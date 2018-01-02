@@ -1,0 +1,19 @@
+{
+  "key": {
+    "algo": "rsa",
+    "size": 4096
+  },
+  "names": [
+    {
+      "O": "etcd",
+      "OU": "etcd Security",
+      "L": "San Francisco",
+      "ST": "California",
+      "C": "USA"
+    }
+  ],
+  "CN": "ca",
+  "ca": {
+    "expiry": "87600h"
+  }
+}

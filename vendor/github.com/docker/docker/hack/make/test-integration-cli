@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+set -e
+
+source "${MAKEDIR}/.go-autogen"
+source hack/make/.integration-test-helpers
+
+# subshell so that we can export PATH without breaking other things
+(
+	bundle .integration-daemon-start
+
+	bundle .integration-daemon-setup
+
+	bundle_test_integration_cli
+
+	bundle .integration-daemon-stop
+
+	if [ "$(go env GOOS)" != 'windows' ]
+	then
+		leftovers=$(ps -ax -o pid,cmd | awk '$2 == "docker-containerd-shim" && $4 ~ /.*\/bundles\/.*\/test-integration-cli/ { print $1 }')
+		if [ -n "$leftovers" ]
+		then
+			ps aux
+			kill -9 $leftovers 2> /dev/null
+			echo "!!!! WARNING you have left over shim(s), Cleanup your test !!!!"
+			exit 1
+		fi
+	fi
+
+) 2>&1 | tee -a "$DEST/test.log"

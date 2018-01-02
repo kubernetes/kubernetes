@@ -1,0 +1,15 @@
+# Configures appc tests at Travis CI (https://travis-ci.org).
+
+language: go
+
+matrix:
+  include:
+    - go: 1.5.3
+      env: GO15VENDOREXPERIMENT=1
+    - go: 1.6.2
+
+# Nothing to install, it's part of vendoring.
+install: true
+
+script:
+ - ./test.sh

@@ -1,0 +1,11 @@
+{
+  "name": "usernames",
+  "in": "path",
+  "description": "usernames to pass",
+  "required": true,
+  "type": "array",
+  "items": {
+    "type": "string"
+  },
+  "collectionFormat": "csv"    
+}

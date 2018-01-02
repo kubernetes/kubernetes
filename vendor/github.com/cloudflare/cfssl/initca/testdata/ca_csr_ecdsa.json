@@ -1,0 +1,18 @@
+{
+  "key": {
+    "algo": "ecdsa",
+    "size": 256
+  },
+  "names": [
+    {
+    "C": "US",
+    "L": "San Francisco",
+    "ST": "California",
+    "O": "CloudFlare, Inc.",
+    "OU": "Test Certificate Authority"
+    }
+  ],
+  "ca": {
+    "expiry": "5m"
+  }
+}

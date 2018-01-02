@@ -1,0 +1,37 @@
+influxd-backup(1)
+=================
+
+NAME
+----
+influxd-backup - Downloads a snapshot of a data node and saves it to disk
+
+SYNOPSIS
+--------
+'influxd backup' [options]
+
+DESCRIPTION
+-----------
+Downloads a snapshot of a data node and saves it to disk.
+
+OPTIONS
+-------
+-host <host:port>::
+  The host to connect to and perform a snapshot of. Defaults to '127.0.0.1:8088'.
+
+-database <name>::
+  The database to backup. Required.
+
+-retention <name>::
+  The retention policy to backup. Optional.
+
+-shard <id>::
+  The shard id to backup. Optional. If specified, '-retention <name>' is required.
+
+-since <2015-12-24T08:12:13>::
+  Do an incremental backup since the passed in time. The time needs to be in the RFC3339 format. Optional.
+
+SEE ALSO
+--------
+*influxd-restore*(1)
+
+include::footer.txt[]

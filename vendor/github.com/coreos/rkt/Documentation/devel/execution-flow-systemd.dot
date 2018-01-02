@@ -1,0 +1,66 @@
+digraph G {
+    graph [fontname = "helvetica"];
+    node [fontname = "Arial", fillcolor="#FFE599", style="filled"];
+    edge [fontname = "monospace"];
+
+    {
+        invokingProcess [shape="node",
+                       label=<<B>systemd-run / service unit</B><BR/>invoking process>, fillcolor="#FFF4D4"]
+        stage0 [shape="node", label=<<B>stage0</B><BR/>rkt>, fillcolor="#FFF4D4"]
+        init [shape="node", label=</init<BR/>"coreos.com/rkt/stage1/run">]
+        ld [shape="node", label="ld-linux-x86-64"]
+        systemdNspawn [shape="node", label=<systemd-nspawn>]
+        systemdMachined [shape="node", label=<systemd-machined>, fillcolor="#FFF4D4"]
+
+        systemd [shape="node",
+                 label=<systemd>]
+      
+        app1 [shape="node",
+              label=<"apps.app.exec"<BR/>app1>]
+      
+        app2 [shape="node",
+              label=<"apps.app.exec"<BR/>app2>]
+
+        journal [shape="node",
+                 label=<systemd-journal>]
+    }
+
+    invokingProcess -> stage0 [label="fork(2)+exec(3)"]
+    stage0 -> init [label="exec(3)"]
+    systemdNspawn -> systemd [label="fork(2)+exec(3)"]
+    systemdNspawn -> systemdMachined [label="register",
+                                      fontname="Arial"]
+    init -> ld [label="exec(3)"]
+    ld -> systemdNspawn
+    systemd -> app1
+    systemd -> app2
+    systemd -> journal [label="fork(2)+exec(3)"]
+
+    invokingProcess
+    stage0
+    systemdMachined
+
+    subgraph cluster_1 {
+        label=<<B>stage1</B>>
+        labeljust="left"
+
+        init
+        ld
+        systemdNspawn
+        systemd
+        journal
+
+        subgraph cluster_2 {
+            label=<<B>stage2</B>>
+            labeljust="left"
+            app1
+        }
+
+        subgraph cluster_3 {
+            label=<<B>stage2</B>>
+            labeljust="left"
+            app2
+        }
+    }
+
+}

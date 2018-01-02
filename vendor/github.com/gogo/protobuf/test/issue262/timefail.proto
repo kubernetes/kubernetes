@@ -1,0 +1,10 @@
+syntax = "proto3";
+
+import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+import "google/protobuf/timestamp.proto";
+
+package timefail;
+
+message TimeFail {
+    google.protobuf.Timestamp time_test = 1 [(gogoproto.stdtime) = true];
+}

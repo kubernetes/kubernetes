@@ -1,0 +1,113 @@
+sudo: false
+
+language: cpp
+
+env:
+  global:
+    - INSTALL_DIR=${TRAVIS_BUILD_DIR}/../install
+    - PROTOC="${INSTALL_DIR}/bin/protoc"
+    - GOPATH=${INSTALL_DIR}/go
+    - MAKE=make
+
+addons:
+  apt:
+    sources: &common_sources
+      - ubuntu-toolchain-r-test
+      - llvm-toolchain-precise-3.6
+    packages: &common_packages
+      - autoconf
+      - automake
+      - build-essential
+      - python-dev
+      - libstdc++-4.9-dev
+      - tcl8.5
+
+matrix:
+  include:
+    - compiler: clang
+      os: osx
+    - compiler: clang
+      os: linux
+      env: REAL_CC=clang-3.6 REAL_CXX=clang++-3.6
+      addons:
+        apt:
+          sources: *common_sources
+          packages:
+          - *common_packages
+          - clang-3.6
+    - compiler: clang
+      os: linux
+      env: REAL_CC=clang-3.6 REAL_CXX=clang++-3.6 SANITIZE="-fsanitize=address -fno-omit-frame-pointer" ASAN_OPTIONS="detect_leaks=1:check_initialization_order=1" LSAN_OPTIONS="suppressions=${HOME}/lsan.supp"
+      addons:
+        apt:
+          sources: *common_sources
+          packages:
+          - *common_packages
+          - clang-3.6
+  exclude:
+    - compiler: gcc
+      os: linux
+      env: REAL_CC=gcc-4.9 REAL_CXX=g++-4.9
+      addons:
+        apt:
+          sources: *common_sources
+          packages:
+          - *common_packages
+          - g++-4.9
+
+cache:
+  apt: true
+  pip: true
+  directories:
+    - $HOME/.cache/pip
+    - $HOME/.ccache
+    - $TRAVIS_BUILD_DIR/../ct
+    - $TRAVIS_BUILD_DIR/../depot_tools
+    - $TRAVIS_BUILD_DIR/../install
+
+
+before_install:
+# Set compiler version overrides if we have any:
+ - if [ "${REAL_CC}" != "" ]; then export CC=${REAL_CC} CXX=${REAL_CXX}; fi
+ - if [ "$TRAVIS_OS_NAME" == "osx" ]; then . ./build/travis.osx.before_install.sh; fi
+# Set up sanitizer blacklists:
+ - echo "leak:InitModule" > ${HOME}/lsan.supp
+ - echo "leak:SetExitLoopHandler" >> ${HOME}/lsan.supp
+ - echo "leak:masterelection_test" >> ${HOME}/lsan.supp
+ - mkdir -p ${INSTALL_DIR}/include ${INSTALL_DIR}/lib ${INSTALL_DIR}/java
+ - echo "INSTALL_DIR=${INSTALL_DIR}"
+ - mkdir -p $GOPATH/src/github.com/google
+ - ln -sf $PWD $GOPATH/src/github.com/google
+ - echo "jars.protobuf = ${INSTALL_DIR}/java/protobuf.jar" > local.properties
+ - echo "protoc.bin = ${PROTOC}" >> local.properties
+
+install:
+ - autoconf --version
+ - pushd ..
+ - mkdir -p ct
+ - wget http://central.maven.org/maven2/com/google/protobuf/protobuf-java/2.6.0/protobuf-java-2.6.0.jar -O ${INSTALL_DIR}/java/protobuf.jar
+ - if [ ! -e depot_tools/gclient ]; then git clone https://chromium.googlesource.com/chromium/tools/depot_tools.git; fi
+ - export PATH="$PATH:/usr/local/bin:"`pwd`/depot_tools
+ - cd ct
+ - ln -s ../certificate-transparency certificate-transparency
+ - if [ ! -f .gclient ]; then gclient config --name="certificate-transparency" --unmanaged https://github.com/${TRAVIS_REPO_SLUG}.git; fi
+ - gclient sync
+ - popd
+ - export PYTHONPATH=$(python -m site --user-site)
+ - pip install --user --upgrade -r python/requirements.txt
+# Sigh, go get -t will fetch part of this package, but doesn't catch the transitive deps so grab it manually:
+ - pushd go
+ - go get github.com/stretchr/testify
+ - go get -v -d -t ./...
+ - popd
+
+script:
+ - getconf _NPROCESSORS_ONLN
+ - ${MAKE} -j$(getconf _NPROCESSORS_ONLN) check VERBOSE=1 V=${ENV_VERBOSE}
+ - ant build test
+ - ${MAKE} -C python test
+ - |
+   pushd ${GOPATH}
+   CGO_CPPFLAGS="-I${INSTALL_DIR}/include" CGO_LDFLAGS="-L${INSTALL_DIR}/lib" go test -v ./src/github.com/google/certificate-transparency/go/...
+   popd
+

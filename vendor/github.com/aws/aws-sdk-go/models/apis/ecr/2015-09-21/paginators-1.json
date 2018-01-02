@@ -1,0 +1,22 @@
+{
+  "pagination": {
+    "ListImages": {
+      "input_token": "nextToken",
+      "output_token": "nextToken",
+      "limit_key": "maxResults",
+      "result_key": "imageIds"
+    },
+    "DescribeImages": {
+      "input_token": "nextToken",
+      "output_token": "nextToken",
+      "limit_key": "maxResults",
+      "result_key": "imageDetails"
+    },
+    "DescribeRepositories": {
+      "input_token": "nextToken",
+      "output_token": "nextToken",
+      "limit_key": "maxResults",
+      "result_key": "repositories"
+    }
+  }
+}

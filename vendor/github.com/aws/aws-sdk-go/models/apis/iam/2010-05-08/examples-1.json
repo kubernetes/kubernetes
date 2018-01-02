@@ -1,0 +1,1191 @@
+{
+  "version": "1.0",
+  "examples": {
+    "AddClientIDToOpenIDConnectProvider": [
+      {
+        "input": {
+          "ClientID": "my-application-ID",
+          "OpenIDConnectProviderArn": "arn:aws:iam::123456789012:oidc-provider/server.example.com"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following add-client-id-to-open-id-connect-provider command adds the client ID my-application-ID to the OIDC provider named server.example.com:",
+        "id": "028e91f4-e2a6-4d59-9e3b-4965a3fb19be",
+        "title": "To add a client ID (audience) to an Open-ID Connect (OIDC) provider"
+      }
+    ],
+    "AddRoleToInstanceProfile": [
+      {
+        "input": {
+          "InstanceProfileName": "Webserver",
+          "RoleName": "S3Access"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following command adds the role named S3Access to the instance profile named Webserver:",
+        "id": "c107fac3-edb6-4827-8a71-8863ec91c81f",
+        "title": "To add a role to an instance profile"
+      }
+    ],
+    "AddUserToGroup": [
+      {
+        "input": {
+          "GroupName": "Admins",
+          "UserName": "Bob"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following command adds an IAM user named Bob to the IAM group named Admins:",
+        "id": "619c7e6b-09f8-4036-857b-51a6ea5027ca",
+        "title": "To add a user to an IAM group"
+      }
+    ],
+    "AttachGroupPolicy": [
+      {
+        "input": {
+          "GroupName": "Finance",
+          "PolicyArn": "arn:aws:iam::aws:policy/ReadOnlyAccess"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following command attaches the AWS managed policy named ReadOnlyAccess to the IAM group named Finance.",
+        "id": "87551489-86f0-45db-9889-759936778f2b",
+        "title": "To attach a managed policy to an IAM group"
+      }
+    ],
+    "AttachRolePolicy": [
+      {
+        "input": {
+          "PolicyArn": "arn:aws:iam::aws:policy/ReadOnlyAccess",
+          "RoleName": "ReadOnlyRole"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following command attaches the AWS managed policy named ReadOnlyAccess to the IAM role named ReadOnlyRole.",
+        "id": "3e1b8c7c-99c8-4fc4-a20c-131fe3f22c7e",
+        "title": "To attach a managed policy to an IAM role"
+      }
+    ],
+    "AttachUserPolicy": [
+      {
+        "input": {
+          "PolicyArn": "arn:aws:iam::aws:policy/AdministratorAccess",
+          "UserName": "Alice"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following command attaches the AWS managed policy named AdministratorAccess to the IAM user named Alice.",
+        "id": "1372ebd8-9475-4b1a-a479-23b6fd4b8b3e",
+        "title": "To attach a managed policy to an IAM user"
+      }
+    ],
+    "ChangePassword": [
+      {
+        "input": {
+          "NewPassword": "]35d/{pB9Fo9wJ",
+          "OldPassword": "3s0K_;xh4~8XXI"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following command changes the password for the current IAM user.",
+        "id": "3a80c66f-bffb-46df-947c-1e8fa583b470",
+        "title": "To change the password for your IAM user"
+      }
+    ],
+    "CreateAccessKey": [
+      {
+        "input": {
+          "UserName": "Bob"
+        },
+        "output": {
+          "AccessKey": {
+            "AccessKeyId": "AKIAIOSFODNN7EXAMPLE",
+            "CreateDate": "2015-03-09T18:39:23.411Z",
+            "SecretAccessKey": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYzEXAMPLEKEY",
+            "Status": "Active",
+            "UserName": "Bob"
+          }
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following command creates an access key (access key ID and secret access key) for the IAM user named Bob.",
+        "id": "1fbb3211-4cf2-41db-8c20-ba58d9f5802d",
+        "title": "To create an access key for an IAM user"
+      }
+    ],
+    "CreateAccountAlias": [
+      {
+        "input": {
+          "AccountAlias": "examplecorp"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following command associates the alias examplecorp to your AWS account.",
+        "id": "5adaf6fb-94fc-4ca2-b825-2fbc2062add1",
+        "title": "To create an account alias"
+      }
+    ],
+    "CreateGroup": [
+      {
+        "input": {
+          "GroupName": "Admins"
+        },
+        "output": {
+          "Group": {
+            "Arn": "arn:aws:iam::123456789012:group/Admins",
+            "CreateDate": "2015-03-09T20:30:24.940Z",
+            "GroupId": "AIDGPMS9RO4H3FEXAMPLE",
+            "GroupName": "Admins",
+            "Path": "/"
+          }
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following command creates an IAM group named Admins.",
+        "id": "d5da2a90-5e69-4ef7-8ae8-4c33dc21fd21",
+        "title": "To create an IAM group"
+      }
+    ],
+    "CreateInstanceProfile": [
+      {
+        "input": {
+          "InstanceProfileName": "Webserver"
+        },
+        "output": {
+          "InstanceProfile": {
+            "Arn": "arn:aws:iam::123456789012:instance-profile/Webserver",
+            "CreateDate": "2015-03-09T20:33:19.626Z",
+            "InstanceProfileId": "AIPAJMBYC7DLSPEXAMPLE",
+            "InstanceProfileName": "Webserver",
+            "Path": "/",
+            "Roles": [
+
+            ]
+          }
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following command creates an instance profile named Webserver that is ready to have a role attached and then be associated with an EC2 instance.",
+        "id": "5d84e6ae-5921-4e39-8454-10232cd9ff9a",
+        "title": "To create an instance profile"
+      }
+    ],
+    "CreateLoginProfile": [
+      {
+        "input": {
+          "Password": "h]6EszR}vJ*m",
+          "PasswordResetRequired": true,
+          "UserName": "Bob"
+        },
+        "output": {
+          "LoginProfile": {
+            "CreateDate": "2015-03-10T20:55:40.274Z",
+            "PasswordResetRequired": true,
+            "UserName": "Bob"
+          }
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following command changes IAM user Bob's password and sets the flag that required Bob to change the password the next time he signs in.",
+        "id": "c63795bc-3444-40b3-89df-83c474ef88be",
+        "title": "To create an instance profile"
+      }
+    ],
+    "CreateOpenIDConnectProvider": [
+      {
+        "input": {
+          "ClientIDList": [
+            "my-application-id"
+          ],
+          "ThumbprintList": [
+            "3768084dfb3d2b68b7897bf5f565da8efEXAMPLE"
+          ],
+          "Url": "https://server.example.com"
+        },
+        "output": {
+          "OpenIDConnectProviderArn": "arn:aws:iam::123456789012:oidc-provider/server.example.com"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example defines a new OIDC provider in IAM with a client ID of my-application-id and pointing at the server with a URL of https://server.example.com.",
+        "id": "4e4a6bff-cc97-4406-922e-0ab4a82cdb63",
+        "title": "To create an instance profile"
+      }
+    ],
+    "CreateRole": [
+      {
+        "input": {
+          "AssumeRolePolicyDocument": "<URL-encoded-JSON>",
+          "Path": "/",
+          "RoleName": "Test-Role"
+        },
+        "output": {
+          "Role": {
+            "Arn": "arn:aws:iam::123456789012:role/Test-Role",
+            "AssumeRolePolicyDocument": "<URL-encoded-JSON>",
+            "CreateDate": "2013-06-07T20:43:32.821Z",
+            "Path": "/",
+            "RoleId": "AKIAIOSFODNN7EXAMPLE",
+            "RoleName": "Test-Role"
+          }
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following command creates a role named Test-Role and attaches a trust policy to it that is provided as a URL-encoded JSON string.",
+        "id": "eaaa4b5f-51f1-4f73-b0d3-30127040eff8",
+        "title": "To create an IAM role"
+      }
+    ],
+    "CreateUser": [
+      {
+        "input": {
+          "UserName": "Bob"
+        },
+        "output": {
+          "User": {
+            "Arn": "arn:aws:iam::123456789012:user/Bob",
+            "CreateDate": "2013-06-08T03:20:41.270Z",
+            "Path": "/",
+            "UserId": "AKIAIOSFODNN7EXAMPLE",
+            "UserName": "Bob"
+          }
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following create-user command creates an IAM user named Bob in the current account.",
+        "id": "eb15f90b-e5f5-4af8-a594-e4e82b181a62",
+        "title": "To create an IAM user"
+      }
+    ],
+    "DeleteAccessKey": [
+      {
+        "input": {
+          "AccessKeyId": "AKIDPMS9RO4H3FEXAMPLE",
+          "UserName": "Bob"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following command deletes one access key (access key ID and secret access key) assigned to the IAM user named Bob.",
+        "id": "61a785a7-d30a-415a-ae18-ab9236e56871",
+        "title": "To delete an access key for an IAM user"
+      }
+    ],
+    "DeleteAccountAlias": [
+      {
+        "input": {
+          "AccountAlias": "mycompany"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following command removes the alias mycompany from the current AWS account:",
+        "id": "7abeca65-04a8-4500-a890-47f1092bf766",
+        "title": "To delete an account alias"
+      }
+    ],
+    "DeleteAccountPasswordPolicy": [
+      {
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following command removes the password policy from the current AWS account:",
+        "id": "9ddf755e-495c-49bc-ae3b-ea6cc9b8ebcf",
+        "title": "To delete the current account password policy"
+      }
+    ],
+    "DeleteGroupPolicy": [
+      {
+        "input": {
+          "GroupName": "Admins",
+          "PolicyName": "ExamplePolicy"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following command deletes the policy named ExamplePolicy from the group named Admins:",
+        "id": "e683f2bd-98a4-4fe0-bb66-33169c692d4a",
+        "title": "To delete a policy from an IAM group"
+      }
+    ],
+    "DeleteInstanceProfile": [
+      {
+        "input": {
+          "InstanceProfileName": "ExampleInstanceProfile"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following command deletes the instance profile named ExampleInstanceProfile",
+        "id": "12d74fb8-3433-49db-8171-a1fc764e354d",
+        "title": "To delete an instance profile"
+      }
+    ],
+    "DeleteLoginProfile": [
+      {
+        "input": {
+          "UserName": "Bob"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following command deletes the password for the IAM user named Bob.",
+        "id": "1fe57059-fc73-42e2-b992-517b7d573b5c",
+        "title": "To delete a password for an IAM user"
+      }
+    ],
+    "DeleteRole": [
+      {
+        "input": {
+          "RoleName": "Test-Role"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following command removes the role named Test-Role.",
+        "id": "053cdf74-9bda-44b8-bdbb-140fd5a32603",
+        "title": "To delete an IAM role"
+      }
+    ],
+    "DeleteRolePolicy": [
+      {
+        "input": {
+          "PolicyName": "ExamplePolicy",
+          "RoleName": "Test-Role"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following command removes the policy named ExamplePolicy from the role named Test-Role.",
+        "id": "9c667336-fde3-462c-b8f3-950800821e27",
+        "title": "To remove a policy from an IAM role"
+      }
+    ],
+    "DeleteSigningCertificate": [
+      {
+        "input": {
+          "CertificateId": "TA7SMP42TDN5Z26OBPJE7EXAMPLE",
+          "UserName": "Anika"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following command deletes the specified signing certificate for the IAM user named Anika.",
+        "id": "e3357586-ba9c-4070-b35b-d1a899b71987",
+        "title": "To delete a signing certificate for an IAM user"
+      }
+    ],
+    "DeleteUser": [
+      {
+        "input": {
+          "UserName": "Bob"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following command removes the IAM user named Bob from the current account.",
+        "id": "a13dc3f9-59fe-42d9-abbb-fb98b204fdf0",
+        "title": "To delete an IAM user"
+      }
+    ],
+    "DeleteUserPolicy": [
+      {
+        "input": {
+          "PolicyName": "ExamplePolicy",
+          "UserName": "Juan"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following delete-user-policy command removes the specified policy from the IAM user named Juan:",
+        "id": "34f07ddc-9bc1-4f52-bc59-cd0a3ccd06c8",
+        "title": "To remove a policy from an IAM user"
+      }
+    ],
+    "DeleteVirtualMFADevice": [
+      {
+        "input": {
+          "SerialNumber": "arn:aws:iam::123456789012:mfa/ExampleName"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following delete-virtual-mfa-device command removes the specified MFA device from the current AWS account.",
+        "id": "2933b08b-dbe7-4b89-b8c1-fdf75feea1ee",
+        "title": "To remove a virtual MFA device"
+      }
+    ],
+    "GetAccountPasswordPolicy": [
+      {
+        "output": {
+          "PasswordPolicy": {
+            "AllowUsersToChangePassword": false,
+            "ExpirePasswords": false,
+            "HardExpiry": false,
+            "MaxPasswordAge": 90,
+            "MinimumPasswordLength": 8,
+            "PasswordReusePrevention": 12,
+            "RequireLowercaseCharacters": false,
+            "RequireNumbers": true,
+            "RequireSymbols": true,
+            "RequireUppercaseCharacters": false
+          }
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following command displays details about the password policy for the current AWS account.",
+        "id": "5e4598c7-c425-431f-8af1-19073b3c4a5f",
+        "title": "To see the current account password policy"
+      }
+    ],
+    "GetAccountSummary": [
+      {
+        "output": {
+          "SummaryMap": {
+            "AccessKeysPerUserQuota": 2,
+            "AccountAccessKeysPresent": 1,
+            "AccountMFAEnabled": 0,
+            "AccountSigningCertificatesPresent": 0,
+            "AttachedPoliciesPerGroupQuota": 10,
+            "AttachedPoliciesPerRoleQuota": 10,
+            "AttachedPoliciesPerUserQuota": 10,
+            "GroupPolicySizeQuota": 5120,
+            "Groups": 15,
+            "GroupsPerUserQuota": 10,
+            "GroupsQuota": 100,
+            "MFADevices": 6,
+            "MFADevicesInUse": 3,
+            "Policies": 8,
+            "PoliciesQuota": 1000,
+            "PolicySizeQuota": 5120,
+            "PolicyVersionsInUse": 22,
+            "PolicyVersionsInUseQuota": 10000,
+            "ServerCertificates": 1,
+            "ServerCertificatesQuota": 20,
+            "SigningCertificatesPerUserQuota": 2,
+            "UserPolicySizeQuota": 2048,
+            "Users": 27,
+            "UsersQuota": 5000,
+            "VersionsPerPolicyQuota": 5
+          }
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following command returns information about the IAM entity quotas and usage in the current AWS account.",
+        "id": "9d8447af-f344-45de-8219-2cebc3cce7f2",
+        "title": "To get information about IAM entity quotas and usage in the current account"
+      }
+    ],
+    "GetInstanceProfile": [
+      {
+        "input": {
+          "InstanceProfileName": "ExampleInstanceProfile"
+        },
+        "output": {
+          "InstanceProfile": {
+            "Arn": "arn:aws:iam::336924118301:instance-profile/ExampleInstanceProfile",
+            "CreateDate": "2013-06-12T23:52:02Z",
+            "InstanceProfileId": "AID2MAB8DPLSRHEXAMPLE",
+            "InstanceProfileName": "ExampleInstanceProfile",
+            "Path": "/",
+            "Roles": [
+              {
+                "Arn": "arn:aws:iam::336924118301:role/Test-Role",
+                "AssumeRolePolicyDocument": "<URL-encoded-JSON>",
+                "CreateDate": "2013-01-09T06:33:26Z",
+                "Path": "/",
+                "RoleId": "AIDGPMS9RO4H3FEXAMPLE",
+                "RoleName": "Test-Role"
+              }
+            ]
+          }
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following command gets information about the instance profile named ExampleInstanceProfile.",
+        "id": "463b9ba5-18cc-4608-9ccb-5a7c6b6e5fe7",
+        "title": "To get information about an instance profile"
+      }
+    ],
+    "GetLoginProfile": [
+      {
+        "input": {
+          "UserName": "Anika"
+        },
+        "output": {
+          "LoginProfile": {
+            "CreateDate": "2012-09-21T23:03:39Z",
+            "UserName": "Anika"
+          }
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following command gets information about the password for the IAM user named Anika.",
+        "id": "d6b580cc-909f-4925-9caa-d425cbc1ad47",
+        "title": "To get password information for an IAM user"
+      }
+    ],
+    "GetRole": [
+      {
+        "input": {
+          "RoleName": "Test-Role"
+        },
+        "output": {
+          "Role": {
+            "Arn": "arn:aws:iam::123456789012:role/Test-Role",
+            "AssumeRolePolicyDocument": "<URL-encoded-JSON>",
+            "CreateDate": "2013-04-18T05:01:58Z",
+            "Path": "/",
+            "RoleId": "AIDIODR4TAW7CSEXAMPLE",
+            "RoleName": "Test-Role"
+          }
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following command gets information about the role named Test-Role.",
+        "id": "5b7d03a6-340c-472d-aa77-56425950d8b0",
+        "title": "To get information about an IAM role"
+      }
+    ],
+    "GetUser": [
+      {
+        "input": {
+          "UserName": "Bob"
+        },
+        "output": {
+          "User": {
+            "Arn": "arn:aws:iam::123456789012:user/Bob",
+            "CreateDate": "2012-09-21T23:03:13Z",
+            "Path": "/",
+            "UserId": "AKIAIOSFODNN7EXAMPLE",
+            "UserName": "Bob"
+          }
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following command gets information about the IAM user named Bob.",
+        "id": "ede000a1-9e4c-40db-bd0a-d4f95e41a6ab",
+        "title": "To get information about an IAM user"
+      }
+    ],
+    "ListAccessKeys": [
+      {
+        "input": {
+          "UserName": "Alice"
+        },
+        "output": {
+          "AccessKeyMetadata": [
+            {
+              "AccessKeyId": "AKIA111111111EXAMPLE",
+              "CreateDate": "2016-12-01T22:19:58Z",
+              "Status": "Active",
+              "UserName": "Alice"
+            },
+            {
+              "AccessKeyId": "AKIA222222222EXAMPLE",
+              "CreateDate": "2016-12-01T22:20:01Z",
+              "Status": "Active",
+              "UserName": "Alice"
+            }
+          ]
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following command lists the access keys IDs for the IAM user named Alice.",
+        "id": "15571463-ebea-411a-a021-1c76bd2a3625",
+        "title": "To list the access key IDs for an IAM user"
+      }
+    ],
+    "ListAccountAliases": [
+      {
+        "input": {
+        },
+        "output": {
+          "AccountAliases": [
+            "exmaple-corporation"
+          ]
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following command lists the aliases for the current account.",
+        "id": "e27b457a-16f9-4e05-a006-3df7b3472741",
+        "title": "To list account aliases"
+      }
+    ],
+    "ListGroupPolicies": [
+      {
+        "input": {
+          "GroupName": "Admins"
+        },
+        "output": {
+          "PolicyNames": [
+            "AdminRoot",
+            "KeyPolicy"
+          ]
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following command lists the names of in-line policies that are embedded in the IAM group named Admins.",
+        "id": "02de5095-2410-4d3a-ac1b-cc40234af68f",
+        "title": "To list the in-line policies for an IAM group"
+      }
+    ],
+    "ListGroups": [
+      {
+        "input": {
+        },
+        "output": {
+          "Groups": [
+            {
+              "Arn": "arn:aws:iam::123456789012:group/Admins",
+              "CreateDate": "2016-12-15T21:40:08.121Z",
+              "GroupId": "AGPA1111111111EXAMPLE",
+              "GroupName": "Admins",
+              "Path": "/division_abc/subdivision_xyz/"
+            },
+            {
+              "Arn": "arn:aws:iam::123456789012:group/division_abc/subdivision_xyz/product_1234/engineering/Test",
+              "CreateDate": "2016-11-30T14:10:01.156Z",
+              "GroupId": "AGP22222222222EXAMPLE",
+              "GroupName": "Test",
+              "Path": "/division_abc/subdivision_xyz/product_1234/engineering/"
+            },
+            {
+              "Arn": "arn:aws:iam::123456789012:group/division_abc/subdivision_xyz/product_1234/Managers",
+              "CreateDate": "2016-06-12T20:14:52.032Z",
+              "GroupId": "AGPI3333333333EXAMPLE",
+              "GroupName": "Managers",
+              "Path": "/division_abc/subdivision_xyz/product_1234/"
+            }
+          ]
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following command lists the IAM groups in the current account:",
+        "id": "b3ab1380-2a21-42fb-8e85-503f65512c66",
+        "title": "To list the IAM groups for the current account"
+      }
+    ],
+    "ListGroupsForUser": [
+      {
+        "input": {
+          "UserName": "Bob"
+        },
+        "output": {
+          "Groups": [
+            {
+              "Arn": "arn:aws:iam::123456789012:group/division_abc/subdivision_xyz/product_1234/engineering/Test",
+              "CreateDate": "2016-11-30T14:10:01.156Z",
+              "GroupId": "AGP2111111111EXAMPLE",
+              "GroupName": "Test",
+              "Path": "/division_abc/subdivision_xyz/product_1234/engineering/"
+            },
+            {
+              "Arn": "arn:aws:iam::123456789012:group/division_abc/subdivision_xyz/product_1234/Managers",
+              "CreateDate": "2016-06-12T20:14:52.032Z",
+              "GroupId": "AGPI222222222SEXAMPLE",
+              "GroupName": "Managers",
+              "Path": "/division_abc/subdivision_xyz/product_1234/"
+            }
+          ]
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following command displays the groups that the IAM user named Bob belongs to.",
+        "id": "278ec2ee-fc28-4136-83fb-433af0ae46a2",
+        "title": "To list the groups that an IAM user belongs to"
+      }
+    ],
+    "ListSigningCertificates": [
+      {
+        "input": {
+          "UserName": "Bob"
+        },
+        "output": {
+          "Certificates": [
+            {
+              "CertificateBody": "-----BEGIN CERTIFICATE-----<certificate-body>-----END CERTIFICATE-----",
+              "CertificateId": "TA7SMP42TDN5Z26OBPJE7EXAMPLE",
+              "Status": "Active",
+              "UploadDate": "2013-06-06T21:40:08Z",
+              "UserName": "Bob"
+            }
+          ]
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following command lists the signing certificates for the IAM user named Bob.",
+        "id": "b4c10256-4fc9-457e-b3fd-4a110d4d73dc",
+        "title": "To list the signing certificates for an IAM user"
+      }
+    ],
+    "ListUsers": [
+      {
+        "input": {
+        },
+        "output": {
+          "Users": [
+            {
+              "Arn": "arn:aws:iam::123456789012:user/division_abc/subdivision_xyz/engineering/Juan",
+              "CreateDate": "2012-09-05T19:38:48Z",
+              "PasswordLastUsed": "2016-09-08T21:47:36Z",
+              "Path": "/division_abc/subdivision_xyz/engineering/",
+              "UserId": "AID2MAB8DPLSRHEXAMPLE",
+              "UserName": "Juan"
+            },
+            {
+              "Arn": "arn:aws:iam::123456789012:user/division_abc/subdivision_xyz/engineering/Anika",
+              "CreateDate": "2014-04-09T15:43:45Z",
+              "PasswordLastUsed": "2016-09-24T16:18:07Z",
+              "Path": "/division_abc/subdivision_xyz/engineering/",
+              "UserId": "AIDIODR4TAW7CSEXAMPLE",
+              "UserName": "Anika"
+            }
+          ]
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following command lists the IAM users in the current account.",
+        "id": "9edfbd73-03d8-4d8a-9a79-76c85e8c8298",
+        "title": "To list IAM users"
+      }
+    ],
+    "ListVirtualMFADevices": [
+      {
+        "input": {
+        },
+        "output": {
+          "VirtualMFADevices": [
+            {
+              "SerialNumber": "arn:aws:iam::123456789012:mfa/ExampleMFADevice"
+            },
+            {
+              "SerialNumber": "arn:aws:iam::123456789012:mfa/Juan"
+            }
+          ]
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following command lists the virtual MFA devices that have been configured for the current account.",
+        "id": "54f9ac18-5100-4070-bec4-fe5f612710d5",
+        "title": "To list virtual MFA devices"
+      }
+    ],
+    "PutGroupPolicy": [
+      {
+        "input": {
+          "GroupName": "Admins",
+          "PolicyDocument": "{\"Version\":\"2012-10-17\",\"Statement\":{\"Effect\":\"Allow\",\"Action\":\"*\",\"Resource\":\"*\"}}",
+          "PolicyName": "AllPerms"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following command adds a policy named AllPerms to the IAM group named Admins.",
+        "id": "4bc17418-758f-4d0f-ab0c-4d00265fec2e",
+        "title": "To add a policy to a group"
+      }
+    ],
+    "PutRolePolicy": [
+      {
+        "input": {
+          "PolicyDocument": "{\"Version\":\"2012-10-17\",\"Statement\":{\"Effect\":\"Allow\",\"Action\":\"s3:*\",\"Resource\":\"*\"}}",
+          "PolicyName": "S3AccessPolicy",
+          "RoleName": "S3Access"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following command adds a permissions policy to the role named Test-Role.",
+        "id": "de62fd00-46c7-4601-9e0d-71d5fbb11ecb",
+        "title": "To attach a permissions policy to an IAM role"
+      }
+    ],
+    "PutUserPolicy": [
+      {
+        "input": {
+          "PolicyDocument": "{\"Version\":\"2012-10-17\",\"Statement\":{\"Effect\":\"Allow\",\"Action\":\"*\",\"Resource\":\"*\"}}",
+          "PolicyName": "AllAccessPolicy",
+          "UserName": "Bob"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following command attaches a policy to the IAM user named Bob.",
+        "id": "2551ffc6-3576-4d39-823f-30b60bffc2c7",
+        "title": "To attach a policy to an IAM user"
+      }
+    ],
+    "RemoveRoleFromInstanceProfile": [
+      {
+        "input": {
+          "InstanceProfileName": "ExampleInstanceProfile",
+          "RoleName": "Test-Role"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following command removes the role named Test-Role from the instance profile named ExampleInstanceProfile.",
+        "id": "6d9f46f1-9f4a-4873-b403-51a85c5c627c",
+        "title": "To remove a role from an instance profile"
+      }
+    ],
+    "RemoveUserFromGroup": [
+      {
+        "input": {
+          "GroupName": "Admins",
+          "UserName": "Bob"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following command removes the user named Bob from the IAM group named Admins.",
+        "id": "fb54d5b4-0caf-41d8-af0e-10a84413f174",
+        "title": "To remove a user from an IAM group"
+      }
+    ],
+    "UpdateAccessKey": [
+      {
+        "input": {
+          "AccessKeyId": "AKIAIOSFODNN7EXAMPLE",
+          "Status": "Inactive",
+          "UserName": "Bob"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following command deactivates the specified access key (access key ID and secret access key) for the IAM user named Bob.",
+        "id": "02b556fd-e673-49b7-ab6b-f2f9035967d0",
+        "title": "To activate or deactivate an access key for an IAM user"
+      }
+    ],
+    "UpdateAccountPasswordPolicy": [
+      {
+        "input": {
+          "MinimumPasswordLength": 8,
+          "RequireNumbers": true
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following command sets the password policy to require a minimum length of eight characters and to require one or more numbers in the password:",
+        "id": "c263a1af-37dc-4423-8dba-9790284ef5e0",
+        "title": "To set or change the current account password policy"
+      }
+    ],
+    "UpdateAssumeRolePolicy": [
+      {
+        "input": {
+          "PolicyDocument": "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"Service\":[\"ec2.amazonaws.com\"]},\"Action\":[\"sts:AssumeRole\"]}]}",
+          "RoleName": "S3AccessForEC2Instances"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following command updates the role trust policy for the role named Test-Role:",
+        "id": "c9150063-d953-4e99-9576-9685872006c6",
+        "title": "To update the trust policy for an IAM role"
+      }
+    ],
+    "UpdateGroup": [
+      {
+        "input": {
+          "GroupName": "Test",
+          "NewGroupName": "Test-1"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following command changes the name of the IAM group Test to Test-1.",
+        "id": "f0cf1662-91ae-4278-a80e-7db54256ccba",
+        "title": "To rename an IAM group"
+      }
+    ],
+    "UpdateLoginProfile": [
+      {
+        "input": {
+          "Password": "SomeKindOfPassword123!@#",
+          "UserName": "Bob"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following command creates or changes the password for the IAM user named Bob.",
+        "id": "036d9498-ecdb-4ed6-a8d8-366c383d1487",
+        "title": "To change the password for an IAM user"
+      }
+    ],
+    "UpdateSigningCertificate": [
+      {
+        "input": {
+          "CertificateId": "TA7SMP42TDN5Z26OBPJE7EXAMPLE",
+          "Status": "Inactive",
+          "UserName": "Bob"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following command changes the status of a signing certificate for a user named Bob to Inactive.",
+        "id": "829aee7b-efc5-4b3b-84a5-7f899b38018d",
+        "title": "To change the active status of a signing certificate for an IAM user"
+      }
+    ],
+    "UpdateUser": [
+      {
+        "input": {
+          "NewUserName": "Robert",
+          "UserName": "Bob"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following command changes the name of the IAM user Bob to Robert. It does not change the user's path.",
+        "id": "275d53ed-347a-44e6-b7d0-a96276154352",
+        "title": "To change an IAM user's name"
+      }
+    ],
+    "UploadServerCertificate": [
+      {
+        "input": {
+          "CertificateBody": "-----BEGIN CERTIFICATE-----<a very long certificate text string>-----END CERTIFICATE-----",
+          "Path": "/company/servercerts/",
+          "PrivateKey": "-----BEGIN DSA PRIVATE KEY-----<a very long private key string>-----END DSA PRIVATE KEY-----",
+          "ServerCertificateName": "ProdServerCert"
+        },
+        "output": {
+          "ServerCertificateMetadata": {
+            "Arn": "arn:aws:iam::123456789012:server-certificate/company/servercerts/ProdServerCert",
+            "Expiration": "2012-05-08T01:02:03.004Z",
+            "Path": "/company/servercerts/",
+            "ServerCertificateId": "ASCA1111111111EXAMPLE",
+            "ServerCertificateName": "ProdServerCert",
+            "UploadDate": "2010-05-08T01:02:03.004Z"
+          }
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following upload-server-certificate command uploads a server certificate to your AWS account:",
+        "id": "06eab6d1-ebf2-4bd9-839d-f7508b9a38b6",
+        "title": "To upload a server certificate to your AWS account"
+      }
+    ],
+    "UploadSigningCertificate": [
+      {
+        "input": {
+          "CertificateBody": "-----BEGIN CERTIFICATE-----<certificate-body>-----END CERTIFICATE-----",
+          "UserName": "Bob"
+        },
+        "output": {
+          "Certificate": {
+            "CertificateBody": "-----BEGIN CERTIFICATE-----<certificate-body>-----END CERTIFICATE-----",
+            "CertificateId": "ID123456789012345EXAMPLE",
+            "Status": "Active",
+            "UploadDate": "2015-06-06T21:40:08.121Z",
+            "UserName": "Bob"
+          }
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following command uploads a signing certificate for the IAM user named Bob.",
+        "id": "e67489b6-7b73-4e30-9ed3-9a9e0231e458",
+        "title": "To upload a signing certificate for an IAM user"
+      }
+    ]
+  }
+}

@@ -1,0 +1,6 @@
+title = "LibNetwork Configuration file"
+
+[cluster]
+  discovery = "consul://localhost:8500"
+  Address = "6.5.5.5"
+  Heartbeat = 3

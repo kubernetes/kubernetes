@@ -1,0 +1,37 @@
+influxd-restore(1)
+==================
+
+NAME
+----
+influxd-restore - Restores the metastore, databases, retention policies, or specific shards
+
+SYNOPSIS
+--------
+'influxd restore' [options] PATH
+
+DESCRIPTION
+-----------
+Uses backups from the PATH to restore the metastore, databases, retention policies, or specific shards. The InfluxDB process must not be running during a restore.
+
+OPTIONS
+-------
+-metadir <path>::
+  If set, the metastore will be recovered to the given path. Optional.
+
+-datadir <path>::
+  If set, the restore process will recover the specified database, retention policy, or shard to the given directory. Optional.
+
+-database <name>::
+  Will restore the database TSM files. Required if no metadir is given. Optional.
+
+-retention <name>::
+  Will restore the retention policy's TSM files. If given, database is required. Optional.
+
+-shard <id>::
+  Will restore the shard's TSM files. If given, database and retention are required. Optional.
+
+SEE ALSO
+--------
+*influxd-backup*(1)
+
+include::footer.txt[]

@@ -1,0 +1,280 @@
+---
+version: 1
+rwmutex: {}
+interactions:
+- request:
+    body: ""
+    form: {}
+    headers:
+      Authorization:
+      - SharedKey golangrocksonazure:9JN+nRwe2PqLaVx4Ni9qQ0FkxwJvu2wOpGt+2y9Z+w8=
+      User-Agent:
+      - Go/go1.9beta1 (amd64-windows) azure-storage-go/10.0.2 api-version/2016-05-31
+        queue
+      x-ms-date:
+      - Thu, 20 Jul 2017 23:34:09 GMT
+      x-ms-version:
+      - 2016-05-31
+    url: https://golangrocksonazure.queue.core.windows.net/queue-154storagequeuesuitetestgetmetadatagetapproximatecount
+    method: PUT
+  response:
+    body: ""
+    headers:
+      Date:
+      - Thu, 20 Jul 2017 23:34:08 GMT
+      Server:
+      - Windows-Azure-Queue/1.0 Microsoft-HTTPAPI/2.0
+      X-Ms-Request-Id:
+      - 3fb9b236-0003-00da-5ab0-011674000000
+      X-Ms-Version:
+      - 2016-05-31
+    status: 201 Created
+    code: 201
+- request:
+    body: ""
+    form: {}
+    headers:
+      Authorization:
+      - SharedKey golangrocksonazure:fI2wimqrN97/396LtIZ3IkscZFFgf63WUmAoD4PoWuU=
+      User-Agent:
+      - Go/go1.9beta1 (amd64-windows) azure-storage-go/10.0.2 api-version/2016-05-31
+        queue
+      x-ms-date:
+      - Thu, 20 Jul 2017 23:34:09 GMT
+      x-ms-version:
+      - 2016-05-31
+    url: https://golangrocksonazure.queue.core.windows.net/queue-154storagequeuesuitetestgetmetadatagetapproximatecount?comp=metadata
+    method: GET
+  response:
+    body: ""
+    headers:
+      Cache-Control:
+      - no-cache
+      Date:
+      - Thu, 20 Jul 2017 23:34:08 GMT
+      Server:
+      - Windows-Azure-Queue/1.0 Microsoft-HTTPAPI/2.0
+      X-Ms-Approximate-Messages-Count:
+      - "0"
+      X-Ms-Request-Id:
+      - 3fb9b238-0003-00da-5bb0-011674000000
+      X-Ms-Version:
+      - 2016-05-31
+    status: 200 OK
+    code: 200
+- request:
+    body: ""
+    form: {}
+    headers:
+      Authorization:
+      - SharedKey golangrocksonazure:6TevVkCDKGyOJRTE40R2UapnUpeoBWKDjbCAwSWt19k=
+      User-Agent:
+      - Go/go1.9beta1 (amd64-windows) azure-storage-go/10.0.2 api-version/2016-05-31
+        queue
+      x-ms-date:
+      - Thu, 20 Jul 2017 23:34:09 GMT
+      x-ms-version:
+      - 2016-05-31
+    url: https://golangrocksonazure.queue.core.windows.net/queue-254storagequeuesuitetestgetmetadatagetapproximatecount
+    method: PUT
+  response:
+    body: ""
+    headers:
+      Date:
+      - Thu, 20 Jul 2017 23:34:08 GMT
+      Server:
+      - Windows-Azure-Queue/1.0 Microsoft-HTTPAPI/2.0
+      X-Ms-Request-Id:
+      - 3fb9b239-0003-00da-5cb0-011674000000
+      X-Ms-Version:
+      - 2016-05-31
+    status: 201 Created
+    code: 201
+- request:
+    body: <QueueMessage><MessageText>lolrofl</MessageText></QueueMessage>
+    form: {}
+    headers:
+      Authorization:
+      - SharedKey golangrocksonazure:piHm7RP9HDbQbgHwvnGDB9g0f4P/RGF9bDfrgQaly9c=
+      Content-Length:
+      - "63"
+      User-Agent:
+      - Go/go1.9beta1 (amd64-windows) azure-storage-go/10.0.2 api-version/2016-05-31
+        queue
+      x-ms-date:
+      - Thu, 20 Jul 2017 23:34:09 GMT
+      x-ms-version:
+      - 2016-05-31
+    url: https://golangrocksonazure.queue.core.windows.net/queue-254storagequeuesuitetestgetmetadatagetapproximatecount/messages
+    method: POST
+  response:
+    body: "\uFEFF\x3C\x3F\x78\x6D\x6C\x20\x76\x65\x72\x73\x69\x6F\x6E\x3D\"\x31\x2E\x30\"\x20\x65\x6E\x63\x6F\x64\x69\x6E\x67\x3D\"\x75\x74\x66\x2D\x38\"\x3F\x3E\x3C\x51\x75\x65\x75\x65\x4D\x65\x73\x73\x61\x67\x65\x73\x4C\x69\x73\x74\x3E\x3C\x51\x75\x65\x75\x65\x4D\x65\x73\x73\x61\x67\x65\x3E\x3C\x4D\x65\x73\x73\x61\x67\x65\x49\x64\x3E\x62\x62\x32\x34\x38\x35\x62\x33\x2D\x62\x34\x37\x36\x2D\x34\x37\x63\x62\x2D\x62\x36\x63\x39\x2D\x36\x30\x37\x66\x35\x35\x36\x65\x39\x36\x63\x62\x3C\x2F\x4D\x65\x73\x73\x61\x67\x65\x49\x64\x3E\x3C\x49\x6E\x73\x65\x72\x74\x69\x6F\x6E\x54\x69\x6D\x65\x3E\x54\x68\x75\x2C\x20\x32\x30\x20\x4A\x75\x6C\x20\x32\x30\x31\x37\x20\x32\x33\x3A\x33\x34\x3A\x30\x39\x20\x47\x4D\x54\x3C\x2F\x49\x6E\x73\x65\x72\x74\x69\x6F\x6E\x54\x69\x6D\x65\x3E\x3C\x45\x78\x70\x69\x72\x61\x74\x69\x6F\x6E\x54\x69\x6D\x65\x3E\x54\x68\x75\x2C\x20\x32\x37\x20\x4A\x75\x6C\x20\x32\x30\x31\x37\x20\x32\x33\x3A\x33\x34\x3A\x30\x39\x20\x47\x4D\x54\x3C\x2F\x45\x78\x70\x69\x72\x61\x74\x69\x6F\x6E\x54\x69\x6D\x65\x3E\x3C\x50\x6F\x70\x52\x65\x63\x65\x69\x70\x74\x3E\x41\x67\x41\x41\x41\x41\x4D\x41\x41\x41\x41\x41\x41\x41\x41\x41\x36\x67\x70\x49\x72\x37\x41\x42\x30\x77\x45\x3D\x3C\x2F\x50\x6F\x70\x52\x65\x63\x65\x69\x70\x74\x3E\x3C\x54\x69\x6D\x65\x4E\x65\x78\x74\x56\x69\x73\x69\x62\x6C\x65\x3E\x54\x68\x75\x2C\x20\x32\x30\x20\x4A\x75\x6C\x20\x32\x30\x31\x37\x20\x32\x33\x3A\x33\x34\x3A\x30\x39\x20\x47\x4D\x54\x3C\x2F\x54\x69\x6D\x65\x4E\x65\x78\x74\x56\x69\x73\x69\x62\x6C\x65\x3E\x3C\x2F\x51\x75\x65\x75\x65\x4D\x65\x73\x73\x61\x67\x65\x3E\x3C\x2F\x51\x75\x65\x75\x65\x4D\x65\x73\x73\x61\x67\x65\x73\x4C\x69\x73\x74\x3E"
+    headers:
+      Content-Type:
+      - application/xml
+      Date:
+      - Thu, 20 Jul 2017 23:34:08 GMT
+      Server:
+      - Windows-Azure-Queue/1.0 Microsoft-HTTPAPI/2.0
+      X-Ms-Request-Id:
+      - 3fb9b23b-0003-00da-5db0-011674000000
+      X-Ms-Version:
+      - 2016-05-31
+    status: 201 Created
+    code: 201
+- request:
+    body: <QueueMessage><MessageText>lolrofl</MessageText></QueueMessage>
+    form: {}
+    headers:
+      Authorization:
+      - SharedKey golangrocksonazure:piHm7RP9HDbQbgHwvnGDB9g0f4P/RGF9bDfrgQaly9c=
+      Content-Length:
+      - "63"
+      User-Agent:
+      - Go/go1.9beta1 (amd64-windows) azure-storage-go/10.0.2 api-version/2016-05-31
+        queue
+      x-ms-date:
+      - Thu, 20 Jul 2017 23:34:09 GMT
+      x-ms-version:
+      - 2016-05-31
+    url: https://golangrocksonazure.queue.core.windows.net/queue-254storagequeuesuitetestgetmetadatagetapproximatecount/messages
+    method: POST
+  response:
+    body: "\uFEFF\x3C\x3F\x78\x6D\x6C\x20\x76\x65\x72\x73\x69\x6F\x6E\x3D\"\x31\x2E\x30\"\x20\x65\x6E\x63\x6F\x64\x69\x6E\x67\x3D\"\x75\x74\x66\x2D\x38\"\x3F\x3E\x3C\x51\x75\x65\x75\x65\x4D\x65\x73\x73\x61\x67\x65\x73\x4C\x69\x73\x74\x3E\x3C\x51\x75\x65\x75\x65\x4D\x65\x73\x73\x61\x67\x65\x3E\x3C\x4D\x65\x73\x73\x61\x67\x65\x49\x64\x3E\x61\x37\x30\x34\x35\x65\x63\x38\x2D\x39\x30\x30\x32\x2D\x34\x30\x30\x62\x2D\x39\x65\x65\x33\x2D\x31\x63\x63\x31\x66\x61\x36\x38\x62\x63\x35\x65\x3C\x2F\x4D\x65\x73\x73\x61\x67\x65\x49\x64\x3E\x3C\x49\x6E\x73\x65\x72\x74\x69\x6F\x6E\x54\x69\x6D\x65\x3E\x54\x68\x75\x2C\x20\x32\x30\x20\x4A\x75\x6C\x20\x32\x30\x31\x37\x20\x32\x33\x3A\x33\x34\x3A\x30\x39\x20\x47\x4D\x54\x3C\x2F\x49\x6E\x73\x65\x72\x74\x69\x6F\x6E\x54\x69\x6D\x65\x3E\x3C\x45\x78\x70\x69\x72\x61\x74\x69\x6F\x6E\x54\x69\x6D\x65\x3E\x54\x68\x75\x2C\x20\x32\x37\x20\x4A\x75\x6C\x20\x32\x30\x31\x37\x20\x32\x33\x3A\x33\x34\x3A\x30\x39\x20\x47\x4D\x54\x3C\x2F\x45\x78\x70\x69\x72\x61\x74\x69\x6F\x6E\x54\x69\x6D\x65\x3E\x3C\x50\x6F\x70\x52\x65\x63\x65\x69\x70\x74\x3E\x41\x67\x41\x41\x41\x41\x4D\x41\x41\x41\x41\x41\x41\x41\x41\x41\x75\x6D\x70\x4A\x72\x37\x41\x42\x30\x77\x45\x3D\x3C\x2F\x50\x6F\x70\x52\x65\x63\x65\x69\x70\x74\x3E\x3C\x54\x69\x6D\x65\x4E\x65\x78\x74\x56\x69\x73\x69\x62\x6C\x65\x3E\x54\x68\x75\x2C\x20\x32\x30\x20\x4A\x75\x6C\x20\x32\x30\x31\x37\x20\x32\x33\x3A\x33\x34\x3A\x30\x39\x20\x47\x4D\x54\x3C\x2F\x54\x69\x6D\x65\x4E\x65\x78\x74\x56\x69\x73\x69\x62\x6C\x65\x3E\x3C\x2F\x51\x75\x65\x75\x65\x4D\x65\x73\x73\x61\x67\x65\x3E\x3C\x2F\x51\x75\x65\x75\x65\x4D\x65\x73\x73\x61\x67\x65\x73\x4C\x69\x73\x74\x3E"
+    headers:
+      Content-Type:
+      - application/xml
+      Date:
+      - Thu, 20 Jul 2017 23:34:08 GMT
+      Server:
+      - Windows-Azure-Queue/1.0 Microsoft-HTTPAPI/2.0
+      X-Ms-Request-Id:
+      - 3fb9b23c-0003-00da-5eb0-011674000000
+      X-Ms-Version:
+      - 2016-05-31
+    status: 201 Created
+    code: 201
+- request:
+    body: <QueueMessage><MessageText>lolrofl</MessageText></QueueMessage>
+    form: {}
+    headers:
+      Authorization:
+      - SharedKey golangrocksonazure:piHm7RP9HDbQbgHwvnGDB9g0f4P/RGF9bDfrgQaly9c=
+      Content-Length:
+      - "63"
+      User-Agent:
+      - Go/go1.9beta1 (amd64-windows) azure-storage-go/10.0.2 api-version/2016-05-31
+        queue
+      x-ms-date:
+      - Thu, 20 Jul 2017 23:34:09 GMT
+      x-ms-version:
+      - 2016-05-31
+    url: https://golangrocksonazure.queue.core.windows.net/queue-254storagequeuesuitetestgetmetadatagetapproximatecount/messages
+    method: POST
+  response:
+    body: "\uFEFF\x3C\x3F\x78\x6D\x6C\x20\x76\x65\x72\x73\x69\x6F\x6E\x3D\"\x31\x2E\x30\"\x20\x65\x6E\x63\x6F\x64\x69\x6E\x67\x3D\"\x75\x74\x66\x2D\x38\"\x3F\x3E\x3C\x51\x75\x65\x75\x65\x4D\x65\x73\x73\x61\x67\x65\x73\x4C\x69\x73\x74\x3E\x3C\x51\x75\x65\x75\x65\x4D\x65\x73\x73\x61\x67\x65\x3E\x3C\x4D\x65\x73\x73\x61\x67\x65\x49\x64\x3E\x65\x36\x65\x30\x33\x63\x63\x61\x2D\x36\x64\x34\x39\x2D\x34\x64\x35\x65\x2D\x39\x65\x37\x36\x2D\x36\x61\x37\x66\x32\x36\x64\x63\x61\x32\x31\x63\x3C\x2F\x4D\x65\x73\x73\x61\x67\x65\x49\x64\x3E\x3C\x49\x6E\x73\x65\x72\x74\x69\x6F\x6E\x54\x69\x6D\x65\x3E\x54\x68\x75\x2C\x20\x32\x30\x20\x4A\x75\x6C\x20\x32\x30\x31\x37\x20\x32\x33\x3A\x33\x34\x3A\x30\x39\x20\x47\x4D\x54\x3C\x2F\x49\x6E\x73\x65\x72\x74\x69\x6F\x6E\x54\x69\x6D\x65\x3E\x3C\x45\x78\x70\x69\x72\x61\x74\x69\x6F\x6E\x54\x69\x6D\x65\x3E\x54\x68\x75\x2C\x20\x32\x37\x20\x4A\x75\x6C\x20\x32\x30\x31\x37\x20\x32\x33\x3A\x33\x34\x3A\x30\x39\x20\x47\x4D\x54\x3C\x2F\x45\x78\x70\x69\x72\x61\x74\x69\x6F\x6E\x54\x69\x6D\x65\x3E\x3C\x50\x6F\x70\x52\x65\x63\x65\x69\x70\x74\x3E\x41\x67\x41\x41\x41\x41\x4D\x41\x41\x41\x41\x41\x41\x41\x41\x41\x68\x73\x70\x4B\x72\x37\x41\x42\x30\x77\x45\x3D\x3C\x2F\x50\x6F\x70\x52\x65\x63\x65\x69\x70\x74\x3E\x3C\x54\x69\x6D\x65\x4E\x65\x78\x74\x56\x69\x73\x69\x62\x6C\x65\x3E\x54\x68\x75\x2C\x20\x32\x30\x20\x4A\x75\x6C\x20\x32\x30\x31\x37\x20\x32\x33\x3A\x33\x34\x3A\x30\x39\x20\x47\x4D\x54\x3C\x2F\x54\x69\x6D\x65\x4E\x65\x78\x74\x56\x69\x73\x69\x62\x6C\x65\x3E\x3C\x2F\x51\x75\x65\x75\x65\x4D\x65\x73\x73\x61\x67\x65\x3E\x3C\x2F\x51\x75\x65\x75\x65\x4D\x65\x73\x73\x61\x67\x65\x73\x4C\x69\x73\x74\x3E"
+    headers:
+      Content-Type:
+      - application/xml
+      Date:
+      - Thu, 20 Jul 2017 23:34:08 GMT
+      Server:
+      - Windows-Azure-Queue/1.0 Microsoft-HTTPAPI/2.0
+      X-Ms-Request-Id:
+      - 3fb9b23d-0003-00da-5fb0-011674000000
+      X-Ms-Version:
+      - 2016-05-31
+    status: 201 Created
+    code: 201
+- request:
+    body: ""
+    form: {}
+    headers:
+      Authorization:
+      - SharedKey golangrocksonazure:V4hC3XWOpzuTJ0n1OQYvIEJO+vfpfbN7hNvKd7Dlm1M=
+      User-Agent:
+      - Go/go1.9beta1 (amd64-windows) azure-storage-go/10.0.2 api-version/2016-05-31
+        queue
+      x-ms-date:
+      - Thu, 20 Jul 2017 23:34:10 GMT
+      x-ms-version:
+      - 2016-05-31
+    url: https://golangrocksonazure.queue.core.windows.net/queue-254storagequeuesuitetestgetmetadatagetapproximatecount?comp=metadata
+    method: GET
+  response:
+    body: ""
+    headers:
+      Cache-Control:
+      - no-cache
+      Date:
+      - Thu, 20 Jul 2017 23:34:09 GMT
+      Server:
+      - Windows-Azure-Queue/1.0 Microsoft-HTTPAPI/2.0
+      X-Ms-Approximate-Messages-Count:
+      - "3"
+      X-Ms-Request-Id:
+      - 3fb9b258-0003-00da-75b0-011674000000
+      X-Ms-Version:
+      - 2016-05-31
+    status: 200 OK
+    code: 200
+- request:
+    body: ""
+    form: {}
+    headers:
+      Authorization:
+      - SharedKey golangrocksonazure:qCEGcM0AZiqgRR7eThfKi1Hczme8JWjGb7oepuAVXOY=
+      User-Agent:
+      - Go/go1.9beta1 (amd64-windows) azure-storage-go/10.0.2 api-version/2016-05-31
+        queue
+      x-ms-date:
+      - Thu, 20 Jul 2017 23:34:10 GMT
+      x-ms-version:
+      - 2016-05-31
+    url: https://golangrocksonazure.queue.core.windows.net/queue-254storagequeuesuitetestgetmetadatagetapproximatecount
+    method: DELETE
+  response:
+    body: ""
+    headers:
+      Content-Length:
+      - "0"
+      Date:
+      - Thu, 20 Jul 2017 23:34:09 GMT
+      Server:
+      - Windows-Azure-Queue/1.0 Microsoft-HTTPAPI/2.0
+      X-Ms-Request-Id:
+      - 3fb9b25b-0003-00da-78b0-011674000000
+      X-Ms-Version:
+      - 2016-05-31
+    status: 204 No Content
+    code: 204
+- request:
+    body: ""
+    form: {}
+    headers:
+      Authorization:
+      - SharedKey golangrocksonazure:RFXlpS6SqnjwwFGwZa6/ieVZjl6sYM/ZifnrKS9fdEA=
+      User-Agent:
+      - Go/go1.9beta1 (amd64-windows) azure-storage-go/10.0.2 api-version/2016-05-31
+        queue
+      x-ms-date:
+      - Thu, 20 Jul 2017 23:34:10 GMT
+      x-ms-version:
+      - 2016-05-31
+    url: https://golangrocksonazure.queue.core.windows.net/queue-154storagequeuesuitetestgetmetadatagetapproximatecount
+    method: DELETE
+  response:
+    body: ""
+    headers:
+      Content-Length:
+      - "0"
+      Date:
+      - Thu, 20 Jul 2017 23:34:09 GMT
+      Server:
+      - Windows-Azure-Queue/1.0 Microsoft-HTTPAPI/2.0
+      X-Ms-Request-Id:
+      - 3fb9b25c-0003-00da-79b0-011674000000
+      X-Ms-Version:
+      - 2016-05-31
+    status: 204 No Content
+    code: 204

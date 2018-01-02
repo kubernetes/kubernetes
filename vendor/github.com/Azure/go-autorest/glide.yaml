@@ -1,0 +1,22 @@
+package: github.com/Azure/go-autorest
+import:
+- package: github.com/dgrijalva/jwt-go
+  subpackages:
+  - .
+- package: golang.org/x/crypto
+  repo: https://github.com/golang/crypto.git
+  vcs: git
+  subpackages:
+  - pkcs12
+- package: golang.org/x/net
+  repo: https://github.com/golang/net.git
+  vcs: git
+  subpackages:
+  - .
+- package: golang.org/x/text
+  repo: https://github.com/golang/text.git
+  vcs: git
+  subpackages:
+  - .
+- package: github.com/mitchellh/go-homedir
+- package: github.com/dimchansky/utfbom

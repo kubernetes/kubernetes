@@ -1,0 +1,10 @@
+package: github.com/euforia/go-git-server
+import:
+- package: github.com/bargez/pktline
+- package: gopkg.in/src-d/go-git.v4
+  subpackages:
+  - plumbing
+  - plumbing/format/packfile
+  - plumbing/object
+  - plumbing/storer
+  - storage/memory

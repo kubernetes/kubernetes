@@ -1,0 +1,17 @@
+UNAME := $(shell uname)
+ifeq ($(UNAME),FreeBSD)
+EXTRA_LDFLAGS="-lexecinfo"
+endif
+
+all: Makefile
+	$(MAKE)
+	# Not good on OSX at the moment:
+	#make check
+	$(MAKE) install
+
+Makefile: configure
+	WARN_OVERRIDES="-Wno-unused-function"
+	./configure --prefix=$(INSTALL_DIR) --disable-shared --enable-static CXXFLAGS="$(WARN_OVERRIDES) -fPIC" CFLAGS="$(WARN_OVERRIDES) -fPIC" CPPFLAGS="-I$(INSTALL_DIR)/include" LDFLAGS="-L$(INSTALL_DIR)/lib $(EXTRA_LDFLAGS)" || tail -1000 config.log
+
+configure: configure.ac
+	autoreconf -vi

@@ -1,0 +1,7 @@
+all:
+	# LevelDB's Makefile doesn't know about CPPFLAGS, so we have to wedge them
+	# in :/
+	CFLAGS="$(CFLAGS) $(CPPFLAGS) -fPIC" CXXFLAGS="$(CXXFLAGS) $(CPPFLAGS) -fPIC" $(MAKE)
+	cp lib*.a $(INSTALL_DIR)/lib
+	mkdir -p $(INSTALL_DIR)/include/leveldb
+	cp include/leveldb/*.h $(INSTALL_DIR)/include/leveldb

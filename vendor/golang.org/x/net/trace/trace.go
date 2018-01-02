@@ -60,7 +60,7 @@ The /debug/events HTTP endpoint organizes the event logs by family and
 by time since the last error.  The expanded view displays recent log
 entries and the log's call stack.
 */
-package trace
+package trace // import "golang.org/x/net/trace"
 
 import (
 	"bytes"

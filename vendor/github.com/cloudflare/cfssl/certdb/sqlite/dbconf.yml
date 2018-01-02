@@ -1,0 +1,15 @@
+development:
+  driver: sqlite3
+  open: ./certstore_development.db
+
+test:
+  driver: sqlite3
+  open: ./certstore_test.db
+
+staging:
+  driver: sqlite3
+  open: ./certstore_staging.db
+
+production:
+  driver: sqlite3
+  open: ./certstore_production.db

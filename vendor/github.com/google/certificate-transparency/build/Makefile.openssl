@@ -1,0 +1,16 @@
+# Grab the openssldir of the system version of openssl in order to try to have
+# our version re-use the system caroots by default.
+OPENSSLDIR := $(shell openssl version -d | awk '{ print $$2 }')
+
+all: $(INSTALL_DIR)/bin/openssl
+
+$(INSTALL_DIR)/bin/openssl: Makefile
+	$(MAKE)
+	$(MAKE) test
+	$(MAKE) install_sw
+
+Makefile: config Configure Makefile.org
+	# Force a 64 bit build on MacOS
+	KERNEL_BITS=64 ./config --install_prefix=$(INSTALL_DIR) --prefix=/ --libdir=lib --openssldir=$(OPENSSLDIR) no-shared enable-static-engine -fPIC
+	# just to be sure we don't have dregs left over
+	$(MAKE) clean

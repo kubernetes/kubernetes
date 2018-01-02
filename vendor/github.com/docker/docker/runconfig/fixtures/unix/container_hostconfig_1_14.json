@@ -1,0 +1,18 @@
+{
+    "Binds": ["/tmp:/tmp"],
+    "ContainerIDFile": "",
+    "LxcConf": [],
+    "Privileged": false,
+    "PortBindings": {
+        "80/tcp": [
+            {
+                "HostIp": "0.0.0.0",
+                "HostPort": "49153"
+            }
+        ]
+    },
+    "Links": ["/name:alias"],
+    "PublishAllPorts": false,
+    "CapAdd": ["NET_ADMIN"],
+    "CapDrop": ["MKNOD"]
+}

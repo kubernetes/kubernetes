@@ -1,0 +1,10 @@
+runtime: go
+api_version: go1
+vm: true
+
+handlers:
+- url: /favicon.ico
+  static_files: favicon.ico
+  upload: favicon.ico
+- url: /.*
+  script: _go_app

@@ -1,0 +1,21 @@
+version: "{build}"
+platform: x64
+
+matrix:
+  allow_failures:
+    - platform: x64
+    
+clone_folder: c:\gopath\src\gopkg.in\src-d\go-git.v4
+
+environment:
+  GOPATH: c:\gopath
+
+install:
+  - set PATH=%GOPATH%\bin;c:\go\bin;"C:\Program Files\Git\mingw64\bin";%PATH%
+  - go version
+  - go get -v -t ./...
+  - git config --global user.email "travis@example.com"
+  - git config --global user.name "Travis CI
+
+build_script:
+  - go test -v ./...

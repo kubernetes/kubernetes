@@ -1,0 +1,614 @@
+{
+  "version": "1.0",
+  "examples": {
+    "AddPermission": [
+      {
+        "input": {
+          "Action": "lambda:InvokeFunction",
+          "FunctionName": "MyFunction",
+          "Principal": "s3.amazonaws.com",
+          "SourceAccount": "123456789012",
+          "SourceArn": "arn:aws:s3:::examplebucket/*",
+          "StatementId": "ID-1"
+        },
+        "output": {
+          "Statement": "ID-1"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "This example adds a permission for an S3 bucket to invoke a Lambda function.",
+        "id": "add-permission-1474651469455",
+        "title": "add-permission"
+      }
+    ],
+    "CreateFunction": [
+      {
+        "input": {
+          "Code": {
+          },
+          "Description": "",
+          "FunctionName": "MyFunction",
+          "Handler": "souce_file.handler_name",
+          "MemorySize": 128,
+          "Publish": true,
+          "Role": "arn:aws:iam::123456789012:role/service-role/role-name",
+          "Runtime": "nodejs4.3",
+          "Timeout": 15,
+          "VpcConfig": {
+          }
+        },
+        "output": {
+          "CodeSha256": "",
+          "CodeSize": 123,
+          "Description": "",
+          "FunctionArn": "arn:aws:lambda:us-west-2:123456789012:function:MyFunction",
+          "FunctionName": "MyFunction",
+          "Handler": "source_file.handler_name",
+          "LastModified": "2016-11-21T19:49:20.006+0000",
+          "MemorySize": 128,
+          "Role": "arn:aws:iam::123456789012:role/service-role/role-name",
+          "Runtime": "nodejs4.3",
+          "Timeout": 123,
+          "Version": "1",
+          "VpcConfig": {
+          }
+        },
+        "comments": {
+          "input": {
+            "Handler": "is of the form of the name of your source file and then name of your function handler",
+            "Role": "replace with the actual arn of the execution role you created"
+          },
+          "output": {
+          }
+        },
+        "description": "This example creates a Lambda function.",
+        "id": "create-function-1474653449931",
+        "title": "create-function"
+      }
+    ],
+    "DeleteAlias": [
+      {
+        "input": {
+          "FunctionName": "myFunction",
+          "Name": "alias"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "This operation deletes a Lambda function alias",
+        "id": "to-delete-a-lambda-function-alias-1481660370804",
+        "title": "To delete a Lambda function alias"
+      }
+    ],
+    "DeleteEventSourceMapping": [
+      {
+        "input": {
+          "UUID": "12345kxodurf3443"
+        },
+        "output": {
+          "BatchSize": 123,
+          "EventSourceArn": "arn:aws:s3:::examplebucket/*",
+          "FunctionArn": "arn:aws:lambda:us-west-2:123456789012:function:myFunction",
+          "LastModified": "2016-11-21T19:49:20.006+0000",
+          "LastProcessingResult": "",
+          "State": "",
+          "StateTransitionReason": "",
+          "UUID": "12345kxodurf3443"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "This operation deletes a Lambda function event source mapping",
+        "id": "to-delete-a-lambda-function-event-source-mapping-1481658973862",
+        "title": "To delete a Lambda function event source mapping"
+      }
+    ],
+    "DeleteFunction": [
+      {
+        "input": {
+          "FunctionName": "myFunction",
+          "Qualifier": "1"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "This operation deletes a Lambda function",
+        "id": "to-delete-a-lambda-function-1481648553696",
+        "title": "To delete a Lambda function"
+      }
+    ],
+    "GetAccountSettings": [
+      {
+        "input": {
+        },
+        "output": {
+          "AccountLimit": {
+          },
+          "AccountUsage": {
+          }
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "This operation retrieves a Lambda customer's account settings",
+        "id": "to-retrieves-a-lambda-customers-account-settings-1481657495274",
+        "title": "To retrieves a Lambda customer's account settings"
+      }
+    ],
+    "GetAlias": [
+      {
+        "input": {
+          "FunctionName": "myFunction",
+          "Name": "myFunctionAlias"
+        },
+        "output": {
+          "AliasArn": "arn:aws:lambda:us-west-2:123456789012:function:myFunctionAlias",
+          "Description": "",
+          "FunctionVersion": "1",
+          "Name": "myFunctionAlias"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "This operation retrieves a Lambda function alias",
+        "id": "to-retrieve-a-lambda-function-alias-1481648742254",
+        "title": "To retrieve a Lambda function alias"
+      }
+    ],
+    "GetEventSourceMapping": [
+      {
+        "input": {
+          "UUID": "123489-xxxxx-kdla8d89d7"
+        },
+        "output": {
+          "BatchSize": 123,
+          "EventSourceArn": "arn:aws:iam::123456789012:eventsource",
+          "FunctionArn": "arn:aws:lambda:us-west-2:123456789012:function:myFunction",
+          "LastModified": "2016-11-21T19:49:20.006+0000",
+          "LastProcessingResult": "",
+          "State": "",
+          "StateTransitionReason": "",
+          "UUID": "123489-xxxxx-kdla8d89d7"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "This operation retrieves a Lambda function's event source mapping",
+        "id": "to-retrieve-a-lambda-functions-event-source-mapping-1481661622799",
+        "title": "To retrieve a Lambda function's event source mapping"
+      }
+    ],
+    "GetFunction": [
+      {
+        "input": {
+          "FunctionName": "myFunction",
+          "Qualifier": "1"
+        },
+        "output": {
+          "Code": {
+            "Location": "somelocation",
+            "RepositoryType": "S3"
+          },
+          "Configuration": {
+            "CodeSha256": "LQT+0DHxxxxcfwLyQjzoEFKZtdqQjHXanlSdfXBlEW0VA=",
+            "CodeSize": 262,
+            "Description": "A starter AWS Lambda function.",
+            "Environment": {
+              "Variables": {
+                "S3_BUCKET": "test"
+              }
+            },
+            "FunctionArn": "arn:aws:lambda:us-west-2:123456789012:function:myFunction",
+            "FunctionName": "myFunction",
+            "Handler": "index.handler",
+            "LastModified": "2016-11-21T19:49:20.006+0000",
+            "MemorySize": 128,
+            "Role": "arn:aws:iam::123456789012:role/lambda_basic_execution",
+            "Runtime": "nodejs4.3",
+            "Timeout": 3,
+            "Version": "$LATEST",
+            "VpcConfig": {
+              "SecurityGroupIds": [
+
+              ],
+              "SubnetIds": [
+
+              ]
+            }
+          }
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "This operation retrieves a Lambda function's event source mapping",
+        "id": "to-retrieve-a-lambda-functions-event-source-mapping-1481661622799",
+        "title": "To retrieve a Lambda function's event source mapping"
+      }
+    ],
+    "GetFunctionConfiguration": [
+      {
+        "input": {
+          "FunctionName": "myFunction",
+          "Qualifier": "1"
+        },
+        "output": {
+          "CodeSha256": "LQT+0DHxxxxcfwLyQjzoEFKZtdqQjHXanlSdfXBlEW0VA=",
+          "CodeSize": 123,
+          "DeadLetterConfig": {
+          },
+          "Description": "",
+          "Environment": {
+          },
+          "FunctionArn": "arn:aws:lambda:us-west-2:123456789012:function:myFunction",
+          "FunctionName": "myFunction",
+          "Handler": "index.handler",
+          "KMSKeyArn": "",
+          "LastModified": "2016-11-21T19:49:20.006+0000",
+          "MemorySize": 128,
+          "Role": "arn:aws:iam::123456789012:role/lambda_basic_execution",
+          "Runtime": "python2.7",
+          "Timeout": 123,
+          "Version": "1",
+          "VpcConfig": {
+          }
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "This operation retrieves a Lambda function's event source mapping",
+        "id": "to-retrieve-a-lambda-functions-event-source-mapping-1481661622799",
+        "title": "To retrieve a Lambda function's event source mapping"
+      }
+    ],
+    "GetPolicy": [
+      {
+        "input": {
+          "FunctionName": "myFunction",
+          "Qualifier": "1"
+        },
+        "output": {
+          "Policy": ""
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "This operation retrieves a Lambda function policy",
+        "id": "to-retrieve-a-lambda-function-policy-1481649319053",
+        "title": "To retrieve a Lambda function policy"
+      }
+    ],
+    "Invoke": [
+      {
+        "input": {
+          "ClientContext": "MyApp",
+          "FunctionName": "MyFunction",
+          "InvocationType": "Event",
+          "LogType": "Tail",
+          "Payload": "fileb://file-path/input.json",
+          "Qualifier": "1"
+        },
+        "output": {
+          "FunctionError": "",
+          "LogResult": "",
+          "Payload": "?",
+          "StatusCode": 123
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "This operation invokes a Lambda function",
+        "id": "to-invoke-a-lambda-function-1481659683915",
+        "title": "To invoke a Lambda function"
+      }
+    ],
+    "InvokeAsync": [
+      {
+        "input": {
+          "FunctionName": "myFunction",
+          "InvokeArgs": "fileb://file-path/input.json"
+        },
+        "output": {
+          "Status": 123
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "This operation invokes a Lambda function asynchronously",
+        "id": "to-invoke-a-lambda-function-asynchronously-1481649694923",
+        "title": "To invoke a Lambda function asynchronously"
+      }
+    ],
+    "ListAliases": [
+      {
+        "input": {
+          "FunctionName": "myFunction",
+          "FunctionVersion": "1",
+          "Marker": "",
+          "MaxItems": 123
+        },
+        "output": {
+          "Aliases": [
+
+          ],
+          "NextMarker": ""
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "This operation retrieves a Lambda function's aliases",
+        "id": "to-retrieve-a-lambda-function-aliases-1481650199732",
+        "title": "To retrieve a Lambda function aliases"
+      }
+    ],
+    "ListFunctions": [
+      {
+        "input": {
+          "Marker": "",
+          "MaxItems": 123
+        },
+        "output": {
+          "Functions": [
+
+          ],
+          "NextMarker": ""
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "This operation retrieves a Lambda functions",
+        "id": "to-retrieve-a-list-of-lambda-functions-1481650507425",
+        "title": "To retrieve a list of Lambda functions"
+      }
+    ],
+    "ListVersionsByFunction": [
+      {
+        "input": {
+          "FunctionName": "myFunction",
+          "Marker": "",
+          "MaxItems": 123
+        },
+        "output": {
+          "NextMarker": "",
+          "Versions": [
+
+          ]
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "This operation retrieves a Lambda function versions",
+        "id": "to-retrieve-a-list-of-lambda-function-versions-1481650603750",
+        "title": "To retrieve a list of Lambda function versions"
+      }
+    ],
+    "PublishVersion": [
+      {
+        "input": {
+          "CodeSha256": "",
+          "Description": "",
+          "FunctionName": "myFunction"
+        },
+        "output": {
+          "CodeSha256": "",
+          "CodeSize": 123,
+          "Description": "",
+          "FunctionArn": "arn:aws:lambda:us-west-2:123456789012:function:myFunction",
+          "FunctionName": "myFunction",
+          "Handler": "index.handler",
+          "LastModified": "2016-11-21T19:49:20.006+0000",
+          "MemorySize": 128,
+          "Role": "arn:aws:iam::123456789012:role/lambda_basic_execution",
+          "Runtime": "python2.7",
+          "Timeout": 123,
+          "Version": "1",
+          "VpcConfig": {
+          }
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "This operation publishes a version of a Lambda function",
+        "id": "to-publish-a-version-of-a-lambda-function-1481650704986",
+        "title": "To publish a version of a Lambda function"
+      }
+    ],
+    "RemovePermission": [
+      {
+        "input": {
+          "FunctionName": "myFunction",
+          "Qualifier": "1",
+          "StatementId": "role-statement-id"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "This operation removes a Lambda function's permissions",
+        "id": "to-remove-a-lambda-functions-permissions-1481661337021",
+        "title": "To remove a Lambda function's permissions"
+      }
+    ],
+    "UpdateAlias": [
+      {
+        "input": {
+          "Description": "",
+          "FunctionName": "myFunction",
+          "FunctionVersion": "1",
+          "Name": "functionAlias"
+        },
+        "output": {
+          "AliasArn": "arn:aws:lambda:us-west-2:123456789012:function:functionAlias",
+          "Description": "",
+          "FunctionVersion": "1",
+          "Name": "functionAlias"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "This operation updates a Lambda function alias",
+        "id": "to-update-a-lambda-function-alias-1481650817950",
+        "title": "To update a Lambda function alias"
+      }
+    ],
+    "UpdateEventSourceMapping": [
+      {
+        "input": {
+          "BatchSize": 123,
+          "Enabled": true,
+          "FunctionName": "myFunction",
+          "UUID": "1234xCy789012"
+        },
+        "output": {
+          "BatchSize": 123,
+          "EventSourceArn": "arn:aws:s3:::examplebucket/*",
+          "FunctionArn": "arn:aws:lambda:us-west-2:123456789012:function:myFunction",
+          "LastModified": "2016-11-21T19:49:20.006+0000",
+          "LastProcessingResult": "",
+          "State": "",
+          "StateTransitionReason": "",
+          "UUID": "1234xCy789012"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "This operation updates a Lambda function event source mapping",
+        "id": "to-update-a-lambda-function-event-source-mapping-1481650907413",
+        "title": "To update a Lambda function event source mapping"
+      }
+    ],
+    "UpdateFunctionCode": [
+      {
+        "input": {
+          "FunctionName": "myFunction",
+          "Publish": true,
+          "S3Bucket": "myBucket",
+          "S3Key": "myKey",
+          "S3ObjectVersion": "1",
+          "ZipFile": "fileb://file-path/file.zip"
+        },
+        "output": {
+          "CodeSha256": "LQT+0DHxxxxcfwLyQjzoEFKZtdqQjHXanlSdfXBlEW0VA=",
+          "CodeSize": 123,
+          "Description": "",
+          "FunctionArn": "arn:aws:lambda:us-west-2:123456789012:function:myFunction",
+          "FunctionName": "myFunction",
+          "Handler": "index.handler",
+          "LastModified": "2016-11-21T19:49:20.006+0000",
+          "MemorySize": 128,
+          "Role": "arn:aws:iam::123456789012:role/lambda_basic_execution",
+          "Runtime": "python2.7",
+          "Timeout": 123,
+          "Version": "1",
+          "VpcConfig": {
+          }
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "This operation updates a Lambda function's code",
+        "id": "to-update-a-lambda-functions-code-1481650992672",
+        "title": "To update a Lambda function's code"
+      }
+    ],
+    "UpdateFunctionConfiguration": [
+      {
+        "input": {
+          "Description": "",
+          "FunctionName": "myFunction",
+          "Handler": "index.handler",
+          "MemorySize": 128,
+          "Role": "arn:aws:iam::123456789012:role/lambda_basic_execution",
+          "Runtime": "python2.7",
+          "Timeout": 123,
+          "VpcConfig": {
+          }
+        },
+        "output": {
+          "CodeSha256": "LQT+0DHxxxxcfwLyQjzoEFKZtdqQjHXanlSdfXBlEW0VA=",
+          "CodeSize": 123,
+          "Description": "",
+          "FunctionArn": "arn:aws:lambda:us-west-2:123456789012:function:myFunction",
+          "FunctionName": "myFunction",
+          "Handler": "index.handler",
+          "LastModified": "2016-11-21T19:49:20.006+0000",
+          "MemorySize": 128,
+          "Role": "arn:aws:iam::123456789012:role/lambda_basic_execution",
+          "Runtime": "python2.7",
+          "Timeout": 123,
+          "Version": "1",
+          "VpcConfig": {
+          }
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "This operation updates a Lambda function's configuration",
+        "id": "to-update-a-lambda-functions-configuration-1481651096447",
+        "title": "To update a Lambda function's configuration"
+      }
+    ]
+  }
+}

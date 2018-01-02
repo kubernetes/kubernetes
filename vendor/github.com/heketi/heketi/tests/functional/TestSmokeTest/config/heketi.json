@@ -1,0 +1,20 @@
+{
+	"_port_comment": "Heketi Server Port Number",
+	"port" : "8080",
+
+	"_glusterfs_comment": "GlusterFS Configuration",
+	"glusterfs" : {
+
+		"_executor_comment": "Execute plugin. Possible choices: mock, ssh",
+		"executor" : "ssh",
+
+		"_db_comment": "Database file name",
+		"db" : "heketi.db",
+
+		"sshexec" : {
+			"keyfile" : "config/insecure_private_key",
+			"user" : "vagrant",
+			"sudo" : true
+		}
+	}
+}

@@ -1,0 +1,9 @@
+[
+{
+	"name":"Mozilla",
+	"weight": 100,
+	"hash_algo": "SHA2",
+	"key_algo": "ECDSA256",
+	"keystore": "misc/trusted_roots/nss.pem"
+}
+]

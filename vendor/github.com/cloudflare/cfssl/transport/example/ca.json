@@ -1,0 +1,15 @@
+{
+    "hosts": [
+	"dropsonde.net"
+    ],
+    "key": {
+	"algo": "rsa",
+	"size":  4096
+    },
+    "names": [{
+	"C": "US",
+	"L": "San Francisco",
+	"OU": "Dropsonde Certificate Authority",
+	"ST": "California"
+    }]
+}

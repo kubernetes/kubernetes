@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+
+export SCRIPTDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+source "${SCRIPTDIR}/.validate"
+
+IFS=$'\n'
+files=( $(validate_diff --diff-filter=ACMR --name-only -- 'profiles/seccomp' || true) )
+unset IFS
+
+if [ ${#files[@]} -gt 0 ]; then
+	# We run 'go generate' and see if we have a diff afterwards
+	go generate ./profiles/seccomp/ >/dev/null
+	# Let see if the working directory is clean
+	diffs="$(git status --porcelain -- profiles/seccomp 2>/dev/null)"
+	if [ "$diffs" ]; then
+		{
+			echo 'The result of go generate ./profiles/seccomp/ differs'
+			echo
+			echo "$diffs"
+			echo
+			echo 'Please re-run go generate ./profiles/seccomp/'
+			echo
+		} >&2
+		false
+	else
+		echo 'Congratulations! Seccomp profile generation is done correctly.'
+	fi
+fi

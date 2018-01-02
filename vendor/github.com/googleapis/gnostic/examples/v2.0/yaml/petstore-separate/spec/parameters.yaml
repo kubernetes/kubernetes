@@ -1,0 +1,16 @@
+tagsParam:
+  name: tags
+  in: query
+  description: tags to filter by
+  required: false
+  type: array
+  collectionFormat: csv
+  items:
+    type: string
+limitsParam:
+  name: limit
+  in: query
+  description: maximum number of results to return
+  required: false
+  type: integer
+  format: int32

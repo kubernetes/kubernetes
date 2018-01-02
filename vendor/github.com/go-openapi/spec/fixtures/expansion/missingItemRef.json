@@ -1,0 +1,31 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "version": "2.1.0",
+    "title": "Missing Item API"
+  },
+  "host": "item.com",
+  "basePath": "/missing/ref",
+  "schemes": [
+    "http"
+  ],
+  "paths": {
+    "/employees": {
+      "get": {
+        "operationId": "LIST-Employees",
+        "summary": "List Employee Types",
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/employees-output"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

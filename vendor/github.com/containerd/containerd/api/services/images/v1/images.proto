@@ -1,0 +1,118 @@
+syntax = "proto3";
+
+package containerd.services.images.v1;
+
+import "gogoproto/gogo.proto";
+import "google/protobuf/empty.proto";
+import "google/protobuf/field_mask.proto";
+import "google/protobuf/timestamp.proto";
+import "github.com/containerd/containerd/api/types/descriptor.proto";
+
+option go_package = "github.com/containerd/containerd/api/services/images/v1;images";
+
+// Images is a service that allows one to register images with containerd.
+//
+// In containerd, an image is merely the mapping of a name to a content root,
+// described by a descriptor. The behavior and state of image is purely
+// dictated by the type of the descriptor.
+//
+// From the perspective of this service, these references are mostly shallow,
+// in that the existence of the required content won't be validated until
+// required by consuming services.
+//
+// As such, this can really be considered a "metadata service".
+service Images {
+	// Get returns an image by name.
+	rpc Get(GetImageRequest) returns (GetImageResponse);
+
+	// List returns a list of all images known to containerd.
+	rpc List(ListImagesRequest) returns (ListImagesResponse);
+
+	// Create an image record in the metadata store.
+	//
+	// The name of the image must be unique.
+	rpc Create(CreateImageRequest) returns (CreateImageResponse);
+
+	// Update assigns the name to a given target image based on the provided
+	// image.
+	rpc Update(UpdateImageRequest) returns (UpdateImageResponse);
+
+	// Delete deletes the image by name.
+	rpc Delete(DeleteImageRequest) returns (google.protobuf.Empty);
+}
+
+message Image {
+	// Name provides a unique name for the image.
+	//
+	// Containerd treats this as the primary identifier.
+	string name = 1;
+
+	// Labels provides free form labels for the image. These are runtime only
+	// and do not get inherited into the package image in any way.
+	//
+	// Labels may be updated using the field mask.
+	// The combined size of a key/value pair cannot exceed 4096 bytes.
+	map<string, string> labels = 2;
+
+	// Target describes the content entry point of the image.
+	containerd.types.Descriptor target = 3 [(gogoproto.nullable) = false];
+
+	// CreatedAt is the time the image was first created.
+	google.protobuf.Timestamp created_at = 7 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+
+	// UpdatedAt is the last time the image was mutated.
+	google.protobuf.Timestamp updated_at = 8 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+}
+
+message GetImageRequest {
+	string name = 1;
+}
+
+message GetImageResponse {
+	Image image = 1;
+}
+
+message CreateImageRequest {
+	Image image = 1 [(gogoproto.nullable) = false];
+}
+
+message CreateImageResponse {
+	Image image = 1 [(gogoproto.nullable) = false];
+}
+
+message UpdateImageRequest {
+	// Image provides a full or partial image for update.
+	//
+	// The name field must be set or an error will be returned.
+	Image image = 1 [(gogoproto.nullable) = false];
+
+	// UpdateMask specifies which fields to perform the update on. If empty,
+	// the operation applies to all fields.
+	google.protobuf.FieldMask update_mask = 2;
+}
+
+message UpdateImageResponse {
+	Image image = 1 [(gogoproto.nullable) = false];
+}
+
+message ListImagesRequest {
+	// Filters contains one or more filters using the syntax defined in the
+	// containerd filter package.
+	//
+	// The returned result will be those that match any of the provided
+	// filters. Expanded, images that match the following will be
+	// returned:
+	//
+	//   filters[0] or filters[1] or ... or filters[n-1] or filters[n]
+	//
+	// If filters is zero-length or nil, all items will be returned.
+	repeated string filters = 1;
+}
+
+message ListImagesResponse {
+	repeated Image images = 1 [(gogoproto.nullable) = false];
+}
+
+message DeleteImageRequest {
+	string name = 1;
+}

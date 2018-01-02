@@ -1,0 +1,149 @@
+{
+ "id": "cloudresourcemanager:v1",
+ "name": "cloudresourcemanager",
+ "canonicalName": "Cloud Resource Manager",
+ "version": "v1",
+ "revision": "20160927",
+ "title": "Google Cloud Resource Manager API",
+ "documentationLink": "https://cloud.google.com/resource-manager",
+ "protocol": "rest",
+ "baseUrl": "https://cloudresourcemanager.googleapis.com/",
+ "basePath": "",
+ "rootUrl": "https://cloudresourcemanager.googleapis.com/",
+ "servicePath": "",
+ "schemas": {
+  "Operation": {
+   "id": "Operation",
+   "type": "object",
+   "properties": {
+    "name": {
+     "type": "string"
+    }
+   }
+  },
+  "SearchOrganizationsRequest": {
+   "id": "SearchOrganizationsRequest",
+   "type": "object",
+   "properties": {
+    "pageSize": {
+     "type": "integer",
+     "description": "The maximum number of Organizations to return in the response. This field is optional.",
+     "format": "int32"
+    },
+    "pageToken": {
+     "type": "string"
+    },
+    "filter": {
+     "type": "string"
+    }
+   }
+  },
+  "SearchOrganizationsResponse": {
+   "id": "SearchOrganizationsResponse",
+   "type": "object",
+   "properties": {
+    "organizations": {
+     "type": "array",
+     "items": {
+      "$ref": "Organization"
+     }
+    },
+    "nextPageToken": {
+     "type": "string"
+    }
+   }
+  },
+  "Organization": {
+   "id": "Organization",
+   "type": "object",
+   "properties": {
+    "name": {
+     "type": "string"
+    }
+   }
+  },
+  "Project": {
+   "id": "Project",
+   "type": "object",
+   "properties": {
+    "projectId": {
+     "type": "string"
+    }
+   }
+  },
+  "ListProjectsResponse": {
+   "id": "ListProjectsResponse",
+   "type": "object",
+   "properties": {
+    "projects": {
+     "type": "array",
+     "items": {
+      "$ref": "Project"
+     }
+    },
+    "nextPageToken": {
+     "type": "string"
+    }
+   }
+  }
+ },
+ "resources": {
+  "projects": {
+   "methods": {
+    "yes1": {
+     "id": "cloudresourcemanager.organizations.search",
+     "path": "v1/organizations:search",
+     "httpMethod": "POST",
+     "request": {
+      "$ref": "SearchOrganizationsRequest"
+     },
+     "response": {
+      "$ref": "SearchOrganizationsResponse"
+     }
+    },
+    "yes2": {
+     "id": "cloudresourcemanager.projects.list",
+     "path": "v1/projects",
+     "httpMethod": "GET",
+     "parameters": {
+      "pageToken": {
+       "type": "string",
+       "location": "query"
+      },
+      "pageSize": {
+       "type": "integer",
+       "format": "int32",
+       "location": "query"
+      },
+      "filter": {
+       "type": "string",
+       "location": "query"
+      }
+     },
+     "response": {
+      "$ref": "ListProjectsResponse"
+     }
+    },
+    "no": {
+     "id": "cloudresourcemanager.operations.get",
+     "path": "v1/{+name}",
+     "httpMethod": "GET",
+     "parameters": {
+      "name": {
+       "type": "string",
+       "required": true,
+       "pattern": "^operations/.*$",
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "name"
+     ],
+     "response": {
+      "$ref": "Operation"
+     }
+    }
+   }
+  }
+ }
+}

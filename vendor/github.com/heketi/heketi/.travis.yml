@@ -1,0 +1,29 @@
+language: go
+sudo: true
+before_install:
+    - sudo apt-get update -qq
+    - sudo apt-get install -qq python python-pip
+    - sudo pip install tox nose
+install:
+- bash .travis-fork-fix
+- go get github.com/mattn/goveralls
+- go get github.com/wadey/gocovmerge
+- curl https://glide.sh/get | sh
+env:
+  global:
+  - secure: tCj+iGIN2GM5yPneme35KIQwqGcXMOLod00qvG/Af0lkjEVJRRNz3gnB3P2dNyj9Nc4FWxSUIjCiIkblOMaEKxPXp1S3Zo7gRBVphyNY5ZvIKeqKoXvBPd6hi9Ft2TaN+4vDczfAKOI/S3/3kN3NmgGCYNTLOues0T4yhVd3v14hoQJxw4Jbjlsj8RGfLrqp+dInFv2tS+xTyK+q/EOiaCpBq4PfK6giKwt943o7jc9v0iWjnP2rWq/AotMo4QutoC0OVeJT8aG41sC5LvlYTBQB22E8Zv439JgHsdhQU1NRd/1VLGKATToxkUxh2Reei42koAWFJ+EfFvAIx03k5+ZYJY7W+Rtuy8jn0uRaZyvvQdUvyT22e9lSJzqkP6JAe7oru9hf9X4K0XSOfMMFUiJDC+rNm0Ajd+r/5h6C+jRqIMDvvFgdlCkM8gKIX1B5N+RM1hxurAGTRpdCPuDVLVeTCbNZCds8jiK1DNky6Ni66plBIV+LKQY3EpjBn0jaWfPdTJbU5OiOb1uadnmzj2yt65Mp3T8QJD3dotURISR8bIS+Xb6vAytKFWmtcqje5Hx4lFTfyrH3gRGjMyeS9j3pVjbbCCV466FHOp9oglpoFv49nXhivPzLqU7mSuLIue+5RZ318HykuBWI+6xAo8aH9nnoBmAWiGCxXwIr13Y=
+matrix:
+  include:
+  - go: 1.7.5
+    env: OPTIONS="-race"
+  - go: 1.8.2
+    env: COVERAGE="true"
+script:
+- go fmt $(go list ./... | grep -v vendor) | wc -l | grep 0
+- go vet $(go list ./... | grep -v vendor)
+- make
+- if [[ -z "$COVERAGE" ]]; then make test ; fi
+- if [[ -n "$COVERAGE" ]]; then bash .travis-coverage; fi
+- cd client/api/python
+- ./unittests.sh
+- tox -e pep8

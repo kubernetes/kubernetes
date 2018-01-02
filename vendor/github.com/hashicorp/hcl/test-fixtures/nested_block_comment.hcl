@@ -1,0 +1,5 @@
+/*
+foo = "bar/*"
+*/
+
+bar = "value"

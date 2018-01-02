@@ -1,0 +1,1932 @@
+{
+  "version": "2.0",
+  "service": null,
+  "operations": {
+    "AddSourceIdentifierToSubscription": null,
+    "AddTagsToResource": null,
+    "AuthorizeDBSecurityGroupIngress": null,
+    "CopyDBParameterGroup": null,
+    "CopyDBSnapshot": null,
+    "CopyOptionGroup": null,
+    "CreateDBInstance": null,
+    "CreateDBInstanceReadReplica": null,
+    "CreateDBParameterGroup": null,
+    "CreateDBSecurityGroup": null,
+    "CreateDBSnapshot": null,
+    "CreateDBSubnetGroup": null,
+    "CreateEventSubscription": null,
+    "CreateOptionGroup": null,
+    "DeleteDBInstance": null,
+    "DeleteDBParameterGroup": null,
+    "DeleteDBSecurityGroup": null,
+    "DeleteDBSnapshot": null,
+    "DeleteDBSubnetGroup": null,
+    "DeleteEventSubscription": null,
+    "DeleteOptionGroup": null,
+    "DescribeDBEngineVersions": null,
+    "DescribeDBInstances": null,
+    "DescribeDBLogFiles": null,
+    "DescribeDBParameterGroups": null,
+    "DescribeDBParameters": null,
+    "DescribeDBSecurityGroups": null,
+    "DescribeDBSnapshots": null,
+    "DescribeDBSubnetGroups": null,
+    "DescribeEngineDefaultParameters": null,
+    "DescribeEventCategories": null,
+    "DescribeEventSubscriptions": null,
+    "DescribeEvents": null,
+    "DescribeOptionGroupOptions": null,
+    "DescribeOptionGroups": null,
+    "DescribeOrderableDBInstanceOptions": null,
+    "DescribeReservedDBInstances": null,
+    "DescribeReservedDBInstancesOfferings": null,
+    "DownloadDBLogFilePortion": null,
+    "ListTagsForResource": null,
+    "ModifyDBInstance": null,
+    "ModifyDBParameterGroup": null,
+    "ModifyDBSubnetGroup": null,
+    "ModifyEventSubscription": null,
+    "ModifyOptionGroup": null,
+    "PromoteReadReplica": null,
+    "PurchaseReservedDBInstancesOffering": null,
+    "RebootDBInstance": null,
+    "RemoveSourceIdentifierFromSubscription": null,
+    "RemoveTagsFromResource": null,
+    "ResetDBParameterGroup": null,
+    "RestoreDBInstanceFromDBSnapshot": null,
+    "RestoreDBInstanceToPointInTime": null,
+    "RevokeDBSecurityGroupIngress": null
+  },
+  "shapes": {
+    "AddSourceIdentifierToSubscriptionMessage": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "AddSourceIdentifierToSubscriptionResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "AddTagsToResourceMessage": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ApplyMethod": {
+      "base": null,
+      "refs": {
+        "Parameter$ApplyMethod": null
+      }
+    },
+    "AuthorizationAlreadyExistsFault": {
+      "base": "<p>The specified CIDRIP or EC2 security group is already authorized for the specified DB security group.</p>",
+      "refs": {
+      }
+    },
+    "AuthorizationNotFoundFault": {
+      "base": "<p>Specified CIDRIP or EC2 security group is not authorized for the specified DB security group.</p> <p>RDS may not also be authorized via IAM to perform necessary actions on your behalf.</p>",
+      "refs": {
+      }
+    },
+    "AuthorizationQuotaExceededFault": {
+      "base": "<p>DB security group authorization quota has been reached.</p>",
+      "refs": {
+      }
+    },
+    "AuthorizeDBSecurityGroupIngressMessage": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "AuthorizeDBSecurityGroupIngressResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "AvailabilityZone": {
+      "base": null,
+      "refs": {
+        "AvailabilityZoneList$member": null,
+        "Subnet$SubnetAvailabilityZone": null
+      }
+    },
+    "AvailabilityZoneList": {
+      "base": null,
+      "refs": {
+        "OrderableDBInstanceOption$AvailabilityZones": null
+      }
+    },
+    "Boolean": {
+      "base": null,
+      "refs": {
+        "DBInstance$MultiAZ": null,
+        "DBInstance$AutoMinorVersionUpgrade": null,
+        "DBInstance$PubliclyAccessible": null,
+        "DBInstanceStatusInfo$Normal": null,
+        "DeleteDBInstanceMessage$SkipFinalSnapshot": null,
+        "DescribeDBEngineVersionsMessage$DefaultOnly": null,
+        "DownloadDBLogFilePortionDetails$AdditionalDataPending": null,
+        "EventSubscription$Enabled": null,
+        "ModifyDBInstanceMessage$ApplyImmediately": null,
+        "ModifyDBInstanceMessage$AllowMajorVersionUpgrade": null,
+        "ModifyOptionGroupMessage$ApplyImmediately": null,
+        "Option$Persistent": null,
+        "Option$Permanent": null,
+        "OptionGroup$AllowsVpcAndNonVpcInstanceMemberships": null,
+        "OptionGroupOption$PortRequired": null,
+        "OptionGroupOption$Persistent": null,
+        "OptionGroupOption$Permanent": null,
+        "OptionGroupOptionSetting$IsModifiable": null,
+        "OptionSetting$IsModifiable": null,
+        "OptionSetting$IsCollection": null,
+        "OrderableDBInstanceOption$MultiAZCapable": null,
+        "OrderableDBInstanceOption$ReadReplicaCapable": null,
+        "OrderableDBInstanceOption$Vpc": null,
+        "OrderableDBInstanceOption$SupportsIops": null,
+        "Parameter$IsModifiable": null,
+        "ReservedDBInstance$MultiAZ": null,
+        "ReservedDBInstancesOffering$MultiAZ": null,
+        "ResetDBParameterGroupMessage$ResetAllParameters": null,
+        "RestoreDBInstanceToPointInTimeMessage$UseLatestRestorableTime": null
+      }
+    },
+    "BooleanOptional": {
+      "base": null,
+      "refs": {
+        "CreateDBInstanceMessage$MultiAZ": null,
+        "CreateDBInstanceMessage$AutoMinorVersionUpgrade": null,
+        "CreateDBInstanceMessage$PubliclyAccessible": null,
+        "CreateDBInstanceReadReplicaMessage$AutoMinorVersionUpgrade": null,
+        "CreateDBInstanceReadReplicaMessage$PubliclyAccessible": null,
+        "CreateEventSubscriptionMessage$Enabled": null,
+        "DescribeDBEngineVersionsMessage$ListSupportedCharacterSets": null,
+        "DescribeOrderableDBInstanceOptionsMessage$Vpc": null,
+        "DescribeReservedDBInstancesMessage$MultiAZ": null,
+        "DescribeReservedDBInstancesOfferingsMessage$MultiAZ": null,
+        "ModifyDBInstanceMessage$MultiAZ": null,
+        "ModifyDBInstanceMessage$AutoMinorVersionUpgrade": null,
+        "ModifyEventSubscriptionMessage$Enabled": null,
+        "PendingModifiedValues$MultiAZ": null,
+        "RebootDBInstanceMessage$ForceFailover": null,
+        "RestoreDBInstanceFromDBSnapshotMessage$MultiAZ": null,
+        "RestoreDBInstanceFromDBSnapshotMessage$PubliclyAccessible": null,
+        "RestoreDBInstanceFromDBSnapshotMessage$AutoMinorVersionUpgrade": null,
+        "RestoreDBInstanceToPointInTimeMessage$MultiAZ": null,
+        "RestoreDBInstanceToPointInTimeMessage$PubliclyAccessible": null,
+        "RestoreDBInstanceToPointInTimeMessage$AutoMinorVersionUpgrade": null
+      }
+    },
+    "CharacterSet": {
+      "base": null,
+      "refs": {
+        "DBEngineVersion$DefaultCharacterSet": null,
+        "SupportedCharacterSetsList$member": null
+      }
+    },
+    "CopyDBParameterGroupMessage": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CopyDBParameterGroupResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CopyDBSnapshotMessage": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CopyDBSnapshotResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CopyOptionGroupMessage": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CopyOptionGroupResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateDBInstanceMessage": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateDBInstanceReadReplicaMessage": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateDBInstanceReadReplicaResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateDBInstanceResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateDBParameterGroupMessage": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateDBParameterGroupResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateDBSecurityGroupMessage": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateDBSecurityGroupResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateDBSnapshotMessage": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateDBSnapshotResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateDBSubnetGroupMessage": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateDBSubnetGroupResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateEventSubscriptionMessage": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateEventSubscriptionResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateOptionGroupMessage": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateOptionGroupResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DBEngineVersion": {
+      "base": null,
+      "refs": {
+        "DBEngineVersionList$member": null
+      }
+    },
+    "DBEngineVersionList": {
+      "base": null,
+      "refs": {
+        "DBEngineVersionMessage$DBEngineVersions": null
+      }
+    },
+    "DBEngineVersionMessage": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DBInstance": {
+      "base": null,
+      "refs": {
+        "CreateDBInstanceReadReplicaResult$DBInstance": null,
+        "CreateDBInstanceResult$DBInstance": null,
+        "DBInstanceList$member": null,
+        "DeleteDBInstanceResult$DBInstance": null,
+        "ModifyDBInstanceResult$DBInstance": null,
+        "PromoteReadReplicaResult$DBInstance": null,
+        "RebootDBInstanceResult$DBInstance": null,
+        "RestoreDBInstanceFromDBSnapshotResult$DBInstance": null,
+        "RestoreDBInstanceToPointInTimeResult$DBInstance": null
+      }
+    },
+    "DBInstanceAlreadyExistsFault": {
+      "base": "<p>User already has a DB instance with the given identifier.</p>",
+      "refs": {
+      }
+    },
+    "DBInstanceList": {
+      "base": null,
+      "refs": {
+        "DBInstanceMessage$DBInstances": null
+      }
+    },
+    "DBInstanceMessage": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DBInstanceNotFoundFault": {
+      "base": "<p> <i>DBInstanceIdentifier</i> does not refer to an existing DB instance. </p>",
+      "refs": {
+      }
+    },
+    "DBInstanceStatusInfo": {
+      "base": null,
+      "refs": {
+        "DBInstanceStatusInfoList$member": null
+      }
+    },
+    "DBInstanceStatusInfoList": {
+      "base": null,
+      "refs": {
+        "DBInstance$StatusInfos": null
+      }
+    },
+    "DBLogFileNotFoundFault": {
+      "base": "<p> <i>LogFileName</i> does not refer to an existing DB log file.</p>",
+      "refs": {
+      }
+    },
+    "DBParameterGroup": {
+      "base": null,
+      "refs": {
+        "CopyDBParameterGroupResult$DBParameterGroup": null,
+        "CreateDBParameterGroupResult$DBParameterGroup": null,
+        "DBParameterGroupList$member": null
+      }
+    },
+    "DBParameterGroupAlreadyExistsFault": {
+      "base": "<p>A DB parameter group with the same name exists.</p>",
+      "refs": {
+      }
+    },
+    "DBParameterGroupDetails": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DBParameterGroupList": {
+      "base": null,
+      "refs": {
+        "DBParameterGroupsMessage$DBParameterGroups": null
+      }
+    },
+    "DBParameterGroupNameMessage": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DBParameterGroupNotFoundFault": {
+      "base": "<p> <i>DBParameterGroupName</i> does not refer to an existing DB parameter group. </p>",
+      "refs": {
+      }
+    },
+    "DBParameterGroupQuotaExceededFault": {
+      "base": "<p>Request would result in user exceeding the allowed number of DB parameter groups.</p>",
+      "refs": {
+      }
+    },
+    "DBParameterGroupStatus": {
+      "base": null,
+      "refs": {
+        "DBParameterGroupStatusList$member": null
+      }
+    },
+    "DBParameterGroupStatusList": {
+      "base": null,
+      "refs": {
+        "DBInstance$DBParameterGroups": null
+      }
+    },
+    "DBParameterGroupsMessage": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DBSecurityGroup": {
+      "base": null,
+      "refs": {
+        "AuthorizeDBSecurityGroupIngressResult$DBSecurityGroup": null,
+        "CreateDBSecurityGroupResult$DBSecurityGroup": null,
+        "DBSecurityGroups$member": null,
+        "RevokeDBSecurityGroupIngressResult$DBSecurityGroup": null
+      }
+    },
+    "DBSecurityGroupAlreadyExistsFault": {
+      "base": "<p> A DB security group with the name specified in <i>DBSecurityGroupName</i> already exists. </p>",
+      "refs": {
+      }
+    },
+    "DBSecurityGroupMembership": {
+      "base": null,
+      "refs": {
+        "DBSecurityGroupMembershipList$member": null
+      }
+    },
+    "DBSecurityGroupMembershipList": {
+      "base": null,
+      "refs": {
+        "DBInstance$DBSecurityGroups": null,
+        "Option$DBSecurityGroupMemberships": null
+      }
+    },
+    "DBSecurityGroupMessage": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DBSecurityGroupNameList": {
+      "base": null,
+      "refs": {
+        "CreateDBInstanceMessage$DBSecurityGroups": null,
+        "ModifyDBInstanceMessage$DBSecurityGroups": null,
+        "OptionConfiguration$DBSecurityGroupMemberships": null
+      }
+    },
+    "DBSecurityGroupNotFoundFault": {
+      "base": "<p> <i>DBSecurityGroupName</i> does not refer to an existing DB security group. </p>",
+      "refs": {
+      }
+    },
+    "DBSecurityGroupNotSupportedFault": {
+      "base": "<p>A DB security group is not allowed for this action.</p>",
+      "refs": {
+      }
+    },
+    "DBSecurityGroupQuotaExceededFault": {
+      "base": "<p>Request would result in user exceeding the allowed number of DB security groups.</p>",
+      "refs": {
+      }
+    },
+    "DBSecurityGroups": {
+      "base": null,
+      "refs": {
+        "DBSecurityGroupMessage$DBSecurityGroups": null
+      }
+    },
+    "DBSnapshot": {
+      "base": null,
+      "refs": {
+        "CopyDBSnapshotResult$DBSnapshot": null,
+        "CreateDBSnapshotResult$DBSnapshot": null,
+        "DBSnapshotList$member": null,
+        "DeleteDBSnapshotResult$DBSnapshot": null
+      }
+    },
+    "DBSnapshotAlreadyExistsFault": {
+      "base": "<p> <i>DBSnapshotIdentifier</i> is already used by an existing snapshot. </p>",
+      "refs": {
+      }
+    },
+    "DBSnapshotList": {
+      "base": null,
+      "refs": {
+        "DBSnapshotMessage$DBSnapshots": null
+      }
+    },
+    "DBSnapshotMessage": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DBSnapshotNotFoundFault": {
+      "base": "<p> <i>DBSnapshotIdentifier</i> does not refer to an existing DB snapshot. </p>",
+      "refs": {
+      }
+    },
+    "DBSubnetGroup": {
+      "base": null,
+      "refs": {
+        "CreateDBSubnetGroupResult$DBSubnetGroup": null,
+        "DBInstance$DBSubnetGroup": null,
+        "DBSubnetGroups$member": null,
+        "ModifyDBSubnetGroupResult$DBSubnetGroup": null
+      }
+    },
+    "DBSubnetGroupAlreadyExistsFault": {
+      "base": "<p> <i>DBSubnetGroupName</i> is already used by an existing DB subnet group. </p>",
+      "refs": {
+      }
+    },
+    "DBSubnetGroupDoesNotCoverEnoughAZs": {
+      "base": "<p>Subnets in the DB subnet group should cover at least two Availability Zones unless there is only one Availability Zone.</p>",
+      "refs": {
+      }
+    },
+    "DBSubnetGroupMessage": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DBSubnetGroupNotAllowedFault": {
+      "base": "<p>Indicates that the DBSubnetGroup should not be specified while creating read replicas that lie in the same region as the source instance.</p>",
+      "refs": {
+      }
+    },
+    "DBSubnetGroupNotFoundFault": {
+      "base": "<p> <i>DBSubnetGroupName</i> does not refer to an existing DB subnet group. </p>",
+      "refs": {
+      }
+    },
+    "DBSubnetGroupQuotaExceededFault": {
+      "base": "<p>Request would result in user exceeding the allowed number of DB subnet groups.</p>",
+      "refs": {
+      }
+    },
+    "DBSubnetGroups": {
+      "base": null,
+      "refs": {
+        "DBSubnetGroupMessage$DBSubnetGroups": null
+      }
+    },
+    "DBSubnetQuotaExceededFault": {
+      "base": "<p>Request would result in user exceeding the allowed number of subnets in a DB subnet groups.</p>",
+      "refs": {
+      }
+    },
+    "DBUpgradeDependencyFailureFault": {
+      "base": "<p>The DB upgrade failed because a resource the DB depends on could not be modified.</p>",
+      "refs": {
+      }
+    },
+    "DeleteDBInstanceMessage": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteDBInstanceResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteDBParameterGroupMessage": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteDBSecurityGroupMessage": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteDBSnapshotMessage": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteDBSnapshotResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteDBSubnetGroupMessage": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteEventSubscriptionMessage": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteEventSubscriptionResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteOptionGroupMessage": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeDBEngineVersionsMessage": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeDBInstancesMessage": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeDBLogFilesDetails": {
+      "base": null,
+      "refs": {
+        "DescribeDBLogFilesList$member": null
+      }
+    },
+    "DescribeDBLogFilesList": {
+      "base": null,
+      "refs": {
+        "DescribeDBLogFilesResponse$DescribeDBLogFiles": null
+      }
+    },
+    "DescribeDBLogFilesMessage": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeDBLogFilesResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeDBParameterGroupsMessage": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeDBParametersMessage": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeDBSecurityGroupsMessage": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeDBSnapshotsMessage": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeDBSubnetGroupsMessage": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeEngineDefaultParametersMessage": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeEngineDefaultParametersResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeEventCategoriesMessage": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeEventSubscriptionsMessage": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeEventsMessage": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeOptionGroupOptionsMessage": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeOptionGroupsMessage": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeOrderableDBInstanceOptionsMessage": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeReservedDBInstancesMessage": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeReservedDBInstancesOfferingsMessage": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "Double": {
+      "base": null,
+      "refs": {
+        "RecurringCharge$RecurringChargeAmount": null,
+        "ReservedDBInstance$FixedPrice": null,
+        "ReservedDBInstance$UsagePrice": null,
+        "ReservedDBInstancesOffering$FixedPrice": null,
+        "ReservedDBInstancesOffering$UsagePrice": null
+      }
+    },
+    "DownloadDBLogFilePortionDetails": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DownloadDBLogFilePortionMessage": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "EC2SecurityGroup": {
+      "base": null,
+      "refs": {
+        "EC2SecurityGroupList$member": null
+      }
+    },
+    "EC2SecurityGroupList": {
+      "base": null,
+      "refs": {
+        "DBSecurityGroup$EC2SecurityGroups": null
+      }
+    },
+    "Endpoint": {
+      "base": null,
+      "refs": {
+        "DBInstance$Endpoint": null
+      }
+    },
+    "EngineDefaults": {
+      "base": null,
+      "refs": {
+        "DescribeEngineDefaultParametersResult$EngineDefaults": null
+      }
+    },
+    "Event": {
+      "base": null,
+      "refs": {
+        "EventList$member": null
+      }
+    },
+    "EventCategoriesList": {
+      "base": null,
+      "refs": {
+        "CreateEventSubscriptionMessage$EventCategories": null,
+        "DescribeEventsMessage$EventCategories": null,
+        "Event$EventCategories": null,
+        "EventCategoriesMap$EventCategories": null,
+        "EventSubscription$EventCategoriesList": null,
+        "ModifyEventSubscriptionMessage$EventCategories": null
+      }
+    },
+    "EventCategoriesMap": {
+      "base": null,
+      "refs": {
+        "EventCategoriesMapList$member": null
+      }
+    },
+    "EventCategoriesMapList": {
+      "base": null,
+      "refs": {
+        "EventCategoriesMessage$EventCategoriesMapList": null
+      }
+    },
+    "EventCategoriesMessage": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "EventList": {
+      "base": null,
+      "refs": {
+        "EventsMessage$Events": null
+      }
+    },
+    "EventSubscription": {
+      "base": null,
+      "refs": {
+        "AddSourceIdentifierToSubscriptionResult$EventSubscription": null,
+        "CreateEventSubscriptionResult$EventSubscription": null,
+        "DeleteEventSubscriptionResult$EventSubscription": null,
+        "EventSubscriptionsList$member": null,
+        "ModifyEventSubscriptionResult$EventSubscription": null,
+        "RemoveSourceIdentifierFromSubscriptionResult$EventSubscription": null
+      }
+    },
+    "EventSubscriptionQuotaExceededFault": {
+      "base": "<p>You have reached the maximum number of event subscriptions.</p>",
+      "refs": {
+      }
+    },
+    "EventSubscriptionsList": {
+      "base": null,
+      "refs": {
+        "EventSubscriptionsMessage$EventSubscriptionsList": null
+      }
+    },
+    "EventSubscriptionsMessage": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "EventsMessage": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "Filter": {
+      "base": null,
+      "refs": {
+        "FilterList$member": null
+      }
+    },
+    "FilterList": {
+      "base": null,
+      "refs": {
+        "DescribeDBEngineVersionsMessage$Filters": null,
+        "DescribeDBInstancesMessage$Filters": null,
+        "DescribeDBLogFilesMessage$Filters": null,
+        "DescribeDBParameterGroupsMessage$Filters": null,
+        "DescribeDBParametersMessage$Filters": null,
+        "DescribeDBSecurityGroupsMessage$Filters": null,
+        "DescribeDBSnapshotsMessage$Filters": null,
+        "DescribeDBSubnetGroupsMessage$Filters": null,
+        "DescribeEngineDefaultParametersMessage$Filters": null,
+        "DescribeEventCategoriesMessage$Filters": null,
+        "DescribeEventSubscriptionsMessage$Filters": null,
+        "DescribeEventsMessage$Filters": null,
+        "DescribeOptionGroupOptionsMessage$Filters": null,
+        "DescribeOptionGroupsMessage$Filters": null,
+        "DescribeOrderableDBInstanceOptionsMessage$Filters": null,
+        "DescribeReservedDBInstancesMessage$Filters": null,
+        "DescribeReservedDBInstancesOfferingsMessage$Filters": null,
+        "ListTagsForResourceMessage$Filters": null
+      }
+    },
+    "FilterValueList": {
+      "base": null,
+      "refs": {
+        "Filter$Values": null
+      }
+    },
+    "IPRange": {
+      "base": null,
+      "refs": {
+        "IPRangeList$member": null
+      }
+    },
+    "IPRangeList": {
+      "base": null,
+      "refs": {
+        "DBSecurityGroup$IPRanges": null
+      }
+    },
+    "InstanceQuotaExceededFault": {
+      "base": "<p>Request would result in user exceeding the allowed number of DB instances.</p>",
+      "refs": {
+      }
+    },
+    "InsufficientDBInstanceCapacityFault": {
+      "base": "<p>Specified DB instance class is not available in the specified Availability Zone.</p>",
+      "refs": {
+      }
+    },
+    "Integer": {
+      "base": null,
+      "refs": {
+        "DBInstance$AllocatedStorage": null,
+        "DBInstance$BackupRetentionPeriod": null,
+        "DBSnapshot$AllocatedStorage": null,
+        "DBSnapshot$Port": null,
+        "DBSnapshot$PercentProgress": null,
+        "DownloadDBLogFilePortionMessage$NumberOfLines": null,
+        "Endpoint$Port": null,
+        "ReservedDBInstance$Duration": null,
+        "ReservedDBInstance$DBInstanceCount": null,
+        "ReservedDBInstancesOffering$Duration": null
+      }
+    },
+    "IntegerOptional": {
+      "base": null,
+      "refs": {
+        "CreateDBInstanceMessage$AllocatedStorage": null,
+        "CreateDBInstanceMessage$BackupRetentionPeriod": null,
+        "CreateDBInstanceMessage$Port": null,
+        "CreateDBInstanceMessage$Iops": null,
+        "CreateDBInstanceReadReplicaMessage$Port": null,
+        "CreateDBInstanceReadReplicaMessage$Iops": null,
+        "DBInstance$Iops": null,
+        "DBSnapshot$Iops": null,
+        "DescribeDBEngineVersionsMessage$MaxRecords": null,
+        "DescribeDBInstancesMessage$MaxRecords": null,
+        "DescribeDBLogFilesMessage$MaxRecords": null,
+        "DescribeDBParameterGroupsMessage$MaxRecords": null,
+        "DescribeDBParametersMessage$MaxRecords": null,
+        "DescribeDBSecurityGroupsMessage$MaxRecords": null,
+        "DescribeDBSnapshotsMessage$MaxRecords": null,
+        "DescribeDBSubnetGroupsMessage$MaxRecords": null,
+        "DescribeEngineDefaultParametersMessage$MaxRecords": null,
+        "DescribeEventSubscriptionsMessage$MaxRecords": null,
+        "DescribeEventsMessage$Duration": null,
+        "DescribeEventsMessage$MaxRecords": null,
+        "DescribeOptionGroupOptionsMessage$MaxRecords": null,
+        "DescribeOptionGroupsMessage$MaxRecords": null,
+        "DescribeOrderableDBInstanceOptionsMessage$MaxRecords": null,
+        "DescribeReservedDBInstancesMessage$MaxRecords": null,
+        "DescribeReservedDBInstancesOfferingsMessage$MaxRecords": null,
+        "ModifyDBInstanceMessage$AllocatedStorage": null,
+        "ModifyDBInstanceMessage$BackupRetentionPeriod": null,
+        "ModifyDBInstanceMessage$Iops": null,
+        "Option$Port": null,
+        "OptionConfiguration$Port": null,
+        "OptionGroupOption$DefaultPort": null,
+        "PendingModifiedValues$AllocatedStorage": null,
+        "PendingModifiedValues$Port": null,
+        "PendingModifiedValues$BackupRetentionPeriod": null,
+        "PendingModifiedValues$Iops": null,
+        "PromoteReadReplicaMessage$BackupRetentionPeriod": null,
+        "PurchaseReservedDBInstancesOfferingMessage$DBInstanceCount": null,
+        "RestoreDBInstanceFromDBSnapshotMessage$Port": null,
+        "RestoreDBInstanceFromDBSnapshotMessage$Iops": null,
+        "RestoreDBInstanceToPointInTimeMessage$Port": null,
+        "RestoreDBInstanceToPointInTimeMessage$Iops": null
+      }
+    },
+    "InvalidDBInstanceStateFault": {
+      "base": "<p> The specified DB instance is not in the <i>available</i> state. </p>",
+      "refs": {
+      }
+    },
+    "InvalidDBParameterGroupStateFault": {
+      "base": "<p>The DB parameter group is in use or is in an invalid state. If you are attempting to delete the parameter group, you cannot delete it when the parameter group is in this state.</p>",
+      "refs": {
+      }
+    },
+    "InvalidDBSecurityGroupStateFault": {
+      "base": "<p>The state of the DB security group does not allow deletion.</p>",
+      "refs": {
+      }
+    },
+    "InvalidDBSnapshotStateFault": {
+      "base": "<p>The state of the DB snapshot does not allow deletion.</p>",
+      "refs": {
+      }
+    },
+    "InvalidDBSubnetGroupFault": {
+      "base": "<p>Indicates the DBSubnetGroup does not belong to the same VPC as that of an existing cross region read replica of the same source instance.</p>",
+      "refs": {
+      }
+    },
+    "InvalidDBSubnetGroupStateFault": {
+      "base": "<p>The DB subnet group cannot be deleted because it is in use.</p>",
+      "refs": {
+      }
+    },
+    "InvalidDBSubnetStateFault": {
+      "base": "<p> The DB subnet is not in the <i>available</i> state. </p>",
+      "refs": {
+      }
+    },
+    "InvalidEventSubscriptionStateFault": {
+      "base": "<p>This error can occur if someone else is modifying a subscription. You should retry the action.</p>",
+      "refs": {
+      }
+    },
+    "InvalidOptionGroupStateFault": {
+      "base": "<p> The option group is not in the <i>available</i> state. </p>",
+      "refs": {
+      }
+    },
+    "InvalidRestoreFault": {
+      "base": "<p>Cannot restore from vpc backup to non-vpc DB instance.</p>",
+      "refs": {
+      }
+    },
+    "InvalidSubnet": {
+      "base": "<p>The requested subnet is invalid, or multiple subnets were requested that are not all in a common VPC.</p>",
+      "refs": {
+      }
+    },
+    "InvalidVPCNetworkStateFault": {
+      "base": "<p>DB subnet group does not cover all Availability Zones after it is created because users' change.</p>",
+      "refs": {
+      }
+    },
+    "KeyList": {
+      "base": null,
+      "refs": {
+        "RemoveTagsFromResourceMessage$TagKeys": null
+      }
+    },
+    "ListTagsForResourceMessage": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "Long": {
+      "base": null,
+      "refs": {
+        "DescribeDBLogFilesDetails$LastWritten": null,
+        "DescribeDBLogFilesDetails$Size": null,
+        "DescribeDBLogFilesMessage$FileLastWritten": null,
+        "DescribeDBLogFilesMessage$FileSize": null
+      }
+    },
+    "ModifyDBInstanceMessage": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ModifyDBInstanceResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ModifyDBParameterGroupMessage": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ModifyDBSubnetGroupMessage": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ModifyDBSubnetGroupResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ModifyEventSubscriptionMessage": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ModifyEventSubscriptionResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ModifyOptionGroupMessage": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ModifyOptionGroupResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "Option": {
+      "base": null,
+      "refs": {
+        "OptionsList$member": null
+      }
+    },
+    "OptionConfiguration": {
+      "base": null,
+      "refs": {
+        "OptionConfigurationList$member": null
+      }
+    },
+    "OptionConfigurationList": {
+      "base": null,
+      "refs": {
+        "ModifyOptionGroupMessage$OptionsToInclude": null
+      }
+    },
+    "OptionGroup": {
+      "base": null,
+      "refs": {
+        "CopyOptionGroupResult$OptionGroup": null,
+        "CreateOptionGroupResult$OptionGroup": null,
+        "ModifyOptionGroupResult$OptionGroup": null,
+        "OptionGroupsList$member": null
+      }
+    },
+    "OptionGroupAlreadyExistsFault": {
+      "base": "<p>The option group you are trying to create already exists.</p>",
+      "refs": {
+      }
+    },
+    "OptionGroupMembership": {
+      "base": null,
+      "refs": {
+        "OptionGroupMembershipList$member": null
+      }
+    },
+    "OptionGroupMembershipList": {
+      "base": null,
+      "refs": {
+        "DBInstance$OptionGroupMemberships": null
+      }
+    },
+    "OptionGroupNotFoundFault": {
+      "base": "<p>The specified option group could not be found.</p>",
+      "refs": {
+      }
+    },
+    "OptionGroupOption": {
+      "base": null,
+      "refs": {
+        "OptionGroupOptionsList$member": null
+      }
+    },
+    "OptionGroupOptionSetting": {
+      "base": null,
+      "refs": {
+        "OptionGroupOptionSettingsList$member": null
+      }
+    },
+    "OptionGroupOptionSettingsList": {
+      "base": null,
+      "refs": {
+        "OptionGroupOption$OptionGroupOptionSettings": null
+      }
+    },
+    "OptionGroupOptionsList": {
+      "base": null,
+      "refs": {
+        "OptionGroupOptionsMessage$OptionGroupOptions": null
+      }
+    },
+    "OptionGroupOptionsMessage": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "OptionGroupQuotaExceededFault": {
+      "base": "<p>The quota of 20 option groups was exceeded for this AWS account.</p>",
+      "refs": {
+      }
+    },
+    "OptionGroups": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "OptionGroupsList": {
+      "base": null,
+      "refs": {
+        "OptionGroups$OptionGroupsList": null
+      }
+    },
+    "OptionNamesList": {
+      "base": null,
+      "refs": {
+        "ModifyOptionGroupMessage$OptionsToRemove": null
+      }
+    },
+    "OptionSetting": {
+      "base": null,
+      "refs": {
+        "OptionSettingConfigurationList$member": null,
+        "OptionSettingsList$member": null
+      }
+    },
+    "OptionSettingConfigurationList": {
+      "base": null,
+      "refs": {
+        "Option$OptionSettings": null
+      }
+    },
+    "OptionSettingsList": {
+      "base": null,
+      "refs": {
+        "OptionConfiguration$OptionSettings": null
+      }
+    },
+    "OptionsDependedOn": {
+      "base": null,
+      "refs": {
+        "OptionGroupOption$OptionsDependedOn": null
+      }
+    },
+    "OptionsList": {
+      "base": null,
+      "refs": {
+        "OptionGroup$Options": null
+      }
+    },
+    "OrderableDBInstanceOption": {
+      "base": null,
+      "refs": {
+        "OrderableDBInstanceOptionsList$member": null
+      }
+    },
+    "OrderableDBInstanceOptionsList": {
+      "base": null,
+      "refs": {
+        "OrderableDBInstanceOptionsMessage$OrderableDBInstanceOptions": null
+      }
+    },
+    "OrderableDBInstanceOptionsMessage": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "Parameter": {
+      "base": null,
+      "refs": {
+        "ParametersList$member": null
+      }
+    },
+    "ParametersList": {
+      "base": null,
+      "refs": {
+        "DBParameterGroupDetails$Parameters": null,
+        "EngineDefaults$Parameters": null,
+        "ModifyDBParameterGroupMessage$Parameters": null,
+        "ResetDBParameterGroupMessage$Parameters": null
+      }
+    },
+    "PendingModifiedValues": {
+      "base": null,
+      "refs": {
+        "DBInstance$PendingModifiedValues": null
+      }
+    },
+    "PointInTimeRestoreNotEnabledFault": {
+      "base": "<p> <i>SourceDBInstanceIdentifier</i> refers to a DB instance with <i>BackupRetentionPeriod</i> equal to 0. </p>",
+      "refs": {
+      }
+    },
+    "PromoteReadReplicaMessage": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "PromoteReadReplicaResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ProvisionedIopsNotAvailableInAZFault": {
+      "base": "<p>Provisioned IOPS not available in the specified Availability Zone.</p>",
+      "refs": {
+      }
+    },
+    "PurchaseReservedDBInstancesOfferingMessage": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "PurchaseReservedDBInstancesOfferingResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ReadReplicaDBInstanceIdentifierList": {
+      "base": null,
+      "refs": {
+        "DBInstance$ReadReplicaDBInstanceIdentifiers": null
+      }
+    },
+    "RebootDBInstanceMessage": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "RebootDBInstanceResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "RecurringCharge": {
+      "base": null,
+      "refs": {
+        "RecurringChargeList$member": null
+      }
+    },
+    "RecurringChargeList": {
+      "base": null,
+      "refs": {
+        "ReservedDBInstance$RecurringCharges": null,
+        "ReservedDBInstancesOffering$RecurringCharges": null
+      }
+    },
+    "RemoveSourceIdentifierFromSubscriptionMessage": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "RemoveSourceIdentifierFromSubscriptionResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "RemoveTagsFromResourceMessage": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ReservedDBInstance": {
+      "base": null,
+      "refs": {
+        "PurchaseReservedDBInstancesOfferingResult$ReservedDBInstance": null,
+        "ReservedDBInstanceList$member": null
+      }
+    },
+    "ReservedDBInstanceAlreadyExistsFault": {
+      "base": "<p>User already has a reservation with the given identifier.</p>",
+      "refs": {
+      }
+    },
+    "ReservedDBInstanceList": {
+      "base": null,
+      "refs": {
+        "ReservedDBInstanceMessage$ReservedDBInstances": null
+      }
+    },
+    "ReservedDBInstanceMessage": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ReservedDBInstanceNotFoundFault": {
+      "base": "<p>The specified reserved DB Instance not found.</p>",
+      "refs": {
+      }
+    },
+    "ReservedDBInstanceQuotaExceededFault": {
+      "base": "<p>Request would exceed the user's DB Instance quota.</p>",
+      "refs": {
+      }
+    },
+    "ReservedDBInstancesOffering": {
+      "base": null,
+      "refs": {
+        "ReservedDBInstancesOfferingList$member": null
+      }
+    },
+    "ReservedDBInstancesOfferingList": {
+      "base": null,
+      "refs": {
+        "ReservedDBInstancesOfferingMessage$ReservedDBInstancesOfferings": null
+      }
+    },
+    "ReservedDBInstancesOfferingMessage": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ReservedDBInstancesOfferingNotFoundFault": {
+      "base": "<p>Specified offering does not exist.</p>",
+      "refs": {
+      }
+    },
+    "ResetDBParameterGroupMessage": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "RestoreDBInstanceFromDBSnapshotMessage": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "RestoreDBInstanceFromDBSnapshotResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "RestoreDBInstanceToPointInTimeMessage": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "RestoreDBInstanceToPointInTimeResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "RevokeDBSecurityGroupIngressMessage": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "RevokeDBSecurityGroupIngressResult": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "SNSInvalidTopicFault": {
+      "base": "<p>SNS has responded that there is a problem with the SND topic specified.</p>",
+      "refs": {
+      }
+    },
+    "SNSNoAuthorizationFault": {
+      "base": "<p>You do not have permission to publish to the SNS topic ARN.</p>",
+      "refs": {
+      }
+    },
+    "SNSTopicArnNotFoundFault": {
+      "base": "<p>The SNS topic ARN does not exist.</p>",
+      "refs": {
+      }
+    },
+    "SnapshotQuotaExceededFault": {
+      "base": "<p>Request would result in user exceeding the allowed number of DB snapshots.</p>",
+      "refs": {
+      }
+    },
+    "SourceIdsList": {
+      "base": null,
+      "refs": {
+        "CreateEventSubscriptionMessage$SourceIds": null,
+        "EventSubscription$SourceIdsList": null
+      }
+    },
+    "SourceNotFoundFault": {
+      "base": "<p>The requested source could not be found.</p>",
+      "refs": {
+      }
+    },
+    "SourceType": {
+      "base": null,
+      "refs": {
+        "DescribeEventsMessage$SourceType": null,
+        "Event$SourceType": null
+      }
+    },
+    "StorageQuotaExceededFault": {
+      "base": "<p>Request would result in user exceeding the allowed amount of storage available across all DB instances.</p>",
+      "refs": {
+      }
+    },
+    "StorageTypeNotSupportedFault": {
+      "base": "<p> <i>StorageType</i> specified cannot be associated with the DB Instance. </p>",
+      "refs": {
+      }
+    },
+    "String": {
+      "base": null,
+      "refs": {
+        "AddSourceIdentifierToSubscriptionMessage$SubscriptionName": null,
+        "AddSourceIdentifierToSubscriptionMessage$SourceIdentifier": null,
+        "AddTagsToResourceMessage$ResourceName": null,
+        "AuthorizeDBSecurityGroupIngressMessage$DBSecurityGroupName": null,
+        "AuthorizeDBSecurityGroupIngressMessage$CIDRIP": null,
+        "AuthorizeDBSecurityGroupIngressMessage$EC2SecurityGroupName": null,
+        "AuthorizeDBSecurityGroupIngressMessage$EC2SecurityGroupId": null,
+        "AuthorizeDBSecurityGroupIngressMessage$EC2SecurityGroupOwnerId": null,
+        "AvailabilityZone$Name": null,
+        "CharacterSet$CharacterSetName": null,
+        "CharacterSet$CharacterSetDescription": null,
+        "CopyDBParameterGroupMessage$SourceDBParameterGroupIdentifier": null,
+        "CopyDBParameterGroupMessage$TargetDBParameterGroupIdentifier": null,
+        "CopyDBParameterGroupMessage$TargetDBParameterGroupDescription": null,
+        "CopyDBSnapshotMessage$SourceDBSnapshotIdentifier": null,
+        "CopyDBSnapshotMessage$TargetDBSnapshotIdentifier": null,
+        "CopyOptionGroupMessage$SourceOptionGroupIdentifier": null,
+        "CopyOptionGroupMessage$TargetOptionGroupIdentifier": null,
+        "CopyOptionGroupMessage$TargetOptionGroupDescription": null,
+        "CreateDBInstanceMessage$DBName": null,
+        "CreateDBInstanceMessage$DBInstanceIdentifier": null,
+        "CreateDBInstanceMessage$DBInstanceClass": null,
+        "CreateDBInstanceMessage$Engine": null,
+        "CreateDBInstanceMessage$MasterUsername": null,
+        "CreateDBInstanceMessage$MasterUserPassword": null,
+        "CreateDBInstanceMessage$AvailabilityZone": null,
+        "CreateDBInstanceMessage$DBSubnetGroupName": null,
+        "CreateDBInstanceMessage$PreferredMaintenanceWindow": null,
+        "CreateDBInstanceMessage$DBParameterGroupName": null,
+        "CreateDBInstanceMessage$PreferredBackupWindow": null,
+        "CreateDBInstanceMessage$EngineVersion": null,
+        "CreateDBInstanceMessage$LicenseModel": null,
+        "CreateDBInstanceMessage$OptionGroupName": null,
+        "CreateDBInstanceMessage$CharacterSetName": null,
+        "CreateDBInstanceMessage$StorageType": null,
+        "CreateDBInstanceMessage$TdeCredentialArn": null,
+        "CreateDBInstanceMessage$TdeCredentialPassword": null,
+        "CreateDBInstanceReadReplicaMessage$DBInstanceIdentifier": null,
+        "CreateDBInstanceReadReplicaMessage$SourceDBInstanceIdentifier": null,
+        "CreateDBInstanceReadReplicaMessage$DBInstanceClass": null,
+        "CreateDBInstanceReadReplicaMessage$AvailabilityZone": null,
+        "CreateDBInstanceReadReplicaMessage$OptionGroupName": null,
+        "CreateDBInstanceReadReplicaMessage$DBSubnetGroupName": null,
+        "CreateDBInstanceReadReplicaMessage$StorageType": null,
+        "CreateDBParameterGroupMessage$DBParameterGroupName": null,
+        "CreateDBParameterGroupMessage$DBParameterGroupFamily": null,
+        "CreateDBParameterGroupMessage$Description": null,
+        "CreateDBSecurityGroupMessage$DBSecurityGroupName": null,
+        "CreateDBSecurityGroupMessage$DBSecurityGroupDescription": null,
+        "CreateDBSnapshotMessage$DBSnapshotIdentifier": null,
+        "CreateDBSnapshotMessage$DBInstanceIdentifier": null,
+        "CreateDBSubnetGroupMessage$DBSubnetGroupName": null,
+        "CreateDBSubnetGroupMessage$DBSubnetGroupDescription": null,
+        "CreateEventSubscriptionMessage$SubscriptionName": null,
+        "CreateEventSubscriptionMessage$SnsTopicArn": null,
+        "CreateEventSubscriptionMessage$SourceType": null,
+        "CreateOptionGroupMessage$OptionGroupName": null,
+        "CreateOptionGroupMessage$EngineName": null,
+        "CreateOptionGroupMessage$MajorEngineVersion": null,
+        "CreateOptionGroupMessage$OptionGroupDescription": null,
+        "DBEngineVersion$Engine": null,
+        "DBEngineVersion$EngineVersion": null,
+        "DBEngineVersion$DBParameterGroupFamily": null,
+        "DBEngineVersion$DBEngineDescription": null,
+        "DBEngineVersion$DBEngineVersionDescription": null,
+        "DBEngineVersionMessage$Marker": null,
+        "DBInstance$DBInstanceIdentifier": null,
+        "DBInstance$DBInstanceClass": null,
+        "DBInstance$Engine": null,
+        "DBInstance$DBInstanceStatus": null,
+        "DBInstance$MasterUsername": null,
+        "DBInstance$DBName": null,
+        "DBInstance$PreferredBackupWindow": null,
+        "DBInstance$AvailabilityZone": null,
+        "DBInstance$PreferredMaintenanceWindow": null,
+        "DBInstance$EngineVersion": null,
+        "DBInstance$ReadReplicaSourceDBInstanceIdentifier": null,
+        "DBInstance$LicenseModel": null,
+        "DBInstance$CharacterSetName": null,
+        "DBInstance$SecondaryAvailabilityZone": null,
+        "DBInstance$StorageType": null,
+        "DBInstance$TdeCredentialArn": null,
+        "DBInstanceMessage$Marker": null,
+        "DBInstanceStatusInfo$StatusType": null,
+        "DBInstanceStatusInfo$Status": null,
+        "DBInstanceStatusInfo$Message": null,
+        "DBParameterGroup$DBParameterGroupName": null,
+        "DBParameterGroup$DBParameterGroupFamily": null,
+        "DBParameterGroup$Description": null,
+        "DBParameterGroupDetails$Marker": null,
+        "DBParameterGroupNameMessage$DBParameterGroupName": null,
+        "DBParameterGroupStatus$DBParameterGroupName": null,
+        "DBParameterGroupStatus$ParameterApplyStatus": null,
+        "DBParameterGroupsMessage$Marker": null,
+        "DBSecurityGroup$OwnerId": null,
+        "DBSecurityGroup$DBSecurityGroupName": null,
+        "DBSecurityGroup$DBSecurityGroupDescription": null,
+        "DBSecurityGroup$VpcId": null,
+        "DBSecurityGroupMembership$DBSecurityGroupName": null,
+        "DBSecurityGroupMembership$Status": null,
+        "DBSecurityGroupMessage$Marker": null,
+        "DBSecurityGroupNameList$member": null,
+        "DBSnapshot$DBSnapshotIdentifier": null,
+        "DBSnapshot$DBInstanceIdentifier": null,
+        "DBSnapshot$Engine": null,
+        "DBSnapshot$Status": null,
+        "DBSnapshot$AvailabilityZone": null,
+        "DBSnapshot$VpcId": null,
+        "DBSnapshot$MasterUsername": null,
+        "DBSnapshot$EngineVersion": null,
+        "DBSnapshot$LicenseModel": null,
+        "DBSnapshot$SnapshotType": null,
+        "DBSnapshot$OptionGroupName": null,
+        "DBSnapshot$SourceRegion": null,
+        "DBSnapshot$StorageType": null,
+        "DBSnapshot$TdeCredentialArn": null,
+        "DBSnapshotMessage$Marker": null,
+        "DBSubnetGroup$DBSubnetGroupName": null,
+        "DBSubnetGroup$DBSubnetGroupDescription": null,
+        "DBSubnetGroup$VpcId": null,
+        "DBSubnetGroup$SubnetGroupStatus": null,
+        "DBSubnetGroupMessage$Marker": null,
+        "DeleteDBInstanceMessage$DBInstanceIdentifier": null,
+        "DeleteDBInstanceMessage$FinalDBSnapshotIdentifier": null,
+        "DeleteDBParameterGroupMessage$DBParameterGroupName": null,
+        "DeleteDBSecurityGroupMessage$DBSecurityGroupName": null,
+        "DeleteDBSnapshotMessage$DBSnapshotIdentifier": null,
+        "DeleteDBSubnetGroupMessage$DBSubnetGroupName": null,
+        "DeleteEventSubscriptionMessage$SubscriptionName": null,
+        "DeleteOptionGroupMessage$OptionGroupName": null,
+        "DescribeDBEngineVersionsMessage$Engine": null,
+        "DescribeDBEngineVersionsMessage$EngineVersion": null,
+        "DescribeDBEngineVersionsMessage$DBParameterGroupFamily": null,
+        "DescribeDBEngineVersionsMessage$Marker": null,
+        "DescribeDBInstancesMessage$DBInstanceIdentifier": null,
+        "DescribeDBInstancesMessage$Marker": null,
+        "DescribeDBLogFilesDetails$LogFileName": null,
+        "DescribeDBLogFilesMessage$DBInstanceIdentifier": null,
+        "DescribeDBLogFilesMessage$FilenameContains": null,
+        "DescribeDBLogFilesMessage$Marker": null,
+        "DescribeDBLogFilesResponse$Marker": null,
+        "DescribeDBParameterGroupsMessage$DBParameterGroupName": null,
+        "DescribeDBParameterGroupsMessage$Marker": null,
+        "DescribeDBParametersMessage$DBParameterGroupName": null,
+        "DescribeDBParametersMessage$Source": null,
+        "DescribeDBParametersMessage$Marker": null,
+        "DescribeDBSecurityGroupsMessage$DBSecurityGroupName": null,
+        "DescribeDBSecurityGroupsMessage$Marker": null,
+        "DescribeDBSnapshotsMessage$DBInstanceIdentifier": null,
+        "DescribeDBSnapshotsMessage$DBSnapshotIdentifier": null,
+        "DescribeDBSnapshotsMessage$SnapshotType": null,
+        "DescribeDBSnapshotsMessage$Marker": null,
+        "DescribeDBSubnetGroupsMessage$DBSubnetGroupName": null,
+        "DescribeDBSubnetGroupsMessage$Marker": null,
+        "DescribeEngineDefaultParametersMessage$DBParameterGroupFamily": null,
+        "DescribeEngineDefaultParametersMessage$Marker": null,
+        "DescribeEventCategoriesMessage$SourceType": null,
+        "DescribeEventSubscriptionsMessage$SubscriptionName": null,
+        "DescribeEventSubscriptionsMessage$Marker": null,
+        "DescribeEventsMessage$SourceIdentifier": null,
+        "DescribeEventsMessage$Marker": null,
+        "DescribeOptionGroupOptionsMessage$EngineName": null,
+        "DescribeOptionGroupOptionsMessage$MajorEngineVersion": null,
+        "DescribeOptionGroupOptionsMessage$Marker": null,
+        "DescribeOptionGroupsMessage$OptionGroupName": null,
+        "DescribeOptionGroupsMessage$Marker": null,
+        "DescribeOptionGroupsMessage$EngineName": null,
+        "DescribeOptionGroupsMessage$MajorEngineVersion": null,
+        "DescribeOrderableDBInstanceOptionsMessage$Engine": null,
+        "DescribeOrderableDBInstanceOptionsMessage$EngineVersion": null,
+        "DescribeOrderableDBInstanceOptionsMessage$DBInstanceClass": null,
+        "DescribeOrderableDBInstanceOptionsMessage$LicenseModel": null,
+        "DescribeOrderableDBInstanceOptionsMessage$Marker": null,
+        "DescribeReservedDBInstancesMessage$ReservedDBInstanceId": null,
+        "DescribeReservedDBInstancesMessage$ReservedDBInstancesOfferingId": null,
+        "DescribeReservedDBInstancesMessage$DBInstanceClass": null,
+        "DescribeReservedDBInstancesMessage$Duration": null,
+        "DescribeReservedDBInstancesMessage$ProductDescription": null,
+        "DescribeReservedDBInstancesMessage$OfferingType": null,
+        "DescribeReservedDBInstancesMessage$Marker": null,
+        "DescribeReservedDBInstancesOfferingsMessage$ReservedDBInstancesOfferingId": null,
+        "DescribeReservedDBInstancesOfferingsMessage$DBInstanceClass": null,
+        "DescribeReservedDBInstancesOfferingsMessage$Duration": null,
+        "DescribeReservedDBInstancesOfferingsMessage$ProductDescription": null,
+        "DescribeReservedDBInstancesOfferingsMessage$OfferingType": null,
+        "DescribeReservedDBInstancesOfferingsMessage$Marker": null,
+        "DownloadDBLogFilePortionDetails$LogFileData": null,
+        "DownloadDBLogFilePortionDetails$Marker": null,
+        "DownloadDBLogFilePortionMessage$DBInstanceIdentifier": null,
+        "DownloadDBLogFilePortionMessage$LogFileName": null,
+        "DownloadDBLogFilePortionMessage$Marker": null,
+        "EC2SecurityGroup$Status": null,
+        "EC2SecurityGroup$EC2SecurityGroupName": null,
+        "EC2SecurityGroup$EC2SecurityGroupId": null,
+        "EC2SecurityGroup$EC2SecurityGroupOwnerId": null,
+        "Endpoint$Address": null,
+        "EngineDefaults$DBParameterGroupFamily": null,
+        "EngineDefaults$Marker": null,
+        "Event$SourceIdentifier": null,
+        "Event$Message": null,
+        "EventCategoriesList$member": null,
+        "EventCategoriesMap$SourceType": null,
+        "EventSubscription$CustomerAwsId": null,
+        "EventSubscription$CustSubscriptionId": null,
+        "EventSubscription$SnsTopicArn": null,
+        "EventSubscription$Status": null,
+        "EventSubscription$SubscriptionCreationTime": null,
+        "EventSubscription$SourceType": null,
+        "EventSubscriptionsMessage$Marker": null,
+        "EventsMessage$Marker": null,
+        "Filter$Name": null,
+        "FilterValueList$member": null,
+        "IPRange$Status": null,
+        "IPRange$CIDRIP": null,
+        "KeyList$member": null,
+        "ListTagsForResourceMessage$ResourceName": null,
+        "ModifyDBInstanceMessage$DBInstanceIdentifier": null,
+        "ModifyDBInstanceMessage$DBInstanceClass": null,
+        "ModifyDBInstanceMessage$MasterUserPassword": null,
+        "ModifyDBInstanceMessage$DBParameterGroupName": null,
+        "ModifyDBInstanceMessage$PreferredBackupWindow": null,
+        "ModifyDBInstanceMessage$PreferredMaintenanceWindow": null,
+        "ModifyDBInstanceMessage$EngineVersion": null,
+        "ModifyDBInstanceMessage$OptionGroupName": null,
+        "ModifyDBInstanceMessage$NewDBInstanceIdentifier": null,
+        "ModifyDBInstanceMessage$StorageType": null,
+        "ModifyDBInstanceMessage$TdeCredentialArn": null,
+        "ModifyDBInstanceMessage$TdeCredentialPassword": null,
+        "ModifyDBParameterGroupMessage$DBParameterGroupName": null,
+        "ModifyDBSubnetGroupMessage$DBSubnetGroupName": null,
+        "ModifyDBSubnetGroupMessage$DBSubnetGroupDescription": null,
+        "ModifyEventSubscriptionMessage$SubscriptionName": null,
+        "ModifyEventSubscriptionMessage$SnsTopicArn": null,
+        "ModifyEventSubscriptionMessage$SourceType": null,
+        "ModifyOptionGroupMessage$OptionGroupName": null,
+        "Option$OptionName": null,
+        "Option$OptionDescription": null,
+        "OptionConfiguration$OptionName": null,
+        "OptionGroup$OptionGroupName": null,
+        "OptionGroup$OptionGroupDescription": null,
+        "OptionGroup$EngineName": null,
+        "OptionGroup$MajorEngineVersion": null,
+        "OptionGroup$VpcId": null,
+        "OptionGroupMembership$OptionGroupName": null,
+        "OptionGroupMembership$Status": null,
+        "OptionGroupOption$Name": null,
+        "OptionGroupOption$Description": null,
+        "OptionGroupOption$EngineName": null,
+        "OptionGroupOption$MajorEngineVersion": null,
+        "OptionGroupOption$MinimumRequiredMinorEngineVersion": null,
+        "OptionGroupOptionSetting$SettingName": null,
+        "OptionGroupOptionSetting$SettingDescription": null,
+        "OptionGroupOptionSetting$DefaultValue": null,
+        "OptionGroupOptionSetting$ApplyType": null,
+        "OptionGroupOptionSetting$AllowedValues": null,
+        "OptionGroupOptionsMessage$Marker": null,
+        "OptionGroups$Marker": null,
+        "OptionNamesList$member": null,
+        "OptionSetting$Name": null,
+        "OptionSetting$Value": null,
+        "OptionSetting$DefaultValue": null,
+        "OptionSetting$Description": null,
+        "OptionSetting$ApplyType": null,
+        "OptionSetting$DataType": null,
+        "OptionSetting$AllowedValues": null,
+        "OptionsDependedOn$member": null,
+        "OrderableDBInstanceOption$Engine": null,
+        "OrderableDBInstanceOption$EngineVersion": null,
+        "OrderableDBInstanceOption$DBInstanceClass": null,
+        "OrderableDBInstanceOption$LicenseModel": null,
+        "OrderableDBInstanceOption$StorageType": null,
+        "OrderableDBInstanceOptionsMessage$Marker": null,
+        "Parameter$ParameterName": null,
+        "Parameter$ParameterValue": null,
+        "Parameter$Description": null,
+        "Parameter$Source": null,
+        "Parameter$ApplyType": null,
+        "Parameter$DataType": null,
+        "Parameter$AllowedValues": null,
+        "Parameter$MinimumEngineVersion": null,
+        "PendingModifiedValues$DBInstanceClass": null,
+        "PendingModifiedValues$MasterUserPassword": null,
+        "PendingModifiedValues$EngineVersion": null,
+        "PendingModifiedValues$DBInstanceIdentifier": null,
+        "PendingModifiedValues$StorageType": null,
+        "PromoteReadReplicaMessage$DBInstanceIdentifier": null,
+        "PromoteReadReplicaMessage$PreferredBackupWindow": null,
+        "PurchaseReservedDBInstancesOfferingMessage$ReservedDBInstancesOfferingId": null,
+        "PurchaseReservedDBInstancesOfferingMessage$ReservedDBInstanceId": null,
+        "ReadReplicaDBInstanceIdentifierList$member": null,
+        "RebootDBInstanceMessage$DBInstanceIdentifier": null,
+        "RecurringCharge$RecurringChargeFrequency": null,
+        "RemoveSourceIdentifierFromSubscriptionMessage$SubscriptionName": null,
+        "RemoveSourceIdentifierFromSubscriptionMessage$SourceIdentifier": null,
+        "RemoveTagsFromResourceMessage$ResourceName": null,
+        "ReservedDBInstance$ReservedDBInstanceId": null,
+        "ReservedDBInstance$ReservedDBInstancesOfferingId": null,
+        "ReservedDBInstance$DBInstanceClass": null,
+        "ReservedDBInstance$CurrencyCode": null,
+        "ReservedDBInstance$ProductDescription": null,
+        "ReservedDBInstance$OfferingType": null,
+        "ReservedDBInstance$State": null,
+        "ReservedDBInstanceMessage$Marker": null,
+        "ReservedDBInstancesOffering$ReservedDBInstancesOfferingId": null,
+        "ReservedDBInstancesOffering$DBInstanceClass": null,
+        "ReservedDBInstancesOffering$CurrencyCode": null,
+        "ReservedDBInstancesOffering$ProductDescription": null,
+        "ReservedDBInstancesOffering$OfferingType": null,
+        "ReservedDBInstancesOfferingMessage$Marker": null,
+        "ResetDBParameterGroupMessage$DBParameterGroupName": null,
+        "RestoreDBInstanceFromDBSnapshotMessage$DBInstanceIdentifier": null,
+        "RestoreDBInstanceFromDBSnapshotMessage$DBSnapshotIdentifier": null,
+        "RestoreDBInstanceFromDBSnapshotMessage$DBInstanceClass": null,
+        "RestoreDBInstanceFromDBSnapshotMessage$AvailabilityZone": null,
+        "RestoreDBInstanceFromDBSnapshotMessage$DBSubnetGroupName": null,
+        "RestoreDBInstanceFromDBSnapshotMessage$LicenseModel": null,
+        "RestoreDBInstanceFromDBSnapshotMessage$DBName": null,
+        "RestoreDBInstanceFromDBSnapshotMessage$Engine": null,
+        "RestoreDBInstanceFromDBSnapshotMessage$OptionGroupName": null,
+        "RestoreDBInstanceFromDBSnapshotMessage$StorageType": null,
+        "RestoreDBInstanceFromDBSnapshotMessage$TdeCredentialArn": null,
+        "RestoreDBInstanceFromDBSnapshotMessage$TdeCredentialPassword": null,
+        "RestoreDBInstanceToPointInTimeMessage$SourceDBInstanceIdentifier": null,
+        "RestoreDBInstanceToPointInTimeMessage$TargetDBInstanceIdentifier": null,
+        "RestoreDBInstanceToPointInTimeMessage$DBInstanceClass": null,
+        "RestoreDBInstanceToPointInTimeMessage$AvailabilityZone": null,
+        "RestoreDBInstanceToPointInTimeMessage$DBSubnetGroupName": null,
+        "RestoreDBInstanceToPointInTimeMessage$LicenseModel": null,
+        "RestoreDBInstanceToPointInTimeMessage$DBName": null,
+        "RestoreDBInstanceToPointInTimeMessage$Engine": null,
+        "RestoreDBInstanceToPointInTimeMessage$OptionGroupName": null,
+        "RestoreDBInstanceToPointInTimeMessage$StorageType": null,
+        "RestoreDBInstanceToPointInTimeMessage$TdeCredentialArn": null,
+        "RestoreDBInstanceToPointInTimeMessage$TdeCredentialPassword": null,
+        "RevokeDBSecurityGroupIngressMessage$DBSecurityGroupName": null,
+        "RevokeDBSecurityGroupIngressMessage$CIDRIP": null,
+        "RevokeDBSecurityGroupIngressMessage$EC2SecurityGroupName": null,
+        "RevokeDBSecurityGroupIngressMessage$EC2SecurityGroupId": null,
+        "RevokeDBSecurityGroupIngressMessage$EC2SecurityGroupOwnerId": null,
+        "SourceIdsList$member": null,
+        "Subnet$SubnetIdentifier": null,
+        "Subnet$SubnetStatus": null,
+        "SubnetIdentifierList$member": null,
+        "Tag$Key": null,
+        "Tag$Value": null,
+        "VpcSecurityGroupIdList$member": null,
+        "VpcSecurityGroupMembership$VpcSecurityGroupId": null,
+        "VpcSecurityGroupMembership$Status": null
+      }
+    },
+    "Subnet": {
+      "base": null,
+      "refs": {
+        "SubnetList$member": null
+      }
+    },
+    "SubnetAlreadyInUse": {
+      "base": "<p>The DB subnet is already in use in the Availability Zone.</p>",
+      "refs": {
+      }
+    },
+    "SubnetIdentifierList": {
+      "base": null,
+      "refs": {
+        "CreateDBSubnetGroupMessage$SubnetIds": null,
+        "ModifyDBSubnetGroupMessage$SubnetIds": null
+      }
+    },
+    "SubnetList": {
+      "base": null,
+      "refs": {
+        "DBSubnetGroup$Subnets": null
+      }
+    },
+    "SubscriptionAlreadyExistFault": {
+      "base": "<p>The supplied subscription name already exists.</p>",
+      "refs": {
+      }
+    },
+    "SubscriptionCategoryNotFoundFault": {
+      "base": "<p>The supplied category does not exist.</p>",
+      "refs": {
+      }
+    },
+    "SubscriptionNotFoundFault": {
+      "base": "<p>The subscription name does not exist.</p>",
+      "refs": {
+      }
+    },
+    "SupportedCharacterSetsList": {
+      "base": null,
+      "refs": {
+        "DBEngineVersion$SupportedCharacterSets": null
+      }
+    },
+    "TStamp": {
+      "base": null,
+      "refs": {
+        "DBInstance$InstanceCreateTime": null,
+        "DBInstance$LatestRestorableTime": null,
+        "DBSnapshot$SnapshotCreateTime": null,
+        "DBSnapshot$InstanceCreateTime": null,
+        "DescribeEventsMessage$StartTime": null,
+        "DescribeEventsMessage$EndTime": null,
+        "Event$Date": null,
+        "ReservedDBInstance$StartTime": null,
+        "RestoreDBInstanceToPointInTimeMessage$RestoreTime": null
+      }
+    },
+    "Tag": {
+      "base": null,
+      "refs": {
+        "TagList$member": null
+      }
+    },
+    "TagList": {
+      "base": null,
+      "refs": {
+        "AddTagsToResourceMessage$Tags": null,
+        "CopyDBParameterGroupMessage$Tags": null,
+        "CopyDBSnapshotMessage$Tags": null,
+        "CopyOptionGroupMessage$Tags": null,
+        "CreateDBInstanceMessage$Tags": null,
+        "CreateDBInstanceReadReplicaMessage$Tags": null,
+        "CreateDBParameterGroupMessage$Tags": null,
+        "CreateDBSecurityGroupMessage$Tags": null,
+        "CreateDBSnapshotMessage$Tags": null,
+        "CreateDBSubnetGroupMessage$Tags": null,
+        "CreateEventSubscriptionMessage$Tags": null,
+        "CreateOptionGroupMessage$Tags": null,
+        "PurchaseReservedDBInstancesOfferingMessage$Tags": null,
+        "RestoreDBInstanceFromDBSnapshotMessage$Tags": null,
+        "RestoreDBInstanceToPointInTimeMessage$Tags": null,
+        "TagListMessage$TagList": null
+      }
+    },
+    "TagListMessage": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "VpcSecurityGroupIdList": {
+      "base": null,
+      "refs": {
+        "CreateDBInstanceMessage$VpcSecurityGroupIds": null,
+        "ModifyDBInstanceMessage$VpcSecurityGroupIds": null,
+        "OptionConfiguration$VpcSecurityGroupMemberships": null
+      }
+    },
+    "VpcSecurityGroupMembership": {
+      "base": null,
+      "refs": {
+        "VpcSecurityGroupMembershipList$member": null
+      }
+    },
+    "VpcSecurityGroupMembershipList": {
+      "base": null,
+      "refs": {
+        "DBInstance$VpcSecurityGroups": null,
+        "Option$VpcSecurityGroupMemberships": null
+      }
+    }
+  }
+}

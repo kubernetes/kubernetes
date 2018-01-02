@@ -1,0 +1,98 @@
+// Package wrapnewlines provides access to the Example API.
+//
+// Usage example:
+//
+//   import "google.golang.org/api/wrapnewlines/v1"
+//   ...
+//   wrapnewlinesService, err := wrapnewlines.New(oauthHttpClient)
+package wrapnewlines // import "google.golang.org/api/wrapnewlines/v1"
+
+import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
+	context "golang.org/x/net/context"
+	ctxhttp "golang.org/x/net/context/ctxhttp"
+	gensupport "google.golang.org/api/gensupport"
+	googleapi "google.golang.org/api/googleapi"
+	"io"
+	"net/http"
+	"net/url"
+	"strconv"
+	"strings"
+)
+
+// Always reference these packages, just in case the auto-generated code
+// below doesn't.
+var _ = bytes.NewBuffer
+var _ = strconv.Itoa
+var _ = fmt.Sprintf
+var _ = json.NewDecoder
+var _ = io.Copy
+var _ = url.Parse
+var _ = gensupport.MarshalJSON
+var _ = googleapi.Version
+var _ = errors.New
+var _ = strings.Replace
+var _ = context.Canceled
+var _ = ctxhttp.Do
+
+const apiId = "wrapnewlines:v1"
+const apiName = "wrapnewlines"
+const apiVersion = "v1"
+const basePath = "https://www.googleapis.com/discovery/v1/apis"
+
+func New(client *http.Client) (*Service, error) {
+	if client == nil {
+		return nil, errors.New("client is nil")
+	}
+	s := &Service{client: client, BasePath: basePath}
+	return s, nil
+}
+
+type Service struct {
+	client    *http.Client
+	BasePath  string // API endpoint base URL
+	UserAgent string // optional additional User-Agent fragment
+}
+
+func (s *Service) userAgent() string {
+	if s.UserAgent == "" {
+		return googleapi.UserAgent
+	}
+	return googleapi.UserAgent + " " + s.UserAgent
+}
+
+// Thing: don't care
+type Thing struct {
+	// Oneline: First sentence. Second sentence. Description is long enough
+	// to be wrapped.
+	Oneline string `json:"oneline,omitempty"`
+
+	// Twoline: First sentence.
+	// Second sentence. Description is long enough to be wrapped.
+	Twoline string `json:"twoline,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "Oneline") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "Oneline") to include in
+	// API requests with the JSON null value. By default, fields with empty
+	// values are omitted from API requests. However, any field with an
+	// empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *Thing) MarshalJSON() ([]byte, error) {
+	type noMethod Thing
+	raw := noMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}

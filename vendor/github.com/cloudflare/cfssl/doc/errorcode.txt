@@ -1,0 +1,53 @@
+1XXX: CertificateError
+    1000: Unknown
+    1001: ReadFailed
+    1002: DecodeFailed
+    1003: ParseFailed
+    1100: SelfSigned
+    12XX: VerifyFailed
+        121X: CertificateInvalid
+            1210: NotAuthorizedToSign
+            1211: Expired
+            1212: CANotAuthorizedForThisName
+            1213: TooManyIntermediates
+            1214: IncompatibleUsage
+        1220: UnknownAuthority
+    1300: BadRequest
+    1400: MissingSerial
+2XXX: PrivateKeyError
+    2000: Unknown
+    2001: ReadFailed
+    2002: DecodeFailed
+    2003: ParseFailed
+    2100: Encrypted
+    2200: NotRSA
+    2300: KeyMismatch
+3XXX: IntermediatesError
+4XXX: RootError
+5XXX: PolicyError
+    5100: NoKeyUsages
+    5200: InvalidPolicy
+    5300: InvalidRequest
+    5400: UnknownProfile
+6XXX: DialError
+7XXX: APIClientError
+    7100: AuthenticationFailure
+    7200: JSONError
+    7300: IOError
+    7400: ClientHTTPError
+    7500: ServerRequestFailed
+8XXX: OCSPError
+    8001: ReadFailed
+    8100: IssuerMismatch
+    8200: InvalidStatus
+9XXX: CSRError
+    9001: ReadFailed
+    9002: DecodeFailed
+    9003: ParseFailed
+    9300: BadRequest
+10XXX: CTError
+    10000: Unknown
+    10100: PrecertSubmissionFailed
+11XXX: CertStoreError
+    11100: InsertFailed
+    11200: RecordNotFound

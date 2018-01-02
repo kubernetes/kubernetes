@@ -1,0 +1,80 @@
+--------------------------------------------------------------------------------
+Testdata in this directory
+See test/httpd-valid.conf for the configured final chains in Apache
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+CT log
+--------------------------------------------------------------------------------
+ct-server-key.pem: a log server private key (ecdsa)
+ct-server-key-public.pem: the corresponding public key
+
+
+--------------------------------------------------------------------------------
+CA certs
+--------------------------------------------------------------------------------
+ca-cert.pem: a self-signed root CA certificate that was trusted by the log
+
+ca-pre-cert.pem: an intermediate CA certificate issued by ca-cert.pem,
+contains the CT extended key usage OID 1.3.6.1.4.1.11129.2.4.4 for
+issuing precerts
+
+intermediate-cert.pem: an intermediate CA certificate issued by
+ca-cert.pem
+
+intermediate-pre-cert.pem: an intermediate CA certificate issued by
+intermediate-cert.pem, contains the CT extended key usage OID
+1.3.6.1.4.1.11129.2.4.4 for issuing precerts
+
+
+--------------------------------------------------------------------------------
+Leaf certs, precerts, and SCTs
+--------------------------------------------------------------------------------
+test-cert.pem: a certificate issued by ca-cert.pem, no CT extensions
+
+test-cert.proof: an SCT for this cert, obtained with 'ct upload', in
+raw serialized TLS format
+
+test-cert-proof.pem: a fake "certificate" that contains this SCT in an
+X509v3 extension with OID 1.3.6.1.4.1.11129.2.4.1
+
+test-cert-chain.pem: same as test-cert-proof.pem (= a chain of "intermediates"
+for Apache)
+
+test-embedded-cert.pem: a certificate issued by ca-cert.pem, with
+embedded SCT in an X509v3 extension with OID 1.3.6.1.4.1.11129.2.4.2
+
+test-embedded-pre-cert.pem: a precertificate for the certificate
+above, with the critical OID 1.3.6.1.4.1.11129.2.4.3 poison
+extension, issued by ca-cert.pem
+
+test-embedded-pre-cert.proof: the SCT
+
+test-embedded-with-preca-*.pem: as above, but precertificate issued by
+ca-pre-cert.pem rather than the final issuer
+
+test-intermediate-*.pem, test-embedded-with-intermediate-*.pem: as above, but
+certificates/precertificates issued by the intermediate ca and/or its
+preca
+
+test-invalid-embedded-cert.pem: a certificate with a correctly
+embedded SCT but invalid SCT signature (hacked together by using one
+CSR with another cert's SCT)
+
+test-no-bc-cert-chain.pem: a certificate chain (taken from the wild)
+where the CA cert does not have a CA:True basic constraint.
+
+test-no-bc-ca-cert.pem: the CA for test-no-bc-cert-chain.pem.
+
+test-no-ca-cert.pem: a cert "issued" by test-cert.pem.
+
+test-no-ca-cert-chain.pem: complete chain for test-no-ca-cert.pem.
+
+test-issuer-collision-chain.pem: a chain for which we have two valid
+issuers (i.e., two trusted root CA certs with identical name and SPKI)
+
+test-colliding-root1.pem: the first matching root for the above chain
+
+test-colliding-root2.pem: the second matching root for the above chain
+
+(*-key.pem is the private key matching *-cert.pem)

@@ -1,0 +1,96 @@
+{
+    "swagger": "2.0",
+    "info": {
+      "title": "Google Example Library API",
+      "description": "A simple Google Example Library API.",
+      "version": "v1"
+    },
+    "host": "library-example.googleapis.com",
+    
+    "x-sampleone-book" : {"code": 123, "message": 999},
+    "x-sampleone-shelf" : {"foo1": 123, "bar": 999},
+
+    "x-sampleone-mysimplestring" : "hello world",
+    "x-sampleone-mysimpleint64" : 12345,
+    "x-sampleone-mysimplenumber" : 111.222,
+    "x-sampleone-mysimpleboolean" : true,
+    
+    "x-sampletwo-book" : {"code": 123, "message": 999},
+    "x-sampletwo-shelf" : {"foo1": 123, "bar": 999},
+
+    "x-unhandled" : {"code": 123, "message": 999},
+
+    "parameters" : {
+      "paramAtSwaggerScope": {
+        "name": "paramAtSwaggerScope",
+        "in": "query",
+        "description": "test",
+        "required": true,
+        "type": "integer",
+        "format": "int32"
+     }
+    },
+     "paths": {
+        "/v1/{sharedParameter}/pets": {
+            "post": {
+                "operationId": "simpleMethod",
+                "parameters": [
+                    {
+                        "name": "myBodyRef",
+                        "in": "body",
+                          "schema": {
+                              "properties": {
+                                  "myStringA": {
+                                      "type": "string"
+                                  }
+                              }
+                          }
+                    },
+                    {
+                      "name": "paramToOverride",
+                      "in": "query",
+                      "description": "New description",
+                      "required": true,
+                      "type": "string"
+                    },
+                    {
+                      "$ref": "#/parameters/paramAtSwaggerScope"
+                    }
+                ],
+                "responses": {
+                    "default": {
+                        "description": "successful operation",
+                        "schema": {
+                                "$ref": "#/definitions/SimpleDef"
+                        }
+                    }
+                }
+            },
+            "parameters": [
+              {
+                "name": "sharedParameter",
+                "in": "path",
+                "description": "Shared parameter",
+                "required": true,
+                "type": "string"
+              },
+              {
+                "name": "paramToOverride",
+                "in": "query",
+                "description": "Description to override",
+                "required": true,
+                "type": "string"
+              }
+            ]
+        }
+    },
+    "definitions": {
+        "SimpleDef": {
+            "properties": {
+                "myStringA": {
+                    "type": "string"
+                }
+            }
+        }
+    }
+}

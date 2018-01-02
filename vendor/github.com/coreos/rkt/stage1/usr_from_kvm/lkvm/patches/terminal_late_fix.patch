@@ -1,0 +1,23 @@
+diff --git a/term.c b/term.c
+index 9763211..dec0d79 100644
+--- a/term.c
++++ b/term.c
+@@ -202,10 +202,16 @@ static int term_init(struct kvm *kvm)
+ 
+ 	return 0;
+ }
+-dev_init(term_init);
++// temporary fix to delay term_init to prevent races between term-poll 
++// and threadpool console RX workers
++// TODO: refactor to synchronize these threads with global cdev.poll_cond/mutex/vq_ready
++// with poll_cond properly initialized earlier
++//dev_init(term_init);
++firmware_init(term_init);
+ 
+ static int term_exit(struct kvm *kvm)
+ {
+ 	return 0;
+ }
+-dev_exit(term_exit);
++//dev_exit(term_exit);
++firmware_exit(term_exit);

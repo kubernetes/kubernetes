@@ -1,0 +1,129 @@
+THE CERTINFO ENDPOINT
+
+Endpoint: /api/v1/cfssl/certinfo
+Method:   POST
+
+Required parameters:
+
+        One of the following two parameters is required.
+
+        * certificate: the PEM-encoded certificate to be parsed.
+        * domain: a domain name indicating a remote host to retrieve a
+          certificate for.
+
+Result:
+
+	The certinfo endpoint returns a JSON object with the following
+	keys:
+
+        * subject contains a JSON object corresponding to a PKIX Name, including:
+            * common_name
+            * serial_number
+            * country
+            * organization
+            * organizational_unit
+            * locality
+            * province
+            * street_address
+            * postal_code
+            * names
+            * extra_names
+        * sans is a list of Subject Alternative Names.
+        * not_before is the certificate's start date.
+        * not_after is the certificate's end date.
+        * sigalg is the signature algorithm used to sign the certificate.
+
+Example:
+
+    $ curl -d '{"domain": "cloudflare.com"}' \
+          ${CFSSL_HOST}/api/v1/cfssl/certinfo \
+          | python -m json.tool
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+100  3229    0  3201  100    28  66658    583 --:--:-- --:--:-- --:--:-- 68106
+curl: (6) Could not resolve host:  
+{
+    "errors": [],
+    "messages": [],
+    "result": {
+        "not_after": "2015-12-31T23:59:59Z",
+        "not_before": "2015-01-05T00:00:00Z",
+        "pem": "-----BEGIN CERTIFICATE-----\nMIIHFDCCBfygAwIBAgIQXu3lLLTt9p4yFCuxChTXSTANBgkqhkiG9w0BAQUFADCB\njjELMAkGA1UEBhMCR0IxGzAZBgNVBAgTEkdyZWF0ZXIgTWFuY2hlc3RlcjEQMA4G\nA1UEBxMHU2FsZm9yZDEaMBgGA1UEChMRQ09NT0RPIENBIExpbWl0ZWQxNDAyBgNV\nBAMTK0NPTU9ETyBFeHRlbmRlZCBWYWxpZGF0aW9uIFNlY3VyZSBTZXJ2ZXIgQ0Ew\nHhcNMTUwMTA1MDAwMDAwWhcNMTUxMjMxMjM1OTU5WjCCARwxEDAOBgNVBAUTBzQ3\nMTA4NzUxEzARBgsrBgEEAYI3PAIBAxMCVVMxGTAXBgsrBgEEAYI3PAIBAhMIRGVs\nYXdhcmUxHTAbBgNVBA8TFFByaXZhdGUgT3JnYW5pemF0aW9uMQswCQYDVQQGEwJV\nUzEOMAwGA1UEERMFOTQxMDcxCzAJBgNVBAgTAkNBMRYwFAYDVQQHEw1TYW4gRnJh\nbmNpc2NvMRkwFwYDVQQJExA2NjUgVGhpcmQgU3RyZWV0MRkwFwYDVQQKExBDbG91\nZEZsYXJlLCBJbmMuMRwwGgYDVQQLExNDbG91ZEZsYXJlIFNlY3VyaXR5MSMwIQYD\nVQQLExpDT01PRE8gRVYgTXVsdGktRG9tYWluIFNTTDCCASIwDQYJKoZIhvcNAQEB\nBQADggEPADCCAQoCggEBAN6yBr75KxUUNMatmcL/Ki8K3Z2kmBMq5k+9G2fyViq7\nEB+Rst+RYCDIOwOf9Fb5q82yMC/CLIu3a9hd+tfITcJ2VhlLYRU9XZPVyZ53yVD8\n67bviNsdKtM1WM40FuK/SG92MLiCPGWD+LkpcxzD5nPZxGuLZhkPjBXpVNiwWZyX\nASD7cKQSZ5Kngc1iANkrxUYL253yq2sqI2pvDjedp/BuTF8V5zUxRlyeUQfuZfEZ\nZsS6VGyHKO2KfrJrDOz7XjBx0bcliYW3bZi/VcxP+Q1kOXLOdtiLEZMbuL9oVHXC\ni7FKGwZIAgvxxupLQuIdQI9+GLSpCrSiQJwk4TOqqOECAwEAAaOCAtswggLXMB8G\nA1UdIwQYMBaAFIhEUf9QKmleLYj0IbrZDPLOy+p8MB0GA1UdDgQWBBTJ4NAMUXb3\nNbMVJu2NtfC7ll2rujAOBgNVHQ8BAf8EBAMCBaAwDAYDVR0TAQH/BAIwADAdBgNV\nHSUEFjAUBggrBgEFBQcDAQYIKwYBBQUHAwIwRgYDVR0gBD8wPTA7BgwrBgEEAbIx\nAQIBBQEwKzApBggrBgEFBQcCARYdaHR0cHM6Ly9zZWN1cmUuY29tb2RvLmNvbS9D\nUFMwUwYDVR0fBEwwSjBIoEagRIZCaHR0cDovL2NybC5jb21vZG9jYS5jb20vQ09N\nT0RPRXh0ZW5kZWRWYWxpZGF0aW9uU2VjdXJlU2VydmVyQ0EuY3JsMIGEBggrBgEF\nBQcBAQR4MHYwTgYIKwYBBQUHMAKGQmh0dHA6Ly9jcnQuY29tb2RvY2EuY29tL0NP\nTU9ET0V4dGVuZGVkVmFsaWRhdGlvblNlY3VyZVNlcnZlckNBLmNydDAkBggrBgEF\nBQcwAYYYaHR0cDovL29jc3AuY29tb2RvY2EuY29tMC0GA1UdEQQmMCSCDmNsb3Vk\nZmxhcmUuY29tghJ3d3cuY2xvdWRmbGFyZS5jb20wggEDBgorBgEEAdZ5AgQCBIH0\nBIHxAO8AdQBo9pj4H2SCvjqM7rkoHUz8cVFdZ5PURNEKZ6y7T0/7xAAAAUq6JZ63\nAAAEAwBGMEQCIDnMUQTV5uhtg3wo4WudmHrLsRGAPxgKahZ2qAheT2nJAiBXTr30\neD/Edkl+klFUUYJIN8ntqy1nOgw1cFGDSMcw+wB2AKS5CZC0GFgUh7sTosxncAo8\nNZgE+RvfuON3zQ7IDdwQAAABSrolns0AAAQDAEcwRQIhAOt2rMbzsavA074rVKZ6\nT+OYR0zL2HX6GjI4+ItnguYRAiA9It+jwuBjW2tocmYNAOgzBzuNNdgBtmqMwkLf\neXRojzANBgkqhkiG9w0BAQUFAAOCAQEAXl5mVmhHA6WcjPhmTMoHGvPCdsGVBWe0\nFr85yjuQsVSKCsZDD3ec01MnNyxwxf6GYFMxysv4j6rC9zlo55fecljtIrPSuftZ\nO4Uvo2a36b5s6sGBqfKQPQbjdbdJvw8yymLHMU25Df3ZZcj0T8bQZKjIZRv5IiDL\nSUlwyxhiiorMrqCPTyiniCXJvfdaFBUWdw37QZWNHyvVap7vUTXQpsHGkt+KL+0w\nC4/mhoakAMd8n+//pBDtHBWqsnxA7/S6vM9zP0+xRR8vHUsDGj28Ito8839WP18u\nfQrczSznX7YbZjCk++r5GpSCFAsBBh5ZmU9bu9XnzAZ2hlkKec/8HA==\n-----END CERTIFICATE-----\n",
+        "sans": [
+            "cloudflare.com",
+            "www.cloudflare.com"
+        ],
+        "sigalg": "SHA1WithRSA",
+        "subject": {
+            "country": "US",
+            "locality": "San Francisco",
+            "names": [
+                "4710875",
+                "US",
+                "Delaware",
+                "Private Organization",
+                "US",
+                "94107",
+                "CA",
+                "San Francisco",
+                "665 Third Street",
+                "CloudFlare, Inc.",
+                "CloudFlare Security",
+                "COMODO EV Multi-Domain SSL"
+            ],
+            "organization": "CloudFlare, Inc.",
+            "organizational_unit": "CloudFlare Security,COMODO EV Multi-Domain SSL",
+            "postal_code": "94107",
+            "province": "CA",
+            "serial_number": "4710875",
+            "street_address": "665 Third Street"
+        }
+    },
+    "success": true
+}
+
+    $curl -d '{"certificate": "-----BEGIN CERTIFICATE-----\nMIIHFDCCBfygAwIBAgIQXu3lLLTt9p4yFCuxChTXSTANBgkqhkiG9w0BAQUFADCB\njjELMAkGA1UEBhMCR0IxGzAZBgNVBAgTEkdyZWF0ZXIgTWFuY2hlc3RlcjEQMA4G\nA1UEBxMHU2FsZm9yZDEaMBgGA1UEChMRQ09NT0RPIENBIExpbWl0ZWQxNDAyBgNV\nBAMTK0NPTU9ETyBFeHRlbmRlZCBWYWxpZGF0aW9uIFNlY3VyZSBTZXJ2ZXIgQ0Ew\nHhcNMTUwMTA1MDAwMDAwWhcNMTUxMjMxMjM1OTU5WjCCARwxEDAOBgNVBAUTBzQ3\nMTA4NzUxEzARBgsrBgEEAYI3PAIBAxMCVVMxGTAXBgsrBgEEAYI3PAIBAhMIRGVs\nYXdhcmUxHTAbBgNVBA8TFFByaXZhdGUgT3JnYW5pemF0aW9uMQswCQYDVQQGEwJV\nUzEOMAwGA1UEERMFOTQxMDcxCzAJBgNVBAgTAkNBMRYwFAYDVQQHEw1TYW4gRnJh\nbmNpc2NvMRkwFwYDVQQJExA2NjUgVGhpcmQgU3RyZWV0MRkwFwYDVQQKExBDbG91\nZEZsYXJlLCBJbmMuMRwwGgYDVQQLExNDbG91ZEZsYXJlIFNlY3VyaXR5MSMwIQYD\nVQQLExpDT01PRE8gRVYgTXVsdGktRG9tYWluIFNTTDCCASIwDQYJKoZIhvcNAQEB\nBQADggEPADCCAQoCggEBAN6yBr75KxUUNMatmcL/Ki8K3Z2kmBMq5k+9G2fyViq7\nEB+Rst+RYCDIOwOf9Fb5q82yMC/CLIu3a9hd+tfITcJ2VhlLYRU9XZPVyZ53yVD8\n67bviNsdKtM1WM40FuK/SG92MLiCPGWD+LkpcxzD5nPZxGuLZhkPjBXpVNiwWZyX\nASD7cKQSZ5Kngc1iANkrxUYL253yq2sqI2pvDjedp/BuTF8V5zUxRlyeUQfuZfEZ\nZsS6VGyHKO2KfrJrDOz7XjBx0bcliYW3bZi/VcxP+Q1kOXLOdtiLEZMbuL9oVHXC\ni7FKGwZIAgvxxupLQuIdQI9+GLSpCrSiQJwk4TOqqOECAwEAAaOCAtswggLXMB8G\nA1UdIwQYMBaAFIhEUf9QKmleLYj0IbrZDPLOy+p8MB0GA1UdDgQWBBTJ4NAMUXb3\nNbMVJu2NtfC7ll2rujAOBgNVHQ8BAf8EBAMCBaAwDAYDVR0TAQH/BAIwADAdBgNV\nHSUEFjAUBggrBgEFBQcDAQYIKwYBBQUHAwIwRgYDVR0gBD8wPTA7BgwrBgEEAbIx\nAQIBBQEwKzApBggrBgEFBQcCARYdaHR0cHM6Ly9zZWN1cmUuY29tb2RvLmNvbS9D\nUFMwUwYDVR0fBEwwSjBIoEagRIZCaHR0cDovL2NybC5jb21vZG9jYS5jb20vQ09N\nT0RPRXh0ZW5kZWRWYWxpZGF0aW9uU2VjdXJlU2VydmVyQ0EuY3JsMIGEBggrBgEF\nBQcBAQR4MHYwTgYIKwYBBQUHMAKGQmh0dHA6Ly9jcnQuY29tb2RvY2EuY29tL0NP\nTU9ET0V4dGVuZGVkVmFsaWRhdGlvblNlY3VyZVNlcnZlckNBLmNydDAkBggrBgEF\nBQcwAYYYaHR0cDovL29jc3AuY29tb2RvY2EuY29tMC0GA1UdEQQmMCSCDmNsb3Vk\nZmxhcmUuY29tghJ3d3cuY2xvdWRmbGFyZS5jb20wggEDBgorBgEEAdZ5AgQCBIH0\nBIHxAO8AdQBo9pj4H2SCvjqM7rkoHUz8cVFdZ5PURNEKZ6y7T0/7xAAAAUq6JZ63\nAAAEAwBGMEQCIDnMUQTV5uhtg3wo4WudmHrLsRGAPxgKahZ2qAheT2nJAiBXTr30\neD/Edkl+klFUUYJIN8ntqy1nOgw1cFGDSMcw+wB2AKS5CZC0GFgUh7sTosxncAo8\nNZgE+RvfuON3zQ7IDdwQAAABSrolns0AAAQDAEcwRQIhAOt2rMbzsavA074rVKZ6\nT+OYR0zL2HX6GjI4+ItnguYRAiA9It+jwuBjW2tocmYNAOgzBzuNNdgBtmqMwkLf\neXRojzANBgkqhkiG9w0BAQUFAAOCAQEAXl5mVmhHA6WcjPhmTMoHGvPCdsGVBWe0\nFr85yjuQsVSKCsZDD3ec01MnNyxwxf6GYFMxysv4j6rC9zlo55fecljtIrPSuftZ\nO4Uvo2a36b5s6sGBqfKQPQbjdbdJvw8yymLHMU25Df3ZZcj0T8bQZKjIZRv5IiDL\nSUlwyxhiiorMrqCPTyiniCXJvfdaFBUWdw37QZWNHyvVap7vUTXQpsHGkt+KL+0w\nC4/mhoakAMd8n+//pBDtHBWqsnxA7/S6vM9zP0+xRR8vHUsDGj28Ito8839WP18u\nfQrczSznX7YbZjCk++r5GpSCFAsBBh5ZmU9bu9XnzAZ2hlkKec/8HA==\n-----END CERTIFICATE-----\n"}' \
+>           ${CFSSL_HOST}/api/v1/cfssl/certinfo \
+>           | python -m json.tool
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+100  5776    0  3201  100  2575   552k   444k --:--:-- --:--:-- --:--:--  625k
+{
+    "errors": [],
+    "messages": [],
+    "result": {
+        "not_after": "2015-12-31T23:59:59Z",
+        "not_before": "2015-01-05T00:00:00Z",
+        "pem": "-----BEGIN CERTIFICATE-----\nMIIHFDCCBfygAwIBAgIQXu3lLLTt9p4yFCuxChTXSTANBgkqhkiG9w0BAQUFADCB\njjELMAkGA1UEBhMCR0IxGzAZBgNVBAgTEkdyZWF0ZXIgTWFuY2hlc3RlcjEQMA4G\nA1UEBxMHU2FsZm9yZDEaMBgGA1UEChMRQ09NT0RPIENBIExpbWl0ZWQxNDAyBgNV\nBAMTK0NPTU9ETyBFeHRlbmRlZCBWYWxpZGF0aW9uIFNlY3VyZSBTZXJ2ZXIgQ0Ew\nHhcNMTUwMTA1MDAwMDAwWhcNMTUxMjMxMjM1OTU5WjCCARwxEDAOBgNVBAUTBzQ3\nMTA4NzUxEzARBgsrBgEEAYI3PAIBAxMCVVMxGTAXBgsrBgEEAYI3PAIBAhMIRGVs\nYXdhcmUxHTAbBgNVBA8TFFByaXZhdGUgT3JnYW5pemF0aW9uMQswCQYDVQQGEwJV\nUzEOMAwGA1UEERMFOTQxMDcxCzAJBgNVBAgTAkNBMRYwFAYDVQQHEw1TYW4gRnJh\nbmNpc2NvMRkwFwYDVQQJExA2NjUgVGhpcmQgU3RyZWV0MRkwFwYDVQQKExBDbG91\nZEZsYXJlLCBJbmMuMRwwGgYDVQQLExNDbG91ZEZsYXJlIFNlY3VyaXR5MSMwIQYD\nVQQLExpDT01PRE8gRVYgTXVsdGktRG9tYWluIFNTTDCCASIwDQYJKoZIhvcNAQEB\nBQADggEPADCCAQoCggEBAN6yBr75KxUUNMatmcL/Ki8K3Z2kmBMq5k+9G2fyViq7\nEB+Rst+RYCDIOwOf9Fb5q82yMC/CLIu3a9hd+tfITcJ2VhlLYRU9XZPVyZ53yVD8\n67bviNsdKtM1WM40FuK/SG92MLiCPGWD+LkpcxzD5nPZxGuLZhkPjBXpVNiwWZyX\nASD7cKQSZ5Kngc1iANkrxUYL253yq2sqI2pvDjedp/BuTF8V5zUxRlyeUQfuZfEZ\nZsS6VGyHKO2KfrJrDOz7XjBx0bcliYW3bZi/VcxP+Q1kOXLOdtiLEZMbuL9oVHXC\ni7FKGwZIAgvxxupLQuIdQI9+GLSpCrSiQJwk4TOqqOECAwEAAaOCAtswggLXMB8G\nA1UdIwQYMBaAFIhEUf9QKmleLYj0IbrZDPLOy+p8MB0GA1UdDgQWBBTJ4NAMUXb3\nNbMVJu2NtfC7ll2rujAOBgNVHQ8BAf8EBAMCBaAwDAYDVR0TAQH/BAIwADAdBgNV\nHSUEFjAUBggrBgEFBQcDAQYIKwYBBQUHAwIwRgYDVR0gBD8wPTA7BgwrBgEEAbIx\nAQIBBQEwKzApBggrBgEFBQcCARYdaHR0cHM6Ly9zZWN1cmUuY29tb2RvLmNvbS9D\nUFMwUwYDVR0fBEwwSjBIoEagRIZCaHR0cDovL2NybC5jb21vZG9jYS5jb20vQ09N\nT0RPRXh0ZW5kZWRWYWxpZGF0aW9uU2VjdXJlU2VydmVyQ0EuY3JsMIGEBggrBgEF\nBQcBAQR4MHYwTgYIKwYBBQUHMAKGQmh0dHA6Ly9jcnQuY29tb2RvY2EuY29tL0NP\nTU9ET0V4dGVuZGVkVmFsaWRhdGlvblNlY3VyZVNlcnZlckNBLmNydDAkBggrBgEF\nBQcwAYYYaHR0cDovL29jc3AuY29tb2RvY2EuY29tMC0GA1UdEQQmMCSCDmNsb3Vk\nZmxhcmUuY29tghJ3d3cuY2xvdWRmbGFyZS5jb20wggEDBgorBgEEAdZ5AgQCBIH0\nBIHxAO8AdQBo9pj4H2SCvjqM7rkoHUz8cVFdZ5PURNEKZ6y7T0/7xAAAAUq6JZ63\nAAAEAwBGMEQCIDnMUQTV5uhtg3wo4WudmHrLsRGAPxgKahZ2qAheT2nJAiBXTr30\neD/Edkl+klFUUYJIN8ntqy1nOgw1cFGDSMcw+wB2AKS5CZC0GFgUh7sTosxncAo8\nNZgE+RvfuON3zQ7IDdwQAAABSrolns0AAAQDAEcwRQIhAOt2rMbzsavA074rVKZ6\nT+OYR0zL2HX6GjI4+ItnguYRAiA9It+jwuBjW2tocmYNAOgzBzuNNdgBtmqMwkLf\neXRojzANBgkqhkiG9w0BAQUFAAOCAQEAXl5mVmhHA6WcjPhmTMoHGvPCdsGVBWe0\nFr85yjuQsVSKCsZDD3ec01MnNyxwxf6GYFMxysv4j6rC9zlo55fecljtIrPSuftZ\nO4Uvo2a36b5s6sGBqfKQPQbjdbdJvw8yymLHMU25Df3ZZcj0T8bQZKjIZRv5IiDL\nSUlwyxhiiorMrqCPTyiniCXJvfdaFBUWdw37QZWNHyvVap7vUTXQpsHGkt+KL+0w\nC4/mhoakAMd8n+//pBDtHBWqsnxA7/S6vM9zP0+xRR8vHUsDGj28Ito8839WP18u\nfQrczSznX7YbZjCk++r5GpSCFAsBBh5ZmU9bu9XnzAZ2hlkKec/8HA==\n-----END CERTIFICATE-----\n",
+        "sans": [
+            "cloudflare.com",
+            "www.cloudflare.com"
+        ],
+        "sigalg": "SHA1WithRSA",
+        "subject": {
+            "country": "US",
+            "locality": "San Francisco",
+            "names": [
+                "4710875",
+                "US",
+                "Delaware",
+                "Private Organization",
+                "US",
+                "94107",
+                "CA",
+                "San Francisco",
+                "665 Third Street",
+                "CloudFlare, Inc.",
+                "CloudFlare Security",
+                "COMODO EV Multi-Domain SSL"
+            ],
+            "organization": "CloudFlare, Inc.",
+            "organizational_unit": "CloudFlare Security,COMODO EV Multi-Domain SSL",
+            "postal_code": "94107",
+            "province": "CA",
+            "serial_number": "4710875",
+            "street_address": "665 Third Street"
+        }
+    },
+    "success": true
+}

@@ -1,0 +1,4 @@
+agent-1: mkdir -p agent-1 && cd agent-1 && ../bin/etcd-agent -etcd-path ../bin/etcd -port 127.0.0.1:19027 -use-root=false
+agent-2: mkdir -p agent-2 && cd agent-2 && ../bin/etcd-agent -etcd-path ../bin/etcd -port 127.0.0.1:29027 -use-root=false
+agent-3: mkdir -p agent-3 && cd agent-3 && ../bin/etcd-agent -etcd-path ../bin/etcd -port 127.0.0.1:39027 -use-root=false
+stresser: sleep 1s && bin/etcd-tester -agent-endpoints "127.0.0.1:19027,127.0.0.1:29027,127.0.0.1:39027"  -client-ports 12379,22379,32379 -peer-ports 12380,22380,32380

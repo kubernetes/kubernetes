@@ -1,0 +1,13 @@
+{
+  "pagination": {
+    "DescribeTrails": {
+      "result_key": "trailList"
+    },
+    "LookupEvents": {
+      "input_token": "NextToken",
+      "limit_key": "MaxResults",
+      "output_token": "NextToken",
+      "result_key": "Events"
+    }
+  }
+}

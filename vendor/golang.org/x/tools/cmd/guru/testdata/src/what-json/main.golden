@@ -1,0 +1,95 @@
+-------- @what call --------
+{
+	"enclosing": [
+		{
+			"desc": "identifier",
+			"start": 189,
+			"end": 190
+		},
+		{
+			"desc": "function call",
+			"start": 189,
+			"end": 192
+		},
+		{
+			"desc": "expression statement",
+			"start": 189,
+			"end": 192
+		},
+		{
+			"desc": "block",
+			"start": 186,
+			"end": 212
+		},
+		{
+			"desc": "function declaration",
+			"start": 174,
+			"end": 212
+		},
+		{
+			"desc": "source file",
+			"start": 0,
+			"end": 259
+		}
+	],
+	"modes": [
+		"callees",
+		"callers",
+		"callstack",
+		"definition",
+		"describe",
+		"freevars",
+		"implements",
+		"pointsto",
+		"referrers",
+		"whicherrs"
+	],
+	"srcdir": "testdata/src",
+	"importpath": "what-json"
+}
+-------- @what pkg --------
+{
+	"enclosing": [
+		{
+			"desc": "identifier",
+			"start": 220,
+			"end": 223
+		},
+		{
+			"desc": "selector",
+			"start": 220,
+			"end": 227
+		},
+		{
+			"desc": "value specification",
+			"start": 218,
+			"end": 227
+		},
+		{
+			"desc": "variable declaration",
+			"start": 214,
+			"end": 227
+		},
+		{
+			"desc": "source file",
+			"start": 0,
+			"end": 259
+		}
+	],
+	"modes": [
+		"definition",
+		"describe",
+		"freevars",
+		"implements",
+		"pointsto",
+		"referrers",
+		"whicherrs"
+	],
+	"srcdir": "testdata/src",
+	"importpath": "what-json",
+	"object": "lib",
+	"sameids": [
+		"$GOPATH/src/what-json/main.go:13:7",
+		"$GOPATH/src/what-json/main.go:14:8"
+	]
+}

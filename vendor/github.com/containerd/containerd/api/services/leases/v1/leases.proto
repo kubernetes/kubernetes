@@ -1,0 +1,58 @@
+syntax = "proto3";
+
+package containerd.services.leases.v1;
+
+import "gogoproto/gogo.proto";
+import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/containerd/containerd/api/services/leases/v1;leases";
+
+// Leases service manages resources leases within the metadata store.
+service Leases {
+	// Create creates a new lease for managing changes to metadata. A lease
+	// can be used to protect objects from being removed.
+	rpc Create(CreateRequest) returns (CreateResponse);
+
+	// Delete deletes the lease and makes any unreferenced objects created
+	// during the lease eligible for garbage collection if not referenced
+	// or retained by other resources during the lease.
+	rpc Delete(DeleteRequest) returns (google.protobuf.Empty);
+
+	// ListTransactions lists all active leases, returning the full list of
+	// leases and optionally including the referenced resources.
+	rpc List(ListRequest) returns (ListResponse);
+}
+
+// Lease is an object which retains resources while it exists.
+message Lease {
+	string id = 1;
+
+	google.protobuf.Timestamp created_at = 2 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+
+	map<string, string> labels = 3;
+}
+
+message CreateRequest {
+	// ID is used to identity the lease, when the id is not set the service
+	// generates a random identifier for the lease.
+	string id = 1;
+
+	map<string, string> labels = 3;
+}
+
+message CreateResponse {
+	Lease lease = 1;
+}
+
+message DeleteRequest {
+	string id = 1;
+}
+
+message ListRequest {
+	repeated string filters = 1;
+}
+
+message ListResponse {
+	repeated Lease leases = 1;
+}

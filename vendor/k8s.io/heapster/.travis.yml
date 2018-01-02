@@ -1,0 +1,16 @@
+sudo: false
+
+language: go
+
+go_import_path: k8s.io/heapster
+
+go:
+  - 1.6
+
+install:
+  - go get -u github.com/axw/gocov/gocov
+  - go get -u golang.org/x/tools/cmd/cover
+  - go get -u github.com/mattn/goveralls
+
+script:
+  - make test-unit test-unit-cov

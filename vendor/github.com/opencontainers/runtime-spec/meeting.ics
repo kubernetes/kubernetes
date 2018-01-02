@@ -1,0 +1,52 @@
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Open Containers Initiative//Developer Meeting//EN
+BEGIN:VTIMEZONE
+TZID:America/Los_Angeles
+LAST-MODIFIED:20050809T050000Z
+BEGIN:STANDARD
+DTSTART:20071104T020000
+RRULE:FREQ=YEARLY;BYMONTH=11;BYDAY=1SU
+TZOFFSETFROM:-0700
+TZOFFSETTO:-0800
+TZNAME:PST
+END:STANDARD
+BEGIN:DAYLIGHT
+DTSTART:20070311T020000
+RRULE:FREQ=YEARLY;BYMONTH=3;BYDAY=2SU
+TZOFFSETFROM:-0800
+TZOFFSETTO:-0700
+TZNAME:PDT
+END:DAYLIGHT
+END:VTIMEZONE
+BEGIN:VEVENT
+UID:tdc-meeting-1@opencontainers.org
+DTSTAMP:20170405T220000Z
+DTSTART;TZID=America/Los_Angeles:20170329T080000
+RRULE:FREQ=WEEKLY;INTERVAL=2;BYDAY=WE
+DURATION:PT1H
+SUMMARY:OCI TDC Meeting
+DESCRIPTION;ALTREP="https://github.com/opencontainers/runtime-spec#
+ weekly-call":Open Containers Initiative Developer Meeting\n
+ https://github.com/opencontainers/runtime-spec#weekly-call\n
+ Web: https://www.uberconference.com/opencontainers\n
+ Audio-only: +1 415 968 0849 (no PIN needed)
+LOCATION:https://www.uberconference.com/opencontainers
+URL:https://github.com/opencontainers/runtime-spec/blob/master/meeting.ics
+END:VEVENT
+BEGIN:VEVENT
+UID:tdc-meeting-2@opencontainers.org
+DTSTAMP:20170517T143500Z
+DTSTART;TZID=America/Los_Angeles:20170517T140000
+RRULE:FREQ=WEEKLY;INTERVAL=2;BYDAY=WE
+DURATION:PT1H
+SUMMARY:OCI TDC Meeting
+DESCRIPTION;ALTREP="https://github.com/opencontainers/runtime-spec#
+ weekly-call":Open Containers Initiative Developer Meeting\n
+ https://github.com/opencontainers/runtime-spec#weekly-call\n
+ Web: https://www.uberconference.com/opencontainers\n
+ Audio-only: +1 415 968 0849 (no PIN needed)
+LOCATION:https://www.uberconference.com/opencontainers
+URL:https://github.com/opencontainers/runtime-spec/blob/master/meeting.ics
+END:VEVENT
+END:VCALENDAR

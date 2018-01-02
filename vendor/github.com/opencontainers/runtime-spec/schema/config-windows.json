@@ -1,0 +1,116 @@
+{
+    "windows": {
+        "description": "Windows platform-specific configurations",
+        "id": "https://opencontainers.org/schema/bundle/windows",
+        "type": "object",
+        "properties": {
+            "layerFolders": {
+                "id": "https://opencontainers.org/schema/bundle/windows/layerFolders",
+                "type": "array",
+                "items": {
+                    "$ref": "defs.json#/definitions/FilePath"
+                },
+                "minItems": 1
+            },
+            "resources": {
+                "id": "https://opencontainers.org/schema/bundle/windows/resources",
+                "type": "object",
+                "properties": {
+                    "memory": {
+                        "id": "https://opencontainers.org/schema/bundle/windows/resources/memory",
+                        "type": "object",
+                        "properties": {
+                            "limit": {
+                                "id": "https://opencontainers.org/schema/bundle/windows/resources/memory/limit",
+                                "$ref": "defs.json#/definitions/uint64"
+                            }
+                        }
+                    },
+                    "cpu": {
+                        "id": "https://opencontainers.org/schema/bundle/windows/resources/cpu",
+                        "type": "object",
+                        "properties": {
+                            "count": {
+                                "id": "https://opencontainers.org/schema/bundle/windows/resources/cpu/count",
+                                "$ref": "defs.json#/definitions/uint64"
+                            },
+                            "shares": {
+                                "id": "https://opencontainers.org/schema/bundle/windows/resources/cpu/shares",
+                                "$ref": "defs.json#/definitions/uint16"
+                            },
+                            "maximum": {
+                                "id": "https://opencontainers.org/schema/bundle/windows/resources/cpu/maximum",
+                                "$ref": "defs.json#/definitions/uint16"
+                            }
+                        }
+                    },
+                    "storage": {
+                        "id": "https://opencontainers.org/schema/bundle/windows/resources/storage",
+                        "type": "object",
+                        "properties": {
+                            "iops": {
+                                "id": "https://opencontainers.org/schema/bundle/windows/resources/storage/iops",
+                                "$ref": "defs.json#/definitions/uint64"
+                            },
+                            "bps": {
+                                "id": "https://opencontainers.org/schema/bundle/windows/resources/storage/bps",
+                                "$ref": "defs.json#/definitions/uint64"
+                            },
+                            "sandboxSize": {
+                                "id": "https://opencontainers.org/schema/bundle/windows/resources/storage/sandboxSize",
+                                "$ref": "defs.json#/definitions/uint64"
+                            }
+                        }
+                    }
+                }
+            },
+            "network": {
+                "id": "https://opencontainers.org/schema/bundle/windows/network",
+                "type": "object",
+                "properties": {
+                    "endpointList": {
+                        "id": "https://opencontainers.org/schema/bundle/windows/network/endpointList",
+                        "$ref": "defs.json#/definitions/ArrayOfStrings"
+                    },
+                    "allowUnqualifiedDNSQuery": {
+                        "id": "https://opencontainers.org/schema/bundle/windows/network/allowUnqualifiedDNSQuery",
+                        "type": "boolean"
+                    },
+                    "DNSSearchList": {
+                        "id": "https://opencontainers.org/schema/bundle/windows/network/DNSSearchList",
+                        "$ref": "defs.json#/definitions/ArrayOfStrings"
+                    },
+                    "networkSharedContainerName": {
+                        "id": "https://opencontainers.org/schema/bundle/windows/network/networkSharedContainerName",
+                        "type": "string"
+                    }
+                }
+            },
+            "credentialSpec": {
+                "id": "https://opencontainers.org/schema/bundle/windows/credentialSpec",
+                "type": "object"
+            },
+            "servicing": {
+                "id": "https://opencontainers.org/schema/bundle/windows/servicing",
+                "type": "boolean"
+            },
+            "ignoreFlushesDuringBoot": {
+                "id": "https://opencontainers.org/schema/bundle/windows/ignoreFlushesDuringBoot",
+                "type": "boolean"
+            },
+            "hyperv": {
+                "id": "https://opencontainers.org/schema/bundle/windows/hyperv",
+                "type": "object",
+                "properties": {
+                    "utilityVMPath": {
+                        "id": "https://opencontainers.org/schema/bundle/windows/hyperv/utilityVMPath",
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "required": [
+            "layerFolders"
+        ]
+    }
+}

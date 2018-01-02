@@ -1,0 +1,16 @@
+{
+  "pagination": {
+    "ListCollections": {
+      "input_token": "NextToken",
+      "limit_key": "MaxResults",
+      "output_token": "NextToken",
+      "result_key": "CollectionIds"
+    },
+    "ListFaces": {
+      "input_token": "NextToken",
+      "limit_key": "MaxResults",
+      "output_token": "NextToken",
+      "result_key": "Faces"
+    }
+  }
+}

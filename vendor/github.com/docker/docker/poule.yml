@@ -1,0 +1,131 @@
+# Add a "status/0-triage" to every newly opened pull request.
+- triggers:
+      pull_request: [ opened ]
+  operations:
+      - type:       label
+        filters: {
+            ~labels: [ "status/0-triage", "status/1-design-review", "status/2-code-review", "status/3-docs-review", "status/4-merge" ],
+        }
+        settings: {
+            patterns: {
+                status/0-triage:     [ ".*" ],
+            }
+        }
+
+# For every newly created or modified issue, assign label based on matching regexp using the `label`
+# operation, as well as an Engine-specific version label using `version-label`.
+- triggers:
+      issues:       [ edited, opened, reopened ]
+  operations:
+      - type:       label
+        settings: {
+            patterns: {
+                area/builder:        [ "dockerfile", "docker build" ],
+                area/distribution:   [ "docker login", "docker logout", "docker pull", "docker push", "docker search" ],
+                area/plugins:        [ "docker plugin" ],
+                area/networking:     [ "docker network", "ipvs", "vxlan" ],
+                area/runtime:        [ "oci runtime error" ],
+                area/security/trust: [ "docker_content_trust" ],
+                area/swarm:          [ "docker node", "docker swarm", "docker service create", "docker service inspect", "docker service logs", "docker service ls", "docker service ps", "docker service rm", "docker service scale", "docker service update" ],
+                platform/desktop:    [ "docker for mac", "docker for windows" ],
+                platform/freebsd:    [ "freebsd" ],
+                platform/windows:    [ "nanoserver", "windowsservercore", "windows server" ],
+                platform/arm:        [ "raspberry", "raspbian", "rpi", "beaglebone", "pine64" ],
+            }
+        }
+      - type:       version-label
+
+# Labeling a PR with `rebuild/<configuration>` triggers a rebuild job for the associated
+# configuration. The label is automatically removed after the rebuild is initiated. There's no such
+# thing as "templating" in this configuration, so we need one operation for each type of
+# configuration that can be triggered.
+- triggers:
+      pull_request: [ labeled ]
+  operations:
+      - type:       rebuild
+        settings: {
+            # When configurations are empty, the `rebuild` operation rebuilds all the currently
+            # known statuses for that pull request.
+            configurations: [],
+            label:          "rebuild/*",
+        }
+      - type:       rebuild
+        settings: {
+            configurations: [ arm ],
+            label:          "rebuild/arm",
+        }
+      - type:       rebuild
+        settings: {
+            configurations: [ experimental ],
+            label:          "rebuild/experimental",
+        }
+      - type:       rebuild
+        settings: {
+            configurations: [ janky ],
+            label:          "rebuild/janky",
+        }
+      - type:       rebuild
+        settings: {
+            configurations: [ powerpc ],
+            label:          "rebuild/powerpc",
+        }
+      - type:       rebuild
+        settings: {
+            configurations: [ userns ],
+            label:          "rebuild/userns",
+        }
+      - type:       rebuild
+        settings: {
+            configurations: [ vendor ],
+            label:          "rebuild/vendor",
+        }
+      - type:       rebuild
+        settings: {
+            configurations: [ win2lin ],
+            label:          "rebuild/win2lin",
+        }
+      - type:       rebuild
+        settings: {
+            configurations: [ windowsRS1 ],
+            label:          "rebuild/windowsRS1",
+        }
+      - type:       rebuild
+        settings: {
+            configurations: [ z ],
+            label:          "rebuild/z",
+        }
+
+# Once a day, randomly assign pull requests older than 2 weeks.
+- schedule:         "@daily"
+  operations:
+      - type:       random-assign
+        filters: {
+            age:    "2w",
+            is:     "pr",
+        }
+        settings: {
+            users: [
+                "aaronlehmann",
+                "akihirosuda",
+                "aluzzardi",
+                "coolljt0725",
+                "cpuguy83",
+                "crosbymichael",
+                "dnephin",
+                "duglin",
+                "ehazlett",
+                "johnstep",
+                "justincormack",
+                "lk4d4",
+                "mhbauer",
+                "mlaventure",
+                "runcom",
+                "stevvooe",
+                "thajeztah",
+                "tiborvass",
+                "tonistiigi",
+                "vdemeester",
+                "vieux",
+                "yongtang",
+            ]
+        }

@@ -1,0 +1,51 @@
+# Configures rkt tests at Travis CI (https://travis-ci.org).
+
+language: go
+sudo: required
+dist: trusty
+
+go:
+  - 1.5.4
+  - 1.6.3
+  - 1.7
+
+env:
+  - TARGET=amd64 GIMME_ARCH=amd64
+  - TARGET=arm64 GIMME_ARCH=arm64 GIMME_CGO_ENABLED=1
+
+addons:
+  apt:
+    packages:
+    - cpio
+    - realpath
+    - squashfs-tools
+    - build-essential
+    - libacl1-dev
+    - libsystemd-journal-dev
+    - gcc-aarch64-linux-gnu
+    - libc6-dev-arm64-cross
+
+install:
+  -
+
+# Build host and fly to ensure we build stage1 init. We don't build everything
+# to avoid downloading large images.
+script:
+  - sh autogen.sh
+
+  - test "${TARGET}" = "amd64"
+    && export CONFIGURE_ARCH="x86_64"
+    && export CONFIGURE_MAKE="unit-check manpages bash-completion"
+    || true
+
+  - test "${TARGET}" = "arm64"
+    && export CONFIGURE_ARCH="aarch64-linux-gnu"
+    && export CONFIGURE_MAKE="V=2"
+    || true
+
+  - sh configure
+        --host=$CONFIGURE_ARCH
+        --with-stage1-flavors=host,fly
+        --enable-tpm=auto
+
+  - make $CONFIGURE_MAKE

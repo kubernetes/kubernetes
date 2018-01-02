@@ -1,0 +1,606 @@
+{
+  "version": "2.0",
+  "service": "<p>Amazon DynamoDB is a fast, highly scalable, highly available, cost-effective non-relational database service.</p> <p>Amazon DynamoDB removes traditional scalability limitations on data storage while maintaining low latency and predictable performance.</p>",
+  "operations": {
+    "BatchGetItem": "<p>Retrieves the attributes for multiple items from multiple tables using their primary keys.</p> <p>The maximum number of item attributes that can be retrieved for a single operation is 100. Also, the number of items retrieved is constrained by a 1 MB the size limit. If the response size limit is exceeded or a partial result is returned due to an internal processing failure, Amazon DynamoDB returns an <code>UnprocessedKeys</code> value so you can retry the operation starting with the next item to get.</p> <p>Amazon DynamoDB automatically adjusts the number of items returned per page to enforce this limit. For example, even if you ask to retrieve 100 items, but each individual item is 50k in size, the system returns 20 items and an appropriate <code>UnprocessedKeys</code> value so you can get the next page of results. If necessary, your application needs its own logic to assemble the pages of results into one set.</p>",
+    "BatchWriteItem": "<p>Allows to execute a batch of Put and/or Delete Requests for many tables in a single call. A total of 25 requests are allowed.</p> <p>There are no transaction guarantees provided by this API. It does not allow conditional puts nor does it support return values.</p>",
+    "CreateTable": "<p>Adds a new table to your account.</p> <p>The table name must be unique among those associated with the AWS Account issuing the request, and the AWS Region that receives the request (e.g. <code>us-east-1</code>).</p> <p>The <code>CreateTable</code> operation triggers an asynchronous workflow to begin creating the table. Amazon DynamoDB immediately returns the state of the table (<code>CREATING</code>) until the table is in the <code>ACTIVE</code> state. Once the table is in the <code>ACTIVE</code> state, you can perform data plane operations.</p>",
+    "DeleteItem": "<p>Deletes a single item in a table by primary key.</p> <p>You can perform a conditional delete operation that deletes the item if it exists, or if it has an expected attribute value.</p>",
+    "DeleteTable": "<p>Deletes a table and all of its items.</p> <p>If the table is in the <code>ACTIVE</code> state, you can delete it. If a table is in <code>CREATING</code> or <code>UPDATING</code> states then Amazon DynamoDB returns a <code>ResourceInUseException</code>. If the specified table does not exist, Amazon DynamoDB returns a <code>ResourceNotFoundException</code>.</p>",
+    "DescribeTable": "<p>Retrieves information about the table, including the current status of the table, the primary key schema and when the table was created.</p> <p>If the table does not exist, Amazon DynamoDB returns a <code>ResourceNotFoundException</code>.</p>",
+    "GetItem": "<p>Retrieves a set of Attributes for an item that matches the primary key.</p> <p>The <code>GetItem</code> operation provides an eventually-consistent read by default. If eventually-consistent reads are not acceptable for your application, use <code>ConsistentRead</code>. Although this operation might take longer than a standard read, it always returns the last updated value.</p>",
+    "ListTables": "<p>Retrieves a paginated list of table names created by the AWS Account of the caller in the AWS Region (e.g. <code>us-east-1</code>).</p>",
+    "PutItem": "<p>Creates a new item, or replaces an old item with a new item (including all the attributes).</p> <p>If an item already exists in the specified table with the same primary key, the new item completely replaces the existing item. You can perform a conditional put (insert a new item if one with the specified primary key doesn't exist), or replace an existing item if it has certain attribute values.</p>",
+    "Query": "<p>Gets the values of one or more items and its attributes by primary key (composite primary key, only).</p> <p>Narrow the scope of the query using comparison operators on the <code>RangeKeyValue</code> of the composite key. Use the <code>ScanIndexForward</code> parameter to get results in forward or reverse order by range key.</p>",
+    "Scan": "<p>Retrieves one or more items and its attributes by performing a full scan of a table.</p> <p>Provide a <code>ScanFilter</code> to get more specific results.</p>",
+    "UpdateItem": "<p>Edits an existing item's attributes.</p> <p>You can perform a conditional update (insert a new attribute name-value pair if it doesn't exist, or replace an existing name-value pair if it has certain expected attribute values).</p>",
+    "UpdateTable": "<p>Updates the provisioned throughput for the given table.</p> <p>Setting the throughput for a table helps you manage performance and is part of the Provisioned Throughput feature of Amazon DynamoDB.</p>"
+  },
+  "shapes": {
+    "AttributeAction": {
+      "base": "<p>The type of action for an item update operation. Only use the add action for numbers or sets; the specified value is added to the existing value. If a set of values is specified, the values are added to the existing set. Adds the specified attribute. If the attribute exists, it is replaced by the new value. If no value is specified, this removes the attribute and its value. If a set of values is specified, then the values in the specified set are removed from the old set.</p>",
+      "refs": {
+        "AttributeValueUpdate$Action": null
+      }
+    },
+    "AttributeMap": {
+      "base": null,
+      "refs": {
+        "DeleteItemOutput$Attributes": "<p>If the <code>ReturnValues</code> parameter is provided as <code>ALL_OLD</code> in the request, Amazon DynamoDB returns an array of attribute name-value pairs (essentially, the deleted item). Otherwise, the response contains an empty set.</p>",
+        "GetItemOutput$Item": "<p>Contains the requested attributes.</p>",
+        "ItemList$member": null,
+        "PutItemOutput$Attributes": "<p>Attribute values before the put operation, but only if the <code>ReturnValues</code> parameter is specified as <code>ALL_OLD</code> in the request.</p>",
+        "UpdateItemOutput$Attributes": "<p>A map of attribute name-value pairs, but only if the <code>ReturnValues</code> parameter is specified as something other than <code>NONE</code> in the request.</p>"
+      }
+    },
+    "AttributeName": {
+      "base": null,
+      "refs": {
+        "AttributeMap$key": null,
+        "AttributeNameList$member": null,
+        "AttributeUpdates$key": null,
+        "ExpectedAttributeMap$key": null,
+        "PutItemInputAttributeMap$key": null
+      }
+    },
+    "AttributeNameList": {
+      "base": "<p>List of <code>Attribute</code> names. If attribute names are not specified then all attributes will be returned. If some attributes are not found, they will not appear in the result.</p>",
+      "refs": {
+        "GetItemInput$AttributesToGet": null,
+        "KeysAndAttributes$AttributesToGet": null,
+        "QueryInput$AttributesToGet": null,
+        "ScanInput$AttributesToGet": null
+      }
+    },
+    "AttributeUpdates": {
+      "base": "<p>Map of attribute name to the new value and action for the update. The attribute names specify the attributes to modify, and cannot contain any primary key attributes.</p>",
+      "refs": {
+        "UpdateItemInput$AttributeUpdates": null
+      }
+    },
+    "AttributeValue": {
+      "base": "<p>AttributeValue can be <code>String</code>, <code>Number</code>, <code>Binary</code>, <code>StringSet</code>, <code>NumberSet</code>, <code>BinarySet</code>.</p>",
+      "refs": {
+        "AttributeMap$value": null,
+        "AttributeValueList$member": null,
+        "AttributeValueUpdate$Value": null,
+        "ExpectedAttributeValue$Value": "<p>Specify whether or not a value already exists and has a specific content for the attribute name-value pair.</p>",
+        "Key$HashKeyElement": "<p>A hash key element is treated as the primary key, and can be a string or a number. Single attribute primary keys have one index value. The value can be <code>String</code>, <code>Number</code>, <code>StringSet</code>, <code>NumberSet</code>.</p>",
+        "Key$RangeKeyElement": "<p>A range key element is treated as a secondary key (used in conjunction with the primary key), and can be a string or a number, and is only used for hash-and-range primary keys. The value can be <code>String</code>, <code>Number</code>, <code>StringSet</code>, <code>NumberSet</code>.</p>",
+        "PutItemInputAttributeMap$value": null,
+        "QueryInput$HashKeyValue": "<p>Attribute value of the hash component of the composite primary key.</p>"
+      }
+    },
+    "AttributeValueList": {
+      "base": "<p>A list of attribute values to be used with a comparison operator for a scan or query operation. For comparisons that require more than one value, such as a <code>BETWEEN</code> comparison, the AttributeValueList contains two attribute values and the comparison operator.</p>",
+      "refs": {
+        "Condition$AttributeValueList": null
+      }
+    },
+    "AttributeValueUpdate": {
+      "base": "<p>Specifies the attribute to update and how to perform the update. Possible values: <code>PUT</code> (default), <code>ADD</code> or <code>DELETE</code>.</p>",
+      "refs": {
+        "AttributeUpdates$value": null
+      }
+    },
+    "BatchGetItemInput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "BatchGetItemOutput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "BatchGetRequestMap": {
+      "base": "<p>A map of the table name and corresponding items to get by primary key. While requesting items, each table name can be invoked only once per operation.</p>",
+      "refs": {
+        "BatchGetItemInput$RequestItems": null,
+        "BatchGetItemOutput$UnprocessedKeys": "<p>Contains a map of tables and their respective keys that were not processed with the current response, possibly due to reaching a limit on the response size. The <code>UnprocessedKeys</code> value is in the same form as a <code>RequestItems</code> parameter (so the value can be provided directly to a subsequent <code>BatchGetItem</code> operation). For more information, see the above <code>RequestItems</code> parameter.</p>"
+      }
+    },
+    "BatchGetResponseMap": {
+      "base": "<p>Table names and the respective item attributes from the tables.</p>",
+      "refs": {
+        "BatchGetItemOutput$Responses": null
+      }
+    },
+    "BatchResponse": {
+      "base": "<p>The item attributes from a response in a specific table, along with the read resources consumed on the table during the request.</p>",
+      "refs": {
+        "BatchGetResponseMap$value": null
+      }
+    },
+    "BatchWriteItemInput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "BatchWriteItemOutput": {
+      "base": "<p>A container for <code>BatchWriteItem</code> response</p>",
+      "refs": {
+      }
+    },
+    "BatchWriteItemRequestMap": {
+      "base": "<p>A map of table name to list-of-write-requests.</p> <p>Key: The table name corresponding to the list of requests</p> <p>Value: Essentially a list of request items. Each request item could contain either a <code>PutRequest</code> or <code>DeleteRequest</code>. Never both.</p>",
+      "refs": {
+        "BatchWriteItemInput$RequestItems": "<p>A map of table name to list-of-write-requests. Used as input to the <code>BatchWriteItem</code> API call</p>",
+        "BatchWriteItemOutput$UnprocessedItems": "<p>The Items which we could not successfully process in a <code>BatchWriteItem</code> call is returned as <code>UnprocessedItems</code></p>"
+      }
+    },
+    "BatchWriteResponse": {
+      "base": null,
+      "refs": {
+        "BatchWriteResponseMap$value": null
+      }
+    },
+    "BatchWriteResponseMap": {
+      "base": null,
+      "refs": {
+        "BatchWriteItemOutput$Responses": "<p>The response object as a result of <code>BatchWriteItem</code> call. This is essentially a map of table name to <code>ConsumedCapacityUnits</code>.</p>"
+      }
+    },
+    "BinaryAttributeValue": {
+      "base": null,
+      "refs": {
+        "AttributeValue$B": "<p>Binary attributes are sequences of unsigned bytes.</p>",
+        "BinarySetAttributeValue$member": null
+      }
+    },
+    "BinarySetAttributeValue": {
+      "base": null,
+      "refs": {
+        "AttributeValue$BS": "<p>A set of binary attributes.</p>"
+      }
+    },
+    "BooleanObject": {
+      "base": null,
+      "refs": {
+        "ExpectedAttributeValue$Exists": "<p>Specify whether or not a value already exists for the attribute name-value pair.</p>",
+        "QueryInput$Count": "<p>If set to <code>true</code>, Amazon DynamoDB returns a total number of items that match the query parameters, instead of a list of the matching items and their attributes. Do not set <code>Count</code> to <code>true</code> while providing a list of <code>AttributesToGet</code>, otherwise Amazon DynamoDB returns a validation error.</p>",
+        "QueryInput$ScanIndexForward": "<p>Specifies forward or backward traversal of the index. Amazon DynamoDB returns results reflecting the requested order, determined by the range key. The default value is <code>true</code> (forward).</p>",
+        "ScanInput$Count": "<p>If set to <code>true</code>, Amazon DynamoDB returns a total number of items for the <code>Scan</code> operation, even if the operation has no matching items for the assigned filter. Do not set <code>Count</code> to <code>true</code> while providing a list of <code>AttributesToGet</code>, otherwise Amazon DynamoDB returns a validation error.</p>"
+      }
+    },
+    "ComparisonOperator": {
+      "base": "<p>A comparison operator is an enumeration of several operations:</p> <ul> <li><code>EQ</code> for <em>equal</em>.</li> <li><code>NE</code> for <em>not equal</em>.</li> <li><code>IN</code> checks for exact matches.</li> <li><code>LE</code> for <em>less than or equal to</em>.</li> <li><code>LT</code> for <em>less than</em>.</li> <li><code>GE</code> for <em>greater than or equal to</em>.</li> <li><code>GT</code> for <em>greater than</em>.</li> <li><code>BETWEEN</code> for <em>between</em>.</li> <li><code>NOT_NULL</code> for <em>exists</em>.</li> <li><code>NULL</code> for <em>not exists</em>.</li> <li><code>CONTAINS</code> for substring or value in a set.</li> <li><code>NOT_CONTAINS</code> for absence of a substring or absence of a value in a set.</li> <li><code>BEGINS_WITH</code> for a substring prefix.</li> </ul> <p>Scan operations support all available comparison operators.</p> <p>Query operations support a subset of the available comparison operators: EQ, LE, LT, GE, GT, BETWEEN, and BEGINS_WITH.</p>",
+      "refs": {
+        "Condition$ComparisonOperator": null
+      }
+    },
+    "Condition": {
+      "base": null,
+      "refs": {
+        "FilterConditionMap$value": null,
+        "QueryInput$RangeKeyCondition": "<p>A container for the attribute values and comparison operators to use for the query.</p>"
+      }
+    },
+    "ConditionalCheckFailedException": {
+      "base": "<p>This exception is thrown when an expected value does not match what was found in the system.</p>",
+      "refs": {
+      }
+    },
+    "ConsistentRead": {
+      "base": "<p>If set to <code>true</code>, then a consistent read is issued. Otherwise eventually-consistent is used.</p>",
+      "refs": {
+        "GetItemInput$ConsistentRead": null,
+        "KeysAndAttributes$ConsistentRead": null,
+        "QueryInput$ConsistentRead": null
+      }
+    },
+    "ConsumedCapacityUnits": {
+      "base": "<p>The number of Capacity Units of the provisioned throughput of the table consumed during the operation. <code>GetItem</code>, <code>BatchGetItem</code>, <code>BatchWriteItem</code>, <code>Query</code>, and <code>Scan</code> operations consume <code>ReadCapacityUnits</code>, while <code>PutItem</code>, <code>UpdateItem</code>, and <code>DeleteItem</code> operations consume <code>WriteCapacityUnits</code>.</p>",
+      "refs": {
+        "BatchResponse$ConsumedCapacityUnits": null,
+        "BatchWriteResponse$ConsumedCapacityUnits": null,
+        "DeleteItemOutput$ConsumedCapacityUnits": null,
+        "GetItemOutput$ConsumedCapacityUnits": null,
+        "PutItemOutput$ConsumedCapacityUnits": null,
+        "QueryOutput$ConsumedCapacityUnits": null,
+        "ScanOutput$ConsumedCapacityUnits": null,
+        "UpdateItemOutput$ConsumedCapacityUnits": null
+      }
+    },
+    "CreateTableInput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateTableOutput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "Date": {
+      "base": null,
+      "refs": {
+        "ProvisionedThroughputDescription$LastIncreaseDateTime": null,
+        "ProvisionedThroughputDescription$LastDecreaseDateTime": null,
+        "TableDescription$CreationDateTime": null
+      }
+    },
+    "DeleteItemInput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteItemOutput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteRequest": {
+      "base": "<p>A container for a Delete BatchWrite request</p>",
+      "refs": {
+        "WriteRequest$DeleteRequest": null
+      }
+    },
+    "DeleteTableInput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteTableOutput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeTableInput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeTableOutput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ErrorMessage": {
+      "base": null,
+      "refs": {
+        "ConditionalCheckFailedException$message": null,
+        "InternalServerError$message": null,
+        "LimitExceededException$message": null,
+        "ProvisionedThroughputExceededException$message": null,
+        "ResourceInUseException$message": null,
+        "ResourceNotFoundException$message": null
+      }
+    },
+    "ExpectedAttributeMap": {
+      "base": "<p>Designates an attribute for a conditional modification. The <code>Expected</code> parameter allows you to provide an attribute name, and whether or not Amazon DynamoDB should check to see if the attribute has a particular value before modifying it.</p>",
+      "refs": {
+        "DeleteItemInput$Expected": null,
+        "PutItemInput$Expected": null,
+        "UpdateItemInput$Expected": null
+      }
+    },
+    "ExpectedAttributeValue": {
+      "base": "<p>Allows you to provide an attribute name, and whether or not Amazon DynamoDB should check to see if the attribute value already exists; or if the attribute value exists and has a particular value before changing it.</p>",
+      "refs": {
+        "ExpectedAttributeMap$value": null
+      }
+    },
+    "FilterConditionMap": {
+      "base": null,
+      "refs": {
+        "ScanInput$ScanFilter": "<p>Evaluates the scan results and returns only the desired values.</p>"
+      }
+    },
+    "GetItemInput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetItemOutput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "Integer": {
+      "base": null,
+      "refs": {
+        "QueryOutput$Count": "<p>Number of items in the response.</p>",
+        "ScanOutput$Count": "<p>Number of items in the response.</p>",
+        "ScanOutput$ScannedCount": "<p>Number of items in the complete scan before any filters are applied. A high <code>ScannedCount</code> value with few, or no, <code>Count</code> results indicates an inefficient <code>Scan</code> operation.</p>"
+      }
+    },
+    "InternalServerError": {
+      "base": "<p>This exception is thrown when the service has a problem when trying to process the request.</p>",
+      "refs": {
+      }
+    },
+    "ItemList": {
+      "base": null,
+      "refs": {
+        "BatchResponse$Items": null,
+        "QueryOutput$Items": null,
+        "ScanOutput$Items": null
+      }
+    },
+    "Key": {
+      "base": "<p>The primary key that uniquely identifies each item in a table. A primary key can be a one attribute (hash) primary key or a two attribute (hash-and-range) primary key.</p>",
+      "refs": {
+        "DeleteItemInput$Key": null,
+        "DeleteRequest$Key": "<p>The item's key to be delete</p>",
+        "GetItemInput$Key": null,
+        "KeyList$member": null,
+        "QueryInput$ExclusiveStartKey": "<p>Primary key of the item from which to continue an earlier query. An earlier query might provide this value as the <code>LastEvaluatedKey</code> if that query operation was interrupted before completing the query; either because of the result set size or the <code>Limit</code> parameter. The <code>LastEvaluatedKey</code> can be passed back in a new query request to continue the operation from that point.</p>",
+        "QueryOutput$LastEvaluatedKey": "<p>Primary key of the item where the query operation stopped, inclusive of the previous result set. Use this value to start a new operation excluding this value in the new request. The <code>LastEvaluatedKey</code> is null when the entire query result set is complete (i.e. the operation processed the \"last page\").</p>",
+        "ScanInput$ExclusiveStartKey": "<p>Primary key of the item from which to continue an earlier scan. An earlier scan might provide this value if that scan operation was interrupted before scanning the entire table; either because of the result set size or the <code>Limit</code> parameter. The <code>LastEvaluatedKey</code> can be passed back in a new scan request to continue the operation from that point.</p>",
+        "ScanOutput$LastEvaluatedKey": "<p>Primary key of the item where the scan operation stopped. Provide this value in a subsequent scan operation to continue the operation from that point. The <code>LastEvaluatedKey</code> is null when the entire scan result set is complete (i.e. the operation processed the \"last page\").</p>",
+        "UpdateItemInput$Key": null
+      }
+    },
+    "KeyList": {
+      "base": null,
+      "refs": {
+        "KeysAndAttributes$Keys": null
+      }
+    },
+    "KeySchema": {
+      "base": "<p>The KeySchema identifies the primary key as a one attribute primary key (hash) or a composite two attribute (hash-and-range) primary key. Single attribute primary keys have one index value: a <code>HashKeyElement</code>. A composite hash-and-range primary key contains two attribute values: a <code>HashKeyElement</code> and a <code>RangeKeyElement</code>.</p>",
+      "refs": {
+        "CreateTableInput$KeySchema": null,
+        "TableDescription$KeySchema": null
+      }
+    },
+    "KeySchemaAttributeName": {
+      "base": null,
+      "refs": {
+        "KeySchemaElement$AttributeName": "<p>The <code>AttributeName</code> of the <code>KeySchemaElement</code>.</p>"
+      }
+    },
+    "KeySchemaElement": {
+      "base": "<p><code>KeySchemaElement</code> is the primary key (hash or hash-and-range) structure for the table.</p>",
+      "refs": {
+        "KeySchema$HashKeyElement": "<p>A hash key element is treated as the primary key, and can be a string or a number. Single attribute primary keys have one index value. The value can be <code>String</code>, <code>Number</code>, <code>StringSet</code>, <code>NumberSet</code>.</p>",
+        "KeySchema$RangeKeyElement": "<p>A range key element is treated as a secondary key (used in conjunction with the primary key), and can be a string or a number, and is only used for hash-and-range primary keys. The value can be <code>String</code>, <code>Number</code>, <code>StringSet</code>, <code>NumberSet</code>.</p>"
+      }
+    },
+    "KeysAndAttributes": {
+      "base": null,
+      "refs": {
+        "BatchGetRequestMap$value": null
+      }
+    },
+    "LimitExceededException": {
+      "base": "<p>This exception is thrown when the subscriber exceeded the limits on the number of objects or operations.</p>",
+      "refs": {
+      }
+    },
+    "ListTablesInput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListTablesInputLimit": {
+      "base": "<p>A number of maximum table names to return.</p>",
+      "refs": {
+        "ListTablesInput$Limit": null
+      }
+    },
+    "ListTablesOutput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "Long": {
+      "base": null,
+      "refs": {
+        "TableDescription$TableSizeBytes": null,
+        "TableDescription$ItemCount": null
+      }
+    },
+    "NumberAttributeValue": {
+      "base": null,
+      "refs": {
+        "AttributeValue$N": "<p>Numbers are positive or negative exact-value decimals and integers. A number can have up to 38 digits precision and can be between 10^-128 to 10^+126.</p>",
+        "NumberSetAttributeValue$member": null
+      }
+    },
+    "NumberSetAttributeValue": {
+      "base": null,
+      "refs": {
+        "AttributeValue$NS": "<p>A set of numbers.</p>"
+      }
+    },
+    "PositiveIntegerObject": {
+      "base": null,
+      "refs": {
+        "QueryInput$Limit": "<p>The maximum number of items to return. If Amazon DynamoDB hits this limit while querying the table, it stops the query and returns the matching values up to the limit, and a <code>LastEvaluatedKey</code> to apply in a subsequent operation to continue the query. Also, if the result set size exceeds 1MB before Amazon DynamoDB hits this limit, it stops the query and returns the matching values, and a <code>LastEvaluatedKey</code> to apply in a subsequent operation to continue the query.</p>",
+        "ScanInput$Limit": "<p>The maximum number of items to return. If Amazon DynamoDB hits this limit while scanning the table, it stops the scan and returns the matching values up to the limit, and a <code>LastEvaluatedKey</code> to apply in a subsequent operation to continue the scan. Also, if the scanned data set size exceeds 1 MB before Amazon DynamoDB hits this limit, it stops the scan and returns the matching values up to the limit, and a <code>LastEvaluatedKey</code> to apply in a subsequent operation to continue the scan.</p>"
+      }
+    },
+    "PositiveLongObject": {
+      "base": null,
+      "refs": {
+        "ProvisionedThroughput$ReadCapacityUnits": "<p><code>ReadCapacityUnits</code> are in terms of strictly consistent reads, assuming items of 1k. 2k items require twice the <code>ReadCapacityUnits</code>. Eventually-consistent reads only require half the <code>ReadCapacityUnits</code> of stirctly consistent reads.</p>",
+        "ProvisionedThroughput$WriteCapacityUnits": "<p><code>WriteCapacityUnits</code> are in terms of strictly consistent reads, assuming items of 1k. 2k items require twice the <code>WriteCapacityUnits</code>.</p>",
+        "ProvisionedThroughputDescription$NumberOfDecreasesToday": null,
+        "ProvisionedThroughputDescription$ReadCapacityUnits": null,
+        "ProvisionedThroughputDescription$WriteCapacityUnits": null
+      }
+    },
+    "ProvisionedThroughput": {
+      "base": "<p>Provisioned throughput reserves the required read and write resources for your table in terms of <code>ReadCapacityUnits</code> and <code>WriteCapacityUnits</code>. Values for provisioned throughput depend upon your expected read/write rates, item size, and consistency. Provide the expected number of read and write operations, assuming an item size of 1k and strictly consistent reads. For 2k item size, double the value. For 3k, triple the value, etc. Eventually-consistent reads consume half the resources of strictly consistent reads.</p>",
+      "refs": {
+        "CreateTableInput$ProvisionedThroughput": null,
+        "UpdateTableInput$ProvisionedThroughput": null
+      }
+    },
+    "ProvisionedThroughputDescription": {
+      "base": null,
+      "refs": {
+        "TableDescription$ProvisionedThroughput": null
+      }
+    },
+    "ProvisionedThroughputExceededException": {
+      "base": "<p>This exception is thrown when the level of provisioned throughput defined for the table is exceeded.</p>",
+      "refs": {
+      }
+    },
+    "PutItemInput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "PutItemInputAttributeMap": {
+      "base": "<p>A map of the attributes for the item, and must include the primary key values that define the item. Other attribute name-value pairs can be provided for the item.</p>",
+      "refs": {
+        "PutItemInput$Item": null,
+        "PutRequest$Item": "<p>The item to put</p>"
+      }
+    },
+    "PutItemOutput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "PutRequest": {
+      "base": "<p>A container for a Put BatchWrite request</p>",
+      "refs": {
+        "WriteRequest$PutRequest": null
+      }
+    },
+    "QueryInput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "QueryOutput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ResourceInUseException": {
+      "base": "<p>This exception is thrown when the resource which is being attempted to be changed is in use.</p>",
+      "refs": {
+      }
+    },
+    "ResourceNotFoundException": {
+      "base": "<p>This exception is thrown when the resource which is being attempted to be changed is in use.</p>",
+      "refs": {
+      }
+    },
+    "ReturnValue": {
+      "base": "<p>Use this parameter if you want to get the attribute name-value pairs before or after they are modified. For <code>PUT</code> operations, the possible parameter values are <code>NONE</code> (default) or <code>ALL_OLD</code>. For update operations, the possible parameter values are <code>NONE</code> (default) or <code>ALL_OLD</code>, <code>UPDATED_OLD</code>, <code>ALL_NEW</code> or <code>UPDATED_NEW</code>.</p> <ul> <li><code>NONE</code>: Nothing is returned.</li> <li><code>ALL_OLD</code>: Returns the attributes of the item as they were before the operation.</li> <li><code>UPDATED_OLD</code>: Returns the values of the updated attributes, only, as they were before the operation.</li> <li><code>ALL_NEW</code>: Returns all the attributes and their new values after the operation.</li> <li><code>UPDATED_NEW</code>: Returns the values of the updated attributes, only, as they are after the operation.</li> </ul>",
+      "refs": {
+        "DeleteItemInput$ReturnValues": null,
+        "PutItemInput$ReturnValues": null,
+        "UpdateItemInput$ReturnValues": null
+      }
+    },
+    "ScalarAttributeType": {
+      "base": null,
+      "refs": {
+        "KeySchemaElement$AttributeType": "<p>The <code>AttributeType</code> of the <code>KeySchemaElement</code> which can be a <code>String</code> or a <code>Number</code>.</p>"
+      }
+    },
+    "ScanInput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ScanOutput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "String": {
+      "base": null,
+      "refs": {
+        "FilterConditionMap$key": null
+      }
+    },
+    "StringAttributeValue": {
+      "base": null,
+      "refs": {
+        "AttributeValue$S": "<p>Strings are Unicode with UTF-8 binary encoding. The maximum size is limited by the size of the primary key (1024 bytes as a range part of a key or 2048 bytes as a single part hash key) or the item size (64k).</p>",
+        "StringSetAttributeValue$member": null
+      }
+    },
+    "StringSetAttributeValue": {
+      "base": null,
+      "refs": {
+        "AttributeValue$SS": "<p>A set of strings.</p>"
+      }
+    },
+    "TableDescription": {
+      "base": null,
+      "refs": {
+        "CreateTableOutput$TableDescription": null,
+        "DeleteTableOutput$TableDescription": null,
+        "DescribeTableOutput$Table": null,
+        "UpdateTableOutput$TableDescription": null
+      }
+    },
+    "TableName": {
+      "base": null,
+      "refs": {
+        "BatchGetRequestMap$key": null,
+        "BatchGetResponseMap$key": null,
+        "BatchWriteItemRequestMap$key": null,
+        "BatchWriteResponseMap$key": null,
+        "CreateTableInput$TableName": "<p>The name of the table you want to create. Allowed characters are <code>a-z</code>, <code>A-Z</code>, <code>0-9</code>, <code>_</code> (underscore), <code>-</code> (hyphen) and <code>.</code> (period).</p>",
+        "DeleteItemInput$TableName": "<p>The name of the table in which you want to delete an item. Allowed characters are <code>a-z</code>, <code>A-Z</code>, <code>0-9</code>, <code>_</code> (underscore), <code>-</code> (hyphen) and <code>.</code> (period).</p>",
+        "DeleteTableInput$TableName": "<p>The name of the table you want to delete. Allowed characters are <code>a-z</code>, <code>A-Z</code>, <code>0-9</code>, <code>_</code> (underscore), <code>-</code> (hyphen) and <code>.</code> (period).</p>",
+        "DescribeTableInput$TableName": "<p>The name of the table you want to describe. Allowed characters are <code>a-z</code>, <code>A-Z</code>, <code>0-9</code>, <code>_</code> (underscore), <code>-</code> (hyphen) and <code>.</code> (period).</p>",
+        "GetItemInput$TableName": "<p>The name of the table in which you want to get an item. Allowed characters are <code>a-z</code>, <code>A-Z</code>, <code>0-9</code>, <code>_</code> (underscore), <code>-</code> (hyphen) and <code>.</code> (period).</p>",
+        "ListTablesInput$ExclusiveStartTableName": "<p>The name of the table that starts the list. If you already ran a <code>ListTables</code> operation and received a <code>LastEvaluatedTableName</code> value in the response, use that value here to continue the list.</p>",
+        "ListTablesOutput$LastEvaluatedTableName": "<p>The name of the last table in the current list. Use this value as the <code>ExclusiveStartTableName</code> in a new request to continue the list until all the table names are returned. If this value is null, all table names have been returned.</p>",
+        "PutItemInput$TableName": "<p>The name of the table in which you want to put an item. Allowed characters are <code>a-z</code>, <code>A-Z</code>, <code>0-9</code>, <code>_</code> (underscore), <code>-</code> (hyphen) and <code>.</code> (period).</p>",
+        "QueryInput$TableName": "<p>The name of the table in which you want to query. Allowed characters are <code>a-z</code>, <code>A-Z</code>, <code>0-9</code>, <code>_</code> (underscore), <code>-</code> (hyphen) and <code>.</code> (period).</p>",
+        "ScanInput$TableName": "<p>The name of the table in which you want to scan. Allowed characters are <code>a-z</code>, <code>A-Z</code>, <code>0-9</code>, <code>_</code> (underscore), <code>-</code> (hyphen) and <code>.</code> (period).</p>",
+        "TableDescription$TableName": "<p>The name of the table being described.</p>",
+        "TableNameList$member": null,
+        "UpdateItemInput$TableName": "<p>The name of the table in which you want to update an item. Allowed characters are <code>a-z</code>, <code>A-Z</code>, <code>0-9</code>, <code>_</code> (underscore), <code>-</code> (hyphen) and <code>.</code> (period).</p>",
+        "UpdateTableInput$TableName": "<p>The name of the table you want to update. Allowed characters are <code>a-z</code>, <code>A-Z</code>, <code>0-9</code>, <code>_</code> (underscore), <code>-</code> (hyphen) and <code>.</code> (period).</p>"
+      }
+    },
+    "TableNameList": {
+      "base": null,
+      "refs": {
+        "ListTablesOutput$TableNames": null
+      }
+    },
+    "TableStatus": {
+      "base": null,
+      "refs": {
+        "TableDescription$TableStatus": null
+      }
+    },
+    "UpdateItemInput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateItemOutput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateTableInput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateTableOutput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "WriteRequest": {
+      "base": "<p>This structure is a Union of PutRequest and DeleteRequest. It can contain exactly one of <code>PutRequest</code> or <code>DeleteRequest</code>. Never Both. This is enforced in the code.</p>",
+      "refs": {
+        "WriteRequests$member": null
+      }
+    },
+    "WriteRequests": {
+      "base": null,
+      "refs": {
+        "BatchWriteItemRequestMap$value": null
+      }
+    }
+  }
+}

@@ -1,0 +1,111 @@
+#/bin/sh
+
+set -e
+
+usage()
+{
+cat << EOF
+NAME:
+    machines - Create Test Environments for Docker Networking
+
+VERSION:
+    0.1
+
+USAGE:
+    $0 <command> [command_options] [arguments...]
+
+COMMANDS:
+    help    
+            Help and usage
+
+    up <kv-store> <scale>    
+            Create environment with given KV store
+            zookeeper | etcd | consul (default)
+	    Create N nodes, default = 2
+
+    destroy 
+            Destroy Environment
+
+EOF
+}
+
+step() {
+    printf "\033[0;36m-----> $@\033[0m\n"
+}
+
+up()
+{
+	step "Creating KV Store Machine"
+	docker-machine create \
+	    -d virtualbox \
+	    mh-kv
+
+	step "KV Store is $1"
+        step "Starting KV Container"
+        case "$1" in
+            etcd)
+            cluster_store="cluster-store=etcd://$(docker-machine ip mh-kv):2379"
+            docker $(docker-machine config mh-kv) run -d \
+                -p "2379:2379" \
+                -h "etcd" \
+                --name "etcd" \
+                quay.io/coreos/etcd:v2.2.1 \
+		--listen-client-urls="http://0.0.0.0:2379" \
+                --advertise-client-urls="http://$(docker-machine ip mh-kv):2379"
+           ;;
+            zookeeper)
+            cluster_store="cluster-store=zk://$(docker-machine ip mh-kv):2181" 
+            docker $(docker-machine config mh-kv) run -d \
+                -p "2181:2181" \
+                -h "zookeeper" \
+                --name "zookeeper" \
+                tianon/zookeeper
+            ;;
+            *)
+            cluster_store="cluster-store=consul://$(docker-machine ip mh-kv):8500"
+            docker $(docker-machine config mh-kv) run -d \
+	        -p "8500:8500" \
+	        -h "consul" \
+                --name "consul" \
+	        progrium/consul -server -bootstrap-expect 1
+            ;;
+        esac
+
+	machines=$2
+        if [ -z machines ]; then
+            machines=2
+        fi
+	step "Creating $machines Machines"       
+ 
+        for i in $(seq $machines); do
+	    step "Creating machine $i"
+            docker-machine create \
+	        -d virtualbox \
+	        --engine-opt="cluster-advertise=eth1:2376" \
+	        --engine-opt="$cluster_store" \
+	        mh-$i
+        done				
+}
+
+destroy()
+{
+    for x in $(docker-machine ls | grep mh- | awk '{ print $1 }'); do
+	docker-machine rm $x
+    done
+}
+
+case "$1" in
+    up)
+        shift
+        up $@
+        ;;
+    destroy)
+        destroy $@
+        ;;
+    help)
+        usage
+        ;;
+    *)
+	usage
+        ;;
+esac

@@ -1,0 +1,237 @@
+.container {
+  max-width: 1271px;
+  margin: 0 auto;
+}
+
+.navbar {
+  padding: 1rem 2rem;
+  .flex-display();
+  .justify-content(space-between);
+  .name {
+    font-size: 2rem;
+    font-weight: 500;
+    color: white;
+    a {
+      color: white;
+    }
+    .org {
+      font-size: 0.8rem;
+      margin-left: 0.5rem;
+      color: rgba(255,255,255,0.8);
+    }
+  }
+  .actions {
+    .flex-display();
+    padding-top: 1rem;
+    padding-right: 1rem;
+    .link {
+      margin-left: 2rem;
+      text-transform: uppercase;
+      font-weight: 600;
+      font-size: 0.8rem;
+      a {
+        color: rgba(255,255,255,0.6);
+        &:hover {
+          color: white;
+        }
+      }
+    }
+  }
+  &.white {
+    background-color: white;
+    .name {
+      a {
+        color: @gray-darkest;
+      }
+      color: @gray-darkest;
+      .org {
+        color: @gray-darkest;
+      }
+    }
+    .actions {
+      .link {
+        a {
+          color: @brand-primary;
+        }
+      }
+    }
+  }
+}
+
+@media screen and (max-width: 600px) {
+  .navbar {
+    .name {
+      .org {
+        display: block;
+        margin-left: 0;
+        margin-top: 0.5rem;
+        line-height: 1rem;
+      }
+    }
+  }
+}
+
+.hero {
+  background-color: @color-gradient-start;
+  background-image: linear-gradient(-135deg, @color-gradient-start 0%, @color-gradient-end 100%);
+  .hamster {
+    padding: 1rem 2rem 3rem 2rem;
+    img {
+      width: 100%;
+      max-width: 500px;
+    }
+    text-align: center;
+  }
+  h3 {
+    padding-top: 1.5rem;
+    text-align: center;
+    color: white;
+    margin-bottom: 1rem;
+    img {
+      height: 30px;
+      width: auto;
+      margin-right: 0.7rem;
+      position: relative;
+      top: 0.4rem;
+    }
+  }
+  p {
+    strong {
+      font-weight: 700;
+    }
+    color: white;
+    font-size: 1.5rem;
+    text-align: center;
+    font-weight: 300;
+    padding: 1rem 2rem 0 2rem;
+    line-height: 2rem;
+  }
+}
+
+.content {
+  background-color: white;
+  .flex-display();
+  .flex-flow(row wrap);
+  &.blue {
+    background-color: @gray-dark;
+    color: white;
+    h2 {
+      color: white;
+    }
+    p {
+      color: rgba(255,255,255,0.8);
+    }
+  }
+  .wrapper-details {
+    padding: 2rem 2.5rem;
+  }
+  .details {
+    .points {
+      .flex-display();
+      .flex-direction(column);
+      .point {
+        padding-top: 1rem;
+        border-bottom: 1px solid @color-background;
+        &:last-child {
+          border-bottom: 0;
+        }
+      }
+    }
+  }
+  .terminal {
+    .flex-display();
+    .align-items(center);
+    .justify-content(center);
+    img {
+      width: 100%;
+    }
+  }
+}
+
+.footer {
+  background-color: @gray-darkest;
+  padding: 2rem;
+  color: white;
+  h3 {
+    text-align: center;
+    color: white;
+    margin-bottom: 0;
+    img {
+      height: 30px;
+      width: auto;
+      margin-right: 0.7rem;
+      position: relative;
+      top: 0.4rem;
+    }
+  }
+  .footer-links {
+    .flex-display();
+    .justify-content(center);
+    margin-top: 1.5rem;
+    .link {
+      margin-right: 0.7rem;
+    }
+  }
+  .copyright {
+    text-align: center;
+    margin-top: 1.5rem;
+    color: rgba(255,255,255,0.6);
+  }
+}
+
+@media screen and (max-width: 960px) {
+  .details, .terminal { 
+    width: 100%; 
+  }
+  .wrapper-terminal {
+    padding: 0 2rem 2rem 2rem;
+  }
+}
+
+@media screen and (min-width: 960px) {
+  .details {
+    width: 60%;
+  }
+  .terminal { 
+    width: 40%;
+  }
+  .wrapper-terminal {
+    padding: 0 2rem 0 0;
+  }
+}
+
+p {
+  font-size: 1.2rem;
+  line-height: 1.5rem;
+  margin-bottom: 1rem;
+}
+
+h2 {
+  font-size: 2rem;
+  font-weight: 500;
+  margin-bottom: 1rem;
+  color: @blue-dark;
+}
+
+h3 {
+  font-size: 1.2rem;
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+  color: @blue-dark;
+}
+
+a {
+  color: @brand-primary;
+  text-decoration: none;
+  &:hover {
+    color: lighten(@brand-primary, 5%);
+  }
+}
+
+body {
+  font-family: @font-regular;
+  -webkit-font-smoothing: antialiased;
+  font-size: 14px;
+  color: @gray-darkest;
+  background-color: @color-background;
+}

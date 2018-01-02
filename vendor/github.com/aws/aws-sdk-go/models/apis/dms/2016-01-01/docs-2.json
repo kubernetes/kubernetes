@@ -1,0 +1,1293 @@
+{
+  "version": "2.0",
+  "service": "<fullname>AWS Database Migration Service</fullname> <p>AWS Database Migration Service (AWS DMS) can migrate your data to and from the most widely used commercial and open-source databases such as Oracle, PostgreSQL, Microsoft SQL Server, Amazon Redshift, MariaDB, Amazon Aurora, MySQL, and SAP Adaptive Server Enterprise (ASE). The service supports homogeneous migrations such as Oracle to Oracle, as well as heterogeneous migrations between different database platforms, such as Oracle to MySQL or SQL Server to PostgreSQL.</p> <p>For more information about AWS DMS, see the AWS DMS user guide at <a href=\"http://docs.aws.amazon.com/dms/latest/userguide/Welcome.html\"> What Is AWS Database Migration Service? </a> </p>",
+  "operations": {
+    "AddTagsToResource": "<p>Adds metadata tags to a DMS resource, including replication instance, endpoint, security group, and migration task. These tags can also be used with cost allocation reporting to track cost associated with DMS resources, or used in a Condition statement in an IAM policy for DMS.</p>",
+    "CreateEndpoint": "<p>Creates an endpoint using the provided settings.</p>",
+    "CreateEventSubscription": "<p> Creates an AWS DMS event notification subscription. </p> <p>You can specify the type of source (<code>SourceType</code>) you want to be notified of, provide a list of AWS DMS source IDs (<code>SourceIds</code>) that triggers the events, and provide a list of event categories (<code>EventCategories</code>) for events you want to be notified of. If you specify both the <code>SourceType</code> and <code>SourceIds</code>, such as <code>SourceType = replication-instance</code> and <code>SourceIdentifier = my-replinstance</code>, you will be notified of all the replication instance events for the specified source. If you specify a <code>SourceType</code> but don't specify a <code>SourceIdentifier</code>, you receive notice of the events for that source type for all your AWS DMS sources. If you don't specify either <code>SourceType</code> nor <code>SourceIdentifier</code>, you will be notified of events generated from all AWS DMS sources belonging to your customer account.</p> <p>For more information about AWS DMS events, see <a href=\"http://docs.aws.amazon.com/dms/latest/userguide/CHAP_Events.html\"> Working with Events and Notifications </a> in the AWS Database MIgration Service User Guide.</p>",
+    "CreateReplicationInstance": "<p>Creates the replication instance using the specified parameters.</p>",
+    "CreateReplicationSubnetGroup": "<p>Creates a replication subnet group given a list of the subnet IDs in a VPC.</p>",
+    "CreateReplicationTask": "<p>Creates a replication task using the specified parameters.</p>",
+    "DeleteCertificate": "<p>Deletes the specified certificate. </p>",
+    "DeleteEndpoint": "<p>Deletes the specified endpoint.</p> <note> <p>All tasks associated with the endpoint must be deleted before you can delete the endpoint.</p> </note> <p/>",
+    "DeleteEventSubscription": "<p> Deletes an AWS DMS event subscription. </p>",
+    "DeleteReplicationInstance": "<p>Deletes the specified replication instance.</p> <note> <p>You must delete any migration tasks that are associated with the replication instance before you can delete it.</p> </note> <p/>",
+    "DeleteReplicationSubnetGroup": "<p>Deletes a subnet group.</p>",
+    "DeleteReplicationTask": "<p>Deletes the specified replication task.</p>",
+    "DescribeAccountAttributes": "<p>Lists all of the AWS DMS attributes for a customer account. The attributes include AWS DMS quotas for the account, such as the number of replication instances allowed. The description for a quota includes the quota name, current usage toward that quota, and the quota's maximum value.</p> <p>This command does not take any parameters.</p>",
+    "DescribeCertificates": "<p>Provides a description of the certificate.</p>",
+    "DescribeConnections": "<p>Describes the status of the connections that have been made between the replication instance and an endpoint. Connections are created when you test an endpoint.</p>",
+    "DescribeEndpointTypes": "<p>Returns information about the type of endpoints available.</p>",
+    "DescribeEndpoints": "<p>Returns information about the endpoints for your account in the current region.</p>",
+    "DescribeEventCategories": "<p>Lists categories for all event source types, or, if specified, for a specified source type. You can see a list of the event categories and source types in <a href=\"http://docs.aws.amazon.com/dms/latest/userguide/CHAP_Events.html\"> Working with Events and Notifications </a> in the AWS Database Migration Service User Guide. </p>",
+    "DescribeEventSubscriptions": "<p>Lists all the event subscriptions for a customer account. The description of a subscription includes <code>SubscriptionName</code>, <code>SNSTopicARN</code>, <code>CustomerID</code>, <code>SourceType</code>, <code>SourceID</code>, <code>CreationTime</code>, and <code>Status</code>. </p> <p>If you specify <code>SubscriptionName</code>, this action lists the description for that subscription.</p>",
+    "DescribeEvents": "<p> Lists events for a given source identifier and source type. You can also specify a start and end time. For more information on AWS DMS events, see <a href=\"http://docs.aws.amazon.com/dms/latest/userguide/CHAP_Events.html\"> Working with Events and Notifications </a>. </p>",
+    "DescribeOrderableReplicationInstances": "<p>Returns information about the replication instance types that can be created in the specified region.</p>",
+    "DescribeRefreshSchemasStatus": "<p>Returns the status of the RefreshSchemas operation.</p>",
+    "DescribeReplicationInstances": "<p>Returns information about replication instances for your account in the current region.</p>",
+    "DescribeReplicationSubnetGroups": "<p>Returns information about the replication subnet groups.</p>",
+    "DescribeReplicationTasks": "<p>Returns information about replication tasks for your account in the current region.</p>",
+    "DescribeSchemas": "<p>Returns information about the schema for the specified endpoint.</p> <p/>",
+    "DescribeTableStatistics": "<p>Returns table statistics on the database migration task, including table name, rows inserted, rows updated, and rows deleted.</p>",
+    "ImportCertificate": "<p>Uploads the specified certificate.</p>",
+    "ListTagsForResource": "<p>Lists all tags for an AWS DMS resource.</p>",
+    "ModifyEndpoint": "<p>Modifies the specified endpoint.</p>",
+    "ModifyEventSubscription": "<p>Modifies an existing AWS DMS event notification subscription. </p>",
+    "ModifyReplicationInstance": "<p>Modifies the replication instance to apply new settings. You can change one or more parameters by specifying these parameters and the new values in the request.</p> <p>Some settings are applied during the maintenance window.</p> <p/>",
+    "ModifyReplicationSubnetGroup": "<p>Modifies the settings for the specified replication subnet group.</p>",
+    "ModifyReplicationTask": "<p>Modifies the specified replication task.</p> <p>You can't modify the task endpoints. The task must be stopped before you can modify it. </p> <p>For more information about AWS DMS tasks, see the AWS DMS user guide at <a href=\"http://docs.aws.amazon.com/dms/latest/userguide/CHAP_Tasks.html\"> Working with Migration Tasks </a> </p>",
+    "RefreshSchemas": "<p>Populates the schema for the specified endpoint. This is an asynchronous operation and can take several minutes. You can check the status of this operation by calling the DescribeRefreshSchemasStatus operation.</p>",
+    "ReloadTables": "<p>Reloads the target database table with the source data. </p>",
+    "RemoveTagsFromResource": "<p>Removes metadata tags from a DMS resource.</p>",
+    "StartReplicationTask": "<p>Starts the replication task.</p> <p>For more information about AWS DMS tasks, see the AWS DMS user guide at <a href=\"http://docs.aws.amazon.com/dms/latest/userguide/CHAP_Tasks.html\"> Working with Migration Tasks </a> </p>",
+    "StopReplicationTask": "<p>Stops the replication task.</p> <p/>",
+    "TestConnection": "<p>Tests the connection between the replication instance and the endpoint.</p>"
+  },
+  "shapes": {
+    "AccessDeniedFault": {
+      "base": "<p>AWS DMS was denied access to the endpoint.</p>",
+      "refs": {
+      }
+    },
+    "AccountQuota": {
+      "base": "<p>Describes a quota for an AWS account, for example, the number of replication instances allowed.</p>",
+      "refs": {
+        "AccountQuotaList$member": null
+      }
+    },
+    "AccountQuotaList": {
+      "base": null,
+      "refs": {
+        "DescribeAccountAttributesResponse$AccountQuotas": "<p>Account quota information.</p>"
+      }
+    },
+    "AddTagsToResourceMessage": {
+      "base": "<p/>",
+      "refs": {
+      }
+    },
+    "AddTagsToResourceResponse": {
+      "base": "<p/>",
+      "refs": {
+      }
+    },
+    "AuthMechanismValue": {
+      "base": null,
+      "refs": {
+        "MongoDbSettings$AuthMechanism": "<p> The authentication mechanism you use to access the MongoDB source endpoint.</p> <p>Valid values: DEFAULT, MONGODB_CR, SCRAM_SHA_1 </p> <p>DEFAULT – For MongoDB version 2.x, use MONGODB_CR. For MongoDB version 3.x, use SCRAM_SHA_1. This attribute is not used when authType=No.</p>"
+      }
+    },
+    "AuthTypeValue": {
+      "base": null,
+      "refs": {
+        "MongoDbSettings$AuthType": "<p> The authentication type you use to access the MongoDB source endpoint.</p> <p>Valid values: NO, PASSWORD </p> <p>When NO is selected, user name and password parameters are not used and can be empty. </p>"
+      }
+    },
+    "AvailabilityZone": {
+      "base": "<p/>",
+      "refs": {
+        "Subnet$SubnetAvailabilityZone": "<p>The Availability Zone of the subnet.</p>"
+      }
+    },
+    "Boolean": {
+      "base": null,
+      "refs": {
+        "EventSubscription$Enabled": "<p>Boolean value that indicates if the event subscription is enabled.</p>",
+        "ModifyReplicationInstanceMessage$ApplyImmediately": "<p>Indicates whether the changes should be applied immediately or during the next maintenance window.</p>",
+        "ModifyReplicationInstanceMessage$AllowMajorVersionUpgrade": "<p>Indicates that major version upgrades are allowed. Changing this parameter does not result in an outage and the change is asynchronously applied as soon as possible.</p> <p>Constraints: This parameter must be set to true when specifying a value for the <code>EngineVersion</code> parameter that is a different major version than the replication instance's current version.</p>",
+        "ReplicationInstance$MultiAZ": "<p> Specifies if the replication instance is a Multi-AZ deployment. You cannot set the <code>AvailabilityZone</code> parameter if the Multi-AZ parameter is set to <code>true</code>. </p>",
+        "ReplicationInstance$AutoMinorVersionUpgrade": "<p>Boolean value indicating if minor version upgrades will be automatically applied to the instance.</p>",
+        "ReplicationInstance$PubliclyAccessible": "<p> Specifies the accessibility options for the replication instance. A value of <code>true</code> represents an instance with a public IP address. A value of <code>false</code> represents an instance with a private IP address. The default value is <code>true</code>. </p>",
+        "SupportedEndpointType$SupportsCDC": "<p>Indicates if Change Data Capture (CDC) is supported.</p>"
+      }
+    },
+    "BooleanOptional": {
+      "base": null,
+      "refs": {
+        "CreateEventSubscriptionMessage$Enabled": "<p> A Boolean value; set to <b>true</b> to activate the subscription, or set to <b>false</b> to create the subscription but not activate it. </p>",
+        "CreateReplicationInstanceMessage$MultiAZ": "<p> Specifies if the replication instance is a Multi-AZ deployment. You cannot set the <code>AvailabilityZone</code> parameter if the Multi-AZ parameter is set to <code>true</code>. </p>",
+        "CreateReplicationInstanceMessage$AutoMinorVersionUpgrade": "<p>Indicates that minor engine upgrades will be applied automatically to the replication instance during the maintenance window.</p> <p>Default: <code>true</code> </p>",
+        "CreateReplicationInstanceMessage$PubliclyAccessible": "<p> Specifies the accessibility options for the replication instance. A value of <code>true</code> represents an instance with a public IP address. A value of <code>false</code> represents an instance with a private IP address. The default value is <code>true</code>. </p>",
+        "ModifyEventSubscriptionMessage$Enabled": "<p> A Boolean value; set to <b>true</b> to activate the subscription. </p>",
+        "ModifyReplicationInstanceMessage$MultiAZ": "<p> Specifies if the replication instance is a Multi-AZ deployment. You cannot set the <code>AvailabilityZone</code> parameter if the Multi-AZ parameter is set to <code>true</code>. </p>",
+        "ModifyReplicationInstanceMessage$AutoMinorVersionUpgrade": "<p> Indicates that minor version upgrades will be applied automatically to the replication instance during the maintenance window. Changing this parameter does not result in an outage except in the following case and the change is asynchronously applied as soon as possible. An outage will result if this parameter is set to <code>true</code> during the maintenance window, and a newer minor version is available, and AWS DMS has enabled auto patching for that engine version. </p>",
+        "ReplicationPendingModifiedValues$MultiAZ": "<p> Specifies if the replication instance is a Multi-AZ deployment. You cannot set the <code>AvailabilityZone</code> parameter if the Multi-AZ parameter is set to <code>true</code>. </p>"
+      }
+    },
+    "Certificate": {
+      "base": "<p>The SSL certificate that can be used to encrypt connections between the endpoints and the replication instance.</p>",
+      "refs": {
+        "CertificateList$member": null,
+        "DeleteCertificateResponse$Certificate": "<p>The Secure Sockets Layer (SSL) certificate.</p>",
+        "ImportCertificateResponse$Certificate": "<p>The certificate to be uploaded.</p>"
+      }
+    },
+    "CertificateList": {
+      "base": null,
+      "refs": {
+        "DescribeCertificatesResponse$Certificates": "<p>The Secure Sockets Layer (SSL) certificates associated with the replication instance.</p>"
+      }
+    },
+    "CertificateWallet": {
+      "base": null,
+      "refs": {
+        "Certificate$CertificateWallet": "<p>The location of the imported Oracle Wallet certificate for use with SSL.</p>",
+        "ImportCertificateMessage$CertificateWallet": "<p>The location of the imported Oracle Wallet certificate for use with SSL.</p>"
+      }
+    },
+    "CompressionTypeValue": {
+      "base": null,
+      "refs": {
+        "S3Settings$CompressionType": "<p> An optional parameter to use GZIP to compress the target files. Set to GZIP to compress the target files. Set to NONE (the default) or do not use to leave the files uncompressed. </p>"
+      }
+    },
+    "Connection": {
+      "base": "<p/>",
+      "refs": {
+        "ConnectionList$member": null,
+        "TestConnectionResponse$Connection": "<p>The connection tested.</p>"
+      }
+    },
+    "ConnectionList": {
+      "base": null,
+      "refs": {
+        "DescribeConnectionsResponse$Connections": "<p>A description of the connections.</p>"
+      }
+    },
+    "CreateEndpointMessage": {
+      "base": "<p/>",
+      "refs": {
+      }
+    },
+    "CreateEndpointResponse": {
+      "base": "<p/>",
+      "refs": {
+      }
+    },
+    "CreateEventSubscriptionMessage": {
+      "base": "<p/>",
+      "refs": {
+      }
+    },
+    "CreateEventSubscriptionResponse": {
+      "base": "<p/>",
+      "refs": {
+      }
+    },
+    "CreateReplicationInstanceMessage": {
+      "base": "<p/>",
+      "refs": {
+      }
+    },
+    "CreateReplicationInstanceResponse": {
+      "base": "<p/>",
+      "refs": {
+      }
+    },
+    "CreateReplicationSubnetGroupMessage": {
+      "base": "<p/>",
+      "refs": {
+      }
+    },
+    "CreateReplicationSubnetGroupResponse": {
+      "base": "<p/>",
+      "refs": {
+      }
+    },
+    "CreateReplicationTaskMessage": {
+      "base": "<p/>",
+      "refs": {
+      }
+    },
+    "CreateReplicationTaskResponse": {
+      "base": "<p/>",
+      "refs": {
+      }
+    },
+    "DeleteCertificateMessage": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteCertificateResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteEndpointMessage": {
+      "base": "<p/>",
+      "refs": {
+      }
+    },
+    "DeleteEndpointResponse": {
+      "base": "<p/>",
+      "refs": {
+      }
+    },
+    "DeleteEventSubscriptionMessage": {
+      "base": "<p/>",
+      "refs": {
+      }
+    },
+    "DeleteEventSubscriptionResponse": {
+      "base": "<p/>",
+      "refs": {
+      }
+    },
+    "DeleteReplicationInstanceMessage": {
+      "base": "<p/>",
+      "refs": {
+      }
+    },
+    "DeleteReplicationInstanceResponse": {
+      "base": "<p/>",
+      "refs": {
+      }
+    },
+    "DeleteReplicationSubnetGroupMessage": {
+      "base": "<p/>",
+      "refs": {
+      }
+    },
+    "DeleteReplicationSubnetGroupResponse": {
+      "base": "<p/>",
+      "refs": {
+      }
+    },
+    "DeleteReplicationTaskMessage": {
+      "base": "<p/>",
+      "refs": {
+      }
+    },
+    "DeleteReplicationTaskResponse": {
+      "base": "<p/>",
+      "refs": {
+      }
+    },
+    "DescribeAccountAttributesMessage": {
+      "base": "<p/>",
+      "refs": {
+      }
+    },
+    "DescribeAccountAttributesResponse": {
+      "base": "<p/>",
+      "refs": {
+      }
+    },
+    "DescribeCertificatesMessage": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeCertificatesResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeConnectionsMessage": {
+      "base": "<p/>",
+      "refs": {
+      }
+    },
+    "DescribeConnectionsResponse": {
+      "base": "<p/>",
+      "refs": {
+      }
+    },
+    "DescribeEndpointTypesMessage": {
+      "base": "<p/>",
+      "refs": {
+      }
+    },
+    "DescribeEndpointTypesResponse": {
+      "base": "<p/>",
+      "refs": {
+      }
+    },
+    "DescribeEndpointsMessage": {
+      "base": "<p/>",
+      "refs": {
+      }
+    },
+    "DescribeEndpointsResponse": {
+      "base": "<p/>",
+      "refs": {
+      }
+    },
+    "DescribeEventCategoriesMessage": {
+      "base": "<p/>",
+      "refs": {
+      }
+    },
+    "DescribeEventCategoriesResponse": {
+      "base": "<p/>",
+      "refs": {
+      }
+    },
+    "DescribeEventSubscriptionsMessage": {
+      "base": "<p/>",
+      "refs": {
+      }
+    },
+    "DescribeEventSubscriptionsResponse": {
+      "base": "<p/>",
+      "refs": {
+      }
+    },
+    "DescribeEventsMessage": {
+      "base": "<p/>",
+      "refs": {
+      }
+    },
+    "DescribeEventsResponse": {
+      "base": "<p/>",
+      "refs": {
+      }
+    },
+    "DescribeOrderableReplicationInstancesMessage": {
+      "base": "<p/>",
+      "refs": {
+      }
+    },
+    "DescribeOrderableReplicationInstancesResponse": {
+      "base": "<p/>",
+      "refs": {
+      }
+    },
+    "DescribeRefreshSchemasStatusMessage": {
+      "base": "<p/>",
+      "refs": {
+      }
+    },
+    "DescribeRefreshSchemasStatusResponse": {
+      "base": "<p/>",
+      "refs": {
+      }
+    },
+    "DescribeReplicationInstancesMessage": {
+      "base": "<p/>",
+      "refs": {
+      }
+    },
+    "DescribeReplicationInstancesResponse": {
+      "base": "<p/>",
+      "refs": {
+      }
+    },
+    "DescribeReplicationSubnetGroupsMessage": {
+      "base": "<p/>",
+      "refs": {
+      }
+    },
+    "DescribeReplicationSubnetGroupsResponse": {
+      "base": "<p/>",
+      "refs": {
+      }
+    },
+    "DescribeReplicationTasksMessage": {
+      "base": "<p/>",
+      "refs": {
+      }
+    },
+    "DescribeReplicationTasksResponse": {
+      "base": "<p/>",
+      "refs": {
+      }
+    },
+    "DescribeSchemasMessage": {
+      "base": "<p/>",
+      "refs": {
+      }
+    },
+    "DescribeSchemasResponse": {
+      "base": "<p/>",
+      "refs": {
+      }
+    },
+    "DescribeTableStatisticsMessage": {
+      "base": "<p/>",
+      "refs": {
+      }
+    },
+    "DescribeTableStatisticsResponse": {
+      "base": "<p/>",
+      "refs": {
+      }
+    },
+    "DmsSslModeValue": {
+      "base": null,
+      "refs": {
+        "CreateEndpointMessage$SslMode": "<p>The SSL mode to use for the SSL connection.</p> <p>SSL mode can be one of four values: none, require, verify-ca, verify-full. </p> <p>The default value is none.</p>",
+        "Endpoint$SslMode": "<p>The SSL mode used to connect to the endpoint.</p> <p>SSL mode can be one of four values: none, require, verify-ca, verify-full. </p> <p>The default value is none.</p>",
+        "ModifyEndpointMessage$SslMode": "<p>The SSL mode to be used.</p> <p>SSL mode can be one of four values: none, require, verify-ca, verify-full. </p> <p>The default value is none.</p>"
+      }
+    },
+    "DynamoDbSettings": {
+      "base": "<p/>",
+      "refs": {
+        "CreateEndpointMessage$DynamoDbSettings": "<p>Settings in JSON format for the target Amazon DynamoDB endpoint. For more information about the available settings, see the <b>Using Object Mapping to Migrate Data to DynamoDB</b> section at <a href=\"http://docs.aws.amazon.com/dms/latest/userguide/CHAP_Target.DynamoDB.html\"> Using an Amazon DynamoDB Database as a Target for AWS Database Migration Service</a>. </p>",
+        "Endpoint$DynamoDbSettings": "<p>The settings for the target DynamoDB database. For more information, see the <code>DynamoDBSettings</code> structure.</p>",
+        "ModifyEndpointMessage$DynamoDbSettings": "<p>Settings in JSON format for the target Amazon DynamoDB endpoint. For more information about the available settings, see the <b>Using Object Mapping to Migrate Data to DynamoDB</b> section at <a href=\"http://docs.aws.amazon.com/dms/latest/userguide/CHAP_Target.DynamoDB.html\"> Using an Amazon DynamoDB Database as a Target for AWS Database Migration Service</a>. </p>"
+      }
+    },
+    "Endpoint": {
+      "base": "<p/>",
+      "refs": {
+        "CreateEndpointResponse$Endpoint": "<p>The endpoint that was created.</p>",
+        "DeleteEndpointResponse$Endpoint": "<p>The endpoint that was deleted.</p>",
+        "EndpointList$member": null,
+        "ModifyEndpointResponse$Endpoint": "<p>The modified endpoint.</p>"
+      }
+    },
+    "EndpointList": {
+      "base": null,
+      "refs": {
+        "DescribeEndpointsResponse$Endpoints": "<p>Endpoint description.</p>"
+      }
+    },
+    "Event": {
+      "base": "<p/>",
+      "refs": {
+        "EventList$member": null
+      }
+    },
+    "EventCategoriesList": {
+      "base": null,
+      "refs": {
+        "CreateEventSubscriptionMessage$EventCategories": "<p> A list of event categories for a source type that you want to subscribe to. You can see a list of the categories for a given source type by calling the <b>DescribeEventCategories</b> action or in the topic <a href=\"http://docs.aws.amazon.com/dms/latest/userguide/CHAP_Events.html\"> Working with Events and Notifications</a> in the AWS Database Migration Service User Guide. </p>",
+        "DescribeEventsMessage$EventCategories": "<p>A list of event categories for a source type that you want to subscribe to.</p>",
+        "Event$EventCategories": "<p>The event categories available for the specified source type.</p>",
+        "EventCategoryGroup$EventCategories": "<p> A list of event categories for a <code>SourceType</code> that you want to subscribe to. </p>",
+        "EventSubscription$EventCategoriesList": "<p>A lists of event categories.</p>",
+        "ModifyEventSubscriptionMessage$EventCategories": "<p> A list of event categories for a source type that you want to subscribe to. Use the <code>DescribeEventCategories</code> action to see a list of event categories. </p>"
+      }
+    },
+    "EventCategoryGroup": {
+      "base": "<p/>",
+      "refs": {
+        "EventCategoryGroupList$member": null
+      }
+    },
+    "EventCategoryGroupList": {
+      "base": null,
+      "refs": {
+        "DescribeEventCategoriesResponse$EventCategoryGroupList": "<p>A list of event categories.</p>"
+      }
+    },
+    "EventList": {
+      "base": null,
+      "refs": {
+        "DescribeEventsResponse$Events": "<p>The events described.</p>"
+      }
+    },
+    "EventSubscription": {
+      "base": "<p/>",
+      "refs": {
+        "CreateEventSubscriptionResponse$EventSubscription": "<p>The event subscription that was created.</p>",
+        "DeleteEventSubscriptionResponse$EventSubscription": "<p>The event subscription that was deleted.</p>",
+        "EventSubscriptionsList$member": null,
+        "ModifyEventSubscriptionResponse$EventSubscription": "<p>The modified event subscription.</p>"
+      }
+    },
+    "EventSubscriptionsList": {
+      "base": null,
+      "refs": {
+        "DescribeEventSubscriptionsResponse$EventSubscriptionsList": "<p>A list of event subscriptions.</p>"
+      }
+    },
+    "ExceptionMessage": {
+      "base": null,
+      "refs": {
+        "AccessDeniedFault$message": "<p/>",
+        "InsufficientResourceCapacityFault$message": "<p/>",
+        "InvalidCertificateFault$message": null,
+        "InvalidResourceStateFault$message": "<p/>",
+        "InvalidSubnet$message": "<p/>",
+        "KMSKeyNotAccessibleFault$message": "<p/>",
+        "ReplicationSubnetGroupDoesNotCoverEnoughAZs$message": "<p/>",
+        "ResourceAlreadyExistsFault$message": "<p/>",
+        "ResourceNotFoundFault$message": "<p/>",
+        "ResourceQuotaExceededFault$message": "<p/>",
+        "SNSInvalidTopicFault$message": "<p/>",
+        "SNSNoAuthorizationFault$message": "<p/>",
+        "StorageQuotaExceededFault$message": "<p/>",
+        "SubnetAlreadyInUse$message": "<p/>",
+        "UpgradeDependencyFailureFault$message": "<p/>"
+      }
+    },
+    "Filter": {
+      "base": "<p/>",
+      "refs": {
+        "FilterList$member": null
+      }
+    },
+    "FilterList": {
+      "base": null,
+      "refs": {
+        "DescribeCertificatesMessage$Filters": "<p>Filters applied to the certificate described in the form of key-value pairs.</p>",
+        "DescribeConnectionsMessage$Filters": "<p>The filters applied to the connection.</p> <p>Valid filter names: endpoint-arn | replication-instance-arn</p>",
+        "DescribeEndpointTypesMessage$Filters": "<p>Filters applied to the describe action.</p> <p>Valid filter names: engine-name | endpoint-type</p>",
+        "DescribeEndpointsMessage$Filters": "<p>Filters applied to the describe action.</p> <p>Valid filter names: endpoint-arn | endpoint-type | endpoint-id | engine-name</p>",
+        "DescribeEventCategoriesMessage$Filters": "<p>Filters applied to the action.</p>",
+        "DescribeEventSubscriptionsMessage$Filters": "<p>Filters applied to the action.</p>",
+        "DescribeEventsMessage$Filters": "<p>Filters applied to the action.</p>",
+        "DescribeReplicationInstancesMessage$Filters": "<p>Filters applied to the describe action.</p> <p>Valid filter names: replication-instance-arn | replication-instance-id | replication-instance-class | engine-version</p>",
+        "DescribeReplicationSubnetGroupsMessage$Filters": "<p>Filters applied to the describe action.</p>",
+        "DescribeReplicationTasksMessage$Filters": "<p>Filters applied to the describe action.</p> <p>Valid filter names: replication-task-arn | replication-task-id | migration-type | endpoint-arn | replication-instance-arn</p>"
+      }
+    },
+    "FilterValueList": {
+      "base": null,
+      "refs": {
+        "Filter$Values": "<p>The filter value.</p>"
+      }
+    },
+    "ImportCertificateMessage": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ImportCertificateResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "InsufficientResourceCapacityFault": {
+      "base": "<p>There are not enough resources allocated to the database migration.</p>",
+      "refs": {
+      }
+    },
+    "Integer": {
+      "base": null,
+      "refs": {
+        "OrderableReplicationInstance$MinAllocatedStorage": "<p>The minimum amount of storage (in gigabytes) that can be allocated for the replication instance.</p>",
+        "OrderableReplicationInstance$MaxAllocatedStorage": "<p>The minimum amount of storage (in gigabytes) that can be allocated for the replication instance.</p>",
+        "OrderableReplicationInstance$DefaultAllocatedStorage": "<p>The default amount of storage (in gigabytes) that is allocated for the replication instance.</p>",
+        "OrderableReplicationInstance$IncludedAllocatedStorage": "<p>The amount of storage (in gigabytes) that is allocated for the replication instance.</p>",
+        "ReplicationInstance$AllocatedStorage": "<p>The amount of storage (in gigabytes) that is allocated for the replication instance.</p>",
+        "ReplicationTaskStats$FullLoadProgressPercent": "<p>The percent complete for the full load migration task.</p>",
+        "ReplicationTaskStats$TablesLoaded": "<p>The number of tables loaded for this task.</p>",
+        "ReplicationTaskStats$TablesLoading": "<p>The number of tables currently loading for this task.</p>",
+        "ReplicationTaskStats$TablesQueued": "<p>The number of tables queued for this task.</p>",
+        "ReplicationTaskStats$TablesErrored": "<p>The number of errors that have occurred during this task.</p>"
+      }
+    },
+    "IntegerOptional": {
+      "base": null,
+      "refs": {
+        "Certificate$KeyLength": "<p>The key length of the cryptographic algorithm being used.</p>",
+        "CreateEndpointMessage$Port": "<p>The port used by the endpoint database.</p>",
+        "CreateReplicationInstanceMessage$AllocatedStorage": "<p>The amount of storage (in gigabytes) to be initially allocated for the replication instance.</p>",
+        "DescribeCertificatesMessage$MaxRecords": "<p> The maximum number of records to include in the response. If more records exist than the specified <code>MaxRecords</code> value, a pagination token called a marker is included in the response so that the remaining results can be retrieved. </p> <p>Default: 10</p>",
+        "DescribeConnectionsMessage$MaxRecords": "<p> The maximum number of records to include in the response. If more records exist than the specified <code>MaxRecords</code> value, a pagination token called a marker is included in the response so that the remaining results can be retrieved. </p> <p>Default: 100</p> <p>Constraints: Minimum 20, maximum 100.</p>",
+        "DescribeEndpointTypesMessage$MaxRecords": "<p> The maximum number of records to include in the response. If more records exist than the specified <code>MaxRecords</code> value, a pagination token called a marker is included in the response so that the remaining results can be retrieved. </p> <p>Default: 100</p> <p>Constraints: Minimum 20, maximum 100.</p>",
+        "DescribeEndpointsMessage$MaxRecords": "<p> The maximum number of records to include in the response. If more records exist than the specified <code>MaxRecords</code> value, a pagination token called a marker is included in the response so that the remaining results can be retrieved. </p> <p>Default: 100</p> <p>Constraints: Minimum 20, maximum 100.</p>",
+        "DescribeEventSubscriptionsMessage$MaxRecords": "<p> The maximum number of records to include in the response. If more records exist than the specified <code>MaxRecords</code> value, a pagination token called a marker is included in the response so that the remaining results can be retrieved. </p> <p>Default: 100</p> <p>Constraints: Minimum 20, maximum 100.</p>",
+        "DescribeEventsMessage$Duration": "<p>The duration of the events to be listed.</p>",
+        "DescribeEventsMessage$MaxRecords": "<p> The maximum number of records to include in the response. If more records exist than the specified <code>MaxRecords</code> value, a pagination token called a marker is included in the response so that the remaining results can be retrieved. </p> <p>Default: 100</p> <p>Constraints: Minimum 20, maximum 100.</p>",
+        "DescribeOrderableReplicationInstancesMessage$MaxRecords": "<p> The maximum number of records to include in the response. If more records exist than the specified <code>MaxRecords</code> value, a pagination token called a marker is included in the response so that the remaining results can be retrieved. </p> <p>Default: 100</p> <p>Constraints: Minimum 20, maximum 100.</p>",
+        "DescribeReplicationInstancesMessage$MaxRecords": "<p> The maximum number of records to include in the response. If more records exist than the specified <code>MaxRecords</code> value, a pagination token called a marker is included in the response so that the remaining results can be retrieved. </p> <p>Default: 100</p> <p>Constraints: Minimum 20, maximum 100.</p>",
+        "DescribeReplicationSubnetGroupsMessage$MaxRecords": "<p> The maximum number of records to include in the response. If more records exist than the specified <code>MaxRecords</code> value, a pagination token called a marker is included in the response so that the remaining results can be retrieved. </p> <p>Default: 100</p> <p>Constraints: Minimum 20, maximum 100.</p>",
+        "DescribeReplicationTasksMessage$MaxRecords": "<p> The maximum number of records to include in the response. If more records exist than the specified <code>MaxRecords</code> value, a pagination token called a marker is included in the response so that the remaining results can be retrieved. </p> <p>Default: 100</p> <p>Constraints: Minimum 20, maximum 100.</p>",
+        "DescribeSchemasMessage$MaxRecords": "<p> The maximum number of records to include in the response. If more records exist than the specified <code>MaxRecords</code> value, a pagination token called a marker is included in the response so that the remaining results can be retrieved. </p> <p>Default: 100</p> <p>Constraints: Minimum 20, maximum 100.</p>",
+        "DescribeTableStatisticsMessage$MaxRecords": "<p> The maximum number of records to include in the response. If more records exist than the specified <code>MaxRecords</code> value, a pagination token called a marker is included in the response so that the remaining results can be retrieved. </p> <p>Default: 100</p> <p>Constraints: Minimum 20, maximum 100.</p>",
+        "Endpoint$Port": "<p>The port value used to access the endpoint.</p>",
+        "ModifyEndpointMessage$Port": "<p>The port used by the endpoint database.</p>",
+        "ModifyReplicationInstanceMessage$AllocatedStorage": "<p>The amount of storage (in gigabytes) to be allocated for the replication instance.</p>",
+        "MongoDbSettings$Port": "<p> The port value for the MongoDB source endpoint. </p>",
+        "ReplicationPendingModifiedValues$AllocatedStorage": "<p>The amount of storage (in gigabytes) that is allocated for the replication instance.</p>"
+      }
+    },
+    "InvalidCertificateFault": {
+      "base": "<p>The certificate was not valid.</p>",
+      "refs": {
+      }
+    },
+    "InvalidResourceStateFault": {
+      "base": "<p>The resource is in a state that prevents it from being used for database migration.</p>",
+      "refs": {
+      }
+    },
+    "InvalidSubnet": {
+      "base": "<p>The subnet provided is invalid.</p>",
+      "refs": {
+      }
+    },
+    "KMSKeyNotAccessibleFault": {
+      "base": "<p>AWS DMS cannot access the KMS key.</p>",
+      "refs": {
+      }
+    },
+    "KeyList": {
+      "base": null,
+      "refs": {
+        "RemoveTagsFromResourceMessage$TagKeys": "<p>The tag key (name) of the tag to be removed.</p>"
+      }
+    },
+    "ListTagsForResourceMessage": {
+      "base": "<p/>",
+      "refs": {
+      }
+    },
+    "ListTagsForResourceResponse": {
+      "base": "<p/>",
+      "refs": {
+      }
+    },
+    "Long": {
+      "base": null,
+      "refs": {
+        "AccountQuota$Used": "<p>The amount currently used toward the quota maximum.</p>",
+        "AccountQuota$Max": "<p>The maximum allowed value for the quota.</p>",
+        "ReplicationTaskStats$ElapsedTimeMillis": "<p>The elapsed time of the task, in milliseconds.</p>",
+        "TableStatistics$Inserts": "<p>The number of insert actions performed on a table.</p>",
+        "TableStatistics$Deletes": "<p>The number of delete actions performed on a table.</p>",
+        "TableStatistics$Updates": "<p>The number of update actions performed on a table.</p>",
+        "TableStatistics$Ddls": "<p>The Data Definition Language (DDL) used to build and modify the structure of your tables.</p>",
+        "TableStatistics$FullLoadRows": "<p>The number of rows added during the Full Load operation.</p>",
+        "TableStatistics$FullLoadCondtnlChkFailedRows": "<p>The number of rows that failed conditional checks during the Full Load operation (valid only for DynamoDB as a target migrations).</p>",
+        "TableStatistics$FullLoadErrorRows": "<p>The number of rows that failed to load during the Full Load operation (valid only for DynamoDB as a target migrations).</p>"
+      }
+    },
+    "MigrationTypeValue": {
+      "base": null,
+      "refs": {
+        "CreateReplicationTaskMessage$MigrationType": "<p>The migration type.</p>",
+        "ModifyReplicationTaskMessage$MigrationType": "<p>The migration type.</p> <p>Valid values: full-load | cdc | full-load-and-cdc</p>",
+        "ReplicationTask$MigrationType": "<p>The type of migration.</p>"
+      }
+    },
+    "ModifyEndpointMessage": {
+      "base": "<p/>",
+      "refs": {
+      }
+    },
+    "ModifyEndpointResponse": {
+      "base": "<p/>",
+      "refs": {
+      }
+    },
+    "ModifyEventSubscriptionMessage": {
+      "base": "<p/>",
+      "refs": {
+      }
+    },
+    "ModifyEventSubscriptionResponse": {
+      "base": "<p/>",
+      "refs": {
+      }
+    },
+    "ModifyReplicationInstanceMessage": {
+      "base": "<p/>",
+      "refs": {
+      }
+    },
+    "ModifyReplicationInstanceResponse": {
+      "base": "<p/>",
+      "refs": {
+      }
+    },
+    "ModifyReplicationSubnetGroupMessage": {
+      "base": "<p/>",
+      "refs": {
+      }
+    },
+    "ModifyReplicationSubnetGroupResponse": {
+      "base": "<p/>",
+      "refs": {
+      }
+    },
+    "ModifyReplicationTaskMessage": {
+      "base": "<p/>",
+      "refs": {
+      }
+    },
+    "ModifyReplicationTaskResponse": {
+      "base": "<p/>",
+      "refs": {
+      }
+    },
+    "MongoDbSettings": {
+      "base": "<p/>",
+      "refs": {
+        "CreateEndpointMessage$MongoDbSettings": "<p>Settings in JSON format for the source MongoDB endpoint. For more information about the available settings, see the <b>Configuration Properties When Using MongoDB as a Source for AWS Database Migration Service</b> section at <a href=\"http://docs.aws.amazon.com/dms/latest/userguide/CHAP_Source.MongoDB.html\"> Using Amazon S3 as a Target for AWS Database Migration Service</a>. </p>",
+        "Endpoint$MongoDbSettings": "<p>The settings for the MongoDB source endpoint. For more information, see the <code>MongoDbSettings</code> structure.</p>",
+        "ModifyEndpointMessage$MongoDbSettings": "<p>Settings in JSON format for the source MongoDB endpoint. For more information about the available settings, see the <b>Configuration Properties When Using MongoDB as a Source for AWS Database Migration Service</b> section at <a href=\"http://docs.aws.amazon.com/dms/latest/userguide/CHAP_Source.MongoDB.html\"> Using Amazon S3 as a Target for AWS Database Migration Service</a>. </p>"
+      }
+    },
+    "NestingLevelValue": {
+      "base": null,
+      "refs": {
+        "MongoDbSettings$NestingLevel": "<p> Specifies either document or table mode. </p> <p>Valid values: NONE, ONE</p> <p>Default value is NONE. Specify NONE to use document mode. Specify ONE to use table mode.</p>"
+      }
+    },
+    "OrderableReplicationInstance": {
+      "base": "<p/>",
+      "refs": {
+        "OrderableReplicationInstanceList$member": null
+      }
+    },
+    "OrderableReplicationInstanceList": {
+      "base": null,
+      "refs": {
+        "DescribeOrderableReplicationInstancesResponse$OrderableReplicationInstances": "<p>The order-able replication instances available.</p>"
+      }
+    },
+    "RefreshSchemasMessage": {
+      "base": "<p/>",
+      "refs": {
+      }
+    },
+    "RefreshSchemasResponse": {
+      "base": "<p/>",
+      "refs": {
+      }
+    },
+    "RefreshSchemasStatus": {
+      "base": "<p/>",
+      "refs": {
+        "DescribeRefreshSchemasStatusResponse$RefreshSchemasStatus": "<p>The status of the schema.</p>",
+        "RefreshSchemasResponse$RefreshSchemasStatus": "<p>The status of the refreshed schema.</p>"
+      }
+    },
+    "RefreshSchemasStatusTypeValue": {
+      "base": null,
+      "refs": {
+        "RefreshSchemasStatus$Status": "<p>The status of the schema.</p>"
+      }
+    },
+    "ReloadTablesMessage": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ReloadTablesResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "RemoveTagsFromResourceMessage": {
+      "base": "<p/>",
+      "refs": {
+      }
+    },
+    "RemoveTagsFromResourceResponse": {
+      "base": "<p/>",
+      "refs": {
+      }
+    },
+    "ReplicationEndpointTypeValue": {
+      "base": null,
+      "refs": {
+        "CreateEndpointMessage$EndpointType": "<p>The type of endpoint.</p>",
+        "Endpoint$EndpointType": "<p>The type of endpoint.</p>",
+        "ModifyEndpointMessage$EndpointType": "<p>The type of endpoint.</p>",
+        "SupportedEndpointType$EndpointType": "<p>The type of endpoint.</p>"
+      }
+    },
+    "ReplicationInstance": {
+      "base": "<p/>",
+      "refs": {
+        "CreateReplicationInstanceResponse$ReplicationInstance": "<p>The replication instance that was created.</p>",
+        "DeleteReplicationInstanceResponse$ReplicationInstance": "<p>The replication instance that was deleted.</p>",
+        "ModifyReplicationInstanceResponse$ReplicationInstance": "<p>The modified replication instance.</p>",
+        "ReplicationInstanceList$member": null
+      }
+    },
+    "ReplicationInstanceList": {
+      "base": null,
+      "refs": {
+        "DescribeReplicationInstancesResponse$ReplicationInstances": "<p>The replication instances described.</p>"
+      }
+    },
+    "ReplicationInstancePrivateIpAddressList": {
+      "base": null,
+      "refs": {
+        "ReplicationInstance$ReplicationInstancePrivateIpAddresses": "<p>The private IP address of the replication instance.</p>"
+      }
+    },
+    "ReplicationInstancePublicIpAddressList": {
+      "base": null,
+      "refs": {
+        "ReplicationInstance$ReplicationInstancePublicIpAddresses": "<p>The public IP address of the replication instance.</p>"
+      }
+    },
+    "ReplicationPendingModifiedValues": {
+      "base": "<p/>",
+      "refs": {
+        "ReplicationInstance$PendingModifiedValues": "<p>The pending modification values.</p>"
+      }
+    },
+    "ReplicationSubnetGroup": {
+      "base": "<p/>",
+      "refs": {
+        "CreateReplicationSubnetGroupResponse$ReplicationSubnetGroup": "<p>The replication subnet group that was created.</p>",
+        "ModifyReplicationSubnetGroupResponse$ReplicationSubnetGroup": "<p>The modified replication subnet group.</p>",
+        "ReplicationInstance$ReplicationSubnetGroup": "<p>The subnet group for the replication instance.</p>",
+        "ReplicationSubnetGroups$member": null
+      }
+    },
+    "ReplicationSubnetGroupDoesNotCoverEnoughAZs": {
+      "base": "<p>The replication subnet group does not cover enough Availability Zones (AZs). Edit the replication subnet group and add more AZs.</p>",
+      "refs": {
+      }
+    },
+    "ReplicationSubnetGroups": {
+      "base": null,
+      "refs": {
+        "DescribeReplicationSubnetGroupsResponse$ReplicationSubnetGroups": "<p>A description of the replication subnet groups.</p>"
+      }
+    },
+    "ReplicationTask": {
+      "base": "<p/>",
+      "refs": {
+        "CreateReplicationTaskResponse$ReplicationTask": "<p>The replication task that was created.</p>",
+        "DeleteReplicationTaskResponse$ReplicationTask": "<p>The deleted replication task.</p>",
+        "ModifyReplicationTaskResponse$ReplicationTask": "<p>The replication task that was modified.</p>",
+        "ReplicationTaskList$member": null,
+        "StartReplicationTaskResponse$ReplicationTask": "<p>The replication task started.</p>",
+        "StopReplicationTaskResponse$ReplicationTask": "<p>The replication task stopped.</p>"
+      }
+    },
+    "ReplicationTaskList": {
+      "base": null,
+      "refs": {
+        "DescribeReplicationTasksResponse$ReplicationTasks": "<p>A description of the replication tasks.</p>"
+      }
+    },
+    "ReplicationTaskStats": {
+      "base": "<p/>",
+      "refs": {
+        "ReplicationTask$ReplicationTaskStats": "<p>The statistics for the task, including elapsed time, tables loaded, and table errors.</p>"
+      }
+    },
+    "ResourceAlreadyExistsFault": {
+      "base": "<p>The resource you are attempting to create already exists.</p>",
+      "refs": {
+      }
+    },
+    "ResourceNotFoundFault": {
+      "base": "<p>The resource could not be found.</p>",
+      "refs": {
+      }
+    },
+    "ResourceQuotaExceededFault": {
+      "base": "<p>The quota for this resource quota has been exceeded.</p>",
+      "refs": {
+      }
+    },
+    "S3Settings": {
+      "base": "<p/>",
+      "refs": {
+        "CreateEndpointMessage$S3Settings": "<p>Settings in JSON format for the target S3 endpoint. For more information about the available settings, see the <b>Extra Connection Attributes</b> section at <a href=\"http://docs.aws.amazon.com/dms/latest/userguide/CHAP_Target.S3.html\"> Using Amazon S3 as a Target for AWS Database Migration Service</a>. </p>",
+        "Endpoint$S3Settings": "<p>The settings for the S3 target endpoint. For more information, see the <code>S3Settings</code> structure.</p>",
+        "ModifyEndpointMessage$S3Settings": "<p>Settings in JSON format for the target S3 endpoint. For more information about the available settings, see the <b>Extra Connection Attributes</b> section at <a href=\"http://docs.aws.amazon.com/dms/latest/userguide/CHAP_Target.S3.html\"> Using Amazon S3 as a Target for AWS Database Migration Service</a>. </p>"
+      }
+    },
+    "SNSInvalidTopicFault": {
+      "base": "<p>The SNS topic is invalid.</p>",
+      "refs": {
+      }
+    },
+    "SNSNoAuthorizationFault": {
+      "base": "<p>You are not authorized for the SNS subscription.</p>",
+      "refs": {
+      }
+    },
+    "SchemaList": {
+      "base": null,
+      "refs": {
+        "DescribeSchemasResponse$Schemas": "<p>The described schema.</p>"
+      }
+    },
+    "SecretString": {
+      "base": null,
+      "refs": {
+        "CreateEndpointMessage$Password": "<p>The password to be used to login to the endpoint database.</p>",
+        "ModifyEndpointMessage$Password": "<p>The password to be used to login to the endpoint database.</p>",
+        "MongoDbSettings$Password": "<p> The password for the user account you use to access the MongoDB source endpoint. </p>"
+      }
+    },
+    "SourceIdsList": {
+      "base": null,
+      "refs": {
+        "CreateEventSubscriptionMessage$SourceIds": "<p> The list of identifiers of the event sources for which events will be returned. If not specified, then all sources are included in the response. An identifier must begin with a letter and must contain only ASCII letters, digits, and hyphens; it cannot end with a hyphen or contain two consecutive hyphens. </p>",
+        "EventSubscription$SourceIdsList": "<p>A list of source Ids for the event subscription.</p>"
+      }
+    },
+    "SourceType": {
+      "base": null,
+      "refs": {
+        "DescribeEventsMessage$SourceType": "<p>The type of AWS DMS resource that generates events.</p> <p>Valid values: replication-instance | migration-task</p>",
+        "Event$SourceType": "<p> The type of AWS DMS resource that generates events. </p> <p>Valid values: replication-instance | endpoint | migration-task</p>"
+      }
+    },
+    "StartReplicationTaskMessage": {
+      "base": "<p/>",
+      "refs": {
+      }
+    },
+    "StartReplicationTaskResponse": {
+      "base": "<p/>",
+      "refs": {
+      }
+    },
+    "StartReplicationTaskTypeValue": {
+      "base": null,
+      "refs": {
+        "StartReplicationTaskMessage$StartReplicationTaskType": "<p>The type of replication task.</p>"
+      }
+    },
+    "StopReplicationTaskMessage": {
+      "base": "<p/>",
+      "refs": {
+      }
+    },
+    "StopReplicationTaskResponse": {
+      "base": "<p/>",
+      "refs": {
+      }
+    },
+    "StorageQuotaExceededFault": {
+      "base": "<p>The storage quota has been exceeded.</p>",
+      "refs": {
+      }
+    },
+    "String": {
+      "base": null,
+      "refs": {
+        "AccountQuota$AccountQuotaName": "<p>The name of the AWS DMS quota for this AWS account.</p>",
+        "AddTagsToResourceMessage$ResourceArn": "<p>The Amazon Resource Name (ARN) of the AWS DMS resource the tag is to be added to. AWS DMS resources include a replication instance, endpoint, and a replication task.</p>",
+        "AvailabilityZone$Name": "<p>The name of the availability zone.</p>",
+        "Certificate$CertificateIdentifier": "<p>The customer-assigned name of the certificate. Valid characters are A-z and 0-9.</p>",
+        "Certificate$CertificatePem": "<p>The contents of the .pem X.509 certificate file for the certificate.</p>",
+        "Certificate$CertificateArn": "<p>The Amazon Resource Name (ARN) for the certificate.</p>",
+        "Certificate$CertificateOwner": "<p>The owner of the certificate.</p>",
+        "Certificate$SigningAlgorithm": "<p>The signing algorithm for the certificate.</p>",
+        "Connection$ReplicationInstanceArn": "<p>The Amazon Resource Name (ARN) of the replication instance.</p>",
+        "Connection$EndpointArn": "<p>The Amazon Resource Name (ARN) string that uniquely identifies the endpoint.</p>",
+        "Connection$Status": "<p>The connection status.</p>",
+        "Connection$LastFailureMessage": "<p>The error message when the connection last failed.</p>",
+        "Connection$EndpointIdentifier": "<p>The identifier of the endpoint. Identifiers must begin with a letter; must contain only ASCII letters, digits, and hyphens; and must not end with a hyphen or contain two consecutive hyphens.</p>",
+        "Connection$ReplicationInstanceIdentifier": "<p>The replication instance identifier. This parameter is stored as a lowercase string.</p>",
+        "CreateEndpointMessage$EndpointIdentifier": "<p>The database endpoint identifier. Identifiers must begin with a letter; must contain only ASCII letters, digits, and hyphens; and must not end with a hyphen or contain two consecutive hyphens.</p>",
+        "CreateEndpointMessage$EngineName": "<p>The type of engine for the endpoint. Valid values, depending on the EndPointType, include MYSQL, ORACLE, POSTGRES, MARIADB, AURORA, REDSHIFT, S3, SYBASE, DYNAMODB, MONGODB, and SQLSERVER.</p>",
+        "CreateEndpointMessage$Username": "<p>The user name to be used to login to the endpoint database.</p>",
+        "CreateEndpointMessage$ServerName": "<p>The name of the server where the endpoint database resides.</p>",
+        "CreateEndpointMessage$DatabaseName": "<p>The name of the endpoint database.</p>",
+        "CreateEndpointMessage$ExtraConnectionAttributes": "<p>Additional attributes associated with the connection.</p>",
+        "CreateEndpointMessage$KmsKeyId": "<p>The KMS key identifier that will be used to encrypt the connection parameters. If you do not specify a value for the KmsKeyId parameter, then AWS DMS will use your default encryption key. AWS KMS creates the default encryption key for your AWS account. Your AWS account has a different default encryption key for each AWS region.</p>",
+        "CreateEndpointMessage$CertificateArn": "<p>The Amazon Resource Number (ARN) for the certificate.</p>",
+        "CreateEventSubscriptionMessage$SubscriptionName": "<p>The name of the DMS event notification subscription. </p> <p>Constraints: The name must be less than 255 characters. </p>",
+        "CreateEventSubscriptionMessage$SnsTopicArn": "<p> The Amazon Resource Name (ARN) of the Amazon SNS topic created for event notification. The ARN is created by Amazon SNS when you create a topic and subscribe to it. </p>",
+        "CreateEventSubscriptionMessage$SourceType": "<p> The type of AWS DMS resource that generates the events. For example, if you want to be notified of events generated by a replication instance, you set this parameter to <code>replication-instance</code>. If this value is not specified, all events are returned. </p> <p>Valid values: replication-instance | migration-task</p>",
+        "CreateReplicationInstanceMessage$ReplicationInstanceIdentifier": "<p>The replication instance identifier. This parameter is stored as a lowercase string.</p> <p>Constraints:</p> <ul> <li> <p>Must contain from 1 to 63 alphanumeric characters or hyphens.</p> </li> <li> <p>First character must be a letter.</p> </li> <li> <p>Cannot end with a hyphen or contain two consecutive hyphens.</p> </li> </ul> <p>Example: <code>myrepinstance</code> </p>",
+        "CreateReplicationInstanceMessage$ReplicationInstanceClass": "<p>The compute and memory capacity of the replication instance as specified by the replication instance class.</p> <p> Valid Values: <code>dms.t2.micro | dms.t2.small | dms.t2.medium | dms.t2.large | dms.c4.large | dms.c4.xlarge | dms.c4.2xlarge | dms.c4.4xlarge </code> </p>",
+        "CreateReplicationInstanceMessage$AvailabilityZone": "<p>The EC2 Availability Zone that the replication instance will be created in.</p> <p>Default: A random, system-chosen Availability Zone in the endpoint's region.</p> <p> Example: <code>us-east-1d</code> </p>",
+        "CreateReplicationInstanceMessage$ReplicationSubnetGroupIdentifier": "<p>A subnet group to associate with the replication instance.</p>",
+        "CreateReplicationInstanceMessage$PreferredMaintenanceWindow": "<p>The weekly time range during which system maintenance can occur, in Universal Coordinated Time (UTC).</p> <p> Format: <code>ddd:hh24:mi-ddd:hh24:mi</code> </p> <p>Default: A 30-minute window selected at random from an 8-hour block of time per region, occurring on a random day of the week.</p> <p>Valid Days: Mon, Tue, Wed, Thu, Fri, Sat, Sun</p> <p>Constraints: Minimum 30-minute window.</p>",
+        "CreateReplicationInstanceMessage$EngineVersion": "<p>The engine version number of the replication instance.</p>",
+        "CreateReplicationInstanceMessage$KmsKeyId": "<p>The KMS key identifier that will be used to encrypt the content on the replication instance. If you do not specify a value for the KmsKeyId parameter, then AWS DMS will use your default encryption key. AWS KMS creates the default encryption key for your AWS account. Your AWS account has a different default encryption key for each AWS region.</p>",
+        "CreateReplicationSubnetGroupMessage$ReplicationSubnetGroupIdentifier": "<p>The name for the replication subnet group. This value is stored as a lowercase string.</p> <p>Constraints: Must contain no more than 255 alphanumeric characters, periods, spaces, underscores, or hyphens. Must not be \"default\".</p> <p>Example: <code>mySubnetgroup</code> </p>",
+        "CreateReplicationSubnetGroupMessage$ReplicationSubnetGroupDescription": "<p>The description for the subnet group.</p>",
+        "CreateReplicationTaskMessage$ReplicationTaskIdentifier": "<p>The replication task identifier.</p> <p>Constraints:</p> <ul> <li> <p>Must contain from 1 to 255 alphanumeric characters or hyphens.</p> </li> <li> <p>First character must be a letter.</p> </li> <li> <p>Cannot end with a hyphen or contain two consecutive hyphens.</p> </li> </ul>",
+        "CreateReplicationTaskMessage$SourceEndpointArn": "<p>The Amazon Resource Name (ARN) string that uniquely identifies the endpoint.</p>",
+        "CreateReplicationTaskMessage$TargetEndpointArn": "<p>The Amazon Resource Name (ARN) string that uniquely identifies the endpoint.</p>",
+        "CreateReplicationTaskMessage$ReplicationInstanceArn": "<p>The Amazon Resource Name (ARN) of the replication instance.</p>",
+        "CreateReplicationTaskMessage$TableMappings": "<p>When using the AWS CLI or boto3, provide the path of the JSON file that contains the table mappings. Precede the path with \"file://\". When working with the DMS API, provide the JSON as the parameter value.</p> <p>For example, --table-mappings file://mappingfile.json</p>",
+        "CreateReplicationTaskMessage$ReplicationTaskSettings": "<p>Settings for the task, such as target metadata settings. For a complete list of task settings, see <a href=\"http://docs.aws.amazon.com/dms/latest/userguide/CHAP_Tasks.CustomizingTasks.TaskSettings.html\">Task Settings for AWS Database Migration Service Tasks</a>.</p>",
+        "DeleteCertificateMessage$CertificateArn": "<p>The Amazon Resource Name (ARN) of the deleted certificate.</p>",
+        "DeleteEndpointMessage$EndpointArn": "<p>The Amazon Resource Name (ARN) string that uniquely identifies the endpoint.</p>",
+        "DeleteEventSubscriptionMessage$SubscriptionName": "<p>The name of the DMS event notification subscription to be deleted.</p>",
+        "DeleteReplicationInstanceMessage$ReplicationInstanceArn": "<p>The Amazon Resource Name (ARN) of the replication instance to be deleted.</p>",
+        "DeleteReplicationSubnetGroupMessage$ReplicationSubnetGroupIdentifier": "<p>The subnet group name of the replication instance.</p>",
+        "DeleteReplicationTaskMessage$ReplicationTaskArn": "<p>The Amazon Resource Name (ARN) of the replication task to be deleted.</p>",
+        "DescribeCertificatesMessage$Marker": "<p> An optional pagination token provided by a previous request. If this parameter is specified, the response includes only records beyond the marker, up to the value specified by <code>MaxRecords</code>. </p>",
+        "DescribeCertificatesResponse$Marker": "<p>The pagination token.</p>",
+        "DescribeConnectionsMessage$Marker": "<p> An optional pagination token provided by a previous request. If this parameter is specified, the response includes only records beyond the marker, up to the value specified by <code>MaxRecords</code>. </p>",
+        "DescribeConnectionsResponse$Marker": "<p> An optional pagination token provided by a previous request. If this parameter is specified, the response includes only records beyond the marker, up to the value specified by <code>MaxRecords</code>. </p>",
+        "DescribeEndpointTypesMessage$Marker": "<p> An optional pagination token provided by a previous request. If this parameter is specified, the response includes only records beyond the marker, up to the value specified by <code>MaxRecords</code>. </p>",
+        "DescribeEndpointTypesResponse$Marker": "<p> An optional pagination token provided by a previous request. If this parameter is specified, the response includes only records beyond the marker, up to the value specified by <code>MaxRecords</code>. </p>",
+        "DescribeEndpointsMessage$Marker": "<p> An optional pagination token provided by a previous request. If this parameter is specified, the response includes only records beyond the marker, up to the value specified by <code>MaxRecords</code>. </p>",
+        "DescribeEndpointsResponse$Marker": "<p> An optional pagination token provided by a previous request. If this parameter is specified, the response includes only records beyond the marker, up to the value specified by <code>MaxRecords</code>. </p>",
+        "DescribeEventCategoriesMessage$SourceType": "<p> The type of AWS DMS resource that generates events. </p> <p>Valid values: replication-instance | migration-task</p>",
+        "DescribeEventSubscriptionsMessage$SubscriptionName": "<p>The name of the AWS DMS event subscription to be described.</p>",
+        "DescribeEventSubscriptionsMessage$Marker": "<p> An optional pagination token provided by a previous request. If this parameter is specified, the response includes only records beyond the marker, up to the value specified by <code>MaxRecords</code>. </p>",
+        "DescribeEventSubscriptionsResponse$Marker": "<p> An optional pagination token provided by a previous request. If this parameter is specified, the response includes only records beyond the marker, up to the value specified by <code>MaxRecords</code>. </p>",
+        "DescribeEventsMessage$SourceIdentifier": "<p> The identifier of the event source. An identifier must begin with a letter and must contain only ASCII letters, digits, and hyphens. It cannot end with a hyphen or contain two consecutive hyphens. </p>",
+        "DescribeEventsMessage$Marker": "<p> An optional pagination token provided by a previous request. If this parameter is specified, the response includes only records beyond the marker, up to the value specified by <code>MaxRecords</code>. </p>",
+        "DescribeEventsResponse$Marker": "<p> An optional pagination token provided by a previous request. If this parameter is specified, the response includes only records beyond the marker, up to the value specified by <code>MaxRecords</code>. </p>",
+        "DescribeOrderableReplicationInstancesMessage$Marker": "<p> An optional pagination token provided by a previous request. If this parameter is specified, the response includes only records beyond the marker, up to the value specified by <code>MaxRecords</code>. </p>",
+        "DescribeOrderableReplicationInstancesResponse$Marker": "<p> An optional pagination token provided by a previous request. If this parameter is specified, the response includes only records beyond the marker, up to the value specified by <code>MaxRecords</code>. </p>",
+        "DescribeRefreshSchemasStatusMessage$EndpointArn": "<p>The Amazon Resource Name (ARN) string that uniquely identifies the endpoint.</p>",
+        "DescribeReplicationInstancesMessage$Marker": "<p> An optional pagination token provided by a previous request. If this parameter is specified, the response includes only records beyond the marker, up to the value specified by <code>MaxRecords</code>. </p>",
+        "DescribeReplicationInstancesResponse$Marker": "<p> An optional pagination token provided by a previous request. If this parameter is specified, the response includes only records beyond the marker, up to the value specified by <code>MaxRecords</code>. </p>",
+        "DescribeReplicationSubnetGroupsMessage$Marker": "<p> An optional pagination token provided by a previous request. If this parameter is specified, the response includes only records beyond the marker, up to the value specified by <code>MaxRecords</code>. </p>",
+        "DescribeReplicationSubnetGroupsResponse$Marker": "<p> An optional pagination token provided by a previous request. If this parameter is specified, the response includes only records beyond the marker, up to the value specified by <code>MaxRecords</code>. </p>",
+        "DescribeReplicationTasksMessage$Marker": "<p> An optional pagination token provided by a previous request. If this parameter is specified, the response includes only records beyond the marker, up to the value specified by <code>MaxRecords</code>. </p>",
+        "DescribeReplicationTasksResponse$Marker": "<p> An optional pagination token provided by a previous request. If this parameter is specified, the response includes only records beyond the marker, up to the value specified by <code>MaxRecords</code>. </p>",
+        "DescribeSchemasMessage$EndpointArn": "<p>The Amazon Resource Name (ARN) string that uniquely identifies the endpoint.</p>",
+        "DescribeSchemasMessage$Marker": "<p> An optional pagination token provided by a previous request. If this parameter is specified, the response includes only records beyond the marker, up to the value specified by <code>MaxRecords</code>. </p>",
+        "DescribeSchemasResponse$Marker": "<p> An optional pagination token provided by a previous request. If this parameter is specified, the response includes only records beyond the marker, up to the value specified by <code>MaxRecords</code>. </p>",
+        "DescribeTableStatisticsMessage$ReplicationTaskArn": "<p>The Amazon Resource Name (ARN) of the replication task.</p>",
+        "DescribeTableStatisticsMessage$Marker": "<p> An optional pagination token provided by a previous request. If this parameter is specified, the response includes only records beyond the marker, up to the value specified by <code>MaxRecords</code>. </p>",
+        "DescribeTableStatisticsResponse$ReplicationTaskArn": "<p>The Amazon Resource Name (ARN) of the replication task.</p>",
+        "DescribeTableStatisticsResponse$Marker": "<p> An optional pagination token provided by a previous request. If this parameter is specified, the response includes only records beyond the marker, up to the value specified by <code>MaxRecords</code>. </p>",
+        "DynamoDbSettings$ServiceAccessRoleArn": "<p> The Amazon Resource Name (ARN) used by the service access IAM role. </p>",
+        "Endpoint$EndpointIdentifier": "<p>The database endpoint identifier. Identifiers must begin with a letter; must contain only ASCII letters, digits, and hyphens; and must not end with a hyphen or contain two consecutive hyphens.</p>",
+        "Endpoint$EngineName": "<p>The database engine name. Valid values, depending on the EndPointType, include MYSQL, ORACLE, POSTGRES, MARIADB, AURORA, REDSHIFT, S3, SYBASE, DYNAMODB, MONGODB, and SQLSERVER.</p>",
+        "Endpoint$Username": "<p>The user name used to connect to the endpoint.</p>",
+        "Endpoint$ServerName": "<p>The name of the server at the endpoint.</p>",
+        "Endpoint$DatabaseName": "<p>The name of the database at the endpoint.</p>",
+        "Endpoint$ExtraConnectionAttributes": "<p>Additional connection attributes used to connect to the endpoint.</p>",
+        "Endpoint$Status": "<p>The status of the endpoint.</p>",
+        "Endpoint$KmsKeyId": "<p>The KMS key identifier that will be used to encrypt the connection parameters. If you do not specify a value for the KmsKeyId parameter, then AWS DMS will use your default encryption key. AWS KMS creates the default encryption key for your AWS account. Your AWS account has a different default encryption key for each AWS region.</p>",
+        "Endpoint$EndpointArn": "<p>The Amazon Resource Name (ARN) string that uniquely identifies the endpoint.</p>",
+        "Endpoint$CertificateArn": "<p>The Amazon Resource Name (ARN) used for SSL connection to the endpoint.</p>",
+        "Endpoint$ExternalId": "<p> Value returned by a call to CreateEndpoint that can be used for cross-account validation. Use it on a subsequent call to CreateEndpoint to create the endpoint with a cross-account. </p>",
+        "Event$SourceIdentifier": "<p> The identifier of the event source. An identifier must begin with a letter and must contain only ASCII letters, digits, and hyphens; it cannot end with a hyphen or contain two consecutive hyphens. </p> <p>Constraints:replication instance, endpoint, migration task</p>",
+        "Event$Message": "<p>The event message.</p>",
+        "EventCategoriesList$member": null,
+        "EventCategoryGroup$SourceType": "<p> The type of AWS DMS resource that generates events. </p> <p>Valid values: replication-instance | replication-server | security-group | migration-task</p>",
+        "EventSubscription$CustomerAwsId": "<p>The AWS customer account associated with the AWS DMS event notification subscription.</p>",
+        "EventSubscription$CustSubscriptionId": "<p>The AWS DMS event notification subscription Id.</p>",
+        "EventSubscription$SnsTopicArn": "<p>The topic ARN of the AWS DMS event notification subscription.</p>",
+        "EventSubscription$Status": "<p>The status of the AWS DMS event notification subscription.</p> <p>Constraints:</p> <p>Can be one of the following: creating | modifying | deleting | active | no-permission | topic-not-exist</p> <p>The status \"no-permission\" indicates that AWS DMS no longer has permission to post to the SNS topic. The status \"topic-not-exist\" indicates that the topic was deleted after the subscription was created.</p>",
+        "EventSubscription$SubscriptionCreationTime": "<p>The time the RDS event notification subscription was created.</p>",
+        "EventSubscription$SourceType": "<p> The type of AWS DMS resource that generates events. </p> <p>Valid values: replication-instance | replication-server | security-group | migration-task</p>",
+        "Filter$Name": "<p>The name of the filter.</p>",
+        "FilterValueList$member": null,
+        "ImportCertificateMessage$CertificateIdentifier": "<p>The customer-assigned name of the certificate. Valid characters are A-z and 0-9.</p>",
+        "ImportCertificateMessage$CertificatePem": "<p>The contents of the .pem X.509 certificate file for the certificate.</p>",
+        "KeyList$member": null,
+        "ListTagsForResourceMessage$ResourceArn": "<p>The Amazon Resource Name (ARN) string that uniquely identifies the AWS DMS resource.</p>",
+        "ModifyEndpointMessage$EndpointArn": "<p>The Amazon Resource Name (ARN) string that uniquely identifies the endpoint.</p>",
+        "ModifyEndpointMessage$EndpointIdentifier": "<p>The database endpoint identifier. Identifiers must begin with a letter; must contain only ASCII letters, digits, and hyphens; and must not end with a hyphen or contain two consecutive hyphens.</p>",
+        "ModifyEndpointMessage$EngineName": "<p>The type of engine for the endpoint. Valid values, depending on the EndPointType, include MYSQL, ORACLE, POSTGRES, MARIADB, AURORA, REDSHIFT, S3, DYNAMODB, MONGODB, SYBASE, and SQLSERVER.</p>",
+        "ModifyEndpointMessage$Username": "<p>The user name to be used to login to the endpoint database.</p>",
+        "ModifyEndpointMessage$ServerName": "<p>The name of the server where the endpoint database resides.</p>",
+        "ModifyEndpointMessage$DatabaseName": "<p>The name of the endpoint database.</p>",
+        "ModifyEndpointMessage$ExtraConnectionAttributes": "<p>Additional attributes associated with the connection.</p>",
+        "ModifyEndpointMessage$CertificateArn": "<p>The Amazon Resource Name (ARN) of the certificate used for SSL connection.</p>",
+        "ModifyEventSubscriptionMessage$SubscriptionName": "<p>The name of the AWS DMS event notification subscription to be modified.</p>",
+        "ModifyEventSubscriptionMessage$SnsTopicArn": "<p> The Amazon Resource Name (ARN) of the Amazon SNS topic created for event notification. The ARN is created by Amazon SNS when you create a topic and subscribe to it.</p>",
+        "ModifyEventSubscriptionMessage$SourceType": "<p> The type of AWS DMS resource that generates the events you want to subscribe to. </p> <p>Valid values: replication-instance | migration-task</p>",
+        "ModifyReplicationInstanceMessage$ReplicationInstanceArn": "<p>The Amazon Resource Name (ARN) of the replication instance.</p>",
+        "ModifyReplicationInstanceMessage$ReplicationInstanceClass": "<p>The compute and memory capacity of the replication instance.</p> <p> Valid Values: <code>dms.t2.micro | dms.t2.small | dms.t2.medium | dms.t2.large | dms.c4.large | dms.c4.xlarge | dms.c4.2xlarge | dms.c4.4xlarge </code> </p>",
+        "ModifyReplicationInstanceMessage$PreferredMaintenanceWindow": "<p>The weekly time range (in UTC) during which system maintenance can occur, which might result in an outage. Changing this parameter does not result in an outage, except in the following situation, and the change is asynchronously applied as soon as possible. If moving this window to the current time, there must be at least 30 minutes between the current time and end of the window to ensure pending changes are applied.</p> <p>Default: Uses existing setting</p> <p>Format: ddd:hh24:mi-ddd:hh24:mi</p> <p>Valid Days: Mon | Tue | Wed | Thu | Fri | Sat | Sun</p> <p>Constraints: Must be at least 30 minutes</p>",
+        "ModifyReplicationInstanceMessage$EngineVersion": "<p>The engine version number of the replication instance.</p>",
+        "ModifyReplicationInstanceMessage$ReplicationInstanceIdentifier": "<p>The replication instance identifier. This parameter is stored as a lowercase string.</p>",
+        "ModifyReplicationSubnetGroupMessage$ReplicationSubnetGroupIdentifier": "<p>The name of the replication instance subnet group.</p>",
+        "ModifyReplicationSubnetGroupMessage$ReplicationSubnetGroupDescription": "<p>The description of the replication instance subnet group.</p>",
+        "ModifyReplicationTaskMessage$ReplicationTaskArn": "<p>The Amazon Resource Name (ARN) of the replication task.</p>",
+        "ModifyReplicationTaskMessage$ReplicationTaskIdentifier": "<p>The replication task identifier.</p> <p>Constraints:</p> <ul> <li> <p>Must contain from 1 to 255 alphanumeric characters or hyphens.</p> </li> <li> <p>First character must be a letter.</p> </li> <li> <p>Cannot end with a hyphen or contain two consecutive hyphens.</p> </li> </ul>",
+        "ModifyReplicationTaskMessage$TableMappings": "<p>When using the AWS CLI or boto3, provide the path of the JSON file that contains the table mappings. Precede the path with \"file://\". When working with the DMS API, provide the JSON as the parameter value.</p> <p>For example, --table-mappings file://mappingfile.json</p>",
+        "ModifyReplicationTaskMessage$ReplicationTaskSettings": "<p>JSON file that contains settings for the task, such as target metadata settings.</p>",
+        "MongoDbSettings$Username": "<p>The user name you use to access the MongoDB source endpoint. </p>",
+        "MongoDbSettings$ServerName": "<p> The name of the server on the MongoDB source endpoint. </p>",
+        "MongoDbSettings$DatabaseName": "<p> The database name on the MongoDB source endpoint. </p>",
+        "MongoDbSettings$ExtractDocId": "<p> Specifies the document ID. Use this attribute when <code>NestingLevel</code> is set to NONE. </p> <p>Default value is false. </p>",
+        "MongoDbSettings$DocsToInvestigate": "<p> Indicates the number of documents to preview to determine the document organization. Use this attribute when <code>NestingLevel</code> is set to ONE. </p> <p>Must be a positive value greater than 0. Default value is 1000.</p>",
+        "MongoDbSettings$AuthSource": "<p> The MongoDB database name. This attribute is not used when <code>authType=NO</code>. </p> <p>The default is admin.</p>",
+        "OrderableReplicationInstance$EngineVersion": "<p>The version of the replication engine.</p>",
+        "OrderableReplicationInstance$ReplicationInstanceClass": "<p>The compute and memory capacity of the replication instance.</p> <p> Valid Values: <code>dms.t2.micro | dms.t2.small | dms.t2.medium | dms.t2.large | dms.c4.large | dms.c4.xlarge | dms.c4.2xlarge | dms.c4.4xlarge </code> </p>",
+        "OrderableReplicationInstance$StorageType": "<p>The type of storage used by the replication instance.</p>",
+        "RefreshSchemasMessage$EndpointArn": "<p>The Amazon Resource Name (ARN) string that uniquely identifies the endpoint.</p>",
+        "RefreshSchemasMessage$ReplicationInstanceArn": "<p>The Amazon Resource Name (ARN) of the replication instance.</p>",
+        "RefreshSchemasStatus$EndpointArn": "<p>The Amazon Resource Name (ARN) string that uniquely identifies the endpoint.</p>",
+        "RefreshSchemasStatus$ReplicationInstanceArn": "<p>The Amazon Resource Name (ARN) of the replication instance.</p>",
+        "RefreshSchemasStatus$LastFailureMessage": "<p>The last failure message for the schema.</p>",
+        "ReloadTablesMessage$ReplicationTaskArn": "<p>The Amazon Resource Name (ARN) of the replication instance. </p>",
+        "ReloadTablesResponse$ReplicationTaskArn": "<p>The Amazon Resource Name (ARN) of the replication task. </p>",
+        "RemoveTagsFromResourceMessage$ResourceArn": "<p>&gt;The Amazon Resource Name (ARN) of the AWS DMS resource the tag is to be removed from.</p>",
+        "ReplicationInstance$ReplicationInstanceIdentifier": "<p>The replication instance identifier. This parameter is stored as a lowercase string.</p> <p>Constraints:</p> <ul> <li> <p>Must contain from 1 to 63 alphanumeric characters or hyphens.</p> </li> <li> <p>First character must be a letter.</p> </li> <li> <p>Cannot end with a hyphen or contain two consecutive hyphens.</p> </li> </ul> <p>Example: <code>myrepinstance</code> </p>",
+        "ReplicationInstance$ReplicationInstanceClass": "<p>The compute and memory capacity of the replication instance.</p> <p> Valid Values: <code>dms.t2.micro | dms.t2.small | dms.t2.medium | dms.t2.large | dms.c4.large | dms.c4.xlarge | dms.c4.2xlarge | dms.c4.4xlarge </code> </p>",
+        "ReplicationInstance$ReplicationInstanceStatus": "<p>The status of the replication instance.</p>",
+        "ReplicationInstance$AvailabilityZone": "<p>The Availability Zone for the instance.</p>",
+        "ReplicationInstance$PreferredMaintenanceWindow": "<p>The maintenance window times for the replication instance.</p>",
+        "ReplicationInstance$EngineVersion": "<p>The engine version number of the replication instance.</p>",
+        "ReplicationInstance$KmsKeyId": "<p>The KMS key identifier that is used to encrypt the content on the replication instance. If you do not specify a value for the KmsKeyId parameter, then AWS DMS will use your default encryption key. AWS KMS creates the default encryption key for your AWS account. Your AWS account has a different default encryption key for each AWS region.</p>",
+        "ReplicationInstance$ReplicationInstanceArn": "<p>The Amazon Resource Name (ARN) of the replication instance.</p>",
+        "ReplicationInstance$ReplicationInstancePublicIpAddress": "<p>The public IP address of the replication instance.</p>",
+        "ReplicationInstance$ReplicationInstancePrivateIpAddress": "<p>The private IP address of the replication instance.</p>",
+        "ReplicationInstance$SecondaryAvailabilityZone": "<p>The availability zone of the standby replication instance in a Multi-AZ deployment.</p>",
+        "ReplicationInstancePrivateIpAddressList$member": null,
+        "ReplicationInstancePublicIpAddressList$member": null,
+        "ReplicationPendingModifiedValues$ReplicationInstanceClass": "<p>The compute and memory capacity of the replication instance.</p> <p> Valid Values: <code>dms.t2.micro | dms.t2.small | dms.t2.medium | dms.t2.large | dms.c4.large | dms.c4.xlarge | dms.c4.2xlarge | dms.c4.4xlarge </code> </p>",
+        "ReplicationPendingModifiedValues$EngineVersion": "<p>The engine version number of the replication instance.</p>",
+        "ReplicationSubnetGroup$ReplicationSubnetGroupIdentifier": "<p>The identifier of the replication instance subnet group.</p>",
+        "ReplicationSubnetGroup$ReplicationSubnetGroupDescription": "<p>The description of the replication subnet group.</p>",
+        "ReplicationSubnetGroup$VpcId": "<p>The ID of the VPC.</p>",
+        "ReplicationSubnetGroup$SubnetGroupStatus": "<p>The status of the subnet group.</p>",
+        "ReplicationTask$ReplicationTaskIdentifier": "<p>The replication task identifier.</p> <p>Constraints:</p> <ul> <li> <p>Must contain from 1 to 255 alphanumeric characters or hyphens.</p> </li> <li> <p>First character must be a letter.</p> </li> <li> <p>Cannot end with a hyphen or contain two consecutive hyphens.</p> </li> </ul>",
+        "ReplicationTask$SourceEndpointArn": "<p>The Amazon Resource Name (ARN) string that uniquely identifies the endpoint.</p>",
+        "ReplicationTask$TargetEndpointArn": "<p>The Amazon Resource Name (ARN) string that uniquely identifies the endpoint.</p>",
+        "ReplicationTask$ReplicationInstanceArn": "<p>The Amazon Resource Name (ARN) of the replication instance.</p>",
+        "ReplicationTask$TableMappings": "<p>Table mappings specified in the task.</p>",
+        "ReplicationTask$ReplicationTaskSettings": "<p>The settings for the replication task.</p>",
+        "ReplicationTask$Status": "<p>The status of the replication task.</p>",
+        "ReplicationTask$LastFailureMessage": "<p>The last error (failure) message generated for the replication instance.</p>",
+        "ReplicationTask$StopReason": "<p>The reason the replication task was stopped.</p>",
+        "ReplicationTask$ReplicationTaskArn": "<p>The Amazon Resource Name (ARN) of the replication task.</p>",
+        "S3Settings$ServiceAccessRoleArn": "<p> The Amazon Resource Name (ARN) used by the service access IAM role. </p>",
+        "S3Settings$ExternalTableDefinition": "<p> </p>",
+        "S3Settings$CsvRowDelimiter": "<p> The delimiter used to separate rows in the source files. The default is a carriage return (\\n). </p>",
+        "S3Settings$CsvDelimiter": "<p> The delimiter used to separate columns in the source files. The default is a comma. </p>",
+        "S3Settings$BucketFolder": "<p> An optional parameter to set a folder name in the S3 bucket. If provided, tables are created in the path &lt;bucketFolder&gt;/&lt;schema_name&gt;/&lt;table_name&gt;/. If this parameter is not specified, then the path used is &lt;schema_name&gt;/&lt;table_name&gt;/. </p>",
+        "S3Settings$BucketName": "<p> The name of the S3 bucket. </p>",
+        "SchemaList$member": null,
+        "SourceIdsList$member": null,
+        "StartReplicationTaskMessage$ReplicationTaskArn": "<p>The Amazon Resource Number (ARN) of the replication task to be started.</p>",
+        "StopReplicationTaskMessage$ReplicationTaskArn": "<p>The Amazon Resource Number(ARN) of the replication task to be stopped.</p>",
+        "Subnet$SubnetIdentifier": "<p>The subnet identifier.</p>",
+        "Subnet$SubnetStatus": "<p>The status of the subnet.</p>",
+        "SubnetIdentifierList$member": null,
+        "SupportedEndpointType$EngineName": "<p>The database engine name. Valid values, depending on the EndPointType, include MYSQL, ORACLE, POSTGRES, MARIADB, AURORA, REDSHIFT, S3, SYBASE, DYNAMODB, MONGODB, and SQLSERVER.</p>",
+        "TableStatistics$SchemaName": "<p>The schema name.</p>",
+        "TableStatistics$TableName": "<p>The name of the table.</p>",
+        "TableStatistics$TableState": "<p>The state of the table.</p>",
+        "TableToReload$SchemaName": "<p>The schema name of the table to be reloaded.</p>",
+        "TableToReload$TableName": "<p>The table name of the table to be reloaded.</p>",
+        "Tag$Key": "<p>A key is the required name of the tag. The string value can be from 1 to 128 Unicode characters in length and cannot be prefixed with \"aws:\" or \"dms:\". The string can only contain only the set of Unicode letters, digits, white-space, '_', '.', '/', '=', '+', '-' (Java regex: \"^([\\\\p{L}\\\\p{Z}\\\\p{N}_.:/=+\\\\-]*)$\").</p>",
+        "Tag$Value": "<p>A value is the optional value of the tag. The string value can be from 1 to 256 Unicode characters in length and cannot be prefixed with \"aws:\" or \"dms:\". The string can only contain only the set of Unicode letters, digits, white-space, '_', '.', '/', '=', '+', '-' (Java regex: \"^([\\\\p{L}\\\\p{Z}\\\\p{N}_.:/=+\\\\-]*)$\").</p>",
+        "TestConnectionMessage$ReplicationInstanceArn": "<p>The Amazon Resource Name (ARN) of the replication instance.</p>",
+        "TestConnectionMessage$EndpointArn": "<p>The Amazon Resource Name (ARN) string that uniquely identifies the endpoint.</p>",
+        "VpcSecurityGroupIdList$member": null,
+        "VpcSecurityGroupMembership$VpcSecurityGroupId": "<p>The VPC security group Id.</p>",
+        "VpcSecurityGroupMembership$Status": "<p>The status of the VPC security group.</p>"
+      }
+    },
+    "Subnet": {
+      "base": "<p/>",
+      "refs": {
+        "SubnetList$member": null
+      }
+    },
+    "SubnetAlreadyInUse": {
+      "base": "<p>The specified subnet is already in use.</p>",
+      "refs": {
+      }
+    },
+    "SubnetIdentifierList": {
+      "base": null,
+      "refs": {
+        "CreateReplicationSubnetGroupMessage$SubnetIds": "<p>The EC2 subnet IDs for the subnet group.</p>",
+        "ModifyReplicationSubnetGroupMessage$SubnetIds": "<p>A list of subnet IDs.</p>"
+      }
+    },
+    "SubnetList": {
+      "base": null,
+      "refs": {
+        "ReplicationSubnetGroup$Subnets": "<p>The subnets that are in the subnet group.</p>"
+      }
+    },
+    "SupportedEndpointType": {
+      "base": "<p/>",
+      "refs": {
+        "SupportedEndpointTypeList$member": null
+      }
+    },
+    "SupportedEndpointTypeList": {
+      "base": null,
+      "refs": {
+        "DescribeEndpointTypesResponse$SupportedEndpointTypes": "<p>The type of endpoints that are supported.</p>"
+      }
+    },
+    "TStamp": {
+      "base": null,
+      "refs": {
+        "Certificate$CertificateCreationDate": "<p>The date that the certificate was created.</p>",
+        "Certificate$ValidFromDate": "<p>The beginning date that the certificate is valid.</p>",
+        "Certificate$ValidToDate": "<p>The final date that the certificate is valid.</p>",
+        "CreateReplicationTaskMessage$CdcStartTime": "<p>The start time for the Change Data Capture (CDC) operation.</p>",
+        "DescribeEventsMessage$StartTime": "<p>The start time for the events to be listed.</p>",
+        "DescribeEventsMessage$EndTime": "<p>The end time for the events to be listed.</p>",
+        "Event$Date": "<p>The date of the event.</p>",
+        "ModifyReplicationTaskMessage$CdcStartTime": "<p>The start time for the Change Data Capture (CDC) operation.</p>",
+        "RefreshSchemasStatus$LastRefreshDate": "<p>The date the schema was last refreshed.</p>",
+        "ReplicationInstance$InstanceCreateTime": "<p>The time the replication instance was created.</p>",
+        "ReplicationTask$ReplicationTaskCreationDate": "<p>The date the replication task was created.</p>",
+        "ReplicationTask$ReplicationTaskStartDate": "<p>The date the replication task is scheduled to start.</p>",
+        "StartReplicationTaskMessage$CdcStartTime": "<p>The start time for the Change Data Capture (CDC) operation.</p>",
+        "TableStatistics$LastUpdateTime": "<p>The last time the table was updated.</p>"
+      }
+    },
+    "TableListToReload": {
+      "base": null,
+      "refs": {
+        "ReloadTablesMessage$TablesToReload": "<p>The name and schema of the table to be reloaded. </p>"
+      }
+    },
+    "TableStatistics": {
+      "base": "<p/>",
+      "refs": {
+        "TableStatisticsList$member": null
+      }
+    },
+    "TableStatisticsList": {
+      "base": null,
+      "refs": {
+        "DescribeTableStatisticsResponse$TableStatistics": "<p>The table statistics.</p>"
+      }
+    },
+    "TableToReload": {
+      "base": "<p/>",
+      "refs": {
+        "TableListToReload$member": null
+      }
+    },
+    "Tag": {
+      "base": "<p/>",
+      "refs": {
+        "TagList$member": null
+      }
+    },
+    "TagList": {
+      "base": null,
+      "refs": {
+        "AddTagsToResourceMessage$Tags": "<p>The tag to be assigned to the DMS resource.</p>",
+        "CreateEndpointMessage$Tags": "<p>Tags to be added to the endpoint.</p>",
+        "CreateEventSubscriptionMessage$Tags": "<p>A tag to be attached to the event subscription.</p>",
+        "CreateReplicationInstanceMessage$Tags": "<p>Tags to be associated with the replication instance.</p>",
+        "CreateReplicationSubnetGroupMessage$Tags": "<p>The tag to be assigned to the subnet group.</p>",
+        "CreateReplicationTaskMessage$Tags": "<p>Tags to be added to the replication instance.</p>",
+        "ImportCertificateMessage$Tags": "<p>The tags associated with the certificate.</p>",
+        "ListTagsForResourceResponse$TagList": "<p>A list of tags for the resource.</p>"
+      }
+    },
+    "TestConnectionMessage": {
+      "base": "<p/>",
+      "refs": {
+      }
+    },
+    "TestConnectionResponse": {
+      "base": "<p/>",
+      "refs": {
+      }
+    },
+    "UpgradeDependencyFailureFault": {
+      "base": "<p>An upgrade dependency is preventing the database migration.</p>",
+      "refs": {
+      }
+    },
+    "VpcSecurityGroupIdList": {
+      "base": null,
+      "refs": {
+        "CreateReplicationInstanceMessage$VpcSecurityGroupIds": "<p> Specifies the VPC security group to be used with the replication instance. The VPC security group must work with the VPC containing the replication instance. </p>",
+        "ModifyReplicationInstanceMessage$VpcSecurityGroupIds": "<p> Specifies the VPC security group to be used with the replication instance. The VPC security group must work with the VPC containing the replication instance. </p>"
+      }
+    },
+    "VpcSecurityGroupMembership": {
+      "base": "<p/>",
+      "refs": {
+        "VpcSecurityGroupMembershipList$member": null
+      }
+    },
+    "VpcSecurityGroupMembershipList": {
+      "base": null,
+      "refs": {
+        "ReplicationInstance$VpcSecurityGroups": "<p>The VPC security group for the instance.</p>"
+      }
+    }
+  }
+}

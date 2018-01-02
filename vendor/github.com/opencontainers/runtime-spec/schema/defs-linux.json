@@ -1,0 +1,270 @@
+{
+    "definitions": {
+        "RootfsPropagation": {
+            "type": "string",
+            "enum": [
+                "private",
+                "shared",
+                "slave",
+                "unbindable"
+            ]
+        },
+        "SeccompArch": {
+            "type": "string",
+            "enum": [
+                "SCMP_ARCH_X86",
+                "SCMP_ARCH_X86_64",
+                "SCMP_ARCH_X32",
+                "SCMP_ARCH_ARM",
+                "SCMP_ARCH_AARCH64",
+                "SCMP_ARCH_MIPS",
+                "SCMP_ARCH_MIPS64",
+                "SCMP_ARCH_MIPS64N32",
+                "SCMP_ARCH_MIPSEL",
+                "SCMP_ARCH_MIPSEL64",
+                "SCMP_ARCH_MIPSEL64N32",
+                "SCMP_ARCH_PPC",
+                "SCMP_ARCH_PPC64",
+                "SCMP_ARCH_PPC64LE",
+                "SCMP_ARCH_S390",
+                "SCMP_ARCH_S390X",
+                "SCMP_ARCH_PARISC",
+                "SCMP_ARCH_PARISC64"
+            ]
+        },
+        "SeccompAction": {
+            "type": "string",
+            "enum": [
+                "SCMP_ACT_KILL",
+                "SCMP_ACT_TRAP",
+                "SCMP_ACT_ERRNO",
+                "SCMP_ACT_TRACE",
+                "SCMP_ACT_ALLOW"
+            ]
+        },
+        "SeccompOperators": {
+            "type": "string",
+            "enum": [
+                "SCMP_CMP_NE",
+                "SCMP_CMP_LT",
+                "SCMP_CMP_LE",
+                "SCMP_CMP_EQ",
+                "SCMP_CMP_GE",
+                "SCMP_CMP_GT",
+                "SCMP_CMP_MASKED_EQ"
+            ]
+        },
+        "SyscallArg": {
+            "type": "object",
+            "properties": {
+                "index": {
+                    "$ref": "defs.json#/definitions/uint32"
+                },
+                "value": {
+                    "$ref": "defs.json#/definitions/uint64"
+                },
+                "valueTwo": {
+                    "$ref": "defs.json#/definitions/uint64"
+                },
+                "op": {
+                    "$ref": "#/definitions/SeccompOperators"
+                }
+            },
+            "required": [
+                "index",
+                "value",
+                "op"
+            ]
+        },
+        "Syscall": {
+            "type": "object",
+            "properties": {
+                "names": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "minItems": 1
+                },
+                "action": {
+                    "$ref": "#/definitions/SeccompAction"
+                },
+                "args": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/SyscallArg"
+                    }
+                }
+            },
+            "required": [
+                "names",
+                "action"
+            ]
+        },
+        "Major": {
+            "description": "major device number",
+            "$ref": "defs.json#/definitions/int64"
+        },
+        "Minor": {
+            "description": "minor device number",
+            "$ref": "defs.json#/definitions/int64"
+        },
+        "FileMode": {
+            "description": "File permissions mode (typically an octal value)",
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 512
+        },
+        "FileType": {
+            "description": "Type of a block or special character device",
+            "type": "string",
+            "pattern": "^[cbup]$"
+        },
+        "Device": {
+            "type": "object",
+            "required": [
+                "type",
+                "path"
+            ],
+            "properties": {
+                "type": {
+                    "$ref": "#/definitions/FileType"
+                },
+                "path": {
+                    "$ref": "defs.json#/definitions/FilePath"
+                },
+                "fileMode": {
+                    "$ref": "#/definitions/FileMode"
+                },
+                "major": {
+                    "$ref": "#/definitions/Major"
+                },
+                "minor": {
+                    "$ref": "#/definitions/Minor"
+                },
+                "uid": {
+                    "$ref": "defs.json#/definitions/UID"
+                },
+                "gid": {
+                    "$ref": "defs.json#/definitions/GID"
+                }
+            }
+        },
+        "weight": {
+            "type": "integer"
+        },
+        "blockIODevice": {
+            "type": "object",
+            "properties": {
+                "major": {
+                    "$ref": "#/definitions/Major"
+                },
+                "minor": {
+                    "$ref": "#/definitions/Minor"
+                }
+            },
+            "required": [
+                "major",
+                "minor"
+            ]
+        },
+        "blockIODeviceWeight": {
+            "type": "object",
+            "allOf": [
+                {
+                    "$ref": "#/definitions/blockIODevice"
+                },
+                {
+                    "type": "object",
+                    "properties": {
+                        "weight": {
+                            "$ref": "#/definitions/weight"
+                        },
+                        "leafWeight": {
+                            "$ref": "#/definitions/weight"
+                        }
+                    }
+                }
+            ]
+        },
+        "blockIODeviceThrottle": {
+            "allOf": [
+                {
+                    "$ref": "#/definitions/blockIODevice"
+                },
+                {
+                    "type": "object",
+                    "properties": {
+                        "rate": {
+                            "$ref": "defs.json#/definitions/uint64"
+                        }
+                    }
+                }
+            ]
+        },
+        "DeviceCgroup": {
+            "type": "object",
+            "properties": {
+                "allow": {
+                    "type": "boolean"
+                },
+                "type": {
+                    "type": "string"
+                },
+                "major": {
+                    "$ref": "#/definitions/Major"
+                },
+                "minor": {
+                    "$ref": "#/definitions/Minor"
+                },
+                "access": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "allow"
+            ]
+        },
+        "NetworkInterfacePriority": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                },
+                "priority": {
+                    "$ref": "defs.json#/definitions/uint32"
+                }
+            },
+            "required": [
+                "name",
+                "priority"
+            ]
+        },
+        "NamespaceType": {
+            "type": "string",
+            "enum": [
+                "mount",
+                "pid",
+                "network",
+                "uts",
+                "ipc",
+                "user",
+                "cgroup"
+            ]
+        },
+        "NamespaceReference": {
+            "type": "object",
+            "properties": {
+                "type": {
+                    "$ref": "#/definitions/NamespaceType"
+                },
+                "path": {
+                    "$ref": "defs.json#/definitions/FilePath"
+                }
+            },
+            "required": [
+                "type"
+            ]
+        }
+    }
+}

@@ -1,0 +1,4 @@
+language: go
+go_import_path: k8s.io/kube-openapi
+script: go test ./pkg/...
+

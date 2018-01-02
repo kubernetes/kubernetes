@@ -1,0 +1,56 @@
+syntax = "proto3";
+
+package containerd.services.events.v1;
+
+import "github.com/containerd/containerd/protobuf/plugin/fieldpath.proto";
+import "gogoproto/gogo.proto";
+import "google/protobuf/any.proto";
+import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/containerd/containerd/api/services/events/v1;events";
+
+service Events {
+	// Publish an event to a topic.
+	//
+	// The event will be packed into a timestamp envelope with the namespace
+	// introspected from the context. The envelope will then be dispatched.
+	rpc Publish(PublishRequest) returns (google.protobuf.Empty);
+
+	// Forward sends an event that has already been packaged into an envelope
+	// with a timestamp and namespace.
+	//
+	// This is useful if earlier timestamping is required or when fowarding on
+	// behalf of another component, namespace or publisher.
+	rpc Forward(ForwardRequest) returns (google.protobuf.Empty);
+
+	// Subscribe to a stream of events, possibly returning only that match any
+	// of the provided filters.
+	//
+	// Unlike many other methods in containerd, subscribers will get messages
+	// from all namespaces unless otherwise specified. If this is not desired,
+	// a filter can be provided in the format 'namespace==<namespace>' to
+	// restrict the received events.
+	rpc Subscribe(SubscribeRequest) returns (stream Envelope);
+}
+
+message PublishRequest {
+	string topic = 1;
+	google.protobuf.Any event = 2;
+}
+
+message ForwardRequest {
+	Envelope envelope = 1;
+}
+
+message SubscribeRequest {
+	repeated string filters = 1;
+}
+
+message Envelope {
+	option (containerd.plugin.fieldpath) = true;
+	google.protobuf.Timestamp timestamp = 1 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+	string namespace = 2;
+	string topic = 3;
+	google.protobuf.Any event = 4;
+}

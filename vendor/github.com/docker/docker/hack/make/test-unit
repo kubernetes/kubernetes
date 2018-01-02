@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+set -e
+
+echo "DEPRECATED: use hack/test/unit instead of hack/make.sh test-unit" >&2
+
+$SCRIPTDIR/test/unit 2>&1 | tee -a "$DEST/test.log"

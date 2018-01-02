@@ -1,0 +1,86 @@
+package client
+
+const (
+	{{.typeUpper}}_TYPE = "{{.schema.Id}}"
+)
+
+type {{.typeCapitalized}} struct {
+	Resource
+    {{range $key, $value := .structFields}}
+    {{$key}} {{$value}} `json:"{{$key | toLowerCamelCase }},omitempty" yaml:"{{$key | toLowerUnderscore }},omitempty"`
+    {{end}}
+}
+
+type {{.typeCapitalized}}Collection struct {
+	Collection
+	Data []{{.typeCapitalized}} `json:"data,omitempty"`
+}
+
+type {{.typeCapitalized}}Client struct {
+	rancherClient *RancherClient
+}
+
+type {{.typeCapitalized}}Operations interface {
+	List(opts *ListOpts) (*{{.typeCapitalized}}Collection, error)
+	Create(opts *{{.typeCapitalized}}) (*{{.typeCapitalized}}, error)
+	Update(existing *{{.typeCapitalized}}, updates interface{}) (*{{.typeCapitalized}}, error)
+	ById(id string) (*{{.typeCapitalized}}, error)
+	Delete(container *{{.typeCapitalized}}) error{{range $key, $value := .resourceActions}}
+    {{if eq $value.Input "" }}
+    Action{{$key | capitalize}} (*{{$.typeCapitalized}}) (*{{.Output | capitalize}}, error)
+    {{else}}
+    Action{{$key | capitalize}} (*{{$.typeCapitalized}}, *{{$value.Input | capitalize}}) (*{{.Output | capitalize}}, error)
+    {{end}}{{end}}
+}
+
+func new{{.typeCapitalized}}Client(rancherClient *RancherClient) *{{.typeCapitalized}}Client {
+	return &{{.typeCapitalized}}Client{
+		rancherClient: rancherClient,
+	}
+}
+
+func (c *{{.typeCapitalized}}Client) Create(container *{{.typeCapitalized}}) (*{{.typeCapitalized}}, error) {
+	resp := &{{.typeCapitalized}}{}
+	err := c.rancherClient.doCreate({{.typeUpper}}_TYPE, container, resp)
+	return resp, err
+}
+
+func (c *{{.typeCapitalized}}Client) Update(existing *{{.typeCapitalized}}, updates interface{}) (*{{.typeCapitalized}}, error) {
+	resp := &{{.typeCapitalized}}{}
+	err := c.rancherClient.doUpdate({{.typeUpper}}_TYPE, &existing.Resource, updates, resp)
+	return resp, err
+}
+
+func (c *{{.typeCapitalized}}Client) List(opts *ListOpts) (*{{.typeCapitalized}}Collection, error) {
+	resp := &{{.typeCapitalized}}Collection{}
+	err := c.rancherClient.doList({{.typeUpper}}_TYPE, opts, resp)
+	return resp, err
+}
+
+func (c *{{.typeCapitalized}}Client) ById(id string) (*{{.typeCapitalized}}, error) {
+	resp := &{{.typeCapitalized}}{}
+	err := c.rancherClient.doById({{.typeUpper}}_TYPE, id, resp)
+	if apiError, ok := err.(*ApiError); ok {
+		if apiError.StatusCode == 404 {
+			return nil, nil
+		}
+	}
+	return resp, err
+}
+
+func (c *{{.typeCapitalized}}Client) Delete(container *{{.typeCapitalized}}) error {
+	return c.rancherClient.doResourceDelete({{.typeUpper}}_TYPE, &container.Resource)
+}{{range $key, $value := .resourceActions}}
+    {{if eq $value.Input "" }}
+func (c *{{$.typeCapitalized}}Client) Action{{$key | capitalize}} (resource *{{$.typeCapitalized}}) (*{{.Output | capitalize}}, error) {
+    {{else}}
+func (c *{{$.typeCapitalized}}Client) Action{{$key | capitalize}} (resource *{{$.typeCapitalized}}, input *{{$value.Input | capitalize}}) (*{{.Output | capitalize}}, error) {
+    {{end}}
+	resp := &{{.Output | capitalize}}{}
+    {{if eq $value.Input "" }}
+	err := c.rancherClient.doAction({{$.typeUpper}}_TYPE, "{{$key}}", &resource.Resource, nil, resp)
+    {{else}}
+	err := c.rancherClient.doAction({{$.typeUpper}}_TYPE, "{{$key}}", &resource.Resource, input, resp)
+    {{end}}
+	return resp, err
+}{{end}}

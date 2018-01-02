@@ -1,0 +1,19 @@
+{
+	"ImportPath": "github.com/aws/aws-sdk-go/awsmigrate/awsmigrate-renamer",
+	"GoVersion": "go1.6",
+	"GodepVersion": "v60",
+	"Deps": [
+		{
+			"ImportPath": "golang.org/x/tools/go/ast/astutil",
+			"Rev": "b75b3f5cd5d50fbb1fb88ce784d2e7cca17bba8a"
+		},
+		{
+			"ImportPath": "golang.org/x/tools/go/buildutil",
+			"Rev": "b75b3f5cd5d50fbb1fb88ce784d2e7cca17bba8a"
+		},
+		{
+			"ImportPath": "golang.org/x/tools/go/loader",
+			"Rev": "b75b3f5cd5d50fbb1fb88ce784d2e7cca17bba8a"
+		}
+	]
+}

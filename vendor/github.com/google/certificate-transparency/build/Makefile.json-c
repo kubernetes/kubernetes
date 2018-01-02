@@ -1,0 +1,14 @@
+all: Makefile
+	$(MAKE)
+#	$(MAKE) check
+	$(MAKE) install
+
+Makefile: configure
+	# The release doesn't build with -Werror because of an unused var, sign.
+	CFLAGS="-Wno-error"
+	./configure --prefix=$(INSTALL_DIR) --disable-shared --enable-static CFLAGS="$(CFLAGS) -I$(INSTALL_DIR)/include -fPIC" LDFLAGS="-L$(INSTALL_DIR)/lib"
+	# in case there's any cruft lying around
+	$(MAKE) clean
+
+configure: configure.ac
+	autoreconf -vi

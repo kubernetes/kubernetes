@@ -1,0 +1,10 @@
+approve_by_comment: true
+approve_regex: ^LGTM
+reject_regex: ^Rejected
+reset_on_push: true
+author_approval: ignored
+reviewers:
+  teams:
+    - runc-maintainers
+  name: default
+  required: 2

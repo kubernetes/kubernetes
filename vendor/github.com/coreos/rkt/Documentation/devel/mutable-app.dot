@@ -1,0 +1,41 @@
+digraph systemd {
+    node [fontname = "Arial", fillcolor="#CFE2F3", style="filled"];
+
+    {
+        notes [
+            shape="note",
+            label=<
+black = Requires<BR ALIGN="LEFT"/>
+dark grey = Wants<BR ALIGN="LEFT"/>
+red = Conflicts<BR ALIGN="LEFT"/>
+green = After<BR ALIGN="LEFT"/>
+>
+        ]
+    }
+
+    "notes" [fillcolor="#FFE599"];
+
+	"[app].service"->"prepare-app@-opt-stage2-[app]-rootfs.service" [color="green"];
+	"[app].service"->"systemd-journald.socket" [color="green"];
+	"[app].service"->"prepare-app@-opt-stage2-[app]-rootfs.service" [color="black"];
+	"[app].service"->"reaper-[app].service" [color="grey66"];
+	"[app].service"->"halt.target" [color="red"];
+
+	"default.target"->"systemd-journald.service" [color="green"];
+	"default.target"->"systemd-journald.service" [color="black"];
+	"default.target"->"[app].service" [color="grey66"];
+	"default.target"->"halt.target" [color="red"];
+
+	"reaper-[app].service"->"halt.target" [color="red"];
+
+	"systemd-journald.service"->"systemd-journald.socket" [color="green"];
+	"systemd-journald.service"->"systemd-journald.socket" [color="black"];
+	"systemd-journald.service"->"systemd-journald.socket" [color="grey66"];
+
+	"halt.target"->"shutdown.service" [color="green"];
+	"halt.target"->"shutdown.service" [color="black"];
+	"halt.target"->"default.target" [color="green"];
+    // [app] dependencies
+    "halt.target"->"reaper-[app].service" [color="green"];
+	"halt.target"->"[app].service" [color="green"];
+}

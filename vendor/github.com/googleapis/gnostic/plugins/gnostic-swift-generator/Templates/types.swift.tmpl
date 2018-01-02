@@ -1,0 +1,83 @@
+// Copyright 2017 Google Inc. All Rights Reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+// Common type declarations
+
+//-{% for serviceType in renderer.types %}
+public class {{ serviceType.name }} : CustomStringConvertible {
+  //-{% for serviceTypeField in serviceType.fields %}
+  public var {{serviceTypeField.name}} : {{serviceTypeField.typeName}} = {{serviceTypeField.initialValue}}
+  //-{% endfor %}
+
+  public init() {}
+
+//-{% if serviceType.isInterfaceType %}
+  public init?(jsonObject: Any?) {
+    if let jsonDictionary = jsonObject as? [String:Any] {  
+      //-{% for serviceTypeField in serviceType.fields %}
+      if let value : Any = jsonDictionary["{{ serviceTypeField.jsonName }}"] {
+        //-{% if serviceTypeField.isArrayType %}
+        var outArray : [{{ serviceTypeField.elementType }}] = []
+        let array = value as! [Any]
+        for arrayValue in array {
+          if let element = {{ serviceTypeField.elementType }}(jsonObject:arrayValue) {
+            outArray.append(element)
+          }
+        }
+        self.{{serviceTypeField.name}} = outArray
+        //-{% endif %}
+        //-{% if serviceTypeField.isCastableType %}
+        self.{{serviceTypeField.name}} = value as! {{serviceTypeField.typeName}} 
+        //-{% endif %}
+        //-{% if serviceTypeField.isConvertableType %}
+        self.{{serviceTypeField.name}} = {{serviceTypeField.typeName}}(value)
+        //-{% endif %}
+      }
+      //-{% endfor %}   
+    } else {
+      return nil
+    }
+  }
+    
+  public func jsonObject() -> Any { 
+    var result : [String:Any] = [:]
+    //-{% for serviceTypeField in serviceType.fields %}
+    //-{% if serviceTypeField.isArrayType %}
+    var outArray : [Any] = []
+    for arrayValue in self.{{ serviceTypeField.name }} {
+      outArray.append(arrayValue.jsonObject())
+    }
+    result["{{ serviceTypeField.jsonName }}"] = outArray
+    //-{% endif %}      
+    //-{% if serviceTypeField.isCastableType %}
+    result["{{ serviceTypeField.jsonName }}"] = self.{{serviceTypeField.name}} 
+    //-{% endif %}      
+    //-{% if serviceTypeField.isConvertableType %}
+    result["{{ serviceTypeField.jsonName }}"] = self.{{serviceTypeField.name}}.jsonObject() 
+    //-{% endif %}
+    //-{% endfor %} 
+    return result
+  }
+  
+//-{% endif %}
+  public var description: String{
+    return "[{{ serviceType.name }}" +
+    //-{% for serviceTypeField in serviceType.fields %}
+      " {{ serviceTypeField.name }}: \(self.{{ serviceTypeField.name }})" +   
+    //-{% endfor %}      
+    "]"
+  }
+}
+
+//-{% endfor %}

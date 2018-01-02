@@ -1,0 +1,94 @@
+# Pony-up!
+machine:
+  pre:
+  # Install gvm
+    - bash < <(curl -s -S -L https://raw.githubusercontent.com/moovweb/gvm/1.0.22/binscripts/gvm-installer)
+  # Install codecov for coverage
+    - pip install --user codecov
+
+  post:
+  # go
+    - gvm install go1.8 --prefer-binary --name=stable
+
+  environment:
+  # Convenient shortcuts to "common" locations
+    CHECKOUT: /home/ubuntu/$CIRCLE_PROJECT_REPONAME
+    BASE_DIR: src/github.com/$CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME
+  # Trick circle brainflat "no absolute path" behavior
+    BASE_STABLE: ../../../$HOME/.gvm/pkgsets/stable/global/$BASE_DIR
+    DOCKER_BUILDTAGS: "include_oss include_gcs"
+  # Workaround Circle parsing dumb bugs and/or YAML wonkyness
+    CIRCLE_PAIN: "mode: set"
+
+  hosts:
+  # Not used yet
+    fancy: 127.0.0.1
+
+dependencies:
+  pre:
+  # Copy the code to the gopath of all go versions
+    - >
+      gvm use stable &&
+      mkdir -p "$(dirname $BASE_STABLE)" &&
+      cp -R "$CHECKOUT" "$BASE_STABLE"
+
+  override:
+  # Install dependencies for every copied clone/go version
+    - gvm use stable && go get github.com/lk4d4/vndr:
+        pwd: $BASE_STABLE
+
+  post:
+  # For the stable go version, additionally install linting tools
+    - >
+      gvm use stable &&
+      go get github.com/axw/gocov/gocov github.com/golang/lint/golint
+
+test:
+  pre:
+  # Output the go versions we are going to test
+    # - gvm use old && go version
+    - gvm use stable && go version
+
+  # Ensure validation of dependencies
+    - git fetch origin:
+        pwd: $BASE_STABLE
+    - gvm use stable && if test -n "`git diff --stat=1000 origin/master | grep -E \"^[[:space:]]*vendor\"`"; then make dep-validate; fi:
+        pwd: $BASE_STABLE
+
+  # First thing: build everything. This will catch compile errors, and it's
+  # also necessary for go vet to work properly (see #807).
+    - gvm use stable && go install $(go list ./... | grep -v "/vendor/"):
+        pwd: $BASE_STABLE
+
+  # FMT
+    - gvm use stable && make fmt:
+        pwd: $BASE_STABLE
+
+   # VET
+    - gvm use stable && make vet:
+        pwd: $BASE_STABLE
+
+  # LINT
+    - gvm use stable && make lint:
+        pwd: $BASE_STABLE
+
+  override:
+  # Test stable, and report
+     - gvm use stable; export ROOT_PACKAGE=$(go list .); go list -tags "$DOCKER_BUILDTAGS" ./... | grep -v "/vendor/" | xargs -L 1 -I{} bash -c 'export PACKAGE={}; go test -tags "$DOCKER_BUILDTAGS" -test.short -coverprofile=$GOPATH/src/$PACKAGE/coverage.out -coverpkg=$(./coverpkg.sh $PACKAGE $ROOT_PACKAGE) $PACKAGE':
+         timeout: 1000
+         pwd: $BASE_STABLE
+
+  # Test stable with race
+     - gvm use stable; export ROOT_PACKAGE=$(go list .); go list -tags "$DOCKER_BUILDTAGS" ./... | grep -v "/vendor/" | grep -v "registry/handlers" | grep -v "registry/storage/driver" | xargs -L 1 -I{} bash -c 'export PACKAGE={}; go test -race -tags "$DOCKER_BUILDTAGS" -test.short $PACKAGE':
+         timeout: 1000
+         pwd: $BASE_STABLE
+  post:
+  # Report to codecov
+    - bash <(curl -s https://codecov.io/bash):
+        pwd: $BASE_STABLE
+
+  ## Notes
+  # Do we want these as well?
+  # - go get code.google.com/p/go.tools/cmd/goimports
+  # - test -z "$(goimports -l -w ./... | tee /dev/stderr)"
+  # http://labix.org/gocheck

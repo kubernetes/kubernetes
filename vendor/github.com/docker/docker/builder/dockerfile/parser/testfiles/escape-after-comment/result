@@ -1,0 +1,3 @@
+(from "image")
+(label "maintainer" "foo@bar.com")
+(env "GOPATH" "\\go")

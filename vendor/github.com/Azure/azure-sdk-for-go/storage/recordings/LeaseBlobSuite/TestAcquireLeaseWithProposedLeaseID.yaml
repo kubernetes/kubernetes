@@ -1,0 +1,144 @@
+---
+version: 1
+rwmutex: {}
+interactions:
+- request:
+    body: ""
+    form: {}
+    headers:
+      Authorization:
+      - SharedKey golangrocksonazure:P7lU9cCuUDDE/FDeNrlpU11glVwpVksAAq/JfYh3sF4=
+      User-Agent:
+      - Go/go1.9beta1 (amd64-windows) azure-storage-go/10.0.2 api-version/2016-05-31
+        blob
+      x-ms-date:
+      - Thu, 20 Jul 2017 23:34:07 GMT
+      x-ms-version:
+      - 2016-05-31
+    url: https://golangrocksonazure.blob.core.windows.net/cnt-50leaseblobsuitetestacquirel?restype=container
+    method: PUT
+  response:
+    body: ""
+    headers:
+      Date:
+      - Thu, 20 Jul 2017 23:34:06 GMT
+      Etag:
+      - '"0x8D4CFC7D09A74B9"'
+      Last-Modified:
+      - Thu, 20 Jul 2017 23:34:07 GMT
+      Server:
+      - Windows-Azure-Blob/1.0 Microsoft-HTTPAPI/2.0
+      X-Ms-Request-Id:
+      - 7d613236-0001-0009-7ab0-01ca46000000
+      X-Ms-Version:
+      - 2016-05-31
+    status: 201 Created
+    code: 201
+- request:
+    body: Hello!
+    form: {}
+    headers:
+      Authorization:
+      - SharedKey golangrocksonazure:OAUn5nunGqLliikeMERe5ikWa4lb/HX5SkVlSvAeZYQ=
+      Content-Length:
+      - "6"
+      User-Agent:
+      - Go/go1.9beta1 (amd64-windows) azure-storage-go/10.0.2 api-version/2016-05-31
+        blob
+      x-ms-blob-type:
+      - BlockBlob
+      x-ms-date:
+      - Thu, 20 Jul 2017 23:34:07 GMT
+      x-ms-version:
+      - 2016-05-31
+    url: https://golangrocksonazure.blob.core.windows.net/cnt-50leaseblobsuitetestacquirel/blob/50leaseblobsuitetestacquireleasewithproposedleaseid
+    method: PUT
+  response:
+    body: ""
+    headers:
+      Content-Md5:
+      - lS0sVtBIWVgzZ0e83ZhZDQ==
+      Date:
+      - Thu, 20 Jul 2017 23:34:06 GMT
+      Etag:
+      - '"0x8D4CFC7D0F6F4B0"'
+      Last-Modified:
+      - Thu, 20 Jul 2017 23:34:07 GMT
+      Server:
+      - Windows-Azure-Blob/1.0 Microsoft-HTTPAPI/2.0
+      X-Ms-Request-Id:
+      - 7d613239-0001-0009-7cb0-01ca46000000
+      X-Ms-Request-Server-Encrypted:
+      - "true"
+      X-Ms-Version:
+      - 2016-05-31
+    status: 201 Created
+    code: 201
+- request:
+    body: ""
+    form: {}
+    headers:
+      Authorization:
+      - SharedKey golangrocksonazure:QzN+uow+JDyH4Ci2Pfrb7PPO8bghQWOMhJtRhRnD19o=
+      User-Agent:
+      - Go/go1.9beta1 (amd64-windows) azure-storage-go/10.0.2 api-version/2016-05-31
+        blob
+      x-ms-date:
+      - Thu, 20 Jul 2017 23:34:07 GMT
+      x-ms-lease-action:
+      - acquire
+      x-ms-lease-duration:
+      - "30"
+      x-ms-proposed-lease-id:
+      - dfe6dde8-68d5-4910-9248-c97c61768fea
+      x-ms-version:
+      - 2016-05-31
+    url: https://golangrocksonazure.blob.core.windows.net/cnt-50leaseblobsuitetestacquirel/blob/50leaseblobsuitetestacquireleasewithproposedleaseid?comp=lease
+    method: PUT
+  response:
+    body: ""
+    headers:
+      Date:
+      - Thu, 20 Jul 2017 23:34:06 GMT
+      Etag:
+      - '"0x8D4CFC7D0F6F4B0"'
+      Last-Modified:
+      - Thu, 20 Jul 2017 23:34:07 GMT
+      Server:
+      - Windows-Azure-Blob/1.0 Microsoft-HTTPAPI/2.0
+      X-Ms-Lease-Id:
+      - dfe6dde8-68d5-4910-9248-c97c61768fea
+      X-Ms-Request-Id:
+      - 7d61323a-0001-0009-7db0-01ca46000000
+      X-Ms-Version:
+      - 2016-05-31
+    status: 201 Created
+    code: 201
+- request:
+    body: ""
+    form: {}
+    headers:
+      Authorization:
+      - SharedKey golangrocksonazure:TiRg3+IwEBTDczQk0sbhm5jtA9RnGIKACvJzRXETH0c=
+      User-Agent:
+      - Go/go1.9beta1 (amd64-windows) azure-storage-go/10.0.2 api-version/2016-05-31
+        blob
+      x-ms-date:
+      - Thu, 20 Jul 2017 23:34:07 GMT
+      x-ms-version:
+      - 2016-05-31
+    url: https://golangrocksonazure.blob.core.windows.net/cnt-50leaseblobsuitetestacquirel?restype=container
+    method: DELETE
+  response:
+    body: ""
+    headers:
+      Date:
+      - Thu, 20 Jul 2017 23:34:06 GMT
+      Server:
+      - Windows-Azure-Blob/1.0 Microsoft-HTTPAPI/2.0
+      X-Ms-Request-Id:
+      - 7d61323b-0001-0009-7eb0-01ca46000000
+      X-Ms-Version:
+      - 2016-05-31
+    status: 202 Accepted
+    code: 202

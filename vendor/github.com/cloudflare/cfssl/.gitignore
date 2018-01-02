@@ -1,0 +1,4 @@
+dist/*
+cli/serve/static.rice-box.go
+.coverprofile
+certdb/testdb/certstore_development.db

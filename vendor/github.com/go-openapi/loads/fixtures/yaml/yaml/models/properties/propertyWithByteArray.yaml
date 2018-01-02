@@ -1,0 +1,4 @@
+type: array
+items:
+  type: string
+  format: byte

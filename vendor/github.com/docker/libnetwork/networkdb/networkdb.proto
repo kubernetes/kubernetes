@@ -1,0 +1,183 @@
+syntax = "proto3";
+
+import "gogoproto/gogo.proto";
+
+package networkdb;
+
+option (gogoproto.marshaler_all) = true;
+option (gogoproto.unmarshaler_all) = true;
+option (gogoproto.stringer_all) = true;
+option (gogoproto.gostring_all) = true;
+option (gogoproto.sizer_all) = true;
+option (gogoproto.goproto_stringer_all) = false;
+
+// MessageType enum defines all the core message types that networkdb
+// uses to communicate to peers.
+enum MessageType {
+	option (gogoproto.goproto_enum_prefix) = false;
+	option (gogoproto.enum_customname) = "MessageType";
+
+	INVALID = 0 [(gogoproto.enumvalue_customname) = "MessageTypeInvalid"];
+
+	// NetworEvent message type is used to communicate network
+	// attachments on the node.
+	NETWORK_EVENT = 1 [(gogoproto.enumvalue_customname) = "MessageTypeNetworkEvent"];
+
+	// TableEvent message type is used to communicate any table
+	// CRUD event that happened on the node.
+	TABLE_EVENT = 2 [(gogoproto.enumvalue_customname) = "MessageTypeTableEvent"];
+
+	// PushPull message type is used to syncup all network
+	// attachments on a peer node either during startup of this
+	// node or with a random peer node periodically thereafter.
+	PUSH_PULL = 3 [(gogoproto.enumvalue_customname) = "MessageTypePushPull"];
+
+	// BulkSync message is used to bulksync the whole networkdb
+	// state with a peer node during startup of this node or with
+	// a random peer node periodically thereafter.
+	BULK_SYNC = 4 [(gogoproto.enumvalue_customname) = "MessageTypeBulkSync"];
+
+	// Compound message type is used to form a compound message
+	// which is a pack of many message of above types, packed into
+	// a single compound message.
+	COMPOUND = 5 [(gogoproto.enumvalue_customname) = "MessageTypeCompound"];
+
+	// NodeEvent message type is used to communicare node
+	// join/leave events in the cluster
+	NODE_EVENT = 6 [(gogoproto.enumvalue_customname) = "MessageTypeNodeEvent"];
+}
+
+// GossipMessage is a basic message header used by all messages types.
+message GossipMessage {
+	MessageType type = 1; // type defines one of the message types defined above.
+	bytes data = 2; // Payload of the message of any type defined here.
+}
+
+// NodeEvent message payload definition.
+message NodeEvent {
+	enum Type {
+		option (gogoproto.goproto_enum_prefix) = false;
+		option (gogoproto.enum_customname) = "Type";
+
+		INVALID = 0 [(gogoproto.enumvalue_customname) = "NodeEventTypeInvalid"];
+		// Join event is generated when this node joins the cluster.
+		JOIN = 1 [(gogoproto.enumvalue_customname) = "NodeEventTypeJoin"];;
+		// Leave event is generated when this node leaves the cluster.
+		LEAVE = 2 [(gogoproto.enumvalue_customname) = "NodeEventTypeLeave"];;
+	}
+
+	Type type = 1;
+
+	// Lamport time using a network lamport clock indicating the
+	// time this event was generated on the node where it was
+	// generated.
+	uint64 l_time = 2 [(gogoproto.customtype) = "github.com/hashicorp/serf/serf.LamportTime", (gogoproto.nullable) = false];
+	// Source node name.
+	string node_name = 3;
+}
+
+// NetworkEvent message payload definition.
+message NetworkEvent {
+	enum Type {
+		option (gogoproto.goproto_enum_prefix) = false;
+		option (gogoproto.enum_customname) = "Type";
+
+		INVALID = 0 [(gogoproto.enumvalue_customname) = "NetworkEventTypeInvalid"];
+		// Join event is generated when this node joins a network.
+		JOIN = 1 [(gogoproto.enumvalue_customname) = "NetworkEventTypeJoin"];;
+		// Leave event is generated when this node leaves a network.
+		LEAVE = 2 [(gogoproto.enumvalue_customname) = "NetworkEventTypeLeave"];;
+	}
+
+	Type type = 1;
+
+	// Lamport time using a network lamport clock indicating the
+	// time this event was generated on the node where it was
+	// generated.
+	uint64 l_time = 2 [(gogoproto.customtype) = "github.com/hashicorp/serf/serf.LamportTime", (gogoproto.nullable) = false];
+	// Source node name.
+	string node_name = 3;
+	// ID of the network for which the event is generated.
+	string network_id = 4 [(gogoproto.customname) = "NetworkID"];
+}
+
+// NetworkEntry for push pull of networks.
+message NetworkEntry {
+	// ID of the network
+	string network_id = 1 [(gogoproto.customname) = "NetworkID"];
+	// Latest lamport time of the network attachment when this
+	// network event was recorded.
+	uint64 l_time = 2 [(gogoproto.customtype) = "github.com/hashicorp/serf/serf.LamportTime", (gogoproto.nullable) = false];
+	// Source node name where this network attachment happened.
+	string node_name = 3;
+	// Indicates if a leave from this network is in progress.
+	bool leaving = 4;
+}
+
+// NetworkPushpull message payload definition.
+message NetworkPushPull {
+	// Lamport time when this push pull was initiated.
+	uint64 l_time = 1 [(gogoproto.customtype) = "github.com/hashicorp/serf/serf.LamportTime", (gogoproto.nullable) = false];
+	repeated NetworkEntry networks = 2;
+}
+
+// TableEvent message payload definition.
+message TableEvent {
+	enum Type {
+		option (gogoproto.goproto_enum_prefix) = false;
+		option (gogoproto.enum_customname) = "Type";
+
+		INVALID = 0 [(gogoproto.enumvalue_customname) = "TableEventTypeInvalid"];
+		// Create signifies that this table entry was just
+		// created.
+		CREATE = 1 [(gogoproto.enumvalue_customname) = "TableEventTypeCreate"];
+		// Update signifies that this table entry was just
+		// updated.
+		UPDATE = 2 [(gogoproto.enumvalue_customname) = "TableEventTypeUpdate"];
+		// Delete signifies that this table entry was just
+		// updated.
+		DELETE = 3 [(gogoproto.enumvalue_customname) = "TableEventTypeDelete"];
+	}
+
+	Type type = 1;
+	// Lamport time when this event was generated.
+	uint64 l_time = 2 [(gogoproto.customtype) = "github.com/hashicorp/serf/serf.LamportTime", (gogoproto.nullable) = false];
+	// Node name where this event originated.
+	string node_name = 3;
+	// ID of the network to which this table entry belongs.
+	string network_id = 4 [(gogoproto.customname) = "NetworkID"];
+	// Name of the table to which this table entry belongs.
+	string table_name = 5;
+	// Entry key.
+	string key = 6;
+	// Entry value.
+	bytes value = 7;
+}
+
+// BulkSync message payload definition.
+message BulkSyncMessage {
+	// Lamport time when this bulk sync was initiated.
+	uint64 l_time = 1 [(gogoproto.customtype) = "github.com/hashicorp/serf/serf.LamportTime", (gogoproto.nullable) = false];
+	// Indicates if this bulksync is a response to a bulk sync
+	// request from a peer node.
+	bool unsolicited = 2;
+	// Name of the node which is producing this bulk sync message.
+	string node_name = 3;
+	// List of network names whose table entries are getting
+	// bulksynced as part of the bulksync.
+	repeated string networks = 4;
+	// Bulksync payload
+	bytes payload = 5;
+}
+
+// Compound message payload definition.
+message CompoundMessage {
+	message SimpleMessage {
+		// Bytestring payload of a message constructed using
+		// other message type definitions.
+		bytes Payload = 1;
+	}
+
+	// A list of simple messages.
+	repeated SimpleMessage messages = 1;
+}

@@ -1,0 +1,45 @@
+CREATE DATABASE thing
+
+CREATE DATABASE thing2
+
+SET Database [thing]
+
+SET Precision [s]
+
+GO INSERT mockCpu
+cpu,
+host=server-[float inc(0) 10000],loc=[us-west|us-east|eu-north]
+value=[int inc(100) 0]
+100000 10s
+
+GO QUERY mockCpu
+SELECT mean(value) FROM cpu WHERE host='server-1'
+DO 10
+
+WAIT
+
+SET DATABASE [thing2]
+
+GO INSERT devices
+devices,
+city=[str rand(8) 100],country=[str rand(8) 25],device_id=[str rand(10) 100]
+lat=[float rand(90) 0],lng=[float rand(120) 0],temp=[float rand(40) 0]
+100000 10s
+
+GO INSERT devices2
+devices2,
+city=[str rand(8) 100],country=[str rand(8) 25],device_id=[str rand(10) 100]
+lat=[float rand(90) 0],lng=[float rand(120) 0],temp=[float rand(40) 0]
+100000 10s
+
+GO QUERY fooName
+SELECT count(temp) FROM devices WHERE temp > 30
+DO 10
+
+WAIT
+
+DROP DATABASE thing
+
+DROP DATABASE thing2
+
+WAIT

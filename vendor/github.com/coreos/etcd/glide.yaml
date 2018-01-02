@@ -1,0 +1,105 @@
+package: github.com/coreos/etcd
+import:
+- package: github.com/bgentry/speakeasy
+  version: 36e9cfdd690967f4f690c6edcc9ffacd006014a0
+- package: github.com/boltdb/bolt
+  version: v1.3.0
+- package: github.com/cockroachdb/cmux
+  version: 112f0506e7743d64a6eb8fedbcff13d9979bbf92
+- package: github.com/coreos/go-semver
+  version: 568e959cd89871e61434c1143528d9162da89ef2
+  subpackages:
+  - semver
+- package: github.com/coreos/go-systemd
+  version: v14
+  subpackages:
+  - daemon
+  - journal
+  - util
+- package: github.com/coreos/pkg
+  version: v3
+  subpackages:
+  - capnslog
+- package: github.com/dustin/go-humanize
+  version: 8929fe90cee4b2cb9deb468b51fb34eba64d1bf0
+- package: github.com/ghodss/yaml
+  version: 73d445a93680fa1a78ae23a5839bad48f32ba1ee
+- package: github.com/gogo/protobuf
+  version: v0.3
+  subpackages:
+  - proto
+- package: github.com/golang/protobuf
+  version: 4bd1920723d7b7c925de087aa32e2187708897f7
+  subpackages:
+  - jsonpb
+  - proto
+- package: github.com/google/btree
+  version: 925471ac9e2131377a91e1595defec898166fe49
+- package: github.com/grpc-ecosystem/grpc-gateway
+  version: 84398b94e188ee336f307779b57b3aa91af7063c
+  subpackages:
+  - runtime
+  - runtime/internal
+  - utilities
+- package: github.com/jonboulle/clockwork
+  version: v0.1.0
+- package: github.com/kr/pty
+  version: f7ee69f31298ecbe5d2b349c711e2547a617d398
+- package: github.com/olekukonko/tablewriter
+  version: cca8bbc0798408af109aaaa239cbd2634846b340
+- package: github.com/prometheus/client_golang
+  version: v0.8.0
+  subpackages:
+  - prometheus
+- package: github.com/spf13/cobra
+  version: 1c44ec8d3f1552cac48999f9306da23c4d8a288b
+- package: github.com/spf13/pflag
+  version: 08b1a584251b5b62f458943640fc8ebd4d50aaa5
+- package: github.com/ugorji/go
+  version: ded73eae5db7e7a0ef6f55aace87a2873c5d2b74
+  subpackages:
+  - codec
+- package: github.com/urfave/cli
+  version: v1.18.0
+- package: github.com/xiang90/probing
+  version: 07dd2e8dfe18522e9c447ba95f2fe95262f63bb2
+- package: github.com/grpc-ecosystem/go-grpc-prometheus
+  version: v1.1
+- package: golang.org/x/crypto
+  version: 1351f936d976c60a0a48d728281922cf63eafb8d
+  subpackages:
+  - bcrypt
+  - blowfish
+- package: golang.org/x/net
+  version: f2499483f923065a842d38eb4c7f1927e6fc6e6d
+  subpackages:
+  - context
+  - http2
+  - http2/hpack
+  - internal/timeseries
+  - trace
+- package: golang.org/x/time
+  version: a4bde12657593d5e90d0533a3e4fd95e635124cb
+  subpackages:
+  - rate
+- package: google.golang.org/grpc
+  version: v1.0.4
+  subpackages:
+  - codes
+  - credentials
+  - grpclog
+  - internal
+  - metadata
+  - naming
+  - peer
+  - transport
+- package: gopkg.in/cheggaaa/pb.v1
+  version: v1.0.2
+- package: gopkg.in/yaml.v2
+  version: 53feefa2559fb8dfa8d81baad31be332c97d6c77
+- package: github.com/stretchr/testify
+  version: 976c720a22c8eb4eb6a0b4348ad85ad12491a506
+  subpackages:
+  - assert
+- package: github.com/karlseguin/ccache
+  version: v2.0.2

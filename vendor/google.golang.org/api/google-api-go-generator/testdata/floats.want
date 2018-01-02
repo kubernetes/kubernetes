@@ -1,0 +1,114 @@
+// Package x provides access to the X.
+//
+// See https://cloud.google.com/appengine/docs/admin-api/
+//
+// Usage example:
+//
+//   import "google.golang.org/api/x/v1"
+//   ...
+//   xService, err := x.New(oauthHttpClient)
+package x // import "google.golang.org/api/x/v1"
+
+import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
+	context "golang.org/x/net/context"
+	ctxhttp "golang.org/x/net/context/ctxhttp"
+	gensupport "google.golang.org/api/gensupport"
+	googleapi "google.golang.org/api/googleapi"
+	"io"
+	"net/http"
+	"net/url"
+	"strconv"
+	"strings"
+)
+
+// Always reference these packages, just in case the auto-generated code
+// below doesn't.
+var _ = bytes.NewBuffer
+var _ = strconv.Itoa
+var _ = fmt.Sprintf
+var _ = json.NewDecoder
+var _ = io.Copy
+var _ = url.Parse
+var _ = gensupport.MarshalJSON
+var _ = googleapi.Version
+var _ = errors.New
+var _ = strings.Replace
+var _ = context.Canceled
+var _ = ctxhttp.Do
+
+const apiId = "X:v1"
+const apiName = "X"
+const apiVersion = "v1"
+const basePath = "https://appengine.googleapis.com/"
+
+func New(client *http.Client) (*Service, error) {
+	if client == nil {
+		return nil, errors.New("client is nil")
+	}
+	s := &Service{client: client, BasePath: basePath}
+	return s, nil
+}
+
+type Service struct {
+	client    *http.Client
+	BasePath  string // API endpoint base URL
+	UserAgent string // optional additional User-Agent fragment
+}
+
+func (s *Service) userAgent() string {
+	if s.UserAgent == "" {
+		return googleapi.UserAgent
+	}
+	return googleapi.UserAgent + " " + s.UserAgent
+}
+
+// Utilization: CPU utilization policy.
+type Utilization struct {
+	Average float64 `json:"average,omitempty"`
+
+	Count int64 `json:"count,omitempty"`
+
+	Target float64 `json:"target,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "Average") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "Average") to include in
+	// API requests with the JSON null value. By default, fields with empty
+	// values are omitted from API requests. However, any field with an
+	// empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *Utilization) MarshalJSON() ([]byte, error) {
+	type noMethod Utilization
+	raw := noMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
+func (s *Utilization) UnmarshalJSON(data []byte) error {
+	type noMethod Utilization
+	var s1 struct {
+		Average gensupport.JSONFloat64 `json:"average"`
+		Target  gensupport.JSONFloat64 `json:"target"`
+		*noMethod
+	}
+	s1.noMethod = (*noMethod)(s)
+	if err := json.Unmarshal(data, &s1); err != nil {
+		return err
+	}
+	s.Average = float64(s1.Average)
+	s.Target = float64(s1.Target)
+	return nil
+}

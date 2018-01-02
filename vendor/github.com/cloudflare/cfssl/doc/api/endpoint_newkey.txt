@@ -1,0 +1,54 @@
+THE CSR GENERATING ENDPOINT
+
+Endpoint: /api/v1/cfssl/newkey
+Method:   POST
+
+Required parameters:
+    
+    * hosts: the list of SANs (subject alternative names) for the
+    requested CSR (certificate signing request)
+    * names: the certifcate subject for the requested CSR
+
+Optional parameters:
+
+    * CN: the common name for the certificate subject in the requested
+    CSR.
+    * key: the key algorithm and size for the newly generated private key,
+    default to ECDSA-256
+    * ca: the CA configuration of the requested CSR, including CA pathlen
+    and CA default expiry
+
+
+Result:
+
+    The returned result is a JSON object with three keys:
+
+    * private key: a PEM-encoded private key
+    * certificate_request: a PEM-encoded certificate request
+    * sums: a JSON object holding both MD5 and SHA1 digests for the certificate
+    request
+
+Example:
+
+    $ curl -d '{"hosts":["www.example.com"], "names":[{"C":"US", "ST":"California", "L":"San Francisco", "O":"example.com"}], "CN": "www.example.com"}' \
+          ${CFSSL_HOST}/api/v1/cfssl/newkey  \
+          | python -m json.tool
+
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+100  1132  100   997  100   135  80572  10909 --:--:-- --:--:-- --:--:-- 83083
+{
+    "errors": [],
+    "messages": [],
+    "result": {
+        "certificate_request": "-----BEGIN CERTIFICATE REQUEST-----\nMIIBUTCB+QIBADBqMQswCQYDVQQGEwJVUzEUMBIGA1UEChMLZXhhbXBsZS5jb20x\nFjAUBgNVBAcTDVNhbiBGcmFuY2lzY28xEzARBgNVBAgTCkNhbGlmb3JuaWExGDAW\nBgNVBAMTD3d3dy5leGFtcGxlLmNvbTBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IA\nBKjGougrsMC6d8+kD4iACNHEGxo3SR4rhg/6n3HWlH4c9f2lNT92juNggq6cakNw\n5LexZmwHDi970YPgdFVSrJWgLTArBgkqhkiG9w0BCQ4xHjAcMBoGA1UdEQQTMBGC\nD3d3dy5leGFtcGxlLmNvbTAKBggqhkjOPQQDAgNHADBEAiBAfw0rotVugRtcqKWF\nnU9DwHXC7nKP4RUVodJo1oGuOwIgYH3hDgSMFsheuvhdzt7ZvLutWHkk6yIRLxJr\ncGsO9/c=\n-----END CERTIFICATE REQUEST-----\n",
+        "private_key": "-----BEGIN EC PRIVATE KEY-----\nMHcCAQEEIO4Nlcbg29aPBqrBowuONq5U2HlvE/xOaCV65gXZ7NPQoAoGCCqGSM49\nAwEHoUQDQgAEqMai6CuwwLp3z6QPiIAI0cQbGjdJHiuGD/qfcdaUfhz1/aU1P3aO\n42CCrpxqQ3Dkt7FmbAcOL3vRg+B0VVKslQ==\n-----END EC PRIVATE KEY-----\n",
+        "sums": {
+            "certificate_request": {
+                "md5": "95E25336DA65B58DA250C3B5FAA4B97F",
+                "sha-1": "5F1ACE9D14F55E95FAA246A80474873C14E0F42F"
+            }
+        }
+    },
+    "success": true
+}

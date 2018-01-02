@@ -1,0 +1,321 @@
+syntax = "proto2";
+
+package ct;
+option java_package = "org.certificatetransparency.ctlog.proto";
+
+
+////////////////////////////////////////////////////////////////////////////////
+// These protocol buffers should be kept aligned with the I-D.                //
+////////////////////////////////////////////////////////////////////////////////
+
+// RFC 5246
+message DigitallySigned {
+  enum HashAlgorithm {
+    NONE = 0;
+    MD5 = 1;
+    SHA1 = 2;
+    SHA224 = 3;
+    SHA256 = 4;
+    SHA384 = 5;
+    SHA512 = 6;
+  }
+
+  enum SignatureAlgorithm {
+    ANONYMOUS = 0;
+    RSA = 1;
+    DSA = 2;
+    ECDSA = 3;
+  }
+
+  // 1 byte
+  optional HashAlgorithm hash_algorithm = 1 [ default = NONE ];
+  // 1 byte
+  optional SignatureAlgorithm sig_algorithm = 2 [ default = ANONYMOUS ];
+  // 0..2^16-1 bytes
+  optional bytes signature = 3;
+}
+
+enum LogEntryType {
+  X509_ENTRY = 0;
+  PRECERT_ENTRY = 1;
+  PRECERT_ENTRY_V2 = 2;
+  // Not part of the I-D, and outside the valid range.
+  X_JSON_ENTRY = 32768;  // Experimental, don't rely on this!
+  UNKNOWN_ENTRY_TYPE = 65536;
+}
+
+message X509ChainEntry {
+  // For V1 this entry just includes the certificate in the leaf_certificate
+  // field
+  // <1..2^24-1>
+  optional bytes leaf_certificate = 1;
+  // For V2 it includes the cert and key hash using CertInfo. The
+  // leaf_certificate field is not used
+  optional CertInfo cert_info = 3;
+  // <0..2^24-1>
+  // A chain from the leaf to a trusted root
+  // (excluding leaf and possibly root).
+  repeated bytes certificate_chain = 2;
+}
+
+// opaque TBSCertificate<1..2^16-1>;
+// struct {
+//   opaque issuer_key_hash[32];
+//   TBSCertificate tbs_certificate;
+// } PreCert;
+// Retained for V1 API compatibility. May be removed in a future release.
+message PreCert {
+  optional bytes issuer_key_hash = 1;
+  optional bytes tbs_certificate = 2;
+}
+
+// In V2 this is used for both certificates and precertificates in SCTs. It
+// replaces PreCert and has the same structure. The older message remains for
+// compatibility with existing code that depends on this proto.
+message CertInfo {
+  optional bytes issuer_key_hash = 1;
+  optional bytes tbs_certificate = 2;
+}
+
+message PrecertChainEntry {
+  // <1..2^24-1>
+  optional bytes pre_certificate = 1;
+  // <0..2^24-1>
+  // The chain certifying the precertificate, as submitted by the CA.
+  repeated bytes precertificate_chain = 2;
+
+  // PreCert input to the SCT. Can be computed from the above.
+  // Store it alongside the entry data so that the signers don't have to
+  // parse certificates to recompute it.
+  optional PreCert pre_cert = 3;
+  // As above for V2 messages. Only one of these fields will be set in a
+  // valid message
+  optional CertInfo cert_info = 4;
+}
+
+message XJSONEntry {
+  optional string json = 1;
+}
+
+// TODO(alcutter): Consider using extensions here instead.
+message LogEntry {
+  optional LogEntryType type = 1 [ default = UNKNOWN_ENTRY_TYPE ];
+
+  optional X509ChainEntry x509_entry = 2;
+
+  optional PrecertChainEntry precert_entry = 3;
+
+  optional XJSONEntry x_json_entry = 4;
+}
+
+enum SignatureType {
+  CERTIFICATE_TIMESTAMP = 0;
+  // TODO(ekasper): called tree_hash in I-D.
+  TREE_HEAD = 1;
+}
+
+enum Version {
+  V1 = 0;
+  V2 = 1;
+  // Not part of the I-D, and outside the valid range.
+  UNKNOWN_VERSION = 256;
+}
+
+message LogID {
+  // 32 bytes
+  optional bytes key_id = 1;
+}
+
+message SctExtension {
+  // Valid range is 0-65534
+  optional uint32 sct_extension_type = 1;
+  // Data is opaque and type specific. <0..2^16-1> bytes
+  optional bytes sct_extension_data = 2;
+}
+
+// TODO(ekasper): implement support for id.
+message SignedCertificateTimestamp {
+  optional Version version = 1 [ default = UNKNOWN_VERSION ];
+  optional LogID id = 2;
+  // UTC time in milliseconds, since January 1, 1970, 00:00.
+  optional uint64 timestamp = 3;
+  optional DigitallySigned signature = 4;
+  // V1 extensions
+  optional bytes extensions = 5;
+  // V2 extensions <0..2^16-1>. Must be ordered by type (lowest first)
+  repeated SctExtension sct_extension = 6;
+}
+
+message SignedCertificateTimestampList {
+  // One or more SCTs, <1..2^16-1> bytes each
+  repeated bytes sct_list = 1;
+}
+
+enum MerkleLeafType {
+  TIMESTAMPED_ENTRY = 0;
+  UNKNOWN_LEAF_TYPE = 256;
+}
+
+message SignedEntry {
+  // For V1 signed entries either the x509 or precert field will be set
+  optional bytes x509 = 1;
+  optional PreCert precert = 2;
+  optional bytes json = 3;
+  // For V2 all entries use the CertInfo field and the above fields are
+  // not set
+  optional CertInfo cert_info = 4;
+}
+
+message TimestampedEntry {
+  optional uint64 timestamp = 1;
+  optional LogEntryType entry_type = 2;
+  optional SignedEntry signed_entry = 3;
+  // V1 extensions
+  optional bytes extensions = 4;
+  // V2 extensions <0..2^16-1>. Must be ordered by type (lowest first)
+  repeated SctExtension sct_extension = 5;
+}
+
+// Stuff that's hashed into a Merkle leaf.
+message MerkleTreeLeaf {
+  // The version of the corresponding SCT.
+  optional Version version = 1 [ default = UNKNOWN_VERSION ];
+  optional MerkleLeafType type = 2 [ default = UNKNOWN_LEAF_TYPE ];
+  optional TimestampedEntry timestamped_entry = 3;
+}
+
+// TODO(benl): No longer needed?
+//
+// Used by cpp/client/ct: it assembles the one from the I-D JSON
+// protocol.
+//
+// Used by cpp/server/blob-server: it uses one to call a variant of
+// LogLookup::AuditProof.
+message MerkleAuditProof {
+  optional Version version = 1 [ default = UNKNOWN_VERSION ];
+  optional LogID id = 2;
+  optional int64 tree_size = 3;
+  optional uint64 timestamp = 4;
+  optional int64 leaf_index = 5;
+  repeated bytes path_node = 6;
+  optional DigitallySigned tree_head_signature = 7;
+}
+
+message ShortMerkleAuditProof {
+  required int64 leaf_index = 1;
+  repeated bytes path_node = 2;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Finally, stuff that's not in the I-D but that we use internally            //
+// for logging entries and tree head state.                                   //
+////////////////////////////////////////////////////////////////////////////////
+
+// TODO(alcutter): Come up with a better name :/
+message LoggedEntryPB {
+  optional int64 sequence_number = 1;
+  optional bytes merkle_leaf_hash = 2;
+  message Contents {
+    optional SignedCertificateTimestamp sct = 1;
+    optional LogEntry entry = 2;
+  }
+  required Contents contents = 3;
+}
+
+message SthExtension {
+  // Valid range is 0-65534
+  optional uint32 sth_extension_type = 1;
+  // Data is opaque and type specific <0..2^16-1> bytes
+  optional bytes sth_extension_data = 2;
+}
+
+message SignedTreeHead {
+  // The version of the tree head signature.
+  // (Note that each leaf has its own version, so a V2 tree
+  // can contain V1 leaves, too.
+  optional Version version = 1 [ default = UNKNOWN_VERSION ];
+  optional LogID id = 2;
+  optional uint64 timestamp = 3;
+  optional int64 tree_size = 4;
+  optional bytes sha256_root_hash = 5;
+  optional DigitallySigned signature = 6;
+  // Only supported in V2. <0..2^16-1>
+  repeated SthExtension sth_extension = 7;
+}
+
+// Stuff the SSL client spits out from a connection.
+message SSLClientCTData {
+  optional LogEntry reconstructed_entry = 1;
+  optional bytes certificate_sha256_hash = 2;
+
+  message SCTInfo {
+    // There is an entry + sct -> leaf hash mapping.
+    optional SignedCertificateTimestamp sct = 1;
+    optional bytes merkle_leaf_hash = 2;
+  }
+  repeated SCTInfo attached_sct_info = 3;
+}
+
+message ClusterNodeState {
+  optional string node_id = 1;
+  optional int64 contiguous_tree_size = 2 [deprecated = true];
+  optional SignedTreeHead newest_sth = 3;
+  optional SignedTreeHead current_serving_sth = 4;
+
+  // The following host_name/log_port pair are used to allow a log node to
+  // contact other nodes in the cluster, primarily for the purposes of
+  // replication.
+  // hostname/ip which can be used to contact [just] this log node
+  optional string hostname = 5;
+  // port on which this log node is listening.
+  optional int32 log_port = 6;
+}
+
+message ClusterControl {
+  optional bool accept_new_entries = 1 [ default = true ];
+}
+
+message ClusterConfig {
+  /////////////////////////////////
+  // This section of the config affects the selection of the cluster's current
+  // serving STH.
+  // The cluster will always attempt to determine the newest (and
+  // largest) possible STH which meets the constraints defined below from the
+  // set of STHs available at the individual cluster nodes.
+  // (Note that nodes with newer/larger STHs can, of course, serve
+  // earlier/smaller STHs.)
+
+
+  // The minimum number of nodes which must be able to serve a given STH.
+  // This setting allows you to configure the level of cluster resiliency
+  // against data (in the form of node/node database) loss.
+  // i.e.: Once an STH has been created, it must have been replicated to
+  // at least this many nodes before being considered as a candidate for
+  // the overall cluster serving STH.
+  optional int32 minimum_serving_nodes = 1;
+
+  // The minimum fraction of nodes which must be able to serve a given STH.
+  // This setting allows you to configure the serving capacity redundancy of
+  // your cluster.
+  // e.g. you determine you need 3 nodes to serve your expected peak traffic
+  // levels, but want to be over-provisioned by 25% to ensure the cluster will
+  // continue to be able to handle the traffic in the case of a single node
+  // failure, you might set this to 0.75 to ensure that any cluster-wide
+  // serving STH candidate must be servable from at least 3 of your 4 nodes.
+  optional double minimum_serving_fraction = 2;
+  /////////////////////////////////
+
+  // When the number of entries in the EtcedConsistentStore exceeds this value,
+  // the log server will reject all calls to add-[pre-]chain to protect itself
+  // and etcd.
+  optional double etcd_reject_add_pending_threshold = 3 [default = 30000];
+}
+
+message SequenceMapping {
+  message Mapping {
+    optional bytes entry_hash = 1;
+    optional int64 sequence_number = 2;
+  }
+
+  repeated Mapping mapping = 1;
+}

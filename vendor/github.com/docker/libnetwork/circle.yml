@@ -1,0 +1,16 @@
+machine:
+  environment:
+    GODIST: "go1.7.1.linux-amd64.tar.gz"
+  services:
+    - docker
+
+dependencies:
+  override:
+    - sudo apt-get update; sudo apt-get install -y iptables zookeeperd
+    - go get golang.org/x/tools/cmd/goimports
+
+test:
+  override:
+    - make circle-ci
+  post:
+    - bash <(curl -s https://codecov.io/bash)

@@ -1,0 +1,18 @@
+{
+	"hosts": [
+		"ca.example2.com"
+	],
+	"names": [
+		{
+			"C":  "US",
+			"ST": "California",
+			"L":  "San Francisco",
+			"O":  "Internet Widgets, LLC",
+			"OU": "Certificate Authority"
+		}
+	],
+	"key": {
+		"algo": "rsa",
+		"size": 2048
+	}
+}

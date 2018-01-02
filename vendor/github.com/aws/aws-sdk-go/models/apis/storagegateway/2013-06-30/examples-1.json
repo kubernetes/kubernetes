@@ -1,0 +1,1381 @@
+{
+  "version": "1.0",
+  "examples": {
+    "ActivateGateway": [
+      {
+        "input": {
+          "ActivationKey": "29AV1-3OFV9-VVIUB-NKT0I-LRO6V",
+          "GatewayName": "My_Gateway",
+          "GatewayRegion": "us-east-1",
+          "GatewayTimezone": "GMT-12:00",
+          "GatewayType": "STORED",
+          "MediumChangerType": "AWS-Gateway-VTL",
+          "TapeDriveType": "IBM-ULT3580-TD5"
+        },
+        "output": {
+          "GatewayARN": "arn:aws:storagegateway:us-east-1:111122223333:gateway/sgw-11A2222B"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "Activates the gateway you previously deployed on your host.",
+        "id": "to-activate-the-gateway-1471281611207",
+        "title": "To activate the gateway"
+      }
+    ],
+    "AddCache": [
+      {
+        "input": {
+          "DiskIds": [
+            "pci-0000:03:00.0-scsi-0:0:0:0",
+            "pci-0000:03:00.0-scsi-0:0:1:0"
+          ],
+          "GatewayARN": "arn:aws:storagegateway:us-east-1:111122223333:gateway/sgw-12A3456B"
+        },
+        "output": {
+          "GatewayARN": "arn:aws:storagegateway:us-east-1:111122223333:gateway/sgw-12A3456B"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example shows a request that activates a gateway-stored volume.",
+        "id": "to-add-a-cache-1471043606854",
+        "title": "To add a cache"
+      }
+    ],
+    "AddTagsToResource": [
+      {
+        "input": {
+          "ResourceARN": "arn:aws:storagegateway:us-east-1:111122223333:gateway/sgw-11A2222B",
+          "Tags": [
+            {
+              "Key": "Dev Gatgeway Region",
+              "Value": "East Coast"
+            }
+          ]
+        },
+        "output": {
+          "ResourceARN": "arn:aws:storagegateway:us-east-1:111122223333:gateway/sgw-11A2222B"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "Adds one or more tags to the specified resource.",
+        "id": "to-add-tags-to-resource-1471283689460",
+        "title": "To add tags to resource"
+      }
+    ],
+    "AddUploadBuffer": [
+      {
+        "input": {
+          "DiskIds": [
+            "pci-0000:03:00.0-scsi-0:0:0:0",
+            "pci-0000:03:00.0-scsi-0:0:1:0"
+          ],
+          "GatewayARN": "arn:aws:storagegateway:us-east-1:111122223333:gateway/sgw-12A3456B"
+        },
+        "output": {
+          "GatewayARN": "arn:aws:storagegateway:us-east-1:111122223333:gateway/sgw-12A3456B"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "Configures one or more gateway local disks as upload buffer for a specified gateway.",
+        "id": "to-add-upload-buffer-on-local-disk-1471293902847",
+        "title": "To add upload buffer on local disk"
+      }
+    ],
+    "AddWorkingStorage": [
+      {
+        "input": {
+          "DiskIds": [
+            "pci-0000:03:00.0-scsi-0:0:0:0",
+            "pci-0000:03:00.0-scsi-0:0:1:0"
+          ],
+          "GatewayARN": "arn:aws:storagegateway:us-east-1:111122223333:gateway/sgw-12A3456B"
+        },
+        "output": {
+          "GatewayARN": "arn:aws:storagegateway:us-east-1:111122223333:gateway/sgw-12A3456B"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "Configures one or more gateway local disks as working storage for a gateway. (Working storage is also referred to as upload buffer.)",
+        "id": "to-add-storage-on-local-disk-1471294305401",
+        "title": "To add storage on local disk"
+      }
+    ],
+    "CancelArchival": [
+      {
+        "input": {
+          "GatewayARN": "arn:aws:storagegateway:us-east-1:111122223333:gateway/sgw-12A3456B",
+          "TapeARN": "arn:aws:storagegateway:us-east-1:999999999999:tape/AMZN01A2A4"
+        },
+        "output": {
+          "TapeARN": "arn:aws:storagegateway:us-east-1:999999999999:tape/AMZN01A2A4"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "Cancels archiving of a virtual tape to the virtual tape shelf (VTS) after the archiving process is initiated.",
+        "id": "to-cancel-virtual-tape-archiving-1471294865203",
+        "title": "To cancel virtual tape archiving"
+      }
+    ],
+    "CancelRetrieval": [
+      {
+        "input": {
+          "GatewayARN": "arn:aws:storagegateway:us-east-1:111122223333:gateway/sgw-12A3456B",
+          "TapeARN": "arn:aws:storagegateway:us-east-1:999999999999:tape/AMZN01A2A4"
+        },
+        "output": {
+          "TapeARN": "arn:aws:storagegateway:us-east-1:999999999999:tape/AMZN01A2A4"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "Cancels retrieval of a virtual tape from the virtual tape shelf (VTS) to a gateway after the retrieval process is initiated.",
+        "id": "to-cancel-virtual-tape-retrieval-1471295704491",
+        "title": "To cancel virtual tape retrieval"
+      }
+    ],
+    "CreateCachediSCSIVolume": [
+      {
+        "input": {
+          "ClientToken": "cachedvol112233",
+          "GatewayARN": "arn:aws:storagegateway:us-east-1:111122223333:gateway/sgw-12A3456B",
+          "NetworkInterfaceId": "10.1.1.1",
+          "SnapshotId": "snap-f47b7b94",
+          "TargetName": "my-volume",
+          "VolumeSizeInBytes": 536870912000
+        },
+        "output": {
+          "TargetARN": "arn:aws:storagegateway:us-east-1:111122223333:gateway/sgw-12A3456B/target/iqn.1997-05.com.amazon:myvolume",
+          "VolumeARN": "arn:aws:storagegateway:us-east-1:111122223333:gateway/sgw-12A3456B/volume/vol-1122AABB"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "Creates a cached volume on a specified cached gateway.",
+        "id": "to-create-a-cached-iscsi-volume-1471296661787",
+        "title": "To create a cached iSCSI volume"
+      }
+    ],
+    "CreateSnapshot": [
+      {
+        "input": {
+          "SnapshotDescription": "My root volume snapshot as of 10/03/2017",
+          "VolumeARN": "arn:aws:storagegateway:us-east-1:111122223333:gateway/sgw-12A3456B/volume/vol-1122AABB"
+        },
+        "output": {
+          "SnapshotId": "snap-78e22663",
+          "VolumeARN": "arn:aws:storagegateway:us-east-1:111122223333:gateway/sgw-12A3456B/volume/vol-1122AABB"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "Initiates an ad-hoc snapshot of a gateway volume.",
+        "id": "to-create-a-snapshot-of-a-gateway-volume-1471301469561",
+        "title": "To create a snapshot of a gateway volume"
+      }
+    ],
+    "CreateSnapshotFromVolumeRecoveryPoint": [
+      {
+        "input": {
+          "SnapshotDescription": "My root volume snapshot as of 2017-06-30T10:10:10.000Z",
+          "VolumeARN": "arn:aws:storagegateway:us-east-1:111122223333:gateway/sgw-12A3456B/volume/vol-1122AABB"
+        },
+        "output": {
+          "SnapshotId": "snap-78e22663",
+          "VolumeARN": "arn:aws:storagegateway:us-east-1:111122223333:gateway/sgw-12A3456B/volume/vol-1122AABB",
+          "VolumeRecoveryPointTime": "2017-06-30T10:10:10.000Z"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "Initiates a snapshot of a gateway from a volume recovery point.",
+        "id": "to-create-a-snapshot-of-a-gateway-volume-1471301469561",
+        "title": "To create a snapshot of a gateway volume"
+      }
+    ],
+    "CreateStorediSCSIVolume": [
+      {
+        "input": {
+          "DiskId": "pci-0000:03:00.0-scsi-0:0:0:0",
+          "GatewayARN": "arn:aws:storagegateway:us-east-1:111122223333:gateway/sgw-12A3456B",
+          "NetworkInterfaceId": "10.1.1.1",
+          "PreserveExistingData": true,
+          "SnapshotId": "snap-f47b7b94",
+          "TargetName": "my-volume"
+        },
+        "output": {
+          "TargetARN": "arn:aws:storagegateway:us-east-1:111122223333:gateway/sgw-12A3456B/target/iqn.1997-05.com.amazon:myvolume",
+          "VolumeARN": "arn:aws:storagegateway:us-east-1:111122223333:gateway/sgw-12A3456B/volume/vol-1122AABB",
+          "VolumeSizeInBytes": 1099511627776
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "Creates a stored volume on a specified stored gateway.",
+        "id": "to-create-a-stored-iscsi-volume-1471367662813",
+        "title": "To create a stored iSCSI volume"
+      }
+    ],
+    "CreateTapeWithBarcode": [
+      {
+        "input": {
+          "GatewayARN": "arn:aws:storagegateway:us-east-1:999999999999:gateway/sgw-12A3456B",
+          "TapeBarcode": "TEST12345",
+          "TapeSizeInBytes": 107374182400
+        },
+        "output": {
+          "TapeARN": "arn:aws:storagegateway:us-east-1:999999999999:tape/TEST12345"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "Creates a virtual tape by using your own barcode.",
+        "id": "to-create-a-virtual-tape-using-a-barcode-1471371842452",
+        "title": "To create a virtual tape using a barcode"
+      }
+    ],
+    "CreateTapes": [
+      {
+        "input": {
+          "ClientToken": "77777",
+          "GatewayARN": "arn:aws:storagegateway:us-east-1:999999999999:gateway/sgw-12A3456B",
+          "NumTapesToCreate": 3,
+          "TapeBarcodePrefix": "TEST",
+          "TapeSizeInBytes": 107374182400
+        },
+        "output": {
+          "TapeARNs": [
+            "arn:aws:storagegateway:us-east-1:999999999999:tape/TEST38A29D",
+            "arn:aws:storagegateway:us-east-1:204469490176:tape/TEST3AA29F",
+            "arn:aws:storagegateway:us-east-1:204469490176:tape/TEST3BA29E"
+          ]
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "Creates one or more virtual tapes.",
+        "id": "to-create-a-virtual-tape-1471372061659",
+        "title": "To create a virtual tape"
+      }
+    ],
+    "DeleteBandwidthRateLimit": [
+      {
+        "input": {
+          "BandwidthType": "All",
+          "GatewayARN": "arn:aws:storagegateway:us-east-1:111122223333:gateway/sgw-12A3456B"
+        },
+        "output": {
+          "GatewayARN": "arn:aws:storagegateway:us-east-1:111122223333:gateway/sgw-12A3456B"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "Deletes the bandwidth rate limits of a gateway; either the upload or download limit, or both.",
+        "id": "to-delete-bandwidth-rate-limits-of-gateway-1471373225520",
+        "title": "To delete bandwidth rate limits of gateway"
+      }
+    ],
+    "DeleteChapCredentials": [
+      {
+        "input": {
+          "InitiatorName": "iqn.1991-05.com.microsoft:computername.domain.example.com",
+          "TargetARN": "arn:aws:storagegateway:us-east-1:111122223333:gateway/sgw-12A3456B/target/iqn.1997-05.com.amazon:myvolume"
+        },
+        "output": {
+          "InitiatorName": "iqn.1991-05.com.microsoft:computername.domain.example.com",
+          "TargetARN": "arn:aws:storagegateway:us-east-1:111122223333:gateway/sgw-12A3456B/target/iqn.1997-05.com.amazon:myvolume"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "Deletes Challenge-Handshake Authentication Protocol (CHAP) credentials for a specified iSCSI target and initiator pair.",
+        "id": "to-delete-chap-credentials-1471375025612",
+        "title": "To delete CHAP credentials"
+      }
+    ],
+    "DeleteGateway": [
+      {
+        "input": {
+          "GatewayARN": "arn:aws:storagegateway:us-east-1:111122223333:gateway/sgw-12A3456B"
+        },
+        "output": {
+          "GatewayARN": "arn:aws:storagegateway:us-east-1:111122223333:gateway/sgw-12A3456B"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "This operation deletes the gateway, but not the gateway's VM from the host computer.",
+        "id": "to-delete-a-gatgeway-1471381697333",
+        "title": "To delete a gatgeway"
+      }
+    ],
+    "DeleteSnapshotSchedule": [
+      {
+        "input": {
+          "VolumeARN": "arn:aws:storagegateway:us-east-1:111122223333:gateway/sgw-12A3456B/volume/vol-1122AABB"
+        },
+        "output": {
+          "VolumeARN": "arn:aws:storagegateway:us-east-1:111122223333:gateway/sgw-12A3456B/volume/vol-1122AABB"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "This action enables you to delete a snapshot schedule for a volume.",
+        "id": "to-delete-a-snapshot-of-a-volume-1471382234377",
+        "title": "To delete a snapshot of a volume"
+      }
+    ],
+    "DeleteTape": [
+      {
+        "input": {
+          "GatewayARN": "arn:aws:storagegateway:us-east-1:204469490176:gateway/sgw-12A3456B",
+          "TapeARN": "arn:aws:storagegateway:us-east-1:204469490176:tape/TEST05A2A0"
+        },
+        "output": {
+          "TapeARN": "arn:aws:storagegateway:us-east-1:204469490176:tape/TEST05A2A0"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "This example deletes the specified virtual tape.",
+        "id": "to-delete-a-virtual-tape-1471382444157",
+        "title": "To delete a virtual tape"
+      }
+    ],
+    "DeleteTapeArchive": [
+      {
+        "input": {
+          "TapeARN": "arn:aws:storagegateway:us-east-1:204469490176:tape/TEST05A2A0"
+        },
+        "output": {
+          "TapeARN": "arn:aws:storagegateway:us-east-1:204469490176:tape/TEST05A2A0"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "Deletes the specified virtual tape from the virtual tape shelf (VTS).",
+        "id": "to-delete-a-virtual-tape-from-the-shelf-vts-1471383964329",
+        "title": "To delete a virtual tape from the shelf (VTS)"
+      }
+    ],
+    "DeleteVolume": [
+      {
+        "input": {
+          "VolumeARN": "arn:aws:storagegateway:us-east-1:111122223333:gateway/sgw-12A3456B/volume/vol-1122AABB"
+        },
+        "output": {
+          "VolumeARN": "arn:aws:storagegateway:us-east-1:111122223333:gateway/sgw-12A3456B/volume/vol-1122AABB"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "Deletes the specified gateway volume that you previously created using the CreateCachediSCSIVolume or CreateStorediSCSIVolume API.",
+        "id": "to-delete-a-gateway-volume-1471384418416",
+        "title": "To delete a gateway volume"
+      }
+    ],
+    "DescribeBandwidthRateLimit": [
+      {
+        "input": {
+          "GatewayARN": "arn:aws:storagegateway:us-east-1:111122223333:gateway/sgw-12A3456B"
+        },
+        "output": {
+          "AverageDownloadRateLimitInBitsPerSec": 204800,
+          "AverageUploadRateLimitInBitsPerSec": 102400,
+          "GatewayARN": "arn:aws:storagegateway:us-east-1:111122223333:gateway/sgw-12A3456B"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "Returns a value for a bandwidth rate limit if set. If not set, then only the gateway ARN is returned.",
+        "id": "to-describe-the-bandwidth-rate-limits-of-a-gateway-1471384826404",
+        "title": "To describe the bandwidth rate limits of a gateway"
+      }
+    ],
+    "DescribeCache": [
+      {
+        "input": {
+          "GatewayARN": "arn:aws:storagegateway:us-east-1:111122223333:gateway/sgw-12A3456B"
+        },
+        "output": {
+          "CacheAllocatedInBytes": 2199023255552,
+          "CacheDirtyPercentage": 0.07,
+          "CacheHitPercentage": 99.68,
+          "CacheMissPercentage": 0.32,
+          "CacheUsedPercentage": 0.07,
+          "DiskIds": [
+            "pci-0000:03:00.0-scsi-0:0:0:0",
+            "pci-0000:04:00.0-scsi-0:1:0:0"
+          ],
+          "GatewayARN": "arn:aws:storagegateway:us-east-1:111122223333:gateway/sgw-12A3456B"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "Returns information about the cache of a gateway.",
+        "id": "to-describe-cache-information-1471385756036",
+        "title": "To describe cache information"
+      }
+    ],
+    "DescribeCachediSCSIVolumes": [
+      {
+        "input": {
+          "VolumeARNs": [
+            "arn:aws:storagegateway:us-east-1:111122223333:gateway/sgw-12A3456B/volume/vol-1122AABB"
+          ]
+        },
+        "output": {
+          "CachediSCSIVolumes": [
+            {
+              "VolumeARN": "arn:aws:storagegateway:us-east-1:111122223333:gateway/sgw-12A3456B/volume/vol-1122AABB",
+              "VolumeId": "vol-1122AABB",
+              "VolumeSizeInBytes": 1099511627776,
+              "VolumeStatus": "AVAILABLE",
+              "VolumeType": "CACHED iSCSI",
+              "VolumeiSCSIAttributes": {
+                "ChapEnabled": true,
+                "LunNumber": 1,
+                "NetworkInterfaceId": "10.243.43.207",
+                "NetworkInterfacePort": 3260,
+                "TargetARN": "arn:aws:storagegateway:us-east-1:111122223333:gateway/sgw-12A3456B/target/iqn.1997-05.com.amazon:myvolume"
+              }
+            }
+          ]
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "Returns a description of the gateway cached iSCSI volumes specified in the request.",
+        "id": "to-describe-gateway-cached-iscsi-volumes-1471458094649",
+        "title": "To describe gateway cached iSCSI volumes"
+      }
+    ],
+    "DescribeChapCredentials": [
+      {
+        "input": {
+          "TargetARN": "arn:aws:storagegateway:us-east-1:111122223333:gateway/sgw-12A3456B/target/iqn.1997-05.com.amazon:myvolume"
+        },
+        "output": {
+          "ChapCredentials": [
+            {
+              "InitiatorName": "iqn.1991-05.com.microsoft:computername.domain.example.com",
+              "SecretToAuthenticateInitiator": "111111111111",
+              "SecretToAuthenticateTarget": "222222222222",
+              "TargetARN": "arn:aws:storagegateway:us-east-1:111122223333:gateway/sgw-12A3456B/target/iqn.1997-05.com.amazon:myvolume"
+            }
+          ]
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "Returns an array of Challenge-Handshake Authentication Protocol (CHAP) credentials information for a specified iSCSI target, one for each target-initiator pair.",
+        "id": "to-describe-chap-credetnitals-for-an-iscsi-1471467462967",
+        "title": "To describe CHAP credetnitals for an iSCSI"
+      }
+    ],
+    "DescribeGatewayInformation": [
+      {
+        "input": {
+          "GatewayARN": "arn:aws:storagegateway:us-east-1:111122223333:gateway/sgw-12A3456B"
+        },
+        "output": {
+          "GatewayARN": "arn:aws:storagegateway:us-east-1:111122223333:gateway/sgw-12A3456B",
+          "GatewayId": "sgw-AABB1122",
+          "GatewayName": "My_Gateway",
+          "GatewayNetworkInterfaces": [
+            {
+              "Ipv4Address": "10.35.69.216"
+            }
+          ],
+          "GatewayState": "STATE_RUNNING",
+          "GatewayTimezone": "GMT-8:00",
+          "GatewayType": "STORED",
+          "LastSoftwareUpdate": "2016-01-02T16:00:00",
+          "NextUpdateAvailabilityDate": "2017-01-02T16:00:00"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "Returns metadata about a gateway such as its name, network interfaces, configured time zone, and the state (whether the gateway is running or not).",
+        "id": "to-describe-metadata-about-the-gateway-1471467849079",
+        "title": "To describe metadata about the gateway"
+      }
+    ],
+    "DescribeMaintenanceStartTime": [
+      {
+        "input": {
+          "GatewayARN": "arn:aws:storagegateway:us-east-1:111122223333:gateway/sgw-12A3456B"
+        },
+        "output": {
+          "DayOfWeek": 2,
+          "GatewayARN": "arn:aws:storagegateway:us-east-1:111122223333:gateway/sgw-12A3456B",
+          "HourOfDay": 15,
+          "MinuteOfHour": 35,
+          "Timezone": "GMT+7:00"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "Returns your gateway's weekly maintenance start time including the day and time of the week.",
+        "id": "to-describe-gateways-maintenance-start-time-1471470727387",
+        "title": "To describe gateway's maintenance start time"
+      }
+    ],
+    "DescribeSnapshotSchedule": [
+      {
+        "input": {
+          "VolumeARN": "arn:aws:storagegateway:us-east-1:111122223333:gateway/sgw-12A3456B/volume/vol-1122AABB"
+        },
+        "output": {
+          "Description": "sgw-AABB1122:vol-AABB1122:Schedule",
+          "RecurrenceInHours": 24,
+          "StartAt": 6,
+          "Timezone": "GMT+7:00",
+          "VolumeARN": "arn:aws:storagegateway:us-east-1:111122223333:gateway/sgw-12A3456B/volume/vol-1122AABB"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "Describes the snapshot schedule for the specified gateway volume including intervals at which snapshots are automatically initiated.",
+        "id": "to-describe-snapshot-schedule-for-gateway-volume-1471471139538",
+        "title": "To describe snapshot schedule for gateway volume"
+      }
+    ],
+    "DescribeStorediSCSIVolumes": [
+      {
+        "input": {
+          "VolumeARNs": [
+            "arn:aws:storagegateway:us-east-1:111122223333:gateway/sgw-12A3456B/volume/vol-1122AABB"
+          ]
+        },
+        "output": {
+          "StorediSCSIVolumes": [
+            {
+              "PreservedExistingData": false,
+              "VolumeARN": "arn:aws:storagegateway:us-east-1:111122223333:gateway/sgw-12A3456B/volume/vol-1122AABB",
+              "VolumeDiskId": "pci-0000:03:00.0-scsi-0:0:0:0",
+              "VolumeId": "vol-1122AABB",
+              "VolumeProgress": 23.7,
+              "VolumeSizeInBytes": 1099511627776,
+              "VolumeStatus": "BOOTSTRAPPING",
+              "VolumeiSCSIAttributes": {
+                "ChapEnabled": true,
+                "NetworkInterfaceId": "10.243.43.207",
+                "NetworkInterfacePort": 3260,
+                "TargetARN": "arn:aws:storagegateway:us-east-1:111122223333:gateway/sgw-12A3456B/target/iqn.1997-05.com.amazon:myvolume"
+              }
+            }
+          ]
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "Returns the description of the gateway volumes specified in the request belonging to the same gateway.",
+        "id": "to-describe-the-volumes-of-a-gateway-1471472640660",
+        "title": "To describe the volumes of a gateway"
+      }
+    ],
+    "DescribeTapeArchives": [
+      {
+        "input": {
+          "Limit": 123,
+          "Marker": "1",
+          "TapeARNs": [
+            "arn:aws:storagegateway:us-east-1:999999999999:tape/AM08A1AD",
+            "arn:aws:storagegateway:us-east-1:999999999999:tape/AMZN01A2A4"
+          ]
+        },
+        "output": {
+          "Marker": "1",
+          "TapeArchives": [
+            {
+              "CompletionTime": "2016-12-16T13:50Z",
+              "TapeARN": "arn:aws:storagegateway:us-east-1:999999999:tape/AM08A1AD",
+              "TapeBarcode": "AM08A1AD",
+              "TapeSizeInBytes": 107374182400,
+              "TapeStatus": "ARCHIVED"
+            },
+            {
+              "CompletionTime": "2016-12-16T13:59Z",
+              "TapeARN": "arn:aws:storagegateway:us-east-1:999999999:tape/AMZN01A2A4",
+              "TapeBarcode": "AMZN01A2A4",
+              "TapeSizeInBytes": 429496729600,
+              "TapeStatus": "ARCHIVED"
+            }
+          ]
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "Returns a description of specified virtual tapes in the virtual tape shelf (VTS).",
+        "id": "to-describe-virtual-tapes-in-the-vts-1471473188198",
+        "title": "To describe virtual tapes in the VTS"
+      }
+    ],
+    "DescribeTapeRecoveryPoints": [
+      {
+        "input": {
+          "GatewayARN": "arn:aws:storagegateway:us-east-1:111122223333:gateway/sgw-12A3456B",
+          "Limit": 1,
+          "Marker": "1"
+        },
+        "output": {
+          "GatewayARN": "arn:aws:storagegateway:us-east-1:111122223333:gateway/sgw-12A3456B",
+          "Marker": "1",
+          "TapeRecoveryPointInfos": [
+            {
+              "TapeARN": "arn:aws:storagegateway:us-east-1:999999999:tape/AMZN01A2A4",
+              "TapeRecoveryPointTime": "2016-12-16T13:50Z",
+              "TapeSizeInBytes": 1471550497,
+              "TapeStatus": "AVAILABLE"
+            }
+          ]
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "Returns a list of virtual tape recovery points that are available for the specified gateway-VTL.",
+        "id": "to-describe-virtual-tape-recovery-points-1471542042026",
+        "title": "To describe virtual tape recovery points"
+      }
+    ],
+    "DescribeTapes": [
+      {
+        "input": {
+          "GatewayARN": "arn:aws:storagegateway:us-east-1:999999999999:gateway/sgw-12A3456B",
+          "Limit": 2,
+          "Marker": "1",
+          "TapeARNs": [
+            "arn:aws:storagegateway:us-east-1:999999999999:tape/TEST04A2A1",
+            "arn:aws:storagegateway:us-east-1:999999999999:tape/TEST05A2A0"
+          ]
+        },
+        "output": {
+          "Marker": "1",
+          "Tapes": [
+            {
+              "TapeARN": "arn:aws:storagegateway:us-east-1:999999999999:tape/TEST04A2A1",
+              "TapeBarcode": "TEST04A2A1",
+              "TapeSizeInBytes": 107374182400,
+              "TapeStatus": "AVAILABLE"
+            },
+            {
+              "TapeARN": "arn:aws:storagegateway:us-east-1:999999999999:tape/TEST05A2A0",
+              "TapeBarcode": "TEST05A2A0",
+              "TapeSizeInBytes": 107374182400,
+              "TapeStatus": "AVAILABLE"
+            }
+          ]
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "Returns a description of the specified Amazon Resource Name (ARN) of virtual tapes. If a TapeARN is not specified, returns a description of all virtual tapes.",
+        "id": "to-describe-virtual-tapes-associated-with-gateway-1471629287727",
+        "title": "To describe virtual tape(s) associated with gateway"
+      }
+    ],
+    "DescribeUploadBuffer": [
+      {
+        "input": {
+          "GatewayARN": "arn:aws:storagegateway:us-east-1:111122223333:gateway/sgw-12A3456B"
+        },
+        "output": {
+          "DiskIds": [
+            "pci-0000:03:00.0-scsi-0:0:0:0",
+            "pci-0000:04:00.0-scsi-0:1:0:0"
+          ],
+          "GatewayARN": "arn:aws:storagegateway:us-east-1:111122223333:gateway/sgw-12A3456B",
+          "UploadBufferAllocatedInBytes": 0,
+          "UploadBufferUsedInBytes": 161061273600
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "Returns information about the upload buffer of a gateway including disk IDs and the amount of upload buffer space allocated/used.",
+        "id": "to-describe-upload-buffer-of-gateway-1471631099003",
+        "title": "To describe upload buffer of gateway"
+      },
+      {
+        "input": {
+          "GatewayARN": "arn:aws:storagegateway:us-east-1:111122223333:gateway/sgw-12A3456B"
+        },
+        "output": {
+          "DiskIds": [
+            "pci-0000:03:00.0-scsi-0:0:0:0",
+            "pci-0000:04:00.0-scsi-0:1:0:0"
+          ],
+          "GatewayARN": "arn:aws:storagegateway:us-east-1:111122223333:gateway/sgw-12A3456B",
+          "UploadBufferAllocatedInBytes": 161061273600,
+          "UploadBufferUsedInBytes": 0
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "Returns information about the upload buffer of a gateway including disk IDs and the amount of upload buffer space allocated and used.",
+        "id": "to-describe-upload-buffer-of-a-gateway--1471904566370",
+        "title": "To describe upload buffer of a gateway"
+      }
+    ],
+    "DescribeVTLDevices": [
+      {
+        "input": {
+          "GatewayARN": "arn:aws:storagegateway:us-east-1:999999999999:gateway/sgw-12A3456B",
+          "Limit": 123,
+          "Marker": "1",
+          "VTLDeviceARNs": [
+
+          ]
+        },
+        "output": {
+          "GatewayARN": "arn:aws:storagegateway:us-east-1:999999999999:gateway/sgw-12A3456B",
+          "Marker": "1",
+          "VTLDevices": [
+            {
+              "DeviceiSCSIAttributes": {
+                "ChapEnabled": false,
+                "NetworkInterfaceId": "10.243.43.207",
+                "NetworkInterfacePort": 3260,
+                "TargetARN": "arn:aws:storagegateway:us-east-1:999999999999:gateway/sgw-12A3456B/target/iqn.1997-05.com.amazon:sgw-1fad4876-mediachanger"
+              },
+              "VTLDeviceARN": "arn:aws:storagegateway:us-east-1:999999999999:gateway/sgw-12A3456B/device/AMZN_SGW-1FAD4876_MEDIACHANGER_00001",
+              "VTLDeviceProductIdentifier": "L700",
+              "VTLDeviceType": "Medium Changer",
+              "VTLDeviceVendor": "STK"
+            },
+            {
+              "DeviceiSCSIAttributes": {
+                "ChapEnabled": false,
+                "NetworkInterfaceId": "10.243.43.209",
+                "NetworkInterfacePort": 3260,
+                "TargetARN": "arn:aws:storagegateway:us-east-1:999999999999:gateway/sgw-12A3456B/target/iqn.1997-05.com.amazon:sgw-1fad4876-tapedrive-01"
+              },
+              "VTLDeviceARN": "arn:aws:storagegateway:us-east-1:999999999999:gateway/sgw-12A3456B/device/AMZN_SGW-1FAD4876_TAPEDRIVE_00001",
+              "VTLDeviceProductIdentifier": "ULT3580-TD5",
+              "VTLDeviceType": "Tape Drive",
+              "VTLDeviceVendor": "IBM"
+            },
+            {
+              "DeviceiSCSIAttributes": {
+                "ChapEnabled": false,
+                "NetworkInterfaceId": "10.243.43.209",
+                "NetworkInterfacePort": 3260,
+                "TargetARN": "arn:aws:storagegateway:us-east-1:999999999999:gateway/sgw-12A3456B/target/iqn.1997-05.com.amazon:sgw-1fad4876-tapedrive-02"
+              },
+              "VTLDeviceARN": "arn:aws:storagegateway:us-east-1:999999999999:gateway/sgw-12A3456B/device/AMZN_SGW-1FAD4876_TAPEDRIVE_00002",
+              "VTLDeviceProductIdentifier": "ULT3580-TD5",
+              "VTLDeviceType": "Tape Drive",
+              "VTLDeviceVendor": "IBM"
+            }
+          ]
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "Returns a description of virtual tape library (VTL) devices for the specified gateway.",
+        "id": "to-describe-virtual-tape-library-vtl-devices-of-a-single-gateway-1471906071410",
+        "title": "To describe virtual tape library (VTL) devices of a single gateway"
+      }
+    ],
+    "DescribeWorkingStorage": [
+      {
+        "input": {
+          "GatewayARN": "arn:aws:storagegateway:us-east-1:111122223333:gateway/sgw-12A3456B"
+        },
+        "output": {
+          "DiskIds": [
+            "pci-0000:03:00.0-scsi-0:0:0:0",
+            "pci-0000:03:00.0-scsi-0:0:1:0"
+          ],
+          "GatewayARN": "arn:aws:storagegateway:us-east-1:111122223333:gateway/sgw-12A3456B",
+          "WorkingStorageAllocatedInBytes": 2199023255552,
+          "WorkingStorageUsedInBytes": 789207040
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "This operation is supported only for the gateway-stored volume architecture. This operation is deprecated in cached-volumes API version (20120630). Use DescribeUploadBuffer instead.",
+        "id": "to-describe-the-working-storage-of-a-gateway-depreciated-1472070842332",
+        "title": "To describe the working storage of a gateway [Depreciated]"
+      }
+    ],
+    "DisableGateway": [
+      {
+        "input": {
+          "GatewayARN": "arn:aws:storagegateway:us-east-1:111122223333:gateway/sgw-12A3456B"
+        },
+        "output": {
+          "GatewayARN": "arn:aws:storagegateway:us-east-1:111122223333:gateway/sgw-12A3456B"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "Disables a gateway when the gateway is no longer functioning. Use this operation for a gateway-VTL that is not reachable or not functioning.",
+        "id": "to-disable-a-gateway-when-it-is-no-longer-functioning-1472076046936",
+        "title": "To disable a gateway when it is no longer functioning"
+      }
+    ],
+    "ListGateways": [
+      {
+        "input": {
+          "Limit": 2,
+          "Marker": "1"
+        },
+        "output": {
+          "Gateways": [
+            {
+              "GatewayARN": "arn:aws:storagegateway:us-east-1:111122223333:gateway/sgw-12A3456B"
+            },
+            {
+              "GatewayARN": "arn:aws:storagegateway:us-east-1:111122223333:gateway/sgw-23A4567C"
+            }
+          ],
+          "Marker": "1"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "Lists gateways owned by an AWS account in a specified region as requested. Results are sorted by gateway ARN up to a maximum of 100 gateways.",
+        "id": "to-lists-region-specific-gateways-per-aws-account-1472077860657",
+        "title": "To lists region specific gateways per AWS account"
+      }
+    ],
+    "ListLocalDisks": [
+      {
+        "input": {
+          "GatewayARN": "arn:aws:storagegateway:us-east-1:111122223333:gateway/sgw-12A3456B"
+        },
+        "output": {
+          "Disks": [
+            {
+              "DiskAllocationType": "CACHE_STORAGE",
+              "DiskId": "pci-0000:03:00.0-scsi-0:0:0:0",
+              "DiskNode": "SCSI(0:0)",
+              "DiskPath": "/dev/sda",
+              "DiskSizeInBytes": 1099511627776,
+              "DiskStatus": "missing"
+            },
+            {
+              "DiskAllocationResource": "",
+              "DiskAllocationType": "UPLOAD_BUFFER",
+              "DiskId": "pci-0000:03:00.0-scsi-0:0:1:0",
+              "DiskNode": "SCSI(0:1)",
+              "DiskPath": "/dev/sdb",
+              "DiskSizeInBytes": 1099511627776,
+              "DiskStatus": "present"
+            }
+          ],
+          "GatewayARN": "arn:aws:storagegateway:us-east-1:111122223333:gateway/sgw-12A3456B"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The request returns a list of all disks, specifying which are configured as working storage, cache storage, or stored volume or not configured at all.",
+        "id": "to-list-the-gateways-local-disks-1472079564618",
+        "title": "To list the gateway's local disks"
+      }
+    ],
+    "ListTagsForResource": [
+      {
+        "input": {
+          "Limit": 1,
+          "Marker": "1",
+          "ResourceARN": "arn:aws:storagegateway:us-east-1:111122223333:gateway/sgw-11A2222B"
+        },
+        "output": {
+          "Marker": "1",
+          "ResourceARN": "arn:aws:storagegateway:us-east-1:111122223333:gateway/sgw-11A2222B",
+          "Tags": [
+            {
+              "Key": "Dev Gatgeway Region",
+              "Value": "East Coast"
+            }
+          ]
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "Lists the tags that have been added to the specified resource.",
+        "id": "to-list-tags-that-have-been-added-to-a-resource-1472080268972",
+        "title": "To list tags that have been added to a resource"
+      }
+    ],
+    "ListVolumeRecoveryPoints": [
+      {
+        "input": {
+          "GatewayARN": "arn:aws:storagegateway:us-east-1:111122223333:gateway/sgw-12A3456B"
+        },
+        "output": {
+          "GatewayARN": "arn:aws:storagegateway:us-east-1:111122223333:gateway/sgw-12A3456B",
+          "VolumeRecoveryPointInfos": [
+            {
+              "VolumeARN": "arn:aws:storagegateway:us-east-1:111122223333:gateway/sgw-12A3456B/volume/vol-1122AABB",
+              "VolumeRecoveryPointTime": "2012-09-04T21:08:44.627Z",
+              "VolumeSizeInBytes": 536870912000
+            }
+          ]
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "Lists the recovery points for a specified gateway in which all data of the volume is consistent and can be used to create a snapshot.",
+        "id": "to-list-recovery-points-for-a-gateway-1472143015088",
+        "title": "To list recovery points for a gateway"
+      }
+    ],
+    "ListVolumes": [
+      {
+        "input": {
+          "GatewayARN": "arn:aws:storagegateway:us-east-1:111122223333:gateway/sgw-12A3456B",
+          "Limit": 2,
+          "Marker": "1"
+        },
+        "output": {
+          "GatewayARN": "arn:aws:storagegateway:us-east-1:111122223333:gateway/sgw-12A3456B",
+          "Marker": "1",
+          "VolumeInfos": [
+            {
+              "GatewayARN": "arn:aws:storagegateway:us-east-1:111122223333:gateway/sgw-12A3456B",
+              "GatewayId": "sgw-12A3456B",
+              "VolumeARN": "arn:aws:storagegateway:us-east-1:111122223333:gateway/sgw-12A3456B/volume/vol-1122AABB",
+              "VolumeId": "vol-1122AABB",
+              "VolumeSizeInBytes": 107374182400,
+              "VolumeType": "STORED"
+            },
+            {
+              "GatewayARN": "arn:aws:storagegateway:us-east-1:111122223333:gateway/sgw-13B4567C",
+              "GatewayId": "sgw-gw-13B4567C",
+              "VolumeARN": "arn:aws:storagegateway:us-east-1:111122223333:gateway/sgw-13B4567C/volume/vol-3344CCDD",
+              "VolumeId": "vol-1122AABB",
+              "VolumeSizeInBytes": 107374182400,
+              "VolumeType": "STORED"
+            }
+          ]
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "Lists the iSCSI stored volumes of a gateway. Results are sorted by volume ARN up to a maximum of 100 volumes.",
+        "id": "to-list-the-iscsi-stored-volumes-of-a-gateway-1472145723653",
+        "title": "To list the iSCSI stored volumes of a gateway"
+      }
+    ],
+    "RemoveTagsFromResource": [
+      {
+        "input": {
+          "ResourceARN": "arn:aws:storagegateway:us-east-1:111122223333:gateway/sgw-11A2222B",
+          "TagKeys": [
+            "Dev Gatgeway Region",
+            "East Coast"
+          ]
+        },
+        "output": {
+          "ResourceARN": "arn:aws:storagegateway:us-east-1:111122223333:gateway/sgw-11A2222B"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "Lists the iSCSI stored volumes of a gateway. Removes one or more tags from the specified resource.",
+        "id": "to-remove-tags-from-a-resource-1472147210553",
+        "title": "To remove tags from a resource"
+      }
+    ],
+    "ResetCache": [
+      {
+        "input": {
+          "GatewayARN": "arn:aws:storagegateway:us-east-1:111122223333:gateway/sgw-13B4567C"
+        },
+        "output": {
+          "GatewayARN": "arn:aws:storagegateway:us-east-1:111122223333:gateway/sgw-13B4567C"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "Resets all cache disks that have encountered a error and makes the disks available for reconfiguration as cache storage.",
+        "id": "to-reset-cache-disks-in-error-status-1472148909807",
+        "title": "To reset cache disks in error status"
+      }
+    ],
+    "RetrieveTapeArchive": [
+      {
+        "input": {
+          "GatewayARN": "arn:aws:storagegateway:us-east-1:999999999999:gateway/sgw-12A3456B",
+          "TapeARN": "arn:aws:storagegateway:us-east-1:999999999999:tape/TEST0AA2AF"
+        },
+        "output": {
+          "TapeARN": "arn:aws:storagegateway:us-east-1:999999999999:tape/TEST0AA2AF"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "Retrieves an archived virtual tape from the virtual tape shelf (VTS) to a gateway-VTL. Virtual tapes archived in the VTS are not associated with any gateway.",
+        "id": "to-retrieve-an-archived-tape-from-the-vts-1472149812358",
+        "title": "To retrieve an archived tape from the VTS"
+      }
+    ],
+    "RetrieveTapeRecoveryPoint": [
+      {
+        "input": {
+          "GatewayARN": "arn:aws:storagegateway:us-east-1:999999999999:gateway/sgw-12A3456B",
+          "TapeARN": "arn:aws:storagegateway:us-east-1:999999999999:tape/TEST0AA2AF"
+        },
+        "output": {
+          "TapeARN": "arn:aws:storagegateway:us-east-1:999999999999:tape/TEST0AA2AF"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "Retrieves the recovery point for the specified virtual tape.",
+        "id": "to-retrieve-the-recovery-point-of-a-virtual-tape-1472150014805",
+        "title": "To retrieve the recovery point of a virtual tape"
+      }
+    ],
+    "SetLocalConsolePassword": [
+      {
+        "input": {
+          "GatewayARN": "arn:aws:storagegateway:us-east-1:999999999999:gateway/sgw-12A3456B",
+          "LocalConsolePassword": "PassWordMustBeAtLeast6Chars."
+        },
+        "output": {
+          "GatewayARN": "arn:aws:storagegateway:us-east-1:999999999999:gateway/sgw-12A3456B"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "Sets the password for your VM local console.",
+        "id": "to-set-a-password-for-your-vm-1472150202632",
+        "title": "To set a password for your VM"
+      }
+    ],
+    "ShutdownGateway": [
+      {
+        "input": {
+          "GatewayARN": "arn:aws:storagegateway:us-east-1:999999999999:gateway/sgw-12A3456B"
+        },
+        "output": {
+          "GatewayARN": "arn:aws:storagegateway:us-east-1:999999999999:gateway/sgw-12A3456B"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "This operation shuts down the gateway service component running in the storage gateway's virtual machine (VM) and not the VM.",
+        "id": "to-shut-down-a-gateway-service-1472150508835",
+        "title": "To shut down a gateway service"
+      }
+    ],
+    "StartGateway": [
+      {
+        "input": {
+          "GatewayARN": "arn:aws:storagegateway:us-east-1:999999999999:gateway/sgw-12A3456B"
+        },
+        "output": {
+          "GatewayARN": "arn:aws:storagegateway:us-east-1:999999999999:gateway/sgw-12A3456B"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "Starts a gateway service that was previously shut down.",
+        "id": "to-start-a-gateway-service-1472150722315",
+        "title": "To start a gateway service"
+      }
+    ],
+    "UpdateBandwidthRateLimit": [
+      {
+        "input": {
+          "AverageDownloadRateLimitInBitsPerSec": 102400,
+          "AverageUploadRateLimitInBitsPerSec": 51200,
+          "GatewayARN": "arn:aws:storagegateway:us-east-1:111122223333:gateway/sgw-12A3456B"
+        },
+        "output": {
+          "GatewayARN": "arn:aws:storagegateway:us-east-1:111122223333:gateway/sgw-12A3456B"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "Updates the bandwidth rate limits of a gateway. Both the upload and download bandwidth rate limit can be set, or either one of the two. If a new limit is not set, the existing rate limit remains.",
+        "id": "to-update-the-bandwidth-rate-limits-of-a-gateway-1472151016202",
+        "title": "To update the bandwidth rate limits of a gateway"
+      }
+    ],
+    "UpdateChapCredentials": [
+      {
+        "input": {
+          "InitiatorName": "iqn.1991-05.com.microsoft:computername.domain.example.com",
+          "SecretToAuthenticateInitiator": "111111111111",
+          "SecretToAuthenticateTarget": "222222222222",
+          "TargetARN": "arn:aws:storagegateway:us-east-1:111122223333:gateway/sgw-12A3456B/target/iqn.1997-05.com.amazon:myvolume"
+        },
+        "output": {
+          "InitiatorName": "iqn.1991-05.com.microsoft:computername.domain.example.com",
+          "TargetARN": "arn:aws:storagegateway:us-east-1:111122223333:gateway/sgw-12A3456B/target/iqn.1997-05.com.amazon:myvolume"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "Updates the Challenge-Handshake Authentication Protocol (CHAP) credentials for a specified iSCSI target.",
+        "id": "to-update-chap-credentials-for-an-iscsi-target-1472151325795",
+        "title": "To update CHAP credentials for an iSCSI target"
+      }
+    ],
+    "UpdateGatewayInformation": [
+      {
+        "input": {
+          "GatewayARN": "arn:aws:storagegateway:us-east-1:111122223333:gateway/sgw-12A3456B",
+          "GatewayName": "MyGateway2",
+          "GatewayTimezone": "GMT-12:00"
+        },
+        "output": {
+          "GatewayARN": "arn:aws:storagegateway:us-east-1:111122223333:gateway/sgw-12A3456B",
+          "GatewayName": ""
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "Updates a gateway's metadata, which includes the gateway's name and time zone.",
+        "id": "to-update-a-gateways-metadata-1472151688693",
+        "title": "To update a gateway's metadata"
+      }
+    ],
+    "UpdateGatewaySoftwareNow": [
+      {
+        "input": {
+          "GatewayARN": "arn:aws:storagegateway:us-east-1:111122223333:gateway/sgw-12A3456B"
+        },
+        "output": {
+          "GatewayARN": "arn:aws:storagegateway:us-east-1:111122223333:gateway/sgw-12A3456B"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "Updates the gateway virtual machine (VM) software. The request immediately triggers the software update.",
+        "id": "to-update-a-gateways-vm-software-1472152020929",
+        "title": "To update a gateway's VM software"
+      }
+    ],
+    "UpdateMaintenanceStartTime": [
+      {
+        "input": {
+          "DayOfWeek": 2,
+          "GatewayARN": "arn:aws:storagegateway:us-east-1:111122223333:gateway/sgw-12A3456B",
+          "HourOfDay": 0,
+          "MinuteOfHour": 30
+        },
+        "output": {
+          "GatewayARN": "arn:aws:storagegateway:us-east-1:111122223333:gateway/sgw-12A3456B"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "Updates a gateway's weekly maintenance start time information, including day and time of the week. The maintenance time is in your gateway's time zone.",
+        "id": "to-update-a-gateways-maintenance-start-time-1472152552031",
+        "title": "To update a gateway's maintenance start time"
+      }
+    ],
+    "UpdateSnapshotSchedule": [
+      {
+        "input": {
+          "Description": "Hourly snapshot",
+          "RecurrenceInHours": 1,
+          "StartAt": 0,
+          "VolumeARN": "arn:aws:storagegateway:us-east-1:111122223333:gateway/sgw-12A3456B/volume/vol-1122AABB"
+        },
+        "output": {
+          "VolumeARN": "arn:aws:storagegateway:us-east-1:111122223333:gateway/sgw-12A3456B/volume/vol-1122AABB"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "Updates a snapshot schedule configured for a gateway volume.",
+        "id": "to-update-a-volume-snapshot-schedule-1472152757068",
+        "title": "To update a volume snapshot schedule"
+      }
+    ],
+    "UpdateVTLDeviceType": [
+      {
+        "input": {
+          "DeviceType": "Medium Changer",
+          "VTLDeviceARN": "arn:aws:storagegateway:us-east-1:999999999999:gateway/sgw-12A3456B/device/AMZN_SGW-1FAD4876_MEDIACHANGER_00001"
+        },
+        "output": {
+          "VTLDeviceARN": "arn:aws:storagegateway:us-east-1:999999999999:gateway/sgw-12A3456B/device/AMZN_SGW-1FAD4876_MEDIACHANGER_00001"
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "Updates the type of medium changer in a gateway-VTL after a gateway-VTL is activated.",
+        "id": "to-update-a-vtl-device-type-1472153012967",
+        "title": "To update a VTL device type"
+      }
+    ]
+  }
+}

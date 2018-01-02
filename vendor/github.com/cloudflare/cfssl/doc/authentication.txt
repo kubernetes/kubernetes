@@ -1,0 +1,26 @@
+CFSSL AUTHENTICATION
+
+In order to prevent a CFSSL signer from being directly available, an
+authentication mechanism is available to provide additional
+security. It is implemented as the concept of an authentication
+provider; a provider can generate "authentication tokens" for a given
+request, and verify that the token is valid for a given
+request. Requests are generally the JSON-encoded form of the request to
+be sent to the server.
+
+An authenticated request has the following fields:
+
+   * token: this is a required field; it contains the computed
+     authentication token.
+   * request: this is a required field; the JSON-encoded request being
+     made.
+   * timestamp: an optional field containing a Unix timestamp. This
+     might be used by an authentication provider; the standard
+     authenticator does not use this.
+   * remote_address: an optional field containing the address or
+     hostname of the server; this may be used by an authentication
+     provider. The standard authenticator does not use this field.
+
+The standard authenticator provided as a reference implementation uses
+HMAC-SHA-256 to compute the HMAC of the request, with the hex-encoded
+authentication key specified in the configuration file.

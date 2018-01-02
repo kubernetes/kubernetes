@@ -1,0 +1,11 @@
+sudo: false
+language: go
+go:
+- 1.6
+- 1.7
+install:
+- go get -v cloud.google.com/go/...
+script:
+- openssl aes-256-cbc -K $encrypted_912ff8fa81ad_key -iv $encrypted_912ff8fa81ad_iv -in key.json.enc -out key.json -d
+- GCLOUD_TESTS_GOLANG_PROJECT_ID="dulcet-port-762" GCLOUD_TESTS_GOLANG_KEY="$(pwd)/key.json"
+  go test -race -v cloud.google.com/go/...

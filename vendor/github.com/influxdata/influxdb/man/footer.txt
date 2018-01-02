@@ -1,0 +1,13 @@
+BUGS
+----
+Report bugs to the GitHub issue tracker <https://github.com/influxdata/influxdb>.
+
+AUTHORS
+-------
+InfluxDB is written and maintained by InfluxData <https://influxdata.com>.
+
+COPYRIGHT
+---------
+InfluxDB is released under the MIT license.
+
+This man page is released under Creative Commons Attribution 4.0 International License.

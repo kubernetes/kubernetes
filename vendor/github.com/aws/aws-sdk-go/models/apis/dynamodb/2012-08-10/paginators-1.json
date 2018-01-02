@@ -1,0 +1,26 @@
+{
+  "pagination": {
+    "BatchGetItem": {
+      "input_token": "RequestItems",
+      "output_token": "UnprocessedKeys"
+    },
+    "ListTables": {
+      "input_token": "ExclusiveStartTableName",
+      "limit_key": "Limit",
+      "output_token": "LastEvaluatedTableName",
+      "result_key": "TableNames"
+    },
+    "Query": {
+      "input_token": "ExclusiveStartKey",
+      "limit_key": "Limit",
+      "output_token": "LastEvaluatedKey",
+      "result_key": "Items"
+    },
+    "Scan": {
+      "input_token": "ExclusiveStartKey",
+      "limit_key": "Limit",
+      "output_token": "LastEvaluatedKey",
+      "result_key": "Items"
+    }
+  }
+}

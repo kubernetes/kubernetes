@@ -1,0 +1,141 @@
+THE BUNDLE ENDPOINT
+
+Endpoint: /api/v1/cfssl/bundle
+Method:   POST
+
+Required parameters:
+
+        One of the following two parameters is required; If both are
+        present, "domain" becomes one of optional parameters with
+        "certificate", read on for details.
+
+        * certificate: the PEM-encoded certificate to be bundled.
+        * domain: a domain name indicating a remote host to retrieve a
+          certificate for.
+
+        If the "certificate" parameter is present, the following four
+        parameters are valid:
+
+        * private_key: the PEM-encoded private key to be included with
+        the bundle. This is valid only if the server is not running in
+        "keyless" mode.
+        * flavor: one of "ubiquitous", "force", or "optimal", with a
+        default value of "ubiquitous". A ubiquitous bundle is one that
+        has a higher probability of being verified everywhere, even by
+        clients using outdated or unusual trust stores. Force will
+        cause the endpoint to use the bundle provided in the
+        "certificate" parameter, and will only verify that the bundle
+        is a valid (verifiable) chain.
+        * domain: the domain name to verify as the hostname of the
+        certificate.
+        * ip: the IP address to verify against the certificate IP SANs
+
+        If only the "domain" parameter is present, the following
+        parameter is valid:
+
+        * ip: the IP address of the remote host; this will fetch the
+        certificate from the IP, and verify that it is valid for the
+        domain name.
+
+Result:
+
+	The bundle endpoint returns a JSON object with the following
+	keys:
+	
+        * bundle contains the concatenated list of PEM certificates
+        forming the certificate chain; this forms the actual
+        bundle. The remaining parameters are additional metadata
+        supporting the bundle.
+        * crl_support is true if CRL information is contained in the
+        certificate.
+        * crt contains the original certificate the bundle is built
+        from.
+        * expires contains the expiration date of the certificate.
+        * hostnames contains the SAN hostnames for the certificate.
+        * issuer contains the X.509 issuer information for the
+        certificate.
+        * key contains the private key for the certificate, if one
+        was presented.
+        * key_size contains the size of the key in bits for the
+        certificate. It will be present even if the private key wasn't
+        provided because this can be determined from the public key.
+        * key_type contains a textual description of the key type,
+        e.g. '2048-bit RSA'.
+        * ocsp contains the OCSP URLs for the certificate, if present.
+        * ocsp_support will be true if the certificate supports OCSP
+        revocation checking.
+        * signature contains the signature type used in the
+        certificate, e.g. 'SHA1WithRSA'.
+        * status contains a number of elements:
+          * code is bit-encoded error code. 1st bit indicates whether
+          there is a expiring certificate in the bundle. 2nd bit indicates
+          whether there is a ubiquity issue with the bundle.
+          * expiring_SKIs contains the SKIs (subject key identifiers)
+          for any certificates that might expire soon (within 30
+          days).
+          * messages is a list of human-readable warnings on bundle
+          ubiquity and certificate expiration. For example, an expiration
+          warning can be "The expiring cert is #1 in the chain", indicating
+          the leaf certificate is expiring. Ubiquity warnings
+          include SHA-1 deprecation warning (if the bundle triggers
+          any major browser's SHA-1 deprecation policy), SHA-2 compatibility
+          warning (if the bundle contains signatures using SHA-2 hash
+          algorithms, it will be rejected by Windows XP SP2), ECDSA
+          compatibility warning (if the bundle contains ECDSA certificates,
+          it will be rejected by Windows XP, Android 2.2 and Android 2.3
+          etc) and root trust warnning (if the bundle cannot be trusted
+          by some major OSes or browsers).
+          * rebundled indicates whether the server had to rebundle the
+          certificate. The server will rebundle the uploaded
+          certificate as needed; for example, if the certificate
+          contains none of the required intermediates or a better set
+          of intermediates was found. In this case, the server will
+          mark rebundled as true.
+          * untrusted_root_stores contains the names of any major
+          OSes and browsers that doesn't trust the bundle. The names
+          are used to contruct the root trust warnings in the messages
+          list
+        * subject contains the X.509 subject identifier from the
+        certificate.
+
+Example:
+
+	$ curl -d '{"domain": "cloudflare.com"}' \
+	      ${CFSSL_HOST}/api/v1/cfssl/bundle	 \
+	      | python -m json.tool
+	  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                         Dload  Upload   Total   Spent    Left  Speed
+        100 11169    0 11141  100    28  19331     48 --:--:-- --:--:-- --:--:-- 19342
+	{
+	    "errors": [],
+	    "messages": [],
+	    "result": {
+		"bundle": "-----BEGIN CERTIFICATE-----\nMIIHFDCCBfygAwIBAgIQXu3lLLTt9p4yFCuxChTXSTANBgkqhkiG9w0BAQUFADCB\njjELMAkGA1UEBhMCR0IxGzAZBgNVBAgTEkdyZWF0ZXIgTWFuY2hlc3RlcjEQMA4G\nA1UEBxMHU2FsZm9yZDEaMBgGA1UEChMRQ09NT0RPIENBIExpbWl0ZWQxNDAyBgNV\nBAMTK0NPTU9ETyBFeHRlbmRlZCBWYWxpZGF0aW9uIFNlY3VyZSBTZXJ2ZXIgQ0Ew\nHhcNMTUwMTA1MDAwMDAwWhcNMTUxMjMxMjM1OTU5WjCCARwxEDAOBgNVBAUTBzQ3\nMTA4NzUxEzARBgsrBgEEAYI3PAIBAxMCVVMxGTAXBgsrBgEEAYI3PAIBAhMIRGVs\nYXdhcmUxHTAbBgNVBA8TFFByaXZhdGUgT3JnYW5pemF0aW9uMQswCQYDVQQGEwJV\nUzEOMAwGA1UEERMFOTQxMDcxCzAJBgNVBAgTAkNBMRYwFAYDVQQHEw1TYW4gRnJh\nbmNpc2NvMRkwFwYDVQQJExA2NjUgVGhpcmQgU3RyZWV0MRkwFwYDVQQKExBDbG91\nZEZsYXJlLCBJbmMuMRwwGgYDVQQLExNDbG91ZEZsYXJlIFNlY3VyaXR5MSMwIQYD\nVQQLExpDT01PRE8gRVYgTXVsdGktRG9tYWluIFNTTDCCASIwDQYJKoZIhvcNAQEB\nBQADggEPADCCAQoCggEBAN6yBr75KxUUNMatmcL/Ki8K3Z2kmBMq5k+9G2fyViq7\nEB+Rst+RYCDIOwOf9Fb5q82yMC/CLIu3a9hd+tfITcJ2VhlLYRU9XZPVyZ53yVD8\n67bviNsdKtM1WM40FuK/SG92MLiCPGWD+LkpcxzD5nPZxGuLZhkPjBXpVNiwWZyX\nASD7cKQSZ5Kngc1iANkrxUYL253yq2sqI2pvDjedp/BuTF8V5zUxRlyeUQfuZfEZ\nZsS6VGyHKO2KfrJrDOz7XjBx0bcliYW3bZi/VcxP+Q1kOXLOdtiLEZMbuL9oVHXC\ni7FKGwZIAgvxxupLQuIdQI9+GLSpCrSiQJwk4TOqqOECAwEAAaOCAtswggLXMB8G\nA1UdIwQYMBaAFIhEUf9QKmleLYj0IbrZDPLOy+p8MB0GA1UdDgQWBBTJ4NAMUXb3\nNbMVJu2NtfC7ll2rujAOBgNVHQ8BAf8EBAMCBaAwDAYDVR0TAQH/BAIwADAdBgNV\nHSUEFjAUBggrBgEFBQcDAQYIKwYBBQUHAwIwRgYDVR0gBD8wPTA7BgwrBgEEAbIx\nAQIBBQEwKzApBggrBgEFBQcCARYdaHR0cHM6Ly9zZWN1cmUuY29tb2RvLmNvbS9D\nUFMwUwYDVR0fBEwwSjBIoEagRIZCaHR0cDovL2NybC5jb21vZG9jYS5jb20vQ09N\nT0RPRXh0ZW5kZWRWYWxpZGF0aW9uU2VjdXJlU2VydmVyQ0EuY3JsMIGEBggrBgEF\nBQcBAQR4MHYwTgYIKwYBBQUHMAKGQmh0dHA6Ly9jcnQuY29tb2RvY2EuY29tL0NP\nTU9ET0V4dGVuZGVkVmFsaWRhdGlvblNlY3VyZVNlcnZlckNBLmNydDAkBggrBgEF\nBQcwAYYYaHR0cDovL29jc3AuY29tb2RvY2EuY29tMC0GA1UdEQQmMCSCDmNsb3Vk\nZmxhcmUuY29tghJ3d3cuY2xvdWRmbGFyZS5jb20wggEDBgorBgEEAdZ5AgQCBIH0\nBIHxAO8AdQBo9pj4H2SCvjqM7rkoHUz8cVFdZ5PURNEKZ6y7T0/7xAAAAUq6JZ63\nAAAEAwBGMEQCIDnMUQTV5uhtg3wo4WudmHrLsRGAPxgKahZ2qAheT2nJAiBXTr30\neD/Edkl+klFUUYJIN8ntqy1nOgw1cFGDSMcw+wB2AKS5CZC0GFgUh7sTosxncAo8\nNZgE+RvfuON3zQ7IDdwQAAABSrolns0AAAQDAEcwRQIhAOt2rMbzsavA074rVKZ6\nT+OYR0zL2HX6GjI4+ItnguYRAiA9It+jwuBjW2tocmYNAOgzBzuNNdgBtmqMwkLf\neXRojzANBgkqhkiG9w0BAQUFAAOCAQEAXl5mVmhHA6WcjPhmTMoHGvPCdsGVBWe0\nFr85yjuQsVSKCsZDD3ec01MnNyxwxf6GYFMxysv4j6rC9zlo55fecljtIrPSuftZ\nO4Uvo2a36b5s6sGBqfKQPQbjdbdJvw8yymLHMU25Df3ZZcj0T8bQZKjIZRv5IiDL\nSUlwyxhiiorMrqCPTyiniCXJvfdaFBUWdw37QZWNHyvVap7vUTXQpsHGkt+KL+0w\nC4/mhoakAMd8n+//pBDtHBWqsnxA7/S6vM9zP0+xRR8vHUsDGj28Ito8839WP18u\nfQrczSznX7YbZjCk++r5GpSCFAsBBh5ZmU9bu9XnzAZ2hlkKec/8HA==\n-----END CERTIFICATE-----\n-----BEGIN CERTIFICATE-----\nMIIFBjCCA+6gAwIBAgIQEaO00OyNt3+doM1dLVEvQjANBgkqhkiG9w0BAQUFADCB\ngTELMAkGA1UEBhMCR0IxGzAZBgNVBAgTEkdyZWF0ZXIgTWFuY2hlc3RlcjEQMA4G\nA1UEBxMHU2FsZm9yZDEaMBgGA1UEChMRQ09NT0RPIENBIExpbWl0ZWQxJzAlBgNV\nBAMTHkNPTU9ETyBDZXJ0aWZpY2F0aW9uIEF1dGhvcml0eTAeFw0xMDA1MjQwMDAw\nMDBaFw0yMDA1MzAxMDQ4MzhaMIGOMQswCQYDVQQGEwJHQjEbMBkGA1UECBMSR3Jl\nYXRlciBNYW5jaGVzdGVyMRAwDgYDVQQHEwdTYWxmb3JkMRowGAYDVQQKExFDT01P\nRE8gQ0EgTGltaXRlZDE0MDIGA1UEAxMrQ09NT0RPIEV4dGVuZGVkIFZhbGlkYXRp\nb24gU2VjdXJlIFNlcnZlciBDQTCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoC\nggEBAMxKljPNJY1n7iiWN4dG8PYEooR/U6qW5h+xAhxu7X0h1Nc8HqLYaS+ot/Wi\n7WRYZOFEZTZJQSABjTsT4gjzDPJXOZM3txyTRIOOvy3xoQV12m7ue28b6naDKHRK\nHCvT9cQDcpOvhs4JjDx11MkKL3Lzrb0OMDyEoXMfAyUUpY/D1vS15N2GevUZumjy\nhVSiMBHK0ZLLO3QGEqA3q2rYVBHfbJoWlLm0p2XGdC0x801S6VVRn8s+oo12mHDS\nb6ZlRS8bhbtbbfnywARmE4R6nc4n2PREnr+svpnba0/bWCGwiSe0jzLWS15ykV7f\nBZ3ZSS/0tm9QH3XLgJ3m0+TR8tMCAwEAAaOCAWkwggFlMB8GA1UdIwQYMBaAFAtY\n5YvGTBU3pECpMKkhvkc2Wlb/MB0GA1UdDgQWBBSIRFH/UCppXi2I9CG62Qzyzsvq\nfDAOBgNVHQ8BAf8EBAMCAQYwEgYDVR0TAQH/BAgwBgEB/wIBADA+BgNVHSAENzA1\nMDMGBFUdIAAwKzApBggrBgEFBQcCARYdaHR0cHM6Ly9zZWN1cmUuY29tb2RvLmNv\nbS9DUFMwSQYDVR0fBEIwQDA+oDygOoY4aHR0cDovL2NybC5jb21vZG9jYS5jb20v\nQ09NT0RPQ2VydGlmaWNhdGlvbkF1dGhvcml0eS5jcmwwdAYIKwYBBQUHAQEEaDBm\nMD4GCCsGAQUFBzAChjJodHRwOi8vY3J0LmNvbW9kb2NhLmNvbS9DT01PRE9BZGRU\ncnVzdFNlcnZlckNBLmNydDAkBggrBgEFBQcwAYYYaHR0cDovL29jc3AuY29tb2Rv\nY2EuY29tMA0GCSqGSIb3DQEBBQUAA4IBAQCaQ7+vpHJezX1vf/T8PYy7cOYe3QT9\nP9ydn7+JdpvyhjH8f7PtKpFTLOKqsOPILHH3FYojHPFpLoH7sbxiC6saVBzZIl40\nTKX2Iw9dej3bQ81pfhc3Us1TocIR1FN4J2TViUFNFlW7kMvw2OTd3dMJZEgo/zIj\nhC+Me1UvzymINzR4DzOq/7fylqSbRIC1vmxWVKukgZ4lGChUOn8sY89ZIIwYazgs\ntN3t40DeDDYlV5rA0WCeXgNol64aO+pF11GZSe5EWVYLXrGPaOqKnsrSyaADfnAl\n9DLJTlCDh6I0SD1PNXf82Ijq9n0ezkO21cJqfjhmY03n7jLvDyToKmf6\n-----END CERTIFICATE-----\n-----BEGIN CERTIFICATE-----\nMIIE8TCCA9mgAwIBAgIQS3VXgmk5DJvjLxLsX22UXjANBgkqhkiG9w0BAQUFADBv\nMQswCQYDVQQGEwJTRTEUMBIGA1UEChMLQWRkVHJ1c3QgQUIxJjAkBgNVBAsTHUFk\nZFRydXN0IEV4dGVybmFsIFRUUCBOZXR3b3JrMSIwIAYDVQQDExlBZGRUcnVzdCBF\neHRlcm5hbCBDQSBSb290MB4XDTEwMDIxMTAwMDAwMFoXDTIwMDUzMDEwNDgzOFow\ngYExCzAJBgNVBAYTAkdCMRswGQYDVQQIExJHcmVhdGVyIE1hbmNoZXN0ZXIxEDAO\nBgNVBAcTB1NhbGZvcmQxGjAYBgNVBAoTEUNPTU9ETyBDQSBMaW1pdGVkMScwJQYD\nVQQDEx5DT01PRE8gQ2VydGlmaWNhdGlvbiBBdXRob3JpdHkwggEiMA0GCSqGSIb3\nDQEBAQUAA4IBDwAwggEKAoIBAQDQQIuLcuORG/dRwRtUBJjTqb/B5opdO4f7u4jO\nDeMvPwaW8KIpUJmu2zuhV7B0UXHN7UKRTUH+qcjYaoZ3RLtZZpdQXrTULHBEz9o3\nlUJpPDDEcbNS8CFNodi6OXwcnqMknfKDFpiqFnxDmxVbt640kf7UYiYYRpo/68H5\n8ZBX66x6DYvbcjBqZtXgRqNw3GjZ/wRIiXfeten7Z21B6bw5vTLZYgLxsag9bjec\n4i/i06Imi8a4VUOI4SM+pdIkOWpHqwDUobOpJf4NP6cdutNRwQuk2qw471VQJAVl\nRpM0Ty2NrcbUIRnSjsoFYXEHc0flihkSvQRNzk6cpUisuyb3AgMBAAGjggF0MIIB\ncDAfBgNVHSMEGDAWgBStvZh6NLQm9/rEJlTvA73gJMtUGjAdBgNVHQ4EFgQUC1jl\ni8ZMFTekQKkwqSG+RzZaVv8wDgYDVR0PAQH/BAQDAgEGMA8GA1UdEwEB/wQFMAMB\nAf8wEQYDVR0gBAowCDAGBgRVHSAAMEQGA1UdHwQ9MDswOaA3oDWGM2h0dHA6Ly9j\ncmwudXNlcnRydXN0LmNvbS9BZGRUcnVzdEV4dGVybmFsQ0FSb290LmNybDCBswYI\nKwYBBQUHAQEEgaYwgaMwPwYIKwYBBQUHMAKGM2h0dHA6Ly9jcnQudXNlcnRydXN0\nLmNvbS9BZGRUcnVzdEV4dGVybmFsQ0FSb290LnA3YzA5BggrBgEFBQcwAoYtaHR0\ncDovL2NydC51c2VydHJ1c3QuY29tL0FkZFRydXN0VVROU0dDQ0EuY3J0MCUGCCsG\nAQUFBzABhhlodHRwOi8vb2NzcC51c2VydHJ1c3QuY29tMA0GCSqGSIb3DQEBBQUA\nA4IBAQBNhw1QMPOCXcQ/1O/ujUjj572Qa8QyOMZeKKtcpa1h+Y67hRQ5IVFbjozc\nF5KAL4OUaYjBvieOT5+pg9i+14eScaO2/RF0uJWBKCB3DUN3dXY4HU0bLpeJjAob\nZhZS1BSab4BIFt4wwEJo6r+iuipETayJ4vPMU5vj5h1uT5if2Q5RUIbgGjQyJIB9\nOofzPOVaTbeLvQokDa7b9I9c0mYMghxyN7bRudCYNBsnbYteHkBzGPqo5MbokMOr\nGeTBoc1M1Dq2iMjz0GVhOr8Y9K8cVqnrlzjZICkfPyopR52KD2oSgUQCIdQ7Ohor\nHkBDfZSgaQ78LvtS9v0uMtjLa73r\n-----END CERTIFICATE-----",
+		"crl_support": true,
+		"crt": "-----BEGIN CERTIFICATE-----\nMIIHFDCCBfygAwIBAgIQXu3lLLTt9p4yFCuxChTXSTANBgkqhkiG9w0BAQUFADCB\njjELMAkGA1UEBhMCR0IxGzAZBgNVBAgTEkdyZWF0ZXIgTWFuY2hlc3RlcjEQMA4G\nA1UEBxMHU2FsZm9yZDEaMBgGA1UEChMRQ09NT0RPIENBIExpbWl0ZWQxNDAyBgNV\nBAMTK0NPTU9ETyBFeHRlbmRlZCBWYWxpZGF0aW9uIFNlY3VyZSBTZXJ2ZXIgQ0Ew\nHhcNMTUwMTA1MDAwMDAwWhcNMTUxMjMxMjM1OTU5WjCCARwxEDAOBgNVBAUTBzQ3\nMTA4NzUxEzARBgsrBgEEAYI3PAIBAxMCVVMxGTAXBgsrBgEEAYI3PAIBAhMIRGVs\nYXdhcmUxHTAbBgNVBA8TFFByaXZhdGUgT3JnYW5pemF0aW9uMQswCQYDVQQGEwJV\nUzEOMAwGA1UEERMFOTQxMDcxCzAJBgNVBAgTAkNBMRYwFAYDVQQHEw1TYW4gRnJh\nbmNpc2NvMRkwFwYDVQQJExA2NjUgVGhpcmQgU3RyZWV0MRkwFwYDVQQKExBDbG91\nZEZsYXJlLCBJbmMuMRwwGgYDVQQLExNDbG91ZEZsYXJlIFNlY3VyaXR5MSMwIQYD\nVQQLExpDT01PRE8gRVYgTXVsdGktRG9tYWluIFNTTDCCASIwDQYJKoZIhvcNAQEB\nBQADggEPADCCAQoCggEBAN6yBr75KxUUNMatmcL/Ki8K3Z2kmBMq5k+9G2fyViq7\nEB+Rst+RYCDIOwOf9Fb5q82yMC/CLIu3a9hd+tfITcJ2VhlLYRU9XZPVyZ53yVD8\n67bviNsdKtM1WM40FuK/SG92MLiCPGWD+LkpcxzD5nPZxGuLZhkPjBXpVNiwWZyX\nASD7cKQSZ5Kngc1iANkrxUYL253yq2sqI2pvDjedp/BuTF8V5zUxRlyeUQfuZfEZ\nZsS6VGyHKO2KfrJrDOz7XjBx0bcliYW3bZi/VcxP+Q1kOXLOdtiLEZMbuL9oVHXC\ni7FKGwZIAgvxxupLQuIdQI9+GLSpCrSiQJwk4TOqqOECAwEAAaOCAtswggLXMB8G\nA1UdIwQYMBaAFIhEUf9QKmleLYj0IbrZDPLOy+p8MB0GA1UdDgQWBBTJ4NAMUXb3\nNbMVJu2NtfC7ll2rujAOBgNVHQ8BAf8EBAMCBaAwDAYDVR0TAQH/BAIwADAdBgNV\nHSUEFjAUBggrBgEFBQcDAQYIKwYBBQUHAwIwRgYDVR0gBD8wPTA7BgwrBgEEAbIx\nAQIBBQEwKzApBggrBgEFBQcCARYdaHR0cHM6Ly9zZWN1cmUuY29tb2RvLmNvbS9D\nUFMwUwYDVR0fBEwwSjBIoEagRIZCaHR0cDovL2NybC5jb21vZG9jYS5jb20vQ09N\nT0RPRXh0ZW5kZWRWYWxpZGF0aW9uU2VjdXJlU2VydmVyQ0EuY3JsMIGEBggrBgEF\nBQcBAQR4MHYwTgYIKwYBBQUHMAKGQmh0dHA6Ly9jcnQuY29tb2RvY2EuY29tL0NP\nTU9ET0V4dGVuZGVkVmFsaWRhdGlvblNlY3VyZVNlcnZlckNBLmNydDAkBggrBgEF\nBQcwAYYYaHR0cDovL29jc3AuY29tb2RvY2EuY29tMC0GA1UdEQQmMCSCDmNsb3Vk\nZmxhcmUuY29tghJ3d3cuY2xvdWRmbGFyZS5jb20wggEDBgorBgEEAdZ5AgQCBIH0\nBIHxAO8AdQBo9pj4H2SCvjqM7rkoHUz8cVFdZ5PURNEKZ6y7T0/7xAAAAUq6JZ63\nAAAEAwBGMEQCIDnMUQTV5uhtg3wo4WudmHrLsRGAPxgKahZ2qAheT2nJAiBXTr30\neD/Edkl+klFUUYJIN8ntqy1nOgw1cFGDSMcw+wB2AKS5CZC0GFgUh7sTosxncAo8\nNZgE+RvfuON3zQ7IDdwQAAABSrolns0AAAQDAEcwRQIhAOt2rMbzsavA074rVKZ6\nT+OYR0zL2HX6GjI4+ItnguYRAiA9It+jwuBjW2tocmYNAOgzBzuNNdgBtmqMwkLf\neXRojzANBgkqhkiG9w0BAQUFAAOCAQEAXl5mVmhHA6WcjPhmTMoHGvPCdsGVBWe0\nFr85yjuQsVSKCsZDD3ec01MnNyxwxf6GYFMxysv4j6rC9zlo55fecljtIrPSuftZ\nO4Uvo2a36b5s6sGBqfKQPQbjdbdJvw8yymLHMU25Df3ZZcj0T8bQZKjIZRv5IiDL\nSUlwyxhiiorMrqCPTyiniCXJvfdaFBUWdw37QZWNHyvVap7vUTXQpsHGkt+KL+0w\nC4/mhoakAMd8n+//pBDtHBWqsnxA7/S6vM9zP0+xRR8vHUsDGj28Ito8839WP18u\nfQrczSznX7YbZjCk++r5GpSCFAsBBh5ZmU9bu9XnzAZ2hlkKec/8HA==\n-----END CERTIFICATE-----",
+		"expires": "2015-12-31T23:59:59Z",
+		"hostnames": [
+		    "cloudflare.com",
+		    "www.cloudflare.com"
+		],
+		"issuer": "/Country=GB/Province=Greater Manchester/Locality=Salford/Organization=COMODO CA Limited/CommonName=COMODO Extended Validation Secure Server CA",
+		"key": "",
+		"key_size": 2048,
+		"key_type": "2048-bit RSA",
+		"ocsp": [
+		    "http://ocsp.comodoca.com"
+		],
+		"ocsp_support": true,
+		"root": "-----BEGIN CERTIFICATE-----\nMIIENjCCAx6gAwIBAgIBATANBgkqhkiG9w0BAQUFADBvMQswCQYDVQQGEwJTRTEU\nMBIGA1UEChMLQWRkVHJ1c3QgQUIxJjAkBgNVBAsTHUFkZFRydXN0IEV4dGVybmFs\nIFRUUCBOZXR3b3JrMSIwIAYDVQQDExlBZGRUcnVzdCBFeHRlcm5hbCBDQSBSb290\nMB4XDTAwMDUzMDEwNDgzOFoXDTIwMDUzMDEwNDgzOFowbzELMAkGA1UEBhMCU0Ux\nFDASBgNVBAoTC0FkZFRydXN0IEFCMSYwJAYDVQQLEx1BZGRUcnVzdCBFeHRlcm5h\nbCBUVFAgTmV0d29yazEiMCAGA1UEAxMZQWRkVHJ1c3QgRXh0ZXJuYWwgQ0EgUm9v\ndDCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBALf3GjPm8gAELTngTlvt\nH7xsD821+iO2zt6bETOXpClMfZOfvUq8k+0DGuOPz+VtUFrWlymUWoCwSXrbLpX9\nuMq/NzgtHj6RQa1wVsfwTz/oMp50ysiQVOnGXw94nZpAPA6sYapeFI+eh6FqUNzX\nmk6vBbOmcZSccbNQYArHE504B4YCqOmoaSYYkKtMsE8jqzpPhNjfzp/haW+710LX\na0Tkx63ubUFfclpxCDezeWWkWaCUN/cALw3CknLa0Dhy2xSoRcRdKn23tNbE7qzN\nE0S3ySvdQwAl+mG5aWpYIxG3pzOPVnVZ9c0p10a3CitlttNCbxWyuHv77+ldU9U0\nWicCAwEAAaOB3DCB2TAdBgNVHQ4EFgQUrb2YejS0Jvf6xCZU7wO94CTLVBowCwYD\nVR0PBAQDAgEGMA8GA1UdEwEB/wQFMAMBAf8wgZkGA1UdIwSBkTCBjoAUrb2YejS0\nJvf6xCZU7wO94CTLVBqhc6RxMG8xCzAJBgNVBAYTAlNFMRQwEgYDVQQKEwtBZGRU\ncnVzdCBBQjEmMCQGA1UECxMdQWRkVHJ1c3QgRXh0ZXJuYWwgVFRQIE5ldHdvcmsx\nIjAgBgNVBAMTGUFkZFRydXN0IEV4dGVybmFsIENBIFJvb3SCAQEwDQYJKoZIhvcN\nAQEFBQADggEBALCb4IUlwtYj4g+WBpKdQZic2YR5gdkeWxQHIzZlj7DYd7usQWxH\nYINRsPkyPef89iYTx4AWpb9a/IfPeHmJIZriTAcKhjW88t5RxNKWt9x+Tu5w/Rw5\n6wwCURQtjr0W4MHfRnXnJK3s9EK0hZNwEGe6nQY1ShjTK3rMUUKhemPR5ruhxSvC\nNr4TDea9Y355e6cJDUCrat2PisP29owaQgVR1EX1n6diIWgVIEM8med8vSTYqZEX\nc4g/VhsxOBi0cQ+azcgOno4uG+GMmIPLHzHxREzGBHNJdmAPx/i9F4BrLunMTA5a\nmnkPIAou1Z5jJh5VkpTYghdae9C8x49OhgQ=\n-----END CERTIFICATE-----",
+		"signature": "SHA1WithRSA",
+		"status": {
+		    "code": 0,
+		    "expiring_SKIs": null,
+		    "messages": null,
+		    "rebundled": false,
+		    "untrusted_root_stores": []
+		},
+		"subject": "/SerialNumber=4710875/=US/=Delaware/=Private Organization/Country=US/PostalCode=94107/Province=CA/Locality=San Francisco/StreetAddress=665 Third Street/Organization=CloudFlare, Inc./OrganizationalUnit=CloudFlare Security/OrganizationalUnit=COMODO EV Multi-Domain SSL"
+	    },
+	    "success": true
+	}

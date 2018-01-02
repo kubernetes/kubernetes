@@ -1,0 +1,23 @@
+package: github.com/appc/spec
+import:
+- package: github.com/coreos/go-semver
+  version: ~0.1.0
+  subpackages:
+  - semver
+- package: github.com/gogo/protobuf
+  version: ~0.2
+  subpackages:
+  - proto
+- package: github.com/spf13/pflag
+  version: 94e98a55fb412fcbcfc302555cb990f5e1590627
+- package: go4.org
+  version: 03efcb870d84809319ea509714dd6d19a1498483
+  subpackages:
+  - errorutil
+- package: golang.org/x/net
+  version: ccfcd82c7124abd517842acbacc3b8c1e390c73d
+  subpackages:
+  - html
+  - html/atom
+- package: gopkg.in/inf.v0
+  version: 3887ee99ecf07df5b447e9b00d9c0b2adaa9f3e4

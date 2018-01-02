@@ -1,0 +1,27 @@
+package meta;
+
+//========================================================================
+//
+// Metadata
+//
+//========================================================================
+
+message Series {
+  required string Key = 1;
+  repeated Tag Tags = 2;
+}
+
+message Tag {
+  required string Key = 1;
+  required string Value = 2;
+}
+
+message MeasurementFields {
+  repeated Field Fields = 1;
+}
+
+message Field {
+  required int32 ID = 1;
+  required string Name = 2;
+  required int32 Type = 3;
+}

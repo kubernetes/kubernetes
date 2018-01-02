@@ -1,0 +1,81 @@
+influx(1)
+=========
+
+NAME
+----
+influx - InfluxDB client
+
+SYNOPSIS
+--------
+[verse]
+'influx' [options]
+'influx' -execute <command> [options]
+'influx' -import -path <path> (-compressed) [options]
+'influx' -version
+
+DESCRIPTION
+-----------
+'influx' is the command line program for interacting with an InfluxDB server.
+
+In the first form, the program starts a CLI that can be used to write data or query the database. The command line is described in *COMMAND LINE*.
+
+In the second form, this will execute a single command, usually a query. This is the equivalent of starting the command line, running one command, and then exiting.
+
+In the third form, this imports a previously exported database to the database.
+
+The fourth form outputs the version of the command line and then immediately exits.
+
+OPTIONS
+-------
+-host <host>::
+  Host to connect to. Default is localhost.
+
+-port <port>::
+  Port to use when connecting to the host. Default is 8086.
+
+-database <database>::
+  Database to use when connecting to the database.
+
+-username <username>::
+  Username to connect to the server.
+
+-password <password>::
+  Password to connect to the server. If left blank, this will prompt for a password.
+
+-ssl:
+  Use https for requests.
+
+-unsafeSsl::
+  Set this with '-ssl' to allow unsafe connections.
+
+-execute <command>::
+  Executes the command and exits.
+
+-format <json|csv|column>::
+  Sets the format of the server responses. Default is column.
+
+-precision <rfc3339|h|m|s|ms|u|ns>::
+  Specifies the format of the timestamp. Default is ns.
+
+-consistency <any|one|quorum|all>::
+  Set the write consistency level. Default is one.
+
+-pretty::
+  Turns on pretty print format for the JSON format.
+
+-import::
+  Import a previous database export from a file. If specified, '-path <path>' must also be specified.
+
+-path <path>::
+  Path to the database export file to import. Must be used with '-import'.
+
+-pps <n>:
+  How many points per second the import will allow. By default, it is zero and will not throttle importing.
+
+-compressed::
+  Set if the import file is compressed. Must be used with '-import'.
+
+-version::
+  Outputs the version of the influx client.
+
+include::footer.txt[]

@@ -1,0 +1,318 @@
+syntax = "proto3";
+
+package containerd.services.content.v1;
+
+import "gogoproto/gogo.proto";
+import "google/protobuf/field_mask.proto";
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/empty.proto";
+
+option go_package = "github.com/containerd/containerd/api/services/content/v1;content";
+
+// Content provides access to a content addressable storage system.
+service Content {
+	// Info returns information about a committed object.
+	//
+	// This call can be used for getting the size of content and checking for
+	// existence.
+	rpc Info(InfoRequest) returns (InfoResponse);
+
+	// Update updates content metadata.
+	//
+	// This call can be used to manage the mutable content labels. The
+	// immutable metadata such as digest, size, and committed at cannot
+	// be updated.
+	rpc Update(UpdateRequest) returns (UpdateResponse);
+
+	// List streams the entire set of content as Info objects and closes the
+	// stream.
+	//
+	// Typically, this will yield a large response, chunked into messages.
+	// Clients should make provisions to ensure they can handle the entire data
+	// set.
+	rpc List(ListContentRequest) returns (stream ListContentResponse);
+
+	// Delete will delete the referenced object.
+	rpc Delete(DeleteContentRequest) returns (google.protobuf.Empty);
+
+	// Read allows one to read an object based on the offset into the content.
+	//
+	// The requested data may be returned in one or more messages.
+	rpc Read(ReadContentRequest) returns (stream ReadContentResponse);
+
+	// Status returns the status for a single reference.
+	rpc Status(StatusRequest) returns (StatusResponse);
+
+	// ListStatuses returns the status of ongoing object ingestions, started via
+	// Write.
+	//
+	// Only those matching the regular expression will be provided in the
+	// response. If the provided regular expression is empty, all ingestions
+	// will be provided.
+	rpc ListStatuses(ListStatusesRequest) returns (ListStatusesResponse);
+
+	// Write begins or resumes writes to a resource identified by a unique ref.
+	// Only one active stream may exist at a time for each ref.
+	//
+	// Once a write stream has started, it may only write to a single ref, thus
+	// once a stream is started, the ref may be ommitted on subsequent writes.
+	//
+	// For any write transaction represented by a ref, only a single write may
+	// be made to a given offset. If overlapping writes occur, it is an error.
+	// Writes should be sequential and implementations may throw an error if
+	// this is required.
+	//
+	// If expected_digest is set and already part of the content store, the
+	// write will fail.
+	//
+	// When completed, the commit flag should be set to true. If expected size
+	// or digest is set, the content will be validated against those values.
+	rpc Write(stream WriteContentRequest) returns (stream WriteContentResponse);
+
+	// Abort cancels the ongoing write named in the request. Any resources
+	// associated with the write will be collected.
+	rpc Abort(AbortRequest) returns (google.protobuf.Empty);
+}
+
+message Info {
+	// Digest is the hash identity of the blob.
+	string digest = 1 [(gogoproto.customtype) = "github.com/opencontainers/go-digest.Digest", (gogoproto.nullable) = false];
+
+	// Size is the total number of bytes in the blob.
+	int64 size = 2;
+
+	// CreatedAt provides the time at which the blob was committed.
+	google.protobuf.Timestamp created_at = 3 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+
+	// UpdatedAt provides the time the info was last updated.
+	google.protobuf.Timestamp updated_at = 4 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+
+	// Labels are arbitrary data on snapshots.
+	//
+	// The combined size of a key/value pair cannot exceed 4096 bytes.
+	map<string, string> labels  = 5;
+}
+
+message InfoRequest {
+	string digest = 1 [(gogoproto.customtype) = "github.com/opencontainers/go-digest.Digest", (gogoproto.nullable) = false];
+}
+
+message InfoResponse {
+	Info info = 1 [(gogoproto.nullable) = false];
+}
+
+message UpdateRequest {
+	Info info = 1 [(gogoproto.nullable) = false];
+
+	// UpdateMask specifies which fields to perform the update on. If empty,
+	// the operation applies to all fields.
+	//
+	// In info, Digest, Size, and CreatedAt are immutable,
+	// other field may be updated using this mask.
+	// If no mask is provided, all mutable field are updated.
+	google.protobuf.FieldMask update_mask = 2;
+}
+
+message UpdateResponse {
+	Info info = 1 [(gogoproto.nullable) = false];
+}
+
+message ListContentRequest {
+	// Filters contains one or more filters using the syntax defined in the
+	// containerd filter package.
+	//
+	// The returned result will be those that match any of the provided
+	// filters. Expanded, containers that match the following will be
+	// returned:
+	//
+	//   filters[0] or filters[1] or ... or filters[n-1] or filters[n]
+	//
+	// If filters is zero-length or nil, all items will be returned.
+	repeated string filters = 1;
+}
+
+message ListContentResponse {
+	repeated Info info = 1 [(gogoproto.nullable) = false];
+}
+
+message DeleteContentRequest {
+	// Digest specifies which content to delete.
+	string digest = 1 [(gogoproto.customtype) = "github.com/opencontainers/go-digest.Digest", (gogoproto.nullable) = false];
+}
+
+// ReadContentRequest defines the fields that make up a request to read a portion of
+// data from a stored object.
+message ReadContentRequest {
+	// Digest is the hash identity to read.
+	string digest = 1 [(gogoproto.customtype) = "github.com/opencontainers/go-digest.Digest", (gogoproto.nullable) = false];
+
+	// Offset specifies the number of bytes from the start at which to begin
+	// the read. If zero or less, the read will be from the start. This uses
+	// standard zero-indexed semantics.
+	int64 offset = 2;
+
+	// size is the total size of the read. If zero, the entire blob will be
+	// returned by the service.
+	int64 size = 3;
+}
+
+// ReadContentResponse carries byte data for a read request.
+message ReadContentResponse {
+	int64 offset = 1; // offset of the returned data
+	bytes data = 2; // actual data
+}
+
+message Status {
+	google.protobuf.Timestamp started_at = 1 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+	google.protobuf.Timestamp updated_at = 2 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+	string ref = 3;
+	int64 offset = 4;
+	int64 total = 5;
+	string expected = 6 [(gogoproto.customtype) = "github.com/opencontainers/go-digest.Digest", (gogoproto.nullable) = false];
+}
+
+
+message StatusRequest {
+	string ref = 1;
+}
+
+message StatusResponse {
+	Status status = 1;
+}
+
+message ListStatusesRequest {
+	repeated string filters = 1;
+}
+
+message ListStatusesResponse {
+	repeated Status statuses = 1 [(gogoproto.nullable) = false];
+}
+
+// WriteAction defines the behavior of a WriteRequest.
+enum WriteAction {
+	option (gogoproto.goproto_enum_prefix) = false;
+	option (gogoproto.enum_customname) = "WriteAction";
+
+	// WriteActionStat instructs the writer to return the current status while
+	// holding the lock on the write.
+	STAT = 0 [(gogoproto.enumvalue_customname) = "WriteActionStat"];
+
+	// WriteActionWrite sets the action for the write request to write data.
+	//
+	// Any data included will be written at the provided offset. The
+	// transaction will be left open for further writes.
+	//
+	// This is the default.
+	WRITE = 1 [(gogoproto.enumvalue_customname) = "WriteActionWrite"];
+
+	// WriteActionCommit will write any outstanding data in the message and
+	// commit the write, storing it under the digest.
+	//
+	// This can be used in a single message to send the data, verify it and
+	// commit it.
+	//
+	// This action will always terminate the write.
+	COMMIT = 2 [(gogoproto.enumvalue_customname) = "WriteActionCommit"];
+}
+
+// WriteContentRequest writes data to the request ref at offset.
+message WriteContentRequest {
+	// Action sets the behavior of the write.
+	//
+	// When this is a write and the ref is not yet allocated, the ref will be
+	// allocated and the data will be written at offset.
+	//
+	// If the action is write and the ref is allocated, it will accept data to
+	// an offset that has not yet been written.
+	//
+	// If the action is write and there is no data, the current write status
+	// will be returned. This works differently from status because the stream
+	// holds a lock.
+	WriteAction action = 1;
+
+	// Ref identifies the pre-commit object to write to.
+	string ref = 2;
+
+	// Total can be set to have the service validate the total size of the
+	// committed content.
+	//
+	// The latest value before or with the commit action message will be use to
+	// validate the content. If the offset overflows total, the service may
+	// report an error. It is only required on one message for the write.
+	//
+	// If the value is zero or less, no validation of the final content will be
+	// performed.
+	int64 total = 3;
+
+	// Expected can be set to have the service validate the final content against
+	// the provided digest.
+	//
+	// If the digest is already present in the object store, an AlreadyExists
+	// error will be returned.
+	//
+	// Only the latest version will be used to check the content against the
+	// digest. It is only required to include it on a single message, before or
+	// with the commit action message.
+	string expected = 4 [(gogoproto.customtype) = "github.com/opencontainers/go-digest.Digest", (gogoproto.nullable) = false];
+
+	// Offset specifies the number of bytes from the start at which to begin
+	// the write. For most implementations, this means from the start of the
+	// file. This uses standard, zero-indexed semantics.
+	//
+	// If the action is write, the remote may remove all previously written
+	// data after the offset. Implementations may support arbitrary offsets but
+	// MUST support reseting this value to zero with a write. If an
+	// implementation does not support a write at a particular offset, an
+	// OutOfRange error must be returned.
+	int64 offset = 5;
+
+	// Data is the actual bytes to be written.
+	//
+	// If this is empty and the message is not a commit, a response will be
+	// returned with the current write state.
+	bytes data = 6;
+
+	// Labels are arbitrary data on snapshots.
+	//
+	// The combined size of a key/value pair cannot exceed 4096 bytes.
+	map<string, string> labels  = 7;
+}
+
+// WriteContentResponse is returned on the culmination of a write call.
+message WriteContentResponse {
+	// Action contains the action for the final message of the stream. A writer
+	// should confirm that they match the intended result.
+	WriteAction action = 1;
+
+	// StartedAt provides the time at which the write began.
+	//
+	// This must be set for stat and commit write actions. All other write
+	// actions may omit this.
+	google.protobuf.Timestamp started_at = 2 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+
+	// UpdatedAt provides the last time of a successful write.
+	//
+	// This must be set for stat and commit write actions. All other write
+	// actions may omit this.
+	google.protobuf.Timestamp updated_at = 3 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+
+	// Offset is the current committed size for the write.
+	int64 offset = 4;
+
+	// Total provides the current, expected total size of the write.
+	//
+	// We include this to provide consistency with the Status structure on the
+	// client writer.
+	//
+	// This is only valid on the Stat and Commit response.
+	int64 total = 5;
+
+	// Digest, if present, includes the digest up to the currently committed
+	// bytes. If action is commit, this field will be set. It is implementation
+	// defined if this is set for other actions.
+	string digest = 6 [(gogoproto.customtype) = "github.com/opencontainers/go-digest.Digest", (gogoproto.nullable) = false];
+}
+
+message AbortRequest {
+	string ref = 1;
+}

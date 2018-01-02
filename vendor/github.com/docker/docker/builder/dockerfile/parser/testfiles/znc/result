@@ -1,0 +1,5 @@
+(from "ubuntu:14.04")
+(label "maintainer" "Erik Hollensbe <erik@hollensbe.org>")
+(run "apt-get update && apt-get install znc -y")
+(add "conf" "/.znc")
+(cmd "/usr/bin/znc" "-f" "-r")

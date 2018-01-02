@@ -1,0 +1,222 @@
+{
+    "description": "Open Container Runtime Specification Container Configuration Schema",
+    "$schema": "http://json-schema.org/draft-04/schema#",
+    "id": "https://opencontainers.org/schema/bundle",
+    "type": "object",
+    "properties": {
+        "ociVersion": {
+            "id": "https://opencontainers.org/schema/bundle/ociVersion",
+            "$ref": "defs.json#/definitions/ociVersion"
+        },
+        "hooks": {
+            "id": "https://opencontainers.org/schema/bundle/hooks",
+            "type": "object",
+            "properties": {
+                "prestart": {
+                    "$ref": "defs.json#/definitions/ArrayOfHooks"
+                },
+                "poststart": {
+                    "$ref": "defs.json#/definitions/ArrayOfHooks"
+                },
+                "poststop": {
+                    "$ref": "defs.json#/definitions/ArrayOfHooks"
+                }
+            }
+        },
+        "annotations": {
+            "$ref": "defs.json#/definitions/annotations"
+        },
+        "hostname": {
+            "id": "https://opencontainers.org/schema/bundle/hostname",
+            "type": "string"
+        },
+        "mounts": {
+            "id": "https://opencontainers.org/schema/bundle/mounts",
+            "type": "array",
+            "items": {
+                "$ref": "defs.json#/definitions/Mount"
+            }
+        },
+        "root": {
+            "description": "Configures the container's root filesystem.",
+            "id": "https://opencontainers.org/schema/bundle/root",
+            "type": "object",
+            "required": [
+                "path"
+            ],
+            "properties": {
+                "path": {
+                    "id": "https://opencontainers.org/schema/bundle/root/path",
+                    "$ref": "defs.json#/definitions/FilePath"
+                },
+                "readonly": {
+                    "id": "https://opencontainers.org/schema/bundle/root/readonly",
+                    "type": "boolean"
+                }
+            }
+        },
+        "process": {
+            "id": "https://opencontainers.org/schema/bundle/process",
+            "type": "object",
+            "required": [
+                "cwd",
+                "args"
+            ],
+            "properties": {
+                "args": {
+                    "id": "https://opencontainers.org/schema/bundle/process/args",
+                    "$ref": "defs.json#/definitions/ArrayOfStrings"
+                },
+                "consoleSize": {
+                    "id": "https://opencontainers.org/schema/bundle/process/consoleSize",
+                    "type": "object",
+                    "required": [
+                        "height",
+                        "width"
+                    ],
+                    "properties": {
+                        "height": {
+                            "id": "https://opencontainers.org/schema/bundle/process/consoleSize/height",
+                            "$ref": "defs.json#/definitions/uint64"
+                        },
+                        "width": {
+                            "id": "https://opencontainers.org/schema/bundle/process/consoleSize/width",
+                            "$ref": "defs.json#/definitions/uint64"
+                        }
+                    }
+                },
+                "cwd": {
+                    "id": "https://opencontainers.org/schema/bundle/process/cwd",
+                    "type": "string"
+                },
+                "env": {
+                    "id": "https://opencontainers.org/schema/bundle/process/env",
+                    "$ref": "defs.json#/definitions/Env"
+                },
+                "terminal": {
+                    "id": "https://opencontainers.org/schema/bundle/process/terminal",
+                    "type": "boolean"
+                },
+                "user": {
+                    "id": "https://opencontainers.org/schema/bundle/process/user",
+                    "type": "object",
+                    "properties": {
+                        "uid": {
+                            "id": "https://opencontainers.org/schema/bundle/process/user/uid",
+                            "$ref": "defs.json#/definitions/UID"
+                        },
+                        "gid": {
+                            "id": "https://opencontainers.org/schema/bundle/process/user/gid",
+                            "$ref": "defs.json#/definitions/GID"
+                        },
+                        "additionalGids": {
+                            "id": "https://opencontainers.org/schema/bundle/process/user/additionalGids",
+                            "$ref": "defs.json#/definitions/ArrayOfGIDs"
+                        },
+                        "username": {
+                            "id": "https://opencontainers.org/schema/bundle/process/user/username",
+                            "type": "string"
+                        }
+                    }
+                },
+                "capabilities": {
+                    "id": "https://opencontainers.org/schema/bundle/process/linux/capabilities",
+                    "type": "object",
+                    "properties": {
+                        "bounding": {
+                            "id": "https://opencontainers.org/schema/bundle/process/linux/capabilities/bounding",
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        },
+                        "permitted": {
+                            "id": "https://opencontainers.org/schema/bundle/process/linux/capabilities/permitted",
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        },
+                        "effective": {
+                            "id": "https://opencontainers.org/schema/bundle/process/linux/capabilities/effective",
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        },
+                        "inheritable": {
+                            "id": "https://opencontainers.org/schema/bundle/process/linux/capabilities/inheritable",
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        },
+                        "ambient": {
+                            "id": "https://opencontainers.org/schema/bundle/process/linux/capabilities/ambient",
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                },
+                "apparmorProfile": {
+                    "id": "https://opencontainers.org/schema/bundle/process/linux/apparmorProfile",
+                    "type": "string"
+                },
+                "oomScoreAdj": {
+                    "id": "https://opencontainers.org/schema/bundle/process/linux/oomScoreAdj",
+                    "type": "integer"
+                },
+                "selinuxLabel": {
+                    "id": "https://opencontainers.org/schema/bundle/process/linux/selinuxLabel",
+                    "type": "string"
+                },
+                "noNewPrivileges": {
+                    "id": "https://opencontainers.org/schema/bundle/process/linux/noNewPrivileges",
+                    "type": "boolean"
+                },
+                "rlimits": {
+                    "id": "https://opencontainers.org/schema/bundle/linux/rlimits",
+                    "type": "array",
+                    "items": {
+                        "id": "https://opencontainers.org/schema/bundle/linux/rlimits/0",
+                        "type": "object",
+                        "required": [
+                            "type",
+                            "soft",
+                            "hard"
+                        ],
+                        "properties": {
+                            "hard": {
+                                "id": "https://opencontainers.org/schema/bundle/linux/rlimits/0/hard",
+                                "$ref": "defs.json#/definitions/uint64"
+                            },
+                            "soft": {
+                                "id": "https://opencontainers.org/schema/bundle/linux/rlimits/0/soft",
+                                "$ref": "defs.json#/definitions/uint64"
+                            },
+                            "type": {
+                                "id": "https://opencontainers.org/schema/bundle/linux/rlimits/0/type",
+                                "type": "string",
+                                "pattern": "^RLIMIT_[A-Z]+$"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "linux": {
+            "$ref": "config-linux.json#/linux"
+        },
+        "solaris": {
+            "$ref": "config-solaris.json#/solaris"
+        },
+        "windows": {
+            "$ref": "config-windows.json#/windows"
+        }
+    },
+    "required": [
+        "ociVersion"
+    ]
+}

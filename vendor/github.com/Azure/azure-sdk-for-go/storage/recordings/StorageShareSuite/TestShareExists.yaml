@@ -1,0 +1,130 @@
+---
+version: 1
+rwmutex: {}
+interactions:
+- request:
+    body: ""
+    form: {}
+    headers:
+      Authorization:
+      - SharedKey golangrocksonazure:0TRVBtGEkwXlYjzb7nxxBWTABsqu8+4ahgzPoIrRwjI=
+      User-Agent:
+      - Go/go1.9beta1 (amd64-windows) azure-storage-go/10.0.2 api-version/2016-05-31
+        file
+      x-ms-date:
+      - Thu, 20 Jul 2017 23:34:11 GMT
+      x-ms-version:
+      - 2016-05-31
+    url: https://golangrocksonazure.file.core.windows.net/share-133storagesharesuitetestshareexists?restype=share
+    method: HEAD
+  response:
+    body: ""
+    headers:
+      Date:
+      - Thu, 20 Jul 2017 23:34:11 GMT
+      Server:
+      - Windows-Azure-File/1.0 Microsoft-HTTPAPI/2.0
+      X-Ms-Request-Id:
+      - f27d5d73-001a-00eb-7cb0-01f767000000
+      X-Ms-Version:
+      - 2016-05-31
+    status: 404 The specified share does not exist.
+    code: 404
+- request:
+    body: ""
+    form: {}
+    headers:
+      Authorization:
+      - SharedKey golangrocksonazure:g4eyKbM5vV2/Ww/XjaYBULkZOisPK0UScIt09Y1wyn8=
+      User-Agent:
+      - Go/go1.9beta1 (amd64-windows) azure-storage-go/10.0.2 api-version/2016-05-31
+        file
+      x-ms-date:
+      - Thu, 20 Jul 2017 23:34:11 GMT
+      x-ms-version:
+      - 2016-05-31
+    url: https://golangrocksonazure.file.core.windows.net/share-233storagesharesuitetestshareexists?restype=share
+    method: PUT
+  response:
+    body: ""
+    headers:
+      Date:
+      - Thu, 20 Jul 2017 23:34:11 GMT
+      Etag:
+      - '"0x8D4CFC7D316262F"'
+      Last-Modified:
+      - Thu, 20 Jul 2017 23:34:11 GMT
+      Server:
+      - Windows-Azure-File/1.0 Microsoft-HTTPAPI/2.0
+      X-Ms-Request-Id:
+      - f27d5d75-001a-00eb-7db0-01f767000000
+      X-Ms-Version:
+      - 2016-05-31
+    status: 201 Created
+    code: 201
+- request:
+    body: ""
+    form: {}
+    headers:
+      Authorization:
+      - SharedKey golangrocksonazure:f8OB0bhHPSj7pO9xnmBUWjq4SNAK0dYuEAfDQoRw+N8=
+      User-Agent:
+      - Go/go1.9beta1 (amd64-windows) azure-storage-go/10.0.2 api-version/2016-05-31
+        file
+      x-ms-date:
+      - Thu, 20 Jul 2017 23:34:11 GMT
+      x-ms-version:
+      - 2016-05-31
+    url: https://golangrocksonazure.file.core.windows.net/share-233storagesharesuitetestshareexists?restype=share
+    method: HEAD
+  response:
+    body: ""
+    headers:
+      Date:
+      - Thu, 20 Jul 2017 23:34:11 GMT
+      Etag:
+      - '"0x8D4CFC7D316262F"'
+      Last-Modified:
+      - Thu, 20 Jul 2017 23:34:11 GMT
+      Server:
+      - Windows-Azure-File/1.0 Microsoft-HTTPAPI/2.0
+      X-Ms-Request-Id:
+      - f27d5d77-001a-00eb-7eb0-01f767000000
+      X-Ms-Share-Quota:
+      - "5120"
+      X-Ms-Version:
+      - 2016-05-31
+    status: 200 OK
+    code: 200
+- request:
+    body: ""
+    form: {}
+    headers:
+      Authorization:
+      - SharedKey golangrocksonazure:aZDcXzst80dQFi31YIv+VVwFJ+QQLPA3meUJLI33hrI=
+      User-Agent:
+      - Go/go1.9beta1 (amd64-windows) azure-storage-go/10.0.2 api-version/2016-05-31
+        file
+      x-ms-date:
+      - Thu, 20 Jul 2017 23:34:11 GMT
+      x-ms-version:
+      - 2016-05-31
+    url: https://golangrocksonazure.file.core.windows.net/share-133storagesharesuitetestshareexists?restype=share
+    method: DELETE
+  response:
+    body: "\uFEFF\x3C\x3F\x78\x6D\x6C\x20\x76\x65\x72\x73\x69\x6F\x6E\x3D\"\x31\x2E\x30\"\x20\x65\x6E\x63\x6F\x64\x69\x6E\x67\x3D\"\x75\x74\x66\x2D\x38\"\x3F\x3E\x3C\x45\x72\x72\x6F\x72\x3E\x3C\x43\x6F\x64\x65\x3E\x53\x68\x61\x72\x65\x4E\x6F\x74\x46\x6F\x75\x6E\x64\x3C\x2F\x43\x6F\x64\x65\x3E\x3C\x4D\x65\x73\x73\x61\x67\x65\x3E\x54\x68\x65\x20\x73\x70\x65\x63\x69\x66\x69\x65\x64\x20\x73\x68\x61\x72\x65\x20\x64\x6F\x65\x73\x20\x6E\x6F\x74\x20\x65\x78\x69\x73\x74\x2E\n\x52\x65\x71\x75\x65\x73\x74\x49\x64\x3A\x66\x32\x37\x64\x35\x64\x37\x38\x2D\x30\x30\x31\x61\x2D\x30\x30\x65\x62\x2D\x37\x66\x62\x30\x2D\x30\x31\x66\x37\x36\x37\x30\x30\x30\x30\x30\x30\n\x54\x69\x6D\x65\x3A\x32\x30\x31\x37\x2D\x30\x37\x2D\x32\x30\x54\x32\x33\x3A\x33\x34\x3A\x31\x31\x2E\x33\x31\x35\x38\x33\x38\x31\x5A\x3C\x2F\x4D\x65\x73\x73\x61\x67\x65\x3E\x3C\x2F\x45\x72\x72\x6F\x72\x3E"
+    headers:
+      Content-Length:
+      - "217"
+      Content-Type:
+      - application/xml
+      Date:
+      - Thu, 20 Jul 2017 23:34:11 GMT
+      Server:
+      - Windows-Azure-File/1.0 Microsoft-HTTPAPI/2.0
+      X-Ms-Request-Id:
+      - f27d5d78-001a-00eb-7fb0-01f767000000
+      X-Ms-Version:
+      - 2016-05-31
+    status: 404 The specified share does not exist.
+    code: 404

@@ -5,7 +5,7 @@
 //go:generate go run gen.go gen_trieval.go
 
 // Package cases provides general and language-specific case mappers.
-package cases
+package cases // import "golang.org/x/text/cases"
 
 import (
 	"golang.org/x/text/language"

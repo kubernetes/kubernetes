@@ -1,0 +1,14 @@
+variable "foo" {}
+variable "foo" {
+}
+
+variable "foo" {
+	# Standalone comment should be still here
+}
+
+foo {
+}
+
+foo {
+  bar = "mssola"
+}

@@ -1,0 +1,61 @@
+version: v1
+kind: Pod
+metadata:
+  name: "@@CONTAINER_HOST@@"
+spec:
+  containers:
+    - name: etcd
+      image: "gcr.io/@@PROJECT@@/etcd:test"
+      imagePullPolicy: Always
+      ports:
+        - name: etcd-client
+          containerPort: 4001
+          hostPort: 4001
+          protocol: TCP
+        - name: etcd-peer
+          containerPort: 7001
+          hostPort: 7001
+          protocol: TCP
+      env:
+        - name: DISCOVERY
+          value: "@@DISCOVERY@@"
+        - name: ETCD_NAME
+          value: "@@ETCD_NAME@@"
+        - name: CONTAINER_HOST
+          value: "@@CONTAINER_HOST@@"
+      volumeMounts:
+        - name: etcddata
+          mountPath: /opt/etcd/data
+          readOnly: false
+    - name: cadvisor-monitor
+      image: google/cadvisor:latest
+      imagePullPolicy: Always
+      ports:
+        - name: cadvisor-mon
+          containerPort: 8080
+          hostPort: 8080
+          protocol: TCP
+      volumeMounts:
+        - name: varrun
+          mountPath: /var/run
+        - name: sys
+          mountPath: /sys
+          readOnly: true
+        - name: varlibdocker
+          mountPath: /var/lib/docker
+          readOnly: true
+  restartPolicy: Always
+  dnsPolicy: ClusterFirst
+  volumes:
+    - name: etcddata
+      hostPath:
+        path: /data/etcd
+    - name: varrun
+      hostPath:
+        path: /var/run
+    - name: sys
+      hostPath:
+        path: /sys
+    - name: varlibdocker
+      hostPath:
+        path: /var/lib/docker

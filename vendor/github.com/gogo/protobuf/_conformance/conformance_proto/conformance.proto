@@ -1,0 +1,285 @@
+// Protocol Buffers - Google's data interchange format
+// Copyright 2008 Google Inc.  All rights reserved.
+// https://developers.google.com/protocol-buffers/
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are
+// met:
+//
+//     * Redistributions of source code must retain the above copyright
+// notice, this list of conditions and the following disclaimer.
+//     * Redistributions in binary form must reproduce the above
+// copyright notice, this list of conditions and the following disclaimer
+// in the documentation and/or other materials provided with the
+// distribution.
+//     * Neither the name of Google Inc. nor the names of its
+// contributors may be used to endorse or promote products derived from
+// this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+syntax = "proto3";
+package conformance;
+option java_package = "com.google.protobuf.conformance";
+
+import "google/protobuf/any.proto";
+import "google/protobuf/duration.proto";
+import "google/protobuf/field_mask.proto";
+import "google/protobuf/struct.proto";
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/wrappers.proto";
+
+// This defines the conformance testing protocol.  This protocol exists between
+// the conformance test suite itself and the code being tested.  For each test,
+// the suite will send a ConformanceRequest message and expect a
+// ConformanceResponse message.
+//
+// You can either run the tests in two different ways:
+//
+//   1. in-process (using the interface in conformance_test.h).
+//
+//   2. as a sub-process communicating over a pipe.  Information about how to
+//      do this is in conformance_test_runner.cc.
+//
+// Pros/cons of the two approaches:
+//
+//   - running as a sub-process is much simpler for languages other than C/C++.
+//
+//   - running as a sub-process may be more tricky in unusual environments like
+//     iOS apps, where fork/stdin/stdout are not available.
+
+enum WireFormat {
+  UNSPECIFIED = 0;
+  PROTOBUF = 1;
+  JSON = 2;
+}
+
+// Represents a single test case's input.  The testee should:
+//
+//   1. parse this proto (which should always succeed)
+//   2. parse the protobuf or JSON payload in "payload" (which may fail)
+//   3. if the parse succeeded, serialize the message in the requested format.
+message ConformanceRequest {
+  // The payload (whether protobuf of JSON) is always for a TestAllTypes proto
+  // (see below).
+  oneof payload {
+    bytes protobuf_payload = 1;
+    string json_payload = 2;
+  }
+
+  // Which format should the testee serialize its message to?
+  WireFormat requested_output_format = 3;
+}
+
+// Represents a single test case's output.
+message ConformanceResponse {
+  oneof result {
+    // This string should be set to indicate parsing failed.  The string can
+    // provide more information about the parse error if it is available.
+    //
+    // Setting this string does not necessarily mean the testee failed the
+    // test.  Some of the test cases are intentionally invalid input.
+    string parse_error = 1;
+
+    // If the input was successfully parsed but errors occurred when
+    // serializing it to the requested output format, set the error message in
+    // this field.
+    string serialize_error = 6;
+
+    // This should be set if some other error occurred.  This will always
+    // indicate that the test failed.  The string can provide more information
+    // about the failure.
+    string runtime_error = 2;
+
+    // If the input was successfully parsed and the requested output was
+    // protobuf, serialize it to protobuf and set it in this field.
+    bytes protobuf_payload = 3;
+
+    // If the input was successfully parsed and the requested output was JSON,
+    // serialize to JSON and set it in this field.
+    string json_payload = 4;
+
+    // For when the testee skipped the test, likely because a certain feature
+    // wasn't supported, like JSON input/output.
+    string skipped = 5;
+  }
+}
+
+// This proto includes every type of field in both singular and repeated
+// forms.
+message TestAllTypes {
+  message NestedMessage {
+    int32 a = 1;
+    TestAllTypes corecursive = 2;
+  }
+
+  enum NestedEnum {
+    FOO = 0;
+    BAR = 1;
+    BAZ = 2;
+    NEG = -1;  // Intentionally negative.
+  }
+
+  // Singular
+  int32 optional_int32    =  1;
+  int64 optional_int64    =  2;
+  uint32 optional_uint32   =  3;
+  uint64 optional_uint64   =  4;
+  sint32 optional_sint32   =  5;
+  sint64 optional_sint64   =  6;
+  fixed32 optional_fixed32  =  7;
+  fixed64 optional_fixed64  =  8;
+  sfixed32 optional_sfixed32 =  9;
+  sfixed64 optional_sfixed64 = 10;
+  float optional_float    = 11;
+  double optional_double   = 12;
+  bool optional_bool     = 13;
+  string optional_string   = 14;
+  bytes optional_bytes    = 15;
+
+  NestedMessage                        optional_nested_message  = 18;
+  ForeignMessage                       optional_foreign_message = 19;
+
+  NestedEnum                           optional_nested_enum     = 21;
+  ForeignEnum                          optional_foreign_enum    = 22;
+
+  string optional_string_piece = 24 [ctype=STRING_PIECE];
+  string optional_cord = 25 [ctype=CORD];
+
+  TestAllTypes recursive_message = 27;
+
+  // Repeated
+  repeated    int32 repeated_int32    = 31;
+  repeated    int64 repeated_int64    = 32;
+  repeated   uint32 repeated_uint32   = 33;
+  repeated   uint64 repeated_uint64   = 34;
+  repeated   sint32 repeated_sint32   = 35;
+  repeated   sint64 repeated_sint64   = 36;
+  repeated  fixed32 repeated_fixed32  = 37;
+  repeated  fixed64 repeated_fixed64  = 38;
+  repeated sfixed32 repeated_sfixed32 = 39;
+  repeated sfixed64 repeated_sfixed64 = 40;
+  repeated    float repeated_float    = 41;
+  repeated   double repeated_double   = 42;
+  repeated     bool repeated_bool     = 43;
+  repeated   string repeated_string   = 44;
+  repeated    bytes repeated_bytes    = 45;
+
+  repeated NestedMessage                        repeated_nested_message  = 48;
+  repeated ForeignMessage                       repeated_foreign_message = 49;
+
+  repeated NestedEnum                           repeated_nested_enum     = 51;
+  repeated ForeignEnum                          repeated_foreign_enum    = 52;
+
+  repeated string repeated_string_piece = 54 [ctype=STRING_PIECE];
+  repeated string repeated_cord = 55 [ctype=CORD];
+
+  // Map
+  map <   int32, int32>    map_int32_int32 = 56;
+  map <   int64, int64>    map_int64_int64 = 57;
+  map <  uint32, uint32>   map_uint32_uint32 = 58;
+  map <  uint64, uint64>   map_uint64_uint64 = 59;
+  map <  sint32, sint32>   map_sint32_sint32 = 60;
+  map <  sint64, sint64>   map_sint64_sint64 = 61;
+  map < fixed32, fixed32>  map_fixed32_fixed32 = 62;
+  map < fixed64, fixed64>  map_fixed64_fixed64 = 63;
+  map <sfixed32, sfixed32> map_sfixed32_sfixed32 = 64;
+  map <sfixed64, sfixed64> map_sfixed64_sfixed64 = 65;
+  map <   int32, float>    map_int32_float = 66;
+  map <   int32, double>   map_int32_double = 67;
+  map <    bool, bool>     map_bool_bool = 68;
+  map <  string, string>   map_string_string = 69;
+  map <  string, bytes>    map_string_bytes = 70;
+  map <  string, NestedMessage>  map_string_nested_message = 71;
+  map <  string, ForeignMessage> map_string_foreign_message = 72;
+  map <  string, NestedEnum>     map_string_nested_enum = 73;
+  map <  string, ForeignEnum>    map_string_foreign_enum = 74;
+
+  oneof oneof_field {
+    uint32 oneof_uint32 = 111;
+    NestedMessage oneof_nested_message = 112;
+    string oneof_string = 113;
+    bytes oneof_bytes = 114;
+    bool oneof_bool = 115;
+    uint64 oneof_uint64 = 116;
+    float oneof_float = 117;
+    double oneof_double = 118;
+    NestedEnum oneof_enum = 119;
+  }
+
+  // Well-known types
+  google.protobuf.BoolValue optional_bool_wrapper = 201;
+  google.protobuf.Int32Value optional_int32_wrapper = 202;
+  google.protobuf.Int64Value optional_int64_wrapper = 203;
+  google.protobuf.UInt32Value optional_uint32_wrapper = 204;
+  google.protobuf.UInt64Value optional_uint64_wrapper = 205;
+  google.protobuf.FloatValue optional_float_wrapper = 206;
+  google.protobuf.DoubleValue optional_double_wrapper = 207;
+  google.protobuf.StringValue optional_string_wrapper = 208;
+  google.protobuf.BytesValue optional_bytes_wrapper = 209;
+
+  repeated google.protobuf.BoolValue repeated_bool_wrapper = 211;
+  repeated google.protobuf.Int32Value repeated_int32_wrapper = 212;
+  repeated google.protobuf.Int64Value repeated_int64_wrapper = 213;
+  repeated google.protobuf.UInt32Value repeated_uint32_wrapper = 214;
+  repeated google.protobuf.UInt64Value repeated_uint64_wrapper = 215;
+  repeated google.protobuf.FloatValue repeated_float_wrapper = 216;
+  repeated google.protobuf.DoubleValue repeated_double_wrapper = 217;
+  repeated google.protobuf.StringValue repeated_string_wrapper = 218;
+  repeated google.protobuf.BytesValue repeated_bytes_wrapper = 219;
+
+  google.protobuf.Duration optional_duration = 301;
+  google.protobuf.Timestamp optional_timestamp = 302;
+  google.protobuf.FieldMask optional_field_mask = 303;
+  google.protobuf.Struct optional_struct = 304;
+  google.protobuf.Any optional_any = 305;
+  google.protobuf.Value optional_value = 306;
+
+  repeated google.protobuf.Duration repeated_duration = 311;
+  repeated google.protobuf.Timestamp repeated_timestamp = 312;
+  repeated google.protobuf.FieldMask repeated_fieldmask = 313;
+  repeated google.protobuf.Struct repeated_struct = 324;
+  repeated google.protobuf.Any repeated_any = 315;
+  repeated google.protobuf.Value repeated_value = 316;
+
+  // Test field-name-to-JSON-name convention.
+  // (protobuf says names can be any valid C/C++ identifier.)
+  int32 fieldname1 = 401;
+  int32 field_name2 = 402;
+  int32 _field_name3 = 403;
+  int32 field__name4_ = 404;
+  int32 field0name5 = 405;
+  int32 field_0_name6 = 406;
+  int32 fieldName7 = 407;
+  int32 FieldName8 = 408;
+  int32 field_Name9 = 409;
+  int32 Field_Name10 = 410;
+  int32 FIELD_NAME11 = 411;
+  int32 FIELD_name12 = 412;
+  int32 __field_name13 = 413;
+  int32 __Field_name14 = 414;
+  int32 field__name15 = 415;
+  int32 field__Name16 = 416;
+  int32 field_name17__ = 417;
+  int32 Field_name18__ = 418;
+}
+
+message ForeignMessage {
+  int32 c = 1;
+}
+
+enum ForeignEnum {
+  FOREIGN_FOO = 0;
+  FOREIGN_BAR = 1;
+  FOREIGN_BAZ = 2;
+}

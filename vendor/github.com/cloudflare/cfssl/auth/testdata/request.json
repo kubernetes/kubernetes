@@ -1,0 +1,30 @@
+{
+	"hostname": "kyleisom.net",
+	"request": "-----BEGIN CERTIFICATE REQUEST-----
+	    MIID0TCCAjsCAQAwYDELMAkGA1UEBhMCVVMxEjAQBgNVBAoTCWRyb3Bzb25kZTEQ
+	    MA4GA1UECxMHQ0YtQ2hhdDEWMBQGA1UEBxMNU2FuIEZyYW5jaXNjbzETMBEGA1UE
+	    CBMKQ2FsaWZvcm5pYTCCAaIwDQYJKoZIhvcNAQEBBQADggGPADCCAYoCggGBAMcC
+	    GBl5LTrekGFWhotkdbZ+R1MloarWxQv9jP4Aekt8UOicypHvFO6xOtSwHo+r32iE
+	    qnS5yv/01P2MJuyqndncTSMsOlT/7n67TM00u01K/9c/sogKEKjlyplTP7yFdG/c
+	    Ou/9qKb/Jald2wELFYE6xq2RDFyxyiZOB3g7Z7Fxa5d6adfGRwZzNtUL4/8s+Lyi
+	    qdw9I1fkQd604poZFN0wrQs4lfhWTUfg0rHuh5wgGKP3VzZpbt8Fb1vNjfbHtohx
+	    G2PCU6Jy+Dc1bSfUzWcQnenp858W4F8z7pF5ybdnFR313HjosqXnG28zITrOadMT
+	    HaJ6zOhgEafUOWXOzjNofFBFa2IuCAT+ITRY1tC/gqpxGwH/yuVN19BG8Upn0+HA
+	    ie2mKCHfSBAKT/Xe4umPeaxSbIqWsW8ck+d3b4or9RZv5cZRcT3oikJt+SQG69pW
+	    4OAbb+ABss/NIuri6z0e7DEeIL5zmySJqdtYHdNYN7++v9xBNsL4IsU6IEy3+QID
+	    AQABoC4wLAYJKoZIhvcNAQkOMR8wHTAbBgNVHREEFDASghBjZi5kcm9wc29uZGUu
+	    bmV0MAsGCSqGSIb3DQEBDAOCAYEAhMAqBirI+k1aU3lfAGQiSm8ytOzZij389hIr
+	    nUp8+WnTuVTb8XZ3/V+L9EnTImF6u1weajXd3Sue49570LbYmIuxBkGp50/BdUDz
+	    uB6xshhJWs12JxUb91Imm0bTRw2zMqewga6ftzZ/AK4msxQA2UIbcWZdsKbuM7so
+	    JTfVW9iOwqHt/64Zj4tBZf9LzODr7kNuKKLnwjizH187xfIIhdrjF8WS7H9APB1O
+	    SuEUDfqh0SWR3ltWuAuUWeo6SKcHVusy/G4YE+PByw1eV7G4SbeG5Z0o+GOUUK/F
+	    b55GmW1xa4LArs1A+zeFbvJ/BApsbU2b6WVmNa7WpHz7WXIFOJuYJgEkVKPJnKus
+	    qqs3FgUqz0Zv7TK8mMiETJoXZs6zCvMysQeu3J/ojgtAjvMhzQc6PS/nvOtJdIg+
+	    H0qX49fhp1BrYyslalzQIF0+H0qSUeyoUyV2wbLBALapxMfvTVlhNwnactcKQxq4
+	    +wT+2PTJ0bM/5AV0TO1SPT0AViJh
+	    -----END CERTIFICATE REQUEST-----",
+	"profile": "",
+	"remote": "",
+	"label": "primary"
+}
+

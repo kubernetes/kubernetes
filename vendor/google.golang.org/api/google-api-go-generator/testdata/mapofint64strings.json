@@ -1,0 +1,34 @@
+{
+ "kind": "discovery#restDescription",
+ "discoveryVersion": "v1",
+ "id": "androidbuildinternal:v1",
+ "name": "androidbuildinternal",
+ "version": "v1",
+ "description": "proper handling of a map of int64s in string format",
+ "protocol": "rest",
+ "schemas": {
+  "TestResultSummaryToolGroupTestSuite": {
+   "id": "TestResultSummaryToolGroupTestSuite",
+   "type": "object",
+   "properties": {
+    "passed": {
+     "type": "boolean"
+    },
+    "passedTestTags": {
+     "type": "object",
+     "additionalProperties": {
+      "type": "string",
+      "format": "int64"
+     }
+    },
+    "testTags": {
+     "type": "object",
+     "additionalProperties": {
+      "type": "string",
+      "format": "int64"
+     }
+    }
+   }
+  }
+ }
+}

@@ -1,0 +1,11 @@
+[Unit]
+Description=rkt api service
+Documentation=http://github.com/coreos/rkt
+After=network.target rkt-api-tcp.socket
+Requires=rkt-api-tcp.socket
+
+[Service]
+ExecStart=/usr/bin/rkt api-service
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,407 @@
+policy_module(docker, 1.0.0)
+
+########################################
+#
+# Declarations
+#
+
+## <desc>
+##  <p>
+##  Determine whether docker can
+##  connect to all TCP ports.
+##  </p>
+## </desc>
+gen_tunable(docker_connect_any, false)
+
+type docker_t;
+type docker_exec_t;
+init_daemon_domain(docker_t, docker_exec_t)
+domain_subj_id_change_exemption(docker_t)
+domain_role_change_exemption(docker_t)
+
+type spc_t;
+domain_type(spc_t)
+role system_r types spc_t;
+
+type spc_var_run_t;
+files_pid_file(spc_var_run_t)
+
+type docker_var_lib_t;
+files_type(docker_var_lib_t)
+
+type docker_home_t;
+userdom_user_home_content(docker_home_t)
+
+type docker_config_t;
+files_config_file(docker_config_t)
+
+type docker_lock_t;
+files_lock_file(docker_lock_t)
+
+type docker_log_t;
+logging_log_file(docker_log_t)
+
+type docker_tmp_t;
+files_tmp_file(docker_tmp_t)
+
+type docker_tmpfs_t;
+files_tmpfs_file(docker_tmpfs_t)
+
+type docker_var_run_t;
+files_pid_file(docker_var_run_t)
+
+type docker_unit_file_t;
+systemd_unit_file(docker_unit_file_t)
+
+type docker_devpts_t;
+term_pty(docker_devpts_t)
+
+type docker_share_t;
+files_type(docker_share_t)
+
+########################################
+#
+# docker local policy
+#
+allow docker_t self:capability { chown kill fowner fsetid mknod net_admin net_bind_service net_raw setfcap };
+allow docker_t self:tun_socket relabelto;
+allow docker_t self:process { getattr signal_perms setrlimit setfscreate };
+allow docker_t self:fifo_file rw_fifo_file_perms;
+allow docker_t self:unix_stream_socket create_stream_socket_perms;
+allow docker_t self:tcp_socket create_stream_socket_perms;
+allow docker_t self:udp_socket create_socket_perms;
+allow docker_t self:capability2 block_suspend;
+
+manage_files_pattern(docker_t, docker_home_t, docker_home_t)
+manage_dirs_pattern(docker_t, docker_home_t, docker_home_t)
+manage_lnk_files_pattern(docker_t, docker_home_t, docker_home_t)
+userdom_admin_home_dir_filetrans(docker_t, docker_home_t, dir, ".docker")
+
+manage_dirs_pattern(docker_t, docker_config_t, docker_config_t)
+manage_files_pattern(docker_t, docker_config_t, docker_config_t)
+files_etc_filetrans(docker_t, docker_config_t, dir, "docker")
+
+manage_dirs_pattern(docker_t, docker_lock_t, docker_lock_t)
+manage_files_pattern(docker_t, docker_lock_t, docker_lock_t)
+
+manage_dirs_pattern(docker_t, docker_log_t, docker_log_t)
+manage_files_pattern(docker_t, docker_log_t, docker_log_t)
+manage_lnk_files_pattern(docker_t, docker_log_t, docker_log_t)
+logging_log_filetrans(docker_t, docker_log_t, { dir file lnk_file })
+allow docker_t docker_log_t:dir_file_class_set { relabelfrom relabelto };
+
+manage_dirs_pattern(docker_t, docker_tmp_t, docker_tmp_t)
+manage_files_pattern(docker_t, docker_tmp_t, docker_tmp_t)
+manage_lnk_files_pattern(docker_t, docker_tmp_t, docker_tmp_t)
+files_tmp_filetrans(docker_t, docker_tmp_t, { dir file lnk_file })
+
+manage_dirs_pattern(docker_t, docker_tmpfs_t, docker_tmpfs_t)
+manage_files_pattern(docker_t, docker_tmpfs_t, docker_tmpfs_t)
+manage_lnk_files_pattern(docker_t, docker_tmpfs_t, docker_tmpfs_t)
+manage_fifo_files_pattern(docker_t, docker_tmpfs_t, docker_tmpfs_t)
+manage_chr_files_pattern(docker_t, docker_tmpfs_t, docker_tmpfs_t)
+manage_blk_files_pattern(docker_t, docker_tmpfs_t, docker_tmpfs_t)
+allow docker_t docker_tmpfs_t:dir relabelfrom;
+can_exec(docker_t, docker_tmpfs_t)
+fs_tmpfs_filetrans(docker_t, docker_tmpfs_t, { dir file })
+allow docker_t docker_tmpfs_t:chr_file mounton;
+
+manage_dirs_pattern(docker_t, docker_share_t, docker_share_t)
+manage_files_pattern(docker_t, docker_share_t, docker_share_t)
+manage_lnk_files_pattern(docker_t, docker_share_t, docker_share_t)
+allow docker_t docker_share_t:dir_file_class_set { relabelfrom relabelto };
+
+can_exec(docker_t, docker_share_t)
+#docker_filetrans_named_content(docker_t)
+
+manage_dirs_pattern(docker_t, docker_var_lib_t, docker_var_lib_t)
+manage_chr_files_pattern(docker_t, docker_var_lib_t, docker_var_lib_t)
+manage_blk_files_pattern(docker_t, docker_var_lib_t, docker_var_lib_t)
+manage_files_pattern(docker_t, docker_var_lib_t, docker_var_lib_t)
+manage_lnk_files_pattern(docker_t, docker_var_lib_t, docker_var_lib_t)
+allow docker_t docker_var_lib_t:dir_file_class_set { relabelfrom relabelto };
+files_var_lib_filetrans(docker_t, docker_var_lib_t, { dir file lnk_file })
+
+manage_dirs_pattern(docker_t, docker_var_run_t, docker_var_run_t)
+manage_files_pattern(docker_t, docker_var_run_t, docker_var_run_t)
+manage_sock_files_pattern(docker_t, docker_var_run_t, docker_var_run_t)
+manage_lnk_files_pattern(docker_t, docker_var_run_t, docker_var_run_t)
+files_pid_filetrans(docker_t, docker_var_run_t, { dir file lnk_file sock_file })
+
+allow docker_t docker_devpts_t:chr_file { relabelfrom rw_chr_file_perms setattr_chr_file_perms };
+term_create_pty(docker_t, docker_devpts_t)
+
+kernel_read_system_state(docker_t)
+kernel_read_network_state(docker_t)
+kernel_read_all_sysctls(docker_t)
+kernel_rw_net_sysctls(docker_t)
+kernel_setsched(docker_t)
+kernel_read_all_proc(docker_t)
+
+domain_use_interactive_fds(docker_t)
+domain_dontaudit_read_all_domains_state(docker_t)
+
+corecmd_exec_bin(docker_t)
+corecmd_exec_shell(docker_t)
+
+corenet_tcp_bind_generic_node(docker_t)
+corenet_tcp_sendrecv_generic_if(docker_t)
+corenet_tcp_sendrecv_generic_node(docker_t)
+corenet_tcp_sendrecv_generic_port(docker_t)
+corenet_tcp_bind_all_ports(docker_t)
+corenet_tcp_connect_http_port(docker_t)
+corenet_tcp_connect_commplex_main_port(docker_t)
+corenet_udp_sendrecv_generic_if(docker_t)
+corenet_udp_sendrecv_generic_node(docker_t)
+corenet_udp_sendrecv_all_ports(docker_t)
+corenet_udp_bind_generic_node(docker_t)
+corenet_udp_bind_all_ports(docker_t)
+
+files_read_config_files(docker_t)
+files_dontaudit_getattr_all_dirs(docker_t)
+files_dontaudit_getattr_all_files(docker_t)
+
+fs_read_cgroup_files(docker_t)
+fs_read_tmpfs_symlinks(docker_t)
+fs_search_all(docker_t)
+fs_getattr_all_fs(docker_t)
+
+storage_raw_rw_fixed_disk(docker_t)
+
+auth_use_nsswitch(docker_t)
+auth_dontaudit_getattr_shadow(docker_t)
+
+init_read_state(docker_t)
+init_status(docker_t)
+
+logging_send_audit_msgs(docker_t)
+logging_send_syslog_msg(docker_t)
+
+miscfiles_read_localization(docker_t)
+
+mount_domtrans(docker_t)
+
+seutil_read_default_contexts(docker_t)
+seutil_read_config(docker_t)
+
+sysnet_dns_name_resolve(docker_t)
+sysnet_exec_ifconfig(docker_t)
+
+optional_policy(`
+	rpm_exec(docker_t)
+	rpm_read_db(docker_t)
+	rpm_exec(docker_t)
+')
+
+optional_policy(`
+	fstools_domtrans(docker_t)
+')
+
+optional_policy(`
+	iptables_domtrans(docker_t)
+')
+
+optional_policy(`
+	openvswitch_stream_connect(docker_t)
+')
+
+allow docker_t self:capability { dac_override setgid setpcap setuid sys_admin sys_boot sys_chroot sys_ptrace };
+
+allow docker_t self:process { getcap setcap setexec setpgid setsched signal_perms };
+
+allow docker_t self:netlink_route_socket rw_netlink_socket_perms;;
+allow docker_t self:netlink_audit_socket create_netlink_socket_perms;
+allow docker_t self:unix_dgram_socket { create_socket_perms sendto };
+allow docker_t self:unix_stream_socket { create_stream_socket_perms connectto };
+
+allow docker_t docker_var_lib_t:dir mounton;
+allow docker_t docker_var_lib_t:chr_file mounton;
+can_exec(docker_t, docker_var_lib_t)
+
+kernel_dontaudit_setsched(docker_t)
+kernel_get_sysvipc_info(docker_t)
+kernel_request_load_module(docker_t)
+kernel_mounton_messages(docker_t)
+kernel_mounton_all_proc(docker_t)
+kernel_mounton_all_sysctls(docker_t)
+kernel_unlabeled_entry_type(spc_t)
+kernel_unlabeled_domtrans(docker_t, spc_t)
+
+dev_getattr_all(docker_t)
+dev_getattr_sysfs_fs(docker_t)
+dev_read_urand(docker_t)
+dev_read_lvm_control(docker_t)
+dev_rw_sysfs(docker_t)
+dev_rw_loop_control(docker_t)
+dev_rw_lvm_control(docker_t)
+
+files_getattr_isid_type_dirs(docker_t)
+files_manage_isid_type_dirs(docker_t)
+files_manage_isid_type_files(docker_t)
+files_manage_isid_type_symlinks(docker_t)
+files_manage_isid_type_chr_files(docker_t)
+files_manage_isid_type_blk_files(docker_t)
+files_exec_isid_files(docker_t)
+files_mounton_isid(docker_t)
+files_mounton_non_security(docker_t)
+files_mounton_isid_type_chr_file(docker_t)
+
+fs_mount_all_fs(docker_t)
+fs_unmount_all_fs(docker_t)
+fs_remount_all_fs(docker_t)
+files_mounton_isid(docker_t)
+fs_manage_cgroup_dirs(docker_t)
+fs_manage_cgroup_files(docker_t)
+fs_relabelfrom_xattr_fs(docker_t)
+fs_relabelfrom_tmpfs(docker_t)
+fs_read_tmpfs_symlinks(docker_t)
+fs_list_hugetlbfs(docker_t)
+
+term_use_generic_ptys(docker_t)
+term_use_ptmx(docker_t)
+term_getattr_pty_fs(docker_t)
+term_relabel_pty_fs(docker_t)
+term_mounton_unallocated_ttys(docker_t)
+
+modutils_domtrans_insmod(docker_t)
+
+systemd_status_all_unit_files(docker_t)
+systemd_start_systemd_services(docker_t)
+
+userdom_stream_connect(docker_t)
+userdom_search_user_home_content(docker_t)
+userdom_read_all_users_state(docker_t)
+userdom_relabel_user_home_files(docker_t)
+userdom_relabel_user_tmp_files(docker_t)
+userdom_relabel_user_tmp_dirs(docker_t)
+
+optional_policy(`
+	gpm_getattr_gpmctl(docker_t)
+')
+
+optional_policy(`
+	dbus_system_bus_client(docker_t)
+	init_dbus_chat(docker_t)
+	init_start_transient_unit(docker_t)
+
+	optional_policy(`
+		systemd_dbus_chat_logind(docker_t)
+	')
+
+	optional_policy(`
+		firewalld_dbus_chat(docker_t)
+	')
+')
+
+optional_policy(`
+	udev_read_db(docker_t)
+')
+
+optional_policy(`
+	virt_read_config(docker_t)
+	virt_exec(docker_t)
+	virt_stream_connect(docker_t)
+	virt_stream_connect_sandbox(docker_t)
+	virt_exec_sandbox_files(docker_t)
+	virt_manage_sandbox_files(docker_t)
+	virt_relabel_sandbox_filesystem(docker_t)
+	virt_transition_svirt_sandbox(docker_t, system_r)
+	virt_mounton_sandbox_file(docker_t)
+#	virt_attach_sandbox_tun_iface(docker_t)
+	allow docker_t svirt_sandbox_domain:tun_socket relabelfrom;
+')
+
+tunable_policy(`docker_connect_any',`
+    corenet_tcp_connect_all_ports(docker_t)
+    corenet_sendrecv_all_packets(docker_t)
+    corenet_tcp_sendrecv_all_ports(docker_t)
+')
+
+########################################
+#
+# spc local policy
+#
+domain_entry_file(spc_t, docker_share_t)
+domain_entry_file(spc_t, docker_var_lib_t)
+role system_r types spc_t;
+
+domain_entry_file(spc_t, docker_share_t)
+domain_entry_file(spc_t, docker_var_lib_t)
+domtrans_pattern(docker_t, docker_share_t, spc_t)
+domtrans_pattern(docker_t, docker_var_lib_t, spc_t)
+allow docker_t spc_t:process { setsched signal_perms };
+ps_process_pattern(docker_t, spc_t)
+allow docker_t spc_t:socket_class_set { relabelto relabelfrom };
+
+optional_policy(`
+	dbus_chat_system_bus(spc_t)
+')
+
+optional_policy(`
+	unconfined_domain_noaudit(spc_t)
+')
+
+optional_policy(`
+	unconfined_domain(docker_t)
+')
+
+optional_policy(`
+	virt_transition_svirt_sandbox(spc_t, system_r)
+')
+
+########################################
+#
+# docker upstream policy
+#
+
+optional_policy(`
+#    domain_stub_named_filetrans_domain()
+     gen_require(`
+        attribute named_filetrans_domain;
+     ')
+
+      docker_filetrans_named_content(named_filetrans_domain)
+')
+
+optional_policy(`
+    lvm_stub()
+    docker_rw_sem(lvm_t)
+')
+
+optional_policy(`
+    staff_stub()
+    docker_stream_connect(staff_t)
+    docker_exec(staff_t)
+')
+
+optional_policy(`
+    virt_stub_svirt_sandbox_domain()
+    virt_stub_svirt_sandbox_file()
+    allow svirt_sandbox_domain self:netlink_kobject_uevent_socket create_socket_perms;
+    docker_read_share_files(svirt_sandbox_domain)
+    docker_lib_filetrans(svirt_sandbox_domain,svirt_sandbox_file_t, sock_file)
+    docker_use_ptys(svirt_sandbox_domain)
+    docker_spc_stream_connect(svirt_sandbox_domain)
+    fs_list_tmpfs(svirt_sandbox_domain)
+    fs_rw_hugetlbfs_files(svirt_sandbox_domain)
+    fs_dontaudit_remount_tmpfs(svirt_sandbox_domain)
+    dev_dontaudit_mounton_sysfs(svirt_sandbox_domain)
+
+    tunable_policy(`virt_sandbox_use_fusefs',`
+	fs_manage_fusefs_dirs(svirt_sandbox_domain)
+	fs_manage_fusefs_files(svirt_sandbox_domain)
+	fs_manage_fusefs_symlinks(svirt_sandbox_domain)
+    ')
+     gen_require(`
+        attribute domain;
+     ')
+
+     dontaudit svirt_sandbox_domain domain:key {search link};
+')
+
+optional_policy(`
+	gen_require(`
+		type pcp_pmcd_t;
+	')
+	docker_manage_lib_files(pcp_pmcd_t)
+')

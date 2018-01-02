@@ -1,0 +1,16 @@
+title = "LibNetwork Configuration file"
+
+[daemon]
+  debug = false
+[cluster]
+  discovery = "consul://localhost:8500"
+  Address = "1.1.1.1"
+  Heartbeat = 20
+[datastore]
+  embedded = false
+[datastore.client]
+  provider = "consul"
+  Address = "localhost:8500"
+[orchestration]
+  agent = true
+  peer="2.2.2.2"

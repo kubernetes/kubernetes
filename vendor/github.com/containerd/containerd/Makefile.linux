@@ -1,0 +1,12 @@
+#linux specific settings
+COMMANDS += containerd-shim
+
+# check GOOS for cross compile builds
+ifeq ($(GOOS),linux)
+	GO_GCFLAGS= -buildmode=pie
+endif
+
+# amd64 supports go test -race
+ifeq ($(GOARCH),amd64)
+	TESTFLAGS_RACE= -race
+endif

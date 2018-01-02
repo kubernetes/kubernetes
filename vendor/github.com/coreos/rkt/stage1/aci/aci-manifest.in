@@ -1,0 +1,61 @@
+{
+    "acKind": "ImageManifest",
+    "acVersion": "0.8.10",
+    "name": "@RKT_STAGE1_NAME@",
+    "labels": [
+        {
+            "name": "version",
+            "value": "@RKT_STAGE1_VERSION@"
+        },
+        {
+            "name": "arch",
+            "value": "@RKT_STAGE1_ARCH@"
+        },
+        {
+            "name": "os",
+            "value": "linux"
+        }
+    ],
+    "annotations": [
+        {
+            "name": "coreos.com/rkt/stage1/run",
+            "value": "/init"
+        },
+        {
+            "name": "coreos.com/rkt/stage1/enter",
+            "value": "@RKT_STAGE1_ENTER@"
+        },
+        {
+            "name": "coreos.com/rkt/stage1/gc",
+            "value": "/gc"
+        },
+        {
+            "name": "coreos.com/rkt/stage1/stop",
+            "value": "@RKT_STAGE1_STOP@"
+        },
+        {
+            "name": "coreos.com/rkt/stage1/app/add",
+            "value": "/app_add"
+        },
+        {
+            "name": "coreos.com/rkt/stage1/app/rm",
+            "value": "/app_rm"
+        },
+        {
+            "name": "coreos.com/rkt/stage1/app/start",
+            "value": "/app_start"
+        },
+        {
+            "name": "coreos.com/rkt/stage1/app/stop",
+            "value": "/app_stop"
+        },
+        {
+            "name": "coreos.com/rkt/stage1/attach",
+            "value": "/attach"
+        },
+        {
+            "name": "coreos.com/rkt/stage1/interface-version",
+            "value": "5"
+        }
+    ]
+}

@@ -1,0 +1,72 @@
+1.1.0 - 2015-08-04
+
+ADDED:
+       - Revocation now checks OCSP status.
+       - Authenticated endpoints are now supported using HMAC tags.
+       - Bundle can verify certificates against a domain or IP.
+       - OCSP subcommand has been added.
+       - PKCS #11 keys are now supported; this support is now the default.
+       - OCSP serving is now implemented.
+       - The multirootca tool is now available for multiple signing
+         keys via an authenticated API.
+       - A scan utility for checking the quality of a server's TLS
+         configuration.
+       - The certificate bundler now supports PKCS #7 and PKCS #12.
+       - An info endpoint has been added to retrieve the signers'
+         certificates.
+       - Signers can now use a serial sequence number for certificate
+         serial numbers; the default remains randomised serial numbers.
+       - CSR whitelisting allows the signer to explicitly distrust
+         certain fields in a CSR.
+       - Signing profiles can include certificate policies and their
+         qualifiers.
+       - The multirootca can use Red October-secured private keys.
+       - The multirootca can whitelist CSRs per-signer based on an
+         IP network whitelist.
+       - The signer can whitelist SANs and common names via a regular-
+         expression whitelist.
+       - Multiple fallback remote signers are now supported in the
+         cfssl server.
+       - A Docker build script has been provided to facilitate building
+         CFSSL for all supported platforms.
+       - The log package includes a new logging level, fatal, that
+         immediately exits with error after printing the log message.
+
+CHANGED:
+       - CLI tool can read from standard input.
+       - The -f flag has been renamed to -config.
+       - Signers have been refactored into local and remote signers
+         under a single universal signer abstraction.
+       - The CLI subcommands have been refactored into separate
+         packages.
+       - Signing can now extract subject information from a CSR.
+       - Various improvements to the certificate ubiquity scoring,
+         such as accounting for SHA1 deprecation.
+       - The bundle CLI tool can set the intermediates directory that
+         newly found intermediates can be stored in.
+       - The CLI tools return exit code 1 on failure.
+
+CONTRIBUTORS:
+       Alice Xia
+       Dan Rohr
+       Didier Smith
+       Dominic Luechinger
+       Erik Kristensen
+       Fabian Ruff
+       George Tankersley
+       Harald Wagener
+       Harry Harpham
+       Jacob H. Haven
+       Jacob Hoffman-Andrews
+       Joshua Kroll
+       Kyle Isom
+       Nick Sullivan
+       Peter Eckersley
+       Richard Barnes
+       Sophie Huang
+       Steve Rude
+       Tara Vancil
+       Terin Stock
+       Thomaz Leite
+       Travis Truman
+       Zi Lin

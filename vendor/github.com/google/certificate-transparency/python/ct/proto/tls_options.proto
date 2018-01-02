@@ -1,0 +1,98 @@
+syntax = "proto2";
+
+import "google/protobuf/descriptor.proto";
+
+package ct;
+
+// TLS field options specify the wire format for parsing TLS wire messages
+// to protocol buffers, using the custom decoder in tls_message.py.
+// TODO(ekasper): encoder.
+// For example, to implement the following TLS specification:
+//
+// enum { apple(0), orange(1), (255) } Fruit;
+//
+// struct {
+//   uint16 weight;
+//   opaque county_code[2];
+// } Apple;
+//
+// struct {
+//   opaque origin<1..2^8-1>;
+// } Orange;
+//
+// struct {
+//   Fruit fruit_type;
+//   select (fruit_type) {
+//     case apple: Apple;
+//     case orange: Orange;
+// } Snack;
+//
+// simply set the protocol buffer options as follows:
+//
+// enum Fruit {
+//   option (tls_enum_opts).max_value = 255;
+//   APPLE = 0;
+//   ORANGE = 1;
+// }
+//
+// message Apple {
+//   optional uint32 weight = 1 [(tls_opts).max_value = 0xffff];
+//   optional bytes country_code = 2 [(tls_opts).fixed_length = 2];
+// }
+//
+// message Orange {
+//   optional bytes origin = 1 [(tls_opts).min_length = 1,
+//                              (tls_opts).max_length = 255];
+//
+// message Snack {
+//   optional Fruit fruit_type = 1;
+//   optional Apple apple = 2 [(tls_opts).select_field = "fruit_type",
+//                             (tls_opts).select_value = 0];
+//   optional Orange orange = 3 [(tls_opts).select_field = "fruit_type",
+//                               (tls_opts).select_value = 1];
+//
+// Note that the numbering of the fields in the message determines their order
+// appearance in the TLS encoding.
+
+message TLSOptions {
+  // Applies to uint32 and uint64, allowing to restrict the field
+  // to a smaller maximum value.
+  // For example, to indicate a uint24, set |bytes_in_use| to 3.
+  optional uint32 bytes_in_use = 1;
+  // Applies to enums, allowing to restrict the maximum value.
+  optional uint32 max_value = 2;
+  // Applies to 'bytes' fields, indicating the fixed length of the element.
+  // TODO(ekasper): this syntax is also specified for TLS vectors but is
+  // currently unimplemented for repeated fields.
+  optional uint32 fixed_length = 3;
+  // The following two options apply to |bytes| fields, indicating the variable
+  // length range of the bytes vector.
+  optional uint32 min_length = 4;
+  optional uint32 max_length = 5;
+  // The following two options apply to repeated fields, indicating the variable
+  // length range of the vector.
+  optional uint32 min_total_length = 6;
+  optional uint32 max_total_length = 7;
+  // The following two options are used to implement TLS variants.
+  // A TLS variant is implemented as a list of optional fields, only one of
+  // which will be present.
+  // |select_field| specifies the name of the enum field determining the TLS
+  // variant. It must be a field preceding the decoded field in the message.
+  optional string select_field = 8;
+  // |select_value| specifies the numeric value corresponding to this variant.
+  // Protobuf enumerateds must be in the int32 range, but TLS enumerateds are
+  // always non-negative.
+  optional uint32 select_value = 9;
+  // An option for specifying that a field is not part of the TLS structure.
+  optional bool skip = 10;
+}
+
+extend google.protobuf.FieldOptions {
+  // Registered with protobuf-global-extension-registry@google.com
+  optional TLSOptions tls_opts = 1023;
+}
+
+extend google.protobuf.EnumOptions {
+  // Registered with protobuf-global-extension-registry@google.com
+  optional TLSOptions tls_enum_opts = 1023;
+}

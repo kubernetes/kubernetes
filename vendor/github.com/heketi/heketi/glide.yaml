@@ -1,0 +1,24 @@
+package: github.com/heketi/heketi
+import:
+- package: github.com/auth0/go-jwt-middleware
+- package: github.com/boltdb/bolt
+  version: ^1.3.0
+- package: github.com/dgrijalva/jwt-go
+  version: ^3.0.0
+- package: github.com/gorilla/context
+- package: github.com/gorilla/mux
+- package: github.com/heketi/rest
+- package: github.com/heketi/tests
+- package: github.com/lpabon/godbc
+- package: github.com/spf13/cobra
+  version: ca57f0f5dba473a8a58765d16d7e811fb8027add
+- package: github.com/spf13/pflag
+  version: e57e3eeb33f795204c1ca35f56c44f83227c6e66
+- package: github.com/urfave/negroni
+  version: ^0.2.0
+- package: golang.org/x/crypto
+  subpackages:
+  - ssh
+  - ssh/agent
+- package: k8s.io/client-go
+  version: v3.0.0-beta.0

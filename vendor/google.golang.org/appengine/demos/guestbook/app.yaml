@@ -1,0 +1,14 @@
+# Demo application for App Engine "flexible environment".
+runtime: go
+vm: true
+api_version: go1
+
+handlers:
+# Favicon.  Without this, the browser hits this once per page view.
+- url: /favicon.ico
+  static_files: favicon.ico
+  upload: favicon.ico
+
+# Main app.  All the real work is here.
+- url: /.*
+  script: _go_app

@@ -1,0 +1,20 @@
+language: go
+
+go:
+    - 1.8
+    - tip
+
+go_import_path: gopkg.in/src-d/go-billy.v3
+
+matrix:
+    allow_failures:
+        - go: tip
+
+install:
+  - go get -v -t ./...
+
+script:
+  - make test-coverage
+
+after_success:
+  - bash <(curl -s https://codecov.io/bash)

@@ -1,0 +1,12 @@
+        {
+            "definitions": {
+                "SampleCompanyOnePrimitiveString": {
+                    "type": "string",
+                    "id": "x-samplecompanyone-mystr"
+                },
+              "SampleCompanyTwoPrimitiveString": {
+                "type": "string",
+                "id": "x-samplecompanyone-mystr"
+              }
+            }
+        }

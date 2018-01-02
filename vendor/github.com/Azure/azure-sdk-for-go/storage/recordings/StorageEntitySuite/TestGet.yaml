@@ -1,0 +1,259 @@
+---
+version: 1
+rwmutex: {}
+interactions:
+- request:
+    body: |
+      {"TableName":"table26storageentitysuitetestget"}
+    form: {}
+    headers:
+      Accept:
+      - application/json;odata=nometadata
+      Accept-Charset:
+      - UTF-8
+      Authorization:
+      - SharedKey golangrocksonazure:EZbr90rtN7p5TmCd/xfA3tm6NyuGDRnetLfXXOuS8g0=
+      Content-Length:
+      - "49"
+      Content-Type:
+      - application/json
+      Prefer:
+      - return-no-content
+      User-Agent:
+      - Go/go1.9beta1 (amd64-windows) azure-storage-go/10.0.2 api-version/2016-05-31
+        table
+      x-ms-date:
+      - Thu, 20 Jul 2017 23:34:05 GMT
+      x-ms-version:
+      - 2016-05-31
+    url: https://golangrocksonazure.table.core.windows.net/Tables?timeout=30
+    method: POST
+  response:
+    body: ""
+    headers:
+      Cache-Control:
+      - no-cache
+      Content-Length:
+      - "0"
+      Dataserviceid:
+      - https://golangrocksonazure.table.core.windows.net/Tables('table26storageentitysuitetestget')
+      Date:
+      - Thu, 20 Jul 2017 23:34:05 GMT
+      Location:
+      - https://golangrocksonazure.table.core.windows.net/Tables('table26storageentitysuitetestget')
+      Preference-Applied:
+      - return-no-content
+      Server:
+      - Windows-Azure-Table/1.0 Microsoft-HTTPAPI/2.0
+      X-Content-Type-Options:
+      - nosniff
+      X-Ms-Request-Id:
+      - 875b81dc-0002-0036-7db0-0102e5000000
+      X-Ms-Version:
+      - 2016-05-31
+    status: 204 No Content
+    code: 204
+- request:
+    body: '{"AmountDue":200.23,"CustomerCode":"c9da6455-213d-42c9-9a79-3e9149a57833","CustomerCode@odata.type":"Edm.Guid","CustomerSince":"1992-12-20T21:55:00Z","CustomerSince@odata.type":"Edm.DateTime","IsActive":true,"NumberOfOrders":"255","NumberOfOrders@odata.type":"Edm.Int64","PartitionKey":"mypartitionkey","RowKey":"myrowkey"}'
+    form: {}
+    headers:
+      Accept:
+      - application/json;odata=nometadata
+      Accept-Charset:
+      - UTF-8
+      Authorization:
+      - SharedKey golangrocksonazure:QjaoU3ULO2w0cvSbOxaXelRkwqEye3ETT3g6oudzBZA=
+      Content-Length:
+      - "323"
+      Content-Type:
+      - application/json
+      Prefer:
+      - return-no-content
+      User-Agent:
+      - Go/go1.9beta1 (amd64-windows) azure-storage-go/10.0.2 api-version/2016-05-31
+        table
+      x-ms-date:
+      - Thu, 20 Jul 2017 23:34:05 GMT
+      x-ms-version:
+      - 2016-05-31
+    url: https://golangrocksonazure.table.core.windows.net/table26storageentitysuitetestget
+    method: POST
+  response:
+    body: ""
+    headers:
+      Cache-Control:
+      - no-cache
+      Content-Length:
+      - "0"
+      Dataserviceid:
+      - https://golangrocksonazure.table.core.windows.net/table26storageentitysuitetestget(PartitionKey='mypartitionkey',RowKey='myrowkey')
+      Date:
+      - Thu, 20 Jul 2017 23:34:05 GMT
+      Etag:
+      - W/"datetime'2017-07-20T23%3A34%3A05.8324981Z'"
+      Location:
+      - https://golangrocksonazure.table.core.windows.net/table26storageentitysuitetestget(PartitionKey='mypartitionkey',RowKey='myrowkey')
+      Preference-Applied:
+      - return-no-content
+      Server:
+      - Windows-Azure-Table/1.0 Microsoft-HTTPAPI/2.0
+      X-Content-Type-Options:
+      - nosniff
+      X-Ms-Request-Id:
+      - 875b81df-0002-0036-7fb0-0102e5000000
+      X-Ms-Version:
+      - 2016-05-31
+    status: 204 No Content
+    code: 204
+- request:
+    body: ""
+    form: {}
+    headers:
+      Accept:
+      - application/json;odata=fullmetadata
+      Authorization:
+      - SharedKey golangrocksonazure:n4L7oJ+L2DiE/USRE/mIW1bwQ1XogOx2ml+lDyvZixE=
+      User-Agent:
+      - Go/go1.9beta1 (amd64-windows) azure-storage-go/10.0.2 api-version/2016-05-31
+        table
+      x-ms-date:
+      - Thu, 20 Jul 2017 23:34:05 GMT
+      x-ms-version:
+      - 2016-05-31
+    url: https://golangrocksonazure.table.core.windows.net/table26storageentitysuitetestget%28PartitionKey=%27mypartitionkey%27,%20RowKey=%27myrowkey%27%29?%24select=IsActive&timeout=30
+    method: GET
+  response:
+    body: '{"odata.metadata":"https://golangrocksonazure.table.core.windows.net/$metadata#table26storageentitysuitetestget/@Element&$select=IsActive","odata.type":"golangrocksonazure.table26storageentitysuitetestget","odata.id":"https://golangrocksonazure.table.core.windows.net/table26storageentitysuitetestget(PartitionKey=''mypartitionkey'',RowKey=''myrowkey'')","odata.etag":"W/\"datetime''2017-07-20T23%3A34%3A05.8324981Z''\"","odata.editLink":"table26storageentitysuitetestget(PartitionKey=''mypartitionkey'',RowKey=''myrowkey'')","IsActive":true}'
+    headers:
+      Cache-Control:
+      - no-cache
+      Content-Type:
+      - application/json;odata=fullmetadata;streaming=true;charset=utf-8
+      Date:
+      - Thu, 20 Jul 2017 23:34:05 GMT
+      Etag:
+      - W/"datetime'2017-07-20T23%3A34%3A05.8324981Z'"
+      Server:
+      - Windows-Azure-Table/1.0 Microsoft-HTTPAPI/2.0
+      X-Content-Type-Options:
+      - nosniff
+      X-Ms-Request-Id:
+      - 875b81e1-0002-0036-01b0-0102e5000000
+      X-Ms-Version:
+      - 2016-05-31
+    status: 200 OK
+    code: 200
+- request:
+    body: ""
+    form: {}
+    headers:
+      Accept:
+      - application/json;odata=fullmetadata
+      Authorization:
+      - SharedKey golangrocksonazure:n4L7oJ+L2DiE/USRE/mIW1bwQ1XogOx2ml+lDyvZixE=
+      User-Agent:
+      - Go/go1.9beta1 (amd64-windows) azure-storage-go/10.0.2 api-version/2016-05-31
+        table
+      x-ms-date:
+      - Thu, 20 Jul 2017 23:34:05 GMT
+      x-ms-version:
+      - 2016-05-31
+    url: https://golangrocksonazure.table.core.windows.net/table26storageentitysuitetestget%28PartitionKey=%27mypartitionkey%27,%20RowKey=%27myrowkey%27%29?%24select=AmountDue%2CCustomerCode%2CCustomerSince%2CIsActive%2CNumberOfOrders&timeout=30
+    method: GET
+  response:
+    body: '{"odata.metadata":"https://golangrocksonazure.table.core.windows.net/$metadata#table26storageentitysuitetestget/@Element&$select=AmountDue,CustomerCode,CustomerSince,IsActive,NumberOfOrders","odata.type":"golangrocksonazure.table26storageentitysuitetestget","odata.id":"https://golangrocksonazure.table.core.windows.net/table26storageentitysuitetestget(PartitionKey=''mypartitionkey'',RowKey=''myrowkey'')","odata.etag":"W/\"datetime''2017-07-20T23%3A34%3A05.8324981Z''\"","odata.editLink":"table26storageentitysuitetestget(PartitionKey=''mypartitionkey'',RowKey=''myrowkey'')","AmountDue":200.23,"CustomerCode@odata.type":"Edm.Guid","CustomerCode":"c9da6455-213d-42c9-9a79-3e9149a57833","CustomerSince@odata.type":"Edm.DateTime","CustomerSince":"1992-12-20T21:55:00Z","IsActive":true,"NumberOfOrders@odata.type":"Edm.Int64","NumberOfOrders":"255"}'
+    headers:
+      Cache-Control:
+      - no-cache
+      Content-Type:
+      - application/json;odata=fullmetadata;streaming=true;charset=utf-8
+      Date:
+      - Thu, 20 Jul 2017 23:34:05 GMT
+      Etag:
+      - W/"datetime'2017-07-20T23%3A34%3A05.8324981Z'"
+      Server:
+      - Windows-Azure-Table/1.0 Microsoft-HTTPAPI/2.0
+      X-Content-Type-Options:
+      - nosniff
+      X-Ms-Request-Id:
+      - 875b81e3-0002-0036-03b0-0102e5000000
+      X-Ms-Version:
+      - 2016-05-31
+    status: 200 OK
+    code: 200
+- request:
+    body: ""
+    form: {}
+    headers:
+      Accept:
+      - application/json;odata=fullmetadata
+      Authorization:
+      - SharedKey golangrocksonazure:n4L7oJ+L2DiE/USRE/mIW1bwQ1XogOx2ml+lDyvZixE=
+      User-Agent:
+      - Go/go1.9beta1 (amd64-windows) azure-storage-go/10.0.2 api-version/2016-05-31
+        table
+      x-ms-date:
+      - Thu, 20 Jul 2017 23:34:05 GMT
+      x-ms-version:
+      - 2016-05-31
+    url: https://golangrocksonazure.table.core.windows.net/table26storageentitysuitetestget%28PartitionKey=%27mypartitionkey%27,%20RowKey=%27myrowkey%27%29?timeout=30
+    method: GET
+  response:
+    body: '{"odata.metadata":"https://golangrocksonazure.table.core.windows.net/$metadata#table26storageentitysuitetestget/@Element","odata.type":"golangrocksonazure.table26storageentitysuitetestget","odata.id":"https://golangrocksonazure.table.core.windows.net/table26storageentitysuitetestget(PartitionKey=''mypartitionkey'',RowKey=''myrowkey'')","odata.etag":"W/\"datetime''2017-07-20T23%3A34%3A05.8324981Z''\"","odata.editLink":"table26storageentitysuitetestget(PartitionKey=''mypartitionkey'',RowKey=''myrowkey'')","PartitionKey":"mypartitionkey","RowKey":"myrowkey","Timestamp@odata.type":"Edm.DateTime","Timestamp":"2017-07-20T23:34:05.8324981Z","AmountDue":200.23,"CustomerCode@odata.type":"Edm.Guid","CustomerCode":"c9da6455-213d-42c9-9a79-3e9149a57833","CustomerSince@odata.type":"Edm.DateTime","CustomerSince":"1992-12-20T21:55:00Z","IsActive":true,"NumberOfOrders@odata.type":"Edm.Int64","NumberOfOrders":"255"}'
+    headers:
+      Cache-Control:
+      - no-cache
+      Content-Type:
+      - application/json;odata=fullmetadata;streaming=true;charset=utf-8
+      Date:
+      - Thu, 20 Jul 2017 23:34:05 GMT
+      Etag:
+      - W/"datetime'2017-07-20T23%3A34%3A05.8324981Z'"
+      Server:
+      - Windows-Azure-Table/1.0 Microsoft-HTTPAPI/2.0
+      X-Content-Type-Options:
+      - nosniff
+      X-Ms-Request-Id:
+      - 875b81e4-0002-0036-04b0-0102e5000000
+      X-Ms-Version:
+      - 2016-05-31
+    status: 200 OK
+    code: 200
+- request:
+    body: ""
+    form: {}
+    headers:
+      Accept:
+      - application/json;odata=nometadata
+      Authorization:
+      - SharedKey golangrocksonazure:1y0duhMkjc4p89TOsMCE01kYsEIo1cED7qhlBD1/IFA=
+      Prefer:
+      - return-no-content
+      User-Agent:
+      - Go/go1.9beta1 (amd64-windows) azure-storage-go/10.0.2 api-version/2016-05-31
+        table
+      x-ms-date:
+      - Thu, 20 Jul 2017 23:34:05 GMT
+      x-ms-version:
+      - 2016-05-31
+    url: https://golangrocksonazure.table.core.windows.net/Tables%28%27table26storageentitysuitetestget%27%29?timeout=30
+    method: DELETE
+  response:
+    body: ""
+    headers:
+      Cache-Control:
+      - no-cache
+      Content-Length:
+      - "0"
+      Date:
+      - Thu, 20 Jul 2017 23:34:05 GMT
+      Server:
+      - Windows-Azure-Table/1.0 Microsoft-HTTPAPI/2.0
+      X-Content-Type-Options:
+      - nosniff
+      X-Ms-Request-Id:
+      - 875b81e5-0002-0036-05b0-0102e5000000
+      X-Ms-Version:
+      - 2016-05-31
+    status: 204 No Content
+    code: 204

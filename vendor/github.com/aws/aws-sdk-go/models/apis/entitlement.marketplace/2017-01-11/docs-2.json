@@ -1,0 +1,131 @@
+{
+  "version": "2.0",
+  "service": "<fullname>AWS Marketplace Entitlement Service</fullname> <p>This reference provides descriptions of the AWS Marketplace Entitlement Service API.</p> <p>AWS Marketplace Entitlement Service is used to determine the entitlement of a customer to a given product. An entitlement represents capacity in a product owned by the customer. For example, a customer might own some number of users or seats in an SaaS application or some amount of data capacity in a multi-tenant database.</p> <p> <b>Getting Entitlement Records</b> </p> <ul> <li> <p> <i>GetEntitlements</i>- Gets the entitlements for a Marketplace product.</p> </li> </ul>",
+  "operations": {
+    "GetEntitlements": "<p>GetEntitlements retrieves entitlement values for a given product. The results can be filtered based on customer identifier or product dimensions.</p>"
+  },
+  "shapes": {
+    "Boolean": {
+      "base": null,
+      "refs": {
+        "EntitlementValue$BooleanValue": "<p>The BooleanValue field will be populated with a boolean value when the entitlement is a boolean type. Otherwise, the field will not be set.</p>"
+      }
+    },
+    "Double": {
+      "base": null,
+      "refs": {
+        "EntitlementValue$DoubleValue": "<p>The DoubleValue field will be populated with a double value when the entitlement is a double type. Otherwise, the field will not be set.</p>"
+      }
+    },
+    "Entitlement": {
+      "base": "<p>An entitlement represents capacity in a product owned by the customer. For example, a customer might own some number of users or seats in an SaaS application or some amount of data capacity in a multi-tenant database.</p>",
+      "refs": {
+        "EntitlementList$member": null
+      }
+    },
+    "EntitlementList": {
+      "base": null,
+      "refs": {
+        "GetEntitlementsResult$Entitlements": "<p>The set of entitlements found through the GetEntitlements operation. If the result contains an empty set of entitlements, NextToken might still be present and should be used.</p>"
+      }
+    },
+    "EntitlementValue": {
+      "base": "<p>The EntitlementValue represents the amount of capacity that the customer is entitled to for the product.</p>",
+      "refs": {
+        "Entitlement$Value": "<p>The EntitlementValue represents the amount of capacity that the customer is entitled to for the product.</p>"
+      }
+    },
+    "ErrorMessage": {
+      "base": null,
+      "refs": {
+        "InternalServiceErrorException$message": null,
+        "InvalidParameterException$message": null,
+        "ThrottlingException$message": null
+      }
+    },
+    "FilterValue": {
+      "base": null,
+      "refs": {
+        "FilterValueList$member": null
+      }
+    },
+    "FilterValueList": {
+      "base": null,
+      "refs": {
+        "GetEntitlementFilters$value": null
+      }
+    },
+    "GetEntitlementFilterName": {
+      "base": null,
+      "refs": {
+        "GetEntitlementFilters$key": null
+      }
+    },
+    "GetEntitlementFilters": {
+      "base": null,
+      "refs": {
+        "GetEntitlementsRequest$Filter": "<p>Filter is used to return entitlements for a specific customer or for a specific dimension. Filters are described as keys mapped to a lists of values. Filtered requests are <i>unioned</i> for each value in the value list, and then <i>intersected</i> for each filter key.</p>"
+      }
+    },
+    "GetEntitlementsRequest": {
+      "base": "<p>The GetEntitlementsRequest contains parameters for the GetEntitlements operation.</p>",
+      "refs": {
+      }
+    },
+    "GetEntitlementsResult": {
+      "base": "<p>The GetEntitlementsRequest contains results from the GetEntitlements operation.</p>",
+      "refs": {
+      }
+    },
+    "Integer": {
+      "base": null,
+      "refs": {
+        "EntitlementValue$IntegerValue": "<p>The IntegerValue field will be populated with an integer value when the entitlement is an integer type. Otherwise, the field will not be set.</p>",
+        "GetEntitlementsRequest$MaxResults": "<p>The maximum number of items to retrieve from the GetEntitlements operation. For pagination, use the NextToken field in subsequent calls to GetEntitlements.</p>"
+      }
+    },
+    "InternalServiceErrorException": {
+      "base": "<p>An internal error has occurred. Retry your request. If the problem persists, post a message with details on the AWS forums.</p>",
+      "refs": {
+      }
+    },
+    "InvalidParameterException": {
+      "base": "<p>One or more parameters in your request was invalid.</p>",
+      "refs": {
+      }
+    },
+    "NonEmptyString": {
+      "base": null,
+      "refs": {
+        "Entitlement$Dimension": "<p>The dimension for which the given entitlement applies. Dimensions represent categories of capacity in a product and are specified when the product is listed in AWS Marketplace.</p>",
+        "Entitlement$CustomerIdentifier": "<p>The customer identifier is a handle to each unique customer in an application. Customer identifiers are obtained through the ResolveCustomer operation in AWS Marketplace Metering Service.</p>",
+        "GetEntitlementsRequest$NextToken": "<p>For paginated calls to GetEntitlements, pass the NextToken from the previous GetEntitlementsResult.</p>",
+        "GetEntitlementsResult$NextToken": "<p>For paginated results, use NextToken in subsequent calls to GetEntitlements. If the result contains an empty set of entitlements, NextToken might still be present and should be used.</p>"
+      }
+    },
+    "ProductCode": {
+      "base": null,
+      "refs": {
+        "Entitlement$ProductCode": "<p>The product code for which the given entitlement applies. Product codes are provided by AWS Marketplace when the product listing is created.</p>",
+        "GetEntitlementsRequest$ProductCode": "<p>Product code is used to uniquely identify a product in AWS Marketplace. The product code will be provided by AWS Marketplace when the product listing is created.</p>"
+      }
+    },
+    "String": {
+      "base": null,
+      "refs": {
+        "EntitlementValue$StringValue": "<p>The StringValue field will be populated with a string value when the entitlement is a string type. Otherwise, the field will not be set.</p>"
+      }
+    },
+    "ThrottlingException": {
+      "base": "<p>The calls to the GetEntitlements API are throttled.</p>",
+      "refs": {
+      }
+    },
+    "Timestamp": {
+      "base": null,
+      "refs": {
+        "Entitlement$ExpirationDate": "<p>The expiration date represents the minimum date through which this entitlement is expected to remain valid. For contractual products listed on AWS Marketplace, the expiration date is the date at which the customer will renew or cancel their contract. Customers who are opting to renew their contract will still have entitlements with an expiration date.</p>"
+      }
+    }
+  }
+}

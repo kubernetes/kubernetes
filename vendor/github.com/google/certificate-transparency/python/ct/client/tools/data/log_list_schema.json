@@ -1,0 +1,59 @@
+{
+  "type":"object",
+  "$schema": "http://json-schema.org/draft-04/schema",
+  "properties":{
+    "operators": {
+      "type":"array",
+      "items":
+        {
+          "type":"object",
+          "properties":{
+            "id": {
+              "type":"number"
+            },
+            "name": {
+              "type":"string"
+            }
+          },
+          "required": ["id", "name"]
+        }
+    },
+
+    "logs": {
+      "type":"array",
+      "items":
+        {
+          "type":"object",
+          "properties":{
+            "description": {
+              "type":"string"
+            },
+            "key": {
+              "type":"string"
+            },
+            "maximum_merge_delay": {
+              "type":"number",
+              "minimum": 0
+            },
+            "operated_by": {
+              "type":"array",
+              "description": "List of log operators",
+              "items":
+                {
+                  "type":"number",
+                  "description": "Operator numeric id"
+                }
+            },
+            "url": {
+              "type":"string"
+            }
+          },
+          "required":["description", "key", "maximum_merge_delay",
+                      "operated_by", "url"]
+        },
+      "minItems": 1
+    }
+  },
+  "required":["logs", "operators"]
+}
+

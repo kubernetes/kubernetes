@@ -1,0 +1,10 @@
+#Windows specific settings.
+WHALE = "+"
+ONI = "-"
+
+BINARY_SUFFIX=".exe"
+
+# amd64 supports go test -race
+ifeq ($(GOARCH),amd64)
+	TESTFLAGS_RACE= -race
+endif

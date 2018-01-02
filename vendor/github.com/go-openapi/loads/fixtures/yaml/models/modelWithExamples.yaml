@@ -1,0 +1,3 @@
+definitions:
+  Pet: {properties: {name: {type: string}}, required: [name]}
+  Dog: {properties: {id: {type: integer, format: int64}, name: {type: string}}, required: [name]}

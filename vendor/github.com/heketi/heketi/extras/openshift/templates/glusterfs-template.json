@@ -1,0 +1,196 @@
+{
+    "kind": "Template",
+    "apiVersion": "v1",
+    "metadata": {
+        "name": "glusterfs",
+        "labels": {
+            "glusterfs": "template"
+        },
+        "annotations": {
+            "description": "GlusterFS container deployment template",
+            "tags": "glusterfs"
+        }
+    },
+    "labels": {
+        "template": "glusterfs"
+    },
+    "objects": [
+        {
+            "kind": "DeploymentConfig",
+            "apiVersion": "v1",
+            "metadata": {
+                "name": "glusterfs-dc-${GLUSTERFS_NODE}",
+                "labels": {
+                    "glusterfs": "dc",
+                    "glusterfs-node": "${GLUSTERFS_NODE}"
+                },
+                "annotations": {
+                    "description": "Deploys the GlusterFS container"
+                }
+            },
+            "spec": {
+                "replicas": 1,
+                "selector": {
+                    "name": "glusterfs"
+                },
+                "triggers": [
+                    {
+                        "type": "ConfigChange"
+                    }
+                ],
+                "strategy": {
+                    "type": "Recreate"
+                },
+                "template": {
+                    "metadata": {
+                        "name": "glusterfs",
+                        "labels": {
+                            "name": "glusterfs",
+                            "glusterfs": "pod",
+                            "glusterfs-node": "${GLUSTERFS_NODE}"
+                        }
+                    },
+                    "spec": {
+                        "nodeSelector": {
+                            "kubernetes.io/hostname": "${GLUSTERFS_NODE}"
+                        },
+                        "hostNetwork": true,
+                        "containers": [
+                            {
+                                "image": "heketi/gluster:latest",
+                                "imagePullPolicy": "Always",
+                                "name": "glusterfs",
+                                "volumeMounts": [
+                                    {
+                                        "name": "glusterfs-heketi",
+                                        "mountPath": "/var/lib/heketi"
+                                    },
+                                    {
+                                        "name": "glusterfs-run",
+                                        "mountPath": "/run"
+                                    },
+                                    {
+                                        "name": "glusterfs-lvm",
+                                        "mountPath": "/run/lvm"
+                                    },
+                                    {
+                                        "name": "glusterfs-etc",
+                                        "mountPath": "/etc/glusterfs"
+                                    },
+                                    {
+                                        "name": "glusterfs-logs",
+                                        "mountPath": "/var/log/glusterfs"
+                                    },
+                                    {
+                                        "name": "glusterfs-config",
+                                        "mountPath": "/var/lib/glusterd"
+                                    },
+                                    {
+                                        "name": "glusterfs-dev",
+                                        "mountPath": "/dev"
+                                    },
+                                    {
+                                        "name": "glusterfs-misc",
+                                        "mountPath": "/var/lib/misc/glusterfsd"
+                                    },
+                                    {
+                                        "name": "glusterfs-cgroup",
+                                        "mountPath": "/sys/fs/cgroup",
+                                        "readOnly": true
+                                    }
+                                ],
+                                "securityContext": {
+                                    "capabilities": {},
+                                    "privileged": true
+                                },
+                                "readinessProbe": {
+                                    "timeoutSeconds": 3,
+                                    "initialDelaySeconds": 100,
+                                    "exec": {
+                                        "command": [
+                                            "/bin/bash",
+                                            "-c",
+                                            "systemctl status glusterd.service"
+                                        ]
+                                    }
+                                },
+                                "livenessProbe": {
+                                    "timeoutSeconds": 3,
+                                    "initialDelaySeconds": 100,
+                                    "exec": {
+                                        "command": [
+                                            "/bin/bash",
+                                            "-c",
+                                            "systemctl status glusterd.service"
+                                        ]
+                                    }
+                                }
+                            }
+                        ],
+                        "volumes": [
+                            {
+                                "name": "glusterfs-heketi",
+                                "hostPath": {
+                                    "path": "/var/lib/heketi"
+                                }
+                            },
+                            {
+                                "name": "glusterfs-run"
+                            },
+                            {
+                                "name": "glusterfs-lvm",
+                                "hostPath": {
+                                    "path": "/run/lvm"
+                                }
+                            },
+                            {
+                                "name": "glusterfs-etc",
+                                "hostPath": {
+                                    "path": "/etc/glusterfs"
+                                }
+                            },
+                            {
+                                "name": "glusterfs-logs",
+                                "hostPath": {
+                                    "path": "/var/log/glusterfs"
+                                }
+                            },
+                            {
+                                "name": "glusterfs-config",
+                                "hostPath": {
+                                    "path": "/var/lib/glusterd"
+                                }
+                            },
+                            {
+                                "name": "glusterfs-dev",
+                                "hostPath": {
+                                    "path": "/dev"
+                                }
+                            },
+                            {
+                                "name": "glusterfs-misc",
+                                "hostPath": {
+                                    "path": "/var/lib/misc/glusterfsd"
+                                }
+                            },
+                            {
+                                "name": "glusterfs-cgroup",
+                                "hostPath": {
+                                    "path": "/sys/fs/cgroup"
+                                }
+                            }
+                        ]
+                    }
+                }
+            }
+        }
+    ],
+    "parameters": [
+        {
+            "name": "GLUSTERFS_NODE",
+            "displayName": "Storage node name",
+            "description": "Node name to run GlusterFS container",
+            "required": true
+        }
+    ]
+}

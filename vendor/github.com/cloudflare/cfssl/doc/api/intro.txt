@@ -1,0 +1,48 @@
+INTRODUCTION TO THE CFSSL API
+
+The CFSSL API allows applications to access the functionality of CFSSL
+over an unauthenticated HTTP connection. By default, the API is
+unauthenticated, it is important to understand that the CFSSL API
+server must be running in a trusted environment in this case.
+
+There are currently nine endpoints, each of which may be found under
+the path `/api/v1/cfssl/<endpoint>`. The documentation for each
+endpoint is found in the `doc/api` directory in the project source
+under the name `endpoint_<endpoint>`. These nine endpoints are:
+
+      - authsign: authenticated signing endpoint
+      - bundle: build certificate bundles
+      - info: obtain information about the CA, including the CA
+        certificate
+      - init_ca: initialise a new certificate authority
+      - newkey: generate a new private key and certificate signing
+        request
+      - newcert: generate a new private key and certificate
+      - scan: scan servers to determine the quality of their TLS set up
+      - scaninfo: list options for scanning
+      - sign: sign a certificate
+
+RESPONSES
+
+Responses take the form of the new CloudFlare API response format:
+
+       {
+         "result": <some data>,
+         "success": true,
+         "errors": [],
+         "messages": [],
+       }
+
+Both the "messages" and "errors" fields have the same general format:
+a message or error has the form
+
+       {
+         "code:" 1234,
+         "message": "Informative message."
+       }
+
+If "success" is not "true", the result should be discarded, and the
+errors examined to determine what happened. The CFSSL error codes are
+documented in the `doc/errors.txt` file in the project source.
+
+

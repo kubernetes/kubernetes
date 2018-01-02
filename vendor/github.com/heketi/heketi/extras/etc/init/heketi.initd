@@ -1,0 +1,129 @@
+#!/bin/sh
+#
+# heketi    Startup script for the heketi server 
+#
+# chkconfig:   - 95 95
+# description: Heketi service
+
+### BEGIN INIT INFO
+# Provides: heketi 
+# Required-Start: $local_fs $network
+# Required-Stop: $local_fs $network
+# Should-Start: 
+# Should-Stop: 
+# Default-Start: 2 3 4 5
+# Default-Stop: 0 1 6
+# Short-Description: start and stop heketi server 
+# Description: Heketi server
+### END INIT INFO
+
+# Source function library.
+. /etc/rc.d/init.d/functions
+
+exec="/usr/bin/heketi"
+prog="heketi"
+user="heketi"
+config="/etc/heketi/heketi.json"
+pidfile="/var/run/$prog.pid"
+lockfile="/var/lock/subsys/$prog"
+logfile="/var/log/$prog"
+
+[ -e /etc/sysconfig/$prog ] && . /etc/sysconfig/$prog
+
+start() {
+
+    [ -x $exec ] || exit 5
+    [ -f $config ] || exit 6
+
+    if [ ! -f $logfile ] ; then
+        touch $logfile
+        chown ${user}:${user} $logfile
+        chmod 600 $logfile
+    fi
+
+    if ! [ -f $pidfile ]; then
+        if [ ! -f $pidfile ] ; then
+            touch $pidfile
+            chown ${user}:${user} $pidfile
+        fi
+        echo -n "Starting $prog: "
+        daemon --user heketi "$exec --config=${config} &>> $logfile & echo \$! > $pidfile"
+        retval=$?
+        if [ $retval -eq 0 ] ; then
+            touch $lockfile
+            echo
+        fi
+        return $retval
+    else
+        failure
+        echo
+        printf "$pidfile still exists...\n"
+        exit 7
+    fi
+
+}
+
+stop() {
+    echo -n $"Stopping $prog: "
+    # stop it here, often "killproc $prog"
+    killproc -p $pidfile $prog
+    retval=$?
+    echo
+    [ $retval -eq 0 ] && rm -f $lockfile
+    return $retval
+}
+
+restart() {
+    stop
+    start
+}
+
+reload() {
+    restart
+}
+
+force_reload() {
+    restart
+}
+
+rh_status() {
+    # run checks to determine if the service is running or use generic status
+    status $prog
+}
+
+rh_status_q() {
+    rh_status >/dev/null 2>&1
+}
+
+
+case "$1" in
+    start)
+        rh_status_q && exit 0
+        $1
+        ;;
+    stop)
+        rh_status_q || exit 0
+        $1
+        ;;
+    restart)
+        $1
+        ;;
+    reload)
+        rh_status_q || exit 7
+        $1
+        ;;
+    force-reload)
+        force_reload
+        ;;
+    status)
+        rh_status
+        ;;
+    condrestart|try-restart)
+        rh_status_q || exit 0
+        restart
+        ;;
+    *)
+        echo $"Usage: $0 {start|stop|status|restart|condrestart|try-restart|reload|force-reload}"
+        exit 2
+esac
+exit $?

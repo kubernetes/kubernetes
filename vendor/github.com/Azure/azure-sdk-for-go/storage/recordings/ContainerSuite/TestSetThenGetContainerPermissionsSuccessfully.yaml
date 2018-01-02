@@ -1,0 +1,136 @@
+---
+version: 1
+rwmutex: {}
+interactions:
+- request:
+    body: ""
+    form: {}
+    headers:
+      Authorization:
+      - SharedKey golangrocksonazure:Mtj+R4Ckw8JZEVYWC90vvqKKG8BwxCQXgunDgOIIrMg=
+      User-Agent:
+      - Go/go1.9beta1 (amd64-windows) azure-storage-go/10.0.2 api-version/2016-05-31
+        blob
+      x-ms-date:
+      - Thu, 20 Jul 2017 23:34:04 GMT
+      x-ms-version:
+      - 2016-05-31
+    url: https://golangrocksonazure.blob.core.windows.net/cnt-61containersuitetestsettheng?restype=container
+    method: PUT
+  response:
+    body: ""
+    headers:
+      Date:
+      - Thu, 20 Jul 2017 23:34:03 GMT
+      Etag:
+      - '"0x8D4CFC7CE75EBE2"'
+      Last-Modified:
+      - Thu, 20 Jul 2017 23:34:03 GMT
+      Server:
+      - Windows-Azure-Blob/1.0 Microsoft-HTTPAPI/2.0
+      X-Ms-Request-Id:
+      - 7d61314a-0001-0009-2fb0-01ca46000000
+      X-Ms-Version:
+      - 2016-05-31
+    status: 201 Created
+    code: 201
+- request:
+    body: <SignedIdentifiers><SignedIdentifier><Id>AutoRestIsSuperCool</Id><AccessPolicy><Start>2050-12-20T21:55:06Z</Start><Expiry>2050-12-21T07:55:06Z</Expiry><Permission>rwd</Permission></AccessPolicy></SignedIdentifier><SignedIdentifier><Id>GolangRocksOnAzure</Id><AccessPolicy><Start>2050-12-21T17:55:06Z</Start><Expiry>2050-12-22T03:55:06Z</Expiry><Permission>r</Permission></AccessPolicy></SignedIdentifier></SignedIdentifiers>
+    form: {}
+    headers:
+      Authorization:
+      - SharedKey golangrocksonazure:DZCaX3tsteRAyWCEEJvEq178Q/Qb6XjZEAt/PwfcqHc=
+      Content-Length:
+      - "424"
+      User-Agent:
+      - Go/go1.9beta1 (amd64-windows) azure-storage-go/10.0.2 api-version/2016-05-31
+        blob
+      x-ms-blob-public-access:
+      - blob
+      x-ms-date:
+      - Thu, 20 Jul 2017 23:34:04 GMT
+      x-ms-version:
+      - 2016-05-31
+    url: https://golangrocksonazure.blob.core.windows.net/cnt-61containersuitetestsettheng?comp=acl&restype=container
+    method: PUT
+  response:
+    body: ""
+    headers:
+      Date:
+      - Thu, 20 Jul 2017 23:34:03 GMT
+      Etag:
+      - '"0x8D4CFC7CEFBE1B7"'
+      Last-Modified:
+      - Thu, 20 Jul 2017 23:34:04 GMT
+      Server:
+      - Windows-Azure-Blob/1.0 Microsoft-HTTPAPI/2.0
+      X-Ms-Request-Id:
+      - 7d61314c-0001-0009-30b0-01ca46000000
+      X-Ms-Version:
+      - 2016-05-31
+    status: 200 OK
+    code: 200
+- request:
+    body: ""
+    form: {}
+    headers:
+      Authorization:
+      - SharedKey golangrocksonazure:p/5wgteu9gf6wLuDYRbU9v0giyxBaA2Pdh5IJXHydps=
+      User-Agent:
+      - Go/go1.9beta1 (amd64-windows) azure-storage-go/10.0.2 api-version/2016-05-31
+        blob
+      x-ms-date:
+      - Thu, 20 Jul 2017 23:34:04 GMT
+      x-ms-version:
+      - 2016-05-31
+    url: https://golangrocksonazure.blob.core.windows.net/cnt-61containersuitetestsettheng?comp=acl&restype=container
+    method: GET
+  response:
+    body: "\uFEFF\x3C\x3F\x78\x6D\x6C\x20\x76\x65\x72\x73\x69\x6F\x6E\x3D\"\x31\x2E\x30\"\x20\x65\x6E\x63\x6F\x64\x69\x6E\x67\x3D\"\x75\x74\x66\x2D\x38\"\x3F\x3E\x3C\x53\x69\x67\x6E\x65\x64\x49\x64\x65\x6E\x74\x69\x66\x69\x65\x72\x73\x3E\x3C\x53\x69\x67\x6E\x65\x64\x49\x64\x65\x6E\x74\x69\x66\x69\x65\x72\x3E\x3C\x49\x64\x3E\x41\x75\x74\x6F\x52\x65\x73\x74\x49\x73\x53\x75\x70\x65\x72\x43\x6F\x6F\x6C\x3C\x2F\x49\x64\x3E\x3C\x41\x63\x63\x65\x73\x73\x50\x6F\x6C\x69\x63\x79\x3E\x3C\x53\x74\x61\x72\x74\x3E\x32\x30\x35\x30\x2D\x31\x32\x2D\x32\x30\x54\x32\x31\x3A\x35\x35\x3A\x30\x36\x2E\x30\x30\x30\x30\x30\x30\x30\x5A\x3C\x2F\x53\x74\x61\x72\x74\x3E\x3C\x45\x78\x70\x69\x72\x79\x3E\x32\x30\x35\x30\x2D\x31\x32\x2D\x32\x31\x54\x30\x37\x3A\x35\x35\x3A\x30\x36\x2E\x30\x30\x30\x30\x30\x30\x30\x5A\x3C\x2F\x45\x78\x70\x69\x72\x79\x3E\x3C\x50\x65\x72\x6D\x69\x73\x73\x69\x6F\x6E\x3E\x72\x77\x64\x3C\x2F\x50\x65\x72\x6D\x69\x73\x73\x69\x6F\x6E\x3E\x3C\x2F\x41\x63\x63\x65\x73\x73\x50\x6F\x6C\x69\x63\x79\x3E\x3C\x2F\x53\x69\x67\x6E\x65\x64\x49\x64\x65\x6E\x74\x69\x66\x69\x65\x72\x3E\x3C\x53\x69\x67\x6E\x65\x64\x49\x64\x65\x6E\x74\x69\x66\x69\x65\x72\x3E\x3C\x49\x64\x3E\x47\x6F\x6C\x61\x6E\x67\x52\x6F\x63\x6B\x73\x4F\x6E\x41\x7A\x75\x72\x65\x3C\x2F\x49\x64\x3E\x3C\x41\x63\x63\x65\x73\x73\x50\x6F\x6C\x69\x63\x79\x3E\x3C\x53\x74\x61\x72\x74\x3E\x32\x30\x35\x30\x2D\x31\x32\x2D\x32\x31\x54\x31\x37\x3A\x35\x35\x3A\x30\x36\x2E\x30\x30\x30\x30\x30\x30\x30\x5A\x3C\x2F\x53\x74\x61\x72\x74\x3E\x3C\x45\x78\x70\x69\x72\x79\x3E\x32\x30\x35\x30\x2D\x31\x32\x2D\x32\x32\x54\x30\x33\x3A\x35\x35\x3A\x30\x36\x2E\x30\x30\x30\x30\x30\x30\x30\x5A\x3C\x2F\x45\x78\x70\x69\x72\x79\x3E\x3C\x50\x65\x72\x6D\x69\x73\x73\x69\x6F\x6E\x3E\x72\x3C\x2F\x50\x65\x72\x6D\x69\x73\x73\x69\x6F\x6E\x3E\x3C\x2F\x41\x63\x63\x65\x73\x73\x50\x6F\x6C\x69\x63\x79\x3E\x3C\x2F\x53\x69\x67\x6E\x65\x64\x49\x64\x65\x6E\x74\x69\x66\x69\x65\x72\x3E\x3C\x2F\x53\x69\x67\x6E\x65\x64\x49\x64\x65\x6E\x74\x69\x66\x69\x65\x72\x73\x3E"
+    headers:
+      Content-Type:
+      - application/xml
+      Date:
+      - Thu, 20 Jul 2017 23:34:03 GMT
+      Etag:
+      - '"0x8D4CFC7CEFBE1B7"'
+      Last-Modified:
+      - Thu, 20 Jul 2017 23:34:04 GMT
+      Server:
+      - Windows-Azure-Blob/1.0 Microsoft-HTTPAPI/2.0
+      X-Ms-Blob-Public-Access:
+      - blob
+      X-Ms-Request-Id:
+      - 7d61314e-0001-0009-32b0-01ca46000000
+      X-Ms-Version:
+      - 2016-05-31
+    status: 200 OK
+    code: 200
+- request:
+    body: ""
+    form: {}
+    headers:
+      Authorization:
+      - SharedKey golangrocksonazure:yJ3UHkxdTIwQzc5ZDNFinb/56WzxWPrbq2SeH4VDc0g=
+      User-Agent:
+      - Go/go1.9beta1 (amd64-windows) azure-storage-go/10.0.2 api-version/2016-05-31
+        blob
+      x-ms-date:
+      - Thu, 20 Jul 2017 23:34:04 GMT
+      x-ms-version:
+      - 2016-05-31
+    url: https://golangrocksonazure.blob.core.windows.net/cnt-61containersuitetestsettheng?restype=container
+    method: DELETE
+  response:
+    body: ""
+    headers:
+      Date:
+      - Thu, 20 Jul 2017 23:34:03 GMT
+      Server:
+      - Windows-Azure-Blob/1.0 Microsoft-HTTPAPI/2.0
+      X-Ms-Request-Id:
+      - 7d61314f-0001-0009-33b0-01ca46000000
+      X-Ms-Version:
+      - 2016-05-31
+    status: 202 Accepted
+    code: 202

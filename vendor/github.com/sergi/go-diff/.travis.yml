@@ -1,0 +1,27 @@
+language: go
+
+os:
+  - linux
+  - osx
+
+go:
+  - 1.8.x
+  - 1.9.x
+
+sudo: false
+
+env:
+  global:
+    # Coveralls.io
+    - secure: OGYOsFNXNarEZ5yA4/M6ZdVguD0jL8vXgXrbLzjcpkKcq8ObHSCtNINoUlnNf6l6Z92kPnuV+LSm7jKTojBlov4IwgiY1ACbvg921SdjxYkg1AiwHTRTLR1g/esX8RdaBpJ0TOcXOFFsYMRVvl5sxxtb0tXSuUrT+Ch4SUCY7X8=
+
+install:
+  - make install-dependencies
+  - make install-tools
+  - make install
+
+script:
+  - make lint
+  - make test-with-coverage
+  - gover
+  - if [ "$TRAVIS_SECURE_ENV_VARS" = "true" ]; then goveralls -coverprofile=gover.coverprofile -service=travis-ci -repotoken $COVERALLS_TOKEN; fi

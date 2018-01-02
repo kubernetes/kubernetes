@@ -1,0 +1,36 @@
+{
+    "solaris": {
+        "description": "Solaris platform-specific configurations",
+        "id": "https://opencontainers.org/schema/bundle/solaris",
+        "type": "object",
+        "properties": {
+            "milestone": {
+                "id": "https://opencontainers.org/schema/bundle/solaris/milestone",
+                "type": "string"
+            },
+            "limitpriv": {
+                "id": "https://opencontainers.org/schema/bundle/solaris/limitpriv",
+                "type": "string"
+            },
+            "maxShmMemory": {
+                "id": "https://opencontainers.org/schema/bundle/solaris/maxShmMemory",
+                "type": "string"
+            },
+            "cappedCPU": {
+                "id": "https://opencontainers.org/schema/bundle/solaris/cappedCPU",
+                "$ref": "defs.json#/definitions/mapStringString"
+            },
+            "cappedMemory": {
+                "id": "https://opencontainers.org/schema/bundle/solaris/cappedMemory",
+                "$ref": "defs.json#/definitions/mapStringString"
+            },
+            "anet": {
+                "id": "https://opencontainers.org/schema/bundle/solaris/anet",
+                "type": "array",
+                "items": {
+                    "$ref": "defs.json#/definitions/mapStringString"
+                }
+            }
+        }
+    }
+}

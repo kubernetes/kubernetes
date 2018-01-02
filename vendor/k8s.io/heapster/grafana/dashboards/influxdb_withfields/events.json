@@ -1,0 +1,389 @@
+{
+  "id": 8,
+  "title": "Events",
+  "originalTitle": "Events",
+  "tags": [],
+  "style": "dark",
+  "timezone": "browser",
+  "editable": true,
+  "hideControls": false,
+  "sharedCrosshair": false,
+  "rows": [
+    {
+      "collapse": false,
+      "editable": true,
+      "height": "250px",
+      "panels": [
+        {
+          "aliasColors": {},
+          "bars": true,
+          "datasource": null,
+          "editable": true,
+          "error": false,
+          "fill": 1,
+          "grid": {
+            "leftLogBase": 1,
+            "leftMax": null,
+            "leftMin": null,
+            "rightLogBase": 1,
+            "rightMax": null,
+            "rightMin": null,
+            "threshold1": null,
+            "threshold1Color": "rgba(216, 200, 27, 0.27)",
+            "threshold2": null,
+            "threshold2Color": "rgba(234, 112, 112, 0.22)"
+          },
+          "id": 3,
+          "isNew": true,
+          "legend": {
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "show": true,
+            "total": false,
+            "values": false
+          },
+          "lines": false,
+          "linewidth": 2,
+          "links": [],
+          "nullPointMode": "connected",
+          "percentage": false,
+          "pointradius": 5,
+          "points": false,
+          "renderer": "flot",
+          "seriesOverrides": [
+            {
+              "alias": "events.count"
+            }
+          ],
+          "span": 12,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "dsType": "influxdb",
+              "groupBy": [
+                {
+                  "params": [
+                    "1m"
+                  ],
+                  "type": "time"
+                },
+                {
+                  "params": [
+                    "null"
+                  ],
+                  "type": "fill"
+                }
+              ],
+              "measurement": "events",
+              "query": "SELECT count(message) FROM \"events\" WHERE \"namespace_name\" =~ /$namespace$/ AND \"kind\" =~ /$kind$/ AND \"object_name\" =~ /$object_name$/  AND \"type\" =~ /$type$/ AND \"reason\" =~ /$reason$/ AND $timeFilter GROUP BY time(1m) fill(null)",
+              "rawQuery": true,
+              "refId": "A",
+              "resultFormat": "time_series",
+              "select": [
+                [
+                  {
+                    "params": [
+                      "message"
+                    ],
+                    "type": "field"
+                  },
+                  {
+                    "params": [],
+                    "type": "count"
+                  }
+                ]
+              ],
+              "tags": []
+            }
+          ],
+          "timeFrom": null,
+          "timeShift": null,
+          "title": "Events by minutes",
+          "tooltip": {
+            "shared": true,
+            "value_type": "cumulative"
+          },
+          "type": "graph",
+          "x-axis": true,
+          "y-axis": true,
+          "y_formats": [
+            "short",
+            "short"
+          ]
+        }
+      ],
+      "title": "Events by minute"
+    },
+    {
+      "collapse": false,
+      "editable": true,
+      "height": "25px",
+      "panels": [
+        {
+          "columns": [],
+          "editable": true,
+          "error": false,
+          "fontSize": "90%",
+          "id": 4,
+          "isNew": true,
+          "links": [],
+          "pageSize": 25,
+          "scroll": false,
+          "showHeader": true,
+          "sort": {
+            "col": 0,
+            "desc": true
+          },
+          "span": 12,
+          "styles": [
+            {
+              "dateFormat": "YYYY/MM/DD HH:mm:ss",
+              "pattern": "Time",
+              "type": "date"
+            },
+            {
+              "colorMode": null,
+              "colors": [
+                "rgba(245, 54, 54, 0.9)",
+                "rgba(237, 129, 40, 0.89)",
+                "rgba(50, 172, 45, 0.97)"
+              ],
+              "decimals": 2,
+              "pattern": "/.*/",
+              "thresholds": [],
+              "type": "string",
+              "unit": "short"
+            }
+          ],
+          "targets": [
+            {
+              "alias": "",
+              "dsType": "influxdb",
+              "groupBy": [],
+              "hide": false,
+              "measurement": "events",
+              "query": "SELECT \"namespace_name\" as \"Namespace\", \"hostname\" as \"Node_name\", \"kind\" as \"Object_kind\", \"object_name\" as \"Object_Name\", \"type\" as \"Type\", \"reason\" as \"Reason\", \"message\" as \"Message\" FROM \"events\" WHERE \"namespace_name\" =~ /$namespace$/ AND \"kind\" =~ /$kind$/ AND \"object_name\" =~ /$object_name$/  AND \"type\" =~ /$type$/ AND \"reason\" =~ /$reason$/ AND $timeFilter",
+              "rawQuery": true,
+              "refId": "A",
+              "resultFormat": "table",
+              "select": [
+                [
+                  {
+                    "params": [
+                      "message"
+                    ],
+                    "type": "field"
+                  }
+                ]
+              ],
+              "tags": []
+            }
+          ],
+          "title": "Events",
+          "transform": "table",
+          "type": "table"
+        }
+      ],
+      "title": "Event list"
+    }
+  ],
+  "time": {
+    "from": "now-30m",
+    "to": "now"
+  },
+  "timepicker": {
+    "now": true,
+    "refresh_intervals": [
+      "5s",
+      "10s",
+      "30s",
+      "1m",
+      "5m",
+      "15m",
+      "30m",
+      "1h",
+      "2h",
+      "1d"
+    ],
+    "time_options": [
+      "5m",
+      "15m",
+      "1h",
+      "6h",
+      "12h",
+      "24h",
+      "2d",
+      "7d",
+      "30d"
+    ]
+  },
+  "templating": {
+    "list": [
+      {
+        "allFormat": "regex wildcard",
+        "current": {
+          "text": "All",
+          "value": ".*"
+        },
+        "datasource": null,
+        "includeAll": true,
+        "label": "Namespace",
+        "multi": true,
+        "multiFormat": "pipe",
+        "name": "namespace",
+        "options": [
+          {
+            "text": "All",
+            "value": ".*",
+            "selected": true
+          }
+        ],
+        "query": "SHOW TAG VALUES FROM \"events\" WITH KEY = \"namespace_name\"",
+        "refresh": true,
+        "type": "query"
+      },
+      {
+        "allFormat": "regex wildcard",
+        "current": {
+          "text": "All",
+          "value": ".*"
+        },
+        "datasource": null,
+        "includeAll": true,
+        "label": "Kind",
+        "multi": true,
+        "multiFormat": "pipe",
+        "name": "kind",
+        "options": [
+          {
+            "text": "All",
+            "value": ".*",
+            "selected": true
+          },
+          {
+            "text": "Pod",
+            "value": "Pod",
+            "selected": false
+          }
+        ],
+        "query": "SHOW TAG VALUES FROM \"events\" WITH KEY = \"kind\" WHERE \"namespace_name\" =~ /$namespace$/ ",
+        "refresh": true,
+        "type": "query"
+      },
+      {
+        "allFormat": "regex wildcard",
+        "current": {
+          "text": "All",
+          "value": ".*"
+        },
+        "datasource": null,
+        "includeAll": true,
+        "label": "Object Name",
+        "multi": true,
+        "multiFormat": "pipe",
+        "name": "object_name",
+        "options": [
+          {
+            "text": "All",
+            "value": ".*",
+            "selected": true
+          }
+        ],
+        "query": "SHOW TAG VALUES FROM \"events\" WITH KEY = \"object_name\" WHERE \"kind\" =~ /$kind$/ AND \"namespace_name\" =~ /$namespace$/ ",
+        "refresh": true,
+        "regex": "",
+        "type": "query"
+      },
+      {
+        "allFormat": "regex wildcard",
+        "current": {
+          "text": "All",
+          "value": ".*"
+        },
+        "datasource": null,
+        "includeAll": true,
+        "label": "Severity",
+        "multi": true,
+        "multiFormat": "pipe",
+        "name": "type",
+        "options": [
+          {
+            "text": "All",
+            "value": ".*",
+            "selected": true
+          },
+          {
+            "text": "Normal",
+            "value": "Normal",
+            "selected": false
+          },
+          {
+            "text": "Warning",
+            "value": "Warning",
+            "selected": false
+          }
+        ],
+        "query": "SHOW TAG VALUES FROM \"events\" WITH KEY = \"type\"",
+        "refresh": true,
+        "regex": "",
+        "type": "query",
+        "useTags": false
+      },
+      {
+        "allFormat": "regex wildcard",
+        "current": {
+          "text": "All",
+          "value": ".*"
+        },
+        "datasource": null,
+        "includeAll": true,
+        "label": "Reason",
+        "multi": true,
+        "multiFormat": "pipe",
+        "name": "reason",
+        "options": [
+          {
+            "text": "All",
+            "value": ".*",
+            "selected": true
+          },
+          {
+            "text": "BackOff",
+            "value": "BackOff",
+            "selected": false
+          },
+          {
+            "text": "Failed",
+            "value": "Failed",
+            "selected": false
+          },
+          {
+            "text": "FailedSync",
+            "value": "FailedSync",
+            "selected": false
+          },
+          {
+            "text": "Pulling",
+            "value": "Pulling",
+            "selected": false
+          }
+        ],
+        "query": "SHOW TAG VALUES FROM \"events\" WITH KEY = \"reason\"",
+        "refresh": true,
+        "regex": "",
+        "type": "query",
+        "useTags": false
+      }
+    ]
+  },
+  "annotations": {
+    "list": []
+  },
+  "refresh": "5s",
+  "schemaVersion": 8,
+  "version": 18,
+  "links": []
+}

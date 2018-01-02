@@ -1,0 +1,17 @@
+language: go
+
+sudo: false
+
+go:
+  - 1.4
+  - 1.5
+  - 1.6
+  - 1.7
+  - 1.8
+  - tip
+
+script:
+  - ./.travis.gogenerate.sh
+  - ./.travis.gofmt.sh
+  - ./.travis.govet.sh
+  - go test -v ./...

@@ -1,0 +1,32 @@
+{
+    "request": {
+        "CN": "test server",
+        "hosts": [
+            "127.0.0.1"
+        ]
+    },
+    "profiles": {
+        "paths": {
+            "private_key": "server.key",
+            "certificate": "server.pem"
+        },
+        "cfssl": {
+            "profile": "server",
+            "remote": "127.0.0.1:8888"
+        }
+    },
+    "roots": [
+        {
+            "type": "system"
+        }
+    ],
+    "client_roots": [
+        {
+            "type": "cfssl",
+            "metadata": {
+                "host": "127.0.0.1:8888",
+                "profile": "maclient"
+            }
+        }
+    ]
+}

@@ -1,0 +1,84 @@
+#!/usr/bin/env bash
+
+: ${TEST_REPEAT:=0}
+
+bundle_test_integration_cli() {
+	TESTFLAGS="$TESTFLAGS -check.v -check.timeout=${TIMEOUT} -test.timeout=360m"
+	go_test_dir integration-cli $DOCKER_INTEGRATION_TESTS_VERIFIED
+}
+
+# If $TESTFLAGS is set in the environment, it is passed as extra arguments to 'go test'.
+# You can use this to select certain tests to run, e.g.
+#
+#     TESTFLAGS='-test.run ^TestBuild$' ./hack/make.sh test-unit
+#
+# For integration-cli test, we use [gocheck](https://labix.org/gocheck), if you want
+# to run certain tests on your local host, you should run with command:
+#
+#     TESTFLAGS='-check.f DockerSuite.TestBuild*' ./hack/make.sh binary test-integration-cli
+#
+go_test_dir() {
+	dir=$1
+	precompiled=$2
+	testbinary="$ABS_DEST/test.main"
+	testcover=()
+	testcoverprofile=()
+	(
+		set -e
+		mkdir -p "$DEST/coverprofiles"
+		export DEST="$ABS_DEST" # in a subshell this is safe -- our integration-cli tests need DEST, and "cd" screws it up
+		if [ -z $precompiled ]; then
+			ensure_test_dir $1 $testbinary
+		fi
+		cd "$dir"
+		i=0
+		while ((++i)); do
+			test_env "$testbinary" $TESTFLAGS
+			if [ $i -gt "$TEST_REPEAT" ]; then
+				break
+			fi
+			echo "Repeating test ($i)"
+		done
+	)
+}
+
+ensure_test_dir() {
+	(
+		# make sure a test dir will compile
+		dir="$1"
+		out="$2"
+		echo Building test dir: "$dir"
+		set -xe
+		cd "$dir"
+		go test -c -o "$out" -ldflags "$LDFLAGS" "${BUILDFLAGS[@]}"
+	)
+}
+
+test_env() {
+	(
+		set -xe
+		# use "env -i" to tightly control the environment variables that bleed into the tests
+		env -i \
+			DEST="$DEST" \
+			DOCKER_CLI_VERSION="$DOCKER_CLI_VERSION" \
+			DOCKER_API_VERSION="$DOCKER_API_VERSION" \
+			DOCKER_INTEGRATION_DAEMON_DEST="$DOCKER_INTEGRATION_DAEMON_DEST" \
+			DOCKER_TLS_VERIFY="$DOCKER_TEST_TLS_VERIFY" \
+			DOCKER_CERT_PATH="$DOCKER_TEST_CERT_PATH" \
+			DOCKER_ENGINE_GOARCH="$DOCKER_ENGINE_GOARCH" \
+			DOCKER_GRAPHDRIVER="$DOCKER_GRAPHDRIVER" \
+			DOCKER_USERLANDPROXY="$DOCKER_USERLANDPROXY" \
+			DOCKER_HOST="$DOCKER_HOST" \
+			DOCKER_REMAP_ROOT="$DOCKER_REMAP_ROOT" \
+			DOCKER_REMOTE_DAEMON="$DOCKER_REMOTE_DAEMON" \
+			DOCKERFILE="$DOCKERFILE" \
+			GOPATH="$GOPATH" \
+			GOTRACEBACK=all \
+			HOME="$ABS_DEST/fake-HOME" \
+			PATH="$PATH" \
+			TEMP="$TEMP" \
+			TEST_IMAGE_NAMESPACE="$TEST_IMAGE_NAMESPACE" \
+			TEST_CLIENT_BINARY="$TEST_CLIENT_BINARY" \
+			"$@"
+	)
+}

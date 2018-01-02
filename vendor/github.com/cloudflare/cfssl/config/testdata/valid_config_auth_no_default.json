@@ -1,0 +1,19 @@
+{
+	"signing": {
+		"profiles": {
+			"CA": {
+				"auth_key": "garbage",
+				"remote": "localhost"
+			}
+		}
+	},
+	"auth_keys": {
+		"garbage": {
+			"type":"standard",
+			"key":"0123456789ABCDEF0123456789ABCDEF"
+		}
+	},
+	"remotes": {
+		"localhost": "127.0.0.1:8888"
+	}
+}

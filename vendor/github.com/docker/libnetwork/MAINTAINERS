@@ -1,0 +1,64 @@
+# Libnetwork maintainers file
+#
+# This file describes who runs the docker/libnetwork project and how.
+# This is a living document - if you see something out of date or missing, speak up!
+#
+# It is structured to be consumable by both humans and programs.
+# To extract its contents programmatically, use any TOML-compliant parser.
+#
+# This file is compiled into the MAINTAINERS file in docker/opensource.
+#
+[Org]
+	[Org."Core maintainers"]
+		people = [
+			"aboch",
+			"LK4D4",
+			"icecrime",
+			"mavenugo",
+			"sanimej",
+			"chenchun",
+                        "fcrisciani",
+		]
+
+[people]
+
+# A reference list of all people associated with the project.
+# All other sections should refer to people by their canonical key
+# in the people section.
+
+	# ADD YOURSELF HERE IN ALPHABETICAL ORDER
+
+	[people.aboch]
+	Name = "Alessandro Boch"
+	Email = "aboch@docker.com"
+	GitHub = "aboch"
+
+	[people.LK4D4]
+	Name = "Alexandr Morozov"
+	Email = "lk4d4@docker.com"
+	GitHub = "LK4D4"
+
+	[people.chenchun]
+	Name = "Chun Chen"
+	Email = "ramichen@tencent.com"
+	GitHub = "chenchun"
+
+	[people.fcrisciani]
+	Name = "Flavio Crisciani"
+	Email = "flavio.crisciani@docker.com"
+	GitHub = "fcrisciani"
+
+	[people.icecrime]
+	Name = "Arnaud Porterie"
+	Email = "arnaud@docker.com"
+	GitHub = "icecrime"
+
+	[people.mavenugo]
+	Name = "Madhu Venugopal"
+	Email = "madhu@docker.com"
+	GitHub = "mavenugo"
+
+	[people.sanimej]
+	Name = "Santhosh Manohar"
+	Email = "santhosh@docker.com"
+	GitHub = "sanimej"

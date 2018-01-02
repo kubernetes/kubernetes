@@ -1,0 +1,36 @@
+# German translations for hello-cplusplus-qt package.
+# Copyright (C) 2005 Yoyodyne, Inc.
+# This file is distributed under the same license as the hello-cplusplus-qt package.
+# Bruno Haible <bruno@clisp.org>, 2005.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: hello-cplusplus-qt 0\n"
+"Report-Msgid-Bugs-To: bug-gnu-gettext@gnu.org\n"
+"POT-Creation-Date: 2003-10-20 10:14+0200\n"
+"PO-Revision-Date: 2003-10-20 10:13+0200\n"
+"Last-Translator: Bruno Haible <bruno@clisp.org>\n"
+"Language-Team: German <de@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: main.cc:17
+msgctxt "Menu"
+msgid "File"
+msgstr "Datei"
+
+#: main.cc:19
+msgctxt "Menu"
+msgid "Edit"
+msgstr "Bearbeiten"
+
+#: main.cc:21
+msgctxt "Menu"
+msgid "Help"
+msgstr ""
+
+#: data.cc:45
+msgctxt "Database"
+msgid "File"
+msgstr "Archiv"

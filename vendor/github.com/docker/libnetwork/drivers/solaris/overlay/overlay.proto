@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+import "gogoproto/gogo.proto";
+
+package overlay;
+
+option (gogoproto.marshaler_all) = true;
+option (gogoproto.unmarshaler_all) = true;
+option (gogoproto.stringer_all) = true;
+option (gogoproto.gostring_all) = true;
+option (gogoproto.sizer_all) = true;
+option (gogoproto.goproto_stringer_all) = false;
+
+// PeerRecord defines the information corresponding to a peer
+// container in the overlay network.
+message PeerRecord {
+	// Endpoint IP is the IP of the container attachment on the
+	// given overlay network.
+	string endpoint_ip = 1 [(gogoproto.customname) = "EndpointIP"];
+	// Endpoint MAC is the mac address of the container attachment
+	// on the given overlay network.
+	string endpoint_mac = 2 [(gogoproto.customname) = "EndpointMAC"];
+	// Tunnel Endpoint IP defines the host IP for the host in
+	// which this container is running and can be reached by
+	// building a tunnel to that host IP.
+	string tunnel_endpoint_ip = 3 [(gogoproto.customname) = "TunnelEndpointIP"];
+}

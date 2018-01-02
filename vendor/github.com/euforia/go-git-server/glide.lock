@@ -1,0 +1,18 @@
+hash: d9cca6d1ee0c587a904c74d4f718279001a28d0e3bb3da3fd07c45c34a41c977
+updated: 2016-12-17T21:24:41.681740065-08:00
+imports:
+- name: github.com/bargez/pktline
+  version: 5b3d21bc298513f43c0052b622f6ec6b35c17722
+- name: gopkg.in/src-d/go-git.v4
+  version: 60cf153c71feb258cc77d1fcf4498d5b72280589
+  subpackages:
+  - config
+  - plumbing
+  - plumbing/format/index
+  - plumbing/format/packfile
+  - plumbing/object
+  - plumbing/storer
+  - storage/memory
+  - utils/binary
+  - utils/ioutil
+testImports: []

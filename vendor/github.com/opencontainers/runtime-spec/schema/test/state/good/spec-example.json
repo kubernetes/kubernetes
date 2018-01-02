@@ -1,0 +1,10 @@
+{
+    "ociVersion": "0.2.0",
+    "id": "oci-container1",
+    "status": "running",
+    "pid": 4422,
+    "bundle": "/containers/redis",
+    "annotations": {
+        "myKey": "myValue"
+    }
+}

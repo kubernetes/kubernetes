@@ -1,0 +1,46 @@
+{
+  "pagination": {
+    "GetWorkflowExecutionHistory": {
+      "input_token": "nextPageToken",
+      "limit_key": "maximumPageSize",
+      "output_token": "nextPageToken",
+      "result_key": "events"
+    },
+    "ListActivityTypes": {
+      "input_token": "nextPageToken",
+      "limit_key": "maximumPageSize",
+      "output_token": "nextPageToken",
+      "result_key": "typeInfos"
+    },
+    "ListClosedWorkflowExecutions": {
+      "input_token": "nextPageToken",
+      "limit_key": "maximumPageSize",
+      "output_token": "nextPageToken",
+      "result_key": "executionInfos"
+    },
+    "ListDomains": {
+      "input_token": "nextPageToken",
+      "limit_key": "maximumPageSize",
+      "output_token": "nextPageToken",
+      "result_key": "domainInfos"
+    },
+    "ListOpenWorkflowExecutions": {
+      "input_token": "nextPageToken",
+      "limit_key": "maximumPageSize",
+      "output_token": "nextPageToken",
+      "result_key": "executionInfos"
+    },
+    "ListWorkflowTypes": {
+      "input_token": "nextPageToken",
+      "limit_key": "maximumPageSize",
+      "output_token": "nextPageToken",
+      "result_key": "typeInfos"
+    },
+    "PollForDecisionTask": {
+      "input_token": "nextPageToken",
+      "limit_key": "maximumPageSize",
+      "output_token": "nextPageToken",
+      "result_key": "events"
+    }
+  }
+}

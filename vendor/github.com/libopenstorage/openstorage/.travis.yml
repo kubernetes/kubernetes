@@ -1,0 +1,24 @@
+sudo: required
+dist: trusty
+services:
+  - docker
+language: go
+go:
+  - 1.6
+before_install:  
+  - sudo apt-get update -yq
+  - sudo apt-get -o Dpkg::Options::="--force-confnew" install -yq docker-ce
+script:
+  - make docker-test
+  - if [ "${TRAVIS_BRANCH}" == "master" ] && [ "${TRAVIS_PULL_REQUEST}" == "false" ]; then
+      make docker-build-osd;
+      docker login -u "${DOCKER_USER}" -p "${DOCKER_PASS}";
+      docker push openstorage/osd;
+    fi
+notifications:
+  email:
+    recipients:
+      - aditya@portworx.com
+      - eng@portworx.com
+    on_success: always
+    on_failure: always

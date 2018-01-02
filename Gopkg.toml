@@ -1,0 +1,469 @@
+
+# Gopkg.toml example
+#
+# Refer to https://github.com/golang/dep/blob/master/docs/Gopkg.toml.md
+# for detailed Gopkg.toml documentation.
+#
+# required = ["github.com/user/thing/cmd/thing"]
+# ignored = ["github.com/user/project/pkgX", "bitbucket.org/user/project/pkgA/pkgY"]
+#
+# [[constraint]]
+#   name = "github.com/user/project"
+#   version = "1.0.0"
+#
+# [[constraint]]
+#   name = "github.com/user/project2"
+#   branch = "dev"
+#   source = "github.com/myfork/project2"
+#
+# [[override]]
+#  name = "github.com/x/y"
+#  version = "2.4.0"
+
+
+[[constraint]]
+  branch = "master"
+  name = "bitbucket.org/bertimus9/systemstat"
+
+[[constraint]]
+  name = "cloud.google.com/go"
+
+[[constraint]]
+  name = "github.com/Azure/azure-sdk-for-go"
+  version = "11.1.1-beta"
+
+[[constraint]]
+  name = "github.com/Azure/go-autorest"
+  version = "9.1.0"
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/JeffAshton/win_pdh"
+
+[[constraint]]
+  name = "github.com/MakeNowJust/heredoc"
+
+[[constraint]]
+  name = "github.com/Microsoft/hcsshim"
+
+[[constraint]]
+  name = "github.com/PuerkitoBio/purell"
+  version = "1.0.0"
+
+[[constraint]]
+  name = "github.com/appc/spec"
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/armon/circbuf"
+
+[[constraint]]
+  name = "github.com/aws/aws-sdk-go"
+  version = "1.12.7"
+
+[[constraint]]
+  name = "github.com/blang/semver"
+  version = "3.5.0"
+
+[[constraint]]
+  name = "github.com/chai2010/gettext-go"
+
+[[constraint]]
+  name = "github.com/cloudflare/cfssl"
+  version = "1.2.0"
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/clusterhq/flocker-go"
+
+[[constraint]]
+  name = "github.com/codedellemc/goscaleio"
+
+[[constraint]]
+  name = "github.com/codegangsta/negroni"
+
+[[constraint]]
+  name = "github.com/container-storage-interface/spec"
+
+[[constraint]]
+  name = "github.com/containernetworking/cni"
+  version = "0.6.0"
+
+[[constraint]]
+  name = "github.com/coreos/etcd"
+  version = "3.1.10"
+
+[[constraint]]
+  name = "github.com/coreos/go-oidc"
+
+[[constraint]]
+  name = "github.com/coreos/go-semver"
+
+[[constraint]]
+  name = "github.com/coreos/go-systemd"
+  version = "14.0.0"
+
+[[constraint]]
+  name = "github.com/coreos/pkg"
+
+[[constraint]]
+  name = "github.com/coreos/rkt"
+  version = "1.25.0"
+
+[[constraint]]
+  name = "github.com/cpuguy83/go-md2man"
+  version = "1.0.4"
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/d2g/dhcp4"
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/d2g/dhcp4client"
+
+[[constraint]]
+  name = "github.com/davecgh/go-spew"
+
+[[constraint]]
+  name = "github.com/daviddengcn/go-colortext"
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/dchest/safefile"
+
+[[constraint]]
+  name = "github.com/dgrijalva/jwt-go"
+
+[[constraint]]
+  name = "github.com/docker/distribution"
+
+[[constraint]]
+  name = "github.com/docker/docker"
+
+[[constraint]]
+  name = "github.com/docker/go-connections"
+  version = "0.3.0"
+
+[[constraint]]
+  name = "github.com/docker/go-units"
+
+[[constraint]]
+  name = "github.com/docker/libnetwork"
+
+[[constraint]]
+  name = "github.com/docker/spdystream"
+
+[[constraint]]
+  name = "github.com/elazarl/go-bindata-assetfs"
+
+[[constraint]]
+  name = "github.com/elazarl/goproxy"
+
+[[constraint]]
+  name = "github.com/emicklei/go-restful"
+
+[[constraint]]
+  name = "github.com/emicklei/go-restful-swagger12"
+  version = "1.0.1"
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/evanphx/json-patch"
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/exponent-io/jsonpath"
+
+[[constraint]]
+  name = "github.com/fatih/camelcase"
+
+[[constraint]]
+  name = "github.com/fsnotify/fsnotify"
+
+[[constraint]]
+  name = "github.com/ghodss/yaml"
+
+[[constraint]]
+  name = "github.com/go-openapi/loads"
+
+[[constraint]]
+  name = "github.com/go-openapi/spec"
+
+[[constraint]]
+  name = "github.com/go-openapi/strfmt"
+
+[[constraint]]
+  name = "github.com/go-openapi/validate"
+
+[[constraint]]
+  name = "github.com/godbus/dbus"
+  version = "3.0.0"
+
+[[constraint]]
+  name = "github.com/gogo/protobuf"
+
+[[constraint]]
+  name = "github.com/golang/glog"
+
+[[constraint]]
+  name = "github.com/golang/groupcache"
+
+[[constraint]]
+  name = "github.com/golang/mock"
+
+[[constraint]]
+  name = "github.com/golang/protobuf"
+
+[[constraint]]
+  name = "github.com/google/cadvisor"
+  version = "0.28.3"
+
+[[constraint]]
+  name = "github.com/google/gofuzz"
+
+[[constraint]]
+  name = "github.com/googleapis/gnostic"
+
+[[constraint]]
+  name = "github.com/gophercloud/gophercloud"
+
+[[constraint]]
+  name = "github.com/gorilla/mux"
+
+[[constraint]]
+  name = "github.com/gregjones/httpcache"
+
+[[constraint]]
+  name = "github.com/hashicorp/golang-lru"
+
+[[constraint]]
+  name = "github.com/hawkular/hawkular-client-go"
+
+[[constraint]]
+  name = "github.com/heketi/heketi"
+
+[[constraint]]
+  name = "github.com/influxdata/influxdb"
+  version = "1.1.1"
+
+[[constraint]]
+  name = "github.com/jonboulle/clockwork"
+
+[[constraint]]
+  name = "github.com/json-iterator/go"
+
+[[constraint]]
+  name = "github.com/juju/ratelimit"
+
+[[constraint]]
+  name = "github.com/kardianos/osext"
+
+[[constraint]]
+  name = "github.com/kr/pty"
+
+[[constraint]]
+  name = "github.com/libopenstorage/openstorage"
+
+[[constraint]]
+  name = "github.com/miekg/dns"
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/mitchellh/go-wordwrap"
+
+[[constraint]]
+  name = "github.com/mitchellh/mapstructure"
+
+[[constraint]]
+  name = "github.com/mvdan/xurls"
+
+[[constraint]]
+  name = "github.com/onsi/ginkgo"
+
+[[constraint]]
+  name = "github.com/onsi/gomega"
+
+[[constraint]]
+  name = "github.com/opencontainers/go-digest"
+
+[[constraint]]
+  name = "github.com/opencontainers/runc"
+
+[[constraint]]
+  name = "github.com/opencontainers/selinux"
+
+[[constraint]]
+  name = "github.com/pborman/uuid"
+
+[[constraint]]
+  name = "github.com/peterbourgon/diskv"
+  version = "2.0.1"
+
+[[constraint]]
+  name = "github.com/pkg/errors"
+  version = "0.8.0"
+
+[[constraint]]
+  name = "github.com/prometheus/client_golang"
+
+[[constraint]]
+  name = "github.com/prometheus/client_model"
+
+[[constraint]]
+  name = "github.com/prometheus/common"
+
+[[constraint]]
+  name = "github.com/quobyte/api"
+
+[[constraint]]
+  name = "github.com/rancher/go-rancher"
+
+[[constraint]]
+  name = "github.com/renstrom/dedent"
+
+[[constraint]]
+  name = "github.com/robfig/cron"
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/rubiojr/go-vhd"
+
+[[constraint]]
+  name = "github.com/russross/blackfriday"
+
+[[constraint]]
+  name = "github.com/spf13/afero"
+
+[[constraint]]
+  name = "github.com/spf13/cobra"
+
+[[constraint]]
+  name = "github.com/spf13/pflag"
+
+[[constraint]]
+  name = "github.com/spf13/viper"
+
+[[constraint]]
+  name = "github.com/storageos/go-api"
+
+[[constraint]]
+  name = "github.com/stretchr/testify"
+
+[[constraint]]
+  name = "github.com/vishvananda/netlink"
+
+[[constraint]]
+  name = "github.com/vmware/govmomi"
+
+[[constraint]]
+  name = "github.com/vmware/photon-controller-go-sdk"
+
+[[constraint]]
+  name = "github.com/xanzy/go-cloudstack"
+
+[[constraint]]
+  name = "github.com/xyproto/simpleredis"
+
+[[constraint]]
+  name = "golang.org/x/crypto"
+
+[[constraint]]
+  name = "golang.org/x/exp"
+
+[[constraint]]
+  name = "golang.org/x/net"
+
+[[constraint]]
+  name = "golang.org/x/oauth2"
+
+[[constraint]]
+  name = "golang.org/x/sys"
+
+[[constraint]]
+  name = "golang.org/x/text"
+
+[[constraint]]
+  name = "golang.org/x/tools"
+
+[[constraint]]
+  name = "google.golang.org/api"
+
+[[constraint]]
+  name = "google.golang.org/grpc"
+  version = "1.3.0"
+
+[[constraint]]
+  name = "gopkg.in/gcfg.v1"
+  version = "1.2.0"
+
+[[constraint]]
+  name = "gopkg.in/inf.v0"
+  version = "0.9.0"
+
+[[constraint]]
+  name = "gopkg.in/square/go-jose.v2"
+  version = "2.1.3"
+
+[[constraint]]
+  name = "gopkg.in/yaml.v2"
+
+[[constraint]]
+  branch = "master"
+  name = "k8s.io/api"
+
+[[constraint]]
+  branch = "master"
+  name = "k8s.io/apiextensions-apiserver"
+
+[[constraint]]
+  branch = "master"
+  name = "k8s.io/apimachinery"
+
+[[constraint]]
+  branch = "master"
+  name = "k8s.io/apiserver"
+
+[[constraint]]
+  name = "k8s.io/client-go"
+  version = "6.0.0"
+
+[[constraint]]
+  branch = "master"
+  name = "k8s.io/code-generator"
+
+[[constraint]]
+  name = "k8s.io/gengo"
+
+[[constraint]]
+  name = "k8s.io/heapster"
+  version = "1.2.0-beta.1"
+
+[[constraint]]
+  branch = "master"
+  name = "k8s.io/kube-aggregator"
+
+[[constraint]]
+  name = "k8s.io/kube-openapi"
+
+[[constraint]]
+  branch = "master"
+  name = "k8s.io/metrics"
+
+[[constraint]]
+  branch = "master"
+  name = "k8s.io/sample-apiserver"
+
+[[constraint]]
+  branch = "master"
+  name = "k8s.io/sample-controller"
+
+[[constraint]]
+  name = "k8s.io/utils"
+
+[[constraint]]
+  name = "vbom.ml/util"
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/euforia/go-git-server"

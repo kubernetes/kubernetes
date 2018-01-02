@@ -1,0 +1,11 @@
+[Unit]
+Description=Configuring GlusterFS in container
+Before=rpcbind.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/sbin/gluster-setup.sh
+
+[Install]
+WantedBy=multi-user.target
+

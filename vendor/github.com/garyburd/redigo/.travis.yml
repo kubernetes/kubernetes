@@ -1,0 +1,16 @@
+language: go
+sudo: false
+services:
+  - redis-server
+
+go:
+  - 1.4
+  - 1.5
+  - 1.6
+  - tip
+
+script:
+  - go get -t -v ./...
+  - diff -u <(echo -n) <(gofmt -d .)
+  - go vet $(go list ./... | grep -v /vendor/)
+  - go test -v -race ./...

@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+
+if ! [[ "$0" =~ "tools/functional-tester/build" ]]; then
+	echo "must be run from repository root"
+	exit 255
+fi
+
+CGO_ENABLED=0 go build -a -installsuffix cgo -ldflags "-s" -o bin/etcd-agent ./cmd/tools/functional-tester/etcd-agent
+CGO_ENABLED=0 go build -a -installsuffix cgo -ldflags "-s" -o bin/etcd-tester ./cmd/tools/functional-tester/etcd-tester
+

@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+set -e
+
+versions=( 1.3.3 1.4.1 1.5.0 1.6.2 )
+
+install() {
+	local version=$1
+	local tmpdir=$(mktemp -d /tmp/XXXXXXXXXX)
+	local dockerfile="${tmpdir}/Dockerfile"
+	cat <<-EOF > "$dockerfile"
+	FROM debian:jessie
+	ENV VERSION ${version}
+	RUN apt-get update && apt-get install -y \
+		apt-transport-https \
+		ca-certificates \
+		--no-install-recommends
+	RUN echo "deb https://get.docker.com/ubuntu docker main" > /etc/apt/sources.list.d/docker.list
+	RUN apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 \
+		--recv-keys 36A1D7869245C8950F966E92D8576A8BA88D21E9
+	RUN apt-get update && apt-get install -y \
+		lxc-docker-\${VERSION}
+	EOF
+
+	docker build --rm --force-rm --no-cache -t docker-old-repo:${version} -f $dockerfile $tmpdir
+}
+
+for v in "${versions[@]}"; do
+	install "$v"
+done

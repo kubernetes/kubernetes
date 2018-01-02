@@ -1,0 +1,13 @@
+diff --git a/builtin-run.c b/builtin-run.c
+index edcaf3e..f2f2d73 100644
+--- a/builtin-run.c
++++ b/builtin-run.c
+@@ -590,7 +591,7 @@ static struct kvm *kvm_cmd_run_init(int argc, const char **argv)
+ 	}
+ 
+ 	if (kvm->cfg.using_rootfs) {
+-		strcat(real_cmdline, " rw rootflags=trans=virtio,version=9p2000.L,cache=loose rootfstype=9p");
++		strcat(real_cmdline, " rw rootflags=trans=virtio,version=9p2000.L,cache=mmap rootfstype=9p");
+ 		if (kvm->cfg.custom_rootfs) {
+ 			kvm_run_set_sandbox(kvm);
+ 

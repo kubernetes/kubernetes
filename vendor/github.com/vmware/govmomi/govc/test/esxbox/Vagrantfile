@@ -1,0 +1,27 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+Vagrant.configure("2") do |config|
+  config.ssh.insert_key = false
+  config.ssh.default.username = "root"
+  config.ssh.shell = "sh"
+  config.vm.hostname = "esxbox"
+
+  config.vm.box = "esxi55"
+  config.vm.synced_folder ".", "/vagrant", disabled: true
+  config.vm.network "forwarded_port", guest: 443, host: 18443
+
+  [:vmware_fusion, :vmware_workstation].each do |name|
+    config.vm.provider name do |v,override|
+      v.vmx["memsize"] = "4096"
+    end
+  end
+
+  config.vm.provision "shell", privileged: false, :inline => <<EOS
+# Turn off the firewall
+esxcli network firewall set --enabled false
+
+# Enable option so we can get VM ip address w/o vmware-tools
+esxcli system settings advanced set -o /Net/GuestIPHack -i 1
+EOS
+end

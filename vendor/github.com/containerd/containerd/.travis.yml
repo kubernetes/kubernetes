@@ -1,0 +1,78 @@
+dist: trusty
+sudo: required
+# setup travis so that we can run containers for integration tests
+services:
+  - docker
+
+language: go
+
+go:
+  - 1.9.x
+
+go_import_path: github.com/containerd/containerd
+
+addons:
+  apt:
+    packages:
+      - btrfs-tools
+      - libseccomp-dev
+      - libapparmor-dev
+      - libnl-3-dev
+      - libnet-dev
+      - protobuf-c-compiler
+      - protobuf-compiler
+      - python-minimal
+      - libcap-dev
+      - libaio-dev
+      - libprotobuf-c0-dev
+      - libprotobuf-dev
+
+env:
+  - TRAVIS_GOOS=linux TRAVIS_CGO_ENABLED=1
+  - TRAVIS_GOOS=darwin TRAVIS_CGO_ENABLED=0
+
+before_install:
+  - uname -r
+
+install:
+  - wget https://github.com/google/protobuf/releases/download/v3.3.0/protoc-3.3.0-linux-x86_64.zip -O /tmp/protoc-3.3.0-linux-x86_64.zip
+  - sudo unzip -o -d /usr/local /tmp/protoc-3.3.0-linux-x86_64.zip
+  - go get -u github.com/vbatts/git-validation
+  - sudo wget https://github.com/crosbymichael/runc/releases/download/ctd-7/runc -O /bin/runc; sudo chmod +x /bin/runc
+  - wget https://github.com/xemul/criu/archive/v3.0.tar.gz -O /tmp/criu.tar.gz
+  - tar -C /tmp/ -zxf /tmp/criu.tar.gz
+  - cd /tmp/criu-3.0 && sudo make install-criu
+  - cd $TRAVIS_BUILD_DIR
+
+script:
+  - export GOOS=$TRAVIS_GOOS
+  - export CGO_ENABLED=$TRAVIS_CGO_ENABLED
+  - GIT_CHECK_EXCLUDE="./vendor" TRAVIS_COMMIT_RANGE="${TRAVIS_COMMIT_RANGE/.../..}" make dco
+  - GOOS=linux make setup
+  - go build -i .
+  - make check
+  - if [ "$GOOS" = "linux" ]; then make check-protos check-api-descriptors; fi
+  - make build
+  - make binaries
+  - if [ "$GOOS" = "linux" ]; then sudo make install ; fi
+  - if [ "$GOOS" = "linux" ]; then make coverage ; fi
+  - if [ "$GOOS" = "linux" ]; then sudo PATH=$PATH GOPATH=$GOPATH make root-coverage ; fi
+  - if [ "$GOOS" = "linux" ]; then sudo PATH=$PATH GOPATH=$GOPATH make integration ; fi
+  - if [ "$GOOS" = "linux" ]; then sudo PATH=$PATH GOPATH=$GOPATH make integration-parallel ; fi
+
+after_success:
+  - bash <(curl -s https://codecov.io/bash)
+
+before_deploy:
+  - make release
+
+deploy:
+  provider: releases
+  api_key:
+    secure: HO+WSIVVUMMsbU74x+YyFsTP3ahqnR4xjwKAziedJ5lZXKJszQBhiYTFmcTeVBoouNjTISd07GQzpoLChuGC20U3+1NbT+CkK8xWR/x1ao2D3JY3Ds6AD9ubWRNWRLptt/xOn5Vq3F8xZyUYchwvDMl4zKCuTKxQGVdHKsINb2DehKcP5cVL6MMvqzEdfj2g99vqXAqs8uuo6dOmvxmHV43bfzDaAJSabjZZs6TKlWTqCQMet8uxyx2Dmjl2lxLwdqv12oJdrszacasn41NYuEyHI2bXyef1mhWGYN4n9bU/Y5winctZ8DOSOZvYg/2ziAaUN0+CTn1IESwVesrPz23P2Sy7wdLxu8dSIZ2yUHl7OsA5T5a5rDchAGguRVNBWvoGtuepEhdRacxTQUo1cMFZsEXjgRKKjdfc1emYQPVdN8mBv8GJwndty473ZXdvFt5R0kNVFtvWuYCa6UYJD2cKrsPSAfbZCDC/LiR3FOoTaUPMZUVkR2ACEO7Dn4+KlmBajqT40Osk/A7k1XA/TzVhMIpLtE0Vk2DfPmGsjCv8bC+MFd+R2Sc8SFdE92oEWRdoPQY5SxMYQtGxA+cbKVlT1kSw6y80yEbx5JZsBnT6+NTHwmDO3kVU9ztLdawOozTElKNAK8HoAyFmzIZ3wL64oThuDrv/TUuY8Iyn814=
+  file_glob: true
+  file: releases/*.tar.gz
+  skip_cleanup: true
+  on:
+    repo: containerd/containerd
+    tags: true

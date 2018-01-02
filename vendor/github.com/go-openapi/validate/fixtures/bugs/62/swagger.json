@@ -1,0 +1,14 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "version": "0.0.1",
+    "title": "test of Swagger of additionalProperties in pathItem"
+  },
+  "paths": {
+    "/": {
+      "invalid-property": {
+        "description": "blah"
+      }
+    }
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "description": "true",
+  "properties": {
+    "name": {
+      "type": "string"
+    }
+  }
+}

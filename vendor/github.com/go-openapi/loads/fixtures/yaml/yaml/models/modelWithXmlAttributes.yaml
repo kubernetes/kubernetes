@@ -1,0 +1,6 @@
+description: 'this model serves xml and json structures'
+xml:
+  name: XMLModel
+properties:
+  id: {type: integer, format: int64, xml: {attribute: true, namespace: ns1, prefix: urn1}}
+  items: {type: array, items: {type: string}, xml: {wrapped: true}}

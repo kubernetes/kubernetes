@@ -1,0 +1,8 @@
+syntax = "proto2";
+
+package grpc.testing;
+
+message ToBeExtended {
+  required int32 foo = 1;
+  extensions 10 to 30;
+}

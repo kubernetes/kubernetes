@@ -1,0 +1,253 @@
+#!/usr/bin/env bash
+#
+# Run all etcd tests
+# ./test
+# ./test -v
+#
+# Run tests for one package
+#
+# PKG=./wal ./test
+# PKG=snap ./test
+#
+# Run code coverage
+# COVERDIR=coverage PASSES=cov ./test
+set -e
+
+source ./build
+
+# build tests with vendored dependencies
+etcd_setup_gopath
+
+if [ -z "$PASSES" ]; then
+	PASSES="fmt dep compile build unit"
+fi
+
+# Invoke ./cover for HTML output
+COVER=${COVER:-"-cover"}
+
+# Hack: gofmt ./ will recursively check the .git directory. So use *.go for gofmt.
+IGNORE_PKGS="(cmd|vendor|etcdserverpb|rafttest|gopath.proto)"
+INTEGRATION_PKGS="(integration|e2e|contrib|functional-tester)"
+TEST_PKGS=`find . -name \*_test.go | while read a; do dirname $a; done | sort | uniq | egrep -v "$IGNORE_PKGS" | sed "s|\./||g"`
+FORMATTABLE=`find . -name \*.go | while read a; do echo $(dirname $a)/"*.go"; done | sort | uniq | egrep -v "$IGNORE_PKGS" | sed "s|\./||g"`
+TESTABLE_AND_FORMATTABLE=`echo "$TEST_PKGS" | egrep -v "$INTEGRATION_PKGS"`
+
+if [ -z "$GOARCH" ]; then
+	GOARCH=$(go env GOARCH);
+fi
+
+# user has not provided PKG override
+if [ -z "$PKG" ]; then
+	TEST=$TESTABLE_AND_FORMATTABLE
+	FMT=$FORMATTABLE
+
+# user has provided PKG override
+else
+	# strip out leading dotslashes and trailing slashes from PKG=./foo/
+	TEST=${PKG/#./}
+	TEST=${TEST/#\//}
+	TEST=${TEST/%\//}
+
+	# only run gofmt on packages provided by user
+	FMT="$TEST"
+fi
+
+# split TEST into an array and prepend REPO_PATH to each local package
+split=(${TEST// / })
+TEST=${split[@]/#/${REPO_PATH}/}
+
+# determine whether target supports race detection
+if [ "$GOARCH" == "amd64" ]; then
+	RACE="--race"
+fi
+
+function unit_pass {
+	echo "Running unit tests..."
+	# only -run=Test so examples can run in integration tests
+	go test -timeout 3m ${COVER} ${RACE} -cpu 1,2,4 -run=Test $@ ${TEST}
+}
+
+function integration_pass {
+	echo "Running integration tests..."
+	go test -timeout 15m -v -cpu 1,2,4 $@ ${REPO_PATH}/integration
+	go test -timeout 1m -v ${RACE} -cpu 1,2,4 $@ ${REPO_PATH}/client/integration
+	go test -timeout 10m -v ${RACE} -cpu 1,2,4 $@ ${REPO_PATH}/clientv3/integration
+	go test -timeout 1m -v -cpu 1,2,4 $@ ${REPO_PATH}/contrib/raftexample
+	go test -timeout 1m -v ${RACE} -cpu 1,2,4 -run=Example $@ ${TEST}
+}
+
+function cov_pass {
+	echo "Running code coverage..."
+	# install gocovmerge before running code coverage from github.com/wadey/gocovmerge
+	# gocovmerge merges coverage files 
+	if ! which gocovmerge >/dev/null; then
+		echo "gocovmerge not installed"
+		exit 255
+	fi
+
+	if [ -z "$COVERDIR" ]; then
+		echo "COVERDIR undeclared"
+		exit 255
+	fi
+
+	mkdir -p "$COVERDIR"
+
+	# PKGS_DELIM contains all the core etcd pkgs delimited by ',' which will be profiled for code coverage.
+	# Integration tests will generate code coverage for those pkgs 
+	PKGS_DELIM=$(echo $TEST | sed 's/ /,/g')
+
+	# TODO create coverage to e2e test
+	PKGS=`echo "$TEST_PKGS" | egrep -v "(e2e|functional-tester)"`
+
+	for t in ${PKGS}; do
+		tf=`echo $t | tr / _`
+		#  uses -run=Test to skip examples because clientv3/ example tests will leak goroutines
+		go test -covermode=set -coverpkg $PKGS_DELIM -timeout 15m -run=Test -v -coverprofile "$COVERDIR/${tf}.coverprofile"  ${REPO_PATH}/$t
+	done
+
+	gocovmerge "$COVERDIR"/*.coverprofile >"$COVERDIR"/cover.out
+}
+
+function e2e_pass {
+	echo "Running e2e tests..."
+	go test -timeout 10m -v -cpu 1,2,4 $@ ${REPO_PATH}/e2e
+}
+
+function integration_e2e_pass {
+	echo "Running integration and e2e tests..."
+
+	go test -timeout 10m -v -cpu 1,2,4 $@ ${REPO_PATH}/e2e &
+	e2epid="$!"
+	go test -timeout 15m -v -cpu 1,2,4 $@ ${REPO_PATH}/integration &
+	intpid="$!"
+	wait $e2epid
+	wait $intpid
+	go test -timeout 1m -v ${RACE} -cpu 1,2,4 $@ ${REPO_PATH}/client/integration
+	go test -timeout 10m -v ${RACE} -cpu 1,2,4 $@ ${REPO_PATH}/clientv3/integration
+	go test -timeout 1m -v -cpu 1,2,4 $@ ${REPO_PATH}/contrib/raftexample
+	go test -timeout 1m -v ${RACE} -cpu 1,2,4 -run=Example $@ ${TEST}
+}
+
+function grpcproxy_pass {
+	go test -timeout 15m -v ${RACE} -tags cluster_proxy -cpu 1,2,4 $@ ${REPO_PATH}/integration
+}
+
+function release_pass {
+	rm -f ./bin/etcd-last-release
+	# to grab latest patch release; bump this up for every minor release
+	UPGRADE_VER=$(git tag -l --sort=-version:refname "v3.0.*" | head -1)
+	if [ -n "$MANUAL_VER" ]; then
+		# in case, we need to test against different version
+		UPGRADE_VER=$MANUAL_VER
+	fi
+
+	local file="etcd-$UPGRADE_VER-linux-$GOARCH.tar.gz"
+	echo "Downloading $file"
+
+	set +e
+	curl --fail -L https://github.com/coreos/etcd/releases/download/$UPGRADE_VER/$file -o /tmp/$file
+	local result=$?
+	set -e
+	case $result in
+		0)	;;
+		22)	return 0
+			;;
+		*)	exit $result
+			;;
+	esac
+
+	tar xzvf /tmp/$file -C /tmp/ --strip-components=1
+	mkdir -p ./bin
+	mv /tmp/etcd ./bin/etcd-last-release
+}
+
+function fmt_pass {
+	toggle_failpoints disable
+
+	echo "Checking gofmt..."
+	fmtRes=$(gofmt -l -s -d $FMT)
+	if [ -n "${fmtRes}" ]; then
+		echo -e "gofmt checking failed:\n${fmtRes}"
+		exit 255
+	fi
+
+	echo "Checking govet..."
+	vetRes=$(go vet $TEST)
+	if [ -n "${vetRes}" ]; then
+		echo -e "govet checking failed:\n${vetRes}"
+		exit 255
+	fi
+
+	echo "Checking 'go tool vet -shadow'..."
+	for path in $FMT; do
+		if [ "${path##*.}" != "go" ]; then
+			path="${path}/*.go"
+		fi
+		vetRes=$(go tool vet -shadow ${path})
+		if [ -n "${vetRes}" ]; then
+			echo -e "govet -shadow checking ${path} failed:\n${vetRes}"
+			exit 255
+		fi
+	done
+
+	echo "Checking for license header..."
+	licRes=$(for file in $(find . -type f -iname '*.go' ! -path './cmd/*' ! -path './gopath.proto/*'); do
+			head -n3 "${file}" | grep -Eq "(Copyright|generated|GENERATED)" || echo -e "  ${file}"
+		done;)
+	if [ -n "${licRes}" ]; then
+		echo -e "license header checking failed:\n${licRes}"
+		exit 255
+	fi
+
+	echo "Checking commit titles..."
+	git log --oneline `git merge-base HEAD master`...HEAD | while read l; do
+		commitMsg=`echo "$l" | cut -f2- -d' '`
+		if [[ "$commitMsg" == Merge* ]]; then
+			# ignore "Merge pull" commits
+			continue
+		fi
+		if [[ "$commitMsg" == Revert* ]]; then
+			# ignore revert commits
+			continue
+		fi
+
+		pkgPrefix=`echo "$commitMsg" | cut -f1 -d':'`
+		spaceCommas=`echo "$commitMsg" | sed 's/ /\n/g' | grep -c ',$' || echo 0`
+		commaSpaces=`echo "$commitMsg" | sed 's/,/\n/g' | grep -c '^ ' || echo 0`
+		if [[ `echo $commitMsg | grep -c ":..*"` == 0 || "$commitMsg" == "$pkgPrefix" || "$spaceCommas" != "$commaSpaces" ]]; then
+    			echo "$l"...
+			echo "Expected commit title format '<package>{\", \"<package>}: <description>'"
+			echo "Got: $l"
+			exit 255
+		fi
+	done
+}
+
+function dep_pass {
+	echo "Checking package dependencies..."
+	# don't pull in etcdserver package
+	pushd clientv3 >/dev/null
+	badpkg="(etcdserver|mvcc)"
+	deps=`go list -f '{{ .Deps }}'  | sed 's/ /\n/g' | egrep "${badpkg}" | egrep -v "${badpkg}/" || echo ""`
+	popd >/dev/null
+	if [ ! -z "$deps" ]; then
+		echo -e "clientv3 has masked dependencies:\n${deps}"
+		exit 255
+	fi
+}
+
+function compile_pass {
+	echo "Checking build..."
+	go build -v ./tools/...
+}
+
+# fail fast on static tests
+function build_pass {
+	GO_BUILD_FLAGS="-a -v" etcd_build
+}
+
+for pass in $PASSES; do
+	${pass}_pass $@
+done
+
+echo "Success"

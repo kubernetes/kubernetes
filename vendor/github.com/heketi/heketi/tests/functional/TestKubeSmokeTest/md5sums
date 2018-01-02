@@ -1,0 +1,4 @@
+8f5de36e01e8f160e91681cbc8355a64  /usr/local/bin/docker-machine
+519d29300df740a73c90d048e5df43fb  /usr/local/bin/docker-machine-driver-kvm
+eab2ea4df73dd3cbbe147954a161d10f  /usr/local/bin/kubectl
+b7490e41854ef77bbd89f46ce4bc2edd  /usr/local/bin/minikube

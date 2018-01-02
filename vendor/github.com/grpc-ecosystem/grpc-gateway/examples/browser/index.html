@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <script type="application/javascript" src="bower_components/swagger-js/browser/swagger-client.min.js"></script>
+    <script type="application/javascript">
+      window.client = new SwaggerClient({
+        url: "http://localhost:8080/swagger/echo_service.swagger.json",
+        success: function() {
+          client.EchoService.Echo(
+              {id: "foo"},
+              {responseContentType: "application/json"},
+              function(data) {
+                document.getElementById("echoBack").innerHTML = data.obj.id;
+              });
+        }
+      })
+    </script>
+  </head>
+  <body>
+    <div id="echoBack"></div>
+  </body>
+</html>

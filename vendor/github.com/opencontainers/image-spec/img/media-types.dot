@@ -1,0 +1,12 @@
+digraph G {
+  {
+    imageIndex [shape=note, label="Image Index\n<<optional>>\napplication/vnd.oci.image.index.v1+json"]
+    manifest [shape=note, label="Image manifest\napplication/vnd.oci.image.manifest.v1+json"]
+    config [shape=note, label="Image JSON\napplication/vnd.oci.image.config.v1+json"]
+    layer [shape=note, label="Layer tar archive\napplication/vnd.oci.image.layer.v1.tar\napplication/vnd.oci.image.layer.v1.tar+gzip\napplication/vnd.oci.image.layer.nondistributable.v1.tar\napplication/vnd.oci.image.layer.nondistributable.v1.tar+gzip"]
+  }
+
+  imageIndex -> manifest [label="1..*"]
+  manifest -> config [label="1..1"]
+  manifest -> layer [label="1..*"]
+}

@@ -1,0 +1,123 @@
+// Copyright 2017 Google Inc. All Rights Reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+// Client code 
+
+import Foundation
+import Dispatch
+
+enum ClientError: Swift.Error {
+  case errorWithCode(Int)
+}
+
+public class Client {
+  var service : String
+  
+  public init(service: String) {
+    self.service = service
+  } 
+//-{% for serviceMethod in renderer.methods %}
+
+  // {{ serviceMethod.description }} Asynchronous.
+  public func {{ serviceMethod.name }}({{ serviceMethod|asyncClientParametersDeclaration }}) throws {
+      var path = self.service 
+      path = path + "{{ serviceMethod.path }}"
+      //-{% for serviceTypeField in serviceMethod|parametersTypeFields %}
+      //-{% if serviceTypeField.position == "path" %}
+      path = path.replacingOccurrences(of:"{"+"{{ serviceTypeField.name }}"+"}", with:"\({{ serviceTypeField.name }})")
+      //-{% endif %}
+      //-{% endfor %}
+      guard let url = URL(string:path) else {
+        throw ClientError.errorWithCode(0)
+      }
+      var request = URLRequest(url:url)
+      request.httpMethod = "{{ serviceMethod.method }}"
+      //-{% for serviceTypeField in serviceMethod|parametersTypeFields %}
+      //-{% if serviceTypeField.position == "body" %}
+      let jsonObject = {{ serviceTypeField.name }}.jsonObject()
+      request.httpBody = try JSONSerialization.data(withJSONObject:jsonObject)
+      //-{% endif %}
+      //-{% endfor %}
+	  //-{% if serviceMethod|hasResponses %}
+      fetch(request) {(data, response, error) in
+        if error != nil {
+          callback(nil, ClientError.errorWithCode(0))
+	  	  return
+        }
+        guard let httpResponse = response else {
+          callback(nil, ClientError.errorWithCode(0))
+		  return
+        }
+        if httpResponse.statusCode == 200 {
+          if let data = data {
+            let jsonObject = try! JSONSerialization.jsonObject(with:data)
+            if let value = {{ serviceMethod.resultTypeName  }}(jsonObject:jsonObject) {          
+              callback(value, nil)
+			  return
+            }
+          }
+		  callback(nil, nil)
+	    } else {
+          callback(nil, ClientError.errorWithCode(httpResponse.statusCode))
+        }
+	  }
+	  //-{% else %}
+      fetch(request) {(data, response, error) in
+        if error != nil {
+          callback(ClientError.errorWithCode(0))
+	  	  return
+        }
+        guard let httpResponse = response else {
+          callback(ClientError.errorWithCode(0))
+		  return
+        }
+        if httpResponse.statusCode == 200 {
+		  callback(nil)
+	    } else {
+          callback(ClientError.errorWithCode(httpResponse.statusCode))
+        }
+	  }	  	  
+	  //-{% endif %}	  
+  }
+  
+  // {{ serviceMethod.description }} Synchronous.
+  public func {{ serviceMethod.name }}({{ serviceMethod|syncClientParametersDeclaration }}) throws {{ serviceMethod|syncClientReturnDeclaration }} {
+	  let sem = DispatchSemaphore(value: 0)
+	  //-{% if serviceMethod|hasResponses %}
+	  var response : {{ serviceMethod.resultTypeName }}?
+	  //-{% endif %}
+	  var error : Swift.Error?
+	  //-{% if serviceMethod|hasResponses %}	  
+	  try {{ serviceMethod.name }}({{ serviceMethod|parameterFieldNames }}) {r, e in
+	  	  response = r 
+	  //-{% else %}
+	  try {{ serviceMethod.name }}({{ serviceMethod|parameterFieldNames }}) {e in	  
+	  //-{% endif %}	  	  
+		  error = e 
+		  sem.signal()
+	  }
+	  sem.wait()
+	  if let actualError = error {
+		  throw actualError
+	  }
+	  //-{% if serviceMethod|hasResponses %}	  
+	  if let actualResponse = response {
+		  return actualResponse
+	  } else {
+		  throw ClientError.errorWithCode(0)
+	  }
+	  //-{% endif %}
+  }
+//-{% endfor %}
+}

@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+
+set -o errexit
+set -o nounset
+set -o pipefail
+
+if [ ! $(command -v gometalinter) ]; then
+	go get -u github.com/alecthomas/gometalinter
+	gometalinter --install
+fi
+
+for d in $(find . -type d -not -iwholename '*.git*' -a -not -iname '.tool' -a -not -iwholename '*vendor*'); do
+	gometalinter \
+		--exclude='error return value not checked.*(Close|Log|Print).*\(errcheck\)$' \
+		--exclude='.*_test\.go:.*error return value not checked.*\(errcheck\)$' \
+		--exclude='duplicate of.*_test.go.*\(dupl\)$' \
+		--exclude='schema/fs.go' \
+		--disable=aligncheck \
+		--disable=gotype \
+		--disable=gas \
+		--cyclo-over=35 \
+		--tests \
+		--deadline=60s "${d}"
+done

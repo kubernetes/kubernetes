@@ -1,0 +1,18 @@
+version: 0.1
+loglevel: debug
+storage:
+    cache:
+        blobdescriptor: inmemory
+    filesystem:
+        rootdirectory: /tmp/registry-dev
+http:
+    addr: 0.0.0.0:5000
+    tls:
+        certificate: "/etc/docker/registry/localregistry.cert"
+        key: "/etc/docker/registry/localregistry.key"
+auth:
+    token:
+        realm: "https://auth.localregistry:5556/token/"
+        issuer: "registry-test"
+        service: "registry-test"
+        rootcertbundle: "/etc/docker/registry/tokenbundle.pem"

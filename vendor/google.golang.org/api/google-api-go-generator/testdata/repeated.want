@@ -1,0 +1,253 @@
+// Package repeated provides access to the Example API.
+//
+// Usage example:
+//
+//   import "google.golang.org/api/repeated/v1"
+//   ...
+//   repeatedService, err := repeated.New(oauthHttpClient)
+package repeated // import "google.golang.org/api/repeated/v1"
+
+import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
+	context "golang.org/x/net/context"
+	ctxhttp "golang.org/x/net/context/ctxhttp"
+	gensupport "google.golang.org/api/gensupport"
+	googleapi "google.golang.org/api/googleapi"
+	"io"
+	"net/http"
+	"net/url"
+	"strconv"
+	"strings"
+)
+
+// Always reference these packages, just in case the auto-generated code
+// below doesn't.
+var _ = bytes.NewBuffer
+var _ = strconv.Itoa
+var _ = fmt.Sprintf
+var _ = json.NewDecoder
+var _ = io.Copy
+var _ = url.Parse
+var _ = gensupport.MarshalJSON
+var _ = googleapi.Version
+var _ = errors.New
+var _ = strings.Replace
+var _ = context.Canceled
+var _ = ctxhttp.Do
+
+const apiId = "repeated:v1"
+const apiName = "repeated"
+const apiVersion = "v1"
+const basePath = "https://www.googleapis.com/discovery/v1/apis"
+
+func New(client *http.Client) (*Service, error) {
+	if client == nil {
+		return nil, errors.New("client is nil")
+	}
+	s := &Service{client: client, BasePath: basePath}
+	s.Accounts = NewAccountsService(s)
+	return s, nil
+}
+
+type Service struct {
+	client    *http.Client
+	BasePath  string // API endpoint base URL
+	UserAgent string // optional additional User-Agent fragment
+
+	Accounts *AccountsService
+}
+
+func (s *Service) userAgent() string {
+	if s.UserAgent == "" {
+		return googleapi.UserAgent
+	}
+	return googleapi.UserAgent + " " + s.UserAgent
+}
+
+func NewAccountsService(s *Service) *AccountsService {
+	rs := &AccountsService{s: s}
+	rs.Reports = NewAccountsReportsService(s)
+	return rs
+}
+
+type AccountsService struct {
+	s *Service
+
+	Reports *AccountsReportsService
+}
+
+func NewAccountsReportsService(s *Service) *AccountsReportsService {
+	rs := &AccountsReportsService{s: s}
+	return rs
+}
+
+type AccountsReportsService struct {
+	s *Service
+}
+
+// method id "adsense.accounts.reports.generate":
+
+type AccountsReportsGenerateCall struct {
+	s            *Service
+	accountId    string
+	urlParams_   gensupport.URLParams
+	ifNoneMatch_ string
+	ctx_         context.Context
+	header_      http.Header
+}
+
+// Generate: Generate an AdSense report based on the report request sent
+// in the query parameters. Returns the result as JSON; to retrieve
+// output in CSV format specify "alt=csv" as a query parameter.
+func (r *AccountsReportsService) Generate(ids []int64, currency string, accountId string, dimension []string) *AccountsReportsGenerateCall {
+	c := &AccountsReportsGenerateCall{s: r.s, urlParams_: make(gensupport.URLParams)}
+	var ids_ []string
+	for _, v := range ids {
+		ids_ = append(ids_, fmt.Sprint(v))
+	}
+	c.urlParams_.SetMulti("ids", ids_)
+	c.urlParams_.Set("currency", currency)
+	c.accountId = accountId
+	c.urlParams_.SetMulti("dimension", append([]string{}, dimension...))
+	return c
+}
+
+// Currency sets the optional parameter "currency": Optional currency to
+// use when reporting on monetary metrics. Defaults to the account's
+// currency if not set.
+func (c *AccountsReportsGenerateCall) Currency(currency string) *AccountsReportsGenerateCall {
+	c.urlParams_.Set("currency", currency)
+	return c
+}
+
+// Dimension sets the optional parameter "dimension": Dimensions to base
+// the report on.
+func (c *AccountsReportsGenerateCall) Dimension(dimension ...string) *AccountsReportsGenerateCall {
+	c.urlParams_.SetMulti("dimension", append([]string{}, dimension...))
+	return c
+}
+
+// Ids sets the optional parameter "ids": Select only user profiles with
+// these IDs.
+func (c *AccountsReportsGenerateCall) Ids(ids ...int64) *AccountsReportsGenerateCall {
+	var ids_ []string
+	for _, v := range ids {
+		ids_ = append(ids_, fmt.Sprint(v))
+	}
+	c.urlParams_.SetMulti("ids", ids_)
+	return c
+}
+
+// Fields allows partial responses to be retrieved. See
+// https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
+// for more information.
+func (c *AccountsReportsGenerateCall) Fields(s ...googleapi.Field) *AccountsReportsGenerateCall {
+	c.urlParams_.Set("fields", googleapi.CombineFields(s))
+	return c
+}
+
+// IfNoneMatch sets the optional parameter which makes the operation
+// fail if the object's ETag matches the given value. This is useful for
+// getting updates only after the object has changed since the last
+// request. Use googleapi.IsNotModified to check whether the response
+// error from Do is the result of In-None-Match.
+func (c *AccountsReportsGenerateCall) IfNoneMatch(entityTag string) *AccountsReportsGenerateCall {
+	c.ifNoneMatch_ = entityTag
+	return c
+}
+
+// Context sets the context to be used in this call's Do method. Any
+// pending HTTP request will be aborted if the provided context is
+// canceled.
+func (c *AccountsReportsGenerateCall) Context(ctx context.Context) *AccountsReportsGenerateCall {
+	c.ctx_ = ctx
+	return c
+}
+
+// Header returns an http.Header that can be modified by the caller to
+// add HTTP headers to the request.
+func (c *AccountsReportsGenerateCall) Header() http.Header {
+	if c.header_ == nil {
+		c.header_ = make(http.Header)
+	}
+	return c.header_
+}
+
+func (c *AccountsReportsGenerateCall) doRequest(alt string) (*http.Response, error) {
+	reqHeaders := make(http.Header)
+	for k, v := range c.header_ {
+		reqHeaders[k] = v
+	}
+	reqHeaders.Set("User-Agent", c.s.userAgent())
+	if c.ifNoneMatch_ != "" {
+		reqHeaders.Set("If-None-Match", c.ifNoneMatch_)
+	}
+	var body io.Reader = nil
+	c.urlParams_.Set("alt", alt)
+	urls := googleapi.ResolveRelative(c.s.BasePath, "accounts/{accountId}/reports")
+	urls += "?" + c.urlParams_.Encode()
+	req, _ := http.NewRequest("GET", urls, body)
+	req.Header = reqHeaders
+	googleapi.Expand(req.URL, map[string]string{
+		"accountId": c.accountId,
+	})
+	return gensupport.SendRequest(c.ctx_, c.s.client, req)
+}
+
+// Do executes the "adsense.accounts.reports.generate" call.
+func (c *AccountsReportsGenerateCall) Do(opts ...googleapi.CallOption) error {
+	gensupport.SetOptions(c.urlParams_, opts...)
+	res, err := c.doRequest("json")
+	if err != nil {
+		return err
+	}
+	defer googleapi.CloseBody(res)
+	if err := googleapi.CheckResponse(res); err != nil {
+		return err
+	}
+	return nil
+	// {
+	//   "description": "Generate an AdSense report based on the report request sent in the query parameters. Returns the result as JSON; to retrieve output in CSV format specify \"alt=csv\" as a query parameter.",
+	//   "httpMethod": "GET",
+	//   "id": "adsense.accounts.reports.generate",
+	//   "parameterOrder": [
+	//     "ids",
+	//     "currency",
+	//     "accountId",
+	//     "dimension"
+	//   ],
+	//   "parameters": {
+	//     "accountId": {
+	//       "description": "Account upon which to report.",
+	//       "location": "path",
+	//       "required": true,
+	//       "type": "string"
+	//     },
+	//     "currency": {
+	//       "description": "Optional currency to use when reporting on monetary metrics. Defaults to the account's currency if not set.",
+	//       "location": "query",
+	//       "pattern": "[a-zA-Z]+",
+	//       "type": "string"
+	//     },
+	//     "dimension": {
+	//       "description": "Dimensions to base the report on.",
+	//       "location": "query",
+	//       "pattern": "[a-zA-Z_]+",
+	//       "repeated": true,
+	//       "type": "string"
+	//     },
+	//     "ids": {
+	//       "description": "Select only user profiles with these IDs.",
+	//       "format": "int64",
+	//       "location": "query",
+	//       "repeated": true,
+	//       "type": "string"
+	//     }
+	//   },
+	//   "path": "accounts/{accountId}/reports"
+	// }
+
+}

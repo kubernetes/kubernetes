@@ -1,0 +1,37 @@
+#!/bin/bash -eu
+#
+# Build the appc release of the specified version.
+#
+# YMMV, no disclaimer or warranty, etc.
+
+if ! [[ "$1" =~ ^v[[:digit:]]+.[[:digit:]]+.[[:digit:]]$ ]]; then 
+	echo "Usage: scripts/build-release <VERSION>"
+	echo "   where VERSION must be vX.Y.Z"
+	exit 255
+fi
+
+ver="appc-${1}"
+releasedir="release-${ver}"
+mkdir "${ver}"
+mkdir "release-${ver}"
+
+git checkout "${1}"
+	./build.sh
+	cp -r bin/actool SPEC.md spec/ "${ver}/"
+	tar czvf "${ver}.tar.gz" "${ver}"
+	echo "Wrote release tarball ${ver}.tar.gz"
+	rm -fr "${ver}"
+	gpg --detach-sign "${ver}.tar.gz"
+	mv "${ver}.tar.gz" "${ver}.tar.gz.sig" "${releasedir}/"
+
+	echo "Building ACE validators"
+	if [[ -f scripts/build-ace-validator-acis ]]; then
+		scripts/build-ace-validator-acis
+	else
+		ace/build_aci # backwards-compatible fallback
+	fi
+	cp bin/ace-validator-{main,sidekick}.aci{,.asc} "${releasedir}/"
+
+git checkout -
+
+echo "Done. Release artifacts in ${releasedir}/"

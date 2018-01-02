@@ -1,0 +1,53 @@
+
+<div class="sidebar-nav">
+
+  <div class="navbar navbar-inverse" role="navigation">
+    <div class="navbar-header">
+      <button type="button" class="navbar-toggle" data-toggle="collapse" data-target=".navbar-collapse">
+          <span class="sr-only">Toggle navigation</span>
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+      </button>
+      <a class="navbar-brand" href="http://rancher.com/"><img src="{{"{{"}}site.baseurl{{"}}"}}/img/rancher-logo-nopadding.svg"></a>
+    </div>
+    <div class="clearfix"></div>
+
+    <div>
+    <!--Start Google Search-->
+    <script>
+      (function() {
+        var cx = '007896692384436596364:60akf3bfmxm';
+        var gcse = document.createElement('script');
+        gcse.type = 'text/javascript';
+        gcse.async = true;
+        gcse.src = (document.location.protocol == 'https:' ? 'https:' : 'http:') +
+            '//cse.google.com/cse.js?cx=' + cx;
+        var s = document.getElementsByTagName('script')[0];
+        s.parentNode.insertBefore(gcse, s);
+      })();
+    </script>
+    <gcse:search></gcse:search>
+    <!--End Google Search-->
+    </div>
+    <!-- Collect the nav links, forms, and other content for toggling -->
+    <div class="navbar-collapse collapse">
+        <ul class="nav navbar-nav" id="mainmenu">
+        {{if $.schemaMap}}{{range $resourceId, $resourceData := .schemaMap}}{{range $link, $val := $resourceData.Resource.Links}}{{if eq $link "showResource"}}<li class="panel">
+            <a href="#{{$resourceId}}"  data-toggle="collapse" class="collapsed" data-parent="#mainmenu">{{$resourceId | capitalize}} <i class="pull-right fa fa-angle-down"></i><i class="pull-right fa fa-angle-up"></i></a>
+            <ul class="collapse list-group-submenu" id="{{$resourceId}}">
+              <li><a href="{{"{{"}}site.baseurl{{"}}"}}/rancher/{{"{{"}}page.version{{"}}"}}/{{"{{"}}page.lang{{"}}"}}/api/api-resources/{{$resourceId}}/">{{$resourceId | capitalize}}</a></li>
+              {{range $collectionMethodsKey, $collectionMethodsValue := $resourceData.CollectionMethods}}{{if eq $collectionMethodsValue "POST"}}<li><a href="{{"{{"}}site.baseurl{{"}}"}}/rancher/{{"{{"}}page.version{{"}}"}}/{{"{{"}}page.lang{{"}}"}}/api/api-resources/{{$resourceId}}/#create">Create</a></li>{{end}}{{end}}
+              {{range $resourceMethodsKey, $resourceMethodsValue := $resourceData.ResourceMethods}}{{if eq $resourceMethodsValue "PUT"}}<li><a href="{{"{{"}}site.baseurl{{"}}"}}/rancher/{{"{{"}}page.version{{"}}"}}/{{"{{"}}page.lang{{"}}"}}/api/api-resources/{{$resourceId}}/#update">Update</a></li>{{end}}
+              {{if eq $resourceMethodsValue "DELETE"}}<li><a href="{{"{{"}}site.baseurl{{"}}"}}/rancher/{{"{{"}}page.version{{"}}"}}/{{"{{"}}page.lang{{"}}"}}/api/api-resources/{{$resourceId}}/#delete">Delete</a></li>{{end}}{{end}}
+              {{range $action, $val := $resourceData.ResourceActions}}<li><a href="{{"{{"}}site.baseurl{{"}}"}}/rancher/{{"{{"}}page.version{{"}}"}}/{{"{{"}}page.lang{{"}}"}}/api/api-resources/{{$resourceId}}/#{{$action}}">{{$action | capitalize}}</a></li>
+              {{end}}
+            </ul>
+          </li>
+          {{end}}{{end}}{{end}}{{end}}
+        </ul><!-- /.navbar-nav -->
+    </div><!-- /.navbar-collapse -->
+
+
+  </div> <!-- /.navbar-inverse -->
+</div> <!-- /.sidebar-nav -->

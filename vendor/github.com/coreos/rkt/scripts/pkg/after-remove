@@ -1,0 +1,2 @@
+rm -rf /var/lib/rkt
+systemctl daemon-reload || true

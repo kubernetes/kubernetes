@@ -1,0 +1,10 @@
+*.o
+*.ko
+*.swp
+*.swo
+*.swk
+*.swl
+*.swm
+*.swn
+.starscope.db
+cscope.out

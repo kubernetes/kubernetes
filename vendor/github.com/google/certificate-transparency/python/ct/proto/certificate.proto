@@ -1,0 +1,72 @@
+syntax = "proto2";
+
+package ct;
+
+import "ct/proto/client.proto";
+
+message Validity {
+  // Milliseconds since epoch.
+  optional uint64 not_before = 1;
+
+  // Milliseconds since epoch.
+  optional uint64 not_after = 2;
+}
+
+message SignatureAlgorithm {
+  optional string algorithm_id = 1;
+
+  optional bytes parameters = 2;
+}
+
+message DNAttribute {
+  optional string type = 1;
+
+  optional string value = 2;
+}
+
+message Observation {
+  optional string description = 1;
+
+  optional string reason = 2;
+
+  optional bytes details = 3;
+}
+
+message X509Description {
+  optional string version = 1;
+
+  // hex, uppercase, without colons, so it's the same as openssl hexstring
+  optional string serial_number = 2;
+
+  // tbs and cert signatures should be the same
+  optional SignatureAlgorithm tbs_signature = 3;
+
+  optional SignatureAlgorithm cert_signature = 4;
+
+  optional Validity validity = 5;
+
+  repeated DNAttribute subject = 6;
+
+  repeated DNAttribute issuer = 7;
+
+  repeated DNAttribute subject_alternative_names = 8;
+
+  // Certificate DER form.
+  optional bytes der = 9;
+
+  // SHA256 hash from DER form.
+  optional bytes sha256_hash = 10;
+
+  repeated Observation observations = 11;
+
+  repeated DNAttribute root_issuer = 12;
+
+  // Type of Log Entry this cert came from: X509 or PRECERT.
+  optional LogEntryType entry_type = 13;
+
+  // True if this cert has the Basic Constraint CA=TRUE.
+  optional bool basic_constraint_ca = 14;
+
+  // SHA256 hash of issuer's public key.
+  optional bytes issuer_pk_sha256_hash = 15;
+}

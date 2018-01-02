@@ -1,0 +1,43 @@
+digraph G {
+    graph [fontname = "helvetica"];
+    node [fontname = "Arial", fillcolor="#FFE599", style="filled"];
+    edge [fontname = "monospace"];
+  
+    {
+        invokingProcess [shape="node",
+                         label=<<B>bash/systemd/kubelet</B><BR/>invoking process>]
+        stage0 [shape="node",
+                label=<<B>stage0</B><BR/>rkt>]
+        entrypoint [shape="node",
+                    label=<entrypoint<BR/>"coreos.com/rkt/stage1/run">]
+        app1 [shape="node",
+              label=<"apps.app.exec"<BR/>app1>]
+        app2 [shape="node",
+              label=<"apps.app.exec"<BR/>app2>]
+    }
+
+    invokingProcess -> stage0 [label="fork(2)+exec(3)"]
+    stage0 -> entrypoint [label="exec(3)"]
+
+    subgraph cluster_1 {
+        label=<<B>stage1</B>>
+        labeljust="left"
+
+        entrypoint
+
+        subgraph cluster_2 {
+            label=<<B>stage2</B>>
+            labeljust="left"
+            app1
+        }
+
+        subgraph cluster_3 {
+            label=<<B>stage2</B>>
+            labeljust="right"
+            app2
+        }
+    }
+
+    entrypoint -> app1
+    entrypoint -> app2
+}

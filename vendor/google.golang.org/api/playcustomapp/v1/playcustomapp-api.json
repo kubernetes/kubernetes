@@ -1,0 +1,149 @@
+{
+ "kind": "discovery#restDescription",
+ "etag": "\"YWOzh2SDasdU84ArJnpYek-OMdg/S9A8Fvkyeh8EMNMlBREkvuFfFUI\"",
+ "discoveryVersion": "v1",
+ "id": "playcustomapp:v1",
+ "name": "playcustomapp",
+ "version": "v1",
+ "revision": "20170622",
+ "title": "Google Play Custom App Publishing API",
+ "description": "An API to publish custom Android apps.",
+ "ownerDomain": "google.com",
+ "ownerName": "Google",
+ "icons": {
+  "x16": "https://www.gstatic.com/images/branding/product/1x/googleg_16dp.png",
+  "x32": "https://www.gstatic.com/images/branding/product/1x/googleg_32dp.png"
+ },
+ "documentationLink": "https://developers.google.com/android/work/play/custom-app-api",
+ "protocol": "rest",
+ "baseUrl": "https://www.googleapis.com/playcustomapp/v1/accounts/",
+ "basePath": "/playcustomapp/v1/accounts/",
+ "rootUrl": "https://www.googleapis.com/",
+ "servicePath": "playcustomapp/v1/accounts/",
+ "batchPath": "batch",
+ "parameters": {
+  "alt": {
+   "type": "string",
+   "description": "Data format for the response.",
+   "default": "json",
+   "enum": [
+    "json"
+   ],
+   "enumDescriptions": [
+    "Responses with Content-Type of application/json"
+   ],
+   "location": "query"
+  },
+  "fields": {
+   "type": "string",
+   "description": "Selector specifying which fields to include in a partial response.",
+   "location": "query"
+  },
+  "key": {
+   "type": "string",
+   "description": "API key. Your API key identifies your project and provides you with API access, quota, and reports. Required unless you provide an OAuth 2.0 token.",
+   "location": "query"
+  },
+  "oauth_token": {
+   "type": "string",
+   "description": "OAuth 2.0 token for the current user.",
+   "location": "query"
+  },
+  "prettyPrint": {
+   "type": "boolean",
+   "description": "Returns response with indentations and line breaks.",
+   "default": "true",
+   "location": "query"
+  },
+  "quotaUser": {
+   "type": "string",
+   "description": "Available to use for quota purposes for server-side applications. Can be any arbitrary string assigned to a user, but should not exceed 40 characters. Overrides userIp if both are provided.",
+   "location": "query"
+  },
+  "userIp": {
+   "type": "string",
+   "description": "IP address of the site where the request originates. Use this if you want to enforce per-user limits.",
+   "location": "query"
+  }
+ },
+ "auth": {
+  "oauth2": {
+   "scopes": {
+    "https://www.googleapis.com/auth/androidpublisher": {
+     "description": "View and manage your Google Play Developer account"
+    }
+   }
+  }
+ },
+ "schemas": {
+  "CustomApp": {
+   "id": "CustomApp",
+   "type": "object",
+   "description": "This resource represents a custom app.",
+   "properties": {
+    "languageCode": {
+     "type": "string",
+     "description": "Default listing language in BCP 47 format."
+    },
+    "title": {
+     "type": "string",
+     "description": "Title for the Android app."
+    }
+   }
+  }
+ },
+ "resources": {
+  "accounts": {
+   "resources": {
+    "customApps": {
+     "methods": {
+      "create": {
+       "id": "playcustomapp.accounts.customApps.create",
+       "path": "{account}/customApps",
+       "httpMethod": "POST",
+       "description": "Create and publish a new custom app.",
+       "parameters": {
+        "account": {
+         "type": "string",
+         "description": "Developer account ID.",
+         "required": true,
+         "format": "int64",
+         "location": "path"
+        }
+       },
+       "parameterOrder": [
+        "account"
+       ],
+       "request": {
+        "$ref": "CustomApp"
+       },
+       "response": {
+        "$ref": "CustomApp"
+       },
+       "scopes": [
+        "https://www.googleapis.com/auth/androidpublisher"
+       ],
+       "supportsMediaUpload": true,
+       "mediaUpload": {
+        "accept": [
+         "*/*"
+        ],
+        "maxSize": "100MB",
+        "protocols": {
+         "simple": {
+          "multipart": true,
+          "path": "/upload/playcustomapp/v1/accounts/{account}/customApps"
+         },
+         "resumable": {
+          "multipart": true,
+          "path": "/resumable/upload/playcustomapp/v1/accounts/{account}/customApps"
+         }
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ }
+}

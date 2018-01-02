@@ -1,0 +1,40 @@
+{
+  "_port_comment": "Heketi Server Port Number",
+  "port": "8080",
+
+  "_use_auth": "Enable JWT authorization. Please enable for deployment",
+  "use_auth": true,
+
+  "_jwt": "Private keys for access",
+  "jwt": {
+    "_admin": "Admin has access to all APIs",
+    "admin": {
+      "key": "My Secret"
+    },
+    "_user": "User only has access to /volumes endpoint",
+    "user": {
+      "key": "My Secret"
+    }
+  },
+
+  "_glusterfs_comment": "GlusterFS Configuration",
+  "glusterfs": {
+    "_executor_comment": [
+      "Execute plugin. Possible choices: mock, ssh",
+      "mock: This setting is used for testing and development.",
+      "      It will not send commands to any node.",
+      "ssh:  This setting will notify Heketi to ssh to the nodes.",
+      "      It will need the values in sshexec to be configured."
+    ],
+    "executor": "mock",
+
+    "_sshexec_comment": "SSH username and private key file information",
+    "sshexec": {
+      "keyfile": "path/to/private_key",
+      "user": "sshuser"
+    },
+
+    "_db_comment": "Database file name",
+    "db": "heketi.db"
+  }
+}

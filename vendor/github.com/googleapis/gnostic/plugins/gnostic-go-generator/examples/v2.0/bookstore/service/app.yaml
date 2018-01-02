@@ -1,0 +1,9 @@
+application: bookstore
+version: 1
+runtime: go
+api_version: go1
+handlers:
+- url: /.*
+  script: _go_app
+- url: /
+  static_dir: static

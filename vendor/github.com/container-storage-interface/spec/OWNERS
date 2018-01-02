@@ -1,0 +1,10 @@
+approvers:
+  - saad-ali # Representing Kubernetes
+  - thockin # Representing Kubernetes
+  - jieyu # Representing Mesos
+  - jdef # Representing Mesos
+  - cpuguy83 # Representing Docker
+  - mycure # Representing Docker
+  - julian-hj # Representing Cloud Foundry 
+  - paulcwarren # Representing Cloud Foundry 
+reviewers:

@@ -1,0 +1,2 @@
+# https://tools.ietf.org/html/rfc5545#section-3.1
+*.ics text eol=crlf

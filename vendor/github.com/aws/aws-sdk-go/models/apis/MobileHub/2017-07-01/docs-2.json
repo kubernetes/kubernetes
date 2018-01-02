@@ -1,0 +1,392 @@
+{
+  "version": "2.0",
+  "service": "<p> AWS Mobile Service provides mobile app and website developers with capabilities required to configure AWS resources and bootstrap their developer desktop projects with the necessary SDKs, constants, tools and samples to make use of those resources. </p>",
+  "operations": {
+    "CreateProject": "<p> Creates an AWS Mobile Hub project. </p>",
+    "DeleteProject": "<p> Delets a project in AWS Mobile Hub. </p>",
+    "DescribeBundle": "<p> Get the bundle details for the requested bundle id. </p>",
+    "DescribeProject": "<p> Gets details about a project in AWS Mobile Hub. </p>",
+    "ExportBundle": "<p> Generates customized software development kit (SDK) and or tool packages used to integrate mobile web or mobile app clients with backend AWS resources. </p>",
+    "ExportProject": "<p> Exports project configuration to a snapshot which can be downloaded and shared. Note that mobile app push credentials are encrypted in exported projects, so they can only be shared successfully within the same AWS account. </p>",
+    "ListBundles": "<p> List all available bundles. </p>",
+    "ListProjects": "<p> Lists projects in AWS Mobile Hub. </p>",
+    "UpdateProject": "<p> Update an existing project. </p>"
+  },
+  "shapes": {
+    "AccountActionRequiredException": {
+      "base": "<p> Account Action is required in order to continue the request. </p>",
+      "refs": {
+      }
+    },
+    "AttributeKey": {
+      "base": "<p> Key part of key-value attribute pairs. </p>",
+      "refs": {
+        "Attributes$key": null
+      }
+    },
+    "AttributeValue": {
+      "base": "<p> Value part of key-value attribute pairs. </p>",
+      "refs": {
+        "Attributes$value": null
+      }
+    },
+    "Attributes": {
+      "base": "<p> Key-value attribute pairs. </p>",
+      "refs": {
+        "Resource$attributes": null
+      }
+    },
+    "BadRequestException": {
+      "base": "<p> The request cannot be processed because some parameter is not valid or the project state prevents the operation from being performed. </p>",
+      "refs": {
+      }
+    },
+    "Boolean": {
+      "base": null,
+      "refs": {
+        "DescribeProjectRequest$syncFromResources": "<p> If set to true, causes AWS Mobile Hub to synchronize information from other services, e.g., update state of AWS CloudFormation stacks in the AWS Mobile Hub project. </p>"
+      }
+    },
+    "BundleDescription": {
+      "base": "<p> Description of the download bundle. </p>",
+      "refs": {
+        "BundleDetails$description": null
+      }
+    },
+    "BundleDetails": {
+      "base": "<p> The details of the bundle. </p>",
+      "refs": {
+        "BundleList$member": null,
+        "DescribeBundleResult$details": "<p> The details of the bundle. </p>"
+      }
+    },
+    "BundleId": {
+      "base": "<p> Unique bundle identifier. </p>",
+      "refs": {
+        "BundleDetails$bundleId": null,
+        "DescribeBundleRequest$bundleId": "<p> Unique bundle identifier. </p>",
+        "ExportBundleRequest$bundleId": "<p> Unique bundle identifier. </p>"
+      }
+    },
+    "BundleList": {
+      "base": "<p> A list of bundles. </p>",
+      "refs": {
+        "ListBundlesResult$bundleList": "<p> A list of bundles. </p>"
+      }
+    },
+    "BundleTitle": {
+      "base": "<p> Title of the download bundle. </p>",
+      "refs": {
+        "BundleDetails$title": null
+      }
+    },
+    "BundleVersion": {
+      "base": "<p> Version of the download bundle. </p>",
+      "refs": {
+        "BundleDetails$version": null
+      }
+    },
+    "ConsoleUrl": {
+      "base": null,
+      "refs": {
+        "ProjectDetails$consoleUrl": "<p> Website URL for this project in the AWS Mobile Hub console. </p>"
+      }
+    },
+    "Contents": {
+      "base": "<p> Binary file data. </p>",
+      "refs": {
+        "CreateProjectRequest$contents": "<p> ZIP or YAML file which contains configuration settings to be used when creating the project. This may be the contents of the file downloaded from the URL provided in an export project operation. </p>",
+        "UpdateProjectRequest$contents": "<p> ZIP or YAML file which contains project configuration to be updated. This should be the contents of the file downloaded from the URL provided in an export project operation. </p>"
+      }
+    },
+    "CreateProjectRequest": {
+      "base": "<p> Request structure used to request a project be created. </p>",
+      "refs": {
+      }
+    },
+    "CreateProjectResult": {
+      "base": "<p> Result structure used in response to a request to create a project. </p>",
+      "refs": {
+      }
+    },
+    "Date": {
+      "base": null,
+      "refs": {
+        "ProjectDetails$createdDate": "<p> Date the project was created. </p>",
+        "ProjectDetails$lastUpdatedDate": "<p> Date of the last modification of the project. </p>"
+      }
+    },
+    "DeleteProjectRequest": {
+      "base": "<p> Request structure used to request a project be deleted. </p>",
+      "refs": {
+      }
+    },
+    "DeleteProjectResult": {
+      "base": "<p> Result structure used in response to request to delete a project. </p>",
+      "refs": {
+      }
+    },
+    "DescribeBundleRequest": {
+      "base": "<p> Request structure to request the details of a specific bundle. </p>",
+      "refs": {
+      }
+    },
+    "DescribeBundleResult": {
+      "base": "<p> Result structure contains the details of the bundle. </p>",
+      "refs": {
+      }
+    },
+    "DescribeProjectRequest": {
+      "base": "<p> Request structure used to request details about a project. </p>",
+      "refs": {
+      }
+    },
+    "DescribeProjectResult": {
+      "base": "<p> Result structure used for requests of project details. </p>",
+      "refs": {
+      }
+    },
+    "DownloadUrl": {
+      "base": "<p> The download Url. </p>",
+      "refs": {
+        "ExportBundleResult$downloadUrl": "<p> URL which contains the custom-generated SDK and tool packages used to integrate the client mobile app or web app with the AWS resources created by the AWS Mobile Hub project. </p>",
+        "ExportProjectResult$downloadUrl": "<p> URL which can be used to download the exported project configuation file(s). </p>"
+      }
+    },
+    "ErrorMessage": {
+      "base": "<p> The Exception Error Message. </p>",
+      "refs": {
+        "AccountActionRequiredException$message": null,
+        "BadRequestException$message": null,
+        "InternalFailureException$message": null,
+        "LimitExceededException$retryAfterSeconds": null,
+        "LimitExceededException$message": null,
+        "NotFoundException$message": null,
+        "ServiceUnavailableException$retryAfterSeconds": null,
+        "ServiceUnavailableException$message": null,
+        "TooManyRequestsException$retryAfterSeconds": null,
+        "TooManyRequestsException$message": null,
+        "UnauthorizedException$message": null
+      }
+    },
+    "ExportBundleRequest": {
+      "base": "<p> Request structure used to request generation of custom SDK and tool packages required to integrate mobile web or app clients with backed AWS resources. </p>",
+      "refs": {
+      }
+    },
+    "ExportBundleResult": {
+      "base": "<p> Result structure which contains link to download custom-generated SDK and tool packages used to integrate mobile web or app clients with backed AWS resources. </p>",
+      "refs": {
+      }
+    },
+    "ExportProjectRequest": {
+      "base": "<p> Request structure used in requests to export project configuration details. </p>",
+      "refs": {
+      }
+    },
+    "ExportProjectResult": {
+      "base": "<p> Result structure used for requests to export project configuration details. </p>",
+      "refs": {
+      }
+    },
+    "Feature": {
+      "base": "<p> Identifies which feature in AWS Mobile Hub is associated with this AWS resource. </p>",
+      "refs": {
+        "Resource$feature": null
+      }
+    },
+    "IconUrl": {
+      "base": "<p> Icon for the download bundle. </p>",
+      "refs": {
+        "BundleDetails$iconUrl": null
+      }
+    },
+    "InternalFailureException": {
+      "base": "<p> The service has encountered an unexpected error condition which prevents it from servicing the request. </p>",
+      "refs": {
+      }
+    },
+    "LimitExceededException": {
+      "base": "<p> There are too many AWS Mobile Hub projects in the account or the account has exceeded the maximum number of resources in some AWS service. You should create another sub-account using AWS Organizations or remove some resources and retry your request. </p>",
+      "refs": {
+      }
+    },
+    "ListBundlesRequest": {
+      "base": "<p> Request structure to request all available bundles. </p>",
+      "refs": {
+      }
+    },
+    "ListBundlesResult": {
+      "base": "<p> Result structure contains a list of all available bundles with details. </p>",
+      "refs": {
+      }
+    },
+    "ListProjectsRequest": {
+      "base": "<p> Request structure used to request projects list in AWS Mobile Hub. </p>",
+      "refs": {
+      }
+    },
+    "ListProjectsResult": {
+      "base": "<p> Result structure used for requests to list projects in AWS Mobile Hub. </p>",
+      "refs": {
+      }
+    },
+    "MaxResults": {
+      "base": "<p> Maximum number of records to list in a single response. </p>",
+      "refs": {
+        "ListBundlesRequest$maxResults": "<p> Maximum number of records to list in a single response. </p>",
+        "ListProjectsRequest$maxResults": "<p> Maximum number of records to list in a single response. </p>"
+      }
+    },
+    "NextToken": {
+      "base": "<p> Pagination token. Set to null to start listing records from start. If non-null pagination token is returned in a result, then pass its value in here in another request to list more entries. </p>",
+      "refs": {
+        "ListBundlesRequest$nextToken": "<p> Pagination token. Set to null to start listing bundles from start. If non-null pagination token is returned in a result, then pass its value in here in another request to list more bundles. </p>",
+        "ListBundlesResult$nextToken": "<p> Pagination token. If non-null pagination token is returned in a result, then pass its value in another request to fetch more entries. </p>",
+        "ListProjectsRequest$nextToken": "<p> Pagination token. Set to null to start listing projects from start. If non-null pagination token is returned in a result, then pass its value in here in another request to list more projects. </p>",
+        "ListProjectsResult$nextToken": null
+      }
+    },
+    "NotFoundException": {
+      "base": "<p> No entity can be found with the specified identifier. </p>",
+      "refs": {
+      }
+    },
+    "Platform": {
+      "base": "<p> Developer desktop or target mobile app or website platform. </p>",
+      "refs": {
+        "ExportBundleRequest$platform": "<p> Developer desktop or target application platform. </p>",
+        "Platforms$member": null
+      }
+    },
+    "Platforms": {
+      "base": "<p> Developer desktop or mobile app or website platforms. </p>",
+      "refs": {
+        "BundleDetails$availablePlatforms": null
+      }
+    },
+    "ProjectDetails": {
+      "base": "<p> Detailed information about an AWS Mobile Hub project. </p>",
+      "refs": {
+        "CreateProjectResult$details": "<p> Detailed information about the created AWS Mobile Hub project. </p>",
+        "DescribeProjectResult$details": null,
+        "UpdateProjectResult$details": "<p> Detailed information about the updated AWS Mobile Hub project. </p>"
+      }
+    },
+    "ProjectId": {
+      "base": "<p> Unique project identifier. </p>",
+      "refs": {
+        "DeleteProjectRequest$projectId": "<p> Unique project identifier. </p>",
+        "DescribeProjectRequest$projectId": "<p> Unique project identifier. </p>",
+        "ExportBundleRequest$projectId": "<p> Unique project identifier. </p>",
+        "ExportProjectRequest$projectId": "<p> Unique project identifier. </p>",
+        "ProjectDetails$projectId": null,
+        "ProjectSummary$projectId": "<p> Unique project identifier. </p>",
+        "UpdateProjectRequest$projectId": "<p> Unique project identifier. </p>"
+      }
+    },
+    "ProjectName": {
+      "base": "<p> Name of the project. </p>",
+      "refs": {
+        "CreateProjectRequest$name": "<p> Name of the project. </p>",
+        "ProjectDetails$name": null,
+        "ProjectSummary$name": "<p> Name of the project. </p>"
+      }
+    },
+    "ProjectRegion": {
+      "base": "<p> Default region to use for AWS resource creation in the AWS Mobile Hub project. </p>",
+      "refs": {
+        "CreateProjectRequest$region": "<p> Default region where project resources should be created. </p>",
+        "ProjectDetails$region": null
+      }
+    },
+    "ProjectState": {
+      "base": "<p> Synchronization state for a project. </p>",
+      "refs": {
+        "ProjectDetails$state": null
+      }
+    },
+    "ProjectSummaries": {
+      "base": "<p> List of projects. </p>",
+      "refs": {
+        "ListProjectsResult$projects": null
+      }
+    },
+    "ProjectSummary": {
+      "base": "<p> Summary information about an AWS Mobile Hub project. </p>",
+      "refs": {
+        "ProjectSummaries$member": null
+      }
+    },
+    "Resource": {
+      "base": "<p> Information about an instance of an AWS resource associated with a project. </p>",
+      "refs": {
+        "Resources$member": null
+      }
+    },
+    "ResourceArn": {
+      "base": "<p> AWS resource name which uniquely identifies the resource in AWS systems. </p>",
+      "refs": {
+        "Resource$arn": null
+      }
+    },
+    "ResourceName": {
+      "base": "<p> Name of the AWS resource (e.g., for an Amazon S3 bucket this is the name of the bucket). </p>",
+      "refs": {
+        "Resource$name": null
+      }
+    },
+    "ResourceType": {
+      "base": "<p> Simplified name for type of AWS resource (e.g., bucket is an Amazon S3 bucket). </p>",
+      "refs": {
+        "Resource$type": null
+      }
+    },
+    "Resources": {
+      "base": "<p> List of AWS resources associated with a project. </p>",
+      "refs": {
+        "DeleteProjectResult$deletedResources": "<p> Resources which were deleted. </p>",
+        "DeleteProjectResult$orphanedResources": "<p> Resources which were not deleted, due to a risk of losing potentially important data or files. </p>",
+        "ProjectDetails$resources": null
+      }
+    },
+    "ServiceUnavailableException": {
+      "base": "<p> The service is temporarily unavailable. The request should be retried after some time delay. </p>",
+      "refs": {
+      }
+    },
+    "ShareUrl": {
+      "base": "<p> URL which can be shared to allow other AWS users to create their own project in AWS Mobile Hub with the same configuration as the specified project. This URL pertains to a snapshot in time of the project configuration that is created when this API is called. If you want to share additional changes to your project configuration, then you will need to create and share a new snapshot by calling this method again. </p>",
+      "refs": {
+        "ExportProjectResult$shareUrl": "<p> URL which can be shared to allow other AWS users to create their own project in AWS Mobile Hub with the same configuration as the specified project. This URL pertains to a snapshot in time of the project configuration that is created when this API is called. If you want to share additional changes to your project configuration, then you will need to create and share a new snapshot by calling this method again. </p>"
+      }
+    },
+    "SnapshotId": {
+      "base": "<p> Unique identifier for the exported snapshot of the project configuration. This snapshot identifier is included in the share URL. </p>",
+      "refs": {
+        "CreateProjectRequest$snapshotId": "<p> Unique identifier for an exported snapshot of project configuration. This snapshot identifier is included in the share URL when a project is exported. </p>",
+        "ExportProjectResult$snapshotId": "<p> Unique identifier for the exported snapshot of the project configuration. This snapshot identifier is included in the share URL. </p>"
+      }
+    },
+    "TooManyRequestsException": {
+      "base": "<p> Too many requests have been received for this AWS account in too short a time. The request should be retried after some time delay. </p>",
+      "refs": {
+      }
+    },
+    "UnauthorizedException": {
+      "base": "<p> Credentials of the caller are insufficient to authorize the request. </p>",
+      "refs": {
+      }
+    },
+    "UpdateProjectRequest": {
+      "base": "<p> Request structure used for requests to update project configuration. </p>",
+      "refs": {
+      }
+    },
+    "UpdateProjectResult": {
+      "base": "<p> Result structure used for requests to updated project configuration. </p>",
+      "refs": {
+      }
+    }
+  }
+}

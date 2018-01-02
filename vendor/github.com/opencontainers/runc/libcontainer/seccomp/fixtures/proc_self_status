@@ -1,0 +1,47 @@
+Name:   cat
+State:  R (running)
+Tgid:   19383
+Ngid:   0
+Pid:    19383
+PPid:   19275
+TracerPid:  0
+Uid:    1000    1000    1000    1000
+Gid:    1000    1000    1000    1000
+FDSize: 256
+Groups: 24 25 27 29 30 44 46 102 104 108 111 1000 1001
+NStgid: 19383
+NSpid:  19383
+NSpgid: 19383
+NSsid:  19275
+VmPeak:     5944 kB
+VmSize:     5944 kB
+VmLck:         0 kB
+VmPin:         0 kB
+VmHWM:       744 kB
+VmRSS:       744 kB
+VmData:      324 kB
+VmStk:       136 kB
+VmExe:        48 kB
+VmLib:      1776 kB
+VmPTE:        32 kB
+VmPMD:        12 kB
+VmSwap:        0 kB
+Threads:    1
+SigQ:   0/30067
+SigPnd: 0000000000000000
+ShdPnd: 0000000000000000
+SigBlk: 0000000000000000
+SigIgn: 0000000000000080
+SigCgt: 0000000000000000
+CapInh: 0000000000000000
+CapPrm: 0000000000000000
+CapEff: 0000000000000000
+CapBnd: 0000003fffffffff
+CapAmb: 0000000000000000
+Seccomp:    0
+Cpus_allowed:   f
+Cpus_allowed_list:  0-3
+Mems_allowed:   00000000,00000001
+Mems_allowed_list:  0
+voluntary_ctxt_switches:    0
+nonvoluntary_ctxt_switches: 1

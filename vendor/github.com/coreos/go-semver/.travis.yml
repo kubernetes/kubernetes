@@ -1,0 +1,5 @@
+language: go
+go:
+  - 1.1
+  - tip
+script: cd semver && go test

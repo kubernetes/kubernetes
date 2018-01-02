@@ -1,0 +1,25 @@
+<html>
+	<head>
+		<link type="text/css" rel="stylesheet" href="/sdk-for-go/api/lib/godoc/style.css">
+	</head>
+	<body>
+		<div style="overflow-x:hidden;text-align:center;">
+			<div id="mobile_container">
+				<div id="mobile_only">
+				<ul class="packages" style="line-height:1.25;font-size:larger;padding-left:60px"> <a href="https://aws.amazon.com/blogs/developer/category/go/">Blog</a>
+				</ul>
+				<ul class="packages" style="line-height:1.25;font-size:larger;padding-left:60px">
+					<a href="https://aws.amazon.com/forms/aws-doc-feedback?hidden_service_name=godoc&hidden_file_name=godoc&hidden_guide_name=godoc&hidden_api_version=HEAD">Feedback</a>
+				</ul>
+				</div>
+				<ul class="packages" >
+				{{range .List}}
+				<li style="padding-left: {{multiply (add .Depth 1) 20}}px;">
+					<a target="_parent" href="{{srcLink .Path}}/">{{html .Name}}</a>
+				</li>
+				{{end}}
+				</ul>
+		</div>
+		</div>
+	</body>
+</html>

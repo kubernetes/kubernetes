@@ -1,0 +1,43 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+#
+
+NODES = 3
+DISKS = 10
+DRIVE_SIZE = "100G"
+
+Vagrant.configure("2") do |config|
+    config.ssh.insert_key = false
+    config.vm.box = "centos/7"
+    config.vm.synced_folder '.', '/home/vagrant/sync', disabled: true
+
+    # Make the glusterfs cluster, each with DISKS number of drives
+    (0..NODES-1).each do |i|
+        config.vm.define "storage#{i}" do |storage|
+            storage.vm.hostname = "storage#{i}"
+	    localip = 100+i
+            storage.vm.network :private_network, ip: "192.168.10.#{localip}"
+            (0..DISKS-1).each do |d|
+                driverletters = ('b'..'z').to_a
+                storage.vm.provider :libvirt do  |lv|
+                    lv.storage :file, :device => "vd#{driverletters[d]}", :path => "test_many_bricks_disk-#{i}-#{d}.disk", :size => "#{DRIVE_SIZE}"
+                    lv.memory = 2048
+                    lv.cpus =2
+                end
+            end
+
+            if i == (NODES-1)
+                # View the documentation for the provider you're using for more
+                # information on available options.
+                storage.vm.provision :ansible do |ansible|
+                    ansible.limit = "all"
+                    ansible.playbook = "site.yml"
+                    ansible.groups = {
+                        "gluster" => (0..NODES-1).map {|j| "storage#{j}"},
+                    }
+                end
+            end
+        end
+    end
+end
+

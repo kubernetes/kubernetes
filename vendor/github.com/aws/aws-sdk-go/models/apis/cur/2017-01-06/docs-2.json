@@ -1,0 +1,169 @@
+{
+  "version": "2.0",
+  "service": "All public APIs for AWS Cost and Usage Report service",
+  "operations": {
+    "DeleteReportDefinition": "Delete a specified report definition",
+    "DescribeReportDefinitions": "Describe a list of report definitions owned by the account",
+    "PutReportDefinition": "Create a new report definition"
+  },
+  "shapes": {
+    "AWSRegion": {
+      "base": "Region of customer S3 bucket.",
+      "refs": {
+        "ReportDefinition$S3Region": null
+      }
+    },
+    "AdditionalArtifact": {
+      "base": "Enable support for Redshift and/or QuickSight.",
+      "refs": {
+        "AdditionalArtifactList$member": null
+      }
+    },
+    "AdditionalArtifactList": {
+      "base": "A list of additional artifacts.",
+      "refs": {
+        "ReportDefinition$AdditionalArtifacts": null
+      }
+    },
+    "CompressionFormat": {
+      "base": "Preferred compression format for report.",
+      "refs": {
+        "ReportDefinition$Compression": null
+      }
+    },
+    "DeleteReportDefinitionRequest": {
+      "base": "Request of DeleteReportDefinition",
+      "refs": {
+      }
+    },
+    "DeleteReportDefinitionResponse": {
+      "base": "Response of DeleteReportDefinition",
+      "refs": {
+      }
+    },
+    "DeleteResponseMessage": {
+      "base": "A message indicates if the deletion is successful.",
+      "refs": {
+        "DeleteReportDefinitionResponse$ResponseMessage": null
+      }
+    },
+    "DescribeReportDefinitionsRequest": {
+      "base": "Request of DescribeReportDefinitions",
+      "refs": {
+      }
+    },
+    "DescribeReportDefinitionsResponse": {
+      "base": "Response of DescribeReportDefinitions",
+      "refs": {
+      }
+    },
+    "DuplicateReportNameException": {
+      "base": "This exception is thrown when putting a report preference with a name that already exists.",
+      "refs": {
+      }
+    },
+    "ErrorMessage": {
+      "base": "A message to show the detail of the exception.",
+      "refs": {
+        "DuplicateReportNameException$Message": null,
+        "InternalErrorException$Message": null,
+        "ReportLimitReachedException$Message": null,
+        "ValidationException$Message": null
+      }
+    },
+    "GenericString": {
+      "base": "A generic string.",
+      "refs": {
+        "DescribeReportDefinitionsRequest$NextToken": null,
+        "DescribeReportDefinitionsResponse$NextToken": null
+      }
+    },
+    "InternalErrorException": {
+      "base": "This exception is thrown on a known dependency failure.",
+      "refs": {
+      }
+    },
+    "MaxResults": {
+      "base": "The max number of results returned by the operation.",
+      "refs": {
+        "DescribeReportDefinitionsRequest$MaxResults": null
+      }
+    },
+    "PutReportDefinitionRequest": {
+      "base": "Request of PutReportDefinition",
+      "refs": {
+      }
+    },
+    "PutReportDefinitionResponse": {
+      "base": "Response of PutReportDefinition",
+      "refs": {
+      }
+    },
+    "ReportDefinition": {
+      "base": "The definition of AWS Cost and Usage Report. Customer can specify the report name, time unit, report format, compression format, S3 bucket and additional artifacts and schema elements in the definition.",
+      "refs": {
+        "PutReportDefinitionRequest$ReportDefinition": null,
+        "ReportDefinitionList$member": null
+      }
+    },
+    "ReportDefinitionList": {
+      "base": "A list of report definitions.",
+      "refs": {
+        "DescribeReportDefinitionsResponse$ReportDefinitions": null
+      }
+    },
+    "ReportFormat": {
+      "base": "Preferred format for report.",
+      "refs": {
+        "ReportDefinition$Format": null
+      }
+    },
+    "ReportLimitReachedException": {
+      "base": "This exception is thrown when the number of report preference reaches max limit. The max number is 5.",
+      "refs": {
+      }
+    },
+    "ReportName": {
+      "base": "Preferred name for a report, it has to be unique. Must starts with a number/letter, case sensitive. Limited to 256 characters.",
+      "refs": {
+        "DeleteReportDefinitionRequest$ReportName": null,
+        "ReportDefinition$ReportName": null
+      }
+    },
+    "S3Bucket": {
+      "base": "Name of customer S3 bucket.",
+      "refs": {
+        "ReportDefinition$S3Bucket": null
+      }
+    },
+    "S3Prefix": {
+      "base": "Preferred report path prefix. Limited to 256 characters.",
+      "refs": {
+        "ReportDefinition$S3Prefix": null
+      }
+    },
+    "SchemaElement": {
+      "base": "Preference of including Resource IDs. You can include additional details about individual resource IDs in your report.",
+      "refs": {
+        "SchemaElementList$member": null
+      }
+    },
+    "SchemaElementList": {
+      "base": "A list of schema elements.",
+      "refs": {
+        "ReportDefinition$AdditionalSchemaElements": null
+      }
+    },
+    "TimeUnit": {
+      "base": "The frequency on which report data are measured and displayed.",
+      "refs": {
+        "ReportDefinition$TimeUnit": null
+      }
+    },
+    "ValidationException": {
+      "base": "This exception is thrown when providing an invalid input. eg. Put a report preference with an invalid report name, or Delete a report preference with an empty report name.",
+      "refs": {
+      }
+    }
+  }
+}

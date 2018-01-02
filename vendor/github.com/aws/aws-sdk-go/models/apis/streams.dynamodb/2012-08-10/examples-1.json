@@ -1,0 +1,212 @@
+{
+  "version": "1.0",
+  "examples": {
+    "DescribeStream": [
+      {
+        "input": {
+          "StreamArn": "arn:aws:dynamodb:us-west-2:111122223333:table/Forum/stream/2015-05-20T20:51:10.252"
+        },
+        "output": {
+          "StreamDescription": {
+            "CreationRequestDateTime": "Wed May 20 13:51:10 PDT 2015",
+            "KeySchema": [
+              {
+                "AttributeName": "ForumName",
+                "KeyType": "HASH"
+              },
+              {
+                "AttributeName": "Subject",
+                "KeyType": "RANGE"
+              }
+            ],
+            "Shards": [
+              {
+                "SequenceNumberRange": {
+                  "EndingSequenceNumber": "20500000000000000910398",
+                  "StartingSequenceNumber": "20500000000000000910398"
+                },
+                "ShardId": "shardId-00000001414562045508-2bac9cd2"
+              },
+              {
+                "ParentShardId": "shardId-00000001414562045508-2bac9cd2",
+                "SequenceNumberRange": {
+                  "EndingSequenceNumber": "820400000000000001192334",
+                  "StartingSequenceNumber": "820400000000000001192334"
+                },
+                "ShardId": "shardId-00000001414576573621-f55eea83"
+              },
+              {
+                "ParentShardId": "shardId-00000001414576573621-f55eea83",
+                "SequenceNumberRange": {
+                  "EndingSequenceNumber": "1683700000000000001135967",
+                  "StartingSequenceNumber": "1683700000000000001135967"
+                },
+                "ShardId": "shardId-00000001414592258131-674fd923"
+              },
+              {
+                "ParentShardId": "shardId-00000001414592258131-674fd923",
+                "SequenceNumberRange": {
+                  "StartingSequenceNumber": "2574600000000000000935255"
+                },
+                "ShardId": "shardId-00000001414608446368-3a1afbaf"
+              }
+            ],
+            "StreamArn": "arn:aws:dynamodb:us-west-2:111122223333:table/Forum/stream/2015-05-20T20:51:10.252",
+            "StreamLabel": "2015-05-20T20:51:10.252",
+            "StreamStatus": "ENABLED",
+            "StreamViewType": "NEW_AND_OLD_IMAGES",
+            "TableName": "Forum"
+          }
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example describes a stream with a given stream ARN.",
+        "id": "to-describe-a-stream-with-a-given-stream-arn-1473457835200",
+        "title": "To describe a stream with a given stream ARN"
+      }
+    ],
+    "GetRecords": [
+      {
+        "input": {
+          "ShardIterator": "arn:aws:dynamodb:us-west-2:111122223333:table/Forum/stream/2015-05-20T20:51:10.252|1|AAAAAAAAAAEvJp6D+zaQ...  <remaining characters omitted> ..."
+        },
+        "output": {
+          "NextShardIterator": "arn:aws:dynamodb:us-west-2:111122223333:table/Forum/stream/2015-05-20T20:51:10.252|1|AAAAAAAAAAGQBYshYDEe ... <remaining characters omitted> ...",
+          "Records": [
+            {
+              "awsRegion": "us-west-2",
+              "dynamodb": {
+                "ApproximateCreationDateTime": "1.46480646E9",
+                "Keys": {
+                  "ForumName": {
+                    "S": "DynamoDB"
+                  },
+                  "Subject": {
+                    "S": "DynamoDB Thread 3"
+                  }
+                },
+                "SequenceNumber": "300000000000000499659",
+                "SizeBytes": 41,
+                "StreamViewType": "KEYS_ONLY"
+              },
+              "eventID": "e2fd9c34eff2d779b297b26f5fef4206",
+              "eventName": "INSERT",
+              "eventSource": "aws:dynamodb",
+              "eventVersion": "1.0"
+            },
+            {
+              "awsRegion": "us-west-2",
+              "dynamodb": {
+                "ApproximateCreationDateTime": "1.46480527E9",
+                "Keys": {
+                  "ForumName": {
+                    "S": "DynamoDB"
+                  },
+                  "Subject": {
+                    "S": "DynamoDB Thread 1"
+                  }
+                },
+                "SequenceNumber": "400000000000000499660",
+                "SizeBytes": 41,
+                "StreamViewType": "KEYS_ONLY"
+              },
+              "eventID": "4b25bd0da9a181a155114127e4837252",
+              "eventName": "MODIFY",
+              "eventSource": "aws:dynamodb",
+              "eventVersion": "1.0"
+            },
+            {
+              "awsRegion": "us-west-2",
+              "dynamodb": {
+                "ApproximateCreationDateTime": "1.46480646E9",
+                "Keys": {
+                  "ForumName": {
+                    "S": "DynamoDB"
+                  },
+                  "Subject": {
+                    "S": "DynamoDB Thread 2"
+                  }
+                },
+                "SequenceNumber": "500000000000000499661",
+                "SizeBytes": 41,
+                "StreamViewType": "KEYS_ONLY"
+              },
+              "eventID": "740280c73a3df7842edab3548a1b08ad",
+              "eventName": "REMOVE",
+              "eventSource": "aws:dynamodb",
+              "eventVersion": "1.0"
+            }
+          ]
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example retrieves all the stream records from a shard.",
+        "id": "to-retrieve-all-the-stream-records-from-a-shard-1473707781419",
+        "title": "To retrieve all the stream records from a shard"
+      }
+    ],
+    "GetShardIterator": [
+      {
+        "input": {
+          "ShardId": "00000001414576573621-f55eea83",
+          "ShardIteratorType": "TRIM_HORIZON",
+          "StreamArn": "arn:aws:dynamodb:us-west-2:111122223333:table/Forum/stream/2015-05-20T20:51:10.252"
+        },
+        "output": {
+          "ShardIterator": "arn:aws:dynamodb:us-west-2:111122223333:table/Forum/stream/2015-05-20T20:51:10.252|1|AAAAAAAAAAEvJp6D+zaQ...  <remaining characters omitted> ..."
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example returns a shard iterator for the provided stream ARN and shard ID.",
+        "id": "to-obtain-a-shard-iterator-for-the-provided-stream-arn-and-shard-id-1473459941476",
+        "title": "To obtain a shard iterator for the provided stream ARN and shard ID"
+      }
+    ],
+    "ListStreams": [
+      {
+        "input": {
+        },
+        "output": {
+          "Streams": [
+            {
+              "StreamArn": "arn:aws:dynamodb:us-wesst-2:111122223333:table/Forum/stream/2015-05-20T20:51:10.252",
+              "StreamLabel": "2015-05-20T20:51:10.252",
+              "TableName": "Forum"
+            },
+            {
+              "StreamArn": "arn:aws:dynamodb:us-west-2:111122223333:table/Forum/stream/2015-05-20T20:50:02.714",
+              "StreamLabel": "2015-05-20T20:50:02.714",
+              "TableName": "Forum"
+            },
+            {
+              "StreamArn": "arn:aws:dynamodb:us-west-2:111122223333:table/Forum/stream/2015-05-19T23:03:50.641",
+              "StreamLabel": "2015-05-19T23:03:50.641",
+              "TableName": "Forum"
+            }
+          ]
+        },
+        "comments": {
+          "input": {
+          },
+          "output": {
+          }
+        },
+        "description": "The following example lists all of the stream ARNs.",
+        "id": "to-list-all-of-the-stream-arns--1473459534285",
+        "title": "To list all of the stream ARNs "
+      }
+    ]
+  }
+}

@@ -1,0 +1,805 @@
+#!/bin/bash
+#
+# bash completion file for runc command
+#
+# This script provides completion of:
+#  - commands and their options
+#  - filepaths
+#
+# To enable the completions either:
+#  - place this file in /usr/share/bash-completion/completions
+#  or
+#  - copy this file to e.g. ~/.runc-completion.sh and add the line
+#    below to your .bashrc after bash completion features are loaded
+#    . ~/.runc-completion.sh
+#
+# Configuration:
+#
+
+# Note for developers:
+# Please arrange options sorted alphabetically by long name with the short
+# options immediately following their corresponding long form.
+# This order should be applied to lists, alternatives and code blocks.
+
+__runc_previous_extglob_setting=$(shopt -p extglob)
+shopt -s extglob
+
+__runc_list_all() {
+	COMPREPLY=($(compgen -W "$(runc list -q)" -- $cur))
+}
+
+__runc_pos_first_nonflag() {
+	local argument_flags=$1
+
+	local counter=$((${subcommand_pos:-${command_pos}} + 1))
+	while [ $counter -le $cword ]; do
+		if [ -n "$argument_flags" ] && eval "case '${words[$counter]}' in $argument_flags) true ;; *) false ;; esac"; then
+			((counter++))
+		else
+			case "${words[$counter]}" in
+			-*) ;;
+			*)
+				break
+				;;
+			esac
+		fi
+		((counter++))
+	done
+
+	echo $counter
+}
+
+# Transforms a multiline list of strings into a single line string
+# with the words separated by "|".
+# This is used to prepare arguments to __runc_pos_first_nonflag().
+__runc_to_alternatives() {
+	local parts=($1)
+	local IFS='|'
+	echo "${parts[*]}"
+}
+
+# Transforms a multiline list of options into an extglob pattern
+# suitable for use in case statements.
+__runc_to_extglob() {
+	local extglob=$(__runc_to_alternatives "$1")
+	echo "@($extglob)"
+}
+
+# Subcommand processing.
+# Locates the first occurrence of any of the subcommands contained in the
+# first argument. In case of a match, calls the corresponding completion
+# function and returns 0.
+# If no match is found, 1 is returned. The calling function can then
+# continue processing its completion.
+#
+# TODO if the preceding command has options that accept arguments and an
+# argument is equal ot one of the subcommands, this is falsely detected as
+# a match.
+__runc_subcommands() {
+	local subcommands="$1"
+
+	local counter=$(($command_pos + 1))
+	while [ $counter -lt $cword ]; do
+		case "${words[$counter]}" in
+		$(__runc_to_extglob "$subcommands"))
+			subcommand_pos=$counter
+			local subcommand=${words[$counter]}
+			local completions_func=_runc_${command}_${subcommand}
+			declare -F $completions_func >/dev/null && $completions_func
+			return 0
+			;;
+		esac
+		((counter++))
+	done
+	return 1
+}
+
+# List all Signals
+__runc_list_signals() {
+	COMPREPLY=($(compgen -W "$(for i in $(kill -l | xargs); do echo $i; done | grep SIG)"))
+}
+
+# suppress trailing whitespace
+__runc_nospace() {
+	# compopt is not available in ancient bash versions
+	type compopt &>/dev/null && compopt -o nospace
+}
+
+# The list of capabilities is defined in types.go, ALL was added manually.
+__runc_complete_capabilities() {
+	COMPREPLY=($(compgen -W "
+		ALL
+		AUDIT_CONTROL
+		AUDIT_WRITE
+		AUDIT_READ
+		BLOCK_SUSPEND
+		CHOWN
+		DAC_OVERRIDE
+		DAC_READ_SEARCH
+		FOWNER
+		FSETID
+		IPC_LOCK
+		IPC_OWNER
+		KILL
+		LEASE
+		LINUX_IMMUTABLE
+		MAC_ADMIN
+		MAC_OVERRIDE
+		MKNOD
+		NET_ADMIN
+		NET_BIND_SERVICE
+		NET_BROADCAST
+		NET_RAW
+		SETFCAP
+		SETGID
+		SETPCAP
+		SETUID
+		SYS_ADMIN
+		SYS_BOOT
+		SYS_CHROOT
+		SYSLOG
+		SYS_MODULE
+		SYS_NICE
+		SYS_PACCT
+		SYS_PTRACE
+		SYS_RAWIO
+		SYS_RESOURCE
+		SYS_TIME
+		SYS_TTY_CONFIG
+		WAKE_ALARM
+	" -- "$cur"))
+}
+
+_runc_exec() {
+	local boolean_options="
+	   --help
+	   --no-new-privs
+	   --tty, -t
+	   --detach, -d
+	"
+
+	local options_with_args="
+	   --console
+	   --cwd
+	   --env, -e
+	   --user, -u
+	   --process, -p
+	   --pid-file
+	   --process-label
+	   --apparmor
+	   --cap, -c
+	"
+
+	local all_options="$options_with_args $boolean_options"
+
+	case "$prev" in
+	--cap | -c)
+		__runc_complete_capabilities
+		return
+		;;
+
+	--console | --cwd | --process | --apparmor)
+		case "$cur" in
+		*:*) ;; # TODO somehow do _filedir for stuff inside the image, if it's already specified (which is also somewhat difficult to determine)
+		'')
+			COMPREPLY=($(compgen -W '/' -- "$cur"))
+			__runc_nospace
+			;;
+		/*)
+			_filedir
+			__runc_nospace
+			;;
+		esac
+		return
+		;;
+	--env | -e)
+		COMPREPLY=($(compgen -e -- "$cur"))
+		__runc_nospace
+		return
+		;;
+	$(__runc_to_extglob "$options_with_args"))
+		return
+		;;
+	esac
+
+	case "$cur" in
+	-*)
+		COMPREPLY=($(compgen -W "$all_options" -- "$cur"))
+		;;
+	*)
+		__runc_list_all
+		;;
+	esac
+}
+
+# global options that may appear after the runc command
+_runc_runc() {
+	local boolean_options="
+		$global_boolean_options
+		--help
+		--version -v
+		--debug
+	"
+	local options_with_args="
+		--log
+		--log-format
+		--root
+		--criu
+	"
+
+	case "$prev" in
+	--log | --root | --criu)
+		case "$cur" in
+		*:*) ;; # TODO somehow do _filedir for stuff inside the image, if it's already specified (which is also somewhat difficult to determine)
+		'')
+			COMPREPLY=($(compgen -W '/' -- "$cur"))
+			__runc_nospace
+			;;
+		*)
+			_filedir
+			__runc_nospace
+			;;
+		esac
+		return
+		;;
+
+	--log-format)
+		COMPREPLY=($(compgen -W 'text json' -- "$cur"))
+		return
+		;;
+
+	$(__runc_to_extglob "$options_with_args"))
+		return
+		;;
+	esac
+
+	case "$cur" in
+	-*)
+		COMPREPLY=($(compgen -W "$boolean_options $options_with_args" -- "$cur"))
+		;;
+	*)
+		local counter=$(__runc_pos_first_nonflag $(__runc_to_extglob "$options_with_args"))
+		if [ $cword -eq $counter ]; then
+			COMPREPLY=($(compgen -W "${commands[*]} help" -- "$cur"))
+		fi
+		;;
+	esac
+}
+
+_runc_pause() {
+	local boolean_options="
+	   --help
+	   -h
+	"
+
+	case "$cur" in
+	-*)
+		COMPREPLY=($(compgen -W "$boolean_options $options_with_args" -- "$cur"))
+		;;
+	*)
+		__runc_list_all
+		;;
+	esac
+}
+
+_runc_ps() {
+	local boolean_options="
+	   --help
+	   -h
+	"
+
+	case "$cur" in
+	-*)
+		COMPREPLY=($(compgen -W "$boolean_options $options_with_args" -- "$cur"))
+		;;
+	*)
+		__runc_list_all
+		;;
+	esac
+}
+
+_runc_delete() {
+	local boolean_options="
+	   --help
+	   -h
+	"
+
+	case "$cur" in
+	-*)
+		COMPREPLY=($(compgen -W "$boolean_options $options_with_args" -- "$cur"))
+		;;
+	*)
+		__runc_list_all
+		;;
+	esac
+}
+
+_runc_kill() {
+	local boolean_options="
+	   --help
+	   -h
+          --all
+          -a
+	"
+
+	case "$prev" in
+	"kill")
+		__runc_list_all
+		return
+		;;
+	*)
+		__runc_list_signals
+		return
+		;;
+	esac
+	case "$cur" in
+	-*)
+		COMPREPLY=($(compgen -W "$boolean_options $options_with_args" -- "$cur"))
+		;;
+	*)
+		__runc_list_all
+		;;
+	esac
+}
+
+_runc_events() {
+	local boolean_options="
+	   --help
+	   --stats
+	"
+
+	local options_with_args="
+	   --interval
+	"
+
+	case "$prev" in
+	$(__runc_to_extglob "$options_with_args"))
+		return
+		;;
+	esac
+
+	case "$cur" in
+	-*)
+		COMPREPLY=($(compgen -W "$boolean_options $options_with_args" -- "$cur"))
+		;;
+	*)
+		__runc_list_all
+		;;
+	esac
+}
+
+_runc_list() {
+	local boolean_options="
+	   --help
+	   --quiet 
+	   -q
+	"
+
+	local options_with_args="
+	   --format
+	   -f
+	"
+
+	case "$prev" in
+	--format | -f)
+		COMPREPLY=($(compgen -W 'text json' -- "$cur"))
+		return
+		;;
+
+	$(__runc_to_extglob "$options_with_args"))
+		return
+		;;
+	esac
+
+	case "$cur" in
+	-*)
+		COMPREPLY=($(compgen -W "$boolean_options $options_with_args" -- "$cur"))
+		;;
+	*)
+		local counter=$(__runc_pos_first_nonflag $(__runc_to_extglob "$options_with_args"))
+		;;
+	esac
+}
+
+_runc_spec() {
+	local boolean_options="
+	   --help
+	"
+
+	local options_with_args="
+	   --bundle
+	   -b
+	"
+
+	case "$prev" in
+	--bundle | -b)
+		case "$cur" in
+		'')
+			COMPREPLY=($(compgen -W '/' -- "$cur"))
+			__runc_nospace
+			;;
+		/*)
+			_filedir
+			__runc_nospace
+			;;
+		esac
+		return
+		;;
+
+	$(__runc_to_extglob "$options_with_args"))
+		return
+		;;
+	esac
+
+	case "$cur" in
+	-*)
+		COMPREPLY=($(compgen -W "$boolean_options $options_with_args" -- "$cur"))
+		;;
+	*)
+		local counter=$(__runc_pos_first_nonflag $(__runc_to_extglob "$options_with_args"))
+		;;
+	esac
+}
+
+_runc_run() {
+	local boolean_options="
+	   --help
+	   --detatch
+	   -d
+	   --no-subreaper
+	   --no-pivot
+	   --no-new-keyring
+	"
+
+	local options_with_args="
+	   --bundle
+	   -b
+	   --console
+	   --pid-file
+	"
+
+	case "$prev" in
+	--bundle | -b | --console | --pid-file)
+		case "$cur" in
+		'')
+			COMPREPLY=($(compgen -W '/' -- "$cur"))
+			__runc_nospace
+			;;
+		/*)
+			_filedir
+			__runc_nospace
+			;;
+		esac
+		return
+		;;
+
+	$(__runc_to_extglob "$options_with_args"))
+		return
+		;;
+	esac
+
+	case "$cur" in
+	-*)
+		COMPREPLY=($(compgen -W "$boolean_options $options_with_args" -- "$cur"))
+		;;
+	*)
+		__runc_list_all
+		;;
+	esac
+}
+
+_runc_checkpoint() {
+	local boolean_options="
+	   --help
+	   -h
+	   --leave-running
+	   --tcp-established
+	   --ext-unix-sk
+	   --shell-job
+	   --file-locks
+	"
+
+	local options_with_args="
+	   --image-path
+	   --work-path
+	   --page-server
+	   --manage-cgroups-mode
+	"
+
+	case "$prev" in
+	--page-server) ;;
+
+	--manage-cgroups-mode)
+		COMPREPLY=($(compgen -W "soft full strict" -- "$cur"))
+		return
+		;;
+
+	--image-path | --work-path)
+		case "$cur" in
+		*:*) ;; # TODO somehow do _filedir for stuff inside the image, if it's already specified (which is also somewhat difficult to determine)
+		'')
+			COMPREPLY=($(compgen -W '/' -- "$cur"))
+			__runc_nospace
+			;;
+		*)
+			_filedir
+			__runc_nospace
+			;;
+		esac
+		return
+		;;
+
+	$(__runc_to_extglob "$options_with_args"))
+		return
+		;;
+	esac
+
+	case "$cur" in
+	-*)
+		COMPREPLY=($(compgen -W "$boolean_options $options_with_args" -- "$cur"))
+		;;
+	*)
+		__runc_list_all
+		;;
+	esac
+}
+_runc_create() {
+	local boolean_options="
+	   --help
+	   --no-pivot
+	   --no-new-keyring
+	"
+
+	local options_with_args="
+	   --bundle
+	   -b
+	   --console
+	   --pid-file
+	"
+	case "$prev" in
+	--bundle | -b | --console | --pid-file)
+		case "$cur" in
+		'')
+			COMPREPLY=($(compgen -W '/' -- "$cur"))
+			__runc_nospace
+			;;
+		/*)
+			_filedir
+			__runc_nospace
+			;;
+		esac
+		return
+		;;
+
+	$(__runc_to_extglob "$options_with_args"))
+		return
+		;;
+	esac
+
+	case "$cur" in
+	-*)
+		COMPREPLY=($(compgen -W "$boolean_options $options_with_args" -- "$cur"))
+		;;
+	*)
+		__runc_list_all
+		;;
+	esac
+
+}
+
+_runc_help() {
+	local counter=$(__runc_pos_first_nonflag)
+	if [ $cword -eq $counter ]; then
+		COMPREPLY=($(compgen -W "${commands[*]}" -- "$cur"))
+	fi
+}
+
+_runc_restore() {
+	local boolean_options="
+	   --help
+	   --tcp-established
+	   --ext-unix-sk
+	   --shell-job
+	   --file-locks
+	   --detach
+	   -d
+	   --no-subreaper
+	   --no-pivot
+	"
+
+	local options_with_args="
+	   -b
+	   --bundle
+	   --image-path
+	   --work-path
+	   --manage-cgroups-mode
+	   --pid-file
+	"
+
+	local all_options="$options_with_args $boolean_options"
+
+	case "$prev" in
+	--manage-cgroups-mode)
+		COMPREPLY=($(compgen -W "soft full strict" -- "$cur"))
+		return
+		;;
+
+	--pid-file | --image-path | --work-path | --bundle | -b)
+		case "$cur" in
+		*:*) ;; # TODO somehow do _filedir for stuff inside the image, if it's already specified (which is also somewhat difficult to determine)
+		'')
+			COMPREPLY=($(compgen -W '/' -- "$cur"))
+			__runc_nospace
+			;;
+		/*)
+			_filedir
+			__runc_nospace
+			;;
+		esac
+		return
+		;;
+
+	$(__runc_to_extglob "$options_with_args"))
+		return
+		;;
+	esac
+
+	case "$cur" in
+	-*)
+		COMPREPLY=($(compgen -W "$all_options" -- "$cur"))
+		;;
+	*)
+		__runc_list_all
+		;;
+	esac
+}
+
+_runc_resume() {
+	local boolean_options="
+	   --help
+	   -h
+	"
+
+	case "$cur" in
+	-*)
+		COMPREPLY=($(compgen -W "$boolean_options $options_with_args" -- "$cur"))
+		;;
+	*)
+		__runc_list_all
+		;;
+	esac
+}
+
+_runc_state() {
+	local boolean_options="
+	   --help
+	   -h
+	"
+
+	case "$cur" in
+	-*)
+		COMPREPLY=($(compgen -W "$boolean_options $options_with_args" -- "$cur"))
+		;;
+	*)
+		__runc_list_all
+		;;
+	esac
+}
+_runc_start() {
+	local boolean_options="
+	   --help
+	   -h
+	"
+
+	case "$cur" in
+	-*)
+		COMPREPLY=($(compgen -W "$boolean_options $options_with_args" -- "$cur"))
+		;;
+	*)
+		__runc_list_all
+		;;
+	esac
+}
+_runc_update() {
+	local boolean_options="
+	   --help
+	"
+
+	local options_with_args="
+	   --blkio-weight
+	   --cpu-period
+	   --cpu-quota
+	   --cpu-rt-period
+	   --cpu-rt-runtime
+	   --cpu-share
+	   --cpuset-cpus
+	   --cpuset-mems
+	   --kernel-memory
+	   --kernel-memory-tcp
+	   --memory
+	   --memory-reservation
+	   --memory-swap
+
+	"
+
+	case "$prev" in
+	$(__runc_to_extglob "$options_with_args"))
+		return
+		;;
+	esac
+
+	case "$cur" in
+	-*)
+		COMPREPLY=($(compgen -W "$boolean_options $options_with_args" -- "$cur"))
+		;;
+	*)
+		__runc_list_all
+		;;
+	esac
+}
+
+_runc() {
+	local previous_extglob_setting=$(shopt -p extglob)
+	shopt -s extglob
+
+	local commands=(
+		checkpoint
+		create
+		delete
+		events
+		exec
+		init
+		kill
+		list
+		pause
+		ps
+		restore
+		resume
+		run
+		spec
+		start
+		state
+		update
+		help
+		h
+	)
+
+	# These options are valid as global options for all client commands
+	# and valid as command options for `runc daemon`
+	local global_boolean_options="
+		--help -h
+		--version -v
+	"
+
+	COMPREPLY=()
+	local cur prev words cword
+	_get_comp_words_by_ref -n : cur prev words cword
+
+	local command='runc' command_pos=0 subcommand_pos
+	local counter=1
+	while [ $counter -lt $cword ]; do
+		case "${words[$counter]}" in
+		-*) ;;
+		=)
+			((counter++))
+			;;
+		*)
+			command="${words[$counter]}"
+			command_pos=$counter
+			break
+			;;
+		esac
+		((counter++))
+	done
+
+	local completions_func=_runc_${command}
+	declare -F $completions_func >/dev/null && $completions_func
+
+	eval "$previous_extglob_setting"
+	return 0
+}
+
+eval "$__runc_previous_extglob_setting"
+unset __runc_previous_extglob_setting
+
+complete -F _runc runc

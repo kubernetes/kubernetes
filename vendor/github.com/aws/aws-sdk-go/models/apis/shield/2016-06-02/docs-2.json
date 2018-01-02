@@ -1,0 +1,394 @@
+{
+  "version": "2.0",
+  "service": "<fullname>AWS Shield Advanced</fullname> <p>This is the <i>AWS Shield Advanced API Reference</i>. This guide is for developers who need detailed information about the AWS Shield Advanced API actions, data types, and errors. For detailed information about AWS WAF and AWS Shield Advanced features and an overview of how to use the AWS WAF and AWS Shield Advanced APIs, see the <a href=\"http://docs.aws.amazon.com/waf/latest/developerguide/\">AWS WAF and AWS Shield Developer Guide</a>.</p>",
+  "operations": {
+    "CreateProtection": "<p>Enables AWS Shield Advanced for a specific AWS resource. The resource can be an Amazon CloudFront distribution, Elastic Load Balancing load balancer, or an Amazon Route 53 hosted zone.</p>",
+    "CreateSubscription": "<p>Activates AWS Shield Advanced for an account.</p>",
+    "DeleteProtection": "<p>Deletes an AWS Shield Advanced <a>Protection</a>.</p>",
+    "DeleteSubscription": "<p>Removes AWS Shield Advanced from an account.</p>",
+    "DescribeAttack": "<p>Describes the details of a DDoS attack. </p>",
+    "DescribeProtection": "<p>Lists the details of a <a>Protection</a> object.</p>",
+    "DescribeSubscription": "<p>Provides details about the AWS Shield Advanced subscription for an account.</p>",
+    "ListAttacks": "<p>Returns all ongoing DDoS attacks or all DDoS attacks during a specified time period.</p>",
+    "ListProtections": "<p>Lists all <a>Protection</a> objects for the account.</p>"
+  },
+  "shapes": {
+    "AttackDetail": {
+      "base": "<p>The details of a DDoS attack.</p>",
+      "refs": {
+        "DescribeAttackResponse$Attack": "<p>The attack that is described.</p>"
+      }
+    },
+    "AttackId": {
+      "base": null,
+      "refs": {
+        "AttackDetail$AttackId": "<p>The unique identifier (ID) of the attack.</p>",
+        "DescribeAttackRequest$AttackId": "<p>The unique identifier (ID) for the attack that to be described.</p>"
+      }
+    },
+    "AttackSummaries": {
+      "base": null,
+      "refs": {
+        "ListAttacksResponse$AttackSummaries": "<p>The attack information for the specified time range.</p>"
+      }
+    },
+    "AttackSummary": {
+      "base": "<p>Summarizes all DDoS attacks for a specified time period.</p>",
+      "refs": {
+        "AttackSummaries$member": null
+      }
+    },
+    "AttackTimestamp": {
+      "base": null,
+      "refs": {
+        "AttackDetail$StartTime": "<p>The time the attack started, in the format 2016-12-16T13:50Z.</p>",
+        "AttackDetail$EndTime": "<p>The time the attack ended, in the format 2016-12-16T13:50Z.</p>",
+        "AttackSummary$StartTime": "<p>The start time of the attack, in the format 2016-12-16T13:50Z.</p>",
+        "AttackSummary$EndTime": "<p>The end time of the attack, in the format 2016-12-16T13:50Z.</p>",
+        "TimeRange$FromInclusive": "<p>The start time, in the format 2016-12-16T13:50Z.</p>",
+        "TimeRange$ToExclusive": "<p>The end time, in the format 2016-12-16T15:50Z.</p>"
+      }
+    },
+    "AttackVectorDescription": {
+      "base": "<p>Describes the attack.</p>",
+      "refs": {
+        "AttackVectorDescriptionList$member": null
+      }
+    },
+    "AttackVectorDescriptionList": {
+      "base": null,
+      "refs": {
+        "AttackSummary$AttackVectors": "<p>The list of attacks for a specified time period.</p>"
+      }
+    },
+    "CreateProtectionRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateProtectionResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateSubscriptionRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateSubscriptionResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteProtectionRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteProtectionResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteSubscriptionRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteSubscriptionResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeAttackRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeAttackResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeProtectionRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeProtectionResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeSubscriptionRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeSubscriptionResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "Double": {
+      "base": null,
+      "refs": {
+        "SummarizedCounter$Max": "<p>The maximum value of the counter for a specified time period.</p>",
+        "SummarizedCounter$Average": "<p>The average value of the counter for a specified time period.</p>",
+        "SummarizedCounter$Sum": "<p>The total of counter values for a specified time period.</p>"
+      }
+    },
+    "DurationInSeconds": {
+      "base": null,
+      "refs": {
+        "Subscription$TimeCommitmentInSeconds": "<p>The length, in seconds, of the AWS Shield Advanced subscription for the account.</p>"
+      }
+    },
+    "Integer": {
+      "base": null,
+      "refs": {
+        "SummarizedCounter$N": "<p>The number of counters for a specified time period.</p>"
+      }
+    },
+    "InternalErrorException": {
+      "base": "<p>Exception that indicates that a problem occurred with the service infrastructure. You can retry the request.</p>",
+      "refs": {
+      }
+    },
+    "InvalidOperationException": {
+      "base": "<p>Exception that indicates that the operation would not cause any change to occur.</p>",
+      "refs": {
+      }
+    },
+    "InvalidParameterException": {
+      "base": "<p>Exception that indicates that the parameters passed to the API are invalid. </p>",
+      "refs": {
+      }
+    },
+    "InvalidResourceException": {
+      "base": "<p>Exception that indicates that the resource is invalid. You might not have access to the resource, or the resource might not exist.</p>",
+      "refs": {
+      }
+    },
+    "LimitNumber": {
+      "base": null,
+      "refs": {
+        "LimitsExceededException$Limit": null
+      }
+    },
+    "LimitType": {
+      "base": null,
+      "refs": {
+        "LimitsExceededException$Type": null
+      }
+    },
+    "LimitsExceededException": {
+      "base": "<p>Exception that indicates that the operation would exceed a limit.</p>",
+      "refs": {
+      }
+    },
+    "ListAttacksRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListAttacksResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListProtectionsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListProtectionsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "LockedSubscriptionException": {
+      "base": "<p>Exception that indicates that the subscription has been modified by another client. You can retry the request.</p>",
+      "refs": {
+      }
+    },
+    "MaxResults": {
+      "base": null,
+      "refs": {
+        "ListAttacksRequest$MaxResults": "<p>The maximum number of <a>AttackSummary</a> objects to be returned. If this is left blank, the first 20 results will be returned.</p>",
+        "ListProtectionsRequest$MaxResults": "<p>The maximum number of <a>Protection</a> objects to be returned. If this is left blank the first 20 results will be returned.</p>"
+      }
+    },
+    "Mitigation": {
+      "base": "<p>The mitigation applied to a DDoS attack.</p>",
+      "refs": {
+        "MitigationList$member": null
+      }
+    },
+    "MitigationList": {
+      "base": null,
+      "refs": {
+        "AttackDetail$Mitigations": "<p>List of mitigation actions taken for the attack.</p>"
+      }
+    },
+    "OptimisticLockException": {
+      "base": "<p>Exception that indicates that the protection state has been modified by another client. You can retry the request.</p>",
+      "refs": {
+      }
+    },
+    "Protection": {
+      "base": "<p>An object that represents a resource that is under DDoS protection.</p>",
+      "refs": {
+        "DescribeProtectionResponse$Protection": "<p>The <a>Protection</a> object that is described.</p>",
+        "Protections$member": null
+      }
+    },
+    "ProtectionId": {
+      "base": null,
+      "refs": {
+        "CreateProtectionResponse$ProtectionId": "<p>The unique identifier (ID) for the <a>Protection</a> object that is created.</p>",
+        "DeleteProtectionRequest$ProtectionId": "<p>The unique identifier (ID) for the <a>Protection</a> object to be deleted.</p>",
+        "DescribeProtectionRequest$ProtectionId": "<p>The unique identifier (ID) for the <a>Protection</a> object that is described.</p>",
+        "Protection$Id": "<p>The unique identifier (ID) of the protection.</p>"
+      }
+    },
+    "ProtectionName": {
+      "base": null,
+      "refs": {
+        "CreateProtectionRequest$Name": "<p>Friendly name for the <code>Protection</code> you are creating.</p>",
+        "Protection$Name": "<p>The friendly name of the protection. For example, <code>My CloudFront distributions</code>.</p>"
+      }
+    },
+    "Protections": {
+      "base": null,
+      "refs": {
+        "ListProtectionsResponse$Protections": "<p>The array of enabled <a>Protection</a> objects.</p>"
+      }
+    },
+    "ResourceAlreadyExistsException": {
+      "base": "<p>Exception indicating the specified resource already exists.</p>",
+      "refs": {
+      }
+    },
+    "ResourceArn": {
+      "base": null,
+      "refs": {
+        "AttackDetail$ResourceArn": "<p>The ARN (Amazon Resource Name) of the resource that was attacked.</p>",
+        "CreateProtectionRequest$ResourceArn": "<p>The ARN (Amazon Resource Name) of the resource to be protected.</p>",
+        "Protection$ResourceArn": "<p>The ARN (Amazon Resource Name) of the AWS resource that is protected.</p>",
+        "ResourceArnFilterList$member": null
+      }
+    },
+    "ResourceArnFilterList": {
+      "base": null,
+      "refs": {
+        "ListAttacksRequest$ResourceArns": "<p>The ARN (Amazon Resource Name) of the resource that was attacked. If this is left blank, all applicable resources for this account will be included.</p>"
+      }
+    },
+    "ResourceNotFoundException": {
+      "base": "<p>Exception indicating the specified resource does not exist.</p>",
+      "refs": {
+      }
+    },
+    "String": {
+      "base": null,
+      "refs": {
+        "AttackSummary$AttackId": "<p>The unique identifier (ID) of the attack.</p>",
+        "AttackSummary$ResourceArn": "<p>The ARN (Amazon Resource Name) of the resource that was attacked.</p>",
+        "AttackVectorDescription$VectorType": "<p>The attack type, for example, SNMP reflection or SYN flood.</p>",
+        "Mitigation$MitigationName": "<p>The name of the mitigation taken for this attack.</p>",
+        "SubResourceSummary$Id": "<p>The unique identifier (ID) of the <code>SubResource</code>.</p>",
+        "SummarizedAttackVector$VectorType": "<p>The attack type, for example, SNMP reflection or SYN flood.</p>",
+        "SummarizedCounter$Name": "<p>The counter name.</p>",
+        "SummarizedCounter$Unit": "<p>The unit of the counters.</p>"
+      }
+    },
+    "SubResourceSummary": {
+      "base": "<p>The attack information for the specified SubResource.</p>",
+      "refs": {
+        "SubResourceSummaryList$member": null
+      }
+    },
+    "SubResourceSummaryList": {
+      "base": null,
+      "refs": {
+        "AttackDetail$SubResources": "<p>If applicable, additional detail about the resource being attacked, for example, IP address or URL.</p>"
+      }
+    },
+    "SubResourceType": {
+      "base": null,
+      "refs": {
+        "SubResourceSummary$Type": "<p>The <code>SubResource</code> type.</p>"
+      }
+    },
+    "Subscription": {
+      "base": "<p>Information about the AWS Shield Advanced subscription for an account.</p>",
+      "refs": {
+        "DescribeSubscriptionResponse$Subscription": "<p>The AWS Shield Advanced subscription details for an account.</p>"
+      }
+    },
+    "SummarizedAttackVector": {
+      "base": "<p>A summary of information about the attack.</p>",
+      "refs": {
+        "SummarizedAttackVectorList$member": null
+      }
+    },
+    "SummarizedAttackVectorList": {
+      "base": null,
+      "refs": {
+        "SubResourceSummary$AttackVectors": "<p>The list of attack types and associated counters.</p>"
+      }
+    },
+    "SummarizedCounter": {
+      "base": "<p>The counter that describes a DDoS attack.</p>",
+      "refs": {
+        "SummarizedCounterList$member": null
+      }
+    },
+    "SummarizedCounterList": {
+      "base": null,
+      "refs": {
+        "AttackDetail$AttackCounters": "<p>List of counters that describe the attack for the specified time period.</p>",
+        "SubResourceSummary$Counters": "<p>The counters that describe the details of the attack.</p>",
+        "SummarizedAttackVector$VectorCounters": "<p>The list of counters that describe the details of the attack.</p>"
+      }
+    },
+    "TimeRange": {
+      "base": "<p>The time range.</p>",
+      "refs": {
+        "ListAttacksRequest$StartTime": "<p>The time period for the attacks.</p>",
+        "ListAttacksRequest$EndTime": "<p>The end of the time period for the attacks.</p>"
+      }
+    },
+    "Timestamp": {
+      "base": null,
+      "refs": {
+        "Subscription$StartTime": "<p>The start time of the subscription, in the format \"2016-12-16T13:50Z\".</p>"
+      }
+    },
+    "Token": {
+      "base": null,
+      "refs": {
+        "ListAttacksRequest$NextToken": "<p>The <code>ListAttacksRequest.NextMarker</code> value from a previous call to <code>ListAttacksRequest</code>. Pass null if this is the first call.</p>",
+        "ListAttacksResponse$NextToken": "<p>The token returned by a previous call to indicate that there is more data available. If not null, more results are available. Pass this value for the <code>NextMarker</code> parameter in a subsequent call to <code>ListAttacks</code> to retrieve the next set of items.</p>",
+        "ListProtectionsRequest$NextToken": "<p>The <code>ListProtectionsRequest.NextToken</code> value from a previous call to <code>ListProtections</code>. Pass null if this is the first call.</p>",
+        "ListProtectionsResponse$NextToken": "<p>If you specify a value for <code>MaxResults</code> and you have more Protections than the value of MaxResults, AWS Shield Advanced returns a NextToken value in the response that allows you to list another group of Protections. For the second and subsequent ListProtections requests, specify the value of NextToken from the previous response to get information about another batch of Protections.</p>"
+      }
+    },
+    "errorMessage": {
+      "base": null,
+      "refs": {
+        "InternalErrorException$message": null,
+        "InvalidOperationException$message": null,
+        "InvalidParameterException$message": null,
+        "InvalidResourceException$message": null,
+        "LimitsExceededException$message": null,
+        "LockedSubscriptionException$message": null,
+        "OptimisticLockException$message": null,
+        "ResourceAlreadyExistsException$message": null,
+        "ResourceNotFoundException$message": null
+      }
+    }
+  }
+}

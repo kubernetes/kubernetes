@@ -1,0 +1,235 @@
+// FIXME: many of these are also in ct.proto.
+
+syntax = "proto2";
+
+package ct;
+
+import "ct/proto/tls_options.proto";
+
+
+message KeyInfo {
+  enum KeyType {
+    ECDSA = 0;
+    RSA = 1;
+  }
+  optional KeyType type = 1;
+  // The serialized public key, PEM-encoded.
+  optional string pem_key = 2;
+}
+
+// A merkle tree storing just enough hashes to be able to append new leaves
+// and obtain the new root_hash, but unable to get arbitrary leaves or hashes
+// within the tree.
+message CompactMerkleTree {
+  optional uint64 tree_size = 1;
+  repeated bytes hashes = 2;
+}
+
+message CtLogMetadata {
+  // The <log_server> path prefix. Responses are bound to the server
+  // by this value.
+  optional string log_server = 1;
+  // The id as per the RFC, i.e., the key hash, base64-encoded.
+  optional string log_id = 2;
+  optional KeyInfo public_key_info = 3;
+}
+
+message CtLogs {
+  repeated CtLogMetadata ctlog = 1;
+}
+
+message SthResponse {
+  optional uint64 tree_size = 1;
+  optional uint64 timestamp = 2;
+  optional bytes sha256_root_hash = 3;
+  optional bytes tree_head_signature = 4;
+}
+
+enum VerifyStatus {
+  VERIFIED = 0;
+  UNVERIFIED = 1;
+  VERIFY_ERROR = 2;
+}
+
+// Currently just a placeholder proto so that we can add new fields without
+// changing the DB schema.
+message AuditInfo {
+  optional VerifyStatus status = 1;
+}
+
+// The STH with additional auditing information such as signature verification
+// status.
+message AuditedSth {
+  optional SthResponse sth = 1;
+  optional AuditInfo audit = 2;
+}
+
+message EntryResponse {
+  optional bytes leaf_input = 1;
+  optional bytes extra_data = 2;
+}
+
+message ProofByHashResponse {
+  optional uint64 leaf_index = 1;
+  repeated bytes audit_path = 2;
+}
+
+message EntryAndProofResponse {
+  optional EntryResponse entry = 1;
+  repeated bytes audit_path = 2;
+}
+
+message MonitorState {
+  optional SthResponse verified_sth = 1;
+  // An STH whose leaf entries are yet to be retrieved. Its timestamp and
+  // tree_size should both be strictly greater than the one for verified_sth.
+  // If not, then this field should be ignored entirely.
+  optional SthResponse pending_sth = 2;
+  // A compact tree representing the last verified batch of leaves that is
+  // is provably-consistent with verified_sth.
+  optional CompactMerkleTree verified_tree = 3;
+  // A compact tree representing the last unverified batch of leaves.
+  optional CompactMerkleTree unverified_tree = 4;
+}
+
+enum Version {
+  option (tls_enum_opts).max_value = 255;
+  V1 = 0;
+  // Not part of the I-D, and outside the valid range.
+  UNKNOWN_VERSION = 256;
+}
+
+enum MerkleLeafType {
+  option (tls_enum_opts).max_value = 255;
+  TIMESTAMPED_ENTRY = 0;
+}
+
+enum LogEntryType {
+  option (tls_enum_opts).max_value = 65535;
+  X509_ENTRY = 0;
+  PRECERT_ENTRY = 1;
+}
+
+enum SignatureType {
+  option (tls_enum_opts).max_value = 255;
+  CERTIFICATE_TIMESTAMP = 0;
+  TREE_HASH = 1;
+}
+
+message PreCert {
+  optional bytes issuer_key_hash = 1 [(tls_opts).fixed_length = 32];
+  optional bytes tbs_certificate = 2 [(tls_opts).min_length = 1,
+                                      (tls_opts).max_length = 0xffffff];
+}
+
+message TimestampedEntry {
+  optional uint64 timestamp = 1;
+  optional LogEntryType entry_type = 2;
+  optional bytes asn1_cert = 3 [(tls_opts).select_field = "entry_type",
+                                (tls_opts).select_value = 0,
+                                (tls_opts).min_length = 1,
+                                (tls_opts).max_length = 0xffffff];
+  optional PreCert pre_cert = 4 [(tls_opts).select_field = "entry_type",
+                                (tls_opts).select_value = 1];
+  optional bytes ct_extensions = 5 [(tls_opts).max_length = 0xffff];
+}
+
+
+message DigitallySignedTimestampedEntry {
+  optional Version sct_version = 1;
+  optional SignatureType signature_type = 2 [default = CERTIFICATE_TIMESTAMP];
+  optional uint64 timestamp = 3;
+  optional LogEntryType entry_type = 4;
+  optional bytes asn1_cert = 5 [(tls_opts).select_field = "entry_type",
+                                (tls_opts).select_value = 0,
+                                (tls_opts).min_length = 1,
+                                (tls_opts).max_length = 0xffffff];
+  optional PreCert pre_cert = 6 [(tls_opts).select_field = "entry_type",
+                                (tls_opts).select_value = 1];
+  optional bytes ct_extensions = 7 [(tls_opts).min_length = 0,
+                                    (tls_opts).max_length = 0xffff];
+}
+
+message MerkleTreeLeaf {
+  optional Version version = 1;
+  optional MerkleLeafType leaf_type = 2;
+  optional TimestampedEntry timestamped_entry = 3
+      [(tls_opts).select_field = "leaf_type",
+       (tls_opts).select_value = 0];
+}
+
+message PrecertChainEntry {
+  optional bytes pre_certificate = 1 [(tls_opts).min_length = 1,
+                                      (tls_opts).max_length = 0xffffff];
+  repeated bytes precertificate_chain = 2
+      [(tls_opts).min_length = 1,
+       (tls_opts).max_length = 0xffffff,
+       (tls_opts).max_total_length = 0xffffff];
+}
+
+message ExtraData {
+  optional LogEntryType entry_type = 1 [(tls_opts).skip = true]; // Prefilled.
+  repeated bytes certificate_chain = 2 [(tls_opts).select_field = "entry_type",
+                                        (tls_opts).select_value = 0,
+                                        (tls_opts).min_length = 1,
+                                        (tls_opts).max_length = 0xffffff,
+                                        (tls_opts).max_total_length = 0xffffff];
+  optional PrecertChainEntry precert_chain_entry = 3
+      [(tls_opts).select_field = "entry_type",
+       (tls_opts).select_value = 1];
+}
+
+message ParsedEntry {
+  optional MerkleTreeLeaf merkle_leaf = 1;
+  optional ExtraData extra_data = 2;
+}
+
+// RFC 5246
+message DigitallySigned {
+  enum HashAlgorithm {
+    option (tls_enum_opts).max_value = 255;
+    NONE = 0;
+    MD5 = 1;
+    SHA1 = 2;
+    SHA224 = 3;
+    SHA256 = 4;
+    SHA384 = 5;
+    SHA512 = 6;
+  }
+
+  enum SignatureAlgorithm {
+    option (tls_enum_opts).max_value = 255;
+    ANONYMOUS = 0;
+    RSA = 1;
+    DSA = 2;
+    ECDSA = 3;
+  }
+
+  // 1 byte
+  optional HashAlgorithm hash_algorithm = 1 [ default = NONE ];
+  // 1 byte
+  optional SignatureAlgorithm sig_algorithm = 2 [ default = ANONYMOUS ];
+  // 0..2^16-1 bytes
+  optional bytes signature = 3 [ (tls_opts).min_length = 0,
+                                 (tls_opts).max_length = 0xffff ];
+}
+message LogID {
+  // 32 bytes
+  optional bytes key_id = 1 [ (tls_opts).fixed_length = 32 ];
+}
+
+message SignedCertificateTimestamp {
+  optional Version version = 1 [ default = UNKNOWN_VERSION ];
+  optional LogID id = 2;
+  // UTC time in milliseconds, since January 1, 1970, 00:00.
+  optional uint64 timestamp = 3;
+  optional bytes extensions = 4 [ (tls_opts).min_length = 0,
+                                  (tls_opts).max_length = 0xffff ];
+  optional DigitallySigned signature = 5;
+}
+
+message SignedCertificateTimestampList {
+  repeated bytes sct_list = 1 [ (tls_opts).min_length = 1,
+                                (tls_opts).max_length = 0xffff,
+                                (tls_opts).max_total_length = 0xffff ];
+}

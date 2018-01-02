@@ -1,0 +1,152 @@
+file {
+  name: "google/protobuf/duration.proto"
+  package: "google.protobuf"
+  message_type {
+    name: "Duration"
+    field {
+      name: "seconds"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_INT64
+      json_name: "seconds"
+    }
+    field {
+      name: "nanos"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_INT32
+      json_name: "nanos"
+    }
+  }
+  options {
+    java_package: "com.google.protobuf"
+    java_outer_classname: "DurationProto"
+    java_multiple_files: true
+    go_package: "github.com/golang/protobuf/ptypes/duration"
+    cc_enable_arenas: true
+    objc_class_prefix: "GPB"
+    csharp_namespace: "Google.Protobuf.WellKnownTypes"
+  }
+  syntax: "proto3"
+}
+file {
+  name: "google/protobuf/timestamp.proto"
+  package: "google.protobuf"
+  message_type {
+    name: "Timestamp"
+    field {
+      name: "seconds"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_INT64
+      json_name: "seconds"
+    }
+    field {
+      name: "nanos"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_INT32
+      json_name: "nanos"
+    }
+  }
+  options {
+    java_package: "com.google.protobuf"
+    java_outer_classname: "TimestampProto"
+    java_multiple_files: true
+    go_package: "github.com/golang/protobuf/ptypes/timestamp"
+    cc_enable_arenas: true
+    objc_class_prefix: "GPB"
+    csharp_namespace: "Google.Protobuf.WellKnownTypes"
+  }
+  syntax: "proto3"
+}
+file {
+  name: "github.com/containerd/containerd/windows/hcsshimtypes/hcsshim.proto"
+  package: "containerd.windows.hcsshim"
+  dependency: "gogoproto/gogo.proto"
+  dependency: "google/protobuf/duration.proto"
+  dependency: "google/protobuf/timestamp.proto"
+  message_type {
+    name: "CreateOptions"
+    field {
+      name: "terminate_duration"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".google.protobuf.Duration"
+      options {
+        65011: 1
+        65001: 0
+      }
+      json_name: "terminateDuration"
+    }
+  }
+  message_type {
+    name: "ProcessDetails"
+    field {
+      name: "image_name"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "imageName"
+    }
+    field {
+      name: "created_at"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".google.protobuf.Timestamp"
+      options {
+        65010: 1
+        65001: 0
+      }
+      json_name: "createdAt"
+    }
+    field {
+      name: "kernel_time_100_ns"
+      number: 3
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT64
+      json_name: "kernelTime100Ns"
+    }
+    field {
+      name: "memory_commit_bytes"
+      number: 4
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT64
+      json_name: "memoryCommitBytes"
+    }
+    field {
+      name: "memory_working_set_private_bytes"
+      number: 5
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT64
+      json_name: "memoryWorkingSetPrivateBytes"
+    }
+    field {
+      name: "memory_working_set_shared_bytes"
+      number: 6
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT64
+      json_name: "memoryWorkingSetSharedBytes"
+    }
+    field {
+      name: "process_id"
+      number: 7
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT32
+      json_name: "processId"
+    }
+    field {
+      name: "user_time_100_ns"
+      number: 8
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT64
+      json_name: "userTime100Ns"
+    }
+  }
+  options {
+    go_package: "github.com/containerd/containerd/windows/hcsshimtypes;hcsshimtypes"
+  }
+  syntax: "proto3"
+}

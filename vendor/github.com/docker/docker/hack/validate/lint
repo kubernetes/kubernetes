@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+
+export SCRIPTDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+source "${SCRIPTDIR}/.validate"
+
+IFS=$'\n'
+files=( $(validate_diff --diff-filter=ACMR --name-only -- '*.go' | grep -v '^vendor/' | grep -v '^api/types/container/' | grep -v '\.pb\.go$'  || true) )
+unset IFS
+
+errors=()
+for f in "${files[@]}"; do
+	failedLint=$(golint "$f")
+	if [ "$failedLint" ]; then
+		errors+=( "$failedLint" )
+	fi
+done
+
+if [ ${#errors[@]} -eq 0 ]; then
+	echo 'Congratulations!  All Go source files have been linted.'
+else
+	{
+		echo "Errors from golint:"
+		for err in "${errors[@]}"; do
+			echo "$err"
+		done
+		echo
+		echo 'Please fix the above errors. You can test via "golint" and commit the result.'
+		echo
+	} >&2
+	false
+fi

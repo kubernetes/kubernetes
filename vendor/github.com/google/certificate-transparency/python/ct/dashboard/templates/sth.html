@@ -1,0 +1,28 @@
+<html>
+  <head>
+  <title>Certificate Transparency dashboard</title>
+  <script src="https://www.google.com/jsapi" type="text/javascript"></script>
+  <script>
+    google.load('visualization', '1', {packages:['corechart']});
+
+    google.setOnLoadCallback(drawTable);
+
+    function drawTable() {
+      var json_data = new google.visualization.DataTable(%(json)s);
+
+      var chart_options = {'title':'Tree size over time', 'width':600,
+                           'height':400,
+                           'hAxis': {'viewWindowMode': 'maximized'}};
+
+      var chart = new google.visualization.LineChart(document.getElementById('chart_div_json'));
+      chart.draw(json_data, chart_options);
+    }
+  </script>
+  <meta http-equiv="refresh" content="60">
+  </head>
+  <body>
+    <H1>Latest Signed Tree Heads from %(log)s</H1>
+    <div id="chart_div_json"></div>
+    <div id="time">%(current_time)s</div>
+  </body>
+</html>

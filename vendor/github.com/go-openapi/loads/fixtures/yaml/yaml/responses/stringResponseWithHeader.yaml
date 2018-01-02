@@ -1,0 +1,6 @@
+description: 'A simple string response'
+schema:
+  type: string
+headers:
+  is-dog: {type: boolean}
+  is-cat: {type: boolean}

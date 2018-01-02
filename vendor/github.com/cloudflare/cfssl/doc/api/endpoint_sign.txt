@@ -1,0 +1,47 @@
+THE SIGNING ENDPOINT
+
+Endpoint: /api/v1/cfssl/sign
+Method:   POST
+
+Required parameters:
+
+    * certificate_request: the CSR bytes to be signed in PEM
+
+Optional parameters:
+
+    * hosts: an array of SAN (subject alternatvie names)
+    which overrides the ones in the CSR
+    * subject: the certificate subject which overrides
+    the ones in the CSR
+    * serial_sequence: a string specify the prefix which the generated
+    certificate serial should have
+    * label: a string specifying which signer to be appointed to sign
+    the CSR, useful when interacting with a remote multi-root CA signer
+    * profile: a string specifying the signing profile for the signer,
+    useful when interacting with a remote multi-root CA signer
+
+Result:
+
+    The returned result is a JSON object with a single key:
+
+    * certificate: a PEM-encoded certificate that has been signed
+    by the server.
+
+Example:
+
+    $ curl -d '{"certificate_request": "-----BEGIN CERTIFICATE REQUEST-----\nMIIBUjCB+QIBADBqMQswCQYDVQQGEwJVUzEUMBIGA1UEChMLZXhhbXBsZS5jb20x\nFjAUBgNVBAcTDVNhbiBGcmFuY2lzY28xEzARBgNVBAgTCkNhbGlmb3JuaWExGDAW\nBgNVBAMTD3d3dy5leGFtcGxlLmNvbTBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IA\nBK/CtZaQ4VliKE+DLIVGLwtSxJgtUKRzGvN1EwI3HRgKDQ3l3urBIzHtUcdMq6HZ\nb8jX0O9fXYUOf4XWggrLk1agLTArBgkqhkiG9w0BCQ4xHjAcMBoGA1UdEQQTMBGC\nD3d3dy5leGFtcGxlLmNvbTAKBggqhkjOPQQDAgNIADBFAiAcvfhXnsLtzep2sKSa\n36W7G9PRbHh8zVGlw3Hph8jR1QIhAKfrgplKwXcUctU5grjQ8KXkJV8RxQUo5KKs\ngFnXYtkb\n-----END CERTIFICATE REQUEST-----\n"}' \
+          ${CFSSL_HOST}/api/v1/cfssl/sign  \
+          | python -m json.tool
+
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+100  1859  100  1287  100   572  27265  12117 --:--:-- --:--:-- --:--:-- 27382
+{
+{
+    "errors": [],
+    "messages": [],
+    "result": {
+        "certificate": "-----BEGIN CERTIFICATE-----\nMIIDRzCCAjGgAwIBAgIIHQdm46rELPQwCwYJKoZIhvcNAQELMIGMMQswCQYDVQQG\nEwJVUzETMBEGA1UECBMKQ2FsaWZvcm5pYTEWMBQGA1UEBxMNU2FuIEZyYW5jaXNj\nbzETMBEGA1UEChMKQ0ZTU0wgVEVTVDEbMBkGA1UEAxMSQ0ZTU0wgVEVTVCBSb290\nIENBMR4wHAYJKoZIhvcNAQkBFg90ZXN0QHRlc3QubG9jYWwwHhcNMTUwODAzMDYx\nNDAwWhcNMTYwODAyMDYxNDAwWjBqMQswCQYDVQQGEwJVUzEUMBIGA1UEChMLZXhh\nbXBsZS5jb20xFjAUBgNVBAcTDVNhbiBGcmFuY2lzY28xEzARBgNVBAgTCkNhbGlm\nb3JuaWExGDAWBgNVBAMTD3d3dy5leGFtcGxlLmNvbTBZMBMGByqGSM49AgEGCCqG\nSM49AwEHA0IABK/CtZaQ4VliKE+DLIVGLwtSxJgtUKRzGvN1EwI3HRgKDQ3l3urB\nIzHtUcdMq6HZb8jX0O9fXYUOf4XWggrLk1ajgZwwgZkwDgYDVR0PAQH/BAQDAgCg\nMB0GA1UdJQQWMBQGCCsGAQUFBwMBBggrBgEFBQcDAjAMBgNVHRMBAf8EAjAAMB0G\nA1UdDgQWBBTF8UwoRdK0rWK8FWiyRxl3H2Wr+TAfBgNVHSMEGDAWgBS30veEuqg5\n1fusEM4p/YuWpBPsvTAaBgNVHREEEzARgg93d3cuZXhhbXBsZS5jb20wCwYJKoZI\nhvcNAQELA4IBAQBR86I/5ChcvdFxSypKOzZMT5CSJMN8rSFfjq+fAP2jMbdVvavR\n9cFdOncosNmDLhifqMx9Cj8pAXtOQcZ+BWEewwEsPYTYorPHSawroMMIO216tufm\nIRj0oPIL8PxRuKwRBtpeIU7F/Z/iGPblSwujunvetEu43i5Zsrh11YkpJ7bIKc9K\nOLaCNIER+tIj9noUA2r6VtMRqSyfwUVslSxirDit9GyuS9wrA563CVicMG5pqtyX\nnTNJqUAgcOy4u1JcJuv24ZNtMBJbzQA1nBI60YPd0VoWQLfnN0qVmR61Av5mTLau\n9Hzx3otLLWcsBUunMR/Zd/GDOlLByEVLRxD9\n-----END CERTIFICATE-----\n"
+    },
+    "success": true
+}

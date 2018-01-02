@@ -1,0 +1,43 @@
+# Test case for the libgettextpo library.
+msgid ""
+msgstr ""
+"Project-Id-Version: libgettextpo 0.18.1\n"
+"Report-Msgid-Bugs-To: bug-gnu-gettext@gnu.org\n"
+"POT-Creation-Date: 2010-06-04 01:57+0200\n"
+"PO-Revision-Date: 2010-06-05 14:39+0200\n"
+"Last-Translator: Bruno Haible <bruno@clisp.org>\n"
+"Language-Team: German <translation-team-de@lists.sourceforge.net>\n"
+"Language: de\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+#: gnulib-lib/w32spawn.h:81
+#, fuzzy, c-format
+msgid "cannot restore fd %d: dup2 failed"
+msgstr "Ausgabedatei »%s« kann nicht erstellt werden"
+
+#: gnulib-lib/wait-process.c:223 gnulib-lib/wait-process.c:255
+#: gnulib-lib/wait-process.c:317
+#, c-format
+msgid "%s subprocess"
+msgstr "Subprozeß %s"
+
+# Adjektiv, kein ganzer Satz!
+#. Denote a lock's state
+msgctxt "Lock state"
+msgid "Open"
+msgstr "Geöffnet"
+
+# Französische Weine sind die besten der Welt.
+#, java-format
+msgid "a bottle of wine"
+msgid_plural "{0,number} bottles of wine"
+msgstr[0] "eine Flasche Wein"
+msgstr[1] "{0,number} Weinflaschen"
+
+#. Denote a lock's state
+#~ msgctxt "Lock state"
+#~ msgid "Closed"
+#~ msgstr "Geschlossen"

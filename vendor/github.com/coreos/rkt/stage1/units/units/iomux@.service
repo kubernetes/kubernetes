@@ -1,0 +1,16 @@
+[Unit]
+Description=Streaming I/O handler for %i
+DefaultDependencies=false
+OnFailureJobMode=fail
+BindsTo=%i.service
+
+[Service]
+Type=simple
+Restart=no
+EnvironmentFile=/rkt/iottymux/%i/env
+ExecStart=/iottymux --action=iomux --app=%i
+User=0
+Group=0
+SyslogIdentifier=%i
+StandardOutput=journal+console
+StandardError=journal+console

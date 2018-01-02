@@ -1,0 +1,12 @@
+[Unit]
+Description=OpenSSH server daemon prerequisites
+DefaultDependencies=no
+
+[Service]
+ExecStartPre=/usr/bin/chown -R root /etc
+ExecStartPre=/usr/bin/chown -R 0:0 /root
+ExecStartPre=/usr/bin/chown -R root /var
+ExecStartPre=/usr/bin/chmod -R 700 /root
+ExecStart=/usr/bin/ssh-keygen -A
+Type=oneshot
+RemainAfterExit=true

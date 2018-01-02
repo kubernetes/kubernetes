@@ -1,0 +1,40 @@
+influxd-config(1)
+=================
+
+NAME
+----
+influxd-config - Generate configuration files for InfluxDB
+
+SYNOPSIS
+--------
+[verse]
+'influxd' config (-config <path>)
+'influxd config' -config /dev/null
+
+DESCRIPTION
+-----------
+'influxd config' will generate a configuration file for InfluxDB. The configuration file will be output to standard output and can be written to a file by redirecting the shell output to another file.
+
+When a configuration file is specified using '-config <path>', this configuration file will be read and will overwrite the default values for any values that are present. It can be used to provide a configuration fragment with only the options you want to customize and generate a new configuration file from that file. If '-config <path>' is not specified, the command will look for a default configuration file using the same method as *influxd-run*(1).
+
+When using this command to regenerate a configuration file in place, be sure to use a temporary file as the output. This command will not work:
+
+===
+# DO NOT USE!
+$ influxd config -config influxdb.conf > influxdb.conf
+
+# PROPER METHOD!
+$ influxd config -config influxdb.conf > influxdb.conf.tmp && \
+      mv influxdb.conf.tmp influxdb.conf
+===
+
+The shell will truncate the configuration file before 'influxd config' can read it and you will lose all of your custom options. For safety, redirect output to a temporary file instead and use 'mv' to move the file afterwards.
+
+The second command version will force 'influxd config' to output the default configuration file. Setting the configuration file to */dev/null* will cause the command to output only the defaults and will not read any values from any existing configuration files.
+
+OPTIONS
+-------
+-config <path>::
+  Customize the default configuration file to load. Disables automatic loading when the path is */dev/null*.
+
+include::footer.txt[]

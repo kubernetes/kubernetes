@@ -1,0 +1,10 @@
+BasedOnStyle: Google
+MaxEmptyLinesToKeep: 2
+ColumnLimit: 79
+DerivePointerAlignment: false
+AllowShortBlocksOnASingleLine: false
+AllowShortCaseLabelsOnASingleLine: false
+AllowShortIfStatementsOnASingleLine: false
+AllowShortLoopsOnASingleLine: false
+AllowShortFunctionsOnASingleLine: None
+PenaltyBreakBeforeFirstCallParameter: 80

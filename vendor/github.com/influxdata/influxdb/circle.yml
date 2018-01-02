@@ -1,0 +1,41 @@
+machine:
+    services:
+        - docker
+    environment:
+      GODIST: "go1.7.4.linux-amd64.tar.gz"
+    post:
+      - mkdir -p download
+      - test -e download/$GODIST || curl -o download/$GODIST https://storage.googleapis.com/golang/$GODIST
+      - sudo rm -rf /usr/local/go
+      - sudo tar -C /usr/local -xzf download/$GODIST
+
+dependencies:
+    cache_directories:
+        - "~/docker"
+        - ~/download
+    override:
+      - ./test.sh save:
+          # building the docker images can take a long time, hence caching
+          timeout: 1800
+
+test:
+    override:
+        - bash circle-test.sh:
+            parallel: true
+
+deployment:
+  release:
+    tag: /^v[0-9]+(\.[0-9]+)*(\S*)$/
+    commands:
+      - >
+        docker run
+        -e "AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID"
+        -e "AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY"
+        -v $(pwd):/root/go/src/github.com/influxdata/influxdb
+        influxdb_build_ubuntu64
+        --release
+        --package
+        --platform all
+        --arch all
+        --upload
+        --bucket dl.influxdata.com/influxdb/releases

@@ -1,0 +1,52 @@
+dist: trusty
+language: go
+go_import_path: github.com/coreos/etcd
+sudo: false
+
+go:
+  - 1.8.3
+
+notifications:
+  on_success: never
+  on_failure: never
+
+env:
+  matrix:
+   - TARGET=amd64
+   - TARGET=arm64
+   - TARGET=arm
+   - TARGET=386
+   - TARGET=ppc64le
+
+matrix:
+  fast_finish: true
+  allow_failures:
+    - go: tip
+  exclude:
+  - go: tip
+    env: TARGET=arm
+  - go: tip
+    env: TARGET=arm64
+  - go: tip
+    env: TARGET=386
+  - go: tip
+    env: TARGET=ppc64le
+
+# disable godep restore override
+install:
+ - pushd cmd/etcd && go get -t -v ./... && popd
+
+script:
+ - >
+    case "${TARGET}" in
+      amd64)
+        GOARCH=amd64 ./test
+        ;;
+      386)
+        GOARCH=386 PASSES="build unit" ./test
+        ;;
+      *)
+        # test building out of gopath
+        GO_BUILD_FLAGS="-a -v" GOPATH="" GOARCH="${TARGET}" ./build
+        ;;
+    esac

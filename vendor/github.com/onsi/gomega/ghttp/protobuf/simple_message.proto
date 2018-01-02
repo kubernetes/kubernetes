@@ -1,0 +1,9 @@
+syntax = "proto2";
+
+package protobuf;
+
+message SimpleMessage {
+    required string description = 1;
+    required int32 id = 2;
+    optional string metadata = 3;
+}

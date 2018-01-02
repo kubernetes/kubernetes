@@ -1,0 +1,14 @@
+syntax = "proto2";
+
+package grpc.testing;
+
+import "proto2.proto";
+
+extend ToBeExtended {
+  optional string frob = 23;
+  optional AnotherExtension nitz = 29;
+}
+
+message AnotherExtension {
+  optional int32 whatchamacallit = 1;
+}

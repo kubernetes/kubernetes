@@ -1,0 +1,411 @@
+{
+  "version": "2.0",
+  "operations": {
+    "DeleteRule": "<p>Deletes a rule. You must remove all targets from a rule using <a>RemoveTargets</a> before you can delete the rule.</p> <p> <b>Note:</b> When you make a change with this action, incoming events might still continue to match to the deleted rule. Please allow a short period of time for changes to take effect. </p>",
+    "DescribeRule": "<p>Describes the details of the specified rule.</p>",
+    "DisableRule": "<p>Disables a rule. A disabled rule won't match any events, and won't self-trigger if it has a schedule expression.</p> <p> <b>Note:</b> When you make a change with this action, incoming events might still continue to match to the disabled rule. Please allow a short period of time for changes to take effect. </p>",
+    "EnableRule": "<p>Enables a rule. If the rule does not exist, the operation fails.</p> <p> <b>Note:</b> When you make a change with this action, incoming events might not immediately start matching to a newly enabled rule. Please allow a short period of time for changes to take effect. </p>",
+    "ListRuleNamesByTarget": "<p>Lists the names of the rules that the given target is put to. Using this action, you can find out which of the rules in Amazon CloudWatch Events can invoke a specific target in your account. If you have more rules in your account than the given limit, the results will be paginated. In that case, use the next token returned in the response and repeat the ListRulesByTarget action until the NextToken in the response is returned as null.</p>",
+    "ListRules": "<p>Lists the Amazon CloudWatch Events rules in your account. You can either list all the rules or you can provide a prefix to match to the rule names. If you have more rules in your account than the given limit, the results will be paginated. In that case, use the next token returned in the response and repeat the ListRules action until the NextToken in the response is returned as null.</p>",
+    "ListTargetsByRule": "<p>Lists of targets assigned to the rule.</p>",
+    "PutEvents": "<p>Sends custom events to Amazon CloudWatch Events so that they can be matched to rules.</p>",
+    "PutRule": "<p>Creates or updates a rule. Rules are enabled by default, or based on value of the State parameter. You can disable a rule using <a>DisableRule</a>.</p> <p> <b>Note:</b> When you make a change with this action, incoming events might not immediately start matching to new or updated rules. Please allow a short period of time for changes to take effect.</p> <p>A rule must contain at least an EventPattern or ScheduleExpression. Rules with EventPatterns are triggered when a matching event is observed. Rules with ScheduleExpressions self-trigger based on the given schedule. A rule can have both an EventPattern and a ScheduleExpression, in which case the rule will trigger on matching events as well as on a schedule.</p> <p> <b>Note:</b> Most services in AWS treat : or / as the same character in Amazon Resource Names (ARNs). However, CloudWatch Events uses an exact match in event patterns and rules. Be sure to use the correct ARN characters when creating event patterns so that they match the ARN syntax in the event you want to match. </p>",
+    "PutTargets": "<p>Adds target(s) to a rule. Updates the target(s) if they are already associated with the role. In other words, if there is already a target with the given target ID, then the target associated with that ID is updated.</p> <p> <b>Note:</b> When you make a change with this action, when the associated rule triggers, new or updated targets might not be immediately invoked. Please allow a short period of time for changes to take effect. </p>",
+    "RemoveTargets": "<p>Removes target(s) from a rule so that when the rule is triggered, those targets will no longer be invoked.</p> <p> <b>Note:</b> When you make a change with this action, when the associated rule triggers, removed targets might still continue to be invoked. Please allow a short period of time for changes to take effect. </p>",
+    "TestEventPattern": "<p>Tests whether an event pattern matches the provided event.</p> <p> <b>Note:</b> Most services in AWS treat : or / as the same character in Amazon Resource Names (ARNs). However, CloudWatch Events uses an exact match in event patterns and rules. Be sure to use the correct ARN characters when creating event patterns so that they match the ARN syntax in the event you want to match. </p>"
+  },
+  "service": "<p>Amazon CloudWatch Events helps you to respond to state changes in your AWS resources. When your resources change state they automatically send events into an event stream. You can create rules that match selected events in the stream and route them to targets to take action. You can also use rules to take action on a pre-determined schedule. For example, you can configure rules to: </p> <ul> <li>Automatically invoke an AWS Lambda function to update DNS entries when an event notifies you that Amazon EC2 instance enters the running state.</li> <li>Direct specific API records from CloudTrail to an Amazon Kinesis stream for detailed analysis of potential security or availability risks.</li> <li>Periodically invoke a built-in target to create a snapshot of an Amazon EBS volume.</li> </ul> <p> For more information about Amazon CloudWatch Events features, see the <a href=\"http://docs.aws.amazon.com/AmazonCloudWatch/latest/DeveloperGuide\">Amazon CloudWatch Developer Guide</a>. </p>",
+  "shapes": {
+    "Boolean": {
+      "base": null,
+      "refs": {
+        "TestEventPatternResponse$Result": "<p>Indicates whether the event matches the event pattern.</p>"
+      }
+    },
+    "ConcurrentModificationException": {
+      "base": "<p>This exception occurs if there is concurrent modification on rule or target.</p>",
+      "refs": {
+      }
+    },
+    "DeleteRuleRequest": {
+      "base": "<p>Container for the parameters to the <a>DeleteRule</a> operation.</p>",
+      "refs": {
+      }
+    },
+    "DescribeRuleRequest": {
+      "base": "<p>Container for the parameters to the <a>DescribeRule</a> operation.</p>",
+      "refs": {
+      }
+    },
+    "DescribeRuleResponse": {
+      "base": "<p>The result of the <a>DescribeRule</a> operation.</p>",
+      "refs": {
+      }
+    },
+    "DisableRuleRequest": {
+      "base": "<p>Container for the parameters to the <a>DisableRule</a> operation.</p>",
+      "refs": {
+      }
+    },
+    "EnableRuleRequest": {
+      "base": "<p>Container for the parameters to the <a>EnableRule</a> operation.</p>",
+      "refs": {
+      }
+    },
+    "ErrorCode": {
+      "base": null,
+      "refs": {
+        "PutEventsResultEntry$ErrorCode": "<p>The error code representing why the event submission failed on this entry.</p>",
+        "PutTargetsResultEntry$ErrorCode": "<p>The error code representing why the target submission failed on this entry.</p>",
+        "RemoveTargetsResultEntry$ErrorCode": "<p>The error code representing why the target removal failed on this entry.</p>"
+      }
+    },
+    "ErrorMessage": {
+      "base": null,
+      "refs": {
+        "PutEventsResultEntry$ErrorMessage": "<p>The error message explaining why the event submission failed on this entry.</p>",
+        "PutTargetsResultEntry$ErrorMessage": "<p>The error message explaining why the target submission failed on this entry.</p>",
+        "RemoveTargetsResultEntry$ErrorMessage": "<p>The error message explaining why the target removal failed on this entry.</p>"
+      }
+    },
+    "EventId": {
+      "base": null,
+      "refs": {
+        "PutEventsResultEntry$EventId": "<p>The ID of the event submitted to Amazon CloudWatch Events.</p>"
+      }
+    },
+    "EventPattern": {
+      "base": null,
+      "refs": {
+        "DescribeRuleResponse$EventPattern": "<p>The event pattern.</p>",
+        "PutRuleRequest$EventPattern": "<p>The event pattern.</p>",
+        "Rule$EventPattern": "<p>The event pattern of the rule.</p>",
+        "TestEventPatternRequest$EventPattern": "<p>The event pattern you want to test.</p>"
+      }
+    },
+    "EventResource": {
+      "base": null,
+      "refs": {
+        "EventResourceList$member": null
+      }
+    },
+    "EventResourceList": {
+      "base": null,
+      "refs": {
+        "PutEventsRequestEntry$Resources": "<p>AWS resources, identified by Amazon Resource Name (ARN), which the event primarily concerns. Any number, including zero, may be present.</p>"
+      }
+    },
+    "EventTime": {
+      "base": null,
+      "refs": {
+        "PutEventsRequestEntry$Time": "<p>Timestamp of event, per <a href=\"https://www.rfc-editor.org/rfc/rfc3339.txt\">RFC3339</a>. If no timestamp is provided, the timestamp of the <a>PutEvents</a> call will be used.</p>"
+      }
+    },
+    "Integer": {
+      "base": null,
+      "refs": {
+        "PutEventsResponse$FailedEntryCount": "<p>The number of failed entries.</p>",
+        "PutTargetsResponse$FailedEntryCount": "<p>The number of failed entries.</p>",
+        "RemoveTargetsResponse$FailedEntryCount": "<p>The number of failed entries.</p>"
+      }
+    },
+    "InternalException": {
+      "base": "<p>This exception occurs due to unexpected causes.</p>",
+      "refs": {
+      }
+    },
+    "InvalidEventPatternException": {
+      "base": "<p>The event pattern is invalid.</p>",
+      "refs": {
+      }
+    },
+    "LimitExceededException": {
+      "base": "<p>This exception occurs if you try to create more rules or add more targets to a rule than allowed by default.</p>",
+      "refs": {
+      }
+    },
+    "LimitMax100": {
+      "base": null,
+      "refs": {
+        "ListRuleNamesByTargetRequest$Limit": "<p>The maximum number of results to return.</p>",
+        "ListRulesRequest$Limit": "<p>The maximum number of results to return.</p>",
+        "ListTargetsByRuleRequest$Limit": "<p>The maximum number of results to return.</p>"
+      }
+    },
+    "ListRuleNamesByTargetRequest": {
+      "base": "<p>Container for the parameters to the <a>ListRuleNamesByTarget</a> operation.</p>",
+      "refs": {
+      }
+    },
+    "ListRuleNamesByTargetResponse": {
+      "base": "<p>The result of the <a>ListRuleNamesByTarget</a> operation.</p>",
+      "refs": {
+      }
+    },
+    "ListRulesRequest": {
+      "base": "<p>Container for the parameters to the <a>ListRules</a> operation.</p>",
+      "refs": {
+      }
+    },
+    "ListRulesResponse": {
+      "base": "<p>The result of the <a>ListRules</a> operation.</p>",
+      "refs": {
+      }
+    },
+    "ListTargetsByRuleRequest": {
+      "base": "<p>Container for the parameters to the <a>ListTargetsByRule</a> operation.</p>",
+      "refs": {
+      }
+    },
+    "ListTargetsByRuleResponse": {
+      "base": "<p>The result of the <a>ListTargetsByRule</a> operation.</p>",
+      "refs": {
+      }
+    },
+    "NextToken": {
+      "base": null,
+      "refs": {
+        "ListRuleNamesByTargetRequest$NextToken": "<p>The token returned by a previous call to indicate that there is more data available.</p>",
+        "ListRuleNamesByTargetResponse$NextToken": "<p>Indicates that there are additional results to retrieve.</p>",
+        "ListRulesRequest$NextToken": "<p>The token returned by a previous call to indicate that there is more data available.</p>",
+        "ListRulesResponse$NextToken": "<p>Indicates that there are additional results to retrieve.</p>",
+        "ListTargetsByRuleRequest$NextToken": "<p>The token returned by a previous call to indicate that there is more data available.</p>",
+        "ListTargetsByRuleResponse$NextToken": "<p>Indicates that there are additional results to retrieve.</p>"
+      }
+    },
+    "PutEventsRequest": {
+      "base": "<p>Container for the parameters to the <a>PutEvents</a> operation.</p>",
+      "refs": {
+      }
+    },
+    "PutEventsRequestEntry": {
+      "base": "<p>Contains information about the event to be used in the PutEvents action.</p>",
+      "refs": {
+        "PutEventsRequestEntryList$member": null
+      }
+    },
+    "PutEventsRequestEntryList": {
+      "base": null,
+      "refs": {
+        "PutEventsRequest$Entries": "<p>The entry that defines an event in your system. You can specify several parameters for the entry such as the source and type of the event, resources associated with the event, and so on.</p>"
+      }
+    },
+    "PutEventsResponse": {
+      "base": "<p>The result of the <a>PutEvents</a> operation.</p>",
+      "refs": {
+      }
+    },
+    "PutEventsResultEntry": {
+      "base": "<p>A PutEventsResult contains a list of PutEventsResultEntry.</p>",
+      "refs": {
+        "PutEventsResultEntryList$member": null
+      }
+    },
+    "PutEventsResultEntryList": {
+      "base": null,
+      "refs": {
+        "PutEventsResponse$Entries": "<p>A list of successfully and unsuccessfully ingested events results. If the ingestion was successful, the entry will have the event ID in it. If not, then the ErrorCode and ErrorMessage can be used to identify the problem with the entry.</p>"
+      }
+    },
+    "PutRuleRequest": {
+      "base": "<p>Container for the parameters to the <a>PutRule</a> operation.</p>",
+      "refs": {
+      }
+    },
+    "PutRuleResponse": {
+      "base": "<p>The result of the <a>PutRule</a> operation.</p>",
+      "refs": {
+      }
+    },
+    "PutTargetsRequest": {
+      "base": "<p>Container for the parameters to the <a>PutTargets</a> operation.</p>",
+      "refs": {
+      }
+    },
+    "PutTargetsResponse": {
+      "base": "<p>The result of the <a>PutTargets</a> operation.</p>",
+      "refs": {
+      }
+    },
+    "PutTargetsResultEntry": {
+      "base": "<p>A PutTargetsResult contains a list of PutTargetsResultEntry.</p>",
+      "refs": {
+        "PutTargetsResultEntryList$member": null
+      }
+    },
+    "PutTargetsResultEntryList": {
+      "base": null,
+      "refs": {
+        "PutTargetsResponse$FailedEntries": "<p>An array of failed target entries.</p>"
+      }
+    },
+    "RemoveTargetsRequest": {
+      "base": "<p>Container for the parameters to the <a>RemoveTargets</a> operation.</p>",
+      "refs": {
+      }
+    },
+    "RemoveTargetsResponse": {
+      "base": "<p>The result of the <a>RemoveTargets</a> operation.</p>",
+      "refs": {
+      }
+    },
+    "RemoveTargetsResultEntry": {
+      "base": "<p>The ID of the target requested to be removed from the rule by Amazon CloudWatch Events.</p>",
+      "refs": {
+        "RemoveTargetsResultEntryList$member": null
+      }
+    },
+    "RemoveTargetsResultEntryList": {
+      "base": null,
+      "refs": {
+        "RemoveTargetsResponse$FailedEntries": "<p>An array of failed target entries.</p>"
+      }
+    },
+    "ResourceNotFoundException": {
+      "base": "<p>The rule does not exist.</p>",
+      "refs": {
+      }
+    },
+    "RoleArn": {
+      "base": null,
+      "refs": {
+        "DescribeRuleResponse$RoleArn": "<p>The Amazon Resource Name (ARN) of the IAM role associated with the rule.</p>",
+        "PutRuleRequest$RoleArn": "<p>The Amazon Resource Name (ARN) of the IAM role associated with the rule.</p>",
+        "Rule$RoleArn": "<p>The Amazon Resource Name (ARN) associated with the role that is used for target invocation.</p>"
+      }
+    },
+    "Rule": {
+      "base": "<p>Contains information about a rule in Amazon CloudWatch Events. A ListRulesResult contains a list of Rules.</p>",
+      "refs": {
+        "RuleResponseList$member": null
+      }
+    },
+    "RuleArn": {
+      "base": null,
+      "refs": {
+        "DescribeRuleResponse$Arn": "<p>The Amazon Resource Name (ARN) associated with the rule.</p>",
+        "PutRuleResponse$RuleArn": "<p>The Amazon Resource Name (ARN) that identifies the rule.</p>",
+        "Rule$Arn": "<p>The Amazon Resource Name (ARN) of the rule.</p>"
+      }
+    },
+    "RuleDescription": {
+      "base": null,
+      "refs": {
+        "DescribeRuleResponse$Description": "<p>The rule's description.</p>",
+        "PutRuleRequest$Description": "<p>A description of the rule.</p>",
+        "Rule$Description": "<p>The description of the rule.</p>"
+      }
+    },
+    "RuleName": {
+      "base": null,
+      "refs": {
+        "DeleteRuleRequest$Name": "<p>The name of the rule to be deleted.</p>",
+        "DescribeRuleRequest$Name": "<p>The name of the rule you want to describe details for.</p>",
+        "DescribeRuleResponse$Name": "<p>The rule's name.</p>",
+        "DisableRuleRequest$Name": "<p>The name of the rule you want to disable.</p>",
+        "EnableRuleRequest$Name": "<p>The name of the rule that you want to enable.</p>",
+        "ListRulesRequest$NamePrefix": "<p>The prefix matching the rule name.</p>",
+        "ListTargetsByRuleRequest$Rule": "<p>The name of the rule whose targets you want to list.</p>",
+        "PutRuleRequest$Name": "<p>The name of the rule that you are creating or updating.</p>",
+        "PutTargetsRequest$Rule": "<p>The name of the rule you want to add targets to.</p>",
+        "RemoveTargetsRequest$Rule": "<p>The name of the rule you want to remove targets from.</p>",
+        "Rule$Name": "<p>The rule's name.</p>",
+        "RuleNameList$member": null
+      }
+    },
+    "RuleNameList": {
+      "base": null,
+      "refs": {
+        "ListRuleNamesByTargetResponse$RuleNames": "<p>List of rules names that can invoke the given target.</p>"
+      }
+    },
+    "RuleResponseList": {
+      "base": null,
+      "refs": {
+        "ListRulesResponse$Rules": "<p>List of rules matching the specified criteria.</p>"
+      }
+    },
+    "RuleState": {
+      "base": null,
+      "refs": {
+        "DescribeRuleResponse$State": "<p>Specifies whether the rule is enabled or disabled.</p>",
+        "PutRuleRequest$State": "<p>Indicates whether the rule is enabled or disabled.</p>",
+        "Rule$State": "<p>The rule's state.</p>"
+      }
+    },
+    "ScheduleExpression": {
+      "base": null,
+      "refs": {
+        "DescribeRuleResponse$ScheduleExpression": "<p>The scheduling expression. For example, \"cron(0 20 * * ? *)\", \"rate(5 minutes)\".</p>",
+        "PutRuleRequest$ScheduleExpression": "<p>The scheduling expression. For example, \"cron(0 20 * * ? *)\", \"rate(5 minutes)\".</p>",
+        "Rule$ScheduleExpression": "<p>The scheduling expression. For example, \"cron(0 20 * * ? *)\", \"rate(5 minutes)\".</p>"
+      }
+    },
+    "String": {
+      "base": null,
+      "refs": {
+        "PutEventsRequestEntry$Source": "<p>The source of the event.</p>",
+        "PutEventsRequestEntry$DetailType": "<p>Free-form string used to decide what fields to expect in the event detail.</p>",
+        "PutEventsRequestEntry$Detail": "<p>In the JSON sense, an object containing fields, which may also contain nested sub-objects. No constraints are imposed on its contents.</p>",
+        "TestEventPatternRequest$Event": "<p>The event in the JSON format to test against the event pattern.</p>"
+      }
+    },
+    "Target": {
+      "base": "<p>Targets are the resources that can be invoked when a rule is triggered. For example, AWS Lambda functions, Amazon Kinesis streams, and built-in targets.</p> <p><b>Input</b> and <b>InputPath</b> are mutually-exclusive and optional parameters of a target. When a rule is triggered due to a matched event, if for a target:</p> <ul> <li>Neither <b>Input</b> nor <b>InputPath</b> is specified, then the entire event is passed to the target in JSON form.</li> <li> <b>InputPath</b> is specified in the form of JSONPath (e.g. <b>$.detail</b>), then only the part of the event specified in the path is passed to the target (e.g. only the detail part of the event is passed). </li> <li> <b>Input</b> is specified in the form of a valid JSON, then the matched event is overridden with this constant.</li> </ul>",
+      "refs": {
+        "TargetList$member": null
+      }
+    },
+    "TargetArn": {
+      "base": null,
+      "refs": {
+        "ListRuleNamesByTargetRequest$TargetArn": "<p>The Amazon Resource Name (ARN) of the target resource that you want to list the rules for.</p>",
+        "Target$Arn": "<p>The Amazon Resource Name (ARN) associated of the target.</p>"
+      }
+    },
+    "TargetId": {
+      "base": null,
+      "refs": {
+        "PutTargetsResultEntry$TargetId": "<p>The ID of the target submitted to Amazon CloudWatch Events.</p>",
+        "RemoveTargetsResultEntry$TargetId": "<p>The ID of the target requested to be removed by Amazon CloudWatch Events.</p>",
+        "Target$Id": "<p>The unique target assignment ID.</p>",
+        "TargetIdList$member": null
+      }
+    },
+    "TargetIdList": {
+      "base": null,
+      "refs": {
+        "RemoveTargetsRequest$Ids": "<p>The list of target IDs to remove from the rule.</p>"
+      }
+    },
+    "TargetInput": {
+      "base": null,
+      "refs": {
+        "Target$Input": "<p>Valid JSON text passed to the target. For more information about JSON text, see <a href=\"http://www.rfc-editor.org/rfc/rfc7159.txt\">The JavaScript Object Notation (JSON) Data Interchange Format</a>.</p>"
+      }
+    },
+    "TargetInputPath": {
+      "base": null,
+      "refs": {
+        "Target$InputPath": "<p>The value of the JSONPath that is used for extracting part of the matched event when passing it to the target. For more information about JSON paths, see <a href=\"http://goessner.net/articles/JsonPath/\">JSONPath</a>.</p>"
+      }
+    },
+    "TargetList": {
+      "base": null,
+      "refs": {
+        "ListTargetsByRuleResponse$Targets": "<p>Lists the targets assigned to the rule.</p>",
+        "PutTargetsRequest$Targets": "<p>List of targets you want to update or add to the rule.</p>"
+      }
+    },
+    "TestEventPatternRequest": {
+      "base": "<p>Container for the parameters to the <a>TestEventPattern</a> operation.</p>",
+      "refs": {
+      }
+    },
+    "TestEventPatternResponse": {
+      "base": "<p>The result of the <a>TestEventPattern</a> operation.</p>",
+      "refs": {
+      }
+    }
+  }
+}

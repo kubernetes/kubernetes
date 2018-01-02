@@ -1,0 +1,10 @@
+all: Makefile
+	$(MAKE) install
+
+Makefile: configure
+	./configure --prefix=$(INSTALL_DIR) --disable-minidebuginfo --disable-shared --enable-static CXXFLAGS="-fPIC" CFLAGS="-fPIC"
+	# Don't really want to install latex:
+	sed -e 's/latex2man/echo/' -e 's/pdflatex/echo/' -ibak doc/Makefile
+
+configure: configure.ac
+	autoreconf -vi

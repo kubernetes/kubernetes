@@ -1,0 +1,27 @@
+sudo: required
+
+services:
+  - docker
+
+env:
+  global:
+    - GOPATH=/opt
+    - BUILD_DIR=/opt/src/github.com/coreos/go-systemd
+  matrix:
+    - DOCKER_BASE=ubuntu:16.04
+    - DOCKER_BASE=debian:stretch
+
+before_install:
+ - docker pull ${DOCKER_BASE}
+ - docker run --privileged -e GOPATH=${GOPATH} --cidfile=/tmp/cidfile ${DOCKER_BASE} /bin/bash -c "apt-get update && apt-get install -y build-essential git golang dbus libsystemd-dev libpam-systemd && go get github.com/coreos/pkg/dlopen && go get github.com/godbus/dbus"
+ - docker commit `cat /tmp/cidfile` go-systemd/container-tests
+ - rm -f /tmp/cidfile
+
+install:
+ - docker run -d --cidfile=/tmp/cidfile --privileged -e GOPATH=${GOPATH} -v ${PWD}:${BUILD_DIR} go-systemd/container-tests /bin/systemd --system
+
+script:
+ - docker exec `cat /tmp/cidfile` /bin/bash -c "cd ${BUILD_DIR} && ./test"
+
+after_script:
+ - docker kill `cat /tmp/cidfile`

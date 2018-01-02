@@ -1,0 +1,19 @@
+{
+  "Vendor": true,
+  "Deadline": "2m",
+  "Sort": ["linter", "severity", "path", "line"],
+  "Exclude": [
+    ".*\\.pb\\.go",
+    "fetch\\.go:.*::error: unrecognized printf verb 'r'"
+  ],
+  "EnableGC": true,
+  "WarnUnmatchedDirective": true,
+
+  "Enable": [
+    "gofmt",
+    "goimports",
+    "golint",
+    "ineffassign",
+    "vet"
+  ]
+}

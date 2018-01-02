@@ -1,0 +1,22 @@
+# Docker project generated files to ignore
+#  if you want to ignore files created by your editor/tools,
+#  please consider a global .gitignore https://help.github.com/articles/ignoring-files
+*.exe
+*.exe~
+*.orig
+*.test
+.*.swp
+.DS_Store
+# a .bashrc may be added to customize the build environment
+.bashrc
+.editorconfig
+.gopath/
+.go-pkg-cache/
+autogen/
+bundles/
+cmd/dockerd/dockerd
+contrib/builder/rpm/*/changelog
+dockerversion/version_autogen.go
+dockerversion/version_autogen_unix.go
+vendor/pkg/
+hack/integration-cli-on-swarm/integration-cli-on-swarm

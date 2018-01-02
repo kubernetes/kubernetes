@@ -1,0 +1,33 @@
+{
+    "acKind": "ImageManifest",
+    "acVersion": "0.8.10",
+    "name": "localhost/rkt-stub-stage1",
+    "labels": [
+        {
+            "name": "version",
+            "value": "0.0.1"
+        },
+        {
+            "name": "arch",
+            "value": "amd64"
+        },
+        {
+            "name": "os",
+            "value": "linux"
+        }
+    ],
+    "annotations": [
+        {
+            "name": "coreos.com/rkt/stage1/run",
+            "value": "/run"
+        },
+        {
+            "name": "coreos.com/rkt/stage1/enter",
+            "value": "/enter"
+        },
+        {
+            "name": "coreos.com/rkt/stage1/gc",
+            "value": "/gc"
+        }
+    ]
+}

@@ -1,0 +1,38 @@
+        {
+            "definitions": {
+                "Book": {
+                    "type": "object",
+                    "id": "x-sampletwo-book",
+                    "required": [
+                        "code",
+                        "message"
+                    ],
+                    "properties": {
+                        "code": {
+                            "type": "integer",
+                            "format": "int32"
+                        },
+                        "message": {
+                            "type": "integer"
+                        }
+                    }
+                },
+                "Shelf": {
+                    "type": "object",
+                    "id": "x-sampletwo-shelf",
+                    "required": [
+                        "foo1",
+                        "bar"
+                    ],
+                    "properties": {
+                        "foo1": {
+                            "type": "integer",
+                            "format": "int32"
+                        },
+                        "bar": {
+                            "type": "integer"
+                        }
+                    }
+                }
+            }
+        }

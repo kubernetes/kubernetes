@@ -1,0 +1,63 @@
+#!/bin/sh -e
+
+# set some environment variables
+ORG_PATH="github.com/coreos"
+REPO_PATH="${ORG_PATH}/etcd"
+export GO15VENDOREXPERIMENT="1"
+
+eval $(go env)
+GIT_SHA=`git rev-parse --short HEAD || echo "GitNotFound"`
+if [ ! -z "$FAILPOINTS" ]; then
+	GIT_SHA="$GIT_SHA"-FAILPOINTS
+fi
+
+# Set GO_LDFLAGS="-s" for building without symbols for debugging.
+GO_LDFLAGS="$GO_LDFLAGS -X ${REPO_PATH}/cmd/vendor/${REPO_PATH}/version.GitSHA=${GIT_SHA}"
+
+# enable/disable failpoints
+toggle_failpoints() {
+	FAILPKGS="etcdserver/ mvcc/backend/"
+
+	mode="disable"
+	if [ ! -z "$FAILPOINTS" ]; then mode="enable"; fi
+	if [ ! -z "$1" ]; then mode="$1"; fi
+
+	if which gofail >/dev/null 2>&1; then
+		gofail "$mode" $FAILPKGS
+	elif [ "$mode" != "disable" ]; then
+		echo "FAILPOINTS set but gofail not found"
+		exit 1
+	fi
+}
+
+etcd_build() {
+	out="bin"
+	if [ -n "${BINDIR}" ]; then out="${BINDIR}"; fi
+	toggle_failpoints
+	# Static compilation is useful when etcd is run in a container
+	CGO_ENABLED=0 go build $GO_BUILD_FLAGS -installsuffix cgo -ldflags "$GO_LDFLAGS" -o ${out}/etcd ${REPO_PATH}/cmd/etcd || return
+	CGO_ENABLED=0 go build $GO_BUILD_FLAGS -installsuffix cgo -ldflags "$GO_LDFLAGS" -o ${out}/etcdctl ${REPO_PATH}/cmd/etcdctl || return
+}
+
+etcd_setup_gopath() {
+	CDIR=$(cd `dirname "$0"` && pwd)
+	cd "$CDIR"
+	etcdGOPATH=${CDIR}/gopath
+	# preserve old gopath to support building with unvendored tooling deps (e.g., gofail)
+	if [ -n "$GOPATH" ]; then
+		GOPATH=":$GOPATH"
+	fi
+	export GOPATH=${etcdGOPATH}$GOPATH
+	rm -rf ${etcdGOPATH}/src
+	mkdir -p ${etcdGOPATH}
+	ln -s ${CDIR}/cmd/vendor ${etcdGOPATH}/src
+}
+
+toggle_failpoints
+
+# only build when called directly, not sourced
+if echo "$0" | grep "build$" >/dev/null; then
+	# force new gopath so builds outside of gopath work
+	etcd_setup_gopath
+	etcd_build
+fi

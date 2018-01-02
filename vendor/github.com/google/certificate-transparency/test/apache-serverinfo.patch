@@ -1,0 +1,208 @@
+Index: CHANGES
+===================================================================
+--- CHANGES	(revision 1584342)
++++ CHANGES	(working copy)
+@@ -151,6 +151,8 @@
+ 
+ Changes with Apache 2.4.7
+ 
++  *) mod_ssl: Add serverinfo support. [Ben Laurie]
++
+   *) APR 1.5.0 or later is now required for the event MPM.
+   
+   *) slotmem_shm: Error detection. [Jim Jagielski]
+Index: modules/ssl/mod_ssl.c
+===================================================================
+--- modules/ssl/mod_ssl.c	(revision 1584342)
++++ modules/ssl/mod_ssl.c	(working copy)
+@@ -91,6 +91,9 @@
+     SSL_CMD_SRV(CertificateChainFile, TAKE1,
+                 "SSL Server CA Certificate Chain file "
+                 "('/path/to/file' - PEM encoded)")
++    SSL_CMD_ALL(CertificateInfoFile, TAKE1,
++                "Serverinfo file "
++                "(`/path/to/file')")
+ #ifdef HAVE_TLS_SESSION_TICKETS
+     SSL_CMD_SRV(SessionTicketKeyFile, TAKE1,
+                 "TLS session ticket encryption/decryption key file (RFC 5077) "
+@@ -295,7 +298,12 @@
+ #if HAVE_ENGINE_LOAD_BUILTIN_ENGINES
+     ENGINE_cleanup();
+ #endif
++
++#if OPENSSL_VERSION_NUMBER >= 0x10000000L
++    ERR_remove_thread_state(NULL);
++#else
+     ERR_remove_state(0);
++#endif
+ 
+     /* Don't call ERR_free_strings here; ERR_load_*_strings only
+      * actually load the error strings once per process due to static
+Index: modules/ssl/ssl_engine_config.c
+===================================================================
+--- modules/ssl/ssl_engine_config.c	(revision 1584342)
++++ modules/ssl/ssl_engine_config.c	(working copy)
+@@ -191,6 +191,7 @@
+ 
+     mctx->pks->cert_files = apr_array_make(p, 3, sizeof(char *));
+     mctx->pks->key_files  = apr_array_make(p, 3, sizeof(char *));
++    mctx->pks->info_files  = apr_array_make(p, 3, sizeof(char *));
+ 
+ #ifdef HAVE_TLS_SESSION_TICKETS
+     mctx->ticket_key = apr_pcalloc(p, sizeof(*mctx->ticket_key));
+@@ -318,6 +319,7 @@
+ 
+     cfgMergeArray(pks->cert_files);
+     cfgMergeArray(pks->key_files);
++    cfgMergeArray(pks->info_files);
+ 
+     cfgMergeString(pks->ca_name_path);
+     cfgMergeString(pks->ca_name_file);
+@@ -788,6 +790,23 @@
+     return NULL;
+ }
+ 
++const char *ssl_cmd_SSLCertificateInfoFile(cmd_parms *cmd,
++					   void *dcfg,
++					   const char *arg)
++{
++    SSLSrvConfigRec *sc = mySrvConfig(cmd->server);
++    const char *err;
++
++    if ((err = ssl_cmd_check_file(cmd, &arg))) {
++        return err;
++    }
++
++    *(const char **)apr_array_push(sc->server->pks->info_files) =
++        apr_pstrdup(cmd->pool, arg);
++
++    return NULL;
++}
++
+ const char *ssl_cmd_SSLCertificateChainFile(cmd_parms *cmd,
+                                             void *dcfg,
+                                             const char *arg)
+Index: modules/ssl/ssl_engine_init.c
+===================================================================
+--- modules/ssl/ssl_engine_init.c	(revision 1584342)
++++ modules/ssl/ssl_engine_init.c	(working copy)
+@@ -861,7 +861,8 @@
+                                           apr_array_header_t *pphrases)
+ {
+     SSLModConfigRec *mc = myModConfig(s);
+-    const char *vhost_id = mctx->sc->vhost_id, *key_id, *certfile, *keyfile;
++    const char *vhost_id = mctx->sc->vhost_id, *key_id, *certfile, *keyfile,
++	*infofile;
+     int i;
+     X509 *cert;
+     DH *dhparams;
+@@ -944,6 +945,26 @@
+             return APR_EGENERAL;
+         }
+ 
++	/* Thirdly, serverinfo, if present */
++        infofile = APR_ARRAY_IDX(mctx->pks->info_files, i, const char *);
++	if (infofile != NULL) {
++#if !defined(OPENSSL_NO_TLSEXT) && OPENSSL_VERSION_NUMBER >= 0x10002000L
++	    if (!SSL_CTX_use_serverinfo_file(mctx->ssl_ctx, infofile)) {
++		ap_log_error(APLOG_MARK, APLOG_ERR, 0, s,
++			     "Unable to initialize TLS authz extension");
++		ssl_log_ssl_error(SSLLOG_MARK, APLOG_ERR, s);
++		ssl_die(s);
++	    }
++	    ap_log_error(APLOG_MARK, APLOG_WARNING, 0, s,
++			 "Set infofile number %d to %s", i, infofile);
++#else
++	    ap_log_error(APLOG_MARK, APLOG_ERR, 0, s,
++			 "Unable to initialize serverinfo extension: "
++			 "OpenSSL version too low");
++	    ssl_die(s);
++#endif
++	}
++
+ #ifdef HAVE_SSL_CONF_CMD
+         /* 
+          * workaround for those OpenSSL versions where SSL_CTX_get0_certificate
+Index: modules/ssl/ssl_private.h
+===================================================================
+--- modules/ssl/ssl_private.h	(revision 1584342)
++++ modules/ssl/ssl_private.h	(working copy)
+@@ -497,6 +497,8 @@
+     /* Lists of configured certs and keys for this server */
+     apr_array_header_t *cert_files;
+     apr_array_header_t *key_files;
++    /** Serverinfo extension */
++    apr_array_header_t *info_files;
+ 
+     /** Certificates which specify the set of CA names which should be
+      * sent in the CertificateRequest message: */
+@@ -673,6 +675,7 @@
+ const char  *ssl_cmd_SSLCertificateFile(cmd_parms *, void *, const char *);
+ const char  *ssl_cmd_SSLCertificateKeyFile(cmd_parms *, void *, const char *);
+ const char  *ssl_cmd_SSLCertificateChainFile(cmd_parms *, void *, const char *);
++const char  *ssl_cmd_SSLCertificateInfoFile(cmd_parms *, void *, const char *);
+ const char  *ssl_cmd_SSLCACertificatePath(cmd_parms *, void *, const char *);
+ const char  *ssl_cmd_SSLCACertificateFile(cmd_parms *, void *, const char *);
+ const char  *ssl_cmd_SSLCADNRequestPath(cmd_parms *, void *, const char *);
+Index: modules/ssl/ssl_util.c
+===================================================================
+--- modules/ssl/ssl_util.c	(revision 1584342)
++++ modules/ssl/ssl_util.c	(working copy)
+@@ -316,6 +316,28 @@
+     apr_pool_destroy(l->pool);
+ }
+ 
++#if OPENSSL_VERSION_NUMBER >= 0x10000000L
++
++static void ssl_util_thr_id(CRYPTO_THREADID *id)
++{
++    /* OpenSSL needs this to return an unsigned long.  On OS/390, the pthread
++     * id is a structure twice that big.  Use the TCB pointer instead as a
++     * unique unsigned long.
++     */
++#ifdef __MVS__
++    struct PSA {
++        char unmapped[540];
++        unsigned long PSATOLD;
++    } *psaptr = 0;
++
++    CRYPTO_THREADID_set_numeric(id, psaptr->PSATOLD);
++#else
++    CRYPTO_THREADID_set_pointer(id, apr_os_thread_current());
++#endif
++}
++
++#else
++
+ static unsigned long ssl_util_thr_id(void)
+ {
+     /* OpenSSL needs this to return an unsigned long.  On OS/390, the pthread
+@@ -334,10 +356,16 @@
+ #endif
+ }
+ 
++#endif
++
+ static apr_status_t ssl_util_thread_cleanup(void *data)
+ {
+     CRYPTO_set_locking_callback(NULL);
++#if OPENSSL_VERSION_NUMBER >= 0x10000000L
++    CRYPTO_THREADID_set_callback(NULL);
++#else
+     CRYPTO_set_id_callback(NULL);
++#endif
+ 
+     CRYPTO_set_dynlock_create_callback(NULL);
+     CRYPTO_set_dynlock_lock_callback(NULL);
+@@ -361,7 +389,11 @@
+         apr_thread_mutex_create(&(lock_cs[i]), APR_THREAD_MUTEX_DEFAULT, p);
+     }
+ 
++#if OPENSSL_VERSION_NUMBER >= 0x10000000L
++    CRYPTO_THREADID_set_callback(ssl_util_thr_id);
++#else
+     CRYPTO_set_id_callback(ssl_util_thr_id);
++#endif
+ 
+     CRYPTO_set_locking_callback(ssl_util_thr_lock);
+ 

@@ -1,0 +1,24 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+# VCSA with VC simulator enabled.
+# 'vagrant provision' will erase any existing inventory and
+# populate with the config in ./provision.sh
+
+Vagrant.configure("2") do |config|
+  config.vm.hostname = "vcsim"
+
+  config.vm.box = "vcsa"
+  config.vm.synced_folder ".", "/vagrant", disabled: true
+
+  config.vm.provision "shell", path: "provision.sh"
+
+  config.vm.network "forwarded_port", guest: 443, host: 16443
+  config.vm.network "forwarded_port", guest: 80, host: 16080
+
+  [:vmware_fusion, :vmware_workstation].each do |name|
+    config.vm.provider name do |v,override|
+      v.vmx["memsize"] = "4096"
+    end
+  end
+end

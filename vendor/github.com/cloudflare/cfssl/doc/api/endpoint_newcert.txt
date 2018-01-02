@@ -1,0 +1,59 @@
+THE CERTIFICATAE GENERATING ENDPOINT
+
+Endpoint: /api/v1/cfssl/newcert
+Method:   POST
+
+Required parameters:
+    
+    * request: a json object specifying the certificate request,
+    exactly the one which can be sent to /api/v1/cfssl/newkey
+    to generate a certificate sigining request
+    (referring to endpoint_newkey for how to write such object)
+
+Optional parameters:
+
+    * label: a string specifying which signer to be appointed to sign
+    the CSR, useful when interacting with cfssl server that stands
+    in front of a remote multi-root CA signer
+    * profile: a string specifying the signing profile for the signer
+
+Result:
+
+    The returned result is a JSON object with four keys:
+
+    * private key: a PEM-encoded private key
+    * certificate_request: a PEM-encoded certificate request
+    * certificate: a PEM-encoded certificate, signed by the server
+    * sums: a JSON object holding both MD5 and SHA1 digests for the certificate
+    request and the certificate
+
+Example:
+
+    $ curl -d '{ "request": {"hosts":["www.example.com"], "names":[{"C":"US", "ST":"California", "L":"San Francisco", "O":"example.com"}], "CN": "www.example.com"} }' \
+          ${CFSSL_HOST}/api/v1/cfssl/newcert  \
+          | python -m json.tool
+
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+100  2487    0  2338  100   149  56536   3603 --:--:-- --:--:-- --:--:-- 57024
+{
+    "errors": [],
+    "messages": [],
+    "result": {
+        "certificate": "-----BEGIN CERTIFICATE-----\nMIIDRzCCAjGgAwIBAgIIV2zafpyQtp4wCwYJKoZIhvcNAQELMIGMMQswCQYDVQQG\nEwJVUzETMBEGA1UECBMKQ2FsaWZvcm5pYTEWMBQGA1UEBxMNU2FuIEZyYW5jaXNj\nbzETMBEGA1UEChMKQ0ZTU0wgVEVTVDEbMBkGA1UEAxMSQ0ZTU0wgVEVTVCBSb290\nIENBMR4wHAYJKoZIhvcNAQkBFg90ZXN0QHRlc3QubG9jYWwwHhcNMTUwODAzMDYx\nMjAwWhcNMTYwODAyMDYxMjAwWjBqMQswCQYDVQQGEwJVUzEUMBIGA1UEChMLZXhh\nbXBsZS5jb20xFjAUBgNVBAcTDVNhbiBGcmFuY2lzY28xEzARBgNVBAgTCkNhbGlm\nb3JuaWExGDAWBgNVBAMTD3d3dy5leGFtcGxlLmNvbTBZMBMGByqGSM49AgEGCCqG\nSM49AwEHA0IABK/CtZaQ4VliKE+DLIVGLwtSxJgtUKRzGvN1EwI3HRgKDQ3l3urB\nIzHtUcdMq6HZb8jX0O9fXYUOf4XWggrLk1ajgZwwgZkwDgYDVR0PAQH/BAQDAgCg\nMB0GA1UdJQQWMBQGCCsGAQUFBwMBBggrBgEFBQcDAjAMBgNVHRMBAf8EAjAAMB0G\nA1UdDgQWBBTF8UwoRdK0rWK8FWiyRxl3H2Wr+TAfBgNVHSMEGDAWgBS30veEuqg5\n1fusEM4p/YuWpBPsvTAaBgNVHREEEzARgg93d3cuZXhhbXBsZS5jb20wCwYJKoZI\nhvcNAQELA4IBAQCT+9xoBO39nFesT0dmdqpwHExU09/IYrkvYwWesX5U9z/f3HYP\nLz/NnXIs6a+k8MglvZgHwr5R8nzVtayfPTWyML6L6AOX8EfV5UXbnXW4XRUhHAik\n+E1gYhOCD1dLQJyQkX8VVr725BUk1yQD3Kf0PJUvagLJjn8Gn7QoGWfvVgpR8iMd\ncBJqlx8Z9KCYcLrpXliD8OJqT7Z8TGbnehpcaNwPPI6dMX57wgXSNuP5g8OkxMcL\nxZEP3q9JRjN3ZiM5xIeoTc/zl1WhZ+YpOHSbv/T9DX3f74ms9GEc0JnR8iENJTu6\nRx0/qPDPpqZ+Fr9v/13/OvQ+jAY5qe/6l1d6\n-----END CERTIFICATE-----\n",
+        "certificate_request": "-----BEGIN CERTIFICATE REQUEST-----\nMIIBUjCB+QIBADBqMQswCQYDVQQGEwJVUzEUMBIGA1UEChMLZXhhbXBsZS5jb20x\nFjAUBgNVBAcTDVNhbiBGcmFuY2lzY28xEzARBgNVBAgTCkNhbGlmb3JuaWExGDAW\nBgNVBAMTD3d3dy5leGFtcGxlLmNvbTBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IA\nBK/CtZaQ4VliKE+DLIVGLwtSxJgtUKRzGvN1EwI3HRgKDQ3l3urBIzHtUcdMq6HZ\nb8jX0O9fXYUOf4XWggrLk1agLTArBgkqhkiG9w0BCQ4xHjAcMBoGA1UdEQQTMBGC\nD3d3dy5leGFtcGxlLmNvbTAKBggqhkjOPQQDAgNIADBFAiAcvfhXnsLtzep2sKSa\n36W7G9PRbHh8zVGlw3Hph8jR1QIhAKfrgplKwXcUctU5grjQ8KXkJV8RxQUo5KKs\ngFnXYtkb\n-----END CERTIFICATE REQUEST-----\n",
+        "private_key": "-----BEGIN EC PRIVATE KEY-----\nMHcCAQEEIJfVVIvXclN1jCWefEwhYYq7y1ya2RjxO5o8QjehD3YdoAoGCCqGSM49\nAwEHoUQDQgAEr8K1lpDhWWIoT4MshUYvC1LEmC1QpHMa83UTAjcdGAoNDeXe6sEj\nMe1Rx0yrodlvyNfQ719dhQ5/hdaCCsuTVg==\n-----END EC PRIVATE KEY-----\n",
+        "sums": {
+            "certificate": {
+                "md5": "E9308D1892F1B77E6721EA2F79C026BE",
+                "sha-1": "4640E6DEC2C40B74F46C409C1D31928EE0073D25"
+            },
+            "certificate_request": {
+                "md5": "AA924136405006E36CEE39FED9CBA5D7",
+                "sha-1": "DF955A43DF669D38E07BF0479789D13881DC9024"
+            }
+        }
+    },
+    "success": true
+}
+

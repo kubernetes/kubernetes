@@ -1,0 +1,389 @@
+# TODO: this file has not yet been included in the main CLDR release.
+# The intent is to verify this file against the Go implementation and then
+# correct the cases and add merge in other interesting test cases.
+# See TestCLDRCompliance in match_test.go, as well as the list of exceptions
+# defined in the map skip below it, for the work in progress.
+
+# Data-driven test for the XLocaleMatcher.
+# Format
+# • Everything after "#" is a comment
+# • Arguments are separated by ";". They are:
+
+# supported ; desired ; expected
+
+# • The supported may have the threshold distance reset as a first item, eg 50, en, fr
+# A line starting with @debug will reach a statement in the test code where you can put a breakpoint for debugging
+# The test code also supports reformatting this file, by setting the REFORMAT flag.
+
+##################################################
+# testParentLocales
+
+# es-419, es-AR, and es-MX are in a cluster; es is in a different one
+
+es-419, es-ES ; 	es-AR ; 	es-419
+es-ES, es-419 ; 	es-AR ; 	es-419
+
+es-419, es ; 	es-AR ; 	es-419
+es, es-419 ; 	es-AR ; 	es-419
+
+es-MX, es ; 	es-AR ; 	es-MX
+es, es-MX ; 	es-AR ; 	es-MX
+
+# en-GB, en-AU, and en-NZ are in a cluster; en in a different one
+
+en-GB, en-US ; 	en-AU ; 	en-GB
+en-US, en-GB ; 	en-AU ; 	en-GB
+
+en-GB, en ; 	en-AU ; 	en-GB
+en, en-GB ; 	en-AU ; 	en-GB
+
+en-NZ, en-US ; 	en-AU ; 	en-NZ
+en-US, en-NZ ; 	en-AU ; 	en-NZ
+
+en-NZ, en ; 	en-AU ; 	en-NZ
+en, en-NZ ; 	en-AU ; 	en-NZ
+
+# pt-AU and pt-PT in one cluster; pt-BR in another
+
+pt-PT, pt-BR ; 	pt-AO ; 	pt-PT
+pt-BR, pt-PT ; 	pt-AO ; 	pt-PT
+
+pt-PT, pt ; 	pt-AO ; 	pt-PT
+pt, pt-PT ; 	pt-AO ; 	pt-PT
+
+zh-MO, zh-TW ; 	zh-HK ; 	zh-MO
+zh-TW, zh-MO ; 	zh-HK ; 	zh-MO
+
+zh-MO, zh-TW ; 	zh-HK ; 	zh-MO
+zh-TW, zh-MO ; 	zh-HK ; 	zh-MO
+
+zh-MO, zh-CN ; 	zh-HK ; 	zh-MO
+zh-CN, zh-MO ; 	zh-HK ; 	zh-MO
+
+zh-MO, zh ; 	zh-HK ; 	zh-MO
+zh, zh-MO ; 	zh-HK ; 	zh-MO
+
+##################################################
+# testChinese
+
+zh-CN, zh-TW, iw ; 	zh-Hant-TW ; 	zh-TW
+zh-CN, zh-TW, iw ; 	zh-Hant ; 	zh-TW
+zh-CN, zh-TW, iw ; 	zh-TW ; 	zh-TW
+zh-CN, zh-TW, iw ; 	zh-Hans-CN ; 	zh-CN
+zh-CN, zh-TW, iw ; 	zh-CN ; 	zh-CN
+zh-CN, zh-TW, iw ; 	zh ; 	zh-CN
+
+##################################################
+# testenGB
+
+fr, en, en-GB, es-419, es-MX, es ; 	en-NZ ; 	en-GB
+fr, en, en-GB, es-419, es-MX, es ; 	es-ES ; 	es
+fr, en, en-GB, es-419, es-MX, es ; 	es-AR ; 	es-419
+fr, en, en-GB, es-419, es-MX, es ; 	es-MX ; 	es-MX
+
+##################################################
+# testFallbacks
+
+91, en, hi ; 	sa ; 	hi
+
+##################################################
+# testBasics
+
+fr, en-GB, en ; 	en-GB ; 	en-GB
+fr, en-GB, en ; 	en ; 	en
+fr, en-GB, en ; 	fr ; 	fr
+fr, en-GB, en ; 	ja ; 	fr	# return first if no match
+
+##################################################
+# testFallback
+
+# check that script fallbacks are handled right
+
+zh-CN, zh-TW, iw ; 	zh-Hant ; 	zh-TW
+zh-CN, zh-TW, iw ; 	zh ; 	zh-CN
+zh-CN, zh-TW, iw ; 	zh-Hans-CN ; 	zh-CN
+zh-CN, zh-TW, iw ; 	zh-Hant-HK ; 	zh-TW
+zh-CN, zh-TW, iw ; 	he-IT ; 	iw
+
+##################################################
+# testSpecials
+
+# check that nearby languages are handled
+
+en, fil, ro, nn ; 	tl ; 	fil
+en, fil, ro, nn ; 	mo ; 	ro
+en, fil, ro, nn ; 	nb ; 	nn
+
+# make sure default works
+
+en, fil, ro, nn ; 	ja ; 	en
+
+##################################################
+# testRegionalSpecials
+
+# verify that en-AU is closer to en-GB than to en (which is en-US)
+
+en, en-GB, es, es-419 ; 	es-MX ; 	es-419
+en, en-GB, es, es-419 ; 	en-AU ; 	en-GB
+en, en-GB, es, es-419 ; 	es-ES ; 	es
+
+##################################################
+# testHK
+
+# HK and MO are closer to each other for Hant than to TW
+
+zh, zh-TW, zh-MO ; 	zh-HK ; 	zh-MO
+zh, zh-TW, zh-HK ; 	zh-MO ; 	zh-HK
+
+##################################################
+# testMatch-exact
+
+# see localeDistance.txt
+
+##################################################
+# testMatch-none
+
+# see localeDistance.txt
+
+##################################################
+# testMatch-matchOnMazimized
+
+zh, zh-Hant ; 	und-TW ; 	zh-Hant	# und-TW should be closer to zh-Hant than to zh
+en-Hant-TW, und-TW ; 	zh-Hant ; 	und-TW	# zh-Hant should be closer to und-TW than to en-Hant-TW
+en-Hant-TW, und-TW ; 	zh ; 	und-TW	# zh should be closer to und-TW than to en-Hant-TW
+
+##################################################
+# testMatchGrandfatheredCode
+
+fr, i-klingon, en-Latn-US ; 	en-GB-oed ; 	en-Latn-US
+
+##################################################
+# testGetBestMatchForList-exactMatch
+fr, en-GB, ja, es-ES, es-MX ; 	ja, de ; 	ja
+
+##################################################
+# testGetBestMatchForList-simpleVariantMatch
+fr, en-GB, ja, es-ES, es-MX ; 	de, en-US ; 	en-GB	# Intentionally avoiding a perfect-match or two candidates for variant matches.
+
+# Fallback.
+
+fr, en-GB, ja, es-ES, es-MX ; 	de, zh ; 	fr
+
+##################################################
+# testGetBestMatchForList-matchOnMaximized
+# Check that if the preference is maximized already, it works as well.
+
+en, ja ; 	ja-Jpan-JP, en-AU ; 	ja	# Match for ja-Jpan-JP (maximized already)
+
+# ja-JP matches ja on likely subtags, and it's listed first, thus it wins over the second preference en-GB.
+
+en, ja ; 	ja-JP, en-US ; 	ja	# Match for ja-Jpan-JP (maximized already)
+
+# Check that if the preference is maximized already, it works as well.
+
+en, ja ; 	ja-Jpan-JP, en-US ; 	ja	# Match for ja-Jpan-JP (maximized already)
+
+##################################################
+# testGetBestMatchForList-noMatchOnMaximized
+# Regression test for http://b/5714572 .
+# de maximizes to de-DE. Pick the exact match for the secondary language instead.
+en, de, fr, ja ; 	de-CH, fr ; 	de
+
+##################################################
+# testBestMatchForTraditionalChinese
+
+# Scenario: An application that only supports Simplified Chinese (and some other languages),
+# but does not support Traditional Chinese. zh-Hans-CN could be replaced with zh-CN, zh, or
+# zh-Hans, it wouldn't make much of a difference.
+
+# The script distance (simplified vs. traditional Han) is considered small enough
+# to be an acceptable match. The regional difference is considered almost insignificant.
+
+fr, zh-Hans-CN, en-US ; 	zh-TW ; 	zh-Hans-CN
+fr, zh-Hans-CN, en-US ; 	zh-Hant ; 	zh-Hans-CN
+
+# For geo-political reasons, you might want to avoid a zh-Hant -> zh-Hans match.
+# In this case, if zh-TW, zh-HK or a tag starting with zh-Hant is requested, you can
+# change your call to getBestMatch to include a 2nd language preference.
+# "en" is a better match since its distance to "en-US" is closer than the distance
+# from "zh-TW" to "zh-CN" (script distance).
+
+fr, zh-Hans-CN, en-US ; 	zh-TW, en ; 	en-US
+fr, zh-Hans-CN, en-US ; 	zh-Hant-CN, en, en ; 	en-US
+fr, zh-Hans-CN, en-US ; 	zh-Hans, en ; 	zh-Hans-CN
+
+##################################################
+# testUndefined
+# When the undefined language doesn't match anything in the list,
+# getBestMatch returns the default, as usual.
+
+it, fr ; 	und ; 	it
+
+# When it *does* occur in the list, bestMatch returns it, as expected.
+it, und ; 	und ; 	und
+
+# The unusual part: max("und") = "en-Latn-US", and since matching is based on maximized
+# tags, the undefined language would normally match English. But that would produce the
+# counterintuitive results that getBestMatch("und", XLocaleMatcher("it,en")) would be "en", and
+# getBestMatch("en", XLocaleMatcher("it,und")) would be "und".
+
+# To avoid that, we change the matcher's definitions of max
+# so that max("und")="und". That produces the following, more desirable
+# results:
+
+it, en ; 	und ; 	it
+it, und ; 	en ; 	it
+
+##################################################
+# testGetBestMatch-regionDistance
+
+es-AR, es ; 	es-MX ; 	es-AR
+fr, en, en-GB ; 	en-CA ; 	en-GB
+de-AT, de-DE, de-CH ; 	de ; 	de-DE
+
+##################################################
+# testAsymmetry
+
+mul, nl ; 	af ; 	nl	# af => nl
+mul, af ; 	nl ; 	mul	# but nl !=> af
+
+##################################################
+# testGetBestMatchForList-matchOnMaximized2
+
+# ja-JP matches ja on likely subtags, and it's listed first, thus it wins over the second preference en-GB.
+
+fr, en-GB, ja, es-ES, es-MX ; 	ja-JP, en-GB ; 	ja	# Match for ja-JP, with likely region subtag
+
+# Check that if the preference is maximized already, it works as well.
+
+fr, en-GB, ja, es-ES, es-MX ; 	ja-Jpan-JP, en-GB ; 	ja	# Match for ja-Jpan-JP (maximized already)
+
+##################################################
+# testGetBestMatchForList-closeEnoughMatchOnMaximized
+
+en-GB, en, de, fr, ja ; 	de-CH, fr ; 	de
+en-GB, en, de, fr, ja ; 	en-US, ar, nl, de, ja ; 	en
+
+##################################################
+# testGetBestMatchForPortuguese
+
+# pt might be supported and not pt-PT
+
+# European user who prefers Spanish over Brazillian Portuguese as a fallback.
+
+pt-PT, pt-BR, es, es-419 ; 	pt-PT, es, pt ; 	pt-PT
+pt-PT, pt, es, es-419 ; 	pt-PT, es, pt ; 	pt-PT	# pt implicit
+
+# Brazillian user who prefers South American Spanish over European Portuguese as a fallback.
+# The asymmetry between this case and above is because it's "pt-PT" that's missing between the
+# matchers as "pt-BR" is a much more common language.
+
+pt-PT, pt-BR, es, es-419 ; 	pt, es-419, pt-PT ; 	pt-BR
+pt-PT, pt-BR, es, es-419 ; 	pt-PT, es, pt ; 	pt-PT
+pt-PT, pt, es, es-419 ; 	pt-PT, es, pt ; 	pt-PT
+pt-PT, pt, es, es-419 ; 	pt, es-419, pt-PT ; 	pt
+
+pt-BR, es, es-419 ; 	pt, es-419, pt-PT ; 	pt-BR
+
+# Code that adds the user's country can get "pt-US" for a user's language.
+# That should fall back to "pt-BR".
+
+pt-PT, pt-BR, es, es-419 ; 	pt-US, pt-PT ; 	pt-BR
+pt-PT, pt, es, es-419 ; 	pt-US, pt-PT, pt ; 	pt	# pt-BR implicit
+
+##################################################
+# testVariantWithScriptMatch 1 and 2
+
+fr, en, sv ; 	en-GB ; 	en
+fr, en, sv ; 	en-GB ; 	en
+en, sv ; 	en-GB, sv ; 	en
+
+##################################################
+# testLongLists
+
+en, sv ; 	sv ; 	sv
+af, am, ar, az, be, bg, bn, bs, ca, cs, cy, cy, da, de, el, en, en-GB, es, es-419, et, eu, fa, fi, fil, fr, ga, gl, gu, hi, hr, hu, hy, id, is, it, iw, ja, ka, kk, km, kn, ko, ky, lo, lt, lv, mk, ml, mn, mr, ms, my, ne, nl, no, pa, pl, pt, pt-PT, ro, ru, si, sk, sl, sq, sr, sr-Latn, sv, sw, ta, te, th, tr, uk, ur, uz, vi, zh-CN, zh-TW, zu ; 	sv ; 	sv
+af, af-NA, af-ZA, agq, agq-CM, ak, ak-GH, am, am-ET, ar, ar-001, ar-AE, ar-BH, ar-DJ, ar-DZ, ar-EG, ar-EH, ar-ER, ar-IL, ar-IQ, ar-JO, ar-KM, ar-KW, ar-LB, ar-LY, ar-MA, ar-MR, ar-OM, ar-PS, ar-QA, ar-SA, ar-SD, ar-SO, ar-SS, ar-SY, ar-TD, ar-TN, ar-YE, as, as-IN, asa, asa-TZ, ast, ast-ES, az, az-Cyrl, az-Cyrl-AZ, az-Latn, az-Latn-AZ, bas, bas-CM, be, be-BY, bem, bem-ZM, bez, bez-TZ, bg, bg-BG, bm, bm-ML, bn, bn-BD, bn-IN, bo, bo-CN, bo-IN, br, br-FR, brx, brx-IN, bs, bs-Cyrl, bs-Cyrl-BA, bs-Latn, bs-Latn-BA, ca, ca-AD, ca-ES, ca-ES-VALENCIA, ca-FR, ca-IT, ce, ce-RU, cgg, cgg-UG, chr, chr-US, ckb, ckb-IQ, ckb-IR, cs, cs-CZ, cu, cu-RU, cy, cy-GB, da, da-DK, da-GL, dav, dav-KE, de, de-AT, de-BE, de-CH, de-DE, de-LI, de-LU, dje, dje-NE, dsb, dsb-DE, dua, dua-CM, dyo, dyo-SN, dz, dz-BT, ebu, ebu-KE, ee, ee-GH, ee-TG, el, el-CY, el-GR, en, en-001, en-150, en-AG, en-AI, en-AS, en-AT, en-AU, en-BB, en-BE, en-BI, en-BM, en-BS, en-BW, en-BZ, en-CA, en-CC, en-CH, en-CK, en-CM, en-CX, en-CY, en-DE, en-DG, en-DK, en-DM, en-ER, en-FI, en-FJ, en-FK, en-FM, en-GB, en-GD, en-GG, en-GH, en-GI, en-GM, en-GU, en-GY, en-HK, en-IE, en-IL, en-IM, en-IN, en-IO, en-JE, en-JM, en-KE, en-KI, en-KN, en-KY, en-LC, en-LR, en-LS, en-MG, en-MH, en-MO, en-MP, en-MS, en-MT, en-MU, en-MW, en-MY, en-NA, en-NF, en-NG, en-NL, en-NR, en-NU, en-NZ, en-PG, en-PH, en-PK, en-PN, en-PR, en-PW, en-RW, en-SB, en-SC, en-SD, en-SE, en-SG, en-SH, en-SI, en-SL, en-SS, en-SX, en-SZ, en-TC, en-TK, en-TO, en-TT, en-TV, en-TZ, en-UG, en-UM, en-US, en-US-POSIX, en-VC, en-VG, en-VI, en-VU, en-WS, en-ZA, en-ZM, en-ZW, eo, eo-001, es, es-419, es-AR, es-BO, es-CL, es-CO, es-CR, es-CU, es-DO, es-EA, es-EC, es-ES, es-GQ, es-GT, es-HN, es-IC, es-MX, es-NI, es-PA, es-PE, es-PH, es-PR, es-PY, es-SV, es-US, es-UY, es-VE, et, et-EE, eu, eu-ES, ewo, ewo-CM, fa, fa-AF, fa-IR, ff, ff-CM, ff-GN, ff-MR, ff-SN, fi, fi-FI, fil, fil-PH, fo, fo-DK, fo-FO, fr, fr-BE, fr-BF, fr-BI, fr-BJ, fr-BL, fr-CA, fr-CD, fr-CF, fr-CG, fr-CH, fr-CI, fr-CM, fr-DJ, fr-DZ, fr-FR, fr-GA, fr-GF, fr-GN, fr-GP, fr-GQ, fr-HT, fr-KM, fr-LU, fr-MA, fr-MC, fr-MF, fr-MG, fr-ML, fr-MQ, fr-MR, fr-MU, fr-NC, fr-NE, fr-PF, fr-PM, fr-RE, fr-RW, fr-SC, fr-SN, fr-SY, fr-TD, fr-TG, fr-TN, fr-VU, fr-WF, fr-YT, fur, fur-IT, fy, fy-NL, ga, ga-IE, gd, gd-GB, gl, gl-ES, gsw, gsw-CH, gsw-FR, gsw-LI, gu, gu-IN, guz, guz-KE, gv, gv-IM, ha, ha-GH, ha-NE, ha-NG, haw, haw-US, he, he-IL, hi, hi-IN, hr, hr-BA, hr-HR, hsb, hsb-DE, hu, hu-HU, hy, hy-AM, id, id-ID, ig, ig-NG, ii, ii-CN, is, is-IS, it, it-CH, it-IT, it-SM, ja, ja-JP, jgo, jgo-CM, jmc, jmc-TZ, ka, ka-GE, kab, kab-DZ, kam, kam-KE, kde, kde-TZ, kea, kea-CV, khq, khq-ML, ki, ki-KE, kk, kk-KZ, kkj, kkj-CM, kl, kl-GL, kln, kln-KE, km, km-KH, kn, kn-IN, ko, ko-KP, ko-KR, kok, kok-IN, ks, ks-IN, ksb, ksb-TZ, ksf, ksf-CM, ksh, ksh-DE, kw, kw-GB, ky, ky-KG, lag, lag-TZ, lb, lb-LU, lg, lg-UG, lkt, lkt-US, ln, ln-AO, ln-CD, ln-CF, ln-CG, lo, lo-LA, lrc, lrc-IQ, lrc-IR, lt, lt-LT, lu, lu-CD, luo, luo-KE, luy, luy-KE, lv, lv-LV, mas, mas-KE, mas-TZ, mer, mer-KE, mfe, mfe-MU, mg, mg-MG, mgh, mgh-MZ, mgo, mgo-CM, mk, mk-MK, ml, ml-IN, mn, mn-MN, mr, mr-IN, ms, ms-BN, ms-MY, ms-SG, mt, mt-MT, mua, mua-CM, my, my-MM, mzn, mzn-IR, naq, naq-NA, nb, nb-NO, nb-SJ, nd, nd-ZW, ne, ne-IN, ne-NP, nl, nl-AW, nl-BE, nl-BQ, nl-CW, nl-NL, nl-SR, nl-SX, nmg, nmg-CM, nn, nn-NO, nnh, nnh-CM, nus, nus-SS, nyn, nyn-UG, om, om-ET, om-KE, or, or-IN, os, os-GE, os-RU, pa, pa-Arab, pa-Arab-PK, pa-Guru, pa-Guru-IN, pl, pl-PL, prg, prg-001, ps, ps-AF, pt, pt-AO, pt-BR, pt-CV, pt-GW, pt-MO, pt-MZ, pt-PT, pt-ST, pt-TL, qu, qu-BO, qu-EC, qu-PE, rm, rm-CH, rn, rn-BI, ro, ro-MD, ro-RO, rof, rof-TZ, root, ru, ru-BY, ru-KG, ru-KZ, ru-MD, ru-RU, ru-UA, rw, rw-RW, rwk, rwk-TZ, sah, sah-RU, saq, saq-KE, sbp, sbp-TZ, se, se-FI, se-NO, se-SE, seh, seh-MZ, ses, ses-ML, sg, sg-CF, shi, shi-Latn, shi-Latn-MA, shi-Tfng, shi-Tfng-MA, si, si-LK, sk, sk-SK, sl, sl-SI, smn, smn-FI, sn, sn-ZW, so, so-DJ, so-ET, so-KE, so-SO, sq, sq-AL, sq-MK, sq-XK, sr, sr-Cyrl, sr-Cyrl-BA, sr-Cyrl-ME, sr-Cyrl-RS, sr-Cyrl-XK, sr-Latn, sr-Latn-BA, sr-Latn-ME, sr-Latn-RS, sr-Latn-XK, sv, sv-AX, sv-FI, sv-SE, sw, sw-CD, sw-KE, sw-TZ, sw-UG, ta, ta-IN, ta-LK, ta-MY, ta-SG, te, te-IN, teo, teo-KE, teo-UG, th, th-TH, ti, ti-ER, ti-ET, tk, tk-TM, to, to-TO, tr, tr-CY, tr-TR, twq, twq-NE, tzm, tzm-MA, ug, ug-CN, uk, uk-UA, ur, ur-IN, ur-PK, uz, uz-Arab, uz-Arab-AF, uz-Cyrl, uz-Cyrl-UZ, uz-Latn, uz-Latn-UZ, vai, vai-Latn, vai-Latn-LR, vai-Vaii, vai-Vaii-LR, vi, vi-VN, vo, vo-001, vun, vun-TZ, wae, wae-CH, xog, xog-UG, yav, yav-CM, yi, yi-001, yo, yo-BJ, yo-NG, zgh, zgh-MA, zh, zh-Hans, zh-Hans-CN, zh-Hans-HK, zh-Hans-MO, zh-Hans-SG, zh-Hant, zh-Hant-HK, zh-Hant-MO, zh-Hant-TW, zu, zu-ZA ; 	sv ; 	sv
+
+##################################################
+# test8288
+
+it, en ; 	und ; 	it
+it, en ; 	und, en ; 	en
+
+# examples from
+# http://unicode.org/repos/cldr/tags/latest/common/bcp47/
+# http://unicode.org/repos/cldr/tags/latest/common/validity/variant.xml
+
+##################################################
+# testUnHack
+
+en-NZ, en-IT ; 	en-US ; 	en-NZ
+
+##################################################
+# testEmptySupported => null
+ ; 	en ; 	null
+
+##################################################
+# testVariantsAndExtensions
+##################################################
+# tests the .combine() method
+
+und, fr ; 	fr-BE-fonipa ; 	fr ; 	fr-BE-fonipa
+und, fr-CA ; 	fr-BE-fonipa ; 	fr-CA ; 	fr-BE-fonipa
+und, fr-fonupa ; 	fr-BE-fonipa ; 	fr-fonupa ; 	fr-BE-fonipa
+und, no ; 	nn-BE-fonipa ; 	no ; 	no-BE-fonipa
+und, en-GB-u-sd-gbsct ; 	en-fonipa-u-nu-Arab-ca-buddhist-t-m0-iso-i0-pinyin ; 	en-GB-u-sd-gbsct ; 	en-GB-fonipa-u-nu-Arab-ca-buddhist-t-m0-iso-i0-pinyin
+
+en-PSCRACK, de-PSCRACK, fr-PSCRACK, pt-PT-PSCRACK ; 	fr-PSCRACK ; 	fr-PSCRACK
+en-PSCRACK, de-PSCRACK, fr-PSCRACK, pt-PT-PSCRACK ; 	fr ; 	fr-PSCRACK
+en-PSCRACK, de-PSCRACK, fr-PSCRACK, pt-PT-PSCRACK ; 	de-CH ; 	de-PSCRACK
+
+##################################################
+# testClusters
+# we favor es-419 over others in cluster. Clusters: es- {ES, MA, EA} {419, AR, MX}
+
+und, es, es-MA, es-MX, es-419 ; 	es-AR ; 	es-419
+und, es-MA, es, es-419, es-MX ; 	es-AR ; 	es-419
+und, es, es-MA, es-MX, es-419 ; 	es-EA ; 	es
+und, es-MA, es, es-419, es-MX ; 	es-EA ; 	es
+
+# of course, fall back to within cluster
+
+und, es, es-MA, es-MX ; 	es-AR ; 	es-MX
+und, es-MA, es, es-MX ; 	es-AR ; 	es-MX
+und, es-MA, es-MX, es-419 ; 	es-EA ; 	es-MA
+und, es-MA, es-419, es-MX ; 	es-EA ; 	es-MA
+
+# we favor es-GB over others in cluster. Clusters: en- {US, GU, VI} {GB, IN, ZA}
+
+und, en, en-GU, en-IN, en-GB ; 	en-ZA ; 	en-GB
+und, en-GU, en, en-GB, en-IN ; 	en-ZA ; 	en-GB
+und, en, en-GU, en-IN, en-GB ; 	en-VI ; 	en
+und, en-GU, en, en-GB, en-IN ; 	en-VI ; 	en
+
+# of course, fall back to within cluster
+
+und, en, en-GU, en-IN ; 	en-ZA ; 	en-IN
+und, en-GU, en, en-IN ; 	en-ZA ; 	en-IN
+und, en-GU, en-IN, en-GB ; 	en-VI ; 	en-GU
+und, en-GU, en-GB, en-IN ; 	en-VI ; 	en-GU
+
+##################################################
+# testThreshold
+@Threshold=60
+
+50, und, fr-CA-fonupa ; 	fr-BE-fonipa ; 	fr-CA-fonupa ; 	fr-BE-fonipa
+50, und, fr-Cyrl-CA-fonupa ; 	fr-BE-fonipa ; 	fr-Cyrl-CA-fonupa ; 	fr-Cyrl-BE-fonipa
+
+@Threshold=-1 # restore
+
+##################################################
+# testScriptFirst
+@DistanceOption=SCRIPT_FIRST
+@debug
+
+ru, fr ; zh, pl ; fr
+ru, fr ; zh-Cyrl, pl ; ru
+hr, en-Cyrl; sr ; en-Cyrl
+da, ru, hr; sr ; ru

@@ -1,0 +1,79 @@
+{
+    "acKind": "ImageManifest",
+    "acVersion": "0.8.10",
+    "name": "coreos.com/rkt-inspect",
+    "labels": [
+        {
+            "name": "version",
+            "value": "1.25.0"
+        },
+        {
+            "name": "arch",
+            "value": "amd64"
+        },
+        {
+            "name": "os",
+            "value": "linux"
+        }
+    ],
+    "app": {
+        "exec": [
+            "/inspect"
+        ],
+        "user": "0",
+        "group": "0",
+        "workingDirectory": "/",
+        "environment": [
+            {
+                "name": "VAR_FROM_MANIFEST",
+                "value": "manifest"
+            },
+            {
+                "name": "PATH",
+                "value": "/bin"
+            }
+        ],
+        "isolators": [
+            {
+                "name": "resource/memory",
+                "value": {
+                    "request": "25Mi",
+                    "limit": "25Mi"
+                }
+            },
+            {
+                "name": "resource/cpu",
+                "value": {
+                    "request": "50m",
+                    "limit": "800m"
+                }
+            }
+        ],
+        "mountPoints": [
+        ],
+        "ports": [
+        ]
+    },
+    "annotations": [
+        {
+            "name": "appc.io/docker/repository",
+            "value": "whatever"
+        },
+        {
+            "name": "coreos.com/rkt/stage1/run",
+            "value": "/ex/run"
+        },
+        {
+            "name": "coreos.com/rkt/stage1/enter",
+            "value": "/ex/enter"
+        },
+        {
+            "name": "coreos.com/rkt/stage1/gc",
+            "value": "/ex/gc"
+        },
+        {
+            "name": "appc.io/executor/supports-systemd-notify",
+            "value": "false"
+        }
+    ]
+}

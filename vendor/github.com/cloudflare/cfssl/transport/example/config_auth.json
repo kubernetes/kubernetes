@@ -1,0 +1,37 @@
+{
+    "auth_keys": {
+        "client": {
+            "type": "standard",
+            "key": "52abb3ac91971bb72bce17e7a289cd04476490b19e0d8eb7810dc42d4ac16c41"
+        },
+        "server": {
+            "type": "standard",
+            "key": "4f4f26686209f672e0ec7b19cbbc8b6d94fdd12cc0b20326f9005d5f234e6e3e"
+        }
+    },
+    "signing": {
+        "default": {
+            "expiry": "168h"
+        },
+        "profiles": {
+            "client": {
+                "auth_key": "client",
+                "expiry": "1h",
+                "usages": [
+                    "signing",
+                    "key encipherment",
+                    "client auth"
+                ]
+            },
+            "server": {
+                "auth_key": "server",
+                "expiry": "8760h",
+                "usages": [
+                    "signing",
+                    "key encipherment",
+                    "server auth"
+                ]
+            }
+        }
+    }
+}

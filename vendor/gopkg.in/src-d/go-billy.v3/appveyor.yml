@@ -1,0 +1,15 @@
+version: "{build}"
+platform: x64
+
+clone_folder: c:\gopath\src\gopkg.in\src-d\go-billy.v3
+
+environment:
+  GOPATH: c:\gopath
+
+install:
+  - set PATH=%GOPATH%\bin;c:\go\bin;%PATH%
+  - go version
+  - go get -v -t ./...
+
+build_script:
+  - go test -v ./...

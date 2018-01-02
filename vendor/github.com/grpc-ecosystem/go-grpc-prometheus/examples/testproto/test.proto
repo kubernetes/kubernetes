@@ -1,0 +1,28 @@
+syntax = "proto3";
+
+package mwitkow.testproto;
+
+
+message Empty {
+}
+
+message PingRequest {
+  string value = 1;
+  int32 sleep_time_ms = 2;
+  uint32 error_code_returned = 3;
+}
+
+message PingResponse {
+  string Value = 1;
+  int32 counter = 2;
+}
+
+service TestService {
+  rpc PingEmpty(Empty) returns (PingResponse) {}
+
+  rpc Ping(PingRequest) returns (PingResponse) {}
+
+  rpc PingError(PingRequest) returns (Empty) {}
+
+  rpc PingList(PingRequest) returns (stream PingResponse) {}
+}

@@ -1,0 +1,16 @@
+{
+  "pagination": {
+    "ListEventSourceMappings": {
+      "input_token": "Marker",
+      "limit_key": "MaxItems",
+      "output_token": "NextMarker",
+      "result_key": "EventSourceMappings"
+    },
+    "ListFunctions": {
+      "input_token": "Marker",
+      "limit_key": "MaxItems",
+      "output_token": "NextMarker",
+      "result_key": "Functions"
+    }
+  }
+}

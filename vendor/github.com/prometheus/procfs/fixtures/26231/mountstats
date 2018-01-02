@@ -1,0 +1,19 @@
+device rootfs mounted on / with fstype rootfs
+device sysfs mounted on /sys with fstype sysfs
+device proc mounted on /proc with fstype proc
+device /dev/sda1 mounted on / with fstype ext4
+device 192.168.1.1:/srv/test mounted on /mnt/nfs/test with fstype nfs4 statvers=1.1
+	opts:	rw,vers=4.0,rsize=1048576,wsize=1048576,namlen=255,acregmin=3,acregmax=60,acdirmin=30,acdirmax=60,hard,proto=tcp,port=0,timeo=600,retrans=2,sec=sys,clientaddr=192.168.1.5,local_lock=none
+	age:	13968
+	caps:	caps=0xfff7,wtmult=512,dtsize=32768,bsize=0,namlen=255
+	nfsv4:	bm0=0xfdffafff,bm1=0xf9be3e,bm2=0x0,acl=0x0,pnfs=not configured
+	sec:	flavor=1,pseudoflavor=1
+	events:	52 226 0 0 1 13 398 0 0 331 0 47 0 0 77 0 0 77 0 0 0 0 0 0 0 0 0
+	bytes:	1207640230 0 0 0 1210214218 0 295483 0
+	RPC iostats version: 1.0  p/v: 100003/4 (nfs)
+	xprt:	tcp 832 0 1 0 11 6428 6428 0 12154 0 24 26 5726
+	per-op statistics
+	        NULL: 0 0 0 0 0 0 0 0
+	        READ: 1298 1298 0 207680 1210292152 6 79386 79407
+	       WRITE: 0 0 0 0 0 0 0 0
+

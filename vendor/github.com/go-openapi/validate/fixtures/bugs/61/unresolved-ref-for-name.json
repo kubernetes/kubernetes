@@ -1,0 +1,47 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "version": "0.0.1",
+    "title": "test of Swagger global parameters"
+  },
+  "parameters": {
+    "userId": {
+      "name": "userId",
+      "in": "path",
+      "type": "string",
+      "required": true
+    }
+  },
+  "paths": {
+    "/foo": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Successful"
+          }
+        }
+      }
+    },
+    "/bar": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Successful"
+          }
+        }
+      }
+    },
+    "/users/{userId}": {
+      "parameters": [{
+        "$ref": "#/parameters/userId"
+      }],
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Successful"
+          }
+        }
+      }
+    }
+  }
+}

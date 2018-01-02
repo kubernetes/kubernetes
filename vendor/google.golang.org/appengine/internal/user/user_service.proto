@@ -1,0 +1,58 @@
+syntax = "proto2";
+option go_package = "user";
+
+package appengine;
+
+message UserServiceError {
+  enum ErrorCode {
+    OK = 0;
+    REDIRECT_URL_TOO_LONG = 1;
+    NOT_ALLOWED = 2;
+    OAUTH_INVALID_TOKEN = 3;
+    OAUTH_INVALID_REQUEST = 4;
+    OAUTH_ERROR = 5;
+  }
+}
+
+message CreateLoginURLRequest {
+  required string destination_url = 1;
+  optional string auth_domain = 2;
+  optional string federated_identity = 3 [default = ""];
+}
+
+message CreateLoginURLResponse {
+  required string login_url = 1;
+}
+
+message CreateLogoutURLRequest {
+  required string destination_url = 1;
+  optional string auth_domain = 2;
+}
+
+message CreateLogoutURLResponse {
+  required string logout_url = 1;
+}
+
+message GetOAuthUserRequest {
+  optional string scope = 1;
+
+  repeated string scopes = 2;
+}
+
+message GetOAuthUserResponse {
+  required string email = 1;
+  required string user_id = 2;
+  required string auth_domain = 3;
+  optional string user_organization = 4 [default = ""];
+  optional bool is_admin = 5 [default = false];
+  optional string client_id = 6 [default = ""];
+
+  repeated string scopes = 7;
+}
+
+message CheckOAuthSignatureRequest {
+}
+
+message CheckOAuthSignatureResponse {
+  required string oauth_consumer_key = 1;
+}

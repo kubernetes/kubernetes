@@ -1,0 +1,92 @@
+syntax = "proto3";
+
+package containerd.services.namespaces.v1;
+
+import "gogoproto/gogo.proto";
+import "google/protobuf/empty.proto";
+import "google/protobuf/field_mask.proto";
+
+option go_package = "github.com/containerd/containerd/api/services/namespaces/v1;namespaces";
+
+// Namespaces provides the ability to manipulate containerd namespaces.
+//
+// All objects in the system are required to be a member of a namespace. If a
+// namespace is deleted, all objects, including containers, images and
+// snapshots, will be deleted, as well.
+//
+// Unless otherwise noted, operations in containerd apply only to the namespace
+// supplied per request.
+//
+// I hope this goes without saying, but namespaces are themselves NOT
+// namespaced.
+service Namespaces {
+	rpc Get(GetNamespaceRequest) returns (GetNamespaceResponse);
+	rpc List(ListNamespacesRequest) returns (ListNamespacesResponse);
+	rpc Create(CreateNamespaceRequest) returns (CreateNamespaceResponse);
+	rpc Update(UpdateNamespaceRequest) returns (UpdateNamespaceResponse);
+	rpc Delete(DeleteNamespaceRequest) returns (google.protobuf.Empty);
+}
+
+message Namespace {
+	string name = 1;
+
+	// Labels provides an area to include arbitrary data on namespaces.
+	//
+	// The combined size of a key/value pair cannot exceed 4096 bytes.
+	//
+	// Note that to add a new value to this field, read the existing set and
+	// include the entire result in the update call.
+	map<string, string> labels  = 2;
+}
+
+message GetNamespaceRequest {
+	string name = 1;
+}
+
+message GetNamespaceResponse {
+	Namespace namespace = 1 [(gogoproto.nullable) = false];
+}
+
+message ListNamespacesRequest {
+	string filter = 1;
+}
+
+message ListNamespacesResponse {
+	repeated Namespace namespaces = 1 [(gogoproto.nullable) = false];
+}
+
+message CreateNamespaceRequest {
+	Namespace namespace = 1 [(gogoproto.nullable) = false];
+}
+
+message CreateNamespaceResponse {
+	Namespace namespace = 1 [(gogoproto.nullable) = false];
+}
+
+// UpdateNamespaceRequest updates the metadata for a namespace.
+//
+// The operation should follow semantics described in
+// https://developers.google.com/protocol-buffers/docs/reference/csharp/class/google/protobuf/well-known-types/field-mask,
+// unless otherwise qualified.
+message UpdateNamespaceRequest {
+	// Namespace provides the target value, as declared by the mask, for the update.
+	//
+	// The namespace field must be set.
+	Namespace namespace = 1 [(gogoproto.nullable) = false];
+
+	// UpdateMask specifies which fields to perform the update on. If empty,
+	// the operation applies to all fields.
+	//
+	// For the most part, this applies only to selectively updating labels on
+	// the namespace. While field masks are typically limited to ascii alphas
+	// and digits, we just take everything after the "labels." as the map key.
+	google.protobuf.FieldMask update_mask = 2;
+}
+
+message UpdateNamespaceResponse {
+	Namespace namespace = 1 [(gogoproto.nullable) = false];
+}
+
+message DeleteNamespaceRequest {
+	string name = 1;
+}

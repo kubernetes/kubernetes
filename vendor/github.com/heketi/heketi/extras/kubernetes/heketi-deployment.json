@@ -1,0 +1,142 @@
+{
+  "kind": "List",
+  "apiVersion": "v1",
+  "items": [
+    {
+      "kind": "Secret",
+      "apiVersion": "v1",
+      "metadata": {
+        "name": "heketi-db-backup",
+        "labels": {
+          "glusterfs": "heketi-db",
+          "heketi": "db"
+        }
+      },
+      "data": {
+        "heketi.db": ""
+      },
+      "type": "Opaque"
+    },
+    {
+      "kind": "Service",
+      "apiVersion": "v1",
+      "metadata": {
+        "name": "heketi",
+        "labels": {
+          "glusterfs": "heketi-service",
+          "deploy-heketi": "support"
+        },
+        "annotations": {
+          "description": "Exposes Heketi Service"
+        }
+      },
+      "spec": {
+        "selector": {
+          "name": "heketi"
+        },
+        "ports": [
+          {
+            "name": "heketi",
+            "port": 8080,
+            "targetPort": 8080
+          }
+        ]
+      }
+    },
+    {
+      "kind": "Deployment",
+      "apiVersion": "extensions/v1beta1",
+      "metadata": {
+        "name": "heketi",
+        "labels": {
+          "glusterfs": "heketi-deployment"
+        },
+        "annotations": {
+          "description": "Defines how to deploy Heketi"
+        }
+      },
+      "spec": {
+        "replicas": 1,
+        "template": {
+          "metadata": {
+            "name": "heketi",
+            "labels": {
+              "name": "heketi",
+              "glusterfs": "heketi-pod"
+            }
+          },
+          "spec": {
+            "serviceAccountName": "heketi-service-account",
+            "containers": [
+              {
+                "image": "heketi/heketi:dev",
+                "imagePullPolicy": "Always",
+                "name": "heketi",
+                "env": [
+                  {
+                    "name": "HEKETI_EXECUTOR",
+                    "value": "kubernetes"
+                  },
+                  {
+                    "name": "HEKETI_FSTAB",
+                    "value": "/var/lib/heketi/fstab"
+                  },
+                  {
+                    "name": "HEKETI_SNAPSHOT_LIMIT",
+                    "value": "14"
+                  },
+                  {
+                    "name": "HEKETI_KUBE_GLUSTER_DAEMONSET",
+                    "value": "y"
+                  }
+                ],
+                "ports": [
+                  {
+                    "containerPort": 8080
+                  }
+                ],
+                "volumeMounts": [
+                    {
+                      "mountPath": "/backupdb",
+                      "name": "heketi-db-secret"
+                    },
+                  {
+                    "name": "db",
+                    "mountPath": "/var/lib/heketi"
+                  }
+                ],
+                "readinessProbe": {
+                  "timeoutSeconds": 3,
+                  "initialDelaySeconds": 3,
+                  "httpGet": {
+                    "path": "/hello",
+                    "port": 8080
+                  }
+                },
+                "livenessProbe": {
+                  "timeoutSeconds": 3,
+                  "initialDelaySeconds": 30,
+                  "httpGet": {
+                    "path": "/hello",
+                    "port": 8080
+                  }
+                }
+              }
+            ],
+            "volumes": [
+              {
+                "name": "db"
+              },
+              {
+                "name": "heketi-db-secret",
+                "secret": {
+                  "secretName": "heketi-db-backup"
+                }
+              }
+            ]
+          }
+        }
+      }
+    }
+  ]
+}

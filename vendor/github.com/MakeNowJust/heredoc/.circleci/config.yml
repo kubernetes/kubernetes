@@ -1,0 +1,13 @@
+version: 2.0
+
+jobs:
+  build:
+    docker:
+      - image: golang:1.8.3
+
+    working_directory: /go/src/github.com/MakeNowJust/heredoc
+    steps:
+      - checkout
+      - run:
+          command: |
+            go test -v

@@ -1,0 +1,127 @@
+// Copyright 2017 Google Inc. All Rights Reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+// Service code
+
+import Kitura
+import KituraNet
+import Foundation
+
+// A server requires an instance of an implementation of this protocol.
+public protocol Service {
+//-{% for serviceMethod in renderer.methods %}
+  // {{ serviceMethod.description }}
+  func {{ serviceMethod.name }} ({{ serviceMethod|protocolParametersDeclaration }}) throws {{ serviceMethod|protocolReturnDeclaration }}
+//-{% endfor %}
+}
+
+func intValue(_ s:String?) -> Int64 {
+  guard let s = s else {
+    return 0
+  }
+  guard let value = Int64(s) else {
+    return 0
+  }
+  return value
+}
+
+public func server(service : Service) -> Router {
+  // Create a new router
+  let router = Router()
+
+//-{% for serviceMethod in renderer.methods %}
+  // {{ serviceMethod.description }}
+  router.{{ serviceMethod.method|lowercase }}("{{ serviceMethod|kituraPath }}") { req, res, next in      
+      //-{% if serviceMethod|hasParameters %}
+      // instantiate the parameters structure
+      let parameters = {{ serviceMethod.parametersTypeName }}()
+      //-{% for serviceTypeField in serviceMethod|parametersTypeFields %}
+      //-{% if serviceTypeField.position == "path" %}
+      parameters.{{ serviceTypeField.name }} = intValue(req.parameters["{{ serviceTypeField.name }}"])
+      //-{% endif %}
+      //-{% endfor %}     
+      //-{% if serviceMethod.method == "POST" %}
+      // deserialize request from post data
+      let bodyString = try req.readString() ?? ""
+      guard let bodyData = bodyString.data(using:.utf8) else {
+        try res.send(status:.badRequest).end()
+        return
+      }
+      var jsonObject : Any? = nil
+      do {
+        jsonObject = try JSONSerialization.jsonObject(with:bodyData)
+      } catch {
+        try res.send(status:.badRequest).end()
+        return
+      }
+      guard let bodyObject = {{ serviceMethod.resultTypeName }}(jsonObject:jsonObject) else {
+        try res.send(status:.badRequest).end()
+        return
+      }
+      parameters.{{ serviceMethod|bodyParameterFieldName }} = bodyObject
+      //-{% endif %}
+      //-{% endif %}
+      //-{% if serviceMethod|hasParameters %}
+      //-{% if serviceMethod|hasResponses %}
+      let responses = try service.{{ serviceMethod.name }}(parameters)
+      //-{% else %}
+      try service.{{ serviceMethod.name }}(parameters)
+      //-{% endif %}
+      //-{% else %}
+      //-{% if serviceMethod|hasResponses %}
+      let responses = try service.{{ serviceMethod.name }}()
+      //-{% else %}
+      try service.{{ serviceMethod.name }}()
+      //-{% endif %}
+      //-{% endif %}
+      //-{% if serviceMethod|hasResponses %}
+        //-{% if serviceMethod|responsesHasFieldNamedOK %}            
+        if let ok = responses.ok {
+          let jsonObject = ok.jsonObject()
+          let responseData = try JSONSerialization.data(withJSONObject:jsonObject)
+          try res.send(data:responseData).end() 
+          return                          
+        } 
+        //-{% endif %}
+        //-{% if serviceMethod|responsesHasFieldNamedError %}               
+        if let errorResponse = responses.error {
+          guard let statusCode = HTTPStatusCode(rawValue:Int(errorResponse.code)) else {
+            try res.send(status:.unknown).end()
+            return
+          }
+          try res.send(status:statusCode).end()
+          return               
+        }
+        //-{% endif %}
+        try res.send(status:.internalServerError).end()
+      //-{% else %}
+      try res.send(status:.OK).end()
+      //-{% endif %}
+  }
+
+//-{% endfor %}
+  return router
+}
+
+public func initialize(service: Service, port:Int) {
+  // Create a new router
+  let router = server(service:service)
+  // Add an HTTP server and connect it to the router
+  Kitura.addHTTPServer(onPort:port, with: router)
+}
+
+public func run() {
+  // Start the Kitura runloop (this call never returns)
+  Kitura.run()
+}

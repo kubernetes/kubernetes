@@ -1,0 +1,197 @@
+---
+swagger: '2.0'
+info:
+  version: 0.1.0
+  title: 'AttendList'
+  description: |
+    AttendList service.
+  contact:
+    name: API Support
+    url: http://attendlist.co/support
+    email: contact@evecon.co
+consumes:
+  - application/json
+produces:
+  - application/json
+definitions:
+  Service:
+    description: Service information
+    type: object
+    properties:
+      Name:
+        type: string
+        readOnly: true
+      Build:
+        type: string
+        readOnly: true
+  Versions:
+    description: Representation of Version information
+    type: object
+    properties:
+      Id:
+        type: integer
+        format: int64
+        readOnly: true
+      Version:
+        type: integer
+        format: int64
+        readOnly: true
+      Created:
+        type: integer
+        format: int64
+        readOnly: true
+      Updated:
+        type: integer
+        format: int64
+        readOnly: true
+      Deleted:
+        type: boolean
+        readOnly: true
+  Dates:
+    description: Representation of Date interval
+    type: object
+    properties:
+      StartDate:
+        type: string
+        format: date-time
+      EndDate:
+        type: string
+        format: date-time
+  Location:
+    description: Representation of lat-lon Location
+    type: object
+    properties:
+      Latitude:
+        type: number
+        format: float
+      Longitude:
+        type: number
+        format: float
+  Event:
+    description: Representation of an Event
+    allOf:
+    - $ref: '#/definitions/Versions'
+    - $ref: '#/definitions/Dates'
+    - $ref: '#/definitions/Location'
+    - type: object
+      properties:
+        Name:
+          type: string
+        URL:
+          type: string
+        Notes:
+          type: string
+        Autosearch:
+          type: boolean
+    example:
+      StartDate: "2015-11-01T12:00:00Z"
+      EndDate: "2015-11-05T12:00:00Z"
+      Latitude: 59.842609
+      Longitude: 30.319087
+      Name: "Bikers meeting"
+      URL: "http://attendlist.co"
+      Notes: "Yet another bikers meeting"
+      Autosearch: false
+paths:
+  /services:
+    get:
+      description: Get services information.
+      tags:
+      - services
+      operationId: getServices
+      responses:
+        '200':
+          description: Successful response
+          schema:
+            title: ArrayOfServices
+            type: array
+            items:
+              $ref: '#/definitions/Service'
+        default:
+          description: Generic Error
+  /events:
+    get:
+      description: Get events.
+      tags:
+      - events
+      operationId: getEvents
+      responses:
+        '200':
+          description: Successful response
+          schema:
+            title: ArrayOfEvents
+            type: array
+            items:
+              $ref: '#/definitions/Event'
+        default:
+          description: Generic Error
+    post:
+      description: Create new event.
+      tags:
+      - events
+      operationId: postEvent
+      parameters:
+        - name: Event
+          in: body
+          description: New events
+          required: true
+          schema:
+            $ref: '#/definitions/Event'
+      responses:
+        '201':
+          description: |
+            Successful response.
+          headers:
+            'Location':
+              description: Contains link to the new Event resource
+              type: string
+        default:
+          description: Generic Error
+  /events/{id}:
+    parameters:
+      - name: id
+        in: path
+        description: Existing event id.
+        required: true
+        type: integer
+        format: int64
+    get:
+      description: Get event by id.
+      tags:
+      - events
+      operationId: getEventById
+      responses:
+        '200':
+          description: Successful response
+          schema:
+            title: Newly created event
+            $ref: '#/definitions/Event'
+        default:
+          description: Generic Error
+    put:
+      description: Update existing event.
+      tags:
+      - events
+      operationId: putEventById
+      parameters:
+        - name: Event
+          in: body
+          description: Existing event
+          required: true
+          schema:
+            $ref: '#/definitions/Event'
+      responses:
+        '204':
+          description: Successful response
+        default:
+          description: Generic Error
+    delete:
+      description: Delete event by id.
+      tags:
+      - events
+      operationId: deleteEventById
+      responses:
+        '204':
+          description: Successful response
+        default:
+          description: Generic Error

@@ -1,0 +1,350 @@
+{
+  "version": "2.0",
+  "service": "<p>Amazon Polly is a web service that makes it easy to synthesize speech from text.</p> <p>The Amazon Polly service provides API operations for synthesizing high-quality speech from plain text and Speech Synthesis Markup Language (SSML), along with managing pronunciations lexicons that enable you to get the best results for your application domain.</p>",
+  "operations": {
+    "DeleteLexicon": "<p>Deletes the specified pronunciation lexicon stored in an AWS Region. A lexicon which has been deleted is not available for speech synthesis, nor is it possible to retrieve it using either the <code>GetLexicon</code> or <code>ListLexicon</code> APIs.</p> <p>For more information, see <a href=\"http://docs.aws.amazon.com/polly/latest/dg/managing-lexicons.html\">Managing Lexicons</a>.</p>",
+    "DescribeVoices": "<p>Returns the list of voices that are available for use when requesting speech synthesis. Each voice speaks a specified language, is either male or female, and is identified by an ID, which is the ASCII version of the voice name. </p> <p>When synthesizing speech ( <code>SynthesizeSpeech</code> ), you provide the voice ID for the voice you want from the list of voices returned by <code>DescribeVoices</code>.</p> <p>For example, you want your news reader application to read news in a specific language, but giving a user the option to choose the voice. Using the <code>DescribeVoices</code> operation you can provide the user with a list of available voices to select from.</p> <p> You can optionally specify a language code to filter the available voices. For example, if you specify <code>en-US</code>, the operation returns a list of all available US English voices. </p> <p>This operation requires permissions to perform the <code>polly:DescribeVoices</code> action.</p>",
+    "GetLexicon": "<p>Returns the content of the specified pronunciation lexicon stored in an AWS Region. For more information, see <a href=\"http://docs.aws.amazon.com/polly/latest/dg/managing-lexicons.html\">Managing Lexicons</a>.</p>",
+    "ListLexicons": "<p>Returns a list of pronunciation lexicons stored in an AWS Region. For more information, see <a href=\"http://docs.aws.amazon.com/polly/latest/dg/managing-lexicons.html\">Managing Lexicons</a>.</p>",
+    "PutLexicon": "<p>Stores a pronunciation lexicon in an AWS Region. If a lexicon with the same name already exists in the region, it is overwritten by the new lexicon. Lexicon operations have eventual consistency, therefore, it might take some time before the lexicon is available to the SynthesizeSpeech operation.</p> <p>For more information, see <a href=\"http://docs.aws.amazon.com/polly/latest/dg/managing-lexicons.html\">Managing Lexicons</a>.</p>",
+    "SynthesizeSpeech": "<p>Synthesizes UTF-8 input, plain text or SSML, to a stream of bytes. SSML input must be valid, well-formed SSML. Some alphabets might not be available with all the voices (for example, Cyrillic might not be read at all by English voices) unless phoneme mapping is used. For more information, see <a href=\"http://docs.aws.amazon.com/polly/latest/dg/how-text-to-speech-works.html\">How it Works</a>.</p>"
+  },
+  "shapes": {
+    "Alphabet": {
+      "base": null,
+      "refs": {
+        "LexiconAttributes$Alphabet": "<p>Phonetic alphabet used in the lexicon. Valid values are <code>ipa</code> and <code>x-sampa</code>.</p>"
+      }
+    },
+    "AudioStream": {
+      "base": null,
+      "refs": {
+        "SynthesizeSpeechOutput$AudioStream": "<p> Stream containing the synthesized speech. </p>"
+      }
+    },
+    "ContentType": {
+      "base": null,
+      "refs": {
+        "SynthesizeSpeechOutput$ContentType": "<p> Specifies the type audio stream. This should reflect the <code>OutputFormat</code> parameter in your request. </p> <ul> <li> <p> If you request <code>mp3</code> as the <code>OutputFormat</code>, the <code>ContentType</code> returned is audio/mpeg. </p> </li> <li> <p> If you request <code>ogg_vorbis</code> as the <code>OutputFormat</code>, the <code>ContentType</code> returned is audio/ogg. </p> </li> <li> <p> If you request <code>pcm</code> as the <code>OutputFormat</code>, the <code>ContentType</code> returned is audio/pcm in a signed 16-bit, 1 channel (mono), little-endian format. </p> </li> <li> <p>If you request <code>json</code> as the <code>OutputFormat</code>, the <code>ContentType</code> returned is audio/json.</p> </li> </ul> <p> </p>"
+      }
+    },
+    "DeleteLexiconInput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteLexiconOutput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeVoicesInput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeVoicesOutput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ErrorMessage": {
+      "base": null,
+      "refs": {
+        "InvalidLexiconException$message": null,
+        "InvalidNextTokenException$message": null,
+        "InvalidSampleRateException$message": null,
+        "InvalidSsmlException$message": null,
+        "LexiconNotFoundException$message": null,
+        "LexiconSizeExceededException$message": null,
+        "MarksNotSupportedForFormatException$message": null,
+        "MaxLexemeLengthExceededException$message": null,
+        "MaxLexiconsNumberExceededException$message": null,
+        "ServiceFailureException$message": null,
+        "SsmlMarksNotSupportedForTextTypeException$message": null,
+        "TextLengthExceededException$message": null,
+        "UnsupportedPlsAlphabetException$message": null,
+        "UnsupportedPlsLanguageException$message": null
+      }
+    },
+    "Gender": {
+      "base": null,
+      "refs": {
+        "Voice$Gender": "<p>Gender of the voice.</p>"
+      }
+    },
+    "GetLexiconInput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetLexiconOutput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "InvalidLexiconException": {
+      "base": "<p>Amazon Polly can't find the specified lexicon. Verify that the lexicon's name is spelled correctly, and then try again.</p>",
+      "refs": {
+      }
+    },
+    "InvalidNextTokenException": {
+      "base": "<p>The NextToken is invalid. Verify that it's spelled correctly, and then try again.</p>",
+      "refs": {
+      }
+    },
+    "InvalidSampleRateException": {
+      "base": "<p>The specified sample rate is not valid.</p>",
+      "refs": {
+      }
+    },
+    "InvalidSsmlException": {
+      "base": "<p>The SSML you provided is invalid. Verify the SSML syntax, spelling of tags and values, and then try again.</p>",
+      "refs": {
+      }
+    },
+    "LanguageCode": {
+      "base": null,
+      "refs": {
+        "DescribeVoicesInput$LanguageCode": "<p> The language identification tag (ISO 639 code for the language name-ISO 3166 country code) for filtering the list of voices returned. If you don't specify this optional parameter, all available voices are returned. </p>",
+        "LexiconAttributes$LanguageCode": "<p>Language code that the lexicon applies to. A lexicon with a language code such as \"en\" would be applied to all English languages (en-GB, en-US, en-AUS, en-WLS, and so on.</p>",
+        "Voice$LanguageCode": "<p>Language code of the voice.</p>"
+      }
+    },
+    "LanguageName": {
+      "base": null,
+      "refs": {
+        "Voice$LanguageName": "<p>Human readable name of the language in English.</p>"
+      }
+    },
+    "LastModified": {
+      "base": null,
+      "refs": {
+        "LexiconAttributes$LastModified": "<p>Date lexicon was last modified (a timestamp value).</p>"
+      }
+    },
+    "LexemesCount": {
+      "base": null,
+      "refs": {
+        "LexiconAttributes$LexemesCount": "<p>Number of lexemes in the lexicon.</p>"
+      }
+    },
+    "Lexicon": {
+      "base": "<p>Provides lexicon name and lexicon content in string format. For more information, see <a href=\"https://www.w3.org/TR/pronunciation-lexicon/\">Pronunciation Lexicon Specification (PLS) Version 1.0</a>.</p>",
+      "refs": {
+        "GetLexiconOutput$Lexicon": "<p>Lexicon object that provides name and the string content of the lexicon. </p>"
+      }
+    },
+    "LexiconArn": {
+      "base": null,
+      "refs": {
+        "LexiconAttributes$LexiconArn": "<p>Amazon Resource Name (ARN) of the lexicon.</p>"
+      }
+    },
+    "LexiconAttributes": {
+      "base": "<p>Contains metadata describing the lexicon such as the number of lexemes, language code, and so on. For more information, see <a href=\"http://docs.aws.amazon.com/polly/latest/dg/managing-lexicons.html\">Managing Lexicons</a>.</p>",
+      "refs": {
+        "GetLexiconOutput$LexiconAttributes": "<p>Metadata of the lexicon, including phonetic alphabetic used, language code, lexicon ARN, number of lexemes defined in the lexicon, and size of lexicon in bytes.</p>",
+        "LexiconDescription$Attributes": "<p>Provides lexicon metadata.</p>"
+      }
+    },
+    "LexiconContent": {
+      "base": null,
+      "refs": {
+        "Lexicon$Content": "<p>Lexicon content in string format. The content of a lexicon must be in PLS format.</p>",
+        "PutLexiconInput$Content": "<p>Content of the PLS lexicon as string data.</p>"
+      }
+    },
+    "LexiconDescription": {
+      "base": "<p>Describes the content of the lexicon.</p>",
+      "refs": {
+        "LexiconDescriptionList$member": null
+      }
+    },
+    "LexiconDescriptionList": {
+      "base": null,
+      "refs": {
+        "ListLexiconsOutput$Lexicons": "<p>A list of lexicon names and attributes.</p>"
+      }
+    },
+    "LexiconName": {
+      "base": null,
+      "refs": {
+        "DeleteLexiconInput$Name": "<p>The name of the lexicon to delete. Must be an existing lexicon in the region.</p>",
+        "GetLexiconInput$Name": "<p>Name of the lexicon.</p>",
+        "Lexicon$Name": "<p>Name of the lexicon.</p>",
+        "LexiconDescription$Name": "<p>Name of the lexicon.</p>",
+        "LexiconNameList$member": null,
+        "PutLexiconInput$Name": "<p>Name of the lexicon. The name must follow the regular express format [0-9A-Za-z]{1,20}. That is, the name is a case-sensitive alphanumeric string up to 20 characters long. </p>"
+      }
+    },
+    "LexiconNameList": {
+      "base": null,
+      "refs": {
+        "SynthesizeSpeechInput$LexiconNames": "<p>List of one or more pronunciation lexicon names you want the service to apply during synthesis. Lexicons are applied only if the language of the lexicon is the same as the language of the voice. For information about storing lexicons, see <a href=\"http://docs.aws.amazon.com/polly/latest/dg/API_PutLexicon.html\">PutLexicon</a>.</p>"
+      }
+    },
+    "LexiconNotFoundException": {
+      "base": "<p>Amazon Polly can't find the specified lexicon. This could be caused by a lexicon that is missing, its name is misspelled or specifying a lexicon that is in a different region.</p> <p>Verify that the lexicon exists, is in the region (see <a>ListLexicons</a>) and that you spelled its name is spelled correctly. Then try again.</p>",
+      "refs": {
+      }
+    },
+    "LexiconSizeExceededException": {
+      "base": "<p>The maximum size of the specified lexicon would be exceeded by this operation.</p>",
+      "refs": {
+      }
+    },
+    "ListLexiconsInput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListLexiconsOutput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "MarksNotSupportedForFormatException": {
+      "base": "<p>Speech marks are not supported for the <code>OutputFormat</code> selected. Speech marks are only available for content in <code>json</code> format.</p>",
+      "refs": {
+      }
+    },
+    "MaxLexemeLengthExceededException": {
+      "base": "<p>The maximum size of the lexeme would be exceeded by this operation.</p>",
+      "refs": {
+      }
+    },
+    "MaxLexiconsNumberExceededException": {
+      "base": "<p>The maximum number of lexicons would be exceeded by this operation.</p>",
+      "refs": {
+      }
+    },
+    "NextToken": {
+      "base": null,
+      "refs": {
+        "DescribeVoicesInput$NextToken": "<p>An opaque pagination token returned from the previous <code>DescribeVoices</code> operation. If present, this indicates where to continue the listing.</p>",
+        "DescribeVoicesOutput$NextToken": "<p>The pagination token to use in the next request to continue the listing of voices. <code>NextToken</code> is returned only if the response is truncated.</p>",
+        "ListLexiconsInput$NextToken": "<p>An opaque pagination token returned from previous <code>ListLexicons</code> operation. If present, indicates where to continue the list of lexicons.</p>",
+        "ListLexiconsOutput$NextToken": "<p>The pagination token to use in the next request to continue the listing of lexicons. <code>NextToken</code> is returned only if the response is truncated.</p>"
+      }
+    },
+    "OutputFormat": {
+      "base": null,
+      "refs": {
+        "SynthesizeSpeechInput$OutputFormat": "<p> The format in which the returned output will be encoded. For audio stream, this will be mp3, ogg_vorbis, or pcm. For speech marks, this will be json. </p>"
+      }
+    },
+    "PutLexiconInput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "PutLexiconOutput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "RequestCharacters": {
+      "base": null,
+      "refs": {
+        "SynthesizeSpeechOutput$RequestCharacters": "<p>Number of characters synthesized.</p>"
+      }
+    },
+    "SampleRate": {
+      "base": null,
+      "refs": {
+        "SynthesizeSpeechInput$SampleRate": "<p> The audio frequency specified in Hz. </p> <p>The valid values for <code>mp3</code> and <code>ogg_vorbis</code> are \"8000\", \"16000\", and \"22050\". The default value is \"22050\". </p> <p> Valid values for <code>pcm</code> are \"8000\" and \"16000\" The default value is \"16000\". </p>"
+      }
+    },
+    "ServiceFailureException": {
+      "base": "<p>An unknown condition has caused a service failure.</p>",
+      "refs": {
+      }
+    },
+    "Size": {
+      "base": null,
+      "refs": {
+        "LexiconAttributes$Size": "<p>Total size of the lexicon, in characters.</p>"
+      }
+    },
+    "SpeechMarkType": {
+      "base": null,
+      "refs": {
+        "SpeechMarkTypeList$member": null
+      }
+    },
+    "SpeechMarkTypeList": {
+      "base": null,
+      "refs": {
+        "SynthesizeSpeechInput$SpeechMarkTypes": "<p>The type of speech marks returned for the input text.</p>"
+      }
+    },
+    "SsmlMarksNotSupportedForTextTypeException": {
+      "base": "<p>SSML speech marks are not supported for plain text-type input.</p>",
+      "refs": {
+      }
+    },
+    "SynthesizeSpeechInput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "SynthesizeSpeechOutput": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "Text": {
+      "base": null,
+      "refs": {
+        "SynthesizeSpeechInput$Text": "<p> Input text to synthesize. If you specify <code>ssml</code> as the <code>TextType</code>, follow the SSML format for the input text. </p>"
+      }
+    },
+    "TextLengthExceededException": {
+      "base": "<p>The value of the \"Text\" parameter is longer than the accepted limits. The limit for input text is a maximum of 3000 characters total, of which no more than 1500 can be billed characters. SSML tags are not counted as billed characters.</p>",
+      "refs": {
+      }
+    },
+    "TextType": {
+      "base": null,
+      "refs": {
+        "SynthesizeSpeechInput$TextType": "<p> Specifies whether the input text is plain text or SSML. The default value is plain text. For more information, see <a href=\"http://docs.aws.amazon.com/polly/latest/dg/ssml.html\">Using SSML</a>.</p>"
+      }
+    },
+    "UnsupportedPlsAlphabetException": {
+      "base": "<p>The alphabet specified by the lexicon is not a supported alphabet. Valid values are <code>x-sampa</code> and <code>ipa</code>.</p>",
+      "refs": {
+      }
+    },
+    "UnsupportedPlsLanguageException": {
+      "base": "<p>The language specified in the lexicon is unsupported. For a list of supported languages, see <a href=\"http://docs.aws.amazon.com/polly/latest/dg/API_LexiconAttributes.html\">Lexicon Attributes</a>.</p>",
+      "refs": {
+      }
+    },
+    "Voice": {
+      "base": "<p>Description of the voice.</p>",
+      "refs": {
+        "VoiceList$member": null
+      }
+    },
+    "VoiceId": {
+      "base": null,
+      "refs": {
+        "SynthesizeSpeechInput$VoiceId": "<p> Voice ID to use for the synthesis. You can get a list of available voice IDs by calling the <a href=\"http://docs.aws.amazon.com/polly/latest/dg/API_DescribeVoices.html\">DescribeVoices</a> operation. </p>",
+        "Voice$Id": "<p>Amazon Polly assigned voice ID. This is the ID that you specify when calling the <code>SynthesizeSpeech</code> operation.</p>"
+      }
+    },
+    "VoiceList": {
+      "base": null,
+      "refs": {
+        "DescribeVoicesOutput$Voices": "<p>A list of voices with their properties.</p>"
+      }
+    },
+    "VoiceName": {
+      "base": null,
+      "refs": {
+        "Voice$Name": "<p>Name of the voice (for example, Salli, Kendra, etc.). This provides a human readable voice name that you might display in your application.</p>"
+      }
+    }
+  }
+}

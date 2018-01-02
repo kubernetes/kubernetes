@@ -1,0 +1,31 @@
+---
+swagger: "2.0"
+info:
+  version: "0.1.0"
+  title: referenced validation invalid
+paths:
+  /:
+    get:
+      responses:
+        default:
+          description: the record
+
+parameters:
+  rateLimit:
+    name: X-Rate-Limit
+    in: header
+    type: integer
+    format: int32
+
+responses:
+  notFound:
+    description: Not found
+
+definitions:
+  record:
+    type: object
+    properties:
+      createdAt:
+        type: string
+        format: date-time
+

@@ -1,0 +1,75 @@
+// Protocol Buffers for Go with Gadgets
+//
+// Copyright (c) 2013, The GoGo Authors. All rights reserved.
+// http://github.com/gogo/protobuf
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are
+// met:
+//
+//     * Redistributions of source code must retain the above copyright
+// notice, this list of conditions and the following disclaimer.
+//     * Redistributions in binary form must reproduce the above
+// copyright notice, this list of conditions and the following disclaimer
+// in the documentation and/or other materials provided with the
+// distribution.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+syntax = "proto2";
+
+// Package enumcustomname tests the behavior of enum_customname and
+// enumvalue_customname extensions.
+package enumcustomname;
+
+import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+import "github.com/gogo/protobuf/test/thetest.proto";
+
+enum MyEnum {
+	option (gogoproto.enum_customname) = "MyCustomEnum";
+
+	// The following field will take on the custom name and the prefix, joined
+	// by an underscore.
+	A = 0 [(gogoproto.enumvalue_customname) = "MyBetterNameA"];
+	B = 1; // Should be MyCustomEnum_B
+}
+
+enum MyUnprefixedEnum {
+	option (gogoproto.goproto_enum_prefix) = false;
+	option (gogoproto.goproto_enum_stringer) = false; // ensure it behaves correctly without stringer.
+	option (gogoproto.enum_customname) = "MyCustomUnprefixedEnum"; // no prefix added but type gets name
+	UNPREFIXED_A = 0 [(gogoproto.enumvalue_customname) = "MyBetterNameUnprefixedA"];
+	UNPREFIXED_B = 1 ; // Should not pick up prefix above
+}
+
+enum MyEnumWithEnumStringer {
+	option (gogoproto.goproto_enum_stringer) = false; // ensure it behaves correctly without stringer.
+	option (gogoproto.enum_stringer) = true; // ensure it behaves correctly without stringer.
+	STRINGER_A = 0 [(gogoproto.enumvalue_customname) = "EnumValueStringerA"];
+	STRINGER_B = 1;
+}
+
+message OnlyEnums {
+	optional MyEnum my_enum = 1;
+	optional MyEnum my_enum_default_a = 2 [default=A];
+	optional MyEnum my_enum_default_b = 3 [default=B];
+	optional MyUnprefixedEnum my_unprefixed_enum = 4;
+	optional MyUnprefixedEnum my_unprefixed_enum_default_a = 5 [default=UNPREFIXED_A];
+	optional MyUnprefixedEnum my_unprefixed_enum_default_b = 6 [default=UNPREFIXED_B];
+	optional test.YetAnotherTestEnum yet_another_test_enum = 7;
+	optional test.YetAnotherTestEnum yet_another_test_enum_default_aa = 8 [default=AA];
+	optional test.YetAnotherTestEnum yet_another_test_enum_default_bb = 9 [default=BB];
+	optional test.YetYetAnotherTestEnum yet_yet_another_test_enum = 10;
+	optional test.YetYetAnotherTestEnum yet_yet_another_test_enum_default_cc = 11 [default=CC];
+	optional test.YetYetAnotherTestEnum yet_yet_another_test_enum_default_dd = 12 [default=DD];
+}

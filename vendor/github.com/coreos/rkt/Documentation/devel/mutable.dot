@@ -1,0 +1,32 @@
+digraph systemd {
+    node [fontname = "Arial", fillcolor="#CFE2F3", style="filled"];
+
+    {
+        notes [
+            shape="note",
+            label=<
+black = Requires<BR ALIGN="LEFT"/>
+dark grey = Wants<BR ALIGN="LEFT"/>
+red = Conflicts<BR ALIGN="LEFT"/>
+green = After<BR ALIGN="LEFT"/>
+blue = Before<BR ALIGN="LEFT"/>
+>
+        ]
+    }
+
+    "notes" [fillcolor="#FFE599"];
+
+    "default.target"->"systemd-journald.service" [color="green"];
+  	"default.target"->"supervisor-ready.service" [color="grey66"];
+  	"default.target"->"supervisor-ready.service" [color="blue"];
+  	"default.target"->"systemd-journald.service" [color="black"];
+  	"default.target"->"halt.target" [color="red"];
+
+    "systemd-journald.service"->"systemd-journald.socket" [color="green"];
+  	"systemd-journald.service"->"systemd-journald.socket" [color="black"];
+  	"systemd-journald.service"->"systemd-journald.socket" [color="grey66"];
+
+    "halt.target"->"default.target" [color="green"];
+  	"halt.target"->"shutdown.service" [color="green"];
+  	"halt.target"->"shutdown.service" [color="black"];
+}

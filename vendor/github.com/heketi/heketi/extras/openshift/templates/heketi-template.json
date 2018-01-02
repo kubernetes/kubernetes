@@ -1,0 +1,234 @@
+{
+  "kind": "Template",
+  "apiVersion": "v1",
+  "metadata": {
+    "name": "heketi",
+    "labels": {
+      "glusterfs": "heketi-template"
+    },
+    "annotations": {
+      "description": "Heketi service deployment template",
+      "tags": "glusterfs,heketi"
+    }
+  },
+  "labels": {
+    "template": "heketi"
+  },
+  "objects": [
+    {
+      "kind": "Service",
+      "apiVersion": "v1",
+      "metadata": {
+        "name": "heketi",
+        "labels": {
+          "glusterfs": "heketi-service"
+        },
+        "annotations": {
+          "description": "Exposes Heketi service"
+        }
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "heketi",
+            "port": 8080,
+            "targetPort": 8080
+          }
+        ],
+        "selector": {
+          "name": "heketi"
+        }
+      }
+    },
+    {
+      "kind": "Route",
+      "apiVersion": "v1",
+      "metadata": {
+        "name": "heketi",
+        "labels": {
+          "glusterfs": "heketi-route"
+        }
+      },
+      "spec": {
+        "to": {
+          "kind": "Service",
+          "name": "heketi"
+        }
+      }
+    },
+    {
+      "kind": "DeploymentConfig",
+      "apiVersion": "v1",
+      "metadata": {
+        "name": "heketi",
+        "labels": {
+          "glusterfs": "heketi-dc"
+        },
+        "annotations": {
+          "description": "Defines how to deploy Heketi"
+        }
+      },
+      "spec": {
+        "replicas": 1,
+        "selector": {
+          "name": "heketi"
+        },
+        "triggers": [
+          {
+            "type": "ConfigChange"
+          }
+        ],
+        "strategy": {
+          "type": "Recreate"
+        },
+        "template": {
+          "metadata": {
+            "name": "heketi",
+            "labels": {
+              "name": "heketi",
+              "glusterfs": "heketi-pod"
+            }
+          },
+          "spec": {
+            "containers": [
+              {
+                "name": "heketi",
+                "image": "heketi/heketi:dev",
+                "imagePullPolicy": "Always",
+                "env": [
+                  {
+                    "name": "HEKETI_USER_KEY",
+                    "value": "${HEKETI_USER_KEY}"
+                  },
+                  {
+                    "name": "HEKETI_ADMIN_KEY",
+                    "value": "${HEKETI_ADMIN_KEY}"
+                  },
+                  {
+                    "name": "HEKETI_EXECUTOR",
+                    "value": "kubernetes"
+                  },
+                  {
+                    "name": "HEKETI_FSTAB",
+                    "value": "/var/lib/heketi/fstab"
+                  },
+                  {
+                    "name": "HEKETI_SNAPSHOT_LIMIT",
+                    "value": "14"
+                  },
+                  {
+                    "name": "HEKETI_KUBE_CERTFILE",
+                    "value": "${HEKETI_KUBE_CERTFILE}"
+                  },
+                  {
+                    "name": "HEKETI_KUBE_INSECURE",
+                    "value": "${HEKETI_KUBE_INSECURE}"
+                  },
+                  {
+                    "name": "HEKETI_KUBE_USER",
+                    "value": "${HEKETI_KUBE_USER}"
+                  },
+                  {
+                    "name": "HEKETI_KUBE_PASSWORD",
+                    "value": "${HEKETI_KUBE_PASSWORD}"
+                  },
+                  {
+                    "name": "HEKETI_KUBE_NAMESPACE",
+                    "value": "${HEKETI_KUBE_NAMESPACE}"
+                  },
+                  {
+                    "name": "HEKETI_KUBE_APIHOST",
+                    "value": "${HEKETI_KUBE_APIHOST}"
+                  }
+                ],
+                "ports": [
+                  {
+                    "containerPort": 8080
+                  }
+                ],
+                "volumeMounts": [
+                  {
+                    "name": "db",
+                    "mountPath": "/var/lib/heketi"
+                  }
+                ],
+                "readinessProbe": {
+                  "timeoutSeconds": 3,
+                  "initialDelaySeconds": 3,
+                  "httpGet": {
+                    "path": "/hello",
+                    "port": 8080
+                  }
+                },
+                "livenessProbe": {
+                  "timeoutSeconds": 3,
+                  "initialDelaySeconds": 30,
+                  "httpGet": {
+                    "path": "/hello",
+                    "port": 8080
+                  }
+                }
+              }
+            ],
+            "volumes": [
+              {
+                "name": "db",
+                "glusterfs": {
+                  "endpoints" : "heketi-storage-endpoints",
+                  "path" : "heketidbstorage"
+                }
+              }
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "parameters": [
+    {
+      "name": "HEKETI_USER_KEY",
+      "displayName": "Heketi User Secret",
+      "description": "Set secret for those creating volumes as type _user_"
+    },
+    {
+      "name": "HEKETI_ADMIN_KEY",
+      "displayName": "Heketi Administrator Secret",
+      "description": "Set secret for administration of the Heketi service as user _admin_"
+    },
+    {
+      "name": "HEKETI_KUBE_CERTFILE",
+      "displayName": "Certificate file",
+      "description": "Container path to Kubernetes certificate file"
+    },
+    {
+      "name": "HEKETI_KUBE_INSECURE",
+      "displayName": "Insecure access",
+      "description": "Allow insecure SSL/HTTPS access",
+      "value": "n"
+    },
+    {
+      "name": "HEKETI_KUBE_USER",
+      "displayName": "User",
+      "description": "OpenShift/Kubernetes username to access Kubernetes API",
+      "required": true
+    },
+    {
+      "name": "HEKETI_KUBE_PASSWORD",
+      "displayName": "Password",
+      "description": "Password for OpenShift user",
+      "required": true
+    },
+    {
+      "name": "HEKETI_KUBE_NAMESPACE",
+      "displayName": "Project/Namespace",
+      "description": "OpenShift project or Kubernetes namespace containing GlusterFS",
+      "required": true
+    },
+    {
+      "name": "HEKETI_KUBE_APIHOST",
+      "displayName": "API Host Address",
+      "description": "Kubernetes API host, for example: https://ip:port",
+      "required": true
+    }
+  ]
+}

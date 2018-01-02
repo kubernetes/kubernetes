@@ -1,0 +1,11 @@
+This is a fork of the encoding/xml package at ca1d6c4, the last commit before
+https://go.googlesource.com/go/+/c0d6d33 "encoding/xml: restore Go 1.4 name
+space behavior" made late in the lead-up to the Go 1.5 release.
+
+The list of encoding/xml changes is at
+https://go.googlesource.com/go/+log/master/src/encoding/xml
+
+This fork is temporary, and I (nigeltao) expect to revert it after Go 1.6 is
+released.
+
+See http://golang.org/issue/11841

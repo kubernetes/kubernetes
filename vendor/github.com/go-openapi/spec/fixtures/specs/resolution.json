@@ -1,0 +1,14 @@
+{
+  "id": "http://localhost:1234",
+  "items": {
+    "id": "deeper/",
+    "items": {
+      "$ref": "stringProp.json"
+    }
+  },
+  "definitions": {
+    "bool": {
+      "$ref": "boolProp.json"
+    }
+  }
+}

@@ -1,0 +1,11 @@
+if [ -f /usr/bin/rkt ]; then
+    if [ -n "$(/usr/bin/rkt list --no-legend | awk '{print $4}' | grep running)" ]; then
+        printf "rkt/before-remove error: detected running containers.\n"
+        exit 1
+    fi
+    /usr/bin/rkt gc --grace-period=0s
+    if [ -n "$(grep "/var/lib/rkt" /proc/mounts)" ]; then
+        printf "rkt/before-remove error: detected active mounts in [/var/lib/rkt].\n"
+        exit 1
+    fi
+fi

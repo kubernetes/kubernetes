@@ -1,0 +1,2 @@
+definitions:
+  Pet: {properties: {name: {type: string}}, required: [name]}

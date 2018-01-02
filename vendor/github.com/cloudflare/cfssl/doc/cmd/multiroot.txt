@@ -1,0 +1,58 @@
+THE MULTIROOTCA PROGRAM
+
+The multirootca program is a authenticated-signer-only server that is
+intended to be used as a remote server for cfssl instances. The
+scenario it was originally intended for is
+
+    + running cfssl as a service on servers to generate keys
+    + using multirootca as a remote signer to manage the CA keys for
+      issuing certificates.
+
+The multirootca configuration file is an ini-style configuration file;
+an example is found in `cmd/multirootca/config/testdata/roots_whitelist.conf`.
+
+    [ primary ]
+    private = file://testdata/server.key
+    certificate = testdata/server.crt
+    config = testdata/config.json
+    nets = 10.0.2.1/24,172.16.3.1/24, 192.168.3.15/32
+     
+    [ backup ]
+    private = file://testdata/server.key
+    certificate = testdata/server.crt
+    config = testdata/config.json
+
+This defines two signers, labelled "primary" and "backup". These are
+both using the same key, but in practice these keys will be
+different. The private key format is described below. The certificate
+entry points the certificate PEM file on disk, and the config entry
+points to a cfssl configuration file to use for each signer; the
+format of this file is described in "cfssl.txt". Optionally, a nets
+entry points to a comma-separated list of networks that should be
+permitted access to the signer. This list forms a whitelist; if it's
+not present, all networks are whitelisted for that signer.
+
+SPECIFYING A PRIVATE KEY
+
+Key specification take the form of a URL. There are currently two
+supported types of keys:
+
+    + private key files: these are specified with the "file://"
+      protocol. The rest of the URL should specify a path on disk
+      where the key may be found.
+
+    + rofile: these are specified with the "rofile://" protocol. The
+      path should point to a file that is encrypted using Red October[1].
+      If this private key type is specified, the following entries must
+      also be provided:
+
+      + ro_server: the hostname:port of the Red October server
+      + ro_user: the username for the Red October server
+      + ro_pass: the password for the Red October server
+
+      Optionally:
+
+      + ro_ca: this can be used to specify a CA roots file to override
+        the system roots.
+      
+[1] https://github.com/cloudflare/redoctober

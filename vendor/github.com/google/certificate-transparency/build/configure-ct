@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+
+# Helper for gclient
+
+GMOCK=`pwd`/googlemock
+PATH=${INSTALL_DIR}/bin:$PATH
+
+set -e
+
+cd certificate-transparency
+if [ ! -f configure ]
+then
+  aclocal
+  ./autogen.sh
+fi
+if [ ! -f Makefile ]
+then
+  EXTRA_CXXFLAGS="-Wall -Werror ${SANITIZE}"
+  EXTRA_LDFLAGS="${SANITIZE}"
+  if [[ "${CXX}" = clang* ]]; then
+    export EXTRA_CXXFLAGS="${EXTRA_CXXFLAGS} -Qunused-arguments"
+  fi
+  # TODO(alcutter): Remove these once C++ code is cleaned up to remove causes
+  # of the warnings:
+  if [[ "${CXX}" =~ ^clang\+\+-3\.[67] ]] || [[ "${CXX}" =~ ^g\+\+-4\.[89] ]]; then
+    export EXTRA_CXXFLAGS="${EXTRA_CXXFLAGS} -Wno-unused-local-typedefs -Wno-error-unused -Wno-return-type"
+  fi
+  case `uname` in
+    Darwin)
+      EXTRA_LIBS="-lresolv"
+      ;;
+    FreeBSD)
+      EXTRA_LDFLAGS="${EXTRA_LDFLAGS} -L/usr/local/lib"
+      EXTRA_LIBS="-lunwind"
+      ;;
+    Linux)
+      EXTRA_LDFLAGS="${EXTRA_LDFLAGS} -Wl,-rpath=${INSTALL_DIR}/lib"
+      EXTRA_LIBS="-lunwind"
+      ;;
+  esac
+
+  ./configure GMOCK_DIR=${GMOCK} ${CONFIGURE_FLAGS} PROTOC=${INSTALL_DIR}/bin/protoc PKG_CONFIG_PATH="${INSTALL_DIR}/lib/pkgconfig" CPPFLAGS="-I${INSTALL_DIR}/include" CXXFLAGS="${CXXFLAGS} ${EXTRA_CXXFLAGS}" LDFLAGS="-L${INSTALL_DIR}/lib $EXTRA_LDFLAGS" LIBS="${EXTRA_LIBS}" INSTALL_DIR=${INSTALL_DIR} || tail -1000 config.log
+
+  ./config.status --config
+fi

@@ -1,4 +1,4 @@
-package client
+package client // import "github.com/influxdata/influxdb/client"
 
 import (
 	"bytes"

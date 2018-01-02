@@ -1,0 +1,30 @@
+hello | hello
+hello${hi}bye | hellobye
+ENV hi=hi
+hello${hi}bye | hellohibye
+ENV space=abc  def
+hello${space}bye | helloabc,defbye
+hello"${space}"bye | helloabc  defbye
+hello "${space}"bye | hello,abc  defbye
+ENV leading=  ab c
+hello${leading}def | hello,ab,cdef
+hello"${leading}" def | hello  ab c,def
+hello"${leading}" | hello  ab c
+hello${leading} | hello,ab,c
+# next line MUST have 3 trailing spaces, don't erase them!
+ENV trailing=ab c   
+hello${trailing} | helloab,c
+hello${trailing}d | helloab,c,d
+hello"${trailing}"d | helloab c   d
+# next line MUST have 3 trailing spaces, don't erase them!
+hel"lo${trailing}" | helloab c   
+hello" there  " | hello there  
+hello there     | hello,there
+hello\ there | hello there
+hello" there | error
+hello\" there | hello",there
+hello"\\there" | hello\there
+hello"\there" | hello\there
+hello'\\there' | hello\\there
+hello'\there' | hello\there
+hello'$there' | hello$there

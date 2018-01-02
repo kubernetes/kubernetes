@@ -1,0 +1,13 @@
+CREATE DATABASE stress
+
+GO INSERT cpu
+cpu,
+host=server-[int inc(0) 100000],location=us-west
+value=[int rand(100) 0]
+10000000 10s 
+
+GO QUERY cpu
+SELECT count(value) FROM cpu WHERE %t
+DO 250
+
+WAIT

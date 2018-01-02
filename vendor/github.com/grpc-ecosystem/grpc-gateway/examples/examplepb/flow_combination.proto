@@ -1,0 +1,168 @@
+syntax = "proto3";
+option go_package = "examplepb";
+package grpc.gateway.examples.examplepb;
+
+import "google/api/annotations.proto";
+
+message EmptyProto {}
+
+message NonEmptyProto {
+	string a = 1;
+	string b = 2;
+	string c = 3;
+}
+
+message UnaryProto {
+	string str = 1;
+}
+
+message NestedProto {
+	UnaryProto a = 1;
+	string b = 2;
+	string c = 3;
+}
+
+message SingleNestedProto {
+	UnaryProto a = 1;
+}
+
+service FlowCombination {
+	rpc RpcEmptyRpc(EmptyProto) returns (EmptyProto) {
+		option (google.api.http) = {
+			post: "/rpc/empty/rpc"
+		};
+	}
+	rpc RpcEmptyStream(EmptyProto) returns (stream EmptyProto) {
+		option (google.api.http) = {
+			post: "/rpc/empty/stream"
+		};
+	}
+	rpc StreamEmptyRpc(stream EmptyProto) returns (EmptyProto) {
+		option (google.api.http) = {
+			post: "/stream/empty/rpc"
+		};
+	}
+	rpc StreamEmptyStream(stream EmptyProto) returns (stream EmptyProto) {
+		option (google.api.http) = {
+			post: "/stream/empty/stream"
+		};
+	}
+
+	rpc RpcBodyRpc(NonEmptyProto) returns (EmptyProto) {
+		option (google.api.http) = {
+			// w/ body; w/o path; w/o query
+			post: "/rpc/body/rpc"
+			body: "*"
+
+			// w/o body; w/ path; w/o query
+			additional_bindings {
+				post: "/rpc/path/{a}/{b}/{c}/rpc"
+			}
+			// w/o body; w/o path; w/ query
+			additional_bindings {
+				post: "/rpc/query/rpc"
+			}
+			// w/ body; w/ path; w/o query
+			additional_bindings {
+				post: "/rpc/body/path/{a}/{b}/rpc"
+				body: "c"
+			}
+			// w/ body; w/o path; w/ query
+			additional_bindings {
+				post: "/rpc/body/query/rpc"
+				body: "c"
+			}
+			// w/ body; w/ path; w/ query
+			additional_bindings {
+				post: "/rpc/body/path/{a}/query/rpc"
+				body: "c"
+			}
+			// w/o body; w/ path; w/ query
+			additional_bindings {
+				post: "/rpc/path/{a}/query/rpc"
+			}
+		};
+	}
+	rpc RpcPathSingleNestedRpc(SingleNestedProto) returns (EmptyProto) {
+		option (google.api.http) = {
+			// w/o body; w/ path (IsNestedProto3); w/o query
+			post: "/rpc/path-nested/{a.str}/rpc"
+		};
+	}
+	rpc RpcPathNestedRpc(NestedProto) returns (EmptyProto) {
+		option (google.api.http) = {
+			// w/ body; w/ path (IsNestedProto3); w/o query
+			post: "/rpc/path-nested/{a.str}/{b}/rpc"
+			body: "c"
+
+			// w/o body; w/ path (IsNestedProto3); w/ query
+			additional_bindings {
+				post: "/rpc/path-nested/{a.str}/rpc"
+			}
+			// w/ body; w/ path (IsNestedProto3); w/ query
+			additional_bindings {
+				post: "/rpc/path-nested/{a.str}/rpc"
+				body: "c"
+			}
+		};
+	}
+
+	rpc RpcBodyStream(NonEmptyProto) returns (stream EmptyProto) {
+		option (google.api.http) = {
+			// w/ body; w/o path; w/o query
+			post: "/rpc/body/stream"
+			body: "*"
+
+			// w/o body; w/ path; w/o query
+			additional_bindings {
+				post: "/rpc/path/{a}/{b}/{c}/stream"
+			}
+			// w/o body; w/o path; w/ query
+			additional_bindings {
+				post: "/rpc/query/stream"
+			}
+			// w/ body; w/ path; w/o query
+			additional_bindings {
+				post: "/rpc/body/path/{a}/{b}/stream"
+				body: "c"
+			}
+			// w/ body; w/o path; w/ query
+			additional_bindings {
+				post: "/rpc/body/query/stream"
+				body: "c"
+			}
+			// w/ body; w/ path; w/ query
+			additional_bindings {
+				post: "/rpc/body/path/{a}/query/stream"
+				body: "c"
+			}
+			// w/o body; w/ path; w/ query
+			additional_bindings {
+				post: "/rpc/path/{a}/query/stream"
+			}
+		};
+	}
+	rpc RpcPathSingleNestedStream(SingleNestedProto) returns (stream EmptyProto) {
+		option (google.api.http) = {
+			// w/o body; w/ path (IsNestedProto3); w/o query
+			post: "/rpc/path-nested/{a.str}/stream"
+		};
+	}
+	rpc RpcPathNestedStream(NestedProto) returns (stream EmptyProto) {
+		option (google.api.http) = {
+			// w/ body; w/ path (IsNestedProto3); w/o query
+			post: "/rpc/path-nested/{a.str}/{b}/stream"
+			body: "c"
+
+			// w/o body; w/ path (IsNestedProto3); w/ query
+			additional_bindings {
+				post: "/rpc/path-nested/{a.str}/stream"
+			}
+			// w/ body; w/ path (IsNestedProto3); w/ query
+			additional_bindings {
+				post: "/rpc/path-nested/{a.str}/stream"
+				body: "c"
+			}
+		};
+	}
+}

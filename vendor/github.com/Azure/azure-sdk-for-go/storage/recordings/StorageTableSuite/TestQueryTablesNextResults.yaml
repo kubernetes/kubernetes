@@ -1,0 +1,345 @@
+---
+version: 1
+rwmutex: {}
+interactions:
+- request:
+    body: |
+      {"TableName":"table044storagetablesuitetestque"}
+    form: {}
+    headers:
+      Accept:
+      - application/json;odata=nometadata
+      Accept-Charset:
+      - UTF-8
+      Authorization:
+      - SharedKey golangrocksonazure:+tQ0CHBBr8KqtfNJZ9ipZgZ9CxD0Cuof10snosZI2GY=
+      Content-Length:
+      - "49"
+      Content-Type:
+      - application/json
+      Prefer:
+      - return-no-content
+      User-Agent:
+      - Go/go1.9beta1 (amd64-windows) azure-storage-go/10.0.2 api-version/2016-05-31
+        table
+      x-ms-date:
+      - Thu, 20 Jul 2017 23:34:12 GMT
+      x-ms-version:
+      - 2016-05-31
+    url: https://golangrocksonazure.table.core.windows.net/Tables?timeout=30
+    method: POST
+  response:
+    body: ""
+    headers:
+      Cache-Control:
+      - no-cache
+      Content-Length:
+      - "0"
+      Dataserviceid:
+      - https://golangrocksonazure.table.core.windows.net/Tables('table044storagetablesuitetestque')
+      Date:
+      - Thu, 20 Jul 2017 23:34:11 GMT
+      Location:
+      - https://golangrocksonazure.table.core.windows.net/Tables('table044storagetablesuitetestque')
+      Preference-Applied:
+      - return-no-content
+      Server:
+      - Windows-Azure-Table/1.0 Microsoft-HTTPAPI/2.0
+      X-Content-Type-Options:
+      - nosniff
+      X-Ms-Request-Id:
+      - 875b83b0-0002-0036-20b0-0102e5000000
+      X-Ms-Version:
+      - 2016-05-31
+    status: 204 No Content
+    code: 204
+- request:
+    body: |
+      {"TableName":"table144storagetablesuitetestque"}
+    form: {}
+    headers:
+      Accept:
+      - application/json;odata=nometadata
+      Accept-Charset:
+      - UTF-8
+      Authorization:
+      - SharedKey golangrocksonazure:+tQ0CHBBr8KqtfNJZ9ipZgZ9CxD0Cuof10snosZI2GY=
+      Content-Length:
+      - "49"
+      Content-Type:
+      - application/json
+      Prefer:
+      - return-no-content
+      User-Agent:
+      - Go/go1.9beta1 (amd64-windows) azure-storage-go/10.0.2 api-version/2016-05-31
+        table
+      x-ms-date:
+      - Thu, 20 Jul 2017 23:34:12 GMT
+      x-ms-version:
+      - 2016-05-31
+    url: https://golangrocksonazure.table.core.windows.net/Tables?timeout=30
+    method: POST
+  response:
+    body: ""
+    headers:
+      Cache-Control:
+      - no-cache
+      Content-Length:
+      - "0"
+      Dataserviceid:
+      - https://golangrocksonazure.table.core.windows.net/Tables('table144storagetablesuitetestque')
+      Date:
+      - Thu, 20 Jul 2017 23:34:11 GMT
+      Location:
+      - https://golangrocksonazure.table.core.windows.net/Tables('table144storagetablesuitetestque')
+      Preference-Applied:
+      - return-no-content
+      Server:
+      - Windows-Azure-Table/1.0 Microsoft-HTTPAPI/2.0
+      X-Content-Type-Options:
+      - nosniff
+      X-Ms-Request-Id:
+      - 875b83b2-0002-0036-21b0-0102e5000000
+      X-Ms-Version:
+      - 2016-05-31
+    status: 204 No Content
+    code: 204
+- request:
+    body: |
+      {"TableName":"table244storagetablesuitetestque"}
+    form: {}
+    headers:
+      Accept:
+      - application/json;odata=nometadata
+      Accept-Charset:
+      - UTF-8
+      Authorization:
+      - SharedKey golangrocksonazure:+tQ0CHBBr8KqtfNJZ9ipZgZ9CxD0Cuof10snosZI2GY=
+      Content-Length:
+      - "49"
+      Content-Type:
+      - application/json
+      Prefer:
+      - return-no-content
+      User-Agent:
+      - Go/go1.9beta1 (amd64-windows) azure-storage-go/10.0.2 api-version/2016-05-31
+        table
+      x-ms-date:
+      - Thu, 20 Jul 2017 23:34:12 GMT
+      x-ms-version:
+      - 2016-05-31
+    url: https://golangrocksonazure.table.core.windows.net/Tables?timeout=30
+    method: POST
+  response:
+    body: ""
+    headers:
+      Cache-Control:
+      - no-cache
+      Content-Length:
+      - "0"
+      Dataserviceid:
+      - https://golangrocksonazure.table.core.windows.net/Tables('table244storagetablesuitetestque')
+      Date:
+      - Thu, 20 Jul 2017 23:34:11 GMT
+      Location:
+      - https://golangrocksonazure.table.core.windows.net/Tables('table244storagetablesuitetestque')
+      Preference-Applied:
+      - return-no-content
+      Server:
+      - Windows-Azure-Table/1.0 Microsoft-HTTPAPI/2.0
+      X-Content-Type-Options:
+      - nosniff
+      X-Ms-Request-Id:
+      - 875b83b4-0002-0036-22b0-0102e5000000
+      X-Ms-Version:
+      - 2016-05-31
+    status: 204 No Content
+    code: 204
+- request:
+    body: ""
+    form: {}
+    headers:
+      Accept:
+      - application/json;odata=minimalmetadata
+      Authorization:
+      - SharedKey golangrocksonazure:+ie5k0ENsVXuMQcRMsKBKucgFst485FsmoRa84lCmY8=
+      User-Agent:
+      - Go/go1.9beta1 (amd64-windows) azure-storage-go/10.0.2 api-version/2016-05-31
+        table
+      x-ms-date:
+      - Thu, 20 Jul 2017 23:34:12 GMT
+      x-ms-version:
+      - 2016-05-31
+    url: https://golangrocksonazure.table.core.windows.net/Tables?%24top=2
+    method: GET
+  response:
+    body: '{"odata.metadata":"https://golangrocksonazure.table.core.windows.net/$metadata#Tables","value":[{"TableName":"table044storagetablesuitetestque"},{"TableName":"table144storagetablesuitetestque"}]}'
+    headers:
+      Cache-Control:
+      - no-cache
+      Content-Type:
+      - application/json;odata=minimalmetadata;streaming=true;charset=utf-8
+      Date:
+      - Thu, 20 Jul 2017 23:34:11 GMT
+      Server:
+      - Windows-Azure-Table/1.0 Microsoft-HTTPAPI/2.0
+      X-Content-Type-Options:
+      - nosniff
+      X-Ms-Continuation-Nexttablename:
+      - 1!68!dGFibGUyMzdhdXRob3JpemF0aW9uc3VpdGV0ZXN0YWwBMDFkMzAxYjBhNjk0ZGM2Ng--
+      X-Ms-Request-Id:
+      - 875b83b8-0002-0036-25b0-0102e5000000
+      X-Ms-Version:
+      - 2016-05-31
+    status: 200 OK
+    code: 200
+- request:
+    body: ""
+    form: {}
+    headers:
+      Accept:
+      - application/json;odata=minimalmetadata
+      Authorization:
+      - SharedKey golangrocksonazure:+ie5k0ENsVXuMQcRMsKBKucgFst485FsmoRa84lCmY8=
+      User-Agent:
+      - Go/go1.9beta1 (amd64-windows) azure-storage-go/10.0.2 api-version/2016-05-31
+        table
+      x-ms-date:
+      - Thu, 20 Jul 2017 23:34:12 GMT
+      x-ms-version:
+      - 2016-05-31
+    url: https://golangrocksonazure.table.core.windows.net/Tables?%24top=2&NextTableName=1%2168%21dGFibGUyMzdhdXRob3JpemF0aW9uc3VpdGV0ZXN0YWwBMDFkMzAxYjBhNjk0ZGM2Ng--
+    method: GET
+  response:
+    body: '{"odata.metadata":"https://golangrocksonazure.table.core.windows.net/$metadata#Tables","value":[{"TableName":"table244storagetablesuitetestque"}]}'
+    headers:
+      Cache-Control:
+      - no-cache
+      Content-Type:
+      - application/json;odata=minimalmetadata;streaming=true;charset=utf-8
+      Date:
+      - Thu, 20 Jul 2017 23:34:11 GMT
+      Server:
+      - Windows-Azure-Table/1.0 Microsoft-HTTPAPI/2.0
+      X-Content-Type-Options:
+      - nosniff
+      X-Ms-Request-Id:
+      - 875b83b9-0002-0036-26b0-0102e5000000
+      X-Ms-Version:
+      - 2016-05-31
+    status: 200 OK
+    code: 200
+- request:
+    body: ""
+    form: {}
+    headers:
+      Accept:
+      - application/json;odata=nometadata
+      Authorization:
+      - SharedKey golangrocksonazure:G3VjC5F0pN4rmQ3TabqrzUGbSZ3k/X9kYthgEiogG7c=
+      Prefer:
+      - return-no-content
+      User-Agent:
+      - Go/go1.9beta1 (amd64-windows) azure-storage-go/10.0.2 api-version/2016-05-31
+        table
+      x-ms-date:
+      - Thu, 20 Jul 2017 23:34:12 GMT
+      x-ms-version:
+      - 2016-05-31
+    url: https://golangrocksonazure.table.core.windows.net/Tables%28%27table244storagetablesuitetestque%27%29?timeout=30
+    method: DELETE
+  response:
+    body: ""
+    headers:
+      Cache-Control:
+      - no-cache
+      Content-Length:
+      - "0"
+      Date:
+      - Thu, 20 Jul 2017 23:34:11 GMT
+      Server:
+      - Windows-Azure-Table/1.0 Microsoft-HTTPAPI/2.0
+      X-Content-Type-Options:
+      - nosniff
+      X-Ms-Request-Id:
+      - 875b83ba-0002-0036-27b0-0102e5000000
+      X-Ms-Version:
+      - 2016-05-31
+    status: 204 No Content
+    code: 204
+- request:
+    body: ""
+    form: {}
+    headers:
+      Accept:
+      - application/json;odata=nometadata
+      Authorization:
+      - SharedKey golangrocksonazure:VOAzBykeqmnu0TU8UoC4ZOhZMuThGZ75IxkKoy6GmvM=
+      Prefer:
+      - return-no-content
+      User-Agent:
+      - Go/go1.9beta1 (amd64-windows) azure-storage-go/10.0.2 api-version/2016-05-31
+        table
+      x-ms-date:
+      - Thu, 20 Jul 2017 23:34:12 GMT
+      x-ms-version:
+      - 2016-05-31
+    url: https://golangrocksonazure.table.core.windows.net/Tables%28%27table144storagetablesuitetestque%27%29?timeout=30
+    method: DELETE
+  response:
+    body: ""
+    headers:
+      Cache-Control:
+      - no-cache
+      Content-Length:
+      - "0"
+      Date:
+      - Thu, 20 Jul 2017 23:34:11 GMT
+      Server:
+      - Windows-Azure-Table/1.0 Microsoft-HTTPAPI/2.0
+      X-Content-Type-Options:
+      - nosniff
+      X-Ms-Request-Id:
+      - 875b83bc-0002-0036-29b0-0102e5000000
+      X-Ms-Version:
+      - 2016-05-31
+    status: 204 No Content
+    code: 204
+- request:
+    body: ""
+    form: {}
+    headers:
+      Accept:
+      - application/json;odata=nometadata
+      Authorization:
+      - SharedKey golangrocksonazure:QrrZYflDOcJogkh+9FxN7sJ4oIdESsDYi+Zymh6Gs+o=
+      Prefer:
+      - return-no-content
+      User-Agent:
+      - Go/go1.9beta1 (amd64-windows) azure-storage-go/10.0.2 api-version/2016-05-31
+        table
+      x-ms-date:
+      - Thu, 20 Jul 2017 23:34:12 GMT
+      x-ms-version:
+      - 2016-05-31
+    url: https://golangrocksonazure.table.core.windows.net/Tables%28%27table044storagetablesuitetestque%27%29?timeout=30
+    method: DELETE
+  response:
+    body: ""
+    headers:
+      Cache-Control:
+      - no-cache
+      Content-Length:
+      - "0"
+      Date:
+      - Thu, 20 Jul 2017 23:34:11 GMT
+      Server:
+      - Windows-Azure-Table/1.0 Microsoft-HTTPAPI/2.0
+      X-Content-Type-Options:
+      - nosniff
+      X-Ms-Request-Id:
+      - 875b83be-0002-0036-2bb0-0102e5000000
+      X-Ms-Version:
+      - 2016-05-31
+    status: 204 No Content
+    code: 204

@@ -1,0 +1,651 @@
+OpenContainers Specifications
+
+Changes with v1.0.0:
+
+	Breaking changes:
+
+	* config: Shift disableOOMKiller from linux.resources to
+	  linux.resources.memory (#896)
+
+	Decreased restrictions:
+
+	* runtime: Make the state JSON's pid optional on non-Linux platforms
+	  (#897)
+
+	Minor fixes and documentation:
+
+	* schema/defs-linux: Require Syscall.action (#885)
+	* specs-go/config: Fix 'omiempty' -> 'omitempty' typo for
+	  LinuxSeccompArg.ValueTwo (#884)
+	* ROAMAP: remove the pre-v1.0.0 roadmap (#890)
+
+Changes with v1.0.0-rc6:
+
+	Breaking changes:
+
+	* config: Shift oomScoreAdj to process and add RFC 2119 requirements
+	  for the runtime (#781, #789, #836)
+	* config: Forbid 'root' on Hyper-V (#820, #838).
+	* config: process.capabilities and process.noNewPrivileges are
+	  Linux-only again (#880).  This partially reverses #673, which had
+	  landed in v1.0.0-rc5.
+	* config: Remove process.rlimits from Windows (#880).  It is now
+	  POSIX-only, while in v1.0.0-rc5 it was cross-platform (because of
+	  #673).  Before #673 (in v1.0.0-rc4 and earlier), it was
+	  Linux-only.
+	* config-linux: Drop redundant 'blkio' prefix from blockIO
+	  properties (#860)
+	* config-linux: Make memory limits int64 instead of uint64 (#876).
+	  This partially reverses #704, which had landed in v1.0.0-rc5.
+	* config-windows: Change CPU 'percent' to 'maximum' (#777)
+	* config-windows: Remove memory 'reservation' (#788)
+	* config-windows: Remove 'resources.network' and add 'network' (#801)
+
+	Additions:
+
+	* config: Windows runtimes MUST support the 'ro' mount option (#868)
+	* config-linux: Add Intel RDT/CAT Linux support (#630, #787)
+	* config-linux: Add Markdown specification for syscalls (#706)
+	* config-linux: Add 'unbindable' rootfsPropagation value (#770, #775)
+	* config-windows: Add 'credentialSpec' (#814, #859)
+	* config-windows: Add 'servicing' (#815)
+	* config-windows: Add 'ignoreFlushesDuringBoot' (#816, #859)
+	* config-windows: Add 'hyperv' (#818, #849, #859)
+	* config-windows: Add 'layerFolders' (#828)
+
+	Removals and increased restrictions:
+
+	* config: Remove 'platform' (#850)
+	* config: Require strictly-postitive 'timeout' values (#764)
+	* config: Strengthen punt to kernel for valid capabilities strings
+	  (#766, #790)
+	* config: Require volume GUID paths for root.path (#849)
+	* config: Forbid setting 'readonly' true on Windows (#819)
+	* config: Forbid setting mount 'type' entirely on Windows and forbid
+	  UNC paths and mapped drives in 'source' on Windows (#821)
+	* config: Remove 'hooks' from Windows spec (#855, #869, #870)
+	* config-linux: Clearly require absolute path for namespace (#720)
+	* config-linux: RFC 2119 tightening for namespaces (#767)
+	* config-linux: Require at least one entry in
+	  linux.seccomp.syscalls[].names (#769)
+	* config-linux: Remove syscall.comment (#714)
+	* config-linux: Use MUST and MAY for weight and leafWeight (#751)
+	* config-linux: Remove explicit 'null' from device cgroup values
+	  (#804)
+	* runtime: Remove "features the runtime chooses to support" (#732)
+	* runtime: Drop "not supported by the base OS" loophole (#733)
+	* runtime-linux: Condition /proc/self/fd symlinks on source
+	  existence (#736)
+
+	Decreased restrictions:
+
+	* config: Make 'process' optional (#701, #805)
+	* config-linux: Make linux.seccomp.syscalls optional (#768)
+	* config-linux: valueTwo is now optional in
+	  `linux.seccomp.syscalls[].args` entries (#877)
+	* config-linux: Remove local range restrictions for blkioWeight,
+	  blkioLeafWeight, weight, leafWeight, and shares (#780)
+	* config-linux: Explicitly allow symlinks for providing devices (#873)
+
+	Minor fixes and documentation:
+
+	* config: Remove "MAY support any valid values" sentence (#851)
+	* config: Remove the previously-forbidden mounts[].type from the
+	  Windows spec (#854)
+	* config: Clarify mounts[].source relative path anchor (#735)
+	* config: Explicitly make consoleSize ignored if terminal is false or
+	  unset (#863)
+	* config: Specify height/width units (characters) for consoleSize (#761)
+	* config: Use "POSIX platforms" instead of "Linux and Solaris" (#838)
+	* config-linux: Explicit namespace for interface names (#713)
+	* config-linux: Explicitly list cgroupsPath as optional (#823)
+	* runtime: Clarify valid container states for 'start', 'kill', and
+	  'delete' (#875)
+	* runtime: Explicitly make process.* timing implementation-defined (#700)
+	* specs-go/config: Remove range restrictions from Windows comments (#783)
+	* specs-go/config: Add omitempty to LinuxSyscall.Args (#763)
+	* specs-go/config: Use a pointer for Process.ConsoleSize (#792)
+	* schema/README: Use v1.0.0 URL in examples to prepare for the 1.0.0
+	  release (#881)
+	* schema/Makefile: Make 'validate' the default target (#750)
+	* schema/Makefile: Add 'clean' target (#774)
+	* schema: Add 'test' target to the Makefile (#785)
+	* *: Remove unnecessary .PHONY entries (#750, #778, #802)
+	* *: Typo fixes and polishing (#681, #708, #702, #703, #709, #711,
+	  #712, #721, #722, #723, #724, #730, #737, #738, #741, #744, #749,
+	  #753, #756, #765, #773, #776, #784, #786, #793, #794, #796, #798,
+	  #799, #800, #803, #807, #809, #811, #812, #822, #824, #826, #827,
+	  #832, #839, #840, #846, #847, #848, #852, #856, #858, #862, #865,
+	  #871, #874)
+
+Changes with v1.0.0-rc5:
+
+	Breaking changes:
+
+	* config: Explicitly require `platform` (#695).
+	* config: The platform-specific sections (`linux`, `solaris`, and
+	  `windows`) MUST NOT be set unless they match `platform.os` (#673).
+	* config: `process.capabilities` is now an object instead of an
+	  array of strings (#675).
+	* config-linux: No longer allow negative values for some resources,
+	  partially reversing #648 from v1.0.0-rc4 (#704).
+	* config-linux: `linux.seccomp.syscalls` entries have `names`
+	  instead of `name` (#657).
+	* runtime: Rename the state `bundlePath` property to `bundle`
+	  (#674).
+
+	Additions:
+
+	* config: `process.capabilities` is no longer Linux-only (#673).
+	* config-linux: `linux.seccomp.syscalls` entries have a new
+	  `comment` property (#657).
+	* config-linux: Add new architectures from libseccomp 2.3.2 (#705)
+	* runtime: Add a `creating` state `status` (#507, #694).
+
+	Removals and increased restrictions:
+
+	* runtime: Document hook timing and exit code handling (#532).
+	* schema/config-linux: Explicit `null` values are no longer
+	  compliant (#662).
+
+	Decreased restrictions:
+
+	* config: `type` and `source` properties are now optional for
+	  `mounts` entries (#699).
+	* config: `args` property is now optional for hooks (#685).
+	* config-linux: Runtimes no longer need to provide `/proc` and
+	  other filesystems unless they are explicitly requested in the
+	  configuration JSON (#666).
+
+	Minor fixes and documentation:
+
+	* spec: Add OCI Runtime Abstract (#691).
+	* config: Document the Go `platform` tag (#570).
+	* config-linux: Remove local uid/gid mapping limit and punt to the
+	  kernel (#693).
+	* schema: Fix broken `string` and similar `$ref`s (#684).
+	* schema: Remove `mounts` from required properties (#696).
+	* schema: Remove `major` and `minor` from `linux.devices` entries
+	  (#688).
+	* schema: Check for the required `type`, `hard`, and `soft` in
+	  `process.rlimits` entries (#696).
+	* schema/validate: Gained usage documentation and fixed
+	  `schemaPath` logic when the argument did not contain `://` (#552).
+	* *: Add anchor tags to a number of spec locations (#707).
+	* *: Consistent link syntax (#687).
+        * *: Minor cleanup and rewording (#697).
+
+Changes with v1.0.0-rc4:
+	Additions:
+
+	* config-linux: Allow negative values for some resources (#648)
+	* config-linux: Lift no-tweaking namespace restriction (#649)
+
+	Removals and increased restrictions:
+
+	* config: Rlimit types must be unique (#607)
+	* config: Forbid empty-string keys in 'annotations' (#645, #654)
+	* config-linux: Require runtime errors for pre-existing devices
+	  (#647)
+	* runtime: Only require 'pid' in the state for created/running
+	  statuses (#664)
+	* schema: Add 'consoleSize' and update requirements (#646)
+	* schema: Remove string pointers (#656)
+	* schema/config-linux: Remove blockIODeviceThrottle and other
+	  pointers (#545)
+
+	Breaking Go changes:
+
+	* specs-go/config: Remove string pointers (#653)
+	* specs-go/config: Make Spec.Hooks a pointer (#427)
+	* specs-go/config: Convert some resources from unsigned integers
+	  to signed integers (#648)
+
+	Minor fixes and documentation:
+
+	* config: Explicitly list 'hooks' as optional and cite POSIX for
+	  'env' and 'args' (#427)
+	* runtime: Replace "process is stopped" with "process exits"
+	  (#465)
+	* schema/config-linux: Add missing kernelTCP (#655)
+	* schema/validate: Allow schema identifiers to contain a URL
+	  scheme (#490)
+	* .travis: Fix git-validation commit ranges (#216)
+	* *: Add anchor tags to a number of spec locations (#612, #636,
+	  #637, #638, #639, #640)
+	* *: Typo fixes and polishing (#643, #650, #652, #656, #660, #665)
+
+Changes with v1.0.0-rc3:
+	Additions:
+
+	* config: Add support for Windows-based containers (#565, #573)
+	* config: Add process.consoleSize (#563)
+	* config: Explicitly allow unknown extensions and document
+	  annotations key conventions (#510)
+	* config: Define mounts entries for Solaris (#588)
+
+	Removals and increased restrictions:
+
+	* config: Require absolute paths for mount destinations (#609)
+	* config-linux: Require absolute path for maskedPaths and
+	  readonlyPaths (#587)
+	* config-linux: Only require /dev/console when process.terminal is
+	  true.  Also require /dev/console to be provided by a bind mount
+	  (#518)
+	* runtime: Require runtimes to generate errors when the container
+	  specified in config.json cannot be created (#559)
+
+	Breaking Go changes:
+
+	* specs-go/config: Aggressive namespacing (#567)
+	* specs-go/config: Remove pointers from LinuxHugepageLimit,
+	  LinuxInterfacePriority, and LinuxPids properties (#586)
+	* specs-go/state: Rename version to ociVersion (#633)
+	  LinuxInterfacePriority, and LinuxPids properties (#586)
+
+	Minor fixes and documentation:
+
+	* spec: Separate the spec from project scaffolding (#626)
+	* README: Define "unspecified", "undefined", and
+	 "implementation-defined" (#575)
+	* config: Clarify absolue and relative values for root.path (#558)
+	* config: Clarify ociVersion covering the configuration <->
+	  runtime API (#523)
+	* config-linux: Forbid duplicated namespaces with same `type`
+	  (#597)
+	* glossary: Make objects explicitly unordered and forbid duplicate
+	  names (#584)
+	* specs-go/config: Add platform tags to Rlimits and
+	  NoNewPRivileges (#564)
+	* schema/defs-linux: Use int64 for major/minor types (#610)
+	* Makefile: Add support for Go 1.7 (#547)
+	* Makefile: Require Go >= 1.6 for golint (#589)
+	* Makefile: Use a POSIX-compatible test ('==' -> '=') (#542)
+	* implementations: Rename ocitools -> runtime-tools (#585)
+	* *: Typo fixes and polishing (#556, #566, #568, #569, #571, #572,
+	  #574, #595, #596, #599, #600, #601, #603, #605, #608, #613, #617,
+	  #619, #621, #622, #623, #624, #625, #627, #629)
+
+Changes with v1.0.0-rc2:
+	Additions:
+
+	* config-linux: Add new architectures from libseccomp 2.3.0 (#505)
+	* schema: Add JSON Schema for state JSON and move schema.json to
+	  config-schema.json and similar (#481, #498, #519)
+
+	Minor fixes and documentation:
+
+	* Add compliance language for platforms and architectures (#527)
+	* Remove "unconditionally compliant" language (#553)
+	* bundle: Remove distribution references (#487)
+	* runtime: Fix sub-bullet indentation (#495)
+	* config: Replace Arch fstab reference with mount(8) (#443)
+	* config: Synchronize comments between Markdown and Go (#525)
+	* config: Drop v0.x compatibility statement (#488)
+	* config-linux: RFC 2119 wording for cgroupsPath (#493)
+	* config-linux: Make linux.devices and linux.resources.devices
+	  optional (#526)
+	* config-linux: Extend no-tweak requirement to runtime namespaces (#538)
+	* schema: Add hook.timeout (#544)
+	* schema: Add missing '"type": "object"' (#528)
+	* schema: Run 'make fmt' and remove duplicates (#546, #551)
+	* schema/config: Make 'hostname' optional (#491)
+	* schema/config-linux: Add linux.resources.devices (#550)
+	* specs-go/config: Add Solaris tags to User properties (#496)
+	* specs-go/config: Make Linux and Solaris omitempty again (#502)
+	* specs-go/config: Make KernelTCP and ClassID omitempty (#531)
+	* specs-go/config: Fix "specified" typo for ApparmorProfile (#503)
+	* Makefile: Remove code-of-conduct.md and version.md when clean (#541)
+	* implementations: Mention cc-oci-runtime (#539)
+	* Use filesystem instead of file system (#529)
+	* .pullapprove: Add DCO check via PullApprove
+	* GOVERNANCE: Add governance and release process docs (#521)
+	* README: Change meeting time from 10am to 2pm Pacific (#524)
+	* README: Update conference-call phone number (#512, #515)
+
+Changes with v1.0.0-rc1:
+	Breaking changes:
+
+	* runtime: Split create and start, #384, #450, #463, #464, #467,
+	  #468
+	* runtime: Remove exec, #388
+	* runtime: Enviroment MUST match the configuration, #397
+	* config: Runtime MUST generate errors for unsupported platforms,
+	  #441
+	* config: Windows mount destinations MUST NOT be nested, #437
+
+	Additions:
+
+	* solaris: Added platform-specific configuration, #411, #424, #431,
+	  #436
+	* runtime: Add 'annotations' and 'status' to the state structure,
+	  #462, #484, #485
+	* runtime: State no longer needs to be serialized as JSON, #446
+	* runtime-linux: Add /dev symbolic links, #449
+	* config: Allow absolute paths for root.path (which previously
+	  required relative paths), #394
+	* config-linux: Add linux.mountLabel, #393
+	* config-linux: Add suport for cgroup namespace, #397
+	* config-linux: Runtime SHOULD NOT modify ownership of any
+	  referenced filesystem (previously the restriction only applied to
+	  the root filesystem), #452
+	* specs-go/seccomp: Add ppc and s390x to specs-go/config.go, #475
+
+	Minor fixes and documentation:
+
+	* README: Add project.md to the Table of Contents, #376
+	* README: Consistenly indent the Table of Contents, #400
+	* README: Link to LICENSE, #442
+	* README: Weekly call is OCI-wide, #378
+	* config: Explicit runtime namespace for hooks, #415
+	* config: Explicit container namespace for uid, gid, and
+	  additionalGids, #412
+	* config: Fix 'string' -> 'array of strings' typo for process.args,
+	  #416
+	* runtime: The runtime MAY validate config.json, #418
+	* runtime: Move errors section out of operations, #445
+	* runtime: MAY -> SHOULD for post-stop error logging, #410
+	* schema/README: Document JSON Schema usage, #360, #385
+	* schema: Minor description updates, #456, #461
+	* schema/validate: Support reading documents via stdin, #482
+	* .pullapprove: Automate review approval, #458, #474
+	* .gitignore: Hide more auto-generated files, #386, #392
+	* .travis: git-validation detects Travis now, #366
+	* .travis: Regress on failure to produce docs, #479
+	* Makefile: Filename docs.* -> oci-runtime-spec.*, #478
+	* Makefile: Add install.tools target, #349
+	* Makefile: Allow native pandoc implementations, #428, #448
+	* Makefile: Prefer Bash, #455
+	* Makefile: Travis support for .gitvalidation, #422
+	* specs-go/config: Add missing omitempties for Process.Terminal,
+	  Root.Readonly, Spec.Linux, and Spec.Mounts, #408, #429, #430, #431
+	* specs-go/config: Remove incorrect omitempties for User.UID and
+	  User.GID, #425
+	* specs-go/config: Drop platform-independent comment, #451
+	* version: Include version in generated documentation, #406
+	* *: Anchor examples, #348
+	* *: Fix remnants from SelinuxProcessLabel to SelinuxLabel rename,
+	   #396
+	* *: Outsource code-of-conduct to TOB repository, #375, #413
+	* *: RFC 2119 consistency, #407, #409, #438, #444, #449
+	* *: Typo fixes, #390, #401
+	* *: Whitespace fixes and validation, #380, #381, #426
+	* ROADMAP: Remove stale targets, #435
+
+Changes with v0.5.0:
+	Breaking changes:
+
+	* specs-go: Renamed the repository from opencontainers/specs to
+	  opencontainers/runtime-spec, #365
+
+	Additions:
+
+	* config: Add 'timeout' for hooks, #346
+	* config-linux: Add 'maskedPaths' and 'readonlyPaths', #364
+
+	Minor fixes and documentation:
+
+	* JSON Schema bug-fixes and improved examples, #370
+	* README: Define "unconditionally compliant", #374
+	* config: Make Markdown canonical, #342
+	* config: Explicitly list mapping from symbolic names to UID/GIDs as
+	  out-of-scope, #347
+	* config-linux: Require the runtime mount namespace for namespace
+	  'path' values, #275
+	* config-linux: Reword kernelTCP docs, #377
+	* specs-go: Add omitempty to 'Device' and 'Namespace', #340
+	* .travis.yml: Use built-in 'go vet' and current 'go lint', dropping
+	  Go < 1.5, #372, #352
+	* implementations: Expand ocitools scope to include testing, #328
+	* style: Move one-sentence-per-line rule from the README, #369
+	* style: Remove dangling parenthesis, #359
+	* README: Add a link to the IRC logs, #358
+	* Fix "manadate", "exmaple", "paramters", and "preferrably" typos,
+	  #353, #354
+
+Changes with v0.4.0:
+	Breaking changes:
+
+	* config: Move capabilities, selinuxProcessLabel, apparmorProfile,
+	  and noNewPrivileges from the linux setting to the process setting
+	  and make them optional, renaming selinuxProcessLabel to
+	  selinuxLabel, #329, #330, #339
+	* runtime: Rename version to ociVerison in the state JSON, #225
+	* runtime: Remove the directory requirement for storing state, now
+	  that there is a 'state' operation, #225, #334
+	* go: Shift *.go to specs-go/*.go, #276
+	* config: Move rlimits to process, #341
+	* go: Move config_linux.go content into config.go, removing
+	  LinuxSpec, #310
+
+	Additions:
+
+	* schema: Add JSON Schema (and validator) for `config.json`, #313
+	* config: Add annotations for opaque-to-the-runtime data, #331
+	* config-linux: Make seccomp optional, #333
+	* runtime: Added additional operations: state, stop, and exec.
+	  #225
+
+	Minor fixes and documentation:
+
+	* config-linux: Change mount type from *rune to *string and fix
+	  octal fileMode examples, #323
+	* runtime: RFC 2119 phrasing for the lifecycle, #225
+	* README: Add a full example of config.json, #276
+	* README: Replace BlueJeans with UberConference, #326, #338
+	* style: Document Go-pointer exceptions, #317
+
+Changes with v0.3.0:
+	Breaking changes:
+
+	* config: Single, unified config file, #284
+	* config: cwd is a required default, and must be absolute, #286,
+	  #307, #308, #312
+	* config: qualify the name of the version field, #309
+	* config-linux: Convert classID from hex to uint32, #296
+	* config-linux: Separate mknod from cgroups, #298
+
+	Additions:
+
+	* config-linux: Add NoNewPrivileges setting for linux, #290
+
+	Minor fixes and documentation:
+
+	* config-linux: clarify oom_score_adj, #236, #292
+	* config-linux: Update links to cgroups documentation, #318
+	* config-linux: Remove pointers for slices preferring omitempty
+	  tag instead, #316
+	* README: add runtime, bundle, and hook author user, #280
+	* ROADMAP: reshuffled and split into GitHub issues, #300, #301,
+	  #304, #306
+	* style: Collect established styles in a discoverable location, #287, #311
+
+Changes with v0.2.0:
+	* Add Apparmor, Selinux and Seccomp
+	* Add Apparmor, Selinux and Seccomp sections
+	* Add bind mount example
+	* Add fd section for linux container process
+	* Add Go types for specification
+	* *: adding a code of conduct
+	* Adding cgroups path to the Spec.
+	* .: Adding listing of implementations
+	* .: adding travis file for future CI
+	* Add license and DCO information for contributions
+	* Add linux spec description
+	* Add MAINTAINERS file
+	* Add memory swappiness to linux spec
+	* Add runtime state configuration and structs
+	* Adds a section for user namespace mappings
+	* Adds link to kernel cgroups documentation
+	* Adds section for Linux Rlimits
+	* Adds section for Linux Sysctl.
+	* Adds user namespace to the list of namespaces
+	* bundle: add initial run use case
+	* bundle: Fix 'and any number of   and other related' typo
+	* bundle.md: clarify arbitrary/conventional dirnames
+	* bundle.md: fix link formatting
+	* bundle.md: fix off-by-one error
+	* bundle.md: various updates to latest spec
+	* bundle: Move 'Linux sysctl' header to its own line
+	* Change commiter to committer
+	* Change Device field order in spec_linux.go, 'Path' should be top of the 'Type' field, according to the different of the config-linux.md, 'Path' field is the unique key.
+	* Change layout of mountpoints and mounts
+	* Change the rlimit type to string instead of int
+	* Clarify behavior around namespaces paths.
+	* config: Add example additionalGids
+	* config: Add example cwd
+	* config: cleanup language on readonly parameter
+	* config: fix links to go files
+	* config-linux: specify the default devices/filesystems available
+	* config.md: clarify destination for mounts
+	* config.md: make the version a semver
+	* config.md: make the version field example a semver
+	* config.md: minor clean up of process specification
+	* config.md: reformat into a standard style
+	* config.md: update links to spec schema code
+	* config.md: various cleanup/consistency fixes
+	* config: minor cleanup
+	* Deduplicate the field of RootfsPropagation
+	* Define constants for Linux Namespace names
+	* Fix LinuxRuntime field
+	* Fix root object keys
+	* Fix typos in config.md
+	* Fix typos in the "Namespace types" section
+	* Fix typos in the rlimits section
+	* Fix Windows path escaping in example mount JSON
+	* JSON objects are easier to parse/manipulate
+	* made repo public. Added warning in README
+	* Make namespaces match runc
+	* make rootfs mount propagation mode settable
+	* Makes namespaces description linux specific
+	* *.md: markdown formatting
+	* Modify the capabilities constants to match header files like other constants
+	* Move linux specific options to linux spec
+	* README: add a rule for paragraph formatting in markdown
+	* README: Document BlueJeans and wiki archive for meetings
+	* README: Document pre-meeting agenda alteration
+	* README: Document YouTube and IRC backchannel for meetings
+	* README: Focus on local runtime (create/start/stop)
+	* README.md: Add a git commit style guide
+	* README.md: contribution about discussion
+	* README: releases section
+	* README: Remove blank line from infrastructure-agnostic paragraph
+	* removed boilerplate file
+	* *: remove superfluous comma in code-of-conduct
+	* Remove trailing whitespace
+	* Rename SystemProperties to Sysctl
+	* Rename the header "Access to devices" to "Devices" to fit with the config
+	* *: re-org the spec
+	* Replace Linux.Device with more specific config
+	* restore formatting
+	* Return golang compliant names for UID and GID in User
+	* Return golint-compliant naming for mappings
+	* runtime: Add prestart/poststop hooks
+	* runtime_config: comments for golint
+	* runtime-config-linux: Drop 'Linux' from headers
+	* runtime_config_linux: Fix 'LinuxSpec' -> 'LinuxRuntimeSpec' in comment
+	* runtime-config-linux: One sentence per line for opening two paragraphs
+	* runtime-config: Remove blank lines from the end of files
+	* runtime-config: Remove 'destination' docs from mounts
+	* runtime.md: convert oc to runc
+	* runtime: use opencontainer vs oci
+	* *: small spelling fixes
+	* Specific platform specific user struct for spec
+	* spec: linux: add support for the PIDs cgroup
+	* spec_linux: conform to `golint`
+	* spec_linux.go: Rename IDMapping fields to follow syscall.SysProcIDMap
+	* spec_linux: remove ending periods on one-line comments
+	* spec: rename ocp to oci and add a link
+	* specs: add json notation
+	* specs: align the ascii graph
+	* specs: fix the description for the [ug]idMappings
+	* specs: introduce the concept of a runtime.json
+	* .tools: cleanup the commit entry
+	* .tools: repo validation tool
+	* travis: fix DCO validation for merges
+	* typo: containers -> container's
+	* typo: the -> for
+	* Update config-linux for better formatting on values
+	* Update README.md
+	* Update readme with weekly call and mailing list
+	* Update runtime.md
+	* Update runtime.md
+	* Update runtime.md
+	* version: more explicit version for comparison
+
+Changes with v0.1.0:
+	* Add Architecture field to Seccomp configuration in Linux runtime
+	* Add @hqhq as maintainer
+	* Add hyphen for host specific
+	* Adding Vishnu Kannan as a Maintainer.
+	* Add initial roadmap
+	* Add lifecycle for containers
+	* Add oom_score_adj to the runtime Spec.
+	* Add post-start hooks
+	* Add Seccomp constants to description of Linux runtime spec
+	* Add Seccomp constants to Linux runtime config
+	* Add some clarity around the state.json file
+	* adds text describing the upper-case keywords used in the spec
+	* add testing framework to ROADMAP
+	* Appropriately mark optional fields as omitempty
+	* cgroup: Add support for memory.kmem.tcp.limit_in_bytes
+	* Change HugepageLimit.Limit type to uint64
+	* Change the behavior when cgroupsPath is absent
+	* Change version from 0.1.0 to 0.2.0
+	* Clarify the semantics of hook elements
+	* Cleanup bundle.md
+	* Cleanup principles
+	* config: linux: update description of PidsLimit
+	* config: Require a new UTS namespace for config.json's hostname
+	* config: Require the runtime to mount Spec.Mounts in order
+	* convert **name** to **`name`**
+	* Example lists "root' but text mentions "bundlePath"
+	* Fix an extra space in VersionMinor
+	* Fix golint warnings
+	* Fix typo in BlockIO struct comment
+	* Fix typo in Filesystem Bundle
+	* Fix value of swappiness
+	* glossary: Provide a quick overview of important terms
+	* glossary: Specify UTF-8 for all our JSON
+	* hooks: deduplicate the hooks docs
+	* implementations: Link to kunalkushwaha/octool
+	* implementations: Link to mrunalp/ocitools
+	* lifecycle: Don't require /run/opencontainer/<runtime>/containers
+	* lifecycle: Mention runtime.json
+	* lifecycle: no hypens
+	* MAINTAINERS: add tianon per the charter
+	* MAINTAINERS: correct Vish's github account
+	* Makefile: Add glossary to DOC_FILES
+	* Make optional Cgroup related config params pointers along with `omitempty` json tag.
+	* Mark RootfsPropagation as omitempty
+	* *.md: update TOC and links
+	* move the description of Rlimits before example
+	* move the description of user ns mapping to proper file
+	* principles: Give principles their own home
+	* *: printable documents
+	* Project: document release process
+	* README: Fix some headers
+	* README: make header more concise
+	* remove blank char from blank line
+	* Remove the unneeded build tag from the config_linux.go
+	* Remove trailing comma in hooks json example
+	* Rename State's Root to Bundle
+	* ROADMAP.md: remove the tail spaces
+	* roadmap: update links and add wiki reference
+	* runtime: Add 'version' to the state.json example
+	* runtime-config: add example label before json example
+	* runtime-config: add section about Hooks
+	* runtime: config: linux: add cgroups information
+	* runtime: config: linux: Edit BlockIO struct
+	* runtime: config: linux: Fix typo and trailing commas in json example
+	* runtime_config_linux.go: add missing pointer
+	* runtime-config-linux.md: fix the type of cpus and mems
+	* runtime.md: fix spacing
+	* Talk about host specific/independent instead of mutability
+	* .tools: commit validator is a separate project
+	* .tools: make GetFetchHeadCommit do what it says
+	* .travis.yml: add go 1.5.1, update from 1.4.2 to 1.4.3
+	* Update readme with wiki link to minutes
+	* Update Typo in ROADMAP.md
+	* Use unsigned for IDs
+	* version: introduce a string for dev indication

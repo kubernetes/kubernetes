@@ -1,0 +1,32 @@
+influxd-run(1)
+==============
+
+NAME
+----
+influxd-run - Configure and start an InfluxDB server
+
+SYNOPSIS
+--------
+[verse]
+'influxd' [-config <path>] [-pidfile <path>] [-cpuprofile <path>] [-memprofile <path>]
+'influxd run' [-config <path>] [-pidfile <path>] [-cpuprofile <path>] [-memprofile <path>]
+
+DESCRIPTION
+-----------
+Runs the InfluxDB server.
+
+OPTIONS
+-------
+-config <path>::
+  Sets the path to the configuration file. This defaults to the environment variable *INFLUXDB_CONFIG_PATH*, *~/.influxdb/influxdb.conf*, or */etc/influxdb/influxdb.conf* if a file is present at any of these locations. Disable the automatic loading of a configuration file by using the null device as the path (such as /dev/null on Linux or Mac OS X).
+
+-pidfile <path>::
+  Write process ID to a file.
+
+-cpuprofile <path>::
+  Write CPU profiling information to a file.
+
+-memprofile <path>::
+  Write memory usage information to a file.
+
+include::footer.txt[]

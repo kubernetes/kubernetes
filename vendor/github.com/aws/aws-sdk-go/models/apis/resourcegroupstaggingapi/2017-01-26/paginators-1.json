@@ -1,0 +1,20 @@
+{
+  "pagination": {
+    "GetResources": {
+      "input_token": "PaginationToken",
+      "limit_key": "ResourcesPerPage",
+      "output_token": "PaginationToken",
+      "result_key": "ResourceTagMappingList"
+    },
+    "GetTagKeys": {
+      "input_token": "PaginationToken",
+      "output_token": "PaginationToken",
+      "result_key": "TagKeys"
+    },
+    "GetTagValues": {
+      "input_token": "PaginationToken",
+      "output_token": "PaginationToken",
+      "result_key": "TagValues"
+    }
+  }
+}

@@ -1,0 +1,4 @@
+/protoc
+/protoc-gen-go
+/csi.a
+/csi/.build/

@@ -1,0 +1,255 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project name="ctlogclient" default="all">
+  <property file="local.properties"/>
+  <property file="build.properties"/>
+  <!-- Compiler options -->
+  <property name="compiler.debug" value="on"/>
+  <property name="compiler.generate.no.warnings" value="off"/>
+  <property name="compiler.args" value="-Xlint:all -Xmaxwarns 10000"/>
+  <property name="compiler.max.memory" value="128m"/>
+  <patternset id="ignored.files">
+    <exclude name="**/CVS/**"/>
+    <exclude name="**/SCCS/**"/>
+    <exclude name="**/RCS/**"/>
+    <exclude name="**/rcs/**"/>
+    <exclude name="**/.DS_Store/**"/>
+    <exclude name="**/.svn/**"/>
+    <exclude name="**/.pyc/**"/>
+    <exclude name="**/.pyo/**"/>
+    <exclude name="**/*.pyc/**"/>
+    <exclude name="**/*.pyo/**"/>
+    <exclude name="**/.git/**"/>
+    <exclude name="**/*.hprof/**"/>
+    <exclude name="**/_svn/**"/>
+    <exclude name="**/.hg/**"/>
+    <exclude name="**/*.lib/**"/>
+    <exclude name="**/*~/**"/>
+    <exclude name="**/__pycache__/**"/>
+    <exclude name="**/.bundle/**"/>
+    <exclude name="**/*.rbc/**"/>
+  </patternset>
+  <patternset id="library.patterns">
+    <include name="*.war"/>
+    <include name="*.ear"/>
+    <include name="*.apk"/>
+    <include name="*.zip"/>
+    <include name="*.swc"/>
+    <include name="*.ane"/>
+    <include name="*.egg"/>
+    <include name="*.jar"/>
+  </patternset>
+  <patternset id="compiler.resources">
+    <include name="**/?*.properties"/>
+    <include name="**/?*.xml"/>
+    <include name="**/?*.gif"/>
+    <include name="**/?*.png"/>
+    <include name="**/?*.jpeg"/>
+    <include name="**/?*.jpg"/>
+    <include name="**/?*.html"/>
+    <include name="**/?*.dtd"/>
+    <include name="**/?*.tld"/>
+    <include name="**/?*.ftl"/>
+  </patternset>
+
+  <!-- Project Libraries -->
+  <!-- jars.* are defined in build.properties -->
+  <path id="library.commons-codec">
+    <pathelement location="${jars.commons-codec}"/>
+  </path>
+  <path id="library.commons-logging">
+    <pathelement location="${jars.commons-logging}"/>
+  </path>
+  <path id="library.guava">
+    <pathelement location="${jars.guava}"/>
+  </path>
+  <path id="library.hamcrest">
+    <pathelement location="${jars.hamcrest}"/>
+  </path>
+  <path id="library.httpclient">
+    <pathelement location="${jars.httpclient}"/>
+  </path>
+  <path id="library.httpcore">
+    <pathelement location="${jars.httpcore}"/>
+  </path>
+  <path id="library.json-simple">
+    <pathelement location="${jars.json-simple}"/>
+  </path>
+  <path id="library.junit">
+    <pathelement location="${jars.junit}"/>
+  </path>
+  <path id="library.mockito">
+    <pathelement location="${jars.mockito}"/>
+  </path>
+  <path id="library.protobuf">
+    <pathelement location="${jars.protobuf}"/>
+  </path>
+  <path id="library.bouncycastleprovider">
+    <pathelement location="${jars.bouncycastleprovider}"/>
+  </path>
+  <path id="library.bouncycastlepkix">
+    <pathelement location="${jars.bouncycastlepkix}"/>
+  </path>
+
+  <!-- CT Log Client -->
+  <dirname property="ctlogclient.basedir" file="${ant.file}"/>
+  <property name="compiler.args.ctlogclient" value="${compiler.args}"/>
+  <property name="ctlogclient.build.dir" value="${ctlogclient.basedir}/java/build"/>
+  <property name="ctlogclient.output.dir" value="${ctlogclient.build.dir}/out"/>
+  <property name="ctlogclient.generated.dir" value="${ctlogclient.build.dir}/generated"/>
+  <property name="ctlogclient.testoutput.dir" value="${ctlogclient.build.dir}/test"/>
+  <property name="ctlogclient.testlogs.dir" value="${ctlogclient.build.dir}/test_logs"/>
+
+  <path id="ctlogclient.bootclasspath">
+    <!-- Paths to be included in compilation bootclasspath -->
+  </path>
+
+  <path id="ctlogclient.compilation.classpath">
+    <path refid="library.guava"/>
+    <path refid="library.json-simple"/>
+    <path refid="library.commons-codec"/>
+    <path refid="library.httpcore"/>
+    <path refid="library.httpclient"/>
+    <path refid="library.commons-logging"/>
+    <path refid="library.protobuf"/>
+    <path refid="library.hamcrest"/>
+    <path refid="library.junit"/>
+    <path refid="library.mockito"/>
+    <path refid="library.bouncycastleprovider"/>
+    <path refid="library.bouncycastlepkix"/>
+  </path>
+
+  <path id="ctlogclient.test.compilation.classpath">
+    <pathelement location="${ctlogclient.output.dir}"/>
+    <path refid="library.guava"/>
+    <path refid="library.json-simple"/>
+    <path refid="library.commons-codec"/>
+    <path refid="library.httpcore"/>
+    <path refid="library.httpclient"/>
+    <path refid="library.commons-logging"/>
+    <path refid="library.protobuf"/>
+    <path refid="library.hamcrest"/>
+    <path refid="library.junit"/>
+    <path refid="library.mockito"/>
+    <path refid="library.bouncycastleprovider"/>
+    <path refid="library.bouncycastlepkix"/>
+  </path>
+
+  <path id="ctlogclient.test.runtime.classpath">
+    <pathelement location="${ctlogclient.testoutput.dir}"/>
+    <pathelement location="${ctlogclient.output.dir}"/>
+    <path refid="library.guava"/>
+    <path refid="library.json-simple"/>
+    <path refid="library.commons-codec"/>
+    <path refid="library.httpcore"/>
+    <path refid="library.httpclient"/>
+    <path refid="library.commons-logging"/>
+    <path refid="library.protobuf"/>
+    <path refid="library.hamcrest"/>
+    <path refid="library.junit"/>
+    <path refid="library.mockito"/>
+    <path refid="library.bouncycastleprovider"/>
+    <path refid="library.bouncycastlepkix"/>
+  </path>
+
+  <patternset id="excluded.from.compilation.ctlogclient">
+    <patternset refid="ignored.files"/>
+  </patternset>
+
+  <path id="ctlogclient.module.sourcepath">
+    <dirset dir="${ctlogclient.basedir}/java">
+      <include name="src"/>
+    </dirset>
+    <dirset dir="${ctlogclient.generated.dir}"/>
+  </path>
+
+  <path id="ctlogclient.module.test.sourcepath">
+    <dirset dir="${ctlogclient.basedir}/java">
+      <include name="test"/>
+    </dirset>
+  </path>
+
+  <target name="compile.ct.proto" description="Compile CT proto">
+    <mkdir dir="${ctlogclient.generated.dir}"/>
+    <exec executable="${protoc.bin}">
+      <arg value="--java_out=${ctlogclient.generated.dir}"/>
+      <arg value="proto/ct.proto"/>
+    </exec>
+  </target>
+
+  <target name="compile.ctlogclient" depends="compile.ctlogclient.production,compile.ctlogclient.tests" description="Compile module ctlogclient"/>
+
+  <target name="compile.ctlogclient.production" depends="compile.ct.proto" description="Compile ctlogclient production classes">
+    <mkdir dir="${ctlogclient.output.dir}"/>
+    <javac destdir="${ctlogclient.output.dir}" includeantruntime="false" debug="${compiler.debug}" nowarn="${compiler.generate.no.warnings}" memorymaximumsize="${compiler.max.memory}" fork="true">
+      <compilerarg line="${compiler.args.ctlogclient}"/>
+      <bootclasspath refid="ctlogclient.bootclasspath"/>
+      <classpath refid="ctlogclient.compilation.classpath"/>
+      <src refid="ctlogclient.module.sourcepath"/>
+      <patternset refid="excluded.from.compilation.ctlogclient"/>
+    </javac>
+
+    <copy todir="${ctlogclient.output.dir}">
+      <fileset dir="${ctlogclient.basedir}/java/src">
+        <patternset refid="compiler.resources"/>
+        <type type="file"/>
+      </fileset>
+    </copy>
+  </target>
+
+  <target name="compile.ctlogclient.tests" depends="compile.ctlogclient.production" description="compile ctlogclient test classes" unless="skip.tests">
+    <mkdir dir="${ctlogclient.testoutput.dir}"/>
+    <javac destdir="${ctlogclient.testoutput.dir}" includeantruntime="false" debug="${compiler.debug}" nowarn="${compiler.generate.no.warnings}" memorymaximumsize="${compiler.max.memory}" fork="true">
+      <compilerarg line="${compiler.args.ctlogclient}"/>
+      <bootclasspath refid="ctlogclient.bootclasspath"/>
+      <classpath refid="ctlogclient.test.compilation.classpath"/>
+      <src refid="ctlogclient.module.test.sourcepath"/>
+      <patternset refid="excluded.from.compilation.ctlogclient"/>
+    </javac>
+
+    <copy todir="${ctlogclient.testoutput.dir}">
+      <fileset dir="${ctlogclient.basedir}/test">
+        <patternset refid="compiler.resources"/>
+        <type type="file"/>
+      </fileset>
+    </copy>
+  </target>
+
+  <target name="run.ctlogclient.tests" depends="compile.ctlogclient.tests" description="Run ctlogclient tests." unless="skip.tests">
+    <mkdir dir="${ctlogclient.testlogs.dir}"/>
+    <junit printsummary="on" fork="true" logfailedtests="true">
+      <classpath refid="ctlogclient.test.runtime.classpath"/>
+      <formatter type="plain"/>
+      <batchtest todir="${ctlogclient.testlogs.dir}">
+        <fileset dir="${ctlogclient.testoutput.dir}">
+          <type type="file"/>
+        </fileset>
+      </batchtest>
+    </junit>
+  </target>
+
+  <target name="test" depends="run.ctlogclient.tests"/>
+
+  <target name="create.ctlogclient.jar" depends="compile.ctlogclient.production" description="Build CT Log client jar.">
+    <mkdir dir="${ctlogclient.build.dir}/distrib"/>
+    <jar destfile="${ctlogclient.build.dir}/distrib/ctlog.jar" basedir="${ctlogclient.output.dir}"/>
+  </target>
+
+  <target name="release" depends="create.ctlogclient.jar"/>
+
+  <target name="clean.module.ctlogclient" description="cleanup module">
+    <delete dir="${ctlogclient.output.dir}"/>
+    <delete dir="${ctlogclient.testoutput.dir}"/>
+    <delete dir="${ctlogclient.testlogs.dir}"/>
+    <delete dir="${ctlogclient.build.dir}"/>
+  </target>
+
+  <target name="init" description="Build initialization">
+    <!-- Perform any build initialization in this target -->
+  </target>
+
+  <target name="clean" depends="clean.module.ctlogclient" description="cleanup all"/>
+
+  <target name="build" depends="init, clean, compile.ctlogclient" description="build all modules"/>
+
+  <target name="all" depends="build" description="build all"/>
+</project>

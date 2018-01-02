@@ -1,0 +1,62 @@
+syntax = "proto3";
+
+package containerd.services.diff.v1;
+
+import "gogoproto/gogo.proto";
+import "github.com/containerd/containerd/api/types/mount.proto";
+import "github.com/containerd/containerd/api/types/descriptor.proto";
+
+option go_package = "github.com/containerd/containerd/api/services/diff/v1;diff";
+
+// Diff service creates and applies diffs
+service Diff {
+	// Apply applies the content associated with the provided digests onto
+	// the provided mounts. Archive content will be extracted and
+	// decompressed if necessary.
+	rpc Apply(ApplyRequest) returns (ApplyResponse);
+
+	// Diff creates a diff between the given mounts and uploads the result
+	// to the content store.
+	rpc Diff(DiffRequest) returns (DiffResponse);
+}
+
+message ApplyRequest {
+	// Diff is the descriptor of the diff to be extracted
+	containerd.types.Descriptor diff = 1;
+
+	repeated containerd.types.Mount mounts = 2;
+}
+
+message ApplyResponse {
+	// Applied is the descriptor for the object which was applied.
+	// If the input was a compressed blob then the result will be
+	// the descriptor for the uncompressed blob.
+	containerd.types.Descriptor applied = 1;
+}
+
+message DiffRequest {
+	// Left are the mounts which represent the older copy
+	// in which is the base of the computed changes.
+	repeated containerd.types.Mount left = 1;
+
+	// Right are the mounts which represents the newer copy
+	// in which changes from the left were made into.
+	repeated containerd.types.Mount right = 2;
+
+	// MediaType is the media type descriptor for the created diff
+	// object
+	string media_type = 3;
+
+	// Ref identifies the pre-commit content store object. This
+	// reference can be used to get the status from the content store.
+	string ref = 4;
+
+	// Labels are the labels to apply to the generated content
+	// on content store commit.
+	map<string, string> labels = 5;
+}
+
+message DiffResponse {
+	// Diff is the descriptor of the diff which can be applied
+	containerd.types.Descriptor diff = 3;
+}

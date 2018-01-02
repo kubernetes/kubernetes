@@ -1,0 +1,77 @@
+influx_inspect(1)
+=================
+
+NAME
+----
+influx_inspect - Displays detailed information about InfluxDB data files
+
+SYNPOSIS
+--------
+[verse]
+'influx_inspect dumptsm' [options]
+'influx_inspect export' [options]
+'influx_inspect report' [options]
+
+DESCRIPTION
+-----------
+Displays detailed information about InfluxDB data files through one of the
+following commands.
+
+*dumptsm*::
+  Dumps low-level details about tsm1 files.
+
+*export*::
+  Exports TSM files into InfluxDB line protocol format.
+
+*report*::
+  Displays shard level report.
+
+DUMPTSM OPTIONS
+---------------
+-all::
+  Dump all data. Caution: This may print a lot of information.
+
+-blocks::
+  Dump raw block data.
+
+-filter-key <string>::
+  Only display index and block data that match this key substring.
+
+-index::
+  Dump raw index data.
+
+EXPORT OPTIONS
+--------------
+-compress::
+  Compress the output.
+
+-db <name>::
+  The database to export. Optional.
+
+-rp <name>::
+  The retention policy to export. Optional. Requires the '-db <name>' option to be specified.
+
+-data-dir <path>::
+  Data storage path. Defaults to '~/.influxdb/data'.
+
+-wal-dir <path>::
+  Wal storage path. Defaults to '~/.influxdb/wal'.
+
+-start <timestamp>::
+  The start time of the export. The timestamp is in RFC3339 format. Optional.
+
+-end <timestamp>::
+  The end time of the export. The timestamp is in RFC3339 format. Optional.
+
+-out <path>::
+  Destination file to write exported data to. Defaults to '~/.influxdb/export'.
+
+REPORT OPTIONS
+--------------
+-detailed::
+  Report detailed cardinality estimates.
+
+-pattern <string>::
+  Include only files matching a pattern.
+
+include:footer.txt[]

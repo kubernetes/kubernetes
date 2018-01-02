@@ -1,0 +1,39 @@
+---
+swagger: "2.0"
+info:
+  version: "0.1.0"
+  title: referenced validation
+paths:
+  /:
+    get:
+      parameters:
+        - $ref: "#/parameters/rateLimit"
+      responses:
+        default:
+          description: the record
+          schema:
+            $ref: "#/definitions/record"
+        404:
+          $ref: "#/responses/notFound"
+
+parameters:
+  rateLimit:
+    name: X-Rate-Limit
+    in: header
+    type: integer
+    format: int32
+
+responses:
+  notFound:
+    description: Not found
+    schema:
+      $ref: "#/definitions/record"
+
+definitions:
+  record:
+    type: object
+    properties:
+      createdAt:
+        type: string
+        format: date-time
+

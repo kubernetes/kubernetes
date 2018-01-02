@@ -1,0 +1,10 @@
+{
+  "endpoint" : {
+    "protocol": "http",
+    "port": 8081,
+    "path": "/METRICS"
+  },
+  "polling_frequency" : 10,
+  "metrics_config" : [
+  ]
+}

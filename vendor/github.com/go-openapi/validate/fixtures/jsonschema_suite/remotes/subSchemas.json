@@ -1,0 +1,8 @@
+{
+    "integer": {
+        "type": "integer"
+    }, 
+    "refToInteger": {
+        "$ref": "#/integer"
+    }
+}

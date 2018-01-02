@@ -1,0 +1,10 @@
+dnspython
+ecdsa
+https://google-visualization-python.googlecode.com/files/gviz_api_py-1.8.2.tar.gz
+mock>=1.0
+protobuf
+python-gflags
+requests>=1.0
+Twisted>=12.1
+bitstring
+pycrypto>=2.5

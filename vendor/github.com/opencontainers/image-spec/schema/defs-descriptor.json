@@ -1,0 +1,27 @@
+{
+  "description": "Definitions particular to OpenContainer Descriptor Specification",
+  "definitions": {
+    "mediaType": {
+      "id": "https://opencontainers.org/schema/image/descriptor/mediaType",
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9!#$&-^_.+]{0,126}/[A-Za-z0-9][A-Za-z0-9!#$&-^_.+]{0,126}$"
+    },
+    "digest": {
+      "description": "the cryptographic checksum digest of the object, in the pattern '<algorithm>:<encoded>'",
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:[+._-][a-z0-9]+)*:[a-zA-Z0-9=_-]+$"
+    },
+    "urls": {
+      "description": "a list of urls from which this object may be downloaded",
+      "type": "array",
+      "items": {
+        "type": "string",
+        "format": "uri"
+      }
+    },
+    "annotations": {
+      "id": "https://opencontainers.org/schema/image/descriptor/annotations",
+      "$ref": "defs.json#/definitions/mapStringString"
+    }
+  }
+}

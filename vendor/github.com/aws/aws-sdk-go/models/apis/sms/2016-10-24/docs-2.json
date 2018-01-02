@@ -1,0 +1,492 @@
+{
+  "version": "2.0",
+  "service": "Amazon Server Migration Service automates the process of migrating servers to EC2.",
+  "operations": {
+    "CreateReplicationJob": "The CreateReplicationJob API is used to create a ReplicationJob to replicate a server on AWS. Call this API to first create a ReplicationJob, which will then schedule periodic ReplicationRuns to replicate your server to AWS. Each ReplicationRun will result in the creation of an AWS AMI.",
+    "DeleteReplicationJob": "The DeleteReplicationJob API is used to delete a ReplicationJob, resulting in no further ReplicationRuns. This will delete the contents of the S3 bucket used to store SMS artifacts, but will not delete any AMIs created by the SMS service.",
+    "DeleteServerCatalog": "The DeleteServerCatalog API clears all servers from your server catalog. This means that these servers will no longer be accessible to the Server Migration Service.",
+    "DisassociateConnector": "The DisassociateConnector API will disassociate a connector from the Server Migration Service, rendering it unavailable to support replication jobs.",
+    "GetConnectors": "The GetConnectors API returns a list of connectors that are registered with the Server Migration Service.",
+    "GetReplicationJobs": "The GetReplicationJobs API will return all of your ReplicationJobs and their details. This API returns a paginated list, that may be consecutively called with nextToken to retrieve all ReplicationJobs.",
+    "GetReplicationRuns": "The GetReplicationRuns API will return all ReplicationRuns for a given ReplicationJob. This API returns a paginated list, that may be consecutively called with nextToken to retrieve all ReplicationRuns for a ReplicationJob.",
+    "GetServers": "The GetServers API returns a list of all servers in your server catalog. For this call to succeed, you must previously have called ImportServerCatalog.",
+    "ImportServerCatalog": "The ImportServerCatalog API is used to gather the complete list of on-premises servers on your premises. This API call requires connectors to be installed and monitoring all servers you would like imported. This API call returns immediately, but may take some time to retrieve all of the servers.",
+    "StartOnDemandReplicationRun": "The StartOnDemandReplicationRun API is used to start a ReplicationRun on demand (in addition to those that are scheduled based on your frequency). This ReplicationRun will start immediately. StartOnDemandReplicationRun is subject to limits on how many on demand ReplicationRuns you may call per 24-hour period.",
+    "UpdateReplicationJob": "The UpdateReplicationJob API is used to change the settings of your existing ReplicationJob created using CreateReplicationJob. Calling this API will affect the next scheduled ReplicationRun."
+  },
+  "shapes": {
+    "AmiId": {
+      "base": "The AMI id for the image resulting from a Replication Run.",
+      "refs": {
+        "ReplicationJob$latestAmiId": null,
+        "ReplicationRun$amiId": null
+      }
+    },
+    "Connector": {
+      "base": "Object representing a Connector",
+      "refs": {
+        "ConnectorList$member": null
+      }
+    },
+    "ConnectorCapability": {
+      "base": "Capabilities for a Connector",
+      "refs": {
+        "ConnectorCapabilityList$member": null
+      }
+    },
+    "ConnectorCapabilityList": {
+      "base": "List of Connector Capabilities",
+      "refs": {
+        "Connector$capabilityList": null
+      }
+    },
+    "ConnectorId": {
+      "base": "Unique Identifier for Connector",
+      "refs": {
+        "Connector$connectorId": null,
+        "DisassociateConnectorRequest$connectorId": null
+      }
+    },
+    "ConnectorList": {
+      "base": "List of connectors",
+      "refs": {
+        "GetConnectorsResponse$connectorList": null
+      }
+    },
+    "ConnectorStatus": {
+      "base": "Status of on-premise Connector",
+      "refs": {
+        "Connector$status": null
+      }
+    },
+    "ConnectorVersion": {
+      "base": "Connector version string",
+      "refs": {
+        "Connector$version": null
+      }
+    },
+    "CreateReplicationJobRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateReplicationJobResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteReplicationJobRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteReplicationJobResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteServerCatalogRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteServerCatalogResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "Description": {
+      "base": "The description for a Replication Job/Run.",
+      "refs": {
+        "CreateReplicationJobRequest$description": null,
+        "ReplicationJob$description": null,
+        "ReplicationRun$description": null,
+        "StartOnDemandReplicationRunRequest$description": null,
+        "UpdateReplicationJobRequest$description": null
+      }
+    },
+    "DisassociateConnectorRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DisassociateConnectorResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ErrorMessage": {
+      "base": "Error Message string",
+      "refs": {
+        "InternalError$message": null,
+        "InvalidParameterException$message": null,
+        "MissingRequiredParameterException$message": null,
+        "NoConnectorsAvailableException$message": null,
+        "OperationNotPermittedException$message": null,
+        "ReplicationJobAlreadyExistsException$message": null,
+        "ReplicationJobNotFoundException$message": null,
+        "ReplicationRunLimitExceededException$message": null,
+        "ServerCannotBeReplicatedException$message": null,
+        "UnauthorizedOperationException$message": null
+      }
+    },
+    "Frequency": {
+      "base": "Interval between Replication Runs. This value is specified in hours, and represents the time between consecutive Replication Runs.",
+      "refs": {
+        "CreateReplicationJobRequest$frequency": null,
+        "ReplicationJob$frequency": null,
+        "UpdateReplicationJobRequest$frequency": null
+      }
+    },
+    "GetConnectorsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetConnectorsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetReplicationJobsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetReplicationJobsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetReplicationRunsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetReplicationRunsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetServersRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetServersResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ImportServerCatalogRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ImportServerCatalogResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "InternalError": {
+      "base": "An internal error has occured.",
+      "refs": {
+      }
+    },
+    "InvalidParameterException": {
+      "base": "A parameter specified in the request is not valid, is unsupported, or cannot be used.",
+      "refs": {
+      }
+    },
+    "IpAddress": {
+      "base": "Internet Protocol (IP) Address",
+      "refs": {
+        "Connector$ipAddress": null
+      }
+    },
+    "LicenseType": {
+      "base": "The license type to be used for the Amazon Machine Image (AMI) created after a successful ReplicationRun.",
+      "refs": {
+        "CreateReplicationJobRequest$licenseType": null,
+        "ReplicationJob$licenseType": null,
+        "UpdateReplicationJobRequest$licenseType": null
+      }
+    },
+    "MacAddress": {
+      "base": "Hardware (MAC) address",
+      "refs": {
+        "Connector$macAddress": null
+      }
+    },
+    "MaxResults": {
+      "base": "The maximum number of results to return in one API call. If left empty, this will default to 50.",
+      "refs": {
+        "GetConnectorsRequest$maxResults": null,
+        "GetReplicationJobsRequest$maxResults": null,
+        "GetReplicationRunsRequest$maxResults": null,
+        "GetServersRequest$maxResults": null
+      }
+    },
+    "MissingRequiredParameterException": {
+      "base": "The request is missing a required parameter. Ensure that you have supplied all the required parameters for the request.",
+      "refs": {
+      }
+    },
+    "NextToken": {
+      "base": "Pagination token to pass as input to API call",
+      "refs": {
+        "GetConnectorsRequest$nextToken": null,
+        "GetConnectorsResponse$nextToken": null,
+        "GetReplicationJobsRequest$nextToken": null,
+        "GetReplicationJobsResponse$nextToken": null,
+        "GetReplicationRunsRequest$nextToken": null,
+        "GetReplicationRunsResponse$nextToken": null,
+        "GetServersRequest$nextToken": null,
+        "GetServersResponse$nextToken": null
+      }
+    },
+    "NoConnectorsAvailableException": {
+      "base": "No connectors are available to handle this request. Please associate connector(s) and verify any existing connectors are healthy and can respond to requests.",
+      "refs": {
+      }
+    },
+    "OperationNotPermittedException": {
+      "base": "The specified operation is not allowed. This error can occur for a number of reasons; for example, you might be trying to start a Replication Run before seed Replication Run.",
+      "refs": {
+      }
+    },
+    "ReplicationJob": {
+      "base": "Object representing a Replication Job",
+      "refs": {
+        "GetReplicationRunsResponse$replicationJob": null,
+        "ReplicationJobList$member": null
+      }
+    },
+    "ReplicationJobAlreadyExistsException": {
+      "base": "An active Replication Job already exists for the specified server.",
+      "refs": {
+      }
+    },
+    "ReplicationJobId": {
+      "base": "The unique identifier for a Replication Job.",
+      "refs": {
+        "CreateReplicationJobResponse$replicationJobId": null,
+        "DeleteReplicationJobRequest$replicationJobId": null,
+        "GetReplicationJobsRequest$replicationJobId": null,
+        "GetReplicationRunsRequest$replicationJobId": null,
+        "ReplicationJob$replicationJobId": null,
+        "Server$replicationJobId": null,
+        "StartOnDemandReplicationRunRequest$replicationJobId": null,
+        "UpdateReplicationJobRequest$replicationJobId": null
+      }
+    },
+    "ReplicationJobList": {
+      "base": "List of Replication Jobs",
+      "refs": {
+        "GetReplicationJobsResponse$replicationJobList": null
+      }
+    },
+    "ReplicationJobNotFoundException": {
+      "base": "The specified Replication Job cannot be found.",
+      "refs": {
+      }
+    },
+    "ReplicationJobState": {
+      "base": "Current state of Replication Job",
+      "refs": {
+        "ReplicationJob$state": null
+      }
+    },
+    "ReplicationJobStatusMessage": {
+      "base": "String describing current status of Replication Job",
+      "refs": {
+        "ReplicationJob$statusMessage": null
+      }
+    },
+    "ReplicationJobTerminated": {
+      "base": "An indicator of the Replication Job being deleted or failed.",
+      "refs": {
+        "Server$replicationJobTerminated": null
+      }
+    },
+    "ReplicationRun": {
+      "base": "Object representing a Replication Run",
+      "refs": {
+        "ReplicationRunList$member": null
+      }
+    },
+    "ReplicationRunId": {
+      "base": "The unique identifier for a Replication Run.",
+      "refs": {
+        "ReplicationRun$replicationRunId": null,
+        "StartOnDemandReplicationRunResponse$replicationRunId": null
+      }
+    },
+    "ReplicationRunLimitExceededException": {
+      "base": "This user has exceeded the maximum allowed Replication Run limit.",
+      "refs": {
+      }
+    },
+    "ReplicationRunList": {
+      "base": "List of Replication Runs",
+      "refs": {
+        "GetReplicationRunsResponse$replicationRunList": null,
+        "ReplicationJob$replicationRunList": null
+      }
+    },
+    "ReplicationRunState": {
+      "base": "Current state of Replication Run",
+      "refs": {
+        "ReplicationRun$state": null
+      }
+    },
+    "ReplicationRunStatusMessage": {
+      "base": "String describing current status of Replication Run",
+      "refs": {
+        "ReplicationRun$statusMessage": null
+      }
+    },
+    "ReplicationRunType": {
+      "base": "Type of Replication Run",
+      "refs": {
+        "ReplicationRun$type": null
+      }
+    },
+    "RoleName": {
+      "base": "Name of service role in customer's account to be used by SMS service.",
+      "refs": {
+        "CreateReplicationJobRequest$roleName": null,
+        "ReplicationJob$roleName": null,
+        "UpdateReplicationJobRequest$roleName": null
+      }
+    },
+    "Server": {
+      "base": "Object representing a server",
+      "refs": {
+        "ServerList$member": null
+      }
+    },
+    "ServerCannotBeReplicatedException": {
+      "base": "The provided server cannot be replicated.",
+      "refs": {
+      }
+    },
+    "ServerCatalogStatus": {
+      "base": "Status of Server catalog",
+      "refs": {
+        "GetServersResponse$serverCatalogStatus": null
+      }
+    },
+    "ServerId": {
+      "base": "Unique Identifier for a server",
+      "refs": {
+        "CreateReplicationJobRequest$serverId": null,
+        "ReplicationJob$serverId": null,
+        "Server$serverId": null
+      }
+    },
+    "ServerList": {
+      "base": "List of servers from catalog",
+      "refs": {
+        "GetServersResponse$serverList": null
+      }
+    },
+    "ServerType": {
+      "base": "Type of server.",
+      "refs": {
+        "ReplicationJob$serverType": null,
+        "Server$serverType": null
+      }
+    },
+    "StartOnDemandReplicationRunRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "StartOnDemandReplicationRunResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "Timestamp": {
+      "base": "Timestamp of an operation",
+      "refs": {
+        "Connector$associatedOn": null,
+        "CreateReplicationJobRequest$seedReplicationTime": null,
+        "GetServersResponse$lastModifiedOn": null,
+        "ReplicationJob$seedReplicationTime": null,
+        "ReplicationJob$nextReplicationRunStartTime": null,
+        "ReplicationRun$scheduledStartTime": null,
+        "ReplicationRun$completedTime": null,
+        "UpdateReplicationJobRequest$nextReplicationRunStartTime": null
+      }
+    },
+    "UnauthorizedOperationException": {
+      "base": "This user does not have permissions to perform this operation.",
+      "refs": {
+      }
+    },
+    "UpdateReplicationJobRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "UpdateReplicationJobResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "VmId": {
+      "base": "Unique Identifier for a VM",
+      "refs": {
+        "VmServerAddress$vmId": null
+      }
+    },
+    "VmManagerId": {
+      "base": "Unique Identifier for VM Manager",
+      "refs": {
+        "Connector$vmManagerId": null,
+        "VmServerAddress$vmManagerId": null
+      }
+    },
+    "VmManagerName": {
+      "base": "VM Manager Name",
+      "refs": {
+        "Connector$vmManagerName": null,
+        "VmServer$vmManagerName": null
+      }
+    },
+    "VmManagerType": {
+      "base": "VM Management Product",
+      "refs": {
+        "Connector$vmManagerType": null,
+        "VmServer$vmManagerType": null
+      }
+    },
+    "VmName": {
+      "base": "Name of Virtual Machine",
+      "refs": {
+        "VmServer$vmName": null
+      }
+    },
+    "VmPath": {
+      "base": "Path to VM",
+      "refs": {
+        "VmServer$vmPath": null
+      }
+    },
+    "VmServer": {
+      "base": "Object representing a VM server",
+      "refs": {
+        "ReplicationJob$vmServer": null,
+        "Server$vmServer": null
+      }
+    },
+    "VmServerAddress": {
+      "base": "Object representing a server's location",
+      "refs": {
+        "VmServer$vmServerAddress": null
+      }
+    }
+  }
+}

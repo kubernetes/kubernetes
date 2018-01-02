@@ -1,0 +1,140 @@
+{
+  "description": "OpenContainer Config Specification",
+  "$schema": "http://json-schema.org/draft-04/schema#",
+  "id": "https://opencontainers.org/schema/image/config",
+  "type": "object",
+  "properties": {
+    "created": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "author": {
+      "type": "string"
+    },
+    "architecture": {
+      "type": "string"
+    },
+    "os": {
+      "type": "string"
+    },
+    "config": {
+      "type": "object",
+      "properties": {
+        "User": {
+          "type": "string"
+        },
+        "ExposedPorts": {
+          "$ref": "defs.json#/definitions/mapStringObject"
+        },
+        "Env": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "Entrypoint": {
+          "oneOf": [
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "Cmd": {
+          "oneOf": [
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "Volumes": {
+          "oneOf": [
+            {
+              "$ref": "defs.json#/definitions/mapStringObject"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "WorkingDir": {
+          "type": "string"
+        },
+        "Labels": {
+          "oneOf": [
+            {
+              "$ref": "defs.json#/definitions/mapStringString"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "StopSignal": {
+          "type": "string"
+        }
+      }
+    },
+    "rootfs": {
+      "type": "object",
+      "properties": {
+        "diff_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "layers"
+          ]
+        }
+      },
+      "required": [
+        "diff_ids",
+        "type"
+      ]
+    },
+    "history": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "created": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "author": {
+            "type": "string"
+          },
+          "created_by": {
+            "type": "string"
+          },
+          "comment": {
+            "type": "string"
+          },
+          "empty_layer": {
+            "type": "boolean"
+          }
+        }
+      }
+    }
+  },
+  "required": [
+    "architecture",
+    "os",
+    "rootfs"
+  ]
+}

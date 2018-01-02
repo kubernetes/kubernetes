@@ -1,0 +1,42 @@
+digraph rkt_dns {
+    graph [nodesep=.5, ranksep=.5];
+
+
+    /* terminal states */
+     { 
+        node [style = rounded shape = rect ];
+
+        node [label=<<FONT face="monospace">rkt run ...</FONT>> val=0]; start;
+        node [label=<pod-wide <FONT face="monospace">resolv.conf</FONT><BR/>created by rkt> ] created
+        node [label=<App's <FONT face="monospace">resolv.conf</FONT> used>] app_term
+        node [label=<No <FONT face="monospace">resolv.conf</FONT>>] none_term
+    }
+
+    /*The conditions */
+    node [shape = diamond height=1.5] {
+        node [label=<<FONT face="monospace">--dns(-domain, etc.)</FONT> passed?<br/>(except <FONT face="monospace">--dns=none)</FONT>>] stage0; 
+        node [label="Did any CNI plugin return DNS?"]; cni;
+        node [label=<<FONT face="monospace">--dns=none</FONT> passed?> ] none; 
+        node [label=<App image contains <FONT face="monospace">resolv.conf</FONT>?>]; app;
+
+    }
+
+    start -> stage0; 
+    { rank=same stage0 -> created [label="Yes"]; }
+
+    stage0 -> cni [label=" No"];
+    { rank=same cni -> none [label=" Yes"]; }
+
+    none -> created [label=" No"];
+    cni -> app [label=" No"];
+    none -> app [label=" Yes" weight=0];
+    
+       
+    subgraph cluster_1 {
+        label="per-app"
+        labeljust="left"
+
+        app -> none_term [label=" No"]
+        { rank=same; app -> app_term [label=" Yes"]; }
+    }
+}

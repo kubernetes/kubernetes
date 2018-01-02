@@ -1,0 +1,21 @@
+digraph G {
+    rankdir="LR";
+
+    graph [fontname = "helvetica"];
+    node [fontname = "Arial", fillcolor="#FFE599", style="filled"];
+    edge [fontname = "monospace"];
+
+    {
+        fetchers [shape="node", label=<Fetchers>, pos="0,0!"]
+        image_store [shape="node", label=<Image Store>, pos="2,0!"]
+        tree_store [shape="node", label=<Tree Store>, pos="4,0!"]
+        fs_contents [shape="node", label=<Stage1-2 fs contents>, pos="6,0!"]
+        renderer [shape="node", label=<Direct Stage1-2 renderer>, pos="4,-1!"]
+    }
+
+    fetchers -> image_store
+    tree_store -> image_store
+    renderer -> image_store
+    fs_contents -> tree_store
+    renderer -> fs_contents [dir=none]
+}

@@ -1,0 +1,12 @@
+#!/bin/bash
+
+set -e
+
+n=1
+for testpkg in $(go list ./testing ./.../testing); do
+  covpkg="${testpkg/"/testing"/}"
+  go test -covermode count -coverprofile "testing_"$n.coverprofile -coverpkg $covpkg $testpkg 2>/dev/null
+  n=$((n+1))
+done
+gocovmerge `ls *.coverprofile` > cover.out
+rm *.coverprofile

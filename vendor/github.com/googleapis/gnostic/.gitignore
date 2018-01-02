@@ -1,0 +1,13 @@
+# Eclipse
+.checkstyle
+.project
+.settings
+# Swift
+.build
+Packages
+# vi
+*.swp
+# vscode
+.vscode
+.DS_Store
+*~

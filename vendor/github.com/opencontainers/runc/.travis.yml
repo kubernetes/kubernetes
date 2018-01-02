@@ -1,0 +1,33 @@
+language: go
+go:
+  - 1.7.x
+  - 1.8.x
+  - tip
+
+matrix:
+  allow_failures:
+    - go: tip
+
+go_import_path: github.com/opencontainers/runc
+
+# `make ci` uses Docker.
+sudo: required
+services:
+  - docker
+
+env:
+  global:
+    - BUILDTAGS="seccomp apparmor selinux ambient"
+
+before_install:
+  - sudo apt-get -qq update
+  - sudo apt-get install -y libseccomp-dev libapparmor-dev
+  - go get -u github.com/golang/lint/golint
+  - go get -u github.com/vbatts/git-validation
+  - go get -u github.com/mvdan/sh/cmd/shfmt
+  - env | grep TRAVIS_
+
+script:
+  - git-validation -run DCO,short-subject -v
+  - make BUILDTAGS="${BUILDTAGS}"
+  - make BUILDTAGS="${BUILDTAGS}" clean ci

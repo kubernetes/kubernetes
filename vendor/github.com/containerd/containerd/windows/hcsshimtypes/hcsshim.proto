@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+package containerd.windows.hcsshim;
+
+import "gogoproto/gogo.proto";
+import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/containerd/containerd/windows/hcsshimtypes;hcsshimtypes";
+
+message CreateOptions {
+	google.protobuf.Duration terminate_duration = 1 [(gogoproto.stdduration) = true, (gogoproto.nullable) = false];
+}
+
+// ProcessDetails contains additional information about a process
+// ProcessDetails is made of the same fields as found in hcsshim.ProcessListItem
+message ProcessDetails {
+	string image_name = 1;
+	google.protobuf.Timestamp created_at = 2 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+	uint64 kernel_time_100_ns = 3;
+	uint64 memory_commit_bytes = 4;
+	uint64 memory_working_set_private_bytes = 5;
+	uint64 memory_working_set_shared_bytes = 6;
+	uint32 process_id = 7;
+	uint64 user_time_100_ns = 8;
+}

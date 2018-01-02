@@ -1,0 +1,2 @@
+{{range $name, $resource := .descriptionMap}}{{$name}}: {{$resource}}
+{{end}}

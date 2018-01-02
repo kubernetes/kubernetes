@@ -1,0 +1,64 @@
+version: v1
+kind: Pod
+metadata:
+  name: "@@CONTAINER_HOST@@"
+spec:
+  containers:
+    - name: super-mirror
+      image: "gcr.io/@@PROJECT@@/super_mirror:test"
+      imagePullPolicy: Always
+      ports:
+        - name: super-mirror
+          containerPort: 80
+          hostPort: 80
+          protocol: TCP
+      env:
+        - name: ETCD_SERVERS
+          value: "@@ETCD_SERVERS@@"
+        - name: CONTAINER_HOST
+          value: "@@CONTAINER_HOST@@"
+        - name: TARGET_LOG_URL
+          value: "@@TARGET_LOG_URL@@"
+        - name: TARGET_LOG_TLS_VERSION
+          value: "@@TARGET_LOG_TLS_VERSION@@"
+        - name: TARGET_LOG_PUBLIC_KEY
+          value: "@@TARGET_LOG_PUBLIC_KEY@@"
+        - name: PROJECT
+          value: @@PROJECT@@
+        - name: MONITORING
+          value: @@MONITORING@@
+      volumeMounts:
+        - name: logdata
+          mountPath: /mnt/ctmirror
+    - name: cadvisor-monitor
+      image: google/cadvisor:latest
+      imagePullPolicy: Always
+      ports:
+        - name: cadvisor-mon
+          containerPort: 8080
+          hostPort: 8080
+          protocol: TCP
+      volumeMounts:
+        - name: varrun
+          mountPath: /var/run
+        - name: sys
+          mountPath: /sys
+          readOnly: true
+        - name: varlibdocker
+          mountPath: /var/lib/docker
+          readOnly: true
+  restartPolicy: Always
+  dnsPolicy: ClusterFirst
+  volumes:
+    - name: logdata
+      hostPath:
+        path: /data/ctmirror
+    - name: varrun
+      hostPath:
+        path: /var/run
+    - name: sys
+      hostPath:
+        path: /sys
+    - name: varlibdocker
+      hostPath:
+        path: /var/lib/docker

@@ -1,0 +1,106 @@
+{/* This is the slide template. It defines how presentations are formatted. */}
+
+{{define "root"}}
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>{{.Title}}</title>
+    <meta charset='utf-8'>
+    <script>
+      var notesEnabled = {{.NotesEnabled}};
+    </script>
+    <script src='/static/slides.js'></script>
+
+    {{if .NotesEnabled}}
+    <script>
+      var sections = {{.Sections}};
+      var titleNotes = {{.TitleNotes}}
+    </script>
+    <script src='/static/notes.js'></script>
+    {{end}}
+
+    <script>
+      // Initialize Google Analytics tracking code on production site only.
+      if (window["location"] && window["location"]["hostname"] == "talks.golang.org") {
+        var _gaq = _gaq || [];
+        _gaq.push(["_setAccount", "UA-11222381-6"]);
+        _gaq.push(["b._setAccount", "UA-49880327-6"]);
+        window.trackPageview = function() {
+          _gaq.push(["_trackPageview", location.pathname+location.hash]);
+          _gaq.push(["b._trackPageview", location.pathname+location.hash]);
+        };
+        window.trackPageview();
+        window.trackEvent = function(category, action, opt_label, opt_value, opt_noninteraction) {
+          _gaq.push(["_trackEvent", category, action, opt_label, opt_value, opt_noninteraction]);
+          _gaq.push(["b._trackEvent", category, action, opt_label, opt_value, opt_noninteraction]);
+        };
+      }
+    </script>
+  </head>
+
+  <body style='display: none'>
+
+    <section class='slides layout-widescreen'>
+
+      <article>
+        <h1>{{.Title}}</h1>
+        {{with .Subtitle}}<h3>{{.}}</h3>{{end}}
+        {{if not .Time.IsZero}}<h3>{{.Time.Format "2 January 2006"}}</h3>{{end}}
+        {{range .Authors}}
+          <div class="presenter">
+            {{range .TextElem}}{{elem $.Template .}}{{end}}
+          </div>
+        {{end}}
+      </article>
+
+  {{range $i, $s := .Sections}}
+  <!-- start of slide {{$s.Number}} -->
+      <article>
+      {{if $s.Elem}}
+        <h3>{{$s.Title}}</h3>
+        {{range $s.Elem}}{{elem $.Template .}}{{end}}
+      {{else}}
+        <h2>{{$s.Title}}</h2>
+      {{end}}
+      </article>
+  <!-- end of slide {{$i}} -->
+  {{end}}{{/* of Slide block */}}
+
+      <article>
+        <h3>Thank you</h3>
+        {{range .Authors}}
+          <div class="presenter">
+            {{range .Elem}}{{elem $.Template .}}{{end}}
+          </div>
+        {{end}}
+      </article>
+
+    </section>
+
+    <div id="help">
+      Use the left and right arrow keys or click the left and right
+      edges of the page to navigate between slides.<br>
+      (Press 'H' or navigate to hide this message.)
+    </div>
+
+    {{if .PlayEnabled}}
+    <script src='/play.js'></script>
+    {{end}}
+
+    <script>
+      (function() {
+        // Load Google Analytics tracking code on production site only.
+        if (window["location"] && window["location"]["hostname"] == "talks.golang.org") {
+          var ga = document.createElement("script"); ga.type = "text/javascript"; ga.async = true;
+          ga.src = ("https:" == document.location.protocol ? "https://ssl" : "http://www") + ".google-analytics.com/ga.js";
+          var s = document.getElementsByTagName("script")[0]; s.parentNode.insertBefore(ga, s);
+        }
+      })();
+    </script>
+  </body>
+</html>
+{{end}}
+
+{{define "newline"}}
+<br>
+{{end}}

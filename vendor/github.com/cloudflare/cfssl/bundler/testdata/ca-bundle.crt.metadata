@@ -1,0 +1,56 @@
+[
+{
+	"name":"Chrome Browser M39",
+	"weight": 0,
+	"hash_algo": "SHA2",
+	"key_algo": "ECDSA256",
+	"hash_algo_expiry":	{
+					"target": "SHA1",
+					"effective_date": "2014-09-26T00:00:00Z",
+					"expiry_deadline": "2017-01-01T00:00:00Z"
+				}
+},
+{
+	"name":"Chrome Browser M40",
+	"weight": 0,
+	"hash_algo": "SHA2",
+	"key_algo": "ECDSA256",
+	"hash_algo_expiry":	{
+					"target": "SHA1",
+					"effective_date": "2014-09-26T00:00:00Z",
+					"expiry_deadline": "2016-06-01T00:00:00Z"
+				}
+},
+{
+	"name":"Chrome Browser M41 and later",
+	"weight": 0,
+	"hash_algo": "SHA2",
+	"key_algo": "ECDSA256",
+	"hash_algo_expiry":	{
+					"target": "SHA1",
+					"effective_date": "2014-09-26T00:00:00Z",
+					"expiry_deadline": "2016-01-01T00:00:00Z"
+				}
+},
+{
+	"name":"Mozilla",
+	"weight": 99,
+	"hash_algo": "SHA2",
+	"key_algo": "ECDSA256",
+	"keystore": "nss.pem"
+},
+{
+	"name":"OSX",
+	"weight": 99,
+	"hash_algo": "SHA2",
+	"key_algo": "ECDSA256",
+	"keystore": "osx.pem"
+},
+{
+	"name":"Android 2.2 Froyo",
+	"weight": 1,
+	"hash_algo": "SHA2",
+	"key_algo": "RSA",
+	"keystore": "froyo.pem"
+}
+]

@@ -1,0 +1,11 @@
+dist
+/doc
+/doc-staging
+.yardoc
+Gemfile.lock
+awstesting/integration/smoke/**/importmarker__.go
+awstesting/integration/smoke/_test/
+/vendor/bin/
+/vendor/pkg/
+/vendor/src/
+/private/model/cli/gen-api/gen-api

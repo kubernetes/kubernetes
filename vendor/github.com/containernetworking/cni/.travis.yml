@@ -1,0 +1,41 @@
+language: go
+sudo: required
+dist: trusty
+
+go:
+  - 1.7.x
+  - 1.8.x
+
+env:
+  global:
+  - TOOLS_CMD=golang.org/x/tools/cmd
+  - PATH=$GOROOT/bin:$PATH
+  - GO15VENDOREXPERIMENT=1
+  matrix:
+  - TARGET=amd64
+  - TARGET=arm
+  - TARGET=arm64
+  - TARGET=ppc64le
+  - TARGET=s390x
+
+matrix:
+  fast_finish: true
+
+install:
+ - go get ${TOOLS_CMD}/cover
+ - go get github.com/modocache/gover
+ - go get github.com/mattn/goveralls
+
+script:
+ - >
+    if [ "${TARGET}" == "amd64" ]; then
+      GOARCH="${TARGET}" ./test.sh;
+    else
+      GOARCH="${TARGET}" ./build.sh;
+    fi
+
+notifications:
+  email: false
+
+git:
+  depth: 9999999

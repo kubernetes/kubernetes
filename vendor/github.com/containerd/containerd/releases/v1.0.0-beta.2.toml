@@ -1,0 +1,103 @@
+# commit to be tagged for new release
+commit = "HEAD"
+
+project_name = "containerd"
+github_repo = "containerd/containerd"
+
+# previous release
+previous = "v1.0.0-beta.1"
+
+pre_release = true
+
+preface = """\
+This release rounds out much of the remaining feature set for the 1.0 release
+time frame. In addition to a large number of bugfixes and utility additions,
+services and methods have been added to the GRPC API to meet production use
+cases.  The highlight is garbage collection, along with database migrations,
+plugin introspection and rich PID listing."""
+
+# notable prs to include in the release notes, 1234 is the pr number
+[notes]
+	[notes.gc]
+	title = "Garbage Collection"
+	description = """\
+Full garbage collection support for cleaning up content, snapshots and metadata
+for containerd resources. The implementation is based on well-known concurrent
+mark and sweep and the approach allows for extensibility in collection
+policies.
+
+The GC is triggered `Container.Delete and Image.Delete. Note that images may
+need to be re-pulled for proper support."""
+
+	[notes.migrations]
+	title = "Migrations"
+	description = """\
+A lightweight migration framework is now part of containerd. This allows us to
+safely evolve the schema between releases with the groundwork laid early.
+
+As part of this release, a migration will be run to add back references in
+support of garbage collection."""
+
+	[notes.introspection]
+	title = "Introspection API"
+	description = """\
+The new introspection API allows for querying the state of containerd. The
+`Plugins` method lists the state and exports of all initialized plugins in use
+in a containerd instance.
+
+```console
+$ ctr plugins
+TYPE                            ID             PLATFORM       STATUS
+io.containerd.content.v1        content        -              ok
+io.containerd.metadata.v1       bolt           -              ok
+io.containerd.differ.v1         walking        linux/amd64    ok
+io.containerd.grpc.v1           containers     -              ok
+io.containerd.grpc.v1           content        -              ok
+io.containerd.grpc.v1           diff           -              ok
+io.containerd.grpc.v1           events         -              ok
+io.containerd.grpc.v1           healthcheck    -              ok
+io.containerd.grpc.v1           images         -              ok
+io.containerd.grpc.v1           namespaces     -              ok
+io.containerd.snapshotter.v1    btrfs          linux/amd64    error
+io.containerd.snapshotter.v1    overlayfs      linux/amd64    ok
+io.containerd.grpc.v1           snapshots      -              ok
+io.containerd.monitor.v1        cgroups        linux/amd64    ok
+io.containerd.runtime.v1        linux          linux/amd64    ok
+io.containerd.grpc.v1           tasks          -              ok
+io.containerd.grpc.v1           version        -              ok
+```"""
+
+	[notes.listpids]
+	title = "Rich ListPIDs"
+	description = """\
+Listing PIDs through the task service can now provide runtime specific metadata
+through the API. This is particularly interesting on the windows platform. The
+following is an example of a Windows container `ps` output:
+
+```console
+$ ctr tasks ps <container-id>
+PID       INFO
+3716      {ImageName:smss.exe CreatedAt:2017-10-10T17:51:45.1552607Z KernelTime_100Ns:156250 MemoryCommitBytes:348160 MemoryWorkingSetPrivateBytes:217088 MemoryWorkingSetSharedBytes:946176 ProcessID:3716 UserTime_100Ns:0}
+5404      {ImageName:csrss.exe CreatedAt:2017-10-10T17:51:45.1848844Z KernelTime_100Ns:0 MemoryCommitBytes:606208 MemoryWorkingSetPrivateBytes:339968 MemoryWorkingSetSharedBytes:1560576 ProcessID:5404 UserTime_100Ns:0}
+3628      {ImageName:wininit.exe CreatedAt:2017-10-10T17:51:45.1974386Z KernelTime_100Ns:156250 MemoryCommitBytes:983040 MemoryWorkingSetPrivateBytes:610304 MemoryWorkingSetSharedBytes:3448832 ProcessID:3628 UserTime_100Ns:0}
+8576      {ImageName:services.exe CreatedAt:2017-10-10T17:51:45.2091635Z KernelTime_100Ns:468750 MemoryCommitBytes:2048000 MemoryWorkingSetPrivateBytes:1437696 MemoryWorkingSetSharedBytes:4182016 ProcessID:8576 UserTime_100Ns:0}
+7892      {ImageName:lsass.exe CreatedAt:2017-10-10T17:51:45.2177712Z KernelTime_100Ns:937500 MemoryCommitBytes:2666496 MemoryWorkingSetPrivateBytes:1982464 MemoryWorkingSetSharedBytes:7561216 ProcessID:7892 UserTime_100Ns:312500}
+6384      {ImageName:svchost.exe CreatedAt:2017-10-10T17:51:45.3676107Z KernelTime_100Ns:468750 MemoryCommitBytes:1896448 MemoryWorkingSetPrivateBytes:1277952 MemoryWorkingSetSharedBytes:4730880 ProcessID:6384 UserTime_100Ns:156250}
+4904      {ImageName:svchost.exe CreatedAt:2017-10-10T17:51:45.5431743Z KernelTime_100Ns:312500 MemoryCommitBytes:1781760 MemoryWorkingSetPrivateBytes:1331200 MemoryWorkingSetSharedBytes:4952064 ProcessID:4904 UserTime_100Ns:0}
+2092      {ImageName:svchost.exe CreatedAt:2017-10-10T17:51:45.5838844Z KernelTime_100Ns:156250 MemoryCommitBytes:2486272 MemoryWorkingSetPrivateBytes:2117632 MemoryWorkingSetSharedBytes:5668864 ProcessID:2092 UserTime_100Ns:312500}
+6576      {ImageName:svchost.exe CreatedAt:2017-10-10T17:51:45.727607Z KernelTime_100Ns:156250 MemoryCommitBytes:1818624 MemoryWorkingSetPrivateBytes:1417216 MemoryWorkingSetSharedBytes:6684672 ProcessID:6576 UserTime_100Ns:156250}
+2412      {ImageName:svchost.exe CreatedAt:2017-10-10T17:51:46.0427889Z KernelTime_100Ns:468750 MemoryCommitBytes:5570560 MemoryWorkingSetPrivateBytes:3915776 MemoryWorkingSetSharedBytes:5963776 ProcessID:2412 UserTime_100Ns:0}
+5472      {ImageName:svchost.exe CreatedAt:2017-10-10T17:51:46.0827893Z KernelTime_100Ns:312500 MemoryCommitBytes:2625536 MemoryWorkingSetPrivateBytes:1908736 MemoryWorkingSetSharedBytes:7532544 ProcessID:5472 UserTime_100Ns:312500}
+8756      {ImageName:svchost.exe CreatedAt:2017-10-10T17:51:46.1108672Z KernelTime_100Ns:312500 MemoryCommitBytes:1843200 MemoryWorkingSetPrivateBytes:1466368 MemoryWorkingSetSharedBytes:4612096 ProcessID:8756 UserTime_100Ns:0}
+1508      {ImageName:svchost.exe CreatedAt:2017-10-10T17:51:46.1522136Z KernelTime_100Ns:2812500 MemoryCommitBytes:4816896 MemoryWorkingSetPrivateBytes:3600384 MemoryWorkingSetSharedBytes:9281536 ProcessID:1508 UserTime_100Ns:468750}
+4612      {ImageName:svchost.exe CreatedAt:2017-10-10T17:51:46.2212148Z KernelTime_100Ns:937500 MemoryCommitBytes:3063808 MemoryWorkingSetPrivateBytes:2265088 MemoryWorkingSetSharedBytes:8667136 ProcessID:4612 UserTime_100Ns:156250}
+5936      {ImageName:CExecSvc.exe CreatedAt:2017-10-10T17:51:46.2224031Z KernelTime_100Ns:0 MemoryCommitBytes:983040 MemoryWorkingSetPrivateBytes:737280 MemoryWorkingSetSharedBytes:3723264 ProcessID:5936 UserTime_100Ns:0}
+4416      {ImageName:cmd.exe CreatedAt:2017-10-10T17:51:46.5943846Z KernelTime_100Ns:0 MemoryCommitBytes:1564672 MemoryWorkingSetPrivateBytes:356352 MemoryWorkingSetSharedBytes:2174976 ProcessID:4416 UserTime_100Ns:0}
+8700      {ImageName:powershell.exe CreatedAt:2017-10-10T17:51:46.6120645Z KernelTime_100Ns:2343750 MemoryCommitBytes:24522752 MemoryWorkingSetPrivateBytes:19853312 MemoryWorkingSetSharedBytes:27156480 ProcessID:8700 UserTime_100Ns:10156250}
+```
+"""
+
+[breaking]
+	[breaking.metrics]
+	pr = 1235
+	description = """ """

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="196px" height="59px" viewBox="0 0 196 59" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" style="background: #FFFFFF;">
+    <!-- Generator: Sketch 41.2 (35397) - http://www.bohemiancoding.com/sketch -->
+    <title>containerd-light</title>
+    <desc>Created with Sketch.</desc>
+    <defs></defs>
+    <g id="Page-1" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="containerd-light" fill="#FFFFFF">
+            <path d="M32,42 L42,42 L42,32 L32,32 L32,42 Z M28,43 L28,46 L46,46 L46,43 L46,31.5 L46,28 L28,28 L28,31.5 L28,43 Z M60,28 L51,28 L48,28 L48,46 L52,46 L52,32 L59,32 L59,46 L63,46 L63,28 L60,28 Z M115.5,28 L107.5,28 L104,28 L104,46 L108,46 L108,32 L115,32 L115,46 L119,46 L119,28 L115.5,28 Z M124,46 L121,46 L121,28 L123,28 L138,28 L138,30 L138,39 L136,39 L125,39 L125,42 L136,42 L136,46 L124,46 Z M134,32 L125,32 L125,35 L134,35 L134,32 Z M82,42 L92,42 L92,39 L82,39 L82,42 Z M80,46 L94,46 L96,46 L96,30.5 L96,28 L82,28 L82,32 L92,32 L92,35 L78,35 L78,38 L78,46 L80,46 Z M70.5,46 L68,46 L68,32 L65,32 L65,28 L68,28 L68,21 L72,21 L72,28 L76,28 L76,32 L72,32 L72,42 L76,42 L76,46 L70.5,46 Z M11,46 L8,46 L8,28 L11,28 L26,28 L26,32 L12,32 L12,42 L26,42 L26,46 L11,46 Z M98,28 L102,28 L102,46 L98,46 L98,28 Z M98,21 L102,21 L102,25 L98,25 L98,21 Z M140,28 L144,28 L144,46 L140,46 L140,28 Z M144,28 L155,28 L155,32 L144,32 L144,28 Z" id="Combined-Shape" opacity="0.66"></path>
+            <path d="M177,27 L177,20 L183,20 L183,46 L180,46 L163,46 L163,41 L177,41 L177,32 L169,32 L169,41 L163,41 L163,27 L166.5,27 L177,27 Z M158,8 L188,8 L188,51 L158,51 L158,8 Z" id="Combined-Shape"></path>
+        </g>
+    </g>
+</svg>

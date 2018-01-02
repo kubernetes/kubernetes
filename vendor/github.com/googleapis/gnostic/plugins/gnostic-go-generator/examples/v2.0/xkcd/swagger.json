@@ -1,0 +1,111 @@
+{
+  "swagger": "2.0",
+  "schemes": [
+    "http"
+  ],
+  "host": "xkcd.com",
+  "basePath": "/",
+  "info": {
+    "description": "Webcomic of romance, sarcasm, math, and language.",
+    "title": "XKCD",
+    "version": "1.0.0",
+    "x-apisguru-categories": [
+      "media"
+    ],
+    "x-logo": {
+      "url": "https://api.apis.guru/v2/cache/logo/http_imgs.xkcd.com_static_terrible_small_logo.png"
+    },
+    "x-origin": {
+      "format": "swagger",
+      "url": "https://raw.githubusercontent.com/APIs-guru/unofficial_openapi_specs/master/xkcd.com/1.0.0/swagger.yaml",
+      "version": "2.0"
+    },
+    "x-preferred": true,
+    "x-providerName": "xkcd.com",
+    "x-tags": [
+      "humor",
+      "comics"
+    ],
+    "x-unofficialSpec": true
+  },
+  "externalDocs": {
+    "url": "https://xkcd.com/json.html"
+  },
+  "securityDefinitions": {},
+  "paths": {
+    "/info.0.json": {
+      "get": {
+        "description": "Fetch current comic and metadata.\n",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/comic"
+            }
+          }
+        }
+      }
+    },
+    "/{comicId}/info.0.json": {
+      "get": {
+        "description": "Fetch comics and metadata  by comic id.\n",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "comicId",
+            "required": true,
+            "type": "number"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/comic"
+            }
+          }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "comic": {
+      "properties": {
+        "alt": {
+          "type": "string"
+        },
+        "day": {
+          "type": "string"
+        },
+        "img": {
+          "type": "string"
+        },
+        "link": {
+          "type": "string"
+        },
+        "month": {
+          "type": "string"
+        },
+        "news": {
+          "type": "string"
+        },
+        "num": {
+          "type": "number"
+        },
+        "safe_title": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "transcript": {
+          "type": "string"
+        },
+        "year": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    }
+  }
+}

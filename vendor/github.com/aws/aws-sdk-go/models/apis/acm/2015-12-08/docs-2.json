@@ -1,0 +1,398 @@
+{
+  "version": "2.0",
+  "service": "<fullname>AWS Certificate Manager</fullname> <p>Welcome to the AWS Certificate Manager (ACM) API documentation.</p> <p>You can use ACM to manage SSL/TLS certificates for your AWS-based websites and applications. For general information about using ACM, see the <a href=\"http://docs.aws.amazon.com/acm/latest/userguide/\"> <i>AWS Certificate Manager User Guide</i> </a>.</p>",
+  "operations": {
+    "AddTagsToCertificate": "<p>Adds one or more tags to an ACM Certificate. Tags are labels that you can use to identify and organize your AWS resources. Each tag consists of a <code>key</code> and an optional <code>value</code>. You specify the certificate on input by its Amazon Resource Name (ARN). You specify the tag by using a key-value pair.</p> <p>You can apply a tag to just one certificate if you want to identify a specific characteristic of that certificate, or you can apply the same tag to multiple certificates if you want to filter for a common relationship among those certificates. Similarly, you can apply the same tag to multiple resources if you want to specify a relationship among those resources. For example, you can add the same tag to an ACM Certificate and an Elastic Load Balancing load balancer to indicate that they are both used by the same website. For more information, see <a href=\"http://docs.aws.amazon.com/acm/latest/userguide/tags.html\">Tagging ACM Certificates</a>.</p> <p>To remove one or more tags, use the <a>RemoveTagsFromCertificate</a> action. To view all of the tags that have been applied to the certificate, use the <a>ListTagsForCertificate</a> action.</p>",
+    "DeleteCertificate": "<p>Deletes an ACM Certificate and its associated private key. If this action succeeds, the certificate no longer appears in the list of ACM Certificates that can be displayed by calling the <a>ListCertificates</a> action or be retrieved by calling the <a>GetCertificate</a> action. The certificate will not be available for use by other AWS services.</p> <note> <p>You cannot delete an ACM Certificate that is being used by another AWS service. To delete a certificate that is in use, the certificate association must first be removed.</p> </note>",
+    "DescribeCertificate": "<p>Returns detailed metadata about the specified ACM Certificate.</p>",
+    "GetCertificate": "<p>Retrieves an ACM Certificate and certificate chain for the certificate specified by an ARN. The chain is an ordered list of certificates that contains the root certificate, intermediate certificates of subordinate CAs, and the ACM Certificate. The certificate and certificate chain are base64 encoded. If you want to decode the certificate chain to see the individual certificate fields, you can use OpenSSL.</p> <note> <p>Currently, ACM Certificates can be used only with Elastic Load Balancing and Amazon CloudFront.</p> </note>",
+    "ImportCertificate": "<p>Imports an SSL/TLS certificate into AWS Certificate Manager (ACM) to use with <a href=\"http://docs.aws.amazon.com/acm/latest/userguide/acm-services.html\">ACM's integrated AWS services</a>.</p> <note> <p>ACM does not provide <a href=\"http://docs.aws.amazon.com/acm/latest/userguide/acm-renewal.html\">managed renewal</a> for certificates that you import.</p> </note> <p>For more information about importing certificates into ACM, including the differences between certificates that you import and those that ACM provides, see <a href=\"http://docs.aws.amazon.com/acm/latest/userguide/import-certificate.html\">Importing Certificates</a> in the <i>AWS Certificate Manager User Guide</i>.</p> <p>To import a certificate, you must provide the certificate and the matching private key. When the certificate is not self-signed, you must also provide a certificate chain. You can omit the certificate chain when importing a self-signed certificate.</p> <p>The certificate, private key, and certificate chain must be PEM-encoded. For more information about converting these items to PEM format, see <a href=\"http://docs.aws.amazon.com/acm/latest/userguide/import-certificate.html#import-certificate-troubleshooting\">Importing Certificates Troubleshooting</a> in the <i>AWS Certificate Manager User Guide</i>.</p> <p>To import a new certificate, omit the <code>CertificateArn</code> field. Include this field only when you want to replace a previously imported certificate.</p> <p>This operation returns the <a href=\"http://docs.aws.amazon.com/general/latest/gr/aws-arns-and-namespaces.html\">Amazon Resource Name (ARN)</a> of the imported certificate.</p>",
+    "ListCertificates": "<p>Retrieves a list of ACM Certificates and the domain name for each. You can optionally filter the list to return only the certificates that match the specified status.</p>",
+    "ListTagsForCertificate": "<p>Lists the tags that have been applied to the ACM Certificate. Use the certificate's Amazon Resource Name (ARN) to specify the certificate. To add a tag to an ACM Certificate, use the <a>AddTagsToCertificate</a> action. To delete a tag, use the <a>RemoveTagsFromCertificate</a> action.</p>",
+    "RemoveTagsFromCertificate": "<p>Remove one or more tags from an ACM Certificate. A tag consists of a key-value pair. If you do not specify the value portion of the tag when calling this function, the tag will be removed regardless of value. If you specify a value, the tag is removed only if it is associated with the specified value.</p> <p>To add tags to a certificate, use the <a>AddTagsToCertificate</a> action. To view all of the tags that have been applied to a specific ACM Certificate, use the <a>ListTagsForCertificate</a> action.</p>",
+    "RequestCertificate": "<p>Requests an ACM Certificate for use with other AWS services. To request an ACM Certificate, you must specify the fully qualified domain name (FQDN) for your site. You can also specify additional FQDNs if users can reach your site by using other names. For each domain name you specify, email is sent to the domain owner to request approval to issue the certificate. After receiving approval from the domain owner, the ACM Certificate is issued. For more information, see the <a href=\"http://docs.aws.amazon.com/acm/latest/userguide/\">AWS Certificate Manager User Guide</a>.</p>",
+    "ResendValidationEmail": "<p>Resends the email that requests domain ownership validation. The domain owner or an authorized representative must approve the ACM Certificate before it can be issued. The certificate can be approved by clicking a link in the mail to navigate to the Amazon certificate approval website and then clicking <b>I Approve</b>. However, the validation email can be blocked by spam filters. Therefore, if you do not receive the original mail, you can request that the mail be resent within 72 hours of requesting the ACM Certificate. If more than 72 hours have elapsed since your original request or since your last attempt to resend validation mail, you must request a new certificate. For more information about setting up your contact email addresses, see <a href=\"http://docs.aws.amazon.com/acm/latest/userguide/setup-email.html\">Configure Email for your Domain</a>. </p>"
+  },
+  "shapes": {
+    "AddTagsToCertificateRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "Arn": {
+      "base": null,
+      "refs": {
+        "AddTagsToCertificateRequest$CertificateArn": "<p>String that contains the ARN of the ACM Certificate to which the tag is to be applied. This must be of the form:</p> <p> <code>arn:aws:acm:region:123456789012:certificate/12345678-1234-1234-1234-123456789012</code> </p> <p>For more information about ARNs, see <a href=\"http://docs.aws.amazon.com/general/latest/gr/aws-arns-and-namespaces.html\">Amazon Resource Names (ARNs) and AWS Service Namespaces</a>.</p>",
+        "CertificateDetail$CertificateArn": "<p>The Amazon Resource Name (ARN) of the certificate. For more information about ARNs, see <a href=\"http://docs.aws.amazon.com/general/latest/gr/aws-arns-and-namespaces.html\">Amazon Resource Names (ARNs) and AWS Service Namespaces</a> in the <i>AWS General Reference</i>.</p>",
+        "CertificateSummary$CertificateArn": "<p>Amazon Resource Name (ARN) of the certificate. This is of the form:</p> <p> <code>arn:aws:acm:region:123456789012:certificate/12345678-1234-1234-1234-123456789012</code> </p> <p>For more information about ARNs, see <a href=\"http://docs.aws.amazon.com/general/latest/gr/aws-arns-and-namespaces.html\">Amazon Resource Names (ARNs) and AWS Service Namespaces</a>.</p>",
+        "DeleteCertificateRequest$CertificateArn": "<p>String that contains the ARN of the ACM Certificate to be deleted. This must be of the form:</p> <p> <code>arn:aws:acm:region:123456789012:certificate/12345678-1234-1234-1234-123456789012</code> </p> <p>For more information about ARNs, see <a href=\"http://docs.aws.amazon.com/general/latest/gr/aws-arns-and-namespaces.html\">Amazon Resource Names (ARNs) and AWS Service Namespaces</a>.</p>",
+        "DescribeCertificateRequest$CertificateArn": "<p>The Amazon Resource Name (ARN) of the ACM Certificate. The ARN must have the following form:</p> <p> <code>arn:aws:acm:region:123456789012:certificate/12345678-1234-1234-1234-123456789012</code> </p> <p>For more information about ARNs, see <a href=\"http://docs.aws.amazon.com/general/latest/gr/aws-arns-and-namespaces.html\">Amazon Resource Names (ARNs) and AWS Service Namespaces</a>.</p>",
+        "GetCertificateRequest$CertificateArn": "<p>String that contains a certificate ARN in the following format:</p> <p> <code>arn:aws:acm:region:123456789012:certificate/12345678-1234-1234-1234-123456789012</code> </p> <p>For more information about ARNs, see <a href=\"http://docs.aws.amazon.com/general/latest/gr/aws-arns-and-namespaces.html\">Amazon Resource Names (ARNs) and AWS Service Namespaces</a>.</p>",
+        "ImportCertificateRequest$CertificateArn": "<p>The <a href=\"http://docs.aws.amazon.com/general/latest/gr/aws-arns-and-namespaces.html\">Amazon Resource Name (ARN)</a> of an imported certificate to replace. To import a new certificate, omit this field.</p>",
+        "ImportCertificateResponse$CertificateArn": "<p>The <a href=\"http://docs.aws.amazon.com/general/latest/gr/aws-arns-and-namespaces.html\">Amazon Resource Name (ARN)</a> of the imported certificate.</p>",
+        "ListTagsForCertificateRequest$CertificateArn": "<p>String that contains the ARN of the ACM Certificate for which you want to list the tags. This has the following form:</p> <p> <code>arn:aws:acm:region:123456789012:certificate/12345678-1234-1234-1234-123456789012</code> </p> <p>For more information about ARNs, see <a href=\"http://docs.aws.amazon.com/general/latest/gr/aws-arns-and-namespaces.html\">Amazon Resource Names (ARNs) and AWS Service Namespaces</a>.</p>",
+        "RemoveTagsFromCertificateRequest$CertificateArn": "<p>String that contains the ARN of the ACM Certificate with one or more tags that you want to remove. This must be of the form:</p> <p> <code>arn:aws:acm:region:123456789012:certificate/12345678-1234-1234-1234-123456789012</code> </p> <p>For more information about ARNs, see <a href=\"http://docs.aws.amazon.com/general/latest/gr/aws-arns-and-namespaces.html\">Amazon Resource Names (ARNs) and AWS Service Namespaces</a>.</p>",
+        "RequestCertificateResponse$CertificateArn": "<p>String that contains the ARN of the issued certificate. This must be of the form:</p> <p> <code>arn:aws:acm:us-east-1:123456789012:certificate/12345678-1234-1234-1234-123456789012</code> </p>",
+        "ResendValidationEmailRequest$CertificateArn": "<p>String that contains the ARN of the requested certificate. The certificate ARN is generated and returned by the <a>RequestCertificate</a> action as soon as the request is made. By default, using this parameter causes email to be sent to all top-level domains you specified in the certificate request.</p> <p>The ARN must be of the form:</p> <p> <code>arn:aws:acm:us-east-1:123456789012:certificate/12345678-1234-1234-1234-123456789012</code> </p>"
+      }
+    },
+    "CertificateBody": {
+      "base": null,
+      "refs": {
+        "GetCertificateResponse$Certificate": "<p>String that contains the ACM Certificate represented by the ARN specified at input.</p>"
+      }
+    },
+    "CertificateBodyBlob": {
+      "base": null,
+      "refs": {
+        "ImportCertificateRequest$Certificate": "<p>The certificate to import. It must meet the following requirements:</p> <ul> <li> <p>Must be PEM-encoded.</p> </li> <li> <p>Must contain a 1024-bit or 2048-bit RSA public key.</p> </li> <li> <p>Must be valid at the time of import. You cannot import a certificate before its validity period begins (the certificate's <code>NotBefore</code> date) or after it expires (the certificate's <code>NotAfter</code> date).</p> </li> </ul>"
+      }
+    },
+    "CertificateChain": {
+      "base": null,
+      "refs": {
+        "GetCertificateResponse$CertificateChain": "<p>The certificate chain that contains the root certificate issued by the certificate authority (CA).</p>"
+      }
+    },
+    "CertificateChainBlob": {
+      "base": null,
+      "refs": {
+        "ImportCertificateRequest$CertificateChain": "<p>The certificate chain. It must be PEM-encoded.</p>"
+      }
+    },
+    "CertificateDetail": {
+      "base": "<p>Contains metadata about an ACM certificate. This structure is returned in the response to a <a>DescribeCertificate</a> request.</p>",
+      "refs": {
+        "DescribeCertificateResponse$Certificate": "<p>Metadata about an ACM certificate.</p>"
+      }
+    },
+    "CertificateStatus": {
+      "base": null,
+      "refs": {
+        "CertificateDetail$Status": "<p>The status of the certificate.</p>",
+        "CertificateStatuses$member": null
+      }
+    },
+    "CertificateStatuses": {
+      "base": null,
+      "refs": {
+        "ListCertificatesRequest$CertificateStatuses": "<p>The status or statuses on which to filter the list of ACM Certificates.</p>"
+      }
+    },
+    "CertificateSummary": {
+      "base": "<p>This structure is returned in the response object of <a>ListCertificates</a> action.</p>",
+      "refs": {
+        "CertificateSummaryList$member": null
+      }
+    },
+    "CertificateSummaryList": {
+      "base": null,
+      "refs": {
+        "ListCertificatesResponse$CertificateSummaryList": "<p>A list of ACM Certificates.</p>"
+      }
+    },
+    "CertificateType": {
+      "base": null,
+      "refs": {
+        "CertificateDetail$Type": "<p>The source of the certificate. For certificates provided by ACM, this value is <code>AMAZON_ISSUED</code>. For certificates that you imported with <a>ImportCertificate</a>, this value is <code>IMPORTED</code>. ACM does not provide <a href=\"http://docs.aws.amazon.com/acm/latest/userguide/acm-renewal.html\">managed renewal</a> for imported certificates. For more information about the differences between certificates that you import and those that ACM provides, see <a href=\"http://docs.aws.amazon.com/acm/latest/userguide/import-certificate.html\">Importing Certificates</a> in the <i>AWS Certificate Manager User Guide</i>.</p>"
+      }
+    },
+    "DeleteCertificateRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeCertificateRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeCertificateResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DomainList": {
+      "base": null,
+      "refs": {
+        "CertificateDetail$SubjectAlternativeNames": "<p>One or more domain names (subject alternative names) included in the certificate. This list contains the domain names that are bound to the public key that is contained in the certificate. The subject alternative names include the canonical domain name (CN) of the certificate and additional domain names that can be used to connect to the website.</p>",
+        "RequestCertificateRequest$SubjectAlternativeNames": "<p>Additional FQDNs to be included in the Subject Alternative Name extension of the ACM Certificate. For example, add the name www.example.net to a certificate for which the <code>DomainName</code> field is www.example.com if users can reach your site by using either name. The maximum number of domain names that you can add to an ACM Certificate is 100. However, the initial limit is 10 domain names. If you need more than 10 names, you must request a limit increase. For more information, see <a href=\"http://docs.aws.amazon.com/acm/latest/userguide/acm-limits.html\">Limits</a>.</p>"
+      }
+    },
+    "DomainNameString": {
+      "base": null,
+      "refs": {
+        "CertificateDetail$DomainName": "<p>The fully qualified domain name for the certificate, such as www.example.com or example.com.</p>",
+        "CertificateSummary$DomainName": "<p>Fully qualified domain name (FQDN), such as www.example.com or example.com, for the certificate.</p>",
+        "DomainList$member": null,
+        "DomainValidation$DomainName": "<p>A fully qualified domain name (FQDN) in the certificate. For example, <code>www.example.com</code> or <code>example.com</code>.</p>",
+        "DomainValidation$ValidationDomain": "<p>The domain name that ACM used to send domain validation emails.</p>",
+        "DomainValidationOption$DomainName": "<p>A fully qualified domain name (FQDN) in the certificate request.</p>",
+        "DomainValidationOption$ValidationDomain": "<p>The domain name that you want ACM to use to send you validation emails. This domain name is the suffix of the email addresses that you want ACM to use. This must be the same as the <code>DomainName</code> value or a superdomain of the <code>DomainName</code> value. For example, if you request a certificate for <code>testing.example.com</code>, you can specify <code>example.com</code> for this value. In that case, ACM sends domain validation emails to the following five addresses:</p> <ul> <li> <p>admin@example.com</p> </li> <li> <p>administrator@example.com</p> </li> <li> <p>hostmaster@example.com</p> </li> <li> <p>postmaster@example.com</p> </li> <li> <p>webmaster@example.com</p> </li> </ul>",
+        "RequestCertificateRequest$DomainName": "<p> Fully qualified domain name (FQDN), such as www.example.com, of the site that you want to secure with an ACM Certificate. Use an asterisk (*) to create a wildcard certificate that protects several sites in the same domain. For example, *.example.com protects www.example.com, site.example.com, and images.example.com. </p> <p> The maximum length of a DNS name is 253 octets. The name is made up of multiple labels separated by periods. No label can be longer than 63 octets. Consider the following examples: </p> <p> <code>(63 octets).(63 octets).(63 octets).(61 octets)</code> is legal because the total length is 253 octets (63+1+63+1+63+1+61) and no label exceeds 63 octets. </p> <p> <code>(64 octets).(63 octets).(63 octets).(61 octets)</code> is not legal because the total length exceeds 253 octets (64+1+63+1+63+1+61) and the first label exceeds 63 octets. </p> <p> <code>(63 octets).(63 octets).(63 octets).(62 octets)</code> is not legal because the total length of the DNS name (63+1+63+1+63+1+62) exceeds 253 octets. </p>",
+        "ResendValidationEmailRequest$Domain": "<p>The fully qualified domain name (FQDN) of the certificate that needs to be validated.</p>",
+        "ResendValidationEmailRequest$ValidationDomain": "<p>The base validation domain that will act as the suffix of the email addresses that are used to send the emails. This must be the same as the <code>Domain</code> value or a superdomain of the <code>Domain</code> value. For example, if you requested a certificate for <code>site.subdomain.example.com</code> and specify a <b>ValidationDomain</b> of <code>subdomain.example.com</code>, ACM sends email to the domain registrant, technical contact, and administrative contact in WHOIS and the following five addresses:</p> <ul> <li> <p>admin@subdomain.example.com</p> </li> <li> <p>administrator@subdomain.example.com</p> </li> <li> <p>hostmaster@subdomain.example.com</p> </li> <li> <p>postmaster@subdomain.example.com</p> </li> <li> <p>webmaster@subdomain.example.com</p> </li> </ul>"
+      }
+    },
+    "DomainStatus": {
+      "base": null,
+      "refs": {
+        "DomainValidation$ValidationStatus": "<p>The validation status of the domain name.</p>"
+      }
+    },
+    "DomainValidation": {
+      "base": "<p>Contains information about the validation of each domain name in the certificate.</p>",
+      "refs": {
+        "DomainValidationList$member": null
+      }
+    },
+    "DomainValidationList": {
+      "base": null,
+      "refs": {
+        "CertificateDetail$DomainValidationOptions": "<p>Contains information about the initial validation of each domain name that occurs as a result of the <a>RequestCertificate</a> request. This field exists only when the certificate type is <code>AMAZON_ISSUED</code>.</p>",
+        "RenewalSummary$DomainValidationOptions": "<p>Contains information about the validation of each domain name in the certificate, as it pertains to ACM's <a href=\"http://docs.aws.amazon.com/acm/latest/userguide/acm-renewal.html\">managed renewal</a>. This is different from the initial validation that occurs as a result of the <a>RequestCertificate</a> request. This field exists only when the certificate type is <code>AMAZON_ISSUED</code>.</p>"
+      }
+    },
+    "DomainValidationOption": {
+      "base": "<p>Contains information about the domain names that you want ACM to use to send you emails to validate your ownership of the domain.</p>",
+      "refs": {
+        "DomainValidationOptionList$member": null
+      }
+    },
+    "DomainValidationOptionList": {
+      "base": null,
+      "refs": {
+        "RequestCertificateRequest$DomainValidationOptions": "<p>The domain name that you want ACM to use to send you emails to validate your ownership of the domain.</p>"
+      }
+    },
+    "FailureReason": {
+      "base": null,
+      "refs": {
+        "CertificateDetail$FailureReason": "<p>The reason the certificate request failed. This value exists only when the certificate status is <code>FAILED</code>. For more information, see <a href=\"http://docs.aws.amazon.com/acm/latest/userguide/troubleshooting.html#troubleshooting-failed\">Certificate Request Failed</a> in the <i>AWS Certificate Manager User Guide</i>.</p>"
+      }
+    },
+    "GetCertificateRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetCertificateResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "IdempotencyToken": {
+      "base": null,
+      "refs": {
+        "RequestCertificateRequest$IdempotencyToken": "<p>Customer chosen string that can be used to distinguish between calls to <code>RequestCertificate</code>. Idempotency tokens time out after one hour. Therefore, if you call <code>RequestCertificate</code> multiple times with the same idempotency token within one hour, ACM recognizes that you are requesting only one certificate and will issue only one. If you change the idempotency token for each call, ACM recognizes that you are requesting multiple certificates.</p>"
+      }
+    },
+    "ImportCertificateRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ImportCertificateResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "InUseList": {
+      "base": null,
+      "refs": {
+        "CertificateDetail$InUseBy": "<p>A list of ARNs for the AWS resources that are using the certificate. A certificate can be used by multiple AWS resources.</p>"
+      }
+    },
+    "InvalidArnException": {
+      "base": "<p>The requested Amazon Resource Name (ARN) does not refer to an existing resource.</p>",
+      "refs": {
+      }
+    },
+    "InvalidDomainValidationOptionsException": {
+      "base": "<p>One or more values in the <a>DomainValidationOption</a> structure is incorrect.</p>",
+      "refs": {
+      }
+    },
+    "InvalidStateException": {
+      "base": "<p>Processing has reached an invalid state. For example, this exception can occur if the specified domain is not using email validation, or the current certificate status does not permit the requested operation. See the exception message returned by ACM to determine which state is not valid.</p>",
+      "refs": {
+      }
+    },
+    "InvalidTagException": {
+      "base": "<p>One or both of the values that make up the key-value pair is not valid. For example, you cannot specify a tag value that begins with <code>aws:</code>.</p>",
+      "refs": {
+      }
+    },
+    "KeyAlgorithm": {
+      "base": null,
+      "refs": {
+        "CertificateDetail$KeyAlgorithm": "<p>The algorithm that was used to generate the key pair (the public and private key).</p>"
+      }
+    },
+    "LimitExceededException": {
+      "base": "<p>An ACM limit has been exceeded. For example, you may have input more domains than are allowed or you've requested too many certificates for your account. See the exception message returned by ACM to determine which limit you have violated. For more information about ACM limits, see the <a href=\"http://docs.aws.amazon.com/acm/latest/userguide/acm-limits.html\">Limits</a> topic.</p>",
+      "refs": {
+      }
+    },
+    "ListCertificatesRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListCertificatesResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListTagsForCertificateRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListTagsForCertificateResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "MaxItems": {
+      "base": null,
+      "refs": {
+        "ListCertificatesRequest$MaxItems": "<p>Use this parameter when paginating results to specify the maximum number of items to return in the response. If additional items exist beyond the number you specify, the <code>NextToken</code> element is sent in the response. Use this <code>NextToken</code> value in a subsequent request to retrieve additional items.</p>"
+      }
+    },
+    "NextToken": {
+      "base": null,
+      "refs": {
+        "ListCertificatesRequest$NextToken": "<p>Use this parameter only when paginating results and only in a subsequent request after you receive a response with truncated results. Set it to the value of <code>NextToken</code> from the response you just received.</p>",
+        "ListCertificatesResponse$NextToken": "<p>When the list is truncated, this value is present and contains the value to use for the <code>NextToken</code> parameter in a subsequent pagination request.</p>"
+      }
+    },
+    "PrivateKeyBlob": {
+      "base": null,
+      "refs": {
+        "ImportCertificateRequest$PrivateKey": "<p>The private key that matches the public key in the certificate. It must meet the following requirements:</p> <ul> <li> <p>Must be PEM-encoded.</p> </li> <li> <p>Must be unencrypted. You cannot import a private key that is protected by a password or passphrase.</p> </li> </ul>"
+      }
+    },
+    "RemoveTagsFromCertificateRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "RenewalStatus": {
+      "base": null,
+      "refs": {
+        "RenewalSummary$RenewalStatus": "<p>The status of ACM's <a href=\"http://docs.aws.amazon.com/acm/latest/userguide/acm-renewal.html\">managed renewal</a> of the certificate.</p>"
+      }
+    },
+    "RenewalSummary": {
+      "base": "<p>Contains information about the status of ACM's <a href=\"http://docs.aws.amazon.com/acm/latest/userguide/acm-renewal.html\">managed renewal</a> for the certificate. This structure exists only when the certificate type is <code>AMAZON_ISSUED</code>.</p>",
+      "refs": {
+        "CertificateDetail$RenewalSummary": "<p>Contains information about the status of ACM's <a href=\"http://docs.aws.amazon.com/acm/latest/userguide/acm-renewal.html\">managed renewal</a> for the certificate. This field exists only when the certificate type is <code>AMAZON_ISSUED</code>.</p>"
+      }
+    },
+    "RequestCertificateRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "RequestCertificateResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "RequestInProgressException": {
+      "base": "<p>The certificate request is in process and the certificate in your account has not yet been issued.</p>",
+      "refs": {
+      }
+    },
+    "ResendValidationEmailRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ResourceInUseException": {
+      "base": "<p>The certificate is in use by another AWS service in the caller's account. Remove the association and try again.</p>",
+      "refs": {
+      }
+    },
+    "ResourceNotFoundException": {
+      "base": "<p>The specified certificate cannot be found in the caller's account, or the caller's account cannot be found.</p>",
+      "refs": {
+      }
+    },
+    "RevocationReason": {
+      "base": null,
+      "refs": {
+        "CertificateDetail$RevocationReason": "<p>The reason the certificate was revoked. This value exists only when the certificate status is <code>REVOKED</code>.</p>"
+      }
+    },
+    "String": {
+      "base": null,
+      "refs": {
+        "CertificateDetail$Serial": "<p>The serial number of the certificate.</p>",
+        "CertificateDetail$Subject": "<p>The name of the entity that is associated with the public key contained in the certificate.</p>",
+        "CertificateDetail$Issuer": "<p>The name of the certificate authority that issued and signed the certificate.</p>",
+        "CertificateDetail$SignatureAlgorithm": "<p>The algorithm that was used to sign the certificate.</p>",
+        "InUseList$member": null,
+        "InvalidArnException$message": null,
+        "InvalidDomainValidationOptionsException$message": null,
+        "InvalidStateException$message": null,
+        "InvalidTagException$message": null,
+        "LimitExceededException$message": null,
+        "RequestInProgressException$message": null,
+        "ResourceInUseException$message": null,
+        "ResourceNotFoundException$message": null,
+        "TooManyTagsException$message": null,
+        "ValidationEmailList$member": null
+      }
+    },
+    "TStamp": {
+      "base": null,
+      "refs": {
+        "CertificateDetail$CreatedAt": "<p>The time at which the certificate was requested. This value exists only when the certificate type is <code>AMAZON_ISSUED</code>.</p>",
+        "CertificateDetail$IssuedAt": "<p>The time at which the certificate was issued. This value exists only when the certificate type is <code>AMAZON_ISSUED</code>.</p>",
+        "CertificateDetail$ImportedAt": "<p>The date and time at which the certificate was imported. This value exists only when the certificate type is <code>IMPORTED</code>.</p>",
+        "CertificateDetail$RevokedAt": "<p>The time at which the certificate was revoked. This value exists only when the certificate status is <code>REVOKED</code>.</p>",
+        "CertificateDetail$NotBefore": "<p>The time before which the certificate is not valid.</p>",
+        "CertificateDetail$NotAfter": "<p>The time after which the certificate is not valid.</p>"
+      }
+    },
+    "Tag": {
+      "base": "<p>A key-value pair that identifies or specifies metadata about an ACM resource.</p>",
+      "refs": {
+        "TagList$member": null
+      }
+    },
+    "TagKey": {
+      "base": null,
+      "refs": {
+        "Tag$Key": "<p>The key of the tag.</p>"
+      }
+    },
+    "TagList": {
+      "base": null,
+      "refs": {
+        "AddTagsToCertificateRequest$Tags": "<p>The key-value pair that defines the tag. The tag value is optional.</p>",
+        "ListTagsForCertificateResponse$Tags": "<p>The key-value pairs that define the applied tags.</p>",
+        "RemoveTagsFromCertificateRequest$Tags": "<p>The key-value pair that defines the tag to remove.</p>"
+      }
+    },
+    "TagValue": {
+      "base": null,
+      "refs": {
+        "Tag$Value": "<p>The value of the tag.</p>"
+      }
+    },
+    "TooManyTagsException": {
+      "base": "<p>The request contains too many tags. Try the request again with fewer tags.</p>",
+      "refs": {
+      }
+    },
+    "ValidationEmailList": {
+      "base": null,
+      "refs": {
+        "DomainValidation$ValidationEmails": "<p>A list of email addresses that ACM used to send domain validation emails.</p>"
+      }
+    }
+  }
+}

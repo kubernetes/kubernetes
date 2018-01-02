@@ -1,0 +1,72 @@
+package influxql;
+
+message Point {
+    required string Name       = 1;
+    required string Tags       = 2;
+    required int64  Time       = 3;
+    required bool   Nil        = 4;
+    repeated Aux    Aux        = 5;
+    optional uint32 Aggregated = 6;
+
+    optional double FloatValue   = 7;
+    optional int64  IntegerValue = 8;
+    optional string StringValue  = 9;
+    optional bool   BooleanValue = 10;
+
+    optional IteratorStats Stats = 11;
+}
+
+message Aux {
+    required int32  DataType     = 1;
+    optional double FloatValue   = 2;
+    optional int64  IntegerValue = 3;
+    optional string StringValue  = 4;
+    optional bool   BooleanValue = 5;
+}
+
+message IteratorOptions {
+    optional string      Expr       = 1;
+    repeated string      Aux        = 2;
+    repeated VarRef      Fields     = 17;
+    repeated Measurement Sources    = 3;
+    optional Interval    Interval   = 4;
+    repeated string      Dimensions = 5;
+    optional int32       Fill       = 6;
+    optional double      FillValue  = 7;
+    optional string      Condition  = 8;
+    optional int64       StartTime  = 9;
+    optional int64       EndTime    = 10;
+    optional bool        Ascending  = 11;
+    optional int64       Limit      = 12;
+    optional int64       Offset     = 13;
+    optional int64       SLimit     = 14;
+    optional int64       SOffset    = 15;
+    optional bool        Dedupe     = 16;
+}
+
+message Measurements {
+    repeated Measurement Items = 1;
+}
+
+message Measurement {
+    optional string Database        = 1;
+    optional string RetentionPolicy = 2;
+    optional string Name            = 3;
+    optional string Regex           = 4;
+    optional bool   IsTarget        = 5;
+}
+
+message Interval {
+    optional int64 Duration = 1;
+    optional int64 Offset   = 2;
+}
+
+message IteratorStats {
+    optional int64 SeriesN = 1;
+    optional int64 PointN  = 2;
+}
+
+message VarRef {
+    required string Val  = 1;
+    optional int32  Type = 2;
+}

@@ -1,0 +1,18 @@
+[
+	{
+		"Name":"Float",
+		"name":"float"
+	},
+	{
+		"Name":"Integer",
+		"name":"integer"
+	},
+	{
+		"Name":"String",
+		"name":"string"
+	},
+	{
+		"Name":"Boolean",
+		"name":"boolean"
+	}
+]

@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<RetrievePropertiesResponse xmlns="urn:vim25" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <returnval>
+    <obj type="SessionManager">SessionManager</obj>
+    <propSet>
+      <name>defaultLocale</name>
+      <val xsi:type="xsd:string">en</val>
+    </propSet>
+    <propSet>
+      <name>messageLocaleList</name>
+      <val xsi:type="ArrayOfString">
+        <string xsi:type="xsd:string">ja</string>
+        <string xsi:type="xsd:string">zh_CN</string>
+        <string xsi:type="xsd:string">en</string>
+        <string xsi:type="xsd:string">de</string>
+        <string xsi:type="xsd:string">zh_TW</string>
+        <string xsi:type="xsd:string">ko</string>
+        <string xsi:type="xsd:string">fr</string>
+      </val>
+    </propSet>
+    <missingSet>
+      <path>message</path>
+      <fault>
+        <fault xsi:type="NotAuthenticated">
+          <object type="Folder">group-d1</object>
+          <privilegeId>System.View</privilegeId>
+        </fault>
+        <localizedMessage/>
+      </fault>
+    </missingSet>
+    <missingSet>
+      <path>sessionList</path>
+      <fault>
+        <fault xsi:type="NotAuthenticated">
+          <object type="Folder">group-d1</object>
+          <privilegeId>Sessions.TerminateSession</privilegeId>
+        </fault>
+        <localizedMessage/>
+      </fault>
+    </missingSet>
+  </returnval>
+</RetrievePropertiesResponse>

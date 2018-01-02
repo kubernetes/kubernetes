@@ -15,7 +15,7 @@ negligible risk of collision.
 
 This package is interoperable with NaCl: https://nacl.cr.yp.to/secretbox.html.
 */
-package secretbox
+package secretbox // import "golang.org/x/crypto/nacl/secretbox"
 
 import (
 	"golang.org/x/crypto/poly1305"

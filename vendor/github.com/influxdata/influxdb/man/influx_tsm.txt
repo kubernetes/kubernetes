@@ -1,0 +1,58 @@
+influx_tsm(1)
+=============
+
+NAME
+----
+influx_tsm - Convert a database from b1 or bz1 format to tsm1 format
+
+SYNPOSIS
+--------
+[verse]
+'influx_tsm' [options] <data-path>
+
+DESCRIPTION
+-----------
+This tool can be used to convert a database from the deprecated b1 or bz1
+formats to tsm1 format. The b1 and bz1 formats were deprecated in 0.10 and
+removed in 0.12.
+
+This tool will backup the directories before conversion (if not disabled). The
+backed-up files must be removed manually, generally after starting up the node
+again to make sure all of the data has been converted correctly.
+
+To restore a backup after attempting to convert to tsm1, you shut down the
+node, remove the converted directory, and copy the backed-up directory to the
+original location.
+
+OPTIONS
+-------
+-backup <path>::
+  The location to backup the current databases. Must not be within the data
+  directory.
+
+-dbs <names>::
+  Comma-delimited list of databases to convert. The default is to convert all
+  databases.
+
+-debug <addr>::
+  If set, http debugging endpoints will be enabled on the given address.
+
+-interval <duration>::
+  How often status updates are printed. Default is '5s'.
+
+-nobackup::
+  Disable database backups. Not recommended.
+
+-parallel::
+  Perform parallel conversions (up to GOMAXPROCS shards at once).
+
+-profile <path>::
+  Write a CPU profile to the path.
+
+-sz <size>::
+  Maximum size of individual TSM files. Defaults to 2147483648.
+
+-y::
+  Don't ask, just convert.
+
+include::footer.txt[]

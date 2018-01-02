@@ -1,0 +1,5 @@
+name = "terraform-test-app"
+
+config_vars {
+    FOO = "bar"
+}

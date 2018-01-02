@@ -1,0 +1,940 @@
+{
+  "version": "2.0",
+  "service": "<p>You can use Amazon CloudWatch Logs to monitor, store, and access your log files from Amazon EC2 instances, AWS CloudTrail, or other sources. You can then retrieve the associated log data from CloudWatch Logs using the CloudWatch console, CloudWatch Logs commands in the AWS CLI, CloudWatch Logs API, or CloudWatch Logs SDK.</p> <p>You can use CloudWatch Logs to:</p> <ul> <li> <p> <b>Monitor logs from EC2 instances in real-time</b>: You can use CloudWatch Logs to monitor applications and systems using log data. For example, CloudWatch Logs can track the number of errors that occur in your application logs and send you a notification whenever the rate of errors exceeds a threshold that you specify. CloudWatch Logs uses your log data for monitoring; so, no code changes are required. For example, you can monitor application logs for specific literal terms (such as \"NullReferenceException\") or count the number of occurrences of a literal term at a particular position in log data (such as \"404\" status codes in an Apache access log). When the term you are searching for is found, CloudWatch Logs reports the data to a CloudWatch metric that you specify.</p> </li> <li> <p> <b>Monitor AWS CloudTrail logged events</b>: You can create alarms in CloudWatch and receive notifications of particular API activity as captured by CloudTrail and use the notification to perform troubleshooting.</p> </li> <li> <p> <b>Archive log data</b>: You can use CloudWatch Logs to store your log data in highly durable storage. You can change the log retention setting so that any log events older than this setting are automatically deleted. The CloudWatch Logs agent makes it easy to quickly send both rotated and non-rotated log data off of a host and into the log service. You can then access the raw log data when you need it.</p> </li> </ul>",
+  "operations": {
+    "AssociateKmsKey": "<p>Associates the specified AWS Key Management Service (AWS KMS) customer master key (CMK) with the specified log group.</p> <p>Associating an AWS KMS CMK with a log group overrides any existing associations between the log group and a CMK. After a CMK is associated with a log group, all newly ingested data for the log group is encrypted using the CMK. This association is stored as long as the data encrypted with the CMK is still within Amazon CloudWatch Logs. This enables Amazon CloudWatch Logs to decrypt this data whenever it is requested.</p> <p>Note that it can take up to 5 minutes for this operation to take effect.</p> <p>If you attempt to associate a CMK with a log group but the CMK does not exist or the CMK is disabled, you will receive an <code>InvalidParameterException</code> error. </p>",
+    "CancelExportTask": "<p>Cancels the specified export task.</p> <p>The task must be in the <code>PENDING</code> or <code>RUNNING</code> state.</p>",
+    "CreateExportTask": "<p>Creates an export task, which allows you to efficiently export data from a log group to an Amazon S3 bucket.</p> <p>This is an asynchronous call. If all the required information is provided, this operation initiates an export task and responds with the ID of the task. After the task has started, you can use <a>DescribeExportTasks</a> to get the status of the export task. Each account can only have one active (<code>RUNNING</code> or <code>PENDING</code>) export task at a time. To cancel an export task, use <a>CancelExportTask</a>.</p> <p>You can export logs from multiple log groups or multiple time ranges to the same S3 bucket. To separate out log data for each export task, you can specify a prefix to be used as the Amazon S3 key prefix for all exported objects.</p>",
+    "CreateLogGroup": "<p>Creates a log group with the specified name.</p> <p>You can create up to 5000 log groups per account.</p> <p>You must use the following guidelines when naming a log group:</p> <ul> <li> <p>Log group names must be unique within a region for an AWS account.</p> </li> <li> <p>Log group names can be between 1 and 512 characters long.</p> </li> <li> <p>Log group names consist of the following characters: a-z, A-Z, 0-9, '_' (underscore), '-' (hyphen), '/' (forward slash), and '.' (period).</p> </li> </ul> <p>If you associate a AWS Key Management Service (AWS KMS) customer master key (CMK) with the log group, ingested data is encrypted using the CMK. This association is stored as long as the data encrypted with the CMK is still within Amazon CloudWatch Logs. This enables Amazon CloudWatch Logs to decrypt this data whenever it is requested.</p> <p>If you attempt to associate a CMK with the log group but the CMK does not exist or the CMK is disabled, you will receive an <code>InvalidParameterException</code> error. </p>",
+    "CreateLogStream": "<p>Creates a log stream for the specified log group.</p> <p>There is no limit on the number of log streams that you can create for a log group.</p> <p>You must use the following guidelines when naming a log stream:</p> <ul> <li> <p>Log stream names must be unique within the log group.</p> </li> <li> <p>Log stream names can be between 1 and 512 characters long.</p> </li> <li> <p>The ':' (colon) and '*' (asterisk) characters are not allowed.</p> </li> </ul>",
+    "DeleteDestination": "<p>Deletes the specified destination, and eventually disables all the subscription filters that publish to it. This operation does not delete the physical resource encapsulated by the destination.</p>",
+    "DeleteLogGroup": "<p>Deletes the specified log group and permanently deletes all the archived log events associated with the log group.</p>",
+    "DeleteLogStream": "<p>Deletes the specified log stream and permanently deletes all the archived log events associated with the log stream.</p>",
+    "DeleteMetricFilter": "<p>Deletes the specified metric filter.</p>",
+    "DeleteResourcePolicy": "<p>Deletes a resource policy from this account. This revokes the access of the identities in that policy to put log events to this account.</p>",
+    "DeleteRetentionPolicy": "<p>Deletes the specified retention policy.</p> <p>Log events do not expire if they belong to log groups without a retention policy.</p>",
+    "DeleteSubscriptionFilter": "<p>Deletes the specified subscription filter.</p>",
+    "DescribeDestinations": "<p>Lists all your destinations. The results are ASCII-sorted by destination name.</p>",
+    "DescribeExportTasks": "<p>Lists the specified export tasks. You can list all your export tasks or filter the results based on task ID or task status.</p>",
+    "DescribeLogGroups": "<p>Lists the specified log groups. You can list all your log groups or filter the results by prefix. The results are ASCII-sorted by log group name.</p>",
+    "DescribeLogStreams": "<p>Lists the log streams for the specified log group. You can list all the log streams or filter the results by prefix. You can also control how the results are ordered.</p> <p>This operation has a limit of five transactions per second, after which transactions are throttled.</p>",
+    "DescribeMetricFilters": "<p>Lists the specified metric filters. You can list all the metric filters or filter the results by log name, prefix, metric name, or metric namespace. The results are ASCII-sorted by filter name.</p>",
+    "DescribeResourcePolicies": "<p>Lists the resource policies in this account.</p>",
+    "DescribeSubscriptionFilters": "<p>Lists the subscription filters for the specified log group. You can list all the subscription filters or filter the results by prefix. The results are ASCII-sorted by filter name.</p>",
+    "DisassociateKmsKey": "<p>Disassociates the associated AWS Key Management Service (AWS KMS) customer master key (CMK) from the specified log group.</p> <p>After the AWS KMS CMK is disassociated from the log group, AWS CloudWatch Logs stops encrypting newly ingested data for the log group. All previously ingested data remains encrypted, and AWS CloudWatch Logs requires permissions for the CMK whenever the encrypted data is requested.</p> <p>Note that it can take up to 5 minutes for this operation to take effect.</p>",
+    "FilterLogEvents": "<p>Lists log events from the specified log group. You can list all the log events or filter the results using a filter pattern, a time range, and the name of the log stream.</p> <p>By default, this operation returns as many log events as can fit in 1 MB (up to 10,000 log events), or all the events found within the time range that you specify. If the results include a token, then there are more log events available, and you can get additional results by specifying the token in a subsequent call.</p>",
+    "GetLogEvents": "<p>Lists log events from the specified log stream. You can list all the log events or filter using a time range.</p> <p>By default, this operation returns as many log events as can fit in a response size of 1MB (up to 10,000 log events). You can get additional log events by specifying one of the tokens in a subsequent call.</p>",
+    "ListTagsLogGroup": "<p>Lists the tags for the specified log group.</p>",
+    "PutDestination": "<p>Creates or updates a destination. A destination encapsulates a physical resource (such as an Amazon Kinesis stream) and enables you to subscribe to a real-time stream of log events for a different account, ingested using <a>PutLogEvents</a>. Currently, the only supported physical resource is a Kinesis stream belonging to the same account as the destination.</p> <p>Through an access policy, a destination controls what is written to its Kinesis stream. By default, <code>PutDestination</code> does not set any access policy with the destination, which means a cross-account user cannot call <a>PutSubscriptionFilter</a> against this destination. To enable this, the destination owner must call <a>PutDestinationPolicy</a> after <code>PutDestination</code>.</p>",
+    "PutDestinationPolicy": "<p>Creates or updates an access policy associated with an existing destination. An access policy is an <a href=\"http://docs.aws.amazon.com/IAM/latest/UserGuide/policies_overview.html\">IAM policy document</a> that is used to authorize claims to register a subscription filter against a given destination.</p>",
+    "PutLogEvents": "<p>Uploads a batch of log events to the specified log stream.</p> <p>You must include the sequence token obtained from the response of the previous call. An upload in a newly created log stream does not require a sequence token. You can also get the sequence token using <a>DescribeLogStreams</a>. If you call <code>PutLogEvents</code> twice within a narrow time period using the same value for <code>sequenceToken</code>, both calls may be successful, or one may be rejected.</p> <p>The batch of events must satisfy the following constraints:</p> <ul> <li> <p>The maximum batch size is 1,048,576 bytes, and this size is calculated as the sum of all event messages in UTF-8, plus 26 bytes for each log event.</p> </li> <li> <p>None of the log events in the batch can be more than 2 hours in the future.</p> </li> <li> <p>None of the log events in the batch can be older than 14 days or the retention period of the log group.</p> </li> <li> <p>The log events in the batch must be in chronological ordered by their time stamp (the time the event occurred, expressed as the number of milliseconds after Jan 1, 1970 00:00:00 UTC).</p> </li> <li> <p>The maximum number of log events in a batch is 10,000.</p> </li> <li> <p>A batch of log events in a single request cannot span more than 24 hours. Otherwise, the operation fails.</p> </li> </ul>",
+    "PutMetricFilter": "<p>Creates or updates a metric filter and associates it with the specified log group. Metric filters allow you to configure rules to extract metric data from log events ingested through <a>PutLogEvents</a>.</p> <p>The maximum number of metric filters that can be associated with a log group is 100.</p>",
+    "PutResourcePolicy": "<p>Creates or updates a resource policy allowing other AWS services to put log events to this account, such as Amazon Route 53. An account can have up to 50 resource policies per region.</p>",
+    "PutRetentionPolicy": "<p>Sets the retention of the specified log group. A retention policy allows you to configure the number of days for which to retain log events in the specified log group.</p>",
+    "PutSubscriptionFilter": "<p>Creates or updates a subscription filter and associates it with the specified log group. Subscription filters allow you to subscribe to a real-time stream of log events ingested through <a>PutLogEvents</a> and have them delivered to a specific destination. Currently, the supported destinations are:</p> <ul> <li> <p>An Amazon Kinesis stream belonging to the same account as the subscription filter, for same-account delivery.</p> </li> <li> <p>A logical destination that belongs to a different account, for cross-account delivery.</p> </li> <li> <p>An Amazon Kinesis Firehose delivery stream that belongs to the same account as the subscription filter, for same-account delivery.</p> </li> <li> <p>An AWS Lambda function that belongs to the same account as the subscription filter, for same-account delivery.</p> </li> </ul> <p>There can only be one subscription filter associated with a log group. If you are updating an existing filter, you must specify the correct name in <code>filterName</code>. Otherwise, the call fails because you cannot associate a second filter with a log group.</p>",
+    "TagLogGroup": "<p>Adds or updates the specified tags for the specified log group.</p> <p>To list the tags for a log group, use <a>ListTagsLogGroup</a>. To remove tags, use <a>UntagLogGroup</a>.</p> <p>For more information about tags, see <a href=\"http://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/log-group-tagging.html\">Tag Log Groups in Amazon CloudWatch Logs</a> in the <i>Amazon CloudWatch Logs User Guide</i>.</p>",
+    "TestMetricFilter": "<p>Tests the filter pattern of a metric filter against a sample of log event messages. You can use this operation to validate the correctness of a metric filter pattern.</p>",
+    "UntagLogGroup": "<p>Removes the specified tags from the specified log group.</p> <p>To list the tags for a log group, use <a>ListTagsLogGroup</a>. To add tags, use <a>UntagLogGroup</a>.</p>"
+  },
+  "shapes": {
+    "AccessPolicy": {
+      "base": null,
+      "refs": {
+        "Destination$accessPolicy": "<p>An IAM policy document that governs which AWS accounts can create subscription filters against this destination.</p>",
+        "PutDestinationPolicyRequest$accessPolicy": "<p>An IAM policy document that authorizes cross-account users to deliver their log events to the associated destination.</p>"
+      }
+    },
+    "Arn": {
+      "base": null,
+      "refs": {
+        "Destination$arn": "<p>The ARN of this destination.</p>",
+        "LogGroup$arn": "<p>The Amazon Resource Name (ARN) of the log group.</p>",
+        "LogStream$arn": "<p>The Amazon Resource Name (ARN) of the log stream.</p>"
+      }
+    },
+    "AssociateKmsKeyRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CancelExportTaskRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateExportTaskRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateExportTaskResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateLogGroupRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "CreateLogStreamRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DataAlreadyAcceptedException": {
+      "base": "<p>The event was already logged.</p>",
+      "refs": {
+      }
+    },
+    "Days": {
+      "base": "<p>The number of days to retain the log events in the specified log group. Possible values are: 1, 3, 5, 7, 14, 30, 60, 90, 120, 150, 180, 365, 400, 545, 731, 1827, and 3653.</p>",
+      "refs": {
+        "LogGroup$retentionInDays": null,
+        "PutRetentionPolicyRequest$retentionInDays": null
+      }
+    },
+    "DefaultValue": {
+      "base": null,
+      "refs": {
+        "MetricTransformation$defaultValue": "<p>(Optional) The value to emit when a filter pattern does not match a log event. This value can be null.</p>"
+      }
+    },
+    "DeleteDestinationRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteLogGroupRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteLogStreamRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteMetricFilterRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteResourcePolicyRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteRetentionPolicyRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DeleteSubscriptionFilterRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "Descending": {
+      "base": null,
+      "refs": {
+        "DescribeLogStreamsRequest$descending": "<p>If the value is true, results are returned in descending order. If the value is to false, results are returned in ascending order. The default value is false.</p>"
+      }
+    },
+    "DescribeDestinationsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeDestinationsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeExportTasksRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeExportTasksResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeLimit": {
+      "base": null,
+      "refs": {
+        "DescribeDestinationsRequest$limit": "<p>The maximum number of items returned. If you don't specify a value, the default is up to 50 items.</p>",
+        "DescribeExportTasksRequest$limit": "<p>The maximum number of items returned. If you don't specify a value, the default is up to 50 items.</p>",
+        "DescribeLogGroupsRequest$limit": "<p>The maximum number of items returned. If you don't specify a value, the default is up to 50 items.</p>",
+        "DescribeLogStreamsRequest$limit": "<p>The maximum number of items returned. If you don't specify a value, the default is up to 50 items.</p>",
+        "DescribeMetricFiltersRequest$limit": "<p>The maximum number of items returned. If you don't specify a value, the default is up to 50 items.</p>",
+        "DescribeResourcePoliciesRequest$limit": "<p>The maximum number of resource policies to be displayed with one call of this API.</p>",
+        "DescribeSubscriptionFiltersRequest$limit": "<p>The maximum number of items returned. If you don't specify a value, the default is up to 50 items.</p>"
+      }
+    },
+    "DescribeLogGroupsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeLogGroupsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeLogStreamsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeLogStreamsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeMetricFiltersRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeMetricFiltersResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeResourcePoliciesRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeResourcePoliciesResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeSubscriptionFiltersRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "DescribeSubscriptionFiltersResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "Destination": {
+      "base": "<p>Represents a cross-account destination that receives subscription log events.</p>",
+      "refs": {
+        "Destinations$member": null,
+        "PutDestinationResponse$destination": "<p>The destination.</p>"
+      }
+    },
+    "DestinationArn": {
+      "base": null,
+      "refs": {
+        "PutSubscriptionFilterRequest$destinationArn": "<p>The ARN of the destination to deliver matching log events to. Currently, the supported destinations are:</p> <ul> <li> <p>An Amazon Kinesis stream belonging to the same account as the subscription filter, for same-account delivery.</p> </li> <li> <p>A logical destination (specified using an ARN) belonging to a different account, for cross-account delivery.</p> </li> <li> <p>An Amazon Kinesis Firehose delivery stream belonging to the same account as the subscription filter, for same-account delivery.</p> </li> <li> <p>An AWS Lambda function belonging to the same account as the subscription filter, for same-account delivery.</p> </li> </ul>",
+        "SubscriptionFilter$destinationArn": "<p>The Amazon Resource Name (ARN) of the destination.</p>"
+      }
+    },
+    "DestinationName": {
+      "base": null,
+      "refs": {
+        "DeleteDestinationRequest$destinationName": "<p>The name of the destination.</p>",
+        "DescribeDestinationsRequest$DestinationNamePrefix": "<p>The prefix to match. If you don't specify a value, no prefix filter is applied.</p>",
+        "Destination$destinationName": "<p>The name of the destination.</p>",
+        "PutDestinationPolicyRequest$destinationName": "<p>A name for an existing destination.</p>",
+        "PutDestinationRequest$destinationName": "<p>A name for the destination.</p>"
+      }
+    },
+    "Destinations": {
+      "base": null,
+      "refs": {
+        "DescribeDestinationsResponse$destinations": "<p>The destinations.</p>"
+      }
+    },
+    "DisassociateKmsKeyRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "Distribution": {
+      "base": "<p>The method used to distribute log data to the destination, which can be either random or grouped by log stream.</p>",
+      "refs": {
+        "PutSubscriptionFilterRequest$distribution": "<p>The method used to distribute log data to the destination. By default log data is grouped by log stream, but the grouping can be set to random for a more even distribution. This property is only applicable when the destination is an Amazon Kinesis stream. </p>",
+        "SubscriptionFilter$distribution": null
+      }
+    },
+    "EventId": {
+      "base": null,
+      "refs": {
+        "FilteredLogEvent$eventId": "<p>The ID of the event.</p>"
+      }
+    },
+    "EventMessage": {
+      "base": null,
+      "refs": {
+        "FilteredLogEvent$message": "<p>The data contained in the log event.</p>",
+        "InputLogEvent$message": "<p>The raw event message.</p>",
+        "MetricFilterMatchRecord$eventMessage": "<p>The raw event data.</p>",
+        "OutputLogEvent$message": "<p>The data contained in the log event.</p>",
+        "TestEventMessages$member": null
+      }
+    },
+    "EventNumber": {
+      "base": null,
+      "refs": {
+        "MetricFilterMatchRecord$eventNumber": "<p>The event number.</p>"
+      }
+    },
+    "EventsLimit": {
+      "base": null,
+      "refs": {
+        "FilterLogEventsRequest$limit": "<p>The maximum number of events to return. The default is 10,000 events.</p>",
+        "GetLogEventsRequest$limit": "<p>The maximum number of log events returned. If you don't specify a value, the maximum is as many log events as can fit in a response size of 1 MB, up to 10,000 log events.</p>"
+      }
+    },
+    "ExportDestinationBucket": {
+      "base": null,
+      "refs": {
+        "CreateExportTaskRequest$destination": "<p>The name of S3 bucket for the exported log data. The bucket must be in the same AWS region.</p>",
+        "ExportTask$destination": "<p>The name of Amazon S3 bucket to which the log data was exported.</p>"
+      }
+    },
+    "ExportDestinationPrefix": {
+      "base": null,
+      "refs": {
+        "CreateExportTaskRequest$destinationPrefix": "<p>The prefix used as the start of the key for every object exported. If you don't specify a value, the default is <code>exportedlogs</code>.</p>",
+        "ExportTask$destinationPrefix": "<p>The prefix that was used as the start of Amazon S3 key for every object exported.</p>"
+      }
+    },
+    "ExportTask": {
+      "base": "<p>Represents an export task.</p>",
+      "refs": {
+        "ExportTasks$member": null
+      }
+    },
+    "ExportTaskExecutionInfo": {
+      "base": "<p>Represents the status of an export task.</p>",
+      "refs": {
+        "ExportTask$executionInfo": "<p>Execution info about the export task.</p>"
+      }
+    },
+    "ExportTaskId": {
+      "base": null,
+      "refs": {
+        "CancelExportTaskRequest$taskId": "<p>The ID of the export task.</p>",
+        "CreateExportTaskResponse$taskId": "<p>The ID of the export task.</p>",
+        "DescribeExportTasksRequest$taskId": "<p>The ID of the export task. Specifying a task ID filters the results to zero or one export tasks.</p>",
+        "ExportTask$taskId": "<p>The ID of the export task.</p>"
+      }
+    },
+    "ExportTaskName": {
+      "base": null,
+      "refs": {
+        "CreateExportTaskRequest$taskName": "<p>The name of the export task.</p>",
+        "ExportTask$taskName": "<p>The name of the export task.</p>"
+      }
+    },
+    "ExportTaskStatus": {
+      "base": "<p>Represents the status of an export task.</p>",
+      "refs": {
+        "ExportTask$status": "<p>The status of the export task.</p>"
+      }
+    },
+    "ExportTaskStatusCode": {
+      "base": null,
+      "refs": {
+        "DescribeExportTasksRequest$statusCode": "<p>The status code of the export task. Specifying a status code filters the results to zero or more export tasks.</p>",
+        "ExportTaskStatus$code": "<p>The status code of the export task.</p>"
+      }
+    },
+    "ExportTaskStatusMessage": {
+      "base": null,
+      "refs": {
+        "ExportTaskStatus$message": "<p>The status message related to the status code.</p>"
+      }
+    },
+    "ExportTasks": {
+      "base": null,
+      "refs": {
+        "DescribeExportTasksResponse$exportTasks": "<p>The export tasks.</p>"
+      }
+    },
+    "ExtractedValues": {
+      "base": null,
+      "refs": {
+        "MetricFilterMatchRecord$extractedValues": "<p>The values extracted from the event data by the filter.</p>"
+      }
+    },
+    "FilterCount": {
+      "base": null,
+      "refs": {
+        "LogGroup$metricFilterCount": "<p>The number of metric filters.</p>"
+      }
+    },
+    "FilterLogEventsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "FilterLogEventsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "FilterName": {
+      "base": null,
+      "refs": {
+        "DeleteMetricFilterRequest$filterName": "<p>The name of the metric filter.</p>",
+        "DeleteSubscriptionFilterRequest$filterName": "<p>The name of the subscription filter.</p>",
+        "DescribeMetricFiltersRequest$filterNamePrefix": "<p>The prefix to match.</p>",
+        "DescribeSubscriptionFiltersRequest$filterNamePrefix": "<p>The prefix to match. If you don't specify a value, no prefix filter is applied.</p>",
+        "MetricFilter$filterName": "<p>The name of the metric filter.</p>",
+        "PutMetricFilterRequest$filterName": "<p>A name for the metric filter.</p>",
+        "PutSubscriptionFilterRequest$filterName": "<p>A name for the subscription filter. If you are updating an existing filter, you must specify the correct name in <code>filterName</code>. Otherwise, the call fails because you cannot associate a second filter with a log group. To find the name of the filter currently associated with a log group, use <a>DescribeSubscriptionFilters</a>.</p>",
+        "SubscriptionFilter$filterName": "<p>The name of the subscription filter.</p>"
+      }
+    },
+    "FilterPattern": {
+      "base": "<p>A symbolic description of how CloudWatch Logs should interpret the data in each log event. For example, a log event may contain time stamps, IP addresses, strings, and so on. You use the filter pattern to specify what to look for in the log event message.</p>",
+      "refs": {
+        "FilterLogEventsRequest$filterPattern": "<p>The filter pattern to use. If not provided, all the events are matched.</p>",
+        "MetricFilter$filterPattern": null,
+        "PutMetricFilterRequest$filterPattern": "<p>A filter pattern for extracting metric data out of ingested log events.</p>",
+        "PutSubscriptionFilterRequest$filterPattern": "<p>A filter pattern for subscribing to a filtered stream of log events.</p>",
+        "SubscriptionFilter$filterPattern": null,
+        "TestMetricFilterRequest$filterPattern": null
+      }
+    },
+    "FilteredLogEvent": {
+      "base": "<p>Represents a matched event.</p>",
+      "refs": {
+        "FilteredLogEvents$member": null
+      }
+    },
+    "FilteredLogEvents": {
+      "base": null,
+      "refs": {
+        "FilterLogEventsResponse$events": "<p>The matched events.</p>"
+      }
+    },
+    "GetLogEventsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "GetLogEventsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "InputLogEvent": {
+      "base": "<p>Represents a log event, which is a record of activity that was recorded by the application or resource being monitored.</p>",
+      "refs": {
+        "InputLogEvents$member": null
+      }
+    },
+    "InputLogEvents": {
+      "base": null,
+      "refs": {
+        "PutLogEventsRequest$logEvents": "<p>The log events.</p>"
+      }
+    },
+    "InputLogStreamNames": {
+      "base": null,
+      "refs": {
+        "FilterLogEventsRequest$logStreamNames": "<p>Optional list of log stream names.</p>"
+      }
+    },
+    "Interleaved": {
+      "base": null,
+      "refs": {
+        "FilterLogEventsRequest$interleaved": "<p>If the value is true, the operation makes a best effort to provide responses that contain events from multiple log streams within the log group, interleaved in a single response. If the value is false, all the matched log events in the first log stream are searched first, then those in the next log stream, and so on. The default is false.</p>"
+      }
+    },
+    "InvalidOperationException": {
+      "base": "<p>The operation is not valid on the specified resource.</p>",
+      "refs": {
+      }
+    },
+    "InvalidParameterException": {
+      "base": "<p>A parameter is specified incorrectly.</p>",
+      "refs": {
+      }
+    },
+    "InvalidSequenceTokenException": {
+      "base": "<p>The sequence token is not valid.</p>",
+      "refs": {
+      }
+    },
+    "KmsKeyId": {
+      "base": null,
+      "refs": {
+        "AssociateKmsKeyRequest$kmsKeyId": "<p>The Amazon Resource Name (ARN) of the CMK to use when encrypting log data. For more information, see <a href=\"http://docs.aws.amazon.com/general/latest/gr/aws-arns-and-namespaces.html#arn-syntax-kms\">Amazon Resource Names - AWS Key Management Service (AWS KMS)</a>.</p>",
+        "CreateLogGroupRequest$kmsKeyId": "<p>The Amazon Resource Name (ARN) of the CMK to use when encrypting log data. For more information, see <a href=\"http://docs.aws.amazon.com/general/latest/gr/aws-arns-and-namespaces.html#arn-syntax-kms\">Amazon Resource Names - AWS Key Management Service (AWS KMS)</a>.</p>",
+        "LogGroup$kmsKeyId": "<p>The Amazon Resource Name (ARN) of the CMK to use when encrypting log data.</p>"
+      }
+    },
+    "LimitExceededException": {
+      "base": "<p>You have reached the maximum number of resources that can be created.</p>",
+      "refs": {
+      }
+    },
+    "ListTagsLogGroupRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "ListTagsLogGroupResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "LogEventIndex": {
+      "base": null,
+      "refs": {
+        "RejectedLogEventsInfo$tooNewLogEventStartIndex": "<p>The log events that are too new.</p>",
+        "RejectedLogEventsInfo$tooOldLogEventEndIndex": "<p>The log events that are too old.</p>",
+        "RejectedLogEventsInfo$expiredLogEventEndIndex": "<p>The expired log events.</p>"
+      }
+    },
+    "LogGroup": {
+      "base": "<p>Represents a log group.</p>",
+      "refs": {
+        "LogGroups$member": null
+      }
+    },
+    "LogGroupName": {
+      "base": null,
+      "refs": {
+        "AssociateKmsKeyRequest$logGroupName": "<p>The name of the log group.</p>",
+        "CreateExportTaskRequest$logGroupName": "<p>The name of the log group.</p>",
+        "CreateLogGroupRequest$logGroupName": "<p>The name of the log group.</p>",
+        "CreateLogStreamRequest$logGroupName": "<p>The name of the log group.</p>",
+        "DeleteLogGroupRequest$logGroupName": "<p>The name of the log group.</p>",
+        "DeleteLogStreamRequest$logGroupName": "<p>The name of the log group.</p>",
+        "DeleteMetricFilterRequest$logGroupName": "<p>The name of the log group.</p>",
+        "DeleteRetentionPolicyRequest$logGroupName": "<p>The name of the log group.</p>",
+        "DeleteSubscriptionFilterRequest$logGroupName": "<p>The name of the log group.</p>",
+        "DescribeLogGroupsRequest$logGroupNamePrefix": "<p>The prefix to match.</p>",
+        "DescribeLogStreamsRequest$logGroupName": "<p>The name of the log group.</p>",
+        "DescribeMetricFiltersRequest$logGroupName": "<p>The name of the log group.</p>",
+        "DescribeSubscriptionFiltersRequest$logGroupName": "<p>The name of the log group.</p>",
+        "DisassociateKmsKeyRequest$logGroupName": "<p>The name of the log group.</p>",
+        "ExportTask$logGroupName": "<p>The name of the log group from which logs data was exported.</p>",
+        "FilterLogEventsRequest$logGroupName": "<p>The name of the log group.</p>",
+        "GetLogEventsRequest$logGroupName": "<p>The name of the log group.</p>",
+        "ListTagsLogGroupRequest$logGroupName": "<p>The name of the log group.</p>",
+        "LogGroup$logGroupName": "<p>The name of the log group.</p>",
+        "MetricFilter$logGroupName": "<p>The name of the log group.</p>",
+        "PutLogEventsRequest$logGroupName": "<p>The name of the log group.</p>",
+        "PutMetricFilterRequest$logGroupName": "<p>The name of the log group.</p>",
+        "PutRetentionPolicyRequest$logGroupName": "<p>The name of the log group.</p>",
+        "PutSubscriptionFilterRequest$logGroupName": "<p>The name of the log group.</p>",
+        "SubscriptionFilter$logGroupName": "<p>The name of the log group.</p>",
+        "TagLogGroupRequest$logGroupName": "<p>The name of the log group.</p>",
+        "UntagLogGroupRequest$logGroupName": "<p>The name of the log group.</p>"
+      }
+    },
+    "LogGroups": {
+      "base": null,
+      "refs": {
+        "DescribeLogGroupsResponse$logGroups": "<p>The log groups.</p>"
+      }
+    },
+    "LogStream": {
+      "base": "<p>Represents a log stream, which is a sequence of log events from a single emitter of logs.</p>",
+      "refs": {
+        "LogStreams$member": null
+      }
+    },
+    "LogStreamName": {
+      "base": null,
+      "refs": {
+        "CreateExportTaskRequest$logStreamNamePrefix": "<p>Export only log streams that match the provided prefix. If you don't specify a value, no prefix filter is applied.</p>",
+        "CreateLogStreamRequest$logStreamName": "<p>The name of the log stream.</p>",
+        "DeleteLogStreamRequest$logStreamName": "<p>The name of the log stream.</p>",
+        "DescribeLogStreamsRequest$logStreamNamePrefix": "<p>The prefix to match.</p> <p>iIf <code>orderBy</code> is <code>LastEventTime</code>,you cannot specify this parameter.</p>",
+        "FilteredLogEvent$logStreamName": "<p>The name of the log stream this event belongs to.</p>",
+        "GetLogEventsRequest$logStreamName": "<p>The name of the log stream.</p>",
+        "InputLogStreamNames$member": null,
+        "LogStream$logStreamName": "<p>The name of the log stream.</p>",
+        "PutLogEventsRequest$logStreamName": "<p>The name of the log stream.</p>",
+        "SearchedLogStream$logStreamName": "<p>The name of the log stream.</p>"
+      }
+    },
+    "LogStreamSearchedCompletely": {
+      "base": null,
+      "refs": {
+        "SearchedLogStream$searchedCompletely": "<p>Indicates whether all the events in this log stream were searched.</p>"
+      }
+    },
+    "LogStreams": {
+      "base": null,
+      "refs": {
+        "DescribeLogStreamsResponse$logStreams": "<p>The log streams.</p>"
+      }
+    },
+    "MetricFilter": {
+      "base": "<p>Metric filters express how CloudWatch Logs would extract metric observations from ingested log events and transform them into metric data in a CloudWatch metric.</p>",
+      "refs": {
+        "MetricFilters$member": null
+      }
+    },
+    "MetricFilterMatchRecord": {
+      "base": "<p>Represents a matched event.</p>",
+      "refs": {
+        "MetricFilterMatches$member": null
+      }
+    },
+    "MetricFilterMatches": {
+      "base": null,
+      "refs": {
+        "TestMetricFilterResponse$matches": "<p>The matched events.</p>"
+      }
+    },
+    "MetricFilters": {
+      "base": null,
+      "refs": {
+        "DescribeMetricFiltersResponse$metricFilters": "<p>The metric filters.</p>"
+      }
+    },
+    "MetricName": {
+      "base": "<p>The name of the CloudWatch metric to which the monitored log information should be published. For example, you may publish to a metric called ErrorCount.</p>",
+      "refs": {
+        "DescribeMetricFiltersRequest$metricName": null,
+        "MetricTransformation$metricName": "<p>The name of the CloudWatch metric.</p>"
+      }
+    },
+    "MetricNamespace": {
+      "base": null,
+      "refs": {
+        "DescribeMetricFiltersRequest$metricNamespace": "<p>The namespace of the CloudWatch metric.</p>",
+        "MetricTransformation$metricNamespace": "<p>The namespace of the CloudWatch metric.</p>"
+      }
+    },
+    "MetricTransformation": {
+      "base": "<p>Indicates how to transform ingested log events in to metric data in a CloudWatch metric.</p>",
+      "refs": {
+        "MetricTransformations$member": null
+      }
+    },
+    "MetricTransformations": {
+      "base": null,
+      "refs": {
+        "MetricFilter$metricTransformations": "<p>The metric transformations.</p>",
+        "PutMetricFilterRequest$metricTransformations": "<p>A collection of information that defines how metric data gets emitted.</p>"
+      }
+    },
+    "MetricValue": {
+      "base": "<p>The value to publish to the CloudWatch metric. For example, if you're counting the occurrences of a term like \"Error\", the value is \"1\" for each occurrence. If you're counting the bytes transferred, the value is the value in the log event.</p>",
+      "refs": {
+        "MetricTransformation$metricValue": "<p>The value to publish to the CloudWatch metric when a filter pattern matches a log event.</p>"
+      }
+    },
+    "NextToken": {
+      "base": "<p>The token for the next set of items to return. The token expires after 24 hours.</p>",
+      "refs": {
+        "DescribeDestinationsRequest$nextToken": "<p>The token for the next set of items to return. (You received this token from a previous call.)</p>",
+        "DescribeDestinationsResponse$nextToken": null,
+        "DescribeExportTasksRequest$nextToken": "<p>The token for the next set of items to return. (You received this token from a previous call.)</p>",
+        "DescribeExportTasksResponse$nextToken": null,
+        "DescribeLogGroupsRequest$nextToken": "<p>The token for the next set of items to return. (You received this token from a previous call.)</p>",
+        "DescribeLogGroupsResponse$nextToken": null,
+        "DescribeLogStreamsRequest$nextToken": "<p>The token for the next set of items to return. (You received this token from a previous call.)</p>",
+        "DescribeLogStreamsResponse$nextToken": null,
+        "DescribeMetricFiltersRequest$nextToken": "<p>The token for the next set of items to return. (You received this token from a previous call.)</p>",
+        "DescribeMetricFiltersResponse$nextToken": null,
+        "DescribeResourcePoliciesRequest$nextToken": null,
+        "DescribeResourcePoliciesResponse$nextToken": null,
+        "DescribeSubscriptionFiltersRequest$nextToken": "<p>The token for the next set of items to return. (You received this token from a previous call.)</p>",
+        "DescribeSubscriptionFiltersResponse$nextToken": null,
+        "FilterLogEventsRequest$nextToken": "<p>The token for the next set of events to return. (You received this token from a previous call.)</p>",
+        "FilterLogEventsResponse$nextToken": "<p>The token to use when requesting the next set of items. The token expires after 24 hours.</p>",
+        "GetLogEventsRequest$nextToken": "<p>The token for the next set of items to return. (You received this token from a previous call.)</p>",
+        "GetLogEventsResponse$nextForwardToken": "<p>The token for the next set of items in the forward direction. The token expires after 24 hours.</p>",
+        "GetLogEventsResponse$nextBackwardToken": "<p>The token for the next set of items in the backward direction. The token expires after 24 hours.</p>"
+      }
+    },
+    "OperationAbortedException": {
+      "base": "<p>Multiple requests to update the same resource were in conflict.</p>",
+      "refs": {
+      }
+    },
+    "OrderBy": {
+      "base": null,
+      "refs": {
+        "DescribeLogStreamsRequest$orderBy": "<p>If the value is <code>LogStreamName</code>, the results are ordered by log stream name. If the value is <code>LastEventTime</code>, the results are ordered by the event time. The default value is <code>LogStreamName</code>.</p> <p>If you order the results by event time, you cannot specify the <code>logStreamNamePrefix</code> parameter.</p> <p>lastEventTimestamp represents the time of the most recent log event in the log stream in CloudWatch Logs. This number is expressed as the number of milliseconds after Jan 1, 1970 00:00:00 UTC. lastEventTimeStamp updates on an eventual consistency basis. It typically updates in less than an hour from ingestion, but may take longer in some rare situations.</p>"
+      }
+    },
+    "OutputLogEvent": {
+      "base": "<p>Represents a log event.</p>",
+      "refs": {
+        "OutputLogEvents$member": null
+      }
+    },
+    "OutputLogEvents": {
+      "base": null,
+      "refs": {
+        "GetLogEventsResponse$events": "<p>The events.</p>"
+      }
+    },
+    "PolicyDocument": {
+      "base": null,
+      "refs": {
+        "PutResourcePolicyRequest$policyDocument": "<p>Details of the new policy, including the identity of the principal that is enabled to put logs to this account. This is formatted as a JSON string.</p> <p>The following example creates a resource policy enabling the Route 53 service to put DNS query logs in to the specified log group. Replace \"logArn\" with the ARN of your CloudWatch Logs resource, such as a log group or log stream.</p> <p> { \"Version\": \"2012-10-17\" \"Statement\": [ { \"Sid\": \"Route53LogsToCloudWatchLogs\", \"Effect\": \"Allow\", \"Principal\": { \"Service\": [ \"route53.amazonaws.com\" ] }, \"Action\":\"logs:PutLogEvents\", \"Resource\": logArn } ] } </p>",
+        "ResourcePolicy$policyDocument": "<p>The details of the policy.</p>"
+      }
+    },
+    "PolicyName": {
+      "base": null,
+      "refs": {
+        "DeleteResourcePolicyRequest$policyName": "<p>The name of the policy to be revoked. This parameter is required.</p>",
+        "PutResourcePolicyRequest$policyName": "<p>Name of the new policy. This parameter is required.</p>",
+        "ResourcePolicy$policyName": "<p>The name of the resource policy.</p>"
+      }
+    },
+    "PutDestinationPolicyRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "PutDestinationRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "PutDestinationResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "PutLogEventsRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "PutLogEventsResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "PutMetricFilterRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "PutResourcePolicyRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "PutResourcePolicyResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "PutRetentionPolicyRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "PutSubscriptionFilterRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "RejectedLogEventsInfo": {
+      "base": "<p>Represents the rejected events.</p>",
+      "refs": {
+        "PutLogEventsResponse$rejectedLogEventsInfo": "<p>The rejected events.</p>"
+      }
+    },
+    "ResourceAlreadyExistsException": {
+      "base": "<p>The specified resource already exists.</p>",
+      "refs": {
+      }
+    },
+    "ResourceNotFoundException": {
+      "base": "<p>The specified resource does not exist.</p>",
+      "refs": {
+      }
+    },
+    "ResourcePolicies": {
+      "base": null,
+      "refs": {
+        "DescribeResourcePoliciesResponse$resourcePolicies": "<p>The resource policies that exist in this account.</p>"
+      }
+    },
+    "ResourcePolicy": {
+      "base": "<p>A policy enabling one or more entities to put logs to a log group in this account.</p>",
+      "refs": {
+        "PutResourcePolicyResponse$resourcePolicy": "<p>The new policy.</p>",
+        "ResourcePolicies$member": null
+      }
+    },
+    "RoleArn": {
+      "base": null,
+      "refs": {
+        "Destination$roleArn": "<p>A role for impersonation, used when delivering log events to the target.</p>",
+        "PutDestinationRequest$roleArn": "<p>The ARN of an IAM role that grants CloudWatch Logs permissions to call the Amazon Kinesis PutRecord operation on the destination stream.</p>",
+        "PutSubscriptionFilterRequest$roleArn": "<p>The ARN of an IAM role that grants CloudWatch Logs permissions to deliver ingested log events to the destination stream. You don't need to provide the ARN when you are working with a logical destination for cross-account delivery.</p>",
+        "SubscriptionFilter$roleArn": "<p/>"
+      }
+    },
+    "SearchedLogStream": {
+      "base": "<p>Represents the search status of a log stream.</p>",
+      "refs": {
+        "SearchedLogStreams$member": null
+      }
+    },
+    "SearchedLogStreams": {
+      "base": null,
+      "refs": {
+        "FilterLogEventsResponse$searchedLogStreams": "<p>Indicates which log streams have been searched and whether each has been searched completely.</p>"
+      }
+    },
+    "SequenceToken": {
+      "base": null,
+      "refs": {
+        "DataAlreadyAcceptedException$expectedSequenceToken": null,
+        "InvalidSequenceTokenException$expectedSequenceToken": null,
+        "LogStream$uploadSequenceToken": "<p>The sequence token.</p>",
+        "PutLogEventsRequest$sequenceToken": "<p>The sequence token obtained from the response of the previous <code>PutLogEvents</code> call. An upload in a newly created log stream does not require a sequence token. You can also get the sequence token using <a>DescribeLogStreams</a>. If you call <code>PutLogEvents</code> twice within a narrow time period using the same value for <code>sequenceToken</code>, both calls may be successful, or one may be rejected.</p>",
+        "PutLogEventsResponse$nextSequenceToken": "<p>The next sequence token.</p>"
+      }
+    },
+    "ServiceUnavailableException": {
+      "base": "<p>The service cannot complete the request.</p>",
+      "refs": {
+      }
+    },
+    "StartFromHead": {
+      "base": null,
+      "refs": {
+        "GetLogEventsRequest$startFromHead": "<p>If the value is true, the earliest log events are returned first. If the value is false, the latest log events are returned first. The default value is false.</p>"
+      }
+    },
+    "StoredBytes": {
+      "base": null,
+      "refs": {
+        "LogGroup$storedBytes": "<p>The number of bytes stored.</p>",
+        "LogStream$storedBytes": "<p>The number of bytes stored.</p>"
+      }
+    },
+    "SubscriptionFilter": {
+      "base": "<p>Represents a subscription filter.</p>",
+      "refs": {
+        "SubscriptionFilters$member": null
+      }
+    },
+    "SubscriptionFilters": {
+      "base": null,
+      "refs": {
+        "DescribeSubscriptionFiltersResponse$subscriptionFilters": "<p>The subscription filters.</p>"
+      }
+    },
+    "TagKey": {
+      "base": null,
+      "refs": {
+        "TagList$member": null,
+        "Tags$key": null
+      }
+    },
+    "TagList": {
+      "base": null,
+      "refs": {
+        "UntagLogGroupRequest$tags": "<p>The tag keys. The corresponding tags are removed from the log group.</p>"
+      }
+    },
+    "TagLogGroupRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "TagValue": {
+      "base": null,
+      "refs": {
+        "Tags$value": null
+      }
+    },
+    "Tags": {
+      "base": null,
+      "refs": {
+        "CreateLogGroupRequest$tags": "<p>The key-value pairs to use for the tags.</p>",
+        "ListTagsLogGroupResponse$tags": "<p>The tags for the log group.</p>",
+        "TagLogGroupRequest$tags": "<p>The key-value pairs to use for the tags.</p>"
+      }
+    },
+    "TargetArn": {
+      "base": null,
+      "refs": {
+        "Destination$targetArn": "<p>The Amazon Resource Name (ARN) of the physical target to where the log events are delivered (for example, a Kinesis stream).</p>",
+        "PutDestinationRequest$targetArn": "<p>The ARN of an Amazon Kinesis stream to which to deliver matching log events.</p>"
+      }
+    },
+    "TestEventMessages": {
+      "base": null,
+      "refs": {
+        "TestMetricFilterRequest$logEventMessages": "<p>The log event messages to test.</p>"
+      }
+    },
+    "TestMetricFilterRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "TestMetricFilterResponse": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "Timestamp": {
+      "base": null,
+      "refs": {
+        "CreateExportTaskRequest$from": "<p>The start time of the range for the request, expressed as the number of milliseconds after Jan 1, 1970 00:00:00 UTC. Events with a time stamp earlier than this time are not exported.</p>",
+        "CreateExportTaskRequest$to": "<p>The end time of the range for the request, expressed as the number of milliseconds after Jan 1, 1970 00:00:00 UTC. Events with a time stamp later than this time are not exported.</p>",
+        "Destination$creationTime": "<p>The creation time of the destination, expressed as the number of milliseconds after Jan 1, 1970 00:00:00 UTC.</p>",
+        "ExportTask$from": "<p>The start time, expressed as the number of milliseconds after Jan 1, 1970 00:00:00 UTC. Events with a time stamp before this time are not exported.</p>",
+        "ExportTask$to": "<p>The end time, expressed as the number of milliseconds after Jan 1, 1970 00:00:00 UTC. Events with a time stamp later than this time are not exported.</p>",
+        "ExportTaskExecutionInfo$creationTime": "<p>The creation time of the export task, expressed as the number of milliseconds after Jan 1, 1970 00:00:00 UTC.</p>",
+        "ExportTaskExecutionInfo$completionTime": "<p>The completion time of the export task, expressed as the number of milliseconds after Jan 1, 1970 00:00:00 UTC.</p>",
+        "FilterLogEventsRequest$startTime": "<p>The start of the time range, expressed as the number of milliseconds after Jan 1, 1970 00:00:00 UTC. Events with a time stamp before this time are not returned.</p>",
+        "FilterLogEventsRequest$endTime": "<p>The end of the time range, expressed as the number of milliseconds after Jan 1, 1970 00:00:00 UTC. Events with a time stamp later than this time are not returned.</p>",
+        "FilteredLogEvent$timestamp": "<p>The time the event occurred, expressed as the number of milliseconds after Jan 1, 1970 00:00:00 UTC.</p>",
+        "FilteredLogEvent$ingestionTime": "<p>The time the event was ingested, expressed as the number of milliseconds after Jan 1, 1970 00:00:00 UTC.</p>",
+        "GetLogEventsRequest$startTime": "<p>The start of the time range, expressed as the number of milliseconds after Jan 1, 1970 00:00:00 UTC. Events with a time stamp earlier than this time are not included.</p>",
+        "GetLogEventsRequest$endTime": "<p>The end of the time range, expressed as the number of milliseconds after Jan 1, 1970 00:00:00 UTC. Events with a time stamp later than this time are not included.</p>",
+        "InputLogEvent$timestamp": "<p>The time the event occurred, expressed as the number of milliseconds fter Jan 1, 1970 00:00:00 UTC.</p>",
+        "LogGroup$creationTime": "<p>The creation time of the log group, expressed as the number of milliseconds after Jan 1, 1970 00:00:00 UTC.</p>",
+        "LogStream$creationTime": "<p>The creation time of the stream, expressed as the number of milliseconds after Jan 1, 1970 00:00:00 UTC.</p>",
+        "LogStream$firstEventTimestamp": "<p>The time of the first event, expressed as the number of milliseconds after Jan 1, 1970 00:00:00 UTC.</p>",
+        "LogStream$lastEventTimestamp": "<p> the time of the most recent log event in the log stream in CloudWatch Logs. This number is expressed as the number of milliseconds after Jan 1, 1970 00:00:00 UTC. lastEventTime updates on an eventual consistency basis. It typically updates in less than an hour from ingestion, but may take longer in some rare situations.</p>",
+        "LogStream$lastIngestionTime": "<p>The ingestion time, expressed as the number of milliseconds after Jan 1, 1970 00:00:00 UTC.</p>",
+        "MetricFilter$creationTime": "<p>The creation time of the metric filter, expressed as the number of milliseconds after Jan 1, 1970 00:00:00 UTC.</p>",
+        "OutputLogEvent$timestamp": "<p>The time the event occurred, expressed as the number of milliseconds after Jan 1, 1970 00:00:00 UTC.</p>",
+        "OutputLogEvent$ingestionTime": "<p>The time the event was ingested, expressed as the number of milliseconds after Jan 1, 1970 00:00:00 UTC.</p>",
+        "ResourcePolicy$lastUpdatedTime": "<p>Time stamp showing when this policy was last updated, expressed as the number of milliseconds after Jan 1, 1970 00:00:00 UTC.</p>",
+        "SubscriptionFilter$creationTime": "<p>The creation time of the subscription filter, expressed as the number of milliseconds after Jan 1, 1970 00:00:00 UTC.</p>"
+      }
+    },
+    "Token": {
+      "base": null,
+      "refs": {
+        "ExtractedValues$key": null
+      }
+    },
+    "UntagLogGroupRequest": {
+      "base": null,
+      "refs": {
+      }
+    },
+    "Value": {
+      "base": null,
+      "refs": {
+        "ExtractedValues$value": null
+      }
+    }
+  }
+}

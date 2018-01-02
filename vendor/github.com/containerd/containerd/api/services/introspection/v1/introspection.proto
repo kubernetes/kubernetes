@@ -1,0 +1,81 @@
+syntax = "proto3";
+
+package containerd.services.introspection.v1;
+
+import "github.com/containerd/containerd/api/types/platform.proto";
+import "google/rpc/status.proto";
+import "gogoproto/gogo.proto";
+
+option go_package = "github.com/containerd/containerd/api/services/introspection/v1;introspection";
+
+service Introspection {
+	// Plugins returns a list of plugins in containerd.
+	//
+	// Clients can use this to detect features and capabilities when using
+	// containerd.
+	rpc Plugins(PluginsRequest) returns (PluginsResponse);
+}
+
+message Plugin {
+	// Type defines the type of plugin.
+	//
+	// See package plugin for a list of possible values. Non core plugins may
+	// define their own values during registration.
+	string type = 1;
+
+	// ID identifies the plugin uniquely in the system.
+	string id = 2;
+
+	// Requires lists the plugin types required by this plugin.
+	repeated string requires = 3;
+
+	// Platforms enumerates the platforms this plugin will support.
+	//
+	// If values are provided here, the plugin will only be operable under the
+	// provided platforms.
+	//
+	// If this is empty, the plugin will work across all platforms.
+	//
+	// If the plugin prefers certain platforms over others, they should be
+	// listed from most to least preferred.
+	repeated types.Platform platforms = 4 [(gogoproto.nullable) = false];
+
+	// Exports allows plugins to provide values about state or configuration to
+	// interested parties.
+	//
+	// One example is exposing the configured path of a snapshotter plugin.
+	map<string, string> exports = 5;
+
+	// Capabilities allows plugins to communicate feature switches to allow
+	// clients to detect features that may not be on be default or may be
+	// different from version to version.
+	//
+	// Use this sparingly.
+	repeated string capabilities = 6;
+
+	// InitErr will be set if the plugin fails initialization.
+	//
+	// This means the plugin may have been registered but a non-terminal error
+	// was encountered during initialization.
+	//
+	// Plugins that have this value set cannot be used.
+	google.rpc.Status init_err = 7;
+}
+
+message PluginsRequest {
+	// Filters contains one or more filters using the syntax defined in the
+	// containerd filter package.
+	//
+	// The returned result will be those that match any of the provided
+	// filters. Expanded, plugins that match the following will be
+	// returned:
+	//
+	//   filters[0] or filters[1] or ... or filters[n-1] or filters[n]
+	//
+	// If filters is zero-length or nil, all items will be returned.
+	repeated string filters = 1;
+}
+
+message PluginsResponse {
+	repeated Plugin plugins = 1 [(gogoproto.nullable) = false];
+}

@@ -1,0 +1,16 @@
+Errors reading examples/errors/petstore-badproperties.yaml
+ERROR $root.info is missing required property: version
+ERROR $root.info has invalid property: myproperty
+ERROR $root.paths./pets.get.parameters.parameter.bodyParameter is missing required property: schema
+ERROR $root.paths./pets.get.parameters.parameter.bodyParameter has invalid properties: type, format, myproperty
+ERROR $root.paths./pets.get.parameters.parameter.bodyParameter has unexpected value for in: query (string)
+ERROR $root.paths./pets.get.parameters.parameter.nonBodyParameter.headerParameterSubSchema has invalid property: myproperty
+ERROR $root.paths./pets.get.parameters.parameter.nonBodyParameter.headerParameterSubSchema has unexpected value for in: query (string)
+ERROR $root.paths./pets.get.parameters.parameter.nonBodyParameter.formDataParameterSubSchema has invalid property: myproperty
+ERROR $root.paths./pets.get.parameters.parameter.nonBodyParameter.formDataParameterSubSchema has unexpected value for in: query (string)
+ERROR $root.paths./pets.get.parameters.parameter.nonBodyParameter.queryParameterSubSchema has invalid property: myproperty
+ERROR $root.paths./pets.get.parameters.parameter.nonBodyParameter.pathParameterSubSchema has invalid property: myproperty
+ERROR $root.paths./pets.get.parameters.parameter.nonBodyParameter.pathParameterSubSchema has unexpected value for in: query (string)
+ERROR $root.paths./pets.get.parameters.jsonReference is missing required property: $ref
+ERROR $root.paths./pets.get.parameters.jsonReference has invalid properties: name, in, required, type, format, myproperty
+ERROR $root.paths./pets.post has unexpected value for tags: pets (string)

@@ -1,0 +1,90 @@
+{
+  "description": "OpenContainer Image Index Specification",
+  "$schema": "http://json-schema.org/draft-04/schema#",
+  "id": "https://opencontainers.org/schema/image/index",
+  "type": "object",
+  "properties": {
+    "schemaVersion": {
+      "description": "This field specifies the image index schema version as an integer",
+      "id": "https://opencontainers.org/schema/image/index/schemaVersion",
+      "type": "integer",
+      "minimum": 2,
+      "maximum": 2
+    },
+    "manifests": {
+      "type": "array",
+      "items": {
+        "id": "https://opencontainers.org/schema/image/manifestDescriptor",
+        "type": "object",
+        "required": [
+          "mediaType",
+          "size",
+          "digest"
+        ],
+        "properties": {
+          "mediaType": {
+            "description": "the mediatype of the referenced object",
+            "$ref": "defs-descriptor.json#/definitions/mediaType"
+          },
+          "size": {
+            "description": "the size in bytes of the referenced object",
+            "$ref": "defs.json#/definitions/int64"
+          },
+          "digest": {
+            "description": "the cryptographic checksum digest of the object, in the pattern '<algorithm>:<encoded>'",
+            "$ref": "defs-descriptor.json#/definitions/digest"
+          },
+          "urls": {
+            "description": "a list of urls from which this object may be downloaded",
+            "$ref": "defs-descriptor.json#/definitions/urls"
+          },
+          "platform": {
+            "id": "https://opencontainers.org/schema/image/platform",
+            "type": "object",
+            "required": [
+              "architecture",
+              "os"
+            ],
+            "properties": {
+              "architecture": {
+                "id": "https://opencontainers.org/schema/image/platform/architecture",
+                "type": "string"
+              },
+              "os": {
+                "id": "https://opencontainers.org/schema/image/platform/os",
+                "type": "string"
+              },
+              "os.version": {
+                "id": "https://opencontainers.org/schema/image/platform/os.version",
+                "type": "string"
+              },
+              "os.features": {
+                "id": "https://opencontainers.org/schema/image/platform/os.features",
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "variant": {
+                "type": "string"
+              }
+              }
+            }
+          },
+          "annotations": {
+            "id": "https://opencontainers.org/schema/image/descriptor/annotations",
+            "$ref": "defs-descriptor.json#/definitions/annotations"
+          }
+        }
+      }
+    },
+    "annotations": {
+      "id": "https://opencontainers.org/schema/image/index/annotations",
+      "$ref": "defs-descriptor.json#/definitions/annotations"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "manifests"
+  ]
+}

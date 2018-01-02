@@ -1,0 +1,7 @@
+[broker]
+dir  = "/tmp/influxdb/8087/broker"
+port = 8087
+
+[data]
+dir  = "/tmp/influxdb/8087/data"
+port = 8087

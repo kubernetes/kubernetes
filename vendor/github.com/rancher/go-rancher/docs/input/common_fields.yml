@@ -1,0 +1,10 @@
+kind: true
+created: true
+state: true
+transitioning: true
+transitioningMessage: true
+transitioningProgress: true
+uuid: true
+removeTime: true
+removed: true
+accountId: true

@@ -1,0 +1,6 @@
+{
+        "endpoint" : "http://localhost:8080/metrics",
+	"polling_frequency" : 10, 
+        "metrics_config" : [
+        ]
+}

@@ -1,0 +1,1 @@
+sort_by(people, &age)[].name

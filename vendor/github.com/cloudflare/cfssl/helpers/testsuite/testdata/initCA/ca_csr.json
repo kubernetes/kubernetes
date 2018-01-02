@@ -1,0 +1,23 @@
+{
+	"cn": "example.com",
+	"hosts": [
+		"ca.example.com"
+	],
+	"names": [
+		{
+			"C":  "US",
+			"ST": "California",
+			"L":  "San Francisco",
+			"O":  "Internet Widgets, LLC",
+			"OU": "Certificate Authority"
+		}
+	],
+	"key": {
+		"algo": "rsa",
+		"size": 2048
+	},
+	"ca": {
+		"pathlen": 1,
+		"expiry": "1/1/2015"
+	} 
+}

@@ -1,0 +1,12 @@
+[Unit]
+Description=rkt supervisor-ready signaling
+DefaultDependencies=no
+Requires=default.target
+Before=halt.target
+Conflicts=halt.target
+
+[Service]
+Type=oneshot
+Restart=no
+ExecStart=/bin/bash -c "systemd-tmpfiles --create  <(echo L+ /rkt/supervisor-status - - - - ready)"
+ExecStop=/bin/bash -c "systemd-tmpfiles --remove  <(echo R /rkt/supervisor-status)"

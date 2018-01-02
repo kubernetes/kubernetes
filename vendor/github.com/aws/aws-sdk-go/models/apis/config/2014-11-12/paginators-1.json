@@ -1,0 +1,10 @@
+{
+  "pagination": {
+    "GetResourceConfigHistory": {
+      "input_token": "nextToken",
+      "limit_key": "limit",
+      "output_token": "nextToken",
+      "result_key": "configurationItems"
+    }
+  }
+}

@@ -1,0 +1,623 @@
+THE SCAN ENDPOINT
+
+Endpoint: /api/v1/cfssl/scan
+Method:   GET
+
+Required parameters:
+
+    * host: the hostname (optionall including port) to scan
+
+Optional parameters:
+
+    * ip: IP Address to override DNS lookup of host
+    * timeout: The ammount of time allotted for the scan to complete (default: 1 minute)
+
+    The following parameters are used by the scanner to select which 
+    scans to run.
+
+    * family:  regular expression specifying scan famil(ies) to run
+    * scanner: regular expression specifying scanner(s) to run
+    
+
+Result:
+
+    The returned result is a JSON object with keys for each scan family. Each
+    of these objects contains keys for each scanner run in that family pointing
+    to objects possibly containing the following keys:
+
+    * grade: a string describing the exit status of the scan. Can be:
+        * "Good": host performing the expected state-of-the-art
+        * "Warning": host with non-ideal configuration,
+                     possibly maintaining support for legacy clients
+        * "Bad": host with serious misconfiguration or vulnerability
+        * "Skipped": indicates that the scan was not performed for some reason
+    * error: any error encountered during the scan process
+    * output: arbitrary JSON data retrieved during the scan
+    
+
+Example:
+
+    $ curl  ${CFSSL_HOST}/api/v1/cfssl/scan?host=cloudflare.com |python -m json.tool
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+100  2358    0  2358    0     0    833      0 --:--:--  0:00:02 --:--:--   833
+{
+    "errors": [],
+    "messages": [],
+    "result": {
+        "Broad": {
+            "IntermediateCAs": {
+                "grade": "Skipped"
+            }
+        },
+        "Connectivity": {
+            "CloudFlareStatus": {
+                "grade": "Good",
+                "output": {
+                    "198.41.214.163": true,
+                    "198.41.215.163": true,
+                    "2400:cb00:2048:1::c629:d49d": true,
+                    "2400:cb00:2048:1::c629:d59d": true
+                }
+            },
+            "DNSLookup": {
+                "grade": "Good",
+                "output": [
+                    "2400:cb00:2048:1::c629:d49d",
+                    "2400:cb00:2048:1::c629:d59d",
+                    "198.41.214.163",
+                    "198.41.215.163"
+                ]
+            },
+            "TCPDial": {
+                "grade": "Good"
+            },
+            "TLSDial": {
+                "grade": "Good"
+            }
+        },
+        "PKI": {
+            "ChainExpiration": {
+                "grade": "Good",
+                "output": "2015-12-31T23:59:59Z"
+            },
+            "ChainValidation": {
+                "grade": "Warning",
+                "output": [
+                    " is signed by RSAWithSHA1",
+                    "COMODO Extended Validation Secure Server CA is signed by RSAWithSHA1"
+                ]
+            },
+            "MultipleCerts": {
+                "grade": "Good"
+            }
+        },
+        "TLSHandshake": {
+            "CipherSuite": {
+                "grade": "Good",
+                "output": [
+                    {
+                        "ECDHE-RSA-AES128-GCM-SHA256": [
+                            {
+                                "TLS 1.2": [
+                                    "secp256r1"
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "ECDHE-RSA-AES128-SHA256": [
+                            {
+                                "TLS 1.2": [
+                                    "secp256r1"
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "ECDHE-RSA-AES128-SHA": [
+                            {
+                                "TLS 1.2": [
+                                    "secp256r1"
+                                ]
+                            },
+                            {
+                                "TLS 1.1": [
+                                    "secp256r1"
+                                ]
+                            },
+                            {
+                                "TLS 1.0": [
+                                    "secp256r1"
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "AES128-GCM-SHA256": [
+                            "TLS 1.2"
+                        ]
+                    },
+                    {
+                        "AES128-SHA256": [
+                            "TLS 1.2"
+                        ]
+                    },
+                    {
+                        "AES128-SHA": [
+                            "TLS 1.2",
+                            "TLS 1.1",
+                            "TLS 1.0"
+                        ]
+                    },
+                    {
+                        "ECDHE-RSA-AES256-GCM-SHA384": [
+                            {
+                                "TLS 1.2": [
+                                    "secp256r1"
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "ECDHE-RSA-AES256-SHA384": [
+                            {
+                                "TLS 1.2": [
+                                    "secp256r1"
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "ECDHE-RSA-AES256-SHA": [
+                            {
+                                "TLS 1.2": [
+                                    "secp256r1"
+                                ]
+                            },
+                            {
+                                "TLS 1.1": [
+                                    "secp256r1"
+                                ]
+                            },
+                            {
+                                "TLS 1.0": [
+                                    "secp256r1"
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "AES256-GCM-SHA384": [
+                            "TLS 1.2"
+                        ]
+                    },
+                    {
+                        "AES256-SHA256": [
+                            "TLS 1.2"
+                        ]
+                    },
+                    {
+                        "AES256-SHA": [
+                            "TLS 1.2",
+                            "TLS 1.1",
+                            "TLS 1.0"
+                        ]
+                    },
+                    {
+                        "ECDHE-RSA-DES-CBC3-SHA": [
+                            {
+                                "TLS 1.2": [
+                                    "secp256r1"
+                                ]
+                            },
+                            {
+                                "TLS 1.1": [
+                                    "secp256r1"
+                                ]
+                            },
+                            {
+                                "TLS 1.0": [
+                                    "secp256r1"
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "DES-CBC3-SHA": [
+                            "TLS 1.2",
+                            "TLS 1.1",
+                            "TLS 1.0"
+                        ]
+                    }
+                ]
+            },
+            "SigAlgs": {
+                "grade": "Good",
+                "output": [
+                    {
+                        "hash": "SHA1",
+                        "signature": "RSA"
+                    },
+                    {
+                        "hash": "SHA1",
+                        "signature": "DSA"
+                    },
+                    {
+                        "hash": "SHA1",
+                        "signature": "ECDSA"
+                    },
+                    {
+                        "hash": "SHA224",
+                        "signature": "RSA"
+                    },
+                    {
+                        "hash": "SHA224",
+                        "signature": "DSA"
+                    },
+                    {
+                        "hash": "SHA224",
+                        "signature": "ECDSA"
+                    },
+                    {
+                        "hash": "SHA256",
+                        "signature": "RSA"
+                    },
+                    {
+                        "hash": "SHA256",
+                        "signature": "DSA"
+                    },
+                    {
+                        "hash": "SHA256",
+                        "signature": "ECDSA"
+                    },
+                    {
+                        "hash": "SHA384",
+                        "signature": "RSA"
+                    },
+                    {
+                        "hash": "SHA384",
+                        "signature": "DSA"
+                    },
+                    {
+                        "hash": "SHA384",
+                        "signature": "ECDSA"
+                    },
+                    {
+                        "hash": "SHA512",
+                        "signature": "RSA"
+                    },
+                    {
+                        "hash": "SHA512",
+                        "signature": "DSA"
+                    },
+                    {
+                        "hash": "SHA512",
+                        "signature": "ECDSA"
+                    }
+                ]
+            }
+        },
+        "TLSSession": {
+            "SessionResume": {
+                "grade": "Good",
+                "output": {
+                    "198.41.214.163": true,
+                    "198.41.215.163": true,
+                    "2400:cb00:2048:1::c629:d49d": true,
+                    "2400:cb00:2048:1::c629:d59d": true
+                }
+            }
+        }
+    },
+    "success": true
+}
+
+    $ curl "${CFSSL_HOST}/api/v1/cfssl/scan?host=cloudflare.com&ip=2400:cb00:2048:1::c629:d49d" |python -m json.tool
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+100  3602    0  3602    0     0    337      0 --:--:--  0:00:10 --:--:--  1044
+{
+    "errors": [],
+    "messages": [],
+    "result": {
+        "Connectivity": {
+            "CloudFlareStatus": {
+                "grade": "Good",
+                "output": {
+                    "198.41.214.163": true,
+                    "198.41.215.163": true,
+                    "2400:cb00:2048:1::c629:d49d": true,
+                    "2400:cb00:2048:1::c629:d59d": true
+                }
+            },
+            "DNSLookup": {
+                "grade": "Good",
+                "output": [
+                    "2400:cb00:2048:1::c629:d59d",
+                    "2400:cb00:2048:1::c629:d49d",
+                    "198.41.215.163",
+                    "198.41.214.163"
+                ]
+            },
+            "TCPDial": {
+                "grade": "Good"
+            },
+            "TLSDial": {
+                "grade": "Good"
+            }
+        },
+        "PKI": {
+            "ChainExpiration": {
+                "grade": "Good",
+                "output": "2015-12-31T23:59:59Z"
+            },
+            "ChainValidation": {
+                "grade": "Warning",
+                "output": [
+                    " is signed by RSAWithSHA1",
+                    "Certificate for COMODO Extended Validation Secure Server CA is valid for too long",
+                    "COMODO Extended Validation Secure Server CA is signed by RSAWithSHA1"
+                ]
+            },
+            "MultipleCerts": {
+                "grade": "Good"
+            }
+        },
+        "TLSHandshake": {
+            "CertsByCiphers": {
+                "grade": "Good",
+                "output": {
+                    "TLS_ECDHE_RSA_WITH_3DES_EDE_CBC_SHA": "SHA1WithRSA",
+                    "TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA": "SHA1WithRSA",
+                    "TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256": "SHA1WithRSA",
+                    "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256": "SHA1WithRSA",
+                    "TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA": "SHA1WithRSA",
+                    "TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA384": "SHA1WithRSA",
+                    "TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384": "SHA1WithRSA",
+                    "TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256": "SHA1WithRSA",
+                    "TLS_RSA_WITH_3DES_EDE_CBC_SHA": "SHA1WithRSA",
+                    "TLS_RSA_WITH_AES_128_CBC_SHA": "SHA1WithRSA",
+                    "TLS_RSA_WITH_AES_128_CBC_SHA256": "SHA1WithRSA",
+                    "TLS_RSA_WITH_AES_128_GCM_SHA256": "SHA1WithRSA",
+                    "TLS_RSA_WITH_AES_256_CBC_SHA": "SHA1WithRSA",
+                    "TLS_RSA_WITH_AES_256_CBC_SHA256": "SHA1WithRSA",
+                    "TLS_RSA_WITH_AES_256_GCM_SHA384": "SHA1WithRSA"
+                }
+            },
+            "CertsBySigAlgs": {
+                "grade": "Good",
+                "output": {
+                    "{DSA,SHA1}": "SHA1WithRSA",
+                    "{DSA,SHA224}": "SHA1WithRSA",
+                    "{DSA,SHA256}": "SHA1WithRSA",
+                    "{DSA,SHA384}": "SHA1WithRSA",
+                    "{DSA,SHA512}": "SHA1WithRSA",
+                    "{ECDSA,SHA1}": "SHA1WithRSA",
+                    "{ECDSA,SHA224}": "SHA1WithRSA",
+                    "{ECDSA,SHA256}": "SHA1WithRSA",
+                    "{ECDSA,SHA384}": "SHA1WithRSA",
+                    "{ECDSA,SHA512}": "SHA1WithRSA",
+                    "{RSA,SHA1}": "SHA1WithRSA",
+                    "{RSA,SHA224}": "SHA1WithRSA",
+                    "{RSA,SHA256}": "SHA1WithRSA",
+                    "{RSA,SHA384}": "SHA1WithRSA",
+                    "{RSA,SHA512}": "SHA1WithRSA"
+                }
+            },
+            "CipherSuite": {
+                "grade": "Good",
+                "output": [
+                    {
+                        "ECDHE-RSA-AES128-GCM-SHA256": [
+                            {
+                                "TLS 1.2": [
+                                    "secp256r1"
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "ECDHE-RSA-AES128-SHA256": [
+                            {
+                                "TLS 1.2": [
+                                    "secp256r1"
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "ECDHE-RSA-AES128-SHA": [
+                            {
+                                "TLS 1.2": [
+                                    "secp256r1"
+                                ]
+                            },
+                            {
+                                "TLS 1.1": [
+                                    "secp256r1"
+                                ]
+                            },
+                            {
+                                "TLS 1.0": [
+                                    "secp256r1"
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "AES128-GCM-SHA256": [
+                            "TLS 1.2"
+                        ]
+                    },
+                    {
+                        "AES128-SHA256": [
+                            "TLS 1.2"
+                        ]
+                    },
+                    {
+                        "AES128-SHA": [
+                            "TLS 1.2",
+                            "TLS 1.1",
+                            "TLS 1.0"
+                        ]
+                    },
+                    {
+                        "ECDHE-RSA-AES256-GCM-SHA384": [
+                            {
+                                "TLS 1.2": [
+                                    "secp256r1"
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "ECDHE-RSA-AES256-SHA384": [
+                            {
+                                "TLS 1.2": [
+                                    "secp256r1"
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "ECDHE-RSA-AES256-SHA": [
+                            {
+                                "TLS 1.2": [
+                                    "secp256r1"
+                                ]
+                            },
+                            {
+                                "TLS 1.1": [
+                                    "secp256r1"
+                                ]
+                            },
+                            {
+                                "TLS 1.0": [
+                                    "secp256r1"
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "AES256-GCM-SHA384": [
+                            "TLS 1.2"
+                        ]
+                    },
+                    {
+                        "AES256-SHA256": [
+                            "TLS 1.2"
+                        ]
+                    },
+                    {
+                        "AES256-SHA": [
+                            "TLS 1.2",
+                            "TLS 1.1",
+                            "TLS 1.0"
+                        ]
+                    },
+                    {
+                        "ECDHE-RSA-DES-CBC3-SHA": [
+                            {
+                                "TLS 1.2": [
+                                    "secp256r1"
+                                ]
+                            },
+                            {
+                                "TLS 1.1": [
+                                    "secp256r1"
+                                ]
+                            },
+                            {
+                                "TLS 1.0": [
+                                    "secp256r1"
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "DES-CBC3-SHA": [
+                            "TLS 1.2",
+                            "TLS 1.1",
+                            "TLS 1.0"
+                        ]
+                    }
+                ]
+            },
+            "SigAlgs": {
+                "grade": "Good",
+                "output": [
+                    {
+                        "hash": "SHA1",
+                        "signature": "RSA"
+                    },
+                    {
+                        "hash": "SHA1",
+                        "signature": "DSA"
+                    },
+                    {
+                        "hash": "SHA1",
+                        "signature": "ECDSA"
+                    },
+                    {
+                        "hash": "SHA224",
+                        "signature": "RSA"
+                    },
+                    {
+                        "hash": "SHA224",
+                        "signature": "DSA"
+                    },
+                    {
+                        "hash": "SHA224",
+                        "signature": "ECDSA"
+                    },
+                    {
+                        "hash": "SHA256",
+                        "signature": "RSA"
+                    },
+                    {
+                        "hash": "SHA256",
+                        "signature": "DSA"
+                    },
+                    {
+                        "hash": "SHA256",
+                        "signature": "ECDSA"
+                    },
+                    {
+                        "hash": "SHA384",
+                        "signature": "RSA"
+                    },
+                    {
+                        "hash": "SHA384",
+                        "signature": "DSA"
+                    },
+                    {
+                        "hash": "SHA384",
+                        "signature": "ECDSA"
+                    },
+                    {
+                        "hash": "SHA512",
+                        "signature": "RSA"
+                    },
+                    {
+                        "hash": "SHA512",
+                        "signature": "DSA"
+                    },
+                    {
+                        "hash": "SHA512",
+                        "signature": "ECDSA"
+                    }
+                ]
+            }
+        },
+        "TLSSession": {
+            "SessionResume": {
+                "grade": "Good",
+                "output": {
+                    "2400:cb00:2048:1::c629:d49d": true
+                }
+            }
+        }
+    },
+    "success": true
+}

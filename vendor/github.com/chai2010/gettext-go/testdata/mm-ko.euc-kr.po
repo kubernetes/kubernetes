@@ -1,0 +1,9096 @@
+# Korean translation for dia
+# Copyright (C) 2000 Free Software Foundation, Inc.
+# Young-Ho,Cha <ganadist@dacome.co.kr>, 2000.
+#: app/sheets.c:453
+msgid ""
+msgstr ""
+"Project-Id-Version: dia 0.85\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2004-08-18 18:13+0200\n"
+"PO-Revision-Date: 2000-05-31 10:16:35+0900\n"
+"Last-Translator: Young-Ho Cha <ganadist@dacome.co.kr>\n"
+"Language-Team: Korean <ko@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=euc-kr\n"
+"Content-Transfer-Encoding: 8-bit\n"
+
+#: app/app_procs.c:219
+#, c-format
+msgid "%s error: don't know how to export into %s\n"
+msgstr ""
+
+#: app/app_procs.c:228
+#, c-format
+msgid "%s error: input and output file name is identical: %s"
+msgstr ""
+
+#: app/app_procs.c:235
+#, fuzzy, c-format
+msgid "%s error: need valid input file %s\n"
+msgstr "올바른 입력 파일이 필요합니다\n"
+
+#. if (!quiet)
+#: app/app_procs.c:255
+#, c-format
+msgid "%s --> %s\n"
+msgstr ""
+
+#: app/app_procs.c:307
+#, fuzzy, c-format
+msgid "Can't find output format %s\n"
+msgstr ""
+"플러그인 `%s'를 읽을수 없습니다\n"
+"%s"
+
+#. Translators:  The argument is a list of options, not to be translated
+#: app/app_procs.c:401
+#, fuzzy, c-format
+msgid "Export to file format and exit.  Supported formats are: %s"
+msgstr "읽어들인 파일을 저장하고 마칩니다"
+
+#. &export_file_name
+#: app/app_procs.c:410
+msgid "Export loaded file and exit"
+msgstr "읽어들인 파일을 저장하고 마칩니다"
+
+#: app/app_procs.c:410
+msgid "OUTPUT"
+msgstr "출력"
+
+#. &export_file_format
+#: app/app_procs.c:412
+msgid "FORMAT"
+msgstr ""
+
+#: app/app_procs.c:415
+#, fuzzy
+msgid "Export graphics size"
+msgstr "읽어들인 파일을 저장하고 마칩니다"
+
+#: app/app_procs.c:415
+msgid "WxH"
+msgstr ""
+
+#: app/app_procs.c:417
+msgid "Don't show the splash screen"
+msgstr ""
+
+#: app/app_procs.c:419
+msgid "Send error messages to stderr instead of showing dialogs."
+msgstr ""
+
+#: app/app_procs.c:421
+msgid "Display credits list and exit"
+msgstr ""
+
+#: app/app_procs.c:423
+msgid "Display version and exit"
+msgstr ""
+
+#: app/app_procs.c:424
+msgid "Show this help message"
+msgstr "이 도움말을 보여줍니다"
+
+#: app/app_procs.c:465
+msgid "Can't connect to session manager!\n"
+msgstr "세션 관리자에 연결을 할수 없습니다!\n"
+
+#. TRANSLATOR: 2nd and 3rd %s are time and date respectively.
+#: app/app_procs.c:492
+#, c-format
+msgid "Dia version %s, compiled %s %s\n"
+msgstr ""
+
+#: app/app_procs.c:494
+#, c-format
+msgid "Dia version %s\n"
+msgstr ""
+
+#: app/app_procs.c:548 app/app_procs.c:550
+msgid ""
+"Couldn't find standard objects when looking for object-libs, exiting...\n"
+msgstr "object-libs는 찾았지만 표준 객체는 찾지 못하였습니다, 종료합니다...\n"
+
+#: app/app_procs.c:591
+#, fuzzy
+msgid "Diagram1.dia"
+msgstr "도표 편집기"
+
+#: app/app_procs.c:633
+msgid ""
+"This shouldn't happen.  Please file a bug report at bugzilla.gnome.org\n"
+"describing how you can cause this message to appear.\n"
+msgstr ""
+
+#. no standard buttons
+#: app/app_procs.c:645
+#, fuzzy
+msgid ""
+"Modified diagrams exist.\n"
+"Are you sure you want to quit Dia\n"
+"without saving them?"
+msgstr ""
+"변경된 도표가 있습니다.\n"
+"정말로 종료하시겠습니까?"
+
+#: app/app_procs.c:649
+#, fuzzy
+msgid "Quit Dia"
+msgstr "이 프로그램은"
+
+#. This printf seems to prevent a race condition with unrefs.
+#. Yuck.  -Lars
+#: app/app_procs.c:700
+msgid "Thank you for using Dia.\n"
+msgstr ""
+
+#: app/app_procs.c:716 app/app_procs.c:723
+msgid "Could not create per-user Dia config directory"
+msgstr "다른 사용자의 Dia 설정 디렉토리를 생성할수 없습니다"
+
+#: app/app_procs.c:725
+msgid ""
+"Could not create per-user Dia config directory. Please make sure that the "
+"environment variable HOME points to an existing directory."
+msgstr ""
+
+#: app/app_procs.c:747
+msgid "Objects and filters internal to dia"
+msgstr "Dia의 내부 객체와 필터"
+
+#: app/app_procs.c:786
+msgid "[OPTION...] [FILE...]"
+msgstr "[옵션...] [파일...]"
+
+#: app/app_procs.c:789
+#, c-format
+msgid ""
+"Error on option %s: %s.\n"
+"Run '%s --help' to see a full list of available command line options.\n"
+msgstr ""
+"옵션 %s에 오류가 있습니다 : %s. \n"
+"'%s --help'를 실행시켜서 명령행 옵션의 전체목록을 참조하십시오.\n"
+
+#: app/app_procs.c:874
+msgid ""
+"The original author of Dia was:\n"
+"\n"
+msgstr ""
+
+#: app/app_procs.c:879
+msgid ""
+"\n"
+"The current maintainers of Dia are:\n"
+"\n"
+msgstr ""
+
+#: app/app_procs.c:884
+msgid ""
+"\n"
+"Other authors are:\n"
+"\n"
+msgstr ""
+
+#: app/app_procs.c:889
+msgid ""
+"\n"
+"Dia is documented by:\n"
+"\n"
+msgstr ""
+
+#: app/autosave.c:93
+msgid "Recovering autosaved diagrams"
+msgstr ""
+
+#: app/autosave.c:101
+msgid ""
+"Autosaved files exist.\n"
+"Please select those you wish to recover."
+msgstr ""
+
+#: app/color_area.c:317 app/color_area.c:364
+#, fuzzy
+msgid "Select foreground color"
+msgstr "전경 색상:"
+
+#: app/color_area.c:318 app/color_area.c:365
+#, fuzzy
+msgid "Select background color"
+msgstr "배경 색상:"
+
+#: app/commands.c:134
+#, fuzzy, c-format
+msgid "Diagram%d.dia"
+msgstr "도표 편집기"
+
+#: app/commands.c:205
+msgid "No existing object to paste.\n"
+msgstr "붙여넣을 객체가 없습니다.\n"
+
+#: app/commands.c:529 app/commands.c:567
+msgid "Could not find help directory"
+msgstr ""
+
+#: app/commands.c:536
+#, fuzzy, c-format
+msgid ""
+"Could not open help directory:\n"
+"%s"
+msgstr "`%s'를 열수 없습니다"
+
+#.
+#. * Translators should localize the following string
+#. * which will give them credit in the About box.
+#. * E.g. "Fulano de Tal <fulano@detal.com>"
+#.
+#: app/commands.c:606
+msgid "translator_credits-PLEASE_ADD_YOURSELF_HERE"
+msgstr ""
+
+#: app/commands.c:620 dia.desktop.in.h:1
+#, fuzzy
+msgid "Dia"
+msgstr "대화상자"
+
+#: app/commands.c:622
+msgid "Copyright (C) 1998-2002 The Free Software Foundation and the authors"
+msgstr ""
+
+#: app/commands.c:623
+#, fuzzy
+msgid ""
+"Dia is a program for drawing structured diagrams.\n"
+"Please visit http://www.gnome.org/projects/dia for more information."
+msgstr ""
+"더 많은 정보를 알고 싶으면 http://www.lysator.liu.se/~alla/dia 를 참조하십시"
+"오"
+
+#: app/commands.c:662
+msgid "About Dia"
+msgstr "이 프로그램은"
+
+#: app/commands.c:705
+#, c-format
+msgid "Dia v %s by Alexander Larsson"
+msgstr ""
+
+#. Exact spelling is Ch&eacute;p&eacute;lov (using *ML entities)
+#: app/commands.c:711
+msgid "Maintainers: Lars Clausen and Cyrille Chepelov"
+msgstr ""
+
+#: app/commands.c:715
+#, fuzzy
+msgid "Please visit http://www.gnome.org/projects/dia for more information"
+msgstr ""
+"더 많은 정보를 알고 싶으면 http://www.lysator.liu.se/~alla/dia 를 참조하십시"
+"오"
+
+#: app/commands.c:720
+msgid "Contributors:"
+msgstr "도와주신분들:"
+
+#: app/defaults.c:43 app/defaults.c:146
+msgid "Object defaults"
+msgstr "기본 객체"
+
+#: app/defaults.c:61
+msgid "This object has no defaults."
+msgstr "이 객체는 기본설정이 없습니다."
+
+#: app/defaults.c:111
+#, fuzzy
+msgid "Defaults: "
+msgstr "기본 보기"
+
+#: app/dia-props.c:89
+#, fuzzy
+msgid "Diagram Properties"
+msgstr "/대화상자/속성(_P)"
+
+#: app/dia-props.c:123
+msgid "Dynamic grid"
+msgstr ""
+
+#: app/dia-props.c:131
+msgid "x"
+msgstr ""
+
+#: app/dia-props.c:135
+msgid "y"
+msgstr ""
+
+#: app/dia-props.c:140
+#, fuzzy
+msgid "Spacing"
+msgstr "비율"
+
+#: app/dia-props.c:160
+#, fuzzy
+msgid "Visible spacing"
+msgstr "격자 보기(_V)"
+
+#. Hexes!
+#: app/dia-props.c:181 app/preferences.c:162
+msgid "Hex grid"
+msgstr ""
+
+#: app/dia-props.c:189
+#, fuzzy
+msgid "Hex grid size"
+msgstr "격자 가로 크기:"
+
+#: app/dia-props.c:202
+#, fuzzy
+msgid "Grid"
+msgstr "격자:"
+
+#: app/dia-props.c:213 lib/diagramdata.c:127
+msgid "Background"
+msgstr "배경"
+
+#: app/dia-props.c:224 app/preferences.c:105
+msgid "Grid Lines"
+msgstr "격자 줄"
+
+#: app/dia-props.c:235
+#, fuzzy
+msgid "Page Breaks"
+msgstr "선 색상:"
+
+#: app/dia-props.c:246
+#, fuzzy
+msgid "Colors"
+msgstr "닫기"
+
+#. Can we be sure that the filename is the 'proper title'?
+#: app/dia-props.c:265
+#, fuzzy, c-format
+msgid "Diagram Properties: %s"
+msgstr "/대화상자/속성(_P)"
+
+#: app/dia_embedd.c:352
+msgid "Could not initialize Bonobo!"
+msgstr "Bonobo를 초기화 할수 없습니다!"
+
+#: app/diacanvas.c:121
+#, fuzzy
+msgid "X position"
+msgstr "합성"
+
+#: app/diacanvas.c:122
+msgid "X position of child widget"
+msgstr ""
+
+#: app/diacanvas.c:131
+#, fuzzy
+msgid "Y position"
+msgstr "합성"
+
+#: app/diacanvas.c:132
+msgid "Y position of child widget"
+msgstr ""
+
+#: app/diagram_tree_menu.c:45
+#, fuzzy
+msgid "/_Sort objects"
+msgstr "흐름도 객체"
+
+#: app/diagram_tree_menu.c:46
+#, fuzzy
+msgid "/Sort objects/by _name"
+msgstr "객체 메뉴 없슴"
+
+#: app/diagram_tree_menu.c:48
+msgid "/Sort objects/by _type"
+msgstr ""
+
+#: app/diagram_tree_menu.c:50
+msgid "/Sort objects/as _inserted"
+msgstr ""
+
+#: app/diagram_tree_menu.c:53
+msgid "/Sort objects/All by name"
+msgstr ""
+
+#: app/diagram_tree_menu.c:55
+msgid "/Sort objects/All by type"
+msgstr ""
+
+#: app/diagram_tree_menu.c:57
+msgid "/Sort objects/All as inserted"
+msgstr ""
+
+#: app/diagram_tree_menu.c:59
+msgid "/Sort objects/_Default"
+msgstr ""
+
+#: app/diagram_tree_menu.c:60
+msgid "/Sort objects/Default/by _name"
+msgstr ""
+
+#: app/diagram_tree_menu.c:62
+msgid "/Sort objects/Default/by _type"
+msgstr ""
+
+#: app/diagram_tree_menu.c:64
+msgid "/Sort objects/Default/as _inserted"
+msgstr ""
+
+#: app/diagram_tree_menu.c:66
+#, fuzzy
+msgid "/Sort _diagrams"
+msgstr "도표 인쇄"
+
+#: app/diagram_tree_menu.c:67
+msgid "/Sort _diagrams/by _name"
+msgstr ""
+
+#: app/diagram_tree_menu.c:69
+msgid "/Sort _diagrams/as _inserted"
+msgstr ""
+
+#: app/diagram_tree_menu.c:71
+#, fuzzy
+msgid "/Sort diagrams/_Default"
+msgstr "도표:"
+
+#: app/diagram_tree_menu.c:72
+msgid "/Sort diagrams/Default/by _name"
+msgstr ""
+
+#: app/diagram_tree_menu.c:74
+msgid "/Sort diagrams/Default/as _inserted"
+msgstr ""
+
+#: app/diagram_tree_menu.c:82 app/diagram_tree_menu.c:93
+#, fuzzy
+msgid "/_Locate"
+msgstr "올려짐:"
+
+#: app/diagram_tree_menu.c:83
+#, fuzzy
+msgid "/_Properties"
+msgstr "설정(_P)"
+
+#: app/diagram_tree_menu.c:84
+msgid "/_Hide this type"
+msgstr ""
+
+#: app/diagram_tree_window.c:76
+#, fuzzy
+msgid "Diagram tree"
+msgstr "도표 편집기"
+
+#: app/dialogs.c:51
+msgid "Ok"
+msgstr ""
+
+#: app/dialogs.c:52 app/layer_dialog.c:1006 app/paginate_psprint.c:291
+msgid "Cancel"
+msgstr "취소"
+
+#. paper size
+#: app/diapagelayout.c:116
+msgid "Paper Size"
+msgstr "종이 크기"
+
+#. orientation
+#: app/diapagelayout.c:149
+msgid "Orientation"
+msgstr "방향"
+
+#. margins
+#: app/diapagelayout.c:187
+msgid "Margins"
+msgstr "여백"
+
+#: app/diapagelayout.c:199
+msgid "Top:"
+msgstr "위:"
+
+#: app/diapagelayout.c:212
+msgid "Bottom:"
+msgstr "아래:"
+
+#: app/diapagelayout.c:225
+msgid "Left:"
+msgstr "왼쪽:"
+
+#: app/diapagelayout.c:238
+msgid "Right:"
+msgstr "오른쪽:"
+
+#. Scaling
+#: app/diapagelayout.c:252
+msgid "Scaling"
+msgstr "비율"
+
+#: app/diapagelayout.c:263
+msgid "Scale:"
+msgstr "비율:"
+
+#: app/diapagelayout.c:275
+msgid "Fit to:"
+msgstr "맞춤:"
+
+#: app/diapagelayout.c:287
+msgid "by"
+msgstr ""
+
+#: app/diapagelayout.c:682
+#, c-format
+msgid "%0.3gcm x %0.3gcm"
+msgstr ""
+
+#: app/diapagelayout.c:786 app/pagesetup.c:76
+msgid "Page Setup"
+msgstr "쪽 설정"
+
+#: app/disp_callbacks.c:81 app/properties.c:152
+msgid ""
+"This object doesn't support Undo/Redo.\n"
+"Undo information erased."
+msgstr ""
+"이 객체는 취소/재실행을 지원하지 않습니다.\n"
+"취소 정보가 지워집니다."
+
+#: app/disp_callbacks.c:116
+#, fuzzy
+msgid "Properties..."
+msgstr "설정(_P)"
+
+#: app/disp_callbacks.c:919
+msgid ""
+"The object you dropped cannot fit into its parent. \n"
+"Either expand the parent object, or drop the object elsewhere."
+msgstr ""
+
+#: app/display.c:95
+msgid "Diagram modified!"
+msgstr "도표가 변경되었습니다!"
+
+#: app/display.c:983
+msgid "<unnamed>"
+msgstr ""
+
+#: app/display.c:985
+#, fuzzy, c-format
+msgid ""
+"The diagram '%s'\n"
+"has not been saved. Save changes now?"
+msgstr ""
+"도표가 저장되지 않았습니다.\n"
+"정말로 이 창을 닫겠습니까?"
+
+#: app/display.c:996
+#, fuzzy
+msgid "Close Diagram"
+msgstr "도표 열기"
+
+#: app/display.c:1001
+msgid "Discard Changes"
+msgstr ""
+
+#: app/export_png.c:134 app/load_save.c:904 app/render_eps.c:103
+#: plug-ins/cairo/diacairo.c:913 plug-ins/cgm/cgm.c:1157
+#: plug-ins/dxf/dxf-export.c:505 plug-ins/hpgl/hpgl.c:732
+#: plug-ins/metapost/render_metapost.c:964
+#: plug-ins/pstricks/render_pstricks.c:800 plug-ins/shape/shape-export.c:135
+#: plug-ins/svg/render_svg.c:152 plug-ins/wpg/wpg.c:1066
+#: plug-ins/xfig/xfig-export.c:1100 plug-ins/xslt/xslt.c:94
+#, fuzzy, c-format
+msgid "Can't open output file %s: %s\n"
+msgstr "`%s'를 열수 없습니다"
+
+#: app/export_png.c:142
+msgid "Could not create PNG write structure"
+msgstr "PNG 쓰기 구조를 생성할수 없습니다"
+
+#: app/export_png.c:151
+msgid "Could not create PNG header info structure"
+msgstr "PNG헤더정보 구조를 생성할수 없습니다"
+
+#: app/export_png.c:159
+msgid "Error occurred while writing PNG"
+msgstr "PNG를 쓰는중 오류가 발생했습니다"
+
+#. Create a dialog
+#: app/export_png.c:299
+#, fuzzy
+msgid "PNG Export Options"
+msgstr "격자 설정"
+
+#. Translators: Menu item Verb/Channel/Export
+#. Translators: Menu item Verb/Channel/Export/Export
+#: app/export_png.c:300 objects/FS/function.c:685 objects/FS/function.c:687
+msgid "Export"
+msgstr ""
+
+#: app/export_png.c:305
+#, fuzzy
+msgid "Image width:"
+msgstr "그림 파일:"
+
+#: app/export_png.c:308
+#, fuzzy
+msgid "Image height:"
+msgstr "그림 파일:"
+
+#: app/export_png.c:354
+msgid "Portable Network Graphics"
+msgstr ""
+
+#: app/filedlg.c:122 app/filedlg.c:404
+msgid "By extension"
+msgstr "확장자"
+
+#: app/filedlg.c:184
+msgid "Open Diagram"
+msgstr "도표 열기"
+
+#: app/filedlg.c:215
+msgid "Open Options"
+msgstr "설정 하기"
+
+#: app/filedlg.c:223 app/filedlg.c:526
+msgid "Determine file type:"
+msgstr "파일형식 결정:"
+
+#: app/filedlg.c:259
+msgid ""
+"Some characters in the filename are neither UTF-8 nor your local encoding.\n"
+"Some things will break."
+msgstr ""
+
+#: app/filedlg.c:265 app/filedlg.c:448
+#, c-format
+msgid ""
+"The file '%s' already exists.\n"
+"Do you want to overwrite it?"
+msgstr ""
+"파일 '%s'가 있습니다.\n"
+"덮어 쓰겠습니까?"
+
+#: app/filedlg.c:273 app/filedlg.c:455
+msgid "File already exists"
+msgstr "파일이 이미 있습니다"
+
+#: app/filedlg.c:306
+msgid "Save Diagram"
+msgstr "도표 저장"
+
+#. Need better way to make it a reasonable size.  Isn't there some
+#. standard look for them (or is that just Gnome?)
+#: app/filedlg.c:311
+#, fuzzy
+msgid "Compress diagram files"
+msgstr "저장파일 압축:"
+
+#: app/filedlg.c:320
+msgid ""
+"Compression reduces file size to less than 1/10th size and speeds up loading "
+"and saving.  Some text programs cannot manipulate compressed files."
+msgstr ""
+
+#: app/filedlg.c:474
+#, c-format
+msgid ""
+"Could not determine which export filter\n"
+"to use to save '%s'"
+msgstr ""
+
+#: app/filedlg.c:493
+msgid "Export Diagram"
+msgstr ""
+
+#: app/filedlg.c:518
+msgid "Export Options"
+msgstr ""
+
+#: app/interface.c:53
+msgid "Modify object(s)"
+msgstr "객체 변경"
+
+#: app/interface.c:54
+msgid "Modify"
+msgstr "변경"
+
+#. Translators: Menu item Verb/Control Magnitude/Change/Magnify
+#: app/interface.c:58 app/interface.c:59 objects/FS/function.c:975
+msgid "Magnify"
+msgstr "확대"
+
+#: app/interface.c:63
+msgid "Scroll around the diagram"
+msgstr "도표 "
+
+#: app/interface.c:64
+msgid "Scroll"
+msgstr ""
+
+#: app/interface.c:68 app/interface.c:69 lib/properties.c:77
+#: lib/properties.h:516 lib/properties.h:519 objects/UML/activity.c:122
+#: objects/UML/actor.c:120 objects/UML/classicon.c:141
+#: objects/UML/component.c:126 objects/UML/component_feature.c:154
+#: objects/UML/node.c:125 objects/UML/note.c:119 objects/UML/object.c:145
+#: objects/UML/small_package.c:126 objects/UML/state.c:139
+#: objects/UML/usecase.c:136 objects/Jackson/requirement.c:144
+#: objects/network/basestation.c:131 objects/network/radiocell.c:146
+msgid "Text"
+msgstr "문자열"
+
+#: app/interface.c:73 app/interface.c:74
+msgid "Box"
+msgstr "상자"
+
+#: app/interface.c:78 app/interface.c:79
+msgid "Ellipse"
+msgstr "타원"
+
+#: app/interface.c:83 app/interface.c:84
+msgid "Polygon"
+msgstr "다각형"
+
+#: app/interface.c:88 app/interface.c:89
+#, fuzzy
+msgid "Beziergon"
+msgstr "베지어"
+
+#: app/interface.c:93 app/interface.c:94 objects/standard/line.c:238
+msgid "Line"
+msgstr "선"
+
+#: app/interface.c:98 app/interface.c:99
+msgid "Arc"
+msgstr "호"
+
+#: app/interface.c:103 app/interface.c:104
+msgid "Zigzagline"
+msgstr "지그재그"
+
+#: app/interface.c:108 app/interface.c:109
+msgid "Polyline"
+msgstr "연결선"
+
+#: app/interface.c:113 app/interface.c:114
+msgid "Bezierline"
+msgstr "베지어"
+
+#: app/interface.c:118 app/interface.c:119
+msgid "Image"
+msgstr "그림"
+
+#: app/interface.c:391
+#, fuzzy
+msgid "Diagram menu."
+msgstr "도표:"
+
+#: app/interface.c:429
+msgid "Pops up the Navigation window."
+msgstr ""
+
+#: app/interface.c:511
+msgid "Zoom"
+msgstr "확대"
+
+#: app/interface.c:525
+msgid "Toggles snap-to-grid for this window."
+msgstr ""
+
+#: app/interface.c:588
+msgid "NULL tooldata in tool_select_update"
+msgstr ""
+
+#: app/interface.c:1071
+msgid ""
+"Foreground & background colors for new objects.  The small black and white "
+"squares reset colors.  The small arrows swap colors.  Double click to change "
+"colors."
+msgstr ""
+
+#: app/interface.c:1086
+msgid ""
+"Line widths.  Click on a line to set the default line width for new "
+"objects.  Double-click to set the line width more precisely."
+msgstr ""
+
+#: app/interface.c:1126
+msgid ""
+"Arrow style at the beginning of new lines.  Click to pick an arrow, or set "
+"arrow parameters with Details..."
+msgstr ""
+
+#: app/interface.c:1131
+msgid ""
+"Line style for new lines.  Click to pick a line style, or set line style "
+"parameters with Details..."
+msgstr ""
+
+#: app/interface.c:1145
+msgid ""
+"Arrow style at the end of new lines.  Click to pick an arrow, or set arrow "
+"parameters with Details..."
+msgstr ""
+
+#: app/interface.c:1255
+msgid "Diagram Editor"
+msgstr "도표 편집기"
+
+#: app/layer_dialog.c:70
+msgid "New Layer"
+msgstr "새 계층"
+
+#: app/layer_dialog.c:71
+msgid "Raise Layer"
+msgstr "계층 올림"
+
+#: app/layer_dialog.c:72
+msgid "Lower Layer"
+msgstr "계층 내림"
+
+#: app/layer_dialog.c:73
+msgid "Delete Layer"
+msgstr "계층 지움"
+
+#: app/layer_dialog.c:212
+msgid "Layers"
+msgstr "게층"
+
+#: app/layer_dialog.c:226
+msgid "Diagrams:"
+msgstr "도표:"
+
+#: app/layer_dialog.c:271
+msgid "Close"
+msgstr "닫기"
+
+#: app/layer_dialog.c:331
+msgid "New layer"
+msgstr "새 계층"
+
+#: app/layer_dialog.c:537
+msgid "none"
+msgstr ""
+
+#: app/layer_dialog.c:968
+msgid "Edit Layer Attributes"
+msgstr "계층 속성 편집"
+
+#: app/layer_dialog.c:987
+msgid "Layer name:"
+msgstr "계층 이름:"
+
+#: app/layer_dialog.c:996 app/paginate_psprint.c:283
+msgid "OK"
+msgstr "확인"
+
+#: app/linewidth_area.c:246 lib/properties.h:480 lib/properties.h:483
+#: objects/chronogram/chronoline.c:181 objects/chronogram/chronoref.c:160
+msgid "Line width"
+msgstr "선 굵기"
+
+#: app/linewidth_area.c:258
+msgid "Line width:"
+msgstr "선 굵기:"
+
+#: app/load_save.c:260
+msgid ""
+"Error loading diagram.\n"
+"Linked object not found in document."
+msgstr ""
+"도표 읽는중 오류.\n"
+"문서에서 연결된 객체를 찾을수 없습니다."
+
+#: app/load_save.c:263
+msgid ""
+"Error loading diagram.\n"
+"connection handle does not exist."
+msgstr ""
+
+#: app/load_save.c:280
+#, fuzzy, c-format
+msgid ""
+"Error loading diagram.\n"
+"connection point %s does not exist."
+msgstr ""
+"도표 읽는중 오류.\n"
+"연결점이 없습니다."
+
+#: app/load_save.c:305
+#, fuzzy, c-format
+msgid "Can't find parent %s of %s object\n"
+msgstr "표준 객체"
+
+#: app/load_save.c:350
+msgid "You must specify a file, not a directory.\n"
+msgstr ""
+
+#: app/load_save.c:357 plug-ins/dxf/dxf-import.c:1304 plug-ins/wpg/wpg.c:1170
+#: plug-ins/xfig/xfig-import.c:1560 plug-ins/xslt/xslt.c:87
+#, c-format
+msgid "Couldn't open: '%s' for reading.\n"
+msgstr ""
+
+#: app/load_save.c:374 app/load_save.c:379
+#, c-format
+msgid ""
+"Error loading diagram %s.\n"
+"Unknown file type."
+msgstr ""
+
+#: app/load_save.c:386
+#, c-format
+msgid ""
+"Error loading diagram %s.\n"
+"Not a Dia file."
+msgstr ""
+
+#: app/load_save.c:586
+#, c-format
+msgid ""
+"Error loading diagram:\n"
+"%s.\n"
+"A valid Dia file defines at least one layer."
+msgstr ""
+
+#: app/load_save.c:937
+#, c-format
+msgid "Failed to save file '%s'.\n"
+msgstr ""
+
+#: app/load_save.c:1008 app/load_save.c:1013
+#, fuzzy
+msgid "Dia Diagram File"
+msgstr "도표 편집기"
+
+#: app/menus.c:49 app/menus.c:84
+msgid "/_File"
+msgstr "/파일(_F)"
+
+#: app/menus.c:51 app/menus.c:86
+msgid "/File/_New"
+msgstr ""
+
+#: app/menus.c:53 app/menus.c:88
+#, fuzzy
+msgid "/File/_Open..."
+msgstr "/파일/쪽 설정(_u)..."
+
+#. recent file list is dynamically inserted here
+#: app/menus.c:55 app/menus.c:60 app/menus.c:64 app/menus.c:66 app/menus.c:95
+#: app/menus.c:99
+#, fuzzy
+msgid "/File/---"
+msgstr "/파일(_F)"
+
+#: app/menus.c:56
+#, fuzzy
+msgid "/File/_Diagram tree"
+msgstr "/파일/도표 인쇄(_P)..."
+
+#: app/menus.c:58
+msgid "/File/Sheets and Objects..."
+msgstr ""
+
+#: app/menus.c:61
+msgid "/File/_Preferences..."
+msgstr ""
+
+#: app/menus.c:63
+#, fuzzy
+msgid "/File/P_lugins..."
+msgstr "플러그인"
+
+#: app/menus.c:67 app/menus.c:103
+msgid "/File/_Quit"
+msgstr ""
+
+#: app/menus.c:69 app/menus.c:230
+msgid "/_Help"
+msgstr ""
+
+#: app/menus.c:71 app/menus.c:232
+msgid "/Help/_Manual"
+msgstr ""
+
+#: app/menus.c:73 app/menus.c:234
+msgid "/Help/---"
+msgstr ""
+
+#: app/menus.c:74 app/menus.c:235
+msgid "/Help/_About..."
+msgstr ""
+
+#: app/menus.c:90
+msgid "/File/_Save"
+msgstr ""
+
+#: app/menus.c:92
+msgid "/File/Save _As..."
+msgstr ""
+
+#: app/menus.c:94
+msgid "/File/_Export..."
+msgstr ""
+
+#: app/menus.c:96
+msgid "/File/Page Set_up..."
+msgstr "/파일/쪽 설정(_u)..."
+
+#: app/menus.c:97
+msgid "/File/_Print Diagram..."
+msgstr "/파일/도표 인쇄(_P)..."
+
+#: app/menus.c:100
+msgid "/File/_Close"
+msgstr "/파일/닫기(_C)"
+
+#: app/menus.c:105
+msgid "/_Edit"
+msgstr "/편집(_E)"
+
+#: app/menus.c:107
+msgid "/Edit/_Undo"
+msgstr "/편집/취소(_U)"
+
+#: app/menus.c:109
+msgid "/Edit/_Redo"
+msgstr "/편집/재실행(_R)"
+
+#: app/menus.c:111 app/menus.c:121
+#, fuzzy
+msgid "/Edit/---"
+msgstr "/편집/자르기"
+
+#: app/menus.c:112
+msgid "/Edit/_Copy"
+msgstr "/편집/복사(_C)"
+
+#: app/menus.c:114
+msgid "/Edit/C_ut"
+msgstr "/편집/자르기(_u)"
+
+#: app/menus.c:116
+msgid "/Edit/_Paste"
+msgstr "/편집/붙이기(_P)"
+
+#: app/menus.c:118
+#, fuzzy
+msgid "/Edit/_Duplicate"
+msgstr "/편집/지우기(_D)"
+
+#: app/menus.c:119
+msgid "/Edit/_Delete"
+msgstr "/편집/지우기(_D)"
+
+#: app/menus.c:122
+msgid "/Edit/Copy Text"
+msgstr "/편집/문자열 복사"
+
+#: app/menus.c:123
+msgid "/Edit/Cut Text"
+msgstr "/편집/문자열 자르기"
+
+#: app/menus.c:124
+msgid "/Edit/Paste _Text"
+msgstr "/편집/문자열 붙이기(_T)"
+
+#: app/menus.c:125
+#, fuzzy
+msgid "/_Diagram"
+msgstr "도표:"
+
+#: app/menus.c:127
+#, fuzzy
+msgid "/Diagram/_Properties..."
+msgstr "/대화상자/속성(_P)"
+
+#: app/menus.c:128
+#, fuzzy
+msgid "/Diagram/_Layers..."
+msgstr "/대화상자/계층(_L)"
+
+#: app/menus.c:129
+msgid "/_View"
+msgstr "/보기(_V)"
+
+#: app/menus.c:131
+msgid "/View/Zoom _In"
+msgstr "/보기/확대(_I)"
+
+#: app/menus.c:133
+msgid "/View/Zoom _Out"
+msgstr "/보기/축소(_O)"
+
+#: app/menus.c:135
+msgid "/View/_Zoom"
+msgstr "/보기/확대(_Z)"
+
+#: app/menus.c:137
+msgid "/View/Zoom/400%"
+msgstr "/보기/확대/400%"
+
+#: app/menus.c:138
+msgid "/View/Zoom/283%"
+msgstr "/보기/확대/283%"
+
+#: app/menus.c:139
+msgid "/View/Zoom/200%"
+msgstr "/보기/확대/200%"
+
+#: app/menus.c:140
+msgid "/View/Zoom/141%"
+msgstr "/보기/확대/141%"
+
+#: app/menus.c:141
+msgid "/View/Zoom/100%"
+msgstr "/보기/확대/100%"
+
+#: app/menus.c:143
+msgid "/View/Zoom/85%"
+msgstr "/보기/축소/85%"
+
+#: app/menus.c:144
+msgid "/View/Zoom/70.7%"
+msgstr "/보기/축소/70.7%"
+
+#: app/menus.c:145
+msgid "/View/Zoom/50%"
+msgstr "/보기/축소/50%"
+
+#: app/menus.c:146
+msgid "/View/Zoom/35.4%"
+msgstr "/보기/축소/35.4%"
+
+#: app/menus.c:147
+msgid "/View/Zoom/25%"
+msgstr "/보기/축소/25%"
+
+#: app/menus.c:148 app/menus.c:156
+#, fuzzy
+msgid "/View/---"
+msgstr "/보기(_V)"
+
+#: app/menus.c:150
+msgid "/View/_AntiAliased"
+msgstr "/보기/안티얼라이싱(_A)"
+
+#: app/menus.c:152
+#, fuzzy
+msgid "/View/Show _Grid"
+msgstr "/보기/모두 보기(_A)"
+
+#: app/menus.c:153
+msgid "/View/_Snap To Grid"
+msgstr "/보기/끊긴 격자"
+
+#: app/menus.c:154
+msgid "/View/Show _Rulers"
+msgstr "/보기/눈금자 보기(_R)"
+
+#: app/menus.c:155
+msgid "/View/Show _Connection Points"
+msgstr "/보기/연결점 보기(_C)"
+
+#: app/menus.c:157
+msgid "/View/New _View"
+msgstr "/보기/새 보기(_V)"
+
+#. Show All, Best Fit.  Same as the Gimp, Ctrl+E
+#: app/menus.c:159
+msgid "/View/Show _All"
+msgstr "/보기/모두 보기(_A)"
+
+#: app/menus.c:160
+#, fuzzy
+msgid "/View/Re_draw"
+msgstr "/보기/새 보기(_V)"
+
+#: app/menus.c:161
+msgid "/_Objects"
+msgstr "/객체(_O)"
+
+#: app/menus.c:163
+msgid "/Objects/Send to _Back"
+msgstr "/객체/뒤로 보내기(_B)"
+
+#: app/menus.c:164
+msgid "/Objects/Bring to _Front"
+msgstr "/객체/앞으로 보내기(_F)"
+
+#: app/menus.c:165
+#, fuzzy
+msgid "/Objects/Send Backwards"
+msgstr "/객체/뒤로 보냄"
+
+#: app/menus.c:166
+#, fuzzy
+msgid "/Objects/Bring Forwards"
+msgstr "/객체/앞으로 보냄"
+
+#: app/menus.c:167 app/menus.c:171 app/menus.c:175 app/menus.c:189
+#, fuzzy
+msgid "/Objects/---"
+msgstr "/객체(_O)"
+
+#: app/menus.c:168
+msgid "/Objects/_Group"
+msgstr "/객체/묶기(_G)"
+
+#. deliberately not using Ctrl+U for Ungroup
+#: app/menus.c:170
+msgid "/Objects/_Ungroup"
+msgstr "/객체/풀기(_U)"
+
+#: app/menus.c:172
+#, fuzzy
+msgid "/Objects/_Parent"
+msgstr "/객체/묶기(_G)"
+
+#: app/menus.c:173
+#, fuzzy
+msgid "/Objects/_Unparent"
+msgstr "/객체/풀기(_U)"
+
+#: app/menus.c:174
+msgid "/Objects/_Unparent Children"
+msgstr ""
+
+#: app/menus.c:176
+#, fuzzy
+msgid "/Objects/Align"
+msgstr "/객체/수직 정렬(_V)"
+
+#: app/menus.c:178
+#, fuzzy
+msgid "/Objects/Align/Left"
+msgstr "/객체/수평 정렬/왼쪽"
+
+#: app/menus.c:179
+#, fuzzy
+msgid "/Objects/Align/Center"
+msgstr "/객체/수직 정렬/중간"
+
+#: app/menus.c:180
+#, fuzzy
+msgid "/Objects/Align/Right"
+msgstr "/객체/수평 정렬/오른쪽"
+
+#: app/menus.c:181
+#, fuzzy
+msgid "/Objects/Align/Top"
+msgstr "/객체/수직 정렬/위"
+
+#: app/menus.c:182
+#, fuzzy
+msgid "/Objects/Align/Middle"
+msgstr "/객체/수직 정렬(_V)"
+
+#: app/menus.c:183
+#, fuzzy
+msgid "/Objects/Align/Bottom"
+msgstr "/객체/수직 정렬/아래"
+
+#: app/menus.c:184
+#, fuzzy
+msgid "/Objects/Align/---"
+msgstr "/객체(_O)"
+
+#: app/menus.c:185
+#, fuzzy
+msgid "/Objects/Align/Spread Out Horizontally"
+msgstr "/객체/수평 정렬(_H)"
+
+#: app/menus.c:186
+#, fuzzy
+msgid "/Objects/Align/Spread Out Vertically"
+msgstr "/객체/수직 정렬(_V)"
+
+#: app/menus.c:187
+#, fuzzy
+msgid "/Objects/Align/Adjacent"
+msgstr "/객체/수평 정렬/"
+
+#: app/menus.c:188
+#, fuzzy
+msgid "/Objects/Align/Stacked"
+msgstr "/객체/수직 정렬(_V)"
+
+#: app/menus.c:190
+#, fuzzy
+msgid "/Objects/_Properties..."
+msgstr "객체 속성"
+
+#: app/menus.c:191
+#, fuzzy
+msgid "/_Select"
+msgstr "선택"
+
+#: app/menus.c:193
+msgid "/Select/All"
+msgstr "/선택/모두"
+
+#: app/menus.c:194
+msgid "/Select/None"
+msgstr "/선택/않음"
+
+#: app/menus.c:195 app/menus.c:208
+msgid "/Select/Invert"
+msgstr "/선택/반대"
+
+#: app/menus.c:196
+msgid "/Select/Connected"
+msgstr "/선택/연결"
+
+#: app/menus.c:197
+msgid "/Select/Transitive"
+msgstr ""
+
+#: app/menus.c:198
+msgid "/Select/Same Type"
+msgstr "/선택/같은 형태"
+
+#: app/menus.c:199
+#, fuzzy
+msgid "/Select/---"
+msgstr "선택"
+
+#: app/menus.c:200
+msgid "/Select/Replace"
+msgstr ""
+
+#: app/menus.c:202
+msgid "/Select/Union"
+msgstr ""
+
+#: app/menus.c:204
+msgid "/Select/Intersect"
+msgstr ""
+
+#: app/menus.c:206
+msgid "/Select/Remove"
+msgstr "/선택/지움"
+
+#: app/menus.c:210
+#, fuzzy
+msgid "/_Tools"
+msgstr "/도구/"
+
+#: app/menus.c:212
+msgid "/Tools/Modify"
+msgstr ""
+
+#: app/menus.c:213
+msgid "/Tools/Magnify"
+msgstr ""
+
+#: app/menus.c:214
+msgid "/Tools/Scroll"
+msgstr ""
+
+#: app/menus.c:215
+msgid "/Tools/Text"
+msgstr "/도구/문자열"
+
+#: app/menus.c:216
+msgid "/Tools/Box"
+msgstr "/도구/상자"
+
+#: app/menus.c:217
+msgid "/Tools/Ellipse"
+msgstr "/도구/타원"
+
+#: app/menus.c:218
+msgid "/Tools/Polygon"
+msgstr "/도구/다각형"
+
+#: app/menus.c:219
+#, fuzzy
+msgid "/Tools/Beziergon"
+msgstr "/도구/베지어곡선"
+
+#: app/menus.c:220 app/menus.c:226
+#, fuzzy
+msgid "/Tools/---"
+msgstr "/도구/"
+
+#: app/menus.c:221
+msgid "/Tools/Line"
+msgstr "/도구/선"
+
+#: app/menus.c:222
+msgid "/Tools/Arc"
+msgstr "/도구/호"
+
+#: app/menus.c:223
+msgid "/Tools/Zigzagline"
+msgstr "/도구/지그재그"
+
+#: app/menus.c:224
+msgid "/Tools/Polyline"
+msgstr "/도구/다형선"
+
+#: app/menus.c:225
+msgid "/Tools/Bezierline"
+msgstr "/도구/베지어곡선"
+
+#: app/menus.c:227
+msgid "/Tools/Image"
+msgstr "/도구/그림"
+
+#: app/menus.c:228
+msgid "/_Input Methods"
+msgstr ""
+
+#: app/menus.c:399
+msgid "NULL tooldata in tool_menu_select"
+msgstr ""
+
+#: app/menus.c:497
+#, fuzzy
+msgid "Diagram Menu"
+msgstr "도표:"
+
+#: app/menus.c:632
+#, c-format
+msgid ""
+"Can't find menu entry '%s'!\n"
+"This is probably a i18n problem (try LANG=C)."
+msgstr ""
+
+#: app/modify_tool.c:328
+msgid "Couldn't get GTK settings"
+msgstr ""
+
+#: app/paginate_psprint.c:242
+msgid "Select Printer"
+msgstr "프린터 선택"
+
+#: app/paginate_psprint.c:254 sheets/ciscocomputer.sheet.in.h:25
+msgid "Printer"
+msgstr "프린터"
+
+#: app/paginate_psprint.c:268 sheets/Misc.sheet.in.h:1
+msgid "File"
+msgstr "파일"
+
+#: app/paginate_psprint.c:377
+#, fuzzy, c-format
+msgid "Could not run command '%s': %s"
+msgstr "`%s'를 열수 없습니다"
+
+#: app/paginate_psprint.c:380
+#, fuzzy, c-format
+msgid "Could not open '%s' for writing: %s"
+msgstr "열수 업습니다: '%s'  쓸수없슴.\n"
+
+#: app/paginate_psprint.c:397
+#, c-format
+msgid "Printing error: command '%s' returned %d\n"
+msgstr ""
+
+#: app/paginate_psprint.c:408
+#, c-format
+msgid "Printing error: command '%s' caused sigpipe."
+msgstr ""
+
+#: app/plugin-manager.c:200
+msgid "Plug-ins"
+msgstr "플러그인"
+
+#: app/plugin-manager.c:255
+#, fuzzy
+msgid "Loaded"
+msgstr "올려짐:"
+
+#: app/plugin-manager.c:262 objects/UML/class.c:112
+#: objects/UML/large_package.c:128
+#, fuzzy
+msgid "Name"
+msgstr "이름:"
+
+#: app/plugin-manager.c:268
+#, fuzzy
+msgid "Description"
+msgstr "설명:"
+
+#: app/plugin-manager.c:277
+#, fuzzy
+msgid "Load at Startup"
+msgstr "시작할때 자동 읽기"
+
+#: app/plugin-manager.c:284
+#, fuzzy
+msgid "File Name"
+msgstr "파일 이름:"
+
+#: app/preferences.c:102
+msgid "User Interface"
+msgstr "사용자 인터페이스"
+
+#: app/preferences.c:103
+#, fuzzy
+msgid "Diagram Defaults"
+msgstr "도표:"
+
+#: app/preferences.c:104
+msgid "View Defaults"
+msgstr "기본 보기"
+
+#: app/preferences.c:106
+#, fuzzy
+msgid "Diagram Tree"
+msgstr "도표:"
+
+#: app/preferences.c:120
+#, fuzzy
+msgid "Reset tools after create"
+msgstr "생성후 도구 리셋:"
+
+#: app/preferences.c:121
+#, fuzzy
+msgid "Compress saved files"
+msgstr "저장파일 압축:"
+
+#: app/preferences.c:122
+msgid "Number of undo levels:"
+msgstr "취소하기 갯수:"
+
+#: app/preferences.c:123
+msgid ""
+"Reverse dragging selects\n"
+"intersecting objects"
+msgstr ""
+
+#: app/preferences.c:124
+msgid "Recent documents list size:"
+msgstr ""
+
+#: app/preferences.c:125
+msgid "Use menu bar"
+msgstr ""
+
+#: app/preferences.c:127
+msgid "Keep tool box on top of diagram windows"
+msgstr ""
+
+#: app/preferences.c:129
+#, fuzzy
+msgid "New diagram:"
+msgstr "새 도표(_N)"
+
+#: app/preferences.c:130
+#, fuzzy
+msgid "Portrait"
+msgstr "역할:"
+
+#: app/preferences.c:132
+#, fuzzy
+msgid "Paper type:"
+msgstr "종이 크기"
+
+#: app/preferences.c:135
+#, fuzzy
+msgid "Background Color:"
+msgstr "배경 색상:"
+
+#: app/preferences.c:138
+msgid "New window:"
+msgstr "새 창:"
+
+#: app/preferences.c:139
+msgid "Width:"
+msgstr "폭:"
+
+#: app/preferences.c:140
+msgid "Height:"
+msgstr "높이:"
+
+#: app/preferences.c:141
+msgid "Magnify:"
+msgstr ""
+
+#: app/preferences.c:144
+msgid "Connection Points:"
+msgstr "연결점:"
+
+#. { NULL, PREF_NONE, 0, NULL, 3, N_("Grid:") },
+#: app/preferences.c:145 app/preferences.c:149 app/preferences.c:155
+#, fuzzy
+msgid "Visible"
+msgstr "격자 보기(_V)"
+
+#: app/preferences.c:148
+msgid "Page breaks:"
+msgstr ""
+
+#: app/preferences.c:150 app/preferences.c:160
+#, fuzzy
+msgid "Color:"
+msgstr "닫기"
+
+#: app/preferences.c:151
+#, fuzzy
+msgid "Solid lines"
+msgstr "격자 줄"
+
+#: app/preferences.c:156
+#, fuzzy
+msgid "Snap to"
+msgstr "끊긴 격자(_S)"
+
+#: app/preferences.c:157
+msgid "Dynamic grid resizing"
+msgstr ""
+
+#: app/preferences.c:158
+msgid "X Size:"
+msgstr ""
+
+#: app/preferences.c:159
+msgid "Y Size:"
+msgstr ""
+
+#: app/preferences.c:161
+msgid "Lines per major line"
+msgstr ""
+
+#: app/preferences.c:163
+#, fuzzy
+msgid "Hex Size:"
+msgstr "B 쪽"
+
+#: app/preferences.c:182
+#, fuzzy
+msgid "Diagram tree window:"
+msgstr "도표:"
+
+#: app/preferences.c:184
+#, fuzzy
+msgid "Save hidden object types"
+msgstr "표준 객체"
+
+#: app/preferences.c:391 lib/prop_inttypes.c:158
+msgid "Yes"
+msgstr "예"
+
+#: app/preferences.c:391 app/preferences.c:402 lib/prop_inttypes.c:160
+#: lib/prop_inttypes.c:186
+msgid "No"
+msgstr "아니오"
+
+#: app/preferences.c:504
+msgid "Preferences"
+msgstr "설정"
+
+#: app/properties.c:55
+msgid "Object properties"
+msgstr "객체 속성"
+
+#: app/properties.c:80
+msgid "This object has no properties."
+msgstr "이 객체는 속성이 없습니다"
+
+#: app/properties.c:202
+#, fuzzy
+msgid "Properties: "
+msgstr "설정(_P)"
+
+#: app/properties.c:206
+#, fuzzy
+msgid "Object properties:"
+msgstr "객체 속성"
+
+#. Use the Plugins menu item to get a pointer to the File menu,
+#. but any item on the File menu will do
+#: app/recent_files.c:61
+#, fuzzy
+msgid "<Toolbox>/File/Plugins..."
+msgstr "플러그인"
+
+#: app/recent_files.c:70 app/recent_files.c:143
+msgid "<Toolbox>/File/Quit"
+msgstr ""
+
+#: app/render_eps.c:145
+msgid "Encapsulated Postscript (using Pango fonts)"
+msgstr ""
+
+#: app/render_eps.c:154
+msgid "Encapsulated Postscript with preview (using Pango fonts)"
+msgstr ""
+
+#: app/render_eps.c:164
+msgid "Encapsulated Postscript (using PostScript Latin-1 fonts)"
+msgstr ""
+
+#: app/render_libart.c:318 lib/dialibartrenderer.c:288
+msgid "gdk_renderer: Unsupported fill mode specified!\n"
+msgstr ""
+
+#: app/sheets.c:154
+#, c-format
+msgid ""
+"%s\n"
+"System sheet"
+msgstr ""
+
+#: app/sheets.c:156
+#, c-format
+msgid ""
+"%s\n"
+"User sheet"
+msgstr ""
+
+#: app/sheets.c:271
+msgid ""
+"Can't get symbol 'custom_type' from any module.\n"
+"Editing shapes is disabled."
+msgstr ""
+
+#: app/sheets.c:373
+#, c-format
+msgid "Widget not found: %s"
+msgstr ""
+
+#: app/sheets.c:448
+msgid "SVG Shape"
+msgstr ""
+
+#: app/sheets.c:450
+msgid "Programmed DiaObject"
+msgstr ""
+
+#: app/sheets_dialog.c:83
+#, fuzzy
+msgid "Sheets and Objects"
+msgstr "표준 객체"
+
+#: app/sheets_dialog.c:109 app/sheets_dialog_callbacks.c:177
+msgid "<- Copy"
+msgstr ""
+
+#: app/sheets_dialog.c:119 app/sheets_dialog_callbacks.c:179
+msgid "<- Copy All"
+msgstr ""
+
+#: app/sheets_dialog.c:126 app/sheets_dialog_callbacks.c:181
+#, fuzzy
+msgid "<- Move"
+msgstr "위로 이동"
+
+#: app/sheets_dialog.c:136 app/sheets_dialog_callbacks.c:183
+msgid "<- Move All"
+msgstr ""
+
+#: app/sheets_dialog.c:233
+#, fuzzy
+msgid "Edit"
+msgstr "/편집(_E)"
+
+#: app/sheets_dialog.c:235
+#, fuzzy
+msgid "_Edit"
+msgstr "/편집(_E)"
+
+#: app/sheets_dialog.c:266
+#, fuzzy
+msgid "Revert"
+msgstr "삭제"
+
+#: app/sheets_dialog.c:354
+msgid "New"
+msgstr ""
+
+#: app/sheets_dialog.c:362 app/sheets_dialog.c:794 objects/Istar/actor.c:143
+#: objects/Istar/actor.c:144 objects/Istar/other.c:150
+#: objects/Istar/other.c:151 objects/KAOS/other.c:151 objects/KAOS/other.c:152
+#, fuzzy
+msgid "Type"
+msgstr "형식:"
+
+#: app/sheets_dialog.c:377
+msgid "Browse..."
+msgstr ""
+
+#: app/sheets_dialog.c:386
+msgid "SVG Shape:"
+msgstr ""
+
+#: app/sheets_dialog.c:413 app/sheets_dialog.c:476
+#, fuzzy
+msgid "description:"
+msgstr "설명:"
+
+#: app/sheets_dialog.c:425
+#, fuzzy
+msgid "Sheet name:"
+msgstr "파일 이름:"
+
+#: app/sheets_dialog.c:446 app/sheets_dialog_callbacks.c:289
+#: app/sheets_dialog_callbacks.c:1090
+#, fuzzy
+msgid "Line Break"
+msgstr "선 색상:"
+
+#: app/sheets_dialog.c:568
+#, fuzzy
+msgid "Edit Attributes"
+msgstr "계층 속성 편집"
+
+#: app/sheets_dialog.c:583
+#, fuzzy
+msgid "DiaObject"
+msgstr "/객체(_O)"
+
+#: app/sheets_dialog.c:599 app/sheets_dialog.c:692
+msgid "Description:"
+msgstr "설명:"
+
+#: app/sheets_dialog.c:618 objects/FS/flow-ortho.c:168 objects/FS/flow.c:146
+#: objects/UML/class_dialog.c:911 objects/UML/class_dialog.c:1845
+#: objects/UML/class_dialog.c:2074 objects/UML/class_dialog.c:2590
+#: objects/Istar/link.c:167 objects/Jackson/phenomenon.c:144
+#: objects/KAOS/metaandorrel.c:164 objects/KAOS/metabinrel.c:181
+msgid "Type:"
+msgstr "형식:"
+
+#: app/sheets_dialog.c:656
+#, fuzzy
+msgid "Sheet"
+msgstr "선택"
+
+#: app/sheets_dialog.c:672 objects/ER/attribute.c:151 objects/ER/entity.c:133
+#: objects/ER/relationship.c:138 objects/UML/association.c:200
+#: objects/UML/association.c:1126 objects/UML/class_dialog.c:900
+#: objects/UML/class_dialog.c:1834 objects/UML/class_dialog.c:2063
+#: objects/UML/class_dialog.c:2579 objects/UML/dependency.c:133
+#: objects/UML/generalization.c:129 objects/UML/realizes.c:130
+msgid "Name:"
+msgstr "이름:"
+
+#. Translators: Menu item Verb/Channel/Export/Remove
+#. Translators: Menu item Verb/Branch/Separate/Remove
+#. Translators: Menu item Verb/Branch/Separate/Remove/Remove
+#: app/sheets_dialog.c:784 objects/FS/function.c:695 objects/FS/function.c:847
+#: objects/FS/function.c:849
+msgid "Remove"
+msgstr "삭제"
+
+#: app/sheets_dialog.c:809
+#, fuzzy
+msgid "DiaObject:"
+msgstr "/객체(_O)"
+
+#: app/sheets_dialog.c:836
+#, fuzzy
+msgid "Sheet:"
+msgstr "선택"
+
+#: app/sheets_dialog.c:920
+msgid "Select SVG Shape File"
+msgstr ""
+
+#: app/sheets_dialog_callbacks.c:164
+#, fuzzy
+msgid "Copy ->"
+msgstr "문자열 복사"
+
+#: app/sheets_dialog_callbacks.c:166
+msgid "Copy All ->"
+msgstr ""
+
+#: app/sheets_dialog_callbacks.c:168
+#, fuzzy
+msgid "Move ->"
+msgstr "위로 이동"
+
+#: app/sheets_dialog_callbacks.c:170
+msgid "Move All ->"
+msgstr ""
+
+#: app/sheets_dialog_callbacks.c:303
+#, c-format
+msgid ""
+"%s\n"
+"Shape"
+msgstr ""
+
+#: app/sheets_dialog_callbacks.c:306
+#, fuzzy, c-format
+msgid ""
+"%s\n"
+"Object"
+msgstr "/객체(_O)"
+
+#: app/sheets_dialog_callbacks.c:309
+#, c-format
+msgid ""
+"%s\n"
+"Unassigned type"
+msgstr ""
+
+#: app/sheets_dialog_callbacks.c:800
+#, c-format
+msgid "Filename must end with '%s': '%s'"
+msgstr ""
+
+#: app/sheets_dialog_callbacks.c:808
+#, fuzzy, c-format
+msgid "Error examining %s: %s"
+msgstr "도표 파일 읽는중 오류\n"
+
+#: app/sheets_dialog_callbacks.c:828
+#, c-format
+msgid "Could not interpret shape file: '%s'"
+msgstr ""
+
+#: app/sheets_dialog_callbacks.c:897
+msgid "Sheet must have a Name"
+msgstr ""
+
+#: app/sheets_dialog_callbacks.c:1594 app/sheets_dialog_callbacks.c:1600
+#, fuzzy, c-format
+msgid "Couldn't open '%s': %s"
+msgstr "`%s'를 열수 없습니다"
+
+#: app/sheets_dialog_callbacks.c:1651
+#, fuzzy, c-format
+msgid "Couldn't open: '%s' for writing"
+msgstr "열수 업습니다: '%s'  쓸수없슴.\n"
+
+#: app/sheets_dialog_callbacks.c:1660
+msgid "a user"
+msgstr ""
+
+#: app/sheets_dialog_callbacks.c:1673
+#, fuzzy, c-format
+msgid "File: %s"
+msgstr "파일"
+
+#: app/sheets_dialog_callbacks.c:1676
+#, c-format
+msgid "Date: %s"
+msgstr ""
+
+#: app/sheets_dialog_callbacks.c:1680
+#, c-format
+msgid "For: %s"
+msgstr ""
+
+#: app/sheets_dialog_callbacks.c:1697
+msgid "add shapes here"
+msgstr ""
+
+#: app/splash.c:58
+msgid "Loading ..."
+msgstr ""
+
+#: app/splash.c:76
+#, c-format
+msgid "Dia v %s"
+msgstr ""
+
+#: dia.desktop.in.h:2
+#, fuzzy
+msgid "Diagram editor"
+msgstr "도표 편집기"
+
+#: lib/arrows.c:40 objects/UML/association.c:1149 objects/Jackson/domain.c:96
+msgid "None"
+msgstr ""
+
+#: lib/arrows.c:41
+msgid "Lines"
+msgstr ""
+
+#: lib/arrows.c:42
+msgid "Hollow Triangle"
+msgstr ""
+
+#: lib/arrows.c:43
+msgid "Filled Triangle"
+msgstr ""
+
+#: lib/arrows.c:44
+msgid "Unfilled Triangle"
+msgstr ""
+
+#: lib/arrows.c:45
+#, fuzzy
+msgid "Hollow Diamond"
+msgstr "이름:"
+
+#: lib/arrows.c:46
+msgid "Filled Diamond"
+msgstr ""
+
+#: lib/arrows.c:47
+#, fuzzy
+msgid "Half Diamond"
+msgstr "이름:"
+
+#: lib/arrows.c:48
+msgid "Half Head"
+msgstr ""
+
+#: lib/arrows.c:49
+msgid "Slashed Cross"
+msgstr ""
+
+#: lib/arrows.c:50
+msgid "Filled Ellipse"
+msgstr ""
+
+#: lib/arrows.c:51
+msgid "Hollow Ellipse"
+msgstr ""
+
+#: lib/arrows.c:52
+msgid "Filled Dot"
+msgstr ""
+
+#: lib/arrows.c:53
+msgid "Dimension Origin"
+msgstr ""
+
+#: lib/arrows.c:54
+msgid "Blanked Dot"
+msgstr ""
+
+#: lib/arrows.c:55
+msgid "Double Hollow Triangle"
+msgstr ""
+
+#: lib/arrows.c:56
+msgid "Double Filled Triangle"
+msgstr ""
+
+#: lib/arrows.c:57
+msgid "Filled Dot and Triangle"
+msgstr ""
+
+#: lib/arrows.c:58
+msgid "Filled Box"
+msgstr ""
+
+#: lib/arrows.c:59
+msgid "Blanked Box"
+msgstr ""
+
+#: lib/arrows.c:60
+#, fuzzy
+msgid "Slashed"
+msgstr "괘선"
+
+#: lib/arrows.c:61
+msgid "Integral Symbol"
+msgstr ""
+
+#: lib/arrows.c:62
+#, fuzzy
+msgid "Crow Foot"
+msgstr "글꼴 크기:"
+
+#: lib/arrows.c:63
+#, fuzzy
+msgid "Cross"
+msgstr "클래스"
+
+#: lib/arrows.c:64
+msgid "1-or-many"
+msgstr ""
+
+#: lib/arrows.c:65
+msgid "0-or-many"
+msgstr ""
+
+#: lib/arrows.c:66
+msgid "1-or-0"
+msgstr ""
+
+#: lib/arrows.c:67
+msgid "1 exactly"
+msgstr ""
+
+#: lib/arrows.c:68
+#, fuzzy
+msgid "Filled Concave"
+msgstr "파일 이름:"
+
+#: lib/arrows.c:69
+msgid "Blanked Concave"
+msgstr ""
+
+#: lib/arrows.c:70
+#, fuzzy
+msgid "Round"
+msgstr "아니오"
+
+#: lib/arrows.c:71
+#, fuzzy
+msgid "Open Round"
+msgstr "설정 하기"
+
+#: lib/arrows.c:72
+msgid "Backslash"
+msgstr ""
+
+#: lib/bezier_conn.c:533
+msgid "Internal error: Setting corner type of endpoint of bezier"
+msgstr "내부 오류: 베지어 곡선 끝점의 가장자리 형태 설정"
+
+#: lib/dia_xml.c:154
+#, c-format
+msgid ""
+"The file %s has no encoding specification;\n"
+"assuming it is encoded in %s"
+msgstr ""
+
+#: lib/dia_xml.c:471
+msgid "Taking point value of non-point node."
+msgstr ""
+
+#: lib/dia_xml.c:482
+#, c-format
+msgid "Incorrect x Point value \"%s\" %f; discarding it."
+msgstr ""
+
+#: lib/dia_xml.c:489
+msgid "Error parsing point."
+msgstr ""
+
+#. don't bother with useless warnings (see above)
+#: lib/dia_xml.c:497
+#, c-format
+msgid "Incorrect y Point value \"%s\" %f; discarding it."
+msgstr ""
+
+#: lib/dia_xml.c:865
+msgid ""
+"Your local character set is UTF-8. Because of issues with libxml1 and the "
+"support of files generated by previous versions of dia, you will encounter  "
+"problems. Please report to dia-list@gnome.org if you see this message."
+msgstr ""
+
+#: lib/diaarrowchooser.c:251
+msgid "Arrow Properties"
+msgstr "화살표 속성"
+
+#: lib/diaarrowchooser.c:333 lib/dialinechooser.c:333
+msgid "Details..."
+msgstr "자세히..."
+
+#. This is the default text shown in the preview entry, though the user
+#. can set it. Remember that some fonts only have capital letters.
+#: lib/diagtkfontsel.c:74
+msgid "abcdefghijk ABCDEFGHIJK"
+msgstr ""
+
+#: lib/diagtkfontsel.c:209
+#, fuzzy
+msgid "Font name"
+msgstr "파일 이름:"
+
+#: lib/diagtkfontsel.c:210
+msgid "The X string that represents this font."
+msgstr ""
+
+#: lib/diagtkfontsel.c:216
+#, fuzzy
+msgid "Preview text"
+msgstr "문자열 만듦"
+
+#: lib/diagtkfontsel.c:217
+msgid "The text to display in order to demonstrate the selected font."
+msgstr ""
+
+#: lib/diagtkfontsel.c:321
+msgid "_Family:"
+msgstr ""
+
+#: lib/diagtkfontsel.c:327
+#, fuzzy
+msgid "_Style:"
+msgstr "비율:"
+
+#: lib/diagtkfontsel.c:333
+#, fuzzy
+msgid "Si_ze:"
+msgstr "B 쪽"
+
+#. create the text entry widget
+#: lib/diagtkfontsel.c:462
+#, fuzzy
+msgid "_Preview:"
+msgstr "설정(_P)"
+
+#: lib/diagtkfontsel.c:1252
+#, fuzzy
+msgid "Font Selection"
+msgstr "연결점:"
+
+#: lib/dialinechooser.c:297
+msgid "Line Style Properties"
+msgstr "선 형태 속성"
+
+#: lib/filter.c:120
+#, c-format
+msgid "Multiple export filters with unique name %s"
+msgstr ""
+
+#: lib/font.c:89
+#, c-format
+msgid "Can't load font %s.\n"
+msgstr ""
+
+#: lib/message.c:78 lib/message.c:238
+msgid "Error"
+msgstr ""
+
+#: lib/message.c:80 lib/message.c:226
+msgid "Warning"
+msgstr ""
+
+#: lib/message.c:106
+msgid "There is one similar message."
+msgstr ""
+
+#: lib/message.c:111
+#, fuzzy
+msgid "Show repeated messages"
+msgstr "그림 만듦"
+
+#: lib/message.c:170
+#, fuzzy, c-format
+msgid "There are %d similar messages."
+msgstr "그림 만듦"
+
+#: lib/message.c:215
+msgid "Notice"
+msgstr ""
+
+#: lib/object_defaults.c:127
+#, fuzzy, c-format
+msgid ""
+"Error loading defaults '%s'.\n"
+"Not a Dia diagram file."
+msgstr "도표 파일 읽는중 오류\n"
+
+#: lib/plug-ins.c:120
+msgid "???"
+msgstr ""
+
+#: lib/plug-ins.c:228
+#, c-format
+msgid "Could not deduce correct path for `%s'"
+msgstr ""
+
+#: lib/plug-ins.c:234
+#, fuzzy, c-format
+msgid ""
+"Could not load plugin '%s'\n"
+"%s"
+msgstr ""
+"플러그인 `%s'를 읽을수 없습니다\n"
+"%s"
+
+#: lib/plug-ins.c:247
+#, c-format
+msgid "Could not find plugin init function in `%s'"
+msgstr "플러그인 초기함수에서 `%s'를 찾을수 업습니다"
+
+#: lib/plug-ins.c:249
+msgid "Missing symbol 'dia_plugin_init'"
+msgstr ""
+
+#: lib/plug-ins.c:257 lib/plug-ins.c:265
+msgid "dia_plugin_init() call failed"
+msgstr ""
+
+#: lib/plug-ins.c:284
+#, c-format
+msgid "%s Plugin could not be unloaded"
+msgstr "플러그인 %s를 제거할수 없습니다"
+
+#: lib/plug-ins.c:372
+#, fuzzy, c-format
+msgid ""
+"Could not open `%s'\n"
+"`%s'"
+msgstr "`%s'를 열수 없습니다"
+
+#: lib/properties.c:62 lib/properties.h:468 lib/widgets.c:791
+msgid "Left"
+msgstr "왼쪽"
+
+#: lib/properties.c:63 lib/properties.h:469 lib/widgets.c:797
+msgid "Center"
+msgstr "중간"
+
+#: lib/properties.c:64 lib/properties.h:470 lib/widgets.c:803
+msgid "Right"
+msgstr "오른쪽"
+
+#: lib/properties.c:71 objects/chronogram/chronoline.c:179
+#: objects/chronogram/chronoref.c:158
+#, fuzzy
+msgid "Line color"
+msgstr "선 색상:"
+
+#: lib/properties.c:72 lib/properties.h:492 lib/properties.h:495
+#, fuzzy
+msgid "Line style"
+msgstr "선 형태:"
+
+#: lib/properties.c:73
+#, fuzzy
+msgid "Fill color"
+msgstr "선 색상:"
+
+#: lib/properties.c:74 lib/properties.h:505
+msgid "Draw background"
+msgstr "배경 그림"
+
+#: lib/properties.c:75 lib/properties.h:509
+#, fuzzy
+msgid "Start arrow"
+msgstr "화살표 보임"
+
+#: lib/properties.c:76 lib/properties.h:512
+#, fuzzy
+msgid "End arrow"
+msgstr "화살표 보임"
+
+#: lib/properties.c:78 lib/properties.h:522
+#, fuzzy
+msgid "Text alignment"
+msgstr "정렬:"
+
+#. all this just to make the defaults selectable ...
+#: lib/properties.c:79 lib/properties.h:525 objects/GRAFCET/condition.c:132
+#: objects/GRAFCET/step.c:165 objects/GRAFCET/transition.c:142
+#: objects/UML/class.c:138 objects/UML/class_dialog.c:351
+#: objects/chronogram/chronoline.c:183 objects/chronogram/chronoref.c:164
+#, fuzzy
+msgid "Font"
+msgstr "글꼴 크기:"
+
+#: lib/properties.c:80 lib/properties.h:528 objects/GRAFCET/condition.c:134
+#: objects/GRAFCET/step.c:167 objects/GRAFCET/transition.c:144
+#: objects/chronogram/chronoline.c:185 objects/chronogram/chronoref.c:166
+#, fuzzy
+msgid "Font size"
+msgstr "글꼴 크기:"
+
+#: lib/properties.c:81 objects/GRAFCET/step.c:169
+#: objects/chronogram/chronoline.c:187 objects/chronogram/chronoref.c:168
+#, fuzzy
+msgid "Text color"
+msgstr "색상 선택"
+
+#: lib/properties.h:486 lib/properties.h:489
+#, fuzzy
+msgid "Line colour"
+msgstr "선 색상:"
+
+#: lib/properties.h:499 lib/properties.h:502
+#, fuzzy
+msgid "Fill colour"
+msgstr "선 색상:"
+
+#: lib/properties.h:531 lib/properties.h:534
+#, fuzzy
+msgid "Text colour"
+msgstr "색상 선택"
+
+#: lib/widgets.c:395
+msgid "Other fonts..."
+msgstr ""
+
+#: lib/widgets.c:522
+#, fuzzy, c-format
+msgid "Couldn't find font family for %s\n"
+msgstr ""
+"플러그인 `%s'를 읽을수 없습니다\n"
+"%s"
+
+#. We hit the Other fonts... entry
+#: lib/widgets.c:587
+#, fuzzy
+msgid "Select font"
+msgstr "프린터 선택"
+
+#. Translators: Menu item Noun/Material/Solid
+#: lib/widgets.c:939 objects/FS/function.c:1063
+msgid "Solid"
+msgstr "실선"
+
+#: lib/widgets.c:945
+msgid "Dashed"
+msgstr "괘선"
+
+#: lib/widgets.c:951
+msgid "Dash-Dot"
+msgstr "일점괘선"
+
+#: lib/widgets.c:957
+msgid "Dash-Dot-Dot"
+msgstr "이점괘선"
+
+#: lib/widgets.c:963
+msgid "Dotted"
+msgstr "점선"
+
+#. fs->sizebox = GTK_HBOX(box);
+#: lib/widgets.c:982
+msgid "Dash length: "
+msgstr ""
+
+#: lib/widgets.c:1137
+msgid "Select color"
+msgstr "색상 선택"
+
+#: lib/widgets.c:1355
+#, fuzzy
+msgid "Size: "
+msgstr "B 쪽"
+
+#: lib/widgets.c:1504
+msgid "Select image file"
+msgstr ""
+
+#: lib/widgets.c:1540
+msgid "Browse"
+msgstr ""
+
+#: objects/ER/attribute.c:153
+msgid "Key:"
+msgstr ""
+
+#: objects/ER/attribute.c:155
+msgid "Weak key:"
+msgstr ""
+
+#: objects/ER/attribute.c:157
+#, fuzzy
+msgid "Derived:"
+msgstr "격자:"
+
+#: objects/ER/attribute.c:159
+msgid "Multivalue:"
+msgstr ""
+
+#: objects/ER/attribute.c:421 sheets/ER.sheet.in.h:1
+msgid "Attribute"
+msgstr ""
+
+#: objects/ER/entity.c:135
+msgid "Weak:"
+msgstr ""
+
+#: objects/ER/entity.c:137
+msgid "Associative:"
+msgstr ""
+
+#: objects/ER/entity.c:406 objects/UML/classicon.c:126 sheets/ER.sheet.in.h:4
+msgid "Entity"
+msgstr ""
+
+#: objects/ER/er.c:44
+msgid "Entity/Relationship diagram objects"
+msgstr ""
+
+#: objects/ER/participation.c:115
+msgid "Total:"
+msgstr ""
+
+#: objects/ER/participation.c:405 objects/FS/flow-ortho.c:644
+#: objects/GRAFCET/vector.c:311 objects/SADT/arrow.c:462
+#: objects/UML/association.c:752 objects/UML/component_feature.c:183
+#: objects/UML/dependency.c:372 objects/UML/generalization.c:368
+#: objects/UML/realizes.c:359 objects/standard/zigzagline.c:346
+msgid "Add segment"
+msgstr ""
+
+#: objects/ER/participation.c:406 objects/FS/flow-ortho.c:645
+#: objects/GRAFCET/vector.c:312 objects/SADT/arrow.c:463
+#: objects/UML/association.c:753 objects/UML/component_feature.c:184
+#: objects/UML/dependency.c:373 objects/UML/generalization.c:369
+#: objects/UML/realizes.c:360 objects/standard/zigzagline.c:347
+msgid "Delete segment"
+msgstr ""
+
+#: objects/ER/relationship.c:140
+msgid "Left Cardinality:"
+msgstr ""
+
+#: objects/ER/relationship.c:142
+msgid "Right Cardinality:"
+msgstr ""
+
+#: objects/ER/relationship.c:144
+#, fuzzy
+msgid "Rotate:"
+msgstr "역할:"
+
+#: objects/ER/relationship.c:146
+msgid "Identifying:"
+msgstr ""
+
+#: objects/ER/relationship.c:449 sheets/ER.sheet.in.h:6
+msgid "Relationship"
+msgstr ""
+
+#. Translators: Menu item Noun/Energy
+#: objects/FS/flow-ortho.c:159 objects/FS/flow-ortho.c:641
+#: objects/FS/flow.c:137 objects/FS/flow.c:576 objects/FS/function.c:1085
+msgid "Energy"
+msgstr ""
+
+#. Translators: Menu item Noun/Material
+#: objects/FS/flow-ortho.c:160 objects/FS/flow-ortho.c:642
+#: objects/FS/flow.c:138 objects/FS/flow.c:577 objects/FS/function.c:1061
+msgid "Material"
+msgstr ""
+
+#. Translators: Menu item Verb/Signal
+#. Translators: Menu item Verb/Signal/Signal
+#. Translators: Menu item Noun/Signal
+#. Translators: Menu item Noun/Signal/Signal
+#: objects/FS/flow-ortho.c:161 objects/FS/flow-ortho.c:643
+#: objects/FS/flow.c:139 objects/FS/flow.c:578 objects/FS/function.c:1023
+#: objects/FS/function.c:1025 objects/FS/function.c:1161
+#: objects/FS/function.c:1163
+msgid "Signal"
+msgstr ""
+
+#: objects/FS/fs.c:43
+msgid "Function structure diagram objects"
+msgstr ""
+
+#: objects/FS/function.c:140
+msgid "Wish function"
+msgstr ""
+
+#: objects/FS/function.c:142
+msgid "User function"
+msgstr ""
+
+#. Translators: Menu item Verb
+#: objects/FS/function.c:665
+msgid "Verb"
+msgstr ""
+
+#. Translators: Menu item Verb/Channel
+#. Translators: Menu item Verb/Channel/Channel
+#. Translators: Menu item Verb/Channel/Transfer/Transport/Channel
+#: objects/FS/function.c:667 objects/FS/function.c:669
+#: objects/FS/function.c:709
+msgid "Channel"
+msgstr ""
+
+#. Translators: Menu item Verb/Channel/Import
+#. Translators: Menu item Verb/Channel/Import/Import
+#: objects/FS/function.c:671 objects/FS/function.c:673
+msgid "Import"
+msgstr ""
+
+#. Translators: Menu item Verb/Channel/Import/Input
+#: objects/FS/function.c:675 objects/KAOS/metabinrel.c:173
+msgid "Input"
+msgstr ""
+
+#. Translators: Menu item Verb/Channel/Import/Receive
+#: objects/FS/function.c:677
+#, fuzzy
+msgid "Receive"
+msgstr "삭제"
+
+#. Translators: Menu item Verb/Channel/Import/Allow
+#. Translators: Menu item Verb/Control Magnitude/Regulate/Allow
+#: objects/FS/function.c:679 objects/FS/function.c:951
+msgid "Allow"
+msgstr ""
+
+#. Translators: Menu item Verb/Channel/Import/Form Entrance
+#: objects/FS/function.c:681
+msgid "Form Entrance"
+msgstr ""
+
+#. Translators: Menu item Verb/Channel/Import/Capture
+#. Translators: Menu item Verb/Provision/Store/Capture
+#: objects/FS/function.c:683 objects/FS/function.c:917
+#, fuzzy
+msgid "Capture"
+msgstr "생성"
+
+#. Translators: Menu item Verb/Channel/Export/Discharge
+#: objects/FS/function.c:689
+msgid "Discharge"
+msgstr ""
+
+#. Translators: Menu item Verb/Channel/Export/Eject
+#: objects/FS/function.c:691
+#, fuzzy
+msgid "Eject"
+msgstr "객체"
+
+#. Translators: Menu item Verb/Channel/Export/Dispose
+#: objects/FS/function.c:693
+msgid "Dispose"
+msgstr ""
+
+#. Translators: Menu item Verb/Channel/Transfer
+#. Translators: Menu item Verb/Channel/Transfer/Transfer
+#. Translators: Menu item Verb/Channel/Transfer/Transmit/Transfer
+#: objects/FS/function.c:697 objects/FS/function.c:699
+#: objects/FS/function.c:717
+msgid "Transfer"
+msgstr ""
+
+#. Translators: Menu item Verb/Channel/Transfer/Transport
+#. Translators: Menu item Verb/Channel/Transfer/Transport/Transport
+#: objects/FS/function.c:701 objects/FS/function.c:703
+msgid "Transport"
+msgstr ""
+
+#. Translators: Menu item Verb/Channel/Transfer/Transport/Lift
+#: objects/FS/function.c:705
+#, fuzzy
+msgid "Lift"
+msgstr "왼쪽"
+
+#. Translators: Menu item Verb/Channel/Transfer/Transport/Move
+#: objects/FS/function.c:707
+#, fuzzy
+msgid "Move"
+msgstr "위로 이동"
+
+#. Translators: Menu item Verb/Channel/Transfer/Transmit
+#. Translators: Menu item Verb/Channel/Transfer/Transmit/Transmit
+#: objects/FS/function.c:711 objects/FS/function.c:713
+msgid "Transmit"
+msgstr ""
+
+#. Translators: Menu item Verb/Channel/Transfer/Transmit/Conduct
+#: objects/FS/function.c:715
+msgid "Conduct"
+msgstr ""
+
+#. Translators: Menu item Verb/Channel/Transfer/Transmit/Convey
+#: objects/FS/function.c:719
+msgid "Convey"
+msgstr ""
+
+#. Translators: Menu item Verb/Channel/Guide
+#. Translators: Menu item Verb/Channel/Guide/Guide
+#. Translators: Menu item Verb/Channel/Guide/Guide/Guide
+#: objects/FS/function.c:721 objects/FS/function.c:723
+#: objects/FS/function.c:725
+#, fuzzy
+msgid "Guide"
+msgstr "격자:"
+
+#. Translators: Menu item Verb/Channel/Guide/Guide/Direct
+#: objects/FS/function.c:727
+msgid "Direct"
+msgstr ""
+
+#. Translators: Menu item Verb/Channel/Guide/Guide/Straighten
+#: objects/FS/function.c:729
+msgid "Straighten"
+msgstr ""
+
+#. Translators: Menu item Verb/Channel/Guide/Guide/Steer
+#: objects/FS/function.c:731
+msgid "Steer"
+msgstr ""
+
+#. Translators: Menu item Verb/Channel/Guide/Translate
+#: objects/FS/function.c:733
+msgid "Translate"
+msgstr ""
+
+#. Translators: Menu item Verb/Channel/Guide/Rotate
+#. Translators: Menu item Verb/Channel/Guide/Rotate/Rotate
+#: objects/FS/function.c:735 objects/FS/function.c:737
+#, fuzzy
+msgid "Rotate"
+msgstr "역할:"
+
+#. Translators: Menu item Verb/Channel/Guide/Rotate/Turn
+#: objects/FS/function.c:739
+msgid "Turn"
+msgstr ""
+
+#. Translators: Menu item Verb/Channel/Guide/Rotate/Spin
+#: objects/FS/function.c:741
+#, fuzzy
+msgid "Spin"
+msgstr "비율"
+
+#. Translators: Menu item Verb/Channel/Guide/Allow DOF
+#. Translators: Menu item Verb/Channel/Guide/Allow DOF/Allow DOF
+#: objects/FS/function.c:743 objects/FS/function.c:745
+msgid "Allow DOF"
+msgstr ""
+
+#. Translators: Menu item Verb/Channel/Guide/Allow DOF/Constrain
+#: objects/FS/function.c:747
+#, fuzzy
+msgid "Constrain"
+msgstr "합성"
+
+#. Translators: Menu item Verb/Channel/Guide/Allow DOF/Unlock
+#: objects/FS/function.c:749
+#, fuzzy
+msgid "Unlock"
+msgstr "제거하기"
+
+#. Translators: Menu item Verb/Support
+#. Translators: Menu item Verb/Support/Support
+#: objects/FS/function.c:751 objects/FS/function.c:753
+msgid "Support"
+msgstr ""
+
+#. Translators: Menu item Verb/Support/Stop
+#. Translators: Menu item Verb/Support/Stop/Stop
+#: objects/FS/function.c:755 objects/FS/function.c:757
+#: sheets/SDL.sheet.in.h:19
+msgid "Stop"
+msgstr ""
+
+#. Translators: Menu item Verb/Support/Stop/Insulate
+#: objects/FS/function.c:759
+msgid "Insulate"
+msgstr ""
+
+#. Translators: Menu item Verb/Support/Stop/Protect
+#: objects/FS/function.c:761
+msgid "Protect"
+msgstr ""
+
+#. Translators: Menu item Verb/Support/Stop/Prevent
+#. Translators: Menu item Verb/Control Magnitude/Regulate/Prevent
+#: objects/FS/function.c:763 objects/FS/function.c:953
+msgid "Prevent"
+msgstr ""
+
+#. Translators: Menu item Verb/Support/Stop/Shield
+#: objects/FS/function.c:765
+msgid "Shield"
+msgstr ""
+
+#. Translators: Menu item Verb/Support/Stop/Inhibit
+#: objects/FS/function.c:767
+msgid "Inhibit"
+msgstr ""
+
+#. Translators: Menu item Verb/Support/Stabilize
+#. Translators: Menu item Verb/Support/Stabilize/Stabilize
+#: objects/FS/function.c:769 objects/FS/function.c:771
+msgid "Stabilize"
+msgstr ""
+
+#. Translators: Menu item Verb/Support/Stabilize/Steady
+#: objects/FS/function.c:773
+msgid "Steady"
+msgstr ""
+
+#. Translators: Menu item Verb/Support/Secure
+#. Translators: Menu item Verb/Support/Secure/Secure
+#: objects/FS/function.c:775 objects/FS/function.c:777
+msgid "Secure"
+msgstr ""
+
+#. Translators: Menu item Verb/Support/Secure/Attach
+#. Translators: Menu item Verb/Connect/Couple/Attach
+#: objects/FS/function.c:779 objects/FS/function.c:811
+msgid "Attach"
+msgstr ""
+
+#. Translators: Menu item Verb/Support/Secure/Mount
+#: objects/FS/function.c:781
+#, fuzzy
+msgid "Mount"
+msgstr "글꼴 크기:"
+
+#. Translators: Menu item Verb/Support/Secure/Lock
+#: objects/FS/function.c:783 sheets/ciscomisc.sheet.in.h:21
+msgid "Lock"
+msgstr ""
+
+#. Translators: Menu item Verb/Support/Secure/Fasten
+#: objects/FS/function.c:785
+msgid "Fasten"
+msgstr ""
+
+#. Translators: Menu item Verb/Support/Secure/Hold
+#: objects/FS/function.c:787
+#, fuzzy
+msgid "Hold"
+msgstr "실선"
+
+#. Translators: Menu item Verb/Support/Position
+#. Translators: Menu item Verb/Support/Position/Position
+#: objects/FS/function.c:789 objects/FS/function.c:791
+#: objects/Istar/actor.c:68
+#, fuzzy
+msgid "Position"
+msgstr "합성"
+
+#. Translators: Menu item Verb/Support/Position/Orient
+#: objects/FS/function.c:793
+#, fuzzy
+msgid "Orient"
+msgstr "방향"
+
+#. Translators: Menu item Verb/Support/Position/Align
+#: objects/FS/function.c:795
+#, fuzzy
+msgid "Align"
+msgstr "정렬:"
+
+#. Translators: Menu item Verb/Support/Position/Locate
+#. Translators: Menu item Verb/Signal/Sense/Locate
+#: objects/FS/function.c:797 objects/FS/function.c:1039
+#, fuzzy
+msgid "Locate"
+msgstr "올려짐:"
+
+#. Translators: Menu item Verb/Connect
+#. Translators: Menu item Verb/Connect/Connect
+#: objects/FS/function.c:799 objects/FS/function.c:801
+msgid "Connect"
+msgstr ""
+
+#. Translators: Menu item Verb/Connect/Couple
+#. Translators: Menu item Verb/Connect/Couple/Couple
+#: objects/FS/function.c:803 objects/FS/function.c:805
+msgid "Couple"
+msgstr ""
+
+#. Translators: Menu item Verb/Connect/Couple/Join
+#: objects/FS/function.c:807
+msgid "Join"
+msgstr ""
+
+#. Translators: Menu item Verb/Connect/Couple/Assemble
+#: objects/FS/function.c:809
+msgid "Assemble"
+msgstr ""
+
+#. Translators: Menu item Verb/Connect/Mix
+#. Translators: Menu item Verb/Connect/Mix/Mix
+#: objects/FS/function.c:813 objects/FS/function.c:815
+msgid "Mix"
+msgstr ""
+
+#. Translators: Menu item Verb/Connect/Mix/Combine
+#: objects/FS/function.c:817
+msgid "Combine"
+msgstr ""
+
+#. Translators: Menu item Verb/Connect/Mix/Blend
+#: objects/FS/function.c:819
+#, fuzzy
+msgid "Blend"
+msgstr "시작"
+
+#. Translators: Menu item Verb/Connect/Mix/Add
+#: objects/FS/function.c:821
+msgid "Add"
+msgstr ""
+
+#. Translators: Menu item Verb/Connect/Mix/Pack
+#: objects/FS/function.c:823
+msgid "Pack"
+msgstr ""
+
+#. Translators: Menu item Verb/Connect/Mix/Coalesce
+#: objects/FS/function.c:825
+#, fuzzy
+msgid "Coalesce"
+msgstr "닫기"
+
+#. Translators: Menu item Verb/Branch
+#. Translators: Menu item Verb/Branch/Branch
+#: objects/FS/function.c:827 objects/FS/function.c:829 sheets/UML.sheet.in.h:5
+msgid "Branch"
+msgstr ""
+
+#. Translators: Menu item Verb/Branch/Separate
+#. Translators: Menu item Verb/Branch/Separate/Separate
+#. Translators: Menu item Verb/Branch/Separate/Separate/Separate
+#: objects/FS/function.c:831 objects/FS/function.c:833
+#: objects/FS/function.c:835
+#, fuzzy
+msgid "Separate"
+msgstr "각도 변경:"
+
+#. Translators: Menu item Verb/Branch/Separate/Separate/Switch
+#: objects/FS/function.c:837
+msgid "Switch"
+msgstr ""
+
+#. Translators: Menu item Verb/Branch/Separate/Separate/Divide
+#: objects/FS/function.c:839
+msgid "Divide"
+msgstr ""
+
+#. Translators: Menu item Verb/Branch/Separate/Separate/Release
+#: objects/FS/function.c:841
+#, fuzzy
+msgid "Release"
+msgstr "지움"
+
+#. Translators: Menu item Verb/Branch/Separate/Separate/Detach
+#: objects/FS/function.c:843
+msgid "Detach"
+msgstr ""
+
+#. Translators: Menu item Verb/Branch/Separate/Separate/Disconnect
+#: objects/FS/function.c:845
+msgid "Disconnect"
+msgstr ""
+
+#. Translators: Menu item Verb/Branch/Separate/Remove/Cut
+#: objects/FS/function.c:851
+msgid "Cut"
+msgstr ""
+
+#. Translators: Menu item Verb/Branch/Separate/Remove/Polish
+#: objects/FS/function.c:853
+msgid "Polish"
+msgstr ""
+
+#. Translators: Menu item Verb/Branch/Separate/Remove/Sand
+#: objects/FS/function.c:855
+msgid "Sand"
+msgstr ""
+
+#. Translators: Menu item Verb/Branch/Separate/Remove/Drill
+#: objects/FS/function.c:857
+msgid "Drill"
+msgstr ""
+
+#. Translators: Menu item Verb/Branch/Separate/Remove/Lathe
+#: objects/FS/function.c:859
+msgid "Lathe"
+msgstr ""
+
+#. Translators: Menu item Verb/Branch/Refine
+#. Translators: Menu item Verb/Branch/Refine/Refine
+#: objects/FS/function.c:861 objects/FS/function.c:863
+#, fuzzy
+msgid "Refine"
+msgstr "선"
+
+#. Translators: Menu item Verb/Branch/Refine/Purify
+#: objects/FS/function.c:865
+msgid "Purify"
+msgstr ""
+
+#. Translators: Menu item Verb/Branch/Refine/Strain
+#: objects/FS/function.c:867
+#, fuzzy
+msgid "Strain"
+msgstr "비율"
+
+#. Translators: Menu item Verb/Branch/Refine/Filter
+#: objects/FS/function.c:869
+#, fuzzy
+msgid "Filter"
+msgstr "파일"
+
+#. Translators: Menu item Verb/Branch/Refine/Percolate
+#: objects/FS/function.c:871
+msgid "Percolate"
+msgstr ""
+
+#. Translators: Menu item Verb/Branch/Refine/Clear
+#: objects/FS/function.c:873
+#, fuzzy
+msgid "Clear"
+msgstr "클래스"
+
+#. Translators: Menu item Verb/Branch/Distribute
+#. Translators: Menu item Verb/Branch/Distribute/Distribute
+#: objects/FS/function.c:875 objects/FS/function.c:877
+#, fuzzy
+msgid "Distribute"
+msgstr "속성"
+
+#. Translators: Menu item Verb/Branch/Distribute/Diverge
+#: objects/FS/function.c:879
+msgid "Diverge"
+msgstr ""
+
+#. Translators: Menu item Verb/Branch/Distribute/Scatter
+#: objects/FS/function.c:881
+#, fuzzy
+msgid "Scatter"
+msgstr "비율:"
+
+#. Translators: Menu item Verb/Branch/Distribute/Disperse
+#: objects/FS/function.c:883
+msgid "Disperse"
+msgstr ""
+
+#. Translators: Menu item Verb/Branch/Distribute/Diffuse
+#. Translators: Menu item Verb/Branch/Dissipate/Diffuse
+#: objects/FS/function.c:885 objects/FS/function.c:899
+msgid "Diffuse"
+msgstr ""
+
+#. Translators: Menu item Verb/Branch/Distribute/Empty
+#: objects/FS/function.c:887
+msgid "Empty"
+msgstr ""
+
+#. Translators: Menu item Verb/Branch/Dissipate
+#. Translators: Menu item Verb/Branch/Dissipate/Dissipate
+#: objects/FS/function.c:889 objects/FS/function.c:891
+msgid "Dissipate"
+msgstr ""
+
+#. Translators: Menu item Verb/Branch/Dissipate/Absorb
+#: objects/FS/function.c:893
+msgid "Absorb"
+msgstr ""
+
+#. Translators: Menu item Verb/Branch/Dissipate/Dampen
+#: objects/FS/function.c:895
+#, fuzzy
+msgid "Dampen"
+msgstr "이름:"
+
+#. Translators: Menu item Verb/Branch/Dissipate/Dispel
+#: objects/FS/function.c:897
+msgid "Dispel"
+msgstr ""
+
+#. Translators: Menu item Verb/Branch/Dissipate/Resist
+#: objects/FS/function.c:901
+msgid "Resist"
+msgstr ""
+
+#. Translators: Menu item Verb/Provision
+#. Translators: Menu item Verb/Provision/Provision
+#: objects/FS/function.c:903 objects/FS/function.c:905
+msgid "Provision"
+msgstr ""
+
+#. Translators: Menu item Verb/Provision/Store
+#. Translators: Menu item Verb/Provision/Store/Store
+#: objects/FS/function.c:907 objects/FS/function.c:909
+msgid "Store"
+msgstr ""
+
+#. Translators: Menu item Verb/Provision/Store/Contain
+#: objects/FS/function.c:911
+msgid "Contain"
+msgstr ""
+
+#. Translators: Menu item Verb/Provision/Store/Collect
+#: objects/FS/function.c:913
+msgid "Collect"
+msgstr ""
+
+#. Translators: Menu item Verb/Provision/Store/Reserve
+#: objects/FS/function.c:915
+#, fuzzy
+msgid "Reserve"
+msgstr "삭제"
+
+#. Translators: Menu item Verb/Provision/Supply
+#. Translators: Menu item Verb/Provision/Supply/Supply
+#: objects/FS/function.c:919 objects/FS/function.c:921
+#, fuzzy
+msgid "Supply"
+msgstr "적용"
+
+#. Translators: Menu item Verb/Provision/Supply/Fill
+#: objects/FS/function.c:923
+#, fuzzy
+msgid "Fill"
+msgstr "파일"
+
+#. Translators: Menu item Verb/Provision/Supply/Provide
+#: objects/FS/function.c:925
+msgid "Provide"
+msgstr ""
+
+#. Translators: Menu item Verb/Provision/Supply/Replenish
+#: objects/FS/function.c:927
+msgid "Replenish"
+msgstr ""
+
+#. Translators: Menu item Verb/Provision/Supply/Expose
+#: objects/FS/function.c:929
+#, fuzzy
+msgid "Expose"
+msgstr "타원"
+
+#. Translators: Menu item Verb/Provision/Extract
+#: objects/FS/function.c:931 sheets/Flowchart.sheet.in.h:7
+#, fuzzy
+msgid "Extract"
+msgstr "추상"
+
+#. Translators: Menu item Verb/Control Magnitude
+#. Translators: Menu item Verb/Control Magnitude/Control Magnitude
+#: objects/FS/function.c:933 objects/FS/function.c:935
+msgid "Control Magnitude"
+msgstr ""
+
+#. Translators: Menu item Verb/Control Magnitude/Actuate
+#. Translators: Menu item Verb/Control Magnitude/Actuate/Actuate
+#: objects/FS/function.c:937 objects/FS/function.c:939
+msgid "Actuate"
+msgstr ""
+
+#. Translators: Menu item Verb/Control Magnitude/Actuate/Start
+#: objects/FS/function.c:941
+#, fuzzy
+msgid "Start"
+msgstr "화살표 보임"
+
+#. Translators: Menu item Verb/Control Magnitude/Actuate/Initiate
+#: objects/FS/function.c:943
+msgid "Initiate"
+msgstr ""
+
+#. Translators: Menu item Verb/Control Magnitude/Regulate
+#. Translators: Menu item Verb/Control Magnitude/Regulate/Regulate
+#: objects/FS/function.c:945 objects/FS/function.c:947
+#, fuzzy
+msgid "Regulate"
+msgstr "템플릿"
+
+#. Translators: Menu item Verb/Control Magnitude/Regulate/Control
+#. Translators: Menu item Noun/Signal/Control
+#: objects/FS/function.c:949 objects/FS/function.c:1167
+#: objects/UML/classicon.c:124
+msgid "Control"
+msgstr ""
+
+#. Translators: Menu item Verb/Control Magnitude/Regulate/Enable
+#: objects/FS/function.c:955
+msgid "Enable"
+msgstr ""
+
+#. Translators: Menu item Verb/Control Magnitude/Regulate/Disable
+#: objects/FS/function.c:957
+msgid "Disable"
+msgstr ""
+
+#. Translators: Menu item Verb/Control Magnitude/Regulate/Limit
+#: objects/FS/function.c:959
+msgid "Limit"
+msgstr ""
+
+#. Translators: Menu item Verb/Control Magnitude/Regulate/Interrupt
+#: objects/FS/function.c:961
+msgid "Interrupt"
+msgstr ""
+
+#. Translators: Menu item Verb/Control Magnitude/Change
+#. Translators: Menu item Verb/Control Magnitude/Change/Change
+#: objects/FS/function.c:963 objects/FS/function.c:965
+#, fuzzy
+msgid "Change"
+msgstr "취소"
+
+#. Translators: Menu item Verb/Control Magnitude/Change/Increase
+#: objects/FS/function.c:967
+msgid "Increase"
+msgstr ""
+
+#. Translators: Menu item Verb/Control Magnitude/Change/Decrease
+#: objects/FS/function.c:969
+msgid "Decrease"
+msgstr ""
+
+#. Translators: Menu item Verb/Control Magnitude/Change/Amplify
+#: objects/FS/function.c:971
+#, fuzzy
+msgid "Amplify"
+msgstr "적용"
+
+#. Translators: Menu item Verb/Control Magnitude/Change/Reduce
+#: objects/FS/function.c:973
+msgid "Reduce"
+msgstr ""
+
+#. Translators: Menu item Verb/Control Magnitude/Change/Normalize
+#: objects/FS/function.c:977
+msgid "Normalize"
+msgstr ""
+
+#. Translators: Menu item Verb/Control Magnitude/Change/Multiply
+#: objects/FS/function.c:979
+#, fuzzy
+msgid "Multiply"
+msgstr "중복"
+
+#. Translators: Menu item Verb/Control Magnitude/Change/Scale
+#: objects/FS/function.c:981
+#, fuzzy
+msgid "Scale"
+msgstr "비율:"
+
+#. Translators: Menu item Verb/Control Magnitude/Change/Rectify
+#: objects/FS/function.c:983
+msgid "Rectify"
+msgstr ""
+
+#. Translators: Menu item Verb/Control Magnitude/Change/Adjust
+#: objects/FS/function.c:985
+msgid "Adjust"
+msgstr ""
+
+#. Translators: Menu item Verb/Control Magnitude/Form
+#. Translators: Menu item Verb/Control Magnitude/Form/Form
+#: objects/FS/function.c:987 objects/FS/function.c:989
+msgid "Form"
+msgstr ""
+
+#. Translators: Menu item Verb/Control Magnitude/Form/Compact
+#: objects/FS/function.c:991
+msgid "Compact"
+msgstr ""
+
+#. Translators: Menu item Verb/Control Magnitude/Form/Crush
+#: objects/FS/function.c:993
+msgid "Crush"
+msgstr ""
+
+#. Translators: Menu item Verb/Control Magnitude/Form/Shape
+#: objects/FS/function.c:995
+msgid "Shape"
+msgstr ""
+
+#. Translators: Menu item Verb/Control Magnitude/Form/Compress
+#: objects/FS/function.c:997
+msgid "Compress"
+msgstr ""
+
+#. Translators: Menu item Verb/Control Magnitude/Form/Pierce
+#: objects/FS/function.c:999
+#, fuzzy
+msgid "Pierce"
+msgstr "프린터"
+
+#. Translators: Menu item Verb/Convert
+#. Translators: Menu item Verb/Convert/Convert
+#: objects/FS/function.c:1001 objects/FS/function.c:1003
+msgid "Convert"
+msgstr ""
+
+#. Translators: Menu item Verb/Convert/Transform
+#: objects/FS/function.c:1005
+msgid "Transform"
+msgstr ""
+
+#. Translators: Menu item Verb/Convert/Liquefy
+#: objects/FS/function.c:1007
+msgid "Liquefy"
+msgstr ""
+
+#. Translators: Menu item Verb/Convert/Solidify
+#: objects/FS/function.c:1009
+#, fuzzy
+msgid "Solidify"
+msgstr "실선"
+
+#. Translators: Menu item Verb/Convert/Evaporate
+#: objects/FS/function.c:1011
+msgid "Evaporate"
+msgstr ""
+
+#. Translators: Menu item Verb/Convert/Sublimate
+#: objects/FS/function.c:1013
+msgid "Sublimate"
+msgstr ""
+
+#. Translators: Menu item Verb/Convert/Condense
+#: objects/FS/function.c:1015
+#, fuzzy
+msgid "Condense"
+msgstr "닫기"
+
+#. Translators: Menu item Verb/Convert/Integrate
+#: objects/FS/function.c:1017
+#, fuzzy
+msgid "Integrate"
+msgstr "사용자 인터페이스"
+
+#. Translators: Menu item Verb/Convert/Differentiate
+#: objects/FS/function.c:1019
+msgid "Differentiate"
+msgstr ""
+
+#. Translators: Menu item Verb/Convert/Process
+#: objects/FS/function.c:1021 sheets/EML.sheet.in.h:5
+msgid "Process"
+msgstr ""
+
+#. Translators: Menu item Verb/Signal/Sense
+#. Translators: Menu item Verb/Signal/Sense/Sense
+#: objects/FS/function.c:1027 objects/FS/function.c:1029
+msgid "Sense"
+msgstr ""
+
+#. Translators: Menu item Verb/Signal/Sense/Perceive
+#: objects/FS/function.c:1031
+#, fuzzy
+msgid "Perceive"
+msgstr "격자:"
+
+#. Translators: Menu item Verb/Signal/Sense/Recognize
+#: objects/FS/function.c:1033
+msgid "Recognize"
+msgstr ""
+
+#. Translators: Menu item Verb/Signal/Sense/Discern
+#: objects/FS/function.c:1035
+msgid "Discern"
+msgstr ""
+
+#. Translators: Menu item Verb/Signal/Sense/Check
+#: objects/FS/function.c:1037
+msgid "Check"
+msgstr ""
+
+#. Translators: Menu item Verb/Signal/Sense/Verify
+#: objects/FS/function.c:1041
+msgid "Verify"
+msgstr ""
+
+#. Translators: Menu item Verb/Signal/Indicate
+#. Translators: Menu item Verb/Signal/Indicate/Indicate
+#: objects/FS/function.c:1043 objects/FS/function.c:1045
+msgid "Indicate"
+msgstr ""
+
+#. Translators: Menu item Verb/Signal/Indicate/Mark
+#: objects/FS/function.c:1047
+msgid "Mark"
+msgstr ""
+
+#. Translators: Menu item Verb/Signal/Display
+#: objects/FS/function.c:1049 sheets/Flowchart.sheet.in.h:5
+msgid "Display"
+msgstr ""
+
+#. Translators: Menu item Verb/Signal/Measure
+#. Translators: Menu item Verb/Signal/Measure/Measure
+#: objects/FS/function.c:1051 objects/FS/function.c:1053
+msgid "Measure"
+msgstr ""
+
+#. Translators: Menu item Verb/Signal/Measure/Calculate
+#: objects/FS/function.c:1055
+#, fuzzy
+msgid "Calculate"
+msgstr "호출"
+
+#. Translators: Menu item Verb/Signal/Represent
+#: objects/FS/function.c:1057
+msgid "Represent"
+msgstr ""
+
+#. Translators: Menu item Noun
+#: objects/FS/function.c:1059
+#, fuzzy
+msgid "Noun"
+msgstr "아니오"
+
+#. Translators: Menu item Noun/Material/Liquid
+#: objects/FS/function.c:1065
+msgid "Liquid"
+msgstr ""
+
+#. Translators: Menu item Noun/Material/Gas
+#: objects/FS/function.c:1067
+msgid "Gas"
+msgstr ""
+
+#. Translators: Menu item Noun/Material/Human
+#. Translators: Menu item Noun/Material/Human/Human
+#. Translators: Menu item Noun/Energy/Human
+#: objects/FS/function.c:1069 objects/FS/function.c:1071
+#: objects/FS/function.c:1155
+msgid "Human"
+msgstr ""
+
+#. Translators: Menu item Noun/Material/Human/Hand
+#: objects/FS/function.c:1073
+msgid "Hand"
+msgstr ""
+
+#. Translators: Menu item Noun/Material/Human/Foot
+#: objects/FS/function.c:1075
+#, fuzzy
+msgid "Foot"
+msgstr "글꼴 크기:"
+
+#. Translators: Menu item Noun/Material/Human/Head
+#: objects/FS/function.c:1077
+msgid "Head"
+msgstr ""
+
+#. Translators: Menu item Noun/Material/Human/Finger
+#: objects/FS/function.c:1079
+#, fuzzy
+msgid "Finger"
+msgstr "프린터"
+
+#. Translators: Menu item Noun/Material/Human/Toe
+#: objects/FS/function.c:1081
+#, fuzzy
+msgid "Toe"
+msgstr "위"
+
+#. Translators: Menu item Noun/Material/Biological
+#: objects/FS/function.c:1083
+msgid "Biological"
+msgstr ""
+
+#. Translators: Menu item Noun/Energy/Mechanical
+#: objects/FS/function.c:1087
+msgid "Mechanical"
+msgstr ""
+
+#. Translators: Menu item Noun/Energy/Mechanical/Mech. Energy
+#: objects/FS/function.c:1089
+msgid "Mech. Energy"
+msgstr ""
+
+#. Translators: Menu item Noun/Energy/Mechanical/Translation
+#: objects/FS/function.c:1091
+#, fuzzy
+msgid "Translation"
+msgstr "방향"
+
+#. Translators: Menu item Noun/Energy/Mechanical/Force
+#: objects/FS/function.c:1093
+msgid "Force"
+msgstr ""
+
+#. Translators: Menu item Noun/Energy/Mechanical/Rotation
+#: objects/FS/function.c:1095
+#, fuzzy
+msgid "Rotation"
+msgstr "역할:"
+
+#. Translators: Menu item Noun/Energy/Mechanical/Torque
+#: objects/FS/function.c:1097
+msgid "Torque"
+msgstr ""
+
+#. Translators: Menu item Noun/Energy/Mechanical/Random Motion
+#: objects/FS/function.c:1099
+msgid "Random Motion"
+msgstr ""
+
+#. Translators: Menu item Noun/Energy/Mechanical/Vibration
+#: objects/FS/function.c:1101
+#, fuzzy
+msgid "Vibration"
+msgstr "작동"
+
+#. Translators: Menu item Noun/Energy/Mechanical/Rotational Energy
+#: objects/FS/function.c:1103
+msgid "Rotational Energy"
+msgstr ""
+
+#. Translators: Menu item Noun/Energy/Mechanical/Translational Energy
+#: objects/FS/function.c:1105
+msgid "Translational Energy"
+msgstr ""
+
+#. Translators: Menu item Noun/Energy/Electricity
+#: objects/FS/function.c:1107
+#, fuzzy
+msgid "Electrical"
+msgstr "좌우 바꿈"
+
+#. Translators: Menu item Noun/Energy/Electricity/Electricity
+#: objects/FS/function.c:1109
+msgid "Electricity"
+msgstr ""
+
+#. Translators: Menu item Noun/Energy/Electricity/Voltage
+#: objects/FS/function.c:1111
+msgid "Voltage"
+msgstr ""
+
+#. Translators: Menu item Noun/Energy/Electricity/Current
+#: objects/FS/function.c:1113
+#, fuzzy
+msgid "Current"
+msgstr "중간"
+
+#. Translators: Menu item Noun/Energy/Hydraulic
+#: objects/FS/function.c:1115
+msgid "Hydraulic"
+msgstr ""
+
+#. Translators: Menu item Noun/Energy/Hydraulic/Pressure
+#: objects/FS/function.c:1117
+msgid "Pressure"
+msgstr ""
+
+#. Translators: Menu item Noun/Energy/Hydraulic/Volumetric Flow
+#: objects/FS/function.c:1119
+msgid "Volumetric Flow"
+msgstr ""
+
+#. Translators: Menu item Noun/Energy/Thermal
+#: objects/FS/function.c:1121
+msgid "Thermal"
+msgstr ""
+
+#. Translators: Menu item Noun/Energy/Thermal/Heat
+#: objects/FS/function.c:1123
+#, fuzzy
+msgid "Heat"
+msgstr "생성"
+
+#. Translators: Menu item Noun/Energy/Thermal/Conduction
+#: objects/FS/function.c:1125
+msgid "Conduction"
+msgstr ""
+
+#. Translators: Menu item Noun/Energy/Thermal/Convection
+#: objects/FS/function.c:1127
+#, fuzzy
+msgid "Convection"
+msgstr "연결점:"
+
+#. Translators: Menu item Noun/Energy/Thermal/Radiation
+#. Translators: Menu item Noun/Energy/Radioactive/Radiation
+#: objects/FS/function.c:1129 objects/FS/function.c:1137
+#, fuzzy
+msgid "Radiation"
+msgstr "방향"
+
+#. Translators: Menu item Noun/Energy/Pneumatic
+#: objects/FS/function.c:1131
+msgid "Pneumatic"
+msgstr ""
+
+#. Translators: Menu item Noun/Energy/Chemical
+#: objects/FS/function.c:1133
+msgid "Chemical"
+msgstr ""
+
+#. Translators: Menu item Noun/Energy/Radioactive
+#: objects/FS/function.c:1135
+msgid "Radioactive"
+msgstr ""
+
+#. Translators: Menu item Noun/Energy/Radioactive/Microwaves
+#: objects/FS/function.c:1139
+msgid "Microwaves"
+msgstr ""
+
+#. Translators: Menu item Noun/Energy/Radioactive/Radio waves
+#: objects/FS/function.c:1141
+msgid "Radio waves"
+msgstr ""
+
+#. Translators: Menu item Noun/Energy/Radioactive/X-Rays
+#: objects/FS/function.c:1143
+msgid "X-Rays"
+msgstr ""
+
+#. Translators: Menu item Noun/Energy/Radioactive/Gamma Rays
+#: objects/FS/function.c:1145
+msgid "Gamma Rays"
+msgstr ""
+
+#. Translators: Menu item Noun/Energy/Acoustic Energy
+#: objects/FS/function.c:1147
+msgid "Acoustic Energy"
+msgstr ""
+
+#. Translators: Menu item Noun/Energy/Optical Energy
+#: objects/FS/function.c:1149
+msgid "Optical Energy"
+msgstr ""
+
+#. Translators: Menu item Noun/Energy/Solar Energy
+#: objects/FS/function.c:1151
+msgid "Solar Energy"
+msgstr ""
+
+#. Translators: Menu item Noun/Energy/Magnetic Energy
+#: objects/FS/function.c:1153
+msgid "Magnetic Energy"
+msgstr ""
+
+#. Translators: Menu item Noun/Energy/Human/Human Motion
+#: objects/FS/function.c:1157
+msgid "Human Motion"
+msgstr ""
+
+#. Translators: Menu item Noun/Energy/Human/Human Force
+#: objects/FS/function.c:1159
+msgid "Human Force"
+msgstr ""
+
+#. Translators: Menu item Noun/Signal/Status
+#: objects/FS/function.c:1165
+msgid "Status"
+msgstr ""
+
+#: objects/FS/function.c:1169
+msgid "User/Device Fn"
+msgstr ""
+
+#: objects/FS/function.c:1170
+msgid "Wish Fn"
+msgstr ""
+
+#: objects/GRAFCET/action.c:135 sheets/SDL.sheet.in.h:9
+msgid "Macro call"
+msgstr ""
+
+#: objects/GRAFCET/action.c:135
+msgid "This action is a call to a macro-step"
+msgstr ""
+
+#: objects/GRAFCET/condition.c:130
+#, fuzzy
+msgid "Condition"
+msgstr "합성"
+
+#: objects/GRAFCET/condition.c:130
+msgid "The boolean equation of the condition"
+msgstr ""
+
+#: objects/GRAFCET/condition.c:132
+msgid "The condition's font"
+msgstr ""
+
+#: objects/GRAFCET/condition.c:134
+msgid "The condition's font size"
+msgstr ""
+
+#: objects/GRAFCET/condition.c:137 objects/GRAFCET/transition.c:147
+#, fuzzy
+msgid "Color"
+msgstr "닫기"
+
+#: objects/GRAFCET/condition.c:137
+msgid "The condition's color"
+msgstr ""
+
+#: objects/GRAFCET/grafcet.c:45
+msgid "GRAFCET diagram objects"
+msgstr ""
+
+#: objects/GRAFCET/step.c:146 sheets/GRAFCET.sheet.in.h:13
+msgid "Regular step"
+msgstr ""
+
+#: objects/GRAFCET/step.c:147 sheets/GRAFCET.sheet.in.h:6
+msgid "Initial step"
+msgstr ""
+
+#: objects/GRAFCET/step.c:148 sheets/GRAFCET.sheet.in.h:8
+msgid "Macro entry step"
+msgstr ""
+
+#: objects/GRAFCET/step.c:149 sheets/GRAFCET.sheet.in.h:9
+msgid "Macro exit step"
+msgstr ""
+
+#: objects/GRAFCET/step.c:150 sheets/GRAFCET.sheet.in.h:7
+msgid "Macro call step"
+msgstr ""
+
+#: objects/GRAFCET/step.c:151
+msgid "Subprogram call step"
+msgstr ""
+
+#: objects/GRAFCET/step.c:158
+msgid "Step name"
+msgstr ""
+
+#: objects/GRAFCET/step.c:158
+msgid "The name of the step"
+msgstr ""
+
+#: objects/GRAFCET/step.c:161
+msgid "Step type"
+msgstr ""
+
+#: objects/GRAFCET/step.c:161
+msgid "The kind of step"
+msgstr ""
+
+#: objects/GRAFCET/step.c:163
+msgid "Active"
+msgstr ""
+
+#: objects/GRAFCET/step.c:163
+msgid "Shows a red dot to figure the step's activity"
+msgstr ""
+
+#: objects/GRAFCET/transition.c:140
+msgid "Receptivity"
+msgstr ""
+
+#: objects/GRAFCET/transition.c:140
+msgid "The boolean equation of the receptivity"
+msgstr ""
+
+#: objects/GRAFCET/transition.c:142
+msgid "The receptivity's font"
+msgstr ""
+
+#: objects/GRAFCET/transition.c:144
+msgid "The receptivity's font size"
+msgstr ""
+
+#: objects/GRAFCET/transition.c:147
+msgid "The receptivity's color"
+msgstr ""
+
+#: objects/GRAFCET/transition.c:148
+msgid "North point"
+msgstr ""
+
+#: objects/GRAFCET/transition.c:149
+#, fuzzy
+msgid "South point"
+msgstr "부드러운 조절"
+
+#: objects/GRAFCET/vector.c:128
+msgid "Draw arrow heads on upward arcs:"
+msgstr ""
+
+#: objects/GRAFCET/vergent.c:122
+msgid "OR"
+msgstr ""
+
+#: objects/GRAFCET/vergent.c:123
+msgid "AND"
+msgstr ""
+
+#: objects/GRAFCET/vergent.c:134
+msgid "Vergent type:"
+msgstr ""
+
+#: objects/GRAFCET/vergent.c:405 objects/SADT/box.c:445
+#: objects/Istar/other.c:483 objects/Jackson/domain.c:539
+#: objects/KAOS/goal.c:587 objects/KAOS/other.c:535
+#: objects/standard/line.c:232
+msgid "Add connection point"
+msgstr ""
+
+#: objects/GRAFCET/vergent.c:406
+msgid "Delete  connection point"
+msgstr ""
+
+#: objects/GRAFCET/vergent.c:410
+msgid "GRAFCET OR/AND vergent"
+msgstr ""
+
+#: objects/Misc/analog_clock.c:136
+#, fuzzy
+msgid "Arrow color"
+msgstr "선 색상:"
+
+#: objects/Misc/analog_clock.c:138
+#, fuzzy
+msgid "Arrow line width"
+msgstr "선 굵기"
+
+#: objects/Misc/analog_clock.c:140
+#, fuzzy
+msgid "Seconds arrow color"
+msgstr "선 굵기"
+
+#: objects/Misc/analog_clock.c:142
+#, fuzzy
+msgid "Seconds arrow line width"
+msgstr "선 굵기"
+
+#: objects/Misc/analog_clock.c:144
+#, fuzzy
+msgid "Show hours"
+msgstr "눈금자 보기(_R)"
+
+#: objects/Misc/libmisc.c:38
+msgid "Miscellaneous objects"
+msgstr ""
+
+#. property rows
+#: objects/SADT/arrow.c:134 objects/UML/class.c:143
+#: objects/UML/class_dialog.c:357
+msgid "Normal"
+msgstr ""
+
+#: objects/SADT/arrow.c:135
+msgid "Import resource (not shown upstairs)"
+msgstr ""
+
+#: objects/SADT/arrow.c:136
+msgid "Imply resource (not shown downstairs)"
+msgstr ""
+
+#: objects/SADT/arrow.c:137
+msgid "Dotted arrow"
+msgstr ""
+
+#: objects/SADT/arrow.c:138
+msgid "disable arrow heads"
+msgstr ""
+
+#: objects/SADT/arrow.c:144
+msgid "Flow style:"
+msgstr ""
+
+#: objects/SADT/arrow.c:146
+msgid "Automatically gray vertical flows:"
+msgstr ""
+
+#: objects/SADT/arrow.c:147
+msgid ""
+"To improve the ease of reading, flows which begin and end vertically can be "
+"rendered gray"
+msgstr ""
+
+#: objects/SADT/arrow.c:468
+msgid "SADT Arrow"
+msgstr ""
+
+#: objects/SADT/box.c:137 objects/flowchart/box.c:150
+#: objects/flowchart/diamond.c:148 objects/flowchart/ellipse.c:147
+#: objects/flowchart/parallelogram.c:152
+msgid "Text padding"
+msgstr "문자열 채움"
+
+#: objects/SADT/box.c:144
+msgid "Activity/Data identifier"
+msgstr ""
+
+#: objects/SADT/box.c:145
+msgid "The identifier which appears in the lower right corner of the Box"
+msgstr ""
+
+#: objects/SADT/box.c:446 objects/Istar/other.c:484
+#: objects/Jackson/domain.c:540 objects/KAOS/goal.c:588
+#: objects/KAOS/other.c:536 objects/standard/line.c:233
+msgid "Delete connection point"
+msgstr ""
+
+#: objects/SADT/box.c:451
+msgid "SADT box"
+msgstr ""
+
+#: objects/SADT/sadt.c:41
+msgid "SADT diagram objects"
+msgstr ""
+
+#: objects/UML/actor.c:359 objects/UML/actor.c:361 sheets/UML.sheet.in.h:2
+msgid "Actor"
+msgstr ""
+
+#: objects/UML/association.c:1139 objects/UML/class_dialog.c:2107
+msgid "Direction:"
+msgstr ""
+
+#: objects/UML/association.c:1156
+msgid "From A to B"
+msgstr "A에서 B로"
+
+#: objects/UML/association.c:1163
+msgid "From B to A"
+msgstr "B에서 A로"
+
+#: objects/UML/association.c:1187 objects/UML/association.c:1195
+msgid "Side A"
+msgstr "A 쪽"
+
+#: objects/UML/association.c:1189 objects/UML/association.c:1197
+msgid "Side B"
+msgstr "B 쪽"
+
+#: objects/UML/association.c:1203
+msgid "Role:"
+msgstr "역할:"
+
+#: objects/UML/association.c:1215
+msgid "Multiplicity:"
+msgstr "중복"
+
+#. Show arrow:
+#: objects/UML/association.c:1226
+msgid "Show arrow"
+msgstr "화살표 보임"
+
+#. Aggregate
+#: objects/UML/association.c:1232
+msgid "Aggregate"
+msgstr "집합"
+
+#. Composition
+#: objects/UML/association.c:1240
+msgid "Composition"
+msgstr "합성"
+
+#: objects/UML/class.c:110 objects/UML/class.c:247 objects/UML/class.c:1163
+#: sheets/UML.sheet.in.h:6
+msgid "Class"
+msgstr "클래스"
+
+#: objects/UML/class.c:114 objects/UML/classicon.c:135
+#: objects/UML/component.c:122 objects/UML/large_package.c:126
+#: objects/UML/object.c:147 objects/UML/small_package.c:122
+msgid "Stereotype"
+msgstr ""
+
+#: objects/UML/class.c:116 objects/UML/class.c:153
+#: objects/UML/class_dialog.c:382 sheets/SDL.sheet.in.h:3
+#, fuzzy
+msgid "Comment"
+msgstr "중간"
+
+#: objects/UML/class.c:118 objects/UML/class.c:147
+#: objects/UML/class_dialog.c:296 objects/UML/class_dialog.c:367
+#: objects/UML/class_dialog.c:1933
+msgid "Abstract"
+msgstr ""
+
+#: objects/UML/class.c:120
+#, fuzzy
+msgid "Template"
+msgstr "템플릿"
+
+#: objects/UML/class.c:123 objects/UML/class_dialog.c:305
+msgid "Suppress Attributes"
+msgstr "속성 안보임"
+
+#: objects/UML/class.c:125
+#, fuzzy
+msgid "Suppress Operations"
+msgstr "작동 안보임"
+
+#: objects/UML/class.c:127
+#, fuzzy
+msgid "Visible Attributes"
+msgstr "속성"
+
+#: objects/UML/class.c:129
+#, fuzzy
+msgid "Visible Operations"
+msgstr "작동"
+
+#: objects/UML/class.c:131
+#, fuzzy
+msgid "Visible Comments"
+msgstr "작동"
+
+#: objects/UML/class.c:133 objects/UML/class_dialog.c:321
+#, fuzzy
+msgid "Wrap Operations"
+msgstr "작동"
+
+#: objects/UML/class.c:135
+msgid "Wrap after char"
+msgstr ""
+
+#: objects/UML/class.c:145 objects/UML/class_dialog.c:362
+msgid "Polymorphic"
+msgstr ""
+
+#: objects/UML/class.c:149
+#, fuzzy
+msgid "Classname"
+msgstr "클래스이름:"
+
+#: objects/UML/class.c:151
+#, fuzzy
+msgid "Abstract Classname"
+msgstr "추상"
+
+#: objects/UML/class.c:157 objects/UML/class.c:159 objects/UML/class.c:161
+#: objects/UML/class.c:163 objects/UML/class.c:165 objects/UML/class.c:167
+msgid " "
+msgstr ""
+
+#: objects/UML/class.c:172 objects/UML/object.c:151
+msgid "Attributes"
+msgstr "속성"
+
+#: objects/UML/class.c:174
+msgid "Operations"
+msgstr "작동"
+
+#: objects/UML/class.c:241
+#, fuzzy
+msgid "Show Comments"
+msgstr "중간"
+
+#. Class page:
+#: objects/UML/class_dialog.c:265
+#, fuzzy
+msgid "_Class"
+msgstr "클래스"
+
+#: objects/UML/class_dialog.c:273
+msgid "Class name:"
+msgstr "클래스이름:"
+
+#: objects/UML/class_dialog.c:281 objects/UML/class_dialog.c:1856
+#: objects/UML/dependency.c:135 objects/UML/generalization.c:131
+#: objects/UML/realizes.c:132
+msgid "Stereotype:"
+msgstr ""
+
+#: objects/UML/class_dialog.c:288 objects/UML/class_dialog.c:933
+#: objects/UML/class_dialog.c:1974 objects/UML/class_dialog.c:2096
+#, fuzzy
+msgid "Comment:"
+msgstr "중간"
+
+#: objects/UML/class_dialog.c:302
+msgid "Attributes visible"
+msgstr "속성 보임"
+
+#: objects/UML/class_dialog.c:311
+msgid "Operations visible"
+msgstr "작동 보임"
+
+#: objects/UML/class_dialog.c:314
+msgid "Suppress operations"
+msgstr "작동 안보임"
+
+#: objects/UML/class_dialog.c:328
+msgid "Wrap after this length: "
+msgstr ""
+
+#: objects/UML/class_dialog.c:335
+#, fuzzy
+msgid "Comments visible"
+msgstr "작동 보임"
+
+#. head line
+#: objects/UML/class_dialog.c:348
+msgid "Kind"
+msgstr ""
+
+#: objects/UML/class_dialog.c:353
+#, fuzzy
+msgid "Size"
+msgstr "B 쪽"
+
+#: objects/UML/class_dialog.c:372
+#, fuzzy
+msgid "Class Name"
+msgstr "클래스이름:"
+
+#: objects/UML/class_dialog.c:377
+#, fuzzy
+msgid "Abstract Class"
+msgstr "추상"
+
+#. should probably be refactored too.
+#: objects/UML/class_dialog.c:394
+#, fuzzy
+msgid "Text Color"
+msgstr "색상 선택"
+
+#: objects/UML/class_dialog.c:402
+#, fuzzy
+msgid "Foreground Color"
+msgstr "전경 색상:"
+
+#: objects/UML/class_dialog.c:410
+#, fuzzy
+msgid "Background Color"
+msgstr "배경 색상:"
+
+#. Attributes page:
+#: objects/UML/class_dialog.c:833
+#, fuzzy
+msgid "_Attributes"
+msgstr "속성"
+
+#: objects/UML/class_dialog.c:861 objects/UML/class_dialog.c:1792
+#: objects/UML/class_dialog.c:2020 objects/UML/class_dialog.c:2540
+#, fuzzy
+msgid "_New"
+msgstr "/보기(_V)"
+
+#: objects/UML/class_dialog.c:867 objects/UML/class_dialog.c:1798
+#: objects/UML/class_dialog.c:2027 objects/UML/class_dialog.c:2546
+msgid "_Delete"
+msgstr ""
+
+#: objects/UML/class_dialog.c:873 objects/UML/class_dialog.c:1804
+#: objects/UML/class_dialog.c:2034 objects/UML/class_dialog.c:2552
+msgid "Move up"
+msgstr "위로 이동"
+
+#: objects/UML/class_dialog.c:879 objects/UML/class_dialog.c:1810
+#: objects/UML/class_dialog.c:2041 objects/UML/class_dialog.c:2558
+msgid "Move down"
+msgstr "아래로 이동"
+
+#: objects/UML/class_dialog.c:890
+msgid "Attribute data"
+msgstr "속성 데이터"
+
+#: objects/UML/class_dialog.c:922
+msgid "Value:"
+msgstr "값:"
+
+#: objects/UML/class_dialog.c:945 objects/UML/class_dialog.c:1869
+msgid "Visibility:"
+msgstr "표시:"
+
+#: objects/UML/class_dialog.c:954 objects/UML/class_dialog.c:1878
+msgid "Public"
+msgstr "공용"
+
+#: objects/UML/class_dialog.c:962 objects/UML/class_dialog.c:1886
+msgid "Private"
+msgstr ""
+
+#: objects/UML/class_dialog.c:970 objects/UML/class_dialog.c:1894
+msgid "Protected"
+msgstr ""
+
+#: objects/UML/class_dialog.c:978 objects/UML/class_dialog.c:1902
+msgid "Implementation"
+msgstr ""
+
+#: objects/UML/class_dialog.c:999 objects/UML/class_dialog.c:1918
+msgid "Class scope"
+msgstr ""
+
+#. Operations page:
+#: objects/UML/class_dialog.c:1764
+#, fuzzy
+msgid "_Operations"
+msgstr "작동"
+
+#: objects/UML/class_dialog.c:1822
+msgid "Operation data"
+msgstr "작동 데이터"
+
+#: objects/UML/class_dialog.c:1924
+msgid "Inheritance type:"
+msgstr ""
+
+#: objects/UML/class_dialog.c:1941
+msgid "Polymorphic (virtual)"
+msgstr ""
+
+#: objects/UML/class_dialog.c:1949
+msgid "Leaf (final)"
+msgstr ""
+
+#: objects/UML/class_dialog.c:1967
+msgid "Query"
+msgstr ""
+
+#: objects/UML/class_dialog.c:1991
+msgid "Parameters:"
+msgstr "인자:"
+
+#: objects/UML/class_dialog.c:2053
+msgid "Parameter data"
+msgstr "인자 데이터"
+
+#: objects/UML/class_dialog.c:2085
+msgid "Def. value:"
+msgstr "기본 값:"
+
+#: objects/UML/class_dialog.c:2116
+#, fuzzy
+msgid "Undefined"
+msgstr "선"
+
+#: objects/UML/class_dialog.c:2124
+msgid "In"
+msgstr ""
+
+#: objects/UML/class_dialog.c:2133
+msgid "Out"
+msgstr ""
+
+#: objects/UML/class_dialog.c:2142
+msgid "In & Out"
+msgstr ""
+
+#. Templates page:
+#: objects/UML/class_dialog.c:2506
+#, fuzzy
+msgid "_Templates"
+msgstr "템플릿"
+
+#: objects/UML/class_dialog.c:2512 sheets/UML.sheet.in.h:29
+msgid "Template class"
+msgstr "템플릿 클래스"
+
+#: objects/UML/class_dialog.c:2569
+msgid "Formal parameter data"
+msgstr ""
+
+#: objects/UML/classicon.c:125
+msgid "Boundary"
+msgstr ""
+
+#: objects/UML/classicon.c:137
+#, fuzzy
+msgid "Is object"
+msgstr "객체 활성"
+
+#: objects/UML/component_feature.c:144 sheets/UML.sheet.in.h:14
+msgid "Facet"
+msgstr ""
+
+#: objects/UML/component_feature.c:145 sheets/UML.sheet.in.h:26
+msgid "Receptacle"
+msgstr ""
+
+#: objects/UML/component_feature.c:146 sheets/UML.sheet.in.h:13
+msgid "Event Source"
+msgstr ""
+
+#: objects/UML/component_feature.c:147 sheets/UML.sheet.in.h:12
+msgid "Event Sink"
+msgstr ""
+
+#: objects/UML/constraint.c:125
+msgid "Constraint:"
+msgstr ""
+
+#: objects/UML/dependency.c:137
+msgid "Show arrow:"
+msgstr ""
+
+#: objects/UML/implements.c:128
+msgid "Interface:"
+msgstr ""
+
+#: objects/UML/lifeline.c:144
+msgid "Draw focus of control:"
+msgstr ""
+
+#: objects/UML/lifeline.c:146
+msgid "Draw destruction mark:"
+msgstr ""
+
+#: objects/UML/lifeline.c:417
+#, fuzzy
+msgid "Add connection points"
+msgstr "연결점:"
+
+#: objects/UML/lifeline.c:418
+#, fuzzy
+msgid "Remove connection points"
+msgstr "연결점 보기(_C)"
+
+#: objects/UML/lifeline.c:422
+msgid "UML Lifeline"
+msgstr ""
+
+#: objects/UML/message.c:135
+msgid "Call"
+msgstr "호출"
+
+#: objects/UML/message.c:136
+msgid "Create"
+msgstr "생성"
+
+#: objects/UML/message.c:137
+msgid "Destroy"
+msgstr "소멸"
+
+#: objects/UML/message.c:138
+msgid "Simple"
+msgstr ""
+
+#: objects/UML/message.c:139
+msgid "Return"
+msgstr ""
+
+#: objects/UML/message.c:140
+msgid "Send"
+msgstr ""
+
+#: objects/UML/message.c:141
+msgid "Recursive"
+msgstr ""
+
+#: objects/UML/message.c:150 objects/Jackson/phenomenon.c:142
+msgid "Message:"
+msgstr ""
+
+#: objects/UML/message.c:152
+msgid "Message type:"
+msgstr ""
+
+#: objects/UML/object.c:149
+msgid "Explicit state"
+msgstr ""
+
+#: objects/UML/object.c:154
+msgid "Active object"
+msgstr "객체 활성"
+
+#: objects/UML/object.c:156
+msgid "Show attributes"
+msgstr ""
+
+#: objects/UML/object.c:158
+#, fuzzy
+msgid "Multiple instance"
+msgstr "중복"
+
+#. Would like to create a state_term instead, but making the connections
+#. * is a pain
+#: objects/UML/state.c:410
+msgid ""
+"This diagram uses the State object for initial/final states.\n"
+"That option will go away in future versions.\n"
+"Please use the Initial/Final State object instead\n"
+msgstr ""
+
+#: objects/UML/state_term.c:118
+msgid "Is final"
+msgstr ""
+
+#: objects/UML/uml.c:64
+msgid "Unified Modelling Language diagram objects"
+msgstr ""
+
+#: objects/UML/usecase.c:130
+msgid "Text outside"
+msgstr ""
+
+#: objects/UML/usecase.c:132
+msgid "Collaboration"
+msgstr ""
+
+#: objects/bondgraph/bondgraph.c:39
+#, fuzzy
+msgid "Bond graph objects"
+msgstr "표준 객체"
+
+#: objects/chronogram/chronogram.c:40
+msgid "Chronogram diagram objects"
+msgstr ""
+
+#: objects/chronogram/chronoline.c:148
+msgid "Data"
+msgstr ""
+
+#: objects/chronogram/chronoline.c:150
+#, fuzzy
+msgid "Data name"
+msgstr "클래스이름:"
+
+#: objects/chronogram/chronoline.c:152
+msgid "Events"
+msgstr ""
+
+#: objects/chronogram/chronoline.c:155
+msgid "Event specification"
+msgstr ""
+
+#: objects/chronogram/chronoline.c:156
+msgid ""
+"@ time    set the pointer at an absolute time.\n"
+"( duration  sets the signal up, then wait 'duration'.\n"
+") duration  sets the signal down, then wait 'duration'.\n"
+"u duration  sets the signal to \"unknown\" state, then wait 'duration'.\n"
+"example : @ 1.0 (2.0)1.0(2.0)\n"
+msgstr ""
+
+#: objects/chronogram/chronoline.c:162
+msgid "Parameters"
+msgstr ""
+
+#: objects/chronogram/chronoline.c:164 objects/chronogram/chronoref.c:146
+#, fuzzy
+msgid "Start time"
+msgstr "화살표 보임"
+
+#: objects/chronogram/chronoline.c:166 objects/chronogram/chronoref.c:148
+msgid "End time"
+msgstr ""
+
+#: objects/chronogram/chronoline.c:168
+#, fuzzy
+msgid "Rise time"
+msgstr "계층 올림"
+
+#: objects/chronogram/chronoline.c:170
+msgid "Fall time"
+msgstr ""
+
+#: objects/chronogram/chronoline.c:171
+msgid "Multi-bit data"
+msgstr ""
+
+#: objects/chronogram/chronoline.c:173 objects/chronogram/chronoref.c:156
+msgid "Aspect"
+msgstr ""
+
+#: objects/chronogram/chronoline.c:175
+#, fuzzy
+msgid "Data color"
+msgstr "색상 선택"
+
+#: objects/chronogram/chronoline.c:177
+#, fuzzy
+msgid "Data line width"
+msgstr "선 굵기"
+
+#: objects/chronogram/chronoref.c:144
+#, fuzzy
+msgid "Time data"
+msgstr "속성 데이터"
+
+#: objects/chronogram/chronoref.c:150
+msgid "Major time step"
+msgstr ""
+
+#: objects/chronogram/chronoref.c:152
+msgid "Minor time step"
+msgstr ""
+
+#: objects/chronogram/chronoref.c:162
+msgid "Minor step line width"
+msgstr ""
+
+#: objects/custom/custom.c:117
+msgid "Custom"
+msgstr ""
+
+#: objects/custom/custom.c:117
+msgid "Custom XML shapes loader"
+msgstr ""
+
+#: objects/custom/custom_object.c:178 objects/custom/custom_object.c:197
+msgid "Flip horizontal"
+msgstr "위아래 바꿈"
+
+#: objects/custom/custom_object.c:180 objects/custom/custom_object.c:199
+msgid "Flip vertical"
+msgstr "좌우 바꿈"
+
+#: objects/custom/custom_object.c:1431
+msgid "Flip Horizontal"
+msgstr "위아래 바꿈"
+
+#: objects/custom/custom_object.c:1432
+msgid "Flip Vertical"
+msgstr "좌우 바꿈"
+
+#: objects/custom/custom_object.c:1469
+#, c-format
+msgid "Cannot open icon file %s for object type '%s'."
+msgstr ""
+
+#: objects/flowchart/box.c:148 objects/standard/box.c:148
+#: objects/standard/polyline.c:130 objects/standard/zigzagline.c:129
+msgid "Corner radius"
+msgstr "가장자리 각도"
+
+#: objects/flowchart/flowchart.c:37
+msgid "Flowchart objects"
+msgstr "흐름도 객체"
+
+#: objects/flowchart/parallelogram.c:150
+#, fuzzy
+msgid "Shear angle"
+msgstr "각도 변경:"
+
+#: objects/Istar/actor.c:66 objects/Istar/link.c:155
+#, fuzzy
+msgid "Unspecified"
+msgstr "선"
+
+#: objects/Istar/actor.c:67 objects/KAOS/other.c:75
+#, fuzzy
+msgid "Agent"
+msgstr "정렬:"
+
+#: objects/Istar/actor.c:69
+#, fuzzy
+msgid "Role"
+msgstr "역할:"
+
+#: objects/Istar/goal.c:74 objects/KAOS/goal.c:79
+msgid "Softgoal"
+msgstr ""
+
+#: objects/Istar/goal.c:75 objects/KAOS/goal.c:80
+msgid "Goal"
+msgstr ""
+
+#: objects/Istar/goal.c:155 objects/Istar/goal.c:156 objects/KAOS/goal.c:159
+#: objects/KAOS/goal.c:160
+#, fuzzy
+msgid "Goal Type"
+msgstr "/선택/같은 형태"
+
+#: objects/Istar/istar.c:46
+#, fuzzy
+msgid "Istar diagram"
+msgstr "도표 인쇄"
+
+#: objects/Istar/link.c:156
+#, fuzzy
+msgid "Positive Contrib"
+msgstr "합성"
+
+#: objects/Istar/link.c:157
+#, fuzzy
+msgid "Negative contrib"
+msgstr "프린터 선택"
+
+#: objects/Istar/link.c:158 sheets/UML.sheet.in.h:10
+#, fuzzy
+msgid "Dependency"
+msgstr "베지어선 만듦"
+
+#: objects/Istar/link.c:159
+#, fuzzy
+msgid "Decomposition"
+msgstr "합성"
+
+#: objects/Istar/link.c:160
+msgid "Means-Ends"
+msgstr ""
+
+#: objects/Istar/other.c:73
+#, fuzzy
+msgid "Resource"
+msgstr "삭제"
+
+#: objects/Istar/other.c:74
+msgid "Task"
+msgstr ""
+
+#: objects/Istar/other.c:489
+msgid "i* other"
+msgstr ""
+
+#: objects/Jackson/domain.c:79
+msgid "Given Domain"
+msgstr ""
+
+#: objects/Jackson/domain.c:80
+msgid "Designed Domain"
+msgstr ""
+
+#: objects/Jackson/domain.c:81
+msgid "Machine Domain"
+msgstr ""
+
+#: objects/Jackson/domain.c:97
+#, fuzzy
+msgid "Causal"
+msgstr "호출"
+
+#: objects/Jackson/domain.c:98
+#, fuzzy
+msgid "Biddable"
+msgstr "파일"
+
+#: objects/Jackson/domain.c:99
+msgid "Lexical"
+msgstr ""
+
+#: objects/Jackson/domain.c:178 objects/Jackson/domain.c:179
+msgid "Domain Type"
+msgstr ""
+
+#: objects/Jackson/domain.c:183
+msgid "Domain Kind"
+msgstr ""
+
+#: objects/Jackson/domain.c:184
+msgid "Optional kind which appears in the lower right corner of the Domain"
+msgstr ""
+
+#: objects/Jackson/domain.c:545
+msgid "Jackson domain"
+msgstr ""
+
+#: objects/Jackson/jackson.c:47
+#, fuzzy
+msgid "Jackson diagram"
+msgstr "새 도표를 만듭니다"
+
+#: objects/Jackson/phenomenon.c:134
+#, fuzzy
+msgid "Shared"
+msgstr "괘선"
+
+#: objects/Jackson/phenomenon.c:135 objects/KAOS/goal.c:81
+msgid "Requirement"
+msgstr ""
+
+#: objects/KAOS/goal.c:82
+msgid "Assumption"
+msgstr ""
+
+#: objects/KAOS/goal.c:83
+msgid "Obstacle"
+msgstr ""
+
+#: objects/KAOS/goal.c:593
+msgid "KAOS goal"
+msgstr ""
+
+#: objects/KAOS/kaos.c:49
+#, fuzzy
+msgid "KAOS diagram"
+msgstr "새 도표(_N)"
+
+#: objects/KAOS/metaandorrel.c:151
+#, fuzzy
+msgid "AND Refinement"
+msgstr "선"
+
+#: objects/KAOS/metaandorrel.c:152
+msgid "Complete AND Refinement"
+msgstr ""
+
+#: objects/KAOS/metaandorrel.c:153
+#, fuzzy
+msgid "OR Refinement"
+msgstr "선"
+
+#: objects/KAOS/metaandorrel.c:154
+#, fuzzy
+msgid "Operationalization"
+msgstr "작동 데이터"
+
+#: objects/KAOS/metaandorrel.c:161
+#, fuzzy
+msgid "Text:"
+msgstr "문자열"
+
+#: objects/KAOS/metabinrel.c:165
+#, fuzzy
+msgid "Contributes"
+msgstr "도와주신분들:"
+
+#: objects/KAOS/metabinrel.c:166
+#, fuzzy
+msgid "Obstructs"
+msgstr "추상"
+
+#: objects/KAOS/metabinrel.c:167
+msgid "Conflicts"
+msgstr ""
+
+#: objects/KAOS/metabinrel.c:168
+#, fuzzy
+msgid "Responsibility"
+msgstr "표시:"
+
+#: objects/KAOS/metabinrel.c:169
+#, fuzzy
+msgid "Monitors"
+msgstr "합성"
+
+#: objects/KAOS/metabinrel.c:170
+#, fuzzy
+msgid "Controls"
+msgstr "뾰족한 조절"
+
+#: objects/KAOS/metabinrel.c:171
+msgid "CapableOf"
+msgstr ""
+
+#: objects/KAOS/metabinrel.c:172
+msgid "Performs"
+msgstr ""
+
+#: objects/KAOS/metabinrel.c:174
+msgid "Output"
+msgstr ""
+
+#: objects/KAOS/other.c:541
+#, fuzzy
+msgid "KAOS other"
+msgstr "가장자리 더하기"
+
+#: objects/network/basestation.c:133
+#, fuzzy
+msgid "Sectors"
+msgstr "색상 선택"
+
+#: objects/network/basestation.c:388 objects/network/basestation.c:390
+#, fuzzy
+msgid "Base Station"
+msgstr "화살표 보임"
+
+#: objects/network/bus.c:599
+msgid "Add Handle"
+msgstr "핸들 추가"
+
+#: objects/network/bus.c:600
+msgid "Delete Handle"
+msgstr "핸들 제거"
+
+#: objects/network/network.c:43
+msgid "Network diagram objects"
+msgstr "네트웍 도표 객체"
+
+#: objects/network/radiocell.c:130
+msgid "Macro Cell"
+msgstr ""
+
+#: objects/network/radiocell.c:131
+msgid "Micro Cell"
+msgstr ""
+
+#: objects/network/radiocell.c:132
+msgid "Pico Cell"
+msgstr ""
+
+#: objects/network/radiocell.c:138
+msgid "Radius"
+msgstr ""
+
+#: objects/network/radiocell.c:140
+#, fuzzy
+msgid "Cell Type:"
+msgstr "형식:"
+
+#: objects/network/radiocell.c:152
+msgid "Subscribers"
+msgstr ""
+
+#: objects/standard/arc.c:131
+msgid "Curve distance"
+msgstr ""
+
+#: objects/standard/bezier.c:545 objects/standard/beziergon.c:499
+msgid "Add Segment"
+msgstr "부분 추가"
+
+#: objects/standard/bezier.c:546 objects/standard/beziergon.c:500
+msgid "Delete Segment"
+msgstr "부분 제거"
+
+#: objects/standard/bezier.c:548 objects/standard/beziergon.c:502
+msgid "Symmetric control"
+msgstr "대칭 조절"
+
+#: objects/standard/bezier.c:550 objects/standard/beziergon.c:504
+msgid "Smooth control"
+msgstr "부드러운 조절"
+
+#: objects/standard/bezier.c:552 objects/standard/beziergon.c:506
+msgid "Cusp control"
+msgstr "뾰족한 조절"
+
+#: objects/standard/box.c:135 objects/standard/ellipse.c:131
+#, fuzzy
+msgid "Free"
+msgstr "생성"
+
+#: objects/standard/box.c:136 objects/standard/ellipse.c:132
+#, fuzzy
+msgid "Fixed"
+msgstr "파일"
+
+#: objects/standard/box.c:137 objects/standard/box.c:687
+msgid "Square"
+msgstr ""
+
+#: objects/standard/box.c:150 objects/standard/ellipse.c:144
+#, fuzzy
+msgid "Aspect ratio"
+msgstr "비율 유지"
+
+#: objects/standard/box.c:683 objects/standard/ellipse.c:664
+#, fuzzy
+msgid "Free aspect"
+msgstr "비율 유지"
+
+#: objects/standard/box.c:685 objects/standard/ellipse.c:666
+msgid "Fixed aspect"
+msgstr ""
+
+#: objects/standard/ellipse.c:133 objects/standard/ellipse.c:668
+#, fuzzy
+msgid "Circle"
+msgstr "프린터"
+
+#: objects/standard/image.c:130
+msgid "Image file"
+msgstr "그림 파일"
+
+#: objects/standard/image.c:132
+msgid "Draw border"
+msgstr "가장자리 그림"
+
+#: objects/standard/image.c:134
+msgid "Keep aspect ratio"
+msgstr "비율 유지"
+
+#. Found file in same dir as diagram.
+#. Found file in current dir.
+#: objects/standard/image.c:669 objects/standard/image.c:680
+#, c-format
+msgid ""
+"The image file '%s' was not found in that directory.\n"
+"Using the file '%s' instead\n"
+msgstr ""
+"그 자료방에 그림파일 '%s'를 찾을수 없습니다.\n"
+"대신에 '%s'파일을 이용합니다\n"
+
+#. Didn't find file in current dir.
+#: objects/standard/image.c:686 objects/standard/image.c:714
+#, c-format
+msgid "The image file '%s' was not found.\n"
+msgstr "그림 파일 '%s' 를 찾을수 없습니다.\n"
+
+#: objects/standard/line.c:135
+#, fuzzy
+msgid "Arrows"
+msgstr "화살표 보임"
+
+#: objects/standard/line.c:140
+msgid "Start point"
+msgstr ""
+
+#: objects/standard/line.c:142
+msgid "End point"
+msgstr ""
+
+#: objects/standard/polygon.c:460 objects/standard/polyline.c:515
+msgid "Add Corner"
+msgstr "가장자리 더하기"
+
+#: objects/standard/polygon.c:461 objects/standard/polyline.c:516
+msgid "Delete Corner"
+msgstr "가장자리 지우기"
+
+#: objects/standard/standard.c:45
+msgid "Standard objects"
+msgstr "표준 객체"
+
+#: plug-ins/cairo/diacairo.c:967
+msgid "Cairo PostScript"
+msgstr ""
+
+#: plug-ins/cairo/diacairo.c:976
+msgid "Cairo PNG"
+msgstr ""
+
+#: plug-ins/cairo/diacairo.c:1004
+msgid "Cairo based Rendering"
+msgstr ""
+
+#: plug-ins/cgm/cgm.c:1109
+msgid ""
+"Image row length larger than maximum cell array.\n"
+"Image not exported to CGM."
+msgstr ""
+"그림의 길이가 최대 셀수를 넘어갔습니다.\n"
+"그림을 CGM으로 저장할수 없습니다."
+
+#: plug-ins/cgm/cgm.c:1365
+msgid "Computer Graphics Metafile"
+msgstr "컴퓨터 그래픽 메타파일"
+
+#: plug-ins/cgm/cgm.c:1379
+msgid "Computer Graphics Metafile export filter"
+msgstr "컴퓨터 그래픽 메타파일 저장 필터"
+
+#: plug-ins/dxf/dxf-export.c:547 plug-ins/dxf/dxf-import.c:1379
+msgid "Drawing Interchange File"
+msgstr ""
+
+#: plug-ins/dxf/dxf-import.c:481 plug-ins/dxf/dxf-import.c:498
+msgid "Bad vertex bulge\n"
+msgstr ""
+
+#: plug-ins/dxf/dxf-import.c:1051
+#, fuzzy, c-format
+msgid "Scale: %f\n"
+msgstr "비율:"
+
+#: plug-ins/dxf/dxf-import.c:1313
+msgid "read_dxf_codes failed\n"
+msgstr ""
+
+#: plug-ins/dxf/dxf-import.c:1345
+#, c-format
+msgid "Unknown dxf code %d\n"
+msgstr ""
+
+#: plug-ins/dxf/dxf.c:37
+msgid "Drawing Interchange File import and export filters"
+msgstr ""
+
+#: plug-ins/hpgl/hpgl.c:772
+#, fuzzy
+msgid "HP Graphics Language"
+msgstr "컴퓨터 그래픽 메타파일 저장 필터"
+
+#: plug-ins/hpgl/hpgl.c:786
+#, fuzzy
+msgid "HP Graphics Language export filter"
+msgstr "컴퓨터 그래픽 메타파일 저장 필터"
+
+#: plug-ins/metapost/metapost.c:34
+#, fuzzy
+msgid "TeX Metapost export filter"
+msgstr "컴퓨터 그래픽 메타파일 저장 필터"
+
+#: plug-ins/metapost/render_metapost.c:1033
+msgid "TeX Metapost macros"
+msgstr ""
+
+#: plug-ins/pixbuf/pixbuf.c:95
+#, fuzzy, c-format
+msgid ""
+"Could not save file:\n"
+"%s\n"
+"%s"
+msgstr "`%s'를 열수 없습니다"
+
+#: plug-ins/pixbuf/pixbuf.c:159
+msgid "GdkPixbuf - not antialiased"
+msgstr ""
+
+#: plug-ins/pixbuf/pixbuf.c:169
+msgid "GdkPixbuf bitmap"
+msgstr ""
+
+#: plug-ins/pixbuf/pixbuf.c:189
+msgid "gdk-pixbuf based bitmap export/import"
+msgstr ""
+
+#: plug-ins/pstricks/pstricks.c:14
+#, fuzzy
+msgid "TeX Pstricks export filter"
+msgstr "컴퓨터 그래픽 메타파일 저장 필터"
+
+#: plug-ins/pstricks/render_pstricks.c:653
+msgid "Not valid UTF8"
+msgstr ""
+
+#: plug-ins/pstricks/render_pstricks.c:871
+msgid "TeX PSTricks macros"
+msgstr ""
+
+#: plug-ins/python/pydia-render.c:711 plug-ins/wmf/wmf.cpp:1137
+#, c-format
+msgid "Couldn't open: '%s' for writing.\n"
+msgstr "열수 업습니다: '%s'  쓸수없슴.\n"
+
+#: plug-ins/python/python.c:92
+msgid "Python scripting support"
+msgstr ""
+
+#: plug-ins/shape/shape-export.c:470
+msgid "Can't export png without libart!"
+msgstr ""
+
+#: plug-ins/shape/shape-export.c:497
+msgid "Dia Shape File"
+msgstr ""
+
+#: plug-ins/shape/shape.c:36
+#, fuzzy
+msgid "dia shape export filter"
+msgstr "컴퓨터 그래픽 메타파일 저장 필터"
+
+#: plug-ins/svg/render_svg.c:301 plug-ins/svg/svg-import.c:641
+msgid "Scalable Vector Graphics"
+msgstr ""
+
+#: plug-ins/svg/svg-import.c:203 plug-ins/svg/svg-import.c:217
+#: plug-ins/xfig/xfig-import.c:108 plug-ins/xfig/xfig-import.c:159
+#: plug-ins/xfig/xfig-import.c:188 plug-ins/xfig/xfig-import.c:224
+#: plug-ins/xfig/xfig-import.c:261 plug-ins/xfig/xfig-import.c:289
+#: plug-ins/xfig/xfig-import.c:326 plug-ins/xfig/xfig-import.c:362
+#: plug-ins/xfig/xfig-import.c:403
+#, fuzzy
+msgid "Can't find standard object"
+msgstr "표준 객체"
+
+#: plug-ins/svg/svg-import.c:229
+msgid "Unexpected SVG path element"
+msgstr ""
+
+#: plug-ins/svg/svg-import.c:287
+msgid "Courier"
+msgstr ""
+
+#: plug-ins/svg/svg-import.c:590
+msgid "Could not find SVG namespace."
+msgstr ""
+
+#: plug-ins/svg/svg-import.c:596
+#, c-format
+msgid "root element was '%s' -- expecting 'svg'."
+msgstr ""
+
+#: plug-ins/svg/svg.c:37
+#, fuzzy
+msgid "Scalable Vector Graphics import and export filters"
+msgstr "컴퓨터 그래픽 메타파일 저장 필터"
+
+#: plug-ins/wmf/wmf.cpp:1204
+msgid "Windows Meta File"
+msgstr ""
+
+#: plug-ins/wmf/wmf.cpp:1220
+#, fuzzy
+msgid "WMF export filter"
+msgstr "컴퓨터 그래픽 메타파일 저장 필터"
+
+#: plug-ins/wpg/wpg.c:1182
+#, c-format
+msgid "File: %s type/version unsupported.\n"
+msgstr ""
+
+#: plug-ins/wpg/wpg.c:1312 plug-ins/wpg/wpg.c:1319
+msgid "WPG"
+msgstr ""
+
+#: plug-ins/wpg/wpg.c:1333
+#, fuzzy
+msgid "WordPerfect Graphics export filter"
+msgstr "컴퓨터 그래픽 메타파일 저장 필터"
+
+#: plug-ins/xfig/xfig-export.c:454
+#, c-format
+msgid "FIG format has no equivalent of arrow style %s, using simple arrow.\n"
+msgstr ""
+
+#: plug-ins/xfig/xfig-export.c:475
+msgid "No more user-definable colors - using black"
+msgstr ""
+
+#: plug-ins/xfig/xfig-export.c:1149
+msgid "XFig format"
+msgstr ""
+
+#: plug-ins/xfig/xfig-import.c:472
+msgid "Patterns are not supported by Dia"
+msgstr ""
+
+#: plug-ins/xfig/xfig-import.c:500
+msgid "Triple-dotted lines are not supported by Dia, using double-dotted"
+msgstr ""
+
+#: plug-ins/xfig/xfig-import.c:504
+#, fuzzy, c-format
+msgid "Line style %d should not appear\n"
+msgstr "선 형태 속성"
+
+#: plug-ins/xfig/xfig-import.c:573
+#, c-format
+msgid "Error while reading %dth of %d points: %s\n"
+msgstr ""
+
+#: plug-ins/xfig/xfig-import.c:595
+#, fuzzy
+msgid "Error while reading arrowhead\n"
+msgstr "도표 파일 읽는중 오류\n"
+
+#: plug-ins/xfig/xfig-import.c:615
+#, c-format
+msgid "Unknown arrow type %d\n"
+msgstr ""
+
+#: plug-ins/xfig/xfig-import.c:731
+#, fuzzy, c-format
+msgid "Couldn't read ellipse info: %s\n"
+msgstr ""
+"플러그인 `%s'를 읽을수 없습니다\n"
+"%s"
+
+#: plug-ins/xfig/xfig-import.c:799
+#, fuzzy, c-format
+msgid "Couldn't read polyline info: %s\n"
+msgstr ""
+"플러그인 `%s'를 읽을수 없습니다\n"
+"%s"
+
+#: plug-ins/xfig/xfig-import.c:814
+#, c-format
+msgid "Couldn't read flipped bit: %s\n"
+msgstr ""
+
+#: plug-ins/xfig/xfig-import.c:832
+msgid "Negative corner radius, negating"
+msgstr ""
+
+#: plug-ins/xfig/xfig-import.c:876 plug-ins/xfig/xfig-import.c:1192
+#, c-format
+msgid "Unknown polyline subtype: %d\n"
+msgstr ""
+
+#: plug-ins/xfig/xfig-import.c:1026 plug-ins/xfig/xfig-import.c:1058
+#, fuzzy, c-format
+msgid "Couldn't read spline info: %s\n"
+msgstr ""
+"플러그인 `%s'를 읽을수 없습니다\n"
+"%s"
+
+#. Open approximated spline
+#. Closed approximated spline
+#: plug-ins/xfig/xfig-import.c:1045 plug-ins/xfig/xfig-import.c:1063
+msgid "Cannot convert approximated spline yet."
+msgstr ""
+
+#: plug-ins/xfig/xfig-import.c:1103
+#, c-format
+msgid "Unknown spline subtype: %d\n"
+msgstr ""
+
+#: plug-ins/xfig/xfig-import.c:1166
+#, fuzzy, c-format
+msgid "Couldn't read arc info: %s\n"
+msgstr ""
+"플러그인 `%s'를 읽을수 없습니다\n"
+"%s"
+
+#: plug-ins/xfig/xfig-import.c:1256
+#, c-format
+msgid "Couldn't read text info: %s\n"
+msgstr ""
+
+#: plug-ins/xfig/xfig-import.c:1319
+#, c-format
+msgid "Couldn't identify FIG object: %s\n"
+msgstr ""
+
+#: plug-ins/xfig/xfig-import.c:1327
+msgid "Compound end outside compound\n"
+msgstr ""
+
+#: plug-ins/xfig/xfig-import.c:1346
+#, fuzzy, c-format
+msgid "Couldn't read color: %s\n"
+msgstr ""
+"플러그인 `%s'를 읽을수 없습니다\n"
+"%s"
+
+#: plug-ins/xfig/xfig-import.c:1391
+#, fuzzy, c-format
+msgid "Couldn't read group extend: %s\n"
+msgstr "`%s'를 열수 없습니다"
+
+#: plug-ins/xfig/xfig-import.c:1402
+#, c-format
+msgid "Unknown object type %d\n"
+msgstr ""
+
+#: plug-ins/xfig/xfig-import.c:1426
+#, c-format
+msgid "`%s' is not one of `%s' or `%s'\n"
+msgstr ""
+
+#: plug-ins/xfig/xfig-import.c:1436
+#, fuzzy, c-format
+msgid "Error reading paper size: %s\n"
+msgstr "도표 파일 읽는중 오류\n"
+
+#: plug-ins/xfig/xfig-import.c:1447
+#, c-format
+msgid "Unknown paper size `%s', using default\n"
+msgstr ""
+
+#: plug-ins/xfig/xfig-import.c:1459
+#, fuzzy, c-format
+msgid "Error reading paper orientation: %s\n"
+msgstr "도표 파일 읽는중 오류\n"
+
+#: plug-ins/xfig/xfig-import.c:1469
+#, fuzzy, c-format
+msgid "Error reading justification: %s\n"
+msgstr "도표 파일 읽는중 오류\n"
+
+#: plug-ins/xfig/xfig-import.c:1479
+#, fuzzy, c-format
+msgid "Error reading units: %s\n"
+msgstr "도표 파일 읽는중 오류\n"
+
+#: plug-ins/xfig/xfig-import.c:1493
+#, fuzzy, c-format
+msgid "Error reading magnification: %s\n"
+msgstr "도표 파일 읽는중 오류\n"
+
+#: plug-ins/xfig/xfig-import.c:1504
+#, fuzzy, c-format
+msgid "Error reading multipage indicator: %s\n"
+msgstr "도표 파일 읽는중 오류\n"
+
+#: plug-ins/xfig/xfig-import.c:1515
+#, fuzzy, c-format
+msgid "Error reading transparent color: %s\n"
+msgstr "도표 파일 읽는중 오류\n"
+
+#: plug-ins/xfig/xfig-import.c:1524 plug-ins/xfig/xfig-import.c:1579
+#: plug-ins/xfig/xfig-import.c:1597
+#, fuzzy, c-format
+msgid "Error reading FIG file: %s\n"
+msgstr "도표 파일 읽는중 오류\n"
+
+#: plug-ins/xfig/xfig-import.c:1526 plug-ins/xfig/xfig-import.c:1581
+msgid "Premature end of FIG file\n"
+msgstr ""
+
+#: plug-ins/xfig/xfig-import.c:1535
+#, fuzzy, c-format
+msgid "Error reading resolution: %s\n"
+msgstr "도표 파일 읽는중 오류\n"
+
+#: plug-ins/xfig/xfig-import.c:1566
+#, c-format
+msgid "Doesn't look like a Fig file: %s\n"
+msgstr ""
+
+#: plug-ins/xfig/xfig-import.c:1572
+#, c-format
+msgid "This is a FIG version %d.%d file, I may not understand it\n"
+msgstr ""
+
+#: plug-ins/xfig/xfig-import.c:1620
+msgid "XFig File Format"
+msgstr ""
+
+#: plug-ins/xfig/xfig.c:39
+#, fuzzy
+msgid "Fig Format import and export filter"
+msgstr "컴퓨터 그래픽 메타파일 저장 필터"
+
+#: plug-ins/xslt/xslt.c:102
+#, fuzzy, c-format
+msgid "Error while parsing %s\n"
+msgstr "도표 파일 읽는중 오류\n"
+
+#: plug-ins/xslt/xslt.c:110
+#, fuzzy, c-format
+msgid "Error while parsing stylesheet %s\n"
+msgstr "도표 파일 읽는중 오류\n"
+
+#: plug-ins/xslt/xslt.c:116
+#, fuzzy, c-format
+msgid "Error while applying stylesheet %s\n"
+msgstr "도표 파일 읽는중 오류\n"
+
+#: plug-ins/xslt/xslt.c:124
+#, fuzzy, c-format
+msgid "Error while parsing stylesheet: %s\n"
+msgstr "도표 파일 읽는중 오류\n"
+
+#: plug-ins/xslt/xslt.c:132
+#, fuzzy, c-format
+msgid "Error while applying stylesheet: %s\n"
+msgstr "도표 파일 읽는중 오류\n"
+
+#: plug-ins/xslt/xslt.c:313
+#, fuzzy
+msgid "XSL Transformation filter"
+msgstr "방향"
+
+#: plug-ins/xslt/xslt.c:337
+msgid "No valid configuration files found for the XSLT plugin, not loading."
+msgstr ""
+
+#: plug-ins/xslt/xsltdialog.c:99
+msgid "Export through XSLT"
+msgstr ""
+
+#: plug-ins/xslt/xsltdialog.c:114
+msgid "From:"
+msgstr ""
+
+#: plug-ins/xslt/xsltdialog.c:149
+#, fuzzy
+msgid "To:"
+msgstr "위:"
+
+#: sheets/Assorted.sheet.in.h:1
+msgid ""
+"An Assorted Collection of Polygons, Beziergons and other Miscellaneous "
+"Geometric Shapes"
+msgstr ""
+
+#: sheets/Assorted.sheet.in.h:2
+msgid "Assorted"
+msgstr ""
+
+#: sheets/Assorted.sheet.in.h:3
+msgid "Chevron"
+msgstr ""
+
+#: sheets/Assorted.sheet.in.h:4
+msgid "Curved eight point star"
+msgstr ""
+
+#: sheets/Assorted.sheet.in.h:5
+msgid "Curved four point star"
+msgstr ""
+
+#: sheets/Assorted.sheet.in.h:6
+#, fuzzy
+msgid "Diamond"
+msgstr "이름:"
+
+#: sheets/Assorted.sheet.in.h:7
+#, fuzzy
+msgid "Down arrow"
+msgstr "화살표 보임"
+
+#: sheets/Assorted.sheet.in.h:8
+msgid "Eight point star"
+msgstr ""
+
+#: sheets/Assorted.sheet.in.h:9
+#, fuzzy
+msgid "Four point star"
+msgstr "부드러운 조절"
+
+#: sheets/Assorted.sheet.in.h:10
+#, fuzzy
+msgid "Heart"
+msgstr "생성"
+
+#: sheets/Assorted.sheet.in.h:11
+msgid "Heptagon. Seven sided shape"
+msgstr ""
+
+#: sheets/Assorted.sheet.in.h:12
+msgid "Hexagon. Six sided shape"
+msgstr ""
+
+#: sheets/Assorted.sheet.in.h:13
+#, fuzzy
+msgid "Horizontal parallelogram"
+msgstr "위아래 바꿈"
+
+#: sheets/Assorted.sheet.in.h:14
+msgid "Isoceles triangle"
+msgstr ""
+
+#: sheets/Assorted.sheet.in.h:15
+#, fuzzy
+msgid "Left arrow"
+msgstr "화살표 보임"
+
+#: sheets/Assorted.sheet.in.h:16
+#, fuzzy
+msgid "Left-right arrow"
+msgstr "오른쪽"
+
+#: sheets/Assorted.sheet.in.h:17
+#, fuzzy
+msgid "Left-right-up arrow"
+msgstr "오른쪽"
+
+#: sheets/Assorted.sheet.in.h:18
+msgid "Left-up arrow"
+msgstr ""
+
+#: sheets/Assorted.sheet.in.h:19
+msgid "Maltese cross"
+msgstr ""
+
+#: sheets/Assorted.sheet.in.h:20
+msgid "Notched left arrow"
+msgstr ""
+
+#: sheets/Assorted.sheet.in.h:21
+#, fuzzy
+msgid "Notched right arrow"
+msgstr "오른쪽"
+
+#: sheets/Assorted.sheet.in.h:22
+msgid "Octogon. Eight sided shape"
+msgstr ""
+
+#: sheets/Assorted.sheet.in.h:23
+msgid "Pentagon block arrow"
+msgstr ""
+
+#: sheets/Assorted.sheet.in.h:24
+msgid "Pentagon. Five sided shape"
+msgstr ""
+
+#: sheets/Assorted.sheet.in.h:25
+msgid "Perfect circle"
+msgstr ""
+
+#: sheets/Assorted.sheet.in.h:26
+msgid "Perfect square, height equals width"
+msgstr ""
+
+#: sheets/Assorted.sheet.in.h:27
+#, fuzzy
+msgid "Quad arrow"
+msgstr "화살표 보임"
+
+#: sheets/Assorted.sheet.in.h:28
+msgid "Quarter circle"
+msgstr ""
+
+#: sheets/Assorted.sheet.in.h:29
+msgid "Quarter moon"
+msgstr ""
+
+#: sheets/Assorted.sheet.in.h:30
+msgid "Right angle triangle"
+msgstr ""
+
+#: sheets/Assorted.sheet.in.h:31
+#, fuzzy
+msgid "Right arrow"
+msgstr "오른쪽"
+
+#: sheets/Assorted.sheet.in.h:32
+#, fuzzy
+msgid "Seven point star"
+msgstr "프린터 선택"
+
+#: sheets/Assorted.sheet.in.h:33
+msgid "Sharp eight point star"
+msgstr ""
+
+#: sheets/Assorted.sheet.in.h:34
+#, fuzzy
+msgid "Six point star"
+msgstr "프린터 선택"
+
+#: sheets/Assorted.sheet.in.h:35
+msgid "Sun"
+msgstr ""
+
+#: sheets/Assorted.sheet.in.h:36
+#, fuzzy
+msgid "Swiss cross"
+msgstr "클래스"
+
+#: sheets/Assorted.sheet.in.h:37
+msgid "Trapezoid"
+msgstr ""
+
+#: sheets/Assorted.sheet.in.h:38
+#, fuzzy
+msgid "Turn-up arrow"
+msgstr "화살표 보임"
+
+#: sheets/Assorted.sheet.in.h:39
+#, fuzzy
+msgid "Up arrow"
+msgstr "화살표 보임"
+
+#: sheets/Assorted.sheet.in.h:40
+#, fuzzy
+msgid "Up-down arrow"
+msgstr "화살표 보임"
+
+#: sheets/Assorted.sheet.in.h:41
+#, fuzzy
+msgid "Up-down-left arrow"
+msgstr "화살표 보임"
+
+#: sheets/Assorted.sheet.in.h:42
+#, fuzzy
+msgid "Vertical parallelogram"
+msgstr "가로 정렬(_H)"
+
+#: sheets/ChemEng.sheet.in.h:1
+#, fuzzy
+msgid "AC Generator"
+msgstr "사용자 인터페이스"
+
+#: sheets/ChemEng.sheet.in.h:2
+#, fuzzy
+msgid "Air Cooler"
+msgstr "가장자리 더하기"
+
+#: sheets/ChemEng.sheet.in.h:3
+msgid "Autoclave"
+msgstr ""
+
+#: sheets/ChemEng.sheet.in.h:4
+msgid "Axial Flow Fan"
+msgstr ""
+
+#: sheets/ChemEng.sheet.in.h:5
+#, fuzzy
+msgid "Basic Filter"
+msgstr "파일"
+
+#: sheets/ChemEng.sheet.in.h:6
+msgid "Centrifugal Pump or Fan"
+msgstr ""
+
+#: sheets/ChemEng.sheet.in.h:7
+#, fuzzy
+msgid "Centrifuge"
+msgstr "중간"
+
+#: sheets/ChemEng.sheet.in.h:8
+#, fuzzy
+msgid "ChemEng"
+msgstr "취소"
+
+#: sheets/ChemEng.sheet.in.h:9
+msgid "Clarifier or Settling Tank"
+msgstr ""
+
+#: sheets/ChemEng.sheet.in.h:10
+msgid "Collection for chemical engineering"
+msgstr ""
+
+#: sheets/ChemEng.sheet.in.h:11
+#, fuzzy
+msgid "Compressor or Turbine"
+msgstr "저장파일 압축:"
+
+#: sheets/ChemEng.sheet.in.h:12
+msgid "Covered tank"
+msgstr ""
+
+#: sheets/ChemEng.sheet.in.h:13
+msgid "Cyclone and hydrocyclone"
+msgstr ""
+
+#: sheets/ChemEng.sheet.in.h:14
+msgid "Double-Pipe Exchanger"
+msgstr ""
+
+#: sheets/ChemEng.sheet.in.h:15
+msgid "Ejector or Injector"
+msgstr ""
+
+#: sheets/ChemEng.sheet.in.h:16
+msgid "Fan or Stirrer"
+msgstr ""
+
+#: sheets/ChemEng.sheet.in.h:17
+msgid "Fixed-Sheet Exchanger"
+msgstr ""
+
+#: sheets/ChemEng.sheet.in.h:18
+msgid "Floating-Head or U-Tube Exchanger"
+msgstr ""
+
+#: sheets/ChemEng.sheet.in.h:19
+msgid "Fluid Contacting Vessel, simple"
+msgstr ""
+
+#: sheets/ChemEng.sheet.in.h:20
+msgid "Forced-Flow Air Cooler"
+msgstr ""
+
+#: sheets/ChemEng.sheet.in.h:21
+msgid "Gas Holder, basic"
+msgstr ""
+
+#: sheets/ChemEng.sheet.in.h:22
+msgid "Heating/Cooling Coil"
+msgstr ""
+
+#: sheets/ChemEng.sheet.in.h:23
+msgid "Heating/Cooling Coil, vertical"
+msgstr ""
+
+#: sheets/ChemEng.sheet.in.h:24
+msgid "Induced-Flow Air Cooler"
+msgstr ""
+
+#: sheets/ChemEng.sheet.in.h:25
+msgid "Kettle Reboiler"
+msgstr ""
+
+#: sheets/ChemEng.sheet.in.h:26
+msgid "Knock-out Drum (with demister pad)"
+msgstr ""
+
+#: sheets/ChemEng.sheet.in.h:27
+msgid "Measurement"
+msgstr ""
+
+#: sheets/ChemEng.sheet.in.h:28
+#, fuzzy
+msgid "Mixer"
+msgstr "중복"
+
+#: sheets/ChemEng.sheet.in.h:29
+msgid "Open Tank"
+msgstr ""
+
+#: sheets/ChemEng.sheet.in.h:30
+msgid "Plate Exchanger"
+msgstr ""
+
+#: sheets/ChemEng.sheet.in.h:31
+#, fuzzy
+msgid "Pneumatic Line"
+msgstr "선 만듦"
+
+#: sheets/ChemEng.sheet.in.h:32
+msgid "Pneumatic Line, vertical"
+msgstr ""
+
+#: sheets/ChemEng.sheet.in.h:33
+msgid "Positive Displacement Rotary Pump or Compressor"
+msgstr ""
+
+#: sheets/ChemEng.sheet.in.h:34
+msgid "Reactor or Absorption Vessel, simple"
+msgstr ""
+
+#: sheets/ChemEng.sheet.in.h:35
+msgid "Reciprocating Compressor or Pump"
+msgstr ""
+
+#: sheets/ChemEng.sheet.in.h:36
+#, fuzzy
+msgid "Regulable Valve"
+msgstr "템플릿"
+
+#: sheets/ChemEng.sheet.in.h:37
+msgid "Regulable Valve, vertical"
+msgstr ""
+
+#: sheets/ChemEng.sheet.in.h:38
+msgid "Sealed Tank"
+msgstr ""
+
+#: sheets/ChemEng.sheet.in.h:39
+#, fuzzy
+msgid "Simple Furnace"
+msgstr "프린터 선택"
+
+#: sheets/ChemEng.sheet.in.h:40
+msgid "Simple Heat Exchanger"
+msgstr ""
+
+#: sheets/ChemEng.sheet.in.h:41
+msgid "Simple Heat Exchanger, vertical"
+msgstr ""
+
+#: sheets/ChemEng.sheet.in.h:42
+msgid "Simple Vessel"
+msgstr ""
+
+#: sheets/ChemEng.sheet.in.h:43
+msgid "Spray Drier"
+msgstr ""
+
+#: sheets/ChemEng.sheet.in.h:44
+msgid "Spraying Device"
+msgstr ""
+
+#: sheets/ChemEng.sheet.in.h:45
+#, fuzzy
+msgid "Storage Sphere"
+msgstr "비율"
+
+#: sheets/ChemEng.sheet.in.h:46
+msgid "Tank with Fixed Roof"
+msgstr ""
+
+#: sheets/ChemEng.sheet.in.h:47
+msgid "Tank with Floating Roof"
+msgstr ""
+
+#: sheets/ChemEng.sheet.in.h:48
+msgid "Tray Column, detailed"
+msgstr ""
+
+#: sheets/ChemEng.sheet.in.h:49
+msgid "Tray Column, simple"
+msgstr ""
+
+#: sheets/ChemEng.sheet.in.h:50
+#, fuzzy
+msgid "Valve"
+msgstr "값:"
+
+#: sheets/ChemEng.sheet.in.h:51
+#, fuzzy
+msgid "Valve, vertical"
+msgstr "좌우 바꿈"
+
+#: sheets/ChemEng.sheet.in.h:52
+msgid "Water Cooler"
+msgstr ""
+
+#: sheets/ChemEng.sheet.in.h:53
+msgid "Water Cooler, vertical"
+msgstr ""
+
+#: sheets/Circuit.sheet.in.h:1
+msgid "Circuit"
+msgstr ""
+
+#: sheets/Circuit.sheet.in.h:2
+msgid "Components for circuit diagrams"
+msgstr ""
+
+#: sheets/Circuit.sheet.in.h:3
+#, fuzzy
+msgid "Ground point"
+msgstr "부드러운 조절"
+
+#: sheets/Circuit.sheet.in.h:4
+#, fuzzy
+msgid "Horizontal jumper"
+msgstr "가로 정렬(_H)"
+
+#: sheets/Circuit.sheet.in.h:5
+#, fuzzy
+msgid "Horizontally aligned LED"
+msgstr "가로 정렬(_H)"
+
+#: sheets/Circuit.sheet.in.h:6
+#, fuzzy
+msgid "Horizontally aligned capacitor"
+msgstr "위아래 바꿈"
+
+#: sheets/Circuit.sheet.in.h:7
+#, fuzzy
+msgid "Horizontally aligned diode"
+msgstr "가로 정렬(_H)"
+
+#: sheets/Circuit.sheet.in.h:8
+#, fuzzy
+msgid "Horizontally aligned fuse"
+msgstr "가로 정렬(_H)"
+
+#: sheets/Circuit.sheet.in.h:9
+#, fuzzy
+msgid "Horizontally aligned inductor"
+msgstr "가로 정렬(_H)"
+
+#: sheets/Circuit.sheet.in.h:10
+#, fuzzy
+msgid "Horizontally aligned inductor (European)"
+msgstr "가로 정렬(_H)"
+
+#: sheets/Circuit.sheet.in.h:11
+#, fuzzy
+msgid "Horizontally aligned powersource"
+msgstr "가로 정렬(_H)"
+
+#: sheets/Circuit.sheet.in.h:12
+#, fuzzy
+msgid "Horizontally aligned resistor"
+msgstr "위아래 바꿈"
+
+#: sheets/Circuit.sheet.in.h:13
+#, fuzzy
+msgid "Horizontally aligned resistor (European)"
+msgstr "위아래 바꿈"
+
+#: sheets/Circuit.sheet.in.h:14
+#, fuzzy
+msgid "Horizontally aligned zener diode"
+msgstr "가로 정렬(_H)"
+
+#: sheets/Circuit.sheet.in.h:15
+#, fuzzy
+msgid "Lamp"
+msgstr "이름:"
+
+#: sheets/Circuit.sheet.in.h:16 sheets/ciscomisc.sheet.in.h:26
+msgid "Microphone"
+msgstr ""
+
+#: sheets/Circuit.sheet.in.h:17
+#, fuzzy
+msgid "NMOS transistor"
+msgstr "방향"
+
+#: sheets/Circuit.sheet.in.h:18
+#, fuzzy
+msgid "NPN bipolar transistor"
+msgstr "방향"
+
+#: sheets/Circuit.sheet.in.h:19
+#, fuzzy
+msgid "Operational amplifier"
+msgstr "가로 정렬(_H)"
+
+#: sheets/Circuit.sheet.in.h:20
+#, fuzzy
+msgid "PMOS transistor"
+msgstr "방향"
+
+#: sheets/Circuit.sheet.in.h:21
+#, fuzzy
+msgid "PNP bipolar transistor"
+msgstr "방향"
+
+#: sheets/Circuit.sheet.in.h:22 sheets/ciscomisc.sheet.in.h:39
+msgid "Speaker"
+msgstr ""
+
+#: sheets/Circuit.sheet.in.h:23
+#, fuzzy
+msgid "Vertically aligned LED"
+msgstr "가로 정렬(_H)"
+
+#: sheets/Circuit.sheet.in.h:24
+#, fuzzy
+msgid "Vertically aligned capacitor"
+msgstr "위아래 바꿈"
+
+#: sheets/Circuit.sheet.in.h:25
+#, fuzzy
+msgid "Vertically aligned diode"
+msgstr "가로 정렬(_H)"
+
+#: sheets/Circuit.sheet.in.h:26
+#, fuzzy
+msgid "Vertically aligned fuse"
+msgstr "가로 정렬(_H)"
+
+#: sheets/Circuit.sheet.in.h:27
+#, fuzzy
+msgid "Vertically aligned inductor"
+msgstr "가로 정렬(_H)"
+
+#: sheets/Circuit.sheet.in.h:28
+#, fuzzy
+msgid "Vertically aligned inductor (European)"
+msgstr "가로 정렬(_H)"
+
+#: sheets/Circuit.sheet.in.h:29
+#, fuzzy
+msgid "Vertically aligned powersource"
+msgstr "위아래 바꿈"
+
+#: sheets/Circuit.sheet.in.h:30
+#, fuzzy
+msgid "Vertically aligned resistor"
+msgstr "위아래 바꿈"
+
+#: sheets/Circuit.sheet.in.h:31
+#, fuzzy
+msgid "Vertically aligned resistor (European)"
+msgstr "위아래 바꿈"
+
+#: sheets/Circuit.sheet.in.h:32
+#, fuzzy
+msgid "Vertically aligned zener diode"
+msgstr "위아래 바꿈"
+
+#: sheets/Contact.sheet.in.h:1
+msgid "'if not' (normally closed) ladder contact"
+msgstr ""
+
+#: sheets/Contact.sheet.in.h:2
+msgid "'if' (normally open) ladder contact"
+msgstr ""
+
+#: sheets/Contact.sheet.in.h:3
+#, fuzzy
+msgid "'jump' output variable"
+msgstr "프린터 선택"
+
+#: sheets/Contact.sheet.in.h:4
+#, fuzzy
+msgid "'reset' output variable"
+msgstr "프린터 선택"
+
+#: sheets/Contact.sheet.in.h:5
+#, fuzzy
+msgid "'set' output variable"
+msgstr "프린터 선택"
+
+#: sheets/Contact.sheet.in.h:6
+msgid "Components for LADDER circuits"
+msgstr ""
+
+#: sheets/Contact.sheet.in.h:7
+#, fuzzy
+msgid "Ladder"
+msgstr "게층"
+
+#: sheets/Contact.sheet.in.h:8
+#, fuzzy
+msgid "Negative output variable"
+msgstr "프린터 선택"
+
+#: sheets/Contact.sheet.in.h:9
+#, fuzzy
+msgid "Power-saved 'reset' output variable"
+msgstr "프린터 선택"
+
+#: sheets/Contact.sheet.in.h:10
+#, fuzzy
+msgid "Power-saved 'set' output variable"
+msgstr "프린터 선택"
+
+#: sheets/Contact.sheet.in.h:11
+#, fuzzy
+msgid "Power-saved negative output variable"
+msgstr "프린터 선택"
+
+#: sheets/Contact.sheet.in.h:12
+#, fuzzy
+msgid "Power-saved simple output variable"
+msgstr "프린터 선택"
+
+#: sheets/Contact.sheet.in.h:13
+#, fuzzy
+msgid "Receptivity output variable"
+msgstr "프린터 선택"
+
+#: sheets/Contact.sheet.in.h:14
+#, fuzzy
+msgid "Simple output variable"
+msgstr "프린터 선택"
+
+#: sheets/Cybernetics.sheet.in.h:1
+msgid "Constant factor below -1"
+msgstr ""
+
+#: sheets/Cybernetics.sheet.in.h:2
+msgid "Constant factor between 0 and -1"
+msgstr ""
+
+#: sheets/Cybernetics.sheet.in.h:3
+msgid "Constant factor between 0 and 1"
+msgstr ""
+
+#: sheets/Cybernetics.sheet.in.h:4
+msgid "Constant factor greater 1"
+msgstr ""
+
+#: sheets/Cybernetics.sheet.in.h:5
+msgid "Constant negative shift on the y-axis"
+msgstr ""
+
+#: sheets/Cybernetics.sheet.in.h:6
+msgid "Constant positive shift on the y-axis"
+msgstr ""
+
+#: sheets/Cybernetics.sheet.in.h:7
+msgid "Cybernetics"
+msgstr ""
+
+#: sheets/Cybernetics.sheet.in.h:8
+msgid "Elements of cybernetic circuits"
+msgstr ""
+
+#: sheets/Cybernetics.sheet.in.h:9
+msgid "Full wave rectifier (absolute value)"
+msgstr ""
+
+#: sheets/Cybernetics.sheet.in.h:10
+msgid "Half wave rectifier or ramp input"
+msgstr ""
+
+#: sheets/Cybernetics.sheet.in.h:11
+msgid "High pass filter"
+msgstr ""
+
+#: sheets/Cybernetics.sheet.in.h:12
+msgid "Integrator - input bottom"
+msgstr ""
+
+#: sheets/Cybernetics.sheet.in.h:13
+msgid "Integrator - input left"
+msgstr ""
+
+#: sheets/Cybernetics.sheet.in.h:14
+msgid "Integrator - input right"
+msgstr ""
+
+#: sheets/Cybernetics.sheet.in.h:15
+msgid "Integrator - input top"
+msgstr ""
+
+#: sheets/Cybernetics.sheet.in.h:16
+msgid "Low pass filter"
+msgstr ""
+
+#: sheets/Cybernetics.sheet.in.h:17
+msgid "Product"
+msgstr ""
+
+#: sheets/Cybernetics.sheet.in.h:18
+msgid "Relay characteristic (sigma)"
+msgstr ""
+
+#: sheets/Cybernetics.sheet.in.h:19
+msgid "Saturation characteristic"
+msgstr ""
+
+#: sheets/Cybernetics.sheet.in.h:20
+msgid "Sensor - bottom"
+msgstr ""
+
+#: sheets/Cybernetics.sheet.in.h:21
+msgid "Sensor - left"
+msgstr ""
+
+#: sheets/Cybernetics.sheet.in.h:22
+msgid "Sensor - right"
+msgstr ""
+
+#: sheets/Cybernetics.sheet.in.h:23
+msgid "Sensor - top"
+msgstr ""
+
+#: sheets/Cybernetics.sheet.in.h:24
+msgid "Sigmoid characteristic"
+msgstr ""
+
+#: sheets/Cybernetics.sheet.in.h:25
+msgid "Sine characteristic or input"
+msgstr ""
+
+#: sheets/Cybernetics.sheet.in.h:26
+msgid "Sum"
+msgstr ""
+
+#: sheets/Cybernetics.sheet.in.h:27
+msgid "Sum, subtracting bottom input"
+msgstr ""
+
+#: sheets/Cybernetics.sheet.in.h:28
+msgid "Sum, subtracting left input"
+msgstr ""
+
+#: sheets/Cybernetics.sheet.in.h:29
+msgid "Sum, subtracting right input"
+msgstr ""
+
+#: sheets/Cybernetics.sheet.in.h:30
+msgid "Sum, subtracting top input"
+msgstr ""
+
+#: sheets/Cybernetics.sheet.in.h:31
+msgid "Template for custom characteristics"
+msgstr ""
+
+#: sheets/Cybernetics.sheet.in.h:32
+#, fuzzy
+msgid "Time delay"
+msgstr "속성 데이터"
+
+#: sheets/EML.sheet.in.h:1
+msgid "EML"
+msgstr ""
+
+#: sheets/EML.sheet.in.h:2
+msgid "Editor for EML Static Structure Diagrams."
+msgstr ""
+
+#: sheets/EML.sheet.in.h:3
+msgid "Instantiation. One process create others"
+msgstr ""
+
+#: sheets/EML.sheet.in.h:4
+msgid "Interaction between processes."
+msgstr ""
+
+#: sheets/ER.sheet.in.h:2
+msgid "ER"
+msgstr ""
+
+#: sheets/ER.sheet.in.h:3
+msgid "Editor for Entity Relations Diagrams"
+msgstr ""
+
+#: sheets/ER.sheet.in.h:5
+#, fuzzy
+msgid "Participation"
+msgstr "방향"
+
+#: sheets/ER.sheet.in.h:7
+msgid "Weak entity"
+msgstr ""
+
+#: sheets/Electric.sheet.in.h:1
+msgid "Components for electric circuits"
+msgstr ""
+
+#: sheets/Electric.sheet.in.h:2 sheets/Pneumatic.sheet.in.h:9
+#, fuzzy
+msgid "Connection point"
+msgstr "연결점:"
+
+#: sheets/Electric.sheet.in.h:3
+#, fuzzy
+msgid "Electric"
+msgstr "좌우 바꿈"
+
+#: sheets/Electric.sheet.in.h:4
+msgid "Lamp or indicator light (horizontal)"
+msgstr ""
+
+#: sheets/Electric.sheet.in.h:5
+msgid "Lamp or indicator light (vertical)"
+msgstr ""
+
+#: sheets/Electric.sheet.in.h:6
+msgid "Normally closed contact (horizontal)"
+msgstr ""
+
+#: sheets/Electric.sheet.in.h:7
+msgid "Normally closed contact (vertical)"
+msgstr ""
+
+#: sheets/Electric.sheet.in.h:8
+msgid "Normally closed position switch (horizontal)"
+msgstr ""
+
+#: sheets/Electric.sheet.in.h:9
+msgid "Normally closed position switch (vertical)"
+msgstr ""
+
+#: sheets/Electric.sheet.in.h:10
+msgid "Normally open contact (horizontal)"
+msgstr ""
+
+#: sheets/Electric.sheet.in.h:11
+msgid "Normally open contact (vertical)"
+msgstr ""
+
+#: sheets/Electric.sheet.in.h:12
+msgid "Normally open position switch (horizontal)"
+msgstr ""
+
+#: sheets/Electric.sheet.in.h:13
+msgid "Normally open position switch (vertical)"
+msgstr ""
+
+#: sheets/Electric.sheet.in.h:14
+#, fuzzy
+msgid "Relay (horizontal)"
+msgstr "위아래 바꿈"
+
+#: sheets/Electric.sheet.in.h:15
+#, fuzzy
+msgid "Relay (vertical)"
+msgstr "좌우 바꿈"
+
+#: sheets/Electric.sheet.in.h:16
+msgid "The command organ of a relay (horizontal)"
+msgstr ""
+
+#: sheets/Electric.sheet.in.h:17
+msgid "The command organ of a relay (vertical)"
+msgstr ""
+
+#: sheets/FS.sheet.in.h:1
+msgid "Editor for Function Structure Diagrams."
+msgstr ""
+
+#: sheets/FS.sheet.in.h:2
+msgid "FS"
+msgstr ""
+
+#: sheets/FS.sheet.in.h:3
+#, fuzzy
+msgid "Flow"
+msgstr "흐름도 객체"
+
+#: sheets/FS.sheet.in.h:4
+#, fuzzy
+msgid "Function"
+msgstr "연결점:"
+
+#: sheets/FS.sheet.in.h:5
+msgid "Orthogonal polyline flow"
+msgstr ""
+
+#: sheets/Flowchart.sheet.in.h:1
+#, fuzzy
+msgid "Collate"
+msgstr "호출"
+
+#: sheets/Flowchart.sheet.in.h:2
+#, fuzzy
+msgid "Connector"
+msgstr "연결점:"
+
+#: sheets/Flowchart.sheet.in.h:3 sheets/SDL.sheet.in.h:4
+#, fuzzy
+msgid "Decision"
+msgstr "설명:"
+
+#: sheets/Flowchart.sheet.in.h:4
+msgid "Delay"
+msgstr ""
+
+#: sheets/Flowchart.sheet.in.h:6
+#, fuzzy
+msgid "Document"
+msgstr "글꼴 크기:"
+
+#: sheets/Flowchart.sheet.in.h:8
+#, fuzzy
+msgid "Flowchart"
+msgstr "흐름도 객체"
+
+#: sheets/Flowchart.sheet.in.h:9
+msgid "Input/Output"
+msgstr ""
+
+#: sheets/Flowchart.sheet.in.h:10
+#, fuzzy
+msgid "Internal storage"
+msgstr "사용자 인터페이스"
+
+#: sheets/Flowchart.sheet.in.h:11
+msgid "Magnetic disk"
+msgstr ""
+
+#: sheets/Flowchart.sheet.in.h:12
+msgid "Magnetic drum"
+msgstr ""
+
+#: sheets/Flowchart.sheet.in.h:13
+msgid "Magnetic tape"
+msgstr ""
+
+#: sheets/Flowchart.sheet.in.h:14
+#, fuzzy
+msgid "Manual input"
+msgstr "작동"
+
+#: sheets/Flowchart.sheet.in.h:15
+#, fuzzy
+msgid "Manual operation"
+msgstr "작동"
+
+#: sheets/Flowchart.sheet.in.h:16
+msgid "Merge"
+msgstr ""
+
+#: sheets/Flowchart.sheet.in.h:17
+msgid "Objects to draw flowcharts"
+msgstr ""
+
+#: sheets/Flowchart.sheet.in.h:18
+msgid "Off page connector"
+msgstr ""
+
+#: sheets/Flowchart.sheet.in.h:19
+#, fuzzy
+msgid "Offline storage"
+msgstr "사용자 인터페이스"
+
+#: sheets/Flowchart.sheet.in.h:20
+msgid "Or"
+msgstr ""
+
+#: sheets/Flowchart.sheet.in.h:21
+#, fuzzy
+msgid "Predefined process"
+msgstr "설정"
+
+#: sheets/Flowchart.sheet.in.h:22
+#, fuzzy
+msgid "Preparation"
+msgstr "작동"
+
+#: sheets/Flowchart.sheet.in.h:23
+#, fuzzy
+msgid "Process/Auxiliary Operation"
+msgstr "작동 안보임"
+
+#: sheets/Flowchart.sheet.in.h:24
+msgid "Punched card"
+msgstr ""
+
+#: sheets/Flowchart.sheet.in.h:25
+msgid "Punched tape"
+msgstr ""
+
+#: sheets/Flowchart.sheet.in.h:26
+#, fuzzy
+msgid "Sort"
+msgstr "화살표 보임"
+
+#: sheets/Flowchart.sheet.in.h:27
+msgid "Summing junction"
+msgstr ""
+
+#: sheets/Flowchart.sheet.in.h:28
+msgid "Terminal Interrupt"
+msgstr ""
+
+#: sheets/Flowchart.sheet.in.h:29
+#, fuzzy
+msgid "Transaction file"
+msgstr "방향"
+
+#: sheets/Flowchart.sheet.in.h:30
+msgid "Transmittal tape"
+msgstr ""
+
+#: sheets/GRAFCET.sheet.in.h:1
+#, fuzzy
+msgid "AND vergent"
+msgstr "부분 추가"
+
+#: sheets/GRAFCET.sheet.in.h:2
+msgid "Action to associate to a step"
+msgstr ""
+
+#: sheets/GRAFCET.sheet.in.h:3
+msgid "Arc (upward)"
+msgstr ""
+
+#: sheets/GRAFCET.sheet.in.h:4
+msgid "Condition (of an action)"
+msgstr ""
+
+#: sheets/GRAFCET.sheet.in.h:5
+msgid "GRAFCET"
+msgstr ""
+
+#: sheets/GRAFCET.sheet.in.h:10
+#, fuzzy
+msgid "Macro sub-program call step"
+msgstr "템플릿"
+
+#: sheets/GRAFCET.sheet.in.h:11
+#, fuzzy
+msgid "OR vergent"
+msgstr "부분 추가"
+
+#: sheets/GRAFCET.sheet.in.h:12
+msgid "Objects to design GRAFCET charts"
+msgstr ""
+
+#: sheets/GRAFCET.sheet.in.h:14
+#, fuzzy
+msgid "Transition"
+msgstr "방향"
+
+#: sheets/IsometricMap.sheet.in.h:1
+msgid "Block 1, 2:4"
+msgstr ""
+
+#: sheets/IsometricMap.sheet.in.h:2
+msgid "Block 2, 2:8"
+msgstr ""
+
+#: sheets/IsometricMap.sheet.in.h:3
+msgid "Block 3, 4:4"
+msgstr ""
+
+#: sheets/IsometricMap.sheet.in.h:4
+msgid "Block 4, 4:8"
+msgstr ""
+
+#: sheets/IsometricMap.sheet.in.h:5
+msgid "Block 5, 3:3"
+msgstr ""
+
+#: sheets/IsometricMap.sheet.in.h:6
+msgid "Block 6, 4:6"
+msgstr ""
+
+#: sheets/IsometricMap.sheet.in.h:7
+#, fuzzy
+msgid "Block 7"
+msgstr "제거하기"
+
+#: sheets/IsometricMap.sheet.in.h:8
+msgid "Car 1, Front View"
+msgstr ""
+
+#: sheets/IsometricMap.sheet.in.h:9
+msgid "Car 2, Rear View"
+msgstr ""
+
+#: sheets/IsometricMap.sheet.in.h:10
+#, fuzzy
+msgid "Corner 1"
+msgstr "가장자리 더하기"
+
+#: sheets/IsometricMap.sheet.in.h:11
+#, fuzzy
+msgid "Corner 2"
+msgstr "가장자리 더하기"
+
+#: sheets/IsometricMap.sheet.in.h:12
+#, fuzzy
+msgid "Crossroads"
+msgstr "클래스"
+
+#: sheets/IsometricMap.sheet.in.h:13
+msgid "Elevated Road"
+msgstr ""
+
+#: sheets/IsometricMap.sheet.in.h:14
+msgid "Factory"
+msgstr ""
+
+#: sheets/IsometricMap.sheet.in.h:15
+msgid "Footbridge, Pedestrian Bridge"
+msgstr ""
+
+#: sheets/IsometricMap.sheet.in.h:16
+msgid "Isometric Directional Map Shapes"
+msgstr ""
+
+#: sheets/IsometricMap.sheet.in.h:17
+msgid "Long Straight Road Section"
+msgstr ""
+
+#: sheets/IsometricMap.sheet.in.h:18
+msgid "Map, Isometric"
+msgstr ""
+
+#: sheets/IsometricMap.sheet.in.h:19
+msgid "One Way Road Sign"
+msgstr ""
+
+#: sheets/IsometricMap.sheet.in.h:20
+#, fuzzy
+msgid "River"
+msgstr "삭제"
+
+#: sheets/IsometricMap.sheet.in.h:21
+#, fuzzy
+msgid "Road Section"
+msgstr "역할:"
+
+#: sheets/IsometricMap.sheet.in.h:22
+msgid "Roof1"
+msgstr ""
+
+#: sheets/IsometricMap.sheet.in.h:23
+#, fuzzy
+msgid "T-Junction"
+msgstr "연결점:"
+
+#: sheets/IsometricMap.sheet.in.h:24
+msgid "Train 1, angled downward"
+msgstr ""
+
+#: sheets/IsometricMap.sheet.in.h:25
+msgid "Train 2, angled upward"
+msgstr ""
+
+#: sheets/IsometricMap.sheet.in.h:26
+msgid "Tree 1"
+msgstr ""
+
+#: sheets/Istar.sheet.in.h:1
+#, fuzzy
+msgid "An i* agent"
+msgstr "부분 추가"
+
+#: sheets/Istar.sheet.in.h:2
+msgid "An i* decomposition link"
+msgstr ""
+
+#: sheets/Istar.sheet.in.h:3
+#, fuzzy
+msgid "An i* dependency link"
+msgstr "베지어선 만듦"
+
+#: sheets/Istar.sheet.in.h:4
+#, fuzzy
+msgid "An i* goal"
+msgstr "집합"
+
+#: sheets/Istar.sheet.in.h:5
+msgid "An i* means-ends link"
+msgstr ""
+
+#: sheets/Istar.sheet.in.h:6
+#, fuzzy
+msgid "An i* negative contribution"
+msgstr "프린터 선택"
+
+#: sheets/Istar.sheet.in.h:7
+#, fuzzy
+msgid "An i* position"
+msgstr "합성"
+
+#: sheets/Istar.sheet.in.h:8
+msgid "An i* positive contribution"
+msgstr ""
+
+#: sheets/Istar.sheet.in.h:9
+msgid "An i* resource"
+msgstr ""
+
+#: sheets/Istar.sheet.in.h:10
+#, fuzzy
+msgid "An i* role"
+msgstr "파일"
+
+#: sheets/Istar.sheet.in.h:11
+msgid "An i* softgoal"
+msgstr ""
+
+#: sheets/Istar.sheet.in.h:12
+msgid "An i* task"
+msgstr ""
+
+#: sheets/Istar.sheet.in.h:13
+msgid "An i* unspecified actor"
+msgstr ""
+
+#: sheets/Istar.sheet.in.h:14
+msgid "An i* unspecified link"
+msgstr ""
+
+#: sheets/Istar.sheet.in.h:15
+msgid "Objects to design i* diagrams"
+msgstr ""
+
+#: sheets/Istar.sheet.in.h:16
+msgid "RE-i*"
+msgstr ""
+
+#: sheets/Jackson.sheet.in.h:1
+msgid "A Jackson designed domain"
+msgstr ""
+
+#: sheets/Jackson.sheet.in.h:2
+msgid "A Jackson given domain"
+msgstr ""
+
+#: sheets/Jackson.sheet.in.h:3
+msgid "A Jackson machine domain"
+msgstr ""
+
+#: sheets/Jackson.sheet.in.h:4
+msgid "A Jackson requirement"
+msgstr ""
+
+#: sheets/Jackson.sheet.in.h:5
+msgid "A Jackson requirement phenomenon"
+msgstr ""
+
+#: sheets/Jackson.sheet.in.h:6
+msgid "A Jackson shared phenomenon"
+msgstr ""
+
+#: sheets/Jackson.sheet.in.h:7
+msgid "Objects to design Jacskon diagrams"
+msgstr ""
+
+#: sheets/Jackson.sheet.in.h:8
+msgid "RE-Jackson"
+msgstr ""
+
+#: sheets/KAOS.sheet.in.h:1
+msgid "A KAOS AND refinement"
+msgstr ""
+
+#: sheets/KAOS.sheet.in.h:2
+msgid "A KAOS OR refinement"
+msgstr ""
+
+#: sheets/KAOS.sheet.in.h:3
+#, fuzzy
+msgid "A KAOS agent"
+msgstr "부분 추가"
+
+#: sheets/KAOS.sheet.in.h:4
+msgid "A KAOS assumption"
+msgstr ""
+
+#: sheets/KAOS.sheet.in.h:5
+msgid "A KAOS binary conflict"
+msgstr ""
+
+#: sheets/KAOS.sheet.in.h:6
+msgid "A KAOS capable-of"
+msgstr ""
+
+#: sheets/KAOS.sheet.in.h:7
+msgid "A KAOS complete AND refinement"
+msgstr ""
+
+#: sheets/KAOS.sheet.in.h:8
+msgid "A KAOS complete OR refinement"
+msgstr ""
+
+#: sheets/KAOS.sheet.in.h:9
+msgid "A KAOS contribution"
+msgstr ""
+
+#: sheets/KAOS.sheet.in.h:10
+msgid "A KAOS control link"
+msgstr ""
+
+#: sheets/KAOS.sheet.in.h:11
+msgid "A KAOS goal"
+msgstr ""
+
+#: sheets/KAOS.sheet.in.h:12
+msgid "A KAOS input"
+msgstr ""
+
+#: sheets/KAOS.sheet.in.h:13
+#, fuzzy
+msgid "A KAOS monitor link"
+msgstr "합성"
+
+#: sheets/KAOS.sheet.in.h:14
+msgid "A KAOS obstacle"
+msgstr ""
+
+#: sheets/KAOS.sheet.in.h:15
+msgid "A KAOS obstruction"
+msgstr ""
+
+#: sheets/KAOS.sheet.in.h:16
+#, fuzzy
+msgid "A KAOS operation"
+msgstr "작동"
+
+#: sheets/KAOS.sheet.in.h:17
+#, fuzzy
+msgid "A KAOS operationalization"
+msgstr "가로 정렬(_H)"
+
+#: sheets/KAOS.sheet.in.h:18
+msgid "A KAOS output"
+msgstr ""
+
+#: sheets/KAOS.sheet.in.h:19
+msgid "A KAOS performs"
+msgstr ""
+
+#: sheets/KAOS.sheet.in.h:20
+#, fuzzy
+msgid "A KAOS requirement"
+msgstr "부분 추가"
+
+#: sheets/KAOS.sheet.in.h:21
+msgid "A KAOS responsibility"
+msgstr ""
+
+#: sheets/KAOS.sheet.in.h:22
+msgid "A KAOS softgoal"
+msgstr ""
+
+#: sheets/KAOS.sheet.in.h:23
+msgid "Objects to design KAOS diagrams"
+msgstr ""
+
+#: sheets/KAOS.sheet.in.h:24
+msgid "RE-KAOS"
+msgstr ""
+
+#: sheets/Logic.sheet.in.h:1
+#, fuzzy
+msgid "AND gate"
+msgstr "집합"
+
+#: sheets/Logic.sheet.in.h:2
+msgid "Boolean Logic"
+msgstr ""
+
+#: sheets/Logic.sheet.in.h:3
+msgid "Crossconnector"
+msgstr ""
+
+#: sheets/Logic.sheet.in.h:4
+#, fuzzy
+msgid "Inverter"
+msgstr "사용자 인터페이스"
+
+#: sheets/Logic.sheet.in.h:5
+msgid "Logic"
+msgstr ""
+
+#: sheets/Logic.sheet.in.h:6
+#, fuzzy
+msgid "NAND gate"
+msgstr "집합"
+
+#: sheets/Logic.sheet.in.h:7
+#, fuzzy
+msgid "NOR gate"
+msgstr "집합"
+
+#: sheets/Logic.sheet.in.h:8
+msgid "NOT"
+msgstr ""
+
+#: sheets/Logic.sheet.in.h:9
+#, fuzzy
+msgid "OR gate"
+msgstr "집합"
+
+#: sheets/Logic.sheet.in.h:10
+#, fuzzy
+msgid "Simple buffer"
+msgstr "프린터 선택"
+
+#: sheets/Logic.sheet.in.h:11
+#, fuzzy
+msgid "XOR gate"
+msgstr "집합"
+
+#: sheets/MSE.sheet.in.h:1
+#, fuzzy
+msgid "Demultiplexer"
+msgstr "중복"
+
+#: sheets/MSE.sheet.in.h:2
+#, fuzzy
+msgid "Large extension node"
+msgstr "확장자"
+
+#: sheets/MSE.sheet.in.h:3
+msgid "MSE"
+msgstr ""
+
+#: sheets/MSE.sheet.in.h:4
+#, fuzzy
+msgid "Multiplexer"
+msgstr "중복"
+
+#: sheets/MSE.sheet.in.h:5
+#, fuzzy
+msgid "Node center"
+msgstr "중간"
+
+#: sheets/MSE.sheet.in.h:6
+#, fuzzy
+msgid "Small extension node"
+msgstr "확장자"
+
+#: sheets/MSE.sheet.in.h:7
+msgid "Tactical satellite communications terminal"
+msgstr ""
+
+#: sheets/MSE.sheet.in.h:8
+msgid "U.S. Army Mobile Subscriber Equipment Components"
+msgstr ""
+
+#: sheets/Misc.sheet.in.h:2
+#, fuzzy
+msgid "Folder"
+msgstr "파일"
+
+#: sheets/Misc.sheet.in.h:3
+msgid "Misc"
+msgstr ""
+
+#: sheets/Misc.sheet.in.h:4
+msgid "Miscellaneous Shapes"
+msgstr ""
+
+#: sheets/Misc.sheet.in.h:5
+#, fuzzy
+msgid "Traditional clock"
+msgstr "방향"
+
+#: sheets/Pneumatic.sheet.in.h:1
+#, fuzzy
+msgid "2/2 distributor"
+msgstr "속성"
+
+#: sheets/Pneumatic.sheet.in.h:2
+#, fuzzy
+msgid "3/2 distributor"
+msgstr "속성"
+
+#: sheets/Pneumatic.sheet.in.h:3
+#, fuzzy
+msgid "3/3 distributor"
+msgstr "속성"
+
+#: sheets/Pneumatic.sheet.in.h:4
+#, fuzzy
+msgid "4/2 distributor"
+msgstr "속성"
+
+#: sheets/Pneumatic.sheet.in.h:5
+#, fuzzy
+msgid "5/2 distributor"
+msgstr "속성"
+
+#: sheets/Pneumatic.sheet.in.h:6
+#, fuzzy
+msgid "5/3 distributor"
+msgstr "속성"
+
+#: sheets/Pneumatic.sheet.in.h:7
+msgid "Air exhaust orifice"
+msgstr ""
+
+#: sheets/Pneumatic.sheet.in.h:8
+msgid "Components for pneumatic and hydraulic circuits"
+msgstr ""
+
+#: sheets/Pneumatic.sheet.in.h:10
+msgid "Double-effect jack"
+msgstr ""
+
+#: sheets/Pneumatic.sheet.in.h:11
+msgid "Electric command (double coil)"
+msgstr ""
+
+#: sheets/Pneumatic.sheet.in.h:12
+msgid "Electric command (single coil)"
+msgstr ""
+
+#: sheets/Pneumatic.sheet.in.h:13
+msgid "Generic pressure source"
+msgstr ""
+
+#: sheets/Pneumatic.sheet.in.h:14
+msgid "Hydraulic pressure source"
+msgstr ""
+
+#: sheets/Pneumatic.sheet.in.h:15
+msgid "Indirect command by hydraulic driver"
+msgstr ""
+
+#: sheets/Pneumatic.sheet.in.h:16
+msgid "Indirect command by pneumatic driver"
+msgstr ""
+
+#: sheets/Pneumatic.sheet.in.h:17
+msgid "Mechanical command by spring"
+msgstr ""
+
+#: sheets/Pneumatic.sheet.in.h:18
+msgid "Mechanical command by tappet"
+msgstr ""
+
+#: sheets/Pneumatic.sheet.in.h:19
+msgid "Muscular command"
+msgstr ""
+
+#: sheets/Pneumatic.sheet.in.h:20
+msgid "Normally-in simple-effect jack"
+msgstr ""
+
+#: sheets/Pneumatic.sheet.in.h:21
+msgid "Normally-out simple-effect jack"
+msgstr ""
+
+#: sheets/Pneumatic.sheet.in.h:22
+msgid "Pneumatic pressure source"
+msgstr ""
+
+#: sheets/Pneumatic.sheet.in.h:23
+msgid "Pneumatic/Hydraulic"
+msgstr ""
+
+#: sheets/Pneumatic.sheet.in.h:24
+msgid "Push-button command"
+msgstr ""
+
+#: sheets/SADT.sheet.in.h:1
+msgid "Activity/data box"
+msgstr ""
+
+#: sheets/SADT.sheet.in.h:2
+msgid "Activity/data flow arrow"
+msgstr ""
+
+#: sheets/SADT.sheet.in.h:3
+msgid "Flow label"
+msgstr ""
+
+#: sheets/SADT.sheet.in.h:4
+msgid "Objects to design SADT diagrams"
+msgstr ""
+
+#: sheets/SADT.sheet.in.h:5
+msgid "SADT/IDEF0"
+msgstr ""
+
+#: sheets/SDL.sheet.in.h:1
+msgid "Action being executed"
+msgstr ""
+
+#: sheets/SDL.sheet.in.h:2
+#, fuzzy
+msgid "Block type reference"
+msgstr "설정"
+
+#: sheets/SDL.sheet.in.h:5
+msgid "Function call"
+msgstr ""
+
+#: sheets/SDL.sheet.in.h:6
+#, fuzzy
+msgid "Function header"
+msgstr "인자:"
+
+#: sheets/SDL.sheet.in.h:7
+msgid "Generic text note"
+msgstr ""
+
+#: sheets/SDL.sheet.in.h:8
+msgid "In/Out connector"
+msgstr ""
+
+#: sheets/SDL.sheet.in.h:10
+msgid "Procedure return"
+msgstr ""
+
+#: sheets/SDL.sheet.in.h:11
+#, fuzzy
+msgid "Process type reference"
+msgstr "설정"
+
+#: sheets/SDL.sheet.in.h:12
+#, fuzzy
+msgid "Receive message"
+msgstr "삭제"
+
+#: sheets/SDL.sheet.in.h:13
+msgid "SDL"
+msgstr ""
+
+#: sheets/SDL.sheet.in.h:14
+#, fuzzy
+msgid "Save state"
+msgstr "화살표 보임"
+
+#: sheets/SDL.sheet.in.h:15
+#, fuzzy
+msgid "Send message"
+msgstr "삭제"
+
+#: sheets/SDL.sheet.in.h:16
+#, fuzzy
+msgid "Service type reference"
+msgstr "설정"
+
+#: sheets/SDL.sheet.in.h:17
+msgid "Specification and Description Language."
+msgstr ""
+
+#: sheets/SDL.sheet.in.h:18 sheets/UML.sheet.in.h:28
+#, fuzzy
+msgid "State"
+msgstr "화살표 보임"
+
+#: sheets/UML.sheet.in.h:1
+msgid "Activity"
+msgstr ""
+
+#: sheets/UML.sheet.in.h:3
+msgid "Aggregation, one class is part of another"
+msgstr ""
+
+#: sheets/UML.sheet.in.h:4
+msgid "Association, two classes are associated"
+msgstr ""
+
+#: sheets/UML.sheet.in.h:7
+#, fuzzy
+msgid "Class stereotype icon"
+msgstr "템플릿 클래스"
+
+#: sheets/UML.sheet.in.h:8
+#, fuzzy
+msgid "Component"
+msgstr "중간"
+
+#: sheets/UML.sheet.in.h:9
+msgid "Constraint, place a constraint on something"
+msgstr ""
+
+#: sheets/UML.sheet.in.h:11
+msgid "Editor for UML Static Structure Diagrams"
+msgstr ""
+
+#: sheets/UML.sheet.in.h:15
+#, fuzzy
+msgid "Fork/union"
+msgstr "연결점:"
+
+#: sheets/UML.sheet.in.h:16
+msgid "Generalization, class inheritance"
+msgstr ""
+
+#: sheets/UML.sheet.in.h:17
+msgid "Implements, class implements a specific interface"
+msgstr ""
+
+#: sheets/UML.sheet.in.h:18
+#, fuzzy
+msgid "Initial/end state"
+msgstr "선 만듦"
+
+#: sheets/UML.sheet.in.h:19
+#, fuzzy
+msgid "Large package"
+msgstr "그림 만듦"
+
+#: sheets/UML.sheet.in.h:20
+#, fuzzy
+msgid "Lifeline"
+msgstr "베지어"
+
+#: sheets/UML.sheet.in.h:21
+#, fuzzy
+msgid "Message"
+msgstr "삭제"
+
+#: sheets/UML.sheet.in.h:22
+#, fuzzy
+msgid "Node"
+msgstr "아니오"
+
+#: sheets/UML.sheet.in.h:23
+#, fuzzy
+msgid "Note"
+msgstr "집합"
+
+#: sheets/UML.sheet.in.h:24
+#, fuzzy
+msgid "Object"
+msgstr "/객체(_O)"
+
+#: sheets/UML.sheet.in.h:25
+msgid "Realizes, implements a specific interface"
+msgstr ""
+
+#: sheets/UML.sheet.in.h:27
+#, fuzzy
+msgid "Small package"
+msgstr "그림 만듦"
+
+#: sheets/UML.sheet.in.h:30
+msgid "UML"
+msgstr ""
+
+#: sheets/UML.sheet.in.h:31
+msgid "Use case"
+msgstr ""
+
+#: sheets/chronogram.sheet.in.h:1
+msgid "Chronogram"
+msgstr ""
+
+#: sheets/chronogram.sheet.in.h:2
+#, fuzzy
+msgid "Data line"
+msgstr "선 굵기"
+
+#: sheets/chronogram.sheet.in.h:3
+msgid "Objects to design chronogram charts"
+msgstr ""
+
+#: sheets/chronogram.sheet.in.h:4
+#, fuzzy
+msgid "Time scale"
+msgstr "속성 데이터"
+
+#: sheets/ciscocomputer.sheet.in.h:1
+#, fuzzy
+msgid "Cisco - Computer"
+msgstr "가장자리 더하기"
+
+#: sheets/ciscocomputer.sheet.in.h:2
+msgid "Cisco CA"
+msgstr ""
+
+#: sheets/ciscocomputer.sheet.in.h:3
+msgid "CiscoSecurity"
+msgstr ""
+
+#: sheets/ciscocomputer.sheet.in.h:4
+msgid "CiscoWorks workstation"
+msgstr ""
+
+#: sheets/ciscocomputer.sheet.in.h:5
+msgid "Communications server"
+msgstr ""
+
+#: sheets/ciscocomputer.sheet.in.h:6
+msgid "Computer shapes by Cisco"
+msgstr ""
+
+#: sheets/ciscocomputer.sheet.in.h:7
+msgid "Directory Server"
+msgstr ""
+
+#: sheets/ciscocomputer.sheet.in.h:8
+#, fuzzy
+msgid "File Server"
+msgstr "파일 이름:"
+
+#: sheets/ciscocomputer.sheet.in.h:9
+msgid "HP Mini"
+msgstr ""
+
+#: sheets/ciscocomputer.sheet.in.h:10
+msgid "Handheld"
+msgstr ""
+
+#: sheets/ciscocomputer.sheet.in.h:11
+msgid "Host"
+msgstr ""
+
+#: sheets/ciscocomputer.sheet.in.h:12
+msgid "IBM Mini (AS400)"
+msgstr ""
+
+#: sheets/ciscocomputer.sheet.in.h:13
+msgid "IBM Tower"
+msgstr ""
+
+#: sheets/ciscocomputer.sheet.in.h:14
+msgid "IBM mainframe"
+msgstr ""
+
+#: sheets/ciscocomputer.sheet.in.h:15
+msgid "IP Softphone"
+msgstr ""
+
+#: sheets/ciscocomputer.sheet.in.h:16
+msgid "IPTV broadcast server"
+msgstr ""
+
+#: sheets/ciscocomputer.sheet.in.h:17
+msgid "Laptop"
+msgstr ""
+
+#: sheets/ciscocomputer.sheet.in.h:18
+#, fuzzy
+msgid "Macintosh"
+msgstr "여백"
+
+#: sheets/ciscocomputer.sheet.in.h:19
+msgid "MicroWebserver"
+msgstr ""
+
+#: sheets/ciscocomputer.sheet.in.h:20
+msgid "Mini VAX"
+msgstr ""
+
+#: sheets/ciscocomputer.sheet.in.h:21
+msgid "MoH server (Music on Hold)"
+msgstr ""
+
+#: sheets/ciscocomputer.sheet.in.h:22
+msgid "PC"
+msgstr ""
+
+#: sheets/ciscocomputer.sheet.in.h:23
+msgid "PC Video"
+msgstr ""
+
+#: sheets/ciscocomputer.sheet.in.h:24
+msgid "PDA"
+msgstr ""
+
+#: sheets/ciscocomputer.sheet.in.h:26
+#, fuzzy
+msgid "Relational Database"
+msgstr "작동 데이터"
+
+#: sheets/ciscocomputer.sheet.in.h:27
+msgid "SC2200/VSC3000 host"
+msgstr ""
+
+#: sheets/ciscocomputer.sheet.in.h:28
+msgid "SIP Proxy server"
+msgstr ""
+
+#: sheets/ciscocomputer.sheet.in.h:29
+msgid "STB (set top box)"
+msgstr ""
+
+#: sheets/ciscocomputer.sheet.in.h:30
+#, fuzzy
+msgid "SUN workstation"
+msgstr "역할:"
+
+#: sheets/ciscocomputer.sheet.in.h:31
+#, fuzzy
+msgid "Scanner"
+msgstr "비율:"
+
+#: sheets/ciscocomputer.sheet.in.h:32
+msgid "Server with PC Router"
+msgstr ""
+
+#: sheets/ciscocomputer.sheet.in.h:33
+#, fuzzy
+msgid "Softphone"
+msgstr "부드러운 조절"
+
+#: sheets/ciscocomputer.sheet.in.h:34
+msgid "Software based server"
+msgstr ""
+
+#: sheets/ciscocomputer.sheet.in.h:35
+#, fuzzy
+msgid "Storage array"
+msgstr "비율"
+
+#: sheets/ciscocomputer.sheet.in.h:36
+#, fuzzy
+msgid "Supercomputer"
+msgstr "가장자리 더하기"
+
+#: sheets/ciscocomputer.sheet.in.h:37
+msgid "TV"
+msgstr ""
+
+#: sheets/ciscocomputer.sheet.in.h:38
+msgid "Terminal"
+msgstr ""
+
+#: sheets/ciscocomputer.sheet.in.h:39
+#, fuzzy
+msgid "Turret"
+msgstr "중간"
+
+#: sheets/ciscocomputer.sheet.in.h:40
+msgid "Unity server"
+msgstr ""
+
+#: sheets/ciscocomputer.sheet.in.h:41
+msgid "Voice commserver"
+msgstr ""
+
+#: sheets/ciscocomputer.sheet.in.h:42
+msgid "WWW server"
+msgstr ""
+
+#: sheets/ciscocomputer.sheet.in.h:43
+msgid "Web browser"
+msgstr ""
+
+#: sheets/ciscocomputer.sheet.in.h:44
+msgid "Web cluster"
+msgstr ""
+
+#: sheets/ciscocomputer.sheet.in.h:45
+msgid "Wireless"
+msgstr ""
+
+#: sheets/ciscocomputer.sheet.in.h:46
+msgid "Workgroup director"
+msgstr ""
+
+#: sheets/ciscocomputer.sheet.in.h:47
+#, fuzzy
+msgid "Workstation"
+msgstr "역할:"
+
+#: sheets/ciscohub.sheet.in.h:1
+msgid "100BaseT hub"
+msgstr ""
+
+#: sheets/ciscohub.sheet.in.h:2
+msgid "ATM fast gigabit etherswitch"
+msgstr ""
+
+#: sheets/ciscohub.sheet.in.h:3
+msgid "ATM switch"
+msgstr ""
+
+#: sheets/ciscohub.sheet.in.h:4
+msgid "Cisco - Hub"
+msgstr ""
+
+#: sheets/ciscohub.sheet.in.h:5
+msgid "Cisco hub"
+msgstr ""
+
+#: sheets/ciscohub.sheet.in.h:6
+msgid "Class 4/5 switch"
+msgstr ""
+
+#: sheets/ciscohub.sheet.in.h:7
+msgid "Content service switch 1100"
+msgstr ""
+
+#: sheets/ciscohub.sheet.in.h:8
+msgid "Content switch"
+msgstr ""
+
+#: sheets/ciscohub.sheet.in.h:9
+msgid "Content switch module"
+msgstr ""
+
+#: sheets/ciscohub.sheet.in.h:10
+msgid "Generic softswitch"
+msgstr ""
+
+#: sheets/ciscohub.sheet.in.h:11
+msgid "Hub"
+msgstr ""
+
+#: sheets/ciscohub.sheet.in.h:12
+msgid "Hub and switch shapes by Cisco"
+msgstr ""
+
+#: sheets/ciscohub.sheet.in.h:13
+msgid "ISDN switch"
+msgstr ""
+
+#: sheets/ciscohub.sheet.in.h:14
+#, fuzzy
+msgid "Layer 3 switch"
+msgstr "게층"
+
+#: sheets/ciscohub.sheet.in.h:15
+msgid "MGX 8220 switch"
+msgstr ""
+
+#: sheets/ciscohub.sheet.in.h:16
+msgid "MGX 8240 switch"
+msgstr ""
+
+#: sheets/ciscohub.sheet.in.h:17
+msgid "MGX 8260 switch"
+msgstr ""
+
+#: sheets/ciscohub.sheet.in.h:18
+msgid "MultiSwitch device"
+msgstr ""
+
+#: sheets/ciscohub.sheet.in.h:19
+#, fuzzy
+msgid "Multilayer switch"
+msgstr "중복"
+
+#: sheets/ciscohub.sheet.in.h:20
+msgid "PBX switch"
+msgstr ""
+
+#: sheets/ciscohub.sheet.in.h:21
+msgid "Programmable switch"
+msgstr ""
+
+#: sheets/ciscohub.sheet.in.h:22
+msgid "Route switch processor"
+msgstr ""
+
+#: sheets/ciscohub.sheet.in.h:23
+msgid "Small hub"
+msgstr ""
+
+#: sheets/ciscohub.sheet.in.h:24
+msgid "Voice ATM switch"
+msgstr ""
+
+#: sheets/ciscohub.sheet.in.h:25
+#, fuzzy
+msgid "Voice switch"
+msgstr "선 굵기"
+
+#: sheets/ciscohub.sheet.in.h:26
+msgid "Voice switch 2"
+msgstr ""
+
+#: sheets/ciscohub.sheet.in.h:27
+msgid "Workgroup switch"
+msgstr ""
+
+#: sheets/ciscomisc.sheet.in.h:1
+msgid "BBFW"
+msgstr ""
+
+#: sheets/ciscomisc.sheet.in.h:2
+msgid "BBFW media"
+msgstr ""
+
+#: sheets/ciscomisc.sheet.in.h:3
+msgid "Branch office"
+msgstr ""
+
+#: sheets/ciscomisc.sheet.in.h:4
+#, fuzzy
+msgid "Breakout box"
+msgstr "상자 만듦"
+
+#: sheets/ciscomisc.sheet.in.h:5
+#, fuzzy
+msgid "Car"
+msgstr "클래스"
+
+#: sheets/ciscomisc.sheet.in.h:6
+msgid "Cellular phone"
+msgstr ""
+
+#: sheets/ciscomisc.sheet.in.h:7
+msgid "Cisco - Misc"
+msgstr ""
+
+#: sheets/ciscomisc.sheet.in.h:8
+#, fuzzy
+msgid "Diskette"
+msgstr "속성"
+
+#: sheets/ciscomisc.sheet.in.h:9
+#, fuzzy
+msgid "Dot-Dot"
+msgstr "이점괘선"
+
+#: sheets/ciscomisc.sheet.in.h:10
+msgid "End office"
+msgstr ""
+
+#: sheets/ciscomisc.sheet.in.h:11
+msgid "Fax"
+msgstr ""
+
+#: sheets/ciscomisc.sheet.in.h:12
+#, fuzzy
+msgid "File cabinet"
+msgstr "파일 이름:"
+
+#: sheets/ciscomisc.sheet.in.h:13
+msgid "Generic building"
+msgstr ""
+
+#: sheets/ciscomisc.sheet.in.h:14
+msgid "Government building"
+msgstr ""
+
+#: sheets/ciscomisc.sheet.in.h:15
+msgid "H.323"
+msgstr ""
+
+#: sheets/ciscomisc.sheet.in.h:16
+msgid "HootPhone"
+msgstr ""
+
+#: sheets/ciscomisc.sheet.in.h:17
+msgid "IP phone"
+msgstr ""
+
+#: sheets/ciscomisc.sheet.in.h:18
+msgid "ITP"
+msgstr ""
+
+#: sheets/ciscomisc.sheet.in.h:19
+msgid "Key"
+msgstr ""
+
+#: sheets/ciscomisc.sheet.in.h:20
+msgid "LAN to LAN"
+msgstr ""
+
+#: sheets/ciscomisc.sheet.in.h:22
+msgid "MAU"
+msgstr ""
+
+#: sheets/ciscomisc.sheet.in.h:23
+msgid "MDU"
+msgstr ""
+
+#: sheets/ciscomisc.sheet.in.h:24
+msgid "Mac woman"
+msgstr ""
+
+#: sheets/ciscomisc.sheet.in.h:25
+msgid "Man/Woman"
+msgstr ""
+
+#: sheets/ciscomisc.sheet.in.h:27
+msgid "Miscellaneous shapes by Cisco"
+msgstr ""
+
+#: sheets/ciscomisc.sheet.in.h:28
+msgid "PC man"
+msgstr ""
+
+#: sheets/ciscomisc.sheet.in.h:29
+#, fuzzy
+msgid "Phone"
+msgstr "연결선"
+
+#: sheets/ciscomisc.sheet.in.h:30
+msgid "Phone/Fax"
+msgstr ""
+
+#: sheets/ciscomisc.sheet.in.h:31
+msgid "RPS"
+msgstr ""
+
+#: sheets/ciscomisc.sheet.in.h:32
+#, fuzzy
+msgid "Radio tower"
+msgstr "방향"
+
+#: sheets/ciscomisc.sheet.in.h:33
+msgid "Running man"
+msgstr ""
+
+#: sheets/ciscomisc.sheet.in.h:34
+msgid "SVX (interchangeable with End office)"
+msgstr ""
+
+#: sheets/ciscomisc.sheet.in.h:35
+#, fuzzy
+msgid "Satellite"
+msgstr "비율:"
+
+#: sheets/ciscomisc.sheet.in.h:36
+msgid "Satellite dish"
+msgstr ""
+
+#: sheets/ciscomisc.sheet.in.h:37
+msgid "Sitting woman"
+msgstr ""
+
+#: sheets/ciscomisc.sheet.in.h:38
+msgid "Small business"
+msgstr ""
+
+#: sheets/ciscomisc.sheet.in.h:40
+msgid "Standing man"
+msgstr ""
+
+#: sheets/ciscomisc.sheet.in.h:41
+#, fuzzy
+msgid "Tablet"
+msgstr "문자열"
+
+#: sheets/ciscomisc.sheet.in.h:42
+msgid "Telecommuter"
+msgstr ""
+
+#: sheets/ciscomisc.sheet.in.h:43
+msgid "Telecommuter house"
+msgstr ""
+
+#: sheets/ciscomisc.sheet.in.h:44
+msgid "Telecommuter house/router"
+msgstr ""
+
+#: sheets/ciscomisc.sheet.in.h:45
+msgid "TokenRing"
+msgstr ""
+
+#: sheets/ciscomisc.sheet.in.h:46
+msgid "Truck"
+msgstr ""
+
+#: sheets/ciscomisc.sheet.in.h:47
+msgid "UPS"
+msgstr ""
+
+#: sheets/ciscomisc.sheet.in.h:48
+msgid "University"
+msgstr ""
+
+#: sheets/ciscomisc.sheet.in.h:49
+msgid "Video camera"
+msgstr ""
+
+#: sheets/ciscomisc.sheet.in.h:50
+msgid "Wireless transport"
+msgstr ""
+
+#: sheets/cisconetwork.sheet.in.h:1
+msgid "10700"
+msgstr ""
+
+#: sheets/cisconetwork.sheet.in.h:2
+msgid "15200"
+msgstr ""
+
+#: sheets/cisconetwork.sheet.in.h:3
+msgid "3174 (desktop) cluster controller"
+msgstr ""
+
+#: sheets/cisconetwork.sheet.in.h:4
+msgid "3X74 (floor) cluster controller"
+msgstr ""
+
+#: sheets/cisconetwork.sheet.in.h:5
+msgid "6701"
+msgstr ""
+
+#: sheets/cisconetwork.sheet.in.h:6
+msgid "6705 Integrated access device"
+msgstr ""
+
+#: sheets/cisconetwork.sheet.in.h:7
+msgid "6732 Multiservice access platform"
+msgstr ""
+
+#: sheets/cisconetwork.sheet.in.h:8
+msgid "ADM"
+msgstr ""
+
+#: sheets/cisconetwork.sheet.in.h:9
+#, fuzzy
+msgid "ASIC processor"
+msgstr "호 만듦"
+
+#: sheets/cisconetwork.sheet.in.h:10
+msgid "ATA"
+msgstr ""
+
+#: sheets/cisconetwork.sheet.in.h:11
+msgid "ATM 3800"
+msgstr ""
+
+#: sheets/cisconetwork.sheet.in.h:12
+msgid "AccessPoint"
+msgstr ""
+
+#: sheets/cisconetwork.sheet.in.h:13
+msgid "BBSM"
+msgstr ""
+
+#: sheets/cisconetwork.sheet.in.h:14
+msgid "BTS 10200"
+msgstr ""
+
+#: sheets/cisconetwork.sheet.in.h:15
+#, fuzzy
+msgid "Bridge"
+msgstr "격자:"
+
+#: sheets/cisconetwork.sheet.in.h:16
+msgid "CDDI-FDDI"
+msgstr ""
+
+#: sheets/cisconetwork.sheet.in.h:17
+msgid "CDM Content distribution manager"
+msgstr ""
+
+#: sheets/cisconetwork.sheet.in.h:18
+msgid "CSU/DSU"
+msgstr ""
+
+#: sheets/cisconetwork.sheet.in.h:19
+msgid "Cable modem"
+msgstr ""
+
+#: sheets/cisconetwork.sheet.in.h:20
+#, fuzzy
+msgid "CallManager"
+msgstr "호출"
+
+#: sheets/cisconetwork.sheet.in.h:21
+msgid "Catalyst access gateway"
+msgstr ""
+
+#: sheets/cisconetwork.sheet.in.h:22
+msgid "Centri firewall"
+msgstr ""
+
+#: sheets/cisconetwork.sheet.in.h:23
+msgid "Cisco - Network"
+msgstr ""
+
+#: sheets/cisconetwork.sheet.in.h:24
+#, fuzzy
+msgid "Cloud"
+msgstr "닫기"
+
+#: sheets/cisconetwork.sheet.in.h:25
+msgid "Content engine (Cache director)"
+msgstr ""
+
+#: sheets/cisconetwork.sheet.in.h:26
+msgid "Content transformation engine (CTE)"
+msgstr ""
+
+#: sheets/cisconetwork.sheet.in.h:27
+msgid "DPT"
+msgstr ""
+
+#: sheets/cisconetwork.sheet.in.h:28
+msgid "DSLAM"
+msgstr ""
+
+#: sheets/cisconetwork.sheet.in.h:29
+#, fuzzy
+msgid "DWDM filter"
+msgstr "컴퓨터 그래픽 메타파일 저장 필터"
+
+#: sheets/cisconetwork.sheet.in.h:30
+#, fuzzy
+msgid "Distributed director"
+msgstr "속성"
+
+#: sheets/cisconetwork.sheet.in.h:31
+#, fuzzy
+msgid "FC storage"
+msgstr "비율"
+
+#: sheets/cisconetwork.sheet.in.h:32
+msgid "FDDI ring"
+msgstr ""
+
+#: sheets/cisconetwork.sheet.in.h:33
+#, fuzzy
+msgid "Firewall"
+msgstr "파일"
+
+#: sheets/cisconetwork.sheet.in.h:34
+#, fuzzy
+msgid "Front end processor"
+msgstr "호 만듦"
+
+#: sheets/cisconetwork.sheet.in.h:35
+msgid "General appliance"
+msgstr ""
+
+#: sheets/cisconetwork.sheet.in.h:36
+msgid "Generic gateway"
+msgstr ""
+
+#: sheets/cisconetwork.sheet.in.h:37
+#, fuzzy
+msgid "Generic processor"
+msgstr "호 만듦"
+
+#: sheets/cisconetwork.sheet.in.h:38
+msgid "ICM"
+msgstr ""
+
+#: sheets/cisconetwork.sheet.in.h:39
+msgid "ICS"
+msgstr ""
+
+#: sheets/cisconetwork.sheet.in.h:40
+msgid "IOS firewall"
+msgstr ""
+
+#: sheets/cisconetwork.sheet.in.h:41
+msgid "IP"
+msgstr ""
+
+#: sheets/cisconetwork.sheet.in.h:42
+msgid "IP DSL"
+msgstr ""
+
+#: sheets/cisconetwork.sheet.in.h:43
+msgid "IPTC"
+msgstr ""
+
+#: sheets/cisconetwork.sheet.in.h:44
+msgid "IPTV content manager"
+msgstr ""
+
+#: sheets/cisconetwork.sheet.in.h:45
+msgid "LocalDirector"
+msgstr ""
+
+#: sheets/cisconetwork.sheet.in.h:46
+msgid "LongReach CPE"
+msgstr ""
+
+#: sheets/cisconetwork.sheet.in.h:47
+msgid "MAS gateway"
+msgstr ""
+
+#: sheets/cisconetwork.sheet.in.h:48
+msgid "ME 1100"
+msgstr ""
+
+#: sheets/cisconetwork.sheet.in.h:49
+msgid "MUX"
+msgstr ""
+
+#: sheets/cisconetwork.sheet.in.h:50
+msgid "Metro 1500"
+msgstr ""
+
+#: sheets/cisconetwork.sheet.in.h:51
+#, fuzzy
+msgid "Modem"
+msgstr "위로 이동"
+
+#: sheets/cisconetwork.sheet.in.h:52
+msgid "NetRanger intrusion detection system"
+msgstr ""
+
+#: sheets/cisconetwork.sheet.in.h:53
+msgid "NetSonar security scanner"
+msgstr ""
+
+#: sheets/cisconetwork.sheet.in.h:54
+#, fuzzy
+msgid "Network management"
+msgstr "네트웍 도표 객체"
+
+#: sheets/cisconetwork.sheet.in.h:55
+msgid "Network shapes by Cisco"
+msgstr ""
+
+#: sheets/cisconetwork.sheet.in.h:56
+msgid "ONS15500 DWDM platform"
+msgstr ""
+
+#: sheets/cisconetwork.sheet.in.h:57
+msgid "Octel"
+msgstr ""
+
+#: sheets/cisconetwork.sheet.in.h:58
+#, fuzzy
+msgid "Optical amplifier"
+msgstr "가로 정렬(_H)"
+
+#: sheets/cisconetwork.sheet.in.h:59
+msgid "Optical transport"
+msgstr ""
+
+#: sheets/cisconetwork.sheet.in.h:60
+msgid "PAD"
+msgstr ""
+
+#: sheets/cisconetwork.sheet.in.h:61
+msgid "PAD X.28"
+msgstr ""
+
+#: sheets/cisconetwork.sheet.in.h:62
+msgid "PBX"
+msgstr ""
+
+#: sheets/cisconetwork.sheet.in.h:63
+msgid "PC adapter card"
+msgstr ""
+
+#: sheets/cisconetwork.sheet.in.h:64
+msgid "PC router card"
+msgstr ""
+
+#: sheets/cisconetwork.sheet.in.h:65
+msgid "PIX firewall"
+msgstr ""
+
+#: sheets/cisconetwork.sheet.in.h:66
+msgid "PXF"
+msgstr ""
+
+#: sheets/cisconetwork.sheet.in.h:67
+msgid "Protocol translator"
+msgstr ""
+
+#: sheets/cisconetwork.sheet.in.h:68
+#, fuzzy
+msgid "RateMUX"
+msgstr "역할:"
+
+#: sheets/cisconetwork.sheet.in.h:69
+#, fuzzy
+msgid "Repeater"
+msgstr "지움"
+
+#: sheets/cisconetwork.sheet.in.h:70
+msgid "SC2200 (Signalling controller)"
+msgstr ""
+
+#: sheets/cisconetwork.sheet.in.h:71
+msgid "STP"
+msgstr ""
+
+#: sheets/cisconetwork.sheet.in.h:72
+#, fuzzy
+msgid "System controller"
+msgstr "대칭 조절"
+
+#: sheets/cisconetwork.sheet.in.h:73
+#, fuzzy
+msgid "Transpath"
+msgstr "방향"
+
+#: sheets/cisconetwork.sheet.in.h:74
+msgid "Universal gateway"
+msgstr ""
+
+#: sheets/cisconetwork.sheet.in.h:75
+msgid "VIP"
+msgstr ""
+
+#: sheets/cisconetwork.sheet.in.h:76
+msgid "VPN concentrator"
+msgstr ""
+
+#: sheets/cisconetwork.sheet.in.h:77
+msgid "VPN gateway"
+msgstr ""
+
+#: sheets/cisconetwork.sheet.in.h:78
+msgid "Virtual switch controller (VSC 3000)"
+msgstr ""
+
+#: sheets/cisconetwork.sheet.in.h:79
+msgid "Wireless bridge"
+msgstr ""
+
+#: sheets/ciscorouter.sheet.in.h:1
+msgid "7500ARS (7513)"
+msgstr ""
+
+#: sheets/ciscorouter.sheet.in.h:2
+msgid "7505"
+msgstr ""
+
+#: sheets/ciscorouter.sheet.in.h:3
+msgid "7507"
+msgstr ""
+
+#: sheets/ciscorouter.sheet.in.h:4
+#, fuzzy
+msgid "ATM router"
+msgstr "가장자리 더하기"
+
+#: sheets/ciscorouter.sheet.in.h:5
+msgid "ATM tag sw gigabit router"
+msgstr ""
+
+#: sheets/ciscorouter.sheet.in.h:6
+msgid "ATM tag switch router"
+msgstr ""
+
+#: sheets/ciscorouter.sheet.in.h:7
+msgid "Broadband router"
+msgstr ""
+
+#: sheets/ciscorouter.sheet.in.h:8
+msgid "Cisco - Router"
+msgstr ""
+
+#: sheets/ciscorouter.sheet.in.h:9
+msgid "Cisco 1000"
+msgstr ""
+
+#: sheets/ciscorouter.sheet.in.h:10
+msgid "Content service router"
+msgstr ""
+
+#: sheets/ciscorouter.sheet.in.h:11
+msgid "Gigabit switch router (ATM tag)"
+msgstr ""
+
+#: sheets/ciscorouter.sheet.in.h:12
+#, fuzzy
+msgid "IAD router"
+msgstr "가장자리 더하기"
+
+#: sheets/ciscorouter.sheet.in.h:13
+msgid "IP telephony router"
+msgstr ""
+
+#: sheets/ciscorouter.sheet.in.h:14
+msgid "NetFlow router"
+msgstr ""
+
+#: sheets/ciscorouter.sheet.in.h:15
+msgid "Optical services router"
+msgstr ""
+
+#: sheets/ciscorouter.sheet.in.h:16
+#, fuzzy
+msgid "Router"
+msgstr "역할:"
+
+#: sheets/ciscorouter.sheet.in.h:17
+msgid "Router in building"
+msgstr ""
+
+#: sheets/ciscorouter.sheet.in.h:18
+msgid "Router shapes by Cisco"
+msgstr ""
+
+#: sheets/ciscorouter.sheet.in.h:19
+msgid "Router with firewall"
+msgstr ""
+
+#: sheets/ciscorouter.sheet.in.h:20
+msgid "Router with silicon switch"
+msgstr ""
+
+#: sheets/ciscorouter.sheet.in.h:21
+#, fuzzy
+msgid "Storage router"
+msgstr "비율"
+
+#: sheets/ciscorouter.sheet.in.h:22
+#, fuzzy
+msgid "TDM router"
+msgstr "가장자리 더하기"
+
+#: sheets/ciscorouter.sheet.in.h:23
+msgid "Voice router"
+msgstr ""
+
+#: sheets/ciscorouter.sheet.in.h:24
+msgid "Wavelength router"
+msgstr ""
+
+#: sheets/ciscorouter.sheet.in.h:25
+msgid "Workgroup 5000 multilayer switch"
+msgstr ""
+
+#: sheets/ciscorouter.sheet.in.h:26
+msgid "Workgroup 5002 multilayer switch"
+msgstr ""
+
+#: sheets/ciscorouter.sheet.in.h:27
+msgid "Workgroup 5500 multilayer switch"
+msgstr ""
+
+#: sheets/ciscorouter.sheet.in.h:28
+msgid "uBR910"
+msgstr ""
+
+#: sheets/civil.sheet.in.h:1
+msgid "Aerator with bubbles"
+msgstr ""
+
+#: sheets/civil.sheet.in.h:2
+msgid "Backflow preventer"
+msgstr ""
+
+#: sheets/civil.sheet.in.h:3
+#, fuzzy
+msgid "Basin"
+msgstr "방향"
+
+#: sheets/civil.sheet.in.h:4
+#, fuzzy
+msgid "Bivalent vertical rest"
+msgstr "좌우 바꿈"
+
+#: sheets/civil.sheet.in.h:5
+msgid "Civil"
+msgstr ""
+
+#: sheets/civil.sheet.in.h:6
+msgid "Civil Engineering Components"
+msgstr ""
+
+#: sheets/civil.sheet.in.h:7
+#, fuzzy
+msgid "Container"
+msgstr "합성"
+
+#: sheets/civil.sheet.in.h:8
+msgid "Final-settling basin"
+msgstr ""
+
+#: sheets/civil.sheet.in.h:9
+#, fuzzy
+msgid "Frequency converter"
+msgstr "사용자 인터페이스"
+
+#: sheets/civil.sheet.in.h:10
+msgid "Gas bottle"
+msgstr ""
+
+#: sheets/civil.sheet.in.h:11
+#, fuzzy
+msgid "Horizontal limiting line"
+msgstr "가로 정렬(_H)"
+
+#: sheets/civil.sheet.in.h:12
+#, fuzzy
+msgid "Horizontal rest"
+msgstr "위아래 바꿈"
+
+#: sheets/civil.sheet.in.h:13
+#, fuzzy
+msgid "Horizontally aligned arrow"
+msgstr "가로 정렬(_H)"
+
+#: sheets/civil.sheet.in.h:14
+#, fuzzy
+msgid "Horizontally aligned compressor"
+msgstr "가로 정렬(_H)"
+
+#: sheets/civil.sheet.in.h:15
+#, fuzzy
+msgid "Horizontally aligned pump"
+msgstr "가로 정렬(_H)"
+
+#: sheets/civil.sheet.in.h:16
+#, fuzzy
+msgid "Horizontally aligned valve"
+msgstr "가로 정렬(_H)"
+
+#: sheets/civil.sheet.in.h:17
+#, fuzzy
+msgid "Motor"
+msgstr "합성"
+
+#: sheets/civil.sheet.in.h:18
+msgid "Preliminary clarification tank"
+msgstr ""
+
+#: sheets/civil.sheet.in.h:19
+#, fuzzy
+msgid "Reference line"
+msgstr "선 만듦"
+
+#: sheets/civil.sheet.in.h:20
+#, fuzzy
+msgid "Rotor"
+msgstr "합성"
+
+#: sheets/civil.sheet.in.h:21
+#, fuzzy
+msgid "Soil"
+msgstr "실선"
+
+#: sheets/civil.sheet.in.h:22
+#, fuzzy
+msgid "Vertical limiting line"
+msgstr "가로 정렬(_H)"
+
+#: sheets/civil.sheet.in.h:23
+#, fuzzy
+msgid "Vertical rest"
+msgstr "좌우 바꿈"
+
+#: sheets/civil.sheet.in.h:24
+#, fuzzy
+msgid "Vertically aligned arrow"
+msgstr "위아래 바꿈"
+
+#: sheets/civil.sheet.in.h:25
+#, fuzzy
+msgid "Vertically aligned compressor"
+msgstr "가로 정렬(_H)"
+
+#: sheets/civil.sheet.in.h:26
+#, fuzzy
+msgid "Vertically aligned propeller"
+msgstr "가로 정렬(_H)"
+
+#: sheets/civil.sheet.in.h:27
+#, fuzzy
+msgid "Vertically aligned pump"
+msgstr "가로 정렬(_H)"
+
+#: sheets/civil.sheet.in.h:28
+#, fuzzy
+msgid "Vertically aligned valve"
+msgstr "가로 정렬(_H)"
+
+#: sheets/civil.sheet.in.h:29
+msgid "Water level"
+msgstr ""
+
+#: sheets/jigsaw.sheet.in.h:1
+msgid "Jigsaw"
+msgstr ""
+
+#: sheets/jigsaw.sheet.in.h:2
+msgid "Jigsaw - part_iiii"
+msgstr ""
+
+#: sheets/jigsaw.sheet.in.h:3
+msgid "Jigsaw - part_iiio"
+msgstr ""
+
+#: sheets/jigsaw.sheet.in.h:4
+msgid "Jigsaw - part_iioi"
+msgstr ""
+
+#: sheets/jigsaw.sheet.in.h:5
+msgid "Jigsaw - part_iioo"
+msgstr ""
+
+#: sheets/jigsaw.sheet.in.h:6
+msgid "Jigsaw - part_ioii"
+msgstr ""
+
+#: sheets/jigsaw.sheet.in.h:7
+msgid "Jigsaw - part_ioio"
+msgstr ""
+
+#: sheets/jigsaw.sheet.in.h:8
+msgid "Jigsaw - part_iooi"
+msgstr ""
+
+#: sheets/jigsaw.sheet.in.h:9
+msgid "Jigsaw - part_iooo"
+msgstr ""
+
+#: sheets/jigsaw.sheet.in.h:10
+msgid "Jigsaw - part_oiii"
+msgstr ""
+
+#: sheets/jigsaw.sheet.in.h:11
+msgid "Jigsaw - part_oiio"
+msgstr ""
+
+#: sheets/jigsaw.sheet.in.h:12
+msgid "Jigsaw - part_oioi"
+msgstr ""
+
+#: sheets/jigsaw.sheet.in.h:13
+msgid "Jigsaw - part_oioo"
+msgstr ""
+
+#: sheets/jigsaw.sheet.in.h:14
+msgid "Jigsaw - part_ooii"
+msgstr ""
+
+#: sheets/jigsaw.sheet.in.h:15
+msgid "Jigsaw - part_ooio"
+msgstr ""
+
+#: sheets/jigsaw.sheet.in.h:16
+msgid "Jigsaw - part_oooi"
+msgstr ""
+
+#: sheets/jigsaw.sheet.in.h:17
+msgid "Jigsaw - part_oooo"
+msgstr ""
+
+#: sheets/jigsaw.sheet.in.h:18
+msgid "Pieces of a jigsaw"
+msgstr ""
+
+#: sheets/network.sheet.in.h:1
+msgid "24 Port Patch Panel"
+msgstr ""
+
+#: sheets/network.sheet.in.h:2
+msgid "3 1/2 inch diskette"
+msgstr ""
+
+#: sheets/network.sheet.in.h:3
+msgid "ATM switch symbol"
+msgstr ""
+
+#: sheets/network.sheet.in.h:4
+msgid "Antenna for wireless transmission"
+msgstr ""
+
+#: sheets/network.sheet.in.h:5
+#, fuzzy
+msgid "Bigtower PC"
+msgstr "합성"
+
+#: sheets/network.sheet.in.h:6
+#, fuzzy
+msgid "Computer"
+msgstr "가장자리 더하기"
+
+#: sheets/network.sheet.in.h:7
+msgid "Desktop PC"
+msgstr ""
+
+#: sheets/network.sheet.in.h:8
+msgid "Digitizing board"
+msgstr ""
+
+#: sheets/network.sheet.in.h:9
+msgid "Ethernet bus"
+msgstr ""
+
+#: sheets/network.sheet.in.h:10
+msgid "External DAT drive"
+msgstr ""
+
+#: sheets/network.sheet.in.h:11
+#, fuzzy
+msgid "Firewall router"
+msgstr "선 색상:"
+
+#: sheets/network.sheet.in.h:12
+msgid "Laptop PC"
+msgstr ""
+
+#: sheets/network.sheet.in.h:13
+#, fuzzy
+msgid "Miditower PC"
+msgstr "합성"
+
+#: sheets/network.sheet.in.h:14
+#, fuzzy
+msgid "Minitower PC"
+msgstr "합성"
+
+#: sheets/network.sheet.in.h:15
+msgid "Mobile phone"
+msgstr ""
+
+#: sheets/network.sheet.in.h:16
+msgid "Mobile telephony base station"
+msgstr ""
+
+#: sheets/network.sheet.in.h:17
+msgid "Mobile telephony cell"
+msgstr ""
+
+#: sheets/network.sheet.in.h:18
+msgid "Modular switching system"
+msgstr ""
+
+#: sheets/network.sheet.in.h:19
+#, fuzzy
+msgid "Monitor"
+msgstr "합성"
+
+#: sheets/network.sheet.in.h:20
+msgid "Network"
+msgstr ""
+
+#: sheets/network.sheet.in.h:21
+msgid "Network cloud"
+msgstr ""
+
+#: sheets/network.sheet.in.h:22
+msgid "Objects to design network diagrams with"
+msgstr ""
+
+#: sheets/network.sheet.in.h:23
+#, fuzzy
+msgid "Plotter"
+msgstr "가장자리 더하기"
+
+#: sheets/network.sheet.in.h:24
+msgid "RJ45 wall-plug"
+msgstr ""
+
+#: sheets/network.sheet.in.h:25
+msgid "Router symbol"
+msgstr ""
+
+#: sheets/network.sheet.in.h:26
+#, fuzzy
+msgid "Simple modem"
+msgstr "프린터 선택"
+
+#: sheets/network.sheet.in.h:27
+#, fuzzy
+msgid "Simple printer"
+msgstr "프린터 선택"
+
+#: sheets/network.sheet.in.h:28
+#, fuzzy
+msgid "Speaker with integrated amplifier"
+msgstr "가로 정렬(_H)"
+
+#: sheets/network.sheet.in.h:29
+#, fuzzy
+msgid "Speaker without amplifier"
+msgstr "가로 정렬(_H)"
+
+#: sheets/network.sheet.in.h:30
+msgid "Stackable hub or switch"
+msgstr ""
+
+#: sheets/network.sheet.in.h:31
+#, fuzzy
+msgid "Storage"
+msgstr "비율"
+
+#: sheets/network.sheet.in.h:32
+msgid "Switch symbol"
+msgstr ""
+
+#: sheets/network.sheet.in.h:33
+msgid "Telephone"
+msgstr ""
+
+#: sheets/network.sheet.in.h:34
+msgid "UNIX workstation"
+msgstr ""
+
+#: sheets/network.sheet.in.h:35
+#, fuzzy
+msgid "WAN connection"
+msgstr "연결점:"
+
+#: sheets/network.sheet.in.h:36
+#, fuzzy
+msgid "WAN link"
+msgstr "연결점:"
+
+#: sheets/network.sheet.in.h:37
+msgid "Wall-plug for the scEAD cabling system"
+msgstr ""
+
+#: sheets/network.sheet.in.h:38
+msgid "Workstation monitor"
+msgstr ""
+
+#: sheets/network.sheet.in.h:39
+msgid "ZIP disk"
+msgstr ""
+
+#: sheets/sybase.sheet.in.h:1
+msgid "Log transfer manager or rep agent"
+msgstr ""
+
+#: sheets/sybase.sheet.in.h:2
+msgid "Objects to design Sybase replication domain diagrams with"
+msgstr ""
+
+#: sheets/sybase.sheet.in.h:3
+msgid "Replication server manager"
+msgstr ""
+
+#: sheets/sybase.sheet.in.h:4
+msgid "Stable storage device"
+msgstr ""
+
+#: sheets/sybase.sheet.in.h:5
+#, fuzzy
+msgid "Sybase"
+msgstr "괘선"
+
+#: sheets/sybase.sheet.in.h:6
+msgid "Sybase client application"
+msgstr ""
+
+#: sheets/sybase.sheet.in.h:7
+msgid "Sybase dataserver"
+msgstr ""
+
+#: sheets/sybase.sheet.in.h:8
+msgid "Sybase replication server"
+msgstr ""
+
+#~ msgid "Untitled-%d"
+#~ msgstr "제목없슴-%d"
+
+#, fuzzy
+#~ msgid "Export file name to use"
+#~ msgstr "읽어들인 파일을 저장하고 마칩니다"
+
+#, fuzzy
+#~ msgid "Quiet operation"
+#~ msgstr "작동 안보임"
+
+#, fuzzy
+#~ msgid ""
+#~ "Error: No arguments found.\n"
+#~ "Run '%s --help' to see a full list of available command line options.\n"
+#~ msgstr ""
+#~ "옵션 %s에 오류가 있습니다 : %s. \n"
+#~ "'%s --help'를 실행시켜서 명령행 옵션의 전체목록을 참조하십시오.\n"
+
+#, fuzzy
+#~ msgid ""
+#~ "%s error: must specify only one of -t or -o.\n"
+#~ "Run '%s --help' to see a full list of available command line options.\n"
+#~ msgstr ""
+#~ "옵션 %s에 오류가 있습니다 : %s. \n"
+#~ "'%s --help'를 실행시켜서 명령행 옵션의 전체목록을 참조하십시오.\n"
+
+#, fuzzy
+#~ msgid "%s error: no input file."
+#~ msgstr "올바른 입력 파일이 필요합니다\n"
+
+#, fuzzy
+#~ msgid "%s error: only one input file expected."
+#~ msgstr "올바른 입력 파일이 필요합니다\n"
+
+#, fuzzy
+#~ msgid "Background Colour"
+#~ msgstr "배경 색상:"
+
+#~ msgid "No object menu"
+#~ msgstr "객체 메뉴 없슴"
+
+#~ msgid "Create Text"
+#~ msgstr "문자열 만듦"
+
+#~ msgid "Create Ellipse"
+#~ msgstr "타원 만듦"
+
+#~ msgid "Create Polygon"
+#~ msgstr "다각형 만듦"
+
+#, fuzzy
+#~ msgid "Create Beziergon"
+#~ msgstr "베지어선 만듦"
+
+#~ msgid "Create Arc"
+#~ msgstr "호 만듦"
+
+#~ msgid "Create Zigzagline"
+#~ msgstr "지그재그 만듦"
+
+#~ msgid "Create Polyline"
+#~ msgstr "연결선 만듦"
+
+#~ msgid "Create Bezierline"
+#~ msgstr "베지어선 만듦"
+
+#~ msgid "Create Image"
+#~ msgstr "그림 만듦"
+
+#~ msgid "_New diagram"
+#~ msgstr "새 도표(_N)"
+
+#, fuzzy
+#~ msgid "_Diagram tree"
+#~ msgstr "도표 편집기"
+
+#, fuzzy
+#~ msgid "Show diagram tree"
+#~ msgstr "새 도표(_N)"
+
+#, fuzzy
+#~ msgid "_Sheets and Objects..."
+#~ msgstr "표준 객체"
+
+#, fuzzy
+#~ msgid "P_lugins"
+#~ msgstr "플러그인"
+
+#~ msgid "Page Set_up..."
+#~ msgstr "쪽 설정(_u)..."
+
+#~ msgid "_Print Diagram..."
+#~ msgstr "도표 인쇄(_P)..."
+
+#~ msgid "Copy Text"
+#~ msgstr "문자열 복사"
+
+#~ msgid "Cut Text"
+#~ msgstr "문자열 자름"
+
+#~ msgid "Paste _Text"
+#~ msgstr "문자열 붙임(_T)"
+
+#~ msgid "Zoom _In"
+#~ msgstr "확대(_I)"
+
+#~ msgid "Zoom in 50%"
+#~ msgstr "2배 확대"
+
+#~ msgid "Zoom _Out"
+#~ msgstr "축소(_O)"
+
+#~ msgid "Zoom out 50%"
+#~ msgstr "2배 축소"
+
+#~ msgid "_Zoom"
+#~ msgstr "확대(_Z)"
+
+#~ msgid "_AntiAliased"
+#~ msgstr "안티얼라이싱(_A)"
+
+#, fuzzy
+#~ msgid "Show _Grid"
+#~ msgstr "가장자리 보임:"
+
+#~ msgid "Show _Rulers"
+#~ msgstr "눈금자 보기(_R)"
+
+#~ msgid "Show _Connection Points"
+#~ msgstr "연결점 보기(_C)"
+
+#~ msgid "Top"
+#~ msgstr "위"
+
+#~ msgid "Bottom"
+#~ msgstr "아래"
+
+#~ msgid "Send to _Back"
+#~ msgstr "뒤로 보냄(_B)"
+
+#~ msgid "Bring to _Front"
+#~ msgstr "앞으로 보냄(_F)"
+
+#, fuzzy
+#~ msgid "Send Backwards"
+#~ msgstr "뒤로 보냄(_B)"
+
+#~ msgid "_Group"
+#~ msgstr "묶기(_G)"
+
+#~ msgid "_Ungroup"
+#~ msgstr "풀기(_U)"
+
+#~ msgid "Align _Horizontal"
+#~ msgstr "가로 정렬(_H)"
+
+#~ msgid "Align _Vertical"
+#~ msgstr "세로 정렬(_V)"
+
+#~ msgid "_Layers"
+#~ msgstr "계층(_L)"
+
+#, fuzzy
+#~ msgid "_Select"
+#~ msgstr "선택"
+
+#, fuzzy
+#~ msgid "_Objects"
+#~ msgstr "/객체(_O)"
+
+#, fuzzy
+#~ msgid "_Tools"
+#~ msgstr "도구"
+
+#, fuzzy
+#~ msgid "_Dialogs"
+#~ msgstr "/대화상자(_D)"
+
+#, fuzzy
+#~ msgid "/View/Diagram Properties..."
+#~ msgstr "/대화상자/속성(_P)"
+
+#~ msgid "/Objects/Align Horizontal/Center"
+#~ msgstr "/객체/수평 정렬/중간"
+
+#~ msgid "/Objects/Align Horizontal/Equal Distance"
+#~ msgstr "/객체/수평 정렬/"
+
+#~ msgid "/_Dialogs"
+#~ msgstr "/대화상자(_D)"
+
+#~ msgid "/Dialogs/_Properties"
+#~ msgstr "/대화상자/속성(_P)"
+
+#~ msgid "Apply"
+#~ msgstr "적용"
+
+#, fuzzy
+#~ msgid "Error occured while printing"
+#~ msgstr "PNG를 쓰는중 오류가 발생했습니다"
+
+#, fuzzy
+#~ msgid "Show at startup:"
+#~ msgstr "시작할때 자동 읽기"
+
+#, fuzzy
+#~ msgid "Default width:"
+#~ msgstr "선 굵기:"
+
+#, fuzzy
+#~ msgid "Can't open history file for writing."
+#~ msgstr "열수 업습니다: '%s'  쓸수없슴.\n"
+
+#~ msgid "Length: "
+#~ msgstr "길이: "
+
+#~ msgid "Width: "
+#~ msgstr "폭: "
+
+#, fuzzy
+#~ msgid "Line gaps"
+#~ msgstr "선 형태:"
+
+#, fuzzy
+#~ msgid "Start at object edge"
+#~ msgstr "표준 객체"
+
+#, fuzzy
+#~ msgid "Helvetica"
+#~ msgstr "좌우 바꿈"
+
+#~ msgid "Delete"
+#~ msgstr "지움"
+
+#, fuzzy
+#~ msgid "Could not load XSLT library (%s) : %s"
+#~ msgstr ""
+#~ "플러그인 `%s'를 읽을수 없습니다\n"
+#~ "%s"
+
+#, fuzzy
+#~ msgid "A pnp bipolar transistor"
+#~ msgstr "방향"
+
+#, fuzzy
+#~ msgid "Create a flow"
+#~ msgstr "상자 만듦"
+
+#, fuzzy
+#~ msgid "Create a function"
+#~ msgstr "선 만듦"
+
+#, fuzzy
+#~ msgid "A macro entry step"
+#~ msgstr "템플릿"
+
+#, fuzzy
+#~ msgid "A macro exit step"
+#~ msgstr "템플릿"
+
+#, fuzzy
+#~ msgid "A regular step"
+#~ msgstr "템플릿"
+
+#, fuzzy
+#~ msgid "A transition"
+#~ msgstr "방향"
+
+#, fuzzy
+#~ msgid "A Nand gate"
+#~ msgstr "집합"
+
+#, fuzzy
+#~ msgid "A Xor gate"
+#~ msgstr "집합"
+
+#, fuzzy
+#~ msgid "An And gate"
+#~ msgstr "집합"
+
+#, fuzzy
+#~ msgid "Create a branch"
+#~ msgstr "호 만듦"
+
+#, fuzzy
+#~ msgid "Create a class"
+#~ msgstr "템플릿 클래스"
+
+#, fuzzy
+#~ msgid "Create a component"
+#~ msgstr "다각형 만듦"
+
+#, fuzzy
+#~ msgid "Create a fork/union"
+#~ msgstr "선 만듦"
+
+#, fuzzy
+#~ msgid "Create a lifeline"
+#~ msgstr "베지어선 만듦"
+
+#, fuzzy
+#~ msgid "Create a message"
+#~ msgstr "그림 만듦"
+
+#, fuzzy
+#~ msgid "Create a node"
+#~ msgstr "선 만듦"
+
+#, fuzzy
+#~ msgid "Create a note"
+#~ msgstr "선 만듦"
+
+#, fuzzy
+#~ msgid "Create a state"
+#~ msgstr "선 만듦"
+
+#, fuzzy
+#~ msgid "Create a template class"
+#~ msgstr "템플릿 클래스"
+
+#, fuzzy
+#~ msgid "Create a use case"
+#~ msgstr "그림 만듦"
+
+#, fuzzy
+#~ msgid "Create an activity"
+#~ msgstr "새 도표를 만듭니다"
+
+#, fuzzy
+#~ msgid "Create an actor"
+#~ msgstr "새 도표를 만듭니다"
+
+#, fuzzy
+#~ msgid "Create an object"
+#~ msgstr "선 만듦"
+
+#~ msgid "/View/_Visible Grid"
+#~ msgstr "/보기/격자 보기"
+
+#~ msgid "Corner rounding:"
+#~ msgstr "가장자리 둥글게함:"
+
+#~ msgid "Shear angle:"
+#~ msgstr "각도 변경:"
+
+#~ msgid "Begin"
+#~ msgstr "시작"
+
+#~ msgid "End"
+#~ msgstr "끝"
+
+#, fuzzy
+#~ msgid "A Diagram Editor"
+#~ msgstr "도표 편집기"
+
+#~ msgid "Image file:"
+#~ msgstr "그림 파일:"
+
+#~ msgid "Keep aspect ratio:"
+#~ msgstr "비율 유지:"
+
+#~ msgid "Maintainer: James Henstridge"
+#~ msgstr "관리자: James Henstridge"
+
+#~ msgid "Fontsize:"
+#~ msgstr "글꼴 크기:"
+
+#~ msgid "Print Diagram"
+#~ msgstr "도표 인쇄"
+
+#, fuzzy
+#~ msgid "An error occured while creating the print context"
+#~ msgstr "PNG를 쓰는중 오류가 발생했습니다"
+
+#~ msgid "yes"
+#~ msgstr "예"
+
+#~ msgid "no"
+#~ msgstr "아니오"
+
+#~ msgid "Load"
+#~ msgstr "읽기"
+
+#~ msgid "Unload"
+#~ msgstr "제거하기"
+
+#, fuzzy
+#~ msgid "<Toolbox>/File/Exit"
+#~ msgstr "파일"
+
+#~ msgid ""
+#~ "Warning no X Font for %s found, \n"
+#~ "using %s instead.\n"
+#~ msgstr ""
+#~ "%s에서 사용할 X 글꼴이 업습니다. \n"
+#~ "%s를 대신 사용합니다.\n"
+
+#, fuzzy
+#~ msgid "Warning: No X fonts found.  The world is ending."
+#~ msgstr ""
+#~ "%s에서 사용할 X 글꼴이 업습니다. \n"
+#~ "%s를 대신 사용합니다.\n"
+
+#~ msgid "Quit, are you sure?"
+#~ msgstr "정말로 종료하시겠습니까?"
+
+#~ msgid "Quit"
+#~ msgstr "종료"
+
+#~ msgid "Really close?"
+#~ msgstr "정말로 닫겠습니까?"
+
+#, fuzzy
+#~ msgid "Down"
+#~ msgstr "아래로 이동"
+
+#, fuzzy
+#~ msgid "_Remove"
+#~ msgstr "삭제"
+
+#~ msgid "`%s' is not a directory"
+#~ msgstr "`%s'는 자료방이 아닙니다"
+
+#, fuzzy
+#~ msgid "Number of processes:"
+#~ msgstr "취소하기 갯수:"
+
+#, fuzzy
+#~ msgid "multiple"
+#~ msgstr "중복"
+
+#, fuzzy
+#~ msgid "Single"
+#~ msgstr "프린터"
+
+#, fuzzy
+#~ msgid "Multiple"
+#~ msgstr "중복"
+
+#, fuzzy
+#~ msgid "Instantiation"
+#~ msgstr "방향"
+
+#, fuzzy
+#~ msgid "Unidirectional"
+#~ msgstr "합성"
+
+#, fuzzy
+#~ msgid "Interaction name:"
+#~ msgstr "사용자 인터페이스"
+
+#, fuzzy
+#~ msgid "relation"
+#~ msgstr "작동"
+
+#, fuzzy
+#~ msgid "Interface functions"
+#~ msgstr "선 만듦"
+
+#, fuzzy
+#~ msgid "Interfaces"
+#~ msgstr "사용자 인터페이스"
+
+#, fuzzy
+#~ msgid "Interface"
+#~ msgstr "사용자 인터페이스"
+
+#, fuzzy
+#~ msgid "Interface name:"
+#~ msgstr "사용자 인터페이스"
+
+#, fuzzy
+#~ msgid "Interface messages"
+#~ msgstr "삭제"
+
+#, fuzzy
+#~ msgid "Message parameters"
+#~ msgstr "인자:"
+
+#, fuzzy
+#~ msgid "Functions"
+#~ msgstr "연결점:"
+
+#, fuzzy
+#~ msgid "Messages"
+#~ msgstr "삭제"
+
+#, fuzzy
+#~ msgid "Process name:"
+#~ msgstr "클래스이름:"
+
+#, fuzzy
+#~ msgid "Process reference name:"
+#~ msgstr "설정"
+
+#, fuzzy
+#~ msgid "Module name:"
+#~ msgstr "파일 이름:"
+
+#, fuzzy
+#~ msgid "Parameter"
+#~ msgstr "인자:"
+
+#~ msgid "Grid:"
+#~ msgstr "격자:"
+
+#~ msgid ""
+#~ "No such file found\n"
+#~ "%s\n"
+#~ msgstr ""
+#~ "파일이 없습니다\n"
+#~ "%s\n"
+
+#~ msgid "Import from XFig"
+#~ msgstr "XFig에서 변환"
+
+#, fuzzy
+#~ msgid "File/New diagram"
+#~ msgstr "새 도표(_N)"
+
+#, fuzzy
+#~ msgid "File/Save As..."
+#~ msgstr "/파일/쪽 설정(_u)..."
+
+#, fuzzy
+#~ msgid "File/Close"
+#~ msgstr "/파일/닫기(_C)"
+
+#, fuzzy
+#~ msgid "View/New View"
+#~ msgstr "/보기/새 보기(_V)"
+
+#~ msgid "/Edit/Copy"
+#~ msgstr "/편집/복사"
+
+#~ msgid "/Edit/Paste"
+#~ msgstr "/편집/붙이기"
+
+#~ msgid "/Edit/Delete"
+#~ msgstr "/편집/지우기"
+
+#~ msgid "/Edit/Paste Text"
+#~ msgstr "/편집/문자열 붙이기"
+
+#~ msgid "/Objects/Group"
+#~ msgstr "/객체/묶음"
+
+#~ msgid "/Objects/Ungroup"
+#~ msgstr "/객체/품"
+
+#~ msgid "/View/Show Rulers"
+#~ msgstr "/보기/눈금자 보기"
+
+#~ msgid "/View/Visible Grid"
+#~ msgstr "/보기/격자 보기"
+
+#~ msgid "/View/Snap To Grid"
+#~ msgstr "/보기/끊긴 격자"
+
+#~ msgid "/View/Show Connection Points"
+#~ msgstr "/보기/연결점 보임"
+
+#~ msgid "/View/AntiAliased"
+#~ msgstr "/보기/안티얼라이싱"
+
+#, fuzzy
+#~ msgid "/Edit/tearoff"
+#~ msgstr "/편집/붙이기"
+
+#, fuzzy
+#~ msgid "/View/tearoff"
+#~ msgstr "/보기/구분자1"
+
+#, fuzzy
+#~ msgid "/View/Zoom/tearoff"
+#~ msgstr "/보기/확대(_Z)"
+
+#~ msgid "/View/sep1"
+#~ msgstr "/보기/구분자1"
+
+#, fuzzy
+#~ msgid "/Select/tearoff"
+#~ msgstr "/선택/반대"
+
+#~ msgid "/Select/sep1"
+#~ msgstr "/선택/구분자1"
+
+#, fuzzy
+#~ msgid "/Objects/tearoff1"
+#~ msgstr "/객체/구분자1"
+
+#~ msgid "/Objects/sep1"
+#~ msgstr "/객체/구분자1"
+
+#, fuzzy
+#~ msgid "/Objects/Align Horizontal/tearoff"
+#~ msgstr "/객체/수평 정렬/중간"
+
+#, fuzzy
+#~ msgid "/Objects/Align Vertical/tearoff"
+#~ msgstr "/객체/수직 정렬/중간"
+
+#, fuzzy
+#~ msgid "/Tools/tearoff"
+#~ msgstr "/도구/상자"
+
+#, fuzzy
+#~ msgid "/Dialogs/tearoff"
+#~ msgstr "/대화상자/계층(_L)"
+
+#~ msgid "Asynchronous"
+#~ msgstr "비동기"
+
+#~ msgid "Grid y size:"
+#~ msgstr "격자 세로 크기:"
+
+#~ msgid "Edit Grid..."
+#~ msgstr "격자 편집..."
+
+#~ msgid "/View/Edit Grid..."
+#~ msgstr "/보기/격자 편집..."

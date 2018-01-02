@@ -1,0 +1,4 @@
+#define DOCKER_NAME "Docker Engine"
+
+#include "common.rc"
+#include "event_messages.rc"

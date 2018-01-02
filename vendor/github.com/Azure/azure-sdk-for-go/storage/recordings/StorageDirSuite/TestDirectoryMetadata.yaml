@@ -1,0 +1,168 @@
+---
+version: 1
+rwmutex: {}
+interactions:
+- request:
+    body: ""
+    form: {}
+    headers:
+      Authorization:
+      - SharedKey golangrocksonazure:CQQmxDZoUsesGytUKxHryivPOlnfXUmtfUJ0EIFkwYs=
+      User-Agent:
+      - Go/go1.9beta1 (amd64-windows) azure-storage-go/10.0.2 api-version/2016-05-31
+        file
+      x-ms-date:
+      - Thu, 20 Jul 2017 23:34:05 GMT
+      x-ms-version:
+      - 2016-05-31
+    url: https://golangrocksonazure.file.core.windows.net/share-37storagedirsuitetestdirectorymetadata?restype=share
+    method: PUT
+  response:
+    body: ""
+    headers:
+      Date:
+      - Thu, 20 Jul 2017 23:34:05 GMT
+      Etag:
+      - '"0x8D4CFC7CF7E999C"'
+      Last-Modified:
+      - Thu, 20 Jul 2017 23:34:05 GMT
+      Server:
+      - Windows-Azure-File/1.0 Microsoft-HTTPAPI/2.0
+      X-Ms-Request-Id:
+      - f27d5ce1-001a-00eb-03b0-01f767000000
+      X-Ms-Version:
+      - 2016-05-31
+    status: 201 Created
+    code: 201
+- request:
+    body: ""
+    form: {}
+    headers:
+      Authorization:
+      - SharedKey golangrocksonazure:SkI6Qoy5QmdaSQ1RRzJCgTMRK4x3eCKXQXCUIYory20=
+      User-Agent:
+      - Go/go1.9beta1 (amd64-windows) azure-storage-go/10.0.2 api-version/2016-05-31
+        file
+      x-ms-date:
+      - Thu, 20 Jul 2017 23:34:05 GMT
+      x-ms-version:
+      - 2016-05-31
+    url: https://golangrocksonazure.file.core.windows.net/share-37storagedirsuitetestdirectorymetadata/testdir?restype=directory
+    method: PUT
+  response:
+    body: ""
+    headers:
+      Date:
+      - Thu, 20 Jul 2017 23:34:05 GMT
+      Etag:
+      - '"0x8D4CFC7CE156EF0"'
+      Last-Modified:
+      - Thu, 20 Jul 2017 23:34:02 GMT
+      Server:
+      - Windows-Azure-File/1.0 Microsoft-HTTPAPI/2.0
+      X-Ms-Request-Id:
+      - f27d5ce3-001a-00eb-04b0-01f767000000
+      X-Ms-Version:
+      - 2016-05-31
+    status: 201 Created
+    code: 201
+- request:
+    body: ""
+    form: {}
+    headers:
+      Authorization:
+      - SharedKey golangrocksonazure:4lDxiD8feNavkwaNfPEuhfzB0g54/8aogwUFqgYlxmk=
+      User-Agent:
+      - Go/go1.9beta1 (amd64-windows) azure-storage-go/10.0.2 api-version/2016-05-31
+        file
+      x-ms-date:
+      - Thu, 20 Jul 2017 23:34:05 GMT
+      x-ms-meta-another:
+      - anothervalue
+      x-ms-meta-something:
+      - somethingvalue
+      x-ms-version:
+      - 2016-05-31
+    url: https://golangrocksonazure.file.core.windows.net/share-37storagedirsuitetestdirectorymetadata/testdir?comp=metadata&restype=directory
+    method: PUT
+  response:
+    body: ""
+    headers:
+      Date:
+      - Thu, 20 Jul 2017 23:34:05 GMT
+      Etag:
+      - '"0x8D4CFC7CE21A5EF"'
+      Last-Modified:
+      - Thu, 20 Jul 2017 23:34:02 GMT
+      Server:
+      - Windows-Azure-File/1.0 Microsoft-HTTPAPI/2.0
+      X-Ms-Request-Id:
+      - f27d5ce4-001a-00eb-05b0-01f767000000
+      X-Ms-Version:
+      - 2016-05-31
+    status: 200 OK
+    code: 200
+- request:
+    body: ""
+    form: {}
+    headers:
+      Authorization:
+      - SharedKey golangrocksonazure:RIE5PdlG56ASKbeUTsGbNebSo58UbCIiNF+JGcmVXqM=
+      User-Agent:
+      - Go/go1.9beta1 (amd64-windows) azure-storage-go/10.0.2 api-version/2016-05-31
+        file
+      x-ms-date:
+      - Thu, 20 Jul 2017 23:34:05 GMT
+      x-ms-version:
+      - 2016-05-31
+    url: https://golangrocksonazure.file.core.windows.net/share-37storagedirsuitetestdirectorymetadata/testdir?restype=directory
+    method: HEAD
+  response:
+    body: ""
+    headers:
+      Date:
+      - Thu, 20 Jul 2017 23:34:05 GMT
+      Etag:
+      - '"0x8D4CFC7CE21A5EF"'
+      Last-Modified:
+      - Thu, 20 Jul 2017 23:34:02 GMT
+      Server:
+      - Windows-Azure-File/1.0 Microsoft-HTTPAPI/2.0
+      X-Ms-Meta-Another:
+      - anothervalue
+      X-Ms-Meta-Something:
+      - somethingvalue
+      X-Ms-Request-Id:
+      - f27d5ce5-001a-00eb-06b0-01f767000000
+      X-Ms-Version:
+      - 2016-05-31
+    status: 200 OK
+    code: 200
+- request:
+    body: ""
+    form: {}
+    headers:
+      Authorization:
+      - SharedKey golangrocksonazure:2Q6md5/MFa1cjJcmyZxc0Tmq7W9CZbU8YEC3gsRUwNE=
+      User-Agent:
+      - Go/go1.9beta1 (amd64-windows) azure-storage-go/10.0.2 api-version/2016-05-31
+        file
+      x-ms-date:
+      - Thu, 20 Jul 2017 23:34:05 GMT
+      x-ms-version:
+      - 2016-05-31
+    url: https://golangrocksonazure.file.core.windows.net/share-37storagedirsuitetestdirectorymetadata?restype=share
+    method: DELETE
+  response:
+    body: ""
+    headers:
+      Date:
+      - Thu, 20 Jul 2017 23:34:05 GMT
+      Server:
+      - Windows-Azure-File/1.0 Microsoft-HTTPAPI/2.0
+      X-Ms-Request-Id:
+      - f27d5ce6-001a-00eb-07b0-01f767000000
+      X-Ms-Version:
+      - 2016-05-31
+    status: 202 Accepted
+    code: 202

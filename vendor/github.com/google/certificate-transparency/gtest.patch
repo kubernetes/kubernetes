@@ -1,0 +1,22 @@
+Index: include/gtest/internal/gtest-port.h
+===================================================================
+--- include/gtest/internal/gtest-port.h	(revision 692)
++++ include/gtest/internal/gtest-port.h	(working copy)
+@@ -345,6 +345,8 @@
+ # define GTEST_OS_OPENBSD 1
+ #elif defined __QNX__
+ # define GTEST_OS_QNX 1
++#elif defined __FreeBSD__
++# define GTEST_OS_FREEBSD 1
+ #endif  // __CYGWIN__
+ 
+ // Macros for disabling Microsoft Visual C++ warnings.
+@@ -791,7 +793,7 @@
+      (GTEST_OS_MAC && !GTEST_OS_IOS) || GTEST_OS_IOS_SIMULATOR || \
+      (GTEST_OS_WINDOWS_DESKTOP && _MSC_VER >= 1400) || \
+      GTEST_OS_WINDOWS_MINGW || GTEST_OS_AIX || GTEST_OS_HPUX || \
+-     GTEST_OS_OPENBSD || GTEST_OS_QNX)
++     GTEST_OS_OPENBSD || GTEST_OS_QNX || GTEST_OS_FREEBSD)
+ # define GTEST_HAS_DEATH_TEST 1
+ # include <vector>  // NOLINT
+ #endif

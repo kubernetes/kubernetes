@@ -1,0 +1,17 @@
+UNAME := $(shell uname)
+ifeq ($(UNAME),FreeBSD)
+EXTRA_LDFLAGS="-lexecinfo"
+endif
+
+all: Makefile
+	$(MAKE)
+# FIXME: for now, install even though checks fail on FreeBSD
+#	make check
+	$(MAKE) install
+
+Makefile: configure
+	WARN_OVERRIDES="-Wno-error"
+	./configure --prefix=$(INSTALL_DIR) --disable-shared --enable-static CPPFLAGS="-I${INSTALL_DIR}/include" LDFLAGS="-L${INSTALL_DIR}/lib ${EXTRA_LDFLAGS}" CXXFLAGS="$(WARN_OVERRIDES) -fPIC" CFLAGS="$(WARN_OVERRIDES) -fPIC"
+
+configure: configure.ac
+	autoreconf -vi

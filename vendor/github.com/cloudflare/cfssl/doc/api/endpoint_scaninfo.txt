@@ -1,0 +1,85 @@
+THE SCANINFO ENDPOINT
+
+Endpoint: /api/v1/cfssl/scaninfo
+Method:   GET
+
+Result:
+
+    The returned result is a JSON object with keys for each scan family. For
+    each family, there exists a `description` containing a string describing the
+    family and a `scanners` object mapping each of the family's scanners to
+    an object containing a `description` string.
+
+Example:
+
+    $ curl -d '{"label": "primary"}' \
+          ${CFSSL_HOST}/api/v1/cfssl/sign  \
+          | python -m json.tool
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+100  1412  100  1412    0     0   391k      0 --:--:-- --:--:-- --:--:--  459k
+{
+    "errors": [],
+    "messages": [],
+    "result": {
+        "Broad": {
+            "description": "Large scale scans of TLS hosts",
+            "scanners": {
+                "IntermediateCAs": {
+                    "description": "Scans a CIDR IP range for unknown Intermediate CAs"
+                }
+            }
+        },
+        "Connectivity": {
+            "description": "Scans for basic connectivity with the host through DNS and TCP/TLS dials",
+            "scanners": {
+                "CloudFlareStatus": {
+                    "description": "Host is on CloudFlare"
+                },
+                "DNSLookup": {
+                    "description": "Host can be resolved through DNS"
+                },
+                "TCPDial": {
+                    "description": "Host accepts TCP connection"
+                },
+                "TLSDial": {
+                    "description": "Host can perform TLS handshake"
+                }
+            }
+        },
+        "PKI": {
+            "description": "Scans for the Public Key Infrastructure",
+            "scanners": {
+                "ChainExpiration": {
+                    "description": "Host's chain hasn't expired and won't expire in the next 30 days"
+                },
+                "ChainValidation": {
+                    "description": "All certificates in host's chain are valid"
+                },
+                "MultipleCerts": {
+                    "description": "Host serves same certificate chain across all IPs"
+                }
+            }
+        },
+        "TLSHandshake": {
+            "description": "Scans for host's SSL/TLS version and cipher suite negotiation",
+            "scanners": {
+                "CipherSuite": {
+                    "description": "Determines host's cipher suites accepted and prefered order"
+                },
+                "SigAlgs": {
+                    "description": "Determines host's accepted signature and hash algorithms"
+                }
+            }
+        },
+        "TLSSession": {
+            "description": "Scans host's implementation of TLS session resumption using session tickets/session IDs",
+            "scanners": {
+                "SessionResume": {
+                    "description": "Host is able to resume sessions across all addresses"
+                }
+            }
+        }
+    },
+    "success": true
+}

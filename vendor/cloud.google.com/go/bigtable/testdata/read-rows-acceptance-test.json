@@ -1,0 +1,1178 @@
+{
+  "tests": [
+    {
+      "name": "invalid - no commit",
+      "chunks": [
+        "row_key: \"RK\"\nfamily_name: \u003c\n  value: \"A\"\n\u003e\nqualifier: \u003c\n  value: \"C\"\n\u003e\ntimestamp_micros: 100\nvalue: \"value-VAL\"\ncommit_row: false\n"
+      ],
+      "results": [
+        {
+          "rk": "",
+          "fm": "",
+          "qual": "",
+          "ts": 0,
+          "value": "",
+          "label": "",
+          "error": true
+        }
+      ]
+    },
+    {
+      "name": "invalid - no cell key before commit",
+      "chunks": [
+        "commit_row: true\n"
+      ],
+      "results": [
+        {
+          "rk": "",
+          "fm": "",
+          "qual": "",
+          "ts": 0,
+          "value": "",
+          "label": "",
+          "error": true
+        }
+      ]
+    },
+    {
+      "name": "invalid - no cell key before value",
+      "chunks": [
+        "timestamp_micros: 100\nvalue: \"value-VAL\"\ncommit_row: false\n"
+      ],
+      "results": [
+        {
+          "rk": "",
+          "fm": "",
+          "qual": "",
+          "ts": 0,
+          "value": "",
+          "label": "",
+          "error": true
+        }
+      ]
+    },
+    {
+      "name": "invalid - new col family must specify qualifier",
+      "chunks": [
+        "row_key: \"RK\"\nfamily_name: \u003c\n  value: \"A\"\n\u003e\nqualifier: \u003c\n  value: \"C\"\n\u003e\ntimestamp_micros: 101\nvalue: \"value-VAL_1\"\ncommit_row: false\n",
+        "family_name: \u003c\n  value: \"B\"\n\u003e\ntimestamp_micros: 102\nvalue: \"value-VAL_2\"\ncommit_row: true\n"
+      ],
+      "results": [
+        {
+          "rk": "",
+          "fm": "",
+          "qual": "",
+          "ts": 0,
+          "value": "",
+          "label": "",
+          "error": true
+        }
+      ]
+    },
+    {
+      "name": "bare commit implies ts=0",
+      "chunks": [
+        "row_key: \"RK\"\nfamily_name: \u003c\n  value: \"A\"\n\u003e\nqualifier: \u003c\n  value: \"C\"\n\u003e\ntimestamp_micros: 100\nvalue: \"value-VAL\"\ncommit_row: false\n",
+        "commit_row: true\n"
+      ],
+      "results": [
+        {
+          "rk": "RK",
+          "fm": "A",
+          "qual": "C",
+          "ts": 100,
+          "value": "value-VAL",
+          "label": "",
+          "error": false
+        },
+        {
+          "rk": "RK",
+          "fm": "A",
+          "qual": "C",
+          "ts": 0,
+          "value": "",
+          "label": "",
+          "error": false
+        }
+      ]
+    },
+    {
+      "name": "simple row with timestamp",
+      "chunks": [
+        "row_key: \"RK\"\nfamily_name: \u003c\n  value: \"A\"\n\u003e\nqualifier: \u003c\n  value: \"C\"\n\u003e\ntimestamp_micros: 100\nvalue: \"value-VAL\"\ncommit_row: true\n"
+      ],
+      "results": [
+        {
+          "rk": "RK",
+          "fm": "A",
+          "qual": "C",
+          "ts": 100,
+          "value": "value-VAL",
+          "label": "",
+          "error": false
+        }
+      ]
+    },
+    {
+      "name": "missing timestamp, implied ts=0",
+      "chunks": [
+        "row_key: \"RK\"\nfamily_name: \u003c\n  value: \"A\"\n\u003e\nqualifier: \u003c\n  value: \"C\"\n\u003e\nvalue: \"value-VAL\"\ncommit_row: true\n"
+      ],
+      "results": [
+        {
+          "rk": "RK",
+          "fm": "A",
+          "qual": "C",
+          "ts": 0,
+          "value": "value-VAL",
+          "label": "",
+          "error": false
+        }
+      ]
+    },
+    {
+      "name": "empty cell value",
+      "chunks": [
+        "row_key: \"RK\"\nfamily_name: \u003c\n  value: \"A\"\n\u003e\nqualifier: \u003c\n  value: \"C\"\n\u003e\ncommit_row: true\n"
+      ],
+      "results": [
+        {
+          "rk": "RK",
+          "fm": "A",
+          "qual": "C",
+          "ts": 0,
+          "value": "",
+          "label": "",
+          "error": false
+        }
+      ]
+    },
+    {
+      "name": "two unsplit cells",
+      "chunks": [
+        "row_key: \"RK\"\nfamily_name: \u003c\n  value: \"A\"\n\u003e\nqualifier: \u003c\n  value: \"C\"\n\u003e\ntimestamp_micros: 101\nvalue: \"value-VAL_1\"\ncommit_row: false\n",
+        "timestamp_micros: 102\nvalue: \"value-VAL_2\"\ncommit_row: true\n"
+      ],
+      "results": [
+        {
+          "rk": "RK",
+          "fm": "A",
+          "qual": "C",
+          "ts": 101,
+          "value": "value-VAL_1",
+          "label": "",
+          "error": false
+        },
+        {
+          "rk": "RK",
+          "fm": "A",
+          "qual": "C",
+          "ts": 102,
+          "value": "value-VAL_2",
+          "label": "",
+          "error": false
+        }
+      ]
+    },
+    {
+      "name": "two qualifiers",
+      "chunks": [
+        "row_key: \"RK\"\nfamily_name: \u003c\n  value: \"A\"\n\u003e\nqualifier: \u003c\n  value: \"C\"\n\u003e\ntimestamp_micros: 101\nvalue: \"value-VAL_1\"\ncommit_row: false\n",
+        "qualifier: \u003c\n  value: \"D\"\n\u003e\ntimestamp_micros: 102\nvalue: \"value-VAL_2\"\ncommit_row: true\n"
+      ],
+      "results": [
+        {
+          "rk": "RK",
+          "fm": "A",
+          "qual": "C",
+          "ts": 101,
+          "value": "value-VAL_1",
+          "label": "",
+          "error": false
+        },
+        {
+          "rk": "RK",
+          "fm": "A",
+          "qual": "D",
+          "ts": 102,
+          "value": "value-VAL_2",
+          "label": "",
+          "error": false
+        }
+      ]
+    },
+    {
+      "name": "two families",
+      "chunks": [
+        "row_key: \"RK\"\nfamily_name: \u003c\n  value: \"A\"\n\u003e\nqualifier: \u003c\n  value: \"C\"\n\u003e\ntimestamp_micros: 101\nvalue: \"value-VAL_1\"\ncommit_row: false\n",
+        "family_name: \u003c\n  value: \"B\"\n\u003e\nqualifier: \u003c\n  value: \"E\"\n\u003e\ntimestamp_micros: 102\nvalue: \"value-VAL_2\"\ncommit_row: true\n"
+      ],
+      "results": [
+        {
+          "rk": "RK",
+          "fm": "A",
+          "qual": "C",
+          "ts": 101,
+          "value": "value-VAL_1",
+          "label": "",
+          "error": false
+        },
+        {
+          "rk": "RK",
+          "fm": "B",
+          "qual": "E",
+          "ts": 102,
+          "value": "value-VAL_2",
+          "label": "",
+          "error": false
+        }
+      ]
+    },
+    {
+      "name": "with labels",
+      "chunks": [
+        "row_key: \"RK\"\nfamily_name: \u003c\n  value: \"A\"\n\u003e\nqualifier: \u003c\n  value: \"C\"\n\u003e\ntimestamp_micros: 101\nlabels: \"L_1\"\nvalue: \"value-VAL_1\"\ncommit_row: false\n",
+        "timestamp_micros: 102\nlabels: \"L_2\"\nvalue: \"value-VAL_2\"\ncommit_row: true\n"
+      ],
+      "results": [
+        {
+          "rk": "RK",
+          "fm": "A",
+          "qual": "C",
+          "ts": 101,
+          "value": "value-VAL_1",
+          "label": "L_1",
+          "error": false
+        },
+        {
+          "rk": "RK",
+          "fm": "A",
+          "qual": "C",
+          "ts": 102,
+          "value": "value-VAL_2",
+          "label": "L_2",
+          "error": false
+        }
+      ]
+    },
+    {
+      "name": "split cell, bare commit",
+      "chunks": [
+        "row_key: \"RK\"\nfamily_name: \u003c\n  value: \"A\"\n\u003e\nqualifier: \u003c\n  value: \"C\"\n\u003e\ntimestamp_micros: 100\nvalue: \"v\"\nvalue_size: 10\ncommit_row: false\n",
+        "value: \"alue-VAL\"\ncommit_row: false\n",
+        "commit_row: true\n"
+      ],
+      "results": [
+        {
+          "rk": "RK",
+          "fm": "A",
+          "qual": "C",
+          "ts": 100,
+          "value": "value-VAL",
+          "label": "",
+          "error": false
+        },
+        {
+          "rk": "RK",
+          "fm": "A",
+          "qual": "C",
+          "ts": 0,
+          "value": "",
+          "label": "",
+          "error": false
+        }
+      ]
+    },
+    {
+      "name": "split cell",
+      "chunks": [
+        "row_key: \"RK\"\nfamily_name: \u003c\n  value: \"A\"\n\u003e\nqualifier: \u003c\n  value: \"C\"\n\u003e\ntimestamp_micros: 100\nvalue: \"v\"\nvalue_size: 10\ncommit_row: false\n",
+        "value: \"alue-VAL\"\ncommit_row: true\n"
+      ],
+      "results": [
+        {
+          "rk": "RK",
+          "fm": "A",
+          "qual": "C",
+          "ts": 100,
+          "value": "value-VAL",
+          "label": "",
+          "error": false
+        }
+      ]
+    },
+    {
+      "name": "split four ways",
+      "chunks": [
+        "row_key: \"RK\"\nfamily_name: \u003c\n  value: \"A\"\n\u003e\nqualifier: \u003c\n  value: \"C\"\n\u003e\ntimestamp_micros: 100\nlabels: \"L\"\nvalue: \"v\"\nvalue_size: 10\ncommit_row: false\n",
+        "value: \"a\"\nvalue_size: 10\ncommit_row: false\n",
+        "value: \"l\"\nvalue_size: 10\ncommit_row: false\n",
+        "value: \"ue-VAL\"\ncommit_row: true\n"
+      ],
+      "results": [
+        {
+          "rk": "RK",
+          "fm": "A",
+          "qual": "C",
+          "ts": 100,
+          "value": "value-VAL",
+          "label": "L",
+          "error": false
+        }
+      ]
+    },
+    {
+      "name": "two split cells",
+      "chunks": [
+        "row_key: \"RK\"\nfamily_name: \u003c\n  value: \"A\"\n\u003e\nqualifier: \u003c\n  value: \"C\"\n\u003e\ntimestamp_micros: 101\nvalue: \"v\"\nvalue_size: 10\ncommit_row: false\n",
+        "value: \"alue-VAL_1\"\ncommit_row: false\n",
+        "timestamp_micros: 102\nvalue: \"v\"\nvalue_size: 10\ncommit_row: false\n",
+        "value: \"alue-VAL_2\"\ncommit_row: true\n"
+      ],
+      "results": [
+        {
+          "rk": "RK",
+          "fm": "A",
+          "qual": "C",
+          "ts": 101,
+          "value": "value-VAL_1",
+          "label": "",
+          "error": false
+        },
+        {
+          "rk": "RK",
+          "fm": "A",
+          "qual": "C",
+          "ts": 102,
+          "value": "value-VAL_2",
+          "label": "",
+          "error": false
+        }
+      ]
+    },
+    {
+      "name": "multi-qualifier splits",
+      "chunks": [
+        "row_key: \"RK\"\nfamily_name: \u003c\n  value: \"A\"\n\u003e\nqualifier: \u003c\n  value: \"C\"\n\u003e\ntimestamp_micros: 101\nvalue: \"v\"\nvalue_size: 10\ncommit_row: false\n",
+        "value: \"alue-VAL_1\"\ncommit_row: false\n",
+        "qualifier: \u003c\n  value: \"D\"\n\u003e\ntimestamp_micros: 102\nvalue: \"v\"\nvalue_size: 10\ncommit_row: false\n",
+        "value: \"alue-VAL_2\"\ncommit_row: true\n"
+      ],
+      "results": [
+        {
+          "rk": "RK",
+          "fm": "A",
+          "qual": "C",
+          "ts": 101,
+          "value": "value-VAL_1",
+          "label": "",
+          "error": false
+        },
+        {
+          "rk": "RK",
+          "fm": "A",
+          "qual": "D",
+          "ts": 102,
+          "value": "value-VAL_2",
+          "label": "",
+          "error": false
+        }
+      ]
+    },
+    {
+      "name": "multi-qualifier multi-split",
+      "chunks": [
+        "row_key: \"RK\"\nfamily_name: \u003c\n  value: \"A\"\n\u003e\nqualifier: \u003c\n  value: \"C\"\n\u003e\ntimestamp_micros: 101\nvalue: \"v\"\nvalue_size: 10\ncommit_row: false\n",
+        "value: \"a\"\nvalue_size: 10\ncommit_row: false\n",
+        "value: \"lue-VAL_1\"\ncommit_row: false\n",
+        "qualifier: \u003c\n  value: \"D\"\n\u003e\ntimestamp_micros: 102\nvalue: \"v\"\nvalue_size: 10\ncommit_row: false\n",
+        "value: \"a\"\nvalue_size: 10\ncommit_row: false\n",
+        "value: \"lue-VAL_2\"\ncommit_row: true\n"
+      ],
+      "results": [
+        {
+          "rk": "RK",
+          "fm": "A",
+          "qual": "C",
+          "ts": 101,
+          "value": "value-VAL_1",
+          "label": "",
+          "error": false
+        },
+        {
+          "rk": "RK",
+          "fm": "A",
+          "qual": "D",
+          "ts": 102,
+          "value": "value-VAL_2",
+          "label": "",
+          "error": false
+        }
+      ]
+    },
+    {
+      "name": "multi-family split",
+      "chunks": [
+        "row_key: \"RK\"\nfamily_name: \u003c\n  value: \"A\"\n\u003e\nqualifier: \u003c\n  value: \"C\"\n\u003e\ntimestamp_micros: 101\nvalue: \"v\"\nvalue_size: 10\ncommit_row: false\n",
+        "value: \"alue-VAL_1\"\ncommit_row: false\n",
+        "family_name: \u003c\n  value: \"B\"\n\u003e\nqualifier: \u003c\n  value: \"E\"\n\u003e\ntimestamp_micros: 102\nvalue: \"v\"\nvalue_size: 10\ncommit_row: false\n",
+        "value: \"alue-VAL_2\"\ncommit_row: true\n"
+      ],
+      "results": [
+        {
+          "rk": "RK",
+          "fm": "A",
+          "qual": "C",
+          "ts": 101,
+          "value": "value-VAL_1",
+          "label": "",
+          "error": false
+        },
+        {
+          "rk": "RK",
+          "fm": "B",
+          "qual": "E",
+          "ts": 102,
+          "value": "value-VAL_2",
+          "label": "",
+          "error": false
+        }
+      ]
+    },
+    {
+      "name": "invalid - no commit between rows",
+      "chunks": [
+        "row_key: \"RK_1\"\nfamily_name: \u003c\n  value: \"A\"\n\u003e\nqualifier: \u003c\n  value: \"C\"\n\u003e\ntimestamp_micros: 100\nvalue: \"value-VAL\"\ncommit_row: false\n",
+        "row_key: \"RK_2\"\nfamily_name: \u003c\n  value: \"A\"\n\u003e\nqualifier: \u003c\n  value: \"C\"\n\u003e\ntimestamp_micros: 100\nvalue: \"value-VAL\"\ncommit_row: false\n"
+      ],
+      "results": [
+        {
+          "rk": "",
+          "fm": "",
+          "qual": "",
+          "ts": 0,
+          "value": "",
+          "label": "",
+          "error": true
+        }
+      ]
+    },
+    {
+      "name": "invalid - no commit after first row",
+      "chunks": [
+        "row_key: \"RK_1\"\nfamily_name: \u003c\n  value: \"A\"\n\u003e\nqualifier: \u003c\n  value: \"C\"\n\u003e\ntimestamp_micros: 100\nvalue: \"value-VAL\"\ncommit_row: false\n",
+        "row_key: \"RK_2\"\nfamily_name: \u003c\n  value: \"A\"\n\u003e\nqualifier: \u003c\n  value: \"C\"\n\u003e\ntimestamp_micros: 100\nvalue: \"value-VAL\"\ncommit_row: true\n"
+      ],
+      "results": [
+        {
+          "rk": "",
+          "fm": "",
+          "qual": "",
+          "ts": 0,
+          "value": "",
+          "label": "",
+          "error": true
+        }
+      ]
+    },
+    {
+      "name": "invalid - last row missing commit",
+      "chunks": [
+        "row_key: \"RK_1\"\nfamily_name: \u003c\n  value: \"A\"\n\u003e\nqualifier: \u003c\n  value: \"C\"\n\u003e\ntimestamp_micros: 100\nvalue: \"value-VAL\"\ncommit_row: true\n",
+        "row_key: \"RK_2\"\nfamily_name: \u003c\n  value: \"A\"\n\u003e\nqualifier: \u003c\n  value: \"C\"\n\u003e\ntimestamp_micros: 100\nvalue: \"value-VAL\"\ncommit_row: false\n"
+      ],
+      "results": [
+        {
+          "rk": "RK_1",
+          "fm": "A",
+          "qual": "C",
+          "ts": 100,
+          "value": "value-VAL",
+          "label": "",
+          "error": false
+        },
+        {
+          "rk": "",
+          "fm": "",
+          "qual": "",
+          "ts": 0,
+          "value": "",
+          "label": "",
+          "error": true
+        }
+      ]
+    },
+    {
+      "name": "invalid - duplicate row key",
+      "chunks": [
+        "row_key: \"RK_1\"\nfamily_name: \u003c\n  value: \"A\"\n\u003e\nqualifier: \u003c\n  value: \"C\"\n\u003e\ntimestamp_micros: 100\nvalue: \"value-VAL\"\ncommit_row: true\n",
+        "row_key: \"RK_1\"\nfamily_name: \u003c\n  value: \"B\"\n\u003e\nqualifier: \u003c\n  value: \"D\"\n\u003e\ntimestamp_micros: 100\nvalue: \"value-VAL\"\ncommit_row: true\n"
+      ],
+      "results": [
+        {
+          "rk": "RK_1",
+          "fm": "A",
+          "qual": "C",
+          "ts": 100,
+          "value": "value-VAL",
+          "label": "",
+          "error": false
+        },
+        {
+          "rk": "",
+          "fm": "",
+          "qual": "",
+          "ts": 0,
+          "value": "",
+          "label": "",
+          "error": true
+        }
+      ]
+    },
+    {
+      "name": "invalid - new row missing row key",
+      "chunks": [
+        "row_key: \"RK_1\"\nfamily_name: \u003c\n  value: \"A\"\n\u003e\nqualifier: \u003c\n  value: \"C\"\n\u003e\ntimestamp_micros: 100\nvalue: \"value-VAL\"\ncommit_row: true\n",
+        "timestamp_micros: 100\nvalue: \"value-VAL\"\ncommit_row: true\n"
+      ],
+      "results": [
+        {
+          "rk": "RK_1",
+          "fm": "A",
+          "qual": "C",
+          "ts": 100,
+          "value": "value-VAL",
+          "label": "",
+          "error": false
+        },
+        {
+          "rk": "",
+          "fm": "",
+          "qual": "",
+          "ts": 0,
+          "value": "",
+          "label": "",
+          "error": true
+        }
+      ]
+    },
+    {
+      "name": "two rows",
+      "chunks": [
+        "row_key: \"RK_1\"\nfamily_name: \u003c\n  value: \"A\"\n\u003e\nqualifier: \u003c\n  value: \"C\"\n\u003e\ntimestamp_micros: 100\nvalue: \"value-VAL\"\ncommit_row: true\n",
+        "row_key: \"RK_2\"\nfamily_name: \u003c\n  value: \"A\"\n\u003e\nqualifier: \u003c\n  value: \"C\"\n\u003e\ntimestamp_micros: 100\nvalue: \"value-VAL\"\ncommit_row: true\n"
+      ],
+      "results": [
+        {
+          "rk": "RK_1",
+          "fm": "A",
+          "qual": "C",
+          "ts": 100,
+          "value": "value-VAL",
+          "label": "",
+          "error": false
+        },
+        {
+          "rk": "RK_2",
+          "fm": "A",
+          "qual": "C",
+          "ts": 100,
+          "value": "value-VAL",
+          "label": "",
+          "error": false
+        }
+      ]
+    },
+    {
+      "name": "two rows implicit timestamp",
+      "chunks": [
+        "row_key: \"RK_1\"\nfamily_name: \u003c\n  value: \"A\"\n\u003e\nqualifier: \u003c\n  value: \"C\"\n\u003e\nvalue: \"value-VAL\"\ncommit_row: true\n",
+        "row_key: \"RK_2\"\nfamily_name: \u003c\n  value: \"A\"\n\u003e\nqualifier: \u003c\n  value: \"C\"\n\u003e\ntimestamp_micros: 100\nvalue: \"value-VAL\"\ncommit_row: true\n"
+      ],
+      "results": [
+        {
+          "rk": "RK_1",
+          "fm": "A",
+          "qual": "C",
+          "ts": 0,
+          "value": "value-VAL",
+          "label": "",
+          "error": false
+        },
+        {
+          "rk": "RK_2",
+          "fm": "A",
+          "qual": "C",
+          "ts": 100,
+          "value": "value-VAL",
+          "label": "",
+          "error": false
+        }
+      ]
+    },
+    {
+      "name": "two rows empty value",
+      "chunks": [
+        "row_key: \"RK_1\"\nfamily_name: \u003c\n  value: \"A\"\n\u003e\nqualifier: \u003c\n  value: \"C\"\n\u003e\ncommit_row: true\n",
+        "row_key: \"RK_2\"\nfamily_name: \u003c\n  value: \"A\"\n\u003e\nqualifier: \u003c\n  value: \"C\"\n\u003e\ntimestamp_micros: 100\nvalue: \"value-VAL\"\ncommit_row: true\n"
+      ],
+      "results": [
+        {
+          "rk": "RK_1",
+          "fm": "A",
+          "qual": "C",
+          "ts": 0,
+          "value": "",
+          "label": "",
+          "error": false
+        },
+        {
+          "rk": "RK_2",
+          "fm": "A",
+          "qual": "C",
+          "ts": 100,
+          "value": "value-VAL",
+          "label": "",
+          "error": false
+        }
+      ]
+    },
+    {
+      "name": "two rows, one with multiple cells",
+      "chunks": [
+        "row_key: \"RK_1\"\nfamily_name: \u003c\n  value: \"A\"\n\u003e\nqualifier: \u003c\n  value: \"C\"\n\u003e\ntimestamp_micros: 101\nvalue: \"value-VAL_1\"\ncommit_row: false\n",
+        "timestamp_micros: 102\nvalue: \"value-VAL_2\"\ncommit_row: true\n",
+        "row_key: \"RK_2\"\nfamily_name: \u003c\n  value: \"B\"\n\u003e\nqualifier: \u003c\n  value: \"D\"\n\u003e\ntimestamp_micros: 103\nvalue: \"value-VAL_3\"\ncommit_row: true\n"
+      ],
+      "results": [
+        {
+          "rk": "RK_1",
+          "fm": "A",
+          "qual": "C",
+          "ts": 101,
+          "value": "value-VAL_1",
+          "label": "",
+          "error": false
+        },
+        {
+          "rk": "RK_1",
+          "fm": "A",
+          "qual": "C",
+          "ts": 102,
+          "value": "value-VAL_2",
+          "label": "",
+          "error": false
+        },
+        {
+          "rk": "RK_2",
+          "fm": "B",
+          "qual": "D",
+          "ts": 103,
+          "value": "value-VAL_3",
+          "label": "",
+          "error": false
+        }
+      ]
+    },
+    {
+      "name": "two rows, multiple cells",
+      "chunks": [
+        "row_key: \"RK_1\"\nfamily_name: \u003c\n  value: \"A\"\n\u003e\nqualifier: \u003c\n  value: \"C\"\n\u003e\ntimestamp_micros: 101\nvalue: \"value-VAL_1\"\ncommit_row: false\n",
+        "qualifier: \u003c\n  value: \"D\"\n\u003e\ntimestamp_micros: 102\nvalue: \"value-VAL_2\"\ncommit_row: true\n",
+        "row_key: \"RK_2\"\nfamily_name: \u003c\n  value: \"B\"\n\u003e\nqualifier: \u003c\n  value: \"E\"\n\u003e\ntimestamp_micros: 103\nvalue: \"value-VAL_3\"\ncommit_row: false\n",
+        "qualifier: \u003c\n  value: \"F\"\n\u003e\ntimestamp_micros: 104\nvalue: \"value-VAL_4\"\ncommit_row: true\n"
+      ],
+      "results": [
+        {
+          "rk": "RK_1",
+          "fm": "A",
+          "qual": "C",
+          "ts": 101,
+          "value": "value-VAL_1",
+          "label": "",
+          "error": false
+        },
+        {
+          "rk": "RK_1",
+          "fm": "A",
+          "qual": "D",
+          "ts": 102,
+          "value": "value-VAL_2",
+          "label": "",
+          "error": false
+        },
+        {
+          "rk": "RK_2",
+          "fm": "B",
+          "qual": "E",
+          "ts": 103,
+          "value": "value-VAL_3",
+          "label": "",
+          "error": false
+        },
+        {
+          "rk": "RK_2",
+          "fm": "B",
+          "qual": "F",
+          "ts": 104,
+          "value": "value-VAL_4",
+          "label": "",
+          "error": false
+        }
+      ]
+    },
+    {
+      "name": "two rows, multiple cells, multiple families",
+      "chunks": [
+        "row_key: \"RK_1\"\nfamily_name: \u003c\n  value: \"A\"\n\u003e\nqualifier: \u003c\n  value: \"C\"\n\u003e\ntimestamp_micros: 101\nvalue: \"value-VAL_1\"\ncommit_row: false\n",
+        "family_name: \u003c\n  value: \"B\"\n\u003e\nqualifier: \u003c\n  value: \"E\"\n\u003e\ntimestamp_micros: 102\nvalue: \"value-VAL_2\"\ncommit_row: true\n",
+        "row_key: \"RK_2\"\nfamily_name: \u003c\n  value: \"M\"\n\u003e\nqualifier: \u003c\n  value: \"O\"\n\u003e\ntimestamp_micros: 103\nvalue: \"value-VAL_3\"\ncommit_row: false\n",
+        "family_name: \u003c\n  value: \"N\"\n\u003e\nqualifier: \u003c\n  value: \"P\"\n\u003e\ntimestamp_micros: 104\nvalue: \"value-VAL_4\"\ncommit_row: true\n"
+      ],
+      "results": [
+        {
+          "rk": "RK_1",
+          "fm": "A",
+          "qual": "C",
+          "ts": 101,
+          "value": "value-VAL_1",
+          "label": "",
+          "error": false
+        },
+        {
+          "rk": "RK_1",
+          "fm": "B",
+          "qual": "E",
+          "ts": 102,
+          "value": "value-VAL_2",
+          "label": "",
+          "error": false
+        },
+        {
+          "rk": "RK_2",
+          "fm": "M",
+          "qual": "O",
+          "ts": 103,
+          "value": "value-VAL_3",
+          "label": "",
+          "error": false
+        },
+        {
+          "rk": "RK_2",
+          "fm": "N",
+          "qual": "P",
+          "ts": 104,
+          "value": "value-VAL_4",
+          "label": "",
+          "error": false
+        }
+      ]
+    },
+    {
+      "name": "two rows, four cells, 2 labels",
+      "chunks": [
+        "row_key: \"RK_1\"\nfamily_name: \u003c\n  value: \"A\"\n\u003e\nqualifier: \u003c\n  value: \"C\"\n\u003e\ntimestamp_micros: 101\nlabels: \"L_1\"\nvalue: \"value-VAL_1\"\ncommit_row: false\n",
+        "timestamp_micros: 102\nvalue: \"value-VAL_2\"\ncommit_row: true\n",
+        "row_key: \"RK_2\"\nfamily_name: \u003c\n  value: \"B\"\n\u003e\nqualifier: \u003c\n  value: \"D\"\n\u003e\ntimestamp_micros: 103\nlabels: \"L_3\"\nvalue: \"value-VAL_3\"\ncommit_row: false\n",
+        "timestamp_micros: 104\nvalue: \"value-VAL_4\"\ncommit_row: true\n"
+      ],
+      "results": [
+        {
+          "rk": "RK_1",
+          "fm": "A",
+          "qual": "C",
+          "ts": 101,
+          "value": "value-VAL_1",
+          "label": "L_1",
+          "error": false
+        },
+        {
+          "rk": "RK_1",
+          "fm": "A",
+          "qual": "C",
+          "ts": 102,
+          "value": "value-VAL_2",
+          "label": "",
+          "error": false
+        },
+        {
+          "rk": "RK_2",
+          "fm": "B",
+          "qual": "D",
+          "ts": 103,
+          "value": "value-VAL_3",
+          "label": "L_3",
+          "error": false
+        },
+        {
+          "rk": "RK_2",
+          "fm": "B",
+          "qual": "D",
+          "ts": 104,
+          "value": "value-VAL_4",
+          "label": "",
+          "error": false
+        }
+      ]
+    },
+    {
+      "name": "two rows with splits, same timestamp",
+      "chunks": [
+        "row_key: \"RK_1\"\nfamily_name: \u003c\n  value: \"A\"\n\u003e\nqualifier: \u003c\n  value: \"C\"\n\u003e\ntimestamp_micros: 100\nvalue: \"v\"\nvalue_size: 10\ncommit_row: false\n",
+        "value: \"alue-VAL_1\"\ncommit_row: true\n",
+        "row_key: \"RK_2\"\nfamily_name: \u003c\n  value: \"A\"\n\u003e\nqualifier: \u003c\n  value: \"C\"\n\u003e\ntimestamp_micros: 100\nvalue: \"v\"\nvalue_size: 10\ncommit_row: false\n",
+        "value: \"alue-VAL_2\"\ncommit_row: true\n"
+      ],
+      "results": [
+        {
+          "rk": "RK_1",
+          "fm": "A",
+          "qual": "C",
+          "ts": 100,
+          "value": "value-VAL_1",
+          "label": "",
+          "error": false
+        },
+        {
+          "rk": "RK_2",
+          "fm": "A",
+          "qual": "C",
+          "ts": 100,
+          "value": "value-VAL_2",
+          "label": "",
+          "error": false
+        }
+      ]
+    },
+    {
+      "name": "invalid - bare reset",
+      "chunks": [
+        "reset_row: true\n"
+      ],
+      "results": [
+        {
+          "rk": "",
+          "fm": "",
+          "qual": "",
+          "ts": 0,
+          "value": "",
+          "label": "",
+          "error": true
+        }
+      ]
+    },
+    {
+      "name": "invalid - bad reset, no commit",
+      "chunks": [
+        "reset_row: true\n",
+        "row_key: \"RK\"\nfamily_name: \u003c\n  value: \"A\"\n\u003e\nqualifier: \u003c\n  value: \"C\"\n\u003e\ntimestamp_micros: 100\nvalue: \"value-VAL\"\ncommit_row: false\n"
+      ],
+      "results": [
+        {
+          "rk": "",
+          "fm": "",
+          "qual": "",
+          "ts": 0,
+          "value": "",
+          "label": "",
+          "error": true
+        }
+      ]
+    },
+    {
+      "name": "invalid - missing key after reset",
+      "chunks": [
+        "row_key: \"RK\"\nfamily_name: \u003c\n  value: \"A\"\n\u003e\nqualifier: \u003c\n  value: \"C\"\n\u003e\ntimestamp_micros: 100\nvalue: \"value-VAL\"\ncommit_row: false\n",
+        "reset_row: true\n",
+        "timestamp_micros: 100\nvalue: \"value-VAL\"\ncommit_row: true\n"
+      ],
+      "results": [
+        {
+          "rk": "",
+          "fm": "",
+          "qual": "",
+          "ts": 0,
+          "value": "",
+          "label": "",
+          "error": true
+        }
+      ]
+    },
+    {
+      "name": "no data after reset",
+      "chunks": [
+        "row_key: \"RK\"\nfamily_name: \u003c\n  value: \"A\"\n\u003e\nqualifier: \u003c\n  value: \"C\"\n\u003e\ntimestamp_micros: 100\nvalue: \"value-VAL\"\ncommit_row: false\n",
+        "reset_row: true\n"
+      ],
+      "results": null
+    },
+    {
+      "name": "simple reset",
+      "chunks": [
+        "row_key: \"RK\"\nfamily_name: \u003c\n  value: \"A\"\n\u003e\nqualifier: \u003c\n  value: \"C\"\n\u003e\ntimestamp_micros: 100\nvalue: \"value-VAL\"\ncommit_row: false\n",
+        "reset_row: true\n",
+        "row_key: \"RK\"\nfamily_name: \u003c\n  value: \"A\"\n\u003e\nqualifier: \u003c\n  value: \"C\"\n\u003e\ntimestamp_micros: 100\nvalue: \"value-VAL\"\ncommit_row: true\n"
+      ],
+      "results": [
+        {
+          "rk": "RK",
+          "fm": "A",
+          "qual": "C",
+          "ts": 100,
+          "value": "value-VAL",
+          "label": "",
+          "error": false
+        }
+      ]
+    },
+    {
+      "name": "reset to new val",
+      "chunks": [
+        "row_key: \"RK\"\nfamily_name: \u003c\n  value: \"A\"\n\u003e\nqualifier: \u003c\n  value: \"C\"\n\u003e\ntimestamp_micros: 100\nvalue: \"value-VAL_1\"\ncommit_row: false\n",
+        "reset_row: true\n",
+        "row_key: \"RK\"\nfamily_name: \u003c\n  value: \"A\"\n\u003e\nqualifier: \u003c\n  value: \"C\"\n\u003e\ntimestamp_micros: 100\nvalue: \"value-VAL_2\"\ncommit_row: true\n"
+      ],
+      "results": [
+        {
+          "rk": "RK",
+          "fm": "A",
+          "qual": "C",
+          "ts": 100,
+          "value": "value-VAL_2",
+          "label": "",
+          "error": false
+        }
+      ]
+    },
+    {
+      "name": "reset to new qual",
+      "chunks": [
+        "row_key: \"RK\"\nfamily_name: \u003c\n  value: \"A\"\n\u003e\nqualifier: \u003c\n  value: \"C\"\n\u003e\ntimestamp_micros: 100\nvalue: \"value-VAL_1\"\ncommit_row: false\n",
+        "reset_row: true\n",
+        "row_key: \"RK\"\nfamily_name: \u003c\n  value: \"A\"\n\u003e\nqualifier: \u003c\n  value: \"D\"\n\u003e\ntimestamp_micros: 100\nvalue: \"value-VAL_1\"\ncommit_row: true\n"
+      ],
+      "results": [
+        {
+          "rk": "RK",
+          "fm": "A",
+          "qual": "D",
+          "ts": 100,
+          "value": "value-VAL_1",
+          "label": "",
+          "error": false
+        }
+      ]
+    },
+    {
+      "name": "reset with splits",
+      "chunks": [
+        "row_key: \"RK\"\nfamily_name: \u003c\n  value: \"A\"\n\u003e\nqualifier: \u003c\n  value: \"C\"\n\u003e\ntimestamp_micros: 100\nvalue: \"value-VAL_1\"\ncommit_row: false\n",
+        "timestamp_micros: 102\nvalue: \"value-VAL_2\"\ncommit_row: false\n",
+        "reset_row: true\n",
+        "row_key: \"RK\"\nfamily_name: \u003c\n  value: \"A\"\n\u003e\nqualifier: \u003c\n  value: \"C\"\n\u003e\ntimestamp_micros: 100\nvalue: \"value-VAL_2\"\ncommit_row: true\n"
+      ],
+      "results": [
+        {
+          "rk": "RK",
+          "fm": "A",
+          "qual": "C",
+          "ts": 100,
+          "value": "value-VAL_2",
+          "label": "",
+          "error": false
+        }
+      ]
+    },
+    {
+      "name": "reset two cells",
+      "chunks": [
+        "row_key: \"RK\"\nfamily_name: \u003c\n  value: \"A\"\n\u003e\nqualifier: \u003c\n  value: \"C\"\n\u003e\ntimestamp_micros: 100\nvalue: \"value-VAL_1\"\ncommit_row: false\n",
+        "reset_row: true\n",
+        "row_key: \"RK\"\nfamily_name: \u003c\n  value: \"A\"\n\u003e\nqualifier: \u003c\n  value: \"C\"\n\u003e\ntimestamp_micros: 100\nvalue: \"value-VAL_2\"\ncommit_row: false\n",
+        "timestamp_micros: 103\nvalue: \"value-VAL_3\"\ncommit_row: true\n"
+      ],
+      "results": [
+        {
+          "rk": "RK",
+          "fm": "A",
+          "qual": "C",
+          "ts": 100,
+          "value": "value-VAL_2",
+          "label": "",
+          "error": false
+        },
+        {
+          "rk": "RK",
+          "fm": "A",
+          "qual": "C",
+          "ts": 103,
+          "value": "value-VAL_3",
+          "label": "",
+          "error": false
+        }
+      ]
+    },
+    {
+      "name": "two resets",
+      "chunks": [
+        "row_key: \"RK\"\nfamily_name: \u003c\n  value: \"A\"\n\u003e\nqualifier: \u003c\n  value: \"C\"\n\u003e\ntimestamp_micros: 100\nvalue: \"value-VAL_1\"\ncommit_row: false\n",
+        "reset_row: true\n",
+        "row_key: \"RK\"\nfamily_name: \u003c\n  value: \"A\"\n\u003e\nqualifier: \u003c\n  value: \"C\"\n\u003e\ntimestamp_micros: 100\nvalue: \"value-VAL_2\"\ncommit_row: false\n",
+        "reset_row: true\n",
+        "row_key: \"RK\"\nfamily_name: \u003c\n  value: \"A\"\n\u003e\nqualifier: \u003c\n  value: \"C\"\n\u003e\ntimestamp_micros: 100\nvalue: \"value-VAL_3\"\ncommit_row: true\n"
+      ],
+      "results": [
+        {
+          "rk": "RK",
+          "fm": "A",
+          "qual": "C",
+          "ts": 100,
+          "value": "value-VAL_3",
+          "label": "",
+          "error": false
+        }
+      ]
+    },
+    {
+      "name": "reset then two cells",
+      "chunks": [
+        "row_key: \"RK\"\nfamily_name: \u003c\n  value: \"A\"\n\u003e\nqualifier: \u003c\n  value: \"C\"\n\u003e\ntimestamp_micros: 100\nvalue: \"value-VAL_1\"\ncommit_row: false\n",
+        "reset_row: true\n",
+        "row_key: \"RK\"\nfamily_name: \u003c\n  value: \"B\"\n\u003e\nqualifier: \u003c\n  value: \"C\"\n\u003e\ntimestamp_micros: 100\nvalue: \"value-VAL_2\"\ncommit_row: false\n",
+        "qualifier: \u003c\n  value: \"D\"\n\u003e\ntimestamp_micros: 103\nvalue: \"value-VAL_3\"\ncommit_row: true\n"
+      ],
+      "results": [
+        {
+          "rk": "RK",
+          "fm": "B",
+          "qual": "C",
+          "ts": 100,
+          "value": "value-VAL_2",
+          "label": "",
+          "error": false
+        },
+        {
+          "rk": "RK",
+          "fm": "B",
+          "qual": "D",
+          "ts": 103,
+          "value": "value-VAL_3",
+          "label": "",
+          "error": false
+        }
+      ]
+    },
+    {
+      "name": "reset to new row",
+      "chunks": [
+        "row_key: \"RK_1\"\nfamily_name: \u003c\n  value: \"A\"\n\u003e\nqualifier: \u003c\n  value: \"C\"\n\u003e\ntimestamp_micros: 100\nvalue: \"value-VAL_1\"\ncommit_row: false\n",
+        "reset_row: true\n",
+        "row_key: \"RK_2\"\nfamily_name: \u003c\n  value: \"A\"\n\u003e\nqualifier: \u003c\n  value: \"C\"\n\u003e\ntimestamp_micros: 100\nvalue: \"value-VAL_2\"\ncommit_row: true\n"
+      ],
+      "results": [
+        {
+          "rk": "RK_2",
+          "fm": "A",
+          "qual": "C",
+          "ts": 100,
+          "value": "value-VAL_2",
+          "label": "",
+          "error": false
+        }
+      ]
+    },
+    {
+      "name": "reset in between chunks",
+      "chunks": [
+        "row_key: \"RK\"\nfamily_name: \u003c\n  value: \"A\"\n\u003e\nqualifier: \u003c\n  value: \"C\"\n\u003e\ntimestamp_micros: 100\nlabels: \"L\"\nvalue: \"v\"\nvalue_size: 10\ncommit_row: false\n",
+        "value: \"a\"\nvalue_size: 10\ncommit_row: false\n",
+        "reset_row: true\n",
+        "row_key: \"RK_1\"\nfamily_name: \u003c\n  value: \"A\"\n\u003e\nqualifier: \u003c\n  value: \"C\"\n\u003e\ntimestamp_micros: 100\nvalue: \"value-VAL_1\"\ncommit_row: true\n"
+      ],
+      "results": [
+        {
+          "rk": "RK_1",
+          "fm": "A",
+          "qual": "C",
+          "ts": 100,
+          "value": "value-VAL_1",
+          "label": "",
+          "error": false
+        }
+      ]
+    },
+    {
+      "name": "invalid - reset with chunk",
+      "chunks": [
+        "row_key: \"RK\"\nfamily_name: \u003c\n  value: \"A\"\n\u003e\nqualifier: \u003c\n  value: \"C\"\n\u003e\ntimestamp_micros: 100\nlabels: \"L\"\nvalue: \"v\"\nvalue_size: 10\ncommit_row: false\n",
+        "value: \"a\"\nvalue_size: 10\nreset_row: true\n"
+      ],
+      "results": [
+        {
+          "rk": "",
+          "fm": "",
+          "qual": "",
+          "ts": 0,
+          "value": "",
+          "label": "",
+          "error": true
+        }
+      ]
+    },
+    {
+      "name": "invalid - commit with chunk",
+      "chunks": [
+        "row_key: \"RK\"\nfamily_name: \u003c\n  value: \"A\"\n\u003e\nqualifier: \u003c\n  value: \"C\"\n\u003e\ntimestamp_micros: 100\nlabels: \"L\"\nvalue: \"v\"\nvalue_size: 10\ncommit_row: false\n",
+        "value: \"a\"\nvalue_size: 10\ncommit_row: true\n"
+      ],
+      "results": [
+        {
+          "rk": "",
+          "fm": "",
+          "qual": "",
+          "ts": 0,
+          "value": "",
+          "label": "",
+          "error": true
+        }
+      ]
+    },
+    {
+      "name": "empty cell chunk",
+      "chunks": [
+        "row_key: \"RK\"\nfamily_name: \u003c\n  value: \"A\"\n\u003e\nqualifier: \u003c\n  value: \"C\"\n\u003e\ntimestamp_micros: 100\nvalue: \"value-VAL\"\ncommit_row: false\n",
+        "commit_row: false\n",
+        "commit_row: true\n"
+      ],
+      "results": [
+        {
+          "rk": "RK",
+          "fm": "A",
+          "qual": "C",
+          "ts": 100,
+          "value": "value-VAL",
+          "label": "",
+          "error": false
+        },
+        {
+          "rk": "RK",
+          "fm": "A",
+          "qual": "C",
+          "ts": 0,
+          "value": "",
+          "label": "",
+          "error": false
+        },
+        {
+          "rk": "RK",
+          "fm": "A",
+          "qual": "C",
+          "ts": 0,
+          "value": "",
+          "label": "",
+          "error": false
+        }
+      ]
+    }
+  ]
+}

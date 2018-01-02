@@ -1,0 +1,25 @@
+#!/bin/bash
+set -e
+set -x
+
+groupadd rkt || true
+gpasswd -a centos rkt || true
+
+#yum update -y
+yum -y -v groupinstall "Development Tools"
+yum -y -v install wget squashfs-tools patch glibc-static gnupg libacl-devel openssl-devel bc
+yum -y -v install java # for Jenkins
+dnf -y -v install iptables intltool
+
+pushd /tmp
+wget -c https://storage.googleapis.com/golang/go1.5.3.linux-amd64.tar.gz
+popd
+tar -C /usr/local -xzf /tmp/go1.5.3.linux-amd64.tar.gz
+ln -sf /usr/local/go/bin/go /usr/local/bin/go
+ln -sf /usr/local/go/bin/godoc /usr/local/bin/godoc
+ln -sf /usr/local/go/bin/gofmt /usr/local/bin/gofmt
+
+# sudo/su without tty is disabled on old CentOS.
+# https://bugzilla.redhat.com/show_bug.cgi?id=1020147
+# Cannot workaround with /usr/bin/expect because this would need expect > 2.27
+sed -i 's/ requiretty$/ !requiretty/g' /etc/sudoers

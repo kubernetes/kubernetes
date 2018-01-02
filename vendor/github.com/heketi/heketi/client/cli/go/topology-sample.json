@@ -1,0 +1,100 @@
+{
+    "clusters": [
+        {
+            "nodes": [
+                {
+                    "node": {
+                        "hostnames": {
+                            "manage": [
+                                "192.168.10.100"
+                            ],
+                            "storage": [
+                                "192.168.10.100"
+                            ]
+                        },
+                        "zone": 1
+                    },
+                    "devices": [
+                        "/dev/sdb",
+                        "/dev/sdc",
+                        "/dev/sdd",
+                        "/dev/sde",
+                        "/dev/sdf",
+                        "/dev/sdg",
+                        "/dev/sdh",
+                        "/dev/sdi"
+                    ]
+                },
+                {
+                    "node": {
+                        "hostnames": {
+                            "manage": [
+                                "192.168.10.101"
+                            ],
+                            "storage": [
+                                "192.168.10.101"
+                            ]
+                        },
+                        "zone": 2
+                    },
+                    "devices": [
+                        "/dev/sdb",
+                        "/dev/sdc",
+                        "/dev/sdd",
+                        "/dev/sde",
+                        "/dev/sdf",
+                        "/dev/sdg",
+                        "/dev/sdh",
+                        "/dev/sdi"
+                    ]
+                },
+                {
+                    "node": {
+                        "hostnames": {
+                            "manage": [
+                                "192.168.10.102"
+                            ],
+                            "storage": [
+                                "192.168.10.102"
+                            ]
+                        },
+                        "zone": 1
+                    },
+                    "devices": [
+                        "/dev/sdb",
+                        "/dev/sdc",
+                        "/dev/sdd",
+                        "/dev/sde",
+                        "/dev/sdf",
+                        "/dev/sdg",
+                        "/dev/sdh",
+                        "/dev/sdi"
+                    ]
+                },
+                {
+                    "node": {
+                        "hostnames": {
+                            "manage": [
+                                "192.168.10.103"
+                            ],
+                            "storage": [
+                                "192.168.10.103"
+                            ]
+                        },
+                        "zone": 2
+                    },
+                    "devices": [
+                        "/dev/sdb",
+                        "/dev/sdc",
+                        "/dev/sdd",
+                        "/dev/sde",
+                        "/dev/sdf",
+                        "/dev/sdg",
+                        "/dev/sdh",
+                        "/dev/sdi"
+                    ]
+                }
+            ]
+        }
+    ]
+}

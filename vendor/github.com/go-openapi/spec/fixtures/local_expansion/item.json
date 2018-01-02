@@ -1,0 +1,18 @@
+{
+  "properties": {
+    "id": {
+      "format": "int64",
+      "readOnly": true,
+      "type": "integer"
+    },
+    "title": {
+      "maxLength": 80,
+      "minLength": 2,
+      "type": "string"
+    }
+  },
+  "required": [
+    "title"
+  ],
+  "type": "object"
+}
