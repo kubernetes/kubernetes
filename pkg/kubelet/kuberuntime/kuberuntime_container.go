@@ -49,6 +49,11 @@ import (
 	"k8s.io/kubernetes/pkg/util/tail"
 )
 
+const (
+	// A minimal shutdown window for avoiding unnecessary SIGKILLs
+	minimumGracePeriodInSeconds = 2
+)
+
 var (
 	ErrCreateContainerConfig = errors.New("CreateContainerConfigError")
 	ErrCreateContainer       = errors.New("CreateContainerError")
