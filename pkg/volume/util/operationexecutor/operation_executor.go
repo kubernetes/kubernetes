@@ -334,6 +334,10 @@ type VolumeToMount struct {
 	// ReportedInUse indicates that the volume was successfully added to the
 	// VolumesInUse field in the node's status.
 	ReportedInUse bool
+
+	// OperationCompleteFunc is a callback to signal the volume operation is
+	// complete which in turn records the metric for that operation
+	OperationCompleteFunc func(error)
 }
 
 // GenerateMsgDetailed returns detailed msgs for volumes to mount

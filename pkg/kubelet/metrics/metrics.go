@@ -47,6 +47,9 @@ const (
 	// Metrics keys of device plugin operations
 	DevicePluginRegistrationCountKey = "device_plugin_registration_count"
 	DevicePluginAllocationLatencyKey = "device_plugin_alloc_latency_microseconds"
+	// Metrics keys of volume operations
+	VolumeManagerOpeationsKey      = "volumemanager_operation_duration_seconds"
+	VolumeManagerOpeationsErrorKey = "volumemanager_operation_errors_total"
 )
 
 var (
@@ -198,6 +201,22 @@ var (
 		},
 		[]string{"resource_name"},
 	)
+	// Metrics keys of volume operations
+	VolumeManagerOperationMetric = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name:    VolumeManagerOpeationsKey,
+			Help:    "VolumeManager storage operation duration",
+			Buckets: []float64{.1, .25, .5, 1, 2.5, 5, 10, 15, 25, 50},
+		},
+		[]string{"volume_plugin", "operation_name"},
+	)
+	VolumeManagerOperationErrorMetric = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: VolumeManagerOpeationsErrorKey,
+			Help: "VolumeManager storage operation errors",
+		},
+		[]string{"volume_plugin", "operation_name"},
+	)
 )
 
 var registerMetrics sync.Once
@@ -226,6 +245,8 @@ func Register(containerCache kubecontainer.RuntimeCache) {
 		prometheus.MustRegister(VolumeStatsInodesUsed)
 		prometheus.MustRegister(DevicePluginRegistrationCount)
 		prometheus.MustRegister(DevicePluginAllocationLatency)
+		prometheus.MustRegister(VolumeManagerOperationMetric)
+		prometheus.MustRegister(VolumeManagerOperationErrorMetric)
 	})
 }
 
@@ -282,4 +303,19 @@ func (pc *podAndContainerCollector) Collect(ch chan<- prometheus.Metric) {
 		runningContainerCountDesc,
 		prometheus.GaugeValue,
 		float64(runningContainers))
+}
+
+// VolumeManagerOperationCompleteHook returns a hook to call when an operation is completed
+func VolumeManagerOperationCompleteHook(plugin, operationName string) func(error) {
+	requestTime := time.Now()
+	opComplete := func(err error) {
+		timeTaken := time.Since(requestTime).Seconds()
+		// Create metric with operation name and plugin name
+		if err != nil {
+			VolumeManagerOperationErrorMetric.WithLabelValues(plugin, operationName).Inc()
+		} else {
+			VolumeManagerOperationMetric.WithLabelValues(plugin, operationName).Observe(timeTaken)
+		}
+	}
+	return opComplete
 }

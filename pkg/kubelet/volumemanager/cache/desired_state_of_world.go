@@ -25,6 +25,7 @@ import (
 	"sync"
 
 	"k8s.io/api/core/v1"
+	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
 	"k8s.io/kubernetes/pkg/volume/util/types"
@@ -73,7 +74,7 @@ type DesiredStateOfWorld interface {
 	// attached volumes, this is a no-op.
 	// If after deleting the pod, the specified volume contains no other child
 	// pods, the volume is also deleted.
-	DeletePodFromVolume(podName types.UniquePodName, volumeName v1.UniqueVolumeName)
+	DeletePodFromVolume(podName types.UniquePodName, volumeName v1.UniqueVolumeName, volumeSpec *volume.Spec)
 
 	// VolumeExists returns true if the given volume exists in the list of
 	// volumes that should be attached to this node.
@@ -94,6 +95,10 @@ type DesiredStateOfWorld interface {
 	// current desired state of the world.
 	GetVolumesToMount() []VolumeToMount
 
+	// GetVolumeUnmountMetric retreives the associated metric for a given volume's
+	// unmount operation
+	GetVolumeUnmountMetric(volumeName v1.UniqueVolumeName) func(error)
+
 	// GetPods generates and returns a map of pods in which map is indexed
 	// with pod's unique name. This map can be used to determine which pod is currently
 	// in desired state of world.
@@ -109,8 +114,9 @@ type VolumeToMount struct {
 // NewDesiredStateOfWorld returns a new instance of DesiredStateOfWorld.
 func NewDesiredStateOfWorld(volumePluginMgr *volume.VolumePluginMgr) DesiredStateOfWorld {
 	return &desiredStateOfWorld{
-		volumesToMount:  make(map[v1.UniqueVolumeName]volumeToMount),
-		volumePluginMgr: volumePluginMgr,
+		volumesToMount:   make(map[v1.UniqueVolumeName]volumeToMount),
+		volumesToUnmount: make(map[v1.UniqueVolumeName]func(error)),
+		volumePluginMgr:  volumePluginMgr,
 	}
 }
 
@@ -120,6 +126,9 @@ type desiredStateOfWorld struct {
 	// the map is the name of the volume and the value is a volume object
 	// containing more information about the volume.
 	volumesToMount map[v1.UniqueVolumeName]volumeToMount
+	// volumesToUnmount is a map containing callback functions to record metrics
+	// for a given Volume's unmount operation
+	volumesToUnmount map[v1.UniqueVolumeName]func(error)
 	// volumePluginMgr is the volume plugin manager used to create volume
 	// plugin objects.
 	volumePluginMgr *volume.VolumePluginMgr
@@ -149,6 +158,10 @@ type volumeToMount struct {
 	// reportedInUse indicates that the volume was successfully added to the
 	// VolumesInUse field in the node's status.
 	reportedInUse bool
+
+	// OperationCompleteFunc is a callback to signal the volume operation is
+	// complete which in turn records the metric for that operation
+	operationCompleteFunc func(error)
 }
 
 // The pod object represents a pod that references the underlying volume and
@@ -216,11 +229,12 @@ func (dsw *desiredStateOfWorld) AddPodToVolume(
 	volumeObj, volumeExists := dsw.volumesToMount[volumeName]
 	if !volumeExists {
 		volumeObj = volumeToMount{
-			volumeName:         volumeName,
-			podsToMount:        make(map[types.UniquePodName]podToMount),
-			pluginIsAttachable: attachable,
-			volumeGidValue:     volumeGidValue,
-			reportedInUse:      false,
+			volumeName:            volumeName,
+			podsToMount:           make(map[types.UniquePodName]podToMount),
+			pluginIsAttachable:    attachable,
+			volumeGidValue:        volumeGidValue,
+			reportedInUse:         false,
+			operationCompleteFunc: metrics.VolumeManagerOperationCompleteHook(volumePlugin.GetPluginName(), "volume_mount"),
 		}
 		dsw.volumesToMount[volumeName] = volumeObj
 	}
@@ -258,9 +272,15 @@ func (dsw *desiredStateOfWorld) MarkVolumesReportedInUse(
 }
 
 func (dsw *desiredStateOfWorld) DeletePodFromVolume(
-	podName types.UniquePodName, volumeName v1.UniqueVolumeName) {
+	podName types.UniquePodName, volumeName v1.UniqueVolumeName, volumeSpec *volume.Spec) {
 	dsw.Lock()
 	defer dsw.Unlock()
+
+	volumePluginName := "plugin_unknown"
+	volumePlugin, err := dsw.volumePluginMgr.FindPluginBySpec(volumeSpec)
+	if err == nil || volumePlugin != nil {
+		volumePluginName = volumePlugin.GetPluginName()
+	}
 
 	volumeObj, volumeExists := dsw.volumesToMount[volumeName]
 	if !volumeExists {
@@ -278,6 +298,9 @@ func (dsw *desiredStateOfWorld) DeletePodFromVolume(
 		// Delete volume if no child pods left
 		delete(dsw.volumesToMount, volumeName)
 	}
+
+	// create metric for volume unmount
+	dsw.volumesToUnmount[volumeName] = metrics.VolumeManagerOperationCompleteHook(volumePluginName, "volume_unmount")
 }
 
 func (dsw *desiredStateOfWorld) VolumeExists(
@@ -329,17 +352,22 @@ func (dsw *desiredStateOfWorld) GetVolumesToMount() []VolumeToMount {
 				volumesToMount,
 				VolumeToMount{
 					VolumeToMount: operationexecutor.VolumeToMount{
-						VolumeName:          volumeName,
-						PodName:             podName,
-						Pod:                 podObj.pod,
-						VolumeSpec:          podObj.spec,
-						PluginIsAttachable:  volumeObj.pluginIsAttachable,
-						OuterVolumeSpecName: podObj.outerVolumeSpecName,
-						VolumeGidValue:      volumeObj.volumeGidValue,
-						ReportedInUse:       volumeObj.reportedInUse}})
+						VolumeName:            volumeName,
+						PodName:               podName,
+						Pod:                   podObj.pod,
+						VolumeSpec:            podObj.spec,
+						PluginIsAttachable:    volumeObj.pluginIsAttachable,
+						OuterVolumeSpecName:   podObj.outerVolumeSpecName,
+						VolumeGidValue:        volumeObj.volumeGidValue,
+						ReportedInUse:         volumeObj.reportedInUse,
+						OperationCompleteFunc: volumeObj.operationCompleteFunc}})
 		}
 	}
 	return volumesToMount
+}
+
+func (dsw *desiredStateOfWorld) GetVolumeUnmountMetric(volumeName v1.UniqueVolumeName) func(error) {
+	return dsw.volumesToUnmount[volumeName]
 }
 
 func (dsw *desiredStateOfWorld) isAttachableVolume(volumeSpec *volume.Spec) bool {

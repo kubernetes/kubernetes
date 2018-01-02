@@ -180,6 +180,10 @@ func (rc *reconciler) reconcile() {
 				continue
 			}
 			err = volumeHandler.UnmountVolumeHandler(mountedVolume.MountedVolume, rc.actualStateOfWorld)
+			operationCompleteFunc := rc.desiredStateOfWorld.GetVolumeUnmountMetric(mountedVolume.VolumeName)
+			if operationCompleteFunc != nil {
+				operationCompleteFunc(err)
+			}
 			if err != nil &&
 				!nestedpendingoperations.IsAlreadyExists(err) &&
 				!exponentialbackoff.IsExponentialBackoff(err) {
@@ -250,6 +254,7 @@ func (rc *reconciler) reconcile() {
 				continue
 			}
 			err = volumeHandler.MountVolumeHandler(rc.waitForAttachTimeout, volumeToMount.VolumeToMount, rc.actualStateOfWorld, isRemount, remountingLogStr)
+			volumeToMount.OperationCompleteFunc(err)
 			if err != nil &&
 				!nestedpendingoperations.IsAlreadyExists(err) &&
 				!exponentialbackoff.IsExponentialBackoff(err) {
