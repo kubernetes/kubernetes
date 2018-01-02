@@ -21,6 +21,7 @@ go_library(
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
+        "//vendor/k8s.io/pkg/kubelet/metrics:go_default_library",
     ],
 )
 
