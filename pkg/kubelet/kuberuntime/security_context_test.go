@@ -45,16 +45,20 @@ func TestVerifyRunAsNonRoot(t *testing.T) {
 	}
 
 	rootUser := int64(0)
+	anyUser := int64(1000)
 	runAsNonRootTrue := true
 	runAsNonRootFalse := false
 	for _, test := range []struct {
-		desc string
-		sc   *v1.SecurityContext
-		fail bool
+		desc     string
+		sc       *v1.SecurityContext
+		uid      *int64
+		username string
+		fail     bool
 	}{
 		{
 			desc: "Pass if SecurityContext is not set",
 			sc:   nil,
+			uid:  &rootUser,
 			fail: false,
 		},
 		{
@@ -62,6 +66,7 @@ func TestVerifyRunAsNonRoot(t *testing.T) {
 			sc: &v1.SecurityContext{
 				RunAsUser: &rootUser,
 			},
+			uid:  &rootUser,
 			fail: false,
 		},
 		{
@@ -69,6 +74,7 @@ func TestVerifyRunAsNonRoot(t *testing.T) {
 			sc: &v1.SecurityContext{
 				RunAsNonRoot: &runAsNonRootFalse,
 			},
+			uid:  &rootUser,
 			fail: false,
 		},
 		{
@@ -77,6 +83,7 @@ func TestVerifyRunAsNonRoot(t *testing.T) {
 				RunAsNonRoot: &runAsNonRootFalse,
 				RunAsUser:    &rootUser,
 			},
+			uid:  &rootUser,
 			fail: false,
 		},
 		{
@@ -85,6 +92,7 @@ func TestVerifyRunAsNonRoot(t *testing.T) {
 				RunAsNonRoot: &runAsNonRootTrue,
 				RunAsUser:    &rootUser,
 			},
+			uid:  &rootUser,
 			fail: true,
 		},
 		{
@@ -92,12 +100,35 @@ func TestVerifyRunAsNonRoot(t *testing.T) {
 			sc: &v1.SecurityContext{
 				RunAsNonRoot: &runAsNonRootTrue,
 			},
+			uid:  &rootUser,
 			fail: true,
+		},
+		{
+			desc: "Fail if image's username is set and RunAsNonRoot is true",
+			sc: &v1.SecurityContext{
+				RunAsNonRoot: &runAsNonRootTrue,
+			},
+			username: "test",
+			fail:     true,
+		},
+		{
+			desc: "Pass if image's user is non-root and RunAsNonRoot is true",
+			sc: &v1.SecurityContext{
+				RunAsNonRoot: &runAsNonRootTrue,
+			},
+			uid:  &anyUser,
+			fail: false,
+		},
+		{
+			desc: "Pass if container's user and image's user aren't set and RunAsNonRoot is true",
+			sc: &v1.SecurityContext{
+				RunAsNonRoot: &runAsNonRootTrue,
+			},
+			fail: false,
 		},
 	} {
 		pod.Spec.Containers[0].SecurityContext = test.sc
-		uid := int64(0)
-		err := verifyRunAsNonRoot(pod, &pod.Spec.Containers[0], &uid, "")
+		err := verifyRunAsNonRoot(pod, &pod.Spec.Containers[0], test.uid, test.username)
 		if test.fail {
 			assert.Error(t, err, test.desc)
 		} else {
