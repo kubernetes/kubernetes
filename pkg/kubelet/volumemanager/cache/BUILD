@@ -34,6 +34,7 @@ go_test(
     embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/pkg/kubelet/volumemanager/cache",
     deps = [
+        "//pkg/kubelet/metrics:go_default_library",
         "//pkg/volume:go_default_library",
         "//pkg/volume/testing:go_default_library",
         "//pkg/volume/util/types:go_default_library",
