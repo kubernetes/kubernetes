@@ -96,12 +96,12 @@ func (a *APIInstaller) Install() ([]metav1.APIResource, *restful.WebService, []e
 	var errors []error
 	ws := a.newWebService()
 
-	proxyHandler := (&handlers.ProxyHandler{
+	proxyHandler := &handlers.ProxyHandler{
 		Prefix:     a.prefix + "/proxy/",
 		Storage:    a.group.Storage,
 		Serializer: a.group.Serializer,
 		Mapper:     a.group.Context,
-	})
+	}
 
 	// Register the paths in a deterministic (sorted) order to get a deterministic swagger spec.
 	paths := make([]string, len(a.group.Storage))
