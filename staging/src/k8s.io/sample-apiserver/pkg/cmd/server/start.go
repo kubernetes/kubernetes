@@ -102,17 +102,17 @@ func (o *WardleServerOptions) Config() (*apiserver.Config, error) {
 		return nil, fmt.Errorf("error creating self-signed certificates: %v", err)
 	}
 
-	serverConfig := genericapiserver.NewRecommendedConfig(apiserver.Codecs)
-
-	o.RecommendedOptions.ExtraAdmissionInitializers = func() ([]admission.PluginInitializer, error) {
-		client, err := clientset.NewForConfig(serverConfig.LoopbackClientConfig)
+	o.RecommendedOptions.ExtraAdmissionInitializers = func(c *genericapiserver.RecommendedConfig) ([]admission.PluginInitializer, error) {
+		client, err := clientset.NewForConfig(c.LoopbackClientConfig)
 		if err != nil {
 			return nil, err
 		}
-		informerFactory := informers.NewSharedInformerFactory(client, serverConfig.LoopbackClientConfig.Timeout)
+		informerFactory := informers.NewSharedInformerFactory(client, c.LoopbackClientConfig.Timeout)
 		o.SharedInformerFactory = informerFactory
 		return []admission.PluginInitializer{wardleinitializer.New(informerFactory)}, nil
 	}
+
+	serverConfig := genericapiserver.NewRecommendedConfig(apiserver.Codecs)
 	if err := o.RecommendedOptions.ApplyTo(serverConfig, apiserver.Scheme); err != nil {
 		return nil, err
 	}

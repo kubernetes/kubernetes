@@ -39,7 +39,7 @@ type RecommendedOptions struct {
 
 	// ExtraAdmissionInitializers is called once after all ApplyTo from the options above, to pass the returned
 	// admission plugin initializers to Admission.ApplyTo.
-	ExtraAdmissionInitializers func() ([]admission.PluginInitializer, error)
+	ExtraAdmissionInitializers func(c *server.RecommendedConfig) ([]admission.PluginInitializer, error)
 	Admission                  *AdmissionOptions
 }
 
@@ -52,7 +52,7 @@ func NewRecommendedOptions(prefix string, codec runtime.Codec) *RecommendedOptio
 		Audit:                      NewAuditOptions(),
 		Features:                   NewFeatureOptions(),
 		CoreAPI:                    NewCoreAPIOptions(),
-		ExtraAdmissionInitializers: func() ([]admission.PluginInitializer, error) { return nil, nil },
+		ExtraAdmissionInitializers: func(c *server.RecommendedConfig) ([]admission.PluginInitializer, error) { return nil, nil },
 		Admission:                  NewAdmissionOptions(),
 	}
 }
@@ -93,7 +93,7 @@ func (o *RecommendedOptions) ApplyTo(config *server.RecommendedConfig, scheme *r
 	if err := o.CoreAPI.ApplyTo(config); err != nil {
 		return err
 	}
-	if initializers, err := o.ExtraAdmissionInitializers(); err != nil {
+	if initializers, err := o.ExtraAdmissionInitializers(config); err != nil {
 		return err
 	} else if err := o.Admission.ApplyTo(&config.Config, config.SharedInformerFactory, config.ClientConfig, scheme, initializers...); err != nil {
 		return err
