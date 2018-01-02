@@ -85,6 +85,8 @@ func NewCmdExec(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer) *c
 		},
 	}
 	cmd.Flags().StringVarP(&options.PodName, "pod", "p", "", "Pod name")
+	// TODO It's deprecated and will be removed in a future release. (kubernetes/kubectl#104)
+	cmd.Flags().MarkDeprecated("pod", "This flag is DEPRECATED and will be removed in a future version. Use exec POD_NAME instead.")
 	// TODO support UID
 	cmd.Flags().StringVarP(&options.ContainerName, "container", "c", "", "Container name. If omitted, the first container in the pod will be chosen")
 	cmd.Flags().BoolVarP(&options.Stdin, "stdin", "i", false, "Pass stdin to the container")
