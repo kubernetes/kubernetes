@@ -40,16 +40,15 @@ fi
 if [[ -z ${KEEP_TMP:-} ]]; then
     KEEP_TMP=false
 fi
-function cleanup {
+function verify_gopath_cleanup {
   if [ "${KEEP_TMP}" == "true" ]; then
     echo "Leaving ${_tmpdir} for you to examine or copy. Please delete it manually when finished. (rm -rf ${_tmpdir})"
   else
     echo "Removing ${_tmpdir}"
     rm -rf "${_tmpdir}"
   fi
-  export GODEP=""
 }
-trap cleanup EXIT
+kube::util::trap_add verify_gopath_cleanup EXIT
 
 # Copy the contents of the kube directory into the nice clean place
 _kubetmp="${_tmpdir}/src/k8s.io"
@@ -58,8 +57,13 @@ mkdir -p "${_kubetmp}"
 git archive --format=tar --prefix=kubernetes/ $(git write-tree) | (cd "${_kubetmp}" && tar xf -)
 _kubetmp="${_kubetmp}/kubernetes"
 
-# Do all our work in the new GOPATH
-export GOPATH="${_tmpdir}"
+# If there is a preloaded set of deps, use that. If not just do all our work in
+# the new GOPATH.
+if [[ -d "${KUBE_ROOT}/_gopath" ]]; then
+  GOPATH="${KUBE_ROOT}/_gopath:${_tmpdir}"
+else
+  GOPATH="${_tmpdir}"
+fi
 
 pushd "${_kubetmp}" 2>&1 > /dev/null
   # Restore the Godeps into our temp directory

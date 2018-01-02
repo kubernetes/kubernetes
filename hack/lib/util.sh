@@ -456,7 +456,6 @@ kube::util::ensure_godep_version() {
 # Ensure that none of the staging repos is checked out in the GOPATH because this
 # easily confused godep.
 kube::util::ensure_no_staging_repos_in_gopath() {
-  kube::util::ensure_single_dir_gopath
   local error=0
   for repo in $(ls ${KUBE_ROOT}/staging/src/k8s.io); do
     if [ -e "${GOPATH}/src/k8s.io/${repo}" ]; then
@@ -489,14 +488,6 @@ kube::util::go_install_from_commit() {
   )
   PATH="${KUBE_TEMP}/go/bin:${PATH}"
   hash -r # force bash to clear PATH cache
-}
-
-# Checks that the GOPATH is simple, i.e. consists only of one directory, not multiple.
-kube::util::ensure_single_dir_gopath() {
-  if [[ "${GOPATH}" == *:* ]]; then
-    echo "GOPATH must consist of a single directory." 1>&2
-    exit 1
-  fi
 }
 
 # Checks whether there are any files matching pattern $2 changed between the
