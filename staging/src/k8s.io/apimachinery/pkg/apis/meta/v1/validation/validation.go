@@ -17,8 +17,6 @@ limitations under the License.
 package validation
 
 import (
-	"fmt"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -78,13 +76,13 @@ func ValidateLabels(labels map[string]string, fldPath *field.Path) field.ErrorLi
 func ValidateDeleteOptions(options *metav1.DeleteOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if options.OrphanDependents != nil && options.PropagationPolicy != nil {
-		allErrs = append(allErrs, field.Invalid(field.NewPath(""), options, "OrphanDependents and DeletionPropagation cannot be both set"))
+		allErrs = append(allErrs, field.Invalid(field.NewPath("propagationPolicy"), options.PropagationPolicy, "orphanDependents and deletionPropagation cannot be both set"))
 	}
 	if options.PropagationPolicy != nil &&
 		*options.PropagationPolicy != metav1.DeletePropagationForeground &&
 		*options.PropagationPolicy != metav1.DeletePropagationBackground &&
 		*options.PropagationPolicy != metav1.DeletePropagationOrphan {
-		allErrs = append(allErrs, field.Invalid(field.NewPath(""), options, fmt.Sprintf("DeletionPropagation need to be one of %q, %q, %q or nil", metav1.DeletePropagationForeground, metav1.DeletePropagationBackground, metav1.DeletePropagationOrphan)))
+		allErrs = append(allErrs, field.NotSupported(field.NewPath("propagationPolicy"), options.PropagationPolicy, []string{string(metav1.DeletePropagationForeground), string(metav1.DeletePropagationBackground), string(metav1.DeletePropagationOrphan), "nil"}))
 	}
 	return allErrs
 }
