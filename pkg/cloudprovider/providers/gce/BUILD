@@ -95,6 +95,7 @@ go_test(
         "gce_healthchecks_test.go",
         "gce_loadbalancer_external_test.go",
         "gce_test.go",
+        "gce_util_test.go",
         "metrics_test.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/cloudprovider/providers/gce",
