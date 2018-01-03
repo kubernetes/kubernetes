@@ -46,13 +46,14 @@ func listAzureDiskPath(io ioHandler) []string {
 	return azureDiskList
 }
 
-// getDiskIDByPath get disk id by device name from /dev/disk/by-id
-func getDiskIDByPath(io ioHandler, devName string) (string, error) {
-	diskIDPath := "/dev/disk/by-id/"
-	dirs, err := io.ReadDir(diskIDPath)
+// getDiskLinkByDevName get disk link by device name from devLinkPath, e.g. /dev/disk/azure/, /dev/disk/by-id/
+func getDiskLinkByDevName(io ioHandler, devLinkPath, devName string) (string, error) {
+	dirs, err := io.ReadDir(devLinkPath)
+	glog.V(12).Infof("azureDisk - begin to find %s from %s", devName, devLinkPath)
 	if err == nil {
 		for _, f := range dirs {
-			diskPath := diskIDPath + f.Name()
+			diskPath := devLinkPath + f.Name()
+			glog.V(12).Infof("azureDisk - begin to Readlink: %s", diskPath)
 			link, linkErr := io.Readlink(diskPath)
 			if linkErr != nil {
 				glog.Warningf("azureDisk - read link (%s) error: %v", diskPath, linkErr)
@@ -62,9 +63,9 @@ func getDiskIDByPath(io ioHandler, devName string) (string, error) {
 				return diskPath, nil
 			}
 		}
-		return "", fmt.Errorf("device name(%s) is not found under %s", devName, diskIDPath)
+		return "", fmt.Errorf("device name(%s) is not found under %s", devName, devLinkPath)
 	}
-	return "", fmt.Errorf("read %s error: %v", diskIDPath, err)
+	return "", fmt.Errorf("read %s error: %v", devLinkPath, err)
 }
 
 func scsiHostRescan(io ioHandler, exec mount.Exec) {
@@ -154,20 +155,22 @@ func findDiskByLunWithConstraint(lun int, io ioHandler, azureDisks []string) (st
 					devName := dev[0].Name()
 					for _, diskName := range azureDisks {
 						glog.V(12).Infof("azureDisk - validating disk %q with sys disk %q", devName, diskName)
-						if string(devName) == diskName {
+						if devName == diskName {
 							found = true
 							break
 						}
 					}
 					if !found {
-						diskPath, err := getDiskIDByPath(io, devName)
-						if err == nil {
-							glog.V(4).Infof("azureDisk - found %s by %s under /dev/disk/by-id", diskPath, devName)
-							return diskPath, nil
-						} else {
-							glog.Warningf("azureDisk - getDiskIDByPath by %s failed, error: %v", devName, err)
-							return "/dev/" + devName, nil
+						devLinkPaths := []string{"/dev/disk/azure/scsi1/", "/dev/disk/by-id/"}
+						for _, devLinkPath := range devLinkPaths {
+							diskPath, err := getDiskLinkByDevName(io, devLinkPath, devName)
+							if err == nil {
+								glog.V(4).Infof("azureDisk - found %s by %s under %s", diskPath, devName, devLinkPath)
+								return diskPath, nil
+							}
+							glog.Warningf("azureDisk - getDiskLinkByDevName by %s under %s failed, error: %v", devName, devLinkPath, err)
 						}
+						return "/dev/" + devName, nil
 					}
 				}
 			}
