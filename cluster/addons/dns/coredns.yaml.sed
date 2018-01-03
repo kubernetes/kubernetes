@@ -57,12 +57,13 @@ data:
   Corefile: |
     .:53 {
         errors
-        log
         health
         kubernetes $DNS_DOMAIN $SERVICE_CLUSTER_IP_RANGE {
             pods insecure
+            upstream /etc/resolv.conf
+            fallthrough in-addr.arpa ip6.arpa
         }
-        prometheus
+        prometheus :9153
         proxy . /etc/resolv.conf
         cache 30
     }
@@ -78,7 +79,11 @@ metadata:
     addonmanager.kubernetes.io/mode: Reconcile
     kubernetes.io/name: "CoreDNS"
 spec:
-  replicas: 1
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
   selector:
     matchLabels:
       k8s-app: coredns
@@ -93,9 +98,21 @@ spec:
           effect: NoSchedule
         - key: "CriticalAddonsOnly"
           operator: "Exists"
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: k8s-app
+                  operator: In
+                  values:
+                  - coredns
+                topologyKey: kubernetes.io/hostname
       containers:
       - name: coredns
-        image: coredns/coredns:1.0.1
+        image: coredns/coredns:1.0.4
         imagePullPolicy: IfNotPresent
         resources:
           limits:
@@ -113,9 +130,6 @@ spec:
           protocol: UDP
         - containerPort: 53
           name: dns-tcp
-          protocol: TCP
-        - containerPort: 9153
-          name: metrics
           protocol: TCP
         livenessProbe:
           httpGet:
@@ -155,7 +169,4 @@ spec:
     protocol: UDP
   - name: dns-tcp
     port: 53
-    protocol: TCP
-  - name: metrics
-    port: 9153
     protocol: TCP
