@@ -53,7 +53,7 @@ func (az *Cloud) createFileShare(accountName, accountKey, name string, sizeGB in
 	if err != nil {
 		mc = newMetricContext("file_share", "delete", az.ResourceGroup, az.SubscriptionID)
 		err := share.Delete(nil)
-		mc.Observe(err)
+		err = mc.Observe(err)
 		if err != nil {
 			glog.Errorf("Error deleting share: %v", err)
 		}
