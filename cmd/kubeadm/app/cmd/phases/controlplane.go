@@ -110,19 +110,19 @@ func getControlPlaneSubCommands(outDir, defaultKubernetesVersion string) []*cobr
 		},
 		{
 			use:     "apiserver",
-			short:   "Generates the API server static Pod manifest.",
+			short:   "Generates the API server static Pod manifest",
 			long:    apiServerControlplaneLongDesc,
 			cmdFunc: controlplanephase.CreateAPIServerStaticPodManifestFile,
 		},
 		{
 			use:     "controller-manager",
-			short:   "Generates the controller-manager static Pod manifest.",
+			short:   "Generates the controller-manager static Pod manifest",
 			long:    controllerManagerControlplaneLongDesc,
 			cmdFunc: controlplanephase.CreateControllerManagerStaticPodManifestFile,
 		},
 		{
 			use:     "scheduler",
-			short:   "Generates the scheduler static Pod manifest.",
+			short:   "Generates the scheduler static Pod manifest",
 			long:    schedulerControlplaneLongDesc,
 			cmdFunc: controlplanephase.CreateSchedulerStaticPodManifestFile,
 		},
@@ -160,7 +160,7 @@ func getControlPlaneSubCommands(outDir, defaultKubernetesVersion string) []*cobr
 			cmd.Flags().Var(utilflag.NewMapStringString(&cfg.SchedulerExtraArgs), "scheduler-extra-args", "A set of extra flags to pass to the Scheduler or override default ones in form of <flagname>=<value>")
 		}
 
-		cmd.Flags().StringVar(&cfgPath, "config", cfgPath, "Path to kubeadm config file (WARNING: Usage of a configuration file is experimental)")
+		cmd.Flags().StringVar(&cfgPath, "config", cfgPath, "Path to kubeadm config file. WARNING: Usage of a configuration file is experimental")
 
 		subCmds = append(subCmds, cmd)
 	}

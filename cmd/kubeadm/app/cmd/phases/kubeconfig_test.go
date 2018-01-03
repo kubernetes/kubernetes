@@ -196,7 +196,7 @@ func TestKubeConfigSubCommandsThatCreateFilesWithFlags(t *testing.T) {
 			// reads generated files
 			config, err := clientcmd.LoadFromFile(filepath.Join(tmpdir, file))
 			if err != nil {
-				t.Errorf("Couldn't load generated kubeconfig file: %v", err)
+				t.Errorf("couldn't load generated kubeconfig file: %v", err)
 			}
 
 			// checks that CLI flags are properly propagated and kubeconfig properties are correct
@@ -302,7 +302,7 @@ func TestKubeConfigSubCommandsThatCreateFilesWithConfigFile(t *testing.T) {
 			// reads generated files
 			config, err := clientcmd.LoadFromFile(filepath.Join(tmpdir, file))
 			if err != nil {
-				t.Errorf("Couldn't load generated kubeconfig file: %v", err)
+				t.Errorf("couldn't load generated kubeconfig file: %v", err)
 			}
 
 			// checks that config file properties are properly propagated and kubeconfig properties are correct
@@ -371,7 +371,7 @@ func TestKubeConfigSubCommandsThatWritesToOut(t *testing.T) {
 		// reads kubeconfig written to stdout
 		config, err := clientcmd.Load(buf.Bytes())
 		if err != nil {
-			t.Errorf("Couldn't read kubeconfig file from buffer: %v", err)
+			t.Errorf("couldn't read kubeconfig file from buffer: %v", err)
 			continue
 		}
 
