@@ -2201,3 +2201,106 @@ func TestControllerRef(t *testing.T) {
 		t.Errorf("unexpected out: %s", out)
 	}
 }
+
+func TestDescribeNodeGpuStatus(t *testing.T) {
+	testCases := []struct {
+		node          *api.Node
+		pods          *api.PodList
+		expectedCount map[string]int
+	}{
+		// Node with GPU devices
+		{
+			node: &api.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "mynode",
+				},
+				Status: api.NodeStatus{
+					Capacity: api.ResourceList{
+						api.ResourceName(api.ResourceCPU):       resource.MustParse("48"),
+						api.ResourceName(api.ResourceMemory):    resource.MustParse("128"),
+						api.ResourceName(api.ResourceNvidiaGPU): resource.MustParse("4"),
+					},
+					Allocatable: api.ResourceList{
+						api.ResourceName(api.ResourceCPU):       resource.MustParse("24"),
+						api.ResourceName(api.ResourceMemory):    resource.MustParse("64"),
+						api.ResourceName(api.ResourceNvidiaGPU): resource.MustParse("4"),
+					},
+				},
+			},
+			pods: &api.PodList{
+				Items: []api.Pod{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "bar",
+							Namespace: "foo",
+						},
+						Spec: api.PodSpec{
+							Containers: []api.Container{
+								{
+									Image: "mytest-image:latest",
+									Resources: api.ResourceRequirements{
+										Limits: api.ResourceList{
+											api.ResourceName(api.ResourceNvidiaGPU): resource.MustParse("1"),
+										},
+										Requests: api.ResourceList{
+											api.ResourceName(api.ResourceNvidiaGPU): resource.MustParse("1"),
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedCount: map[string]int{"GPU Requests": 2, "GPU Limits": 2, "1 (25%)": 4},
+		},
+		// Node without GPU devices
+		{
+			node: &api.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "mynode",
+				},
+				Status: api.NodeStatus{
+					Capacity: api.ResourceList{
+						api.ResourceName(api.ResourceCPU):    resource.MustParse("48"),
+						api.ResourceName(api.ResourceMemory): resource.MustParse("128"),
+					},
+					Allocatable: api.ResourceList{
+						api.ResourceName(api.ResourceCPU):    resource.MustParse("24"),
+						api.ResourceName(api.ResourceMemory): resource.MustParse("64"),
+					},
+				},
+			},
+			pods: &api.PodList{
+				Items: []api.Pod{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "bar",
+							Namespace: "foo",
+						},
+						Spec: api.PodSpec{
+							Containers: []api.Container{
+								{Image: "mytest-image:latest"},
+							},
+						},
+					},
+				},
+			},
+			expectedCount: map[string]int{"GPU Requests": 2, "GPU Limits": 2, "1 (25%)": 0},
+		},
+	}
+	for _, test := range testCases {
+		fake := fake.NewSimpleClientset(test.node, test.pods)
+		c := &describeClient{T: t, Namespace: "foo", Interface: fake}
+		d := NodeDescriber{c}
+		out, err := d.Describe("foo", "mynode", printers.DescriberSettings{ShowEvents: true})
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		for element, count := range test.expectedCount {
+			if strings.Count(out, element) != count {
+				t.Errorf("expected to find %q %d times in output: %q", element, count, out)
+			}
+		}
+	}
+}
