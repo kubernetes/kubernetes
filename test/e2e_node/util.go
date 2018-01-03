@@ -138,6 +138,12 @@ func setKubeletConfiguration(f *framework.Framework, kubeCfg *kubeletconfig.Kube
 	const (
 		restartGap   = 40 * time.Second
 		pollInterval = 5 * time.Second
+
+		// as we use period=10*time.Second and jitterFactor=0.2
+		// in cc.syncConfigSource(client, nodeName),
+		// so we set waitGap = 12*time.Second to wait for kubelet restart
+		// ref: pkg/kubelet/kubeletconfig/controller.go#L220-L222
+		waitGap = 12 * time.Second
 	)
 
 	// make sure Dynamic Kubelet Configuration feature is enabled on the Kubelet we are about to reconfigure
@@ -171,6 +177,9 @@ func setKubeletConfiguration(f *framework.Framework, kubeCfg *kubeletconfig.Kube
 		}
 		return nil
 	}, time.Minute, time.Second).Should(BeNil())
+
+	// wait for kubelet restart
+	time.Sleep(waitGap)
 
 	// poll for new config, for a maximum wait of restartGap
 	Eventually(func() error {
