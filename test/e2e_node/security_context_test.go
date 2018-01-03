@@ -150,7 +150,7 @@ var _ = framework.KubeDescribe("Security Context", func() {
 
 		hostSharedMemoryID := ""
 		BeforeEach(func() {
-			output, err := exec.Command("sh", "-c", "ipcmk -M 1M | awk '{print $NF}'").Output()
+			output, err := exec.Command("sh", "-c", "ipcmk -M 1048576 | awk '{print $NF}'").Output()
 			if err != nil {
 				framework.Failf("Failed to create the shared memory on the host: %v", err)
 			}
