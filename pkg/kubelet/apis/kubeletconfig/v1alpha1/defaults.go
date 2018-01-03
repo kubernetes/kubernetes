@@ -211,6 +211,9 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 		temp := int32(DefaultIPTablesDropBit)
 		obj.IPTablesDropBit = &temp
 	}
+	if obj.FailSwapOn == nil {
+		obj.FailSwapOn = utilpointer.BoolPtr(true)
+	}
 	if obj.CgroupsPerQOS == nil {
 		temp := true
 		obj.CgroupsPerQOS = &temp
