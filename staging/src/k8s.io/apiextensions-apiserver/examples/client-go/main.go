@@ -22,7 +22,6 @@ import (
 	"flag"
 	"fmt"
 
-	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apiv1 "k8s.io/client-go/pkg/api/v1"
@@ -35,6 +34,7 @@ import (
 	crv1 "k8s.io/apiextensions-apiserver/examples/client-go/apis/cr/v1"
 	exampleclient "k8s.io/apiextensions-apiserver/examples/client-go/client"
 	examplecontroller "k8s.io/apiextensions-apiserver/examples/client-go/controller"
+	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 )
 
 func main() {
