@@ -258,7 +258,7 @@ type KubeletConfiguration struct {
 	// featureGates is a map of feature names to bools that enable or disable alpha/experimental features.
 	FeatureGates map[string]bool `json:"featureGates,omitempty"`
 	// Tells the Kubelet to fail to start if swap is enabled on the node.
-	FailSwapOn bool `json:"failSwapOn,omitempty"`
+	FailSwapOn *bool `json:"failSwapOn,omitempty"`
 
 	/* following flags are meant for Node Allocatable */
 
