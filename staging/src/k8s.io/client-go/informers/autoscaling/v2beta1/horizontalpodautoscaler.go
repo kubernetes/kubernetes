@@ -19,6 +19,8 @@ limitations under the License.
 package v2beta1
 
 import (
+	time "time"
+
 	autoscaling_v2beta1 "k8s.io/api/autoscaling/v2beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
@@ -27,7 +29,6 @@ import (
 	kubernetes "k8s.io/client-go/kubernetes"
 	v2beta1 "k8s.io/client-go/listers/autoscaling/v2beta1"
 	cache "k8s.io/client-go/tools/cache"
-	time "time"
 )
 
 // HorizontalPodAutoscalerInformer provides access to a shared informer and lister for

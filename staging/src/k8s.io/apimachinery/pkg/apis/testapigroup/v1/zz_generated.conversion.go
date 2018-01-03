@@ -21,11 +21,12 @@ limitations under the License.
 package v1
 
 import (
+	unsafe "unsafe"
+
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	testapigroup "k8s.io/apimachinery/pkg/apis/testapigroup"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
-	unsafe "unsafe"
 )
 
 func init() {

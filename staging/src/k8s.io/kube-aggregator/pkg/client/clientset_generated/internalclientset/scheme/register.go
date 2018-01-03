@@ -17,6 +17,8 @@ limitations under the License.
 package scheme
 
 import (
+	os "os"
+
 	announced "k8s.io/apimachinery/pkg/apimachinery/announced"
 	registered "k8s.io/apimachinery/pkg/apimachinery/registered"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -24,7 +26,6 @@ import (
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	apiregistration "k8s.io/kube-aggregator/pkg/apis/apiregistration/install"
-	os "os"
 )
 
 var Scheme = runtime.NewScheme()

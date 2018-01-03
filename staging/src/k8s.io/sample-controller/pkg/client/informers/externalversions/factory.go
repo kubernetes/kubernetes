@@ -19,6 +19,10 @@ limitations under the License.
 package externalversions
 
 import (
+	reflect "reflect"
+	sync "sync"
+	time "time"
+
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
@@ -26,9 +30,6 @@ import (
 	versioned "k8s.io/sample-controller/pkg/client/clientset/versioned"
 	internalinterfaces "k8s.io/sample-controller/pkg/client/informers/externalversions/internalinterfaces"
 	samplecontroller "k8s.io/sample-controller/pkg/client/informers/externalversions/samplecontroller"
-	reflect "reflect"
-	sync "sync"
-	time "time"
 )
 
 type sharedInformerFactory struct {

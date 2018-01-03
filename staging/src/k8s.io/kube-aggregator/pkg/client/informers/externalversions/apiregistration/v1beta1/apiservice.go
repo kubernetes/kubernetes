@@ -19,6 +19,8 @@ limitations under the License.
 package v1beta1
 
 import (
+	time "time"
+
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -27,7 +29,6 @@ import (
 	clientset "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset"
 	internalinterfaces "k8s.io/kube-aggregator/pkg/client/informers/externalversions/internalinterfaces"
 	v1beta1 "k8s.io/kube-aggregator/pkg/client/listers/apiregistration/v1beta1"
-	time "time"
 )
 
 // APIServiceInformer provides access to a shared informer and lister for

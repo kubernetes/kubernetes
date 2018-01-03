@@ -21,6 +21,8 @@ limitations under the License.
 package v1beta1
 
 import (
+	unsafe "unsafe"
+
 	v1beta1 "k8s.io/api/batch/v1beta1"
 	core_v1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -29,7 +31,6 @@ import (
 	batch "k8s.io/kubernetes/pkg/apis/batch"
 	batch_v1 "k8s.io/kubernetes/pkg/apis/batch/v1"
 	core "k8s.io/kubernetes/pkg/apis/core"
-	unsafe "unsafe"
 )
 
 func init() {

@@ -19,6 +19,8 @@ limitations under the License.
 package v2alpha1
 
 import (
+	time "time"
+
 	batch_v2alpha1 "k8s.io/api/batch/v2alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
@@ -27,7 +29,6 @@ import (
 	kubernetes "k8s.io/client-go/kubernetes"
 	v2alpha1 "k8s.io/client-go/listers/batch/v2alpha1"
 	cache "k8s.io/client-go/tools/cache"
-	time "time"
 )
 
 // CronJobInformer provides access to a shared informer and lister for
