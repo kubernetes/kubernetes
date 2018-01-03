@@ -1011,7 +1011,7 @@ func TestMakeSignalObservations(t *testing.T) {
 	if res.CmpInt64(int64(allocatableMemoryCapacity)) != 0 {
 		t.Errorf("Expected Threshold %v to be equal to value %v", res.Value(), allocatableMemoryCapacity)
 	}
-	actualObservations, statsFunc, err := makeSignalObservations(provider, capacityProvider, pods)
+	actualObservations, statsFunc, err := makeSignalObservations(provider, capacityProvider)
 	if err != nil {
 		t.Errorf("Unexpected err: %v", err)
 	}
