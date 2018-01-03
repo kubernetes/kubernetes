@@ -1253,6 +1253,9 @@ func (og *operationGenerator) GenerateExpandVolumeFunc(
 	if err != nil {
 		return volumetypes.GeneratedOperations{}, fmt.Errorf("Error finding plugin for expanding volume: %q with error %v", pvcWithResizeRequest.QualifiedName(), err)
 	}
+	if volumePlugin == nil {
+		return volumetypes.GeneratedOperations{}, fmt.Errorf("Can not find plugin for expanding volume: %q", pvcWithResizeRequest.QualifiedName())
+	}
 
 	expandVolumeFunc := func() (error, error) {
 		newSize := pvcWithResizeRequest.ExpectedSize
