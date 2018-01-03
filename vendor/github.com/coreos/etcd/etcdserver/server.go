@@ -608,7 +608,7 @@ type raftReadyHandler struct {
 }
 
 func (s *EtcdServer) run() {
-	snap, err := s.r.raftStorage.Snapshot()
+	snapshot, err := s.r.raftStorage.Snapshot()
 	if err != nil {
 		plog.Panicf("get snapshot from raft storage error: %v", err)
 	}
@@ -666,10 +666,10 @@ func (s *EtcdServer) run() {
 	// asynchronously accept apply packets, dispatch progress in-order
 	sched := schedule.NewFIFOScheduler()
 	ep := etcdProgress{
-		confState: snap.Metadata.ConfState,
-		snapi:     snap.Metadata.Index,
-		appliedt:  snap.Metadata.Term,
-		appliedi:  snap.Metadata.Index,
+		confState: snapshot.Metadata.ConfState,
+		snapi:     snapshot.Metadata.Index,
+		appliedt:  snapshot.Metadata.Term,
+		appliedi:  snapshot.Metadata.Index,
 	}
 
 	defer func() {
