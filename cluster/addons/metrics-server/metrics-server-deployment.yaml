@@ -62,8 +62,8 @@ spec:
             cpu: 100m
             memory: 300Mi
           requests:
-            cpu: 50m
-            memory: 100Mi
+            cpu: 5m
+            memory: 50Mi
         env:
           - name: MY_POD_NAME
             valueFrom:
