@@ -27,6 +27,7 @@ import (
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/kubernetes/pkg/cloudprovider"
 )
 
 var (
@@ -76,9 +77,7 @@ type vmRequest struct {
 /// getVirtualMachine calls 'VirtualMachinesClient.Get' with a timed cache
 /// The service side has throttling control that delays responses if there're multiple requests onto certain vm
 /// resource request in short period.
-func (az *Cloud) getVirtualMachine(nodeName types.NodeName) (vm compute.VirtualMachine, exists bool, err error) {
-	var realErr error
-
+func (az *Cloud) getVirtualMachine(nodeName types.NodeName) (vm compute.VirtualMachine, err error) {
 	vmName := string(nodeName)
 
 	cachedRequest, err := vmCache.GetOrCreate(vmName, func() interface{} {
@@ -88,7 +87,7 @@ func (az *Cloud) getVirtualMachine(nodeName types.NodeName) (vm compute.VirtualM
 		}
 	})
 	if err != nil {
-		return compute.VirtualMachine{}, false, err
+		return compute.VirtualMachine{}, err
 	}
 	request := cachedRequest.(*vmRequest)
 
@@ -107,22 +106,22 @@ func (az *Cloud) getVirtualMachine(nodeName types.NodeName) (vm compute.VirtualM
 			vm, err = az.VirtualMachinesClient.Get(az.ResourceGroup, vmName, compute.InstanceView)
 			glog.V(10).Infof("VirtualMachinesClient.Get(%s): end", vmName)
 
-			exists, realErr = checkResourceExistsFromError(err)
+			exists, realErr := checkResourceExistsFromError(err)
 			if realErr != nil {
-				return vm, false, realErr
+				return vm, realErr
 			}
 
 			if !exists {
-				return vm, false, nil
+				return vm, cloudprovider.InstanceNotFound
 			}
 
 			request.vm = &vm
 		}
-		return vm, exists, err
+		return vm, nil
 	}
 
 	glog.V(6).Infof("getVirtualMachine hits cache for(%s)", vmName)
-	return *request.vm, true, nil
+	return *request.vm, nil
 }
 
 func (az *Cloud) getVmssVirtualMachine(nodeName types.NodeName) (vm compute.VirtualMachineScaleSetVM, exists bool, err error) {
