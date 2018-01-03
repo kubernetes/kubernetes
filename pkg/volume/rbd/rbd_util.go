@@ -28,7 +28,6 @@ import (
 	"os"
 	"os/exec"
 	"path"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -47,10 +46,6 @@ const (
 	imageSizeStr    = "size "
 	sizeDivStr      = " MB in"
 	kubeLockMagic   = "kubelet_lock_magic_"
-)
-
-var (
-	clientKubeLockMagicRe = regexp.MustCompile("client.* " + kubeLockMagic + ".*")
 )
 
 // search /sys/bus for rbd device that matches given pool and image
@@ -132,20 +127,21 @@ func rbdErrors(runErr, resultErr error) error {
 	return resultErr
 }
 
-// 'rbd' utility simply pass '-m <mon>' parameter to kernel rbd/libceph
-// modules, which takes a comma-seprated list of one or more monitor addresses
-// (e.g.  ip1[:port1][,ip2[:port2]...]) in its first version in linux (see
-// https://github.com/torvalds/linux/blob/602adf400201636e95c3fed9f31fba54a3d7e844/net/ceph/ceph_common.c#L239)
-// Also, libceph choose monitor randomly, so we can simply pass all addresses
-// without randomization (see
+// 'rbd' utility builds a comma-separated list of monitor addresses from '-m' /
+// '--mon_host` parameter (comma, semi-colon, or white-space delimited monitor
+// addresses) and send it to kernel rbd/libceph modules, which can accept
+// comma-seprated list of monitor addresses (e.g. ip1[:port1][,ip2[:port2]...])
+// in theirs first version in linux (see
+// https://github.com/torvalds/linux/blob/602adf400201636e95c3fed9f31fba54a3d7e844/net/ceph/ceph_common.c#L239).
+// Also, libceph module choose monitor randomly, so we can simply pass all
+// addresses without randomization (see
 // https://github.com/torvalds/linux/blob/602adf400201636e95c3fed9f31fba54a3d7e844/net/ceph/mon_client.c#L132).
 func (util *RBDUtil) kernelRBDMonitorsOpt(mons []string) string {
 	return strings.Join(mons, ",")
 }
 
-// rbdLock acquires a lock on image if lock is true, otherwise releases if a
-// lock is found on image.
-func (util *RBDUtil) rbdLock(b rbdMounter, lock bool) error {
+// rbdUnlock releases a lock on image if found.
+func (util *RBDUtil) rbdUnlock(b rbdMounter) error {
 	var err error
 	var output, locker string
 	var cmd []byte
@@ -168,10 +164,7 @@ func (util *RBDUtil) rbdLock(b rbdMounter, lock bool) error {
 
 	mon := util.kernelRBDMonitorsOpt(b.Mon)
 
-	// cmd "rbd lock list" serves two purposes:
-	// for fencing, check if lock already held for this host
-	// this edge case happens if host crashes in the middle of acquiring lock and mounting rbd
-	// for defencing, get the locker name, something like "client.1234"
+	// get the locker name, something like "client.1234"
 	args := []string{"lock", "list", b.Image, "--pool", b.Pool, "--id", b.Id, "-m", mon}
 	args = append(args, secret_opt...)
 	cmd, err = b.exec.Run("rbd", args...)
@@ -180,62 +173,21 @@ func (util *RBDUtil) rbdLock(b rbdMounter, lock bool) error {
 	if err != nil {
 		return err
 	}
+	ind := strings.LastIndex(output, lock_id) - 1
+	for i := ind; i >= 0; i-- {
+		if output[i] == '\n' {
+			locker = output[(i + 1):ind]
+			break
+		}
+	}
 
-	if lock {
-		// check if lock is already held for this host by matching lock_id and rbd lock id
-		if strings.Contains(output, lock_id) {
-			// this host already holds the lock, exit
-			glog.V(1).Infof("rbd: lock already held for %s", lock_id)
-			return nil
-		}
-		// clean up orphaned lock if no watcher on the image
-		used, rbdOutput, statusErr := util.rbdStatus(&b)
-		if statusErr != nil {
-			return fmt.Errorf("rbdStatus failed error %v, rbd output: %v", statusErr, rbdOutput)
-		}
-		if used {
-			// this image is already used by a node other than this node
-			return fmt.Errorf("rbd image: %s/%s is already used by a node other than this node, rbd output: %v", b.Image, b.Pool, output)
-		}
-
-		// best effort clean up orphaned locked if not used
-		locks := clientKubeLockMagicRe.FindAllStringSubmatch(output, -1)
-		for _, v := range locks {
-			if len(v) > 0 {
-				lockInfo := strings.Split(v[0], " ")
-				if len(lockInfo) > 2 {
-					args := []string{"lock", "remove", b.Image, lockInfo[1], lockInfo[0], "--pool", b.Pool, "--id", b.Id, "-m", mon}
-					args = append(args, secret_opt...)
-					cmd, err = b.exec.Run("rbd", args...)
-					glog.Infof("remove orphaned locker %s from client %s: err %v, rbd output: %s", lockInfo[1], lockInfo[0], err, string(cmd))
-				}
-			}
-		}
-
-		// hold a lock: rbd lock add
-		args := []string{"lock", "add", b.Image, lock_id, "--pool", b.Pool, "--id", b.Id, "-m", mon}
+	// remove a lock if found: rbd lock remove
+	if len(locker) > 0 {
+		args := []string{"lock", "remove", b.Image, lock_id, locker, "--pool", b.Pool, "--id", b.Id, "-m", mon}
 		args = append(args, secret_opt...)
 		cmd, err = b.exec.Run("rbd", args...)
 		if err == nil {
-			glog.V(4).Infof("rbd: successfully add lock (locker_id: %s) on image: %s/%s with id %s mon %s", lock_id, b.Pool, b.Image, b.Id, mon)
-		}
-	} else {
-		// defencing, find locker name
-		ind := strings.LastIndex(output, lock_id) - 1
-		for i := ind; i >= 0; i-- {
-			if output[i] == '\n' {
-				locker = output[(i + 1):ind]
-				break
-			}
-		}
-		// remove a lock if found: rbd lock remove
-		if len(locker) > 0 {
-			args := []string{"lock", "remove", b.Image, lock_id, locker, "--pool", b.Pool, "--id", b.Id, "-m", mon}
-			args = append(args, secret_opt...)
-			cmd, err = b.exec.Run("rbd", args...)
-			if err == nil {
-				glog.V(4).Infof("rbd: successfully remove lock (locker_id: %s) on image: %s/%s with id %s mon %s", lock_id, b.Pool, b.Image, b.Id, mon)
-			}
+			glog.V(4).Infof("rbd: successfully remove lock (locker_id: %s) on image: %s/%s with id %s mon %s", lock_id, b.Pool, b.Image, b.Id, mon)
 		}
 	}
 
@@ -243,7 +195,6 @@ func (util *RBDUtil) rbdLock(b rbdMounter, lock bool) error {
 }
 
 // AttachDisk attaches the disk on the node.
-// If Volume is not read-only, acquire a lock on image first.
 func (util *RBDUtil) AttachDisk(b rbdMounter) (string, error) {
 	var err error
 	var output []byte
@@ -334,7 +285,7 @@ func (util *RBDUtil) DetachDisk(plugin *rbdPlugin, deviceMountPath string, devic
 // At last, it removes rbd.json file.
 func (util *RBDUtil) cleanOldRBDFile(plugin *rbdPlugin, rbdFile string) error {
 	mounter := &rbdMounter{
-		// util.rbdLock needs it to run command.
+		// util.rbdUnlock needs it to run command.
 		rbd: newRBD("", "", "", "", false, plugin, util),
 	}
 	fp, err := os.Open(rbdFile)
@@ -355,7 +306,7 @@ func (util *RBDUtil) cleanOldRBDFile(plugin *rbdPlugin, rbdFile string) error {
 	// remove rbd lock if found
 	// the disk is not attached to this node anymore, so the lock on image
 	// for this node can be removed safely
-	err = util.rbdLock(*mounter, false)
+	err = util.rbdUnlock(*mounter)
 	if err == nil {
 		os.Remove(rbdFile)
 	}
