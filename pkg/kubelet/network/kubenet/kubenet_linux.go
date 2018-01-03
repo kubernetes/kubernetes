@@ -765,7 +765,10 @@ func (plugin *kubenetNetworkPlugin) delContainerFromNetwork(config *libcni.Netwo
 	}
 
 	glog.V(3).Infof("Removing %s/%s from '%s' with CNI '%s' plugin and runtime: %+v", namespace, name, config.Network.Name, config.Network.Type, rt)
-	if err := plugin.cniConfig.DelNetwork(config, rt); err != nil {
+	err = plugin.cniConfig.DelNetwork(config, rt)
+	// The pod may not get deleted successfully at the first time.
+	// Ignore "no such file or directory" error in case the network has already been deleted in previous attempts.
+	if err != nil && !strings.Contains(err.Error(), "no such file or directory") {
 		return fmt.Errorf("Error removing container from network: %v", err)
 	}
 	return nil
