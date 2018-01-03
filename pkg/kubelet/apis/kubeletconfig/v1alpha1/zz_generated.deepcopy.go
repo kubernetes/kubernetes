@@ -185,6 +185,15 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 			**out = **in
 		}
 	}
+	if in.CAdvisorAllowDynamicHousekeeping != nil {
+		in, out := &in.CAdvisorAllowDynamicHousekeeping, &out.CAdvisorAllowDynamicHousekeeping
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(bool)
+			**out = **in
+		}
+	}
 	if in.CAdvisorPort != nil {
 		in, out := &in.CAdvisorPort, &out.CAdvisorPort
 		if *in == nil {

@@ -74,6 +74,9 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 	if obj.CAdvisorPort == nil {
 		obj.CAdvisorPort = utilpointer.Int32Ptr(4194)
 	}
+	if obj.CAdvisorAllowDynamicHousekeeping == nil {
+		obj.CAdvisorAllowDynamicHousekeeping = boolVar(true)
+	}
 	if obj.VolumeStatsAggPeriod == zeroDuration {
 		obj.VolumeStatsAggPeriod = metav1.Duration{Duration: time.Minute}
 	}

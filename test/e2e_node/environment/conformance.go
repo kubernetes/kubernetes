@@ -38,6 +38,8 @@ const failed = "\033[0;31mFAILED\033[0m"
 const notConfigured = "\033[0;34mNOT CONFIGURED\033[0m"
 const skipped = "\033[0;34mSKIPPED\033[0m"
 
+const allowDynamicHousekeeping = true
+
 var checkFlag = flag.String(
 	"check", "all", "what to check for conformance.  One or more of all,container-runtime,daemons,dns,firewall,kernel")
 
@@ -99,7 +101,7 @@ func containerRuntime() error {
 	}
 
 	// Setup cadvisor to check the container environment
-	c, err := cadvisor.New("", 0 /*don't start the http server*/, cadvisor.NewImageFsInfoProvider("docker", ""), "/var/lib/kubelet", false)
+	c, err := cadvisor.New("", 0 /*don't start the http server*/, cadvisor.NewImageFsInfoProvider("docker", ""), "/var/lib/kubelet", false, allowDynamicHousekeeping)
 	if err != nil {
 		return printError("Container Runtime Check: %s Could not start cadvisor %v", failed, err)
 	}
