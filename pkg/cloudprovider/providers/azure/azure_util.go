@@ -564,13 +564,11 @@ func (as *availabilitySet) GetPrimaryInterface(nodeName, vmSetName string) (netw
 	var machine compute.VirtualMachine
 
 	as.operationPollRateLimiter.Accept()
-	glog.V(10).Infof("VirtualMachinesClient.Get(%q): start", nodeName)
-	machine, err := as.VirtualMachineClientGetWithRetry(as.ResourceGroup, nodeName, "")
+	machine, err := as.GetVirtualMachineWithRetry(types.NodeName(nodeName))
 	if err != nil {
 		glog.V(2).Infof("GetPrimaryInterface(%s, %s) abort backoff", nodeName, vmSetName)
 		return network.Interface{}, err
 	}
-	glog.V(10).Infof("VirtualMachinesClient.Get(%q): end", nodeName)
 
 	primaryNicID, err := getPrimaryInterfaceID(machine)
 	if err != nil {
