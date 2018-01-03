@@ -1158,7 +1158,9 @@ func (proxier *Proxier) syncProxyRules() {
 		// We need to bind ClusterIP to dummy interface, so set `bindAddr` parameter to `true` in syncService()
 		if err := proxier.syncService(svcNameString, serv, true); err == nil {
 			activeIPVSServices[serv.String()] = true
-			if err := proxier.syncEndpoint(svcName, svcInfo.onlyNodeLocalEndpoints, serv); err != nil {
+			// ExternalTrafficPolicy only works for NodePort and external LB traffic, does not affect ClusterIP
+			// So we still need clusterIP rules in onlyNodeLocalEndpoints mode.
+			if err := proxier.syncEndpoint(svcName, false, serv); err != nil {
 				glog.Errorf("Failed to sync endpoint for service: %v, err: %v", serv, err)
 			}
 		} else {
