@@ -704,7 +704,6 @@ type EmptyDirVolumeSource struct {
 type StorageMedium string
 
 const (
-	StorageMediumDefault   StorageMedium = ""          // use whatever the default is for the node
 	StorageMediumMemory    StorageMedium = "Memory"    // use memory (tmpfs)
 	StorageMediumHugePages StorageMedium = "HugePages" // use hugepages
 )
@@ -2149,11 +2148,6 @@ const (
 	// PodReady means the pod is able to service requests and should be added to the
 	// load balancing pools of all matching services.
 	PodReady PodConditionType = "Ready"
-	// PodInitialized means that all init containers in the pod have started successfully.
-	PodInitialized PodConditionType = "Initialized"
-	// PodReasonUnschedulable reason in PodScheduled PodCondition means that the scheduler
-	// can't schedule the pod right now, for example due to insufficient resources in the cluster.
-	PodReasonUnschedulable = "Unschedulable"
 )
 
 type PodCondition struct {
@@ -2871,14 +2865,6 @@ type ReplicationControllerStatus struct {
 
 type ReplicationControllerConditionType string
 
-// These are valid conditions of a replication controller.
-const (
-	// ReplicationControllerReplicaFailure is added in a replication controller when one of its pods
-	// fails to be created due to insufficient quota, limit ranges, pod security policy, node selectors,
-	// etc. or deleted due to kubelet being down or finalizers are failing.
-	ReplicationControllerReplicaFailure ReplicationControllerConditionType = "ReplicaFailure"
-)
-
 // ReplicationControllerCondition describes the state of a replication controller at a certain point.
 type ReplicationControllerCondition struct {
 	// Type of replication controller condition.
@@ -3489,16 +3475,6 @@ type ContainerImage struct {
 
 type NodePhase string
 
-// These are the valid phases of node.
-const (
-	// NodePending means the node has been created/added by the system, but not configured.
-	NodePending NodePhase = "Pending"
-	// NodeRunning means the node has been configured and has Kubernetes components running.
-	NodeRunning NodePhase = "Running"
-	// NodeTerminated means the node has been removed from the cluster.
-	NodeTerminated NodePhase = "Terminated"
-)
-
 type NodeConditionType string
 
 // These are valid conditions of node. Currently, we don't have enough information to decide
@@ -3516,8 +3492,6 @@ const (
 	NodeDiskPressure NodeConditionType = "DiskPressure"
 	// NodeNetworkUnavailable means that network for the node is not correctly configured.
 	NodeNetworkUnavailable NodeConditionType = "NetworkUnavailable"
-	// NodeConfigOK indicates whether the kubelet is correctly configured
-	NodeConfigOK NodeConditionType = "ConfigOK"
 )
 
 type NodeCondition struct {
@@ -3707,8 +3681,6 @@ type Preconditions struct {
 type DeletionPropagation string
 
 const (
-	// Orphans the dependents.
-	DeletePropagationOrphan DeletionPropagation = "Orphan"
 	// Deletes the object from the key-value store, the garbage collector will delete the dependents in the background.
 	DeletePropagationBackground DeletionPropagation = "Background"
 	// The object exists in the key-value store until the garbage collector deletes all the dependents whose ownerReference.blockOwnerDeletion=true from the key-value store.
@@ -4056,12 +4028,6 @@ type EventSeries struct {
 
 type EventSeriesState string
 
-const (
-	EventSeriesStateOngoing  EventSeriesState = "Ongoing"
-	EventSeriesStateFinished EventSeriesState = "Finished"
-	EventSeriesStateUnknown  EventSeriesState = "Unknown"
-)
-
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // EventList is a list of events.
@@ -4296,12 +4262,6 @@ const (
 	ServiceAccountUIDKey = "kubernetes.io/service-account.uid"
 	// ServiceAccountTokenKey is the key of the required data for SecretTypeServiceAccountToken secrets
 	ServiceAccountTokenKey = "token"
-	// ServiceAccountKubeconfigKey is the key of the optional kubeconfig data for SecretTypeServiceAccountToken secrets
-	ServiceAccountKubeconfigKey = "kubernetes.kubeconfig"
-	// ServiceAccountRootCAKey is the key of the optional root certificate authority for SecretTypeServiceAccountToken secrets
-	ServiceAccountRootCAKey = "ca.crt"
-	// ServiceAccountNamespaceKey is the key of the optional namespace to use as the default for namespaced API calls
-	ServiceAccountNamespaceKey = "namespace"
 
 	// SecretTypeDockercfg contains a dockercfg file that follows the same format rules as ~/.dockercfg
 	//
