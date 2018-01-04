@@ -21,10 +21,11 @@ limitations under the License.
 package v1alpha1
 
 import (
+	unsafe "unsafe"
+
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	eventratelimit "k8s.io/kubernetes/plugin/pkg/admission/eventratelimit/apis/eventratelimit"
-	unsafe "unsafe"
 )
 
 func init() {

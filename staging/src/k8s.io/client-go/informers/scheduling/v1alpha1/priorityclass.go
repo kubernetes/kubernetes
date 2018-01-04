@@ -19,6 +19,8 @@ limitations under the License.
 package v1alpha1
 
 import (
+	time "time"
+
 	scheduling_v1alpha1 "k8s.io/api/scheduling/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
@@ -27,7 +29,6 @@ import (
 	kubernetes "k8s.io/client-go/kubernetes"
 	v1alpha1 "k8s.io/client-go/listers/scheduling/v1alpha1"
 	cache "k8s.io/client-go/tools/cache"
-	time "time"
 )
 
 // PriorityClassInformer provides access to a shared informer and lister for

@@ -19,6 +19,8 @@ limitations under the License.
 package internalversion
 
 import (
+	time "time"
+
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -27,7 +29,6 @@ import (
 	clientset_internalversion "k8s.io/code-generator/_examples/apiserver/clientset/internalversion"
 	internalinterfaces "k8s.io/code-generator/_examples/apiserver/informers/internalversion/internalinterfaces"
 	internalversion "k8s.io/code-generator/_examples/apiserver/listers/example/internalversion"
-	time "time"
 )
 
 // TestTypeInformer provides access to a shared informer and lister for

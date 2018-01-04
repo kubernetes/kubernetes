@@ -19,6 +19,8 @@ limitations under the License.
 package v1beta1
 
 import (
+	time "time"
+
 	policy_v1beta1 "k8s.io/api/policy/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
@@ -27,7 +29,6 @@ import (
 	kubernetes "k8s.io/client-go/kubernetes"
 	v1beta1 "k8s.io/client-go/listers/policy/v1beta1"
 	cache "k8s.io/client-go/tools/cache"
-	time "time"
 )
 
 // PodDisruptionBudgetInformer provides access to a shared informer and lister for

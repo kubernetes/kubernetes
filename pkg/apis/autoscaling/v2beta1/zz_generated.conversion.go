@@ -21,6 +21,8 @@ limitations under the License.
 package v2beta1
 
 import (
+	unsafe "unsafe"
+
 	v2beta1 "k8s.io/api/autoscaling/v2beta1"
 	v1 "k8s.io/api/core/v1"
 	resource "k8s.io/apimachinery/pkg/api/resource"
@@ -29,7 +31,6 @@ import (
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	autoscaling "k8s.io/kubernetes/pkg/apis/autoscaling"
 	core "k8s.io/kubernetes/pkg/apis/core"
-	unsafe "unsafe"
 )
 
 func init() {
