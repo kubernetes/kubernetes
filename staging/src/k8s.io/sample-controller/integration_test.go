@@ -25,6 +25,7 @@ import (
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	extensionclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	exttesting "k8s.io/apiextensions-apiserver/test/integration/testserver"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -41,7 +42,7 @@ func TestMain(m *testing.M) {
 	framework.EtcdMain(m.Run)
 }
 
-func TestNewDeployment(t *testing.T) {
+func TestController(t *testing.T) {
 	// Start an API server
 	result := apitesting.StartTestServerOrDie(t, nil, framework.SharedEtcd())
 	defer result.TearDownFn()
@@ -189,7 +190,10 @@ func TestNewDeployment(t *testing.T) {
 				metav1.GetOptions{},
 			)
 			if err != nil {
-				return false, nil
+				if errors.IsNotFound(err) {
+					return false, nil
+				}
+				return false, err
 			}
 			if *deployment.Spec.Replicas != 123 {
 				return false, fmt.Errorf(
