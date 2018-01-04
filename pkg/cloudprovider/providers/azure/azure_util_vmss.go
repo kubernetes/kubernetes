@@ -849,7 +849,7 @@ func (ss *scaleSet) EnsureHostsInPool(serviceName string, nodes []*v1.Node, back
 	}
 	ss.operationPollRateLimiter.Accept()
 	glog.V(10).Infof("VirtualMachineScaleSetsClient.UpdateInstances(%q): start", vmSetName)
-	mc := newMetricContext("vmss", "update_interfaces", ss.ResourceGroup, ss.SubscriptionID)
+	mc := newMetricContext("vmss", "update_instances", ss.ResourceGroup, ss.SubscriptionID)
 	respChan, errChan := ss.VirtualMachineScaleSetsClient.UpdateInstances(ss.ResourceGroup, vmSetName, vmInstanceIDs, nil)
 	resp := <-respChan
 	err = <-errChan
@@ -945,7 +945,7 @@ func (ss *scaleSet) EnsureBackendPoolDeleted(poolID, vmSetName string) error {
 	}
 	ss.operationPollRateLimiter.Accept()
 	glog.V(10).Infof("VirtualMachineScaleSetsClient.UpdateInstances(%q): start", vmSetName)
-	mc = newMetricContext("vmss", "update_interfaces", ss.ResourceGroup, ss.SubscriptionID)
+	mc = newMetricContext("vmss", "update_instances", ss.ResourceGroup, ss.SubscriptionID)
 	updateRespChan, errChan := ss.VirtualMachineScaleSetsClient.UpdateInstances(ss.ResourceGroup, vmSetName, vmInstanceIDs, nil)
 	updateResp := <-updateRespChan
 	err = <-errChan

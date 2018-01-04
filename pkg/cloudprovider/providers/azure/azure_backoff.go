@@ -155,7 +155,7 @@ func (az *Cloud) CreateOrUpdateSGWithRetry(sg network.SecurityGroup) error {
 	return wait.ExponentialBackoff(az.requestBackoff(), func() (bool, error) {
 		az.operationPollRateLimiter.Accept()
 		glog.V(10).Infof("SecurityGroupsClient.CreateOrUpdate(%s): start", *sg.Name)
-		mc := newMetricContext("security_groups", "crate_or_update", az.ResourceGroup, az.SubscriptionID)
+		mc := newMetricContext("security_groups", "create_or_update", az.ResourceGroup, az.SubscriptionID)
 		respChan, errChan := az.SecurityGroupsClient.CreateOrUpdate(az.ResourceGroup, *sg.Name, sg, nil)
 		resp := <-respChan
 		err := <-errChan
@@ -170,7 +170,7 @@ func (az *Cloud) CreateOrUpdateLBWithRetry(lb network.LoadBalancer) error {
 	return wait.ExponentialBackoff(az.requestBackoff(), func() (bool, error) {
 		az.operationPollRateLimiter.Accept()
 		glog.V(10).Infof("LoadBalancerClient.CreateOrUpdate(%s): start", *lb.Name)
-		mc := newMetricContext("load_balancer", "crate_or_update", az.ResourceGroup, az.SubscriptionID)
+		mc := newMetricContext("load_balancer", "create_or_update", az.ResourceGroup, az.SubscriptionID)
 		respChan, errChan := az.LoadBalancerClient.CreateOrUpdate(az.ResourceGroup, *lb.Name, lb, nil)
 		resp := <-respChan
 		err := <-errChan
@@ -319,7 +319,7 @@ func (az *Cloud) CreateOrUpdateInterfaceWithRetry(nic network.Interface) error {
 	return wait.ExponentialBackoff(az.requestBackoff(), func() (bool, error) {
 		az.operationPollRateLimiter.Accept()
 		glog.V(10).Infof("InterfacesClient.CreateOrUpdate(%s): start", *nic.Name)
-		mc := newMetricContext("interfaces", "crate_or_update", az.ResourceGroup, az.SubscriptionID)
+		mc := newMetricContext("interfaces", "create_or_update", az.ResourceGroup, az.SubscriptionID)
 		respChan, errChan := az.InterfacesClient.CreateOrUpdate(az.ResourceGroup, *nic.Name, nic, nil)
 		resp := <-respChan
 		err := <-errChan
