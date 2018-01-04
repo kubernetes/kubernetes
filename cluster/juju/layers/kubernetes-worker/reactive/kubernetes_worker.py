@@ -969,7 +969,8 @@ def get_node_name():
 
                     # if we didn't match, just bail to the next node
                     break
-    return ""
+    msg = 'Failed to get node name for node %s' % gethostname()
+    raise GetNodeNameFailed(msg)
 
 
 class ApplyNodeLabelFailed(Exception):
@@ -979,9 +980,6 @@ class ApplyNodeLabelFailed(Exception):
 def _apply_node_label(label, delete=False, overwrite=False):
     ''' Invoke kubectl to apply node label changes '''
     nodename = get_node_name()
-    if nodename == "":
-        msg = 'Unable to get node name for node {}'.format(gethostname())
-        raise ApplyNodeLabelFailed(msg)
 
     # TODO: Make this part of the kubectl calls instead of a special string
     cmd_base = 'kubectl --kubeconfig={0} label node {1} {2}'
