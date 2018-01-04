@@ -67,7 +67,7 @@ func (c *ManagedDiskController) CreateManagedDisk(diskName string, storageAccoun
 	respChan, errChan := c.common.cloud.DisksClient.CreateOrUpdate(c.common.resourceGroup, diskName, model, cancel)
 	<-respChan
 	err := <-errChan
-	err = mc.Observe(err)
+	mc.Observe(err)
 	if err != nil {
 		return "", err
 	}
@@ -106,7 +106,7 @@ func (c *ManagedDiskController) DeleteManagedDisk(diskURI string) error {
 	respChan, errChan := c.common.cloud.DisksClient.Delete(c.common.resourceGroup, diskName, cancel)
 	<-respChan
 	err := <-errChan
-	err = mc.Observe(err)
+	mc.Observe(err)
 	if err != nil {
 		return err
 	}
@@ -122,7 +122,7 @@ func (c *ManagedDiskController) DeleteManagedDisk(diskURI string) error {
 func (c *ManagedDiskController) getDisk(diskName string) (string, string, error) {
 	mc := newMetricContext("disks", "get", c.common.resourceGroup, c.common.subscriptionID)
 	result, err := c.common.cloud.DisksClient.Get(c.common.resourceGroup, diskName)
-	err = mc.Observe(err)
+	mc.Observe(err)
 	if err != nil {
 		return "", "", err
 	}

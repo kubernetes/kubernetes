@@ -405,7 +405,7 @@ func (ss *scaleSet) listScaleSetsWithRetry() ([]string, error) {
 		glog.V(10).Infof("VirtualMachineScaleSetsClient.List start for %v", ss.ResourceGroup)
 		mc := newMetricContext("vmss", "list", ss.ResourceGroup, ss.SubscriptionID)
 		result, err = ss.VirtualMachineScaleSetsClient.List(ss.ResourceGroup)
-		err = mc.Observe(err)
+		mc.Observe(err)
 		glog.V(10).Infof("VirtualMachineScaleSetsClient.List end for %v", ss.ResourceGroup)
 		if err != nil {
 			glog.Errorf("VirtualMachineScaleSetsClient.List for %v failed: %v", ss.ResourceGroup, err)
@@ -431,7 +431,7 @@ func (ss *scaleSet) listScaleSetsWithRetry() ([]string, error) {
 				glog.V(10).Infof("VirtualMachineScaleSetsClient.ListNextResults start for %v", ss.ResourceGroup)
 				mc := newMetricContext("vmss", "list_next_results", ss.ResourceGroup, ss.SubscriptionID)
 				result, err = ss.VirtualMachineScaleSetsClient.ListNextResults(result)
-				err = mc.Observe(err)
+				mc.Observe(err)
 				glog.V(10).Infof("VirtualMachineScaleSetsClient.ListNextResults end for %v", ss.ResourceGroup)
 				if err != nil {
 					glog.Errorf("VirtualMachineScaleSetsClient.ListNextResults for %v failed: %v", ss.ResourceGroup, err)
@@ -463,7 +463,7 @@ func (ss *scaleSet) listScaleSetVMsWithRetry(scaleSetName string) ([]compute.Vir
 		glog.V(10).Infof("VirtualMachineScaleSetVMsClient.List start for %v", scaleSetName)
 		mc := newMetricContext("vmss", "list", ss.ResourceGroup, ss.SubscriptionID)
 		result, err = ss.VirtualMachineScaleSetVMsClient.List(ss.ResourceGroup, scaleSetName, "", "", string(compute.InstanceView))
-		err = mc.Observe(err)
+		mc.Observe(err)
 		glog.V(10).Infof("VirtualMachineScaleSetVMsClient.List end for %v", scaleSetName)
 		if err != nil {
 			glog.Errorf("VirtualMachineScaleSetVMsClient.List for %v failed: %v", scaleSetName, err)
@@ -487,7 +487,7 @@ func (ss *scaleSet) listScaleSetVMsWithRetry(scaleSetName string) ([]compute.Vir
 				glog.V(10).Infof("VirtualMachineScaleSetVMsClient.ListNextResults start for %v", scaleSetName)
 				mc := newMetricContext("vmss", "list_next_results", ss.ResourceGroup, ss.SubscriptionID)
 				result, err = ss.VirtualMachineScaleSetVMsClient.ListNextResults(result)
-				err = mc.Observe(err)
+				mc.Observe(err)
 				glog.V(10).Infof("VirtualMachineScaleSetVMsClient.ListNextResults end for %v", ss.ResourceGroup)
 				if err != nil {
 					glog.Errorf("VirtualMachineScaleSetVMsClient.ListNextResults for %v failed: %v", scaleSetName, err)
@@ -634,7 +634,7 @@ func (ss *scaleSet) GetPrimaryInterface(nodeName, vmSetName string) (network.Int
 	glog.V(10).Infof("InterfacesClient.Get(%q): start", nicName)
 	mc := newMetricContext("interfaces", "get_vmss_nic", ss.ResourceGroup, ss.SubscriptionID)
 	nic, err := ss.InterfacesClient.GetVirtualMachineScaleSetNetworkInterface(ss.ResourceGroup, vm.ScaleSetName, vm.InstanceID, nicName, "")
-	err = mc.Observe(err)
+	mc.Observe(err)
 	glog.V(10).Infof("InterfacesClient.Get(%q): end", nicName)
 	if err != nil {
 		glog.Errorf("error: ss.GetPrimaryInterface(%s), ss.GetVirtualMachineScaleSetNetworkInterface.Get(%s, %s, %s), err=%v", nodeName, ss.ResourceGroup, vm.ScaleSetName, nicName, err)
@@ -656,7 +656,7 @@ func (ss *scaleSet) getScaleSet(name string) (compute.VirtualMachineScaleSet, bo
 	glog.V(10).Infof("VirtualMachineScaleSetsClient.Get(%s): start", name)
 	mc := newMetricContext("vmss", "get", ss.ResourceGroup, ss.SubscriptionID)
 	result, err := ss.VirtualMachineScaleSetsClient.Get(ss.ResourceGroup, name)
-	err = mc.Observe(err)
+	mc.Observe(err)
 	glog.V(10).Infof("VirtualMachineScaleSetsClient.Get(%s): end", name)
 
 	exists, realErr := checkResourceExistsFromError(err)
@@ -732,7 +732,7 @@ func (ss *scaleSet) createOrUpdateVMSSWithRetry(virtualMachineScaleSet compute.V
 		respChan, errChan := ss.VirtualMachineScaleSetsClient.CreateOrUpdate(ss.ResourceGroup, *virtualMachineScaleSet.Name, virtualMachineScaleSet, nil)
 		resp := <-respChan
 		err := <-errChan
-		err = mc.Observe(err)
+		mc.Observe(err)
 		glog.V(10).Infof("VirtualMachineScaleSetsClient.CreateOrUpdate(%s): end", *virtualMachineScaleSet.Name)
 		return processRetryResponse(resp.Response, err)
 	})
@@ -747,7 +747,7 @@ func (ss *scaleSet) updateVMSSInstancesWithRetry(scaleSetName string, vmInstance
 		respChan, errChan := ss.VirtualMachineScaleSetsClient.UpdateInstances(ss.ResourceGroup, scaleSetName, vmInstanceIDs, nil)
 		resp := <-respChan
 		err := <-errChan
-		err = mc.Observe(err)
+		mc.Observe(err)
 		glog.V(10).Infof("VirtualMachineScaleSetsClient.UpdateInstances(%s): end", scaleSetName)
 		return processRetryResponse(resp.Response, err)
 	})
@@ -806,7 +806,7 @@ func (ss *scaleSet) EnsureHostsInPool(serviceName string, nodes []*v1.Node, back
 		respChan, errChan := ss.VirtualMachineScaleSetsClient.CreateOrUpdate(ss.ResourceGroup, vmSetName, virtualMachineScaleSet, nil)
 		resp := <-respChan
 		err := <-errChan
-		err = mc.Observe(err)
+		mc.Observe(err)
 		glog.V(10).Infof("VirtualMachineScaleSetsClient.CreateOrUpdate(%q): end", vmSetName)
 		if ss.CloudProviderBackoff && shouldRetryAPIRequest(resp.Response, err) {
 			glog.V(2).Infof("VirtualMachineScaleSetsClient.CreateOrUpdate for service (%): scale set (%s) - updating, err=%v", serviceName, vmSetName, err)
@@ -853,7 +853,7 @@ func (ss *scaleSet) EnsureHostsInPool(serviceName string, nodes []*v1.Node, back
 	respChan, errChan := ss.VirtualMachineScaleSetsClient.UpdateInstances(ss.ResourceGroup, vmSetName, vmInstanceIDs, nil)
 	resp := <-respChan
 	err = <-errChan
-	err = mc.Observe(err)
+	mc.Observe(err)
 	glog.V(10).Infof("VirtualMachineScaleSetsClient.UpdateInstances(%q): end", vmSetName)
 	if ss.CloudProviderBackoff && shouldRetryAPIRequest(resp.Response, err) {
 		glog.V(2).Infof("VirtualMachineScaleSetsClient.UpdateInstances for service (%): scale set (%s) - updating, err=%v", serviceName, vmSetName, err)
@@ -924,7 +924,7 @@ func (ss *scaleSet) EnsureBackendPoolDeleted(poolID, vmSetName string) error {
 	respChan, errChan := ss.VirtualMachineScaleSetsClient.CreateOrUpdate(ss.ResourceGroup, vmSetName, virtualMachineScaleSet, nil)
 	resp := <-respChan
 	err = <-errChan
-	err = mc.Observe(err)
+	mc.Observe(err)
 	glog.V(10).Infof("VirtualMachineScaleSetsClient.CreateOrUpdate(%q): end", vmSetName)
 	if ss.CloudProviderBackoff && shouldRetryAPIRequest(resp.Response, err) {
 		glog.V(2).Infof("VirtualMachineScaleSetsClient.CreateOrUpdate: scale set (%s) - updating, err=%v", vmSetName, err)
@@ -949,7 +949,7 @@ func (ss *scaleSet) EnsureBackendPoolDeleted(poolID, vmSetName string) error {
 	updateRespChan, errChan := ss.VirtualMachineScaleSetsClient.UpdateInstances(ss.ResourceGroup, vmSetName, vmInstanceIDs, nil)
 	updateResp := <-updateRespChan
 	err = <-errChan
-	err = mc.Observe(err)
+	mc.Observe(err)
 	glog.V(10).Infof("VirtualMachineScaleSetsClient.UpdateInstances(%q): end", vmSetName)
 	if ss.CloudProviderBackoff && shouldRetryAPIRequest(updateResp.Response, err) {
 		glog.V(2).Infof("VirtualMachineScaleSetsClient.UpdateInstances scale set (%s) - updating, err=%v", vmSetName, err)

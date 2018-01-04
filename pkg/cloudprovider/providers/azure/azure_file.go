@@ -42,18 +42,18 @@ func (az *Cloud) createFileShare(accountName, accountKey, name string, sizeGB in
 
 	mc := newMetricContext("file_share", "create", az.ResourceGroup, az.SubscriptionID)
 	err = share.Create(nil)
-	err = mc.Observe(err)
+	mc.Observe(err)
 	if err != nil {
 		return fmt.Errorf("failed to create file share, err: %v", err)
 	}
 	share.Properties.Quota = sizeGB
 	mc = newMetricContext("file_share", "set_properties", az.ResourceGroup, az.SubscriptionID)
 	err = share.SetProperties(nil)
-	err = mc.Observe(err)
+	mc.Observe(err)
 	if err != nil {
 		mc = newMetricContext("file_share", "delete", az.ResourceGroup, az.SubscriptionID)
 		err := share.Delete(nil)
-		err = mc.Observe(err)
+		mc.Observe(err)
 		if err != nil {
 			glog.Errorf("Error deleting share: %v", err)
 		}
@@ -68,7 +68,9 @@ func (az *Cloud) deleteFileShare(accountName, accountKey, name string) error {
 	if err == nil {
 		share := fileClient.GetShareReference(name)
 		mc := newMetricContext("file_share", "delete", az.ResourceGroup, az.SubscriptionID)
-		return mc.Observe(share.Delete(nil))
+		err := share.Delete(nil)
+		mc.Observe(err)
+		return err
 	}
 	return nil
 }

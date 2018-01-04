@@ -428,7 +428,7 @@ func (az *Cloud) ensurePublicIPExists(service *v1.Service, pipName string, domai
 	glog.V(10).Infof("PublicIPAddressesClient.Get(%s, %q): start", pipResourceGroup, *pip.Name)
 	mc := newMetricContext("public_ip_addresses", "get", az.ResourceGroup, az.SubscriptionID)
 	pip, err = az.PublicIPAddressesClient.Get(pipResourceGroup, *pip.Name, "")
-	err = mc.Observe(err)
+	mc.Observe(err)
 	glog.V(10).Infof("PublicIPAddressesClient.Get(%s, %q): end", pipResourceGroup, *pip.Name)
 	if err != nil {
 		return nil, err
@@ -814,7 +814,7 @@ func (az *Cloud) reconcileSecurityGroup(clusterName string, service *v1.Service,
 	glog.V(10).Infof("SecurityGroupsClient.Get(%q): start", az.SecurityGroupName)
 	mc := newMetricContext("security_groups", "get", az.ResourceGroup, az.SubscriptionID)
 	sg, err := az.SecurityGroupsClient.Get(az.ResourceGroup, az.SecurityGroupName, "")
-	err = mc.Observe(err)
+	mc.Observe(err)
 	glog.V(10).Infof("SecurityGroupsClient.Get(%q): end", az.SecurityGroupName)
 	if err != nil {
 		return nil, err
