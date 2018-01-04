@@ -528,12 +528,6 @@ func (ds *dockerService) makeSandboxDockerConfig(c *runtimeapi.PodSandboxConfig,
 	// TODO(random-liu): Deprecate this label once container metrics is directly got from CRI.
 	labels[types.KubernetesContainerNameLabel] = sandboxContainerName
 
-	apiVersion, err := ds.getDockerAPIVersion()
-	if err != nil {
-		return nil, fmt.Errorf("unable to get the docker API version: %v", err)
-	}
-	securityOptSep := getSecurityOptSeparator(apiVersion)
-
 	hc := &dockercontainer.HostConfig{}
 	createConfig := &dockertypes.ContainerCreateConfig{
 		Name: makeSandboxName(c),
@@ -547,7 +541,7 @@ func (ds *dockerService) makeSandboxDockerConfig(c *runtimeapi.PodSandboxConfig,
 	}
 
 	// Apply linux-specific options.
-	if err := ds.applySandboxLinuxOptions(hc, c.GetLinux(), createConfig, image, securityOptSep); err != nil {
+	if err := ds.applySandboxLinuxOptions(hc, c.GetLinux(), createConfig, image, securityOptSeparator); err != nil {
 		return nil, err
 	}
 
@@ -565,7 +559,7 @@ func (ds *dockerService) makeSandboxDockerConfig(c *runtimeapi.PodSandboxConfig,
 	}
 
 	// Set security options.
-	securityOpts, err := ds.getSecurityOpts(c.GetLinux().GetSecurityContext().GetSeccompProfilePath(), securityOptSep)
+	securityOpts, err := ds.getSecurityOpts(c.GetLinux().GetSecurityContext().GetSeccompProfilePath(), securityOptSeparator)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate sandbox security options for sandbox %q: %v", c.Metadata.Name, err)
 	}
