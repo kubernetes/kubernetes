@@ -162,7 +162,15 @@ func (kl *Kubelet) getPodResourcesDir() string {
 // GetPods returns all pods bound to the kubelet and their spec, and the mirror
 // pods.
 func (kl *Kubelet) GetPods() []*v1.Pod {
-	return kl.podManager.GetPods()
+	pods := kl.podManager.GetPods()
+	// a kubelet running without apiserver requires an additional
+	// update of the static pod status. See #57106
+	for _, p := range pods {
+		if status, ok := kl.statusManager.GetPodStatus(p.UID); ok {
+			p.Status = status
+		}
+	}
+	return pods
 }
 
 // GetRunningPods returns all pods running on kubelet from looking at the
