@@ -84,6 +84,7 @@ const (
 	heketiAnn               = "heketi-dynamic-provisioner"
 	glusterTypeAnn          = "gluster.org/type"
 	glusterDescAnn          = "Gluster-Internal: Dynamically provisioned PV"
+	heketiVolIDAnn          = "gluster.kubernetes.io/heketi-volume-id"
 )
 
 func (plugin *glusterfsPlugin) Init(host volume.VolumeHost) error {
@@ -695,7 +696,7 @@ func (p *glusterfsVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
 
 	glog.V(2).Infof("Allocated GID [%d] for PVC %s", gid, p.options.PVC.Name)
 
-	glusterfs, sizeGiB, err := p.CreateVolume(gid)
+	glusterfs, sizeGiB, volID, err := p.CreateVolume(gid)
 	if err != nil {
 		if releaseErr := gidTable.Release(gid); releaseErr != nil {
 			glog.Errorf("error when releasing GID in storageclass: %s", scName)
@@ -723,6 +724,7 @@ func (p *glusterfsVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
 		glusterTypeAnn:                             "file",
 		"Description":                              glusterDescAnn,
 		v1.MountOptionAnnotation:                   "auto_unmount",
+		heketiVolIDAnn:                             volID,
 	}
 
 	pv.Spec.Capacity = v1.ResourceList{
@@ -731,7 +733,7 @@ func (p *glusterfsVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
 	return pv, nil
 }
 
-func (p *glusterfsVolumeProvisioner) CreateVolume(gid int) (r *v1.GlusterfsVolumeSource, size int, err error) {
+func (p *glusterfsVolumeProvisioner) CreateVolume(gid int) (r *v1.GlusterfsVolumeSource, size int, volID string, err error) {
 	var clusterIDs []string
 	capacity := p.options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
 	// Glusterfs creates volumes in units of GiB, but heketi documentation incorrectly reports GBs
@@ -739,12 +741,12 @@ func (p *glusterfsVolumeProvisioner) CreateVolume(gid int) (r *v1.GlusterfsVolum
 	glog.V(2).Infof("create volume of size: %d GiB and configuration %+v", sz, p.provisionerConfig)
 	if p.url == "" {
 		glog.Errorf("REST server endpoint is empty")
-		return nil, 0, fmt.Errorf("failed to create glusterfs REST client, REST URL is empty")
+		return nil, 0, "", fmt.Errorf("failed to create glusterfs REST client, REST URL is empty")
 	}
 	cli := gcli.NewClient(p.url, p.user, p.secretValue)
 	if cli == nil {
 		glog.Errorf("failed to create glusterfs rest client")
-		return nil, 0, fmt.Errorf("failed to create glusterfs REST client, REST server authentication failed")
+		return nil, 0, "", fmt.Errorf("failed to create glusterfs REST client, REST server authentication failed")
 	}
 	if p.provisionerConfig.clusterID != "" {
 		clusterIDs = dstrings.Split(p.clusterID, ",")
@@ -755,13 +757,14 @@ func (p *glusterfsVolumeProvisioner) CreateVolume(gid int) (r *v1.GlusterfsVolum
 	volume, err := cli.VolumeCreate(volumeReq)
 	if err != nil {
 		glog.Errorf("error creating volume %v ", err)
-		return nil, 0, fmt.Errorf("error creating volume %v", err)
+		return nil, 0, "", fmt.Errorf("error creating volume %v", err)
 	}
 	glog.V(1).Infof("volume with size: %d and name: %s created", volume.Size, volume.Name)
+	volID = volume.Id
 	dynamicHostIps, err := getClusterNodes(cli, volume.Cluster)
 	if err != nil {
 		glog.Errorf("error [%v] when getting cluster nodes for volume %s", err, volume)
-		return nil, 0, fmt.Errorf("error [%v] when getting cluster nodes for volume %s", err, volume)
+		return nil, 0, "", fmt.Errorf("error [%v] when getting cluster nodes for volume %s", err, volume)
 	}
 
 	// The 'endpointname' is created in form of 'glusterfs-dynamic-<claimname>'.
@@ -777,14 +780,14 @@ func (p *glusterfsVolumeProvisioner) CreateVolume(gid int) (r *v1.GlusterfsVolum
 		if deleteErr != nil {
 			glog.Errorf("error when deleting the volume :%v , manual deletion required", deleteErr)
 		}
-		return nil, 0, fmt.Errorf("failed to create endpoint/service %v", err)
+		return nil, 0, "", fmt.Errorf("failed to create endpoint/service %v", err)
 	}
 	glog.V(3).Infof("dynamic ep %v and svc : %v ", endpoint, service)
 	return &v1.GlusterfsVolumeSource{
 		EndpointsName: endpoint.Name,
 		Path:          volume.Name,
 		ReadOnly:      false,
-	}, sz, nil
+	}, sz, volID, nil
 }
 
 func (p *glusterfsVolumeProvisioner) createEndpointService(namespace string, epServiceName string, hostips []string, pvcname string) (endpoint *v1.Endpoints, service *v1.Service, err error) {
