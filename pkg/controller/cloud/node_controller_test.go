@@ -35,7 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/testutil"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
-	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
+	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 
 	"github.com/golang/glog"
 	"github.com/stretchr/testify/assert"

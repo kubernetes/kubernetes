@@ -117,6 +117,13 @@
                 "k8s.io/kubernetes/pkg/printers/internalversion",
                 "k8s.io/kubernetes/pkg/registry/rbac/reconciliation",
                 "k8s.io/kubernetes/pkg/registry/rbac/validation",
+                "k8s.io/kubernetes/pkg/scheduler/algorithm",
+                "k8s.io/kubernetes/pkg/scheduler/algorithm/predicates",
+                "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities/util",
+                "k8s.io/kubernetes/pkg/scheduler/api",
+                "k8s.io/kubernetes/pkg/scheduler/schedulercache",
+                "k8s.io/kubernetes/pkg/scheduler/util",
+                "k8s.io/kubernetes/pkg/scheduler/volumebinder",
                 "k8s.io/kubernetes/pkg/security/apparmor",
                 "k8s.io/kubernetes/pkg/serviceaccount",
                 "k8s.io/kubernetes/pkg/util/file",
@@ -137,13 +144,7 @@
                 "k8s.io/kubernetes/pkg/version",
                 "k8s.io/kubernetes/pkg/version/prometheus",
                 "k8s.io/kubernetes/pkg/volume",
-                "k8s.io/kubernetes/pkg/volume/util",
-                "k8s.io/kubernetes/plugin/pkg/scheduler/algorithm",
-                "k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates",
-                "k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/priorities/util",
-                "k8s.io/kubernetes/plugin/pkg/scheduler/api",
-                "k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache",
-                "k8s.io/kubernetes/plugin/pkg/scheduler/util"
+                "k8s.io/kubernetes/pkg/volume/util"
 		],
 		"ForbiddenPrefixes": []
 	}]

@@ -20,7 +20,7 @@ import (
 	"flag"
 
 	"k8s.io/apiserver/pkg/server/healthz"
-	"k8s.io/kubernetes/plugin/cmd/kube-scheduler/app"
+	"k8s.io/kubernetes/cmd/kube-scheduler/app"
 )
 
 // NewScheduler creates a new hyperkube Server object that includes the

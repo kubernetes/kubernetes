@@ -466,21 +466,6 @@ $(filter-out %$(EXCLUDE_TARGET),$(notdir $(abspath $(wildcard cmd/*/)))): genera
 	hack/make-rules/build.sh cmd/$@
 endif
 
-define PLUGIN_CMD_HELP_INFO
-# Add rules for all directories in plugin/cmd/
-#
-# Example:
-#   make kube-scheduler
-endef
-.PHONY: $(notdir $(abspath $(wildcard plugin/cmd/*/)))
-ifeq ($(PRINT_HELP),y)
-$(notdir $(abspath $(wildcard plugin/cmd/*/))):
-	@echo "$$PLUGIN_CMD_HELP_INFO"
-else
-$(notdir $(abspath $(wildcard plugin/cmd/*/))): generated_files
-	hack/make-rules/build.sh plugin/cmd/$@
-endif
-
 define GENERATED_FILES_HELP_INFO
 # Produce auto-generated files needed for the build.
 #

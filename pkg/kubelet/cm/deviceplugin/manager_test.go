@@ -35,8 +35,8 @@ import (
 	pluginapi "k8s.io/kubernetes/pkg/kubelet/apis/deviceplugin/v1alpha"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	utilstore "k8s.io/kubernetes/pkg/kubelet/util/store"
+	"k8s.io/kubernetes/pkg/scheduler/schedulercache"
 	utilfs "k8s.io/kubernetes/pkg/util/filesystem"
-	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 )
 
 const (

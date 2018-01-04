@@ -32,7 +32,7 @@ import (
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
-	schedulerutils "k8s.io/kubernetes/plugin/pkg/scheduler/util"
+	schedulerutils "k8s.io/kubernetes/pkg/scheduler/util"
 )
 
 const (
