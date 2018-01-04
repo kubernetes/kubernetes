@@ -247,11 +247,6 @@ const MaxReadThenCreateRetries = 30
 // need hardcoded defaults.
 const DefaultVolumeType = "gp2"
 
-// DefaultMaxEBSVolumes is the limit for volumes attached to an instance.
-// Amazon recommends no more than 40; the system root volume uses at least one.
-// See http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/volume_limits.html#linux-specific-volume-limits
-const DefaultMaxEBSVolumes = 39
-
 // Used to call RecognizeWellKnownRegions just once
 var once sync.Once
 
