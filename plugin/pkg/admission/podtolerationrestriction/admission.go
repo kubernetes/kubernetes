@@ -37,6 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubeapiserver/admission/util"
 	"k8s.io/kubernetes/pkg/util/tolerations"
 	pluginapi "k8s.io/kubernetes/plugin/pkg/admission/podtolerationrestriction/apis/podtolerationrestriction"
+	pluginapiv1alpha1 "k8s.io/kubernetes/plugin/pkg/admission/podtolerationrestriction/apis/podtolerationrestriction/v1alpha1"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 )
 
@@ -49,6 +50,9 @@ func Register(plugins *admission.Plugins) {
 		}
 		return NewPodTolerationsPlugin(pluginConfig), nil
 	})
+	// add our config types
+	pluginapi.AddToScheme(plugins.ConfigScheme)
+	pluginapiv1alpha1.AddToScheme(plugins.ConfigScheme)
 }
 
 // The annotation keys for default and whitelist of tolerations

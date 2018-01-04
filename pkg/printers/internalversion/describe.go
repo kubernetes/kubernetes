@@ -1081,7 +1081,7 @@ func printFlexPersistentVolumeSource(flex *api.FlexPersistentVolumeSource, w Pre
 		"    Driver:\t%v\n"+
 		"    FSType:\t%v\n"+
 		"    SecretRef:\t%v\n"+
-		"    ReadOnly:\t%v\n",
+		"    ReadOnly:\t%v\n"+
 		"    Options:\t%v\n",
 		flex.Driver, flex.FSType, flex.SecretRef, flex.ReadOnly, flex.Options)
 }
@@ -2635,10 +2635,11 @@ func describeNode(node *api.Node, nodeNonTerminatedPodsList *api.PodList, events
 		if len(node.Spec.ExternalID) > 0 {
 			w.Write(LEVEL_0, "ExternalID:\t%s\n", node.Spec.ExternalID)
 		}
+		if len(node.Spec.ProviderID) > 0 {
+			w.Write(LEVEL_0, "ProviderID:\t%s\n", node.Spec.ProviderID)
+		}
 		if canViewPods && nodeNonTerminatedPodsList != nil {
-			if err := describeNodeResource(nodeNonTerminatedPodsList, node, w); err != nil {
-				return err
-			}
+			describeNodeResource(nodeNonTerminatedPodsList, node, w)
 		} else {
 			w.Write(LEVEL_0, "Pods:\tnot authorized\n")
 		}
@@ -2878,7 +2879,7 @@ func describeHorizontalPodAutoscaler(hpa *autoscaling.HorizontalPodAutoscaler, e
 	})
 }
 
-func describeNodeResource(nodeNonTerminatedPodsList *api.PodList, node *api.Node, w PrefixWriter) error {
+func describeNodeResource(nodeNonTerminatedPodsList *api.PodList, node *api.Node, w PrefixWriter) {
 	w.Write(LEVEL_0, "Non-terminated Pods:\t(%d in total)\n", len(nodeNonTerminatedPodsList.Items))
 	w.Write(LEVEL_1, "Namespace\tName\t\tCPU Requests\tCPU Limits\tMemory Requests\tMemory Limits\n")
 	w.Write(LEVEL_1, "---------\t----\t\t------------\t----------\t---------------\t-------------\n")
@@ -2888,10 +2889,7 @@ func describeNodeResource(nodeNonTerminatedPodsList *api.PodList, node *api.Node
 	}
 
 	for _, pod := range nodeNonTerminatedPodsList.Items {
-		req, limit, err := resourcehelper.PodRequestsAndLimits(&pod)
-		if err != nil {
-			return err
-		}
+		req, limit := resourcehelper.PodRequestsAndLimits(&pod)
 		cpuReq, cpuLimit, memoryReq, memoryLimit := req[api.ResourceCPU], limit[api.ResourceCPU], req[api.ResourceMemory], limit[api.ResourceMemory]
 		fractionCpuReq := float64(cpuReq.MilliValue()) / float64(allocatable.Cpu().MilliValue()) * 100
 		fractionCpuLimit := float64(cpuLimit.MilliValue()) / float64(allocatable.Cpu().MilliValue()) * 100
@@ -2904,10 +2902,7 @@ func describeNodeResource(nodeNonTerminatedPodsList *api.PodList, node *api.Node
 
 	w.Write(LEVEL_0, "Allocated resources:\n  (Total limits may be over 100 percent, i.e., overcommitted.)\n  CPU Requests\tCPU Limits\tMemory Requests\tMemory Limits\n")
 	w.Write(LEVEL_1, "------------\t----------\t---------------\t-------------\n")
-	reqs, limits, err := getPodsTotalRequestsAndLimits(nodeNonTerminatedPodsList)
-	if err != nil {
-		return err
-	}
+	reqs, limits := getPodsTotalRequestsAndLimits(nodeNonTerminatedPodsList)
 	cpuReqs, cpuLimits, memoryReqs, memoryLimits := reqs[api.ResourceCPU], limits[api.ResourceCPU], reqs[api.ResourceMemory], limits[api.ResourceMemory]
 	fractionCpuReqs := float64(cpuReqs.MilliValue()) / float64(allocatable.Cpu().MilliValue()) * 100
 	fractionCpuLimits := float64(cpuLimits.MilliValue()) / float64(allocatable.Cpu().MilliValue()) * 100
@@ -2916,16 +2911,12 @@ func describeNodeResource(nodeNonTerminatedPodsList *api.PodList, node *api.Node
 	w.Write(LEVEL_1, "%s (%d%%)\t%s (%d%%)\t%s (%d%%)\t%s (%d%%)\n",
 		cpuReqs.String(), int64(fractionCpuReqs), cpuLimits.String(), int64(fractionCpuLimits),
 		memoryReqs.String(), int64(fractionMemoryReqs), memoryLimits.String(), int64(fractionMemoryLimits))
-	return nil
 }
 
-func getPodsTotalRequestsAndLimits(podList *api.PodList) (reqs map[api.ResourceName]resource.Quantity, limits map[api.ResourceName]resource.Quantity, err error) {
+func getPodsTotalRequestsAndLimits(podList *api.PodList) (reqs map[api.ResourceName]resource.Quantity, limits map[api.ResourceName]resource.Quantity) {
 	reqs, limits = map[api.ResourceName]resource.Quantity{}, map[api.ResourceName]resource.Quantity{}
 	for _, pod := range podList.Items {
-		podReqs, podLimits, err := resourcehelper.PodRequestsAndLimits(&pod)
-		if err != nil {
-			return nil, nil, err
-		}
+		podReqs, podLimits := resourcehelper.PodRequestsAndLimits(&pod)
 		for podReqName, podReqValue := range podReqs {
 			if value, ok := reqs[podReqName]; !ok {
 				reqs[podReqName] = *podReqValue.Copy()

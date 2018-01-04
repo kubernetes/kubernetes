@@ -28,7 +28,6 @@ go_test(
         "//pkg/apis/storage:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/fake:go_default_library",
-        "//pkg/kubectl/testing:go_default_library",
         "//pkg/printers:go_default_library",
         "//pkg/util/pointer:go_default_library",
         "//vendor/github.com/ghodss/yaml:go_default_library",

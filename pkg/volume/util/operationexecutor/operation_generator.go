@@ -497,10 +497,10 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 
 			// resizeFileSystem will resize the file system if user has requested a resize of
 			// underlying persistent volume and is allowed to do so.
-			resizeError := og.resizeFileSystem(volumeToMount, devicePath, volumePlugin.GetPluginName())
+			resizeSimpleError, resizeDetailedError := og.resizeFileSystem(volumeToMount, devicePath, volumePlugin.GetPluginName())
 
-			if resizeError != nil {
-				return volumeToMount.GenerateError("MountVolume.Resize failed", resizeError)
+			if resizeSimpleError != nil || resizeDetailedError != nil {
+				return resizeSimpleError, resizeDetailedError
 			}
 
 			deviceMountPath, err :=
@@ -586,10 +586,10 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 	}, nil
 }
 
-func (og *operationGenerator) resizeFileSystem(volumeToMount VolumeToMount, devicePath string, pluginName string) error {
+func (og *operationGenerator) resizeFileSystem(volumeToMount VolumeToMount, devicePath string, pluginName string) (simpleErr, detailedErr error) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.ExpandPersistentVolumes) {
 		glog.V(6).Infof("Resizing is not enabled for this volume %s", volumeToMount.VolumeName)
-		return nil
+		return nil, nil
 	}
 
 	mounter := og.volumePluginMgr.Host.GetMounter(pluginName)
@@ -604,7 +604,7 @@ func (og *operationGenerator) resizeFileSystem(volumeToMount VolumeToMount, devi
 		pvc, err := og.kubeClient.CoreV1().PersistentVolumeClaims(pv.Spec.ClaimRef.Namespace).Get(pv.Spec.ClaimRef.Name, metav1.GetOptions{})
 		if err != nil {
 			// Return error rather than leave the file system un-resized, caller will log and retry
-			return volumeToMount.GenerateErrorDetailed("MountVolume get PVC failed", err)
+			return volumeToMount.GenerateError("MountVolume.resizeFileSystem get PVC failed", err)
 		}
 
 		pvcStatusCap := pvc.Status.Capacity[v1.ResourceStorage]
@@ -617,7 +617,7 @@ func (og *operationGenerator) resizeFileSystem(volumeToMount VolumeToMount, devi
 				simpleMsg, detailedMsg := volumeToMount.GenerateMsg("MountVolume.resizeFileSystem failed", "requested read-only file system")
 				glog.Warningf(detailedMsg)
 				og.recorder.Eventf(volumeToMount.Pod, v1.EventTypeWarning, kevents.FileSystemResizeFailed, simpleMsg)
-				return nil
+				return nil, nil
 			}
 
 			diskFormatter := &mount.SafeFormatAndMount{
@@ -629,10 +629,7 @@ func (og *operationGenerator) resizeFileSystem(volumeToMount VolumeToMount, devi
 			resizeStatus, resizeErr := resizer.Resize(devicePath)
 
 			if resizeErr != nil {
-				resizeDetailedError := volumeToMount.GenerateErrorDetailed("MountVolume.resizeFileSystem failed", resizeErr)
-				glog.Error(resizeDetailedError)
-				og.recorder.Eventf(volumeToMount.Pod, v1.EventTypeWarning, kevents.FileSystemResizeFailed, resizeDetailedError.Error())
-				return resizeDetailedError
+				return volumeToMount.GenerateError("MountVolume.resizeFileSystem failed", resizeErr)
 			}
 
 			if resizeStatus {
@@ -645,12 +642,12 @@ func (og *operationGenerator) resizeFileSystem(volumeToMount VolumeToMount, devi
 			err = updatePVCStatusCapacity(pvc.Name, pvc, pv.Spec.Capacity, og.kubeClient)
 			if err != nil {
 				// On retry, resizeFileSystem will be called again but do nothing
-				return volumeToMount.GenerateErrorDetailed("MountVolume update PVC status failed", err)
+				return volumeToMount.GenerateError("MountVolume.resizeFileSystem update PVC status failed", err)
 			}
-			return nil
+			return nil, nil
 		}
 	}
-	return nil
+	return nil, nil
 }
 
 func (og *operationGenerator) GenerateUnmountVolumeFunc(
@@ -1252,6 +1249,9 @@ func (og *operationGenerator) GenerateExpandVolumeFunc(
 
 	if err != nil {
 		return volumetypes.GeneratedOperations{}, fmt.Errorf("Error finding plugin for expanding volume: %q with error %v", pvcWithResizeRequest.QualifiedName(), err)
+	}
+	if volumePlugin == nil {
+		return volumetypes.GeneratedOperations{}, fmt.Errorf("Can not find plugin for expanding volume: %q", pvcWithResizeRequest.QualifiedName())
 	}
 
 	expandVolumeFunc := func() (error, error) {

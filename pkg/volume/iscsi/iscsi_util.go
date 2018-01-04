@@ -279,6 +279,12 @@ func (util *ISCSIUtil) AttachDisk(b iscsiDiskMounter) (string, error) {
 			lastErr = fmt.Errorf("iscsi: failed to attach disk: Error: %s (%v)", string(out), err)
 			continue
 		}
+		// in case of node failure/restart, explicitly set to manual login so it doesn't hang on boot
+		out, err = b.exec.Run("iscsiadm", "-m", "node", "-p", tp, "-T", b.Iqn, "-o", "update", "node.startup", "-v", "manual")
+		if err != nil {
+			// don't fail if we can't set startup mode, but log warning so there is a clue
+			glog.Warningf("Warning: Failed to set iSCSI login mode to manual. Error: %v", err)
+		}
 		if exist := waitForPathToExist(&devicePath, 10, iscsiTransport); !exist {
 			glog.Errorf("Could not attach disk: Timeout after 10s")
 			// update last error

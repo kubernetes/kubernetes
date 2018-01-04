@@ -50,30 +50,42 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/apis/storage"
-	kubectltesting "k8s.io/kubernetes/pkg/kubectl/testing"
 	"k8s.io/kubernetes/pkg/printers"
 )
 
 func init() {
-	legacyscheme.Scheme.AddKnownTypes(testapi.Default.InternalGroupVersion(), &kubectltesting.TestStruct{})
-	legacyscheme.Scheme.AddKnownTypes(legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion, &kubectltesting.TestStruct{})
+	legacyscheme.Scheme.AddKnownTypes(testapi.Default.InternalGroupVersion(), &TestPrintType{})
+	legacyscheme.Scheme.AddKnownTypes(legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion, &TestPrintType{})
 }
 
-var testData = kubectltesting.TestStruct{
+var testData = TestStruct{
 	Key:        "testValue",
 	Map:        map[string]int{"TestSubkey": 1},
 	StringList: []string{"a", "b", "c"},
 	IntList:    []int{1, 2, 3},
 }
 
+type TestStruct struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+	Key               string         `json:"Key"`
+	Map               map[string]int `json:"Map"`
+	StringList        []string       `json:"StringList"`
+	IntList           []int          `json:"IntList"`
+}
+
+func (in *TestStruct) DeepCopyObject() runtime.Object {
+	panic("never called")
+}
+
 func TestVersionedPrinter(t *testing.T) {
-	original := &kubectltesting.TestStruct{Key: "value"}
+	original := &TestPrintType{Data: "value"}
 	p := printers.NewVersionedPrinter(
 		printers.ResourcePrinterFunc(func(obj runtime.Object, w io.Writer) error {
 			if obj == original {
 				t.Fatalf("object should not be identical: %#v", obj)
 			}
-			if obj.(*kubectltesting.TestStruct).Key != "value" {
+			if obj.(*TestPrintType).Data != "value" {
 				t.Fatalf("object was not converted: %#v", obj)
 			}
 			return nil
@@ -315,14 +327,14 @@ func testPrinter(t *testing.T, printer printers.ResourcePrinter, unmarshalFunc f
 	if err != nil {
 		t.Fatal(err)
 	}
-	var poutput kubectltesting.TestStruct
+	var poutput TestStruct
 	// Verify that given function runs without error.
 	err = unmarshalFunc(buf.Bytes(), &poutput)
 	if err != nil {
 		t.Fatal(err)
 	}
 	// Use real decode function to undo the versioning process.
-	poutput = kubectltesting.TestStruct{}
+	poutput = TestStruct{}
 	s := yamlserializer.NewDecodingSerializer(testapi.Default.Codec())
 	if err := runtime.DecodeInto(s, buf.Bytes(), &poutput); err != nil {
 		t.Fatal(err)

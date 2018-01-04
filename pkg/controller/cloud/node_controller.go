@@ -192,7 +192,7 @@ func (cnc *CloudNodeController) updateNodeAddress(node *v1.Node, instances cloud
 	if !nodeAddressesChangeDetected(node.Status.Addresses, newNode.Status.Addresses) {
 		return
 	}
-	_, err = nodeutil.PatchNodeStatus(cnc.kubeClient.CoreV1(), types.NodeName(node.Name), node, newNode)
+	_, _, err = nodeutil.PatchNodeStatus(cnc.kubeClient.CoreV1(), types.NodeName(node.Name), node, newNode)
 	if err != nil {
 		glog.Errorf("Error patching node with cloud ip addresses = [%v]", err)
 	}

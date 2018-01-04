@@ -146,7 +146,7 @@ func Run(s *options.CMServer) error {
 			clientBuilder = controller.SAControllerClientBuilder{
 				ClientConfig:         restclient.AnonymousClientConfig(kubeconfig),
 				CoreClient:           kubeClient.CoreV1(),
-				AuthenticationClient: kubeClient.Authentication(),
+				AuthenticationClient: kubeClient.AuthenticationV1(),
 				Namespace:            "kube-system",
 			}
 		} else {
@@ -169,7 +169,9 @@ func Run(s *options.CMServer) error {
 	}
 
 	if !s.LeaderElection.LeaderElect {
-		run(nil)
+		stopCh := make(chan struct{})
+		defer close(stopCh)
+		run(stopCh)
 		panic("unreachable")
 	}
 

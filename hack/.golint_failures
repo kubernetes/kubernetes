@@ -154,7 +154,6 @@ pkg/kubectl/cmd/util/jsonmerge
 pkg/kubectl/cmd/util/sanity
 pkg/kubectl/metricsutil
 pkg/kubectl/resource
-pkg/kubectl/testing
 pkg/kubectl/util
 pkg/kubectl/util/crlf
 pkg/kubectl/util/slice

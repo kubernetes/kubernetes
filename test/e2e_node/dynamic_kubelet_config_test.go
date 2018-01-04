@@ -86,7 +86,7 @@ var _ = framework.KubeDescribe("DynamicKubeletConfiguration [Feature:DynamicKube
 					Namespace: originalConfigMap.Namespace,
 					Name:      originalConfigMap.Name}},
 				expectConfigOK: &apiv1.NodeCondition{Type: apiv1.NodeConfigOK, Status: apiv1.ConditionTrue,
-					Message: fmt.Sprintf(status.CurRemoteMessageFmt, originalConfigMap.UID),
+					Message: fmt.Sprintf(status.CurRemoteMessageFmt, configMapAPIPath(originalConfigMap)),
 					Reason:  status.CurRemoteOkayReason},
 				expectConfig: originalKC,
 			}, false)
@@ -162,7 +162,7 @@ var _ = framework.KubeDescribe("DynamicKubeletConfiguration [Feature:DynamicKube
 							Name:      correctConfigMap.Name}},
 						expectConfigOK: &apiv1.NodeCondition{Type: apiv1.NodeConfigOK, Status: apiv1.ConditionFalse,
 							Message: "",
-							Reason:  fmt.Sprintf(status.FailSyncReasonFmt, fmt.Sprintf(status.FailSyncReasonUIDMismatchFmt, "foo", correctConfigMap.UID))},
+							Reason:  fmt.Sprintf(status.FailSyncReasonFmt, fmt.Sprintf(status.FailSyncReasonUIDMismatchFmt, "foo", configMapAPIPath(correctConfigMap), correctConfigMap.UID))},
 						expectConfig: nil,
 						event:        false,
 					},
@@ -174,7 +174,7 @@ var _ = framework.KubeDescribe("DynamicKubeletConfiguration [Feature:DynamicKube
 							Namespace: correctConfigMap.Namespace,
 							Name:      correctConfigMap.Name}},
 						expectConfigOK: &apiv1.NodeCondition{Type: apiv1.NodeConfigOK, Status: apiv1.ConditionTrue,
-							Message: fmt.Sprintf(status.CurRemoteMessageFmt, correctConfigMap.UID),
+							Message: fmt.Sprintf(status.CurRemoteMessageFmt, configMapAPIPath(correctConfigMap)),
 							Reason:  status.CurRemoteOkayReason},
 						expectConfig: correctKC,
 						event:        true,
@@ -188,7 +188,7 @@ var _ = framework.KubeDescribe("DynamicKubeletConfiguration [Feature:DynamicKube
 							Name:      failParseConfigMap.Name}},
 						expectConfigOK: &apiv1.NodeCondition{Type: apiv1.NodeConfigOK, Status: apiv1.ConditionFalse,
 							Message: status.LkgLocalMessage,
-							Reason:  fmt.Sprintf(status.CurFailParseReasonFmt, failParseConfigMap.UID)},
+							Reason:  fmt.Sprintf(status.CurFailParseReasonFmt, configMapAPIPath(failParseConfigMap))},
 						expectConfig: nil,
 						event:        true,
 					},
@@ -201,7 +201,7 @@ var _ = framework.KubeDescribe("DynamicKubeletConfiguration [Feature:DynamicKube
 							Name:      failValidateConfigMap.Name}},
 						expectConfigOK: &apiv1.NodeCondition{Type: apiv1.NodeConfigOK, Status: apiv1.ConditionFalse,
 							Message: status.LkgLocalMessage,
-							Reason:  fmt.Sprintf(status.CurFailValidateReasonFmt, failValidateConfigMap.UID)},
+							Reason:  fmt.Sprintf(status.CurFailValidateReasonFmt, configMapAPIPath(failValidateConfigMap))},
 						expectConfig: nil,
 						event:        true,
 					},
@@ -244,7 +244,7 @@ var _ = framework.KubeDescribe("DynamicKubeletConfiguration [Feature:DynamicKube
 							Namespace: lkgConfigMap.Namespace,
 							Name:      lkgConfigMap.Name}},
 						expectConfigOK: &apiv1.NodeCondition{Type: apiv1.NodeConfigOK, Status: apiv1.ConditionTrue,
-							Message: fmt.Sprintf(status.CurRemoteMessageFmt, lkgConfigMap.UID),
+							Message: fmt.Sprintf(status.CurRemoteMessageFmt, configMapAPIPath(lkgConfigMap)),
 							Reason:  status.CurRemoteOkayReason},
 						expectConfig: lkgKC,
 						event:        true,
@@ -257,8 +257,8 @@ var _ = framework.KubeDescribe("DynamicKubeletConfiguration [Feature:DynamicKube
 							Namespace: badConfigMap.Namespace,
 							Name:      badConfigMap.Name}},
 						expectConfigOK: &apiv1.NodeCondition{Type: apiv1.NodeConfigOK, Status: apiv1.ConditionFalse,
-							Message: fmt.Sprintf(status.LkgRemoteMessageFmt, lkgConfigMap.UID),
-							Reason:  fmt.Sprintf(status.CurFailParseReasonFmt, badConfigMap.UID)},
+							Message: fmt.Sprintf(status.LkgRemoteMessageFmt, configMapAPIPath(lkgConfigMap)),
+							Reason:  fmt.Sprintf(status.CurFailParseReasonFmt, configMapAPIPath(badConfigMap))},
 						expectConfig: lkgKC,
 						event:        true,
 					},
@@ -294,7 +294,7 @@ var _ = framework.KubeDescribe("DynamicKubeletConfiguration [Feature:DynamicKube
 							Namespace: cm1.Namespace,
 							Name:      cm1.Name}},
 						expectConfigOK: &apiv1.NodeCondition{Type: apiv1.NodeConfigOK, Status: apiv1.ConditionTrue,
-							Message: fmt.Sprintf(status.CurRemoteMessageFmt, cm1.UID),
+							Message: fmt.Sprintf(status.CurRemoteMessageFmt, configMapAPIPath(cm1)),
 							Reason:  status.CurRemoteOkayReason},
 						expectConfig: kc1,
 						event:        true,
@@ -306,7 +306,7 @@ var _ = framework.KubeDescribe("DynamicKubeletConfiguration [Feature:DynamicKube
 							Namespace: cm2.Namespace,
 							Name:      cm2.Name}},
 						expectConfigOK: &apiv1.NodeCondition{Type: apiv1.NodeConfigOK, Status: apiv1.ConditionTrue,
-							Message: fmt.Sprintf(status.CurRemoteMessageFmt, cm2.UID),
+							Message: fmt.Sprintf(status.CurRemoteMessageFmt, configMapAPIPath(cm2)),
 							Reason:  status.CurRemoteOkayReason},
 						expectConfig: kc2,
 						event:        true,
@@ -487,4 +487,9 @@ func checkEvent(f *framework.Framework, desc string, expect *apiv1.NodeConfigSou
 
 		return nil
 	}, timeout, interval).Should(BeNil())
+}
+
+// constructs the expected SelfLink for a config map
+func configMapAPIPath(cm *apiv1.ConfigMap) string {
+	return fmt.Sprintf("/api/v1/namespaces/%s/configmaps/%s", cm.Namespace, cm.Name)
 }

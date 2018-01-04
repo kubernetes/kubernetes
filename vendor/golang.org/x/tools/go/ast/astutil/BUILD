@@ -3,16 +3,12 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = [
-        "doc.go",
-        "types.go",
-        "zz_generated.deepcopy.go",
+        "enclosing.go",
+        "imports.go",
+        "util.go",
     ],
-    importpath = "k8s.io/kubernetes/pkg/kubectl/testing",
+    importpath = "golang.org/x/tools/go/ast/astutil",
     visibility = ["//visibility:public"],
-    deps = [
-        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
-    ],
 )
 
 filegroup(

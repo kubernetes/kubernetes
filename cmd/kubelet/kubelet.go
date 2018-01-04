@@ -75,7 +75,7 @@ func main() {
 	// bootstrap the kubelet config controller, app.BootstrapKubeletConfigController will check
 	// feature gates and only turn on relevant parts of the controller
 	kubeletConfig, kubeletConfigController, err := app.BootstrapKubeletConfigController(
-		defaultConfig, kubeletFlags.InitConfigDir, kubeletFlags.DynamicConfigDir)
+		defaultConfig, kubeletFlags.KubeletConfigFile, kubeletFlags.DynamicConfigDir)
 	if err != nil {
 		die(err)
 	}

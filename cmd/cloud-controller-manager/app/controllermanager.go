@@ -140,7 +140,7 @@ func Run(s *options.CloudControllerManagerServer) error {
 			clientBuilder = controller.SAControllerClientBuilder{
 				ClientConfig:         restclient.AnonymousClientConfig(kubeconfig),
 				CoreClient:           kubeClient.CoreV1(),
-				AuthenticationClient: kubeClient.Authentication(),
+				AuthenticationClient: kubeClient.AuthenticationV1(),
 				Namespace:            "kube-system",
 			}
 		} else {

@@ -496,6 +496,16 @@ EOF
 kube_apiserver_request_timeout_sec: '$(echo "$KUBE_APISERVER_REQUEST_TIMEOUT_SEC" | sed -e "s/'/''/g")'
 EOF
     fi
+    if [ -n "${ETCD_LIVENESS_PROBE_INITIAL_DELAY_SEC:-}" ]; then
+      cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
+etcd_liveness_probe_initial_delay: '$(echo "$ETCD_LIVENESS_PROBE_INITIAL_DELAY_SEC" | sed -e "s/'/''/g")'
+EOF
+    fi
+    if [ -n "${KUBE_APISERVER_LIVENESS_PROBE_INITIAL_DELAY_SEC:-}" ]; then
+      cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
+kube_apiserver_liveness_probe_initial_delay: '$(echo "$KUBE_APISERVER_LIVENESS_PROBE_INITIAL_DELAY_SEC" | sed -e "s/'/''/g")'
+EOF
+    fi
     if [ -n "${ADMISSION_CONTROL:-}" ] && [ ${ADMISSION_CONTROL} == *"ImagePolicyWebhook"* ]; then
       cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
 admission-control-config-file: /etc/admission_controller.config

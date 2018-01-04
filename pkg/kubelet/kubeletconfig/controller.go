@@ -40,7 +40,6 @@ import (
 
 const (
 	checkpointsDir = "checkpoints"
-	initConfigDir  = "init"
 )
 
 // Controller is the controller which, among other things:
@@ -74,19 +73,19 @@ type Controller struct {
 }
 
 // NewController constructs a new Controller object and returns it. Directory paths must be absolute.
-// If the `initConfigDir` is an empty string, skips trying to load the init config.
+// If the `kubeletConfigFile` is an empty string, skips trying to load the kubelet config file.
 // If the `dynamicConfigDir` is an empty string, skips trying to load checkpoints or download new config,
 // but will still sync the ConfigOK condition if you call StartSync with a non-nil client.
 func NewController(defaultConfig *kubeletconfig.KubeletConfiguration,
-	initConfigDir string,
+	kubeletConfigFile string,
 	dynamicConfigDir string) (*Controller, error) {
 	var err error
 
 	fs := utilfs.DefaultFs{}
 
 	var fileLoader configfiles.Loader
-	if len(initConfigDir) > 0 {
-		fileLoader, err = configfiles.NewFsLoader(fs, initConfigDir)
+	if len(kubeletConfigFile) > 0 {
+		fileLoader, err = configfiles.NewFsLoader(fs, kubeletConfigFile)
 		if err != nil {
 			return nil, err
 		}
@@ -116,7 +115,7 @@ func (cc *Controller) Bootstrap() (*kubeletconfig.KubeletConfiguration, error) {
 	local, err := cc.loadLocalConfig()
 	if err != nil {
 		return nil, err
-	} // Assert: the default and init configs are both valid
+	} // Assert: the default and file configs are both valid
 
 	// if dynamic config is disabled, we just stop here
 	if !cc.dynamicConfig {
@@ -137,20 +136,16 @@ func (cc *Controller) Bootstrap() (*kubeletconfig.KubeletConfiguration, error) {
 	if err == nil {
 		// set the status to indicate we will use the assigned config
 		if curSource != nil {
-			cc.configOK.Set(fmt.Sprintf(status.CurRemoteMessageFmt, curSource.UID()), reason, apiv1.ConditionTrue)
+			cc.configOK.Set(fmt.Sprintf(status.CurRemoteMessageFmt, curSource.APIPath()), reason, apiv1.ConditionTrue)
 		} else {
 			cc.configOK.Set(status.CurLocalMessage, reason, apiv1.ConditionTrue)
 		}
 
-		// when the trial period is over, the assigned config becomes the last-known-good
-		if trial, err := cc.inTrial(assigned.ConfigTrialDuration.Duration); err != nil {
-			utillog.Errorf("failed to check trial period for assigned config, error: %v", err)
-		} else if !trial {
-			utillog.Infof("assigned config passed trial period, will set as last-known-good")
-			if err := cc.graduateAssignedToLastKnownGood(); err != nil {
-				utillog.Errorf("failed to set last-known-good to assigned config, error: %v", err)
-			}
-		}
+		// update the last-known-good config if necessary, and start a timer that
+		// periodically checks whether the last-known good needs to be updated
+		// we only do this when the assigned config loads and passes validation
+		// wait.Forever will call the func once before starting the timer
+		go wait.Forever(func() { cc.checkTrial(assigned.ConfigTrialDuration.Duration) }, 10*time.Second)
 
 		return assigned, nil
 	} // Assert: the assigned config failed to load, parse, or validate
@@ -171,7 +166,7 @@ func (cc *Controller) Bootstrap() (*kubeletconfig.KubeletConfiguration, error) {
 
 	// set the status to indicate that we had to roll back to the lkg for the reason reported when we tried to load the assigned config
 	if lkgSource != nil {
-		cc.configOK.Set(fmt.Sprintf(status.LkgRemoteMessageFmt, lkgSource.UID()), reason, apiv1.ConditionFalse)
+		cc.configOK.Set(fmt.Sprintf(status.LkgRemoteMessageFmt, lkgSource.APIPath()), reason, apiv1.ConditionFalse)
 	} else {
 		cc.configOK.Set(status.LkgLocalMessage, reason, apiv1.ConditionFalse)
 	}
@@ -271,14 +266,14 @@ func (cc *Controller) loadAssignedConfig(local *kubeletconfig.KubeletConfigurati
 	// load from checkpoint
 	checkpoint, err := cc.checkpointStore.Load(curUID)
 	if err != nil {
-		return nil, src, fmt.Sprintf(status.CurFailLoadReasonFmt, curUID), err
+		return nil, src, fmt.Sprintf(status.CurFailLoadReasonFmt, src.APIPath()), err
 	}
 	cur, err := checkpoint.Parse()
 	if err != nil {
-		return nil, src, fmt.Sprintf(status.CurFailParseReasonFmt, curUID), err
+		return nil, src, fmt.Sprintf(status.CurFailParseReasonFmt, src.APIPath()), err
 	}
 	if err := validation.ValidateKubeletConfiguration(cur); err != nil {
-		return nil, src, fmt.Sprintf(status.CurFailValidateReasonFmt, curUID), err
+		return nil, src, fmt.Sprintf(status.CurFailValidateReasonFmt, src.APIPath()), err
 	}
 	return cur, src, status.CurRemoteOkayReason, nil
 }
@@ -301,14 +296,14 @@ func (cc *Controller) loadLastKnownGoodConfig(local *kubeletconfig.KubeletConfig
 	// load from checkpoint
 	checkpoint, err := cc.checkpointStore.Load(lkgUID)
 	if err != nil {
-		return nil, src, fmt.Errorf("%s, error: %v", fmt.Sprintf(status.LkgFailLoadReasonFmt, lkgUID), err)
+		return nil, src, fmt.Errorf("%s, error: %v", fmt.Sprintf(status.LkgFailLoadReasonFmt, src.APIPath()), err)
 	}
 	lkg, err := checkpoint.Parse()
 	if err != nil {
-		return nil, src, fmt.Errorf("%s, error: %v", fmt.Sprintf(status.LkgFailParseReasonFmt, lkgUID), err)
+		return nil, src, fmt.Errorf("%s, error: %v", fmt.Sprintf(status.LkgFailParseReasonFmt, src.APIPath()), err)
 	}
 	if err := validation.ValidateKubeletConfiguration(lkg); err != nil {
-		return nil, src, fmt.Errorf("%s, error: %v", fmt.Sprintf(status.LkgFailValidateReasonFmt, lkgUID), err)
+		return nil, src, fmt.Errorf("%s, error: %v", fmt.Sprintf(status.LkgFailValidateReasonFmt, src.APIPath()), err)
 	}
 	return lkg, src, nil
 }
@@ -318,6 +313,19 @@ func (cc *Controller) initializeDynamicConfigDir() error {
 	utillog.Infof("ensuring filesystem is set up correctly")
 	// initializeDynamicConfigDir local checkpoint storage location
 	return cc.checkpointStore.Initialize()
+}
+
+// checkTrial checks whether the trial duration has passed, and updates the last-known-good config if necessary
+func (cc *Controller) checkTrial(duration time.Duration) {
+	// when the trial period is over, the assigned config becomes the last-known-good
+	if trial, err := cc.inTrial(duration); err != nil {
+		utillog.Errorf("failed to check trial period for assigned config, error: %v", err)
+	} else if !trial {
+		utillog.Infof("assigned config passed trial period, will set as last-known-good")
+		if err := cc.graduateAssignedToLastKnownGood(); err != nil {
+			utillog.Errorf("failed to set last-known-good to assigned config, error: %v", err)
+		}
+	}
 }
 
 // inTrial returns true if the time elapsed since the last modification of the current config does not exceed `trialDur`, false otherwise

@@ -139,7 +139,7 @@ func (cc *Controller) checkpointConfigSource(client clientset.Interface, source 
 
 	// if the checkpoint already exists, skip downloading
 	if ok, err := cc.checkpointStore.Exists(uid); err != nil {
-		reason := fmt.Sprintf(status.FailSyncReasonCheckpointExistenceFmt, uid)
+		reason := fmt.Sprintf(status.FailSyncReasonCheckpointExistenceFmt, source.APIPath(), uid)
 		return reason, fmt.Errorf("%s, error: %v", reason, err)
 	} else if ok {
 		utillog.Infof("checkpoint already exists for object with UID %q, skipping download", uid)
@@ -155,7 +155,7 @@ func (cc *Controller) checkpointConfigSource(client clientset.Interface, source 
 	// save
 	err = cc.checkpointStore.Save(checkpoint)
 	if err != nil {
-		reason := fmt.Sprintf(status.FailSyncReasonSaveCheckpointFmt, checkpoint.UID())
+		reason := fmt.Sprintf(status.FailSyncReasonSaveCheckpointFmt, source.APIPath(), checkpoint.UID())
 		return reason, fmt.Errorf("%s, error: %v", reason, err)
 	}
 
@@ -170,7 +170,7 @@ func (cc *Controller) setCurrentConfig(source checkpoint.RemoteConfigSource) (bo
 		if source == nil {
 			return false, status.FailSyncReasonSetCurrentLocal, err
 		}
-		return false, fmt.Sprintf(status.FailSyncReasonSetCurrentUIDFmt, source.UID()), err
+		return false, fmt.Sprintf(status.FailSyncReasonSetCurrentUIDFmt, source.APIPath(), source.UID()), err
 	}
 	return updated, "", nil
 }

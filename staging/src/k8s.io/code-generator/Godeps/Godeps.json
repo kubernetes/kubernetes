@@ -207,48 +207,56 @@
 			"Rev": "b19bf474d317b857955b12035d2c5acb57ce8b01"
 		},
 		{
+			"ImportPath": "golang.org/x/tools/go/ast/astutil",
+			"Rev": "2382e3994d48b1d22acc2c86bcad0a2aff028e32"
+		},
+		{
+			"ImportPath": "golang.org/x/tools/imports",
+			"Rev": "2382e3994d48b1d22acc2c86bcad0a2aff028e32"
+		},
+		{
 			"ImportPath": "gopkg.in/yaml.v2",
 			"Rev": "53feefa2559fb8dfa8d81baad31be332c97d6c77"
 		},
 		{
 			"ImportPath": "k8s.io/gengo/args",
-			"Rev": "b58fc7edb82e0c6ffc9b8aef61813c7261b785d4"
+			"Rev": "b6c426f7730e6d66e6e476a85d1c3eb7633880e0"
 		},
 		{
 			"ImportPath": "k8s.io/gengo/examples/deepcopy-gen/generators",
-			"Rev": "b58fc7edb82e0c6ffc9b8aef61813c7261b785d4"
+			"Rev": "b6c426f7730e6d66e6e476a85d1c3eb7633880e0"
 		},
 		{
 			"ImportPath": "k8s.io/gengo/examples/defaulter-gen/generators",
-			"Rev": "b58fc7edb82e0c6ffc9b8aef61813c7261b785d4"
+			"Rev": "b6c426f7730e6d66e6e476a85d1c3eb7633880e0"
 		},
 		{
 			"ImportPath": "k8s.io/gengo/examples/import-boss/generators",
-			"Rev": "b58fc7edb82e0c6ffc9b8aef61813c7261b785d4"
+			"Rev": "b6c426f7730e6d66e6e476a85d1c3eb7633880e0"
 		},
 		{
 			"ImportPath": "k8s.io/gengo/examples/set-gen/generators",
-			"Rev": "b58fc7edb82e0c6ffc9b8aef61813c7261b785d4"
+			"Rev": "b6c426f7730e6d66e6e476a85d1c3eb7633880e0"
 		},
 		{
 			"ImportPath": "k8s.io/gengo/examples/set-gen/sets",
-			"Rev": "b58fc7edb82e0c6ffc9b8aef61813c7261b785d4"
+			"Rev": "b6c426f7730e6d66e6e476a85d1c3eb7633880e0"
 		},
 		{
 			"ImportPath": "k8s.io/gengo/generator",
-			"Rev": "b58fc7edb82e0c6ffc9b8aef61813c7261b785d4"
+			"Rev": "b6c426f7730e6d66e6e476a85d1c3eb7633880e0"
 		},
 		{
 			"ImportPath": "k8s.io/gengo/namer",
-			"Rev": "b58fc7edb82e0c6ffc9b8aef61813c7261b785d4"
+			"Rev": "b6c426f7730e6d66e6e476a85d1c3eb7633880e0"
 		},
 		{
 			"ImportPath": "k8s.io/gengo/parser",
-			"Rev": "b58fc7edb82e0c6ffc9b8aef61813c7261b785d4"
+			"Rev": "b6c426f7730e6d66e6e476a85d1c3eb7633880e0"
 		},
 		{
 			"ImportPath": "k8s.io/gengo/types",
-			"Rev": "b58fc7edb82e0c6ffc9b8aef61813c7261b785d4"
+			"Rev": "b6c426f7730e6d66e6e476a85d1c3eb7633880e0"
 		},
 		{
 			"ImportPath": "k8s.io/kube-openapi/pkg/common",
