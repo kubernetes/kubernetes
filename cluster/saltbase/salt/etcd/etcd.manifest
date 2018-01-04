@@ -40,7 +40,7 @@
 "containers":[
     {
     "name": "etcd-container",
-    "image": "{{ pillar.get('etcd_docker_repository', 'gcr.io/google_containers/etcd') }}:{{ pillar.get('etcd_docker_tag', '3.1.10') }}",
+    "image": "{{ pillar.get('etcd_docker_repository', 'gcr.io/google_containers/etcd') }}:{{ pillar.get('etcd_docker_tag', '3.1.11') }}",
     "resources": {
       "requests": {
         "cpu": {{ cpulimit }}
@@ -56,7 +56,7 @@
         "value": "{{ pillar.get('storage_backend', 'etcd3') }}"
       },
       { "name": "TARGET_VERSION",
-        "value": "{{ pillar.get('etcd_version', '3.1.10') }}"
+        "value": "{{ pillar.get('etcd_version', '3.1.11') }}"
       },
       { "name": "DATA_DIRECTORY",
         "value": "/var/etcd/data{{ suffix }}"

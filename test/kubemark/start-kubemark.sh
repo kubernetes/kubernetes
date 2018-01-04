@@ -55,7 +55,7 @@ SERVICE_CLUSTER_IP_RANGE="${SERVICE_CLUSTER_IP_RANGE:-}"
 EVENT_PD="${EVENT_PD:-}"
 
 # Etcd related variables.
-ETCD_IMAGE="${ETCD_IMAGE:-3.1.10}"
+ETCD_IMAGE="${ETCD_IMAGE:-3.1.11}"
 ETCD_VERSION="${ETCD_VERSION:-}"
 
 # Controller-manager related variables.
