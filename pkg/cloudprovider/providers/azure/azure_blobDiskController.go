@@ -611,7 +611,7 @@ func (c *BlobDiskController) findSANameForDisk(storageAccountType storage.SkuNam
 		return SAName, nil
 	}
 
-	// avergates are not ok and we are at capacity(max storage accounts allowed)
+	// averages are not ok and we are at capacity (max storage accounts allowed)
 	if aboveAvg && countAccounts == maxStorageAccounts {
 		glog.Infof("azureDisk - shared storageAccounts utilzation(%v) > grow-at-avg-utilization (%v). But k8s maxed on SAs for PVC(%v). k8s will now exceed grow-at-avg-utilization without adding accounts",
 			avgUtilization, storageAccountUtilizationBeforeGrowing, maxStorageAccounts)

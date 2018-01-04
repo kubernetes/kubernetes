@@ -106,8 +106,8 @@ func (c *ManagedDiskController) DeleteManagedDisk(diskURI string) error {
 	if err != nil {
 		return err
 	}
-	// We don't need poll here, k8s will immediatly stop referencing the disk
-	// the disk will be evantually deleted - cleanly - by ARM
+	// We don't need poll here, k8s will immediately stop referencing the disk
+	// the disk will be eventually deleted - cleanly - by ARM
 
 	glog.V(2).Infof("azureDisk - deleted a managed disk: %s", diskURI)
 
