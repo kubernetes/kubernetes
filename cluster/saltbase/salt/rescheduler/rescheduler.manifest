@@ -28,7 +28,7 @@ spec:
     # TODO: split this out into args when we no longer need to pipe stdout to a file #6428
     - sh
     - -c
-    - '/rescheduler --running-in-cluster=false 1>>/var/log/rescheduler.log 2>&1'
+    - 'exec /rescheduler --running-in-cluster=false 1>>/var/log/rescheduler.log 2>&1'
   volumes:
   - hostPath:
       path: /var/log/rescheduler.log
