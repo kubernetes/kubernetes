@@ -470,14 +470,18 @@ var _ = SIGDescribe("Services", func() {
 		jig.RunOrFail(ns, nil)
 
 		By("hitting the pod through the service's NodePort")
-		jig.TestReachableHTTP(nodeIP, nodePort, framework.KubeProxyLagTimeout)
+		hostExec := framework.LaunchHostExecPod(f.ClientSet, f.Namespace.Name, "hostexec")
+		cmd := fmt.Sprintf(`for i in $(seq 1 300); do if curl http://%s:%d/echo?msg=hello; then exit 0; fi; sleep 1; done; exit 1`, nodeIP, nodePort)
+		stdout, err := framework.RunHostCmd(hostExec.Namespace, hostExec.Name, cmd)
+		if err != nil {
+			framework.Failf("expected node port %d can be access, stdoutL %v. err: %v", nodePort, stdout, err)
+		}
 
 		By("verifying the node port is locked")
-		hostExec := framework.LaunchHostExecPod(f.ClientSet, f.Namespace.Name, "hostexec")
 		// Even if the node-ip:node-port check above passed, this hostexec pod
 		// might fall on a node with a laggy kube-proxy.
-		cmd := fmt.Sprintf(`for i in $(seq 1 300); do if ss -ant46 'sport = :%d' | grep ^LISTEN; then exit 0; fi; sleep 1; done; exit 1`, nodePort)
-		stdout, err := framework.RunHostCmd(hostExec.Namespace, hostExec.Name, cmd)
+		cmd = fmt.Sprintf(`for i in $(seq 1 300); do if ss -ant46 'sport = :%d' | grep ^LISTEN; then exit 0; fi; sleep 1; done; exit 1`, nodePort)
+		stdout, err = framework.RunHostCmd(hostExec.Namespace, hostExec.Name, cmd)
 		if err != nil {
 			framework.Failf("expected node port %d to be in use, stdout: %v. err: %v", nodePort, stdout, err)
 		}
