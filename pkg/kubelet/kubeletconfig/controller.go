@@ -136,7 +136,7 @@ func (cc *Controller) Bootstrap() (*kubeletconfig.KubeletConfiguration, error) {
 	if err == nil {
 		// set the status to indicate we will use the assigned config
 		if curSource != nil {
-			cc.configOK.Set(fmt.Sprintf(status.CurRemoteMessageFmt, curSource.UID()), reason, apiv1.ConditionTrue)
+			cc.configOK.Set(fmt.Sprintf(status.CurRemoteMessageFmt, curSource.APIPath()), reason, apiv1.ConditionTrue)
 		} else {
 			cc.configOK.Set(status.CurLocalMessage, reason, apiv1.ConditionTrue)
 		}
@@ -166,7 +166,7 @@ func (cc *Controller) Bootstrap() (*kubeletconfig.KubeletConfiguration, error) {
 
 	// set the status to indicate that we had to roll back to the lkg for the reason reported when we tried to load the assigned config
 	if lkgSource != nil {
-		cc.configOK.Set(fmt.Sprintf(status.LkgRemoteMessageFmt, lkgSource.UID()), reason, apiv1.ConditionFalse)
+		cc.configOK.Set(fmt.Sprintf(status.LkgRemoteMessageFmt, lkgSource.APIPath()), reason, apiv1.ConditionFalse)
 	} else {
 		cc.configOK.Set(status.LkgLocalMessage, reason, apiv1.ConditionFalse)
 	}
@@ -266,14 +266,14 @@ func (cc *Controller) loadAssignedConfig(local *kubeletconfig.KubeletConfigurati
 	// load from checkpoint
 	checkpoint, err := cc.checkpointStore.Load(curUID)
 	if err != nil {
-		return nil, src, fmt.Sprintf(status.CurFailLoadReasonFmt, curUID), err
+		return nil, src, fmt.Sprintf(status.CurFailLoadReasonFmt, src.APIPath()), err
 	}
 	cur, err := checkpoint.Parse()
 	if err != nil {
-		return nil, src, fmt.Sprintf(status.CurFailParseReasonFmt, curUID), err
+		return nil, src, fmt.Sprintf(status.CurFailParseReasonFmt, src.APIPath()), err
 	}
 	if err := validation.ValidateKubeletConfiguration(cur); err != nil {
-		return nil, src, fmt.Sprintf(status.CurFailValidateReasonFmt, curUID), err
+		return nil, src, fmt.Sprintf(status.CurFailValidateReasonFmt, src.APIPath()), err
 	}
 	return cur, src, status.CurRemoteOkayReason, nil
 }
@@ -296,14 +296,14 @@ func (cc *Controller) loadLastKnownGoodConfig(local *kubeletconfig.KubeletConfig
 	// load from checkpoint
 	checkpoint, err := cc.checkpointStore.Load(lkgUID)
 	if err != nil {
-		return nil, src, fmt.Errorf("%s, error: %v", fmt.Sprintf(status.LkgFailLoadReasonFmt, lkgUID), err)
+		return nil, src, fmt.Errorf("%s, error: %v", fmt.Sprintf(status.LkgFailLoadReasonFmt, src.APIPath()), err)
 	}
 	lkg, err := checkpoint.Parse()
 	if err != nil {
-		return nil, src, fmt.Errorf("%s, error: %v", fmt.Sprintf(status.LkgFailParseReasonFmt, lkgUID), err)
+		return nil, src, fmt.Errorf("%s, error: %v", fmt.Sprintf(status.LkgFailParseReasonFmt, src.APIPath()), err)
 	}
 	if err := validation.ValidateKubeletConfiguration(lkg); err != nil {
-		return nil, src, fmt.Errorf("%s, error: %v", fmt.Sprintf(status.LkgFailValidateReasonFmt, lkgUID), err)
+		return nil, src, fmt.Errorf("%s, error: %v", fmt.Sprintf(status.LkgFailValidateReasonFmt, src.APIPath()), err)
 	}
 	return lkg, src, nil
 }

@@ -128,13 +128,13 @@ func (r *remoteConfigMap) Download(client clientset.Interface) (Checkpoint, stri
 	// get the ConfigMap via namespace/name, there doesn't seem to be a way to get it by UID
 	cm, err := client.CoreV1().ConfigMaps(r.source.ConfigMapRef.Namespace).Get(r.source.ConfigMapRef.Name, metav1.GetOptions{})
 	if err != nil {
-		reason = fmt.Sprintf(status.FailSyncReasonDownloadFmt, r.source.ConfigMapRef.Name, r.source.ConfigMapRef.Namespace)
+		reason = fmt.Sprintf(status.FailSyncReasonDownloadFmt, r.APIPath())
 		return nil, reason, fmt.Errorf("%s, error: %v", reason, err)
 	}
 
 	// ensure that UID matches the UID on the reference, the ObjectReference must be unambiguous
 	if r.source.ConfigMapRef.UID != cm.UID {
-		reason = fmt.Sprintf(status.FailSyncReasonUIDMismatchFmt, r.source.ConfigMapRef.UID, cm.UID)
+		reason = fmt.Sprintf(status.FailSyncReasonUIDMismatchFmt, r.source.ConfigMapRef.UID, r.APIPath(), cm.UID)
 		return nil, reason, fmt.Errorf(reason)
 	}
 
