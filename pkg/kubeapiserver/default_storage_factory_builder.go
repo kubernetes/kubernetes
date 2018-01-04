@@ -56,7 +56,7 @@ func NewStorageFactory(storageConfig storagebackend.Config, defaultMediaType str
 	return serverstorage.NewDefaultStorageFactory(storageConfig, defaultMediaType, serializer, resourceEncodingConfig, apiResourceConfig, SpecialDefaultResourcePrefixes), nil
 }
 
-// Merges the given defaultResourceConfig with specifc GroupvVersionResource overrides.
+// Merges the given defaultResourceConfig with specific GroupVersionResource overrides.
 func mergeResourceEncodingConfigs(defaultResourceEncoding *serverstorage.DefaultResourceEncodingConfig, resourceEncodingOverrides []schema.GroupVersionResource) *serverstorage.DefaultResourceEncodingConfig {
 	resourceEncodingConfig := defaultResourceEncoding
 	for _, gvr := range resourceEncodingOverrides {
@@ -66,7 +66,7 @@ func mergeResourceEncodingConfigs(defaultResourceEncoding *serverstorage.Default
 	return resourceEncodingConfig
 }
 
-// Merges the given defaultResourceConfig with specifc GroupVersion overrides.
+// Merges the given defaultResourceConfig with specific GroupVersion overrides.
 func mergeGroupEncodingConfigs(defaultResourceEncoding *serverstorage.DefaultResourceEncodingConfig, storageEncodingOverrides map[string]schema.GroupVersion) *serverstorage.DefaultResourceEncodingConfig {
 	resourceEncodingConfig := defaultResourceEncoding
 	for group, storageEncodingVersion := range storageEncodingOverrides {
