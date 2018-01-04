@@ -44,8 +44,8 @@ func (az *Cloud) requestBackoff() (resourceRequestBackoff wait.Backoff) {
 // GetVirtualMachineWithRetry invokes az.getVirtualMachine with exponential backoff retry
 func (az *Cloud) GetVirtualMachineWithRetry(name types.NodeName) (compute.VirtualMachine, error) {
 	var machine compute.VirtualMachine
+	var retryErr error
 	err := wait.ExponentialBackoff(az.requestBackoff(), func() (bool, error) {
-		var retryErr error
 		machine, retryErr = az.getVirtualMachine(name)
 		if retryErr != nil {
 			glog.Errorf("backoff: failure, will retry,err=%v", retryErr)
@@ -54,6 +54,10 @@ func (az *Cloud) GetVirtualMachineWithRetry(name types.NodeName) (compute.Virtua
 		glog.V(2).Infof("backoff: success")
 		return true, nil
 	})
+	if err == wait.ErrWaitTimeout {
+		err = retryErr
+	}
+
 	return machine, err
 }
 
