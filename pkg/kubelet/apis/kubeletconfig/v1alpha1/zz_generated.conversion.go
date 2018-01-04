@@ -164,12 +164,6 @@ func autoConvert_v1alpha1_KubeletConfiguration_To_kubeletconfig_KubeletConfigura
 	if err := Convert_v1alpha1_KubeletAuthorization_To_kubeletconfig_KubeletAuthorization(&in.Authorization, &out.Authorization, s); err != nil {
 		return err
 	}
-	if err := v1.Convert_Pointer_bool_To_bool(&in.AllowPrivileged, &out.AllowPrivileged, s); err != nil {
-		return err
-	}
-	out.HostNetworkSources = *(*[]string)(unsafe.Pointer(&in.HostNetworkSources))
-	out.HostPIDSources = *(*[]string)(unsafe.Pointer(&in.HostPIDSources))
-	out.HostIPCSources = *(*[]string)(unsafe.Pointer(&in.HostIPCSources))
 	if err := v1.Convert_Pointer_int32_To_int32(&in.RegistryPullQPS, &out.RegistryPullQPS, s); err != nil {
 		return err
 	}
@@ -291,12 +285,6 @@ func autoConvert_kubeletconfig_KubeletConfiguration_To_v1alpha1_KubeletConfigura
 	if err := Convert_kubeletconfig_KubeletAuthorization_To_v1alpha1_KubeletAuthorization(&in.Authorization, &out.Authorization, s); err != nil {
 		return err
 	}
-	if err := v1.Convert_bool_To_Pointer_bool(&in.AllowPrivileged, &out.AllowPrivileged, s); err != nil {
-		return err
-	}
-	out.HostNetworkSources = *(*[]string)(unsafe.Pointer(&in.HostNetworkSources))
-	out.HostPIDSources = *(*[]string)(unsafe.Pointer(&in.HostPIDSources))
-	out.HostIPCSources = *(*[]string)(unsafe.Pointer(&in.HostIPCSources))
 	if err := v1.Convert_int32_To_Pointer_int32(&in.RegistryPullQPS, &out.RegistryPullQPS, s); err != nil {
 		return err
 	}
