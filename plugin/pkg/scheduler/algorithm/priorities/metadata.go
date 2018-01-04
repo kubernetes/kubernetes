@@ -44,11 +44,12 @@ func NewPriorityMetadataFactory(serviceLister algorithm.ServiceLister, controlle
 
 // priorityMetadata is a type that is passed as metadata for priority functions
 type priorityMetadata struct {
-	nonZeroRequest *schedulercache.Resource
-	podTolerations []v1.Toleration
-	affinity       *v1.Affinity
-	podSelectors   []labels.Selector
-	controllerRef  *metav1.OwnerReference
+	nonZeroRequest          *schedulercache.Resource
+	podTolerations          []v1.Toleration
+	affinity                *v1.Affinity
+	podSelectors            []labels.Selector
+	controllerRef           *metav1.OwnerReference
+	podFirstServiceSelector labels.Selector
 }
 
 // PriorityMetadata is a MetadataProducer.  Node info can be nil.
@@ -57,30 +58,40 @@ func (pmf *PriorityMetadataFactory) PriorityMetadata(pod *v1.Pod, nodeNameToInfo
 	if pod == nil {
 		return nil
 	}
-	tolerationsPreferNoSchedule := getAllTolerationPreferNoSchedule(pod.Spec.Tolerations)
-	podSelectors := getSelectors(pod, pmf.serviceLister, pmf.controllerLister, pmf.replicaSetLister, pmf.statefulSetLister)
 	return &priorityMetadata{
-		nonZeroRequest: getNonZeroRequests(pod),
-		podTolerations: tolerationsPreferNoSchedule,
-		affinity:       pod.Spec.Affinity,
-		podSelectors:   podSelectors,
-		controllerRef:  priorityutil.GetControllerRef(pod),
+		nonZeroRequest:          getNonZeroRequests(pod),
+		podTolerations:          getAllTolerationPreferNoSchedule(pod.Spec.Tolerations),
+		affinity:                pod.Spec.Affinity,
+		podSelectors:            getSelectors(pod, pmf.serviceLister, pmf.controllerLister, pmf.replicaSetLister, pmf.statefulSetLister),
+		controllerRef:           priorityutil.GetControllerRef(pod),
+		podFirstServiceSelector: getFirstServiceSelector(pod, pmf.serviceLister),
 	}
+}
+
+// getFirstServiceSelector returns one selector of services the given pod.
+func getFirstServiceSelector(pod *v1.Pod, sl algorithm.ServiceLister) (firstServiceSelector labels.Selector) {
+	if services, err := sl.GetPodServices(pod); err == nil && len(services) > 0 {
+		return labels.SelectorFromSet(services[0].Spec.Selector)
+	}
+	return nil
 }
 
 // getSelectors returns selectors of services, RCs and RSs matching the given pod.
 func getSelectors(pod *v1.Pod, sl algorithm.ServiceLister, cl algorithm.ControllerLister, rsl algorithm.ReplicaSetLister, ssl algorithm.StatefulSetLister) []labels.Selector {
 	var selectors []labels.Selector
+
 	if services, err := sl.GetPodServices(pod); err == nil {
 		for _, service := range services {
 			selectors = append(selectors, labels.SelectorFromSet(service.Spec.Selector))
 		}
 	}
+
 	if rcs, err := cl.GetPodControllers(pod); err == nil {
 		for _, rc := range rcs {
 			selectors = append(selectors, labels.SelectorFromSet(rc.Spec.Selector))
 		}
 	}
+
 	if rss, err := rsl.GetPodReplicaSets(pod); err == nil {
 		for _, rs := range rss {
 			if selector, err := metav1.LabelSelectorAsSelector(rs.Spec.Selector); err == nil {
@@ -88,6 +99,7 @@ func getSelectors(pod *v1.Pod, sl algorithm.ServiceLister, cl algorithm.Controll
 			}
 		}
 	}
+
 	if sss, err := ssl.GetPodStatefulSets(pod); err == nil {
 		for _, ss := range sss {
 			if selector, err := metav1.LabelSelectorAsSelector(ss.Spec.Selector); err == nil {
@@ -95,5 +107,6 @@ func getSelectors(pod *v1.Pod, sl algorithm.ServiceLister, cl algorithm.Controll
 			}
 		}
 	}
+
 	return selectors
 }
