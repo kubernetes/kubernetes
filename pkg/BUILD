@@ -95,6 +95,7 @@ filegroup(
         "//pkg/quota:all-srcs",
         "//pkg/registry:all-srcs",
         "//pkg/routes:all-srcs",
+        "//pkg/scheduler:all-srcs",
         "//pkg/security:all-srcs",
         "//pkg/securitycontext:all-srcs",
         "//pkg/serviceaccount:all-srcs",

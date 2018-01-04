@@ -14,10 +14,10 @@ go_library(
         "types.go",
         "well_known_labels.go",
     ],
-    importpath = "k8s.io/kubernetes/plugin/pkg/scheduler/algorithm",
+    importpath = "k8s.io/kubernetes/pkg/scheduler/algorithm",
     deps = [
-        "//plugin/pkg/scheduler/api:go_default_library",
-        "//plugin/pkg/scheduler/schedulercache:go_default_library",
+        "//pkg/scheduler/api:go_default_library",
+        "//pkg/scheduler/schedulercache:go_default_library",
         "//vendor/k8s.io/api/apps/v1beta1:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/api/extensions/v1beta1:go_default_library",
@@ -32,9 +32,9 @@ go_test(
         "types_test.go",
     ],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/plugin/pkg/scheduler/algorithm",
+    importpath = "k8s.io/kubernetes/pkg/scheduler/algorithm",
     deps = [
-        "//plugin/pkg/scheduler/schedulercache:go_default_library",
+        "//pkg/scheduler/schedulercache:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/labels:go_default_library",
     ],
@@ -51,8 +51,8 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//plugin/pkg/scheduler/algorithm/predicates:all-srcs",
-        "//plugin/pkg/scheduler/algorithm/priorities:all-srcs",
+        "//pkg/scheduler/algorithm/predicates:all-srcs",
+        "//pkg/scheduler/algorithm/priorities:all-srcs",
     ],
     tags = ["automanaged"],
 )
