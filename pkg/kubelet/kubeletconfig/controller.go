@@ -141,15 +141,11 @@ func (cc *Controller) Bootstrap() (*kubeletconfig.KubeletConfiguration, error) {
 			cc.configOK.Set(status.CurLocalMessage, reason, apiv1.ConditionTrue)
 		}
 
-		// when the trial period is over, the assigned config becomes the last-known-good
-		if trial, err := cc.inTrial(assigned.ConfigTrialDuration.Duration); err != nil {
-			utillog.Errorf("failed to check trial period for assigned config, error: %v", err)
-		} else if !trial {
-			utillog.Infof("assigned config passed trial period, will set as last-known-good")
-			if err := cc.graduateAssignedToLastKnownGood(); err != nil {
-				utillog.Errorf("failed to set last-known-good to assigned config, error: %v", err)
-			}
-		}
+		// update the last-known-good config if necessary, and start a timer that
+		// periodically checks whether the last-known good needs to be updated
+		// we only do this when the assigned config loads and passes validation
+		// wait.Forever will call the func once before starting the timer
+		go wait.Forever(func() { cc.checkTrial(assigned.ConfigTrialDuration.Duration) }, 10*time.Second)
 
 		return assigned, nil
 	} // Assert: the assigned config failed to load, parse, or validate
@@ -317,6 +313,19 @@ func (cc *Controller) initializeDynamicConfigDir() error {
 	utillog.Infof("ensuring filesystem is set up correctly")
 	// initializeDynamicConfigDir local checkpoint storage location
 	return cc.checkpointStore.Initialize()
+}
+
+// checkTrial checks whether the trial duration has passed, and updates the last-known-good config if necessary
+func (cc *Controller) checkTrial(duration time.Duration) {
+	// when the trial period is over, the assigned config becomes the last-known-good
+	if trial, err := cc.inTrial(duration); err != nil {
+		utillog.Errorf("failed to check trial period for assigned config, error: %v", err)
+	} else if !trial {
+		utillog.Infof("assigned config passed trial period, will set as last-known-good")
+		if err := cc.graduateAssignedToLastKnownGood(); err != nil {
+			utillog.Errorf("failed to set last-known-good to assigned config, error: %v", err)
+		}
+	}
 }
 
 // inTrial returns true if the time elapsed since the last modification of the current config does not exceed `trialDur`, false otherwise
