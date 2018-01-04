@@ -120,7 +120,7 @@ const (
 	// provisioner daemonSetName name
 	daemonSetName = "local-volume-provisioner"
 	// provisioner default mount point folder
-	provisionerDefaultMountRoot = "/mnt-local-storage"
+	provisionerDefaultMountRoot = "/mnt/local-storage"
 	// provisioner node/pv cluster role binding
 	nodeBindingName         = "local-storage:provisioner-node-binding"
 	pvBindingName           = "local-storage:provisioner-pv-binding"
@@ -1071,7 +1071,7 @@ func createProvisionerDaemonset(config *localTestConfig) {
 								},
 								{
 									Name:      "local-disks",
-									MountPath: "/mnt/local-storage",
+									MountPath: provisionerDefaultMountRoot,
 								},
 							},
 						},
