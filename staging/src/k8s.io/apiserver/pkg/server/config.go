@@ -342,10 +342,10 @@ func (c *Config) Complete(informers informers.SharedInformerFactory) CompletedCo
 	if host == "" && c.PublicAddress != nil {
 		host = c.PublicAddress.String()
 	}
-	if !strings.Contains(host, ":") {
-		if c.ReadWritePort != 0 {
-			host = net.JoinHostPort(host, strconv.Itoa(c.ReadWritePort))
-		}
+
+	// if there is no port, and we have a ReadWritePort, use that
+	if _, _, err := net.SplitHostPort(host); err != nil && c.ReadWritePort != 0 {
+		host = net.JoinHostPort(host, strconv.Itoa(c.ReadWritePort))
 	}
 	c.ExternalAddress = host
 
