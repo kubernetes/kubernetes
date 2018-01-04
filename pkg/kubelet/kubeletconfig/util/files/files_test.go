@@ -18,6 +18,7 @@ package files
 
 import (
 	"fmt"
+	"io/ioutil"
 	utilfs "k8s.io/kubernetes/pkg/util/filesystem"
 	"os"
 	"path/filepath"
@@ -27,7 +28,7 @@ import (
 
 func TestFileExists(t *testing.T) {
 	fs := utilfs.DefaultFs{}
-	prePath := "/tmp/TestFileExists"
+	prePath := getTempDir(t, "TestFileExists")
 	defer cleanup(t, fs, prePath)
 
 	testcases := map[string]struct {
@@ -95,7 +96,7 @@ func TestFileExists(t *testing.T) {
 
 func TestEnsureFile(t *testing.T) {
 	fs := utilfs.DefaultFs{}
-	prePath := "/tmp/TestEnsureFile"
+	prePath := getTempDir(t, "TestEnsureFile")
 	defer cleanup(t, fs, prePath)
 
 	testcases := map[string]struct {
@@ -143,7 +144,7 @@ func TestEnsureFile(t *testing.T) {
 
 func TestWriteTmpFile(t *testing.T) {
 	fs := utilfs.DefaultFs{}
-	prePath := "/tmp/TestWriteTmpFile"
+	prePath := getTempDir(t, "TestWriteTmpFile")
 	filePath := prePath + "/test"
 	fileContent := "a test case of WriteTmpFile"
 	defer cleanup(t, fs, prePath)
@@ -169,7 +170,7 @@ func TestWriteTmpFile(t *testing.T) {
 }
 
 func TestReplaceFile(t *testing.T) {
-	prePath := "/tmp/TestReplaceFile"
+	prePath := getTempDir(t, "TestReplaceFile")
 	filePath := prePath + "/test"
 	fileContent := "a test case of ReplaceFile"
 	fs := utilfs.DefaultFs{}
@@ -200,7 +201,7 @@ func TestReplaceFile(t *testing.T) {
 
 func TestDirExists(t *testing.T) {
 	fs := utilfs.DefaultFs{}
-	prePath := "/tmp/TestDirExists"
+	prePath := getTempDir(t, "TestDirExists")
 	defer cleanup(t, fs, prePath)
 
 	testcases := map[string]struct {
@@ -269,7 +270,7 @@ func TestDirExists(t *testing.T) {
 }
 
 func TestEnsureDir(t *testing.T) {
-	prePath := "/tmp/TestEnsureDir"
+	prePath := getTempDir(t, "TestEnsureDir")
 	fs := utilfs.DefaultFs{}
 	defer cleanup(t, fs, prePath)
 
@@ -337,6 +338,14 @@ func TestEnsureDir(t *testing.T) {
 			}
 		})
 	}
+}
+
+func getTempDir(t *testing.T, subPath string) string {
+	dir, err := ioutil.TempDir("", subPath)
+	if err != nil {
+		t.Fatalf("error in getting temp dir via ioutil, error: %v", err)
+	}
+	return dir
 }
 
 func getFileMode(fs utilfs.Filesystem, path string) string {
