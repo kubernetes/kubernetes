@@ -493,7 +493,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies) (err error) {
 		}
 	}
 
-	nodeName, err := getNodeName(kubeDeps.Cloud, nodeutil.GetHostname(s.HostnameOverride))
+	nodeName, err := cloudprovider.GetNodeName(kubeDeps.Cloud, nodeutil.GetHostname(s.HostnameOverride))
 	if err != nil {
 		return err
 	}
@@ -839,7 +839,7 @@ func addChaosToClientConfig(s *options.KubeletServer, config *restclient.Config)
 func RunKubelet(kubeFlags *options.KubeletFlags, kubeCfg *kubeletconfiginternal.KubeletConfiguration, kubeDeps *kubelet.Dependencies, runOnce bool) error {
 	hostname := nodeutil.GetHostname(kubeFlags.HostnameOverride)
 	// Query the cloud provider for our node name, default to hostname if kubeDeps.Cloud == nil
-	nodeName, err := getNodeName(kubeDeps.Cloud, hostname)
+	nodeName, err := cloudprovider.GetNodeName(kubeDeps.Cloud, hostname)
 	if err != nil {
 		return err
 	}

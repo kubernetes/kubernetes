@@ -22,8 +22,10 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/client-go/informers"
 	"k8s.io/kubernetes/pkg/controller"
 )
@@ -86,6 +88,31 @@ func GetInstanceProviderID(ctx context.Context, cloud Interface, nodeName types.
 		return "", fmt.Errorf("failed to get instance ID from cloud provider: %v", err)
 	}
 	return cloud.ProviderName() + "://" + instanceID, nil
+}
+
+// GetNodeName returns the node name according to the cloud provider
+// if cloud provider is specified. Otherwise, returns the hostname of the node.
+func GetNodeName(cloud Interface, hostname string) (types.NodeName, error) {
+	if cloud == nil {
+		return types.NodeName(hostname), nil
+	}
+
+	instances, ok := cloud.Instances()
+	if !ok {
+		return "", fmt.Errorf("failed to get instances from cloud provider")
+	}
+
+	nodeName, err := instances.CurrentNodeName(context.TODO(), hostname)
+	if err != nil {
+		return "", fmt.Errorf("error fetching current node name from cloud provider: %v", err)
+	}
+
+	if msgs := utilvalidation.IsDNS1123Subdomain(string(nodeName)); len(msgs) != 0 {
+		return "", fmt.Errorf("invalid nodename: %s", strings.Join(msgs, ", "))
+	}
+
+	glog.V(2).Infof("Cloud provider determined current node name to be %s", nodeName)
+	return nodeName, nil
 }
 
 // LoadBalancer is an abstract, pluggable interface for load balancers.

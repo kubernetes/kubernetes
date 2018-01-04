@@ -370,19 +370,16 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	cloudNames := []string{}
 	if kubeDeps.Cloud != nil {
 		var err error
-		instances, ok := kubeDeps.Cloud.Instances()
-		if !ok {
-			return nil, fmt.Errorf("failed to get instances from cloud provider")
-		}
-
-		nodeName, err = instances.CurrentNodeName(context.TODO(), hostname)
+		nodeName, err = cloudprovider.GetNodeName(kubeDeps.Cloud, hostname)
 		if err != nil {
-			return nil, fmt.Errorf("error fetching current instance name from cloud provider: %v", err)
+			return nil, err
 		}
-
-		glog.V(2).Infof("cloud provider determined current node name to be %s", nodeName)
 
 		if utilfeature.DefaultFeatureGate.Enabled(features.RotateKubeletServerCertificate) {
+			instances, ok := kubeDeps.Cloud.Instances()
+			if !ok {
+				return nil, fmt.Errorf("failed to get instances from cloud provider")
+			}
 			nodeAddresses, err := instances.NodeAddresses(context.TODO(), nodeName)
 			if err != nil {
 				return nil, fmt.Errorf("failed to get the addresses of the current instance from the cloud provider: %v", err)
