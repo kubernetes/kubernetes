@@ -207,7 +207,7 @@ func (r *proxyHandler) updateAPIService(apiService *apiregistrationapi.APIServic
 		serviceNamespace: apiService.Spec.Service.Namespace,
 	}
 	newInfo.proxyRoundTripper, newInfo.transportBuildingError = restclient.TransportFor(newInfo.restConfig)
-	if newInfo.transportBuildingError == nil && r.proxyTransport.Dial != nil {
+	if newInfo.transportBuildingError == nil && r.proxyTransport != nil && r.proxyTransport.Dial != nil {
 		switch transport := newInfo.proxyRoundTripper.(type) {
 		case *http.Transport:
 			transport.Dial = r.proxyTransport.Dial
