@@ -207,4 +207,9 @@ func TestController(t *testing.T) {
 	if err != nil {
 		t.Fatalf("controller failed to create expected deployment: %v", err)
 	}
+
+	// TODO:
+	// * Test for recorded events
+	// * Test with existing deployments
+	// * Test Foo status updates.
 }
