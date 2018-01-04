@@ -74,6 +74,7 @@ import (
 
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
+	scaleclient "k8s.io/client-go/scale"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
@@ -2682,20 +2683,25 @@ func RemoveAvoidPodsOffNode(c clientset.Interface, nodeName string) {
 	ExpectNoError(err)
 }
 
-func getScalerForKind(internalClientset internalclientset.Interface, kind schema.GroupKind) (kubectl.Scaler, error) {
-	return kubectl.ScalerFor(kind, internalClientset)
+//TODO(p0lyn0mial): remove internalClientset and kind
+func getScalerForKind(internalClientset internalclientset.Interface, kind schema.GroupKind, scalesGetter scaleclient.ScalesGetter, gr schema.GroupResource) (kubectl.Scaler, error) {
+	return kubectl.ScalerFor(kind, internalClientset, scalesGetter, gr)
 }
 
+//TODO(p0lyn0mial): remove internalClientset and kind.
+//TODO(p0lyn0mial): update the callers.
 func ScaleResource(
 	clientset clientset.Interface,
 	internalClientset internalclientset.Interface,
+	scalesGetter scaleclient.ScalesGetter,
 	ns, name string,
 	size uint,
 	wait bool,
 	kind schema.GroupKind,
+	gr schema.GroupResource,
 ) error {
 	By(fmt.Sprintf("Scaling %v %s in namespace %s to %d", kind, name, ns, size))
-	scaler, err := getScalerForKind(internalClientset, kind)
+	scaler, err := getScalerForKind(internalClientset, kind, scalesGetter, gr)
 	if err != nil {
 		return err
 	}
