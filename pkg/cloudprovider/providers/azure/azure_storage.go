@@ -42,20 +42,24 @@ func (az *Cloud) CreateFileShare(name, storageAccount, storageType, location str
 			// find the access key with this account
 			key, err := az.getStorageAccesskey(account.Name)
 			if err != nil {
-				glog.V(2).Infof("no key found for storage account %s", account.Name)
+				err = fmt.Errorf("could not get storage key for storage account %s: %v", account.Name, err)
 				continue
 			}
 
 			err = az.createFileShare(account.Name, key, name, requestGB)
 			if err != nil {
-				glog.V(2).Infof("failed to create share %s in account %s: %v", name, account.Name, err)
+				err = fmt.Errorf("failed to create share %s in account %s: %v", name, account.Name, err)
 				continue
 			}
 			glog.V(4).Infof("created share %s in account %s", name, account.Name)
 			return account.Name, key, err
 		}
 	}
-	return "", "", fmt.Errorf("failed to find a matching storage account")
+
+	if err == nil {
+		err = fmt.Errorf("failed to find a matching storage account")
+	}
+	return "", "", err
 }
 
 // DeleteFileShare deletes a file share using storage account name and key
