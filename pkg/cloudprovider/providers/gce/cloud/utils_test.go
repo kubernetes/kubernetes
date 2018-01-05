@@ -161,7 +161,7 @@ func TestCopyVisJSON(t *testing.T) {
 func TestSelfLink(t *testing.T) {
 	t.Parallel()
 
-	for _, tc := range []struct{
+	for _, tc := range []struct {
 		ver      meta.Version
 		project  string
 		resource string
@@ -189,7 +189,7 @@ func TestSelfLink(t *testing.T) {
 			*meta.GlobalKey("key3"),
 			"https://www.googleapis.com/compute/v1/projects/proj4/urlMaps/key3",
 		},
-	}{
+	} {
 		if link := SelfLink(tc.ver, tc.project, tc.resource, tc.key); link != tc.want {
 			t.Errorf("SelfLink(%v, %q, %q, %v) = %v, want %q", tc.ver, tc.project, tc.resource, tc.key, link, tc.want)
 		}

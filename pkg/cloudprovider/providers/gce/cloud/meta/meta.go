@@ -65,14 +65,14 @@ var AllVersions = []Version{
 // AllServices are a list of all the services to generate code for. Keep
 // this list in lexiographical order by object type.
 var AllServices = []*ServiceInfo{
-	&ServiceInfo{
+	{
 		Object:      "Address",
 		Service:     "Addresses",
 		Resource:    "addresses",
 		keyType:     Regional,
 		serviceType: reflect.TypeOf(&ga.AddressesService{}),
 	},
-	&ServiceInfo{
+	{
 		Object:      "Address",
 		Service:     "Addresses",
 		Resource:    "addresses",
@@ -80,7 +80,7 @@ var AllServices = []*ServiceInfo{
 		keyType:     Regional,
 		serviceType: reflect.TypeOf(&alpha.AddressesService{}),
 	},
-	&ServiceInfo{
+	{
 		Object:      "Address",
 		Service:     "Addresses",
 		Resource:    "addresses",
@@ -88,14 +88,14 @@ var AllServices = []*ServiceInfo{
 		keyType:     Regional,
 		serviceType: reflect.TypeOf(&beta.AddressesService{}),
 	},
-	&ServiceInfo{
+	{
 		Object:      "Address",
 		Service:     "GlobalAddresses",
 		Resource:    "addresses",
 		keyType:     Global,
 		serviceType: reflect.TypeOf(&ga.GlobalAddressesService{}),
 	},
-	&ServiceInfo{
+	{
 		Object:      "BackendService",
 		Service:     "BackendServices",
 		Resource:    "backendServices",
@@ -106,16 +106,16 @@ var AllServices = []*ServiceInfo{
 			"Update",
 		},
 	},
-	&ServiceInfo{
+	{
 		Object:            "BackendService",
 		Service:           "BackendServices",
-		Resource:    "backendServices",
+		Resource:          "backendServices",
 		version:           VersionAlpha,
 		keyType:           Global,
 		serviceType:       reflect.TypeOf(&alpha.BackendServicesService{}),
 		additionalMethods: []string{"Update"},
 	},
-	&ServiceInfo{
+	{
 		Object:      "BackendService",
 		Service:     "RegionBackendServices",
 		Resource:    "backendServices",
@@ -127,14 +127,14 @@ var AllServices = []*ServiceInfo{
 			"Update",
 		},
 	},
-	&ServiceInfo{
+	{
 		Object:      "Disk",
 		Service:     "Disks",
 		Resource:    "disks",
 		keyType:     Zonal,
 		serviceType: reflect.TypeOf(&ga.DisksService{}),
 	},
-	&ServiceInfo{
+	{
 		Object:      "Disk",
 		Service:     "Disks",
 		Resource:    "disks",
@@ -142,7 +142,7 @@ var AllServices = []*ServiceInfo{
 		keyType:     Zonal,
 		serviceType: reflect.TypeOf(&alpha.DisksService{}),
 	},
-	&ServiceInfo{
+	{
 		Object:      "Disk",
 		Service:     "RegionDisks",
 		Resource:    "disks",
@@ -150,7 +150,7 @@ var AllServices = []*ServiceInfo{
 		keyType:     Regional,
 		serviceType: reflect.TypeOf(&alpha.DisksService{}),
 	},
-	&ServiceInfo{
+	{
 		Object:      "Firewall",
 		Service:     "Firewalls",
 		Resource:    "firewalls",
@@ -160,14 +160,14 @@ var AllServices = []*ServiceInfo{
 			"Update",
 		},
 	},
-	&ServiceInfo{
+	{
 		Object:      "ForwardingRule",
 		Service:     "ForwardingRules",
 		Resource:    "forwardingRules",
 		keyType:     Regional,
 		serviceType: reflect.TypeOf(&ga.ForwardingRulesService{}),
 	},
-	&ServiceInfo{
+	{
 		Object:      "ForwardingRule",
 		Service:     "ForwardingRules",
 		Resource:    "forwardingRules",
@@ -175,7 +175,7 @@ var AllServices = []*ServiceInfo{
 		keyType:     Regional,
 		serviceType: reflect.TypeOf(&alpha.ForwardingRulesService{}),
 	},
-	&ServiceInfo{
+	{
 		Object:      "ForwardingRule",
 		Service:     "GlobalForwardingRules",
 		Resource:    "forwardingRules",
@@ -185,7 +185,7 @@ var AllServices = []*ServiceInfo{
 			"SetTarget",
 		},
 	},
-	&ServiceInfo{
+	{
 		Object:      "HealthCheck",
 		Service:     "HealthChecks",
 		Resource:    "healthChecks",
@@ -195,7 +195,7 @@ var AllServices = []*ServiceInfo{
 			"Update",
 		},
 	},
-	&ServiceInfo{
+	{
 		Object:      "HealthCheck",
 		Service:     "HealthChecks",
 		Resource:    "healthChecks",
@@ -206,7 +206,7 @@ var AllServices = []*ServiceInfo{
 			"Update",
 		},
 	},
-	&ServiceInfo{
+	{
 		Object:      "HttpHealthCheck",
 		Service:     "HttpHealthChecks",
 		Resource:    "httpHealthChecks",
@@ -216,7 +216,7 @@ var AllServices = []*ServiceInfo{
 			"Update",
 		},
 	},
-	&ServiceInfo{
+	{
 		Object:      "HttpsHealthCheck",
 		Service:     "HttpsHealthChecks",
 		Resource:    "httpsHealthChecks",
@@ -226,7 +226,7 @@ var AllServices = []*ServiceInfo{
 			"Update",
 		},
 	},
-	&ServiceInfo{
+	{
 		Object:      "InstanceGroup",
 		Service:     "InstanceGroups",
 		Resource:    "instanceGroups",
@@ -239,7 +239,7 @@ var AllServices = []*ServiceInfo{
 			"SetNamedPorts",
 		},
 	},
-	&ServiceInfo{
+	{
 		Object:      "Instance",
 		Service:     "Instances",
 		Resource:    "instances",
@@ -250,7 +250,7 @@ var AllServices = []*ServiceInfo{
 			"DetachDisk",
 		},
 	},
-	&ServiceInfo{
+	{
 		Object:      "Instance",
 		Service:     "Instances",
 		Resource:    "instances",
@@ -262,7 +262,7 @@ var AllServices = []*ServiceInfo{
 			"DetachDisk",
 		},
 	},
-	&ServiceInfo{
+	{
 		Object:      "Instance",
 		Service:     "Instances",
 		Resource:    "instances",
@@ -275,7 +275,7 @@ var AllServices = []*ServiceInfo{
 			"UpdateNetworkInterface",
 		},
 	},
-	&ServiceInfo{
+	{
 		Object:      "NetworkEndpointGroup",
 		Service:     "NetworkEndpointGroups",
 		Resource:    "networkEndpointGroups",
@@ -288,16 +288,16 @@ var AllServices = []*ServiceInfo{
 		},
 		options: AggregatedList,
 	},
-	&ServiceInfo{
-		Object:  "Project",
-		Service: "Projects",
+	{
+		Object:   "Project",
+		Service:  "Projects",
 		Resource: "projects",
-		keyType: Global,
+		keyType:  Global,
 		// Generate only the stub with no methods.
 		options:     NoGet | NoList | NoInsert | NoDelete | CustomOps,
 		serviceType: reflect.TypeOf(&ga.ProjectsService{}),
 	},
-	&ServiceInfo{
+	{
 		Object:      "Region",
 		Service:     "Regions",
 		Resource:    "regions",
@@ -305,21 +305,21 @@ var AllServices = []*ServiceInfo{
 		options:     ReadOnly,
 		serviceType: reflect.TypeOf(&ga.RegionsService{}),
 	},
-	&ServiceInfo{
+	{
 		Object:      "Route",
 		Service:     "Routes",
 		Resource:    "routes",
 		keyType:     Global,
 		serviceType: reflect.TypeOf(&ga.RoutesService{}),
 	},
-	&ServiceInfo{
+	{
 		Object:      "SslCertificate",
 		Service:     "SslCertificates",
 		Resource:    "sslCertificates",
 		keyType:     Global,
 		serviceType: reflect.TypeOf(&ga.SslCertificatesService{}),
 	},
-	&ServiceInfo{
+	{
 		Object:      "TargetHttpProxy",
 		Service:     "TargetHttpProxies",
 		Resource:    "targetHttpProxies",
@@ -329,7 +329,7 @@ var AllServices = []*ServiceInfo{
 			"SetUrlMap",
 		},
 	},
-	&ServiceInfo{
+	{
 		Object:      "TargetHttpsProxy",
 		Service:     "TargetHttpsProxies",
 		Resource:    "targetHttpsProxies",
@@ -340,7 +340,7 @@ var AllServices = []*ServiceInfo{
 			"SetUrlMap",
 		},
 	},
-	&ServiceInfo{
+	{
 		Object:      "TargetPool",
 		Service:     "TargetPools",
 		Resource:    "targetPools",
@@ -351,7 +351,7 @@ var AllServices = []*ServiceInfo{
 			"RemoveInstance",
 		},
 	},
-	&ServiceInfo{
+	{
 		Object:      "UrlMap",
 		Service:     "UrlMaps",
 		Resource:    "urlMaps",
@@ -361,7 +361,7 @@ var AllServices = []*ServiceInfo{
 			"Update",
 		},
 	},
-	&ServiceInfo{
+	{
 		Object:      "Zone",
 		Service:     "Zones",
 		Resource:    "zones",
