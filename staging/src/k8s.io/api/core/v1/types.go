@@ -1021,8 +1021,8 @@ type FlockerVolumeSource struct {
 type StorageMedium string
 
 const (
-	StorageMediumDefault   StorageMedium = ""          // use whatever the default is for the node
-	StorageMediumMemory    StorageMedium = "Memory"    // use memory (tmpfs)
+	StorageMediumDefault   StorageMedium = ""          // use whatever the default is for the node, assume anything we don't explicitly handle is this
+	StorageMediumMemory    StorageMedium = "Memory"    // use memory (e.g. tmpfs on linux)
 	StorageMediumHugePages StorageMedium = "HugePages" // use hugepages
 )
 
