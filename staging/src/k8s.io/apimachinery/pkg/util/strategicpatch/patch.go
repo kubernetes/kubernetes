@@ -1322,23 +1322,23 @@ func mergeMap(original, patch map[string]interface{}, schema LookupPatchMeta, me
 		// If they're both maps or lists, recurse into the value.
 		switch originalType.Kind() {
 		case reflect.Map:
-			subschema, patchMeta, err := schema.LookupPatchMetadataForStruct(k)
-			if err != nil {
-				return nil, err
+			subschema, patchMeta, err2 := schema.LookupPatchMetadataForStruct(k)
+			if err2 != nil {
+				return nil, err2
 			}
-			_, patchStrategy, err := extractRetainKeysPatchStrategy(patchMeta.GetPatchStrategies())
-			if err != nil {
-				return nil, err
+			_, patchStrategy, err2 := extractRetainKeysPatchStrategy(patchMeta.GetPatchStrategies())
+			if err2 != nil {
+				return nil, err2
 			}
 			original[k], err = mergeMapHandler(original[k], patchV, subschema, patchStrategy, mergeOptions)
 		case reflect.Slice:
-			subschema, patchMeta, err := schema.LookupPatchMetadataForSlice(k)
-			if err != nil {
-				return nil, err
+			subschema, patchMeta, err2 := schema.LookupPatchMetadataForSlice(k)
+			if err2 != nil {
+				return nil, err2
 			}
-			_, patchStrategy, err := extractRetainKeysPatchStrategy(patchMeta.GetPatchStrategies())
-			if err != nil {
-				return nil, err
+			_, patchStrategy, err2 := extractRetainKeysPatchStrategy(patchMeta.GetPatchStrategies())
+			if err2 != nil {
+				return nil, err2
 			}
 			original[k], err = mergeSliceHandler(original[k], patchV, subschema, patchStrategy, patchMeta.GetPatchMergeKey(), isDeleteList, mergeOptions)
 		default:
