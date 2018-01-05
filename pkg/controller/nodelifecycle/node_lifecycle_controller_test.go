@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,10 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package node
+package nodelifecycle
 
 import (
-	"net"
 	"strings"
 	"testing"
 	"time"
@@ -39,10 +38,9 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	fakecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/controller/node/ipam"
-	"k8s.io/kubernetes/pkg/controller/node/scheduler"
-	"k8s.io/kubernetes/pkg/controller/node/util"
+	"k8s.io/kubernetes/pkg/controller/nodelifecycle/scheduler"
 	"k8s.io/kubernetes/pkg/controller/testutil"
+	nodeutil "k8s.io/kubernetes/pkg/controller/util/node"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/util/node"
 	taintutils "k8s.io/kubernetes/pkg/util/taints"
@@ -60,13 +58,46 @@ const (
 
 func alwaysReady() bool { return true }
 
-type nodeController struct {
+type nodeLifecycleController struct {
 	*Controller
 	nodeInformer      coreinformers.NodeInformer
 	daemonSetInformer extensionsinformers.DaemonSetInformer
 }
 
-func newNodeControllerFromClient(
+// doEviction does the fake eviction and returns the status of eviction operation.
+func (nc *nodeLifecycleController) doEviction(fakeNodeHandler *testutil.FakeNodeHandler) bool {
+	var podEvicted bool
+	zones := testutil.GetZones(fakeNodeHandler)
+	for _, zone := range zones {
+		nc.zonePodEvictor[zone].Try(func(value scheduler.TimedValue) (bool, time.Duration) {
+			uid, _ := value.UID.(string)
+			nodeutil.DeletePods(fakeNodeHandler, nc.recorder, value.Value, uid, nc.daemonSetStore)
+			return true, 0
+		})
+	}
+
+	for _, action := range fakeNodeHandler.Actions() {
+		if action.GetVerb() == "delete" && action.GetResource().Resource == "pods" {
+			podEvicted = true
+			return podEvicted
+		}
+	}
+	return podEvicted
+}
+
+func (nc *nodeLifecycleController) syncNodeStore(fakeNodeHandler *testutil.FakeNodeHandler) error {
+	nodes, err := fakeNodeHandler.List(metav1.ListOptions{})
+	if err != nil {
+		return err
+	}
+	newElems := make([]interface{}, 0, len(nodes.Items))
+	for i := range nodes.Items {
+		newElems = append(newElems, &nodes.Items[i])
+	}
+	return nc.nodeInformer.Informer().GetStore().Replace(newElems, "newRV")
+}
+
+func newNodeLifecycleControllerFromClient(
 	cloud cloudprovider.Interface,
 	kubeClient clientset.Interface,
 	podEvictionTimeout time.Duration,
@@ -77,37 +108,28 @@ func newNodeControllerFromClient(
 	nodeMonitorGracePeriod time.Duration,
 	nodeStartupGracePeriod time.Duration,
 	nodeMonitorPeriod time.Duration,
-	clusterCIDR *net.IPNet,
-	serviceCIDR *net.IPNet,
-	nodeCIDRMaskSize int,
-	allocateNodeCIDRs bool,
 	useTaints bool,
-) (*nodeController, error) {
+) (*nodeLifecycleController, error) {
 
 	factory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
 
 	nodeInformer := factory.Core().V1().Nodes()
 	daemonSetInformer := factory.Extensions().V1beta1().DaemonSets()
 
-	nc, err := NewNodeController(
+	nc, err := NewNodeLifecycleController(
 		factory.Core().V1().Pods(),
 		nodeInformer,
 		daemonSetInformer,
 		cloud,
 		kubeClient,
+		nodeMonitorPeriod,
+		nodeStartupGracePeriod,
+		nodeMonitorGracePeriod,
 		podEvictionTimeout,
 		evictionLimiterQPS,
 		secondaryEvictionLimiterQPS,
 		largeClusterThreshold,
 		unhealthyZoneThreshold,
-		nodeMonitorGracePeriod,
-		nodeStartupGracePeriod,
-		nodeMonitorPeriod,
-		clusterCIDR,
-		serviceCIDR,
-		nodeCIDRMaskSize,
-		allocateNodeCIDRs,
-		ipam.RangeAllocatorType,
 		useTaints,
 		useTaints,
 		useTaints,
@@ -120,19 +142,7 @@ func newNodeControllerFromClient(
 	nc.nodeInformerSynced = alwaysReady
 	nc.daemonSetInformerSynced = alwaysReady
 
-	return &nodeController{nc, nodeInformer, daemonSetInformer}, nil
-}
-
-func syncNodeStore(nc *nodeController, fakeNodeHandler *testutil.FakeNodeHandler) error {
-	nodes, err := fakeNodeHandler.List(metav1.ListOptions{})
-	if err != nil {
-		return err
-	}
-	newElems := make([]interface{}, 0, len(nodes.Items))
-	for i := range nodes.Items {
-		newElems = append(newElems, &nodes.Items[i])
-	}
-	return nc.nodeInformer.Informer().GetStore().Replace(newElems, "newRV")
+	return &nodeLifecycleController{nc, nodeInformer, daemonSetInformer}, nil
 }
 
 func TestMonitorNodeStatusEvictPods(t *testing.T) {
@@ -597,7 +607,7 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 	}
 
 	for _, item := range table {
-		nodeController, _ := newNodeControllerFromClient(
+		nodeController, _ := newNodeLifecycleControllerFromClient(
 			nil,
 			item.fakeNodeHandler,
 			evictionTimeout,
@@ -608,17 +618,13 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 			testNodeMonitorGracePeriod,
 			testNodeStartupGracePeriod,
 			testNodeMonitorPeriod,
-			nil,
-			nil,
-			0,
-			false,
 			false)
 		nodeController.now = func() metav1.Time { return fakeNow }
 		nodeController.recorder = testutil.NewFakeRecorder()
 		for _, ds := range item.daemonSets {
 			nodeController.daemonSetInformer.Informer().GetStore().Add(&ds)
 		}
-		if err := syncNodeStore(nodeController, item.fakeNodeHandler); err != nil {
+		if err := nodeController.syncNodeStore(item.fakeNodeHandler); err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
 		if err := nodeController.monitorNodeStatus(); err != nil {
@@ -633,7 +639,7 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 			item.fakeNodeHandler.Existing[0].Labels = labels
 			item.fakeNodeHandler.Existing[1].Labels = labels
 		}
-		if err := syncNodeStore(nodeController, item.fakeNodeHandler); err != nil {
+		if err := nodeController.syncNodeStore(item.fakeNodeHandler); err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
 		if err := nodeController.monitorNodeStatus(); err != nil {
@@ -644,7 +650,7 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 			if _, ok := nodeController.zonePodEvictor[zone]; ok {
 				nodeController.zonePodEvictor[zone].Try(func(value scheduler.TimedValue) (bool, time.Duration) {
 					nodeUID, _ := value.UID.(string)
-					util.DeletePods(item.fakeNodeHandler, nodeController.recorder, value.Value, nodeUID, nodeController.daemonSetInformer.Lister())
+					nodeutil.DeletePods(item.fakeNodeHandler, nodeController.recorder, value.Value, nodeUID, nodeController.daemonSetInformer.Lister())
 					return true, 0
 				})
 			} else {
@@ -763,12 +769,21 @@ func TestPodStatusChange(t *testing.T) {
 	}
 
 	for _, item := range table {
-		nodeController, _ := newNodeControllerFromClient(nil, item.fakeNodeHandler,
-			evictionTimeout, testRateLimiterQPS, testRateLimiterQPS, testLargeClusterThreshold, testUnhealthyThreshold, testNodeMonitorGracePeriod,
-			testNodeStartupGracePeriod, testNodeMonitorPeriod, nil, nil, 0, false, false)
+		nodeController, _ := newNodeLifecycleControllerFromClient(
+			nil,
+			item.fakeNodeHandler,
+			evictionTimeout,
+			testRateLimiterQPS,
+			testRateLimiterQPS,
+			testLargeClusterThreshold,
+			testUnhealthyThreshold,
+			testNodeMonitorGracePeriod,
+			testNodeStartupGracePeriod,
+			testNodeMonitorPeriod,
+			false)
 		nodeController.now = func() metav1.Time { return fakeNow }
 		nodeController.recorder = testutil.NewFakeRecorder()
-		if err := syncNodeStore(nodeController, item.fakeNodeHandler); err != nil {
+		if err := nodeController.syncNodeStore(item.fakeNodeHandler); err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
 		if err := nodeController.monitorNodeStatus(); err != nil {
@@ -779,7 +794,7 @@ func TestPodStatusChange(t *testing.T) {
 			item.fakeNodeHandler.Existing[0].Status = item.newNodeStatus
 			item.fakeNodeHandler.Existing[1].Status = item.secondNodeNewStatus
 		}
-		if err := syncNodeStore(nodeController, item.fakeNodeHandler); err != nil {
+		if err := nodeController.syncNodeStore(item.fakeNodeHandler); err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
 		if err := nodeController.monitorNodeStatus(); err != nil {
@@ -789,7 +804,7 @@ func TestPodStatusChange(t *testing.T) {
 		for _, zone := range zones {
 			nodeController.zonePodEvictor[zone].Try(func(value scheduler.TimedValue) (bool, time.Duration) {
 				nodeUID, _ := value.UID.(string)
-				util.DeletePods(item.fakeNodeHandler, nodeController.recorder, value.Value, nodeUID, nodeController.daemonSetStore)
+				nodeutil.DeletePods(item.fakeNodeHandler, nodeController.recorder, value.Value, nodeUID, nodeController.daemonSetStore)
 				return true, 0
 			})
 		}
@@ -809,7 +824,6 @@ func TestPodStatusChange(t *testing.T) {
 			t.Errorf("expected pod update: %+v, got %+v for %+v", podReasonUpdate, item.expectedPodUpdate, item.description)
 		}
 	}
-
 }
 
 func TestMonitorNodeStatusEvictPodsWithDisruption(t *testing.T) {
@@ -1280,9 +1294,18 @@ func TestMonitorNodeStatusEvictPodsWithDisruption(t *testing.T) {
 			Existing:  item.nodeList,
 			Clientset: fake.NewSimpleClientset(&v1.PodList{Items: item.podList}),
 		}
-		nodeController, _ := newNodeControllerFromClient(nil, fakeNodeHandler,
-			evictionTimeout, testRateLimiterQPS, testRateLimiterQPS, testLargeClusterThreshold, testUnhealthyThreshold, testNodeMonitorGracePeriod,
-			testNodeStartupGracePeriod, testNodeMonitorPeriod, nil, nil, 0, false, false)
+		nodeController, _ := newNodeLifecycleControllerFromClient(
+			nil,
+			fakeNodeHandler,
+			evictionTimeout,
+			testRateLimiterQPS,
+			testRateLimiterQPS,
+			testLargeClusterThreshold,
+			testUnhealthyThreshold,
+			testNodeMonitorGracePeriod,
+			testNodeStartupGracePeriod,
+			testNodeMonitorPeriod,
+			false)
 		nodeController.now = func() metav1.Time { return fakeNow }
 		nodeController.enterPartialDisruptionFunc = func(nodeNum int) float32 {
 			return testRateLimiterQPS
@@ -1291,7 +1314,7 @@ func TestMonitorNodeStatusEvictPodsWithDisruption(t *testing.T) {
 		nodeController.enterFullDisruptionFunc = func(nodeNum int) float32 {
 			return testRateLimiterQPS
 		}
-		if err := syncNodeStore(nodeController, fakeNodeHandler); err != nil {
+		if err := nodeController.syncNodeStore(fakeNodeHandler); err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
 		if err := nodeController.monitorNodeStatus(); err != nil {
@@ -1309,7 +1332,7 @@ func TestMonitorNodeStatusEvictPodsWithDisruption(t *testing.T) {
 			fakeNodeHandler.Existing[i].Status = item.updatedNodeStatuses[i]
 		}
 
-		if err := syncNodeStore(nodeController, fakeNodeHandler); err != nil {
+		if err := nodeController.syncNodeStore(fakeNodeHandler); err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
 		if err := nodeController.monitorNodeStatus(); err != nil {
@@ -1335,27 +1358,6 @@ func TestMonitorNodeStatusEvictPodsWithDisruption(t *testing.T) {
 			t.Errorf("%v: expected pod eviction: %+v, got %+v", item.description, item.expectedEvictPods, podEvicted)
 		}
 	}
-}
-
-// doEviction does the fake eviction and returns the status of eviction operation.
-func (nc *nodeController) doEviction(fakeNodeHandler *testutil.FakeNodeHandler) bool {
-	var podEvicted bool
-	zones := testutil.GetZones(fakeNodeHandler)
-	for _, zone := range zones {
-		nc.zonePodEvictor[zone].Try(func(value scheduler.TimedValue) (bool, time.Duration) {
-			uid, _ := value.UID.(string)
-			util.DeletePods(fakeNodeHandler, nc.recorder, value.Value, uid, nc.daemonSetStore)
-			return true, 0
-		})
-	}
-
-	for _, action := range fakeNodeHandler.Actions() {
-		if action.GetVerb() == "delete" && action.GetResource().Resource == "pods" {
-			podEvicted = true
-			return podEvicted
-		}
-	}
-	return podEvicted
 }
 
 // TestCloudProviderNoRateLimit tests that monitorNodes() immediately deletes
@@ -1384,10 +1386,18 @@ func TestCloudProviderNoRateLimit(t *testing.T) {
 		Clientset:      fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testutil.NewPod("pod0", "node0"), *testutil.NewPod("pod1", "node0")}}),
 		DeleteWaitChan: make(chan struct{}),
 	}
-	nodeController, _ := newNodeControllerFromClient(nil, fnh, 10*time.Minute,
-		testRateLimiterQPS, testRateLimiterQPS, testLargeClusterThreshold, testUnhealthyThreshold,
-		testNodeMonitorGracePeriod, testNodeStartupGracePeriod,
-		testNodeMonitorPeriod, nil, nil, 0, false, false)
+	nodeController, _ := newNodeLifecycleControllerFromClient(
+		nil,
+		fnh,
+		10*time.Minute,
+		testRateLimiterQPS,
+		testRateLimiterQPS,
+		testLargeClusterThreshold,
+		testUnhealthyThreshold,
+		testNodeMonitorGracePeriod,
+		testNodeStartupGracePeriod,
+		testNodeMonitorPeriod,
+		false)
 	nodeController.cloud = &fakecloud.FakeCloud{}
 	nodeController.now = func() metav1.Time { return metav1.Date(2016, 1, 1, 12, 0, 0, 0, time.UTC) }
 	nodeController.recorder = testutil.NewFakeRecorder()
@@ -1395,7 +1405,7 @@ func TestCloudProviderNoRateLimit(t *testing.T) {
 		return false, nil
 	}
 	// monitorNodeStatus should allow this node to be immediately deleted
-	if err := syncNodeStore(nodeController, fnh); err != nil {
+	if err := nodeController.syncNodeStore(fnh); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 	if err := nodeController.monitorNodeStatus(); err != nil {
@@ -1624,12 +1634,21 @@ func TestMonitorNodeStatusUpdateStatus(t *testing.T) {
 	}
 
 	for i, item := range table {
-		nodeController, _ := newNodeControllerFromClient(nil, item.fakeNodeHandler, 5*time.Minute,
-			testRateLimiterQPS, testRateLimiterQPS, testLargeClusterThreshold, testUnhealthyThreshold,
-			testNodeMonitorGracePeriod, testNodeStartupGracePeriod, testNodeMonitorPeriod, nil, nil, 0, false, false)
+		nodeController, _ := newNodeLifecycleControllerFromClient(
+			nil,
+			item.fakeNodeHandler,
+			5*time.Minute,
+			testRateLimiterQPS,
+			testRateLimiterQPS,
+			testLargeClusterThreshold,
+			testUnhealthyThreshold,
+			testNodeMonitorGracePeriod,
+			testNodeStartupGracePeriod,
+			testNodeMonitorPeriod,
+			false)
 		nodeController.now = func() metav1.Time { return fakeNow }
 		nodeController.recorder = testutil.NewFakeRecorder()
-		if err := syncNodeStore(nodeController, item.fakeNodeHandler); err != nil {
+		if err := nodeController.syncNodeStore(item.fakeNodeHandler); err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
 		if err := nodeController.monitorNodeStatus(); err != nil {
@@ -1638,7 +1657,7 @@ func TestMonitorNodeStatusUpdateStatus(t *testing.T) {
 		if item.timeToPass > 0 {
 			nodeController.now = func() metav1.Time { return metav1.Time{Time: fakeNow.Add(item.timeToPass)} }
 			item.fakeNodeHandler.Existing[0].Status = item.newNodeStatus
-			if err := syncNodeStore(nodeController, item.fakeNodeHandler); err != nil {
+			if err := nodeController.syncNodeStore(item.fakeNodeHandler); err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
 			if err := nodeController.monitorNodeStatus(); err != nil {
@@ -1768,12 +1787,21 @@ func TestMonitorNodeStatusMarkPodsNotReady(t *testing.T) {
 	}
 
 	for i, item := range table {
-		nodeController, _ := newNodeControllerFromClient(nil, item.fakeNodeHandler, 5*time.Minute,
-			testRateLimiterQPS, testRateLimiterQPS, testLargeClusterThreshold, testUnhealthyThreshold,
-			testNodeMonitorGracePeriod, testNodeStartupGracePeriod, testNodeMonitorPeriod, nil, nil, 0, false, false)
+		nodeController, _ := newNodeLifecycleControllerFromClient(
+			nil,
+			item.fakeNodeHandler,
+			5*time.Minute,
+			testRateLimiterQPS,
+			testRateLimiterQPS,
+			testLargeClusterThreshold,
+			testUnhealthyThreshold,
+			testNodeMonitorGracePeriod,
+			testNodeStartupGracePeriod,
+			testNodeMonitorPeriod,
+			false)
 		nodeController.now = func() metav1.Time { return fakeNow }
 		nodeController.recorder = testutil.NewFakeRecorder()
-		if err := syncNodeStore(nodeController, item.fakeNodeHandler); err != nil {
+		if err := nodeController.syncNodeStore(item.fakeNodeHandler); err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
 		if err := nodeController.monitorNodeStatus(); err != nil {
@@ -1782,7 +1810,7 @@ func TestMonitorNodeStatusMarkPodsNotReady(t *testing.T) {
 		if item.timeToPass > 0 {
 			nodeController.now = func() metav1.Time { return metav1.Time{Time: fakeNow.Add(item.timeToPass)} }
 			item.fakeNodeHandler.Existing[0].Status = item.newNodeStatus
-			if err := syncNodeStore(nodeController, item.fakeNodeHandler); err != nil {
+			if err := nodeController.syncNodeStore(item.fakeNodeHandler); err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
 			if err := nodeController.monitorNodeStatus(); err != nil {
@@ -1879,12 +1907,21 @@ func TestSwapUnreachableNotReadyTaints(t *testing.T) {
 	originalTaint := UnreachableTaintTemplate
 	updatedTaint := NotReadyTaintTemplate
 
-	nodeController, _ := newNodeControllerFromClient(nil, fakeNodeHandler,
-		evictionTimeout, testRateLimiterQPS, testRateLimiterQPS, testLargeClusterThreshold, testUnhealthyThreshold, testNodeMonitorGracePeriod,
-		testNodeStartupGracePeriod, testNodeMonitorPeriod, nil, nil, 0, false, true)
+	nodeController, _ := newNodeLifecycleControllerFromClient(
+		nil,
+		fakeNodeHandler,
+		evictionTimeout,
+		testRateLimiterQPS,
+		testRateLimiterQPS,
+		testLargeClusterThreshold,
+		testUnhealthyThreshold,
+		testNodeMonitorGracePeriod,
+		testNodeStartupGracePeriod,
+		testNodeMonitorPeriod,
+		true)
 	nodeController.now = func() metav1.Time { return fakeNow }
 	nodeController.recorder = testutil.NewFakeRecorder()
-	if err := syncNodeStore(nodeController, fakeNodeHandler); err != nil {
+	if err := nodeController.syncNodeStore(fakeNodeHandler); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 	if err := nodeController.monitorNodeStatus(); err != nil {
@@ -1922,7 +1959,7 @@ func TestSwapUnreachableNotReadyTaints(t *testing.T) {
 		return
 	}
 
-	if err := syncNodeStore(nodeController, fakeNodeHandler); err != nil {
+	if err := nodeController.syncNodeStore(fakeNodeHandler); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 	if err := nodeController.monitorNodeStatus(); err != nil {
@@ -1972,9 +2009,18 @@ func TestTaintsNodeByCondition(t *testing.T) {
 		Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testutil.NewPod("pod0", "node0")}}),
 	}
 
-	nodeController, _ := newNodeControllerFromClient(nil, fakeNodeHandler, evictionTimeout,
-		testRateLimiterQPS, testRateLimiterQPS, testLargeClusterThreshold, testUnhealthyThreshold, testNodeMonitorGracePeriod,
-		testNodeStartupGracePeriod, testNodeMonitorPeriod, nil, nil, 0, false, true)
+	nodeController, _ := newNodeLifecycleControllerFromClient(
+		nil,
+		fakeNodeHandler,
+		evictionTimeout,
+		testRateLimiterQPS,
+		testRateLimiterQPS,
+		testLargeClusterThreshold,
+		testUnhealthyThreshold,
+		testNodeMonitorGracePeriod,
+		testNodeStartupGracePeriod,
+		testNodeMonitorPeriod,
+		true)
 	nodeController.now = func() metav1.Time { return fakeNow }
 	nodeController.recorder = testutil.NewFakeRecorder()
 
@@ -2098,11 +2144,11 @@ func TestTaintsNodeByCondition(t *testing.T) {
 
 	for _, test := range tests {
 		fakeNodeHandler.Update(test.Node)
-		if err := syncNodeStore(nodeController, fakeNodeHandler); err != nil {
+		if err := nodeController.syncNodeStore(fakeNodeHandler); err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
 		nodeController.doNoScheduleTaintingPass(test.Node)
-		if err := syncNodeStore(nodeController, fakeNodeHandler); err != nil {
+		if err := nodeController.syncNodeStore(fakeNodeHandler); err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
 		node0, err := nodeController.nodeLister.Get("node0")
@@ -2150,10 +2196,18 @@ func TestNodeEventGeneration(t *testing.T) {
 		Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testutil.NewPod("pod0", "node0")}}),
 	}
 
-	nodeController, _ := newNodeControllerFromClient(nil, fakeNodeHandler, 5*time.Minute,
-		testRateLimiterQPS, testRateLimiterQPS, testLargeClusterThreshold, testUnhealthyThreshold,
-		testNodeMonitorGracePeriod, testNodeStartupGracePeriod,
-		testNodeMonitorPeriod, nil, nil, 0, false, false)
+	nodeController, _ := newNodeLifecycleControllerFromClient(
+		nil,
+		fakeNodeHandler,
+		5*time.Minute,
+		testRateLimiterQPS,
+		testRateLimiterQPS,
+		testLargeClusterThreshold,
+		testUnhealthyThreshold,
+		testNodeMonitorGracePeriod,
+		testNodeStartupGracePeriod,
+		testNodeMonitorPeriod,
+		false)
 	nodeController.cloud = &fakecloud.FakeCloud{}
 	nodeController.nodeExistsInCloudProvider = func(nodeName types.NodeName) (bool, error) {
 		return false, nil
@@ -2161,7 +2215,7 @@ func TestNodeEventGeneration(t *testing.T) {
 	nodeController.now = func() metav1.Time { return fakeNow }
 	fakeRecorder := testutil.NewFakeRecorder()
 	nodeController.recorder = fakeRecorder
-	if err := syncNodeStore(nodeController, fakeNodeHandler); err != nil {
+	if err := nodeController.syncNodeStore(fakeNodeHandler); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 	if err := nodeController.monitorNodeStatus(); err != nil {
@@ -2208,9 +2262,18 @@ func TestFixDeprecatedTaintKey(t *testing.T) {
 		Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testutil.NewPod("pod0", "node0")}}),
 	}
 
-	nodeController, _ := newNodeControllerFromClient(nil, fakeNodeHandler, evictionTimeout,
-		testRateLimiterQPS, testRateLimiterQPS, testLargeClusterThreshold, testUnhealthyThreshold, testNodeMonitorGracePeriod,
-		testNodeStartupGracePeriod, testNodeMonitorPeriod, nil, nil, 0, false, true)
+	nodeController, _ := newNodeLifecycleControllerFromClient(
+		nil,
+		fakeNodeHandler,
+		evictionTimeout,
+		testRateLimiterQPS,
+		testRateLimiterQPS,
+		testLargeClusterThreshold,
+		testUnhealthyThreshold,
+		testNodeMonitorGracePeriod,
+		testNodeStartupGracePeriod,
+		testNodeMonitorPeriod,
+		true)
 	nodeController.now = func() metav1.Time { return fakeNow }
 	nodeController.recorder = testutil.NewFakeRecorder()
 
@@ -2319,11 +2382,11 @@ func TestFixDeprecatedTaintKey(t *testing.T) {
 
 	for _, test := range tests {
 		fakeNodeHandler.Update(test.Node)
-		if err := syncNodeStore(nodeController, fakeNodeHandler); err != nil {
+		if err := nodeController.syncNodeStore(fakeNodeHandler); err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
 		nodeController.doFixDeprecatedTaintKeyPass(test.Node)
-		if err := syncNodeStore(nodeController, fakeNodeHandler); err != nil {
+		if err := nodeController.syncNodeStore(fakeNodeHandler); err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
 		node, err := nodeController.nodeLister.Get(test.Node.GetName())

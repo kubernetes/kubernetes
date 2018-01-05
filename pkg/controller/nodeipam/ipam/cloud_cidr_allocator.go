@@ -40,7 +40,7 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/controller/node/util"
+	nodeutil "k8s.io/kubernetes/pkg/controller/util/node"
 	utilnode "k8s.io/kubernetes/pkg/util/node"
 )
 
@@ -101,8 +101,8 @@ func NewCloudCIDRAllocator(client clientset.Interface, cloud cloudprovider.Inter
 	}
 
 	nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: util.CreateAddNodeHandler(ca.AllocateOrOccupyCIDR),
-		UpdateFunc: util.CreateUpdateNodeHandler(func(_, newNode *v1.Node) error {
+		AddFunc: nodeutil.CreateAddNodeHandler(ca.AllocateOrOccupyCIDR),
+		UpdateFunc: nodeutil.CreateUpdateNodeHandler(func(_, newNode *v1.Node) error {
 			if newNode.Spec.PodCIDR == "" {
 				return ca.AllocateOrOccupyCIDR(newNode)
 			}
@@ -114,7 +114,7 @@ func NewCloudCIDRAllocator(client clientset.Interface, cloud cloudprovider.Inter
 			}
 			return nil
 		}),
-		DeleteFunc: util.CreateDeleteNodeHandler(ca.ReleaseCIDR),
+		DeleteFunc: nodeutil.CreateDeleteNodeHandler(ca.ReleaseCIDR),
 	})
 
 	glog.V(0).Infof("Using cloud CIDR allocator (provider: %v)", cloud.ProviderName())
@@ -197,11 +197,11 @@ func (ca *cloudCIDRAllocator) updateCIDRAllocation(nodeName string) error {
 
 	cidrs, err := ca.cloud.AliasRanges(types.NodeName(nodeName))
 	if err != nil {
-		util.RecordNodeStatusChange(ca.recorder, node, "CIDRNotAvailable")
+		nodeutil.RecordNodeStatusChange(ca.recorder, node, "CIDRNotAvailable")
 		return fmt.Errorf("failed to allocate cidr: %v", err)
 	}
 	if len(cidrs) == 0 {
-		util.RecordNodeStatusChange(ca.recorder, node, "CIDRNotAvailable")
+		nodeutil.RecordNodeStatusChange(ca.recorder, node, "CIDRNotAvailable")
 		return fmt.Errorf("failed to allocate cidr: Node %v has no CIDRs", node.Name)
 	}
 	_, cidr, err := net.ParseCIDR(cidrs[0])
@@ -237,7 +237,7 @@ func (ca *cloudCIDRAllocator) updateCIDRAllocation(nodeName string) error {
 		glog.Errorf("Failed to update node %v PodCIDR to %v (%d retries left): %v", node.Name, podCIDR, cidrUpdateRetries-rep-1, err)
 	}
 	if err != nil {
-		util.RecordNodeStatusChange(ca.recorder, node, "CIDRAssignmentFailed")
+		nodeutil.RecordNodeStatusChange(ca.recorder, node, "CIDRAssignmentFailed")
 		glog.Errorf("CIDR assignment for node %v failed: %v.", nodeName, err)
 		return err
 	}

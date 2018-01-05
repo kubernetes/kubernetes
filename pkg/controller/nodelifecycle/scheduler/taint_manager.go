@@ -18,9 +18,6 @@ package scheduler
 
 import (
 	"fmt"
-	"sync"
-	"time"
-
 	"k8s.io/api/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
@@ -30,6 +27,8 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
+	"sync"
+	"time"
 
 	"k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"

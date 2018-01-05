@@ -36,9 +36,9 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/controller/node/ipam/cidrset"
-	"k8s.io/kubernetes/pkg/controller/node/util"
-	nodeutil "k8s.io/kubernetes/pkg/util/node"
+	"k8s.io/kubernetes/pkg/controller/nodeipam/ipam/cidrset"
+	nodeutil "k8s.io/kubernetes/pkg/controller/util/node"
+	utilnode "k8s.io/kubernetes/pkg/util/node"
 )
 
 type rangeAllocator struct {
@@ -119,8 +119,8 @@ func NewCIDRRangeAllocator(client clientset.Interface, nodeInformer informers.No
 	}
 
 	nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: util.CreateAddNodeHandler(ra.AllocateOrOccupyCIDR),
-		UpdateFunc: util.CreateUpdateNodeHandler(func(_, newNode *v1.Node) error {
+		AddFunc: nodeutil.CreateAddNodeHandler(ra.AllocateOrOccupyCIDR),
+		UpdateFunc: nodeutil.CreateUpdateNodeHandler(func(_, newNode *v1.Node) error {
 			// If the PodCIDR is not empty we either:
 			// - already processed a Node that already had a CIDR after NC restarted
 			//   (cidr is marked as used),
@@ -145,7 +145,7 @@ func NewCIDRRangeAllocator(client clientset.Interface, nodeInformer informers.No
 			}
 			return nil
 		}),
-		DeleteFunc: util.CreateDeleteNodeHandler(ra.ReleaseCIDR),
+		DeleteFunc: nodeutil.CreateDeleteNodeHandler(ra.ReleaseCIDR),
 	})
 
 	return ra, nil
@@ -234,7 +234,7 @@ func (r *rangeAllocator) AllocateOrOccupyCIDR(node *v1.Node) error {
 	podCIDR, err := r.cidrs.AllocateNext()
 	if err != nil {
 		r.removeNodeFromProcessing(node.Name)
-		util.RecordNodeStatusChange(r.recorder, node, "CIDRNotAvailable")
+		nodeutil.RecordNodeStatusChange(r.recorder, node, "CIDRNotAvailable")
 		return fmt.Errorf("failed to allocate cidr: %v", err)
 	}
 
@@ -303,14 +303,14 @@ func (r *rangeAllocator) updateCIDRAllocation(data nodeAndCIDR) error {
 			}
 			return nil
 		}
-		if err = nodeutil.PatchNodeCIDR(r.client, types.NodeName(node.Name), podCIDR); err == nil {
+		if err = utilnode.PatchNodeCIDR(r.client, types.NodeName(node.Name), podCIDR); err == nil {
 			glog.Infof("Set node %v PodCIDR to %v", node.Name, podCIDR)
 			break
 		}
 		glog.Errorf("Failed to update node %v PodCIDR to %v (%d retries left): %v", node.Name, podCIDR, cidrUpdateRetries-rep-1, err)
 	}
 	if err != nil {
-		util.RecordNodeStatusChange(r.recorder, node, "CIDRAssignmentFailed")
+		nodeutil.RecordNodeStatusChange(r.recorder, node, "CIDRAssignmentFailed")
 		// We accept the fact that we may leek CIDRs here. This is safer than releasing
 		// them in case when we don't know if request went through.
 		// NodeController restart will return all falsely allocated CIDRs to the pool.

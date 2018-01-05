@@ -30,9 +30,9 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
-	"k8s.io/kubernetes/pkg/controller/node/ipam/cidrset"
-	nodesync "k8s.io/kubernetes/pkg/controller/node/ipam/sync"
-	"k8s.io/kubernetes/pkg/controller/node/util"
+	"k8s.io/kubernetes/pkg/controller/nodeipam/ipam/cidrset"
+	nodesync "k8s.io/kubernetes/pkg/controller/nodeipam/ipam/sync"
+	nodeutil "k8s.io/kubernetes/pkg/controller/util/node"
 )
 
 // Config for the IPAM controller.
@@ -128,9 +128,9 @@ func (c *Controller) Start(nodeInformer informers.NodeInformer) error {
 	}
 
 	nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc:    util.CreateAddNodeHandler(c.onAdd),
-		UpdateFunc: util.CreateUpdateNodeHandler(c.onUpdate),
-		DeleteFunc: util.CreateDeleteNodeHandler(c.onDelete),
+		AddFunc:    nodeutil.CreateAddNodeHandler(c.onAdd),
+		UpdateFunc: nodeutil.CreateUpdateNodeHandler(c.onUpdate),
+		DeleteFunc: nodeutil.CreateDeleteNodeHandler(c.onDelete),
 	})
 
 	return nil

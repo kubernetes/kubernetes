@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package util
+package node
 
 import (
 	"errors"
@@ -170,9 +170,9 @@ func MarkAllPodsNotReady(kubeClient clientset.Interface, node *v1.Node) error {
 	return fmt.Errorf("%v", strings.Join(errMsg, "; "))
 }
 
-// NodeExistsInCloudProvider returns true if the node exists in the
+// ExistsInCloudProvider returns true if the node exists in the
 // cloud provider.
-func NodeExistsInCloudProvider(cloud cloudprovider.Interface, nodeName types.NodeName) (bool, error) {
+func ExistsInCloudProvider(cloud cloudprovider.Interface, nodeName types.NodeName) (bool, error) {
 	instances, ok := cloud.Instances()
 	if !ok {
 		return false, fmt.Errorf("%v", ErrCloudInstance)
@@ -198,7 +198,7 @@ func RecordNodeEvent(recorder record.EventRecorder, nodeName, nodeUID, eventtype
 	recorder.Eventf(ref, eventtype, reason, "Node %s event: %s", nodeName, event)
 }
 
-// RecordNodeStatusChange records a event related to a node status change.
+// RecordNodeStatusChange records a event related to a node status change. (Common to lifecycle and ipam)
 func RecordNodeStatusChange(recorder record.EventRecorder, node *v1.Node, newStatus string) {
 	ref := &v1.ObjectReference{
 		Kind:      "Node",
@@ -257,7 +257,7 @@ func CreateAddNodeHandler(f func(node *v1.Node) error) func(obj interface{}) {
 	}
 }
 
-// CreateUpdateNodeHandler creates a node update handler.
+// CreateUpdateNodeHandler creates a node update handler. (Common to lifecycle and ipam)
 func CreateUpdateNodeHandler(f func(oldNode, newNode *v1.Node) error) func(oldObj, newObj interface{}) {
 	return func(origOldObj, origNewObj interface{}) {
 		node := origNewObj.(*v1.Node).DeepCopy()
@@ -269,7 +269,7 @@ func CreateUpdateNodeHandler(f func(oldNode, newNode *v1.Node) error) func(oldOb
 	}
 }
 
-// CreateDeleteNodeHandler creates a delete node handler.
+// CreateDeleteNodeHandler creates a delete node handler. (Common to lifecycle and ipam)
 func CreateDeleteNodeHandler(f func(node *v1.Node) error) func(obj interface{}) {
 	return func(originalObj interface{}) {
 		originalNode, isNode := originalObj.(*v1.Node)

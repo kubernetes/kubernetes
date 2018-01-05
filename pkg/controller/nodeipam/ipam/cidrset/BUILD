@@ -10,14 +10,14 @@ go_test(
     name = "go_default_test",
     srcs = ["cidr_set_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/controller/node/ipam/cidrset",
+    importpath = "k8s.io/kubernetes/pkg/controller/nodeipam/ipam/cidrset",
     deps = ["//vendor/github.com/golang/glog:go_default_library"],
 )
 
 go_library(
     name = "go_default_library",
     srcs = ["cidr_set.go"],
-    importpath = "k8s.io/kubernetes/pkg/controller/node/ipam/cidrset",
+    importpath = "k8s.io/kubernetes/pkg/controller/nodeipam/ipam/cidrset",
 )
 
 filegroup(
