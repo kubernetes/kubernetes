@@ -1,4 +1,4 @@
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   name: nvidia-gpu-device-plugin
@@ -36,7 +36,7 @@ spec:
         hostPath:
           path: /dev
       containers:
-      - image: "gcr.io/google-containers/nvidia-gpu-device-plugin@sha256:0e79da6998a61257585e0d3fb5848240129f0fa5b4ad972dfed4049448093c33"
+      - image: "gcr.io/google-containers/nvidia-gpu-device-plugin:31ee590ea32667804438a380cea5f46064cf9f03"
         command: ["/usr/bin/nvidia-gpu-device-plugin", "-logtostderr"]
         name: nvidia-gpu-device-plugin
         resources:
