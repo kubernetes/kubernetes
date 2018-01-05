@@ -19,6 +19,7 @@
 
 REGISTRY?=gcr.io/google_containers
 ARCH?=amd64
+OUT_DIR?=_output
 TEMP_DIR:=$(shell mktemp -d -t hyperkubeXXXXXX)
 CNI_RELEASE=0799f5732f2a11b329d9e3d51b9c8f2e3759f2ff
 CACHEBUST?=1
@@ -62,7 +63,7 @@ endif
 	cp -r ./* ${TEMP_DIR}
 	mkdir -p ${TEMP_DIR}/cni-bin
 
-	cp ../../../_output/dockerized/bin/linux/${ARCH}/hyperkube ${TEMP_DIR}
+	cp ../../../$(OUT_DIR)/dockerized/bin/linux/${ARCH}/hyperkube ${TEMP_DIR}
 	chmod a+rx ${TEMP_DIR}/hyperkube
 
 	cd ${TEMP_DIR} && sed -i.back "s|ARCH|${QEMUARCH}|g" Dockerfile
