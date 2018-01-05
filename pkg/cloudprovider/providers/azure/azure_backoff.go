@@ -64,7 +64,9 @@ func (az *Cloud) VirtualMachineClientGetWithRetry(resourceGroup, vmName string, 
 	err := wait.ExponentialBackoff(az.requestBackoff(), func() (bool, error) {
 		var retryErr error
 		az.operationPollRateLimiter.Accept()
+		mc := newMetricContext("vms", "get", az.ResourceGroup, az.SubscriptionID)
 		machine, retryErr = az.VirtualMachinesClient.Get(resourceGroup, vmName, types)
+		mc.Observe(retryErr)
 		if retryErr != nil {
 			glog.Errorf("backoff: failure, will retry,err=%v", retryErr)
 			return false, nil
@@ -83,7 +85,9 @@ func (az *Cloud) VirtualMachineClientListWithRetry() ([]compute.VirtualMachine, 
 		var retryErr error
 		az.operationPollRateLimiter.Accept()
 		glog.V(10).Infof("VirtualMachinesClient.List(%v): start", az.ResourceGroup)
+		mc := newMetricContext("vms", "list", az.ResourceGroup, az.SubscriptionID)
 		result, retryErr = az.VirtualMachinesClient.List(az.ResourceGroup)
+		mc.Observe(retryErr)
 		glog.V(10).Infof("VirtualMachinesClient.List(%v): end", az.ResourceGroup)
 		if retryErr != nil {
 			glog.Errorf("VirtualMachinesClient.List(%v) - backoff: failure, will retry,err=%v",
@@ -108,7 +112,9 @@ func (az *Cloud) VirtualMachineClientListWithRetry() ([]compute.VirtualMachine, 
 				var retryErr error
 				az.operationPollRateLimiter.Accept()
 				glog.V(10).Infof("VirtualMachinesClient.ListNextResults(%v): start", az.ResourceGroup)
+				mc := newMetricContext("vms", "list_next_results", az.ResourceGroup, az.SubscriptionID)
 				result, retryErr = az.VirtualMachinesClient.ListNextResults(result)
+				mc.Observe(retryErr)
 				glog.V(10).Infof("VirtualMachinesClient.ListNextResults(%v): end", az.ResourceGroup)
 				if retryErr != nil {
 					glog.Errorf("VirtualMachinesClient.ListNextResults(%v) - backoff: failure, will retry,err=%v",
@@ -149,9 +155,11 @@ func (az *Cloud) CreateOrUpdateSGWithRetry(sg network.SecurityGroup) error {
 	return wait.ExponentialBackoff(az.requestBackoff(), func() (bool, error) {
 		az.operationPollRateLimiter.Accept()
 		glog.V(10).Infof("SecurityGroupsClient.CreateOrUpdate(%s): start", *sg.Name)
+		mc := newMetricContext("security_groups", "create_or_update", az.ResourceGroup, az.SubscriptionID)
 		respChan, errChan := az.SecurityGroupsClient.CreateOrUpdate(az.ResourceGroup, *sg.Name, sg, nil)
 		resp := <-respChan
 		err := <-errChan
+		mc.Observe(err)
 		glog.V(10).Infof("SecurityGroupsClient.CreateOrUpdate(%s): end", *sg.Name)
 		return processRetryResponse(resp.Response, err)
 	})
@@ -162,9 +170,11 @@ func (az *Cloud) CreateOrUpdateLBWithRetry(lb network.LoadBalancer) error {
 	return wait.ExponentialBackoff(az.requestBackoff(), func() (bool, error) {
 		az.operationPollRateLimiter.Accept()
 		glog.V(10).Infof("LoadBalancerClient.CreateOrUpdate(%s): start", *lb.Name)
+		mc := newMetricContext("load_balancer", "create_or_update", az.ResourceGroup, az.SubscriptionID)
 		respChan, errChan := az.LoadBalancerClient.CreateOrUpdate(az.ResourceGroup, *lb.Name, lb, nil)
 		resp := <-respChan
 		err := <-errChan
+		mc.Observe(err)
 		glog.V(10).Infof("LoadBalancerClient.CreateOrUpdate(%s): end", *lb.Name)
 		return processRetryResponse(resp.Response, err)
 	})
@@ -179,7 +189,9 @@ func (az *Cloud) ListLBWithRetry() ([]network.LoadBalancer, error) {
 		var retryErr error
 		az.operationPollRateLimiter.Accept()
 		glog.V(10).Infof("LoadBalancerClient.List(%v): start", az.ResourceGroup)
+		mc := newMetricContext("load_balancer", "list", az.ResourceGroup, az.SubscriptionID)
 		result, retryErr = az.LoadBalancerClient.List(az.ResourceGroup)
+		mc.Observe(retryErr)
 		glog.V(10).Infof("LoadBalancerClient.List(%v): end", az.ResourceGroup)
 		if retryErr != nil {
 			glog.Errorf("LoadBalancerClient.List(%v) - backoff: failure, will retry,err=%v",
@@ -205,7 +217,9 @@ func (az *Cloud) ListLBWithRetry() ([]network.LoadBalancer, error) {
 				var retryErr error
 				az.operationPollRateLimiter.Accept()
 				glog.V(10).Infof("LoadBalancerClient.ListNextResults(%v): start", az.ResourceGroup)
+				mc := newMetricContext("load_balancer", "list_next_results", az.ResourceGroup, az.SubscriptionID)
 				result, retryErr = az.LoadBalancerClient.ListNextResults(result)
+				mc.Observe(retryErr)
 				glog.V(10).Infof("LoadBalancerClient.ListNextResults(%v): end", az.ResourceGroup)
 				if retryErr != nil {
 					glog.Errorf("LoadBalancerClient.ListNextResults(%v) - backoff: failure, will retry,err=%v",
@@ -234,7 +248,9 @@ func (az *Cloud) ListPIPWithRetry(pipResourceGroup string) ([]network.PublicIPAd
 		var retryErr error
 		az.operationPollRateLimiter.Accept()
 		glog.V(10).Infof("PublicIPAddressesClient.List(%v): start", pipResourceGroup)
+		mc := newMetricContext("public_ip_addresses", "list", az.ResourceGroup, az.SubscriptionID)
 		result, retryErr = az.PublicIPAddressesClient.List(pipResourceGroup)
+		mc.Observe(retryErr)
 		glog.V(10).Infof("PublicIPAddressesClient.List(%v): end", pipResourceGroup)
 		if retryErr != nil {
 			glog.Errorf("PublicIPAddressesClient.List(%v) - backoff: failure, will retry,err=%v",
@@ -260,7 +276,9 @@ func (az *Cloud) ListPIPWithRetry(pipResourceGroup string) ([]network.PublicIPAd
 				var retryErr error
 				az.operationPollRateLimiter.Accept()
 				glog.V(10).Infof("PublicIPAddressesClient.ListNextResults(%v): start", pipResourceGroup)
+				mc := newMetricContext("public_ip_addresses", "list_next_results", az.ResourceGroup, az.SubscriptionID)
 				result, retryErr = az.PublicIPAddressesClient.ListNextResults(result)
+				mc.Observe(retryErr)
 				glog.V(10).Infof("PublicIPAddressesClient.ListNextResults(%v): end", pipResourceGroup)
 				if retryErr != nil {
 					glog.Errorf("PublicIPAddressesClient.ListNextResults(%v) - backoff: failure, will retry,err=%v",
@@ -286,9 +304,11 @@ func (az *Cloud) CreateOrUpdatePIPWithRetry(pipResourceGroup string, pip network
 	return wait.ExponentialBackoff(az.requestBackoff(), func() (bool, error) {
 		az.operationPollRateLimiter.Accept()
 		glog.V(10).Infof("PublicIPAddressesClient.CreateOrUpdate(%s, %s): start", pipResourceGroup, *pip.Name)
+		mc := newMetricContext("public_ip_addresses", "create_or_update", az.ResourceGroup, az.SubscriptionID)
 		respChan, errChan := az.PublicIPAddressesClient.CreateOrUpdate(pipResourceGroup, *pip.Name, pip, nil)
 		resp := <-respChan
 		err := <-errChan
+		mc.Observe(err)
 		glog.V(10).Infof("PublicIPAddressesClient.CreateOrUpdate(%s, %s): end", pipResourceGroup, *pip.Name)
 		return processRetryResponse(resp.Response, err)
 	})
@@ -299,9 +319,11 @@ func (az *Cloud) CreateOrUpdateInterfaceWithRetry(nic network.Interface) error {
 	return wait.ExponentialBackoff(az.requestBackoff(), func() (bool, error) {
 		az.operationPollRateLimiter.Accept()
 		glog.V(10).Infof("InterfacesClient.CreateOrUpdate(%s): start", *nic.Name)
+		mc := newMetricContext("interfaces", "create_or_update", az.ResourceGroup, az.SubscriptionID)
 		respChan, errChan := az.InterfacesClient.CreateOrUpdate(az.ResourceGroup, *nic.Name, nic, nil)
 		resp := <-respChan
 		err := <-errChan
+		mc.Observe(err)
 		glog.V(10).Infof("InterfacesClient.CreateOrUpdate(%s): end", *nic.Name)
 		return processRetryResponse(resp.Response, err)
 	})
@@ -312,9 +334,11 @@ func (az *Cloud) DeletePublicIPWithRetry(pipResourceGroup string, pipName string
 	return wait.ExponentialBackoff(az.requestBackoff(), func() (bool, error) {
 		az.operationPollRateLimiter.Accept()
 		glog.V(10).Infof("PublicIPAddressesClient.Delete(%s, %s): start", pipResourceGroup, pipName)
+		mc := newMetricContext("public_ip_addresses", "delete", az.ResourceGroup, az.SubscriptionID)
 		respChan, errChan := az.PublicIPAddressesClient.Delete(pipResourceGroup, pipName, nil)
 		resp := <-respChan
 		err := <-errChan
+		mc.Observe(err)
 		glog.V(10).Infof("PublicIPAddressesClient.Delete(%s, %s): end", pipResourceGroup, pipName)
 		return processRetryResponse(resp, err)
 	})
@@ -325,9 +349,11 @@ func (az *Cloud) DeleteLBWithRetry(lbName string) error {
 	return wait.ExponentialBackoff(az.requestBackoff(), func() (bool, error) {
 		az.operationPollRateLimiter.Accept()
 		glog.V(10).Infof("LoadBalancerClient.Delete(%s): start", lbName)
+		mc := newMetricContext("load_balancer", "delete", az.ResourceGroup, az.SubscriptionID)
 		respChan, errChan := az.LoadBalancerClient.Delete(az.ResourceGroup, lbName, nil)
 		resp := <-respChan
 		err := <-errChan
+		mc.Observe(err)
 		glog.V(10).Infof("LoadBalancerClient.Delete(%s): end", lbName)
 		return processRetryResponse(resp, err)
 	})
@@ -338,9 +364,11 @@ func (az *Cloud) CreateOrUpdateRouteTableWithRetry(routeTable network.RouteTable
 	return wait.ExponentialBackoff(az.requestBackoff(), func() (bool, error) {
 		az.operationPollRateLimiter.Accept()
 		glog.V(10).Infof("RouteTablesClient.CreateOrUpdate(%s): start", *routeTable.Name)
+		mc := newMetricContext("route_tables", "create_or_update", az.ResourceGroup, az.SubscriptionID)
 		respChan, errChan := az.RouteTablesClient.CreateOrUpdate(az.ResourceGroup, az.RouteTableName, routeTable, nil)
 		resp := <-respChan
 		err := <-errChan
+		mc.Observe(err)
 		glog.V(10).Infof("RouteTablesClient.CreateOrUpdate(%s): end", *routeTable.Name)
 		return processRetryResponse(resp.Response, err)
 	})
@@ -351,9 +379,11 @@ func (az *Cloud) CreateOrUpdateRouteWithRetry(route network.Route) error {
 	return wait.ExponentialBackoff(az.requestBackoff(), func() (bool, error) {
 		az.operationPollRateLimiter.Accept()
 		glog.V(10).Infof("RoutesClient.CreateOrUpdate(%s): start", *route.Name)
+		mc := newMetricContext("routes", "create_or_update", az.ResourceGroup, az.SubscriptionID)
 		respChan, errChan := az.RoutesClient.CreateOrUpdate(az.ResourceGroup, az.RouteTableName, *route.Name, route, nil)
 		resp := <-respChan
 		err := <-errChan
+		mc.Observe(err)
 		glog.V(10).Infof("RoutesClient.CreateOrUpdate(%s): end", *route.Name)
 		return processRetryResponse(resp.Response, err)
 	})
@@ -364,9 +394,11 @@ func (az *Cloud) DeleteRouteWithRetry(routeName string) error {
 	return wait.ExponentialBackoff(az.requestBackoff(), func() (bool, error) {
 		az.operationPollRateLimiter.Accept()
 		glog.V(10).Infof("RoutesClient.Delete(%s): start", az.RouteTableName)
+		mc := newMetricContext("routes", "delete", az.ResourceGroup, az.SubscriptionID)
 		respChan, errChan := az.RoutesClient.Delete(az.ResourceGroup, az.RouteTableName, routeName, nil)
 		resp := <-respChan
 		err := <-errChan
+		mc.Observe(err)
 		glog.V(10).Infof("RoutesClient.Delete(%s): end", az.RouteTableName)
 		return processRetryResponse(resp, err)
 	})
@@ -377,9 +409,11 @@ func (az *Cloud) CreateOrUpdateVMWithRetry(vmName string, newVM compute.VirtualM
 	return wait.ExponentialBackoff(az.requestBackoff(), func() (bool, error) {
 		az.operationPollRateLimiter.Accept()
 		glog.V(10).Infof("VirtualMachinesClient.CreateOrUpdate(%s): start", vmName)
+		mc := newMetricContext("vms", "create_or_update", az.ResourceGroup, az.SubscriptionID)
 		respChan, errChan := az.VirtualMachinesClient.CreateOrUpdate(az.ResourceGroup, vmName, newVM, nil)
 		resp := <-respChan
 		err := <-errChan
+		mc.Observe(err)
 		glog.V(10).Infof("VirtualMachinesClient.CreateOrUpdate(%s): end", vmName)
 		return processRetryResponse(resp.Response, err)
 	})

@@ -112,9 +112,11 @@ func (c *controllerCommon) AttachDisk(isManagedDisk bool, diskName, diskURI stri
 	vmName := mapNodeNameToVMName(nodeName)
 	glog.V(2).Infof("azureDisk - update(%s): vm(%s) - attach disk", c.resourceGroup, vmName)
 	c.cloud.operationPollRateLimiter.Accept()
+	mc := newMetricContext("vms", "create_or_update", c.resourceGroup, c.subscriptionID)
 	respChan, errChan := c.cloud.VirtualMachinesClient.CreateOrUpdate(c.resourceGroup, vmName, newVM, nil)
 	resp := <-respChan
 	err = <-errChan
+	mc.Observe(err)
 	if c.cloud.CloudProviderBackoff && shouldRetryAPIRequest(resp.Response, err) {
 		glog.V(2).Infof("azureDisk - update(%s) backing off: vm(%s)", c.resourceGroup, vmName)
 		retryErr := c.cloud.CreateOrUpdateVMWithRetry(vmName, newVM)
@@ -178,9 +180,11 @@ func (c *controllerCommon) DetachDiskByName(diskName, diskURI string, nodeName t
 	vmName := mapNodeNameToVMName(nodeName)
 	glog.V(2).Infof("azureDisk - update(%s): vm(%s) - detach disk", c.resourceGroup, vmName)
 	c.cloud.operationPollRateLimiter.Accept()
+	mc := newMetricContext("vms", "create_or_update", c.resourceGroup, c.subscriptionID)
 	respChan, errChan := c.cloud.VirtualMachinesClient.CreateOrUpdate(c.resourceGroup, vmName, newVM, nil)
 	resp := <-respChan
 	err = <-errChan
+	mc.Observe(err)
 	if c.cloud.CloudProviderBackoff && shouldRetryAPIRequest(resp.Response, err) {
 		glog.V(2).Infof("azureDisk - update(%s) backing off: vm(%s)", c.resourceGroup, vmName)
 		retryErr := c.cloud.CreateOrUpdateVMWithRetry(vmName, newVM)

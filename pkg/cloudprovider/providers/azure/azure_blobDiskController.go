@@ -183,14 +183,20 @@ func (c *BlobDiskController) createVHDBlobDisk(blobClient azstorage.BlobStorageC
 	blob := container.GetBlobReference(vhdName)
 	blob.Properties.ContentLength = vhdSize
 	blob.Metadata = tags
+	mc := newMetricContext("blob", "purge_page_blob", c.common.resourceGroup, c.common.subscriptionID)
 	err := blob.PutPageBlob(nil)
+	mc.Observe(err)
 	if err != nil {
 		// if container doesn't exist, create one and retry PutPageBlob
 		detail := err.Error()
 		if strings.Contains(detail, errContainerNotFound) {
+			mc := newMetricContext("blob_container", "create", c.common.resourceGroup, c.common.subscriptionID)
 			err = container.Create(&azstorage.CreateContainerOptions{Access: azstorage.ContainerAccessTypePrivate})
+			mc.Observe(err)
 			if err == nil {
+				mc := newMetricContext("blob", "purge_page_blob", c.common.resourceGroup, c.common.subscriptionID)
 				err = blob.PutPageBlob(nil)
+				mc.Observe(err)
 			}
 		}
 	}
@@ -201,7 +207,9 @@ func (c *BlobDiskController) createVHDBlobDisk(blobClient azstorage.BlobStorageC
 	// add VHD signature to the blob
 	h, err := createVHDHeader(uint64(size))
 	if err != nil {
-		blob.DeleteIfExists(nil)
+		mc := newMetricContext("blob", "delete_if_exists", c.common.resourceGroup, c.common.subscriptionID)
+		_, delErr := blob.DeleteIfExists(nil)
+		mc.Observe(delErr)
 		return "", "", fmt.Errorf("failed to create vhd header, err: %v", err)
 	}
 
@@ -209,7 +217,10 @@ func (c *BlobDiskController) createVHDBlobDisk(blobClient azstorage.BlobStorageC
 		Start: uint64(size),
 		End:   uint64(vhdSize - 1),
 	}
-	if err = blob.WriteRange(blobRange, bytes.NewBuffer(h[:vhd.VHD_HEADER_SIZE]), nil); err != nil {
+	mc = newMetricContext("blob", "write_range", c.common.resourceGroup, c.common.subscriptionID)
+	err = blob.WriteRange(blobRange, bytes.NewBuffer(h[:vhd.VHD_HEADER_SIZE]), nil)
+	mc.Observe(err)
+	if err != nil {
 		glog.Infof("azureDisk - failed to put header page for data disk %s in container %s account %s, error was %s\n",
 			vhdName, containerName, accountName, err.Error())
 		return "", "", err
@@ -235,7 +246,10 @@ func (c *BlobDiskController) deleteVhdBlob(accountName, accountKey, blobName str
 
 	container := blobSvc.GetContainerReference(vhdContainerName)
 	blob := container.GetBlobReference(blobName)
-	return blob.Delete(nil)
+	mc := newMetricContext("blob", "delete", c.common.resourceGroup, c.common.subscriptionID)
+	err = blob.Delete(nil)
+	mc.Observe(err)
+	return err
 }
 
 //CreateBlobDisk : create a blob disk in a node
@@ -285,7 +299,9 @@ func (c *BlobDiskController) DeleteBlobDisk(diskURI string) error {
 
 	container := blobSvc.GetContainerReference(defaultContainerName)
 	blob := container.GetBlobReference(vhdName)
+	mc := newMetricContext("blob", "delete_if_exists", c.common.resourceGroup, c.common.subscriptionID)
 	_, err = blob.DeleteIfExists(nil)
+	mc.Observe(err)
 
 	if c.accounts[storageAccountName].diskCount == -1 {
 		if diskCount, err := c.getDiskCount(storageAccountName); err != nil {
@@ -316,7 +332,9 @@ func (c *BlobDiskController) getStorageAccountKey(SAName string) (string, error)
 	if account, exists := c.accounts[SAName]; exists && account.key != "" {
 		return c.accounts[SAName].key, nil
 	}
+	mc := newMetricContext("storage_account", "list_keys", c.common.resourceGroup, c.common.subscriptionID)
 	listKeysResult, err := c.common.cloud.StorageAccountClient.ListKeys(c.common.resourceGroup, SAName)
+	mc.Observe(err)
 	if err != nil {
 		return "", err
 	}
@@ -427,7 +445,9 @@ func (c *BlobDiskController) ensureDefaultContainer(storageAccountName string) e
 	}
 
 	container := blobSvc.GetContainerReference(defaultContainerName)
+	mc := newMetricContext("blob_container", "create_if_not_exists", c.common.resourceGroup, c.common.subscriptionID)
 	bCreated, err := container.CreateIfNotExists(&azstorage.CreateContainerOptions{Access: azstorage.ContainerAccessTypePrivate})
+	mc.Observe(err)
 	if err != nil {
 		return err
 	}
@@ -460,7 +480,9 @@ func (c *BlobDiskController) getDiskCount(SAName string) (int, error) {
 	params := azstorage.ListBlobsParameters{}
 
 	container := blobSvc.GetContainerReference(defaultContainerName)
+	mc := newMetricContext("blob_container", "list_blobs", c.common.resourceGroup, c.common.subscriptionID)
 	response, err := container.ListBlobs(params)
+	mc.Observe(err)
 	if err != nil {
 		return 0, err
 	}
@@ -471,7 +493,9 @@ func (c *BlobDiskController) getDiskCount(SAName string) (int, error) {
 }
 
 func (c *BlobDiskController) getAllStorageAccounts() (map[string]*storageAccountState, error) {
+	mc := newMetricContext("storage_account", "list_by_resource_group", c.common.resourceGroup, c.common.subscriptionID)
 	accountListResult, err := c.common.cloud.StorageAccountClient.ListByResourceGroup(c.common.resourceGroup)
+	mc.Observe(err)
 	if err != nil {
 		return nil, err
 	}
@@ -527,8 +551,10 @@ func (c *BlobDiskController) createStorageAccount(storageAccountName string, sto
 			Location: &location}
 		cancel := make(chan struct{})
 
+		mc := newMetricContext("storage_account", "create", c.common.resourceGroup, c.common.subscriptionID)
 		_, errChan := c.common.cloud.StorageAccountClient.Create(c.common.resourceGroup, storageAccountName, cp, cancel)
 		err := <-errChan
+		mc.Observe(err)
 		if err != nil {
 			return fmt.Errorf(fmt.Sprintf("Create Storage Account: %s, error: %s", storageAccountName, err))
 		}
@@ -638,7 +664,9 @@ func (c *BlobDiskController) getNextAccountNum() int {
 }
 
 func (c *BlobDiskController) deleteStorageAccount(storageAccountName string) error {
+	mc := newMetricContext("storage_account", "delete", c.common.resourceGroup, c.common.subscriptionID)
 	resp, err := c.common.cloud.StorageAccountClient.Delete(c.common.resourceGroup, storageAccountName)
+	mc.Observe(err)
 	if err != nil {
 		return fmt.Errorf("azureDisk - Delete of storage account '%s' failed with status %s...%v", storageAccountName, resp.Status, err)
 	}
@@ -651,7 +679,9 @@ func (c *BlobDiskController) deleteStorageAccount(storageAccountName string) err
 
 //Gets storage account exist, provisionStatus, Error if any
 func (c *BlobDiskController) getStorageAccountState(storageAccountName string) (bool, storage.ProvisioningState, error) {
+	mc := newMetricContext("storage_account", "get_properties", c.common.resourceGroup, c.common.subscriptionID)
 	account, err := c.common.cloud.StorageAccountClient.GetProperties(c.common.resourceGroup, storageAccountName)
+	mc.Observe(err)
 	if err != nil {
 		return false, "", err
 	}

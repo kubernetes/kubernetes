@@ -602,7 +602,9 @@ func (as *availabilitySet) GetPrimaryInterface(nodeName, vmSetName string) (netw
 
 	as.operationPollRateLimiter.Accept()
 	glog.V(10).Infof("InterfacesClient.Get(%q): start", nicName)
+	mc := newMetricContext("interfaces", "get", as.ResourceGroup, as.SubscriptionID)
 	nic, err := as.InterfacesClient.Get(as.ResourceGroup, nicName, "")
+	mc.Observe(err)
 	glog.V(10).Infof("InterfacesClient.Get(%q): end", nicName)
 	if err != nil {
 		return network.Interface{}, err
@@ -655,9 +657,11 @@ func (as *availabilitySet) ensureHostInPool(serviceName string, nodeName types.N
 		glog.V(3).Infof("nicupdate(%s): nic(%s) - updating", serviceName, nicName)
 		as.operationPollRateLimiter.Accept()
 		glog.V(10).Infof("InterfacesClient.CreateOrUpdate(%q): start", *nic.Name)
+		mc := newMetricContext("interfaces", "create_or_update", as.ResourceGroup, as.SubscriptionID)
 		respChan, errChan := as.InterfacesClient.CreateOrUpdate(as.ResourceGroup, *nic.Name, nic, nil)
 		resp := <-respChan
 		err := <-errChan
+		mc.Observe(err)
 		glog.V(10).Infof("InterfacesClient.CreateOrUpdate(%q): end", *nic.Name)
 		if as.CloudProviderBackoff && shouldRetryAPIRequest(resp.Response, err) {
 			glog.V(2).Infof("nicupdate(%s) backing off: nic(%s) - updating, err=%v", serviceName, nicName, err)

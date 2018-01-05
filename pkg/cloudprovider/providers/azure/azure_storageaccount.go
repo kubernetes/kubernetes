@@ -31,7 +31,9 @@ type accountWithLocation struct {
 func (az *Cloud) getStorageAccounts() ([]accountWithLocation, error) {
 	az.operationPollRateLimiter.Accept()
 	glog.V(10).Infof("StorageAccountClient.ListByResourceGroup(%v): start", az.ResourceGroup)
+	mc := newMetricContext("storage_account", "list_by_resource_group", az.ResourceGroup, az.SubscriptionID)
 	result, err := az.StorageAccountClient.ListByResourceGroup(az.ResourceGroup)
+	mc.Observe(err)
 	glog.V(10).Infof("StorageAccountClient.ListByResourceGroup(%v): end", az.ResourceGroup)
 	if err != nil {
 		return nil, err
@@ -63,7 +65,9 @@ func (az *Cloud) getStorageAccounts() ([]accountWithLocation, error) {
 func (az *Cloud) getStorageAccesskey(account string) (string, error) {
 	az.operationPollRateLimiter.Accept()
 	glog.V(10).Infof("StorageAccountClient.ListKeys(%q): start", account)
+	mc := newMetricContext("storage_account", "list_keys", az.ResourceGroup, az.SubscriptionID)
 	result, err := az.StorageAccountClient.ListKeys(az.ResourceGroup, account)
+	mc.Observe(err)
 	glog.V(10).Infof("StorageAccountClient.ListKeys(%q): end", account)
 	if err != nil {
 		return "", err
