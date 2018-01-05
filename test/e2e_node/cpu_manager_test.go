@@ -143,6 +143,9 @@ func enableCPUManagerInKubelet(f *framework.Framework) (oldCfg *kubeletconfig.Ku
 	oldCfg, err := getCurrentKubeletConfig()
 	framework.ExpectNoError(err)
 	newCfg := oldCfg.DeepCopy()
+	if newCfg.FeatureGates == nil {
+		newCfg.FeatureGates = make(map[string]bool)
+	}
 
 	// Enable CPU Manager using feature gate.
 	newCfg.FeatureGates[string(features.CPUManager)] = true
