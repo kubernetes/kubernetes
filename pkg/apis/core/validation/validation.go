@@ -932,8 +932,7 @@ func validateGlusterfsVolumeSource(glusterfs *core.GlusterfsVolumeSource, fldPat
 func validateFlockerVolumeSource(flocker *core.FlockerVolumeSource, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if len(flocker.DatasetName) == 0 && len(flocker.DatasetUUID) == 0 {
-		//TODO: consider adding a RequiredOneOf() error for this and similar cases
-		allErrs = append(allErrs, field.Required(fldPath, "one of datasetName and datasetUUID is required"))
+		allErrs = append(allErrs, field.RequiredOneOf(fldPath, []string{"datasetName", "datasetUUID"}, "exactly one must have a value"))
 	}
 	if len(flocker.DatasetName) != 0 && len(flocker.DatasetUUID) != 0 {
 		allErrs = append(allErrs, field.Invalid(fldPath, "resource", "datasetName and datasetUUID can not be specified simultaneously"))
@@ -966,7 +965,7 @@ func validateDownwardAPIVolumeFile(file *core.DownwardAPIVolumeFile, fldPath *fi
 	} else if file.ResourceFieldRef != nil {
 		allErrs = append(allErrs, validateContainerResourceFieldSelector(file.ResourceFieldRef, &validContainerResourceFieldPathExpressions, fldPath.Child("resourceFieldRef"), true)...)
 	} else {
-		allErrs = append(allErrs, field.Required(fldPath, "one of fieldRef and resourceFieldRef is required"))
+		allErrs = append(allErrs, field.RequiredOneOf(fldPath, []string{"fieldRef", "resourceFieldRef"}, "exactly one must have a value"))
 	}
 	if file.Mode != nil && (*file.Mode > 0777 || *file.Mode < 0) {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("mode"), *file.Mode, fileModeErrorMsg))
@@ -1986,7 +1985,7 @@ func validateEnvVarValueFrom(ev core.EnvVar, fldPath *field.Path) field.ErrorLis
 	}
 
 	if numSources == 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath, "", "must specify one of: `fieldRef`, `resourceFieldRef`, `configMapKeyRef` or `secretKeyRef`"))
+		allErrs = append(allErrs, field.RequiredOneOf(fldPath, []string{"fieldRef", "resourceFieldRef", "configMapKeyRef", "secretKeyRef"}, "exactly one must have a value"))
 	} else if len(ev.Value) != 0 {
 		if numSources != 0 {
 			allErrs = append(allErrs, field.Invalid(fldPath, "", "may not be specified when `value` is not empty"))
@@ -2081,7 +2080,7 @@ func ValidateEnvFrom(vars []core.EnvFromSource, fldPath *field.Path) field.Error
 		}
 
 		if numSources == 0 {
-			allErrs = append(allErrs, field.Invalid(fldPath, "", "must specify one of: `configMapRef` or `secretRef`"))
+			allErrs = append(allErrs, field.RequiredOneOf(fldPath, []string{"configMapRef", "secretRef"}, "exactly one must have a value"))
 		} else if numSources > 1 {
 			allErrs = append(allErrs, field.Invalid(fldPath, "", "may not have more than one field specified at a time"))
 		}
