@@ -20,7 +20,6 @@ import random
 import shutil
 import subprocess
 import time
-import json
 
 from shlex import split
 from subprocess import check_call, check_output
