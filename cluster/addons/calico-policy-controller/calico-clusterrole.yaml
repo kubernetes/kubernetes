@@ -44,6 +44,13 @@ rules:
       - list
       - update
       - watch
+  - apiGroups: [""]
+    resources:
+      - serviceaccounts
+    verbs:
+      - get
+      - list
+      - watch
   - apiGroups: ["extensions"]
     resources:
       - networkpolicies
@@ -53,10 +60,12 @@ rules:
       - watch
   - apiGroups: ["crd.projectcalico.org"]
     resources:
-      - globalfelixconfigs
-      - globalbgpconfigs
+      - felixconfigurations
+      - bgpconfigurations
       - ippools
       - globalnetworkpolicies
+      - clusterinformations
+      - networkpolicies
     verbs:
       - create
       - get
