@@ -34,7 +34,7 @@ import (
 // namespace> tuple to a unversioned.APIResource struct.
 func (gc *GarbageCollector) apiResource(apiVersion, kind string) (*metav1.APIResource, error) {
 	fqKind := schema.FromAPIVersionAndKind(apiVersion, kind)
-	mapping, err := gc.restMapper.RESTMapping(fqKind.GroupKind(), apiVersion)
+	mapping, err := gc.restMapper.RESTMapping(fqKind.GroupKind(), fqKind.Version)
 	if err != nil {
 		return nil, newRESTMappingError(kind, apiVersion)
 	}

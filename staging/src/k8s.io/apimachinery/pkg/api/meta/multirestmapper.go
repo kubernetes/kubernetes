@@ -179,7 +179,7 @@ func (m MultiRESTMapper) RESTMapping(gk schema.GroupKind, versions ...string) (*
 	if len(errors) > 0 {
 		return nil, utilerrors.NewAggregate(errors)
 	}
-	return nil, &NoKindMatchError{PartialKind: gk.WithVersion("")}
+	return nil, &NoKindMatchError{GroupKind: gk, SearchedVersions: versions}
 }
 
 // RESTMappings returns all possible RESTMappings for the provided group kind, or an error
@@ -204,7 +204,7 @@ func (m MultiRESTMapper) RESTMappings(gk schema.GroupKind, versions ...string) (
 		return nil, utilerrors.NewAggregate(errors)
 	}
 	if len(allMappings) == 0 {
-		return nil, &NoKindMatchError{PartialKind: gk.WithVersion("")}
+		return nil, &NoKindMatchError{GroupKind: gk, SearchedVersions: versions}
 	}
 	return allMappings, nil
 }
