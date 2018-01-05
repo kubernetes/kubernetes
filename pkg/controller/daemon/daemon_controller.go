@@ -121,7 +121,13 @@ type DaemonSetsController struct {
 	nodeLister corelisters.NodeLister
 	// nodeStoreSynced returns true if the node store has been synced at least once.
 	// Added as a member to the struct to allow injection for testing.
-	nodeStoreSynced cache.InformerSynced
+	nodeStoreSynced                    cache.InformerSynced
+	namespaceLister                    corelisters.NamespaceLister
+	namespaceStoreSynced               cache.InformerSynced
+	openshiftDefaultNodeSelectorString string
+	openshiftDefaultNodeSelector       labels.Selector
+	kubeDefaultNodeSelectorString      string
+	kubeDefaultNodeSelector            labels.Selector
 
 	// DaemonSet keys that need to be synced.
 	queue workqueue.RateLimitingInterface
@@ -287,6 +293,11 @@ func (dsc *DaemonSetsController) Run(workers int, stopCh <-chan struct{}) {
 
 	if !cache.WaitForNamedCacheSync("daemon sets", stopCh, dsc.podStoreSynced, dsc.nodeStoreSynced, dsc.historyStoreSynced, dsc.dsStoreSynced) {
 		return
+	}
+	if dsc.namespaceStoreSynced != nil {
+		if !cache.WaitForNamedCacheSync("daemon sets", stopCh, dsc.namespaceStoreSynced) {
+			return
+		}
 	}
 
 	for i := 0; i < workers; i++ {
@@ -1242,6 +1253,10 @@ func (dsc *DaemonSetsController) nodeShouldRunDaemonPod(node *v1.Node, ds *apps.
 			return t.Effect == v1.TaintEffectNoExecute
 		})
 		return false, shouldContinueRunning, nil
+	}
+
+	if matches, matchErr := dsc.namespaceNodeSelectorMatches(node, ds); !matches || matchErr != nil {
+		return false, false, matchErr
 	}
 
 	return true, true, nil
