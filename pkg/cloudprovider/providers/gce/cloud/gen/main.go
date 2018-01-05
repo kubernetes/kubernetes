@@ -30,8 +30,8 @@ import (
 	"text/template"
 	"time"
 
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud/meta"
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud/meta"
 )
 
 const (
@@ -167,6 +167,7 @@ type GCE struct {
 }
 
 {{range .All}}
+// {{.WrapType}} returns the interface for the {{.Version}} {{.Service}}.
 func (gce *GCE) {{.WrapType}}() {{.WrapType}} {
 	return gce.{{.Field}}
 }
@@ -196,6 +197,7 @@ type MockGCE struct {
 {{- end}}
 }
 {{range .All}}
+// {{.WrapType}} returns the interface for the {{.Version}} {{.Service}}.
 func (mock *MockGCE) {{.WrapType}}() {{.WrapType}} {
 	return mock.{{.MockField}}
 }

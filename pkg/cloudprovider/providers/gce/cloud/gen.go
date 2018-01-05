@@ -150,99 +150,162 @@ type GCE struct {
 	gceZones                      *GCEZones
 }
 
+// Addresses returns the interface for the ga Addresses.
 func (gce *GCE) Addresses() Addresses {
 	return gce.gceAddresses
 }
+
+// AlphaAddresses returns the interface for the alpha Addresses.
 func (gce *GCE) AlphaAddresses() AlphaAddresses {
 	return gce.gceAlphaAddresses
 }
+
+// BetaAddresses returns the interface for the beta Addresses.
 func (gce *GCE) BetaAddresses() BetaAddresses {
 	return gce.gceBetaAddresses
 }
+
+// GlobalAddresses returns the interface for the ga GlobalAddresses.
 func (gce *GCE) GlobalAddresses() GlobalAddresses {
 	return gce.gceGlobalAddresses
 }
+
+// BackendServices returns the interface for the ga BackendServices.
 func (gce *GCE) BackendServices() BackendServices {
 	return gce.gceBackendServices
 }
+
+// AlphaBackendServices returns the interface for the alpha BackendServices.
 func (gce *GCE) AlphaBackendServices() AlphaBackendServices {
 	return gce.gceAlphaBackendServices
 }
+
+// AlphaRegionBackendServices returns the interface for the alpha RegionBackendServices.
 func (gce *GCE) AlphaRegionBackendServices() AlphaRegionBackendServices {
 	return gce.gceAlphaRegionBackendServices
 }
+
+// Disks returns the interface for the ga Disks.
 func (gce *GCE) Disks() Disks {
 	return gce.gceDisks
 }
+
+// AlphaDisks returns the interface for the alpha Disks.
 func (gce *GCE) AlphaDisks() AlphaDisks {
 	return gce.gceAlphaDisks
 }
+
+// AlphaRegionDisks returns the interface for the alpha RegionDisks.
 func (gce *GCE) AlphaRegionDisks() AlphaRegionDisks {
 	return gce.gceAlphaRegionDisks
 }
+
+// Firewalls returns the interface for the ga Firewalls.
 func (gce *GCE) Firewalls() Firewalls {
 	return gce.gceFirewalls
 }
+
+// ForwardingRules returns the interface for the ga ForwardingRules.
 func (gce *GCE) ForwardingRules() ForwardingRules {
 	return gce.gceForwardingRules
 }
+
+// AlphaForwardingRules returns the interface for the alpha ForwardingRules.
 func (gce *GCE) AlphaForwardingRules() AlphaForwardingRules {
 	return gce.gceAlphaForwardingRules
 }
+
+// GlobalForwardingRules returns the interface for the ga GlobalForwardingRules.
 func (gce *GCE) GlobalForwardingRules() GlobalForwardingRules {
 	return gce.gceGlobalForwardingRules
 }
+
+// HealthChecks returns the interface for the ga HealthChecks.
 func (gce *GCE) HealthChecks() HealthChecks {
 	return gce.gceHealthChecks
 }
+
+// AlphaHealthChecks returns the interface for the alpha HealthChecks.
 func (gce *GCE) AlphaHealthChecks() AlphaHealthChecks {
 	return gce.gceAlphaHealthChecks
 }
+
+// HttpHealthChecks returns the interface for the ga HttpHealthChecks.
 func (gce *GCE) HttpHealthChecks() HttpHealthChecks {
 	return gce.gceHttpHealthChecks
 }
+
+// HttpsHealthChecks returns the interface for the ga HttpsHealthChecks.
 func (gce *GCE) HttpsHealthChecks() HttpsHealthChecks {
 	return gce.gceHttpsHealthChecks
 }
+
+// InstanceGroups returns the interface for the ga InstanceGroups.
 func (gce *GCE) InstanceGroups() InstanceGroups {
 	return gce.gceInstanceGroups
 }
+
+// Instances returns the interface for the ga Instances.
 func (gce *GCE) Instances() Instances {
 	return gce.gceInstances
 }
+
+// BetaInstances returns the interface for the beta Instances.
 func (gce *GCE) BetaInstances() BetaInstances {
 	return gce.gceBetaInstances
 }
+
+// AlphaInstances returns the interface for the alpha Instances.
 func (gce *GCE) AlphaInstances() AlphaInstances {
 	return gce.gceAlphaInstances
 }
+
+// AlphaNetworkEndpointGroups returns the interface for the alpha NetworkEndpointGroups.
 func (gce *GCE) AlphaNetworkEndpointGroups() AlphaNetworkEndpointGroups {
 	return gce.gceAlphaNetworkEndpointGroups
 }
+
+// Projects returns the interface for the ga Projects.
 func (gce *GCE) Projects() Projects {
 	return gce.gceProjects
 }
+
+// Regions returns the interface for the ga Regions.
 func (gce *GCE) Regions() Regions {
 	return gce.gceRegions
 }
+
+// Routes returns the interface for the ga Routes.
 func (gce *GCE) Routes() Routes {
 	return gce.gceRoutes
 }
+
+// SslCertificates returns the interface for the ga SslCertificates.
 func (gce *GCE) SslCertificates() SslCertificates {
 	return gce.gceSslCertificates
 }
+
+// TargetHttpProxies returns the interface for the ga TargetHttpProxies.
 func (gce *GCE) TargetHttpProxies() TargetHttpProxies {
 	return gce.gceTargetHttpProxies
 }
+
+// TargetHttpsProxies returns the interface for the ga TargetHttpsProxies.
 func (gce *GCE) TargetHttpsProxies() TargetHttpsProxies {
 	return gce.gceTargetHttpsProxies
 }
+
+// TargetPools returns the interface for the ga TargetPools.
 func (gce *GCE) TargetPools() TargetPools {
 	return gce.gceTargetPools
 }
+
+// UrlMaps returns the interface for the ga UrlMaps.
 func (gce *GCE) UrlMaps() UrlMaps {
 	return gce.gceUrlMaps
 }
+
+// Zones returns the interface for the ga Zones.
 func (gce *GCE) Zones() Zones {
 	return gce.gceZones
 }
@@ -350,130 +413,162 @@ type MockGCE struct {
 	MockZones                      *MockZones
 }
 
+// Addresses returns the interface for the ga Addresses.
 func (mock *MockGCE) Addresses() Addresses {
 	return mock.MockAddresses
 }
 
+// AlphaAddresses returns the interface for the alpha Addresses.
 func (mock *MockGCE) AlphaAddresses() AlphaAddresses {
 	return mock.MockAlphaAddresses
 }
 
+// BetaAddresses returns the interface for the beta Addresses.
 func (mock *MockGCE) BetaAddresses() BetaAddresses {
 	return mock.MockBetaAddresses
 }
 
+// GlobalAddresses returns the interface for the ga GlobalAddresses.
 func (mock *MockGCE) GlobalAddresses() GlobalAddresses {
 	return mock.MockGlobalAddresses
 }
 
+// BackendServices returns the interface for the ga BackendServices.
 func (mock *MockGCE) BackendServices() BackendServices {
 	return mock.MockBackendServices
 }
 
+// AlphaBackendServices returns the interface for the alpha BackendServices.
 func (mock *MockGCE) AlphaBackendServices() AlphaBackendServices {
 	return mock.MockAlphaBackendServices
 }
 
+// AlphaRegionBackendServices returns the interface for the alpha RegionBackendServices.
 func (mock *MockGCE) AlphaRegionBackendServices() AlphaRegionBackendServices {
 	return mock.MockAlphaRegionBackendServices
 }
 
+// Disks returns the interface for the ga Disks.
 func (mock *MockGCE) Disks() Disks {
 	return mock.MockDisks
 }
 
+// AlphaDisks returns the interface for the alpha Disks.
 func (mock *MockGCE) AlphaDisks() AlphaDisks {
 	return mock.MockAlphaDisks
 }
 
+// AlphaRegionDisks returns the interface for the alpha RegionDisks.
 func (mock *MockGCE) AlphaRegionDisks() AlphaRegionDisks {
 	return mock.MockAlphaRegionDisks
 }
 
+// Firewalls returns the interface for the ga Firewalls.
 func (mock *MockGCE) Firewalls() Firewalls {
 	return mock.MockFirewalls
 }
 
+// ForwardingRules returns the interface for the ga ForwardingRules.
 func (mock *MockGCE) ForwardingRules() ForwardingRules {
 	return mock.MockForwardingRules
 }
 
+// AlphaForwardingRules returns the interface for the alpha ForwardingRules.
 func (mock *MockGCE) AlphaForwardingRules() AlphaForwardingRules {
 	return mock.MockAlphaForwardingRules
 }
 
+// GlobalForwardingRules returns the interface for the ga GlobalForwardingRules.
 func (mock *MockGCE) GlobalForwardingRules() GlobalForwardingRules {
 	return mock.MockGlobalForwardingRules
 }
 
+// HealthChecks returns the interface for the ga HealthChecks.
 func (mock *MockGCE) HealthChecks() HealthChecks {
 	return mock.MockHealthChecks
 }
 
+// AlphaHealthChecks returns the interface for the alpha HealthChecks.
 func (mock *MockGCE) AlphaHealthChecks() AlphaHealthChecks {
 	return mock.MockAlphaHealthChecks
 }
 
+// HttpHealthChecks returns the interface for the ga HttpHealthChecks.
 func (mock *MockGCE) HttpHealthChecks() HttpHealthChecks {
 	return mock.MockHttpHealthChecks
 }
 
+// HttpsHealthChecks returns the interface for the ga HttpsHealthChecks.
 func (mock *MockGCE) HttpsHealthChecks() HttpsHealthChecks {
 	return mock.MockHttpsHealthChecks
 }
 
+// InstanceGroups returns the interface for the ga InstanceGroups.
 func (mock *MockGCE) InstanceGroups() InstanceGroups {
 	return mock.MockInstanceGroups
 }
 
+// Instances returns the interface for the ga Instances.
 func (mock *MockGCE) Instances() Instances {
 	return mock.MockInstances
 }
 
+// BetaInstances returns the interface for the beta Instances.
 func (mock *MockGCE) BetaInstances() BetaInstances {
 	return mock.MockBetaInstances
 }
 
+// AlphaInstances returns the interface for the alpha Instances.
 func (mock *MockGCE) AlphaInstances() AlphaInstances {
 	return mock.MockAlphaInstances
 }
 
+// AlphaNetworkEndpointGroups returns the interface for the alpha NetworkEndpointGroups.
 func (mock *MockGCE) AlphaNetworkEndpointGroups() AlphaNetworkEndpointGroups {
 	return mock.MockAlphaNetworkEndpointGroups
 }
 
+// Projects returns the interface for the ga Projects.
 func (mock *MockGCE) Projects() Projects {
 	return mock.MockProjects
 }
 
+// Regions returns the interface for the ga Regions.
 func (mock *MockGCE) Regions() Regions {
 	return mock.MockRegions
 }
 
+// Routes returns the interface for the ga Routes.
 func (mock *MockGCE) Routes() Routes {
 	return mock.MockRoutes
 }
 
+// SslCertificates returns the interface for the ga SslCertificates.
 func (mock *MockGCE) SslCertificates() SslCertificates {
 	return mock.MockSslCertificates
 }
 
+// TargetHttpProxies returns the interface for the ga TargetHttpProxies.
 func (mock *MockGCE) TargetHttpProxies() TargetHttpProxies {
 	return mock.MockTargetHttpProxies
 }
 
+// TargetHttpsProxies returns the interface for the ga TargetHttpsProxies.
 func (mock *MockGCE) TargetHttpsProxies() TargetHttpsProxies {
 	return mock.MockTargetHttpsProxies
 }
 
+// TargetPools returns the interface for the ga TargetPools.
 func (mock *MockGCE) TargetPools() TargetPools {
 	return mock.MockTargetPools
 }
 
+// UrlMaps returns the interface for the ga UrlMaps.
 func (mock *MockGCE) UrlMaps() UrlMaps {
 	return mock.MockUrlMaps
 }
 
+// Zones returns the interface for the ga Zones.
 func (mock *MockGCE) Zones() Zones {
 	return mock.MockZones
 }

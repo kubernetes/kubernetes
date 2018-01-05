@@ -220,6 +220,7 @@ type ServiceGroup struct {
 	GA    *ServiceInfo
 }
 
+// Service returns any ServiceInfo object belonging to the ServiceGroup.
 func (sg *ServiceGroup) Service() string {
 	switch {
 	case sg.GA != nil:
@@ -233,14 +234,17 @@ func (sg *ServiceGroup) Service() string {
 	}
 }
 
+// HasGA returns true if this object has a GA representation.
 func (sg *ServiceGroup) HasGA() bool {
 	return sg.GA != nil
 }
 
+// HasAlpha returns true if this object has a Alpha representation.
 func (sg *ServiceGroup) HasAlpha() bool {
 	return sg.Alpha != nil
 }
 
+// HasBeta returns true if this object has a Beta representation.
 func (sg *ServiceGroup) HasBeta() bool {
 	return sg.Beta != nil
 }

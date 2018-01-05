@@ -91,7 +91,7 @@ func newMethod(s *ServiceInfo, m reflect.Method) *Method {
 	return ret
 }
 
-// Method is used to generate the calling code non-standard methods.
+// Method is used to generate the calling code for non-standard methods.
 type Method struct {
 	*ServiceInfo
 	m reflect.Method
@@ -135,6 +135,7 @@ func (mr *Method) args(skip int, nameArgs bool, prefix []string) []string {
 	return append(prefix, a...)
 }
 
+// init the method, preforming some rudimentary static checking.
 func (mr *Method) init() {
 	fType := mr.m.Func.Type()
 	if fType.NumIn() < mr.argsSkip() {
@@ -189,10 +190,14 @@ func (mr *Method) init() {
 	}
 }
 
+// Name is the name of the method.
 func (mr *Method) Name() string {
 	return mr.m.Name
 }
 
+// CallArgs is a list of comma separated "argN" used for calling the method.
+// For example, if the method has two additional arguments, this will return
+// "arg0, arg1".
 func (mr *Method) CallArgs() string {
 	var args []string
 	for i := mr.argsSkip(); i < mr.m.Func.Type().NumIn(); i++ {
@@ -204,10 +209,12 @@ func (mr *Method) CallArgs() string {
 	return fmt.Sprintf(", %s", strings.Join(args, ", "))
 }
 
+// MockHookName is the name of the hook function in the mock.
 func (mr *Method) MockHookName() string {
 	return mr.m.Name + "Hook"
 }
 
+// MockHook is the definition of the hook function.
 func (mr *Method) MockHook() string {
 	args := mr.args(mr.argsSkip(), false, []string{
 		fmt.Sprintf("*%s", mr.MockWrapType()),
@@ -220,6 +227,7 @@ func (mr *Method) MockHook() string {
 	return fmt.Sprintf("%v func(%v) (*%v.%v, error)", mr.MockHookName(), strings.Join(args, ", "), mr.Version(), mr.ReturnType)
 }
 
+// FcnArgs is the function signature for the definition of the method.
 func (mr *Method) FcnArgs() string {
 	args := mr.args(mr.argsSkip(), true, []string{
 		"ctx context.Context",
@@ -232,6 +240,7 @@ func (mr *Method) FcnArgs() string {
 	return fmt.Sprintf("%v(%v) (*%v.%v, error)", mr.m.Name, strings.Join(args, ", "), mr.Version(), mr.ReturnType)
 }
 
+// InterfaceFunc is the function declaration of the method in the interface.
 func (mr *Method) InterfaceFunc() string {
 	args := mr.args(mr.argsSkip(), false, []string{"context.Context", "meta.Key"})
 	if mr.ReturnType == "Operation" {

@@ -21,9 +21,9 @@ import (
 	"fmt"
 	"net/http"
 
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud/meta"
 	compute "google.golang.org/api/compute/v1"
 	"google.golang.org/api/googleapi"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud/meta"
 )
 
 // ProjectsOps is the manually implemented methods for the Projects service.
@@ -37,6 +37,7 @@ type MockProjectOpsState struct {
 	metadata map[string]*compute.Metadata
 }
 
+// Get a project by projectID.
 func (m *MockProjects) Get(ctx context.Context, projectID string) (*compute.Project, error) {
 	m.Lock.Lock()
 	defer m.Lock.Unlock()
@@ -50,6 +51,7 @@ func (m *MockProjects) Get(ctx context.Context, projectID string) (*compute.Proj
 	}
 }
 
+// Get a project by projectID.
 func (g *GCEProjects) Get(ctx context.Context, projectID string) (*compute.Project, error) {
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -65,6 +67,7 @@ func (g *GCEProjects) Get(ctx context.Context, projectID string) (*compute.Proje
 	return call.Do()
 }
 
+// SetCommonInstanceMetadata for a given project.
 func (m *MockProjects) SetCommonInstanceMetadata(ctx context.Context, projectID string, meta *compute.Metadata) error {
 	if m.X == nil {
 		m.X = &MockProjectOpsState{metadata: map[string]*compute.Metadata{}}
@@ -74,6 +77,7 @@ func (m *MockProjects) SetCommonInstanceMetadata(ctx context.Context, projectID 
 	return nil
 }
 
+// SetCommonInstanceMetadata for a given project.
 func (g *GCEProjects) SetCommonInstanceMetadata(ctx context.Context, projectID string, m *compute.Metadata) error {
 	rk := &RateLimitKey{
 		ProjectID: projectID,

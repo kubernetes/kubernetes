@@ -60,6 +60,7 @@ limitations under the License.
 //  &ServiceInfo{
 //    Object:      "InstanceGroup",   // Name of the object type.
 //    Service:     "InstanceGroups",  // Name of the service.
+//    Resource:    "instanceGroups",  // Lowercase resource name (as appears in the URL).
 //    version:     meta.VersionAlpha, // API version (one entry per version is needed).
 //    keyType:     Zonal,             // What kind of resource this is.
 //    serviceType: reflect.TypeOf(&alpha.InstanceGroupsService{}), // Associated golang type.

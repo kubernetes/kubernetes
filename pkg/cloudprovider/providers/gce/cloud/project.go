@@ -39,6 +39,7 @@ type SingleProjectRouter struct {
 	ID string
 }
 
+// ProjectID returns the project ID to be used for a call to the API.
 func (r *SingleProjectRouter) ProjectID(ctx context.Context, version meta.Version, service string) string {
 	return r.ID
 }

@@ -51,6 +51,7 @@ type RateLimiter interface {
 type NopRateLimiter struct {
 }
 
+// Accept the operation to be rate limited.
 func (*NopRateLimiter) Accept(ctx context.Context, key *RateLimitKey) error {
 	// Rate limit polling of the Operation status to avoid hammering GCE
 	// for the status of an operation.
