@@ -39,12 +39,9 @@ go_library(
     srcs = [
         "e2e.go",
         "examples.go",
-        "gke_local_ssd.go",
-        "gke_node_pools.go",
     ],
     importpath = "k8s.io/kubernetes/test/e2e",
     deps = [
-        "//pkg/api/testapi:go_default_library",
         "//pkg/api/v1/pod:go_default_library",
         "//pkg/cloudprovider/providers/azure:go_default_library",
         "//pkg/cloudprovider/providers/gce:go_default_library",
@@ -68,7 +65,6 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/labels:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/uuid:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/authentication/serviceaccount:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes:go_default_library",
@@ -104,6 +100,7 @@ filegroup(
         "//test/e2e/chaosmonkey:all-srcs",
         "//test/e2e/common:all-srcs",
         "//test/e2e/framework:all-srcs",
+        "//test/e2e/gcp:all-srcs",
         "//test/e2e/generated:all-srcs",
         "//test/e2e/instrumentation:all-srcs",
         "//test/e2e/kubectl:all-srcs",

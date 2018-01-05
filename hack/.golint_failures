@@ -764,6 +764,7 @@ test/e2e/common
 test/e2e/framework
 test/e2e/framework/metrics
 test/e2e/framework/timer
+test/e2e/gcp
 test/e2e/instrumentation
 test/e2e/instrumentation/logging
 test/e2e/instrumentation/monitoring
