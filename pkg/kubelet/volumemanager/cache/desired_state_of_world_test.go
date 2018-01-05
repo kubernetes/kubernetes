@@ -154,7 +154,7 @@ func Test_DeletePodFromVolume_Positive_PodExistsVolumeExists(t *testing.T) {
 	verifyPodExistsInVolumeDsw(t, podName, generatedVolumeName, dsw)
 
 	// Act
-	dsw.DeletePodFromVolume(podName, generatedVolumeName)
+	dsw.DeletePodFromVolume(podName, generatedVolumeName, volumeSpec)
 
 	// Assert
 	verifyVolumeDoesntExist(t, generatedVolumeName, dsw)

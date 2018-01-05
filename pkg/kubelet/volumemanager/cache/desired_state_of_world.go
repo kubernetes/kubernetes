@@ -95,9 +95,9 @@ type DesiredStateOfWorld interface {
 	// current desired state of the world.
 	GetVolumesToMount() []VolumeToMount
 
-	// GetVolumeUnmountMetric retreives the associated metric for a given volume's
-	// unmount operation
-	GetVolumeUnmountMetric(volumeName v1.UniqueVolumeName) func(error)
+	// GetVolumeUnmountMetricCallback retreives the associated metric callback for a given
+	// volume's unmount operation
+	GetVolumeUnmountMetricCallback(volumeName v1.UniqueVolumeName) func(error)
 
 	// GetPods generates and returns a map of pods in which map is indexed
 	// with pod's unique name. This map can be used to determine which pod is currently
@@ -276,7 +276,7 @@ func (dsw *desiredStateOfWorld) DeletePodFromVolume(
 	dsw.Lock()
 	defer dsw.Unlock()
 
-	volumePluginName := "plugin_unknown"
+	volumePluginName := "<n/a>"
 	volumePlugin, err := dsw.volumePluginMgr.FindPluginBySpec(volumeSpec)
 	if err == nil || volumePlugin != nil {
 		volumePluginName = volumePlugin.GetPluginName()
@@ -366,8 +366,10 @@ func (dsw *desiredStateOfWorld) GetVolumesToMount() []VolumeToMount {
 	return volumesToMount
 }
 
-func (dsw *desiredStateOfWorld) GetVolumeUnmountMetric(volumeName v1.UniqueVolumeName) func(error) {
-	return dsw.volumesToUnmount[volumeName]
+func (dsw *desiredStateOfWorld) GetVolumeUnmountMetricCallback(volumeName v1.UniqueVolumeName) func(error) {
+	operationComplete := dsw.volumesToUnmount[volumeName]
+	delete(dsw.volumesToUnmount, volumeName)
+	return operationComplete
 }
 
 func (dsw *desiredStateOfWorld) isAttachableVolume(volumeSpec *volume.Spec) bool {
