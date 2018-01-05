@@ -302,6 +302,7 @@ func (tc *NoExecuteTaintManager) processPodOnNode(
 ) {
 	if len(taints) == 0 {
 		tc.cancelWorkWithEvent(podNamespacedName)
+		return
 	}
 	allTolerated, usedTolerations := v1helper.GetMatchingTolerations(taints, tolerations)
 	if !allTolerated {
@@ -392,14 +393,6 @@ func (tc *NoExecuteTaintManager) handleNodeUpdate(nodeUpdate *nodeUpdateItem) {
 		return
 	}
 	if len(pods) == 0 {
-		return
-	}
-	// Short circuit, to make this controller a bit faster.
-	if len(taints) == 0 {
-		glog.V(4).Infof("All taints were removed from the Node %v. Cancelling all evictions...", node.Name)
-		for i := range pods {
-			tc.cancelWorkWithEvent(types.NamespacedName{Namespace: pods[i].Namespace, Name: pods[i].Name})
-		}
 		return
 	}
 
