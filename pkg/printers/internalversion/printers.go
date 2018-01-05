@@ -1224,7 +1224,7 @@ func printPersistentVolume(obj *api.PersistentVolume, options printers.PrintOpti
 	}
 
 	row.Cells = append(row.Cells, obj.Name, aSize, modesStr, reclaimPolicyStr,
-		string(phase), claimRefUID, helper.GetPersistentVolumeClass(obj),
+		string(phase), claimRefUID, obj.Spec.StorageClassName,
 		obj.Status.Reason,
 		translateTimestamp(obj.CreationTimestamp))
 	return []metav1beta1.TableRow{row}, nil

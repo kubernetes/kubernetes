@@ -132,11 +132,10 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 					},
 				},
 			}
+			noClass := ""
 			pvcConfig = framework.PersistentVolumeClaimConfig{
-				Annotations: map[string]string{
-					v1.BetaStorageClassAnnotation: "",
-				},
-				Selector: selector,
+				Selector:         selector,
+				StorageClassName: &noClass,
 			}
 		})
 

@@ -64,11 +64,10 @@ var _ = utils.SIGDescribe("PV Protection", func() {
 			},
 		}
 
+		noClass := ""
 		pvcConfig = framework.PersistentVolumeClaimConfig{
-			Annotations: map[string]string{
-				v1.BetaStorageClassAnnotation: "",
-			},
-			Selector: selector,
+			Selector:         selector,
+			StorageClassName: &noClass,
 		}
 
 		By("Creating a PV")

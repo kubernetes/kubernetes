@@ -29,7 +29,6 @@ go_library(
     deps = [
         "//pkg/api/testapi:go_default_library",
         "//pkg/api/v1/pod:go_default_library",
-        "//pkg/apis/core/v1/helper:go_default_library",
         "//pkg/apis/storage/v1/util:go_default_library",
         "//pkg/client/conditions:go_default_library",
         "//pkg/kubelet/apis:go_default_library",

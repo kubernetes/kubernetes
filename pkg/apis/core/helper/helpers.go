@@ -527,24 +527,9 @@ func PodAnnotationsFromSysctls(sysctls []core.Sysctl) string {
 	return strings.Join(kvs, ",")
 }
 
-// GetPersistentVolumeClass returns StorageClassName.
-func GetPersistentVolumeClass(volume *core.PersistentVolume) string {
-	// Use beta annotation first
-	if class, found := volume.Annotations[core.BetaStorageClassAnnotation]; found {
-		return class
-	}
-
-	return volume.Spec.StorageClassName
-}
-
 // GetPersistentVolumeClaimClass returns StorageClassName. If no storage class was
 // requested, it returns "".
 func GetPersistentVolumeClaimClass(claim *core.PersistentVolumeClaim) string {
-	// Use beta annotation first
-	if class, found := claim.Annotations[core.BetaStorageClassAnnotation]; found {
-		return class
-	}
-
 	if claim.Spec.StorageClassName != nil {
 		return *claim.Spec.StorageClassName
 	}
@@ -554,11 +539,6 @@ func GetPersistentVolumeClaimClass(claim *core.PersistentVolumeClaim) string {
 
 // PersistentVolumeClaimHasClass returns true if given claim has set StorageClassName field.
 func PersistentVolumeClaimHasClass(claim *core.PersistentVolumeClaim) bool {
-	// Use beta annotation first
-	if _, found := claim.Annotations[core.BetaStorageClassAnnotation]; found {
-		return true
-	}
-
 	if claim.Spec.StorageClassName != nil {
 		return true
 	}

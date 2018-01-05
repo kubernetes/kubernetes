@@ -220,7 +220,7 @@ func findMatchingVolume(
 		} else if selector != nil && !selector.Matches(labels.Set(volume.Labels)) {
 			continue
 		}
-		if v1helper.GetPersistentVolumeClass(volume) != requestedClass {
+		if volume.Spec.StorageClassName != requestedClass {
 			continue
 		}
 		if !nodeAffinityValid {
