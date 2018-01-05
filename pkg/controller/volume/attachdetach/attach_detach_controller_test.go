@@ -79,6 +79,24 @@ func Test_AttachDetachControllerStateOfWolrdPopulators_Positive(t *testing.T) {
 		cloud:       nil,
 	}
 
+	podsList, err := fakeKubeClient.Core().Pods(v1.NamespaceAll).List(metav1.ListOptions{})
+	if err != nil {
+		t.Fatalf("Run failed with error. Expected: <no error> Actual: %v", err)
+	}
+	for _, pod := range podsList.Items {
+		podToAdd := pod
+		podInformer.Informer().GetIndexer().Add(&podToAdd)
+	}
+
+	nodesList, err := fakeKubeClient.Core().Nodes().List(metav1.ListOptions{})
+	if err != nil {
+		t.Fatalf("Run failed with error. Expected: <no error> Actual: %v", err)
+	}
+	for _, node := range nodesList.Items {
+		nodeToAdd := node
+		nodeInformer.Informer().GetIndexer().Add(&nodeToAdd)
+	}
+
 	// Act
 	plugins := controllervolumetesting.CreateTestPlugin()
 	var prober volume.DynamicPluginProber = nil // TODO (#51147) inject mock
@@ -90,7 +108,7 @@ func Test_AttachDetachControllerStateOfWolrdPopulators_Positive(t *testing.T) {
 	adc.actualStateOfWorld = cache.NewActualStateOfWorld(&adc.volumePluginMgr)
 	adc.desiredStateOfWorld = cache.NewDesiredStateOfWorld(&adc.volumePluginMgr)
 
-	err := adc.populateActualStateOfWorld()
+	err = adc.populateActualStateOfWorld()
 	if err != nil {
 		t.Fatalf("Run failed with error. Expected: <no error> Actual: <%v>", err)
 	}
@@ -105,7 +123,6 @@ func Test_AttachDetachControllerStateOfWolrdPopulators_Positive(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to list nodes in indexer. Expected: <no error> Actual: %v", err)
 	}
-
 	for _, node := range nodes {
 		nodeName := types.NodeName(node.Name)
 		for _, attachedVolume := range node.Status.VolumesAttached {
