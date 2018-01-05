@@ -71,7 +71,7 @@ avoid Fluentd pods scheduling there.
 [setupCreds]: https://www.elastic.co/guide/en/x-pack/current/setting-up-authentication.html#reset-built-in-user-passwords
 [fluentdCreds]: https://github.com/uken/fluent-plugin-elasticsearch#user-password-path-scheme-ssl_verify
 [fluentdEnvVar]: https://docs.fluentd.org/v0.12/articles/faq#how-can-i-use-environment-variables-to-configure-parameters-dynamically
-[configMap]: https://kubernetes.io/docs/tasks/configure-pod-container/configmap/
+[configMap]: https://kubernetes.io/docs/tasks/configure-pod-container/configure-pod-configmap/
 [secret]: https://kubernetes.io/docs/concepts/configuration/secret/
 [statefulSet]: https://kubernetes.io/docs/concepts/workloads/controllers/statefulset
 [initContainer]: https://kubernetes.io/docs/concepts/workloads/pods/init-containers/
