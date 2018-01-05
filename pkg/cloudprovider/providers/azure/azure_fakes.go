@@ -24,11 +24,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Azure/go-autorest/autorest/to"
-
 	"github.com/Azure/azure-sdk-for-go/arm/compute"
+	"github.com/Azure/azure-sdk-for-go/arm/disk"
 	"github.com/Azure/azure-sdk-for-go/arm/network"
+	"github.com/Azure/azure-sdk-for-go/arm/storage"
 	"github.com/Azure/go-autorest/autorest"
+	"github.com/Azure/go-autorest/autorest/to"
 )
 
 type fakeAzureLBClient struct {
@@ -784,4 +785,320 @@ func (fVMSSC fakeVirtualMachineScaleSetsClient) UpdateInstances(resourceGroupNam
 	}
 	err = nil
 	return resultChan, errChan
+}
+
+type fakeRoutesClient struct {
+	mutex     *sync.Mutex
+	FakeStore map[string]map[string]network.Route
+}
+
+func newFakeRoutesClient() fakeRoutesClient {
+	fRC := fakeRoutesClient{}
+	fRC.FakeStore = make(map[string]map[string]network.Route)
+	fRC.mutex = &sync.Mutex{}
+	return fRC
+}
+
+func (fRC fakeRoutesClient) CreateOrUpdate(resourceGroupName string, routeTableName string, routeName string, routeParameters network.Route, cancel <-chan struct{}) (<-chan network.Route, <-chan error) {
+	fRC.mutex.Lock()
+	defer fRC.mutex.Unlock()
+
+	resultChan := make(chan network.Route, 1)
+	errChan := make(chan error, 1)
+	var result network.Route
+	var err error
+	defer func() {
+		resultChan <- result
+		errChan <- err
+		close(resultChan)
+		close(errChan)
+	}()
+
+	if _, ok := fRC.FakeStore[routeTableName]; !ok {
+		fRC.FakeStore[routeTableName] = make(map[string]network.Route)
+	}
+	fRC.FakeStore[routeTableName][routeName] = routeParameters
+	result = fRC.FakeStore[routeTableName][routeName]
+	result.Response.Response = &http.Response{
+		StatusCode: http.StatusOK,
+	}
+	err = nil
+	return resultChan, errChan
+}
+
+func (fRC fakeRoutesClient) Delete(resourceGroupName string, routeTableName string, routeName string, cancel <-chan struct{}) (<-chan autorest.Response, <-chan error) {
+	fRC.mutex.Lock()
+	defer fRC.mutex.Unlock()
+
+	respChan := make(chan autorest.Response, 1)
+	errChan := make(chan error, 1)
+	var resp autorest.Response
+	var err error
+	defer func() {
+		respChan <- resp
+		errChan <- err
+		close(respChan)
+		close(errChan)
+	}()
+	if routes, ok := fRC.FakeStore[routeTableName]; ok {
+		if _, ok := routes[routeName]; ok {
+			delete(routes, routeName)
+			resp.Response = &http.Response{
+				StatusCode: http.StatusAccepted,
+			}
+
+			err = nil
+			return respChan, errChan
+		}
+	}
+	resp.Response = &http.Response{
+		StatusCode: http.StatusNotFound,
+	}
+	err = autorest.DetailedError{
+		StatusCode: http.StatusNotFound,
+		Message:    "Not such Route",
+	}
+	return respChan, errChan
+}
+
+type fakeRouteTablesClient struct {
+	mutex     *sync.Mutex
+	FakeStore map[string]map[string]network.RouteTable
+}
+
+func newFakeRouteTablesClient() fakeRouteTablesClient {
+	fRTC := fakeRouteTablesClient{}
+	fRTC.FakeStore = make(map[string]map[string]network.RouteTable)
+	fRTC.mutex = &sync.Mutex{}
+	return fRTC
+}
+
+func (fRTC fakeRouteTablesClient) CreateOrUpdate(resourceGroupName string, routeTableName string, parameters network.RouteTable, cancel <-chan struct{}) (<-chan network.RouteTable, <-chan error) {
+	fRTC.mutex.Lock()
+	defer fRTC.mutex.Unlock()
+
+	resultChan := make(chan network.RouteTable, 1)
+	errChan := make(chan error, 1)
+	var result network.RouteTable
+	var err error
+	defer func() {
+		resultChan <- result
+		errChan <- err
+		close(resultChan)
+		close(errChan)
+	}()
+
+	if _, ok := fRTC.FakeStore[resourceGroupName]; !ok {
+		fRTC.FakeStore[resourceGroupName] = make(map[string]network.RouteTable)
+	}
+	fRTC.FakeStore[resourceGroupName][routeTableName] = parameters
+	result = fRTC.FakeStore[resourceGroupName][routeTableName]
+	result.Response.Response = &http.Response{
+		StatusCode: http.StatusOK,
+	}
+	err = nil
+	return resultChan, errChan
+}
+
+func (fRTC fakeRouteTablesClient) Get(resourceGroupName string, routeTableName string, expand string) (result network.RouteTable, err error) {
+	fRTC.mutex.Lock()
+	defer fRTC.mutex.Unlock()
+	if _, ok := fRTC.FakeStore[resourceGroupName]; ok {
+		if entity, ok := fRTC.FakeStore[resourceGroupName][routeTableName]; ok {
+			return entity, nil
+		}
+	}
+	return result, autorest.DetailedError{
+		StatusCode: http.StatusNotFound,
+		Message:    "Not such RouteTable",
+	}
+}
+
+type fakeStorageAccountClient struct {
+	mutex     *sync.Mutex
+	FakeStore map[string]map[string]storage.Account
+}
+
+func newFakeStorageAccountClient() fakeStorageAccountClient {
+	fSAC := fakeStorageAccountClient{}
+	fSAC.FakeStore = make(map[string]map[string]storage.Account)
+	fSAC.mutex = &sync.Mutex{}
+	return fSAC
+}
+
+func (fSAC fakeStorageAccountClient) Create(resourceGroupName string, accountName string, parameters storage.AccountCreateParameters, cancel <-chan struct{}) (<-chan storage.Account, <-chan error) {
+	fSAC.mutex.Lock()
+	defer fSAC.mutex.Unlock()
+
+	resultChan := make(chan storage.Account, 1)
+	errChan := make(chan error, 1)
+	var result storage.Account
+	var err error
+	defer func() {
+		resultChan <- result
+		errChan <- err
+		close(resultChan)
+		close(errChan)
+	}()
+
+	if _, ok := fSAC.FakeStore[resourceGroupName]; !ok {
+		fSAC.FakeStore[resourceGroupName] = make(map[string]storage.Account)
+	}
+	fSAC.FakeStore[resourceGroupName][accountName] = storage.Account{
+		Name:              &accountName,
+		Sku:               parameters.Sku,
+		Kind:              parameters.Kind,
+		Location:          parameters.Location,
+		Identity:          parameters.Identity,
+		Tags:              parameters.Tags,
+		AccountProperties: &storage.AccountProperties{},
+	}
+	result = fSAC.FakeStore[resourceGroupName][accountName]
+	result.Response.Response = &http.Response{
+		StatusCode: http.StatusOK,
+	}
+	err = nil
+	return resultChan, errChan
+}
+
+func (fSAC fakeStorageAccountClient) Delete(resourceGroupName string, accountName string) (result autorest.Response, err error) {
+	fSAC.mutex.Lock()
+	defer fSAC.mutex.Unlock()
+
+	if rgAccounts, ok := fSAC.FakeStore[resourceGroupName]; ok {
+		if _, ok := rgAccounts[accountName]; ok {
+			delete(rgAccounts, accountName)
+			result.Response = &http.Response{
+				StatusCode: http.StatusAccepted,
+			}
+			return result, nil
+		}
+	}
+
+	result.Response = &http.Response{
+		StatusCode: http.StatusNotFound,
+	}
+	err = autorest.DetailedError{
+		StatusCode: http.StatusNotFound,
+		Message:    "Not such StorageAccount",
+	}
+	return result, err
+}
+
+func (fSAC fakeStorageAccountClient) ListKeys(resourceGroupName string, accountName string) (result storage.AccountListKeysResult, err error) {
+	return storage.AccountListKeysResult{}, nil
+}
+
+func (fSAC fakeStorageAccountClient) ListByResourceGroup(resourceGroupName string) (result storage.AccountListResult, err error) {
+	return storage.AccountListResult{}, nil
+}
+
+func (fSAC fakeStorageAccountClient) GetProperties(resourceGroupName string, accountName string) (result storage.Account, err error) {
+	fSAC.mutex.Lock()
+	defer fSAC.mutex.Unlock()
+
+	if _, ok := fSAC.FakeStore[resourceGroupName]; ok {
+		if entity, ok := fSAC.FakeStore[resourceGroupName][accountName]; ok {
+			return entity, nil
+		}
+	}
+
+	return result, autorest.DetailedError{
+		StatusCode: http.StatusNotFound,
+		Message:    "Not such StorageAccount",
+	}
+}
+
+type fakeDisksClient struct {
+	mutex     *sync.Mutex
+	FakeStore map[string]map[string]disk.Model
+}
+
+func newFakeDisksClient() fakeDisksClient {
+	fDC := fakeDisksClient{}
+	fDC.FakeStore = make(map[string]map[string]disk.Model)
+	fDC.mutex = &sync.Mutex{}
+	return fDC
+}
+
+func (fDC fakeDisksClient) CreateOrUpdate(resourceGroupName string, diskName string, diskParameter disk.Model, cancel <-chan struct{}) (<-chan disk.Model, <-chan error) {
+	fDC.mutex.Lock()
+	defer fDC.mutex.Unlock()
+
+	resultChan := make(chan disk.Model, 1)
+	errChan := make(chan error, 1)
+	var result disk.Model
+	var err error
+	defer func() {
+		resultChan <- result
+		errChan <- err
+		close(resultChan)
+		close(errChan)
+	}()
+
+	if _, ok := fDC.FakeStore[resourceGroupName]; !ok {
+		fDC.FakeStore[resourceGroupName] = make(map[string]disk.Model)
+	}
+	fDC.FakeStore[resourceGroupName][diskName] = diskParameter
+	result = fDC.FakeStore[resourceGroupName][diskName]
+	result.Response.Response = &http.Response{
+		StatusCode: http.StatusOK,
+	}
+	err = nil
+	return resultChan, errChan
+}
+
+func (fDC fakeDisksClient) Delete(resourceGroupName string, diskName string, cancel <-chan struct{}) (<-chan disk.OperationStatusResponse, <-chan error) {
+	fDC.mutex.Lock()
+	defer fDC.mutex.Unlock()
+
+	respChan := make(chan disk.OperationStatusResponse, 1)
+	errChan := make(chan error, 1)
+	var resp disk.OperationStatusResponse
+	var err error
+	defer func() {
+		respChan <- resp
+		errChan <- err
+		close(respChan)
+		close(errChan)
+	}()
+	if rgDisks, ok := fDC.FakeStore[resourceGroupName]; ok {
+		if _, ok := rgDisks[diskName]; ok {
+			delete(rgDisks, diskName)
+			resp.Response = autorest.Response{
+				Response: &http.Response{
+					StatusCode: http.StatusAccepted,
+				},
+			}
+
+			err = nil
+			return respChan, errChan
+		}
+	}
+	resp.Response = autorest.Response{
+		Response: &http.Response{
+			StatusCode: http.StatusNotFound,
+		},
+	}
+	err = autorest.DetailedError{
+		StatusCode: http.StatusNotFound,
+		Message:    "Not such Disk",
+	}
+	return respChan, errChan
+}
+
+func (fDC fakeDisksClient) Get(resourceGroupName string, diskName string) (result disk.Model, err error) {
+	fDC.mutex.Lock()
+	defer fDC.mutex.Unlock()
+
+	if _, ok := fDC.FakeStore[resourceGroupName]; ok {
+		if entity, ok := fDC.FakeStore[resourceGroupName][diskName]; ok {
+			return entity, nil
+		}
+	}
+
+	return result, autorest.DetailedError{
+		StatusCode: http.StatusNotFound,
+		Message:    "Not such Disk",
+	}
 }
