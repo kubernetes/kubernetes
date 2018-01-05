@@ -32,6 +32,7 @@ go_test(
         "//vendor/k8s.io/apiserver/pkg/apis/example/v1:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/endpoints/request:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/registry/rest:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/util/trace:go_default_library",
     ],
 )
 
