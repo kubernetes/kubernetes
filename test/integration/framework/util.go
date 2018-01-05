@@ -38,10 +38,10 @@ import (
 )
 
 const (
-	// When these values are updated, also update cmd/kubelet/app/options/options.go
-	// A copy of these values exist in e2e/framework/util.go.
+	// When these values are updated, also update cmd/kubelet/app/options/container_runtime.go
+	// A copy of these values exist in test/utils/image/manifest.go
 	currentPodInfraContainerImageName    = "gcr.io/google_containers/pause"
-	currentPodInfraContainerImageVersion = "3.0"
+	currentPodInfraContainerImageVersion = "3.1"
 )
 
 // GetServerArchitecture fetches the architecture of the cluster's apiserver.
