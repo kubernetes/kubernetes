@@ -414,7 +414,7 @@ message PodSandboxStatus {
 message PodSandboxStatusResponse {
     // Status of the PodSandbox.
     PodSandboxStatus status = 1;
-    // Info is extra information of the PodSandbox. The key could be abitrary string, and
+    // Info is extra information of the PodSandbox. The key could be arbitrary string, and
     // value should be in json format. The information could include anything useful for
     // debug, e.g. network namespace for linux container based container runtime.
     // It should only be returned non-empty when Verbose is true.
@@ -852,7 +852,7 @@ message ContainerStatus {
 message ContainerStatusResponse {
     // Status of the container.
     ContainerStatus status = 1;
-    // Info is extra information of the Container. The key could be abitrary string, and
+    // Info is extra information of the Container. The key could be arbitrary string, and
     // value should be in json format. The information could include anything useful for
     // debug, e.g. pid for linux container based container runtime.
     // It should only be returned non-empty when Verbose is true.
@@ -993,7 +993,7 @@ message ImageStatusRequest {
 message ImageStatusResponse {
     // Status of the image.
     Image image = 1;
-    // Info is extra information of the Image. The key could be abitrary string, and
+    // Info is extra information of the Image. The key could be arbitrary string, and
     // value should be in json format. The information could include anything useful
     // for debug, e.g. image config for oci image based container runtime.
     // It should only be returned non-empty when Verbose is true.
@@ -1088,7 +1088,7 @@ message StatusRequest {
 message StatusResponse {
     // Status of the Runtime.
     RuntimeStatus status = 1;
-    // Info is extra information of the Runtime. The key could be abitrary string, and
+    // Info is extra information of the Runtime. The key could be arbitrary string, and
     // value should be in json format. The information could include anything useful for
     // debug, e.g. plugins used by the container runtime.
     // It should only be returned non-empty when Verbose is true.
