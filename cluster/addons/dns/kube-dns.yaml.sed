@@ -56,7 +56,7 @@ metadata:
   labels:
     addonmanager.kubernetes.io/mode: EnsureExists
 ---
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1beta2
 kind: Deployment
 metadata:
   name: kube-dns
