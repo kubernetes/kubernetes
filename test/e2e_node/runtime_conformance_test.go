@@ -36,9 +36,8 @@ import (
 )
 
 const (
-	consistentCheckTimeout = time.Second * 5
-	retryTimeout           = time.Minute * 5
-	pollInterval           = time.Second * 1
+	retryTimeout = time.Minute * 5
+	pollInterval = time.Second * 1
 )
 
 var _ = framework.KubeDescribe("Container Runtime Conformance Test", func() {
