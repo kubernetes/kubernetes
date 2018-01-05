@@ -94,10 +94,10 @@ func (pf *PortForwarder) waitForUDPSocket(conn *net.UDPConn, port ForwardedPort)
 
 		_, err = socketMap[createKey(rmAddr)].Write(bufSend[:rn])
 		if err != nil {
-			fmt.Fprintf(pf.out, "goroutine 1: Error write to spdy:", err)
+			fmt.Fprintf(pf.out, "waitForUDPSocket 1: Error write to spdy:", err)
 			break
 		} else {
-			fmt.Fprintf(pf.out, "goroutine 1: send to spdy, data: %s\n", string(bufSend[:rn]))
+			fmt.Fprintf(pf.out, "waitForUDPSocket 1: send to spdy, data: %s\n", string(bufSend[:rn]))
 		}
 	}
 }

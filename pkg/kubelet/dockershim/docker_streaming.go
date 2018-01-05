@@ -39,6 +39,8 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/util/ioutils"
 
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
+	"k8s.io/apiserver/pkg/storage/names"
+	"strconv"
 )
 
 type streamingRuntime struct {
@@ -217,7 +219,8 @@ func protForwardTcp(containerPid int, port int32, stream io.ReadWriteCloser) err
 
 func portForwardUdp(containerPid int, port int32, stream io.ReadWriteCloser) error {
 	unixDomainSocketPath := "/tmp/my.sock"
-	unixDomainSocketPath1 := "/tmp/1.sock"
+	unixDomainSocketPath1 := "/tmp/"+names.SimpleNameGenerator.GenerateName(strconv.Itoa(containerPid))+".sock"
+
 	socatPath, lookupErr := exec.LookPath("socat")
 	if lookupErr != nil {
 		return fmt.Errorf("unable to do port forwarding: socat not found.")
