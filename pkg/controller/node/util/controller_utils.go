@@ -72,6 +72,9 @@ func DeletePods(kubeClient clientset.Interface, recorder record.EventRecorder, n
 			continue
 		}
 
+		// Set pod phase to Unknown, since it may caused by node unresponsive
+		pod.Status.Phase = v1.PodUnknown
+
 		// Set reason and message in the pod object.
 		if _, err = SetPodTerminationReason(kubeClient, &pod, nodeName); err != nil {
 			if apierrors.IsConflict(err) {
