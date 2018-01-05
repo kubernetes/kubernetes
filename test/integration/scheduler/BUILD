@@ -11,6 +11,7 @@ go_test(
     size = "large",
     srcs = [
         "extender_test.go",
+        "local-pv-neg-affinity_test.go",
         "main_test.go",
         "predicates_test.go",
         "preemption_test.go",

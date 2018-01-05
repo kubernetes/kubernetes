@@ -82,8 +82,8 @@ var (
 	NoSnatTest               = ImageConfig{e2eRegistry, "no-snat-test", "1.0", true}
 	NoSnatTestProxy          = ImageConfig{e2eRegistry, "no-snat-test-proxy", "1.0", true}
 	NWayHTTP                 = ImageConfig{e2eRegistry, "n-way-http", "1.0", true}
-	// When these values are updated, also update cmd/kubelet/app/options/options.go
-	Pause               = ImageConfig{gcRegistry, "pause", "3.0", true}
+	// When these values are updated, also update cmd/kubelet/app/options/container_runtime.go
+	Pause               = ImageConfig{gcRegistry, "pause", "3.1", true}
 	Porter              = ImageConfig{e2eRegistry, "porter", "1.0", true}
 	PortForwardTester   = ImageConfig{e2eRegistry, "port-forward-tester", "1.0", true}
 	Redis               = ImageConfig{e2eRegistry, "redis", "1.0", true}

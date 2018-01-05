@@ -368,13 +368,3 @@ func deprecatedAlias(deprecatedVersion string, cmd *cobra.Command) *cobra.Comman
 	cmd.Hidden = true
 	return cmd
 }
-
-// deprecated is similar to deprecatedAlias, but it is used for deprecations
-// that are not simple aliases; this command is actually a different
-// (deprecated) codepath.
-func deprecated(baseName, to string, parent, cmd *cobra.Command) string {
-	cmd.Long = fmt.Sprintf("Deprecated: all functionality can be found in \"%s %s\"", baseName, to)
-	cmd.Short = fmt.Sprintf("Deprecated: use %s", to)
-	parent.AddCommand(cmd)
-	return cmd.Name()
-}

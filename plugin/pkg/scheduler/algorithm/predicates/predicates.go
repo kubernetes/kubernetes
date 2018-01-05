@@ -35,7 +35,6 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
@@ -68,6 +67,11 @@ const (
 	NoVolumeZoneConflictPred            = "NoVolumeZoneConflict"
 	CheckNodeMemoryPressurePred         = "CheckNodeMemoryPressure"
 	CheckNodeDiskPressurePred           = "CheckNodeDiskPressure"
+
+	// DefaultMaxEBSVolumes is the limit for volumes attached to an instance.
+	// Amazon recommends no more than 40; the system root volume uses at least one.
+	// See http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/volume_limits.html#linux-specific-volume-limits
+	DefaultMaxEBSVolumes = 39
 	// DefaultMaxGCEPDVolumes defines the maximum number of PD Volumes for GCE
 	// GCE instances can have up to 16 PD volumes attached.
 	DefaultMaxGCEPDVolumes = 16
@@ -283,7 +287,7 @@ func NewMaxPDVolumeCountPredicate(filterName string, pvInfo PersistentVolumeInfo
 
 	case EBSVolumeFilterType:
 		filter = EBSVolumeFilter
-		maxVolumes = getMaxVols(aws.DefaultMaxEBSVolumes)
+		maxVolumes = getMaxVols(DefaultMaxEBSVolumes)
 	case GCEPDVolumeFilterType:
 		filter = GCEPDVolumeFilter
 		maxVolumes = getMaxVols(DefaultMaxGCEPDVolumes)

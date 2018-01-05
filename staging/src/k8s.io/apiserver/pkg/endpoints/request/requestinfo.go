@@ -21,6 +21,7 @@ import (
 	"net/http"
 	"strings"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
@@ -178,7 +179,7 @@ func (r *RequestInfoFactory) NewRequestInfo(req *http.Request) (*RequestInfo, er
 			}
 		}
 	} else {
-		requestInfo.Namespace = "" // TODO(sttts): solve import cycle when using metav1.NamespaceNone
+		requestInfo.Namespace = metav1.NamespaceNone
 	}
 
 	// parsing successful, so we now know the proper value for .Parts

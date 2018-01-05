@@ -252,7 +252,7 @@ func TestRESTClientQpsSumEqualZero(t *testing.T) {
 func TestRESTClientCPUEmptyMetrics(t *testing.T) {
 	tc := restClientTestCase{
 		resourceName:         v1.ResourceCPU,
-		desiredError:         fmt.Errorf("no metrics returned from heapster"),
+		desiredError:         fmt.Errorf("no metrics returned from resource metrics API"),
 		reportedMetricPoints: []metricPoint{},
 		reportedPodMetrics:   [][]int64{},
 	}

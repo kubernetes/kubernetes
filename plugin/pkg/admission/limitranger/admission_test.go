@@ -733,6 +733,15 @@ func TestLimitRangerAdmitPod(t *testing.T) {
 	if err != nil {
 		t.Errorf("Should have ignored calls to any subresource of pod %v", err)
 	}
+
+	// a pod that is undergoing termination should never be blocked
+	terminatingPod := validPod("terminatingPod", 1, api.ResourceRequirements{})
+	now := metav1.Now()
+	terminatingPod.DeletionTimestamp = &now
+	err = handler.Validate(admission.NewAttributesRecord(&terminatingPod, &terminatingPod, api.Kind("Pod").WithVersion("version"), limitRange.Namespace, "terminatingPod", api.Resource("pods").WithVersion("version"), "", admission.Update, nil))
+	if err != nil {
+		t.Errorf("LimitRange should ignore a pod marked for termination")
+	}
 }
 
 // newMockClientForTest creates a mock client that returns a client configured for the specified list of limit ranges
