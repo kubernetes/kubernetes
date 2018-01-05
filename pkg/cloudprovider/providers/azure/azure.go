@@ -176,20 +176,48 @@ type VirtualMachineScaleSetVMsClient interface {
 	ListNextResults(lastResults compute.VirtualMachineScaleSetVMListResult) (result compute.VirtualMachineScaleSetVMListResult, err error)
 }
 
+// RoutesClient defines needed functions for azure network.RoutesClient
+type RoutesClient interface {
+	CreateOrUpdate(resourceGroupName string, routeTableName string, routeName string, routeParameters network.Route, cancel <-chan struct{}) (<-chan network.Route, <-chan error)
+	Delete(resourceGroupName string, routeTableName string, routeName string, cancel <-chan struct{}) (<-chan autorest.Response, <-chan error)
+}
+
+// RouteTablesClient defines needed functions for azure network.RouteTablesClient
+type RouteTablesClient interface {
+	CreateOrUpdate(resourceGroupName string, routeTableName string, parameters network.RouteTable, cancel <-chan struct{}) (<-chan network.RouteTable, <-chan error)
+	Get(resourceGroupName string, routeTableName string, expand string) (result network.RouteTable, err error)
+}
+
+// StorageAccountClient defines needed functions for azure storage.AccountsClient
+type StorageAccountClient interface {
+	Create(resourceGroupName string, accountName string, parameters storage.AccountCreateParameters, cancel <-chan struct{}) (<-chan storage.Account, <-chan error)
+	Delete(resourceGroupName string, accountName string) (result autorest.Response, err error)
+	ListKeys(resourceGroupName string, accountName string) (result storage.AccountListKeysResult, err error)
+	ListByResourceGroup(resourceGroupName string) (result storage.AccountListResult, err error)
+	GetProperties(resourceGroupName string, accountName string) (result storage.Account, err error)
+}
+
+// DisksClient defines needed functions for azure disk.DisksClient
+type DisksClient interface {
+	CreateOrUpdate(resourceGroupName string, diskName string, diskParameter disk.Model, cancel <-chan struct{}) (<-chan disk.Model, <-chan error)
+	Delete(resourceGroupName string, diskName string, cancel <-chan struct{}) (<-chan disk.OperationStatusResponse, <-chan error)
+	Get(resourceGroupName string, diskName string) (result disk.Model, err error)
+}
+
 // Cloud holds the config and clients
 type Cloud struct {
 	Config
 	Environment              azure.Environment
-	RoutesClient             network.RoutesClient
+	RoutesClient             RoutesClient
 	SubnetsClient            SubnetsClient
 	InterfacesClient         InterfacesClient
-	RouteTablesClient        network.RouteTablesClient
+	RouteTablesClient        RouteTablesClient
 	LoadBalancerClient       LoadBalancersClient
 	PublicIPAddressesClient  PublicIPAddressesClient
 	SecurityGroupsClient     SecurityGroupsClient
 	VirtualMachinesClient    VirtualMachinesClient
-	StorageAccountClient     storage.AccountsClient
-	DisksClient              disk.DisksClient
+	StorageAccountClient     StorageAccountClient
+	DisksClient              DisksClient
 	operationPollRateLimiter flowcontrol.RateLimiter
 	resourceRequestBackoff   wait.Backoff
 	vmSet                    VMSet
@@ -236,17 +264,19 @@ func NewCloud(configReader io.Reader) (cloudprovider.Interface, error) {
 	configureUserAgent(&subnetsClient.Client)
 	az.SubnetsClient = subnetsClient
 
-	az.RouteTablesClient = network.NewRouteTablesClient(az.SubscriptionID)
-	az.RouteTablesClient.BaseURI = az.Environment.ResourceManagerEndpoint
-	az.RouteTablesClient.Authorizer = autorest.NewBearerAuthorizer(servicePrincipalToken)
-	az.RouteTablesClient.PollingDelay = 5 * time.Second
-	configureUserAgent(&az.RouteTablesClient.Client)
+	routeTablesClient := network.NewRouteTablesClient(az.SubscriptionID)
+	routeTablesClient.BaseURI = az.Environment.ResourceManagerEndpoint
+	routeTablesClient.Authorizer = autorest.NewBearerAuthorizer(servicePrincipalToken)
+	routeTablesClient.PollingDelay = 5 * time.Second
+	configureUserAgent(&routeTablesClient.Client)
+	az.RouteTablesClient = routeTablesClient
 
-	az.RoutesClient = network.NewRoutesClient(az.SubscriptionID)
-	az.RoutesClient.BaseURI = az.Environment.ResourceManagerEndpoint
-	az.RoutesClient.Authorizer = autorest.NewBearerAuthorizer(servicePrincipalToken)
-	az.RoutesClient.PollingDelay = 5 * time.Second
-	configureUserAgent(&az.RoutesClient.Client)
+	routesClient := network.NewRoutesClient(az.SubscriptionID)
+	routesClient.BaseURI = az.Environment.ResourceManagerEndpoint
+	routesClient.Authorizer = autorest.NewBearerAuthorizer(servicePrincipalToken)
+	routesClient.PollingDelay = 5 * time.Second
+	configureUserAgent(&routesClient.Client)
+	az.RoutesClient = routesClient
 
 	interfacesClient := network.NewInterfacesClient(az.SubscriptionID)
 	interfacesClient.BaseURI = az.Environment.ResourceManagerEndpoint
@@ -297,13 +327,19 @@ func NewCloud(configReader io.Reader) (cloudprovider.Interface, error) {
 	configureUserAgent(&virtualMachineScaleSetsClient.Client)
 	az.VirtualMachineScaleSetsClient = virtualMachineScaleSetsClient
 
-	az.StorageAccountClient = storage.NewAccountsClientWithBaseURI(az.Environment.ResourceManagerEndpoint, az.SubscriptionID)
-	az.StorageAccountClient.Authorizer = autorest.NewBearerAuthorizer(servicePrincipalToken)
-	configureUserAgent(&az.StorageAccountClient.Client)
+	storageAccountClient := storage.NewAccountsClientWithBaseURI(az.Environment.ResourceManagerEndpoint, az.SubscriptionID)
+	storageAccountClient.BaseURI = az.Environment.ResourceManagerEndpoint
+	storageAccountClient.Authorizer = autorest.NewBearerAuthorizer(servicePrincipalToken)
+	storageAccountClient.PollingDelay = 5 * time.Second
+	configureUserAgent(&storageAccountClient.Client)
+	az.StorageAccountClient = storageAccountClient
 
-	az.DisksClient = disk.NewDisksClientWithBaseURI(az.Environment.ResourceManagerEndpoint, az.SubscriptionID)
-	az.DisksClient.Authorizer = autorest.NewBearerAuthorizer(servicePrincipalToken)
-	configureUserAgent(&az.DisksClient.Client)
+	disksClient := disk.NewDisksClientWithBaseURI(az.Environment.ResourceManagerEndpoint, az.SubscriptionID)
+	disksClient.BaseURI = az.Environment.ResourceManagerEndpoint
+	disksClient.Authorizer = autorest.NewBearerAuthorizer(servicePrincipalToken)
+	disksClient.PollingDelay = 5 * time.Second
+	configureUserAgent(&disksClient.Client)
+	az.DisksClient = disksClient
 
 	// Conditionally configure rate limits
 	if az.CloudProviderRateLimit {
