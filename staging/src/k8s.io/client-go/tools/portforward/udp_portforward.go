@@ -39,7 +39,7 @@ func (pf *PortForwarder) isUdp() bool {
 	return false
 }
 
-type UDPSocket map[net.UDPAddr]io.ReadWriteCloser
+type UDPSocket map[string]io.ReadWriteCloser
 
 func (pf *PortForwarder) setupBackToUDPClient(stream httpstream.Stream, connUDP *net.UDPConn, addr *net.UDPAddr) {
 	bufRecv := make([]byte, 1024)
@@ -64,9 +64,13 @@ func (pf *PortForwarder) setupBackToUDPClient(stream httpstream.Stream, connUDP 
 	}
 }
 
+func createKey(addr *net.UDPAddr) string {
+	return addr.IP.String() + strconv.Itoa(addr.Port)
+}
+
 func (pf *PortForwarder) waitForUDPSocket(conn *net.UDPConn, port ForwardedPort) {
 	bufSend := make([]byte, 1024)
-	var socket UDPSocket
+	socketMap := make(UDPSocket)
 
 	fmt.Fprintf(pf.out, "waitForUDPSocket started\n")
 
@@ -76,7 +80,7 @@ func (pf *PortForwarder) waitForUDPSocket(conn *net.UDPConn, port ForwardedPort)
 			fmt.Fprintf(pf.out, "ReadFromUDP wrong\n")
 		}
 
-		if socket[*rmAddr] == nil {
+		if socketMap[createKey(rmAddr)] == nil {
 			dataStream, errorStream, err := pf.createStream(conn, port)
 			if err != nil {
 				runtime.HandleError(err)
@@ -85,10 +89,10 @@ func (pf *PortForwarder) waitForUDPSocket(conn *net.UDPConn, port ForwardedPort)
 
 			go pf.handleErrorStream(errorStream, port)
 			go pf.setupBackToUDPClient(dataStream, conn, rmAddr)
-			socket[*rmAddr] = dataStream
+			socketMap[createKey(rmAddr)] = dataStream
 		}
 
-		_, err = socket[*rmAddr].Write(bufSend[:rn])
+		_, err = socketMap[createKey(rmAddr)].Write(bufSend[:rn])
 		if err != nil {
 			fmt.Fprintf(pf.out, "goroutine 1: Error write to spdy:", err)
 			break
