@@ -317,7 +317,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local [Feature:LocalPersistentVolum
 					reason:  "FailedMount",
 					pattern: make([]string, 2)}
 				ep.pattern = append(ep.pattern, "NodeSelectorTerm")
-				ep.pattern = append(ep.pattern, "Storage node affinity check failed")
+				ep.pattern = append(ep.pattern, "MountVolume.NodeAffinity check failed")
 
 				It("should not be able to mount due to different NodeName", func() {
 					testPodWithNodeName(config, testVolType, ep, config.nodes[1].Name, makeLocalPodWithNodeName, testMode)
