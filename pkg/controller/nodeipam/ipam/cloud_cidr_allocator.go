@@ -196,14 +196,20 @@ func (ca *cloudCIDRAllocator) updateCIDRAllocation(nodeName string) error {
 	defer ca.removeNodeFromProcessing(nodeName)
 
 	cidrs, err := ca.cloud.AliasRanges(types.NodeName(nodeName))
-	if err != nil {
-		nodeutil.RecordNodeStatusChange(ca.recorder, node, "CIDRNotAvailable")
+	if err != nil || len(cidrs) == 0 {
+		node, err2 := ca.nodeLister.Get(nodeName)
+		if err2 != nil {
+			glog.Errorf("Failed while getting node %v to set CIDRNotAvailable: %v", nodeName, err2)
+		} else {
+			nodeutil.RecordNodeStatusChange(ca.recorder, node, "CIDRNotAvailable")
+		}
+
+		if len(cidrs) == 0 {
+			return fmt.Errorf("failed to allocate cidr: Node %v has no CIDRs", node.Name)
+		}
 		return fmt.Errorf("failed to allocate cidr: %v", err)
 	}
-	if len(cidrs) == 0 {
-		nodeutil.RecordNodeStatusChange(ca.recorder, node, "CIDRNotAvailable")
-		return fmt.Errorf("failed to allocate cidr: Node %v has no CIDRs", node.Name)
-	}
+
 	_, cidr, err := net.ParseCIDR(cidrs[0])
 	if err != nil {
 		return fmt.Errorf("failed to parse string '%s' as a CIDR: %v", cidrs[0], err)
