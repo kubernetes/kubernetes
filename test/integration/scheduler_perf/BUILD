@@ -16,9 +16,9 @@ go_library(
     deps = [
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/api/testapi:go_default_library",
-        "//plugin/pkg/scheduler:go_default_library",
-        "//plugin/pkg/scheduler/algorithmprovider:go_default_library",
-        "//plugin/pkg/scheduler/factory:go_default_library",
+        "//pkg/scheduler:go_default_library",
+        "//pkg/scheduler/algorithmprovider:go_default_library",
+        "//pkg/scheduler/factory:go_default_library",
         "//test/integration/framework:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
@@ -43,7 +43,7 @@ go_test(
     tags = ["integration"],
     deps = [
         "//pkg/kubelet/apis:go_default_library",
-        "//plugin/pkg/scheduler:go_default_library",
+        "//pkg/scheduler:go_default_library",
         "//test/integration/framework:go_default_library",
         "//test/utils:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",

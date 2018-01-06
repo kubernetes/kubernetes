@@ -38,8 +38,8 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	utilstore "k8s.io/kubernetes/pkg/kubelet/util/store"
+	"k8s.io/kubernetes/pkg/scheduler/schedulercache"
 	utilfs "k8s.io/kubernetes/pkg/util/filesystem"
-	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 )
 
 // ActivePodsFunc is a function that returns a list of pods to reconcile.
