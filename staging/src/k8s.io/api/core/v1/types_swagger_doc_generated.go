@@ -219,9 +219,10 @@ func (ComponentStatusList) SwaggerDoc() map[string]string {
 }
 
 var map_ConfigMap = map[string]string{
-	"":         "ConfigMap holds configuration data for pods to consume.",
-	"metadata": "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata",
-	"data":     "Data contains the configuration data. Each key must consist of alphanumeric characters, '-', '_' or '.'.",
+	"":           "ConfigMap holds configuration data for pods to consume.",
+	"metadata":   "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata",
+	"data":       "Data contains the configuration data. Each key must consist of alphanumeric characters, '-', '_' or '.'. Values with non-UTF-8 byte sequences must use the BinaryData field. The keys stored in Data must not overlap with the keys in the BinaryData field, this is enforced during validation process.",
+	"binaryData": "BinaryData contains the binary data. Each key must consist of alphanumeric characters, '-', '_' or '.'. BinaryData can contain byte sequences that are not in the UTF-8 range. The keys stored in BinaryData must not overlap with the ones in the Data field, this is enforced during validation process. Using this field will require 1.10+ apiserver and kubelet.",
 }
 
 func (ConfigMap) SwaggerDoc() map[string]string {
