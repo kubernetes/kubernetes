@@ -59,15 +59,16 @@ data:
         errors
         log
         health
-        kubernetes $DNS_DOMAIN $SERVICE_CLUSTER_IP_RANGE {
+        kubernetes $DNS_DOMAIN $SERVICE_CLUSTER_IP_RANGE $POD_CIDR{
             pods insecure
+            upstream /etc/resolv.conf
         }
-        prometheus
+        prometheus :9153
         proxy . /etc/resolv.conf
         cache 30
     }
 ---
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1beta2
 kind: Deployment
 metadata:
   name: coredns
