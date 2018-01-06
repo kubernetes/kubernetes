@@ -66,10 +66,7 @@ func WriteCert(certPath string, data []byte) error {
 	if err := os.MkdirAll(filepath.Dir(certPath), os.FileMode(0755)); err != nil {
 		return err
 	}
-	if err := ioutil.WriteFile(certPath, data, os.FileMode(0644)); err != nil {
-		return err
-	}
-	return nil
+	return ioutil.WriteFile(certPath, data, os.FileMode(0644))
 }
 
 // WriteKey writes the pem-encoded key data to keyPath.
@@ -80,10 +77,7 @@ func WriteKey(keyPath string, data []byte) error {
 	if err := os.MkdirAll(filepath.Dir(keyPath), os.FileMode(0755)); err != nil {
 		return err
 	}
-	if err := ioutil.WriteFile(keyPath, data, os.FileMode(0600)); err != nil {
-		return err
-	}
-	return nil
+	return ioutil.WriteFile(keyPath, data, os.FileMode(0600))
 }
 
 // LoadOrGenerateKeyFile looks for a key in the file at the given path. If it

@@ -17,24 +17,41 @@ limitations under the License.
 package dns
 
 import (
+	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/pkg/util/version"
 )
 
 const (
-	kubeDNSv170AndAboveVersion = "1.14.5"
+	kubeDNSv190AndAboveVersion = "1.14.7"
+	coreDNSVersion             = "1.0.1"
 )
 
-// GetKubeDNSVersion returns the right kube-dns version for a specific k8s version
-func GetKubeDNSVersion(kubeVersion *version.Version) string {
-	// v1.7.0+ uses 1.14.5, just return that here
-	// In the future when the kube-dns version is bumped at HEAD; add conditional logic to return the right versions
+// GetDNSVersion returns the right kube-dns version for a specific k8s version
+func GetDNSVersion(kubeVersion *version.Version, dns string) string {
+	// v1.9.0+ uses kube-dns 1.14.7
+	// v1.9.0+ uses CoreDNS  1.0.1 if feature gate "CoreDNS" is enabled.
+
+	// In the future when the version is bumped at HEAD; add conditional logic to return the right versions
 	// Also, the version might be bumped for different k8s releases on the same branch
-	return kubeDNSv170AndAboveVersion
+	switch dns {
+	case kubeadmconstants.CoreDNS:
+		// return the CoreDNS version
+		return coreDNSVersion
+	default:
+		return kubeDNSv190AndAboveVersion
+	}
 }
 
 // GetKubeDNSManifest returns the right kube-dns YAML manifest for a specific k8s version
 func GetKubeDNSManifest(kubeVersion *version.Version) string {
-	// v1.7.0+ has only one known YAML manifest spec, just return that here
+	// v1.8.0+ has only one known YAML manifest spec, just return that here
 	// In the future when the kube-dns version is bumped at HEAD; add conditional logic to return the right manifest
-	return v170AndAboveKubeDNSDeployment
+	return v180AndAboveKubeDNSDeployment
+}
+
+// GetCoreDNSManifest returns the right CoreDNS YAML manifest for a specific k8s version
+func GetCoreDNSManifest(kubeVersion *version.Version) string {
+	// v1.9.0+ has only one known YAML manifest spec, just return that here
+	// In the future when the CoreDNS version is bumped at HEAD; add conditional logic to return the right manifest
+	return CoreDNSDeployment
 }

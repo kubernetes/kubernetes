@@ -34,15 +34,6 @@ sh_binary(
 )
 
 sh_binary(
-    name = "test-federation-cmd",
-    srcs = ["test-federation-cmd.sh"],
-    deps = [
-        ":test-cmd-util",
-        "//hack/lib",
-    ],
-)
-
-sh_binary(
     name = "test-integration",
     srcs = ["test-cmd.sh"],
     deps = [

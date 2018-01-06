@@ -26,9 +26,6 @@
 # 3. Kubectl prints the output to stderr (the output should be captured and then
 #    logged)
 
-# The business logic for whether a given object should be created
-# was already enforced by salt, and /etc/kubernetes/addons is the
-# managed result is of that. Start everything below that directory.
 KUBECTL=${KUBECTL_BIN:-/usr/local/bin/kubectl}
 KUBECTL_OPTS=${KUBECTL_OPTS:-}
 
@@ -46,6 +43,11 @@ ADDON_MANAGER_LABEL="addonmanager.kubernetes.io/mode"
 # CLUSTER_SERVICE_LABEL=true and without ADDON_MANAGER_LABEL=EnsureExists
 # will be reconciled for now.
 CLUSTER_SERVICE_LABEL="kubernetes.io/cluster-service"
+
+# Whether only one addon manager should be running in a multi-master setup.
+# Disabling this flag will force all addon managers to assume they are the
+# leaders.
+ADDON_MANAGER_LEADER_ELECTION=${ADDON_MANAGER_LEADER_ELECTION:-true}
 
 # Remember that you can't log from functions that print some output (because
 # logs are also printed on stdout).
@@ -143,6 +145,25 @@ function ensure_addons() {
   log INFO "== Kubernetes addon ensure completed at $(date -Is) =="
 }
 
+function is_leader() {
+  # In multi-master setup, only one addon manager should be running. We use
+  # existing leader election in kube-controller-manager instead of implementing
+  # a separate mechanism here.
+  if ! $ADDON_MANAGER_LEADER_ELECTION; then
+    log INFO "Leader election disabled."
+    return 0;
+  fi
+  KUBE_CONTROLLER_MANAGER_LEADER=`${KUBECTL} -n kube-system get ep kube-controller-manager \
+    -o go-template=$'{{index .metadata.annotations "control-plane.alpha.kubernetes.io/leader"}}' \
+    | sed 's/^.*"holderIdentity":"\([^"]*\)".*/\1/'`
+  # If there was any problem with getting the leader election results, var will
+  # be empty. Since it's better to have multiple addon managers than no addon
+  # managers at all, we're going to assume that we're the leader in such case.
+  log INFO "Leader is $KUBE_CONTROLLER_MANAGER_LEADER"
+  [[ "$KUBE_CONTROLLER_MANAGER_LEADER" == "" ||
+     "$HOSTNAME" == "$KUBE_CONTROLLER_MANAGER_LEADER" ]]
+}
+
 # The business logic for whether a given object should be created
 # was already enforced by salt, and /etc/kubernetes/addons is the
 # managed result is of that. Start everything below that directory.
@@ -178,8 +199,12 @@ done
 log INFO "== Entering periodical apply loop at $(date -Is) =="
 while true; do
   start_sec=$(date +"%s")
-  ensure_addons
-  reconcile_addons
+  if is_leader; then
+    ensure_addons
+    reconcile_addons
+  else
+    log INFO "Not elected leader, going back to sleep."
+  fi
   end_sec=$(date +"%s")
   len_sec=$((${end_sec}-${start_sec}))
   # subtract the time passed from the sleep time

@@ -25,7 +25,7 @@ import (
 
 type stateMemory struct {
 	sync.RWMutex
-	assignments   map[string]cpuset.CPUSet
+	assignments   ContainerCPUAssignments
 	defaultCPUSet cpuset.CPUSet
 }
 
@@ -35,7 +35,7 @@ var _ State = &stateMemory{}
 func NewMemoryState() State {
 	glog.Infof("[cpumanager] initializing new in-memory state store")
 	return &stateMemory{
-		assignments:   map[string]cpuset.CPUSet{},
+		assignments:   ContainerCPUAssignments{},
 		defaultCPUSet: cpuset.NewCPUSet(),
 	}
 }
@@ -65,6 +65,12 @@ func (s *stateMemory) GetCPUSetOrDefault(containerID string) cpuset.CPUSet {
 	return s.GetDefaultCPUSet()
 }
 
+func (s *stateMemory) GetCPUAssignments() ContainerCPUAssignments {
+	s.RLock()
+	defer s.RUnlock()
+	return s.assignments.Clone()
+}
+
 func (s *stateMemory) SetCPUSet(containerID string, cset cpuset.CPUSet) {
 	s.Lock()
 	defer s.Unlock()
@@ -81,10 +87,27 @@ func (s *stateMemory) SetDefaultCPUSet(cset cpuset.CPUSet) {
 	glog.Infof("[cpumanager] updated default cpuset: \"%s\"", cset)
 }
 
+func (s *stateMemory) SetCPUAssignments(a ContainerCPUAssignments) {
+	s.Lock()
+	defer s.Unlock()
+
+	s.assignments = a.Clone()
+	glog.Infof("[cpumanager] updated cpuset assignments: \"%v\"", a)
+}
+
 func (s *stateMemory) Delete(containerID string) {
 	s.Lock()
 	defer s.Unlock()
 
 	delete(s.assignments, containerID)
 	glog.V(2).Infof("[cpumanager] deleted cpuset assignment (container id: %s)", containerID)
+}
+
+func (s *stateMemory) ClearState() {
+	s.Lock()
+	defer s.Unlock()
+
+	s.defaultCPUSet = cpuset.CPUSet{}
+	s.assignments = make(ContainerCPUAssignments)
+	glog.V(2).Infof("[cpumanager] cleared state")
 }

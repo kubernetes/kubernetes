@@ -21,18 +21,19 @@ import (
 	"net/http"
 	"testing"
 
+	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/rest/fake"
-	"k8s.io/kubernetes/pkg/api"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 )
 
 func TestCreateService(t *testing.T) {
-	service := &api.Service{}
+	service := &v1.Service{}
 	service.Name = "my-service"
 	f, tf, codec, negSer := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
-		APIRegistry:          api.Registry,
+		GroupVersion:         schema.GroupVersion{Version: "v1"},
 		NegotiatedSerializer: negSer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
@@ -57,12 +58,12 @@ func TestCreateService(t *testing.T) {
 }
 
 func TestCreateServiceNodePort(t *testing.T) {
-	service := &api.Service{}
+	service := &v1.Service{}
 	service.Name = "my-node-port-service"
 	f, tf, codec, negSer := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
-		APIRegistry:          api.Registry,
+		GroupVersion:         schema.GroupVersion{Version: "v1"},
 		NegotiatedSerializer: negSer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
@@ -87,12 +88,12 @@ func TestCreateServiceNodePort(t *testing.T) {
 }
 
 func TestCreateServiceExternalName(t *testing.T) {
-	service := &api.Service{}
+	service := &v1.Service{}
 	service.Name = "my-external-name-service"
 	f, tf, codec, negSer := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
-		APIRegistry:          api.Registry,
+		GroupVersion:         schema.GroupVersion{Version: "v1"},
 		NegotiatedSerializer: negSer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {

@@ -29,16 +29,4 @@ source "${KUBE_ROOT}/cluster/kube-util.sh"
 
 prepare-e2e
 
-if [[ "${FEDERATION:-}" == "true" ]]; then
-  cur_ip_octet2=180
-  for zone in ${E2E_ZONES};do
-    (
-      export CLUSTER_IP_RANGE="10.${cur_ip_octet2}.0.0/16"
-      set-federation-zone-vars "$zone"
-      test-setup
-    )
-    cur_ip_octet2="$((cur_ip_octet2 + 1))"
-  done
-else
-  test-setup
-fi
+test-setup

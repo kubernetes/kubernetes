@@ -26,6 +26,7 @@ import (
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 
 	"github.com/golang/glog"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 )
 
@@ -61,10 +62,9 @@ func TestGetVolumeName_PersistentVolume(t *testing.T) {
 type testcase struct {
 	name aws.KubernetesVolumeID
 	// For fake AWS:
-	attach         attachCall
-	detach         detachCall
-	diskIsAttached diskIsAttachedCall
-	t              *testing.T
+	attach attachCall
+	detach detachCall
+	t      *testing.T
 
 	// Actual test to run
 	test func(test *testcase) (string, error)
@@ -80,7 +80,6 @@ func TestAttachDetach(t *testing.T) {
 	spec := createVolSpec(diskName, readOnly)
 	attachError := errors.New("Fake attach error")
 	detachError := errors.New("Fake detach error")
-	diskCheckError := errors.New("Fake DiskIsAttached error")
 	tests := []testcase{
 		// Successful Attach call
 		{
@@ -106,44 +105,18 @@ func TestAttachDetach(t *testing.T) {
 
 		// Detach succeeds
 		{
-			name:           "Detach_Positive",
-			diskIsAttached: diskIsAttachedCall{diskName, nodeName, true, nil},
-			detach:         detachCall{diskName, nodeName, "/dev/sda", nil},
+			name:   "Detach_Positive",
+			detach: detachCall{diskName, nodeName, "/dev/sda", nil},
 			test: func(testcase *testcase) (string, error) {
 				detacher := newDetacher(testcase)
 				mountPath := "/mnt/" + string(diskName)
 				return "", detacher.Detach(mountPath, nodeName)
 			},
 		},
-
-		// Disk is already detached
-		{
-			name:           "Detach_Positive_AlreadyDetached",
-			diskIsAttached: diskIsAttachedCall{diskName, nodeName, false, nil},
-			test: func(testcase *testcase) (string, error) {
-				detacher := newDetacher(testcase)
-				mountPath := "/mnt/" + string(diskName)
-				return "", detacher.Detach(mountPath, nodeName)
-			},
-		},
-
-		// Detach succeeds when DiskIsAttached fails
-		{
-			name:           "Detach_Positive_CheckFails",
-			diskIsAttached: diskIsAttachedCall{diskName, nodeName, false, diskCheckError},
-			detach:         detachCall{diskName, nodeName, "/dev/sda", nil},
-			test: func(testcase *testcase) (string, error) {
-				detacher := newDetacher(testcase)
-				mountPath := "/mnt/" + string(diskName)
-				return "", detacher.Detach(mountPath, nodeName)
-			},
-		},
-
 		// Detach fails
 		{
-			name:           "Detach_Negative",
-			diskIsAttached: diskIsAttachedCall{diskName, nodeName, false, diskCheckError},
-			detach:         detachCall{diskName, nodeName, "", detachError},
+			name:   "Detach_Negative",
+			detach: detachCall{diskName, nodeName, "", detachError},
 			test: func(testcase *testcase) (string, error) {
 				detacher := newDetacher(testcase)
 				mountPath := "/mnt/" + string(diskName)
@@ -297,28 +270,8 @@ func (testcase *testcase) DetachDisk(diskName aws.KubernetesVolumeID, nodeName t
 }
 
 func (testcase *testcase) DiskIsAttached(diskName aws.KubernetesVolumeID, nodeName types.NodeName) (bool, error) {
-	expected := &testcase.diskIsAttached
-
-	if expected.diskName == "" && expected.nodeName == "" {
-		// testcase.diskIsAttached looks uninitialized, test did not expect to
-		// call DiskIsAttached
-		testcase.t.Errorf("Unexpected DiskIsAttached call!")
-		return false, errors.New("Unexpected DiskIsAttached call!")
-	}
-
-	if expected.diskName != diskName {
-		testcase.t.Errorf("Unexpected DiskIsAttached call: expected diskName %s, got %s", expected.diskName, diskName)
-		return false, errors.New("Unexpected DiskIsAttached call: wrong diskName")
-	}
-
-	if expected.nodeName != nodeName {
-		testcase.t.Errorf("Unexpected DiskIsAttached call: expected nodeName %s, got %s", expected.nodeName, nodeName)
-		return false, errors.New("Unexpected DiskIsAttached call: wrong nodeName")
-	}
-
-	glog.V(4).Infof("DiskIsAttached call: %s, %s, returning %v, %v", diskName, nodeName, expected.isAttached, expected.ret)
-
-	return expected.isAttached, expected.ret
+	// DetachDisk no longer relies on DiskIsAttached api call
+	return false, nil
 }
 
 func (testcase *testcase) DisksAreAttached(nodeDisks map[types.NodeName][]aws.KubernetesVolumeID) (map[types.NodeName]map[aws.KubernetesVolumeID]bool, error) {
@@ -339,4 +292,11 @@ func (testcase *testcase) GetVolumeLabels(volumeName aws.KubernetesVolumeID) (ma
 
 func (testcase *testcase) GetDiskPath(volumeName aws.KubernetesVolumeID) (string, error) {
 	return "", errors.New("Not implemented")
+}
+
+func (testcase *testcase) ResizeDisk(
+	volumeName aws.KubernetesVolumeID,
+	oldSize resource.Quantity,
+	newSize resource.Quantity) (resource.Quantity, error) {
+	return oldSize, errors.New("Not implemented")
 }

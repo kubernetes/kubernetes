@@ -10,7 +10,6 @@ go_library(
     srcs = ["fake.go"],
     importpath = "k8s.io/client-go/rest/fake",
     deps = [
-        "//vendor/k8s.io/apimachinery/pkg/apimachinery/registered:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",

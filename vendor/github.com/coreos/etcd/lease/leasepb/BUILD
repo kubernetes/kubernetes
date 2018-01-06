@@ -1,5 +1,11 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
+filegroup(
+    name = "go_default_library_protos",
+    srcs = ["lease.proto"],
+    visibility = ["//visibility:public"],
+)
+
 go_library(
     name = "go_default_library",
     srcs = ["lease.pb.go"],
@@ -9,12 +15,6 @@ go_library(
         "//vendor/github.com/coreos/etcd/etcdserver/etcdserverpb:go_default_library",
         "//vendor/github.com/golang/protobuf/proto:go_default_library",
     ],
-)
-
-filegroup(
-    name = "go_default_library_protos",
-    srcs = ["lease.proto"],
-    visibility = ["//visibility:public"],
 )
 
 filegroup(

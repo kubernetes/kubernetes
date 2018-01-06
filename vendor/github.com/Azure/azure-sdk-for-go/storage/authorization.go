@@ -1,6 +1,20 @@
 // Package storage provides clients for Microsoft Azure Storage Services.
 package storage
 
+// Copyright 2017 Microsoft Corporation
+//
+//  Licensed under the Apache License, Version 2.0 (the "License");
+//  you may not use this file except in compliance with the License.
+//  You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+//  Unless required by applicable law or agreed to in writing, software
+//  distributed under the License is distributed on an "AS IS" BASIS,
+//  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//  See the License for the specific language governing permissions and
+//  limitations under the License.
+
 import (
 	"bytes"
 	"fmt"
@@ -41,16 +55,18 @@ const (
 )
 
 func (c *Client) addAuthorizationHeader(verb, url string, headers map[string]string, auth authentication) (map[string]string, error) {
-	authHeader, err := c.getSharedKey(verb, url, headers, auth)
-	if err != nil {
-		return nil, err
+	if !c.sasClient {
+		authHeader, err := c.getSharedKey(verb, url, headers, auth)
+		if err != nil {
+			return nil, err
+		}
+		headers[headerAuthorization] = authHeader
 	}
-	headers[headerAuthorization] = authHeader
 	return headers, nil
 }
 
 func (c *Client) getSharedKey(verb, url string, headers map[string]string, auth authentication) (string, error) {
-	canRes, err := c.buildCanonicalizedResource(url, auth)
+	canRes, err := c.buildCanonicalizedResource(url, auth, false)
 	if err != nil {
 		return "", err
 	}
@@ -62,15 +78,18 @@ func (c *Client) getSharedKey(verb, url string, headers map[string]string, auth 
 	return c.createAuthorizationHeader(canString, auth), nil
 }
 
-func (c *Client) buildCanonicalizedResource(uri string, auth authentication) (string, error) {
+func (c *Client) buildCanonicalizedResource(uri string, auth authentication, sas bool) (string, error) {
 	errMsg := "buildCanonicalizedResource error: %s"
 	u, err := url.Parse(uri)
 	if err != nil {
 		return "", fmt.Errorf(errMsg, err.Error())
 	}
 
-	cr := bytes.NewBufferString("/")
-	cr.WriteString(c.getCanonicalizedAccountName())
+	cr := bytes.NewBufferString("")
+	if c.accountName != StorageEmulatorAccountName || !sas {
+		cr.WriteString("/")
+		cr.WriteString(c.getCanonicalizedAccountName())
+	}
 
 	if len(u.Path) > 0 {
 		// Any portion of the CanonicalizedResource string that is derived from

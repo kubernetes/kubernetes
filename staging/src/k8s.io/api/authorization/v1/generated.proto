@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2018 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -121,7 +121,8 @@ message ResourceRule {
   // +optional
   repeated string apiGroups = 2;
 
-  // Resources is a list of resources this rule applies to.  ResourceAll represents all resources.  "*" means all.
+  // Resources is a list of resources this rule applies to.  "*" means all in the specified apiGroups.
+  //  "*/foo" represents the subresource 'foo' for all resources in the specified apiGroups.
   // +optional
   repeated string resources = 3;
 
@@ -225,8 +226,15 @@ message SubjectAccessReviewSpec {
 
 // SubjectAccessReviewStatus
 message SubjectAccessReviewStatus {
-  // Allowed is required.  True if the action would be allowed, false otherwise.
+  // Allowed is required. True if the action would be allowed, false otherwise.
   optional bool allowed = 1;
+
+  // Denied is optional. True if the action would be denied, otherwise
+  // false. If both allowed is false and denied is false, then the
+  // authorizer has no opinion on whether to authorize the action. Denied
+  // may not be true if Allowed is true.
+  // +optional
+  optional bool denied = 4;
 
   // Reason is optional.  It indicates why a request was allowed or denied.
   // +optional

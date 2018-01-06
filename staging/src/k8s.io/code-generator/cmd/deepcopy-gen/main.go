@@ -30,11 +30,6 @@ limitations under the License.
 // one file, of the form:
 //   // +k8s:deepcopy-gen=package
 //
-// Packages can request that the generated DeepCopy functions be registered
-// with an `init()` function call to `Scheme.AddGeneratedDeepCopyFuncs()` by
-// changing the tag to:
-//   // +k8s:deepcopy-gen=package,register
-//
 // DeepCopy functions can be generated for individual types, rather than the
 // entire package by specifying a comment on the type definion of the form:
 //   // +k8s:deepcopy-gen=true
@@ -48,30 +43,35 @@ limitations under the License.
 package main
 
 import (
+	"flag"
 	"path/filepath"
-
-	"k8s.io/gengo/args"
-	"k8s.io/gengo/examples/deepcopy-gen/generators"
 
 	"github.com/golang/glog"
 	"github.com/spf13/pflag"
+	"k8s.io/gengo/args"
+	"k8s.io/gengo/examples/deepcopy-gen/generators"
+
+	generatorargs "k8s.io/code-generator/cmd/deepcopy-gen/args"
 )
 
 func main() {
-	arguments := args.Default()
-
-	// Custom args.
-	customArgs := &generators.CustomArgs{}
-	pflag.CommandLine.StringSliceVar(&customArgs.BoundingDirs, "bounding-dirs", customArgs.BoundingDirs,
-		"Comma-separated list of import paths which bound the types for which deep-copies will be generated.")
+	genericArgs, customArgs := generatorargs.NewDefaults()
 
 	// Override defaults.
-	arguments.GoHeaderFilePath = filepath.Join(args.DefaultSourceTree(), "k8s.io/kubernetes/hack/boilerplate/boilerplate.go.txt")
-	arguments.OutputFileBaseName = "deepcopy_generated"
-	arguments.CustomArgs = customArgs
+	// TODO: move this out of deepcopy-gen
+	genericArgs.GoHeaderFilePath = filepath.Join(args.DefaultSourceTree(), "k8s.io/kubernetes/hack/boilerplate/boilerplate.go.txt")
+
+	genericArgs.AddFlags(pflag.CommandLine)
+	customArgs.AddFlags(pflag.CommandLine)
+	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
+	pflag.Parse()
+
+	if err := generatorargs.Validate(genericArgs); err != nil {
+		glog.Fatalf("Error: %v", err)
+	}
 
 	// Run it.
-	if err := arguments.Execute(
+	if err := genericArgs.Execute(
 		generators.NameSystems(),
 		generators.DefaultNameSystem(),
 		generators.Packages,

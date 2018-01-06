@@ -33,7 +33,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	bootstrapapi "k8s.io/kubernetes/pkg/bootstrap/api"
 	"k8s.io/kubernetes/pkg/util/metrics"
 )
@@ -92,26 +92,28 @@ type BootstrapSigner struct {
 // NewBootstrapSigner returns a new *BootstrapSigner.
 //
 // TODO: Switch to shared informers
-func NewBootstrapSigner(cl clientset.Interface, options BootstrapSignerOptions) *BootstrapSigner {
+func NewBootstrapSigner(cl clientset.Interface, options BootstrapSignerOptions) (*BootstrapSigner, error) {
 	e := &BootstrapSigner{
 		client:          cl,
 		configMapKey:    options.ConfigMapNamespace + "/" + options.ConfigMapName,
 		secretNamespace: options.TokenSecretNamespace,
 		syncQueue:       workqueue.NewNamed("bootstrap_signer_queue"),
 	}
-	if cl.Core().RESTClient().GetRateLimiter() != nil {
-		metrics.RegisterMetricAndTrackRateLimiterUsage("bootstrap_signer", cl.Core().RESTClient().GetRateLimiter())
+	if cl.CoreV1().RESTClient().GetRateLimiter() != nil {
+		if err := metrics.RegisterMetricAndTrackRateLimiterUsage("bootstrap_signer", cl.CoreV1().RESTClient().GetRateLimiter()); err != nil {
+			return nil, err
+		}
 	}
 	configMapSelector := fields.SelectorFromSet(map[string]string{api.ObjectNameField: options.ConfigMapName})
 	e.configMaps, e.configMapsController = cache.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(lo metav1.ListOptions) (runtime.Object, error) {
 				lo.FieldSelector = configMapSelector.String()
-				return e.client.Core().ConfigMaps(options.ConfigMapNamespace).List(lo)
+				return e.client.CoreV1().ConfigMaps(options.ConfigMapNamespace).List(lo)
 			},
 			WatchFunc: func(lo metav1.ListOptions) (watch.Interface, error) {
 				lo.FieldSelector = configMapSelector.String()
-				return e.client.Core().ConfigMaps(options.ConfigMapNamespace).Watch(lo)
+				return e.client.CoreV1().ConfigMaps(options.ConfigMapNamespace).Watch(lo)
 			},
 		},
 		&v1.ConfigMap{},
@@ -127,11 +129,11 @@ func NewBootstrapSigner(cl clientset.Interface, options BootstrapSignerOptions) 
 		&cache.ListWatch{
 			ListFunc: func(lo metav1.ListOptions) (runtime.Object, error) {
 				lo.FieldSelector = secretSelector.String()
-				return e.client.Core().Secrets(e.secretNamespace).List(lo)
+				return e.client.CoreV1().Secrets(e.secretNamespace).List(lo)
 			},
 			WatchFunc: func(lo metav1.ListOptions) (watch.Interface, error) {
 				lo.FieldSelector = secretSelector.String()
-				return e.client.Core().Secrets(e.secretNamespace).Watch(lo)
+				return e.client.CoreV1().Secrets(e.secretNamespace).Watch(lo)
 			},
 		},
 		&v1.Secret{},
@@ -142,7 +144,7 @@ func NewBootstrapSigner(cl clientset.Interface, options BootstrapSignerOptions) 
 			DeleteFunc: func(_ interface{}) { e.pokeConfigMapSync() },
 		},
 	)
-	return e
+	return e, nil
 }
 
 // Run runs controller loops and returns when they are done
@@ -227,7 +229,7 @@ func (e *BootstrapSigner) signConfigMap() {
 }
 
 func (e *BootstrapSigner) updateConfigMap(cm *v1.ConfigMap) {
-	_, err := e.client.Core().ConfigMaps(cm.Namespace).Update(cm)
+	_, err := e.client.CoreV1().ConfigMaps(cm.Namespace).Update(cm)
 	if err != nil && !apierrors.IsConflict(err) && !apierrors.IsNotFound(err) {
 		glog.V(3).Infof("Error updating ConfigMap: %v", err)
 	}

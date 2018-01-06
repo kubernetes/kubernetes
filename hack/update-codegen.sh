@@ -40,6 +40,7 @@ informergen=$(kube::util::find-binary "informer-gen")
 
 GROUP_VERSIONS=(${KUBE_AVAILABLE_GROUP_VERSIONS})
 GV_DIRS=()
+INTERNAL_DIRS=()
 for gv in "${GROUP_VERSIONS[@]}"; do
 	# add items, but strip off any leading apis/ you find to match command expectations
 	api_dir=$(kube::util::group-version-to-pkg-path "${gv}")
@@ -47,28 +48,36 @@ for gv in "${GROUP_VERSIONS[@]}"; do
 	nopkg_dir=${nopkg_dir#vendor/k8s.io/api/}
 	pkg_dir=${nopkg_dir#apis/}
 
+
 	# skip groups that aren't being served, clients for these don't matter
     if [[ " ${KUBE_NONSERVER_GROUP_VERSIONS} " == *" ${gv} "* ]]; then
       continue
     fi
 
 	GV_DIRS+=("${pkg_dir}")
+
+	# collect internal groups
+	int_group="${pkg_dir%/*}/"
+	if [[ "${pkg_dir}" = core/* ]]; then
+	  int_group="api/"
+	fi
+    if ! [[ " ${INTERNAL_DIRS[@]:-} " =~ " ${int_group} " ]]; then
+      INTERNAL_DIRS+=("${int_group}")
+    fi
 done
 # delimit by commas for the command
 GV_DIRS_CSV=$(IFS=',';echo "${GV_DIRS[*]// /,}";IFS=$)
+INTERNAL_DIRS_CSV=$(IFS=',';echo "${INTERNAL_DIRS[*]// /,}";IFS=$)
 
 # This can be called with one flag, --verify-only, so it works for both the
 # update- and verify- scripts.
-${clientgen} "$@"
-${clientgen} --output-base "${KUBE_ROOT}/vendor" --clientset-path="k8s.io/client-go" --clientset-name="kubernetes" --input-base="k8s.io/kubernetes/vendor/k8s.io/api" --input="${GV_DIRS_CSV}" "$@"
-# Clientgen for federation clientset.
-${clientgen} --clientset-name=federation_clientset --clientset-path=k8s.io/kubernetes/federation/client/clientset_generated --input-base="k8s.io/kubernetes/vendor/k8s.io/api" --input="../../../federation/apis/federation/v1beta1","core/v1","extensions/v1beta1","batch/v1","autoscaling/v1" --included-types-overrides="core/v1/Service,core/v1/Namespace,extensions/v1beta1/ReplicaSet,core/v1/Secret,extensions/v1beta1/Ingress,extensions/v1beta1/Deployment,extensions/v1beta1/DaemonSet,core/v1/ConfigMap,core/v1/Event,batch/v1/Job,autoscaling/v1/HorizontalPodAutoscaler"   "$@"
+${clientgen} --input-base="k8s.io/kubernetes/pkg/apis" --input="${INTERNAL_DIRS_CSV}" "$@"
+${clientgen} --output-base "${KUBE_ROOT}/vendor" --output-package="k8s.io/client-go" --clientset-name="kubernetes" --input-base="k8s.io/kubernetes/vendor/k8s.io/api" --input="${GV_DIRS_CSV}" "$@"
 
 listergen_internal_apis=(
-pkg/api
 $(
   cd ${KUBE_ROOT}
-  find pkg/apis -maxdepth 2 -name types.go | xargs -n1 dirname | sort 
+  find pkg/apis -maxdepth 2 -name types.go | xargs -n1 dirname | sort
 )
 )
 listergen_internal_apis=(${listergen_internal_apis[@]/#/k8s.io/kubernetes/})
@@ -78,18 +87,16 @@ ${listergen} --input-dirs "${listergen_internal_apis_csv}" "$@"
 listergen_external_apis=(
 $(
   cd ${KUBE_ROOT}/staging/src
-  # because client-gen doesn't do policy/v1alpha1, we have to skip it too
-  find k8s.io/api -name types.go | xargs -n1 dirname | sort | grep -v pkg.apis.policy.v1alpha1
+  find k8s.io/api -name types.go | xargs -n1 dirname | sort
 )
 )
 listergen_external_apis_csv=$(IFS=,; echo "${listergen_external_apis[*]}")
 ${listergen} --output-base "${KUBE_ROOT}/vendor" --output-package "k8s.io/client-go/listers" --input-dirs "${listergen_external_apis_csv}" "$@"
 
 informergen_internal_apis=(
-pkg/api
 $(
   cd ${KUBE_ROOT}
-  find pkg/apis -maxdepth 2 -name types.go | xargs -n1 dirname | sort 
+  find pkg/apis -maxdepth 2 -name types.go | xargs -n1 dirname | sort
 )
 )
 informergen_internal_apis=(${informergen_internal_apis[@]/#/k8s.io/kubernetes/})
@@ -125,5 +132,6 @@ ${informergen} \
 CODEGEN_PKG=./vendor/k8s.io/code-generator vendor/k8s.io/code-generator/hack/update-codegen.sh
 CODEGEN_PKG=./vendor/k8s.io/code-generator vendor/k8s.io/kube-aggregator/hack/update-codegen.sh
 CODEGEN_PKG=./vendor/k8s.io/code-generator vendor/k8s.io/sample-apiserver/hack/update-codegen.sh
+CODEGEN_PKG=./vendor/k8s.io/code-generator vendor/k8s.io/sample-controller/hack/update-codegen.sh
 CODEGEN_PKG=./vendor/k8s.io/code-generator vendor/k8s.io/apiextensions-apiserver/hack/update-codegen.sh
 CODEGEN_PKG=./vendor/k8s.io/code-generator vendor/k8s.io/metrics/hack/update-codegen.sh

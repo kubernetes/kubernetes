@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2018 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	rest "k8s.io/client-go/rest"
-	api "k8s.io/kubernetes/pkg/api"
+	core "k8s.io/kubernetes/pkg/apis/core"
 	scheme "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/scheme"
 )
 
@@ -33,14 +33,14 @@ type ComponentStatusesGetter interface {
 
 // ComponentStatusInterface has methods to work with ComponentStatus resources.
 type ComponentStatusInterface interface {
-	Create(*api.ComponentStatus) (*api.ComponentStatus, error)
-	Update(*api.ComponentStatus) (*api.ComponentStatus, error)
+	Create(*core.ComponentStatus) (*core.ComponentStatus, error)
+	Update(*core.ComponentStatus) (*core.ComponentStatus, error)
 	Delete(name string, options *v1.DeleteOptions) error
 	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
-	Get(name string, options v1.GetOptions) (*api.ComponentStatus, error)
-	List(opts v1.ListOptions) (*api.ComponentStatusList, error)
+	Get(name string, options v1.GetOptions) (*core.ComponentStatus, error)
+	List(opts v1.ListOptions) (*core.ComponentStatusList, error)
 	Watch(opts v1.ListOptions) (watch.Interface, error)
-	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *api.ComponentStatus, err error)
+	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *core.ComponentStatus, err error)
 	ComponentStatusExpansion
 }
 
@@ -57,8 +57,8 @@ func newComponentStatuses(c *CoreClient) *componentStatuses {
 }
 
 // Get takes name of the componentStatus, and returns the corresponding componentStatus object, and an error if there is any.
-func (c *componentStatuses) Get(name string, options v1.GetOptions) (result *api.ComponentStatus, err error) {
-	result = &api.ComponentStatus{}
+func (c *componentStatuses) Get(name string, options v1.GetOptions) (result *core.ComponentStatus, err error) {
+	result = &core.ComponentStatus{}
 	err = c.client.Get().
 		Resource("componentstatuses").
 		Name(name).
@@ -69,8 +69,8 @@ func (c *componentStatuses) Get(name string, options v1.GetOptions) (result *api
 }
 
 // List takes label and field selectors, and returns the list of ComponentStatuses that match those selectors.
-func (c *componentStatuses) List(opts v1.ListOptions) (result *api.ComponentStatusList, err error) {
-	result = &api.ComponentStatusList{}
+func (c *componentStatuses) List(opts v1.ListOptions) (result *core.ComponentStatusList, err error) {
+	result = &core.ComponentStatusList{}
 	err = c.client.Get().
 		Resource("componentstatuses").
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -89,8 +89,8 @@ func (c *componentStatuses) Watch(opts v1.ListOptions) (watch.Interface, error) 
 }
 
 // Create takes the representation of a componentStatus and creates it.  Returns the server's representation of the componentStatus, and an error, if there is any.
-func (c *componentStatuses) Create(componentStatus *api.ComponentStatus) (result *api.ComponentStatus, err error) {
-	result = &api.ComponentStatus{}
+func (c *componentStatuses) Create(componentStatus *core.ComponentStatus) (result *core.ComponentStatus, err error) {
+	result = &core.ComponentStatus{}
 	err = c.client.Post().
 		Resource("componentstatuses").
 		Body(componentStatus).
@@ -100,8 +100,8 @@ func (c *componentStatuses) Create(componentStatus *api.ComponentStatus) (result
 }
 
 // Update takes the representation of a componentStatus and updates it. Returns the server's representation of the componentStatus, and an error, if there is any.
-func (c *componentStatuses) Update(componentStatus *api.ComponentStatus) (result *api.ComponentStatus, err error) {
-	result = &api.ComponentStatus{}
+func (c *componentStatuses) Update(componentStatus *core.ComponentStatus) (result *core.ComponentStatus, err error) {
+	result = &core.ComponentStatus{}
 	err = c.client.Put().
 		Resource("componentstatuses").
 		Name(componentStatus.Name).
@@ -132,8 +132,8 @@ func (c *componentStatuses) DeleteCollection(options *v1.DeleteOptions, listOpti
 }
 
 // Patch applies the patch and returns the patched componentStatus.
-func (c *componentStatuses) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *api.ComponentStatus, err error) {
-	result = &api.ComponentStatus{}
+func (c *componentStatuses) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *core.ComponentStatus, err error) {
+	result = &core.ComponentStatus{}
 	err = c.client.Patch(pt).
 		Resource("componentstatuses").
 		SubResource(subresources...).

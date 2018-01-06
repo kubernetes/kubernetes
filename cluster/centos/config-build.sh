@@ -40,8 +40,7 @@ FLANNEL_DOWNLOAD_URL=\
 ETCD_DOWNLOAD_URL=\
 "https://github.com/coreos/etcd/releases/download/v${ETCD_VERSION}/etcd-v${ETCD_VERSION}-linux-amd64.tar.gz"
 
-# TODO(#33726): switch to dl.k8s.io
 K8S_CLIENT_DOWNLOAD_URL=\
-"https://storage.googleapis.com/kubernetes-release/release/v${K8S_VERSION}/kubernetes-client-linux-amd64.tar.gz"
+"https://dl.k8s.io/v${K8S_VERSION}/kubernetes-client-linux-amd64.tar.gz"
 K8S_SERVER_DOWNLOAD_URL=\
-"https://storage.googleapis.com/kubernetes-release/release/v${K8S_VERSION}/kubernetes-server-linux-amd64.tar.gz"
+"https://dl.k8s.io/v${K8S_VERSION}/kubernetes-server-linux-amd64.tar.gz"

@@ -23,7 +23,7 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	clientset "k8s.io/client-go/kubernetes"
-	apiv1 "k8s.io/kubernetes/pkg/api/v1"
+	apiv1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/kubernetes/pkg/registry/core/secret"
 	secretstore "k8s.io/kubernetes/pkg/registry/core/secret/storage"
 	serviceaccountregistry "k8s.io/kubernetes/pkg/registry/core/serviceaccount"
@@ -44,10 +44,10 @@ func NewGetterFromClient(c clientset.Interface) serviceaccount.ServiceAccountTok
 	return clientGetter{c}
 }
 func (c clientGetter) GetServiceAccount(namespace, name string) (*v1.ServiceAccount, error) {
-	return c.client.Core().ServiceAccounts(namespace).Get(name, metav1.GetOptions{})
+	return c.client.CoreV1().ServiceAccounts(namespace).Get(name, metav1.GetOptions{})
 }
 func (c clientGetter) GetSecret(namespace, name string) (*v1.Secret, error) {
-	return c.client.Core().Secrets(namespace).Get(name, metav1.GetOptions{})
+	return c.client.CoreV1().Secrets(namespace).Get(name, metav1.GetOptions{})
 }
 
 // registryGetter implements ServiceAccountTokenGetter using a service account and secret registry
@@ -68,7 +68,7 @@ func (r *registryGetter) GetServiceAccount(namespace, name string) (*v1.ServiceA
 		return nil, err
 	}
 	v1ServiceAccount := v1.ServiceAccount{}
-	err = apiv1.Convert_api_ServiceAccount_To_v1_ServiceAccount(internalServiceAccount, &v1ServiceAccount, nil)
+	err = apiv1.Convert_core_ServiceAccount_To_v1_ServiceAccount(internalServiceAccount, &v1ServiceAccount, nil)
 	return &v1ServiceAccount, err
 
 }
@@ -79,7 +79,7 @@ func (r *registryGetter) GetSecret(namespace, name string) (*v1.Secret, error) {
 		return nil, err
 	}
 	v1Secret := v1.Secret{}
-	err = apiv1.Convert_api_Secret_To_v1_Secret(internalSecret, &v1Secret, nil)
+	err = apiv1.Convert_core_Secret_To_v1_Secret(internalSecret, &v1Secret, nil)
 	return &v1Secret, err
 
 }

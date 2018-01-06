@@ -15,7 +15,8 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/plugin/pkg/admission/imagepolicy",
     deps = [
-        "//pkg/api:go_default_library",
+        "//pkg/api/legacyscheme:go_default_library",
+        "//pkg/apis/core:go_default_library",
         "//pkg/apis/imagepolicy/install:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/api/imagepolicy/v1alpha1:go_default_library",
@@ -36,10 +37,10 @@ go_test(
         "certs_test.go",
         "config_test.go",
     ],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/plugin/pkg/admission/imagepolicy",
-    library = ":go_default_library",
     deps = [
-        "//pkg/api:go_default_library",
+        "//pkg/apis/core:go_default_library",
         "//pkg/apis/imagepolicy/install:go_default_library",
         "//vendor/k8s.io/api/imagepolicy/v1alpha1:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/admission:go_default_library",

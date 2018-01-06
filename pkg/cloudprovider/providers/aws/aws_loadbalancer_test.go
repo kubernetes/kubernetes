@@ -125,3 +125,37 @@ func TestAWSARNEquals(t *testing.T) {
 		}
 	}
 }
+
+func TestIsNLB(t *testing.T) {
+	tests := []struct {
+		name string
+
+		annotations map[string]string
+		want        bool
+	}{
+		{
+			"NLB annotation provided",
+			map[string]string{"service.beta.kubernetes.io/aws-load-balancer-type": "nlb"},
+			true,
+		},
+		{
+			"NLB annotation has invalid value",
+			map[string]string{"service.beta.kubernetes.io/aws-load-balancer-type": "elb"},
+			false,
+		},
+		{
+			"NLB annotation absent",
+			map[string]string{},
+			false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Logf("Running test case %s", test.name)
+		got := isNLB(test.annotations)
+
+		if got != test.want {
+			t.Errorf("Incorrect value for isNLB() case %s. Got %t, expected %t.", test.name, got, test.want)
+		}
+	}
+}

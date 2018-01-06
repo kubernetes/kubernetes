@@ -89,7 +89,7 @@ func ListAccessor(obj interface{}) (List, error) {
 		}
 		return nil, errNotList
 	default:
-		panic(fmt.Errorf("%T does not implement the List interface", obj))
+		return nil, errNotList
 	}
 }
 
@@ -364,6 +364,23 @@ func (resourceAccessor) SetResourceVersion(obj runtime.Object, version string) e
 		return err
 	}
 	accessor.SetResourceVersion(version)
+	return nil
+}
+
+func (resourceAccessor) Continue(obj runtime.Object) (string, error) {
+	accessor, err := ListAccessor(obj)
+	if err != nil {
+		return "", err
+	}
+	return accessor.GetContinue(), nil
+}
+
+func (resourceAccessor) SetContinue(obj runtime.Object, version string) error {
+	accessor, err := ListAccessor(obj)
+	if err != nil {
+		return err
+	}
+	accessor.SetContinue(version)
 	return nil
 }
 

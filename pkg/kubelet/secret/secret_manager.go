@@ -64,7 +64,7 @@ func NewSimpleSecretManager(kubeClient clientset.Interface) Manager {
 }
 
 func (s *simpleSecretManager) GetSecret(namespace, name string) (*v1.Secret, error) {
-	return s.kubeClient.Core().Secrets(namespace).Get(name, metav1.GetOptions{})
+	return s.kubeClient.CoreV1().Secrets(namespace).Get(name, metav1.GetOptions{})
 }
 
 func (s *simpleSecretManager) RegisterPod(pod *v1.Pod) {
@@ -216,7 +216,7 @@ func (s *secretStore) Get(namespace, name string) (*v1.Secret, error) {
 			// etcd and apiserver (the cache is eventually consistent).
 			util.FromApiserverCache(&opts)
 		}
-		secret, err := s.kubeClient.Core().Secrets(namespace).Get(name, opts)
+		secret, err := s.kubeClient.CoreV1().Secrets(namespace).Get(name, opts)
 		if err != nil && !apierrors.IsNotFound(err) && data.secret == nil && data.err == nil {
 			// Couldn't fetch the latest secret, but there is no cached data to return.
 			// Return the fetch result instead.

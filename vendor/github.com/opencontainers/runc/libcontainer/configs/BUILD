@@ -4,26 +4,69 @@ go_library(
     name = "go_default_library",
     srcs = [
         "blkio_device.go",
-        "cgroup_unsupported.go",
         "config.go",
         "device.go",
         "hugepage_limit.go",
         "interface_priority_map.go",
         "mount.go",
         "namespaces.go",
-        "namespaces_syscall_unsupported.go",
-        "namespaces_unsupported.go",
         "network.go",
     ] + select({
-        "@io_bazel_rules_go//go/platform:linux_amd64": [
+        "@io_bazel_rules_go//go/platform:android": [
+            "cgroup_unsupported.go",
+            "namespaces_syscall_unsupported.go",
+            "namespaces_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:darwin": [
+            "cgroup_unsupported.go",
+            "namespaces_syscall_unsupported.go",
+            "namespaces_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:dragonfly": [
+            "cgroup_unsupported.go",
+            "namespaces_syscall_unsupported.go",
+            "namespaces_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:freebsd": [
+            "device_defaults.go",
+            "namespaces_syscall_unsupported.go",
+            "namespaces_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:linux": [
             "cgroup_linux.go",
             "config_linux.go",
             "device_defaults.go",
             "namespaces_linux.go",
             "namespaces_syscall.go",
         ],
-        "@io_bazel_rules_go//go/platform:windows_amd64": [
+        "@io_bazel_rules_go//go/platform:nacl": [
+            "cgroup_unsupported.go",
+            "namespaces_syscall_unsupported.go",
+            "namespaces_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:netbsd": [
+            "cgroup_unsupported.go",
+            "namespaces_syscall_unsupported.go",
+            "namespaces_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:openbsd": [
+            "cgroup_unsupported.go",
+            "namespaces_syscall_unsupported.go",
+            "namespaces_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:plan9": [
+            "cgroup_unsupported.go",
+            "namespaces_syscall_unsupported.go",
+            "namespaces_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:solaris": [
+            "cgroup_unsupported.go",
+            "namespaces_syscall_unsupported.go",
+            "namespaces_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:windows": [
             "cgroup_windows.go",
+            "namespaces_unsupported.go",
         ],
         "//conditions:default": [],
     }),
@@ -33,7 +76,7 @@ go_library(
         "//vendor/github.com/opencontainers/runtime-spec/specs-go:go_default_library",
         "//vendor/github.com/sirupsen/logrus:go_default_library",
     ] + select({
-        "@io_bazel_rules_go//go/platform:linux_amd64": [
+        "@io_bazel_rules_go//go/platform:linux": [
             "//vendor/golang.org/x/sys/unix:go_default_library",
         ],
         "//conditions:default": [],

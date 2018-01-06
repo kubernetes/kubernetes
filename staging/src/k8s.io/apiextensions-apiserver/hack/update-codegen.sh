@@ -50,7 +50,7 @@ apiextensions/
 apiextensions/v1beta1
 )
 INPUT="--input ${INPUT_APIS[@]}"
-CLIENTSET_PATH="--clientset-path k8s.io/apiextensions-apiserver/pkg/client/clientset"
+CLIENTSET_PATH="--output-package k8s.io/apiextensions-apiserver/pkg/client/clientset"
 
 ${CLIENTGEN} ${INPUT_BASE} ${INPUT} ${CLIENTSET_PATH} --output-base ${SCRIPT_BASE}
 ${CLIENTGEN} --clientset-name="clientset" ${INPUT_BASE} --input apiextensions/v1beta1 ${CLIENTSET_PATH}  --output-base ${SCRIPT_BASE}

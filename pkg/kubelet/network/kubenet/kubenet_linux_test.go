@@ -18,7 +18,6 @@ package kubenet
 
 import (
 	"fmt"
-	"net"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -198,36 +197,6 @@ func TestInit_MTU(t *testing.T) {
 	}
 	assert.Equal(t, 1234, kubenet.mtu, "kubenet.mtu should have been set")
 	assert.Equal(t, 1, sysctl.Settings["net/bridge/bridge-nf-call-iptables"], "net/bridge/bridge-nf-call-iptables sysctl should have been set")
-}
-
-func TestGenerateMacAddress(t *testing.T) {
-	testCases := []struct {
-		ip          net.IP
-		expectedMAC string
-	}{
-		{
-			ip:          net.ParseIP("10.0.0.2"),
-			expectedMAC: privateMACPrefix + ":0a:00:00:02",
-		},
-		{
-			ip:          net.ParseIP("10.250.0.244"),
-			expectedMAC: privateMACPrefix + ":0a:fa:00:f4",
-		},
-		{
-			ip:          net.ParseIP("172.17.0.2"),
-			expectedMAC: privateMACPrefix + ":ac:11:00:02",
-		},
-	}
-
-	for _, tc := range testCases {
-		mac, err := generateHardwareAddr(tc.ip)
-		if err != nil {
-			t.Errorf("Did not expect error: %v", err)
-		}
-		if mac.String() != tc.expectedMAC {
-			t.Errorf("generated mac: %q, expecting: %q", mac.String(), tc.expectedMAC)
-		}
-	}
 }
 
 // TestInvocationWithoutRuntime invokes the plugin without a runtime.

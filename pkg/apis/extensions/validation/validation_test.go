@@ -26,7 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/security/apparmor"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/seccomp"
@@ -1232,11 +1232,6 @@ func TestValidateDeployment(t *testing.T) {
 	}
 }
 
-func int64p(i int) *int64 {
-	i64 := int64(i)
-	return &i64
-}
-
 func TestValidateDeploymentStatus(t *testing.T) {
 	collisionCount := int32(-3)
 	tests := []struct {
@@ -1334,15 +1329,6 @@ func TestValidateDeploymentStatus(t *testing.T) {
 			availableReplicas:  3,
 			observedGeneration: 1,
 			expectedErr:        true,
-		},
-		// TODO: Remove the following test case once we stop supporting upgrades from 1.5.
-		{
-			name:               "don't validate readyReplicas when it's zero",
-			replicas:           3,
-			readyReplicas:      0,
-			availableReplicas:  3,
-			observedGeneration: 1,
-			expectedErr:        false,
 		},
 		{
 			name:               "invalid collisionCount",
@@ -1481,8 +1467,6 @@ func TestValidateDeploymentRollback(t *testing.T) {
 		}
 	}
 }
-
-type ingressRules map[string]string
 
 func TestValidateIngress(t *testing.T) {
 	defaultBackend := extensions.IngressBackend{
@@ -1746,70 +1730,6 @@ func TestValidateIngressStatusUpdate(t *testing.T) {
 			if err.Field != s[0] || !strings.Contains(err.Error(), s[1]) {
 				t.Errorf("unexpected error: %q, expected: %q", err, k)
 			}
-		}
-	}
-}
-
-func TestValidateScale(t *testing.T) {
-	successCases := []extensions.Scale{
-		{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "frontend",
-				Namespace: metav1.NamespaceDefault,
-			},
-			Spec: extensions.ScaleSpec{
-				Replicas: 1,
-			},
-		},
-		{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "frontend",
-				Namespace: metav1.NamespaceDefault,
-			},
-			Spec: extensions.ScaleSpec{
-				Replicas: 10,
-			},
-		},
-		{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "frontend",
-				Namespace: metav1.NamespaceDefault,
-			},
-			Spec: extensions.ScaleSpec{
-				Replicas: 0,
-			},
-		},
-	}
-
-	for _, successCase := range successCases {
-		if errs := ValidateScale(&successCase); len(errs) != 0 {
-			t.Errorf("expected success: %v", errs)
-		}
-	}
-
-	errorCases := []struct {
-		scale extensions.Scale
-		msg   string
-	}{
-		{
-			scale: extensions.Scale{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "frontend",
-					Namespace: metav1.NamespaceDefault,
-				},
-				Spec: extensions.ScaleSpec{
-					Replicas: -1,
-				},
-			},
-			msg: "must be greater than or equal to 0",
-		},
-	}
-
-	for _, c := range errorCases {
-		if errs := ValidateScale(&c.scale); len(errs) == 0 {
-			t.Errorf("expected failure for %s", c.msg)
-		} else if !strings.Contains(errs[0].Error(), c.msg) {
-			t.Errorf("unexpected error: %v, expected: %s", errs[0], c.msg)
 		}
 	}
 }
@@ -2523,6 +2443,13 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 	pe := true
 	invalidDefaultAllowPrivilegeEscalation.Spec.DefaultAllowPrivilegeEscalation = &pe
 
+	emptyFlexDriver := validPSP()
+	emptyFlexDriver.Spec.Volumes = []extensions.FSType{extensions.FlexVolume}
+	emptyFlexDriver.Spec.AllowedFlexVolumes = []extensions.AllowedFlexVolume{{}}
+
+	nonEmptyFlexVolumes := validPSP()
+	nonEmptyFlexVolumes.Spec.AllowedFlexVolumes = []extensions.AllowedFlexVolume{{Driver: "example/driver"}}
+
 	type testCase struct {
 		psp         *extensions.PodSecurityPolicy
 		errorType   field.ErrorType
@@ -2654,6 +2581,11 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 			errorType:   field.ErrorTypeInvalid,
 			errorDetail: "must not contain '..'",
 		},
+		"empty flex volume driver": {
+			psp:         emptyFlexDriver,
+			errorType:   field.ErrorTypeRequired,
+			errorDetail: "must specify a driver",
+		},
 	}
 
 	for k, v := range errorCases {
@@ -2733,6 +2665,17 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 	validDefaultAllowPrivilegeEscalation.Spec.DefaultAllowPrivilegeEscalation = &pe
 	validDefaultAllowPrivilegeEscalation.Spec.AllowPrivilegeEscalation = true
 
+	flexvolumeWhenFlexVolumesAllowed := validPSP()
+	flexvolumeWhenFlexVolumesAllowed.Spec.Volumes = []extensions.FSType{extensions.FlexVolume}
+	flexvolumeWhenFlexVolumesAllowed.Spec.AllowedFlexVolumes = []extensions.AllowedFlexVolume{
+		{Driver: "example/driver1"},
+	}
+
+	flexvolumeWhenAllVolumesAllowed := validPSP()
+	flexvolumeWhenAllVolumesAllowed.Spec.Volumes = []extensions.FSType{extensions.All}
+	flexvolumeWhenAllVolumesAllowed.Spec.AllowedFlexVolumes = []extensions.AllowedFlexVolume{
+		{Driver: "example/driver2"},
+	}
 	successCases := map[string]struct {
 		psp *extensions.PodSecurityPolicy
 	}{
@@ -2762,6 +2705,12 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 		},
 		"valid defaultAllowPrivilegeEscalation as true": {
 			psp: validDefaultAllowPrivilegeEscalation,
+		},
+		"allow white-listed flexVolume when flex volumes are allowed": {
+			psp: flexvolumeWhenFlexVolumesAllowed,
+		},
+		"allow white-listed flexVolume when all volumes are allowed": {
+			psp: flexvolumeWhenAllVolumesAllowed,
 		},
 	}
 

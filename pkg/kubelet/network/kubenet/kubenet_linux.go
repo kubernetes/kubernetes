@@ -23,7 +23,6 @@ import (
 	"io/ioutil"
 	"net"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -59,12 +58,6 @@ const (
 	// fallbackMTU is used if an MTU is not specified, and we cannot determine the MTU
 	fallbackMTU = 1460
 
-	// private mac prefix safe to use
-	// Universally administered and locally administered addresses are distinguished by setting the second-least-significant
-	// bit of the first octet of the address. If it is 1, the address is locally administered. For example, for address 0a:00:00:00:00:00,
-	// the first cotet is 0a(hex), the binary form of which is 00001010, where the second-least-significant bit is 1.
-	privateMACPrefix = "0a:58"
-
 	// ebtables Chain to store dedup rules
 	dedupChain = utilebtables.Chain("KUBE-DEDUP")
 
@@ -98,7 +91,7 @@ type kubenetNetworkPlugin struct {
 	iptables        utiliptables.Interface
 	sysctl          utilsysctl.Interface
 	ebtables        utilebtables.Interface
-	// vendorDir is passed by kubelet network-plugin-dir parameter.
+	// vendorDir is passed by kubelet cni-bin-dir parameter.
 	// kubenet will search for cni binaries in DefaultCNIDir first, then continue to vendorDir.
 	vendorDir         string
 	nonMasqueradeCIDR string
@@ -311,6 +304,11 @@ func (plugin *kubenetNetworkPlugin) Capabilities() utilsets.Int {
 // TODO: Don't pass the pod to this method, it only needs it for bandwidth
 // shaping and hostport management.
 func (plugin *kubenetNetworkPlugin) setup(namespace string, name string, id kubecontainer.ContainerID, pod *v1.Pod, annotations map[string]string) error {
+	// Disable DAD so we skip the kernel delay on bringing up new interfaces.
+	if err := plugin.disableContainerDAD(id); err != nil {
+		glog.V(3).Infof("Failed to disable DAD in container: %v", err)
+	}
+
 	// Bring up container loopback interface
 	if _, err := plugin.addContainerToNetwork(plugin.loConfig, "lo", namespace, name, id); err != nil {
 		return err
@@ -334,35 +332,23 @@ func (plugin *kubenetNetworkPlugin) setup(namespace string, name string, id kube
 		return fmt.Errorf("CNI plugin reported an invalid IPv4 address for container %v: %+v.", id, res.IP4)
 	}
 
-	// Explicitly assign mac address to cbr0. If bridge mac address is not explicitly set will adopt the lowest MAC address of the attached veths.
-	// TODO: Remove this once upstream cni bridge plugin handles this
-	link, err := netlink.LinkByName(BridgeName)
-	if err != nil {
-		return fmt.Errorf("failed to lookup %q: %v", BridgeName, err)
-	}
-	macAddr, err := generateHardwareAddr(plugin.gateway)
-	if err != nil {
-		return err
-	}
-	glog.V(3).Infof("Configure %q mac address to %v", BridgeName, macAddr)
-	err = netlink.LinkSetHardwareAddr(link, macAddr)
-	if err != nil {
-		return fmt.Errorf("Failed to configure %q mac address to %q: %v", BridgeName, macAddr, err)
-	}
-
 	// Put the container bridge into promiscuous mode to force it to accept hairpin packets.
 	// TODO: Remove this once the kernel bug (#20096) is fixed.
-	// TODO: check and set promiscuous mode with netlink once vishvananda/netlink supports it
 	if plugin.hairpinMode == kubeletconfig.PromiscuousBridge {
-		output, err := plugin.execer.Command("ip", "link", "show", "dev", BridgeName).CombinedOutput()
-		if err != nil || strings.Index(string(output), "PROMISC") < 0 {
-			_, err := plugin.execer.Command("ip", "link", "set", BridgeName, "promisc", "on").CombinedOutput()
+		link, err := netlink.LinkByName(BridgeName)
+		if err != nil {
+			return fmt.Errorf("failed to lookup %q: %v", BridgeName, err)
+		}
+		if link.Attrs().Promisc != 1 {
+			// promiscuous mode is not on, then turn it on.
+			err := netlink.SetPromiscOn(link)
 			if err != nil {
 				return fmt.Errorf("Error setting promiscuous mode on %s: %v", BridgeName, err)
 			}
 		}
+
 		// configure the ebtables rules to eliminate duplicate packets by best effort
-		plugin.syncEbtablesDedupRules(macAddr)
+		plugin.syncEbtablesDedupRules(link.Attrs().HardwareAddr)
 	}
 
 	plugin.podIPs[id] = ip4.String()
@@ -761,7 +747,11 @@ func (plugin *kubenetNetworkPlugin) addContainerToNetwork(config *libcni.Network
 	}
 
 	glog.V(3).Infof("Adding %s/%s to '%s' with CNI '%s' plugin and runtime: %+v", namespace, name, config.Network.Name, config.Network.Type, rt)
+	// The network plugin can take up to 3 seconds to execute,
+	// so yield the lock while it runs.
+	plugin.mu.Unlock()
 	res, err := plugin.cniConfig.AddNetwork(config, rt)
+	plugin.mu.Lock()
 	if err != nil {
 		return nil, fmt.Errorf("Error adding container to network: %v", err)
 	}
@@ -775,7 +765,10 @@ func (plugin *kubenetNetworkPlugin) delContainerFromNetwork(config *libcni.Netwo
 	}
 
 	glog.V(3).Infof("Removing %s/%s from '%s' with CNI '%s' plugin and runtime: %+v", namespace, name, config.Network.Name, config.Network.Type, rt)
-	if err := plugin.cniConfig.DelNetwork(config, rt); err != nil {
+	err = plugin.cniConfig.DelNetwork(config, rt)
+	// The pod may not get deleted successfully at the first time.
+	// Ignore "no such file or directory" error in case the network has already been deleted in previous attempts.
+	if err != nil && !strings.Contains(err.Error(), "no such file or directory") {
 		return fmt.Errorf("Error removing container from network: %v", err)
 	}
 	return nil
@@ -834,20 +827,42 @@ func (plugin *kubenetNetworkPlugin) syncEbtablesDedupRules(macAddr net.HardwareA
 	}
 }
 
-// generateHardwareAddr generates 48 bit virtual mac addresses based on the IP input.
-func generateHardwareAddr(ip net.IP) (net.HardwareAddr, error) {
-	if ip.To4() == nil {
-		return nil, fmt.Errorf("generateHardwareAddr only support valid ipv4 address as input")
-	}
-	mac := privateMACPrefix
-	sections := strings.Split(ip.String(), ".")
-	for _, s := range sections {
-		i, _ := strconv.Atoi(s)
-		mac = mac + ":" + fmt.Sprintf("%02x", i)
-	}
-	hwAddr, err := net.ParseMAC(mac)
+// disableContainerDAD disables duplicate address detection in the container.
+// DAD has a negative affect on pod creation latency, since we have to wait
+// a second or more for the addresses to leave the "tentative" state. Since
+// we're sure there won't be an address conflict (since we manage them manually),
+// this is safe. See issue 54651.
+//
+// This sets net.ipv6.conf.default.dad_transmits to 0. It must be run *before*
+// the CNI plugins are run.
+func (plugin *kubenetNetworkPlugin) disableContainerDAD(id kubecontainer.ContainerID) error {
+	key := "net/ipv6/conf/default/dad_transmits"
+
+	sysctlBin, err := plugin.execer.LookPath("sysctl")
 	if err != nil {
-		return nil, fmt.Errorf("Failed to parse mac address %s generated based on ip %s due to: %v", mac, ip, err)
+		return fmt.Errorf("Could not find sysctl binary: %s", err)
 	}
-	return hwAddr, nil
+
+	netnsPath, err := plugin.host.GetNetNS(id.ID)
+	if err != nil {
+		return fmt.Errorf("Failed to get netns: %v", err)
+	}
+	if netnsPath == "" {
+		return fmt.Errorf("Pod has no network namespace")
+	}
+
+	// If the sysctl doesn't exist, it means ipv6 is disabled; log and move on
+	if _, err := plugin.sysctl.GetSysctl(key); err != nil {
+		return fmt.Errorf("Ipv6 not enabled: %v", err)
+	}
+
+	output, err := plugin.execer.Command(plugin.nsenterPath,
+		fmt.Sprintf("--net=%s", netnsPath), "-F", "--",
+		sysctlBin, "-w", fmt.Sprintf("%s=%s", key, "0"),
+	).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("Failed to write sysctl: output: %s error: %s",
+			output, err)
+	}
+	return nil
 }

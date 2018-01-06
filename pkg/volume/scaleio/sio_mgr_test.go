@@ -37,7 +37,7 @@ var (
 		confKey.sslEnabled: "false",
 		confKey.system:     "scaleio",
 		confKey.volumeName: "sio-0001",
-		confKey.secretRef:  "sio-secret",
+		confKey.secretName: "sio-secret",
 		confKey.username:   "c2lvdXNlcgo=",     // siouser
 		confKey.password:   "c2lvcGFzc3dvcmQK", // siopassword
 	}

@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2018 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,18 +20,17 @@ package internalversion
 
 import (
 	"k8s.io/apimachinery/pkg/api/errors"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
-	api "k8s.io/kubernetes/pkg/api"
+	core "k8s.io/kubernetes/pkg/apis/core"
 )
 
 // PersistentVolumeLister helps list PersistentVolumes.
 type PersistentVolumeLister interface {
 	// List lists all PersistentVolumes in the indexer.
-	List(selector labels.Selector) (ret []*api.PersistentVolume, err error)
+	List(selector labels.Selector) (ret []*core.PersistentVolume, err error)
 	// Get retrieves the PersistentVolume from the index for a given name.
-	Get(name string) (*api.PersistentVolume, error)
+	Get(name string) (*core.PersistentVolume, error)
 	PersistentVolumeListerExpansion
 }
 
@@ -46,22 +45,21 @@ func NewPersistentVolumeLister(indexer cache.Indexer) PersistentVolumeLister {
 }
 
 // List lists all PersistentVolumes in the indexer.
-func (s *persistentVolumeLister) List(selector labels.Selector) (ret []*api.PersistentVolume, err error) {
+func (s *persistentVolumeLister) List(selector labels.Selector) (ret []*core.PersistentVolume, err error) {
 	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*api.PersistentVolume))
+		ret = append(ret, m.(*core.PersistentVolume))
 	})
 	return ret, err
 }
 
 // Get retrieves the PersistentVolume from the index for a given name.
-func (s *persistentVolumeLister) Get(name string) (*api.PersistentVolume, error) {
-	key := &api.PersistentVolume{ObjectMeta: v1.ObjectMeta{Name: name}}
-	obj, exists, err := s.indexer.Get(key)
+func (s *persistentVolumeLister) Get(name string) (*core.PersistentVolume, error) {
+	obj, exists, err := s.indexer.GetByKey(name)
 	if err != nil {
 		return nil, err
 	}
 	if !exists {
-		return nil, errors.NewNotFound(api.Resource("persistentvolume"), name)
+		return nil, errors.NewNotFound(core.Resource("persistentvolume"), name)
 	}
-	return obj.(*api.PersistentVolume), nil
+	return obj.(*core.PersistentVolume), nil
 }

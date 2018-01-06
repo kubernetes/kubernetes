@@ -20,6 +20,7 @@ import (
 	"flag"
 	"fmt"
 	"net"
+	"sort"
 	"strings"
 
 	"github.com/golang/glog"
@@ -62,7 +63,9 @@ func init() {
 
 // String is the method to format the flag's value, part of the flag.Value interface.
 func (c *cidrs) String() string {
-	return strings.Join(c.ipn.StringSlice(), ",")
+	s := c.ipn.StringSlice()
+	sort.Strings(s)
+	return strings.Join(s, ",")
 }
 
 // Set supports a value of CSV or the flag repeated multiple times

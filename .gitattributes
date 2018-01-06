@@ -1,10 +1,11 @@
 hack/verify-flags/known-flags.txt merge=union
 test/test_owners.csv merge=union
 
-**/zz_generated.*.go -diff
-**/types.generated.go -diff
-**/generated.pb.go -diff
+**/zz_generated.*.go -diff linguist-generated=true
+**/types.generated.go -diff linguist-generated=true
+**/generated.pb.go -diff linguist-generated=true
 **/generated.proto -diff
-**/types_swagger_doc_generated.go -diff
-docs/api-reference/** -diff
-federation/docs/api-reference/** -diff
+**/types_swagger_doc_generated.go -diff linguist-generated=true
+docs/api-reference/** -diff linguist-generated=true
+api/swagger-spec/*.json -diff linguist-generated=true
+api/openapi-spec/*.json -diff linguist-generated=true

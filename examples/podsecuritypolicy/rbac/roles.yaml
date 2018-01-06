@@ -1,10 +1,9 @@
-# restrictedPSP grants access to use
-# the restricted PSP.
+# restricted-psp-user grants access to use the restricted PSP.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   name: restricted-psp-user
-rules: 
+rules:
 - apiGroups:
   - extensions
   resources:
@@ -14,13 +13,12 @@ rules:
   verbs:
   - use
 ---
-# privilegedPSP grants access to use the privileged
-# PSP.
+# privileged-psp-user grants access to use the privileged PSP.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   name: privileged-psp-user
-rules: 
+rules:
 - apiGroups:
   - extensions
   resources:

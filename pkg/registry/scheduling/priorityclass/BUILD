@@ -9,8 +9,8 @@ load(
 go_test(
     name = "go_default_test",
     srcs = ["strategy_test.go"],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/pkg/registry/scheduling/priorityclass",
-    library = ":go_default_library",
     deps = [
         "//pkg/apis/scheduling:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
@@ -27,7 +27,7 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/registry/scheduling/priorityclass",
     deps = [
-        "//pkg/api:go_default_library",
+        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/scheduling:go_default_library",
         "//pkg/apis/scheduling/validation:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/internalversion:go_default_library",

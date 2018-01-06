@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"flag"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -33,6 +34,8 @@ import (
 	"syscall"
 	"testing"
 	"time"
+
+	"github.com/golang/glog"
 
 	"k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -1694,6 +1697,74 @@ func TestDoContext(t *testing.T) {
 	if err == nil {
 		t.Fatal("Expected context cancellation error")
 	}
+}
+
+func buildString(length int) string {
+	s := make([]byte, length)
+	for i := range s {
+		s[i] = 'a'
+	}
+	return string(s)
+}
+
+func TestTruncateBody(t *testing.T) {
+	tests := []struct {
+		body  string
+		want  string
+		level string
+	}{
+		// Anything below 8 is completely truncated
+		{
+			body:  "Completely truncated below 8",
+			want:  " [truncated 28 chars]",
+			level: "0",
+		},
+		// Small strings are not truncated by high levels
+		{
+			body:  "Small body never gets truncated",
+			want:  "Small body never gets truncated",
+			level: "10",
+		},
+		{
+			body:  "Small body never gets truncated",
+			want:  "Small body never gets truncated",
+			level: "8",
+		},
+		// Strings are truncated to 1024 if level is less than 9.
+		{
+			body:  buildString(2000),
+			level: "8",
+			want:  fmt.Sprintf("%s [truncated 976 chars]", buildString(1024)),
+		},
+		// Strings are truncated to 10240 if level is 9.
+		{
+			body:  buildString(20000),
+			level: "9",
+			want:  fmt.Sprintf("%s [truncated 9760 chars]", buildString(10240)),
+		},
+		// Strings are not truncated if level is 10 or higher
+		{
+			body:  buildString(20000),
+			level: "10",
+			want:  buildString(20000),
+		},
+		// Strings are not truncated if level is 10 or higher
+		{
+			body:  buildString(20000),
+			level: "11",
+			want:  buildString(20000),
+		},
+	}
+
+	l := flag.Lookup("v").Value.(flag.Getter).Get().(glog.Level)
+	for _, test := range tests {
+		flag.Set("v", test.level)
+		got := truncateBody(test.body)
+		if got != test.want {
+			t.Errorf("truncateBody(%v) = %v, want %v", test.body, got, test.want)
+		}
+	}
+	flag.Set("v", l.String())
 }
 
 func defaultResourcePathWithPrefix(prefix, resource, namespace, name string) string {

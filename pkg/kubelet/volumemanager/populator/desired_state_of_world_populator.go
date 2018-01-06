@@ -31,7 +31,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/pod"
@@ -260,11 +262,12 @@ func (dswp *desiredStateOfWorldPopulator) processPodVolumes(pod *v1.Pod) {
 	}
 
 	allVolumesAdded := true
+	mountsMap, devicesMap := dswp.makeVolumeMap(pod.Spec.Containers)
 
 	// Process volume spec for each volume defined in pod
 	for _, podVolume := range pod.Spec.Volumes {
 		volumeSpec, volumeGidValue, err :=
-			dswp.createVolumeSpec(podVolume, pod.Namespace)
+			dswp.createVolumeSpec(podVolume, pod.Name, pod.Namespace, mountsMap, devicesMap)
 		if err != nil {
 			glog.Errorf(
 				"Error processing volume %q for pod %q: %v",
@@ -336,7 +339,7 @@ func (dswp *desiredStateOfWorldPopulator) deleteProcessedPod(
 // specified volume. It dereference any PVC to get PV objects, if needed.
 // Returns an error if unable to obtain the volume at this time.
 func (dswp *desiredStateOfWorldPopulator) createVolumeSpec(
-	podVolume v1.Volume, podNamespace string) (*volume.Spec, string, error) {
+	podVolume v1.Volume, podName string, podNamespace string, mountsMap map[string]bool, devicesMap map[string]bool) (*volume.Spec, string, error) {
 	if pvcSource :=
 		podVolume.VolumeSource.PersistentVolumeClaim; pvcSource != nil {
 		glog.V(10).Infof(
@@ -381,6 +384,31 @@ func (dswp *desiredStateOfWorldPopulator) createVolumeSpec(
 			pvcSource.ClaimName,
 			pvcUID)
 
+		// TODO: remove feature gate check after no longer needed
+		if utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) {
+			volumeMode, err := volumehelper.GetVolumeMode(volumeSpec)
+			if err != nil {
+				return nil, "", err
+			}
+			// Error if a container has volumeMounts but the volumeMode of PVC isn't Filesystem
+			if mountsMap[podVolume.Name] && volumeMode != v1.PersistentVolumeFilesystem {
+				return nil, "", fmt.Errorf(
+					"Volume %q has volumeMode %q, but is specified in volumeMounts for pod %q/%q",
+					podVolume.Name,
+					volumeMode,
+					podNamespace,
+					podName)
+			}
+			// Error if a container has volumeDevices but the volumeMode of PVC isn't Block
+			if devicesMap[podVolume.Name] && volumeMode != v1.PersistentVolumeBlock {
+				return nil, "", fmt.Errorf(
+					"Volume %q has volumeMode %q, but is specified in volumeDevices for pod %q/%q",
+					podVolume.Name,
+					volumeMode,
+					podNamespace,
+					podName)
+			}
+		}
 		return volumeSpec, volumeGidValue, nil
 	}
 
@@ -391,18 +419,36 @@ func (dswp *desiredStateOfWorldPopulator) createVolumeSpec(
 }
 
 // getPVCExtractPV fetches the PVC object with the given namespace and name from
-// the API server extracts the name of the PV it is pointing to and returns it.
+// the API server, checks whether PVC is being deleted, extracts the name of the PV
+// it is pointing to and returns it.
 // An error is returned if the PVC object's phase is not "Bound".
 func (dswp *desiredStateOfWorldPopulator) getPVCExtractPV(
 	namespace string, claimName string) (string, types.UID, error) {
 	pvc, err :=
-		dswp.kubeClient.Core().PersistentVolumeClaims(namespace).Get(claimName, metav1.GetOptions{})
+		dswp.kubeClient.CoreV1().PersistentVolumeClaims(namespace).Get(claimName, metav1.GetOptions{})
 	if err != nil || pvc == nil {
 		return "", "", fmt.Errorf(
 			"failed to fetch PVC %s/%s from API server. err=%v",
 			namespace,
 			claimName,
 			err)
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.PVCProtection) {
+		// Pods that uses a PVC that is being deleted must not be started.
+		//
+		// In case an old kubelet is running without this check or some kubelets
+		// have this feature disabled, the worst that can happen is that such
+		// pod is scheduled. This was the default behavior in 1.8 and earlier
+		// and users should not be that surprised.
+		// It should happen only in very rare case when scheduler schedules
+		// a pod and user deletes a PVC that's used by it at the same time.
+		if pvc.ObjectMeta.DeletionTimestamp != nil {
+			return "", "", fmt.Errorf(
+				"can't start pod because PVC %s/%s is being deleted",
+				namespace,
+				claimName)
+		}
 	}
 
 	if pvc.Status.Phase != v1.ClaimBound || pvc.Spec.VolumeName == "" {
@@ -425,7 +471,7 @@ func (dswp *desiredStateOfWorldPopulator) getPVSpec(
 	name string,
 	pvcReadOnly bool,
 	expectedClaimUID types.UID) (*volume.Spec, string, error) {
-	pv, err := dswp.kubeClient.Core().PersistentVolumes().Get(name, metav1.GetOptions{})
+	pv, err := dswp.kubeClient.CoreV1().PersistentVolumes().Get(name, metav1.GetOptions{})
 	if err != nil || pv == nil {
 		return nil, "", fmt.Errorf(
 			"failed to fetch PV %q from API server. err=%v", name, err)
@@ -447,6 +493,28 @@ func (dswp *desiredStateOfWorldPopulator) getPVSpec(
 
 	volumeGidValue := getPVVolumeGidAnnotationValue(pv)
 	return volume.NewSpecFromPersistentVolume(pv, pvcReadOnly), volumeGidValue, nil
+}
+
+func (dswp *desiredStateOfWorldPopulator) makeVolumeMap(containers []v1.Container) (map[string]bool, map[string]bool) {
+	volumeDevicesMap := make(map[string]bool)
+	volumeMountsMap := make(map[string]bool)
+
+	for _, container := range containers {
+		if container.VolumeMounts != nil {
+			for _, mount := range container.VolumeMounts {
+				volumeMountsMap[mount.Name] = true
+			}
+		}
+		// TODO: remove feature gate check after no longer needed
+		if utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) &&
+			container.VolumeDevices != nil {
+			for _, device := range container.VolumeDevices {
+				volumeDevicesMap[device.Name] = true
+			}
+		}
+	}
+
+	return volumeMountsMap, volumeDevicesMap
 }
 
 func getPVVolumeGidAnnotationValue(pv *v1.PersistentVolume) string {

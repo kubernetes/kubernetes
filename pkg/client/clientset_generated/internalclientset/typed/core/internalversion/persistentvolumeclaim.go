@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2018 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	rest "k8s.io/client-go/rest"
-	api "k8s.io/kubernetes/pkg/api"
+	core "k8s.io/kubernetes/pkg/apis/core"
 	scheme "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/scheme"
 )
 
@@ -33,15 +33,15 @@ type PersistentVolumeClaimsGetter interface {
 
 // PersistentVolumeClaimInterface has methods to work with PersistentVolumeClaim resources.
 type PersistentVolumeClaimInterface interface {
-	Create(*api.PersistentVolumeClaim) (*api.PersistentVolumeClaim, error)
-	Update(*api.PersistentVolumeClaim) (*api.PersistentVolumeClaim, error)
-	UpdateStatus(*api.PersistentVolumeClaim) (*api.PersistentVolumeClaim, error)
+	Create(*core.PersistentVolumeClaim) (*core.PersistentVolumeClaim, error)
+	Update(*core.PersistentVolumeClaim) (*core.PersistentVolumeClaim, error)
+	UpdateStatus(*core.PersistentVolumeClaim) (*core.PersistentVolumeClaim, error)
 	Delete(name string, options *v1.DeleteOptions) error
 	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
-	Get(name string, options v1.GetOptions) (*api.PersistentVolumeClaim, error)
-	List(opts v1.ListOptions) (*api.PersistentVolumeClaimList, error)
+	Get(name string, options v1.GetOptions) (*core.PersistentVolumeClaim, error)
+	List(opts v1.ListOptions) (*core.PersistentVolumeClaimList, error)
 	Watch(opts v1.ListOptions) (watch.Interface, error)
-	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *api.PersistentVolumeClaim, err error)
+	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *core.PersistentVolumeClaim, err error)
 	PersistentVolumeClaimExpansion
 }
 
@@ -60,8 +60,8 @@ func newPersistentVolumeClaims(c *CoreClient, namespace string) *persistentVolum
 }
 
 // Get takes name of the persistentVolumeClaim, and returns the corresponding persistentVolumeClaim object, and an error if there is any.
-func (c *persistentVolumeClaims) Get(name string, options v1.GetOptions) (result *api.PersistentVolumeClaim, err error) {
-	result = &api.PersistentVolumeClaim{}
+func (c *persistentVolumeClaims) Get(name string, options v1.GetOptions) (result *core.PersistentVolumeClaim, err error) {
+	result = &core.PersistentVolumeClaim{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("persistentvolumeclaims").
@@ -73,8 +73,8 @@ func (c *persistentVolumeClaims) Get(name string, options v1.GetOptions) (result
 }
 
 // List takes label and field selectors, and returns the list of PersistentVolumeClaims that match those selectors.
-func (c *persistentVolumeClaims) List(opts v1.ListOptions) (result *api.PersistentVolumeClaimList, err error) {
-	result = &api.PersistentVolumeClaimList{}
+func (c *persistentVolumeClaims) List(opts v1.ListOptions) (result *core.PersistentVolumeClaimList, err error) {
+	result = &core.PersistentVolumeClaimList{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("persistentvolumeclaims").
@@ -95,8 +95,8 @@ func (c *persistentVolumeClaims) Watch(opts v1.ListOptions) (watch.Interface, er
 }
 
 // Create takes the representation of a persistentVolumeClaim and creates it.  Returns the server's representation of the persistentVolumeClaim, and an error, if there is any.
-func (c *persistentVolumeClaims) Create(persistentVolumeClaim *api.PersistentVolumeClaim) (result *api.PersistentVolumeClaim, err error) {
-	result = &api.PersistentVolumeClaim{}
+func (c *persistentVolumeClaims) Create(persistentVolumeClaim *core.PersistentVolumeClaim) (result *core.PersistentVolumeClaim, err error) {
+	result = &core.PersistentVolumeClaim{}
 	err = c.client.Post().
 		Namespace(c.ns).
 		Resource("persistentvolumeclaims").
@@ -107,8 +107,8 @@ func (c *persistentVolumeClaims) Create(persistentVolumeClaim *api.PersistentVol
 }
 
 // Update takes the representation of a persistentVolumeClaim and updates it. Returns the server's representation of the persistentVolumeClaim, and an error, if there is any.
-func (c *persistentVolumeClaims) Update(persistentVolumeClaim *api.PersistentVolumeClaim) (result *api.PersistentVolumeClaim, err error) {
-	result = &api.PersistentVolumeClaim{}
+func (c *persistentVolumeClaims) Update(persistentVolumeClaim *core.PersistentVolumeClaim) (result *core.PersistentVolumeClaim, err error) {
+	result = &core.PersistentVolumeClaim{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("persistentvolumeclaims").
@@ -122,8 +122,8 @@ func (c *persistentVolumeClaims) Update(persistentVolumeClaim *api.PersistentVol
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
 
-func (c *persistentVolumeClaims) UpdateStatus(persistentVolumeClaim *api.PersistentVolumeClaim) (result *api.PersistentVolumeClaim, err error) {
-	result = &api.PersistentVolumeClaim{}
+func (c *persistentVolumeClaims) UpdateStatus(persistentVolumeClaim *core.PersistentVolumeClaim) (result *core.PersistentVolumeClaim, err error) {
+	result = &core.PersistentVolumeClaim{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("persistentvolumeclaims").
@@ -158,8 +158,8 @@ func (c *persistentVolumeClaims) DeleteCollection(options *v1.DeleteOptions, lis
 }
 
 // Patch applies the patch and returns the patched persistentVolumeClaim.
-func (c *persistentVolumeClaims) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *api.PersistentVolumeClaim, err error) {
-	result = &api.PersistentVolumeClaim{}
+func (c *persistentVolumeClaims) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *core.PersistentVolumeClaim, err error) {
+	result = &core.PersistentVolumeClaim{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
 		Resource("persistentvolumeclaims").

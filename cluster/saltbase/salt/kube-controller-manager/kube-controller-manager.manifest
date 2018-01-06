@@ -34,6 +34,8 @@
 {% set cloud_config_volume = "" -%}
 {% set additional_cloud_config_mount = "{\"name\": \"usrsharessl\",\"mountPath\": \"/usr/share/ssl\", \"readOnly\": true}, {\"name\": \"usrssl\",\"mountPath\": \"/usr/ssl\", \"readOnly\": true}, {\"name\": \"usrlibssl\",\"mountPath\": \"/usr/lib/ssl\", \"readOnly\": true}, {\"name\": \"usrlocalopenssl\",\"mountPath\": \"/usr/local/openssl\", \"readOnly\": true}," -%}
 {% set additional_cloud_config_volume = "{\"name\": \"usrsharessl\",\"hostPath\": {\"path\": \"/usr/share/ssl\"}}, {\"name\": \"usrssl\",\"hostPath\": {\"path\": \"/usr/ssl\"}}, {\"name\": \"usrlibssl\",\"hostPath\": {\"path\": \"/usr/lib/ssl\"}}, {\"name\": \"usrlocalopenssl\",\"hostPath\": {\"path\": \"/usr/local/openssl\"}}," -%}
+{% set pv_recycler_mount = "" -%}
+{% set pv_recycler_volume = "" -%}
 {% set srv_kube_path = "/srv/kubernetes" -%}
 
 {% if grains.cloud is defined -%}
@@ -116,7 +118,7 @@
     "command": [
                  "/bin/sh",
                  "-c",
-                 "/usr/local/bin/kube-controller-manager {{params}} 1>>/var/log/kube-controller-manager.log 2>&1"
+                 "exec /usr/local/bin/kube-controller-manager {{params}} 1>>/var/log/kube-controller-manager.log 2>&1"
                ],
     {{container_env}}
     "livenessProbe": {
@@ -131,6 +133,7 @@
     "volumeMounts": [
         {{cloud_config_mount}}
         {{additional_cloud_config_mount}}
+        {{pv_recycler_mount}}
         { "name": "srvkube",
         "mountPath": "{{srv_kube_path}}",
         "readOnly": true},
@@ -158,6 +161,7 @@
 "volumes":[
   {{cloud_config_volume}}
   {{additional_cloud_config_volume}}
+  {{pv_recycler_volume}}
   { "name": "srvkube",
     "hostPath": {
         "path": "{{srv_kube_path}}"}

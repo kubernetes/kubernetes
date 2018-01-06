@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 
 	"github.com/golang/glog"
+	"github.com/juju/ratelimit"
 )
 
 type CertificateController struct {
@@ -53,16 +54,20 @@ func NewCertificateController(
 	kubeClient clientset.Interface,
 	csrInformer certificatesinformers.CertificateSigningRequestInformer,
 	handler func(*certificates.CertificateSigningRequest) error,
-) (*CertificateController, error) {
+) *CertificateController {
 	// Send events to the apiserver
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
-	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(kubeClient.Core().RESTClient()).Events("")})
+	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(kubeClient.CoreV1().RESTClient()).Events("")})
 
 	cc := &CertificateController{
 		kubeClient: kubeClient,
-		queue:      workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "certificate"),
-		handler:    handler,
+		queue: workqueue.NewNamedRateLimitingQueue(workqueue.NewMaxOfRateLimiter(
+			workqueue.NewItemExponentialFailureRateLimiter(200*time.Millisecond, 1000*time.Second),
+			// 10 qps, 100 bucket size.  This is only for retry speed and its only the overall factor (not per item)
+			&workqueue.BucketRateLimiter{Bucket: ratelimit.NewBucketWithRate(float64(10), int64(100))},
+		), "certificate"),
+		handler: handler,
 	}
 
 	// Manage the addition/update of certificate requests
@@ -97,8 +102,7 @@ func NewCertificateController(
 	})
 	cc.csrLister = csrInformer.Lister()
 	cc.csrsSynced = csrInformer.Informer().HasSynced
-	cc.handler = handler
-	return cc, nil
+	return cc
 }
 
 // Run the main goroutine responsible for watching and syncing jobs.
@@ -136,7 +140,11 @@ func (cc *CertificateController) processNextWorkItem() bool {
 
 	if err := cc.syncFunc(cKey.(string)); err != nil {
 		cc.queue.AddRateLimited(cKey)
-		utilruntime.HandleError(fmt.Errorf("Sync %v failed with : %v", cKey, err))
+		if _, ignorable := err.(ignorableError); !ignorable {
+			utilruntime.HandleError(fmt.Errorf("Sync %v failed with : %v", cKey, err))
+		} else {
+			glog.V(4).Infof("Sync %v failed with : %v", cKey, err)
+		}
 		return true
 	}
 
@@ -181,4 +189,18 @@ func (cc *CertificateController) syncFunc(key string) error {
 	csr = csr.DeepCopy()
 
 	return cc.handler(csr)
+}
+
+// IgnorableError returns an error that we shouldn't handle (i.e. log) because
+// it's spammy and usually user error. Instead we will log these errors at a
+// higher log level. We still need to throw these errors to signal that the
+// sync should be retried.
+func IgnorableError(s string, args ...interface{}) ignorableError {
+	return ignorableError(fmt.Sprintf(s, args...))
+}
+
+type ignorableError string
+
+func (e ignorableError) Error() string {
+	return string(e)
 }

@@ -30,8 +30,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/storage/names"
-	"k8s.io/kubernetes/pkg/api"
 	podutil "k8s.io/kubernetes/pkg/api/pod"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 	corelisters "k8s.io/kubernetes/pkg/client/listers/core/internalversion"
@@ -80,6 +80,8 @@ type serviceAccount struct {
 	secretLister         corelisters.SecretLister
 }
 
+var _ admission.MutationInterface = &serviceAccount{}
+var _ admission.ValidationInterface = &serviceAccount{}
 var _ = kubeapiserveradmission.WantsInternalKubeClientSet(&serviceAccount{})
 var _ = kubeapiserveradmission.WantsInternalKubeInformerFactory(&serviceAccount{})
 
@@ -117,8 +119,8 @@ func (a *serviceAccount) SetInternalKubeInformerFactory(f informers.SharedInform
 	})
 }
 
-// Validate ensures an authorizer is set.
-func (a *serviceAccount) Validate() error {
+// ValidateInitialization ensures an authorizer is set.
+func (a *serviceAccount) ValidateInitialization() error {
 	if a.client == nil {
 		return fmt.Errorf("missing client")
 	}
@@ -132,18 +134,9 @@ func (a *serviceAccount) Validate() error {
 }
 
 func (s *serviceAccount) Admit(a admission.Attributes) (err error) {
-	if a.GetResource().GroupResource() != api.Resource("pods") {
+	if shouldIgnore(a) {
 		return nil
 	}
-	obj := a.GetObject()
-	if obj == nil {
-		return nil
-	}
-	pod, ok := obj.(*api.Pod)
-	if !ok {
-		return nil
-	}
-
 	updateInitialized, err := util.IsUpdatingInitializedObject(a)
 	if err != nil {
 		return err
@@ -153,9 +146,56 @@ func (s *serviceAccount) Admit(a admission.Attributes) (err error) {
 		return nil
 	}
 
+	pod := a.GetObject().(*api.Pod)
+
 	// Don't modify the spec of mirror pods.
 	// That makes the kubelet very angry and confused, and it immediately deletes the pod (because the spec doesn't match)
 	// That said, don't allow mirror pods to reference ServiceAccounts or SecretVolumeSources either
+	if _, isMirrorPod := pod.Annotations[api.MirrorPodAnnotationKey]; isMirrorPod {
+		return s.Validate(a)
+	}
+
+	// Set the default service account if needed
+	if len(pod.Spec.ServiceAccountName) == 0 {
+		pod.Spec.ServiceAccountName = DefaultServiceAccountName
+	}
+
+	serviceAccount, err := s.getServiceAccount(a.GetNamespace(), pod.Spec.ServiceAccountName)
+	if err != nil {
+		return admission.NewForbidden(a, fmt.Errorf("error looking up service account %s/%s: %v", a.GetNamespace(), pod.Spec.ServiceAccountName, err))
+	}
+	if s.MountServiceAccountToken && shouldAutomount(serviceAccount, pod) {
+		if err := s.mountServiceAccountToken(serviceAccount, pod); err != nil {
+			if _, ok := err.(errors.APIStatus); ok {
+				return err
+			}
+			return admission.NewForbidden(a, err)
+		}
+	}
+	if len(pod.Spec.ImagePullSecrets) == 0 {
+		pod.Spec.ImagePullSecrets = make([]api.LocalObjectReference, len(serviceAccount.ImagePullSecrets))
+		copy(pod.Spec.ImagePullSecrets, serviceAccount.ImagePullSecrets)
+	}
+
+	return s.Validate(a)
+}
+
+func (s *serviceAccount) Validate(a admission.Attributes) (err error) {
+	if shouldIgnore(a) {
+		return nil
+	}
+	updateInitialized, err := util.IsUpdatingInitializedObject(a)
+	if err != nil {
+		return err
+	}
+	if updateInitialized {
+		// related pod spec fields are immutable after the pod is initialized
+		return nil
+	}
+
+	pod := a.GetObject().(*api.Pod)
+
+	// Mirror pods have restrictions on what they can reference
 	if _, isMirrorPod := pod.Annotations[api.MirrorPodAnnotationKey]; isMirrorPod {
 		if len(pod.Spec.ServiceAccountName) != 0 {
 			return admission.NewForbidden(a, fmt.Errorf("a mirror pod may not reference service accounts"))
@@ -171,19 +211,10 @@ func (s *serviceAccount) Admit(a admission.Attributes) (err error) {
 		return nil
 	}
 
-	// Set the default service account if needed
-	if len(pod.Spec.ServiceAccountName) == 0 {
-		pod.Spec.ServiceAccountName = DefaultServiceAccountName
-	}
-
 	// Ensure the referenced service account exists
 	serviceAccount, err := s.getServiceAccount(a.GetNamespace(), pod.Spec.ServiceAccountName)
 	if err != nil {
 		return admission.NewForbidden(a, fmt.Errorf("error looking up service account %s/%s: %v", a.GetNamespace(), pod.Spec.ServiceAccountName, err))
-	}
-	if serviceAccount == nil {
-		// TODO: convert to a ServerTimeout error (or other error that sends a Retry-After header)
-		return admission.NewForbidden(a, fmt.Errorf("service account %s/%s was not found, retry after the service account is created", a.GetNamespace(), pod.Spec.ServiceAccountName))
 	}
 
 	if s.enforceMountableSecrets(serviceAccount) {
@@ -192,21 +223,23 @@ func (s *serviceAccount) Admit(a admission.Attributes) (err error) {
 		}
 	}
 
-	if s.MountServiceAccountToken && shouldAutomount(serviceAccount, pod) {
-		if err := s.mountServiceAccountToken(serviceAccount, pod); err != nil {
-			if _, ok := err.(errors.APIStatus); ok {
-				return err
-			}
-			return admission.NewForbidden(a, err)
-		}
-	}
-
-	if len(pod.Spec.ImagePullSecrets) == 0 {
-		pod.Spec.ImagePullSecrets = make([]api.LocalObjectReference, len(serviceAccount.ImagePullSecrets))
-		copy(pod.Spec.ImagePullSecrets, serviceAccount.ImagePullSecrets)
-	}
-
 	return nil
+}
+
+func shouldIgnore(a admission.Attributes) bool {
+	if a.GetResource().GroupResource() != api.Resource("pods") {
+		return true
+	}
+	obj := a.GetObject()
+	if obj == nil {
+		return true
+	}
+	_, ok := obj.(*api.Pod)
+	if !ok {
+		return true
+	}
+
+	return false
 }
 
 func shouldAutomount(sa *api.ServiceAccount, pod *api.Pod) bool {
@@ -267,7 +300,7 @@ func (s *serviceAccount) getServiceAccount(namespace string, name string) (*api.
 		}
 	}
 
-	return nil, nil
+	return nil, errors.NewNotFound(api.Resource("serviceaccount"), name)
 }
 
 // getReferencedServiceAccountToken returns the name of the first referenced secret which is a ServiceAccountToken for the service account

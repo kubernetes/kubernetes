@@ -24,5 +24,5 @@ import (
 // WantsInternalWardleInformerFactory defines a function which sets InformerFactory for admission plugins that need it
 type WantsInternalWardleInformerFactory interface {
 	SetInternalWardleInformerFactory(informers.SharedInformerFactory)
-	admission.Validator
+	admission.InitializationValidator
 }

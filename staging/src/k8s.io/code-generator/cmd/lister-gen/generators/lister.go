@@ -107,17 +107,18 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 
 			internalGVPkg = strings.Join(parts[0:len(parts)-1], "/")
 		}
+		groupPackageName := strings.ToLower(gv.Group.NonEmpty())
 
 		// If there's a comment of the form "// +groupName=somegroup" or
 		// "// +groupName=somegroup.foo.bar.io", use the first field (somegroup) as the name of the
 		// group when generating.
-		if override := types.ExtractCommentTags("+", p.DocComments)["groupName"]; override != nil {
+		if override := types.ExtractCommentTags("+", p.Comments)["groupName"]; override != nil {
 			gv.Group = clientgentypes.Group(strings.SplitN(override[0], ".", 2)[0])
 		}
 
 		var typesToGenerate []*types.Type
 		for _, t := range p.Types {
-			tags := util.MustParseClientGenTags(t.SecondClosestCommentLines)
+			tags := util.MustParseClientGenTags(append(t.SecondClosestCommentLines, t.CommentLines...))
 			if !tags.GenerateClient || !tags.HasVerb("list") || !tags.HasVerb("get") {
 				continue
 			}
@@ -129,7 +130,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 		orderer := namer.Orderer{Namer: namer.NewPrivateNamer(0)}
 		typesToGenerate = orderer.OrderTypes(typesToGenerate)
 
-		packagePath := filepath.Join(arguments.OutputPackagePath, strings.ToLower(gv.Group.NonEmpty()), strings.ToLower(gv.Version.NonEmpty()))
+		packagePath := filepath.Join(arguments.OutputPackagePath, groupPackageName, strings.ToLower(gv.Version.NonEmpty()))
 		packageList = append(packageList, &generator.DefaultPackage{
 			PackageName: strings.ToLower(gv.Version.NonEmpty()),
 			PackagePath: packagePath,
@@ -159,7 +160,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 				return generators
 			},
 			FilterFunc: func(c *generator.Context, t *types.Type) bool {
-				tags := util.MustParseClientGenTags(t.SecondClosestCommentLines)
+				tags := util.MustParseClientGenTags(append(t.SecondClosestCommentLines, t.CommentLines...))
 				return tags.GenerateClient && tags.HasVerb("list") && tags.HasVerb("get")
 			},
 		})
@@ -173,7 +174,7 @@ func objectMetaForPackage(p *types.Package) (*types.Type, bool, error) {
 	generatingForPackage := false
 	for _, t := range p.Types {
 		// filter out types which dont have genclient.
-		if !util.MustParseClientGenTags(t.SecondClosestCommentLines).GenerateClient {
+		if !util.MustParseClientGenTags(append(t.SecondClosestCommentLines, t.CommentLines...)).GenerateClient {
 			continue
 		}
 		generatingForPackage = true
@@ -237,7 +238,7 @@ func (g *listerGenerator) GenerateType(c *generator.Context, t *types.Type, w io
 		"objectMeta": g.objectMeta,
 	}
 
-	tags, err := util.ParseClientGenTags(t.SecondClosestCommentLines)
+	tags, err := util.ParseClientGenTags(append(t.SecondClosestCommentLines, t.CommentLines...))
 	if err != nil {
 		return err
 	}
@@ -322,8 +323,7 @@ func (s *$.type|private$Lister) $.type|publicPlural$(namespace string) $.type|pu
 var typeLister_NonNamespacedGet = `
 // Get retrieves the $.type|public$ from the index for a given name.
 func (s *$.type|private$Lister) Get(name string) (*$.type|raw$, error) {
-  key := &$.type|raw${ObjectMeta: $.objectMeta|raw${Name: name}}
-  obj, exists, err := s.indexer.Get(key)
+  obj, exists, err := s.indexer.GetByKey(name)
   if err != nil {
     return nil, err
   }

@@ -21,19 +21,19 @@ import (
 	"io"
 	"strings"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
-	"k8s.io/kubernetes/pkg/api"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 )
 
 // selectContainers allows one or more containers to be matched against a string or wildcard
-func selectContainers(containers []api.Container, spec string) ([]*api.Container, []*api.Container) {
-	out := []*api.Container{}
-	skipped := []*api.Container{}
+func selectContainers(containers []v1.Container, spec string) ([]*v1.Container, []*v1.Container) {
+	out := []*v1.Container{}
+	skipped := []*v1.Container{}
 	for i, c := range containers {
 		if selectString(c.Name, spec) {
 			out = append(out, &containers[i])
@@ -126,10 +126,7 @@ type patchFn func(*resource.Info) ([]byte, error)
 // the changes in the object. Encoder must be able to encode the info into the appropriate destination type.
 // This function returns whether the mutation function made any change in the original object.
 func CalculatePatch(patch *Patch, encoder runtime.Encoder, mutateFn patchFn) bool {
-	versionedEncoder := api.Codecs.EncoderForVersion(encoder, patch.Info.Mapping.GroupVersionKind.GroupVersion())
-
-	patch.Before, patch.Err = runtime.Encode(versionedEncoder, patch.Info.Object)
-
+	patch.Before, patch.Err = runtime.Encode(encoder, patch.Info.Object)
 	patch.After, patch.Err = mutateFn(patch.Info)
 	if patch.Err != nil {
 		return true
@@ -138,14 +135,7 @@ func CalculatePatch(patch *Patch, encoder runtime.Encoder, mutateFn patchFn) boo
 		return false
 	}
 
-	// TODO: should be via New
-	versioned, err := patch.Info.Mapping.ConvertToVersion(patch.Info.Object, patch.Info.Mapping.GroupVersionKind.GroupVersion())
-	if err != nil {
-		patch.Err = err
-		return true
-	}
-
-	patch.Patch, patch.Err = strategicpatch.CreateTwoWayMergePatch(patch.Before, patch.After, versioned)
+	patch.Patch, patch.Err = strategicpatch.CreateTwoWayMergePatch(patch.Before, patch.After, patch.Info.Object)
 	return true
 }
 
@@ -162,17 +152,17 @@ func CalculatePatches(infos []*resource.Info, encoder runtime.Encoder, mutateFn 
 	return patches
 }
 
-func findEnv(env []api.EnvVar, name string) (api.EnvVar, bool) {
+func findEnv(env []v1.EnvVar, name string) (v1.EnvVar, bool) {
 	for _, e := range env {
 		if e.Name == name {
 			return e, true
 		}
 	}
-	return api.EnvVar{}, false
+	return v1.EnvVar{}, false
 }
 
-func updateEnv(existing []api.EnvVar, env []api.EnvVar, remove []string) []api.EnvVar {
-	out := []api.EnvVar{}
+func updateEnv(existing []v1.EnvVar, env []v1.EnvVar, remove []string) []v1.EnvVar {
+	out := []v1.EnvVar{}
 	covered := sets.NewString(remove...)
 	for _, e := range existing {
 		if covered.Has(e.Name) {

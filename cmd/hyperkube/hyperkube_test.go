@@ -151,6 +151,7 @@ func runFull(t *testing.T, args string, stopCh <-chan struct{}) *result {
 	hk.AddServer(testServer("test1"))
 	hk.AddServer(testServer("test2"))
 	hk.AddServer(testServer("test3"))
+	hk.AddAlphaServer(testServer("testAlpha1"))
 	hk.AddServer(testServerError("test-error"))
 	hk.AddServer(testStopChIgnoringServer("test-stop-ch-ignoring"))
 	hk.AddServer(testStopChRespectingServer("test-stop-ch-respecting"))
@@ -234,6 +235,22 @@ func TestServerError(t *testing.T) {
 	x := runFull(t, "hyperkube test-error", wait.NeverStop)
 	assert.Contains(t, x.output, "test-error Run")
 	assert.EqualError(t, x.err, "server returning error")
+}
+
+func TestAlphaRun(t *testing.T) {
+	x := runFull(t, "hyperkube alpha testAlpha1", wait.NeverStop)
+	assert.NoError(t, x.err)
+}
+
+func TestAlphaNoArgs(t *testing.T) {
+	x := runFull(t, "hyperkube alpha", wait.NeverStop)
+	assert.EqualError(t, x.err, "no alpha server specified")
+}
+
+func TestAlphaBadServer(t *testing.T) {
+	x := runFull(t, "hyperkube alpha bad-server", wait.NeverStop)
+	assert.EqualError(t, x.err, "Server not found: bad-server")
+	assert.Contains(t, x.output, "Usage")
 }
 
 func TestStopChIgnoringServer(t *testing.T) {

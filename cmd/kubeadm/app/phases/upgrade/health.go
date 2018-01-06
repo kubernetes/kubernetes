@@ -21,76 +21,75 @@ import (
 	"net/http"
 	"os"
 
-	apps "k8s.io/api/apps/v1beta2"
+	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 )
 
 // healthCheck is a helper struct for easily performing healthchecks against the cluster and printing the output
 type healthCheck struct {
-	description, okMessage, failMessage string
-	// f is invoked with a k8s client passed to it. Should return an optional warning and/or an error
+	name   string
+	client clientset.Interface
+	// f is invoked with a k8s client passed to it. Should return an optional error
 	f func(clientset.Interface) error
+}
+
+// Check is part of the preflight.Checker interface
+func (c *healthCheck) Check() (warnings, errors []error) {
+	if err := c.f(c.client); err != nil {
+		return nil, []error{err}
+	}
+	return nil, nil
+}
+
+// Name is part of the preflight.Checker interface
+func (c *healthCheck) Name() string {
+	return c.name
 }
 
 // CheckClusterHealth makes sure:
 // - the API /healthz endpoint is healthy
-// - all Nodes are Ready
+// - all master Nodes are Ready
 // - (if self-hosted) that there are DaemonSets with at least one Pod for all control plane components
 // - (if static pod-hosted) that all required Static Pod manifests exist on disk
-func CheckClusterHealth(client clientset.Interface) error {
+func CheckClusterHealth(client clientset.Interface, ignoreChecksErrors sets.String) error {
 	fmt.Println("[upgrade] Making sure the cluster is healthy:")
 
-	healthChecks := []healthCheck{
-		{
-			description: "API Server health",
-			okMessage:   "Healthy",
-			failMessage: "Unhealthy",
-			f:           apiServerHealthy,
+	healthChecks := []preflight.Checker{
+		&healthCheck{
+			name:   "APIServerHealth",
+			client: client,
+			f:      apiServerHealthy,
 		},
-		{
-			description: "Node health",
-			okMessage:   "All Nodes are healthy",
-			failMessage: "More than one Node unhealthy",
-			f:           nodesHealthy,
+		&healthCheck{
+			name:   "MasterNodesReady",
+			client: client,
+			f:      masterNodesReady,
 		},
 		// TODO: Add a check for ComponentStatuses here?
 	}
 
 	// Run slightly different health checks depending on control plane hosting type
 	if IsControlPlaneSelfHosted(client) {
-		healthChecks = append(healthChecks, healthCheck{
-			description: "Control plane DaemonSet health",
-			okMessage:   "All control plane DaemonSets are healthy",
-			failMessage: "More than one control plane DaemonSet unhealthy",
-			f:           controlPlaneHealth,
+		healthChecks = append(healthChecks, &healthCheck{
+			name:   "ControlPlaneHealth",
+			client: client,
+			f:      controlPlaneHealth,
 		})
 	} else {
-		healthChecks = append(healthChecks, healthCheck{
-			description: "Static Pod manifests exists on disk",
-			okMessage:   "All manifests exist on disk",
-			failMessage: "Some manifests don't exist on disk",
-			f:           staticPodManifestHealth,
+		healthChecks = append(healthChecks, &healthCheck{
+			name:   "StaticPodManifest",
+			client: client,
+			f:      staticPodManifestHealth,
 		})
 	}
 
-	return runHealthChecks(client, healthChecks)
-}
-
-// runHealthChecks runs a set of health checks against the cluster
-func runHealthChecks(client clientset.Interface, healthChecks []healthCheck) error {
-	for _, check := range healthChecks {
-
-		err := check.f(client)
-		if err != nil {
-			fmt.Printf("[upgrade/health] Checking %s: %s\n", check.description, check.failMessage)
-			return fmt.Errorf("The cluster is not in an upgradeable state due to: %v", err)
-		}
-		fmt.Printf("[upgrade/health] Checking %s: %s\n", check.description, check.okMessage)
-	}
-	return nil
+	return preflight.RunChecks(healthChecks, os.Stderr, ignoreChecksErrors)
 }
 
 // apiServerHealthy checks whether the API server's /healthz endpoint is healthy
@@ -108,16 +107,25 @@ func apiServerHealthy(client clientset.Interface) error {
 	return nil
 }
 
-// nodesHealthy checks whether all Nodes in the cluster are in the Running state
-func nodesHealthy(client clientset.Interface) error {
-	nodes, err := client.CoreV1().Nodes().List(metav1.ListOptions{})
+// masterNodesReady checks whether all master Nodes in the cluster are in the Running state
+func masterNodesReady(client clientset.Interface) error {
+	selector := labels.SelectorFromSet(labels.Set(map[string]string{
+		constants.LabelNodeRoleMaster: "",
+	}))
+	masters, err := client.CoreV1().Nodes().List(metav1.ListOptions{
+		LabelSelector: selector.String(),
+	})
 	if err != nil {
-		return fmt.Errorf("couldn't list all nodes in cluster: %v", err)
+		return fmt.Errorf("couldn't list masters in cluster: %v", err)
 	}
 
-	notReadyNodes := getNotReadyNodes(nodes.Items)
-	if len(notReadyNodes) != 0 {
-		return fmt.Errorf("there are NotReady Nodes in the cluster: %v", notReadyNodes)
+	if len(masters.Items) == 0 {
+		return fmt.Errorf("failed to find any nodes with master role")
+	}
+
+	notReadyMasters := getNotReadyNodes(masters.Items)
+	if len(notReadyMasters) != 0 {
+		return fmt.Errorf("there are NotReady masters in the cluster: %v", notReadyMasters)
 	}
 	return nil
 }
@@ -166,7 +174,7 @@ func getNotReadyDaemonSets(client clientset.Interface) ([]error, error) {
 	notReadyDaemonSets := []error{}
 	for _, component := range constants.MasterComponents {
 		dsName := constants.AddSelfHostedPrefix(component)
-		ds, err := client.AppsV1beta2().DaemonSets(metav1.NamespaceSystem).Get(dsName, metav1.GetOptions{})
+		ds, err := client.AppsV1().DaemonSets(metav1.NamespaceSystem).Get(dsName, metav1.GetOptions{})
 		if err != nil {
 			return nil, fmt.Errorf("couldn't get daemonset %q in the %s namespace", dsName, metav1.NamespaceSystem)
 		}

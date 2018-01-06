@@ -301,10 +301,12 @@ func recursiveTar(srcBase, srcFile, destBase, destFile string, tw *tar.Writer) e
 		if err != nil {
 			return err
 		}
-
 		defer f.Close()
-		_, err = io.Copy(tw, f)
-		return err
+
+		if _, err := io.Copy(tw, f); err != nil {
+			return err
+		}
+		return f.Close()
 	}
 	return nil
 }
@@ -330,7 +332,6 @@ func untarAll(reader io.Reader, destFile, prefix string) error {
 			return err
 		}
 		if header.FileInfo().IsDir() {
-
 			if err := os.MkdirAll(outFileName, 0755); err != nil {
 				return err
 			}
@@ -359,7 +360,12 @@ func untarAll(reader io.Reader, destFile, prefix string) error {
 				return err
 			}
 			defer outFile.Close()
-			io.Copy(outFile, tarReader)
+			if _, err := io.Copy(outFile, tarReader); err != nil {
+				return err
+			}
+			if err := outFile.Close(); err != nil {
+				return err
+			}
 		}
 	}
 

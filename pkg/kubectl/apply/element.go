@@ -78,16 +78,14 @@ type FieldMeta interface {
 
 // FieldMetaImpl implements FieldMeta
 type FieldMetaImpl struct {
-	// The type of merge strategy to use for this field
+	// MergeType is the type of merge strategy to use for this field
 	// maybe "merge", "replace" or "retainkeys"
-	// TODO: There maybe multiple strategies, so this may need to be a slice, map, or struct
-	// Address this in a follow up in the PR to introduce retainkeys strategy
 	MergeType string
 
-	// The merge key to use when the MergeType is "merge" and underlying type is a list
+	// MergeKeys are the merge keys to use when the MergeType is "merge" and underlying type is a list
 	MergeKeys MergeKeys
 
-	// The openapi type of the field - "list", "primitive", "map"
+	// Type is the openapi type of the field - "list", "primitive", "map"
 	Type string
 
 	// Name contains of the field

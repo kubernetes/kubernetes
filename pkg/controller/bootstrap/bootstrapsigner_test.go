@@ -26,7 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	bootstrapapi "k8s.io/kubernetes/pkg/bootstrap/api"
 )
 
@@ -36,10 +36,14 @@ func init() {
 
 const testTokenID = "abc123"
 
-func newBootstrapSigner() (*BootstrapSigner, *fake.Clientset) {
+func newBootstrapSigner() (*BootstrapSigner, *fake.Clientset, error) {
 	options := DefaultBootstrapSignerOptions()
 	cl := fake.NewSimpleClientset()
-	return NewBootstrapSigner(cl, options), cl
+	bsc, err := NewBootstrapSigner(cl, options)
+	if err != nil {
+		return nil, nil, err
+	}
+	return bsc, cl, nil
 }
 
 func newConfigMap(tokenID, signature string) *v1.ConfigMap {
@@ -60,13 +64,19 @@ func newConfigMap(tokenID, signature string) *v1.ConfigMap {
 }
 
 func TestNoConfigMap(t *testing.T) {
-	signer, cl := newBootstrapSigner()
+	signer, cl, err := newBootstrapSigner()
+	if err != nil {
+		t.Fatalf("error creating BootstrapSigner: %v", err)
+	}
 	signer.signConfigMap()
 	verifyActions(t, []core.Action{}, cl.Actions())
 }
 
 func TestSimpleSign(t *testing.T) {
-	signer, cl := newBootstrapSigner()
+	signer, cl, err := newBootstrapSigner()
+	if err != nil {
+		t.Fatalf("error creating BootstrapSigner: %v", err)
+	}
 
 	cm := newConfigMap("", "")
 	signer.configMaps.Add(cm)
@@ -87,7 +97,10 @@ func TestSimpleSign(t *testing.T) {
 }
 
 func TestNoSignNeeded(t *testing.T) {
-	signer, cl := newBootstrapSigner()
+	signer, cl, err := newBootstrapSigner()
+	if err != nil {
+		t.Fatalf("error creating BootstrapSigner: %v", err)
+	}
 
 	cm := newConfigMap(testTokenID, "eyJhbGciOiJIUzI1NiIsImtpZCI6ImFiYzEyMyJ9..QSxpUG7Q542CirTI2ECPSZjvBOJURUW5a7XqFpNI958")
 	signer.configMaps.Add(cm)
@@ -102,7 +115,10 @@ func TestNoSignNeeded(t *testing.T) {
 }
 
 func TestUpdateSignature(t *testing.T) {
-	signer, cl := newBootstrapSigner()
+	signer, cl, err := newBootstrapSigner()
+	if err != nil {
+		t.Fatalf("error creating BootstrapSigner: %v", err)
+	}
 
 	cm := newConfigMap(testTokenID, "old signature")
 	signer.configMaps.Add(cm)
@@ -123,7 +139,10 @@ func TestUpdateSignature(t *testing.T) {
 }
 
 func TestRemoveSignature(t *testing.T) {
-	signer, cl := newBootstrapSigner()
+	signer, cl, err := newBootstrapSigner()
+	if err != nil {
+		t.Fatalf("error creating BootstrapSigner: %v", err)
+	}
 
 	cm := newConfigMap(testTokenID, "old signature")
 	signer.configMaps.Add(cm)

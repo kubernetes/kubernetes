@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2018 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,10 +18,10 @@ limitations under the License.
 
 package v1
 
-// DaemonSetListerExpansion allows custom methods to be added to
-// DaemonSetLister.
-type DaemonSetListerExpansion interface{}
+// ControllerRevisionListerExpansion allows custom methods to be added to
+// ControllerRevisionLister.
+type ControllerRevisionListerExpansion interface{}
 
-// DaemonSetNamespaceListerExpansion allows custom methods to be added to
-// DaemonSetNamespaceLister.
-type DaemonSetNamespaceListerExpansion interface{}
+// ControllerRevisionNamespaceListerExpansion allows custom methods to be added to
+// ControllerRevisionNamespaceLister.
+type ControllerRevisionNamespaceListerExpansion interface{}

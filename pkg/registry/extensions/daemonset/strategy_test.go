@@ -24,7 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 )
 
@@ -35,12 +35,57 @@ const (
 	namespace     = "test-namespace"
 )
 
-func TestDefaultGarbageCollectionPolicy(t *testing.T) {
+func TestDaemonsetDefaultGarbageCollectionPolicy(t *testing.T) {
 	// Make sure we correctly implement the interface.
 	// Otherwise a typo could silently change the default.
 	var gcds rest.GarbageCollectionDeleteStrategy = Strategy
-	if got, want := gcds.DefaultGarbageCollectionPolicy(), rest.OrphanDependents; got != want {
-		t.Errorf("DefaultGarbageCollectionPolicy() = %#v, want %#v", got, want)
+	tests := []struct {
+		requestInfo      genericapirequest.RequestInfo
+		expectedGCPolicy rest.GarbageCollectionPolicy
+		isNilRequestInfo bool
+	}{
+		{
+			genericapirequest.RequestInfo{
+				APIGroup:   "extensions",
+				APIVersion: "v1beta1",
+				Resource:   "daemonsets",
+			},
+			rest.OrphanDependents,
+			false,
+		},
+		{
+			genericapirequest.RequestInfo{
+				APIGroup:   "apps",
+				APIVersion: "v1beta2",
+				Resource:   "daemonsets",
+			},
+			rest.OrphanDependents,
+			false,
+		},
+		{
+			genericapirequest.RequestInfo{
+				APIGroup:   "apps",
+				APIVersion: "v1",
+				Resource:   "daemonsets",
+			},
+			rest.DeleteDependents,
+			false,
+		},
+		{
+			expectedGCPolicy: rest.OrphanDependents,
+			isNilRequestInfo: true,
+		},
+	}
+
+	for _, test := range tests {
+		context := genericapirequest.NewContext()
+		if !test.isNilRequestInfo {
+			context = genericapirequest.WithRequestInfo(context, &test.requestInfo)
+		}
+		if got, want := gcds.DefaultGarbageCollectionPolicy(context), test.expectedGCPolicy; got != want {
+			t.Errorf("%s/%s: DefaultGarbageCollectionPolicy() = %#v, want %#v", test.requestInfo.APIGroup,
+				test.requestInfo.APIVersion, got, want)
+		}
 	}
 }
 
@@ -51,6 +96,26 @@ func TestSelectorImmutability(t *testing.T) {
 		newSelectorLabels map[string]string
 		expectedErrorList field.ErrorList
 	}{
+		{
+			genericapirequest.RequestInfo{
+				APIGroup:   "apps",
+				APIVersion: "v1",
+				Resource:   "daemonsets",
+			},
+			map[string]string{"a": "b"},
+			map[string]string{"c": "d"},
+			field.ErrorList{
+				&field.Error{
+					Type:  field.ErrorTypeInvalid,
+					Field: field.NewPath("spec").Child("selector").String(),
+					BadValue: &metav1.LabelSelector{
+						MatchLabels:      map[string]string{"c": "d"},
+						MatchExpressions: []metav1.LabelSelectorRequirement{},
+					},
+					Detail: "field is immutable",
+				},
+			},
+		},
 		{
 			genericapirequest.RequestInfo{
 				APIGroup:   "apps",

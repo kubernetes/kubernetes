@@ -19,6 +19,7 @@ package cpumanager
 import (
 	"testing"
 
+	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 )
 
@@ -36,7 +37,7 @@ func TestNonePolicyAdd(t *testing.T) {
 	policy := &nonePolicy{}
 
 	st := &mockState{
-		assignments:   map[string]cpuset.CPUSet{},
+		assignments:   state.ContainerCPUAssignments{},
 		defaultCPUSet: cpuset.NewCPUSet(1, 2, 3, 4, 5, 6, 7),
 	}
 
@@ -53,7 +54,7 @@ func TestNonePolicyRemove(t *testing.T) {
 	policy := &nonePolicy{}
 
 	st := &mockState{
-		assignments:   map[string]cpuset.CPUSet{},
+		assignments:   state.ContainerCPUAssignments{},
 		defaultCPUSet: cpuset.NewCPUSet(1, 2, 3, 4, 5, 6, 7),
 	}
 

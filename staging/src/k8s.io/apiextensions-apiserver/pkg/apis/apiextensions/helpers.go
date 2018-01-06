@@ -16,11 +16,18 @@ limitations under the License.
 
 package apiextensions
 
+import (
+	"time"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
 // SetCRDCondition sets the status condition.  It either overwrites the existing one or
 // creates a new one
 func SetCRDCondition(crd *CustomResourceDefinition, newCondition CustomResourceDefinitionCondition) {
 	existingCondition := FindCRDCondition(crd, newCondition.Type)
 	if existingCondition == nil {
+		newCondition.LastTransitionTime = metav1.NewTime(time.Now())
 		crd.Status.Conditions = append(crd.Status.Conditions, newCondition)
 		return
 	}

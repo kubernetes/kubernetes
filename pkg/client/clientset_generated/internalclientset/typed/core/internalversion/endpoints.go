@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2018 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	rest "k8s.io/client-go/rest"
-	api "k8s.io/kubernetes/pkg/api"
+	core "k8s.io/kubernetes/pkg/apis/core"
 	scheme "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/scheme"
 )
 
@@ -33,14 +33,14 @@ type EndpointsGetter interface {
 
 // EndpointsInterface has methods to work with Endpoints resources.
 type EndpointsInterface interface {
-	Create(*api.Endpoints) (*api.Endpoints, error)
-	Update(*api.Endpoints) (*api.Endpoints, error)
+	Create(*core.Endpoints) (*core.Endpoints, error)
+	Update(*core.Endpoints) (*core.Endpoints, error)
 	Delete(name string, options *v1.DeleteOptions) error
 	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
-	Get(name string, options v1.GetOptions) (*api.Endpoints, error)
-	List(opts v1.ListOptions) (*api.EndpointsList, error)
+	Get(name string, options v1.GetOptions) (*core.Endpoints, error)
+	List(opts v1.ListOptions) (*core.EndpointsList, error)
 	Watch(opts v1.ListOptions) (watch.Interface, error)
-	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *api.Endpoints, err error)
+	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *core.Endpoints, err error)
 	EndpointsExpansion
 }
 
@@ -59,8 +59,8 @@ func newEndpoints(c *CoreClient, namespace string) *endpoints {
 }
 
 // Get takes name of the endpoints, and returns the corresponding endpoints object, and an error if there is any.
-func (c *endpoints) Get(name string, options v1.GetOptions) (result *api.Endpoints, err error) {
-	result = &api.Endpoints{}
+func (c *endpoints) Get(name string, options v1.GetOptions) (result *core.Endpoints, err error) {
+	result = &core.Endpoints{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("endpoints").
@@ -72,8 +72,8 @@ func (c *endpoints) Get(name string, options v1.GetOptions) (result *api.Endpoin
 }
 
 // List takes label and field selectors, and returns the list of Endpoints that match those selectors.
-func (c *endpoints) List(opts v1.ListOptions) (result *api.EndpointsList, err error) {
-	result = &api.EndpointsList{}
+func (c *endpoints) List(opts v1.ListOptions) (result *core.EndpointsList, err error) {
+	result = &core.EndpointsList{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("endpoints").
@@ -94,8 +94,8 @@ func (c *endpoints) Watch(opts v1.ListOptions) (watch.Interface, error) {
 }
 
 // Create takes the representation of a endpoints and creates it.  Returns the server's representation of the endpoints, and an error, if there is any.
-func (c *endpoints) Create(endpoints *api.Endpoints) (result *api.Endpoints, err error) {
-	result = &api.Endpoints{}
+func (c *endpoints) Create(endpoints *core.Endpoints) (result *core.Endpoints, err error) {
+	result = &core.Endpoints{}
 	err = c.client.Post().
 		Namespace(c.ns).
 		Resource("endpoints").
@@ -106,8 +106,8 @@ func (c *endpoints) Create(endpoints *api.Endpoints) (result *api.Endpoints, err
 }
 
 // Update takes the representation of a endpoints and updates it. Returns the server's representation of the endpoints, and an error, if there is any.
-func (c *endpoints) Update(endpoints *api.Endpoints) (result *api.Endpoints, err error) {
-	result = &api.Endpoints{}
+func (c *endpoints) Update(endpoints *core.Endpoints) (result *core.Endpoints, err error) {
+	result = &core.Endpoints{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("endpoints").
@@ -141,8 +141,8 @@ func (c *endpoints) DeleteCollection(options *v1.DeleteOptions, listOptions v1.L
 }
 
 // Patch applies the patch and returns the patched endpoints.
-func (c *endpoints) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *api.Endpoints, err error) {
-	result = &api.Endpoints{}
+func (c *endpoints) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *core.Endpoints, err error) {
+	result = &core.Endpoints{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
 		Resource("endpoints").

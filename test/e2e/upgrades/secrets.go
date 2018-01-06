@@ -54,7 +54,7 @@ func (t *SecretUpgradeTest) Setup(f *framework.Framework) {
 
 	By("Creating a secret")
 	var err error
-	if t.secret, err = f.ClientSet.Core().Secrets(ns.Name).Create(t.secret); err != nil {
+	if t.secret, err = f.ClientSet.CoreV1().Secrets(ns.Name).Create(t.secret); err != nil {
 		framework.Failf("unable to create test secret %s: %v", t.secret.Name, err)
 	}
 
@@ -114,7 +114,7 @@ func (t *SecretUpgradeTest) testPod(f *framework.Framework) {
 				},
 				{
 					Name:    "secret-env-test",
-					Image:   imageutils.GetBusyBoxImage(),
+					Image:   "busybox",
 					Command: []string{"sh", "-c", "env"},
 					Env: []v1.EnvVar{
 						{

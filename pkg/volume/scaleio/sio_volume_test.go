@@ -27,6 +27,7 @@ import (
 
 	api "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	fakeclient "k8s.io/client-go/kubernetes/fake"
 	utiltesting "k8s.io/client-go/util/testing"
@@ -39,29 +40,18 @@ var (
 	testSioPD      = "default"
 	testSioVol     = "vol-0001"
 	testns         = "default"
+	testSecret     = "sio-secret"
 	testSioVolName = fmt.Sprintf("%s%s%s", testns, "-", testSioVol)
 	podUID         = types.UID("sio-pod")
 )
 
-func newPluginMgr(t *testing.T) (*volume.VolumePluginMgr, string) {
+func newPluginMgr(t *testing.T, apiObject runtime.Object) (*volume.VolumePluginMgr, string) {
 	tmpDir, err := utiltesting.MkTmpdir("scaleio-test")
 	if err != nil {
 		t.Fatalf("can't make a temp dir: %v", err)
 	}
-	config := &api.Secret{
-		ObjectMeta: meta.ObjectMeta{
-			Name:      "sio-secret",
-			Namespace: testns,
-			UID:       "1234567890",
-		},
-		Type: api.SecretType("kubernetes.io/scaleio"),
-		Data: map[string][]byte{
-			"username": []byte("username"),
-			"password": []byte("password"),
-		},
-	}
 
-	fakeClient := fakeclient.NewSimpleClientset(config)
+	fakeClient := fakeclient.NewSimpleClientset(apiObject)
 	host := volumetest.NewFakeVolumeHostWithNodeLabels(
 		tmpDir,
 		fakeClient,
@@ -74,8 +64,23 @@ func newPluginMgr(t *testing.T) (*volume.VolumePluginMgr, string) {
 	return plugMgr, tmpDir
 }
 
+func makeScaleIOSecret(name, namespace string) *api.Secret {
+	return &api.Secret{
+		ObjectMeta: meta.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+			UID:       "1234567890",
+		},
+		Type: api.SecretType("kubernetes.io/scaleio"),
+		Data: map[string][]byte{
+			"username": []byte("username"),
+			"password": []byte("password"),
+		},
+	}
+}
+
 func TestVolumeCanSupport(t *testing.T) {
-	plugMgr, tmpDir := newPluginMgr(t)
+	plugMgr, tmpDir := newPluginMgr(t, makeScaleIOSecret(testSecret, testns))
 	defer os.RemoveAll(tmpDir)
 	plug, err := plugMgr.FindPluginByName(sioPluginName)
 	if err != nil {
@@ -100,7 +105,7 @@ func TestVolumeCanSupport(t *testing.T) {
 			PersistentVolume: &api.PersistentVolume{
 				Spec: api.PersistentVolumeSpec{
 					PersistentVolumeSource: api.PersistentVolumeSource{
-						ScaleIO: &api.ScaleIOVolumeSource{},
+						ScaleIO: &api.ScaleIOPersistentVolumeSource{},
 					},
 				},
 			},
@@ -111,7 +116,7 @@ func TestVolumeCanSupport(t *testing.T) {
 }
 
 func TestVolumeGetAccessModes(t *testing.T) {
-	plugMgr, tmpDir := newPluginMgr(t)
+	plugMgr, tmpDir := newPluginMgr(t, makeScaleIOSecret(testSecret, testns))
 	defer os.RemoveAll(tmpDir)
 	plug, err := plugMgr.FindPersistentPluginByName(sioPluginName)
 	if err != nil {
@@ -131,7 +136,7 @@ func containsMode(modes []api.PersistentVolumeAccessMode, mode api.PersistentVol
 }
 
 func TestVolumeMounterUnmounter(t *testing.T) {
-	plugMgr, tmpDir := newPluginMgr(t)
+	plugMgr, tmpDir := newPluginMgr(t, makeScaleIOSecret(testSecret, testns))
 	defer os.RemoveAll(tmpDir)
 
 	plug, err := plugMgr.FindPluginByName(sioPluginName)
@@ -153,7 +158,7 @@ func TestVolumeMounterUnmounter(t *testing.T) {
 				StoragePool:      "default",
 				VolumeName:       testSioVol,
 				FSType:           "ext4",
-				SecretRef:        &api.LocalObjectReference{Name: "sio-secret"},
+				SecretRef:        &api.LocalObjectReference{Name: testSecret},
 				ReadOnly:         false,
 			},
 		},
@@ -236,7 +241,7 @@ func TestVolumeMounterUnmounter(t *testing.T) {
 	if _, err := os.Stat(path); err == nil {
 		t.Errorf("TearDown() failed, volume path still exists: %s", path)
 	} else if !os.IsNotExist(err) {
-		t.Errorf("SetUp() failed: %v", err)
+		t.Errorf("TearDown() failed: %v", err)
 	}
 	// are we still mapped
 	if sio.volume.MappedSdcInfo != nil {
@@ -245,7 +250,7 @@ func TestVolumeMounterUnmounter(t *testing.T) {
 }
 
 func TestVolumeProvisioner(t *testing.T) {
-	plugMgr, tmpDir := newPluginMgr(t)
+	plugMgr, tmpDir := newPluginMgr(t, makeScaleIOSecret(testSecret, testns))
 	defer os.RemoveAll(tmpDir)
 
 	plug, err := plugMgr.FindPluginByName(sioPluginName)
@@ -274,7 +279,7 @@ func TestVolumeProvisioner(t *testing.T) {
 		confKey.system:           "sio",
 		confKey.protectionDomain: testSioPD,
 		confKey.storagePool:      "default",
-		confKey.secretRef:        "sio-secret",
+		confKey.secretName:       testSecret,
 	}
 
 	provisioner, err := sioPlug.NewProvisioner(options)
@@ -294,6 +299,17 @@ func TestVolumeProvisioner(t *testing.T) {
 	spec, err := provisioner.Provision()
 	if err != nil {
 		t.Fatalf("call to Provision() failed: %v", err)
+	}
+
+	if spec.Namespace != testns {
+		t.Fatalf("unexpected namespace %v", spec.Namespace)
+	}
+	if spec.Spec.ScaleIO.SecretRef == nil {
+		t.Fatalf("unexpected nil value for spec.SecretRef")
+	}
+	if spec.Spec.ScaleIO.SecretRef.Name != testSecret ||
+		spec.Spec.ScaleIO.SecretRef.Namespace != testns {
+		t.Fatalf("spec.SecretRef is not being set properly")
 	}
 
 	spec.Spec.ClaimRef = &api.ObjectReference{Namespace: testns}
@@ -379,7 +395,7 @@ func TestVolumeProvisioner(t *testing.T) {
 }
 
 func TestVolumeProvisionerWithIncompleteConfig(t *testing.T) {
-	plugMgr, tmpDir := newPluginMgr(t)
+	plugMgr, tmpDir := newPluginMgr(t, makeScaleIOSecret(testSecret, testns))
 	defer os.RemoveAll(tmpDir)
 
 	plug, err := plugMgr.FindPluginByName(sioPluginName)
@@ -411,7 +427,7 @@ func TestVolumeProvisionerWithIncompleteConfig(t *testing.T) {
 }
 
 func TestVolumeProvisionerWithZeroCapacity(t *testing.T) {
-	plugMgr, tmpDir := newPluginMgr(t)
+	plugMgr, tmpDir := newPluginMgr(t, makeScaleIOSecret(testSecret, testns))
 	defer os.RemoveAll(tmpDir)
 
 	plug, err := plugMgr.FindPluginByName(sioPluginName)
@@ -440,7 +456,7 @@ func TestVolumeProvisionerWithZeroCapacity(t *testing.T) {
 		confKey.system:           "sio",
 		confKey.protectionDomain: testSioPD,
 		confKey.storagePool:      "default",
-		confKey.secretRef:        "sio-secret",
+		confKey.secretName:       "sio-secret",
 	}
 
 	provisioner, _ := sioPlug.NewProvisioner(options)
@@ -456,4 +472,64 @@ func TestVolumeProvisionerWithZeroCapacity(t *testing.T) {
 		t.Fatalf("call to Provision() should fail with invalid capacity")
 	}
 
+}
+
+func TestVolumeProvisionerWithSecretNamespace(t *testing.T) {
+	plugMgr, tmpDir := newPluginMgr(t, makeScaleIOSecret("sio-sec", "sio-ns"))
+	defer os.RemoveAll(tmpDir)
+
+	plug, err := plugMgr.FindPluginByName(sioPluginName)
+	if err != nil {
+		t.Fatalf("Can't find the plugin %v", sioPluginName)
+	}
+	sioPlug, ok := plug.(*sioPlugin)
+	if !ok {
+		t.Fatal("Cannot assert plugin to be type sioPlugin")
+	}
+
+	options := volume.VolumeOptions{
+		ClusterName: "testcluster",
+		PVName:      "pvc-sio-dynamic-vol",
+		PVC:         volumetest.CreateTestPVC("100Mi", []api.PersistentVolumeAccessMode{api.ReadWriteOnce}),
+		PersistentVolumeReclaimPolicy: api.PersistentVolumeReclaimDelete,
+	}
+
+	options.PVC.Spec.AccessModes = []api.PersistentVolumeAccessMode{
+		api.ReadWriteOnce,
+	}
+
+	options.PVC.Namespace = "pvc-ns"
+	options.Parameters = map[string]string{
+		confKey.gateway:          "http://test.scaleio:11111",
+		confKey.system:           "sio",
+		confKey.protectionDomain: testSioPD,
+		confKey.storagePool:      "default",
+		confKey.secretName:       "sio-sec",
+		confKey.secretNamespace:  "sio-ns",
+	}
+
+	provisioner, _ := sioPlug.NewProvisioner(options)
+	sio := newFakeSio()
+	sioVol := provisioner.(*sioVolume)
+	if err := sioVol.setSioMgrFromConfig(); err != nil {
+		t.Fatalf("failed to create scaleio mgr from config: %v", err)
+	}
+	sioVol.sioMgr.client = sio
+
+	spec, err := sioVol.Provision()
+	if err != nil {
+		t.Fatalf("call to Provision() failed: %v", err)
+	}
+
+	if spec.GetObjectMeta().GetNamespace() != "pvc-ns" {
+		t.Fatalf("unexpected spec.namespace %s", spec.GetObjectMeta().GetNamespace())
+	}
+
+	if spec.Spec.ScaleIO.SecretRef.Name != "sio-sec" {
+		t.Fatalf("unexpected spec.ScaleIOPersistentVolume.SecretRef.Name %v", spec.Spec.ScaleIO.SecretRef.Name)
+	}
+
+	if spec.Spec.ScaleIO.SecretRef.Namespace != "sio-ns" {
+		t.Fatalf("unexpected spec.ScaleIOPersistentVolume.SecretRef.Namespace %v", spec.Spec.ScaleIO.SecretRef.Namespace)
+	}
 }

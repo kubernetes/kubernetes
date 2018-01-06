@@ -10,7 +10,7 @@ go_library(
     srcs = ["storage_autoscaling.go"],
     importpath = "k8s.io/kubernetes/pkg/registry/autoscaling/rest",
     deps = [
-        "//pkg/api:go_default_library",
+        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/autoscaling:go_default_library",
         "//pkg/registry/autoscaling/horizontalpodautoscaler/storage:go_default_library",
         "//vendor/k8s.io/api/autoscaling/v1:go_default_library",

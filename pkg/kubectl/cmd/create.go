@@ -19,10 +19,15 @@ package cmd
 import (
 	"fmt"
 	"io"
+	"os"
 	"runtime"
+	"strings"
 
 	"github.com/spf13/cobra"
 
+	"net/url"
+
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
@@ -36,6 +41,7 @@ type CreateOptions struct {
 	FilenameOptions  resource.FilenameOptions
 	Selector         string
 	EditBeforeCreate bool
+	Raw              string
 }
 
 var (
@@ -69,7 +75,7 @@ func NewCmdCreate(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 				defaultRunFunc(cmd, args)
 				return
 			}
-			cmdutil.CheckErr(ValidateArgs(cmd, args))
+			cmdutil.CheckErr(options.ValidateArgs(cmd, args))
 			cmdutil.CheckErr(RunCreate(f, cmd, out, errOut, &options))
 		},
 	}
@@ -87,6 +93,7 @@ func NewCmdCreate(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 	cmdutil.AddDryRunFlag(cmd)
 	cmdutil.AddInclude3rdPartyFlags(cmd)
 	cmd.Flags().StringVarP(&options.Selector, "selector", "l", "", "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
+	cmd.Flags().StringVar(&options.Raw, "raw", options.Raw, "Raw URI to POST to the server.  Uses the transport specified by the kubeconfig file.")
 
 	// create subcommands
 	cmd.AddCommand(NewCmdCreateNamespace(f, out))
@@ -101,17 +108,69 @@ func NewCmdCreate(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 	cmd.AddCommand(NewCmdCreateRole(f, out))
 	cmd.AddCommand(NewCmdCreateRoleBinding(f, out))
 	cmd.AddCommand(NewCmdCreatePodDisruptionBudget(f, out))
+	cmd.AddCommand(NewCmdCreatePriorityClass(f, out))
 	return cmd
 }
 
-func ValidateArgs(cmd *cobra.Command, args []string) error {
+func (o *CreateOptions) ValidateArgs(cmd *cobra.Command, args []string) error {
 	if len(args) != 0 {
 		return cmdutil.UsageErrorf(cmd, "Unexpected args: %v", args)
 	}
+	if len(o.Raw) > 0 {
+		if o.EditBeforeCreate {
+			return cmdutil.UsageErrorf(cmd, "--raw and --edit are mutually exclusive")
+		}
+		if len(o.FilenameOptions.Filenames) != 1 {
+			return cmdutil.UsageErrorf(cmd, "--raw can only use a single local file or stdin")
+		}
+		if strings.Index(o.FilenameOptions.Filenames[0], "http://") == 0 || strings.Index(o.FilenameOptions.Filenames[0], "https://") == 0 {
+			return cmdutil.UsageErrorf(cmd, "--raw cannot read from a url")
+		}
+		if o.FilenameOptions.Recursive {
+			return cmdutil.UsageErrorf(cmd, "--raw and --recursive are mutually exclusive")
+		}
+		if len(o.Selector) > 0 {
+			return cmdutil.UsageErrorf(cmd, "--raw and --selector (-l) are mutually exclusive")
+		}
+		if len(cmdutil.GetFlagString(cmd, "output")) > 0 {
+			return cmdutil.UsageErrorf(cmd, "--raw and --output are mutually exclusive")
+		}
+		if _, err := url.ParseRequestURI(o.Raw); err != nil {
+			return cmdutil.UsageErrorf(cmd, "--raw must be a valid URL path: %v", err)
+		}
+	}
+
 	return nil
 }
 
 func RunCreate(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, options *CreateOptions) error {
+	// raw only makes sense for a single file resource multiple objects aren't likely to do what you want.
+	// the validator enforces this, so
+	if len(options.Raw) > 0 {
+		restClient, err := f.RESTClient()
+		if err != nil {
+			return err
+		}
+
+		var data io.ReadCloser
+		if options.FilenameOptions.Filenames[0] == "-" {
+			data = os.Stdin
+		} else {
+			data, err = os.Open(options.FilenameOptions.Filenames[0])
+			if err != nil {
+				return err
+			}
+		}
+		// TODO post content with stream.  Right now it ignores body content
+		bytes, err := restClient.Post().RequestURI(options.Raw).Body(data).DoRaw()
+		if err != nil {
+			return err
+		}
+
+		fmt.Fprintf(out, "%v", string(bytes))
+		return nil
+	}
+
 	if options.EditBeforeCreate {
 		return RunEditOnCreate(f, out, errOut, cmd, &options.FilenameOptions)
 	}
@@ -125,18 +184,13 @@ func RunCreate(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opt
 		return err
 	}
 
-	mapper, typer, err := f.UnstructuredObject()
-	if err != nil {
-		return err
-	}
-
 	r := f.NewBuilder().
-		Unstructured(f.UnstructuredClientForMapping, mapper, typer).
+		Unstructured().
 		Schema(schema).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, &options.FilenameOptions).
-		SelectorParam(options.Selector).
+		LabelSelectorParam(options.Selector).
 		Flatten().
 		Do()
 	err = r.Err()
@@ -146,6 +200,7 @@ func RunCreate(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opt
 
 	dryRun := cmdutil.GetFlagBool(cmd, "dry-run")
 	output := cmdutil.GetFlagString(cmd, "output")
+	mapper := r.Mapper().RESTMapper
 
 	count := 0
 	err = r.Visit(func(info *resource.Info, err error) error {
@@ -172,13 +227,13 @@ func RunCreate(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opt
 
 		shortOutput := output == "name"
 		if len(output) > 0 && !shortOutput {
-			return cmdutil.PrintResourceInfoForCommand(cmd, info, f, out)
+			return f.PrintResourceInfoForCommand(cmd, info, out)
 		}
 		if !shortOutput {
 			f.PrintObjectSpecificMessage(info.Object, out)
 		}
 
-		cmdutil.PrintSuccess(mapper, shortOutput, out, info.Mapping.Resource, info.Name, dryRun, "created")
+		f.PrintSuccess(mapper, shortOutput, out, info.Mapping.Resource, info.Name, dryRun, "created")
 		return nil
 	})
 	if err != nil {
@@ -223,8 +278,8 @@ func createAndRefresh(info *resource.Info) error {
 
 // NameFromCommandArgs is a utility function for commands that assume the first argument is a resource name
 func NameFromCommandArgs(cmd *cobra.Command, args []string) (string, error) {
-	if len(args) == 0 {
-		return "", cmdutil.UsageErrorf(cmd, "NAME is required")
+	if len(args) != 1 {
+		return "", cmdutil.UsageErrorf(cmd, "exactly one NAME is required, got %d", len(args))
 	}
 	return args[0], nil
 }
@@ -242,7 +297,7 @@ type CreateSubcommandOptions struct {
 
 // RunCreateSubcommand executes a create subcommand using the specified options
 func RunCreateSubcommand(f cmdutil.Factory, cmd *cobra.Command, out io.Writer, options *CreateSubcommandOptions) error {
-	namespace, _, err := f.DefaultNamespace()
+	namespace, nsOverriden, err := f.DefaultNamespace()
 	if err != nil {
 		return err
 	}
@@ -283,10 +338,14 @@ func RunCreateSubcommand(f cmdutil.Factory, cmd *cobra.Command, out io.Writer, o
 		if err != nil {
 			return err
 		}
+	} else {
+		if meta, err := meta.Accessor(obj); err == nil && nsOverriden {
+			meta.SetNamespace(namespace)
+		}
 	}
 
 	if useShortOutput := options.OutputFormat == "name"; useShortOutput || len(options.OutputFormat) == 0 {
-		cmdutil.PrintSuccess(mapper, useShortOutput, out, mapping.Resource, info.Name, options.DryRun, "created")
+		f.PrintSuccess(mapper, useShortOutput, out, mapping.Resource, info.Name, options.DryRun, "created")
 		return nil
 	}
 

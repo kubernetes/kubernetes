@@ -169,6 +169,7 @@ func NewCmdCreateSecretDockerRegistry(f cmdutil.Factory, cmdOut io.Writer) *cobr
 	cmd.Flags().String("docker-email", "", i18n.T("Email for Docker registry"))
 	cmd.Flags().String("docker-server", "https://index.docker.io/v1/", i18n.T("Server location for Docker registry"))
 	cmd.Flags().Bool("append-hash", false, "Append a hash of the secret to its name.")
+
 	cmdutil.AddInclude3rdPartyFlags(cmd)
 	return cmd
 }

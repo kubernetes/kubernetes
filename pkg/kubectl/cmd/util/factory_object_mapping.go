@@ -27,6 +27,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/golang/glog"
+
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -35,14 +37,15 @@ import (
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	restclient "k8s.io/client-go/rest"
-	"k8s.io/kubernetes/federation/apis/federation"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/batch"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/kubectl"
+	"k8s.io/kubernetes/pkg/kubectl/categories"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
 	openapivalidation "k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi/validation"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
@@ -70,60 +73,51 @@ func NewObjectMappingFactory(clientAccessFactory ClientAccessFactory) ObjectMapp
 	return f
 }
 
-// TODO: This method should return an error now that it can fail.  Alternatively, it needs to
-//   return lazy implementations of mapper and typer that don't hit the wire until they are
-//   invoked.
-func (f *ring1Factory) Object() (meta.RESTMapper, runtime.ObjectTyper) {
-	mapper := api.Registry.RESTMapper()
-	discoveryClient, err := f.clientAccessFactory.DiscoveryClient()
-	if err == nil {
-		mapper = meta.FirstHitRESTMapper{
-			MultiRESTMapper: meta.MultiRESTMapper{
-				discovery.NewDeferredDiscoveryRESTMapper(discoveryClient, api.Registry.InterfacesFor),
-				api.Registry.RESTMapper(), // hardcoded fall back
-			},
-		}
-
-		// wrap with shortcuts, they require a discoveryClient
-		mapper, err = NewShortcutExpander(mapper, discoveryClient)
-		// you only have an error on missing discoveryClient, so this shouldn't fail.  Check anyway.
-		CheckErr(err)
-	}
-
-	return mapper, api.Scheme
-}
-
-func (f *ring1Factory) UnstructuredObject() (meta.RESTMapper, runtime.ObjectTyper, error) {
+// objectLoader attempts to perform discovery against the server, and will fall back to
+// the built in mapper if necessary. It supports unstructured objects either way, since
+// the underlying Scheme supports Unstructured. The mapper will return converters that can
+// convert versioned types to unstructured and back.
+func (f *ring1Factory) objectLoader() (meta.RESTMapper, runtime.ObjectTyper, error) {
 	discoveryClient, err := f.clientAccessFactory.DiscoveryClient()
 	if err != nil {
-		return nil, nil, err
+		glog.V(3).Infof("Unable to get a discovery client to find server resources, falling back to hardcoded types: %v", err)
+		return legacyscheme.Registry.RESTMapper(), legacyscheme.Scheme, nil
 	}
+
 	groupResources, err := discovery.GetAPIGroupResources(discoveryClient)
 	if err != nil && !discoveryClient.Fresh() {
 		discoveryClient.Invalidate()
 		groupResources, err = discovery.GetAPIGroupResources(discoveryClient)
 	}
 	if err != nil {
-		return nil, nil, err
+		glog.V(3).Infof("Unable to retrieve API resources, falling back to hardcoded types: %v", err)
+		return legacyscheme.Registry.RESTMapper(), legacyscheme.Scheme, nil
 	}
 
-	mapper := discovery.NewDeferredDiscoveryRESTMapper(discoveryClient, meta.InterfacesForUnstructured)
-	typer := discovery.NewUnstructuredObjectTyper(groupResources)
-	expander, err := NewShortcutExpander(mapper, discoveryClient)
+	// allow conversion between typed and unstructured objects
+	interfaces := meta.InterfacesForUnstructuredConversion(legacyscheme.Registry.InterfacesFor)
+	mapper := discovery.NewDeferredDiscoveryRESTMapper(discoveryClient, meta.VersionInterfacesFunc(interfaces))
+	// TODO: should this also indicate it recognizes typed objects?
+	typer := discovery.NewUnstructuredObjectTyper(groupResources, legacyscheme.Scheme)
+	expander := NewShortcutExpander(mapper, discoveryClient)
 	return expander, typer, err
 }
 
-func (f *ring1Factory) CategoryExpander() resource.CategoryExpander {
-	legacyExpander := resource.LegacyCategoryExpander
+func (f *ring1Factory) Object() (meta.RESTMapper, runtime.ObjectTyper) {
+	return meta.NewLazyObjectLoader(f.objectLoader)
+}
+
+func (f *ring1Factory) CategoryExpander() categories.CategoryExpander {
+	legacyExpander := categories.LegacyCategoryExpander
 
 	discoveryClient, err := f.clientAccessFactory.DiscoveryClient()
 	if err == nil {
 		// fallback is the legacy expander wrapped with discovery based filtering
-		fallbackExpander, err := resource.NewDiscoveryFilteredExpander(legacyExpander, discoveryClient)
+		fallbackExpander, err := categories.NewDiscoveryFilteredExpander(legacyExpander, discoveryClient)
 		CheckErr(err)
 
 		// by default use the expander that discovers based on "categories" field from the API
-		discoveryCategoryExpander, err := resource.NewDiscoveryCategoryExpander(fallbackExpander, discoveryClient)
+		discoveryCategoryExpander, err := categories.NewDiscoveryCategoryExpander(fallbackExpander, discoveryClient)
 		CheckErr(err)
 
 		return discoveryCategoryExpander
@@ -142,9 +136,6 @@ func (f *ring1Factory) ClientForMapping(mapping *meta.RESTMapping) (resource.RES
 	}
 	gvk := mapping.GroupVersionKind
 	switch gvk.Group {
-	case federation.GroupName:
-		mappingVersion := mapping.GroupVersionKind.GroupVersion()
-		return f.clientAccessFactory.FederationClientForVersion(&mappingVersion)
 	case api.GroupName:
 		cfg.APIPath = "/api"
 	default:
@@ -175,15 +166,6 @@ func (f *ring1Factory) UnstructuredClientForMapping(mapping *meta.RESTMapping) (
 
 func (f *ring1Factory) Describer(mapping *meta.RESTMapping) (printers.Describer, error) {
 	mappingVersion := mapping.GroupVersionKind.GroupVersion()
-	if mapping.GroupVersionKind.Group == federation.GroupName {
-		fedClientSet, err := f.clientAccessFactory.FederationClientSetForVersion(&mappingVersion)
-		if err != nil {
-			return nil, err
-		}
-		if mapping.GroupVersionKind.Kind == "Cluster" {
-			return &printersinternal.ClusterDescriber{Interface: fedClientSet}, nil
-		}
-	}
 
 	clientset, err := f.clientAccessFactory.ClientSetForVersion(&mappingVersion)
 	if err != nil {
@@ -284,11 +266,7 @@ func (f *ring1Factory) LogsForObject(object, options runtime.Object, timeout tim
 		}
 
 	default:
-		gvks, _, err := api.Scheme.ObjectKinds(object)
-		if err != nil {
-			return nil, err
-		}
-		return nil, fmt.Errorf("cannot get the logs from %v", gvks[0])
+		return nil, fmt.Errorf("cannot get the logs from %T", object)
 	}
 
 	sortBy := func(pods []*v1.Pod) sort.Interface { return controller.ByLogging(pods) }
@@ -326,26 +304,23 @@ func (f *ring1Factory) Reaper(mapping *meta.RESTMapping) (kubectl.Reaper, error)
 }
 
 func (f *ring1Factory) HistoryViewer(mapping *meta.RESTMapping) (kubectl.HistoryViewer, error) {
-	mappingVersion := mapping.GroupVersionKind.GroupVersion()
-	clientset, err := f.clientAccessFactory.ClientSetForVersion(&mappingVersion)
+	external, err := f.clientAccessFactory.KubernetesClientSet()
 	if err != nil {
 		return nil, err
 	}
-	return kubectl.HistoryViewerFor(mapping.GroupVersionKind.GroupKind(), clientset)
+	return kubectl.HistoryViewerFor(mapping.GroupVersionKind.GroupKind(), external)
 }
 
 func (f *ring1Factory) Rollbacker(mapping *meta.RESTMapping) (kubectl.Rollbacker, error) {
-	mappingVersion := mapping.GroupVersionKind.GroupVersion()
-	clientset, err := f.clientAccessFactory.ClientSetForVersion(&mappingVersion)
+	external, err := f.clientAccessFactory.KubernetesClientSet()
 	if err != nil {
 		return nil, err
 	}
-	return kubectl.RollbackerFor(mapping.GroupVersionKind.GroupKind(), clientset)
+	return kubectl.RollbackerFor(mapping.GroupVersionKind.GroupKind(), external)
 }
 
 func (f *ring1Factory) StatusViewer(mapping *meta.RESTMapping) (kubectl.StatusViewer, error) {
-	mappingVersion := mapping.GroupVersionKind.GroupVersion()
-	clientset, err := f.clientAccessFactory.ClientSetForVersion(&mappingVersion)
+	clientset, err := f.clientAccessFactory.KubernetesClientSet()
 	if err != nil {
 		return nil, err
 	}
@@ -415,11 +390,7 @@ func (f *ring1Factory) AttachablePodForObject(object runtime.Object, timeout tim
 		return t, nil
 
 	default:
-		gvks, _, err := api.Scheme.ObjectKinds(object)
-		if err != nil {
-			return nil, err
-		}
-		return nil, fmt.Errorf("cannot attach to %v: not implemented", gvks[0])
+		return nil, fmt.Errorf("cannot attach to %T: not implemented", object)
 	}
 
 	sortBy := func(pods []*v1.Pod) sort.Interface { return sort.Reverse(controller.ActivePods(pods)) }

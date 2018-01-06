@@ -37,8 +37,8 @@ import (
 	nodeutilv1 "k8s.io/kubernetes/pkg/api/v1/node"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
+	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
-	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 )
 
 var UpdateNodeSpecBackoff = wait.Backoff{
@@ -147,6 +147,15 @@ func (cnc *CloudNodeController) updateNodeAddress(node *v1.Node, instances cloud
 		glog.V(5).Infof("This node %s is still tainted. Will not process.", node.Name)
 		return
 	}
+	// Node that isn't present according to the cloud provider shouldn't have its address updated
+	exists, err := ensureNodeExistsByProviderIDOrExternalID(instances, node)
+	if err != nil {
+		// Continue to update node address when not sure the node is not exists
+		glog.Errorf("%v", err)
+	} else if !exists {
+		glog.V(4).Infof("The node %s is no longer present according to the cloud provider, do not process.", node.Name)
+		return
+	}
 
 	nodeAddresses, err := getNodeAddressesByProviderIDOrName(instances, node)
 	if err != nil {
@@ -183,7 +192,7 @@ func (cnc *CloudNodeController) updateNodeAddress(node *v1.Node, instances cloud
 	if !nodeAddressesChangeDetected(node.Status.Addresses, newNode.Status.Addresses) {
 		return
 	}
-	_, err = nodeutil.PatchNodeStatus(cnc.kubeClient.CoreV1(), types.NodeName(node.Name), node, newNode)
+	_, _, err = nodeutil.PatchNodeStatus(cnc.kubeClient.CoreV1(), types.NodeName(node.Name), node, newNode)
 	if err != nil {
 		glog.Errorf("Error patching node with cloud ip addresses = [%v]", err)
 	}

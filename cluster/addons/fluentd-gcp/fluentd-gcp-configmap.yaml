@@ -41,17 +41,26 @@ data:
     # Tag is then parsed by google_cloud plugin and translated to the metadata,
     # visible in the log viewer
 
-    # Example:
+    # Json Log Example:
     # {"log":"[info:2016-02-16T16:04:05.930-08:00] Some log text here\n","stream":"stdout","time":"2016-02-17T00:04:05.931087621Z"}
+    # CRI Log Example:
+    # 2016-02-17T00:04:05.931087621Z stdout F [info:2016-02-16T16:04:05.930-08:00] Some log text here
     <source>
       type tail
-      format json
-      time_key time
       path /var/log/containers/*.log
       pos_file /var/log/gcp-containers.log.pos
-      time_format %Y-%m-%dT%H:%M:%S.%N%Z
       tag reform.*
       read_from_head true
+      format multi_format
+      <pattern>
+        format json
+        time_key time
+        time_format %Y-%m-%dT%H:%M:%S.%NZ
+      </pattern>
+      <pattern>
+        format /^(?<time>.+) (?<stream>stdout|stderr) [^ ]* (?<log>.*)$/
+        time_format %Y-%m-%dT%H:%M:%S.%N%:z
+      </pattern>
     </source>
 
     <filter reform.**>
@@ -389,7 +398,7 @@ data:
       num_threads 2
     </match>
 metadata:
-  name: fluentd-gcp-config-v1.2.2
+  name: fluentd-gcp-config-v1.2.3
   namespace: kube-system
   labels:
     addonmanager.kubernetes.io/mode: Reconcile

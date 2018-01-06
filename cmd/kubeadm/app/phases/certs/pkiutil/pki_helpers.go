@@ -76,11 +76,7 @@ func WriteCertAndKey(pkiPath string, name string, cert *x509.Certificate, key *r
 		return err
 	}
 
-	if err := WriteCert(pkiPath, name, cert); err != nil {
-		return err
-	}
-
-	return nil
+	return WriteCert(pkiPath, name, cert)
 }
 
 // WriteCert stores the given certificate at the given location

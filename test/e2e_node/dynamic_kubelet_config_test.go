@@ -26,6 +26,7 @@ import (
 	apiv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
+	controller "k8s.io/kubernetes/pkg/kubelet/kubeletconfig"
 	"k8s.io/kubernetes/pkg/kubelet/kubeletconfig/status"
 
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -39,6 +40,11 @@ type configState struct {
 	configSource   *apiv1.NodeConfigSource
 	expectConfigOK *apiv1.NodeCondition
 	expectConfig   *kubeletconfig.KubeletConfiguration
+	// whether the state would cause a config change event as a result of the update to Node.Spec.ConfigSource,
+	// assuming that the current source would have also caused a config change event.
+	// for example, some malformed references may result in a download failure, in which case the Kubelet
+	// does not restart to change config, while an invalid payload will be detected upon restart
+	event bool
 }
 
 // This test is marked [Disruptive] because the Kubelet restarts several times during this test.
@@ -80,9 +86,10 @@ var _ = framework.KubeDescribe("DynamicKubeletConfiguration [Feature:DynamicKube
 					Namespace: originalConfigMap.Namespace,
 					Name:      originalConfigMap.Name}},
 				expectConfigOK: &apiv1.NodeCondition{Type: apiv1.NodeConfigOK, Status: apiv1.ConditionTrue,
-					Message: fmt.Sprintf(status.CurRemoteMessageFmt, originalConfigMap.UID),
-					Reason:  status.CurRemoteOKReason},
-				expectConfig: originalKC})
+					Message: fmt.Sprintf(status.CurRemoteMessageFmt, configMapAPIPath(originalConfigMap)),
+					Reason:  status.CurRemoteOkayReason},
+				expectConfig: originalKC,
+			}, false)
 		})
 
 		Context("When setting new NodeConfigSources that cause transitions between ConfigOK conditions", func() {
@@ -119,9 +126,11 @@ var _ = framework.KubeDescribe("DynamicKubeletConfiguration [Feature:DynamicKube
 					{desc: "Node.Spec.ConfigSource is nil",
 						configSource: nil,
 						expectConfigOK: &apiv1.NodeCondition{Type: apiv1.NodeConfigOK, Status: apiv1.ConditionTrue,
-							Message: status.CurDefaultMessage,
-							Reason:  status.CurDefaultOKReason},
-						expectConfig: nil},
+							Message: status.CurLocalMessage,
+							Reason:  status.CurLocalOkayReason},
+						expectConfig: nil,
+						event:        true,
+					},
 
 					// Node.Spec.ConfigSource has all nil subfields
 					{desc: "Node.Spec.ConfigSource has all nil subfields",
@@ -129,7 +138,9 @@ var _ = framework.KubeDescribe("DynamicKubeletConfiguration [Feature:DynamicKube
 						expectConfigOK: &apiv1.NodeCondition{Type: apiv1.NodeConfigOK, Status: apiv1.ConditionFalse,
 							Message: "",
 							Reason:  fmt.Sprintf(status.FailSyncReasonFmt, status.FailSyncReasonAllNilSubfields)},
-						expectConfig: nil},
+						expectConfig: nil,
+						event:        false,
+					},
 
 					// Node.Spec.ConfigSource.ConfigMapRef is partial
 					{desc: "Node.Spec.ConfigSource.ConfigMapRef is partial",
@@ -140,17 +151,21 @@ var _ = framework.KubeDescribe("DynamicKubeletConfiguration [Feature:DynamicKube
 						expectConfigOK: &apiv1.NodeCondition{Type: apiv1.NodeConfigOK, Status: apiv1.ConditionFalse,
 							Message: "",
 							Reason:  fmt.Sprintf(status.FailSyncReasonFmt, status.FailSyncReasonPartialObjectReference)},
-						expectConfig: nil},
+						expectConfig: nil,
+						event:        false,
+					},
 
 					// Node.Spec.ConfigSource's UID does not align with namespace/name
-					{desc: "Node.Spec.ConfigSource's UID does not align with namespace/name",
+					{desc: "Node.Spec.ConfigSource.ConfigMapRef.UID does not align with Namespace/Name",
 						configSource: &apiv1.NodeConfigSource{ConfigMapRef: &apiv1.ObjectReference{UID: "foo",
 							Namespace: correctConfigMap.Namespace,
 							Name:      correctConfigMap.Name}},
 						expectConfigOK: &apiv1.NodeCondition{Type: apiv1.NodeConfigOK, Status: apiv1.ConditionFalse,
 							Message: "",
-							Reason:  fmt.Sprintf(status.FailSyncReasonFmt, fmt.Sprintf(status.FailSyncReasonUIDMismatchFmt, "foo", correctConfigMap.UID))},
-						expectConfig: nil},
+							Reason:  fmt.Sprintf(status.FailSyncReasonFmt, fmt.Sprintf(status.FailSyncReasonUIDMismatchFmt, "foo", configMapAPIPath(correctConfigMap), correctConfigMap.UID))},
+						expectConfig: nil,
+						event:        false,
+					},
 
 					// correct
 					{desc: "correct",
@@ -159,9 +174,11 @@ var _ = framework.KubeDescribe("DynamicKubeletConfiguration [Feature:DynamicKube
 							Namespace: correctConfigMap.Namespace,
 							Name:      correctConfigMap.Name}},
 						expectConfigOK: &apiv1.NodeCondition{Type: apiv1.NodeConfigOK, Status: apiv1.ConditionTrue,
-							Message: fmt.Sprintf(status.CurRemoteMessageFmt, correctConfigMap.UID),
-							Reason:  status.CurRemoteOKReason},
-						expectConfig: correctKC},
+							Message: fmt.Sprintf(status.CurRemoteMessageFmt, configMapAPIPath(correctConfigMap)),
+							Reason:  status.CurRemoteOkayReason},
+						expectConfig: correctKC,
+						event:        true,
+					},
 
 					// fail-parse
 					{desc: "fail-parse",
@@ -170,9 +187,11 @@ var _ = framework.KubeDescribe("DynamicKubeletConfiguration [Feature:DynamicKube
 							Namespace: failParseConfigMap.Namespace,
 							Name:      failParseConfigMap.Name}},
 						expectConfigOK: &apiv1.NodeCondition{Type: apiv1.NodeConfigOK, Status: apiv1.ConditionFalse,
-							Message: status.LkgDefaultMessage,
-							Reason:  fmt.Sprintf(status.CurFailParseReasonFmt, failParseConfigMap.UID)},
-						expectConfig: nil},
+							Message: status.LkgLocalMessage,
+							Reason:  fmt.Sprintf(status.CurFailParseReasonFmt, configMapAPIPath(failParseConfigMap))},
+						expectConfig: nil,
+						event:        true,
+					},
 
 					// fail-validate
 					{desc: "fail-validate",
@@ -181,9 +200,11 @@ var _ = framework.KubeDescribe("DynamicKubeletConfiguration [Feature:DynamicKube
 							Namespace: failValidateConfigMap.Namespace,
 							Name:      failValidateConfigMap.Name}},
 						expectConfigOK: &apiv1.NodeCondition{Type: apiv1.NodeConfigOK, Status: apiv1.ConditionFalse,
-							Message: status.LkgDefaultMessage,
-							Reason:  fmt.Sprintf(status.CurFailValidateReasonFmt, failValidateConfigMap.UID)},
-						expectConfig: nil},
+							Message: status.LkgLocalMessage,
+							Reason:  fmt.Sprintf(status.CurFailValidateReasonFmt, configMapAPIPath(failValidateConfigMap))},
+						expectConfig: nil,
+						event:        true,
+					},
 				}
 
 				L := len(states)
@@ -194,8 +215,8 @@ var _ = framework.KubeDescribe("DynamicKubeletConfiguration [Feature:DynamicKube
 			})
 		})
 
-		Context("When a remote config becomes the new last-known-good before the Kubelet is updated to use a new, bad config", func() {
-			It("it should report a status and configz indicating that it rolled back to the new last-known-good", func() {
+		Context("When a remote config becomes the new last-known-good, and then the Kubelet is updated to use a new, bad config", func() {
+			It("the Kubelet should report a status and configz indicating that it rolled back to the new last-known-good", func() {
 				var err error
 				// we base the "lkg" configmap off of the current configuration, but set the trial
 				// duration very low so that it quickly becomes the last-known-good
@@ -223,9 +244,11 @@ var _ = framework.KubeDescribe("DynamicKubeletConfiguration [Feature:DynamicKube
 							Namespace: lkgConfigMap.Namespace,
 							Name:      lkgConfigMap.Name}},
 						expectConfigOK: &apiv1.NodeCondition{Type: apiv1.NodeConfigOK, Status: apiv1.ConditionTrue,
-							Message: fmt.Sprintf(status.CurRemoteMessageFmt, lkgConfigMap.UID),
-							Reason:  status.CurRemoteOKReason},
-						expectConfig: lkgKC},
+							Message: fmt.Sprintf(status.CurRemoteMessageFmt, configMapAPIPath(lkgConfigMap)),
+							Reason:  status.CurRemoteOkayReason},
+						expectConfig: lkgKC,
+						event:        true,
+					},
 
 					// bad config
 					{desc: "bad config",
@@ -234,9 +257,11 @@ var _ = framework.KubeDescribe("DynamicKubeletConfiguration [Feature:DynamicKube
 							Namespace: badConfigMap.Namespace,
 							Name:      badConfigMap.Name}},
 						expectConfigOK: &apiv1.NodeCondition{Type: apiv1.NodeConfigOK, Status: apiv1.ConditionFalse,
-							Message: fmt.Sprintf(status.LkgRemoteMessageFmt, lkgConfigMap.UID),
-							Reason:  fmt.Sprintf(status.CurFailParseReasonFmt, badConfigMap.UID)},
-						expectConfig: lkgKC},
+							Message: fmt.Sprintf(status.LkgRemoteMessageFmt, configMapAPIPath(lkgConfigMap)),
+							Reason:  fmt.Sprintf(status.CurFailParseReasonFmt, configMapAPIPath(badConfigMap))},
+						expectConfig: lkgKC,
+						event:        true,
+					},
 				}
 
 				testBothDirections(f, &states[0], states[1:])
@@ -269,18 +294,23 @@ var _ = framework.KubeDescribe("DynamicKubeletConfiguration [Feature:DynamicKube
 							Namespace: cm1.Namespace,
 							Name:      cm1.Name}},
 						expectConfigOK: &apiv1.NodeCondition{Type: apiv1.NodeConfigOK, Status: apiv1.ConditionTrue,
-							Message: fmt.Sprintf(status.CurRemoteMessageFmt, cm1.UID),
-							Reason:  status.CurRemoteOKReason},
-						expectConfig: kc1},
+							Message: fmt.Sprintf(status.CurRemoteMessageFmt, configMapAPIPath(cm1)),
+							Reason:  status.CurRemoteOkayReason},
+						expectConfig: kc1,
+						event:        true,
+					},
+
 					{desc: "cm2",
 						configSource: &apiv1.NodeConfigSource{ConfigMapRef: &apiv1.ObjectReference{
 							UID:       cm2.UID,
 							Namespace: cm2.Namespace,
 							Name:      cm2.Name}},
 						expectConfigOK: &apiv1.NodeCondition{Type: apiv1.NodeConfigOK, Status: apiv1.ConditionTrue,
-							Message: fmt.Sprintf(status.CurRemoteMessageFmt, cm2.UID),
-							Reason:  status.CurRemoteOKReason},
-						expectConfig: kc2},
+							Message: fmt.Sprintf(status.CurRemoteMessageFmt, configMapAPIPath(cm2)),
+							Reason:  status.CurRemoteOkayReason},
+						expectConfig: kc2,
+						event:        true,
+					},
 				}
 
 				for i := 0; i < 50; i++ { // change the config 101 times (changes 3 times in the first iteration, 2 times in each subsequent iteration)
@@ -296,61 +326,68 @@ var _ = framework.KubeDescribe("DynamicKubeletConfiguration [Feature:DynamicKube
 func testBothDirections(f *framework.Framework, first *configState, states []configState) {
 	// set to first and check that everything got set up properly
 	By(fmt.Sprintf("setting configSource to state %q", first.desc))
-	setAndTestKubeletConfigState(f, first)
+	// we don't always expect an event here, because setting "first" might not represent
+	// a change from the current configuration
+	setAndTestKubeletConfigState(f, first, false)
 
 	// for each state, set to that state, check condition and configz, then reset to first and check again
 	for i := range states {
 		By(fmt.Sprintf("from %q to %q", first.desc, states[i].desc))
-		setAndTestKubeletConfigState(f, &states[i])
+		// from first -> states[i], states[i].event fully describes whether we should get a config change event
+		setAndTestKubeletConfigState(f, &states[i], states[i].event)
 
 		By(fmt.Sprintf("back to %q from %q", first.desc, states[i].desc))
-		setAndTestKubeletConfigState(f, first)
+		// whether first -> states[i] should have produced a config change event partially determines whether states[i] -> first should produce an event
+		setAndTestKubeletConfigState(f, first, first.event && states[i].event)
 	}
 }
 
 // setAndTestKubeletConfigState tests that after setting the config source, the ConfigOK condition
 // and (if appropriate) configuration exposed via conifgz are as expected.
 // The configuration will be converted to the internal type prior to comparison.
-func setAndTestKubeletConfigState(f *framework.Framework, state *configState) {
+func setAndTestKubeletConfigState(f *framework.Framework, state *configState, expectEvent bool) {
 	// set the desired state, retry a few times in case we are competing with other editors
 	Eventually(func() error {
 		if err := setNodeConfigSource(f, state.configSource); err != nil {
-			return err
+			return fmt.Errorf("case %s: error setting Node.Spec.ConfigSource", err)
 		}
 		return nil
 	}, time.Minute, time.Second).Should(BeNil())
 	// check that config source actually got set to what we expect
-	checkNodeConfigSource(f, state.configSource)
+	checkNodeConfigSource(f, state.desc, state.configSource)
 	// check condition
-	checkConfigOKCondition(f, state.expectConfigOK)
+	checkConfigOKCondition(f, state.desc, state.expectConfigOK)
 	// check expectConfig
 	if state.expectConfig != nil {
-		checkConfig(f, state.expectConfig)
+		checkConfig(f, state.desc, state.expectConfig)
+	}
+	// check that an event was sent for the config change
+	if expectEvent {
+		checkEvent(f, state.desc, state.configSource)
 	}
 }
 
 // make sure the node's config source matches what we expect, after setting it
-func checkNodeConfigSource(f *framework.Framework, expect *apiv1.NodeConfigSource) {
+func checkNodeConfigSource(f *framework.Framework, desc string, expect *apiv1.NodeConfigSource) {
 	const (
 		timeout  = time.Minute
 		interval = time.Second
 	)
-
 	Eventually(func() error {
 		node, err := f.ClientSet.CoreV1().Nodes().Get(framework.TestContext.NodeName, metav1.GetOptions{})
 		if err != nil {
-			return err
+			return fmt.Errorf("checkNodeConfigSource: case %s: %v", desc, err)
 		}
 		actual := node.Spec.ConfigSource
 		if !reflect.DeepEqual(expect, actual) {
-			return fmt.Errorf(spew.Sprintf("expected %#v but got %#v", expect, actual))
+			return fmt.Errorf(spew.Sprintf("checkNodeConfigSource: case %s: expected %#v but got %#v", desc, expect, actual))
 		}
 		return nil
 	}, timeout, interval).Should(BeNil())
 }
 
 // make sure the ConfigOK node condition eventually matches what we expect
-func checkConfigOKCondition(f *framework.Framework, expect *apiv1.NodeCondition) {
+func checkConfigOKCondition(f *framework.Framework, desc string, expect *apiv1.NodeCondition) {
 	const (
 		timeout  = time.Minute
 		interval = time.Second
@@ -359,14 +396,14 @@ func checkConfigOKCondition(f *framework.Framework, expect *apiv1.NodeCondition)
 	Eventually(func() error {
 		node, err := f.ClientSet.CoreV1().Nodes().Get(framework.TestContext.NodeName, metav1.GetOptions{})
 		if err != nil {
-			return err
+			return fmt.Errorf("checkConfigOKCondition: case %s: %v", desc, err)
 		}
 		actual := getConfigOKCondition(node.Status.Conditions)
 		if actual == nil {
-			return fmt.Errorf("ConfigOK condition not found on node %q", framework.TestContext.NodeName)
+			return fmt.Errorf("checkConfigOKCondition: case %s: ConfigOK condition not found on node %q", desc, framework.TestContext.NodeName)
 		}
 		if err := expectConfigOK(expect, actual); err != nil {
-			return err
+			return fmt.Errorf("checkConfigOKCondition: case %s: %v", desc, err)
 		}
 		return nil
 	}, timeout, interval).Should(BeNil())
@@ -388,7 +425,7 @@ func expectConfigOK(expect, actual *apiv1.NodeCondition) error {
 }
 
 // make sure config exposed on configz matches what we expect
-func checkConfig(f *framework.Framework, expect *kubeletconfig.KubeletConfiguration) {
+func checkConfig(f *framework.Framework, desc string, expect *kubeletconfig.KubeletConfiguration) {
 	const (
 		timeout  = time.Minute
 		interval = time.Second
@@ -396,11 +433,63 @@ func checkConfig(f *framework.Framework, expect *kubeletconfig.KubeletConfigurat
 	Eventually(func() error {
 		actual, err := getCurrentKubeletConfig()
 		if err != nil {
-			return err
+			return fmt.Errorf("checkConfig: case %s: %v", desc, err)
 		}
 		if !reflect.DeepEqual(expect, actual) {
-			return fmt.Errorf(spew.Sprintf("expected %#v but got %#v", expect, actual))
+			return fmt.Errorf(spew.Sprintf("checkConfig: case %s: expected %#v but got %#v", desc, expect, actual))
 		}
 		return nil
 	}, timeout, interval).Should(BeNil())
+}
+
+// checkEvent makes sure an event was sent marking the Kubelet's restart to use new config,
+// and that it mentions the config we expect.
+func checkEvent(f *framework.Framework, desc string, expect *apiv1.NodeConfigSource) {
+	const (
+		timeout  = time.Minute
+		interval = time.Second
+	)
+	Eventually(func() error {
+		events, err := f.ClientSet.CoreV1().Events("").List(metav1.ListOptions{})
+		if err != nil {
+			return fmt.Errorf("checkEvent: case %s: %v", desc, err)
+		}
+		// find config changed event with most recent timestamp
+		var recent *apiv1.Event
+		for i := range events.Items {
+			if events.Items[i].Reason == controller.KubeletConfigChangedEventReason {
+				if recent == nil {
+					recent = &events.Items[i]
+					continue
+				}
+				// for these events, first and last timestamp are always the same
+				if events.Items[i].FirstTimestamp.Time.After(recent.FirstTimestamp.Time) {
+					recent = &events.Items[i]
+				}
+			}
+		}
+
+		// we expect at least one config change event
+		if recent == nil {
+			return fmt.Errorf("checkEvent: case %s: no events found with reason %s", desc, controller.KubeletConfigChangedEventReason)
+		}
+
+		// ensure the message is what we expect (including the resource path)
+		expectMessage := fmt.Sprintf(controller.EventMessageFmt, controller.LocalConfigMessage)
+		if expect != nil {
+			if expect.ConfigMapRef != nil {
+				expectMessage = fmt.Sprintf(controller.EventMessageFmt, fmt.Sprintf("/api/v1/namespaces/%s/configmaps/%s", expect.ConfigMapRef.Namespace, expect.ConfigMapRef.Name))
+			}
+		}
+		if expectMessage != recent.Message {
+			return fmt.Errorf("checkEvent: case %s: expected event message %q but got %q", desc, expectMessage, recent.Message)
+		}
+
+		return nil
+	}, timeout, interval).Should(BeNil())
+}
+
+// constructs the expected SelfLink for a config map
+func configMapAPIPath(cm *apiv1.ConfigMap) string {
+	return fmt.Sprintf("/api/v1/namespaces/%s/configmaps/%s", cm.Namespace, cm.Name)
 }

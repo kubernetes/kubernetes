@@ -18,6 +18,7 @@ package ipvs
 
 import (
 	"bytes"
+	"fmt"
 	"net"
 	"reflect"
 	"testing"
@@ -25,7 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/utils/exec"
 	fakeexec "k8s.io/utils/exec/testing"
@@ -33,6 +34,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	netlinktest "k8s.io/kubernetes/pkg/proxy/ipvs/testing"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
+	utilipset "k8s.io/kubernetes/pkg/util/ipset"
+	ipsettest "k8s.io/kubernetes/pkg/util/ipset/testing"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	iptablestest "k8s.io/kubernetes/pkg/util/iptables/testing"
 	utilipvs "k8s.io/kubernetes/pkg/util/ipvs"
@@ -85,7 +88,26 @@ func (fake *fakeHealthChecker) SyncEndpoints(newEndpoints map[types.NamespacedNa
 	return nil
 }
 
-func NewFakeProxier(ipt utiliptables.Interface, ipvs utilipvs.Interface, nodeIPs []net.IP) *Proxier {
+// fakeKernelHandler implements KernelHandler.
+type fakeKernelHandler struct {
+	modules []string
+}
+
+func (fake *fakeKernelHandler) GetModules() ([]string, error) {
+	return fake.modules, nil
+}
+
+// fakeKernelHandler implements KernelHandler.
+type fakeIPSetVersioner struct {
+	version string
+	err     error
+}
+
+func (fake *fakeIPSetVersioner) GetVersion() (string, error) {
+	return fake.version, fake.err
+}
+
+func NewFakeProxier(ipt utiliptables.Interface, ipvs utilipvs.Interface, ipset utilipset.Interface, nodeIPs []net.IP) *Proxier {
 	fcmd := fakeexec.FakeCmd{
 		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
 			func() ([]byte, error) { return []byte("dummy device have been created"), nil },
@@ -98,24 +120,34 @@ func NewFakeProxier(ipt utiliptables.Interface, ipvs utilipvs.Interface, nodeIPs
 		LookPathFunc: func(cmd string) (string, error) { return cmd, nil },
 	}
 	return &Proxier{
-		exec:             fexec,
-		serviceMap:       make(proxyServiceMap),
-		serviceChanges:   newServiceChangeMap(),
-		endpointsMap:     make(proxyEndpointsMap),
-		endpointsChanges: newEndpointsChangeMap(testHostname),
-		iptables:         ipt,
-		ipvs:             ipvs,
-		clusterCIDR:      "10.0.0.0/24",
-		hostname:         testHostname,
-		portsMap:         make(map[proxyutil.LocalPort]proxyutil.Closeable),
-		portMapper:       &fakePortOpener{[]*proxyutil.LocalPort{}},
-		healthChecker:    newFakeHealthChecker(),
-		ipvsScheduler:    DefaultScheduler,
-		ipGetter:         &fakeIPGetter{nodeIPs: nodeIPs},
-		iptablesData:     bytes.NewBuffer(nil),
-		natChains:        bytes.NewBuffer(nil),
-		natRules:         bytes.NewBuffer(nil),
-		netlinkHandle:    netlinktest.NewFakeNetlinkHandle(),
+		exec:               fexec,
+		serviceMap:         make(proxyServiceMap),
+		serviceChanges:     newServiceChangeMap(),
+		endpointsMap:       make(proxyEndpointsMap),
+		endpointsChanges:   newEndpointsChangeMap(testHostname),
+		iptables:           ipt,
+		ipvs:               ipvs,
+		ipset:              ipset,
+		clusterCIDR:        "10.0.0.0/24",
+		hostname:           testHostname,
+		portsMap:           make(map[proxyutil.LocalPort]proxyutil.Closeable),
+		portMapper:         &fakePortOpener{[]*proxyutil.LocalPort{}},
+		healthChecker:      newFakeHealthChecker(),
+		ipvsScheduler:      DefaultScheduler,
+		ipGetter:           &fakeIPGetter{nodeIPs: nodeIPs},
+		iptablesData:       bytes.NewBuffer(nil),
+		natChains:          bytes.NewBuffer(nil),
+		natRules:           bytes.NewBuffer(nil),
+		netlinkHandle:      netlinktest.NewFakeNetlinkHandle(),
+		loopbackSet:        NewIPSet(ipset, KubeLoopBackIPSet, utilipset.HashIPPortIP, false),
+		clusterIPSet:       NewIPSet(ipset, KubeClusterIPSet, utilipset.HashIPPort, false),
+		externalIPSet:      NewIPSet(ipset, KubeExternalIPSet, utilipset.HashIPPort, false),
+		lbIngressSet:       NewIPSet(ipset, KubeLoadBalancerSet, utilipset.HashIPPort, false),
+		lbMasqSet:          NewIPSet(ipset, KubeLoadBalancerMasqSet, utilipset.HashIPPort, false),
+		lbWhiteListIPSet:   NewIPSet(ipset, KubeLoadBalancerSourceIPSet, utilipset.HashIPPortIP, false),
+		lbWhiteListCIDRSet: NewIPSet(ipset, KubeLoadBalancerSourceCIDRSet, utilipset.HashIPPortNet, false),
+		nodePortSetTCP:     NewIPSet(ipset, KubeNodePortSetTCP, utilipset.BitmapPort, false),
+		nodePortSetUDP:     NewIPSet(ipset, KubeNodePortSetUDP, utilipset.BitmapPort, false),
 	}
 }
 
@@ -168,13 +200,155 @@ func makeTestEndpoints(namespace, name string, eptFunc func(*api.Endpoints)) *ap
 	return ept
 }
 
+func TestCanUseIPVSProxier(t *testing.T) {
+	testCases := []struct {
+		mods         []string
+		kernelErr    error
+		ipsetVersion string
+		ipsetErr     error
+		ok           bool
+	}{
+		// case 0, kernel error
+		{
+			mods:         []string{"foo", "bar", "baz"},
+			kernelErr:    fmt.Errorf("oops"),
+			ipsetVersion: "0.0",
+			ok:           false,
+		},
+		// case 1, ipset error
+		{
+			mods:         []string{"foo", "bar", "baz"},
+			ipsetVersion: MinIPSetCheckVersion,
+			ipsetErr:     fmt.Errorf("oops"),
+			ok:           false,
+		},
+		// case 2, missing required kernel modules and ipset version too low
+		{
+			mods:         []string{"foo", "bar", "baz"},
+			ipsetVersion: "1.1",
+			ok:           false,
+		},
+		// case 3, missing required ip_vs_* kernel modules
+		{
+			mods:         []string{"ip_vs", "a", "bc", "def"},
+			ipsetVersion: MinIPSetCheckVersion,
+			ok:           false,
+		},
+		// case 4, ipset version too low
+		{
+			mods:         []string{"ip_vs", "ip_vs_rr", "ip_vs_wrr", "ip_vs_sh", "nf_conntrack_ipv4"},
+			ipsetVersion: "4.3.0",
+			ok:           false,
+		},
+		// case 5
+		{
+			mods:         []string{"ip_vs", "ip_vs_rr", "ip_vs_wrr", "ip_vs_sh", "nf_conntrack_ipv4"},
+			ipsetVersion: MinIPSetCheckVersion,
+			ok:           true,
+		},
+		// case 6
+		{
+			mods:         []string{"ip_vs", "ip_vs_rr", "ip_vs_wrr", "ip_vs_sh", "nf_conntrack_ipv4", "foo", "bar"},
+			ipsetVersion: "6.19",
+			ok:           true,
+		},
+	}
+
+	for i := range testCases {
+		handle := &fakeKernelHandler{modules: testCases[i].mods}
+		versioner := &fakeIPSetVersioner{version: testCases[i].ipsetVersion, err: testCases[i].ipsetErr}
+		ok, _ := CanUseIPVSProxier(handle, versioner)
+		if ok != testCases[i].ok {
+			t.Errorf("Case [%d], expect %v, got %v", i, testCases[i].ok, ok)
+		}
+	}
+}
+
+func TestGetNodeIPs(t *testing.T) {
+	testCases := []struct {
+		devAddresses map[string][]string
+		expectIPs    []string
+	}{
+		// case 0
+		{
+			devAddresses: map[string][]string{"eth0": {"1.2.3.4"}, "lo": {"127.0.0.1"}},
+			expectIPs:    []string{"1.2.3.4", "127.0.0.1"},
+		},
+		// case 1
+		{
+			devAddresses: map[string][]string{"lo": {"127.0.0.1"}},
+			expectIPs:    []string{"127.0.0.1"},
+		},
+		// case 2
+		{
+			devAddresses: map[string][]string{},
+			expectIPs:    []string{},
+		},
+		// case 3
+		{
+			devAddresses: map[string][]string{"encap0": {"10.20.30.40"}, "lo": {"127.0.0.1"}, "docker0": {"172.17.0.1"}},
+			expectIPs:    []string{"10.20.30.40", "127.0.0.1", "172.17.0.1"},
+		},
+		// case 4
+		{
+			devAddresses: map[string][]string{"encaps9": {"10.20.30.40"}, "lo": {"127.0.0.1"}, "encap7": {"10.20.30.31"}},
+			expectIPs:    []string{"10.20.30.40", "127.0.0.1", "10.20.30.31"},
+		},
+		// case 5
+		{
+			devAddresses: map[string][]string{"kube-ipvs0": {"1.2.3.4"}, "lo": {"127.0.0.1"}, "encap7": {"10.20.30.31"}},
+			expectIPs:    []string{"127.0.0.1", "10.20.30.31"},
+		},
+		// case 6
+		{
+			devAddresses: map[string][]string{"kube-ipvs0": {"1.2.3.4", "2.3.4.5"}, "lo": {"127.0.0.1"}},
+			expectIPs:    []string{"127.0.0.1"},
+		},
+		// case 7
+		{
+			devAddresses: map[string][]string{"kube-ipvs0": {"1.2.3.4", "2.3.4.5"}},
+			expectIPs:    []string{},
+		},
+		// case 8
+		{
+			devAddresses: map[string][]string{"kube-ipvs0": {"1.2.3.4", "2.3.4.5"}, "eth5": {"3.4.5.6"}, "lo": {"127.0.0.1"}},
+			expectIPs:    []string{"127.0.0.1", "3.4.5.6"},
+		},
+		// case 9
+		{
+			devAddresses: map[string][]string{"ipvs0": {"1.2.3.4"}, "lo": {"127.0.0.1"}, "encap7": {"10.20.30.31"}},
+			expectIPs:    []string{"127.0.0.1", "10.20.30.31", "1.2.3.4"},
+		},
+	}
+
+	for i := range testCases {
+		fake := netlinktest.NewFakeNetlinkHandle()
+		for dev, addresses := range testCases[i].devAddresses {
+			fake.SetLocalAddresses(dev, addresses...)
+		}
+		r := realIPGetter{nl: fake}
+		ips, err := r.NodeIPs()
+		if err != nil {
+			t.Errorf("Unexpected error: %v", err)
+		}
+		ipStrs := sets.NewString()
+		for _, ip := range ips {
+			ipStrs.Insert(ip.String())
+		}
+		if !ipStrs.Equal(sets.NewString(testCases[i].expectIPs...)) {
+			t.Errorf("case[%d], unexpected mismatch, expected: %v, got: %v", i, testCases[i].expectIPs, ips)
+		}
+	}
+}
+
 func TestNodePort(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
+	ipset := ipsettest.NewFake(testIPSetVersion)
 	nodeIPv4 := net.ParseIP("100.101.102.103")
 	nodeIPv6 := net.ParseIP("2001:db8::1:1")
 	nodeIPs := sets.NewString(nodeIPv4.String(), nodeIPv6.String())
-	fp := NewFakeProxier(ipt, ipvs, []net.IP{nodeIPv4, nodeIPv6})
+	fp := NewFakeProxier(ipt, ipvs, ipset, []net.IP{nodeIPv4, nodeIPv6})
 	svcIP := "10.20.30.41"
 	svcPort := 80
 	svcNodePort := 3001
@@ -248,8 +422,9 @@ func TestNodePort(t *testing.T) {
 func TestNodePortNoEndpoint(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
+	ipset := ipsettest.NewFake(testIPSetVersion)
 	nodeIP := net.ParseIP("100.101.102.103")
-	fp := NewFakeProxier(ipt, ipvs, []net.IP{nodeIP})
+	fp := NewFakeProxier(ipt, ipvs, ipset, []net.IP{nodeIP})
 	svcIP := "10.20.30.41"
 	svcPort := 80
 	svcNodePort := 3001
@@ -301,7 +476,8 @@ func TestNodePortNoEndpoint(t *testing.T) {
 func TestClusterIPNoEndpoint(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
-	fp := NewFakeProxier(ipt, ipvs, nil)
+	ipset := ipsettest.NewFake(testIPSetVersion)
+	fp := NewFakeProxier(ipt, ipvs, ipset, nil)
 	svcIP := "10.20.30.41"
 	svcPort := 80
 	svcPortName := proxy.ServicePortName{
@@ -344,7 +520,8 @@ func TestClusterIPNoEndpoint(t *testing.T) {
 func TestClusterIP(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
-	fp := NewFakeProxier(ipt, ipvs, nil)
+	ipset := ipsettest.NewFake(testIPSetVersion)
+	fp := NewFakeProxier(ipt, ipvs, ipset, nil)
 
 	svcIPv4 := "10.20.30.41"
 	svcPortV4 := 80
@@ -450,7 +627,8 @@ func TestClusterIP(t *testing.T) {
 func TestExternalIPsNoEndpoint(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
-	fp := NewFakeProxier(ipt, ipvs, nil)
+	ipset := ipsettest.NewFake(testIPSetVersion)
+	fp := NewFakeProxier(ipt, ipvs, ipset, nil)
 	svcIP := "10.20.30.41"
 	svcPort := 80
 	svcExternalIPs := "50.60.70.81"
@@ -504,7 +682,8 @@ func TestExternalIPsNoEndpoint(t *testing.T) {
 func TestExternalIPs(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
-	fp := NewFakeProxier(ipt, ipvs, nil)
+	ipset := ipsettest.NewFake(testIPSetVersion)
+	fp := NewFakeProxier(ipt, ipvs, ipset, nil)
 	svcIP := "10.20.30.41"
 	svcPort := 80
 	svcExternalIPs := sets.NewString("50.60.70.81", "2012::51")
@@ -573,7 +752,8 @@ func TestExternalIPs(t *testing.T) {
 func TestLoadBalancer(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
-	fp := NewFakeProxier(ipt, ipvs, nil)
+	ipset := ipsettest.NewFake(testIPSetVersion)
+	fp := NewFakeProxier(ipt, ipvs, ipset, nil)
 	svcIP := "10.20.30.41"
 	svcPort := 80
 	svcNodePort := 3001
@@ -624,8 +804,9 @@ func strPtr(s string) *string {
 func TestOnlyLocalNodePorts(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
+	ipset := ipsettest.NewFake(testIPSetVersion)
 	nodeIP := net.ParseIP("100.101.102.103")
-	fp := NewFakeProxier(ipt, ipvs, []net.IP{nodeIP})
+	fp := NewFakeProxier(ipt, ipvs, ipset, []net.IP{nodeIP})
 	svcIP := "10.20.30.41"
 	svcPort := 80
 	svcNodePort := 3001
@@ -701,11 +882,11 @@ func TestOnlyLocalNodePorts(t *testing.T) {
 	}
 }
 
-// NO help
 func TestOnlyLocalLoadBalancing(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
-	fp := NewFakeProxier(ipt, ipvs, nil)
+	ipset := ipsettest.NewFake(testIPSetVersion)
+	fp := NewFakeProxier(ipt, ipvs, ipset, nil)
 	svcIP := "10.20.30.41"
 	svcPort := 80
 	svcNodePort := 3001
@@ -769,7 +950,8 @@ func addTestPort(array []api.ServicePort, name string, protocol api.Protocol, po
 func TestBuildServiceMapAddRemove(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
-	fp := NewFakeProxier(ipt, ipvs, nil)
+	ipset := ipsettest.NewFake(testIPSetVersion)
+	fp := NewFakeProxier(ipt, ipvs, ipset, nil)
 
 	services := []*api.Service{
 		makeTestService("somewhere-else", "cluster-ip", func(svc *api.Service) {
@@ -874,7 +1056,8 @@ func TestBuildServiceMapAddRemove(t *testing.T) {
 func TestBuildServiceMapServiceHeadless(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
-	fp := NewFakeProxier(ipt, ipvs, nil)
+	ipset := ipsettest.NewFake(testIPSetVersion)
+	fp := NewFakeProxier(ipt, ipvs, ipset, nil)
 
 	makeServiceMap(fp,
 		makeTestService("somewhere-else", "headless", func(svc *api.Service) {
@@ -907,7 +1090,8 @@ func TestBuildServiceMapServiceHeadless(t *testing.T) {
 func TestBuildServiceMapServiceTypeExternalName(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
-	fp := NewFakeProxier(ipt, ipvs, nil)
+	ipset := ipsettest.NewFake(testIPSetVersion)
+	fp := NewFakeProxier(ipt, ipvs, ipset, nil)
 
 	makeServiceMap(fp,
 		makeTestService("somewhere-else", "external-name", func(svc *api.Service) {
@@ -934,7 +1118,8 @@ func TestBuildServiceMapServiceTypeExternalName(t *testing.T) {
 func TestBuildServiceMapServiceUpdate(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
-	fp := NewFakeProxier(ipt, ipvs, nil)
+	ipset := ipsettest.NewFake(testIPSetVersion)
+	fp := NewFakeProxier(ipt, ipvs, ipset, nil)
 
 	servicev1 := makeTestService("somewhere", "some-service", func(svc *api.Service) {
 		svc.Spec.Type = api.ServiceTypeClusterIP
@@ -1016,8 +1201,9 @@ func TestBuildServiceMapServiceUpdate(t *testing.T) {
 func TestSessionAffinity(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
+	ipset := ipsettest.NewFake(testIPSetVersion)
 	nodeIP := net.ParseIP("100.101.102.103")
-	fp := NewFakeProxier(ipt, ipvs, []net.IP{nodeIP})
+	fp := NewFakeProxier(ipt, ipvs, ipset, []net.IP{nodeIP})
 	svcIP := "10.20.30.41"
 	svcPort := 80
 	svcNodePort := 3001
@@ -1879,7 +2065,8 @@ func Test_updateEndpointsMap(t *testing.T) {
 	for tci, tc := range testCases {
 		ipt := iptablestest.NewFake()
 		ipvs := ipvstest.NewFake()
-		fp := NewFakeProxier(ipt, ipvs, nil)
+		ipset := ipsettest.NewFake(testIPSetVersion)
+		fp := NewFakeProxier(ipt, ipvs, ipset, nil)
 		fp.hostname = nodeName
 
 		// First check that after adding all previous versions of endpoints,
@@ -2017,6 +2204,14 @@ func Test_getLocalIPs(t *testing.T) {
 			{Namespace: "ns2", Name: "ep2"}: sets.NewString("2.2.2.2", "2.2.2.22", "2.2.2.3"),
 			{Namespace: "ns4", Name: "ep4"}: sets.NewString("4.4.4.4", "4.4.4.6"),
 		},
+	}, {
+		// Case[5]: named port local and bad endpoints IP
+		endpointsMap: map[proxy.ServicePortName][]*endpointsInfo{
+			makeServicePortName("ns1", "ep1", "p11"): {
+				{endpoint: "bad ip:11", isLocal: true},
+			},
+		},
+		expected: map[types.NamespacedName]sets.String{},
 	}}
 
 	for tci, tc := range testCases {
@@ -2214,74 +2409,110 @@ func Test_endpointsToEndpointsMap(t *testing.T) {
 	}
 }
 
-func Test_ensureDummyDevice(t *testing.T) {
-	fcmd := fakeexec.FakeCmd{
-		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
-			// Success.
-			func() ([]byte, error) { return []byte{}, nil },
-			// Exists.
-			func() ([]byte, error) { return nil, &fakeexec.FakeExitError{Status: 2} },
+func Test_syncService(t *testing.T) {
+	testCases := []struct {
+		oldVirtualServer *utilipvs.VirtualServer
+		svcName          string
+		newVirtualServer *utilipvs.VirtualServer
+		bindAddr         bool
+	}{
+		{
+			// case 0, old virtual server is same as new virtual server
+			oldVirtualServer: &utilipvs.VirtualServer{
+				Address:   net.ParseIP("1.2.3.4"),
+				Protocol:  string(api.ProtocolTCP),
+				Port:      80,
+				Scheduler: "rr",
+				Flags:     utilipvs.FlagHashed,
+			},
+			svcName: "foo",
+			newVirtualServer: &utilipvs.VirtualServer{
+				Address:   net.ParseIP("1.2.3.4"),
+				Protocol:  string(api.ProtocolTCP),
+				Port:      80,
+				Scheduler: "rr",
+				Flags:     utilipvs.FlagHashed,
+			},
+			bindAddr: false,
+		},
+		{
+			// case 1, old virtual server is different from new virtual server
+			oldVirtualServer: &utilipvs.VirtualServer{
+				Address:   net.ParseIP("1.2.3.4"),
+				Protocol:  string(api.ProtocolTCP),
+				Port:      8080,
+				Scheduler: "rr",
+				Flags:     utilipvs.FlagHashed,
+			},
+			svcName: "bar",
+			newVirtualServer: &utilipvs.VirtualServer{
+				Address:   net.ParseIP("1.2.3.4"),
+				Protocol:  string(api.ProtocolTCP),
+				Port:      8080,
+				Scheduler: "rr",
+				Flags:     utilipvs.FlagPersistent,
+			},
+			bindAddr: false,
+		},
+		{
+			// case 2, old virtual server is different from new virtual server
+			oldVirtualServer: &utilipvs.VirtualServer{
+				Address:   net.ParseIP("1.2.3.4"),
+				Protocol:  string(api.ProtocolTCP),
+				Port:      8080,
+				Scheduler: "rr",
+				Flags:     utilipvs.FlagHashed,
+			},
+			svcName: "bar",
+			newVirtualServer: &utilipvs.VirtualServer{
+				Address:   net.ParseIP("1.2.3.4"),
+				Protocol:  string(api.ProtocolTCP),
+				Port:      8080,
+				Scheduler: "wlc",
+				Flags:     utilipvs.FlagHashed,
+			},
+			bindAddr: false,
+		},
+		{
+			// case 3, old virtual server is nil, and create new virtual server
+			oldVirtualServer: nil,
+			svcName:          "baz",
+			newVirtualServer: &utilipvs.VirtualServer{
+				Address:   net.ParseIP("1.2.3.4"),
+				Protocol:  string(api.ProtocolUDP),
+				Port:      53,
+				Scheduler: "rr",
+				Flags:     utilipvs.FlagHashed,
+			},
+			bindAddr: true,
 		},
 	}
-	fexec := fakeexec.FakeExec{
-		CommandScript: []fakeexec.FakeCommandAction{
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-		},
-	}
-	// Success.
-	exists, err := ensureDummyDevice(&fexec, DefaultDummyDevice)
-	if err != nil {
-		t.Errorf("expected success, got %v", err)
-	}
-	if exists {
-		t.Errorf("expected exists = false")
-	}
-	if fcmd.CombinedOutputCalls != 1 {
-		t.Errorf("expected 1 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
-	}
-	if !sets.NewString(fcmd.CombinedOutputLog[0]...).HasAll("ip", "link", "add", "kube-ipvs0", "type", "dummy") {
-		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[0])
-	}
-	// Exists.
-	exists, err = ensureDummyDevice(&fexec, DefaultDummyDevice)
-	if err != nil {
-		t.Errorf("expected success, got %v", err)
-	}
-	if !exists {
-		t.Errorf("expected exists = true")
-	}
-}
 
-func Test_deleteDummyDevice(t *testing.T) {
-	fcmd := fakeexec.FakeCmd{
-		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
-			// Success.
-			func() ([]byte, error) { return []byte{}, nil },
-			// Failure.
-			func() ([]byte, error) { return nil, &fakeexec.FakeExitError{Status: 1} },
-		},
-	}
-	fexec := fakeexec.FakeExec{
-		CommandScript: []fakeexec.FakeCommandAction{
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-		},
-	}
-	// Success.
-	err := deleteDummyDevice(&fexec, DefaultDummyDevice)
-	if err != nil {
-		t.Errorf("expected success, got %v", err)
-	}
-	if fcmd.CombinedOutputCalls != 1 {
-		t.Errorf("expected 1 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
-	}
-	if !sets.NewString(fcmd.CombinedOutputLog[0]...).HasAll("ip", "link", "del", "kube-ipvs0") {
-		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[0])
-	}
-	// Failure.
-	err = deleteDummyDevice(&fexec, DefaultDummyDevice)
-	if err == nil {
-		t.Errorf("expected failure")
+	for i := range testCases {
+		ipt := iptablestest.NewFake()
+		ipvs := ipvstest.NewFake()
+		ipset := ipsettest.NewFake(testIPSetVersion)
+		proxier := NewFakeProxier(ipt, ipvs, ipset, nil)
+
+		if testCases[i].oldVirtualServer != nil {
+			if err := proxier.ipvs.AddVirtualServer(testCases[i].oldVirtualServer); err != nil {
+				t.Errorf("Case [%d], unexpected add IPVS virtual server error: %v", i, err)
+			}
+		}
+		if err := proxier.syncService(testCases[i].svcName, testCases[i].newVirtualServer, testCases[i].bindAddr); err != nil {
+			t.Errorf("Case [%d], unexpected sync IPVS virutal server error: %v", i, err)
+		}
+		// check
+		list, err := proxier.ipvs.GetVirtualServers()
+		if err != nil {
+			t.Errorf("Case [%d], unexpected list IPVS virtual server error: %v", i, err)
+		}
+		if len(list) != 1 {
+			t.Errorf("Case [%d], expect %d virtual servers, got %d", i, 1, len(list))
+			continue
+		}
+		if !list[0].Equal(testCases[i].newVirtualServer) {
+			t.Errorf("Case [%d], unexpected mismatch, expect: %#v, got: %#v", i, testCases[i].newVirtualServer, list[0])
+		}
 	}
 }

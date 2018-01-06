@@ -408,7 +408,7 @@ func VerifyPodStartupLatency(latency *PodStartupLatency) error {
 		return fmt.Errorf("too high pod startup latency 90th percentile: %v", latency.Latency.Perc90)
 	}
 	if latency.Latency.Perc99 > podStartupThreshold {
-		return fmt.Errorf("too high pod startup latency 99th percentil: %v", latency.Latency.Perc99)
+		return fmt.Errorf("too high pod startup latency 99th percentile: %v", latency.Latency.Perc99)
 	}
 	return nil
 }
@@ -416,7 +416,7 @@ func VerifyPodStartupLatency(latency *PodStartupLatency) error {
 // Resets latency metrics in apiserver.
 func ResetMetrics(c clientset.Interface) error {
 	Logf("Resetting latency metrics in apiserver...")
-	body, err := c.Core().RESTClient().Delete().AbsPath("/metrics").DoRaw()
+	body, err := c.CoreV1().RESTClient().Delete().AbsPath("/metrics").DoRaw()
 	if err != nil {
 		return err
 	}
@@ -428,7 +428,7 @@ func ResetMetrics(c clientset.Interface) error {
 
 // Retrieves metrics information.
 func getMetrics(c clientset.Interface) (string, error) {
-	body, err := c.Core().RESTClient().Get().AbsPath("/metrics").DoRaw()
+	body, err := c.CoreV1().RESTClient().Get().AbsPath("/metrics").DoRaw()
 	if err != nil {
 		return "", err
 	}
@@ -440,13 +440,8 @@ func getSchedulingLatency(c clientset.Interface) (*SchedulingLatency, error) {
 	result := SchedulingLatency{}
 
 	// Check if master Node is registered
-	nodes, err := c.Core().Nodes().List(metav1.ListOptions{})
+	nodes, err := c.CoreV1().Nodes().List(metav1.ListOptions{})
 	ExpectNoError(err)
-
-	subResourceProxyAvailable, err := ServerVersionGTE(SubResourcePodProxyVersion, c.Discovery())
-	if err != nil {
-		return nil, err
-	}
 
 	var data string
 	var masterRegistered = false
@@ -460,25 +455,14 @@ func getSchedulingLatency(c clientset.Interface) (*SchedulingLatency, error) {
 		defer cancel()
 
 		var rawData []byte
-		if subResourceProxyAvailable {
-			rawData, err = c.Core().RESTClient().Get().
-				Context(ctx).
-				Namespace(metav1.NamespaceSystem).
-				Resource("pods").
-				Name(fmt.Sprintf("kube-scheduler-%v:%v", TestContext.CloudConfig.MasterName, ports.SchedulerPort)).
-				SubResource("proxy").
-				Suffix("metrics").
-				Do().Raw()
-		} else {
-			rawData, err = c.Core().RESTClient().Get().
-				Context(ctx).
-				Prefix("proxy").
-				Namespace(metav1.NamespaceSystem).
-				SubResource("pods").
-				Name(fmt.Sprintf("kube-scheduler-%v:%v", TestContext.CloudConfig.MasterName, ports.SchedulerPort)).
-				Suffix("metrics").
-				Do().Raw()
-		}
+		rawData, err = c.CoreV1().RESTClient().Get().
+			Context(ctx).
+			Namespace(metav1.NamespaceSystem).
+			Resource("pods").
+			Name(fmt.Sprintf("kube-scheduler-%v:%v", TestContext.CloudConfig.MasterName, ports.SchedulerPort)).
+			SubResource("proxy").
+			Suffix("metrics").
+			Do().Raw()
 
 		ExpectNoError(err)
 		data = string(rawData)

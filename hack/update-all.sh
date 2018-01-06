@@ -58,15 +58,13 @@ fi
 BASH_TARGETS="
 	update-generated-protobuf
 	update-codegen
+	update-generated-runtime
+	update-generated-device-plugin
 	update-generated-docs
 	update-generated-swagger-docs
 	update-swagger-spec
 	update-openapi-spec
 	update-api-reference-docs
-	update-federation-openapi-spec
-	update-federation-swagger-spec
-	update-federation-generated-swagger-docs
-	update-federation-api-reference-docs
 	update-staging-godeps
 	update-bazel"
 

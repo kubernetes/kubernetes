@@ -113,46 +113,59 @@ func TestRealServer(t *testing.T) {
 		Port:     uint16(80),
 		Protocol: string("TCP"),
 	}
+	rss := []*utilipvs.RealServer{
+		{net.ParseIP("172.16.2.1"), 8080, 1},
+		{net.ParseIP("172.16.2.2"), 8080, 2},
+		{net.ParseIP("172.16.2.3"), 8080, 3},
+	}
 	err := fake.AddVirtualServer(vs)
 	if err != nil {
 		t.Errorf("Fail to add virutal server, error: %v", err)
 	}
-	// Add a real server to the virtual server
-	rs1 := &utilipvs.RealServer{
-		Address: net.ParseIP("172.16.2.1"),
+	// Add real server to the virtual server
+	for i := range rss {
+		if err = fake.AddRealServer(vs, rss[i]); err != nil {
+			t.Errorf("Fail to add real server, error: %v", err)
+		}
+	}
+	// Delete a real server of the virtual server
+	// Make sure any position of the list can be real deleted
+	rssLen := len(rss)
+	for i := range rss {
+		// List all real servers of the virtual server
+		list, err := fake.GetRealServers(vs)
+		if err != nil {
+			t.Errorf("Fail to get real servers of the virtual server, error: %v", err)
+		}
+		if len(list) != rssLen {
+			t.Errorf("Expect %d virutal servers, got: %d", len(rss), len(list))
+		}
+		rsToDel := list[i]
+		if err = fake.DeleteRealServer(vs, rsToDel); err != nil {
+			t.Errorf("Fail to delete real server of the virtual server, error: %v", err)
+		} else {
+			dests, err := fake.GetRealServers(vs)
+			if err != nil {
+				t.Errorf("Fail to get real servers of the virtual server, error: %v", err)
+			}
+			for _, dest := range dests {
+				if toRealServerKey(dest).String() == toRealServerKey(rsToDel).String() {
+					t.Errorf("Expect real server %q be deleted.", rsToDel.String())
+				}
+			}
+			if err = fake.AddRealServer(vs, rsToDel); err != nil {
+				t.Errorf("Fail to add real server, error: %v", err)
+			}
+		}
+	}
+	// Test delete real server that not exist
+	rs := &utilipvs.RealServer{
+		Address: net.ParseIP("172.16.2.4"),
 		Port:    uint16(8080),
 		Weight:  1,
 	}
-	err = fake.AddRealServer(vs, rs1)
-	if err != nil {
-		t.Errorf("Fail to add real server, error: %v", err)
-	}
-	// Add another real server to the virtual server
-	rs2 := &utilipvs.RealServer{
-		Address: net.ParseIP("172.16.3.2"),
-		Port:    uint16(8080),
-		Weight:  2,
-	}
-	err = fake.AddRealServer(vs, rs2)
-	if err != nil {
-		t.Errorf("Fail to add real server, error: %v", err)
-	}
-	// List all real servers of the virtual server
-	list, err := fake.GetRealServers(vs)
-	if err != nil {
-		t.Errorf("Fail to get real servers of the virtual server, error: %v", err)
-	}
-	if len(list) != 2 {
-		t.Errorf("Expect 2 virutal servers, got: %d", len(list))
-	}
-	// Delete a real server of the virtual server
-	err = fake.DeleteRealServer(vs, rs2)
-	list, err = fake.GetRealServers(vs)
-	if err != nil {
-		t.Errorf("Fail to get real servers of the virtual server, error: %v", err)
-	}
-	if len(list) != 1 {
-		t.Errorf("Expect 1 real server, got: %d", len(list))
+	if err = fake.DeleteRealServer(vs, rs); err == nil {
+		t.Errorf("Delete real server that not exist, Expect error, got nil")
 	}
 	// Delete the virtual server
 	err = fake.DeleteVirtualServer(vs)

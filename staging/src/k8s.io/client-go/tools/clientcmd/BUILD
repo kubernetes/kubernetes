@@ -15,8 +15,8 @@ go_test(
         "overrides_test.go",
         "validation_test.go",
     ],
+    embed = [":go_default_library"],
     importpath = "k8s.io/client-go/tools/clientcmd",
-    library = ":go_default_library",
     deps = [
         "//vendor/github.com/ghodss/yaml:go_default_library",
         "//vendor/github.com/imdario/mergo:go_default_library",

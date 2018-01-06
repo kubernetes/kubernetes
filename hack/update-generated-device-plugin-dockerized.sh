@@ -19,8 +19,7 @@ set -o nounset
 set -o pipefail
 
 KUBE_ROOT="$(cd "$(dirname "${BASH_SOURCE}")/../" && pwd -P)"
-DEVICE_PLUGIN_ROOT="${KUBE_ROOT}/pkg/kubelet/apis/deviceplugin/v1alpha1/"
+DEVICE_PLUGIN_ROOT="${KUBE_ROOT}/pkg/kubelet/apis/deviceplugin/v1alpha/"
 
 source "${KUBE_ROOT}/hack/lib/protoc.sh"
-
 kube::protoc::generate_proto ${DEVICE_PLUGIN_ROOT}

@@ -144,7 +144,7 @@ func getZonesFromNodes(kubeClient clientset.Interface) (sets.String, error) {
 	// TODO: caching, currently it is overkill because it calls this function
 	// only when it creates dynamic PV
 	zones := make(sets.String)
-	nodes, err := kubeClient.Core().Nodes().List(metav1.ListOptions{})
+	nodes, err := kubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
 	if err != nil {
 		glog.V(2).Infof("Error listing nodes")
 		return zones, err
@@ -224,6 +224,17 @@ func probeAttachedVolume() error {
 	scsiHostRescan()
 
 	executor := exec.New()
+
+	// udevadm settle waits for udevd to process the device creation
+	// events for all hardware devices, thus ensuring that any device
+	// nodes have been created successfully before proceeding.
+	argsSettle := []string{"settle"}
+	cmdSettle := executor.Command("udevadm", argsSettle...)
+	_, errSettle := cmdSettle.CombinedOutput()
+	if errSettle != nil {
+		glog.Errorf("error running udevadm settle %v\n", errSettle)
+	}
+
 	args := []string{"trigger"}
 	cmd := executor.Command("udevadm", args...)
 	_, err := cmd.CombinedOutput()

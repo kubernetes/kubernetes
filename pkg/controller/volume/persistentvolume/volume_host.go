@@ -37,11 +37,19 @@ func (ctrl *PersistentVolumeController) GetPluginDir(pluginName string) string {
 	return ""
 }
 
+func (ctrl *PersistentVolumeController) GetVolumeDevicePluginDir(pluginName string) string {
+	return ""
+}
+
 func (ctrl *PersistentVolumeController) GetPodVolumeDir(podUID types.UID, pluginName string, volumeName string) string {
 	return ""
 }
 
 func (ctrl *PersistentVolumeController) GetPodPluginDir(podUID types.UID, pluginName string) string {
+	return ""
+}
+
+func (ctrl *PersistentVolumeController) GetPodVolumeDeviceDir(ppodUID types.UID, pluginName string) string {
 	return ""
 }
 
@@ -99,4 +107,8 @@ func (adc *PersistentVolumeController) GetExec(pluginName string) mount.Exec {
 
 func (ctrl *PersistentVolumeController) GetNodeLabels() (map[string]string, error) {
 	return nil, fmt.Errorf("GetNodeLabels() unsupported in PersistentVolumeController")
+}
+
+func (ctrl *PersistentVolumeController) GetNodeName() types.NodeName {
+	return ""
 }

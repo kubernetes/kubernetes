@@ -80,7 +80,13 @@ func (t *Time) Before(u *Time) bool {
 
 // Equal reports whether the time instant t is equal to u.
 func (t *Time) Equal(u *Time) bool {
-	return t.Time.Equal(u.Time)
+	if t == nil && u == nil {
+		return true
+	}
+	if t != nil && u != nil {
+		return t.Time.Equal(u.Time)
+	}
+	return false
 }
 
 // Unix returns the local time corresponding to the given Unix time

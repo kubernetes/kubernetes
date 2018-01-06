@@ -30,28 +30,48 @@ var _ = Describe("[sig-network] Networking", func() {
 		// Try to hit all endpoints through a test container, retry 5 times,
 		// expect exactly one unique hostname. Each of these endpoints reports
 		// its own hostname.
-		It("should function for intra-pod communication: http [Conformance]", func() {
+		/*
+			    Testname: networking-intra-pod-http
+			    Description: Try to hit test endpoints from a test container and make
+				sure each of them can report a unique hostname.
+		*/
+		framework.ConformanceIt("should function for intra-pod communication: http ", func() {
 			config := framework.NewCoreNetworkingTestConfig(f)
 			for _, endpointPod := range config.EndpointPods {
 				config.DialFromTestContainer("http", endpointPod.Status.PodIP, framework.EndpointHttpPort, config.MaxTries, 0, sets.NewString(endpointPod.Name))
 			}
 		})
 
-		It("should function for intra-pod communication: udp [Conformance]", func() {
+		/*
+			    Testname: networking-intra-pod-udp
+			    Description: Try to hit test endpoints from a test container using udp
+				and make sure each of them can report a unique hostname.
+		*/
+		framework.ConformanceIt("should function for intra-pod communication: udp ", func() {
 			config := framework.NewCoreNetworkingTestConfig(f)
 			for _, endpointPod := range config.EndpointPods {
 				config.DialFromTestContainer("udp", endpointPod.Status.PodIP, framework.EndpointUdpPort, config.MaxTries, 0, sets.NewString(endpointPod.Name))
 			}
 		})
 
-		It("should function for node-pod communication: http [Conformance]", func() {
+		/*
+			    Testname: networking-node-pod-http
+			    Description: Try to hit test endpoints from the pod and make sure each
+				of them can report a unique hostname.
+		*/
+		framework.ConformanceIt("should function for node-pod communication: http ", func() {
 			config := framework.NewCoreNetworkingTestConfig(f)
 			for _, endpointPod := range config.EndpointPods {
 				config.DialFromNode("http", endpointPod.Status.PodIP, framework.EndpointHttpPort, config.MaxTries, 0, sets.NewString(endpointPod.Name))
 			}
 		})
 
-		It("should function for node-pod communication: udp [Conformance]", func() {
+		/*
+			    Testname: networking-node-pod-udp
+			    Description: Try to hit test endpoints from the pod using udp and make sure
+				each of them can report a unique hostname.
+		*/
+		framework.ConformanceIt("should function for node-pod communication: udp ", func() {
 			config := framework.NewCoreNetworkingTestConfig(f)
 			for _, endpointPod := range config.EndpointPods {
 				config.DialFromNode("udp", endpointPod.Status.PodIP, framework.EndpointUdpPort, config.MaxTries, 0, sets.NewString(endpointPod.Name))

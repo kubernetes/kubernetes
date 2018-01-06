@@ -28,21 +28,19 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	internalinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 	"k8s.io/kubernetes/pkg/controller"
 	replicationcontroller "k8s.io/kubernetes/pkg/controller/replication"
 	resourcequotacontroller "k8s.io/kubernetes/pkg/controller/resourcequota"
-	kubeadmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
+	"k8s.io/kubernetes/pkg/quota/generic"
 	quotainstall "k8s.io/kubernetes/pkg/quota/install"
 	"k8s.io/kubernetes/plugin/pkg/admission/resourcequota"
 	resourcequotaapi "k8s.io/kubernetes/plugin/pkg/admission/resourcequota/apis/resourcequota"
@@ -71,11 +69,11 @@ func TestQuota(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	admission.(kubeadmission.WantsInternalKubeClientSet).SetInternalKubeClientSet(internalClientset)
+	admission.SetInternalKubeClientSet(internalClientset)
 	internalInformers := internalinformers.NewSharedInformerFactory(internalClientset, controller.NoResyncPeriodFunc())
-	admission.(kubeadmission.WantsInternalKubeInformerFactory).SetInternalKubeInformerFactory(internalInformers)
-	quotaRegistry := quotainstall.NewRegistry(nil, nil)
-	admission.(kubeadmission.WantsQuotaRegistry).SetQuotaRegistry(quotaRegistry)
+	admission.SetInternalKubeInformerFactory(internalInformers)
+	qca := quotainstall.NewQuotaConfigurationForAdmission()
+	admission.SetQuotaConfiguration(qca)
 	defer close(admissionCh)
 
 	masterConfig := framework.NewIntegrationTestMasterConfig()
@@ -101,22 +99,33 @@ func TestQuota(t *testing.T) {
 	rm.SetEventRecorder(&record.FakeRecorder{})
 	go rm.Run(3, controllerCh)
 
-	resourceQuotaRegistry := quotainstall.NewRegistry(clientset, nil)
-	groupKindsToReplenish := []schema.GroupKind{
-		api.Kind("Pod"),
-	}
+	discoveryFunc := clientset.Discovery().ServerPreferredNamespacedResources
+	listerFuncForResource := generic.ListerFuncForResourceFunc(informers.ForResource)
+	qc := quotainstall.NewQuotaConfigurationForControllers(listerFuncForResource)
+	informersStarted := make(chan struct{})
 	resourceQuotaControllerOptions := &resourcequotacontroller.ResourceQuotaControllerOptions{
 		QuotaClient:               clientset.Core(),
 		ResourceQuotaInformer:     informers.Core().V1().ResourceQuotas(),
 		ResyncPeriod:              controller.NoResyncPeriodFunc,
-		Registry:                  resourceQuotaRegistry,
-		GroupKindsToReplenish:     groupKindsToReplenish,
+		InformerFactory:           informers,
 		ReplenishmentResyncPeriod: controller.NoResyncPeriodFunc,
-		ControllerFactory:         resourcequotacontroller.NewReplenishmentControllerFactory(informers),
+		DiscoveryFunc:             discoveryFunc,
+		IgnoredResourcesFunc:      qc.IgnoredResources,
+		InformersStarted:          informersStarted,
+		Registry:                  generic.NewRegistry(qc.Evaluators()),
 	}
-	go resourcequotacontroller.NewResourceQuotaController(resourceQuotaControllerOptions).Run(2, controllerCh)
+	resourceQuotaController, err := resourcequotacontroller.NewResourceQuotaController(resourceQuotaControllerOptions)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	go resourceQuotaController.Run(2, controllerCh)
+
+	// Periodically the quota controller to detect new resource types
+	go resourceQuotaController.Sync(discoveryFunc, 30*time.Second, controllerCh)
+
 	internalInformers.Start(controllerCh)
 	informers.Start(controllerCh)
+	close(informersStarted)
 
 	startTime := time.Now()
 	scale(t, ns2.Name, clientset)
@@ -158,7 +167,6 @@ func waitForQuota(t *testing.T, quota *v1.ResourceQuota, clientset *clientset.Cl
 		default:
 			return false, nil
 		}
-
 		switch cast := event.Object.(type) {
 		case *v1.ResourceQuota:
 			if len(cast.Status.Hard) > 0 {
@@ -254,15 +262,15 @@ func TestQuotaLimitedResourceDenial(t *testing.T) {
 			},
 		},
 	}
-	quotaRegistry := quotainstall.NewRegistry(nil, nil)
+	qca := quotainstall.NewQuotaConfigurationForAdmission()
 	admission, err := resourcequota.NewResourceQuota(config, 5, admissionCh)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	admission.(kubeadmission.WantsInternalKubeClientSet).SetInternalKubeClientSet(internalClientset)
+	admission.SetInternalKubeClientSet(internalClientset)
 	internalInformers := internalinformers.NewSharedInformerFactory(internalClientset, controller.NoResyncPeriodFunc())
-	admission.(kubeadmission.WantsInternalKubeInformerFactory).SetInternalKubeInformerFactory(internalInformers)
-	admission.(kubeadmission.WantsQuotaRegistry).SetQuotaRegistry(quotaRegistry)
+	admission.SetInternalKubeInformerFactory(internalInformers)
+	admission.SetQuotaConfiguration(qca)
 	defer close(admissionCh)
 
 	masterConfig := framework.NewIntegrationTestMasterConfig()
@@ -286,22 +294,33 @@ func TestQuotaLimitedResourceDenial(t *testing.T) {
 	rm.SetEventRecorder(&record.FakeRecorder{})
 	go rm.Run(3, controllerCh)
 
-	resourceQuotaRegistry := quotainstall.NewRegistry(clientset, nil)
-	groupKindsToReplenish := []schema.GroupKind{
-		api.Kind("Pod"),
-	}
+	discoveryFunc := clientset.Discovery().ServerPreferredNamespacedResources
+	listerFuncForResource := generic.ListerFuncForResourceFunc(informers.ForResource)
+	qc := quotainstall.NewQuotaConfigurationForControllers(listerFuncForResource)
+	informersStarted := make(chan struct{})
 	resourceQuotaControllerOptions := &resourcequotacontroller.ResourceQuotaControllerOptions{
 		QuotaClient:               clientset.Core(),
 		ResourceQuotaInformer:     informers.Core().V1().ResourceQuotas(),
 		ResyncPeriod:              controller.NoResyncPeriodFunc,
-		Registry:                  resourceQuotaRegistry,
-		GroupKindsToReplenish:     groupKindsToReplenish,
+		InformerFactory:           informers,
 		ReplenishmentResyncPeriod: controller.NoResyncPeriodFunc,
-		ControllerFactory:         resourcequotacontroller.NewReplenishmentControllerFactory(informers),
+		DiscoveryFunc:             discoveryFunc,
+		IgnoredResourcesFunc:      qc.IgnoredResources,
+		InformersStarted:          informersStarted,
+		Registry:                  generic.NewRegistry(qc.Evaluators()),
 	}
-	go resourcequotacontroller.NewResourceQuotaController(resourceQuotaControllerOptions).Run(2, controllerCh)
+	resourceQuotaController, err := resourcequotacontroller.NewResourceQuotaController(resourceQuotaControllerOptions)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	go resourceQuotaController.Run(2, controllerCh)
+
+	// Periodically the quota controller to detect new resource types
+	go resourceQuotaController.Sync(discoveryFunc, 30*time.Second, controllerCh)
+
 	internalInformers.Start(controllerCh)
 	informers.Start(controllerCh)
+	close(informersStarted)
 
 	// try to create a pod
 	pod := &v1.Pod{
@@ -323,6 +342,7 @@ func TestQuotaLimitedResourceDenial(t *testing.T) {
 	}
 
 	// now create a covering quota
+	// note: limited resource does a matchContains, so we now have "pods" matching "pods" and "count/pods"
 	quota := &v1.ResourceQuota{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "quota",
@@ -330,7 +350,8 @@ func TestQuotaLimitedResourceDenial(t *testing.T) {
 		},
 		Spec: v1.ResourceQuotaSpec{
 			Hard: v1.ResourceList{
-				v1.ResourcePods: resource.MustParse("1000"),
+				v1.ResourcePods:               resource.MustParse("1000"),
+				v1.ResourceName("count/pods"): resource.MustParse("1000"),
 			},
 		},
 	}

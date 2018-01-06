@@ -17,8 +17,8 @@ limitations under the License.
 package parse
 
 import (
+	"k8s.io/kube-openapi/pkg/util/proto"
 	"k8s.io/kubernetes/pkg/kubectl/apply"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
 )
 
 // Item wraps values from 3 sources (recorded, local, remote).
@@ -31,7 +31,7 @@ type Item interface {
 // primitiveItem contains a recorded, local, and remote value
 type primitiveItem struct {
 	Name      string
-	Primitive *openapi.Primitive
+	Primitive *proto.Primitive
 
 	apply.RawElementData
 }
@@ -40,7 +40,7 @@ func (i *primitiveItem) CreateElement(v ItemVisitor) (apply.Element, error) {
 	return v.CreatePrimitiveElement(i)
 }
 
-func (i *primitiveItem) GetMeta() openapi.Schema {
+func (i *primitiveItem) GetMeta() proto.Schema {
 	// https://golang.org/doc/faq#nil_error
 	if i.Primitive != nil {
 		return i.Primitive
@@ -51,7 +51,7 @@ func (i *primitiveItem) GetMeta() openapi.Schema {
 // listItem contains a recorded, local, and remote list
 type listItem struct {
 	Name  string
-	Array *openapi.Array
+	Array *proto.Array
 
 	apply.ListElementData
 }
@@ -60,7 +60,7 @@ func (i *listItem) CreateElement(v ItemVisitor) (apply.Element, error) {
 	return v.CreateListElement(i)
 }
 
-func (i *listItem) GetMeta() openapi.Schema {
+func (i *listItem) GetMeta() proto.Schema {
 	// https://golang.org/doc/faq#nil_error
 	if i.Array != nil {
 		return i.Array
@@ -71,7 +71,7 @@ func (i *listItem) GetMeta() openapi.Schema {
 // mapItem contains a recorded, local, and remote map
 type mapItem struct {
 	Name string
-	Map  *openapi.Map
+	Map  *proto.Map
 
 	apply.MapElementData
 }
@@ -80,7 +80,7 @@ func (i *mapItem) CreateElement(v ItemVisitor) (apply.Element, error) {
 	return v.CreateMapElement(i)
 }
 
-func (i *mapItem) GetMeta() openapi.Schema {
+func (i *mapItem) GetMeta() proto.Schema {
 	// https://golang.org/doc/faq#nil_error
 	if i.Map != nil {
 		return i.Map
@@ -91,12 +91,12 @@ func (i *mapItem) GetMeta() openapi.Schema {
 // mapItem contains a recorded, local, and remote map
 type typeItem struct {
 	Name string
-	Type *openapi.Kind
+	Type *proto.Kind
 
 	apply.MapElementData
 }
 
-func (i *typeItem) GetMeta() openapi.Schema {
+func (i *typeItem) GetMeta() proto.Schema {
 	// https://golang.org/doc/faq#nil_error
 	if i.Type != nil {
 		return i.Type

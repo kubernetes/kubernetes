@@ -77,7 +77,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 
 			By("Creating service " + headlessSvcName + " in namespace " + ns)
 			headlessService := framework.CreateServiceSpec(headlessSvcName, "", true, labels)
-			_, err := c.Core().Services(ns).Create(headlessService)
+			_, err := c.CoreV1().Services(ns).Create(headlessService)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
@@ -650,7 +650,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 		It("Scaling should happen in predictable order and halt if any stateful pod is unhealthy", func() {
 			psLabels := klabels.Set(labels)
 			By("Initializing watcher for selector " + psLabels.String())
-			watcher, err := f.ClientSet.Core().Pods(ns).Watch(metav1.ListOptions{
+			watcher, err := f.ClientSet.CoreV1().Pods(ns).Watch(metav1.ListOptions{
 				LabelSelector: psLabels.AsSelector().String(),
 			})
 			Expect(err).NotTo(HaveOccurred())
@@ -692,7 +692,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			By("Scale down will halt with unhealthy stateful pod")
-			watcher, err = f.ClientSet.Core().Pods(ns).Watch(metav1.ListOptions{
+			watcher, err = f.ClientSet.CoreV1().Pods(ns).Watch(metav1.ListOptions{
 				LabelSelector: psLabels.AsSelector().String(),
 			})
 			Expect(err).NotTo(HaveOccurred())
@@ -785,7 +785,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 					NodeName: node.Name,
 				},
 			}
-			pod, err := f.ClientSet.Core().Pods(f.Namespace.Name).Create(pod)
+			pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
 			framework.ExpectNoError(err)
 
 			By("Creating statefulset with conflicting port in namespace " + f.Namespace.Name)
@@ -803,7 +803,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 
 			var initialStatefulPodUID types.UID
 			By("Waiting until stateful pod " + statefulPodName + " will be recreated and deleted at least once in namespace " + f.Namespace.Name)
-			w, err := f.ClientSet.Core().Pods(f.Namespace.Name).Watch(metav1.SingleObject(metav1.ObjectMeta{Name: statefulPodName}))
+			w, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Watch(metav1.SingleObject(metav1.ObjectMeta{Name: statefulPodName}))
 			framework.ExpectNoError(err)
 			// we need to get UID from pod in any state and wait until stateful set controller will remove pod atleast once
 			_, err = watch.Until(framework.StatefulPodTimeout, w, func(event watch.Event) (bool, error) {
@@ -826,13 +826,13 @@ var _ = SIGDescribe("StatefulSet", func() {
 			}
 
 			By("Removing pod with conflicting port in namespace " + f.Namespace.Name)
-			err = f.ClientSet.Core().Pods(f.Namespace.Name).Delete(pod.Name, metav1.NewDeleteOptions(0))
+			err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(pod.Name, metav1.NewDeleteOptions(0))
 			framework.ExpectNoError(err)
 
 			By("Waiting when stateful pod " + statefulPodName + " will be recreated in namespace " + f.Namespace.Name + " and will be in running state")
 			// we may catch delete event, thats why we are waiting for running phase like this, and not with watch.Until
 			Eventually(func() error {
-				statefulPod, err := f.ClientSet.Core().Pods(f.Namespace.Name).Get(statefulPodName, metav1.GetOptions{})
+				statefulPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(statefulPodName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}

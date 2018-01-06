@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2018 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -28,69 +28,6 @@ import "k8s.io/apimachinery/pkg/util/intstr/generated.proto";
 
 // Package-wide variables from generator "generated".
 option go_package = "v1alpha1";
-
-// AdmissionHookClientConfig contains the information to make a TLS
-// connection with the webhook
-message AdmissionHookClientConfig {
-  // Service is a reference to the service for this webhook. If there is only
-  // one port open for the service, that port will be used. If there are multiple
-  // ports open, port 443 will be used if it is open, otherwise it is an error.
-  // Required
-  optional ServiceReference service = 1;
-
-  // CABundle is a PEM encoded CA bundle which will be used to validate webhook's server certificate.
-  // Required
-  optional bytes caBundle = 2;
-}
-
-// ExternalAdmissionHook describes an external admission webhook and the
-// resources and operations it applies to.
-message ExternalAdmissionHook {
-  // The name of the external admission webhook.
-  // Name should be fully qualified, e.g., imagepolicy.kubernetes.io, where
-  // "imagepolicy" is the name of the webhook, and kubernetes.io is the name
-  // of the organization.
-  // Required.
-  optional string name = 1;
-
-  // ClientConfig defines how to communicate with the hook.
-  // Required
-  optional AdmissionHookClientConfig clientConfig = 2;
-
-  // Rules describes what operations on what resources/subresources the webhook cares about.
-  // The webhook cares about an operation if it matches _any_ Rule.
-  repeated RuleWithOperations rules = 3;
-
-  // FailurePolicy defines how unrecognized errors from the admission endpoint are handled -
-  // allowed values are Ignore or Fail. Defaults to Ignore.
-  // +optional
-  optional string failurePolicy = 4;
-}
-
-// ExternalAdmissionHookConfiguration describes the configuration of initializers.
-message ExternalAdmissionHookConfiguration {
-  // Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata.
-  // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
-
-  // ExternalAdmissionHooks is a list of external admission webhooks and the
-  // affected resources and operations.
-  // +optional
-  // +patchMergeKey=name
-  // +patchStrategy=merge
-  repeated ExternalAdmissionHook externalAdmissionHooks = 2;
-}
-
-// ExternalAdmissionHookConfigurationList is a list of ExternalAdmissionHookConfiguration.
-message ExternalAdmissionHookConfigurationList {
-  // Standard list metadata.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds
-  // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
-
-  // List of ExternalAdmissionHookConfiguration.
-  repeated ExternalAdmissionHookConfiguration items = 2;
-}
 
 // Initializer describes the name and the failure policy of an initializer, and
 // what resources it applies to.
@@ -167,30 +104,5 @@ message Rule {
   // Depending on the enclosing object, subresources might not be allowed.
   // Required.
   repeated string resources = 3;
-}
-
-// RuleWithOperations is a tuple of Operations and Resources. It is recommended to make
-// sure that all the tuple expansions are valid.
-message RuleWithOperations {
-  // Operations is the operations the admission hook cares about - CREATE, UPDATE, or *
-  // for all operations.
-  // If '*' is present, the length of the slice must be one.
-  // Required.
-  repeated string operations = 1;
-
-  // Rule is embedded, it describes other criteria of the rule, like
-  // APIGroups, APIVersions, Resources, etc.
-  optional Rule rule = 2;
-}
-
-// ServiceReference holds a reference to Service.legacy.k8s.io
-message ServiceReference {
-  // Namespace is the namespace of the service
-  // Required
-  optional string namespace = 1;
-
-  // Name is the name of the service
-  // Required
-  optional string name = 2;
 }
 

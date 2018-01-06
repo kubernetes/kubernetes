@@ -29,19 +29,30 @@ func Register(plugins *admission.Plugins) {
 	})
 }
 
-// alwaysAdmit is an implementation of admission.Interface which always says yes to an admit request.
+// AlwaysAdmit is an implementation of admission.Interface which always says yes to an admit request.
 // It is useful in tests and when using kubernetes in an open manner.
-type alwaysAdmit struct{}
+type AlwaysAdmit struct{}
 
-func (alwaysAdmit) Admit(a admission.Attributes) (err error) {
+var _ admission.MutationInterface = AlwaysAdmit{}
+var _ admission.ValidationInterface = AlwaysAdmit{}
+
+// Admit makes an admission decision based on the request attributes
+func (AlwaysAdmit) Admit(a admission.Attributes) (err error) {
 	return nil
 }
 
-func (alwaysAdmit) Handles(operation admission.Operation) bool {
+// Validate makes an admission decision based on the request attributes.  It is NOT allowed to mutate.
+func (AlwaysAdmit) Validate(a admission.Attributes) (err error) {
+	return nil
+}
+
+// Handles returns true if this admission controller can handle the given operation
+// where operation can be one of CREATE, UPDATE, DELETE, or CONNECT
+func (AlwaysAdmit) Handles(operation admission.Operation) bool {
 	return true
 }
 
 // NewAlwaysAdmit creates a new always admit admission handler
-func NewAlwaysAdmit() admission.Interface {
-	return new(alwaysAdmit)
+func NewAlwaysAdmit() *AlwaysAdmit {
+	return new(AlwaysAdmit)
 }

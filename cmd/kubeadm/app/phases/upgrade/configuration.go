@@ -30,7 +30,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 )
 
 // FetchConfiguration fetches configuration required for upgrading your cluster from a file (which has precedence) or a ConfigMap in the cluster
@@ -64,7 +64,7 @@ func loadConfigurationBytes(client clientset.Interface, w io.Writer, cfgPath str
 	configMap, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(constants.MasterConfigurationConfigMap, metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {
 		fmt.Printf("[upgrade/config] In order to upgrade, a ConfigMap called %q in the %s namespace must exist.\n", constants.MasterConfigurationConfigMap, metav1.NamespaceSystem)
-		fmt.Println("[upgrade/config] Without this information, 'kubeadm upgrade' don't how to configure your upgraded cluster.")
+		fmt.Println("[upgrade/config] Without this information, 'kubeadm upgrade' won't know how to configure your upgraded cluster.")
 		fmt.Println("")
 		fmt.Println("[upgrade/config] Next steps:")
 		fmt.Printf("\t- OPTION 1: Run 'kubeadm config upload from-flags' and specify the same CLI arguments you passed to 'kubeadm init' when you created your master.\n")
@@ -86,12 +86,12 @@ func bytesToValidatedMasterConfig(b []byte) (*kubeadmapiext.MasterConfiguration,
 	finalCfg := &kubeadmapiext.MasterConfiguration{}
 	internalcfg := &kubeadmapi.MasterConfiguration{}
 
-	if err := runtime.DecodeInto(api.Codecs.UniversalDecoder(), b, cfg); err != nil {
+	if err := runtime.DecodeInto(legacyscheme.Codecs.UniversalDecoder(), b, cfg); err != nil {
 		return nil, fmt.Errorf("unable to decode config from bytes: %v", err)
 	}
 	// Default and convert to the internal version
-	api.Scheme.Default(cfg)
-	api.Scheme.Convert(cfg, internalcfg, nil)
+	legacyscheme.Scheme.Default(cfg)
+	legacyscheme.Scheme.Convert(cfg, internalcfg, nil)
 
 	// Applies dynamic defaults to settings not provided with flags
 	if err := configutil.SetInitDynamicDefaults(internalcfg); err != nil {
@@ -102,6 +102,6 @@ func bytesToValidatedMasterConfig(b []byte) (*kubeadmapiext.MasterConfiguration,
 		return nil, err
 	}
 	// Finally converts back to the external version
-	api.Scheme.Convert(internalcfg, finalCfg, nil)
+	legacyscheme.Scheme.Convert(internalcfg, finalCfg, nil)
 	return finalCfg, nil
 }

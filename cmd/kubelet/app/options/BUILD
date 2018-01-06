@@ -15,12 +15,14 @@ go_library(
     importpath = "k8s.io/kubernetes/cmd/kubelet/app/options",
     deps = [
         "//pkg/apis/componentconfig:go_default_library",
+        "//pkg/apis/core:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/kubelet/apis/kubeletconfig:go_default_library",
         "//pkg/kubelet/apis/kubeletconfig/scheme:go_default_library",
         "//pkg/kubelet/apis/kubeletconfig/v1alpha1:go_default_library",
         "//pkg/kubelet/apis/kubeletconfig/validation:go_default_library",
         "//pkg/kubelet/config:go_default_library",
+        "//pkg/kubelet/types:go_default_library",
         "//pkg/util/taints:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
@@ -45,8 +47,8 @@ filegroup(
 go_test(
     name = "go_default_test",
     srcs = ["options_test.go"],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/cmd/kubelet/app/options",
-    library = ":go_default_library",
     deps = [
         "//vendor/github.com/spf13/pflag:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/diff:go_default_library",

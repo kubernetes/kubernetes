@@ -153,7 +153,7 @@ func kindMatches(pattern schema.GroupVersionKind, kind schema.GroupVersionKind) 
 }
 
 func (m PriorityRESTMapper) RESTMapping(gk schema.GroupKind, versions ...string) (mapping *RESTMapping, err error) {
-	mappings, err := m.Delegate.RESTMappings(gk)
+	mappings, err := m.Delegate.RESTMappings(gk, versions...)
 	if err != nil {
 		return nil, err
 	}

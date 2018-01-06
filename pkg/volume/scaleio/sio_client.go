@@ -373,49 +373,25 @@ func (c *sioClient) GetVolumeRefs(volId sioVolumeID) (refs int, err error) {
 func (c *sioClient) Devs() (map[string]string, error) {
 	volumeMap := make(map[string]string)
 
-	// grab the sdc tool output
-	out, err := c.exec.Run(c.getSdcCmd(), "--query_vols")
-	if err != nil {
-		glog.Error(log("sdc --query_vols failed: %v", err))
-		return nil, err
-	}
-
-	// --query_vols output is a heading followed by list of attached vols as follows:
-	// Retrieve ? volume(s)
-	// VOL-ID a2b8419300000000 MDM-ID 788d9efb0a8f20cb
-	// ...
-	// parse output and store it in a map as  map[<mdmID-volID>]volID
-	// that map is used later to retrieve device path (next section)
-	result := string(out)
-	mdmMap := make(map[string]string)
-	lines := strings.Split(result, "\n")
-	for _, line := range lines {
-		//line e.g.: "VOL-ID a2b8419300000000 MDM-ID 788d9efb0a8f20cb"
-		if strings.HasPrefix(line, "VOL-ID") {
-			//split[1] = volID; split[3] = mdmID
-			split := strings.Split(line, " ")
-			key := fmt.Sprintf("%s-%s", split[3], split[1])
-			mdmMap[key] = split[1]
-		}
-	}
-
 	files, err := c.getSioDiskPaths()
 	if err != nil {
 		return nil, err
 	}
 
 	for _, f := range files {
-		// remove emec-vol- prefix to be left with concated mdmID-volID
-		mdmVolumeID := strings.Replace(f.Name(), "emc-vol-", "", 1)
+		// split emc-vol-<mdmID>-<volumeID> to pull out volumeID
+		parts := strings.Split(f.Name(), "-")
+		if len(parts) != 4 {
+			return nil, errors.New("unexpected ScaleIO device name format")
+		}
+		volumeID := parts[3]
 		devPath, err := filepath.EvalSymlinks(fmt.Sprintf("%s/%s", sioDiskIDPath, f.Name()))
 		if err != nil {
 			glog.Error(log("devicepath-to-volID mapping error: %v", err))
 			return nil, err
 		}
-		// map volID to devicePath
-		if volumeID, ok := mdmMap[mdmVolumeID]; ok {
-			volumeMap[volumeID] = devPath
-		}
+		// map volumeID to devicePath
+		volumeMap[volumeID] = devPath
 	}
 	return volumeMap, nil
 }

@@ -26,7 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/remotecommand"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 
 	. "github.com/onsi/gomega"
 )
@@ -57,7 +57,7 @@ func (f *Framework) ExecWithOptions(options ExecOptions) (string, string, error)
 
 	const tty = false
 
-	req := f.ClientSet.Core().RESTClient().Post().
+	req := f.ClientSet.CoreV1().RESTClient().Post().
 		Resource("pods").
 		Name(options.PodName).
 		Namespace(options.Namespace).
@@ -70,7 +70,7 @@ func (f *Framework) ExecWithOptions(options ExecOptions) (string, string, error)
 		Stdout:    options.CaptureStdout,
 		Stderr:    options.CaptureStderr,
 		TTY:       tty,
-	}, api.ParameterCodec)
+	}, legacyscheme.ParameterCodec)
 
 	var stdout, stderr bytes.Buffer
 	err = execute("POST", req.URL(), config, options.Stdin, &stdout, &stderr, tty)

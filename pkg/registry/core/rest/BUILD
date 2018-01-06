@@ -9,8 +9,8 @@ load(
 go_test(
     name = "go_default_test",
     srcs = ["storage_core_test.go"],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/pkg/registry/core/rest",
-    library = ":go_default_library",
     deps = [
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/server/storage:go_default_library",
@@ -23,7 +23,8 @@ go_library(
     srcs = ["storage_core.go"],
     importpath = "k8s.io/kubernetes/pkg/registry/core/rest",
     deps = [
-        "//pkg/api:go_default_library",
+        "//pkg/api/legacyscheme:go_default_library",
+        "//pkg/apis/core:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/typed/policy/internalversion:go_default_library",
         "//pkg/kubelet/client:go_default_library",
         "//pkg/master/ports:go_default_library",

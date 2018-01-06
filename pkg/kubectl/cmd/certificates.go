@@ -168,6 +168,7 @@ func (options *CertificateOptions) modifyCertificateCondition(f cmdutil.Factory,
 		return err
 	}
 	r := f.NewBuilder().
+		Internal().
 		ContinueOnError().
 		FilenameParam(false, &options.FilenameOptions).
 		ResourceNames("certificatesigningrequest", options.csrNames...).
@@ -188,7 +189,7 @@ func (options *CertificateOptions) modifyCertificateCondition(f cmdutil.Factory,
 			return err
 		}
 		found++
-		cmdutil.PrintSuccess(mapper, options.outputStyle == "name", out, info.Mapping.Resource, info.Name, false, verb)
+		f.PrintSuccess(mapper, options.outputStyle == "name", out, info.Mapping.Resource, info.Name, false, verb)
 		return nil
 	})
 	if found == 0 {

@@ -23,6 +23,20 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+### Hardcoded constants
+DEFAULT_CNI_VERSION="v0.6.0"
+DEFAULT_CNI_SHA1="d595d3ded6499a64e8dac02466e2f5f2ce257c9f" 
+DEFAULT_NPD_VERSION="v0.4.1"
+DEFAULT_NPD_SHA1="a57a3fe64cab8a18ec654f5cef0aec59dae62568"
+DEFAULT_MOUNTER_TAR_SHA="8003b798cf33c7f91320cd6ee5cec4fa22244571"
+###
+
+# Use --retry-connrefused opt only if it's supported by curl.
+CURL_RETRY_CONNREFUSED=""
+if curl --help | grep -q -- '--retry-connrefused'; then
+  CURL_RETRY_CONNREFUSED='--retry-connrefused'
+fi
+
 function set-broken-motd {
   cat > /etc/motd <<EOF
 Broken (or in progress) Kubernetes node setup! Check the cluster initialization status
@@ -40,8 +54,9 @@ EOF
 
 function download-kube-env {
   # Fetch kube-env from GCE metadata server.
+  (umask 700;
   local -r tmp_kube_env="/tmp/kube-env.yaml"
-  curl --fail --retry 5 --retry-delay 3 --silent --show-error \
+  curl --fail --retry 5 --retry-delay 3 ${CURL_RETRY_CONNREFUSED} --silent --show-error \
     -H "X-Google-Metadata-Request: True" \
     -o "${tmp_kube_env}" \
     http://metadata.google.internal/computeMetadata/v1/instance/attributes/kube-env
@@ -52,12 +67,14 @@ for k,v in yaml.load(sys.stdin).iteritems():
   print("readonly {var}={value}".format(var = k, value = pipes.quote(str(v))))
 ''' < "${tmp_kube_env}" > "${KUBE_HOME}/kube-env")
   rm -f "${tmp_kube_env}"
+  )
 }
 
 function download-kube-master-certs {
   # Fetch kube-env from GCE metadata server.
+  (umask 700;
   local -r tmp_kube_master_certs="/tmp/kube-master-certs.yaml"
-  curl --fail --retry 5 --retry-delay 3 --silent --show-error \
+  curl --fail --retry 5 --retry-delay 3 ${CURL_RETRY_CONNREFUSED} --silent --show-error \
     -H "X-Google-Metadata-Request: True" \
     -o "${tmp_kube_master_certs}" \
     http://metadata.google.internal/computeMetadata/v1/instance/attributes/kube-master-certs
@@ -68,6 +85,7 @@ for k,v in yaml.load(sys.stdin).iteritems():
   print("readonly {var}={value}".format(var = k, value = pipes.quote(str(v))))
 ''' < "${tmp_kube_master_certs}" > "${KUBE_HOME}/kube-master-certs")
   rm -f "${tmp_kube_master_certs}"
+  )
 }
 
 function validate-hash {
@@ -94,7 +112,7 @@ function download-or-bust {
     for url in "${urls[@]}"; do
       local file="${url##*/}"
       rm -f "${file}"
-      if ! curl -f --ipv4 -Lo "${file}" --connect-timeout 20 --max-time 300 --retry 6 --retry-delay 10 "${url}"; then
+      if ! curl -f --ipv4 -Lo "${file}" --connect-timeout 20 --max-time 300 --retry 6 --retry-delay 10 ${CURL_RETRY_CONNREFUSED} "${url}"; then
         echo "== Failed to download ${url}. Retrying. =="
       elif [[ -n "${hash}" ]] && ! validate-hash "${file}" "${hash}"; then
         echo "== Hash validation of ${url} failed. Retrying. =="
@@ -122,7 +140,7 @@ function split-commas {
 
 function install-gci-mounter-tools {
   CONTAINERIZED_MOUNTER_HOME="${KUBE_HOME}/containerized_mounter"
-  local -r mounter_tar_sha="8003b798cf33c7f91320cd6ee5cec4fa22244571"
+  local -r mounter_tar_sha="${DEFAULT_MOUNTER_TAR_SHA}"
   if is-preloaded "mounter" "${mounter_tar_sha}"; then
     echo "mounter is preloaded."
     return
@@ -133,7 +151,7 @@ function install-gci-mounter-tools {
   chmod a+x "${CONTAINERIZED_MOUNTER_HOME}"
   mkdir -p "${CONTAINERIZED_MOUNTER_HOME}/rootfs"
   download-or-bust "${mounter_tar_sha}" "https://storage.googleapis.com/kubernetes-release/gci-mounter/mounter.tar"
-  cp "${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty/gci-mounter" "${CONTAINERIZED_MOUNTER_HOME}/mounter"
+  cp "${KUBE_HOME}/kubernetes/server/bin/mounter" "${CONTAINERIZED_MOUNTER_HOME}/mounter"
   chmod a+x "${CONTAINERIZED_MOUNTER_HOME}/mounter"
   mv "${KUBE_HOME}/mounter.tar" /tmp/mounter.tar
   tar xf /tmp/mounter.tar -C "${CONTAINERIZED_MOUNTER_HOME}/rootfs"
@@ -147,8 +165,8 @@ function install-node-problem-detector {
       local -r npd_version="${NODE_PROBLEM_DETECTOR_VERSION}"
       local -r npd_sha1="${NODE_PROBLEM_DETECTOR_TAR_HASH}"
   else
-      local -r npd_version="v0.4.1"
-      local -r npd_sha1="a57a3fe64cab8a18ec654f5cef0aec59dae62568"
+      local -r npd_version="${DEFAULT_NPD_VERSION}"
+      local -r npd_sha1="${DEFAULT_NPD_SHA1}"
   fi
 
   if is-preloaded "node-problem-detector" "${npd_sha1}"; then
@@ -170,9 +188,8 @@ function install-node-problem-detector {
 }
 
 function install-cni-binaries {
-  local -r cni_version="v0.6.0"
-  local -r cni_tar="cni-plugins-amd64-${cni_version}.tgz"
-  local -r cni_sha1="d595d3ded6499a64e8dac02466e2f5f2ce257c9f"
+  local -r cni_tar="cni-plugins-amd64-${DEFAULT_CNI_VERSION}.tgz"
+  local -r cni_sha1="${DEFAULT_CNI_SHA1}"
   if is-preloaded "${cni_tar}" "${cni_sha1}"; then
     echo "${cni_tar} is preloaded."
     return
@@ -234,7 +251,7 @@ function try-load-docker-image {
   set +e
   local -r max_attempts=5
   local -i attempt_num=1
-  until timeout 30 docker load -i "${img}"; do
+  until timeout 30 ${LOAD_IMAGE_COMMAND:-docker load -i} "${img}"; do
     if [[ "${attempt_num}" == "${max_attempts}" ]]; then
       echo "Fail to load docker image file ${img} after ${max_attempts} retries. Exit!!"
       exit 1

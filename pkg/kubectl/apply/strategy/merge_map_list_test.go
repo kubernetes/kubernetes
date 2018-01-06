@@ -20,6 +20,8 @@ import (
 	. "github.com/onsi/ginkgo"
 
 	"k8s.io/kubernetes/pkg/kubectl/apply/strategy"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
+	tst "k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi/testing"
 )
 
 var _ = Describe("Merging fields of type list-of-map with openapi", func() {
@@ -431,6 +433,11 @@ spec:
 })
 
 var _ = Describe("Merging fields of type list-of-map with openapi containing a multi-field mergekey", func() {
+	var resources openapi.Resources
+	BeforeEach(func() {
+		resources = tst.NewFakeResources("test_swagger.json")
+	})
+
 	Context("where one of the items has been deleted", func() {
 		It("should delete the item", func() {
 			recorded := create(`
@@ -492,7 +499,7 @@ spec:
           protocol: TCP
           hostPort: 2020
 `)
-			runWith(strategy.Create(strategy.Options{}), recorded, local, remote, expected, "test_swagger.json")
+			runWith(strategy.Create(strategy.Options{}), recorded, local, remote, expected, resources)
 		})
 	})
 
@@ -564,7 +571,7 @@ spec:
           hostPort: 2022
           hostIP: "127.0.0.1"
 `)
-			runWith(strategy.Create(strategy.Options{}), recorded, local, remote, expected, "test_swagger.json")
+			runWith(strategy.Create(strategy.Options{}), recorded, local, remote, expected, resources)
 		})
 	})
 
@@ -630,7 +637,7 @@ spec:
           protocol: UDP
           hostPort: 2022
 `)
-			runWith(strategy.Create(strategy.Options{}), recorded, local, remote, expected, "test_swagger.json")
+			runWith(strategy.Create(strategy.Options{}), recorded, local, remote, expected, resources)
 		})
 	})
 })

@@ -21,7 +21,6 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
-	"sync"
 	"testing"
 	"time"
 
@@ -34,7 +33,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtimeutils "k8s.io/apimachinery/pkg/util/runtime"
 	clientset "k8s.io/client-go/kubernetes"
-	federationtest "k8s.io/kubernetes/federation/test/e2e"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/azure"
 	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	"k8s.io/kubernetes/pkg/kubectl/util/logs"
@@ -45,11 +43,6 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework/metrics"
 	"k8s.io/kubernetes/test/e2e/manifest"
 	testutils "k8s.io/kubernetes/test/utils"
-)
-
-const (
-	// TODO: Delete this once all the tests that depend upon it are moved out of test/e2e and into subdirs
-	podName = "pfpod"
 )
 
 var (
@@ -79,7 +72,7 @@ func setupProviderConfig() error {
 			managedZones = []string{zone}
 		}
 
-		gceAlphaFeatureGate, err := gcecloud.NewAlphaFeatureGate([]string{})
+		gceAlphaFeatureGate, err := gcecloud.NewAlphaFeatureGate([]string{gcecloud.AlphaFeatureNetworkEndpointGroup})
 		if err != nil {
 			glog.Errorf("Encountered error for creating alpha feature gate: %v", err)
 		}
@@ -104,8 +97,9 @@ func setupProviderConfig() error {
 
 		cloudConfig.Provider = gceCloud
 
+		// Arbitrarily pick one of the zones we have nodes in
 		if cloudConfig.Zone == "" && framework.TestContext.CloudConfig.MultiZone {
-			zones, err := gceCloud.GetAllZones()
+			zones, err := gceCloud.GetAllZonesFromCloudProvider()
 			if err != nil {
 				return err
 			}
@@ -166,7 +160,6 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 				metav1.NamespaceSystem,
 				metav1.NamespaceDefault,
 				metav1.NamespacePublic,
-				framework.FederationSystemNamespace(),
 			})
 		if err != nil {
 			framework.Failf("Error deleting orphaned namespaces: %v", err)
@@ -229,7 +222,7 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	}
 
 	// Log the version of the server and this client.
-	framework.Logf("Client version: %s", version.Get().GitVersion)
+	framework.Logf("e2e test version: %s", version.Get().GitVersion)
 
 	dc := c.DiscoveryClient
 
@@ -238,14 +231,11 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 		framework.Logf("Unexpected server error retrieving version: %v", serverErr)
 	}
 	if serverVersion != nil {
-		framework.Logf("Server version: %s", serverVersion.GitVersion)
+		framework.Logf("kube-apiserver version: %s", serverVersion.GitVersion)
 	}
 
 	// Reference common test to make the import valid.
 	commontest.CurrentSuite = commontest.E2E
-
-	// Reference federation test to make the import valid.
-	federationtest.FederationSuite = commontest.FederationE2E
 
 	return nil
 
@@ -259,55 +249,13 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	}
 })
 
-type CleanupActionHandle *int
-
-var cleanupActionsLock sync.Mutex
-var cleanupActions = map[CleanupActionHandle]func(){}
-
-// AddCleanupAction installs a function that will be called in the event of the
-// whole test being terminated.  This allows arbitrary pieces of the overall
-// test to hook into SynchronizedAfterSuite().
-func AddCleanupAction(fn func()) CleanupActionHandle {
-	p := CleanupActionHandle(new(int))
-	cleanupActionsLock.Lock()
-	defer cleanupActionsLock.Unlock()
-	cleanupActions[p] = fn
-	return p
-}
-
-// RemoveCleanupAction removes a function that was installed by
-// AddCleanupAction.
-func RemoveCleanupAction(p CleanupActionHandle) {
-	cleanupActionsLock.Lock()
-	defer cleanupActionsLock.Unlock()
-	delete(cleanupActions, p)
-}
-
-// RunCleanupActions runs all functions installed by AddCleanupAction.  It does
-// not remove them (see RemoveCleanupAction) but it does run unlocked, so they
-// may remove themselves.
-func RunCleanupActions() {
-	list := []func(){}
-	func() {
-		cleanupActionsLock.Lock()
-		defer cleanupActionsLock.Unlock()
-		for _, fn := range cleanupActions {
-			list = append(list, fn)
-		}
-	}()
-	// Run unlocked.
-	for _, fn := range list {
-		fn()
-	}
-}
-
 // Similar to SynchornizedBeforeSuite, we want to run some operations only once (such as collecting cluster logs).
 // Here, the order of functions is reversed; first, the function which runs everywhere,
 // and then the function that only runs on the first Ginkgo node.
 var _ = ginkgo.SynchronizedAfterSuite(func() {
 	// Run on all Ginkgo nodes
 	framework.Logf("Running AfterSuite actions on all node")
-	RunCleanupActions()
+	framework.RunCleanupActions()
 }, func() {
 	// Run only Ginkgo on node 1
 	framework.Logf("Running AfterSuite actions on node 1")
@@ -396,12 +344,12 @@ func runKubernetesServiceTestContainer(c clientset.Interface, ns string) {
 		return
 	}
 	p.Namespace = ns
-	if _, err := c.Core().Pods(ns).Create(p); err != nil {
+	if _, err := c.CoreV1().Pods(ns).Create(p); err != nil {
 		framework.Logf("Failed to create %v: %v", p.Name, err)
 		return
 	}
 	defer func() {
-		if err := c.Core().Pods(ns).Delete(p.Name, nil); err != nil {
+		if err := c.CoreV1().Pods(ns).Delete(p.Name, nil); err != nil {
 			framework.Logf("Failed to delete pod %v: %v", p.Name, err)
 		}
 	}()

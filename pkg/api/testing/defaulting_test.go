@@ -31,7 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/diff"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 )
 
 type orderedGroupVersionKinds []schema.GroupVersionKind
@@ -58,8 +58,6 @@ func TestDefaulting(t *testing.T) {
 		{Group: "", Version: "v1", Kind: "PersistentVolumeList"}:                                  {},
 		{Group: "", Version: "v1", Kind: "PersistentVolumeClaim"}:                                 {},
 		{Group: "", Version: "v1", Kind: "PersistentVolumeClaimList"}:                             {},
-		{Group: "", Version: "v1", Kind: "PodAttachOptions"}:                                      {},
-		{Group: "", Version: "v1", Kind: "PodExecOptions"}:                                        {},
 		{Group: "", Version: "v1", Kind: "Pod"}:                                                   {},
 		{Group: "", Version: "v1", Kind: "PodList"}:                                               {},
 		{Group: "", Version: "v1", Kind: "PodTemplate"}:                                           {},
@@ -74,6 +72,8 @@ func TestDefaulting(t *testing.T) {
 		{Group: "apps", Version: "v1beta1", Kind: "StatefulSetList"}:                              {},
 		{Group: "apps", Version: "v1beta2", Kind: "StatefulSet"}:                                  {},
 		{Group: "apps", Version: "v1beta2", Kind: "StatefulSetList"}:                              {},
+		{Group: "apps", Version: "v1", Kind: "StatefulSet"}:                                       {},
+		{Group: "apps", Version: "v1", Kind: "StatefulSetList"}:                                   {},
 		{Group: "autoscaling", Version: "v1", Kind: "HorizontalPodAutoscaler"}:                    {},
 		{Group: "autoscaling", Version: "v1", Kind: "HorizontalPodAutoscalerList"}:                {},
 		{Group: "autoscaling", Version: "v2beta1", Kind: "HorizontalPodAutoscaler"}:               {},
@@ -95,48 +95,54 @@ func TestDefaulting(t *testing.T) {
 		// This object contains only int fields which currently breaks the defaulting test because
 		// it's pretty stupid. Once we add non integer fields, we should uncomment this.
 		// {Group: "kubeadm.k8s.io", Version: "v1alpha1", Kind: "NodeConfiguration"}:                 {},
-		{Group: "extensions", Version: "v1beta1", Kind: "DaemonSet"}:                                                 {},
-		{Group: "extensions", Version: "v1beta1", Kind: "DaemonSetList"}:                                             {},
-		{Group: "apps", Version: "v1beta2", Kind: "DaemonSet"}:                                                       {},
-		{Group: "apps", Version: "v1beta2", Kind: "DaemonSetList"}:                                                   {},
-		{Group: "apps", Version: "v1", Kind: "DaemonSet"}:                                                            {},
-		{Group: "apps", Version: "v1", Kind: "DaemonSetList"}:                                                        {},
-		{Group: "extensions", Version: "v1beta1", Kind: "Deployment"}:                                                {},
-		{Group: "extensions", Version: "v1beta1", Kind: "DeploymentList"}:                                            {},
-		{Group: "apps", Version: "v1beta1", Kind: "Deployment"}:                                                      {},
-		{Group: "apps", Version: "v1beta1", Kind: "DeploymentList"}:                                                  {},
-		{Group: "apps", Version: "v1beta2", Kind: "Deployment"}:                                                      {},
-		{Group: "apps", Version: "v1beta2", Kind: "DeploymentList"}:                                                  {},
-		{Group: "extensions", Version: "v1beta1", Kind: "PodSecurityPolicy"}:                                         {},
-		{Group: "extensions", Version: "v1beta1", Kind: "PodSecurityPolicyList"}:                                     {},
-		{Group: "apps", Version: "v1beta2", Kind: "ReplicaSet"}:                                                      {},
-		{Group: "apps", Version: "v1beta2", Kind: "ReplicaSetList"}:                                                  {},
-		{Group: "extensions", Version: "v1beta1", Kind: "ReplicaSet"}:                                                {},
-		{Group: "extensions", Version: "v1beta1", Kind: "ReplicaSetList"}:                                            {},
-		{Group: "extensions", Version: "v1beta1", Kind: "NetworkPolicy"}:                                             {},
-		{Group: "extensions", Version: "v1beta1", Kind: "NetworkPolicyList"}:                                         {},
-		{Group: "rbac.authorization.k8s.io", Version: "v1alpha1", Kind: "ClusterRoleBinding"}:                        {},
-		{Group: "rbac.authorization.k8s.io", Version: "v1alpha1", Kind: "ClusterRoleBindingList"}:                    {},
-		{Group: "rbac.authorization.k8s.io", Version: "v1alpha1", Kind: "RoleBinding"}:                               {},
-		{Group: "rbac.authorization.k8s.io", Version: "v1alpha1", Kind: "RoleBindingList"}:                           {},
-		{Group: "rbac.authorization.k8s.io", Version: "v1beta1", Kind: "ClusterRoleBinding"}:                         {},
-		{Group: "rbac.authorization.k8s.io", Version: "v1beta1", Kind: "ClusterRoleBindingList"}:                     {},
-		{Group: "rbac.authorization.k8s.io", Version: "v1beta1", Kind: "RoleBinding"}:                                {},
-		{Group: "rbac.authorization.k8s.io", Version: "v1beta1", Kind: "RoleBindingList"}:                            {},
-		{Group: "rbac.authorization.k8s.io", Version: "v1", Kind: "ClusterRoleBinding"}:                              {},
-		{Group: "rbac.authorization.k8s.io", Version: "v1", Kind: "ClusterRoleBindingList"}:                          {},
-		{Group: "rbac.authorization.k8s.io", Version: "v1", Kind: "RoleBinding"}:                                     {},
-		{Group: "rbac.authorization.k8s.io", Version: "v1", Kind: "RoleBindingList"}:                                 {},
-		{Group: "settings.k8s.io", Version: "v1alpha1", Kind: "PodPreset"}:                                           {},
-		{Group: "settings.k8s.io", Version: "v1alpha1", Kind: "PodPresetList"}:                                       {},
-		{Group: "admissionregistration.k8s.io", Version: "v1alpha1", Kind: "ExternalAdmissionHookConfiguration"}:     {},
-		{Group: "admissionregistration.k8s.io", Version: "v1alpha1", Kind: "ExternalAdmissionHookConfigurationList"}: {},
-		{Group: "networking.k8s.io", Version: "v1", Kind: "NetworkPolicy"}:                                           {},
-		{Group: "networking.k8s.io", Version: "v1", Kind: "NetworkPolicyList"}:                                       {},
-		{Group: "storage.k8s.io", Version: "v1beta1", Kind: "StorageClass"}:                                          {},
-		{Group: "storage.k8s.io", Version: "v1beta1", Kind: "StorageClassList"}:                                      {},
-		{Group: "storage.k8s.io", Version: "v1", Kind: "StorageClass"}:                                               {},
-		{Group: "storage.k8s.io", Version: "v1", Kind: "StorageClassList"}:                                           {},
+		{Group: "extensions", Version: "v1beta1", Kind: "DaemonSet"}:                                            {},
+		{Group: "extensions", Version: "v1beta1", Kind: "DaemonSetList"}:                                        {},
+		{Group: "apps", Version: "v1beta2", Kind: "DaemonSet"}:                                                  {},
+		{Group: "apps", Version: "v1beta2", Kind: "DaemonSetList"}:                                              {},
+		{Group: "apps", Version: "v1", Kind: "DaemonSet"}:                                                       {},
+		{Group: "apps", Version: "v1", Kind: "DaemonSetList"}:                                                   {},
+		{Group: "extensions", Version: "v1beta1", Kind: "Deployment"}:                                           {},
+		{Group: "extensions", Version: "v1beta1", Kind: "DeploymentList"}:                                       {},
+		{Group: "apps", Version: "v1beta1", Kind: "Deployment"}:                                                 {},
+		{Group: "apps", Version: "v1beta1", Kind: "DeploymentList"}:                                             {},
+		{Group: "apps", Version: "v1beta2", Kind: "Deployment"}:                                                 {},
+		{Group: "apps", Version: "v1beta2", Kind: "DeploymentList"}:                                             {},
+		{Group: "apps", Version: "v1", Kind: "Deployment"}:                                                      {},
+		{Group: "apps", Version: "v1", Kind: "DeploymentList"}:                                                  {},
+		{Group: "extensions", Version: "v1beta1", Kind: "PodSecurityPolicy"}:                                    {},
+		{Group: "extensions", Version: "v1beta1", Kind: "PodSecurityPolicyList"}:                                {},
+		{Group: "apps", Version: "v1beta2", Kind: "ReplicaSet"}:                                                 {},
+		{Group: "apps", Version: "v1beta2", Kind: "ReplicaSetList"}:                                             {},
+		{Group: "apps", Version: "v1", Kind: "ReplicaSet"}:                                                      {},
+		{Group: "apps", Version: "v1", Kind: "ReplicaSetList"}:                                                  {},
+		{Group: "extensions", Version: "v1beta1", Kind: "ReplicaSet"}:                                           {},
+		{Group: "extensions", Version: "v1beta1", Kind: "ReplicaSetList"}:                                       {},
+		{Group: "extensions", Version: "v1beta1", Kind: "NetworkPolicy"}:                                        {},
+		{Group: "extensions", Version: "v1beta1", Kind: "NetworkPolicyList"}:                                    {},
+		{Group: "rbac.authorization.k8s.io", Version: "v1alpha1", Kind: "ClusterRoleBinding"}:                   {},
+		{Group: "rbac.authorization.k8s.io", Version: "v1alpha1", Kind: "ClusterRoleBindingList"}:               {},
+		{Group: "rbac.authorization.k8s.io", Version: "v1alpha1", Kind: "RoleBinding"}:                          {},
+		{Group: "rbac.authorization.k8s.io", Version: "v1alpha1", Kind: "RoleBindingList"}:                      {},
+		{Group: "rbac.authorization.k8s.io", Version: "v1beta1", Kind: "ClusterRoleBinding"}:                    {},
+		{Group: "rbac.authorization.k8s.io", Version: "v1beta1", Kind: "ClusterRoleBindingList"}:                {},
+		{Group: "rbac.authorization.k8s.io", Version: "v1beta1", Kind: "RoleBinding"}:                           {},
+		{Group: "rbac.authorization.k8s.io", Version: "v1beta1", Kind: "RoleBindingList"}:                       {},
+		{Group: "rbac.authorization.k8s.io", Version: "v1", Kind: "ClusterRoleBinding"}:                         {},
+		{Group: "rbac.authorization.k8s.io", Version: "v1", Kind: "ClusterRoleBindingList"}:                     {},
+		{Group: "rbac.authorization.k8s.io", Version: "v1", Kind: "RoleBinding"}:                                {},
+		{Group: "rbac.authorization.k8s.io", Version: "v1", Kind: "RoleBindingList"}:                            {},
+		{Group: "settings.k8s.io", Version: "v1alpha1", Kind: "PodPreset"}:                                      {},
+		{Group: "settings.k8s.io", Version: "v1alpha1", Kind: "PodPresetList"}:                                  {},
+		{Group: "admissionregistration.k8s.io", Version: "v1beta1", Kind: "ValidatingWebhookConfiguration"}:     {},
+		{Group: "admissionregistration.k8s.io", Version: "v1beta1", Kind: "ValidatingWebhookConfigurationList"}: {},
+		{Group: "admissionregistration.k8s.io", Version: "v1beta1", Kind: "MutatingWebhookConfiguration"}:       {},
+		{Group: "admissionregistration.k8s.io", Version: "v1beta1", Kind: "MutatingWebhookConfigurationList"}:   {},
+		{Group: "networking.k8s.io", Version: "v1", Kind: "NetworkPolicy"}:                                      {},
+		{Group: "networking.k8s.io", Version: "v1", Kind: "NetworkPolicyList"}:                                  {},
+		{Group: "storage.k8s.io", Version: "v1beta1", Kind: "StorageClass"}:                                     {},
+		{Group: "storage.k8s.io", Version: "v1beta1", Kind: "StorageClassList"}:                                 {},
+		{Group: "storage.k8s.io", Version: "v1", Kind: "StorageClass"}:                                          {},
+		{Group: "storage.k8s.io", Version: "v1", Kind: "StorageClassList"}:                                      {},
 	}
 
 	f := fuzz.New().NilChance(.5).NumElements(1, 1).RandSource(rand.NewSource(1))
@@ -157,7 +163,7 @@ func TestDefaulting(t *testing.T) {
 		},
 	)
 
-	scheme := api.Scheme
+	scheme := legacyscheme.Scheme
 	var testTypes orderedGroupVersionKinds
 	for gvk := range scheme.AllKnownTypes() {
 		if gvk.Version == runtime.APIVersionInternal {
@@ -216,7 +222,7 @@ func BenchmarkPodDefaulting(b *testing.B) {
 		f.Fuzz(&items[i])
 	}
 
-	scheme := api.Scheme
+	scheme := legacyscheme.Scheme
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		pod := &items[i%len(items)]

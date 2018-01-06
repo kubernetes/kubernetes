@@ -66,10 +66,6 @@ function create-node-pki {
     KUBELET_KEY_PATH="${pki_dir}/kubelet.key"
     echo "${KUBELET_KEY}" | base64 --decode > "${KUBELET_KEY_PATH}"
   fi
-
-  # TODO(mikedanese): remove this when we don't support downgrading to versions
-  # < 1.6.
-  ln -sf "${CA_CERT_BUNDLE_PATH}" /etc/kubernetes/ca.crt
 }
 
 # A hookpoint for setting up local devices
@@ -90,11 +86,41 @@ ensure-local-disks() {
 function config-ip-firewall {
   echo "Configuring IP firewall rules"
 
-  iptables -N KUBE-METADATA-SERVER
-  iptables -I FORWARD -p tcp -d 169.254.169.254 --dport 80 -j KUBE-METADATA-SERVER
+  # Do not consider loopback addresses as martian source or destination while
+  # routing. This enables the use of 127/8 for local routing purposes.
+  sysctl -w net.ipv4.conf.all.route_localnet=1
 
-  if [[ -n "${KUBE_FIREWALL_METADATA_SERVER:-}" ]]; then
-    iptables -A KUBE-METADATA-SERVER -j DROP
+  # We need to add rules to accept all TCP/UDP/ICMP packets.
+  if iptables -L INPUT | grep "Chain INPUT (policy DROP)" > /dev/null; then
+    echo "Add rules to accept all inbound TCP/UDP/ICMP packets"
+    iptables -A INPUT -p TCP -j ACCEPT
+    iptables -A INPUT -p UDP -j ACCEPT
+    iptables -A INPUT -p ICMP -j ACCEPT
+  fi
+  if iptables -L FORWARD | grep "Chain FORWARD (policy DROP)" > /dev/null; then
+    echo "Add rules to accept all forwarded TCP/UDP/ICMP packets"
+    iptables -A FORWARD -p TCP -j ACCEPT
+    iptables -A FORWARD -p UDP -j ACCEPT
+    iptables -A FORWARD -p ICMP -j ACCEPT
+  fi
+
+  # Flush iptables nat table
+  iptables -t nat -F || true
+
+  if [[ "${NON_MASQUERADE_CIDR:-}" == "0.0.0.0/0" ]]; then
+    echo "Add rules for ip masquerade"
+    iptables -t nat -N IP-MASQ
+    iptables -t nat -A POSTROUTING -m comment --comment "ip-masq: ensure nat POSTROUTING directs all non-LOCAL destination traffic to our custom IP-MASQ chain" -m addrtype ! --dst-type LOCAL -j IP-MASQ
+    iptables -t nat -A IP-MASQ -d 169.254.0.0/16 -m comment --comment "ip-masq: local traffic is not subject to MASQUERADE" -j RETURN
+    iptables -t nat -A IP-MASQ -d 10.0.0.0/8 -m comment --comment "ip-masq: local traffic is not subject to MASQUERADE" -j RETURN
+    iptables -t nat -A IP-MASQ -d 172.16.0.0/12 -m comment --comment "ip-masq: local traffic is not subject to MASQUERADE" -j RETURN
+    iptables -t nat -A IP-MASQ -d 192.168.0.0/16 -m comment --comment "ip-masq: local traffic is not subject to MASQUERADE" -j RETURN
+    iptables -t nat -A IP-MASQ -m comment --comment "ip-masq: outbound traffic is subject to MASQUERADE (must be last in chain)" -j MASQUERADE
+  fi
+
+  if [[ "${ENABLE_METADATA_CONCEALMENT:-}" == "true" ]]; then
+    echo "Add rule for metadata concealment"
+    iptables -t nat -I PREROUTING -p tcp -d 169.254.169.254 --dport 80 -m comment --comment "metadata-concealment: bridge traffic to metadata server goes to metadata proxy" -j DNAT --to-destination 127.0.0.1:988
   fi
 }
 
@@ -155,6 +181,7 @@ function curl-metadata() {
 }
 
 function set-kube-env() {
+  (umask 700;
   local kube_env_yaml="${INSTALL_DIR}/kube_env.yaml"
 
   until curl-metadata kube-env > "${kube_env_yaml}"; do
@@ -170,6 +197,7 @@ for k,v in yaml.load(sys.stdin).iteritems():
   print("""readonly {var}={value}""".format(var = k, value = pipes.quote(str(v))))
   print("""export {var}""".format(var = k))
   ' < """${kube_env_yaml}""")"
+  )
 }
 
 function remove-docker-artifacts() {
@@ -177,7 +205,6 @@ function remove-docker-artifacts() {
   apt-get-install bridge-utils
 
   # Remove docker artifacts on minion nodes, if present
-  iptables -t nat -F || true
   ifconfig docker0 down || true
   brctl delbr docker0 || true
   echo "== Finished deleting docker0 =="
@@ -419,12 +446,14 @@ enable_cluster_ui: '$(echo "$ENABLE_CLUSTER_UI" | sed -e "s/'/''/g")'
 enable_node_problem_detector: '$(echo "$ENABLE_NODE_PROBLEM_DETECTOR" | sed -e "s/'/''/g")'
 enable_l7_loadbalancing: '$(echo "$ENABLE_L7_LOADBALANCING" | sed -e "s/'/''/g")'
 enable_node_logging: '$(echo "$ENABLE_NODE_LOGGING" | sed -e "s/'/''/g")'
-enable_metadata_proxy: '$(echo "$ENABLE_METADATA_PROXY" | sed -e "s/'/''/g")'
+enable_metadata_proxy: '$(echo "$ENABLE_METADATA_CONCEALMENT" | sed -e "s/'/''/g")'
 enable_metrics_server: '$(echo "$ENABLE_METRICS_SERVER" | sed -e "s/'/''/g")'
+enable_pod_security_policy: '$(echo "$ENABLE_POD_SECURITY_POLICY" | sed -e "s/'/''/g")'
 enable_rescheduler: '$(echo "$ENABLE_RESCHEDULER" | sed -e "s/'/''/g")'
 logging_destination: '$(echo "$LOGGING_DESTINATION" | sed -e "s/'/''/g")'
 elasticsearch_replicas: '$(echo "$ELASTICSEARCH_LOGGING_REPLICAS" | sed -e "s/'/''/g")'
 enable_cluster_dns: '$(echo "$ENABLE_CLUSTER_DNS" | sed -e "s/'/''/g")'
+cluster_dns_core_dns: '$(echo "$CLUSTER_DNS_CORE_DNS" | sed -e "s/'/''/g")'
 enable_cluster_registry: '$(echo "$ENABLE_CLUSTER_REGISTRY" | sed -e "s/'/''/g")'
 dns_server: '$(echo "$DNS_SERVER_IP" | sed -e "s/'/''/g")'
 dns_domain: '$(echo "$DNS_DOMAIN" | sed -e "s/'/''/g")'
@@ -447,7 +476,7 @@ kube_uid: '$(echo "${KUBE_UID}" | sed -e "s/'/''/g")'
 initial_etcd_cluster: '$(echo "${INITIAL_ETCD_CLUSTER:-}" | sed -e "s/'/''/g")'
 initial_etcd_cluster_state: '$(echo "${INITIAL_ETCD_CLUSTER_STATE:-}" | sed -e "s/'/''/g")'
 ca_cert_bundle_path: '$(echo "${CA_CERT_BUNDLE_PATH:-}" | sed -e "s/'/''/g")'
-hostname: $(hostname -s)
+hostname: '$(echo "${ETCD_HOSTNAME:-$(hostname -s)}" | sed -e "s/'/''/g")'
 enable_pod_priority: '$(echo "${ENABLE_POD_PRIORITY:-}" | sed -e "s/'/''/g")'
 enable_default_storage_class: '$(echo "$ENABLE_DEFAULT_STORAGE_CLASS" | sed -e "s/'/''/g")'
 kube_proxy_daemonset: '$(echo "$KUBE_PROXY_DAEMONSET" | sed -e "s/'/''/g")'
@@ -465,6 +494,16 @@ EOF
     if [ -n "${KUBE_APISERVER_REQUEST_TIMEOUT_SEC:-}" ]; then
       cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
 kube_apiserver_request_timeout_sec: '$(echo "$KUBE_APISERVER_REQUEST_TIMEOUT_SEC" | sed -e "s/'/''/g")'
+EOF
+    fi
+    if [ -n "${ETCD_LIVENESS_PROBE_INITIAL_DELAY_SEC:-}" ]; then
+      cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
+etcd_liveness_probe_initial_delay: '$(echo "$ETCD_LIVENESS_PROBE_INITIAL_DELAY_SEC" | sed -e "s/'/''/g")'
+EOF
+    fi
+    if [ -n "${KUBE_APISERVER_LIVENESS_PROBE_INITIAL_DELAY_SEC:-}" ]; then
+      cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
+kube_apiserver_liveness_probe_initial_delay: '$(echo "$KUBE_APISERVER_LIVENESS_PROBE_INITIAL_DELAY_SEC" | sed -e "s/'/''/g")'
 EOF
     fi
     if [ -n "${ADMISSION_CONTROL:-}" ] && [ ${ADMISSION_CONTROL} == *"ImagePolicyWebhook"* ]; then
@@ -583,6 +622,11 @@ EOF
     if [ -n "${NODE_LABELS:-}" ]; then
       cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
 node_labels: '$(echo "${NODE_LABELS}" | sed -e "s/'/''/g")'
+EOF
+    fi
+    if [ -n "${NON_MASTER_NODE_LABELS:-}" ]; then
+      cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
+non_master_node_labels: '$(echo "${NON_MASTER_NODE_LABELS}" | sed -e "s/'/''/g")'
 EOF
     fi
     if [ -n "${NODE_TAINTS:-}" ]; then
@@ -853,7 +897,6 @@ fi
 if [[ -z "${is_push}" ]]; then
   echo "== kube-up node config starting =="
   set-broken-motd
-  config-ip-firewall
   ensure-basic-networking
   fix-apt-sources
   ensure-install-dir
@@ -870,6 +913,7 @@ if [[ -z "${is_push}" ]]; then
   download-release
   configure-salt
   remove-docker-artifacts
+  config-ip-firewall
   run-salt
   reset-motd
 

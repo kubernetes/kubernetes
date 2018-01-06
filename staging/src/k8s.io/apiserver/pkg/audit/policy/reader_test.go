@@ -71,6 +71,24 @@ rules:
   - level: Metadata
 `
 
+const policyWithNoVersionOrKind = `
+rules:
+  - level: None
+    nonResourceURLs:
+      - /healthz*
+      - /version
+  - level: RequestResponse
+    users: ["tim"]
+    userGroups: ["testers", "developers"]
+    verbs: ["patch", "delete", "create"]
+    resources:
+      - group: ""
+      - group: "rbac.authorization.k8s.io"
+        resources: ["clusterroles", "clusterrolebindings"]
+    namespaces: ["default", "kube-system"]
+  - level: Metadata
+`
+
 var expectedPolicy = &audit.Policy{
 	Rules: []audit.PolicyRule{{
 		Level:           audit.LevelNone,
@@ -102,6 +120,15 @@ func TestParserV1alpha1(t *testing.T) {
 	if !reflect.DeepEqual(policy, expectedPolicy) {
 		t.Errorf("Unexpected policy! Diff:\n%s", diff.ObjectDiff(policy, expectedPolicy))
 	}
+}
+
+func TestParsePolicyWithNoVersionOrKind(t *testing.T) {
+	f, err := writePolicy(t, policyWithNoVersionOrKind)
+	require.NoError(t, err)
+	defer os.Remove(f)
+
+	_, err = LoadPolicyFromFile(f)
+	assert.Contains(t, err.Error(), "unknown group version field")
 }
 
 func TestParserV1beta1(t *testing.T) {

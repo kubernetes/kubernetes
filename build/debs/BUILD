@@ -41,7 +41,7 @@ deb_data(
     name = "kube-scheduler",
     data = [
         {
-            "files": ["//plugin/cmd/kube-scheduler"],
+            "files": ["//cmd/kube-scheduler"],
             "mode": "0755",
             "dir": "/usr/bin",
         },
@@ -82,7 +82,7 @@ deb_data(
 
 pkg_tar(
     name = "kubernetes-cni-data",
-    package_dir = "/opt/cni",
+    package_dir = "/opt/cni/bin",
     deps = ["@kubernetes_cni//file"],
 )
 

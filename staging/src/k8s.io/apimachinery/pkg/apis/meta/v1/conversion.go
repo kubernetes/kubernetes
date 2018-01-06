@@ -38,6 +38,7 @@ func AddConversionFuncs(scheme *runtime.Scheme) error {
 		Convert_intstr_IntOrString_To_intstr_IntOrString,
 
 		Convert_unversioned_Time_To_unversioned_Time,
+		Convert_unversioned_MicroTime_To_unversioned_MicroTime,
 
 		Convert_Pointer_v1_Duration_To_v1_Duration,
 		Convert_v1_Duration_To_Pointer_v1_Duration,
@@ -199,6 +200,12 @@ func Convert_v1_Duration_To_Pointer_v1_Duration(in *Duration, out **Duration, s 
 	return nil
 }
 
+func Convert_unversioned_MicroTime_To_unversioned_MicroTime(in *MicroTime, out *MicroTime, s conversion.Scope) error {
+	// Cannot deep copy these, because time.Time has unexported fields.
+	*out = *in
+	return nil
+}
+
 // Convert_Slice_string_To_unversioned_Time allows converting a URL query parameter value
 func Convert_Slice_string_To_unversioned_Time(input *[]string, out *Time, s conversion.Scope) error {
 	str := ""
@@ -252,7 +259,6 @@ func Convert_map_to_unversioned_LabelSelector(in *map[string]string, out *LabelS
 	if in == nil {
 		return nil
 	}
-	out = new(LabelSelector)
 	for labelKey, labelValue := range *in {
 		AddLabelToSelector(out, labelKey, labelValue)
 	}

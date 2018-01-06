@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2018 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,7 +20,6 @@ package internalversion
 
 import (
 	"k8s.io/apimachinery/pkg/api/errors"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
 	wardle "k8s.io/sample-apiserver/pkg/apis/wardle"
@@ -55,8 +54,7 @@ func (s *fischerLister) List(selector labels.Selector) (ret []*wardle.Fischer, e
 
 // Get retrieves the Fischer from the index for a given name.
 func (s *fischerLister) Get(name string) (*wardle.Fischer, error) {
-	key := &wardle.Fischer{ObjectMeta: v1.ObjectMeta{Name: name}}
-	obj, exists, err := s.indexer.Get(key)
+	obj, exists, err := s.indexer.GetByKey(name)
 	if err != nil {
 		return nil, err
 	}

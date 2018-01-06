@@ -21,6 +21,7 @@ import (
 	"crypto/sha256"
 	"encoding/base32"
 	"fmt"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -177,6 +178,8 @@ func (hm *hostportManager) Remove(id string, podPortMapping *PodPortMapping) (er
 	chainsToRemove := []utiliptables.Chain{}
 	for _, pm := range hostportMappings {
 		chainsToRemove = append(chainsToRemove, getHostportChain(id, pm))
+		// TODO remove this after release 1.9, please refer https://github.com/kubernetes/kubernetes/pull/55153
+		chainsToRemove = append(chainsToRemove, getBuggyHostportChain(id, pm))
 	}
 
 	// remove rules that consists of target chains
@@ -247,6 +250,16 @@ func (hm *hostportManager) closeHostports(hostportMappings []*PortMapping) error
 // WARNING: Please do not change this function. Otherwise, HostportManager may not be able to
 // identify existing iptables chains.
 func getHostportChain(id string, pm *PortMapping) utiliptables.Chain {
+	hash := sha256.Sum256([]byte(id + strconv.Itoa(int(pm.HostPort)) + string(pm.Protocol)))
+	encoded := base32.StdEncoding.EncodeToString(hash[:])
+	return utiliptables.Chain(kubeHostportChainPrefix + encoded[:16])
+}
+
+// This bugy func does bad conversion on HostPort from int32 to string.
+// It may generates same chain names for different ports of the same pod, e.g. port 57119/55429/56833.
+// `getHostportChain` fixed this bug. In order to cleanup the legacy chains/rules, it is temporarily left.
+// TODO remove this after release 1.9, please refer https://github.com/kubernetes/kubernetes/pull/55153
+func getBuggyHostportChain(id string, pm *PortMapping) utiliptables.Chain {
 	hash := sha256.Sum256([]byte(id + string(pm.HostPort) + string(pm.Protocol)))
 	encoded := base32.StdEncoding.EncodeToString(hash[:])
 	return utiliptables.Chain(kubeHostportChainPrefix + encoded[:16])

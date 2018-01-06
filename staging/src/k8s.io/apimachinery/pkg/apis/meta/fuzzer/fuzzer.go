@@ -18,7 +18,10 @@ package fuzzer
 
 import (
 	"fmt"
+	"math/rand"
+	"sort"
 	"strconv"
+	"strings"
 
 	"github.com/google/gofuzz"
 
@@ -96,7 +99,80 @@ func genericFuzzerFuncs(codecs runtimeserializer.CodecFactory) []interface{} {
 	}
 }
 
+// taken from gofuzz internals for RandString
+type charRange struct {
+	first, last rune
+}
+
+func (c *charRange) choose(r *rand.Rand) rune {
+	count := int64(c.last - c.first + 1)
+	ch := c.first + rune(r.Int63n(count))
+
+	return ch
+}
+
+// randomLabelPart produces a valid random label value or name-part
+// of a label key.
+func randomLabelPart(c fuzz.Continue, canBeEmpty bool) string {
+	validStartEnd := []charRange{{'0', '9'}, {'a', 'z'}, {'A', 'Z'}}
+	validMiddle := []charRange{{'0', '9'}, {'a', 'z'}, {'A', 'Z'},
+		{'.', '.'}, {'-', '-'}, {'_', '_'}}
+
+	partLen := c.Rand.Intn(64) // len is [0, 63]
+	if !canBeEmpty {
+		partLen = c.Rand.Intn(63) + 1 // len is [1, 63]
+	}
+
+	runes := make([]rune, partLen)
+	if partLen == 0 {
+		return string(runes)
+	}
+
+	runes[0] = validStartEnd[c.Rand.Intn(len(validStartEnd))].choose(c.Rand)
+	for i := range runes[1:] {
+		runes[i+1] = validMiddle[c.Rand.Intn(len(validMiddle))].choose(c.Rand)
+	}
+	runes[len(runes)-1] = validStartEnd[c.Rand.Intn(len(validStartEnd))].choose(c.Rand)
+
+	return string(runes)
+}
+
+func randomDNSLabel(c fuzz.Continue) string {
+	validStartEnd := []charRange{{'0', '9'}, {'a', 'z'}}
+	validMiddle := []charRange{{'0', '9'}, {'a', 'z'}, {'-', '-'}}
+
+	partLen := c.Rand.Intn(63) + 1 // len is [1, 63]
+	runes := make([]rune, partLen)
+
+	runes[0] = validStartEnd[c.Rand.Intn(len(validStartEnd))].choose(c.Rand)
+	for i := range runes[1:] {
+		runes[i+1] = validMiddle[c.Rand.Intn(len(validMiddle))].choose(c.Rand)
+	}
+	runes[len(runes)-1] = validStartEnd[c.Rand.Intn(len(validStartEnd))].choose(c.Rand)
+
+	return string(runes)
+}
+
+func randomLabelKey(c fuzz.Continue) string {
+	namePart := randomLabelPart(c, false)
+	prefixPart := ""
+
+	usePrefix := c.RandBool()
+	if usePrefix {
+		// we can fit, with dots, at most 3 labels in the 253 allotted characters
+		prefixPartsLen := c.Rand.Intn(2) + 1
+		prefixParts := make([]string, prefixPartsLen)
+		for i := range prefixParts {
+			prefixParts[i] = randomDNSLabel(c)
+		}
+		prefixPart = strings.Join(prefixParts, ".") + "/"
+	}
+
+	return prefixPart + namePart
+}
+
 func v1FuzzerFuncs(codecs runtimeserializer.CodecFactory) []interface{} {
+
 	return []interface{}{
 		func(j *metav1.TypeMeta, c fuzz.Continue) {
 			// We have to customize the randomization of TypeMetas because their
@@ -119,6 +195,57 @@ func v1FuzzerFuncs(codecs runtimeserializer.CodecFactory) []interface{} {
 		func(j *metav1.ListMeta, c fuzz.Continue) {
 			j.ResourceVersion = strconv.FormatUint(c.RandUint64(), 10)
 			j.SelfLink = c.RandString()
+		},
+		func(j *metav1.LabelSelector, c fuzz.Continue) {
+			c.FuzzNoCustom(j)
+			// we can't have an entirely empty selector, so force
+			// use of MatchExpression if necessary
+			if len(j.MatchLabels) == 0 && len(j.MatchExpressions) == 0 {
+				j.MatchExpressions = make([]metav1.LabelSelectorRequirement, c.Rand.Intn(2)+1)
+			}
+
+			if j.MatchLabels != nil {
+				fuzzedMatchLabels := make(map[string]string, len(j.MatchLabels))
+				for i := 0; i < len(j.MatchLabels); i++ {
+					fuzzedMatchLabels[randomLabelKey(c)] = randomLabelPart(c, true)
+				}
+				j.MatchLabels = fuzzedMatchLabels
+			}
+
+			validOperators := []metav1.LabelSelectorOperator{
+				metav1.LabelSelectorOpIn,
+				metav1.LabelSelectorOpNotIn,
+				metav1.LabelSelectorOpExists,
+				metav1.LabelSelectorOpDoesNotExist,
+			}
+
+			if j.MatchExpressions != nil {
+				// NB: the label selector parser code sorts match expressions by key, and sorts the values,
+				// so we need to make sure ours are sorted as well here to preserve round-trip comparision.
+				// In practice, not sorting doesn't hurt anything...
+
+				for i := range j.MatchExpressions {
+					req := metav1.LabelSelectorRequirement{}
+					c.Fuzz(&req)
+					req.Key = randomLabelKey(c)
+					req.Operator = validOperators[c.Rand.Intn(len(validOperators))]
+					if req.Operator == metav1.LabelSelectorOpIn || req.Operator == metav1.LabelSelectorOpNotIn {
+						if len(req.Values) == 0 {
+							// we must have some values here, so randomly choose a short length
+							req.Values = make([]string, c.Rand.Intn(2)+1)
+						}
+						for i := range req.Values {
+							req.Values[i] = randomLabelPart(c, true)
+						}
+						sort.Strings(req.Values)
+					} else {
+						req.Values = nil
+					}
+					j.MatchExpressions[i] = req
+				}
+
+				sort.Slice(j.MatchExpressions, func(a, b int) bool { return j.MatchExpressions[a].Key < j.MatchExpressions[b].Key })
+			}
 		},
 	}
 }

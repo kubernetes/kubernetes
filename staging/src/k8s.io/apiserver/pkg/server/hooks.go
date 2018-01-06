@@ -23,6 +23,7 @@ import (
 
 	"github.com/golang/glog"
 
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/server/healthz"
 	restclient "k8s.io/client-go/rest"
@@ -38,6 +39,9 @@ import (
 // If you use this feature, tag @deads2k on github who has promised to review code for anyone's PostStartHook
 // until it becomes easier to use.
 type PostStartHookFunc func(context PostStartHookContext) error
+
+// PreShutdownHookFunc is a function that can be added to the shutdown logic.
+type PreShutdownHookFunc func() error
 
 // PostStartHookContext provides information about this API server to a PostStartHookFunc
 type PostStartHookContext struct {
@@ -57,6 +61,10 @@ type postStartHookEntry struct {
 
 	// done will be closed when the postHook is finished
 	done chan struct{}
+}
+
+type preShutdownHookEntry struct {
+	hook PreShutdownHookFunc
 }
 
 // AddPostStartHook allows you to add a PostStartHook.
@@ -97,6 +105,37 @@ func (s *GenericAPIServer) AddPostStartHookOrDie(name string, hook PostStartHook
 	}
 }
 
+// AddPreShutdownHook allows you to add a PreShutdownHook.
+func (s *GenericAPIServer) AddPreShutdownHook(name string, hook PreShutdownHookFunc) error {
+	if len(name) == 0 {
+		return fmt.Errorf("missing name")
+	}
+	if hook == nil {
+		return nil
+	}
+
+	s.preShutdownHookLock.Lock()
+	defer s.preShutdownHookLock.Unlock()
+
+	if s.preShutdownHooksCalled {
+		return fmt.Errorf("unable to add %q because PreShutdownHooks have already been called", name)
+	}
+	if _, exists := s.preShutdownHooks[name]; exists {
+		return fmt.Errorf("unable to add %q because it is already registered", name)
+	}
+
+	s.preShutdownHooks[name] = preShutdownHookEntry{hook: hook}
+
+	return nil
+}
+
+// AddPreShutdownHookOrDie allows you to add a PostStartHook, but dies on failure
+func (s *GenericAPIServer) AddPreShutdownHookOrDie(name string, hook PreShutdownHookFunc) {
+	if err := s.AddPreShutdownHook(name, hook); err != nil {
+		glog.Fatalf("Error registering PreShutdownHook %q: %v", name, err)
+	}
+}
+
 // RunPostStartHooks runs the PostStartHooks for the server
 func (s *GenericAPIServer) RunPostStartHooks(stopCh <-chan struct{}) {
 	s.postStartHookLock.Lock()
@@ -113,8 +152,24 @@ func (s *GenericAPIServer) RunPostStartHooks(stopCh <-chan struct{}) {
 	}
 }
 
-// isHookRegistered checks whether a given hook is registered
-func (s *GenericAPIServer) isHookRegistered(name string) bool {
+// RunPreShutdownHooks runs the PreShutdownHooks for the server
+func (s *GenericAPIServer) RunPreShutdownHooks() error {
+	var errorList []error
+
+	s.preShutdownHookLock.Lock()
+	defer s.preShutdownHookLock.Unlock()
+	s.preShutdownHooksCalled = true
+
+	for hookName, hookEntry := range s.preShutdownHooks {
+		if err := runPreShutdownHook(hookName, hookEntry); err != nil {
+			errorList = append(errorList, err)
+		}
+	}
+	return utilerrors.NewAggregate(errorList)
+}
+
+// isPostStartHookRegistered checks whether a given PostStartHook is registered
+func (s *GenericAPIServer) isPostStartHookRegistered(name string) bool {
 	s.postStartHookLock.Lock()
 	defer s.postStartHookLock.Unlock()
 	_, exists := s.postStartHooks[name]
@@ -133,6 +188,19 @@ func runPostStartHook(name string, entry postStartHookEntry, context PostStartHo
 		glog.Fatalf("PostStartHook %q failed: %v", name, err)
 	}
 	close(entry.done)
+}
+
+func runPreShutdownHook(name string, entry preShutdownHookEntry) error {
+	var err error
+	func() {
+		// don't let the hook *accidentally* panic and kill the server
+		defer utilruntime.HandleCrash()
+		err = entry.hook()
+	}()
+	if err != nil {
+		return fmt.Errorf("PreShutdownHook %q failed: %v", name, err)
+	}
+	return nil
 }
 
 // postStartHookHealthz implements a healthz check for poststarthooks.  It will return a "hookNotFinished"

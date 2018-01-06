@@ -196,6 +196,8 @@ func (r *volumeReactor) React(action core.Action) (handled bool, ret runtime.Obj
 			if storedVer != requestedVer {
 				return true, obj, versionConflictError
 			}
+			// Don't modify the existing object
+			volume = volume.DeepCopy()
 			volume.ResourceVersion = strconv.Itoa(storedVer + 1)
 		} else {
 			return true, nil, fmt.Errorf("Cannot update volume %s: volume not found", volume.Name)
@@ -220,6 +222,8 @@ func (r *volumeReactor) React(action core.Action) (handled bool, ret runtime.Obj
 			if storedVer != requestedVer {
 				return true, obj, versionConflictError
 			}
+			// Don't modify the existing object
+			claim = claim.DeepCopy()
 			claim.ResourceVersion = strconv.Itoa(storedVer + 1)
 		} else {
 			return true, nil, fmt.Errorf("Cannot update claim %s: claim not found", claim.Name)
@@ -301,7 +305,12 @@ func (r *volumeReactor) checkVolumes(expectedVolumes []*v1.PersistentVolume) err
 	gotMap := make(map[string]*v1.PersistentVolume)
 	// Clear any ResourceVersion from both sets
 	for _, v := range expectedVolumes {
+		// Don't modify the existing object
+		v := v.DeepCopy()
 		v.ResourceVersion = ""
+		if v.Spec.ClaimRef != nil {
+			v.Spec.ClaimRef.ResourceVersion = ""
+		}
 		expectedMap[v.Name] = v
 	}
 	for _, v := range r.volumes {
@@ -331,6 +340,8 @@ func (r *volumeReactor) checkClaims(expectedClaims []*v1.PersistentVolumeClaim) 
 	expectedMap := make(map[string]*v1.PersistentVolumeClaim)
 	gotMap := make(map[string]*v1.PersistentVolumeClaim)
 	for _, c := range expectedClaims {
+		// Don't modify the existing object
+		c = c.DeepCopy()
 		c.ResourceVersion = ""
 		expectedMap[c.Name] = c
 	}
@@ -680,6 +691,22 @@ func withLabelSelector(labels map[string]string, claims []*v1.PersistentVolumeCl
 	return claims
 }
 
+// withVolumeVolumeMode applies the given VolumeMode to the first volume in the array and
+// returns the array.  Meant to be used to compose volumes specified inline in
+// a test.
+func withVolumeVolumeMode(mode *v1.PersistentVolumeMode, volumes []*v1.PersistentVolume) []*v1.PersistentVolume {
+	volumes[0].Spec.VolumeMode = mode
+	return volumes
+}
+
+// withClaimVolumeMode applies the given VolumeMode to the first claim in the array and
+// returns the array.  Meant to be used to compose volumes specified inline in
+// a test.
+func withClaimVolumeMode(mode *v1.PersistentVolumeMode, claims []*v1.PersistentVolumeClaim) []*v1.PersistentVolumeClaim {
+	claims[0].Spec.VolumeMode = mode
+	return claims
+}
+
 // withExpectedCapacity sets the claim.Spec.Capacity of the first claim in the
 // array to given value and returns the array.  Meant to be used to compose
 // claims specified inline in a test.
@@ -806,6 +833,9 @@ var (
 	classUnknownInternal         string = "unknown-internal"
 	classUnsupportedMountOptions string = "unsupported-mountoptions"
 	classLarge                   string = "large"
+	classWait                    string = "wait"
+
+	modeWait = storage.VolumeBindingWaitForFirstConsumer
 )
 
 // wrapTestWithPluginCalls returns a testCall that:

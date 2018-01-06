@@ -19,8 +19,8 @@ set -o nounset
 set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
-DEVICE_PLUGIN_ROOT="${KUBE_ROOT}/pkg/kubelet/apis/deviceplugin/v1alpha1/"
 ERROR="Device plugin api is out of date. Please run hack/update-generated-device-plugin.sh"
+DEVICE_PLUGIN_ROOT="${KUBE_ROOT}/pkg/kubelet/apis/deviceplugin/v1alpha/"
 
 source "${KUBE_ROOT}/hack/lib/protoc.sh"
 kube::golang::setup_env

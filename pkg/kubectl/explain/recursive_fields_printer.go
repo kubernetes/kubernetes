@@ -16,9 +16,7 @@ limitations under the License.
 
 package explain
 
-import (
-	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
-)
+import "k8s.io/kube-openapi/pkg/util/proto"
 
 // indentPerLevel is the level of indentation for each field recursion.
 const indentPerLevel = 3
@@ -30,17 +28,17 @@ type recursiveFieldsPrinter struct {
 	Error  error
 }
 
-var _ openapi.SchemaVisitor = &recursiveFieldsPrinter{}
+var _ proto.SchemaVisitor = &recursiveFieldsPrinter{}
 var _ fieldsPrinter = &recursiveFieldsPrinter{}
 
 // VisitArray is just a passthrough.
-func (f *recursiveFieldsPrinter) VisitArray(a *openapi.Array) {
+func (f *recursiveFieldsPrinter) VisitArray(a *proto.Array) {
 	a.SubType.Accept(f)
 }
 
 // VisitKind prints all its fields with their type, and then recurses
 // inside each of these (pre-order).
-func (f *recursiveFieldsPrinter) VisitKind(k *openapi.Kind) {
+func (f *recursiveFieldsPrinter) VisitKind(k *proto.Kind) {
 	for _, key := range k.Keys() {
 		v := k.Fields[key]
 		f.Writer.Write("%s\t<%s>", key, GetTypeName(v))
@@ -55,23 +53,23 @@ func (f *recursiveFieldsPrinter) VisitKind(k *openapi.Kind) {
 }
 
 // VisitMap is just a passthrough.
-func (f *recursiveFieldsPrinter) VisitMap(m *openapi.Map) {
+func (f *recursiveFieldsPrinter) VisitMap(m *proto.Map) {
 	m.SubType.Accept(f)
 }
 
 // VisitPrimitive does nothing, since it doesn't have sub-fields.
-func (f *recursiveFieldsPrinter) VisitPrimitive(p *openapi.Primitive) {
+func (f *recursiveFieldsPrinter) VisitPrimitive(p *proto.Primitive) {
 	// Nothing to do.
 }
 
 // VisitReference is just a passthrough.
-func (f *recursiveFieldsPrinter) VisitReference(r openapi.Reference) {
+func (f *recursiveFieldsPrinter) VisitReference(r proto.Reference) {
 	r.SubSchema().Accept(f)
 }
 
 // PrintFields will recursively print all the fields for the given
 // schema.
-func (f *recursiveFieldsPrinter) PrintFields(schema openapi.Schema) error {
+func (f *recursiveFieldsPrinter) PrintFields(schema proto.Schema) error {
 	schema.Accept(f)
 	return f.Error
 }

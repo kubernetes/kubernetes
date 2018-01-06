@@ -18,7 +18,7 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/test/e2e/framework/metrics",
     deps = [
-        "//pkg/api:go_default_library",
+        "//pkg/apis/core:go_default_library",
         "//pkg/master/ports:go_default_library",
         "//pkg/util/system:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",

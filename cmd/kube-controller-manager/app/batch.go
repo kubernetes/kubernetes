@@ -21,6 +21,8 @@ limitations under the License.
 package app
 
 import (
+	"fmt"
+
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/controller/cronjob"
 	"k8s.io/kubernetes/pkg/controller/job"
@@ -42,8 +44,12 @@ func startCronJobController(ctx ControllerContext) (bool, error) {
 	if !ctx.AvailableResources[schema.GroupVersionResource{Group: "batch", Version: "v1beta1", Resource: "cronjobs"}] {
 		return false, nil
 	}
-	go cronjob.NewCronJobController(
+	cjc, err := cronjob.NewCronJobController(
 		ctx.ClientBuilder.ClientOrDie("cronjob-controller"),
-	).Run(ctx.Stop)
+	)
+	if err != nil {
+		return true, fmt.Errorf("error creating CronJob controller: %v", err)
+	}
+	go cjc.Run(ctx.Stop)
 	return true, nil
 }

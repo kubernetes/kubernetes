@@ -20,5 +20,5 @@ func Minor(dev uint64) uint32 {
 // Mkdev returns a Darwin device number generated from the given major and minor
 // components.
 func Mkdev(major, minor uint32) uint64 {
-	return uint64((major << 24) | minor)
+	return (uint64(major) << 24) | uint64(minor)
 }

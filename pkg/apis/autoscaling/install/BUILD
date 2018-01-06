@@ -10,7 +10,7 @@ go_library(
     srcs = ["install.go"],
     importpath = "k8s.io/kubernetes/pkg/apis/autoscaling/install",
     deps = [
-        "//pkg/api:go_default_library",
+        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/autoscaling:go_default_library",
         "//pkg/apis/autoscaling/v1:go_default_library",
         "//pkg/apis/autoscaling/v2beta1:go_default_library",

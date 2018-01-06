@@ -23,7 +23,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/test/e2e/generated"
 )
 
@@ -36,7 +36,7 @@ func PodFromManifest(filename string) (*v1.Pod, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := runtime.DecodeInto(api.Codecs.UniversalDecoder(), json, &pod); err != nil {
+	if err := runtime.DecodeInto(legacyscheme.Codecs.UniversalDecoder(), json, &pod); err != nil {
 		return nil, err
 	}
 	return &pod, nil
@@ -51,7 +51,7 @@ func RcFromManifest(fileName string) (*v1.ReplicationController, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := runtime.DecodeInto(api.Codecs.UniversalDecoder(), json, &controller); err != nil {
+	if err := runtime.DecodeInto(legacyscheme.Codecs.UniversalDecoder(), json, &controller); err != nil {
 		return nil, err
 	}
 	return &controller, nil
@@ -66,7 +66,7 @@ func SvcFromManifest(fileName string) (*v1.Service, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := runtime.DecodeInto(api.Codecs.UniversalDecoder(), json, &svc); err != nil {
+	if err := runtime.DecodeInto(legacyscheme.Codecs.UniversalDecoder(), json, &svc); err != nil {
 		return nil, err
 	}
 	return &svc, nil
@@ -81,7 +81,7 @@ func IngressFromManifest(fileName string) (*extensions.Ingress, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := runtime.DecodeInto(api.Codecs.UniversalDecoder(), json, &ing); err != nil {
+	if err := runtime.DecodeInto(legacyscheme.Codecs.UniversalDecoder(), json, &ing); err != nil {
 		return nil, err
 	}
 	return &ing, nil
@@ -96,7 +96,7 @@ func StatefulSetFromManifest(fileName, ns string) (*apps.StatefulSet, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := runtime.DecodeInto(api.Codecs.UniversalDecoder(), json, &ss); err != nil {
+	if err := runtime.DecodeInto(legacyscheme.Codecs.UniversalDecoder(), json, &ss); err != nil {
 		return nil, err
 	}
 	ss.Namespace = ns

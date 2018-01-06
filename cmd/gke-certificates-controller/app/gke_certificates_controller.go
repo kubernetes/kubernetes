@@ -28,7 +28,7 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/certificates"
 
@@ -65,7 +65,7 @@ func Run(s *GKECertificatesController) error {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
 	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(kubeClient.CoreV1().RESTClient()).Events("")})
-	recorder := eventBroadcaster.NewRecorder(api.Scheme, v1.EventSource{Component: "gke-certificates-controller"})
+	recorder := eventBroadcaster.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: "gke-certificates-controller"})
 
 	clientBuilder := controller.SimpleControllerClientBuilder{ClientConfig: kubeconfig}
 	client := clientBuilder.ClientOrDie("certificate-controller")
@@ -77,14 +77,11 @@ func Run(s *GKECertificatesController) error {
 		return err
 	}
 
-	controller, err := certificates.NewCertificateController(
+	controller := certificates.NewCertificateController(
 		client,
 		sharedInformers.Certificates().V1beta1().CertificateSigningRequests(),
 		signer.handle,
 	)
-	if err != nil {
-		return err
-	}
 
 	sharedInformers.Start(nil)
 	controller.Run(5, nil) // runs forever

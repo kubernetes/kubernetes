@@ -19,12 +19,14 @@ package deployment
 import (
 	"fmt"
 	"net/http/httptest"
+	"sync"
 	"testing"
 	"time"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
@@ -33,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/deployment"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	"k8s.io/kubernetes/pkg/controller/replicaset"
+	"k8s.io/kubernetes/pkg/util/metrics"
 	"k8s.io/kubernetes/test/integration/framework"
 	testutil "k8s.io/kubernetes/test/utils"
 )
@@ -41,8 +44,8 @@ const (
 	pollInterval = 100 * time.Millisecond
 	pollTimeout  = 60 * time.Second
 
-	fakeImageName = "fake-name"
-	fakeImage     = "fakeimage"
+	fakeContainerName = "fake-name"
+	fakeImage         = "fakeimage"
 )
 
 var pauseFn = func(update *v1beta1.Deployment) {
@@ -78,7 +81,8 @@ func newDeployment(name, ns string, replicas int32) *v1beta1.Deployment {
 			Replicas: &replicas,
 			Selector: &metav1.LabelSelector{MatchLabels: testLabels()},
 			Strategy: v1beta1.DeploymentStrategy{
-				Type: v1beta1.RollingUpdateDeploymentStrategyType,
+				Type:          v1beta1.RollingUpdateDeploymentStrategyType,
+				RollingUpdate: new(v1beta1.RollingUpdateDeployment),
 			},
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
@@ -87,13 +91,53 @@ func newDeployment(name, ns string, replicas int32) *v1beta1.Deployment {
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
 						{
-							Name:  fakeImageName,
+							Name:  fakeContainerName,
 							Image: fakeImage,
 						},
 					},
 				},
 			},
 		},
+	}
+}
+
+func newReplicaSet(name, ns string, replicas int32) *v1beta1.ReplicaSet {
+	return &v1beta1.ReplicaSet{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "ReplicaSet",
+			APIVersion: "extensions/v1beta1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: ns,
+			Name:      name,
+		},
+		Spec: v1beta1.ReplicaSetSpec{
+			Selector: &metav1.LabelSelector{
+				MatchLabels: testLabels(),
+			},
+			Replicas: &replicas,
+			Template: v1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: testLabels(),
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:  fakeContainerName,
+							Image: fakeImage,
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func newDeploymentRollback(name string, annotations map[string]string, revision int64) *v1beta1.DeploymentRollback {
+	return &v1beta1.DeploymentRollback{
+		Name:               name,
+		UpdatedAnnotations: annotations,
+		RollbackTo:         v1beta1.RollbackConfig{Revision: revision},
 	}
 }
 
@@ -110,12 +154,16 @@ func dcSetup(t *testing.T) (*httptest.Server, framework.CloseFunc, *replicaset.R
 	resyncPeriod := 12 * time.Hour
 	informers := informers.NewSharedInformerFactory(clientset.NewForConfigOrDie(restclient.AddUserAgent(&config, "deployment-informers")), resyncPeriod)
 
-	dc := deployment.NewDeploymentController(
+	metrics.UnregisterMetricAndUntrackRateLimiterUsage("deployment_controller")
+	dc, err := deployment.NewDeploymentController(
 		informers.Extensions().V1beta1().Deployments(),
 		informers.Extensions().V1beta1().ReplicaSets(),
 		informers.Core().V1().Pods(),
 		clientset.NewForConfigOrDie(restclient.AddUserAgent(&config, "deployment-controller")),
 	)
+	if err != nil {
+		t.Fatalf("error creating Deployment controller: %v", err)
+	}
 	rm := replicaset.NewReplicaSetController(
 		informers.Extensions().V1beta1().ReplicaSets(),
 		informers.Core().V1().Pods(),
@@ -160,59 +208,114 @@ func (d *deploymentTester) waitForDeploymentRevisionAndImage(revision, image str
 	return nil
 }
 
-// markAllPodsReady manually updates all Deployment pods status to ready
-func (d *deploymentTester) markAllPodsReady() {
+func markPodReady(c clientset.Interface, ns string, pod *v1.Pod) error {
+	addPodConditionReady(pod, metav1.Now())
+	_, err := c.CoreV1().Pods(ns).UpdateStatus(pod)
+	return err
+}
+
+func intOrStrP(num int) *intstr.IntOrString {
+	intstr := intstr.FromInt(num)
+	return &intstr
+}
+
+// markUpdatedPodsReady manually marks updated Deployment pods status to ready,
+// until the deployment is complete
+func (d *deploymentTester) markUpdatedPodsReady(wg *sync.WaitGroup) {
+	defer wg.Done()
+
 	ns := d.deployment.Namespace
-	selector, err := metav1.LabelSelectorAsSelector(d.deployment.Spec.Selector)
-	if err != nil {
-		d.t.Fatalf("failed to parse Deployment selector: %v", err)
-	}
-	var readyPods int32
-	err = wait.PollImmediate(pollInterval, pollTimeout, func() (bool, error) {
-		readyPods = 0
-		pods, err := d.c.Core().Pods(ns).List(metav1.ListOptions{LabelSelector: selector.String()})
+	err := wait.PollImmediate(pollInterval, pollTimeout, func() (bool, error) {
+		// We're done when the deployment is complete
+		if completed, err := d.deploymentComplete(); err != nil {
+			return false, err
+		} else if completed {
+			return true, nil
+		}
+		// Otherwise, mark remaining pods as ready
+		pods, err := d.listUpdatedPods()
 		if err != nil {
-			d.t.Logf("failed to list Deployment pods, will retry later: %v", err)
+			d.t.Log(err)
 			return false, nil
 		}
-		for i := range pods.Items {
-			pod := pods.Items[i]
+		d.t.Logf("%d/%d of deployment pods are created", len(pods), *d.deployment.Spec.Replicas)
+		for i := range pods {
+			pod := pods[i]
 			if podutil.IsPodReady(&pod) {
-				readyPods++
 				continue
 			}
-			addPodConditionReady(&pod, metav1.Now())
-			if _, err = d.c.Core().Pods(ns).UpdateStatus(&pod); err != nil {
+			if err = markPodReady(d.c, ns, &pod); err != nil {
 				d.t.Logf("failed to update Deployment pod %s, will retry later: %v", pod.Name, err)
-			} else {
-				readyPods++
 			}
-		}
-		if readyPods >= *d.deployment.Spec.Replicas {
-			return true, nil
 		}
 		return false, nil
 	})
 	if err != nil {
-		d.t.Fatalf("failed to mark all Deployment pods to ready: %v", err)
+		d.t.Fatalf("failed to mark updated Deployment pods to ready: %v", err)
 	}
 }
 
-func (d *deploymentTester) waitForDeploymentStatusValid() error {
-	return testutil.WaitForDeploymentStatusValid(d.c, d.deployment, d.t.Logf, pollInterval, pollTimeout)
+func (d *deploymentTester) deploymentComplete() (bool, error) {
+	latest, err := d.c.ExtensionsV1beta1().Deployments(d.deployment.Namespace).Get(d.deployment.Name, metav1.GetOptions{})
+	if err != nil {
+		return false, err
+	}
+	return deploymentutil.DeploymentComplete(d.deployment, &latest.Status), nil
 }
 
-// waitForDeploymentStatusValidAndMarkPodsReady waits for the Deployment status to become valid
-// while marking all Deployment pods as ready at the same time.
-func (d *deploymentTester) waitForDeploymentStatusValidAndMarkPodsReady() error {
-	// Manually mark all Deployment pods as ready in a separate goroutine
-	go d.markAllPodsReady()
+// Waits for the deployment to complete, and check rolling update strategy isn't broken at any times.
+// Rolling update strategy should not be broken during a rolling update.
+func (d *deploymentTester) waitForDeploymentCompleteAndCheckRolling() error {
+	return testutil.WaitForDeploymentCompleteAndCheckRolling(d.c, d.deployment, d.t.Logf, pollInterval, pollTimeout)
+}
 
-	// Make sure the Deployment status is valid while Deployment pods are becoming ready
-	err := d.waitForDeploymentStatusValid()
+// Waits for the deployment to complete, and don't check if rolling update strategy is broken.
+// Rolling update strategy is used only during a rolling update, and can be violated in other situations,
+// such as shortly after a scaling event or the deployment is just created.
+func (d *deploymentTester) waitForDeploymentComplete() error {
+	return testutil.WaitForDeploymentComplete(d.c, d.deployment, d.t.Logf, pollInterval, pollTimeout)
+}
+
+// waitForDeploymentCompleteAndCheckRollingAndMarkPodsReady waits for the Deployment to complete
+// while marking updated Deployment pods as ready at the same time.
+// Uses hard check to make sure rolling update strategy is not violated at any times.
+func (d *deploymentTester) waitForDeploymentCompleteAndCheckRollingAndMarkPodsReady() error {
+	var wg sync.WaitGroup
+
+	// Manually mark updated Deployment pods as ready in a separate goroutine
+	wg.Add(1)
+	go d.markUpdatedPodsReady(&wg)
+
+	// Wait for the Deployment status to complete while Deployment pods are becoming ready
+	err := d.waitForDeploymentCompleteAndCheckRolling()
+	if err != nil {
+		return fmt.Errorf("failed to wait for Deployment %s to complete: %v", d.deployment.Name, err)
+	}
+
+	// Wait for goroutine to finish
+	wg.Wait()
+
+	return nil
+}
+
+// waitForDeploymentCompleteAndMarkPodsReady waits for the Deployment to complete
+// while marking updated Deployment pods as ready at the same time.
+func (d *deploymentTester) waitForDeploymentCompleteAndMarkPodsReady() error {
+	var wg sync.WaitGroup
+
+	// Manually mark updated Deployment pods as ready in a separate goroutine
+	wg.Add(1)
+	go d.markUpdatedPodsReady(&wg)
+
+	// Wait for the Deployment status to complete using soft check, while Deployment pods are becoming ready
+	err := d.waitForDeploymentComplete()
 	if err != nil {
 		return fmt.Errorf("failed to wait for Deployment status %s: %v", d.deployment.Name, err)
 	}
+
+	// Wait for goroutine to finish
+	wg.Wait()
+
 	return nil
 }
 
@@ -228,7 +331,11 @@ func (d *deploymentTester) waitForObservedDeployment(desiredGeneration int64) er
 }
 
 func (d *deploymentTester) getNewReplicaSet() (*v1beta1.ReplicaSet, error) {
-	rs, err := deploymentutil.GetNewReplicaSet(d.deployment, d.c.ExtensionsV1beta1())
+	deployment, err := d.c.ExtensionsV1beta1().Deployments(d.deployment.Namespace).Get(d.deployment.Name, metav1.GetOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("failed retrieving deployment %s: %v", d.deployment.Name, err)
+	}
+	rs, err := deploymentutil.GetNewReplicaSet(deployment, d.c.ExtensionsV1beta1())
 	if err != nil {
 		return nil, fmt.Errorf("failed retrieving new replicaset of deployment %s: %v", d.deployment.Name, err)
 	}
@@ -259,4 +366,53 @@ func (d *deploymentTester) expectNewReplicaSet() (*v1beta1.ReplicaSet, error) {
 
 func (d *deploymentTester) updateReplicaSet(name string, applyUpdate testutil.UpdateReplicaSetFunc) (*v1beta1.ReplicaSet, error) {
 	return testutil.UpdateReplicaSetWithRetries(d.c, d.deployment.Namespace, name, applyUpdate, d.t.Logf, pollInterval, pollTimeout)
+}
+
+// waitForDeploymentRollbackCleared waits for deployment either started rolling back or doesn't need to rollback.
+func (d *deploymentTester) waitForDeploymentRollbackCleared() error {
+	return testutil.WaitForDeploymentRollbackCleared(d.c, d.deployment.Namespace, d.deployment.Name, pollInterval, pollTimeout)
+}
+
+// checkDeploymentRevisionAndImage checks if the input deployment's and its new replica set's revision and image are as expected.
+func (d *deploymentTester) checkDeploymentRevisionAndImage(revision, image string) error {
+	return testutil.CheckDeploymentRevisionAndImage(d.c, d.deployment.Namespace, d.deployment.Name, revision, image)
+}
+
+func (d *deploymentTester) waitForDeploymentUpdatedReplicasLTE(minUpdatedReplicas int32) error {
+	return testutil.WaitForDeploymentUpdatedReplicasLTE(d.c, d.deployment.Namespace, d.deployment.Name, minUpdatedReplicas, d.deployment.Generation, pollInterval, pollTimeout)
+}
+
+func (d *deploymentTester) waitForDeploymentWithCondition(reason string, condType v1beta1.DeploymentConditionType) error {
+	return testutil.WaitForDeploymentWithCondition(d.c, d.deployment.Namespace, d.deployment.Name, reason, condType, d.t.Logf, pollInterval, pollTimeout)
+}
+
+func (d *deploymentTester) listUpdatedPods() ([]v1.Pod, error) {
+	selector, err := metav1.LabelSelectorAsSelector(d.deployment.Spec.Selector)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse deployment selector: %v", err)
+	}
+	pods, err := d.c.CoreV1().Pods(d.deployment.Namespace).List(metav1.ListOptions{LabelSelector: selector.String()})
+	if err != nil {
+		return nil, fmt.Errorf("failed to list deployment pods, will retry later: %v", err)
+	}
+	newRS, err := d.getNewReplicaSet()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get new replicaset of deployment %q: %v", d.deployment.Name, err)
+	}
+	if newRS == nil {
+		return nil, fmt.Errorf("unable to find new replicaset of deployment %q", d.deployment.Name)
+	}
+
+	var ownedPods []v1.Pod
+	for _, pod := range pods.Items {
+		rs := metav1.GetControllerOf(&pod)
+		if rs.UID == newRS.UID {
+			ownedPods = append(ownedPods, pod)
+		}
+	}
+	return ownedPods, nil
+}
+
+func (d *deploymentTester) waitRSStable(replicaset *v1beta1.ReplicaSet) error {
+	return testutil.WaitRSStable(d.t, d.c, replicaset, pollInterval, pollTimeout)
 }

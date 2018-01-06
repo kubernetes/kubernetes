@@ -17,13 +17,22 @@ limitations under the License.
 package cadvisor
 
 import (
+	goruntime "runtime"
+
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	cadvisorapi2 "github.com/google/cadvisor/info/v2"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
+	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
+)
+
+const (
+	// Please keep this in sync with the one in:
+	// github.com/google/cadvisor/container/crio/client.go
+	CrioSocket = "/var/run/crio/crio.sock"
 )
 
 func CapacityFromMachineInfo(info *cadvisorapi.MachineInfo) v1.ResourceList {
@@ -56,4 +65,17 @@ func EphemeralStorageCapacityFromFsInfo(info cadvisorapi2.FsInfo) v1.ResourceLis
 			resource.BinarySI),
 	}
 	return c
+}
+
+// CRI integrations should get container metrics via CRI. Docker
+// uses the built-in cadvisor to gather such metrics on Linux for
+// historical reasons.
+// cri-o relies on cadvisor as a temporary workaround. The code should
+// be removed. Related issue:
+// https://github.com/kubernetes/kubernetes/issues/51798
+// UsingLegacyCadvisorStats returns true if container stats are provided by cadvisor instead of through the CRI
+func UsingLegacyCadvisorStats(runtime, runtimeEndpoint string) bool {
+	return runtime == kubetypes.RktContainerRuntime ||
+		(runtime == kubetypes.DockerContainerRuntime && goruntime.GOOS == "linux") ||
+		runtimeEndpoint == CrioSocket
 }

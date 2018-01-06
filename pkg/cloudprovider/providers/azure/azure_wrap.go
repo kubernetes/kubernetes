@@ -18,12 +18,16 @@ package azure
 
 import (
 	"net/http"
+	"sync"
+	"time"
 
 	"github.com/Azure/azure-sdk-for-go/arm/compute"
 	"github.com/Azure/azure-sdk-for-go/arm/network"
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/golang/glog"
+
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/kubernetes/pkg/cloudprovider"
 )
 
 // checkExistsFromError inspects an error and returns a true if err is nil,
@@ -34,31 +38,85 @@ func checkResourceExistsFromError(err error) (bool, error) {
 		return true, nil
 	}
 	v, ok := err.(autorest.DetailedError)
-	if ok && v.StatusCode == http.StatusNotFound {
+	if !ok {
+		return false, err
+	}
+	if v.StatusCode == http.StatusNotFound {
 		return false, nil
 	}
 	return false, v
 }
 
-func (az *Cloud) getVirtualMachine(nodeName types.NodeName) (vm compute.VirtualMachine, exists bool, err error) {
-	var realErr error
+// If it is StatusNotFound return nil,
+// Otherwise, return what it is
+func ignoreStatusNotFoundFromError(err error) error {
+	if err == nil {
+		return nil
+	}
+	v, ok := err.(autorest.DetailedError)
+	if ok && v.StatusCode == http.StatusNotFound {
+		return nil
+	}
+	return err
+}
 
+// cache used by getVirtualMachine
+// 15s for expiration duration
+var vmCache = newTimedcache(15 * time.Second)
+
+type vmRequest struct {
+	lock *sync.Mutex
+	vm   *compute.VirtualMachine
+}
+
+/// getVirtualMachine calls 'VirtualMachinesClient.Get' with a timed cache
+/// The service side has throttling control that delays responses if there're multiple requests onto certain vm
+/// resource request in short period.
+func (az *Cloud) getVirtualMachine(nodeName types.NodeName) (vm compute.VirtualMachine, err error) {
 	vmName := string(nodeName)
-	az.operationPollRateLimiter.Accept()
-	glog.V(10).Infof("VirtualMachinesClient.Get(%s): start", vmName)
-	vm, err = az.VirtualMachinesClient.Get(az.ResourceGroup, vmName, "")
-	glog.V(10).Infof("VirtualMachinesClient.Get(%s): end", vmName)
 
-	exists, realErr = checkResourceExistsFromError(err)
-	if realErr != nil {
-		return vm, false, realErr
+	cachedRequest, err := vmCache.GetOrCreate(vmName, func() interface{} {
+		return &vmRequest{
+			lock: &sync.Mutex{},
+			vm:   nil,
+		}
+	})
+	if err != nil {
+		return compute.VirtualMachine{}, err
+	}
+	request := cachedRequest.(*vmRequest)
+
+	if request.vm == nil {
+		request.lock.Lock()
+		defer request.lock.Unlock()
+		if request.vm == nil {
+			// Currently InstanceView request are used by azure_zones, while the calls come after non-InstanceView
+			// request. If we first send an InstanceView request and then a non InstanceView request, the second
+			// request will still hit throttling. This is what happens now for cloud controller manager: In this
+			// case we do get instance view every time to fulfill the azure_zones requirement without hitting
+			// throttling.
+			// Consider adding separate parameter for controlling 'InstanceView' once node update issue #56276 is fixed
+			az.operationPollRateLimiter.Accept()
+			glog.V(10).Infof("VirtualMachinesClient.Get(%s): start", vmName)
+			vm, err = az.VirtualMachinesClient.Get(az.ResourceGroup, vmName, compute.InstanceView)
+			glog.V(10).Infof("VirtualMachinesClient.Get(%s): end", vmName)
+
+			exists, realErr := checkResourceExistsFromError(err)
+			if realErr != nil {
+				return vm, realErr
+			}
+
+			if !exists {
+				return vm, cloudprovider.InstanceNotFound
+			}
+
+			request.vm = &vm
+		}
+		return vm, nil
 	}
 
-	if !exists {
-		return vm, false, nil
-	}
-
-	return vm, exists, err
+	glog.V(6).Infof("getVirtualMachine hits cache for(%s)", vmName)
+	return *request.vm, nil
 }
 
 func (az *Cloud) getRouteTable() (routeTable network.RouteTable, exists bool, err error) {
@@ -103,7 +161,6 @@ func (az *Cloud) getSecurityGroup() (sg network.SecurityGroup, exists bool, err 
 
 func (az *Cloud) getAzureLoadBalancer(name string) (lb network.LoadBalancer, exists bool, err error) {
 	var realErr error
-
 	az.operationPollRateLimiter.Accept()
 	glog.V(10).Infof("LoadBalancerClient.Get(%s): start", name)
 	lb, err = az.LoadBalancerClient.Get(az.ResourceGroup, name, "")
@@ -121,13 +178,36 @@ func (az *Cloud) getAzureLoadBalancer(name string) (lb network.LoadBalancer, exi
 	return lb, exists, err
 }
 
-func (az *Cloud) getPublicIPAddress(name string) (pip network.PublicIPAddress, exists bool, err error) {
+func (az *Cloud) listLoadBalancers() (lbListResult network.LoadBalancerListResult, exists bool, err error) {
 	var realErr error
 
 	az.operationPollRateLimiter.Accept()
-	glog.V(10).Infof("PublicIPAddressesClient.Get(%s): start", name)
-	pip, err = az.PublicIPAddressesClient.Get(az.ResourceGroup, name, "")
-	glog.V(10).Infof("PublicIPAddressesClient.Get(%s): end", name)
+	glog.V(10).Infof("LoadBalancerClient.List(%s): start", az.ResourceGroup)
+	lbListResult, err = az.LoadBalancerClient.List(az.ResourceGroup)
+	glog.V(10).Infof("LoadBalancerClient.List(%s): end", az.ResourceGroup)
+	exists, realErr = checkResourceExistsFromError(err)
+	if realErr != nil {
+		return lbListResult, false, realErr
+	}
+
+	if !exists {
+		return lbListResult, false, nil
+	}
+
+	return lbListResult, exists, err
+}
+
+func (az *Cloud) getPublicIPAddress(pipResourceGroup string, pipName string) (pip network.PublicIPAddress, exists bool, err error) {
+	resourceGroup := az.ResourceGroup
+	if pipResourceGroup != "" {
+		resourceGroup = pipResourceGroup
+	}
+
+	var realErr error
+	az.operationPollRateLimiter.Accept()
+	glog.V(10).Infof("PublicIPAddressesClient.Get(%s, %s): start", resourceGroup, pipName)
+	pip, err = az.PublicIPAddressesClient.Get(resourceGroup, pipName, "")
+	glog.V(10).Infof("PublicIPAddressesClient.Get(%s, %s): end", resourceGroup, pipName)
 
 	exists, realErr = checkResourceExistsFromError(err)
 	if realErr != nil {

@@ -109,10 +109,7 @@ func ReplaceFile(fs utilfs.Filesystem, path string, data []byte) error {
 		return err
 	}
 	// rename over existing file
-	if err := fs.Rename(tmpPath, path); err != nil {
-		return err
-	}
-	return nil
+	return fs.Rename(tmpPath, path)
 }
 
 // DirExists returns true if a directory exists at `path`, false if `path` does not exist, otherwise an error
@@ -138,8 +135,5 @@ func EnsureDir(fs utilfs.Filesystem, path string) error {
 	} // Assert: dir does not exist
 
 	// create the dir
-	if err := fs.MkdirAll(path, defaultPerm); err != nil {
-		return err
-	}
-	return nil
+	return fs.MkdirAll(path, defaultPerm)
 }

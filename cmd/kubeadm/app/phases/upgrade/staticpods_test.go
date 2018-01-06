@@ -30,8 +30,9 @@ import (
 	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/controlplane"
+	etcdphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/etcd"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 )
 
 const (
@@ -108,6 +109,11 @@ func (w *fakeWaiter) WaitForStaticPodControlPlaneHashes(_ string) (map[string]st
 	return map[string]string{}, w.errsToReturn[waitForHashes]
 }
 
+// WaitForStaticPodSingleHash returns an error if set from errsToReturn
+func (w *fakeWaiter) WaitForStaticPodSingleHash(_ string, _ string) (string, error) {
+	return "", w.errsToReturn[waitForHashes]
+}
+
 // WaitForStaticPodControlPlaneHashChange returns an error if set from errsToReturn
 func (w *fakeWaiter) WaitForStaticPodControlPlaneHashChange(_, _, _ string) error {
 	return w.errsToReturn[waitForHashChange]
@@ -122,6 +128,7 @@ type fakeStaticPodPathManager struct {
 	realManifestDir   string
 	tempManifestDir   string
 	backupManifestDir string
+	backupEtcdDir     string
 	MoveFileFunc      func(string, string) error
 }
 
@@ -140,11 +147,16 @@ func NewFakeStaticPodPathManager(moveFileFunc func(string, string) error) (Stati
 	if err != nil {
 		return nil, fmt.Errorf("couldn't create a temporary directory for the upgrade: %v", err)
 	}
+	backupEtcdDir, err := ioutil.TempDir("", "kubeadm-backup-etcd")
+	if err != nil {
+		return nil, err
+	}
 
 	return &fakeStaticPodPathManager{
 		realManifestDir:   realManifestsDir,
 		tempManifestDir:   upgradedManifestsDir,
 		backupManifestDir: backupManifestsDir,
+		backupEtcdDir:     backupEtcdDir,
 		MoveFileFunc:      moveFileFunc,
 	}, nil
 }
@@ -172,6 +184,10 @@ func (spm *fakeStaticPodPathManager) BackupManifestPath(component string) string
 }
 func (spm *fakeStaticPodPathManager) BackupManifestDir() string {
 	return spm.backupManifestDir
+}
+
+func (spm *fakeStaticPodPathManager) BackupEtcdDir() string {
+	return spm.backupEtcdDir
 }
 
 func TestStaticPodControlPlane(t *testing.T) {
@@ -280,7 +296,6 @@ func TestStaticPodControlPlane(t *testing.T) {
 	}
 
 	for _, rt := range tests {
-
 		waiter := NewFakeStaticPodWaiter(rt.waitErrsToReturn)
 		pathMgr, err := NewFakeStaticPodPathManager(rt.moveFileFunc)
 		if err != nil {
@@ -299,6 +314,10 @@ func TestStaticPodControlPlane(t *testing.T) {
 		if err != nil {
 			t.Fatalf("couldn't run CreateInitStaticPodManifestFiles: %v", err)
 		}
+		err = etcdphase.CreateLocalEtcdStaticPodManifestFile(pathMgr.RealManifestDir(), oldcfg)
+		if err != nil {
+			t.Fatalf("couldn't run CreateLocalEtcdStaticPodManifestFile: %v", err)
+		}
 		// Get a hash of the v1.7 API server manifest to compare later (was the file re-written)
 		oldHash, err := getAPIServerHash(pathMgr.RealManifestDir())
 		if err != nil {
@@ -310,7 +329,7 @@ func TestStaticPodControlPlane(t *testing.T) {
 			t.Fatalf("couldn't create config: %v", err)
 		}
 
-		actualErr := StaticPodControlPlane(waiter, pathMgr, newcfg)
+		actualErr := StaticPodControlPlane(waiter, pathMgr, newcfg, false)
 		if (actualErr != nil) != rt.expectedErr {
 			t.Errorf(
 				"failed UpgradeStaticPodControlPlane\n\texpected error: %t\n\tgot: %t",
@@ -349,9 +368,9 @@ func getAPIServerHash(dir string) (string, error) {
 func getConfig(version string) (*kubeadmapi.MasterConfiguration, error) {
 	externalcfg := &kubeadmapiext.MasterConfiguration{}
 	internalcfg := &kubeadmapi.MasterConfiguration{}
-	if err := runtime.DecodeInto(api.Codecs.UniversalDecoder(), []byte(fmt.Sprintf(testConfiguration, version)), externalcfg); err != nil {
+	if err := runtime.DecodeInto(legacyscheme.Codecs.UniversalDecoder(), []byte(fmt.Sprintf(testConfiguration, version)), externalcfg); err != nil {
 		return nil, fmt.Errorf("unable to decode config: %v", err)
 	}
-	api.Scheme.Convert(externalcfg, internalcfg, nil)
+	legacyscheme.Scheme.Convert(externalcfg, internalcfg, nil)
 	return internalcfg, nil
 }

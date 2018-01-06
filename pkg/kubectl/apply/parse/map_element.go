@@ -17,14 +17,14 @@ limitations under the License.
 package parse
 
 import (
+	"k8s.io/kube-openapi/pkg/util/proto"
 	"k8s.io/kubernetes/pkg/kubectl/apply"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
 )
 
 // mapElement builds a new mapElement from a mapItem
 func (v ElementBuildingVisitor) mapElement(meta apply.FieldMetaImpl, item *mapItem) (*apply.MapElement, error) {
 	// Function to return schema type of the map values
-	var fn schemaFn = func(string) openapi.Schema {
+	var fn schemaFn = func(string) proto.Schema {
 		// All map values share the same schema
 		if item.Map != nil && item.Map.SubType != nil {
 			return item.Map.SubType
@@ -39,11 +39,15 @@ func (v ElementBuildingVisitor) mapElement(meta apply.FieldMetaImpl, item *mapIt
 	}
 
 	// Return the result
-	return &apply.MapElement{meta, item.MapElementData, values}, nil
+	return &apply.MapElement{
+		FieldMetaImpl:  meta,
+		MapElementData: item.MapElementData,
+		Values:         values,
+	}, nil
 }
 
 // schemaFn returns the schema for a field or map value based on its name or key
-type schemaFn func(key string) openapi.Schema
+type schemaFn func(key string) proto.Schema
 
 // createMapValues combines the recorded, local and remote values from
 // data into a map of elements.

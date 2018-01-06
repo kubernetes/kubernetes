@@ -96,16 +96,27 @@ data:
     # the name of the Kubernetes container regardless of how many times the
     # Kubernetes pod has been restarted (resulting in a several Docker container IDs).
 
-    # Example:
+    # Json Log Example:
     # {"log":"[info:2016-02-16T16:04:05.930-08:00] Some log text here\n","stream":"stdout","time":"2016-02-17T00:04:05.931087621Z"}
+    # CRI Log Example:
+    # 2016-02-17T00:04:05.931087621Z stdout F [info:2016-02-16T16:04:05.930-08:00] Some log text here
     <source>
       type tail
       path /var/log/containers/*.log
       pos_file /var/log/es-containers.log.pos
       time_format %Y-%m-%dT%H:%M:%S.%NZ
       tag kubernetes.*
-      format json
       read_from_head true
+      format multi_format
+      <pattern>
+        format json
+        time_key time
+        time_format %Y-%m-%dT%H:%M:%S.%NZ
+      </pattern>
+      <pattern>
+        format /^(?<time>.+) (?<stream>stdout|stderr) [^ ]* (?<log>.*)$/
+        time_format %Y-%m-%dT%H:%M:%S.%N%:z
+      </pattern>
     </source>
   system.input.conf: |-
     # Example:
@@ -356,7 +367,7 @@ data:
        num_threads 2
     </match>
 metadata:
-  name: fluentd-es-config-v0.1.0
+  name: fluentd-es-config-v0.1.1
   namespace: kube-system
   labels:
     addonmanager.kubernetes.io/mode: Reconcile

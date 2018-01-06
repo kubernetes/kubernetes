@@ -23,12 +23,12 @@ import (
 
 	"github.com/spf13/cobra"
 
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/apis/rbac"
-	internalversionrbac "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/rbac/internalversion"
+	clientgorbacv1 "k8s.io/client-go/kubernetes/typed/rbac/v1"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
@@ -108,10 +108,11 @@ type CreateRoleOptions struct {
 	DryRun       bool
 	OutputFormat string
 	Namespace    string
-	Client       internalversionrbac.RbacInterface
+	Client       clientgorbacv1.RbacV1Interface
 	Mapper       meta.RESTMapper
 	Out          io.Writer
 	PrintObject  func(obj runtime.Object) error
+	PrintSuccess func(mapper meta.RESTMapper, shortOutput bool, out io.Writer, resource, name string, dryRun bool, operation string)
 }
 
 // Role is a command to ease creating Roles.
@@ -161,6 +162,7 @@ func (c *CreateRoleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args
 		}
 	}
 	c.Verbs = verbs
+	c.PrintSuccess = f.PrintSuccess
 
 	// Support resource.group pattern. If no API Group specified, use "" as core API Group.
 	// e.g. --resource=pods,deployments.extensions
@@ -206,11 +208,11 @@ func (c *CreateRoleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args
 		return f.PrintObject(cmd, false, c.Mapper, obj, c.Out)
 	}
 
-	clientSet, err := f.ClientSet()
+	clientset, err := f.KubernetesClientSet()
 	if err != nil {
 		return err
 	}
-	c.Client = clientSet.Rbac()
+	c.Client = clientset.RbacV1()
 
 	return nil
 }
@@ -275,7 +277,7 @@ func (c *CreateRoleOptions) validateResource() error {
 }
 
 func (c *CreateRoleOptions) RunCreateRole() error {
-	role := &rbac.Role{}
+	role := &rbacv1.Role{}
 	role.Name = c.Name
 	rules, err := generateResourcePolicyRules(c.Mapper, c.Verbs, c.Resources, c.ResourceNames, []string{})
 	if err != nil {
@@ -292,7 +294,7 @@ func (c *CreateRoleOptions) RunCreateRole() error {
 	}
 
 	if useShortOutput := c.OutputFormat == "name"; useShortOutput || len(c.OutputFormat) == 0 {
-		cmdutil.PrintSuccess(c.Mapper, useShortOutput, c.Out, "roles", c.Name, c.DryRun, "created")
+		c.PrintSuccess(c.Mapper, useShortOutput, c.Out, "roles", c.Name, c.DryRun, "created")
 		return nil
 	}
 
@@ -308,7 +310,7 @@ func arrayContains(s []string, e string) bool {
 	return false
 }
 
-func generateResourcePolicyRules(mapper meta.RESTMapper, verbs []string, resources []ResourceOptions, resourceNames []string, nonResourceURLs []string) ([]rbac.PolicyRule, error) {
+func generateResourcePolicyRules(mapper meta.RESTMapper, verbs []string, resources []ResourceOptions, resourceNames []string, nonResourceURLs []string) ([]rbacv1.PolicyRule, error) {
 	// groupResourceMapping is a apigroup-resource map. The key of this map is api group, while the value
 	// is a string array of resources under this api group.
 	// E.g.  groupResourceMapping = {"extensions": ["replicasets", "deployments"], "batch":["jobs"]}
@@ -334,9 +336,9 @@ func generateResourcePolicyRules(mapper meta.RESTMapper, verbs []string, resourc
 	}
 
 	// Create separate rule for each of the api group.
-	rules := []rbac.PolicyRule{}
+	rules := []rbacv1.PolicyRule{}
 	for _, g := range sets.StringKeySet(groupResourceMapping).List() {
-		rule := rbac.PolicyRule{}
+		rule := rbacv1.PolicyRule{}
 		rule.Verbs = verbs
 		rule.Resources = groupResourceMapping[g]
 		rule.APIGroups = []string{g}
@@ -345,7 +347,7 @@ func generateResourcePolicyRules(mapper meta.RESTMapper, verbs []string, resourc
 	}
 
 	if len(nonResourceURLs) > 0 {
-		rule := rbac.PolicyRule{}
+		rule := rbacv1.PolicyRule{}
 		rule.Verbs = verbs
 		rule.NonResourceURLs = nonResourceURLs
 		rules = append(rules, rule)

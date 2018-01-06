@@ -156,6 +156,10 @@ func enableCPUManagerInKubelet(f *framework.Framework) (oldCfg *kubeletconfig.Ku
 	// The Kubelet panics if either kube-reserved or system-reserved is not set
 	// when CPU Manager is enabled. Set cpu in kube-reserved > 0 so that
 	// kubelet doesn't panic.
+	if newCfg.KubeReserved == nil {
+		newCfg.KubeReserved = map[string]string{}
+	}
+
 	if _, ok := newCfg.KubeReserved["cpu"]; !ok {
 		newCfg.KubeReserved["cpu"] = "200m"
 	}
@@ -183,14 +187,15 @@ func runCPUManagerTests(f *framework.Framework) {
 	var pod, pod1, pod2 *v1.Pod
 
 	It("should assign CPUs as expected based on the Pod spec", func() {
-		oldCfg = enableCPUManagerInKubelet(f)
-
 		cpuCap, cpuAlloc, cpuRes = getLocalNodeCPUDetails(f)
 
-		// Skip CPU Manager tests if the number of allocatable CPUs < 1.
-		if cpuAlloc < 1 {
-			framework.Skipf("Skipping CPU Manager tests since the number of allocatable CPUs < 1")
+		// Skip CPU Manager tests altogether if the CPU capacity < 2.
+		if cpuCap < 2 {
+			framework.Skipf("Skipping CPU Manager tests since the CPU capacity < 2")
 		}
+
+		// Enable CPU Manager in the kubelet.
+		oldCfg = enableCPUManagerInKubelet(f)
 
 		By("running a non-Gu pod")
 		ctnAttrs = []ctnAttribute{
@@ -286,9 +291,9 @@ func runCPUManagerTests(f *framework.Framework) {
 		waitForContainerRemoval(fmt.Sprintf("%s_%s", pod1.Spec.Containers[0].Name, pod1.Name))
 		waitForContainerRemoval(fmt.Sprintf("%s_%s", pod2.Spec.Containers[0].Name, pod2.Name))
 
-		// Skip rest of the tests if the number of allocatable CPUs < 2.
-		if cpuAlloc < 2 {
-			framework.Skipf("Skipping rest of the CPU Manager tests since the number of allocatable CPUs < 2")
+		// Skip rest of the tests if CPU capacity < 3.
+		if cpuCap < 3 {
+			framework.Skipf("Skipping rest of the CPU Manager tests since CPU capacity < 3")
 		}
 
 		By("running a Gu pod requesting multiple CPUs")
@@ -410,7 +415,7 @@ func runCPUManagerTests(f *framework.Framework) {
 }
 
 // Serial because the test updates kubelet configuration.
-var _ = framework.KubeDescribe("CPU Manager [Serial]", func() {
+var _ = SIGDescribe("CPU Manager [Feature:CPUManager]", func() {
 	f := framework.NewDefaultFramework("cpu-manager-test")
 
 	Context("With kubeconfig updated with static CPU Manager policy run the CPU Manager tests", func() {

@@ -38,7 +38,7 @@ type GroupMeta struct {
 	// to go through the InterfacesFor method below.
 	SelfLinker runtime.SelfLinker
 
-	// RESTMapper provides the default mapping between REST paths and the objects declared in api.Scheme and all known
+	// RESTMapper provides the default mapping between REST paths and the objects declared in a Scheme and all known
 	// versions.
 	RESTMapper meta.RESTMapper
 

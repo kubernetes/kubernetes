@@ -18,9 +18,11 @@ package validation
 
 import (
 	"fmt"
+	"net/url"
 	"strings"
 
 	genericvalidation "k8s.io/apimachinery/pkg/api/validation"
+	metav1validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -163,15 +165,23 @@ func ValidateInitializerConfigurationUpdate(newIC, oldIC *admissionregistration.
 	return ValidateInitializerConfiguration(newIC)
 }
 
-func ValidateExternalAdmissionHookConfiguration(e *admissionregistration.ExternalAdmissionHookConfiguration) field.ErrorList {
+func ValidateValidatingWebhookConfiguration(e *admissionregistration.ValidatingWebhookConfiguration) field.ErrorList {
 	allErrors := genericvalidation.ValidateObjectMeta(&e.ObjectMeta, false, genericvalidation.NameIsDNSSubdomain, field.NewPath("metadata"))
-	for i, hook := range e.ExternalAdmissionHooks {
-		allErrors = append(allErrors, validateExternalAdmissionHook(&hook, field.NewPath("externalAdmissionHooks").Index(i))...)
+	for i, hook := range e.Webhooks {
+		allErrors = append(allErrors, validateWebhook(&hook, field.NewPath("webhooks").Index(i))...)
 	}
 	return allErrors
 }
 
-func validateExternalAdmissionHook(hook *admissionregistration.ExternalAdmissionHook, fldPath *field.Path) field.ErrorList {
+func ValidateMutatingWebhookConfiguration(e *admissionregistration.MutatingWebhookConfiguration) field.ErrorList {
+	allErrors := genericvalidation.ValidateObjectMeta(&e.ObjectMeta, false, genericvalidation.NameIsDNSSubdomain, field.NewPath("metadata"))
+	for i, hook := range e.Webhooks {
+		allErrors = append(allErrors, validateWebhook(&hook, field.NewPath("webhooks").Index(i))...)
+	}
+	return allErrors
+}
+
+func validateWebhook(hook *admissionregistration.Webhook, fldPath *field.Path) field.ErrorList {
 	var allErrors field.ErrorList
 	// hook.Name must be fully qualified
 	allErrors = append(allErrors, validation.IsFullyQualifiedName(fldPath.Child("name"), hook.Name)...)
@@ -179,12 +189,107 @@ func validateExternalAdmissionHook(hook *admissionregistration.ExternalAdmission
 	for i, rule := range hook.Rules {
 		allErrors = append(allErrors, validateRuleWithOperations(&rule, fldPath.Child("rules").Index(i))...)
 	}
-	// TODO: relax the validation rule when admissionregistration is beta.
-	if hook.FailurePolicy != nil && *hook.FailurePolicy != admissionregistration.Ignore {
-		allErrors = append(allErrors, field.NotSupported(fldPath.Child("failurePolicy"), *hook.FailurePolicy, []string{string(admissionregistration.Ignore)}))
+	if hook.FailurePolicy != nil && !supportedFailurePolicies.Has(string(*hook.FailurePolicy)) {
+		allErrors = append(allErrors, field.NotSupported(fldPath.Child("failurePolicy"), *hook.FailurePolicy, supportedFailurePolicies.List()))
+	}
+
+	if hook.NamespaceSelector != nil {
+		allErrors = append(allErrors, metav1validation.ValidateLabelSelector(hook.NamespaceSelector, fldPath.Child("namespaceSelector"))...)
+	}
+
+	allErrors = append(allErrors, validateWebhookClientConfig(fldPath.Child("clientConfig"), &hook.ClientConfig)...)
+
+	return allErrors
+}
+
+func validateWebhookClientConfig(fldPath *field.Path, cc *admissionregistration.WebhookClientConfig) field.ErrorList {
+	var allErrors field.ErrorList
+	if (cc.URL == nil) == (cc.Service == nil) {
+		allErrors = append(allErrors, field.Required(fldPath.Child("url"), "exactly one of url or service is required"))
+	}
+
+	if cc.URL != nil {
+		const form = "; desired format: https://host[/path]"
+		if u, err := url.Parse(*cc.URL); err != nil {
+			allErrors = append(allErrors, field.Required(fldPath.Child("url"), "url must be a valid URL: "+err.Error()+form))
+		} else {
+			if u.Scheme != "https" {
+				allErrors = append(allErrors, field.Invalid(fldPath.Child("url"), u.Scheme, "'https' is the only allowed URL scheme"+form))
+			}
+			if len(u.Host) == 0 {
+				allErrors = append(allErrors, field.Invalid(fldPath.Child("url"), u.Host, "host must be provided"+form))
+			}
+			if u.User != nil {
+				allErrors = append(allErrors, field.Invalid(fldPath.Child("url"), u.User.String(), "user information is not permitted in the URL"))
+			}
+			if len(u.Fragment) != 0 {
+				allErrors = append(allErrors, field.Invalid(fldPath.Child("url"), u.Fragment, "fragments are not permitted in the URL"))
+			}
+			if len(u.RawQuery) != 0 {
+				allErrors = append(allErrors, field.Invalid(fldPath.Child("url"), u.RawQuery, "query parameters are not permitted in the URL"))
+			}
+		}
+	}
+
+	if cc.Service != nil {
+		allErrors = append(allErrors, validateWebhookService(fldPath.Child("service"), cc.Service)...)
 	}
 	return allErrors
 }
+
+func validateWebhookService(fldPath *field.Path, svc *admissionregistration.ServiceReference) field.ErrorList {
+	var allErrors field.ErrorList
+
+	if len(svc.Name) == 0 {
+		allErrors = append(allErrors, field.Required(fldPath.Child("name"), "service name is required"))
+	}
+
+	if len(svc.Namespace) == 0 {
+		allErrors = append(allErrors, field.Required(fldPath.Child("namespace"), "service namespace is required"))
+	}
+
+	if svc.Path == nil {
+		return allErrors
+	}
+
+	// TODO: replace below with url.Parse + verifying that host is empty?
+
+	urlPath := *svc.Path
+	if urlPath == "/" || len(urlPath) == 0 {
+		return allErrors
+	}
+	if urlPath == "//" {
+		allErrors = append(allErrors, field.Invalid(fldPath.Child("path"), urlPath, "segment[0] may not be empty"))
+		return allErrors
+	}
+
+	if !strings.HasPrefix(urlPath, "/") {
+		allErrors = append(allErrors, field.Invalid(fldPath.Child("path"), urlPath, "must start with a '/'"))
+	}
+
+	urlPathToCheck := urlPath[1:]
+	if strings.HasSuffix(urlPathToCheck, "/") {
+		urlPathToCheck = urlPathToCheck[:len(urlPathToCheck)-1]
+	}
+	steps := strings.Split(urlPathToCheck, "/")
+	for i, step := range steps {
+		if len(step) == 0 {
+			allErrors = append(allErrors, field.Invalid(fldPath.Child("path"), urlPath, fmt.Sprintf("segment[%d] may not be empty", i)))
+			continue
+		}
+		failures := validation.IsDNS1123Subdomain(step)
+		for _, failure := range failures {
+			allErrors = append(allErrors, field.Invalid(fldPath.Child("path"), urlPath, fmt.Sprintf("segment[%d]: %v", i, failure)))
+		}
+	}
+
+	return allErrors
+}
+
+var supportedFailurePolicies = sets.NewString(
+	string(admissionregistration.Ignore),
+	string(admissionregistration.Fail),
+)
 
 var supportedOperations = sets.NewString(
 	string(admissionregistration.OperationAll),
@@ -221,6 +326,10 @@ func validateRuleWithOperations(ruleWithOperations *admissionregistration.RuleWi
 	return allErrors
 }
 
-func ValidateExternalAdmissionHookConfigurationUpdate(newC, oldC *admissionregistration.ExternalAdmissionHookConfiguration) field.ErrorList {
-	return ValidateExternalAdmissionHookConfiguration(newC)
+func ValidateValidatingWebhookConfigurationUpdate(newC, oldC *admissionregistration.ValidatingWebhookConfiguration) field.ErrorList {
+	return ValidateValidatingWebhookConfiguration(newC)
+}
+
+func ValidateMutatingWebhookConfigurationUpdate(newC, oldC *admissionregistration.MutatingWebhookConfiguration) field.ErrorList {
+	return ValidateMutatingWebhookConfiguration(newC)
 }

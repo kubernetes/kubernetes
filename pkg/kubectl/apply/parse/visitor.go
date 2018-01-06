@@ -54,7 +54,7 @@ func (v ElementBuildingVisitor) CreateListElement(item *listItem) (apply.Element
 	if err != nil {
 		return nil, err
 	}
-	if meta.GetFieldMergeType() == "merge" {
+	if meta.GetFieldMergeType() == apply.MergeStrategy {
 		return v.mergeListElement(meta, item)
 	}
 	return v.replaceListElement(meta, item)

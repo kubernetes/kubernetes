@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2018 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,6 +21,7 @@ syntax = 'proto2';
 
 package k8s.io.api.rbac.v1;
 
+import "k8s.io/api/rbac/v1alpha1/generated.proto";
 import "k8s.io/apimachinery/pkg/apis/meta/v1/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
@@ -28,6 +29,14 @@ import "k8s.io/apimachinery/pkg/util/intstr/generated.proto";
 
 // Package-wide variables from generator "generated".
 option go_package = "v1";
+
+// AggregationRule describes how to locate ClusterRoles to aggregate into the ClusterRole
+message AggregationRule {
+  // ClusterRoleSelectors holds a list of selectors which will be used to find ClusterRoles and create the rules.
+  // If any of the selectors match, then the ClusterRole's permissions will be added
+  // +optional
+  repeated k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector clusterRoleSelectors = 1;
+}
 
 // ClusterRole is a cluster level, logical grouping of PolicyRules that can be referenced as a unit by a RoleBinding or ClusterRoleBinding.
 message ClusterRole {
@@ -37,6 +46,12 @@ message ClusterRole {
 
   // Rules holds all the PolicyRules for this ClusterRole
   repeated PolicyRule rules = 2;
+
+  // AggregationRule is an optional field that describes how to build the Rules for this ClusterRole.
+  // If AggregationRule is set, then the Rules are controller managed and direct changes to Rules will be
+  // stomped by the controller.
+  // +optional
+  optional AggregationRule aggregationRule = 3;
 }
 
 // ClusterRoleBinding references a ClusterRole, but not contain it.  It can reference a ClusterRole in the global namespace,

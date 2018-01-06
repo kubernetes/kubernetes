@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 	"reflect"
+	"regexp"
 	"sort"
 	"strings"
 	"testing"
@@ -29,6 +30,7 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/servers"
 	"k8s.io/api/core/v1"
 
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -44,14 +46,14 @@ const (
 	// waiting for specified volume status. Starting with 1
 	// seconds, multiplying by 1.2 with each step and taking 13 steps at maximum
 	// it will time out after 32s, which roughly corresponds to 30s
-	volumeStatusInitDealy = 1 * time.Second
+	volumeStatusInitDelay = 1 * time.Second
 	volumeStatusFactor    = 1.2
 	volumeStatusSteps     = 13
 )
 
 func WaitForVolumeStatus(t *testing.T, os *OpenStack, volumeName string, status string) {
 	backoff := wait.Backoff{
-		Duration: volumeStatusInitDealy,
+		Duration: volumeStatusInitDelay,
 		Factor:   volumeStatusFactor,
 		Steps:    volumeStatusSteps,
 	}
@@ -169,6 +171,7 @@ func TestCheckOpenStackOpts(t *testing.T) {
 					SubnetId:             "6261548e-ffde-4bc7-bd22-59c83578c5ef",
 					FloatingNetworkId:    "38b8b5f9-64dc-4424-bf86-679595714786",
 					LBMethod:             "ROUND_ROBIN",
+					LBProvider:           "haproxy",
 					CreateMonitor:        true,
 					MonitorDelay:         delay,
 					MonitorTimeout:       timeout,
@@ -227,7 +230,7 @@ func TestCheckOpenStackOpts(t *testing.T) {
 					SearchOrder: "",
 				},
 			},
-			expectedError: fmt.Errorf("Invalid value in section [Metadata] with key `search-order`. Value cannot be empty"),
+			expectedError: fmt.Errorf("invalid value in section [Metadata] with key `search-order`. Value cannot be empty"),
 		},
 		{
 			name: "test5",
@@ -237,7 +240,7 @@ func TestCheckOpenStackOpts(t *testing.T) {
 					SearchOrder: "value1,value2,value3",
 				},
 			},
-			expectedError: fmt.Errorf("Invalid value in section [Metadata] with key `search-order`. Value cannot contain more than 2 elements"),
+			expectedError: fmt.Errorf("invalid value in section [Metadata] with key `search-order`. Value cannot contain more than 2 elements"),
 		},
 		{
 			name: "test6",
@@ -247,8 +250,8 @@ func TestCheckOpenStackOpts(t *testing.T) {
 					SearchOrder: "value1",
 				},
 			},
-			expectedError: fmt.Errorf("Invalid element '%s' found in section [Metadata] with key `search-order`."+
-				"Supported elements include '%s' and '%s'", "value1", configDriveID, metadataID),
+			expectedError: fmt.Errorf("invalid element %q found in section [Metadata] with key `search-order`."+
+				"Supported elements include %q and %q", "value1", configDriveID, metadataID),
 		},
 	}
 
@@ -419,6 +422,7 @@ func configFromEnv() (cfg Config, ok bool) {
 			cfg.Global.DomainId != "" || cfg.Global.DomainName != ""))
 
 	cfg.Metadata.SearchOrder = fmt.Sprintf("%s,%s", configDriveID, metadataID)
+	cfg.BlockStorage.BSVersion = "auto"
 
 	return
 }
@@ -441,7 +445,7 @@ func TestLoadBalancer(t *testing.T) {
 		t.Skipf("No config found in environment")
 	}
 
-	versions := []string{"v1", "v2", ""}
+	versions := []string{"v2", ""}
 
 	for _, v := range versions {
 		t.Logf("Trying LBVersion = '%s'\n", v)
@@ -497,6 +501,8 @@ func TestZones(t *testing.T) {
 	}
 }
 
+var diskPathRegexp = regexp.MustCompile("/dev/disk/(?:by-id|by-path)/")
+
 func TestVolumes(t *testing.T) {
 	cfg, ok := configFromEnv()
 	if !ok {
@@ -521,28 +527,40 @@ func TestVolumes(t *testing.T) {
 
 	id, err := os.InstanceID()
 	if err != nil {
-		t.Fatalf("Cannot find instance id: %v", err)
+		t.Logf("Cannot find instance id: %v - perhaps you are running this test outside a VM launched by OpenStack", err)
+	} else {
+		diskId, err := os.AttachDisk(id, vol)
+		if err != nil {
+			t.Fatalf("Cannot AttachDisk Cinder volume %s: %v", vol, err)
+		}
+		t.Logf("Volume (%s) attached, disk ID: %s\n", vol, diskId)
+
+		WaitForVolumeStatus(t, os, vol, volumeInUseStatus)
+
+		devicePath := os.GetDevicePath(diskId)
+		if diskPathRegexp.FindString(devicePath) == "" {
+			t.Fatalf("GetDevicePath returned and unexpected path for Cinder volume %s, returned %s", vol, devicePath)
+		}
+		t.Logf("Volume (%s) found at path: %s\n", vol, devicePath)
+
+		err = os.DetachDisk(id, vol)
+		if err != nil {
+			t.Fatalf("Cannot DetachDisk Cinder volume %s: %v", vol, err)
+		}
+		t.Logf("Volume (%s) detached\n", vol)
+
+		WaitForVolumeStatus(t, os, vol, volumeAvailableStatus)
 	}
 
-	diskId, err := os.AttachDisk(id, vol)
+	expectedVolSize := resource.MustParse("2Gi")
+	newVolSize, err := os.ExpandVolume(vol, resource.MustParse("1Gi"), expectedVolSize)
 	if err != nil {
-		t.Fatalf("Cannot AttachDisk Cinder volume %s: %v", vol, err)
+		t.Fatalf("Cannot expand a Cinder volume: %v", err)
 	}
-	t.Logf("Volume (%s) attached, disk ID: %s\n", vol, diskId)
-
-	WaitForVolumeStatus(t, os, vol, volumeInUseStatus)
-
-	devicePath := os.GetDevicePath(diskId)
-	if !strings.HasPrefix(devicePath, "/dev/disk/by-id/") {
-		t.Fatalf("GetDevicePath returned and unexpected path for Cinder volume %s, returned %s", vol, devicePath)
+	if newVolSize != expectedVolSize {
+		t.Logf("Expected: %v but got: %v ", expectedVolSize, newVolSize)
 	}
-	t.Logf("Volume (%s) found at path: %s\n", vol, devicePath)
-
-	err = os.DetachDisk(id, vol)
-	if err != nil {
-		t.Fatalf("Cannot DetachDisk Cinder volume %s: %v", vol, err)
-	}
-	t.Logf("Volume (%s) detached\n", vol)
+	t.Logf("Volume expanded to (%v) \n", newVolSize)
 
 	WaitForVolumeStatus(t, os, vol, volumeAvailableStatus)
 

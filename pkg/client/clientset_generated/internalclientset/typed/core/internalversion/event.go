@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2018 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	rest "k8s.io/client-go/rest"
-	api "k8s.io/kubernetes/pkg/api"
+	core "k8s.io/kubernetes/pkg/apis/core"
 	scheme "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/scheme"
 )
 
@@ -33,14 +33,14 @@ type EventsGetter interface {
 
 // EventInterface has methods to work with Event resources.
 type EventInterface interface {
-	Create(*api.Event) (*api.Event, error)
-	Update(*api.Event) (*api.Event, error)
+	Create(*core.Event) (*core.Event, error)
+	Update(*core.Event) (*core.Event, error)
 	Delete(name string, options *v1.DeleteOptions) error
 	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
-	Get(name string, options v1.GetOptions) (*api.Event, error)
-	List(opts v1.ListOptions) (*api.EventList, error)
+	Get(name string, options v1.GetOptions) (*core.Event, error)
+	List(opts v1.ListOptions) (*core.EventList, error)
 	Watch(opts v1.ListOptions) (watch.Interface, error)
-	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *api.Event, err error)
+	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *core.Event, err error)
 	EventExpansion
 }
 
@@ -59,8 +59,8 @@ func newEvents(c *CoreClient, namespace string) *events {
 }
 
 // Get takes name of the event, and returns the corresponding event object, and an error if there is any.
-func (c *events) Get(name string, options v1.GetOptions) (result *api.Event, err error) {
-	result = &api.Event{}
+func (c *events) Get(name string, options v1.GetOptions) (result *core.Event, err error) {
+	result = &core.Event{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("events").
@@ -72,8 +72,8 @@ func (c *events) Get(name string, options v1.GetOptions) (result *api.Event, err
 }
 
 // List takes label and field selectors, and returns the list of Events that match those selectors.
-func (c *events) List(opts v1.ListOptions) (result *api.EventList, err error) {
-	result = &api.EventList{}
+func (c *events) List(opts v1.ListOptions) (result *core.EventList, err error) {
+	result = &core.EventList{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("events").
@@ -94,8 +94,8 @@ func (c *events) Watch(opts v1.ListOptions) (watch.Interface, error) {
 }
 
 // Create takes the representation of a event and creates it.  Returns the server's representation of the event, and an error, if there is any.
-func (c *events) Create(event *api.Event) (result *api.Event, err error) {
-	result = &api.Event{}
+func (c *events) Create(event *core.Event) (result *core.Event, err error) {
+	result = &core.Event{}
 	err = c.client.Post().
 		Namespace(c.ns).
 		Resource("events").
@@ -106,8 +106,8 @@ func (c *events) Create(event *api.Event) (result *api.Event, err error) {
 }
 
 // Update takes the representation of a event and updates it. Returns the server's representation of the event, and an error, if there is any.
-func (c *events) Update(event *api.Event) (result *api.Event, err error) {
-	result = &api.Event{}
+func (c *events) Update(event *core.Event) (result *core.Event, err error) {
+	result = &core.Event{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("events").
@@ -141,8 +141,8 @@ func (c *events) DeleteCollection(options *v1.DeleteOptions, listOptions v1.List
 }
 
 // Patch applies the patch and returns the patched event.
-func (c *events) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *api.Event, err error) {
-	result = &api.Event{}
+func (c *events) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *core.Event, err error) {
+	result = &core.Event{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
 		Resource("events").

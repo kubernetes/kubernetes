@@ -87,7 +87,7 @@ func isDockerLiveRestoreEnabled() (bool, error) {
 	return info.LiveRestoreEnabled, nil
 }
 
-// stopDockerDaemon starts the Docker daemon.
+// startDockerDaemon starts the Docker daemon.
 func startDockerDaemon() error {
 	switch {
 	case systemdutil.IsRunningSystemd():

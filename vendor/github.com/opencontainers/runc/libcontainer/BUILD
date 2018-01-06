@@ -12,7 +12,11 @@ go_library(
         "stats.go",
         "sync.go",
     ] + select({
-        "@io_bazel_rules_go//go/platform:linux_amd64": [
+        "@io_bazel_rules_go//go/platform:freebsd": [
+            "console_freebsd.go",
+            "stats_freebsd.go",
+        ],
+        "@io_bazel_rules_go//go/platform:linux": [
             "capabilities_linux.go",
             "compat_1.5_linux.go",
             "console_linux.go",
@@ -32,7 +36,12 @@ go_library(
             "state_linux.go",
             "stats_linux.go",
         ],
-        "@io_bazel_rules_go//go/platform:windows_amd64": [
+        "@io_bazel_rules_go//go/platform:solaris": [
+            "console_solaris.go",
+            "container_solaris.go",
+            "stats_solaris.go",
+        ],
+        "@io_bazel_rules_go//go/platform:windows": [
             "console_windows.go",
             "container_windows.go",
             "criu_opts_windows.go",
@@ -47,7 +56,7 @@ go_library(
         "//vendor/github.com/opencontainers/runc/libcontainer/stacktrace:go_default_library",
         "//vendor/github.com/opencontainers/runc/libcontainer/utils:go_default_library",
     ] + select({
-        "@io_bazel_rules_go//go/platform:linux_amd64": [
+        "@io_bazel_rules_go//go/platform:linux": [
             "//vendor/github.com/docker/docker/pkg/mount:go_default_library",
             "//vendor/github.com/docker/docker/pkg/symlink:go_default_library",
             "//vendor/github.com/golang/protobuf/proto:go_default_library",

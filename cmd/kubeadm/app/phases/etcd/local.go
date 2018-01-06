@@ -36,7 +36,6 @@ func CreateLocalEtcdStaticPodManifestFile(manifestDir string, cfg *kubeadmapi.Ma
 
 	// gets etcd StaticPodSpec, actualized for the current MasterConfiguration
 	spec := GetEtcdPodSpec(cfg)
-
 	// writes etcd StaticPod to disk
 	if err := staticpodutil.WriteStaticPodToDisk(kubeadmconstants.Etcd, manifestDir, spec); err != nil {
 		return err
@@ -47,17 +46,20 @@ func CreateLocalEtcdStaticPodManifestFile(manifestDir string, cfg *kubeadmapi.Ma
 }
 
 // GetEtcdPodSpec returns the etcd static Pod actualized to the context of the current MasterConfiguration
-// NB. GetEtcdPodSpec methods holds the information about how kubeadm creates etcd static pod mainfests.
+// NB. GetEtcdPodSpec methods holds the information about how kubeadm creates etcd static pod manifests.
 func GetEtcdPodSpec(cfg *kubeadmapi.MasterConfiguration) v1.Pod {
 	pathType := v1.HostPathDirectoryOrCreate
+	etcdMounts := map[string]v1.Volume{
+		etcdVolumeName: staticpodutil.NewVolume(etcdVolumeName, cfg.Etcd.DataDir, &pathType),
+	}
 	return staticpodutil.ComponentPod(v1.Container{
 		Name:    kubeadmconstants.Etcd,
 		Command: getEtcdCommand(cfg),
-		Image:   images.GetCoreImage(kubeadmconstants.Etcd, cfg.ImageRepository, "", cfg.Etcd.Image),
+		Image:   images.GetCoreImage(kubeadmconstants.Etcd, cfg.ImageRepository, cfg.KubernetesVersion, cfg.Etcd.Image),
 		// Mount the etcd datadir path read-write so etcd can store data in a more persistent manner
 		VolumeMounts:  []v1.VolumeMount{staticpodutil.NewVolumeMount(etcdVolumeName, cfg.Etcd.DataDir, false)},
-		LivenessProbe: staticpodutil.ComponentProbe(2379, "/health", v1.URISchemeHTTP),
-	}, []v1.Volume{staticpodutil.NewVolume(etcdVolumeName, cfg.Etcd.DataDir, &pathType)})
+		LivenessProbe: staticpodutil.ComponentProbe(cfg, kubeadmconstants.Etcd, 2379, "/health", v1.URISchemeHTTP),
+	}, etcdMounts)
 }
 
 // getEtcdCommand builds the right etcd command from the given config object

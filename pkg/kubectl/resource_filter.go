@@ -19,7 +19,7 @@ package kubectl
 import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/printers"
 )
 
@@ -56,30 +56,10 @@ func filterPods(obj runtime.Object, options printers.PrintOptions) bool {
 
 // Filter loops through a collection of FilterFuncs until it finds one that can filter the given resource
 func (f Filters) Filter(obj runtime.Object, opts *printers.PrintOptions) (bool, error) {
-	// check if the object is unstructured. If so, let's attempt to convert it to a type we can understand
-	// before apply filter func.
-	obj, _ = DecodeUnknownObject(obj)
-
 	for _, filter := range f {
 		if ok := filter(obj, *opts); ok {
 			return true, nil
 		}
 	}
 	return false, nil
-}
-
-// check if the object is unstructured. If so, let's attempt to convert it to a type we can understand.
-func DecodeUnknownObject(obj runtime.Object) (runtime.Object, error) {
-	var err error
-
-	switch obj.(type) {
-	case runtime.Unstructured, *runtime.Unknown:
-		if objBytes, err := runtime.Encode(api.Codecs.LegacyCodec(), obj); err == nil {
-			if decodedObj, err := runtime.Decode(api.Codecs.UniversalDecoder(), objBytes); err == nil {
-				obj = decodedObj
-			}
-		}
-	}
-
-	return obj, err
 }

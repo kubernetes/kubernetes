@@ -26,6 +26,49 @@ func addDefaultingFuncs(scheme *runtime.Scheme) error {
 	return RegisterDefaults(scheme)
 }
 
+// SetDefaults_Deployment sets additional defaults compared to its counterpart
+// in extensions. These addons are:
+// - MaxUnavailable during rolling update set to 25% (1 in extensions)
+// - MaxSurge value during rolling update set to 25% (1 in extensions)
+// - RevisionHistoryLimit set to 10 (not set in extensions)
+// - ProgressDeadlineSeconds set to 600s (not set in extensions)
+func SetDefaults_Deployment(obj *appsv1.Deployment) {
+	// Set DeploymentSpec.Replicas to 1 if it is not set.
+	if obj.Spec.Replicas == nil {
+		obj.Spec.Replicas = new(int32)
+		*obj.Spec.Replicas = 1
+	}
+	strategy := &obj.Spec.Strategy
+	// Set default DeploymentStrategyType as RollingUpdate.
+	if strategy.Type == "" {
+		strategy.Type = appsv1.RollingUpdateDeploymentStrategyType
+	}
+	if strategy.Type == appsv1.RollingUpdateDeploymentStrategyType {
+		if strategy.RollingUpdate == nil {
+			rollingUpdate := appsv1.RollingUpdateDeployment{}
+			strategy.RollingUpdate = &rollingUpdate
+		}
+		if strategy.RollingUpdate.MaxUnavailable == nil {
+			// Set default MaxUnavailable as 25% by default.
+			maxUnavailable := intstr.FromString("25%")
+			strategy.RollingUpdate.MaxUnavailable = &maxUnavailable
+		}
+		if strategy.RollingUpdate.MaxSurge == nil {
+			// Set default MaxSurge as 25% by default.
+			maxSurge := intstr.FromString("25%")
+			strategy.RollingUpdate.MaxSurge = &maxSurge
+		}
+	}
+	if obj.Spec.RevisionHistoryLimit == nil {
+		obj.Spec.RevisionHistoryLimit = new(int32)
+		*obj.Spec.RevisionHistoryLimit = 10
+	}
+	if obj.Spec.ProgressDeadlineSeconds == nil {
+		obj.Spec.ProgressDeadlineSeconds = new(int32)
+		*obj.Spec.ProgressDeadlineSeconds = 600
+	}
+}
+
 func SetDefaults_DaemonSet(obj *appsv1.DaemonSet) {
 	updateStrategy := &obj.Spec.UpdateStrategy
 	if updateStrategy.Type == "" {
@@ -45,5 +88,40 @@ func SetDefaults_DaemonSet(obj *appsv1.DaemonSet) {
 	if obj.Spec.RevisionHistoryLimit == nil {
 		obj.Spec.RevisionHistoryLimit = new(int32)
 		*obj.Spec.RevisionHistoryLimit = 10
+	}
+}
+
+func SetDefaults_StatefulSet(obj *appsv1.StatefulSet) {
+	if len(obj.Spec.PodManagementPolicy) == 0 {
+		obj.Spec.PodManagementPolicy = appsv1.OrderedReadyPodManagement
+	}
+
+	if obj.Spec.UpdateStrategy.Type == "" {
+		obj.Spec.UpdateStrategy.Type = appsv1.RollingUpdateStatefulSetStrategyType
+
+		// UpdateStrategy.RollingUpdate will take default values below.
+		obj.Spec.UpdateStrategy.RollingUpdate = &appsv1.RollingUpdateStatefulSetStrategy{}
+	}
+
+	if obj.Spec.UpdateStrategy.Type == appsv1.RollingUpdateStatefulSetStrategyType &&
+		obj.Spec.UpdateStrategy.RollingUpdate != nil &&
+		obj.Spec.UpdateStrategy.RollingUpdate.Partition == nil {
+		obj.Spec.UpdateStrategy.RollingUpdate.Partition = new(int32)
+		*obj.Spec.UpdateStrategy.RollingUpdate.Partition = 0
+	}
+
+	if obj.Spec.Replicas == nil {
+		obj.Spec.Replicas = new(int32)
+		*obj.Spec.Replicas = 1
+	}
+	if obj.Spec.RevisionHistoryLimit == nil {
+		obj.Spec.RevisionHistoryLimit = new(int32)
+		*obj.Spec.RevisionHistoryLimit = 10
+	}
+}
+func SetDefaults_ReplicaSet(obj *appsv1.ReplicaSet) {
+	if obj.Spec.Replicas == nil {
+		obj.Spec.Replicas = new(int32)
+		*obj.Spec.Replicas = 1
 	}
 }

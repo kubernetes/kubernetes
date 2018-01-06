@@ -8,8 +8,8 @@ load(
 
 go_binary(
     name = "kubemark",
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/cmd/kubemark",
-    library = ":go_default_library",
 )
 
 go_library(
@@ -17,11 +17,12 @@ go_library(
     srcs = ["hollow-node.go"],
     importpath = "k8s.io/kubernetes/cmd/kubemark",
     deps = [
-        "//pkg/api:go_default_library",
+        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//pkg/client/metrics/prometheus:go_default_library",
         "//pkg/kubelet/cadvisor/testing:go_default_library",
         "//pkg/kubelet/cm:go_default_library",
+        "//pkg/kubelet/dockershim:go_default_library",
         "//pkg/kubelet/dockershim/libdocker:go_default_library",
         "//pkg/kubemark:go_default_library",
         "//pkg/util/iptables/testing:go_default_library",

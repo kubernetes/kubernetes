@@ -26,9 +26,11 @@ import (
 
 	"github.com/ghodss/yaml"
 
+	"k8s.io/apimachinery/pkg/util/sets"
 	fakediscovery "k8s.io/client-go/discovery/fake"
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
+	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/upgrade"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
@@ -46,26 +48,36 @@ type upgradeVariables struct {
 }
 
 // enforceRequirements verifies that it's okay to upgrade and then returns the variables needed for the rest of the procedure
-func enforceRequirements(kubeConfigPath, cfgPath string, printConfig, dryRun bool) (*upgradeVariables, error) {
-	client, err := getClient(kubeConfigPath, dryRun)
+func enforceRequirements(flags *cmdUpgradeFlags, dryRun bool, newK8sVersion string) (*upgradeVariables, error) {
+	client, err := getClient(flags.kubeConfigPath, dryRun)
 	if err != nil {
-		return nil, fmt.Errorf("couldn't create a Kubernetes client from file %q: %v", kubeConfigPath, err)
+		return nil, fmt.Errorf("couldn't create a Kubernetes client from file %q: %v", flags.kubeConfigPath, err)
 	}
 
 	// Run healthchecks against the cluster
-	if err := upgrade.CheckClusterHealth(client); err != nil {
+	if err := upgrade.CheckClusterHealth(client, flags.ignorePreflightErrorsSet); err != nil {
 		return nil, fmt.Errorf("[upgrade/health] FATAL: %v", err)
 	}
 
 	// Fetch the configuration from a file or ConfigMap and validate it
-	cfg, err := upgrade.FetchConfiguration(client, os.Stdout, cfgPath)
+	cfg, err := upgrade.FetchConfiguration(client, os.Stdout, flags.cfgPath)
 	if err != nil {
 		return nil, fmt.Errorf("[upgrade/config] FATAL: %v", err)
 	}
 
+	// If a new k8s version should be set, apply the change before printing the config
+	if len(newK8sVersion) != 0 {
+		cfg.KubernetesVersion = newK8sVersion
+	}
+
 	// If the user told us to print this information out; do it!
-	if printConfig {
+	if flags.printConfig {
 		printConfiguration(cfg, os.Stdout)
+	}
+
+	cfg.FeatureGates, err = features.NewFeatureGate(&features.InitFeatureGates, flags.featureGatesString)
+	if err != nil {
+		return nil, fmt.Errorf("[upgrade/config] FATAL: %v", err)
 	}
 
 	return &upgradeVariables{
@@ -97,14 +109,9 @@ func printConfiguration(cfg *kubeadmapiext.MasterConfiguration, w io.Writer) {
 }
 
 // runPreflightChecks runs the root preflight check
-func runPreflightChecks(skipPreFlight bool) error {
-	if skipPreFlight {
-		fmt.Println("[preflight] Skipping pre-flight checks")
-		return nil
-	}
-
-	fmt.Println("[preflight] Running pre-flight checks")
-	return preflight.RunRootCheckOnly()
+func runPreflightChecks(ignorePreflightErrors sets.String) error {
+	fmt.Println("[preflight] Running pre-flight checks.")
+	return preflight.RunRootCheckOnly(ignorePreflightErrors)
 }
 
 // getClient gets a real or fake client depending on whether the user is dry-running or not

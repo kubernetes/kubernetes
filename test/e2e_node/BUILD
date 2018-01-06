@@ -12,13 +12,14 @@ go_library(
         "container.go",
         "doc.go",
         "docker_util.go",
+        "framework.go",
         "gpu_device_plugin.go",
         "gpus.go",
         "image_list.go",
         "simple_mount.go",
         "util.go",
     ] + select({
-        "@io_bazel_rules_go//go/platform:linux_amd64": [
+        "@io_bazel_rules_go//go/platform:linux": [
             "benchmark_util.go",
             "node_problem_detector_linux.go",
             "resource_collector.go",
@@ -47,6 +48,7 @@ go_library(
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",
         "//vendor/github.com/onsi/gomega:go_default_library",
+        "//vendor/github.com/prometheus/common/model:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
@@ -56,7 +58,7 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/util/uuid:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes/scheme:go_default_library",
     ] + select({
-        "@io_bazel_rules_go//go/platform:linux_amd64": [
+        "@io_bazel_rules_go//go/platform:linux": [
             "//pkg/api/v1/node:go_default_library",
             "//pkg/util/procfs:go_default_library",
             "//test/e2e/perftype:go_default_library",
@@ -101,7 +103,7 @@ go_test(
         "summary_test.go",
         "volume_manager_test.go",
     ] + select({
-        "@io_bazel_rules_go//go/platform:linux_amd64": [
+        "@io_bazel_rules_go//go/platform:linux": [
             "container_manager_test.go",
             "density_test.go",
             "node_container_manager_test.go",
@@ -110,12 +112,12 @@ go_test(
         ],
         "//conditions:default": [],
     }),
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/test/e2e_node",
-    library = ":go_default_library",
     tags = ["e2e"],
     deps = [
-        "//pkg/api:go_default_library",
         "//pkg/api/v1/node:go_default_library",
+        "//pkg/apis/core:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/kubelet:go_default_library",
         "//pkg/kubelet/apis/kubeletconfig:go_default_library",
@@ -126,6 +128,7 @@ go_test(
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/dockershim/libdocker:go_default_library",
         "//pkg/kubelet/images:go_default_library",
+        "//pkg/kubelet/kubeletconfig:go_default_library",
         "//pkg/kubelet/kubeletconfig/status:go_default_library",
         "//pkg/kubelet/metrics:go_default_library",
         "//pkg/kubelet/types:go_default_library",
@@ -135,6 +138,7 @@ go_test(
         "//test/e2e_node/services:go_default_library",
         "//test/e2e_node/system:go_default_library",
         "//test/utils/image:go_default_library",
+        "//vendor/github.com/blang/semver:go_default_library",
         "//vendor/github.com/coreos/go-systemd/util:go_default_library",
         "//vendor/github.com/davecgh/go-spew/spew:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
@@ -160,7 +164,7 @@ go_test(
         "//vendor/k8s.io/apimachinery/pkg/watch:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes:go_default_library",
     ] + select({
-        "@io_bazel_rules_go//go/platform:linux_amd64": [
+        "@io_bazel_rules_go//go/platform:linux": [
             "//test/e2e/framework/metrics:go_default_library",
             "//test/utils:go_default_library",
             "//vendor/k8s.io/apimachinery/pkg/labels:go_default_library",

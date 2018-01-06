@@ -22,8 +22,8 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/kubernetes/pkg/api"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -63,7 +63,6 @@ type ResourcesOptions struct {
 	resource.FilenameOptions
 
 	Mapper            meta.RESTMapper
-	Typer             runtime.ObjectTyper
 	Infos             []*resource.Info
 	Encoder           runtime.Encoder
 	Out               io.Writer
@@ -79,10 +78,11 @@ type ResourcesOptions struct {
 
 	Limits               string
 	Requests             string
-	ResourceRequirements api.ResourceRequirements
+	ResourceRequirements v1.ResourceRequirements
 
+	PrintSuccess           func(mapper meta.RESTMapper, shortOutput bool, out io.Writer, resource, name string, dryRun bool, operation string)
 	PrintObject            func(cmd *cobra.Command, isLocal bool, mapper meta.RESTMapper, obj runtime.Object, out io.Writer) error
-	UpdatePodSpecForObject func(obj runtime.Object, fn func(*api.PodSpec) error) (bool, error)
+	UpdatePodSpecForObject func(obj runtime.Object, fn func(*v1.PodSpec) error) (bool, error)
 	Resources              []string
 }
 
@@ -127,7 +127,8 @@ func NewCmdResources(f cmdutil.Factory, out io.Writer, errOut io.Writer) *cobra.
 }
 
 func (o *ResourcesOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
-	o.Mapper, o.Typer = f.Object()
+	o.Mapper, _ = f.Object()
+	o.PrintSuccess = f.PrintSuccess
 	o.UpdatePodSpecForObject = f.UpdatePodSpecForObject
 	o.Encoder = f.JSONEncoder()
 	o.Output = cmdutil.GetFlagString(cmd, "output")
@@ -144,6 +145,8 @@ func (o *ResourcesOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args 
 
 	includeUninitialized := cmdutil.ShouldIncludeUninitialized(cmd, false)
 	builder := f.NewBuilder().
+		Internal().
+		LocalParam(o.Local).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, &o.FilenameOptions).
@@ -151,19 +154,18 @@ func (o *ResourcesOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args 
 		Flatten()
 
 	if !o.Local {
-		builder = builder.
-			SelectorParam(o.Selector).
+		builder.LabelSelectorParam(o.Selector).
 			ResourceTypeOrNameArgs(o.All, args...).
 			Latest()
 	} else {
 		// if a --local flag was provided, and a resource was specified in the form
 		// <resource>/<name>, fail immediately as --local cannot query the api server
 		// for the specified resource.
+		// TODO: this should be in the builder - if someone specifies tuples, fail when
+		// local is true
 		if len(args) > 0 {
 			return resource.LocalResourceError
 		}
-
-		builder = builder.Local(f.ClientForMapping)
 	}
 
 	o.Infos, err = builder.Do().Infos()
@@ -179,7 +181,7 @@ func (o *ResourcesOptions) Validate() error {
 		return fmt.Errorf("you must specify an update to requests or limits (in the form of --requests/--limits)")
 	}
 
-	o.ResourceRequirements, err = kubectl.HandleResourceRequirements(map[string]string{"limits": o.Limits, "requests": o.Requests})
+	o.ResourceRequirements, err = kubectl.HandleResourceRequirementsV1(map[string]string{"limits": o.Limits, "requests": o.Requests})
 	if err != nil {
 		return err
 	}
@@ -191,19 +193,20 @@ func (o *ResourcesOptions) Run() error {
 	allErrs := []error{}
 	patches := CalculatePatches(o.Infos, o.Encoder, func(info *resource.Info) ([]byte, error) {
 		transformed := false
-		_, err := o.UpdatePodSpecForObject(info.Object, func(spec *api.PodSpec) error {
+		info.Object = info.AsVersioned()
+		_, err := o.UpdatePodSpecForObject(info.Object, func(spec *v1.PodSpec) error {
 			containers, _ := selectContainers(spec.Containers, o.ContainerSelector)
 			if len(containers) != 0 {
 				for i := range containers {
 					if len(o.Limits) != 0 && len(containers[i].Resources.Limits) == 0 {
-						containers[i].Resources.Limits = make(api.ResourceList)
+						containers[i].Resources.Limits = make(v1.ResourceList)
 					}
 					for key, value := range o.ResourceRequirements.Limits {
 						containers[i].Resources.Limits[key] = value
 					}
 
 					if len(o.Requests) != 0 && len(containers[i].Resources.Requests) == 0 {
-						containers[i].Resources.Requests = make(api.ResourceList)
+						containers[i].Resources.Requests = make(v1.ResourceList)
 					}
 					for key, value := range o.ResourceRequirements.Requests {
 						containers[i].Resources.Requests[key] = value
@@ -216,9 +219,7 @@ func (o *ResourcesOptions) Run() error {
 			return nil
 		})
 		if transformed && err == nil {
-			// TODO: switch UpdatePodSpecForObject to work on v1.PodSpec, use info.VersionedObject, and avoid conversion completely
-			versionedEncoder := api.Codecs.EncoderForVersion(o.Encoder, info.Mapping.GroupVersionKind.GroupVersion())
-			return runtime.Encode(versionedEncoder, info.Object)
+			return runtime.Encode(o.Encoder, info.Object)
 		}
 		return nil, err
 	})
@@ -237,7 +238,10 @@ func (o *ResourcesOptions) Run() error {
 		}
 
 		if o.Local || cmdutil.GetDryRunFlag(o.Cmd) {
-			return o.PrintObject(o.Cmd, o.Local, o.Mapper, info.Object, o.Out)
+			if err := o.PrintObject(o.Cmd, o.Local, o.Mapper, patch.Info.AsVersioned(), o.Out); err != nil {
+				return err
+			}
+			continue
 		}
 
 		obj, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch.Patch)
@@ -259,9 +263,12 @@ func (o *ResourcesOptions) Run() error {
 
 		shortOutput := o.Output == "name"
 		if len(o.Output) > 0 && !shortOutput {
-			return o.PrintObject(o.Cmd, o.Local, o.Mapper, info.Object, o.Out)
+			if err := o.PrintObject(o.Cmd, o.Local, o.Mapper, info.AsVersioned(), o.Out); err != nil {
+				return err
+			}
+			continue
 		}
-		cmdutil.PrintSuccess(o.Mapper, shortOutput, o.Out, info.Mapping.Resource, info.Name, false, "resource requirements updated")
+		o.PrintSuccess(o.Mapper, shortOutput, o.Out, info.Mapping.Resource, info.Name, false, "resource requirements updated")
 	}
 	return utilerrors.NewAggregate(allErrs)
 }

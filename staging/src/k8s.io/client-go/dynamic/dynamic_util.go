@@ -84,7 +84,7 @@ func NewObjectTyper(resources []*metav1.APIResourceList) (runtime.ObjectTyper, e
 // information.
 func (ot *ObjectTyper) ObjectKinds(obj runtime.Object) ([]schema.GroupVersionKind, bool, error) {
 	if _, ok := obj.(*unstructured.Unstructured); !ok {
-		return nil, false, fmt.Errorf("type %T is invalid for dynamic object typer", obj)
+		return nil, false, fmt.Errorf("type %T is invalid for determining dynamic object types", obj)
 	}
 	return []schema.GroupVersionKind{obj.GetObjectKind().GroupVersionKind()}, false, nil
 }

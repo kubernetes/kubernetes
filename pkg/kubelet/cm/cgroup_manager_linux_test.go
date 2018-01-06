@@ -99,3 +99,35 @@ func TestLibcontainerAdapterAdaptToSystemdAsCgroupFs(t *testing.T) {
 		}
 	}
 }
+
+func TestLibcontainerAdapterNotAdaptToSystemd(t *testing.T) {
+	cgroupfs := newLibcontainerAdapter(libcontainerCgroupfs)
+	otherAdatper := newLibcontainerAdapter(libcontainerCgroupManagerType("test"))
+
+	testCases := []struct {
+		input    string
+		expected string
+	}{
+		{
+			input:    "/",
+			expected: "/",
+		},
+		{
+			input:    "/Burstable",
+			expected: "/Burstable",
+		},
+		{
+			input:    "",
+			expected: "",
+		},
+	}
+	for _, testCase := range testCases {
+		if actual := cgroupfs.adaptName(CgroupName(testCase.input), true); actual != testCase.expected {
+			t.Errorf("Unexpected result, input: %v, expected: %v, actual: %v", testCase.input, testCase.expected, actual)
+		}
+
+		if actual := otherAdatper.adaptName(CgroupName(testCase.input), true); actual != testCase.expected {
+			t.Errorf("Unexpected result, input: %v, expected: %v, actual: %v", testCase.input, testCase.expected, actual)
+		}
+	}
+}

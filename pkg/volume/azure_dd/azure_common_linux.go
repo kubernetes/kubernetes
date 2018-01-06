@@ -19,6 +19,7 @@ limitations under the License.
 package azure_dd
 
 import (
+	"fmt"
 	"path"
 	"strconv"
 	libstrings "strings"
@@ -43,6 +44,28 @@ func listAzureDiskPath(io ioHandler) []string {
 	}
 	glog.V(12).Infof("Azure sys disks paths: %v", azureDiskList)
 	return azureDiskList
+}
+
+// getDiskLinkByDevName get disk link by device name from devLinkPath, e.g. /dev/disk/azure/, /dev/disk/by-id/
+func getDiskLinkByDevName(io ioHandler, devLinkPath, devName string) (string, error) {
+	dirs, err := io.ReadDir(devLinkPath)
+	glog.V(12).Infof("azureDisk - begin to find %s from %s", devName, devLinkPath)
+	if err == nil {
+		for _, f := range dirs {
+			diskPath := devLinkPath + f.Name()
+			glog.V(12).Infof("azureDisk - begin to Readlink: %s", diskPath)
+			link, linkErr := io.Readlink(diskPath)
+			if linkErr != nil {
+				glog.Warningf("azureDisk - read link (%s) error: %v", diskPath, linkErr)
+				continue
+			}
+			if libstrings.HasSuffix(link, devName) {
+				return diskPath, nil
+			}
+		}
+		return "", fmt.Errorf("device name(%s) is not found under %s", devName, devLinkPath)
+	}
+	return "", fmt.Errorf("read %s error: %v", devLinkPath, err)
 }
 
 func scsiHostRescan(io ioHandler, exec mount.Exec) {
@@ -77,6 +100,19 @@ func findDiskByLunWithConstraint(lun int, io ioHandler, azureDisks []string) (st
 			if len(arr) < 4 {
 				continue
 			}
+			if len(azureDisks) == 0 {
+				glog.V(4).Infof("/dev/disk/azure is not populated, now try to parse %v directly", name)
+				target, err := strconv.Atoi(arr[0])
+				if err != nil {
+					glog.Errorf("failed to parse target from %v (%v), err %v", arr[0], name, err)
+					continue
+				}
+				// as observed, targets 0-3 are used by OS disks. Skip them
+				if target <= 3 {
+					continue
+				}
+			}
+
 			// extract LUN from the path.
 			// LUN is the last index of the array, i.e. 1 in /sys/bus/scsi/devices/3:0:0:1
 			l, err := strconv.Atoi(arr[3])
@@ -116,15 +152,25 @@ func findDiskByLunWithConstraint(lun int, io ioHandler, azureDisks []string) (st
 				dir := path.Join(sys_path, name, "block")
 				if dev, err := io.ReadDir(dir); err == nil {
 					found := false
+					devName := dev[0].Name()
 					for _, diskName := range azureDisks {
-						glog.V(12).Infof("azure disk - validating disk %q with sys disk %q", dev[0].Name(), diskName)
-						if string(dev[0].Name()) == diskName {
+						glog.V(12).Infof("azureDisk - validating disk %q with sys disk %q", devName, diskName)
+						if devName == diskName {
 							found = true
 							break
 						}
 					}
 					if !found {
-						return "/dev/" + dev[0].Name(), nil
+						devLinkPaths := []string{"/dev/disk/azure/scsi1/", "/dev/disk/by-id/"}
+						for _, devLinkPath := range devLinkPaths {
+							diskPath, err := getDiskLinkByDevName(io, devLinkPath, devName)
+							if err == nil {
+								glog.V(4).Infof("azureDisk - found %s by %s under %s", diskPath, devName, devLinkPath)
+								return diskPath, nil
+							}
+							glog.Warningf("azureDisk - getDiskLinkByDevName by %s under %s failed, error: %v", devName, devLinkPath, err)
+						}
+						return "/dev/" + devName, nil
 					}
 				}
 			}
@@ -150,9 +196,10 @@ func formatIfNotFormatted(disk string, fstype string, exec mount.Exec) {
 		_, err := exec.Run("mkfs."+fstype, args...)
 		if err == nil {
 			// the disk has been formatted successfully try to mount it again.
-			glog.Infof("azureDisk - Disk successfully formatted (mkfs): %s - %s %s", fstype, disk, "tt")
+			glog.Infof("azureDisk - Disk successfully formatted with 'mkfs.%s %v'", fstype, args)
+		} else {
+			glog.Warningf("azureDisk - Error formatting volume with 'mkfs.%s %v': %v", fstype, args, err)
 		}
-		glog.Warningf("azureDisk - format of disk %q failed: type:(%q) target:(%q) options:(%q)error:(%v)", disk, fstype, "tt", "o", err)
 	} else {
 		if err != nil {
 			glog.Warningf("azureDisk - Failed to check if the disk %s formatted with error %s, will attach anyway", disk, err)

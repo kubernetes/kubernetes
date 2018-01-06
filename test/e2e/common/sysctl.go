@@ -20,7 +20,7 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
-	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
+	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/kubelet/sysctl"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -171,7 +171,7 @@ var _ = framework.KubeDescribe("Sysctls", func() {
 		})
 
 		By("Creating a pod with one valid and two invalid sysctls")
-		client := f.ClientSet.Core().Pods(f.Namespace.Name)
+		client := f.ClientSet.CoreV1().Pods(f.Namespace.Name)
 		_, err := client.Create(pod)
 
 		Expect(err).NotTo(BeNil())

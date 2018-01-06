@@ -45,7 +45,7 @@ var _ = SIGDescribe("DNS configMap federations", func() {
 func (t *dnsFederationsConfigMapTest) run() {
 	t.init()
 
-	defer t.c.Core().ConfigMaps(t.ns).Delete(t.name, nil)
+	defer t.c.CoreV1().ConfigMaps(t.ns).Delete(t.name, nil)
 	t.createUtilPod()
 	defer t.deleteUtilPod()
 
@@ -175,7 +175,7 @@ func (t *dnsNameserverTest) run() {
 		"dnsmasq",
 		moreForeverTestTimeout)
 
-	t.c.Core().ConfigMaps(t.ns).Delete(t.name, nil)
+	t.c.CoreV1().ConfigMaps(t.ns).Delete(t.name, nil)
 	// Wait for the deleted ConfigMap to take effect, otherwise the
 	// configuration can bleed into other tests.
 	t.checkDNSRecordFrom(

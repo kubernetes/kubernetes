@@ -28,7 +28,7 @@ import (
 )
 
 func DeletePodOrErrorf(t *testing.T, c clientset.Interface, ns, name string) {
-	if err := c.Core().Pods(ns).Delete(name, nil); err != nil {
+	if err := c.CoreV1().Pods(ns).Delete(name, nil); err != nil {
 		t.Errorf("unable to delete pod %v: %v", name, err)
 	}
 }

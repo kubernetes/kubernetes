@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2018 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,6 +25,8 @@ import (
 	clientset "k8s.io/code-generator/_examples/apiserver/clientset/internalversion"
 	exampleinternalversion "k8s.io/code-generator/_examples/apiserver/clientset/internalversion/typed/example/internalversion"
 	fakeexampleinternalversion "k8s.io/code-generator/_examples/apiserver/clientset/internalversion/typed/example/internalversion/fake"
+	secondexampleinternalversion "k8s.io/code-generator/_examples/apiserver/clientset/internalversion/typed/example2/internalversion"
+	fakesecondexampleinternalversion "k8s.io/code-generator/_examples/apiserver/clientset/internalversion/typed/example2/internalversion/fake"
 )
 
 // NewSimpleClientset returns a clientset that will respond with the provided objects.
@@ -63,4 +65,9 @@ var _ clientset.Interface = &Clientset{}
 // Example retrieves the ExampleClient
 func (c *Clientset) Example() exampleinternalversion.ExampleInterface {
 	return &fakeexampleinternalversion.FakeExample{Fake: &c.Fake}
+}
+
+// SecondExample retrieves the SecondExampleClient
+func (c *Clientset) SecondExample() secondexampleinternalversion.SecondExampleInterface {
+	return &fakesecondexampleinternalversion.FakeSecondExample{Fake: &c.Fake}
 }

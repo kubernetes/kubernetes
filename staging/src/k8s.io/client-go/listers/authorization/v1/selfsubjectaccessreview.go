@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2018 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,7 +21,6 @@ package v1
 import (
 	v1 "k8s.io/api/authorization/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
 )
@@ -55,8 +54,7 @@ func (s *selfSubjectAccessReviewLister) List(selector labels.Selector) (ret []*v
 
 // Get retrieves the SelfSubjectAccessReview from the index for a given name.
 func (s *selfSubjectAccessReviewLister) Get(name string) (*v1.SelfSubjectAccessReview, error) {
-	key := &v1.SelfSubjectAccessReview{ObjectMeta: meta_v1.ObjectMeta{Name: name}}
-	obj, exists, err := s.indexer.Get(key)
+	obj, exists, err := s.indexer.GetByKey(name)
 	if err != nil {
 		return nil, err
 	}

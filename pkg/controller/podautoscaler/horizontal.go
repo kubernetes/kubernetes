@@ -25,9 +25,9 @@ import (
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	autoscalingv2 "k8s.io/api/autoscaling/v2beta1"
 	"k8s.io/api/core/v1"
-	extensions "k8s.io/api/extensions/v1beta1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
+	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -39,12 +39,12 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	autoscalingclient "k8s.io/client-go/kubernetes/typed/autoscaling/v1"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
-	extensionsclient "k8s.io/client-go/kubernetes/typed/extensions/v1beta1"
 	autoscalinglisters "k8s.io/client-go/listers/autoscaling/v1"
+	scaleclient "k8s.io/client-go/scale"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/controller"
 )
 
@@ -57,8 +57,9 @@ var (
 // in the system with the actual deployments/replication controllers they
 // control.
 type HorizontalController struct {
-	scaleNamespacer extensionsclient.ScalesGetter
+	scaleNamespacer scaleclient.ScalesGetter
 	hpaNamespacer   autoscalingclient.HorizontalPodAutoscalersGetter
+	mapper          apimeta.RESTMapper
 
 	replicaCalc   *ReplicaCalculator
 	eventRecorder record.EventRecorder
@@ -78,8 +79,9 @@ type HorizontalController struct {
 // NewHorizontalController creates a new HorizontalController.
 func NewHorizontalController(
 	evtNamespacer v1core.EventsGetter,
-	scaleNamespacer extensionsclient.ScalesGetter,
+	scaleNamespacer scaleclient.ScalesGetter,
 	hpaNamespacer autoscalingclient.HorizontalPodAutoscalersGetter,
+	mapper apimeta.RESTMapper,
 	replicaCalc *ReplicaCalculator,
 	hpaInformer autoscalinginformers.HorizontalPodAutoscalerInformer,
 	resyncPeriod time.Duration,
@@ -88,6 +90,7 @@ func NewHorizontalController(
 
 ) *HorizontalController {
 	broadcaster := record.NewBroadcaster()
+	broadcaster.StartLogging(glog.Infof)
 	// TODO: remove the wrapper when every clients have moved to use the clientset.
 	broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: evtNamespacer.Events("")})
 	recorder := broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "horizontal-pod-autoscaler"})
@@ -99,7 +102,8 @@ func NewHorizontalController(
 		hpaNamespacer:            hpaNamespacer,
 		upscaleForbiddenWindow:   upscaleForbiddenWindow,
 		downscaleForbiddenWindow: downscaleForbiddenWindow,
-		queue: workqueue.NewNamedRateLimitingQueue(NewDefaultHPARateLimiter(resyncPeriod), "horizontalpodautoscaler"),
+		queue:  workqueue.NewNamedRateLimitingQueue(NewDefaultHPARateLimiter(resyncPeriod), "horizontalpodautoscaler"),
+		mapper: mapper,
 	}
 
 	hpaInformer.Informer().AddEventHandlerWithResyncPeriod(
@@ -189,7 +193,7 @@ func (a *HorizontalController) processNextWorkItem() bool {
 // Computes the desired number of replicas for the metric specifications listed in the HPA, returning the maximum
 // of the computed replica counts, a description of the associated metric, and the statuses of all metrics
 // computed.
-func (a *HorizontalController) computeReplicasForMetrics(hpa *autoscalingv2.HorizontalPodAutoscaler, scale *extensions.Scale,
+func (a *HorizontalController) computeReplicasForMetrics(hpa *autoscalingv2.HorizontalPodAutoscaler, scale *autoscalingv1.Scale,
 	metricSpecs []autoscalingv2.MetricSpec) (replicas int32, metric string, statuses []autoscalingv2.MetricStatus, timestamp time.Time, err error) {
 
 	currentReplicas := scale.Status.Replicas
@@ -197,21 +201,14 @@ func (a *HorizontalController) computeReplicasForMetrics(hpa *autoscalingv2.Hori
 	statuses = make([]autoscalingv2.MetricStatus, len(metricSpecs))
 
 	for i, metricSpec := range metricSpecs {
-		if len(scale.Status.Selector) == 0 && len(scale.Status.TargetSelector) == 0 {
+		if scale.Status.Selector == "" {
 			errMsg := "selector is required"
 			a.eventRecorder.Event(hpa, v1.EventTypeWarning, "SelectorRequired", errMsg)
 			setCondition(hpa, autoscalingv2.ScalingActive, v1.ConditionFalse, "InvalidSelector", "the HPA target's scale is missing a selector")
 			return 0, "", nil, time.Time{}, fmt.Errorf(errMsg)
 		}
 
-		var selector labels.Selector
-		var err error
-		if len(scale.Status.Selector) > 0 {
-			selector = labels.SelectorFromSet(labels.Set(scale.Status.Selector))
-			err = nil
-		} else {
-			selector, err = labels.Parse(scale.Status.TargetSelector)
-		}
+		selector, err := labels.Parse(scale.Status.Selector)
 		if err != nil {
 			errMsg := fmt.Sprintf("couldn't convert selector into a corresponding internal selector object: %v", err)
 			a.eventRecorder.Event(hpa, v1.EventTypeWarning, "InvalidSelector", errMsg)
@@ -349,7 +346,28 @@ func (a *HorizontalController) reconcileAutoscaler(hpav1Shared *autoscalingv1.Ho
 
 	reference := fmt.Sprintf("%s/%s/%s", hpa.Spec.ScaleTargetRef.Kind, hpa.Namespace, hpa.Spec.ScaleTargetRef.Name)
 
-	scale, err := a.scaleNamespacer.Scales(hpa.Namespace).Get(hpa.Spec.ScaleTargetRef.Kind, hpa.Spec.ScaleTargetRef.Name)
+	targetGV, err := schema.ParseGroupVersion(hpa.Spec.ScaleTargetRef.APIVersion)
+	if err != nil {
+		a.eventRecorder.Event(hpa, v1.EventTypeWarning, "FailedGetScale", err.Error())
+		setCondition(hpa, autoscalingv2.AbleToScale, v1.ConditionFalse, "FailedGetScale", "the HPA controller was unable to get the target's current scale: %v", err)
+		a.updateStatusIfNeeded(hpaStatusOriginal, hpa)
+		return fmt.Errorf("invalid API version in scale target reference: %v", err)
+	}
+
+	targetGK := schema.GroupKind{
+		Group: targetGV.Group,
+		Kind:  hpa.Spec.ScaleTargetRef.Kind,
+	}
+
+	mappings, err := a.mapper.RESTMappings(targetGK)
+	if err != nil {
+		a.eventRecorder.Event(hpa, v1.EventTypeWarning, "FailedGetScale", err.Error())
+		setCondition(hpa, autoscalingv2.AbleToScale, v1.ConditionFalse, "FailedGetScale", "the HPA controller was unable to get the target's current scale: %v", err)
+		a.updateStatusIfNeeded(hpaStatusOriginal, hpa)
+		return fmt.Errorf("unable to determine resource for scale target reference: %v", err)
+	}
+
+	scale, targetGR, err := a.scaleForResourceMappings(hpa.Namespace, hpa.Spec.ScaleTargetRef.Name, mappings)
 	if err != nil {
 		a.eventRecorder.Event(hpa, v1.EventTypeWarning, "FailedGetScale", err.Error())
 		setCondition(hpa, autoscalingv2.AbleToScale, v1.ConditionFalse, "FailedGetScale", "the HPA controller was unable to get the target's current scale: %v", err)
@@ -410,46 +428,7 @@ func (a *HorizontalController) reconcileAutoscaler(hpav1Shared *autoscalingv1.Ho
 			rescaleReason = "All metrics below target"
 		}
 
-		// Do not upscale too much to prevent incorrect rapid increase of the number of master replicas caused by
-		// bogus CPU usage report from heapster/kubelet (like in issue #32304).
-		scaleUpLimit := calculateScaleUpLimit(currentReplicas)
-
-		switch {
-		case desiredReplicas > scaleUpLimit:
-			setCondition(hpa, autoscalingv2.ScalingLimited, v1.ConditionTrue, "ScaleUpLimit", "the desired replica count is increasing faster than the maximum scale rate")
-			desiredReplicas = scaleUpLimit
-
-			// Ensure that even if the scaleUpLimit is greater
-			// than the maximum number of replicas, we only
-			// set the max number of replicas as desired.
-			if scaleUpLimit > hpa.Spec.MaxReplicas {
-				setCondition(hpa, autoscalingv2.ScalingLimited, v1.ConditionTrue, "TooManyReplicas", "the desired replica count was more than the maximum replica count")
-				desiredReplicas = hpa.Spec.MaxReplicas
-			}
-
-		case hpa.Spec.MinReplicas != nil && desiredReplicas < *hpa.Spec.MinReplicas:
-			// make sure we aren't below our minimum
-			var statusMsg string
-			if desiredReplicas == 0 {
-				statusMsg = "the desired replica count was zero"
-			} else {
-				statusMsg = "the desired replica count was less than the minimum replica count"
-			}
-
-			setCondition(hpa, autoscalingv2.ScalingLimited, v1.ConditionTrue, "TooFewReplicas", statusMsg)
-			desiredReplicas = *hpa.Spec.MinReplicas
-		case desiredReplicas == 0:
-			//  never scale down to 0, reserved for disabling autoscaling
-			setCondition(hpa, autoscalingv2.ScalingLimited, v1.ConditionTrue, "TooFewReplicas", "the desired replica count was zero")
-			desiredReplicas = 1
-		case desiredReplicas > hpa.Spec.MaxReplicas:
-			// make sure we aren't above our maximum
-			setCondition(hpa, autoscalingv2.ScalingLimited, v1.ConditionTrue, "TooManyReplicas", "the desired replica count was more than the maximum replica count")
-			desiredReplicas = hpa.Spec.MaxReplicas
-		default:
-			// mark that we're within acceptible limits
-			setCondition(hpa, autoscalingv2.ScalingLimited, v1.ConditionFalse, "DesiredWithinRange", "the desired replica count is within the acceptible range")
-		}
+		desiredReplicas = a.normalizeDesiredReplicas(hpa, currentReplicas, desiredReplicas)
 
 		rescale = a.shouldScale(hpa, currentReplicas, desiredReplicas, timestamp)
 		backoffDown := false
@@ -479,7 +458,7 @@ func (a *HorizontalController) reconcileAutoscaler(hpav1Shared *autoscalingv1.Ho
 
 	if rescale {
 		scale.Spec.Replicas = desiredReplicas
-		_, err = a.scaleNamespacer.Scales(hpa.Namespace).Update(hpa.Spec.ScaleTargetRef.Kind, scale)
+		_, err = a.scaleNamespacer.Scales(hpa.Namespace).Update(targetGR, scale)
 		if err != nil {
 			a.eventRecorder.Eventf(hpa, v1.EventTypeWarning, "FailedRescale", "New size: %d; reason: %s; error: %v", desiredReplicas, rescaleReason, err.Error())
 			setCondition(hpa, autoscalingv2.AbleToScale, v1.ConditionFalse, "FailedUpdateScale", "the HPA controller was unable to update the target scale: %v", err)
@@ -500,6 +479,75 @@ func (a *HorizontalController) reconcileAutoscaler(hpav1Shared *autoscalingv1.Ho
 
 	a.setStatus(hpa, currentReplicas, desiredReplicas, metricStatuses, rescale)
 	return a.updateStatusIfNeeded(hpaStatusOriginal, hpa)
+}
+
+// normalizeDesiredReplicas takes the metrics desired replicas value and normalizes it based on the appropriate conditions (i.e. < maxReplicas, >
+// minReplicas, etc...)
+func (a *HorizontalController) normalizeDesiredReplicas(hpa *autoscalingv2.HorizontalPodAutoscaler, currentReplicas int32, prenormalizedDesiredReplicas int32) int32 {
+	var minReplicas int32
+	if hpa.Spec.MinReplicas != nil {
+		minReplicas = *hpa.Spec.MinReplicas
+	} else {
+		minReplicas = 0
+	}
+
+	desiredReplicas, condition, reason := convertDesiredReplicasWithRules(currentReplicas, prenormalizedDesiredReplicas, minReplicas, hpa.Spec.MaxReplicas)
+
+	if desiredReplicas == prenormalizedDesiredReplicas {
+		setCondition(hpa, autoscalingv2.ScalingLimited, v1.ConditionFalse, condition, reason)
+	} else {
+		setCondition(hpa, autoscalingv2.ScalingLimited, v1.ConditionTrue, condition, reason)
+	}
+
+	return desiredReplicas
+}
+
+// convertDesiredReplicas performs the actual normalization, without depending on `HorizontalController` or `HorizontalPodAutoscaler`
+func convertDesiredReplicasWithRules(currentReplicas, desiredReplicas, hpaMinReplicas, hpaMaxReplicas int32) (int32, string, string) {
+
+	var minimumAllowedReplicas int32
+	var maximumAllowedReplicas int32
+
+	var possibleLimitingCondition string
+	var possibleLimitingReason string
+
+	if hpaMinReplicas == 0 {
+		minimumAllowedReplicas = 1
+		possibleLimitingReason = "the desired replica count is zero"
+	} else {
+		minimumAllowedReplicas = hpaMinReplicas
+		possibleLimitingReason = "the desired replica count is less than the minimum replica count"
+	}
+
+	// Do not upscale too much to prevent incorrect rapid increase of the number of master replicas caused by
+	// bogus CPU usage report from heapster/kubelet (like in issue #32304).
+	scaleUpLimit := calculateScaleUpLimit(currentReplicas)
+
+	if hpaMaxReplicas > scaleUpLimit {
+		maximumAllowedReplicas = scaleUpLimit
+
+		possibleLimitingCondition = "ScaleUpLimit"
+		possibleLimitingReason = "the desired replica count is increasing faster than the maximum scale rate"
+	} else {
+		maximumAllowedReplicas = hpaMaxReplicas
+
+		possibleLimitingCondition = "TooManyReplicas"
+		possibleLimitingReason = "the desired replica count is more than the maximum replica count"
+	}
+
+	if desiredReplicas < minimumAllowedReplicas {
+		possibleLimitingCondition = "TooFewReplicas"
+
+		return minimumAllowedReplicas, possibleLimitingCondition, possibleLimitingReason
+	} else if desiredReplicas > maximumAllowedReplicas {
+		return maximumAllowedReplicas, possibleLimitingCondition, possibleLimitingReason
+	}
+
+	return desiredReplicas, "DesiredWithinRange", "the desired count is within the acceptable range"
+}
+
+func calculateScaleUpLimit(currentReplicas int32) int32 {
+	return int32(math.Max(scaleUpLimitFactor*float64(currentReplicas), scaleUpLimitMinimum))
 }
 
 func (a *HorizontalController) shouldScale(hpa *autoscalingv2.HorizontalPodAutoscaler, currentReplicas, desiredReplicas int32, timestamp time.Time) bool {
@@ -524,6 +572,35 @@ func (a *HorizontalController) shouldScale(hpa *autoscalingv2.HorizontalPodAutos
 	}
 
 	return false
+}
+
+// scaleForResourceMappings attempts to fetch the scale for the
+// resource with the given name and namespace, trying each RESTMapping
+// in turn until a working one is found.  If none work, the first error
+// is returned.  It returns both the scale, as well as the group-resource from
+// the working mapping.
+func (a *HorizontalController) scaleForResourceMappings(namespace, name string, mappings []*apimeta.RESTMapping) (*autoscalingv1.Scale, schema.GroupResource, error) {
+	var firstErr error
+	for i, mapping := range mappings {
+		targetGR := mapping.GroupVersionKind.GroupVersion().WithResource(mapping.Resource).GroupResource()
+		scale, err := a.scaleNamespacer.Scales(namespace).Get(targetGR, name)
+		if err == nil {
+			return scale, targetGR, nil
+		}
+
+		// if this is the first error, remember it,
+		// then go on and try other mappings until we find a good one
+		if i == 0 {
+			firstErr = err
+		}
+	}
+
+	// make sure we handle an empty set of mappings
+	if firstErr == nil {
+		firstErr = fmt.Errorf("unrecognized resource")
+	}
+
+	return nil, schema.GroupResource{}, firstErr
 }
 
 // setCurrentReplicasInStatus sets the current replica count in the status of the HPA.
@@ -576,17 +653,17 @@ func (a *HorizontalController) updateStatus(hpa *autoscalingv2.HorizontalPodAuto
 	return nil
 }
 
-// unsafeConvertToVersionVia is like api.Scheme.UnsafeConvertToVersion, but it does so via an internal version first.
+// unsafeConvertToVersionVia is like Scheme.UnsafeConvertToVersion, but it does so via an internal version first.
 // We use it since working with v2alpha1 is convenient here, but we want to use the v1 client (and
 // can't just use the internal version).  Note that conversion mutates the object, so you need to deepcopy
 // *before* you call this if the input object came out of a shared cache.
 func unsafeConvertToVersionVia(obj runtime.Object, externalVersion schema.GroupVersion) (runtime.Object, error) {
-	objInt, err := api.Scheme.UnsafeConvertToVersion(obj, schema.GroupVersion{Group: externalVersion.Group, Version: runtime.APIVersionInternal})
+	objInt, err := legacyscheme.Scheme.UnsafeConvertToVersion(obj, schema.GroupVersion{Group: externalVersion.Group, Version: runtime.APIVersionInternal})
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert the given object to the internal version: %v", err)
 	}
 
-	objExt, err := api.Scheme.UnsafeConvertToVersion(objInt, externalVersion)
+	objExt, err := legacyscheme.Scheme.UnsafeConvertToVersion(objInt, externalVersion)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert the given object back to the external version: %v", err)
 	}
@@ -631,8 +708,4 @@ func setConditionInList(inputList []autoscalingv2.HorizontalPodAutoscalerConditi
 	existingCond.Message = fmt.Sprintf(message, args...)
 
 	return resList
-}
-
-func calculateScaleUpLimit(currentReplicas int32) int32 {
-	return int32(math.Max(scaleUpLimitFactor*float64(currentReplicas), scaleUpLimitMinimum))
 }

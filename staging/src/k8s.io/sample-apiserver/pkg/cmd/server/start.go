@@ -119,7 +119,7 @@ func (o WardleServerOptions) Config() (*apiserver.Config, error) {
 		return nil, err
 	}
 
-	if err := o.Admission.ApplyTo(&serverConfig.Config, serverConfig.SharedInformerFactory, nil, nil, serverConfig.ClientConfig, apiserver.Scheme, admissionInitializer); err != nil {
+	if err := o.Admission.ApplyTo(&serverConfig.Config, serverConfig.SharedInformerFactory, serverConfig.ClientConfig, apiserver.Scheme, admissionInitializer); err != nil {
 		return nil, err
 	}
 

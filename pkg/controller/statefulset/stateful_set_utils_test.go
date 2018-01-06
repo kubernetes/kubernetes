@@ -78,6 +78,11 @@ func TestIdentityMatches(t *testing.T) {
 	if identityMatches(set, pod) {
 		t.Error("identity matches for a Pod with the wrong namespace")
 	}
+	pod = newStatefulSetPod(set, 1)
+	delete(pod.Labels, apps.StatefulSetPodNameLabel)
+	if identityMatches(set, pod) {
+		t.Error("identity matches for a Pod with the wrong statefulSetPodNameLabel")
+	}
 }
 
 func TestStorageMatches(t *testing.T) {
@@ -126,6 +131,11 @@ func TestUpdateIdentity(t *testing.T) {
 	updateIdentity(set, pod)
 	if !identityMatches(set, pod) {
 		t.Error("updateIdentity failed to update the Pods namespace")
+	}
+	delete(pod.Labels, apps.StatefulSetPodNameLabel)
+	updateIdentity(set, pod)
+	if !identityMatches(set, pod) {
+		t.Error("updateIdentity failed to restore the statefulSetPodName label")
 	}
 }
 

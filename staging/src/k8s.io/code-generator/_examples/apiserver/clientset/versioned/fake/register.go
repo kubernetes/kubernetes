@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2018 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,6 +22,7 @@ import (
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	examplev1 "k8s.io/code-generator/_examples/apiserver/apis/example/v1"
+	secondexamplev1 "k8s.io/code-generator/_examples/apiserver/apis/example2/v1"
 )
 
 var scheme = runtime.NewScheme()
@@ -49,5 +50,6 @@ func init() {
 // correctly.
 func AddToScheme(scheme *runtime.Scheme) {
 	examplev1.AddToScheme(scheme)
+	secondexamplev1.AddToScheme(scheme)
 
 }

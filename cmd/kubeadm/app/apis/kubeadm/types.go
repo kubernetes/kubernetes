@@ -18,6 +18,8 @@ package kubeadm
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	kubeletconfigv1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1alpha1"
+	kubeproxyconfigv1alpha1 "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/v1alpha1"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -27,20 +29,26 @@ import (
 type MasterConfiguration struct {
 	metav1.TypeMeta
 
-	API                API
-	Etcd               Etcd
-	Networking         Networking
-	KubernetesVersion  string
-	CloudProvider      string
-	NodeName           string
-	AuthorizationModes []string
+	API                  API
+	KubeProxy            KubeProxy
+	Etcd                 Etcd
+	KubeletConfiguration KubeletConfiguration
+	Networking           Networking
+	KubernetesVersion    string
+	CloudProvider        string
+	NodeName             string
+	AuthorizationModes   []string
 
 	Token    string
-	TokenTTL metav1.Duration
+	TokenTTL *metav1.Duration
 
 	APIServerExtraArgs         map[string]string
 	ControllerManagerExtraArgs map[string]string
 	SchedulerExtraArgs         map[string]string
+
+	APIServerExtraVolumes         []HostPathMount
+	ControllerManagerExtraVolumes []HostPathMount
+	SchedulerExtraVolumes         []HostPathMount
 
 	// APIServerCertSANs sets extra Subject Alternative Names for the API Server signing cert
 	APIServerCertSANs []string
@@ -92,7 +100,21 @@ type Etcd struct {
 	DataDir   string
 	ExtraArgs map[string]string
 	// Image specifies which container image to use for running etcd. If empty, automatically populated by kubeadm using the image repository and default etcd version
-	Image string
+	Image      string
+	SelfHosted *SelfHostedEtcd
+}
+
+// SelfHostedEtcd describes options required to configure self-hosted etcd
+type SelfHostedEtcd struct {
+	// CertificatesDir represents the directory where all etcd TLS assets are stored. By default this is
+	// a dir names "etcd" in the main CertificatesDir value.
+	CertificatesDir string
+	// ClusterServiceName is the name of the service that load balances the etcd cluster
+	ClusterServiceName string
+	// EtcdVersion is the version of etcd running in the cluster.
+	EtcdVersion string
+	// OperatorVersion is the version of the etcd-operator to use.
+	OperatorVersion string
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -124,6 +146,14 @@ type NodeConfiguration struct {
 	// without CA verification via DiscoveryTokenCACertHashes. This can weaken
 	// the security of kubeadm since other nodes can impersonate the master.
 	DiscoveryTokenUnsafeSkipCAVerification bool
+
+	// FeatureGates enabled by the user
+	FeatureGates map[string]bool
+}
+
+// KubeletConfiguration contains elements describing initial remote configuration of kubelet
+type KubeletConfiguration struct {
+	BaseConfig *kubeletconfigv1alpha1.KubeletConfiguration
 }
 
 // GetControlPlaneImageRepository returns name of image repository
@@ -136,4 +166,17 @@ func (cfg *MasterConfiguration) GetControlPlaneImageRepository() string {
 		return cfg.CIImageRepository
 	}
 	return cfg.ImageRepository
+}
+
+// HostPathMount contains elements describing volumes that are mounted from the
+// host
+type HostPathMount struct {
+	Name      string
+	HostPath  string
+	MountPath string
+}
+
+// KubeProxy contains elements describing the proxy configuration
+type KubeProxy struct {
+	Config *kubeproxyconfigv1alpha1.KubeProxyConfiguration
 }

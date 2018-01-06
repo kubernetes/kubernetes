@@ -44,7 +44,6 @@ RUN echo "Yes, do as I say!" | apt-get purge \
     debconf-i18n \
     e2fslibs \
     e2fsprogs \
-    gcc-4.8-base \
     init \
     initscripts \
     libcap2-bin \
@@ -54,7 +53,7 @@ RUN echo "Yes, do as I say!" | apt-get purge \
     libudev1 \
     libblkid1 \
     libncursesw5 \
-    libprocps3 \
+    libprocps6 \
     libslang2 \
     libss2 \
     libtext-charwidth-perl libtext-iconv-perl libtext-wrapi18n-perl \

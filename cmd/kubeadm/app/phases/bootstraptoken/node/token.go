@@ -53,7 +53,11 @@ func UpdateOrCreateToken(client clientset.Interface, token string, failIfExists 
 				return fmt.Errorf("a token with id %q already exists", tokenID)
 			}
 			// Secret with this ID already exists, update it:
-			secret.Data = encodeTokenSecretData(tokenID, tokenSecret, tokenDuration, usages, extraGroups, description)
+			tokenSecretData, err := encodeTokenSecretData(tokenID, tokenSecret, tokenDuration, usages, extraGroups, description)
+			if err != nil {
+				return err
+			}
+			secret.Data = tokenSecretData
 			if _, err := client.CoreV1().Secrets(metav1.NamespaceSystem).Update(secret); err == nil {
 				return nil
 			}
@@ -63,12 +67,17 @@ func UpdateOrCreateToken(client clientset.Interface, token string, failIfExists 
 
 		// Secret does not already exist:
 		if apierrors.IsNotFound(err) {
+			tokenSecretData, err := encodeTokenSecretData(tokenID, tokenSecret, tokenDuration, usages, extraGroups, description)
+			if err != nil {
+				return err
+			}
+
 			secret = &v1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: secretName,
 				},
 				Type: v1.SecretType(bootstrapapi.SecretTypeBootstrapToken),
-				Data: encodeTokenSecretData(tokenID, tokenSecret, tokenDuration, usages, extraGroups, description),
+				Data: tokenSecretData,
 			}
 			if _, err := client.CoreV1().Secrets(metav1.NamespaceSystem).Create(secret); err == nil {
 				return nil
@@ -86,7 +95,7 @@ func UpdateOrCreateToken(client clientset.Interface, token string, failIfExists 
 }
 
 // encodeTokenSecretData takes the token discovery object and an optional duration and returns the .Data for the Secret
-func encodeTokenSecretData(tokenID, tokenSecret string, duration time.Duration, usages []string, extraGroups []string, description string) map[string][]byte {
+func encodeTokenSecretData(tokenID, tokenSecret string, duration time.Duration, usages []string, extraGroups []string, description string) (map[string][]byte, error) {
 	data := map[string][]byte{
 		bootstrapapi.BootstrapTokenIDKey:     []byte(tokenID),
 		bootstrapapi.BootstrapTokenSecretKey: []byte(tokenSecret),
@@ -104,9 +113,13 @@ func encodeTokenSecretData(tokenID, tokenSecret string, duration time.Duration, 
 	if len(description) > 0 {
 		data[bootstrapapi.BootstrapTokenDescriptionKey] = []byte(description)
 	}
+
+	// validate usages
+	if err := bootstrapapi.ValidateUsages(usages); err != nil {
+		return nil, err
+	}
 	for _, usage := range usages {
-		// TODO: Validate the usage string here before
 		data[bootstrapapi.BootstrapTokenUsagePrefix+usage] = []byte("true")
 	}
-	return data
+	return data, nil
 }

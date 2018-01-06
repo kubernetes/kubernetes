@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2018 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@ package internalversion
 
 import (
 	"fmt"
+
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	cache "k8s.io/client-go/tools/cache"
 	apiregistration "k8s.io/kube-aggregator/pkg/apis/apiregistration"
@@ -51,7 +52,7 @@ func (f *genericInformer) Lister() cache.GenericLister {
 // TODO extend this to unknown resources with a client pool
 func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource) (GenericInformer, error) {
 	switch resource {
-	// Group=Apiregistration, Version=InternalVersion
+	// Group=apiregistration.k8s.io, Version=internalVersion
 	case apiregistration.SchemeGroupVersion.WithResource("apiservices"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Apiregistration().InternalVersion().APIServices().Informer()}, nil
 

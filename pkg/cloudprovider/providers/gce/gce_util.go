@@ -19,6 +19,7 @@ package gce
 import (
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"regexp"
 	"strings"
@@ -39,6 +40,13 @@ type gceInstance struct {
 	Disks []*compute.AttachedDisk
 	Type  string
 }
+
+var (
+	autoSubnetIPRange = &net.IPNet{
+		IP:   net.ParseIP("10.128.0.0"),
+		Mask: net.CIDRMask(9, 32),
+	}
+)
 
 var providerIdRE = regexp.MustCompile(`^` + ProviderName + `://([^/]+)/([^/]+)/([^/]+)$`)
 
@@ -210,4 +218,59 @@ func handleAlphaNetworkTierGetError(err error) (string, error) {
 	}
 	// Can't get the network tier, just return an error.
 	return "", err
+}
+
+// containsCIDR returns true if outer contains inner.
+func containsCIDR(outer, inner *net.IPNet) bool {
+	return outer.Contains(firstIPInRange(inner)) && outer.Contains(lastIPInRange(inner))
+}
+
+// firstIPInRange returns the first IP in a given IP range.
+func firstIPInRange(ipNet *net.IPNet) net.IP {
+	return ipNet.IP.Mask(ipNet.Mask)
+}
+
+// lastIPInRange returns the last IP in a given IP range.
+func lastIPInRange(cidr *net.IPNet) net.IP {
+	ip := append([]byte{}, cidr.IP...)
+	for i, b := range cidr.Mask {
+		ip[i] |= ^b
+	}
+	return ip
+}
+
+// subnetsInCIDR takes a list of subnets for a single region and
+// returns subnets which exists in the specified CIDR range.
+func subnetsInCIDR(subnets []*compute.Subnetwork, cidr *net.IPNet) ([]*compute.Subnetwork, error) {
+	var res []*compute.Subnetwork
+	for _, subnet := range subnets {
+		_, subnetRange, err := net.ParseCIDR(subnet.IpCidrRange)
+		if err != nil {
+			return nil, fmt.Errorf("unable to parse CIDR %q for subnet %q: %v", subnet.IpCidrRange, subnet.Name, err)
+		}
+		if containsCIDR(cidr, subnetRange) {
+			res = append(res, subnet)
+		}
+	}
+	return res, nil
+}
+
+type netType string
+
+const (
+	netTypeLegacy netType = "LEGACY"
+	netTypeAuto   netType = "AUTO"
+	netTypeCustom netType = "CUSTOM"
+)
+
+func typeOfNetwork(network *compute.Network) netType {
+	if network.IPv4Range != "" {
+		return netTypeLegacy
+	}
+
+	if network.AutoCreateSubnetworks {
+		return netTypeAuto
+	}
+
+	return netTypeCustom
 }

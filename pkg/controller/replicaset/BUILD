@@ -24,6 +24,7 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/labels:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//vendor/k8s.io/client-go/informers/core/v1:go_default_library",
@@ -43,11 +44,14 @@ go_library(
 
 go_test(
     name = "go_default_test",
-    srcs = ["replica_set_test.go"],
+    srcs = [
+        "replica_set_test.go",
+        "replica_set_utils_test.go",
+    ],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/pkg/controller/replicaset",
-    library = ":go_default_library",
     deps = [
-        "//pkg/api:go_default_library",
+        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/securitycontext:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",

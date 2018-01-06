@@ -21,13 +21,18 @@ import (
 
 	extensions "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
-	"k8s.io/kubernetes/pkg/util/version"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/upgrades"
 
 	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+)
+
+const (
+	deploymentName = "dp"
 )
 
 // TODO: Test that the deployment stays available during master (and maybe
@@ -36,60 +41,43 @@ import (
 // DeploymentUpgradeTest tests that a deployment is using the same replica
 // sets before and after a cluster upgrade.
 type DeploymentUpgradeTest struct {
-	oldD     *extensions.Deployment
-	updatedD *extensions.Deployment
-	oldRS    *extensions.ReplicaSet
-	newRS    *extensions.ReplicaSet
+	oldDeploymentUID types.UID
+	oldRSUID         types.UID
+	newRSUID         types.UID
 }
 
 func (DeploymentUpgradeTest) Name() string { return "[sig-apps] deployment-upgrade" }
 
-func (DeploymentUpgradeTest) Skip(upgCtx upgrades.UpgradeContext) bool {
-	// The Deployment upgrade test currently relies on implementation details to probe the
-	// ReplicaSets belonging to a Deployment. As of 1.7, the client code we call into no
-	// longer supports talking to a server <1.6. (see #47685)
-	minVersion := version.MustParseSemantic("v1.6.0")
-
-	for _, vCtx := range upgCtx.Versions {
-		if vCtx.Version.LessThan(minVersion) {
-			return true
-		}
-	}
-	return false
-}
-
-var _ upgrades.Skippable = DeploymentUpgradeTest{}
-
-// Setup creates a deployment and makes sure it has a new and an old replica set running.
-// This calls in to client code and should not be expected to work against a cluster more than one minor version away from the current version.
+// Setup creates a deployment and makes sure it has a new and an old replicaset running.
 func (t *DeploymentUpgradeTest) Setup(f *framework.Framework) {
-	deploymentName := "deployment-hash-test"
 	c := f.ClientSet
 	nginxImage := imageutils.GetE2EImage(imageutils.NginxSlim)
 
 	ns := f.Namespace.Name
+	deploymentClient := c.ExtensionsV1beta1().Deployments(ns)
+	rsClient := c.ExtensionsV1beta1().ReplicaSets(ns)
 
-	By(fmt.Sprintf("Creating a deployment %q in namespace %q", deploymentName, ns))
+	By(fmt.Sprintf("Creating a deployment %q with 1 replica in namespace %q", deploymentName, ns))
 	d := framework.NewDeployment(deploymentName, int32(1), map[string]string{"test": "upgrade"}, "nginx", nginxImage, extensions.RollingUpdateDeploymentStrategyType)
-	deployment, err := c.Extensions().Deployments(ns).Create(d)
-	framework.ExpectNoError(err)
-
-	// Wait for it to be updated to revision 1
-	By(fmt.Sprintf("Waiting deployment %q to be updated to revision 1", deploymentName))
-	err = framework.WaitForDeploymentRevisionAndImage(c, ns, deploymentName, "1", nginxImage)
+	deployment, err := deploymentClient.Create(d)
 	framework.ExpectNoError(err)
 
 	By(fmt.Sprintf("Waiting deployment %q to complete", deploymentName))
-	framework.ExpectNoError(framework.WaitForDeploymentStatusValid(c, deployment))
+	framework.ExpectNoError(framework.WaitForDeploymentComplete(c, deployment))
 
-	rs, err := deploymentutil.GetNewReplicaSet(deployment, c.ExtensionsV1beta1())
+	By(fmt.Sprintf("Getting replicaset revision 1 of deployment %q", deploymentName))
+	rsSelector, err := metav1.LabelSelectorAsSelector(d.Spec.Selector)
 	framework.ExpectNoError(err)
-	if rs == nil {
-		framework.ExpectNoError(fmt.Errorf("expected a new replica set for deployment %q, found none", deployment.Name))
+	rsList, err := rsClient.List(metav1.ListOptions{LabelSelector: rsSelector.String()})
+	framework.ExpectNoError(err)
+	rss := rsList.Items
+	if len(rss) != 1 {
+		framework.ExpectNoError(fmt.Errorf("expected one replicaset, got %d", len(rss)))
 	}
+	t.oldRSUID = rss[0].UID
 
-	// Store the old replica set - should be the same after the upgrade.
-	t.oldRS = rs
+	By(fmt.Sprintf("Waiting for revision of the deployment %q to become 1", deploymentName))
+	framework.ExpectNoError(framework.WaitForDeploymentRevision(c, deployment, "1"))
 
 	// Trigger a new rollout so that we have some history.
 	By(fmt.Sprintf("Triggering a new rollout for deployment %q", deploymentName))
@@ -98,89 +86,87 @@ func (t *DeploymentUpgradeTest) Setup(f *framework.Framework) {
 	})
 	framework.ExpectNoError(err)
 
-	// Use observedGeneration to determine if the controller noticed the pod template update.
-	framework.Logf("Wait deployment %q to be observed by the deployment controller", deploymentName)
-	framework.ExpectNoError(framework.WaitForObservedDeployment(c, ns, deploymentName, deployment.Generation))
-
-	// Wait for it to be updated to revision 2
-	By(fmt.Sprintf("Waiting deployment %q to be updated to revision 2", deploymentName))
-	framework.ExpectNoError(framework.WaitForDeploymentRevisionAndImage(c, ns, deploymentName, "2", nginxImage))
-
 	By(fmt.Sprintf("Waiting deployment %q to complete", deploymentName))
-	framework.ExpectNoError(framework.WaitForDeploymentStatus(c, deployment))
+	framework.ExpectNoError(framework.WaitForDeploymentComplete(c, deployment))
 
-	rs, err = deploymentutil.GetNewReplicaSet(deployment, c.ExtensionsV1beta1())
+	By(fmt.Sprintf("Getting replicasets revision 1 and 2 of deployment %q", deploymentName))
+	rsList, err = rsClient.List(metav1.ListOptions{LabelSelector: rsSelector.String()})
 	framework.ExpectNoError(err)
-	if rs == nil {
-		framework.ExpectNoError(fmt.Errorf("expected a new replica set for deployment %q", deployment.Name))
+	rss = rsList.Items
+	if len(rss) != 2 {
+		framework.ExpectNoError(fmt.Errorf("expected 2 replicaset, got %d", len(rss)))
 	}
 
-	if rs.UID == t.oldRS.UID {
-		framework.ExpectNoError(fmt.Errorf("expected a new replica set different from the previous one"))
+	By(fmt.Sprintf("Checking replicaset of deployment %q that is created before rollout survives the rollout", deploymentName))
+	switch t.oldRSUID {
+	case rss[0].UID:
+		t.newRSUID = rss[1].UID
+	case rss[1].UID:
+		t.newRSUID = rss[0].UID
+	default:
+		framework.ExpectNoError(fmt.Errorf("old replicaset with UID %q does not survive rollout", t.oldRSUID))
 	}
 
-	// Store new replica set - should be the same after the upgrade.
-	t.newRS = rs
-	deployment, err = c.Extensions().Deployments(ns).Get(deployment.Name, metav1.GetOptions{})
-	framework.ExpectNoError(err)
-	t.oldD = deployment
+	By(fmt.Sprintf("Waiting for revision of the deployment %q to become 2", deploymentName))
+	framework.ExpectNoError(framework.WaitForDeploymentRevision(c, deployment, "2"))
+
+	t.oldDeploymentUID = deployment.UID
 }
 
-// Test checks whether the replica sets for a deployment are the same after an upgrade.
+// Test checks whether the replicasets for a deployment are the same after an upgrade.
 func (t *DeploymentUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, upgrade upgrades.UpgradeType) {
 	// Block until upgrade is done
-	By(fmt.Sprintf("Waiting for upgrade to finish before checking replica sets for deployment %q", t.oldD.Name))
+	By(fmt.Sprintf("Waiting for upgrade to finish before checking replicasets for deployment %q", deploymentName))
 	<-done
 
 	c := f.ClientSet
+	ns := f.Namespace.Name
+	deploymentClient := c.ExtensionsV1beta1().Deployments(ns)
+	rsClient := c.ExtensionsV1beta1().ReplicaSets(ns)
 
-	deployment, err := c.Extensions().Deployments(t.oldD.Namespace).Get(t.oldD.Name, metav1.GetOptions{})
+	deployment, err := deploymentClient.Get(deploymentName, metav1.GetOptions{})
 	framework.ExpectNoError(err)
-	t.updatedD = deployment
 
-	By(fmt.Sprintf("Waiting for deployment %q to complete adoption", deployment.Name))
-	framework.ExpectNoError(framework.WaitForDeploymentStatus(c, deployment))
+	By(fmt.Sprintf("Checking UID to verify deployment %q survives upgrade", deploymentName))
+	Expect(deployment.UID).To(Equal(t.oldDeploymentUID))
 
-	By(fmt.Sprintf("Checking that replica sets for deployment %q are the same as prior to the upgrade", t.updatedD.Name))
-	_, allOldRSs, newRS, err := deploymentutil.GetAllReplicaSets(t.updatedD, c.ExtensionsV1beta1())
+	By(fmt.Sprintf("Verifying deployment %q does not create new replicasets", deploymentName))
+	rsSelector, err := metav1.LabelSelectorAsSelector(deployment.Spec.Selector)
 	framework.ExpectNoError(err)
-	if newRS == nil {
-		By(t.spewDeploymentAndReplicaSets(newRS, allOldRSs))
-		framework.ExpectNoError(fmt.Errorf("expected a new replica set for deployment %q", t.updatedD.Name))
+	rsList, err := rsClient.List(metav1.ListOptions{LabelSelector: rsSelector.String()})
+	framework.ExpectNoError(err)
+	rss := rsList.Items
+	if len(rss) != 2 {
+		framework.ExpectNoError(fmt.Errorf("expected 2 replicaset, got %d", len(rss)))
 	}
-	if newRS.UID != t.newRS.UID {
-		By(t.spewDeploymentAndReplicaSets(newRS, allOldRSs))
-		framework.ExpectNoError(fmt.Errorf("expected new replica set:\n%#v\ngot new replica set:\n%#v\n", t.newRS, newRS))
+
+	switch t.oldRSUID {
+	case rss[0].UID:
+		Expect(rss[1].UID).To(Equal(t.newRSUID))
+	case rss[1].UID:
+		Expect(rss[0].UID).To(Equal(t.newRSUID))
+	default:
+		framework.ExpectNoError(fmt.Errorf("new replicasets are created during upgrade of deployment %q", deploymentName))
 	}
-	if len(allOldRSs) != 1 {
-		By(t.spewDeploymentAndReplicaSets(newRS, allOldRSs))
-		errString := fmt.Sprintf("expected one old replica set, got %d\n", len(allOldRSs))
-		for i := range allOldRSs {
-			rs := allOldRSs[i]
-			errString += fmt.Sprintf("%#v\n", rs)
-		}
-		framework.ExpectNoError(fmt.Errorf(errString))
-	}
-	if allOldRSs[0].UID != t.oldRS.UID {
-		By(t.spewDeploymentAndReplicaSets(newRS, allOldRSs))
-		framework.ExpectNoError(fmt.Errorf("expected old replica set:\n%#v\ngot old replica set:\n%#v\n", t.oldRS, allOldRSs[0]))
-	}
+
+	By(fmt.Sprintf("Verifying revision of the deployment %q is still 2", deploymentName))
+	Expect(deployment.Annotations[deploymentutil.RevisionAnnotation]).To(Equal("2"))
+
+	By(fmt.Sprintf("Waiting for deployment %q to complete adoption", deploymentName))
+	framework.ExpectNoError(framework.WaitForDeploymentComplete(c, deployment))
+
+	// Verify the upgraded deployment is active by scaling up the deployment by 1
+	By(fmt.Sprintf("Scaling up replicaset of deployment %q by 1", deploymentName))
+	_, err = framework.UpdateDeploymentWithRetries(c, ns, deploymentName, func(deployment *extensions.Deployment) {
+		*deployment.Spec.Replicas = *deployment.Spec.Replicas + 1
+	})
+	framework.ExpectNoError(err)
+
+	By(fmt.Sprintf("Waiting for deployment %q to complete after scaling", deploymentName))
+	framework.ExpectNoError(framework.WaitForDeploymentComplete(c, deployment))
 }
 
 // Teardown cleans up any remaining resources.
 func (t *DeploymentUpgradeTest) Teardown(f *framework.Framework) {
 	// rely on the namespace deletion to clean up everything
-}
-
-func (t *DeploymentUpgradeTest) spewDeploymentAndReplicaSets(newRS *extensions.ReplicaSet, allOldRSs []*extensions.ReplicaSet) string {
-	msg := fmt.Sprintf("deployment prior to the upgrade:\n%#v\n", t.oldD)
-	msg += fmt.Sprintf("old replica sets prior to the upgrade:\n%#v\n", t.oldRS)
-	msg += fmt.Sprintf("new replica sets prior to the upgrade:\n%#v\n", t.newRS)
-	msg += fmt.Sprintf("deployment after the upgrade:\n%#v\n", t.updatedD)
-	msg += fmt.Sprintf("new replica set after the upgrade:\n%#v\n", newRS)
-	msg += fmt.Sprintf("old replica sets after the upgrade:\n")
-	for i := range allOldRSs {
-		msg += fmt.Sprintf("%#v\n", allOldRSs[i])
-	}
-	return msg
 }

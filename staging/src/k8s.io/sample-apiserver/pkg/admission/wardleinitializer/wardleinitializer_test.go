@@ -52,7 +52,7 @@ func (self *wantInternalWardleInformerFactory) SetInternalWardleInformerFactory(
 }
 func (self *wantInternalWardleInformerFactory) Admit(a admission.Attributes) error { return nil }
 func (self *wantInternalWardleInformerFactory) Handles(o admission.Operation) bool { return false }
-func (self *wantInternalWardleInformerFactory) Validate() error                    { return nil }
+func (self *wantInternalWardleInformerFactory) ValidateInitialization() error      { return nil }
 
 var _ admission.Interface = &wantInternalWardleInformerFactory{}
 var _ wardleinitializer.WantsInternalWardleInformerFactory = &wantInternalWardleInformerFactory{}

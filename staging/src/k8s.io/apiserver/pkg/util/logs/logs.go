@@ -46,8 +46,8 @@ func (writer GlogWriter) Write(data []byte) (n int, err error) {
 func InitLogs() {
 	log.SetOutput(GlogWriter{})
 	log.SetFlags(0)
-	// The default glog flush interval is 30 seconds, which is frighteningly long.
-	go wait.Until(glog.Flush, *logFlushFreq, wait.NeverStop)
+	// The default glog flush interval is 5 seconds.
+	go wait.Forever(glog.Flush, *logFlushFreq)
 }
 
 // FlushLogs flushes logs immediately.

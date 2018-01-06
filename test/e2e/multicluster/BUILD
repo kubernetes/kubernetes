@@ -5,6 +5,7 @@ go_library(
     srcs = [
         "framework.go",
         "ubernetes_lite.go",
+        "ubernetes_lite_volumes.go",
     ],
     importpath = "k8s.io/kubernetes/test/e2e/multicluster",
     visibility = ["//visibility:public"],
@@ -14,7 +15,9 @@ go_library(
         "//test/utils:go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",
         "//vendor/github.com/onsi/gomega:go_default_library",
+        "//vendor/google.golang.org/api/compute/v1:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/labels:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/intstr:go_default_library",

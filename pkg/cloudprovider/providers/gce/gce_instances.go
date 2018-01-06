@@ -116,19 +116,35 @@ func (gce *GCECloud) NodeAddressesByProviderID(providerID string) ([]v1.NodeAddr
 	return nodeAddresses, nil
 }
 
+// instanceByProviderID returns the cloudprovider instance of the node
+// with the specified unique providerID
+func (gce *GCECloud) instanceByProviderID(providerID string) (*gceInstance, error) {
+	project, zone, name, err := splitProviderID(providerID)
+	if err != nil {
+		return nil, err
+	}
+
+	instance, err := gce.getInstanceFromProjectInZoneByName(project, zone, name)
+	if err != nil {
+		if isHTTPErrorCode(err, http.StatusNotFound) {
+			return nil, cloudprovider.InstanceNotFound
+		}
+		return nil, err
+	}
+
+	return instance, nil
+}
+
 // InstanceTypeByProviderID returns the cloudprovider instance type of the node
 // with the specified unique providerID This method will not be called from the
 // node that is requesting this ID. i.e. metadata service and other local
 // methods cannot be used here
 func (gce *GCECloud) InstanceTypeByProviderID(providerID string) (string, error) {
-	project, zone, name, err := splitProviderID(providerID)
+	instance, err := gce.instanceByProviderID(providerID)
 	if err != nil {
 		return "", err
 	}
-	instance, err := gce.getInstanceFromProjectInZoneByName(project, zone, name)
-	if err != nil {
-		return "", err
-	}
+
 	return instance.Type, nil
 }
 
@@ -156,7 +172,15 @@ func (gce *GCECloud) ExternalID(nodeName types.NodeName) (string, error) {
 // InstanceExistsByProviderID returns true if the instance with the given provider id still exists and is running.
 // If false is returned with no error, the instance will be immediately deleted by the cloud controller manager.
 func (gce *GCECloud) InstanceExistsByProviderID(providerID string) (bool, error) {
-	return false, cloudprovider.NotImplemented
+	_, err := gce.instanceByProviderID(providerID)
+	if err != nil {
+		if err == cloudprovider.InstanceNotFound {
+			return false, nil
+		}
+		return false, err
+	}
+
+	return true, nil
 }
 
 // InstanceID returns the cloud provider ID of the node with the specified NodeName.
@@ -249,35 +273,39 @@ func (gce *GCECloud) AddSSHKeyToAllInstances(user string, keyData []byte) error 
 	})
 }
 
-// GetAllZones returns all the zones in which nodes are running
-func (gce *GCECloud) GetAllZones() (sets.String, error) {
-	// Fast-path for non-multizone
-	if len(gce.managedZones) == 1 {
-		return sets.NewString(gce.managedZones...), nil
+// GetAllCurrentZones returns all the zones in which k8s nodes are currently running
+func (gce *GCECloud) GetAllCurrentZones() (sets.String, error) {
+	if gce.nodeInformerSynced == nil {
+		glog.Warningf("GCECloud object does not have informers set, should only happen in E2E binary.")
+		return gce.GetAllZonesFromCloudProvider()
 	}
+	gce.nodeZonesLock.Lock()
+	defer gce.nodeZonesLock.Unlock()
+	if !gce.nodeInformerSynced() {
+		return nil, fmt.Errorf("Node informer is not synced when trying to GetAllCurrentZones")
+	}
+	zones := sets.NewString()
+	for zone, nodes := range gce.nodeZones {
+		if len(nodes) > 0 {
+			zones.Insert(zone)
+		}
+	}
+	return zones, nil
+}
 
-	// TODO: Caching, but this is currently only called when we are creating a volume,
-	// which is a relatively infrequent operation, and this is only # zones API calls
+// GetAllZonesFromCloudProvider returns all the zones in which nodes are running
+// Only use this in E2E tests to get zones, on real clusters this will
+// get all zones with compute instances in them even if not k8s instances!!!
+// ex. I have k8s nodes in us-central1-c and us-central1-b. I also have
+// a non-k8s compute in us-central1-a. This func will return a,b, and c.
+func (gce *GCECloud) GetAllZonesFromCloudProvider() (sets.String, error) {
 	zones := sets.NewString()
 
-	// TODO: Parallelize, although O(zones) so not too bad (N <= 3 typically)
 	for _, zone := range gce.managedZones {
 		mc := newInstancesMetricContext("list", zone)
 		// We only retrieve one page in each zone - we only care about existence
 		listCall := gce.service.Instances.List(gce.projectID, zone)
 
-		// No filter: We assume that a zone is either used or unused
-		// We could only consider running nodes (like we do in List above),
-		// but probably if instances are starting we still want to consider them.
-		// I think we should wait until we have a reason to make the
-		// call one way or the other; we generally can't guarantee correct
-		// volume spreading if the set of zones is changing
-		// (and volume spreading is currently only a heuristic).
-		// Long term we want to replace GetAllZones (which primarily supports volume
-		// spreading) with a scheduler policy that is able to see the global state of
-		// volumes and the health of zones.
-
-		// Just a minimal set of fields - we only care about existence
 		listCall = listCall.Fields("items(name)")
 		res, err := listCall.Do()
 		if err != nil {
@@ -291,6 +319,16 @@ func (gce *GCECloud) GetAllZones() (sets.String, error) {
 	}
 
 	return zones, nil
+}
+
+// InsertInstance creates a new instance on GCP
+func (gce *GCECloud) InsertInstance(project string, zone string, rb *compute.Instance) error {
+	mc := newInstancesMetricContext("create", zone)
+	op, err := gce.service.Instances.Insert(project, zone, rb).Do()
+	if err != nil {
+		return mc.Observe(err)
+	}
+	return gce.waitForZoneOp(op, zone, mc)
 }
 
 // ListInstanceNames returns a string of instance names seperated by spaces.
@@ -371,7 +409,7 @@ func (gce *GCECloud) AddAliasToInstance(nodeName types.NodeName, alias *net.IPNe
 
 	mc := newInstancesMetricContext("addalias", v1instance.Zone)
 	op, err := gce.serviceAlpha.Instances.UpdateNetworkInterface(
-		gce.projectID, instance.Zone, instance.Name, iface.Name, iface).Do()
+		gce.projectID, lastComponent(instance.Zone), instance.Name, iface.Name, iface).Do()
 	if err != nil {
 		return mc.Observe(err)
 	}
@@ -464,6 +502,7 @@ func (gce *GCECloud) getInstanceByName(name string) (*gceInstance, error) {
 			if isHTTPErrorCode(err, http.StatusNotFound) {
 				continue
 			}
+			glog.Errorf("getInstanceByName: failed to get instance %s in zone %s; err: %v", name, zone, err)
 			return nil, err
 		}
 		return instance, nil
@@ -478,7 +517,6 @@ func (gce *GCECloud) getInstanceFromProjectInZoneByName(project, zone, name stri
 	res, err := gce.service.Instances.Get(project, zone, name).Do()
 	mc.Observe(err)
 	if err != nil {
-		glog.Errorf("getInstanceFromProjectInZoneByName: failed to get instance %s; err: %v", name, err)
 		return nil, err
 	}
 

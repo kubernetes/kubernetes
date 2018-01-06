@@ -41,6 +41,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/reconciler"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
 	"k8s.io/kubernetes/pkg/volume/util/types"
 	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
@@ -168,8 +169,8 @@ func NewVolumeManager(
 			kubeClient,
 			volumePluginMgr,
 			recorder,
-			checkNodeCapabilitiesBeforeMount),
-		),
+			checkNodeCapabilitiesBeforeMount,
+			util.NewBlockVolumePathHandler())),
 	}
 
 	vm.desiredStateOfWorldPopulator = populator.NewDesiredStateOfWorldPopulator(
@@ -253,7 +254,11 @@ func (vm *volumeManager) Run(sourcesReady config.SourcesReady, stopCh <-chan str
 func (vm *volumeManager) GetMountedVolumesForPod(podName types.UniquePodName) container.VolumeMap {
 	podVolumes := make(container.VolumeMap)
 	for _, mountedVolume := range vm.actualStateOfWorld.GetMountedVolumesForPod(podName) {
-		podVolumes[mountedVolume.OuterVolumeSpecName] = container.VolumeInfo{Mounter: mountedVolume.Mounter}
+		podVolumes[mountedVolume.OuterVolumeSpecName] = container.VolumeInfo{
+			Mounter:           mountedVolume.Mounter,
+			BlockVolumeMapper: mountedVolume.BlockVolumeMapper,
+			ReadOnly:          mountedVolume.VolumeSpec.ReadOnly,
+		}
 	}
 	return podVolumes
 }
@@ -352,19 +357,36 @@ func (vm *volumeManager) WaitForAttachAndMount(pod *v1.Pod) error {
 		// Timeout expired
 		unmountedVolumes :=
 			vm.getUnmountedVolumes(uniquePodName, expectedVolumes)
+		// Also get unattached volumes for error message
+		unattachedVolumes :=
+			vm.getUnattachedVolumes(expectedVolumes)
+
 		if len(unmountedVolumes) == 0 {
 			return nil
 		}
 
 		return fmt.Errorf(
-			"timeout expired waiting for volumes to attach/mount for pod %q/%q. list of unattached/unmounted volumes=%v",
+			"timeout expired waiting for volumes to attach or mount for pod %q/%q. list of unmounted volumes=%v. list of unattached volumes=%v",
 			pod.Namespace,
 			pod.Name,
-			unmountedVolumes)
+			unmountedVolumes,
+			unattachedVolumes)
 	}
 
 	glog.V(3).Infof("All volumes are attached and mounted for pod %q", format.Pod(pod))
 	return nil
+}
+
+// getUnattachedVolumes returns a list of the volumes that are expected to be attached but
+// are not currently attached to the node
+func (vm *volumeManager) getUnattachedVolumes(expectedVolumes []string) []string {
+	unattachedVolumes := []string{}
+	for _, volume := range expectedVolumes {
+		if !vm.actualStateOfWorld.VolumeExists(v1.UniqueVolumeName(volume)) {
+			unattachedVolumes = append(unattachedVolumes, volume)
+		}
+	}
+	return unattachedVolumes
 }
 
 // verifyVolumesMountedFunc returns a method that returns true when all expected

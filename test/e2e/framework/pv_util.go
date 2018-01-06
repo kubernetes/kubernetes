@@ -36,10 +36,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/api/v1/helper"
+	"k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	awscloud "k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
 	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 const (
@@ -718,16 +719,11 @@ func createPD(zone string) (string, error) {
 			return "", err
 		}
 
-		if azureCloud.BlobDiskController == nil {
-			return "", fmt.Errorf("BlobDiskController is nil, it's not expected.")
-		}
-
-		diskUri, err := azureCloud.BlobDiskController.CreateBlobDisk(pdName, "standard_lrs", 1, false)
+		_, diskURI, _, err := azureCloud.CreateVolume(pdName, "" /* account */, "" /* sku */, "" /* location */, 1 /* sizeGb */)
 		if err != nil {
 			return "", err
 		}
-
-		return diskUri, nil
+		return diskURI, nil
 	} else {
 		return "", fmt.Errorf("provider does not support volume creation")
 	}
@@ -772,11 +768,7 @@ func deletePD(pdName string) error {
 		if err != nil {
 			return err
 		}
-		if azureCloud.BlobDiskController == nil {
-			return fmt.Errorf("BlobDiskController is nil, it's not expected.")
-		}
-		diskName := pdName[(strings.LastIndex(pdName, "/") + 1):]
-		err = azureCloud.BlobDiskController.DeleteBlobDisk(diskName, false)
+		err = azureCloud.DeleteVolume(pdName)
 		if err != nil {
 			Logf("failed to delete Azure volume %q: %v", pdName, err)
 			return err
@@ -790,12 +782,12 @@ func deletePD(pdName string) error {
 // Returns a pod definition based on the namespace. The pod references the PVC's
 // name.
 func MakeWritePod(ns string, pvc *v1.PersistentVolumeClaim) *v1.Pod {
-	return MakePod(ns, []*v1.PersistentVolumeClaim{pvc}, true, "touch /mnt/volume1/SUCCESS && (id -G | grep -E '\\b777\\b')")
+	return MakePod(ns, nil, []*v1.PersistentVolumeClaim{pvc}, true, "touch /mnt/volume1/SUCCESS && (id -G | grep -E '\\b777\\b')")
 }
 
 // Returns a pod definition based on the namespace. The pod references the PVC's
 // name.  A slice of BASH commands can be supplied as args to be run by the pod
-func MakePod(ns string, pvclaims []*v1.PersistentVolumeClaim, isPrivileged bool, command string) *v1.Pod {
+func MakePod(ns string, nodeSelector map[string]string, pvclaims []*v1.PersistentVolumeClaim, isPrivileged bool, command string) *v1.Pod {
 	if len(command) == 0 {
 		command = "while true; do sleep 1; done"
 	}
@@ -832,6 +824,9 @@ func MakePod(ns string, pvclaims []*v1.PersistentVolumeClaim, isPrivileged bool,
 	}
 	podSpec.Spec.Containers[0].VolumeMounts = volumeMounts
 	podSpec.Spec.Volumes = volumes
+	if nodeSelector != nil {
+		podSpec.Spec.NodeSelector = nodeSelector
+	}
 	return podSpec
 }
 
@@ -862,7 +857,7 @@ func MakeSecPod(ns string, pvclaims []*v1.PersistentVolumeClaim, isPrivileged bo
 			Containers: []v1.Container{
 				{
 					Name:    "write-pod",
-					Image:   "gcr.io/google_containers/busybox:1.24",
+					Image:   imageutils.GetE2EImage(imageutils.BusyBox),
 					Command: []string{"/bin/sh"},
 					Args:    []string{"-c", command},
 					SecurityContext: &v1.SecurityContext{
@@ -886,9 +881,9 @@ func MakeSecPod(ns string, pvclaims []*v1.PersistentVolumeClaim, isPrivileged bo
 	return podSpec
 }
 
-// create pod with given claims
-func CreatePod(client clientset.Interface, namespace string, pvclaims []*v1.PersistentVolumeClaim, isPrivileged bool, command string) (*v1.Pod, error) {
-	pod := MakePod(namespace, pvclaims, isPrivileged, command)
+// CreatePod with given claims based on node selector
+func CreatePod(client clientset.Interface, namespace string, nodeSelector map[string]string, pvclaims []*v1.PersistentVolumeClaim, isPrivileged bool, command string) (*v1.Pod, error) {
+	pod := MakePod(namespace, nodeSelector, pvclaims, isPrivileged, command)
 	pod, err := client.CoreV1().Pods(namespace).Create(pod)
 	if err != nil {
 		return nil, fmt.Errorf("pod Create API error: %v", err)
@@ -928,7 +923,7 @@ func CreateSecPod(client clientset.Interface, namespace string, pvclaims []*v1.P
 
 // Define and create a pod with a mounted PV.  Pod runs infinite loop until killed.
 func CreateClientPod(c clientset.Interface, ns string, pvc *v1.PersistentVolumeClaim) (*v1.Pod, error) {
-	return CreatePod(c, ns, []*v1.PersistentVolumeClaim{pvc}, true, "")
+	return CreatePod(c, ns, nil, []*v1.PersistentVolumeClaim{pvc}, true, "")
 }
 
 // wait until all pvcs phase set to bound

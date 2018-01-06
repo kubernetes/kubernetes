@@ -35,6 +35,7 @@ var map_StorageClass = map[string]string{
 	"reclaimPolicy":        "Dynamically provisioned PersistentVolumes of this storage class are created with this reclaimPolicy. Defaults to Delete.",
 	"mountOptions":         "Dynamically provisioned PersistentVolumes of this storage class are created with these mountOptions, e.g. [\"ro\", \"soft\"]. Not validated - mount of the PVs will simply fail if one is invalid.",
 	"allowVolumeExpansion": "AllowVolumeExpansion shows whether the storage class allow volume expand",
+	"volumeBindingMode":    "VolumeBindingMode indicates how PersistentVolumeClaims should be provisioned and bound.  When unset, VolumeBindingImmediate is used. This field is alpha-level and is only honored by servers that enable the VolumeScheduling feature.",
 }
 
 func (StorageClass) SwaggerDoc() map[string]string {

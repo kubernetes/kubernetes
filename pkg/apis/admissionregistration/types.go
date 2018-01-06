@@ -106,7 +106,7 @@ type Rule struct {
 type FailurePolicyType string
 
 const (
-	// Ignore means the initilizer is removed from the initializers list of an
+	// Ignore means the initializer is removed from the initializers list of an
 	// object if the initializer is timed out.
 	Ignore FailurePolicyType = "Ignore"
 	// For 1.7, only "Ignore" is allowed. "Fail" will be allowed when the
@@ -118,35 +118,61 @@ const (
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// ExternalAdmissionHookConfiguration describes the configuration of initializers.
-type ExternalAdmissionHookConfiguration struct {
+// ValidatingWebhookConfiguration describes the configuration of an admission webhook that accepts or rejects and object without changing it.
+type ValidatingWebhookConfiguration struct {
 	metav1.TypeMeta
 	// Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata.
 	// +optional
 	metav1.ObjectMeta
-	// ExternalAdmissionHooks is a list of external admission webhooks and the
-	// affected resources and operations.
+	// Webhooks is a list of webhooks and the affected resources and operations.
 	// +optional
-	ExternalAdmissionHooks []ExternalAdmissionHook
+	Webhooks []Webhook
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// ExternalAdmissionHookConfigurationList is a list of ExternalAdmissionHookConfiguration.
-type ExternalAdmissionHookConfigurationList struct {
+// ValidatingWebhookConfigurationList is a list of ValidatingWebhookConfiguration.
+type ValidatingWebhookConfigurationList struct {
 	metav1.TypeMeta
 	// Standard list metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds
 	// +optional
 	metav1.ListMeta
-	// List of ExternalAdmissionHookConfiguration.
-	Items []ExternalAdmissionHookConfiguration
+	// List of ValidatingWebhookConfigurations.
+	Items []ValidatingWebhookConfiguration
 }
 
-// ExternalAdmissionHook describes an external admission webhook and the
-// resources and operations it applies to.
-type ExternalAdmissionHook struct {
-	// The name of the external admission webhook.
+// +genclient
+// +genclient:nonNamespaced
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// MutatingWebhookConfiguration describes the configuration of and admission webhook that accept or reject and may change the object.
+type MutatingWebhookConfiguration struct {
+	metav1.TypeMeta
+	// Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata.
+	// +optional
+	metav1.ObjectMeta
+	// Webhooks is a list of webhooks and the affected resources and operations.
+	// +optional
+	Webhooks []Webhook
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// MutatingWebhookConfigurationList is a list of MutatingWebhookConfiguration.
+type MutatingWebhookConfigurationList struct {
+	metav1.TypeMeta
+	// Standard list metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds
+	// +optional
+	metav1.ListMeta
+	// List of MutatingWebhookConfiguration.
+	Items []MutatingWebhookConfiguration
+}
+
+// Webhook describes an admission webhook and the resources and operations it applies to.
+type Webhook struct {
+	// The name of the admission webhook.
 	// Name should be fully qualified, e.g., imagepolicy.kubernetes.io, where
 	// "imagepolicy" is the name of the webhook, and kubernetes.io is the name
 	// of the organization.
@@ -155,7 +181,7 @@ type ExternalAdmissionHook struct {
 
 	// ClientConfig defines how to communicate with the hook.
 	// Required
-	ClientConfig AdmissionHookClientConfig
+	ClientConfig WebhookClientConfig
 
 	// Rules describes what operations on what resources/subresources the webhook cares about.
 	// The webhook cares about an operation if it matches _any_ Rule.
@@ -165,6 +191,52 @@ type ExternalAdmissionHook struct {
 	// allowed values are Ignore or Fail. Defaults to Ignore.
 	// +optional
 	FailurePolicy *FailurePolicyType
+
+	// NamespaceSelector decides whether to run the webhook on an object based
+	// on whether the namespace for that object matches the selector. If the
+	// object itself is a namespace, the matching is performed on
+	// object.metadata.labels. If the object is other cluster scoped resource,
+	// it is not subjected to the webhook.
+	//
+	// For example, to run the webhook on any objects whose namespace is not
+	// associated with "runlevel" of "0" or "1";  you will set the selector as
+	// follows:
+	// "namespaceSelector": {
+	//   "matchExpressions": [
+	//     {
+	//       "key": "runlevel",
+	//       "operator": "NotIn",
+	//       "values": [
+	//         "0",
+	//         "1"
+	//       ]
+	//     }
+	//   ]
+	// }
+	//
+	// If instead you want to only run the webhook on any objects whose
+	// namespace is associated with the "environment" of "prod" or "staging";
+	// you will set the selector as follows:
+	// "namespaceSelector": {
+	//   "matchExpressions": [
+	//     {
+	//       "key": "environment",
+	//       "operator": "In",
+	//       "values": [
+	//         "prod",
+	//         "staging"
+	//       ]
+	//     }
+	//   ]
+	// }
+	//
+	// See
+	// https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/
+	// for more examples of label selectors.
+	//
+	// Default to the empty LabelSelector, which matches everything.
+	// +optional
+	NamespaceSelector *metav1.LabelSelector
 }
 
 // RuleWithOperations is a tuple of Operations and Resources. It is recommended to make
@@ -191,25 +263,67 @@ const (
 	Connect      OperationType = "CONNECT"
 )
 
-// AdmissionHookClientConfig contains the information to make a TLS
+// WebhookClientConfig contains the information to make a TLS
 // connection with the webhook
-type AdmissionHookClientConfig struct {
-	// Service is a reference to the service for this webhook. If there is only
-	// one port open for the service, that port will be used. If there are multiple
-	// ports open, port 443 will be used if it is open, otherwise it is an error.
-	// Required
-	Service ServiceReference
-	// CABundle is a PEM encoded CA bundle which will be used to validate webhook's server certificate.
-	// Required
+type WebhookClientConfig struct {
+	// `url` gives the location of the webhook, in standard URL form
+	// (`[scheme://]host:port/path`). Exactly one of `url` or `service`
+	// must be specified.
+	//
+	// The `host` should not refer to a service running in the cluster; use
+	// the `service` field instead. The host might be resolved via external
+	// DNS in some apiservers (e.g., `kube-apiserver` cannot resolve
+	// in-cluster DNS as that would be a layering violation). `host` may
+	// also be an IP address.
+	//
+	// Please note that using `localhost` or `127.0.0.1` as a `host` is
+	// risky unless you take great care to run this webhook on all hosts
+	// which run an apiserver which might need to make calls to this
+	// webhook. Such installs are likely to be non-portable, i.e., not easy
+	// to turn up in a new cluster.
+	//
+	// The scheme must be "https"; the URL must begin with "https://".
+	//
+	// A path is optional, and if present may be any string permissible in
+	// a URL. You may use the path to pass an arbitrary string to the
+	// webhook, for example, a cluster identifier.
+	//
+	// Attempting to use a user or basic auth e.g. "user:password@" is not
+	// allowed. Fragments ("#...") and query parameters ("?...") are not
+	// allowed, either.
+	//
+	// +optional
+	URL *string
+
+	// `service` is a reference to the service for this webhook. Either
+	// `service` or `url` must be specified.
+	//
+	// If the webhook is running within the cluster, then you should use `service`.
+	//
+	// If there is only one port open for the service, that port will be
+	// used. If there are multiple ports open, port 443 will be used if it
+	// is open, otherwise it is an error.
+	//
+	// +optional
+	Service *ServiceReference
+
+	// `caBundle` is a PEM encoded CA bundle which will be used to validate
+	// the webhook's server certificate.
+	// Required.
 	CABundle []byte
 }
 
 // ServiceReference holds a reference to Service.legacy.k8s.io
 type ServiceReference struct {
-	// Namespace is the namespace of the service
+	// `namespace` is the namespace of the service.
 	// Required
 	Namespace string
-	// Name is the name of the service
+	// `name` is the name of the service.
 	// Required
 	Name string
+
+	// `path` is an optional URL path which will be sent in any request to
+	// this service.
+	// +optional
+	Path *string
 }

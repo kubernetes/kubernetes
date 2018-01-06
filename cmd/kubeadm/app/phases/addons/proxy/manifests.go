@@ -17,8 +17,8 @@ limitations under the License.
 package proxy
 
 const (
-	// KubeProxyConfigMap is the proxy ConfigMap manifest
-	KubeProxyConfigMap = `
+	// KubeProxyConfigMap19 is the proxy ConfigMap manifest for Kubernetes 1.9 and above
+	KubeProxyConfigMap19 = `
 kind: ConfigMap
 apiVersion: v1
 metadata:
@@ -27,7 +27,7 @@ metadata:
   labels:
     app: kube-proxy
 data:
-  kubeconfig.conf: |
+  kubeconfig.conf: |-
     apiVersion: v1
     kind: Config
     clusters:
@@ -46,11 +46,13 @@ data:
     - name: default
       user:
         tokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+  config.conf: |-
+{{ .ProxyConfig}}
 `
 
-	// KubeProxyDaemonSet is the proxy DaemonSet manifest
-	KubeProxyDaemonSet = `
-apiVersion: apps/v1beta2
+	// KubeProxyDaemonSet19 is the proxy DaemonSet manifest for Kubernetes 1.9 and above
+	KubeProxyDaemonSet19 = `
+apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   labels:
@@ -74,8 +76,7 @@ spec:
         imagePullPolicy: IfNotPresent
         command:
         - /usr/local/bin/kube-proxy
-        - --kubeconfig=/var/lib/kube-proxy/kubeconfig.conf
-        {{ .ClusterCIDR }}
+        - --config=/var/lib/kube-proxy/config.conf
         securityContext:
           privileged: true
         volumeMounts:
@@ -84,6 +85,9 @@ spec:
         - mountPath: /run/xtables.lock
           name: xtables-lock
           readOnly: false
+        - mountPath: /lib/modules
+          name: lib-modules
+          readOnly: true
       hostNetwork: true
       serviceAccountName: kube-proxy
       tolerations:
@@ -100,5 +104,8 @@ spec:
         hostPath:
           path: /run/xtables.lock
           type: FileOrCreate
+      - name: lib-modules
+        hostPath:
+          path: /lib/modules
 `
 )

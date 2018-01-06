@@ -50,7 +50,7 @@ func NewCSRSigningController(
 		client,
 		csrInformer,
 		signer.handle,
-	)
+	), nil
 }
 
 type cfsslSigner struct {
@@ -103,7 +103,7 @@ func (s *cfsslSigner) handle(csr *capi.CertificateSigningRequest) error {
 	if err != nil {
 		return fmt.Errorf("error auto signing csr: %v", err)
 	}
-	_, err = s.client.Certificates().CertificateSigningRequests().UpdateStatus(csr)
+	_, err = s.client.CertificatesV1beta1().CertificateSigningRequests().UpdateStatus(csr)
 	if err != nil {
 		return fmt.Errorf("error updating signature for csr: %v", err)
 	}

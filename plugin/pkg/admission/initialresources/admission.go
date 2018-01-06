@@ -28,7 +28,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apiserver/pkg/admission"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
 var (
@@ -57,15 +57,17 @@ func Register(plugins *admission.Plugins) {
 	})
 }
 
-type initialResources struct {
+type InitialResources struct {
 	*admission.Handler
 	source     dataSource
 	percentile int64
 	nsOnly     bool
 }
 
-func newInitialResources(source dataSource, percentile int64, nsOnly bool) admission.Interface {
-	return &initialResources{
+var _ admission.MutationInterface = &InitialResources{}
+
+func newInitialResources(source dataSource, percentile int64, nsOnly bool) *InitialResources {
+	return &InitialResources{
 		Handler:    admission.NewHandler(admission.Create),
 		source:     source,
 		percentile: percentile,
@@ -73,7 +75,8 @@ func newInitialResources(source dataSource, percentile int64, nsOnly bool) admis
 	}
 }
 
-func (ir initialResources) Admit(a admission.Attributes) (err error) {
+// Admit makes an admission decision based on the request attributes
+func (ir InitialResources) Admit(a admission.Attributes) (err error) {
 	// Ignore all calls to subresources or resources other than pods.
 	if a.GetSubresource() != "" || a.GetResource().GroupResource() != api.Resource("pods") {
 		return nil
@@ -89,7 +92,7 @@ func (ir initialResources) Admit(a admission.Attributes) (err error) {
 
 // The method veryfies whether resources should be set for the given pod and
 // if there is estimation available the method fills Request field.
-func (ir initialResources) estimateAndFillResourcesIfNotSet(pod *api.Pod) {
+func (ir InitialResources) estimateAndFillResourcesIfNotSet(pod *api.Pod) {
 	var annotations []string
 	for i := range pod.Spec.InitContainers {
 		annotations = append(annotations, ir.estimateContainer(pod, &pod.Spec.InitContainers[i], "init container")...)
@@ -106,7 +109,7 @@ func (ir initialResources) estimateAndFillResourcesIfNotSet(pod *api.Pod) {
 	}
 }
 
-func (ir initialResources) estimateContainer(pod *api.Pod, c *api.Container, message string) []string {
+func (ir InitialResources) estimateContainer(pod *api.Pod, c *api.Container, message string) []string {
 	var annotations []string
 	req := c.Resources.Requests
 	cpu := ir.getEstimationIfNeeded(api.ResourceCPU, c, pod.ObjectMeta.Namespace)
@@ -137,7 +140,7 @@ func (ir initialResources) estimateContainer(pod *api.Pod, c *api.Container, mes
 
 // getEstimationIfNeeded estimates compute resource for container if its corresponding
 // Request(min amount) and Limit(max amount) both are not specified.
-func (ir initialResources) getEstimationIfNeeded(kind api.ResourceName, c *api.Container, ns string) *resource.Quantity {
+func (ir InitialResources) getEstimationIfNeeded(kind api.ResourceName, c *api.Container, ns string) *resource.Quantity {
 	requests := c.Resources.Requests
 	limits := c.Resources.Limits
 	var quantity *resource.Quantity
@@ -152,7 +155,7 @@ func (ir initialResources) getEstimationIfNeeded(kind api.ResourceName, c *api.C
 	}
 	return quantity
 }
-func (ir initialResources) getEstimation(kind api.ResourceName, c *api.Container, ns string) (*resource.Quantity, error) {
+func (ir InitialResources) getEstimation(kind api.ResourceName, c *api.Container, ns string) (*resource.Quantity, error) {
 	end := time.Now()
 	start := end.Add(-week)
 	var usage, samples int64

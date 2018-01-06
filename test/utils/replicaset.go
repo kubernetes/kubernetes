@@ -18,6 +18,7 @@ package utils
 
 import (
 	"fmt"
+	"testing"
 	"time"
 
 	extensions "k8s.io/api/extensions/v1beta1"
@@ -33,12 +34,12 @@ func UpdateReplicaSetWithRetries(c clientset.Interface, namespace, name string, 
 	var updateErr error
 	pollErr := wait.PollImmediate(pollInterval, pollTimeout, func() (bool, error) {
 		var err error
-		if rs, err = c.Extensions().ReplicaSets(namespace).Get(name, metav1.GetOptions{}); err != nil {
+		if rs, err = c.ExtensionsV1beta1().ReplicaSets(namespace).Get(name, metav1.GetOptions{}); err != nil {
 			return false, err
 		}
 		// Apply the update, then attempt to push it to the apiserver.
 		applyUpdate(rs)
-		if rs, err = c.Extensions().ReplicaSets(namespace).Update(rs); err == nil {
+		if rs, err = c.ExtensionsV1beta1().ReplicaSets(namespace).Update(rs); err == nil {
 			logf("Updating replica set %q", name)
 			return true, nil
 		}
@@ -49,4 +50,19 @@ func UpdateReplicaSetWithRetries(c clientset.Interface, namespace, name string, 
 		pollErr = fmt.Errorf("couldn't apply the provided updated to replicaset %q: %v", name, updateErr)
 	}
 	return rs, pollErr
+}
+
+// Verify .Status.Replicas is equal to .Spec.Replicas
+func WaitRSStable(t *testing.T, clientSet clientset.Interface, rs *extensions.ReplicaSet, pollInterval, pollTimeout time.Duration) error {
+	desiredGeneration := rs.Generation
+	if err := wait.PollImmediate(pollInterval, pollTimeout, func() (bool, error) {
+		newRS, err := clientSet.ExtensionsV1beta1().ReplicaSets(rs.Namespace).Get(rs.Name, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		return newRS.Status.ObservedGeneration >= desiredGeneration && newRS.Status.Replicas == *rs.Spec.Replicas, nil
+	}); err != nil {
+		return fmt.Errorf("failed to verify .Status.Replicas is equal to .Spec.Replicas for replicaset %q: %v", rs.Name, err)
+	}
+	return nil
 }

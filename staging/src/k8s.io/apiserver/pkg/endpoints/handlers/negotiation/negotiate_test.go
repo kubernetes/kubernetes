@@ -181,7 +181,26 @@ func TestNegotiate(t *testing.T) {
 			serializer:  fakeCodec,
 			params:      map[string]string{"pretty": "1"},
 		},
-
+		{
+			req: &http.Request{
+				Header: http.Header{
+					"Accept": []string{"application/json;as=BOGUS;v=v1alpha1;g=meta.k8s.io, application/json"},
+				},
+			},
+			contentType: "application/json",
+			ns:          &fakeNegotiater{serializer: fakeCodec, types: []string{"application/json"}},
+			serializer:  fakeCodec,
+		},
+		{
+			req: &http.Request{
+				Header: http.Header{
+					"Accept": []string{"application/BOGUS, application/json"},
+				},
+			},
+			contentType: "application/json",
+			ns:          &fakeNegotiater{serializer: fakeCodec, types: []string{"application/json"}},
+			serializer:  fakeCodec,
+		},
 		// "application" is not a valid media type, so the server will reject the response during
 		// negotiation (the server, in error, has specified an invalid media type)
 		{

@@ -74,17 +74,11 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxConfig(pod *v1.Pod, attemp
 		Annotations: newPodAnnotations(pod),
 	}
 
-	dnsServers, dnsSearches, useClusterFirstPolicy, err := m.runtimeHelper.GetClusterDNS(pod)
+	dnsConfig, err := m.runtimeHelper.GetPodDNS(pod)
 	if err != nil {
 		return nil, err
 	}
-	podSandboxConfig.DnsConfig = &runtimeapi.DNSConfig{
-		Servers:  dnsServers,
-		Searches: dnsSearches,
-	}
-	if useClusterFirstPolicy {
-		podSandboxConfig.DnsConfig.Options = defaultDNSOptions
-	}
+	podSandboxConfig.DnsConfig = dnsConfig
 
 	if !kubecontainer.IsHostNetworkPod(pod) {
 		// TODO: Add domain support in new runtime interface

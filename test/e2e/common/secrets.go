@@ -30,13 +30,18 @@ import (
 var _ = Describe("[sig-api-machinery] Secrets", func() {
 	f := framework.NewDefaultFramework("secrets")
 
-	It("should be consumable from pods in env vars [Conformance]", func() {
+	/*
+		    Testname: secret-env-vars
+		    Description: Ensure that secret can be consumed via environment
+			variables.
+	*/
+	framework.ConformanceIt("should be consumable from pods in env vars ", func() {
 		name := "secret-test-" + string(uuid.NewUUID())
 		secret := secretForTest(f.Namespace.Name, name)
 
 		By(fmt.Sprintf("Creating secret with name %s", secret.Name))
 		var err error
-		if secret, err = f.ClientSet.Core().Secrets(f.Namespace.Name).Create(secret); err != nil {
+		if secret, err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(secret); err != nil {
 			framework.Failf("unable to create test secret %s: %v", secret.Name, err)
 		}
 
@@ -74,12 +79,17 @@ var _ = Describe("[sig-api-machinery] Secrets", func() {
 		})
 	})
 
-	It("should be consumable via the environment [Conformance]", func() {
+	/*
+		    Testname: secret-configmaps-source
+		    Description: Ensure that secret can be consumed via source of a set
+			of ConfigMaps.
+	*/
+	framework.ConformanceIt("should be consumable via the environment ", func() {
 		name := "secret-test-" + string(uuid.NewUUID())
 		secret := newEnvFromSecret(f.Namespace.Name, name)
 		By(fmt.Sprintf("creating secret %v/%v", f.Namespace.Name, secret.Name))
 		var err error
-		if secret, err = f.ClientSet.Core().Secrets(f.Namespace.Name).Create(secret); err != nil {
+		if secret, err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(secret); err != nil {
 			framework.Failf("unable to create test secret %s: %v", secret.Name, err)
 		}
 

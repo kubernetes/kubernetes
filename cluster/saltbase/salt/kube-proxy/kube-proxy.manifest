@@ -65,6 +65,11 @@ metadata:
 spec:
   {{pod_priority}}
   hostNetwork: true
+  tolerations:
+  - operator: "Exists"
+    effect: "NoExecute"
+  - operator: "Exists"
+    effect: "NoSchedule"
   containers:
   - name: kube-proxy
     image: {{pillar['kube_docker_registry']}}/kube-proxy:{{pillar['kube-proxy_docker_tag']}}
@@ -74,7 +79,7 @@ spec:
     command:
     - /bin/sh
     - -c
-    - kube-proxy {{api_servers_with_port}} {{kubeconfig}} {{cluster_cidr}} --resource-container="" --oom-score-adj=-998 {{params}} 1>>/var/log/kube-proxy.log 2>&1
+    - exec kube-proxy {{api_servers_with_port}} {{kubeconfig}} {{cluster_cidr}} --resource-container="" --oom-score-adj=-998 {{params}} 1>>/var/log/kube-proxy.log 2>&1
     {{container_env}}
     {{kube_cache_mutation_detector_env_name}}
       {{kube_cache_mutation_detector_env_value}}
@@ -96,6 +101,9 @@ spec:
     - mountPath: /run/xtables.lock
       name: iptableslock
       readOnly: false
+    - mountPath: /lib/modules
+      name: lib-modules
+      readOnly: true
   volumes:
   - hostPath:
       path: /usr/share/ca-certificates
@@ -114,3 +122,6 @@ spec:
       path: /run/xtables.lock
       type: FileOrCreate
     name: iptableslock
+  - name: lib-modules
+    hostPath:
+      path: /lib/modules

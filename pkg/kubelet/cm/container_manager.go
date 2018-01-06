@@ -23,10 +23,12 @@ import (
 	// TODO: Migrate kubelet to either use its own internal objects or client library.
 	"k8s.io/api/core/v1"
 	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
-	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
+	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
+	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/status"
+	"k8s.io/kubernetes/pkg/scheduler/schedulercache"
 
 	"fmt"
 	"strconv"
@@ -40,7 +42,7 @@ type ContainerManager interface {
 	// Runs the container manager's housekeeping.
 	// - Ensures that the Docker daemon is in a container.
 	// - Creates the system container where all non-containerized processes run.
-	Start(*v1.Node, ActivePodsFunc, status.PodStatusProvider, internalapi.RuntimeService) error
+	Start(*v1.Node, ActivePodsFunc, config.SourcesReady, status.PodStatusProvider, internalapi.RuntimeService) error
 
 	// SystemCgroupsLimit returns resources allocated to system cgroups in the machine.
 	// These cgroups include the system and Kubernetes services.
@@ -68,13 +70,24 @@ type ContainerManager interface {
 	// GetCapacity returns the amount of compute resources tracked by container manager available on the node.
 	GetCapacity() v1.ResourceList
 
+	// GetDevicePluginResourceCapacity returns the amount of device plugin resources available on the node
+	// and inactive device plugin resources previously registered on the node.
+	GetDevicePluginResourceCapacity() (v1.ResourceList, []string)
+
 	// UpdateQOSCgroups performs housekeeping updates to ensure that the top
 	// level QoS containers have their desired state in a thread-safe way
 	UpdateQOSCgroups() error
 
 	// GetResources returns RunContainerOptions with devices, mounts, and env fields populated for
 	// extended resources required by container.
-	GetResources(pod *v1.Pod, container *v1.Container, activePods []*v1.Pod) (*kubecontainer.RunContainerOptions, error)
+	GetResources(pod *v1.Pod, container *v1.Container) (*kubecontainer.RunContainerOptions, error)
+
+	// UpdatePluginResources calls Allocate of device plugin handler for potential
+	// requests for device plugin resources, and returns an error if fails.
+	// Otherwise, it updates allocatableResource in nodeInfo if necessary,
+	// to make sure it is at least equal to the pod's requested capacity for
+	// any registered device plugin resource
+	UpdatePluginResources(*schedulercache.NodeInfo, *lifecycle.PodAdmitAttributes) error
 
 	InternalContainerLifecycle() InternalContainerLifecycle
 }
@@ -87,6 +100,7 @@ type NodeConfig struct {
 	CgroupsPerQOS         bool
 	CgroupRoot            string
 	CgroupDriver          string
+	KubeletRootDir        string
 	ProtectKernelDefaults bool
 	NodeAllocatableConfig
 	ExperimentalQOSReserved               map[v1.ResourceName]int64
@@ -108,18 +122,7 @@ type Status struct {
 	SoftRequirements error
 }
 
-const (
-	// Uer visible keys for managing node allocatable enforcement on the node.
-	NodeAllocatableEnforcementKey = "pods"
-	SystemReservedEnforcementKey  = "system-reserved"
-	KubeReservedEnforcementKey    = "kube-reserved"
-)
-
-// containerManager for the kubelet is currently an injected dependency.
-// We need to parse the --qos-reserve-requests option in
-// cmd/kubelet/app/server.go and there isn't really a good place to put
-// the code.  If/When the kubelet dependency injection gets worked out,
-// maybe there will be a better place for it.
+// parsePercentage parses the percentage string to numeric value.
 func parsePercentage(v string) (int64, error) {
 	if !strings.HasSuffix(v, "%") {
 		return 0, fmt.Errorf("percentage expected, got '%s'", v)
@@ -135,7 +138,7 @@ func parsePercentage(v string) (int64, error) {
 }
 
 // ParseQOSReserved parses the --qos-reserve-requests option
-func ParseQOSReserved(m kubeletconfig.ConfigurationMap) (*map[v1.ResourceName]int64, error) {
+func ParseQOSReserved(m map[string]string) (*map[v1.ResourceName]int64, error) {
 	reservations := make(map[v1.ResourceName]int64)
 	for k, v := range m {
 		switch v1.ResourceName(k) {

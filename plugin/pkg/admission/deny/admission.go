@@ -30,19 +30,30 @@ func Register(plugins *admission.Plugins) {
 	})
 }
 
-// alwaysDeny is an implementation of admission.Interface which always says no to an admission request.
+// AlwaysDeny is an implementation of admission.Interface which always says no to an admission request.
 // It is useful in unit tests to force an operation to be forbidden.
-type alwaysDeny struct{}
+type AlwaysDeny struct{}
 
-func (alwaysDeny) Admit(a admission.Attributes) (err error) {
+var _ admission.MutationInterface = AlwaysDeny{}
+var _ admission.ValidationInterface = AlwaysDeny{}
+
+// Admit makes an admission decision based on the request attributes.
+func (AlwaysDeny) Admit(a admission.Attributes) (err error) {
 	return admission.NewForbidden(a, errors.New("Admission control is denying all modifications"))
 }
 
-func (alwaysDeny) Handles(operation admission.Operation) bool {
+// Validate makes an admission decision based on the request attributes.  It is NOT allowed to mutate.
+func (AlwaysDeny) Validate(a admission.Attributes) (err error) {
+	return admission.NewForbidden(a, errors.New("Admission control is denying all modifications"))
+}
+
+// Handles returns true if this admission controller can handle the given operation
+// where operation can be one of CREATE, UPDATE, DELETE, or CONNECT
+func (AlwaysDeny) Handles(operation admission.Operation) bool {
 	return true
 }
 
 // NewAlwaysDeny creates an always deny admission handler
-func NewAlwaysDeny() admission.Interface {
-	return new(alwaysDeny)
+func NewAlwaysDeny() *AlwaysDeny {
+	return new(AlwaysDeny)
 }

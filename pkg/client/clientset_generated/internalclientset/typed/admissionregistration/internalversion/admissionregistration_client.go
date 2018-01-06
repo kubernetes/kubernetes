@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2018 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -23,8 +23,9 @@ import (
 
 type AdmissionregistrationInterface interface {
 	RESTClient() rest.Interface
-	ExternalAdmissionHookConfigurationsGetter
 	InitializerConfigurationsGetter
+	MutatingWebhookConfigurationsGetter
+	ValidatingWebhookConfigurationsGetter
 }
 
 // AdmissionregistrationClient is used to interact with features provided by the admissionregistration.k8s.io group.
@@ -32,12 +33,16 @@ type AdmissionregistrationClient struct {
 	restClient rest.Interface
 }
 
-func (c *AdmissionregistrationClient) ExternalAdmissionHookConfigurations() ExternalAdmissionHookConfigurationInterface {
-	return newExternalAdmissionHookConfigurations(c)
-}
-
 func (c *AdmissionregistrationClient) InitializerConfigurations() InitializerConfigurationInterface {
 	return newInitializerConfigurations(c)
+}
+
+func (c *AdmissionregistrationClient) MutatingWebhookConfigurations() MutatingWebhookConfigurationInterface {
+	return newMutatingWebhookConfigurations(c)
+}
+
+func (c *AdmissionregistrationClient) ValidatingWebhookConfigurations() ValidatingWebhookConfigurationInterface {
+	return newValidatingWebhookConfigurations(c)
 }
 
 // NewForConfig creates a new AdmissionregistrationClient for the given config.

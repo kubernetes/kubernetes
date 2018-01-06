@@ -8,7 +8,6 @@ go_library(
         "container_reference_manager.go",
         "helpers.go",
         "os.go",
-        "pty_unsupported.go",
         "ref.go",
         "resize.go",
         "runtime.go",
@@ -16,15 +15,45 @@ go_library(
         "runtime_cache_fake.go",
         "sync_result.go",
     ] + select({
-        "@io_bazel_rules_go//go/platform:linux_amd64": [
+        "@io_bazel_rules_go//go/platform:android": [
+            "pty_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:darwin": [
+            "pty_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:dragonfly": [
+            "pty_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:freebsd": [
+            "pty_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:linux": [
             "pty_linux.go",
+        ],
+        "@io_bazel_rules_go//go/platform:nacl": [
+            "pty_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:netbsd": [
+            "pty_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:openbsd": [
+            "pty_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:plan9": [
+            "pty_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:solaris": [
+            "pty_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:windows": [
+            "pty_unsupported.go",
         ],
         "//conditions:default": [],
     }),
     importpath = "k8s.io/kubernetes/pkg/kubelet/container",
     visibility = ["//visibility:public"],
     deps = [
-        "//pkg/api:go_default_library",
+        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/kubelet/apis/cri/v1alpha1/runtime:go_default_library",
         "//pkg/kubelet/util/format:go_default_library",
         "//pkg/kubelet/util/ioutils:go_default_library",
@@ -43,7 +72,7 @@ go_library(
         "//vendor/k8s.io/client-go/tools/remotecommand:go_default_library",
         "//vendor/k8s.io/client-go/util/flowcontrol:go_default_library",
     ] + select({
-        "@io_bazel_rules_go//go/platform:linux_amd64": [
+        "@io_bazel_rules_go//go/platform:linux": [
             "//vendor/github.com/kr/pty:go_default_library",
         ],
         "//conditions:default": [],
@@ -58,11 +87,11 @@ go_test(
         "ref_test.go",
         "sync_result_test.go",
     ],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/pkg/kubelet/container",
-    library = ":go_default_library",
     deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/api/install:go_default_library",
+        "//pkg/api/legacyscheme:go_default_library",
+        "//pkg/apis/core/install:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",

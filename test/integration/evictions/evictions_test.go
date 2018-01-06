@@ -75,12 +75,12 @@ func TestConcurrentEvictionRequests(t *testing.T) {
 		podName := fmt.Sprintf(podNameFormat, i)
 		pod := newPod(podName)
 
-		if _, err := clientSet.Core().Pods(ns.Name).Create(pod); err != nil {
+		if _, err := clientSet.CoreV1().Pods(ns.Name).Create(pod); err != nil {
 			t.Errorf("Failed to create pod: %v", err)
 		}
 
 		addPodConditionReady(pod)
-		if _, err := clientSet.Core().Pods(ns.Name).UpdateStatus(pod); err != nil {
+		if _, err := clientSet.CoreV1().Pods(ns.Name).UpdateStatus(pod); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -124,7 +124,7 @@ func TestConcurrentEvictionRequests(t *testing.T) {
 				// should not return here otherwise we would leak the pod
 			}
 
-			_, err = clientSet.Core().Pods(ns.Name).Get(podName, metav1.GetOptions{})
+			_, err = clientSet.CoreV1().Pods(ns.Name).Get(podName, metav1.GetOptions{})
 			switch {
 			case errors.IsNotFound(err):
 				atomic.AddUint32(&numberPodsEvicted, 1)
@@ -138,7 +138,7 @@ func TestConcurrentEvictionRequests(t *testing.T) {
 			}
 
 			// delete pod which still exists due to error
-			e := clientSet.Core().Pods(ns.Name).Delete(podName, deleteOption)
+			e := clientSet.CoreV1().Pods(ns.Name).Delete(podName, deleteOption)
 			if e != nil {
 				errCh <- e
 			}

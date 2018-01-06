@@ -28,13 +28,13 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	apiserverserviceaccount "k8s.io/apiserver/pkg/authentication/serviceaccount"
-	clientgoclientset "k8s.io/client-go/kubernetes"
 	clientset "k8s.io/client-go/kubernetes"
 	v1authentication "k8s.io/client-go/kubernetes/typed/authentication/v1"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 
 	"github.com/golang/glog"
@@ -46,8 +46,8 @@ type ControllerClientBuilder interface {
 	ConfigOrDie(name string) *restclient.Config
 	Client(name string) (clientset.Interface, error)
 	ClientOrDie(name string) clientset.Interface
-	ClientGoClient(name string) (clientgoclientset.Interface, error)
-	ClientGoClientOrDie(name string) clientgoclientset.Interface
+	ClientGoClient(name string) (clientset.Interface, error)
+	ClientGoClientOrDie(name string) clientset.Interface
 }
 
 // SimpleControllerClientBuilder returns a fixed client with different user agents
@@ -85,15 +85,15 @@ func (b SimpleControllerClientBuilder) ClientOrDie(name string) clientset.Interf
 	return client
 }
 
-func (b SimpleControllerClientBuilder) ClientGoClient(name string) (clientgoclientset.Interface, error) {
+func (b SimpleControllerClientBuilder) ClientGoClient(name string) (clientset.Interface, error) {
 	clientConfig, err := b.Config(name)
 	if err != nil {
 		return nil, err
 	}
-	return clientgoclientset.NewForConfig(clientConfig)
+	return clientset.NewForConfig(clientConfig)
 }
 
-func (b SimpleControllerClientBuilder) ClientGoClientOrDie(name string) clientgoclientset.Interface {
+func (b SimpleControllerClientBuilder) ClientGoClientOrDie(name string) clientset.Interface {
 	client, err := b.ClientGoClient(name)
 	if err != nil {
 		glog.Fatal(err)
@@ -237,7 +237,7 @@ func (b SAControllerClientBuilder) getAuthenticatedConfig(sa *v1.ServiceAccount,
 	// If we couldn't run the token review, the API might be disabled or we might not have permission.
 	// Try to make a request to /apis with the token. If we get a 401 we should consider the token invalid.
 	clientConfigCopy := *clientConfig
-	clientConfigCopy.NegotiatedSerializer = api.Codecs
+	clientConfigCopy.NegotiatedSerializer = legacyscheme.Codecs
 	client, err := restclient.UnversionedRESTClientFor(&clientConfigCopy)
 	if err != nil {
 		return nil, false, err
@@ -275,15 +275,15 @@ func (b SAControllerClientBuilder) ClientOrDie(name string) clientset.Interface 
 	return client
 }
 
-func (b SAControllerClientBuilder) ClientGoClient(name string) (clientgoclientset.Interface, error) {
+func (b SAControllerClientBuilder) ClientGoClient(name string) (clientset.Interface, error) {
 	clientConfig, err := b.Config(name)
 	if err != nil {
 		return nil, err
 	}
-	return clientgoclientset.NewForConfig(clientConfig)
+	return clientset.NewForConfig(clientConfig)
 }
 
-func (b SAControllerClientBuilder) ClientGoClientOrDie(name string) clientgoclientset.Interface {
+func (b SAControllerClientBuilder) ClientGoClientOrDie(name string) clientset.Interface {
 	client, err := b.ClientGoClient(name)
 	if err != nil {
 		glog.Fatal(err)

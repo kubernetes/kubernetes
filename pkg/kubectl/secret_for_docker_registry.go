@@ -20,8 +20,8 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	"k8s.io/kubernetes/pkg/kubectl/util/hash"
 )
@@ -85,15 +85,15 @@ func (s SecretForDockerRegistryGeneratorV1) StructuredGenerate() (runtime.Object
 	if err := s.validate(); err != nil {
 		return nil, err
 	}
-	dockercfgContent, err := handleDockercfgContent(s.Username, s.Password, s.Email, s.Server)
+	dockercfgJsonContent, err := handleDockerCfgJsonContent(s.Username, s.Password, s.Email, s.Server)
 	if err != nil {
 		return nil, err
 	}
-	secret := &api.Secret{}
+	secret := &v1.Secret{}
 	secret.Name = s.Name
-	secret.Type = api.SecretTypeDockercfg
+	secret.Type = v1.SecretTypeDockerConfigJson
 	secret.Data = map[string][]byte{}
-	secret.Data[api.DockerConfigKey] = dockercfgContent
+	secret.Data[v1.DockerConfigJsonKey] = dockercfgJsonContent
 	if s.AppendHash {
 		h, err := hash.SecretHash(secret)
 		if err != nil {
@@ -133,15 +133,17 @@ func (s SecretForDockerRegistryGeneratorV1) validate() error {
 	return nil
 }
 
-// handleDockercfgContent serializes a dockercfg json file
-func handleDockercfgContent(username, password, email, server string) ([]byte, error) {
+// handleDockerCfgJsonContent serializes a ~/.docker/config.json file
+func handleDockerCfgJsonContent(username, password, email, server string) ([]byte, error) {
 	dockercfgAuth := credentialprovider.DockerConfigEntry{
 		Username: username,
 		Password: password,
 		Email:    email,
 	}
 
-	dockerCfg := map[string]credentialprovider.DockerConfigEntry{server: dockercfgAuth}
+	dockerCfgJson := credentialprovider.DockerConfigJson{
+		Auths: map[string]credentialprovider.DockerConfigEntry{server: dockercfgAuth},
+	}
 
-	return json.Marshal(dockerCfg)
+	return json.Marshal(dockerCfgJson)
 }

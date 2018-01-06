@@ -144,8 +144,9 @@ func (a *APIInstaller) newWebService() *restful.WebService {
 // object. If the storage object is a subresource and has an override supplied for it, it returns
 // the group version kind supplied in the override.
 func (a *APIInstaller) getResourceKind(path string, storage rest.Storage) (schema.GroupVersionKind, error) {
-	if fqKindToRegister, ok := a.group.SubresourceGroupVersionKind[path]; ok {
-		return fqKindToRegister, nil
+	// Let the storage tell us exactly what GVK it has
+	if gvkProvider, ok := storage.(rest.GroupVersionKindProvider); ok {
+		return gvkProvider.GroupVersionKind(a.group.GroupVersion), nil
 	}
 
 	object := storage.New()
@@ -161,12 +162,6 @@ func (a *APIInstaller) getResourceKind(path string, storage rest.Storage) (schem
 		if fqKind.Group == a.group.GroupVersion.Group {
 			fqKindToRegister = a.group.GroupVersion.WithKind(fqKind.Kind)
 			break
-		}
-
-		// TODO: keep rid of extensions api group dependency here
-		// This keeps it doing what it was doing before, but it doesn't feel right.
-		if fqKind.Group == "extensions" && fqKind.Kind == "ThirdPartyResourceData" {
-			fqKindToRegister = a.group.GroupVersion.WithKind(fqKind.Kind)
 		}
 	}
 	if fqKindToRegister.Empty() {
@@ -878,7 +873,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		apiResource.Categories = categoriesProvider.Categories()
 	}
 	if gvkProvider, ok := storage.(rest.GroupVersionKindProvider); ok {
-		gvk := gvkProvider.GroupVersionKind()
+		gvk := gvkProvider.GroupVersionKind(a.group.GroupVersion)
 		apiResource.Group = gvk.Group
 		apiResource.Version = gvk.Version
 		apiResource.Kind = gvk.Kind

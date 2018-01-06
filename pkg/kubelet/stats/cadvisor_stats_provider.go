@@ -18,6 +18,7 @@ package stats
 
 import (
 	"fmt"
+	"path"
 	"sort"
 	"strings"
 
@@ -28,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
+	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/leaky"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
@@ -74,24 +76,13 @@ func (p *cadvisorStatsProvider) ListPodStats() ([]statsapi.PodStats, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to get imageFs info: %v", err)
 	}
-
-	infos, err := p.cadvisor.ContainerInfoV2("/", cadvisorapiv2.RequestOptions{
-		IdType:    cadvisorapiv2.TypeName,
-		Count:     2, // 2 samples are needed to compute "instantaneous" CPU
-		Recursive: true,
-	})
+	infos, err := getCadvisorContainerInfo(p.cadvisor)
 	if err != nil {
-		if _, ok := infos["/"]; ok {
-			// If the failure is partial, log it and return a best-effort
-			// response.
-			glog.Errorf("Partial failure issuing cadvisor.ContainerInfoV2: %v", err)
-		} else {
-			return nil, fmt.Errorf("failed to get root cgroup stats: %v", err)
-		}
+		return nil, fmt.Errorf("failed to get container info from cadvisor: %v", err)
 	}
-
+	// removeTerminatedContainerInfo will also remove pod level cgroups, so save the infos into allInfos first
+	allInfos := infos
 	infos = removeTerminatedContainerInfo(infos)
-
 	// Map each container to a pod and update the PodStats with container data.
 	podToStats := map[statsapi.PodReference]*statsapi.PodStats{}
 	for key, cinfo := range infos {
@@ -106,7 +97,7 @@ func (p *cadvisorStatsProvider) ListPodStats() ([]statsapi.PodStats, error) {
 		if !isPodManagedContainer(&cinfo) {
 			continue
 		}
-		ref := buildPodRef(&cinfo)
+		ref := buildPodRef(cinfo.Spec.Labels)
 
 		// Lookup the PodStats for the pod using the PodRef. If none exists,
 		// initialize a new entry.
@@ -134,13 +125,71 @@ func (p *cadvisorStatsProvider) ListPodStats() ([]statsapi.PodStats, error) {
 	for _, podStats := range podToStats {
 		// Lookup the volume stats for each pod.
 		podUID := types.UID(podStats.PodRef.UID)
+		var ephemeralStats []statsapi.VolumeStats
 		if vstats, found := p.resourceAnalyzer.GetPodVolumeStats(podUID); found {
-			podStats.VolumeStats = vstats.Volumes
+			ephemeralStats = make([]statsapi.VolumeStats, len(vstats.EphemeralVolumes))
+			copy(ephemeralStats, vstats.EphemeralVolumes)
+			podStats.VolumeStats = append(vstats.EphemeralVolumes, vstats.PersistentVolumes...)
+		}
+		podStats.EphemeralStorage = calcEphemeralStorage(podStats.Containers, ephemeralStats, &rootFsInfo)
+		// Lookup the pod-level cgroup's CPU and memory stats
+		podInfo := getcadvisorPodInfoFromPodUID(podUID, allInfos)
+		if podInfo != nil {
+			cpu, memory := cadvisorInfoToCPUandMemoryStats(podInfo)
+			podStats.CPU = cpu
+			podStats.Memory = memory
 		}
 		result = append(result, *podStats)
 	}
 
 	return result, nil
+}
+
+func calcEphemeralStorage(containers []statsapi.ContainerStats, volumes []statsapi.VolumeStats, rootFsInfo *cadvisorapiv2.FsInfo) *statsapi.FsStats {
+	result := &statsapi.FsStats{
+		Time:           metav1.NewTime(rootFsInfo.Timestamp),
+		AvailableBytes: &rootFsInfo.Available,
+		CapacityBytes:  &rootFsInfo.Capacity,
+		InodesFree:     rootFsInfo.InodesFree,
+		Inodes:         rootFsInfo.Inodes,
+	}
+	for _, container := range containers {
+		addContainerUsage(result, &container)
+	}
+	for _, volume := range volumes {
+		result.UsedBytes = addUsage(result.UsedBytes, volume.FsStats.UsedBytes)
+		result.InodesUsed = addUsage(result.InodesUsed, volume.InodesUsed)
+		result.Time = maxUpdateTime(&result.Time, &volume.FsStats.Time)
+	}
+	return result
+}
+
+func addContainerUsage(stat *statsapi.FsStats, container *statsapi.ContainerStats) {
+	if rootFs := container.Rootfs; rootFs != nil {
+		stat.Time = maxUpdateTime(&stat.Time, &rootFs.Time)
+		stat.InodesUsed = addUsage(stat.InodesUsed, rootFs.InodesUsed)
+		stat.UsedBytes = addUsage(stat.UsedBytes, rootFs.UsedBytes)
+		if logs := container.Logs; logs != nil {
+			stat.UsedBytes = addUsage(stat.UsedBytes, logs.UsedBytes)
+			stat.Time = maxUpdateTime(&stat.Time, &logs.Time)
+		}
+	}
+}
+
+func maxUpdateTime(first, second *metav1.Time) metav1.Time {
+	if first.Before(second) {
+		return *second
+	}
+	return *first
+}
+func addUsage(first, second *uint64) *uint64 {
+	if first == nil {
+		return second
+	} else if second == nil {
+		return first
+	}
+	total := *first + *second
+	return &total
 }
 
 // ImageFsStats returns the stats of the filesystem for storing images.
@@ -172,10 +221,10 @@ func (p *cadvisorStatsProvider) ImageFsStats() (*statsapi.FsStats, error) {
 }
 
 // buildPodRef returns a PodReference that identifies the Pod managing cinfo
-func buildPodRef(cinfo *cadvisorapiv2.ContainerInfo) statsapi.PodReference {
-	podName := kubetypes.GetPodName(cinfo.Spec.Labels)
-	podNamespace := kubetypes.GetPodNamespace(cinfo.Spec.Labels)
-	podUID := kubetypes.GetPodUID(cinfo.Spec.Labels)
+func buildPodRef(containerLabels map[string]string) statsapi.PodReference {
+	podName := kubetypes.GetPodName(containerLabels)
+	podNamespace := kubetypes.GetPodNamespace(containerLabels)
+	podUID := kubetypes.GetPodUID(containerLabels)
 	return statsapi.PodReference{Name: podName, Namespace: podNamespace, UID: podUID}
 }
 
@@ -192,6 +241,19 @@ func isPodManagedContainer(cinfo *cadvisorapiv2.ContainerInfo) bool {
 	return managed
 }
 
+// getcadvisorPodInfoFromPodUID returns a pod cgroup information by matching the podUID with its CgroupName identifier base name
+func getcadvisorPodInfoFromPodUID(podUID types.UID, infos map[string]cadvisorapiv2.ContainerInfo) *cadvisorapiv2.ContainerInfo {
+	for key, info := range infos {
+		if cm.IsSystemdStyleName(key) {
+			key = cm.RevertFromSystemdToCgroupStyleName(key)
+		}
+		if cm.GetPodCgroupNameSuffix(podUID) == path.Base(key) {
+			return &info
+		}
+	}
+	return nil
+}
+
 // removeTerminatedContainerInfo returns the specified containerInfo but with
 // the stats of the terminated containers removed.
 //
@@ -204,7 +266,7 @@ func removeTerminatedContainerInfo(containerInfo map[string]cadvisorapiv2.Contai
 			continue
 		}
 		cinfoID := containerID{
-			podRef:        buildPodRef(&cinfo),
+			podRef:        buildPodRef(cinfo.Spec.Labels),
 			containerName: kubetypes.GetContainerName(cinfo.Spec.Labels),
 		}
 		cinfoMap[cinfoID] = append(cinfoMap[cinfoID], containerInfoWithCgroup{
@@ -278,4 +340,22 @@ func hasMemoryAndCPUInstUsage(info *cadvisorapiv2.ContainerInfo) bool {
 		return false
 	}
 	return cstat.CpuInst.Usage.Total != 0 && cstat.Memory.RSS != 0
+}
+
+func getCadvisorContainerInfo(ca cadvisor.Interface) (map[string]cadvisorapiv2.ContainerInfo, error) {
+	infos, err := ca.ContainerInfoV2("/", cadvisorapiv2.RequestOptions{
+		IdType:    cadvisorapiv2.TypeName,
+		Count:     2, // 2 samples are needed to compute "instantaneous" CPU
+		Recursive: true,
+	})
+	if err != nil {
+		if _, ok := infos["/"]; ok {
+			// If the failure is partial, log it and return a best-effort
+			// response.
+			glog.Errorf("Partial failure issuing cadvisor.ContainerInfoV2: %v", err)
+		} else {
+			return nil, fmt.Errorf("failed to get root cgroup stats: %v", err)
+		}
+	}
+	return infos, nil
 }

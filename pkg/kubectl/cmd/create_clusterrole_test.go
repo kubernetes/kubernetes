@@ -22,10 +22,10 @@ import (
 	"reflect"
 	"testing"
 
+	rbac "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest/fake"
-	"k8s.io/kubernetes/pkg/apis/rbac"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 )
 
@@ -444,13 +444,15 @@ func TestClusterRoleValidate(t *testing.T) {
 	}
 
 	for name, test := range tests {
-		test.clusterRoleOptions.Mapper, _ = f.Object()
-		err := test.clusterRoleOptions.Validate()
-		if test.expectErr && err == nil {
-			t.Errorf("%s: expect error happens, but validate passes.", name)
-		}
-		if !test.expectErr && err != nil {
-			t.Errorf("%s: unexpected error: %v", name, err)
-		}
+		t.Run(name, func(t *testing.T) {
+			test.clusterRoleOptions.Mapper, _ = f.Object()
+			err := test.clusterRoleOptions.Validate()
+			if test.expectErr && err == nil {
+				t.Errorf("%s: expect error happens, but validate passes.", name)
+			}
+			if !test.expectErr && err != nil {
+				t.Errorf("%s: unexpected error: %v", name, err)
+			}
+		})
 	}
 }

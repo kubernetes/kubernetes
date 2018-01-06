@@ -241,6 +241,33 @@ func (plugin *awsElasticBlockStorePlugin) ConstructVolumeSpec(volName, mountPath
 	return volume.NewSpecFromVolume(awsVolume), nil
 }
 
+func (plugin *awsElasticBlockStorePlugin) RequiresFSResize() bool {
+	return true
+}
+
+func (plugin *awsElasticBlockStorePlugin) ExpandVolumeDevice(
+	spec *volume.Spec,
+	newSize resource.Quantity,
+	oldSize resource.Quantity) (resource.Quantity, error) {
+	var awsVolume aws.Volumes
+
+	awsVolume, err := getCloudProvider(plugin.host.GetCloudProvider())
+
+	if err != nil {
+		return oldSize, err
+	}
+	// we don't expect to receive this call for non PVs
+	rawVolumeName := spec.PersistentVolume.Spec.AWSElasticBlockStore.VolumeID
+	volumeID := aws.KubernetesVolumeID(rawVolumeName)
+
+	if volumeID == "" {
+		return oldSize, fmt.Errorf("EBS.ExpandVolumeDevice Invalid volume id for %s", spec.Name())
+	}
+	return awsVolume.ResizeDisk(volumeID, oldSize, newSize)
+}
+
+var _ volume.ExpandableVolumePlugin = &awsElasticBlockStorePlugin{}
+
 // Abstract interface to PD operations.
 type ebsManager interface {
 	CreateVolume(provisioner *awsElasticBlockStoreProvisioner) (volumeID aws.KubernetesVolumeID, volumeSizeGB int, labels map[string]string, fstype string, err error)

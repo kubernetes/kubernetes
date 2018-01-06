@@ -25,10 +25,11 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	envutil "k8s.io/kubernetes/pkg/kubectl/cmd/util/env"
@@ -38,7 +39,8 @@ import (
 )
 
 var (
-	envResources = `
+	validEnvNameRegexp = regexp.MustCompile("[^a-zA-Z0-9_]")
+	envResources       = `
   	pod (po), replicationcontroller (rc), deployment (deploy), daemonset (ds), job, replicaset (rs)`
 
 	envLong = templates.LongDesc(`
@@ -73,10 +75,10 @@ var (
 	  kubectl set env rc --all ENV=prod
 
 	  # Import environment from a secret
-	  kubectl set env --from=secret/mysecret dc/myapp
+	  kubectl set env --from=secret/mysecret deployment/myapp
 
 	  # Import environment from a config map with a prefix
-	  kubectl set env --from=configmap/myconfigmap --prefix=MYSQL_ dc/myapp
+	  kubectl set env --from=configmap/myconfigmap --prefix=MYSQL_ deployment/myapp
 
 	  # Remove the environment variable ENV from container 'c1' in all deployment configs
 	  kubectl set env deployments --all --containers="c1" ENV-
@@ -86,7 +88,7 @@ var (
 	  kubectl set env -f deploy.json ENV-
 
 	  # Set some of the local shell environment into a deployment config on the server
-	  env | grep RAILS_ | kubectl set env -e - dc/registry`)
+	  env | grep RAILS_ | kubectl set env -e - deployment/registry`)
 )
 
 type EnvOptions struct {
@@ -115,14 +117,13 @@ type EnvOptions struct {
 	Prefix            string
 
 	Mapper  meta.RESTMapper
-	Typer   runtime.ObjectTyper
 	Builder *resource.Builder
 	Infos   []*resource.Info
 	Encoder runtime.Encoder
 
 	Cmd *cobra.Command
 
-	UpdatePodSpecForObject func(obj runtime.Object, fn func(*api.PodSpec) error) (bool, error)
+	UpdatePodSpecForObject func(obj runtime.Object, fn func(*v1.PodSpec) error) (bool, error)
 	PrintObject            func(cmd *cobra.Command, isLocal bool, mapper meta.RESTMapper, obj runtime.Object, out io.Writer) error
 }
 
@@ -152,7 +153,7 @@ func NewCmdEnv(f cmdutil.Factory, in io.Reader, out, errout io.Writer) *cobra.Co
 	cmd.Flags().BoolVar(&options.List, "list", options.List, "If true, display the environment and any changes in the standard format. this flag will removed when we have kubectl view env.")
 	cmd.Flags().BoolVar(&options.Resolve, "resolve", options.Resolve, "If true, show secret or configmap references when listing variables")
 	cmd.Flags().StringVarP(&options.Selector, "selector", "l", options.Selector, "Selector (label query) to filter on")
-	cmd.Flags().BoolVar(&options.Local, "local", false, "If true, set image will NOT contact api-server but run locally.")
+	cmd.Flags().BoolVar(&options.Local, "local", false, "If true, set env will NOT contact api-server but run locally.")
 	cmd.Flags().BoolVar(&options.All, "all", options.All, "If true, select all resources in the namespace of the specified resource types")
 	cmd.Flags().BoolVar(&options.Overwrite, "overwrite", true, "If true, allow environment to be overwritten, otherwise reject updates that overwrite existing environment.")
 
@@ -162,7 +163,7 @@ func NewCmdEnv(f cmdutil.Factory, in io.Reader, out, errout io.Writer) *cobra.Co
 	return cmd
 }
 
-func validateNoOverwrites(existing []api.EnvVar, env []api.EnvVar) error {
+func validateNoOverwrites(existing []v1.EnvVar, env []v1.EnvVar) error {
 	for _, e := range env {
 		if current, exists := findEnv(existing, e.Name); exists && current.Value != e.Value {
 			return fmt.Errorf("'%s' already has a value (%s), and --overwrite is false", current.Name, current.Value)
@@ -172,7 +173,6 @@ func validateNoOverwrites(existing []api.EnvVar, env []api.EnvVar) error {
 }
 
 func keyToEnvName(key string) string {
-	validEnvNameRegexp := regexp.MustCompile("[^a-zA-Z0-9_]")
 	return strings.ToUpper(validEnvNameRegexp.ReplaceAllString(key, "_"))
 }
 
@@ -185,7 +185,7 @@ func (o *EnvOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []stri
 		return cmdutil.UsageErrorf(cmd, "one or more resources must be specified as <resource> <name> or <resource>/<name>")
 	}
 
-	o.Mapper, o.Typer = f.Object()
+	o.Mapper, _ = f.Object()
 	o.UpdatePodSpecForObject = f.UpdatePodSpecForObject
 	o.Encoder = f.JSONEncoder()
 	o.ContainerSelector = cmdutil.GetFlagString(cmd, "containers")
@@ -215,9 +215,13 @@ func (o *EnvOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []stri
 
 // RunEnv contains all the necessary functionality for the OpenShift cli env command
 func (o *EnvOptions) RunEnv(f cmdutil.Factory) error {
-	kubeClient, err := f.ClientSet()
-	if err != nil {
-		return err
+	var kubeClient *kubernetes.Clientset
+	if o.List {
+		client, err := f.KubernetesClientSet()
+		if err != nil {
+			return err
+		}
+		kubeClient = client
 	}
 
 	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
@@ -232,6 +236,8 @@ func (o *EnvOptions) RunEnv(f cmdutil.Factory) error {
 
 	if len(o.From) != 0 {
 		b := f.NewBuilder().
+			Internal().
+			LocalParam(o.Local).
 			ContinueOnError().
 			NamespaceParam(cmdNamespace).DefaultNamespace().
 			FilenameParam(enforceNamespace, &o.FilenameOptions).
@@ -239,11 +245,9 @@ func (o *EnvOptions) RunEnv(f cmdutil.Factory) error {
 
 		if !o.Local {
 			b = b.
-				SelectorParam(o.Selector).
+				LabelSelectorParam(o.Selector).
 				ResourceTypeOrNameArgs(o.All, o.From).
 				Latest()
-		} else {
-			b = b.Local(f.ClientForMapping)
 		}
 
 		infos, err := b.Do().Infos()
@@ -252,14 +256,18 @@ func (o *EnvOptions) RunEnv(f cmdutil.Factory) error {
 		}
 
 		for _, info := range infos {
-			switch from := info.Object.(type) {
-			case *api.Secret:
+			versionedObject, err := info.Mapping.ConvertToVersion(info.Object, info.Mapping.GroupVersionKind.GroupVersion())
+			if err != nil {
+				return err
+			}
+			switch from := versionedObject.(type) {
+			case *v1.Secret:
 				for key := range from.Data {
-					envVar := api.EnvVar{
+					envVar := v1.EnvVar{
 						Name: keyToEnvName(key),
-						ValueFrom: &api.EnvVarSource{
-							SecretKeyRef: &api.SecretKeySelector{
-								LocalObjectReference: api.LocalObjectReference{
+						ValueFrom: &v1.EnvVarSource{
+							SecretKeyRef: &v1.SecretKeySelector{
+								LocalObjectReference: v1.LocalObjectReference{
 									Name: from.Name,
 								},
 								Key: key,
@@ -268,13 +276,13 @@ func (o *EnvOptions) RunEnv(f cmdutil.Factory) error {
 					}
 					env = append(env, envVar)
 				}
-			case *api.ConfigMap:
+			case *v1.ConfigMap:
 				for key := range from.Data {
-					envVar := api.EnvVar{
+					envVar := v1.EnvVar{
 						Name: keyToEnvName(key),
-						ValueFrom: &api.EnvVarSource{
-							ConfigMapKeyRef: &api.ConfigMapKeySelector{
-								LocalObjectReference: api.LocalObjectReference{
+						ValueFrom: &v1.EnvVarSource{
+							ConfigMapKeyRef: &v1.ConfigMapKeySelector{
+								LocalObjectReference: v1.LocalObjectReference{
 									Name: from.Name,
 								},
 								Key: key,
@@ -296,18 +304,17 @@ func (o *EnvOptions) RunEnv(f cmdutil.Factory) error {
 	}
 
 	b := f.NewBuilder().
+		Internal().
+		LocalParam(o.Local).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, &o.FilenameOptions).
 		Flatten()
 
 	if !o.Local {
-		b = b.
-			SelectorParam(o.Selector).
+		b.LabelSelectorParam(o.Selector).
 			ResourceTypeOrNameArgs(o.All, o.Resources...).
 			Latest()
-	} else {
-		b = b.Local(f.ClientForMapping)
 	}
 
 	o.Infos, err = b.Do().Infos()
@@ -315,7 +322,8 @@ func (o *EnvOptions) RunEnv(f cmdutil.Factory) error {
 		return err
 	}
 	patches := CalculatePatches(o.Infos, o.Encoder, func(info *resource.Info) ([]byte, error) {
-		_, err := f.UpdatePodSpecForObject(info.Object, func(spec *api.PodSpec) error {
+		info.Object = info.AsVersioned()
+		_, err := o.UpdatePodSpecForObject(info.Object, func(spec *v1.PodSpec) error {
 			resolutionErrorsEncountered := false
 			containers, _ := selectContainers(spec.Containers, o.ContainerSelector)
 			if len(containers) == 0 {
@@ -381,9 +389,7 @@ func (o *EnvOptions) RunEnv(f cmdutil.Factory) error {
 		})
 
 		if err == nil {
-			// TODO: switch UpdatePodSpecForObject to work on v1.PodSpec, use info.VersionedObject, and avoid conversion completely
-			versionedEncoder := api.Codecs.EncoderForVersion(o.Encoder, info.Mapping.GroupVersionKind.GroupVersion())
-			return runtime.Encode(versionedEncoder, info.Object)
+			return runtime.Encode(o.Encoder, info.Object)
 		}
 		return nil, err
 	})
@@ -407,7 +413,7 @@ func (o *EnvOptions) RunEnv(f cmdutil.Factory) error {
 		}
 
 		if o.PrintObject != nil && (o.Local || o.DryRun) {
-			if err := o.PrintObject(o.Cmd, o.Local, o.Mapper, info.Object, o.Out); err != nil {
+			if err := o.PrintObject(o.Cmd, o.Local, o.Mapper, patch.Info.AsVersioned(), o.Out); err != nil {
 				return err
 			}
 			continue
@@ -427,10 +433,13 @@ func (o *EnvOptions) RunEnv(f cmdutil.Factory) error {
 		}
 
 		if len(o.Output) > 0 {
-			return o.PrintObject(o.Cmd, o.Local, o.Mapper, obj, o.Out)
+			if err := o.PrintObject(o.Cmd, o.Local, o.Mapper, info.AsVersioned(), o.Out); err != nil {
+				return err
+			}
+			continue
 		}
 
-		cmdutil.PrintSuccess(o.Mapper, o.ShortOutput, o.Out, info.Mapping.Resource, info.Name, false, "env updated")
+		f.PrintSuccess(o.Mapper, o.ShortOutput, o.Out, info.Mapping.Resource, info.Name, false, "env updated")
 	}
 	return utilerrors.NewAggregate(allErrs)
 }

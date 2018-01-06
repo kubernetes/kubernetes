@@ -46,7 +46,7 @@ func TestSummaryProvider(t *testing.T) {
 		node         = &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "test-node"}}
 		nodeConfig   = cm.NodeConfig{
 			RuntimeCgroupsName: "/runtime",
-			SystemCgroupsName:  "/system",
+			SystemCgroupsName:  "/misc",
 			KubeletCgroupsName: "/kubelet",
 		}
 		cgroupStatsMap = map[string]struct {
@@ -55,7 +55,7 @@ func TestSummaryProvider(t *testing.T) {
 		}{
 			"/":        {cs: getContainerStats(), ns: getNetworkStats()},
 			"/runtime": {cs: getContainerStats(), ns: getNetworkStats()},
-			"/system":  {cs: getContainerStats(), ns: getNetworkStats()},
+			"/misc":    {cs: getContainerStats(), ns: getNetworkStats()},
 			"/kubelet": {cs: getContainerStats(), ns: getNetworkStats()},
 		}
 	)
@@ -71,7 +71,7 @@ func TestSummaryProvider(t *testing.T) {
 		On("RootFsStats").Return(rootFsStats, nil).
 		On("GetCgroupStats", "/").Return(cgroupStatsMap["/"].cs, cgroupStatsMap["/"].ns, nil).
 		On("GetCgroupStats", "/runtime").Return(cgroupStatsMap["/runtime"].cs, cgroupStatsMap["/runtime"].ns, nil).
-		On("GetCgroupStats", "/system").Return(cgroupStatsMap["/system"].cs, cgroupStatsMap["/system"].ns, nil).
+		On("GetCgroupStats", "/misc").Return(cgroupStatsMap["/misc"].cs, cgroupStatsMap["/misc"].ns, nil).
 		On("GetCgroupStats", "/kubelet").Return(cgroupStatsMap["/kubelet"].cs, cgroupStatsMap["/kubelet"].ns, nil)
 
 	provider := NewSummaryProvider(mockStatsProvider)
@@ -87,29 +87,30 @@ func TestSummaryProvider(t *testing.T) {
 	assert.Equal(summary.Node.Runtime, &statsapi.RuntimeStats{ImageFs: imageFsStats})
 
 	assert.Equal(len(summary.Node.SystemContainers), 3)
-	assert.Contains(summary.Node.SystemContainers,
-		statsapi.ContainerStats{
-			Name:               "kubelet",
-			StartTime:          cgroupStatsMap["/kubelet"].cs.StartTime,
-			CPU:                cgroupStatsMap["/kubelet"].cs.CPU,
-			Memory:             cgroupStatsMap["/kubelet"].cs.Memory,
-			UserDefinedMetrics: cgroupStatsMap["/kubelet"].cs.UserDefinedMetrics,
-		},
-		statsapi.ContainerStats{
-			Name:               "system",
-			StartTime:          cgroupStatsMap["/system"].cs.StartTime,
-			CPU:                cgroupStatsMap["/system"].cs.CPU,
-			Memory:             cgroupStatsMap["/system"].cs.Memory,
-			UserDefinedMetrics: cgroupStatsMap["/system"].cs.UserDefinedMetrics,
-		},
-		statsapi.ContainerStats{
-			Name:               "runtime",
-			StartTime:          cgroupStatsMap["/runtime"].cs.StartTime,
-			CPU:                cgroupStatsMap["/runtime"].cs.CPU,
-			Memory:             cgroupStatsMap["/runtime"].cs.Memory,
-			UserDefinedMetrics: cgroupStatsMap["/runtime"].cs.UserDefinedMetrics,
-		},
-	)
+	assert.Contains(summary.Node.SystemContainers, statsapi.ContainerStats{
+		Name:               "kubelet",
+		StartTime:          cgroupStatsMap["/kubelet"].cs.StartTime,
+		CPU:                cgroupStatsMap["/kubelet"].cs.CPU,
+		Memory:             cgroupStatsMap["/kubelet"].cs.Memory,
+		Accelerators:       cgroupStatsMap["/kubelet"].cs.Accelerators,
+		UserDefinedMetrics: cgroupStatsMap["/kubelet"].cs.UserDefinedMetrics,
+	})
+	assert.Contains(summary.Node.SystemContainers, statsapi.ContainerStats{
+		Name:               "misc",
+		StartTime:          cgroupStatsMap["/misc"].cs.StartTime,
+		CPU:                cgroupStatsMap["/misc"].cs.CPU,
+		Memory:             cgroupStatsMap["/misc"].cs.Memory,
+		Accelerators:       cgroupStatsMap["/misc"].cs.Accelerators,
+		UserDefinedMetrics: cgroupStatsMap["/misc"].cs.UserDefinedMetrics,
+	})
+	assert.Contains(summary.Node.SystemContainers, statsapi.ContainerStats{
+		Name:               "runtime",
+		StartTime:          cgroupStatsMap["/runtime"].cs.StartTime,
+		CPU:                cgroupStatsMap["/runtime"].cs.CPU,
+		Memory:             cgroupStatsMap["/runtime"].cs.Memory,
+		Accelerators:       cgroupStatsMap["/runtime"].cs.Accelerators,
+		UserDefinedMetrics: cgroupStatsMap["/runtime"].cs.UserDefinedMetrics,
+	})
 	assert.Equal(summary.Pods, podStats)
 }
 

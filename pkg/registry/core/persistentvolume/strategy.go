@@ -27,8 +27,10 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/validation"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	pvutil "k8s.io/kubernetes/pkg/api/persistentvolume"
+	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/apis/core/validation"
 	volumevalidation "k8s.io/kubernetes/pkg/volume/validation"
 )
 
@@ -40,7 +42,7 @@ type persistentvolumeStrategy struct {
 
 // Strategy is the default logic that applies when creating and updating PersistentVolume
 // objects via the REST API.
-var Strategy = persistentvolumeStrategy{api.Scheme, names.SimpleNameGenerator}
+var Strategy = persistentvolumeStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
 
 func (persistentvolumeStrategy) NamespaceScoped() bool {
 	return false
@@ -50,6 +52,8 @@ func (persistentvolumeStrategy) NamespaceScoped() bool {
 func (persistentvolumeStrategy) PrepareForCreate(ctx genericapirequest.Context, obj runtime.Object) {
 	pv := obj.(*api.PersistentVolume)
 	pv.Status = api.PersistentVolumeStatus{}
+
+	pvutil.DropDisabledAlphaFields(&pv.Spec)
 }
 
 func (persistentvolumeStrategy) Validate(ctx genericapirequest.Context, obj runtime.Object) field.ErrorList {
@@ -71,6 +75,9 @@ func (persistentvolumeStrategy) PrepareForUpdate(ctx genericapirequest.Context, 
 	newPv := obj.(*api.PersistentVolume)
 	oldPv := old.(*api.PersistentVolume)
 	newPv.Status = oldPv.Status
+
+	pvutil.DropDisabledAlphaFields(&newPv.Spec)
+	pvutil.DropDisabledAlphaFields(&oldPv.Spec)
 }
 
 func (persistentvolumeStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {

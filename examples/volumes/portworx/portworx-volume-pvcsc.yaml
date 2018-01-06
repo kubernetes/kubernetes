@@ -2,11 +2,10 @@ kind: PersistentVolumeClaim
 apiVersion: v1
 metadata:
   name: pvcsc001
-  annotations:
-    volume.beta.kubernetes.io/storage-class: portworx-io-priority-high
 spec:
   accessModes:
     - ReadWriteOnce
   resources:
     requests:
       storage: 2Gi
+  storageClassName: portworx-io-priority-high

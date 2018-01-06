@@ -67,18 +67,9 @@ func TestGetAccessModes(t *testing.T) {
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
-	if !contains(plug.GetAccessModes(), v1.ReadWriteOnce) || !contains(plug.GetAccessModes(), v1.ReadOnlyMany) {
+	if !volumetest.ContainsAccessMode(plug.GetAccessModes(), v1.ReadWriteOnce) || !volumetest.ContainsAccessMode(plug.GetAccessModes(), v1.ReadOnlyMany) {
 		t.Errorf("Expected two AccessModeTypes:  %s and %s", v1.ReadWriteOnce, v1.ReadOnlyMany)
 	}
-}
-
-func contains(modes []v1.PersistentVolumeAccessMode, mode v1.PersistentVolumeAccessMode) bool {
-	for _, m := range modes {
-		if m == mode {
-			return true
-		}
-	}
-	return false
 }
 
 type fakeDiskManager struct {
@@ -188,7 +179,7 @@ func doTestPlugin(t *testing.T, spec *volume.Spec) {
 	if _, err := os.Stat(path); err == nil {
 		t.Errorf("TearDown() failed, volume path still exists: %s", path)
 	} else if !os.IsNotExist(err) {
-		t.Errorf("SetUp() failed: %v", err)
+		t.Errorf("TearDown() failed: %v", err)
 	}
 }
 
@@ -214,7 +205,7 @@ func TestPluginPersistentVolume(t *testing.T) {
 		},
 		Spec: v1.PersistentVolumeSpec{
 			PersistentVolumeSource: v1.PersistentVolumeSource{
-				ISCSI: &v1.ISCSIVolumeSource{
+				ISCSI: &v1.ISCSIPersistentVolumeSource{
 					TargetPortal: "127.0.0.1:3260",
 					IQN:          "iqn.2014-12.server:storage.target01",
 					FSType:       "ext4",
@@ -239,7 +230,7 @@ func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 		},
 		Spec: v1.PersistentVolumeSpec{
 			PersistentVolumeSource: v1.PersistentVolumeSource{
-				ISCSI: &v1.ISCSIVolumeSource{
+				ISCSI: &v1.ISCSIPersistentVolumeSource{
 					TargetPortal: "127.0.0.1:3260",
 					IQN:          "iqn.2014-12.server:storage.target01",
 					FSType:       "ext4",
@@ -291,4 +282,147 @@ func TestPortalMounter(t *testing.T) {
 	if portal := portalMounter("127.0.0.1:3260"); portal != "127.0.0.1:3260" {
 		t.Errorf("wrong portal: %s", portal)
 	}
+}
+
+type testcase struct {
+	name      string
+	defaultNs string
+	spec      *volume.Spec
+	// Expected return of the test
+	expectedName  string
+	expectedNs    string
+	expectedIface string
+	expectedError error
+}
+
+func TestGetSecretNameAndNamespaceForPV(t *testing.T) {
+	tests := []testcase{
+		{
+			name:      "persistent volume source",
+			defaultNs: "default",
+			spec: &volume.Spec{
+				PersistentVolume: &v1.PersistentVolume{
+					Spec: v1.PersistentVolumeSpec{
+						PersistentVolumeSource: v1.PersistentVolumeSource{
+							ISCSI: &v1.ISCSIPersistentVolumeSource{
+								TargetPortal: "127.0.0.1:3260",
+								IQN:          "iqn.2014-12.server:storage.target01",
+								FSType:       "ext4",
+								Lun:          0,
+								SecretRef: &v1.SecretReference{
+									Name:      "name",
+									Namespace: "ns",
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedName:  "name",
+			expectedNs:    "ns",
+			expectedError: nil,
+		},
+		{
+			name:      "persistent volume source without namespace",
+			defaultNs: "default",
+			spec: &volume.Spec{
+				PersistentVolume: &v1.PersistentVolume{
+					Spec: v1.PersistentVolumeSpec{
+						PersistentVolumeSource: v1.PersistentVolumeSource{
+							ISCSI: &v1.ISCSIPersistentVolumeSource{
+								TargetPortal: "127.0.0.1:3260",
+								IQN:          "iqn.2014-12.server:storage.target01",
+								FSType:       "ext4",
+								Lun:          0,
+								SecretRef: &v1.SecretReference{
+									Name: "name",
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedName:  "name",
+			expectedNs:    "default",
+			expectedError: nil,
+		},
+		{
+			name:      "pod volume source",
+			defaultNs: "default",
+			spec: &volume.Spec{
+				Volume: &v1.Volume{
+					VolumeSource: v1.VolumeSource{
+						ISCSI: &v1.ISCSIVolumeSource{
+							TargetPortal: "127.0.0.1:3260",
+							IQN:          "iqn.2014-12.server:storage.target01",
+							FSType:       "ext4",
+							Lun:          0,
+						},
+					},
+				},
+			},
+			expectedName:  "",
+			expectedNs:    "",
+			expectedError: nil,
+		},
+	}
+	for _, testcase := range tests {
+		resultName, resultNs, err := getISCSISecretNameAndNamespace(testcase.spec, testcase.defaultNs)
+		if err != testcase.expectedError || resultName != testcase.expectedName || resultNs != testcase.expectedNs {
+			t.Errorf("%s failed: expected err=%v ns=%q name=%q, got %v/%q/%q", testcase.name, testcase.expectedError, testcase.expectedNs, testcase.expectedName,
+				err, resultNs, resultName)
+		}
+	}
+
+}
+
+func TestGetISCSIInitiatorInfo(t *testing.T) {
+	tests := []testcase{
+		{
+			name: "persistent volume source",
+			spec: &volume.Spec{
+				PersistentVolume: &v1.PersistentVolume{
+					Spec: v1.PersistentVolumeSpec{
+						PersistentVolumeSource: v1.PersistentVolumeSource{
+							ISCSI: &v1.ISCSIPersistentVolumeSource{
+								TargetPortal:   "127.0.0.1:3260",
+								IQN:            "iqn.2014-12.server:storage.target01",
+								FSType:         "ext4",
+								Lun:            0,
+								ISCSIInterface: "tcp",
+							},
+						},
+					},
+				},
+			},
+			expectedIface: "tcp",
+			expectedError: nil,
+		},
+		{
+			name: "pod volume source",
+			spec: &volume.Spec{
+				Volume: &v1.Volume{
+					VolumeSource: v1.VolumeSource{
+						ISCSI: &v1.ISCSIVolumeSource{
+							TargetPortal:   "127.0.0.1:3260",
+							IQN:            "iqn.2014-12.server:storage.target01",
+							FSType:         "ext4",
+							Lun:            0,
+							ISCSIInterface: "tcp",
+						},
+					},
+				},
+			},
+			expectedIface: "tcp",
+			expectedError: nil,
+		},
+	}
+	for _, testcase := range tests {
+		resultIface, _, err := getISCSIInitiatorInfo(testcase.spec)
+		if err != testcase.expectedError || resultIface != testcase.expectedIface {
+			t.Errorf("%s failed: expected err=%v iface=%s, got %v/%s", testcase.name, testcase.expectedError, testcase.expectedIface,
+				err, resultIface)
+		}
+	}
+
 }

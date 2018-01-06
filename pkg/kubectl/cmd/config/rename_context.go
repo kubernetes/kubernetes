@@ -43,7 +43,7 @@ const (
 
 var (
 	renameContextLong = templates.LongDesc(`
-		Renames a context from the kubeconfig file .
+		Renames a context from the kubeconfig file.
 
 		CONTEXT_NAME is the context name that you wish change.
 
@@ -70,7 +70,7 @@ func NewCmdConfigRenameContext(out io.Writer, configAccess clientcmd.ConfigAcces
 				cmdutil.CheckErr(err)
 			}
 			if err := options.Validate(); err != nil {
-				cmdutil.UsageErrorf(cmd, err.Error())
+				cmdutil.CheckErr(cmdutil.UsageErrorf(cmd, err.Error()))
 			}
 			if err := options.RunRenameContext(out); err != nil {
 				cmdutil.CheckErr(err)
@@ -130,6 +130,6 @@ func (o RenameContextOptions) RunRenameContext(out io.Writer) error {
 		return err
 	}
 
-	fmt.Fprintf(out, "Context %q was renamed to %q.\n", o.contextName, o.newName)
+	fmt.Fprintf(out, "Context %q renamed to %q.\n", o.contextName, o.newName)
 	return nil
 }

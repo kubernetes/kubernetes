@@ -39,6 +39,9 @@ func NewKubelet() (*Server, error) {
 		configuration data, with the running set of containers by starting or stopping
 		Docker containers.`,
 		Run: func(_ *Server, _ []string, stopCh <-chan struct{}) error {
+			if s.ExperimentalDockershim {
+				return app.RunDockershim(&s.KubeletFlags, &s.KubeletConfiguration)
+			}
 			return app.Run(s, nil)
 		},
 	}

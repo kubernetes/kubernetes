@@ -155,7 +155,7 @@ var _ = framework.KubeDescribe("NodeProblemDetector", func() {
 			By("Create the test log file")
 			Expect(err).NotTo(HaveOccurred())
 			By("Create config map for the node problem detector")
-			_, err = c.Core().ConfigMaps(ns).Create(&v1.ConfigMap{
+			_, err = c.CoreV1().ConfigMaps(ns).Create(&v1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{Name: configName},
 				Data:       map[string]string{path.Base(configFile): config},
 			})
@@ -331,20 +331,20 @@ var _ = framework.KubeDescribe("NodeProblemDetector", func() {
 
 				By(fmt.Sprintf("Wait for %d events generated", test.events))
 				Eventually(func() error {
-					return verifyEvents(c.Core().Events(eventNamespace), eventListOptions, test.events, tempReason, tempMessage)
+					return verifyEvents(c.CoreV1().Events(eventNamespace), eventListOptions, test.events, tempReason, tempMessage)
 				}, pollTimeout, pollInterval).Should(Succeed())
 				By(fmt.Sprintf("Make sure only %d events generated", test.events))
 				Consistently(func() error {
-					return verifyEvents(c.Core().Events(eventNamespace), eventListOptions, test.events, tempReason, tempMessage)
+					return verifyEvents(c.CoreV1().Events(eventNamespace), eventListOptions, test.events, tempReason, tempMessage)
 				}, pollConsistent, pollInterval).Should(Succeed())
 
 				By(fmt.Sprintf("Make sure node condition %q is set", condition))
 				Eventually(func() error {
-					return verifyNodeCondition(c.Core().Nodes(), condition, test.conditionType, test.conditionReason, test.conditionMessage)
+					return verifyNodeCondition(c.CoreV1().Nodes(), condition, test.conditionType, test.conditionReason, test.conditionMessage)
 				}, pollTimeout, pollInterval).Should(Succeed())
 				By(fmt.Sprintf("Make sure node condition %q is stable", condition))
 				Consistently(func() error {
-					return verifyNodeCondition(c.Core().Nodes(), condition, test.conditionType, test.conditionReason, test.conditionMessage)
+					return verifyNodeCondition(c.CoreV1().Nodes(), condition, test.conditionType, test.conditionReason, test.conditionMessage)
 				}, pollConsistent, pollInterval).Should(Succeed())
 			}
 		})
@@ -361,12 +361,12 @@ var _ = framework.KubeDescribe("NodeProblemDetector", func() {
 			By("Wait for the node problem detector to disappear")
 			Expect(framework.WaitForPodToDisappear(c, ns, name, labels.Everything(), pollInterval, pollTimeout)).To(Succeed())
 			By("Delete the config map")
-			c.Core().ConfigMaps(ns).Delete(configName, nil)
+			c.CoreV1().ConfigMaps(ns).Delete(configName, nil)
 			By("Clean up the events")
-			Expect(c.Core().Events(eventNamespace).DeleteCollection(metav1.NewDeleteOptions(0), eventListOptions)).To(Succeed())
+			Expect(c.CoreV1().Events(eventNamespace).DeleteCollection(metav1.NewDeleteOptions(0), eventListOptions)).To(Succeed())
 			By("Clean up the node condition")
 			patch := []byte(fmt.Sprintf(`{"status":{"conditions":[{"$patch":"delete","type":"%s"}]}}`, condition))
-			c.Core().RESTClient().Patch(types.StrategicMergePatchType).Resource("nodes").Name(framework.TestContext.NodeName).SubResource("status").Body(patch).Do()
+			c.CoreV1().RESTClient().Patch(types.StrategicMergePatchType).Resource("nodes").Name(framework.TestContext.NodeName).SubResource("status").Body(patch).Do()
 		})
 	})
 })

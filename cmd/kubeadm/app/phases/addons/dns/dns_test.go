@@ -23,8 +23,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
+	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
 func TestCreateServiceAccount(t *testing.T) {
@@ -90,11 +91,13 @@ func TestCompileManifests(t *testing.T) {
 		expected bool
 	}{
 		{
-			manifest: v170AndAboveKubeDNSDeployment,
-			data: struct{ ImageRepository, Arch, Version, DNSDomain, MasterTaintKey string }{
+			manifest: v180AndAboveKubeDNSDeployment,
+			data: struct{ ImageRepository, Arch, Version, DNSBindAddr, DNSProbeAddr, DNSDomain, MasterTaintKey string }{
 				ImageRepository: "foo",
 				Arch:            "foo",
 				Version:         "foo",
+				DNSBindAddr:     "foo",
+				DNSProbeAddr:    "foo",
 				DNSDomain:       "foo",
 				MasterTaintKey:  "foo",
 			},
@@ -107,6 +110,29 @@ func TestCompileManifests(t *testing.T) {
 			},
 			expected: true,
 		},
+		{
+			manifest: CoreDNSDeployment,
+			data: struct{ MasterTaintKey, Version string }{
+				MasterTaintKey: "foo",
+				Version:        "foo",
+			},
+			expected: true,
+		},
+		{
+			manifest: KubeDNSService,
+			data: struct{ DNSIP string }{
+				DNSIP: "foo",
+			},
+			expected: true,
+		},
+		{
+			manifest: CoreDNSConfigMap,
+			data: struct{ DNSDomain, ServiceCIDR string }{
+				DNSDomain:   "foo",
+				ServiceCIDR: "foo",
+			},
+			expected: true,
+		},
 	}
 	for _, rt := range tests {
 		_, actual := kubeadmutil.ParseTemplate(rt.manifest, rt.data)
@@ -115,6 +141,36 @@ func TestCompileManifests(t *testing.T) {
 				"failed CompileManifests:\n\texpected: %t\n\t  actual: %t",
 				rt.expected,
 				(actual == nil),
+			)
+		}
+	}
+}
+
+func TestGetDNSIP(t *testing.T) {
+	var tests = []struct {
+		svcSubnet, expectedDNSIP string
+	}{
+		{
+			svcSubnet:     "10.96.0.0/12",
+			expectedDNSIP: "10.96.0.10",
+		},
+		{
+			svcSubnet:     "10.87.116.64/26",
+			expectedDNSIP: "10.87.116.74",
+		},
+	}
+	for _, rt := range tests {
+		dnsIP, err := kubeadmconstants.GetDNSIP(rt.svcSubnet)
+		if err != nil {
+			t.Fatalf("couldn't get dnsIP : %v", err)
+		}
+
+		actualDNSIP := dnsIP.String()
+		if actualDNSIP != rt.expectedDNSIP {
+			t.Errorf(
+				"failed GetDNSIP\n\texpected: %s\n\t  actual: %s",
+				rt.expectedDNSIP,
+				actualDNSIP,
 			)
 		}
 	}

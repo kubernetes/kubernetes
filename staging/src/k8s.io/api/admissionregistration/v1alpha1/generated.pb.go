@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2018 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,16 +25,10 @@ limitations under the License.
 		k8s.io/kubernetes/vendor/k8s.io/api/admissionregistration/v1alpha1/generated.proto
 
 	It has these top-level messages:
-		AdmissionHookClientConfig
-		ExternalAdmissionHook
-		ExternalAdmissionHookConfiguration
-		ExternalAdmissionHookConfigurationList
 		Initializer
 		InitializerConfiguration
 		InitializerConfigurationList
 		Rule
-		RuleWithOperations
-		ServiceReference
 */
 package v1alpha1
 
@@ -58,226 +52,32 @@ var _ = math.Inf
 // proto package needs to be updated.
 const _ = proto.GoGoProtoPackageIsVersion2 // please upgrade the proto package
 
-func (m *AdmissionHookClientConfig) Reset()      { *m = AdmissionHookClientConfig{} }
-func (*AdmissionHookClientConfig) ProtoMessage() {}
-func (*AdmissionHookClientConfig) Descriptor() ([]byte, []int) {
-	return fileDescriptorGenerated, []int{0}
-}
-
-func (m *ExternalAdmissionHook) Reset()                    { *m = ExternalAdmissionHook{} }
-func (*ExternalAdmissionHook) ProtoMessage()               {}
-func (*ExternalAdmissionHook) Descriptor() ([]byte, []int) { return fileDescriptorGenerated, []int{1} }
-
-func (m *ExternalAdmissionHookConfiguration) Reset()      { *m = ExternalAdmissionHookConfiguration{} }
-func (*ExternalAdmissionHookConfiguration) ProtoMessage() {}
-func (*ExternalAdmissionHookConfiguration) Descriptor() ([]byte, []int) {
-	return fileDescriptorGenerated, []int{2}
-}
-
-func (m *ExternalAdmissionHookConfigurationList) Reset() {
-	*m = ExternalAdmissionHookConfigurationList{}
-}
-func (*ExternalAdmissionHookConfigurationList) ProtoMessage() {}
-func (*ExternalAdmissionHookConfigurationList) Descriptor() ([]byte, []int) {
-	return fileDescriptorGenerated, []int{3}
-}
-
 func (m *Initializer) Reset()                    { *m = Initializer{} }
 func (*Initializer) ProtoMessage()               {}
-func (*Initializer) Descriptor() ([]byte, []int) { return fileDescriptorGenerated, []int{4} }
+func (*Initializer) Descriptor() ([]byte, []int) { return fileDescriptorGenerated, []int{0} }
 
 func (m *InitializerConfiguration) Reset()      { *m = InitializerConfiguration{} }
 func (*InitializerConfiguration) ProtoMessage() {}
 func (*InitializerConfiguration) Descriptor() ([]byte, []int) {
-	return fileDescriptorGenerated, []int{5}
+	return fileDescriptorGenerated, []int{1}
 }
 
 func (m *InitializerConfigurationList) Reset()      { *m = InitializerConfigurationList{} }
 func (*InitializerConfigurationList) ProtoMessage() {}
 func (*InitializerConfigurationList) Descriptor() ([]byte, []int) {
-	return fileDescriptorGenerated, []int{6}
+	return fileDescriptorGenerated, []int{2}
 }
 
 func (m *Rule) Reset()                    { *m = Rule{} }
 func (*Rule) ProtoMessage()               {}
-func (*Rule) Descriptor() ([]byte, []int) { return fileDescriptorGenerated, []int{7} }
-
-func (m *RuleWithOperations) Reset()                    { *m = RuleWithOperations{} }
-func (*RuleWithOperations) ProtoMessage()               {}
-func (*RuleWithOperations) Descriptor() ([]byte, []int) { return fileDescriptorGenerated, []int{8} }
-
-func (m *ServiceReference) Reset()                    { *m = ServiceReference{} }
-func (*ServiceReference) ProtoMessage()               {}
-func (*ServiceReference) Descriptor() ([]byte, []int) { return fileDescriptorGenerated, []int{9} }
+func (*Rule) Descriptor() ([]byte, []int) { return fileDescriptorGenerated, []int{3} }
 
 func init() {
-	proto.RegisterType((*AdmissionHookClientConfig)(nil), "k8s.io.api.admissionregistration.v1alpha1.AdmissionHookClientConfig")
-	proto.RegisterType((*ExternalAdmissionHook)(nil), "k8s.io.api.admissionregistration.v1alpha1.ExternalAdmissionHook")
-	proto.RegisterType((*ExternalAdmissionHookConfiguration)(nil), "k8s.io.api.admissionregistration.v1alpha1.ExternalAdmissionHookConfiguration")
-	proto.RegisterType((*ExternalAdmissionHookConfigurationList)(nil), "k8s.io.api.admissionregistration.v1alpha1.ExternalAdmissionHookConfigurationList")
 	proto.RegisterType((*Initializer)(nil), "k8s.io.api.admissionregistration.v1alpha1.Initializer")
 	proto.RegisterType((*InitializerConfiguration)(nil), "k8s.io.api.admissionregistration.v1alpha1.InitializerConfiguration")
 	proto.RegisterType((*InitializerConfigurationList)(nil), "k8s.io.api.admissionregistration.v1alpha1.InitializerConfigurationList")
 	proto.RegisterType((*Rule)(nil), "k8s.io.api.admissionregistration.v1alpha1.Rule")
-	proto.RegisterType((*RuleWithOperations)(nil), "k8s.io.api.admissionregistration.v1alpha1.RuleWithOperations")
-	proto.RegisterType((*ServiceReference)(nil), "k8s.io.api.admissionregistration.v1alpha1.ServiceReference")
 }
-func (m *AdmissionHookClientConfig) Marshal() (dAtA []byte, err error) {
-	size := m.Size()
-	dAtA = make([]byte, size)
-	n, err := m.MarshalTo(dAtA)
-	if err != nil {
-		return nil, err
-	}
-	return dAtA[:n], nil
-}
-
-func (m *AdmissionHookClientConfig) MarshalTo(dAtA []byte) (int, error) {
-	var i int
-	_ = i
-	var l int
-	_ = l
-	dAtA[i] = 0xa
-	i++
-	i = encodeVarintGenerated(dAtA, i, uint64(m.Service.Size()))
-	n1, err := m.Service.MarshalTo(dAtA[i:])
-	if err != nil {
-		return 0, err
-	}
-	i += n1
-	if m.CABundle != nil {
-		dAtA[i] = 0x12
-		i++
-		i = encodeVarintGenerated(dAtA, i, uint64(len(m.CABundle)))
-		i += copy(dAtA[i:], m.CABundle)
-	}
-	return i, nil
-}
-
-func (m *ExternalAdmissionHook) Marshal() (dAtA []byte, err error) {
-	size := m.Size()
-	dAtA = make([]byte, size)
-	n, err := m.MarshalTo(dAtA)
-	if err != nil {
-		return nil, err
-	}
-	return dAtA[:n], nil
-}
-
-func (m *ExternalAdmissionHook) MarshalTo(dAtA []byte) (int, error) {
-	var i int
-	_ = i
-	var l int
-	_ = l
-	dAtA[i] = 0xa
-	i++
-	i = encodeVarintGenerated(dAtA, i, uint64(len(m.Name)))
-	i += copy(dAtA[i:], m.Name)
-	dAtA[i] = 0x12
-	i++
-	i = encodeVarintGenerated(dAtA, i, uint64(m.ClientConfig.Size()))
-	n2, err := m.ClientConfig.MarshalTo(dAtA[i:])
-	if err != nil {
-		return 0, err
-	}
-	i += n2
-	if len(m.Rules) > 0 {
-		for _, msg := range m.Rules {
-			dAtA[i] = 0x1a
-			i++
-			i = encodeVarintGenerated(dAtA, i, uint64(msg.Size()))
-			n, err := msg.MarshalTo(dAtA[i:])
-			if err != nil {
-				return 0, err
-			}
-			i += n
-		}
-	}
-	if m.FailurePolicy != nil {
-		dAtA[i] = 0x22
-		i++
-		i = encodeVarintGenerated(dAtA, i, uint64(len(*m.FailurePolicy)))
-		i += copy(dAtA[i:], *m.FailurePolicy)
-	}
-	return i, nil
-}
-
-func (m *ExternalAdmissionHookConfiguration) Marshal() (dAtA []byte, err error) {
-	size := m.Size()
-	dAtA = make([]byte, size)
-	n, err := m.MarshalTo(dAtA)
-	if err != nil {
-		return nil, err
-	}
-	return dAtA[:n], nil
-}
-
-func (m *ExternalAdmissionHookConfiguration) MarshalTo(dAtA []byte) (int, error) {
-	var i int
-	_ = i
-	var l int
-	_ = l
-	dAtA[i] = 0xa
-	i++
-	i = encodeVarintGenerated(dAtA, i, uint64(m.ObjectMeta.Size()))
-	n3, err := m.ObjectMeta.MarshalTo(dAtA[i:])
-	if err != nil {
-		return 0, err
-	}
-	i += n3
-	if len(m.ExternalAdmissionHooks) > 0 {
-		for _, msg := range m.ExternalAdmissionHooks {
-			dAtA[i] = 0x12
-			i++
-			i = encodeVarintGenerated(dAtA, i, uint64(msg.Size()))
-			n, err := msg.MarshalTo(dAtA[i:])
-			if err != nil {
-				return 0, err
-			}
-			i += n
-		}
-	}
-	return i, nil
-}
-
-func (m *ExternalAdmissionHookConfigurationList) Marshal() (dAtA []byte, err error) {
-	size := m.Size()
-	dAtA = make([]byte, size)
-	n, err := m.MarshalTo(dAtA)
-	if err != nil {
-		return nil, err
-	}
-	return dAtA[:n], nil
-}
-
-func (m *ExternalAdmissionHookConfigurationList) MarshalTo(dAtA []byte) (int, error) {
-	var i int
-	_ = i
-	var l int
-	_ = l
-	dAtA[i] = 0xa
-	i++
-	i = encodeVarintGenerated(dAtA, i, uint64(m.ListMeta.Size()))
-	n4, err := m.ListMeta.MarshalTo(dAtA[i:])
-	if err != nil {
-		return 0, err
-	}
-	i += n4
-	if len(m.Items) > 0 {
-		for _, msg := range m.Items {
-			dAtA[i] = 0x12
-			i++
-			i = encodeVarintGenerated(dAtA, i, uint64(msg.Size()))
-			n, err := msg.MarshalTo(dAtA[i:])
-			if err != nil {
-				return 0, err
-			}
-			i += n
-		}
-	}
-	return i, nil
-}
-
 func (m *Initializer) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
@@ -330,11 +130,11 @@ func (m *InitializerConfiguration) MarshalTo(dAtA []byte) (int, error) {
 	dAtA[i] = 0xa
 	i++
 	i = encodeVarintGenerated(dAtA, i, uint64(m.ObjectMeta.Size()))
-	n5, err := m.ObjectMeta.MarshalTo(dAtA[i:])
+	n1, err := m.ObjectMeta.MarshalTo(dAtA[i:])
 	if err != nil {
 		return 0, err
 	}
-	i += n5
+	i += n1
 	if len(m.Initializers) > 0 {
 		for _, msg := range m.Initializers {
 			dAtA[i] = 0x12
@@ -368,11 +168,11 @@ func (m *InitializerConfigurationList) MarshalTo(dAtA []byte) (int, error) {
 	dAtA[i] = 0xa
 	i++
 	i = encodeVarintGenerated(dAtA, i, uint64(m.ListMeta.Size()))
-	n6, err := m.ListMeta.MarshalTo(dAtA[i:])
+	n2, err := m.ListMeta.MarshalTo(dAtA[i:])
 	if err != nil {
 		return 0, err
 	}
-	i += n6
+	i += n2
 	if len(m.Items) > 0 {
 		for _, msg := range m.Items {
 			dAtA[i] = 0x12
@@ -451,73 +251,6 @@ func (m *Rule) MarshalTo(dAtA []byte) (int, error) {
 	return i, nil
 }
 
-func (m *RuleWithOperations) Marshal() (dAtA []byte, err error) {
-	size := m.Size()
-	dAtA = make([]byte, size)
-	n, err := m.MarshalTo(dAtA)
-	if err != nil {
-		return nil, err
-	}
-	return dAtA[:n], nil
-}
-
-func (m *RuleWithOperations) MarshalTo(dAtA []byte) (int, error) {
-	var i int
-	_ = i
-	var l int
-	_ = l
-	if len(m.Operations) > 0 {
-		for _, s := range m.Operations {
-			dAtA[i] = 0xa
-			i++
-			l = len(s)
-			for l >= 1<<7 {
-				dAtA[i] = uint8(uint64(l)&0x7f | 0x80)
-				l >>= 7
-				i++
-			}
-			dAtA[i] = uint8(l)
-			i++
-			i += copy(dAtA[i:], s)
-		}
-	}
-	dAtA[i] = 0x12
-	i++
-	i = encodeVarintGenerated(dAtA, i, uint64(m.Rule.Size()))
-	n7, err := m.Rule.MarshalTo(dAtA[i:])
-	if err != nil {
-		return 0, err
-	}
-	i += n7
-	return i, nil
-}
-
-func (m *ServiceReference) Marshal() (dAtA []byte, err error) {
-	size := m.Size()
-	dAtA = make([]byte, size)
-	n, err := m.MarshalTo(dAtA)
-	if err != nil {
-		return nil, err
-	}
-	return dAtA[:n], nil
-}
-
-func (m *ServiceReference) MarshalTo(dAtA []byte) (int, error) {
-	var i int
-	_ = i
-	var l int
-	_ = l
-	dAtA[i] = 0xa
-	i++
-	i = encodeVarintGenerated(dAtA, i, uint64(len(m.Namespace)))
-	i += copy(dAtA[i:], m.Namespace)
-	dAtA[i] = 0x12
-	i++
-	i = encodeVarintGenerated(dAtA, i, uint64(len(m.Name)))
-	i += copy(dAtA[i:], m.Name)
-	return i, nil
-}
-
 func encodeFixed64Generated(dAtA []byte, offset int, v uint64) int {
 	dAtA[offset] = uint8(v)
 	dAtA[offset+1] = uint8(v >> 8)
@@ -545,66 +278,6 @@ func encodeVarintGenerated(dAtA []byte, offset int, v uint64) int {
 	dAtA[offset] = uint8(v)
 	return offset + 1
 }
-func (m *AdmissionHookClientConfig) Size() (n int) {
-	var l int
-	_ = l
-	l = m.Service.Size()
-	n += 1 + l + sovGenerated(uint64(l))
-	if m.CABundle != nil {
-		l = len(m.CABundle)
-		n += 1 + l + sovGenerated(uint64(l))
-	}
-	return n
-}
-
-func (m *ExternalAdmissionHook) Size() (n int) {
-	var l int
-	_ = l
-	l = len(m.Name)
-	n += 1 + l + sovGenerated(uint64(l))
-	l = m.ClientConfig.Size()
-	n += 1 + l + sovGenerated(uint64(l))
-	if len(m.Rules) > 0 {
-		for _, e := range m.Rules {
-			l = e.Size()
-			n += 1 + l + sovGenerated(uint64(l))
-		}
-	}
-	if m.FailurePolicy != nil {
-		l = len(*m.FailurePolicy)
-		n += 1 + l + sovGenerated(uint64(l))
-	}
-	return n
-}
-
-func (m *ExternalAdmissionHookConfiguration) Size() (n int) {
-	var l int
-	_ = l
-	l = m.ObjectMeta.Size()
-	n += 1 + l + sovGenerated(uint64(l))
-	if len(m.ExternalAdmissionHooks) > 0 {
-		for _, e := range m.ExternalAdmissionHooks {
-			l = e.Size()
-			n += 1 + l + sovGenerated(uint64(l))
-		}
-	}
-	return n
-}
-
-func (m *ExternalAdmissionHookConfigurationList) Size() (n int) {
-	var l int
-	_ = l
-	l = m.ListMeta.Size()
-	n += 1 + l + sovGenerated(uint64(l))
-	if len(m.Items) > 0 {
-		for _, e := range m.Items {
-			l = e.Size()
-			n += 1 + l + sovGenerated(uint64(l))
-		}
-	}
-	return n
-}
-
 func (m *Initializer) Size() (n int) {
 	var l int
 	_ = l
@@ -671,30 +344,6 @@ func (m *Rule) Size() (n int) {
 	return n
 }
 
-func (m *RuleWithOperations) Size() (n int) {
-	var l int
-	_ = l
-	if len(m.Operations) > 0 {
-		for _, s := range m.Operations {
-			l = len(s)
-			n += 1 + l + sovGenerated(uint64(l))
-		}
-	}
-	l = m.Rule.Size()
-	n += 1 + l + sovGenerated(uint64(l))
-	return n
-}
-
-func (m *ServiceReference) Size() (n int) {
-	var l int
-	_ = l
-	l = len(m.Namespace)
-	n += 1 + l + sovGenerated(uint64(l))
-	l = len(m.Name)
-	n += 1 + l + sovGenerated(uint64(l))
-	return n
-}
-
 func sovGenerated(x uint64) (n int) {
 	for {
 		n++
@@ -707,52 +356,6 @@ func sovGenerated(x uint64) (n int) {
 }
 func sozGenerated(x uint64) (n int) {
 	return sovGenerated(uint64((x << 1) ^ uint64((int64(x) >> 63))))
-}
-func (this *AdmissionHookClientConfig) String() string {
-	if this == nil {
-		return "nil"
-	}
-	s := strings.Join([]string{`&AdmissionHookClientConfig{`,
-		`Service:` + strings.Replace(strings.Replace(this.Service.String(), "ServiceReference", "ServiceReference", 1), `&`, ``, 1) + `,`,
-		`CABundle:` + valueToStringGenerated(this.CABundle) + `,`,
-		`}`,
-	}, "")
-	return s
-}
-func (this *ExternalAdmissionHook) String() string {
-	if this == nil {
-		return "nil"
-	}
-	s := strings.Join([]string{`&ExternalAdmissionHook{`,
-		`Name:` + fmt.Sprintf("%v", this.Name) + `,`,
-		`ClientConfig:` + strings.Replace(strings.Replace(this.ClientConfig.String(), "AdmissionHookClientConfig", "AdmissionHookClientConfig", 1), `&`, ``, 1) + `,`,
-		`Rules:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.Rules), "RuleWithOperations", "RuleWithOperations", 1), `&`, ``, 1) + `,`,
-		`FailurePolicy:` + valueToStringGenerated(this.FailurePolicy) + `,`,
-		`}`,
-	}, "")
-	return s
-}
-func (this *ExternalAdmissionHookConfiguration) String() string {
-	if this == nil {
-		return "nil"
-	}
-	s := strings.Join([]string{`&ExternalAdmissionHookConfiguration{`,
-		`ObjectMeta:` + strings.Replace(strings.Replace(this.ObjectMeta.String(), "ObjectMeta", "k8s_io_apimachinery_pkg_apis_meta_v1.ObjectMeta", 1), `&`, ``, 1) + `,`,
-		`ExternalAdmissionHooks:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.ExternalAdmissionHooks), "ExternalAdmissionHook", "ExternalAdmissionHook", 1), `&`, ``, 1) + `,`,
-		`}`,
-	}, "")
-	return s
-}
-func (this *ExternalAdmissionHookConfigurationList) String() string {
-	if this == nil {
-		return "nil"
-	}
-	s := strings.Join([]string{`&ExternalAdmissionHookConfigurationList{`,
-		`ListMeta:` + strings.Replace(strings.Replace(this.ListMeta.String(), "ListMeta", "k8s_io_apimachinery_pkg_apis_meta_v1.ListMeta", 1), `&`, ``, 1) + `,`,
-		`Items:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.Items), "ExternalAdmissionHookConfiguration", "ExternalAdmissionHookConfiguration", 1), `&`, ``, 1) + `,`,
-		`}`,
-	}, "")
-	return s
 }
 func (this *Initializer) String() string {
 	if this == nil {
@@ -799,28 +402,6 @@ func (this *Rule) String() string {
 	}, "")
 	return s
 }
-func (this *RuleWithOperations) String() string {
-	if this == nil {
-		return "nil"
-	}
-	s := strings.Join([]string{`&RuleWithOperations{`,
-		`Operations:` + fmt.Sprintf("%v", this.Operations) + `,`,
-		`Rule:` + strings.Replace(strings.Replace(this.Rule.String(), "Rule", "Rule", 1), `&`, ``, 1) + `,`,
-		`}`,
-	}, "")
-	return s
-}
-func (this *ServiceReference) String() string {
-	if this == nil {
-		return "nil"
-	}
-	s := strings.Join([]string{`&ServiceReference{`,
-		`Namespace:` + fmt.Sprintf("%v", this.Namespace) + `,`,
-		`Name:` + fmt.Sprintf("%v", this.Name) + `,`,
-		`}`,
-	}, "")
-	return s
-}
 func valueToStringGenerated(v interface{}) string {
 	rv := reflect.ValueOf(v)
 	if rv.IsNil() {
@@ -828,509 +409,6 @@ func valueToStringGenerated(v interface{}) string {
 	}
 	pv := reflect.Indirect(rv).Interface()
 	return fmt.Sprintf("*%v", pv)
-}
-func (m *AdmissionHookClientConfig) Unmarshal(dAtA []byte) error {
-	l := len(dAtA)
-	iNdEx := 0
-	for iNdEx < l {
-		preIndex := iNdEx
-		var wire uint64
-		for shift := uint(0); ; shift += 7 {
-			if shift >= 64 {
-				return ErrIntOverflowGenerated
-			}
-			if iNdEx >= l {
-				return io.ErrUnexpectedEOF
-			}
-			b := dAtA[iNdEx]
-			iNdEx++
-			wire |= (uint64(b) & 0x7F) << shift
-			if b < 0x80 {
-				break
-			}
-		}
-		fieldNum := int32(wire >> 3)
-		wireType := int(wire & 0x7)
-		if wireType == 4 {
-			return fmt.Errorf("proto: AdmissionHookClientConfig: wiretype end group for non-group")
-		}
-		if fieldNum <= 0 {
-			return fmt.Errorf("proto: AdmissionHookClientConfig: illegal tag %d (wire type %d)", fieldNum, wire)
-		}
-		switch fieldNum {
-		case 1:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Service", wireType)
-			}
-			var msglen int
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowGenerated
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				msglen |= (int(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			if msglen < 0 {
-				return ErrInvalidLengthGenerated
-			}
-			postIndex := iNdEx + msglen
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			if err := m.Service.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
-				return err
-			}
-			iNdEx = postIndex
-		case 2:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field CABundle", wireType)
-			}
-			var byteLen int
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowGenerated
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				byteLen |= (int(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			if byteLen < 0 {
-				return ErrInvalidLengthGenerated
-			}
-			postIndex := iNdEx + byteLen
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			m.CABundle = append(m.CABundle[:0], dAtA[iNdEx:postIndex]...)
-			if m.CABundle == nil {
-				m.CABundle = []byte{}
-			}
-			iNdEx = postIndex
-		default:
-			iNdEx = preIndex
-			skippy, err := skipGenerated(dAtA[iNdEx:])
-			if err != nil {
-				return err
-			}
-			if skippy < 0 {
-				return ErrInvalidLengthGenerated
-			}
-			if (iNdEx + skippy) > l {
-				return io.ErrUnexpectedEOF
-			}
-			iNdEx += skippy
-		}
-	}
-
-	if iNdEx > l {
-		return io.ErrUnexpectedEOF
-	}
-	return nil
-}
-func (m *ExternalAdmissionHook) Unmarshal(dAtA []byte) error {
-	l := len(dAtA)
-	iNdEx := 0
-	for iNdEx < l {
-		preIndex := iNdEx
-		var wire uint64
-		for shift := uint(0); ; shift += 7 {
-			if shift >= 64 {
-				return ErrIntOverflowGenerated
-			}
-			if iNdEx >= l {
-				return io.ErrUnexpectedEOF
-			}
-			b := dAtA[iNdEx]
-			iNdEx++
-			wire |= (uint64(b) & 0x7F) << shift
-			if b < 0x80 {
-				break
-			}
-		}
-		fieldNum := int32(wire >> 3)
-		wireType := int(wire & 0x7)
-		if wireType == 4 {
-			return fmt.Errorf("proto: ExternalAdmissionHook: wiretype end group for non-group")
-		}
-		if fieldNum <= 0 {
-			return fmt.Errorf("proto: ExternalAdmissionHook: illegal tag %d (wire type %d)", fieldNum, wire)
-		}
-		switch fieldNum {
-		case 1:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Name", wireType)
-			}
-			var stringLen uint64
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowGenerated
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				stringLen |= (uint64(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			intStringLen := int(stringLen)
-			if intStringLen < 0 {
-				return ErrInvalidLengthGenerated
-			}
-			postIndex := iNdEx + intStringLen
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			m.Name = string(dAtA[iNdEx:postIndex])
-			iNdEx = postIndex
-		case 2:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field ClientConfig", wireType)
-			}
-			var msglen int
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowGenerated
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				msglen |= (int(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			if msglen < 0 {
-				return ErrInvalidLengthGenerated
-			}
-			postIndex := iNdEx + msglen
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			if err := m.ClientConfig.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
-				return err
-			}
-			iNdEx = postIndex
-		case 3:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Rules", wireType)
-			}
-			var msglen int
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowGenerated
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				msglen |= (int(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			if msglen < 0 {
-				return ErrInvalidLengthGenerated
-			}
-			postIndex := iNdEx + msglen
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			m.Rules = append(m.Rules, RuleWithOperations{})
-			if err := m.Rules[len(m.Rules)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
-				return err
-			}
-			iNdEx = postIndex
-		case 4:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field FailurePolicy", wireType)
-			}
-			var stringLen uint64
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowGenerated
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				stringLen |= (uint64(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			intStringLen := int(stringLen)
-			if intStringLen < 0 {
-				return ErrInvalidLengthGenerated
-			}
-			postIndex := iNdEx + intStringLen
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			s := FailurePolicyType(dAtA[iNdEx:postIndex])
-			m.FailurePolicy = &s
-			iNdEx = postIndex
-		default:
-			iNdEx = preIndex
-			skippy, err := skipGenerated(dAtA[iNdEx:])
-			if err != nil {
-				return err
-			}
-			if skippy < 0 {
-				return ErrInvalidLengthGenerated
-			}
-			if (iNdEx + skippy) > l {
-				return io.ErrUnexpectedEOF
-			}
-			iNdEx += skippy
-		}
-	}
-
-	if iNdEx > l {
-		return io.ErrUnexpectedEOF
-	}
-	return nil
-}
-func (m *ExternalAdmissionHookConfiguration) Unmarshal(dAtA []byte) error {
-	l := len(dAtA)
-	iNdEx := 0
-	for iNdEx < l {
-		preIndex := iNdEx
-		var wire uint64
-		for shift := uint(0); ; shift += 7 {
-			if shift >= 64 {
-				return ErrIntOverflowGenerated
-			}
-			if iNdEx >= l {
-				return io.ErrUnexpectedEOF
-			}
-			b := dAtA[iNdEx]
-			iNdEx++
-			wire |= (uint64(b) & 0x7F) << shift
-			if b < 0x80 {
-				break
-			}
-		}
-		fieldNum := int32(wire >> 3)
-		wireType := int(wire & 0x7)
-		if wireType == 4 {
-			return fmt.Errorf("proto: ExternalAdmissionHookConfiguration: wiretype end group for non-group")
-		}
-		if fieldNum <= 0 {
-			return fmt.Errorf("proto: ExternalAdmissionHookConfiguration: illegal tag %d (wire type %d)", fieldNum, wire)
-		}
-		switch fieldNum {
-		case 1:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field ObjectMeta", wireType)
-			}
-			var msglen int
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowGenerated
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				msglen |= (int(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			if msglen < 0 {
-				return ErrInvalidLengthGenerated
-			}
-			postIndex := iNdEx + msglen
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			if err := m.ObjectMeta.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
-				return err
-			}
-			iNdEx = postIndex
-		case 2:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field ExternalAdmissionHooks", wireType)
-			}
-			var msglen int
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowGenerated
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				msglen |= (int(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			if msglen < 0 {
-				return ErrInvalidLengthGenerated
-			}
-			postIndex := iNdEx + msglen
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			m.ExternalAdmissionHooks = append(m.ExternalAdmissionHooks, ExternalAdmissionHook{})
-			if err := m.ExternalAdmissionHooks[len(m.ExternalAdmissionHooks)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
-				return err
-			}
-			iNdEx = postIndex
-		default:
-			iNdEx = preIndex
-			skippy, err := skipGenerated(dAtA[iNdEx:])
-			if err != nil {
-				return err
-			}
-			if skippy < 0 {
-				return ErrInvalidLengthGenerated
-			}
-			if (iNdEx + skippy) > l {
-				return io.ErrUnexpectedEOF
-			}
-			iNdEx += skippy
-		}
-	}
-
-	if iNdEx > l {
-		return io.ErrUnexpectedEOF
-	}
-	return nil
-}
-func (m *ExternalAdmissionHookConfigurationList) Unmarshal(dAtA []byte) error {
-	l := len(dAtA)
-	iNdEx := 0
-	for iNdEx < l {
-		preIndex := iNdEx
-		var wire uint64
-		for shift := uint(0); ; shift += 7 {
-			if shift >= 64 {
-				return ErrIntOverflowGenerated
-			}
-			if iNdEx >= l {
-				return io.ErrUnexpectedEOF
-			}
-			b := dAtA[iNdEx]
-			iNdEx++
-			wire |= (uint64(b) & 0x7F) << shift
-			if b < 0x80 {
-				break
-			}
-		}
-		fieldNum := int32(wire >> 3)
-		wireType := int(wire & 0x7)
-		if wireType == 4 {
-			return fmt.Errorf("proto: ExternalAdmissionHookConfigurationList: wiretype end group for non-group")
-		}
-		if fieldNum <= 0 {
-			return fmt.Errorf("proto: ExternalAdmissionHookConfigurationList: illegal tag %d (wire type %d)", fieldNum, wire)
-		}
-		switch fieldNum {
-		case 1:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field ListMeta", wireType)
-			}
-			var msglen int
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowGenerated
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				msglen |= (int(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			if msglen < 0 {
-				return ErrInvalidLengthGenerated
-			}
-			postIndex := iNdEx + msglen
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			if err := m.ListMeta.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
-				return err
-			}
-			iNdEx = postIndex
-		case 2:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Items", wireType)
-			}
-			var msglen int
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowGenerated
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				msglen |= (int(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			if msglen < 0 {
-				return ErrInvalidLengthGenerated
-			}
-			postIndex := iNdEx + msglen
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			m.Items = append(m.Items, ExternalAdmissionHookConfiguration{})
-			if err := m.Items[len(m.Items)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
-				return err
-			}
-			iNdEx = postIndex
-		default:
-			iNdEx = preIndex
-			skippy, err := skipGenerated(dAtA[iNdEx:])
-			if err != nil {
-				return err
-			}
-			if skippy < 0 {
-				return ErrInvalidLengthGenerated
-			}
-			if (iNdEx + skippy) > l {
-				return io.ErrUnexpectedEOF
-			}
-			iNdEx += skippy
-		}
-	}
-
-	if iNdEx > l {
-		return io.ErrUnexpectedEOF
-	}
-	return nil
 }
 func (m *Initializer) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
@@ -1801,223 +879,6 @@ func (m *Rule) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
-func (m *RuleWithOperations) Unmarshal(dAtA []byte) error {
-	l := len(dAtA)
-	iNdEx := 0
-	for iNdEx < l {
-		preIndex := iNdEx
-		var wire uint64
-		for shift := uint(0); ; shift += 7 {
-			if shift >= 64 {
-				return ErrIntOverflowGenerated
-			}
-			if iNdEx >= l {
-				return io.ErrUnexpectedEOF
-			}
-			b := dAtA[iNdEx]
-			iNdEx++
-			wire |= (uint64(b) & 0x7F) << shift
-			if b < 0x80 {
-				break
-			}
-		}
-		fieldNum := int32(wire >> 3)
-		wireType := int(wire & 0x7)
-		if wireType == 4 {
-			return fmt.Errorf("proto: RuleWithOperations: wiretype end group for non-group")
-		}
-		if fieldNum <= 0 {
-			return fmt.Errorf("proto: RuleWithOperations: illegal tag %d (wire type %d)", fieldNum, wire)
-		}
-		switch fieldNum {
-		case 1:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Operations", wireType)
-			}
-			var stringLen uint64
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowGenerated
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				stringLen |= (uint64(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			intStringLen := int(stringLen)
-			if intStringLen < 0 {
-				return ErrInvalidLengthGenerated
-			}
-			postIndex := iNdEx + intStringLen
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			m.Operations = append(m.Operations, OperationType(dAtA[iNdEx:postIndex]))
-			iNdEx = postIndex
-		case 2:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Rule", wireType)
-			}
-			var msglen int
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowGenerated
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				msglen |= (int(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			if msglen < 0 {
-				return ErrInvalidLengthGenerated
-			}
-			postIndex := iNdEx + msglen
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			if err := m.Rule.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
-				return err
-			}
-			iNdEx = postIndex
-		default:
-			iNdEx = preIndex
-			skippy, err := skipGenerated(dAtA[iNdEx:])
-			if err != nil {
-				return err
-			}
-			if skippy < 0 {
-				return ErrInvalidLengthGenerated
-			}
-			if (iNdEx + skippy) > l {
-				return io.ErrUnexpectedEOF
-			}
-			iNdEx += skippy
-		}
-	}
-
-	if iNdEx > l {
-		return io.ErrUnexpectedEOF
-	}
-	return nil
-}
-func (m *ServiceReference) Unmarshal(dAtA []byte) error {
-	l := len(dAtA)
-	iNdEx := 0
-	for iNdEx < l {
-		preIndex := iNdEx
-		var wire uint64
-		for shift := uint(0); ; shift += 7 {
-			if shift >= 64 {
-				return ErrIntOverflowGenerated
-			}
-			if iNdEx >= l {
-				return io.ErrUnexpectedEOF
-			}
-			b := dAtA[iNdEx]
-			iNdEx++
-			wire |= (uint64(b) & 0x7F) << shift
-			if b < 0x80 {
-				break
-			}
-		}
-		fieldNum := int32(wire >> 3)
-		wireType := int(wire & 0x7)
-		if wireType == 4 {
-			return fmt.Errorf("proto: ServiceReference: wiretype end group for non-group")
-		}
-		if fieldNum <= 0 {
-			return fmt.Errorf("proto: ServiceReference: illegal tag %d (wire type %d)", fieldNum, wire)
-		}
-		switch fieldNum {
-		case 1:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Namespace", wireType)
-			}
-			var stringLen uint64
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowGenerated
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				stringLen |= (uint64(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			intStringLen := int(stringLen)
-			if intStringLen < 0 {
-				return ErrInvalidLengthGenerated
-			}
-			postIndex := iNdEx + intStringLen
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			m.Namespace = string(dAtA[iNdEx:postIndex])
-			iNdEx = postIndex
-		case 2:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Name", wireType)
-			}
-			var stringLen uint64
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowGenerated
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				stringLen |= (uint64(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			intStringLen := int(stringLen)
-			if intStringLen < 0 {
-				return ErrInvalidLengthGenerated
-			}
-			postIndex := iNdEx + intStringLen
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			m.Name = string(dAtA[iNdEx:postIndex])
-			iNdEx = postIndex
-		default:
-			iNdEx = preIndex
-			skippy, err := skipGenerated(dAtA[iNdEx:])
-			if err != nil {
-				return err
-			}
-			if skippy < 0 {
-				return ErrInvalidLengthGenerated
-			}
-			if (iNdEx + skippy) > l {
-				return io.ErrUnexpectedEOF
-			}
-			iNdEx += skippy
-		}
-	}
-
-	if iNdEx > l {
-		return io.ErrUnexpectedEOF
-	}
-	return nil
-}
 func skipGenerated(dAtA []byte) (n int, err error) {
 	l := len(dAtA)
 	iNdEx := 0
@@ -2128,60 +989,40 @@ func init() {
 }
 
 var fileDescriptorGenerated = []byte{
-	// 871 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xbc, 0x55, 0xcd, 0x8b, 0x23, 0x45,
-	0x14, 0x4f, 0x65, 0x32, 0x6c, 0x52, 0x49, 0xd8, 0xdd, 0x42, 0x97, 0x38, 0x48, 0x77, 0xe8, 0xc3,
-	0x12, 0x11, 0xbb, 0x9d, 0x51, 0x16, 0x41, 0x44, 0xa7, 0xc7, 0xaf, 0x81, 0xfd, 0x18, 0xcb, 0x45,
-	0x41, 0x3c, 0x58, 0xe9, 0xbc, 0x24, 0x65, 0xfa, 0x8b, 0xaa, 0xea, 0xe0, 0x78, 0x10, 0x2f, 0xde,
-	0x05, 0x2f, 0x5e, 0xbd, 0x79, 0xf1, 0xff, 0x98, 0xe3, 0x1e, 0xf7, 0x14, 0x9c, 0x16, 0xbc, 0x08,
-	0xfe, 0x01, 0x73, 0x92, 0xfe, 0x4a, 0x3a, 0x9b, 0x84, 0x4d, 0x5c, 0x98, 0x5b, 0xea, 0xf7, 0xea,
-	0xf7, 0xde, 0xef, 0xfd, 0xf2, 0x5e, 0x35, 0xa6, 0x93, 0x77, 0xa4, 0xc9, 0x03, 0x6b, 0x12, 0xf5,
-	0x41, 0xf8, 0xa0, 0x40, 0x5a, 0x53, 0xf0, 0x07, 0x81, 0xb0, 0xf2, 0x00, 0x0b, 0xb9, 0xc5, 0x06,
-	0x1e, 0x97, 0x92, 0x07, 0xbe, 0x80, 0x11, 0x97, 0x4a, 0x30, 0xc5, 0x03, 0xdf, 0x9a, 0x1e, 0x32,
-	0x37, 0x1c, 0xb3, 0x43, 0x6b, 0x04, 0x3e, 0x08, 0xa6, 0x60, 0x60, 0x86, 0x22, 0x50, 0x01, 0x79,
-	0x2d, 0xa3, 0x9a, 0x2c, 0xe4, 0xe6, 0x5a, 0xaa, 0x59, 0x50, 0x0f, 0xde, 0x18, 0x71, 0x35, 0x8e,
-	0xfa, 0xa6, 0x13, 0x78, 0xd6, 0x28, 0x18, 0x05, 0x56, 0x9a, 0xa1, 0x1f, 0x0d, 0xd3, 0x53, 0x7a,
-	0x48, 0x7f, 0x65, 0x99, 0x0f, 0xde, 0x5e, 0x88, 0xf2, 0x98, 0x33, 0xe6, 0x3e, 0x88, 0x73, 0x2b,
-	0x9c, 0x8c, 0x12, 0x40, 0x5a, 0x1e, 0x28, 0x66, 0x4d, 0x57, 0xf4, 0x1c, 0x58, 0x9b, 0x58, 0x22,
-	0xf2, 0x15, 0xf7, 0x60, 0x85, 0x70, 0xef, 0x79, 0x04, 0xe9, 0x8c, 0xc1, 0x63, 0x2b, 0xbc, 0xb7,
-	0x36, 0xf1, 0x22, 0xc5, 0x5d, 0x8b, 0xfb, 0x4a, 0x2a, 0xf1, 0x2c, 0xc9, 0xf8, 0x03, 0xe1, 0x57,
-	0x8e, 0x0b, 0x97, 0x3e, 0x0d, 0x82, 0xc9, 0x89, 0xcb, 0xc1, 0x57, 0x27, 0x81, 0x3f, 0xe4, 0x23,
-	0x32, 0xc4, 0x37, 0x24, 0x88, 0x29, 0x77, 0xa0, 0x83, 0xba, 0xa8, 0xd7, 0x3c, 0x7a, 0xd7, 0xdc,
-	0xda, 0x5d, 0xf3, 0xf3, 0x8c, 0x49, 0x61, 0x08, 0x02, 0x7c, 0x07, 0xec, 0x9b, 0x17, 0x33, 0xbd,
-	0x12, 0xcf, 0xf4, 0x1b, 0x45, 0xa4, 0x48, 0x4e, 0x7a, 0xb8, 0xee, 0x30, 0x3b, 0xf2, 0x07, 0x2e,
-	0x74, 0xaa, 0x5d, 0xd4, 0x6b, 0xd9, 0xad, 0x78, 0xa6, 0xd7, 0x4f, 0x8e, 0x33, 0x8c, 0xce, 0xa3,
-	0xc6, 0x3f, 0x55, 0xfc, 0xf2, 0x47, 0xdf, 0x29, 0x10, 0x3e, 0x73, 0x97, 0x74, 0x93, 0x2e, 0xae,
-	0xf9, 0xcc, 0xcb, 0x84, 0x36, 0xec, 0x56, 0x5e, 0xab, 0xf6, 0x90, 0x79, 0x40, 0xd3, 0x08, 0xf9,
-	0x01, 0xb7, 0x9c, 0x52, 0x77, 0x69, 0xa5, 0xe6, 0xd1, 0x87, 0x3b, 0xb4, 0xb4, 0xd1, 0x29, 0xfb,
-	0xa5, 0xbc, 0x5e, 0xab, 0x8c, 0xd2, 0xa5, 0x7a, 0xa4, 0x8f, 0xf7, 0x45, 0xe4, 0x82, 0xec, 0xec,
-	0x75, 0xf7, 0x7a, 0xcd, 0xa3, 0xf7, 0x76, 0x28, 0x4c, 0x23, 0x17, 0xbe, 0xe4, 0x6a, 0xfc, 0x28,
-	0x84, 0x2c, 0x24, 0xed, 0x76, 0x5e, 0x71, 0x3f, 0x89, 0x49, 0x9a, 0xa5, 0x26, 0xf7, 0x71, 0x7b,
-	0xc8, 0xb8, 0x1b, 0x09, 0x38, 0x0b, 0x5c, 0xee, 0x9c, 0x77, 0x6a, 0xa9, 0x1d, 0x77, 0xe3, 0x99,
-	0xde, 0xfe, 0xb8, 0x1c, 0xb8, 0x9a, 0xe9, 0xb7, 0x97, 0x80, 0xc7, 0xe7, 0x21, 0xd0, 0x65, 0xb2,
-	0xf1, 0x5b, 0x15, 0x1b, 0x6b, 0xdd, 0xce, 0x3a, 0x8a, 0x32, 0x2d, 0xe4, 0x1b, 0x5c, 0x4f, 0xa6,
-	0x7f, 0xc0, 0x14, 0xcb, 0xe7, 0xe4, 0xcd, 0x52, 0x6f, 0xf3, 0x61, 0x34, 0xc3, 0xc9, 0x28, 0x01,
-	0xa4, 0x99, 0xdc, 0x36, 0xa7, 0x87, 0xe6, 0xa3, 0xfe, 0xb7, 0xe0, 0xa8, 0x07, 0xa0, 0x98, 0x4d,
-	0xf2, 0x76, 0xf0, 0x02, 0xa3, 0xf3, 0xac, 0xe4, 0x57, 0x84, 0xef, 0xc0, 0x3a, 0x21, 0xb2, 0x53,
-	0x4d, 0xcd, 0xfc, 0x60, 0x07, 0x33, 0xd7, 0x76, 0x64, 0x6b, 0xb9, 0x80, 0x3b, 0x6b, 0xc3, 0x92,
-	0x6e, 0xa8, 0x6f, 0x5c, 0x21, 0x7c, 0xf7, 0xf9, 0x1e, 0xdd, 0xe7, 0x52, 0x91, 0xaf, 0x57, 0x7c,
-	0x32, 0xb7, 0xf3, 0x29, 0x61, 0xa7, 0x2e, 0xdd, 0xca, 0x45, 0xd6, 0x0b, 0xa4, 0xe4, 0x91, 0xc0,
-	0xfb, 0x5c, 0x81, 0x57, 0x38, 0xf2, 0xe0, 0x45, 0x1d, 0x59, 0xd2, 0xbf, 0x18, 0xb7, 0xd3, 0xa4,
-	0x06, 0xcd, 0x4a, 0x19, 0x3f, 0x21, 0xdc, 0x3c, 0xf5, 0xb9, 0xe2, 0xcc, 0xe5, 0xdf, 0x83, 0xd8,
-	0x62, 0x09, 0x1f, 0x17, 0x4b, 0x90, 0xa9, 0xb4, 0x76, 0x5c, 0x82, 0xf5, 0x63, 0x6f, 0xfc, 0x8b,
-	0x70, 0xa7, 0xa4, 0xe3, 0xba, 0xc7, 0x33, 0xc4, 0x2d, 0xbe, 0xa8, 0x5e, 0xf4, 0x76, 0x6f, 0x87,
-	0xde, 0x4a, 0xe2, 0x17, 0x6f, 0x49, 0x09, 0x94, 0x74, 0xa9, 0x82, 0xf1, 0x37, 0xc2, 0xaf, 0x6e,
-	0x6a, 0xf8, 0x1a, 0x66, 0x6d, 0xbc, 0x3c, 0x6b, 0x27, 0xff, 0xaf, 0xd3, 0x6d, 0x26, 0xec, 0x17,
-	0x84, 0x6b, 0xc9, 0x5f, 0x4d, 0x5e, 0xc7, 0x0d, 0x16, 0xf2, 0x4f, 0x44, 0x10, 0x85, 0xb2, 0x83,
-	0xba, 0x7b, 0xbd, 0x86, 0xdd, 0x8e, 0x67, 0x7a, 0xe3, 0xf8, 0xec, 0x34, 0x03, 0xe9, 0x22, 0x4e,
-	0x0e, 0x71, 0x93, 0x85, 0xfc, 0x0b, 0x10, 0x89, 0x8e, 0x4c, 0x65, 0xc3, 0xbe, 0x19, 0xcf, 0xf4,
-	0xe6, 0xf1, 0xd9, 0x69, 0x01, 0xd3, 0xf2, 0x9d, 0x24, 0xbf, 0x00, 0x19, 0x44, 0xc2, 0xc9, 0x5f,
-	0xe8, 0x3c, 0x3f, 0x2d, 0x40, 0xba, 0x88, 0x1b, 0xbf, 0x23, 0x4c, 0x56, 0xdf, 0x64, 0xf2, 0x3e,
-	0xc6, 0xc1, 0xfc, 0x94, 0x8b, 0xd4, 0xd3, 0xa9, 0x99, 0xa3, 0x57, 0x33, 0xbd, 0x3d, 0x3f, 0xa5,
-	0x6f, 0x6e, 0x89, 0x42, 0x3e, 0xc3, 0xb5, 0x64, 0xa0, 0xf3, 0x4f, 0xd3, 0xce, 0xcb, 0x31, 0x5f,
-	0xb8, 0xe4, 0x44, 0xd3, 0x54, 0x06, 0xe0, 0x5b, 0xcf, 0x7e, 0x89, 0x89, 0x85, 0x1b, 0xc9, 0x32,
-	0xca, 0x90, 0x39, 0xc5, 0xae, 0xde, 0xce, 0xa9, 0x8d, 0x87, 0x45, 0x80, 0x2e, 0xee, 0xcc, 0xf7,
-	0xba, 0xba, 0x69, 0xaf, 0x6d, 0xf3, 0xe2, 0x52, 0xab, 0x3c, 0xb9, 0xd4, 0x2a, 0x4f, 0x2f, 0xb5,
-	0xca, 0x8f, 0xb1, 0x86, 0x2e, 0x62, 0x0d, 0x3d, 0x89, 0x35, 0xf4, 0x34, 0xd6, 0xd0, 0x9f, 0xb1,
-	0x86, 0x7e, 0xfe, 0x4b, 0xab, 0x7c, 0x55, 0x2f, 0xf4, 0xfe, 0x17, 0x00, 0x00, 0xff, 0xff, 0xe7,
-	0xb5, 0x5f, 0xd5, 0xfb, 0x09, 0x00, 0x00,
+	// 545 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x9c, 0x51, 0x4d, 0x8b, 0x13, 0x3f,
+	0x18, 0x6f, 0xfe, 0xdb, 0x42, 0x9b, 0x76, 0xf9, 0xcb, 0xe0, 0xa1, 0x14, 0x99, 0x96, 0x9e, 0x2a,
+	0x62, 0x62, 0x57, 0x59, 0xbc, 0xee, 0xec, 0x41, 0x0a, 0xbe, 0x2c, 0x41, 0x3c, 0x88, 0x07, 0xd3,
+	0xf6, 0xd9, 0x69, 0x6c, 0x27, 0x19, 0x92, 0x4c, 0x41, 0x4f, 0x5e, 0xbc, 0x0b, 0x7e, 0xa9, 0x1e,
+	0xf7, 0xb8, 0xa7, 0x62, 0x47, 0xf0, 0xe8, 0x67, 0x90, 0x99, 0xe9, 0xec, 0xcc, 0x5a, 0x8b, 0xab,
+	0xb7, 0x3c, 0xbf, 0x27, 0xbf, 0xb7, 0x04, 0xb3, 0xf9, 0x63, 0x43, 0x84, 0xa2, 0xf3, 0x68, 0x0c,
+	0x5a, 0x82, 0x05, 0x43, 0x97, 0x20, 0xa7, 0x4a, 0xd3, 0xed, 0x82, 0x87, 0x82, 0xf2, 0x69, 0x20,
+	0x8c, 0x11, 0x4a, 0x6a, 0xf0, 0x85, 0xb1, 0x9a, 0x5b, 0xa1, 0x24, 0x5d, 0x0e, 0xf9, 0x22, 0x9c,
+	0xf1, 0x21, 0xf5, 0x41, 0x82, 0xe6, 0x16, 0xa6, 0x24, 0xd4, 0xca, 0x2a, 0xe7, 0x6e, 0x46, 0x25,
+	0x3c, 0x14, 0xe4, 0xb7, 0x54, 0x92, 0x53, 0x3b, 0xf7, 0x7d, 0x61, 0x67, 0xd1, 0x98, 0x4c, 0x54,
+	0x40, 0x7d, 0xe5, 0x2b, 0x9a, 0x2a, 0x8c, 0xa3, 0xf3, 0x74, 0x4a, 0x87, 0xf4, 0x94, 0x29, 0x77,
+	0x1e, 0x15, 0xa1, 0x02, 0x3e, 0x99, 0x09, 0x09, 0xfa, 0x3d, 0x0d, 0xe7, 0x7e, 0x02, 0x18, 0x1a,
+	0x80, 0xe5, 0x74, 0xb9, 0x93, 0xa7, 0x43, 0xf7, 0xb1, 0x74, 0x24, 0xad, 0x08, 0x60, 0x87, 0x70,
+	0xfc, 0x27, 0x82, 0x99, 0xcc, 0x20, 0xe0, 0x3b, 0xbc, 0x87, 0xfb, 0x78, 0x91, 0x15, 0x0b, 0x2a,
+	0xa4, 0x35, 0x56, 0xff, 0x4a, 0xea, 0x7f, 0x42, 0xb8, 0x39, 0x92, 0xc2, 0x0a, 0xbe, 0x10, 0x1f,
+	0x40, 0x3b, 0x3d, 0x5c, 0x95, 0x3c, 0x80, 0x36, 0xea, 0xa1, 0x41, 0xc3, 0x6b, 0xad, 0xd6, 0xdd,
+	0x4a, 0xbc, 0xee, 0x56, 0x9f, 0xf3, 0x00, 0x58, 0xba, 0x71, 0x5e, 0xe2, 0x9a, 0x8e, 0x16, 0x60,
+	0xda, 0xff, 0xf5, 0x0e, 0x06, 0xcd, 0x23, 0x4a, 0x6e, 0xfc, 0xde, 0x84, 0x45, 0x0b, 0xf0, 0x0e,
+	0xb7, 0x9a, 0xb5, 0x64, 0x32, 0x2c, 0x13, 0xeb, 0xff, 0x40, 0xb8, 0x5d, 0xca, 0x71, 0xaa, 0xe4,
+	0xb9, 0xf0, 0xa3, 0x4c, 0xc0, 0x79, 0x8b, 0xeb, 0xc9, 0xeb, 0x4e, 0xb9, 0xe5, 0x69, 0xb0, 0xe6,
+	0xd1, 0x83, 0x92, 0xeb, 0x55, 0x59, 0x12, 0xce, 0xfd, 0x04, 0x30, 0x24, 0xb9, 0x4d, 0x96, 0x43,
+	0xf2, 0x62, 0xfc, 0x0e, 0x26, 0xf6, 0x19, 0x58, 0xee, 0x39, 0x5b, 0x5b, 0x5c, 0x60, 0xec, 0x4a,
+	0xd5, 0x09, 0x71, 0x4b, 0x14, 0xee, 0x79, 0xb7, 0xe3, 0xbf, 0xe8, 0x56, 0x0a, 0xef, 0xdd, 0xde,
+	0x7a, 0xb5, 0x4a, 0xa0, 0x61, 0xd7, 0x1c, 0xfa, 0xdf, 0x11, 0xbe, 0xb3, 0xaf, 0xf0, 0x53, 0x61,
+	0xac, 0xf3, 0x66, 0xa7, 0x34, 0xb9, 0x59, 0xe9, 0x84, 0x9d, 0x56, 0xbe, 0xb5, 0x8d, 0x51, 0xcf,
+	0x91, 0x52, 0xe1, 0x19, 0xae, 0x09, 0x0b, 0x41, 0xde, 0xf4, 0xf4, 0xdf, 0x9a, 0x5e, 0x4b, 0x5d,
+	0xfc, 0xec, 0x28, 0x51, 0x66, 0x99, 0x41, 0xff, 0x0b, 0xc2, 0xd5, 0xe4, 0xab, 0x9d, 0x7b, 0xb8,
+	0xc1, 0x43, 0xf1, 0x44, 0xab, 0x28, 0x34, 0x6d, 0xd4, 0x3b, 0x18, 0x34, 0xbc, 0xc3, 0x78, 0xdd,
+	0x6d, 0x9c, 0x9c, 0x8d, 0x32, 0x90, 0x15, 0x7b, 0x67, 0x88, 0x9b, 0x3c, 0x14, 0xaf, 0x40, 0x27,
+	0x39, 0xb2, 0x94, 0x0d, 0xef, 0xff, 0x78, 0xdd, 0x6d, 0x9e, 0x9c, 0x8d, 0x72, 0x98, 0x95, 0xef,
+	0x24, 0xfa, 0x1a, 0x8c, 0x8a, 0xf4, 0x04, 0x4c, 0xfb, 0xa0, 0xd0, 0x67, 0x39, 0xc8, 0x8a, 0xbd,
+	0x47, 0x56, 0x1b, 0xb7, 0x72, 0xb1, 0x71, 0x2b, 0x97, 0x1b, 0xb7, 0xf2, 0x31, 0x76, 0xd1, 0x2a,
+	0x76, 0xd1, 0x45, 0xec, 0xa2, 0xcb, 0xd8, 0x45, 0x5f, 0x63, 0x17, 0x7d, 0xfe, 0xe6, 0x56, 0x5e,
+	0xd7, 0xf3, 0xd2, 0x3f, 0x03, 0x00, 0x00, 0xff, 0xff, 0x1d, 0xfb, 0x23, 0x89, 0xaa, 0x04, 0x00,
+	0x00,
 }

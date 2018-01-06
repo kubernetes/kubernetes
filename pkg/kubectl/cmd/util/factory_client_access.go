@@ -29,11 +29,18 @@ import (
 	"strings"
 	"time"
 
+	"k8s.io/api/core/v1"
+
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
+	appsv1 "k8s.io/api/apps/v1"
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
+	appsv1beta2 "k8s.io/api/apps/v1beta2"
+	batchv1 "k8s.io/api/batch/v1"
+	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	batchv2alpha1 "k8s.io/api/batch/v2alpha1"
+	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -45,10 +52,9 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/homedir"
-	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/apps"
-	"k8s.io/kubernetes/pkg/apis/batch"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/kubectl"
@@ -212,48 +218,69 @@ func (f *ring0Factory) RESTClient() (*restclient.RESTClient, error) {
 	return restclient.RESTClientFor(clientConfig)
 }
 
-func (f *ring0Factory) FederationClientSetForVersion(version *schema.GroupVersion) (fedclientset.Interface, error) {
-	return f.clientCache.FederationClientSetForVersion(version)
-}
-
-func (f *ring0Factory) FederationClientForVersion(version *schema.GroupVersion) (*restclient.RESTClient, error) {
-	return f.clientCache.FederationClientForVersion(version)
-}
-
 func (f *ring0Factory) Decoder(toInternal bool) runtime.Decoder {
 	var decoder runtime.Decoder
 	if toInternal {
-		decoder = api.Codecs.UniversalDecoder()
+		decoder = legacyscheme.Codecs.UniversalDecoder()
 	} else {
-		decoder = api.Codecs.UniversalDeserializer()
+		decoder = legacyscheme.Codecs.UniversalDeserializer()
 	}
 	return decoder
 }
 
 func (f *ring0Factory) JSONEncoder() runtime.Encoder {
-	return api.Codecs.LegacyCodec(api.Registry.EnabledVersions()...)
+	return legacyscheme.Codecs.LegacyCodec(legacyscheme.Registry.EnabledVersions()...)
 }
 
-func (f *ring0Factory) UpdatePodSpecForObject(obj runtime.Object, fn func(*api.PodSpec) error) (bool, error) {
+func (f *ring0Factory) UpdatePodSpecForObject(obj runtime.Object, fn func(*v1.PodSpec) error) (bool, error) {
 	// TODO: replace with a swagger schema based approach (identify pod template via schema introspection)
 	switch t := obj.(type) {
-	case *api.Pod:
+	case *v1.Pod:
 		return true, fn(&t.Spec)
-	case *api.ReplicationController:
+	// ReplicationController
+	case *v1.ReplicationController:
 		if t.Spec.Template == nil {
-			t.Spec.Template = &api.PodTemplateSpec{}
+			t.Spec.Template = &v1.PodTemplateSpec{}
 		}
 		return true, fn(&t.Spec.Template.Spec)
-	case *extensions.Deployment:
+	// Deployment
+	case *extensionsv1beta1.Deployment:
 		return true, fn(&t.Spec.Template.Spec)
-	case *extensions.DaemonSet:
+	case *appsv1beta1.Deployment:
 		return true, fn(&t.Spec.Template.Spec)
-	case *extensions.ReplicaSet:
+	case *appsv1beta2.Deployment:
 		return true, fn(&t.Spec.Template.Spec)
-	case *apps.StatefulSet:
+	case *appsv1.Deployment:
 		return true, fn(&t.Spec.Template.Spec)
-	case *batch.Job:
+	// DaemonSet
+	case *extensionsv1beta1.DaemonSet:
 		return true, fn(&t.Spec.Template.Spec)
+	case *appsv1beta2.DaemonSet:
+		return true, fn(&t.Spec.Template.Spec)
+	case *appsv1.DaemonSet:
+		return true, fn(&t.Spec.Template.Spec)
+	// ReplicaSet
+	case *extensionsv1beta1.ReplicaSet:
+		return true, fn(&t.Spec.Template.Spec)
+	case *appsv1beta2.ReplicaSet:
+		return true, fn(&t.Spec.Template.Spec)
+	case *appsv1.ReplicaSet:
+		return true, fn(&t.Spec.Template.Spec)
+	// StatefulSet
+	case *appsv1beta1.StatefulSet:
+		return true, fn(&t.Spec.Template.Spec)
+	case *appsv1beta2.StatefulSet:
+		return true, fn(&t.Spec.Template.Spec)
+	case *appsv1.StatefulSet:
+		return true, fn(&t.Spec.Template.Spec)
+	// Job
+	case *batchv1.Job:
+		return true, fn(&t.Spec.Template.Spec)
+	// CronJob
+	case *batchv1beta1.CronJob:
+		return true, fn(&t.Spec.JobTemplate.Spec.Template.Spec)
+	case *batchv2alpha1.CronJob:
+		return true, fn(&t.Spec.JobTemplate.Spec.Template.Spec)
 	default:
 		return false, fmt.Errorf("the object is not a pod or does not have a pod template")
 	}
@@ -289,11 +316,7 @@ func (f *ring0Factory) MapBasedSelectorForObject(object runtime.Object) (string,
 		}
 		return kubectl.MakeLabels(t.Spec.Selector.MatchLabels), nil
 	default:
-		gvks, _, err := api.Scheme.ObjectKinds(object)
-		if err != nil {
-			return "", err
-		}
-		return "", fmt.Errorf("cannot extract pod selector from %v", gvks[0])
+		return "", fmt.Errorf("cannot extract pod selector from %T", object)
 	}
 }
 
@@ -311,11 +334,7 @@ func (f *ring0Factory) PortsForObject(object runtime.Object) ([]string, error) {
 	case *extensions.ReplicaSet:
 		return getPorts(t.Spec.Template.Spec), nil
 	default:
-		gvks, _, err := api.Scheme.ObjectKinds(object)
-		if err != nil {
-			return nil, err
-		}
-		return nil, fmt.Errorf("cannot extract ports from %v", gvks[0])
+		return nil, fmt.Errorf("cannot extract ports from %T", object)
 	}
 }
 
@@ -333,11 +352,7 @@ func (f *ring0Factory) ProtocolsForObject(object runtime.Object) (map[string]str
 	case *extensions.ReplicaSet:
 		return getProtocols(t.Spec.Template.Spec), nil
 	default:
-		gvks, _, err := api.Scheme.ObjectKinds(object)
-		if err != nil {
-			return nil, err
-		}
-		return nil, fmt.Errorf("cannot extract protocols from %v", gvks[0])
+		return nil, fmt.Errorf("cannot extract protocols from %T", object)
 	}
 }
 
@@ -400,24 +415,6 @@ func (f *ring0Factory) BindFlags(flags *pflag.FlagSet) {
 func (f *ring0Factory) BindExternalFlags(flags *pflag.FlagSet) {
 	// any flags defined by external projects (not part of pflags)
 	flags.AddGoFlagSet(flag.CommandLine)
-}
-
-func (f *ring0Factory) DefaultResourceFilterOptions(cmd *cobra.Command, withNamespace bool) *printers.PrintOptions {
-	columnLabel, err := cmd.Flags().GetStringSlice("label-columns")
-	if err != nil {
-		columnLabel = []string{}
-	}
-	opts := &printers.PrintOptions{
-		NoHeaders:          GetFlagBool(cmd, "no-headers"),
-		WithNamespace:      withNamespace,
-		Wide:               GetWideFlag(cmd),
-		ShowAll:            GetFlagBool(cmd, "show-all"),
-		ShowLabels:         GetFlagBool(cmd, "show-labels"),
-		AbsoluteTimestamps: isWatch(cmd),
-		ColumnLabels:       columnLabel,
-	}
-
-	return opts
 }
 
 func (f *ring0Factory) DefaultResourceFilterFunc() kubectl.Filters {
@@ -506,6 +503,7 @@ const (
 	ClusterV1Beta1GeneratorName             = "cluster/v1beta1"
 	PodDisruptionBudgetV1GeneratorName      = "poddisruptionbudget/v1beta1"
 	PodDisruptionBudgetV2GeneratorName      = "poddisruptionbudget/v1beta1/v2"
+	PriorityClassV1Alpha1GeneratorName      = "priorityclass/v1alpha1"
 )
 
 // DefaultGenerators returns the set of default generators for use in Factory instances
@@ -545,10 +543,6 @@ func DefaultGenerators(cmdName string) map[string]kubectl.Generator {
 			JobV1GeneratorName:                 kubectl.JobV1{},
 			CronJobV2Alpha1GeneratorName:       kubectl.CronJobV2Alpha1{},
 			CronJobV1Beta1GeneratorName:        kubectl.CronJobV1Beta1{},
-		}
-	case "autoscale":
-		generator = map[string]kubectl.Generator{
-			HorizontalPodAutoscalerV1GeneratorName: kubectl.HorizontalPodAutoscalerV1{},
 		}
 	case "namespace":
 		generator = map[string]kubectl.Generator{

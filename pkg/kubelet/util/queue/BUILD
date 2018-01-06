@@ -19,8 +19,8 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["work_queue_test.go"],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/pkg/kubelet/util/queue",
-    library = ":go_default_library",
     deps = [
         "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/clock:go_default_library",

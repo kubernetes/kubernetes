@@ -82,6 +82,7 @@ type Table string
 const (
 	TableNAT    Table = "nat"
 	TableFilter Table = "filter"
+	TableMangle Table = "mangle"
 )
 
 type Chain string
@@ -91,6 +92,7 @@ const (
 	ChainPrerouting  Chain = "PREROUTING"
 	ChainOutput      Chain = "OUTPUT"
 	ChainInput       Chain = "INPUT"
+	ChainForward     Chain = "FORWARD"
 )
 
 const (
@@ -118,9 +120,11 @@ const NoFlushTables FlushFlag = false
 // (test whether a rule exists).
 const MinCheckVersion = "1.4.11"
 
-// Minimum iptables versions supporting the -w and -w2 flags
-const MinWaitVersion = "1.4.20"
-const MinWait2Version = "1.4.22"
+// Minimum iptables versions supporting the -w and -w<seconds> flags
+const WaitMinVersion = "1.4.20"
+const WaitSecondsMinVersion = "1.4.22"
+const WaitString = "-w"
+const WaitSecondsString = "-w5"
 
 const LockfilePath16x = "/run/xtables.lock"
 
@@ -537,24 +541,24 @@ func getIPTablesWaitFlag(vstring string) []string {
 		return nil
 	}
 
-	minVersion, err := utilversion.ParseGeneric(MinWaitVersion)
+	minVersion, err := utilversion.ParseGeneric(WaitMinVersion)
 	if err != nil {
-		glog.Errorf("MinWaitVersion (%s) is not a valid version string: %v", MinWaitVersion, err)
+		glog.Errorf("WaitMinVersion (%s) is not a valid version string: %v", WaitMinVersion, err)
 		return nil
 	}
 	if version.LessThan(minVersion) {
 		return nil
 	}
 
-	minVersion, err = utilversion.ParseGeneric(MinWait2Version)
+	minVersion, err = utilversion.ParseGeneric(WaitSecondsMinVersion)
 	if err != nil {
-		glog.Errorf("MinWait2Version (%s) is not a valid version string: %v", MinWait2Version, err)
+		glog.Errorf("WaitSecondsMinVersion (%s) is not a valid version string: %v", WaitSecondsMinVersion, err)
 		return nil
 	}
 	if version.LessThan(minVersion) {
-		return []string{"-w"}
+		return []string{WaitString}
 	} else {
-		return []string{"-w2"}
+		return []string{WaitSecondsString}
 	}
 }
 
@@ -590,7 +594,7 @@ func getIPTablesRestoreWaitFlag(exec utilexec.Interface, protocol Protocol) []st
 		return nil
 	}
 
-	return []string{"--wait=2"}
+	return []string{WaitSecondsString}
 }
 
 // getIPTablesRestoreVersionString runs "iptables-restore --version" to get the version string

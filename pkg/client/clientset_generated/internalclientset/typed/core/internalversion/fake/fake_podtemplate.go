@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2018 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -23,7 +23,7 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
-	api "k8s.io/kubernetes/pkg/api"
+	core "k8s.io/kubernetes/pkg/apis/core"
 )
 
 // FakePodTemplates implements PodTemplateInterface
@@ -37,20 +37,20 @@ var podtemplatesResource = schema.GroupVersionResource{Group: "", Version: "", R
 var podtemplatesKind = schema.GroupVersionKind{Group: "", Version: "", Kind: "PodTemplate"}
 
 // Get takes name of the podTemplate, and returns the corresponding podTemplate object, and an error if there is any.
-func (c *FakePodTemplates) Get(name string, options v1.GetOptions) (result *api.PodTemplate, err error) {
+func (c *FakePodTemplates) Get(name string, options v1.GetOptions) (result *core.PodTemplate, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(podtemplatesResource, c.ns, name), &api.PodTemplate{})
+		Invokes(testing.NewGetAction(podtemplatesResource, c.ns, name), &core.PodTemplate{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*api.PodTemplate), err
+	return obj.(*core.PodTemplate), err
 }
 
 // List takes label and field selectors, and returns the list of PodTemplates that match those selectors.
-func (c *FakePodTemplates) List(opts v1.ListOptions) (result *api.PodTemplateList, err error) {
+func (c *FakePodTemplates) List(opts v1.ListOptions) (result *core.PodTemplateList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(podtemplatesResource, podtemplatesKind, c.ns, opts), &api.PodTemplateList{})
+		Invokes(testing.NewListAction(podtemplatesResource, podtemplatesKind, c.ns, opts), &core.PodTemplateList{})
 
 	if obj == nil {
 		return nil, err
@@ -60,8 +60,8 @@ func (c *FakePodTemplates) List(opts v1.ListOptions) (result *api.PodTemplateLis
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &api.PodTemplateList{}
-	for _, item := range obj.(*api.PodTemplateList).Items {
+	list := &core.PodTemplateList{}
+	for _, item := range obj.(*core.PodTemplateList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
 		}
@@ -77,31 +77,31 @@ func (c *FakePodTemplates) Watch(opts v1.ListOptions) (watch.Interface, error) {
 }
 
 // Create takes the representation of a podTemplate and creates it.  Returns the server's representation of the podTemplate, and an error, if there is any.
-func (c *FakePodTemplates) Create(podTemplate *api.PodTemplate) (result *api.PodTemplate, err error) {
+func (c *FakePodTemplates) Create(podTemplate *core.PodTemplate) (result *core.PodTemplate, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(podtemplatesResource, c.ns, podTemplate), &api.PodTemplate{})
+		Invokes(testing.NewCreateAction(podtemplatesResource, c.ns, podTemplate), &core.PodTemplate{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*api.PodTemplate), err
+	return obj.(*core.PodTemplate), err
 }
 
 // Update takes the representation of a podTemplate and updates it. Returns the server's representation of the podTemplate, and an error, if there is any.
-func (c *FakePodTemplates) Update(podTemplate *api.PodTemplate) (result *api.PodTemplate, err error) {
+func (c *FakePodTemplates) Update(podTemplate *core.PodTemplate) (result *core.PodTemplate, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(podtemplatesResource, c.ns, podTemplate), &api.PodTemplate{})
+		Invokes(testing.NewUpdateAction(podtemplatesResource, c.ns, podTemplate), &core.PodTemplate{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*api.PodTemplate), err
+	return obj.(*core.PodTemplate), err
 }
 
 // Delete takes name of the podTemplate and deletes it. Returns an error if one occurs.
 func (c *FakePodTemplates) Delete(name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(podtemplatesResource, c.ns, name), &api.PodTemplate{})
+		Invokes(testing.NewDeleteAction(podtemplatesResource, c.ns, name), &core.PodTemplate{})
 
 	return err
 }
@@ -110,17 +110,17 @@ func (c *FakePodTemplates) Delete(name string, options *v1.DeleteOptions) error 
 func (c *FakePodTemplates) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	action := testing.NewDeleteCollectionAction(podtemplatesResource, c.ns, listOptions)
 
-	_, err := c.Fake.Invokes(action, &api.PodTemplateList{})
+	_, err := c.Fake.Invokes(action, &core.PodTemplateList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched podTemplate.
-func (c *FakePodTemplates) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *api.PodTemplate, err error) {
+func (c *FakePodTemplates) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *core.PodTemplate, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(podtemplatesResource, c.ns, name, data, subresources...), &api.PodTemplate{})
+		Invokes(testing.NewPatchSubresourceAction(podtemplatesResource, c.ns, name, data, subresources...), &core.PodTemplate{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*api.PodTemplate), err
+	return obj.(*core.PodTemplate), err
 }

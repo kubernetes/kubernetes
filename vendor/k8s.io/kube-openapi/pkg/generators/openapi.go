@@ -118,17 +118,32 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 
 `)...)
 
-	if err := context.AddDir(arguments.OutputPackagePath); err != nil {
+	outputPath := arguments.OutputPackagePath
+
+	if err := context.AddDir(outputPath); err != nil {
 		glog.Fatalf("Failed to load output package: %v", err)
 	}
-	pkg := context.Universe[arguments.OutputPackagePath]
+
+	// Compute the canonical output path to allow retrieval of the
+	// package for a vendored output path.
+	const vendorPath = "/vendor/"
+	canonicalOutputPath := outputPath
+	if strings.Contains(outputPath, vendorPath) {
+		canonicalOutputPath = outputPath[strings.Index(outputPath, vendorPath)+len(vendorPath):]
+	}
+
+	// The package for outputPath is mapped to the canonical path
+	pkg := context.Universe[canonicalOutputPath]
 	if pkg == nil {
 		glog.Fatalf("Got nil output package: %v", err)
 	}
 	return generator.Packages{
 		&generator.DefaultPackage{
 			PackageName: strings.Split(filepath.Base(pkg.Path), ".")[0],
-			PackagePath: pkg.Path,
+			// Use the supplied output path rather than the canonical
+			// one to allow generation into the path of a
+			// vendored package.
+			PackagePath: outputPath,
 			HeaderText:  header,
 			GeneratorFunc: func(c *generator.Context) (generators []generator.Generator) {
 				return []generator.Generator{NewOpenAPIGen(arguments.OutputFileBaseName, pkg, context)}

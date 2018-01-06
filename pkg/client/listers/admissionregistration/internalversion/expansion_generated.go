@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2018 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,10 +18,14 @@ limitations under the License.
 
 package internalversion
 
-// ExternalAdmissionHookConfigurationListerExpansion allows custom methods to be added to
-// ExternalAdmissionHookConfigurationLister.
-type ExternalAdmissionHookConfigurationListerExpansion interface{}
-
 // InitializerConfigurationListerExpansion allows custom methods to be added to
 // InitializerConfigurationLister.
 type InitializerConfigurationListerExpansion interface{}
+
+// MutatingWebhookConfigurationListerExpansion allows custom methods to be added to
+// MutatingWebhookConfigurationLister.
+type MutatingWebhookConfigurationListerExpansion interface{}
+
+// ValidatingWebhookConfigurationListerExpansion allows custom methods to be added to
+// ValidatingWebhookConfigurationLister.
+type ValidatingWebhookConfigurationListerExpansion interface{}

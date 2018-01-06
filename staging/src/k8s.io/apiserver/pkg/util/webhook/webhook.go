@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -104,15 +105,12 @@ func WithExponentialBackoff(initialBackoff time.Duration, webhookFn func() error
 	var err error
 	wait.ExponentialBackoff(backoff, func() (bool, error) {
 		err = webhookFn()
-		// these errors indicate a need to retry an authentication check
-		if apierrors.IsServerTimeout(err) || apierrors.IsTimeout(err) || apierrors.IsTooManyRequests(err) {
+		// these errors indicate a transient error that should be retried.
+		if net.IsConnectionReset(err) || apierrors.IsInternalError(err) || apierrors.IsTimeout(err) || apierrors.IsTooManyRequests(err) {
 			return false, nil
 		}
 		// if the error sends the Retry-After header, we respect it as an explicit confirmation we should retry.
 		if _, shouldRetry := apierrors.SuggestsClientDelay(err); shouldRetry {
-			return false, nil
-		}
-		if apierrors.IsInternalError(err) {
 			return false, nil
 		}
 		if err != nil {

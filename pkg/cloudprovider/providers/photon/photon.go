@@ -38,7 +38,7 @@ import (
 	"gopkg.in/gcfg.v1"
 	"k8s.io/api/core/v1"
 	k8stypes "k8s.io/apimachinery/pkg/types"
-	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
+	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller"
 )
@@ -544,11 +544,6 @@ func (pc *PCCloud) GetZoneByNodeName(nodeName k8stypes.NodeName) (cloudprovider.
 // Routes returns a false since the interface is not supported for photon controller.
 func (pc *PCCloud) Routes() (cloudprovider.Routes, bool) {
 	return nil, false
-}
-
-// ScrubDNS filters DNS settings for pods.
-func (pc *PCCloud) ScrubDNS(nameservers, searches []string) (nsOut, srchOut []string) {
-	return nameservers, searches
 }
 
 // HasClusterID returns true if the cluster has a clusterID

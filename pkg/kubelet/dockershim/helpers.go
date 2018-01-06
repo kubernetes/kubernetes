@@ -223,14 +223,6 @@ func getApparmorSecurityOpts(sc *runtimeapi.LinuxContainerSecurityContext, separ
 	return fmtOpts, nil
 }
 
-func getNetworkNamespace(c *dockertypes.ContainerJSON) (string, error) {
-	if c.State.Pid == 0 {
-		// Docker reports pid 0 for an exited container.
-		return "", fmt.Errorf("Cannot find network namespace for the terminated container %q", c.ID)
-	}
-	return fmt.Sprintf(dockerNetNSFmt, c.State.Pid), nil
-}
-
 // dockerFilter wraps around dockerfilters.Args and provides methods to modify
 // the filter easily.
 type dockerFilter struct {

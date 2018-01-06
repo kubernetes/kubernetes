@@ -11,9 +11,38 @@ go_library(
         "repair.go",
         "util.go",
         "wal.go",
-        "wal_unix.go",
     ] + select({
-        "@io_bazel_rules_go//go/platform:windows_amd64": [
+        "@io_bazel_rules_go//go/platform:android": [
+            "wal_unix.go",
+        ],
+        "@io_bazel_rules_go//go/platform:darwin": [
+            "wal_unix.go",
+        ],
+        "@io_bazel_rules_go//go/platform:dragonfly": [
+            "wal_unix.go",
+        ],
+        "@io_bazel_rules_go//go/platform:freebsd": [
+            "wal_unix.go",
+        ],
+        "@io_bazel_rules_go//go/platform:linux": [
+            "wal_unix.go",
+        ],
+        "@io_bazel_rules_go//go/platform:nacl": [
+            "wal_unix.go",
+        ],
+        "@io_bazel_rules_go//go/platform:netbsd": [
+            "wal_unix.go",
+        ],
+        "@io_bazel_rules_go//go/platform:openbsd": [
+            "wal_unix.go",
+        ],
+        "@io_bazel_rules_go//go/platform:plan9": [
+            "wal_unix.go",
+        ],
+        "@io_bazel_rules_go//go/platform:solaris": [
+            "wal_unix.go",
+        ],
+        "@io_bazel_rules_go//go/platform:windows": [
             "wal_windows.go",
         ],
         "//conditions:default": [],

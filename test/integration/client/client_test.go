@@ -38,7 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/version"
 	e2e "k8s.io/kubernetes/test/e2e/framework"
@@ -376,7 +376,7 @@ func TestPatchWithCreateOnUpdate(t *testing.T) {
 
 	// Make sure patch doesn't get to CreateOnUpdate
 	{
-		endpointJSON, err := runtime.Encode(api.Codecs.LegacyCodec(v1.SchemeGroupVersion), endpointTemplate)
+		endpointJSON, err := runtime.Encode(legacyscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), endpointTemplate)
 		if err != nil {
 			t.Fatalf("Failed creating endpoint JSON: %v", err)
 		}
@@ -393,7 +393,7 @@ func TestPatchWithCreateOnUpdate(t *testing.T) {
 
 	// Make sure identity patch is accepted
 	{
-		endpointJSON, err := runtime.Encode(api.Codecs.LegacyCodec(v1.SchemeGroupVersion), createdEndpoint)
+		endpointJSON, err := runtime.Encode(legacyscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), createdEndpoint)
 		if err != nil {
 			t.Fatalf("Failed creating endpoint JSON: %v", err)
 		}
@@ -407,7 +407,7 @@ func TestPatchWithCreateOnUpdate(t *testing.T) {
 		endpointTemplate.Name = ""
 		endpointTemplate.UID = ""
 		endpointTemplate.ResourceVersion = "1"
-		endpointJSON, err := runtime.Encode(api.Codecs.LegacyCodec(v1.SchemeGroupVersion), endpointTemplate)
+		endpointJSON, err := runtime.Encode(legacyscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), endpointTemplate)
 		if err != nil {
 			t.Fatalf("Failed creating endpoint JSON: %v", err)
 		}
@@ -421,7 +421,7 @@ func TestPatchWithCreateOnUpdate(t *testing.T) {
 		endpointTemplate.Name = ""
 		endpointTemplate.UID = "abc"
 		endpointTemplate.ResourceVersion = ""
-		endpointJSON, err := runtime.Encode(api.Codecs.LegacyCodec(v1.SchemeGroupVersion), endpointTemplate)
+		endpointJSON, err := runtime.Encode(legacyscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), endpointTemplate)
 		if err != nil {
 			t.Fatalf("Failed creating endpoint JSON: %v", err)
 		}
@@ -435,7 +435,7 @@ func TestPatchWithCreateOnUpdate(t *testing.T) {
 		endpointTemplate.Name = "changedname"
 		endpointTemplate.UID = ""
 		endpointTemplate.ResourceVersion = ""
-		endpointJSON, err := runtime.Encode(api.Codecs.LegacyCodec(v1.SchemeGroupVersion), endpointTemplate)
+		endpointJSON, err := runtime.Encode(legacyscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), endpointTemplate)
 		if err != nil {
 			t.Fatalf("Failed creating endpoint JSON: %v", err)
 		}
@@ -449,7 +449,7 @@ func TestPatchWithCreateOnUpdate(t *testing.T) {
 		endpointTemplate.Name = ""
 		endpointTemplate.UID = ""
 		endpointTemplate.ResourceVersion = ""
-		endpointJSON, err := runtime.Encode(api.Codecs.LegacyCodec(v1.SchemeGroupVersion), endpointTemplate)
+		endpointJSON, err := runtime.Encode(legacyscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), endpointTemplate)
 		if err != nil {
 			t.Fatalf("Failed creating endpoint JSON: %v", err)
 		}
@@ -789,20 +789,20 @@ func runSelfLinkTestOnNamespace(t *testing.T, c clientset.Interface, namespace s
 			},
 		},
 	}
-	pod, err := c.Core().Pods(namespace).Create(&podBody)
+	pod, err := c.CoreV1().Pods(namespace).Create(&podBody)
 	if err != nil {
 		t.Fatalf("Failed creating selflinktest pod: %v", err)
 	}
-	if err = c.Core().RESTClient().Get().RequestURI(pod.SelfLink).Do().Into(pod); err != nil {
+	if err = c.CoreV1().RESTClient().Get().RequestURI(pod.SelfLink).Do().Into(pod); err != nil {
 		t.Errorf("Failed listing pod with supplied self link '%v': %v", pod.SelfLink, err)
 	}
 
-	podList, err := c.Core().Pods(namespace).List(metav1.ListOptions{})
+	podList, err := c.CoreV1().Pods(namespace).List(metav1.ListOptions{})
 	if err != nil {
 		t.Errorf("Failed listing pods: %v", err)
 	}
 
-	if err = c.Core().RESTClient().Get().RequestURI(podList.SelfLink).Do().Into(podList); err != nil {
+	if err = c.CoreV1().RESTClient().Get().RequestURI(podList.SelfLink).Do().Into(podList); err != nil {
 		t.Errorf("Failed listing pods with supplied self link '%v': %v", podList.SelfLink, err)
 	}
 
@@ -813,7 +813,7 @@ func runSelfLinkTestOnNamespace(t *testing.T, c clientset.Interface, namespace s
 			continue
 		}
 		found = true
-		err = c.Core().RESTClient().Get().RequestURI(item.SelfLink).Do().Into(pod)
+		err = c.CoreV1().RESTClient().Get().RequestURI(item.SelfLink).Do().Into(pod)
 		if err != nil {
 			t.Errorf("Failed listing pod with supplied self link '%v': %v", item.SelfLink, err)
 		}

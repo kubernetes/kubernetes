@@ -119,7 +119,7 @@ func TestBanflunderAdmissionPlugin(t *testing.T) {
 			}
 			targetInitializer.Initialize(target)
 
-			err = admission.Validate(target)
+			err = admission.ValidateInitialization(target)
 			if err != nil {
 				t.Fatalf("scenario %d: failed to initialize banflunder admission plugin due to =%v", index, err)
 			}

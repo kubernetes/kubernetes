@@ -63,6 +63,12 @@ func TestCanSupport(t *testing.T) {
 	if plugin.GetPluginName() != downwardAPIPluginName {
 		t.Errorf("Wrong name: %s", plugin.GetPluginName())
 	}
+	if !plugin.CanSupport(&volume.Spec{Volume: &v1.Volume{VolumeSource: v1.VolumeSource{DownwardAPI: &v1.DownwardAPIVolumeSource{}}}}) {
+		t.Errorf("Expected true")
+	}
+	if plugin.CanSupport(&volume.Spec{Volume: &v1.Volume{VolumeSource: v1.VolumeSource{}}}) {
+		t.Errorf("Expected false")
+	}
 }
 
 func TestDownwardAPI(t *testing.T) {
@@ -287,7 +293,7 @@ func (test *downwardAPITest) tearDown() {
 	if _, err := os.Stat(test.volumePath); err == nil {
 		test.t.Errorf("TearDown() failed, volume path still exists: %s", test.volumePath)
 	} else if !os.IsNotExist(err) {
-		test.t.Errorf("SetUp() failed: %v", err)
+		test.t.Errorf("TearDown() failed: %v", err)
 	}
 	os.RemoveAll(test.rootDir)
 }

@@ -25,7 +25,11 @@ import (
 	"strings"
 
 	"github.com/golang/glog"
+	"k8s.io/api/core/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
+	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
 type ioHandler interface {
@@ -36,6 +40,11 @@ type ioHandler interface {
 }
 
 type osIOHandler struct{}
+
+const (
+	byPath = "/dev/disk/by-path/"
+	byID   = "/dev/disk/by-id/"
+)
 
 func (handler *osIOHandler) ReadDir(dirname string) ([]os.FileInfo, error) {
 	return ioutil.ReadDir(dirname)
@@ -50,37 +59,17 @@ func (handler *osIOHandler) WriteFile(filename string, data []byte, perm os.File
 	return ioutil.WriteFile(filename, data, perm)
 }
 
-// given a disk path like /dev/sdx, find the devicemapper parent
-// TODO #23192 Convert this code to use the generic code in ../util
-// which is used by the iSCSI implementation
-func findMultipathDeviceMapper(disk string, io ioHandler) string {
-	sys_path := "/sys/block/"
-	if dirs, err := io.ReadDir(sys_path); err == nil {
-		for _, f := range dirs {
-			name := f.Name()
-			if strings.HasPrefix(name, "dm-") {
-				if _, err1 := io.Lstat(sys_path + name + "/slaves/" + disk); err1 == nil {
-					return "/dev/" + name
-				}
-			}
-		}
-	}
-	return ""
-}
-
 // given a wwn and lun, find the device and associated devicemapper parent
-func findDisk(wwn, lun string, io ioHandler) (string, string) {
+func findDisk(wwn, lun string, io ioHandler, deviceUtil volumeutil.DeviceUtil) (string, string) {
 	fc_path := "-fc-0x" + wwn + "-lun-" + lun
-	dev_path := "/dev/disk/by-path/"
+	dev_path := byPath
 	if dirs, err := io.ReadDir(dev_path); err == nil {
 		for _, f := range dirs {
 			name := f.Name()
 			if strings.Contains(name, fc_path) {
 				if disk, err1 := io.EvalSymlinks(dev_path + name); err1 == nil {
-					arr := strings.Split(disk, "/")
-					l := len(arr) - 1
-					dev := arr[l]
-					dm := findMultipathDeviceMapper(dev, io)
+					dm := deviceUtil.FindMultipathDeviceForDevice(disk)
+					glog.Infof("fc: find disk: %v, dm: %v", disk, dm)
 					return disk, dm
 				}
 			}
@@ -90,7 +79,7 @@ func findDisk(wwn, lun string, io ioHandler) (string, string) {
 }
 
 // given a wwid, find the device and associated devicemapper parent
-func findDiskWWIDs(wwid string, io ioHandler) (string, string) {
+func findDiskWWIDs(wwid string, io ioHandler, deviceUtil volumeutil.DeviceUtil) (string, string) {
 	// Example wwid format:
 	//   3600508b400105e210000900000490000
 	//   <VENDOR NAME> <IDENTIFIER NUMBER>
@@ -101,7 +90,7 @@ func findDiskWWIDs(wwid string, io ioHandler) (string, string) {
 	// underscore when wwid is exposed under /dev/by-id.
 
 	fc_path := "scsi-" + wwid
-	dev_id := "/dev/disk/by-id/"
+	dev_id := byID
 	if dirs, err := io.ReadDir(dev_id); err == nil {
 		for _, f := range dirs {
 			name := f.Name()
@@ -111,10 +100,8 @@ func findDiskWWIDs(wwid string, io ioHandler) (string, string) {
 					glog.V(2).Infof("fc: failed to find a corresponding disk from symlink[%s], error %v", dev_id+name, err)
 					return "", ""
 				}
-				arr := strings.Split(disk, "/")
-				l := len(arr) - 1
-				dev := arr[l]
-				dm := findMultipathDeviceMapper(dev, io)
+				dm := deviceUtil.FindMultipathDeviceForDevice(disk)
+				glog.Infof("fc: find disk: %v, dm: %v", disk, dm)
 				return disk, dm
 			}
 		}
@@ -143,12 +130,21 @@ func scsiHostRescan(io ioHandler) {
 	}
 }
 
-// make a directory like /var/lib/kubelet/plugins/kubernetes.io/pod/fc/target-lun-0
+// make a directory like /var/lib/kubelet/plugins/kubernetes.io/fc/target-lun-0
 func makePDNameInternal(host volume.VolumeHost, wwns []string, lun string, wwids []string) string {
 	if len(wwns) != 0 {
 		return path.Join(host.GetPluginDir(fcPluginName), wwns[0]+"-lun-"+lun)
 	} else {
 		return path.Join(host.GetPluginDir(fcPluginName), wwids[0])
+	}
+}
+
+// make a directory like /var/lib/kubelet/plugins/kubernetes.io/fc/volumeDevices/target-lun-0
+func makeVDPDNameInternal(host volume.VolumeHost, wwns []string, lun string, wwids []string) string {
+	if len(wwns) != 0 {
+		return path.Join(host.GetVolumeDevicePluginDir(fcPluginName), wwns[0]+"-lun-"+lun)
+	} else {
+		return path.Join(host.GetVolumeDevicePluginDir(fcPluginName), wwids[0])
 	}
 }
 
@@ -158,7 +154,12 @@ func (util *FCUtil) MakeGlobalPDName(fc fcDisk) string {
 	return makePDNameInternal(fc.plugin.host, fc.wwns, fc.lun, fc.wwids)
 }
 
-func searchDisk(b fcDiskMounter) (string, string) {
+// Global volume device plugin dir
+func (util *FCUtil) MakeGlobalVDPDName(fc fcDisk) string {
+	return makeVDPDNameInternal(fc.plugin.host, fc.wwns, fc.lun, fc.wwids)
+}
+
+func searchDisk(b fcDiskMounter) (string, error) {
 	var diskIds []string
 	var disk string
 	var dm string
@@ -180,9 +181,9 @@ func searchDisk(b fcDiskMounter) (string, string) {
 	for true {
 		for _, diskId := range diskIds {
 			if len(wwns) != 0 {
-				disk, dm = findDisk(diskId, lun, io)
+				disk, dm = findDisk(diskId, lun, io, b.deviceUtil)
 			} else {
-				disk, dm = findDiskWWIDs(diskId, io)
+				disk, dm = findDiskWWIDs(diskId, io, b.deviceUtil)
 			}
 			// if multipath device is found, break
 			if dm != "" {
@@ -198,14 +199,6 @@ func searchDisk(b fcDiskMounter) (string, string) {
 		scsiHostRescan(io)
 		rescaned = true
 	}
-	return disk, dm
-}
-
-func (util *FCUtil) AttachDisk(b fcDiskMounter) (string, error) {
-	devicePath := ""
-	var disk, dm string
-
-	disk, dm = searchDisk(b)
 	// if no disk matches input wwn and lun, exit
 	if disk == "" && dm == "" {
 		return "", fmt.Errorf("no fc disk found")
@@ -213,10 +206,26 @@ func (util *FCUtil) AttachDisk(b fcDiskMounter) (string, error) {
 
 	// if multipath devicemapper device is found, use it; otherwise use raw disk
 	if dm != "" {
-		devicePath = dm
-	} else {
-		devicePath = disk
+		return dm, nil
 	}
+	return disk, nil
+}
+
+func (util *FCUtil) AttachDisk(b fcDiskMounter) (string, error) {
+	devicePath, err := searchDisk(b)
+	if err != nil {
+		return "", err
+	}
+	// TODO: remove feature gate check after no longer needed
+	if utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) {
+		// If the volumeMode is 'Block', plugin don't have to format the volume.
+		// The globalPDPath will be created by operationexecutor. Just return devicePath here.
+		glog.V(5).Infof("fc: AttachDisk volumeMode: %s, devicePath: %s", b.volumeMode, devicePath)
+		if b.volumeMode == v1.PersistentVolumeBlock {
+			return devicePath, nil
+		}
+	}
+
 	// mount it
 	globalPDPath := util.MakeGlobalPDName(*b.fcDisk)
 	if err := os.MkdirAll(globalPDPath, 0750); err != nil {
@@ -240,13 +249,153 @@ func (util *FCUtil) AttachDisk(b fcDiskMounter) (string, error) {
 	return devicePath, err
 }
 
-func (util *FCUtil) DetachDisk(c fcDiskUnmounter, devName string) error {
-	// Remove scsi device from the node.
-	if !strings.HasPrefix(devName, "/dev/") {
-		return fmt.Errorf("fc detach disk: invalid device name: %s", devName)
+// DetachDisk removes scsi device file such as /dev/sdX from the node.
+func (util *FCUtil) DetachDisk(c fcDiskUnmounter, devicePath string) error {
+	var devices []string
+	// devicePath might be like /dev/mapper/mpathX. Find destination.
+	dstPath, err := c.io.EvalSymlinks(devicePath)
+	if err != nil {
+		return err
 	}
-	arr := strings.Split(devName, "/")
-	dev := arr[len(arr)-1]
-	removeFromScsiSubsystem(dev, c.io)
+	// Find slave
+	if strings.HasPrefix(dstPath, "/dev/dm-") {
+		devices = c.deviceUtil.FindSlaveDevicesOnMultipath(dstPath)
+	} else {
+		// Add single devicepath to devices
+		devices = append(devices, dstPath)
+	}
+	glog.V(4).Infof("fc: DetachDisk devicePath: %v, dstPath: %v, devices: %v", devicePath, dstPath, devices)
+	var lastErr error
+	for _, device := range devices {
+		err := util.detachFCDisk(c.io, device)
+		if err != nil {
+			glog.Errorf("fc: detachFCDisk failed. device: %v err: %v", device, err)
+			lastErr = fmt.Errorf("fc: detachFCDisk failed. device: %v err: %v", device, err)
+		}
+	}
+	if lastErr != nil {
+		glog.Errorf("fc: last error occurred during detach disk:\n%v", lastErr)
+		return lastErr
+	}
 	return nil
+}
+
+// detachFCDisk removes scsi device file such as /dev/sdX from the node.
+func (util *FCUtil) detachFCDisk(io ioHandler, devicePath string) error {
+	// Remove scsi device from the node.
+	if !strings.HasPrefix(devicePath, "/dev/") {
+		return fmt.Errorf("fc detach disk: invalid device name: %s", devicePath)
+	}
+	arr := strings.Split(devicePath, "/")
+	dev := arr[len(arr)-1]
+	removeFromScsiSubsystem(dev, io)
+	return nil
+}
+
+// DetachBlockFCDisk detaches a volume from kubelet node, removes scsi device file
+// such as /dev/sdX from the node, and then removes loopback for the scsi device.
+func (util *FCUtil) DetachBlockFCDisk(c fcDiskUnmapper, mapPath, devicePath string) error {
+	// Check if devicePath is valid
+	if len(devicePath) != 0 {
+		if pathExists, pathErr := checkPathExists(devicePath); !pathExists || pathErr != nil {
+			return pathErr
+		}
+	} else {
+		// TODO: FC plugin can't obtain the devicePath from kubelet becuase devicePath
+		// in volume object isn't updated when volume is attached to kubelet node.
+		glog.Infof("fc: devicePath is empty. Try to retreive FC configuration from global map path: %v", mapPath)
+	}
+
+	// Check if global map path is valid
+	// global map path examples:
+	//   wwn+lun: plugins/kubernetes.io/fc/volumeDevices/50060e801049cfd1-lun-0/
+	//   wwid: plugins/kubernetes.io/fc/volumeDevices/3600508b400105e210000900000490000/
+	if pathExists, pathErr := checkPathExists(mapPath); !pathExists || pathErr != nil {
+		return pathErr
+	}
+
+	// Retreive volume plugin dependent path like '50060e801049cfd1-lun-0' from global map path
+	arr := strings.Split(mapPath, "/")
+	if len(arr) < 1 {
+		return fmt.Errorf("Fail to retreive volume plugin information from global map path: %v", mapPath)
+	}
+	volumeInfo := arr[len(arr)-1]
+
+	// Search symbolick link which matches volumeInfo under /dev/disk/by-path or /dev/disk/by-id
+	// then find destination device path from the link
+	searchPath := byID
+	if strings.Contains(volumeInfo, "-lun-") {
+		searchPath = byPath
+	}
+	fis, err := ioutil.ReadDir(searchPath)
+	if err != nil {
+		return err
+	}
+	for _, fi := range fis {
+		if strings.Contains(fi.Name(), volumeInfo) {
+			devicePath = path.Join(searchPath, fi.Name())
+			glog.V(5).Infof("fc: updated devicePath: %s", devicePath)
+			break
+		}
+	}
+	if len(devicePath) == 0 {
+		return fmt.Errorf("fc: failed to find corresponding device from searchPath: %v", searchPath)
+	}
+	dstPath, err := c.io.EvalSymlinks(devicePath)
+	if err != nil {
+		return err
+	}
+	glog.V(4).Infof("fc: find destination device path from symlink: %v", dstPath)
+
+	// Get loopback device which takes fd lock for device beofore detaching a volume from node.
+	var devices []string
+	blkUtil := volumeutil.NewBlockVolumePathHandler()
+	dm := c.deviceUtil.FindMultipathDeviceForDevice(dstPath)
+	if len(dm) != 0 {
+		dstPath = dm
+	}
+	loop, err := volumeutil.BlockVolumePathHandler.GetLoopDevice(blkUtil, dstPath)
+	if err != nil {
+		glog.Warningf("fc: failed to get loopback for device: %v, err: %v", dstPath, err)
+	} else {
+		glog.V(4).Infof("fc: found loopback: %v", loop)
+	}
+
+	// Detach volume from kubelet node
+	if len(dm) != 0 {
+		// Find all devices which are managed by multipath
+		devices = c.deviceUtil.FindSlaveDevicesOnMultipath(dm)
+	} else {
+		// Add single device path to devices
+		devices = append(devices, dstPath)
+	}
+	var lastErr error
+	for _, device := range devices {
+		err = util.detachFCDisk(c.io, device)
+		if err != nil {
+			glog.Errorf("fc: detachFCDisk failed. device: %v err: %v", device, err)
+			lastErr = fmt.Errorf("fc: detachFCDisk failed. device: %v err: %v", device, err)
+		}
+	}
+	if lastErr != nil {
+		glog.Errorf("fc: last error occurred during detach disk:\n%v", lastErr)
+		return lastErr
+	}
+
+	// The volume was successfully detached from node. We can safely remove the loopback.
+	err = volumeutil.BlockVolumePathHandler.RemoveLoopDevice(blkUtil, loop)
+	if err != nil {
+		return fmt.Errorf("fc: failed to remove loopback :%v, err: %v", loop, err)
+	}
+	return nil
+}
+
+func checkPathExists(path string) (bool, error) {
+	if pathExists, pathErr := volumeutil.PathExists(path); pathErr != nil {
+		return pathExists, fmt.Errorf("Error checking if path exists: %v", pathErr)
+	} else if !pathExists {
+		glog.Warningf("Warning: Unmap skipped because path does not exist: %v", path)
+		return pathExists, nil
+	}
+	return true, nil
 }

@@ -27,30 +27,23 @@ import (
 // WantsExternalKubeClientSet defines a function which sets external ClientSet for admission plugins that need it
 type WantsExternalKubeClientSet interface {
 	SetExternalKubeClientSet(kubernetes.Interface)
-	admission.Validator
+	admission.InitializationValidator
 }
 
 // WantsExternalKubeInformerFactory defines a function which sets InformerFactory for admission plugins that need it
 type WantsExternalKubeInformerFactory interface {
 	SetExternalKubeInformerFactory(informers.SharedInformerFactory)
-	admission.Validator
+	admission.InitializationValidator
 }
 
 // WantsAuthorizer defines a function which sets Authorizer for admission plugins that need it.
 type WantsAuthorizer interface {
 	SetAuthorizer(authorizer.Authorizer)
-	admission.Validator
-}
-
-// WantsClientCert defines a fuction that accepts a cert & key for admission
-// plugins that need to make calls and prove their identity.
-type WantsClientCert interface {
-	SetClientCert(cert, key []byte)
-	admission.Validator
+	admission.InitializationValidator
 }
 
 // WantsScheme defines a function that accepts runtime.Scheme for admission plugins that need it.
 type WantsScheme interface {
 	SetScheme(*runtime.Scheme)
-	admission.Validator
+	admission.InitializationValidator
 }

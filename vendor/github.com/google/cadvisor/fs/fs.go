@@ -136,8 +136,8 @@ func NewFsInfo(context Context) (FsInfo, error) {
 	fsInfo.addDockerImagesLabel(context, mounts)
 	fsInfo.addCrioImagesLabel(context, mounts)
 
-	glog.Infof("Filesystem UUIDs: %+v", fsInfo.fsUUIDToDeviceName)
-	glog.Infof("Filesystem partitions: %+v", fsInfo.partitions)
+	glog.V(1).Infof("Filesystem UUIDs: %+v", fsInfo.fsUUIDToDeviceName)
+	glog.V(1).Infof("Filesystem partitions: %+v", fsInfo.partitions)
 	fsInfo.addSystemRootLabel(mounts)
 	return fsInfo, nil
 }
@@ -162,7 +162,7 @@ func getFsUUIDToDeviceNameMap() (map[string]string, error) {
 		path := filepath.Join(dir, file.Name())
 		target, err := os.Readlink(path)
 		if err != nil {
-			glog.Infof("Failed to resolve symlink for %q", path)
+			glog.Warningf("Failed to resolve symlink for %q", path)
 			continue
 		}
 		device, err := filepath.Abs(filepath.Join(dir, target))
@@ -438,7 +438,7 @@ func getDiskStatsMap(diskStatsFile string) (map[string]DiskStats, error) {
 	file, err := os.Open(diskStatsFile)
 	if err != nil {
 		if os.IsNotExist(err) {
-			glog.Infof("not collecting filesystem statistics because file %q was not available", diskStatsFile)
+			glog.Warningf("Not collecting filesystem statistics because file %q was not found", diskStatsFile)
 			return diskStatsMap, nil
 		}
 		return nil, err
@@ -561,12 +561,12 @@ func GetDirDiskUsage(dir string, timeout time.Duration) (uint64, error) {
 		return 0, fmt.Errorf("failed to exec du - %v", err)
 	}
 	timer := time.AfterFunc(timeout, func() {
-		glog.Infof("killing cmd %v due to timeout(%s)", cmd.Args, timeout.String())
+		glog.Warningf("Killing cmd %v due to timeout(%s)", cmd.Args, timeout.String())
 		cmd.Process.Kill()
 	})
 	stdoutb, souterr := ioutil.ReadAll(stdoutp)
 	if souterr != nil {
-		glog.Errorf("failed to read from stdout for cmd %v - %v", cmd.Args, souterr)
+		glog.Errorf("Failed to read from stdout for cmd %v - %v", cmd.Args, souterr)
 	}
 	stderrb, _ := ioutil.ReadAll(stderrp)
 	err = cmd.Wait()
@@ -600,13 +600,14 @@ func GetDirInodeUsage(dir string, timeout time.Duration) (uint64, error) {
 		return 0, fmt.Errorf("failed to exec cmd %v - %v; stderr: %v", findCmd.Args, err, stderr.String())
 	}
 	timer := time.AfterFunc(timeout, func() {
-		glog.Infof("killing cmd %v due to timeout(%s)", findCmd.Args, timeout.String())
+		glog.Warningf("Killing cmd %v due to timeout(%s)", findCmd.Args, timeout.String())
 		findCmd.Process.Kill()
 	})
-	if err := findCmd.Wait(); err != nil {
+	err := findCmd.Wait()
+	timer.Stop()
+	if err != nil {
 		return 0, fmt.Errorf("cmd %v failed. stderr: %s; err: %v", findCmd.Args, stderr.String(), err)
 	}
-	timer.Stop()
 	return counter.bytesWritten, nil
 }
 
@@ -740,7 +741,7 @@ func getBtrfsMajorMinorIds(mount *mount.Info) (int, int, error) {
 		return 0, 0, err
 	}
 
-	glog.Infof("btrfs mount %#v", mount)
+	glog.V(4).Infof("btrfs mount %#v", mount)
 	if buf.Mode&syscall.S_IFMT == syscall.S_IFBLK {
 		err := syscall.Stat(mount.Mountpoint, buf)
 		if err != nil {
@@ -748,8 +749,8 @@ func getBtrfsMajorMinorIds(mount *mount.Info) (int, int, error) {
 			return 0, 0, err
 		}
 
-		glog.Infof("btrfs dev major:minor %d:%d\n", int(major(buf.Dev)), int(minor(buf.Dev)))
-		glog.Infof("btrfs rdev major:minor %d:%d\n", int(major(buf.Rdev)), int(minor(buf.Rdev)))
+		glog.V(4).Infof("btrfs dev major:minor %d:%d\n", int(major(buf.Dev)), int(minor(buf.Dev)))
+		glog.V(4).Infof("btrfs rdev major:minor %d:%d\n", int(major(buf.Rdev)), int(minor(buf.Rdev)))
 
 		return int(major(buf.Dev)), int(minor(buf.Dev)), nil
 	} else {

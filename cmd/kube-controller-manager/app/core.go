@@ -36,13 +36,14 @@ import (
 	cacheddiscovery "k8s.io/client-go/discovery/cached"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/controller"
 	endpointcontroller "k8s.io/kubernetes/pkg/controller/endpoint"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector"
 	namespacecontroller "k8s.io/kubernetes/pkg/controller/namespace"
-	nodecontroller "k8s.io/kubernetes/pkg/controller/node"
-	"k8s.io/kubernetes/pkg/controller/node/ipam"
+	nodeipamcontroller "k8s.io/kubernetes/pkg/controller/nodeipam"
+	"k8s.io/kubernetes/pkg/controller/nodeipam/ipam"
+	lifecyclecontroller "k8s.io/kubernetes/pkg/controller/nodelifecycle"
 	"k8s.io/kubernetes/pkg/controller/podgc"
 	replicationcontroller "k8s.io/kubernetes/pkg/controller/replication"
 	resourcequotacontroller "k8s.io/kubernetes/pkg/controller/resourcequota"
@@ -53,7 +54,9 @@ import (
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach"
 	"k8s.io/kubernetes/pkg/controller/volume/expand"
 	persistentvolumecontroller "k8s.io/kubernetes/pkg/controller/volume/persistentvolume"
+	"k8s.io/kubernetes/pkg/controller/volume/pvcprotection"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/quota/generic"
 	quotainstall "k8s.io/kubernetes/pkg/quota/install"
 	"k8s.io/kubernetes/pkg/util/metrics"
 )
@@ -67,6 +70,7 @@ func startServiceController(ctx ControllerContext) (bool, error) {
 		ctx.Options.ClusterName,
 	)
 	if err != nil {
+		// This error shouldn't fail. It lives like this as a legacy.
 		glog.Errorf("Failed to start service controller: %v", err)
 		return false, nil
 	}
@@ -74,43 +78,58 @@ func startServiceController(ctx ControllerContext) (bool, error) {
 	return true, nil
 }
 
-func startNodeController(ctx ControllerContext) (bool, error) {
-	var clusterCIDR *net.IPNet
-	var err error
-	if len(strings.TrimSpace(ctx.Options.ClusterCIDR)) != 0 {
-		_, clusterCIDR, err = net.ParseCIDR(ctx.Options.ClusterCIDR)
-		if err != nil {
-			glog.Warningf("Unsuccessful parsing of cluster CIDR %v: %v", ctx.Options.ClusterCIDR, err)
+func startNodeIpamController(ctx ControllerContext) (bool, error) {
+	var clusterCIDR *net.IPNet = nil
+	var serviceCIDR *net.IPNet = nil
+	if ctx.Options.AllocateNodeCIDRs {
+		var err error
+		if len(strings.TrimSpace(ctx.Options.ClusterCIDR)) != 0 {
+			_, clusterCIDR, err = net.ParseCIDR(ctx.Options.ClusterCIDR)
+			if err != nil {
+				glog.Warningf("Unsuccessful parsing of cluster CIDR %v: %v", ctx.Options.ClusterCIDR, err)
+			}
+		}
+
+		if len(strings.TrimSpace(ctx.Options.ServiceCIDR)) != 0 {
+			_, serviceCIDR, err = net.ParseCIDR(ctx.Options.ServiceCIDR)
+			if err != nil {
+				glog.Warningf("Unsuccessful parsing of service CIDR %v: %v", ctx.Options.ServiceCIDR, err)
+			}
 		}
 	}
 
-	var serviceCIDR *net.IPNet
-	if len(strings.TrimSpace(ctx.Options.ServiceCIDR)) != 0 {
-		_, serviceCIDR, err = net.ParseCIDR(ctx.Options.ServiceCIDR)
-		if err != nil {
-			glog.Warningf("Unsuccessful parsing of service CIDR %v: %v", ctx.Options.ServiceCIDR, err)
-		}
-	}
-
-	nodeController, err := nodecontroller.NewNodeController(
-		ctx.InformerFactory.Core().V1().Pods(),
+	nodeIpamController, err := nodeipamcontroller.NewNodeIpamController(
 		ctx.InformerFactory.Core().V1().Nodes(),
-		ctx.InformerFactory.Extensions().V1beta1().DaemonSets(),
 		ctx.Cloud,
 		ctx.ClientBuilder.ClientOrDie("node-controller"),
-		ctx.Options.PodEvictionTimeout.Duration,
-		ctx.Options.NodeEvictionRate,
-		ctx.Options.SecondaryNodeEvictionRate,
-		ctx.Options.LargeClusterSizeThreshold,
-		ctx.Options.UnhealthyZoneThreshold,
-		ctx.Options.NodeMonitorGracePeriod.Duration,
-		ctx.Options.NodeStartupGracePeriod.Duration,
-		ctx.Options.NodeMonitorPeriod.Duration,
 		clusterCIDR,
 		serviceCIDR,
 		int(ctx.Options.NodeCIDRMaskSize),
 		ctx.Options.AllocateNodeCIDRs,
 		ipam.CIDRAllocatorType(ctx.Options.CIDRAllocatorType),
+	)
+	if err != nil {
+		return true, err
+	}
+	go nodeIpamController.Run(ctx.Stop)
+	return true, nil
+}
+
+func startNodeLifecycleController(ctx ControllerContext) (bool, error) {
+	lifecycleController, err := lifecyclecontroller.NewNodeLifecycleController(
+		ctx.InformerFactory.Core().V1().Pods(),
+		ctx.InformerFactory.Core().V1().Nodes(),
+		ctx.InformerFactory.Extensions().V1beta1().DaemonSets(),
+		ctx.Cloud,
+		ctx.ClientBuilder.ClientOrDie("node-controller"),
+		ctx.Options.NodeMonitorPeriod.Duration,
+		ctx.Options.NodeStartupGracePeriod.Duration,
+		ctx.Options.NodeMonitorGracePeriod.Duration,
+		ctx.Options.PodEvictionTimeout.Duration,
+		ctx.Options.NodeEvictionRate,
+		ctx.Options.SecondaryNodeEvictionRate,
+		ctx.Options.LargeClusterSizeThreshold,
+		ctx.Options.UnhealthyZoneThreshold,
 		ctx.Options.EnableTaintManager,
 		utilfeature.DefaultFeatureGate.Enabled(features.TaintBasedEvictions),
 		utilfeature.DefaultFeatureGate.Enabled(features.TaintNodesByCondition),
@@ -118,15 +137,11 @@ func startNodeController(ctx ControllerContext) (bool, error) {
 	if err != nil {
 		return true, err
 	}
-	go nodeController.Run(ctx.Stop)
+	go lifecycleController.Run(ctx.Stop)
 	return true, nil
 }
 
 func startRouteController(ctx ControllerContext) (bool, error) {
-	_, clusterCIDR, err := net.ParseCIDR(ctx.Options.ClusterCIDR)
-	if err != nil {
-		glog.Warningf("Unsuccessful parsing of cluster CIDR %v: %v", ctx.Options.ClusterCIDR, err)
-	}
 	if !ctx.Options.AllocateNodeCIDRs || !ctx.Options.ConfigureCloudRoutes {
 		glog.Infof("Will not configure cloud provider routes for allocate-node-cidrs: %v, configure-cloud-routes: %v.", ctx.Options.AllocateNodeCIDRs, ctx.Options.ConfigureCloudRoutes)
 		return false, nil
@@ -139,6 +154,10 @@ func startRouteController(ctx ControllerContext) (bool, error) {
 	if !ok {
 		glog.Warning("configure-cloud-routes is set, but cloud provider does not support routes. Will not configure cloud provider routes.")
 		return false, nil
+	}
+	_, clusterCIDR, err := net.ParseCIDR(ctx.Options.ClusterCIDR)
+	if err != nil {
+		glog.Warningf("Unsuccessful parsing of cluster CIDR %v: %v", ctx.Options.ClusterCIDR, err)
 	}
 	routeController := routecontroller.New(routes, ctx.ClientBuilder.ClientOrDie("route-controller"), ctx.InformerFactory.Core().V1().Nodes(), ctx.Options.ClusterName, clusterCIDR)
 	go routeController.Run(ctx.Stop, ctx.Options.RouteReconciliationPeriod.Duration)
@@ -239,37 +258,42 @@ func startPodGCController(ctx ControllerContext) (bool, error) {
 
 func startResourceQuotaController(ctx ControllerContext) (bool, error) {
 	resourceQuotaControllerClient := ctx.ClientBuilder.ClientOrDie("resourcequota-controller")
-	resourceQuotaRegistry := quotainstall.NewRegistry(resourceQuotaControllerClient, ctx.InformerFactory)
-	groupKindsToReplenish := []schema.GroupKind{
-		api.Kind("Pod"),
-		api.Kind("Service"),
-		api.Kind("ReplicationController"),
-		api.Kind("PersistentVolumeClaim"),
-		api.Kind("Secret"),
-		api.Kind("ConfigMap"),
-	}
+	discoveryFunc := resourceQuotaControllerClient.Discovery().ServerPreferredNamespacedResources
+	listerFuncForResource := generic.ListerFuncForResourceFunc(ctx.InformerFactory.ForResource)
+	quotaConfiguration := quotainstall.NewQuotaConfigurationForControllers(listerFuncForResource)
+
 	resourceQuotaControllerOptions := &resourcequotacontroller.ResourceQuotaControllerOptions{
-		QuotaClient:               resourceQuotaControllerClient.Core(),
+		QuotaClient:               resourceQuotaControllerClient.CoreV1(),
 		ResourceQuotaInformer:     ctx.InformerFactory.Core().V1().ResourceQuotas(),
 		ResyncPeriod:              controller.StaticResyncPeriodFunc(ctx.Options.ResourceQuotaSyncPeriod.Duration),
-		Registry:                  resourceQuotaRegistry,
-		ControllerFactory:         resourcequotacontroller.NewReplenishmentControllerFactory(ctx.InformerFactory),
+		InformerFactory:           ctx.InformerFactory,
 		ReplenishmentResyncPeriod: ResyncPeriod(&ctx.Options),
-		GroupKindsToReplenish:     groupKindsToReplenish,
+		DiscoveryFunc:             discoveryFunc,
+		IgnoredResourcesFunc:      quotaConfiguration.IgnoredResources,
+		InformersStarted:          ctx.InformersStarted,
+		Registry:                  generic.NewRegistry(quotaConfiguration.Evaluators()),
 	}
-	if resourceQuotaControllerClient.Core().RESTClient().GetRateLimiter() != nil {
-		metrics.RegisterMetricAndTrackRateLimiterUsage("resource_quota_controller", resourceQuotaControllerClient.Core().RESTClient().GetRateLimiter())
+	if resourceQuotaControllerClient.CoreV1().RESTClient().GetRateLimiter() != nil {
+		if err := metrics.RegisterMetricAndTrackRateLimiterUsage("resource_quota_controller", resourceQuotaControllerClient.CoreV1().RESTClient().GetRateLimiter()); err != nil {
+			return true, err
+		}
 	}
 
-	go resourcequotacontroller.NewResourceQuotaController(
-		resourceQuotaControllerOptions,
-	).Run(int(ctx.Options.ConcurrentResourceQuotaSyncs), ctx.Stop)
+	resourceQuotaController, err := resourcequotacontroller.NewResourceQuotaController(resourceQuotaControllerOptions)
+	if err != nil {
+		return false, err
+	}
+	go resourceQuotaController.Run(int(ctx.Options.ConcurrentResourceQuotaSyncs), ctx.Stop)
+
+	// Periodically the quota controller to detect new resource types
+	go resourceQuotaController.Sync(discoveryFunc, 30*time.Second, ctx.Stop)
+
 	return true, nil
 }
 
 func startNamespaceController(ctx ControllerContext) (bool, error) {
 	// TODO: should use a dynamic RESTMapper built from the discovery results.
-	restMapper := api.Registry.RESTMapper()
+	restMapper := legacyscheme.Registry.RESTMapper()
 
 	// the namespace cleanup controller is very chatty.  It makes lots of discovery calls and then it makes lots of delete calls
 	// the ratelimiter negatively affects its speed.  Deleting 100 total items in a namespace (that's only a few of each resource
@@ -296,12 +320,16 @@ func startNamespaceController(ctx ControllerContext) (bool, error) {
 }
 
 func startServiceAccountController(ctx ControllerContext) (bool, error) {
-	go serviceaccountcontroller.NewServiceAccountsController(
+	sac, err := serviceaccountcontroller.NewServiceAccountsController(
 		ctx.InformerFactory.Core().V1().ServiceAccounts(),
 		ctx.InformerFactory.Core().V1().Namespaces(),
 		ctx.ClientBuilder.ClientOrDie("service-account-controller"),
 		serviceaccountcontroller.DefaultServiceAccountsControllerOptions(),
-	).Run(1, ctx.Stop)
+	)
+	if err != nil {
+		return true, fmt.Errorf("error creating ServiceAccount controller: %v", err)
+	}
+	go sac.Run(1, ctx.Stop)
 	return true, nil
 }
 
@@ -335,10 +363,7 @@ func startGarbageCollectorController(ctx ControllerContext) (bool, error) {
 	clientPool := dynamic.NewClientPool(config, restMapper, dynamic.LegacyAPIPathResolverFunc)
 
 	// Get an initial set of deletable resources to prime the garbage collector.
-	deletableResources, err := garbagecollector.GetDeletableResources(discoveryClient)
-	if err != nil {
-		return true, err
-	}
+	deletableResources := garbagecollector.GetDeletableResources(discoveryClient)
 	ignoredResources := make(map[schema.GroupResource]struct{})
 	for _, r := range ctx.Options.GCIgnoredResources {
 		ignoredResources[schema.GroupResource{Group: r.Group, Resource: r.Resource}] = struct{}{}
@@ -365,4 +390,16 @@ func startGarbageCollectorController(ctx ControllerContext) (bool, error) {
 	go garbageCollector.Sync(gcClientset.Discovery(), 30*time.Second, ctx.Stop)
 
 	return true, nil
+}
+
+func startPVCProtectionController(ctx ControllerContext) (bool, error) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.PVCProtection) {
+		go pvcprotection.NewPVCProtectionController(
+			ctx.InformerFactory.Core().V1().PersistentVolumeClaims(),
+			ctx.InformerFactory.Core().V1().Pods(),
+			ctx.ClientBuilder.ClientOrDie("pvc-protection-controller"),
+		).Run(1, ctx.Stop)
+		return true, nil
+	}
+	return false, nil
 }

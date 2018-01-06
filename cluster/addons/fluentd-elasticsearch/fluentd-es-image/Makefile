@@ -16,7 +16,7 @@
 
 PREFIX = gcr.io/google-containers
 IMAGE = fluentd-elasticsearch
-TAG = v2.0.1
+TAG = v2.0.2
 
 build:
 	docker build --pull -t $(PREFIX)/$(IMAGE):$(TAG) .

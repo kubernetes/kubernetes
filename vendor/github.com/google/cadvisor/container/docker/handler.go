@@ -32,8 +32,8 @@ import (
 	dockerutil "github.com/google/cadvisor/utils/docker"
 	"github.com/google/cadvisor/zfs"
 
-	docker "github.com/docker/engine-api/client"
-	dockercontainer "github.com/docker/engine-api/types/container"
+	dockercontainer "github.com/docker/docker/api/types/container"
+	docker "github.com/docker/docker/client"
 	"github.com/golang/glog"
 	"github.com/opencontainers/runc/libcontainer/cgroups"
 	cgroupfs "github.com/opencontainers/runc/libcontainer/cgroups/fs"
@@ -43,7 +43,8 @@ import (
 
 const (
 	// The read write layers exist here.
-	aufsRWLayer = "diff"
+	aufsRWLayer     = "diff"
+	overlay2RWLayer = "diff"
 
 	// Path to the directory where docker stores log files if the json logging driver is enabled.
 	pathToContainersDir = "containers"
@@ -195,8 +196,10 @@ func newDockerContainerHandler(
 	switch storageDriver {
 	case aufsStorageDriver:
 		rootfsStorageDir = path.Join(storageDir, string(aufsStorageDriver), aufsRWLayer, rwLayerID)
-	case overlayStorageDriver, overlay2StorageDriver:
+	case overlayStorageDriver:
 		rootfsStorageDir = path.Join(storageDir, string(storageDriver), rwLayerID)
+	case overlay2StorageDriver:
+		rootfsStorageDir = path.Join(storageDir, string(storageDriver), rwLayerID, overlay2RWLayer)
 	case zfsStorageDriver:
 		status, err := Status()
 		if err != nil {

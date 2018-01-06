@@ -29,7 +29,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/util/slice"
 )
 
@@ -128,7 +128,7 @@ func TestRecyclerPod(t *testing.T) {
 				{v1.EventTypeWarning, "Unable to mount volumes for pod \"recycler-for-podRecyclerFailure_default(3c9809e5-347c-11e6-a79b-3c970e965218)\": timeout expired waiting for volumes to attach/mount"},
 				{v1.EventTypeWarning, "Error syncing pod, skipping: timeout expired waiting for volumes to attach/mount for pod \"default\"/\"recycler-for-podRecyclerFailure\". list of unattached/unmounted"},
 			},
-			expectedError: "Pod was active on the node longer than specified deadline",
+			expectedError: "failed to recycle volume: Pod was active on the node longer than specified deadline",
 		},
 		{
 			// Recycler pod gets deleted
@@ -143,32 +143,15 @@ func TestRecyclerPod(t *testing.T) {
 			expectedEvents: []mockEvent{
 				{v1.EventTypeNormal, "Successfully assigned recycler-for-podRecyclerDeleted to 127.0.0.1"},
 			},
-			expectedError: "recycler pod was deleted",
+			expectedError: "failed to recycle volume: recycler pod was deleted",
 		},
 		{
 			// Another recycler pod is already running
-			name:        "RecyclerRunning",
-			existingPod: newPod("podOldRecycler", v1.PodRunning, ""),
-			createPod:   newPod("podNewRecycler", v1.PodFailed, "mock message"),
-			eventSequence: []watch.Event{
-				// Old pod succeeds
-				newPodEvent(watch.Modified, "podOldRecycler", v1.PodSucceeded, ""),
-			},
-			// No error = old pod succeeded. If the new pod was used, there
-			// would be error with "mock message".
-			expectedError: "",
-		},
-		{
-			// Another recycler pod is already running and fails
-			name:        "FailedRecyclerRunning",
-			existingPod: newPod("podOldRecycler", v1.PodRunning, ""),
-			createPod:   newPod("podNewRecycler", v1.PodFailed, "mock message"),
-			eventSequence: []watch.Event{
-				// Old pod failure
-				newPodEvent(watch.Modified, "podOldRecycler", v1.PodFailed, "Pod was active on the node longer than specified deadline"),
-			},
-			// If the new pod was used, there would be error with "mock message".
-			expectedError: "Pod was active on the node longer than specified deadline",
+			name:          "RecyclerRunning",
+			existingPod:   newPod("podOldRecycler", v1.PodRunning, ""),
+			createPod:     newPod("podNewRecycler", v1.PodFailed, "mock message"),
+			eventSequence: []watch.Event{},
+			expectedError: "old recycler pod found, will retry later",
 		},
 	}
 
@@ -883,6 +866,37 @@ func TestValidateZone(t *testing.T) {
 	for _, succCase := range succCases {
 		if got := ValidateZone(succCase); got != nil {
 			t.Errorf("%v(%v) returned (%v), want (%v)", functionUnderTest, succCase, got, nil)
+		}
+	}
+}
+
+func TestGetWindowsPath(t *testing.T) {
+	tests := []struct {
+		path         string
+		expectedPath string
+	}{
+		{
+			path:         `/var/lib/kubelet/pods/146f8428-83e7-11e7-8dd4-000d3a31dac4/volumes/kubernetes.io~disk`,
+			expectedPath: `c:\var\lib\kubelet\pods\146f8428-83e7-11e7-8dd4-000d3a31dac4\volumes\kubernetes.io~disk`,
+		},
+		{
+			path:         `\var/lib/kubelet/pods/146f8428-83e7-11e7-8dd4-000d3a31dac4\volumes\kubernetes.io~disk`,
+			expectedPath: `c:\var\lib\kubelet\pods\146f8428-83e7-11e7-8dd4-000d3a31dac4\volumes\kubernetes.io~disk`,
+		},
+		{
+			path:         `/`,
+			expectedPath: `c:\`,
+		},
+		{
+			path:         ``,
+			expectedPath: ``,
+		},
+	}
+
+	for _, test := range tests {
+		result := GetWindowsPath(test.path)
+		if result != test.expectedPath {
+			t.Errorf("GetWindowsPath(%v) returned (%v), want (%v)", test.path, result, test.expectedPath)
 		}
 	}
 }

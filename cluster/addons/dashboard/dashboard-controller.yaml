@@ -1,4 +1,13 @@
-apiVersion: extensions/v1beta1
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  labels:
+    k8s-app: kubernetes-dashboard
+    addonmanager.kubernetes.io/mode: Reconcile
+  name: kubernetes-dashboard
+  namespace: kube-system
+---
+apiVersion: apps/v1beta2
 kind: Deployment
 metadata:
   name: kubernetes-dashboard
@@ -20,23 +29,38 @@ spec:
     spec:
       containers:
       - name: kubernetes-dashboard
-        image: gcr.io/google_containers/kubernetes-dashboard-amd64:v1.6.3
+        image: gcr.io/google_containers/kubernetes-dashboard-amd64:v1.8.0
         resources:
-          # keep request = limit to keep this container in guaranteed class
           limits:
             cpu: 100m
             memory: 300Mi
           requests:
-            cpu: 100m
+            cpu: 50m
             memory: 100Mi
         ports:
-        - containerPort: 9090
+        - containerPort: 8443
+          protocol: TCP
+        args:
+          - --auto-generate-certificates
+        volumeMounts:
+        - name: kubernetes-dashboard-certs
+          mountPath: /certs
+        - name: tmp-volume
+          mountPath: /tmp
         livenessProbe:
           httpGet:
+            scheme: HTTPS
             path: /
-            port: 9090
+            port: 8443
           initialDelaySeconds: 30
           timeoutSeconds: 30
+      volumes:
+      - name: kubernetes-dashboard-certs
+        secret:
+          secretName: kubernetes-dashboard-certs
+      - name: tmp-volume
+        emptyDir: {}
+      serviceAccountName: kubernetes-dashboard
       tolerations:
       - key: "CriticalAddonsOnly"
         operator: "Exists"

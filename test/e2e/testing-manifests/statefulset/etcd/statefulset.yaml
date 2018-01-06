@@ -166,8 +166,6 @@ spec:
   volumeClaimTemplates:
   - metadata:
       name: datadir
-      annotations:
-        volume.alpha.kubernetes.io/storage-class: anything
     spec:
       accessModes:
         - "ReadWriteOnce"
@@ -175,4 +173,3 @@ spec:
         requests:
           # upstream recommended max is 700M
           storage: 1Gi
-

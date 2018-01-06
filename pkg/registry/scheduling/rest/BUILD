@@ -10,7 +10,7 @@ go_library(
     srcs = ["storage_scheduling.go"],
     importpath = "k8s.io/kubernetes/pkg/registry/scheduling/rest",
     deps = [
-        "//pkg/api:go_default_library",
+        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/scheduling:go_default_library",
         "//pkg/apis/scheduling/v1alpha1:go_default_library",
         "//pkg/registry/scheduling/priorityclass/storage:go_default_library",

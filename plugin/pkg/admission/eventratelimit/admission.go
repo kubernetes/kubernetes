@@ -21,8 +21,9 @@ import (
 
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/client-go/util/flowcontrol"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	eventratelimitapi "k8s.io/kubernetes/plugin/pkg/admission/eventratelimit/apis/eventratelimit"
+	eventratelimitapiv1alpha1 "k8s.io/kubernetes/plugin/pkg/admission/eventratelimit/apis/eventratelimit/v1alpha1"
 	"k8s.io/kubernetes/plugin/pkg/admission/eventratelimit/apis/eventratelimit/validation"
 )
 
@@ -43,10 +44,14 @@ func Register(plugins *admission.Plugins) {
 			}
 			return newEventRateLimit(configuration, realClock{})
 		})
+
+	// add our config types
+	eventratelimitapi.AddToScheme(plugins.ConfigScheme)
+	eventratelimitapiv1alpha1.AddToScheme(plugins.ConfigScheme)
 }
 
-// eventRateLimitAdmission implements an admission controller that can enforce event rate limits
-type eventRateLimitAdmission struct {
+// Plugin implements an admission controller that can enforce event rate limits
+type Plugin struct {
 	*admission.Handler
 	// limitEnforcers is the collection of limit enforcers. There is one limit enforcer for each
 	// active limit type. As there are 4 limit types, the length of the array will be at most 4.
@@ -54,8 +59,10 @@ type eventRateLimitAdmission struct {
 	limitEnforcers []*limitEnforcer
 }
 
+var _ admission.ValidationInterface = &Plugin{}
+
 // newEventRateLimit configures an admission controller that can enforce event rate limits
-func newEventRateLimit(config *eventratelimitapi.Configuration, clock flowcontrol.Clock) (admission.Interface, error) {
+func newEventRateLimit(config *eventratelimitapi.Configuration, clock flowcontrol.Clock) (*Plugin, error) {
 	limitEnforcers := make([]*limitEnforcer, 0, len(config.Limits))
 	for _, limitConfig := range config.Limits {
 		enforcer, err := newLimitEnforcer(limitConfig, clock)
@@ -65,7 +72,7 @@ func newEventRateLimit(config *eventratelimitapi.Configuration, clock flowcontro
 		limitEnforcers = append(limitEnforcers, enforcer)
 	}
 
-	eventRateLimitAdmission := &eventRateLimitAdmission{
+	eventRateLimitAdmission := &Plugin{
 		Handler:        admission.NewHandler(admission.Create, admission.Update),
 		limitEnforcers: limitEnforcers,
 	}
@@ -73,8 +80,8 @@ func newEventRateLimit(config *eventratelimitapi.Configuration, clock flowcontro
 	return eventRateLimitAdmission, nil
 }
 
-// Admit makes admission decisions while enforcing event rate limits
-func (a *eventRateLimitAdmission) Admit(attr admission.Attributes) (err error) {
+// Validate makes admission decisions while enforcing event rate limits
+func (a *Plugin) Validate(attr admission.Attributes) (err error) {
 	// ignore all operations that do not correspond to an Event kind
 	if attr.GetKind().GroupKind() != api.Kind("Event") {
 		return nil

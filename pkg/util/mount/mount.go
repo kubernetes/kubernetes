@@ -19,12 +19,7 @@ limitations under the License.
 package mount
 
 import (
-	"fmt"
-	"path"
 	"path/filepath"
-	"strings"
-
-	"github.com/golang/glog"
 )
 
 type FileType string
@@ -138,41 +133,6 @@ func (mounter *SafeFormatAndMount) FormatAndMount(source string, target string, 
 	return mounter.formatAndMount(source, target, fstype, options)
 }
 
-// GetMountRefs finds all other references to the device referenced
-// by mountPath; returns a list of paths.
-func GetMountRefs(mounter Interface, mountPath string) ([]string, error) {
-	mps, err := mounter.List()
-	if err != nil {
-		return nil, err
-	}
-	// Find the device name.
-	deviceName := ""
-	// If mountPath is symlink, need get its target path.
-	slTarget, err := filepath.EvalSymlinks(mountPath)
-	if err != nil {
-		slTarget = mountPath
-	}
-	for i := range mps {
-		if mps[i].Path == slTarget {
-			deviceName = mps[i].Device
-			break
-		}
-	}
-
-	// Find all references to the device.
-	var refs []string
-	if deviceName == "" {
-		glog.Warningf("could not determine device for path: %q", mountPath)
-	} else {
-		for i := range mps {
-			if mps[i].Device == deviceName && mps[i].Path != slTarget {
-				refs = append(refs, mps[i].Path)
-			}
-		}
-	}
-	return refs, nil
-}
-
 // GetMountRefsByDev finds all references to the device provided
 // by mountPath; returns a list of paths.
 func GetMountRefsByDev(mounter Interface, mountPath string) ([]string, error) {
@@ -237,34 +197,6 @@ func GetDeviceNameFromMount(mounter Interface, mountPath string) (string, int, e
 		}
 	}
 	return device, refCount, nil
-}
-
-// getDeviceNameFromMount find the device name from /proc/mounts in which
-// the mount path reference should match the given plugin directory. In case no mount path reference
-// matches, returns the volume name taken from its given mountPath
-func getDeviceNameFromMount(mounter Interface, mountPath, pluginDir string) (string, error) {
-	refs, err := GetMountRefs(mounter, mountPath)
-	if err != nil {
-		glog.V(4).Infof("GetMountRefs failed for mount path %q: %v", mountPath, err)
-		return "", err
-	}
-	if len(refs) == 0 {
-		glog.V(4).Infof("Directory %s is not mounted", mountPath)
-		return "", fmt.Errorf("directory %s is not mounted", mountPath)
-	}
-	basemountPath := path.Join(pluginDir, MountsInGlobalPDPath)
-	for _, ref := range refs {
-		if strings.HasPrefix(ref, basemountPath) {
-			volumeID, err := filepath.Rel(basemountPath, ref)
-			if err != nil {
-				glog.Errorf("Failed to get volume id from mount %s - %v", mountPath, err)
-				return "", err
-			}
-			return volumeID, nil
-		}
-	}
-
-	return path.Base(mountPath), nil
 }
 
 // IsNotMountPoint determines if a directory is a mountpoint.

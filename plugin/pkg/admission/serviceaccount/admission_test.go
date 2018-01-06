@@ -26,7 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 	corelisters "k8s.io/kubernetes/pkg/client/listers/core/internalversion"
@@ -35,13 +35,10 @@ import (
 )
 
 func TestIgnoresNonCreate(t *testing.T) {
-	pod := &api.Pod{}
 	for _, op := range []admission.Operation{admission.Delete, admission.Connect} {
-		attrs := admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), "myns", "myname", api.Resource("pods").WithVersion("version"), "", op, nil)
-		handler := admission.NewChainHandler(NewServiceAccount())
-		err := handler.Admit(attrs)
-		if err != nil {
-			t.Errorf("Expected %s operation allowed, got err: %v", op, err)
+		handler := NewServiceAccount()
+		if handler.Handles(op) {
+			t.Errorf("Expected not to handle operation %s", op)
 		}
 	}
 }
@@ -50,7 +47,7 @@ func TestIgnoresUpdateOfInitializedPod(t *testing.T) {
 	pod := &api.Pod{}
 	oldPod := &api.Pod{}
 	attrs := admission.NewAttributesRecord(pod, oldPod, api.Kind("Pod").WithVersion("version"), "myns", "myname", api.Resource("pods").WithVersion("version"), "", admission.Update, nil)
-	handler := admission.NewChainHandler(NewServiceAccount())
+	handler := NewServiceAccount()
 	err := handler.Admit(attrs)
 	if err != nil {
 		t.Errorf("Expected update of initialized pod allowed, got err: %v", err)

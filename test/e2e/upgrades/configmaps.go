@@ -56,7 +56,7 @@ func (t *ConfigMapUpgradeTest) Setup(f *framework.Framework) {
 
 	By("Creating a ConfigMap")
 	var err error
-	if t.configMap, err = f.ClientSet.Core().ConfigMaps(ns.Name).Create(t.configMap); err != nil {
+	if t.configMap, err = f.ClientSet.CoreV1().ConfigMaps(ns.Name).Create(t.configMap); err != nil {
 		framework.Failf("unable to create test ConfigMap %s: %v", t.configMap.Name, err)
 	}
 
@@ -118,7 +118,7 @@ func (t *ConfigMapUpgradeTest) testPod(f *framework.Framework) {
 				},
 				{
 					Name:    "configmap-env-test",
-					Image:   imageutils.GetBusyBoxImage(),
+					Image:   "busybox",
 					Command: []string{"sh", "-c", "env"},
 					Env: []v1.EnvVar{
 						{

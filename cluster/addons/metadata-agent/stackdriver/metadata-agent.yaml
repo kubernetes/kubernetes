@@ -1,0 +1,38 @@
+kind: DaemonSet
+apiVersion: extensions/v1beta1
+metadata:
+  labels:
+    app: stackdriver-agents
+    kubernetes.io/cluster-service: "true"
+    addonmanager.kubernetes.io/mode: Reconcile
+  name: stackdriver-agents
+  namespace: kube-system
+spec:
+  selector:
+    matchLabels:
+      app: stackdriver-agents
+  template:
+    metadata:
+      labels:
+        app: stackdriver-agents
+    spec:
+      containers:
+      - image: us.gcr.io/container-monitoring-storage/stackdriver-metadata-agent:{{ metadata_agent_version }}
+        imagePullPolicy: IfNotPresent
+        name: metadata-agent
+        ports:
+        - containerPort: 8000
+          hostPort: 8799
+          protocol: TCP
+        resources:
+          requests:
+            cpu: {{ metadata_agent_cpu_request }}
+            memory: {{ metadata_agent_memory_request }}
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      terminationGracePeriodSeconds: 30
+  updateStrategy:
+    rollingUpdate:
+      maxUnavailable: 1
+    type: RollingUpdate

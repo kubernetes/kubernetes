@@ -37,17 +37,17 @@ func Register(plugins *admission.Plugins) {
 	})
 }
 
-type disallowFlunder struct {
+type DisallowFlunder struct {
 	*admission.Handler
 	lister listers.FischerLister
 }
 
-var _ = wardleinitializer.WantsInternalWardleInformerFactory(&disallowFlunder{})
+var _ = wardleinitializer.WantsInternalWardleInformerFactory(&DisallowFlunder{})
 
 // Admit ensures that the object in-flight is of kind Flunder.
 // In addition checks that the Name is not on the banned list.
 // The list is stored in Fischers API objects.
-func (d *disallowFlunder) Admit(a admission.Attributes) error {
+func (d *DisallowFlunder) Admit(a admission.Attributes) error {
 	// we are only interested in flunders
 	if a.GetKind().GroupKind() != wardle.Kind("Flunder") {
 		return nil
@@ -80,12 +80,12 @@ func (d *disallowFlunder) Admit(a admission.Attributes) error {
 
 // SetInternalWardleInformerFactory gets Lister from SharedInformerFactory.
 // The lister knows how to lists Fischers.
-func (d *disallowFlunder) SetInternalWardleInformerFactory(f informers.SharedInformerFactory) {
+func (d *DisallowFlunder) SetInternalWardleInformerFactory(f informers.SharedInformerFactory) {
 	d.lister = f.Wardle().InternalVersion().Fischers().Lister()
 }
 
-// Validate checks whether the plugin was correctly initialized.
-func (d *disallowFlunder) Validate() error {
+// ValidaValidateInitializationte checks whether the plugin was correctly initialized.
+func (d *DisallowFlunder) ValidateInitialization() error {
 	if d.lister == nil {
 		return fmt.Errorf("missing fischer lister")
 	}
@@ -93,8 +93,8 @@ func (d *disallowFlunder) Validate() error {
 }
 
 // New creates a new ban flunder admission plugin
-func New() (admission.Interface, error) {
-	return &disallowFlunder{
+func New() (*DisallowFlunder, error) {
+	return &DisallowFlunder{
 		Handler: admission.NewHandler(admission.Create),
 	}, nil
 }

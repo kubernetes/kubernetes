@@ -175,7 +175,7 @@ func (s *StatefulSetTester) Saturate(ss *apps.StatefulSet) {
 func (s *StatefulSetTester) DeleteStatefulPodAtIndex(index int, ss *apps.StatefulSet) {
 	name := getStatefulSetPodNameAtIndex(index, ss)
 	noGrace := int64(0)
-	if err := s.c.Core().Pods(ss.Namespace).Delete(name, &metav1.DeleteOptions{GracePeriodSeconds: &noGrace}); err != nil {
+	if err := s.c.CoreV1().Pods(ss.Namespace).Delete(name, &metav1.DeleteOptions{GracePeriodSeconds: &noGrace}); err != nil {
 		Failf("Failed to delete stateful pod %v for StatefulSet %v/%v: %v", name, ss.Namespace, ss.Name, err)
 	}
 }
@@ -186,7 +186,7 @@ type VerifyStatefulPodFunc func(*v1.Pod)
 // VerifyPodAtIndex applies a visitor patter to the Pod at index in ss. verify is is applied to the Pod to "visit" it.
 func (s *StatefulSetTester) VerifyPodAtIndex(index int, ss *apps.StatefulSet, verify VerifyStatefulPodFunc) {
 	name := getStatefulSetPodNameAtIndex(index, ss)
-	pod, err := s.c.Core().Pods(ss.Namespace).Get(name, metav1.GetOptions{})
+	pod, err := s.c.CoreV1().Pods(ss.Namespace).Get(name, metav1.GetOptions{})
 	Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Failed to get stateful pod %s for StatefulSet %s/%s", name, ss.Namespace, ss.Name))
 	verify(pod)
 }
@@ -266,7 +266,7 @@ func (s *StatefulSetTester) update(ns, name string, update func(ss *apps.Statefu
 func (s *StatefulSetTester) GetPodList(ss *apps.StatefulSet) *v1.PodList {
 	selector, err := metav1.LabelSelectorAsSelector(ss.Spec.Selector)
 	ExpectNoError(err)
-	podList, err := s.c.Core().Pods(ss.Namespace).List(metav1.ListOptions{LabelSelector: selector.String()})
+	podList, err := s.c.CoreV1().Pods(ss.Namespace).List(metav1.ListOptions{LabelSelector: selector.String()})
 	ExpectNoError(err)
 	return podList
 }
@@ -701,7 +701,7 @@ func DeleteAllStatefulSets(c clientset.Interface, ns string) {
 	pvNames := sets.NewString()
 	// TODO: Don't assume all pvcs in the ns belong to a statefulset
 	pvcPollErr := wait.PollImmediate(StatefulSetPoll, StatefulSetTimeout, func() (bool, error) {
-		pvcList, err := c.Core().PersistentVolumeClaims(ns).List(metav1.ListOptions{LabelSelector: labels.Everything().String()})
+		pvcList, err := c.CoreV1().PersistentVolumeClaims(ns).List(metav1.ListOptions{LabelSelector: labels.Everything().String()})
 		if err != nil {
 			Logf("WARNING: Failed to list pvcs, retrying %v", err)
 			return false, nil
@@ -710,7 +710,7 @@ func DeleteAllStatefulSets(c clientset.Interface, ns string) {
 			pvNames.Insert(pvc.Spec.VolumeName)
 			// TODO: Double check that there are no pods referencing the pvc
 			Logf("Deleting pvc: %v with volume %v", pvc.Name, pvc.Spec.VolumeName)
-			if err := c.Core().PersistentVolumeClaims(ns).Delete(pvc.Name, nil); err != nil {
+			if err := c.CoreV1().PersistentVolumeClaims(ns).Delete(pvc.Name, nil); err != nil {
 				return false, nil
 			}
 		}
@@ -721,7 +721,7 @@ func DeleteAllStatefulSets(c clientset.Interface, ns string) {
 	}
 
 	pollErr := wait.PollImmediate(StatefulSetPoll, StatefulSetTimeout, func() (bool, error) {
-		pvList, err := c.Core().PersistentVolumes().List(metav1.ListOptions{LabelSelector: labels.Everything().String()})
+		pvList, err := c.CoreV1().PersistentVolumes().List(metav1.ListOptions{LabelSelector: labels.Everything().String()})
 		if err != nil {
 			Logf("WARNING: Failed to list pvs, retrying %v", err)
 			return false, nil
@@ -751,9 +751,6 @@ func NewStatefulSetPVC(name string) v1.PersistentVolumeClaim {
 	return v1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
-			Annotations: map[string]string{
-				"volume.alpha.kubernetes.io/storage-class": "anything",
-			},
 		},
 		Spec: v1.PersistentVolumeClaimSpec{
 			AccessModes: []v1.PersistentVolumeAccessMode{

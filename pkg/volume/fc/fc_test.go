@@ -67,18 +67,9 @@ func TestGetAccessModes(t *testing.T) {
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
-	if !contains(plug.GetAccessModes(), v1.ReadWriteOnce) || !contains(plug.GetAccessModes(), v1.ReadOnlyMany) {
+	if !volumetest.ContainsAccessMode(plug.GetAccessModes(), v1.ReadWriteOnce) || !volumetest.ContainsAccessMode(plug.GetAccessModes(), v1.ReadOnlyMany) {
 		t.Errorf("Expected two AccessModeTypes:  %s and %s", v1.ReadWriteOnce, v1.ReadOnlyMany)
 	}
-}
-
-func contains(modes []v1.PersistentVolumeAccessMode, mode v1.PersistentVolumeAccessMode) bool {
-	for _, m := range modes {
-		if m == mode {
-			return true
-		}
-	}
-	return false
 }
 
 type fakeDiskManager struct {
@@ -100,6 +91,11 @@ func (fake *fakeDiskManager) Cleanup() {
 func (fake *fakeDiskManager) MakeGlobalPDName(disk fcDisk) string {
 	return fake.tmpDir
 }
+
+func (fake *fakeDiskManager) MakeGlobalVDPDName(disk fcDisk) string {
+	return fake.tmpDir
+}
+
 func (fake *fakeDiskManager) AttachDisk(b fcDiskMounter) (string, error) {
 	globalPath := b.manager.MakeGlobalPDName(*b.fcDisk)
 	err := os.MkdirAll(globalPath, 0750)
@@ -117,6 +113,15 @@ func (fake *fakeDiskManager) AttachDisk(b fcDiskMounter) (string, error) {
 func (fake *fakeDiskManager) DetachDisk(c fcDiskUnmounter, mntPath string) error {
 	globalPath := c.manager.MakeGlobalPDName(*c.fcDisk)
 	err := os.RemoveAll(globalPath)
+	if err != nil {
+		return err
+	}
+	fake.detachCalled = true
+	return nil
+}
+
+func (fake *fakeDiskManager) DetachBlockFCDisk(c fcDiskUnmapper, mapPath, devicePath string) error {
+	err := os.RemoveAll(mapPath)
 	if err != nil {
 		return err
 	}
@@ -190,7 +195,7 @@ func doTestPlugin(t *testing.T, spec *volume.Spec) {
 	if _, err := os.Stat(path); err == nil {
 		t.Errorf("TearDown() failed, volume path still exists: %s", path)
 	} else if !os.IsNotExist(err) {
-		t.Errorf("SetUp() failed: %v", err)
+		t.Errorf("TearDown() failed: %v", err)
 	}
 }
 
@@ -368,5 +373,42 @@ func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 
 	if !mounter.GetAttributes().ReadOnly {
 		t.Errorf("Expected true for mounter.IsReadOnly")
+	}
+}
+
+func Test_getWwnsLun(t *testing.T) {
+	num := int32(0)
+	fc := &v1.FCVolumeSource{
+		TargetWWNs: []string{"500a0981891b8dc5"},
+		FSType:     "ext4",
+		Lun:        &num,
+	}
+	wwn, lun, _, err := getWwnsLunWwids(fc)
+	// if no wwn and lun, exit
+	if (len(wwn) == 0 && lun != "0") || err != nil {
+		t.Errorf("no fc disk found")
+	}
+}
+
+func Test_getWwids(t *testing.T) {
+	fc := &v1.FCVolumeSource{
+		FSType: "ext4",
+		WWIDs:  []string{"3600508b400105e210000900000490000"},
+	}
+	_, _, wwid, err := getWwnsLunWwids(fc)
+	// if no wwn and lun, exit
+	if len(wwid) == 0 || err != nil {
+		t.Errorf("no fc disk found")
+	}
+}
+
+func Test_getWwnsLunWwidsError(t *testing.T) {
+	fc := &v1.FCVolumeSource{
+		FSType: "ext4",
+	}
+	wwn, lun, wwid, err := getWwnsLunWwids(fc)
+	// expected no wwn and lun and wwid
+	if (len(wwn) != 0 && lun != "" && len(wwid) != 0) || err == nil {
+		t.Errorf("unexpected fc disk found")
 	}
 }

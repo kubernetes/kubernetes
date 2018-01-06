@@ -17,9 +17,11 @@ limitations under the License.
 package azure_file
 
 import (
+	"fmt"
 	"io/ioutil"
 	"os"
 	"path"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -71,18 +73,9 @@ func TestGetAccessModes(t *testing.T) {
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
-	if !contains(plug.GetAccessModes(), v1.ReadWriteOnce) || !contains(plug.GetAccessModes(), v1.ReadOnlyMany) || !contains(plug.GetAccessModes(), v1.ReadWriteMany) {
+	if !volumetest.ContainsAccessMode(plug.GetAccessModes(), v1.ReadWriteOnce) || !volumetest.ContainsAccessMode(plug.GetAccessModes(), v1.ReadOnlyMany) || !volumetest.ContainsAccessMode(plug.GetAccessModes(), v1.ReadWriteMany) {
 		t.Errorf("Expected three AccessModeTypes:  %s, %s, and %s", v1.ReadWriteOnce, v1.ReadOnlyMany, v1.ReadWriteMany)
 	}
-}
-
-func contains(modes []v1.PersistentVolumeAccessMode, mode v1.PersistentVolumeAccessMode) bool {
-	for _, m := range modes {
-		if m == mode {
-			return true
-		}
-	}
-	return false
 }
 
 func getAzureTestCloud(t *testing.T) *azure.Cloud {
@@ -193,7 +186,7 @@ func testPlugin(t *testing.T, tmpDir string, volumeHost volume.VolumeHost) {
 	if _, err := os.Stat(path); err == nil {
 		t.Errorf("TearDown() failed, volume path still exists: %s", path)
 	} else if !os.IsNotExist(err) {
-		t.Errorf("SetUp() failed: %v", err)
+		t.Errorf("TearDown() failed: %v", err)
 	}
 }
 
@@ -366,4 +359,39 @@ func TestGetSecretNameAndNamespaceForPV(t *testing.T) {
 		}
 	}
 
+}
+
+func TestAppendDefaultMountOptions(t *testing.T) {
+	tests := []struct {
+		options  []string
+		expected []string
+	}{
+		{
+			options:  []string{"dir_mode=0777"},
+			expected: []string{"dir_mode=0777", fmt.Sprintf("%s=%s", fileMode, defaultFileMode), fmt.Sprintf("%s=%s", vers, defaultVers)},
+		},
+		{
+			options:  []string{"file_mode=0777"},
+			expected: []string{"file_mode=0777", fmt.Sprintf("%s=%s", dirMode, defaultDirMode), fmt.Sprintf("%s=%s", vers, defaultVers)},
+		},
+		{
+			options:  []string{"vers=2.1"},
+			expected: []string{"vers=2.1", fmt.Sprintf("%s=%s", fileMode, defaultFileMode), fmt.Sprintf("%s=%s", dirMode, defaultDirMode)},
+		},
+		{
+			options:  []string{""},
+			expected: []string{"", fmt.Sprintf("%s=%s", fileMode, defaultFileMode), fmt.Sprintf("%s=%s", dirMode, defaultDirMode), fmt.Sprintf("%s=%s", vers, defaultVers)},
+		},
+		{
+			options:  []string{"file_mode=0777", "dir_mode=0777"},
+			expected: []string{"file_mode=0777", "dir_mode=0777", fmt.Sprintf("%s=%s", vers, defaultVers)},
+		},
+	}
+
+	for _, test := range tests {
+		result := appendDefaultMountOptions(test.options)
+		if !reflect.DeepEqual(result, test.expected) {
+			t.Errorf("input: %q, appendDefaultMountOptions result: %q, expected: %q", test.options, result, test.expected)
+		}
+	}
 }

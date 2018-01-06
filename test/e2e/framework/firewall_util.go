@@ -100,7 +100,7 @@ func ConstructHealthCheckFirewallForLBService(clusterID string, svc *v1.Service,
 // GetInstanceTags gets tags from GCE instance with given name.
 func GetInstanceTags(cloudConfig CloudConfig, instanceName string) *compute.Tags {
 	gceCloud := cloudConfig.Provider.(*gcecloud.GCECloud)
-	res, err := gceCloud.GetComputeService().Instances.Get(cloudConfig.ProjectID, cloudConfig.Zone,
+	res, err := gceCloud.ComputeServices().GA.Instances.Get(cloudConfig.ProjectID, cloudConfig.Zone,
 		instanceName).Do()
 	if err != nil {
 		Failf("Failed to get instance tags for %v: %v", instanceName, err)
@@ -113,7 +113,7 @@ func SetInstanceTags(cloudConfig CloudConfig, instanceName, zone string, tags []
 	gceCloud := cloudConfig.Provider.(*gcecloud.GCECloud)
 	// Re-get instance everytime because we need the latest fingerprint for updating metadata
 	resTags := GetInstanceTags(cloudConfig, instanceName)
-	_, err := gceCloud.GetComputeService().Instances.SetTags(
+	_, err := gceCloud.ComputeServices().GA.Instances.SetTags(
 		cloudConfig.ProjectID, zone, instanceName,
 		&compute.Tags{Fingerprint: resTags.Fingerprint, Items: tags}).Do()
 	if err != nil {
@@ -373,7 +373,7 @@ func WaitForFirewallRule(gceCloud *gcecloud.GCECloud, fwName string, exist bool,
 }
 
 func GetClusterID(c clientset.Interface) (string, error) {
-	cm, err := c.Core().ConfigMaps(metav1.NamespaceSystem).Get(gcecloud.UIDConfigMapName, metav1.GetOptions{})
+	cm, err := c.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(gcecloud.UIDConfigMapName, metav1.GetOptions{})
 	if err != nil || cm == nil {
 		return "", fmt.Errorf("error getting cluster ID: %v", err)
 	}

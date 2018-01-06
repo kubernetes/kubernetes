@@ -74,7 +74,8 @@ func NewInitializer() admission.Interface {
 	return &initializer{}
 }
 
-func (i *initializer) Validate() error {
+// ValidateInitialization implements the InitializationValidator interface.
+func (i *initializer) ValidateInitialization() error {
 	if i.config == nil {
 		return fmt.Errorf("the Initializer admission plugin requires a Kubernetes client to be provided")
 	}
@@ -94,10 +95,12 @@ func (i *initializer) Validate() error {
 	return nil
 }
 
+// SetExternalKubeClientSet implements the WantsExternalKubeClientSet interface.
 func (i *initializer) SetExternalKubeClientSet(client clientset.Interface) {
-	i.config = configuration.NewInitializerConfigurationManager(client.Admissionregistration().InitializerConfigurations())
+	i.config = configuration.NewInitializerConfigurationManager(client.AdmissionregistrationV1alpha1().InitializerConfigurations())
 }
 
+// SetAuthorizer implements the WantsAuthorizer interface.
 func (i *initializer) SetAuthorizer(a authorizer.Authorizer) {
 	i.authorizer = a
 }
@@ -257,7 +260,7 @@ func (i *initializer) Admit(a admission.Attributes) (err error) {
 
 func (i *initializer) canInitialize(a admission.Attributes, message string) error {
 	// caller must have the ability to mutate un-initialized resources
-	authorized, reason, err := i.authorizer.Authorize(authorizer.AttributesRecord{
+	decision, reason, err := i.authorizer.Authorize(authorizer.AttributesRecord{
 		Name:            a.GetName(),
 		ResourceRequest: true,
 		User:            a.GetUserInfo(),
@@ -270,12 +273,14 @@ func (i *initializer) canInitialize(a admission.Attributes, message string) erro
 	if err != nil {
 		return err
 	}
-	if !authorized {
+	if decision != authorizer.DecisionAllow {
 		return errors.NewForbidden(a.GetResource().GroupResource(), a.GetName(), fmt.Errorf("%s: %s", message, reason))
 	}
 	return nil
 }
 
+// Handles returns true if this admission controller can handle the given operation
+// where operation can be one of CREATE, UPDATE, DELETE, or CONNECT
 func (i *initializer) Handles(op admission.Operation) bool {
 	return op == admission.Create || op == admission.Update
 }

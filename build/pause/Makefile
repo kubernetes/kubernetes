@@ -18,14 +18,15 @@ REGISTRY ?= gcr.io/google_containers
 IMAGE = $(REGISTRY)/pause-$(ARCH)
 LEGACY_AMD64_IMAGE = $(REGISTRY)/pause
 
-TAG = 3.0
+TAG = 3.1
+REV = $(shell git describe --contains --always --match='v*')
 
 # Architectures supported: amd64, arm, arm64, ppc64le and s390x
 ARCH ?= amd64
 
 ALL_ARCH = amd64 arm arm64 ppc64le s390x
 
-CFLAGS = -Os -Wall -Werror -static
+CFLAGS = -Os -Wall -Werror -static -DVERSION=v$(TAG)-$(REV)
 KUBE_CROSS_IMAGE ?= gcr.io/google_containers/kube-cross
 KUBE_CROSS_VERSION ?= $(shell cat ../build-image/cross/VERSION)
 
@@ -37,7 +38,7 @@ ifeq ($(ARCH),amd64)
 endif
 
 ifeq ($(ARCH),arm)
-	TRIPLE ?= arm-linux-gnueabi
+	TRIPLE ?= arm-linux-gnueabihf
 endif
 
 ifeq ($(ARCH),arm64)

@@ -13,11 +13,11 @@ spec:
   - name: kube-addon-manager
     # When updating version also bump it in:
     # - test/kubemark/resources/manifests/kube-addon-manager.yaml
-    image: gcr.io/google-containers/kube-addon-manager:v6.4-beta.2
+    image: gcr.io/google-containers/kube-addon-manager:v6.5
     command:
     - /bin/bash
     - -c
-    - /opt/kube-addons.sh 1>>/var/log/kube-addon-manager.log 2>&1
+    - exec /opt/kube-addons.sh 1>>/var/log/kube-addon-manager.log 2>&1
     resources:
       requests:
         cpu: 5m

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package to keep track of API Versions that can be registered and are enabled in api.Scheme.
+// Package to keep track of API Versions that can be registered and are enabled in a Scheme.
 package registered
 
 import (

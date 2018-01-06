@@ -9,10 +9,10 @@ load(
 go_test(
     name = "go_default_test",
     srcs = ["node_authorizer_test.go"],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/plugin/pkg/auth/authorizer/node",
-    library = ":go_default_library",
     deps = [
-        "//pkg/api:go_default_library",
+        "//pkg/apis/core:go_default_library",
         "//pkg/auth/nodeidentifier:go_default_library",
         "//plugin/pkg/auth/authorizer/rbac/bootstrappolicy:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
@@ -30,12 +30,13 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/plugin/pkg/auth/authorizer/node",
     deps = [
-        "//pkg/api:go_default_library",
         "//pkg/api/persistentvolume:go_default_library",
         "//pkg/api/pod:go_default_library",
+        "//pkg/apis/core:go_default_library",
         "//pkg/apis/rbac:go_default_library",
         "//pkg/auth/nodeidentifier:go_default_library",
         "//pkg/client/informers/informers_generated/internalversion/core/internalversion:go_default_library",
+        "//pkg/features:go_default_library",
         "//plugin/pkg/auth/authorizer/rbac:go_default_library",
         "//third_party/forked/gonum/graph:go_default_library",
         "//third_party/forked/gonum/graph/simple:go_default_library",
@@ -43,6 +44,7 @@ go_library(
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/authorization/authorizer:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//vendor/k8s.io/client-go/tools/cache:go_default_library",
     ],
 )

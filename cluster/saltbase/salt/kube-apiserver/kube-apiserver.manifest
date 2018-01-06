@@ -66,6 +66,8 @@
   {% set storage_media_type = "--storage-media-type=" + pillar['storage_media_type'] -%}
 {% endif -%}
 
+{% set liveness_probe_initial_delay = pillar.get('kube_apiserver_liveness_probe_initial_delay', 15) -%}
+
 {% set request_timeout = "" -%}
 {% if pillar['kube_apiserver_request_timeout_sec'] is defined -%}
   {% set request_timeout = "--request-timeout=" + pillar['kube_apiserver_request_timeout_sec'] + "s" -%}
@@ -239,7 +241,7 @@
     "command": [
                  "/bin/sh",
                  "-c",
-                 "/usr/local/bin/kube-apiserver {{params}} --allow-privileged={{pillar['allow_privileged']}} 1>>/var/log/kube-apiserver.log 2>&1"
+                 "exec /usr/local/bin/kube-apiserver {{params}} --allow-privileged={{pillar['allow_privileged']}} 1>>/var/log/kube-apiserver.log 2>&1"
                ],
     {{container_env}}
     "livenessProbe": {
@@ -248,7 +250,7 @@
         "port": 8080,
         "path": "/healthz"
       },
-      "initialDelaySeconds": 15,
+      "initialDelaySeconds": {{liveness_probe_initial_delay}},
       "timeoutSeconds": 15
     },
     "ports":[

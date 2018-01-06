@@ -24,16 +24,16 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 )
 
 var _ metav1.Object = &metav1.ObjectMeta{}
 
 func TestAccessorImplementations(t *testing.T) {
-	for _, gv := range api.Registry.EnabledVersions() {
+	for _, gv := range legacyscheme.Registry.EnabledVersions() {
 		internalGV := schema.GroupVersion{Group: gv.Group, Version: runtime.APIVersionInternal}
 		for _, gv := range []schema.GroupVersion{gv, internalGV} {
-			for kind, knownType := range api.Scheme.KnownTypes(gv) {
+			for kind, knownType := range legacyscheme.Scheme.KnownTypes(gv) {
 				value := reflect.New(knownType)
 				obj := value.Interface()
 				if _, ok := obj.(runtime.Object); !ok {

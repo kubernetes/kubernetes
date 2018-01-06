@@ -18,20 +18,13 @@ package unstructured
 
 import (
 	"bytes"
-	gojson "encoding/json"
 	"errors"
 	"fmt"
-	"io"
-	"strings"
-
-	"github.com/golang/glog"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/conversion/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/json"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 )
 
@@ -54,50 +47,33 @@ type Unstructured struct {
 
 var _ metav1.Object = &Unstructured{}
 var _ runtime.Unstructured = &Unstructured{}
-var _ runtime.Unstructured = &UnstructuredList{}
 
-func (obj *Unstructured) GetObjectKind() schema.ObjectKind     { return obj }
-func (obj *UnstructuredList) GetObjectKind() schema.ObjectKind { return obj }
-
-func (obj *Unstructured) IsUnstructuredObject()     {}
-func (obj *UnstructuredList) IsUnstructuredObject() {}
+func (obj *Unstructured) GetObjectKind() schema.ObjectKind { return obj }
 
 func (obj *Unstructured) IsList() bool {
-	if obj.Object != nil {
-		_, ok := obj.Object["items"]
-		return ok
-	}
-	return false
-}
-func (obj *UnstructuredList) IsList() bool { return true }
-
-func (obj *Unstructured) EachListItem(fn func(runtime.Object) error) error {
-	if obj.Object == nil {
-		return fmt.Errorf("content is not a list")
-	}
 	field, ok := obj.Object["items"]
 	if !ok {
-		return fmt.Errorf("content is not a list")
+		return false
+	}
+	_, ok = field.([]interface{})
+	return ok
+}
+
+func (obj *Unstructured) EachListItem(fn func(runtime.Object) error) error {
+	field, ok := obj.Object["items"]
+	if !ok {
+		return errors.New("content is not a list")
 	}
 	items, ok := field.([]interface{})
 	if !ok {
-		return nil
+		return fmt.Errorf("content is not a list: %T", field)
 	}
 	for _, item := range items {
 		child, ok := item.(map[string]interface{})
 		if !ok {
-			return fmt.Errorf("items member is not an object")
+			return fmt.Errorf("items member is not an object: %T", child)
 		}
 		if err := fn(&Unstructured{Object: child}); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (obj *UnstructuredList) EachListItem(fn func(runtime.Object) error) error {
-	for i := range obj.Items {
-		if err := fn(&obj.Items[i]); err != nil {
 			return err
 		}
 	}
@@ -111,23 +87,8 @@ func (obj *Unstructured) UnstructuredContent() map[string]interface{} {
 	return obj.Object
 }
 
-// UnstructuredContent returns a map contain an overlay of the Items field onto
-// the Object field. Items always overwrites overlay. Changing "items" in the
-// returned object will affect items in the underlying Items field, but changing
-// the "items" slice itself will have no effect.
-// TODO: expose SetUnstructuredContent on runtime.Unstructured that allows
-// items to be changed.
-func (obj *UnstructuredList) UnstructuredContent() map[string]interface{} {
-	out := obj.Object
-	if out == nil {
-		out = make(map[string]interface{})
-	}
-	items := make([]interface{}, len(obj.Items))
-	for i, item := range obj.Items {
-		items[i] = item.Object
-	}
-	out["items"] = items
-	return out
+func (obj *Unstructured) SetUnstructuredContent(content map[string]interface{}) {
+	obj.Object = content
 }
 
 // MarshalJSON ensures that the unstructured object produces proper
@@ -151,227 +112,61 @@ func (in *Unstructured) DeepCopy() *Unstructured {
 	}
 	out := new(Unstructured)
 	*out = *in
-	out.Object = unstructured.DeepCopyJSON(in.Object)
+	out.Object = runtime.DeepCopyJSON(in.Object)
 	return out
-}
-
-func (in *UnstructuredList) DeepCopy() *UnstructuredList {
-	if in == nil {
-		return nil
-	}
-	out := new(UnstructuredList)
-	*out = *in
-	out.Object = unstructured.DeepCopyJSON(in.Object)
-	out.Items = make([]Unstructured, len(in.Items))
-	for i := range in.Items {
-		in.Items[i].DeepCopyInto(&out.Items[i])
-	}
-	return out
-}
-
-func getNestedField(obj map[string]interface{}, fields ...string) interface{} {
-	var val interface{} = obj
-	for _, field := range fields {
-		if _, ok := val.(map[string]interface{}); !ok {
-			return nil
-		}
-		val = val.(map[string]interface{})[field]
-	}
-	return val
-}
-
-func getNestedString(obj map[string]interface{}, fields ...string) string {
-	if str, ok := getNestedField(obj, fields...).(string); ok {
-		return str
-	}
-	return ""
-}
-
-func getNestedInt64(obj map[string]interface{}, fields ...string) int64 {
-	if str, ok := getNestedField(obj, fields...).(int64); ok {
-		return str
-	}
-	return 0
-}
-
-func getNestedInt64Pointer(obj map[string]interface{}, fields ...string) *int64 {
-	nested := getNestedField(obj, fields...)
-	switch n := nested.(type) {
-	case int64:
-		return &n
-	case *int64:
-		return n
-	default:
-		return nil
-	}
-}
-
-func getNestedSlice(obj map[string]interface{}, fields ...string) []string {
-	if m, ok := getNestedField(obj, fields...).([]interface{}); ok {
-		strSlice := make([]string, 0, len(m))
-		for _, v := range m {
-			if str, ok := v.(string); ok {
-				strSlice = append(strSlice, str)
-			}
-		}
-		return strSlice
-	}
-	return nil
-}
-
-func getNestedMap(obj map[string]interface{}, fields ...string) map[string]string {
-	if m, ok := getNestedField(obj, fields...).(map[string]interface{}); ok {
-		strMap := make(map[string]string, len(m))
-		for k, v := range m {
-			if str, ok := v.(string); ok {
-				strMap[k] = str
-			}
-		}
-		return strMap
-	}
-	return nil
-}
-
-func setNestedField(obj map[string]interface{}, value interface{}, fields ...string) {
-	m := obj
-	if len(fields) > 1 {
-		for _, field := range fields[0 : len(fields)-1] {
-			if _, ok := m[field].(map[string]interface{}); !ok {
-				m[field] = make(map[string]interface{})
-			}
-			m = m[field].(map[string]interface{})
-		}
-	}
-	m[fields[len(fields)-1]] = value
-}
-
-func setNestedSlice(obj map[string]interface{}, value []string, fields ...string) {
-	m := make([]interface{}, 0, len(value))
-	for _, v := range value {
-		m = append(m, v)
-	}
-	setNestedField(obj, m, fields...)
-}
-
-func setNestedMap(obj map[string]interface{}, value map[string]string, fields ...string) {
-	m := make(map[string]interface{}, len(value))
-	for k, v := range value {
-		m[k] = v
-	}
-	setNestedField(obj, m, fields...)
 }
 
 func (u *Unstructured) setNestedField(value interface{}, fields ...string) {
 	if u.Object == nil {
 		u.Object = make(map[string]interface{})
 	}
-	setNestedField(u.Object, value, fields...)
+	SetNestedField(u.Object, value, fields...)
 }
 
 func (u *Unstructured) setNestedSlice(value []string, fields ...string) {
 	if u.Object == nil {
 		u.Object = make(map[string]interface{})
 	}
-	setNestedSlice(u.Object, value, fields...)
+	SetNestedStringSlice(u.Object, value, fields...)
 }
 
 func (u *Unstructured) setNestedMap(value map[string]string, fields ...string) {
 	if u.Object == nil {
 		u.Object = make(map[string]interface{})
 	}
-	setNestedMap(u.Object, value, fields...)
-}
-
-func extractOwnerReference(src interface{}) metav1.OwnerReference {
-	v := src.(map[string]interface{})
-	// though this field is a *bool, but when decoded from JSON, it's
-	// unmarshalled as bool.
-	var controllerPtr *bool
-	controller, ok := (getNestedField(v, "controller")).(bool)
-	if !ok {
-		controllerPtr = nil
-	} else {
-		controllerCopy := controller
-		controllerPtr = &controllerCopy
-	}
-	var blockOwnerDeletionPtr *bool
-	blockOwnerDeletion, ok := (getNestedField(v, "blockOwnerDeletion")).(bool)
-	if !ok {
-		blockOwnerDeletionPtr = nil
-	} else {
-		blockOwnerDeletionCopy := blockOwnerDeletion
-		blockOwnerDeletionPtr = &blockOwnerDeletionCopy
-	}
-	return metav1.OwnerReference{
-		Kind:               getNestedString(v, "kind"),
-		Name:               getNestedString(v, "name"),
-		APIVersion:         getNestedString(v, "apiVersion"),
-		UID:                (types.UID)(getNestedString(v, "uid")),
-		Controller:         controllerPtr,
-		BlockOwnerDeletion: blockOwnerDeletionPtr,
-	}
-}
-
-func setOwnerReference(src metav1.OwnerReference) map[string]interface{} {
-	ret := make(map[string]interface{})
-	setNestedField(ret, src.Kind, "kind")
-	setNestedField(ret, src.Name, "name")
-	setNestedField(ret, src.APIVersion, "apiVersion")
-	setNestedField(ret, string(src.UID), "uid")
-	// json.Unmarshal() extracts boolean json fields as bool, not as *bool and hence extractOwnerReference()
-	// expects bool or a missing field, not *bool. So if pointer is nil, fields are omitted from the ret object.
-	// If pointer is non-nil, they are set to the referenced value.
-	if src.Controller != nil {
-		setNestedField(ret, *src.Controller, "controller")
-	}
-	if src.BlockOwnerDeletion != nil {
-		setNestedField(ret, *src.BlockOwnerDeletion, "blockOwnerDeletion")
-	}
-	return ret
-}
-
-func getOwnerReferences(object map[string]interface{}) ([]map[string]interface{}, error) {
-	field := getNestedField(object, "metadata", "ownerReferences")
-	if field == nil {
-		return nil, fmt.Errorf("cannot find field metadata.ownerReferences in %v", object)
-	}
-	ownerReferences, ok := field.([]map[string]interface{})
-	if ok {
-		return ownerReferences, nil
-	}
-	// TODO: This is hacky...
-	interfaces, ok := field.([]interface{})
-	if !ok {
-		return nil, fmt.Errorf("expect metadata.ownerReferences to be a slice in %#v", object)
-	}
-	ownerReferences = make([]map[string]interface{}, 0, len(interfaces))
-	for i := 0; i < len(interfaces); i++ {
-		r, ok := interfaces[i].(map[string]interface{})
-		if !ok {
-			return nil, fmt.Errorf("expect element metadata.ownerReferences to be a map[string]interface{} in %#v", object)
-		}
-		ownerReferences = append(ownerReferences, r)
-	}
-	return ownerReferences, nil
+	SetNestedStringMap(u.Object, value, fields...)
 }
 
 func (u *Unstructured) GetOwnerReferences() []metav1.OwnerReference {
-	original, err := getOwnerReferences(u.Object)
-	if err != nil {
-		glog.V(6).Info(err)
+	field, found, err := nestedFieldNoCopy(u.Object, "metadata", "ownerReferences")
+	if !found || err != nil {
+		return nil
+	}
+	original, ok := field.([]interface{})
+	if !ok {
 		return nil
 	}
 	ret := make([]metav1.OwnerReference, 0, len(original))
-	for i := 0; i < len(original); i++ {
-		ret = append(ret, extractOwnerReference(original[i]))
+	for _, obj := range original {
+		o, ok := obj.(map[string]interface{})
+		if !ok {
+			// expected map[string]interface{}, got something else
+			return nil
+		}
+		ret = append(ret, extractOwnerReference(o))
 	}
 	return ret
 }
 
 func (u *Unstructured) SetOwnerReferences(references []metav1.OwnerReference) {
-	var newReferences = make([]map[string]interface{}, 0, len(references))
-	for i := 0; i < len(references); i++ {
-		newReferences = append(newReferences, setOwnerReference(references[i]))
+	newReferences := make([]interface{}, 0, len(references))
+	for _, reference := range references {
+		out, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&reference)
+		if err != nil {
+			utilruntime.HandleError(fmt.Errorf("unable to convert Owner Reference: %v", err))
+			continue
+		}
+		newReferences = append(newReferences, out)
 	}
 	u.setNestedField(newReferences, "metadata", "ownerReferences")
 }
@@ -433,7 +228,11 @@ func (u *Unstructured) SetResourceVersion(version string) {
 }
 
 func (u *Unstructured) GetGeneration() int64 {
-	return getNestedInt64(u.Object, "metadata", "generation")
+	val, found, err := NestedInt64(u.Object, "metadata", "generation")
+	if !found || err != nil {
+		return 0
+	}
+	return val
 }
 
 func (u *Unstructured) SetGeneration(generation int64) {
@@ -464,6 +263,10 @@ func (u *Unstructured) GetCreationTimestamp() metav1.Time {
 
 func (u *Unstructured) SetCreationTimestamp(timestamp metav1.Time) {
 	ts, _ := timestamp.MarshalQueryParameter()
+	if len(ts) == 0 || timestamp.Time.IsZero() {
+		RemoveNestedField(u.Object, "metadata", "creationTimestamp")
+		return
+	}
 	u.setNestedField(ts, "metadata", "creationTimestamp")
 }
 
@@ -478,7 +281,7 @@ func (u *Unstructured) GetDeletionTimestamp() *metav1.Time {
 
 func (u *Unstructured) SetDeletionTimestamp(timestamp *metav1.Time) {
 	if timestamp == nil {
-		u.setNestedField(nil, "metadata", "deletionTimestamp")
+		RemoveNestedField(u.Object, "metadata", "deletionTimestamp")
 		return
 	}
 	ts, _ := timestamp.MarshalQueryParameter()
@@ -486,15 +289,24 @@ func (u *Unstructured) SetDeletionTimestamp(timestamp *metav1.Time) {
 }
 
 func (u *Unstructured) GetDeletionGracePeriodSeconds() *int64 {
-	return getNestedInt64Pointer(u.Object, "metadata", "deletionGracePeriodSeconds")
+	val, found, err := NestedInt64(u.Object, "metadata", "deletionGracePeriodSeconds")
+	if !found || err != nil {
+		return nil
+	}
+	return &val
 }
 
 func (u *Unstructured) SetDeletionGracePeriodSeconds(deletionGracePeriodSeconds *int64) {
-	u.setNestedField(deletionGracePeriodSeconds, "metadata", "deletionGracePeriodSeconds")
+	if deletionGracePeriodSeconds == nil {
+		RemoveNestedField(u.Object, "metadata", "deletionGracePeriodSeconds")
+		return
+	}
+	u.setNestedField(*deletionGracePeriodSeconds, "metadata", "deletionGracePeriodSeconds")
 }
 
 func (u *Unstructured) GetLabels() map[string]string {
-	return getNestedMap(u.Object, "metadata", "labels")
+	m, _, _ := NestedStringMap(u.Object, "metadata", "labels")
+	return m
 }
 
 func (u *Unstructured) SetLabels(labels map[string]string) {
@@ -502,7 +314,8 @@ func (u *Unstructured) SetLabels(labels map[string]string) {
 }
 
 func (u *Unstructured) GetAnnotations() map[string]string {
-	return getNestedMap(u.Object, "metadata", "annotations")
+	m, _, _ := NestedStringMap(u.Object, "metadata", "annotations")
+	return m
 }
 
 func (u *Unstructured) SetAnnotations(annotations map[string]string) {
@@ -523,41 +336,34 @@ func (u *Unstructured) GroupVersionKind() schema.GroupVersionKind {
 	return gvk
 }
 
-var converter = unstructured.NewConverter(false)
-
 func (u *Unstructured) GetInitializers() *metav1.Initializers {
-	field := getNestedField(u.Object, "metadata", "initializers")
-	if field == nil {
-		return nil
-	}
-	obj, ok := field.(map[string]interface{})
-	if !ok {
+	m, found, err := nestedMapNoCopy(u.Object, "metadata", "initializers")
+	if !found || err != nil {
 		return nil
 	}
 	out := &metav1.Initializers{}
-	if err := converter.FromUnstructured(obj, out); err != nil {
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(m, out); err != nil {
 		utilruntime.HandleError(fmt.Errorf("unable to retrieve initializers for object: %v", err))
+		return nil
 	}
 	return out
 }
 
 func (u *Unstructured) SetInitializers(initializers *metav1.Initializers) {
-	if u.Object == nil {
-		u.Object = make(map[string]interface{})
-	}
 	if initializers == nil {
-		setNestedField(u.Object, nil, "metadata", "initializers")
+		RemoveNestedField(u.Object, "metadata", "initializers")
 		return
 	}
-	out, err := converter.ToUnstructured(initializers)
+	out, err := runtime.DefaultUnstructuredConverter.ToUnstructured(initializers)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("unable to retrieve initializers for object: %v", err))
 	}
-	setNestedField(u.Object, out, "metadata", "initializers")
+	u.setNestedField(out, "metadata", "initializers")
 }
 
 func (u *Unstructured) GetFinalizers() []string {
-	return getNestedSlice(u.Object, "metadata", "finalizers")
+	val, _, _ := NestedStringSlice(u.Object, "metadata", "finalizers")
+	return val
 }
 
 func (u *Unstructured) SetFinalizers(finalizers []string) {
@@ -570,273 +376,4 @@ func (u *Unstructured) GetClusterName() string {
 
 func (u *Unstructured) SetClusterName(clusterName string) {
 	u.setNestedField(clusterName, "metadata", "clusterName")
-}
-
-// UnstructuredList allows lists that do not have Golang structs
-// registered to be manipulated generically. This can be used to deal
-// with the API lists from a plug-in.
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-// +k8s:deepcopy-gen=true
-type UnstructuredList struct {
-	Object map[string]interface{}
-
-	// Items is a list of unstructured objects.
-	Items []Unstructured `json:"items"`
-}
-
-var _ metav1.ListInterface = &UnstructuredList{}
-
-// MarshalJSON ensures that the unstructured list object produces proper
-// JSON when passed to Go's standard JSON library.
-func (u *UnstructuredList) MarshalJSON() ([]byte, error) {
-	var buf bytes.Buffer
-	err := UnstructuredJSONScheme.Encode(u, &buf)
-	return buf.Bytes(), err
-}
-
-// UnmarshalJSON ensures that the unstructured list object properly
-// decodes JSON when passed to Go's standard JSON library.
-func (u *UnstructuredList) UnmarshalJSON(b []byte) error {
-	_, _, err := UnstructuredJSONScheme.Decode(b, nil, u)
-	return err
-}
-
-func (u *UnstructuredList) setNestedField(value interface{}, fields ...string) {
-	if u.Object == nil {
-		u.Object = make(map[string]interface{})
-	}
-	setNestedField(u.Object, value, fields...)
-}
-
-func (u *UnstructuredList) GetAPIVersion() string {
-	return getNestedString(u.Object, "apiVersion")
-}
-
-func (u *UnstructuredList) SetAPIVersion(version string) {
-	u.setNestedField(version, "apiVersion")
-}
-
-func (u *UnstructuredList) GetKind() string {
-	return getNestedString(u.Object, "kind")
-}
-
-func (u *UnstructuredList) SetKind(kind string) {
-	u.setNestedField(kind, "kind")
-}
-
-func (u *UnstructuredList) GetResourceVersion() string {
-	return getNestedString(u.Object, "metadata", "resourceVersion")
-}
-
-func (u *UnstructuredList) SetResourceVersion(version string) {
-	u.setNestedField(version, "metadata", "resourceVersion")
-}
-
-func (u *UnstructuredList) GetSelfLink() string {
-	return getNestedString(u.Object, "metadata", "selfLink")
-}
-
-func (u *UnstructuredList) SetSelfLink(selfLink string) {
-	u.setNestedField(selfLink, "metadata", "selfLink")
-}
-
-func (u *UnstructuredList) GetContinue() string {
-	return getNestedString(u.Object, "metadata", "continue")
-}
-
-func (u *UnstructuredList) SetContinue(c string) {
-	u.setNestedField(c, "metadata", "continue")
-}
-
-func (u *UnstructuredList) SetGroupVersionKind(gvk schema.GroupVersionKind) {
-	u.SetAPIVersion(gvk.GroupVersion().String())
-	u.SetKind(gvk.Kind)
-}
-
-func (u *UnstructuredList) GroupVersionKind() schema.GroupVersionKind {
-	gv, err := schema.ParseGroupVersion(u.GetAPIVersion())
-	if err != nil {
-		return schema.GroupVersionKind{}
-	}
-	gvk := gv.WithKind(u.GetKind())
-	return gvk
-}
-
-// UnstructuredJSONScheme is capable of converting JSON data into the Unstructured
-// type, which can be used for generic access to objects without a predefined scheme.
-// TODO: move into serializer/json.
-var UnstructuredJSONScheme runtime.Codec = unstructuredJSONScheme{}
-
-type unstructuredJSONScheme struct{}
-
-func (s unstructuredJSONScheme) Decode(data []byte, _ *schema.GroupVersionKind, obj runtime.Object) (runtime.Object, *schema.GroupVersionKind, error) {
-	var err error
-	if obj != nil {
-		err = s.decodeInto(data, obj)
-	} else {
-		obj, err = s.decode(data)
-	}
-
-	if err != nil {
-		return nil, nil, err
-	}
-
-	gvk := obj.GetObjectKind().GroupVersionKind()
-	if len(gvk.Kind) == 0 {
-		return nil, &gvk, runtime.NewMissingKindErr(string(data))
-	}
-
-	return obj, &gvk, nil
-}
-
-func (unstructuredJSONScheme) Encode(obj runtime.Object, w io.Writer) error {
-	switch t := obj.(type) {
-	case *Unstructured:
-		return json.NewEncoder(w).Encode(t.Object)
-	case *UnstructuredList:
-		items := make([]map[string]interface{}, 0, len(t.Items))
-		for _, i := range t.Items {
-			items = append(items, i.Object)
-		}
-		listObj := make(map[string]interface{}, len(t.Object)+1)
-		for k, v := range t.Object { // Make a shallow copy
-			listObj[k] = v
-		}
-		listObj["items"] = items
-		return json.NewEncoder(w).Encode(listObj)
-	case *runtime.Unknown:
-		// TODO: Unstructured needs to deal with ContentType.
-		_, err := w.Write(t.Raw)
-		return err
-	default:
-		return json.NewEncoder(w).Encode(t)
-	}
-}
-
-func (s unstructuredJSONScheme) decode(data []byte) (runtime.Object, error) {
-	type detector struct {
-		Items gojson.RawMessage
-	}
-	var det detector
-	if err := json.Unmarshal(data, &det); err != nil {
-		return nil, err
-	}
-
-	if det.Items != nil {
-		list := &UnstructuredList{}
-		err := s.decodeToList(data, list)
-		return list, err
-	}
-
-	// No Items field, so it wasn't a list.
-	unstruct := &Unstructured{}
-	err := s.decodeToUnstructured(data, unstruct)
-	return unstruct, err
-}
-
-func (s unstructuredJSONScheme) decodeInto(data []byte, obj runtime.Object) error {
-	switch x := obj.(type) {
-	case *Unstructured:
-		return s.decodeToUnstructured(data, x)
-	case *UnstructuredList:
-		return s.decodeToList(data, x)
-	case *runtime.VersionedObjects:
-		o, err := s.decode(data)
-		if err == nil {
-			x.Objects = []runtime.Object{o}
-		}
-		return err
-	default:
-		return json.Unmarshal(data, x)
-	}
-}
-
-func (unstructuredJSONScheme) decodeToUnstructured(data []byte, unstruct *Unstructured) error {
-	m := make(map[string]interface{})
-	if err := json.Unmarshal(data, &m); err != nil {
-		return err
-	}
-
-	unstruct.Object = m
-
-	return nil
-}
-
-func (s unstructuredJSONScheme) decodeToList(data []byte, list *UnstructuredList) error {
-	type decodeList struct {
-		Items []gojson.RawMessage
-	}
-
-	var dList decodeList
-	if err := json.Unmarshal(data, &dList); err != nil {
-		return err
-	}
-
-	if err := json.Unmarshal(data, &list.Object); err != nil {
-		return err
-	}
-
-	// For typed lists, e.g., a PodList, API server doesn't set each item's
-	// APIVersion and Kind. We need to set it.
-	listAPIVersion := list.GetAPIVersion()
-	listKind := list.GetKind()
-	itemKind := strings.TrimSuffix(listKind, "List")
-
-	delete(list.Object, "items")
-	list.Items = nil
-	for _, i := range dList.Items {
-		unstruct := &Unstructured{}
-		if err := s.decodeToUnstructured([]byte(i), unstruct); err != nil {
-			return err
-		}
-		// This is hacky. Set the item's Kind and APIVersion to those inferred
-		// from the List.
-		if len(unstruct.GetKind()) == 0 && len(unstruct.GetAPIVersion()) == 0 {
-			unstruct.SetKind(itemKind)
-			unstruct.SetAPIVersion(listAPIVersion)
-		}
-		list.Items = append(list.Items, *unstruct)
-	}
-	return nil
-}
-
-// UnstructuredObjectConverter is an ObjectConverter for use with
-// Unstructured objects. Since it has no schema or type information,
-// it will only succeed for no-op conversions. This is provided as a
-// sane implementation for APIs that require an object converter.
-type UnstructuredObjectConverter struct{}
-
-func (UnstructuredObjectConverter) Convert(in, out, context interface{}) error {
-	unstructIn, ok := in.(*Unstructured)
-	if !ok {
-		return fmt.Errorf("input type %T in not valid for unstructured conversion", in)
-	}
-
-	unstructOut, ok := out.(*Unstructured)
-	if !ok {
-		return fmt.Errorf("output type %T in not valid for unstructured conversion", out)
-	}
-
-	// maybe deep copy the map? It is documented in the
-	// ObjectConverter interface that this function is not
-	// guaranteeed to not mutate the input. Or maybe set the input
-	// object to nil.
-	unstructOut.Object = unstructIn.Object
-	return nil
-}
-
-func (UnstructuredObjectConverter) ConvertToVersion(in runtime.Object, target runtime.GroupVersioner) (runtime.Object, error) {
-	if kind := in.GetObjectKind().GroupVersionKind(); !kind.Empty() {
-		gvk, ok := target.KindForGroupVersionKinds([]schema.GroupVersionKind{kind})
-		if !ok {
-			// TODO: should this be a typed error?
-			return nil, fmt.Errorf("%v is unstructured and is not suitable for converting to %q", kind, target)
-		}
-		in.GetObjectKind().SetGroupVersionKind(gvk)
-	}
-	return in, nil
-}
-
-func (UnstructuredObjectConverter) ConvertFieldLabel(version, kind, label, value string) (string, string, error) {
-	return "", "", errors.New("unstructured cannot convert field labels")
 }

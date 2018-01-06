@@ -1,0 +1,9 @@
+# To be owned by sig-architecture.
+options:
+  no_parent_owners: true
+reviewers:
+  - bgrant0607
+  - smarterclayton
+approvers:
+  - bgrant0607
+  - smarterclayton

@@ -57,9 +57,9 @@ func Register(plugins *admission.Plugins) {
 	})
 }
 
-// lifecycle is an implementation of admission.Interface.
+// Lifecycle is an implementation of admission.Interface.
 // It enforces life-cycle constraints around a Namespace depending on its Phase
-type lifecycle struct {
+type Lifecycle struct {
 	*admission.Handler
 	client             kubernetes.Interface
 	immortalNamespaces sets.String
@@ -69,23 +69,10 @@ type lifecycle struct {
 	forceLiveLookupCache *utilcache.LRUExpireCache
 }
 
-type forceLiveLookupEntry struct {
-	expiry time.Time
-}
+var _ = initializer.WantsExternalKubeInformerFactory(&Lifecycle{})
+var _ = initializer.WantsExternalKubeClientSet(&Lifecycle{})
 
-var _ = initializer.WantsExternalKubeInformerFactory(&lifecycle{})
-var _ = initializer.WantsExternalKubeClientSet(&lifecycle{})
-
-func makeNamespaceKey(namespace string) *v1.Namespace {
-	return &v1.Namespace{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      namespace,
-			Namespace: "",
-		},
-	}
-}
-
-func (l *lifecycle) Admit(a admission.Attributes) error {
+func (l *Lifecycle) Admit(a admission.Attributes) error {
 	// prevent deletion of immortal namespaces
 	if a.GetOperation() == admission.Delete && a.GetKind().GroupKind() == v1.SchemeGroupVersion.WithKind("Namespace").GroupKind() && l.immortalNamespaces.Has(a.GetName()) {
 		return errors.NewForbidden(a.GetResource().GroupResource(), a.GetName(), fmt.Errorf("this namespace may not be deleted"))
@@ -165,7 +152,7 @@ func (l *lifecycle) Admit(a admission.Attributes) error {
 	// refuse to operate on non-existent namespaces
 	if !exists || forceLiveLookup {
 		// as a last resort, make a call directly to storage
-		namespace, err = l.client.Core().Namespaces().Get(a.GetNamespace(), metav1.GetOptions{})
+		namespace, err = l.client.CoreV1().Namespaces().Get(a.GetNamespace(), metav1.GetOptions{})
 		switch {
 		case errors.IsNotFound(err):
 			return err
@@ -182,37 +169,40 @@ func (l *lifecycle) Admit(a admission.Attributes) error {
 		}
 
 		// TODO: This should probably not be a 403
-		return admission.NewForbidden(a, fmt.Errorf("unable to create new content in namespace %s because it is being terminated.", a.GetNamespace()))
+		return admission.NewForbidden(a, fmt.Errorf("unable to create new content in namespace %s because it is being terminated", a.GetNamespace()))
 	}
 
 	return nil
 }
 
-// NewLifecycle creates a new namespace lifecycle admission control handler
-func NewLifecycle(immortalNamespaces sets.String) (admission.Interface, error) {
+// NewLifecycle creates a new namespace Lifecycle admission control handler
+func NewLifecycle(immortalNamespaces sets.String) (*Lifecycle, error) {
 	return newLifecycleWithClock(immortalNamespaces, clock.RealClock{})
 }
 
-func newLifecycleWithClock(immortalNamespaces sets.String, clock utilcache.Clock) (admission.Interface, error) {
+func newLifecycleWithClock(immortalNamespaces sets.String, clock utilcache.Clock) (*Lifecycle, error) {
 	forceLiveLookupCache := utilcache.NewLRUExpireCacheWithClock(100, clock)
-	return &lifecycle{
+	return &Lifecycle{
 		Handler:              admission.NewHandler(admission.Create, admission.Update, admission.Delete),
 		immortalNamespaces:   immortalNamespaces,
 		forceLiveLookupCache: forceLiveLookupCache,
 	}, nil
 }
 
-func (l *lifecycle) SetExternalKubeInformerFactory(f informers.SharedInformerFactory) {
+// SetExternalKubeInformerFactory implements the WantsExternalKubeInformerFactory interface.
+func (l *Lifecycle) SetExternalKubeInformerFactory(f informers.SharedInformerFactory) {
 	namespaceInformer := f.Core().V1().Namespaces()
 	l.namespaceLister = namespaceInformer.Lister()
 	l.SetReadyFunc(namespaceInformer.Informer().HasSynced)
 }
 
-func (l *lifecycle) SetExternalKubeClientSet(client kubernetes.Interface) {
+// SetExternalKubeClientSet implements the WantsExternalKubeClientSet interface.
+func (l *Lifecycle) SetExternalKubeClientSet(client kubernetes.Interface) {
 	l.client = client
 }
 
-func (l *lifecycle) Validate() error {
+// ValidateInitialization implements the InitializationValidator interface.
+func (l *Lifecycle) ValidateInitialization() error {
 	if l.namespaceLister == nil {
 		return fmt.Errorf("missing namespaceLister")
 	}

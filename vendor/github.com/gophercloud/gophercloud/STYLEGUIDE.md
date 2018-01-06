@@ -1,6 +1,8 @@
 
 ## On Pull Requests
 
+- Please make sure to read our [contributing guide](/.github/CONTRIBUTING.md).
+
 - Before you start a PR there needs to be a Github issue and a discussion about it
   on that issue with a core contributor, even if it's just a 'SGTM'.
 
@@ -33,6 +35,9 @@
 - Unless explicitly asked, do not squash commits in the middle of a review; only
   append. It makes it difficult for the reviewer to see what's changed from one
   review to the next.
+
+- See [#583](https://github.com/gophercloud/gophercloud/issues/583) as an example of a
+  well-formatted issue which contains all relevant information we need to review and approve.
 
 ## On Code
 

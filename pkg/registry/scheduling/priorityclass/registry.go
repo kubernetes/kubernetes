@@ -28,8 +28,8 @@ import (
 // Registry is an interface for things that know how to store PriorityClass.
 type Registry interface {
 	ListPriorityClasses(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (*scheduling.PriorityClassList, error)
-	CreatePriorityClass(ctx genericapirequest.Context, pc *scheduling.PriorityClass) error
-	UpdatePriorityClass(ctx genericapirequest.Context, pc *scheduling.PriorityClass) error
+	CreatePriorityClass(ctx genericapirequest.Context, pc *scheduling.PriorityClass, createValidation rest.ValidateObjectFunc) error
+	UpdatePriorityClass(ctx genericapirequest.Context, pc *scheduling.PriorityClass, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) error
 	GetPriorityClass(ctx genericapirequest.Context, name string, options *metav1.GetOptions) (*scheduling.PriorityClass, error)
 	DeletePriorityClass(ctx genericapirequest.Context, name string) error
 	WatchPriorityClasses(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (watch.Interface, error)
@@ -55,13 +55,13 @@ func (s *storage) ListPriorityClasses(ctx genericapirequest.Context, options *me
 	return obj.(*scheduling.PriorityClassList), nil
 }
 
-func (s *storage) CreatePriorityClass(ctx genericapirequest.Context, pc *scheduling.PriorityClass) error {
-	_, err := s.Create(ctx, pc, false)
+func (s *storage) CreatePriorityClass(ctx genericapirequest.Context, pc *scheduling.PriorityClass, createValidation rest.ValidateObjectFunc) error {
+	_, err := s.Create(ctx, pc, createValidation, false)
 	return err
 }
 
-func (s *storage) UpdatePriorityClass(ctx genericapirequest.Context, pc *scheduling.PriorityClass) error {
-	_, _, err := s.Update(ctx, pc.Name, rest.DefaultUpdatedObjectInfo(pc))
+func (s *storage) UpdatePriorityClass(ctx genericapirequest.Context, pc *scheduling.PriorityClass, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) error {
+	_, _, err := s.Update(ctx, pc.Name, rest.DefaultUpdatedObjectInfo(pc), createValidation, updateValidation)
 	return err
 }
 

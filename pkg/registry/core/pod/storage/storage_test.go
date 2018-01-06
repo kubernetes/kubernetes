@@ -34,13 +34,14 @@ import (
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/generic"
+	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage"
 	storeerr "k8s.io/apiserver/pkg/storage/errors"
 	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 	"k8s.io/kubernetes/pkg/securitycontext"
 )
@@ -98,7 +99,7 @@ func TestCreate(t *testing.T) {
 	storage, _, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Store)
+	test := genericregistrytest.New(t, storage.Store)
 	pod := validNewPod()
 	pod.ObjectMeta = metav1.ObjectMeta{}
 	// Make an invalid pod with an an incorrect label.
@@ -125,7 +126,7 @@ func TestUpdate(t *testing.T) {
 	storage, _, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Store)
+	test := genericregistrytest.New(t, storage.Store)
 	test.TestUpdate(
 		// valid
 		validNewPod(),
@@ -142,7 +143,7 @@ func TestDelete(t *testing.T) {
 	storage, _, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Store).ReturnDeletedObject()
+	test := genericregistrytest.New(t, storage.Store).ReturnDeletedObject()
 	test.TestDelete(validNewPod())
 
 	scheduledPod := validNewPod()
@@ -188,7 +189,7 @@ func TestIgnoreDeleteNotFound(t *testing.T) {
 	}
 
 	// create pod
-	_, err = registry.Create(testContext, pod, false)
+	_, err = registry.Create(testContext, pod, rest.ValidateAllObjectFunc, false)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -225,7 +226,7 @@ func TestCreateSetsFields(t *testing.T) {
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	pod := validNewPod()
-	_, err := storage.Create(genericapirequest.NewDefaultContext(), pod, false)
+	_, err := storage.Create(genericapirequest.NewDefaultContext(), pod, rest.ValidateAllObjectFunc, false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -366,7 +367,7 @@ func TestGet(t *testing.T) {
 	storage, _, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Store)
+	test := genericregistrytest.New(t, storage.Store)
 	test.TestGet(validNewPod())
 }
 
@@ -374,7 +375,7 @@ func TestList(t *testing.T) {
 	storage, _, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Store)
+	test := genericregistrytest.New(t, storage.Store)
 	test.TestList(validNewPod())
 }
 
@@ -382,7 +383,7 @@ func TestWatch(t *testing.T) {
 	storage, _, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Store)
+	test := genericregistrytest.New(t, storage.Store)
 	test.TestWatch(
 		validNewPod(),
 		// matching labels
@@ -489,7 +490,7 @@ func TestEtcdCreate(t *testing.T) {
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	ctx := genericapirequest.NewDefaultContext()
-	_, err := storage.Create(ctx, validNewPod(), false)
+	_, err := storage.Create(ctx, validNewPod(), rest.ValidateAllObjectFunc, false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -498,7 +499,7 @@ func TestEtcdCreate(t *testing.T) {
 	_, err = bindingStorage.Create(ctx, &api.Binding{
 		ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Name: "foo"},
 		Target:     api.ObjectReference{Name: "machine"},
-	}, false)
+	}, rest.ValidateAllObjectFunc, false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -524,7 +525,7 @@ func TestEtcdCreateBindingNoPod(t *testing.T) {
 	_, err := bindingStorage.Create(ctx, &api.Binding{
 		ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Name: "foo"},
 		Target:     api.ObjectReference{Name: "machine"},
-	}, false)
+	}, rest.ValidateAllObjectFunc, false)
 	if err == nil {
 		t.Fatalf("Expected not-found-error but got nothing")
 	}
@@ -547,7 +548,7 @@ func TestEtcdCreateFailsWithoutNamespace(t *testing.T) {
 	defer storage.Store.DestroyFunc()
 	pod := validNewPod()
 	pod.Namespace = ""
-	_, err := storage.Create(genericapirequest.NewContext(), pod, false)
+	_, err := storage.Create(genericapirequest.NewContext(), pod, rest.ValidateAllObjectFunc, false)
 	// Accept "namespace" or "Namespace".
 	if err == nil || !strings.Contains(err.Error(), "amespace") {
 		t.Fatalf("expected error that namespace was missing from context, got: %v", err)
@@ -559,7 +560,7 @@ func TestEtcdCreateWithContainersNotFound(t *testing.T) {
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	ctx := genericapirequest.NewDefaultContext()
-	_, err := storage.Create(ctx, validNewPod(), false)
+	_, err := storage.Create(ctx, validNewPod(), rest.ValidateAllObjectFunc, false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -572,7 +573,7 @@ func TestEtcdCreateWithContainersNotFound(t *testing.T) {
 			Annotations: map[string]string{"label1": "value1"},
 		},
 		Target: api.ObjectReference{Name: "machine"},
-	}, false)
+	}, rest.ValidateAllObjectFunc, false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -594,7 +595,7 @@ func TestEtcdCreateWithConflict(t *testing.T) {
 	defer storage.Store.DestroyFunc()
 	ctx := genericapirequest.NewDefaultContext()
 
-	_, err := storage.Create(ctx, validNewPod(), false)
+	_, err := storage.Create(ctx, validNewPod(), rest.ValidateAllObjectFunc, false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -608,12 +609,12 @@ func TestEtcdCreateWithConflict(t *testing.T) {
 		},
 		Target: api.ObjectReference{Name: "machine"},
 	}
-	_, err = bindingStorage.Create(ctx, &binding, false)
+	_, err = bindingStorage.Create(ctx, &binding, rest.ValidateAllObjectFunc, false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	_, err = bindingStorage.Create(ctx, &binding, false)
+	_, err = bindingStorage.Create(ctx, &binding, rest.ValidateAllObjectFunc, false)
 	if err == nil || !errors.IsConflict(err) {
 		t.Fatalf("expected resource conflict error, not: %v", err)
 	}
@@ -624,7 +625,7 @@ func TestEtcdCreateWithExistingContainers(t *testing.T) {
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	ctx := genericapirequest.NewDefaultContext()
-	_, err := storage.Create(ctx, validNewPod(), false)
+	_, err := storage.Create(ctx, validNewPod(), rest.ValidateAllObjectFunc, false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -633,7 +634,7 @@ func TestEtcdCreateWithExistingContainers(t *testing.T) {
 	_, err = bindingStorage.Create(ctx, &api.Binding{
 		ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Name: "foo"},
 		Target:     api.ObjectReference{Name: "machine"},
-	}, false)
+	}, rest.ValidateAllObjectFunc, false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -683,10 +684,10 @@ func TestEtcdCreateBinding(t *testing.T) {
 	for k, test := range testCases {
 		storage, bindingStorage, _, server := newStorage(t)
 
-		if _, err := storage.Create(ctx, validNewPod(), false); err != nil {
+		if _, err := storage.Create(ctx, validNewPod(), rest.ValidateAllObjectFunc, false); err != nil {
 			t.Fatalf("%s: unexpected error: %v", k, err)
 		}
-		if _, err := bindingStorage.Create(ctx, &test.binding, false); !test.errOK(err) {
+		if _, err := bindingStorage.Create(ctx, &test.binding, rest.ValidateAllObjectFunc, false); !test.errOK(err) {
 			t.Errorf("%s: unexpected error: %v", k, err)
 		} else if err == nil {
 			// If bind succeeded, verify Host field in pod's Spec.
@@ -712,7 +713,7 @@ func TestEtcdUpdateUninitialized(t *testing.T) {
 	pod := validNewPod()
 	// add pending initializers to the pod
 	pod.ObjectMeta.Initializers = &metav1.Initializers{Pending: []metav1.Initializer{{Name: "init.k8s.io"}}}
-	if _, err := storage.Create(ctx, pod, true); err != nil {
+	if _, err := storage.Create(ctx, pod, rest.ValidateAllObjectFunc, true); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	podIn := *pod
@@ -727,7 +728,7 @@ func TestEtcdUpdateUninitialized(t *testing.T) {
 	})
 	podIn.ObjectMeta.Initializers = nil
 
-	_, _, err := storage.Update(ctx, podIn.Name, rest.DefaultUpdatedObjectInfo(&podIn))
+	_, _, err := storage.Update(ctx, podIn.Name, rest.DefaultUpdatedObjectInfo(&podIn), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -754,7 +755,7 @@ func TestEtcdStatusUpdateUninitialized(t *testing.T) {
 	pod := validNewPod()
 	// add pending initializers to the pod
 	pod.ObjectMeta.Initializers = &metav1.Initializers{Pending: []metav1.Initializer{{Name: "init.k8s.io"}}}
-	if _, err := storage.Create(ctx, pod, true); err != nil {
+	if _, err := storage.Create(ctx, pod, rest.ValidateAllObjectFunc, true); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	podIn := *pod
@@ -762,7 +763,7 @@ func TestEtcdStatusUpdateUninitialized(t *testing.T) {
 	podIn.Status.Phase = api.PodRunning
 	podIn.ObjectMeta.Initializers = nil
 
-	_, _, err := statusStorage.Update(ctx, podIn.Name, rest.DefaultUpdatedObjectInfo(&podIn))
+	_, _, err := statusStorage.Update(ctx, podIn.Name, rest.DefaultUpdatedObjectInfo(&podIn), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc)
 	expected := "Forbidden: must not update status when the object is uninitialized"
 	if err == nil {
 		t.Fatalf("Unexpected no err, expected %q", expected)
@@ -778,12 +779,12 @@ func TestEtcdUpdateNotScheduled(t *testing.T) {
 	defer storage.Store.DestroyFunc()
 	ctx := genericapirequest.NewDefaultContext()
 
-	if _, err := storage.Create(ctx, validNewPod(), false); err != nil {
+	if _, err := storage.Create(ctx, validNewPod(), rest.ValidateAllObjectFunc, false); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
 	podIn := validChangedPod()
-	_, _, err := storage.Update(ctx, podIn.Name, rest.DefaultUpdatedObjectInfo(podIn))
+	_, _, err := storage.Update(ctx, podIn.Name, rest.DefaultUpdatedObjectInfo(podIn), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -853,7 +854,7 @@ func TestEtcdUpdateScheduled(t *testing.T) {
 			SchedulerName:                 api.DefaultSchedulerName,
 		},
 	}
-	_, _, err = storage.Update(ctx, podIn.Name, rest.DefaultUpdatedObjectInfo(&podIn))
+	_, _, err = storage.Update(ctx, podIn.Name, rest.DefaultUpdatedObjectInfo(&podIn), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -937,7 +938,7 @@ func TestEtcdUpdateStatus(t *testing.T) {
 	expected.Labels = podIn.Labels
 	expected.Status = podIn.Status
 
-	_, _, err = statusStorage.Update(ctx, podIn.Name, rest.DefaultUpdatedObjectInfo(&podIn))
+	_, _, err = statusStorage.Update(ctx, podIn.Name, rest.DefaultUpdatedObjectInfo(&podIn), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}

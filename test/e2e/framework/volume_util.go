@@ -48,19 +48,11 @@ import (
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/golang/glog"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-)
-
-// Current supported images for e2e volume testing to be assigned to VolumeTestConfig.serverImage
-const (
-	NfsServerImage       string = "gcr.io/google_containers/volume-nfs:0.8"
-	IscsiServerImage     string = "gcr.io/google_containers/volume-iscsi:0.1"
-	GlusterfsServerImage string = "gcr.io/google_containers/volume-gluster:0.2"
-	CephServerImage      string = "gcr.io/google_containers/volume-ceph:0.1"
-	RbdServerImage       string = "gcr.io/google_containers/volume-rbd:0.1"
 )
 
 const (
@@ -91,6 +83,7 @@ type VolumeTestConfig struct {
 	ServerArgs []string
 	// Volumes needed to be mounted to the server container from the host
 	// map <host (source) path> -> <container (dst.) path>
+	// if <host (source) path> is empty, mount a tmpfs emptydir
 	ServerVolumes map[string]string
 	// Wait for the pod to terminate successfully
 	// False indicates that the pod is long running
@@ -114,10 +107,11 @@ type VolumeTest struct {
 // NFS-specific wrapper for CreateStorageServer.
 func NewNFSServer(cs clientset.Interface, namespace string, args []string) (config VolumeTestConfig, pod *v1.Pod, ip string) {
 	config = VolumeTestConfig{
-		Namespace:   namespace,
-		Prefix:      "nfs",
-		ServerImage: NfsServerImage,
-		ServerPorts: []int{2049},
+		Namespace:     namespace,
+		Prefix:        "nfs",
+		ServerImage:   imageutils.GetE2EImage(imageutils.VolumeNFSServer),
+		ServerPorts:   []int{2049},
+		ServerVolumes: map[string]string{"": "/exports"},
 	}
 	if len(args) > 0 {
 		config.ServerArgs = args
@@ -131,7 +125,7 @@ func NewGlusterfsServer(cs clientset.Interface, namespace string) (config Volume
 	config = VolumeTestConfig{
 		Namespace:   namespace,
 		Prefix:      "gluster",
-		ServerImage: GlusterfsServerImage,
+		ServerImage: imageutils.GetE2EImage(imageutils.VolumeGlusterServer),
 		ServerPorts: []int{24007, 24008, 49152},
 	}
 	pod, ip = CreateStorageServer(cs, config)
@@ -173,7 +167,7 @@ func NewISCSIServer(cs clientset.Interface, namespace string) (config VolumeTest
 	config = VolumeTestConfig{
 		Namespace:   namespace,
 		Prefix:      "iscsi",
-		ServerImage: IscsiServerImage,
+		ServerImage: imageutils.GetE2EImage(imageutils.VolumeISCSIServer),
 		ServerPorts: []int{3260},
 		ServerVolumes: map[string]string{
 			// iSCSI container needs to insert modules from the host
@@ -189,7 +183,7 @@ func NewRBDServer(cs clientset.Interface, namespace string) (config VolumeTestCo
 	config = VolumeTestConfig{
 		Namespace:   namespace,
 		Prefix:      "rbd",
-		ServerImage: RbdServerImage,
+		ServerImage: imageutils.GetE2EImage(imageutils.VolumeRBDServer),
 		ServerPorts: []int{6789},
 		ServerVolumes: map[string]string{
 			"/lib/modules": "/lib/modules",
@@ -238,8 +232,12 @@ func StartVolumeServer(client clientset.Interface, config VolumeTestConfig) *v1.
 	for src, dst := range config.ServerVolumes {
 		mountName := fmt.Sprintf("path%d", i)
 		volumes[i].Name = mountName
-		volumes[i].VolumeSource.HostPath = &v1.HostPathVolumeSource{
-			Path: src,
+		if src == "" {
+			volumes[i].VolumeSource.EmptyDir = &v1.EmptyDirVolumeSource{Medium: v1.StorageMediumMemory}
+		} else {
+			volumes[i].VolumeSource.HostPath = &v1.HostPathVolumeSource{
+				Path: src,
+			}
 		}
 
 		mounts[i].Name = mountName
@@ -359,6 +357,7 @@ func VolumeTestCleanup(f *Framework, config VolumeTestConfig) {
 // pod.
 func TestVolumeClient(client clientset.Interface, config VolumeTestConfig, fsGroup *int64, tests []VolumeTest) {
 	By(fmt.Sprint("starting ", config.Prefix, " client"))
+	var gracePeriod int64 = 1
 	clientPod := &v1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
@@ -387,6 +386,7 @@ func TestVolumeClient(client clientset.Interface, config VolumeTestConfig, fsGro
 					VolumeMounts: []v1.VolumeMount{},
 				},
 			},
+			TerminationGracePeriodSeconds: &gracePeriod,
 			SecurityContext: &v1.PodSecurityContext{
 				SELinuxOptions: &v1.SELinuxOptions{
 					Level: "s0:c0,c1",

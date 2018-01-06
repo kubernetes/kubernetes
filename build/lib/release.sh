@@ -28,11 +28,7 @@ readonly RELEASE_STAGE="${LOCAL_OUTPUT_ROOT}/release-stage"
 readonly RELEASE_TARS="${LOCAL_OUTPUT_ROOT}/release-tars"
 readonly RELEASE_IMAGES="${LOCAL_OUTPUT_ROOT}/release-images"
 
-KUBE_BUILD_HYPERKUBE=${KUBE_BUILD_HYPERKUBE:-n}
-if [[ -n "${KUBE_DOCKER_IMAGE_TAG-}" && -n "${KUBE_DOCKER_REGISTRY-}" ]]; then
-  # retain legacy behavior of automatically building hyperkube during releases
-  KUBE_BUILD_HYPERKUBE=y
-fi
+KUBE_BUILD_HYPERKUBE=${KUBE_BUILD_HYPERKUBE:-y}
 
 # Validate a ci version
 #
@@ -98,18 +94,23 @@ function kube::release::package_tarballs() {
 
 # Package the source code we built, for compliance/licensing/audit/yadda.
 function kube::release::package_src_tarball() {
+  local -r src_tarball="${RELEASE_TARS}/kubernetes-src.tar.gz"
   kube::log::status "Building tarball: src"
-  local source_files=(
-    $(cd "${KUBE_ROOT}" && find . -mindepth 1 -maxdepth 1 \
-      -not \( \
-        \( -path ./_\*        -o \
-           -path ./.git\*     -o \
-           -path ./.config\* -o \
-           -path ./.gsutil\*    \
-        \) -prune \
-      \))
-  )
-  "${TAR}" czf "${RELEASE_TARS}/kubernetes-src.tar.gz" -C "${KUBE_ROOT}" "${source_files[@]}"
+  if [[ "${KUBE_GIT_TREE_STATE-}" == "clean" ]]; then
+    git archive -o "${src_tarball}" HEAD
+  else
+    local source_files=(
+      $(cd "${KUBE_ROOT}" && find . -mindepth 1 -maxdepth 1 \
+        -not \( \
+          \( -path ./_\*        -o \
+             -path ./.git\*     -o \
+             -path ./.config\* -o \
+             -path ./.gsutil\*    \
+          \) -prune \
+        \))
+    )
+    "${TAR}" czf "${src_tarball}" -C "${KUBE_ROOT}" "${source_files[@]}"
+  fi
 }
 
 # Package up all of the cross compiled clients. Over time this should grow into
@@ -412,13 +413,18 @@ function kube::release::package_kube_manifests_tarball() {
   cp "${salt_dir}/rescheduler/rescheduler.manifest" "${gci_dst_dir}/"
   cp "${salt_dir}/e2e-image-puller/e2e-image-puller.manifest" "${gci_dst_dir}/"
   cp "${KUBE_ROOT}/cluster/gce/gci/configure-helper.sh" "${gci_dst_dir}/gci-configure-helper.sh"
-  cp "${KUBE_ROOT}/cluster/gce/gci/mounter/mounter" "${gci_dst_dir}/gci-mounter"
   cp "${KUBE_ROOT}/cluster/gce/gci/health-monitor.sh" "${gci_dst_dir}/health-monitor.sh"
   cp "${KUBE_ROOT}/cluster/gce/container-linux/configure-helper.sh" "${gci_dst_dir}/container-linux-configure-helper.sh"
   cp -r "${salt_dir}/kube-admission-controls/limit-range" "${gci_dst_dir}"
   local objects
   objects=$(cd "${KUBE_ROOT}/cluster/addons" && find . \( -name \*.yaml -or -name \*.yaml.in -or -name \*.json \) | grep -v demo)
   tar c -C "${KUBE_ROOT}/cluster/addons" ${objects} | tar x -C "${gci_dst_dir}"
+  # Merge GCE-specific addons with general purpose addons.
+  local gce_objects
+  gce_objects=$(cd "${KUBE_ROOT}/cluster/gce/addons" && find . \( -name \*.yaml -or -name \*.yaml.in -or -name \*.json \) \( -not -name \*demo\* \))
+  if [[ -n "${gce_objects}" ]]; then
+    tar c -C "${KUBE_ROOT}/cluster/gce/addons" ${gce_objects} | tar x -C "${gci_dst_dir}"
+  fi
 
   kube::release::clean_cruft
 
@@ -502,11 +508,6 @@ EOF
 
   mkdir -p "${release_stage}/third_party"
   cp -R "${KUBE_ROOT}/third_party/htpasswd" "${release_stage}/third_party/htpasswd"
-
-  # Include only federation/cluster and federation/deploy
-  mkdir "${release_stage}/federation"
-  cp -R "${KUBE_ROOT}/federation/cluster" "${release_stage}/federation/"
-  cp -R "${KUBE_ROOT}/federation/deploy" "${release_stage}/federation/"
 
   # Include hack/lib as a dependency for the cluster/ scripts
   mkdir -p "${release_stage}/hack"

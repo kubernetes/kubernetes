@@ -27,7 +27,56 @@ spec:
     command:
     - /bin/sh
     - -c
-    - "for i in gcr.io/google_containers/alpine-with-bash:1.0 gcr.io/google_containers/apparmor-loader:0.1 gcr.io/google_containers/busybox:1.24 gcr.io/google_containers/dnsutils:e2e gcr.io/google_containers/e2e-net-amd64:1.0 gcr.io/google_containers/echoserver:1.6 gcr.io/google_containers/eptest:0.1 gcr.io/google_containers/fakegitserver:0.1 gcr.io/google_containers/galera-install:0.1 gcr.io/google_containers/hostexec:1.2 gcr.io/google_containers/invalid-image:invalid-tag gcr.io/google_containers/iperf:e2e gcr.io/google_containers/jessie-dnsutils:e2e gcr.io/google_containers/k8s-dns-dnsmasq-amd64:1.14.5 gcr.io/google_containers/liveness:e2e gcr.io/google_containers/logs-generator:v0.1.0 gcr.io/google_containers/mounttest:0.8 gcr.io/google_containers/mounttest-user:0.5 gcr.io/google_containers/mysql-galera:e2e gcr.io/google_containers/mysql-healthz:1.0 gcr.io/google_containers/netexec:1.4 gcr.io/google_containers/netexec:1.5 gcr.io/google_containers/netexec:1.7 gcr.io/google_containers/nettest:1.7 gcr.io/google_containers/nginx:1.7.9 gcr.io/google_containers/nginx-ingress-controller:0.9.0-beta.1 gcr.io/google_containers/nginx-slim:0.7 gcr.io/google_containers/nginx-slim:0.8 gcr.io/google_containers/node-problem-detector:v0.3.0 gcr.io/google_containers/pause gcr.io/google_containers/porter:4524579c0eb935c056c8e75563b4e1eda31587e0 gcr.io/google_containers/portforwardtester:1.2 gcr.io/google_containers/redis-install-3.2.0:e2e gcr.io/google_containers/resource_consumer:beta4 gcr.io/google_containers/resource_consumer/controller:beta4 gcr.io/google_containers/serve_hostname:v1.4 gcr.io/google_containers/servicelb:0.1 gcr.io/google_containers/test-webserver:e2e gcr.io/google_containers/update-demo:kitten gcr.io/google_containers/update-demo:nautilus gcr.io/google_containers/volume-ceph:0.1 gcr.io/google_containers/volume-gluster:0.2 gcr.io/google_containers/volume-iscsi:0.1 gcr.io/google_containers/volume-nfs:0.8 gcr.io/google_containers/volume-rbd:0.1 gcr.io/google_containers/zookeeper-install-3.5.0-alpha:e2e gcr.io/google_samples/gb-redisslave:nonexistent; do echo $(date '+%X') pulling $i; docker pull $i 1>/dev/null; done; exit 0;"
+    - >
+      for i in
+      gcr.io/google_containers/alpine-with-bash:1.0
+      gcr.io/google_containers/apparmor-loader:0.1
+      gcr.io/google_containers/busybox:1.24
+      gcr.io/google_containers/dnsutils:e2e
+      gcr.io/google_containers/e2e-net-amd64:1.0
+      gcr.io/google_containers/echoserver:1.6
+      gcr.io/google_containers/eptest:0.1
+      gcr.io/google_containers/fakegitserver:0.1
+      gcr.io/google_containers/galera-install:0.1
+      gcr.io/google_containers/hostexec:1.2
+      gcr.io/google_containers/invalid-image:invalid-tag
+      gcr.io/google_containers/iperf:e2e
+      gcr.io/google_containers/jessie-dnsutils:e2e
+      gcr.io/google_containers/k8s-dns-dnsmasq-amd64:1.14.5
+      gcr.io/google_containers/liveness:e2e
+      gcr.io/google_containers/logs-generator:v0.1.0
+      gcr.io/google_containers/mounttest:0.8
+      gcr.io/google_containers/mounttest-user:0.5
+      gcr.io/google_containers/mysql-galera:e2e
+      gcr.io/google_containers/mysql-healthz:1.0
+      gcr.io/google_containers/netexec:1.4
+      gcr.io/google_containers/netexec:1.5
+      gcr.io/google_containers/netexec:1.7
+      gcr.io/google_containers/nettest:1.7
+      gcr.io/google_containers/nginx:1.7.9
+      gcr.io/google_containers/nginx-ingress-controller:0.9.0-beta.1
+      gcr.io/google_containers/nginx-slim:0.7
+      gcr.io/google_containers/nginx-slim:0.8
+      gcr.io/google_containers/node-problem-detector:v0.3.0
+      gcr.io/google_containers/pause
+      gcr.io/google_containers/porter:4524579c0eb935c056c8e75563b4e1eda31587e0
+      gcr.io/google_containers/portforwardtester:1.2
+      gcr.io/google_containers/redis-install-3.2.0:e2e
+      gcr.io/google_containers/resource_consumer:beta4
+      gcr.io/google_containers/resource_consumer/controller:beta4
+      gcr.io/kubernetes-e2e-test-images/serve-hostname-amd64:1.1
+      gcr.io/google_containers/servicelb:0.1
+      gcr.io/google_containers/test-webserver:e2e
+      gcr.io/google_containers/update-demo:kitten
+      gcr.io/google_containers/update-demo:nautilus
+      gcr.io/google_containers/volume-ceph:0.1
+      gcr.io/google_containers/volume-gluster:0.2
+      gcr.io/google_containers/volume-iscsi:0.1
+      gcr.io/google_containers/volume-nfs:0.8
+      gcr.io/google_containers/volume-rbd:0.1
+      gcr.io/google_containers/zookeeper-install-3.5.0-alpha:e2e
+      gcr.io/google_samples/gb-redisslave:nonexistent
+      ; do echo $(date '+%X') pulling $i; docker pull $i 1>/dev/null; done; exit 0;
     securityContext:
       privileged: true
     volumeMounts:

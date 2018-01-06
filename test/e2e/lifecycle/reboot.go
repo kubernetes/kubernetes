@@ -28,7 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/test/e2e/framework"
 	testutils "k8s.io/kubernetes/test/utils"
 
@@ -67,7 +67,7 @@ var _ = SIGDescribe("Reboot [Disruptive] [Feature:Reboot]", func() {
 			// events for the kube-system namespace on failures
 			namespaceName := metav1.NamespaceSystem
 			By(fmt.Sprintf("Collecting events from namespace %q.", namespaceName))
-			events, err := f.ClientSet.Core().Events(namespaceName).List(metav1.ListOptions{})
+			events, err := f.ClientSet.CoreV1().Events(namespaceName).List(metav1.ListOptions{})
 			Expect(err).NotTo(HaveOccurred())
 
 			for _, e := range events.Items {
@@ -224,7 +224,7 @@ func rebootNode(c clientset.Interface, provider, name, rebootCmd string) bool {
 
 	// Get the node initially.
 	framework.Logf("Getting %s", name)
-	node, err := c.Core().Nodes().Get(name, metav1.GetOptions{})
+	node, err := c.CoreV1().Nodes().Get(name, metav1.GetOptions{})
 	if err != nil {
 		framework.Logf("Couldn't get node %s", name)
 		return false

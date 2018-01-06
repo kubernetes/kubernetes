@@ -28,6 +28,11 @@ spec:
       hostNetwork: true
       nodeSelector:
         beta.kubernetes.io/kube-proxy-ds-ready: "true"
+      tolerations:
+      - operator: "Exists"
+        effect: "NoExecute"
+      - operator: "Exists"
+        effect: "NoSchedule"
       containers:
       - name: kube-proxy
         image: {{pillar['kube_docker_registry']}}/kube-proxy:{{pillar['kube-proxy_docker_tag']}}
@@ -52,6 +57,9 @@ spec:
         - mountPath: /run/xtables.lock
           name: xtables-lock
           readOnly: false
+        - mountPath: /lib/modules
+          name: lib-modules
+          readOnly: true
       volumes:
       - name: varlog
         hostPath:
@@ -60,4 +68,7 @@ spec:
         hostPath:
           path: /run/xtables.lock
           type: FileOrCreate
+      - name: lib-modules
+        hostPath:
+          path: /lib/modules
       serviceAccountName: kube-proxy

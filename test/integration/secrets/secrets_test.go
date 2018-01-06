@@ -31,7 +31,7 @@ import (
 )
 
 func deleteSecretOrErrorf(t *testing.T, c clientset.Interface, ns, name string) {
-	if err := c.Core().Secrets(ns).Delete(name, nil); err != nil {
+	if err := c.CoreV1().Secrets(ns).Delete(name, nil); err != nil {
 		t.Errorf("unable to delete secret %v: %v", name, err)
 	}
 }
@@ -62,7 +62,7 @@ func DoTestSecrets(t *testing.T, client clientset.Interface, ns *v1.Namespace) {
 		},
 	}
 
-	if _, err := client.Core().Secrets(s.Namespace).Create(&s); err != nil {
+	if _, err := client.CoreV1().Secrets(s.Namespace).Create(&s); err != nil {
 		t.Errorf("unable to create test secret: %v", err)
 	}
 	defer deleteSecretOrErrorf(t, client, s.Namespace, s.Name)
@@ -102,14 +102,14 @@ func DoTestSecrets(t *testing.T, client clientset.Interface, ns *v1.Namespace) {
 
 	// Create a pod to consume secret.
 	pod.ObjectMeta.Name = "uses-secret"
-	if _, err := client.Core().Pods(ns.Name).Create(pod); err != nil {
+	if _, err := client.CoreV1().Pods(ns.Name).Create(pod); err != nil {
 		t.Errorf("Failed to create pod: %v", err)
 	}
 	defer integration.DeletePodOrErrorf(t, client, ns.Name, pod.Name)
 
 	// Create a pod that consumes non-existent secret.
 	pod.ObjectMeta.Name = "uses-non-existent-secret"
-	if _, err := client.Core().Pods(ns.Name).Create(pod); err != nil {
+	if _, err := client.CoreV1().Pods(ns.Name).Create(pod); err != nil {
 		t.Errorf("Failed to create pod: %v", err)
 	}
 	defer integration.DeletePodOrErrorf(t, client, ns.Name, pod.Name)
