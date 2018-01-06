@@ -34,20 +34,14 @@ import (
 
 type InterPodAffinity struct {
 	info                  predicates.NodeInfo
-	nodeLister            algorithm.NodeLister
-	podLister             algorithm.PodLister
 	hardPodAffinityWeight int32
 }
 
 func NewInterPodAffinityPriority(
 	info predicates.NodeInfo,
-	nodeLister algorithm.NodeLister,
-	podLister algorithm.PodLister,
 	hardPodAffinityWeight int32) algorithm.PriorityFunction {
 	interPodAffinity := &InterPodAffinity{
-		info:                  info,
-		nodeLister:            nodeLister,
-		podLister:             podLister,
+		info: info,
 		hardPodAffinityWeight: hardPodAffinityWeight,
 	}
 	return interPodAffinity.CalculateInterPodAffinityPriority
