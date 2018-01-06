@@ -124,8 +124,13 @@ type NegotiatedSerializer interface {
 	// serializer are in the provided group version.
 	EncoderForVersion(serializer Encoder, gv GroupVersioner) Encoder
 	// DecoderForVersion returns a decoder that ensures objects being read by the provided
-	// serializer are in the provided group version by default.
+	// serializer are in the provided group version by default. It will not set defaults.
 	DecoderToVersion(serializer Decoder, gv GroupVersioner) Decoder
+	// DecoderForVersionWithDefaults returns a decoder that ensures objects being read by the provided
+	// serializer are in the provided group version by default. It also sets defaults prior to performing
+	// conversion.
+	// TODO: this method is deprecated and will be removed when the server splits out defaulting from decoding
+	DecoderToVersionWithDefaults(serializer Decoder, gv GroupVersioner) Decoder
 }
 
 // StorageSerializer is an interface used for obtaining encoders, decoders, and serializers
@@ -145,6 +150,11 @@ type StorageSerializer interface {
 	// DecoderForVersion returns a decoder that ensures objects being read by the provided
 	// serializer are in the provided group version by default.
 	DecoderToVersion(serializer Decoder, gv GroupVersioner) Decoder
+	// DecoderForVersionWithDefaults returns a decoder that ensures objects being read by the provided
+	// serializer are in the provided group version by default. It also sets defaults prior to performing
+	// conversion.
+	// TODO: this method is deprecated and will be removed when the server splits out defaulting from decoding
+	DecoderToVersionWithDefaults(serializer Decoder, gv GroupVersioner) Decoder
 }
 
 // NestedObjectEncoder is an optional interface that objects may implement to be given

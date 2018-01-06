@@ -155,7 +155,7 @@ func (f CodecFactory) SupportedMediaTypes() []runtime.SerializerInfo {
 
 // LegacyCodec encodes output to a given API versions, and decodes output into the internal form from
 // any recognized source. The returned codec will always encode output to JSON. If a type is not
-// found in the list of versions an error will be returned.
+// found in the list of versions an error will be returned. It does not perform defaulting.
 //
 // This method is deprecated - clients and servers should negotiate a serializer by mime-type and
 // invoke CodecForVersions. Callers that need only to read data should use UniversalDecoder().
@@ -163,7 +163,7 @@ func (f CodecFactory) SupportedMediaTypes() []runtime.SerializerInfo {
 // TODO: make this call exist only in pkg/api, and initialize it with the set of default versions.
 //   All other callers will be forced to request a Codec directly.
 func (f CodecFactory) LegacyCodec(version ...schema.GroupVersion) runtime.Codec {
-	return versioning.NewDefaultingCodecForScheme(f.scheme, f.legacySerializer, f.universal, schema.GroupVersions(version), runtime.InternalGroupVersioner)
+	return versioning.NewCodecForScheme(f.scheme, f.legacySerializer, f.universal, schema.GroupVersions(version), runtime.InternalGroupVersioner)
 }
 
 // UniversalDeserializer can convert any stored data recognized by this factory into a Go object that satisfies
@@ -188,13 +188,14 @@ func (f CodecFactory) UniversalDecoder(versions ...schema.GroupVersion) runtime.
 	} else {
 		versioner = schema.GroupVersions(versions)
 	}
-	return f.CodecForVersions(nil, f.universal, nil, versioner)
+	return f.CodecForVersions(false, nil, f.universal, nil, versioner)
 }
 
 // CodecForVersions creates a codec with the provided serializer. If an object is decoded and its group is not in the list,
 // it will default to runtime.APIVersionInternal. If encode is not specified for an object's group, the object is not
 // converted. If encode or decode are nil, no conversion is performed.
-func (f CodecFactory) CodecForVersions(encoder runtime.Encoder, decoder runtime.Decoder, encode runtime.GroupVersioner, decode runtime.GroupVersioner) runtime.Codec {
+// TODO: stop using this method, we should ask for decoder and encoder separately
+func (f CodecFactory) CodecForVersions(defaulting bool, encoder runtime.Encoder, decoder runtime.Decoder, encode runtime.GroupVersioner, decode runtime.GroupVersioner) runtime.Codec {
 	// TODO: these are for backcompat, remove them in the future
 	if encode == nil {
 		encode = runtime.DisabledGroupVersioner
@@ -202,20 +203,28 @@ func (f CodecFactory) CodecForVersions(encoder runtime.Encoder, decoder runtime.
 	if decode == nil {
 		decode = runtime.InternalGroupVersioner
 	}
-	return versioning.NewDefaultingCodecForScheme(f.scheme, encoder, decoder, encode, decode)
+	if defaulting {
+		return versioning.NewDefaultingCodecForScheme(f.scheme, encoder, decoder, encode, decode)
+	}
+	return versioning.NewCodecForScheme(f.scheme, encoder, decoder, encode, decode)
 }
 
-// DecoderToVersion returns a decoder that targets the provided group version.
+// DecoderToVersion returns a decoder that targets the provided group version but does not provide defaulting.
 func (f CodecFactory) DecoderToVersion(decoder runtime.Decoder, gv runtime.GroupVersioner) runtime.Decoder {
-	return f.CodecForVersions(nil, decoder, nil, gv)
+	return f.CodecForVersions(false, nil, decoder, nil, gv)
+}
+
+// DecoderToVersionWithDefaults returns a decoder that targets the provided group version and provides defaulting.
+func (f CodecFactory) DecoderToVersionWithDefaults(decoder runtime.Decoder, gv runtime.GroupVersioner) runtime.Decoder {
+	return f.CodecForVersions(true, nil, decoder, nil, gv)
 }
 
 // EncoderForVersion returns an encoder that targets the provided group version.
 func (f CodecFactory) EncoderForVersion(encoder runtime.Encoder, gv runtime.GroupVersioner) runtime.Encoder {
-	return f.CodecForVersions(encoder, nil, gv, nil)
+	return f.CodecForVersions(false, encoder, nil, gv, nil)
 }
 
-// DirectCodecFactory provides methods for retrieving "DirectCodec"s, which do not do conversion.
+// DirectCodecFactory provides methods for retrieving "DirectCodec"s, which do not do conversion or defaulting.
 type DirectCodecFactory struct {
 	CodecFactory
 }
@@ -233,5 +242,13 @@ func (f DirectCodecFactory) EncoderForVersion(serializer runtime.Encoder, versio
 func (f DirectCodecFactory) DecoderToVersion(serializer runtime.Decoder, _ runtime.GroupVersioner) runtime.Decoder {
 	return versioning.DirectDecoder{
 		Decoder: serializer,
+	}
+}
+
+// DecoderToVersionWithDefaults returns an decoder that does not do conversion. gv is ignored. It performs defaulting.
+func (f DirectCodecFactory) DecoderToVersionWithDefaults(serializer runtime.Decoder, _ runtime.GroupVersioner) runtime.Decoder {
+	return versioning.DirectDecoder{
+		Decoder:   serializer,
+		Defaulter: f.CodecFactory.scheme,
 	}
 }

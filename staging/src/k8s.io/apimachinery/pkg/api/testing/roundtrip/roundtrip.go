@@ -220,7 +220,7 @@ func roundTripToAllExternalVersions(t *testing.T, scheme *runtime.Scheme, codecF
 		// TODO remove this hack after we're past the intermediate steps
 		if !skipProtobuf && externalGVK.Group != "kubeadm.k8s.io" {
 			s := protobuf.NewSerializer(scheme, scheme, "application/arbitrary.content.type")
-			protobufCodec := codecFactory.CodecForVersions(s, s, externalGVK.GroupVersion(), nil)
+			protobufCodec := codecFactory.CodecForVersions(false, s, s, externalGVK.GroupVersion(), nil)
 			roundTrip(t, scheme, protobufCodec, object)
 		}
 	}

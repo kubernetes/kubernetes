@@ -434,7 +434,7 @@ func TestSetEnvRemote(t *testing.T) {
 		groupVersion := schema.GroupVersion{Group: input.apiGroup, Version: input.apiVersion}
 		testapi.Default = testapi.Groups[input.testAPIGroup]
 		f, tf, _, ns := cmdtesting.NewAPIFactory()
-		codec := scheme.Codecs.CodecForVersions(scheme.Codecs.LegacyCodec(groupVersion), scheme.Codecs.UniversalDecoder(groupVersion), groupVersion, groupVersion)
+		codec := scheme.Codecs.CodecForVersions(false, scheme.Codecs.LegacyCodec(groupVersion), scheme.Codecs.UniversalDecoder(groupVersion), groupVersion, groupVersion)
 		tf.Printer = printers.NewVersionedPrinter(&printers.YAMLPrinter{}, testapi.Default.Converter(), *testapi.Default.GroupVersion())
 		tf.Namespace = "test"
 		tf.CategoryExpander = categories.LegacyCategoryExpander

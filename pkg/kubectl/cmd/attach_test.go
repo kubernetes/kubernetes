@@ -309,6 +309,7 @@ func TestAttachWarnings(t *testing.T) {
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 				switch p, m := req.URL.Path, req.Method; {
 				case p == test.podPath && m == "GET":
+					t.Logf("returning %#v\n%s", test.pod, runtime.EncodeOrDie(codec, test.pod))
 					body := objBody(codec, test.pod)
 					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: body}, nil
 				case p == test.fetchPodPath && m == "GET":

@@ -208,7 +208,7 @@ func (p *AttachOptions) Run() error {
 		if err != nil {
 			return err
 		}
-
+		fmt.Printf("DEBUG: Got pod %#v\n", pod)
 		if pod.Status.Phase == api.PodSucceeded || pod.Status.Phase == api.PodFailed {
 			return fmt.Errorf("cannot attach a container in a completed pod; current phase is %s", pod.Status.Phase)
 		}
