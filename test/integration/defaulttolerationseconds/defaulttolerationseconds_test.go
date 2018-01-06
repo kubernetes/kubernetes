@@ -26,15 +26,24 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
 	"k8s.io/kubernetes/plugin/pkg/admission/defaulttolerationseconds"
+	defaulttolerationsecondsapi "k8s.io/kubernetes/plugin/pkg/admission/defaulttolerationseconds/apis/defaulttolerationseconds"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
 func TestAdmission(t *testing.T) {
+	defaultSeconds := int64(400)
+	config := &defaulttolerationsecondsapi.Configuration{
+		DefaultTolerationSecondsConfig: defaulttolerationsecondsapi.DefaultTolerationSecondsConfig{
+			DefaultNotReadyTolerationSeconds:    &defaultSeconds,
+			DefaultUnreachableTolerationSeconds: &defaultSeconds,
+		},
+	}
+
 	masterConfig := framework.NewMasterConfig()
 	masterConfig.GenericConfig.EnableProfiling = true
 	masterConfig.GenericConfig.EnableMetrics = true
-	masterConfig.GenericConfig.AdmissionControl = defaulttolerationseconds.NewDefaultTolerationSeconds()
+	masterConfig.GenericConfig.AdmissionControl = defaulttolerationseconds.NewDefaultTolerationSeconds(config)
 	_, s, closeFn := framework.RunAMaster(masterConfig)
 	defer closeFn()
 
@@ -63,7 +72,6 @@ func TestAdmission(t *testing.T) {
 		t.Fatalf("error creating pod: %v", err)
 	}
 
-	var defaultSeconds int64 = 300
 	nodeNotReady := v1.Toleration{
 		Key:               algorithm.TaintNodeNotReady,
 		Operator:          v1.TolerationOpExists,

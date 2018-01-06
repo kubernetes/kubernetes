@@ -17,7 +17,6 @@ limitations under the License.
 package defaulttolerationseconds
 
 import (
-	"flag"
 	"fmt"
 	"io"
 
@@ -25,42 +24,44 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
+	defaulttolerationsecondsapi "k8s.io/kubernetes/plugin/pkg/admission/defaulttolerationseconds/apis/defaulttolerationseconds"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
-)
-
-var (
-	defaultNotReadyTolerationSeconds = flag.Int64("default-not-ready-toleration-seconds", 300,
-		"Indicates the tolerationSeconds of the toleration for notReady:NoExecute"+
-			" that is added by default to every pod that does not already have such a toleration.")
-
-	defaultUnreachableTolerationSeconds = flag.Int64("default-unreachable-toleration-seconds", 300,
-		"Indicates the tolerationSeconds of the toleration for unreachable:NoExecute"+
-			" that is added by default to every pod that does not already have such a toleration.")
 )
 
 // Register registers a plugin
 func Register(plugins *admission.Plugins) {
-	plugins.Register("DefaultTolerationSeconds", func(config io.Reader) (admission.Interface, error) {
-		return NewDefaultTolerationSeconds(), nil
-	})
+	plugins.Register("DefaultTolerationSeconds",
+		func(config io.Reader) (admission.Interface, error) {
+			// load the configuration provided (if any)
+			configuration, err := LoadConfiguration(config)
+			if err != nil {
+				return nil, err
+			}
+			return NewDefaultTolerationSeconds(configuration), nil
+		})
 }
 
 // Plugin contains the client used by the admission controller
 // It will add default tolerations for every pod
 // that tolerate taints `notReady:NoExecute` and `unreachable:NoExecute`,
-// with tolerationSeconds of 300s.
+// with tolerationSeconds from configuration, or with default
+// tolerationSeconds of 300s if not configured or misconfigured.
 // If the pod already specifies a toleration for taint `notReady:NoExecute`
 // or `unreachable:NoExecute`, the plugin won't touch it.
 type Plugin struct {
 	*admission.Handler
+	notReadyTolerationSeconds    *int64
+	unreachableTolerationSeconds *int64
 }
 
 var _ admission.MutationInterface = &Plugin{}
 
 // NewDefaultTolerationSeconds creates a new instance of the DefaultTolerationSeconds admission controller
-func NewDefaultTolerationSeconds() *Plugin {
+func NewDefaultTolerationSeconds(config *defaulttolerationsecondsapi.Configuration) *Plugin {
 	return &Plugin{
-		Handler: admission.NewHandler(admission.Create, admission.Update),
+		Handler:                      admission.NewHandler(admission.Create, admission.Update),
+		notReadyTolerationSeconds:    config.DefaultTolerationSecondsConfig.DefaultNotReadyTolerationSeconds,
+		unreachableTolerationSeconds: config.DefaultTolerationSecondsConfig.DefaultUnreachableTolerationSeconds,
 	}
 }
 
@@ -106,7 +107,7 @@ func (p *Plugin) Admit(attributes admission.Attributes) (err error) {
 			Key:               algorithm.TaintNodeNotReady,
 			Operator:          api.TolerationOpExists,
 			Effect:            api.TaintEffectNoExecute,
-			TolerationSeconds: defaultNotReadyTolerationSeconds,
+			TolerationSeconds: p.notReadyTolerationSeconds,
 		})
 	}
 
@@ -115,7 +116,7 @@ func (p *Plugin) Admit(attributes admission.Attributes) (err error) {
 			Key:               algorithm.TaintNodeUnreachable,
 			Operator:          api.TolerationOpExists,
 			Effect:            api.TaintEffectNoExecute,
-			TolerationSeconds: defaultUnreachableTolerationSeconds,
+			TolerationSeconds: p.unreachableTolerationSeconds,
 		})
 	}
 	return nil
