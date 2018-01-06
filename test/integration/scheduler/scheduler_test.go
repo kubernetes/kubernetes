@@ -94,8 +94,6 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 	// Pre-register some predicate and priority functions
 	factory.RegisterFitPredicate("PredicateOne", PredicateOne)
 	factory.RegisterFitPredicate("PredicateTwo", PredicateTwo)
-	factory.RegisterPriorityFunction("PriorityOne", PriorityOne, 1)
-	factory.RegisterPriorityFunction("PriorityTwo", PriorityTwo, 1)
 
 	// Add a ConfigMap object.
 	configPolicyName := "scheduler-custom-policy-config"

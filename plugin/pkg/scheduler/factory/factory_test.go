@@ -108,8 +108,6 @@ func TestCreateFromConfig(t *testing.T) {
 	// Pre-register some predicate and priority functions
 	RegisterFitPredicate("PredicateOne", PredicateOne)
 	RegisterFitPredicate("PredicateTwo", PredicateTwo)
-	RegisterPriorityFunction("PriorityOne", PriorityOne, 1)
-	RegisterPriorityFunction("PriorityTwo", PriorityTwo, 1)
 
 	configData = []byte(`{
 		"kind" : "Policy",
@@ -169,8 +167,6 @@ func TestCreateFromConfigWithHardPodAffinitySymmetricWeight(t *testing.T) {
 	// Pre-register some predicate and priority functions
 	RegisterFitPredicate("PredicateOne", PredicateOne)
 	RegisterFitPredicate("PredicateTwo", PredicateTwo)
-	RegisterPriorityFunction("PriorityOne", PriorityOne, 1)
-	RegisterPriorityFunction("PriorityTwo", PriorityTwo, 1)
 
 	configData = []byte(`{
 		"kind" : "Policy",
