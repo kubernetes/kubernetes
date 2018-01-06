@@ -63,6 +63,10 @@ def upgrade_charm():
     cleanup_pre_snap_services()
     check_resources_for_upgrade_needed()
 
+    # Remove the RC for nginx ingress if it exists
+    if hookenv.config().get('ingress'):
+        kubectl_success('delete', 'rc', 'nginx-ingress-controller')
+
     # Remove gpu.enabled state so we can reconfigure gpu-related kubelet flags,
     # since they can differ between k8s versions
     remove_state('kubernetes-worker.gpu.enabled')
@@ -373,7 +377,7 @@ def sdn_changed():
 @when('kubernetes-worker.config.created')
 @when_not('kubernetes-worker.ingress.available')
 def render_and_launch_ingress():
-    ''' If configuration has ingress RC enabled, launch the ingress load
+    ''' If configuration has ingress daemon set enabled, launch the ingress load
     balancer and default http backend. Otherwise attempt deletion. '''
     config = hookenv.config()
     # If ingress is enabled, launch the ingress controller
@@ -384,21 +388,9 @@ def render_and_launch_ingress():
         kubectl_manifest('delete',
                          '/root/cdk/addons/default-http-backend.yaml')
         kubectl_manifest('delete',
-                         '/root/cdk/addons/ingress-replication-controller.yaml')  # noqa
+                         '/root/cdk/addons/ingress-daemon-set.yaml')  # noqa
         hookenv.close_port(80)
         hookenv.close_port(443)
-
-
-@when('kubernetes-worker.ingress.available')
-def scale_ingress_controller():
-    ''' Scale the number of ingress controller replicas to match the number of
-    nodes. '''
-    try:
-        output = kubectl('get', 'nodes', '-o', 'name')
-        count = len(output.splitlines())
-        kubectl('scale', '--replicas=%d' % count, 'rc/nginx-ingress-controller')  # noqa
-    except CalledProcessError:
-        hookenv.log('Failed to scale ingress controllers. Will attempt again next update.')  # noqa
 
 
 @when('config.changed.labels', 'kubernetes-worker.config.created')
@@ -428,6 +420,10 @@ def apply_node_labels():
     # Atomically set a label
     for label in user_labels:
         _apply_node_label(label, overwrite=True)
+
+    # Set label for application name
+    _apply_node_label('juju-application={}'.format(hookenv.service_name()),
+                      overwrite=True)
 
 
 @when_any('config.changed.kubelet-extra-args',
@@ -653,15 +649,16 @@ def launch_default_ingress_controller():
         hookenv.close_port(443)
         return
 
-    # Render the ingress replication controller manifest
+    # Render the ingress daemon set controller manifest
     context['ingress_image'] = \
         "gcr.io/google_containers/nginx-ingress-controller:0.9.0-beta.13"
     if arch() == 's390x':
         context['ingress_image'] = \
             "docker.io/cdkbot/nginx-ingress-controller-s390x:0.9.0-beta.13"
-    manifest = addon_path.format('ingress-replication-controller.yaml')
-    render('ingress-replication-controller.yaml', manifest, context)
-    hookenv.log('Creating the ingress replication controller.')
+    context['juju_application'] = hookenv.service_name()
+    manifest = addon_path.format('ingress-daemon-set.yaml')
+    render('ingress-daemon-set.yaml', manifest, context)
+    hookenv.log('Creating the ingress daemon set.')
     try:
         kubectl('apply', '-f', manifest)
     except CalledProcessError as e:
@@ -934,24 +931,64 @@ def _systemctl_is_active(application):
         return False
 
 
+class GetNodeNameFailed(Exception):
+    pass
+
+
+def get_node_name():
+    # Get all the nodes in the cluster
+    cmd = 'kubectl --kubeconfig={} get no -o=json'.format(kubeconfig_path)
+    cmd = cmd.split()
+    deadline = time.time() + 60
+    while time.time() < deadline:
+        try:
+            raw = check_output(cmd)
+            break
+        except CalledProcessError:
+            hookenv.log('Failed to get node name for node %s.'
+                        ' Will retry.' % (gethostname()))
+            time.sleep(1)
+    else:
+        msg = 'Failed to get node name for node %s' % gethostname()
+        raise GetNodeNameFailed(msg)
+
+    result = json.loads(raw.decode('utf-8'))
+    if 'items' in result:
+        for node in result['items']:
+            if 'status' not in node:
+                continue
+            if 'addresses' not in node['status']:
+                continue
+
+            # find the hostname
+            for address in node['status']['addresses']:
+                if address['type'] == 'Hostname':
+                    if address['address'] == gethostname():
+                        return node['metadata']['name']
+
+                    # if we didn't match, just bail to the next node
+                    break
+    msg = 'Failed to get node name for node %s' % gethostname()
+    raise GetNodeNameFailed(msg)
+
+
 class ApplyNodeLabelFailed(Exception):
     pass
 
 
 def _apply_node_label(label, delete=False, overwrite=False):
     ''' Invoke kubectl to apply node label changes '''
+    nodename = get_node_name()
 
-    # k8s lowercases hostnames and uses them as node names
-    hostname = gethostname().lower()
     # TODO: Make this part of the kubectl calls instead of a special string
     cmd_base = 'kubectl --kubeconfig={0} label node {1} {2}'
 
     if delete is True:
         label_key = label.split('=')[0]
-        cmd = cmd_base.format(kubeconfig_path, hostname, label_key)
+        cmd = cmd_base.format(kubeconfig_path, nodename, label_key)
         cmd = cmd + '-'
     else:
-        cmd = cmd_base.format(kubeconfig_path, hostname, label)
+        cmd = cmd_base.format(kubeconfig_path, nodename, label)
         if overwrite:
             cmd = '{} --overwrite'.format(cmd)
     cmd = cmd.split()

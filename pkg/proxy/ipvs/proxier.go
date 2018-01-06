@@ -852,6 +852,7 @@ func CleanupLeftovers(ipvs utilipvs.Interface, ipt utiliptables.Interface, ipset
 		encounteredError = false
 		err := ipvs.Flush()
 		if err != nil {
+			glog.Errorf("Error flushing IPVS rules: %v", err)
 			encounteredError = true
 		}
 	}
@@ -859,6 +860,7 @@ func CleanupLeftovers(ipvs utilipvs.Interface, ipt utiliptables.Interface, ipset
 	nl := NewNetLinkHandle()
 	err := nl.DeleteDummyDevice(DefaultDummyDevice)
 	if err != nil {
+		glog.Errorf("Error deleting dummy device %s created by IPVS proxier: %v", DefaultDummyDevice, err)
 		encounteredError = true
 	}
 	// Clear iptables created by ipvs Proxier.
@@ -870,7 +872,10 @@ func CleanupLeftovers(ipvs utilipvs.Interface, ipt utiliptables.Interface, ipset
 	for _, set := range ipSetsToDestroy {
 		err = ipset.DestroySet(set)
 		if err != nil {
-			encounteredError = true
+			if !utilipset.IsNotFoundError(err) {
+				glog.Errorf("Error removing ipset %s, error: %v", set, err)
+				encounteredError = true
+			}
 		}
 	}
 	return encounteredError

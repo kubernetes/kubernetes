@@ -6879,6 +6879,28 @@ func TestValidatePod(t *testing.T) {
 				},
 			},
 		},
+		"invalid extended resource requirement without limit": {
+			expectedError: "Limit must be set",
+			spec: core.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: "ns"},
+				Spec: core.PodSpec{
+					Containers: []core.Container{
+						{
+							Name:            "invalid",
+							Image:           "image",
+							ImagePullPolicy: "IfNotPresent",
+							Resources: core.ResourceRequirements{
+								Requests: core.ResourceList{
+									core.ResourceName("example.com/a"): resource.MustParse("2"),
+								},
+							},
+						},
+					},
+					RestartPolicy: core.RestartPolicyAlways,
+					DNSPolicy:     core.DNSClusterFirst,
+				},
+			},
+		},
 		"invalid fractional extended resource in container request": {
 			expectedError: "must be an integer",
 			spec: core.Pod{

@@ -109,6 +109,7 @@ func (client ApplicationGatewaysClient) BackendHealthPreparer(resourceGroupName 
 func (client ApplicationGatewaysClient) BackendHealthSender(req *http.Request) (*http.Response, error) {
 	return autorest.SendWithSender(client,
 		req,
+		azure.DoRetryWithRegistration(client.Client),
 		azure.DoPollForAsynchronous(client.PollingDelay))
 }
 
@@ -209,6 +210,7 @@ func (client ApplicationGatewaysClient) CreateOrUpdatePreparer(resourceGroupName
 func (client ApplicationGatewaysClient) CreateOrUpdateSender(req *http.Request) (*http.Response, error) {
 	return autorest.SendWithSender(client,
 		req,
+		azure.DoRetryWithRegistration(client.Client),
 		azure.DoPollForAsynchronous(client.PollingDelay))
 }
 
@@ -290,6 +292,7 @@ func (client ApplicationGatewaysClient) DeletePreparer(resourceGroupName string,
 func (client ApplicationGatewaysClient) DeleteSender(req *http.Request) (*http.Response, error) {
 	return autorest.SendWithSender(client,
 		req,
+		azure.DoRetryWithRegistration(client.Client),
 		azure.DoPollForAsynchronous(client.PollingDelay))
 }
 
@@ -354,7 +357,9 @@ func (client ApplicationGatewaysClient) GetPreparer(resourceGroupName string, ap
 // GetSender sends the Get request. The method will close the
 // http.Response Body if it receives an error.
 func (client ApplicationGatewaysClient) GetSender(req *http.Request) (*http.Response, error) {
-	return autorest.SendWithSender(client, req)
+	return autorest.SendWithSender(client,
+		req,
+		azure.DoRetryWithRegistration(client.Client))
 }
 
 // GetResponder handles the response to the Get request. The method always
@@ -418,7 +423,9 @@ func (client ApplicationGatewaysClient) GetSslPredefinedPolicyPreparer(predefine
 // GetSslPredefinedPolicySender sends the GetSslPredefinedPolicy request. The method will close the
 // http.Response Body if it receives an error.
 func (client ApplicationGatewaysClient) GetSslPredefinedPolicySender(req *http.Request) (*http.Response, error) {
-	return autorest.SendWithSender(client, req)
+	return autorest.SendWithSender(client,
+		req,
+		azure.DoRetryWithRegistration(client.Client))
 }
 
 // GetSslPredefinedPolicyResponder handles the response to the GetSslPredefinedPolicy request. The method always
@@ -482,7 +489,9 @@ func (client ApplicationGatewaysClient) ListPreparer(resourceGroupName string) (
 // ListSender sends the List request. The method will close the
 // http.Response Body if it receives an error.
 func (client ApplicationGatewaysClient) ListSender(req *http.Request) (*http.Response, error) {
-	return autorest.SendWithSender(client, req)
+	return autorest.SendWithSender(client,
+		req,
+		azure.DoRetryWithRegistration(client.Client))
 }
 
 // ListResponder handles the response to the List request. The method always
@@ -612,7 +621,9 @@ func (client ApplicationGatewaysClient) ListAllPreparer() (*http.Request, error)
 // ListAllSender sends the ListAll request. The method will close the
 // http.Response Body if it receives an error.
 func (client ApplicationGatewaysClient) ListAllSender(req *http.Request) (*http.Response, error) {
-	return autorest.SendWithSender(client, req)
+	return autorest.SendWithSender(client,
+		req,
+		azure.DoRetryWithRegistration(client.Client))
 }
 
 // ListAllResponder handles the response to the ListAll request. The method always
@@ -742,7 +753,9 @@ func (client ApplicationGatewaysClient) ListAvailableSslOptionsPreparer() (*http
 // ListAvailableSslOptionsSender sends the ListAvailableSslOptions request. The method will close the
 // http.Response Body if it receives an error.
 func (client ApplicationGatewaysClient) ListAvailableSslOptionsSender(req *http.Request) (*http.Response, error) {
-	return autorest.SendWithSender(client, req)
+	return autorest.SendWithSender(client,
+		req,
+		azure.DoRetryWithRegistration(client.Client))
 }
 
 // ListAvailableSslOptionsResponder handles the response to the ListAvailableSslOptions request. The method always
@@ -803,7 +816,9 @@ func (client ApplicationGatewaysClient) ListAvailableSslPredefinedPoliciesPrepar
 // ListAvailableSslPredefinedPoliciesSender sends the ListAvailableSslPredefinedPolicies request. The method will close the
 // http.Response Body if it receives an error.
 func (client ApplicationGatewaysClient) ListAvailableSslPredefinedPoliciesSender(req *http.Request) (*http.Response, error) {
-	return autorest.SendWithSender(client, req)
+	return autorest.SendWithSender(client,
+		req,
+		azure.DoRetryWithRegistration(client.Client))
 }
 
 // ListAvailableSslPredefinedPoliciesResponder handles the response to the ListAvailableSslPredefinedPolicies request. The method always
@@ -933,7 +948,9 @@ func (client ApplicationGatewaysClient) ListAvailableWafRuleSetsPreparer() (*htt
 // ListAvailableWafRuleSetsSender sends the ListAvailableWafRuleSets request. The method will close the
 // http.Response Body if it receives an error.
 func (client ApplicationGatewaysClient) ListAvailableWafRuleSetsSender(req *http.Request) (*http.Response, error) {
-	return autorest.SendWithSender(client, req)
+	return autorest.SendWithSender(client,
+		req,
+		azure.DoRetryWithRegistration(client.Client))
 }
 
 // ListAvailableWafRuleSetsResponder handles the response to the ListAvailableWafRuleSets request. The method always
@@ -1014,6 +1031,7 @@ func (client ApplicationGatewaysClient) StartPreparer(resourceGroupName string, 
 func (client ApplicationGatewaysClient) StartSender(req *http.Request) (*http.Response, error) {
 	return autorest.SendWithSender(client,
 		req,
+		azure.DoRetryWithRegistration(client.Client),
 		azure.DoPollForAsynchronous(client.PollingDelay))
 }
 
@@ -1095,6 +1113,7 @@ func (client ApplicationGatewaysClient) StopPreparer(resourceGroupName string, a
 func (client ApplicationGatewaysClient) StopSender(req *http.Request) (*http.Response, error) {
 	return autorest.SendWithSender(client,
 		req,
+		azure.DoRetryWithRegistration(client.Client),
 		azure.DoPollForAsynchronous(client.PollingDelay))
 }
 

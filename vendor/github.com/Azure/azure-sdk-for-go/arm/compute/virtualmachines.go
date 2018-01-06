@@ -119,6 +119,7 @@ func (client VirtualMachinesClient) CapturePreparer(resourceGroupName string, VM
 func (client VirtualMachinesClient) CaptureSender(req *http.Request) (*http.Response, error) {
 	return autorest.SendWithSender(client,
 		req,
+		azure.DoRetryWithRegistration(client.Client),
 		azure.DoPollForAsynchronous(client.PollingDelay))
 }
 
@@ -201,6 +202,7 @@ func (client VirtualMachinesClient) ConvertToManagedDisksPreparer(resourceGroupN
 func (client VirtualMachinesClient) ConvertToManagedDisksSender(req *http.Request) (*http.Response, error) {
 	return autorest.SendWithSender(client,
 		req,
+		azure.DoRetryWithRegistration(client.Client),
 		azure.DoPollForAsynchronous(client.PollingDelay))
 }
 
@@ -310,6 +312,7 @@ func (client VirtualMachinesClient) CreateOrUpdatePreparer(resourceGroupName str
 func (client VirtualMachinesClient) CreateOrUpdateSender(req *http.Request) (*http.Response, error) {
 	return autorest.SendWithSender(client,
 		req,
+		azure.DoRetryWithRegistration(client.Client),
 		azure.DoPollForAsynchronous(client.PollingDelay))
 }
 
@@ -392,6 +395,7 @@ func (client VirtualMachinesClient) DeallocatePreparer(resourceGroupName string,
 func (client VirtualMachinesClient) DeallocateSender(req *http.Request) (*http.Response, error) {
 	return autorest.SendWithSender(client,
 		req,
+		azure.DoRetryWithRegistration(client.Client),
 		azure.DoPollForAsynchronous(client.PollingDelay))
 }
 
@@ -473,6 +477,7 @@ func (client VirtualMachinesClient) DeletePreparer(resourceGroupName string, VMN
 func (client VirtualMachinesClient) DeleteSender(req *http.Request) (*http.Response, error) {
 	return autorest.SendWithSender(client,
 		req,
+		azure.DoRetryWithRegistration(client.Client),
 		azure.DoPollForAsynchronous(client.PollingDelay))
 }
 
@@ -538,7 +543,9 @@ func (client VirtualMachinesClient) GeneralizePreparer(resourceGroupName string,
 // GeneralizeSender sends the Generalize request. The method will close the
 // http.Response Body if it receives an error.
 func (client VirtualMachinesClient) GeneralizeSender(req *http.Request) (*http.Response, error) {
-	return autorest.SendWithSender(client, req)
+	return autorest.SendWithSender(client,
+		req,
+		azure.DoRetryWithRegistration(client.Client))
 }
 
 // GeneralizeResponder handles the response to the Generalize request. The method always
@@ -607,7 +614,9 @@ func (client VirtualMachinesClient) GetPreparer(resourceGroupName string, VMName
 // GetSender sends the Get request. The method will close the
 // http.Response Body if it receives an error.
 func (client VirtualMachinesClient) GetSender(req *http.Request) (*http.Response, error) {
-	return autorest.SendWithSender(client, req)
+	return autorest.SendWithSender(client,
+		req,
+		azure.DoRetryWithRegistration(client.Client))
 }
 
 // GetResponder handles the response to the Get request. The method always
@@ -672,7 +681,9 @@ func (client VirtualMachinesClient) InstanceViewPreparer(resourceGroupName strin
 // InstanceViewSender sends the InstanceView request. The method will close the
 // http.Response Body if it receives an error.
 func (client VirtualMachinesClient) InstanceViewSender(req *http.Request) (*http.Response, error) {
-	return autorest.SendWithSender(client, req)
+	return autorest.SendWithSender(client,
+		req,
+		azure.DoRetryWithRegistration(client.Client))
 }
 
 // InstanceViewResponder handles the response to the InstanceView request. The method always
@@ -737,7 +748,9 @@ func (client VirtualMachinesClient) ListPreparer(resourceGroupName string) (*htt
 // ListSender sends the List request. The method will close the
 // http.Response Body if it receives an error.
 func (client VirtualMachinesClient) ListSender(req *http.Request) (*http.Response, error) {
-	return autorest.SendWithSender(client, req)
+	return autorest.SendWithSender(client,
+		req,
+		azure.DoRetryWithRegistration(client.Client))
 }
 
 // ListResponder handles the response to the List request. The method always
@@ -868,7 +881,9 @@ func (client VirtualMachinesClient) ListAllPreparer() (*http.Request, error) {
 // ListAllSender sends the ListAll request. The method will close the
 // http.Response Body if it receives an error.
 func (client VirtualMachinesClient) ListAllSender(req *http.Request) (*http.Response, error) {
-	return autorest.SendWithSender(client, req)
+	return autorest.SendWithSender(client,
+		req,
+		azure.DoRetryWithRegistration(client.Client))
 }
 
 // ListAllResponder handles the response to the ListAll request. The method always
@@ -1002,7 +1017,9 @@ func (client VirtualMachinesClient) ListAvailableSizesPreparer(resourceGroupName
 // ListAvailableSizesSender sends the ListAvailableSizes request. The method will close the
 // http.Response Body if it receives an error.
 func (client VirtualMachinesClient) ListAvailableSizesSender(req *http.Request) (*http.Response, error) {
-	return autorest.SendWithSender(client, req)
+	return autorest.SendWithSender(client,
+		req,
+		azure.DoRetryWithRegistration(client.Client))
 }
 
 // ListAvailableSizesResponder handles the response to the ListAvailableSizes request. The method always
@@ -1084,6 +1101,7 @@ func (client VirtualMachinesClient) PerformMaintenancePreparer(resourceGroupName
 func (client VirtualMachinesClient) PerformMaintenanceSender(req *http.Request) (*http.Response, error) {
 	return autorest.SendWithSender(client,
 		req,
+		azure.DoRetryWithRegistration(client.Client),
 		azure.DoPollForAsynchronous(client.PollingDelay))
 }
 
@@ -1167,6 +1185,7 @@ func (client VirtualMachinesClient) PowerOffPreparer(resourceGroupName string, V
 func (client VirtualMachinesClient) PowerOffSender(req *http.Request) (*http.Response, error) {
 	return autorest.SendWithSender(client,
 		req,
+		azure.DoRetryWithRegistration(client.Client),
 		azure.DoPollForAsynchronous(client.PollingDelay))
 }
 
@@ -1249,6 +1268,7 @@ func (client VirtualMachinesClient) RedeployPreparer(resourceGroupName string, V
 func (client VirtualMachinesClient) RedeploySender(req *http.Request) (*http.Response, error) {
 	return autorest.SendWithSender(client,
 		req,
+		azure.DoRetryWithRegistration(client.Client),
 		azure.DoPollForAsynchronous(client.PollingDelay))
 }
 
@@ -1330,6 +1350,7 @@ func (client VirtualMachinesClient) RestartPreparer(resourceGroupName string, VM
 func (client VirtualMachinesClient) RestartSender(req *http.Request) (*http.Response, error) {
 	return autorest.SendWithSender(client,
 		req,
+		azure.DoRetryWithRegistration(client.Client),
 		azure.DoPollForAsynchronous(client.PollingDelay))
 }
 
@@ -1423,6 +1444,7 @@ func (client VirtualMachinesClient) RunCommandPreparer(resourceGroupName string,
 func (client VirtualMachinesClient) RunCommandSender(req *http.Request) (*http.Response, error) {
 	return autorest.SendWithSender(client,
 		req,
+		azure.DoRetryWithRegistration(client.Client),
 		azure.DoPollForAsynchronous(client.PollingDelay))
 }
 
@@ -1504,6 +1526,7 @@ func (client VirtualMachinesClient) StartPreparer(resourceGroupName string, VMNa
 func (client VirtualMachinesClient) StartSender(req *http.Request) (*http.Response, error) {
 	return autorest.SendWithSender(client,
 		req,
+		azure.DoRetryWithRegistration(client.Client),
 		azure.DoPollForAsynchronous(client.PollingDelay))
 }
 

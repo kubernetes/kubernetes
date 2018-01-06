@@ -134,7 +134,7 @@ spec:
         - --service-cluster-ip-range=10.96.0.0/12
         - --tls-cert-file=/etc/kubernetes/pki/apiserver.crt
         - --kubelet-client-certificate=/etc/kubernetes/pki/apiserver-kubelet-client.crt
-        - --advertise-address=192.168.1.115
+        - --advertise-address=$(HOST_IP)
         - --requestheader-client-ca-file=/etc/kubernetes/pki/front-proxy-ca.crt
         - --insecure-port=0
         - --experimental-bootstrap-token-auth=true
@@ -148,6 +148,11 @@ spec:
         - --proxy-client-key-file=/etc/kubernetes/pki/front-proxy-client.key
         - --authorization-mode=Node,RBAC
         - --etcd-servers=http://127.0.0.1:2379
+        env:
+        - name: HOST_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.hostIP
         image: gcr.io/google_containers/kube-apiserver-amd64:v1.7.4
         livenessProbe:
           failureThreshold: 8

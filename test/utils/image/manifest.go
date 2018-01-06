@@ -52,7 +52,7 @@ var (
 	APIServer                = ImageConfig{e2eRegistry, "k8s-aggregator-sample-apiserver", "1.7v2", true}
 	AppArmorLoader           = ImageConfig{gcRegistry, "apparmor-loader", "0.1", false}
 	BusyBox                  = ImageConfig{gcRegistry, "busybox", "1.24", false}
-	CheckMetadataConcealment = ImageConfig{gcRegistry, "check-metadata-concealment", "v0.0.2", false}
+	CheckMetadataConcealment = ImageConfig{gcRegistry, "check-metadata-concealment", "v0.0.3", false}
 	ClusterTester            = ImageConfig{e2eRegistry, "clusterapi-tester", "1.0", true}
 	CudaVectorAdd            = ImageConfig{e2eRegistry, "cuda-vector-add", "1.0", true}
 	Dnsutils                 = ImageConfig{e2eRegistry, "dnsutils", "1.0", true}

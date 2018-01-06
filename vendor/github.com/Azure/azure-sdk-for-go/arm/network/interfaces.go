@@ -107,6 +107,7 @@ func (client InterfacesClient) CreateOrUpdatePreparer(resourceGroupName string, 
 func (client InterfacesClient) CreateOrUpdateSender(req *http.Request) (*http.Response, error) {
 	return autorest.SendWithSender(client,
 		req,
+		azure.DoRetryWithRegistration(client.Client),
 		azure.DoPollForAsynchronous(client.PollingDelay))
 }
 
@@ -188,6 +189,7 @@ func (client InterfacesClient) DeletePreparer(resourceGroupName string, networkI
 func (client InterfacesClient) DeleteSender(req *http.Request) (*http.Response, error) {
 	return autorest.SendWithSender(client,
 		req,
+		azure.DoRetryWithRegistration(client.Client),
 		azure.DoPollForAsynchronous(client.PollingDelay))
 }
 
@@ -256,7 +258,9 @@ func (client InterfacesClient) GetPreparer(resourceGroupName string, networkInte
 // GetSender sends the Get request. The method will close the
 // http.Response Body if it receives an error.
 func (client InterfacesClient) GetSender(req *http.Request) (*http.Response, error) {
-	return autorest.SendWithSender(client, req)
+	return autorest.SendWithSender(client,
+		req,
+		azure.DoRetryWithRegistration(client.Client))
 }
 
 // GetResponder handles the response to the Get request. The method always
@@ -338,6 +342,7 @@ func (client InterfacesClient) GetEffectiveRouteTablePreparer(resourceGroupName 
 func (client InterfacesClient) GetEffectiveRouteTableSender(req *http.Request) (*http.Response, error) {
 	return autorest.SendWithSender(client,
 		req,
+		azure.DoRetryWithRegistration(client.Client),
 		azure.DoPollForAsynchronous(client.PollingDelay))
 }
 
@@ -410,7 +415,9 @@ func (client InterfacesClient) GetVirtualMachineScaleSetNetworkInterfacePreparer
 // GetVirtualMachineScaleSetNetworkInterfaceSender sends the GetVirtualMachineScaleSetNetworkInterface request. The method will close the
 // http.Response Body if it receives an error.
 func (client InterfacesClient) GetVirtualMachineScaleSetNetworkInterfaceSender(req *http.Request) (*http.Response, error) {
-	return autorest.SendWithSender(client, req)
+	return autorest.SendWithSender(client,
+		req,
+		azure.DoRetryWithRegistration(client.Client))
 }
 
 // GetVirtualMachineScaleSetNetworkInterfaceResponder handles the response to the GetVirtualMachineScaleSetNetworkInterface request. The method always
@@ -474,7 +481,9 @@ func (client InterfacesClient) ListPreparer(resourceGroupName string) (*http.Req
 // ListSender sends the List request. The method will close the
 // http.Response Body if it receives an error.
 func (client InterfacesClient) ListSender(req *http.Request) (*http.Response, error) {
-	return autorest.SendWithSender(client, req)
+	return autorest.SendWithSender(client,
+		req,
+		azure.DoRetryWithRegistration(client.Client))
 }
 
 // ListResponder handles the response to the List request. The method always
@@ -604,7 +613,9 @@ func (client InterfacesClient) ListAllPreparer() (*http.Request, error) {
 // ListAllSender sends the ListAll request. The method will close the
 // http.Response Body if it receives an error.
 func (client InterfacesClient) ListAllSender(req *http.Request) (*http.Response, error) {
-	return autorest.SendWithSender(client, req)
+	return autorest.SendWithSender(client,
+		req,
+		azure.DoRetryWithRegistration(client.Client))
 }
 
 // ListAllResponder handles the response to the ListAll request. The method always
@@ -755,6 +766,7 @@ func (client InterfacesClient) ListEffectiveNetworkSecurityGroupsPreparer(resour
 func (client InterfacesClient) ListEffectiveNetworkSecurityGroupsSender(req *http.Request) (*http.Response, error) {
 	return autorest.SendWithSender(client,
 		req,
+		azure.DoRetryWithRegistration(client.Client),
 		azure.DoPollForAsynchronous(client.PollingDelay))
 }
 
@@ -821,7 +833,9 @@ func (client InterfacesClient) ListVirtualMachineScaleSetNetworkInterfacesPrepar
 // ListVirtualMachineScaleSetNetworkInterfacesSender sends the ListVirtualMachineScaleSetNetworkInterfaces request. The method will close the
 // http.Response Body if it receives an error.
 func (client InterfacesClient) ListVirtualMachineScaleSetNetworkInterfacesSender(req *http.Request) (*http.Response, error) {
-	return autorest.SendWithSender(client, req)
+	return autorest.SendWithSender(client,
+		req,
+		azure.DoRetryWithRegistration(client.Client))
 }
 
 // ListVirtualMachineScaleSetNetworkInterfacesResponder handles the response to the ListVirtualMachineScaleSetNetworkInterfaces request. The method always
@@ -958,7 +972,9 @@ func (client InterfacesClient) ListVirtualMachineScaleSetVMNetworkInterfacesPrep
 // ListVirtualMachineScaleSetVMNetworkInterfacesSender sends the ListVirtualMachineScaleSetVMNetworkInterfaces request. The method will close the
 // http.Response Body if it receives an error.
 func (client InterfacesClient) ListVirtualMachineScaleSetVMNetworkInterfacesSender(req *http.Request) (*http.Response, error) {
-	return autorest.SendWithSender(client, req)
+	return autorest.SendWithSender(client,
+		req,
+		azure.DoRetryWithRegistration(client.Client))
 }
 
 // ListVirtualMachineScaleSetVMNetworkInterfacesResponder handles the response to the ListVirtualMachineScaleSetVMNetworkInterfaces request. The method always

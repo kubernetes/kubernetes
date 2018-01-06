@@ -368,10 +368,12 @@ func NewControllerInitializers(loopMode ControllerLoopMode) map[string]InitFunc 
 	controllers["tokencleaner"] = startTokenCleanerController
 	if loopMode == IncludeCloudLoops {
 		controllers["service"] = startServiceController
+		controllers["nodeipam"] = startNodeIpamController
 		controllers["route"] = startRouteController
-		// TODO: Move node controller and volume controller into the IncludeCloudLoops only set.
+		// TODO: volume controller into the IncludeCloudLoops only set.
+		// TODO: Separate cluster in cloud check from node lifecycle controller.
 	}
-	controllers["node"] = startNodeController
+	controllers["nodelifecycle"] = startNodeLifecycleController
 	controllers["persistentvolume-binder"] = startPersistentVolumeBinderController
 	controllers["attachdetach"] = startAttachDetachController
 	controllers["persistentvolume-expander"] = startVolumeExpandController

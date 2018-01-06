@@ -4420,14 +4420,14 @@ func ValidateResourceRequirements(requirements *core.ResourceRequirements, fldPa
 		// Check that request <= limit.
 		limitQuantity, exists := requirements.Limits[resourceName]
 		if exists {
-			// For GPUs, not only requests can't exceed limits, they also can't be lower, i.e. must be equal.
+			// For non overcommitable resources, not only requests can't exceed limits, they also can't be lower, i.e. must be equal.
 			if quantity.Cmp(limitQuantity) != 0 && !helper.IsOvercommitAllowed(resourceName) {
 				allErrs = append(allErrs, field.Invalid(reqPath, quantity.String(), fmt.Sprintf("must be equal to %s limit", resourceName)))
 			} else if quantity.Cmp(limitQuantity) > 0 {
 				allErrs = append(allErrs, field.Invalid(reqPath, quantity.String(), fmt.Sprintf("must be less than or equal to %s limit", resourceName)))
 			}
-		} else if resourceName == core.ResourceNvidiaGPU {
-			allErrs = append(allErrs, field.Invalid(reqPath, quantity.String(), fmt.Sprintf("must be equal to %s request", core.ResourceNvidiaGPU)))
+		} else if !helper.IsOvercommitAllowed(resourceName) {
+			allErrs = append(allErrs, field.Required(limPath, "Limit must be set for non overcommitable resources"))
 		}
 		if helper.IsHugePageResourceName(resourceName) {
 			reqContainsHugePages = true

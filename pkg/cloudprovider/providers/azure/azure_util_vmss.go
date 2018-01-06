@@ -939,5 +939,24 @@ func (ss *scaleSet) EnsureBackendPoolDeleted(poolID, vmSetName string) error {
 		return err
 	}
 
+	// Update virtualMachineScaleSet again. This is a workaround for removing VMSS reference from LB.
+	// TODO: remove this workaround when figuring out the root cause.
+	if len(newBackendPools) == 0 {
+		glog.V(3).Infof("VirtualMachineScaleSetsClient.CreateOrUpdate: scale set (%s) - updating second time", vmSetName)
+		ss.operationPollRateLimiter.Accept()
+		glog.V(10).Infof("VirtualMachineScaleSetsClient.CreateOrUpdate(%q): start", vmSetName)
+		respChan, errChan = ss.VirtualMachineScaleSetsClient.CreateOrUpdate(ss.ResourceGroup, vmSetName, virtualMachineScaleSet, nil)
+		resp = <-respChan
+		err = <-errChan
+		glog.V(10).Infof("VirtualMachineScaleSetsClient.CreateOrUpdate(%q): end", vmSetName)
+		if ss.CloudProviderBackoff && shouldRetryAPIRequest(resp.Response, err) {
+			glog.V(2).Infof("VirtualMachineScaleSetsClient.CreateOrUpdate: scale set (%s) - updating, err=%v", vmSetName, err)
+			retryErr := ss.createOrUpdateVMSSWithRetry(virtualMachineScaleSet)
+			if retryErr != nil {
+				glog.V(2).Infof("VirtualMachineScaleSetsClient.CreateOrUpdate abort backoff: scale set (%s) - updating", vmSetName)
+			}
+		}
+	}
+
 	return nil
 }

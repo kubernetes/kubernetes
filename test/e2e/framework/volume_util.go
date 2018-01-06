@@ -83,6 +83,7 @@ type VolumeTestConfig struct {
 	ServerArgs []string
 	// Volumes needed to be mounted to the server container from the host
 	// map <host (source) path> -> <container (dst.) path>
+	// if <host (source) path> is empty, mount a tmpfs emptydir
 	ServerVolumes map[string]string
 	// Wait for the pod to terminate successfully
 	// False indicates that the pod is long running
@@ -106,10 +107,11 @@ type VolumeTest struct {
 // NFS-specific wrapper for CreateStorageServer.
 func NewNFSServer(cs clientset.Interface, namespace string, args []string) (config VolumeTestConfig, pod *v1.Pod, ip string) {
 	config = VolumeTestConfig{
-		Namespace:   namespace,
-		Prefix:      "nfs",
-		ServerImage: imageutils.GetE2EImage(imageutils.VolumeNFSServer),
-		ServerPorts: []int{2049},
+		Namespace:     namespace,
+		Prefix:        "nfs",
+		ServerImage:   imageutils.GetE2EImage(imageutils.VolumeNFSServer),
+		ServerPorts:   []int{2049},
+		ServerVolumes: map[string]string{"": "/exports"},
 	}
 	if len(args) > 0 {
 		config.ServerArgs = args
@@ -230,8 +232,12 @@ func StartVolumeServer(client clientset.Interface, config VolumeTestConfig) *v1.
 	for src, dst := range config.ServerVolumes {
 		mountName := fmt.Sprintf("path%d", i)
 		volumes[i].Name = mountName
-		volumes[i].VolumeSource.HostPath = &v1.HostPathVolumeSource{
-			Path: src,
+		if src == "" {
+			volumes[i].VolumeSource.EmptyDir = &v1.EmptyDirVolumeSource{Medium: v1.StorageMediumMemory}
+		} else {
+			volumes[i].VolumeSource.HostPath = &v1.HostPathVolumeSource{
+				Path: src,
+			}
 		}
 
 		mounts[i].Name = mountName

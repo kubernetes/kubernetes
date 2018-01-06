@@ -106,6 +106,7 @@ func (client VirtualMachineScaleSetRollingUpgradesClient) CancelPreparer(resourc
 func (client VirtualMachineScaleSetRollingUpgradesClient) CancelSender(req *http.Request) (*http.Response, error) {
 	return autorest.SendWithSender(client,
 		req,
+		azure.DoRetryWithRegistration(client.Client),
 		azure.DoPollForAsynchronous(client.PollingDelay))
 }
 
@@ -171,7 +172,9 @@ func (client VirtualMachineScaleSetRollingUpgradesClient) GetLatestPreparer(reso
 // GetLatestSender sends the GetLatest request. The method will close the
 // http.Response Body if it receives an error.
 func (client VirtualMachineScaleSetRollingUpgradesClient) GetLatestSender(req *http.Request) (*http.Response, error) {
-	return autorest.SendWithSender(client, req)
+	return autorest.SendWithSender(client,
+		req,
+		azure.DoRetryWithRegistration(client.Client))
 }
 
 // GetLatestResponder handles the response to the GetLatest request. The method always
@@ -254,6 +257,7 @@ func (client VirtualMachineScaleSetRollingUpgradesClient) StartOSUpgradePreparer
 func (client VirtualMachineScaleSetRollingUpgradesClient) StartOSUpgradeSender(req *http.Request) (*http.Response, error) {
 	return autorest.SendWithSender(client,
 		req,
+		azure.DoRetryWithRegistration(client.Client),
 		azure.DoPollForAsynchronous(client.PollingDelay))
 }
 
