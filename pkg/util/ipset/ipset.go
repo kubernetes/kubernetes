@@ -322,4 +322,23 @@ func validatePortRange(portRange string) bool {
 	return true
 }
 
+// IsNotFoundError returns true if the error indicates "not found".  It parses
+// the error string looking for known values, which is imperfect but works in
+// practice.
+func IsNotFoundError(err error) bool {
+	es := err.Error()
+	if strings.Contains(es, "does not exist") {
+		// set with the same name already exists
+		// xref: https://github.com/Olipro/ipset/blob/master/lib/errcode.c#L32-L33
+		return true
+	}
+	if strings.Contains(es, "element is missing") {
+		// entry is missing from the set
+		// xref: https://github.com/Olipro/ipset/blob/master/lib/parse.c#L1904
+		// https://github.com/Olipro/ipset/blob/master/lib/parse.c#L1925
+		return true
+	}
+	return false
+}
+
 var _ = Interface(&runner{})
