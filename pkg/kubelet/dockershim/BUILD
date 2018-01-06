@@ -82,6 +82,7 @@ go_library(
     }),
     importpath = "k8s.io/kubernetes/pkg/kubelet/dockershim",
     deps = [
+        "//pkg/apis/core:go_default_library",
         "//pkg/credentialprovider:go_default_library",
         "//pkg/kubelet/apis/cri:go_default_library",
         "//pkg/kubelet/apis/cri/v1alpha1/runtime:go_default_library",
@@ -119,6 +120,7 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/errors:go_default_library",
+        "//vendor/k8s.io/client-go/tools/portforward:go_default_library",
         "//vendor/k8s.io/client-go/tools/remotecommand:go_default_library",
     ],
 )

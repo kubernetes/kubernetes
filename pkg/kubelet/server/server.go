@@ -176,7 +176,8 @@ type HostInterface interface {
 	AttachContainer(name string, uid types.UID, container string, in io.Reader, out, err io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize) error
 	GetKubeletContainerLogs(podFullName, containerName string, logOptions *v1.PodLogOptions, stdout, stderr io.Writer) error
 	ServeLogs(w http.ResponseWriter, req *http.Request)
-	PortForward(name string, uid types.UID, port int32, stream io.ReadWriteCloser) error
+	//need udp
+	PortForward(name string, uid types.UID, protocal string, port int32, stream io.ReadWriteCloser) error
 	StreamingConnectionIdleTimeout() time.Duration
 	ResyncInterval() time.Duration
 	GetHostname() string

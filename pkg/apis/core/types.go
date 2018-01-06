@@ -4433,6 +4433,17 @@ const (
 	// Value for streamType header for terminal resize stream
 	StreamTypeResize = "resize"
 
+	// Name of header that specifies PortForward protocol type
+	PortForwardProtocolType = "protocolType"
+	// Value for PortForwardProtocolType header for TCP4 protocol
+	PortForwardProtocolTypeTcp4 = "TCP4"
+	// Value for PortForwardProtocolType header for TCP6 protocol
+	PortForwardProtocolTypeTcp6 = "TCP6"
+	// Value for PortForwardProtocolType header for UDP4 protocol
+	PortForwardProtocolTypeUdp4 = "UDP4"
+	// Value for PortForwardProtocolType header for UDP6 protocol
+	PortForwardProtocolTypeUdp6 = "UDP6"
+
 	// Name of header that specifies the port being forwarded
 	PortHeader = "port"
 	// Name of header that specifies a request ID used to associate the error

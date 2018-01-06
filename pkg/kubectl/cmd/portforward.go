@@ -39,15 +39,16 @@ import (
 
 // PortForwardOptions contains all the options for running the port-forward cli command.
 type PortForwardOptions struct {
-	Namespace     string
-	PodName       string
-	RESTClient    *restclient.RESTClient
-	Config        *restclient.Config
-	PodClient     coreclient.PodsGetter
-	Ports         []string
-	PortForwarder portForwarder
-	StopChannel   chan struct{}
-	ReadyChannel  chan struct{}
+	Namespace           string
+	PodName             string
+	RESTClient          *restclient.RESTClient
+	Config              *restclient.Config
+	PodClient           coreclient.PodsGetter
+	PortForwardProtocol string
+	Ports               []string
+	PortForwarder       portForwarder
+	StopChannel         chan struct{}
+	ReadyChannel        chan struct{}
 }
 
 var (
@@ -87,6 +88,7 @@ func NewCmdPortForward(f cmdutil.Factory, cmdOut, cmdErr io.Writer) *cobra.Comma
 		},
 	}
 	cmd.Flags().StringP("pod", "p", "", "Pod name")
+	cmd.Flags().StringP("protocol", "", "tcp", "Forward Protocol: currently support TCP4 and UDP")
 	// TODO support UID
 	return cmd
 }
@@ -105,7 +107,7 @@ func (f *defaultPortForwarder) ForwardPorts(method string, url *url.URL, opts Po
 		return err
 	}
 	dialer := spdy.NewDialer(upgrader, &http.Client{Transport: transport}, method, url)
-	fw, err := portforward.New(dialer, opts.Ports, opts.StopChannel, opts.ReadyChannel, f.cmdOut, f.cmdErr)
+	fw, err := portforward.New(dialer, opts.PortForwardProtocol, opts.Ports, opts.StopChannel, opts.ReadyChannel, f.cmdOut, f.cmdErr)
 	if err != nil {
 		return err
 	}
@@ -115,6 +117,11 @@ func (f *defaultPortForwarder) ForwardPorts(method string, url *url.URL, opts Po
 // Complete completes all the required options for port-forward cmd.
 func (o *PortForwardOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	var err error
+	o.PortForwardProtocol = cmdutil.GetFlagString(cmd, "protocol")
+	if len(o.PortForwardProtocol) == 0 {
+		o.PortForwardProtocol = api.PortForwardProtocolTypeTcp4
+	}
+
 	o.PodName = cmdutil.GetFlagString(cmd, "pod")
 	if len(o.PodName) == 0 && len(args) == 0 {
 		return cmdutil.UsageErrorf(cmd, "POD is required for port-forward")
