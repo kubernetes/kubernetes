@@ -30,33 +30,33 @@
 		},
 		{
 			"ImportPath": "github.com/Azure/azure-sdk-for-go/arm/compute",
-			"Comment": "v11.1.1-beta",
-			"Rev": "509eea43b93cec2f3f17acbe2578ef58703923f8"
+			"Comment": "v12.1.0-beta",
+			"Rev": "934e2462aeb6e0c14186dcfeedd73a026d1b8eeb"
 		},
 		{
 			"ImportPath": "github.com/Azure/azure-sdk-for-go/arm/containerregistry",
-			"Comment": "v11.1.1-beta",
-			"Rev": "509eea43b93cec2f3f17acbe2578ef58703923f8"
+			"Comment": "v12.1.0-beta",
+			"Rev": "934e2462aeb6e0c14186dcfeedd73a026d1b8eeb"
 		},
 		{
 			"ImportPath": "github.com/Azure/azure-sdk-for-go/arm/disk",
-			"Comment": "v11.1.1-beta",
-			"Rev": "509eea43b93cec2f3f17acbe2578ef58703923f8"
+			"Comment": "v12.1.0-beta",
+			"Rev": "934e2462aeb6e0c14186dcfeedd73a026d1b8eeb"
 		},
 		{
 			"ImportPath": "github.com/Azure/azure-sdk-for-go/arm/network",
-			"Comment": "v11.1.1-beta",
-			"Rev": "509eea43b93cec2f3f17acbe2578ef58703923f8"
+			"Comment": "v12.1.0-beta",
+			"Rev": "934e2462aeb6e0c14186dcfeedd73a026d1b8eeb"
 		},
 		{
 			"ImportPath": "github.com/Azure/azure-sdk-for-go/arm/storage",
-			"Comment": "v11.1.1-beta",
-			"Rev": "509eea43b93cec2f3f17acbe2578ef58703923f8"
+			"Comment": "v12.1.0-beta",
+			"Rev": "934e2462aeb6e0c14186dcfeedd73a026d1b8eeb"
 		},
 		{
 			"ImportPath": "github.com/Azure/azure-sdk-for-go/storage",
-			"Comment": "v11.1.1-beta",
-			"Rev": "509eea43b93cec2f3f17acbe2578ef58703923f8"
+			"Comment": "v12.1.0-beta",
+			"Rev": "934e2462aeb6e0c14186dcfeedd73a026d1b8eeb"
 		},
 		{
 			"ImportPath": "github.com/Azure/go-ansiterm",
@@ -2435,9 +2435,9 @@
 			"Rev": "300106c228d52c8941d4b3de6054a6062a86dda3"
 		},
 		{
-			"ImportPath": "github.com/satori/uuid",
-			"Comment": "v1.1.0-8-g5bf94b6",
-			"Rev": "5bf94b69c6b68ee1b541973bb8e1144db23a194b"
+			"ImportPath": "github.com/satori/go.uuid",
+			"Comment": "v1.1.0",
+			"Rev": "879c5887cd475cd7864858769793b2ceb0d44feb"
 		},
 		{
 			"ImportPath": "github.com/seccomp/libseccomp-golang",

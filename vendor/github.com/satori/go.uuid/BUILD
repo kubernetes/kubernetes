@@ -3,7 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = ["uuid.go"],
-    importpath = "github.com/satori/uuid",
+    importpath = "github.com/satori/go.uuid",
     visibility = ["//visibility:public"],
 )
 

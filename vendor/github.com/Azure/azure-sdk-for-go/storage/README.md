@@ -6,7 +6,7 @@ This package includes support for [Azure Storage Emulator](https://azure.microso
 
 # Getting Started
 
- 1. Go get the SDK `go get -u github.com/Azure/azure-sdk-for=go/storage`
+ 1. Go get the SDK `go get -u github.com/Azure/azure-sdk-for-go/storage`
  1. If you don't already have one, [create a Storage Account](https://docs.microsoft.com/en-us/azure/storage/storage-create-storage-account).
       - Take note of your Azure Storage Account Name and Azure Storage Account Key. They'll both be necessary for using this library.
       - This option is production ready, but can also be used for development.

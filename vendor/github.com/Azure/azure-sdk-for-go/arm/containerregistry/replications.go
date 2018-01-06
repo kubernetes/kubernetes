@@ -125,6 +125,7 @@ func (client ReplicationsClient) CreatePreparer(resourceGroupName string, regist
 func (client ReplicationsClient) CreateSender(req *http.Request) (*http.Response, error) {
 	return autorest.SendWithSender(client,
 		req,
+		azure.DoRetryWithRegistration(client.Client),
 		azure.DoPollForAsynchronous(client.PollingDelay))
 }
 
@@ -224,6 +225,7 @@ func (client ReplicationsClient) DeletePreparer(resourceGroupName string, regist
 func (client ReplicationsClient) DeleteSender(req *http.Request) (*http.Response, error) {
 	return autorest.SendWithSender(client,
 		req,
+		azure.DoRetryWithRegistration(client.Client),
 		azure.DoPollForAsynchronous(client.PollingDelay))
 }
 
@@ -302,7 +304,9 @@ func (client ReplicationsClient) GetPreparer(resourceGroupName string, registryN
 // GetSender sends the Get request. The method will close the
 // http.Response Body if it receives an error.
 func (client ReplicationsClient) GetSender(req *http.Request) (*http.Response, error) {
-	return autorest.SendWithSender(client, req)
+	return autorest.SendWithSender(client,
+		req,
+		azure.DoRetryWithRegistration(client.Client))
 }
 
 // GetResponder handles the response to the Get request. The method always
@@ -376,7 +380,9 @@ func (client ReplicationsClient) ListPreparer(resourceGroupName string, registry
 // ListSender sends the List request. The method will close the
 // http.Response Body if it receives an error.
 func (client ReplicationsClient) ListSender(req *http.Request) (*http.Response, error) {
-	return autorest.SendWithSender(client, req)
+	return autorest.SendWithSender(client,
+		req,
+		azure.DoRetryWithRegistration(client.Client))
 }
 
 // ListResponder handles the response to the List request. The method always
@@ -547,6 +553,7 @@ func (client ReplicationsClient) UpdatePreparer(resourceGroupName string, regist
 func (client ReplicationsClient) UpdateSender(req *http.Request) (*http.Response, error) {
 	return autorest.SendWithSender(client,
 		req,
+		azure.DoRetryWithRegistration(client.Client),
 		azure.DoPollForAsynchronous(client.PollingDelay))
 }
 

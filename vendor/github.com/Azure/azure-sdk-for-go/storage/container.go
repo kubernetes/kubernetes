@@ -512,6 +512,81 @@ func (c *Container) ListBlobs(params ListBlobsParameters) (BlobListResponse, err
 	return out, err
 }
 
+// ContainerMetadataOptions includes options for container metadata operations
+type ContainerMetadataOptions struct {
+	Timeout   uint
+	LeaseID   string `header:"x-ms-lease-id"`
+	RequestID string `header:"x-ms-client-request-id"`
+}
+
+// SetMetadata replaces the metadata for the specified container.
+//
+// Some keys may be converted to Camel-Case before sending. All keys
+// are returned in lower case by GetBlobMetadata. HTTP header names
+// are case-insensitive so case munging should not matter to other
+// applications either.
+//
+// See https://docs.microsoft.com/en-us/rest/api/storageservices/set-container-metadata
+func (c *Container) SetMetadata(options *ContainerMetadataOptions) error {
+	params := url.Values{
+		"comp":    {"metadata"},
+		"restype": {"container"},
+	}
+	headers := c.bsc.client.getStandardHeaders()
+	headers = c.bsc.client.addMetadataToHeaders(headers, c.Metadata)
+
+	if options != nil {
+		params = addTimeout(params, options.Timeout)
+		headers = mergeHeaders(headers, headersFromStruct(*options))
+	}
+
+	uri := c.bsc.client.getEndpoint(blobServiceName, c.buildPath(), params)
+
+	resp, err := c.bsc.client.exec(http.MethodPut, uri, headers, nil, c.bsc.auth)
+	if err != nil {
+		return err
+	}
+	readAndCloseBody(resp.body)
+	return checkRespCode(resp.statusCode, []int{http.StatusOK})
+}
+
+// GetMetadata returns all user-defined metadata for the specified container.
+//
+// All metadata keys will be returned in lower case. (HTTP header
+// names are case-insensitive.)
+//
+// See https://docs.microsoft.com/en-us/rest/api/storageservices/get-container-metadata
+func (c *Container) GetMetadata(options *ContainerMetadataOptions) error {
+	params := url.Values{
+		"comp":    {"metadata"},
+		"restype": {"container"},
+	}
+	headers := c.bsc.client.getStandardHeaders()
+
+	if options != nil {
+		params = addTimeout(params, options.Timeout)
+		headers = mergeHeaders(headers, headersFromStruct(*options))
+	}
+
+	uri := c.bsc.client.getEndpoint(blobServiceName, c.buildPath(), params)
+
+	resp, err := c.bsc.client.exec(http.MethodGet, uri, headers, nil, c.bsc.auth)
+	if err != nil {
+		return err
+	}
+	readAndCloseBody(resp.body)
+	if err := checkRespCode(resp.statusCode, []int{http.StatusOK}); err != nil {
+		return err
+	}
+
+	c.writeMetadata(resp.headers)
+	return nil
+}
+
+func (c *Container) writeMetadata(h http.Header) {
+	c.Metadata = writeMetadata(h)
+}
+
 func generateContainerACLpayload(policies []ContainerAccessPolicy) (io.Reader, int, error) {
 	sil := SignedIdentifiers{
 		SignedIdentifiers: []SignedIdentifier{},

@@ -91,7 +91,9 @@ func (client VirtualNetworksClient) CheckIPAddressAvailabilityPreparer(resourceG
 // CheckIPAddressAvailabilitySender sends the CheckIPAddressAvailability request. The method will close the
 // http.Response Body if it receives an error.
 func (client VirtualNetworksClient) CheckIPAddressAvailabilitySender(req *http.Request) (*http.Response, error) {
-	return autorest.SendWithSender(client, req)
+	return autorest.SendWithSender(client,
+		req,
+		azure.DoRetryWithRegistration(client.Client))
 }
 
 // CheckIPAddressAvailabilityResponder handles the response to the CheckIPAddressAvailability request. The method always
@@ -176,6 +178,7 @@ func (client VirtualNetworksClient) CreateOrUpdatePreparer(resourceGroupName str
 func (client VirtualNetworksClient) CreateOrUpdateSender(req *http.Request) (*http.Response, error) {
 	return autorest.SendWithSender(client,
 		req,
+		azure.DoRetryWithRegistration(client.Client),
 		azure.DoPollForAsynchronous(client.PollingDelay))
 }
 
@@ -257,6 +260,7 @@ func (client VirtualNetworksClient) DeletePreparer(resourceGroupName string, vir
 func (client VirtualNetworksClient) DeleteSender(req *http.Request) (*http.Response, error) {
 	return autorest.SendWithSender(client,
 		req,
+		azure.DoRetryWithRegistration(client.Client),
 		azure.DoPollForAsynchronous(client.PollingDelay))
 }
 
@@ -325,7 +329,9 @@ func (client VirtualNetworksClient) GetPreparer(resourceGroupName string, virtua
 // GetSender sends the Get request. The method will close the
 // http.Response Body if it receives an error.
 func (client VirtualNetworksClient) GetSender(req *http.Request) (*http.Response, error) {
-	return autorest.SendWithSender(client, req)
+	return autorest.SendWithSender(client,
+		req,
+		azure.DoRetryWithRegistration(client.Client))
 }
 
 // GetResponder handles the response to the Get request. The method always
@@ -389,7 +395,9 @@ func (client VirtualNetworksClient) ListPreparer(resourceGroupName string) (*htt
 // ListSender sends the List request. The method will close the
 // http.Response Body if it receives an error.
 func (client VirtualNetworksClient) ListSender(req *http.Request) (*http.Response, error) {
-	return autorest.SendWithSender(client, req)
+	return autorest.SendWithSender(client,
+		req,
+		azure.DoRetryWithRegistration(client.Client))
 }
 
 // ListResponder handles the response to the List request. The method always
@@ -519,7 +527,9 @@ func (client VirtualNetworksClient) ListAllPreparer() (*http.Request, error) {
 // ListAllSender sends the ListAll request. The method will close the
 // http.Response Body if it receives an error.
 func (client VirtualNetworksClient) ListAllSender(req *http.Request) (*http.Response, error) {
-	return autorest.SendWithSender(client, req)
+	return autorest.SendWithSender(client,
+		req,
+		azure.DoRetryWithRegistration(client.Client))
 }
 
 // ListAllResponder handles the response to the ListAll request. The method always
@@ -653,7 +663,9 @@ func (client VirtualNetworksClient) ListUsagePreparer(resourceGroupName string, 
 // ListUsageSender sends the ListUsage request. The method will close the
 // http.Response Body if it receives an error.
 func (client VirtualNetworksClient) ListUsageSender(req *http.Request) (*http.Response, error) {
-	return autorest.SendWithSender(client, req)
+	return autorest.SendWithSender(client,
+		req,
+		azure.DoRetryWithRegistration(client.Client))
 }
 
 // ListUsageResponder handles the response to the ListUsage request. The method always
