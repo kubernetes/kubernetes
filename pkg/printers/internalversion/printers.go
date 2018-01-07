@@ -591,7 +591,9 @@ func printPod(pod *api.Pod, options printers.PrintOptions) ([]metav1alpha1.Table
 		}
 	}
 
-	if pod.DeletionTimestamp != nil && pod.Status.Reason == node.NodeUnreachablePodReason {
+	if pod.Status.Phase == "Deleted" {
+		reason = "Deleted"
+	} else if pod.DeletionTimestamp != nil && pod.Status.Reason == node.NodeUnreachablePodReason {
 		reason = "Unknown"
 	} else if pod.DeletionTimestamp != nil {
 		reason = "Terminating"
@@ -1226,7 +1228,7 @@ func printPersistentVolumeClaim(obj *api.PersistentVolumeClaim, options printers
 	}
 
 	phase := obj.Status.Phase
-	if obj.ObjectMeta.DeletionTimestamp != nil {
+	if obj.Status.Phase != "Deleted" && obj.ObjectMeta.DeletionTimestamp != nil {
 		phase = "Terminating"
 	}
 

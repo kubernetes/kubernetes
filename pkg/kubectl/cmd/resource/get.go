@@ -542,6 +542,11 @@ func (options *GetOptions) watch(f cmdutil.Factory, cmd *cobra.Command, args []s
 				return false, nil
 			}
 
+			if e.Type == watch.Deleted {
+				e.Object.(*unstructured.Unstructured).
+					Object["status"].(map[string]interface{})["phase"] = "Deleted"
+			}
+
 			if isFiltered, err := filterFuncs.Filter(e.Object, filterOpts); !isFiltered {
 				if err != nil {
 					glog.V(2).Infof("Unable to filter resource: %v", err)

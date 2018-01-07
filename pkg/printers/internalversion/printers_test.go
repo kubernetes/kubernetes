@@ -1668,6 +1668,22 @@ func TestPrintPod(t *testing.T) {
 			},
 			[]metav1alpha1.TableRow{{Cells: []interface{}{"test5", "1/2", "podReason", 6, "<unknown>"}}},
 		},
+		{
+			// Test Deleted status phase
+			api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "test6"},
+				Spec:       api.PodSpec{Containers: make([]api.Container, 2)},
+				Status: api.PodStatus{
+					Reason: "podReason",
+					Phase:  "Deleted",
+					ContainerStatuses: []api.ContainerStatus{
+						{RestartCount: 3, State: api.ContainerState{Terminated: &api.ContainerStateTerminated{}}},
+						{RestartCount: 3, State: api.ContainerState{Terminated: &api.ContainerStateTerminated{}}},
+					},
+				},
+			},
+			[]metav1alpha1.TableRow{{Cells: []interface{}{"test6", "0/2", "Deleted", 6, "<unknown>"}}},
+		},
 	}
 
 	for i, test := range tests {
@@ -3072,6 +3088,26 @@ func TestPrintPersistentVolumeClaim(t *testing.T) {
 				},
 			},
 			"test4\tPending\tmy-volume\t10Gi\tRWO\tmy-scn\t<unknown>\n",
+		},
+		{
+			// Test Deleted status phase
+			api.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test5",
+				},
+				Spec: api.PersistentVolumeClaimSpec{
+					VolumeName:       "my-volume",
+					StorageClassName: &myScn,
+				},
+				Status: api.PersistentVolumeClaimStatus{
+					Phase:       "Deleted",
+					AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
+					Capacity: map[api.ResourceName]resource.Quantity{
+						api.ResourceStorage: resource.MustParse("10Gi"),
+					},
+				},
+			},
+			"test5\tDeleted\tmy-volume\t10Gi\tRWO\tmy-scn\t<unknown>\n",
 		},
 	}
 	buf := bytes.NewBuffer([]byte{})

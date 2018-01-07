@@ -1084,6 +1084,9 @@ func watchTestData() ([]api.Pod, []watch.Event) {
 					ResourceVersion: "12",
 				},
 				Spec: apitesting.DeepEqualSafePodSpec(),
+				Status: api.PodStatus{
+					Phase: "Deleted",
+				},
 			},
 		},
 	}
