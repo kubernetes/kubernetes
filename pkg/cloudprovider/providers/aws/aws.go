@@ -528,7 +528,7 @@ type CloudConfig struct {
 
 		// KubernetesClusterTag is the legacy cluster id we'll use to identify our cluster resources
 		KubernetesClusterTag string
-		// KubernetesClusterTag is the cluster id we'll use to identify our cluster resources
+		// KubernetesClusterID is the cluster id we'll use to identify our cluster resources
 		KubernetesClusterID string
 
 		//The aws provider creates an inbound rule per load balancer on the node security
