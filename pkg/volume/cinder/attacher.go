@@ -27,7 +27,6 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
@@ -186,23 +185,7 @@ func (attacher *cinderDiskAttacher) VolumesAreAttached(specs []*volume.Spec, nod
 		volumeSpecMap[volumeSource.VolumeID] = spec
 	}
 
-	instanceID, err := attacher.nodeInstanceID(nodeName)
-	if err != nil {
-		if err == cloudprovider.InstanceNotFound {
-			// If node doesn't exist, OpenStack Nova will assume the volumes are not attached to it.
-			// Mark the volumes as detached and return false without error.
-			glog.Warningf("VolumesAreAttached: node %q does not exist.", nodeName)
-			for spec := range volumesAttachedCheck {
-				volumesAttachedCheck[spec] = false
-			}
-
-			return volumesAttachedCheck, nil
-		}
-
-		return volumesAttachedCheck, err
-	}
-
-	attachedResult, err := attacher.cinderProvider.DisksAreAttached(instanceID, volumeIDList)
+	attachedResult, err := attacher.cinderProvider.DisksAreAttachedByName(nodeName, volumeIDList)
 	if err != nil {
 		// Log error and continue with attach
 		glog.Errorf(
@@ -375,20 +358,10 @@ func (detacher *cinderDiskDetacher) waitDiskDetached(instanceID, volumeID string
 
 func (detacher *cinderDiskDetacher) Detach(volumeName string, nodeName types.NodeName) error {
 	volumeID := path.Base(volumeName)
-	instances, res := detacher.cinderProvider.Instances()
-	if !res {
-		return fmt.Errorf("failed to list openstack instances")
-	}
-	instanceID, err := instances.InstanceID(nodeName)
-	if ind := strings.LastIndex(instanceID, "/"); ind >= 0 {
-		instanceID = instanceID[(ind + 1):]
-	}
-
 	if err := detacher.waitOperationFinished(volumeID); err != nil {
 		return err
 	}
-
-	attached, err := detacher.cinderProvider.DiskIsAttached(instanceID, volumeID)
+	attached, instanceID, err := detacher.cinderProvider.DiskIsAttachedByName(nodeName, volumeID)
 	if err != nil {
 		// Log error and continue with detach
 		glog.Errorf(
