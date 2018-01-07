@@ -125,7 +125,7 @@ func NewStatefulSetController(
 				if oldPS.Status.Replicas != curPS.Status.Replicas {
 					glog.V(4).Infof("Observed updated replica count for StatefulSet: %v, %d->%d", curPS.Name, oldPS.Status.Replicas, curPS.Status.Replicas)
 				}
-				if !labels.Equals(oldPS.Spec.Template.Spec.NodeSelector, curPS.Spec.Template.Spec.NodeSelector) {
+				if !reflect.DeepEqual(oldPS.Spec.Template.Spec.NodeSelector, curPS.Spec.Template.Spec.NodeSelector) {
 					glog.V(4).Infof("Observed updated nodeSelector for StatefulSet: %v, %v->%v", curPS.Name, oldPS.Spec.Template.Spec.NodeSelector, curPS.Spec.Template.Spec.NodeSelector)
 				}
 				ssc.enqueueStatefulSet(cur)

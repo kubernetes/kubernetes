@@ -26,13 +26,13 @@ import (
 	apps "k8s.io/api/apps/v1beta1"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/client-go/kubernetes/scheme"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/history"
+	"reflect"
 )
 
 // maxUpdateRetries is the maximum number of retries used for update conflict resolution prior to failure
@@ -142,7 +142,7 @@ func storageMatches(set *apps.StatefulSet, pod *v1.Pod) bool {
 func nodeSelectorMatches(set *apps.StatefulSet, pod *v1.Pod) bool {
 	setNodeSelector := set.Spec.Template.Spec.NodeSelector
 	podNodeSelector := pod.Spec.NodeSelector
-	return labels.Equals(setNodeSelector, labels.Set(podNodeSelector))
+	return reflect.DeepEqual(setNodeSelector, podNodeSelector)
 }
 
 // updateNodeSelector updates pod's nodeSelector to conform with the latest nodeSelector from StatefulSet.
