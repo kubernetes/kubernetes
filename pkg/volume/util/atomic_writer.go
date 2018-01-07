@@ -18,8 +18,12 @@ package util
 
 import (
 	"bytes"
+	"encoding/base64"
 	"fmt"
 	"io/ioutil"
+	"mime"
+	"mime/multipart"
+	"net/mail"
 	"os"
 	"path"
 	"path/filepath"
@@ -366,11 +370,34 @@ func (w *AtomicWriter) newTimestampDir() (string, error) {
 	return tsDir, nil
 }
 
+func (w *AtomicWriter) decodeMimeMessage(data []byte) ([]byte, error) {
+	var err error
+	if msg, err := mail.ReadMessage(bytes.NewBuffer(data)); err == nil {
+		if _, params, err := mime.ParseMediaType(msg.Header.Get("Content-Type")); err == nil {
+			if part, err := multipart.NewReader(msg.Body, params["boundary"]).NextPart(); err == nil {
+				if contents, err := ioutil.ReadAll(part); err == nil {
+					if decoded, err := base64.StdEncoding.DecodeString(string(contents)); err == nil {
+						return decoded, nil
+					}
+				}
+			}
+		}
+	}
+	return nil, err
+}
+
 // writePayloadToDir writes the given payload to the given directory.  The
 // directory must exist.
 func (w *AtomicWriter) writePayloadToDir(payload map[string]FileProjection, dir string) error {
 	for userVisiblePath, fileProjection := range payload {
 		content := fileProjection.Data
+		if bytes.HasPrefix(content, []byte("MIME-Version: 1.0")) {
+			if decoded, err := w.decodeMimeMessage(content); err == nil {
+				content = decoded
+			} else {
+				glog.Infof("unable to decode mime message: %v", err)
+			}
+		}
 		mode := os.FileMode(fileProjection.Mode)
 		fullPath := path.Join(dir, userVisiblePath)
 		baseDir, _ := filepath.Split(fullPath)

@@ -17,8 +17,13 @@ limitations under the License.
 package kubectl
 
 import (
+	"bytes"
+	"encoding/base64"
 	"fmt"
 	"io/ioutil"
+	"mime/multipart"
+	"net/http"
+	"net/textproto"
 	"os"
 	"path"
 	"strings"
@@ -248,6 +253,23 @@ func handleConfigMapFromEnvFileSource(configMap *v1.ConfigMap, envFileSource str
 	})
 }
 
+func encodeMimeMessage(contents []byte) string {
+	body := new(bytes.Buffer)
+	body.Write([]byte("MIME-Version: 1.0\n"))
+	body.Write([]byte("Content-Type: multipart/mixed; boundary=frontier\n\n"))
+	writer := multipart.NewWriter(body)
+	writer.SetBoundary("frontier")
+	header := textproto.MIMEHeader{
+		"Content-Type":              {"application/octet-stream"},
+		"Content-Transfer-Encoding": {"base64"},
+	}
+	part, _ := writer.CreatePart(header)
+	encodedString := base64.StdEncoding.EncodeToString([]byte(contents))
+	part.Write([]byte(encodedString))
+	writer.Close()
+	return string(body.Bytes())
+}
+
 // addKeyFromFileToConfigMap adds a key with the given name to a ConfigMap, populating
 // the value with the content of the given file path, or returns an error.
 func addKeyFromFileToConfigMap(configMap *v1.ConfigMap, keyName, filePath string) error {
@@ -255,7 +277,11 @@ func addKeyFromFileToConfigMap(configMap *v1.ConfigMap, keyName, filePath string
 	if err != nil {
 		return err
 	}
-	return addKeyFromLiteralToConfigMap(configMap, keyName, string(data))
+	contentType := http.DetectContentType(data)
+	if strings.HasPrefix(contentType, "text/plain") {
+		return addKeyFromLiteralToConfigMap(configMap, keyName, string(data))
+	}
+	return addKeyFromLiteralToConfigMap(configMap, keyName, encodeMimeMessage(data))
 }
 
 // addKeyFromLiteralToConfigMap adds the given key and data to the given config map,
