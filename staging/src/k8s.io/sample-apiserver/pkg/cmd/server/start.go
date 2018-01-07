@@ -56,7 +56,7 @@ func NewWardleServerOptions(out, errOut io.Writer) *WardleServerOptions {
 	return o
 }
 
-// NewCommandStartMaster provides a CLI handler for 'start master' command
+// NewCommandStartWardleServer provides a CLI handler for 'start master' command
 func NewCommandStartWardleServer(out, errOut io.Writer, stopCh <-chan struct{}) *cobra.Command {
 	o := NewWardleServerOptions(out, errOut)
 
