@@ -19,6 +19,7 @@ package errors
 import (
 	"errors"
 	"fmt"
+	"net/http"
 	"reflect"
 	"testing"
 
@@ -113,9 +114,40 @@ func TestErrorNew(t *testing.T) {
 	}
 }
 
+func TestUnexpectedServerError(t *testing.T) {
+	groupResource := resource("tests")
+	name := "1"
+	err := &StatusError{metav1.Status{
+		Status: metav1.StatusFailure,
+		Code:   http.StatusNotFound,
+		Reason: metav1.StatusReasonNotFound,
+		Details: &metav1.StatusDetails{
+			Group: groupResource.Group,
+			Kind:  groupResource.Resource,
+			Name:  name,
+			Causes: []metav1.StatusCause{
+				{
+					Type:    metav1.CauseTypeUnexpectedServerResponse,
+					Message: "404 page not found",
+				},
+			},
+		},
+		Message: fmt.Sprintf("%s %q not found", groupResource.String(), name),
+	}}
+
+	if IsNotFound(err) {
+		t.Errorf("expected not to be %s", metav1.StatusReasonNotFound)
+	}
+
+	if !IsUnexpectedServerError(err) {
+		t.Errorf("expected to be %s", metav1.CauseTypeUnexpectedServerResponse)
+	}
+}
+
 func TestNewInvalid(t *testing.T) {
 	testCases := []struct {
-		Err     *field.Error
+		Err *field.Error
+
 		Details *metav1.StatusDetails
 	}{
 		{
