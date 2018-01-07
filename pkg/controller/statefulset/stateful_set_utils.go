@@ -26,6 +26,7 @@ import (
 	apps "k8s.io/api/apps/v1beta1"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -135,6 +136,19 @@ func storageMatches(set *apps.StatefulSet, pod *v1.Pod) bool {
 		}
 	}
 	return true
+}
+
+// nodeSelectorMatches returns is pod has valid nodeSelector
+func nodeSelectorMatches(set *apps.StatefulSet, pod *v1.Pod) bool {
+	setNodeSelector := set.Spec.Template.Spec.NodeSelector
+	podNodeSelector := pod.Spec.NodeSelector
+	return labels.Equals(setNodeSelector, labels.Set(podNodeSelector))
+}
+
+// updateNodeSelector updates pod's nodeSelector to conform with the latest nodeSelector from StatefulSet.
+func updateNodeSelector(set *apps.StatefulSet, pod *v1.Pod) {
+	newNodeSelector := set.Spec.Template.Spec.NodeSelector
+	pod.Spec.NodeSelector = newNodeSelector
 }
 
 // getPersistentVolumeClaims gets a map of PersistentVolumeClaims to their template names, as defined in set. The
