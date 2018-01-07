@@ -59,7 +59,7 @@ type managerImpl struct {
 	killPodFunc KillPodFunc
 	// the interface that knows how to do image gc
 	imageGC ImageGC
-	// the interface that knows how to do image gc
+	// the interface that knows how to do container gc
 	containerGC ContainerGC
 	// protects access to internal state
 	sync.RWMutex
