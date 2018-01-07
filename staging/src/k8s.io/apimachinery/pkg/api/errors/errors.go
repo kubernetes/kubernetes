@@ -405,7 +405,7 @@ func NewGenericServerResponse(code int, verb string, qualifiedResource schema.Gr
 
 // IsNotFound returns true if the specified error was created by NewNotFound.
 func IsNotFound(err error) bool {
-	return ReasonForError(err) == metav1.StatusReasonNotFound
+	return ReasonForError(err) == metav1.StatusReasonNotFound && !IsUnexpectedServerError(err)
 }
 
 // IsAlreadyExists determines if the err is an error which indicates that a specified resource already exists.
