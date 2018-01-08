@@ -151,6 +151,7 @@ def install_load_balancer(apiserver, tls):
                 port=port,
                 server_certificate=server_cert_path,
                 server_key=server_key_path,
+                proxy_read_timeout=hookenv.config('proxy_read_timeout')
         )
 
         maybe_write_apilb_logrotate_config()

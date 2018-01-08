@@ -21,6 +21,7 @@ import (
 	"os"
 	"time"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/errors"
 	clientset "k8s.io/client-go/kubernetes"
@@ -122,9 +123,13 @@ func removeOldKubeDNSDeploymentIfCoreDNSIsUsed(cfg *kubeadmapi.MasterConfigurati
 				return err
 			}
 			if coreDNSDeployment.Status.ReadyReplicas == 0 {
-				return fmt.Errorf("the CodeDNS deployment isn't ready yet")
+				return fmt.Errorf("the CoreDNS deployment isn't ready yet")
 			}
-			return apiclient.DeleteDeploymentForeground(client, metav1.NamespaceSystem, kubeadmconstants.KubeDNS)
+			err = apiclient.DeleteDeploymentForeground(client, metav1.NamespaceSystem, kubeadmconstants.KubeDNS)
+			if err != nil && !apierrors.IsNotFound(err) {
+				return err
+			}
+			return nil
 		}, 10)
 	}
 	return nil

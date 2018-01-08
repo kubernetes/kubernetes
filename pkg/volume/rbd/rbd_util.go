@@ -35,6 +35,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/util/wait"
 	fileutil "k8s.io/kubernetes/pkg/util/file"
 	"k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/volume"
@@ -46,6 +47,11 @@ const (
 	imageSizeStr    = "size "
 	sizeDivStr      = " MB in"
 	kubeLockMagic   = "kubelet_lock_magic_"
+	// The following three values are used for 30 seconds timeout
+	// while waiting for RBD Watcher to expire.
+	rbdImageWatcherInitDelay = 1 * time.Second
+	rbdImageWatcherFactor    = 1.4
+	rbdImageWatcherSteps     = 10
 )
 
 // search /sys/bus for rbd device that matches given pool and image
@@ -109,6 +115,11 @@ func makePDNameInternal(host volume.VolumeHost, pool string, image string) strin
 	return path.Join(host.GetPluginDir(rbdPluginName), "rbd", pool+"-image-"+image)
 }
 
+// make a directory like /var/lib/kubelet/plugins/kubernetes.io/rbd/volumeDevices/pool-image-image
+func makeVDPDNameInternal(host volume.VolumeHost, pool string, image string) string {
+	return path.Join(host.GetVolumeDevicePluginDir(rbdPluginName), pool+"-image-"+image)
+}
+
 // RBDUtil implements diskManager interface.
 type RBDUtil struct{}
 
@@ -116,6 +127,10 @@ var _ diskManager = &RBDUtil{}
 
 func (util *RBDUtil) MakeGlobalPDName(rbd rbd) string {
 	return makePDNameInternal(rbd.plugin.host, rbd.Pool, rbd.Image)
+}
+
+func (util *RBDUtil) MakeGlobalVDPDName(rbd rbd) string {
+	return makeVDPDNameInternal(rbd.plugin.host, rbd.Pool, rbd.Image)
 }
 
 func rbdErrors(runErr, resultErr error) error {
@@ -217,13 +232,27 @@ func (util *RBDUtil) AttachDisk(b rbdMounter) (string, error) {
 
 		// Currently, we don't acquire advisory lock on image, but for backward
 		// compatibility, we need to check if the image is being used by nodes running old kubelet.
-		found, rbdOutput, err := util.rbdStatus(&b)
-		if err != nil {
-			return "", fmt.Errorf("error: %v, rbd output: %v", err, rbdOutput)
+		// osd_client_watch_timeout defaults to 30 seconds, if the watcher stays active longer than 30 seconds,
+		// rbd image does not get mounted and failure message gets generated.
+		backoff := wait.Backoff{
+			Duration: rbdImageWatcherInitDelay,
+			Factor:   rbdImageWatcherFactor,
+			Steps:    rbdImageWatcherSteps,
 		}
-		if found {
-			glog.Infof("rbd image %s/%s is still being used ", b.Pool, b.Image)
-			return "", fmt.Errorf("rbd image %s/%s is still being used. rbd output: %s", b.Pool, b.Image, rbdOutput)
+		err := wait.ExponentialBackoff(backoff, func() (bool, error) {
+			used, rbdOutput, err := util.rbdStatus(&b)
+			if err != nil {
+				return false, fmt.Errorf("fail to check rbd image status with: (%v), rbd output: (%s)", err, rbdOutput)
+			}
+			return !used, nil
+		})
+		// return error if rbd image has not become available for the specified timeout
+		if err == wait.ErrWaitTimeout {
+			return "", fmt.Errorf("rbd image %s/%s is still being used", b.Pool, b.Image)
+		}
+		// return error if any other errors were encountered during wating for the image to becme avialble
+		if err != nil {
+			return "", err
 		}
 
 		mon := util.kernelRBDMonitorsOpt(b.Mon)
@@ -278,6 +307,35 @@ func (util *RBDUtil) DetachDisk(plugin *rbdPlugin, deviceMountPath string, devic
 		}
 		glog.V(3).Infof("rbd: successfully remove %s", rbdFile)
 	}
+	return nil
+}
+
+// DetachBlockDisk detaches the disk from the node.
+func (util *RBDUtil) DetachBlockDisk(disk rbdDiskUnmapper, mapPath string) error {
+
+	if pathExists, pathErr := volutil.PathExists(mapPath); pathErr != nil {
+		return fmt.Errorf("Error checking if path exists: %v", pathErr)
+	} else if !pathExists {
+		glog.Warningf("Warning: Unmap skipped because path does not exist: %v", mapPath)
+		return nil
+	}
+	// If we arrive here, device is no longer used, see if need to logout the target
+	device, err := getBlockVolumeDevice(mapPath)
+	if err != nil {
+		return err
+	}
+
+	if len(device) == 0 {
+		return fmt.Errorf("DetachDisk failed , device is empty")
+	}
+	// rbd unmap
+	exec := disk.plugin.host.GetExec(disk.plugin.GetPluginName())
+	output, err := exec.Run("rbd", "unmap", device)
+	if err != nil {
+		return rbdErrors(err, fmt.Errorf("rbd: failed to unmap device %s, error %v, rbd output: %s", device, err, string(output)))
+	}
+	glog.V(3).Infof("rbd: successfully unmap device %s", device)
+
 	return nil
 }
 

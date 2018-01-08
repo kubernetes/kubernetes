@@ -62,7 +62,7 @@ func Repair(dirpath string) bool {
 			}
 			defer bf.Close()
 
-			if _, err = f.Seek(0, os.SEEK_SET); err != nil {
+			if _, err = f.Seek(0, io.SeekStart); err != nil {
 				plog.Errorf("could not repair %v, failed to read file", f.Name())
 				return false
 			}

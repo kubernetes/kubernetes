@@ -1,33 +1,18 @@
 /*
  *
- * Copyright 2014, Google Inc.
- * All rights reserved.
+ * Copyright 2014 gRPC authors.
  *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are
- * met:
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- *     * Redistributions of source code must retain the above copyright
- * notice, this list of conditions and the following disclaimer.
- *     * Redistributions in binary form must reproduce the above
- * copyright notice, this list of conditions and the following disclaimer
- * in the documentation and/or other materials provided with the
- * distribution.
- *     * Neither the name of Google Inc. nor the names of its
- * contributors may be used to endorse or promote products derived from
- * this software without specific prior written permission.
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
- * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
- * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
- * OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
- * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
- * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
- * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
- * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
  */
 
@@ -40,9 +25,9 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"net/http"
 	"strconv"
 	"strings"
-	"sync/atomic"
 	"time"
 
 	"github.com/golang/protobuf/proto"
@@ -50,7 +35,6 @@ import (
 	"golang.org/x/net/http2/hpack"
 	spb "google.golang.org/genproto/googleapis/rpc/status"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/grpclog"
 	"google.golang.org/grpc/status"
 )
 
@@ -60,7 +44,8 @@ const (
 	// http://http2.github.io/http2-spec/#SettingValues
 	http2InitHeaderTableSize = 4096
 	// http2IOBufSize specifies the buffer size for sending frames.
-	http2IOBufSize = 32 * 1024
+	defaultWriteBufSize = 32 * 1024
+	defaultReadBufSize  = 32 * 1024
 )
 
 var (
@@ -88,6 +73,24 @@ var (
 		codes.ResourceExhausted: http2.ErrCodeEnhanceYourCalm,
 		codes.PermissionDenied:  http2.ErrCodeInadequateSecurity,
 	}
+	httpStatusConvTab = map[int]codes.Code{
+		// 400 Bad Request - INTERNAL.
+		http.StatusBadRequest: codes.Internal,
+		// 401 Unauthorized  - UNAUTHENTICATED.
+		http.StatusUnauthorized: codes.Unauthenticated,
+		// 403 Forbidden - PERMISSION_DENIED.
+		http.StatusForbidden: codes.PermissionDenied,
+		// 404 Not Found - UNIMPLEMENTED.
+		http.StatusNotFound: codes.Unimplemented,
+		// 429 Too Many Requests - UNAVAILABLE.
+		http.StatusTooManyRequests: codes.Unavailable,
+		// 502 Bad Gateway - UNAVAILABLE.
+		http.StatusBadGateway: codes.Unavailable,
+		// 503 Service Unavailable - UNAVAILABLE.
+		http.StatusServiceUnavailable: codes.Unavailable,
+		// 504 Gateway timeout - UNAVAILABLE.
+		http.StatusGatewayTimeout: codes.Unavailable,
+	}
 )
 
 // Records the states during HPACK decoding. Must be reset once the
@@ -100,14 +103,17 @@ type decodeState struct {
 	statusGen *status.Status
 	// rawStatusCode and rawStatusMsg are set from the raw trailer fields and are not
 	// intended for direct access outside of parsing.
-	rawStatusCode int32
+	rawStatusCode *int
 	rawStatusMsg  string
+	httpStatus    *int
 	// Server side only fields.
 	timeoutSet bool
 	timeout    time.Duration
 	method     string
 	// key-value metadata map from the peer.
-	mdata map[string][]string
+	mdata      map[string][]string
+	statsTags  []byte
+	statsTrace []byte
 }
 
 // isReservedHeader checks whether hdr belongs to HTTP2 headers
@@ -159,7 +165,7 @@ func validContentType(t string) bool {
 func (d *decodeState) status() *status.Status {
 	if d.statusGen == nil {
 		// No status-details were provided; generate status using code/msg.
-		d.statusGen = status.New(codes.Code(d.rawStatusCode), d.rawStatusMsg)
+		d.statusGen = status.New(codes.Code(int32(*(d.rawStatusCode))), d.rawStatusMsg)
 	}
 	return d.statusGen
 }
@@ -193,6 +199,51 @@ func decodeMetadataHeader(k, v string) (string, error) {
 	return v, nil
 }
 
+func (d *decodeState) decodeResponseHeader(frame *http2.MetaHeadersFrame) error {
+	for _, hf := range frame.Fields {
+		if err := d.processHeaderField(hf); err != nil {
+			return err
+		}
+	}
+
+	// If grpc status exists, no need to check further.
+	if d.rawStatusCode != nil || d.statusGen != nil {
+		return nil
+	}
+
+	// If grpc status doesn't exist and http status doesn't exist,
+	// then it's a malformed header.
+	if d.httpStatus == nil {
+		return streamErrorf(codes.Internal, "malformed header: doesn't contain status(gRPC or HTTP)")
+	}
+
+	if *(d.httpStatus) != http.StatusOK {
+		code, ok := httpStatusConvTab[*(d.httpStatus)]
+		if !ok {
+			code = codes.Unknown
+		}
+		return streamErrorf(code, http.StatusText(*(d.httpStatus)))
+	}
+
+	// gRPC status doesn't exist and http status is OK.
+	// Set rawStatusCode to be unknown and return nil error.
+	// So that, if the stream has ended this Unknown status
+	// will be propogated to the user.
+	// Otherwise, it will be ignored. In which case, status from
+	// a later trailer, that has StreamEnded flag set, is propogated.
+	code := int(codes.Unknown)
+	d.rawStatusCode = &code
+	return nil
+
+}
+
+func (d *decodeState) addMetadata(k, v string) {
+	if d.mdata == nil {
+		d.mdata = make(map[string][]string)
+	}
+	d.mdata[k] = append(d.mdata[k], v)
+}
+
 func (d *decodeState) processHeaderField(f hpack.HeaderField) error {
 	switch f.Name {
 	case "content-type":
@@ -206,7 +257,7 @@ func (d *decodeState) processHeaderField(f hpack.HeaderField) error {
 		if err != nil {
 			return streamErrorf(codes.Internal, "transport: malformed grpc-status: %v", err)
 		}
-		d.rawStatusCode = int32(code)
+		d.rawStatusCode = &code
 	case "grpc-message":
 		d.rawStatusMsg = decodeGrpcMessage(f.Value)
 	case "grpc-status-details-bin":
@@ -227,18 +278,36 @@ func (d *decodeState) processHeaderField(f hpack.HeaderField) error {
 		}
 	case ":path":
 		d.method = f.Value
-	default:
-		if !isReservedHeader(f.Name) || isWhitelistedPseudoHeader(f.Name) {
-			if d.mdata == nil {
-				d.mdata = make(map[string][]string)
-			}
-			v, err := decodeMetadataHeader(f.Name, f.Value)
-			if err != nil {
-				grpclog.Printf("Failed to decode (%q, %q): %v", f.Name, f.Value, err)
-				return nil
-			}
-			d.mdata[f.Name] = append(d.mdata[f.Name], v)
+	case ":status":
+		code, err := strconv.Atoi(f.Value)
+		if err != nil {
+			return streamErrorf(codes.Internal, "transport: malformed http-status: %v", err)
 		}
+		d.httpStatus = &code
+	case "grpc-tags-bin":
+		v, err := decodeBinHeader(f.Value)
+		if err != nil {
+			return streamErrorf(codes.Internal, "transport: malformed grpc-tags-bin: %v", err)
+		}
+		d.statsTags = v
+		d.addMetadata(f.Name, string(v))
+	case "grpc-trace-bin":
+		v, err := decodeBinHeader(f.Value)
+		if err != nil {
+			return streamErrorf(codes.Internal, "transport: malformed grpc-trace-bin: %v", err)
+		}
+		d.statsTrace = v
+		d.addMetadata(f.Name, string(v))
+	default:
+		if isReservedHeader(f.Name) && !isWhitelistedPseudoHeader(f.Name) {
+			break
+		}
+		v, err := decodeMetadataHeader(f.Name, f.Value)
+		if err != nil {
+			errorf("Failed to decode metadata header (%q, %q): %v", f.Name, f.Value, err)
+			return nil
+		}
+		d.addMetadata(f.Name, string(v))
 	}
 	return nil
 }
@@ -406,10 +475,10 @@ type framer struct {
 	fr         *http2.Framer
 }
 
-func newFramer(conn net.Conn) *framer {
+func newFramer(conn net.Conn, writeBufferSize, readBufferSize int) *framer {
 	f := &framer{
-		reader: bufio.NewReaderSize(conn, http2IOBufSize),
-		writer: bufio.NewWriterSize(conn, http2IOBufSize),
+		reader: bufio.NewReaderSize(conn, readBufferSize),
+		writer: bufio.NewWriterSize(conn, writeBufferSize),
 	}
 	f.fr = http2.NewFramer(f.writer, f.reader)
 	// Opt-in to Frame reuse API on framer to reduce garbage.
@@ -417,133 +486,4 @@ func newFramer(conn net.Conn) *framer {
 	f.fr.SetReuseFrames()
 	f.fr.ReadMetaHeaders = hpack.NewDecoder(http2InitHeaderTableSize, nil)
 	return f
-}
-
-func (f *framer) adjustNumWriters(i int32) int32 {
-	return atomic.AddInt32(&f.numWriters, i)
-}
-
-// The following writeXXX functions can only be called when the caller gets
-// unblocked from writableChan channel (i.e., owns the privilege to write).
-
-func (f *framer) writeContinuation(forceFlush bool, streamID uint32, endHeaders bool, headerBlockFragment []byte) error {
-	if err := f.fr.WriteContinuation(streamID, endHeaders, headerBlockFragment); err != nil {
-		return err
-	}
-	if forceFlush {
-		return f.writer.Flush()
-	}
-	return nil
-}
-
-func (f *framer) writeData(forceFlush bool, streamID uint32, endStream bool, data []byte) error {
-	if err := f.fr.WriteData(streamID, endStream, data); err != nil {
-		return err
-	}
-	if forceFlush {
-		return f.writer.Flush()
-	}
-	return nil
-}
-
-func (f *framer) writeGoAway(forceFlush bool, maxStreamID uint32, code http2.ErrCode, debugData []byte) error {
-	if err := f.fr.WriteGoAway(maxStreamID, code, debugData); err != nil {
-		return err
-	}
-	if forceFlush {
-		return f.writer.Flush()
-	}
-	return nil
-}
-
-func (f *framer) writeHeaders(forceFlush bool, p http2.HeadersFrameParam) error {
-	if err := f.fr.WriteHeaders(p); err != nil {
-		return err
-	}
-	if forceFlush {
-		return f.writer.Flush()
-	}
-	return nil
-}
-
-func (f *framer) writePing(forceFlush, ack bool, data [8]byte) error {
-	if err := f.fr.WritePing(ack, data); err != nil {
-		return err
-	}
-	if forceFlush {
-		return f.writer.Flush()
-	}
-	return nil
-}
-
-func (f *framer) writePriority(forceFlush bool, streamID uint32, p http2.PriorityParam) error {
-	if err := f.fr.WritePriority(streamID, p); err != nil {
-		return err
-	}
-	if forceFlush {
-		return f.writer.Flush()
-	}
-	return nil
-}
-
-func (f *framer) writePushPromise(forceFlush bool, p http2.PushPromiseParam) error {
-	if err := f.fr.WritePushPromise(p); err != nil {
-		return err
-	}
-	if forceFlush {
-		return f.writer.Flush()
-	}
-	return nil
-}
-
-func (f *framer) writeRSTStream(forceFlush bool, streamID uint32, code http2.ErrCode) error {
-	if err := f.fr.WriteRSTStream(streamID, code); err != nil {
-		return err
-	}
-	if forceFlush {
-		return f.writer.Flush()
-	}
-	return nil
-}
-
-func (f *framer) writeSettings(forceFlush bool, settings ...http2.Setting) error {
-	if err := f.fr.WriteSettings(settings...); err != nil {
-		return err
-	}
-	if forceFlush {
-		return f.writer.Flush()
-	}
-	return nil
-}
-
-func (f *framer) writeSettingsAck(forceFlush bool) error {
-	if err := f.fr.WriteSettingsAck(); err != nil {
-		return err
-	}
-	if forceFlush {
-		return f.writer.Flush()
-	}
-	return nil
-}
-
-func (f *framer) writeWindowUpdate(forceFlush bool, streamID, incr uint32) error {
-	if err := f.fr.WriteWindowUpdate(streamID, incr); err != nil {
-		return err
-	}
-	if forceFlush {
-		return f.writer.Flush()
-	}
-	return nil
-}
-
-func (f *framer) flushWrite() error {
-	return f.writer.Flush()
-}
-
-func (f *framer) readFrame() (http2.Frame, error) {
-	return f.fr.ReadFrame()
-}
-
-func (f *framer) errorDetail() error {
-	return f.fr.ErrorDetail()
 }

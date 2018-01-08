@@ -73,6 +73,22 @@ type User struct {
 }
 ```
 
+## Validation
+
+To validate custom resources, use the [`CustomResourceValidation`](https://kubernetes.io/docs/tasks/access-kubernetes-api/extend-api-custom-resource-definitions/#validation) feature.
+
+This feature is beta and enabled by default in v1.9. If you are using v1.8, enable the feature using
+the `CustomResourceValidation` feature gate on the [kube-apiserver](https://kubernetes.io/docs/admin/kube-apiserver):
+
+```sh
+--feature-gates=CustomResourceValidation=true
+```
+
+### Example
+
+The schema in the [example CRD](./artifacts/examples/crd.yaml) applies the following validation on the custom resource:
+`spec.replicas` must be an integer and must have a minimum value of 1 and a maximum value of 10.
+
 ## Cleanup
 
 You can clean up the created CustomResourceDefinition with:

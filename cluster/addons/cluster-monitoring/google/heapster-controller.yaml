@@ -101,7 +101,7 @@ spec:
               memory: {{ nanny_memory }}
           volumeMounts:
           - name: heapster-config-volume
-            mountMath: /etc/config
+            mountPath: /etc/config
           env:
             - name: MY_POD_NAME
               valueFrom:
@@ -143,7 +143,7 @@ spec:
                   fieldPath: metadata.namespace
           volumeMounts:
           - name: eventer-config-volume
-            mountMath: /etc/config
+            mountPath: /etc/config
           command:
             - /pod_nanny
             - --config-dir=/etc/config
@@ -160,7 +160,6 @@ spec:
         - name: heapster-config-volume
           configMap:
             name: heapster-config
-      volumes:
         - name: eventer-config-volume
           configMap:
             name: eventer-config
