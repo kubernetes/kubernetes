@@ -176,7 +176,7 @@ func (fk *fakeKubelet) ListVolumesForPod(podUID types.UID) (map[string]volume.Vo
 func (_ *fakeKubelet) RootFsStats() (*statsapi.FsStats, error)    { return nil, nil }
 func (_ *fakeKubelet) ListPodStats() ([]statsapi.PodStats, error) { return nil, nil }
 func (_ *fakeKubelet) ImageFsStats() (*statsapi.FsStats, error)   { return nil, nil }
-func (_ *fakeKubelet) GetCgroupStats(cgroupName string) (*statsapi.ContainerStats, *statsapi.NetworkStats, error) {
+func (_ *fakeKubelet) GetCgroupStats(cgroupName string, updateStats bool) (*statsapi.ContainerStats, *statsapi.NetworkStats, error) {
 	return nil, nil, nil
 }
 
