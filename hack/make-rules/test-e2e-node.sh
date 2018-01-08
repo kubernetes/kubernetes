@@ -60,6 +60,16 @@ if [ ! -d "${artifacts}" ]; then
 fi
 echo "Test artifacts will be written to ${artifacts}"
 
+if [[ $runtime == "remote" ]] ; then
+  if [[ ! -z $container_runtime_endpoint ]] ; then
+    test_args="--container-runtime-endpoint=${container_runtime_endpoint} $test_args"
+  fi
+  if [[ ! -z $image_service_endpoint ]] ; then
+    test_args="--image-service-endpoint=$image_service_endpoint $test_args"
+  fi
+fi
+
+
 if [ $remote = true ] ; then
   # The following options are only valid in remote run.
   images=${IMAGES:-""}
@@ -153,22 +163,12 @@ else
 
   # Runtime flags
   test_args='--kubelet-flags="--container-runtime='$runtime'" '$test_args
-  if [[ $runtime == "remote" ]] ; then
-      if [[ ! -z $container_runtime_endpoint ]] ; then
-	      test_args='--kubelet-flags="--container-runtime-endpoint='$container_runtime_endpoint'" '$test_args
-      fi
-      if [[ ! -z $image_service_endpoint ]] ; then
-	      test_args='--kubelet-flags="--image-service-endpoint='$image_service_endpoint'" '$test_args
-      fi
-  fi
 
   # Test using the host the script was run on
   # Provided for backwards compatibility
   go run test/e2e_node/runner/local/run_local.go \
     --system-spec-name="$system_spec_name" --ginkgo-flags="$ginkgoflags" \
     --test-flags="--container-runtime=${runtime} \
-    --container-runtime-endpoint=${container_runtime_endpoint} \
-    --image-service-endpoint=${image_service_endpoint} \
     --alsologtostderr --v 4 --report-dir=${artifacts} --node-name $(hostname) \
     $test_args" --build-dependencies=true 2>&1 | tee -i "${artifacts}/build-log.txt"
   exit $?
