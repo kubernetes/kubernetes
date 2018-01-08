@@ -328,14 +328,12 @@ func NewCloud(configReader io.Reader) (cloudprovider.Interface, error) {
 	az.VirtualMachineScaleSetsClient = virtualMachineScaleSetsClient
 
 	storageAccountClient := storage.NewAccountsClientWithBaseURI(az.Environment.ResourceManagerEndpoint, az.SubscriptionID)
-	storageAccountClient.BaseURI = az.Environment.ResourceManagerEndpoint
 	storageAccountClient.Authorizer = autorest.NewBearerAuthorizer(servicePrincipalToken)
 	storageAccountClient.PollingDelay = 5 * time.Second
 	configureUserAgent(&storageAccountClient.Client)
 	az.StorageAccountClient = storageAccountClient
 
 	disksClient := disk.NewDisksClientWithBaseURI(az.Environment.ResourceManagerEndpoint, az.SubscriptionID)
-	disksClient.BaseURI = az.Environment.ResourceManagerEndpoint
 	disksClient.Authorizer = autorest.NewBearerAuthorizer(servicePrincipalToken)
 	disksClient.PollingDelay = 5 * time.Second
 	configureUserAgent(&disksClient.Client)
