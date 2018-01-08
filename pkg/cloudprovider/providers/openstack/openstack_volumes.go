@@ -524,10 +524,12 @@ func (os *OpenStack) GetDevicePath(volumeID string) string {
 
 	if devicePath == "" {
 		devicePath = os.GetDevicePathFromInstanceMetadata(volumeID)
-	}
-
-	if devicePath == "" {
-		glog.Warningf("Failed to find device for the volumeID: %q", volumeID)
+		if devicePath == "" {
+			glog.Warningf("Failed to find device for the volumeID: %q", volumeID)
+			return ""
+		} else {
+			return devicePath
+		}
 	}
 
 	return devicePath
