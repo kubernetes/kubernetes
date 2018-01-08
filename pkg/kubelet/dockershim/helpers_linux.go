@@ -28,6 +28,7 @@ import (
 	"strings"
 
 	"github.com/blang/semver"
+
 	dockertypes "github.com/docker/docker/api/types"
 	dockercontainer "github.com/docker/docker/api/types/container"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
@@ -103,12 +104,17 @@ func (ds *dockerService) updateCreateConfig(
 		// TODO: Can we assume the defaults are sane?
 		rOpts := lc.GetResources()
 		if rOpts != nil {
+			max_pids := config.Linux.MaxPids
+			if max_pids == 0 {
+				max_pids = ds.dockerPIDsLimit
+			}
 			createConfig.HostConfig.Resources = dockercontainer.Resources{
 				Memory:     rOpts.MemoryLimitInBytes,
 				MemorySwap: DefaultMemorySwap(),
 				CPUShares:  rOpts.CpuShares,
 				CPUQuota:   rOpts.CpuQuota,
 				CPUPeriod:  rOpts.CpuPeriod,
+				PidsLimit:  max_pids,
 			}
 			createConfig.HostConfig.OomScoreAdj = int(rOpts.OomScoreAdj)
 		}

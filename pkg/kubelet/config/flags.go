@@ -42,6 +42,8 @@ type ContainerRuntimeOptions struct {
 	// disable it for docker will be removed unless a compelling use case is discovered with widespread use.
 	// TODO: Remove once we no longer support disabling shared PID namespace (https://issues.k8s.io/41938)
 	DockerDisableSharedPID bool
+	// Set the --pids-limit when creating a docker container.
+	DockerPIDsLimit int64
 	// PodSandboxImage is the image whose network/ipc namespaces
 	// containers in each pod will use.
 	PodSandboxImage string
@@ -90,6 +92,8 @@ func (s *ContainerRuntimeOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.DockershimRootDirectory, "experimental-dockershim-root-directory", s.DockershimRootDirectory, "Path to the dockershim root directory.")
 	fs.MarkHidden("experimental-dockershim-root-directory")
 	fs.BoolVar(&s.DockerDisableSharedPID, "docker-disable-shared-pid", s.DockerDisableSharedPID, "The Container Runtime Interface (CRI) defaults to using a shared PID namespace for containers in a pod when running with Docker 1.13.1 or higher. Setting this flag reverts to the previous behavior of isolated PID namespaces. This ability will be removed in a future Kubernetes release.")
+	fs.Int64Var(&s.DockerPIDsLimit, "docker-pids-limit", s.DockerPIDsLimit, "Tune container pids limit for docker (set -1 for unlimited), kernel >= 4.3")
+
 	fs.StringVar(&s.PodSandboxImage, "pod-infra-container-image", s.PodSandboxImage, "The image whose network/ipc namespaces containers in each pod will use.")
 	fs.StringVar(&s.DockerEndpoint, "docker-endpoint", s.DockerEndpoint, "Use this for the docker endpoint to communicate with")
 	fs.DurationVar(&s.ImagePullProgressDeadline.Duration, "image-pull-progress-deadline", s.ImagePullProgressDeadline.Duration, "If no pulling progress is made before this deadline, the image pulling will be cancelled.")

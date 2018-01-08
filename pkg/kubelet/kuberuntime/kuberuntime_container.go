@@ -25,6 +25,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -47,6 +48,10 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/util/selinux"
 	"k8s.io/kubernetes/pkg/util/tail"
+)
+
+const (
+	MaxPidsAnnotationKey = "node.alpha.kubernetes.io/max-pids"
 )
 
 var (
@@ -231,6 +236,12 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerConfig(container *v1.C
 	lc := &runtimeapi.LinuxContainerConfig{
 		Resources:       &runtimeapi.LinuxContainerResources{},
 		SecurityContext: m.determineEffectiveSecurityContext(pod, container, uid, username),
+	}
+
+	if max_pids_value, ok := pod.Annotations[MaxPidsAnnotationKey]; ok && max_pids_value != "" {
+		if max_pids, err := strconv.ParseInt(max_pids_value, 10, 64); err == nil && max_pids >= 0 {
+			lc.MaxPids = max_pids
+		}
 	}
 
 	// set linux container resources
