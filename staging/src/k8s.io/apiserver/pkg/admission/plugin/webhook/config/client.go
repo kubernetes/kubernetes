@@ -111,7 +111,7 @@ func (cm *ClientManager) HookClient(h *v1beta1.Webhook) (*rest.RESTClient, error
 	}
 
 	complete := func(cfg *rest.Config) (*rest.RESTClient, error) {
-		if len(h.ClientConfig.CABundle) != 0 {
+		if len(cfg.TLSClientConfig.CAData) == 0 {
 			cfg.TLSClientConfig.CAData = h.ClientConfig.CABundle
 		}
 		cfg.ContentConfig.NegotiatedSerializer = cm.negotiatedSerializer
