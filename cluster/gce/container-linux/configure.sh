@@ -119,7 +119,7 @@ function install-kube-binary-config {
     local -r cni_version="v0.6.0"
     local -r cni_tar="cni-plugins-amd64-${cni_version}.tgz"
     local -r cni_sha1="d595d3ded6499a64e8dac02466e2f5f2ce257c9f"
-    download-or-bust "${cni_sha1}" "https://storage.googleapis.com/kubernetes-release/network-plugins/${cni_tar}"
+    download-or-bust "${cni_sha1}" "https://dl.k8s.io/network-plugins/${cni_tar}"
     local -r cni_dir="${KUBE_HOME}/cni"
     mkdir -p "${cni_dir}/bin"
     tar xzf "${KUBE_HOME}/${cni_tar}" -C "${cni_dir}/bin" --overwrite

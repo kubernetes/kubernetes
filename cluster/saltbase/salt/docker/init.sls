@@ -324,7 +324,7 @@ net.ipv4.ip_forward:
 # 6. Update override_deb, override_deb_sha1, override_docker_ver with new
 #    deb name, new hash and new version
 
-{% set storage_base='https://storage.googleapis.com/kubernetes-release/docker/' %}
+{% set storage_base='https://dl.k8s.io/docker/' %}
 
 {% set override_deb_url='' %}
 

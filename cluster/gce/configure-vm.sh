@@ -165,7 +165,7 @@ You can find documentation for Kubernetes at:
 The source for this release can be found at:
   /usr/local/share/doc/kubernetes/kubernetes-src.tar.gz
 Or you can download it at:
-  https://storage.googleapis.com/kubernetes-release/release/${version}/kubernetes-src.tar.gz
+  https://dl.k8s.io/release/${version}/kubernetes-src.tar.gz
 
 It is based on the Kubernetes source at:
   https://github.com/kubernetes/kubernetes/tree/${gitref}
@@ -357,7 +357,7 @@ install-salt() {
     salt-common_2014.1.13+ds-1~bpo70+1_all.deb
     salt-minion_2014.1.13+ds-1~bpo70+1_all.deb
   )
-  URL_BASE="https://storage.googleapis.com/kubernetes-release/salt"
+  URL_BASE="https://dl.k8s.io/salt"
 
   for deb in "${DEBS[@]}"; do
     if [ ! -e "${deb}" ]; then

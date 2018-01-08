@@ -35,7 +35,7 @@ all: push
 
 cni-tars/$(CNI_TARBALL):
 	mkdir -p cni-tars/
-	cd cni-tars/ && curl -sSLO --retry 5 https://storage.googleapis.com/kubernetes-release/network-plugins/${CNI_TARBALL}
+	cd cni-tars/ && curl -sSLO --retry 5 https://dl.k8s.io/network-plugins/${CNI_TARBALL}
 
 clean:
 	rm -rf cni-tars/
