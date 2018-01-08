@@ -18,6 +18,8 @@ package rbd
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	dstrings "strings"
 
 	"github.com/golang/glog"
@@ -55,6 +57,7 @@ var _ volume.DeletableVolumePlugin = &rbdPlugin{}
 var _ volume.ProvisionableVolumePlugin = &rbdPlugin{}
 var _ volume.AttachableVolumePlugin = &rbdPlugin{}
 var _ volume.ExpandableVolumePlugin = &rbdPlugin{}
+var _ volume.BlockVolumePlugin = &rbdPlugin{}
 
 const (
 	rbdPluginName                  = "kubernetes.io/rbd"
@@ -368,6 +371,127 @@ func (plugin *rbdPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*vol
 	return volume.NewSpecFromVolume(rbdVolume), nil
 }
 
+func (plugin *rbdPlugin) ConstructBlockVolumeSpec(podUID types.UID, volumeName, mapPath string) (*volume.Spec, error) {
+	pluginDir := plugin.host.GetVolumeDevicePluginDir(rbdPluginName)
+	blkutil := volutil.NewBlockVolumePathHandler()
+
+	globalMapPathUUID, err := blkutil.FindGlobalMapPathUUIDFromPod(pluginDir, mapPath, podUID)
+	if err != nil {
+		return nil, err
+	}
+	glog.V(5).Infof("globalMapPathUUID: %v, err: %v", globalMapPathUUID, err)
+	globalMapPath := filepath.Dir(globalMapPathUUID)
+	if len(globalMapPath) == 1 {
+		return nil, fmt.Errorf("failed to retreive volume plugin information from globalMapPathUUID: %v", globalMapPathUUID)
+	}
+	return getVolumeSpecFromGlobalMapPath(globalMapPath)
+}
+
+func getVolumeSpecFromGlobalMapPath(globalMapPath string) (*volume.Spec, error) {
+	// Retreive volume spec information from globalMapPath
+	// globalMapPath example:
+	//   plugins/kubernetes.io/{PluginName}/{DefaultKubeletVolumeDevicesDirName}/{volumePluginDependentPath}
+	pool, image, err := getPoolAndImageFromMapPath(globalMapPath)
+	if err != nil {
+		return nil, err
+	}
+	block := v1.PersistentVolumeBlock
+	rbdVolume := &v1.PersistentVolume{
+		Spec: v1.PersistentVolumeSpec{
+			PersistentVolumeSource: v1.PersistentVolumeSource{
+				RBD: &v1.RBDPersistentVolumeSource{
+					RBDImage: image,
+					RBDPool:  pool,
+				},
+			},
+			VolumeMode: &block,
+		},
+	}
+
+	return volume.NewSpecFromPersistentVolume(rbdVolume, true), nil
+}
+
+func (plugin *rbdPlugin) NewBlockVolumeMapper(spec *volume.Spec, pod *v1.Pod, _ volume.VolumeOptions) (volume.BlockVolumeMapper, error) {
+
+	var uid types.UID
+	if pod != nil {
+		uid = pod.UID
+	}
+	secret := ""
+	// var err error
+	if pod != nil {
+		secretName, secretNs, err := getSecretNameAndNamespace(spec, pod.Namespace)
+		if err != nil {
+			return nil, err
+		}
+		if len(secretName) > 0 && len(secretNs) > 0 {
+			// if secret is provideded, retrieve it
+			kubeClient := plugin.host.GetKubeClient()
+			if kubeClient == nil {
+				return nil, fmt.Errorf("Cannot get kube client")
+			}
+			secrets, err := kubeClient.Core().Secrets(secretNs).Get(secretName, metav1.GetOptions{})
+			if err != nil {
+				err = fmt.Errorf("Couldn't get secret %v/%v err: %v", secretNs, secretName, err)
+				return nil, err
+			}
+			for _, data := range secrets.Data {
+				secret = string(data)
+			}
+		}
+	}
+
+	return plugin.newBlockVolumeMapperInternal(spec, uid, &RBDUtil{}, secret, plugin.host.GetMounter(plugin.GetPluginName()), plugin.host.GetExec(plugin.GetPluginName()))
+}
+
+func (plugin *rbdPlugin) newBlockVolumeMapperInternal(spec *volume.Spec, podUID types.UID, manager diskManager, secret string, mounter mount.Interface, exec mount.Exec) (volume.BlockVolumeMapper, error) {
+	mon, err := getVolumeSourceMonitors(spec)
+	if err != nil {
+		return nil, err
+	}
+	img, err := getVolumeSourceImage(spec)
+	if err != nil {
+		return nil, err
+	}
+	pool, err := getVolumeSourcePool(spec)
+	if err != nil {
+		return nil, err
+	}
+	id, err := getVolumeSourceUser(spec)
+	if err != nil {
+		return nil, err
+	}
+	keyring, err := getVolumeSourceKeyRing(spec)
+	if err != nil {
+		return nil, err
+	}
+	ro, err := getVolumeSourceReadOnly(spec)
+	if err != nil {
+		return nil, err
+	}
+
+	return &rbdDiskMapper{
+		rbd:     newRBD(podUID, spec.Name(), img, pool, ro, plugin, manager),
+		mon:     mon,
+		id:      id,
+		keyring: keyring,
+		secret:  secret,
+	}, nil
+}
+
+func (plugin *rbdPlugin) NewBlockVolumeUnmapper(volName string, podUID types.UID) (volume.BlockVolumeUnmapper, error) {
+	return plugin.newUnmapperInternal(volName, podUID, &RBDUtil{})
+}
+
+func (plugin *rbdPlugin) newUnmapperInternal(volName string, podUID types.UID, manager diskManager) (volume.BlockVolumeUnmapper, error) {
+	return &rbdDiskUnmapper{
+		rbdDiskMapper: &rbdDiskMapper{
+			rbd: newRBD(podUID, volName, "", "", false, plugin, manager),
+			mon: make([]string, 0),
+		},
+	}, nil
+}
+
 func (plugin *rbdPlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, error) {
 	if spec.PersistentVolume != nil && spec.PersistentVolume.Spec.RBD == nil {
 		return nil, fmt.Errorf("spec.PersistentVolumeSource.Spec.RBD is nil")
@@ -658,6 +782,134 @@ func (c *rbdUnmounter) TearDownAt(dir string) error {
 		return err
 	}
 	glog.V(3).Infof("rbd: successfully teardown at %s", dir)
+	return nil
+}
+
+var _ volume.BlockVolumeMapper = &rbdDiskMapper{}
+
+type rbdDiskMapper struct {
+	*rbd
+	mon           []string
+	id            string
+	keyring       string
+	secret        string
+	adminSecret   string
+	adminId       string
+	imageFormat   string
+	imageFeatures []string
+}
+
+var _ volume.BlockVolumeUnmapper = &rbdDiskUnmapper{}
+
+// GetGlobalMapPath returns global map path and error
+// path: plugins/kubernetes.io/{PluginName}/volumeDevices/{rbd pool}-image-{rbd image-name}/{podUid}
+func (rbd *rbd) GetGlobalMapPath(spec *volume.Spec) (string, error) {
+	return rbd.rbdGlobalMapPath(spec)
+}
+
+// GetPodDeviceMapPath returns pod device map path and volume name
+// path: pods/{podUid}/volumeDevices/kubernetes.io~rbd
+// volumeName: pv0001
+func (rbd *rbd) GetPodDeviceMapPath() (string, string) {
+	return rbd.rbdPodDeviceMapPath()
+}
+
+func (rbd *rbdDiskMapper) SetUpDevice() (string, error) {
+	return "", nil
+}
+
+func (rbd *rbd) rbdGlobalMapPath(spec *volume.Spec) (string, error) {
+	var err error
+	mon, err := getVolumeSourceMonitors(spec)
+	if err != nil {
+		return "", err
+	}
+	img, err := getVolumeSourceImage(spec)
+	if err != nil {
+		return "", err
+	}
+	pool, err := getVolumeSourcePool(spec)
+	if err != nil {
+		return "", err
+	}
+	ro, err := getVolumeSourceReadOnly(spec)
+	if err != nil {
+		return "", err
+	}
+
+	mounter := &rbdMounter{
+		rbd: newRBD("", spec.Name(), img, pool, ro, rbd.plugin, &RBDUtil{}),
+		Mon: mon,
+	}
+	return rbd.manager.MakeGlobalVDPDName(*mounter.rbd), nil
+}
+
+func (rbd *rbd) rbdPodDeviceMapPath() (string, string) {
+	name := rbdPluginName
+	return rbd.plugin.host.GetPodVolumeDeviceDir(rbd.podUID, strings.EscapeQualifiedNameForDisk(name)), rbd.volName
+}
+
+type rbdDiskUnmapper struct {
+	*rbdDiskMapper
+}
+
+func getPoolAndImageFromMapPath(mapPath string) (string, string, error) {
+
+	pathParts := dstrings.Split(mapPath, "/")
+	if len(pathParts) < 2 {
+		return "", "", fmt.Errorf("corrupted mapPath")
+	}
+	rbdParts := dstrings.Split(pathParts[len(pathParts)-1], "-image-")
+
+	if len(rbdParts) < 2 {
+		return "", "", fmt.Errorf("corrupted mapPath")
+	}
+	return string(rbdParts[0]), string(rbdParts[1]), nil
+}
+
+func getBlockVolumeDevice(mapPath string) (string, error) {
+	pool, image, err := getPoolAndImageFromMapPath(mapPath)
+	if err != nil {
+		return "", err
+	}
+	// Getting full device path
+	device, found := getDevFromImageAndPool(pool, image)
+	if !found {
+		return "", err
+	}
+	return device, nil
+}
+
+func (rbd *rbdDiskUnmapper) TearDownDevice(mapPath, _ string) error {
+
+	device, err := getBlockVolumeDevice(mapPath)
+	if err != nil {
+		return fmt.Errorf("rbd: failed to get loopback for device: %v, err: %v", device, err)
+	}
+	blkUtil := volutil.NewBlockVolumePathHandler()
+	loop, err := volutil.BlockVolumePathHandler.GetLoopDevice(blkUtil, device)
+	if err != nil {
+		return fmt.Errorf("rbd: failed to get loopback for device: %v, err: %v", device, err)
+	}
+	// Remove loop device before detaching volume since volume detach operation gets busy if volume is opened by loopback.
+	err = volutil.BlockVolumePathHandler.RemoveLoopDevice(blkUtil, loop)
+	if err != nil {
+		return fmt.Errorf("rbd: failed to remove loopback :%v, err: %v", loop, err)
+	}
+	glog.V(4).Infof("rbd: successfully removed loop device: %s", loop)
+
+	err = rbd.manager.DetachBlockDisk(*rbd, mapPath)
+	if err != nil {
+		return fmt.Errorf("rbd: failed to detach disk: %s\nError: %v", mapPath, err)
+	}
+	glog.V(4).Infof("rbd: %q is unmapped, deleting the directory", mapPath)
+
+	err = os.RemoveAll(mapPath)
+	if err != nil {
+		return fmt.Errorf("rbd: failed to delete the directory: %s\nError: %v", mapPath, err)
+	}
+	glog.V(4).Infof("rbd: successfully detached disk: %s", mapPath)
+
 	return nil
 }
 

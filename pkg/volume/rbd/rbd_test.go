@@ -81,16 +81,31 @@ func (fake *fakeDiskManager) MakeGlobalPDName(rbd rbd) string {
 	return makePDNameInternal(rbd.plugin.host, rbd.Pool, rbd.Image)
 }
 
+func (fake *fakeDiskManager) MakeGlobalVDPDName(rbd rbd) string {
+	return makePDNameInternal(rbd.plugin.host, rbd.Pool, rbd.Image)
+}
+
 func (fake *fakeDiskManager) AttachDisk(b rbdMounter) (string, error) {
 	fake.mutex.Lock()
 	defer fake.mutex.Unlock()
-	fake.rbdMapIndex += 1
+	fake.rbdMapIndex++
 	devicePath := fmt.Sprintf("/dev/rbd%d", fake.rbdMapIndex)
 	fake.rbdDevices[devicePath] = true
 	return devicePath, nil
 }
 
 func (fake *fakeDiskManager) DetachDisk(r *rbdPlugin, deviceMountPath string, device string) error {
+	fake.mutex.Lock()
+	defer fake.mutex.Unlock()
+	ok := fake.rbdDevices[device]
+	if !ok {
+		return fmt.Errorf("rbd: failed to detach device %s, it does not exist", device)
+	}
+	delete(fake.rbdDevices, device)
+	return nil
+}
+
+func (fake *fakeDiskManager) DetachBlockDisk(r rbdDiskUnmapper, device string) error {
 	fake.mutex.Lock()
 	defer fake.mutex.Unlock()
 	ok := fake.rbdDevices[device]
