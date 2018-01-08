@@ -180,7 +180,7 @@ func (rc *reconciler) reconcile() {
 				continue
 			}
 			err = volumeHandler.UnmountVolumeHandler(mountedVolume.MountedVolume, rc.actualStateOfWorld)
-			operationCompleteFunc := rc.desiredStateOfWorld.GetVolumeUnmountMetricCallback(mountedVolume.VolumeName)
+			operationCompleteFunc := rc.desiredStateOfWorld.GetVolumeUnmountCompletionCallback(mountedVolume.VolumeName)
 			if operationCompleteFunc != nil {
 				operationCompleteFunc(err)
 			}
