@@ -115,7 +115,7 @@ func (e *E2EServices) startKubelet() (*server, error) {
 	glog.Info("Starting kubelet")
 
 	// set feature gates so we can check which features are enabled and pass the appropriate flags
-	utilfeature.DefaultFeatureGate.Set(framework.TestContext.FeatureGates)
+	utilfeature.DefaultFeatureGate.SetFromMap(framework.TestContext.FeatureGates)
 
 	// Build kubeconfig
 	kubeconfigPath, err := createKubeconfigCWD()
@@ -265,9 +265,9 @@ func (e *E2EServices) startKubelet() (*server, error) {
 
 	// Apply test framework feature gates by default. This could also be overridden
 	// by kubelet-flags.
-	if framework.TestContext.FeatureGates != "" {
-		cmdArgs = append(cmdArgs, "--feature-gates", framework.TestContext.FeatureGates)
-		utilflag.NewMapStringBool(&kc.FeatureGates).Set(framework.TestContext.FeatureGates)
+	if len(framework.TestContext.FeatureGates) > 0 {
+		cmdArgs = append(cmdArgs, "--feature-gates", utilflag.NewMapStringBool(&framework.TestContext.FeatureGates).String())
+		kc.FeatureGates = framework.TestContext.FeatureGates
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicKubeletConfig) {
