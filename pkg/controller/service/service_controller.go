@@ -18,7 +18,6 @@ package service
 
 import (
 	"fmt"
-	"sort"
 	"sync"
 	"time"
 
@@ -28,6 +27,7 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	coreinformers "k8s.io/client-go/informers/core/v1"
@@ -567,10 +567,10 @@ func portEqualForLB(x, y *v1.ServicePort) bool {
 	return true
 }
 
-func nodeNames(nodes []*v1.Node) []string {
-	ret := make([]string, len(nodes))
-	for i, node := range nodes {
-		ret[i] = node.Name
+func nodeNames(nodes []*v1.Node) sets.String {
+	ret := sets.NewString()
+	for _, node := range nodes {
+		ret.Insert(node.Name)
 	}
 	return ret
 }
@@ -579,25 +579,7 @@ func nodeSlicesEqualForLB(x, y []*v1.Node) bool {
 	if len(x) != len(y) {
 		return false
 	}
-	return stringSlicesEqual(nodeNames(x), nodeNames(y))
-}
-
-func stringSlicesEqual(x, y []string) bool {
-	if len(x) != len(y) {
-		return false
-	}
-	if !sort.StringsAreSorted(x) {
-		sort.Strings(x)
-	}
-	if !sort.StringsAreSorted(y) {
-		sort.Strings(y)
-	}
-	for i := range x {
-		if x[i] != y[i] {
-			return false
-		}
-	}
-	return true
+	return nodeNames(x).Equal(nodeNames(x))
 }
 
 func getNodeConditionPredicate() corelisters.NodeConditionPredicate {
