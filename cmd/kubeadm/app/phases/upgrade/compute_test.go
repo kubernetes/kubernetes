@@ -64,7 +64,7 @@ type fakeEtcdCluster struct{}
 
 func (f fakeEtcdCluster) GetEtcdClusterStatus() (*clientv3.StatusResponse, error) {
 	client := &clientv3.StatusResponse{}
-	client.Version = "3.1.10"
+	client.Version = "3.1.11"
 	return client, nil
 }
 
@@ -108,13 +108,13 @@ func TestGetAvailableUpgrades(t *testing.T) {
 						},
 						KubeadmVersion: "v1.9.2",
 						DNSVersion:     "1.14.8",
-						EtcdVersion:    "3.1.10",
+						EtcdVersion:    "3.1.11",
 					},
 					After: ClusterState{
 						KubeVersion:    "v1.9.3",
 						KubeadmVersion: "v1.9.3",
 						DNSVersion:     "1.14.8",
-						EtcdVersion:    "3.1.10",
+						EtcdVersion:    "3.1.11",
 					},
 				},
 			},
@@ -140,13 +140,13 @@ func TestGetAvailableUpgrades(t *testing.T) {
 						},
 						KubeadmVersion: "v1.10.0",
 						DNSVersion:     "1.14.8",
-						EtcdVersion:    "3.1.10",
+						EtcdVersion:    "3.1.11",
 					},
 					After: ClusterState{
 						KubeVersion:    "v1.10.0",
 						KubeadmVersion: "v1.10.0",
 						DNSVersion:     "1.14.8",
-						EtcdVersion:    "3.1.10",
+						EtcdVersion:    "3.2.14",
 					},
 				},
 			},
@@ -172,13 +172,13 @@ func TestGetAvailableUpgrades(t *testing.T) {
 						},
 						KubeadmVersion: "v1.9.5",
 						DNSVersion:     "1.14.8",
-						EtcdVersion:    "3.1.10",
+						EtcdVersion:    "3.1.11",
 					},
 					After: ClusterState{
 						KubeVersion:    "v1.9.5",
 						KubeadmVersion: "v1.9.5", // Note: The kubeadm version mustn't be "downgraded" here
 						DNSVersion:     "1.14.8",
-						EtcdVersion:    "3.1.10",
+						EtcdVersion:    "3.1.11",
 					},
 				},
 				{
@@ -190,13 +190,13 @@ func TestGetAvailableUpgrades(t *testing.T) {
 						},
 						KubeadmVersion: "v1.9.5",
 						DNSVersion:     "1.14.8",
-						EtcdVersion:    "3.1.10",
+						EtcdVersion:    "3.1.11",
 					},
 					After: ClusterState{
 						KubeVersion:    "v1.10.1",
 						KubeadmVersion: "v1.10.1",
 						DNSVersion:     "1.14.8",
-						EtcdVersion:    "3.1.10",
+						EtcdVersion:    "3.2.14",
 					},
 				},
 			},
@@ -237,13 +237,13 @@ func TestGetAvailableUpgrades(t *testing.T) {
 						},
 						KubeadmVersion: "v1.9.5",
 						DNSVersion:     "1.14.8",
-						EtcdVersion:    "3.1.10",
+						EtcdVersion:    "3.1.11",
 					},
 					After: ClusterState{
 						KubeVersion:    "v1.10.0-alpha.2",
 						KubeadmVersion: "v1.10.0-alpha.2",
 						DNSVersion:     "1.14.8",
-						EtcdVersion:    "3.1.10",
+						EtcdVersion:    "3.2.14",
 					},
 				},
 			},
@@ -270,13 +270,13 @@ func TestGetAvailableUpgrades(t *testing.T) {
 						},
 						KubeadmVersion: "v1.9.5",
 						DNSVersion:     "1.14.8",
-						EtcdVersion:    "3.1.10",
+						EtcdVersion:    "3.1.11",
 					},
 					After: ClusterState{
 						KubeVersion:    "v1.10.0-alpha.2",
 						KubeadmVersion: "v1.10.0-alpha.2",
 						DNSVersion:     "1.14.8",
-						EtcdVersion:    "3.1.10",
+						EtcdVersion:    "3.2.14",
 					},
 				},
 			},
@@ -304,13 +304,13 @@ func TestGetAvailableUpgrades(t *testing.T) {
 						},
 						KubeadmVersion: "v1.9.5",
 						DNSVersion:     "1.14.8",
-						EtcdVersion:    "3.1.10",
+						EtcdVersion:    "3.1.11",
 					},
 					After: ClusterState{
 						KubeVersion:    "v1.10.0-beta.1",
 						KubeadmVersion: "v1.10.0-beta.1",
 						DNSVersion:     "1.14.8",
-						EtcdVersion:    "3.1.10",
+						EtcdVersion:    "3.2.14",
 					},
 				},
 			},
@@ -338,13 +338,13 @@ func TestGetAvailableUpgrades(t *testing.T) {
 						},
 						KubeadmVersion: "v1.9.5",
 						DNSVersion:     "1.14.8",
-						EtcdVersion:    "3.1.10",
+						EtcdVersion:    "3.1.11",
 					},
 					After: ClusterState{
 						KubeVersion:    "v1.10.0-rc.1",
 						KubeadmVersion: "v1.10.0-rc.1",
 						DNSVersion:     "1.14.8",
-						EtcdVersion:    "3.1.10",
+						EtcdVersion:    "3.2.14",
 					},
 				},
 			},
@@ -372,13 +372,13 @@ func TestGetAvailableUpgrades(t *testing.T) {
 						},
 						KubeadmVersion: "v1.9.5",
 						DNSVersion:     "1.14.8",
-						EtcdVersion:    "3.1.10",
+						EtcdVersion:    "3.1.11",
 					},
 					After: ClusterState{
 						KubeVersion:    "v1.10.6-rc.1",
 						KubeadmVersion: "v1.10.6-rc.1",
 						DNSVersion:     "1.14.8",
-						EtcdVersion:    "3.1.10",
+						EtcdVersion:    "3.2.14",
 					},
 				},
 			},
@@ -406,13 +406,13 @@ func TestGetAvailableUpgrades(t *testing.T) {
 						},
 						KubeadmVersion: "v1.9.5",
 						DNSVersion:     "1.14.8",
-						EtcdVersion:    "3.1.10",
+						EtcdVersion:    "3.1.11",
 					},
 					After: ClusterState{
 						KubeVersion:    "v1.10.0-rc.1",
 						KubeadmVersion: "v1.10.0-rc.1",
 						DNSVersion:     "1.14.8",
-						EtcdVersion:    "3.1.10",
+						EtcdVersion:    "3.2.14",
 					},
 				},
 				{
@@ -424,13 +424,13 @@ func TestGetAvailableUpgrades(t *testing.T) {
 						},
 						KubeadmVersion: "v1.9.5",
 						DNSVersion:     "1.14.8",
-						EtcdVersion:    "3.1.10",
+						EtcdVersion:    "3.1.11",
 					},
 					After: ClusterState{
 						KubeVersion:    "v1.11.0-alpha.2",
 						KubeadmVersion: "v1.11.0-alpha.2",
 						DNSVersion:     "1.14.8",
-						EtcdVersion:    "3.1.10",
+						EtcdVersion:    "3.2.14",
 					},
 				},
 			},
@@ -444,7 +444,6 @@ func TestGetAvailableUpgrades(t *testing.T) {
 	// kubernetes release.
 	testCluster := fakeEtcdCluster{}
 	for _, rt := range tests {
-
 		actualUpgrades, actualErr := GetAvailableUpgrades(rt.vg, rt.allowExperimental, rt.allowRCs, testCluster, featureGates)
 		if !reflect.DeepEqual(actualUpgrades, rt.expectedUpgrades) {
 			t.Errorf("failed TestGetAvailableUpgrades\n\texpected upgrades: %v\n\tgot: %v", rt.expectedUpgrades, actualUpgrades)
