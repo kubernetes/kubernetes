@@ -1,4 +1,4 @@
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1beta2
 kind: Deployment
 metadata:
   name: calico-typha
@@ -8,6 +8,9 @@ metadata:
     addonmanager.kubernetes.io/mode: Reconcile
     k8s-app: calico-typha
 spec:
+  selector:
+    matchLabels:
+      k8s-app: calico-typha
   revisionHistoryLimit: 2
   template:
     metadata:

@@ -1,5 +1,5 @@
 kind: Deployment
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1beta2
 metadata:
   name: calico-typha-vertical-autoscaler
   namespace: kube-system
@@ -8,11 +8,16 @@ metadata:
     kubernetes.io/cluster-service: "true"
     addonmanager.kubernetes.io/mode: Reconcile
 spec:
+  selector:
+    matchLabels:
+      k8s-app: calico-typha-autoscaler
+      name: calico-typha-vertical-autoscaler
   replicas: 1
   template:
     metadata:
       labels:
         k8s-app: calico-typha-autoscaler
+        name: calico-typha-vertical-autoscaler
       annotations:
         scheduler.alpha.kubernetes.io/critical-pod: ''
     spec:
