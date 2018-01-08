@@ -172,8 +172,16 @@ function kube::release::package_node_tarballs() {
     cp "${node_bins[@]/#/${LOCAL_OUTPUT_BINPATH}/${platform}/}" \
       "${release_stage}/node/bin/"
 
-    # TODO: Docker images here
-    # kube::release::create_docker_images_for_server "${release_stage}/server/bin" "${arch}"
+    # Docker images here
+    mkdir -p "${release_stage}/server/bin"
+
+    # This fancy expression will expand to prepend a path
+    # (${LOCAL_OUTPUT_BINPATH}/${platform}/) to every item in the
+    # KUBE_SERVER_BINARIES array.
+    cp "${KUBE_SERVER_BINARIES[@]/#/${LOCAL_OUTPUT_BINPATH}/${platform}/}" \
+      "${release_stage}/server/bin/"
+
+    kube::release::create_docker_images_for_server "${release_stage}/server/bin" "${arch}"
 
     # Include the client binaries here too as they are useful debugging tools.
     local client_bins=("${KUBE_CLIENT_BINARIES[@]}")
