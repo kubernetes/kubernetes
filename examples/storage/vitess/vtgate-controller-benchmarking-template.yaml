@@ -13,7 +13,7 @@ spec:
     spec:
       containers:
         - name: vtgate
-          image: {{vitess_image}}
+          image: vitess/root
           livenessProbe:
             httpGet:
               path: /debug/vars
@@ -27,8 +27,8 @@ spec:
               mountPath: /vt/vtdataroot
           resources:
             limits:
-              memory: "512Mi"
-              cpu: "500m"
+              memory: "4Gi"
+              cpu: "6"
           command:
             - sh
             - "-c"
@@ -42,16 +42,16 @@ spec:
               -alsologtostderr
               -port 15001
               -grpc_port 15991
-              -mysql_server_port {{mysql_server_port}}
-              -mysql_auth_server_static_string '{\"mysql_user\":{\"Password\":\"mysql_password\"}}'
               -service_map 'grpc-vtgateservice'
               -cells_to_watch {{cell}}
               -tablet_types_to_wait MASTER,REPLICA
               -gateway_implementation discoverygateway
               -cell {{cell}}" vitess
+          env:
+            - name: GOMAXPROCS
+              value: "16"
       volumes:
         - name: syslog
           hostPath: {path: /dev/log}
         - name: vtdataroot
-          emptyDir: {}
-
+          {{vtdataroot_volume}}

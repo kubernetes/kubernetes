@@ -14,20 +14,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This is an example script that stops vtgate.
+# This is an example script that stops orchestrator.
 
 set -e
 
 script_root=`dirname "${BASH_SOURCE}"`
 source $script_root/env.sh
 
-cells=`echo $CELLS | tr ',' ' '`
+echo "Stopping orchestrator replicationcontroller..."
+$KUBECTL $KUBECTL_OPTIONS delete replicationcontroller orchestrator
 
-for cell in $cells; do
-  echo "Stopping vtgate replicationcontroller in cell $cell..."
-  $KUBECTL $KUBECTL_OPTIONS delete replicationcontroller vtgate-$cell
+echo "Deleting orchestrator service..."
+$KUBECTL $KUBECTL_OPTIONS delete service orchestrator
 
-  echo "Deleting vtgate service in cell $cell..."
-  $KUBECTL $KUBECTL_OPTIONS delete service vtgate-$cell
-done
-
+echo "Deleting orchestrator configmap..."
+$KUBECTL $KUBECTL_OPTIONS delete configmap orchestrator-conf

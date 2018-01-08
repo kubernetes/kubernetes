@@ -1,0 +1,56 @@
+# Orchestrator service
+apiVersion: v1
+kind: Service
+metadata:
+  name: orchestrator
+  labels:
+    component: orchestrator
+    app: vitess
+spec:
+  ports:
+    - port: 80
+      targetPort: 3000
+  selector:
+    component: orchestrator
+    app: vitess
+---
+# Orchestrator replication controller
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: orchestrator
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        component: orchestrator
+        app: vitess
+    spec:
+      containers:
+        - name: orchestrator
+          image: vitess/orchestrator
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 3000
+            initialDelaySeconds: 300
+            timeoutSeconds: 30
+          resources:
+            limits:
+              memory: "512Mi"
+              cpu: "100m"
+          volumeMounts:
+            - mountPath: /orc/conf
+              name: config
+        - name: mysql
+          image: vitess/orchestrator
+          resources:
+            limits:
+              memory: "512Mi"
+              cpu: "100m"
+          command: ["mysqld"]
+      volumes:
+        - name: config
+          configMap:
+            name: orchestrator-conf

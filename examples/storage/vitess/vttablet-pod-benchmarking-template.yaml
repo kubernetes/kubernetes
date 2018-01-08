@@ -11,44 +11,37 @@ metadata:
 spec:
   containers:
     - name: vttablet
-      image: {{vitess_image}}
-      livenessProbe:
-        httpGet:
-          path: /debug/vars
-          port: {{port}}
-        initialDelaySeconds: 60
-        timeoutSeconds: 10
+      image: vitess/root
+      resources:
+        limits:
+          memory: "4Gi"
+          cpu: "2"
       volumeMounts:
         - name: syslog
           mountPath: /dev/log
         - name: vtdataroot
           mountPath: /vt/vtdataroot
-        - name: certs
-          readOnly: true
-          # Mount root certs from the host OS into the location
-          # expected for our container OS (Debian):
-          mountPath: /etc/ssl/certs/ca-certificates.crt
-      resources:
-        limits:
-          memory: "1Gi"
-          cpu: "500m"
-      ports:
-        - name: web
-          containerPort: {{port}}
-        - name: grpc
-          containerPort: {{grpc_port}}
       command:
         - bash
         - "-c"
         - >-
           set -e
 
+          mysql_socket="$VTDATAROOT/{{tablet_subdir}}/mysql.sock"
+
           mkdir -p $VTDATAROOT/tmp
 
           chown -R vitess /vt
 
+          while [ ! -e $mysql_socket ]; do
+          echo "[$(date)] waiting for $mysql_socket" ;
+          sleep 1 ;
+          done
+
+          su -p -s /bin/bash -c "mysql -u vt_dba -S $mysql_socket
+          -e 'CREATE DATABASE IF NOT EXISTS vt_{{keyspace}}'" vitess
+
           su -p -s /bin/bash -c "/vt/bin/vttablet
-          -binlog_use_v3_resharding_mode
           -topo_implementation etcd
           -etcd_global_addrs http://etcd-global:4001
           -log_dir $VTDATAROOT/tmp
@@ -61,7 +54,6 @@ spec:
           -init_keyspace {{keyspace}}
           -init_shard {{shard}}
           -init_tablet_type {{tablet_type}}
-          -health_check_interval 5s
           -mysqlctl_socket $VTDATAROOT/mysqlctl.sock
           -db-config-app-uname vt_app
           -db-config-app-dbname vt_{{keyspace}}
@@ -75,25 +67,24 @@ spec:
           -db-config-filtered-uname vt_filtered
           -db-config-filtered-dbname vt_{{keyspace}}
           -db-config-filtered-charset utf8
-          -enable_semi_sync
-          -enable_replication_reporter
-          -orc_api_url http://orchestrator/api
-          -orc_discover_interval 5m
-          -restore_from_backup {{backup_flags}}" vitess
+          -queryserver-config-transaction-cap 300
+          -queryserver-config-schema-reload-time 1
+          -queryserver-config-pool-size 100
+          -enable_replication_reporter" vitess
       env:
-        - name: EXTRA_MY_CNF
-          value: /vt/config/mycnf/master_mysql56.cnf
+        - name: GOMAXPROCS
+          value: "16"
     - name: mysql
-      image: {{vitess_image}}
+      image: vitess/root
+      resources:
+        limits:
+          memory: "4Gi"
+          cpu: "2"
       volumeMounts:
         - name: syslog
           mountPath: /dev/log
         - name: vtdataroot
           mountPath: /vt/vtdataroot
-      resources:
-        limits:
-          memory: "1Gi"
-          cpu: "500m"
       command:
         - sh
         - "-c"
@@ -111,18 +102,10 @@ spec:
           -init_db_sql_file $VTROOT/config/init_db.sql" vitess
       env:
         - name: EXTRA_MY_CNF
-          value: /vt/config/mycnf/master_mysql56.cnf
+          value: /vt/config/mycnf/benchmark.cnf:/vt/config/mycnf/master_mysql56.cnf
   volumes:
     - name: syslog
       hostPath: {path: /dev/log}
     - name: vtdataroot
       {{vtdataroot_volume}}
-    - name: certs
-      # Uncomment one of the following lines to configure the location
-      # of the root certificates file on your host OS. We need this so
-      # we can import it into the container OS.
-      # If your host OS is Fedora/RHEL:
-      #hostPath: {path: /etc/pki/tls/certs/ca-bundle.crt}
-      # If your host OS is Debian/Ubuntu/Gentoo:
-      hostPath: {path: /etc/ssl/certs/ca-certificates.crt}
 

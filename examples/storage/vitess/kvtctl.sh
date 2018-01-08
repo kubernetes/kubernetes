@@ -14,20 +14,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This is an example script that stops vtgate.
+# This is a script that uses kubectl to figure out the address for vtctld,
+# and then runs vtctlclient with that address.
 
 set -e
 
 script_root=`dirname "${BASH_SOURCE}"`
 source $script_root/env.sh
 
-cells=`echo $CELLS | tr ',' ' '`
+echo "Starting port forwarding to vtctld..."
+start_vtctld_forward
+trap stop_vtctld_forward EXIT
 
-for cell in $cells; do
-  echo "Stopping vtgate replicationcontroller in cell $cell..."
-  $KUBECTL $KUBECTL_OPTIONS delete replicationcontroller vtgate-$cell
-
-  echo "Deleting vtgate service in cell $cell..."
-  $KUBECTL $KUBECTL_OPTIONS delete service vtgate-$cell
-done
+vtctlclient -server 127.0.0.1:$vtctld_forward_port "$@"
 

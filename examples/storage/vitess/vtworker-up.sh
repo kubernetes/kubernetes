@@ -14,20 +14,29 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This is an example script that stops vtgate.
-
 set -e
 
 script_root=`dirname "${BASH_SOURCE}"`
 source $script_root/env.sh
 
-cells=`echo $CELLS | tr ',' ' '`
+cell=(`echo $CELLS | tr ',' ' '`) # ref to cell will get first element
+port=15032
+grpc_port=15033
 
-for cell in $cells; do
-  echo "Stopping vtgate replicationcontroller in cell $cell..."
-  $KUBECTL $KUBECTL_OPTIONS delete replicationcontroller vtgate-$cell
-
-  echo "Deleting vtgate service in cell $cell..."
-  $KUBECTL $KUBECTL_OPTIONS delete service vtgate-$cell
+sed_script=""
+for var in vitess_image cell port grpc_port; do
+  sed_script+="s,{{$var}},${!var},g;"
 done
 
+echo "Creating vtworker pod in cell $cell..."
+cat vtworker-controller-interactive-template.yaml | sed -e "$sed_script" | $KUBECTL $KUBECTL_OPTIONS create -f -
+
+set +e
+
+service_type='LoadBalancer'
+echo "Creating vtworker $service_type service..."
+sed_script=""
+for var in service_type port grpc_port; do
+  sed_script+="s,{{$var}},${!var},g;"
+done
+cat vtworker-service-template.yaml | sed -e "$sed_script" | $KUBECTL $KUBECTL_OPTIONS create -f -

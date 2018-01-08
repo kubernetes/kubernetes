@@ -1,0 +1,17 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: vtworker
+  labels:
+    component: vtworker
+    app: vitess
+spec:
+  ports:
+    - name: web
+      port: {{port}}
+    - name: grpc
+      port: {{grpc_port}}
+  selector:
+    component: vtworker
+    app: vitess
+  type: {{service_type}}

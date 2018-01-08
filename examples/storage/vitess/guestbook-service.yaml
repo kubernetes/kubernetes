@@ -3,14 +3,14 @@ apiVersion: v1
 metadata:
   name: guestbook
   labels:
-    component: guestbook
-    app: vitess
+    component: frontend
+    app: guestbook
 spec:
   ports:
     - port: 80
       targetPort: http-server
   selector:
-    component: guestbook
-    app: vitess
+    component: frontend
+    app: guestbook
   type: LoadBalancer
 

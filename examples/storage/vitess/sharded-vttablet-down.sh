@@ -14,20 +14,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This is an example script that stops vtgate.
+# This is an example script that tears down the vttablet deployment
+# created by sharded-vttablet-up.sh.
 
-set -e
+SHARDS='-80,80-'
+UID_BASE=200
 
-script_root=`dirname "${BASH_SOURCE}"`
-source $script_root/env.sh
-
-cells=`echo $CELLS | tr ',' ' '`
-
-for cell in $cells; do
-  echo "Stopping vtgate replicationcontroller in cell $cell..."
-  $KUBECTL $KUBECTL_OPTIONS delete replicationcontroller vtgate-$cell
-
-  echo "Deleting vtgate service in cell $cell..."
-  $KUBECTL $KUBECTL_OPTIONS delete service vtgate-$cell
-done
-
+source ./vttablet-down.sh

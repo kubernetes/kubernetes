@@ -1,3 +1,5 @@
+---
+# Regular service for load balancing client connections.
 kind: Service
 apiVersion: v1
 metadata:
@@ -9,6 +11,25 @@ metadata:
 spec:
   ports:
     - port: 4001
+  selector:
+    component: etcd
+    cell: {{cell}}
+    app: vitess
+---
+# Headless service for etcd cluster bootstrap.
+kind: Service
+apiVersion: v1
+metadata:
+  name: etcd-{{cell}}-srv
+  labels:
+    component: etcd
+    cell: {{cell}}
+    app: vitess
+spec:
+  clusterIP: None
+  ports:
+    - name: etcd-server
+      port: 7001
   selector:
     component: etcd
     cell: {{cell}}
