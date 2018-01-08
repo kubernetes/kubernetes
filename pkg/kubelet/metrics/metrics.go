@@ -48,8 +48,8 @@ const (
 	DevicePluginRegistrationCountKey = "device_plugin_registration_count"
 	DevicePluginAllocationLatencyKey = "device_plugin_alloc_latency_microseconds"
 	// Metrics keys of volume operations
-	VolumeManagerOpeationsKey      = "volumemanager_operation_duration_seconds"
-	VolumeManagerOpeationsErrorKey = "volumemanager_operation_errors_total"
+	VolumeManagerOperationsKey      = "volumemanager_operation_duration_seconds"
+	VolumeManagerOperationsErrorKey = "volumemanager_operation_errors_total"
 )
 
 var (
@@ -204,7 +204,7 @@ var (
 	// Metrics keys of volume operations
 	VolumeManagerOperationMetric = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
-			Name:    VolumeManagerOpeationsKey,
+			Name:    VolumeManagerOperationsKey,
 			Help:    "VolumeManager storage operation duration",
 			Buckets: []float64{.1, .25, .5, 1, 2.5, 5, 10, 15, 25, 50},
 		},
@@ -212,7 +212,7 @@ var (
 	)
 	VolumeManagerOperationErrorMetric = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
-			Name: VolumeManagerOpeationsErrorKey,
+			Name: VolumeManagerOperationsErrorKey,
 			Help: "VolumeManager storage operation errors",
 		},
 		[]string{"volume_plugin", "operation_name"},

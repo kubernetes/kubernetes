@@ -95,9 +95,9 @@ type DesiredStateOfWorld interface {
 	// current desired state of the world.
 	GetVolumesToMount() []VolumeToMount
 
-	// GetVolumeUnmountMetricCallback retreives the associated metric callback for a given
+	// GetVolumeUnmountCompletionCallback retrieves the associated metric callback for a given
 	// volume's unmount operation
-	GetVolumeUnmountMetricCallback(volumeName v1.UniqueVolumeName) func(error)
+	GetVolumeUnmountCompletionCallback(volumeName v1.UniqueVolumeName) func(error)
 
 	// GetPods generates and returns a map of pods in which map is indexed
 	// with pod's unique name. This map can be used to determine which pod is currently
@@ -114,9 +114,9 @@ type VolumeToMount struct {
 // NewDesiredStateOfWorld returns a new instance of DesiredStateOfWorld.
 func NewDesiredStateOfWorld(volumePluginMgr *volume.VolumePluginMgr) DesiredStateOfWorld {
 	return &desiredStateOfWorld{
-		volumesToMount:   make(map[v1.UniqueVolumeName]volumeToMount),
-		volumesToUnmount: make(map[v1.UniqueVolumeName]func(error)),
-		volumePluginMgr:  volumePluginMgr,
+		volumesToMount:               make(map[v1.UniqueVolumeName]volumeToMount),
+		unmountCompletionCallbackMap: make(map[v1.UniqueVolumeName]func(error)),
+		volumePluginMgr:              volumePluginMgr,
 	}
 }
 
@@ -126,9 +126,9 @@ type desiredStateOfWorld struct {
 	// the map is the name of the volume and the value is a volume object
 	// containing more information about the volume.
 	volumesToMount map[v1.UniqueVolumeName]volumeToMount
-	// volumesToUnmount is a map containing callback functions to record metrics
+	// unmountCompletionCallbackMap is a map containing callback functions to record metrics
 	// for a given Volume's unmount operation
-	volumesToUnmount map[v1.UniqueVolumeName]func(error)
+	unmountCompletionCallbackMap map[v1.UniqueVolumeName]func(error)
 	// volumePluginMgr is the volume plugin manager used to create volume
 	// plugin objects.
 	volumePluginMgr *volume.VolumePluginMgr
@@ -300,7 +300,7 @@ func (dsw *desiredStateOfWorld) DeletePodFromVolume(
 	}
 
 	// create metric for volume unmount
-	dsw.volumesToUnmount[volumeName] = metrics.VolumeManagerOperationCompleteHook(volumePluginName, "volume_unmount")
+	dsw.unmountCompletionCallbackMap[volumeName] = metrics.VolumeManagerOperationCompleteHook(volumePluginName, "volume_unmount")
 }
 
 func (dsw *desiredStateOfWorld) VolumeExists(
@@ -366,9 +366,12 @@ func (dsw *desiredStateOfWorld) GetVolumesToMount() []VolumeToMount {
 	return volumesToMount
 }
 
-func (dsw *desiredStateOfWorld) GetVolumeUnmountMetricCallback(volumeName v1.UniqueVolumeName) func(error) {
-	operationComplete := dsw.volumesToUnmount[volumeName]
-	delete(dsw.volumesToUnmount, volumeName)
+func (dsw *desiredStateOfWorld) GetVolumeUnmountCompletionCallback(volumeName v1.UniqueVolumeName) func(error) {
+	dsw.Lock()
+	defer dsw.Unlock()
+
+	operationComplete := dsw.unmountCompletionCallbackMap[volumeName]
+	delete(dsw.unmountCompletionCallbackMap, volumeName)
 	return operationComplete
 }
 
