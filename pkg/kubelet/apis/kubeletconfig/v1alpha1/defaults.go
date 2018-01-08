@@ -129,6 +129,10 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 	if obj.MaxPods == 0 {
 		obj.MaxPods = 110
 	}
+	if obj.PodPidsLimit == nil {
+		temp := int64(-1)
+		obj.PodPidsLimit = &temp
+	}
 	if obj.NodeStatusUpdateFrequency == zeroDuration {
 		obj.NodeStatusUpdateFrequency = metav1.Duration{Duration: 10 * time.Second}
 	}

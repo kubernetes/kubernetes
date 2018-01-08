@@ -27,7 +27,9 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
+	kubefeatures "k8s.io/kubernetes/pkg/features"
 )
 
 const (
@@ -45,6 +47,8 @@ type podContainerManagerImpl struct {
 	// cgroupManager is the cgroup Manager Object responsible for managing all
 	// pod cgroups.
 	cgroupManager CgroupManager
+	// Maximum number of pids in a pod
+	podPidsLimit int64
 }
 
 // Make sure that podContainerManagerImpl implements the PodContainerManager interface
@@ -76,6 +80,9 @@ func (m *podContainerManagerImpl) EnsureExists(pod *v1.Pod) error {
 		containerConfig := &CgroupConfig{
 			Name:               podContainerName,
 			ResourceParameters: ResourceConfigForPod(pod),
+		}
+		if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.SupportPodPidsLimit) && m.podPidsLimit > 0 {
+			containerConfig.ResourceParameters.PodPidsLimit = &m.podPidsLimit
 		}
 		if err := m.cgroupManager.Create(containerConfig); err != nil {
 			return fmt.Errorf("failed to create container for %v : %v", podContainerName, err)

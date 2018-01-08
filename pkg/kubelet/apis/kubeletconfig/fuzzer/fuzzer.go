@@ -62,6 +62,8 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			obj.ImageGCLowThresholdPercent = 80
 			obj.MaxOpenFiles = 1000000
 			obj.MaxPods = 110
+			temp := int64(-1)
+			obj.PodPidsLimit = &temp
 			obj.NodeStatusUpdateFrequency = metav1.Duration{Duration: 10 * time.Second}
 			obj.CPUManagerPolicy = "none"
 			obj.CPUManagerReconcilePeriod = obj.NodeStatusUpdateFrequency
