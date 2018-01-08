@@ -90,6 +90,7 @@ type LoadBalancerOpts struct {
 type BlockStorageOpts struct {
 	BSVersion       string `gcfg:"bs-version"`        // overrides autodetection. v1 or v2. Defaults to auto
 	TrustDevicePath bool   `gcfg:"trust-device-path"` // See Issue #33128
+	IgnoreVolumeAZ  bool   `gcfg:"ignore-volume-az"`
 }
 
 type RouterOpts struct {
@@ -177,6 +178,7 @@ func readConfig(config io.Reader) (Config, error) {
 	// Set default values for config params
 	cfg.BlockStorage.BSVersion = "auto"
 	cfg.BlockStorage.TrustDevicePath = false
+	cfg.BlockStorage.IgnoreVolumeAZ = false
 
 	err := gcfg.ReadInto(&cfg, config)
 	return cfg, err
