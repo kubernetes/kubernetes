@@ -93,14 +93,8 @@ type KubeProxyConntrackConfiguration struct {
 type KubeProxyConfiguration struct {
 	metav1.TypeMeta `json:",inline"`
 
-	// TODO FeatureGates really should be a map but that requires refactoring all
-	// components to use config files because local-up-cluster.sh only supports
-	// the --feature-gates flag right now, which is comma-separated key=value
-	// pairs.
-	//
-	// featureGates is a comma-separated list of key=value pairs that control
-	// which alpha/beta features are enabled.
-	FeatureGates string `json:"featureGates"`
+	// featureGates is a map of feature names to bools that enable or disable alpha/experimental features.
+	FeatureGates map[string]bool `json:"featureGates,omitempty"`
 
 	// bindAddress is the IP address for the proxy server to serve on (set to 0.0.0.0
 	// for all interfaces)

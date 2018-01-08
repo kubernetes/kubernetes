@@ -193,7 +193,7 @@ func (o *Options) Complete() error {
 		} else {
 			o.config = c
 			// Make sure we apply the feature gate settings in the config file.
-			utilfeature.DefaultFeatureGate.Set(o.config.FeatureGates)
+			utilfeature.DefaultFeatureGate.SetFromMap(o.config.FeatureGates)
 		}
 	}
 
