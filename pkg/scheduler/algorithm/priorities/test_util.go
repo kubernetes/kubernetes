@@ -17,6 +17,8 @@ limitations under the License.
 package priorities
 
 import (
+	"encoding/json"
+	"fmt"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -58,4 +60,16 @@ func priorityFunction(mapFn algorithm.PriorityMapFunction, reduceFn algorithm.Pr
 		}
 		return result, nil
 	}
+}
+
+func marshalComparingTestResults(expected interface{}, got interface{}) (expectedString, gotString []byte, err error) {
+	expectedMarshal, err := json.Marshal(expected)
+	if err != nil {
+		return nil, nil, fmt.Errorf("error in marshalling expected list : %v", err)
+	}
+	gotMarshal, err := json.Marshal(got)
+	if err != nil {
+		return nil, nil, fmt.Errorf("error in marshalling got list : %v", err)
+	}
+	return expectedMarshal, gotMarshal, nil
 }

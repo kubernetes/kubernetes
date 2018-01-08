@@ -772,7 +772,7 @@ func TestZoneSpreadPriority(t *testing.T) {
 			schedulertesting.FakeControllerLister(rcs),
 			schedulertesting.FakeReplicaSetLister(rss),
 			schedulertesting.FakeStatefulSetLister(sss))
-		mataData := mataDataProducer(test.pod, nodeNameToInfo)
+		mataData := mataDataProducer(test.pod, nodeNameToInfo, nil)
 		ttp := priorityFunction(zoneSpread.CalculateAntiAffinityPriorityMap, zoneSpread.CalculateAntiAffinityPriorityReduce, mataData)
 		list, err := ttp(test.pod, nodeNameToInfo, makeLabeledNodeList(test.nodes))
 		if err != nil {

@@ -73,13 +73,13 @@ func hasNoPodsPredicate(pod *v1.Pod, meta algorithm.PredicateMetadata, nodeInfo 
 }
 
 func numericPriority(pod *v1.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo, nodes []*v1.Node) (schedulerapi.HostPriorityList, error) {
-	result := []schedulerapi.HostPriority{}
+	result := []*schedulerapi.HostPriority{}
 	for _, node := range nodes {
 		score, err := strconv.Atoi(node.Name)
 		if err != nil {
 			return nil, err
 		}
-		result = append(result, schedulerapi.HostPriority{
+		result = append(result, &schedulerapi.HostPriority{
 			Host:  node.Name,
 			Score: score,
 		})
@@ -90,7 +90,7 @@ func numericPriority(pod *v1.Pod, nodeNameToInfo map[string]*schedulercache.Node
 func reverseNumericPriority(pod *v1.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo, nodes []*v1.Node) (schedulerapi.HostPriorityList, error) {
 	var maxScore float64
 	minScore := math.MaxFloat64
-	reverseResult := []schedulerapi.HostPriority{}
+	reverseResult := []*schedulerapi.HostPriority{}
 	result, err := numericPriority(pod, nodeNameToInfo, nodes)
 	if err != nil {
 		return nil, err
@@ -101,7 +101,7 @@ func reverseNumericPriority(pod *v1.Pod, nodeNameToInfo map[string]*schedulercac
 		minScore = math.Min(minScore, float64(hostPriority.Score))
 	}
 	for _, hostPriority := range result {
-		reverseResult = append(reverseResult, schedulerapi.HostPriority{
+		reverseResult = append(reverseResult, &schedulerapi.HostPriority{
 			Host:  hostPriority.Host,
 			Score: int(maxScore + minScore - float64(hostPriority.Score)),
 		})
@@ -126,7 +126,7 @@ func TestSelectHost(t *testing.T) {
 		expectsErr    bool
 	}{
 		{
-			list: []schedulerapi.HostPriority{
+			list: []*schedulerapi.HostPriority{
 				{Host: "machine1.1", Score: 1},
 				{Host: "machine2.1", Score: 2},
 			},
@@ -135,7 +135,7 @@ func TestSelectHost(t *testing.T) {
 		},
 		// equal scores
 		{
-			list: []schedulerapi.HostPriority{
+			list: []*schedulerapi.HostPriority{
 				{Host: "machine1.1", Score: 1},
 				{Host: "machine1.2", Score: 2},
 				{Host: "machine1.3", Score: 2},
@@ -146,7 +146,7 @@ func TestSelectHost(t *testing.T) {
 		},
 		// out of order scores
 		{
-			list: []schedulerapi.HostPriority{
+			list: []*schedulerapi.HostPriority{
 				{Host: "machine1.1", Score: 3},
 				{Host: "machine1.2", Score: 3},
 				{Host: "machine2.1", Score: 2},
@@ -158,7 +158,7 @@ func TestSelectHost(t *testing.T) {
 		},
 		// empty priorityList
 		{
-			list:          []schedulerapi.HostPriority{},
+			list:          []*schedulerapi.HostPriority{},
 			possibleHosts: sets.NewString(),
 			expectsErr:    true,
 		},
@@ -639,7 +639,7 @@ func TestZeroRequest(t *testing.T) {
 			schedulertesting.FakeControllerLister([]*v1.ReplicationController{}),
 			schedulertesting.FakeReplicaSetLister([]*extensions.ReplicaSet{}),
 			schedulertesting.FakeStatefulSetLister([]*apps.StatefulSet{}))
-		mataData := mataDataProducer(test.pod, nodeNameToInfo)
+		mataData := mataDataProducer(test.pod, nodeNameToInfo, test.nodes)
 
 		list, err := PrioritizeNodes(
 			test.pod, nodeNameToInfo, mataData, priorityConfigs,
