@@ -239,6 +239,18 @@ func (e *E2EServices) startKubelet() (*server, error) {
 		cmdArgs = append(cmdArgs, "--hostname-override", framework.TestContext.NodeName)
 	}
 
+	if framework.TestContext.ContainerRuntime != "" {
+		cmdArgs = append(cmdArgs, "--container-runtime", framework.TestContext.ContainerRuntime)
+	}
+
+	if framework.TestContext.ContainerRuntimeEndpoint != "" {
+		cmdArgs = append(cmdArgs, "--container-runtime-endpoint", framework.TestContext.ContainerRuntimeEndpoint)
+	}
+
+	if framework.TestContext.ImageServiceEndpoint != "" {
+		cmdArgs = append(cmdArgs, "--image-service-endpoint", framework.TestContext.ImageServiceEndpoint)
+	}
+
 	// Override the default kubelet flags.
 	cmdArgs = append(cmdArgs, kubeletArgs...)
 
