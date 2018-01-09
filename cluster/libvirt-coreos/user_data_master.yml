@@ -23,6 +23,7 @@ coreos:
         --insecure-bind-address=0.0.0.0 \
         --insecure-port=8080 \
         --etcd-servers=http://127.0.0.1:2379 \
+        --storage-backend=etcd2 \
         --kubelet-port=10250 \
         --v=4 \
         --service-cluster-ip-range=${SERVICE_CLUSTER_IP_RANGE}
