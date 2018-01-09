@@ -74,10 +74,10 @@ func (az *Cloud) GetLoadBalancer(clusterName string, service *v1.Service) (statu
 	if err != nil {
 		return nil, false, err
 	}
-	if exists == false {
+	if !exists {
 		serviceName := getServiceName(service)
-		glog.V(5).Infof("getloadbalancer (cluster:%s) (service:%s)- IP doesn't exist in any of the lbs", clusterName, serviceName)
-		return nil, false, fmt.Errorf("Service(%s) - Loadbalancer not found", serviceName)
+		glog.V(5).Infof("getloadbalancer (cluster:%s) (service:%s) - doesn't exist", clusterName, serviceName)
+		return nil, false, nil
 	}
 	return status, true, nil
 }
