@@ -11752,7 +11752,7 @@ func TestValidateSecurityContext(t *testing.T) {
 		"negative RunAsUser": {
 			sc:          negativeRunAsUser,
 			errorType:   "FieldValueInvalid",
-			errorDetail: isNegativeErrorMsg,
+			errorDetail: "must be between",
 		},
 	}
 	for k, v := range errorCases {
