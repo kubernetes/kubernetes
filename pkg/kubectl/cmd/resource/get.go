@@ -301,11 +301,7 @@ func (options *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []str
 
 	useOpenAPIPrintColumns := cmdutil.GetFlagBool(cmd, useOpenAPIPrintColumnFlagLabel)
 
-	showKind := options.ShowKind
-	// TODO: abstract more cleanly
-	if resource.MultipleTypesRequested(args) || cmdutil.MustPrintWithKinds(objs, infos, sorter) {
-		showKind = true
-	}
+	showKind := options.ShowKind || resource.MultipleTypesRequested(args) || cmdutil.MustPrintWithKinds(objs, infos, sorter)
 
 	filteredResourceCount := 0
 	noHeaders := cmdutil.GetFlagBool(cmd, "no-headers")
