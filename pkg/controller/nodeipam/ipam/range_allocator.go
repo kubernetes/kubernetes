@@ -286,39 +286,40 @@ func (r *rangeAllocator) updateCIDRAllocation(data nodeAndCIDR) error {
 	defer r.removeNodeFromProcessing(data.nodeName)
 
 	podCIDR := data.cidr.String()
-	for rep := 0; rep < cidrUpdateRetries; rep++ {
-		node, err = r.nodeLister.Get(data.nodeName)
-		if err != nil {
-			glog.Errorf("Failed while getting node %v to retry updating Node.Spec.PodCIDR: %v", data.nodeName, err)
-			continue
+
+	node, err = r.nodeLister.Get(data.nodeName)
+	if err != nil {
+		glog.Errorf("Failed while getting node %v for updating Node.Spec.PodCIDR: %v", data.nodeName, err)
+		return err
+	}
+
+	if node.Spec.PodCIDR == podCIDR {
+		glog.V(4).Infof("Node %v already has allocated CIDR %v. It matches the proposed one.", node.Name, podCIDR)
+		return nil
+	}
+	if node.Spec.PodCIDR != "" {
+		glog.Errorf("Node %v already has a CIDR allocated %v. Releasing the new one %v.", node.Name, node.Spec.PodCIDR, podCIDR)
+		if err := r.cidrs.Release(data.cidr); err != nil {
+			glog.Errorf("Error when releasing CIDR %v", podCIDR)
 		}
-		if node.Spec.PodCIDR != "" {
-			glog.V(4).Infof("Node %v already has allocated CIDR %v. Releasing assigned one if different.", node.Name, node.Spec.PodCIDR)
-			if node.Spec.PodCIDR != podCIDR {
-				glog.Errorf("Node %q PodCIDR seems to have changed (original=%v, current=%v), releasing original and occupying new CIDR",
-					node.Name, node.Spec.PodCIDR, podCIDR)
-				if err := r.cidrs.Release(data.cidr); err != nil {
-					glog.Errorf("Error when releasing CIDR %v", podCIDR)
-				}
-			}
-			return nil
-		}
+		return nil
+	}
+	// If we reached here, it means that the node has no CIDR currently assigned. So we set it.
+	for i := 0; i < cidrUpdateRetries; i++ {
 		if err = utilnode.PatchNodeCIDR(r.client, types.NodeName(node.Name), podCIDR); err == nil {
 			glog.Infof("Set node %v PodCIDR to %v", node.Name, podCIDR)
-			break
+			return nil
 		}
-		glog.Errorf("Failed to update node %v PodCIDR to %v (%d retries left): %v", node.Name, podCIDR, cidrUpdateRetries-rep-1, err)
 	}
-	if err != nil {
-		nodeutil.RecordNodeStatusChange(r.recorder, node, "CIDRAssignmentFailed")
-		// We accept the fact that we may leek CIDRs here. This is safer than releasing
-		// them in case when we don't know if request went through.
-		// NodeController restart will return all falsely allocated CIDRs to the pool.
-		if !apierrors.IsServerTimeout(err) {
-			glog.Errorf("CIDR assignment for node %v failed: %v. Releasing allocated CIDR", data.nodeName, err)
-			if releaseErr := r.cidrs.Release(data.cidr); releaseErr != nil {
-				glog.Errorf("Error releasing allocated CIDR for node %v: %v", data.nodeName, releaseErr)
-			}
+	glog.Errorf("Failed to update node %v PodCIDR to %v after multiple attempts: %v", node.Name, podCIDR, err)
+	nodeutil.RecordNodeStatusChange(r.recorder, node, "CIDRAssignmentFailed")
+	// We accept the fact that we may leak CIDRs here. This is safer than releasing
+	// them in case when we don't know if request went through.
+	// NodeController restart will return all falsely allocated CIDRs to the pool.
+	if !apierrors.IsServerTimeout(err) {
+		glog.Errorf("CIDR assignment for node %v failed: %v. Releasing allocated CIDR", node.Name, err)
+		if releaseErr := r.cidrs.Release(data.cidr); releaseErr != nil {
+			glog.Errorf("Error releasing allocated CIDR for node %v: %v", node.Name, releaseErr)
 		}
 	}
 	return err
