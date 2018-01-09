@@ -12,10 +12,12 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/validation",
     deps = [
         "//pkg/apis/core/validation:go_default_library",
+        "//pkg/features:go_default_library",
         "//pkg/proxy/apis/kubeproxyconfig:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/net:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/validation/field:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/util/feature:go_default_library",
     ],
 )
 
@@ -38,9 +40,11 @@ go_test(
     importpath = "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/validation",
     library = ":go_default_library",
     deps = [
+        "//pkg/features:go_default_library",
         "//pkg/proxy/apis/kubeproxyconfig:go_default_library",
         "//pkg/util/pointer:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/validation/field:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/util/feature:go_default_library",
     ],
 )
