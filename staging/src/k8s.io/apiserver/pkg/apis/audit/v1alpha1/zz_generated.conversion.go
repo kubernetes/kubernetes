@@ -84,6 +84,7 @@ func autoConvert_v1alpha1_Event_To_audit_Event(in *Event, out *audit.Event, s co
 	out.ResponseObject = (*runtime.Unknown)(unsafe.Pointer(in.ResponseObject))
 	out.RequestReceivedTimestamp = in.RequestReceivedTimestamp
 	out.StageTimestamp = in.StageTimestamp
+	out.Annotations = *(*map[string]string)(unsafe.Pointer(&in.Annotations))
 	return nil
 }
 
@@ -113,6 +114,7 @@ func autoConvert_audit_Event_To_v1alpha1_Event(in *audit.Event, out *Event, s co
 	out.ResponseObject = (*runtime.Unknown)(unsafe.Pointer(in.ResponseObject))
 	out.RequestReceivedTimestamp = in.RequestReceivedTimestamp
 	out.StageTimestamp = in.StageTimestamp
+	out.Annotations = *(*map[string]string)(unsafe.Pointer(&in.Annotations))
 	return nil
 }
 

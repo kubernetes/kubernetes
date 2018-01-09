@@ -101,6 +101,12 @@ message Event {
   // Time the request reached current audit stage.
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.MicroTime stageTimestamp = 16;
+
+  // Annotations is an unstructured key value map stored with an event. Mechanisms like RBAC and
+  // PSP will store admission information in Annotations, like name of the policy which admits
+  // the request.
+  // +optional
+  map<string, string> annotations = 17;
 }
 
 // EventList is a list of audit Events.
