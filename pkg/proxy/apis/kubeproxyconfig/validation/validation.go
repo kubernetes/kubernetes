@@ -26,7 +26,9 @@ import (
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig"
 )
 
@@ -153,18 +155,24 @@ func validateProxyMode(mode kubeproxyconfig.ProxyMode, fldPath *field.Path) fiel
 }
 
 func validateProxyModeLinux(mode kubeproxyconfig.ProxyMode, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
 	validModes := sets.NewString(
 		string(kubeproxyconfig.ProxyModeUserspace),
 		string(kubeproxyconfig.ProxyModeIPTables),
 		string(kubeproxyconfig.ProxyModeIPVS),
 	)
 
-	if mode == "" || validModes.Has(string(mode)) {
-		return nil
+	if mode == kubeproxyconfig.ProxyModeIPVS && !utilfeature.DefaultFeatureGate.Enabled(features.SupportIPVSProxyMode) {
+		errMsg := fmt.Sprintf("must enable feature gate %s when specifying proxy mode %s ", features.SupportIPVSProxyMode, kubeproxyconfig.ProxyModeIPVS)
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("ProxyMode"), string(mode), errMsg))
 	}
 
-	errMsg := fmt.Sprintf("must be %s or blank (blank means the best-available proxy [currently iptables])", strings.Join(validModes.List(), ","))
-	return field.ErrorList{field.Invalid(fldPath.Child("ProxyMode"), string(mode), errMsg)}
+	if mode != "" && !validModes.Has(string(mode)) {
+		errMsg := fmt.Sprintf("must be %s or blank (blank means the best-available proxy [currently iptables])", strings.Join(validModes.List(), ","))
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("ProxyMode"), string(mode), errMsg))
+	}
+
+	return allErrs
 }
 
 func validateProxyModeWindows(mode kubeproxyconfig.ProxyMode, fldPath *field.Path) field.ErrorList {

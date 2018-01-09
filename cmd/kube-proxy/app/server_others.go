@@ -276,7 +276,7 @@ func getProxyMode(proxyMode string, iptver iptables.IPTablesVersioner, khandle i
 		return proxyModeUserspace
 	}
 
-	if len(proxyMode) > 0 && proxyMode == proxyModeIPTables {
+	if proxyMode == proxyModeIPTables {
 		return tryIPTablesProxy(iptver, kcompat)
 	}
 

@@ -25,6 +25,8 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig"
 	"k8s.io/kubernetes/pkg/util/pointer"
 )
@@ -76,6 +78,12 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 				TCPCloseWaitTimeout:   &metav1.Duration{Duration: 5 * time.Second},
 			},
 		},
+	}
+
+	err := utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%s=true", features.SupportIPVSProxyMode))
+	if err != nil {
+		t.Errorf("Failed to enable feature gate for %s: %v", features.SupportIPVSProxyMode, err)
+		return
 	}
 
 	for _, successCase := range successCases {
@@ -517,13 +525,29 @@ func TestValidateProxyMode(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		successCases = append(successCases, kubeproxyconfig.ProxyModeKernelspace)
 	} else {
-		successCases = append(successCases, kubeproxyconfig.ProxyModeIPTables, kubeproxyconfig.ProxyModeIPVS)
+		successCases = append(successCases, kubeproxyconfig.ProxyModeIPTables)
 	}
 
 	for _, successCase := range successCases {
 		if errs := validateProxyMode(successCase, newPath.Child("ProxyMode")); len(errs) != 0 {
 			t.Errorf("expected success: %v", errs)
 		}
+	}
+
+	err := utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%s=true", features.SupportIPVSProxyMode))
+	if err != nil {
+		t.Errorf("Failed to enable feature gate for %s: %v", features.SupportIPVSProxyMode, err)
+		return
+	}
+
+	if errs := validateProxyMode(kubeproxyconfig.ProxyModeIPVS, newPath.Child("ProxyMode")); len(errs) != 0 {
+		t.Errorf("expected success: %v", errs)
+	}
+
+	err = utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%s=false", features.SupportIPVSProxyMode))
+	if err != nil {
+		t.Errorf("Failed to disable feature gate for %s: %v", features.SupportIPVSProxyMode, err)
+		return
 	}
 
 	errorCases := []struct {
@@ -533,6 +557,10 @@ func TestValidateProxyMode(t *testing.T) {
 		{
 			mode: kubeproxyconfig.ProxyMode("non-existing"),
 			msg:  "or blank (blank means the",
+		},
+		{
+			mode: kubeproxyconfig.ProxyModeIPVS,
+			msg:  "must enable feature gate",
 		},
 	}
 
