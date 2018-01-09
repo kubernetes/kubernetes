@@ -120,6 +120,10 @@ func Run(runOptions *options.ServerRunOptions, stopCh <-chan struct{}) error {
 	// To help debugging, immediately log version
 	glog.Infof("Version: %+v", version.Get())
 
+	if errs := runOptions.Validate(); len(errs) > 0 {
+		return utilerrors.NewAggregate(errs)
+	}
+
 	server, err := CreateServerChain(runOptions, stopCh)
 	if err != nil {
 		return err
