@@ -331,9 +331,8 @@ func (cephfsMounter *cephfsMounter) checkFuseMount() bool {
 	execute := cephfsMounter.plugin.host.GetExec(cephfsMounter.plugin.GetPluginName())
 	switch runtime.GOOS {
 	case "linux":
-		retBytes, err := execute.Run("/bin/ls", "/sbin/mount.fuse.ceph")
-		if err == nil && string(retBytes) == "/sbin/mount.fuse.ceph\n" {
-			glog.V(4).Infof("/sbin/mount.fuse.ceph exists, it should be fuse mount")
+		if _, err := execute.Run("/usr/bin/test", "-x", "/sbin/mount.fuse.ceph"); err == nil {
+			glog.V(4).Infof("/sbin/mount.fuse.ceph exists, it should be fuse mount.")
 			return true
 		}
 		return false
@@ -356,7 +355,7 @@ func (cephfsVolume *cephfs) execFuseMount(mountpoint string) error {
 		payload := make(map[string]util.FileProjection, 1)
 		var fileProjection util.FileProjection
 
-		keyring := fmt.Sprintf("[client.%s]\n", cephfsVolume.id) + "key = " + cephfsVolume.secret + "\n"
+		keyring := fmt.Sprintf("[client.%s]\nkey = %s\n", cephfsVolume.id, cephfsVolume.secret)
 
 		fileProjection.Data = []byte(keyring)
 		fileProjection.Mode = int32(0644)
