@@ -30,30 +30,46 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
+type podEventType int
+
+const (
+	podAdd podEventType = iota
+	podModify
+	podDelete
+
+	eventBufferLen = 10
+)
+
+type watchEvent struct {
+	fileName  string
+	eventType podEventType
+}
+
 type sourceFile struct {
 	path           string
 	nodeName       types.NodeName
+	period         time.Duration
 	store          cache.Store
 	fileKeyMapping map[string]string
 	updates        chan<- interface{}
+	watchEvents    chan *watchEvent
 }
 
 func NewSourceFile(path string, nodeName types.NodeName, period time.Duration, updates chan<- interface{}) {
 	// "golang.org/x/exp/inotify" requires a path without trailing "/"
 	path = strings.TrimRight(path, string(os.PathSeparator))
 
-	config := newSourceFile(path, nodeName, updates)
+	config := newSourceFile(path, nodeName, period, updates)
 	glog.V(1).Infof("Watching path %q", path)
-	go wait.Forever(config.run, period)
+	config.run()
 }
 
-func newSourceFile(path string, nodeName types.NodeName, updates chan<- interface{}) *sourceFile {
+func newSourceFile(path string, nodeName types.NodeName, period time.Duration, updates chan<- interface{}) *sourceFile {
 	send := func(objs []interface{}) {
 		var pods []*v1.Pod
 		for _, o := range objs {
@@ -65,23 +81,40 @@ func newSourceFile(path string, nodeName types.NodeName, updates chan<- interfac
 	return &sourceFile{
 		path:           path,
 		nodeName:       nodeName,
+		period:         period,
 		store:          store,
 		fileKeyMapping: map[string]string{},
 		updates:        updates,
+		watchEvents:    make(chan *watchEvent, eventBufferLen),
 	}
 }
 
 func (s *sourceFile) run() {
-	if err := s.watch(); err != nil {
-		glog.Errorf("Unable to read manifest path %q: %v", s.path, err)
-	}
+	listTicker := time.NewTicker(s.period)
+
+	go func() {
+		for {
+			select {
+			case <-listTicker.C:
+				if err := s.listConfig(); err != nil {
+					glog.Errorf("Unable to read config path %q: %v", s.path, err)
+				}
+			case e := <-s.watchEvents:
+				if err := s.consumeWatchEvent(e); err != nil {
+					glog.Errorf("Unable to process watch event: %v", err)
+				}
+			}
+		}
+	}()
+
+	s.startWatch()
 }
 
 func (s *sourceFile) applyDefaults(pod *api.Pod, source string) error {
 	return applyDefaults(pod, source, true, s.nodeName)
 }
 
-func (s *sourceFile) resetStoreFromPath() error {
+func (s *sourceFile) listConfig() error {
 	path := s.path
 	statInfo, err := os.Stat(path)
 	if err != nil {
@@ -158,7 +191,7 @@ func (s *sourceFile) extractFromDir(name string) ([]*v1.Pod, error) {
 }
 
 func (s *sourceFile) extractFromFile(filename string) (pod *v1.Pod, err error) {
-	glog.V(3).Infof("Reading manifest file %q", filename)
+	glog.V(3).Infof("Reading config file %q", filename)
 	defer func() {
 		if err == nil && pod != nil {
 			objKey, keyErr := cache.MetaNamespaceKeyFunc(pod)
@@ -193,7 +226,7 @@ func (s *sourceFile) extractFromFile(filename string) (pod *v1.Pod, err error) {
 		return pod, nil
 	}
 
-	return pod, fmt.Errorf("%v: couldn't parse as pod(%v), please check manifest file.\n", filename, podErr)
+	return pod, fmt.Errorf("%v: couldn't parse as pod(%v), please check config file.\n", filename, podErr)
 }
 
 func (s *sourceFile) replaceStore(pods ...*v1.Pod) (err error) {

@@ -80,6 +80,7 @@ go_library(
     ] + select({
         "@io_bazel_rules_go//go/platform:linux": [
             "//vendor/golang.org/x/exp/inotify:go_default_library",
+            "//vendor/k8s.io/client-go/util/flowcontrol:go_default_library",
         ],
         "//conditions:default": [],
     }),
@@ -91,6 +92,7 @@ go_test(
         "apiserver_test.go",
         "common_test.go",
         "config_test.go",
+        "file_test.go",
         "http_test.go",
     ] + select({
         "@io_bazel_rules_go//go/platform:linux": [
