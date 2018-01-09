@@ -54,7 +54,7 @@ func NewCmdCreateClusterRoleBinding(f cmdutil.Factory, cmdOut io.Writer) *cobra.
 	cmdutil.AddGeneratorFlags(cmd, cmdutil.ClusterRoleBindingV1GeneratorName)
 	cmd.Flags().String("clusterrole", "", i18n.T("ClusterRole this ClusterRoleBinding should reference"))
 	cmd.MarkFlagCustom("clusterrole", "__kubectl_get_resource_clusterrole")
-	cmd.Flags().StringArray("user", []string{}, "Usernames to bind to the role")
+	cmd.Flags().StringArray("roleuser", []string{}, "Usernames to bind to the role")
 	cmd.Flags().StringArray("group", []string{}, "Groups to bind to the role")
 	cmd.Flags().StringArray("serviceaccount", []string{}, "Service accounts to bind to the role, in the format <namespace>:<name>")
 	return cmd
@@ -72,7 +72,7 @@ func CreateClusterRoleBinding(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Co
 		generator = &kubectl.ClusterRoleBindingGeneratorV1{
 			Name:            name,
 			ClusterRole:     cmdutil.GetFlagString(cmd, "clusterrole"),
-			Users:           cmdutil.GetFlagStringArray(cmd, "user"),
+			Users:           cmdutil.GetFlagStringArray(cmd, "roleuser"),
 			Groups:          cmdutil.GetFlagStringArray(cmd, "group"),
 			ServiceAccounts: cmdutil.GetFlagStringArray(cmd, "serviceaccount"),
 		}

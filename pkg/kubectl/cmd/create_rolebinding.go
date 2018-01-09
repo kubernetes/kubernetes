@@ -54,7 +54,7 @@ func NewCmdCreateRoleBinding(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command
 	cmdutil.AddGeneratorFlags(cmd, cmdutil.RoleBindingV1GeneratorName)
 	cmd.Flags().String("clusterrole", "", i18n.T("ClusterRole this RoleBinding should reference"))
 	cmd.Flags().String("role", "", i18n.T("Role this RoleBinding should reference"))
-	cmd.Flags().StringArray("user", []string{}, "Usernames to bind to the role")
+	cmd.Flags().StringArray("roleuser", []string{}, "Usernames to bind to the role")
 	cmd.Flags().StringArray("group", []string{}, "Groups to bind to the role")
 	cmd.Flags().StringArray("serviceaccount", []string{}, "Service accounts to bind to the role, in the format <namespace>:<name>")
 	return cmd
@@ -72,7 +72,7 @@ func CreateRoleBinding(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Command, 
 			Name:            name,
 			ClusterRole:     cmdutil.GetFlagString(cmd, "clusterrole"),
 			Role:            cmdutil.GetFlagString(cmd, "role"),
-			Users:           cmdutil.GetFlagStringArray(cmd, "user"),
+			Users:           cmdutil.GetFlagStringArray(cmd, "roleuser"),
 			Groups:          cmdutil.GetFlagStringArray(cmd, "group"),
 			ServiceAccounts: cmdutil.GetFlagStringArray(cmd, "serviceaccount"),
 		}
