@@ -17,7 +17,7 @@ spec:
     command:
     - /bin/bash
     - -c
-    - /opt/kube-addons.sh 1>>/var/log/kube-addon-manager.log 2>&1
+    - exec /opt/kube-addons.sh 1>>/var/log/kube-addon-manager.log 2>&1
     resources:
       requests:
         cpu: 5m
