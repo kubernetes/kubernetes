@@ -35,7 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	_ "k8s.io/kubernetes/pkg/scheduler/algorithmprovider"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
-	e2e "k8s.io/kubernetes/test/e2e/framework"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 const (
@@ -390,7 +390,7 @@ func DoTestPodScheduling(ns *v1.Namespace, t *testing.T, cs clientset.Interface)
 			Containers: []v1.Container{
 				{
 					Name:  "container",
-					Image: e2e.GetPauseImageName(cs),
+					Image: imageutils.GetPauseImageName(),
 					Resources: v1.ResourceRequirements{
 						Limits: v1.ResourceList{
 							extendedResourceName: *resource.NewQuantity(1, resource.DecimalSI),

@@ -31,6 +31,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	testutils "k8s.io/kubernetes/test/utils"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/golang/glog"
 	. "github.com/onsi/ginkgo"
@@ -432,7 +433,7 @@ func reserveMemoryRCConfig(f *framework.Framework, id string, replicas, megabyte
 		Name:           id,
 		Namespace:      f.Namespace.Name,
 		Timeout:        timeout,
-		Image:          framework.GetPauseImageName(f.ClientSet),
+		Image:          imageutils.GetPauseImageName(),
 		Replicas:       replicas,
 		MemRequest:     int64(1024 * 1024 * megabytes / replicas),
 	}
@@ -492,7 +493,7 @@ func createHostPortPodsWithMemory(f *framework.Framework, id string, replicas, p
 		Name:           id,
 		Namespace:      f.Namespace.Name,
 		Timeout:        timeout,
-		Image:          framework.GetPauseImageName(f.ClientSet),
+		Image:          imageutils.GetPauseImageName(),
 		Replicas:       replicas,
 		HostPorts:      map[string]int{"port1": port},
 		MemRequest:     request,

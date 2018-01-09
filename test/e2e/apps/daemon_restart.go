@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/test/e2e/framework"
 	testutils "k8s.io/kubernetes/test/utils"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -202,7 +203,7 @@ var _ = SIGDescribe("DaemonRestart [Disruptive]", func() {
 			InternalClient: f.InternalClientset,
 			Name:           rcName,
 			Namespace:      ns,
-			Image:          framework.GetPauseImageName(f.ClientSet),
+			Image:          imageutils.GetPauseImageName(),
 			Replicas:       numPods,
 			CreatedPods:    &[]*v1.Pod{},
 		}

@@ -22,6 +22,7 @@ import (
 	"k8s.io/api/core/v1"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/test/e2e/framework"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	. "github.com/onsi/ginkgo"
 )
@@ -42,7 +43,7 @@ var _ = SIGDescribe("Empty [Feature:Empty]", func() {
 	})
 
 	It("starts a pod", func() {
-		configs, _, _ := GenerateConfigsForGroup([]*v1.Namespace{f.Namespace}, "empty-pod", 1, 1, framework.GetPauseImageName(f.ClientSet), []string{}, api.Kind("ReplicationController"), 0, 0)
+		configs, _, _ := GenerateConfigsForGroup([]*v1.Namespace{f.Namespace}, "empty-pod", 1, 1, imageutils.GetPauseImageName(), []string{}, api.Kind("ReplicationController"), 0, 0)
 		if len(configs) != 1 {
 			framework.Failf("generateConfigs should have generated single config")
 		}

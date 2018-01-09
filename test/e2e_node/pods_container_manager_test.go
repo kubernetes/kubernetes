@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/test/e2e/framework"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/golang/glog"
 	. "github.com/onsi/ginkgo"
@@ -188,7 +189,7 @@ var _ = framework.KubeDescribe("Kubelet Cgroup Manager", func() {
 						Spec: v1.PodSpec{
 							Containers: []v1.Container{
 								{
-									Image:     framework.GetPauseImageName(f.ClientSet),
+									Image:     imageutils.GetPauseImageName(),
 									Name:      "container" + string(uuid.NewUUID()),
 									Resources: getResourceRequirements(getResourceList("100m", "100Mi"), getResourceList("100m", "100Mi")),
 								},
@@ -232,7 +233,7 @@ var _ = framework.KubeDescribe("Kubelet Cgroup Manager", func() {
 						Spec: v1.PodSpec{
 							Containers: []v1.Container{
 								{
-									Image:     framework.GetPauseImageName(f.ClientSet),
+									Image:     imageutils.GetPauseImageName(),
 									Name:      "container" + string(uuid.NewUUID()),
 									Resources: getResourceRequirements(getResourceList("", ""), getResourceList("", "")),
 								},
@@ -276,7 +277,7 @@ var _ = framework.KubeDescribe("Kubelet Cgroup Manager", func() {
 						Spec: v1.PodSpec{
 							Containers: []v1.Container{
 								{
-									Image:     framework.GetPauseImageName(f.ClientSet),
+									Image:     imageutils.GetPauseImageName(),
 									Name:      "container" + string(uuid.NewUUID()),
 									Resources: getResourceRequirements(getResourceList("100m", "100Mi"), getResourceList("200m", "200Mi")),
 								},

@@ -28,6 +28,7 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/test/e2e/framework"
 	testutils "k8s.io/kubernetes/test/utils"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -139,7 +140,7 @@ var _ = framework.KubeDescribe("EquivalenceCache [Serial]", func() {
 				},
 			},
 		}
-		rc := getRCWithInterPodAffinity(affinityRCName, labelsMap, replica, affinity, framework.GetPauseImageName(f.ClientSet))
+		rc := getRCWithInterPodAffinity(affinityRCName, labelsMap, replica, affinity, imageutils.GetPauseImageName())
 		defer framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.ScalesGetter, ns, affinityRCName)
 
 		// RC should be running successfully
@@ -216,7 +217,7 @@ var _ = framework.KubeDescribe("EquivalenceCache [Serial]", func() {
 			},
 		}
 		rc := getRCWithInterPodAffinityNodeSelector(labelRCName, labelsMap, replica, affinity,
-			framework.GetPauseImageName(f.ClientSet), map[string]string{k: v})
+			imageutils.GetPauseImageName(), map[string]string{k: v})
 		defer framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.ScalesGetter, ns, labelRCName)
 
 		WaitForSchedulerAfterAction(f, func() error {
@@ -273,7 +274,7 @@ func CreateNodeSelectorPods(f *framework.Framework, id string, replicas int, nod
 		Name:           id,
 		Namespace:      f.Namespace.Name,
 		Timeout:        defaultTimeout,
-		Image:          framework.GetPauseImageName(f.ClientSet),
+		Image:          imageutils.GetPauseImageName(),
 		Replicas:       replicas,
 		HostPorts:      map[string]int{"port1": 4321},
 		NodeSelector:   nodeSelector,
