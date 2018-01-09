@@ -908,15 +908,15 @@ func (kl *Kubelet) PodResourcesAreReclaimed(pod *v1.Pod, status v1.PodStatus) bo
 		return false
 	}
 	// pod's containers should be deleted
-	runtimeStatus, err := kl.podCache.Get(pod.UID)
-	if err != nil {
-		glog.V(3).Infof("Pod %q is terminated, Error getting runtimeStatus from the podCache: %s", format.Pod(pod), err)
-		return false
-	}
-	if len(runtimeStatus.ContainerStatuses) > 0 {
-		glog.V(3).Infof("Pod %q is terminated, but some containers have not been cleaned up: %+v", format.Pod(pod), runtimeStatus.ContainerStatuses)
-		return false
-	}
+	//runtimeStatus, err := kl.podCache.Get(pod.UID)
+	//if err != nil {
+	//	glog.V(3).Infof("Pod %q is terminated, Error getting runtimeStatus from the podCache: %s", format.Pod(pod), err)
+	//	return false
+	//}
+	//if len(runtimeStatus.ContainerStatuses) > 0 {
+	//	glog.V(3).Infof("Pod %q is terminated, but some containers have not been cleaned up: %+v", format.Pod(pod), runtimeStatus.ContainerStatuses)
+	//	return false
+	//}
 	if kl.podVolumesExist(pod.UID) && !kl.keepTerminatedPodVolumes {
 		// We shouldnt delete pods whose volumes have not been cleaned up if we are not keeping terminated pod volumes
 		glog.V(3).Infof("Pod %q is terminated, but some volumes have not been cleaned up", format.Pod(pod))
