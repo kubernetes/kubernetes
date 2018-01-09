@@ -18,6 +18,7 @@ package e2e_node
 
 import (
 	"fmt"
+	"net/http"
 	"os/exec"
 	"strconv"
 	"strings"
@@ -30,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
+	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -44,10 +46,9 @@ type ctnAttribute struct {
 }
 
 // makeCPUMangerPod returns a pod with the provided ctnAttributes.
-func makeCPUManagerPod(podName string, ctnAttributes []ctnAttribute) *v1.Pod {
+func makeCPUManagerPod(podName string, ctnAttributes []ctnAttribute, cmd string) *v1.Pod {
 	var containers []v1.Container
 	for _, ctnAttr := range ctnAttributes {
-		cpusetCmd := fmt.Sprintf("grep Cpus_allowed_list /proc/self/status | cut -f2 && sleep 1d")
 		ctn := v1.Container{
 			Name:  ctnAttr.ctnName,
 			Image: busyboxImage,
@@ -61,7 +62,7 @@ func makeCPUManagerPod(podName string, ctnAttributes []ctnAttribute) *v1.Pod {
 					v1.ResourceName(v1.ResourceMemory): resource.MustParse("100Mi"),
 				},
 			},
-			Command: []string{"sh", "-c", cpusetCmd},
+			Command: []string{"sh", "-c", cmd},
 		}
 		containers = append(containers, ctn)
 	}
@@ -178,6 +179,21 @@ func enableCPUManagerInKubelet(f *framework.Framework) (oldCfg *kubeletconfig.Ku
 	return oldCfg
 }
 
+// wait for local Kubelet to be healthy
+func waitForKubeletUp() error {
+	url := "http://localhost:" + strconv.Itoa(ports.KubeletReadOnlyPort) + "/healthz"
+	for start := time.Now(); time.Since(start) < time.Minute; time.Sleep(5 * time.Second) {
+		// ignoring errors since it will timeout after 1 min anyway
+		resp, err := http.Get(url)
+		if err == nil {
+			if resp.StatusCode == 200 {
+				return nil
+			}
+		}
+	}
+	return fmt.Errorf("waiting for kubelet timed out")
+}
+
 func runCPUManagerTests(f *framework.Framework) {
 	var cpuCap, cpuAlloc, cpuRes int64
 	var oldCfg *kubeletconfig.KubeletConfiguration
@@ -208,7 +224,10 @@ func runCPUManagerTests(f *framework.Framework) {
 				cpuLimit:   "200m",
 			},
 		}
-		pod = makeCPUManagerPod("non-gu-pod", ctnAttrs)
+
+		cpusetCmd := fmt.Sprintf("grep Cpus_allowed_list /proc/self/status | cut -f2 && sleep 1d")
+
+		pod = makeCPUManagerPod("non-gu-pod", ctnAttrs, cpusetCmd)
 		pod = f.PodClient().CreateSync(pod)
 
 		By("checking if the expected cpuset was assigned")
@@ -229,7 +248,7 @@ func runCPUManagerTests(f *framework.Framework) {
 				cpuLimit:   "1000m",
 			},
 		}
-		pod = makeCPUManagerPod("gu-pod", ctnAttrs)
+		pod = makeCPUManagerPod("gu-pod", ctnAttrs, cpusetCmd)
 		pod = f.PodClient().CreateSync(pod)
 
 		By("checking if the expected cpuset was assigned")
@@ -255,7 +274,7 @@ func runCPUManagerTests(f *framework.Framework) {
 				cpuLimit:   "1000m",
 			},
 		}
-		pod1 = makeCPUManagerPod("gu-pod", ctnAttrs)
+		pod1 = makeCPUManagerPod("gu-pod", ctnAttrs, cpusetCmd)
 		pod1 = f.PodClient().CreateSync(pod1)
 
 		ctnAttrs = []ctnAttribute{
@@ -265,7 +284,7 @@ func runCPUManagerTests(f *framework.Framework) {
 				cpuLimit:   "300m",
 			},
 		}
-		pod2 = makeCPUManagerPod("non-gu-pod", ctnAttrs)
+		pod2 = makeCPUManagerPod("non-gu-pod", ctnAttrs, cpusetCmd)
 		pod2 = f.PodClient().CreateSync(pod2)
 
 		By("checking if the expected cpuset was assigned")
@@ -307,7 +326,7 @@ func runCPUManagerTests(f *framework.Framework) {
 				cpuLimit:   "2000m",
 			},
 		}
-		pod = makeCPUManagerPod("gu-pod", ctnAttrs)
+		pod = makeCPUManagerPod("gu-pod", ctnAttrs, cpusetCmd)
 		pod = f.PodClient().CreateSync(pod)
 
 		By("checking if the expected cpuset was assigned")
@@ -342,7 +361,7 @@ func runCPUManagerTests(f *framework.Framework) {
 				cpuLimit:   "1000m",
 			},
 		}
-		pod = makeCPUManagerPod("gu-pod", ctnAttrs)
+		pod = makeCPUManagerPod("gu-pod", ctnAttrs, cpusetCmd)
 		pod = f.PodClient().CreateSync(pod)
 
 		By("checking if the expected cpuset was assigned")
@@ -376,7 +395,7 @@ func runCPUManagerTests(f *framework.Framework) {
 				cpuLimit:   "1000m",
 			},
 		}
-		pod1 = makeCPUManagerPod("gu-pod1", ctnAttrs)
+		pod1 = makeCPUManagerPod("gu-pod1", ctnAttrs, cpusetCmd)
 		pod1 = f.PodClient().CreateSync(pod1)
 
 		ctnAttrs = []ctnAttribute{
@@ -386,7 +405,7 @@ func runCPUManagerTests(f *framework.Framework) {
 				cpuLimit:   "1000m",
 			},
 		}
-		pod2 = makeCPUManagerPod("gu-pod2", ctnAttrs)
+		pod2 = makeCPUManagerPod("gu-pod2", ctnAttrs, cpusetCmd)
 		pod2 = f.PodClient().CreateSync(pod2)
 
 		By("checking if the expected cpuset was assigned")
@@ -413,6 +432,64 @@ func runCPUManagerTests(f *framework.Framework) {
 		waitForContainerRemoval(fmt.Sprintf("%s_%s", pod1.Spec.Containers[0].Name, pod1.Name))
 		waitForContainerRemoval(fmt.Sprintf("%s_%s", pod2.Spec.Containers[0].Name, pod2.Name))
 
+		setOldKubeletConfig(f, oldCfg)
+	})
+
+	It("should reassigne CPUs after kubelet restart", func() {
+		oldCfg = enableCPUManagerInKubelet(f)
+
+		cpuCap, cpuAlloc, cpuRes = getLocalNodeCPUDetails(f)
+
+		// Skip CPU Manager tests if the number of allocatable CPUs < 1.
+		if cpuAlloc < 1 {
+			framework.Skipf("Skipping CPU Manager tests since the number of allocatable CPUs < 1")
+		}
+
+		By("running a Gu pod requesting multiple CPUs")
+		ctnAttrs = []ctnAttribute{
+			{
+				ctnName:    "gu-container",
+				cpuRequest: "2000m",
+				cpuLimit:   "2000m",
+			},
+		}
+		pod = makeCPUManagerPod("gu-pod", ctnAttrs, fmt.Sprintf("while :; do grep Cpus_allowed_list /proc/self/status | cut -f2 && sleep 0.5; done"))
+		pod = f.PodClient().CreateSync(pod)
+
+		By("checking if the expected cpuset was assigned")
+		cpuListString = "1-2"
+		if isHTEnabled() {
+			cpuListString = "2-3"
+			cpuList = cpuset.MustParse(getCPUSiblingList(0)).ToSlice()
+			if cpuList[1] != 1 {
+				cset = cpuset.MustParse(getCPUSiblingList(1))
+				cpuListString = fmt.Sprintf("%s", cset)
+			}
+		}
+
+		expAllowedCPUsListRegex = fmt.Sprintf("^%s$", cpuListString)
+		err = f.PodClient().MatchContainerLastLineOfOutput(pod.Name, pod.Spec.Containers[0].Name, expAllowedCPUsListRegex)
+		framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]",
+			pod.Spec.Containers[0].Name, pod.Name)
+
+		By("restarting kubelet")
+		restartKubelet(f)
+		// waiting for kubelet
+		By("waiting for kubelet to restart")
+		// wait for /healthz endpoint to return ok, to be sure that CPUManager is working
+		framework.ExpectNoError(waitForKubeletUp())
+		// wait for node to be schedulable to be able to retireve logs from Pod
+		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(f.ClientSet, time.Second*15))
+
+		By("checking if the expected cpuset was assigned after restart")
+		expAllowedCPUsListRegex = fmt.Sprintf("^%s$", cpuListString)
+		err = f.PodClient().MatchContainerLastLineOfOutput(pod.Name, pod.Spec.Containers[0].Name, expAllowedCPUsListRegex)
+		framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]",
+			pod.Spec.Containers[0].Name, pod.Name)
+
+		By("by deleting the pods and waiting for container removal")
+		deletePods(f, []string{pod.Name})
+		waitForContainerRemoval(fmt.Sprintf("%s_%s", pod.Spec.Containers[0].Name, pod.Name))
 		setOldKubeletConfig(f, oldCfg)
 	})
 }

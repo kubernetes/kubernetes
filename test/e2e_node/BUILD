@@ -132,6 +132,7 @@ go_test(
         "//pkg/kubelet/kubeletconfig/status:go_default_library",
         "//pkg/kubelet/metrics:go_default_library",
         "//pkg/kubelet/types:go_default_library",
+        "//pkg/master/ports:go_default_library",
         "//pkg/security/apparmor:go_default_library",
         "//test/e2e/common:go_default_library",
         "//test/e2e/framework:go_default_library",

@@ -19,6 +19,7 @@ package framework
 import (
 	"fmt"
 	"regexp"
+	"strings"
 	"sync"
 	"time"
 
@@ -256,6 +257,30 @@ func (c *PodClient) MatchContainerOutput(name string, containerName string, expe
 	}
 	if !regex.MatchString(output) {
 		return fmt.Errorf("failed to match regexp %q in output %q", expectedRegexp, output)
+	}
+	return nil
+}
+
+// MatchContainerLastLineOfOutput gets last line of output of a container and match expected regexp in the output.
+func (c *PodClient) MatchContainerLastLineOfOutput(name string, containerName string, expectedRegexp string) error {
+	f := c.f
+	output, err := GetPodLogs(f.ClientSet, f.Namespace.Name, name, containerName)
+	if err != nil {
+		return fmt.Errorf("failed to get output for container %q of pod %q", containerName, name)
+	}
+	lines := strings.Split(output, "\n")
+	lastLine := lines[len(lines)-1]
+
+	// if last line is an empty string get the second last line
+	if lastLine == "" {
+		lastLine = lines[len(lines)-2]
+	}
+	regex, err := regexp.Compile(expectedRegexp)
+	if err != nil {
+		return fmt.Errorf("failed to compile regexp %q: %v", expectedRegexp, err)
+	}
+	if !regex.MatchString(lastLine) {
+		return fmt.Errorf("failed to match regexp %q in last line of output %q", expectedRegexp, lastLine)
 	}
 	return nil
 }
