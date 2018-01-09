@@ -73,9 +73,11 @@ type VolumeCapability_AccessMode_Mode int32
 
 const (
 	VolumeCapability_AccessMode_UNKNOWN VolumeCapability_AccessMode_Mode = 0
-	// Can be published as read/write at one node at a time.
+	// Can only be published once as read/write on a single node, at
+	// any given time.
 	VolumeCapability_AccessMode_SINGLE_NODE_WRITER VolumeCapability_AccessMode_Mode = 1
-	// Can be published as readonly at one node at a time.
+	// Can only be published once as readonly on a single node, at
+	// any given time.
 	VolumeCapability_AccessMode_SINGLE_NODE_READER_ONLY VolumeCapability_AccessMode_Mode = 2
 	// Can be published as readonly at multiple nodes simultaneously.
 	VolumeCapability_AccessMode_MULTI_NODE_READER_ONLY VolumeCapability_AccessMode_Mode = 3
@@ -1344,6 +1346,8 @@ type NodePublishVolumeRequest struct {
 	// The path to which the volume will be published. It MUST be an
 	// absolute path in the root filesystem of the process serving this
 	// request. The CO SHALL ensure uniqueness of target_path per volume.
+	// The CO SHALL ensure that the path exists, and that the process
+	// serving the request has `read` and `write` permissions to the path.
 	// This is a REQUIRED field.
 	TargetPath string `protobuf:"bytes,4,opt,name=target_path,json=targetPath" json:"target_path,omitempty"`
 	// The capability of the volume the CO expects the volume to have.

@@ -43,6 +43,32 @@ func deepEqualWithoutGeneration(t *testing.T, testcase int, actual, expected *No
 	}
 }
 
+type hostPortInfoParam struct {
+	protocol, ip string
+	port         int32
+}
+
+type hostPortInfoBuilder struct {
+	inputs []hostPortInfoParam
+}
+
+func newHostPortInfoBuilder() *hostPortInfoBuilder {
+	return &hostPortInfoBuilder{}
+}
+
+func (b *hostPortInfoBuilder) add(protocol, ip string, port int32) *hostPortInfoBuilder {
+	b.inputs = append(b.inputs, hostPortInfoParam{protocol, ip, port})
+	return b
+}
+
+func (b *hostPortInfoBuilder) build() schedutil.HostPortInfo {
+	res := make(schedutil.HostPortInfo)
+	for _, param := range b.inputs {
+		res.Add(param.ip, param.protocol, param.port)
+	}
+	return res
+}
+
 // TestAssumePodScheduled tests that after a pod is assumed, its information is aggregated
 // on node level.
 func TestAssumePodScheduled(t *testing.T) {
@@ -74,7 +100,7 @@ func TestAssumePodScheduled(t *testing.T) {
 			},
 			allocatableResource: &Resource{},
 			pods:                []*v1.Pod{testPods[0]},
-			usedPorts:           map[string]bool{"TCP/127.0.0.1/80": true},
+			usedPorts:           newHostPortInfoBuilder().add("TCP", "127.0.0.1", 80).build(),
 		},
 	}, {
 		pods: []*v1.Pod{testPods[1], testPods[2]},
@@ -89,7 +115,7 @@ func TestAssumePodScheduled(t *testing.T) {
 			},
 			allocatableResource: &Resource{},
 			pods:                []*v1.Pod{testPods[1], testPods[2]},
-			usedPorts:           map[string]bool{"TCP/127.0.0.1/80": true, "TCP/127.0.0.1/8080": true},
+			usedPorts:           newHostPortInfoBuilder().add("TCP", "127.0.0.1", 80).add("TCP", "127.0.0.1", 8080).build(),
 		},
 	}, { // test non-zero request
 		pods: []*v1.Pod{testPods[3]},
@@ -104,7 +130,7 @@ func TestAssumePodScheduled(t *testing.T) {
 			},
 			allocatableResource: &Resource{},
 			pods:                []*v1.Pod{testPods[3]},
-			usedPorts:           map[string]bool{"TCP/127.0.0.1/80": true},
+			usedPorts:           newHostPortInfoBuilder().add("TCP", "127.0.0.1", 80).build(),
 		},
 	}, {
 		pods: []*v1.Pod{testPods[4]},
@@ -120,7 +146,7 @@ func TestAssumePodScheduled(t *testing.T) {
 			},
 			allocatableResource: &Resource{},
 			pods:                []*v1.Pod{testPods[4]},
-			usedPorts:           map[string]bool{"TCP/127.0.0.1/80": true},
+			usedPorts:           newHostPortInfoBuilder().add("TCP", "127.0.0.1", 80).build(),
 		},
 	}, {
 		pods: []*v1.Pod{testPods[4], testPods[5]},
@@ -136,7 +162,7 @@ func TestAssumePodScheduled(t *testing.T) {
 			},
 			allocatableResource: &Resource{},
 			pods:                []*v1.Pod{testPods[4], testPods[5]},
-			usedPorts:           map[string]bool{"TCP/127.0.0.1/80": true, "TCP/127.0.0.1/8080": true},
+			usedPorts:           newHostPortInfoBuilder().add("TCP", "127.0.0.1", 80).add("TCP", "127.0.0.1", 8080).build(),
 		},
 	}, {
 		pods: []*v1.Pod{testPods[6]},
@@ -151,7 +177,7 @@ func TestAssumePodScheduled(t *testing.T) {
 			},
 			allocatableResource: &Resource{},
 			pods:                []*v1.Pod{testPods[6]},
-			usedPorts:           map[string]bool{},
+			usedPorts:           newHostPortInfoBuilder().build(),
 		},
 	},
 	}
@@ -227,7 +253,7 @@ func TestExpirePod(t *testing.T) {
 			},
 			allocatableResource: &Resource{},
 			pods:                []*v1.Pod{testPods[1]},
-			usedPorts:           map[string]bool{"TCP/127.0.0.1/8080": true},
+			usedPorts:           newHostPortInfoBuilder().add("TCP", "127.0.0.1", 8080).build(),
 		},
 	}}
 
@@ -276,7 +302,7 @@ func TestAddPodWillConfirm(t *testing.T) {
 			},
 			allocatableResource: &Resource{},
 			pods:                []*v1.Pod{testPods[0]},
-			usedPorts:           map[string]bool{"TCP/127.0.0.1/80": true},
+			usedPorts:           newHostPortInfoBuilder().add("TCP", "127.0.0.1", 80).build(),
 		},
 	}}
 
@@ -331,7 +357,7 @@ func TestAddPodWillReplaceAssumed(t *testing.T) {
 				},
 				allocatableResource: &Resource{},
 				pods:                []*v1.Pod{updatedPod.DeepCopy()},
-				usedPorts:           map[string]bool{"TCP/0.0.0.0/90": true},
+				usedPorts:           newHostPortInfoBuilder().add("TCP", "0.0.0.0", 90).build(),
 			},
 		},
 	}}
@@ -383,7 +409,7 @@ func TestAddPodAfterExpiration(t *testing.T) {
 			},
 			allocatableResource: &Resource{},
 			pods:                []*v1.Pod{basePod},
-			usedPorts:           map[string]bool{"TCP/127.0.0.1/80": true},
+			usedPorts:           newHostPortInfoBuilder().add("TCP", "127.0.0.1", 80).build(),
 		},
 	}}
 
@@ -436,7 +462,7 @@ func TestUpdatePod(t *testing.T) {
 			},
 			allocatableResource: &Resource{},
 			pods:                []*v1.Pod{testPods[1]},
-			usedPorts:           map[string]bool{"TCP/127.0.0.1/8080": true},
+			usedPorts:           newHostPortInfoBuilder().add("TCP", "127.0.0.1", 8080).build(),
 		}, {
 			requestedResource: &Resource{
 				MilliCPU: 100,
@@ -448,7 +474,7 @@ func TestUpdatePod(t *testing.T) {
 			},
 			allocatableResource: &Resource{},
 			pods:                []*v1.Pod{testPods[0]},
-			usedPorts:           map[string]bool{"TCP/127.0.0.1/80": true},
+			usedPorts:           newHostPortInfoBuilder().add("TCP", "127.0.0.1", 80).build(),
 		}},
 	}}
 
@@ -503,7 +529,7 @@ func TestExpireAddUpdatePod(t *testing.T) {
 			},
 			allocatableResource: &Resource{},
 			pods:                []*v1.Pod{testPods[1]},
-			usedPorts:           map[string]bool{"TCP/127.0.0.1/8080": true},
+			usedPorts:           newHostPortInfoBuilder().add("TCP", "127.0.0.1", 8080).build(),
 		}, {
 			requestedResource: &Resource{
 				MilliCPU: 100,
@@ -515,7 +541,7 @@ func TestExpireAddUpdatePod(t *testing.T) {
 			},
 			allocatableResource: &Resource{},
 			pods:                []*v1.Pod{testPods[0]},
-			usedPorts:           map[string]bool{"TCP/127.0.0.1/80": true},
+			usedPorts:           newHostPortInfoBuilder().add("TCP", "127.0.0.1", 80).build(),
 		}},
 	}}
 
@@ -569,7 +595,7 @@ func TestRemovePod(t *testing.T) {
 			},
 			allocatableResource: &Resource{},
 			pods:                []*v1.Pod{basePod},
-			usedPorts:           map[string]bool{"TCP/127.0.0.1/80": true},
+			usedPorts:           newHostPortInfoBuilder().add("TCP", "127.0.0.1", 80).build(),
 		},
 	}}
 
@@ -672,7 +698,7 @@ func buildNodeInfo(node *v1.Node, pods []*v1.Pod) *NodeInfo {
 		expected.pods = append(expected.pods, pod)
 		expected.requestedResource.Add(getResourceRequest(pod))
 		expected.nonzeroRequest.Add(getResourceRequest(pod))
-		expected.usedPorts = schedutil.GetUsedPorts(pod)
+		expected.updateUsedPorts(pod, true)
 		expected.generation++
 	}
 

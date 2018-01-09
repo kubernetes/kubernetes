@@ -210,35 +210,34 @@ func (ca *cloudCIDRAllocator) updateCIDRAllocation(nodeName string) error {
 	}
 	podCIDR := cidr.String()
 
-	for rep := 0; rep < cidrUpdateRetries; rep++ {
-		node, err = ca.nodeLister.Get(nodeName)
-		if err != nil {
-			glog.Errorf("Failed while getting node %v to retry updating Node.Spec.PodCIDR: %v", nodeName, err)
-			continue
-		}
+	node, err = ca.nodeLister.Get(nodeName)
+	if err != nil {
+		glog.Errorf("Failed while getting node %v for updating Node.Spec.PodCIDR: %v", nodeName, err)
+		return err
+	}
+
+	if node.Spec.PodCIDR == podCIDR {
+		glog.V(4).Infof("Node %v already has allocated CIDR %v. It matches the proposed one.", node.Name, podCIDR)
+		// We don't return here, in order to set the NetworkUnavailable condition later below.
+	} else {
 		if node.Spec.PodCIDR != "" {
-			if node.Spec.PodCIDR == podCIDR {
-				glog.V(4).Infof("Node %v already has allocated CIDR %v. It matches the proposed one.", node.Name, podCIDR)
-				// We don't return to set the NetworkUnavailable condition if needed.
-				break
-			}
-			glog.Errorf("PodCIDR being reassigned! Node %v spec has %v, but cloud provider has assigned %v",
-				node.Name, node.Spec.PodCIDR, podCIDR)
+			glog.Errorf("PodCIDR being reassigned! Node %v spec has %v, but cloud provider has assigned %v", node.Name, node.Spec.PodCIDR, podCIDR)
 			// We fall through and set the CIDR despite this error. This
 			// implements the same logic as implemented in the
 			// rangeAllocator.
 			//
 			// See https://github.com/kubernetes/kubernetes/pull/42147#discussion_r103357248
 		}
-		if err = utilnode.PatchNodeCIDR(ca.client, types.NodeName(node.Name), podCIDR); err == nil {
-			glog.Infof("Set node %v PodCIDR to %v", node.Name, podCIDR)
-			break
+		for i := 0; i < cidrUpdateRetries; i++ {
+			if err = utilnode.PatchNodeCIDR(ca.client, types.NodeName(node.Name), podCIDR); err == nil {
+				glog.Infof("Set node %v PodCIDR to %v", node.Name, podCIDR)
+				break
+			}
 		}
-		glog.Errorf("Failed to update node %v PodCIDR to %v (%d retries left): %v", node.Name, podCIDR, cidrUpdateRetries-rep-1, err)
 	}
 	if err != nil {
 		nodeutil.RecordNodeStatusChange(ca.recorder, node, "CIDRAssignmentFailed")
-		glog.Errorf("CIDR assignment for node %v failed: %v.", nodeName, err)
+		glog.Errorf("Failed to update node %v PodCIDR to %v after multiple attempts: %v", node.Name, podCIDR, err)
 		return err
 	}
 

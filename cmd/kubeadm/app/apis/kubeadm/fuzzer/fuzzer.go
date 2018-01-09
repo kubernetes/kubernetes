@@ -66,7 +66,6 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			obj.KubeletConfiguration = kubeadm.KubeletConfiguration{
 				BaseConfig: &kubeletconfigv1alpha1.KubeletConfiguration{
 					PodManifestPath: "foo",
-					AllowPrivileged: utilpointer.BoolPtr(true),
 					ClusterDNS:      []string{"foo"},
 					ClusterDomain:   "foo",
 					Authorization:   kubeletconfigv1alpha1.KubeletAuthorization{Mode: "foo"},

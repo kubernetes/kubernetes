@@ -20,6 +20,7 @@ import (
 	"os"
 	"reflect"
 	"strconv"
+	"strings"
 	"testing"
 
 	"k8s.io/api/core/v1"
@@ -32,7 +33,6 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/pkg/scheduler/schedulercache"
 	schedulertesting "k8s.io/kubernetes/pkg/scheduler/testing"
-	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 )
 
 var (
@@ -518,13 +518,13 @@ func TestPodFitsHost(t *testing.T) {
 func newPod(host string, hostPortInfos ...string) *v1.Pod {
 	networkPorts := []v1.ContainerPort{}
 	for _, portInfo := range hostPortInfos {
-		hostPortInfo := decode(portInfo)
-		hostPort, _ := strconv.Atoi(hostPortInfo.hostPort)
+		splited := strings.Split(portInfo, "/")
+		hostPort, _ := strconv.Atoi(splited[2])
 
 		networkPorts = append(networkPorts, v1.ContainerPort{
-			HostIP:   hostPortInfo.hostIP,
+			HostIP:   splited[1],
 			HostPort: int32(hostPort),
-			Protocol: v1.Protocol(hostPortInfo.protocol),
+			Protocol: v1.Protocol(splited[0]),
 		})
 	}
 	return &v1.Pod{
@@ -649,41 +649,6 @@ func TestPodFitsHostPorts(t *testing.T) {
 		}
 		if test.fits != fits {
 			t.Errorf("%s: expected %v, saw %v", test.test, test.fits, fits)
-		}
-	}
-}
-
-func TestGetUsedPorts(t *testing.T) {
-	tests := []struct {
-		pods  []*v1.Pod
-		ports map[string]bool
-	}{
-		{
-			[]*v1.Pod{
-				newPod("m1", "UDP/127.0.0.1/9090"),
-			},
-			map[string]bool{"UDP/127.0.0.1/9090": true},
-		},
-		{
-			[]*v1.Pod{
-				newPod("m1", "UDP/127.0.0.1/9090"),
-				newPod("m1", "UDP/127.0.0.1/9091"),
-			},
-			map[string]bool{"UDP/127.0.0.1/9090": true, "UDP/127.0.0.1/9091": true},
-		},
-		{
-			[]*v1.Pod{
-				newPod("m1", "TCP/0.0.0.0/9090"),
-				newPod("m2", "UDP/127.0.0.1/9091"),
-			},
-			map[string]bool{"TCP/0.0.0.0/9090": true, "UDP/127.0.0.1/9091": true},
-		},
-	}
-
-	for _, test := range tests {
-		ports := schedutil.GetUsedPorts(test.pods...)
-		if !reflect.DeepEqual(test.ports, ports) {
-			t.Errorf("%s: expected %v, got %v", "test get used ports", test.ports, ports)
 		}
 	}
 }

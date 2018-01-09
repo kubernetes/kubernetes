@@ -108,15 +108,6 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 	if obj.HealthzPort == nil {
 		obj.HealthzPort = utilpointer.Int32Ptr(10248)
 	}
-	if obj.HostNetworkSources == nil {
-		obj.HostNetworkSources = []string{kubetypes.AllSource}
-	}
-	if obj.HostPIDSources == nil {
-		obj.HostPIDSources = []string{kubetypes.AllSource}
-	}
-	if obj.HostIPCSources == nil {
-		obj.HostIPCSources = []string{kubetypes.AllSource}
-	}
 	if obj.HTTPCheckFrequency == zeroDuration {
 		obj.HTTPCheckFrequency = metav1.Duration{Duration: 20 * time.Second}
 	}

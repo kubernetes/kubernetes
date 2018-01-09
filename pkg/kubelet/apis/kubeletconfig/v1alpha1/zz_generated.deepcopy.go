@@ -134,30 +134,6 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 	}
 	in.Authentication.DeepCopyInto(&out.Authentication)
 	out.Authorization = in.Authorization
-	if in.AllowPrivileged != nil {
-		in, out := &in.AllowPrivileged, &out.AllowPrivileged
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(bool)
-			**out = **in
-		}
-	}
-	if in.HostNetworkSources != nil {
-		in, out := &in.HostNetworkSources, &out.HostNetworkSources
-		*out = make([]string, len(*in))
-		copy(*out, *in)
-	}
-	if in.HostPIDSources != nil {
-		in, out := &in.HostPIDSources, &out.HostPIDSources
-		*out = make([]string, len(*in))
-		copy(*out, *in)
-	}
-	if in.HostIPCSources != nil {
-		in, out := &in.HostIPCSources, &out.HostIPCSources
-		*out = make([]string, len(*in))
-		copy(*out, *in)
-	}
 	if in.RegistryPullQPS != nil {
 		in, out := &in.RegistryPullQPS, &out.RegistryPullQPS
 		if *in == nil {
