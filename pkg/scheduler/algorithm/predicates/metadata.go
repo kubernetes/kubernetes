@@ -46,7 +46,7 @@ type predicateMetadata struct {
 	pod           *v1.Pod
 	podBestEffort bool
 	podRequest    *schedulercache.Resource
-	podPorts      map[string]bool
+	podPorts      []*v1.ContainerPort
 	//key is a pod full name with the anti-affinity rules.
 	matchingAntiAffinityTerms          map[string][]matchingPodAntiAffinityTerm
 	serviceAffinityInUse               bool
@@ -90,7 +90,7 @@ func (pfactory *PredicateMetadataFactory) GetMetadata(pod *v1.Pod, nodeNameToInf
 		pod:                       pod,
 		podBestEffort:             isPodBestEffort(pod),
 		podRequest:                GetResourceRequest(pod),
-		podPorts:                  schedutil.GetUsedPorts(pod),
+		podPorts:                  schedutil.GetContainerPorts(pod),
 		matchingAntiAffinityTerms: matchingTerms,
 	}
 	for predicateName, precomputeFunc := range predicateMetadataProducers {
@@ -172,10 +172,7 @@ func (meta *predicateMetadata) ShallowCopy() algorithm.PredicateMetadata {
 		podRequest:           meta.podRequest,
 		serviceAffinityInUse: meta.serviceAffinityInUse,
 	}
-	newPredMeta.podPorts = map[string]bool{}
-	for k, v := range meta.podPorts {
-		newPredMeta.podPorts[k] = v
-	}
+	newPredMeta.podPorts = append([]*v1.ContainerPort(nil), meta.podPorts...)
 	newPredMeta.matchingAntiAffinityTerms = map[string][]matchingPodAntiAffinityTerm{}
 	for k, v := range meta.matchingAntiAffinityTerms {
 		newPredMeta.matchingAntiAffinityTerms[k] = append([]matchingPodAntiAffinityTerm(nil), v...)
