@@ -6,7 +6,7 @@ master and three nodes (workers) running on `192.168.10.1`-`192.168.10.4`.
 For working correctly you need to create the directory addressed as `POOL_PATH` in
 `util.sh`:
 ```
-$ sudo mkdir /var/lib/libvirt/images/kubernetes
+$ sudo mkdir -p /var/lib/libvirt/images/kubernetes
 $ sudo chown -R $USER:$USER /var/lib/libvirt/images/kubernetes/
 ```
 
