@@ -157,9 +157,6 @@ func (e *E2EServices) startKubelet() (*server, error) {
 	kc.VolumeStatsAggPeriod = metav1.Duration{Duration: 10 * time.Second} // Aggregate volumes frequently so tests don't need to wait as long
 	kubeletConfigFlags = append(kubeletConfigFlags, "volume-stats-agg-period")
 
-	kc.AllowPrivileged = true
-	kubeletConfigFlags = append(kubeletConfigFlags, "allow-privileged")
-
 	kc.SerializeImagePulls = false
 	kubeletConfigFlags = append(kubeletConfigFlags, "serialize-image-pulls")
 
@@ -264,6 +261,7 @@ func (e *E2EServices) startKubelet() (*server, error) {
 		"--root-dir", KubeletRootDirectory,
 		"--docker-disable-shared-pid=false",
 		"--v", LOG_VERBOSITY_LEVEL, "--logtostderr",
+		"--allow-privileged", "true",
 	)
 
 	// Apply test framework feature gates by default. This could also be overridden

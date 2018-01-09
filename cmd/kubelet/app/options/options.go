@@ -37,6 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1alpha1"
 	kubeletconfigvalidation "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/validation"
 	"k8s.io/kubernetes/pkg/kubelet/config"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	utiltaints "k8s.io/kubernetes/pkg/util/taints"
 )
 
@@ -187,6 +188,19 @@ type KubeletFlags struct {
 	KeepTerminatedPodVolumes bool
 	// enable gathering custom metrics.
 	EnableCustomMetrics bool
+	// allowPrivileged enables containers to request privileged mode.
+	// Defaults to false.
+	AllowPrivileged bool
+	// hostNetworkSources is a comma-separated list of sources from which the
+	// Kubelet allows pods to use of host network. Defaults to "*". Valid
+	// options are "file", "http", "api", and "*" (all sources).
+	HostNetworkSources []string
+	// hostPIDSources is a comma-separated list of sources from which the
+	// Kubelet allows pods to use the host pid namespace. Defaults to "*".
+	HostPIDSources []string
+	// hostIPCSources is a comma-separated list of sources from which the
+	// Kubelet allows pods to use the host ipc namespace. Defaults to "*".
+	HostIPCSources []string
 }
 
 // NewKubeletFlags will create a new KubeletFlags with default values
@@ -221,6 +235,9 @@ func NewKubeletFlags() *KubeletFlags {
 		VolumePluginDir:     "/usr/libexec/kubernetes/kubelet-plugins/volume/exec/",
 		RegisterNode:        true,
 		SeccompProfileRoot:  filepath.Join(v1alpha1.DefaultRootDir, "seccomp"),
+		HostNetworkSources:  []string{kubetypes.AllSource},
+		HostPIDSources:      []string{kubetypes.AllSource},
+		HostIPCSources:      []string{kubetypes.AllSource},
 	}
 }
 
@@ -366,6 +383,18 @@ func (f *KubeletFlags) AddFlags(fs *pflag.FlagSet) {
 	// TODO(#54161:v1.11.0): Remove --enable-custom-metrics flag, it is deprecated.
 	fs.BoolVar(&f.EnableCustomMetrics, "enable-custom-metrics", f.EnableCustomMetrics, "Support for gathering custom metrics.")
 	fs.MarkDeprecated("enable-custom-metrics", "will be removed in a future version")
+	// TODO(#58010:v1.12.0): Remove --allow-privileged, it is deprecated
+	fs.BoolVar(&f.AllowPrivileged, "allow-privileged", f.AllowPrivileged, "If true, allow containers to request privileged mode.")
+	fs.MarkDeprecated("allow-privileged", "will be removed in a future version")
+	// TODO(#58010:v1.12.0): Remove --host-network-sources, it is deprecated
+	fs.StringSliceVar(&f.HostNetworkSources, "host-network-sources", f.HostNetworkSources, "Comma-separated list of sources from which the Kubelet allows pods to use of host network.")
+	fs.MarkDeprecated("host-network-sources", "will be removed in a future version")
+	// TODO(#58010:v1.12.0): Remove --host-pid-sources, it is deprecated
+	fs.StringSliceVar(&f.HostPIDSources, "host-pid-sources", f.HostPIDSources, "Comma-separated list of sources from which the Kubelet allows pods to use the host pid namespace.")
+	fs.MarkDeprecated("host-pid-sources", "will be removed in a future version")
+	// TODO(#58010:v1.12.0): Remove --host-ipc-sources, it is deprecated
+	fs.StringSliceVar(&f.HostIPCSources, "host-ipc-sources", f.HostIPCSources, "Comma-separated list of sources from which the Kubelet allows pods to use the host ipc namespace.")
+	fs.MarkDeprecated("host-ipc-sources", "will be removed in a future version")
 
 }
 
@@ -414,10 +443,6 @@ func AddKubeletConfigFlags(fs *pflag.FlagSet, c *kubeletconfig.KubeletConfigurat
 		"are generated for the public address and saved to the directory passed to --cert-dir.")
 	fs.StringVar(&c.TLSPrivateKeyFile, "tls-private-key-file", c.TLSPrivateKeyFile, "File containing x509 private key matching --tls-cert-file.")
 
-	fs.BoolVar(&c.AllowPrivileged, "allow-privileged", c.AllowPrivileged, "If true, allow containers to request privileged mode.")
-	fs.StringSliceVar(&c.HostNetworkSources, "host-network-sources", c.HostNetworkSources, "Comma-separated list of sources from which the Kubelet allows pods to use of host network.")
-	fs.StringSliceVar(&c.HostPIDSources, "host-pid-sources", c.HostPIDSources, "Comma-separated list of sources from which the Kubelet allows pods to use the host pid namespace.")
-	fs.StringSliceVar(&c.HostIPCSources, "host-ipc-sources", c.HostIPCSources, "Comma-separated list of sources from which the Kubelet allows pods to use the host ipc namespace.")
 	fs.Int32Var(&c.RegistryPullQPS, "registry-qps", c.RegistryPullQPS, "If > 0, limit registry pull QPS to this value.  If 0, unlimited.")
 	fs.Int32Var(&c.RegistryBurst, "registry-burst", c.RegistryBurst, "Maximum size of a bursty pulls, temporarily allows pulls to burst to this number, while still not exceeding registry-qps. Only used if --registry-qps > 0")
 	fs.Int32Var(&c.EventRecordQPS, "event-qps", c.EventRecordQPS, "If > 0, limit event creations per second to this value. If 0, unlimited.")

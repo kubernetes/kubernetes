@@ -89,19 +89,6 @@ type KubeletConfiguration struct {
 	Authentication KubeletAuthentication
 	// authorization specifies how requests to the Kubelet's server are authorized
 	Authorization KubeletAuthorization
-	// allowPrivileged enables containers to request privileged mode.
-	// Defaults to false.
-	AllowPrivileged bool
-	// hostNetworkSources is a comma-separated list of sources from which the
-	// Kubelet allows pods to use of host network. Defaults to "*". Valid
-	// options are "file", "http", "api", and "*" (all sources).
-	HostNetworkSources []string
-	// hostPIDSources is a comma-separated list of sources from which the
-	// Kubelet allows pods to use the host pid namespace. Defaults to "*".
-	HostPIDSources []string
-	// hostIPCSources is a comma-separated list of sources from which the
-	// Kubelet allows pods to use the host ipc namespace. Defaults to "*".
-	HostIPCSources []string
 	// registryPullQPS is the limit of registry pulls per second. If 0,
 	// unlimited. Set to 0 for no limit. Defaults to 5.0.
 	RegistryPullQPS int32
