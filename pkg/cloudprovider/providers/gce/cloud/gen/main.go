@@ -28,6 +28,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"sort"
 	"text/template"
 	"time"
 
@@ -1110,7 +1111,14 @@ func Test{{.Service}}Group(t *testing.T) {
 }
 `
 	tmpl := template.Must(template.New("unittest").Parse(text))
-	for _, s := range meta.AllServicesByGroup {
+	// Sort keys so the output will be stable.
+	var keys []string
+	for k, _ := range meta.AllServicesByGroup {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for _, k := range keys {
+		s := meta.AllServicesByGroup[k]
 		if err := tmpl.Execute(wr, s); err != nil {
 			panic(err)
 		}
