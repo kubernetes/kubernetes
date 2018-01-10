@@ -21,6 +21,7 @@ package util
 import (
 	"errors"
 	"fmt"
+	"net"
 	"os"
 	"reflect"
 	"sort"
@@ -90,6 +91,9 @@ func (f *ring1Factory) objectLoader() (meta.RESTMapper, runtime.ObjectTyper, err
 		groupResources, err = discovery.GetAPIGroupResources(discoveryClient)
 	}
 	if err != nil {
+		if _, ok := err.(net.Error); ok {
+			return nil, nil, err
+		}
 		glog.V(3).Infof("Unable to retrieve API resources, falling back to hardcoded types: %v", err)
 		return legacyscheme.Registry.RESTMapper(), legacyscheme.Scheme, nil
 	}
