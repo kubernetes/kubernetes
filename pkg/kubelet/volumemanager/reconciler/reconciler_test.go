@@ -331,7 +331,7 @@ func Test_Run_Positive_VolumeAttachMountUnmountDetach(t *testing.T) {
 	assert.NoError(t, volumetesting.VerifyZeroDetachCallCount(fakePlugin))
 
 	// Act
-	dsw.DeletePodFromVolume(podName, generatedVolumeName, volumeSpec)
+	dsw.DeletePodFromVolume(podName, generatedVolumeName)
 	waitForDetach(t, fakePlugin, generatedVolumeName, asw)
 
 	// Assert
@@ -423,7 +423,7 @@ func Test_Run_Positive_VolumeUnmountControllerAttachEnabled(t *testing.T) {
 	assert.NoError(t, volumetesting.VerifyZeroDetachCallCount(fakePlugin))
 
 	// Act
-	dsw.DeletePodFromVolume(podName, generatedVolumeName, volumeSpec)
+	dsw.DeletePodFromVolume(podName, generatedVolumeName)
 	waitForDetach(t, fakePlugin, generatedVolumeName, asw)
 
 	// Assert
@@ -701,7 +701,7 @@ func Test_Run_Positive_BlockVolumeAttachMapUnmapDetach(t *testing.T) {
 	assert.NoError(t, volumetesting.VerifyZeroDetachCallCount(fakePlugin))
 
 	// Act
-	dsw.DeletePodFromVolume(podName, generatedVolumeName, volumeSpec)
+	dsw.DeletePodFromVolume(podName, generatedVolumeName)
 	waitForDetach(t, fakePlugin, generatedVolumeName, asw)
 
 	// Assert
@@ -805,7 +805,7 @@ func Test_Run_Positive_VolumeUnmapControllerAttachEnabled(t *testing.T) {
 	assert.NoError(t, volumetesting.VerifyZeroDetachCallCount(fakePlugin))
 
 	// Act
-	dsw.DeletePodFromVolume(podName, generatedVolumeName, volumeSpec)
+	dsw.DeletePodFromVolume(podName, generatedVolumeName)
 	waitForDetach(t, fakePlugin, generatedVolumeName, asw)
 
 	// Assert

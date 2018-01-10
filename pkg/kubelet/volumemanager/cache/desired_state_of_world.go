@@ -74,7 +74,7 @@ type DesiredStateOfWorld interface {
 	// attached volumes, this is a no-op.
 	// If after deleting the pod, the specified volume contains no other child
 	// pods, the volume is also deleted.
-	DeletePodFromVolume(podName types.UniquePodName, volumeName v1.UniqueVolumeName, volumeSpec *volume.Spec)
+	DeletePodFromVolume(podName types.UniquePodName, volumeName v1.UniqueVolumeName)
 
 	// VolumeExists returns true if the given volume exists in the list of
 	// volumes that should be attached to this node.
@@ -272,15 +272,9 @@ func (dsw *desiredStateOfWorld) MarkVolumesReportedInUse(
 }
 
 func (dsw *desiredStateOfWorld) DeletePodFromVolume(
-	podName types.UniquePodName, volumeName v1.UniqueVolumeName, volumeSpec *volume.Spec) {
+	podName types.UniquePodName, volumeName v1.UniqueVolumeName) {
 	dsw.Lock()
 	defer dsw.Unlock()
-
-	volumePluginName := "<n/a>"
-	volumePlugin, err := dsw.volumePluginMgr.FindPluginBySpec(volumeSpec)
-	if err == nil || volumePlugin != nil {
-		volumePluginName = volumePlugin.GetPluginName()
-	}
 
 	volumeObj, volumeExists := dsw.volumesToMount[volumeName]
 	if !volumeExists {
@@ -289,6 +283,13 @@ func (dsw *desiredStateOfWorld) DeletePodFromVolume(
 
 	if _, podExists := volumeObj.podsToMount[podName]; !podExists {
 		return
+	}
+
+	volumePluginName := "<n/a>"
+	volumePlugin, err := dsw.volumePluginMgr.FindPluginBySpec(
+		dsw.volumesToMount[volumeName].podsToMount[podName].spec)
+	if err == nil || volumePlugin != nil {
+		volumePluginName = volumePlugin.GetPluginName()
 	}
 
 	// Delete pod if it exists
