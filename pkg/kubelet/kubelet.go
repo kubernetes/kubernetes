@@ -357,6 +357,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		}
 	}
 
+	actualHostname := types.NodeName(nodeutil.GetHostname(""))
 	hostname := nodeutil.GetHostname(hostnameOverride)
 	// Query the cloud provider for our node name, default to hostname
 	nodeName := types.NodeName(hostname)
@@ -369,15 +370,14 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 			return nil, fmt.Errorf("failed to get instances from cloud provider")
 		}
 
-		nodeName, err = instances.CurrentNodeName(hostname)
+		actualHostname, err = instances.CurrentNodeName(hostname)
 		if err != nil {
 			return nil, fmt.Errorf("error fetching current instance name from cloud provider: %v", err)
 		}
-
-		glog.V(2).Infof("cloud provider determined current node name to be %s", nodeName)
+		glog.V(2).Infof("cloud provider determined the hostname of node %s to be %s", nodeName, actualHostname)
 
 		if utilfeature.DefaultFeatureGate.Enabled(features.RotateKubeletServerCertificate) {
-			nodeAddresses, err := instances.NodeAddresses(nodeName)
+			nodeAddresses, err := instances.NodeAddresses(actualHostname)
 			if err != nil {
 				return nil, fmt.Errorf("failed to get the addresses of the current instance from the cloud provider: %v", err)
 			}
@@ -393,7 +393,6 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 				}
 			}
 		}
-
 	}
 
 	if kubeDeps.PodConfig == nil {
@@ -481,6 +480,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 
 	klet := &Kubelet{
 		hostname:                       hostname,
+		actualHostname:                 actualHostname,
 		nodeName:                       nodeName,
 		kubeClient:                     kubeDeps.KubeClient,
 		heartbeatClient:                kubeDeps.HeartbeatClient,
@@ -902,6 +902,7 @@ type Kubelet struct {
 	kubeletConfiguration kubeletconfiginternal.KubeletConfiguration
 
 	hostname        string
+	actualHostname  types.NodeName
 	nodeName        types.NodeName
 	runtimeCache    kubecontainer.RuntimeCache
 	kubeClient      clientset.Interface
