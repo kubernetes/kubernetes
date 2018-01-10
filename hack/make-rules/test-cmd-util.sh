@@ -2313,11 +2313,15 @@ run_configmap_tests() {
   kube::test::get_object_assert 'configmaps --namespace=test-configmaps' "{{range.items}}{{$id_field}}:{{end}}" ''
   # Command
   kubectl create configmap test-configmap --from-literal=key1=value1 --namespace=test-configmaps
+  kubectl create configmap test-binary-configmap --from-file <( head -c 256 /dev/urandom ) --namespace=test-configmaps
   # Post-condition: configmap exists and has expected values
   kube::test::get_object_assert 'configmap/test-configmap --namespace=test-configmaps' "{{$id_field}}" 'test-configmap'
+  kube::test::get_object_assert 'configmap/test-binary-configmap --namespace=test-configmaps' "{{$id_field}}" 'test-binary-configmap'
   [[ "$(kubectl get configmap/test-configmap --namespace=test-configmaps -o yaml "${kube_flags[@]}" | grep 'key1: value1')" ]]
+  [[ "$(kubectl get configmap/test-binary-configmap --namespace=test-configmaps -o yaml "${kube_flags[@]}" | grep 'binaryData')" ]]
   # Clean-up
   kubectl delete configmap test-configmap --namespace=test-configmaps
+  kubectl delete configmap test-binary-configmap --namespace=test-configmaps
   kubectl delete namespace test-configmaps
 
   set +o nounset
