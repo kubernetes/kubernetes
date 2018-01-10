@@ -12,6 +12,7 @@ go_library(
         "azure.go",
         "azure_backoff.go",
         "azure_blobDiskController.go",
+        "azure_client.go",
         "azure_controllerCommon.go",
         "azure_fakes.go",
         "azure_file.go",
@@ -42,6 +43,7 @@ go_library(
         "//vendor/github.com/Azure/azure-sdk-for-go/arm/storage:go_default_library",
         "//vendor/github.com/Azure/azure-sdk-for-go/storage:go_default_library",
         "//vendor/github.com/Azure/go-autorest/autorest:go_default_library",
+        "//vendor/github.com/Azure/go-autorest/autorest/adal:go_default_library",
         "//vendor/github.com/Azure/go-autorest/autorest/azure:go_default_library",
         "//vendor/github.com/Azure/go-autorest/autorest/to:go_default_library",
         "//vendor/github.com/ghodss/yaml:go_default_library",
@@ -80,7 +82,6 @@ go_test(
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
-        "//vendor/k8s.io/client-go/util/flowcontrol:go_default_library",
     ],
 )
 
