@@ -168,13 +168,12 @@ func TestAttacherWaitForVolumeAttachment(t *testing.T) {
 		name       string
 		attached   bool
 		attachErr  *storage.VolumeError
-		sleepTime  time.Duration
 		timeout    time.Duration
 		shouldFail bool
 	}{
-		{name: "attach ok", attached: true, sleepTime: 10 * time.Millisecond, timeout: 50 * time.Millisecond},
-		{name: "attachment error", attachErr: &storage.VolumeError{Message: "missing volume"}, sleepTime: 10 * time.Millisecond, timeout: 30 * time.Millisecond},
-		{name: "time ran out", attached: false, sleepTime: 5 * time.Millisecond},
+		{name: "attach ok", attached: true, timeout: 50 * time.Millisecond},
+		{name: "attachment error", attachErr: &storage.VolumeError{Message: "missing volume"}, timeout: 30 * time.Millisecond},
+		{name: "time ran out", attached: false},
 	}
 
 	for i, tc := range testCases {
@@ -185,7 +184,6 @@ func TestAttacherWaitForVolumeAttachment(t *testing.T) {
 		attachment := makeTestAttachment(attachID, nodeName, pvName)
 		attachment.Status.Attached = tc.attached
 		attachment.Status.AttachError = tc.attachErr
-		csiAttacher.waitSleepTime = tc.sleepTime
 
 		go func() {
 			_, err := csiAttacher.k8s.StorageV1alpha1().VolumeAttachments().Create(attachment)
@@ -203,8 +201,10 @@ func TestAttacherWaitForVolumeAttachment(t *testing.T) {
 				t.Errorf("expecting error [%v], got [%v]", tc.attachErr.Message, err.Error())
 			}
 		}
-		if err == nil && retID != attachID {
-			t.Errorf("attacher.WaitForAttach not returning attachment ID")
+		if err == nil && attachment.Status.Attached {
+			if retID != attachID {
+				t.Errorf("attacher.WaitForAttach not returning attachment ID, %s, %s", retID, attachID)
+			}
 		}
 	}
 }

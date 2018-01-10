@@ -30,6 +30,7 @@ import (
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/volume"
 )
@@ -39,6 +40,12 @@ type csiAttacher struct {
 	k8s           kubernetes.Interface
 	waitSleepTime time.Duration
 }
+
+const (
+	// podMountAndAttachRetryInterval is the amount of time the mount or attach
+	// call waits before retrying
+	podMountAndAttachRetryInterval time.Duration = 300 * time.Millisecond
+)
 
 // volume.Attacher methods
 var _ volume.Attacher = &csiAttacher{}
@@ -117,41 +124,61 @@ func (c *csiAttacher) WaitForAttach(spec *volume.Spec, attachID string, pod *v1.
 func (c *csiAttacher) waitForVolumeAttachment(volumeHandle, attachID string, timeout time.Duration) (string, error) {
 	glog.V(4).Info(log("probing for updates from CSI driver for [attachment.ID=%v]", attachID))
 
-	ticker := time.NewTicker(c.waitSleepTime)
-	defer ticker.Stop()
+	err := wait.Poll(
+		podMountAndAttachRetryInterval,
+		c.waitSleepTime*10,
+		c.verifyVolumesDetachedFunc(volumeHandle, attachID))
 
-	timer := time.NewTimer(timeout) // TODO (vladimirvivien) investigate making this configurable
-	defer timer.Stop()
+	if err != nil {
 
-	//TODO (vladimirvivien) instead of polling api-server, change to a api-server watch
-	for {
-		select {
-		case <-ticker.C:
-			glog.V(4).Info(log("probing VolumeAttachment [id=%v]", attachID))
-			attach, err := c.k8s.StorageV1alpha1().VolumeAttachments().Get(attachID, meta.GetOptions{})
-			if err != nil {
-				glog.Error(log("attacher.WaitForAttach failed (will continue to try): %v", err))
-				continue
-			}
-			// if being deleted, fail fast
-			if attach.GetDeletionTimestamp() != nil {
-				glog.Error(log("VolumeAttachment [%s] has deletion timestamp, will not continue to wait for attachment", attachID))
-				return "", errors.New("volume attachment is being deleted")
-			}
-			// attachment OK
-			if attach.Status.Attached {
-				return attachID, nil
-			}
-			// driver reports attach error
-			attachErr := attach.Status.AttachError
-			if attachErr != nil {
-				glog.Error(log("attachment for %v failed: %v", volumeHandle, attachErr.Message))
-				return "", errors.New(attachErr.Message)
-			}
-		case <-timer.C:
-			glog.Error(log("attacher.WaitForAttach timeout after %v [volume=%v; attachment.ID=%v]", timeout, volumeHandle, attachID))
+		if err == wait.ErrWaitTimeout {
 			return "", fmt.Errorf("attachment timeout for volume %v", volumeHandle)
 		}
+		return "", err
+	}
+
+	attach, err := c.k8s.StorageV1alpha1().VolumeAttachments().Get(attachID, meta.GetOptions{})
+	if err != nil {
+		return "", err
+	}
+
+	// attachment OK
+	if attach.Status.Attached {
+		return attachID, nil
+	}
+	// driver reports attach error
+	attachErr := attach.Status.AttachError
+	if attachErr != nil {
+
+		return "", errors.New(attachErr.Message)
+	}
+	return "", err
+}
+
+func (c *csiAttacher) verifyVolumesAttachedFunc(volumeHandle, attachID string) wait.ConditionFunc {
+	return func() (done bool, err error) {
+		glog.V(4).Info(log("probing VolumeAttachment [id=%v]", attachID))
+		attach, err := c.k8s.StorageV1alpha1().VolumeAttachments().Get(attachID, meta.GetOptions{})
+		if err != nil {
+			glog.Error(log("attacher.WaitForAttach failed (will continue to try): %v", err))
+			return false, err
+		}
+
+		if attach.GetDeletionTimestamp() != nil {
+			glog.Error(log("VolumeAttachment [%s] has deletion timestamp, will not continue to wait for attachment", attachID))
+			return true, errors.New("volume attachment is being deleted")
+		}
+
+		if attach.Status.Attached {
+			return true, nil
+		}
+
+		attachErr := attach.Status.AttachError
+		if attachErr != nil {
+			glog.Error(log("attachment for %v failed: %v", volumeHandle, attachErr.Message))
+			return false, errors.New(attachErr.Message)
+		}
+		return false, nil
 	}
 }
 
@@ -221,43 +248,63 @@ func (c *csiAttacher) Detach(volumeName string, nodeName types.NodeName) error {
 	return c.waitForVolumeDetachment(volID, attachID)
 }
 
+func (c *csiAttacher) verifyVolumesDetachedFunc(volumeHandle, attachID string) wait.ConditionFunc {
+	return func() (done bool, err error) {
+		glog.V(4).Info(log("probing VolumeAttachment [id=%v]", attachID))
+		attach, err := c.k8s.StorageV1alpha1().VolumeAttachments().Get(attachID, meta.GetOptions{})
+		if err != nil {
+			if apierrs.IsNotFound(err) {
+				//object deleted or never existed, done
+				glog.V(4).Info(log("VolumeAttachment object [%v] for volume [%v] not found, object deleted", attachID, volumeHandle))
+				return true, nil
+			}
+			glog.Error(log("detacher.WaitForDetach failed for volume [%s] (will continue to try): %v", volumeHandle, err))
+			return false, nil
+		}
+
+		// driver reports attach error
+		detachErr := attach.Status.DetachError
+		if detachErr != nil {
+			glog.Error(log("detachment for VolumeAttachment [%v] for volume [%s] failed: %v", attachID, volumeHandle, detachErr.Message))
+			return false, errors.New(detachErr.Message)
+		}
+
+		return true, nil
+	}
+}
 func (c *csiAttacher) waitForVolumeDetachment(volumeHandle, attachID string) error {
 	glog.V(4).Info(log("probing for updates from CSI driver for [attachment.ID=%v]", attachID))
+	err := wait.Poll(
+		podMountAndAttachRetryInterval,
+		c.waitSleepTime*10,
+		c.verifyVolumesDetachedFunc(volumeHandle, attachID))
 
-	ticker := time.NewTicker(c.waitSleepTime)
-	defer ticker.Stop()
+	if err != nil {
 
-	timeout := c.waitSleepTime * 10
-	timer := time.NewTimer(timeout) // TODO (vladimirvivien) investigate making this configurable
-	defer timer.Stop()
-
-	//TODO (vladimirvivien) instead of polling api-server, change to a api-server watch
-	for {
-		select {
-		case <-ticker.C:
-			glog.V(4).Info(log("probing VolumeAttachment [id=%v]", attachID))
-			attach, err := c.k8s.StorageV1alpha1().VolumeAttachments().Get(attachID, meta.GetOptions{})
-			if err != nil {
-				if apierrs.IsNotFound(err) {
-					//object deleted or never existed, done
-					glog.V(4).Info(log("VolumeAttachment object [%v] for volume [%v] not found, object deleted", attachID, volumeHandle))
-					return nil
-				}
-				glog.Error(log("detacher.WaitForDetach failed for volume [%s] (will continue to try): %v", volumeHandle, err))
-				continue
-			}
-
-			// driver reports attach error
-			detachErr := attach.Status.DetachError
-			if detachErr != nil {
-				glog.Error(log("detachment for VolumeAttachment [%v] for volume [%s] failed: %v", attachID, volumeHandle, detachErr.Message))
-				return errors.New(detachErr.Message)
-			}
-		case <-timer.C:
-			glog.Error(log("detacher.WaitForDetach timeout after %v [volume=%v; attachment.ID=%v]", timeout, volumeHandle, attachID))
-			return fmt.Errorf("detachment timed out for volume %v", volumeHandle)
+		if err == wait.ErrWaitTimeout {
+			return fmt.Errorf("attachment timeout for volume %v", volumeHandle)
 		}
+		return err
 	}
+
+	attach, err := c.k8s.StorageV1alpha1().VolumeAttachments().Get(attachID, meta.GetOptions{})
+	if err != nil {
+		if apierrs.IsNotFound(err) {
+			//object deleted or never existed, done
+			glog.V(4).Info(log("Latest VolumeAttachment object [%v] for volume [%v] not found, object deleted", attachID, volumeHandle))
+			return nil
+		}
+		return err
+	}
+
+	// driver reports attach error
+	detachErr := attach.Status.DetachError
+	if detachErr != nil {
+		glog.Error(log("Latest detachment for VolumeAttachment [%v] for volume [%s] failed: %v", attachID, volumeHandle, detachErr.Message))
+		return errors.New(detachErr.Message)
+	}
+
+	return err
 }
 
 func (c *csiAttacher) UnmountDevice(deviceMountPath string) error {
