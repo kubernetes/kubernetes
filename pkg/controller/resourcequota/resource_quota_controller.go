@@ -210,6 +210,8 @@ func (rq *ResourceQuotaController) worker(queue workqueue.RateLimitingInterface)
 			return true
 		}
 		defer queue.Done(key)
+		rq.workerLock.RLock()
+		defer rq.workerLock.RUnlock()
 		err := rq.syncHandler(key.(string))
 		if err == nil {
 			queue.Forget(key)
