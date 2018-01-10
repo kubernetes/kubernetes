@@ -59,7 +59,7 @@ spec:
     - --requestheader-username-headers=X-Remote-User
     - --requestheader-extra-headers-prefix=X-Remote-Extra-
     - --requestheader-allowed-names=front-proxy-client
-    - --admission-control=Initializers,NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,DefaultTolerationSeconds,NodeRestriction,ResourceQuota
+    - --admission-control=NamespaceLifecycle,Initializers,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,DefaultTolerationSeconds,NodeRestriction,ResourceQuota
     - --allow-privileged=true
     - --client-ca-file=/etc/kubernetes/pki/ca.crt
     - --tls-private-key-file=/etc/kubernetes/pki/apiserver.key
@@ -141,7 +141,7 @@ spec:
         - --requestheader-username-headers=X-Remote-User
         - --requestheader-extra-headers-prefix=X-Remote-Extra-
         - --requestheader-allowed-names=front-proxy-client
-        - --admission-control=Initializers,NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,DefaultTolerationSeconds,NodeRestriction,ResourceQuota
+        - --admission-control=NamespaceLifecycle,Initializers,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,DefaultTolerationSeconds,NodeRestriction,ResourceQuota
         - --allow-privileged=true
         - --client-ca-file=/etc/kubernetes/pki/ca.crt
         - --tls-private-key-file=/etc/kubernetes/pki/apiserver.key
