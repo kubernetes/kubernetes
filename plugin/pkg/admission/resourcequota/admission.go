@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/endpoints/request"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
@@ -127,7 +128,7 @@ func (a *QuotaAdmission) ValidateInitialization() error {
 }
 
 // Validate makes admission decisions while enforcing quota
-func (a *QuotaAdmission) Validate(attr admission.Attributes) (err error) {
+func (a *QuotaAdmission) Validate(_ request.Context, attr admission.Attributes) (err error) {
 	// ignore all operations that correspond to sub-resource actions
 	if attr.GetSubresource() != "" {
 		return nil

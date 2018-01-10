@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/sample-apiserver/pkg/admission/wardleinitializer"
 	"k8s.io/sample-apiserver/pkg/client/clientset/internalversion/fake"
 	informers "k8s.io/sample-apiserver/pkg/client/informers/internalversion"
@@ -50,7 +51,9 @@ type wantInternalWardleInformerFactory struct {
 func (self *wantInternalWardleInformerFactory) SetInternalWardleInformerFactory(sf informers.SharedInformerFactory) {
 	self.sf = sf
 }
-func (self *wantInternalWardleInformerFactory) Admit(a admission.Attributes) error { return nil }
+func (self *wantInternalWardleInformerFactory) Admit(ctx request.Context, a admission.Attributes) error {
+	return nil
+}
 func (self *wantInternalWardleInformerFactory) Handles(o admission.Operation) bool { return false }
 func (self *wantInternalWardleInformerFactory) ValidateInitialization() error      { return nil }
 

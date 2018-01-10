@@ -46,6 +46,7 @@ import (
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/request"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/rules"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/versioned"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 )
@@ -195,7 +196,7 @@ func (a *MutatingWebhook) loadConfiguration(attr admission.Attributes) (*v1beta1
 }
 
 // Admit makes an admission decision based on the request attributes.
-func (a *MutatingWebhook) Admit(attr admission.Attributes) error {
+func (a *MutatingWebhook) Admit(_ genericapirequest.Context, attr admission.Attributes) error {
 	hookConfig, err := a.loadConfiguration(attr)
 	if err != nil {
 		return err

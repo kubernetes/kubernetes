@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	admission "k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/endpoints/request"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
 	"k8s.io/kubernetes/pkg/apis/storage"
@@ -84,7 +85,7 @@ func (a *claimDefaulterPlugin) ValidateInitialization() error {
 // 1.  Find available StorageClasses.
 // 2.  Figure which is the default
 // 3.  Write to the PVClaim
-func (c *claimDefaulterPlugin) Admit(a admission.Attributes) error {
+func (c *claimDefaulterPlugin) Admit(_ request.Context, a admission.Attributes) error {
 	if a.GetResource().GroupResource() != api.Resource("persistentvolumeclaims") {
 		return nil
 	}

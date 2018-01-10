@@ -232,7 +232,7 @@ func (i *wrappedUpdatedObjectInfo) UpdatedObject(ctx genericapirequest.Context, 
 }
 
 // AdmissionToValidateObjectUpdateFunc converts validating admission to a rest validate object update func
-func AdmissionToValidateObjectUpdateFunc(admit admission.Interface, staticAttributes admission.Attributes) ValidateObjectUpdateFunc {
+func AdmissionToValidateObjectUpdateFunc(ctx genericapirequest.Context, admit admission.Interface, staticAttributes admission.Attributes) ValidateObjectUpdateFunc {
 	validatingAdmission, ok := admit.(admission.ValidationInterface)
 	if !ok {
 		return func(obj, old runtime.Object) error { return nil }
@@ -252,6 +252,6 @@ func AdmissionToValidateObjectUpdateFunc(admit admission.Interface, staticAttrib
 		if !validatingAdmission.Handles(finalAttributes.GetOperation()) {
 			return nil
 		}
-		return validatingAdmission.Validate(finalAttributes)
+		return validatingAdmission.Validate(ctx, finalAttributes)
 	}
 }

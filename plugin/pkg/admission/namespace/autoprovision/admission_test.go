@@ -98,7 +98,7 @@ func TestAdmission(t *testing.T) {
 	informerFactory.Start(wait.NeverStop)
 
 	pod := newPod(namespace)
-	err = handler.Admit(admission.NewAttributesRecord(&pod, nil, api.Kind("Pod").WithVersion("version"), pod.Namespace, pod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, nil))
+	err = handler.Admit(nil, admission.NewAttributesRecord(&pod, nil, api.Kind("Pod").WithVersion("version"), pod.Namespace, pod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, nil))
 	if err != nil {
 		t.Errorf("unexpected error returned from admission handler")
 	}
@@ -118,7 +118,7 @@ func TestAdmissionNamespaceExists(t *testing.T) {
 	informerFactory.Start(wait.NeverStop)
 
 	pod := newPod(namespace)
-	err = handler.Admit(admission.NewAttributesRecord(&pod, nil, api.Kind("Pod").WithVersion("version"), pod.Namespace, pod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, nil))
+	err = handler.Admit(nil, admission.NewAttributesRecord(&pod, nil, api.Kind("Pod").WithVersion("version"), pod.Namespace, pod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, nil))
 	if err != nil {
 		t.Errorf("unexpected error returned from admission handler")
 	}
@@ -139,7 +139,7 @@ func TestIgnoreAdmission(t *testing.T) {
 	chainHandler := admission.NewChainHandler(handler)
 
 	pod := newPod(namespace)
-	err = chainHandler.Admit(admission.NewAttributesRecord(&pod, nil, api.Kind("Pod").WithVersion("version"), pod.Namespace, pod.Name, api.Resource("pods").WithVersion("version"), "", admission.Update, nil))
+	err = chainHandler.Admit(nil, admission.NewAttributesRecord(&pod, nil, api.Kind("Pod").WithVersion("version"), pod.Namespace, pod.Name, api.Resource("pods").WithVersion("version"), "", admission.Update, nil))
 	if err != nil {
 		t.Errorf("unexpected error returned from admission handler")
 	}
@@ -161,7 +161,7 @@ func TestAdmissionWithLatentCache(t *testing.T) {
 	informerFactory.Start(wait.NeverStop)
 
 	pod := newPod(namespace)
-	err = handler.Admit(admission.NewAttributesRecord(&pod, nil, api.Kind("Pod").WithVersion("version"), pod.Namespace, pod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, nil))
+	err = handler.Admit(nil, admission.NewAttributesRecord(&pod, nil, api.Kind("Pod").WithVersion("version"), pod.Namespace, pod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, nil))
 	if err != nil {
 		t.Errorf("unexpected error returned from admission handler")
 	}

@@ -23,6 +23,7 @@ import (
 	"github.com/golang/glog"
 
 	admission "k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/util/feature"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
@@ -79,7 +80,7 @@ func (c *pvcProtectionPlugin) ValidateInitialization() error {
 // PVCProtectionController when it's not referenced by any pod.
 //
 // This prevents users from deleting a PVC that's used by a running pod.
-func (c *pvcProtectionPlugin) Admit(a admission.Attributes) error {
+func (c *pvcProtectionPlugin) Admit(_ request.Context, a admission.Attributes) error {
 	if !feature.DefaultFeatureGate.Enabled(features.PVCProtection) {
 		return nil
 	}

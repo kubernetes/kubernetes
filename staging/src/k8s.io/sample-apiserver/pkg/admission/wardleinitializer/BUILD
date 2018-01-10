@@ -25,6 +25,7 @@ go_test(
     importpath = "k8s.io/sample-apiserver/pkg/admission/wardleinitializer_test",
     deps = [
         "//vendor/k8s.io/apiserver/pkg/admission:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/endpoints/request:go_default_library",
         "//vendor/k8s.io/sample-apiserver/pkg/admission/wardleinitializer:go_default_library",
         "//vendor/k8s.io/sample-apiserver/pkg/client/clientset/internalversion/fake:go_default_library",
         "//vendor/k8s.io/sample-apiserver/pkg/client/informers/internalversion:go_default_library",

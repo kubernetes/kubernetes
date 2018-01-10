@@ -95,7 +95,7 @@ func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface
 		staticAdmissionAttributes := admission.NewAttributesRecord(nil, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Update, userInfo)
 		updateMutation := func(updatedObject runtime.Object, currentObject runtime.Object) error {
 			if mutatingAdmission, ok := admit.(admission.MutationInterface); ok && admit.Handles(admission.Update) {
-				return mutatingAdmission.Admit(admission.NewAttributesRecord(updatedObject, currentObject, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Update, userInfo))
+				return mutatingAdmission.Admit(ctx, admission.NewAttributesRecord(updatedObject, currentObject, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Update, userInfo))
 			}
 			return nil
 		}
@@ -103,8 +103,8 @@ func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface
 		result, err := patchResource(
 			ctx,
 			updateMutation,
-			rest.AdmissionToValidateObjectFunc(admit, staticAdmissionAttributes),
-			rest.AdmissionToValidateObjectUpdateFunc(admit, staticAdmissionAttributes),
+			rest.AdmissionToValidateObjectFunc(ctx, admit, staticAdmissionAttributes),
+			rest.AdmissionToValidateObjectUpdateFunc(ctx, admit, staticAdmissionAttributes),
 			timeout, versionedObj,
 			r,
 			name,

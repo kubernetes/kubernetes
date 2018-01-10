@@ -147,7 +147,7 @@ func TestPriorityClassAdmission(t *testing.T) {
 			admission.Create,
 			nil,
 		)
-		err := ctrl.Validate(attrs)
+		err := ctrl.Validate(nil, attrs)
 		glog.Infof("Got %v", err)
 		if err != nil && !test.expectError {
 			t.Errorf("Test %q: unexpected error received: %v", test.name, err)
@@ -219,7 +219,7 @@ func TestDefaultPriority(t *testing.T) {
 			t.Errorf("Test %q: expected default priority %d, but got %d", test.name, test.expectedDefaultBefore, defaultPriority)
 		}
 		if test.attributes != nil {
-			err := ctrl.Validate(test.attributes)
+			err := ctrl.Validate(nil, test.attributes)
 			if err != nil {
 				t.Errorf("Test %q: unexpected error received: %v", test.name, err)
 			}
@@ -399,7 +399,7 @@ func TestPodAdmission(t *testing.T) {
 			admission.Create,
 			nil,
 		)
-		err := ctrl.Admit(attrs)
+		err := ctrl.Admit(nil, attrs)
 		glog.Infof("Got %v", err)
 		if !test.expectError {
 			if err != nil {

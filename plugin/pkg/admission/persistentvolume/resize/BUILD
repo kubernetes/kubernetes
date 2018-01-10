@@ -36,6 +36,7 @@ go_library(
         "//pkg/client/listers/storage/internalversion:go_default_library",
         "//pkg/kubeapiserver/admission:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/admission:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/endpoints/request:go_default_library",
     ],
 )
 

@@ -22,6 +22,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apiserver/pkg/endpoints/request"
 )
 
 type FakeHandler struct {
@@ -31,7 +32,7 @@ type FakeHandler struct {
 	validate, validateCalled bool
 }
 
-func (h *FakeHandler) Admit(a Attributes) (err error) {
+func (h *FakeHandler) Admit(_ request.Context, a Attributes) (err error) {
 	h.admitCalled = true
 	if h.admit {
 		return nil
@@ -39,7 +40,7 @@ func (h *FakeHandler) Admit(a Attributes) (err error) {
 	return fmt.Errorf("Don't admit")
 }
 
-func (h *FakeHandler) Validate(a Attributes) (err error) {
+func (h *FakeHandler) Validate(_ request.Context, a Attributes) (err error) {
 	h.validateCalled = true
 	if h.validate {
 		return nil
@@ -119,7 +120,7 @@ func TestAdmitAndValidate(t *testing.T) {
 	for _, test := range tests {
 		t.Logf("testcase = %s", test.name)
 		// call admit and check that validate was not called at all
-		err := test.chain.Admit(NewAttributesRecord(nil, nil, schema.GroupVersionKind{}, test.ns, "", schema.GroupVersionResource{}, "", test.operation, nil))
+		err := test.chain.Admit(nil, NewAttributesRecord(nil, nil, schema.GroupVersionKind{}, test.ns, "", schema.GroupVersionResource{}, "", test.operation, nil))
 		accepted := (err == nil)
 		if accepted != test.accept {
 			t.Errorf("unexpected result of admit call: %v", accepted)
@@ -140,7 +141,7 @@ func TestAdmitAndValidate(t *testing.T) {
 		}
 
 		// call validate and check that admit was not called at all
-		err = test.chain.Validate(NewAttributesRecord(nil, nil, schema.GroupVersionKind{}, test.ns, "", schema.GroupVersionResource{}, "", test.operation, nil))
+		err = test.chain.Validate(nil, NewAttributesRecord(nil, nil, schema.GroupVersionKind{}, test.ns, "", schema.GroupVersionResource{}, "", test.operation, nil))
 		accepted = (err == nil)
 		if accepted != test.accept {
 			t.Errorf("unexpected result of validate call: %v\n", accepted)

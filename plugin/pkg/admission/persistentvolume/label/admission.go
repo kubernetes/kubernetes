@@ -24,6 +24,7 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/endpoints/request"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
@@ -74,7 +75,7 @@ func (l *persistentVolumeLabel) SetCloudConfig(cloudConfig []byte) {
 	l.cloudConfig = cloudConfig
 }
 
-func (l *persistentVolumeLabel) Admit(a admission.Attributes) (err error) {
+func (l *persistentVolumeLabel) Admit(_ request.Context, a admission.Attributes) (err error) {
 	if a.GetResource().GroupResource() != api.Resource("persistentvolumes") {
 		return nil
 	}

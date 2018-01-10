@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/endpoints/request"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
@@ -94,7 +95,7 @@ func readConfig(config io.Reader) *pluginConfig {
 }
 
 // Admit enforces that pod and its namespace node label selectors matches at least a node in the cluster.
-func (p *podNodeSelector) Admit(a admission.Attributes) error {
+func (p *podNodeSelector) Admit(ctx request.Context, a admission.Attributes) error {
 	if shouldIgnore(a) {
 		return nil
 	}
@@ -125,11 +126,11 @@ func (p *podNodeSelector) Admit(a admission.Attributes) error {
 	// second selector wins
 	podNodeSelectorLabels := labels.Merge(namespaceNodeSelector, pod.Spec.NodeSelector)
 	pod.Spec.NodeSelector = map[string]string(podNodeSelectorLabels)
-	return p.Validate(a)
+	return p.Validate(ctx, a)
 }
 
 // Validate ensures that the pod node selector is allowed
-func (p *podNodeSelector) Validate(a admission.Attributes) error {
+func (p *podNodeSelector) Validate(_ request.Context, a admission.Attributes) error {
 	if shouldIgnore(a) {
 		return nil
 	}

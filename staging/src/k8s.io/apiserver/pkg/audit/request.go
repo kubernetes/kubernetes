@@ -187,6 +187,17 @@ func LogResponseObject(ae *audit.Event, obj runtime.Object, gv schema.GroupVersi
 	}
 }
 
+// LogAnnotations fills in the Annotations according to the key value pair.
+func LogAnnotations(ae *audit.Event, key, value string) {
+	if ae == nil || ae.Level.Less(audit.LevelMetadata) {
+		return
+	}
+	if ae.Annotations == nil {
+		ae.Annotations = make(map[string]string)
+	}
+	ae.Annotations[key] = value
+}
+
 func encodeObject(obj runtime.Object, gv schema.GroupVersion, serializer runtime.NegotiatedSerializer) (*runtime.Unknown, error) {
 	supported := serializer.SupportedMediaTypes()
 	for i := range supported {

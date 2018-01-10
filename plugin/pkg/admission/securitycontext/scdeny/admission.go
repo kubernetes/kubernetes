@@ -22,6 +22,7 @@ import (
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/endpoints/request"
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
@@ -47,7 +48,7 @@ func NewSecurityContextDeny() *Plugin {
 }
 
 // Validate will deny any pod that defines SELinuxOptions or RunAsUser.
-func (p *Plugin) Validate(a admission.Attributes) (err error) {
+func (p *Plugin) Validate(_ request.Context, a admission.Attributes) (err error) {
 	if a.GetSubresource() != "" || a.GetResource().GroupResource() != api.Resource("pods") {
 		return nil
 	}

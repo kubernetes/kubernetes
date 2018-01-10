@@ -21,6 +21,7 @@ import (
 	"io"
 
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/endpoints/request"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	apihelper "k8s.io/kubernetes/pkg/apis/core/helper"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
@@ -80,7 +81,7 @@ func (pvcr *persistentVolumeClaimResize) ValidateInitialization() error {
 	return nil
 }
 
-func (pvcr *persistentVolumeClaimResize) Validate(a admission.Attributes) error {
+func (pvcr *persistentVolumeClaimResize) Validate(_ request.Context, a admission.Attributes) error {
 	if a.GetResource().GroupResource() != api.Resource("persistentvolumeclaims") {
 		return nil
 	}

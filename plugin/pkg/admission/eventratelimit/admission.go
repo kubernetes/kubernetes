@@ -20,6 +20,7 @@ import (
 	"io"
 
 	"k8s.io/apiserver/pkg/admission"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/client-go/util/flowcontrol"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	eventratelimitapi "k8s.io/kubernetes/plugin/pkg/admission/eventratelimit/apis/eventratelimit"
@@ -81,7 +82,7 @@ func newEventRateLimit(config *eventratelimitapi.Configuration, clock flowcontro
 }
 
 // Validate makes admission decisions while enforcing event rate limits
-func (a *Plugin) Validate(attr admission.Attributes) (err error) {
+func (a *Plugin) Validate(_ genericapirequest.Context, attr admission.Attributes) (err error) {
 	// ignore all operations that do not correspond to an Event kind
 	if attr.GetKind().GroupKind() != api.Kind("Event") {
 		return nil

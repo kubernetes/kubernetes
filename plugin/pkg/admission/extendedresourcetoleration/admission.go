@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
 )
@@ -53,7 +54,7 @@ type plugin struct {
 // a toleration with key "example.com/device", operator "Exists" and effect "NoSchedule".
 // The rationale for this is described in:
 // https://github.com/kubernetes/kubernetes/issues/55080
-func (p *plugin) Admit(attributes admission.Attributes) error {
+func (p *plugin) Admit(_ request.Context, attributes admission.Attributes) error {
 	// Ignore all calls to subresources or resources other than pods.
 	if len(attributes.GetSubresource()) != 0 || attributes.GetResource().GroupResource() != core.Resource("pods") {
 		return nil

@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/endpoints/request"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
@@ -51,7 +52,7 @@ var _ = kubeapiserveradmission.WantsInternalKubeInformerFactory(&Provision{})
 var _ = kubeapiserveradmission.WantsInternalKubeClientSet(&Provision{})
 
 // Admit makes an admission decision based on the request attributes
-func (p *Provision) Admit(a admission.Attributes) error {
+func (p *Provision) Admit(_ request.Context, a admission.Attributes) error {
 	// if we're here, then we've already passed authentication, so we're allowed to do what we're trying to do
 	// if we're here, then the API server has found a route, which means that if we have a non-empty namespace
 	// its a namespaced resource.

@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	"k8s.io/apiserver/pkg/endpoints/request"
 )
 
 // Register registers a plugin
@@ -81,7 +82,7 @@ func (a *gcPermissionsEnforcement) isWhiteListed(groupResource schema.GroupResou
 	return false
 }
 
-func (a *gcPermissionsEnforcement) Validate(attributes admission.Attributes) (err error) {
+func (a *gcPermissionsEnforcement) Validate(_ request.Context, attributes admission.Attributes) (err error) {
 	// // if the request is in the whitelist, we skip mutation checks for this resource.
 	if a.isWhiteListed(attributes.GetResource().GroupResource(), attributes.GetSubresource()) {
 		return nil

@@ -22,6 +22,7 @@ import (
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/endpoints/request"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 )
@@ -49,7 +50,7 @@ func NewInterPodAntiAffinity() *Plugin {
 
 // Validate will deny any pod that defines AntiAffinity topology key other than kubeletapis.LabelHostname i.e. "kubernetes.io/hostname"
 // in  requiredDuringSchedulingRequiredDuringExecution and requiredDuringSchedulingIgnoredDuringExecution.
-func (p *Plugin) Validate(attributes admission.Attributes) (err error) {
+func (p *Plugin) Validate(_ request.Context, attributes admission.Attributes) (err error) {
 	// Ignore all calls to subresources or resources other than pods.
 	if len(attributes.GetSubresource()) != 0 || attributes.GetResource().GroupResource() != api.Resource("pods") {
 		return nil

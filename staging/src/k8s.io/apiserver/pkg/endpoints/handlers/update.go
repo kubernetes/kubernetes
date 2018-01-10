@@ -91,7 +91,7 @@ func UpdateResource(r rest.Updater, scope RequestScope, typer runtime.ObjectType
 		var transformers []rest.TransformFunc
 		if mutatingAdmission, ok := admit.(admission.MutationInterface); ok && mutatingAdmission.Handles(admission.Update) {
 			transformers = append(transformers, func(ctx request.Context, newObj, oldObj runtime.Object) (runtime.Object, error) {
-				return newObj, mutatingAdmission.Admit(admission.NewAttributesRecord(newObj, oldObj, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Update, userInfo))
+				return newObj, mutatingAdmission.Admit(ctx, admission.NewAttributesRecord(newObj, oldObj, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Update, userInfo))
 			})
 		}
 
@@ -102,8 +102,8 @@ func UpdateResource(r rest.Updater, scope RequestScope, typer runtime.ObjectType
 				ctx,
 				name,
 				rest.DefaultUpdatedObjectInfo(obj, transformers...),
-				rest.AdmissionToValidateObjectFunc(admit, staticAdmissionAttributes),
-				rest.AdmissionToValidateObjectUpdateFunc(admit, staticAdmissionAttributes),
+				rest.AdmissionToValidateObjectFunc(ctx, admit, staticAdmissionAttributes),
+				rest.AdmissionToValidateObjectUpdateFunc(ctx, admit, staticAdmissionAttributes),
 			)
 			wasCreated = created
 			return obj, err

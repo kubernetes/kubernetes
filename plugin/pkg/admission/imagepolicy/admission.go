@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/cache"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -110,7 +111,7 @@ func (a *Plugin) webhookError(pod *api.Pod, attributes admission.Attributes, err
 }
 
 // Validate makes an admission decision based on the request attributes
-func (a *Plugin) Validate(attributes admission.Attributes) (err error) {
+func (a *Plugin) Validate(_ request.Context, attributes admission.Attributes) (err error) {
 	// Ignore all calls to subresources or resources other than pods.
 	if attributes.GetSubresource() != "" || attributes.GetResource().GroupResource() != api.Resource("pods") {
 		return nil

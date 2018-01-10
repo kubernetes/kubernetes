@@ -130,7 +130,7 @@ func TestBanflunderAdmissionPlugin(t *testing.T) {
 			informersFactory.WaitForCacheSync(stop)
 
 			// act
-			err = target.Admit(admission.NewAttributesRecord(
+			err = target.Admit(nil, admission.NewAttributesRecord(
 				&scenario.admissionInput,
 				nil,
 				scenario.admissionInputKind,

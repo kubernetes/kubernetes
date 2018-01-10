@@ -33,6 +33,7 @@ import (
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
+	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	kapi "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
@@ -44,6 +45,8 @@ import (
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/seccomp"
 	psputil "k8s.io/kubernetes/pkg/security/podsecuritypolicy/util"
 )
+
+var ctx = request.NewContext()
 
 const defaultContainerName = "test-c"
 
@@ -468,7 +471,7 @@ func TestFailClosedOnInvalidPod(t *testing.T) {
 	pod := &v1.Pod{}
 	attrs := kadmission.NewAttributesRecord(pod, nil, kapi.Kind("Pod").WithVersion("version"), pod.Namespace, pod.Name, kapi.Resource("pods").WithVersion("version"), "", kadmission.Create, &user.DefaultInfo{})
 
-	err := plugin.Admit(attrs)
+	err := plugin.Admit(ctx, attrs)
 	if err == nil {
 		t.Fatalf("expected versioned pod object to fail mutating admission")
 	}
@@ -476,7 +479,7 @@ func TestFailClosedOnInvalidPod(t *testing.T) {
 		t.Errorf("expected type error on Admit but got: %v", err)
 	}
 
-	err = plugin.Validate(attrs)
+	err = plugin.Validate(ctx, attrs)
 	if err == nil {
 		t.Fatalf("expected versioned pod object to fail validating admission")
 	}
@@ -1796,7 +1799,7 @@ func testPSPAdmitAdvanced(testCaseName string, op kadmission.Operation, psps []*
 	plugin := NewTestAdmission(psps, authz)
 
 	attrs := kadmission.NewAttributesRecord(pod, oldPod, kapi.Kind("Pod").WithVersion("version"), pod.Namespace, "", kapi.Resource("pods").WithVersion("version"), "", op, userInfo)
-	err := plugin.Admit(attrs)
+	err := plugin.Admit(ctx, attrs)
 
 	if shouldPassAdmit && err != nil {
 		t.Errorf("%s: expected no errors on Admit but received %v", testCaseName, err)
@@ -1824,7 +1827,7 @@ func testPSPAdmitAdvanced(testCaseName string, op kadmission.Operation, psps []*
 		t.Errorf("%s: expected errors on Admit but received none", testCaseName)
 	}
 
-	err = plugin.Validate(attrs)
+	err = plugin.Validate(ctx, attrs)
 	if shouldPassValidate && err != nil {
 		t.Errorf("%s: expected no errors on Validate but received %v", testCaseName, err)
 	} else if !shouldPassValidate && err == nil {
