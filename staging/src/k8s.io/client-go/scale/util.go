@@ -23,6 +23,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/client-go/discovery"
 	scalescheme "k8s.io/client-go/scale/scheme"
 	scaleappsint "k8s.io/client-go/scale/scheme/appsint"
@@ -124,6 +125,7 @@ func NewDiscoveryScaleKindResolver(client discovery.ServerResourcesInterface) Sc
 // ScaleConverter knows how to convert between external scale versions.
 type ScaleConverter struct {
 	scheme            *runtime.Scheme
+	codecs            serializer.CodecFactory
 	internalVersioner runtime.GroupVersioner
 }
 
@@ -141,6 +143,7 @@ func NewScaleConverter() *ScaleConverter {
 
 	return &ScaleConverter{
 		scheme: scheme,
+		codecs: serializer.NewCodecFactory(scheme),
 		internalVersioner: runtime.NewMultiGroupVersioner(
 			scalescheme.SchemeGroupVersion,
 			schema.GroupKind{Group: scaleext.GroupName, Kind: "Scale"},
@@ -154,6 +157,22 @@ func NewScaleConverter() *ScaleConverter {
 // Scheme returns the scheme used by this scale converter.
 func (c *ScaleConverter) Scheme() *runtime.Scheme {
 	return c.scheme
+}
+
+func (c *ScaleConverter) Codecs() serializer.CodecFactory {
+	return c.codecs
+}
+
+func (c *ScaleConverter) ScaleVersions() []schema.GroupVersion {
+	return []schema.GroupVersion{
+		scaleautoscaling.SchemeGroupVersion,
+		scalescheme.SchemeGroupVersion,
+		scaleext.SchemeGroupVersion,
+		scaleextint.SchemeGroupVersion,
+		scaleappsint.SchemeGroupVersion,
+		scaleappsv1beta1.SchemeGroupVersion,
+		scaleappsv1beta2.SchemeGroupVersion,
+	}
 }
 
 // ConvertToVersion converts the given *external* input object to the given output *external* output group-version.
