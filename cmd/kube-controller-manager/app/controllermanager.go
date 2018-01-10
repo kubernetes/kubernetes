@@ -128,7 +128,9 @@ func Run(s *options.CMServer) error {
 		return err
 	}
 
-	go startHTTP(s)
+	if s.Port >= 0 {
+		go startHTTP(s)
+	}
 
 	recorder := createRecorder(kubeClient)
 
