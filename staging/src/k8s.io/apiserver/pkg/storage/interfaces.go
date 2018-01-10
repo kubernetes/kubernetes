@@ -28,7 +28,9 @@ import (
 // Versioner abstracts setting and retrieving metadata fields from database response
 // onto the object ot list. It is required to maintain storage invariants - updating an
 // object twice with the same data except for the ResourceVersion and SelfLink must be
-// a no-op.
+// a no-op. A resourceVersion of type uint64 is a 'raw' resourceVersion,
+// intended to be sent directly to or from the backend. A resourceVersion of
+// type string is a 'safe' resourceVersion, intended for consumption by users.
 type Versioner interface {
 	// UpdateObject sets storage metadata into an API object. Returns an error if the object
 	// cannot be updated correctly. May return nil if the requested object does not need metadata
@@ -45,6 +47,17 @@ type Versioner interface {
 	// ObjectResourceVersion returns the resource version (for persistence) of the specified object.
 	// Should return an error if the specified object does not have a persistable version.
 	ObjectResourceVersion(obj runtime.Object) (uint64, error)
+
+	// ParseWatchResourceVersion takes a resource version argument and
+	// converts it to the storage backend we should pass to helper.Watch().
+	// Because resourceVersion is an opaque value, the default watch
+	// behavior for non-zero watch is to watch the next value (if you pass
+	// "1", you will see updates from "2" onwards).
+	ParseWatchResourceVersion(resourceVersion string) (uint64, error)
+	// ParseListResourceVersion takes a resource version argument and
+	// converts it to the storage backend version. Appropriate for
+	// everything that's not intended as an argument for watch.
+	ParseListResourceVersion(resourceVersion string) (uint64, error)
 }
 
 // ResponseMeta contains information about the database metadata that is associated with

@@ -203,3 +203,9 @@ func (testVersioner) PrepareObjectForStorage(obj runtime.Object) error {
 func (testVersioner) ObjectResourceVersion(obj runtime.Object) (uint64, error) {
 	return 0, fmt.Errorf("unimplemented")
 }
+func (testVersioner) ParseWatchResourceVersion(resourceVersion string) (uint64, error) {
+	return strconv.ParseUint(resourceVersion, 10, 64)
+}
+func (testVersioner) ParseListResourceVersion(resourceVersion string) (uint64, error) {
+	return strconv.ParseUint(resourceVersion, 10, 64)
+}
