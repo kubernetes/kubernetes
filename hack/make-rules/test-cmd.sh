@@ -34,7 +34,7 @@ function run_kube_apiserver() {
   kube::log::status "Starting kube-apiserver"
 
   # Admission Controllers to invoke prior to persisting objects in cluster
-  ADMISSION_CONTROL="Initializers,NamespaceLifecycle,LimitRanger,ResourceQuota"
+  ADMISSION_CONTROL="NamespaceLifecycle,Initializers,LimitRanger,ResourceQuota"
 
   # Include RBAC (to exercise bootstrapping), and AlwaysAllow to allow all actions
   AUTHORIZATION_MODE="RBAC,AlwaysAllow"
