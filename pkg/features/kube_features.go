@@ -118,10 +118,16 @@ const (
 	ExpandPersistentVolumes utilfeature.Feature = "ExpandPersistentVolumes"
 
 	// owner: @verb
-	// alpha: v1.8
+	// alpha: v1.10
 	//
 	// Allows running a "debug container" in a pod namespaces to troubleshoot a running pod.
 	DebugContainers utilfeature.Feature = "DebugContainers"
+
+	// owner: @verb
+	// alpha: v1.10
+	//
+	// Allows all containers in a pod to share a process namespace.
+	PodShareProcessNamespace utilfeature.Feature = "PodShareProcessNamespace"
 
 	// owner: @bsalamat
 	// alpha: v1.8
@@ -239,6 +245,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	LocalStorageCapacityIsolation:               {Default: false, PreRelease: utilfeature.Alpha},
 	HugePages:                                   {Default: true, PreRelease: utilfeature.Beta},
 	DebugContainers:                             {Default: false, PreRelease: utilfeature.Alpha},
+	PodShareProcessNamespace:                    {Default: false, PreRelease: utilfeature.Alpha},
 	PodPriority:                                 {Default: false, PreRelease: utilfeature.Alpha},
 	EnableEquivalenceClassCache:                 {Default: false, PreRelease: utilfeature.Alpha},
 	TaintNodesByCondition:                       {Default: false, PreRelease: utilfeature.Alpha},
