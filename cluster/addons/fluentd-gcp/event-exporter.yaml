@@ -49,7 +49,8 @@ spec:
       - name: event-exporter
         image: k8s.gcr.io/event-exporter:v0.1.7
         command:
-        - '/event-exporter'
+        - /event-exporter
+        - -sink-opts="-location={{ event_exporter_zone }}"
       # BEGIN_PROMETHEUS_TO_SD
       - name: prometheus-to-sd-exporter
         image: k8s.gcr.io/prometheus-to-sd:v0.2.4
