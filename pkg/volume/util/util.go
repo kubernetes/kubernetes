@@ -46,6 +46,7 @@ const (
 	ErrDeviceNotFound     = "device not found"
 	ErrDeviceNotSupported = "device not supported"
 	ErrNotAvailable       = "not available"
+	ErrGlusterTransport   = "Transport endpoint is not connected"
 )
 
 // IsReady checks for the existence of a regular file
@@ -141,6 +142,8 @@ func UnmountMountPoint(mountPath string, mounter mount.Interface, extensiveMount
 func PathExists(path string) (bool, error) {
 	_, err := os.Stat(path)
 	if err == nil {
+		return true, nil
+	} else if strings.Contains(err.Error(), ErrGlusterTransport) {
 		return true, nil
 	} else if os.IsNotExist(err) {
 		return false, nil
