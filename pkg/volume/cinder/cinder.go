@@ -375,7 +375,7 @@ func (b *cinderVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 	}
 
 	if !b.readOnly {
-		volume.SetVolumeOwnership(b, fsGroup)
+		volume.SetVolumeOwnership(b, fsGroup, true)
 	}
 	glog.V(3).Infof("Cinder volume %s mounted to %s", b.pdName, dir)
 

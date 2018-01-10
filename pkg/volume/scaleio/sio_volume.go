@@ -156,7 +156,7 @@ func (v *sioVolume) SetUpAt(dir string, fsGroup *int64) error {
 
 	if !v.readOnly && fsGroup != nil {
 		glog.V(4).Info(log("applying  value FSGroup ownership"))
-		volume.SetVolumeOwnership(v, fsGroup)
+		volume.SetVolumeOwnership(v, fsGroup, true)
 	}
 
 	glog.V(4).Info(log("successfully setup PV %s: volume %s mapped as %s mounted at %s", v.volSpecName, v.volName, devicePath, dir))

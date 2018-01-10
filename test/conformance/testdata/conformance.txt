@@ -106,6 +106,7 @@ test/e2e/common/secrets_volume.go: "should be consumable from pods in volume as 
 test/e2e/common/secrets_volume.go: "should be consumable from pods in volume with mappings "
 test/e2e/common/secrets_volume.go: "should be consumable from pods in volume with mappings and Item Mode set "
 test/e2e/common/secrets_volume.go: "should be consumable in multiple volumes in a pod "
+test/e2e/common/secrets_volume.go: "should be mounted with the correct mode"
 test/e2e/common/secrets_volume.go: "optional updates should be reflected in volume "
 test/e2e/kubectl/kubectl.go: "should create and stop a replication controller "
 test/e2e/kubectl/kubectl.go: "should scale a replication controller "
