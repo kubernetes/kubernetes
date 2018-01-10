@@ -1,4 +1,4 @@
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: calico-typha
@@ -8,6 +8,13 @@ metadata:
     addonmanager.kubernetes.io/mode: Reconcile
     k8s-app: calico-typha
 spec:
+  # Number of Typha replicas.  To enable Typha, set this to a non-zero value *and* set the
+  # typha_service_name variable in the calico-config ConfigMap above.
+  #
+  # We recommend using Typha if you have more than 50 nodes.  Above 100 nodes it is essential
+  # (when using the Kubernetes datastore).  Use one replica for every 100-200 nodes.  In
+  # production, we recommend running at least 3 replicas to reduce the impact of rolling upgrade.
+  replicas: 1
   revisionHistoryLimit: 2
   template:
     metadata:
@@ -22,31 +29,35 @@ spec:
       hostNetwork: true
       serviceAccountName: calico
       containers:
-      - image: calico/typha:v0.5.1
+      - image: calico/typha:v0.6.0
         name: calico-typha
         ports:
         - containerPort: 5473
           name: calico-typha
           protocol: TCP
         env:
+          # Enable "info" logging by default.  Can be set to "debug" to increase verbosity.
+          - name: TYPHA_LOGSEVERITYSCREEN
+            value: "info"
+          # Disable logging to file and syslog since those don't make sense in Kubernetes.
           - name: TYPHA_LOGFILEPATH
             value: "none"
           - name: TYPHA_LOGSEVERITYSYS
             value: "none"
-          - name: TYPHA_LOGSEVERITYSCREEN
-            value: "info"
-          - name: TYPHA_PROMETHEUSMETRICSENABLED
-            value: "true"
+          # Monitor the Kubernetes API to find the number of running instances and rebalance
+          # connections.
           - name: TYPHA_CONNECTIONREBALANCINGMODE
             value: "kubernetes"
-          - name: TYPHA_PROMETHEUSMETRICSPORT
-            value: "9093"
           - name: TYPHA_DATASTORETYPE
             value: "kubernetes"
-          - name: TYPHA_MAXCONNECTIONSLOWERLIMIT
-            value: "1"
           - name: TYPHA_HEALTHENABLED
             value: "true"
+          # Uncomment these lines to enable prometheus metrics.  Since Typha is host-networked,
+          # this opens a port on the host, which may need to be secured.
+          #- name: TYPHA_PROMETHEUSMETRICSENABLED
+          #  value: "true"
+          #- name: TYPHA_PROMETHEUSMETRICSPORT
+          #  value: "9093"
         volumeMounts:
         - mountPath: /etc/calico
           name: etc-calico
