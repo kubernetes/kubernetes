@@ -767,11 +767,19 @@ func (c *PrometheusCollector) collectContainersInfo(ch chan<- prometheus.Metric)
 		glog.Warningf("Couldn't get containers: %s", err)
 		return
 	}
+	rawLabels := map[string]struct{}{}
 	for _, container := range containers {
-		labels, values := []string{}, []string{}
-		for l, v := range c.containerLabelsFunc(container) {
+		for l := range c.containerLabelsFunc(container) {
+			rawLabels[l] = struct{}{}
+		}
+	}
+	for _, container := range containers {
+		values := make([]string, 0, len(rawLabels))
+		labels := make([]string, 0, len(rawLabels))
+		containerLabels := c.containerLabelsFunc(container)
+		for l := range rawLabels {
 			labels = append(labels, sanitizeLabelName(l))
-			values = append(values, v)
+			values = append(values, containerLabels[l])
 		}
 
 		// Container spec
