@@ -98,12 +98,14 @@ func (s strategy) Export(ctx genericapirequest.Context, obj runtime.Object, exac
 }
 
 // GetAttrs returns labels and fields of a given object for filtering purposes.
-func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
+func GetAttrs(obj runtime.Object) (apistorage.ObjectAttrs, error) {
+	result := apistorage.ObjectAttrs{}
 	secret, ok := obj.(*api.Secret)
 	if !ok {
-		return nil, nil, false, fmt.Errorf("not a secret")
+		return result, fmt.Errorf("not a secret")
 	}
-	return labels.Set(secret.Labels), SelectableFields(secret), secret.Initializers != nil, nil
+	result.FieldSet = SelectableFields(secret)
+	return result, nil
 }
 
 // Matcher returns a generic matcher for a given label and field selector.

@@ -35,12 +35,14 @@ func NewStrategy(typer runtime.ObjectTyper) fischerStrategy {
 	return fischerStrategy{typer, names.SimpleNameGenerator}
 }
 
-func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
+func GetAttrs(obj runtime.Object) (storage.ObjectAttrs, error) {
+	result := storage.ObjectAttrs{}
 	apiserver, ok := obj.(*wardle.Fischer)
 	if !ok {
-		return nil, nil, false, fmt.Errorf("given object is not a Fischer.")
+		return result, fmt.Errorf("given object is not a Fischer.")
 	}
-	return labels.Set(apiserver.ObjectMeta.Labels), fischerToSelectableFields(apiserver), apiserver.Initializers != nil, nil
+	result.FieldSet = fischerToSelectableFields(apiserver)
+	return result, nil
 }
 
 // MatchFischer is the filter used by the generic etcd backend to watch events

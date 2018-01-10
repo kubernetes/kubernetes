@@ -32,7 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
-	pkgstorage "k8s.io/apiserver/pkg/storage"
+	apistorage "k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -159,18 +159,20 @@ func NodeToSelectableFields(node *api.Node) fields.Set {
 	return generic.MergeFieldsSets(objectMetaFieldsSet, specificFieldsSet)
 }
 
-// GetAttrs returns labels and fields of a given object for filtering purposes.
-func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
+// GetAttrs returns fields of a given object for filtering purposes.
+func GetAttrs(obj runtime.Object) (apistorage.ObjectAttrs, error) {
+	result := apistorage.ObjectAttrs{}
 	nodeObj, ok := obj.(*api.Node)
 	if !ok {
-		return nil, nil, false, fmt.Errorf("not a node")
+		return result, fmt.Errorf("not a node")
 	}
-	return labels.Set(nodeObj.ObjectMeta.Labels), NodeToSelectableFields(nodeObj), nodeObj.Initializers != nil, nil
+	result.FieldSet = NodeToSelectableFields(nodeObj)
+	return result, nil
 }
 
 // MatchNode returns a generic matcher for a given label and field selector.
-func MatchNode(label labels.Selector, field fields.Selector) pkgstorage.SelectionPredicate {
-	return pkgstorage.SelectionPredicate{
+func MatchNode(label labels.Selector, field fields.Selector) apistorage.SelectionPredicate {
+	return apistorage.SelectionPredicate{
 		Label:       label,
 		Field:       field,
 		GetAttrs:    GetAttrs,
@@ -178,10 +180,13 @@ func MatchNode(label labels.Selector, field fields.Selector) pkgstorage.Selectio
 	}
 }
 
-func NodeNameTriggerFunc(obj runtime.Object) []pkgstorage.MatchValue {
+func NodeNameTriggerFunc(obj runtime.Object) []apistorage.MatchValue {
 	node := obj.(*api.Node)
-	result := pkgstorage.MatchValue{IndexName: "metadata.name", Value: node.ObjectMeta.Name}
-	return []pkgstorage.MatchValue{result}
+	result := apistorage.MatchValue{
+		IndexName: "metadata.name",
+		Value:     node.ObjectMeta.Name,
+	}
+	return []apistorage.MatchValue{result}
 }
 
 // ResourceLocation returns an URL and transport which one can use to send traffic for the specified node.

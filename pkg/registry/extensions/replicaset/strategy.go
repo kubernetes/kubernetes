@@ -159,12 +159,14 @@ func ReplicaSetToSelectableFields(rs *extensions.ReplicaSet) fields.Set {
 }
 
 // GetAttrs returns labels and fields of a given object for filtering purposes.
-func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
+func GetAttrs(obj runtime.Object) (apistorage.ObjectAttrs, error) {
+	result := apistorage.ObjectAttrs{}
 	rs, ok := obj.(*extensions.ReplicaSet)
 	if !ok {
-		return nil, nil, false, fmt.Errorf("given object is not a ReplicaSet.")
+		return result, fmt.Errorf("given object is not a ReplicaSet.")
 	}
-	return labels.Set(rs.ObjectMeta.Labels), ReplicaSetToSelectableFields(rs), rs.Initializers != nil, nil
+	result.FieldSet = ReplicaSetToSelectableFields(rs)
+	return result, nil
 }
 
 // MatchReplicaSet is the filter used by the generic etcd backend to route

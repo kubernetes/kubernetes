@@ -20,6 +20,7 @@ import (
 	"errors"
 	"testing"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -27,20 +28,13 @@ import (
 )
 
 type Ignored struct {
+	metav1.ObjectMeta
 	ID string
 }
 
-type IgnoredList struct {
-	Items []Ignored
-}
-
-func (obj *Ignored) GetObjectKind() schema.ObjectKind     { return schema.EmptyObjectKind }
-func (obj *IgnoredList) GetObjectKind() schema.ObjectKind { return schema.EmptyObjectKind }
+func (obj *Ignored) GetObjectKind() schema.ObjectKind { return schema.EmptyObjectKind }
 func (obj *Ignored) DeepCopyObject() runtime.Object {
 	panic("Ignored does not support DeepCopy")
-}
-func (obj *IgnoredList) DeepCopyObject() runtime.Object {
-	panic("IgnoredList does not support DeepCopy")
 }
 
 func TestSelectionPredicate(t *testing.T) {
@@ -90,8 +84,8 @@ func TestSelectionPredicate(t *testing.T) {
 			matchSingleKey: "12345",
 		},
 		"error": {
-			labelSelector: "name=foo",
 			fieldSelector: "uid=12345",
+			fields:        fields.Set{"metadata.name": "12345"},
 			err:           errors.New("maybe this is a 'wrong object type' error"),
 			shouldMatch:   false,
 		},
@@ -109,11 +103,20 @@ func TestSelectionPredicate(t *testing.T) {
 		sp := &SelectionPredicate{
 			Label: parsedLabel,
 			Field: parsedField,
-			GetAttrs: func(runtime.Object) (label labels.Set, field fields.Set, uninitialized bool, err error) {
-				return item.labels, item.fields, item.uninitialized, item.err
+			GetAttrs: func(runtime.Object) (ObjectAttrs, error) {
+				return ObjectAttrs{
+					FieldSet: item.fields,
+				}, item.err
 			},
 		}
-		got, err := sp.Matches(&Ignored{})
+
+		obj := &Ignored{}
+		obj.SetLabels(item.labels)
+		if item.uninitialized {
+			obj.SetInitializers(&metav1.Initializers{})
+		}
+
+		got, err := sp.Matches(obj)
 		if e, a := item.err, err; e != a {
 			t.Errorf("%v: expected %v, got %v", name, e, a)
 			continue

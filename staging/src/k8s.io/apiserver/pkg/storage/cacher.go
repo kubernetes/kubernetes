@@ -63,7 +63,7 @@ type CacherConfig struct {
 	KeyFunc func(runtime.Object) (string, error)
 
 	// GetAttrsFunc is used to get object labels, fields, and the uninitialized bool
-	GetAttrsFunc func(runtime.Object) (label labels.Set, field fields.Set, uninitialized bool, err error)
+	GetAttrsFunc AttrFunc
 
 	// TriggerPublisherFunc is used for optimizing amount of watchers that
 	// needs to process an incoming event.

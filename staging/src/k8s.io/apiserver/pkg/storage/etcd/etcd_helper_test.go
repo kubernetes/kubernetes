@@ -249,9 +249,11 @@ func TestListFiltered(t *testing.T) {
 	p := storage.SelectionPredicate{
 		Label: labels.Everything(),
 		Field: fields.SelectorFromSet(fields.Set{"metadata.name": "bar"}),
-		GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
+		GetAttrs: func(obj runtime.Object) (storage.ObjectAttrs, error) {
 			pod := obj.(*example.Pod)
-			return labels.Set(pod.Labels), fields.Set{"metadata.name": pod.Name}, pod.Initializers != nil, nil
+			return storage.ObjectAttrs{
+				FieldSet: fields.Set{"metadata.name": pod.Name},
+			}, nil
 		},
 	}
 	var got example.PodList

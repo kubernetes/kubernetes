@@ -25,8 +25,6 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -50,8 +48,8 @@ func newTestWatchCache(capacity int) *watchCache {
 	keyFunc := func(obj runtime.Object) (string, error) {
 		return NamespaceKeyFunc("prefix", obj)
 	}
-	getAttrsFunc := func(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
-		return nil, nil, false, nil
+	getAttrsFunc := func(obj runtime.Object) (ObjectAttrs, error) {
+		return ObjectAttrs{}, nil
 	}
 	wc := newWatchCache(capacity, keyFunc, getAttrsFunc)
 	wc.clock = clock.NewFakeClock(time.Now())
