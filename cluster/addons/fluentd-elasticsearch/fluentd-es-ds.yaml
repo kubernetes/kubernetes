@@ -112,4 +112,4 @@ spec:
           path: /usr/lib64
       - name: config-volume
         configMap:
-          name: fluentd-es-config-v0.1.1
+          name: fluentd-es-config-v0.1.2
