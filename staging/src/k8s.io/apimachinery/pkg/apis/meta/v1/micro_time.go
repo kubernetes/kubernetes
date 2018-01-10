@@ -20,9 +20,6 @@ import (
 	"encoding/json"
 	"time"
 
-	openapi "k8s.io/kube-openapi/pkg/common"
-
-	"github.com/go-openapi/spec"
 	"github.com/google/gofuzz"
 )
 
@@ -149,16 +146,15 @@ func (t MicroTime) MarshalJSON() ([]byte, error) {
 	return json.Marshal(t.UTC().Format(RFC3339Micro))
 }
 
-func (_ MicroTime) OpenAPIDefinition() openapi.OpenAPIDefinition {
-	return openapi.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Type:   []string{"string"},
-				Format: "date-time",
-			},
-		},
-	}
-}
+// OpenAPISchemaType is used by the kube-openapi generator when constructing
+// the OpenAPI spec of this type.
+//
+// See: https://github.com/kubernetes/kube-openapi/tree/master/pkg/generators
+func (_ MicroTime) OpenAPISchemaType() []string { return []string{"string"} }
+
+// OpenAPISchemaFormat is used by the kube-openapi generator when constructing
+// the OpenAPI spec of this type.
+func (_ MicroTime) OpenAPISchemaFormat() string { return "date-time" }
 
 // MarshalQueryParameter converts to a URL query parameter value
 func (t MicroTime) MarshalQueryParameter() (string, error) {
