@@ -25,12 +25,12 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"os/exec"
 	"text/template"
 	"time"
 
-	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud/meta"
 )
 
@@ -1131,7 +1131,7 @@ func main() {
 		genUnitTestHeader(out)
 		genUnitTestServices(out)
 	default:
-		glog.Fatalf("Invalid -mode: %q", flags.mode)
+		log.Fatalf("Invalid -mode: %q", flags.mode)
 	}
 
 	if flags.gofmt {
