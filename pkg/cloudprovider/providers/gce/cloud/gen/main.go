@@ -1113,7 +1113,7 @@ func Test{{.Service}}Group(t *testing.T) {
 	tmpl := template.Must(template.New("unittest").Parse(text))
 	// Sort keys so the output will be stable.
 	var keys []string
-	for k, _ := range meta.AllServicesByGroup {
+	for k := range meta.AllServicesByGroup {
 		keys = append(keys, k)
 	}
 	sort.Strings(keys)

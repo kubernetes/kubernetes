@@ -5,10 +5,7 @@ go_library(
     srcs = ["main.go"],
     importpath = "k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud/gen",
     visibility = ["//visibility:private"],
-    deps = [
-        "//pkg/cloudprovider/providers/gce/cloud/meta:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
-    ],
+    deps = ["//pkg/cloudprovider/providers/gce/cloud/meta:go_default_library"],
 )
 
 go_binary(
