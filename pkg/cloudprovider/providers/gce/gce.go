@@ -30,6 +30,13 @@ import (
 	gcfg "gopkg.in/gcfg.v1"
 
 	"cloud.google.com/go/compute/metadata"
+	"github.com/golang/glog"
+	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/google"
+	computealpha "google.golang.org/api/compute/v0.alpha"
+	computebeta "google.golang.org/api/compute/v0.beta"
+	compute "google.golang.org/api/compute/v1"
+	container "google.golang.org/api/container/v1"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -41,18 +48,12 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
+
 	"k8s.io/kubernetes/pkg/cloudprovider"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud"
 	"k8s.io/kubernetes/pkg/controller"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/version"
-
-	"github.com/golang/glog"
-	"golang.org/x/oauth2"
-	"golang.org/x/oauth2/google"
-	computealpha "google.golang.org/api/compute/v0.alpha"
-	computebeta "google.golang.org/api/compute/v0.beta"
-	compute "google.golang.org/api/compute/v1"
-	container "google.golang.org/api/container/v1"
 )
 
 const (
@@ -147,6 +148,9 @@ type GCECloud struct {
 	// the corresponding api is enabled.
 	// If not enabled, it should return error.
 	AlphaFeatureGate *AlphaFeatureGate
+
+	// New code generated interface to the GCE compute library.
+	c cloud.Cloud
 }
 
 // TODO: replace gcfg with json
@@ -243,7 +247,6 @@ func newGCECloud(config io.Reader) (gceCloud *GCECloud, err error) {
 		return nil, err
 	}
 	return CreateGCECloud(cloudConfig)
-
 }
 
 func readConfig(reader io.Reader) (*ConfigFile, error) {
@@ -363,11 +366,12 @@ func generateCloudConfig(configFile *ConfigFile) (cloudConfig *CloudConfig, err 
 // If no tokenSource is specified, uses oauth2.DefaultTokenSource.
 // If managedZones is nil / empty all zones in the region will be managed.
 func CreateGCECloud(config *CloudConfig) (*GCECloud, error) {
-	// Remove any pre-release version and build metadata from the semver, leaving only the MAJOR.MINOR.PATCH portion.
-	// See http://semver.org/.
+	// Remove any pre-release version and build metadata from the semver,
+	// leaving only the MAJOR.MINOR.PATCH portion. See http://semver.org/.
 	version := strings.TrimLeft(strings.Split(strings.Split(version.Get().GitVersion, "-")[0], "+")[0], "v")
 
-	// Create a user-agent header append string to supply to the Google API clients, to identify Kubernetes as the origin of the GCP API calls.
+	// Create a user-agent header append string to supply to the Google API
+	// clients, to identify Kubernetes as the origin of the GCP API calls.
 	userAgent := fmt.Sprintf("Kubernetes/%s (%s %s)", version, runtime.GOOS, runtime.GOARCH)
 
 	// Use ProjectID for NetworkProjectID, if it wasn't explicitly set.
@@ -506,6 +510,13 @@ func CreateGCECloud(config *CloudConfig) (*GCECloud, error) {
 	}
 
 	gce.manager = &gceServiceManager{gce}
+	gce.c = cloud.NewGCE(&cloud.Service{
+		GA:            service,
+		Alpha:         serviceAlpha,
+		Beta:          serviceBeta,
+		ProjectRouter: &gceProjectRouter{gce},
+		RateLimiter:   &gceRateLimiter{gce},
+	})
 
 	return gce, nil
 }
