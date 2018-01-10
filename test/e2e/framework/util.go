@@ -3236,6 +3236,30 @@ func SSH(cmd, host, provider string) (SSHResult, error) {
 	return result, err
 }
 
+func SSHWithStdin(input, cmd, host, provider string) (SSHResult, error) {
+	result := SSHResult{Host: host, Cmd: cmd}
+
+	// Get a signer for the provider.
+	signer, err := GetSigner(provider)
+	if err != nil {
+		return result, fmt.Errorf("error getting signer for provider %s: '%v'", provider, err)
+	}
+
+	// RunSSHCommand will default to Getenv("USER") if user == "", but we're
+	// defaulting here as well for logging clarity.
+	result.User = os.Getenv("KUBE_SSH_USER")
+	if result.User == "" {
+		result.User = os.Getenv("USER")
+	}
+
+	stdout, stderr, code, err := sshutil.RunSSHCommandWithStdin(input, cmd, result.User, host, signer)
+	result.Stdout = stdout
+	result.Stderr = stderr
+	result.Code = code
+
+	return result, err
+}
+
 func LogSSHResult(result SSHResult) {
 	remote := fmt.Sprintf("%s@%s", result.User, result.Host)
 	Logf("ssh %s: command:   %s", remote, result.Cmd)
@@ -3245,6 +3269,10 @@ func LogSSHResult(result SSHResult) {
 }
 
 func IssueSSHCommandWithResult(cmd, provider string, node *v1.Node) (*SSHResult, error) {
+	return IssueSSHCommandWithResultAndInput("", cmd, provider, node)
+}
+
+func IssueSSHCommandWithResultAndInput(input, cmd, provider string, node *v1.Node) (*SSHResult, error) {
 	Logf("Getting external IP address for %s", node.Name)
 	host := ""
 	for _, a := range node.Status.Addresses {
@@ -3269,7 +3297,7 @@ func IssueSSHCommandWithResult(cmd, provider string, node *v1.Node) (*SSHResult,
 	}
 
 	Logf("SSH %q on %s(%s)", cmd, node.Name, host)
-	result, err := SSH(cmd, host, provider)
+	result, err := SSHWithStdin(input, cmd, host, provider)
 	LogSSHResult(result)
 
 	if result.Code != 0 || err != nil {
