@@ -25,7 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
-	genericapiserver "k8s.io/apiserver/pkg/server"
+	"k8s.io/apiserver/pkg/server/types"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 )
@@ -40,7 +40,7 @@ type ClientCARegistrationHook struct {
 	RequestHeaderAllowedNames        []string
 }
 
-func (h ClientCARegistrationHook) PostStartHook(hookContext genericapiserver.PostStartHookContext) error {
+func (h ClientCARegistrationHook) PostStartHook(hookContext types.PostStartHookContext) error {
 	// no work to do
 	if len(h.ClientCA) == 0 && len(h.RequestHeaderCA) == 0 {
 		return nil

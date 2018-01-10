@@ -57,6 +57,7 @@ import (
 	genericfilters "k8s.io/apiserver/pkg/server/filters"
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/server/routes"
+	"k8s.io/apiserver/pkg/server/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	restclient "k8s.io/client-go/rest"
@@ -94,8 +95,9 @@ type Config struct {
 	RuleResolver authorizer.RuleResolver
 	// AdmissionControl performs deep inspection of a given request (including content)
 	// to set values and determine whether its allowed
-	AdmissionControl      admission.Interface
-	CorsAllowedOriginList []string
+	AdmissionControl        admission.Interface
+	AdmissionPostStartHooks []admission.PostStartHookFuncAndName
+	CorsAllowedOriginList   []string
 
 	EnableSwaggerUI bool
 	EnableIndex     bool
@@ -487,12 +489,20 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 
 	genericApiServerHookName := "generic-apiserver-start-informers"
 	if c.SharedInformerFactory != nil && !s.isPostStartHookRegistered(genericApiServerHookName) {
-		err := s.AddPostStartHook(genericApiServerHookName, func(context PostStartHookContext) error {
+		err := s.AddPostStartHook(genericApiServerHookName, func(context types.PostStartHookContext) error {
 			c.SharedInformerFactory.Start(context.StopCh)
 			return nil
 		})
 		if err != nil {
 			return nil, err
+		}
+	}
+
+	for _, hook := range c.AdmissionPostStartHooks {
+		if !s.isPostStartHookRegistered(hook.Name) {
+			if err := s.AddPostStartHook(hook.Name, hook.Func); err != nil {
+				return nil, err
+			}
 		}
 	}
 

@@ -104,6 +104,7 @@ go_library(
         "//vendor/k8s.io/apiserver/pkg/server:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/server/healthz:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/server/storage:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/server/types:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/storage/storagebackend/factory:go_default_library",
         "//vendor/k8s.io/client-go/informers:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes/typed/core/v1:go_default_library",

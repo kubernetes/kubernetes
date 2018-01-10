@@ -141,6 +141,7 @@ go_library(
         "//vendor/k8s.io/apiserver/pkg/server/healthz:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/server/mux:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/server/routes:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/server/types:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//vendor/k8s.io/client-go/informers:go_default_library",
         "//vendor/k8s.io/client-go/rest:go_default_library",
@@ -167,6 +168,7 @@ filegroup(
         "//staging/src/k8s.io/apiserver/pkg/server/options:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/server/routes:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/server/storage:all-srcs",
+        "//staging/src/k8s.io/apiserver/pkg/server/types:all-srcs",
     ],
     tags = ["automanaged"],
 )

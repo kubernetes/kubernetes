@@ -35,6 +35,7 @@ import (
 	genericregistry "k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
+	"k8s.io/apiserver/pkg/server/types"
 
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/install"
@@ -199,11 +200,11 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		crdHandler,
 	)
 
-	s.GenericAPIServer.AddPostStartHook("start-apiextensions-informers", func(context genericapiserver.PostStartHookContext) error {
+	s.GenericAPIServer.AddPostStartHook("start-apiextensions-informers", func(context types.PostStartHookContext) error {
 		s.Informers.Start(context.StopCh)
 		return nil
 	})
-	s.GenericAPIServer.AddPostStartHook("start-apiextensions-controllers", func(context genericapiserver.PostStartHookContext) error {
+	s.GenericAPIServer.AddPostStartHook("start-apiextensions-controllers", func(context types.PostStartHookContext) error {
 		go crdController.Run(context.StopCh)
 		go namingController.Run(context.StopCh)
 		go finalizingController.Run(5, context.StopCh)

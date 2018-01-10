@@ -334,6 +334,20 @@ else
   ADMISSION_CONTROL=${KUBE_ADMISSION_CONTROL}
 fi
 
+if [[ ${ADMISSION_CONTROL} == *"Initializers"* ]]; then
+    if [[ -n "${RUNTIME_CONFIG}" ]]; then
+      RUNTIME_CONFIG+=","
+    fi
+    RUNTIME_CONFIG+="admissionregistration.k8s.io/v1alpha1"
+fi
+
+if [[ ${ADMISSION_CONTROL} == *"AdmissionWebhook"* ]]; then
+    if [[ -n "${RUNTIME_CONFIG}" ]]; then
+      RUNTIME_CONFIG+=","
+    fi
+    RUNTIME_CONFIG+="admissionregistration.k8s.io/v1beta1"
+fi
+
 # Optional: if set to true kube-up will automatically check for existing resources and clean them up.
 KUBE_UP_AUTOMATIC_CLEANUP=${KUBE_UP_AUTOMATIC_CLEANUP:-false}
 
