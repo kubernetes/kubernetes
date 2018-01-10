@@ -262,8 +262,9 @@ func (b *glusterfsMounter) SetUpAt(dir string, fsGroup *int64) error {
 	if !notMnt {
 		return nil
 	}
-
-	os.MkdirAll(dir, 0750)
+	if err := os.MkdirAll(dir, 0750); err != nil {
+		return err
+	}
 	err = b.setUpAtInternal(dir)
 	if err == nil {
 		return nil
