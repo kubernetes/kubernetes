@@ -34,7 +34,7 @@ import (
 )
 
 var flagConfigFile = pflag.String("azure-container-registry-config", "",
-	"Path to the file container Azure container registry configuration information.")
+	"Path to the file containing Azure container registry configuration information.")
 
 const dummyRegistryEmail = "name@contoso.com"
 
