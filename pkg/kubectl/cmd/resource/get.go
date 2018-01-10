@@ -65,6 +65,8 @@ type GetOptions struct {
 	ShowKind       bool
 	LabelColumns   []string
 	Export         bool
+
+	IncludeUninitialized bool
 }
 
 var (
@@ -190,9 +192,13 @@ func (options *GetOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args 
 		options.ExplicitNamespace = false
 	}
 
+	options.IncludeUninitialized = cmdutil.ShouldIncludeUninitialized(cmd, false)
+
 	switch {
 	case options.Watch || options.WatchOnly:
-
+		// include uninitialized objects when watching on a single object
+		// unless explicitly set --include-uninitialized=false
+		options.IncludeUninitialized = cmdutil.ShouldIncludeUninitialized(cmd, len(args) == 2)
 	default:
 		if len(args) == 0 && cmdutil.IsFilenameSliceEmpty(options.Filenames) {
 			fmt.Fprint(options.ErrOut, "You must specify the type of resource to get. ", cmdutil.ValidResourceTypeList(f))
@@ -240,7 +246,7 @@ func (options *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []str
 		FieldSelectorParam(options.FieldSelector).
 		ExportParam(options.Export).
 		RequestChunksOf(options.ChunkSize).
-		IncludeUninitialized(cmdutil.ShouldIncludeUninitialized(cmd, false)). // TODO: this needs to be better factored
+		IncludeUninitialized(options.IncludeUninitialized).
 		ResourceTypeOrNameArgs(true, args...).
 		ContinueOnError().
 		Latest().
@@ -438,11 +444,6 @@ func (options *GetOptions) raw(f cmdutil.Factory) error {
 // watch starts a client-side watch of one or more resources.
 // TODO: remove the need for arguments here.
 func (options *GetOptions) watch(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
-	// TODO: this could be better factored
-	// include uninitialized objects when watching on a single object
-	// unless explicitly set --include-uninitialized=false
-	includeUninitialized := cmdutil.ShouldIncludeUninitialized(cmd, len(args) == 2)
-
 	r := f.NewBuilder().
 		Unstructured().
 		NamespaceParam(options.Namespace).DefaultNamespace().AllNamespaces(options.AllNamespaces).
@@ -451,7 +452,7 @@ func (options *GetOptions) watch(f cmdutil.Factory, cmd *cobra.Command, args []s
 		FieldSelectorParam(options.FieldSelector).
 		ExportParam(options.Export).
 		RequestChunksOf(options.ChunkSize).
-		IncludeUninitialized(includeUninitialized).
+		IncludeUninitialized(options.IncludeUninitialized).
 		ResourceTypeOrNameArgs(true, args...).
 		SingleResourceType().
 		Latest().

@@ -24,7 +24,7 @@ import string
 import json
 import ipaddress
 
-import charms.leadership
+from charms.leadership import leader_get, leader_set
 
 from shutil import move
 
@@ -112,6 +112,7 @@ def check_for_upgrade_needed():
         # we take no risk and forcibly upgrade the snaps.
         # Forcibly means we do not prompt the user to call the upgrade action.
         set_upgrade_needed(forced=True)
+    upgrade_for_etcd()
 
 
 def snap_resources_changed():
@@ -135,6 +136,13 @@ def snap_resources_changed():
         db.set('snap.resources.fingerprint.initialised', True)
         any_file_changed(paths)
         return 'unknown'
+
+def upgrade_for_etcd():
+    # we are upgrading the charm.
+    # If this is an old deployment etcd_version is not set
+    # so if we are the leader we need to set it to v2
+    if not leader_get('etcd_version') and is_state('leadership.is_leader'):
+        leader_set(etcd_version='etcd2')
 
 
 def add_rbac_roles():
@@ -316,7 +324,7 @@ def setup_leader_authentication():
     # path as a key.
     # eg:
     # {'/root/cdk/serviceaccount.key': 'RSA:2471731...'}
-    charms.leadership.leader_set(leader_data)
+    leader_set(leader_data)
     remove_state('kubernetes-master.components.started')
     set_state('authentication.setup')
 
@@ -364,7 +372,7 @@ def get_keys_from_leader(keys, overwrite_local=False):
         # If the path does not exist, assume we need it
         if not os.path.exists(k) or overwrite_local:
             # Fetch data from leadership broadcast
-            contents = charms.leadership.leader_get(k)
+            contents = leader_get(k)
             # Default to logging the warning and wait for leader data to be set
             if contents is None:
                 msg = "Waiting on leaders crypto keys."
@@ -423,6 +431,7 @@ def master_services_down():
 
 @when('etcd.available', 'tls_client.server.certificate.saved',
       'authentication.setup')
+@when('leadership.set.etcd_version')
 @when_not('kubernetes-master.components.started')
 def start_master(etcd):
     '''Run the Kubernetes master components.'''
@@ -440,7 +449,8 @@ def start_master(etcd):
     handle_etcd_relation(etcd)
 
     # Add CLI options to all components
-    configure_apiserver(etcd)
+    leader_etcd_version = leader_get('etcd_version')
+    configure_apiserver(etcd.get_connection_string(), leader_etcd_version)
     configure_controller_manager()
     configure_scheduler()
     set_state('kubernetes-master.components.started')
@@ -461,6 +471,14 @@ def etcd_data_change(etcd):
     # handling of the master components
     if data_changed('etcd-connect', connection_string):
         remove_state('kubernetes-master.components.started')
+
+    # We are the leader and the etcd_version is not set meaning
+    # this is the first time we connect to etcd.
+    if is_state('leadership.is_leader') and not leader_get('etcd_version'):
+        if etcd.get_version().startswith('3.'):
+            leader_set(etcd_version='etcd3')
+        else:
+            leader_set(etcd_version='etcd2')
 
 
 @when('kube-control.connected')
@@ -816,9 +834,11 @@ def on_config_allow_privileged_change():
 
 @when('config.changed.api-extra-args')
 @when('kubernetes-master.components.started')
+@when('leadership.set.etcd_version')
 @when('etcd.available')
 def on_config_api_extra_args_change(etcd):
-    configure_apiserver(etcd)
+    configure_apiserver(etcd.get_connection_string(),
+                        leader_get('etcd_version'))
 
 
 @when('config.changed.controller-manager-extra-args')
@@ -1045,7 +1065,7 @@ def configure_kubernetes_service(service, base_args, extra_args_key):
     db.set(prev_args_key, args)
 
 
-def configure_apiserver(etcd):
+def configure_apiserver(etcd_connection_string, leader_etcd_version):
     api_opts = {}
 
     # Get the tls paths from the layer data.
@@ -1075,8 +1095,7 @@ def configure_apiserver(etcd):
     api_opts['logtostderr'] = 'true'
     api_opts['insecure-bind-address'] = '127.0.0.1'
     api_opts['insecure-port'] = '8080'
-    api_opts['storage-backend'] = 'etcd2'  # FIXME: add etcd3 support
-
+    api_opts['storage-backend'] = leader_etcd_version
     api_opts['basic-auth-file'] = '/root/cdk/basic_auth.csv'
     api_opts['token-auth-file'] = '/root/cdk/known_tokens.csv'
     api_opts['service-account-key-file'] = '/root/cdk/serviceaccount.key'
@@ -1089,7 +1108,7 @@ def configure_apiserver(etcd):
     api_opts['etcd-cafile'] = etcd_ca
     api_opts['etcd-keyfile'] = etcd_key
     api_opts['etcd-certfile'] = etcd_cert
-    api_opts['etcd-servers'] = etcd.get_connection_string()
+    api_opts['etcd-servers'] = etcd_connection_string
 
     admission_control = [
         'Initializers',

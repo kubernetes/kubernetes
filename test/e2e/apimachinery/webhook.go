@@ -133,6 +133,12 @@ var _ = SIGDescribe("AdmissionWebhook", func() {
 		testMutatingConfigMapWebhook(f)
 	})
 
+	It("Should mutate pod and apply defaults after mutation", func() {
+		registerMutatingWebhookForPod(f, context)
+		defer client.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Delete(mutatingWebhookConfigName, nil)
+		testMutatingPodWebhook(f)
+	})
+
 	It("Should mutate crd", func() {
 		crdCleanup, dynamicClient := createCRD(f)
 		defer crdCleanup()
@@ -423,6 +429,7 @@ func registerMutatingWebhookForConfigMap(f *framework.Framework, context *certCo
 	// The webhook configuration is honored in 1s.
 	time.Sleep(10 * time.Second)
 }
+
 func testMutatingConfigMapWebhook(f *framework.Framework) {
 	By("create a configmap that should be updated by the webhook")
 	client := f.ClientSet
@@ -436,6 +443,77 @@ func testMutatingConfigMapWebhook(f *framework.Framework) {
 	}
 	if !reflect.DeepEqual(expectedConfigMapData, mutatedConfigMap.Data) {
 		framework.Failf("\nexpected %#v\n, got %#v\n", expectedConfigMapData, mutatedConfigMap.Data)
+	}
+}
+
+func registerMutatingWebhookForPod(f *framework.Framework, context *certContext) {
+	client := f.ClientSet
+	By("Registering the mutating pod webhook via the AdmissionRegistration API")
+
+	namespace := f.Namespace.Name
+
+	_, err := client.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Create(&v1beta1.MutatingWebhookConfiguration{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: mutatingWebhookConfigName,
+		},
+		Webhooks: []v1beta1.Webhook{
+			{
+				Name: "adding-init-container.k8s.io",
+				Rules: []v1beta1.RuleWithOperations{{
+					Operations: []v1beta1.OperationType{v1beta1.Create},
+					Rule: v1beta1.Rule{
+						APIGroups:   []string{""},
+						APIVersions: []string{"v1"},
+						Resources:   []string{"pods"},
+					},
+				}},
+				ClientConfig: v1beta1.WebhookClientConfig{
+					Service: &v1beta1.ServiceReference{
+						Namespace: namespace,
+						Name:      serviceName,
+						Path:      strPtr("/mutating-pods"),
+					},
+					CABundle: context.signingCert,
+				},
+			},
+		},
+	})
+	framework.ExpectNoError(err, "registering mutating webhook config %s with namespace %s", mutatingWebhookConfigName, namespace)
+
+	// The webhook configuration is honored in 1s.
+	time.Sleep(10 * time.Second)
+}
+
+func testMutatingPodWebhook(f *framework.Framework) {
+	By("create a pod that should be updated by the webhook")
+	client := f.ClientSet
+	configMap := toBeMutatedPod(f)
+	mutatedPod, err := client.CoreV1().Pods(f.Namespace.Name).Create(configMap)
+	Expect(err).To(BeNil())
+	if len(mutatedPod.Spec.InitContainers) != 1 {
+		framework.Failf("expect pod to have 1 init container, got %#v", mutatedPod.Spec.InitContainers)
+	}
+	if got, expected := mutatedPod.Spec.InitContainers[0].Name, "webhook-added-init-container"; got != expected {
+		framework.Failf("expect the init container name to be %q, got %q", expected, got)
+	}
+	if got, expected := mutatedPod.Spec.InitContainers[0].TerminationMessagePolicy, v1.TerminationMessageReadFile; got != expected {
+		framework.Failf("expect the init terminationMessagePolicy to be default to %q, got %q", expected, got)
+	}
+}
+
+func toBeMutatedPod(f *framework.Framework) *v1.Pod {
+	return &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "webhook-to-be-mutated",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:  "example",
+					Image: framework.GetPauseImageName(f.ClientSet),
+				},
+			},
+		},
 	}
 }
 

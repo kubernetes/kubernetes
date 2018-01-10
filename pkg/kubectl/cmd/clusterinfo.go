@@ -135,7 +135,7 @@ func printService(out io.Writer, name, link string) {
 	ct.ChangeColor(ct.Green, false, ct.None, false)
 	fmt.Fprint(out, name)
 	ct.ResetColor()
-	fmt.Fprintf(out, " is running at ")
+	fmt.Fprint(out, " is running at ")
 	ct.ChangeColor(ct.Yellow, false, ct.None, false)
 	fmt.Fprint(out, link)
 	ct.ResetColor()

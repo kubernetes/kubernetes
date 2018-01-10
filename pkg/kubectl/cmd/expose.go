@@ -99,7 +99,7 @@ func NewCmdExposeService(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd.Flags().String("protocol", "", i18n.T("The network protocol for the service to be created. Default is 'TCP'."))
 	cmd.Flags().String("port", "", i18n.T("The port that the service should serve on. Copied from the resource being exposed, if unspecified"))
 	cmd.Flags().String("type", "", i18n.T("Type for this service: ClusterIP, NodePort, LoadBalancer, or ExternalName. Default is 'ClusterIP'."))
-	cmd.Flags().String("load-balancer-ip", "", i18n.T("IP to assign to the Load Balancer. If empty, an ephemeral IP will be created and used (cloud-provider specific)."))
+	cmd.Flags().String("load-balancer-ip", "", i18n.T("IP to assign to the LoadBalancer. If empty, an ephemeral IP will be created and used (cloud-provider specific)."))
 	cmd.Flags().String("selector", "", i18n.T("A label selector to use for this service. Only equality-based selector requirements are supported. If empty (the default) infer the selector from the replication controller or replica set.)"))
 	cmd.Flags().StringP("labels", "l", "", "Labels to apply to the service created by this call.")
 	cmd.Flags().String("container-port", "", i18n.T("Synonym for --target-port"))

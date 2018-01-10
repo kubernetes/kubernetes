@@ -48,7 +48,7 @@ func (i *ImageConfig) SetVersion(version string) {
 }
 
 var (
-	AdmissionWebhook         = ImageConfig{e2eRegistry, "k8s-sample-admission-webhook", "1.8v7", true}
+	AdmissionWebhook         = ImageConfig{e2eRegistry, "k8s-sample-admission-webhook", "1.9v1", true}
 	APIServer                = ImageConfig{e2eRegistry, "k8s-aggregator-sample-apiserver", "1.7v2", true}
 	AppArmorLoader           = ImageConfig{gcRegistry, "apparmor-loader", "0.1", false}
 	BusyBox                  = ImageConfig{gcRegistry, "busybox", "1.24", false}

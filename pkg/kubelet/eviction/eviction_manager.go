@@ -251,7 +251,7 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 			m.synchronize(diskInfoProvider, podFunc, capacityProvider)
 		})
 		if err != nil {
-			glog.Warningf("eviction manager: failed to create hard memory threshold notifier: %v", err)
+			glog.Warningf("eviction manager: failed to create soft memory threshold notifier: %v", err)
 		}
 		// start hard memory notification
 		err = startMemoryThresholdNotifier(m.config.Thresholds, observations, true, func(desc string) {
@@ -259,7 +259,7 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 			m.synchronize(diskInfoProvider, podFunc, capacityProvider)
 		})
 		if err != nil {
-			glog.Warningf("eviction manager: failed to create soft memory threshold notifier: %v", err)
+			glog.Warningf("eviction manager: failed to create hard memory threshold notifier: %v", err)
 		}
 	}
 

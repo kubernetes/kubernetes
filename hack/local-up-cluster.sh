@@ -605,7 +605,7 @@ function start_controller_manager {
       node_cidr_args="--allocate-node-cidrs=true --cluster-cidr=10.1.0.0/16 "
     fi
 
-    cloud_config_arg=cloud_config_arg="--cloud-provider=${CLOUD_PROVIDER} --cloud-config=${CLOUD_CONFIG}"
+    cloud_config_arg="--cloud-provider=${CLOUD_PROVIDER} --cloud-config=${CLOUD_CONFIG}"
     if [[ "${EXTERNAL_CLOUD_PROVIDER:-}" == "true" ]]; then
       cloud_config_arg="--cloud-provider=external"
     fi
@@ -668,7 +668,7 @@ function start_kubelet {
       priv_arg="--allow-privileged "
     fi
 
-    cloud_config_arg=cloud_config_arg="--cloud-provider=${CLOUD_PROVIDER} --cloud-config=${CLOUD_CONFIG}"
+    cloud_config_arg="--cloud-provider=${CLOUD_PROVIDER} --cloud-config=${CLOUD_CONFIG}"
     if [[ "${EXTERNAL_CLOUD_PROVIDER:-}" == "true" ]]; then
        cloud_config_arg="--cloud-provider=external"
     fi

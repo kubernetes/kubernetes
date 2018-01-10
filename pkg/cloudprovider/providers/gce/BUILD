@@ -125,6 +125,9 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [":package-srcs"],
+    srcs = [
+        ":package-srcs",
+        "//pkg/cloudprovider/providers/gce/cloud:all-srcs",
+    ],
     tags = ["automanaged"],
 )

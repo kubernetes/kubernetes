@@ -232,6 +232,19 @@ func (attacher *azureDiskAttacher) MountDevice(spec *volume.Spec, devicePath str
 		}
 	}
 
+	if !notMnt {
+		// testing original mount point, make sure the mount link is valid
+		if _, err := (&osIOHandler{}).ReadDir(deviceMountPath); err != nil {
+			// mount link is invalid, now unmount and remount later
+			glog.Warningf("azureDisk - ReadDir %s failed with %v, unmount this directory", deviceMountPath, err)
+			if err := mounter.Unmount(deviceMountPath); err != nil {
+				glog.Errorf("azureDisk - Unmount deviceMountPath %s failed with %v", deviceMountPath, err)
+				return err
+			}
+			notMnt = true
+		}
+	}
+
 	volumeSource, err := getVolumeSource(spec)
 	if err != nil {
 		return err

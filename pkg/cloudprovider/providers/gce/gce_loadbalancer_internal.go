@@ -82,10 +82,18 @@ func (gce *GCECloud) ensureInternalLoadBalancer(clusterName, clusterID string, s
 	requestedIP := determineRequestedIP(svc, existingFwdRule)
 	ipToUse := requestedIP
 
+	// If the ILB already exists, continue using the subnet that it's already using.
+	// This is to support existing ILBs that were setup using the wrong subnet.
+	subnetworkURL := gce.SubnetworkURL()
+	if existingFwdRule != nil && existingFwdRule.Subnetwork != "" {
+		// external LBs have an empty Subnetwork field.
+		subnetworkURL = existingFwdRule.Subnetwork
+	}
+
 	var addrMgr *addressManager
 	// If the network is not a legacy network, use the address manager
 	if !gce.IsLegacyNetwork() {
-		addrMgr = newAddressManager(gce, nm.String(), gce.Region(), gce.SubnetworkURL(), loadBalancerName, requestedIP, schemeInternal)
+		addrMgr = newAddressManager(gce, nm.String(), gce.Region(), subnetworkURL, loadBalancerName, requestedIP, schemeInternal)
 		ipToUse, err = addrMgr.HoldAddress()
 		if err != nil {
 			return nil, err
@@ -108,9 +116,10 @@ func (gce *GCECloud) ensureInternalLoadBalancer(clusterName, clusterID string, s
 		LoadBalancingScheme: string(scheme),
 	}
 
-	// Specify subnetwork if known
-	if len(gce.subnetworkURL) > 0 {
-		expectedFwdRule.Subnetwork = gce.subnetworkURL
+	// Given that CreateGCECloud will attempt to determine the subnet based off the network,
+	// the subnetwork should rarely be unknown.
+	if subnetworkURL != "" {
+		expectedFwdRule.Subnetwork = subnetworkURL
 	} else {
 		expectedFwdRule.Network = gce.networkURL
 	}

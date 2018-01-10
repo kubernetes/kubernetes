@@ -57,14 +57,16 @@ type TestContextType struct {
 	Prefix         string
 	MinStartupPods int
 	// Timeout for waiting for system pods to be running
-	SystemPodsStartupTimeout time.Duration
-	UpgradeTarget            string
-	EtcdUpgradeStorage       string
-	EtcdUpgradeVersion       string
-	UpgradeImage             string
-	GCEUpgradeScript         string
-	ContainerRuntime         string
-	ContainerRuntimeEndpoint string
+	SystemPodsStartupTimeout    time.Duration
+	UpgradeTarget               string
+	EtcdUpgradeStorage          string
+	EtcdUpgradeVersion          string
+	UpgradeImage                string
+	GCEUpgradeScript            string
+	ContainerRuntime            string
+	ContainerRuntimeEndpoint    string
+	ContainerRuntimeProcessName string
+	ContainerRuntimePidFile     string
 	// SystemdServices are comma separated list of systemd services the test framework
 	// will dump logs for.
 	SystemdServices          string
@@ -203,7 +205,9 @@ func RegisterCommonFlags() {
 	flag.StringVar(&TestContext.FeatureGates, "feature-gates", "", "A set of key=value pairs that describe feature gates for alpha/experimental features.")
 	flag.StringVar(&TestContext.Viper, "viper-config", "e2e", "The name of the viper config i.e. 'e2e' will read values from 'e2e.json' locally.  All e2e parameters are meant to be configurable by viper.")
 	flag.StringVar(&TestContext.ContainerRuntime, "container-runtime", "docker", "The container runtime of cluster VM instances (docker/rkt/remote).")
-	flag.StringVar(&TestContext.ContainerRuntimeEndpoint, "container-runtime-endpoint", "", "The container runtime endpoint of cluster VM instances.")
+	flag.StringVar(&TestContext.ContainerRuntimeEndpoint, "container-runtime-endpoint", "unix:///var/run/dockershim.sock", "The container runtime endpoint of cluster VM instances.")
+	flag.StringVar(&TestContext.ContainerRuntimeProcessName, "container-runtime-process-name", "dockerd", "The name of the container runtime process.")
+	flag.StringVar(&TestContext.ContainerRuntimePidFile, "container-runtime-pid-file", "/var/run/docker.pid", "The pid file of the container runtime.")
 	flag.StringVar(&TestContext.SystemdServices, "systemd-services", "docker", "The comma separated list of systemd services the framework will dump logs for.")
 	flag.StringVar(&TestContext.ImageServiceEndpoint, "image-service-endpoint", "", "The image service endpoint of cluster VM instances.")
 	flag.StringVar(&TestContext.DockershimCheckpointDir, "dockershim-checkpoint-dir", "/var/lib/dockershim/sandbox", "The directory for dockershim to store sandbox checkpoints.")

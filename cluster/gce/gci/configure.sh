@@ -138,6 +138,13 @@ function split-commas {
   echo $1 | tr "," "\n"
 }
 
+function remount-flexvolume-directory {
+  local -r flexvolume_plugin_dir=$1
+  mkdir -p $flexvolume_plugin_dir
+  mount --bind $flexvolume_plugin_dir $flexvolume_plugin_dir
+  mount -o remount,exec $flexvolume_plugin_dir
+}
+
 function install-gci-mounter-tools {
   CONTAINERIZED_MOUNTER_HOME="${KUBE_HOME}/containerized_mounter"
   local -r mounter_tar_sha="${DEFAULT_MOUNTER_TAR_SHA}"
@@ -335,6 +342,11 @@ function install-kube-binary-config {
 
   # Install gci mounter related artifacts to allow mounting storage volumes in GCI
   install-gci-mounter-tools
+
+  # Remount the Flexvolume directory with the "exec" option, if needed.
+  if [[ "${REMOUNT_VOLUME_PLUGIN_DIR:-}" == "true" && -n "${VOLUME_PLUGIN_DIR:-}" ]]; then
+    remount-flexvolume-directory "${VOLUME_PLUGIN_DIR}"
+  fi
 
   # Clean up.
   rm -rf "${KUBE_HOME}/kubernetes"

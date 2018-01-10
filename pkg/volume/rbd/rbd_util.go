@@ -37,6 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/wait"
 	fileutil "k8s.io/kubernetes/pkg/util/file"
+	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/volume"
 	volutil "k8s.io/kubernetes/pkg/volume/util"
@@ -110,9 +111,18 @@ func waitForPath(pool, image string, maxRetries int) (string, bool) {
 	return "", false
 }
 
-// make a directory like /var/lib/kubelet/plugins/kubernetes.io/pod/rbd/pool-image-image
+// make a directory like /var/lib/kubelet/plugins/kubernetes.io/rbd/mounts/pool-image-image
 func makePDNameInternal(host volume.VolumeHost, pool string, image string) string {
-	return path.Join(host.GetPluginDir(rbdPluginName), "rbd", pool+"-image-"+image)
+	// Backward compatibility for the deprecated format: /var/lib/kubelet/plugins/kubernetes.io/rbd/rbd/pool-image-image
+	deprecatedDir := path.Join(host.GetPluginDir(rbdPluginName), "rbd", pool+"-image-"+image)
+	info, err := os.Stat(deprecatedDir)
+	if err == nil && info.IsDir() {
+		// The device mount path has already been created with the deprecated format, return it.
+		glog.V(5).Infof("Deprecated format path %s found", deprecatedDir)
+		return deprecatedDir
+	}
+	// Return the canonical format path.
+	return path.Join(host.GetPluginDir(rbdPluginName), mount.MountsInGlobalPDPath, pool+"-image-"+image)
 }
 
 // make a directory like /var/lib/kubelet/plugins/kubernetes.io/rbd/volumeDevices/pool-image-image

@@ -325,7 +325,7 @@ func TestPlugin(t *testing.T) {
 			},
 		},
 		expectedDevicePath:      "/dev/rbd1",
-		expectedDeviceMountPath: fmt.Sprintf("%s/plugins/kubernetes.io/rbd/rbd/pool1-image-image1", tmpDir),
+		expectedDeviceMountPath: fmt.Sprintf("%s/plugins/kubernetes.io/rbd/mounts/pool1-image-image1", tmpDir),
 		expectedPodMountPath:    fmt.Sprintf("%s/pods/%s/volumes/kubernetes.io~rbd/vol1", tmpDir, podUID),
 	})
 	cases = append(cases, &testcase{
@@ -353,7 +353,7 @@ func TestPlugin(t *testing.T) {
 			},
 		},
 		expectedDevicePath:      "/dev/rbd1",
-		expectedDeviceMountPath: fmt.Sprintf("%s/plugins/kubernetes.io/rbd/rbd/pool2-image-image2", tmpDir),
+		expectedDeviceMountPath: fmt.Sprintf("%s/plugins/kubernetes.io/rbd/mounts/pool2-image-image2", tmpDir),
 		expectedPodMountPath:    fmt.Sprintf("%s/pods/%s/volumes/kubernetes.io~rbd/vol2", tmpDir, podUID),
 	})
 
@@ -448,5 +448,129 @@ func TestGetSecretNameAndNamespace(t *testing.T) {
 	}
 	if strings.Compare(secretName, foundSecretName) != 0 || strings.Compare(secretNamespace, foundSecretNamespace) != 0 {
 		t.Errorf("getSecretNameAndNamespace returned incorrect values, expected %s and %s but got %s and %s", secretName, secretNamespace, foundSecretName, foundSecretNamespace)
+	}
+}
+
+// https://github.com/kubernetes/kubernetes/issues/57744
+func TestGetDeviceMountPath(t *testing.T) {
+	tmpDir, err := utiltesting.MkTmpdir("rbd_test")
+	if err != nil {
+		t.Fatalf("error creating temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	fakeVolumeHost := volumetest.NewFakeVolumeHost(tmpDir, nil, nil)
+	plugMgr := volume.VolumePluginMgr{}
+	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, fakeVolumeHost)
+	plug, err := plugMgr.FindPluginByName("kubernetes.io/rbd")
+	if err != nil {
+		t.Errorf("Can't find the plugin by name")
+	}
+	fdm := NewFakeDiskManager()
+
+	// attacher
+	attacher, err := plug.(*rbdPlugin).newAttacherInternal(fdm)
+	if err != nil {
+		t.Errorf("Failed to make a new Attacher: %v", err)
+	}
+
+	pool, image := "pool", "image"
+	spec := volume.NewSpecFromVolume(&v1.Volume{
+		Name: "vol",
+		VolumeSource: v1.VolumeSource{
+			RBD: &v1.RBDVolumeSource{
+				CephMonitors: []string{"a", "b"},
+				RBDPool:      pool,
+				RBDImage:     image,
+				FSType:       "ext4",
+			},
+		},
+	})
+
+	deprecatedDir := fmt.Sprintf("%s/plugins/kubernetes.io/rbd/rbd/%s-image-%s", tmpDir, pool, image)
+	canonicalDir := fmt.Sprintf("%s/plugins/kubernetes.io/rbd/mounts/%s-image-%s", tmpDir, pool, image)
+
+	type testCase struct {
+		deprecated bool
+		targetPath string
+	}
+	for _, c := range []testCase{
+		{false, canonicalDir},
+		{true, deprecatedDir},
+	} {
+		if c.deprecated {
+			// This is a deprecated device mount path, we create it,
+			// and hope attacher.GetDeviceMountPath return c.targetPath.
+			if err := os.MkdirAll(c.targetPath, 0700); err != nil {
+				t.Fatalf("Create deprecated mount path failed: %v", err)
+			}
+		}
+		mountPath, err := attacher.GetDeviceMountPath(spec)
+		if err != nil {
+			t.Fatalf("GetDeviceMountPath failed: %v", err)
+		}
+		if mountPath != c.targetPath {
+			t.Errorf("Mismatch device mount path: wanted %s, got %s", c.targetPath, mountPath)
+		}
+	}
+}
+
+// https://github.com/kubernetes/kubernetes/issues/57744
+func TestConstructVolumeSpec(t *testing.T) {
+	tmpDir, err := utiltesting.MkTmpdir("rbd_test")
+	if err != nil {
+		t.Fatalf("error creating temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	fakeVolumeHost := volumetest.NewFakeVolumeHost(tmpDir, nil, nil)
+	plugMgr := volume.VolumePluginMgr{}
+	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, fakeVolumeHost)
+	plug, err := plugMgr.FindPluginByName("kubernetes.io/rbd")
+	if err != nil {
+		t.Errorf("Can't find the plugin by name")
+	}
+	fakeMounter := fakeVolumeHost.GetMounter(plug.GetPluginName()).(*mount.FakeMounter)
+
+	pool, image, volumeName := "pool", "image", "vol"
+	podMountPath := fmt.Sprintf("%s/pods/pod123/volumes/kubernetes.io~rbd/%s", tmpDir, volumeName)
+	deprecatedDir := fmt.Sprintf("%s/plugins/kubernetes.io/rbd/rbd/%s-image-%s", tmpDir, pool, image)
+	canonicalDir := fmt.Sprintf("%s/plugins/kubernetes.io/rbd/mounts/%s-image-%s", tmpDir, pool, image)
+
+	type testCase struct {
+		volumeName string
+		targetPath string
+	}
+
+	for _, c := range []testCase{
+		{"vol", canonicalDir},
+		{"vol", deprecatedDir},
+	} {
+		if err := os.MkdirAll(c.targetPath, 0700); err != nil {
+			t.Fatalf("Create mount path %s failed: %v", c.targetPath, err)
+		}
+		if err = fakeMounter.Mount("/dev/rbd0", c.targetPath, "fake", nil); err != nil {
+			t.Fatalf("Mount %s to %s failed: %v", c.targetPath, podMountPath, err)
+		}
+		if err = fakeMounter.Mount(c.targetPath, podMountPath, "fake", []string{"bind"}); err != nil {
+			t.Fatalf("Mount %s to %s failed: %v", c.targetPath, podMountPath, err)
+		}
+		spec, err := plug.ConstructVolumeSpec(c.volumeName, podMountPath)
+		if err != nil {
+			t.Errorf("ConstructVolumeSpec failed: %v", err)
+		} else {
+			if spec.Volume.RBD.RBDPool != pool {
+				t.Errorf("Mismatch rbd pool: wanted %s, got %s", pool, spec.Volume.RBD.RBDPool)
+			}
+			if spec.Volume.RBD.RBDImage != image {
+				t.Fatalf("Mismatch rbd image: wanted %s, got %s", image, spec.Volume.RBD.RBDImage)
+			}
+		}
+		if err = fakeMounter.Unmount(podMountPath); err != nil {
+			t.Fatalf("Unmount pod path %s failed: %v", podMountPath, err)
+		}
+		if err = fakeMounter.Unmount(c.targetPath); err != nil {
+			t.Fatalf("Unmount device path %s failed: %v", c.targetPath, err)
+		}
 	}
 }

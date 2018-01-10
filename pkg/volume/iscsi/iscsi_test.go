@@ -19,6 +19,7 @@ package iscsi
 import (
 	"fmt"
 	"os"
+	"strings"
 	"testing"
 
 	"k8s.io/api/core/v1"
@@ -80,7 +81,7 @@ type fakeDiskManager struct {
 
 func NewFakeDiskManager() *fakeDiskManager {
 	return &fakeDiskManager{
-		tmpDir: utiltesting.MkTmpdirOrDie("fc_test"),
+		tmpDir: utiltesting.MkTmpdirOrDie("iscsi_test"),
 	}
 }
 
@@ -91,6 +92,11 @@ func (fake *fakeDiskManager) Cleanup() {
 func (fake *fakeDiskManager) MakeGlobalPDName(disk iscsiDisk) string {
 	return fake.tmpDir
 }
+
+func (fake *fakeDiskManager) MakeGlobalVDPDName(disk iscsiDisk) string {
+	return fake.tmpDir
+}
+
 func (fake *fakeDiskManager) AttachDisk(b iscsiDiskMounter) (string, error) {
 	globalPath := b.manager.MakeGlobalPDName(*b.iscsiDisk)
 	err := os.MkdirAll(globalPath, 0750)
@@ -106,6 +112,15 @@ func (fake *fakeDiskManager) AttachDisk(b iscsiDiskMounter) (string, error) {
 
 func (fake *fakeDiskManager) DetachDisk(c iscsiDiskUnmounter, mntPath string) error {
 	globalPath := c.manager.MakeGlobalPDName(*c.iscsiDisk)
+	err := os.RemoveAll(globalPath)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (fake *fakeDiskManager) DetachBlockISCSIDisk(c iscsiDiskUnmapper, mntPath string) error {
+	globalPath := c.manager.MakeGlobalVDPDName(*c.iscsiDisk)
 	err := os.RemoveAll(globalPath)
 	if err != nil {
 		return err
@@ -289,10 +304,12 @@ type testcase struct {
 	defaultNs string
 	spec      *volume.Spec
 	// Expected return of the test
-	expectedName  string
-	expectedNs    string
-	expectedIface string
-	expectedError error
+	expectedName          string
+	expectedNs            string
+	expectedIface         string
+	expectedError         error
+	expectedDiscoveryCHAP bool
+	expectedSessionCHAP   bool
 }
 
 func TestGetSecretNameAndNamespaceForPV(t *testing.T) {
@@ -424,5 +441,105 @@ func TestGetISCSIInitiatorInfo(t *testing.T) {
 				err, resultIface)
 		}
 	}
+}
 
+func TestGetISCSICHAP(t *testing.T) {
+	tests := []testcase{
+		{
+			name: "persistent volume source",
+			spec: &volume.Spec{
+				PersistentVolume: &v1.PersistentVolume{
+					Spec: v1.PersistentVolumeSpec{
+						PersistentVolumeSource: v1.PersistentVolumeSource{
+							ISCSI: &v1.ISCSIPersistentVolumeSource{
+								DiscoveryCHAPAuth: true,
+								SessionCHAPAuth:   true,
+							},
+						},
+					},
+				},
+			},
+			expectedDiscoveryCHAP: true,
+			expectedSessionCHAP:   true,
+			expectedError:         nil,
+		},
+		{
+			name: "pod volume source",
+			spec: &volume.Spec{
+				Volume: &v1.Volume{
+					VolumeSource: v1.VolumeSource{
+						ISCSI: &v1.ISCSIVolumeSource{
+							DiscoveryCHAPAuth: true,
+							SessionCHAPAuth:   true,
+						},
+					},
+				},
+			},
+			expectedDiscoveryCHAP: true,
+			expectedSessionCHAP:   true,
+			expectedError:         nil,
+		},
+		{
+			name: "no volume",
+			spec: &volume.Spec{},
+			expectedDiscoveryCHAP: false,
+			expectedSessionCHAP:   false,
+			expectedError:         fmt.Errorf("Spec does not reference an ISCSI volume type"),
+		},
+	}
+	for _, testcase := range tests {
+		resultDiscoveryCHAP, err := getISCSIDiscoveryCHAPInfo(testcase.spec)
+		resultSessionCHAP, err := getISCSISessionCHAPInfo(testcase.spec)
+		switch testcase.name {
+		case "no volume":
+			if err.Error() != testcase.expectedError.Error() || resultDiscoveryCHAP != testcase.expectedDiscoveryCHAP || resultSessionCHAP != testcase.expectedSessionCHAP {
+				t.Errorf("%s failed: expected err=%v DiscoveryCHAP=%v SessionCHAP=%v, got %v/%v/%v",
+					testcase.name, testcase.expectedError, testcase.expectedDiscoveryCHAP, testcase.expectedSessionCHAP,
+					err, resultDiscoveryCHAP, resultSessionCHAP)
+			}
+		default:
+			if err != testcase.expectedError || resultDiscoveryCHAP != testcase.expectedDiscoveryCHAP || resultSessionCHAP != testcase.expectedSessionCHAP {
+				t.Errorf("%s failed: expected err=%v DiscoveryCHAP=%v SessionCHAP=%v, got %v/%v/%v", testcase.name, testcase.expectedError, testcase.expectedDiscoveryCHAP, testcase.expectedSessionCHAP,
+					err, resultDiscoveryCHAP, resultSessionCHAP)
+			}
+		}
+	}
+}
+
+func TestGetVolumeSpec(t *testing.T) {
+	path := "plugins/kubernetes.io/iscsi/volumeDevices/iface-default/127.0.0.1:3260-iqn.2014-12.server:storage.target01-lun-0"
+	spec, _ := getVolumeSpecFromGlobalMapPath("test", path)
+
+	portal := spec.PersistentVolume.Spec.PersistentVolumeSource.ISCSI.TargetPortal
+	if portal != "127.0.0.1:3260" {
+		t.Errorf("wrong portal: %v", portal)
+	}
+	iqn := spec.PersistentVolume.Spec.PersistentVolumeSource.ISCSI.IQN
+	if iqn != "iqn.2014-12.server:storage.target01" {
+		t.Errorf("wrong iqn: %v", iqn)
+	}
+	lun := spec.PersistentVolume.Spec.PersistentVolumeSource.ISCSI.Lun
+	if lun != 0 {
+		t.Errorf("wrong lun: %v", lun)
+	}
+	iface := spec.PersistentVolume.Spec.PersistentVolumeSource.ISCSI.ISCSIInterface
+	if iface != "default" {
+		t.Errorf("wrong ISCSIInterface: %v", iface)
+	}
+}
+
+func TestGetVolumeSpec_no_lun(t *testing.T) {
+	path := "plugins/kubernetes.io/iscsi/volumeDevices/iface-default/127.0.0.1:3260-iqn.2014-12.server:storage.target01"
+	_, err := getVolumeSpecFromGlobalMapPath("test", path)
+	if !strings.Contains(err.Error(), "malformatted mnt path") {
+		t.Errorf("should get error: malformatted mnt path")
+	}
+}
+
+func TestGetVolumeSpec_no_iface(t *testing.T) {
+	path := "plugins/kubernetes.io/iscsi/volumeDevices/default/127.0.0.1:3260-iqn.2014-12.server:storage.target01-lun-0"
+	_, err := getVolumeSpecFromGlobalMapPath("test", path)
+	if !strings.Contains(err.Error(), "failed to retreive iface") {
+		t.Errorf("should get error: failed to retreive iface")
+	}
 }

@@ -35,11 +35,13 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/kubernetes/pkg/features"
+	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
 	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
 	kubeletscheme "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/scheme"
 	kubeletconfigv1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1alpha1"
 	stats "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
+	"k8s.io/kubernetes/pkg/kubelet/remote"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/metrics"
 
@@ -364,4 +366,26 @@ func runCommand(cmd ...string) (string, error) {
 		return "", fmt.Errorf("failed to run %q: %s (%s)", strings.Join(cmd, " "), err, output)
 	}
 	return string(output), nil
+}
+
+// getCRIClient connects CRI and returns CRI runtime service clients and image service client.
+func getCRIClient() (internalapi.RuntimeService, internalapi.ImageManagerService, error) {
+	// connection timeout for CRI service connection
+	const connectionTimeout = 2 * time.Minute
+	runtimeEndpoint := framework.TestContext.ContainerRuntimeEndpoint
+	r, err := remote.NewRemoteRuntimeService(runtimeEndpoint, connectionTimeout)
+	if err != nil {
+		return nil, nil, err
+	}
+	imageManagerEndpoint := runtimeEndpoint
+	if framework.TestContext.ImageServiceEndpoint != "" {
+		//ImageServiceEndpoint is the same as ContainerRuntimeEndpoint if not
+		//explicitly specified
+		imageManagerEndpoint = framework.TestContext.ImageServiceEndpoint
+	}
+	i, err := remote.NewRemoteImageService(imageManagerEndpoint, connectionTimeout)
+	if err != nil {
+		return nil, nil, err
+	}
+	return r, i, nil
 }

@@ -64,6 +64,9 @@ const (
 	MiB int64 = 1024 * KiB
 	GiB int64 = 1024 * MiB
 	TiB int64 = 1024 * GiB
+
+	// Waiting period for volume server (Ceph, ...) to initialize itself.
+	VolumeServerPodStartupSleep = 20 * time.Second
 )
 
 // Configuration of one tests. The test consist of:
@@ -190,6 +193,14 @@ func NewRBDServer(cs clientset.Interface, namespace string) (config VolumeTestCo
 		},
 	}
 	pod, ip = CreateStorageServer(cs, config)
+
+	// Ceph server container needs some time to start. Tests continue working if
+	// this sleep is removed, however kubelet logs (and kubectl describe
+	// <client pod>) would be cluttered with error messages about non-existing
+	// image.
+	Logf("sleeping a bit to give ceph server time to initialize")
+	time.Sleep(VolumeServerPodStartupSleep)
+
 	return config, pod, ip
 }
 

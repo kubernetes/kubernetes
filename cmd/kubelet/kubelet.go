@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/golang/glog"
 	"github.com/spf13/pflag"
 
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -36,25 +37,43 @@ import (
 	"k8s.io/kubernetes/pkg/version/verflag"
 )
 
+func parseFlagSet(fs *pflag.FlagSet, args []string) error {
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	fs.VisitAll(func(flag *pflag.Flag) {
+		glog.V(2).Infof("FLAG: --%s=%q", flag.Name, flag.Value)
+	})
+	return nil
+}
+
 func die(err error) {
 	fmt.Fprintf(os.Stderr, "error: %v\n", err)
 	os.Exit(1)
 }
 
 func main() {
-	// construct KubeletFlags object and register command line flags mapping
-	kubeletFlags := options.NewKubeletFlags()
-	kubeletFlags.AddFlags(pflag.CommandLine)
+	fs := pflag.NewFlagSet(os.Args[0], pflag.ExitOnError)
+	// set the normalize func, similar to k8s.io/apiserver/pkg/util/flag/flags.go:InitFlags
+	fs.SetNormalizeFunc(flag.WordSepNormalizeFunc)
+	// explicitly add flags from libs that register global flags
+	options.AddGlobalFlags(fs)
 
-	// construct KubeletConfiguration object and register command line flags mapping
+	// register kubelet flags
+	kubeletFlags := options.NewKubeletFlags()
+	kubeletFlags.AddFlags(fs)
+
+	// register kubelet config flags
 	defaultConfig, err := options.NewKubeletConfiguration()
 	if err != nil {
 		die(err)
 	}
-	options.AddKubeletConfigFlags(pflag.CommandLine, defaultConfig)
+	options.AddKubeletConfigFlags(fs, defaultConfig)
 
-	// parse the command line flags into the respective objects
-	flag.InitFlags()
+	// parse flags
+	if err := parseFlagSet(fs, os.Args[1:]); err != nil {
+		die(err)
+	}
 
 	// initialize logging and defer flush
 	logs.InitLogs()
