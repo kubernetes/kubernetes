@@ -301,6 +301,18 @@ func (e *E2EServices) startKubelet() (*server, error) {
 		cmdArgs = append(cmdArgs, "--hostname-override", framework.TestContext.NodeName)
 	}
 
+	if framework.TestContext.ContainerRuntime != "" {
+		cmdArgs = append(cmdArgs, "--container-runtime", framework.TestContext.ContainerRuntime)
+	}
+
+	if framework.TestContext.ContainerRuntimeEndpoint != "" {
+		cmdArgs = append(cmdArgs, "--container-runtime-endpoint", framework.TestContext.ContainerRuntimeEndpoint)
+	}
+
+	if framework.TestContext.ImageServiceEndpoint != "" {
+		cmdArgs = append(cmdArgs, "--image-service-endpoint", framework.TestContext.ImageServiceEndpoint)
+	}
+
 	// Write config file or flags, depending on whether --generate-kubelet-config-file was provided
 	if genKubeletConfigFile {
 		if err := writeKubeletConfigFile(kc, kubeletConfigPath); err != nil {
