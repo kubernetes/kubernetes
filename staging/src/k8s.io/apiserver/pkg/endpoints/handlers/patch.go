@@ -125,7 +125,7 @@ func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface
 			name,
 			patchType,
 			patchJS,
-			scope.Namer, scope.Creater, scope.Defaulter, scope.UnsafeConvertor, scope.Kind, scope.Resource, codec, trace)
+			scope.Namer, scope.Creater, scope.Defaulter, scope.UnsafeConvertor, scope.Kind, scope.Resource, codec, trace, patchTypes)
 		if err != nil {
 			scope.err(err, w, req)
 			return
@@ -169,6 +169,7 @@ func patchResource(
 	resource schema.GroupVersionResource,
 	codec runtime.Codec,
 	trace *utiltrace.Trace,
+	supportedPatchTypes []string,
 ) (runtime.Object, error) {
 
 	namespace := request.NamespaceValue(ctx)
@@ -290,80 +291,83 @@ func patchResource(
 			// 3. ensure no conflicts between the two patches
 			// 4. apply the #1 patch to the currentJS object
 
-			// Since the patch is applied on versioned objects, we need to convert the
-			// current object to versioned representation first.
-			currentVersionedObject, err := unsafeConvertor.ConvertToVersion(currentObject, kind.GroupVersion())
-			if err != nil {
-				return nil, err
-			}
-			currentObjMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(currentVersionedObject)
-			if err != nil {
-				return nil, err
-			}
-
-			var currentPatchMap map[string]interface{}
-			if originalObjMap != nil {
-				var err error
-				currentPatchMap, err = strategicpatch.CreateTwoWayMergeMapPatch(originalObjMap, currentObjMap, versionedObj)
-				if err != nil {
-					return nil, interpretPatchError(err)
-				}
-			} else {
-				// Compute current patch.
-				currentObjJS, err := runtime.Encode(codec, currentObject)
+			// Calculate only if strategic merge patch is supported.
+			if sets.NewString(supportedPatchTypes...).Has(string(types.StrategicMergePatchType)) {
+				// Since the patch is applied on versioned objects, we need to convert the
+				// current object to versioned representation first.
+				currentVersionedObject, err := unsafeConvertor.ConvertToVersion(currentObject, kind.GroupVersion())
 				if err != nil {
 					return nil, err
 				}
-				currentPatch, err := strategicpatch.CreateTwoWayMergePatch(originalObjJS, currentObjJS, versionedObj)
+				currentObjMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(currentVersionedObject)
 				if err != nil {
-					return nil, interpretPatchError(err)
+					return nil, err
 				}
-				currentPatchMap = make(map[string]interface{})
-				if err := json.Unmarshal(currentPatch, &currentPatchMap); err != nil {
-					return nil, errors.NewBadRequest(err.Error())
+
+				var currentPatchMap map[string]interface{}
+				if originalObjMap != nil {
+					var err error
+					currentPatchMap, err = strategicpatch.CreateTwoWayMergeMapPatch(originalObjMap, currentObjMap, versionedObj)
+					if err != nil {
+						return nil, interpretPatchError(err)
+					}
+				} else {
+					// Compute current patch.
+					currentObjJS, err := runtime.Encode(codec, currentObject)
+					if err != nil {
+						return nil, err
+					}
+					currentPatch, err := strategicpatch.CreateTwoWayMergePatch(originalObjJS, currentObjJS, versionedObj)
+					if err != nil {
+						return nil, interpretPatchError(err)
+					}
+					currentPatchMap = make(map[string]interface{})
+					if err := json.Unmarshal(currentPatch, &currentPatchMap); err != nil {
+						return nil, errors.NewBadRequest(err.Error())
+					}
 				}
-			}
 
-			// Get a fresh copy of the original strategic patch each time through, since applying it mutates the map
-			originalPatchMap, err := getOriginalPatchMap()
-			if err != nil {
-				return nil, err
-			}
-
-			hasConflicts, err := mergepatch.HasConflicts(originalPatchMap, currentPatchMap)
-			if err != nil {
-				return nil, err
-			}
-
-			if hasConflicts {
-				diff1, _ := json.Marshal(currentPatchMap)
-				diff2, _ := json.Marshal(originalPatchMap)
-				patchDiffErr := fmt.Errorf("there is a meaningful conflict (firstResourceVersion: %q, currentResourceVersion: %q):\n diff1=%v\n, diff2=%v\n", originalResourceVersion, currentResourceVersion, string(diff1), string(diff2))
-				glog.V(4).Infof("patchResource failed for resource %s, because there is a meaningful conflict(firstResourceVersion: %q, currentResourceVersion: %q):\n diff1=%v\n, diff2=%v\n", name, originalResourceVersion, currentResourceVersion, string(diff1), string(diff2))
-
-				// Return the last conflict error we got if we have one
-				if lastConflictErr != nil {
-					return nil, lastConflictErr
+				// Get a fresh copy of the original strategic patch each time through, since applying it mutates the map
+				originalPatchMap, err := getOriginalPatchMap()
+				if err != nil {
+					return nil, err
 				}
-				// Otherwise manufacture one of our own
-				return nil, errors.NewConflict(resource.GroupResource(), name, patchDiffErr)
-			}
 
-			versionedObjToUpdate, err := creater.New(kind)
-			if err != nil {
-				return nil, err
-			}
-			if err := applyPatchToObject(codec, defaulter, currentObjMap, originalPatchMap, versionedObjToUpdate, versionedObj); err != nil {
-				return nil, err
-			}
-			// Convert the object back to unversioned.
-			gvk := kind.GroupKind().WithVersion(runtime.APIVersionInternal)
-			objToUpdate, err := unsafeConvertor.ConvertToVersion(versionedObjToUpdate, gvk.GroupVersion())
-			if err != nil {
-				return nil, err
-			}
+				hasConflicts, err := mergepatch.HasConflicts(originalPatchMap, currentPatchMap)
+				if err != nil {
+					return nil, err
+				}
 
-			return objToUpdate, nil
+				if hasConflicts {
+					diff1, _ := json.Marshal(currentPatchMap)
+					diff2, _ := json.Marshal(originalPatchMap)
+					patchDiffErr := fmt.Errorf("there is a meaningful conflict (firstResourceVersion: %q, currentResourceVersion: %q):\n diff1=%v\n, diff2=%v\n", originalResourceVersion, currentResourceVersion, string(diff1), string(diff2))
+					glog.V(4).Infof("patchResource failed for resource %s, because there is a meaningful conflict(firstResourceVersion: %q, currentResourceVersion: %q):\n diff1=%v\n, diff2=%v\n", name, originalResourceVersion, currentResourceVersion, string(diff1), string(diff2))
+
+					// Return the last conflict error we got if we have one
+					if lastConflictErr != nil {
+						return nil, lastConflictErr
+					}
+					// Otherwise manufacture one of our own
+					return nil, errors.NewConflict(resource.GroupResource(), name, patchDiffErr)
+				}
+
+				versionedObjToUpdate, err := creater.New(kind)
+				if err != nil {
+					return nil, err
+				}
+				if err := applyPatchToObject(codec, defaulter, currentObjMap, originalPatchMap, versionedObjToUpdate, versionedObj); err != nil {
+					return nil, err
+				}
+				// Convert the object back to unversioned.
+				gvk := kind.GroupKind().WithVersion(runtime.APIVersionInternal)
+				objToUpdate, err := unsafeConvertor.ConvertToVersion(versionedObjToUpdate, gvk.GroupVersion())
+				if err != nil {
+					return nil, err
+				}
+
+				return objToUpdate, nil
+			}
 		}
 	}
 
