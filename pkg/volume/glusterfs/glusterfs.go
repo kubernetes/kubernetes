@@ -600,8 +600,13 @@ func (d *glusterfsVolumeDeleter) getGid() (int, bool, error) {
 
 func (d *glusterfsVolumeDeleter) Delete() error {
 	glog.V(2).Infof("delete volume: %s ", d.glusterfsMounter.path)
+
 	volumeName := d.glusterfsMounter.path
-	volumeID := dstrings.TrimPrefix(volumeName, volPrefix)
+	volumeID, err := getVolumeID(d.spec, volumeName)
+	if err != nil {
+		return fmt.Errorf("failed to get volumeID, err: %v", err)
+	}
+
 	class, err := volutil.GetClassForVolume(d.plugin.host.GetKubeClient(), d.spec)
 	if err != nil {
 		return err
@@ -1055,13 +1060,35 @@ func parseClassParameters(params map[string]string, kubeClient clientset.Interfa
 	return &cfg, nil
 }
 
+// getVolumeID returns volumeID from the PV or volumename.
+func getVolumeID(pv *v1.PersistentVolume, volumeName string) (string, error) {
+	volumeID := ""
+
+	// Get volID from pvspec if available, else fill it from volumename.
+	if pv != nil {
+		if pv.Annotations["VolID"] != "" {
+			volumeID = pv.Annotations["VolID"]
+		} else {
+			volumeID = dstrings.TrimPrefix(volumeName, volPrefix)
+		}
+	} else {
+		return volumeID, fmt.Errorf("provided PV spec is nil")
+	}
+	if volumeID == "" {
+		return volumeID, fmt.Errorf("volume ID is empty")
+	}
+	return volumeID, nil
+}
+
 func (plugin *glusterfsPlugin) ExpandVolumeDevice(spec *volume.Spec, newSize resource.Quantity, oldSize resource.Quantity) (resource.Quantity, error) {
 	pvSpec := spec.PersistentVolume.Spec
 	glog.V(2).Infof("Request to expand volume: %s ", pvSpec.Glusterfs.Path)
 	volumeName := pvSpec.Glusterfs.Path
+	volumeID, err := getVolumeID(spec.PersistentVolume, volumeName)
 
-	// Fetch the volume for expansion.
-	volumeID := dstrings.TrimPrefix(volumeName, volPrefix)
+	if err != nil {
+		return oldSize, fmt.Errorf("failed to get volumeID, err: %v", err)
+	}
 
 	//Get details of SC.
 	class, err := volutil.GetClassForVolume(plugin.host.GetKubeClient(), spec.PersistentVolume)
