@@ -171,22 +171,28 @@ func NewCloud(configReader io.Reader) (cloudprovider.Interface, error) {
 			config.CloudProviderRateLimitBucket)
 	}
 
+	azClientConfig := &azClientConfig{
+		subscriptionID:          config.SubscriptionID,
+		resourceManagerEndpoint: env.ResourceManagerEndpoint,
+		servicePrincipalToken:   servicePrincipalToken,
+		rateLimiter:             operationPollRateLimiter,
+	}
 	az := Cloud{
 		Config:      *config,
 		Environment: *env,
 
-		DisksClient:                     newAzDisksClient(config.SubscriptionID, env.ResourceManagerEndpoint, servicePrincipalToken, operationPollRateLimiter),
-		RoutesClient:                    newAzRoutesClient(config.SubscriptionID, env.ResourceManagerEndpoint, servicePrincipalToken, operationPollRateLimiter),
-		SubnetsClient:                   newAzSubnetsClient(config.SubscriptionID, env.ResourceManagerEndpoint, servicePrincipalToken, operationPollRateLimiter),
-		InterfacesClient:                newAzInterfacesClient(config.SubscriptionID, env.ResourceManagerEndpoint, servicePrincipalToken, operationPollRateLimiter),
-		RouteTablesClient:               newAzRouteTablesClient(config.SubscriptionID, env.ResourceManagerEndpoint, servicePrincipalToken, operationPollRateLimiter),
-		LoadBalancerClient:              newAzLoadBalancersClient(config.SubscriptionID, env.ResourceManagerEndpoint, servicePrincipalToken, operationPollRateLimiter),
-		SecurityGroupsClient:            newAzSecurityGroupsClient(config.SubscriptionID, env.ResourceManagerEndpoint, servicePrincipalToken, operationPollRateLimiter),
-		StorageAccountClient:            newAzStorageAccountClient(config.SubscriptionID, env.ResourceManagerEndpoint, servicePrincipalToken, operationPollRateLimiter),
-		VirtualMachinesClient:           newAzVirtualMachinesClient(config.SubscriptionID, env.ResourceManagerEndpoint, servicePrincipalToken, operationPollRateLimiter),
-		PublicIPAddressesClient:         newAzPublicIPAddressesClient(config.SubscriptionID, env.ResourceManagerEndpoint, servicePrincipalToken, operationPollRateLimiter),
-		VirtualMachineScaleSetsClient:   newAzVirtualMachineScaleSetsClient(config.SubscriptionID, env.ResourceManagerEndpoint, servicePrincipalToken, operationPollRateLimiter),
-		VirtualMachineScaleSetVMsClient: newAzVirtualMachineScaleSetVMsClient(config.SubscriptionID, env.ResourceManagerEndpoint, servicePrincipalToken, operationPollRateLimiter),
+		DisksClient:                     newAzDisksClient(azClientConfig),
+		RoutesClient:                    newAzRoutesClient(azClientConfig),
+		SubnetsClient:                   newAzSubnetsClient(azClientConfig),
+		InterfacesClient:                newAzInterfacesClient(azClientConfig),
+		RouteTablesClient:               newAzRouteTablesClient(azClientConfig),
+		LoadBalancerClient:              newAzLoadBalancersClient(azClientConfig),
+		SecurityGroupsClient:            newAzSecurityGroupsClient(azClientConfig),
+		StorageAccountClient:            newAzStorageAccountClient(azClientConfig),
+		VirtualMachinesClient:           newAzVirtualMachinesClient(azClientConfig),
+		PublicIPAddressesClient:         newAzPublicIPAddressesClient(azClientConfig),
+		VirtualMachineScaleSetsClient:   newAzVirtualMachineScaleSetsClient(azClientConfig),
+		VirtualMachineScaleSetVMsClient: newAzVirtualMachineScaleSetVMsClient(azClientConfig),
 	}
 
 	// Conditionally configure resource request backoff

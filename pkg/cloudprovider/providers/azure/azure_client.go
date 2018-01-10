@@ -124,21 +124,29 @@ type DisksClient interface {
 	Get(resourceGroupName string, diskName string) (result disk.Model, err error)
 }
 
+// azClientConfig contains all essential information to create an Azure client.
+type azClientConfig struct {
+	subscriptionID          string
+	resourceManagerEndpoint string
+	servicePrincipalToken   *adal.ServicePrincipalToken
+	rateLimiter             flowcontrol.RateLimiter
+}
+
 // azVirtualMachinesClient implements VirtualMachinesClient.
 type azVirtualMachinesClient struct {
 	client      compute.VirtualMachinesClient
 	rateLimiter flowcontrol.RateLimiter
 }
 
-func newAzVirtualMachinesClient(subscriptionID string, endpoint string, servicePrincipalToken *adal.ServicePrincipalToken, rateLimiter flowcontrol.RateLimiter) *azVirtualMachinesClient {
-	virtualMachinesClient := compute.NewVirtualMachinesClient(subscriptionID)
-	virtualMachinesClient.BaseURI = endpoint
-	virtualMachinesClient.Authorizer = autorest.NewBearerAuthorizer(servicePrincipalToken)
+func newAzVirtualMachinesClient(config *azClientConfig) *azVirtualMachinesClient {
+	virtualMachinesClient := compute.NewVirtualMachinesClient(config.subscriptionID)
+	virtualMachinesClient.BaseURI = config.resourceManagerEndpoint
+	virtualMachinesClient.Authorizer = autorest.NewBearerAuthorizer(config.servicePrincipalToken)
 	virtualMachinesClient.PollingDelay = 5 * time.Second
 	configureUserAgent(&virtualMachinesClient.Client)
 
 	return &azVirtualMachinesClient{
-		rateLimiter: rateLimiter,
+		rateLimiter: config.rateLimiter,
 		client:      virtualMachinesClient,
 	}
 }
@@ -189,15 +197,15 @@ type azInterfacesClient struct {
 	rateLimiter flowcontrol.RateLimiter
 }
 
-func newAzInterfacesClient(subscriptionID string, endpoint string, servicePrincipalToken *adal.ServicePrincipalToken, rateLimiter flowcontrol.RateLimiter) *azInterfacesClient {
-	interfacesClient := network.NewInterfacesClient(subscriptionID)
-	interfacesClient.BaseURI = endpoint
-	interfacesClient.Authorizer = autorest.NewBearerAuthorizer(servicePrincipalToken)
+func newAzInterfacesClient(config *azClientConfig) *azInterfacesClient {
+	interfacesClient := network.NewInterfacesClient(config.subscriptionID)
+	interfacesClient.BaseURI = config.resourceManagerEndpoint
+	interfacesClient.Authorizer = autorest.NewBearerAuthorizer(config.servicePrincipalToken)
 	interfacesClient.PollingDelay = 5 * time.Second
 	configureUserAgent(&interfacesClient.Client)
 
 	return &azInterfacesClient{
-		rateLimiter: rateLimiter,
+		rateLimiter: config.rateLimiter,
 		client:      interfacesClient,
 	}
 }
@@ -238,15 +246,15 @@ type azLoadBalancersClient struct {
 	rateLimiter flowcontrol.RateLimiter
 }
 
-func newAzLoadBalancersClient(subscriptionID string, endpoint string, servicePrincipalToken *adal.ServicePrincipalToken, rateLimiter flowcontrol.RateLimiter) *azLoadBalancersClient {
-	loadBalancerClient := network.NewLoadBalancersClient(subscriptionID)
-	loadBalancerClient.BaseURI = endpoint
-	loadBalancerClient.Authorizer = autorest.NewBearerAuthorizer(servicePrincipalToken)
+func newAzLoadBalancersClient(config *azClientConfig) *azLoadBalancersClient {
+	loadBalancerClient := network.NewLoadBalancersClient(config.subscriptionID)
+	loadBalancerClient.BaseURI = config.resourceManagerEndpoint
+	loadBalancerClient.Authorizer = autorest.NewBearerAuthorizer(config.servicePrincipalToken)
 	loadBalancerClient.PollingDelay = 5 * time.Second
 	configureUserAgent(&loadBalancerClient.Client)
 
 	return &azLoadBalancersClient{
-		rateLimiter: rateLimiter,
+		rateLimiter: config.rateLimiter,
 		client:      loadBalancerClient,
 	}
 }
@@ -307,15 +315,15 @@ type azPublicIPAddressesClient struct {
 	rateLimiter flowcontrol.RateLimiter
 }
 
-func newAzPublicIPAddressesClient(subscriptionID string, endpoint string, servicePrincipalToken *adal.ServicePrincipalToken, rateLimiter flowcontrol.RateLimiter) *azPublicIPAddressesClient {
-	publicIPAddressClient := network.NewPublicIPAddressesClient(subscriptionID)
-	publicIPAddressClient.BaseURI = endpoint
-	publicIPAddressClient.Authorizer = autorest.NewBearerAuthorizer(servicePrincipalToken)
+func newAzPublicIPAddressesClient(config *azClientConfig) *azPublicIPAddressesClient {
+	publicIPAddressClient := network.NewPublicIPAddressesClient(config.subscriptionID)
+	publicIPAddressClient.BaseURI = config.resourceManagerEndpoint
+	publicIPAddressClient.Authorizer = autorest.NewBearerAuthorizer(config.servicePrincipalToken)
 	publicIPAddressClient.PollingDelay = 5 * time.Second
 	configureUserAgent(&publicIPAddressClient.Client)
 
 	return &azPublicIPAddressesClient{
-		rateLimiter: rateLimiter,
+		rateLimiter: config.rateLimiter,
 		client:      publicIPAddressClient,
 	}
 }
@@ -376,16 +384,16 @@ type azSubnetsClient struct {
 	rateLimiter flowcontrol.RateLimiter
 }
 
-func newAzSubnetsClient(subscriptionID string, endpoint string, servicePrincipalToken *adal.ServicePrincipalToken, rateLimiter flowcontrol.RateLimiter) *azSubnetsClient {
-	subnetsClient := network.NewSubnetsClient(subscriptionID)
-	subnetsClient.BaseURI = endpoint
-	subnetsClient.Authorizer = autorest.NewBearerAuthorizer(servicePrincipalToken)
+func newAzSubnetsClient(config *azClientConfig) *azSubnetsClient {
+	subnetsClient := network.NewSubnetsClient(config.subscriptionID)
+	subnetsClient.BaseURI = config.resourceManagerEndpoint
+	subnetsClient.Authorizer = autorest.NewBearerAuthorizer(config.servicePrincipalToken)
 	subnetsClient.PollingDelay = 5 * time.Second
 	configureUserAgent(&subnetsClient.Client)
 
 	return &azSubnetsClient{
 		client:      subnetsClient,
-		rateLimiter: rateLimiter,
+		rateLimiter: config.rateLimiter,
 	}
 }
 
@@ -435,15 +443,15 @@ type azSecurityGroupsClient struct {
 	rateLimiter flowcontrol.RateLimiter
 }
 
-func newAzSecurityGroupsClient(subscriptionID string, endpoint string, servicePrincipalToken *adal.ServicePrincipalToken, rateLimiter flowcontrol.RateLimiter) *azSecurityGroupsClient {
-	securityGroupsClient := network.NewSecurityGroupsClient(subscriptionID)
-	securityGroupsClient.BaseURI = endpoint
-	securityGroupsClient.Authorizer = autorest.NewBearerAuthorizer(servicePrincipalToken)
+func newAzSecurityGroupsClient(config *azClientConfig) *azSecurityGroupsClient {
+	securityGroupsClient := network.NewSecurityGroupsClient(config.subscriptionID)
+	securityGroupsClient.BaseURI = config.resourceManagerEndpoint
+	securityGroupsClient.Authorizer = autorest.NewBearerAuthorizer(config.servicePrincipalToken)
 	securityGroupsClient.PollingDelay = 5 * time.Second
 	configureUserAgent(&securityGroupsClient.Client)
 
 	return &azSecurityGroupsClient{
-		rateLimiter: rateLimiter,
+		rateLimiter: config.rateLimiter,
 		client:      securityGroupsClient,
 	}
 }
@@ -494,16 +502,16 @@ type azVirtualMachineScaleSetsClient struct {
 	rateLimiter flowcontrol.RateLimiter
 }
 
-func newAzVirtualMachineScaleSetsClient(subscriptionID string, endpoint string, servicePrincipalToken *adal.ServicePrincipalToken, rateLimiter flowcontrol.RateLimiter) *azVirtualMachineScaleSetsClient {
-	virtualMachineScaleSetsClient := compute.NewVirtualMachineScaleSetsClient(subscriptionID)
-	virtualMachineScaleSetsClient.BaseURI = endpoint
-	virtualMachineScaleSetsClient.Authorizer = autorest.NewBearerAuthorizer(servicePrincipalToken)
+func newAzVirtualMachineScaleSetsClient(config *azClientConfig) *azVirtualMachineScaleSetsClient {
+	virtualMachineScaleSetsClient := compute.NewVirtualMachineScaleSetsClient(config.subscriptionID)
+	virtualMachineScaleSetsClient.BaseURI = config.resourceManagerEndpoint
+	virtualMachineScaleSetsClient.Authorizer = autorest.NewBearerAuthorizer(config.servicePrincipalToken)
 	virtualMachineScaleSetsClient.PollingDelay = 5 * time.Second
 	configureUserAgent(&virtualMachineScaleSetsClient.Client)
 
 	return &azVirtualMachineScaleSetsClient{
 		client:      virtualMachineScaleSetsClient,
-		rateLimiter: rateLimiter,
+		rateLimiter: config.rateLimiter,
 	}
 }
 
@@ -563,16 +571,16 @@ type azVirtualMachineScaleSetVMsClient struct {
 	rateLimiter flowcontrol.RateLimiter
 }
 
-func newAzVirtualMachineScaleSetVMsClient(subscriptionID string, endpoint string, servicePrincipalToken *adal.ServicePrincipalToken, rateLimiter flowcontrol.RateLimiter) *azVirtualMachineScaleSetVMsClient {
-	virtualMachineScaleSetVMsClient := compute.NewVirtualMachineScaleSetVMsClient(subscriptionID)
-	virtualMachineScaleSetVMsClient.BaseURI = endpoint
-	virtualMachineScaleSetVMsClient.Authorizer = autorest.NewBearerAuthorizer(servicePrincipalToken)
+func newAzVirtualMachineScaleSetVMsClient(config *azClientConfig) *azVirtualMachineScaleSetVMsClient {
+	virtualMachineScaleSetVMsClient := compute.NewVirtualMachineScaleSetVMsClient(config.subscriptionID)
+	virtualMachineScaleSetVMsClient.BaseURI = config.resourceManagerEndpoint
+	virtualMachineScaleSetVMsClient.Authorizer = autorest.NewBearerAuthorizer(config.servicePrincipalToken)
 	virtualMachineScaleSetVMsClient.PollingDelay = 5 * time.Second
 	configureUserAgent(&virtualMachineScaleSetVMsClient.Client)
 
 	return &azVirtualMachineScaleSetVMsClient{
 		client:      virtualMachineScaleSetVMsClient,
-		rateLimiter: rateLimiter,
+		rateLimiter: config.rateLimiter,
 	}
 }
 
@@ -622,16 +630,16 @@ type azRoutesClient struct {
 	rateLimiter flowcontrol.RateLimiter
 }
 
-func newAzRoutesClient(subscriptionID string, endpoint string, servicePrincipalToken *adal.ServicePrincipalToken, rateLimiter flowcontrol.RateLimiter) *azRoutesClient {
-	routesClient := network.NewRoutesClient(subscriptionID)
-	routesClient.BaseURI = endpoint
-	routesClient.Authorizer = autorest.NewBearerAuthorizer(servicePrincipalToken)
+func newAzRoutesClient(config *azClientConfig) *azRoutesClient {
+	routesClient := network.NewRoutesClient(config.subscriptionID)
+	routesClient.BaseURI = config.resourceManagerEndpoint
+	routesClient.Authorizer = autorest.NewBearerAuthorizer(config.servicePrincipalToken)
 	routesClient.PollingDelay = 5 * time.Second
 	configureUserAgent(&routesClient.Client)
 
 	return &azRoutesClient{
 		client:      routesClient,
-		rateLimiter: rateLimiter,
+		rateLimiter: config.rateLimiter,
 	}
 }
 
@@ -661,16 +669,16 @@ type azRouteTablesClient struct {
 	rateLimiter flowcontrol.RateLimiter
 }
 
-func newAzRouteTablesClient(subscriptionID string, endpoint string, servicePrincipalToken *adal.ServicePrincipalToken, rateLimiter flowcontrol.RateLimiter) *azRouteTablesClient {
-	routeTablesClient := network.NewRouteTablesClient(subscriptionID)
-	routeTablesClient.BaseURI = endpoint
-	routeTablesClient.Authorizer = autorest.NewBearerAuthorizer(servicePrincipalToken)
+func newAzRouteTablesClient(config *azClientConfig) *azRouteTablesClient {
+	routeTablesClient := network.NewRouteTablesClient(config.subscriptionID)
+	routeTablesClient.BaseURI = config.resourceManagerEndpoint
+	routeTablesClient.Authorizer = autorest.NewBearerAuthorizer(config.servicePrincipalToken)
 	routeTablesClient.PollingDelay = 5 * time.Second
 	configureUserAgent(&routeTablesClient.Client)
 
 	return &azRouteTablesClient{
 		client:      routeTablesClient,
-		rateLimiter: rateLimiter,
+		rateLimiter: config.rateLimiter,
 	}
 }
 
@@ -700,15 +708,15 @@ type azStorageAccountClient struct {
 	rateLimiter flowcontrol.RateLimiter
 }
 
-func newAzStorageAccountClient(subscriptionID string, endpoint string, servicePrincipalToken *adal.ServicePrincipalToken, rateLimiter flowcontrol.RateLimiter) *azStorageAccountClient {
-	storageAccountClient := storage.NewAccountsClientWithBaseURI(endpoint, subscriptionID)
-	storageAccountClient.Authorizer = autorest.NewBearerAuthorizer(servicePrincipalToken)
+func newAzStorageAccountClient(config *azClientConfig) *azStorageAccountClient {
+	storageAccountClient := storage.NewAccountsClientWithBaseURI(config.resourceManagerEndpoint, config.subscriptionID)
+	storageAccountClient.Authorizer = autorest.NewBearerAuthorizer(config.servicePrincipalToken)
 	storageAccountClient.PollingDelay = 5 * time.Second
 	configureUserAgent(&storageAccountClient.Client)
 
 	return &azStorageAccountClient{
 		client:      storageAccountClient,
-		rateLimiter: rateLimiter,
+		rateLimiter: config.rateLimiter,
 	}
 }
 
@@ -768,15 +776,15 @@ type azDisksClient struct {
 	rateLimiter flowcontrol.RateLimiter
 }
 
-func newAzDisksClient(subscriptionID string, endpoint string, servicePrincipalToken *adal.ServicePrincipalToken, rateLimiter flowcontrol.RateLimiter) *azDisksClient {
-	disksClient := disk.NewDisksClientWithBaseURI(endpoint, subscriptionID)
-	disksClient.Authorizer = autorest.NewBearerAuthorizer(servicePrincipalToken)
+func newAzDisksClient(config *azClientConfig) *azDisksClient {
+	disksClient := disk.NewDisksClientWithBaseURI(config.resourceManagerEndpoint, config.subscriptionID)
+	disksClient.Authorizer = autorest.NewBearerAuthorizer(config.servicePrincipalToken)
 	disksClient.PollingDelay = 5 * time.Second
 	configureUserAgent(&disksClient.Client)
 
 	return &azDisksClient{
 		client:      disksClient,
-		rateLimiter: rateLimiter,
+		rateLimiter: config.rateLimiter,
 	}
 }
 
