@@ -73,9 +73,9 @@ const (
 	// errFailedToDialDevicePlugin is the error raised when the device plugin could not be
 	// reached on the registered socket
 	errFailedToDialDevicePlugin = "failed to dial device plugin:"
-	// errUnsuportedVersion is the error raised when the device plugin uses an API version not
+	// errUnsupportedVersion is the error raised when the device plugin uses an API version not
 	// supported by the Kubelet registry
-	errUnsuportedVersion = "requested API version %q is not supported by kubelet. Supported version is %q"
+	errUnsupportedVersion = "requested API version %q is not supported by kubelet. Supported version is %q"
 	// errDevicePluginAlreadyExists is the error raised when a device plugin with the
 	// same Resource Name tries to register itself
 	errDevicePluginAlreadyExists = "another device plugin already registered this Resource Name"
