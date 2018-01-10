@@ -33,6 +33,7 @@ var SpecialDefaultResourcePrefixes = map[schema.GroupResource]string{
 	{Group: "", Resource: "services"}:                      "services/specs",
 	{Group: "extensions", Resource: "ingresses"}:           "ingress",
 	{Group: "extensions", Resource: "podsecuritypolicies"}: "podsecuritypolicy",
+	{Group: "policy", Resource: "podsecuritypolicies"}:     "podsecuritypolicy",
 }
 
 // NewStorageFactory builds the DefaultStorageFactory.
