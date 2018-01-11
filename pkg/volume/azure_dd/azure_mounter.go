@@ -86,8 +86,19 @@ func (m *azureDiskMounter) SetUpAt(dir string, fsGroup *int64) error {
 		return err
 	}
 	if !mountPoint {
-		glog.V(4).Infof("azureDisk - already mounted to target %s", dir)
-		return nil
+		// testing original mount point, make sure the mount link is valid
+		_, err := (&osIOHandler{}).ReadDir(dir)
+		if err == nil {
+			glog.V(4).Infof("azureDisk - already mounted to target %s", dir)
+			return nil
+		}
+		// mount link is invalid, now unmount and remount later
+		glog.Warningf("azureDisk - ReadDir %s failed with %v, unmount this directory", dir, err)
+		if err := mounter.Unmount(dir); err != nil {
+			glog.Errorf("azureDisk - Unmount directory %s failed with %v", dir, err)
+			return err
+		}
+		mountPoint = true
 	}
 
 	if runtime.GOOS != "windows" {
