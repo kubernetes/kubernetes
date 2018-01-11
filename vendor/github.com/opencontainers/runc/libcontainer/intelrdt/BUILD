@@ -4,18 +4,16 @@ go_library(
     name = "go_default_library",
     srcs = select({
         "@io_bazel_rules_go//go/platform:linux": [
-            "rootless.go",
+            "intelrdt.go",
+            "stats.go",
         ],
         "//conditions:default": [],
     }),
-    importpath = "github.com/opencontainers/runc/libcontainer/cgroups/rootless",
+    importpath = "github.com/opencontainers/runc/libcontainer/intelrdt",
     visibility = ["//visibility:public"],
     deps = select({
         "@io_bazel_rules_go//go/platform:linux": [
-            "//vendor/github.com/opencontainers/runc/libcontainer/cgroups:go_default_library",
-            "//vendor/github.com/opencontainers/runc/libcontainer/cgroups/fs:go_default_library",
             "//vendor/github.com/opencontainers/runc/libcontainer/configs:go_default_library",
-            "//vendor/github.com/opencontainers/runc/libcontainer/configs/validate:go_default_library",
         ],
         "//conditions:default": [],
     }),
