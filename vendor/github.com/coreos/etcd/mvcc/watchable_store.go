@@ -258,6 +258,21 @@ func (s *watchableStore) cancelWatcher(wa *watcher) {
 	s.mu.Unlock()
 }
 
+func (s *watchableStore) Restore(b backend.Backend) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	err := s.store.Restore(b)
+	if err != nil {
+		return err
+	}
+
+	for wa := range s.synced.watchers {
+		s.unsynced.watchers.add(wa)
+	}
+	s.synced = newWatcherGroup()
+	return nil
+}
+
 // syncWatchersLoop syncs the watcher in the unsynced map every 100ms.
 func (s *watchableStore) syncWatchersLoop() {
 	defer s.wg.Done()

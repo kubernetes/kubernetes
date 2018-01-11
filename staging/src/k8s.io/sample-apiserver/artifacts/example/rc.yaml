@@ -21,4 +21,4 @@ spec:
         imagePullPolicy: Never
         command: [ "/kube-sample-apiserver", "--etcd-servers=http://localhost:2379" ]
       - name: etcd
-        image: quay.io/coreos/etcd:v3.1.10
+        image: quay.io/coreos/etcd:v3.1.11

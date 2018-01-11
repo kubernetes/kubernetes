@@ -12,12 +12,12 @@ http_archive(
     urls = ["https://github.com/kubernetes/repo-infra/archive/653485c1a6d554513266d55683da451bd41f7d65.tar.gz"],
 )
 
-ETCD_VERSION = "3.1.10"
+ETCD_VERSION = "3.1.11"
 
 new_http_archive(
     name = "com_coreos_etcd",
     build_file = "third_party/etcd.BUILD",
-    sha256 = "2d335f298619c6fb02b1124773a56966e448ad9952b26fea52909da4fe80d2be",
+    sha256 = "b80c6c0719beee703821ece80f9e48b071ad5f59bb284bd3ea2104700738d9ec",
     strip_prefix = "etcd-v%s-linux-amd64" % ETCD_VERSION,
     urls = ["https://github.com/coreos/etcd/releases/download/v%s/etcd-v%s-linux-amd64.tar.gz" % (ETCD_VERSION, ETCD_VERSION)],
 )
