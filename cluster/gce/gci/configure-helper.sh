@@ -2149,7 +2149,14 @@ EOF
       sed -i -e "s@{{ metadata_agent_memory_request }}@${metadata_agent_memory_request}@g" "${daemon_set_yaml}"
     fi
   fi
+
   if [[ "${ENABLE_METRICS_SERVER:-}" == "true" ]]; then
+    if [ -n "${CUSTOM_METRICS_SERVER_YAML}" ]; then
+      local -r metrics_server_file="${dst_dir}/metrics-server/metrics-server-deployment.yaml"
+      cat > "${metrics_server_file}" <<EOF
+$(echo "${CUSTOM_METRICS_SERVER_FILE}")
+EOF
+    fi
     setup-addon-manifests "addons" "metrics-server"
   fi
   if [[ "${ENABLE_NVIDIA_GPU_DEVICE_PLUGIN:-}" == "true" ]]; then
