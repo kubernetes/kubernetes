@@ -101,6 +101,7 @@ filegroup(
         "//pkg/kubectl/util/logs:all-srcs",
         "//pkg/kubectl/util/slice:all-srcs",
         "//pkg/kubectl/util/term:all-srcs",
+        "//pkg/kubectl/util/transport:all-srcs",
     ],
     tags = ["automanaged"],
     visibility = ["//build/visible_to:pkg_kubectl_util_CONSUMERS"],

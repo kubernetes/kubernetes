@@ -151,10 +151,6 @@
 			"Rev": "1643683e1b54a9e88ad26d98f81400c8c9d9f4f9"
 		},
 		{
-			"ImportPath": "github.com/google/btree",
-			"Rev": "7d79101e329e5a3adf994758c578dab82b90c017"
-		},
-		{
 			"ImportPath": "github.com/google/gofuzz",
 			"Rev": "44d81051d367757e1c7c6a5a86423ece9afcf63c"
 		},
@@ -199,14 +195,6 @@
 			"Rev": "8e59687aa4b27ab22a0bf3295f1e165ff7bd5f97"
 		},
 		{
-			"ImportPath": "github.com/gregjones/httpcache",
-			"Rev": "787624de3eb7bd915c329cba748687a3b22666a6"
-		},
-		{
-			"ImportPath": "github.com/gregjones/httpcache/diskcache",
-			"Rev": "787624de3eb7bd915c329cba748687a3b22666a6"
-		},
-		{
 			"ImportPath": "github.com/hashicorp/golang-lru",
 			"Rev": "a0d98a5f288019575c6d1f4bb1573fef2d1fcdc4"
 		},
@@ -245,10 +233,6 @@
 		{
 			"ImportPath": "github.com/mailru/easyjson/jwriter",
 			"Rev": "2f5df55504ebc322e4d52d34df6a1f5b503bf26d"
-		},
-		{
-			"ImportPath": "github.com/peterbourgon/diskv",
-			"Rev": "5f041e8faa004a95c88a202771f4cc3e991971e6"
 		},
 		{
 			"ImportPath": "github.com/pmezard/go-difflib/difflib",
