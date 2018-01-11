@@ -221,6 +221,11 @@ func (c *csiAttacher) Detach(volumeName string, nodeName types.NodeName) error {
 	return c.waitForVolumeDetachment(volID, attachID)
 }
 
+// SafeToDetachFromNode returns true if it is safe to detach drive from node immediately
+func (c *csiAttacher) SafeToDetachFromNode(nodeName types.NodeName) (bool, error) {
+	return false, nil
+}
+
 func (c *csiAttacher) waitForVolumeDetachment(volumeHandle, attachID string) error {
 	glog.V(4).Info(log("probing for updates from CSI driver for [attachment.ID=%v]", attachID))
 

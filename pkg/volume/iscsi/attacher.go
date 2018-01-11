@@ -143,6 +143,11 @@ func (detacher *iscsiDetacher) Detach(volumeName string, nodeName types.NodeName
 	return nil
 }
 
+// SafeToDetachFromNode returns true if it is safe to detach drive from node immediately
+func (detacher *iscsiDetacher) SafeToDetachFromNode(nodeName types.NodeName) (bool, error) {
+	return false, nil
+}
+
 func (detacher *iscsiDetacher) UnmountDevice(deviceMountPath string) error {
 	unMounter := volumeSpecToUnmounter(detacher.mounter, detacher.host)
 	err := detacher.manager.DetachDisk(*unMounter, deviceMountPath)

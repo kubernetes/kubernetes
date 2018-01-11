@@ -141,6 +141,11 @@ func (detacher *fcDetacher) Detach(volumeName string, nodeName types.NodeName) e
 	return nil
 }
 
+// SafeToDetachFromNode returns true if it is safe to detach drive from node immediately
+func (detacher *fcDetacher) SafeToDetachFromNode(nodeName types.NodeName) (bool, error) {
+	return false, nil
+}
+
 func (detacher *fcDetacher) UnmountDevice(deviceMountPath string) error {
 	// Specify device name for DetachDisk later
 	devName, _, err := mount.GetDeviceNameFromMount(detacher.mounter, deviceMountPath)

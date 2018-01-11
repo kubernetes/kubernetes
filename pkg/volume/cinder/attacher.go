@@ -393,6 +393,11 @@ func (detacher *cinderDiskDetacher) Detach(volumeName string, nodeName types.Nod
 	return nil
 }
 
+// SafeToDetachFromNode returns true if it is safe to detach drive from node immediately
+func (detacher *cinderDiskDetacher) SafeToDetachFromNode(nodeName types.NodeName) (bool, error) {
+	return detacher.cinderProvider.SafeToDetachNode(nodeName)
+}
+
 func (detacher *cinderDiskDetacher) UnmountDevice(deviceMountPath string) error {
 	return volumeutil.UnmountPath(deviceMountPath, detacher.mounter)
 }

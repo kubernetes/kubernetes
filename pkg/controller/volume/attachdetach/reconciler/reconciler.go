@@ -197,8 +197,10 @@ func (rc *reconciler) reconcile() {
 			}
 			// Check whether timeout has reached the maximum waiting time
 			timeout := elapsedTime > rc.maxWaitForUnmountDuration
-			// Check whether volume is still mounted. Skip detach if it is still mounted unless timeout
-			if attachedVolume.MountedByNode && !timeout {
+			safeToDetach := rc.desiredStateOfWorld.SafeToDetach(attachedVolume.NodeName)
+
+			// Check whether volume is still mounted. Skip detach if it is still mounted unless timeout or node is safe to detach
+			if attachedVolume.MountedByNode && !timeout && !safeToDetach {
 				glog.V(12).Infof(attachedVolume.GenerateMsgDetailed("Cannot detach volume because it is still mounted", ""))
 				continue
 			}

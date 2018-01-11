@@ -263,6 +263,11 @@ func (detacher *awsElasticBlockStoreDetacher) Detach(volumeName string, nodeName
 	return nil
 }
 
+// SafeToDetachFromNode returns true if it is safe to detach drive from node immediately
+func (detacher *awsElasticBlockStoreDetacher) SafeToDetachFromNode(nodeName types.NodeName) (bool, error) {
+	return false, nil
+}
+
 func (detacher *awsElasticBlockStoreDetacher) UnmountDevice(deviceMountPath string) error {
 	return volumeutil.UnmountPath(deviceMountPath, detacher.mounter)
 }

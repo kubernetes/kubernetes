@@ -277,6 +277,11 @@ func (detacher *vsphereVMDKDetacher) Detach(volumeName string, nodeName types.No
 	return nil
 }
 
+// SafeToDetachFromNode returns true if it is safe to detach drive from node immediately
+func (detacher *vsphereVMDKDetacher) SafeToDetachFromNode(nodeName types.NodeName) (bool, error) {
+	return false, nil
+}
+
 func (detacher *vsphereVMDKDetacher) UnmountDevice(deviceMountPath string) error {
 	return volumeutil.UnmountPath(deviceMountPath, detacher.mounter)
 }

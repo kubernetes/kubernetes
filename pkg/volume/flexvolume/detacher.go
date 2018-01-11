@@ -46,6 +46,11 @@ func (d *flexVolumeDetacher) Detach(volumeName string, hostName types.NodeName) 
 	return err
 }
 
+// SafeToDetachFromNode returns true if it is safe to detach drive from node immediately
+func (d *flexVolumeDetacher) SafeToDetachFromNode(nodeName types.NodeName) (bool, error) {
+	return false, nil
+}
+
 // UnmountDevice is part of the volume.Detacher interface.
 func (d *flexVolumeDetacher) UnmountDevice(deviceMountPath string) error {
 
