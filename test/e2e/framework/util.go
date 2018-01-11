@@ -3900,9 +3900,7 @@ func sshRestartMaster() error {
 	}
 	var command string
 	if ProviderIs("gce") {
-		// `kube-apiserver_kube-apiserver` matches the name of the apiserver
-		// container.
-		command = "sudo docker ps | grep kube-apiserver_kube-apiserver | cut -d ' ' -f 1 | xargs sudo docker kill"
+		command = "pidof kube-apiserver | xargs sudo kill"
 	} else {
 		command = "sudo /etc/init.d/kube-apiserver restart"
 	}
@@ -3933,9 +3931,9 @@ func RestartControllerManager() error {
 	if ProviderIs("gce") && !MasterOSDistroIs("gci") {
 		return fmt.Errorf("unsupported master OS distro: %s", TestContext.MasterOSDistro)
 	}
-	cmd := "sudo docker ps | grep k8s_kube-controller-manager | cut -d ' ' -f 1 | xargs sudo docker kill"
+	cmd := "pidof kube-controller-manager | xargs sudo kill"
 	Logf("Restarting controller-manager via ssh, running: %v", cmd)
-	result, err := SSH(cmd, GetMasterHost()+":22", TestContext.Provider)
+	result, err := SSH(cmd, net.JoinHostPort(GetMasterHost(), sshPort), TestContext.Provider)
 	if err != nil || result.Code != 0 {
 		LogSSHResult(result)
 		return fmt.Errorf("couldn't restart controller-manager: %v", err)
@@ -3946,7 +3944,7 @@ func RestartControllerManager() error {
 func WaitForControllerManagerUp() error {
 	cmd := "curl http://localhost:" + strconv.Itoa(ports.ControllerManagerPort) + "/healthz"
 	for start := time.Now(); time.Since(start) < time.Minute; time.Sleep(5 * time.Second) {
-		result, err := SSH(cmd, GetMasterHost()+":22", TestContext.Provider)
+		result, err := SSH(cmd, net.JoinHostPort(GetMasterHost(), sshPort), TestContext.Provider)
 		if err != nil || result.Code != 0 {
 			LogSSHResult(result)
 		}
@@ -3960,9 +3958,9 @@ func WaitForControllerManagerUp() error {
 // CheckForControllerManagerHealthy checks that the controller manager does not crash within "duration"
 func CheckForControllerManagerHealthy(duration time.Duration) error {
 	var PID string
-	cmd := "sudo docker ps | grep k8s_kube-controller-manager | cut -d ' ' -f 1"
+	cmd := "pidof kube-controller-manager"
 	for start := time.Now(); time.Since(start) < duration; time.Sleep(5 * time.Second) {
-		result, err := SSH(cmd, GetMasterHost()+":22", TestContext.Provider)
+		result, err := SSH(cmd, net.JoinHostPort(GetMasterHost(), sshPort), TestContext.Provider)
 		if err != nil {
 			// We don't necessarily know that it crashed, pipe could just be broken
 			LogSSHResult(result)
