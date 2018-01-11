@@ -25,7 +25,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apiserver/pkg/apis/apiserver"
-	apiserverapi "k8s.io/apiserver/pkg/apis/apiserver"
 	apiserverapiv1alpha1 "k8s.io/apiserver/pkg/apis/apiserver/v1alpha1"
 )
 
@@ -138,7 +137,7 @@ func TestReadAdmissionConfiguration(t *testing.T) {
 	}
 
 	scheme := runtime.NewScheme()
-	apiserverapi.AddToScheme(scheme)
+	apiserver.AddToScheme(scheme)
 	apiserverapiv1alpha1.AddToScheme(scheme)
 
 	for testName, testCase := range testCases {
@@ -210,7 +209,7 @@ func TestEmbeddedConfiguration(t *testing.T) {
 
 	for desc, test := range testCases {
 		scheme := runtime.NewScheme()
-		apiserverapi.AddToScheme(scheme)
+		apiserver.AddToScheme(scheme)
 		apiserverapiv1alpha1.AddToScheme(scheme)
 
 		if err = ioutil.WriteFile(configFileName, []byte(test.ConfigBody), 0644); err != nil {

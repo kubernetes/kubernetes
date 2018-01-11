@@ -23,7 +23,6 @@ import (
 
 	autoscalingapi "k8s.io/api/autoscaling/v2beta1"
 	"k8s.io/api/core/v1"
-	kv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -186,7 +185,7 @@ func (tc *restClientTestCase) runTest(t *testing.T) {
 	metricsClient := NewRESTMetricsClient(testMetricsClient.MetricsV1beta1(), testCMClient)
 	isResource := len(tc.resourceName) > 0
 	if isResource {
-		info, timestamp, err := metricsClient.GetResourceMetric(kv1.ResourceName(tc.resourceName), tc.namespace, tc.selector)
+		info, timestamp, err := metricsClient.GetResourceMetric(v1.ResourceName(tc.resourceName), tc.namespace, tc.selector)
 		tc.verifyResults(t, info, timestamp, err)
 	} else if tc.singleObject == nil {
 		info, timestamp, err := metricsClient.GetRawMetric(tc.metricName, tc.namespace, tc.selector)
