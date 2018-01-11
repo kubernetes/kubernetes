@@ -222,7 +222,7 @@ func makeExpectedConfig(m *kubeGenericRuntimeManager, pod *v1.Pod, containerInde
 		Args:        []string(nil),
 		WorkingDir:  container.WorkingDir,
 		Labels:      newContainerLabels(container, pod, kubecontainer.ContainerTypeRegular),
-		Annotations: newContainerAnnotations(container, pod, restartCount),
+		Annotations: newContainerAnnotations(container, pod, restartCount, opts),
 		Devices:     makeDevices(opts),
 		Mounts:      m.makeMounts(opts, container),
 		LogPath:     containerLogsPath,
