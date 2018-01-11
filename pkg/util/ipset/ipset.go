@@ -50,7 +50,6 @@ type Interface interface {
 	ListSets() ([]string, error)
 	// GetVersion returns the "X.Y" version string for ipset.
 	GetVersion() (string, error)
-	// TODO: add comment message for ipset
 }
 
 // IPSetCmd represents the ipset util.  We use ipset command for ipset execute.
@@ -144,6 +143,10 @@ type Entry struct {
 
 // Validate checks if a given ipset entry is valid or not.  The set parameter is the ipset that entry belongs to.
 func (e *Entry) Validate(set *IPSet) bool {
+	if e.Port < 0 {
+		glog.Errorf("Entry %v port number %d should be >=0 for ipset %v", e, e.Port, set)
+		return false
+	}
 	switch e.SetType {
 	case HashIPPort:
 		// set default protocol to tcp if empty
@@ -159,11 +162,6 @@ func (e *Entry) Validate(set *IPSet) bool {
 		if valid := validateProtocol(e.Protocol); !valid {
 			return false
 		}
-
-		if e.Port < 0 {
-			glog.Errorf("Entry %v port number %d should be >=0 for ipset %v", e, e.Port, set)
-			return false
-		}
 	case HashIPPortIP:
 		// set default protocol to tcp if empty
 		if len(e.Protocol) == 0 {
@@ -176,11 +174,6 @@ func (e *Entry) Validate(set *IPSet) bool {
 		}
 
 		if valid := validateProtocol(e.Protocol); !valid {
-			return false
-		}
-
-		if e.Port < 0 {
-			glog.Errorf("Entry %v port number %d should be >=0 for ipset %v ", e, e.Port, set)
 			return false
 		}
 
@@ -204,22 +197,12 @@ func (e *Entry) Validate(set *IPSet) bool {
 			return false
 		}
 
-		if e.Port < 0 {
-			glog.Errorf("Entry %v port number %d should be >=0 for ipset %v", e, e.Port, set)
-			return false
-		}
-
 		// Net can not be empty for `hash:ip,port,net` type ip set
 		if _, ipNet, _ := net.ParseCIDR(e.Net); ipNet == nil {
 			glog.Errorf("Error parsing entry %v ip net %v for ipset %v", e, e.Net, set)
 			return false
 		}
 	case BitmapPort:
-		if e.Port < 0 {
-			glog.Errorf("Entry %v port number %d should be >=0 for ipset %v", e, e.Port, set)
-			return false
-		}
-
 		// check if port number satisfies its ipset's requirement of port range
 		if set == nil {
 			glog.Errorf("Unable to reference ip set where the entry %v exists", e)
@@ -297,7 +280,7 @@ func (runner *runner) CreateSet(set *IPSet, ignoreExistErr bool) error {
 	// Validate ipset before creating
 	valid := set.Validate()
 	if !valid {
-		return fmt.Errorf("Error creating ipset since it's invalid")
+		return fmt.Errorf("error creating ipset since it's invalid")
 	}
 	return runner.createSet(set, ignoreExistErr)
 }

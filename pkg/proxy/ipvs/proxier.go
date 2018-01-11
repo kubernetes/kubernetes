@@ -970,8 +970,8 @@ func (proxier *Proxier) OnEndpointsSynced() {
 	proxier.syncProxyRules()
 }
 
-// EntryInvalidErr indiates if an ipset entry is invalid or not
-const EntryInvalidErr = "error adding entry %s to ipset %s since entry is invalid"
+// EntryInvalidErr indicates if an ipset entry is invalid or not
+const EntryInvalidErr = "error adding entry %s to ipset %s"
 
 // This is where all of the ipvs calls happen.
 // assumes proxier.mu is held
@@ -1145,13 +1145,7 @@ func (proxier *Proxier) syncProxyRules() {
 		// add service Cluster IP:Port to kubeServiceAccess ip set for the purpose of solving hairpin.
 		// proxier.kubeServiceAccessSet.activeEntries.Insert(entry.String())
 		// Install masquerade rules if 'masqueradeAll' or 'clusterCIDR' is specified.
-		if proxier.masqueradeAll {
-			if valid := proxier.clusterIPSet.validateEntry(entry); !valid {
-				glog.Errorf("%s", fmt.Sprintf(EntryInvalidErr, entry, proxier.clusterIPSet.Name))
-				continue
-			}
-			proxier.clusterIPSet.activeEntries.Insert(entry.String())
-		} else if len(proxier.clusterCIDR) > 0 {
+		if proxier.masqueradeAll || len(proxier.clusterCIDR) > 0 {
 			if valid := proxier.clusterIPSet.validateEntry(entry); !valid {
 				glog.Errorf("%s", fmt.Sprintf(EntryInvalidErr, entry, proxier.clusterIPSet.Name))
 				continue
@@ -1380,22 +1374,22 @@ func (proxier *Proxier) syncProxyRules() {
 					Protocol: protocol,
 					SetType:  utilipset.BitmapPort,
 				}
+				var nodePortSet *IPSet
 				switch protocol {
 				case "tcp":
-					if valid := proxier.nodePortSetTCP.validateEntry(entry); !valid {
-						glog.Errorf("%s", fmt.Sprintf(EntryInvalidErr, entry, proxier.nodePortSetTCP.Name))
-						continue
-					}
-					proxier.nodePortSetTCP.activeEntries.Insert(entry.String())
+					nodePortSet = proxier.nodePortSetTCP
 				case "udp":
-					if valid := proxier.nodePortSetUDP.validateEntry(entry); !valid {
-						glog.Errorf("%s", fmt.Sprintf(EntryInvalidErr, entry, proxier.nodePortSetUDP.Name))
-						continue
-					}
-					proxier.nodePortSetUDP.activeEntries.Insert(entry.String())
+					nodePortSet = proxier.nodePortSetUDP
 				default:
 					// It should never hit
 					glog.Errorf("Unsupported protocol type: %s", protocol)
+				}
+				if nodePortSet != nil {
+					if valid := nodePortSet.validateEntry(entry); !valid {
+						glog.Errorf("%s", fmt.Sprintf(EntryInvalidErr, entry, nodePortSet.Name))
+						continue
+					}
+					nodePortSet.activeEntries.Insert(entry.String())
 				}
 			}
 
