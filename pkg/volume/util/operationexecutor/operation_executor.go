@@ -22,7 +22,6 @@ package operationexecutor
 
 import (
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/golang/glog"
@@ -169,7 +168,7 @@ type ActualStateOfWorldMounterUpdater interface {
 	MarkVolumeAsUnmounted(podName volumetypes.UniquePodName, volumeName v1.UniqueVolumeName) error
 
 	// Marks the specified volume as having been globally mounted.
-	MarkDeviceAsMounted(volumeName v1.UniqueVolumeName) error
+	MarkDeviceAsMounted(volumeName v1.UniqueVolumeName, devicePath, deviceMountPath string) error
 
 	// Marks the specified volume as having its global mount unmounted.
 	MarkDeviceAsUnmounted(volumeName v1.UniqueVolumeName) error
@@ -386,6 +385,14 @@ type AttachedVolume struct {
 	// DevicePath contains the path on the node where the volume is attached.
 	// For non-attachable volumes this is empty.
 	DevicePath string
+
+	// DeviceMountPath contains the path on the node where the device should
+	// be mounted after it is attached.
+	DeviceMountPath string
+
+	// PluginName is the Unescaped Qualified name of the volume plugin used to
+	// attach and mount this volume.
+	PluginName string
 }
 
 // GenerateMsgDetailed returns detailed msgs for attached volumes
@@ -529,6 +536,10 @@ type MountedVolume struct {
 	// VolumeSpec is a volume spec containing the specification for the volume
 	// that should be mounted.
 	VolumeSpec *volume.Spec
+
+	// DeviceMountPath contains the path on the node where the device should
+	// be mounted after it is attached.
+	DeviceMountPath string
 }
 
 // GenerateMsgDetailed returns detailed msgs for mounted volumes
@@ -866,6 +877,21 @@ func NewVolumeHandler(volumeSpec *volume.Spec, oe OperationExecutor) (VolumeStat
 	return volumeHandler, nil
 }
 
+// NewVolumeHandlerWithMode return a new instance of volumeHandler depens on a volumeMode
+func NewVolumeHandlerWithMode(volumeMode v1.PersistentVolumeMode, oe OperationExecutor) (VolumeStateHandler, error) {
+	var volumeHandler VolumeStateHandler
+	if utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) {
+		if volumeMode == v1.PersistentVolumeFilesystem {
+			volumeHandler = NewFilesystemVolumeHandler(oe)
+		} else {
+			volumeHandler = NewBlockVolumeHandler(oe)
+		}
+	} else {
+		volumeHandler = NewFilesystemVolumeHandler(oe)
+	}
+	return volumeHandler, nil
+}
+
 // NewFilesystemVolumeHandler returns a new instance of FilesystemVolumeHandler.
 func NewFilesystemVolumeHandler(operationExecutor OperationExecutor) FilesystemVolumeHandler {
 	return FilesystemVolumeHandler{
@@ -924,7 +950,7 @@ func (f FilesystemVolumeHandler) UnmountDeviceHandler(attachedVolume AttachedVol
 // ReconstructVolumeHandler create volumeSpec from mount path
 // This method is handler for filesystem volume
 func (f FilesystemVolumeHandler) ReconstructVolumeHandler(plugin volume.VolumePlugin, _ volume.BlockVolumePlugin, _ types.UID, _ volumetypes.UniquePodName, volumeSpecName string, mountPath string, _ string) (*volume.Spec, error) {
-	glog.V(12).Infof("Starting operationExecutor.ReconstructVolumepodName")
+	glog.V(4).Infof("Starting operationExecutor.ReconstructVolumepodName volume spec name %s, mount path %s", volumeSpecName, mountPath)
 	volumeSpec, err := plugin.ConstructVolumeSpec(volumeSpecName, mountPath)
 	if err != nil {
 		return nil, err
@@ -1023,22 +1049,4 @@ func (b BlockVolumeHandler) CheckVolumeExistence(mountPath, volumeName string, m
 			checkErr)
 	}
 	return islinkExist, nil
-}
-
-// TODO: this is a workaround for the unmount device issue caused by gci mounter.
-// In GCI cluster, if gci mounter is used for mounting, the container started by mounter
-// script will cause additional mounts created in the container. Since these mounts are
-// irrelavant to the original mounts, they should be not considered when checking the
-// mount references. Current solution is to filter out those mount paths that contain
-// the string of original mount path.
-// Plan to work on better approach to solve this issue.
-
-func hasMountRefs(mountPath string, mountRefs []string) bool {
-	count := 0
-	for _, ref := range mountRefs {
-		if !strings.Contains(ref, mountPath) {
-			count = count + 1
-		}
-	}
-	return count > 0
 }
