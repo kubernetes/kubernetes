@@ -192,16 +192,26 @@ func deployWebhookAndService(f *framework.Framework, image string, context *cert
 	By("Deploying the webhook pod")
 	client := f.ClientSet
 
+	secretData := map[string][]byte{
+		"tls.crt": context.cert,
+		"tls.key": context.key,
+	}
+	clientCAFile := ""
+
+	// If the provider is gce then we need to set up client authentication in the webhook
+	// TODO (jennybuckley): Set up client certs for other providers by default
+	if framework.ProviderIs("gce") {
+		secretData["ca.crt"] = getClientCA(f)
+		clientCAFile = "/webhook.local.config/certificates/ca.crt"
+	}
+
 	// Creating the secret that contains the webhook's cert.
 	secret := &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: secretName,
 		},
 		Type: v1.SecretTypeOpaque,
-		Data: map[string][]byte{
-			"tls.crt": context.cert,
-			"tls.key": context.key,
-		},
+		Data: secretData,
 	}
 	namespace := f.Namespace.Name
 	_, err := client.CoreV1().Secrets(namespace).Create(secret)
@@ -233,6 +243,7 @@ func deployWebhookAndService(f *framework.Framework, image string, context *cert
 			Args: []string{
 				"--tls-cert-file=/webhook.local.config/certificates/tls.crt",
 				"--tls-private-key-file=/webhook.local.config/certificates/tls.key",
+				"--client-ca-file=" + clientCAFile,
 				"--alsologtostderr",
 				"-v=4",
 				"2>&1",
