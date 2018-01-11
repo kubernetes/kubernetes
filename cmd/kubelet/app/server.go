@@ -270,9 +270,6 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies) (err error) {
 	// About to get clients and such, detect standaloneMode
 	standaloneMode := true
 	switch {
-	case s.RequireKubeConfig == true:
-		standaloneMode = false
-		glog.Warningf("--require-kubeconfig is deprecated. Set --kubeconfig without using --require-kubeconfig.")
 	case s.KubeConfig.Provided():
 		standaloneMode = false
 	}
@@ -364,8 +361,6 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies) (err error) {
 
 		} else {
 			switch {
-			case s.RequireKubeConfig:
-				return fmt.Errorf("invalid kubeconfig: %v", err)
 			case s.KubeConfig.Provided():
 				glog.Warningf("invalid kubeconfig: %v", err)
 			}
@@ -587,9 +582,7 @@ func kubeconfigClientConfig(s *options.KubeletServer) (*restclient.Config, error
 // --require-kubeconfig=true, we attempt to load the default kubeconfig file.
 func createClientConfig(s *options.KubeletServer) (*restclient.Config, error) {
 	// If --kubeconfig was not provided, it will have a default path set in cmd/kubelet/app/options/options.go.
-	// We only use that default path when --require-kubeconfig=true. The default path is temporary until --require-kubeconfig is removed.
-	// TODO(#41161:v1.10.0): Remove the default kubeconfig path and --require-kubeconfig.
-	if s.BootstrapKubeconfig != "" || s.KubeConfig.Provided() || s.RequireKubeConfig == true {
+	if s.BootstrapKubeconfig != "" || s.KubeConfig.Provided() {
 		return kubeconfigClientConfig(s)
 	} else {
 		return nil, fmt.Errorf("createClientConfig called in standalone mode")
