@@ -193,7 +193,6 @@ pkg_tar(
     files = [
         "//:Godeps/LICENSES",
         "//:README.md",
-        "//:Vagrantfile",
         "//:version",
         "//cluster:all-srcs",
         "//docs:all-srcs",

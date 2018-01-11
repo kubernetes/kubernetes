@@ -3454,12 +3454,6 @@ func GetSigner(provider string) (ssh.Signer, error) {
 		}
 		// Otherwise revert to home dir
 		keyfile = "kube_aws_rsa"
-	case "vagrant":
-		keyfile = os.Getenv("VAGRANT_SSH_KEY")
-		if len(keyfile) != 0 {
-			return sshutil.MakePrivateKeySignerFromFile(keyfile)
-		}
-		return nil, fmt.Errorf("VAGRANT_SSH_KEY env variable should be provided")
 	case "local", "vsphere":
 		keyfile = os.Getenv("LOCAL_SSH_KEY") // maybe?
 		if len(keyfile) == 0 {
