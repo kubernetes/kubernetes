@@ -35,6 +35,7 @@
 {% set additional_cloud_config_mount = "{\"name\": \"usrsharessl\",\"mountPath\": \"/usr/share/ssl\", \"readOnly\": true}, {\"name\": \"usrssl\",\"mountPath\": \"/usr/ssl\", \"readOnly\": true}, {\"name\": \"usrlibssl\",\"mountPath\": \"/usr/lib/ssl\", \"readOnly\": true}, {\"name\": \"usrlocalopenssl\",\"mountPath\": \"/usr/local/openssl\", \"readOnly\": true}," -%}
 {% set additional_cloud_config_volume = "{\"name\": \"usrsharessl\",\"hostPath\": {\"path\": \"/usr/share/ssl\"}}, {\"name\": \"usrssl\",\"hostPath\": {\"path\": \"/usr/ssl\"}}, {\"name\": \"usrlibssl\",\"hostPath\": {\"path\": \"/usr/lib/ssl\"}}, {\"name\": \"usrlocalopenssl\",\"hostPath\": {\"path\": \"/usr/local/openssl\"}}," -%}
 {% set srv_kube_path = "/srv/kubernetes" -%}
+{% flex_vol_plugin_dir = "/usr/libexec/kubernetes/kubelet-plugins/volume/exec" -%}
 
 {% if grains.cloud is defined -%}
   {% if grains.cloud not in ['vagrant', 'photon-controller', 'azure-legacy'] -%}
@@ -134,6 +135,7 @@
         { "name": "srvkube",
         "mountPath": "{{srv_kube_path}}",
         "readOnly": true},
+        {{flexvolume_hostpath_mount}}
         { "name": "logfile",
         "mountPath": "/var/log/kube-controller-manager.log",
         "readOnly": false},
@@ -162,6 +164,7 @@
     "hostPath": {
         "path": "{{srv_kube_path}}"}
   },
+  {{flexvolume_hostpath}}
   { "name": "logfile",
     "hostPath": {
         "path": "/var/log/kube-controller-manager.log",
