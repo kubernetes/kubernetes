@@ -415,7 +415,6 @@ func (az *Cloud) ensurePublicIPExists(service *v1.Service, pipName string, domai
 	}
 	pip.Tags = &map[string]*string{"service": &serviceName}
 	glog.V(3).Infof("ensure(%s): pip(%s) - creating", serviceName, *pip.Name)
-	az.operationPollRateLimiter.Accept()
 	glog.V(10).Infof("CreateOrUpdatePIPWithRetry(%s, %q): start", pipResourceGroup, *pip.Name)
 	err = az.CreateOrUpdatePIPWithRetry(pipResourceGroup, pip)
 	if err != nil {
@@ -424,10 +423,7 @@ func (az *Cloud) ensurePublicIPExists(service *v1.Service, pipName string, domai
 	}
 	glog.V(10).Infof("CreateOrUpdatePIPWithRetry(%s, %q): end", pipResourceGroup, *pip.Name)
 
-	az.operationPollRateLimiter.Accept()
-	glog.V(10).Infof("PublicIPAddressesClient.Get(%s, %q): start", pipResourceGroup, *pip.Name)
 	pip, err = az.PublicIPAddressesClient.Get(pipResourceGroup, *pip.Name, "")
-	glog.V(10).Infof("PublicIPAddressesClient.Get(%s, %q): end", pipResourceGroup, *pip.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -762,14 +758,13 @@ func (az *Cloud) reconcileLoadBalancer(clusterName string, service *v1.Service, 
 			glog.V(10).Infof("EnsureBackendPoolDeleted(%s, %s): end", lbBackendPoolID, vmSetName)
 
 			// Remove the LB.
-			az.operationPollRateLimiter.Accept()
-			glog.V(10).Infof("LoadBalancerClient.Delete(%q): start", lbName)
+			glog.V(10).Infof("az.DeleteLBWithRetry(%q): start", lbName)
 			err = az.DeleteLBWithRetry(lbName)
 			if err != nil {
 				glog.V(2).Infof("delete(%s) abort backoff: lb(%s) - deleting; no remaining frontendipconfigs", serviceName, lbName)
 				return nil, err
 			}
-			glog.V(10).Infof("LoadBalancerClient.Delete(%q): end", lbName)
+			glog.V(10).Infof("az.DeleteLBWithRetry(%q): end", lbName)
 		} else {
 			glog.V(3).Infof("ensure(%s): lb(%s) - updating", serviceName, lbName)
 			err := az.CreateOrUpdateLBWithRetry(*lb)
@@ -808,10 +803,7 @@ func (az *Cloud) reconcileSecurityGroup(clusterName string, service *v1.Service,
 		ports = []v1.ServicePort{}
 	}
 
-	az.operationPollRateLimiter.Accept()
-	glog.V(10).Infof("SecurityGroupsClient.Get(%q): start", az.SecurityGroupName)
 	sg, err := az.SecurityGroupsClient.Get(az.ResourceGroup, az.SecurityGroupName, "")
-	glog.V(10).Infof("SecurityGroupsClient.Get(%q): end", az.SecurityGroupName)
 	if err != nil {
 		return nil, err
 	}
@@ -980,7 +972,6 @@ func (az *Cloud) reconcileSecurityGroup(clusterName string, service *v1.Service,
 	if dirtySg {
 		sg.SecurityRules = &updatedRules
 		glog.V(3).Infof("ensure(%s): sg(%s) - updating", serviceName, *sg.Name)
-		az.operationPollRateLimiter.Accept()
 		glog.V(10).Infof("CreateOrUpdateSGWithRetry(%q): start", *sg.Name)
 		err := az.CreateOrUpdateSGWithRetry(sg)
 		if err != nil {
@@ -1169,7 +1160,6 @@ func (az *Cloud) reconcilePublicIP(clusterName string, service *v1.Service, want
 				// Public ip resource with match service tag
 			} else {
 				glog.V(2).Infof("ensure(%s): pip(%s) - deleting", serviceName, pipName)
-				az.operationPollRateLimiter.Accept()
 				glog.V(10).Infof("DeletePublicIPWithRetry(%s, %q): start", pipResourceGroup, pipName)
 				err = az.DeletePublicIPWithRetry(pipResourceGroup, pipName)
 				if err != nil {

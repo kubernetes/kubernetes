@@ -30,10 +30,6 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/version"
 
-	"github.com/Azure/azure-sdk-for-go/arm/compute"
-	"github.com/Azure/azure-sdk-for-go/arm/disk"
-	"github.com/Azure/azure-sdk-for-go/arm/network"
-	"github.com/Azure/azure-sdk-for-go/arm/storage"
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/ghodss/yaml"
@@ -110,117 +106,22 @@ type Config struct {
 	MaximumLoadBalancerRuleCount int `json:"maximumLoadBalancerRuleCount"`
 }
 
-// VirtualMachinesClient defines needed functions for azure compute.VirtualMachinesClient
-type VirtualMachinesClient interface {
-	CreateOrUpdate(resourceGroupName string, VMName string, parameters compute.VirtualMachine, cancel <-chan struct{}) (<-chan compute.VirtualMachine, <-chan error)
-	Get(resourceGroupName string, VMName string, expand compute.InstanceViewTypes) (result compute.VirtualMachine, err error)
-	List(resourceGroupName string) (result compute.VirtualMachineListResult, err error)
-	ListNextResults(lastResults compute.VirtualMachineListResult) (result compute.VirtualMachineListResult, err error)
-}
-
-// InterfacesClient defines needed functions for azure network.InterfacesClient
-type InterfacesClient interface {
-	CreateOrUpdate(resourceGroupName string, networkInterfaceName string, parameters network.Interface, cancel <-chan struct{}) (<-chan network.Interface, <-chan error)
-	Get(resourceGroupName string, networkInterfaceName string, expand string) (result network.Interface, err error)
-	GetVirtualMachineScaleSetNetworkInterface(resourceGroupName string, virtualMachineScaleSetName string, virtualmachineIndex string, networkInterfaceName string, expand string) (result network.Interface, err error)
-}
-
-// LoadBalancersClient defines needed functions for azure network.LoadBalancersClient
-type LoadBalancersClient interface {
-	CreateOrUpdate(resourceGroupName string, loadBalancerName string, parameters network.LoadBalancer, cancel <-chan struct{}) (<-chan network.LoadBalancer, <-chan error)
-	Delete(resourceGroupName string, loadBalancerName string, cancel <-chan struct{}) (<-chan autorest.Response, <-chan error)
-	Get(resourceGroupName string, loadBalancerName string, expand string) (result network.LoadBalancer, err error)
-	List(resourceGroupName string) (result network.LoadBalancerListResult, err error)
-	ListNextResults(lastResult network.LoadBalancerListResult) (result network.LoadBalancerListResult, err error)
-}
-
-// PublicIPAddressesClient defines needed functions for azure network.PublicIPAddressesClient
-type PublicIPAddressesClient interface {
-	CreateOrUpdate(resourceGroupName string, publicIPAddressName string, parameters network.PublicIPAddress, cancel <-chan struct{}) (<-chan network.PublicIPAddress, <-chan error)
-	Delete(resourceGroupName string, publicIPAddressName string, cancel <-chan struct{}) (<-chan autorest.Response, <-chan error)
-	Get(resourceGroupName string, publicIPAddressName string, expand string) (result network.PublicIPAddress, err error)
-	List(resourceGroupName string) (result network.PublicIPAddressListResult, err error)
-	ListNextResults(lastResults network.PublicIPAddressListResult) (result network.PublicIPAddressListResult, err error)
-}
-
-// SubnetsClient defines needed functions for azure network.SubnetsClient
-type SubnetsClient interface {
-	CreateOrUpdate(resourceGroupName string, virtualNetworkName string, subnetName string, subnetParameters network.Subnet, cancel <-chan struct{}) (<-chan network.Subnet, <-chan error)
-	Delete(resourceGroupName string, virtualNetworkName string, subnetName string, cancel <-chan struct{}) (<-chan autorest.Response, <-chan error)
-	Get(resourceGroupName string, virtualNetworkName string, subnetName string, expand string) (result network.Subnet, err error)
-	List(resourceGroupName string, virtualNetworkName string) (result network.SubnetListResult, err error)
-}
-
-// SecurityGroupsClient defines needed functions for azure network.SecurityGroupsClient
-type SecurityGroupsClient interface {
-	CreateOrUpdate(resourceGroupName string, networkSecurityGroupName string, parameters network.SecurityGroup, cancel <-chan struct{}) (<-chan network.SecurityGroup, <-chan error)
-	Delete(resourceGroupName string, networkSecurityGroupName string, cancel <-chan struct{}) (<-chan autorest.Response, <-chan error)
-	Get(resourceGroupName string, networkSecurityGroupName string, expand string) (result network.SecurityGroup, err error)
-	List(resourceGroupName string) (result network.SecurityGroupListResult, err error)
-}
-
-// VirtualMachineScaleSetsClient defines needed functions for azure compute.VirtualMachineScaleSetsClient
-type VirtualMachineScaleSetsClient interface {
-	CreateOrUpdate(resourceGroupName string, VMScaleSetName string, parameters compute.VirtualMachineScaleSet, cancel <-chan struct{}) (<-chan compute.VirtualMachineScaleSet, <-chan error)
-	Get(resourceGroupName string, VMScaleSetName string) (result compute.VirtualMachineScaleSet, err error)
-	List(resourceGroupName string) (result compute.VirtualMachineScaleSetListResult, err error)
-	ListNextResults(lastResults compute.VirtualMachineScaleSetListResult) (result compute.VirtualMachineScaleSetListResult, err error)
-	UpdateInstances(resourceGroupName string, VMScaleSetName string, VMInstanceIDs compute.VirtualMachineScaleSetVMInstanceRequiredIDs, cancel <-chan struct{}) (<-chan compute.OperationStatusResponse, <-chan error)
-}
-
-// VirtualMachineScaleSetVMsClient defines needed functions for azure compute.VirtualMachineScaleSetVMsClient
-type VirtualMachineScaleSetVMsClient interface {
-	Get(resourceGroupName string, VMScaleSetName string, instanceID string) (result compute.VirtualMachineScaleSetVM, err error)
-	GetInstanceView(resourceGroupName string, VMScaleSetName string, instanceID string) (result compute.VirtualMachineScaleSetVMInstanceView, err error)
-	List(resourceGroupName string, virtualMachineScaleSetName string, filter string, selectParameter string, expand string) (result compute.VirtualMachineScaleSetVMListResult, err error)
-	ListNextResults(lastResults compute.VirtualMachineScaleSetVMListResult) (result compute.VirtualMachineScaleSetVMListResult, err error)
-}
-
-// RoutesClient defines needed functions for azure network.RoutesClient
-type RoutesClient interface {
-	CreateOrUpdate(resourceGroupName string, routeTableName string, routeName string, routeParameters network.Route, cancel <-chan struct{}) (<-chan network.Route, <-chan error)
-	Delete(resourceGroupName string, routeTableName string, routeName string, cancel <-chan struct{}) (<-chan autorest.Response, <-chan error)
-}
-
-// RouteTablesClient defines needed functions for azure network.RouteTablesClient
-type RouteTablesClient interface {
-	CreateOrUpdate(resourceGroupName string, routeTableName string, parameters network.RouteTable, cancel <-chan struct{}) (<-chan network.RouteTable, <-chan error)
-	Get(resourceGroupName string, routeTableName string, expand string) (result network.RouteTable, err error)
-}
-
-// StorageAccountClient defines needed functions for azure storage.AccountsClient
-type StorageAccountClient interface {
-	Create(resourceGroupName string, accountName string, parameters storage.AccountCreateParameters, cancel <-chan struct{}) (<-chan storage.Account, <-chan error)
-	Delete(resourceGroupName string, accountName string) (result autorest.Response, err error)
-	ListKeys(resourceGroupName string, accountName string) (result storage.AccountListKeysResult, err error)
-	ListByResourceGroup(resourceGroupName string) (result storage.AccountListResult, err error)
-	GetProperties(resourceGroupName string, accountName string) (result storage.Account, err error)
-}
-
-// DisksClient defines needed functions for azure disk.DisksClient
-type DisksClient interface {
-	CreateOrUpdate(resourceGroupName string, diskName string, diskParameter disk.Model, cancel <-chan struct{}) (<-chan disk.Model, <-chan error)
-	Delete(resourceGroupName string, diskName string, cancel <-chan struct{}) (<-chan disk.OperationStatusResponse, <-chan error)
-	Get(resourceGroupName string, diskName string) (result disk.Model, err error)
-}
-
 // Cloud holds the config and clients
 type Cloud struct {
 	Config
-	Environment              azure.Environment
-	RoutesClient             RoutesClient
-	SubnetsClient            SubnetsClient
-	InterfacesClient         InterfacesClient
-	RouteTablesClient        RouteTablesClient
-	LoadBalancerClient       LoadBalancersClient
-	PublicIPAddressesClient  PublicIPAddressesClient
-	SecurityGroupsClient     SecurityGroupsClient
-	VirtualMachinesClient    VirtualMachinesClient
-	StorageAccountClient     StorageAccountClient
-	DisksClient              DisksClient
-	operationPollRateLimiter flowcontrol.RateLimiter
-	resourceRequestBackoff   wait.Backoff
-	vmSet                    VMSet
+	Environment             azure.Environment
+	RoutesClient            RoutesClient
+	SubnetsClient           SubnetsClient
+	InterfacesClient        InterfacesClient
+	RouteTablesClient       RouteTablesClient
+	LoadBalancerClient      LoadBalancersClient
+	PublicIPAddressesClient PublicIPAddressesClient
+	SecurityGroupsClient    SecurityGroupsClient
+	VirtualMachinesClient   VirtualMachinesClient
+	StorageAccountClient    StorageAccountClient
+	DisksClient             DisksClient
+	resourceRequestBackoff  wait.Backoff
+	vmSet                   VMSet
 
 	// Clients for vmss.
 	VirtualMachineScaleSetsClient   VirtualMachineScaleSetsClient
@@ -247,116 +148,51 @@ func NewCloud(configReader io.Reader) (cloudprovider.Interface, error) {
 		return nil, err
 	}
 
-	az := Cloud{
-		Config:      *config,
-		Environment: *env,
-	}
-
 	servicePrincipalToken, err := auth.GetServicePrincipalToken(&config.AzureAuthConfig, env)
 	if err != nil {
 		return nil, err
 	}
 
-	subnetsClient := network.NewSubnetsClient(az.SubscriptionID)
-	subnetsClient.BaseURI = az.Environment.ResourceManagerEndpoint
-	subnetsClient.Authorizer = autorest.NewBearerAuthorizer(servicePrincipalToken)
-	subnetsClient.PollingDelay = 5 * time.Second
-	configureUserAgent(&subnetsClient.Client)
-	az.SubnetsClient = subnetsClient
-
-	routeTablesClient := network.NewRouteTablesClient(az.SubscriptionID)
-	routeTablesClient.BaseURI = az.Environment.ResourceManagerEndpoint
-	routeTablesClient.Authorizer = autorest.NewBearerAuthorizer(servicePrincipalToken)
-	routeTablesClient.PollingDelay = 5 * time.Second
-	configureUserAgent(&routeTablesClient.Client)
-	az.RouteTablesClient = routeTablesClient
-
-	routesClient := network.NewRoutesClient(az.SubscriptionID)
-	routesClient.BaseURI = az.Environment.ResourceManagerEndpoint
-	routesClient.Authorizer = autorest.NewBearerAuthorizer(servicePrincipalToken)
-	routesClient.PollingDelay = 5 * time.Second
-	configureUserAgent(&routesClient.Client)
-	az.RoutesClient = routesClient
-
-	interfacesClient := network.NewInterfacesClient(az.SubscriptionID)
-	interfacesClient.BaseURI = az.Environment.ResourceManagerEndpoint
-	interfacesClient.Authorizer = autorest.NewBearerAuthorizer(servicePrincipalToken)
-	interfacesClient.PollingDelay = 5 * time.Second
-	configureUserAgent(&interfacesClient.Client)
-	az.InterfacesClient = interfacesClient
-
-	loadBalancerClient := network.NewLoadBalancersClient(az.SubscriptionID)
-	loadBalancerClient.BaseURI = az.Environment.ResourceManagerEndpoint
-	loadBalancerClient.Authorizer = autorest.NewBearerAuthorizer(servicePrincipalToken)
-	loadBalancerClient.PollingDelay = 5 * time.Second
-	configureUserAgent(&loadBalancerClient.Client)
-	az.LoadBalancerClient = loadBalancerClient
-
-	virtualMachinesClient := compute.NewVirtualMachinesClient(az.SubscriptionID)
-	virtualMachinesClient.BaseURI = az.Environment.ResourceManagerEndpoint
-	virtualMachinesClient.Authorizer = autorest.NewBearerAuthorizer(servicePrincipalToken)
-	virtualMachinesClient.PollingDelay = 5 * time.Second
-	configureUserAgent(&virtualMachinesClient.Client)
-	az.VirtualMachinesClient = virtualMachinesClient
-
-	publicIPAddressClient := network.NewPublicIPAddressesClient(az.SubscriptionID)
-	publicIPAddressClient.BaseURI = az.Environment.ResourceManagerEndpoint
-	publicIPAddressClient.Authorizer = autorest.NewBearerAuthorizer(servicePrincipalToken)
-	publicIPAddressClient.PollingDelay = 5 * time.Second
-	configureUserAgent(&publicIPAddressClient.Client)
-	az.PublicIPAddressesClient = publicIPAddressClient
-
-	securityGroupsClient := network.NewSecurityGroupsClient(az.SubscriptionID)
-	securityGroupsClient.BaseURI = az.Environment.ResourceManagerEndpoint
-	securityGroupsClient.Authorizer = autorest.NewBearerAuthorizer(servicePrincipalToken)
-	securityGroupsClient.PollingDelay = 5 * time.Second
-	configureUserAgent(&securityGroupsClient.Client)
-	az.SecurityGroupsClient = securityGroupsClient
-
-	virtualMachineScaleSetVMsClient := compute.NewVirtualMachineScaleSetVMsClient(az.SubscriptionID)
-	virtualMachineScaleSetVMsClient.BaseURI = az.Environment.ResourceManagerEndpoint
-	virtualMachineScaleSetVMsClient.Authorizer = autorest.NewBearerAuthorizer(servicePrincipalToken)
-	virtualMachineScaleSetVMsClient.PollingDelay = 5 * time.Second
-	configureUserAgent(&virtualMachineScaleSetVMsClient.Client)
-	az.VirtualMachineScaleSetVMsClient = virtualMachineScaleSetVMsClient
-
-	virtualMachineScaleSetsClient := compute.NewVirtualMachineScaleSetsClient(az.SubscriptionID)
-	virtualMachineScaleSetsClient.BaseURI = az.Environment.ResourceManagerEndpoint
-	virtualMachineScaleSetsClient.Authorizer = autorest.NewBearerAuthorizer(servicePrincipalToken)
-	virtualMachineScaleSetsClient.PollingDelay = 5 * time.Second
-	configureUserAgent(&virtualMachineScaleSetsClient.Client)
-	az.VirtualMachineScaleSetsClient = virtualMachineScaleSetsClient
-
-	storageAccountClient := storage.NewAccountsClientWithBaseURI(az.Environment.ResourceManagerEndpoint, az.SubscriptionID)
-	storageAccountClient.Authorizer = autorest.NewBearerAuthorizer(servicePrincipalToken)
-	storageAccountClient.PollingDelay = 5 * time.Second
-	configureUserAgent(&storageAccountClient.Client)
-	az.StorageAccountClient = storageAccountClient
-
-	disksClient := disk.NewDisksClientWithBaseURI(az.Environment.ResourceManagerEndpoint, az.SubscriptionID)
-	disksClient.Authorizer = autorest.NewBearerAuthorizer(servicePrincipalToken)
-	disksClient.PollingDelay = 5 * time.Second
-	configureUserAgent(&disksClient.Client)
-	az.DisksClient = disksClient
-
-	// Conditionally configure rate limits
-	if az.CloudProviderRateLimit {
+	// operationPollRateLimiter.Accept() is a no-op if rate limits are configured off.
+	operationPollRateLimiter := flowcontrol.NewFakeAlwaysRateLimiter()
+	if config.CloudProviderRateLimit {
 		// Assign rate limit defaults if no configuration was passed in
-		if az.CloudProviderRateLimitQPS == 0 {
-			az.CloudProviderRateLimitQPS = rateLimitQPSDefault
+		if config.CloudProviderRateLimitQPS == 0 {
+			config.CloudProviderRateLimitQPS = rateLimitQPSDefault
 		}
-		if az.CloudProviderRateLimitBucket == 0 {
-			az.CloudProviderRateLimitBucket = rateLimitBucketDefault
+		if config.CloudProviderRateLimitBucket == 0 {
+			config.CloudProviderRateLimitBucket = rateLimitBucketDefault
 		}
-		az.operationPollRateLimiter = flowcontrol.NewTokenBucketRateLimiter(
-			az.CloudProviderRateLimitQPS,
-			az.CloudProviderRateLimitBucket)
+		operationPollRateLimiter = flowcontrol.NewTokenBucketRateLimiter(
+			config.CloudProviderRateLimitQPS,
+			config.CloudProviderRateLimitBucket)
 		glog.V(2).Infof("Azure cloudprovider using rate limit config: QPS=%g, bucket=%d",
-			az.CloudProviderRateLimitQPS,
-			az.CloudProviderRateLimitBucket)
-	} else {
-		// if rate limits are configured off, az.operationPollRateLimiter.Accept() is a no-op
-		az.operationPollRateLimiter = flowcontrol.NewFakeAlwaysRateLimiter()
+			config.CloudProviderRateLimitQPS,
+			config.CloudProviderRateLimitBucket)
+	}
+
+	azClientConfig := &azClientConfig{
+		subscriptionID:          config.SubscriptionID,
+		resourceManagerEndpoint: env.ResourceManagerEndpoint,
+		servicePrincipalToken:   servicePrincipalToken,
+		rateLimiter:             operationPollRateLimiter,
+	}
+	az := Cloud{
+		Config:      *config,
+		Environment: *env,
+
+		DisksClient:                     newAzDisksClient(azClientConfig),
+		RoutesClient:                    newAzRoutesClient(azClientConfig),
+		SubnetsClient:                   newAzSubnetsClient(azClientConfig),
+		InterfacesClient:                newAzInterfacesClient(azClientConfig),
+		RouteTablesClient:               newAzRouteTablesClient(azClientConfig),
+		LoadBalancerClient:              newAzLoadBalancersClient(azClientConfig),
+		SecurityGroupsClient:            newAzSecurityGroupsClient(azClientConfig),
+		StorageAccountClient:            newAzStorageAccountClient(azClientConfig),
+		VirtualMachinesClient:           newAzVirtualMachinesClient(azClientConfig),
+		PublicIPAddressesClient:         newAzPublicIPAddressesClient(azClientConfig),
+		VirtualMachineScaleSetsClient:   newAzVirtualMachineScaleSetsClient(azClientConfig),
+		VirtualMachineScaleSetVMsClient: newAzVirtualMachineScaleSetVMsClient(azClientConfig),
 	}
 
 	// Conditionally configure resource request backoff
