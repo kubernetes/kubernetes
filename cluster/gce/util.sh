@@ -571,8 +571,11 @@ function construct-kubelet-flags {
        [[ "${HAIRPIN_MODE:-}" == "none" ]]; then
       flags+=" --hairpin-mode=${HAIRPIN_MODE}"
     fi
+    flags+=" --anonymous-auth=false"
+    flags+=" --authentication-token-webhook"
+    flags+=" --authorization-mode=Webhook"
     # Keep client-ca-file in sync with CA_CERT_BUNDLE_PATH in configure-helper.sh
-    flags+=" --anonymous-auth=false --authorization-mode=Webhook --client-ca-file=/etc/srv/kubernetes/pki/ca-certificates.crt"
+    flags+=" --client-ca-file=/etc/srv/kubernetes/pki/ca-certificates.crt"
   fi
   # Network plugin
   if [[ -n "${NETWORK_PROVIDER:-}" || -n "${NETWORK_POLICY_PROVIDER:-}" ]]; then
