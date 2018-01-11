@@ -161,7 +161,7 @@ func TestPlugin(t *testing.T) {
 
 	client := fake.NewSimpleClientset()
 
-	client.Core().Secrets("default").Create(&v1.Secret{
+	client.CoreV1().Secrets("default").Create(&v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      secretName,
 			Namespace: "default",
