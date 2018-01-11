@@ -344,37 +344,6 @@ net.ipv4.ip_forward:
 {% set override_deb_sha1='' %}
 {% set override_docker_ver='' %}
 
-{% elif grains.get('cloud', '') == 'aws'
-   and grains.get('os_family', '') == 'Debian'
-   and grains.get('oscodename', '') == 'jessie' -%}
-# TODO: Get from google storage?
-{% set docker_pkg_name='docker-engine' %}
-{% set override_docker_ver='1.11.2-0~jessie' %}
-{% set override_deb='docker-engine_1.11.2-0~jessie_amd64.deb' %}
-{% set override_deb_url='http://apt.dockerproject.org/repo/pool/main/d/docker-engine/docker-engine_1.11.2-0~jessie_amd64.deb' %}
-{% set override_deb_sha1='c312f1f6fa0b34df4589bb812e4f7af8e28fd51d' %}
-
-# Ubuntu presents as os_family=Debian, osfullname=Ubuntu
-{% elif grains.get('cloud', '') == 'aws'
-   and grains.get('os_family', '') == 'Debian'
-   and grains.get('oscodename', '') == 'trusty' -%}
-# TODO: Get from google storage?
-{% set docker_pkg_name='docker-engine' %}
-{% set override_docker_ver='1.11.2-0~trusty' %}
-{% set override_deb='docker-engine_1.11.2-0~trusty_amd64.deb' %}
-{% set override_deb_url='http://apt.dockerproject.org/repo/pool/main/d/docker-engine/docker-engine_1.11.2-0~trusty_amd64.deb' %}
-{% set override_deb_sha1='022dee31e68c6d572eaac750915786e4a6729d2a' %}
-
-{% elif grains.get('cloud', '') == 'aws'
-   and grains.get('os_family', '') == 'Debian'
-   and grains.get('oscodename', '') == 'wily' -%}
-# TODO: Get from google storage?
-{% set docker_pkg_name='docker-engine' %}
-{% set override_docker_ver='1.11.2-0~wily' %}
-{% set override_deb='docker-engine_1.11.2-0~wily_amd64.deb' %}
-{% set override_deb_url='http://apt.dockerproject.org/repo/pool/main/d/docker-engine/docker-engine_1.11.2-0~wily_amd64.deb' %}
-{% set override_deb_sha1='3e02f51fe18aa777eeb1676c3d9a75e5ea6d96c9' %}
-
 {% else %}
 {% set docker_pkg_name='lxc-docker-1.7.1' %}
 {% set override_docker_ver='1.7.1' %}
@@ -502,19 +471,8 @@ fix-systemd-docker-healthcheck-service:
 {% endif %}
 
 docker:
-# Starting Docker is racy on aws for some reason.  To be honest, since Monit
-# is managing Docker restart we should probably just delete this whole thing
-# but the kubernetes components use salt 'require' to set up a dag, and that
-# complicated and scary to unwind.
-# On AWS, we use a trick now... We don't start the docker service through Salt.
-# Kubelet or our health checker will start it.  But we use service.enabled,
-# so we still have a `service: docker` node for our DAG.
-{% if grains.cloud is defined and grains.cloud == 'aws' %}
-  service.enabled:
-{% else %}
   service.running:
     - enable: True
-{% endif %}
 # If we put a watch on this, salt will try to start the service.
 # We put the watch on the fixer instead
 {% if not pillar.get('is_systemd') %}

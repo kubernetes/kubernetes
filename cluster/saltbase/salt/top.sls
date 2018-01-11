@@ -3,9 +3,6 @@ base:
     - base
     - debian-auto-upgrades
     - salt-helpers
-{% if grains.get('cloud') == 'aws' %}
-    - ntp
-{% endif %}
 {% if pillar.get('e2e_storage_test_environment', '').lower() == 'true' %}
     - e2e
 {% endif %}
@@ -20,7 +17,6 @@ base:
 {% elif pillar.get('network_provider', '').lower() == 'cni' %}
     - cni
 {% endif %}
-    - helpers
     - kube-client-tools
     - kube-node-unpacker
     - kubelet
@@ -60,11 +56,9 @@ base:
     - kube-client-tools
     - kube-master-addons
     - kube-admission-controls
-{% if grains['cloud'] is defined and grains['cloud'] != 'vagrant' %}
     - logrotate
-{% endif %}
     - kube-addons
-{% if grains['cloud'] is defined and grains['cloud'] in [ 'vagrant', 'gce', 'aws', 'photon-controller', 'openstack', 'azure-legacy'] %}
+{% if grains['cloud'] is defined and grains['cloud'] == 'gce' %}
     - docker
     - kubelet
 {% endif %}
