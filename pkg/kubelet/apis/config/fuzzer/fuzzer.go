@@ -93,6 +93,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			obj.ContainerLogMaxFiles = 5
 			obj.ContainerLogMaxSize = "10Mi"
 			obj.ConfigMapAndSecretChangeDetectionStrategy = "Watch"
+			obj.ProcessVolumeFailureEventInterval = metav1.Duration{Duration: 10 * time.Second}
 		},
 	}
 }

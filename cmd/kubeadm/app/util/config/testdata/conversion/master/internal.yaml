@@ -135,6 +135,7 @@ ComponentConfigs:
     PodPidsLimit: -1
     PodsPerCore: 0
     Port: 10250
+    ProcessVolumeFailureEventInterval: 10s
     ProtectKernelDefaults: false
     QOSReserved: null
     ReadOnlyPort: 0

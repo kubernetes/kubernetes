@@ -14,6 +14,7 @@ go_library(
         "//pkg/features:go_default_library",
         "//pkg/kubelet/config:go_default_library",
         "//pkg/kubelet/container:go_default_library",
+        "//pkg/kubelet/events:go_default_library",
         "//pkg/kubelet/pod:go_default_library",
         "//pkg/kubelet/status:go_default_library",
         "//pkg/kubelet/util/format:go_default_library",
@@ -28,6 +29,7 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
+        "//staging/src/k8s.io/client-go/tools/record:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
     ],
 )

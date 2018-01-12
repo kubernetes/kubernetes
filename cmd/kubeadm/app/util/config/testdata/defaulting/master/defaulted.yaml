@@ -139,6 +139,7 @@ nodeStatusUpdateFrequency: 10s
 oomScoreAdj: -999
 podPidsLimit: -1
 port: 10250
+processVolumeFailureEventInterval: 10s
 registryBurst: 10
 registryPullQPS: 5
 resolvConf: /etc/resolv.conf

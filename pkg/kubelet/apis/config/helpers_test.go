@@ -217,5 +217,6 @@ var (
 		"TypeMeta.APIVersion",
 		"TypeMeta.Kind",
 		"VolumeStatsAggPeriod.Duration",
+		"ProcessVolumeFailureEventInterval.Duration",
 	)
 )

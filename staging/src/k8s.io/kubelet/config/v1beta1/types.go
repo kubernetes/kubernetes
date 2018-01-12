@@ -706,6 +706,13 @@ type KubeletConfiguration struct {
 	// Default: ["pods"]
 	// +optional
 	EnforceNodeAllocatable []string `json:"enforceNodeAllocatable,omitempty"`
+	// This flag specifies the interval of reporting volume processing failure event to pod.
+	// E.g. when configuring a wrong FlexVolume name in pod, "no volume plugin matched" error would be thrown out.
+	// Volume manager can generate a lot of similar errors because of its desired state of world loop.
+	// User can config the interval of error events reported to pod by this kubelet flag.
+	// Default: "10s"
+	// +optional
+	ProcessVolumeFailureEventInterval metav1.Duration `json:"processVolumeFailureEventInterval,omitempty"`
 }
 
 type KubeletAuthorizationMode string

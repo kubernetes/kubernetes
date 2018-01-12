@@ -305,6 +305,11 @@ type KubeletConfiguration struct {
 	// This flag accepts a list of options. Acceptable options are `pods`, `system-reserved` & `kube-reserved`.
 	// Refer to [Node Allocatable](https://git.k8s.io/community/contributors/design-proposals/node/node-allocatable.md) doc for more information.
 	EnforceNodeAllocatable []string
+	// This flag specifies the interval of reporting volume processing failure event to pod.
+	// E.g. when configuring a wrong FlexVolume name in pod, "no volume plugin matched" error would be thrown out.
+	// Volume manager can generate a lot of similar errors because of its desired state of world loop.
+	// User can config the interval of error events reported to pod by this kubelet flag.
+	ProcessVolumeFailureEventInterval metav1.Duration
 }
 
 type KubeletAuthorizationMode string
