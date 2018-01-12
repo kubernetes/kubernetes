@@ -1515,30 +1515,53 @@ var _ = SIGDescribe("Services", func() {
 		tcpIngressIP = framework.GetIngressPoint(lbIngress)
 		jig.TestReachableHTTP(tcpIngressIP, svcPort, framework.LoadBalancerLagTimeoutDefault)
 
-		// GCE cannot test a specific IP because the test may not own it. This cloud specific condition
-		// will be removed when GCP supports similar functionality.
-		if framework.ProviderIs("azure") {
-			By("switching back to interal type LoadBalancer, with static IP specified.")
-			internalStaticIP := "10.240.11.11"
-			svc = jig.UpdateServiceOrFail(namespace, serviceName, func(svc *v1.Service) {
-				svc.Spec.LoadBalancerIP = internalStaticIP
-				enableILB(svc)
-			})
-			framework.Logf("Waiting up to %v for service %q to have an internal LoadBalancer", createTimeout, serviceName)
-			if pollErr := wait.PollImmediate(pollInterval, createTimeout, func() (bool, error) {
-				svc, err := jig.Client.CoreV1().Services(namespace).Get(serviceName, metav1.GetOptions{})
-				if err != nil {
-					return false, err
+		By("switching back to interal type LoadBalancer, with static IP specified.")
+		internalStaticIP := "10.240.11.11"
+		if framework.ProviderIs("gce", "gke") {
+			By("creating a static internal IP")
+			gceCloud, err := framework.GetGCECloud()
+			Expect(err).NotTo(HaveOccurred())
+
+			staticIPName := fmt.Sprintf("e2e-ilb-test-%s", framework.RunId)
+			defer func() {
+				// Release GCE static IP - this is not kube-managed and will not be automatically released.
+				if err := gceCloud.DeleteRegionAddress(staticIPName, gceCloud.Region()); err != nil {
+					framework.Logf("failed to release internal static IP %s: %v", staticIPName, err)
 				}
-				lbIngress = &svc.Status.LoadBalancer.Ingress[0]
-				return isInternalEndpoint(lbIngress), nil
-			}); pollErr != nil {
-				framework.Failf("Loadbalancer IP not changed to internal.")
+			}()
+
+			addr := &compute.Address{
+				Name:        staticIPName,
+				AddressType: "INTERNAL",
+				Subnetwork:  gceCloud.SubnetworkURL(),
 			}
-			// should have the given static internal IP.
-			jig.SanityCheckService(svc, v1.ServiceTypeLoadBalancer)
-			Expect(framework.GetIngressPoint(lbIngress)).To(Equal(internalStaticIP))
+			gceCloud.ReserveRegionAddress(addr, gceCloud.Region())
+			Expect(err).NotTo(HaveOccurred())
+
+			addr, err = gceCloud.GetRegionAddress(staticIPName, gceCloud.Region())
+			Expect(err).NotTo(HaveOccurred())
+			internalStaticIP = addr.Address
+			framework.Logf("created internal static IP %s", internalStaticIP)
 		}
+
+		svc = jig.UpdateServiceOrFail(namespace, serviceName, func(svc *v1.Service) {
+			svc.Spec.LoadBalancerIP = internalStaticIP
+			enableILB(svc)
+		})
+		framework.Logf("Waiting up to %v for service %q to have an internal LoadBalancer", createTimeout, serviceName)
+		if pollErr := wait.PollImmediate(pollInterval, createTimeout, func() (bool, error) {
+			svc, err := jig.Client.CoreV1().Services(namespace).Get(serviceName, metav1.GetOptions{})
+			if err != nil {
+				return false, err
+			}
+			lbIngress = &svc.Status.LoadBalancer.Ingress[0]
+			return isInternalEndpoint(lbIngress), nil
+		}); pollErr != nil {
+			framework.Failf("Loadbalancer IP not changed to internal.")
+		}
+		// should have the given static internal IP.
+		jig.SanityCheckService(svc, v1.ServiceTypeLoadBalancer)
+		Expect(framework.GetIngressPoint(lbIngress)).To(Equal(internalStaticIP))
 
 		By("switching to ClusterIP type to destroy loadbalancer")
 		jig.ChangeServiceType(svc.Namespace, svc.Name, v1.ServiceTypeClusterIP, createTimeout)
