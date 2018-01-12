@@ -1,4 +1,0 @@
-description: 'true'
-additionalProperties:
-  type: string
-  format: date-time

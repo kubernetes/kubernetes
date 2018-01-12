@@ -1,6 +1,0 @@
-# This file stop Debian's apachectl from trying to create directories that
-# require root. Ignored by other distros.
-export APACHE_PID_FILE=testdata/httpd.pid
-export APACHE_RUN_DIR=testdata/
-export APACHE_LOCK_DIR=testdata/
-export APACHE_LOG_DIR=testdata/logs

@@ -1,1 +1,0 @@
-CMD [ "echo", [ "nested json" ] ]

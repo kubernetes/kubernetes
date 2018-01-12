@@ -1,7 +1,0 @@
-{
-  "description": "A simple string response",
-  "schema": {
-    "type": "integer",
-    "format": "int64"
-  }
-}

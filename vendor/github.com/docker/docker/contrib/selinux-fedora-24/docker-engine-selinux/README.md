@@ -1,1 +1,0 @@
-SELinux policy for docker

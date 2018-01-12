@@ -1,3 +1,0 @@
-# HELP container_scrape_error 1 if there was an error while getting container metrics, 0 otherwise
-# TYPE container_scrape_error gauge
-container_scrape_error 1

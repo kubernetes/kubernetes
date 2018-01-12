@@ -1,6 +1,0 @@
-{
-  "maxReviewers": 3,
-  "fileBlacklist": ["CHANGELOG.md"],
-  "userBlacklist": ["pauldix", "toddboom", "aviau", "mark-rushakoff"],
-  "requiredOrgs": ["influxdata"]
-}

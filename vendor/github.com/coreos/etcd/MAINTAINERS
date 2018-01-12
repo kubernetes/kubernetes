@@ -1,7 +1,0 @@
-Anthony Romano <anthony.romano@coreos.com> (@heyitsanthony) pkg:*
-Brandon Philips <brandon.philips@coreos.com> (@philips) pkg:*
-Gyu-Ho Lee <gyu_ho.lee@coreos.com> (@gyuho) pkg:*
-Xiang Li <xiang.li@coreos.com> (@xiang90) pkg:*
-
-Ben Darnell <ben@cockroachlabs.com> (@bdarnell) pkg:github.com/coreos/etcd/raft
-Hitoshi Mitake <mitake.hitoshi@lab.ntt.co.jp> (@mitake) pkg:github.com/coreos/etcd/auth

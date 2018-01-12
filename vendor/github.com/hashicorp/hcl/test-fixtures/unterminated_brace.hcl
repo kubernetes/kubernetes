@@ -1,2 +1,0 @@
-foo "baz" {
-    bar = "baz"

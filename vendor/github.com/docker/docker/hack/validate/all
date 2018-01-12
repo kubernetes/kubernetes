@@ -1,8 +1,0 @@
-#!/usr/bin/env bash
-#
-# Run all validation
-
-export SCRIPTDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-
-. $SCRIPTDIR/default
-. $SCRIPTDIR/vendor

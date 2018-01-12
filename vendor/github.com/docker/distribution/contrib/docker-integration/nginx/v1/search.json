@@ -1,1 +1,0 @@
-{"num_pages":1,"num_results":2,"page":1,"page_size": 25,"query":"testsearch","results":[{"description":"","is_automated":false,"is_official":false,"is_trusted":false, "name":"dmcgowan/testsearch-1","star_count":1000},{"description":"Some automated build","is_automated":true,"is_official":false,"is_trusted":false,"name":"dmcgowan/testsearch-2","star_count":10}]}

@@ -1,5 +1,0 @@
-/*
-foo = "bar/*"
-*/
-
-bar = "value"

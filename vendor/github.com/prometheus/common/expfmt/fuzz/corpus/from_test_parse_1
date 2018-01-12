@@ -1,6 +1,0 @@
-
-minimal_metric 1.234
-another_metric -3e3 103948
-# Even that:
-no_labels{} 3
-# HELP line for non-existing metric will be ignored.

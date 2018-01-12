@@ -1,9 +1,0 @@
-[Unit]
-Description=OSD
-
-[Service]
-ExecStart=/usr/local/bin/osd -d -f /etc/sysconfig/osd/config.yaml
-Restart=on-failure
-
-[Install]
-WantedBy=multi-user.target

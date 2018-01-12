@@ -1,6 +1,0 @@
-[Unit]
-Description=starting a failed test
-
-[Service]
-ExecStartPre=/bin/false
-ExecStart=/bin/sleep 400

@@ -1,2 +1,0 @@
-Network tx and rx bytes should not be equal
-Network tx and rx packets should not be equal

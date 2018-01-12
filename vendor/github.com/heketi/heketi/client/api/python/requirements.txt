@@ -1,2 +1,0 @@
-pyjwt >= 1.4.0
-requests >= 2.9.0

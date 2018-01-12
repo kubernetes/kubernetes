@@ -1,8 +1,0 @@
-application: <your-app-id-here>
-version: v1
-runtime: go
-api_version: go1
-
-handlers:
-- url: /.*
-  script: _go_app

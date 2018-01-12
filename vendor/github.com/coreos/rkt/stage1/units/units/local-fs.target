@@ -1,4 +1,0 @@
-[Unit]
-Description=Hook into early systemd for socket-activated systemd instances
-DefaultDependencies=false
-Requires=sockets.target

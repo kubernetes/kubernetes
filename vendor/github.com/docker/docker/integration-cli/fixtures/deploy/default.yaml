@@ -1,9 +1,0 @@
-
-version: "3"
-services:
-  web:
-    image: busybox@sha256:e4f93f6ed15a0cdd342f5aae387886fba0ab98af0a102da6276eaf24d6e6ade0
-    command: top
-  db:
-    image: busybox@sha256:e4f93f6ed15a0cdd342f5aae387886fba0ab98af0a102da6276eaf24d6e6ade0
-    command: "tail -f /dev/null"

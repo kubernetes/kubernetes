@@ -1,7 +1,0 @@
-#darwin specific settings
-COMMANDS += containerd-shim
-
-# amd64 supports go test -race
-ifeq ($(GOARCH),amd64)
-	TESTFLAGS_RACE= -race
-endif

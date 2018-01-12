@@ -1,9 +1,0 @@
-PASS
-BenchmarkSafe	  500000	      6131 ns/op
-BenchmarkUsuallySafe	  200000	      7864 ns/op
-BenchmarkUnsafe	  100000	     28560 ns/op
-BenchmarkAllDWORD	   50000	     38722 ns/op
-BenchmarkAllOctal	   50000	     40941 ns/op
-BenchmarkAllHex	   50000	     44063 ns/op
-BenchmarkAllCombined	   50000	     33613 ns/op
-ok  	github.com/PuerkitoBio/purell	17.404s

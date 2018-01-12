@@ -1,4 +1,0 @@
-description: 'true'
-additionalProperties:
-  type: integer
-  format: int64

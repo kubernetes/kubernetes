@@ -1,5 +1,0 @@
----
-osd:
-  drivers:
-    btrfs:
-        home: "/var/lib/openstorage/btrfs"

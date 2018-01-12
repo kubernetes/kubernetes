@@ -1,4 +1,0 @@
-(from "ubuntu:14.04")
-(run "apt-get update && apt-get install libcap2-bin mumble-server -y")
-(add "./mumble-server.ini" "/etc/mumble-server.ini")
-(cmd "/usr/sbin/murmurd")

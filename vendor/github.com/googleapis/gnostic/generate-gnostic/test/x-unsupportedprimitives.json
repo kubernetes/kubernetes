@@ -1,8 +1,0 @@
-        {
-            "definitions": {
-                "SampleCompanyOnePrimitiveString": {
-                    "type": "unsupportedtype",
-                    "id": "x-samplecompanyone-mystr"
-                }
-            }
-        }

@@ -1,6 +1,0 @@
-[Unit]
-Description=Reboot
-DefaultDependencies=no
-Requires=systemd-reboot.service
-After=systemd-reboot.service
-AllowIsolate=yes

@@ -1,4 +1,0 @@
-package chrootarchive
-
-func init() {
-}

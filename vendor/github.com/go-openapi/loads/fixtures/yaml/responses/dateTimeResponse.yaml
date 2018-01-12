@@ -1,4 +1,0 @@
-description: 'A date-time response'
-schema:
-  type: string
-  format: date-time

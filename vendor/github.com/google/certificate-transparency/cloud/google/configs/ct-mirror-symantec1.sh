@@ -1,9 +1,0 @@
-export INSTANCE_TYPE="mirror"
-export PROJECT="ct-mirror-symantec1"
-export REGION="us-central1"
-export CLUSTER="ct-mirror-symantec1"
-export ZONES="b c f"
-export MIRROR_NUM_REPLICAS_PER_ZONE=2
-export MIRROR_TARGET_URL="https://ct.ws.symantec.com/"
-export MIRROR_TARGET_PUBLIC_KEY="symantec1.pem"
-export MONITORING="gcm"

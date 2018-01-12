@@ -1,4 +1,0 @@
-[Unit]
-Description=Exit the container
-DefaultDependencies=no
-AllowIsolate=yes

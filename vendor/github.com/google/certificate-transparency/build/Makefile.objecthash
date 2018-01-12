@@ -1,5 +1,0 @@
-all: test
-
-test:
-	# TODO(alcutter): Doesn't work because pkg-config in the objecthash doesn't know we need -ldl too.
-	# PKG_CONFIG_PATH="$(INSTALL_DIR)/lib/pkgconfig" $(MAKE) c CPPFLAGS="-I $(INSTALL_DIR)/include" LDFLAGS="-L $(INSTALL_DIR)/lib"

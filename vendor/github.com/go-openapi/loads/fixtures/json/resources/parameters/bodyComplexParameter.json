@@ -1,9 +1,0 @@
-{
-  "name": "user",
-  "in": "body",
-  "description": "user to add to the system",
-  "required": true,
-  "schema": {
-    "$ref": "User"
-  }
-}

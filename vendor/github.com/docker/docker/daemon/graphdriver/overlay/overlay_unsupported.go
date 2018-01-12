@@ -1,3 +1,0 @@
-// +build !linux
-
-package overlay

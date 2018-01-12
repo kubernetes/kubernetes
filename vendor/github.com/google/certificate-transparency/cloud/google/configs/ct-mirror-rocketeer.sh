@@ -1,9 +1,0 @@
-export INSTANCE_TYPE="mirror"
-export PROJECT="ct-mirror-rocketeer"
-export REGION="us-central1"
-export CLUSTER="ct-mirror-rocketeer"
-export ZONES="a b c"
-export MIRROR_NUM_REPLICAS_PER_ZONE=2
-export MIRROR_TARGET_URL="https://ct.googleapis.com/rocketeer"
-export MIRROR_TARGET_PUBLIC_KEY="rocketeer.pem"
-export MONITORING="gcm"

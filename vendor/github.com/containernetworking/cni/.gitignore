@@ -1,5 +1,0 @@
-bin/
-gopath/
-*.sw[ponm]
-.vagrant
-release-*

@@ -1,3 +1,0 @@
-Errors reading examples/errors/petstore-unresolvedrefs.yaml
-ERROR could not resolve #/definitions/Pet
-ERROR could not resolve #/definitions/Error

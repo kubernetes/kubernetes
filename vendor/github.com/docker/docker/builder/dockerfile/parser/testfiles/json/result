@@ -1,8 +1,0 @@
-(cmd)
-(cmd "")
-(cmd "a")
-(cmd "a" "b")
-(cmd "a" "b")
-(cmd "a" "b")
-(cmd "a" "b")
-(cmd "abc 123" "♥" "☃" "\" \\ / \b \f \n \r \t \x00")

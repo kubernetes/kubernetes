@@ -1,5 +1,0 @@
-{
-  "$ref": "Foo",
-  "description": "a boolean",
-  "readOnly": true
-}

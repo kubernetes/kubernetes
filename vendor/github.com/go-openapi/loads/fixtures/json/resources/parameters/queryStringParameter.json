@@ -1,8 +1,0 @@
-{
-  "name": "id",
-  "in": "query",
-  "description": "ID of the object to fetch",
-  "required": true,
-  "type": "integer",
-  "format": "int64"
-}

@@ -1,9 +1,0 @@
-{
-  "description": "A complex object array response",
-  "schema": {
-    "type": "array",
-    "items": {
-      "$ref": "VeryComplexType"
-    }
-  }
-}

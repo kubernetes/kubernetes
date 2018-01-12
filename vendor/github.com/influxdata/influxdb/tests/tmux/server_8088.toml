@@ -1,7 +1,0 @@
-[broker]
-dir  = "/tmp/influxdb/8088/broker"
-port = 8088
-
-[data]
-dir  = "/tmp/influxdb/8088/data"
-port = 8088

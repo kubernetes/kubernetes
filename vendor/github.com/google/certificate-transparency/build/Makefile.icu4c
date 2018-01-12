@@ -1,9 +1,0 @@
-all: Makefile
-	$(MAKE) install
-
-Makefile: configure
-	EXTRA_LDFLAGS="-ldl"
-	./configure --prefix=$(INSTALL_DIR) --disable-shared --enable-static CPPFLAGS="-I${INSTALL_DIR}/include" LDFLAGS="-L${INSTALL_DIR}/lib ${EXTRA_LDFLAGS}" CXXFLAGS="$(WARN_OVERRIDES) -fPIC" CFLAGS="$(WARN_OVERRIDES) -fPIC"
-
-configure: configure.ac
-	autoreconf -vi

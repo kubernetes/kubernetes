@@ -1,9 +1,0 @@
-type: object
-allOf:
-  - $ref: 'Pet.yaml'
-  - required:
-      - name
-    properties:
-      description:
-        type: integer
-        format: int64

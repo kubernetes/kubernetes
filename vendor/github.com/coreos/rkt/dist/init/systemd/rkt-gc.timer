@@ -1,9 +1,0 @@
-[Unit]
-Description=Periodic Garbage Collection for rkt
-
-[Timer]
-OnActiveSec=0s
-OnUnitActiveSec=12h
-
-[Install]
-WantedBy=default.target

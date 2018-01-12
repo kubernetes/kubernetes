@@ -1,5 +1,0 @@
-resource = [{
-	foo = [{
-		bar = {}
-	}]
-}]

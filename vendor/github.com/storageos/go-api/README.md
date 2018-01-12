@@ -1,2 +1,0 @@
-# StorageOS API client library
-

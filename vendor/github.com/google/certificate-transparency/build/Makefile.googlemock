@@ -1,4 +1,0 @@
-all: configure
-
-configure: configure.ac
-	autoreconf -vi

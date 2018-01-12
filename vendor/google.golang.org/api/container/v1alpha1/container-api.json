@@ -1,7 +1,0 @@
-{
-  "error": {
-    "code": 404,
-    "message": "Discovery document not found for API service: container.googleapis.com format: rest version: v1alpha1",
-    "status": "NOT_FOUND"
-  }
-}

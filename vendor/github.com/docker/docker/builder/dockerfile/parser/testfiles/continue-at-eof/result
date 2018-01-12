@@ -1,2 +1,0 @@
-(from "alpine:3.5")
-(run "something")

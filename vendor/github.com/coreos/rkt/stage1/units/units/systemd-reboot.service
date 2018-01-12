@@ -1,7 +1,0 @@
-[Unit]
-Description=Reboot
-DefaultDependencies=no
-
-[Service]
-Type=oneshot
-ExecStart=/usr/bin/systemctl --force reboot

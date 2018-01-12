@@ -1,2 +1,0 @@
-systemd-tmpfiles --create /usr/lib/tmpfiles.d/rkt.conf
-systemctl daemon-reload || true

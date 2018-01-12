@@ -1,4 +1,0 @@
-description: 'A string array response'
-schema:
-  type: array
-  items: {type: string}

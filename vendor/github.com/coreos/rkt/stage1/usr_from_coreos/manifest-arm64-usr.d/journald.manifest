@@ -1,5 +1,0 @@
-lib/systemd/system/syslog.socket
-lib/systemd/system/systemd-journald-audit.socket
-lib/systemd/system/systemd-journald-dev-log.socket
-lib/systemd/system/systemd-journald.service
-lib/systemd/system/systemd-journald.socket

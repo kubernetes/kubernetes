@@ -1,2 +1,0 @@
-Schema SampleCompanyOnePrimitiveString has type 'unsupportedtype' which is not supported. Supported primitive types are [boolean integer number string].
-

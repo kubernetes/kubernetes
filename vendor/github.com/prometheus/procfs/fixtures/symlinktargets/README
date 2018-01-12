@@ -1,2 +1,0 @@
-This directory contains some empty files that are the symlinks the files in the "fd" directory point to.
-They are otherwise ignored by the tests

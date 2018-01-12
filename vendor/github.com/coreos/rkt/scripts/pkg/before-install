@@ -1,2 +1,0 @@
-groupadd --force --system rkt-admin
-groupadd --force --system rkt

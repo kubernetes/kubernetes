@@ -1,5 +1,0 @@
-
-.PHONY:
-prep:
-	glide install
-

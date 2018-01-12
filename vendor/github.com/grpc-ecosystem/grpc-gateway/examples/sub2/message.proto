@@ -1,7 +1,0 @@
-syntax = "proto3";
-option go_package = "github.com/grpc-ecosystem/grpc-gateway/examples/sub2";
-package sub2;
-
-message IdMessage {
-	string uuid = 1;
-}

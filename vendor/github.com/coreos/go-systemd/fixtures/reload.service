@@ -1,6 +1,0 @@
-[Unit]
-Description=reload test
-
-[Service]
-ExecStart=/bin/bash -c "trap '' HUP; /bin/sleep 400"
-ExecReload=-/bin/systemctl kill -s HUP reload.service

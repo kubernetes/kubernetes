@@ -1,2 +1,0 @@
-// gophercloud
-package testing

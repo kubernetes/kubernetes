@@ -1,5 +1,0 @@
-name: username
-in: path
-description: 'username to fetch'
-required: true
-type: string

@@ -1,4 +1,0 @@
-This directory holds programs from
-"The Computer Language Benchmarks Game".
-They used to be in the main Go distribution in test/bench/shootout
-but are now only of historical value.

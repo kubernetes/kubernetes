@@ -1,5 +1,0 @@
-vendor/pkg
-/runc
-contrib/cmd/recvtty/recvtty
-man/man8
-release

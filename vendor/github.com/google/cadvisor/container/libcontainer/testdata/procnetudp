@@ -1,3 +1,0 @@
-  sl  local_address rem_address   st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode ref pointer drops             
-  1: 00000000:07D3 00000000:0000 07 00000000:00000000 00:00000000 00000000     0        0 16583 2 ffff8800b4549400 0         
-  21: 00000000:A841 00000000:0000 07 0000000A:0000000B 00:00000000 00000000  1000        0 114299623 2 ffff880338477800 4     

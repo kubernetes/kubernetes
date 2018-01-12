@@ -1,6 +1,0 @@
-sudo: false
-
-language: go
-go:
-  - 1.7.5
-  - tip

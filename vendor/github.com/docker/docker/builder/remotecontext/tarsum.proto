@@ -1,7 +1,0 @@
-syntax = "proto3";
-
-package remotecontext; // no namespace because only used internally
-
-message TarsumBackup {
-  map<string, string> Hashes = 1;
-}

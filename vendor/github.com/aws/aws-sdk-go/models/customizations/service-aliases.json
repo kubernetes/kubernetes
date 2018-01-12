@@ -1,5 +1,0 @@
-{
-	"elasticloadbalancing": "ELB",
-	"elasticloadbalancingv2": "ELBV2",
-	"config": "ConfigService"
-}

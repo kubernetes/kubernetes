@@ -1,9 +1,0 @@
-description: "This is a Map[String, { id: Long, name: String}]"
-additionalProperties:
-  type: "object"
-  properties:
-    id:
-      type: "integer"
-      format: "int64"
-    name:
-      type: "string"

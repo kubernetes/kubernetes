@@ -1,9 +1,0 @@
-{
-  "id": "http://localhost:1234",
-  "items": {
-    "id": "deeper/",
-    "items": {
-      "$ref": "arrayProp.json#/items"
-    }
-  }
-}
