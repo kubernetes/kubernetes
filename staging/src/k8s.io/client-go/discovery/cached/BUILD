@@ -22,7 +22,6 @@ go_library(
     srcs = ["memcache.go"],
     importpath = "k8s.io/client-go/discovery/cached",
     deps = [
-        "//vendor/github.com/googleapis/gnostic/OpenAPIv2:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/version:go_default_library",

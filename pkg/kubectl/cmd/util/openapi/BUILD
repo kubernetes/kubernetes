@@ -17,6 +17,7 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi",
     deps = [
         "//vendor/github.com/go-openapi/spec:go_default_library",
+        "//vendor/github.com/golang/protobuf/proto:go_default_library",
         "//vendor/github.com/googleapis/gnostic/OpenAPIv2:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//vendor/k8s.io/client-go/discovery:go_default_library",

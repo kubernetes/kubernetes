@@ -21,8 +21,6 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/googleapis/gnostic/OpenAPIv2"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/version"
@@ -112,10 +110,6 @@ func (d *memCacheClient) ServerPreferredNamespacedResources() ([]*metav1.APIReso
 
 func (d *memCacheClient) ServerVersion() (*version.Info, error) {
 	return d.delegate.ServerVersion()
-}
-
-func (d *memCacheClient) OpenAPISchema() (*openapi_v2.Document, error) {
-	return d.delegate.OpenAPISchema()
 }
 
 func (d *memCacheClient) Fresh() bool {

@@ -25,7 +25,6 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	"github.com/googleapis/gnostic/OpenAPIv2"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -229,10 +228,6 @@ func (d *CachedDiscoveryClient) ServerPreferredNamespacedResources() ([]*metav1.
 
 func (d *CachedDiscoveryClient) ServerVersion() (*version.Info, error) {
 	return d.delegate.ServerVersion()
-}
-
-func (d *CachedDiscoveryClient) OpenAPISchema() (*openapi_v2.Document, error) {
-	return d.delegate.OpenAPISchema()
 }
 
 func (d *CachedDiscoveryClient) Fresh() bool {

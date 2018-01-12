@@ -19,8 +19,6 @@ package fake
 import (
 	"fmt"
 
-	"github.com/googleapis/gnostic/OpenAPIv2"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/version"
@@ -120,10 +118,6 @@ func (c *FakeDiscovery) ServerVersion() (*version.Info, error) {
 
 	versionInfo := kubeversion.Get()
 	return &versionInfo, nil
-}
-
-func (c *FakeDiscovery) OpenAPISchema() (*openapi_v2.Document, error) {
-	return &openapi_v2.Document{}, nil
 }
 
 func (c *FakeDiscovery) RESTClient() restclient.Interface {
