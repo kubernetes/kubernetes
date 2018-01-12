@@ -151,6 +151,7 @@ var (
 		"CgroupDriver",
 		"CgroupRoot",
 		"CgroupsPerQOS",
+		"CloudProvider",
 		"ClusterDNS[*]",
 		"ClusterDomain",
 		"ConfigTrialDuration.Duration",

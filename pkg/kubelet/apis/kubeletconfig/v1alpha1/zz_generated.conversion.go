@@ -186,6 +186,7 @@ func autoConvert_v1alpha1_KubeletConfiguration_To_kubeletconfig_KubeletConfigura
 	if err := v1.Convert_Pointer_int32_To_int32(&in.OOMScoreAdj, &out.OOMScoreAdj, s); err != nil {
 		return err
 	}
+	out.CloudProvider = in.CloudProvider
 	out.ClusterDomain = in.ClusterDomain
 	out.ClusterDNS = *(*[]string)(unsafe.Pointer(&in.ClusterDNS))
 	out.StreamingConnectionIdleTimeout = in.StreamingConnectionIdleTimeout
@@ -307,6 +308,7 @@ func autoConvert_kubeletconfig_KubeletConfiguration_To_v1alpha1_KubeletConfigura
 	if err := v1.Convert_int32_To_Pointer_int32(&in.OOMScoreAdj, &out.OOMScoreAdj, s); err != nil {
 		return err
 	}
+	out.CloudProvider = in.CloudProvider
 	out.ClusterDomain = in.ClusterDomain
 	out.ClusterDNS = *(*[]string)(unsafe.Pointer(&in.ClusterDNS))
 	out.StreamingConnectionIdleTimeout = in.StreamingConnectionIdleTimeout
