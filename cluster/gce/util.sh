@@ -3111,4 +3111,5 @@ function ssh-to-node() {
 # Perform preparations required to run e2e tests
 function prepare-e2e() {
   detect-project
+  detect-subnetworks
 }

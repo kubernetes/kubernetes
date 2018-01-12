@@ -184,6 +184,7 @@ type CloudConfig struct {
 	ClusterIPRange    string
 	ClusterTag        string
 	Network           string
+	Subnetwork        string
 	ConfigFile        string // for azure and openstack
 	NodeTag           string
 	MasterTag         string
@@ -267,6 +268,7 @@ func RegisterClusterFlags() {
 	flag.StringVar(&cloudConfig.Cluster, "gke-cluster", "", "GKE name of cluster being used, if applicable")
 	flag.StringVar(&cloudConfig.NodeInstanceGroup, "node-instance-group", "", "Name of the managed instance group for nodes. Valid only for gce, gke or aws. If there is more than one group: comma separated list of groups.")
 	flag.StringVar(&cloudConfig.Network, "network", "e2e", "The cloud provider network for this e2e cluster.")
+	flag.StringVar(&cloudConfig.Subnetwork, "subnetwork", "", "The cloud provider subnetwork for this e2e cluster.")
 	flag.IntVar(&cloudConfig.NumNodes, "num-nodes", -1, "Number of nodes in the cluster")
 	flag.StringVar(&cloudConfig.ClusterIPRange, "cluster-ip-range", "10.64.0.0/14", "A CIDR notation IP range from which to assign IPs in the cluster.")
 	flag.StringVar(&cloudConfig.NodeTag, "node-tag", "", "Network tags used on node instances. Valid only for gce, gke")

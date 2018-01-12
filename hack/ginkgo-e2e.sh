@@ -157,6 +157,7 @@ export PATH=$(dirname "${e2e_test}"):"${PATH}"
   --node-instance-group="${NODE_INSTANCE_GROUP:-}" \
   --prefix="${KUBE_GCE_INSTANCE_PREFIX:-e2e}" \
   --network="${KUBE_GCE_NETWORK:-${KUBE_GKE_NETWORK:-e2e}}" \
+  --subnetwork="${SUBNETWORK:-}" \
   --node-tag="${NODE_TAG:-}" \
   --master-tag="${MASTER_TAG:-}" \
   --cluster-monitoring-mode="${KUBE_ENABLE_CLUSTER_MONITORING:-standalone}" \
