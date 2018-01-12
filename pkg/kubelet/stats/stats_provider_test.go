@@ -71,6 +71,7 @@ func TestGetCgroupStats(t *testing.T) {
 	const (
 		cgroupName        = "test-cgroup-name"
 		containerInfoSeed = 1000
+		updateStats       = false
 	)
 	var (
 		mockCadvisor     = new(cadvisortest.Mock)
@@ -87,7 +88,7 @@ func TestGetCgroupStats(t *testing.T) {
 	mockCadvisor.On("ContainerInfoV2", cgroupName, options).Return(containerInfoMap, nil)
 
 	provider := newStatsProvider(mockCadvisor, mockPodManager, mockRuntimeCache, fakeContainerStatsProvider{})
-	cs, ns, err := provider.GetCgroupStats(cgroupName)
+	cs, ns, err := provider.GetCgroupStats(cgroupName, updateStats)
 	assert.NoError(err)
 
 	checkCPUStats(t, "", containerInfoSeed, cs.CPU)
@@ -599,8 +600,8 @@ type fakeResourceAnalyzer struct {
 	podVolumeStats serverstats.PodVolumeStats
 }
 
-func (o *fakeResourceAnalyzer) Start()                          {}
-func (o *fakeResourceAnalyzer) Get() (*statsapi.Summary, error) { return nil, nil }
+func (o *fakeResourceAnalyzer) Start()                              {}
+func (o *fakeResourceAnalyzer) Get(bool) (*statsapi.Summary, error) { return nil, nil }
 func (o *fakeResourceAnalyzer) GetPodVolumeStats(uid types.UID) (serverstats.PodVolumeStats, bool) {
 	return o.podVolumeStats, true
 }
