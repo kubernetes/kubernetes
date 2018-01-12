@@ -22,6 +22,7 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"github.com/prometheus/common/model"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -165,6 +166,145 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 		framework.Logf("Deleting pod %q/%q", pod.Namespace, pod.Name)
 		framework.ExpectNoError(framework.DeletePodWithWait(f, c, pod))
 	})
+
+	// Test for pv controller metrics, concretely: bound/unbound pv/pvc count.
+	Describe("PVController", func() {
+		const (
+			classKey     = "storage_class"
+			namespaceKey = "namespace"
+
+			boundPVKey    = "pv_collector_bound_pv_count"
+			unboundPVKey  = "pv_collector_unbound_pv_count"
+			boundPVCKey   = "pv_collector_bound_pvc_count"
+			unboundPVCKey = "pv_collector_unbound_pvc_count"
+		)
+
+		var (
+			pv  *v1.PersistentVolume
+			pvc *v1.PersistentVolumeClaim
+
+			className = "bound-unbound-count-test-sc"
+			pvConfig  = framework.PersistentVolumeConfig{
+				PVSource: v1.PersistentVolumeSource{
+					HostPath: &v1.HostPathVolumeSource{Path: "/data"},
+				},
+				NamePrefix:       "pv-test-",
+				StorageClassName: className,
+			}
+			pvcConfig = framework.PersistentVolumeClaimConfig{StorageClassName: &className}
+
+			metrics = []struct {
+				name      string
+				dimension string
+			}{
+				{boundPVKey, classKey},
+				{unboundPVKey, classKey},
+				{boundPVCKey, namespaceKey},
+				{unboundPVCKey, namespaceKey},
+			}
+
+			// Original metric values before we create any PV/PVCs. The length should be 4,
+			// and the elements should be bound pv count, unbound pv count, bound pvc count,
+			// unbound pvc count in turn.
+			// We use these values to calculate relative increment of each test.
+			originMetricValues []map[string]int64
+		)
+
+		// validator used to validate each metric's values, the length of metricValues
+		// should be 4, and the elements should be bound pv count, unbound pv count, bound
+		// pvc count, unbound pvc count in turn.
+		validator := func(metricValues []map[string]int64) {
+			Expect(len(metricValues)).To(Equal(4),
+				"Wrong metric size: %d", len(metricValues))
+
+			controllerMetrics, err := metricsGrabber.GrabFromControllerManager()
+			Expect(err).NotTo(HaveOccurred(), "Error getting c-m metricValues: %v", err)
+
+			for i, metric := range metrics {
+				expectValues := metricValues[i]
+				if expectValues == nil {
+					expectValues = make(map[string]int64)
+				}
+				// We using relative increment value instead of absolute value to reduce unexpected flakes.
+				// Concretely, we expect the difference of the updated values and original values for each
+				// test suit are equal to expectValues.
+				actualValues := calculateRelativeValues(originMetricValues[i],
+					getPVControllerMetrics(controllerMetrics, metric.name, metric.dimension))
+				Expect(actualValues).To(Equal(expectValues),
+					"Wrong pv controller metric %s(%s): wanted %v, got %v",
+					metric.name, metric.dimension, expectValues, actualValues)
+			}
+		}
+
+		BeforeEach(func() {
+			pv = framework.MakePersistentVolume(pvConfig)
+			pvc = framework.MakePersistentVolumeClaim(pvcConfig, ns)
+
+			// Initializes all original metric values.
+			controllerMetrics, err := metricsGrabber.GrabFromControllerManager()
+			Expect(err).NotTo(HaveOccurred(), "Error getting c-m metricValues: %v", err)
+			for _, metric := range metrics {
+				originMetricValues = append(originMetricValues,
+					getPVControllerMetrics(controllerMetrics, metric.name, metric.dimension))
+			}
+		})
+
+		AfterEach(func() {
+			if err := framework.DeletePersistentVolume(c, pv.Name); err != nil {
+				framework.Failf("Error deleting pv: %v", err)
+			}
+			if err := framework.DeletePersistentVolumeClaim(c, pvc.Name, pvc.Namespace); err != nil {
+				framework.Failf("Error deleting pvc: %v", err)
+			}
+
+			// Clear original metric values.
+			originMetricValues = nil
+		})
+
+		It("should create none metrics for pvc controller before creating any PV or PVC", func() {
+			if !metricsGrabber.HasRegisteredMaster() {
+				framework.Skipf("Environment does not support getting controller-manager metrics - skipping")
+			}
+			validator([]map[string]int64{nil, nil, nil, nil})
+		})
+
+		It("should create unbound pv count metrics for pvc controller after creating pv only",
+			func() {
+				var err error
+				if !metricsGrabber.HasRegisteredMaster() {
+					framework.Skipf("Environment does not support getting controller-manager metrics - skipping")
+				}
+				pv, err = framework.CreatePV(c, pv)
+				Expect(err).NotTo(HaveOccurred(), "Error creating pv: %v", err)
+				waitForPVControllerSync(metricsGrabber, unboundPVKey, classKey)
+				validator([]map[string]int64{nil, {className: 1}, nil, nil})
+			})
+
+		It("should create unbound pvc count metrics for pvc controller after creating pvc only",
+			func() {
+				var err error
+				if !metricsGrabber.HasRegisteredMaster() {
+					framework.Skipf("Environment does not support getting controller-manager metrics - skipping")
+				}
+				pvc, err = framework.CreatePVC(c, ns, pvc)
+				Expect(err).NotTo(HaveOccurred(), "Error creating pvc: %v", err)
+				waitForPVControllerSync(metricsGrabber, unboundPVCKey, namespaceKey)
+				validator([]map[string]int64{nil, nil, nil, {ns: 1}})
+			})
+
+		It("should create bound pv/pvc count metrics for pvc controller after creating both pv and pvc",
+			func() {
+				var err error
+				if !metricsGrabber.HasRegisteredMaster() {
+					framework.Skipf("Environment does not support getting controller-manager metrics - skipping")
+				}
+				pv, pvc, err = framework.CreatePVPVC(c, pvConfig, pvcConfig, ns, true)
+				Expect(err).NotTo(HaveOccurred(), "Error creating pv pvc: %v", err)
+				waitForPVControllerSync(metricsGrabber, boundPVKey, classKey)
+				validator([]map[string]int64{{className: 1}, nil, {ns: 1}, nil})
+
+			})
+	})
 })
 
 func waitForDetachAndGrabMetrics(oldMetrics map[string]int64, metricsGrabber *metrics.MetricsGrabber) map[string]int64 {
@@ -269,4 +409,52 @@ func findVolumeStatMetric(metricKeyName string, namespace string, pvcName string
 	}
 	Expect(errCount).To(Equal(0), "Found invalid samples")
 	return found
+}
+
+// Wait for the count of a pv controller's metric specified by metricName and dimension bigger than zero.
+func waitForPVControllerSync(metricsGrabber *metrics.MetricsGrabber, metricName, dimension string) {
+	backoff := wait.Backoff{
+		Duration: 10 * time.Second,
+		Factor:   1.2,
+		Steps:    21,
+	}
+	verifyMetricFunc := func() (bool, error) {
+		updatedMetrics, err := metricsGrabber.GrabFromControllerManager()
+		if err != nil {
+			framework.Logf("Error fetching controller-manager metrics")
+			return false, err
+		}
+		return len(getPVControllerMetrics(updatedMetrics, metricName, dimension)) > 0, nil
+	}
+	waitErr := wait.ExponentialBackoff(backoff, verifyMetricFunc)
+	Expect(waitErr).NotTo(HaveOccurred(),
+		"Timeout error fetching pv controller metrics : %v", waitErr)
+}
+
+func getPVControllerMetrics(ms metrics.ControllerManagerMetrics, metricName, dimension string) map[string]int64 {
+	result := make(map[string]int64)
+	for method, samples := range ms {
+		if method != metricName {
+			continue
+		}
+		for _, sample := range samples {
+			count := int64(sample.Value)
+			dimensionName := string(sample.Metric[model.LabelName(dimension)])
+			result[dimensionName] = count
+		}
+	}
+	return result
+}
+
+func calculateRelativeValues(originValues, updatedValues map[string]int64) map[string]int64 {
+	relativeValues := make(map[string]int64)
+	for key, value := range updatedValues {
+		relativeValues[key] = value - originValues[key]
+	}
+	for key, value := range originValues {
+		if _, exist := updatedValues[key]; !exist {
+			relativeValues[key] = -value
+		}
+	}
+	return relativeValues
 }
