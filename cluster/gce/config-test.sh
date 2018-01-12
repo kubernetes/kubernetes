@@ -383,6 +383,10 @@ ENABLE_DEFAULT_STORAGE_CLASS="${ENABLE_DEFAULT_STORAGE_CLASS:-true}"
 # Upgrade test jobs that go from a version < 1.6 to a version >= 1.6 should override this to be true.
 ENABLE_LEGACY_ABAC="${ENABLE_LEGACY_ABAC:-false}" # true, false
 
+# Optional: Enable insecure localhost port
+# Disabling this by default in tests ensures default configurations work without the insecure port enabled
+ENABLE_INSECURE_PORT="${ENABLE_INSECURE_PORT:-false}" # true, false
+
 # TODO(dawn1107): Remove this once the flag is built into CVM image.
 # Kernel panic upon soft lockup issue
 SOFTLOCKUP_PANIC="${SOFTLOCKUP_PANIC:-true}" # true, false
