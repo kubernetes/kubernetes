@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	clientset "k8s.io/client-go/kubernetes"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/util/mount"
@@ -406,17 +407,18 @@ func (plugin *glusterfsPlugin) newProvisionerInternal(options volume.VolumeOptio
 }
 
 type provisionerConfig struct {
-	url             string
-	user            string
-	userKey         string
-	secretNamespace string
-	secretName      string
-	secretValue     string
-	clusterID       string
-	gidMin          int
-	gidMax          int
-	volumeType      gapi.VolumeDurabilityInfo
-	volumeOptions   []string
+	url              string
+	user             string
+	userKey          string
+	secretNamespace  string
+	secretName       string
+	secretValue      string
+	clusterID        string
+	gidMin           int
+	gidMax           int
+	volumeType       gapi.VolumeDurabilityInfo
+	volumeOptions    []string
+	volumeNamePrefix string
 }
 
 type glusterfsVolumeProvisioner struct {
@@ -743,6 +745,7 @@ func (p *glusterfsVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
 
 func (p *glusterfsVolumeProvisioner) CreateVolume(gid int) (r *v1.GlusterfsVolumeSource, size int, volID string, err error) {
 	var clusterIDs []string
+	customVolumeName := ""
 	capacity := p.options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
 	// Glusterfs creates volumes in units of GiB, but heketi documentation incorrectly reports GBs
 	sz := int(volume.RoundUpToGiB(capacity))
@@ -760,8 +763,13 @@ func (p *glusterfsVolumeProvisioner) CreateVolume(gid int) (r *v1.GlusterfsVolum
 		clusterIDs = dstrings.Split(p.clusterID, ",")
 		glog.V(4).Infof("provided clusterIDs: %v", clusterIDs)
 	}
+
+	if p.provisionerConfig.volumeNamePrefix != "" {
+		customVolumeName = fmt.Sprintf("%s_%s_%s", p.provisionerConfig.volumeNamePrefix, p.options.PVC.Name, uuid.NewUUID())
+	}
+
 	gid64 := int64(gid)
-	volumeReq := &gapi.VolumeCreateRequest{Size: sz, Clusters: clusterIDs, Gid: gid64, Durability: p.volumeType, GlusterVolumeOptions: p.volumeOptions}
+	volumeReq := &gapi.VolumeCreateRequest{Size: sz, Name: customVolumeName, Clusters: clusterIDs, Gid: gid64, Durability: p.volumeType, GlusterVolumeOptions: p.volumeOptions}
 	volume, err := cli.VolumeCreate(volumeReq)
 	if err != nil {
 		glog.Errorf("error creating volume %v ", err)
@@ -927,6 +935,7 @@ func parseClassParameters(params map[string]string, kubeClient clientset.Interfa
 	authEnabled := true
 	parseVolumeType := ""
 	parseVolumeOptions := ""
+	parseVolumeNamePrefix := ""
 
 	for k, v := range params {
 		switch dstrings.ToLower(k) {
@@ -977,7 +986,10 @@ func parseClassParameters(params map[string]string, kubeClient clientset.Interfa
 			if len(v) != 0 {
 				parseVolumeOptions = v
 			}
-
+		case "volumenameprefix":
+			if len(v) != 0 {
+				parseVolumeNamePrefix = v
+			}
 		default:
 			return nil, fmt.Errorf("invalid option %q for volume plugin %s", k, glusterfsPluginName)
 		}
@@ -1056,6 +1068,13 @@ func parseClassParameters(params map[string]string, kubeClient clientset.Interfa
 		}
 		cfg.volumeOptions = volOptions
 
+	}
+
+	if len(parseVolumeNamePrefix) != 0 {
+		if dstrings.Contains(parseVolumeNamePrefix, "_") {
+			return nil, fmt.Errorf("Storageclass parameter 'volumenameprefix' should not contain '_' in its value")
+		}
+		cfg.volumeNamePrefix = parseVolumeNamePrefix
 	}
 	return &cfg, nil
 }
