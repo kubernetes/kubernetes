@@ -66,6 +66,7 @@ func TestPodAdmission(t *testing.T) {
 		mergedNodeSelector              labels.Set
 		ignoreTestNamespaceNodeSelector bool
 		admit                           bool
+		validate                        bool
 		testName                        string
 	}{
 		{
@@ -74,6 +75,7 @@ func TestPodAdmission(t *testing.T) {
 			mergedNodeSelector:              labels.Set{},
 			ignoreTestNamespaceNodeSelector: true,
 			admit:    true,
+			validate: true,
 			testName: "No node selectors",
 		},
 		{
@@ -82,6 +84,7 @@ func TestPodAdmission(t *testing.T) {
 			mergedNodeSelector:              labels.Set{"infra": "false"},
 			ignoreTestNamespaceNodeSelector: true,
 			admit:    true,
+			validate: true,
 			testName: "Default node selector and no conflicts",
 		},
 		{
@@ -90,6 +93,7 @@ func TestPodAdmission(t *testing.T) {
 			podNodeSelector:       map[string]string{},
 			mergedNodeSelector:    labels.Set{"infra": "false"},
 			admit:                 true,
+			validate:              true,
 			testName:              "TestNamespace node selector with whitespaces and no conflicts",
 		},
 		{
@@ -98,6 +102,7 @@ func TestPodAdmission(t *testing.T) {
 			podNodeSelector:       map[string]string{},
 			mergedNodeSelector:    labels.Set{"infra": "true"},
 			admit:                 true,
+			validate:              true,
 			testName:              "Default and namespace node selector, no conflicts",
 		},
 		{
@@ -106,6 +111,7 @@ func TestPodAdmission(t *testing.T) {
 			podNodeSelector:       map[string]string{},
 			mergedNodeSelector:    labels.Set{},
 			admit:                 true,
+			validate:              true,
 			testName:              "Empty namespace node selector and no conflicts",
 		},
 		{
@@ -114,6 +120,7 @@ func TestPodAdmission(t *testing.T) {
 			podNodeSelector:       map[string]string{"env": "test"},
 			mergedNodeSelector:    labels.Set{"infra": "true", "env": "test"},
 			admit:                 true,
+			validate:              true,
 			testName:              "TestNamespace and pod node selector, no conflicts",
 		},
 		{
@@ -137,6 +144,7 @@ func TestPodAdmission(t *testing.T) {
 			podNodeSelector:       map[string]string{"env": "dev", "color": "blue"},
 			mergedNodeSelector:    labels.Set{"infra": "false", "env": "dev", "color": "blue"},
 			admit:                 true,
+			validate:              true,
 			testName:              "Merged pod node selectors satisfy the whitelist",
 		},
 		{
@@ -144,7 +152,8 @@ func TestPodAdmission(t *testing.T) {
 			namespaceNodeSelector: "infra=false, env = dev",
 			whitelist:             "env=dev, infra=true, color=blue",
 			podNodeSelector:       map[string]string{"env": "dev", "color": "blue"},
-			admit:                 false,
+			admit:                 true,
+			validate:              false,
 			testName:              "Merged pod node selectors conflict with the whitelist",
 		},
 		{
@@ -152,7 +161,8 @@ func TestPodAdmission(t *testing.T) {
 			ignoreTestNamespaceNodeSelector: true,
 			whitelist:                       "env=prd",
 			podNodeSelector:                 map[string]string{},
-			admit:                           false,
+			admit:                           true,
+			validate:                        false,
 			testName:                        "Default node selector conflict with the whitelist",
 		},
 	}
@@ -172,14 +182,16 @@ func TestPodAdmission(t *testing.T) {
 		} else if !test.admit && err == nil {
 			t.Errorf("Test: %s, expected an error", test.testName)
 		}
-		if test.admit && !labels.Equals(test.mergedNodeSelector, labels.Set(pod.Spec.NodeSelector)) {
-			t.Errorf("Test: %s, expected: %s but got: %s", test.testName, test.mergedNodeSelector, pod.Spec.NodeSelector)
-		}
-		err = handler.Validate(admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), "testNamespace", namespace.ObjectMeta.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, nil))
-		if test.admit && err != nil {
-			t.Errorf("Test: %s, expected no error but got: %s", test.testName, err)
-		} else if !test.admit && err == nil {
-			t.Errorf("Test: %s, expected an error", test.testName)
+		if test.admit {
+			err = handler.Validate(admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), "testNamespace", namespace.ObjectMeta.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, nil))
+			if test.validate && err != nil {
+				t.Errorf("Test: %s, expected no error but got: %s", test.testName, err)
+			} else if !test.validate && err == nil {
+				t.Errorf("Test: %s, expected an error", test.testName)
+			}
+			if test.validate && !labels.Equals(test.mergedNodeSelector, labels.Set(pod.Spec.NodeSelector)) {
+				t.Errorf("Test: %s, expected: %s but got: %s", test.testName, test.mergedNodeSelector, pod.Spec.NodeSelector)
+			}
 		}
 
 		// handles update of uninitialized pod like it's newly created.
@@ -189,14 +201,16 @@ func TestPodAdmission(t *testing.T) {
 		} else if !test.admit && err == nil {
 			t.Errorf("Test: %s, expected an error", test.testName)
 		}
-		if test.admit && !labels.Equals(test.mergedNodeSelector, labels.Set(pod.Spec.NodeSelector)) {
-			t.Errorf("Test: %s, expected: %s but got: %s", test.testName, test.mergedNodeSelector, pod.Spec.NodeSelector)
-		}
-		err = handler.Validate(admission.NewAttributesRecord(pod, &oldPod, api.Kind("Pod").WithVersion("version"), "testNamespace", namespace.ObjectMeta.Name, api.Resource("pods").WithVersion("version"), "", admission.Update, nil))
-		if test.admit && err != nil {
-			t.Errorf("Test: %s, expected no error but got: %s", test.testName, err)
-		} else if !test.admit && err == nil {
-			t.Errorf("Test: %s, expected an error", test.testName)
+		if test.admit {
+			err = handler.Validate(admission.NewAttributesRecord(pod, &oldPod, api.Kind("Pod").WithVersion("version"), "testNamespace", namespace.ObjectMeta.Name, api.Resource("pods").WithVersion("version"), "", admission.Update, nil))
+			if test.validate && err != nil {
+				t.Errorf("Test: %s, expected no error but got: %s", test.testName, err)
+			} else if !test.validate && err == nil {
+				t.Errorf("Test: %s, expected an error", test.testName)
+			}
+			if test.validate && !labels.Equals(test.mergedNodeSelector, labels.Set(pod.Spec.NodeSelector)) {
+				t.Errorf("Test: %s, expected: %s but got: %s", test.testName, test.mergedNodeSelector, pod.Spec.NodeSelector)
+			}
 		}
 	}
 }
