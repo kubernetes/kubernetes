@@ -78,7 +78,7 @@ func (sched *Scheduler) StopEverything() {
 // factory.go.
 type Configurator interface {
 	GetPriorityFunctionConfigs(priorityKeys sets.String) ([]algorithm.PriorityConfig, error)
-	GetPriorityMetadataProducer() (algorithm.MetadataProducer, error)
+	GetPriorityMetadataProducer() (algorithm.PriorityMetadataProducer, error)
 	GetPredicateMetadataProducer() (algorithm.PredicateMetadataProducer, error)
 	GetPredicates(predicateKeys sets.String) (map[string]algorithm.FitPredicate, error)
 	GetHardPodAffinitySymmetricWeight() int32
