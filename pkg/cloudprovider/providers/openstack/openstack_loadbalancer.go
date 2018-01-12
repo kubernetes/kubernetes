@@ -537,7 +537,7 @@ func getSubnetIDForLB(compute *gophercloud.ServiceClient, node v1.Node) (string,
 	for _, intf := range interfaces {
 		for _, fixedIP := range intf.FixedIPs {
 			if fixedIP.IPAddress == ipAddress {
-				return intf.NetID, nil
+				return fixedIP.SubnetID, nil
 			}
 		}
 	}
