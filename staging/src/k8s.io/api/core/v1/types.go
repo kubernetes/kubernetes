@@ -1730,6 +1730,12 @@ type CSIPersistentVolumeSource struct {
 	// Defaults to false (read/write).
 	// +optional
 	ReadOnly bool `json:"readOnly,omitempty" protobuf:"varint,3,opt,name=readOnly"`
+
+	// Filesystem type to mount.
+	// Must be a filesystem type supported by the host operating system.
+	// Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
+	// +optional
+	FSType string `json:"fsType,omitempty" protobuf:"bytes,4,opt,name=fsType"`
 }
 
 // ContainerPort represents a network port in a single container.
