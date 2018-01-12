@@ -40,6 +40,7 @@ import (
 const (
 	devicePluginFeatureGate = "DevicePlugins=true"
 	testPodNamePrefix       = "nvidia-gpu-"
+	nonDeviceResource       = "example.com/exampleResource"
 )
 
 // Serial because the test restarts Kubelet
@@ -72,19 +73,37 @@ var _ = framework.KubeDescribe("NVIDIA GPU Device Plugin [Feature:GPUDevicePlugi
 			if framework.NumberOfNVIDIAGPUs(getLocalNode(f)) < 2 {
 				Skip("Not enough GPUs to execute this test (at least two needed)")
 			}
+
+			By("Adding extended resource not managed by device plugin")
+			node := getLocalNode(f)
+			node.Status.Capacity[nonDeviceResource] = resource.MustParse("5")
+			_, err := f.ClientSet.CoreV1().Nodes().UpdateStatus(node)
+			framework.ExpectNoError(err)
+			Eventually(func() bool {
+				alloc, ok := getLocalNode(f).Status.Allocatable[nonDeviceResource]
+				return ok && alloc.Value() == 5
+			}, 5*time.Minute, framework.Poll).Should(BeTrue())
 		})
 
 		AfterEach(func() {
 			l, err := f.PodClient().List(metav1.ListOptions{})
 			framework.ExpectNoError(err)
-
 			for _, p := range l.Items {
 				if p.Namespace != f.Namespace.Name {
 					continue
 				}
-
 				f.PodClient().Delete(p.Name, &metav1.DeleteOptions{})
 			}
+
+			By("Removing extended resource not managed by device plugin")
+			node := getLocalNode(f)
+			delete(node.Status.Capacity, nonDeviceResource)
+			_, err = f.ClientSet.CoreV1().Nodes().UpdateStatus(node)
+			framework.ExpectNoError(err)
+			Eventually(func() bool {
+				_, ok := getLocalNode(f).Status.Allocatable[nonDeviceResource]
+				return !ok
+			}, 5*time.Minute, framework.Poll).Should(BeTrue())
 		})
 
 		It("checks that when Kubelet restarts exclusive GPU assignation to pods is kept.", func() {
@@ -182,16 +201,18 @@ func makeCudaPauseImage() *v1.Pod {
 				Command: []string{"sh", "-c", "devs=$(ls /dev/ | egrep '^nvidia[0-9]+$') && echo gpu devices: $devs"},
 
 				Resources: v1.ResourceRequirements{
-					Limits:   newDecimalResourceList(framework.NVIDIAGPUResourceName, 1),
-					Requests: newDecimalResourceList(framework.NVIDIAGPUResourceName, 1),
+					Limits: v1.ResourceList{
+						framework.NVIDIAGPUResourceName: *resource.NewQuantity(1, resource.DecimalSI),
+						nonDeviceResource:               *resource.NewQuantity(1, resource.DecimalSI),
+					},
+					Requests: v1.ResourceList{
+						framework.NVIDIAGPUResourceName: *resource.NewQuantity(1, resource.DecimalSI),
+						nonDeviceResource:               *resource.NewQuantity(1, resource.DecimalSI),
+					},
 				},
 			}},
 		},
 	}
-}
-
-func newDecimalResourceList(name v1.ResourceName, quantity int64) v1.ResourceList {
-	return v1.ResourceList{name: *resource.NewQuantity(quantity, resource.DecimalSI)}
 }
 
 // TODO: Find a uniform way to deal with systemctl/initctl/service operations. #34494
