@@ -31,7 +31,7 @@
 #
 #  Set KUBERNETES_SKIP_CONFIRM to skip the installation confirmation prompt.
 #  Set KUBERNETES_RELEASE_URL to choose where to download binaries from.
-#    (Defaults to https://storage.googleapis.com/kubernetes-release/release).
+#    (Defaults to https://dl.k8s.io/release).
 #  Set KUBERNETES_DOWNLOAD_TESTS to additionally download and extract the test
 #    binaries tarball.
 
@@ -59,47 +59,7 @@ function detect_kube_release() {
 }
 
 function detect_client_info() {
-  local kernel=$(uname -s)
-  case "${kernel}" in
-    Darwin)
-      CLIENT_PLATFORM="darwin"
-      ;;
-    Linux)
-      CLIENT_PLATFORM="linux"
-      ;;
-    *)
-      echo "Unknown, unsupported platform: ${kernel}." >&2
-      echo "Supported platforms: Linux, Darwin." >&2
-      echo "Bailing out." >&2
-      exit 2
-  esac
-
-  # TODO: migrate the kube::util::host_platform function out of hack/lib and
-  # use it here.
-  local machine=$(uname -m)
-  case "${machine}" in
-    x86_64*|i?86_64*|amd64*)
-      CLIENT_ARCH="amd64"
-      ;;
-    aarch64*|arm64*)
-      CLIENT_ARCH="arm64"
-      ;;
-    arm*)
-      CLIENT_ARCH="arm"
-      ;;
-    i?86*)
-      CLIENT_ARCH="386"
-      ;;
-    s390x*)
-      CLIENT_ARCH="s390x"
-      ;;	  
-    *)
-      echo "Unknown, unsupported architecture (${machine})." >&2
-      echo "Supported architectures x86_64, i686, arm, arm64, s390x." >&2
-      echo "Bailing out." >&2
-      exit 3
-      ;;
-  esac
+  kube::util::host_platform
 }
 
 function md5sum_file() {
