@@ -101,6 +101,20 @@ func (a *AdmissionOptions) ApplyTo(
 	scheme *runtime.Scheme,
 	pluginInitializers ...admission.PluginInitializer,
 ) error {
+	if a == nil {
+		return nil
+	}
+
+	// Admission need scheme to construct admission initializer.
+	if scheme == nil {
+		return fmt.Errorf("admission depends on a scheme, it cannot be nil")
+	}
+
+	// Admission depends on CoreAPI to set SharedInformerFactory and ClientConfig.
+	if informers == nil {
+		return fmt.Errorf("admission depends on a Kubernetes core API shared informer, it cannot be nil")
+	}
+
 	pluginNames := a.PluginNames
 	if len(a.PluginNames) == 0 {
 		pluginNames = a.enabledPluginNames()

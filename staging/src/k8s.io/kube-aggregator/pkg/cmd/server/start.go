@@ -109,7 +109,7 @@ func (o AggregatorOptions) RunAggregator(stopCh <-chan struct{}) error {
 
 	serverConfig := genericapiserver.NewRecommendedConfig(apiserver.Codecs)
 
-	if err := o.RecommendedOptions.ApplyTo(serverConfig); err != nil {
+	if err := o.RecommendedOptions.ApplyTo(serverConfig, apiserver.Scheme); err != nil {
 		return err
 	}
 	serverConfig.LongRunningFunc = filters.BasicLongRunningRequestCheck(
