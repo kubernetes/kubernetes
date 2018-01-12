@@ -157,7 +157,8 @@ func NewVolumeManager(
 	kubeletPodsDir string,
 	recorder record.EventRecorder,
 	checkNodeCapabilitiesBeforeMount bool,
-	keepTerminatedPodVolumes bool) VolumeManager {
+	keepTerminatedPodVolumes bool,
+	processVolumeFailureEventInterval time.Duration) VolumeManager {
 
 	vm := &volumeManager{
 		kubeClient:          kubeClient,
@@ -181,7 +182,9 @@ func NewVolumeManager(
 		vm.desiredStateOfWorld,
 		vm.actualStateOfWorld,
 		kubeContainerRuntime,
-		keepTerminatedPodVolumes)
+		keepTerminatedPodVolumes,
+		recorder,
+		processVolumeFailureEventInterval)
 	vm.reconciler = reconciler.NewReconciler(
 		kubeClient,
 		controllerAttachDetachEnabled,

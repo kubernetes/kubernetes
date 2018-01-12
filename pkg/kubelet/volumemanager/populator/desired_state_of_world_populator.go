@@ -33,9 +33,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	kevents "k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/pod"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
@@ -85,7 +87,9 @@ func NewDesiredStateOfWorldPopulator(
 	desiredStateOfWorld cache.DesiredStateOfWorld,
 	actualStateOfWorld cache.ActualStateOfWorld,
 	kubeContainerRuntime kubecontainer.Runtime,
-	keepTerminatedPodVolumes bool) DesiredStateOfWorldPopulator {
+	keepTerminatedPodVolumes bool,
+	recorder record.EventRecorder,
+	processVolumeFailureEventInterval time.Duration) DesiredStateOfWorldPopulator {
 	return &desiredStateOfWorldPopulator{
 		kubeClient:                kubeClient,
 		loopSleepDuration:         loopSleepDuration,
@@ -96,10 +100,14 @@ func NewDesiredStateOfWorldPopulator(
 		actualStateOfWorld:        actualStateOfWorld,
 		pods: processedPods{
 			processedPods: make(map[volumetypes.UniquePodName]bool)},
+		failedProcessPodMessages: failedProcessPodMessages{
+			messages: make(map[volumetypes.UniquePodName]map[string]time.Time)},
 		kubeContainerRuntime:     kubeContainerRuntime,
 		keepTerminatedPodVolumes: keepTerminatedPodVolumes,
 		hasAddedPods:             false,
 		hasAddedPodsLock:         sync.RWMutex{},
+		recorder:                 recorder,
+		failureEventInterval:     processVolumeFailureEventInterval,
 	}
 }
 
@@ -112,15 +120,26 @@ type desiredStateOfWorldPopulator struct {
 	desiredStateOfWorld       cache.DesiredStateOfWorld
 	actualStateOfWorld        cache.ActualStateOfWorld
 	pods                      processedPods
-	kubeContainerRuntime      kubecontainer.Runtime
-	timeOfLastGetPodStatus    time.Time
-	keepTerminatedPodVolumes  bool
-	hasAddedPods              bool
-	hasAddedPodsLock          sync.RWMutex
+	// failedProcessPodMessages records volume processing errors for pods,
+	// e.g. failed to find a proper volume plugin to handle a specific volume from a pod.
+	// The errors recorded in failedProcessPodMessages are reported as warning events to pods.
+	failedProcessPodMessages failedProcessPodMessages
+	kubeContainerRuntime     kubecontainer.Runtime
+	timeOfLastGetPodStatus   time.Time
+	keepTerminatedPodVolumes bool
+	hasAddedPods             bool
+	hasAddedPodsLock         sync.RWMutex
+	recorder                 record.EventRecorder
+	failureEventInterval     time.Duration
 }
 
 type processedPods struct {
 	processedPods map[volumetypes.UniquePodName]bool
+	sync.RWMutex
+}
+
+type failedProcessPodMessages struct {
+	messages map[volumetypes.UniquePodName]map[string]time.Time
 	sync.RWMutex
 }
 
@@ -182,13 +201,16 @@ func (dswp *desiredStateOfWorldPopulator) isPodTerminated(pod *v1.Pod) bool {
 // Iterate through all pods and add to desired state of world if they don't
 // exist but should
 func (dswp *desiredStateOfWorldPopulator) findAndAddNewPods() {
-	for _, pod := range dswp.podManager.GetPods() {
+	pods := dswp.podManager.GetPods()
+	for _, pod := range pods {
 		if dswp.isPodTerminated(pod) {
 			// Do not (re)add volumes for terminated pods
 			continue
 		}
 		dswp.processPodVolumes(pod)
 	}
+
+	dswp.cleanupFailedProcessPodMessage(pods)
 }
 
 // Iterate through all pods in desired state of world, and remove if they no
@@ -267,17 +289,15 @@ func (dswp *desiredStateOfWorldPopulator) processPodVolumes(pod *v1.Pod) {
 
 	allVolumesAdded := true
 	mountsMap, devicesMap := dswp.makeVolumeMap(pod.Spec.Containers)
+	errEventTemplate := "Error processing volume %q for pod %q: %v"
 
 	// Process volume spec for each volume defined in pod
 	for _, podVolume := range pod.Spec.Volumes {
 		volumeSpec, volumeGidValue, err :=
 			dswp.createVolumeSpec(podVolume, pod.Name, pod.Namespace, mountsMap, devicesMap)
 		if err != nil {
-			glog.Errorf(
-				"Error processing volume %q for pod %q: %v",
-				podVolume.Name,
-				format.Pod(pod),
-				err)
+			msg := fmt.Sprintf(errEventTemplate, podVolume.Name, format.Pod(pod), err)
+			dswp.recordFailedProcessPodEvent(pod, msg, msg)
 			allVolumesAdded = false
 			continue
 		}
@@ -286,12 +306,9 @@ func (dswp *desiredStateOfWorldPopulator) processPodVolumes(pod *v1.Pod) {
 		_, err = dswp.desiredStateOfWorld.AddPodToVolume(
 			uniquePodName, pod, volumeSpec, podVolume.Name, volumeGidValue)
 		if err != nil {
-			glog.Errorf(
-				"Failed to add volume %q (specName: %q) for pod %q to desiredStateOfWorld. err=%v",
-				podVolume.Name,
-				volumeSpec.Name(),
-				uniquePodName,
-				err)
+			eventMsg := fmt.Sprintf(errEventTemplate, podVolume.Name, format.Pod(pod), err)
+			logMsg := fmt.Sprintf("Failed to add volume %q (specName: %q) for pod %q to desiredStateOfWorld. err=%v", podVolume.Name, volumeSpec.Name(), uniquePodName, err)
+			dswp.recordFailedProcessPodEvent(pod, eventMsg, logMsg)
 			allVolumesAdded = false
 		}
 
@@ -333,6 +350,27 @@ func (dswp *desiredStateOfWorldPopulator) markPodProcessed(
 	dswp.pods.processedPods[podName] = true
 }
 
+func (dswp *desiredStateOfWorldPopulator) recordFailedProcessPodEvent(
+	pod *v1.Pod, msg string, logMsg string) {
+	dswp.failedProcessPodMessages.Lock()
+	defer dswp.failedProcessPodMessages.Unlock()
+
+	uniquePodName := volumehelper.GetUniquePodName(pod)
+
+	msgMap, found := dswp.failedProcessPodMessages.messages[uniquePodName]
+	if !found {
+		dswp.failedProcessPodMessages.messages[uniquePodName] = make(map[string]time.Time)
+		msgMap = dswp.failedProcessPodMessages.messages[uniquePodName]
+	}
+
+	lastTime, found := msgMap[msg]
+	if !found || time.Since(lastTime) > dswp.failureEventInterval {
+		msgMap[msg] = time.Now()
+		dswp.recorder.Eventf(pod, v1.EventTypeWarning, kevents.FailedProcessVolume, msg)
+		glog.Errorf(logMsg)
+	}
+}
+
 // markPodProcessed removes the specified pod from processedPods
 func (dswp *desiredStateOfWorldPopulator) deleteProcessedPod(
 	podName volumetypes.UniquePodName) {
@@ -340,6 +378,28 @@ func (dswp *desiredStateOfWorldPopulator) deleteProcessedPod(
 	defer dswp.pods.Unlock()
 
 	delete(dswp.pods.processedPods, podName)
+}
+
+// Removes the stale pod error records from failedProcessedPodMessages
+func (dswp *desiredStateOfWorldPopulator) cleanupFailedProcessPodMessage(
+	currentPods []*v1.Pod) {
+	dswp.failedProcessPodMessages.Lock()
+	defer dswp.failedProcessPodMessages.Unlock()
+
+	currentPodStateMap := make(map[volumetypes.UniquePodName]bool)
+	for _, pod := range currentPods {
+		uniquePodName := volumehelper.GetUniquePodName(pod)
+		currentPodStateMap[uniquePodName] = dswp.isPodTerminated(pod)
+	}
+
+	for podName := range dswp.failedProcessPodMessages.messages {
+		terminated, found := currentPodStateMap[podName]
+
+		if !found || terminated || dswp.podPreviouslyProcessed(podName) {
+			delete(dswp.failedProcessPodMessages.messages, podName)
+			continue
+		}
+	}
 }
 
 // createVolumeSpec creates and returns a mutatable volume.Spec object for the

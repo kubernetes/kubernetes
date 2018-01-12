@@ -51,6 +51,7 @@ const (
 	FailedAttachVolume                   = "FailedAttachVolume"
 	FailedDetachVolume                   = "FailedDetachVolume"
 	FailedMountVolume                    = "FailedMount"
+	FailedProcessVolume                  = "FailedProcessVolume"
 	VolumeResizeFailed                   = "VolumeResizeFailed"
 	VolumeResizeSuccess                  = "VolumeResizeSuccessful"
 	FileSystemResizeFailed               = "FileSystemResizeFailed"
