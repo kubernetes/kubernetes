@@ -436,8 +436,8 @@ function find-release-tars() {
 
   # This tarball is used by GCI, Ubuntu Trusty, and Container Linux.
   KUBE_MANIFESTS_TAR=
-  if [[ "${MASTER_OS_DISTRIBUTION:-}" == "trusty" || "${MASTER_OS_DISTRIBUTION:-}" == "gci" || "${MASTER_OS_DISTRIBUTION:-}" == "container-linux" || "${MASTER_OS_DISTRIBUTION:-}" == "ubuntu" ]] || \
-     [[ "${NODE_OS_DISTRIBUTION:-}" == "trusty" || "${NODE_OS_DISTRIBUTION:-}" == "gci" || "${NODE_OS_DISTRIBUTION:-}" == "container-linux" || "${NODE_OS_DISTRIBUTION:-}" == "ubuntu" ]] ; then
+  if [[ "${MASTER_OS_DISTRIBUTION:-}" == "trusty" || "${MASTER_OS_DISTRIBUTION:-}" == "gci" || "${MASTER_OS_DISTRIBUTION:-}" == "ubuntu" ]] || \
+     [[ "${NODE_OS_DISTRIBUTION:-}" == "trusty" || "${NODE_OS_DISTRIBUTION:-}" == "gci" || "${NODE_OS_DISTRIBUTION:-}" == "ubuntu" ]] ; then
     KUBE_MANIFESTS_TAR=$(find-tar kubernetes-manifests.tar.gz)
   fi
 }
@@ -576,9 +576,7 @@ function build-kube-env {
   local server_binary_tar_url=$SERVER_BINARY_TAR_URL
   local salt_tar_url=$SALT_TAR_URL
   local kube_manifests_tar_url="${KUBE_MANIFESTS_TAR_URL:-}"
-  if [[ "${master}" == "true" && "${MASTER_OS_DISTRIBUTION}" == "container-linux" ]] || \
-     [[ "${master}" == "false" && "${NODE_OS_DISTRIBUTION}" == "container-linux" ]] || \
-     [[ "${master}" == "true" && "${MASTER_OS_DISTRIBUTION}" == "ubuntu" ]] || \
+  if [[ "${master}" == "true" && "${MASTER_OS_DISTRIBUTION}" == "ubuntu" ]] || \
      [[ "${master}" == "false" && "${NODE_OS_DISTRIBUTION}" == "ubuntu" ]] ; then
     # TODO: Support fallback .tar.gz settings on Container Linux
     server_binary_tar_url=$(split_csv "${SERVER_BINARY_TAR_URL}")
@@ -696,8 +694,8 @@ EOF
 TERMINATED_POD_GC_THRESHOLD: $(yaml-quote ${TERMINATED_POD_GC_THRESHOLD})
 EOF
   fi
-  if [[ "${master}" == "true" && ("${MASTER_OS_DISTRIBUTION}" == "trusty" || "${MASTER_OS_DISTRIBUTION}" == "gci" || "${MASTER_OS_DISTRIBUTION}" == "container-linux") || "${MASTER_OS_DISTRIBUTION}" == "ubuntu" ]] || \
-     [[ "${master}" == "false" && ("${NODE_OS_DISTRIBUTION}" == "trusty" || "${NODE_OS_DISTRIBUTION}" == "gci" || "${NODE_OS_DISTRIBUTION}" == "container-linux") || "${NODE_OS_DISTRIBUTION}" = "ubuntu" ]] ; then
+  if [[ "${master}" == "true" && ("${MASTER_OS_DISTRIBUTION}" == "trusty" || "${MASTER_OS_DISTRIBUTION}" == "gci") || "${MASTER_OS_DISTRIBUTION}" == "ubuntu" ]] || \
+     [[ "${master}" == "false" && ("${NODE_OS_DISTRIBUTION}" == "trusty" || "${NODE_OS_DISTRIBUTION}" == "gci") || "${NODE_OS_DISTRIBUTION}" = "ubuntu" ]] ; then
     cat >>$file <<EOF
 KUBE_MANIFESTS_TAR_URL: $(yaml-quote ${kube_manifests_tar_url})
 KUBE_MANIFESTS_TAR_HASH: $(yaml-quote ${KUBE_MANIFESTS_TAR_HASH})
@@ -942,16 +940,6 @@ EOF
   if [ -n "${EVICTION_HARD:-}" ]; then
       cat >>$file <<EOF
 EVICTION_HARD: $(yaml-quote ${EVICTION_HARD})
-EOF
-  fi
-  if [[ "${master}" == "true" && "${MASTER_OS_DISTRIBUTION}" == "container-linux" ]] || \
-     [[ "${master}" == "false" && "${NODE_OS_DISTRIBUTION}" == "container-linux" ]]; then
-    # Container-Linux-only env vars. TODO(yifan): Make them available on other distros.
-    cat >>$file <<EOF
-KUBERNETES_CONTAINER_RUNTIME: $(yaml-quote ${CONTAINER_RUNTIME:-rkt})
-RKT_VERSION: $(yaml-quote ${RKT_VERSION:-})
-RKT_PATH: $(yaml-quote ${RKT_PATH:-})
-RKT_STAGE1_IMAGE: $(yaml-quote ${RKT_STAGE1_IMAGE:-})
 EOF
   fi
   if [[ "${ENABLE_CLUSTER_AUTOSCALER}" == "true" ]]; then
