@@ -108,7 +108,7 @@ var _ = instrumentation.SIGDescribe("Cluster level logging implemented by Stackd
 			})
 
 			ginkgo.By("Checking that too long lines are trimmed", func() {
-				maxLength := 100000
+				maxLength := 100 * 1024
 				cmd := []string{
 					"/bin/sh",
 					"-c",
