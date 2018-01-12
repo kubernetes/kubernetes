@@ -90,20 +90,12 @@ func TestRun(t *testing.T) {
 
 	go e.run()
 	// Wait for the first callback to be issued.
-	select {
-	case <-callbackChan:
-		break
-	}
+	<-callbackChan
 
 	p.Update(updated)
 
 	// Wait for the second callback to be issued.
-	select {
-	case <-callbackChan:
-		break
-	}
-
-	time.Sleep(time.Second)
+	<-callbackChan
 
 	e.mutex.Lock()
 	defer e.mutex.Unlock()
