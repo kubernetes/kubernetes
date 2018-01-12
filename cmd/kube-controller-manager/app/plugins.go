@@ -106,7 +106,7 @@ func ProbeExpandableVolumePlugins(config componentconfig.VolumeConfiguration) []
 	allPlugins = append(allPlugins, scaleio.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, storageos.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, fc.ProbeVolumePlugins()...)
-	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIPersistentVolume) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.CSIPersistentVolume) {
 		allPlugins = append(allPlugins, csi.ProbeVolumePlugins()...)
 	}
 	return allPlugins
