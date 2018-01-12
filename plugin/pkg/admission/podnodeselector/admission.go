@@ -125,7 +125,7 @@ func (p *podNodeSelector) Admit(a admission.Attributes) error {
 	// second selector wins
 	podNodeSelectorLabels := labels.Merge(namespaceNodeSelector, pod.Spec.NodeSelector)
 	pod.Spec.NodeSelector = map[string]string(podNodeSelectorLabels)
-	return p.Validate(a)
+	return nil
 }
 
 // Validate ensures that the pod node selector is allowed
