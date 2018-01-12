@@ -71,6 +71,12 @@ func (cas *FakeCloudAddressService) ReserveAlphaRegionAddress(addr *computealpha
 		addr.AddressType = string(schemeExternal)
 	}
 
+	// Set the default NetworkTier for external IPs.
+	// Internal IPs have empty-string value
+	if addr.AddressType == string(schemeExternal) && addr.NetworkTier == "" {
+		addr.NetworkTier = NetworkTierDefault.ToGCEValue()
+	}
+
 	if cas.reservedAddrs[addr.Address] {
 		msg := "IP in use"
 		// When the IP is already in use, this call returns an error code based
@@ -208,8 +214,7 @@ func convertToAlphaAddress(object gceObject) *computealpha.Address {
 	if err := json.Unmarshal(enc, &addr); err != nil {
 		panic(fmt.Sprintf("Failed to convert GCE apiObject %v to alpha address: %v", object, err))
 	}
-	// Set the default values for the Alpha fields.
-	addr.NetworkTier = NetworkTierDefault.ToGCEValue()
+
 	return &addr
 }
 

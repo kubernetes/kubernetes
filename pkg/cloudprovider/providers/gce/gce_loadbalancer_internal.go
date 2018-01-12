@@ -77,11 +77,6 @@ func (gce *GCECloud) ensureInternalLoadBalancer(clusterName, clusterID string, s
 		return nil, err
 	}
 
-	// Determine IP which will be used for this LB. If no forwarding rule has been established
-	// or specified in the Service spec, then requestedIP = "".
-	requestedIP := determineRequestedIP(svc, existingFwdRule)
-	ipToUse := requestedIP
-
 	// If the ILB already exists, continue using the subnet that it's already using.
 	// This is to support existing ILBs that were setup using the wrong subnet.
 	subnetworkURL := gce.SubnetworkURL()
@@ -90,10 +85,20 @@ func (gce *GCECloud) ensureInternalLoadBalancer(clusterName, clusterID string, s
 		subnetworkURL = existingFwdRule.Subnetwork
 	}
 
+	var ipToUse string
 	var addrMgr *addressManager
-	// If the network is not a legacy network, use the address manager
-	if !gce.IsLegacyNetwork() {
-		addrMgr = newAddressManager(gce, nm.String(), gce.Region(), subnetworkURL, loadBalancerName, requestedIP, schemeInternal)
+	if gce.IsLegacyNetwork() {
+		ipToUse = determineRequestedIP(svc, existingFwdRule)
+	} else {
+		// If the network is not a legacy network, use the address manager
+		currentIP := ""
+		if existingFwdRule != nil {
+			currentIP = existingFwdRule.IPAddress
+		}
+
+		desc := makeServiceDescription(nm.String())
+		a := newAddressParams(loadBalancerName, desc, svc.Spec.LoadBalancerIP, currentIP, schemeInternal, NetworkTierDefault)
+		addrMgr = newAddressManager(gce, gce.Region(), gce.SubnetworkURL(), a, gce.AlphaFeatureGate)
 		ipToUse, err = addrMgr.HoldAddress()
 		if err != nil {
 			return nil, err
