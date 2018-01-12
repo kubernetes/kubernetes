@@ -38,6 +38,18 @@ type Stub struct {
 	update chan []*pluginapi.Device
 
 	server *grpc.Server
+
+	// allocFunc is used for handling allocation request
+	allocFunc stubAllocFunc
+}
+
+// stubAllocFunc is the function called when receive an allocation request from Kubelet
+type stubAllocFunc func(r *pluginapi.AllocateRequest, devs map[string]pluginapi.Device) (*pluginapi.AllocateResponse, error)
+
+func defaultAllocFunc(r *pluginapi.AllocateRequest, devs map[string]pluginapi.Device) (*pluginapi.AllocateResponse, error) {
+	var response pluginapi.AllocateResponse
+
+	return &response, nil
 }
 
 // NewDevicePluginStub returns an initialized DevicePlugin Stub.
@@ -48,7 +60,14 @@ func NewDevicePluginStub(devs []*pluginapi.Device, socket string) *Stub {
 
 		stop:   make(chan interface{}),
 		update: make(chan []*pluginapi.Device),
+
+		allocFunc: defaultAllocFunc,
 	}
+}
+
+// SetAllocFunc sets allocFunc of the device plugin
+func (m *Stub) SetAllocFunc(f stubAllocFunc) {
+	m.allocFunc = f
 }
 
 // Start starts the gRPC server of the device plugin
@@ -145,8 +164,13 @@ func (m *Stub) Update(devs []*pluginapi.Device) {
 func (m *Stub) Allocate(ctx context.Context, r *pluginapi.AllocateRequest) (*pluginapi.AllocateResponse, error) {
 	log.Printf("Allocate, %+v", r)
 
-	var response pluginapi.AllocateResponse
-	return &response, nil
+	devs := make(map[string]pluginapi.Device)
+
+	for _, dev := range m.devs {
+		devs[dev.ID] = *dev
+	}
+
+	return m.allocFunc(r, devs)
 }
 
 func (m *Stub) cleanup() error {

@@ -24,6 +24,7 @@ import (
 	"net/http"
 	"os/exec"
 	"reflect"
+	"regexp"
 	"strings"
 	"time"
 
@@ -392,4 +393,17 @@ func getCRIClient() (internalapi.RuntimeService, internalapi.ImageManagerService
 		return nil, nil, err
 	}
 	return r, i, nil
+}
+
+// TODO: Find a uniform way to deal with systemctl/initctl/service operations. #34494
+func restartKubelet() {
+	stdout, err := exec.Command("sudo", "systemctl", "list-units", "kubelet*", "--state=running").CombinedOutput()
+	framework.ExpectNoError(err)
+	regex := regexp.MustCompile("(kubelet-[0-9]+)")
+	matches := regex.FindStringSubmatch(string(stdout))
+	Expect(len(matches)).NotTo(BeZero())
+	kube := matches[0]
+	framework.Logf("Get running kubelet with systemctl: %v, %v", string(stdout), kube)
+	stdout, err = exec.Command("sudo", "systemctl", "restart", kube).CombinedOutput()
+	framework.ExpectNoError(err, "Failed to restart kubelet with systemctl: %v, %v", err, stdout)
 }
