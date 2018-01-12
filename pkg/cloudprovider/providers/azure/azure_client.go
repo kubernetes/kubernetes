@@ -158,7 +158,13 @@ func (az *azVirtualMachinesClient) CreateOrUpdate(resourceGroupName string, VMNa
 		glog.V(10).Infof("azVirtualMachinesClient.CreateOrUpdate(%q, %q): end", resourceGroupName, VMName)
 	}()
 
-	return az.client.CreateOrUpdate(resourceGroupName, VMName, parameters, cancel)
+	errChan := make(chan error, 1)
+	mc := newMetricContext("vm", "create_or_update", resourceGroupName, az.client.SubscriptionID)
+	resultChan, proxyErrChan := az.client.CreateOrUpdate(resourceGroupName, VMName, parameters, cancel)
+	err := <-proxyErrChan
+	mc.Observe(err)
+	errChan <- err
+	return resultChan, errChan
 }
 
 func (az *azVirtualMachinesClient) Get(resourceGroupName string, VMName string, expand compute.InstanceViewTypes) (result compute.VirtualMachine, err error) {
@@ -168,7 +174,10 @@ func (az *azVirtualMachinesClient) Get(resourceGroupName string, VMName string, 
 		glog.V(10).Infof("azVirtualMachinesClient.Get(%q, %q): end", resourceGroupName, VMName)
 	}()
 
-	return az.client.Get(resourceGroupName, VMName, expand)
+	mc := newMetricContext("vm", "get", resourceGroupName, az.client.SubscriptionID)
+	result, err = az.client.Get(resourceGroupName, VMName, expand)
+	mc.Observe(err)
+	return
 }
 
 func (az *azVirtualMachinesClient) List(resourceGroupName string) (result compute.VirtualMachineListResult, err error) {
@@ -178,7 +187,10 @@ func (az *azVirtualMachinesClient) List(resourceGroupName string) (result comput
 		glog.V(10).Infof("azVirtualMachinesClient.List(%q): end", resourceGroupName)
 	}()
 
-	return az.client.List(resourceGroupName)
+	mc := newMetricContext("vm", "list", resourceGroupName, az.client.SubscriptionID)
+	result, err = az.client.List(resourceGroupName)
+	mc.Observe(err)
+	return
 }
 
 func (az *azVirtualMachinesClient) ListNextResults(lastResults compute.VirtualMachineListResult) (result compute.VirtualMachineListResult, err error) {
@@ -217,7 +229,13 @@ func (az *azInterfacesClient) CreateOrUpdate(resourceGroupName string, networkIn
 		glog.V(10).Infof("azInterfacesClient.CreateOrUpdate(%q,%q): end", resourceGroupName, networkInterfaceName)
 	}()
 
-	return az.client.CreateOrUpdate(resourceGroupName, networkInterfaceName, parameters, cancel)
+	errChan := make(chan error, 1)
+	mc := newMetricContext("interfaces", "create_or_update", resourceGroupName, az.client.SubscriptionID)
+	resultChan, proxyErrChan := az.client.CreateOrUpdate(resourceGroupName, networkInterfaceName, parameters, cancel)
+	err := <-proxyErrChan
+	mc.Observe(err)
+	errChan <- err
+	return resultChan, errChan
 }
 
 func (az *azInterfacesClient) Get(resourceGroupName string, networkInterfaceName string, expand string) (result network.Interface, err error) {
@@ -227,7 +245,10 @@ func (az *azInterfacesClient) Get(resourceGroupName string, networkInterfaceName
 		glog.V(10).Infof("azInterfacesClient.Get(%q,%q): end", resourceGroupName, networkInterfaceName)
 	}()
 
-	return az.client.Get(resourceGroupName, networkInterfaceName, expand)
+	mc := newMetricContext("interfaces", "get", resourceGroupName, az.client.SubscriptionID)
+	result, err = az.client.Get(resourceGroupName, networkInterfaceName, expand)
+	mc.Observe(err)
+	return
 }
 
 func (az *azInterfacesClient) GetVirtualMachineScaleSetNetworkInterface(resourceGroupName string, virtualMachineScaleSetName string, virtualmachineIndex string, networkInterfaceName string, expand string) (result network.Interface, err error) {
@@ -237,7 +258,10 @@ func (az *azInterfacesClient) GetVirtualMachineScaleSetNetworkInterface(resource
 		glog.V(10).Infof("azInterfacesClient.GetVirtualMachineScaleSetNetworkInterface(%q,%q,%q,%q): end", resourceGroupName, virtualMachineScaleSetName, virtualmachineIndex, networkInterfaceName)
 	}()
 
-	return az.client.GetVirtualMachineScaleSetNetworkInterface(resourceGroupName, virtualMachineScaleSetName, virtualmachineIndex, networkInterfaceName, expand)
+	mc := newMetricContext("interfaces", "get_vmss_ni", resourceGroupName, az.client.SubscriptionID)
+	result, err = az.client.GetVirtualMachineScaleSetNetworkInterface(resourceGroupName, virtualMachineScaleSetName, virtualmachineIndex, networkInterfaceName, expand)
+	mc.Observe(err)
+	return
 }
 
 // azLoadBalancersClient implements LoadBalancersClient.
@@ -266,7 +290,13 @@ func (az *azLoadBalancersClient) CreateOrUpdate(resourceGroupName string, loadBa
 		glog.V(10).Infof("azLoadBalancersClient.CreateOrUpdate(%q,%q): end", resourceGroupName, loadBalancerName)
 	}()
 
-	return az.client.CreateOrUpdate(resourceGroupName, loadBalancerName, parameters, cancel)
+	errChan := make(chan error, 1)
+	mc := newMetricContext("load_balancers", "create_or_update", resourceGroupName, az.client.SubscriptionID)
+	resultChan, proxyErrChan := az.client.CreateOrUpdate(resourceGroupName, loadBalancerName, parameters, cancel)
+	err := <-proxyErrChan
+	mc.Observe(err)
+	errChan <- err
+	return resultChan, errChan
 }
 
 func (az *azLoadBalancersClient) Delete(resourceGroupName string, loadBalancerName string, cancel <-chan struct{}) (<-chan autorest.Response, <-chan error) {
@@ -276,7 +306,13 @@ func (az *azLoadBalancersClient) Delete(resourceGroupName string, loadBalancerNa
 		glog.V(10).Infof("azLoadBalancersClient.Delete(%q,%q): end", resourceGroupName, loadBalancerName)
 	}()
 
-	return az.client.Delete(resourceGroupName, loadBalancerName, cancel)
+	errChan := make(chan error, 1)
+	mc := newMetricContext("load_balancers", "delete", resourceGroupName, az.client.SubscriptionID)
+	resultChan, proxyErrChan := az.client.Delete(resourceGroupName, loadBalancerName, cancel)
+	err := <-proxyErrChan
+	mc.Observe(err)
+	errChan <- err
+	return resultChan, errChan
 }
 
 func (az *azLoadBalancersClient) Get(resourceGroupName string, loadBalancerName string, expand string) (result network.LoadBalancer, err error) {
@@ -286,7 +322,10 @@ func (az *azLoadBalancersClient) Get(resourceGroupName string, loadBalancerName 
 		glog.V(10).Infof("azLoadBalancersClient.Get(%q,%q): end", resourceGroupName, loadBalancerName)
 	}()
 
-	return az.client.Get(resourceGroupName, loadBalancerName, expand)
+	mc := newMetricContext("load_balancers", "get", resourceGroupName, az.client.SubscriptionID)
+	result, err = az.client.Get(resourceGroupName, loadBalancerName, expand)
+	mc.Observe(err)
+	return
 }
 
 func (az *azLoadBalancersClient) List(resourceGroupName string) (result network.LoadBalancerListResult, err error) {
@@ -296,7 +335,10 @@ func (az *azLoadBalancersClient) List(resourceGroupName string) (result network.
 		glog.V(10).Infof("azLoadBalancersClient.List(%q): end", resourceGroupName)
 	}()
 
-	return az.client.List(resourceGroupName)
+	mc := newMetricContext("load_balancers", "list", resourceGroupName, az.client.SubscriptionID)
+	result, err = az.client.List(resourceGroupName)
+	mc.Observe(err)
+	return
 }
 
 func (az *azLoadBalancersClient) ListNextResults(lastResult network.LoadBalancerListResult) (result network.LoadBalancerListResult, err error) {
@@ -335,7 +377,13 @@ func (az *azPublicIPAddressesClient) CreateOrUpdate(resourceGroupName string, pu
 		glog.V(10).Infof("azPublicIPAddressesClient.CreateOrUpdate(%q,%q): end", resourceGroupName, publicIPAddressName)
 	}()
 
-	return az.client.CreateOrUpdate(resourceGroupName, publicIPAddressName, parameters, cancel)
+	errChan := make(chan error, 1)
+	mc := newMetricContext("public_ip_addresses", "create_or_update", resourceGroupName, az.client.SubscriptionID)
+	resultChan, proxyErrChan := az.client.CreateOrUpdate(resourceGroupName, publicIPAddressName, parameters, cancel)
+	err := <-proxyErrChan
+	mc.Observe(err)
+	errChan <- err
+	return resultChan, errChan
 }
 
 func (az *azPublicIPAddressesClient) Delete(resourceGroupName string, publicIPAddressName string, cancel <-chan struct{}) (<-chan autorest.Response, <-chan error) {
@@ -345,7 +393,13 @@ func (az *azPublicIPAddressesClient) Delete(resourceGroupName string, publicIPAd
 		glog.V(10).Infof("azPublicIPAddressesClient.Delete(%q,%q): end", resourceGroupName, publicIPAddressName)
 	}()
 
-	return az.client.Delete(resourceGroupName, publicIPAddressName, cancel)
+	errChan := make(chan error, 1)
+	mc := newMetricContext("public_ip_addresses", "delete", resourceGroupName, az.client.SubscriptionID)
+	resultChan, proxyErrChan := az.client.Delete(resourceGroupName, publicIPAddressName, cancel)
+	err := <-proxyErrChan
+	mc.Observe(err)
+	errChan <- err
+	return resultChan, errChan
 }
 
 func (az *azPublicIPAddressesClient) Get(resourceGroupName string, publicIPAddressName string, expand string) (result network.PublicIPAddress, err error) {
@@ -355,7 +409,10 @@ func (az *azPublicIPAddressesClient) Get(resourceGroupName string, publicIPAddre
 		glog.V(10).Infof("azPublicIPAddressesClient.Get(%q,%q): end", resourceGroupName, publicIPAddressName)
 	}()
 
-	return az.client.Get(resourceGroupName, publicIPAddressName, expand)
+	mc := newMetricContext("public_ip_addresses", "get", resourceGroupName, az.client.SubscriptionID)
+	result, err = az.client.Get(resourceGroupName, publicIPAddressName, expand)
+	mc.Observe(err)
+	return
 }
 
 func (az *azPublicIPAddressesClient) List(resourceGroupName string) (result network.PublicIPAddressListResult, err error) {
@@ -365,7 +422,10 @@ func (az *azPublicIPAddressesClient) List(resourceGroupName string) (result netw
 		glog.V(10).Infof("azPublicIPAddressesClient.List(%q): end", resourceGroupName)
 	}()
 
-	return az.client.List(resourceGroupName)
+	mc := newMetricContext("public_ip_addresses", "list", resourceGroupName, az.client.SubscriptionID)
+	result, err = az.client.List(resourceGroupName)
+	mc.Observe(err)
+	return
 }
 
 func (az *azPublicIPAddressesClient) ListNextResults(lastResults network.PublicIPAddressListResult) (result network.PublicIPAddressListResult, err error) {
@@ -404,7 +464,13 @@ func (az *azSubnetsClient) CreateOrUpdate(resourceGroupName string, virtualNetwo
 		glog.V(10).Infof("azSubnetsClient.CreateOrUpdate(%q,%q,%q): end", resourceGroupName, virtualNetworkName, subnetName)
 	}()
 
-	return az.client.CreateOrUpdate(resourceGroupName, virtualNetworkName, subnetName, subnetParameters, cancel)
+	errChan := make(chan error, 1)
+	mc := newMetricContext("subnets", "create_or_update", resourceGroupName, az.client.SubscriptionID)
+	resultChan, proxyErrChan := az.client.CreateOrUpdate(resourceGroupName, virtualNetworkName, subnetName, subnetParameters, cancel)
+	err := <-proxyErrChan
+	mc.Observe(err)
+	errChan <- err
+	return resultChan, errChan
 }
 
 func (az *azSubnetsClient) Delete(resourceGroupName string, virtualNetworkName string, subnetName string, cancel <-chan struct{}) (<-chan autorest.Response, <-chan error) {
@@ -414,7 +480,13 @@ func (az *azSubnetsClient) Delete(resourceGroupName string, virtualNetworkName s
 		glog.V(10).Infof("azSubnetsClient.Delete(%q,%q,%q): end", resourceGroupName, virtualNetworkName, subnetName)
 	}()
 
-	return az.client.Delete(resourceGroupName, virtualNetworkName, subnetName, cancel)
+	errChan := make(chan error, 1)
+	mc := newMetricContext("subnets", "delete", resourceGroupName, az.client.SubscriptionID)
+	resultChan, proxyErrChan := az.client.Delete(resourceGroupName, virtualNetworkName, subnetName, cancel)
+	err := <-proxyErrChan
+	mc.Observe(err)
+	errChan <- err
+	return resultChan, errChan
 }
 
 func (az *azSubnetsClient) Get(resourceGroupName string, virtualNetworkName string, subnetName string, expand string) (result network.Subnet, err error) {
@@ -424,7 +496,10 @@ func (az *azSubnetsClient) Get(resourceGroupName string, virtualNetworkName stri
 		glog.V(10).Infof("azSubnetsClient.Get(%q,%q,%q): end", resourceGroupName, virtualNetworkName, subnetName)
 	}()
 
-	return az.client.Get(resourceGroupName, virtualNetworkName, subnetName, expand)
+	mc := newMetricContext("subnets", "get", resourceGroupName, az.client.SubscriptionID)
+	result, err = az.client.Get(resourceGroupName, virtualNetworkName, subnetName, expand)
+	mc.Observe(err)
+	return
 }
 
 func (az *azSubnetsClient) List(resourceGroupName string, virtualNetworkName string) (result network.SubnetListResult, err error) {
@@ -434,7 +509,10 @@ func (az *azSubnetsClient) List(resourceGroupName string, virtualNetworkName str
 		glog.V(10).Infof("azSubnetsClient.List(%q,%q): end", resourceGroupName, virtualNetworkName)
 	}()
 
-	return az.client.List(resourceGroupName, virtualNetworkName)
+	mc := newMetricContext("subnets", "list", resourceGroupName, az.client.SubscriptionID)
+	result, err = az.client.List(resourceGroupName, virtualNetworkName)
+	mc.Observe(err)
+	return
 }
 
 // azSecurityGroupsClient implements SecurityGroupsClient.
@@ -463,7 +541,13 @@ func (az *azSecurityGroupsClient) CreateOrUpdate(resourceGroupName string, netwo
 		glog.V(10).Infof("azSecurityGroupsClient.CreateOrUpdate(%q,%q): end", resourceGroupName, networkSecurityGroupName)
 	}()
 
-	return az.client.CreateOrUpdate(resourceGroupName, networkSecurityGroupName, parameters, cancel)
+	errChan := make(chan error, 1)
+	mc := newMetricContext("security_groups", "create_or_update", resourceGroupName, az.client.SubscriptionID)
+	resultChan, proxyErrChan := az.client.CreateOrUpdate(resourceGroupName, networkSecurityGroupName, parameters, cancel)
+	err := <-proxyErrChan
+	mc.Observe(err)
+	errChan <- err
+	return resultChan, errChan
 }
 
 func (az *azSecurityGroupsClient) Delete(resourceGroupName string, networkSecurityGroupName string, cancel <-chan struct{}) (<-chan autorest.Response, <-chan error) {
@@ -473,7 +557,13 @@ func (az *azSecurityGroupsClient) Delete(resourceGroupName string, networkSecuri
 		glog.V(10).Infof("azSecurityGroupsClient.Delete(%q,%q): end", resourceGroupName, networkSecurityGroupName)
 	}()
 
-	return az.client.Delete(resourceGroupName, networkSecurityGroupName, cancel)
+	errChan := make(chan error, 1)
+	mc := newMetricContext("security_groups", "delete", resourceGroupName, az.client.SubscriptionID)
+	resultChan, proxyErrChan := az.client.Delete(resourceGroupName, networkSecurityGroupName, cancel)
+	err := <-proxyErrChan
+	mc.Observe(err)
+	errChan <- err
+	return resultChan, errChan
 }
 
 func (az *azSecurityGroupsClient) Get(resourceGroupName string, networkSecurityGroupName string, expand string) (result network.SecurityGroup, err error) {
@@ -483,7 +573,10 @@ func (az *azSecurityGroupsClient) Get(resourceGroupName string, networkSecurityG
 		glog.V(10).Infof("azSecurityGroupsClient.Get(%q,%q): end", resourceGroupName, networkSecurityGroupName)
 	}()
 
-	return az.client.Get(resourceGroupName, networkSecurityGroupName, expand)
+	mc := newMetricContext("security_groups", "get", resourceGroupName, az.client.SubscriptionID)
+	result, err = az.client.Get(resourceGroupName, networkSecurityGroupName, expand)
+	mc.Observe(err)
+	return
 }
 
 func (az *azSecurityGroupsClient) List(resourceGroupName string) (result network.SecurityGroupListResult, err error) {
@@ -493,7 +586,10 @@ func (az *azSecurityGroupsClient) List(resourceGroupName string) (result network
 		glog.V(10).Infof("azSecurityGroupsClient.List(%q): end", resourceGroupName)
 	}()
 
-	return az.client.List(resourceGroupName)
+	mc := newMetricContext("security_groups", "list", resourceGroupName, az.client.SubscriptionID)
+	result, err = az.client.List(resourceGroupName)
+	mc.Observe(err)
+	return
 }
 
 // azVirtualMachineScaleSetsClient implements VirtualMachineScaleSetsClient.
@@ -522,7 +618,13 @@ func (az *azVirtualMachineScaleSetsClient) CreateOrUpdate(resourceGroupName stri
 		glog.V(10).Infof("azVirtualMachineScaleSetsClient.CreateOrUpdate(%q,%q): end", resourceGroupName, VMScaleSetName)
 	}()
 
-	return az.client.CreateOrUpdate(resourceGroupName, VMScaleSetName, parameters, cancel)
+	errChan := make(chan error, 1)
+	mc := newMetricContext("vmss", "create_or_update", resourceGroupName, az.client.SubscriptionID)
+	resultChan, proxyErrChan := az.client.CreateOrUpdate(resourceGroupName, VMScaleSetName, parameters, cancel)
+	err := <-proxyErrChan
+	mc.Observe(err)
+	errChan <- err
+	return resultChan, errChan
 }
 
 func (az *azVirtualMachineScaleSetsClient) Get(resourceGroupName string, VMScaleSetName string) (result compute.VirtualMachineScaleSet, err error) {
@@ -532,7 +634,10 @@ func (az *azVirtualMachineScaleSetsClient) Get(resourceGroupName string, VMScale
 		glog.V(10).Infof("azVirtualMachineScaleSetsClient.Get(%q,%q): end", resourceGroupName, VMScaleSetName)
 	}()
 
-	return az.client.Get(resourceGroupName, VMScaleSetName)
+	mc := newMetricContext("vmss", "get", resourceGroupName, az.client.SubscriptionID)
+	result, err = az.client.Get(resourceGroupName, VMScaleSetName)
+	mc.Observe(err)
+	return
 }
 
 func (az *azVirtualMachineScaleSetsClient) List(resourceGroupName string) (result compute.VirtualMachineScaleSetListResult, err error) {
@@ -542,7 +647,10 @@ func (az *azVirtualMachineScaleSetsClient) List(resourceGroupName string) (resul
 		glog.V(10).Infof("azVirtualMachineScaleSetsClient.List(%q,%q): end", resourceGroupName)
 	}()
 
-	return az.client.List(resourceGroupName)
+	mc := newMetricContext("vmss", "list", resourceGroupName, az.client.SubscriptionID)
+	result, err = az.client.List(resourceGroupName)
+	mc.Observe(err)
+	return
 }
 
 func (az *azVirtualMachineScaleSetsClient) ListNextResults(lastResults compute.VirtualMachineScaleSetListResult) (result compute.VirtualMachineScaleSetListResult, err error) {
@@ -562,7 +670,13 @@ func (az *azVirtualMachineScaleSetsClient) UpdateInstances(resourceGroupName str
 		glog.V(10).Infof("azVirtualMachineScaleSetsClient.UpdateInstances(%q,%q,%q): end", resourceGroupName, VMScaleSetName, VMInstanceIDs)
 	}()
 
-	return az.client.UpdateInstances(resourceGroupName, VMScaleSetName, VMInstanceIDs, cancel)
+	errChan := make(chan error, 1)
+	mc := newMetricContext("vmss", "update_instances", resourceGroupName, az.client.SubscriptionID)
+	resultChan, proxyErrChan := az.client.UpdateInstances(resourceGroupName, VMScaleSetName, VMInstanceIDs, cancel)
+	err := <-proxyErrChan
+	mc.Observe(err)
+	errChan <- err
+	return resultChan, errChan
 }
 
 // azVirtualMachineScaleSetVMsClient implements VirtualMachineScaleSetVMsClient.
@@ -591,7 +705,10 @@ func (az *azVirtualMachineScaleSetVMsClient) Get(resourceGroupName string, VMSca
 		glog.V(10).Infof("azVirtualMachineScaleSetVMsClient.Get(%q,%q,%q): end", resourceGroupName, VMScaleSetName, instanceID)
 	}()
 
-	return az.client.Get(resourceGroupName, VMScaleSetName, instanceID)
+	mc := newMetricContext("vmssvm", "get", resourceGroupName, az.client.SubscriptionID)
+	result, err = az.client.Get(resourceGroupName, VMScaleSetName, instanceID)
+	mc.Observe(err)
+	return
 }
 
 func (az *azVirtualMachineScaleSetVMsClient) GetInstanceView(resourceGroupName string, VMScaleSetName string, instanceID string) (result compute.VirtualMachineScaleSetVMInstanceView, err error) {
@@ -601,7 +718,10 @@ func (az *azVirtualMachineScaleSetVMsClient) GetInstanceView(resourceGroupName s
 		glog.V(10).Infof("azVirtualMachineScaleSetVMsClient.GetInstanceView(%q,%q,%q): end", resourceGroupName, VMScaleSetName, instanceID)
 	}()
 
-	return az.client.GetInstanceView(resourceGroupName, VMScaleSetName, instanceID)
+	mc := newMetricContext("vmssvm", "get_instance_view", resourceGroupName, az.client.SubscriptionID)
+	result, err = az.client.GetInstanceView(resourceGroupName, VMScaleSetName, instanceID)
+	mc.Observe(err)
+	return
 }
 
 func (az *azVirtualMachineScaleSetVMsClient) List(resourceGroupName string, virtualMachineScaleSetName string, filter string, selectParameter string, expand string) (result compute.VirtualMachineScaleSetVMListResult, err error) {
@@ -611,7 +731,10 @@ func (az *azVirtualMachineScaleSetVMsClient) List(resourceGroupName string, virt
 		glog.V(10).Infof("azVirtualMachineScaleSetVMsClient.List(%q,%q,%q): end", resourceGroupName, virtualMachineScaleSetName, filter)
 	}()
 
-	return az.client.List(resourceGroupName, virtualMachineScaleSetName, filter, selectParameter, expand)
+	mc := newMetricContext("vmssvm", "list", resourceGroupName, az.client.SubscriptionID)
+	result, err = az.client.List(resourceGroupName, virtualMachineScaleSetName, filter, selectParameter, expand)
+	mc.Observe(err)
+	return
 }
 
 func (az *azVirtualMachineScaleSetVMsClient) ListNextResults(lastResults compute.VirtualMachineScaleSetVMListResult) (result compute.VirtualMachineScaleSetVMListResult, err error) {
@@ -650,7 +773,13 @@ func (az *azRoutesClient) CreateOrUpdate(resourceGroupName string, routeTableNam
 		glog.V(10).Infof("azRoutesClient.CreateOrUpdate(%q,%q,%q): end", resourceGroupName, routeTableName, routeName)
 	}()
 
-	return az.client.CreateOrUpdate(resourceGroupName, routeTableName, routeName, routeParameters, cancel)
+	errChan := make(chan error, 1)
+	mc := newMetricContext("routes", "create_or_update", resourceGroupName, az.client.SubscriptionID)
+	resultChan, proxyErrChan := az.client.CreateOrUpdate(resourceGroupName, routeTableName, routeName, routeParameters, cancel)
+	err := <-proxyErrChan
+	mc.Observe(err)
+	errChan <- err
+	return resultChan, errChan
 }
 
 func (az *azRoutesClient) Delete(resourceGroupName string, routeTableName string, routeName string, cancel <-chan struct{}) (<-chan autorest.Response, <-chan error) {
@@ -660,7 +789,13 @@ func (az *azRoutesClient) Delete(resourceGroupName string, routeTableName string
 		glog.V(10).Infof("azRoutesClient.Delete(%q,%q,%q): end", resourceGroupName, routeTableName, routeName)
 	}()
 
-	return az.client.Delete(resourceGroupName, routeTableName, routeName, cancel)
+	errChan := make(chan error, 1)
+	mc := newMetricContext("routes", "delete", resourceGroupName, az.client.SubscriptionID)
+	resultChan, proxyErrChan := az.client.Delete(resourceGroupName, routeTableName, routeName, cancel)
+	err := <-proxyErrChan
+	mc.Observe(err)
+	errChan <- err
+	return resultChan, errChan
 }
 
 // azRouteTablesClient implements RouteTablesClient.
@@ -689,7 +824,13 @@ func (az *azRouteTablesClient) CreateOrUpdate(resourceGroupName string, routeTab
 		glog.V(10).Infof("azRouteTablesClient.CreateOrUpdate(%q,%q): end", resourceGroupName, routeTableName)
 	}()
 
-	return az.client.CreateOrUpdate(resourceGroupName, routeTableName, parameters, cancel)
+	errChan := make(chan error, 1)
+	mc := newMetricContext("route_tables", "create_or_update", resourceGroupName, az.client.SubscriptionID)
+	resultChan, proxyErrChan := az.client.CreateOrUpdate(resourceGroupName, routeTableName, parameters, cancel)
+	err := <-proxyErrChan
+	mc.Observe(err)
+	errChan <- err
+	return resultChan, errChan
 }
 
 func (az *azRouteTablesClient) Get(resourceGroupName string, routeTableName string, expand string) (result network.RouteTable, err error) {
@@ -699,7 +840,10 @@ func (az *azRouteTablesClient) Get(resourceGroupName string, routeTableName stri
 		glog.V(10).Infof("azRouteTablesClient.Get(%q,%q): end", resourceGroupName, routeTableName)
 	}()
 
-	return az.client.Get(resourceGroupName, routeTableName, expand)
+	mc := newMetricContext("route_tables", "get", resourceGroupName, az.client.SubscriptionID)
+	result, err = az.client.Get(resourceGroupName, routeTableName, expand)
+	mc.Observe(err)
+	return
 }
 
 // azStorageAccountClient implements StorageAccountClient.
@@ -727,7 +871,13 @@ func (az *azStorageAccountClient) Create(resourceGroupName string, accountName s
 		glog.V(10).Infof("azStorageAccountClient.Create(%q,%q): end", resourceGroupName, accountName)
 	}()
 
-	return az.client.Create(resourceGroupName, accountName, parameters, cancel)
+	errChan := make(chan error, 1)
+	mc := newMetricContext("storage_account", "create", resourceGroupName, az.client.SubscriptionID)
+	resultChan, proxyErrChan := az.client.Create(resourceGroupName, accountName, parameters, cancel)
+	err := <-proxyErrChan
+	mc.Observe(err)
+	errChan <- err
+	return resultChan, errChan
 }
 
 func (az *azStorageAccountClient) Delete(resourceGroupName string, accountName string) (result autorest.Response, err error) {
@@ -737,7 +887,10 @@ func (az *azStorageAccountClient) Delete(resourceGroupName string, accountName s
 		glog.V(10).Infof("azStorageAccountClient.Delete(%q,%q): end", resourceGroupName, accountName)
 	}()
 
-	return az.client.Delete(resourceGroupName, accountName)
+	mc := newMetricContext("storage_account", "delete", resourceGroupName, az.client.SubscriptionID)
+	result, err = az.client.Delete(resourceGroupName, accountName)
+	mc.Observe(err)
+	return
 }
 
 func (az *azStorageAccountClient) ListKeys(resourceGroupName string, accountName string) (result storage.AccountListKeysResult, err error) {
@@ -747,7 +900,10 @@ func (az *azStorageAccountClient) ListKeys(resourceGroupName string, accountName
 		glog.V(10).Infof("azStorageAccountClient.ListKeys(%q,%q): end", resourceGroupName, accountName)
 	}()
 
-	return az.client.ListKeys(resourceGroupName, accountName)
+	mc := newMetricContext("storage_account", "list_keys", resourceGroupName, az.client.SubscriptionID)
+	result, err = az.client.ListKeys(resourceGroupName, accountName)
+	mc.Observe(err)
+	return
 }
 
 func (az *azStorageAccountClient) ListByResourceGroup(resourceGroupName string) (result storage.AccountListResult, err error) {
@@ -757,7 +913,10 @@ func (az *azStorageAccountClient) ListByResourceGroup(resourceGroupName string) 
 		glog.V(10).Infof("azStorageAccountClient.ListByResourceGroup(%q): end", resourceGroupName)
 	}()
 
-	return az.client.ListByResourceGroup(resourceGroupName)
+	mc := newMetricContext("storage_account", "list_by_resource_group", resourceGroupName, az.client.SubscriptionID)
+	result, err = az.client.ListByResourceGroup(resourceGroupName)
+	mc.Observe(err)
+	return
 }
 
 func (az *azStorageAccountClient) GetProperties(resourceGroupName string, accountName string) (result storage.Account, err error) {
@@ -767,7 +926,10 @@ func (az *azStorageAccountClient) GetProperties(resourceGroupName string, accoun
 		glog.V(10).Infof("azStorageAccountClient.GetProperties(%q,%q): end", resourceGroupName, accountName)
 	}()
 
-	return az.client.GetProperties(resourceGroupName, accountName)
+	mc := newMetricContext("storage_account", "get_properties", resourceGroupName, az.client.SubscriptionID)
+	result, err = az.client.GetProperties(resourceGroupName, accountName)
+	mc.Observe(err)
+	return
 }
 
 // azDisksClient implements DisksClient.
@@ -795,7 +957,13 @@ func (az *azDisksClient) CreateOrUpdate(resourceGroupName string, diskName strin
 		glog.V(10).Infof("azDisksClient.CreateOrUpdate(%q,%q): end", resourceGroupName, diskName)
 	}()
 
-	return az.client.CreateOrUpdate(resourceGroupName, diskName, diskParameter, cancel)
+	errChan := make(chan error, 1)
+	mc := newMetricContext("disks", "create_or_update", resourceGroupName, az.client.SubscriptionID)
+	resultChan, proxyErrChan := az.client.CreateOrUpdate(resourceGroupName, diskName, diskParameter, cancel)
+	err := <-proxyErrChan
+	mc.Observe(err)
+	errChan <- err
+	return resultChan, errChan
 }
 
 func (az *azDisksClient) Delete(resourceGroupName string, diskName string, cancel <-chan struct{}) (<-chan disk.OperationStatusResponse, <-chan error) {
@@ -805,7 +973,13 @@ func (az *azDisksClient) Delete(resourceGroupName string, diskName string, cance
 		glog.V(10).Infof("azDisksClient.Delete(%q,%q): end", resourceGroupName, diskName)
 	}()
 
-	return az.client.Delete(resourceGroupName, diskName, cancel)
+	errChan := make(chan error, 1)
+	mc := newMetricContext("disks", "delete", resourceGroupName, az.client.SubscriptionID)
+	resultChan, proxyErrChan := az.client.Delete(resourceGroupName, diskName, cancel)
+	err := <-proxyErrChan
+	mc.Observe(err)
+	errChan <- err
+	return resultChan, errChan
 }
 
 func (az *azDisksClient) Get(resourceGroupName string, diskName string) (result disk.Model, err error) {
@@ -815,5 +989,8 @@ func (az *azDisksClient) Get(resourceGroupName string, diskName string) (result 
 		glog.V(10).Infof("azDisksClient.Get(%q,%q): end", resourceGroupName, diskName)
 	}()
 
-	return az.client.Get(resourceGroupName, diskName)
+	mc := newMetricContext("disks", "get", resourceGroupName, az.client.SubscriptionID)
+	result, err = az.client.Get(resourceGroupName, diskName)
+	mc.Observe(err)
+	return
 }
