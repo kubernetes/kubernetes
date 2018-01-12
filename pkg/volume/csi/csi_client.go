@@ -129,7 +129,7 @@ func (c *csiDriverClient) AssertSupportedVersion(ctx grpctx.Context, ver *csipb.
 	c.versionSupported = supported
 
 	if !supported {
-		return fmt.Errorf("version %s not supported", verToStr(ver))
+		return fmt.Errorf("Expected version  %s. Version reported by CSI driver of %s is not supported", verToStr(ver), versToStr(vers))
 	}
 
 	glog.V(4).Info(log("version %s supported", verToStr(ver)))
