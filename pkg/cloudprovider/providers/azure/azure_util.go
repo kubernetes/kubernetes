@@ -389,7 +389,6 @@ func (as *availabilitySet) GetInstanceIDByNodeName(name string) (string, error) 
 	var machine compute.VirtualMachine
 	var err error
 
-	as.operationPollRateLimiter.Accept()
 	machine, err = as.getVirtualMachine(types.NodeName(name))
 	if err != nil {
 		if as.CloudProviderBackoff {
@@ -563,7 +562,6 @@ func (as *availabilitySet) GetVMSetNames(service *v1.Service, nodes []*v1.Node) 
 func (as *availabilitySet) GetPrimaryInterface(nodeName, vmSetName string) (network.Interface, error) {
 	var machine compute.VirtualMachine
 
-	as.operationPollRateLimiter.Accept()
 	machine, err := as.GetVirtualMachineWithRetry(types.NodeName(nodeName))
 	if err != nil {
 		glog.V(2).Infof("GetPrimaryInterface(%s, %s) abort backoff", nodeName, vmSetName)
@@ -589,10 +587,7 @@ func (as *availabilitySet) GetPrimaryInterface(nodeName, vmSetName string) (netw
 		}
 	}
 
-	as.operationPollRateLimiter.Accept()
-	glog.V(10).Infof("InterfacesClient.Get(%q): start", nicName)
 	nic, err := as.InterfacesClient.Get(as.ResourceGroup, nicName, "")
-	glog.V(10).Infof("InterfacesClient.Get(%q): end", nicName)
 	if err != nil {
 		return network.Interface{}, err
 	}
@@ -642,8 +637,6 @@ func (as *availabilitySet) ensureHostInPool(serviceName string, nodeName types.N
 
 		nicName := *nic.Name
 		glog.V(3).Infof("nicupdate(%s): nic(%s) - updating", serviceName, nicName)
-		as.operationPollRateLimiter.Accept()
-		glog.V(10).Infof("InterfacesClient.CreateOrUpdate(%q): start", *nic.Name)
 		respChan, errChan := as.InterfacesClient.CreateOrUpdate(as.ResourceGroup, *nic.Name, nic, nil)
 		resp := <-respChan
 		err := <-errChan

@@ -28,10 +28,10 @@ type pluginInitializer struct {
 var _ admission.PluginInitializer = pluginInitializer{}
 
 // New creates an instance of wardle admission plugins initializer.
-func New(informers informers.SharedInformerFactory) (pluginInitializer, error) {
+func New(informers informers.SharedInformerFactory) pluginInitializer {
 	return pluginInitializer{
 		informers: informers,
-	}, nil
+	}
 }
 
 // Initialize checks the initialization interfaces implemented by a plugin

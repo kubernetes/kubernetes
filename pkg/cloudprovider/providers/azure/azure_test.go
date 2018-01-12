@@ -25,7 +25,6 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/util/flowcontrol"
 	serviceapi "k8s.io/kubernetes/pkg/api/v1/service"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/azure/auth"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
@@ -862,7 +861,6 @@ func getTestCloud() (az *Cloud) {
 			MaximumLoadBalancerRuleCount: 250,
 		},
 	}
-	az.operationPollRateLimiter = flowcontrol.NewTokenBucketRateLimiter(100, 100)
 	az.LoadBalancerClient = newFakeAzureLBClient()
 	az.PublicIPAddressesClient = newFakeAzurePIPClient(az.Config.SubscriptionID)
 	az.SubnetsClient = newFakeAzureSubnetsClient()

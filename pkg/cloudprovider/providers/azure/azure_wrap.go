@@ -96,11 +96,7 @@ func (az *Cloud) getVirtualMachine(nodeName types.NodeName) (vm compute.VirtualM
 			// case we do get instance view every time to fulfill the azure_zones requirement without hitting
 			// throttling.
 			// Consider adding separate parameter for controlling 'InstanceView' once node update issue #56276 is fixed
-			az.operationPollRateLimiter.Accept()
-			glog.V(10).Infof("VirtualMachinesClient.Get(%s): start", vmName)
 			vm, err = az.VirtualMachinesClient.Get(az.ResourceGroup, vmName, compute.InstanceView)
-			glog.V(10).Infof("VirtualMachinesClient.Get(%s): end", vmName)
-
 			exists, realErr := checkResourceExistsFromError(err)
 			if realErr != nil {
 				return vm, realErr
@@ -122,11 +118,7 @@ func (az *Cloud) getVirtualMachine(nodeName types.NodeName) (vm compute.VirtualM
 func (az *Cloud) getRouteTable() (routeTable network.RouteTable, exists bool, err error) {
 	var realErr error
 
-	az.operationPollRateLimiter.Accept()
-	glog.V(10).Infof("RouteTablesClient.Get(%s): start", az.RouteTableName)
 	routeTable, err = az.RouteTablesClient.Get(az.ResourceGroup, az.RouteTableName, "")
-	glog.V(10).Infof("RouteTablesClient.Get(%s): end", az.RouteTableName)
-
 	exists, realErr = checkResourceExistsFromError(err)
 	if realErr != nil {
 		return routeTable, false, realErr
@@ -142,11 +134,7 @@ func (az *Cloud) getRouteTable() (routeTable network.RouteTable, exists bool, er
 func (az *Cloud) getSecurityGroup() (sg network.SecurityGroup, exists bool, err error) {
 	var realErr error
 
-	az.operationPollRateLimiter.Accept()
-	glog.V(10).Infof("SecurityGroupsClient.Get(%s): start", az.SecurityGroupName)
 	sg, err = az.SecurityGroupsClient.Get(az.ResourceGroup, az.SecurityGroupName, "")
-	glog.V(10).Infof("SecurityGroupsClient.Get(%s): end", az.SecurityGroupName)
-
 	exists, realErr = checkResourceExistsFromError(err)
 	if realErr != nil {
 		return sg, false, realErr
@@ -161,11 +149,8 @@ func (az *Cloud) getSecurityGroup() (sg network.SecurityGroup, exists bool, err 
 
 func (az *Cloud) getAzureLoadBalancer(name string) (lb network.LoadBalancer, exists bool, err error) {
 	var realErr error
-	az.operationPollRateLimiter.Accept()
-	glog.V(10).Infof("LoadBalancerClient.Get(%s): start", name)
-	lb, err = az.LoadBalancerClient.Get(az.ResourceGroup, name, "")
-	glog.V(10).Infof("LoadBalancerClient.Get(%s): end", name)
 
+	lb, err = az.LoadBalancerClient.Get(az.ResourceGroup, name, "")
 	exists, realErr = checkResourceExistsFromError(err)
 	if realErr != nil {
 		return lb, false, realErr
@@ -181,10 +166,7 @@ func (az *Cloud) getAzureLoadBalancer(name string) (lb network.LoadBalancer, exi
 func (az *Cloud) listLoadBalancers() (lbListResult network.LoadBalancerListResult, exists bool, err error) {
 	var realErr error
 
-	az.operationPollRateLimiter.Accept()
-	glog.V(10).Infof("LoadBalancerClient.List(%s): start", az.ResourceGroup)
 	lbListResult, err = az.LoadBalancerClient.List(az.ResourceGroup)
-	glog.V(10).Infof("LoadBalancerClient.List(%s): end", az.ResourceGroup)
 	exists, realErr = checkResourceExistsFromError(err)
 	if realErr != nil {
 		return lbListResult, false, realErr
@@ -204,11 +186,7 @@ func (az *Cloud) getPublicIPAddress(pipResourceGroup string, pipName string) (pi
 	}
 
 	var realErr error
-	az.operationPollRateLimiter.Accept()
-	glog.V(10).Infof("PublicIPAddressesClient.Get(%s, %s): start", resourceGroup, pipName)
 	pip, err = az.PublicIPAddressesClient.Get(resourceGroup, pipName, "")
-	glog.V(10).Infof("PublicIPAddressesClient.Get(%s, %s): end", resourceGroup, pipName)
-
 	exists, realErr = checkResourceExistsFromError(err)
 	if realErr != nil {
 		return pip, false, realErr
@@ -231,11 +209,7 @@ func (az *Cloud) getSubnet(virtualNetworkName string, subnetName string) (subnet
 		rg = az.ResourceGroup
 	}
 
-	az.operationPollRateLimiter.Accept()
-	glog.V(10).Infof("SubnetsClient.Get(%s): start", subnetName)
 	subnet, err = az.SubnetsClient.Get(rg, virtualNetworkName, subnetName, "")
-	glog.V(10).Infof("SubnetsClient.Get(%s): end", subnetName)
-
 	exists, realErr = checkResourceExistsFromError(err)
 	if realErr != nil {
 		return subnet, false, realErr
