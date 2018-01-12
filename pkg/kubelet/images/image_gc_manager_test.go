@@ -33,6 +33,7 @@ import (
 )
 
 var zero time.Time
+var sandboxImage = "gcr.io/google_containers/pause-amd64:latest"
 
 func newRealImageGCManager(policy ImageGCPolicy) (*realImageGCManager, *containertest.FakeRuntime, *statstest.StatsProvider) {
 	fakeRuntime := &containertest.FakeRuntime{}
@@ -43,6 +44,7 @@ func newRealImageGCManager(policy ImageGCPolicy) (*realImageGCManager, *containe
 		imageRecords:  make(map[string]*imageRecord),
 		statsProvider: mockStatsProvider,
 		recorder:      &record.FakeRecorder{},
+		sandboxImage:  sandboxImage,
 	}, fakeRuntime, mockStatsProvider
 }
 
@@ -174,6 +176,21 @@ func TestDetectImagesWithNewImage(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(detectedTime, newContainer.firstDetected)
 	assert.Equal(zero, noContainer.lastUsed)
+}
+
+func TestDeleteUnusedImagesExemptSandboxImage(t *testing.T) {
+	manager, fakeRuntime, _ := newRealImageGCManager(ImageGCPolicy{})
+	fakeRuntime.ImageList = []container.Image{
+		{
+			ID:   sandboxImage,
+			Size: 1024,
+		},
+	}
+
+	spaceFreed, err := manager.DeleteUnusedImages()
+	assert := assert.New(t)
+	require.NoError(t, err)
+	assert.EqualValues(0, spaceFreed)
 }
 
 func TestDetectImagesContainerStopped(t *testing.T) {
@@ -524,7 +541,7 @@ func TestValidateImageGCPolicy(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		if _, err := NewImageGCManager(nil, nil, nil, nil, tc.imageGCPolicy); err != nil {
+		if _, err := NewImageGCManager(nil, nil, nil, nil, tc.imageGCPolicy, ""); err != nil {
 			if err.Error() != tc.expectErr {
 				t.Errorf("[%s:]Expected err:%v, but got:%v", tc.name, tc.expectErr, err.Error())
 			}
