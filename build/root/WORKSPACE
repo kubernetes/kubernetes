@@ -12,6 +12,13 @@ http_archive(
     urls = ["https://github.com/kubernetes/repo-infra/archive/1fb0a3ff0cc5308a6d8e2f3f9c57d1f2f940354e.tar.gz"],
 )
 
+http_archive(
+    name = "bazel_skylib",
+    sha256 = "bbccf674aa441c266df9894182d80de104cabd19be98be002f6d478aaa31574d",
+    strip_prefix = "bazel-skylib-2169ae1c374aab4a09aa90e65efe1a3aad4e279b",
+    urls = ["https://github.com/bazelbuild/bazel-skylib/archive/2169ae1c374aab4a09aa90e65efe1a3aad4e279b.tar.gz"],
+)
+
 ETCD_VERSION = "3.1.10"
 
 new_http_archive(
@@ -39,9 +46,9 @@ http_archive(
     urls = ["https://github.com/bazelbuild/rules_docker/archive/8bbe2a8abd382641e65ff7127a3700a8530f02ce.tar.gz"],
 )
 
-load("@io_kubernetes_build//defs:bazel_version.bzl", "check_version")
+load("@bazel_skylib//:lib.bzl", "versions")
 
-check_version("0.8.0")
+versions.check(minimum_bazel_version = "0.8.0")
 
 load("@io_bazel_rules_go//go:def.bzl", "go_rules_dependencies", "go_register_toolchains", "go_download_sdk")
 load("@io_bazel_rules_docker//docker:docker.bzl", "docker_repositories", "docker_pull")
