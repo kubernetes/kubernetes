@@ -644,6 +644,9 @@ EOF
 enable_cluster_autoscaler: '$(echo "${ENABLE_CLUSTER_AUTOSCALER}" | sed -e "s/'/''/g")'
 autoscaler_mig_config: '$(echo "${AUTOSCALER_MIG_CONFIG}" | sed -e "s/'/''/g")'
 autoscaler_expander_config: '$(echo "${AUTOSCALER_EXPANDER_CONFIG}" | sed -e "s/'/''/g")'
+autoscaler_node_autoprovisioning_enabled: '$(echo "${AUTOSCALER_NODE_AUTOPROVISIONING_ENABLED}" | sed -e "s/'/''/g")'
+autoscaler_gke_cluster_name: '$(echo "${AUTOSCALER_GKE_CLUSTER_NAME}" | sed -e "s/'/''/g")'
+autoscaler_cloud_provider: '$(echo "${AUTOSCALER_CLOUD_PROVIDER}" | sed -e "s/'/''/g")'
 EOF
     fi
     if [ -n "${SCHEDULING_ALGORITHM_PROVIDER:-}" ]; then

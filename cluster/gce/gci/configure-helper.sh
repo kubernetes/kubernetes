@@ -1934,11 +1934,18 @@ function start-cluster-autoscaler {
     local -r src_file="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty/cluster-autoscaler.manifest"
     remove-salt-config-comments "${src_file}"
 
-    local params="${AUTOSCALER_MIG_CONFIG} ${CLOUD_CONFIG_OPT} ${AUTOSCALER_EXPANDER_CONFIG:---expander=price}"
+    local params="${CLOUD_CONFIG_OPT} ${AUTOSCALER_EXPANDER_CONFIG:---expander=price}"
     sed -i -e "s@{{params}}@${params}@g" "${src_file}"
     sed -i -e "s@{{cloud_config_mount}}@${CLOUD_CONFIG_MOUNT}@g" "${src_file}"
     sed -i -e "s@{{cloud_config_volume}}@${CLOUD_CONFIG_VOLUME}@g" "${src_file}"
     sed -i -e "s@{%.*%}@@g" "${src_file}"
+    local autoscaling_params=""
+    if [[ -z ${AUTOSCALER_NODE_AUTOPROVISIONING_ENABLED:-} ]]; then
+      autoscaling_params="${AUTOSCALER_MIG_CONFIG}"
+    fi
+    sed -i -e "s@{{autoscaling_params}}@${autoscaling_params}@g" "${src_file}"
+    local autoprovisioning_params="${AUTOSCALER_NODE_AUTOPROVISIONING_ENABLED:-} ${AUTOSCALER_GKE_CLUSTER_NAME:-} ${AUTOSCALER_CLOUD_PROVIDER:-}"
+    sed -i -e "s@{{autoprovisioning_params}}@${autoprovisioning_params}@g" "${src_file}"
 
     cp "${src_file}" /etc/kubernetes/manifests
   fi
