@@ -20,7 +20,6 @@ filegroup(
         "//cluster/images/etcd/rollback:all-srcs",
         "//cluster/images/hyperkube:all-srcs",
         "//cluster/images/kubemark:all-srcs",
-        "//cluster/saltbase:all-srcs",
     ],
     tags = ["automanaged"],
 )
