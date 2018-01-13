@@ -391,38 +391,35 @@ function kube::release::package_salt_tarball() {
 function kube::release::package_kube_manifests_tarball() {
   kube::log::status "Building tarball: manifests"
 
-  local salt_dir="${KUBE_ROOT}/cluster/saltbase/salt"
+  local src_dir="${KUBE_ROOT}/cluster/gce/manifests"
 
   local release_stage="${RELEASE_STAGE}/manifests/kubernetes"
   rm -rf "${release_stage}"
 
-  mkdir -p "${release_stage}"
-  cp "${salt_dir}/kube-registry-proxy/kube-registry-proxy.yaml" "${release_stage}/"
-  cp "${salt_dir}/kube-proxy/kube-proxy.manifest" "${release_stage}/"
-
-  local gci_dst_dir="${release_stage}/gci-trusty"
-  mkdir -p "${gci_dst_dir}"
-  cp "${salt_dir}/cluster-autoscaler/cluster-autoscaler.manifest" "${gci_dst_dir}/"
-  cp "${salt_dir}/etcd/etcd.manifest" "${gci_dst_dir}"
-  cp "${salt_dir}/kube-scheduler/kube-scheduler.manifest" "${gci_dst_dir}"
-  cp "${salt_dir}/kube-apiserver/kube-apiserver.manifest" "${gci_dst_dir}"
-  cp "${salt_dir}/kube-apiserver/abac-authz-policy.jsonl" "${gci_dst_dir}"
-  cp "${salt_dir}/kube-controller-manager/kube-controller-manager.manifest" "${gci_dst_dir}"
-  cp "${salt_dir}/kube-addons/kube-addon-manager.yaml" "${gci_dst_dir}"
-  cp "${salt_dir}/l7-gcp/glbc.manifest" "${gci_dst_dir}"
-  cp "${salt_dir}/rescheduler/rescheduler.manifest" "${gci_dst_dir}/"
-  cp "${salt_dir}/e2e-image-puller/e2e-image-puller.manifest" "${gci_dst_dir}/"
-  cp "${KUBE_ROOT}/cluster/gce/gci/configure-helper.sh" "${gci_dst_dir}/gci-configure-helper.sh"
-  cp "${KUBE_ROOT}/cluster/gce/gci/health-monitor.sh" "${gci_dst_dir}/health-monitor.sh"
-  cp -r "${salt_dir}/kube-admission-controls/limit-range" "${gci_dst_dir}"
+  local dst_dir="${release_stage}/gci-trusty"
+  mkdir -p "${dst_dir}"
+  cp "${src_dir}/kube-registry-proxy.yaml" "${dst_dir}/"
+  cp "${src_dir}/kube-proxy.manifest" "${dst_dir}/"
+  cp "${src_dir}/cluster-autoscaler.manifest" "${dst_dir}/"
+  cp "${src_dir}/etcd.manifest" "${dst_dir}"
+  cp "${src_dir}/kube-scheduler.manifest" "${dst_dir}"
+  cp "${src_dir}/kube-apiserver.manifest" "${dst_dir}"
+  cp "${src_dir}/abac-authz-policy.jsonl" "${dst_dir}"
+  cp "${src_dir}/kube-controller-manager.manifest" "${dst_dir}"
+  cp "${src_dir}/kube-addon-manager.yaml" "${dst_dir}"
+  cp "${src_dir}/glbc.manifest" "${dst_dir}"
+  cp "${src_dir}/rescheduler.manifest" "${dst_dir}/"
+  cp "${src_dir}/e2e-image-puller.manifest" "${dst_dir}/"
+  cp "${KUBE_ROOT}/cluster/gce/gci/configure-helper.sh" "${dst_dir}/gci-configure-helper.sh"
+  cp "${KUBE_ROOT}/cluster/gce/gci/health-monitor.sh" "${dst_dir}/health-monitor.sh"
   local objects
   objects=$(cd "${KUBE_ROOT}/cluster/addons" && find . \( -name \*.yaml -or -name \*.yaml.in -or -name \*.json \) | grep -v demo)
-  tar c -C "${KUBE_ROOT}/cluster/addons" ${objects} | tar x -C "${gci_dst_dir}"
+  tar c -C "${KUBE_ROOT}/cluster/addons" ${objects} | tar x -C "${dst_dir}"
   # Merge GCE-specific addons with general purpose addons.
   local gce_objects
   gce_objects=$(cd "${KUBE_ROOT}/cluster/gce/addons" && find . \( -name \*.yaml -or -name \*.yaml.in -or -name \*.json \) \( -not -name \*demo\* \))
   if [[ -n "${gce_objects}" ]]; then
-    tar c -C "${KUBE_ROOT}/cluster/gce/addons" ${gce_objects} | tar x -C "${gci_dst_dir}"
+    tar c -C "${KUBE_ROOT}/cluster/gce/addons" ${gce_objects} | tar x -C "${dst_dir}"
   fi
 
   kube::release::clean_cruft
