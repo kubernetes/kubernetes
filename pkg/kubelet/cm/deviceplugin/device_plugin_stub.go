@@ -89,7 +89,7 @@ func (m *Stub) Start() error {
 	// Wait till grpc server is ready.
 	for i := 0; i < 10; i++ {
 		services := m.server.GetServiceInfo()
-		if len(services) > 1 {
+		if len(services) > 0 {
 			break
 		}
 		time.Sleep(1 * time.Second)
@@ -134,16 +134,8 @@ func (m *Stub) Register(kubeletEndpoint, resourceName string) error {
 // ListAndWatch lists devices and update that list according to the Update call
 func (m *Stub) ListAndWatch(e *pluginapi.Empty, s pluginapi.DevicePlugin_ListAndWatchServer) error {
 	log.Println("ListAndWatch")
-	var devs []*pluginapi.Device
 
-	for _, d := range m.devs {
-		devs = append(devs, &pluginapi.Device{
-			ID:     d.ID,
-			Health: pluginapi.Healthy,
-		})
-	}
-
-	s.Send(&pluginapi.ListAndWatchResponse{Devices: devs})
+	s.Send(&pluginapi.ListAndWatchResponse{Devices: m.devs})
 
 	for {
 		select {
