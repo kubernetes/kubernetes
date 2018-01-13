@@ -1265,7 +1265,7 @@ var _ = SIGDescribe("Services", func() {
 		}
 
 		By("Scaling down replication controller to zero")
-		framework.ScaleRC(f.ClientSet, f.InternalClientset, t.Namespace, rcSpec.Name, 0, false)
+		framework.ScaleRC(f.ClientSet, f.InternalClientset, f.ScalesGetter, t.Namespace, rcSpec.Name, 0, false)
 
 		By("Update service to not tolerate unready services")
 		_, err = framework.UpdateService(f.ClientSet, t.Namespace, t.ServiceName, func(s *v1.Service) {
