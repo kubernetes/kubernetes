@@ -39,7 +39,7 @@ if ! which go-bindata &>/dev/null ; then
 fi
 
 # run the generation from the root directory for stable output
-pushd "${KUBE_ROOT}"
+pushd "${KUBE_ROOT}" >/dev/null
 
 # These are files for e2e tests.
 BINDATA_OUTPUT="test/e2e/generated/bindata.go"
@@ -84,4 +84,4 @@ fi
 
 rm -f "${BINDATA_OUTPUT}.tmp"
 
-popd
+popd >/dev/null

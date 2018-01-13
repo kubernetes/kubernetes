@@ -8,6 +8,8 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "csi_hostpath.go",
+        "csi_volumes.go",
         "empty_dir_wrapper.go",
         "flexvolume.go",
         "pd.go",
@@ -48,6 +50,7 @@ go_library(
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/api/extensions/v1beta1:go_default_library",
         "//vendor/k8s.io/api/policy/v1beta1:go_default_library",
+        "//vendor/k8s.io/api/rbac/v1:go_default_library",
         "//vendor/k8s.io/api/rbac/v1beta1:go_default_library",
         "//vendor/k8s.io/api/storage/v1:go_default_library",
         "//vendor/k8s.io/api/storage/v1beta1:go_default_library",

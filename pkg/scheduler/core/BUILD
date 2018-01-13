@@ -50,6 +50,7 @@ go_library(
         "//pkg/scheduler/algorithm/predicates:go_default_library",
         "//pkg/scheduler/algorithm/priorities/util:go_default_library",
         "//pkg/scheduler/api:go_default_library",
+        "//pkg/scheduler/metrics:go_default_library",
         "//pkg/scheduler/schedulercache:go_default_library",
         "//pkg/scheduler/util:go_default_library",
         "//pkg/scheduler/volumebinder:go_default_library",

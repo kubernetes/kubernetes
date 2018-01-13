@@ -53,7 +53,10 @@ type Scaler interface {
 	ScaleSimple(namespace, name string, preconditions *ScalePrecondition, newSize uint) (updatedResourceVersion string, err error)
 }
 
-func ScalerFor(kind schema.GroupKind, c internalclientset.Interface) (Scaler, error) {
+// ScalerFor gets a scaler for a given resource
+// TODO(p0lyn0mial): remove kind and internalclientset
+// TODO(p0lyn0mial): once we have only one scaler, there is  no need to return an error anymore.
+func ScalerFor(kind schema.GroupKind, c internalclientset.Interface, scalesGetter scaleclient.ScalesGetter, gr schema.GroupResource) (Scaler, error) {
 	switch kind {
 	case api.Kind("ReplicationController"):
 		return &ReplicationControllerScaler{c.Core()}, nil
@@ -63,10 +66,9 @@ func ScalerFor(kind schema.GroupKind, c internalclientset.Interface) (Scaler, er
 		return &JobScaler{c.Batch()}, nil // Either kind of job can be scaled with Batch interface.
 	case apps.Kind("StatefulSet"):
 		return &StatefulSetScaler{c.Apps()}, nil
-	case extensions.Kind("Deployment"), apps.Kind("Deployment"):
-		return &DeploymentScaler{c.Extensions()}, nil
+	default:
+		return &GenericScaler{scalesGetter, gr}, nil
 	}
-	return nil, fmt.Errorf("no scaler has been implemented for %q", kind)
 }
 
 // ScalePrecondition describes a condition that must be true for the scale to take place
@@ -533,7 +535,7 @@ func (precondition *ScalePrecondition) validateGeneric(scale *autoscalingapi.Sca
 }
 
 // GenericScaler can update scales for resources in a particular namespace
-// TODO(o0lyn0mial): when the work on GenericScaler is done, don't
+// TODO(po0lyn0mial): when the work on GenericScaler is done, don't
 // export the GenericScaler. Instead use ScalerFor method for getting the Scaler
 // also update the UTs
 type GenericScaler struct {

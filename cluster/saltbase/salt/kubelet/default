@@ -22,7 +22,7 @@
 {% set debugging_handlers = "--enable-debugging-handlers=true" -%}
 
 {% if grains['roles'][0] == 'kubernetes-master' -%}
-  {% if grains.cloud in ['aws', 'gce', 'vagrant', 'photon-controller', 'openstack', 'azure-legacy'] -%}
+  {% if grains.cloud == 'gce' -%}
     # Unless given a specific directive, disable registration for the kubelet
     # running on the master.
     {% if kubeconfig != "" -%}
@@ -37,14 +37,11 @@
 {% endif -%}
 
 {% set cloud_provider = "" -%}
-{% if grains.cloud is defined and grains.cloud not in ['vagrant', 'photon-controller', 'azure-legacy'] -%}
+{% if grains.cloud is defined -%}
   {% set cloud_provider = "--cloud-provider=" + grains.cloud -%}
 {% endif -%}
 
 {% set cloud_config = "" -%}
-{% if grains.cloud in [ 'openstack' ] and grains.cloud_config is defined -%}
-  {% set cloud_config = "--cloud-config=" + grains.cloud_config -%}
-{% endif -%}
 
 {% set config = "--pod-manifest-path=/etc/kubernetes/manifests" -%}
 

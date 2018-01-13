@@ -446,7 +446,7 @@ func (o *DrainOptions) getPodsForDeletion(nodeInfo *resource.Info) (pods []corev
 
 	for _, pod := range podList.Items {
 		podOk := true
-		for _, filt := range []podFilter{mirrorPodFilter, o.localStorageFilter, o.unreplicatedFilter, o.daemonsetFilter} {
+		for _, filt := range []podFilter{o.daemonsetFilter, mirrorPodFilter, o.localStorageFilter, o.unreplicatedFilter} {
 			filterOk, w, f := filt(pod)
 
 			podOk = podOk && filterOk
@@ -455,6 +455,13 @@ func (o *DrainOptions) getPodsForDeletion(nodeInfo *resource.Info) (pods []corev
 			}
 			if f != nil {
 				fs[f.string] = append(fs[f.string], pod.Name)
+			}
+
+			// short-circuit as soon as pod not ok
+			// at that point, there is no reason to run pod
+			// through any additional filters
+			if !podOk {
+				break
 			}
 		}
 		if podOk {

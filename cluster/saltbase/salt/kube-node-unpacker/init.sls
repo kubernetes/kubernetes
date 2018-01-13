@@ -24,10 +24,6 @@ kube-proxy-tar:
 {% set is_helium = '0' %}
 # Super annoying, the salt version on GCE is old enough that 'salt.cmd.run'
 # isn't supported
-{% if grains.cloud is defined and grains.cloud == 'aws' %}
-   # Salt has terrible problems with systemd on AWS too
-   {% set is_helium = '0' %}
-{% endif %}
 # Salt Helium doesn't support systemd modules for service running
 {% if pillar.get('is_systemd') and is_helium == '0' %}
 

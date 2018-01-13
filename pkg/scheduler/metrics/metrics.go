@@ -25,8 +25,7 @@ import (
 
 const schedulerSubsystem = "scheduler"
 
-var BindingSaturationReportInterval = 1 * time.Second
-
+// All the histogram based metrics have 1ms as size for the smallest bucket.
 var (
 	E2eSchedulingLatency = prometheus.NewHistogram(
 		prometheus.HistogramOpts{
@@ -44,6 +43,30 @@ var (
 			Buckets:   prometheus.ExponentialBuckets(1000, 2, 15),
 		},
 	)
+	SchedulingAlgorithmPredicateEvaluationDuration = prometheus.NewHistogram(
+		prometheus.HistogramOpts{
+			Subsystem: schedulerSubsystem,
+			Name:      "scheduling_algorithm_predicate_evaluation",
+			Help:      "Scheduling algorithm predicate evaluation duration",
+			Buckets:   prometheus.ExponentialBuckets(1000, 2, 15),
+		},
+	)
+	SchedulingAlgorithmPriorityEvaluationDuration = prometheus.NewHistogram(
+		prometheus.HistogramOpts{
+			Subsystem: schedulerSubsystem,
+			Name:      "scheduling_algorithm_priority_evaluation",
+			Help:      "Scheduling algorithm priority evaluation duration",
+			Buckets:   prometheus.ExponentialBuckets(1000, 2, 15),
+		},
+	)
+	SchedulingAlgorithmPremptionEvaluationDuration = prometheus.NewHistogram(
+		prometheus.HistogramOpts{
+			Subsystem: schedulerSubsystem,
+			Name:      "scheduling_algorithm_preemption_evaluation",
+			Help:      "Scheduling algorithm preemption evaluation duration",
+			Buckets:   prometheus.ExponentialBuckets(1000, 2, 15),
+		},
+	)
 	BindingLatency = prometheus.NewHistogram(
 		prometheus.HistogramOpts{
 			Subsystem: schedulerSubsystem,
@@ -52,6 +75,18 @@ var (
 			Buckets:   prometheus.ExponentialBuckets(1000, 2, 15),
 		},
 	)
+	PreemptionVictims = prometheus.NewGauge(
+		prometheus.GaugeOpts{
+			Subsystem: schedulerSubsystem,
+			Name:      "pod_preemption_victims",
+			Help:      "Number of selected preemption victims",
+		})
+	PreemptionAttempts = prometheus.NewCounter(
+		prometheus.CounterOpts{
+			Subsystem: schedulerSubsystem,
+			Name:      "total_preemption_attempts",
+			Help:      "Total preemption attempts in the cluster till now",
+		})
 )
 
 var registerMetrics sync.Once
@@ -63,6 +98,12 @@ func Register() {
 		prometheus.MustRegister(E2eSchedulingLatency)
 		prometheus.MustRegister(SchedulingAlgorithmLatency)
 		prometheus.MustRegister(BindingLatency)
+
+		prometheus.MustRegister(SchedulingAlgorithmPredicateEvaluationDuration)
+		prometheus.MustRegister(SchedulingAlgorithmPriorityEvaluationDuration)
+		prometheus.MustRegister(SchedulingAlgorithmPremptionEvaluationDuration)
+		prometheus.MustRegister(PreemptionVictims)
+		prometheus.MustRegister(PreemptionAttempts)
 	})
 }
 
