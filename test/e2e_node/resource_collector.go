@@ -45,6 +45,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e_node/perftype"
 
+	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
 
@@ -373,6 +374,7 @@ func deletePodsSync(f *framework.Framework, pods []*v1.Pod) {
 	for _, pod := range pods {
 		wg.Add(1)
 		go func(pod *v1.Pod) {
+			defer GinkgoRecover()
 			defer wg.Done()
 
 			err := f.PodClient().Delete(pod.ObjectMeta.Name, metav1.NewDeleteOptions(30))
