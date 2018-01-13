@@ -25,7 +25,7 @@ source "${KUBE_ROOT}/cluster/gce/${KUBE_CONFIG_FILE-"config-default.sh"}"
 source "${KUBE_ROOT}/cluster/common.sh"
 source "${KUBE_ROOT}/hack/lib/util.sh"
 
-if [[ "${NODE_OS_DISTRIBUTION}" == "debian" || "${NODE_OS_DISTRIBUTION}" == "trusty" || "${NODE_OS_DISTRIBUTION}" == "gci" || "${NODE_OS_DISTRIBUTION}" == "ubuntu" ]]; then
+if [[ "${NODE_OS_DISTRIBUTION}" == "gci" || "${NODE_OS_DISTRIBUTION}" == "ubuntu" ]]; then
   source "${KUBE_ROOT}/cluster/gce/${NODE_OS_DISTRIBUTION}/node-helper.sh"
 else
   echo "Cannot operate on cluster using node os distro: ${NODE_OS_DISTRIBUTION}" >&2
@@ -2172,13 +2172,4 @@ function ssh-to-node() {
 # Perform preparations required to run e2e tests
 function prepare-e2e() {
   detect-project
-}
-
-# Writes configure-vm.sh to a temporary location with comments stripped. GCE
-# limits the size of metadata fields to 32K, and stripping comments is the
-# easiest way to buy us a little more room.
-function prepare-startup-script() {
-  # Find a standard sed instance (and ensure that the command works as expected on a Mac).
-  kube::util::ensure-gnu-sed
-  ${SED} '/^\s*#\([^!].*\)*$/ d' ${KUBE_ROOT}/cluster/gce/configure-vm.sh > ${KUBE_TEMP}/configure-vm.sh
 }
