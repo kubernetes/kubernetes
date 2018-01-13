@@ -139,7 +139,7 @@ func (p *podTolerationsPlugin) Admit(a admission.Attributes) error {
 	}
 	pod.Spec.Tolerations = finalTolerations
 
-	return p.Validate(a)
+	return nil
 }
 func (p *podTolerationsPlugin) Validate(a admission.Attributes) error {
 	if shouldIgnore(a) {

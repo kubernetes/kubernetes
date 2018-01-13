@@ -113,6 +113,11 @@ func TestRejectsMirrorPodWithServiceAccount(t *testing.T) {
 	}
 	attrs := admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), "myns", "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, nil)
 	err := NewServiceAccount().Admit(attrs)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+
+	err = NewServiceAccount().Validate(attrs)
 	if err == nil {
 		t.Errorf("Expected a mirror pod to be prevented from referencing a service account")
 	}
@@ -133,6 +138,11 @@ func TestRejectsMirrorPodWithSecretVolumes(t *testing.T) {
 	}
 	attrs := admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), "myns", "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, nil)
 	err := NewServiceAccount().Admit(attrs)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+
+	err = NewServiceAccount().Validate(attrs)
 	if err == nil {
 		t.Errorf("Expected a mirror pod to be prevented from referencing a secret volume")
 	}
@@ -607,7 +617,11 @@ func TestRejectsUnreferencedSecretVolumes(t *testing.T) {
 		},
 	}
 	attrs := admission.NewAttributesRecord(pod1, nil, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, nil)
-	if err := admit.Admit(attrs); err == nil {
+	if err := admit.Admit(attrs); err != nil {
+		t.Errorf("Expected error: %v", err)
+	}
+	err := admit.Validate(attrs)
+	if err == nil {
 		t.Errorf("Expected rejection for using a secret the service account does not reference")
 	}
 
@@ -631,7 +645,10 @@ func TestRejectsUnreferencedSecretVolumes(t *testing.T) {
 		},
 	}
 	attrs = admission.NewAttributesRecord(pod2, nil, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, nil)
-	if err := admit.Admit(attrs); err == nil || !strings.Contains(err.Error(), "with envVar") {
+	if err := admit.Admit(attrs); err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	if err := admit.Validate(attrs); err == nil || !strings.Contains(err.Error(), "with envVar") {
 		t.Errorf("Unexpected error: %v", err)
 	}
 
@@ -655,7 +672,10 @@ func TestRejectsUnreferencedSecretVolumes(t *testing.T) {
 		},
 	}
 	attrs = admission.NewAttributesRecord(pod2, nil, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, nil)
-	if err := admit.Admit(attrs); err == nil || !strings.Contains(err.Error(), "with envVar") {
+	if err := admit.Admit(attrs); err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	if err := admit.Validate(attrs); err == nil || !strings.Contains(err.Error(), "with envVar") {
 		t.Errorf("Unexpected error: %v", err)
 	}
 }
@@ -687,6 +707,10 @@ func TestAllowUnreferencedSecretVolumesForPermissiveSAs(t *testing.T) {
 	}
 	attrs := admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, nil)
 	err := admit.Admit(attrs)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	err = admit.Validate(attrs)
 	if err == nil {
 		t.Errorf("Expected rejection for using a secret the service account does not reference")
 	}
@@ -722,6 +746,11 @@ func TestAllowsReferencedImagePullSecrets(t *testing.T) {
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
+
+	err = admit.Validate(attrs)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
 }
 
 func TestRejectsUnreferencedImagePullSecrets(t *testing.T) {
@@ -748,6 +777,11 @@ func TestRejectsUnreferencedImagePullSecrets(t *testing.T) {
 	}
 	attrs := admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, nil)
 	err := admit.Admit(attrs)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+
+	err = admit.Validate(attrs)
 	if err == nil {
 		t.Errorf("Expected rejection for using a secret the service account does not reference")
 	}

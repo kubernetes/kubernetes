@@ -152,7 +152,7 @@ func (s *serviceAccount) Admit(a admission.Attributes) (err error) {
 	// That makes the kubelet very angry and confused, and it immediately deletes the pod (because the spec doesn't match)
 	// That said, don't allow mirror pods to reference ServiceAccounts or SecretVolumeSources either
 	if _, isMirrorPod := pod.Annotations[api.MirrorPodAnnotationKey]; isMirrorPod {
-		return s.Validate(a)
+		return nil
 	}
 
 	// Set the default service account if needed
@@ -177,7 +177,7 @@ func (s *serviceAccount) Admit(a admission.Attributes) (err error) {
 		copy(pod.Spec.ImagePullSecrets, serviceAccount.ImagePullSecrets)
 	}
 
-	return s.Validate(a)
+	return nil
 }
 
 func (s *serviceAccount) Validate(a admission.Attributes) (err error) {
