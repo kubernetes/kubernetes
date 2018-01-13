@@ -174,7 +174,7 @@ func (a *MutatingWebhook) ValidateInitialization() error {
 		return fmt.Errorf("MutatingWebhook.convertor is not properly setup: %v", err)
 	}
 	if a.defaulter == nil {
-		return fmt.Errorf("MutatingWebhook.defaulter is not properly setup: %v")
+		return fmt.Errorf("MutatingWebhook.defaulter is not properly setup")
 	}
 	go a.hookSource.Run(wait.NeverStop)
 	return nil
