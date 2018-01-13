@@ -1438,3 +1438,50 @@ function pushd() {
 function popd() {
   command popd $@ > /dev/null
 }
+
+# This figures out the host platform without relying on golang.  We need this as
+# we don't want a golang install to be a prerequisite to building yet we need
+# this info to figure out where the final binaries are placed.
+kube::util::host_platform() {
+  case "$(uname -s)" in
+    Darwin)
+      CLIENT_PLATFORM=darwin
+      ;;
+    Linux)
+      CLIENT_PLATFORM=linux
+      ;;
+    *)
+      echo "Unknown, unsupported platform: ${kernel}." >&2
+      echo "Supported platforms: Linux, Darwin." >&2
+      echo "Bailing out." >&2
+      exit 2
+  esac
+
+  case "$(uname -m)" in
+    x86_64*|i?86_64*|amd64*)
+      CLIENT_ARCH="amd64"
+      ;;
+    aarch64*|arm64*)
+      CLIENT_ARCH="arm64"
+      ;;
+    arm*)
+      CLIENT_ARCH="arm"
+      ;;
+    i?86*)
+      CLIENT_ARCH="x86"
+      ;;
+    s390x*)
+      CLIENT_ARCH="s390x"
+      ;;
+    ppc64le*)
+      CLIENT_ARCH=ppc64le
+      ;;
+    *)
+      echo "Unknown, unsupported architecture (${machine})." >&2
+      echo "Supported architectures x86_64, i686, arm, arm64, s390x." >&2
+      echo "Bailing out." >&2
+      exit 3
+      ;;
+  esac
+  echo "${CLIENT_PLATFORM}/${CLIENT_ARCH}"
+}
