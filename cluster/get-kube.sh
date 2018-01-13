@@ -24,14 +24,6 @@
 #  Set KUBERNETES_PROVIDER to choose between different providers:
 #  Google Compute Engine [default]
 #   * export KUBERNETES_PROVIDER=gce; wget -q -O - https://get.k8s.io | bash
-#  Libvirt (with CoreOS as a guest operating system)
-#   * export KUBERNETES_PROVIDER=libvirt-coreos; wget -q -O - https://get.k8s.io | bash
-#  Vagrant (local virtual machines)
-#   * export KUBERNETES_PROVIDER=vagrant; wget -q -O - https://get.k8s.io | bash
-#  VMWare Photon Controller
-#   * export KUBERNETES_PROVIDER=photon-controller; wget -q -O - https://get.k8s.io | bash
-#  OpenStack-Heat
-#   * export KUBERNETES_PROVIDER=openstack-heat; wget -q -O - https://get.k8s.io | bash
 #
 #  Set KUBERNETES_RELEASE to choose a specific release instead of the current
 #    stable release, (e.g. 'v1.3.7').
