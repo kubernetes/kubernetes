@@ -20,7 +20,6 @@ filegroup(
         "//cluster/images/etcd/rollback:all-srcs",
         "//cluster/images/hyperkube:all-srcs",
         "//cluster/images/kubemark:all-srcs",
-        "//cluster/lib:all-srcs",
         "//cluster/saltbase:all-srcs",
     ],
     tags = ["automanaged"],
@@ -55,7 +54,6 @@ sh_test(
     name = "common_test",
     srcs = ["common.sh"],
     deps = [
-        "//cluster/lib",
         "//hack/lib",
     ],
 )
@@ -64,7 +62,6 @@ sh_test(
     name = "clientbin_test",
     srcs = ["clientbin.sh"],
     deps = [
-        "//cluster/lib",
         "//hack/lib",
     ],
 )
@@ -73,7 +70,6 @@ sh_test(
     name = "kube-util_test",
     srcs = ["kube-util.sh"],
     deps = [
-        "//cluster/lib",
         "//hack/lib",
     ],
 )
