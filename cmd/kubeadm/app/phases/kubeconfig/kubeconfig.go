@@ -31,6 +31,7 @@ import (
 	certutil "k8s.io/client-go/util/cert"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs/pkiutil"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
@@ -65,6 +66,19 @@ func CreateInitKubeConfigFiles(outDir string, cfg *kubeadmapi.MasterConfiguratio
 		cfg,
 		kubeadmconstants.AdminKubeConfigFileName,
 		kubeadmconstants.KubeletKubeConfigFileName,
+		kubeadmconstants.ControllerManagerKubeConfigFileName,
+		kubeadmconstants.SchedulerKubeConfigFileName,
+	)
+}
+
+// CreateJoinMasterKubeConfigFiles will create and write to disk the kubeconfig files required by kubeadm
+// join --master workflow, plus a the admin kubeconfig file to be deployed on the new master.
+// If kubeconfig files already exists, they are used only if evaluated equal; otherwise an error is returned.
+func CreateJoinMasterKubeConfigFiles(outDir string, cfg *kubeadmapi.MasterConfiguration) error {
+	return createKubeConfigFiles(
+		outDir,
+		cfg,
+		kubeadmconstants.AdminKubeConfigFileName,
 		kubeadmconstants.ControllerManagerKubeConfigFileName,
 		kubeadmconstants.SchedulerKubeConfigFileName,
 	)
@@ -175,6 +189,16 @@ func getKubeConfigSpecs(cfg *kubeadmapi.MasterConfiguration) (map[string]*kubeCo
 				CAKey: caKey,
 			},
 		},
+	}
+
+	// if we are in HA configuration
+	if features.Enabled(cfg.FeatureGates, features.HighAvailability) {
+		// The controller manager and the scheduler are explicitly connected to the local instance of
+		// API server (via hostnetwork) thus avoiding to go through the external load balancer
+		masterLocalEndpoint := kubeadmutil.GetHostNetworkMasterEndpoint(cfg)
+
+		kubeConfigSpec[kubeadmconstants.ControllerManagerKubeConfigFileName].APIServer = masterLocalEndpoint
+		kubeConfigSpec[kubeadmconstants.SchedulerKubeConfigFileName].APIServer = masterLocalEndpoint
 	}
 
 	return kubeConfigSpec, nil

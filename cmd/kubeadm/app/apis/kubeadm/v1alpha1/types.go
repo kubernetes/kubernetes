@@ -143,6 +143,19 @@ type NodeConfiguration struct {
 
 	// FeatureGates enabled by the user
 	FeatureGates map[string]bool `json:"featureGates,omitempty"`
+
+	// Master flag specifies that the node should be joined as an additional master
+	// ** Note for reviewers:
+	// ** Eventually we can generalize this concept introducing (Node)Roles
+	// ** (change from join --master to join --role=master)
+	// ** WDYT?
+	Master bool `json:"master"`
+
+	// MasterConfigurationFile specifies the path of the cluster configuration file.
+	// Please note that the user is requested provide this file only if the
+	// RBAC rules for accessing the kubeadm-config ConfigMap during the discovery phase
+	// are explicitly removed.
+	MasterConfigurationFile string `json:"masterConfigurationFile"`
 }
 
 // KubeletConfiguration contains elements describing initial remote configuration of kubelet

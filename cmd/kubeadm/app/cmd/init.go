@@ -249,6 +249,22 @@ func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration, ignorePrefligh
 		return nil, err
 	}
 
+	// if the cluster should be created with features.HighAvailability enabled
+	if !features.Enabled(cfg.FeatureGates, features.HighAvailability) {
+
+		// Checks if the cluster meets the requirements for kubeadm HighAvailability / current version
+
+		// 1. Checks if the cluster uses an external etcd
+		if len(cfg.Etcd.Endpoints) == 0 {
+			return nil, fmt.Errorf("a cluster with '--feature-gates=HighAvailability=true' requires an external etcd")
+		}
+
+		// 2. Checks if the cluster uses an external load balancer
+		// TODO
+		// ** Note for reviewers:
+		// ** How to check this? Check if advertise addres != any IP address of the machine's newtwork interfaces?
+	}
+
 	fmt.Printf("[init] Using Kubernetes version: %s\n", cfg.KubernetesVersion)
 	fmt.Printf("[init] Using Authorization modes: %v\n", cfg.AuthorizationModes)
 

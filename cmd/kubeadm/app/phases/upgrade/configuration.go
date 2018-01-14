@@ -33,6 +33,11 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 )
 
+// ** Note for reviewers:
+// ** Functions in this package will be re-used in kubeadm join --master.
+// ** As a consequence we should probably move this functions to the util/config package (this will be implemented in another PR)
+// ** WDYT?
+
 // FetchConfiguration fetches configuration required for upgrading your cluster from a file (which has precedence) or a ConfigMap in the cluster
 func FetchConfiguration(client clientset.Interface, w io.Writer, cfgPath string) (*kubeadmapiext.MasterConfiguration, error) {
 	fmt.Println("[upgrade/config] Making sure the configuration is correct:")

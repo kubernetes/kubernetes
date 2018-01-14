@@ -49,3 +49,14 @@ func GetMasterHostPort(cfg *kubeadmapi.MasterConfiguration) (string, error) {
 	hostPort := net.JoinHostPort(masterIP.String(), strconv.Itoa(int(cfg.API.BindPort)))
 	return hostPort, nil
 }
+
+// GetHostNetworkMasterEndpoint returns a properly formatted Master Endpoint
+// that allows to access the API server via hostnetwork/local host.
+func GetHostNetworkMasterEndpoint(cfg *kubeadmapi.MasterConfiguration) string {
+
+	// ** note for reviewers
+	// ** ipv6?
+	hostPort := net.JoinHostPort("127.0.0.1", strconv.Itoa(int(cfg.API.BindPort)))
+
+	return fmt.Sprintf("https://%s", hostPort)
+}

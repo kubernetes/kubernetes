@@ -28,6 +28,7 @@ import (
 	certutil "k8s.io/client-go/util/cert"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs/pkiutil"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 )
@@ -443,6 +444,61 @@ func UsingExternalCA(cfg *kubeadmapi.MasterConfiguration) (bool, error) {
 	return true, nil
 }
 
+// ** Note for reviewers:
+// ** Following function is meant to be used in kubeadm join --master, but it is temporary implemented
+// ** here because it uses validate* functions which are not public.
+// ** We should probably make validate* function public and move them
+// ** into the pkiutil package (this will be implemented in another PR)
+// ** WDYT?
+
+// CheckIfLocalPkiReadyForJoinAsMaster determines whether the local pki folder of a node is ready for
+// bootstrapping an additional master node.
+// Please note that this function enforces that the certificates that must be equal across all
+// the master nodes were provided by the user, while it tolerates that the other certificates are
+// not provided (eventually, those certificates will be re-created during kubeadm --join master)
+func CheckIfLocalPkiReadyForJoinAsMaster(cfg *kubeadmapi.MasterConfiguration) error {
+
+	// Checks that the certificates that must be equal across all the master nodes were provided
+	// by the user and valid
+	if err := validateCACertAndKey(certKeyLocation{cfg.CertificatesDir, kubeadmconstants.CACertAndKeyBaseName, "", "CA"}); err != nil {
+		return err
+	}
+
+	if err := validatePrivatePublicKey(certKeyLocation{cfg.CertificatesDir, "", kubeadmconstants.ServiceAccountKeyBaseName, "service account"}); err != nil {
+		return err
+	}
+
+	// If the remaining certificate are present in the pki folder, checks their validity
+	APISserverCertFile := filepath.Join(cfg.CertificatesDir, kubeadmconstants.APIServerCertName)
+	if _, err := os.Stat(APISserverCertFile); !os.IsExist(err) {
+		if err := validateSignedCert(certKeyLocation{cfg.CertificatesDir, kubeadmconstants.CACertAndKeyBaseName, kubeadmconstants.APIServerCertAndKeyBaseName, "API server"}); err != nil {
+			return err
+		}
+	}
+
+	APIServerKubeletClientCertFile := filepath.Join(cfg.CertificatesDir, kubeadmconstants.APIServerKubeletClientCertName)
+	if _, err := os.Stat(APIServerKubeletClientCertFile); !os.IsExist(err) {
+		if err := validateSignedCert(certKeyLocation{cfg.CertificatesDir, kubeadmconstants.CACertAndKeyBaseName, kubeadmconstants.APIServerKubeletClientCertAndKeyBaseName, "API server kubelet client"}); err != nil {
+			return err
+		}
+	}
+
+	FrontProxyCACertFile := filepath.Join(cfg.CertificatesDir, kubeadmconstants.FrontProxyCACertName)
+	if _, err := os.Stat(FrontProxyCACertFile); !os.IsExist(err) {
+		if err := validateCACertAndKey(certKeyLocation{cfg.CertificatesDir, kubeadmconstants.FrontProxyCACertAndKeyBaseName, "", "front-proxy CA"}); err != nil {
+			return err
+		}
+	}
+
+	FrontProxyClientCertFile := filepath.Join(cfg.CertificatesDir, kubeadmconstants.FrontProxyClientCertName)
+	if _, err := os.Stat(FrontProxyClientCertFile); !os.IsExist(err) {
+		if err := validateSignedCert(certKeyLocation{cfg.CertificatesDir, kubeadmconstants.FrontProxyCACertAndKeyBaseName, kubeadmconstants.FrontProxyClientCertAndKeyBaseName, "front-proxy client"}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // validateCACert tries to load a x509 certificate from pkiDir and validates that it is a CA
 func validateCACert(l certKeyLocation) error {
 	// Check CA Cert
@@ -537,6 +593,17 @@ func getAltNames(cfg *kubeadmapi.MasterConfiguration) (*certutil.AltNames, error
 			internalAPIServerVirtualIP,
 			advertiseAddress,
 		},
+	}
+
+	// if we are in HA configuration
+	if features.Enabled(cfg.FeatureGates, features.HighAvailability) {
+		// add localhost IP address thus allowing the controller manager and the scheduler to
+		// connect to the local instance of API server without going through the external load balancer
+		// (this is possible because the API server runs with hostnetwork=true)
+
+		// ** note for reviewers
+		// ** ipv6?
+		altNames.IPs = append(altNames.IPs, net.ParseIP("127.0.0.1"))
 	}
 
 	// adds additional SAN

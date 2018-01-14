@@ -960,9 +960,15 @@ func RunJoinNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.NodeConfigura
 		ServiceCheck{Service: "kubelet", CheckIfActive: false},
 		PortOpenCheck{port: 10250},
 		DirAvailableCheck{Path: filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.ManifestsSubDirName)},
-		FileAvailableCheck{Path: cfg.CACertPath},
 		FileAvailableCheck{Path: filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.KubeletKubeConfigFileName)},
 	}
+
+	// if the node is joining as worker node (not as a master)
+	if !cfg.Master {
+		// ensure /etc/kubernetes/pki/ca.crt does not exists
+		checks = append(checks, FileAvailableCheck{Path: cfg.CACertPath})
+	}
+
 	if useCRI {
 		checks = append(checks, CRICheck{socket: criSocket, exec: execer})
 	} else {
