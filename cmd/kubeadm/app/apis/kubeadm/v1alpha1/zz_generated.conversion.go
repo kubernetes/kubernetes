@@ -300,6 +300,8 @@ func autoConvert_v1alpha1_NodeConfiguration_To_kubeadm_NodeConfiguration(in *Nod
 	out.DiscoveryTokenCACertHashes = *(*[]string)(unsafe.Pointer(&in.DiscoveryTokenCACertHashes))
 	out.DiscoveryTokenUnsafeSkipCAVerification = in.DiscoveryTokenUnsafeSkipCAVerification
 	out.FeatureGates = *(*map[string]bool)(unsafe.Pointer(&in.FeatureGates))
+	out.Master = in.Master
+	out.MasterConfigurationFile = in.MasterConfigurationFile
 	return nil
 }
 
@@ -319,6 +321,8 @@ func autoConvert_kubeadm_NodeConfiguration_To_v1alpha1_NodeConfiguration(in *kub
 	out.DiscoveryTokenCACertHashes = *(*[]string)(unsafe.Pointer(&in.DiscoveryTokenCACertHashes))
 	out.DiscoveryTokenUnsafeSkipCAVerification = in.DiscoveryTokenUnsafeSkipCAVerification
 	out.FeatureGates = *(*map[string]bool)(unsafe.Pointer(&in.FeatureGates))
+	out.Master = in.Master
+	out.MasterConfigurationFile = in.MasterConfigurationFile
 	return nil
 }
 
