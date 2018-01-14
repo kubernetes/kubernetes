@@ -87,13 +87,11 @@ func (a *Plugin) Validate(attr admission.Attributes) (err error) {
 		return nil
 	}
 
-	var rejectionError error
-	// give each limit enforcer a chance to reject the event
 	for _, enforcer := range a.limitEnforcers {
 		if err := enforcer.accept(attr); err != nil {
-			rejectionError = err
+			return err
 		}
 	}
 
-	return rejectionError
+	return nil
 }
