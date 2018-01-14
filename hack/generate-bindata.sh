@@ -22,7 +22,7 @@ if [[ -z "${KUBE_ROOT:-}" ]]; then
 	KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 fi
 
-source "${KUBE_ROOT}/cluster/lib/logging.sh"
+source "${KUBE_ROOT}/hack/lib/logging.sh"
 
 if [[ ! -d "${KUBE_ROOT}/examples" ]]; then
 	echo "${KUBE_ROOT}/examples not detected.  This script should be run from a location where the source dirs are available."

@@ -119,8 +119,10 @@ func (s *EtcdOptions) AddFlags(fs *pflag.FlagSet) {
 
 	fs.StringSliceVar(&s.WatchCacheSizes, "watch-cache-sizes", s.WatchCacheSizes, ""+
 		"List of watch cache sizes for every resource (pods, nodes, etc.), comma separated. "+
-		"The individual override format: resource#size, where size is a number. It takes effect "+
-		"when watch-cache is enabled.")
+		"The individual override format: resource[.group]#size, where resource is lowercase plural (no version), "+
+		"group is optional, and size is a number. It takes effect when watch-cache is enabled. "+
+		"Some resources (replicationcontrollers, endpoints, nodes, pods, services, apiservices.apiregistration.k8s.io) "+
+		"have system defaults set by heuristics, others default to default-watch-cache-size")
 
 	fs.StringVar(&s.StorageConfig.Type, "storage-backend", s.StorageConfig.Type,
 		"The storage backend for persistence. Options: 'etcd3' (default), 'etcd2'.")

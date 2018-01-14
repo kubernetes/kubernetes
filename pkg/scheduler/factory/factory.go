@@ -130,6 +130,9 @@ type configFactory struct {
 
 	// Handles volume binding decisions
 	volumeBinder *volumebinder.VolumeBinder
+
+	// always check all predicates even if the middle of one predicate fails.
+	alwaysCheckAllPredicates bool
 }
 
 // NewConfigFactory initializes the default implementation of a Configurator To encourage eventual privatization of the struct type, we only
@@ -880,6 +883,12 @@ func (f *configFactory) CreateFromConfig(policy schedulerapi.Policy) (*scheduler
 	if policy.HardPodAffinitySymmetricWeight != 0 {
 		f.hardPodAffinitySymmetricWeight = policy.HardPodAffinitySymmetricWeight
 	}
+	// When AlwaysCheckAllPredicates is set to true, scheduler checks all the configured
+	// predicates even after one or more of them fails.
+	if policy.AlwaysCheckAllPredicates {
+		f.alwaysCheckAllPredicates = policy.AlwaysCheckAllPredicates
+	}
+
 	return f.CreateFromKeys(predicateKeys, priorityKeys, extenders)
 }
 
@@ -933,7 +942,7 @@ func (f *configFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, 
 		glog.Info("Created equivalence class cache")
 	}
 
-	algo := core.NewGenericScheduler(f.schedulerCache, f.equivalencePodCache, f.podQueue, predicateFuncs, predicateMetaProducer, priorityConfigs, priorityMetaProducer, extenders, f.volumeBinder, f.pVCLister)
+	algo := core.NewGenericScheduler(f.schedulerCache, f.equivalencePodCache, f.podQueue, predicateFuncs, predicateMetaProducer, priorityConfigs, priorityMetaProducer, extenders, f.volumeBinder, f.pVCLister, f.alwaysCheckAllPredicates)
 
 	podBackoff := util.CreateDefaultPodBackoff()
 	return &scheduler.Config{

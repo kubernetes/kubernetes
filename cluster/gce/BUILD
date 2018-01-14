@@ -38,13 +38,12 @@ filegroup(
     tags = ["automanaged"],
 )
 
-# Having the configure-vm.sh script and and trusty code from the GCE cluster
-# deploy hosted with the release is useful for GKE.
-# This list should match the list in kubernetes/release/lib/releaselib.sh.
+# Having the COS code from the GCE cluster deploy hosted with the release is
+# useful for GKE.  This list should match the list in
+# kubernetes/release/lib/releaselib.sh.
 release_filegroup(
     name = "gcs-release-artifacts",
     srcs = [
-        "configure-vm.sh",
         "gci/configure.sh",
         "gci/master.yaml",
         "gci/node.yaml",

@@ -187,16 +187,17 @@ func TestSelectHost(t *testing.T) {
 func TestGenericScheduler(t *testing.T) {
 	predicates.SetPredicatesOrdering(order)
 	tests := []struct {
-		name          string
-		predicates    map[string]algorithm.FitPredicate
-		prioritizers  []algorithm.PriorityConfig
-		nodes         []string
-		pvcs          []*v1.PersistentVolumeClaim
-		pod           *v1.Pod
-		pods          []*v1.Pod
-		expectedHosts sets.String
-		expectsErr    bool
-		wErr          error
+		name                     string
+		predicates               map[string]algorithm.FitPredicate
+		prioritizers             []algorithm.PriorityConfig
+		alwaysCheckAllPredicates bool
+		nodes                    []string
+		pvcs                     []*v1.PersistentVolumeClaim
+		pod                      *v1.Pod
+		pods                     []*v1.Pod
+		expectedHosts            sets.String
+		expectsErr               bool
+		wErr                     error
 	}{
 		{
 			predicates:   map[string]algorithm.FitPredicate{"false": falsePredicate},
@@ -377,6 +378,22 @@ func TestGenericScheduler(t *testing.T) {
 			expectsErr: true,
 			wErr:       fmt.Errorf("persistentvolumeclaim \"existingPVC\" is being deleted"),
 		},
+		{
+			// alwaysCheckAllPredicates is true
+			predicates:               map[string]algorithm.FitPredicate{"true": truePredicate, "matches": matchesPredicate, "false": falsePredicate},
+			prioritizers:             []algorithm.PriorityConfig{{Map: EqualPriorityMap, Weight: 1}},
+			alwaysCheckAllPredicates: true,
+			nodes: []string{"1"},
+			pod:   &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2"}},
+			name:  "test alwaysCheckAllPredicates is true",
+			wErr: &FitError{
+				Pod:         &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2"}},
+				NumAllNodes: 1,
+				FailedPredicates: FailedPredicateMap{
+					"1": []algorithm.PredicateFailureReason{algorithmpredicates.ErrFakePredicate, algorithmpredicates.ErrFakePredicate},
+				},
+			},
+		},
 	}
 	for _, test := range tests {
 		cache := schedulercache.New(time.Duration(0), wait.NeverStop)
@@ -393,7 +410,7 @@ func TestGenericScheduler(t *testing.T) {
 		pvcLister := schedulertesting.FakePersistentVolumeClaimLister(pvcs)
 
 		scheduler := NewGenericScheduler(
-			cache, nil, NewSchedulingQueue(), test.predicates, algorithm.EmptyPredicateMetadataProducer, test.prioritizers, algorithm.EmptyMetadataProducer, []algorithm.SchedulerExtender{}, nil, pvcLister)
+			cache, nil, NewSchedulingQueue(), test.predicates, algorithm.EmptyPredicateMetadataProducer, test.prioritizers, algorithm.EmptyMetadataProducer, []algorithm.SchedulerExtender{}, nil, pvcLister, test.alwaysCheckAllPredicates)
 		machine, err := scheduler.Schedule(test.pod, schedulertesting.FakeNodeLister(makeNodeList(test.nodes)))
 
 		if !reflect.DeepEqual(err, test.wErr) {
@@ -414,7 +431,7 @@ func TestFindFitAllError(t *testing.T) {
 		"2": schedulercache.NewNodeInfo(),
 		"1": schedulercache.NewNodeInfo(),
 	}
-	_, predicateMap, err := findNodesThatFit(&v1.Pod{}, nodeNameToInfo, makeNodeList(nodes), predicates, nil, algorithm.EmptyPredicateMetadataProducer, nil, nil)
+	_, predicateMap, err := findNodesThatFit(&v1.Pod{}, nodeNameToInfo, makeNodeList(nodes), predicates, nil, algorithm.EmptyPredicateMetadataProducer, nil, nil, false)
 
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -449,7 +466,7 @@ func TestFindFitSomeError(t *testing.T) {
 		nodeNameToInfo[name].SetNode(&v1.Node{ObjectMeta: metav1.ObjectMeta{Name: name}})
 	}
 
-	_, predicateMap, err := findNodesThatFit(pod, nodeNameToInfo, makeNodeList(nodes), predicates, nil, algorithm.EmptyPredicateMetadataProducer, nil, nil)
+	_, predicateMap, err := findNodesThatFit(pod, nodeNameToInfo, makeNodeList(nodes), predicates, nil, algorithm.EmptyPredicateMetadataProducer, nil, nil, false)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -1276,7 +1293,7 @@ func TestPreempt(t *testing.T) {
 			extenders = append(extenders, extender)
 		}
 		scheduler := NewGenericScheduler(
-			cache, nil, NewSchedulingQueue(), map[string]algorithm.FitPredicate{"matches": algorithmpredicates.PodFitsResources}, algorithm.EmptyPredicateMetadataProducer, []algorithm.PriorityConfig{{Function: numericPriority, Weight: 1}}, algorithm.EmptyMetadataProducer, extenders, nil, schedulertesting.FakePersistentVolumeClaimLister{})
+			cache, nil, NewSchedulingQueue(), map[string]algorithm.FitPredicate{"matches": algorithmpredicates.PodFitsResources}, algorithm.EmptyPredicateMetadataProducer, []algorithm.PriorityConfig{{Function: numericPriority, Weight: 1}}, algorithm.EmptyMetadataProducer, extenders, nil, schedulertesting.FakePersistentVolumeClaimLister{}, false)
 		// Call Preempt and check the expected results.
 		node, victims, _, err := scheduler.Preempt(test.pod, schedulertesting.FakeNodeLister(makeNodeList(nodeNames)), error(&FitError{Pod: test.pod, FailedPredicates: failedPredMap}))
 		if err != nil {

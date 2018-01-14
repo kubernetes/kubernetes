@@ -47,6 +47,12 @@ type Policy struct {
 	// corresponding to every RequiredDuringScheduling affinity rule.
 	// HardPodAffinitySymmetricWeight represents the weight of implicit PreferredDuringScheduling affinity rule, in the range 1-100.
 	HardPodAffinitySymmetricWeight int32
+
+	// When AlwaysCheckAllPredicates is set to true, scheduler checks all
+	// the configured predicates even after one or more of them fails.
+	// When the flag is set to false, scheduler skips checking the rest
+	// of the predicates after it finds one predicate that failed.
+	AlwaysCheckAllPredicates bool
 }
 
 type PredicatePolicy struct {

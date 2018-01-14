@@ -25,7 +25,7 @@ source "${KUBE_ROOT}/cluster/gce/${KUBE_CONFIG_FILE-"config-default.sh"}"
 source "${KUBE_ROOT}/cluster/common.sh"
 source "${KUBE_ROOT}/hack/lib/util.sh"
 
-if [[ "${NODE_OS_DISTRIBUTION}" == "debian" || "${NODE_OS_DISTRIBUTION}" == "trusty" || "${NODE_OS_DISTRIBUTION}" == "gci" || "${NODE_OS_DISTRIBUTION}" == "ubuntu" ]]; then
+if [[ "${NODE_OS_DISTRIBUTION}" == "gci" || "${NODE_OS_DISTRIBUTION}" == "ubuntu" ]]; then
   source "${KUBE_ROOT}/cluster/gce/${NODE_OS_DISTRIBUTION}/node-helper.sh"
 else
   echo "Cannot operate on cluster using node os distro: ${NODE_OS_DISTRIBUTION}" >&2
@@ -2065,66 +2065,6 @@ function prepare-push() {
   fi
 }
 
-# Push binaries to kubernetes master
-function push-master() {
-  echo "Updating master metadata ..."
-  write-master-env
-  prepare-startup-script
-  add-instance-metadata-from-file "${KUBE_MASTER}" "kube-env=${KUBE_TEMP}/master-kube-env.yaml" "startup-script=${KUBE_TEMP}/configure-vm.sh"
-
-  echo "Pushing to master (log at ${OUTPUT}/push-${KUBE_MASTER}.log) ..."
-  cat ${KUBE_TEMP}/configure-vm.sh | gcloud compute ssh --ssh-flag="-o LogLevel=quiet" --project "${PROJECT}" --zone "${ZONE}" "${KUBE_MASTER}" --command "sudo bash -s -- --push" &> ${OUTPUT}/push-"${KUBE_MASTER}".log
-}
-
-# Push binaries to kubernetes node
-function push-node() {
-  node=${1}
-
-  echo "Updating node ${node} metadata... "
-  prepare-startup-script
-  add-instance-metadata-from-file "${node}" "kube-env=${KUBE_TEMP}/node-kube-env.yaml" "startup-script=${KUBE_TEMP}/configure-vm.sh"
-
-  echo "Start upgrading node ${node} (log at ${OUTPUT}/push-${node}.log) ..."
-  cat ${KUBE_TEMP}/configure-vm.sh | gcloud compute ssh --ssh-flag="-o LogLevel=quiet" --project "${PROJECT}" --zone "${ZONE}" "${node}" --command "sudo bash -s -- --push" &> ${OUTPUT}/push-"${node}".log
-}
-
-# Push binaries to kubernetes cluster
-function kube-push() {
-  # Disable this until it's fixed.
-  # See https://github.com/kubernetes/kubernetes/issues/17397
-  echo "./cluster/kube-push.sh is currently not supported in GCE."
-  echo "Please use ./cluster/gce/upgrade.sh."
-  exit 1
-
-  prepare-push true
-
-  push-master
-
-  for (( i=0; i<${#NODE_NAMES[@]}; i++)); do
-    push-node "${NODE_NAMES[$i]}" &
-  done
-
-  kube::util::wait-for-jobs || {
-    echo -e "${color_red}Some commands failed.${color_norm}" >&2
-  }
-
-  # TODO(zmerlynn): Re-create instance-template with the new
-  # node-kube-env. This isn't important until the node-ip-range issue
-  # is solved (because that's blocking automatic dynamic nodes from
-  # working). The node-kube-env has to be composed with the KUBELET_TOKEN
-  # and KUBE_PROXY_TOKEN.  Ideally we would have
-  # http://issue.k8s.io/3168
-  # implemented before then, though, so avoiding this mess until then.
-
-  echo
-  echo "Kubernetes cluster is running.  The master is running at:"
-  echo
-  echo "  https://${KUBE_MASTER_IP}"
-  echo
-  echo "The user name and password to use is located in ~/.kube/config"
-  echo
-}
-
 # -----------------------------------------------------------------------------
 # Cluster specific test helpers used from hack/e2e.go
 
@@ -2232,13 +2172,4 @@ function ssh-to-node() {
 # Perform preparations required to run e2e tests
 function prepare-e2e() {
   detect-project
-}
-
-# Writes configure-vm.sh to a temporary location with comments stripped. GCE
-# limits the size of metadata fields to 32K, and stripping comments is the
-# easiest way to buy us a little more room.
-function prepare-startup-script() {
-  # Find a standard sed instance (and ensure that the command works as expected on a Mac).
-  kube::util::ensure-gnu-sed
-  ${SED} '/^\s*#\([^!].*\)*$/ d' ${KUBE_ROOT}/cluster/gce/configure-vm.sh > ${KUBE_TEMP}/configure-vm.sh
 }
