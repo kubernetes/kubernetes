@@ -6,13 +6,11 @@ sh_library(
         "etcd.sh",
         "golang.sh",
         "init.sh",
+        "logging.sh",
         "swagger.sh",
         "test.sh",
         "util.sh",
         "version.sh",
-    ],
-    deps = [
-        "//cluster/lib",
     ],
 )
 
