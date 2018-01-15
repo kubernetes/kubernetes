@@ -111,7 +111,7 @@ func TestCreateClusterRoleBinding(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
 	cmd := NewCmdCreateClusterRoleBinding(f, buf)
 	cmd.Flags().Set("clusterrole", "fake-clusterrole")
-	cmd.Flags().Set("user", "fake-user")
+	cmd.Flags().Set("roleuser", "fake-user")
 	cmd.Flags().Set("group", "fake-group")
 	cmd.Flags().Set("output", "name")
 	cmd.Flags().Set("serviceaccount", "fake-namespace:fake-account")

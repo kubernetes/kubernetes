@@ -112,7 +112,7 @@ func TestCreateRoleBinding(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
 	cmd := NewCmdCreateRoleBinding(f, buf)
 	cmd.Flags().Set("role", "fake-role")
-	cmd.Flags().Set("user", "fake-user")
+	cmd.Flags().Set("roleuser", "fake-user")
 	cmd.Flags().Set("group", "fake-group")
 	cmd.Flags().Set("serviceaccount", "fake-namespace:fake-account")
 	cmd.Run(cmd, []string{"fake-binding"})
