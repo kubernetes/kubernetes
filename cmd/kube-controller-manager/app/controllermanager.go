@@ -171,9 +171,7 @@ func Run(s *options.CMServer) error {
 	}
 
 	if !s.LeaderElection.LeaderElect {
-		stopCh := make(chan struct{})
-		defer close(stopCh)
-		run(stopCh)
+		run(wait.NeverStop)
 		panic("unreachable")
 	}
 
