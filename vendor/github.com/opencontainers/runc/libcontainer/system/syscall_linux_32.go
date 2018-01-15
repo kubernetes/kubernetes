@@ -1,4 +1,5 @@
-// +build linux,arm
+// +build linux
+// +build 386 arm
 
 package system
 

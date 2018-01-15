@@ -12,15 +12,16 @@ import (
 	"syscall" // only for Errno
 	"unsafe"
 
+	"golang.org/x/sys/unix"
+
+	"github.com/containerd/console"
 	"github.com/opencontainers/runc/libcontainer/cgroups"
 	"github.com/opencontainers/runc/libcontainer/configs"
 	"github.com/opencontainers/runc/libcontainer/system"
 	"github.com/opencontainers/runc/libcontainer/user"
 	"github.com/opencontainers/runc/libcontainer/utils"
-
 	"github.com/sirupsen/logrus"
 	"github.com/vishvananda/netlink"
-	"golang.org/x/sys/unix"
 )
 
 type initType string
@@ -61,6 +62,8 @@ type initConfig struct {
 	ContainerId      string                `json:"containerid"`
 	Rlimits          []configs.Rlimit      `json:"rlimits"`
 	CreateConsole    bool                  `json:"create_console"`
+	ConsoleWidth     uint16                `json:"console_width"`
+	ConsoleHeight    uint16                `json:"console_height"`
 	Rootless         bool                  `json:"rootless"`
 }
 
@@ -170,29 +173,38 @@ func setupConsole(socket *os.File, config *initConfig, mount bool) error {
 	// however, that setupUser (specifically fixStdioPermissions) *will* change
 	// the UID owner of the console to be the user the process will run as (so
 	// they can actually control their console).
-	console, err := newConsole()
+
+	pty, slavePath, err := console.NewPty()
 	if err != nil {
 		return err
 	}
-	// After we return from here, we don't need the console anymore.
-	defer console.Close()
 
-	linuxConsole, ok := console.(*linuxConsole)
-	if !ok {
-		return fmt.Errorf("failed to cast console to *linuxConsole")
+	if config.ConsoleHeight != 0 && config.ConsoleWidth != 0 {
+		err = pty.Resize(console.WinSize{
+			Height: config.ConsoleHeight,
+			Width:  config.ConsoleWidth,
+		})
+
+		if err != nil {
+			return err
+		}
 	}
+
+	// After we return from here, we don't need the console anymore.
+	defer pty.Close()
+
 	// Mount the console inside our rootfs.
 	if mount {
-		if err := linuxConsole.mount(); err != nil {
+		if err := mountConsole(slavePath); err != nil {
 			return err
 		}
 	}
 	// While we can access console.master, using the API is a good idea.
-	if err := utils.SendFd(socket, linuxConsole.File()); err != nil {
+	if err := utils.SendFd(socket, pty.Name(), pty.Fd()); err != nil {
 		return err
 	}
 	// Now, dup over all the things.
-	return linuxConsole.dupStdio()
+	return dupStdio(slavePath)
 }
 
 // syncParentReady sends to the given pipe a JSON payload which indicates that
@@ -261,25 +273,27 @@ func setupUser(config *initConfig) error {
 		}
 	}
 
+	// Rather than just erroring out later in setuid(2) and setgid(2), check
+	// that the user is mapped here.
+	if _, err := config.Config.HostUID(execUser.Uid); err != nil {
+		return fmt.Errorf("cannot set uid to unmapped user in user namespace")
+	}
+	if _, err := config.Config.HostGID(execUser.Gid); err != nil {
+		return fmt.Errorf("cannot set gid to unmapped user in user namespace")
+	}
+
 	if config.Rootless {
-		if execUser.Uid != 0 {
-			return fmt.Errorf("cannot run as a non-root user in a rootless container")
-		}
-
-		if execUser.Gid != 0 {
-			return fmt.Errorf("cannot run as a non-root group in a rootless container")
-		}
-
-		// We cannot set any additional groups in a rootless container and thus we
-		// bail if the user asked us to do so. TODO: We currently can't do this
-		// earlier, but if libcontainer.Process.User was typesafe this might work.
+		// We cannot set any additional groups in a rootless container and thus
+		// we bail if the user asked us to do so. TODO: We currently can't do
+		// this check earlier, but if libcontainer.Process.User was typesafe
+		// this might work.
 		if len(addGroups) > 0 {
 			return fmt.Errorf("cannot set any additional groups in a rootless container")
 		}
 	}
 
-	// before we change to the container's user make sure that the processes STDIO
-	// is correctly owned by the user that we are switching to.
+	// Before we change to the container's user make sure that the processes
+	// STDIO is correctly owned by the user that we are switching to.
 	if err := fixStdioPermissions(config, execUser); err != nil {
 		return err
 	}
@@ -298,7 +312,6 @@ func setupUser(config *initConfig) error {
 	if err := system.Setgid(execUser.Gid); err != nil {
 		return err
 	}
-
 	if err := system.Setuid(execUser.Uid); err != nil {
 		return err
 	}
@@ -335,14 +348,6 @@ func fixStdioPermissions(config *initConfig, u *user.ExecUser) error {
 			continue
 		}
 
-		// Skip chown if s.Gid is actually an unmapped gid in the host. While
-		// this is a bit dodgy if it just so happens that the console _is_
-		// owned by overflow_gid, there's no way for us to disambiguate this as
-		// a userspace program.
-		if _, err := config.Config.HostGID(int(s.Gid)); err != nil {
-			continue
-		}
-
 		// We only change the uid owner (as it is possible for the mount to
 		// prefer a different gid, and there's no reason for us to change it).
 		// The reason why we don't just leave the default uid=X mount setup is
@@ -350,6 +355,15 @@ func fixStdioPermissions(config *initConfig, u *user.ExecUser) error {
 		// this code, you couldn't effectively run as a non-root user inside a
 		// container and also have a console set up.
 		if err := unix.Fchown(int(fd), u.Uid, int(s.Gid)); err != nil {
+			// If we've hit an EINVAL then s.Gid isn't mapped in the user
+			// namespace. If we've hit an EPERM then the inode's current owner
+			// is not mapped in our user namespace (in particular,
+			// privileged_wrt_inode_uidgid() has failed). In either case, we
+			// are in a configuration where it's better for us to just not
+			// touch the stdio rather than bail at this point.
+			if err == unix.EINVAL || err == unix.EPERM {
+				continue
+			}
 			return err
 		}
 	}
@@ -480,6 +494,16 @@ func signalAllProcesses(m cgroups.Manager, s os.Signal) error {
 		logrus.Warn(err)
 	}
 
+	subreaper, err := system.GetSubreaper()
+	if err != nil {
+		// The error here means that PR_GET_CHILD_SUBREAPER is not
+		// supported because this code might run on a kernel older
+		// than 3.4. We don't want to throw an error in that case,
+		// and we simplify things, considering there is no subreaper
+		// set.
+		subreaper = 0
+	}
+
 	for _, p := range procs {
 		if s != unix.SIGKILL {
 			if ok, err := isWaitable(p.Pid); err != nil {
@@ -493,9 +517,16 @@ func signalAllProcesses(m cgroups.Manager, s os.Signal) error {
 			}
 		}
 
-		if _, err := p.Wait(); err != nil {
-			if !isNoChildren(err) {
-				logrus.Warn("wait: ", err)
+		// In case a subreaper has been setup, this code must not
+		// wait for the process. Otherwise, we cannot be sure the
+		// current process will be reaped by the subreaper, while
+		// the subreaper might be waiting for this process in order
+		// to retrieve its exit code.
+		if subreaper == 0 {
+			if _, err := p.Wait(); err != nil {
+				if !isNoChildren(err) {
+					logrus.Warn("wait: ", err)
+				}
 			}
 		}
 	}
