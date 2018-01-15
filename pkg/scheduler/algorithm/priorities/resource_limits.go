@@ -34,10 +34,10 @@ import (
 // of the pod are satisfied, the node is assigned a score of 1.
 // Rationale of choosing the lowest score of 1 is that this is mainly selected to break ties between nodes that have
 // same scores assigned by one of least and most requested priority functions.
-func ResourceLimitsPriorityMap(pod *v1.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (schedulerapi.HostPriority, error) {
+func ResourceLimitsPriorityMap(pod *v1.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (*schedulerapi.HostPriority, error) {
 	node := nodeInfo.Node()
 	if node == nil {
-		return schedulerapi.HostPriority{}, fmt.Errorf("node not found")
+		return &schedulerapi.HostPriority{}, fmt.Errorf("node not found")
 	}
 
 	allocatableResources := nodeInfo.AllocatableResource()
@@ -65,7 +65,7 @@ func ResourceLimitsPriorityMap(pod *v1.Pod, meta interface{}, nodeInfo *schedule
 		)
 	}
 
-	return schedulerapi.HostPriority{
+	return &schedulerapi.HostPriority{
 		Host:  node.Name,
 		Score: score,
 	}, nil

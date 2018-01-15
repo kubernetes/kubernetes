@@ -70,11 +70,11 @@ func PredicateTwo(pod *v1.Pod, meta algorithm.PredicateMetadata, nodeInfo *sched
 }
 
 func PriorityOne(pod *v1.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo, nodes []*v1.Node) (schedulerapi.HostPriorityList, error) {
-	return []schedulerapi.HostPriority{}, nil
+	return []*schedulerapi.HostPriority{}, nil
 }
 
 func PriorityTwo(pod *v1.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo, nodes []*v1.Node) (schedulerapi.HostPriorityList, error) {
-	return []schedulerapi.HostPriority{}, nil
+	return []*schedulerapi.HostPriority{}, nil
 }
 
 // TestSchedulerCreationFromConfigMap verifies that scheduler can be created

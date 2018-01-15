@@ -77,7 +77,7 @@ func TestTaintAndToleration(t *testing.T) {
 					Effect: v1.TaintEffectPreferNoSchedule,
 				}}),
 			},
-			expectedList: []schedulerapi.HostPriority{
+			expectedList: []*schedulerapi.HostPriority{
 				{Host: "nodeA", Score: schedulerapi.MaxPriority},
 				{Host: "nodeB", Score: 0},
 			},
@@ -119,7 +119,7 @@ func TestTaintAndToleration(t *testing.T) {
 					},
 				}),
 			},
-			expectedList: []schedulerapi.HostPriority{
+			expectedList: []*schedulerapi.HostPriority{
 				{Host: "nodeA", Score: schedulerapi.MaxPriority},
 				{Host: "nodeB", Score: schedulerapi.MaxPriority},
 				{Host: "nodeC", Score: schedulerapi.MaxPriority},
@@ -155,7 +155,7 @@ func TestTaintAndToleration(t *testing.T) {
 					},
 				}),
 			},
-			expectedList: []schedulerapi.HostPriority{
+			expectedList: []*schedulerapi.HostPriority{
 				{Host: "nodeA", Score: schedulerapi.MaxPriority},
 				{Host: "nodeB", Score: 5},
 				{Host: "nodeC", Score: 0},
@@ -198,7 +198,7 @@ func TestTaintAndToleration(t *testing.T) {
 					},
 				}),
 			},
-			expectedList: []schedulerapi.HostPriority{
+			expectedList: []*schedulerapi.HostPriority{
 				{Host: "nodeA", Score: schedulerapi.MaxPriority},
 				{Host: "nodeB", Score: schedulerapi.MaxPriority},
 				{Host: "nodeC", Score: 0},
@@ -219,7 +219,7 @@ func TestTaintAndToleration(t *testing.T) {
 					},
 				}),
 			},
-			expectedList: []schedulerapi.HostPriority{
+			expectedList: []*schedulerapi.HostPriority{
 				{Host: "nodeA", Score: schedulerapi.MaxPriority},
 				{Host: "nodeB", Score: 0},
 			},
@@ -234,7 +234,11 @@ func TestTaintAndToleration(t *testing.T) {
 		}
 
 		if !reflect.DeepEqual(test.expectedList, list) {
-			t.Errorf("%s,\nexpected:\n\t%+v,\ngot:\n\t%+v", test.test, test.expectedList, list)
+			expectedString, gotString, err := marshalComparingTestResults(test.expectedList, list)
+			if err != nil {
+				t.Error(err)
+			}
+			t.Errorf("%s: \nexpected %s, \ngot %s", test.test, expectedString, gotString)
 		}
 	}
 

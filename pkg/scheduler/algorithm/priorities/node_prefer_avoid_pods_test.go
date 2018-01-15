@@ -96,7 +96,7 @@ func TestNodePreferAvoidPriority(t *testing.T) {
 				},
 			},
 			nodes:        testNodes,
-			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 0}, {Host: "machine2", Score: schedulerapi.MaxPriority}, {Host: "machine3", Score: schedulerapi.MaxPriority}},
+			expectedList: []*schedulerapi.HostPriority{{Host: "machine1", Score: 0}, {Host: "machine2", Score: schedulerapi.MaxPriority}, {Host: "machine3", Score: schedulerapi.MaxPriority}},
 			test:         "pod managed by ReplicationController should avoid a node, this node get lowest priority score",
 		},
 		{
@@ -109,7 +109,7 @@ func TestNodePreferAvoidPriority(t *testing.T) {
 				},
 			},
 			nodes:        testNodes,
-			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: schedulerapi.MaxPriority}, {Host: "machine2", Score: schedulerapi.MaxPriority}, {Host: "machine3", Score: schedulerapi.MaxPriority}},
+			expectedList: []*schedulerapi.HostPriority{{Host: "machine1", Score: schedulerapi.MaxPriority}, {Host: "machine2", Score: schedulerapi.MaxPriority}, {Host: "machine3", Score: schedulerapi.MaxPriority}},
 			test:         "ownership by random controller should be ignored",
 		},
 		{
@@ -122,7 +122,7 @@ func TestNodePreferAvoidPriority(t *testing.T) {
 				},
 			},
 			nodes:        testNodes,
-			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: schedulerapi.MaxPriority}, {Host: "machine2", Score: schedulerapi.MaxPriority}, {Host: "machine3", Score: schedulerapi.MaxPriority}},
+			expectedList: []*schedulerapi.HostPriority{{Host: "machine1", Score: schedulerapi.MaxPriority}, {Host: "machine2", Score: schedulerapi.MaxPriority}, {Host: "machine3", Score: schedulerapi.MaxPriority}},
 			test:         "owner without Controller field set should be ignored",
 		},
 		{
@@ -135,7 +135,7 @@ func TestNodePreferAvoidPriority(t *testing.T) {
 				},
 			},
 			nodes:        testNodes,
-			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: schedulerapi.MaxPriority}, {Host: "machine2", Score: 0}, {Host: "machine3", Score: schedulerapi.MaxPriority}},
+			expectedList: []*schedulerapi.HostPriority{{Host: "machine1", Score: schedulerapi.MaxPriority}, {Host: "machine2", Score: 0}, {Host: "machine3", Score: schedulerapi.MaxPriority}},
 			test:         "pod managed by ReplicaSet should avoid a node, this node get lowest priority score",
 		},
 	}
@@ -150,7 +150,11 @@ func TestNodePreferAvoidPriority(t *testing.T) {
 		sort.Sort(test.expectedList)
 		sort.Sort(list)
 		if !reflect.DeepEqual(test.expectedList, list) {
-			t.Errorf("%s: expected %#v, got %#v", test.test, test.expectedList, list)
+			expectedString, gotString, err := marshalComparingTestResults(test.expectedList, list)
+			if err != nil {
+				t.Error(err)
+			}
+			t.Errorf("%s: \nexpected %s, \ngot %s", test.test, expectedString, gotString)
 		}
 	}
 }

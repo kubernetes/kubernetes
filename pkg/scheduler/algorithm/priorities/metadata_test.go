@@ -159,7 +159,7 @@ func TestPriorityMetadata(t *testing.T) {
 		schedulertesting.FakeReplicaSetLister([]*extensions.ReplicaSet{}),
 		schedulertesting.FakeStatefulSetLister([]*apps.StatefulSet{}))
 	for _, test := range tests {
-		ptData := mataDataProducer(test.pod, nil)
+		ptData := mataDataProducer(test.pod, nil, nil)
 		if !reflect.DeepEqual(test.expected, ptData) {
 			t.Errorf("%s: expected %#v, got %#v", test.test, test.expected, ptData)
 		}

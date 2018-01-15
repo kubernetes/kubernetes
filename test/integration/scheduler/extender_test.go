@@ -225,7 +225,7 @@ func (e *Extender) Prioritize(args *schedulerapi.ExtenderArgs) (*schedulerapi.Ho
 		}
 	}
 	for host, score := range combinedScores {
-		result = append(result, schedulerapi.HostPriority{Host: host, Score: score})
+		result = append(result, &schedulerapi.HostPriority{Host: host, Score: score})
 	}
 	return &result, nil
 }
@@ -263,7 +263,7 @@ func machine_2_Prioritizer(pod *v1.Pod, nodes *v1.NodeList) (*schedulerapi.HostP
 		if node.Name == "machine2" {
 			score = 10
 		}
-		result = append(result, schedulerapi.HostPriority{
+		result = append(result, &schedulerapi.HostPriority{
 			Host:  node.Name,
 			Score: score,
 		})
@@ -278,7 +278,7 @@ func machine_3_Prioritizer(pod *v1.Pod, nodes *v1.NodeList) (*schedulerapi.HostP
 		if node.Name == "machine3" {
 			score = 10
 		}
-		result = append(result, schedulerapi.HostPriority{
+		result = append(result, &schedulerapi.HostPriority{
 			Host:  node.Name,
 			Score: score,
 		})

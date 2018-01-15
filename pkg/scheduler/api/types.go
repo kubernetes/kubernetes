@@ -215,7 +215,7 @@ type HostPriority struct {
 	Score int
 }
 
-type HostPriorityList []HostPriority
+type HostPriorityList []*HostPriority
 
 func (h HostPriorityList) Len() int {
 	return len(h)

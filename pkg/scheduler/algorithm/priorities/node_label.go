@@ -42,10 +42,10 @@ func NewNodeLabelPriority(label string, presence bool) (algorithm.PriorityMapFun
 // CalculateNodeLabelPriority checks whether a particular label exists on a node or not, regardless of its value.
 // If presence is true, prioritizes nodes that have the specified label, regardless of value.
 // If presence is false, prioritizes nodes that do not have the specified label.
-func (n *NodeLabelPrioritizer) CalculateNodeLabelPriorityMap(pod *v1.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (schedulerapi.HostPriority, error) {
+func (n *NodeLabelPrioritizer) CalculateNodeLabelPriorityMap(pod *v1.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (*schedulerapi.HostPriority, error) {
 	node := nodeInfo.Node()
 	if node == nil {
-		return schedulerapi.HostPriority{}, fmt.Errorf("node not found")
+		return &schedulerapi.HostPriority{}, fmt.Errorf("node not found")
 	}
 
 	exists := labels.Set(node.Labels).Has(n.label)
@@ -53,7 +53,7 @@ func (n *NodeLabelPrioritizer) CalculateNodeLabelPriorityMap(pod *v1.Pod, meta i
 	if (exists && n.presence) || (!exists && !n.presence) {
 		score = schedulerapi.MaxPriority
 	}
-	return schedulerapi.HostPriority{
+	return &schedulerapi.HostPriority{
 		Host:  node.Name,
 		Score: score,
 	}, nil

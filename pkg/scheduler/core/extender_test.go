@@ -75,7 +75,7 @@ func machine1PrioritizerExtender(pod *v1.Pod, nodes []*v1.Node) (*schedulerapi.H
 		if node.Name == "machine1" {
 			score = 10
 		}
-		result = append(result, schedulerapi.HostPriority{Host: node.Name, Score: score})
+		result = append(result, &schedulerapi.HostPriority{Host: node.Name, Score: score})
 	}
 	return &result, nil
 }
@@ -87,19 +87,19 @@ func machine2PrioritizerExtender(pod *v1.Pod, nodes []*v1.Node) (*schedulerapi.H
 		if node.Name == "machine2" {
 			score = 10
 		}
-		result = append(result, schedulerapi.HostPriority{Host: node.Name, Score: score})
+		result = append(result, &schedulerapi.HostPriority{Host: node.Name, Score: score})
 	}
 	return &result, nil
 }
 
 func machine2Prioritizer(_ *v1.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo, nodes []*v1.Node) (schedulerapi.HostPriorityList, error) {
-	result := []schedulerapi.HostPriority{}
+	result := []*schedulerapi.HostPriority{}
 	for _, node := range nodes {
 		score := 1
 		if node.Name == "machine2" {
 			score = 10
 		}
-		result = append(result, schedulerapi.HostPriority{Host: node.Name, Score: score})
+		result = append(result, &schedulerapi.HostPriority{Host: node.Name, Score: score})
 	}
 	return result, nil
 }
@@ -159,7 +159,7 @@ func (f *FakeExtender) Prioritize(pod *v1.Pod, nodes []*v1.Node) (*schedulerapi.
 		}
 	}
 	for host, score := range combinedScores {
-		result = append(result, schedulerapi.HostPriority{Host: host, Score: score})
+		result = append(result, &schedulerapi.HostPriority{Host: host, Score: score})
 	}
 	return &result, f.weight, nil
 }

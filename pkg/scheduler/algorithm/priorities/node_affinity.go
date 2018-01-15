@@ -31,10 +31,10 @@ import (
 // it will a get an add of preferredSchedulingTerm.Weight. Thus, the more preferredSchedulingTerms
 // the node satisfies and the more the preferredSchedulingTerm that is satisfied weights, the higher
 // score the node gets.
-func CalculateNodeAffinityPriorityMap(pod *v1.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (schedulerapi.HostPriority, error) {
+func CalculateNodeAffinityPriorityMap(pod *v1.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (*schedulerapi.HostPriority, error) {
 	node := nodeInfo.Node()
 	if node == nil {
-		return schedulerapi.HostPriority{}, fmt.Errorf("node not found")
+		return &schedulerapi.HostPriority{}, fmt.Errorf("node not found")
 	}
 
 	var affinity *v1.Affinity
@@ -60,7 +60,7 @@ func CalculateNodeAffinityPriorityMap(pod *v1.Pod, meta interface{}, nodeInfo *s
 			// TODO: Avoid computing it for all nodes if this becomes a performance problem.
 			nodeSelector, err := v1helper.NodeSelectorRequirementsAsSelector(preferredSchedulingTerm.Preference.MatchExpressions)
 			if err != nil {
-				return schedulerapi.HostPriority{}, err
+				return &schedulerapi.HostPriority{}, err
 			}
 			if nodeSelector.Matches(labels.Set(node.Labels)) {
 				count += preferredSchedulingTerm.Weight
@@ -68,7 +68,7 @@ func CalculateNodeAffinityPriorityMap(pod *v1.Pod, meta interface{}, nodeInfo *s
 		}
 	}
 
-	return schedulerapi.HostPriority{
+	return &schedulerapi.HostPriority{
 		Host:  node.Name,
 		Score: int(count),
 	}, nil

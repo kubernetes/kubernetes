@@ -124,7 +124,7 @@ func TestImageLocalityPriority(t *testing.T) {
 			// Score: (250M-23M)/97.7M + 1 = 3
 			pod:          &v1.Pod{Spec: test_40_250},
 			nodes:        []*v1.Node{makeImageNode("machine1", node_40_140_2000), makeImageNode("machine2", node_250_10)},
-			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 1}, {Host: "machine2", Score: 3}},
+			expectedList: []*schedulerapi.HostPriority{{Host: "machine1", Score: 1}, {Host: "machine2", Score: 3}},
 			test:         "two images spread on two nodes, prefer the larger image one",
 		},
 		{
@@ -139,7 +139,7 @@ func TestImageLocalityPriority(t *testing.T) {
 			// Score: 0
 			pod:          &v1.Pod{Spec: test_40_140},
 			nodes:        []*v1.Node{makeImageNode("machine1", node_40_140_2000), makeImageNode("machine2", node_250_10)},
-			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 2}, {Host: "machine2", Score: 0}},
+			expectedList: []*schedulerapi.HostPriority{{Host: "machine1", Score: 2}, {Host: "machine2", Score: 0}},
 			test:         "two images on one node, prefer this node",
 		},
 		{
@@ -154,7 +154,7 @@ func TestImageLocalityPriority(t *testing.T) {
 			// Score: 10 < min score = 0
 			pod:          &v1.Pod{Spec: test_min_max},
 			nodes:        []*v1.Node{makeImageNode("machine1", node_40_140_2000), makeImageNode("machine2", node_250_10)},
-			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: schedulerapi.MaxPriority}, {Host: "machine2", Score: 0}},
+			expectedList: []*schedulerapi.HostPriority{{Host: "machine1", Score: schedulerapi.MaxPriority}, {Host: "machine2", Score: 0}},
 			test:         "if exceed limit, use limit",
 		},
 	}
@@ -170,7 +170,11 @@ func TestImageLocalityPriority(t *testing.T) {
 		sort.Sort(list)
 
 		if !reflect.DeepEqual(test.expectedList, list) {
-			t.Errorf("%s: expected %#v, got %#v", test.test, test.expectedList, list)
+			expectedString, gotString, err := marshalComparingTestResults(test.expectedList, list)
+			if err != nil {
+				t.Error(err)
+			}
+			t.Errorf("%s: expected %s, got %s", test.test, expectedString, gotString)
 		}
 	}
 }
