@@ -422,7 +422,7 @@ func (ss *scaleSet) listScaleSetsWithRetry() ([]string, error) {
 
 		if result.NextLink != nil {
 			backoffError := wait.ExponentialBackoff(ss.requestBackoff(), func() (bool, error) {
-				result, err = ss.VirtualMachineScaleSetsClient.ListNextResults(result)
+				result, err = ss.VirtualMachineScaleSetsClient.ListNextResults(ss.ResourceGroup, result)
 				if err != nil {
 					glog.Errorf("VirtualMachineScaleSetsClient.ListNextResults for %v failed: %v", ss.ResourceGroup, err)
 					return false, err
@@ -468,7 +468,7 @@ func (ss *scaleSet) listScaleSetVMsWithRetry(scaleSetName string) ([]compute.Vir
 
 		if result.NextLink != nil {
 			backoffError := wait.ExponentialBackoff(ss.requestBackoff(), func() (bool, error) {
-				result, err = ss.VirtualMachineScaleSetVMsClient.ListNextResults(result)
+				result, err = ss.VirtualMachineScaleSetVMsClient.ListNextResults(ss.ResourceGroup, result)
 				if err != nil {
 					glog.Errorf("VirtualMachineScaleSetVMsClient.ListNextResults for %v failed: %v", scaleSetName, err)
 					return false, err

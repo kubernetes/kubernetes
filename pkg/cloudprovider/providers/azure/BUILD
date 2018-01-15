@@ -19,6 +19,7 @@ go_library(
         "azure_instances.go",
         "azure_loadbalancer.go",
         "azure_managedDiskController.go",
+        "azure_metrics.go",
         "azure_routes.go",
         "azure_storage.go",
         "azure_storageaccount.go",
@@ -48,6 +49,7 @@ go_library(
         "//vendor/github.com/Azure/go-autorest/autorest/to:go_default_library",
         "//vendor/github.com/ghodss/yaml:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",
         "//vendor/github.com/rubiojr/go-vhd/vhd:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
@@ -63,6 +65,7 @@ go_test(
     name = "go_default_test",
     srcs = [
         "azure_loadbalancer_test.go",
+        "azure_metrics_test.go",
         "azure_test.go",
         "azure_util_cache_test.go",
         "azure_util_test.go",
