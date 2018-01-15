@@ -2693,7 +2693,7 @@ func ScaleResource(
 	gr schema.GroupResource,
 ) error {
 	By(fmt.Sprintf("Scaling %v %s in namespace %s to %d", kind, name, ns, size))
-	scaler:= &kubectl.GenericScaler{scalesGetter, gr}
+	scaler := &kubectl.GenericScaler{scalesGetter, gr}
 	waitForScale := kubectl.NewRetryParams(5*time.Second, 1*time.Minute)
 	waitForReplicas := kubectl.NewRetryParams(5*time.Second, 5*time.Minute)
 	if err := scaler.Scale(ns, name, size, nil, waitForScale, waitForReplicas); err != nil {

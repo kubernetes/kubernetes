@@ -296,7 +296,7 @@ func (f *ring1Factory) Scaler(mapping *meta.RESTMapping) (kubectl.Scaler, error)
 	scalesGetter := scaleclient.New(restClient, mapper, dynamic.LegacyAPIPathResolverFunc, resolver)
 	gvk := mapping.GroupVersionKind.GroupVersion().WithResource(mapping.Resource)
 
-	return &kubectl.GenericScaler{scalesGetter, gvk.GroupResource()},nil
+	return &kubectl.GenericScaler{scalesGetter, gvk.GroupResource()}, nil
 }
 
 func (f *ring1Factory) Reaper(mapping *meta.RESTMapping) (kubectl.Reaper, error) {
