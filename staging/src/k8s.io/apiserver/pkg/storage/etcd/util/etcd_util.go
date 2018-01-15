@@ -84,7 +84,8 @@ func GetEtcdVersion(host string) (string, error) {
 
 type etcdHealth struct {
 	// Note this has to be public so the json library can modify it.
-	Health string `json:"health"`
+	Health interface{} `json:"health"`
+	Errors []string    `json:"errors"`
 }
 
 func EtcdHealthCheck(data []byte) error {
@@ -92,8 +93,20 @@ func EtcdHealthCheck(data []byte) error {
 	if err := json.Unmarshal(data, &obj); err != nil {
 		return err
 	}
-	if obj.Health != "true" {
-		return fmt.Errorf("Unhealthy status: %s", obj.Health)
+
+	switch health := obj.Health.(type) {
+	case string:
+		// 3.2.x and below returns a string "true" when healthy
+		if health != "true" {
+			return fmt.Errorf("Unhealthy status: %s", health)
+		}
+	case bool:
+		// 3.3.x and above returns a boolean
+		if !health {
+			return fmt.Errorf("Unhealthy status: %v", obj.Errors)
+		}
+	default:
+		return fmt.Errorf("Unknown status: %#v", health)
 	}
 	return nil
 }
