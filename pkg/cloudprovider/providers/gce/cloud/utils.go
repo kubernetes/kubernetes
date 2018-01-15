@@ -142,7 +142,7 @@ func copyViaJSON(dest, src interface{}) error {
 }
 
 // SelfLink returns the self link URL for the given object.
-func SelfLink(ver meta.Version, project, resource string, key meta.Key) string {
+func SelfLink(ver meta.Version, project, resource string, key *meta.Key) string {
 	var prefix string
 	switch ver {
 	case meta.VersionAlpha:
