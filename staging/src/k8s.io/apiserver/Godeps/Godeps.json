@@ -23,6 +23,10 @@
 			"Rev": "5bd2802263f21d8788851d5305584c82a5c75d7e"
 		},
 		{
+			"ImportPath": "github.com/agext/levenshtein",
+			"Rev": "5f10fee965225ac1eecdc234c09daf5cd9e7f7b6"
+		},
+		{
 			"ImportPath": "github.com/beorn7/perks/quantile",
 			"Rev": "3ac7bf7a47d159a033b107610db8a1b6575507a4"
 		},

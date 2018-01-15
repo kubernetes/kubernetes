@@ -31,6 +31,10 @@
 			"Rev": "d4e6b95c12a08b4de2d48b45d5b4d594e5d32fab"
 		},
 		{
+			"ImportPath": "github.com/agext/levenshtein",
+			"Rev": "5f10fee965225ac1eecdc234c09daf5cd9e7f7b6"
+		},
+		{
 			"ImportPath": "github.com/davecgh/go-spew/spew",
 			"Rev": "782f4967f2dc4564575ca782fe2d04090b5faca8"
 		},

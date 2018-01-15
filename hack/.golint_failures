@@ -504,7 +504,6 @@ staging/src/k8s.io/apimachinery/pkg/util/net
 staging/src/k8s.io/apimachinery/pkg/util/proxy
 staging/src/k8s.io/apimachinery/pkg/util/rand
 staging/src/k8s.io/apimachinery/pkg/util/remotecommand
-staging/src/k8s.io/apimachinery/pkg/util/runtime
 staging/src/k8s.io/apimachinery/pkg/util/sets
 staging/src/k8s.io/apimachinery/pkg/util/sets/types
 staging/src/k8s.io/apimachinery/pkg/util/strategicpatch

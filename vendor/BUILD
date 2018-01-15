@@ -31,6 +31,7 @@ filegroup(
         "//vendor/github.com/PuerkitoBio/purell:all-srcs",
         "//vendor/github.com/PuerkitoBio/urlesc:all-srcs",
         "//vendor/github.com/abbot/go-http-auth:all-srcs",
+        "//vendor/github.com/agext/levenshtein:all-srcs",
         "//vendor/github.com/appc/spec/schema:all-srcs",
         "//vendor/github.com/armon/circbuf:all-srcs",
         "//vendor/github.com/asaskevich/govalidator:all-srcs",
