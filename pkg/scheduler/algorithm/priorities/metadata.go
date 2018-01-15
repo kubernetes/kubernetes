@@ -32,7 +32,7 @@ type PriorityMetadataFactory struct {
 	statefulSetLister algorithm.StatefulSetLister
 }
 
-func NewPriorityMetadataFactory(serviceLister algorithm.ServiceLister, controllerLister algorithm.ControllerLister, replicaSetLister algorithm.ReplicaSetLister, statefulSetLister algorithm.StatefulSetLister) algorithm.MetadataProducer {
+func NewPriorityMetadataFactory(serviceLister algorithm.ServiceLister, controllerLister algorithm.ControllerLister, replicaSetLister algorithm.ReplicaSetLister, statefulSetLister algorithm.StatefulSetLister) algorithm.PriorityMetadataProducer {
 	factory := &PriorityMetadataFactory{
 		serviceLister:     serviceLister,
 		controllerLister:  controllerLister,
@@ -52,7 +52,7 @@ type priorityMetadata struct {
 	podFirstServiceSelector labels.Selector
 }
 
-// PriorityMetadata is a MetadataProducer.  Node info can be nil.
+// PriorityMetadata is a PriorityMetadataProducer.  Node info can be nil.
 func (pmf *PriorityMetadataFactory) PriorityMetadata(pod *v1.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo) interface{} {
 	// If we cannot compute metadata, just return nil
 	if pod == nil {
