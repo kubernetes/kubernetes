@@ -334,8 +334,6 @@ func newTestPods(count int) []*v1.Pod {
 	return pods
 }
 
-var emptyPodUIDs map[types.UID]kubetypes.SyncPodType
-
 func TestSyncLoopAbort(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()

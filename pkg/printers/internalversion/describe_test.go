@@ -783,8 +783,8 @@ func TestDefaultDescribers(t *testing.T) {
 
 func TestGetPodsTotalRequests(t *testing.T) {
 	testCases := []struct {
-		pods                         *api.PodList
-		expectedReqs, expectedLimits map[api.ResourceName]resource.Quantity
+		pods         *api.PodList
+		expectedReqs map[api.ResourceName]resource.Quantity
 	}{
 		{
 			pods: &api.PodList{

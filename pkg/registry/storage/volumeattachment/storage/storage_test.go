@@ -60,10 +60,6 @@ func validNewVolumeAttachment(name string) *storageapi.VolumeAttachment {
 	}
 }
 
-func validChangedVolumeAttachment() *storageapi.VolumeAttachment {
-	return validNewVolumeAttachment("foo")
-}
-
 func TestCreate(t *testing.T) {
 	if *testapi.Storage.GroupVersion() != storageapiv1alpha1.SchemeGroupVersion {
 		// skip the test for all versions exception v1alpha1

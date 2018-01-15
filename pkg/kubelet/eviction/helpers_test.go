@@ -1645,7 +1645,7 @@ func TestGetStarvedResources(t *testing.T) {
 	}
 }
 
-func testParsePercentage(t *testing.T) {
+func TestParsePercentage(t *testing.T) {
 	testCases := map[string]struct {
 		hasError bool
 		value    float32
@@ -1674,7 +1674,7 @@ func testParsePercentage(t *testing.T) {
 	}
 }
 
-func testCompareThresholdValue(t *testing.T) {
+func TestCompareThresholdValue(t *testing.T) {
 	testCases := []struct {
 		a, b  evictionapi.ThresholdValue
 		equal bool
@@ -1827,20 +1827,6 @@ func newResourceList(cpu, memory, disk string) v1.ResourceList {
 	}
 	if disk != "" {
 		res[v1.ResourceEphemeralStorage] = resource.MustParse(disk)
-	}
-	return res
-}
-
-func newEphemeralStorageResourceList(ephemeral, cpu, memory string) v1.ResourceList {
-	res := v1.ResourceList{}
-	if ephemeral != "" {
-		res[v1.ResourceEphemeralStorage] = resource.MustParse(ephemeral)
-	}
-	if cpu != "" {
-		res[v1.ResourceCPU] = resource.MustParse(cpu)
-	}
-	if memory != "" {
-		res[v1.ResourceMemory] = resource.MustParse("1Mi")
 	}
 	return res
 }

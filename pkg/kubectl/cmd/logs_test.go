@@ -34,8 +34,8 @@ import (
 
 func TestLog(t *testing.T) {
 	tests := []struct {
-		name, version, podPath, logPath, container string
-		pod                                        *api.Pod
+		name, version, podPath, logPath string
+		pod                             *api.Pod
 	}{
 		{
 			name:    "v1 - pod log",

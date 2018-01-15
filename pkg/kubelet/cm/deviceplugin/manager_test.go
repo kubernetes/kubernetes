@@ -233,11 +233,6 @@ func TestUpdateCapacityAllocatable(t *testing.T) {
 
 }
 
-type stringPairType struct {
-	value1 string
-	value2 string
-}
-
 func constructDevices(devices []string) sets.String {
 	ret := sets.NewString()
 	for _, dev := range devices {
