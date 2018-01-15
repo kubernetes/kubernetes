@@ -2683,16 +2683,12 @@ func RemoveAvoidPodsOffNode(c clientset.Interface, nodeName string) {
 	ExpectNoError(err)
 }
 
-//TODO(p0lyn0mial): remove internalClientset and kind
-func getScalerForKind(internalClientset internalclientset.Interface, kind schema.GroupKind, scalesGetter scaleclient.ScalesGetter, gr schema.GroupResource) (kubectl.Scaler, error) {
-	return kubectl.ScalerFor(kind, internalClientset, scalesGetter, gr)
+func getScalerForKind(scalesGetter scaleclient.ScalesGetter, gr schema.GroupResource) kubectl.Scaler {
+	return kubectl.ScalerFor(scalesGetter, gr)
 }
 
-//TODO(p0lyn0mial): remove internalClientset and kind.
-//TODO(p0lyn0mial): update the callers.
 func ScaleResource(
 	clientset clientset.Interface,
-	internalClientset internalclientset.Interface,
 	scalesGetter scaleclient.ScalesGetter,
 	ns, name string,
 	size uint,
@@ -2701,13 +2697,10 @@ func ScaleResource(
 	gr schema.GroupResource,
 ) error {
 	By(fmt.Sprintf("Scaling %v %s in namespace %s to %d", kind, name, ns, size))
-	scaler, err := getScalerForKind(internalClientset, kind, scalesGetter, gr)
-	if err != nil {
-		return err
-	}
+	scaler:= getScalerForKind(scalesGetter, gr)
 	waitForScale := kubectl.NewRetryParams(5*time.Second, 1*time.Minute)
 	waitForReplicas := kubectl.NewRetryParams(5*time.Second, 5*time.Minute)
-	if err = scaler.Scale(ns, name, size, nil, waitForScale, waitForReplicas); err != nil {
+	if err := scaler.Scale(ns, name, size, nil, waitForScale, waitForReplicas); err != nil {
 		return fmt.Errorf("error while scaling RC %s to %d replicas: %v", name, size, err)
 	}
 	if !wait {

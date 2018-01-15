@@ -34,7 +34,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 
 	scaleclient "k8s.io/client-go/scale"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	appsclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/apps/internalversion"
 	batchclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/batch/internalversion"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
@@ -54,21 +53,8 @@ type Scaler interface {
 }
 
 // ScalerFor gets a scaler for a given resource
-// TODO(p0lyn0mial): remove kind and internalclientset
-// TODO(p0lyn0mial): once we have only one scaler, there is  no need to return an error anymore.
-func ScalerFor(kind schema.GroupKind, c internalclientset.Interface, scalesGetter scaleclient.ScalesGetter, gr schema.GroupResource) (Scaler, error) {
-	switch kind {
-	case api.Kind("ReplicationController"):
-		return &ReplicationControllerScaler{c.Core()}, nil
-	case extensions.Kind("ReplicaSet"), apps.Kind("ReplicaSet"):
-		return &ReplicaSetScaler{c.Extensions()}, nil
-	case batch.Kind("Job"):
-		return &JobScaler{c.Batch()}, nil // Either kind of job can be scaled with Batch interface.
-	case apps.Kind("StatefulSet"):
-		return &StatefulSetScaler{c.Apps()}, nil
-	default:
-		return &GenericScaler{scalesGetter, gr}, nil
-	}
+func ScalerFor(scalesGetter scaleclient.ScalesGetter, gr schema.GroupResource) Scaler {
+		return &GenericScaler{scalesGetter, gr}
 }
 
 // ScalePrecondition describes a condition that must be true for the scale to take place
@@ -167,6 +153,7 @@ func (precondition *ScalePrecondition) ValidateReplicationController(controller 
 	return nil
 }
 
+// TODO(p0lyn0mial): remove ReplicationControllerScaler
 type ReplicationControllerScaler struct {
 	c coreclient.ReplicationControllersGetter
 }
@@ -265,6 +252,7 @@ func (precondition *ScalePrecondition) ValidateReplicaSet(replicaSet *extensions
 	return nil
 }
 
+// TODO(polyn0mial): remove ReplicaSetScaler
 type ReplicaSetScaler struct {
 	c extensionsclient.ReplicaSetsGetter
 }
@@ -339,6 +327,7 @@ func (precondition *ScalePrecondition) ValidateJob(job *batch.Job) error {
 	return nil
 }
 
+// TODO(p0lyn0mial): remove StatefulSetScaler
 type StatefulSetScaler struct {
 	c appsclient.StatefulSetsGetter
 }
@@ -395,6 +384,7 @@ func (scaler *StatefulSetScaler) Scale(namespace, name string, newSize uint, pre
 	return nil
 }
 
+// TODO(p0lyn0mial): remove JobScaler
 type JobScaler struct {
 	c batchclient.JobsGetter
 }
@@ -463,6 +453,7 @@ func (precondition *ScalePrecondition) ValidateDeployment(deployment *extensions
 	return nil
 }
 
+// TODO(p0lyn0mial): remove DeploymentScaler
 type DeploymentScaler struct {
 	c extensionsclient.DeploymentsGetter
 }

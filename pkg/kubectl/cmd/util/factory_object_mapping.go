@@ -282,13 +282,6 @@ func (f *ring1Factory) LogsForObject(object, options runtime.Object, timeout tim
 }
 
 func (f *ring1Factory) Scaler(mapping *meta.RESTMapping) (kubectl.Scaler, error) {
-	mappingVersion := mapping.GroupVersionKind.GroupVersion()
-	clientset, err := f.clientAccessFactory.ClientSetForVersion(&mappingVersion)
-	if err != nil {
-		return nil, err
-	}
-
-	// create scales getter
 	// TODO(p0lyn0mial): put scalesGetter to a factory
 	discoClient, err := f.clientAccessFactory.DiscoveryClient()
 	if err != nil {
@@ -303,7 +296,7 @@ func (f *ring1Factory) Scaler(mapping *meta.RESTMapping) (kubectl.Scaler, error)
 	scalesGetter := scaleclient.New(restClient, mapper, dynamic.LegacyAPIPathResolverFunc, resolver)
 	gvk := mapping.GroupVersionKind.GroupVersion().WithResource(mapping.Resource)
 
-	return kubectl.ScalerFor(mapping.GroupVersionKind.GroupKind(), clientset, scalesGetter, gvk.GroupResource())
+	return kubectl.ScalerFor(scalesGetter, gvk.GroupResource()), nil
 }
 
 func (f *ring1Factory) Reaper(mapping *meta.RESTMapping) (kubectl.Reaper, error) {
