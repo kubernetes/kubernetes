@@ -28,6 +28,9 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 )
 
+// PluginName indicates name of admission plugin.
+const PluginName = "DefaultTolerationSeconds"
+
 var (
 	defaultNotReadyTolerationSeconds = flag.Int64("default-not-ready-toleration-seconds", 300,
 		"Indicates the tolerationSeconds of the toleration for notReady:NoExecute"+
@@ -40,7 +43,7 @@ var (
 
 // Register registers a plugin
 func Register(plugins *admission.Plugins) {
-	plugins.Register("DefaultTolerationSeconds", func(config io.Reader) (admission.Interface, error) {
+	plugins.Register(PluginName, func(config io.Reader) (admission.Interface, error) {
 		return NewDefaultTolerationSeconds(), nil
 	})
 }

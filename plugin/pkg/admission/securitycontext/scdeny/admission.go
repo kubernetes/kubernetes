@@ -25,9 +25,12 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
+// PluginName indicates name of admission plugin.
+const PluginName = "SecurityContextDeny"
+
 // Register registers a plugin
 func Register(plugins *admission.Plugins) {
-	plugins.Register("SecurityContextDeny", func(config io.Reader) (admission.Interface, error) {
+	plugins.Register(PluginName, func(config io.Reader) (admission.Interface, error) {
 		return NewSecurityContextDeny(), nil
 	})
 }

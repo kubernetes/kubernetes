@@ -34,7 +34,8 @@ import (
 )
 
 const (
-	pluginName = "Priority"
+	// PluginName indicates name of admission plugin.
+	PluginName = "Priority"
 
 	// HighestUserDefinablePriority is the highest priority for user defined priority classes. Priority values larger than 1 billion are reserved for Kubernetes system use.
 	HighestUserDefinablePriority = 1000000000
@@ -50,7 +51,7 @@ var SystemPriorityClasses = map[string]int32{
 
 // Register registers a plugin
 func Register(plugins *admission.Plugins) {
-	plugins.Register(pluginName, func(config io.Reader) (admission.Interface, error) {
+	plugins.Register(PluginName, func(config io.Reader) (admission.Interface, error) {
 		return NewPlugin(), nil
 	})
 }
@@ -79,10 +80,10 @@ func NewPlugin() *PriorityPlugin {
 // ValidateInitialization implements the InitializationValidator interface.
 func (p *PriorityPlugin) ValidateInitialization() error {
 	if p.client == nil {
-		return fmt.Errorf("%s requires a client", pluginName)
+		return fmt.Errorf("%s requires a client", PluginName)
 	}
 	if p.lister == nil {
-		return fmt.Errorf("%s requires a lister", pluginName)
+		return fmt.Errorf("%s requires a lister", PluginName)
 	}
 	return nil
 }

@@ -46,7 +46,7 @@ type ServerRunOptions struct {
 	InsecureServing         *kubeoptions.InsecureServingOptions
 	Audit                   *genericoptions.AuditOptions
 	Features                *genericoptions.FeatureOptions
-	Admission               *genericoptions.AdmissionOptions
+	Admission               *kubeoptions.AdmissionOptions
 	Authentication          *kubeoptions.BuiltInAuthenticationOptions
 	Authorization           *kubeoptions.BuiltInAuthorizationOptions
 	CloudProvider           *kubeoptions.CloudProviderOptions
@@ -82,7 +82,7 @@ func NewServerRunOptions() *ServerRunOptions {
 		InsecureServing:      kubeoptions.NewInsecureServingOptions(),
 		Audit:                genericoptions.NewAuditOptions(),
 		Features:             genericoptions.NewFeatureOptions(),
-		Admission:            genericoptions.NewAdmissionOptions(),
+		Admission:            kubeoptions.NewAdmissionOptions(),
 		Authentication:       kubeoptions.NewBuiltInAuthenticationOptions().WithAll(),
 		Authorization:        kubeoptions.NewBuiltInAuthorizationOptions(),
 		CloudProvider:        kubeoptions.NewCloudProviderOptions(),
@@ -116,10 +116,6 @@ func NewServerRunOptions() *ServerRunOptions {
 	// Overwrite the default for storage data format.
 	s.Etcd.DefaultStorageMediaType = "application/vnd.kubernetes.protobuf"
 
-	// register all admission plugins
-	RegisterAllAdmissionPlugins(s.Admission.Plugins)
-	// Set the default for admission plugins names
-	s.Admission.PluginNames = []string{"AlwaysAdmit"}
 	return &s
 }
 

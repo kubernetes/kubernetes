@@ -30,9 +30,12 @@ import (
 	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 )
 
+// PluginName indicates name of admission plugin.
+const PluginName = "NamespaceAutoProvision"
+
 // Register registers a plugin
 func Register(plugins *admission.Plugins) {
-	plugins.Register("NamespaceAutoProvision", func(config io.Reader) (admission.Interface, error) {
+	plugins.Register(PluginName, func(config io.Reader) (admission.Interface, error) {
 		return NewProvision(), nil
 	})
 }
