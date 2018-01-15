@@ -118,6 +118,7 @@ func AddHandlers(h printers.PrintHandler) {
 
 	replicaSetColumnDefinitions := []metav1alpha1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
+		{Name: "ApiVersion", Type: "string", Description: metav1.TypeMeta{}.SwaggerDoc()["apiVersion"]},
 		{Name: "Desired", Type: "integer", Description: extensionsv1beta1.ReplicaSetSpec{}.SwaggerDoc()["replicas"]},
 		{Name: "Current", Type: "integer", Description: extensionsv1beta1.ReplicaSetStatus{}.SwaggerDoc()["replicas"]},
 		{Name: "Ready", Type: "integer", Description: extensionsv1beta1.ReplicaSetStatus{}.SwaggerDoc()["readyReplicas"]},
@@ -131,6 +132,7 @@ func AddHandlers(h printers.PrintHandler) {
 
 	daemonSetColumnDefinitions := []metav1alpha1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
+		{Name: "ApiVersion", Type: "string", Description: metav1.TypeMeta{}.SwaggerDoc()["apiVersion"]},
 		{Name: "Desired", Type: "integer", Description: extensionsv1beta1.DaemonSetStatus{}.SwaggerDoc()["desiredNumberScheduled"]},
 		{Name: "Current", Type: "integer", Description: extensionsv1beta1.DaemonSetStatus{}.SwaggerDoc()["currentNumberScheduled"]},
 		{Name: "Ready", Type: "integer", Description: extensionsv1beta1.DaemonSetStatus{}.SwaggerDoc()["numberReady"]},
@@ -305,6 +307,7 @@ func AddHandlers(h printers.PrintHandler) {
 
 	deploymentColumnDefinitions := []metav1alpha1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
+		{Name: "ApiVersion", Type: "string", Description: metav1.TypeMeta{}.SwaggerDoc()["apiVersion"]},
 		{Name: "Desired", Type: "string", Description: extensionsv1beta1.DeploymentSpec{}.SwaggerDoc()["replicas"]},
 		{Name: "Current", Type: "string", Description: extensionsv1beta1.DeploymentStatus{}.SwaggerDoc()["replicas"]},
 		{Name: "Up-to-date", Type: "string", Description: extensionsv1beta1.DeploymentStatus{}.SwaggerDoc()["updatedReplicas"]},
@@ -709,7 +712,15 @@ func printReplicaSet(obj *extensions.ReplicaSet, options printers.PrintOptions) 
 	currentReplicas := obj.Status.Replicas
 	readyReplicas := obj.Status.ReadyReplicas
 
-	row.Cells = append(row.Cells, obj.Name, desiredReplicas, currentReplicas, readyReplicas, translateTimestamp(obj.CreationTimestamp))
+	var apiVersion = ""
+	if obj.SelfLink != "" {
+		part := strings.Split(obj.SelfLink, "/")
+		apiVersion = part[2] + "/" + part[3]
+	} else {
+		apiVersion = "<none>"
+	}
+	row.Cells = append(row.Cells, obj.Name, apiVersion, desiredReplicas, currentReplicas, readyReplicas, translateTimestamp(obj.CreationTimestamp))
+
 	if options.Wide {
 		names, images := layoutContainerCells(obj.Spec.Template.Spec.Containers)
 		row.Cells = append(row.Cells, names, images, metav1.FormatLabelSelector(obj.Spec.Selector))
@@ -989,7 +1000,15 @@ func printDaemonSet(obj *extensions.DaemonSet, options printers.PrintOptions) ([
 	numberUpdated := obj.Status.UpdatedNumberScheduled
 	numberAvailable := obj.Status.NumberAvailable
 
-	row.Cells = append(row.Cells, obj.Name, desiredScheduled, currentScheduled, numberReady, numberUpdated, numberAvailable, labels.FormatLabels(obj.Spec.Template.Spec.NodeSelector), translateTimestamp(obj.CreationTimestamp))
+	var apiVersion = ""
+	if obj.SelfLink != "" {
+		part := strings.Split(obj.SelfLink, "/")
+		apiVersion = part[2] + "/" + part[3]
+	} else {
+		apiVersion = "<none>"
+	}
+	row.Cells = append(row.Cells, obj.Name, apiVersion, desiredScheduled, currentScheduled, numberReady, numberUpdated, numberAvailable, labels.FormatLabels(obj.Spec.Template.Spec.NodeSelector), translateTimestamp(obj.CreationTimestamp))
+
 	if options.Wide {
 		names, images := layoutContainerCells(obj.Spec.Template.Spec.Containers)
 		row.Cells = append(row.Cells, names, images, metav1.FormatLabelSelector(obj.Spec.Selector))
@@ -1441,6 +1460,7 @@ func printDeployment(obj *extensions.Deployment, options printers.PrintOptions) 
 	row := metav1alpha1.TableRow{
 		Object: runtime.RawExtension{Object: obj},
 	}
+
 	desiredReplicas := obj.Spec.Replicas
 	currentReplicas := obj.Status.Replicas
 	updatedReplicas := obj.Status.UpdatedReplicas
@@ -1452,7 +1472,15 @@ func printDeployment(obj *extensions.Deployment, options printers.PrintOptions) 
 		// this shouldn't happen if LabelSelector passed validation
 		return nil, err
 	}
-	row.Cells = append(row.Cells, obj.Name, desiredReplicas, currentReplicas, updatedReplicas, availableReplicas, age)
+	var apiVersion = ""
+	if obj.SelfLink != "" {
+		part := strings.Split(obj.SelfLink, "/")
+		apiVersion = part[2] + "/" + part[3]
+	} else {
+		apiVersion = "<none>"
+	}
+	row.Cells = append(row.Cells, obj.Name, apiVersion, desiredReplicas, currentReplicas, updatedReplicas, availableReplicas, age)
+
 	if options.Wide {
 		containers, images := layoutContainerCells(containers)
 		row.Cells = append(row.Cells, containers, images, selector.String())

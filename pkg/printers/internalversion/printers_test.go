@@ -2014,8 +2014,8 @@ func TestPrintDeployment(t *testing.T) {
 					UnavailableReplicas: 4,
 				},
 			},
-			"test1\t5\t10\t2\t1\t0s\n",
-			"test1\t5\t10\t2\t1\t0s\tfake-container1,fake-container2\tfake-image1,fake-image2\tfoo=bar\n",
+			"test1\t<none>\t5\t10\t2\t1\t0s\n",
+			"test1\t<none>\t5\t10\t2\t1\t0s\tfake-container1,fake-container2\tfake-image1,fake-image2\tfoo=bar\n",
 		},
 	}
 
@@ -2068,7 +2068,7 @@ func TestPrintDaemonSet(t *testing.T) {
 					NumberAvailable:        0,
 				},
 			},
-			"test1\t3\t2\t1\t2\t0\t<none>\t0s\n",
+			"test1\t<none>\t3\t2\t1\t2\t0\t<none>\t0s\n",
 		},
 	}
 
@@ -2959,8 +2959,8 @@ func TestPrintReplicaSet(t *testing.T) {
 					ReadyReplicas: 2,
 				},
 			},
-			"test1\t5\t5\t2\t0s\n",
-			"test1\t5\t5\t2\t0s\tfake-container1,fake-container2\tfake-image1,fake-image2\tfoo=bar\n",
+			"test1\t<none>\t5\t5\t2\t0s\n",
+			"test1\t<none>\t5\t5\t2\t0s\tfake-container1,fake-container2\tfake-image1,fake-image2\tfoo=bar\n",
 		},
 	}
 
