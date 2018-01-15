@@ -81,7 +81,7 @@ func NewCommandStartCustomResourceDefinitionsServer(out, errOut io.Writer, stopC
 	return cmd
 }
 
-func (o CustomResourceDefinitionsServerOptions) Validate(args []string) error {
+func (o *CustomResourceDefinitionsServerOptions) Validate(args []string) error {
 	errors := []error{}
 	errors = append(errors, o.RecommendedOptions.Validate()...)
 	return utilerrors.NewAggregate(errors)
@@ -91,7 +91,7 @@ func (o *CustomResourceDefinitionsServerOptions) Complete() error {
 	return nil
 }
 
-func (o CustomResourceDefinitionsServerOptions) Config() (*apiserver.Config, error) {
+func (o *CustomResourceDefinitionsServerOptions) Config() (*apiserver.Config, error) {
 	// TODO have a "real" external address
 	if err := o.RecommendedOptions.SecureServing.MaybeDefaultWithSelfSignedCerts("localhost", nil, []net.IP{net.ParseIP("127.0.0.1")}); err != nil {
 		return nil, fmt.Errorf("error creating self-signed certificates: %v", err)
@@ -125,7 +125,7 @@ func NewCRDRESTOptionsGetter(etcdOptions genericoptions.EtcdOptions) genericregi
 	return ret
 }
 
-func (o CustomResourceDefinitionsServerOptions) RunCustomResourceDefinitionsServer(stopCh <-chan struct{}) error {
+func (o *CustomResourceDefinitionsServerOptions) RunCustomResourceDefinitionsServer(stopCh <-chan struct{}) error {
 	config, err := o.Config()
 	if err != nil {
 		return err

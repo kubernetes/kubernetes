@@ -83,7 +83,7 @@ func NewCommandStartWardleServer(out, errOut io.Writer, stopCh <-chan struct{}) 
 	return cmd
 }
 
-func (o WardleServerOptions) Validate(args []string) error {
+func (o *WardleServerOptions) Validate(args []string) error {
 	errors := []error{}
 	errors = append(errors, o.RecommendedOptions.Validate()...)
 	return utilerrors.NewAggregate(errors)
@@ -124,7 +124,7 @@ func (o *WardleServerOptions) Config() (*apiserver.Config, error) {
 	return config, nil
 }
 
-func (o WardleServerOptions) RunWardleServer(stopCh <-chan struct{}) error {
+func (o *WardleServerOptions) RunWardleServer(stopCh <-chan struct{}) error {
 	config, err := o.Config()
 	if err != nil {
 		return err

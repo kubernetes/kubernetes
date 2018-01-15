@@ -91,7 +91,7 @@ func NewDefaultOptions(out, err io.Writer) *AggregatorOptions {
 	return o
 }
 
-func (o AggregatorOptions) Validate(args []string) error {
+func (o *AggregatorOptions) Validate(args []string) error {
 	errors := []error{}
 	errors = append(errors, o.RecommendedOptions.Validate()...)
 	return utilerrors.NewAggregate(errors)
@@ -101,7 +101,7 @@ func (o *AggregatorOptions) Complete() error {
 	return nil
 }
 
-func (o AggregatorOptions) RunAggregator(stopCh <-chan struct{}) error {
+func (o *AggregatorOptions) RunAggregator(stopCh <-chan struct{}) error {
 	// TODO have a "real" external address
 	if err := o.RecommendedOptions.SecureServing.MaybeDefaultWithSelfSignedCerts("localhost", nil, nil); err != nil {
 		return fmt.Errorf("error creating self-signed certificates: %v", err)
