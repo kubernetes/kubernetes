@@ -27,6 +27,30 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 )
 
+const (
+	// ServiceAnnotationLoadBalancerName is the annotation used on the service
+	// to specify a portion of the name of the cloud provider load balancer.
+	// The maximum length for this portion can be 16 characters. The full
+	// load balancer name will include be created using the following
+	// template: `k8s-{loadbalancer-name:16}-{uid:10}`
+	// The cloudprovider will use this as a hint for inclusion in the name of the
+	// created load balancer, ideally it will be created using the template above.
+	// For example: `"kubernetes.io/loadbalancer-name": "myserver"`, would create
+	// a load balancer with the name: `k8s-myserver-abcgef1234`
+	ServiceAnnotationLoadBalancerName = "kubernetes.io/loadbalancer-name"
+
+	// ServiceAnnotationLoadBalancerAutoGenerateName is the annotation on the
+	// service to automatically create a name based on the name,
+	// namespace, and uuid of the service. The cloud provider loadbalancer name
+	// will be created using the following template: `k8s-{namespace:8}-{name:8}-{uuid:10}`
+	// The cloudprovider will use this as a hint for inclusion in the name of the
+	// created load balancer, ideally it will be created using the template above.
+	// For example, having the annotation `"kubernetes.io/loadlbalancer-name-auto-generate"`, could create
+	// a load balancer with the name `k8s-default-myservic-abcgef1234` for a
+	// service called `myservice` on namespace `default`.
+	ServiceAnnotationLoadBalancerAutoGenerateName = "kubernetes.io/loadbalancer-name-auto-generate"
+)
+
 // Interface is an abstract, pluggable interface for cloud providers.
 type Interface interface {
 	// Initialize provides the cloud with a kubernetes client builder and may spawn goroutines
@@ -64,13 +88,48 @@ type Clusters interface {
 // TODO(#6812): Use a shorter name that's less likely to be longer than cloud
 // providers' name length limits.
 func GetLoadBalancerName(service *v1.Service) string {
-	//GCE requires that the name of a load balancer starts with a lower case letter.
-	ret := "a" + string(service.UID)
-	ret = strings.Replace(ret, "-", "", -1)
+
+	var ret string
+
+	if val, ok := service.Annotations[ServiceAnnotationLoadBalancerName]; ok {
+		// The service load balancer portion name has be explicitly set
+		if len(val) > 16 {
+			val = val[:16]
+		}
+
+		ret = val
+	} else if _, ok = service.Annotations[ServiceAnnotationLoadBalancerAutoGenerateName]; ok {
+		// The load balancer name should be auto generated using service information
+		name := service.GetName()
+		namespace := service.GetNamespace()
+		ret = fmt.Sprintf("%.8s-%.8s", namespace, name)
+	}
+
+	if len(ret) > 0 {
+		ret = "k8s-" + ret + "-" + strings.Replace(string(service.UID), "-", "", -1)
+	} else {
+		// Fallback to original way to generate the name
+		//GCE requires that the name of a load balancer starts with a lower case letter.
+		ret = "a" + string(service.UID)
+		ret = strings.Replace(ret, "-", "", -1)
+	}
+
 	//AWS requires that the name of a load balancer is shorter than 32 bytes.
 	if len(ret) > 32 {
 		ret = ret[:32]
 	}
+
+	// Sanitize for AWS: Only English ASCII alphanumeric characters or hyphens:
+	// We cannot return an error, so we must fix it here.
+	ret = strings.Map(func(c rune) rune {
+		if 'a' <= c && c <= 'z' || 'A' <= c && c <= 'Z' || '0' <= c && c <= '9' || c == '-' {
+			return c
+		}
+
+		// Replace with an acceptable character
+		return 'z'
+	}, ret)
+
 	return ret
 }
 
