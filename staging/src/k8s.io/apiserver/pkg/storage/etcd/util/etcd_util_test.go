@@ -104,6 +104,18 @@ func TestEtcdHealthCheck(t *testing.T) {
 			expectErr: true,
 		},
 		{
+			data:      `{"health": true}`,
+			expectErr: false,
+		},
+		{
+			data:      `{"health": false}`,
+			expectErr: true,
+		},
+		{
+			data:      `{}`,
+			expectErr: true,
+		},
+		{
 			data:      "invalid json",
 			expectErr: true,
 		},
