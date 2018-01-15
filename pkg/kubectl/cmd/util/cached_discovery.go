@@ -25,7 +25,8 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	"github.com/googleapis/gnostic/OpenAPIv2"
+	"github.com/golang/protobuf/proto"
+	openapi_v2 "github.com/googleapis/gnostic/OpenAPIv2"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -59,6 +60,10 @@ type CachedDiscoveryClient struct {
 
 var _ discovery.CachedDiscoveryInterface = &CachedDiscoveryClient{}
 
+type cachedObjectEncoder interface {
+	Encode(obj interface{}) ([]byte, error)
+}
+
 // ServerResourcesForGroupVersion returns the supported resources for a group and version.
 func (d *CachedDiscoveryClient) ServerResourcesForGroupVersion(groupVersion string) (*metav1.APIResourceList, error) {
 	filename := filepath.Join(d.cacheDirectory, groupVersion, "serverresources.json")
@@ -82,7 +87,7 @@ func (d *CachedDiscoveryClient) ServerResourcesForGroupVersion(groupVersion stri
 		return liveResources, err
 	}
 
-	if err := d.writeCachedFile(filename, liveResources); err != nil {
+	if err := d.writeCachedFile(filename, liveResources, &cachedRuntimeObjectEncoder{}); err != nil {
 		glog.V(3).Infof("failed to write cache to %v due to %v", filename, err)
 	}
 
@@ -107,6 +112,12 @@ func (d *CachedDiscoveryClient) ServerResources() ([]*metav1.APIResourceList, er
 	return result, nil
 }
 
+type cachedRuntimeObjectEncoder struct{}
+
+func (e cachedRuntimeObjectEncoder) Encode(obj interface{}) ([]byte, error) {
+	return runtime.Encode(scheme.Codecs.LegacyCodec(), obj.(runtime.Object))
+}
+
 func (d *CachedDiscoveryClient) ServerGroups() (*metav1.APIGroupList, error) {
 	filename := filepath.Join(d.cacheDirectory, "servergroups.json")
 	cachedBytes, err := d.getCachedFile(filename)
@@ -129,7 +140,7 @@ func (d *CachedDiscoveryClient) ServerGroups() (*metav1.APIGroupList, error) {
 		return liveGroups, err
 	}
 
-	if err := d.writeCachedFile(filename, liveGroups); err != nil {
+	if err := d.writeCachedFile(filename, liveGroups, &cachedRuntimeObjectEncoder{}); err != nil {
 		glog.V(3).Infof("failed to write cache to %v due to %v", filename, err)
 	}
 
@@ -174,12 +185,12 @@ func (d *CachedDiscoveryClient) getCachedFile(filename string) ([]byte, error) {
 	return cachedBytes, nil
 }
 
-func (d *CachedDiscoveryClient) writeCachedFile(filename string, obj runtime.Object) error {
+func (d *CachedDiscoveryClient) writeCachedFile(filename string, obj interface{}, encoder cachedObjectEncoder) error {
 	if err := os.MkdirAll(filepath.Dir(filename), 0755); err != nil {
 		return err
 	}
 
-	bytes, err := runtime.Encode(scheme.Codecs.LegacyCodec(), obj)
+	bytes, err := encoder.Encode(obj)
 	if err != nil {
 		return err
 	}
@@ -231,8 +242,35 @@ func (d *CachedDiscoveryClient) ServerVersion() (*version.Info, error) {
 	return d.delegate.ServerVersion()
 }
 
+type cachedOpenAPIObjectEncoder struct{}
+
+func (e *cachedOpenAPIObjectEncoder) Encode(obj interface{}) ([]byte, error) {
+	return proto.Marshal(obj.(proto.Message))
+}
+
 func (d *CachedDiscoveryClient) OpenAPISchema() (*openapi_v2.Document, error) {
-	return d.delegate.OpenAPISchema()
+	filename := filepath.Join(d.cacheDirectory, "openapischema.pb")
+	cachedBytes, err := d.getCachedFile(filename)
+	// don't fail on errors, we either don't have a file or won't be able to run the cached check. Either way we can fallback.
+	if err == nil {
+		cachedDocument := &openapi_v2.Document{}
+		if err := proto.Unmarshal(cachedBytes, cachedDocument); err == nil {
+			glog.V(10).Infof("returning cached discovery info from %v", filename)
+			return cachedDocument, nil
+		}
+	}
+
+	liveDocument, err := d.delegate.OpenAPISchema()
+	if err != nil {
+		glog.V(3).Infof("skipped caching discovery info due to %v", err)
+		return liveDocument, err
+	}
+
+	if err := d.writeCachedFile(filename, liveDocument, &cachedOpenAPIObjectEncoder{}); err != nil {
+		glog.V(3).Infof("failed to write cache to %v due to %v", filename, err)
+	}
+
+	return liveDocument, nil
 }
 
 func (d *CachedDiscoveryClient) Fresh() bool {
