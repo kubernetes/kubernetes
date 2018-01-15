@@ -187,8 +187,12 @@ func makeAPIServiceAvailableHealthzCheck(name string, apiServices []*apiregistra
 	})
 }
 
+// priority defines group priority that is used in discovery. This controls
+// group position in the kubectl output.
 type priority struct {
-	group   int32
+	// group indicates the order of the group relative to other groups.
+	group int32
+	// version indicates the relative order of the version inside of its group.
 	version int32
 }
 
@@ -229,6 +233,9 @@ var apiVersionPriorities = map[schema.GroupVersion]priority{
 	{Group: "admissionregistration.k8s.io", Version: "v1beta1"}:  {group: 16700, version: 12},
 	{Group: "admissionregistration.k8s.io", Version: "v1alpha1"}: {group: 16700, version: 9},
 	{Group: "scheduling.k8s.io", Version: "v1alpha1"}:            {group: 16600, version: 9},
+	// Append a new group to the end of the list if unsure.
+	// You can use min(existing group)-100 as the initial value for a group.
+	// Version can be set to 9 (to have space around) for a new group.
 }
 
 func apiServicesToRegister(delegateAPIServer genericapiserver.DelegationTarget, registration autoregister.AutoAPIServiceRegistration) []*apiregistration.APIService {
