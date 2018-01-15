@@ -90,10 +90,17 @@ func TestReadConfig(t *testing.T) {
 		t.Errorf("Should fail when no config is provided: %s", err)
 	}
 
+	os.Setenv("OS_PASSWORD", "mypass")
+	defer os.Unsetenv("OS_PASSWORD")
+
+	os.Setenv("OS_TENANT_NAME", "admin")
+	defer os.Unsetenv("OS_TENANT_NAME")
+
 	cfg, err := readConfig(strings.NewReader(`
  [Global]
  auth-url = http://auth.url
- username = user
+ user-id = user
+ tenant-name = demo
  [LoadBalancer]
  create-monitor = yes
  monitor-delay = 1m
@@ -111,6 +118,19 @@ func TestReadConfig(t *testing.T) {
 	}
 	if cfg.Global.AuthUrl != "http://auth.url" {
 		t.Errorf("incorrect authurl: %s", cfg.Global.AuthUrl)
+	}
+
+	if cfg.Global.UserId != "user" {
+		t.Errorf("incorrect userid: %s", cfg.Global.UserId)
+	}
+
+	if cfg.Global.Password != "mypass" {
+		t.Errorf("incorrect password: %s", cfg.Global.Password)
+	}
+
+	// config file wins over environment variable
+	if cfg.Global.TenantName != "demo" {
+		t.Errorf("incorrect tenant name: %s", cfg.Global.TenantName)
 	}
 
 	if !cfg.LoadBalancer.CreateMonitor {
@@ -375,56 +395,6 @@ func TestNodeAddresses(t *testing.T) {
 	if !reflect.DeepEqual(want, addrs) {
 		t.Errorf("nodeAddresses returned incorrect value %v", addrs)
 	}
-}
-
-// This allows acceptance testing against an existing OpenStack
-// install, using the standard OS_* OpenStack client environment
-// variables.
-// FIXME: it would be better to hermetically test against canned JSON
-// requests/responses.
-func configFromEnv() (cfg Config, ok bool) {
-	cfg.Global.AuthUrl = os.Getenv("OS_AUTH_URL")
-
-	cfg.Global.TenantId = os.Getenv("OS_TENANT_ID")
-	// Rax/nova _insists_ that we don't specify both tenant ID and name
-	if cfg.Global.TenantId == "" {
-		cfg.Global.TenantName = os.Getenv("OS_TENANT_NAME")
-	}
-
-	cfg.Global.Username = os.Getenv("OS_USERNAME")
-	cfg.Global.Password = os.Getenv("OS_PASSWORD")
-	cfg.Global.Region = os.Getenv("OS_REGION_NAME")
-
-	cfg.Global.TenantName = os.Getenv("OS_TENANT_NAME")
-	if cfg.Global.TenantName == "" {
-		cfg.Global.TenantName = os.Getenv("OS_PROJECT_NAME")
-	}
-
-	cfg.Global.TenantId = os.Getenv("OS_TENANT_ID")
-	if cfg.Global.TenantId == "" {
-		cfg.Global.TenantId = os.Getenv("OS_PROJECT_ID")
-	}
-
-	cfg.Global.DomainId = os.Getenv("OS_DOMAIN_ID")
-	if cfg.Global.DomainId == "" {
-		cfg.Global.DomainId = os.Getenv("OS_USER_DOMAIN_ID")
-	}
-
-	cfg.Global.DomainName = os.Getenv("OS_DOMAIN_NAME")
-	if cfg.Global.DomainName == "" {
-		cfg.Global.DomainName = os.Getenv("OS_USER_DOMAIN_NAME")
-	}
-
-	ok = (cfg.Global.AuthUrl != "" &&
-		cfg.Global.Username != "" &&
-		cfg.Global.Password != "" &&
-		(cfg.Global.TenantId != "" || cfg.Global.TenantName != "" ||
-			cfg.Global.DomainId != "" || cfg.Global.DomainName != ""))
-
-	cfg.Metadata.SearchOrder = fmt.Sprintf("%s,%s", configDriveID, metadataID)
-	cfg.BlockStorage.BSVersion = "auto"
-
-	return
 }
 
 func TestNewOpenStack(t *testing.T) {

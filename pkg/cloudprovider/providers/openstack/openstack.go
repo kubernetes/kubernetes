@@ -23,6 +23,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"os"
 	"regexp"
 	"strings"
 	"time"
@@ -180,12 +181,50 @@ func (cfg Config) toAuth3Options() tokens3.AuthOptions {
 	}
 }
 
+// configFromEnv allows setting up credentials etc using the
+// standard OS_* OpenStack client environment variables.
+func configFromEnv() (cfg Config, ok bool) {
+	cfg.Global.AuthUrl = os.Getenv("OS_AUTH_URL")
+	cfg.Global.Username = os.Getenv("OS_USERNAME")
+	cfg.Global.Password = os.Getenv("OS_PASSWORD")
+	cfg.Global.Region = os.Getenv("OS_REGION_NAME")
+
+	cfg.Global.TenantId = os.Getenv("OS_TENANT_ID")
+	if cfg.Global.TenantId == "" {
+		cfg.Global.TenantId = os.Getenv("OS_PROJECT_ID")
+	}
+	cfg.Global.TenantName = os.Getenv("OS_TENANT_NAME")
+	if cfg.Global.TenantName == "" {
+		cfg.Global.TenantName = os.Getenv("OS_PROJECT_NAME")
+	}
+
+	cfg.Global.DomainId = os.Getenv("OS_DOMAIN_ID")
+	if cfg.Global.DomainId == "" {
+		cfg.Global.DomainId = os.Getenv("OS_USER_DOMAIN_ID")
+	}
+	cfg.Global.DomainName = os.Getenv("OS_DOMAIN_NAME")
+	if cfg.Global.DomainName == "" {
+		cfg.Global.DomainName = os.Getenv("OS_USER_DOMAIN_NAME")
+	}
+
+	ok = cfg.Global.AuthUrl != "" &&
+		cfg.Global.Username != "" &&
+		cfg.Global.Password != "" &&
+		(cfg.Global.TenantId != "" || cfg.Global.TenantName != "" ||
+			cfg.Global.DomainId != "" || cfg.Global.DomainName != "")
+
+	cfg.Metadata.SearchOrder = fmt.Sprintf("%s,%s", configDriveID, metadataID)
+	cfg.BlockStorage.BSVersion = "auto"
+
+	return
+}
+
 func readConfig(config io.Reader) (Config, error) {
 	if config == nil {
 		return Config{}, fmt.Errorf("no OpenStack cloud provider config file given")
 	}
 
-	var cfg Config
+	cfg, _ := configFromEnv()
 
 	// Set default values for config params
 	cfg.BlockStorage.BSVersion = "auto"
