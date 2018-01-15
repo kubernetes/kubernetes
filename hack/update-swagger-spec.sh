@@ -37,14 +37,17 @@ make -C "${KUBE_ROOT}" WHAT=cmd/kube-apiserver
 
 function cleanup()
 {
-    [[ -n ${APISERVER_PID-} ]] && kill ${APISERVER_PID} 1>&2 2>/dev/null
+    if [[ -n "${APISERVER_PID-}" ]]; then
+      kill "${APISERVER_PID}" &>/dev/null || :
+      wait "${APISERVER_PID}" &>/dev/null || :
+    fi
 
     kube::etcd::cleanup
 
     kube::log::status "Clean up complete"
 }
 
-trap cleanup EXIT SIGINT
+kube::util::trap_add cleanup EXIT
 
 kube::golang::setup_env
 
