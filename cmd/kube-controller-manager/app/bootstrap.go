@@ -39,6 +39,7 @@ func startBootstrapSignerController(ctx ControllerContext) (bool, error) {
 func startTokenCleanerController(ctx ControllerContext) (bool, error) {
 	tcc, err := bootstrap.NewTokenCleaner(
 		ctx.ClientBuilder.ClientGoClientOrDie("token-cleaner"),
+		ctx.InformerFactory.Core().V1().Secrets(),
 		bootstrap.DefaultTokenCleanerOptions(),
 	)
 	if err != nil {

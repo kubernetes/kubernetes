@@ -983,7 +983,7 @@ func (f *configFactory) GetPriorityFunctionConfigs(priorityKeys sets.String) ([]
 	return getPriorityFunctionConfigs(priorityKeys, *pluginArgs)
 }
 
-func (f *configFactory) GetPriorityMetadataProducer() (algorithm.MetadataProducer, error) {
+func (f *configFactory) GetPriorityMetadataProducer() (algorithm.PriorityMetadataProducer, error) {
 	pluginArgs, err := f.getPluginArgs()
 	if err != nil {
 		return nil, err

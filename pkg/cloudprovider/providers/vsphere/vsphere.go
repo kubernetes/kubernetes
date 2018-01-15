@@ -375,14 +375,6 @@ func newControllerNode(cfg VSphereConfig) (*VSphere, error) {
 	if cfg.Global.VCenterPort == "" {
 		cfg.Global.VCenterPort = "443"
 	}
-	if cfg.Global.VMUUID == "" {
-		// This needs root privileges on the host, and will fail otherwise.
-		cfg.Global.VMUUID, err = getvmUUID()
-		if err != nil {
-			glog.Errorf("Failed to get VM UUID. err: %+v", err)
-			return nil, err
-		}
-	}
 	vsphereInstanceMap, err := populateVsphereInstanceMap(&cfg)
 	if err != nil {
 		return nil, err

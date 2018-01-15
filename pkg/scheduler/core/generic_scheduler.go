@@ -94,17 +94,16 @@ type genericScheduler struct {
 	equivalenceCache         *EquivalenceCache
 	schedulingQueue          SchedulingQueue
 	predicates               map[string]algorithm.FitPredicate
-	priorityMetaProducer     algorithm.MetadataProducer
+	priorityMetaProducer     algorithm.PriorityMetadataProducer
 	predicateMetaProducer    algorithm.PredicateMetadataProducer
 	prioritizers             []algorithm.PriorityConfig
 	extenders                []algorithm.SchedulerExtender
 	lastNodeIndexLock        sync.Mutex
 	lastNodeIndex            uint64
 	alwaysCheckAllPredicates bool
-
-	cachedNodeInfoMap map[string]*schedulercache.NodeInfo
-	volumeBinder      *volumebinder.VolumeBinder
-	pvcLister         corelisters.PersistentVolumeClaimLister
+	cachedNodeInfoMap        map[string]*schedulercache.NodeInfo
+	volumeBinder             *volumebinder.VolumeBinder
+	pvcLister                corelisters.PersistentVolumeClaimLister
 }
 
 // Schedule tries to schedule the given pod to one of node in the node list.
@@ -1048,7 +1047,7 @@ func NewGenericScheduler(
 	predicates map[string]algorithm.FitPredicate,
 	predicateMetaProducer algorithm.PredicateMetadataProducer,
 	prioritizers []algorithm.PriorityConfig,
-	priorityMetaProducer algorithm.MetadataProducer,
+	priorityMetaProducer algorithm.PriorityMetadataProducer,
 	extenders []algorithm.SchedulerExtender,
 	volumeBinder *volumebinder.VolumeBinder,
 	pvcLister corelisters.PersistentVolumeClaimLister,
