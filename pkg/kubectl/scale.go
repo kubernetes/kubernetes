@@ -52,11 +52,6 @@ type Scaler interface {
 	ScaleSimple(namespace, name string, preconditions *ScalePrecondition, newSize uint) (updatedResourceVersion string, err error)
 }
 
-// ScalerFor gets a scaler for a given resource
-func ScalerFor(scalesGetter scaleclient.ScalesGetter, gr schema.GroupResource) Scaler {
-	return &GenericScaler{scalesGetter, gr}
-}
-
 // ScalePrecondition describes a condition that must be true for the scale to take place
 // If CurrentSize == -1, it is ignored.
 // If CurrentResourceVersion is the empty string, it is ignored.
