@@ -83,12 +83,13 @@ type GraphBuilder struct {
 	// After that it is safe to start them here, before that it is not.
 	informersStarted <-chan struct{}
 
-	// stopCh drives shutdown. If it is nil, it indicates that Run() has not been
-	// called yet. If it is non-nil, then when closed it indicates everything
-	// should shut down.
-	//
+	// stopCh drives shutdown. When a receive from it unblocks, monitors will shut down.
 	// This channel is also protected by monitorLock.
 	stopCh <-chan struct{}
+
+	// running tracks whether Run() has been called.
+	// it is protected by monitorLock.
+	running bool
 
 	// metaOnlyClientPool uses a special codec, which removes fields except for
 	// apiVersion, kind, and metadata during decoding.
@@ -275,7 +276,7 @@ func (gb *GraphBuilder) startMonitors() {
 	gb.monitorLock.Lock()
 	defer gb.monitorLock.Unlock()
 
-	if gb.stopCh == nil {
+	if !gb.running {
 		return
 	}
 
@@ -325,6 +326,7 @@ func (gb *GraphBuilder) Run(stopCh <-chan struct{}) {
 	// Set up the stop channel.
 	gb.monitorLock.Lock()
 	gb.stopCh = stopCh
+	gb.running = true
 	gb.monitorLock.Unlock()
 
 	// Start monitors and begin change processing until the stop channel is
