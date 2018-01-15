@@ -89,7 +89,7 @@ func (az *Cloud) VirtualMachineClientListWithRetry() ([]compute.VirtualMachine, 
 		if result.NextLink != nil {
 			err := wait.ExponentialBackoff(az.requestBackoff(), func() (bool, error) {
 				var retryErr error
-				result, retryErr = az.VirtualMachinesClient.ListNextResults(result)
+				result, retryErr = az.VirtualMachinesClient.ListNextResults(az.ResourceGroup, result)
 				if retryErr != nil {
 					glog.Errorf("VirtualMachinesClient.ListNextResults(%v) - backoff: failure, will retry,err=%v",
 						az.ResourceGroup, retryErr)
@@ -176,7 +176,7 @@ func (az *Cloud) ListLBWithRetry() ([]network.LoadBalancer, error) {
 		if result.NextLink != nil {
 			err := wait.ExponentialBackoff(az.requestBackoff(), func() (bool, error) {
 				var retryErr error
-				result, retryErr = az.LoadBalancerClient.ListNextResults(result)
+				result, retryErr = az.LoadBalancerClient.ListNextResults(az.ResourceGroup, result)
 				if retryErr != nil {
 					glog.Errorf("LoadBalancerClient.ListNextResults(%v) - backoff: failure, will retry,err=%v",
 						az.ResourceGroup,
@@ -225,7 +225,7 @@ func (az *Cloud) ListPIPWithRetry(pipResourceGroup string) ([]network.PublicIPAd
 		if result.NextLink != nil {
 			err := wait.ExponentialBackoff(az.requestBackoff(), func() (bool, error) {
 				var retryErr error
-				result, retryErr = az.PublicIPAddressesClient.ListNextResults(result)
+				result, retryErr = az.PublicIPAddressesClient.ListNextResults(az.ResourceGroup, result)
 				if retryErr != nil {
 					glog.Errorf("PublicIPAddressesClient.ListNextResults(%v) - backoff: failure, will retry,err=%v",
 						pipResourceGroup,

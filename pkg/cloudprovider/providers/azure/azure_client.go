@@ -35,7 +35,7 @@ type VirtualMachinesClient interface {
 	CreateOrUpdate(resourceGroupName string, VMName string, parameters compute.VirtualMachine, cancel <-chan struct{}) (<-chan compute.VirtualMachine, <-chan error)
 	Get(resourceGroupName string, VMName string, expand compute.InstanceViewTypes) (result compute.VirtualMachine, err error)
 	List(resourceGroupName string) (result compute.VirtualMachineListResult, err error)
-	ListNextResults(lastResults compute.VirtualMachineListResult) (result compute.VirtualMachineListResult, err error)
+	ListNextResults(resourceGroupName string, lastResults compute.VirtualMachineListResult) (result compute.VirtualMachineListResult, err error)
 }
 
 // InterfacesClient defines needed functions for azure network.InterfacesClient
@@ -51,7 +51,7 @@ type LoadBalancersClient interface {
 	Delete(resourceGroupName string, loadBalancerName string, cancel <-chan struct{}) (<-chan autorest.Response, <-chan error)
 	Get(resourceGroupName string, loadBalancerName string, expand string) (result network.LoadBalancer, err error)
 	List(resourceGroupName string) (result network.LoadBalancerListResult, err error)
-	ListNextResults(lastResult network.LoadBalancerListResult) (result network.LoadBalancerListResult, err error)
+	ListNextResults(resourceGroupName string, lastResult network.LoadBalancerListResult) (result network.LoadBalancerListResult, err error)
 }
 
 // PublicIPAddressesClient defines needed functions for azure network.PublicIPAddressesClient
@@ -60,7 +60,7 @@ type PublicIPAddressesClient interface {
 	Delete(resourceGroupName string, publicIPAddressName string, cancel <-chan struct{}) (<-chan autorest.Response, <-chan error)
 	Get(resourceGroupName string, publicIPAddressName string, expand string) (result network.PublicIPAddress, err error)
 	List(resourceGroupName string) (result network.PublicIPAddressListResult, err error)
-	ListNextResults(lastResults network.PublicIPAddressListResult) (result network.PublicIPAddressListResult, err error)
+	ListNextResults(resourceGroupName string, lastResults network.PublicIPAddressListResult) (result network.PublicIPAddressListResult, err error)
 }
 
 // SubnetsClient defines needed functions for azure network.SubnetsClient
@@ -84,7 +84,7 @@ type VirtualMachineScaleSetsClient interface {
 	CreateOrUpdate(resourceGroupName string, VMScaleSetName string, parameters compute.VirtualMachineScaleSet, cancel <-chan struct{}) (<-chan compute.VirtualMachineScaleSet, <-chan error)
 	Get(resourceGroupName string, VMScaleSetName string) (result compute.VirtualMachineScaleSet, err error)
 	List(resourceGroupName string) (result compute.VirtualMachineScaleSetListResult, err error)
-	ListNextResults(lastResults compute.VirtualMachineScaleSetListResult) (result compute.VirtualMachineScaleSetListResult, err error)
+	ListNextResults(resourceGroupName string, astResults compute.VirtualMachineScaleSetListResult) (result compute.VirtualMachineScaleSetListResult, err error)
 	UpdateInstances(resourceGroupName string, VMScaleSetName string, VMInstanceIDs compute.VirtualMachineScaleSetVMInstanceRequiredIDs, cancel <-chan struct{}) (<-chan compute.OperationStatusResponse, <-chan error)
 }
 
@@ -93,7 +93,7 @@ type VirtualMachineScaleSetVMsClient interface {
 	Get(resourceGroupName string, VMScaleSetName string, instanceID string) (result compute.VirtualMachineScaleSetVM, err error)
 	GetInstanceView(resourceGroupName string, VMScaleSetName string, instanceID string) (result compute.VirtualMachineScaleSetVMInstanceView, err error)
 	List(resourceGroupName string, virtualMachineScaleSetName string, filter string, selectParameter string, expand string) (result compute.VirtualMachineScaleSetVMListResult, err error)
-	ListNextResults(lastResults compute.VirtualMachineScaleSetVMListResult) (result compute.VirtualMachineScaleSetVMListResult, err error)
+	ListNextResults(resourceGroupName string, lastResults compute.VirtualMachineScaleSetVMListResult) (result compute.VirtualMachineScaleSetVMListResult, err error)
 }
 
 // RoutesClient defines needed functions for azure network.RoutesClient
@@ -193,14 +193,17 @@ func (az *azVirtualMachinesClient) List(resourceGroupName string) (result comput
 	return
 }
 
-func (az *azVirtualMachinesClient) ListNextResults(lastResults compute.VirtualMachineListResult) (result compute.VirtualMachineListResult, err error) {
+func (az *azVirtualMachinesClient) ListNextResults(resourceGroupName string, lastResults compute.VirtualMachineListResult) (result compute.VirtualMachineListResult, err error) {
 	az.rateLimiter.Accept()
 	glog.V(10).Infof("azVirtualMachinesClient.ListNextResults(%q): start", lastResults)
 	defer func() {
 		glog.V(10).Infof("azVirtualMachinesClient.ListNextResults(%q): end", lastResults)
 	}()
 
-	return az.client.ListNextResults(lastResults)
+	mc := newMetricContext("vm", "list_next_results", resourceGroupName, az.client.SubscriptionID)
+	result, err = az.client.ListNextResults(lastResults)
+	mc.Observe(err)
+	return
 }
 
 // azInterfacesClient implements InterfacesClient.
@@ -341,14 +344,17 @@ func (az *azLoadBalancersClient) List(resourceGroupName string) (result network.
 	return
 }
 
-func (az *azLoadBalancersClient) ListNextResults(lastResult network.LoadBalancerListResult) (result network.LoadBalancerListResult, err error) {
+func (az *azLoadBalancersClient) ListNextResults(resourceGroupName string, lastResult network.LoadBalancerListResult) (result network.LoadBalancerListResult, err error) {
 	az.rateLimiter.Accept()
 	glog.V(10).Infof("azLoadBalancersClient.ListNextResults(%q): start", lastResult)
 	defer func() {
 		glog.V(10).Infof("azLoadBalancersClient.ListNextResults(%q): end", lastResult)
 	}()
 
-	return az.client.ListNextResults(lastResult)
+	mc := newMetricContext("load_balancers", "list_next_results", resourceGroupName, az.client.SubscriptionID)
+	result, err = az.client.ListNextResults(lastResult)
+	mc.Observe(err)
+	return
 }
 
 // azPublicIPAddressesClient implements PublicIPAddressesClient.
@@ -428,14 +434,17 @@ func (az *azPublicIPAddressesClient) List(resourceGroupName string) (result netw
 	return
 }
 
-func (az *azPublicIPAddressesClient) ListNextResults(lastResults network.PublicIPAddressListResult) (result network.PublicIPAddressListResult, err error) {
+func (az *azPublicIPAddressesClient) ListNextResults(resourceGroupName string, lastResults network.PublicIPAddressListResult) (result network.PublicIPAddressListResult, err error) {
 	az.rateLimiter.Accept()
 	glog.V(10).Infof("azPublicIPAddressesClient.ListNextResults(%q): start", lastResults)
 	defer func() {
 		glog.V(10).Infof("azPublicIPAddressesClient.ListNextResults(%q): end", lastResults)
 	}()
 
-	return az.client.ListNextResults(lastResults)
+	mc := newMetricContext("public_ip_addresses", "list_next_results", resourceGroupName, az.client.SubscriptionID)
+	result, err = az.client.ListNextResults(lastResults)
+	mc.Observe(err)
+	return
 }
 
 // azSubnetsClient implements SubnetsClient.
@@ -653,14 +662,17 @@ func (az *azVirtualMachineScaleSetsClient) List(resourceGroupName string) (resul
 	return
 }
 
-func (az *azVirtualMachineScaleSetsClient) ListNextResults(lastResults compute.VirtualMachineScaleSetListResult) (result compute.VirtualMachineScaleSetListResult, err error) {
+func (az *azVirtualMachineScaleSetsClient) ListNextResults(resourceGroupName string, lastResults compute.VirtualMachineScaleSetListResult) (result compute.VirtualMachineScaleSetListResult, err error) {
 	az.rateLimiter.Accept()
 	glog.V(10).Infof("azVirtualMachineScaleSetsClient.ListNextResults(%q): start", lastResults)
 	defer func() {
 		glog.V(10).Infof("azVirtualMachineScaleSetsClient.ListNextResults(%q): end", lastResults)
 	}()
 
-	return az.client.ListNextResults(lastResults)
+	mc := newMetricContext("vmss", "list_next_results", resourceGroupName, az.client.SubscriptionID)
+	result, err = az.client.ListNextResults(lastResults)
+	mc.Observe(err)
+	return
 }
 
 func (az *azVirtualMachineScaleSetsClient) UpdateInstances(resourceGroupName string, VMScaleSetName string, VMInstanceIDs compute.VirtualMachineScaleSetVMInstanceRequiredIDs, cancel <-chan struct{}) (<-chan compute.OperationStatusResponse, <-chan error) {
@@ -737,14 +749,17 @@ func (az *azVirtualMachineScaleSetVMsClient) List(resourceGroupName string, virt
 	return
 }
 
-func (az *azVirtualMachineScaleSetVMsClient) ListNextResults(lastResults compute.VirtualMachineScaleSetVMListResult) (result compute.VirtualMachineScaleSetVMListResult, err error) {
+func (az *azVirtualMachineScaleSetVMsClient) ListNextResults(resourceGroupName string, lastResults compute.VirtualMachineScaleSetVMListResult) (result compute.VirtualMachineScaleSetVMListResult, err error) {
 	az.rateLimiter.Accept()
 	glog.V(10).Infof("azVirtualMachineScaleSetVMsClient.ListNextResults(%q,%q,%q): start", lastResults)
 	defer func() {
 		glog.V(10).Infof("azVirtualMachineScaleSetVMsClient.ListNextResults(%q,%q,%q): end", lastResults)
 	}()
 
-	return az.client.ListNextResults(lastResults)
+	mc := newMetricContext("vmssvm", "list_next_results", resourceGroupName, az.client.SubscriptionID)
+	result, err = az.client.ListNextResults(lastResults)
+	mc.Observe(err)
+	return
 }
 
 // azRoutesClient implements RoutesClient.

@@ -144,7 +144,7 @@ func (fLBC fakeAzureLBClient) List(resourceGroupName string) (result network.Loa
 	return result, nil
 }
 
-func (fLBC fakeAzureLBClient) ListNextResults(lastResult network.LoadBalancerListResult) (result network.LoadBalancerListResult, err error) {
+func (fLBC fakeAzureLBClient) ListNextResults(resourceGroupName string, lastResult network.LoadBalancerListResult) (result network.LoadBalancerListResult, err error) {
 	fLBC.mutex.Lock()
 	defer fLBC.mutex.Unlock()
 	result.Response.Response = &http.Response{
@@ -264,7 +264,7 @@ func (fAPC fakeAzurePIPClient) Get(resourceGroupName string, publicIPAddressName
 	}
 }
 
-func (fAPC fakeAzurePIPClient) ListNextResults(lastResults network.PublicIPAddressListResult) (result network.PublicIPAddressListResult, err error) {
+func (fAPC fakeAzurePIPClient) ListNextResults(resourceGroupName string, lastResults network.PublicIPAddressListResult) (result network.PublicIPAddressListResult, err error) {
 	fAPC.mutex.Lock()
 	defer fAPC.mutex.Unlock()
 	return network.PublicIPAddressListResult{}, nil
@@ -411,7 +411,7 @@ func (fVMC fakeAzureVirtualMachinesClient) List(resourceGroupName string) (resul
 	result.Value = &value
 	return result, nil
 }
-func (fVMC fakeAzureVirtualMachinesClient) ListNextResults(lastResults compute.VirtualMachineListResult) (result compute.VirtualMachineListResult, err error) {
+func (fVMC fakeAzureVirtualMachinesClient) ListNextResults(resourceGroupName string, lastResults compute.VirtualMachineListResult) (result compute.VirtualMachineListResult, err error) {
 	fVMC.mutex.Lock()
 	defer fVMC.mutex.Unlock()
 	return compute.VirtualMachineListResult{}, nil
@@ -659,7 +659,7 @@ func (fVMC fakeVirtualMachineScaleSetVMsClient) List(resourceGroupName string, v
 	return result, nil
 }
 
-func (fVMC fakeVirtualMachineScaleSetVMsClient) ListNextResults(lastResults compute.VirtualMachineScaleSetVMListResult) (result compute.VirtualMachineScaleSetVMListResult, err error) {
+func (fVMC fakeVirtualMachineScaleSetVMsClient) ListNextResults(resourceGroupName string, lastResults compute.VirtualMachineScaleSetVMListResult) (result compute.VirtualMachineScaleSetVMListResult, err error) {
 	return result, nil
 }
 
@@ -764,7 +764,7 @@ func (fVMSSC fakeVirtualMachineScaleSetsClient) List(resourceGroupName string) (
 	return result, nil
 }
 
-func (fVMSSC fakeVirtualMachineScaleSetsClient) ListNextResults(lastResults compute.VirtualMachineScaleSetListResult) (result compute.VirtualMachineScaleSetListResult, err error) {
+func (fVMSSC fakeVirtualMachineScaleSetsClient) ListNextResults(resourceGroupName string, lastResults compute.VirtualMachineScaleSetListResult) (result compute.VirtualMachineScaleSetListResult, err error) {
 	return result, nil
 }
 
