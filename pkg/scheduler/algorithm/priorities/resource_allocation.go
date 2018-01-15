@@ -45,7 +45,7 @@ func (r *ResourceAllocationPriority) PriorityMap(
 	if priorityMeta, ok := meta.(*priorityMetadata); ok {
 		requested = *priorityMeta.nonZeroRequest
 	} else {
-		// We couldn't parse metadatat - fallback to computing it.
+		// We couldn't parse metadata - fallback to computing it.
 		requested = *getNonZeroRequests(pod)
 	}
 
