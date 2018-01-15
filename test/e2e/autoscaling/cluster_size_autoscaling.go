@@ -246,36 +246,41 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 	It("should increase cluster size if pending pods are small and there is another node pool that is not autoscaled [Feature:ClusterSizeAutoscalingScaleUp]", func() {
 		framework.SkipUnlessProviderIs("gke")
 
-		By("Creating new node-pool with one n1-standard-4 machine")
+		By("Creating new node-pool with n1-standard-4 machines")
 		const extraPoolName = "extra-pool"
-		addNodePool(extraPoolName, "n1-standard-4", 1)
+		extraNodes := addNodePool(extraPoolName, "n1-standard-4", 1)
 		defer deleteNodePool(extraPoolName)
-		framework.ExpectNoError(framework.WaitForReadyNodes(c, nodeCount+1, resizeTimeout))
+		framework.ExpectNoError(framework.WaitForReadyNodes(c, nodeCount+extraNodes, resizeTimeout))
 		glog.Infof("Not enabling cluster autoscaler for the node pool (on purpose).")
 
-		By("Get memory available on new node, so we can account for it when creating RC")
+		By("Getting memory available on new nodes, so we can account for it when creating RC")
 		nodes := getPoolNodes(f, extraPoolName)
-		Expect(len(nodes)).Should(Equal(1))
-		extraMem := nodes[0].Status.Capacity[v1.ResourceMemory]
-		extraMemMb := int((&extraMem).Value() / 1024 / 1024)
+		Expect(len(nodes)).Should(Equal(extraNodes))
+		extraMemMb := 0
+		for _, node := range nodes {
+			mem := node.Status.Capacity[v1.ResourceMemory]
+			extraMemMb += int((&mem).Value() / 1024 / 1024)
+		}
 
-		ReserveMemory(f, "memory-reservation", 100, nodeCount*memAllocatableMb+extraMemMb, false, defaultTimeout)
+		By("Reserving 0.1x more memory than the cluster holds to trigger scale up")
+		totalMemoryReservation := int(1.1 * float64(nodeCount*memAllocatableMb+extraMemMb))
+		ReserveMemory(f, "memory-reservation", 100, totalMemoryReservation, false, defaultTimeout)
 		defer framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.Namespace.Name, "memory-reservation")
 
 		// Verify, that cluster size is increased
 		framework.ExpectNoError(WaitForClusterSizeFunc(f.ClientSet,
-			func(size int) bool { return size >= nodeCount+2 }, scaleUpTimeout))
+			func(size int) bool { return size >= nodeCount+extraNodes+1 }, scaleUpTimeout))
 		framework.ExpectNoError(waitForAllCaPodsReadyInNamespace(f, c))
 	})
 
 	It("should disable node pool autoscaling [Feature:ClusterSizeAutoscalingScaleUp]", func() {
 		framework.SkipUnlessProviderIs("gke")
 
-		By("Creating new node-pool with one n1-standard-4 machine")
+		By("Creating new node-pool with n1-standard-4 machines")
 		const extraPoolName = "extra-pool"
-		addNodePool(extraPoolName, "n1-standard-4", 1)
+		extraNodes := addNodePool(extraPoolName, "n1-standard-4", 1)
 		defer deleteNodePool(extraPoolName)
-		framework.ExpectNoError(framework.WaitForReadyNodes(c, nodeCount+1, resizeTimeout))
+		framework.ExpectNoError(framework.WaitForReadyNodes(c, nodeCount+extraNodes, resizeTimeout))
 		framework.ExpectNoError(enableAutoscaler(extraPoolName, 1, 2))
 		framework.ExpectNoError(disableAutoscaler(extraPoolName, 1, 2))
 	})
@@ -505,23 +510,25 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 	It("should scale up correct target pool [Feature:ClusterSizeAutoscalingScaleUp]", func() {
 		framework.SkipUnlessProviderIs("gke")
 
-		By("Creating new node-pool with one n1-standard-4 machine")
+		By("Creating new node-pool with n1-standard-4 machines")
 		const extraPoolName = "extra-pool"
-		addNodePool(extraPoolName, "n1-standard-4", 1)
+		extraNodes := addNodePool(extraPoolName, "n1-standard-4", 1)
 		defer deleteNodePool(extraPoolName)
-		framework.ExpectNoError(framework.WaitForReadyNodes(c, nodeCount+1, resizeTimeout))
+		framework.ExpectNoError(framework.WaitForReadyNodes(c, nodeCount+extraNodes, resizeTimeout))
 		framework.ExpectNoError(enableAutoscaler(extraPoolName, 1, 2))
 		defer disableAutoscaler(extraPoolName, 1, 2)
 
-		By("Creating rc with 2 pods too big to fit default-pool but fitting extra-pool")
-		ReserveMemory(f, "memory-reservation", 2, int(2.5*float64(memAllocatableMb)), false, defaultTimeout)
+		extraPods := extraNodes + 1
+		totalMemoryReservation := int(float64(extraPods) * 1.5 * float64(memAllocatableMb))
+		By(fmt.Sprintf("Creating rc with %v pods too big to fit default-pool but fitting extra-pool", extraPods))
+		ReserveMemory(f, "memory-reservation", extraPods, totalMemoryReservation, false, defaultTimeout)
 		defer framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.Namespace.Name, "memory-reservation")
 
 		// Apparently GKE master is restarted couple minutes after the node pool is added
 		// reseting all the timers in scale down code. Adding 5 extra minutes to workaround
 		// this issue.
 		// TODO: Remove the extra time when GKE restart is fixed.
-		framework.ExpectNoError(framework.WaitForReadyNodes(c, nodeCount+2, scaleUpTimeout+5*time.Minute))
+		framework.ExpectNoError(framework.WaitForReadyNodes(c, nodeCount+extraNodes+1, scaleUpTimeout+5*time.Minute))
 	})
 
 	simpleScaleDownTest := func(unready int) {
@@ -559,11 +566,11 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 		increasedSize := manuallyIncreaseClusterSize(f, originalSizes)
 
 		const extraPoolName = "extra-pool"
-		addNodePool(extraPoolName, "n1-standard-1", 3)
+		extraNodes := addNodePool(extraPoolName, "n1-standard-1", 3)
 		defer deleteNodePool(extraPoolName)
 
 		framework.ExpectNoError(WaitForClusterSizeFunc(f.ClientSet,
-			func(size int) bool { return size >= increasedSize+3 }, scaleUpTimeout))
+			func(size int) bool { return size >= increasedSize+extraNodes }, scaleUpTimeout))
 
 		By("Some node should be removed")
 		// Apparently GKE master is restarted couple minutes after the node pool is added
@@ -571,7 +578,7 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 		// this issue.
 		// TODO: Remove the extra time when GKE restart is fixed.
 		framework.ExpectNoError(WaitForClusterSizeFunc(f.ClientSet,
-			func(size int) bool { return size < increasedSize+3 }, scaleDownTimeout+10*time.Minute))
+			func(size int) bool { return size < increasedSize+extraNodes }, scaleDownTimeout+10*time.Minute))
 	})
 
 	It("should be able to scale down when rescheduling a pod is required and pdb allows for it[Feature:ClusterSizeAutoscalingScaleDown]", func() {
@@ -672,23 +679,25 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 	// verify the targeted node pool/MIG is of size 0
 	gkeScaleToZero := func() {
 		// GKE-specific setup
-		By("Add a new node pool with 1 node and min size 0")
+		By("Add a new node pool with size 1 and min size 0")
 		const extraPoolName = "extra-pool"
-		addNodePool(extraPoolName, "n1-standard-4", 1)
+		extraNodes := addNodePool(extraPoolName, "n1-standard-4", 1)
 		defer deleteNodePool(extraPoolName)
-		framework.ExpectNoError(framework.WaitForReadyNodes(c, nodeCount+1, resizeTimeout))
+		framework.ExpectNoError(framework.WaitForReadyNodes(c, nodeCount+extraNodes, resizeTimeout))
 		framework.ExpectNoError(enableAutoscaler(extraPoolName, 0, 1))
 		defer disableAutoscaler(extraPoolName, 0, 1)
 
 		ngNodes := getPoolNodes(f, extraPoolName)
-		Expect(len(ngNodes) == 1).To(BeTrue())
-		node := ngNodes[0]
-		By(fmt.Sprintf("Target node for scale-down: %s", node.Name))
+		Expect(len(ngNodes)).To(Equal(extraNodes))
+		for _, node := range ngNodes {
+			By(fmt.Sprintf("Target node for scale-down: %s", node.Name))
+		}
 
-		// this part is identical
-		drainNode(f, node)
+		for _, node := range ngNodes {
+			drainNode(f, node)
+		}
 		framework.ExpectNoError(WaitForClusterSizeFunc(f.ClientSet,
-			func(size int) bool { return size < nodeCount+1 }, scaleDownTimeout))
+			func(size int) bool { return size <= nodeCount }, scaleDownTimeout))
 
 		// GKE-specific check
 		newSize := getPoolSize(f, extraPoolName)
@@ -1051,7 +1060,7 @@ func getClusterLocation() string {
 	}
 }
 
-func getGcloudCommand(commandTrack string, args []string) []string {
+func getGcloudCommandFromTrack(commandTrack string, args []string) []string {
 	command := []string{"gcloud"}
 	if commandTrack == "beta" || commandTrack == "alpha" {
 		command = append(command, commandTrack)
@@ -1060,6 +1069,14 @@ func getGcloudCommand(commandTrack string, args []string) []string {
 	command = append(command, getClusterLocation())
 	command = append(command, "--project="+framework.TestContext.CloudConfig.ProjectID)
 	return command
+}
+
+func getGcloudCommand(args []string) []string {
+	track := ""
+	if isRegionalCluster() {
+		track = "beta"
+	}
+	return getGcloudCommandFromTrack(track, args)
 }
 
 func isRegionalCluster() bool {
@@ -1075,11 +1092,7 @@ func enableAutoscaler(nodePool string, minCount, maxCount int) error {
 		"--min-nodes=" + strconv.Itoa(minCount),
 		"--max-nodes=" + strconv.Itoa(maxCount),
 		"--node-pool=" + nodePool}
-	track := ""
-	if isRegionalCluster() {
-		track = "beta"
-	}
-	output, err := execCmd(getGcloudCommand(track, args)...).CombinedOutput()
+	output, err := execCmd(getGcloudCommand(args)...).CombinedOutput()
 
 	if err != nil {
 		glog.Errorf("Failed config update result: %s", output)
@@ -1103,11 +1116,7 @@ func disableAutoscaler(nodePool string, minCount, maxCount int) error {
 	args := []string{"container", "clusters", "update", framework.TestContext.CloudConfig.Cluster,
 		"--no-enable-autoscaling",
 		"--node-pool=" + nodePool}
-	track := ""
-	if isRegionalCluster() {
-		track = "beta"
-	}
-	output, err := execCmd(getGcloudCommand(track, args)...).CombinedOutput()
+	output, err := execCmd(getGcloudCommand(args)...).CombinedOutput()
 
 	if err != nil {
 		glog.Errorf("Failed config update result: %s", output)
@@ -1219,10 +1228,8 @@ func disableAutoprovisioning() error {
 
 func getNAPNodePools() ([]string, error) {
 	if framework.ProviderIs("gke") {
-		output, err := exec.Command("gcloud", "container", "node-pools", "list",
-			"--project="+framework.TestContext.CloudConfig.ProjectID,
-			"--zone="+framework.TestContext.CloudConfig.Zone,
-			"--cluster="+framework.TestContext.CloudConfig.Cluster).CombinedOutput()
+		args := []string{"container", "node-pools", "list", "--cluster=" + framework.TestContext.CloudConfig.Cluster}
+		output, err := execCmd(getGcloudCommand(args)...).CombinedOutput()
 		if err != nil {
 			glog.Errorf("Failed to get instance groups: %v", string(output))
 			return nil, err
@@ -1278,21 +1285,23 @@ func waitTillAllNAPNodePoolsAreRemoved() error {
 	return err
 }
 
-func addNodePool(name string, machineType string, numNodes int) {
+// Returns size of the newly added node pool
+func addNodePool(name string, machineType string, numNodes int) int {
 	args := []string{"container", "node-pools", "create", name, "--quiet",
 		"--machine-type=" + machineType,
 		"--num-nodes=" + strconv.Itoa(numNodes),
 		"--cluster=" + framework.TestContext.CloudConfig.Cluster}
-	output, err := execCmd(getGcloudCommand("alpha", args)...).CombinedOutput()
+	output, err := execCmd(getGcloudCommand(args)...).CombinedOutput()
 	glog.Infof("Creating node-pool %s: %s", name, output)
 	framework.ExpectNoError(err)
+	return getPoolInitialSize(name)
 }
 
 func deleteNodePool(name string) {
 	glog.Infof("Deleting node pool %s", name)
 	args := []string{"container", "node-pools", "delete", name, "--quiet",
 		"--cluster=" + framework.TestContext.CloudConfig.Cluster}
-	output, err := execCmd(getGcloudCommand("alpha", args)...).CombinedOutput()
+	output, err := execCmd(getGcloudCommand(args)...).CombinedOutput()
 	if err != nil {
 		glog.Infof("Error: %v", err)
 	}
@@ -1308,6 +1317,32 @@ func getPoolNodes(f *framework.Framework, poolName string) []*v1.Node {
 		}
 	}
 	return nodes
+}
+
+// getPoolInitialSize returns the initial size of the node pool taking into
+// account that it may span multiple zones. In that case, node pool consists of
+// multiple migs all containing initialNodeCount nodes.
+func getPoolInitialSize(poolName string) int {
+	// get initial node count
+	args := []string{"container", "node-pools", "describe", poolName, "--quiet",
+		"--cluster=" + framework.TestContext.CloudConfig.Cluster,
+		"--format=value(initialNodeCount)"}
+	output, err := execCmd(getGcloudCommand(args)...).CombinedOutput()
+	glog.Infof("Node-pool initial size: %s", output)
+	framework.ExpectNoError(err)
+	fields := strings.Fields(string(output))
+	Expect(len(fields)).Should(Equal(1))
+	size, err := strconv.ParseInt(fields[0], 10, 64)
+	framework.ExpectNoError(err)
+
+	// get number of node pools
+	args = []string{"container", "node-pools", "describe", poolName, "--quiet",
+		"--cluster=" + framework.TestContext.CloudConfig.Cluster,
+		"--format=value(instanceGroupUrls)"}
+	output, err = execCmd(getGcloudCommand(args)...).CombinedOutput()
+	framework.ExpectNoError(err)
+	nodeGroupCount := len(strings.Split(string(output), ";"))
+	return int(size) * nodeGroupCount
 }
 
 func getPoolSize(f *framework.Framework, poolName string) int {
