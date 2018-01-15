@@ -30,4 +30,6 @@ const (
 	DevicePluginPath = "/var/lib/kubelet/device-plugins/"
 	// KubeletSocket is the path of the Kubelet registry socket
 	KubeletSocket = DevicePluginPath + "kubelet.sock"
+	// Timeout duration in secs for PreStartContainer RPC
+	KubeletPreStartContainerRPCTimeoutInSecs = 30
 )

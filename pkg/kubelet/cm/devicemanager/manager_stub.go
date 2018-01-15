@@ -53,8 +53,8 @@ func (h *ManagerStub) Allocate(node *schedulercache.NodeInfo, attrs *lifecycle.P
 }
 
 // GetDeviceRunContainerOptions simply returns nil.
-func (h *ManagerStub) GetDeviceRunContainerOptions(pod *v1.Pod, container *v1.Container) *DeviceRunContainerOptions {
-	return nil
+func (h *ManagerStub) GetDeviceRunContainerOptions(pod *v1.Pod, container *v1.Container) (*DeviceRunContainerOptions, error) {
+	return nil, nil
 }
 
 // GetCapacity simply returns nil capacity and empty removed resource list.
