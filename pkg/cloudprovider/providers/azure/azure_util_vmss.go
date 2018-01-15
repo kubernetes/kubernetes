@@ -121,7 +121,7 @@ func (ss *scaleSet) updateCache() error {
 		for _, vm := range vms {
 			nodeName := ""
 			if vm.OsProfile != nil && vm.OsProfile.ComputerName != nil {
-				nodeName = *vm.OsProfile.ComputerName
+				nodeName = strings.ToLower(*vm.OsProfile.ComputerName)
 			}
 
 			vmSize := ""
