@@ -51,7 +51,7 @@ type Manager interface {
 	// GetDeviceRunContainerOptions checks whether we have cached containerDevices
 	// for the passed-in <pod, container> and returns its DeviceRunContainerOptions
 	// for the found one. An empty struct is returned in case no cached state is found.
-	GetDeviceRunContainerOptions(pod *v1.Pod, container *v1.Container) *DeviceRunContainerOptions
+	GetDeviceRunContainerOptions(pod *v1.Pod, container *v1.Container) (*DeviceRunContainerOptions, error)
 
 	// GetCapacity returns the amount of available device plugin resource capacity, resource allocatable
 	// and inactive device plugin resources previously registered on the node.

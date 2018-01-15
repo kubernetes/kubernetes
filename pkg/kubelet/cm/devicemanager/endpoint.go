@@ -36,6 +36,7 @@ type endpoint interface {
 	run()
 	stop()
 	allocate(devs []string) (*pluginapi.AllocateResponse, error)
+	preStartContainer(devs []string) (*pluginapi.PreStartContainerResponse, error)
 	getDevices() []pluginapi.Device
 	callback(resourceName string, added, updated, deleted []pluginapi.Device)
 }
@@ -65,8 +66,9 @@ func newEndpointImpl(socketPath, resourceName string, devices map[string]plugina
 		client:     client,
 		clientConn: c,
 
-		socketPath:   socketPath,
-		resourceName: resourceName,
+		socketPath:                      socketPath,
+		resourceName:                    resourceName,
+		invokePreStartContainerBoolFlag: false,
 
 		devices: devices,
 		cb:      callback,
@@ -178,6 +180,15 @@ func (e *endpointImpl) run() {
 // allocate issues Allocate gRPC call to the device plugin.
 func (e *endpointImpl) allocate(devs []string) (*pluginapi.AllocateResponse, error) {
 	return e.client.Allocate(context.Background(), &pluginapi.AllocateRequest{
+		DevicesIDs: devs,
+	})
+}
+
+// preStartContainer issues PreStartContainer gRPC call to the device plugin.
+func (e *endpointImpl) preStartContainer(devs []string) (*pluginapi.PreStartContainerResponse, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), pluginapi.KubeletPreStartContainerRPCTimeoutInSecs*time.Second)
+	defer cancel()
+	return e.client.PreStartContainer(ctx, &pluginapi.PreStartContainerRequest{
 		DevicesIDs: devs,
 	})
 }

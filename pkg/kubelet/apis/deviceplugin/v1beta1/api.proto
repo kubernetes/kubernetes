@@ -1,7 +1,7 @@
 // To regenerate api.pb.go run hack/update-device-plugin.sh
 syntax = 'proto3';
 
-package v1beta1;
+package deviceplugin;
 
 import "github.com/gogo/protobuf/gogoproto/gogo.proto";
 
@@ -24,6 +24,11 @@ service Registration {
 	rpc Register(RegisterRequest) returns (Empty) {}
 }
 
+message DevicePluginOptions {
+        // Indicates if PreStartContainer call is required before each container start
+	bool pre_start_required = 1;
+}
+
 message RegisterRequest {
 	// Version of the API the Device Plugin was built against
 	string version = 1;
@@ -32,6 +37,8 @@ message RegisterRequest {
 	string endpoint = 2;
 	// Schedulable resource name. As of now it's expected to be a DNS Label
 	string resource_name = 3;
+        // Options to be communicated with Device Manager
+        DevicePluginOptions options = 4;
 }
 
 message Empty {
@@ -48,6 +55,11 @@ service DevicePlugin {
 	// Plugin can run device specific operations and instruct Kubelet
 	// of the steps to make the Device available in the container
 	rpc Allocate(AllocateRequest) returns (AllocateResponse) {}
+
+        // PreStartContainer is called, if indicated by Device Plugin during registeration phase,
+        // before each container start. Device plugin can run device specific operations
+        // such as reseting the device before making devices available to the container
+	rpc PreStartContainer(PreStartContainerRequest) returns (PreStartContainerResponse) {}
 }
 
 // ListAndWatch returns a stream of List of Devices
@@ -69,6 +81,18 @@ message Device {
 	string ID = 1;
 	// Health of the device, can be healthy or unhealthy, see constants.go
 	string health = 2;
+}
+
+// - PreStartContainer is expected to be called before each container start if indicated by plugin during registration phase.
+// - PreStartContainer allows kubelet to pass reinitialized devices to containers.
+// - PreStartContainer allows Device Plugin to run device specific operations on
+//   the Devices requested
+message PreStartContainerRequest {
+        repeated string devicesIDs = 1;
+}
+
+// PreStartContainerResponse will be send by plugin in response to PreStartContainerRequest
+message PreStartContainerResponse {
 }
 
 // - Allocate is expected to be called during pod creation since allocation

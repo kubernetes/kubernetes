@@ -75,7 +75,7 @@ var _ = framework.KubeDescribe("Device Plugin [Feature:DevicePlugin] [Serial] [D
 			framework.ExpectNoError(err)
 
 			By("Register resources")
-			err = dp1.Register(pluginapi.KubeletSocket, resourceName)
+			err = dp1.Register(pluginapi.KubeletSocket, resourceName, false)
 			framework.ExpectNoError(err)
 
 			By("Waiting for the resource exported by the stub device plugin to become available on the local node")
@@ -112,7 +112,7 @@ var _ = framework.KubeDescribe("Device Plugin [Feature:DevicePlugin] [Serial] [D
 			err = dp1.Start()
 			framework.ExpectNoError(err)
 
-			err = dp1.Register(pluginapi.KubeletSocket, resourceName)
+			err = dp1.Register(pluginapi.KubeletSocket, resourceName, false)
 			framework.ExpectNoError(err)
 
 			By("Waiting for resource to become available on the local node after re-registration")

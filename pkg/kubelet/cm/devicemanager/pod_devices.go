@@ -117,7 +117,9 @@ func (pdev podDevices) devices() map[string]sets.String {
 				if _, exists := ret[resource]; !exists {
 					ret[resource] = sets.NewString()
 				}
-				ret[resource] = ret[resource].Union(devices.deviceIds)
+				if devices.allocResp != nil {
+					ret[resource] = ret[resource].Union(devices.deviceIds)
+				}
 			}
 		}
 	}
