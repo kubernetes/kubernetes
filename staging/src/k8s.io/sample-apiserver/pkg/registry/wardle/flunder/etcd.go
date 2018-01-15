@@ -18,8 +18,11 @@ package flunder
 
 import (
 	"k8s.io/apimachinery/pkg/runtime"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
+	"k8s.io/apiserver/pkg/registry/rest"
+
 	"k8s.io/sample-apiserver/pkg/apis/wardle"
 	"k8s.io/sample-apiserver/pkg/registry"
 )
@@ -43,4 +46,32 @@ func NewREST(scheme *runtime.Scheme, optsGetter generic.RESTOptionsGetter) (*reg
 		return nil, err
 	}
 	return &registry.REST{store}, nil
+}
+
+// NewStatusREST makes a RESTStorage for status that has more limited options.
+// It is based on the original REST so that we can share the same underlying store
+func NewStatusREST(scheme *runtime.Scheme, rest *registry.REST) *StatusREST {
+	statusStore := *rest.Store
+
+	// For status, we want to limit to Update only.
+	// So set the CreateStrategy and DeleteStrategy to nil.
+	statusStore.CreateStrategy = nil
+	statusStore.DeleteStrategy = nil
+	statusStore.UpdateStrategy = NewFlunderStatusStrategy(scheme)
+	return &StatusREST{store: &statusStore}
+}
+
+type StatusREST struct {
+	store *genericregistry.Store
+}
+
+var _ = rest.Updater(&StatusREST{})
+
+func (r *StatusREST) New() runtime.Object {
+	return &wardle.Flunder{}
+}
+
+// Update alters the status subset of an object.
+func (r *StatusREST) Update(ctx genericapirequest.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (runtime.Object, bool, error) {
+	return r.store.Update(ctx, name, objInfo, createValidation, updateValidation)
 }

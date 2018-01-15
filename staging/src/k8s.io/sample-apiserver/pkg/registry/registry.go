@@ -31,7 +31,7 @@ type REST struct {
 // RESTInPeace is just a simple function that panics on error.
 // Otherwise returns the given storage object. It is meant to be
 // a wrapper for wardle registries.
-func RESTInPeace(storage rest.StandardStorage, err error) rest.StandardStorage {
+func RESTInPeace(storage rest.Storage, err error) rest.Storage {
 	if err != nil {
 		err = fmt.Errorf("unable to create REST storage for a resource due to %v, will die", err)
 		panic(err)
