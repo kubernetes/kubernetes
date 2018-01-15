@@ -526,19 +526,16 @@ func (precondition *ScalePrecondition) validateGeneric(scale *autoscalingapi.Sca
 }
 
 // GenericScaler can update scales for resources in a particular namespace
-// TODO(po0lyn0mial): when the work on GenericScaler is done, don't
-// export the GenericScaler. Instead use ScalerFor method for getting the Scaler
-// also update the UTs
 type GenericScaler struct {
-	scaleNamespacer scaleclient.ScalesGetter
-	targetGR        schema.GroupResource
+	ScaleNamespacer scaleclient.ScalesGetter
+	TargetGR        schema.GroupResource
 }
 
 var _ Scaler = &GenericScaler{}
 
 // ScaleSimple updates a scale of a given resource. It returns the resourceVersion of the scale if the update was successful.
 func (s *GenericScaler) ScaleSimple(namespace, name string, preconditions *ScalePrecondition, newSize uint) (updatedResourceVersion string, err error) {
-	scale, err := s.scaleNamespacer.Scales(namespace).Get(s.targetGR, name)
+	scale, err := s.ScaleNamespacer.Scales(namespace).Get(s.TargetGR, name)
 	if err != nil {
 		return "", ScaleError{ScaleGetFailure, "", err}
 	}
@@ -549,7 +546,7 @@ func (s *GenericScaler) ScaleSimple(namespace, name string, preconditions *Scale
 	}
 
 	scale.Spec.Replicas = int32(newSize)
-	updatedScale, err := s.scaleNamespacer.Scales(namespace).Update(s.targetGR, scale)
+	updatedScale, err := s.ScaleNamespacer.Scales(namespace).Update(s.TargetGR, scale)
 	if err != nil {
 		if errors.IsConflict(err) {
 			return "", ScaleError{ScaleUpdateConflictFailure, scale.ResourceVersion, err}
@@ -577,7 +574,7 @@ func (s *GenericScaler) Scale(namespace, resourceName string, newSize uint, prec
 		err := wait.PollImmediate(
 			waitForReplicas.Interval,
 			waitForReplicas.Timeout,
-			scaleHasDesiredReplicas(s.scaleNamespacer, s.targetGR, resourceName, namespace, int32(newSize)))
+			scaleHasDesiredReplicas(s.ScaleNamespacer, s.TargetGR, resourceName, namespace, int32(newSize)))
 		if err == wait.ErrWaitTimeout {
 			return fmt.Errorf("timed out waiting for %q to be synced", resourceName)
 		}

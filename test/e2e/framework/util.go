@@ -2683,10 +2683,6 @@ func RemoveAvoidPodsOffNode(c clientset.Interface, nodeName string) {
 	ExpectNoError(err)
 }
 
-func getScalerForKind(scalesGetter scaleclient.ScalesGetter, gr schema.GroupResource) kubectl.Scaler {
-	return kubectl.ScalerFor(scalesGetter, gr)
-}
-
 func ScaleResource(
 	clientset clientset.Interface,
 	scalesGetter scaleclient.ScalesGetter,
@@ -2697,7 +2693,7 @@ func ScaleResource(
 	gr schema.GroupResource,
 ) error {
 	By(fmt.Sprintf("Scaling %v %s in namespace %s to %d", kind, name, ns, size))
-	scaler:= getScalerForKind(scalesGetter, gr)
+	scaler:= &kubectl.GenericScaler{scalesGetter, gr}
 	waitForScale := kubectl.NewRetryParams(5*time.Second, 1*time.Minute)
 	waitForReplicas := kubectl.NewRetryParams(5*time.Second, 5*time.Minute)
 	if err := scaler.Scale(ns, name, size, nil, waitForScale, waitForReplicas); err != nil {
