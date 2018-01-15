@@ -79,7 +79,7 @@ func TestTopNodeAllMetrics(t *testing.T) {
 }
 
 func TestTopNodeAllMetricsCustomDefaults(t *testing.T) {
-	customBaseHeapsterServiceAddress := "/api/v1/namespaces/custom-namespace/services/https:custom-heapster-service:/proxy"
+	customBaseHeapsterServiceAddress := "/api/v1/namespaces/custom-namespace/services/https:custom-heapster-service:8082/proxy"
 	customBaseMetricsAddress := customBaseHeapsterServiceAddress + "/apis/metrics"
 
 	initTestErrorHandler(t)
@@ -116,6 +116,7 @@ func TestTopNodeAllMetricsCustomDefaults(t *testing.T) {
 			Namespace: "custom-namespace",
 			Scheme:    "https",
 			Service:   "custom-heapster-service",
+			Port:      "8082",
 		},
 	}
 	cmd := NewCmdTopNode(f, opts, buf)
