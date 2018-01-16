@@ -62,7 +62,8 @@ type LabelOptions struct {
 	removeLabels []string
 
 	// Common shared fields
-	out io.Writer
+	out    io.Writer
+	errout io.Writer
 }
 
 var (
@@ -95,8 +96,11 @@ var (
 		kubectl label pods foo bar-`))
 )
 
-func NewCmdLabel(f cmdutil.Factory, out io.Writer) *cobra.Command {
-	options := &LabelOptions{}
+func NewCmdLabel(f cmdutil.Factory, out, errout io.Writer) *cobra.Command {
+	options := &LabelOptions{
+		errout: errout,
+	}
+
 	validArgs := cmdutil.ValidArgList(f)
 
 	cmd := &cobra.Command{
@@ -280,8 +284,13 @@ func (o *LabelOptions) RunLabel(f cmdutil.Factory, cmd *cobra.Command) error {
 				return err
 			}
 
+			indent := ""
+			if !one {
+				indent = " "
+				fmt.Fprintf(o.errout, "Listing labels for %s.%s/%s:\n", info.Mapping.GroupVersionKind.Kind, info.Mapping.GroupVersionKind.Group, info.Name)
+			}
 			for k, v := range accessor.GetLabels() {
-				fmt.Fprintf(o.out, "%s=%s\n", k, v)
+				fmt.Fprintf(o.out, "%s%s=%s\n", indent, k, v)
 			}
 
 			return nil
