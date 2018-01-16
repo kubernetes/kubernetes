@@ -263,7 +263,7 @@ func ValidateIPNetFromString(subnet string, minAddrs int64, fldPath *field.Path)
 }
 
 // ValidateNetworking validates networking configuration
-func ValidateNetworking(c *kubeadm.Networking, fldPath *field.Path) field.ErrorList {
+func ValidateNetworking(c *kubeadm.Networking, _ *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, apivalidation.ValidateDNS1123Subdomain(c.DNSDomain, field.NewPath("dns-domain"))...)
 	allErrs = append(allErrs, ValidateIPNetFromString(c.ServiceSubnet, constants.MinimumAddressesInServiceSubnet, field.NewPath("service-subnet"))...)
