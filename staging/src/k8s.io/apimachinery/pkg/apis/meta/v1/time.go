@@ -59,7 +59,7 @@ func Date(year int, month time.Month, day, hour, min, sec, nsec int, loc *time.L
 
 // Now returns the current local time.
 func Now() Time {
-	return Time{time.Now()}
+	return Time{time.Now().UTC()}
 }
 
 // IsZero returns true if the value is nil or time is zero.
@@ -113,7 +113,7 @@ func (t *Time) UnmarshalJSON(b []byte) error {
 		return err
 	}
 
-	t.Time = pt.Local()
+	t.Time = pt.UTC()
 	return nil
 }
 
@@ -134,7 +134,7 @@ func (t *Time) UnmarshalQueryParameter(str string) error {
 		return err
 	}
 
-	t.Time = pt.Local()
+	t.Time = pt.UTC()
 	return nil
 }
 

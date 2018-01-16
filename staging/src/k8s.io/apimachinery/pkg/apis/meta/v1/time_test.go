@@ -57,7 +57,7 @@ func TestTimeUnmarshalYAML(t *testing.T) {
 		result Time
 	}{
 		{"t: null\n", Time{}},
-		{"t: 1998-05-05T05:05:05Z\n", Time{Date(1998, time.May, 5, 5, 5, 5, 0, time.UTC).Local()}},
+		{"t: 1998-05-05T05:05:05Z\n", Time{Date(1998, time.May, 5, 5, 5, 5, 0, time.UTC).UTC()}},
 	}
 
 	for _, c := range cases {
@@ -99,7 +99,7 @@ func TestTimeUnmarshalJSON(t *testing.T) {
 		result Time
 	}{
 		{"{\"t\":null}", Time{}},
-		{"{\"t\":\"1998-05-05T05:05:05Z\"}", Time{Date(1998, time.May, 5, 5, 5, 5, 0, time.UTC).Local()}},
+		{"{\"t\":\"1998-05-05T05:05:05Z\"}", Time{Date(1998, time.May, 5, 5, 5, 5, 0, time.UTC).UTC()}},
 	}
 
 	for _, c := range cases {
@@ -118,8 +118,8 @@ func TestTimeMarshalJSONUnmarshalYAML(t *testing.T) {
 		input Time
 	}{
 		{Time{}},
-		{Date(1998, time.May, 5, 5, 5, 5, 50, time.Local).Rfc3339Copy()},
-		{Date(1998, time.May, 5, 5, 5, 5, 0, time.Local).Rfc3339Copy()},
+		{Date(1998, time.May, 5, 5, 5, 5, 50, time.UTC).Rfc3339Copy()},
+		{Date(1998, time.May, 5, 5, 5, 5, 0, time.UTC).Rfc3339Copy()},
 	}
 
 	for i, c := range cases {
