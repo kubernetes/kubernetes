@@ -91,7 +91,7 @@ func TestAdmit(t *testing.T) {
 			nil, // userInfo
 		)
 
-		err := ctrl.Admit(attrs)
+		err := ctrl.Admit(nil, attrs)
 		if err != nil {
 			t.Errorf("Test %q: got unexpected error: %v", test.name, err)
 		}

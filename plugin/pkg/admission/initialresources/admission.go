@@ -28,6 +28,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/endpoints/request"
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
@@ -76,7 +77,7 @@ func newInitialResources(source dataSource, percentile int64, nsOnly bool) *Init
 }
 
 // Admit makes an admission decision based on the request attributes
-func (ir InitialResources) Admit(a admission.Attributes) (err error) {
+func (ir InitialResources) Admit(_ request.Context, a admission.Attributes) (err error) {
 	// Ignore all calls to subresources or resources other than pods.
 	if a.GetSubresource() != "" || a.GetResource().GroupResource() != api.Resource("pods") {
 		return nil

@@ -23,6 +23,7 @@ go_test(
         "//vendor/k8s.io/apimachinery/pkg/util/json:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/apis/apiserver:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/apis/apiserver/v1alpha1:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/endpoints/request:go_default_library",
     ],
 )
 
@@ -51,6 +52,7 @@ go_library(
         "//vendor/k8s.io/apiserver/pkg/apis/apiserver:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/apis/apiserver/v1alpha1:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/authentication/user:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/endpoints/request:go_default_library",
     ],
 )
 

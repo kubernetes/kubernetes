@@ -128,6 +128,12 @@ type Event struct {
 	// Time the request reached current audit stage.
 	// +optional
 	StageTimestamp metav1.MicroTime `json:"stageTimestamp" protobuf:"bytes,16,opt,name=stageTimestamp"`
+
+	// Annotations is an unstructured key value map stored with an event. Mechanisms like RBAC and
+	// PSP will store admission information in Annotations, like name of the policy which admits
+	// the request.
+	// +optional
+	Annotations map[string]string `json:"annotations,omitempty" protobuf:"bytes,17,rep,name=annotations"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

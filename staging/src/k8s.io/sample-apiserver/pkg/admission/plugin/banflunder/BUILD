@@ -15,6 +15,7 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/api/meta:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/labels:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/admission:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/endpoints/request:go_default_library",
         "//vendor/k8s.io/sample-apiserver/pkg/admission/wardleinitializer:go_default_library",
         "//vendor/k8s.io/sample-apiserver/pkg/apis/wardle:go_default_library",
         "//vendor/k8s.io/sample-apiserver/pkg/client/informers/internalversion:go_default_library",

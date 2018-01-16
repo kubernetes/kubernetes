@@ -16,6 +16,10 @@ limitations under the License.
 
 package admission
 
+import (
+	"k8s.io/apiserver/pkg/endpoints/request"
+)
+
 // chainAdmissionHandler is an instance of admission.NamedHandler that performs admission control using
 // a chain of admission handlers
 type chainAdmissionHandler []Interface
@@ -26,13 +30,13 @@ func NewChainHandler(handlers ...Interface) chainAdmissionHandler {
 }
 
 // Admit performs an admission control check using a chain of handlers, and returns immediately on first error
-func (admissionHandler chainAdmissionHandler) Admit(a Attributes) error {
+func (admissionHandler chainAdmissionHandler) Admit(ctx request.Context, a Attributes) error {
 	for _, handler := range admissionHandler {
 		if !handler.Handles(a.GetOperation()) {
 			continue
 		}
 		if mutator, ok := handler.(MutationInterface); ok {
-			err := mutator.Admit(a)
+			err := mutator.Admit(ctx, a)
 			if err != nil {
 				return err
 			}
@@ -42,13 +46,13 @@ func (admissionHandler chainAdmissionHandler) Admit(a Attributes) error {
 }
 
 // Validate performs an admission control check using a chain of handlers, and returns immediately on first error
-func (admissionHandler chainAdmissionHandler) Validate(a Attributes) error {
+func (admissionHandler chainAdmissionHandler) Validate(ctx request.Context, a Attributes) error {
 	for _, handler := range admissionHandler {
 		if !handler.Handles(a.GetOperation()) {
 			continue
 		}
 		if validator, ok := handler.(ValidationInterface); ok {
-			err := validator.Validate(a)
+			err := validator.Validate(ctx, a)
 			if err != nil {
 				return err
 			}

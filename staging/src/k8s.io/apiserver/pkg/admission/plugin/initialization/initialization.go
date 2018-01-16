@@ -35,6 +35,7 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/configuration"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
@@ -147,7 +148,7 @@ func (i *initializer) readConfig(a admission.Attributes) (*v1alpha1.InitializerC
 // can update objects that have not completed initialization. Sub resources can still be modified on
 // resources that are undergoing initialization.
 // TODO: once this logic is ready for beta, move it into the REST storage layer.
-func (i *initializer) Admit(a admission.Attributes) (err error) {
+func (i *initializer) Admit(_ request.Context, a admission.Attributes) (err error) {
 	switch a.GetOperation() {
 	case admission.Create, admission.Update:
 	default:

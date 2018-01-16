@@ -45,6 +45,7 @@ import (
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/request"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/rules"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/versioned"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 )
@@ -189,7 +190,7 @@ func (a *ValidatingAdmissionWebhook) loadConfiguration(attr admission.Attributes
 }
 
 // Validate makes an admission decision based on the request attributes.
-func (a *ValidatingAdmissionWebhook) Validate(attr admission.Attributes) error {
+func (a *ValidatingAdmissionWebhook) Validate(_ genericapirequest.Context, attr admission.Attributes) error {
 	hookConfig, err := a.loadConfiguration(attr)
 	if err != nil {
 		return err

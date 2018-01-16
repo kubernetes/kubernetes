@@ -22,6 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/authentication/user"
+	"k8s.io/apiserver/pkg/endpoints/request"
 )
 
 // Attributes is an interface used by AdmissionController to get information about a request
@@ -62,7 +63,7 @@ type MutationInterface interface {
 	Interface
 
 	// Admit makes an admission decision based on the request attributes
-	Admit(a Attributes) (err error)
+	Admit(ctx request.Context, a Attributes) (err error)
 }
 
 // ValidationInterface is an abstract, pluggable interface for Admission Control decisions.
@@ -70,7 +71,7 @@ type ValidationInterface interface {
 	Interface
 
 	// Validate makes an admission decision based on the request attributes.  It is NOT allowed to mutate
-	Validate(a Attributes) (err error)
+	Validate(ctx request.Context, a Attributes) (err error)
 }
 
 // Operation is the type of resource operation being checked for admission control

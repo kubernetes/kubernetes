@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/endpoints/request"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	podutil "k8s.io/kubernetes/pkg/api/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -88,7 +89,7 @@ var (
 	pvcResource  = api.Resource("persistentvolumeclaims")
 )
 
-func (c *nodePlugin) Admit(a admission.Attributes) error {
+func (c *nodePlugin) Admit(_ request.Context, a admission.Attributes) error {
 	nodeName, isNode := c.nodeIdentifier.NodeIdentity(a.GetUserInfo())
 
 	// Our job is just to restrict nodes

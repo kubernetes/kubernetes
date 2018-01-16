@@ -29,8 +29,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/admission"
 	genericadmissioninit "k8s.io/apiserver/pkg/admission/initializer"
+	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	"k8s.io/apiserver/pkg/endpoints/request"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
@@ -107,7 +109,7 @@ func (a *PodSecurityPolicyPlugin) SetInternalKubeInformerFactory(f informers.Sha
 // 3.  Try to generate and validate a PSP with providers.  If we find one then admit the pod
 //     with the validated PSP.  If we don't find any reject the pod and give all errors from the
 //     failed attempts.
-func (c *PodSecurityPolicyPlugin) Admit(a admission.Attributes) error {
+func (c *PodSecurityPolicyPlugin) Admit(ctx request.Context, a admission.Attributes) error {
 	if ignore, err := shouldIgnore(a); err != nil {
 		return err
 	} else if ignore {
@@ -134,6 +136,8 @@ func (c *PodSecurityPolicyPlugin) Admit(a admission.Attributes) error {
 		if pod.ObjectMeta.Annotations == nil {
 			pod.ObjectMeta.Annotations = map[string]string{}
 		}
+		ae := request.AuditEventFrom(ctx)
+		audit.LogAnnotations(ae, "podsecuritypolicy/admit", pspName)
 		pod.ObjectMeta.Annotations[psputil.ValidatedPSPAnnotation] = pspName
 		return nil
 	}
@@ -143,7 +147,7 @@ func (c *PodSecurityPolicyPlugin) Admit(a admission.Attributes) error {
 	return admission.NewForbidden(a, fmt.Errorf("unable to validate against any pod security policy: %v", validationErrs))
 }
 
-func (c *PodSecurityPolicyPlugin) Validate(a admission.Attributes) error {
+func (c *PodSecurityPolicyPlugin) Validate(ctx request.Context, a admission.Attributes) error {
 	if ignore, err := shouldIgnore(a); err != nil {
 		return err
 	} else if ignore {
@@ -153,11 +157,13 @@ func (c *PodSecurityPolicyPlugin) Validate(a admission.Attributes) error {
 	pod := a.GetObject().(*api.Pod)
 
 	// compute the context. Mutation is not allowed. ValidatedPSPAnnotation is used as a hint to gain same speed-up.
-	allowedPod, _, validationErrs, err := c.computeSecurityContext(a, pod, false, pod.ObjectMeta.Annotations[psputil.ValidatedPSPAnnotation])
+	allowedPod, pspName, validationErrs, err := c.computeSecurityContext(a, pod, false, pod.ObjectMeta.Annotations[psputil.ValidatedPSPAnnotation])
 	if err != nil {
 		return admission.NewForbidden(a, err)
 	}
 	if apiequality.Semantic.DeepEqual(pod, allowedPod) {
+		ae := request.AuditEventFrom(ctx)
+		audit.LogAnnotations(ae, "podsecuritypolicy/validate", pspName)
 		return nil
 	}
 

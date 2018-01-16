@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/endpoints/request"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
@@ -106,7 +107,7 @@ var (
 
 // Admit checks Pods and admits or rejects them. It also resolves the priority of pods based on their PriorityClass.
 // Note that pod validation mechanism prevents update of a pod priority.
-func (p *PriorityPlugin) Admit(a admission.Attributes) error {
+func (p *PriorityPlugin) Admit(_ request.Context, a admission.Attributes) error {
 	operation := a.GetOperation()
 	// Ignore all calls to subresources
 	if len(a.GetSubresource()) != 0 {
@@ -126,7 +127,7 @@ func (p *PriorityPlugin) Admit(a admission.Attributes) error {
 }
 
 // Validate checks PriorityClasses and admits or rejects them.
-func (p *PriorityPlugin) Validate(a admission.Attributes) error {
+func (p *PriorityPlugin) Validate(_ request.Context, a admission.Attributes) error {
 	operation := a.GetOperation()
 	// Ignore all calls to subresources
 	if len(a.GetSubresource()) != 0 {

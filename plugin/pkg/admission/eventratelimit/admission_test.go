@@ -482,7 +482,7 @@ func TestEventRateLimiting(t *testing.T) {
 					clock.Step(rq.delay)
 				}
 				attributes := attributesForRequest(rq)
-				err = eventratelimit.Validate(attributes)
+				err = eventratelimit.Validate(nil, attributes)
 				if rq.accepted != (err == nil) {
 					expectedAction := "admitted"
 					if !rq.accepted {

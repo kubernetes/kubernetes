@@ -716,7 +716,7 @@ func Test_nodePlugin_Admit(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			c := NewPlugin(nodeidentifier.NewDefaultNodeIdentifier())
 			c.podsGetter = tt.podsGetter
-			err := c.Admit(tt.attributes)
+			err := c.Admit(nil, tt.attributes)
 			if (err == nil) != (len(tt.err) == 0) {
 				t.Errorf("nodePlugin.Admit() error = %v, expected %v", err, tt.err)
 				return

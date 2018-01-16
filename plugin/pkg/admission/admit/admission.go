@@ -20,6 +20,7 @@ import (
 	"io"
 
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/endpoints/request"
 )
 
 // Register registers a plugin
@@ -37,12 +38,12 @@ var _ admission.MutationInterface = AlwaysAdmit{}
 var _ admission.ValidationInterface = AlwaysAdmit{}
 
 // Admit makes an admission decision based on the request attributes
-func (AlwaysAdmit) Admit(a admission.Attributes) (err error) {
+func (AlwaysAdmit) Admit(_ request.Context, a admission.Attributes) (err error) {
 	return nil
 }
 
 // Validate makes an admission decision based on the request attributes.  It is NOT allowed to mutate.
-func (AlwaysAdmit) Validate(a admission.Attributes) (err error) {
+func (AlwaysAdmit) Validate(_ request.Context, a admission.Attributes) (err error) {
 	return nil
 }
 

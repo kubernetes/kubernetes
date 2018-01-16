@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/endpoints/request"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	qoshelper "k8s.io/kubernetes/pkg/apis/core/helper/qos"
 	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
@@ -78,7 +79,7 @@ type podTolerationsPlugin struct {
 // instead if specified. Tolerations to a namespace are assigned via
 // scheduler.alpha.kubernetes.io/defaultTolerations and scheduler.alpha.kubernetes.io/tolerationsWhitelist
 // annotations keys.
-func (p *podTolerationsPlugin) Admit(a admission.Attributes) error {
+func (p *podTolerationsPlugin) Admit(ctx request.Context, a admission.Attributes) error {
 	if shouldIgnore(a) {
 		return nil
 	}
@@ -135,9 +136,9 @@ func (p *podTolerationsPlugin) Admit(a admission.Attributes) error {
 	}
 	pod.Spec.Tolerations = finalTolerations
 
-	return p.Validate(a)
+	return p.Validate(ctx, a)
 }
-func (p *podTolerationsPlugin) Validate(a admission.Attributes) error {
+func (p *podTolerationsPlugin) Validate(_ request.Context, a admission.Attributes) error {
 	if shouldIgnore(a) {
 		return nil
 	}

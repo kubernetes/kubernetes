@@ -180,7 +180,7 @@ func TestAdmitUpdate(t *testing.T) {
 		newObj := &v1.Pod{}
 		newObj.Initializers = tc.newInitializers
 		a := admission.NewAttributesRecord(newObj, oldObj, schema.GroupVersionKind{}, "", "foo", schema.GroupVersionResource{}, "", admission.Update, nil)
-		err := plugin.Admit(a)
+		err := plugin.Admit(nil, a)
 		switch {
 		case tc.err == "" && err != nil:
 			t.Errorf("%q: unexpected error: %v", tc.name, err)

@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/endpoints/request"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
@@ -90,12 +91,12 @@ func (l *LimitRanger) ValidateInitialization() error {
 }
 
 // Admit admits resources into cluster that do not violate any defined LimitRange in the namespace
-func (l *LimitRanger) Admit(a admission.Attributes) (err error) {
+func (l *LimitRanger) Admit(_ request.Context, a admission.Attributes) (err error) {
 	return l.runLimitFunc(a, l.actions.MutateLimit)
 }
 
 // Validate admits resources into cluster that do not violate any defined LimitRange in the namespace
-func (l *LimitRanger) Validate(a admission.Attributes) (err error) {
+func (l *LimitRanger) Validate(_ request.Context, a admission.Attributes) (err error) {
 	return l.runLimitFunc(a, l.actions.ValidateLimit)
 }
 

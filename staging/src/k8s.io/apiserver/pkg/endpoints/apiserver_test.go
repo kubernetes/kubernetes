@@ -74,7 +74,7 @@ import (
 // It is useful in tests and when using kubernetes in an open manner.
 type alwaysAdmit struct{}
 
-func (alwaysAdmit) Admit(a admission.Attributes) (err error) {
+func (alwaysAdmit) Admit(ctx request.Context, a admission.Attributes) (err error) {
 	return nil
 }
 
@@ -84,7 +84,7 @@ func (alwaysAdmit) Handles(operation admission.Operation) bool {
 
 type alwaysMutatingDeny struct{}
 
-func (alwaysMutatingDeny) Admit(a admission.Attributes) (err error) {
+func (alwaysMutatingDeny) Admit(ctx request.Context, a admission.Attributes) (err error) {
 	return admission.NewForbidden(a, errors.New("Mutating admission control is denying all modifications"))
 }
 
@@ -94,7 +94,7 @@ func (alwaysMutatingDeny) Handles(operation admission.Operation) bool {
 
 type alwaysValidatingDeny struct{}
 
-func (alwaysValidatingDeny) Validate(a admission.Attributes) (err error) {
+func (alwaysValidatingDeny) Validate(ctx request.Context, a admission.Attributes) (err error) {
 	return admission.NewForbidden(a, errors.New("Validating admission control is denying all modifications"))
 }
 

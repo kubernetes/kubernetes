@@ -23,6 +23,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/endpoints/request"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
@@ -65,7 +66,7 @@ func NewDefaultTolerationSeconds() *Plugin {
 }
 
 // Admit makes an admission decision based on the request attributes
-func (p *Plugin) Admit(attributes admission.Attributes) (err error) {
+func (p *Plugin) Admit(_ request.Context, attributes admission.Attributes) (err error) {
 	if attributes.GetResource().GroupResource() != api.Resource("pods") {
 		return nil
 	}

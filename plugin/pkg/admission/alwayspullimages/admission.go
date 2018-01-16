@@ -30,6 +30,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/endpoints/request"
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
@@ -50,7 +51,7 @@ var _ admission.MutationInterface = &AlwaysPullImages{}
 var _ admission.ValidationInterface = &AlwaysPullImages{}
 
 // Admit makes an admission decision based on the request attributes
-func (a *AlwaysPullImages) Admit(attributes admission.Attributes) (err error) {
+func (a *AlwaysPullImages) Admit(_ request.Context, attributes admission.Attributes) (err error) {
 	// Ignore all calls to subresources or resources other than pods.
 	if shouldIgnore(attributes) {
 		return nil
@@ -72,7 +73,7 @@ func (a *AlwaysPullImages) Admit(attributes admission.Attributes) (err error) {
 }
 
 // Validate makes sure that all containers are set to always pull images
-func (*AlwaysPullImages) Validate(attributes admission.Attributes) (err error) {
+func (*AlwaysPullImages) Validate(_ request.Context, attributes admission.Attributes) (err error) {
 	if shouldIgnore(attributes) {
 		return nil
 	}

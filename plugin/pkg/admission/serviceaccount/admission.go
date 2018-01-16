@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/storage/names"
 	podutil "k8s.io/kubernetes/pkg/api/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -133,7 +134,7 @@ func (a *serviceAccount) ValidateInitialization() error {
 	return nil
 }
 
-func (s *serviceAccount) Admit(a admission.Attributes) (err error) {
+func (s *serviceAccount) Admit(ctx request.Context, a admission.Attributes) (err error) {
 	if shouldIgnore(a) {
 		return nil
 	}
@@ -152,7 +153,7 @@ func (s *serviceAccount) Admit(a admission.Attributes) (err error) {
 	// That makes the kubelet very angry and confused, and it immediately deletes the pod (because the spec doesn't match)
 	// That said, don't allow mirror pods to reference ServiceAccounts or SecretVolumeSources either
 	if _, isMirrorPod := pod.Annotations[api.MirrorPodAnnotationKey]; isMirrorPod {
-		return s.Validate(a)
+		return s.Validate(ctx, a)
 	}
 
 	// Set the default service account if needed
@@ -177,10 +178,10 @@ func (s *serviceAccount) Admit(a admission.Attributes) (err error) {
 		copy(pod.Spec.ImagePullSecrets, serviceAccount.ImagePullSecrets)
 	}
 
-	return s.Validate(a)
+	return s.Validate(ctx, a)
 }
 
-func (s *serviceAccount) Validate(a admission.Attributes) (err error) {
+func (s *serviceAccount) Validate(_ request.Context, a admission.Attributes) (err error) {
 	if shouldIgnore(a) {
 		return nil
 	}

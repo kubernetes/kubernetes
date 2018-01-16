@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/ref"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -91,7 +92,7 @@ func (a *podPresetPlugin) SetInternalKubeInformerFactory(f informers.SharedInfor
 }
 
 // Admit injects a pod with the specific fields for each pod preset it matches.
-func (c *podPresetPlugin) Admit(a admission.Attributes) error {
+func (c *podPresetPlugin) Admit(_ request.Context, a admission.Attributes) error {
 	// Ignore all calls to subresources or resources other than pods.
 	// Ignore all operations other than CREATE.
 	if len(a.GetSubresource()) != 0 || a.GetResource().GroupResource() != api.Resource("pods") || a.GetOperation() != admission.Create {
