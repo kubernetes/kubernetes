@@ -24,7 +24,6 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
@@ -370,20 +369,4 @@ func WaitForFirewallRule(gceCloud *gcecloud.GCECloud, fwName string, exist bool,
 		return nil, fmt.Errorf("error waiting for firewall %v exist=%v", fwName, exist)
 	}
 	return fw, nil
-}
-
-func GetClusterID(c clientset.Interface) (string, error) {
-	cm, err := c.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(gcecloud.UIDConfigMapName, metav1.GetOptions{})
-	if err != nil || cm == nil {
-		return "", fmt.Errorf("error getting cluster ID: %v", err)
-	}
-	clusterID, clusterIDExists := cm.Data[gcecloud.UIDCluster]
-	providerID, providerIDExists := cm.Data[gcecloud.UIDProvider]
-	if !clusterIDExists {
-		return "", fmt.Errorf("cluster ID not set")
-	}
-	if providerIDExists {
-		return providerID, nil
-	}
-	return clusterID, nil
 }

@@ -1109,6 +1109,42 @@ func (j *IngressTestJig) TryDeleteIngress() {
 	}
 }
 
+// getIngressAddress returns the ips/hostnames associated with the Ingress.
+func getIngressAddress(client clientset.Interface, ns, name string) ([]string, error) {
+	ing, err := client.ExtensionsV1beta1().Ingresses(ns).Get(name, metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+	addresses := []string{}
+	for _, a := range ing.Status.LoadBalancer.Ingress {
+		if a.IP != "" {
+			addresses = append(addresses, a.IP)
+		}
+		if a.Hostname != "" {
+			addresses = append(addresses, a.Hostname)
+		}
+	}
+	return addresses, nil
+}
+
+// WaitForIngressAddress waits for the Ingress to acquire an address.
+func WaitForIngressAddress(c clientset.Interface, ns, ingName string, timeout time.Duration) (string, error) {
+	var address string
+	err := wait.PollImmediate(10*time.Second, timeout, func() (bool, error) {
+		ipOrNameList, err := getIngressAddress(c, ns, ingName)
+		if err != nil || len(ipOrNameList) == 0 {
+			Logf("Waiting for Ingress %v to acquire IP, error %v", ingName, err)
+			if IsRetryableAPIError(err) {
+				return false, nil
+			}
+			return false, err
+		}
+		address = ipOrNameList[0]
+		return true, nil
+	})
+	return address, err
+}
+
 // WaitForIngress waits till the ingress acquires an IP, then waits for its
 // hosts/urls to respond to a protocol check (either http or https). If
 // waitForNodePort is true, the NodePort of the Service is verified before
@@ -1166,6 +1202,14 @@ func (j *IngressTestJig) pollServiceNodePort(ns, name string, port int) {
 	u, err := GetNodePortURL(j.Client, ns, name, port)
 	ExpectNoError(err)
 	ExpectNoError(PollURL(u, "", 30*time.Second, j.PollInterval, &http.Client{Timeout: IngressReqTimeout}, false))
+}
+
+func (j *IngressTestJig) GetDefaultBackendNodePort() (int32, error) {
+	defaultSvc, err := j.Client.CoreV1().Services(metav1.NamespaceSystem).Get(defaultBackendName, metav1.GetOptions{})
+	if err != nil {
+		return 0, err
+	}
+	return defaultSvc.Spec.Ports[0].NodePort, nil
 }
 
 // GetIngressNodePorts returns related backend services' nodePorts.
