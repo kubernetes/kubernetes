@@ -121,7 +121,7 @@ func (ss *scaleSet) updateCache() error {
 		for _, vm := range vms {
 			nodeName := ""
 			if vm.OsProfile != nil && vm.OsProfile.ComputerName != nil {
-				nodeName = *vm.OsProfile.ComputerName
+				nodeName = strings.ToLower(*vm.OsProfile.ComputerName)
 			}
 
 			vmSize := ""
@@ -190,10 +190,12 @@ func (ss *scaleSet) getCachedVirtualMachine(nodeName string) (scaleSetVMInfo, er
 	}
 
 	// Update cache and try again.
+	glog.V(10).Infof("vmss cache before updateCache: %v", ss.cache)
 	if err := ss.updateCache(); err != nil {
 		glog.Errorf("updateCache failed with error: %v", err)
 		return scaleSetVMInfo{}, err
 	}
+	glog.V(10).Infof("vmss cache after updateCache: %v", ss.cache)
 	vm, found = getVMFromCache(nodeName)
 	if found {
 		return vm, nil
