@@ -48,7 +48,7 @@ import (
 
 const (
 	// How often resizing loop runs
-	syncLoopPeriod time.Duration = 30 * time.Second
+	syncLoopPeriod time.Duration = 400 * time.Millisecond
 	// How often pvc populator runs
 	populatorLoopPeriod time.Duration = 2 * time.Minute
 )
@@ -182,12 +182,21 @@ func (expc *expandController) pvcUpdate(oldObj, newObj interface{}) {
 	if newPVC == nil || !ok {
 		return
 	}
-	pv, err := getPersistentVolume(newPVC, expc.pvLister)
-	if err != nil {
-		glog.V(5).Infof("Error getting Persistent Volume for pvc %q : %v", newPVC.UID, err)
-		return
+
+	newSize := newPVC.Spec.Resources.Requests[v1.ResourceStorage]
+	oldSize := oldPvc.Spec.Resources.Requests[v1.ResourceStorage]
+
+	// We perform additional checks inside resizeMap.AddPVCUpdate function
+	// this check here exists to ensure - we do not consider every
+	// PVC update event for resizing, just those where the PVC size changes
+	if newSize.Cmp(oldSize) > 0 {
+		pv, err := getPersistentVolume(newPVC, expc.pvLister)
+		if err != nil {
+			glog.V(5).Infof("Error getting Persistent Volume for pvc %q : %v", newPVC.UID, err)
+			return
+		}
+		expc.resizeMap.AddPVCUpdate(newPVC, pv)
 	}
-	expc.resizeMap.AddPVCUpdate(newPVC, pv)
 }
 
 func getPersistentVolume(pvc *v1.PersistentVolumeClaim, pvLister corelisters.PersistentVolumeLister) (*v1.PersistentVolume, error) {
