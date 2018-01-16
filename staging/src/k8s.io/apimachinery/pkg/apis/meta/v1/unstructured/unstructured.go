@@ -176,6 +176,10 @@ func (u *Unstructured) GetAPIVersion() string {
 }
 
 func (u *Unstructured) SetAPIVersion(version string) {
+	if len(version) == 0 {
+		RemoveNestedField(u.Object, "apiVersion")
+		return
+	}
 	u.setNestedField(version, "apiVersion")
 }
 
@@ -184,6 +188,10 @@ func (u *Unstructured) GetKind() string {
 }
 
 func (u *Unstructured) SetKind(kind string) {
+	if len(kind) == 0 {
+		RemoveNestedField(u.Object, "kind")
+		return
+	}
 	u.setNestedField(kind, "kind")
 }
 
@@ -192,6 +200,10 @@ func (u *Unstructured) GetNamespace() string {
 }
 
 func (u *Unstructured) SetNamespace(namespace string) {
+	if len(namespace) == 0 {
+		RemoveNestedField(u.Object, "metadata", "namespace")
+		return
+	}
 	u.setNestedField(namespace, "metadata", "namespace")
 }
 
@@ -200,6 +212,10 @@ func (u *Unstructured) GetName() string {
 }
 
 func (u *Unstructured) SetName(name string) {
+	if len(name) == 0 {
+		RemoveNestedField(u.Object, "metadata", "name")
+		return
+	}
 	u.setNestedField(name, "metadata", "name")
 }
 
@@ -208,6 +224,10 @@ func (u *Unstructured) GetGenerateName() string {
 }
 
 func (u *Unstructured) SetGenerateName(name string) {
+	if len(name) == 0 {
+		RemoveNestedField(u.Object, "metadata", "generateName")
+		return
+	}
 	u.setNestedField(name, "metadata", "generateName")
 }
 
@@ -216,6 +236,10 @@ func (u *Unstructured) GetUID() types.UID {
 }
 
 func (u *Unstructured) SetUID(uid types.UID) {
+	if len(uid) == 0 {
+		RemoveNestedField(u.Object, "metadata", "uid")
+		return
+	}
 	u.setNestedField(string(uid), "metadata", "uid")
 }
 
@@ -224,6 +248,10 @@ func (u *Unstructured) GetResourceVersion() string {
 }
 
 func (u *Unstructured) SetResourceVersion(version string) {
+	if len(version) == 0 {
+		RemoveNestedField(u.Object, "metadata", "resourceVersion")
+		return
+	}
 	u.setNestedField(version, "metadata", "resourceVersion")
 }
 
@@ -236,6 +264,10 @@ func (u *Unstructured) GetGeneration() int64 {
 }
 
 func (u *Unstructured) SetGeneration(generation int64) {
+	if generation == 0 {
+		RemoveNestedField(u.Object, "metadata", "generation")
+		return
+	}
 	u.setNestedField(generation, "metadata", "generation")
 }
 
@@ -244,15 +276,11 @@ func (u *Unstructured) GetSelfLink() string {
 }
 
 func (u *Unstructured) SetSelfLink(selfLink string) {
+	if len(selfLink) == 0 {
+		RemoveNestedField(u.Object, "metadata", "selfLink")
+		return
+	}
 	u.setNestedField(selfLink, "metadata", "selfLink")
-}
-
-func (u *Unstructured) GetContinue() string {
-	return getNestedString(u.Object, "metadata", "continue")
-}
-
-func (u *Unstructured) SetContinue(c string) {
-	u.setNestedField(c, "metadata", "continue")
 }
 
 func (u *Unstructured) GetCreationTimestamp() metav1.Time {
@@ -310,6 +338,10 @@ func (u *Unstructured) GetLabels() map[string]string {
 }
 
 func (u *Unstructured) SetLabels(labels map[string]string) {
+	if labels == nil || len(labels) == 0 {
+		RemoveNestedField(u.Object, "metadata", "labels")
+		return
+	}
 	u.setNestedMap(labels, "metadata", "labels")
 }
 
@@ -319,6 +351,10 @@ func (u *Unstructured) GetAnnotations() map[string]string {
 }
 
 func (u *Unstructured) SetAnnotations(annotations map[string]string) {
+	if annotations == nil || len(annotations) == 0 {
+		RemoveNestedField(u.Object, "metadata", "annotations")
+		return
+	}
 	u.setNestedMap(annotations, "metadata", "annotations")
 }
 
@@ -367,6 +403,10 @@ func (u *Unstructured) GetFinalizers() []string {
 }
 
 func (u *Unstructured) SetFinalizers(finalizers []string) {
+	if finalizers == nil || len(finalizers) == 0 {
+		RemoveNestedField(u.Object, "metadata", "finalizers")
+		return
+	}
 	u.setNestedSlice(finalizers, "metadata", "finalizers")
 }
 
@@ -375,5 +415,9 @@ func (u *Unstructured) GetClusterName() string {
 }
 
 func (u *Unstructured) SetClusterName(clusterName string) {
+	if len(clusterName) == 0 {
+		RemoveNestedField(u.Object, "metadata", "clusterName")
+		return
+	}
 	u.setNestedField(clusterName, "metadata", "clusterName")
 }

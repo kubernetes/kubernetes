@@ -132,6 +132,10 @@ func (u *UnstructuredList) GetAPIVersion() string {
 }
 
 func (u *UnstructuredList) SetAPIVersion(version string) {
+	if len(version) == 0 {
+		RemoveNestedField(u.Object, "apiVersion")
+		return
+	}
 	u.setNestedField(version, "apiVersion")
 }
 
@@ -140,6 +144,10 @@ func (u *UnstructuredList) GetKind() string {
 }
 
 func (u *UnstructuredList) SetKind(kind string) {
+	if len(kind) == 0 {
+		RemoveNestedField(u.Object, "kind")
+		return
+	}
 	u.setNestedField(kind, "kind")
 }
 
@@ -148,6 +156,10 @@ func (u *UnstructuredList) GetResourceVersion() string {
 }
 
 func (u *UnstructuredList) SetResourceVersion(version string) {
+	if len(version) == 0 {
+		RemoveNestedField(u.Object, "metadata", "resourceVersion")
+		return
+	}
 	u.setNestedField(version, "metadata", "resourceVersion")
 }
 
@@ -156,6 +168,10 @@ func (u *UnstructuredList) GetSelfLink() string {
 }
 
 func (u *UnstructuredList) SetSelfLink(selfLink string) {
+	if len(selfLink) == 0 {
+		RemoveNestedField(u.Object, "metadata", "selfLink")
+		return
+	}
 	u.setNestedField(selfLink, "metadata", "selfLink")
 }
 
@@ -164,6 +180,10 @@ func (u *UnstructuredList) GetContinue() string {
 }
 
 func (u *UnstructuredList) SetContinue(c string) {
+	if len(c) == 0 {
+		RemoveNestedField(u.Object, "metadata", "continue")
+		return
+	}
 	u.setNestedField(c, "metadata", "continue")
 }
 
