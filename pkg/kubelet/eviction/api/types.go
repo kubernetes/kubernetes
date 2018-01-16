@@ -38,8 +38,6 @@ const (
 	SignalImageFsInodesFree Signal = "imagefs.inodesFree"
 	// SignalAllocatableMemoryAvailable is amount of memory available for pod allocation (i.e. allocatable - workingSet (of pods), in bytes.
 	SignalAllocatableMemoryAvailable Signal = "allocatableMemory.available"
-	// SignalAllocatableNodeFsAvailable is amount of local storage available for pod allocation
-	SignalAllocatableNodeFsAvailable Signal = "allocatableNodeFs.available"
 	// SignalPIDAvailable is amount of PID available for pod allocation
 	SignalPIDAvailable Signal = "pid.available"
 )
@@ -66,7 +64,6 @@ var OpForSignal = map[Signal]ThresholdOperator{
 	SignalImageFsAvailable:           OpLessThan,
 	SignalImageFsInodesFree:          OpLessThan,
 	SignalAllocatableMemoryAvailable: OpLessThan,
-	SignalAllocatableNodeFsAvailable: OpLessThan,
 }
 
 // ThresholdValue is a value holder that abstracts literal versus percentage based quantity
