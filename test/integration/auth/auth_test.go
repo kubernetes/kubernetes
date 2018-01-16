@@ -887,9 +887,9 @@ func TestAuthorizationAttributeDetermination(t *testing.T) {
 		URL                string
 		expectedAttributes authorizer.Attributes
 	}{
-		"prefix/version/resource":        {"GET", "/api/v1/pods", authorizer.AttributesRecord{APIGroup: api.GroupName, Resource: "pods"}},
-		"prefix/group/version/resource":  {"GET", "/apis/extensions/v1/pods", authorizer.AttributesRecord{APIGroup: extensions.GroupName, Resource: "pods"}},
-		"prefix/group/version/resource2": {"GET", "/apis/autoscaling/v1/horizontalpodautoscalers", authorizer.AttributesRecord{APIGroup: autoscaling.GroupName, Resource: "horizontalpodautoscalers"}},
+		"prefix/version/resource":        {"GET", "/api/v1/pods", &authorizer.AttributesRecord{APIGroup: api.GroupName, Resource: "pods"}},
+		"prefix/group/version/resource":  {"GET", "/apis/extensions/v1/pods", &authorizer.AttributesRecord{APIGroup: extensions.GroupName, Resource: "pods"}},
+		"prefix/group/version/resource2": {"GET", "/apis/autoscaling/v1/horizontalpodautoscalers", &authorizer.AttributesRecord{APIGroup: autoscaling.GroupName, Resource: "horizontalpodautoscalers"}},
 	}
 
 	currentAuthorizationAttributesIndex := 0

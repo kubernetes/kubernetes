@@ -392,7 +392,7 @@ func TestTLSConfig(t *testing.T) {
 				return
 			}
 
-			attr := authorizer.AttributesRecord{User: &user.DefaultInfo{}}
+			attr := &authorizer.AttributesRecord{User: &user.DefaultInfo{}}
 
 			// Allow all and see if we get an error.
 			service.Allow()
@@ -466,7 +466,7 @@ func TestWebhook(t *testing.T) {
 		want v1beta1.SubjectAccessReview
 	}{
 		{
-			attr: authorizer.AttributesRecord{User: &user.DefaultInfo{}},
+			attr: &authorizer.AttributesRecord{User: &user.DefaultInfo{}},
 			want: v1beta1.SubjectAccessReview{
 				TypeMeta: expTypeMeta,
 				Spec: v1beta1.SubjectAccessReviewSpec{
@@ -475,7 +475,7 @@ func TestWebhook(t *testing.T) {
 			},
 		},
 		{
-			attr: authorizer.AttributesRecord{User: &user.DefaultInfo{Name: "jane"}},
+			attr: &authorizer.AttributesRecord{User: &user.DefaultInfo{Name: "jane"}},
 			want: v1beta1.SubjectAccessReview{
 				TypeMeta: expTypeMeta,
 				Spec: v1beta1.SubjectAccessReviewSpec{
@@ -485,7 +485,7 @@ func TestWebhook(t *testing.T) {
 			},
 		},
 		{
-			attr: authorizer.AttributesRecord{
+			attr: &authorizer.AttributesRecord{
 				User: &user.DefaultInfo{
 					Name:   "jane",
 					UID:    "1",
@@ -543,7 +543,7 @@ func TestWebhook(t *testing.T) {
 }
 
 type webhookCacheTestCase struct {
-	attr authorizer.AttributesRecord
+	attr *authorizer.AttributesRecord
 
 	allow      bool
 	statusCode int
@@ -593,8 +593,8 @@ func TestWebhookCache(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	aliceAttr := authorizer.AttributesRecord{User: &user.DefaultInfo{Name: "alice"}}
-	bobAttr := authorizer.AttributesRecord{User: &user.DefaultInfo{Name: "bob"}}
+	aliceAttr := &authorizer.AttributesRecord{User: &user.DefaultInfo{Name: "alice"}}
+	bobAttr := &authorizer.AttributesRecord{User: &user.DefaultInfo{Name: "bob"}}
 
 	tests := []webhookCacheTestCase{
 		// server error and 429's retry

@@ -123,7 +123,7 @@ func TestAuthorizeV0(t *testing.T) {
 		{User: uChuck, Verb: "get", Path: "/", Resource: "", NS: "", ExpectDecision: authorizer.DecisionNoOpinion},
 	}
 	for i, tc := range testCases {
-		attr := authorizer.AttributesRecord{
+		attr := &authorizer.AttributesRecord{
 			User:      &tc.User,
 			Verb:      tc.Verb,
 			Resource:  tc.Resource,
@@ -319,7 +319,7 @@ func TestRulesFor(t *testing.T) {
 		},
 	}
 	for i, tc := range testCases {
-		attr := authorizer.AttributesRecord{
+		attr := &authorizer.AttributesRecord{
 			User:      &tc.User,
 			Namespace: tc.Namespace,
 		}
@@ -441,7 +441,7 @@ func TestAuthorizeV1beta1(t *testing.T) {
 		{User: uAPIGroup, Verb: "get", APIGroup: "x", Resource: "foo", NS: "projectXGroup", ExpectDecision: authorizer.DecisionAllow},
 	}
 	for i, tc := range testCases {
-		attr := authorizer.AttributesRecord{
+		attr := &authorizer.AttributesRecord{
 			User:            &tc.User,
 			Verb:            tc.Verb,
 			Resource:        tc.Resource,
@@ -804,7 +804,7 @@ func TestSubjectMatches(t *testing.T) {
 			t.Errorf("%s: error converting: %v", k, err)
 			continue
 		}
-		attr := authorizer.AttributesRecord{
+		attr := &authorizer.AttributesRecord{
 			User: &tc.User,
 		}
 		actualMatch := subjectMatches(*policy, attr.GetUser())
@@ -843,7 +843,7 @@ func TestPolicy(t *testing.T) {
 			policy: &v0.Policy{
 				Readonly: true,
 			},
-			attr: authorizer.AttributesRecord{
+			attr: &authorizer.AttributesRecord{
 				User: &user.DefaultInfo{
 					Name:   "foo",
 					Groups: []string{user.AllAuthenticated},
@@ -857,7 +857,7 @@ func TestPolicy(t *testing.T) {
 			policy: &v0.Policy{
 				User: "foo",
 			},
-			attr: authorizer.AttributesRecord{
+			attr: &authorizer.AttributesRecord{
 				User: &user.DefaultInfo{
 					Name:   "bar",
 					Groups: []string{user.AllAuthenticated},
@@ -870,7 +870,7 @@ func TestPolicy(t *testing.T) {
 			policy: &v0.Policy{
 				Resource: "foo",
 			},
-			attr: authorizer.AttributesRecord{
+			attr: &authorizer.AttributesRecord{
 				User: &user.DefaultInfo{
 					Name:   "foo",
 					Groups: []string{user.AllAuthenticated},
@@ -887,7 +887,7 @@ func TestPolicy(t *testing.T) {
 				Resource:  "foo",
 				Namespace: "foo",
 			},
-			attr: authorizer.AttributesRecord{
+			attr: &authorizer.AttributesRecord{
 				User: &user.DefaultInfo{
 					Name:   "foo",
 					Groups: []string{user.AllAuthenticated},
@@ -903,7 +903,7 @@ func TestPolicy(t *testing.T) {
 		// v0 matches
 		{
 			policy: &v0.Policy{},
-			attr: authorizer.AttributesRecord{
+			attr: &authorizer.AttributesRecord{
 				User: &user.DefaultInfo{
 					Name:   "foo",
 					Groups: []string{user.AllAuthenticated},
@@ -917,7 +917,7 @@ func TestPolicy(t *testing.T) {
 			policy: &v0.Policy{
 				Readonly: true,
 			},
-			attr: authorizer.AttributesRecord{
+			attr: &authorizer.AttributesRecord{
 				User: &user.DefaultInfo{
 					Name:   "foo",
 					Groups: []string{user.AllAuthenticated},
@@ -931,7 +931,7 @@ func TestPolicy(t *testing.T) {
 			policy: &v0.Policy{
 				User: "foo",
 			},
-			attr: authorizer.AttributesRecord{
+			attr: &authorizer.AttributesRecord{
 				User: &user.DefaultInfo{
 					Name:   "foo",
 					Groups: []string{user.AllAuthenticated},
@@ -944,7 +944,7 @@ func TestPolicy(t *testing.T) {
 			policy: &v0.Policy{
 				Resource: "foo",
 			},
-			attr: authorizer.AttributesRecord{
+			attr: &authorizer.AttributesRecord{
 				User: &user.DefaultInfo{
 					Name:   "foo",
 					Groups: []string{user.AllAuthenticated},
@@ -959,7 +959,7 @@ func TestPolicy(t *testing.T) {
 		// v1 mismatches
 		{
 			policy: &v1beta1.Policy{},
-			attr: authorizer.AttributesRecord{
+			attr: &authorizer.AttributesRecord{
 				User: &user.DefaultInfo{
 					Name:   "foo",
 					Groups: []string{user.AllAuthenticated},
@@ -975,7 +975,7 @@ func TestPolicy(t *testing.T) {
 					User: "foo",
 				},
 			},
-			attr: authorizer.AttributesRecord{
+			attr: &authorizer.AttributesRecord{
 				User: &user.DefaultInfo{
 					Name:   "bar",
 					Groups: []string{user.AllAuthenticated},
@@ -992,7 +992,7 @@ func TestPolicy(t *testing.T) {
 					Readonly: true,
 				},
 			},
-			attr: authorizer.AttributesRecord{
+			attr: &authorizer.AttributesRecord{
 				User: &user.DefaultInfo{
 					Name:   "foo",
 					Groups: []string{user.AllAuthenticated},
@@ -1009,7 +1009,7 @@ func TestPolicy(t *testing.T) {
 					Resource: "foo",
 				},
 			},
-			attr: authorizer.AttributesRecord{
+			attr: &authorizer.AttributesRecord{
 				User: &user.DefaultInfo{
 					Name:   "foo",
 					Groups: []string{user.AllAuthenticated},
@@ -1028,7 +1028,7 @@ func TestPolicy(t *testing.T) {
 					Resource:  "baz",
 				},
 			},
-			attr: authorizer.AttributesRecord{
+			attr: &authorizer.AttributesRecord{
 				User: &user.DefaultInfo{
 					Name:   "foo",
 					Groups: []string{user.AllAuthenticated},
@@ -1047,7 +1047,7 @@ func TestPolicy(t *testing.T) {
 					NonResourcePath: "/api",
 				},
 			},
-			attr: authorizer.AttributesRecord{
+			attr: &authorizer.AttributesRecord{
 				User: &user.DefaultInfo{
 					Name:   "foo",
 					Groups: []string{user.AllAuthenticated},
@@ -1065,7 +1065,7 @@ func TestPolicy(t *testing.T) {
 					NonResourcePath: "/api/*",
 				},
 			},
-			attr: authorizer.AttributesRecord{
+			attr: &authorizer.AttributesRecord{
 				User: &user.DefaultInfo{
 					Name:   "foo",
 					Groups: []string{user.AllAuthenticated},
@@ -1084,7 +1084,7 @@ func TestPolicy(t *testing.T) {
 					User: "foo",
 				},
 			},
-			attr: authorizer.AttributesRecord{
+			attr: &authorizer.AttributesRecord{
 				User: &user.DefaultInfo{
 					Name:   "foo",
 					Groups: []string{user.AllAuthenticated},
@@ -1100,7 +1100,7 @@ func TestPolicy(t *testing.T) {
 					User: "*",
 				},
 			},
-			attr: authorizer.AttributesRecord{
+			attr: &authorizer.AttributesRecord{
 				User: &user.DefaultInfo{
 					Name:   "foo",
 					Groups: []string{user.AllAuthenticated},
@@ -1116,7 +1116,7 @@ func TestPolicy(t *testing.T) {
 					Group: "bar",
 				},
 			},
-			attr: authorizer.AttributesRecord{
+			attr: &authorizer.AttributesRecord{
 				User: &user.DefaultInfo{
 					Name:   "foo",
 					Groups: []string{"bar", user.AllAuthenticated},
@@ -1132,7 +1132,7 @@ func TestPolicy(t *testing.T) {
 					Group: "*",
 				},
 			},
-			attr: authorizer.AttributesRecord{
+			attr: &authorizer.AttributesRecord{
 				User: &user.DefaultInfo{
 					Name:   "foo",
 					Groups: []string{"bar", user.AllAuthenticated},
@@ -1149,7 +1149,7 @@ func TestPolicy(t *testing.T) {
 					Readonly: true,
 				},
 			},
-			attr: authorizer.AttributesRecord{
+			attr: &authorizer.AttributesRecord{
 				User: &user.DefaultInfo{
 					Name:   "foo",
 					Groups: []string{user.AllAuthenticated},
@@ -1167,7 +1167,7 @@ func TestPolicy(t *testing.T) {
 					Resource: "foo",
 				},
 			},
-			attr: authorizer.AttributesRecord{
+			attr: &authorizer.AttributesRecord{
 				User: &user.DefaultInfo{
 					Name:   "foo",
 					Groups: []string{user.AllAuthenticated},
@@ -1186,7 +1186,7 @@ func TestPolicy(t *testing.T) {
 					Resource:  "baz",
 				},
 			},
-			attr: authorizer.AttributesRecord{
+			attr: &authorizer.AttributesRecord{
 				User: &user.DefaultInfo{
 					Name:   "foo",
 					Groups: []string{user.AllAuthenticated},
@@ -1205,7 +1205,7 @@ func TestPolicy(t *testing.T) {
 					NonResourcePath: "/api",
 				},
 			},
-			attr: authorizer.AttributesRecord{
+			attr: &authorizer.AttributesRecord{
 				User: &user.DefaultInfo{
 					Name:   "foo",
 					Groups: []string{user.AllAuthenticated},
@@ -1223,7 +1223,7 @@ func TestPolicy(t *testing.T) {
 					NonResourcePath: "*",
 				},
 			},
-			attr: authorizer.AttributesRecord{
+			attr: &authorizer.AttributesRecord{
 				User: &user.DefaultInfo{
 					Name:   "foo",
 					Groups: []string{user.AllAuthenticated},
@@ -1241,7 +1241,7 @@ func TestPolicy(t *testing.T) {
 					NonResourcePath: "/api/*",
 				},
 			},
-			attr: authorizer.AttributesRecord{
+			attr: &authorizer.AttributesRecord{
 				User: &user.DefaultInfo{
 					Name:   "foo",
 					Groups: []string{user.AllAuthenticated},

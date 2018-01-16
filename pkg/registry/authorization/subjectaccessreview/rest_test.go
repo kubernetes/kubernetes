@@ -66,7 +66,7 @@ func TestCreate(t *testing.T) {
 			decision: authorizer.DecisionNoOpinion,
 			reason:   "myreason",
 			err:      errors.New("myerror"),
-			expectedAttrs: authorizer.AttributesRecord{
+			expectedAttrs: &authorizer.AttributesRecord{
 				User:            &user.DefaultInfo{Name: "bob"},
 				Verb:            "get",
 				Path:            "/mypath",
@@ -87,7 +87,7 @@ func TestCreate(t *testing.T) {
 			decision: authorizer.DecisionAllow,
 			reason:   "allowed",
 			err:      nil,
-			expectedAttrs: authorizer.AttributesRecord{
+			expectedAttrs: &authorizer.AttributesRecord{
 				User:            &user.DefaultInfo{Name: "bob"},
 				Verb:            "get",
 				Path:            "/mypath",
@@ -116,7 +116,7 @@ func TestCreate(t *testing.T) {
 			decision: authorizer.DecisionNoOpinion,
 			reason:   "myreason",
 			err:      errors.New("myerror"),
-			expectedAttrs: authorizer.AttributesRecord{
+			expectedAttrs: &authorizer.AttributesRecord{
 				User:            &user.DefaultInfo{Name: "bob"},
 				Namespace:       "myns",
 				Verb:            "create",
@@ -151,7 +151,7 @@ func TestCreate(t *testing.T) {
 			decision: authorizer.DecisionAllow,
 			reason:   "allowed",
 			err:      nil,
-			expectedAttrs: authorizer.AttributesRecord{
+			expectedAttrs: &authorizer.AttributesRecord{
 				User:            &user.DefaultInfo{Name: "bob"},
 				Namespace:       "myns",
 				Verb:            "create",
@@ -176,7 +176,7 @@ func TestCreate(t *testing.T) {
 				ResourceAttributes: &authorizationapi.ResourceAttributes{},
 			},
 			decision: authorizer.DecisionDeny,
-			expectedAttrs: authorizer.AttributesRecord{
+			expectedAttrs: &authorizer.AttributesRecord{
 				User:            &user.DefaultInfo{Name: "bob"},
 				ResourceRequest: true,
 			},

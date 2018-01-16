@@ -369,7 +369,7 @@ func authorizedForPolicy(info user.Info, namespace string, policyName string, au
 // buildAttributes builds an attributes record for a SAR based on the user info and policy.
 func buildAttributes(info user.Info, namespace string, policyName string) authorizer.Attributes {
 	// check against the namespace that the pod is being created in to allow per-namespace PSP grants.
-	attr := authorizer.AttributesRecord{
+	attr := &authorizer.AttributesRecord{
 		User:            info,
 		Verb:            "use",
 		Namespace:       namespace,

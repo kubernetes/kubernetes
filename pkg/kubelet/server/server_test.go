@@ -660,7 +660,7 @@ Otherwise, add it to the expected list of paths that map to the "proxy" subresou
 	for _, tc := range testcases {
 		var (
 			expectedUser       = &user.DefaultInfo{Name: "test"}
-			expectedAttributes = authorizer.AttributesRecord{
+			expectedAttributes = &authorizer.AttributesRecord{
 				User:            expectedUser,
 				APIGroup:        "",
 				APIVersion:      "v1",
@@ -690,7 +690,7 @@ Otherwise, add it to the expected list of paths that map to the "proxy" subresou
 		}
 		fw.fakeAuth.authorizeFunc = func(a authorizer.Attributes) (decision authorizer.Decision, reason string, err error) {
 			calledAuthorize = true
-			if a != expectedAttributes {
+			if !reflect.DeepEqual(a, expectedAttributes) {
 				t.Fatalf("%s: expected attributes\n\t%#v\ngot\n\t%#v", tc.Path, expectedAttributes, a)
 			}
 			return authorizer.DecisionNoOpinion, "", nil

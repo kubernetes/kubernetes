@@ -178,32 +178,32 @@ func TestAuthorizer(t *testing.T) {
 				newClusterRoleBinding("non-resource-url-prefix", "User:prefixed", "Group:prefixed"),
 			},
 			shouldPass: []authorizer.Attributes{
-				authorizer.AttributesRecord{User: &user.DefaultInfo{Name: "foo"}, Verb: "get", Path: "/apis"},
-				authorizer.AttributesRecord{User: &user.DefaultInfo{Groups: []string{"bar"}}, Verb: "get", Path: "/apis"},
-				authorizer.AttributesRecord{User: &user.DefaultInfo{Name: "admin"}, Verb: "get", Path: "/apis"},
-				authorizer.AttributesRecord{User: &user.DefaultInfo{Groups: []string{"admin"}}, Verb: "get", Path: "/apis"},
-				authorizer.AttributesRecord{User: &user.DefaultInfo{Name: "admin"}, Verb: "watch", Path: "/apis"},
-				authorizer.AttributesRecord{User: &user.DefaultInfo{Groups: []string{"admin"}}, Verb: "watch", Path: "/apis"},
+				&authorizer.AttributesRecord{User: &user.DefaultInfo{Name: "foo"}, Verb: "get", Path: "/apis"},
+				&authorizer.AttributesRecord{User: &user.DefaultInfo{Groups: []string{"bar"}}, Verb: "get", Path: "/apis"},
+				&authorizer.AttributesRecord{User: &user.DefaultInfo{Name: "admin"}, Verb: "get", Path: "/apis"},
+				&authorizer.AttributesRecord{User: &user.DefaultInfo{Groups: []string{"admin"}}, Verb: "get", Path: "/apis"},
+				&authorizer.AttributesRecord{User: &user.DefaultInfo{Name: "admin"}, Verb: "watch", Path: "/apis"},
+				&authorizer.AttributesRecord{User: &user.DefaultInfo{Groups: []string{"admin"}}, Verb: "watch", Path: "/apis"},
 
-				authorizer.AttributesRecord{User: &user.DefaultInfo{Name: "prefixed"}, Verb: "get", Path: "/apis/v1"},
-				authorizer.AttributesRecord{User: &user.DefaultInfo{Groups: []string{"prefixed"}}, Verb: "get", Path: "/apis/v1"},
-				authorizer.AttributesRecord{User: &user.DefaultInfo{Name: "prefixed"}, Verb: "get", Path: "/apis/v1/foobar"},
-				authorizer.AttributesRecord{User: &user.DefaultInfo{Groups: []string{"prefixed"}}, Verb: "get", Path: "/apis/v1/foorbar"},
+				&authorizer.AttributesRecord{User: &user.DefaultInfo{Name: "prefixed"}, Verb: "get", Path: "/apis/v1"},
+				&authorizer.AttributesRecord{User: &user.DefaultInfo{Groups: []string{"prefixed"}}, Verb: "get", Path: "/apis/v1"},
+				&authorizer.AttributesRecord{User: &user.DefaultInfo{Name: "prefixed"}, Verb: "get", Path: "/apis/v1/foobar"},
+				&authorizer.AttributesRecord{User: &user.DefaultInfo{Groups: []string{"prefixed"}}, Verb: "get", Path: "/apis/v1/foorbar"},
 			},
 			shouldFail: []authorizer.Attributes{
 				// wrong verb
-				authorizer.AttributesRecord{User: &user.DefaultInfo{Name: "foo"}, Verb: "watch", Path: "/apis"},
-				authorizer.AttributesRecord{User: &user.DefaultInfo{Groups: []string{"bar"}}, Verb: "watch", Path: "/apis"},
+				&authorizer.AttributesRecord{User: &user.DefaultInfo{Name: "foo"}, Verb: "watch", Path: "/apis"},
+				&authorizer.AttributesRecord{User: &user.DefaultInfo{Groups: []string{"bar"}}, Verb: "watch", Path: "/apis"},
 
 				// wrong path
-				authorizer.AttributesRecord{User: &user.DefaultInfo{Name: "foo"}, Verb: "get", Path: "/api/v1"},
-				authorizer.AttributesRecord{User: &user.DefaultInfo{Groups: []string{"bar"}}, Verb: "get", Path: "/api/v1"},
-				authorizer.AttributesRecord{User: &user.DefaultInfo{Name: "admin"}, Verb: "get", Path: "/api/v1"},
-				authorizer.AttributesRecord{User: &user.DefaultInfo{Groups: []string{"admin"}}, Verb: "get", Path: "/api/v1"},
+				&authorizer.AttributesRecord{User: &user.DefaultInfo{Name: "foo"}, Verb: "get", Path: "/api/v1"},
+				&authorizer.AttributesRecord{User: &user.DefaultInfo{Groups: []string{"bar"}}, Verb: "get", Path: "/api/v1"},
+				&authorizer.AttributesRecord{User: &user.DefaultInfo{Name: "admin"}, Verb: "get", Path: "/api/v1"},
+				&authorizer.AttributesRecord{User: &user.DefaultInfo{Groups: []string{"admin"}}, Verb: "get", Path: "/api/v1"},
 
 				// not covered by prefix
-				authorizer.AttributesRecord{User: &user.DefaultInfo{Name: "prefixed"}, Verb: "get", Path: "/api/v1"},
-				authorizer.AttributesRecord{User: &user.DefaultInfo{Groups: []string{"prefixed"}}, Verb: "get", Path: "/api/v1"},
+				&authorizer.AttributesRecord{User: &user.DefaultInfo{Name: "prefixed"}, Verb: "get", Path: "/api/v1"},
+				&authorizer.AttributesRecord{User: &user.DefaultInfo{Groups: []string{"prefixed"}}, Verb: "get", Path: "/api/v1"},
 			},
 		},
 		{
@@ -265,12 +265,12 @@ func TestRuleMatches(t *testing.T) {
 		name string
 		rule rbac.PolicyRule
 
-		requestsToExpected map[authorizer.AttributesRecord]bool
+		requestsToExpected map[*authorizer.AttributesRecord]bool
 	}{
 		{
 			name: "star verb, exact match other",
 			rule: rbac.NewRule("*").Groups("group1").Resources("resource1").RuleOrDie(),
-			requestsToExpected: map[authorizer.AttributesRecord]bool{
+			requestsToExpected: map[*authorizer.AttributesRecord]bool{
 				resourceRequest("verb1").Group("group1").Resource("resource1").New(): true,
 				resourceRequest("verb1").Group("group2").Resource("resource1").New(): false,
 				resourceRequest("verb1").Group("group1").Resource("resource2").New(): false,
@@ -284,7 +284,7 @@ func TestRuleMatches(t *testing.T) {
 		{
 			name: "star group, exact match other",
 			rule: rbac.NewRule("verb1").Groups("*").Resources("resource1").RuleOrDie(),
-			requestsToExpected: map[authorizer.AttributesRecord]bool{
+			requestsToExpected: map[*authorizer.AttributesRecord]bool{
 				resourceRequest("verb1").Group("group1").Resource("resource1").New(): true,
 				resourceRequest("verb1").Group("group2").Resource("resource1").New(): true,
 				resourceRequest("verb1").Group("group1").Resource("resource2").New(): false,
@@ -298,7 +298,7 @@ func TestRuleMatches(t *testing.T) {
 		{
 			name: "star resource, exact match other",
 			rule: rbac.NewRule("verb1").Groups("group1").Resources("*").RuleOrDie(),
-			requestsToExpected: map[authorizer.AttributesRecord]bool{
+			requestsToExpected: map[*authorizer.AttributesRecord]bool{
 				resourceRequest("verb1").Group("group1").Resource("resource1").New(): true,
 				resourceRequest("verb1").Group("group2").Resource("resource1").New(): false,
 				resourceRequest("verb1").Group("group1").Resource("resource2").New(): true,
@@ -312,7 +312,7 @@ func TestRuleMatches(t *testing.T) {
 		{
 			name: "tuple expansion",
 			rule: rbac.NewRule("verb1", "verb2").Groups("group1", "group2").Resources("resource1", "resource2").RuleOrDie(),
-			requestsToExpected: map[authorizer.AttributesRecord]bool{
+			requestsToExpected: map[*authorizer.AttributesRecord]bool{
 				resourceRequest("verb1").Group("group1").Resource("resource1").New(): true,
 				resourceRequest("verb1").Group("group2").Resource("resource1").New(): true,
 				resourceRequest("verb1").Group("group1").Resource("resource2").New(): true,
@@ -326,7 +326,7 @@ func TestRuleMatches(t *testing.T) {
 		{
 			name: "subresource expansion",
 			rule: rbac.NewRule("*").Groups("*").Resources("resource1/subresource1").RuleOrDie(),
-			requestsToExpected: map[authorizer.AttributesRecord]bool{
+			requestsToExpected: map[*authorizer.AttributesRecord]bool{
 				resourceRequest("verb1").Group("group1").Resource("resource1").Subresource("subresource1").New(): true,
 				resourceRequest("verb1").Group("group2").Resource("resource1").Subresource("subresource2").New(): false,
 				resourceRequest("verb1").Group("group1").Resource("resource2").Subresource("subresource1").New(): false,
@@ -340,7 +340,7 @@ func TestRuleMatches(t *testing.T) {
 		{
 			name: "star nonresource, exact match other",
 			rule: rbac.NewRule("verb1").URLs("*").RuleOrDie(),
-			requestsToExpected: map[authorizer.AttributesRecord]bool{
+			requestsToExpected: map[*authorizer.AttributesRecord]bool{
 				nonresourceRequest("verb1").URL("/foo").New():         true,
 				nonresourceRequest("verb1").URL("/foo/bar").New():     true,
 				nonresourceRequest("verb1").URL("/foo/baz").New():     true,
@@ -356,7 +356,7 @@ func TestRuleMatches(t *testing.T) {
 		{
 			name: "star nonresource subpath",
 			rule: rbac.NewRule("verb1").URLs("/foo/*").RuleOrDie(),
-			requestsToExpected: map[authorizer.AttributesRecord]bool{
+			requestsToExpected: map[*authorizer.AttributesRecord]bool{
 				nonresourceRequest("verb1").URL("/foo").New():            false,
 				nonresourceRequest("verb1").URL("/foo/bar").New():        true,
 				nonresourceRequest("verb1").URL("/foo/baz").New():        true,
@@ -372,7 +372,7 @@ func TestRuleMatches(t *testing.T) {
 		{
 			name: "star verb, exact nonresource",
 			rule: rbac.NewRule("*").URLs("/foo", "/foo/bar/one").RuleOrDie(),
-			requestsToExpected: map[authorizer.AttributesRecord]bool{
+			requestsToExpected: map[*authorizer.AttributesRecord]bool{
 				nonresourceRequest("verb1").URL("/foo").New():         true,
 				nonresourceRequest("verb1").URL("/foo/bar").New():     false,
 				nonresourceRequest("verb1").URL("/foo/baz").New():     false,
@@ -396,18 +396,18 @@ func TestRuleMatches(t *testing.T) {
 }
 
 type requestAttributeBuilder struct {
-	request authorizer.AttributesRecord
+	request *authorizer.AttributesRecord
 }
 
 func resourceRequest(verb string) *requestAttributeBuilder {
 	return &requestAttributeBuilder{
-		request: authorizer.AttributesRecord{ResourceRequest: true, Verb: verb},
+		request: &authorizer.AttributesRecord{ResourceRequest: true, Verb: verb},
 	}
 }
 
 func nonresourceRequest(verb string) *requestAttributeBuilder {
 	return &requestAttributeBuilder{
-		request: authorizer.AttributesRecord{ResourceRequest: false, Verb: verb},
+		request: &authorizer.AttributesRecord{ResourceRequest: false, Verb: verb},
 	}
 }
 
@@ -436,7 +436,7 @@ func (r *requestAttributeBuilder) URL(url string) *requestAttributeBuilder {
 	return r
 }
 
-func (r *requestAttributeBuilder) New() authorizer.AttributesRecord {
+func (r *requestAttributeBuilder) New() *authorizer.AttributesRecord {
 	return r.request
 }
 
@@ -469,7 +469,7 @@ func BenchmarkAuthorize(b *testing.B) {
 	}{
 		{
 			"allow list pods",
-			authorizer.AttributesRecord{
+			&authorizer.AttributesRecord{
 				ResourceRequest: true,
 				User:            nodeUser,
 				Verb:            "list",
@@ -483,7 +483,7 @@ func BenchmarkAuthorize(b *testing.B) {
 		},
 		{
 			"allow update pods/status",
-			authorizer.AttributesRecord{
+			&authorizer.AttributesRecord{
 				ResourceRequest: true,
 				User:            nodeUser,
 				Verb:            "update",
@@ -497,7 +497,7 @@ func BenchmarkAuthorize(b *testing.B) {
 		},
 		{
 			"forbid educate dolphins",
-			authorizer.AttributesRecord{
+			&authorizer.AttributesRecord{
 				ResourceRequest: true,
 				User:            nodeUser,
 				Verb:            "educate",
