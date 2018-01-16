@@ -227,7 +227,11 @@ func (r *crdHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			http.Error(w, fmt.Sprintf("%v not allowed while CustomResourceDefinition is terminating", requestInfo.Verb), http.StatusMethodNotAllowed)
 			return
 		}
-		handler := handlers.PatchResource(storage, requestScope, r.admission, unstructured.UnstructuredObjectConverter{})
+		supportedTypes := []string{
+			string(types.JSONPatchType),
+			string(types.MergePatchType),
+		}
+		handler := handlers.PatchResource(storage, requestScope, r.admission, unstructured.UnstructuredObjectConverter{}, supportedTypes)
 		handler(w, req)
 		return
 	case "delete":
