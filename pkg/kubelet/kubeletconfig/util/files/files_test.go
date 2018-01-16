@@ -111,10 +111,10 @@ func TestEnsureFile(t *testing.T) {
 			path:   prePath + "/FileNotExists",
 			create: false,
 		},
-		//"file not exists in subdir": {
-		//	path:   prePath + "/FileNotExistsInSubDir/test1",
-		//	create: false,
-		//},
+		"file not exists in subdir": {
+			path:   prePath + "/FileNotExistsInSubDir/test1",
+			create: false,
+		},
 	}
 
 	for testcaseName, testcase := range testcases {
