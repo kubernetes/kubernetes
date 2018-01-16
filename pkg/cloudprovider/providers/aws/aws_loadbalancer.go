@@ -1375,8 +1375,7 @@ func (c *Cloud) ensureSSLNegotiationPolicy(loadBalancer *elb.LoadBalancerDescrip
 	if err != nil {
 		if aerr, ok := err.(awserr.Error); ok {
 			switch aerr.Code() {
-			case "PolicyNotFound":
-				// TODO change from string to `elb.ErrCodePolicyNotFoundException` once the AWS SDK is updated
+			case elb.ErrCodePolicyNotFoundException:
 			default:
 				return fmt.Errorf("error describing security policies on load balancer: %q", err)
 			}
