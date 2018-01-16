@@ -82,7 +82,7 @@ type KubeletConfiguration struct {
 	// and key are generated for the public address and saved to the directory
 	// passed to certDir.
 	TLSCertFile string
-	// tlsPrivateKeyFile is the ile containing x509 private key matching
+	// tlsPrivateKeyFile is the file containing x509 private key matching
 	// tlsCertFile.
 	TLSPrivateKeyFile string
 	// TLSCipherSuites is the list of allowed cipher suites for the server.
