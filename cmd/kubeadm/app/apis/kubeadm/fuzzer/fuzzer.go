@@ -66,7 +66,6 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			obj.KubeletConfiguration = kubeadm.KubeletConfiguration{
 				BaseConfig: &kubeletconfigv1alpha1.KubeletConfiguration{
 					PodManifestPath: "foo",
-					AllowPrivileged: utilpointer.BoolPtr(true),
 					ClusterDNS:      []string{"foo"},
 					ClusterDomain:   "foo",
 					Authorization:   kubeletconfigv1alpha1.KubeletAuthorization{Mode: "foo"},
@@ -115,7 +114,6 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 		},
 		func(obj *kubeadm.NodeConfiguration, c fuzz.Continue) {
 			c.FuzzNoCustom(obj)
-			obj.CACertPath = "foo"
 			obj.CACertPath = "foo"
 			obj.DiscoveryFile = "foo"
 			obj.DiscoveryToken = "foo"

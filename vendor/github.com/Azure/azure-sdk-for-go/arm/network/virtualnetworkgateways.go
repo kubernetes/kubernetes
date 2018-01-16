@@ -117,6 +117,7 @@ func (client VirtualNetworkGatewaysClient) CreateOrUpdatePreparer(resourceGroupN
 func (client VirtualNetworkGatewaysClient) CreateOrUpdateSender(req *http.Request) (*http.Response, error) {
 	return autorest.SendWithSender(client,
 		req,
+		azure.DoRetryWithRegistration(client.Client),
 		azure.DoPollForAsynchronous(client.PollingDelay))
 }
 
@@ -200,6 +201,7 @@ func (client VirtualNetworkGatewaysClient) DeletePreparer(resourceGroupName stri
 func (client VirtualNetworkGatewaysClient) DeleteSender(req *http.Request) (*http.Response, error) {
 	return autorest.SendWithSender(client,
 		req,
+		azure.DoRetryWithRegistration(client.Client),
 		azure.DoPollForAsynchronous(client.PollingDelay))
 }
 
@@ -284,6 +286,7 @@ func (client VirtualNetworkGatewaysClient) GeneratevpnclientpackagePreparer(reso
 func (client VirtualNetworkGatewaysClient) GeneratevpnclientpackageSender(req *http.Request) (*http.Response, error) {
 	return autorest.SendWithSender(client,
 		req,
+		azure.DoRetryWithRegistration(client.Client),
 		azure.DoPollForAsynchronous(client.PollingDelay))
 }
 
@@ -370,6 +373,7 @@ func (client VirtualNetworkGatewaysClient) GenerateVpnProfilePreparer(resourceGr
 func (client VirtualNetworkGatewaysClient) GenerateVpnProfileSender(req *http.Request) (*http.Response, error) {
 	return autorest.SendWithSender(client,
 		req,
+		azure.DoRetryWithRegistration(client.Client),
 		azure.DoPollForAsynchronous(client.PollingDelay))
 }
 
@@ -436,7 +440,9 @@ func (client VirtualNetworkGatewaysClient) GetPreparer(resourceGroupName string,
 // GetSender sends the Get request. The method will close the
 // http.Response Body if it receives an error.
 func (client VirtualNetworkGatewaysClient) GetSender(req *http.Request) (*http.Response, error) {
-	return autorest.SendWithSender(client, req)
+	return autorest.SendWithSender(client,
+		req,
+		azure.DoRetryWithRegistration(client.Client))
 }
 
 // GetResponder handles the response to the Get request. The method always
@@ -520,6 +526,7 @@ func (client VirtualNetworkGatewaysClient) GetAdvertisedRoutesPreparer(resourceG
 func (client VirtualNetworkGatewaysClient) GetAdvertisedRoutesSender(req *http.Request) (*http.Response, error) {
 	return autorest.SendWithSender(client,
 		req,
+		azure.DoRetryWithRegistration(client.Client),
 		azure.DoPollForAsynchronous(client.PollingDelay))
 }
 
@@ -606,6 +613,7 @@ func (client VirtualNetworkGatewaysClient) GetBgpPeerStatusPreparer(resourceGrou
 func (client VirtualNetworkGatewaysClient) GetBgpPeerStatusSender(req *http.Request) (*http.Response, error) {
 	return autorest.SendWithSender(client,
 		req,
+		azure.DoRetryWithRegistration(client.Client),
 		azure.DoPollForAsynchronous(client.PollingDelay))
 }
 
@@ -689,6 +697,7 @@ func (client VirtualNetworkGatewaysClient) GetLearnedRoutesPreparer(resourceGrou
 func (client VirtualNetworkGatewaysClient) GetLearnedRoutesSender(req *http.Request) (*http.Response, error) {
 	return autorest.SendWithSender(client,
 		req,
+		azure.DoRetryWithRegistration(client.Client),
 		azure.DoPollForAsynchronous(client.PollingDelay))
 }
 
@@ -773,6 +782,7 @@ func (client VirtualNetworkGatewaysClient) GetVpnProfilePackageURLPreparer(resou
 func (client VirtualNetworkGatewaysClient) GetVpnProfilePackageURLSender(req *http.Request) (*http.Response, error) {
 	return autorest.SendWithSender(client,
 		req,
+		azure.DoRetryWithRegistration(client.Client),
 		azure.DoPollForAsynchronous(client.PollingDelay))
 }
 
@@ -837,7 +847,9 @@ func (client VirtualNetworkGatewaysClient) ListPreparer(resourceGroupName string
 // ListSender sends the List request. The method will close the
 // http.Response Body if it receives an error.
 func (client VirtualNetworkGatewaysClient) ListSender(req *http.Request) (*http.Response, error) {
-	return autorest.SendWithSender(client, req)
+	return autorest.SendWithSender(client,
+		req,
+		azure.DoRetryWithRegistration(client.Client))
 }
 
 // ListResponder handles the response to the List request. The method always
@@ -972,7 +984,9 @@ func (client VirtualNetworkGatewaysClient) ListConnectionsPreparer(resourceGroup
 // ListConnectionsSender sends the ListConnections request. The method will close the
 // http.Response Body if it receives an error.
 func (client VirtualNetworkGatewaysClient) ListConnectionsSender(req *http.Request) (*http.Response, error) {
-	return autorest.SendWithSender(client, req)
+	return autorest.SendWithSender(client,
+		req,
+		azure.DoRetryWithRegistration(client.Client))
 }
 
 // ListConnectionsResponder handles the response to the ListConnections request. The method always
@@ -1128,6 +1142,7 @@ func (client VirtualNetworkGatewaysClient) ResetPreparer(resourceGroupName strin
 func (client VirtualNetworkGatewaysClient) ResetSender(req *http.Request) (*http.Response, error) {
 	return autorest.SendWithSender(client,
 		req,
+		azure.DoRetryWithRegistration(client.Client),
 		azure.DoPollForAsynchronous(client.PollingDelay))
 }
 
@@ -1194,7 +1209,9 @@ func (client VirtualNetworkGatewaysClient) SupportedVpnDevicesPreparer(resourceG
 // SupportedVpnDevicesSender sends the SupportedVpnDevices request. The method will close the
 // http.Response Body if it receives an error.
 func (client VirtualNetworkGatewaysClient) SupportedVpnDevicesSender(req *http.Request) (*http.Response, error) {
-	return autorest.SendWithSender(client, req)
+	return autorest.SendWithSender(client,
+		req,
+		azure.DoRetryWithRegistration(client.Client))
 }
 
 // SupportedVpnDevicesResponder handles the response to the SupportedVpnDevices request. The method always
@@ -1263,7 +1280,9 @@ func (client VirtualNetworkGatewaysClient) VpnDeviceConfigurationScriptPreparer(
 // VpnDeviceConfigurationScriptSender sends the VpnDeviceConfigurationScript request. The method will close the
 // http.Response Body if it receives an error.
 func (client VirtualNetworkGatewaysClient) VpnDeviceConfigurationScriptSender(req *http.Request) (*http.Response, error) {
-	return autorest.SendWithSender(client, req)
+	return autorest.SendWithSender(client,
+		req,
+		azure.DoRetryWithRegistration(client.Client))
 }
 
 // VpnDeviceConfigurationScriptResponder handles the response to the VpnDeviceConfigurationScript request. The method always

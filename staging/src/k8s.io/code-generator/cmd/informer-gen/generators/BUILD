@@ -8,7 +8,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
-        "customargs.go",
         "factory.go",
         "factoryinterface.go",
         "generic.go",
@@ -22,9 +21,9 @@ go_library(
     importpath = "k8s.io/code-generator/cmd/informer-gen/generators",
     deps = [
         "//vendor/github.com/golang/glog:go_default_library",
-        "//vendor/github.com/spf13/pflag:go_default_library",
         "//vendor/k8s.io/code-generator/cmd/client-gen/generators/util:go_default_library",
         "//vendor/k8s.io/code-generator/cmd/client-gen/types:go_default_library",
+        "//vendor/k8s.io/code-generator/cmd/informer-gen/args:go_default_library",
         "//vendor/k8s.io/gengo/args:go_default_library",
         "//vendor/k8s.io/gengo/generator:go_default_library",
         "//vendor/k8s.io/gengo/namer:go_default_library",

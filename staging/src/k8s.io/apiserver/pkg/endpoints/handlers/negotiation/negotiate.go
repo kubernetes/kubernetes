@@ -73,31 +73,30 @@ func NegotiateOutputStreamSerializer(req *http.Request, ns runtime.NegotiatedSer
 }
 
 // NegotiateInputSerializer returns the input serializer for the provided request.
-func NegotiateInputSerializer(req *http.Request, ns runtime.NegotiatedSerializer) (runtime.SerializerInfo, error) {
+func NegotiateInputSerializer(req *http.Request, streaming bool, ns runtime.NegotiatedSerializer) (runtime.SerializerInfo, error) {
 	mediaType := req.Header.Get("Content-Type")
-	return NegotiateInputSerializerForMediaType(mediaType, ns)
+	return NegotiateInputSerializerForMediaType(mediaType, streaming, ns)
 }
 
 // NegotiateInputSerializerForMediaType returns the appropriate serializer for the given media type or an error.
-func NegotiateInputSerializerForMediaType(mediaType string, ns runtime.NegotiatedSerializer) (runtime.SerializerInfo, error) {
+func NegotiateInputSerializerForMediaType(mediaType string, streaming bool, ns runtime.NegotiatedSerializer) (runtime.SerializerInfo, error) {
 	mediaTypes := ns.SupportedMediaTypes()
 	if len(mediaType) == 0 {
 		mediaType = mediaTypes[0].MediaType
 	}
-	mediaType, _, err := mime.ParseMediaType(mediaType)
-	if err != nil {
-		_, supported := MediaTypesForSerializer(ns)
-		return runtime.SerializerInfo{}, NewUnsupportedMediaTypeError(supported)
-	}
-
-	for _, info := range mediaTypes {
-		if info.MediaType != mediaType {
-			continue
+	if mediaType, _, err := mime.ParseMediaType(mediaType); err == nil {
+		for _, info := range mediaTypes {
+			if info.MediaType != mediaType {
+				continue
+			}
+			return info, nil
 		}
-		return info, nil
 	}
 
-	_, supported := MediaTypesForSerializer(ns)
+	supported, streamingSupported := MediaTypesForSerializer(ns)
+	if streaming {
+		return runtime.SerializerInfo{}, NewUnsupportedMediaTypeError(streamingSupported)
+	}
 	return runtime.SerializerInfo{}, NewUnsupportedMediaTypeError(supported)
 }
 
@@ -273,6 +272,13 @@ func acceptMediaTypeOptions(params map[string]string, accepts *AcceptedMediaType
 	return options, true
 }
 
+type candidateMediaType struct {
+	accepted *AcceptedMediaType
+	clauses  goautoneg.Accept
+}
+
+type candidateMediaTypeSlice []candidateMediaType
+
 // NegotiateMediaTypeOptions returns the most appropriate content type given the accept header and
 // a list of alternatives along with the accepted media type parameters.
 func NegotiateMediaTypeOptions(header string, accepted []AcceptedMediaType, endpoint EndpointRestrictions) (MediaTypeOptions, bool) {
@@ -282,6 +288,7 @@ func NegotiateMediaTypeOptions(header string, accepted []AcceptedMediaType, endp
 		}, true
 	}
 
+	var candidates candidateMediaTypeSlice
 	clauses := goautoneg.ParseAccept(header)
 	for _, clause := range clauses {
 		for i := range accepted {
@@ -290,12 +297,17 @@ func NegotiateMediaTypeOptions(header string, accepted []AcceptedMediaType, endp
 			case clause.Type == accepts.Type && clause.SubType == accepts.SubType,
 				clause.Type == accepts.Type && clause.SubType == "*",
 				clause.Type == "*" && clause.SubType == "*":
-				// TODO: should we prefer the first type with no unrecognized options?  Do we need to ignore unrecognized
-				// parameters.
-				return acceptMediaTypeOptions(clause.Params, accepts, endpoint)
+				candidates = append(candidates, candidateMediaType{accepted: accepts, clauses: clause})
 			}
 		}
 	}
+
+	for _, v := range candidates {
+		if retVal, ret := acceptMediaTypeOptions(v.clauses.Params, v.accepted, endpoint); ret {
+			return retVal, true
+		}
+	}
+
 	return MediaTypeOptions{}, false
 }
 

@@ -257,7 +257,7 @@ var _ = SIGDescribe("DaemonRestart [Disruptive]", func() {
 		// that it had the opportunity to create/delete pods, if it were going to do so. Scaling the RC
 		// to the same size achieves this, because the scale operation advances the RC's sequence number
 		// and awaits it to be observed and reported back in the RC's status.
-		framework.ScaleRC(f.ClientSet, f.InternalClientset, ns, rcName, numPods, true)
+		framework.ScaleRC(f.ClientSet, f.InternalClientset, f.ScalesGetter, ns, rcName, numPods, true)
 
 		// Only check the keys, the pods can be different if the kubelet updated it.
 		// TODO: Can it really?
@@ -288,9 +288,9 @@ var _ = SIGDescribe("DaemonRestart [Disruptive]", func() {
 		restarter.kill()
 		// This is best effort to try and create pods while the scheduler is down,
 		// since we don't know exactly when it is restarted after the kill signal.
-		framework.ExpectNoError(framework.ScaleRC(f.ClientSet, f.InternalClientset, ns, rcName, numPods+5, false))
+		framework.ExpectNoError(framework.ScaleRC(f.ClientSet, f.InternalClientset, f.ScalesGetter, ns, rcName, numPods+5, false))
 		restarter.waitUp()
-		framework.ExpectNoError(framework.ScaleRC(f.ClientSet, f.InternalClientset, ns, rcName, numPods+5, true))
+		framework.ExpectNoError(framework.ScaleRC(f.ClientSet, f.InternalClientset, f.ScalesGetter, ns, rcName, numPods+5, true))
 	})
 
 	It("Kubelet should not restart containers across restart", func() {

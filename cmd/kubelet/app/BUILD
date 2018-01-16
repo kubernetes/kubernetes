@@ -9,8 +9,8 @@ load(
 go_test(
     name = "go_default_test",
     srcs = ["server_test.go"],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/cmd/kubelet/app",
-    library = ":go_default_library",
 )
 
 go_library(
@@ -19,10 +19,39 @@ go_library(
         "auth.go",
         "plugins.go",
         "server.go",
-        "server_unsupported.go",
     ] + select({
-        "@io_bazel_rules_go//go/platform:linux_amd64": [
+        "@io_bazel_rules_go//go/platform:android": [
+            "server_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:darwin": [
+            "server_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:dragonfly": [
+            "server_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:freebsd": [
+            "server_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:linux": [
             "server_linux.go",
+        ],
+        "@io_bazel_rules_go//go/platform:nacl": [
+            "server_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:netbsd": [
+            "server_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:openbsd": [
+            "server_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:plan9": [
+            "server_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:solaris": [
+            "server_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:windows": [
+            "server_unsupported.go",
         ],
         "//conditions:default": [],
     }),
@@ -126,7 +155,7 @@ go_library(
         "//vendor/k8s.io/client-go/util/cert:go_default_library",
         "//vendor/k8s.io/client-go/util/certificate:go_default_library",
     ] + select({
-        "@io_bazel_rules_go//go/platform:linux_amd64": [
+        "@io_bazel_rules_go//go/platform:linux": [
             "//vendor/golang.org/x/exp/inotify:go_default_library",
         ],
         "//conditions:default": [],

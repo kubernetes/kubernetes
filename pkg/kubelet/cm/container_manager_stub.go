@@ -26,7 +26,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/status"
-	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
+	"k8s.io/kubernetes/pkg/scheduler/schedulercache"
 )
 
 type containerManagerStub struct{}
@@ -70,8 +70,8 @@ func (cm *containerManagerStub) GetCapacity() v1.ResourceList {
 	return nil
 }
 
-func (cm *containerManagerStub) GetDevicePluginResourceCapacity() (v1.ResourceList, []string) {
-	return nil, []string{}
+func (cm *containerManagerStub) GetDevicePluginResourceCapacity() (v1.ResourceList, v1.ResourceList, []string) {
+	return nil, nil, []string{}
 }
 
 func (cm *containerManagerStub) NewPodContainerManager() PodContainerManager {

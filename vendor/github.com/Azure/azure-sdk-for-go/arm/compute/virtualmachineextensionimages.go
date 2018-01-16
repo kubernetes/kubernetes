@@ -90,7 +90,9 @@ func (client VirtualMachineExtensionImagesClient) GetPreparer(location string, p
 // GetSender sends the Get request. The method will close the
 // http.Response Body if it receives an error.
 func (client VirtualMachineExtensionImagesClient) GetSender(req *http.Request) (*http.Response, error) {
-	return autorest.SendWithSender(client, req)
+	return autorest.SendWithSender(client,
+		req,
+		azure.DoRetryWithRegistration(client.Client))
 }
 
 // GetResponder handles the response to the Get request. The method always
@@ -155,7 +157,9 @@ func (client VirtualMachineExtensionImagesClient) ListTypesPreparer(location str
 // ListTypesSender sends the ListTypes request. The method will close the
 // http.Response Body if it receives an error.
 func (client VirtualMachineExtensionImagesClient) ListTypesSender(req *http.Request) (*http.Response, error) {
-	return autorest.SendWithSender(client, req)
+	return autorest.SendWithSender(client,
+		req,
+		azure.DoRetryWithRegistration(client.Client))
 }
 
 // ListTypesResponder handles the response to the ListTypes request. The method always
@@ -230,7 +234,9 @@ func (client VirtualMachineExtensionImagesClient) ListVersionsPreparer(location 
 // ListVersionsSender sends the ListVersions request. The method will close the
 // http.Response Body if it receives an error.
 func (client VirtualMachineExtensionImagesClient) ListVersionsSender(req *http.Request) (*http.Response, error) {
-	return autorest.SendWithSender(client, req)
+	return autorest.SendWithSender(client,
+		req,
+		azure.DoRetryWithRegistration(client.Client))
 }
 
 // ListVersionsResponder handles the response to the ListVersions request. The method always

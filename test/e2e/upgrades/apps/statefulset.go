@@ -66,7 +66,7 @@ func (t *StatefulSetUpgradeTest) Setup(f *framework.Framework) {
 	t.tester.PauseNewPods(t.set)
 
 	By("Creating service " + headlessSvcName + " in namespace " + ns)
-	_, err := f.ClientSet.Core().Services(ns).Create(t.service)
+	_, err := f.ClientSet.CoreV1().Services(ns).Create(t.service)
 	Expect(err).NotTo(HaveOccurred())
 
 	By("Creating statefulset " + ssName + " in namespace " + ns)

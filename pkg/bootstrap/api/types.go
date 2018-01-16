@@ -95,3 +95,6 @@ const (
 	// tokens (in addition to any groups from BootstrapTokenExtraGroupsKey).
 	BootstrapDefaultGroup = "system:bootstrappers"
 )
+
+// KnownTokenUsages specifies the known functions a token will get.
+var KnownTokenUsages = []string{"signing", "authentication"}

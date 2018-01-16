@@ -247,11 +247,6 @@ const MaxReadThenCreateRetries = 30
 // need hardcoded defaults.
 const DefaultVolumeType = "gp2"
 
-// DefaultMaxEBSVolumes is the limit for volumes attached to an instance.
-// Amazon recommends no more than 40; the system root volume uses at least one.
-// See http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/volume_limits.html#linux-specific-volume-limits
-const DefaultMaxEBSVolumes = 39
-
 // Used to call RecognizeWellKnownRegions just once
 var once sync.Once
 
@@ -533,7 +528,7 @@ type CloudConfig struct {
 
 		// KubernetesClusterTag is the legacy cluster id we'll use to identify our cluster resources
 		KubernetesClusterTag string
-		// KubernetesClusterTag is the cluster id we'll use to identify our cluster resources
+		// KubernetesClusterID is the cluster id we'll use to identify our cluster resources
 		KubernetesClusterID string
 
 		//The aws provider creates an inbound rule per load balancer on the node security
@@ -1133,11 +1128,6 @@ func (c *Cloud) Clusters() (cloudprovider.Clusters, bool) {
 // ProviderName returns the cloud provider ID.
 func (c *Cloud) ProviderName() string {
 	return ProviderName
-}
-
-// ScrubDNS filters DNS settings for pods.
-func (c *Cloud) ScrubDNS(nameservers, searches []string) (nsOut, srchOut []string) {
-	return nameservers, searches
 }
 
 // LoadBalancer returns an implementation of LoadBalancer for Amazon Web Services.

@@ -41,7 +41,7 @@ deb_data(
     name = "kube-scheduler",
     data = [
         {
-            "files": ["//plugin/cmd/kube-scheduler"],
+            "files": ["//cmd/kube-scheduler"],
             "mode": "0755",
             "dir": "/usr/bin",
         },

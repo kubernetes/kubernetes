@@ -29,8 +29,8 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 )
 
-// specialDefaultResourcePrefixes are prefixes compiled into Kubernetes.
-var specialDefaultResourcePrefixes = map[schema.GroupResource]string{
+// SpecialDefaultResourcePrefixes are prefixes compiled into Kubernetes.
+var SpecialDefaultResourcePrefixes = map[schema.GroupResource]string{
 	{Group: "", Resource: "replicationControllers"}:        "controllers",
 	{Group: "", Resource: "replicationcontrollers"}:        "controllers",
 	{Group: "", Resource: "endpoints"}:                     "services/endpoints",
@@ -53,10 +53,10 @@ func NewStorageFactory(storageConfig storagebackend.Config, defaultMediaType str
 	if err != nil {
 		return nil, err
 	}
-	return serverstorage.NewDefaultStorageFactory(storageConfig, defaultMediaType, serializer, resourceEncodingConfig, apiResourceConfig, specialDefaultResourcePrefixes), nil
+	return serverstorage.NewDefaultStorageFactory(storageConfig, defaultMediaType, serializer, resourceEncodingConfig, apiResourceConfig, SpecialDefaultResourcePrefixes), nil
 }
 
-// Merges the given defaultResourceConfig with specifc GroupvVersionResource overrides.
+// Merges the given defaultResourceConfig with specific GroupVersionResource overrides.
 func mergeResourceEncodingConfigs(defaultResourceEncoding *serverstorage.DefaultResourceEncodingConfig, resourceEncodingOverrides []schema.GroupVersionResource) *serverstorage.DefaultResourceEncodingConfig {
 	resourceEncodingConfig := defaultResourceEncoding
 	for _, gvr := range resourceEncodingOverrides {
@@ -66,7 +66,7 @@ func mergeResourceEncodingConfigs(defaultResourceEncoding *serverstorage.Default
 	return resourceEncodingConfig
 }
 
-// Merges the given defaultResourceConfig with specifc GroupVersion overrides.
+// Merges the given defaultResourceConfig with specific GroupVersion overrides.
 func mergeGroupEncodingConfigs(defaultResourceEncoding *serverstorage.DefaultResourceEncodingConfig, storageEncodingOverrides map[string]schema.GroupVersion) *serverstorage.DefaultResourceEncodingConfig {
 	resourceEncodingConfig := defaultResourceEncoding
 	for group, storageEncodingVersion := range storageEncodingOverrides {

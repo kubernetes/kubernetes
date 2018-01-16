@@ -122,7 +122,7 @@ func (d *YAMLDecoder) Read(data []byte) (n int, err error) {
 	if left <= len(data) {
 		copy(data, d.remaining)
 		d.remaining = nil
-		return len(d.remaining), nil
+		return left, nil
 	}
 
 	// caller will need to reread

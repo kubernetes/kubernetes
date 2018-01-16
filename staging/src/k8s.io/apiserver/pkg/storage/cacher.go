@@ -655,7 +655,7 @@ func (c *Cacher) Stop() {
 	}
 	c.stopLock.Lock()
 	if c.stopped {
-		// avoid that it was locked meanwhile as isStopped only read-locks
+		c.stopLock.Unlock()
 		return
 	}
 	c.stopped = true
@@ -676,18 +676,22 @@ func forgetWatcher(c *Cacher, index int, triggerValue string, triggerSupported b
 			glog.V(1).Infof("Forcing watcher close due to unresponsiveness: %v", c.objectType.String())
 		}
 		// It's possible that the watcher is already not in the structure (e.g. in case of
-		// simulaneous Stop() and terminateAllWatchers(), but it doesn't break anything.
+		// simultaneous Stop() and terminateAllWatchers(), but it doesn't break anything.
 		c.watchers.deleteWatcher(index, triggerValue, triggerSupported)
 	}
 }
 
 func filterFunction(key string, p SelectionPredicate) func(string, runtime.Object) bool {
-	f := SimpleFilter(p)
 	filterFunc := func(objKey string, obj runtime.Object) bool {
 		if !hasPathPrefix(objKey, key) {
 			return false
 		}
-		return f(obj)
+		matches, err := p.Matches(obj)
+		if err != nil {
+			glog.Errorf("invalid object for matching. Obj: %v. Err: %v", obj, err)
+			return false
+		}
+		return matches
 	}
 	return filterFunc
 }
@@ -743,7 +747,7 @@ func (lw *cacherListerWatcher) Watch(options metav1.ListOptions) (watch.Interfac
 	return lw.storage.WatchList(context.TODO(), lw.resourcePrefix, options.ResourceVersion, Everything)
 }
 
-// cacherWatch implements watch.Interface to return a single error
+// errWatcher implements watch.Interface to return a single error
 type errWatcher struct {
 	result chan watch.Event
 }
@@ -783,7 +787,7 @@ func (c *errWatcher) Stop() {
 	// no-op
 }
 
-// cacherWatch implements watch.Interface
+// cachWatcher implements watch.Interface
 type cacheWatcher struct {
 	sync.Mutex
 	input   chan *watchCacheEvent

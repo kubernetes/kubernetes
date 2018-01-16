@@ -139,7 +139,7 @@ func UnsecuredDependencies(s *options.KubeletServer) (*kubelet.Dependencies, err
 	mounter := mount.New(s.ExperimentalMounterPath)
 	var writer kubeio.Writer = &kubeio.StdWriter{}
 	if s.Containerized {
-		glog.V(2).Info("Running kubelet in containerized mode (experimental)")
+		glog.V(2).Info("Running kubelet in containerized mode")
 		mounter = mount.NewNsenterMounter()
 		writer = &kubeio.NsenterWriter{}
 	}
@@ -289,12 +289,8 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies) (err error) {
 		}
 	}
 
-	if s.CloudProvider == kubeletconfigv1alpha1.AutoDetectCloudProvider {
-		glog.Warning("--cloud-provider=auto-detect is deprecated. The desired cloud provider should be set explicitly")
-	}
-
 	if kubeDeps.Cloud == nil {
-		if !cloudprovider.IsExternal(s.CloudProvider) && s.CloudProvider != kubeletconfigv1alpha1.AutoDetectCloudProvider {
+		if !cloudprovider.IsExternal(s.CloudProvider) {
 			cloud, err := cloudprovider.InitCloudProvider(s.CloudProvider, s.CloudConfigFile)
 			if err != nil {
 				return err
@@ -333,7 +329,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies) (err error) {
 		var heartbeatClient v1core.CoreV1Interface
 		var externalKubeClient clientset.Interface
 
-		clientConfig, err := CreateAPIServerClientConfig(s)
+		clientConfig, err := createAPIServerClientConfig(s)
 
 		var clientCertificateManager certificate.Manager
 		if err == nil {
@@ -401,7 +397,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies) (err error) {
 	// Alpha Dynamic Configuration Implementation;
 	// if the kubelet config controller is available, inject the latest to start the config and status sync loops
 	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicKubeletConfig) && kubeDeps.KubeletConfigController != nil && !standaloneMode && !s.RunOnce {
-		kubeDeps.KubeletConfigController.StartSync(kubeDeps.KubeClient, string(nodeName))
+		kubeDeps.KubeletConfigController.StartSync(kubeDeps.KubeClient, kubeDeps.EventClient, string(nodeName))
 	}
 
 	if kubeDeps.Auth == nil {
@@ -617,10 +613,9 @@ func createClientConfig(s *options.KubeletServer) (*restclient.Config, error) {
 	}
 }
 
-// CreateAPIServerClientConfig generates a client.Config from command line flags
+// createAPIServerClientConfig generates a client.Config from command line flags
 // via createClientConfig and then injects chaos into the configuration via addChaosToClientConfig.
-// This func is exported to support integration with third party kubelet extensions (e.g. kubernetes-mesos).
-func CreateAPIServerClientConfig(s *options.KubeletServer) (*restclient.Config, error) {
+func createAPIServerClientConfig(s *options.KubeletServer) (*restclient.Config, error) {
 	clientConfig, err := createClientConfig(s)
 	if err != nil {
 		return nil, err
@@ -667,17 +662,17 @@ func RunKubelet(kubeFlags *options.KubeletFlags, kubeCfg *kubeletconfiginternal.
 	//                prefer this to be done as part of an independent validation step on the
 	//                KubeletConfiguration. But as far as I can tell, we don't have an explicit
 	//                place for validation of the KubeletConfiguration yet.
-	hostNetworkSources, err := kubetypes.GetValidatedSources(kubeCfg.HostNetworkSources)
+	hostNetworkSources, err := kubetypes.GetValidatedSources(kubeFlags.HostNetworkSources)
 	if err != nil {
 		return err
 	}
 
-	hostPIDSources, err := kubetypes.GetValidatedSources(kubeCfg.HostPIDSources)
+	hostPIDSources, err := kubetypes.GetValidatedSources(kubeFlags.HostPIDSources)
 	if err != nil {
 		return err
 	}
 
-	hostIPCSources, err := kubetypes.GetValidatedSources(kubeCfg.HostIPCSources)
+	hostIPCSources, err := kubetypes.GetValidatedSources(kubeFlags.HostIPCSources)
 	if err != nil {
 		return err
 	}
@@ -687,20 +682,16 @@ func RunKubelet(kubeFlags *options.KubeletFlags, kubeCfg *kubeletconfiginternal.
 		HostPIDSources:     hostPIDSources,
 		HostIPCSources:     hostIPCSources,
 	}
-	capabilities.Setup(kubeCfg.AllowPrivileged, privilegedSources, 0)
+	capabilities.Setup(kubeFlags.AllowPrivileged, privilegedSources, 0)
 
 	credentialprovider.SetPreferredDockercfgPath(kubeFlags.RootDirectory)
 	glog.V(2).Infof("Using root directory: %v", kubeFlags.RootDirectory)
 
-	builder := kubeDeps.Builder
-	if builder == nil {
-		builder = CreateAndInitKubelet
-	}
 	if kubeDeps.OSInterface == nil {
 		kubeDeps.OSInterface = kubecontainer.RealOS{}
 	}
 
-	k, err := builder(kubeCfg,
+	k, err := CreateAndInitKubelet(kubeCfg,
 		kubeDeps,
 		&kubeFlags.ContainerRuntimeOptions,
 		kubeFlags.ContainerRuntime,
@@ -714,7 +705,6 @@ func RunKubelet(kubeFlags *options.KubeletFlags, kubeCfg *kubeletconfiginternal.
 		kubeFlags.RegisterNode,
 		kubeFlags.RegisterWithTaints,
 		kubeFlags.AllowedUnsafeSysctls,
-		kubeFlags.Containerized,
 		kubeFlags.RemoteRuntimeEndpoint,
 		kubeFlags.RemoteImageEndpoint,
 		kubeFlags.ExperimentalMounterPath,
@@ -788,7 +778,6 @@ func CreateAndInitKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	registerNode bool,
 	registerWithTaints []api.Taint,
 	allowedUnsafeSysctls []string,
-	containerized bool,
 	remoteRuntimeEndpoint string,
 	remoteImageEndpoint string,
 	experimentalMounterPath string,
@@ -822,7 +811,6 @@ func CreateAndInitKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		registerNode,
 		registerWithTaints,
 		allowedUnsafeSysctls,
-		containerized,
 		remoteRuntimeEndpoint,
 		remoteImageEndpoint,
 		experimentalMounterPath,
@@ -878,16 +866,16 @@ func parseResourceList(m map[string]string) (v1.ResourceList, error) {
 
 // BootstrapKubeletConfigController constructs and bootstrap a configuration controller
 func BootstrapKubeletConfigController(defaultConfig *kubeletconfiginternal.KubeletConfiguration,
-	initConfigDirFlag flag.StringFlag,
+	kubeletConfigFileFlag flag.StringFlag,
 	dynamicConfigDirFlag flag.StringFlag) (*kubeletconfiginternal.KubeletConfiguration, *kubeletconfig.Controller, error) {
 	var err error
 	// Alpha Dynamic Configuration Implementation; this section only loads config from disk, it does not contact the API server
 	// compute absolute paths based on current working dir
-	initConfigDir := ""
-	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletConfigFile) && initConfigDirFlag.Provided() {
-		initConfigDir, err = filepath.Abs(initConfigDirFlag.Value())
+	kubeletConfigFile := ""
+	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletConfigFile) && kubeletConfigFileFlag.Provided() {
+		kubeletConfigFile, err = filepath.Abs(kubeletConfigFileFlag.Value())
 		if err != nil {
-			return nil, nil, fmt.Errorf("failed to get absolute path for --init-config-dir")
+			return nil, nil, fmt.Errorf("failed to get absolute path for --config")
 		}
 	}
 	dynamicConfigDir := ""
@@ -898,8 +886,8 @@ func BootstrapKubeletConfigController(defaultConfig *kubeletconfiginternal.Kubel
 		}
 	}
 
-	// get the latest KubeletConfiguration checkpoint from disk, or load the init or default config if no valid checkpoints exist
-	kubeletConfigController, err := kubeletconfig.NewController(defaultConfig, initConfigDir, dynamicConfigDir)
+	// get the latest KubeletConfiguration checkpoint from disk, or load the kubelet config file or default config if no valid checkpoints exist
+	kubeletConfigController, err := kubeletconfig.NewController(defaultConfig, kubeletConfigFile, dynamicConfigDir)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to construct controller, error: %v", err)
 	}

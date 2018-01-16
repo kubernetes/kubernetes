@@ -45,6 +45,7 @@ import (
 	storageutil "k8s.io/kubernetes/pkg/apis/storage/v1/util"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
 type storageClassTest struct {
@@ -55,6 +56,7 @@ type storageClassTest struct {
 	claimSize      string
 	expectedSize   string
 	pvCheck        func(volume *v1.PersistentVolume) error
+	nodeName       string
 }
 
 const (
@@ -138,10 +140,10 @@ func testDynamicProvisioning(t storageClassTest, client clientset.Interface, cla
 		// Get entry, get mount options at 6th word, replace brackets with commas
 		command += fmt.Sprintf(" && ( mount | grep 'on /mnt/test' | awk '{print $6}' | sed 's/^(/,/; s/)$/,/' | grep -q ,%s, )", option)
 	}
-	runInPodWithVolume(client, claim.Namespace, claim.Name, command)
+	runInPodWithVolume(client, claim.Namespace, claim.Name, t.nodeName, command)
 
 	By("checking the created volume is readable and retains data")
-	runInPodWithVolume(client, claim.Namespace, claim.Name, "grep 'hello world' /mnt/test/data")
+	runInPodWithVolume(client, claim.Namespace, claim.Name, t.nodeName, "grep 'hello world' /mnt/test/data")
 
 	By(fmt.Sprintf("deleting claim %q/%q", claim.Namespace, claim.Name))
 	framework.ExpectNoError(client.CoreV1().PersistentVolumeClaims(claim.Namespace).Delete(claim.Name, nil))
@@ -229,7 +231,7 @@ func checkGCEPD(volume *v1.PersistentVolume, volumeType string) error {
 	return nil
 }
 
-var _ = SIGDescribe("Dynamic Provisioning", func() {
+var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 	f := framework.NewDefaultFramework("volume-provisioning")
 
 	// filled in BeforeEach
@@ -249,140 +251,140 @@ var _ = SIGDescribe("Dynamic Provisioning", func() {
 			// that can be used to persist data among pods.
 			tests := []storageClassTest{
 				{
-					"SSD PD on GCE/GKE",
-					[]string{"gce", "gke"},
-					"kubernetes.io/gce-pd",
-					map[string]string{
+					name:           "SSD PD on GCE/GKE",
+					cloudProviders: []string{"gce", "gke"},
+					provisioner:    "kubernetes.io/gce-pd",
+					parameters: map[string]string{
 						"type": "pd-ssd",
 						"zone": cloudZone,
 					},
-					"1.5Gi",
-					"2Gi",
-					func(volume *v1.PersistentVolume) error {
+					claimSize:    "1.5G",
+					expectedSize: "2G",
+					pvCheck: func(volume *v1.PersistentVolume) error {
 						return checkGCEPD(volume, "pd-ssd")
 					},
 				},
 				{
-					"HDD PD on GCE/GKE",
-					[]string{"gce", "gke"},
-					"kubernetes.io/gce-pd",
-					map[string]string{
+					name:           "HDD PD on GCE/GKE",
+					cloudProviders: []string{"gce", "gke"},
+					provisioner:    "kubernetes.io/gce-pd",
+					parameters: map[string]string{
 						"type": "pd-standard",
 					},
-					"1.5Gi",
-					"2Gi",
-					func(volume *v1.PersistentVolume) error {
+					claimSize:    "1.5G",
+					expectedSize: "2G",
+					pvCheck: func(volume *v1.PersistentVolume) error {
 						return checkGCEPD(volume, "pd-standard")
 					},
 				},
 				// AWS
 				{
-					"gp2 EBS on AWS",
-					[]string{"aws"},
-					"kubernetes.io/aws-ebs",
-					map[string]string{
+					name:           "gp2 EBS on AWS",
+					cloudProviders: []string{"aws"},
+					provisioner:    "kubernetes.io/aws-ebs",
+					parameters: map[string]string{
 						"type": "gp2",
 						"zone": cloudZone,
 					},
-					"1.5Gi",
-					"2Gi",
-					func(volume *v1.PersistentVolume) error {
+					claimSize:    "1.5Gi",
+					expectedSize: "2Gi",
+					pvCheck: func(volume *v1.PersistentVolume) error {
 						return checkAWSEBS(volume, "gp2", false)
 					},
 				},
 				{
-					"io1 EBS on AWS",
-					[]string{"aws"},
-					"kubernetes.io/aws-ebs",
-					map[string]string{
+					name:           "io1 EBS on AWS",
+					cloudProviders: []string{"aws"},
+					provisioner:    "kubernetes.io/aws-ebs",
+					parameters: map[string]string{
 						"type":      "io1",
 						"iopsPerGB": "50",
 					},
-					"3.5Gi",
-					"4Gi", // 4 GiB is minimum for io1
-					func(volume *v1.PersistentVolume) error {
+					claimSize:    "3.5Gi",
+					expectedSize: "4Gi", // 4 GiB is minimum for io1
+					pvCheck: func(volume *v1.PersistentVolume) error {
 						return checkAWSEBS(volume, "io1", false)
 					},
 				},
 				{
-					"sc1 EBS on AWS",
-					[]string{"aws"},
-					"kubernetes.io/aws-ebs",
-					map[string]string{
+					name:           "sc1 EBS on AWS",
+					cloudProviders: []string{"aws"},
+					provisioner:    "kubernetes.io/aws-ebs",
+					parameters: map[string]string{
 						"type": "sc1",
 					},
-					"500Gi", // minimum for sc1
-					"500Gi",
-					func(volume *v1.PersistentVolume) error {
+					claimSize:    "500Gi", // minimum for sc1
+					expectedSize: "500Gi",
+					pvCheck: func(volume *v1.PersistentVolume) error {
 						return checkAWSEBS(volume, "sc1", false)
 					},
 				},
 				{
-					"st1 EBS on AWS",
-					[]string{"aws"},
-					"kubernetes.io/aws-ebs",
-					map[string]string{
+					name:           "st1 EBS on AWS",
+					cloudProviders: []string{"aws"},
+					provisioner:    "kubernetes.io/aws-ebs",
+					parameters: map[string]string{
 						"type": "st1",
 					},
-					"500Gi", // minimum for st1
-					"500Gi",
-					func(volume *v1.PersistentVolume) error {
+					claimSize:    "500Gi", // minimum for st1
+					expectedSize: "500Gi",
+					pvCheck: func(volume *v1.PersistentVolume) error {
 						return checkAWSEBS(volume, "st1", false)
 					},
 				},
 				{
-					"encrypted EBS on AWS",
-					[]string{"aws"},
-					"kubernetes.io/aws-ebs",
-					map[string]string{
+					name:           "encrypted EBS on AWS",
+					cloudProviders: []string{"aws"},
+					provisioner:    "kubernetes.io/aws-ebs",
+					parameters: map[string]string{
 						"encrypted": "true",
 					},
-					"1Gi",
-					"1Gi",
-					func(volume *v1.PersistentVolume) error {
+					claimSize:    "1Gi",
+					expectedSize: "1Gi",
+					pvCheck: func(volume *v1.PersistentVolume) error {
 						return checkAWSEBS(volume, "gp2", true)
 					},
 				},
 				// OpenStack generic tests (works on all OpenStack deployments)
 				{
-					"generic Cinder volume on OpenStack",
-					[]string{"openstack"},
-					"kubernetes.io/cinder",
-					map[string]string{},
-					"1.5Gi",
-					"2Gi",
-					nil, // there is currently nothing to check on OpenStack
+					name:           "generic Cinder volume on OpenStack",
+					cloudProviders: []string{"openstack"},
+					provisioner:    "kubernetes.io/cinder",
+					parameters:     map[string]string{},
+					claimSize:      "1.5Gi",
+					expectedSize:   "2Gi",
+					pvCheck:        nil, // there is currently nothing to check on OpenStack
 				},
 				{
-					"Cinder volume with empty volume type and zone on OpenStack",
-					[]string{"openstack"},
-					"kubernetes.io/cinder",
-					map[string]string{
+					name:           "Cinder volume with empty volume type and zone on OpenStack",
+					cloudProviders: []string{"openstack"},
+					provisioner:    "kubernetes.io/cinder",
+					parameters: map[string]string{
 						"type":         "",
 						"availability": "",
 					},
-					"1.5Gi",
-					"2Gi",
-					nil, // there is currently nothing to check on OpenStack
+					claimSize:    "1.5Gi",
+					expectedSize: "2Gi",
+					pvCheck:      nil, // there is currently nothing to check on OpenStack
 				},
 				// vSphere generic test
 				{
-					"generic vSphere volume",
-					[]string{"vsphere"},
-					"kubernetes.io/vsphere-volume",
-					map[string]string{},
-					"1.5Gi",
-					"1.5Gi",
-					nil,
+					name:           "generic vSphere volume",
+					cloudProviders: []string{"vsphere"},
+					provisioner:    "kubernetes.io/vsphere-volume",
+					parameters:     map[string]string{},
+					claimSize:      "1.5Gi",
+					expectedSize:   "1.5Gi",
+					pvCheck:        nil,
 				},
 				{
-					"Azure disk volume with empty sku and location",
-					[]string{"azure"},
-					"kubernetes.io/azure-disk",
-					map[string]string{},
-					"1Gi",
-					"1Gi",
-					nil,
+					name:           "Azure disk volume with empty sku and location",
+					cloudProviders: []string{"azure"},
+					provisioner:    "kubernetes.io/azure-disk",
+					parameters:     map[string]string{},
+					claimSize:      "1Gi",
+					expectedSize:   "1Gi",
+					pvCheck:        nil,
 				},
 			}
 
@@ -429,15 +431,15 @@ var _ = SIGDescribe("Dynamic Provisioning", func() {
 			framework.SkipUnlessProviderIs("gce", "gke")
 
 			test := storageClassTest{
-				"HDD PD on GCE/GKE",
-				[]string{"gce", "gke"},
-				"kubernetes.io/gce-pd",
-				map[string]string{
+				name:           "HDD PD on GCE/GKE",
+				cloudProviders: []string{"gce", "gke"},
+				provisioner:    "kubernetes.io/gce-pd",
+				parameters: map[string]string{
 					"type": "pd-standard",
 				},
-				"1Gi",
-				"1Gi",
-				func(volume *v1.PersistentVolume) error {
+				claimSize:    "1G",
+				expectedSize: "1G",
+				pvCheck: func(volume *v1.PersistentVolume) error {
 					return checkGCEPD(volume, "pd-standard")
 				},
 			}
@@ -463,15 +465,15 @@ var _ = SIGDescribe("Dynamic Provisioning", func() {
 			framework.SkipUnlessProviderIs("gce", "gke")
 
 			test := storageClassTest{
-				"HDD PD on GCE/GKE",
-				[]string{"gce", "gke"},
-				"kubernetes.io/gce-pd",
-				map[string]string{
+				name:           "HDD PD on GCE/GKE",
+				cloudProviders: []string{"gce", "gke"},
+				provisioner:    "kubernetes.io/gce-pd",
+				parameters: map[string]string{
 					"type": "pd-standard",
 				},
-				"1Gi",
-				"1Gi",
-				func(volume *v1.PersistentVolume) error {
+				claimSize:    "1G",
+				expectedSize: "1G",
+				pvCheck: func(volume *v1.PersistentVolume) error {
 					return checkGCEPD(volume, "pd-standard")
 				},
 			}
@@ -500,7 +502,7 @@ var _ = SIGDescribe("Dynamic Provisioning", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			// Get a list of all zones in the project
-			zones, err := gceCloud.GetComputeService().Zones.List(framework.TestContext.CloudConfig.ProjectID).Do()
+			zones, err := gceCloud.ComputeServices().GA.Zones.List(framework.TestContext.CloudConfig.ProjectID).Do()
 			Expect(err).NotTo(HaveOccurred())
 			for _, z := range zones.Items {
 				allZones.Insert(z.Name)
@@ -520,7 +522,7 @@ var _ = SIGDescribe("Dynamic Provisioning", func() {
 				name:        "unmanaged_zone",
 				provisioner: "kubernetes.io/gce-pd",
 				parameters:  map[string]string{"zone": unmanagedZone},
-				claimSize:   "1Gi",
+				claimSize:   "1G",
 			}
 			sc := newStorageClass(test, ns, suffix)
 			sc, err = c.StorageV1().StorageClasses().Create(sc)
@@ -640,6 +642,14 @@ var _ = SIGDescribe("Dynamic Provisioning", func() {
 				claimSize:    "2Gi",
 				expectedSize: "2Gi",
 			}
+			// gce or gke
+			if getDefaultPluginName() == "kubernetes.io/gce-pd" {
+				// using GB not GiB as e2e test unit since gce-pd returns GB,
+				// or expectedSize may be greater than claimSize.
+				test.claimSize = "2G"
+				test.expectedSize = "2G"
+			}
+
 			claim := newClaim(test, ns, "default")
 			testDynamicProvisioning(test, c, claim, nil)
 		})
@@ -782,7 +792,7 @@ func newClaim(t storageClassTest, ns, suffix string) *v1.PersistentVolumeClaim {
 }
 
 // runInPodWithVolume runs a command in a pod with given claim mounted to /mnt directory.
-func runInPodWithVolume(c clientset.Interface, ns, claimName, command string) {
+func runInPodWithVolume(c clientset.Interface, ns, claimName, nodeName, command string) {
 	pod := &v1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
@@ -819,6 +829,10 @@ func runInPodWithVolume(c clientset.Interface, ns, claimName, command string) {
 				},
 			},
 		},
+	}
+
+	if len(nodeName) != 0 {
+		pod.Spec.NodeName = nodeName
 	}
 	pod, err := c.CoreV1().Pods(ns).Create(pod)
 	framework.ExpectNoError(err, "Failed to create pod: %v", err)
@@ -905,7 +919,7 @@ func startExternalProvisioner(c clientset.Interface, ns string) *v1.Pod {
 			Containers: []v1.Container{
 				{
 					Name:  "nfs-provisioner",
-					Image: "quay.io/kubernetes_incubator/nfs-provisioner:v1.0.6",
+					Image: "quay.io/kubernetes_incubator/nfs-provisioner:v1.0.9",
 					SecurityContext: &v1.SecurityContext{
 						Capabilities: &v1.Capabilities{
 							Add: []v1.Capability{"DAC_READ_SEARCH"},

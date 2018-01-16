@@ -70501,7 +70501,7 @@
     "description": "Spec to control the desired behavior of rolling update.",
     "properties": {
      "maxSurge": {
-      "description": "The maximum number of pods that can be scheduled above the desired number of pods. Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%). This can not be 0 if MaxUnavailable is 0. Absolute number is calculated from percentage by rounding up. Defaults to 25%. Example: when this is set to 30%, the new RC can be scaled up immediately when the rolling update starts, such that the total number of old and new pods do not exceed 130% of desired pods. Once old pods have been killed, new RC can be scaled up further, ensuring that total number of pods running at any time during the update is atmost 130% of desired pods.",
+      "description": "The maximum number of pods that can be scheduled above the desired number of pods. Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%). This can not be 0 if MaxUnavailable is 0. Absolute number is calculated from percentage by rounding up. Defaults to 25%. Example: when this is set to 30%, the new RC can be scaled up immediately when the rolling update starts, such that the total number of old and new pods do not exceed 130% of desired pods. Once old pods have been killed, new RC can be scaled up further, ensuring that total number of pods running at any time during the update is at most 130% of desired pods.",
       "$ref": "#/definitions/io.k8s.apimachinery.pkg.util.intstr.IntOrString"
      },
      "maxUnavailable": {
@@ -73604,7 +73604,7 @@
       "$ref": "#/definitions/io.k8s.api.autoscaling.v2beta1.ResourceMetricSource"
      },
      "type": {
-      "description": "type is the type of metric source.  It should match one of the fields below.",
+      "description": "type is the type of metric source.  It should be one of \"Object\", \"Pods\" or \"Resource\", each mapping to a matching field in the object.",
       "type": "string"
      }
     }
@@ -73628,7 +73628,7 @@
       "$ref": "#/definitions/io.k8s.api.autoscaling.v2beta1.ResourceMetricStatus"
      },
      "type": {
-      "description": "type is the type of metric source.  It will match one of the fields below.",
+      "description": "type is the type of metric source.  It will be one of \"Object\", \"Pods\" or \"Resource\", each corresponds to a matching field in the object.",
       "type": "string"
      }
     }
@@ -75654,8 +75654,39 @@
      }
     }
    },
+   "io.k8s.api.core.v1.FlexPersistentVolumeSource": {
+    "description": "FlexPersistentVolumeSource represents a generic persistent volume resource that is provisioned/attached using an exec based plugin.",
+    "required": [
+     "driver"
+    ],
+    "properties": {
+     "driver": {
+      "description": "Driver is the name of the driver to use for this volume.",
+      "type": "string"
+     },
+     "fsType": {
+      "description": "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". The default filesystem depends on FlexVolume script.",
+      "type": "string"
+     },
+     "options": {
+      "description": "Optional: Extra command options if any.",
+      "type": "object",
+      "additionalProperties": {
+       "type": "string"
+      }
+     },
+     "readOnly": {
+      "description": "Optional: Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts.",
+      "type": "boolean"
+     },
+     "secretRef": {
+      "description": "Optional: SecretRef is reference to the secret object containing sensitive information to pass to the plugin scripts. This may be empty if no secret object is specified. If the secret object contains more than one secret, all secrets are passed to the plugin scripts.",
+      "$ref": "#/definitions/io.k8s.api.core.v1.SecretReference"
+     }
+    }
+   },
    "io.k8s.api.core.v1.FlexVolumeSource": {
-    "description": "FlexVolume represents a generic volume resource that is provisioned/attached using an exec based plugin. This is an alpha feature and may change in future.",
+    "description": "FlexVolume represents a generic volume resource that is provisioned/attached using an exec based plugin.",
     "required": [
      "driver"
     ],
@@ -77006,8 +77037,8 @@
       "$ref": "#/definitions/io.k8s.api.core.v1.FCVolumeSource"
      },
      "flexVolume": {
-      "description": "FlexVolume represents a generic volume resource that is provisioned/attached using an exec based plugin. This is an alpha feature and may change in future.",
-      "$ref": "#/definitions/io.k8s.api.core.v1.FlexVolumeSource"
+      "description": "FlexVolume represents a generic volume resource that is provisioned/attached using an exec based plugin.",
+      "$ref": "#/definitions/io.k8s.api.core.v1.FlexPersistentVolumeSource"
      },
      "flocker": {
       "description": "Flocker represents a Flocker volume attached to a kubelet's host machine and exposed to the pod for its usage. This depends on the Flocker control service being running",
@@ -78895,7 +78926,7 @@
       "$ref": "#/definitions/io.k8s.api.core.v1.FCVolumeSource"
      },
      "flexVolume": {
-      "description": "FlexVolume represents a generic volume resource that is provisioned/attached using an exec based plugin. This is an alpha feature and may change in future.",
+      "description": "FlexVolume represents a generic volume resource that is provisioned/attached using an exec based plugin.",
       "$ref": "#/definitions/io.k8s.api.core.v1.FlexVolumeSource"
      },
      "flocker": {

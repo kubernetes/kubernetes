@@ -94,7 +94,7 @@ func TestCompression(t *testing.T) {
 		}
 		body, err := ioutil.ReadAll(reader)
 		if err != nil {
-			t.Fatal("unexpected error: %v", err)
+			t.Fatalf("unexpected error: %v", err)
 		}
 		if !bytes.Equal(body, responseData) {
 			t.Fatalf("Expected response body %s to equal %s", body, responseData)

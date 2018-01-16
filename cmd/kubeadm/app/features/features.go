@@ -33,7 +33,7 @@ const (
 	// CoreDNS is alpha in v1.9
 	CoreDNS = "CoreDNS"
 
-	// SelfHosting is beta in v1.9
+	// SelfHosting is alpha in v1.8 and v1.9
 	SelfHosting = "SelfHosting"
 
 	// StoreCertsInSecrets is alpha in v1.8 and v1.9
@@ -47,7 +47,7 @@ var v190 = version.MustParseSemantic("v1.9.0-alpha.1")
 
 // InitFeatureGates are the default feature gates for the init command
 var InitFeatureGates = FeatureList{
-	SelfHosting:         {FeatureSpec: utilfeature.FeatureSpec{Default: false, PreRelease: utilfeature.Beta}},
+	SelfHosting:         {FeatureSpec: utilfeature.FeatureSpec{Default: false, PreRelease: utilfeature.Alpha}},
 	StoreCertsInSecrets: {FeatureSpec: utilfeature.FeatureSpec{Default: false, PreRelease: utilfeature.Alpha}},
 	// We don't want to advertise this feature gate exists in v1.9 to avoid confusion as it is not yet working
 	HighAvailability:     {FeatureSpec: utilfeature.FeatureSpec{Default: false, PreRelease: utilfeature.Alpha}, MinimumVersion: v190, HiddenInHelpText: true},

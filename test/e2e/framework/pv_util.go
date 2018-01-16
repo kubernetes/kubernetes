@@ -40,6 +40,7 @@ import (
 	awscloud "k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
 	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 const (
@@ -856,7 +857,7 @@ func MakeSecPod(ns string, pvclaims []*v1.PersistentVolumeClaim, isPrivileged bo
 			Containers: []v1.Container{
 				{
 					Name:    "write-pod",
-					Image:   "gcr.io/google_containers/busybox:1.24",
+					Image:   imageutils.GetE2EImage(imageutils.BusyBox),
 					Command: []string{"/bin/sh"},
 					Args:    []string{"-c", command},
 					SecurityContext: &v1.SecurityContext{

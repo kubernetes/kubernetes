@@ -14,24 +14,14 @@
 {% set srv_sshproxy_path = "/srv/sshproxy" -%}
 
 {% if grains.cloud is defined -%}
-  {% if grains.cloud not in ['vagrant', 'photon-controller', 'azure-legacy'] -%}
-    {% set cloud_provider = "--cloud-provider=" + grains.cloud -%}
-  {% endif -%}
+  {% set cloud_provider = "--cloud-provider=" + grains.cloud -%}
 
-  {% if grains.cloud in [ 'openstack' ] and grains.cloud_config is defined -%}
-    {% set cloud_config = "--cloud-config=" + grains.cloud_config -%}
-  {% endif -%}
-
-  {% if grains.cloud in [ 'aws', 'gce' ] and grains.cloud_config is defined -%}
+  {% if grains.cloud == 'gce' and grains.cloud_config is defined -%}
     {% set cloud_config = "--cloud-config=" + grains.cloud_config -%}
     {% set cloud_config_mount = "{\"name\": \"cloudconfigmount\",\"mountPath\": \"" + grains.cloud_config + "\", \"readOnly\": true}," -%}
     {% set cloud_config_volume = "{\"name\": \"cloudconfigmount\",\"hostPath\": {\"path\": \"" + grains.cloud_config + "\", \"type\": \"FileOrCreate\"}}," -%}
   {% endif -%}
 
-  {% if grains.cloud in ['openstack'] -%}
-    {% set cloud_config_mount = "{\"name\": \"instanceid\",\"mountPath\": \"/var/lib/cloud/data/instance-id\",\"readOnly\": true}," -%}
-    {% set cloud_config_volume = "{\"name\": \"instanceid\",\"hostPath\": {\"path\": \"/var/lib/cloud/data/instance-id\"}}," -%}
-  {% endif -%}
 {% endif -%}
 
 {% set advertise_address = "" -%}
@@ -66,6 +56,8 @@
   {% set storage_media_type = "--storage-media-type=" + pillar['storage_media_type'] -%}
 {% endif -%}
 
+{% set liveness_probe_initial_delay = pillar.get('kube_apiserver_liveness_probe_initial_delay', 15) -%}
+
 {% set request_timeout = "" -%}
 {% if pillar['kube_apiserver_request_timeout_sec'] is defined -%}
   {% set request_timeout = "--request-timeout=" + pillar['kube_apiserver_request_timeout_sec'] + "s" -%}
@@ -97,7 +89,7 @@
 {% set client_ca_file = "" -%}
 
 {% set secure_port = "6443" -%}
-{% if grains['cloud'] is defined and grains.cloud in [ 'aws', 'gce', 'vagrant', 'photon-controller', 'openstack']    %}
+{% if grains['cloud'] is defined and grains.cloud == 'gce' %}
   {% set secure_port = "443" -%}
   {% set client_ca_file = "--client-ca-file=/srv/kubernetes/ca.crt" -%}
 {% endif -%}
@@ -111,7 +103,7 @@
 {% set basic_auth_file = "" -%}
 {% set authz_mode = "" -%}
 {% set abac_policy_file = "" -%}
-{% if grains['cloud'] is defined and grains.cloud in [ 'aws', 'gce', 'vagrant', 'photon-controller', 'openstack']  %}
+{% if grains['cloud'] is defined and grains.cloud == 'gce' %}
   {% set token_auth_file = " --token-auth-file=/srv/kubernetes/known_tokens.csv" -%}
   {% set basic_auth_file = " --basic-auth-file=/srv/kubernetes/basic_auth.csv" -%}
   {% set authz_mode = " --authorization-mode=ABAC" -%}
@@ -239,7 +231,7 @@
     "command": [
                  "/bin/sh",
                  "-c",
-                 "/usr/local/bin/kube-apiserver {{params}} --allow-privileged={{pillar['allow_privileged']}} 1>>/var/log/kube-apiserver.log 2>&1"
+                 "exec /usr/local/bin/kube-apiserver {{params}} --allow-privileged={{pillar['allow_privileged']}} 1>>/var/log/kube-apiserver.log 2>&1"
                ],
     {{container_env}}
     "livenessProbe": {
@@ -248,7 +240,7 @@
         "port": 8080,
         "path": "/healthz"
       },
-      "initialDelaySeconds": 15,
+      "initialDelaySeconds": {{liveness_probe_initial_delay}},
       "timeoutSeconds": 15
     },
     "ports":[

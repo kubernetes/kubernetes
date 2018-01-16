@@ -38,6 +38,13 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
+const (
+	// GB - GigaByte size
+	GB = 1000 * 1000 * 1000
+	// GIB - GibiByte size
+	GIB = 1024 * 1024 * 1024
+)
+
 type RecycleEventRecorder func(eventtype, message string)
 
 // RecycleVolumeByWatchingPodUntilCompletion is intended for use with volume
@@ -87,9 +94,8 @@ func internalRecycleVolumeByWatchingPodUntilCompletion(pvName string, pod *v1.Po
 			// Recycler will try again and the old pod will be hopefuly deleted
 			// at that time.
 			return fmt.Errorf("old recycler pod found, will retry later")
-		} else {
-			return fmt.Errorf("unexpected error creating recycler pod:  %+v\n", err)
 		}
+		return fmt.Errorf("unexpected error creating recycler pod:  %+v", err)
 	}
 	err = waitForPod(pod, recyclerClient, podCh)
 
@@ -274,9 +280,8 @@ func CalculateTimeoutForVolume(minimumTimeout, timeoutIncrement int, pv *v1.Pers
 	timeout := (pvSize / giSize) * int64(timeoutIncrement)
 	if timeout < int64(minimumTimeout) {
 		return int64(minimumTimeout)
-	} else {
-		return timeout
 	}
+	return timeout
 }
 
 // RoundUpSize calculates how many allocation units are needed to accommodate
@@ -286,6 +291,18 @@ func CalculateTimeoutForVolume(minimumTimeout, timeoutIncrement int, pv *v1.Pers
 // (2 GiB is the smallest allocatable volume that can hold 1500MiB)
 func RoundUpSize(volumeSizeBytes int64, allocationUnitBytes int64) int64 {
 	return (volumeSizeBytes + allocationUnitBytes - 1) / allocationUnitBytes
+}
+
+// RoundUpToGB rounds up given quantity to chunks of GB
+func RoundUpToGB(size resource.Quantity) int64 {
+	requestBytes := size.Value()
+	return RoundUpSize(requestBytes, GB)
+}
+
+// RoundUpToGiB rounds up given quantity upto chunks of GiB
+func RoundUpToGiB(size resource.Quantity) int64 {
+	requestBytes := size.Value()
+	return RoundUpSize(requestBytes, GIB)
 }
 
 // GenerateVolumeName returns a PV name with clusterName prefix. The function
@@ -304,7 +321,7 @@ func GenerateVolumeName(clusterName, pvName string, maxLength int) string {
 	return prefix + "-" + pvName
 }
 
-// Check if the path from the mounter is empty.
+// GetPath checks if the path from the mounter is empty.
 func GetPath(mounter Mounter) (string, error) {
 	path := mounter.GetPath()
 	if path == "" {
@@ -313,7 +330,7 @@ func GetPath(mounter Mounter) (string, error) {
 	return path, nil
 }
 
-// ChooseZone implements our heuristics for choosing a zone for volume creation based on the volume name
+// ChooseZoneForVolume  implements our heuristics for choosing a zone for volume creation based on the volume name
 // Volumes are generally round-robin-ed across all active zones, using the hash of the PVC Name.
 // However, if the PVCName ends with `-<integer>`, we will hash the prefix, and then add the integer to the hash.
 // This means that a StatefulSet's volumes (`claimname-statefulsetname-id`) will spread across available zones,
@@ -494,4 +511,13 @@ func AccessModesContainedInAll(indexedModes []v1.PersistentVolumeAccessMode, req
 		}
 	}
 	return true
+}
+
+// GetWindowsPath get a windows path
+func GetWindowsPath(path string) string {
+	windowsPath := strings.Replace(path, "/", "\\", -1)
+	if strings.HasPrefix(windowsPath, "\\") {
+		windowsPath = "c:" + windowsPath
+	}
+	return windowsPath
 }

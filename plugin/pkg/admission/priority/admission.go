@@ -177,12 +177,15 @@ func (p *PriorityPlugin) admitPod(a admission.Attributes) error {
 			if !ok {
 				// Now that we didn't find any system priority, try resolving by user defined priority classes.
 				pc, err := p.lister.Get(pod.Spec.PriorityClassName)
+
 				if err != nil {
-					return fmt.Errorf("failed to get default priority class %s: %v", pod.Spec.PriorityClassName, err)
+					if errors.IsNotFound(err) {
+						return admission.NewForbidden(a, fmt.Errorf("no PriorityClass with name %v was found", pod.Spec.PriorityClassName))
+					}
+
+					return fmt.Errorf("failed to get PriorityClass with name %s: %v", pod.Spec.PriorityClassName, err)
 				}
-				if pc == nil {
-					return admission.NewForbidden(a, fmt.Errorf("no PriorityClass with name %v was found", pod.Spec.PriorityClassName))
-				}
+
 				priority = pc.Value
 			}
 		}

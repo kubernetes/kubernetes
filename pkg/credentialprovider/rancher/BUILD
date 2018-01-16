@@ -9,8 +9,8 @@ load(
 go_test(
     name = "go_default_test",
     srcs = ["rancher_registry_credentials_test.go"],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/pkg/credentialprovider/rancher",
-    library = ":go_default_library",
     deps = [
         "//pkg/credentialprovider:go_default_library",
         "//vendor/github.com/rancher/go-rancher/client:go_default_library",

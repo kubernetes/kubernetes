@@ -304,6 +304,34 @@ func TestDrain(t *testing.T) {
 		},
 	}
 
+	ds_pod_with_emptyDir := corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:              "bar",
+			Namespace:         "default",
+			CreationTimestamp: metav1.Time{Time: time.Now()},
+			Labels:            labels,
+			SelfLink:          testapi.Default.SelfLink("pods", "bar"),
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion:         "extensions/v1beta1",
+					Kind:               "DaemonSet",
+					Name:               "ds",
+					BlockOwnerDeletion: boolptr(true),
+					Controller:         boolptr(true),
+				},
+			},
+		},
+		Spec: corev1.PodSpec{
+			NodeName: "node",
+			Volumes: []corev1.Volume{
+				{
+					Name:         "scratch",
+					VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{Medium: ""}},
+				},
+			},
+		},
+	}
+
 	orphaned_ds_pod := corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              "bar",
@@ -414,15 +442,16 @@ func TestDrain(t *testing.T) {
 	}
 
 	tests := []struct {
-		description  string
-		node         *corev1.Node
-		expected     *corev1.Node
-		pods         []corev1.Pod
-		rcs          []api.ReplicationController
-		replicaSets  []extensions.ReplicaSet
-		args         []string
-		expectFatal  bool
-		expectDelete bool
+		description   string
+		node          *corev1.Node
+		expected      *corev1.Node
+		pods          []corev1.Pod
+		rcs           []api.ReplicationController
+		replicaSets   []extensions.ReplicaSet
+		args          []string
+		expectWarning string
+		expectFatal   bool
+		expectDelete  bool
 	}{
 		{
 			description:  "RC-managed pod",
@@ -473,6 +502,17 @@ func TestDrain(t *testing.T) {
 			args:         []string{"node", "--ignore-daemonsets"},
 			expectFatal:  false,
 			expectDelete: false,
+		},
+		{
+			description:   "DS-managed pod with emptyDir with --ignore-daemonsets",
+			node:          node,
+			expected:      cordoned_node,
+			pods:          []corev1.Pod{ds_pod_with_emptyDir},
+			rcs:           []api.ReplicationController{rc},
+			args:          []string{"node", "--ignore-daemonsets"},
+			expectWarning: "WARNING: Ignoring DaemonSet-managed pods: bar\n",
+			expectFatal:   false,
+			expectDelete:  false,
 		},
 		{
 			description:  "Job-managed pod",
@@ -661,6 +701,7 @@ func TestDrain(t *testing.T) {
 			cmd := NewCmdDrain(f, buf, errBuf)
 
 			saw_fatal := false
+			fatal_msg := ""
 			func() {
 				defer func() {
 					// Recover from the panic below.
@@ -668,13 +709,18 @@ func TestDrain(t *testing.T) {
 					// Restore cmdutil behavior
 					cmdutil.DefaultBehaviorOnFatal()
 				}()
-				cmdutil.BehaviorOnFatal(func(e string, code int) { saw_fatal = true; panic(e) })
+				cmdutil.BehaviorOnFatal(func(e string, code int) { saw_fatal = true; fatal_msg = e; panic(e) })
 				cmd.SetArgs(test.args)
 				cmd.Execute()
 			}()
 			if test.expectFatal {
 				if !saw_fatal {
 					t.Fatalf("%s: unexpected non-error when using %s", test.description, currMethod)
+				}
+			} else {
+				if saw_fatal {
+					t.Fatalf("%s: unexpected error when using %s: %s", test.description, currMethod, fatal_msg)
+
 				}
 			}
 
@@ -691,6 +737,16 @@ func TestDrain(t *testing.T) {
 			if !test.expectDelete {
 				if deleted {
 					t.Fatalf("%s: unexpected delete when using %s", test.description, currMethod)
+				}
+			}
+
+			if len(test.expectWarning) > 0 {
+				if len(errBuf.String()) == 0 {
+					t.Fatalf("%s: expected warning, but found no stderr output", test.description)
+				}
+
+				if errBuf.String() != test.expectWarning {
+					t.Fatalf("%s: actual warning message did not match expected warning message.\n Expecting: %s\n  Got: %s", test.description, test.expectWarning, errBuf.String())
 				}
 			}
 		}

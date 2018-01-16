@@ -119,7 +119,7 @@ func (t *DaemonSetUpgradeTest) validateRunningDaemonSet(f *framework.Framework) 
 }
 
 func checkRunningOnAllNodes(f *framework.Framework, namespace string, selector map[string]string) (bool, error) {
-	nodeList, err := f.ClientSet.Core().Nodes().List(metav1.ListOptions{})
+	nodeList, err := f.ClientSet.CoreV1().Nodes().List(metav1.ListOptions{})
 	if err != nil {
 		return false, err
 	}
@@ -139,7 +139,7 @@ func checkRunningOnAllNodes(f *framework.Framework, namespace string, selector m
 func checkDaemonPodOnNodes(f *framework.Framework, namespace string, labelSet map[string]string, nodeNames []string) (bool, error) {
 	selector := labels.Set(labelSet).AsSelector()
 	options := metav1.ListOptions{LabelSelector: selector.String()}
-	podList, err := f.ClientSet.Core().Pods(namespace).List(options)
+	podList, err := f.ClientSet.CoreV1().Pods(namespace).List(options)
 	if err != nil {
 		return false, err
 	}

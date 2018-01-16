@@ -28,11 +28,7 @@ readonly RELEASE_STAGE="${LOCAL_OUTPUT_ROOT}/release-stage"
 readonly RELEASE_TARS="${LOCAL_OUTPUT_ROOT}/release-tars"
 readonly RELEASE_IMAGES="${LOCAL_OUTPUT_ROOT}/release-images"
 
-KUBE_BUILD_HYPERKUBE=${KUBE_BUILD_HYPERKUBE:-n}
-if [[ -n "${KUBE_DOCKER_IMAGE_TAG-}" && -n "${KUBE_DOCKER_REGISTRY-}" ]]; then
-  # retain legacy behavior of automatically building hyperkube during releases
-  KUBE_BUILD_HYPERKUBE=y
-fi
+KUBE_BUILD_HYPERKUBE=${KUBE_BUILD_HYPERKUBE:-y}
 
 # Validate a ci version
 #
@@ -418,7 +414,6 @@ function kube::release::package_kube_manifests_tarball() {
   cp "${salt_dir}/e2e-image-puller/e2e-image-puller.manifest" "${gci_dst_dir}/"
   cp "${KUBE_ROOT}/cluster/gce/gci/configure-helper.sh" "${gci_dst_dir}/gci-configure-helper.sh"
   cp "${KUBE_ROOT}/cluster/gce/gci/health-monitor.sh" "${gci_dst_dir}/health-monitor.sh"
-  cp "${KUBE_ROOT}/cluster/gce/container-linux/configure-helper.sh" "${gci_dst_dir}/container-linux-configure-helper.sh"
   cp -r "${salt_dir}/kube-admission-controls/limit-range" "${gci_dst_dir}"
   local objects
   objects=$(cd "${KUBE_ROOT}/cluster/addons" && find . \( -name \*.yaml -or -name \*.yaml.in -or -name \*.json \) | grep -v demo)
@@ -521,7 +516,6 @@ EOF
   cp -R "${KUBE_ROOT}/docs" "${release_stage}/"
   cp "${KUBE_ROOT}/README.md" "${release_stage}/"
   cp "${KUBE_ROOT}/Godeps/LICENSES" "${release_stage}/"
-  cp "${KUBE_ROOT}/Vagrantfile" "${release_stage}/"
 
   echo "${KUBE_GIT_VERSION}" > "${release_stage}/version"
 

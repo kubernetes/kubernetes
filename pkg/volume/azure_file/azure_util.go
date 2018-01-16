@@ -30,8 +30,8 @@ const (
 	fileMode        = "file_mode"
 	dirMode         = "dir_mode"
 	vers            = "vers"
-	defaultFileMode = "0700"
-	defaultDirMode  = "0700"
+	defaultFileMode = "0755"
+	defaultDirMode  = "0755"
 	defaultVers     = "3.0"
 )
 
@@ -50,7 +50,7 @@ func (s *azureSvc) GetAzureCredentials(host volume.VolumeHost, nameSpace, secret
 		return "", "", fmt.Errorf("Cannot get kube client")
 	}
 
-	keys, err := kubeClient.Core().Secrets(nameSpace).Get(secretName, metav1.GetOptions{})
+	keys, err := kubeClient.CoreV1().Secrets(nameSpace).Get(secretName, metav1.GetOptions{})
 	if err != nil {
 		return "", "", fmt.Errorf("Couldn't get secret %v/%v", nameSpace, secretName)
 	}
@@ -85,7 +85,7 @@ func (s *azureSvc) SetAzureCredentials(host volume.VolumeHost, nameSpace, accoun
 		},
 		Type: "Opaque",
 	}
-	_, err := kubeClient.Core().Secrets(nameSpace).Create(secret)
+	_, err := kubeClient.CoreV1().Secrets(nameSpace).Create(secret)
 	if errors.IsAlreadyExists(err) {
 		err = nil
 	}

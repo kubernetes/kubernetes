@@ -24,6 +24,7 @@ import (
 	"net/http"
 	"os/exec"
 	"reflect"
+	"regexp"
 	"strings"
 	"time"
 
@@ -35,11 +36,13 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/kubernetes/pkg/features"
+	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
 	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
 	kubeletscheme "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/scheme"
 	kubeletconfigv1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1alpha1"
 	stats "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
+	"k8s.io/kubernetes/pkg/kubelet/remote"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/metrics"
 
@@ -107,6 +110,10 @@ func tempSetCurrentKubeletConfig(f *framework.Framework, updateFunction func(ini
 		framework.ExpectNoError(err)
 		newCfg := oldCfg.DeepCopy()
 		updateFunction(newCfg)
+		if reflect.DeepEqual(*newCfg, *oldCfg) {
+			return
+		}
+
 		framework.ExpectNoError(setKubeletConfiguration(f, newCfg))
 	})
 	AfterEach(func() {
@@ -302,7 +309,7 @@ func newKubeletConfigMap(name string, internalKC *kubeletconfig.KubeletConfigura
 	framework.ExpectNoError(err)
 
 	cmap := &apiv1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{GenerateName: name},
+		ObjectMeta: metav1.ObjectMeta{GenerateName: name + "-"},
 		Data: map[string]string{
 			"kubelet": string(data),
 		},
@@ -364,4 +371,39 @@ func runCommand(cmd ...string) (string, error) {
 		return "", fmt.Errorf("failed to run %q: %s (%s)", strings.Join(cmd, " "), err, output)
 	}
 	return string(output), nil
+}
+
+// getCRIClient connects CRI and returns CRI runtime service clients and image service client.
+func getCRIClient() (internalapi.RuntimeService, internalapi.ImageManagerService, error) {
+	// connection timeout for CRI service connection
+	const connectionTimeout = 2 * time.Minute
+	runtimeEndpoint := framework.TestContext.ContainerRuntimeEndpoint
+	r, err := remote.NewRemoteRuntimeService(runtimeEndpoint, connectionTimeout)
+	if err != nil {
+		return nil, nil, err
+	}
+	imageManagerEndpoint := runtimeEndpoint
+	if framework.TestContext.ImageServiceEndpoint != "" {
+		//ImageServiceEndpoint is the same as ContainerRuntimeEndpoint if not
+		//explicitly specified
+		imageManagerEndpoint = framework.TestContext.ImageServiceEndpoint
+	}
+	i, err := remote.NewRemoteImageService(imageManagerEndpoint, connectionTimeout)
+	if err != nil {
+		return nil, nil, err
+	}
+	return r, i, nil
+}
+
+// TODO: Find a uniform way to deal with systemctl/initctl/service operations. #34494
+func restartKubelet() {
+	stdout, err := exec.Command("sudo", "systemctl", "list-units", "kubelet*", "--state=running").CombinedOutput()
+	framework.ExpectNoError(err)
+	regex := regexp.MustCompile("(kubelet-[0-9]+)")
+	matches := regex.FindStringSubmatch(string(stdout))
+	Expect(len(matches)).NotTo(BeZero())
+	kube := matches[0]
+	framework.Logf("Get running kubelet with systemctl: %v, %v", string(stdout), kube)
+	stdout, err = exec.Command("sudo", "systemctl", "restart", kube).CombinedOutput()
+	framework.ExpectNoError(err, "Failed to restart kubelet with systemctl: %v, %v", err, stdout)
 }

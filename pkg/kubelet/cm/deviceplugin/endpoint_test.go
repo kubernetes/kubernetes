@@ -19,7 +19,6 @@ package deviceplugin
 import (
 	"path"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -54,23 +53,49 @@ func TestRun(t *testing.T) {
 		{ID: "AThirdDeviceId", Health: pluginapi.Healthy},
 	}
 
-	p, e := esetup(t, devs, socket, "mock", func(n string, a, u, r []pluginapi.Device) {
-		require.Len(t, a, 1)
-		require.Len(t, u, 1)
-		require.Len(t, r, 1)
+	callbackCount := 0
+	callbackChan := make(chan int)
+	callback := func(n string, a, u, r []pluginapi.Device) {
+		// Should be called twice:
+		// one for plugin registration, one for plugin update.
+		if callbackCount > 2 {
+			t.FailNow()
+		}
 
-		require.Equal(t, a[0].ID, updated[1].ID)
+		// Check plugin registration
+		if callbackCount == 0 {
+			require.Len(t, a, 2)
+			require.Len(t, u, 0)
+			require.Len(t, r, 0)
+		}
 
-		require.Equal(t, u[0].ID, updated[0].ID)
-		require.Equal(t, u[0].Health, updated[0].Health)
+		// Check plugin update
+		if callbackCount == 1 {
+			require.Len(t, a, 1)
+			require.Len(t, u, 1)
+			require.Len(t, r, 1)
 
-		require.Equal(t, r[0].ID, devs[1].ID)
-	})
+			require.Equal(t, a[0].ID, updated[1].ID)
+			require.Equal(t, u[0].ID, updated[0].ID)
+			require.Equal(t, u[0].Health, updated[0].Health)
+			require.Equal(t, r[0].ID, devs[1].ID)
+		}
+
+		callbackCount++
+		callbackChan <- callbackCount
+	}
+
+	p, e := esetup(t, devs, socket, "mock", callback)
 	defer ecleanup(t, p, e)
 
 	go e.run()
+	// Wait for the first callback to be issued.
+	<-callbackChan
+
 	p.Update(updated)
-	time.Sleep(time.Second)
+
+	// Wait for the second callback to be issued.
+	<-callbackChan
 
 	e.mutex.Lock()
 	defer e.mutex.Unlock()
@@ -102,7 +127,7 @@ func esetup(t *testing.T, devs []*pluginapi.Device, socket, resourceName string,
 	err := p.Start()
 	require.NoError(t, err)
 
-	e, err := newEndpointImpl(socket, "mock", make(map[string]pluginapi.Device), func(n string, a, u, r []pluginapi.Device) {})
+	e, err := newEndpointImpl(socket, resourceName, make(map[string]pluginapi.Device), callback)
 	require.NoError(t, err)
 
 	return p, e

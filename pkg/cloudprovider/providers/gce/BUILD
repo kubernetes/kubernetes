@@ -41,12 +41,15 @@ go_library(
         "gce_util.go",
         "gce_zones.go",
         "metrics.go",
+        "support.go",
         "token_source.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/cloudprovider/providers/gce",
     deps = [
         "//pkg/api/v1/service:go_default_library",
         "//pkg/cloudprovider:go_default_library",
+        "//pkg/cloudprovider/providers/gce/cloud:go_default_library",
+        "//pkg/cloudprovider/providers/gce/cloud/meta:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/kubelet/apis:go_default_library",
         "//pkg/master/ports:go_default_library",
@@ -95,10 +98,11 @@ go_test(
         "gce_healthchecks_test.go",
         "gce_loadbalancer_external_test.go",
         "gce_test.go",
+        "gce_util_test.go",
         "metrics_test.go",
     ],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/pkg/cloudprovider/providers/gce",
-    library = ":go_default_library",
     deps = [
         "//pkg/cloudprovider:go_default_library",
         "//pkg/kubelet/apis:go_default_library",
@@ -124,6 +128,9 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [":package-srcs"],
+    srcs = [
+        ":package-srcs",
+        "//pkg/cloudprovider/providers/gce/cloud:all-srcs",
+    ],
     tags = ["automanaged"],
 )

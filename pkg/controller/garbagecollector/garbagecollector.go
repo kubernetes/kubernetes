@@ -38,7 +38,6 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/controller/garbagecollector/metaonly"
 	_ "k8s.io/kubernetes/pkg/util/reflector/prometheus" // for reflector metric registration
 	// install the prometheus plugin
 	_ "k8s.io/kubernetes/pkg/util/workqueue/prometheus"
@@ -259,22 +258,14 @@ func (gc *GarbageCollector) attemptToDeleteWorker() bool {
 		}
 		// retry if garbage collection of an object failed.
 		gc.attemptToDelete.AddRateLimited(item)
+	} else if !n.isObserved() {
+		// requeue if item hasn't been observed via an informer event yet.
+		// otherwise a virtual node for an item added AND removed during watch reestablishment can get stuck in the graph and never removed.
+		// see https://issue.k8s.io/56121
+		glog.V(5).Infof("item %s hasn't been observed via informer yet", n.identity)
+		gc.attemptToDelete.AddRateLimited(item)
 	}
 	return true
-}
-
-func objectReferenceToMetadataOnlyObject(ref objectReference) *metaonly.MetadataOnlyObject {
-	return &metaonly.MetadataOnlyObject{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: ref.APIVersion,
-			Kind:       ref.Kind,
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: ref.Namespace,
-			UID:       ref.UID,
-			Name:      ref.Name,
-		},
-	}
 }
 
 // isDangling check if a reference is pointing to an object that doesn't exist.
@@ -297,7 +288,7 @@ func (gc *GarbageCollector) isDangling(reference metav1.OwnerReference, item *no
 	if err != nil {
 		return false, nil, err
 	}
-	resource, err := gc.apiResource(reference.APIVersion, reference.Kind, len(item.identity.Namespace) != 0)
+	resource, err := gc.apiResource(reference.APIVersion, reference.Kind)
 	if err != nil {
 		return false, nil, err
 	}
@@ -353,15 +344,6 @@ func (gc *GarbageCollector) classifyReferences(item *node, latestReferences []me
 	return solid, dangling, waitingForDependentsDeletion, nil
 }
 
-func (gc *GarbageCollector) generateVirtualDeleteEvent(identity objectReference) {
-	event := &event{
-		eventType: deleteEvent,
-		obj:       objectReferenceToMetadataOnlyObject(identity),
-	}
-	glog.V(5).Infof("generating virtual delete event for %s\n\n", event.obj)
-	gc.dependencyGraphBuilder.enqueueChanges(event)
-}
-
 func ownerRefsToUIDs(refs []metav1.OwnerReference) []types.UID {
 	var ret []types.UID
 	for _, ref := range refs {
@@ -387,7 +369,10 @@ func (gc *GarbageCollector) attemptToDeleteItem(item *node) error {
 		// exist yet, so we need to enqueue a virtual Delete event to remove
 		// the virtual node from GraphBuilder.uidToNode.
 		glog.V(5).Infof("item %v not found, generating a virtual delete event", item.identity)
-		gc.generateVirtualDeleteEvent(item.identity)
+		gc.dependencyGraphBuilder.enqueueVirtualDeleteEvent(item.identity)
+		// since we're manually inserting a delete event to remove this node,
+		// we don't need to keep tracking it as a virtual node and requeueing in attemptToDelete
+		item.markObserved()
 		return nil
 	case err != nil:
 		return err
@@ -395,7 +380,10 @@ func (gc *GarbageCollector) attemptToDeleteItem(item *node) error {
 
 	if latest.GetUID() != item.identity.UID {
 		glog.V(5).Infof("UID doesn't match, item %v not found, generating a virtual delete event", item.identity)
-		gc.generateVirtualDeleteEvent(item.identity)
+		gc.dependencyGraphBuilder.enqueueVirtualDeleteEvent(item.identity)
+		// since we're manually inserting a delete event to remove this node,
+		// we don't need to keep tracking it as a virtual node and requeueing in attemptToDelete
+		item.markObserved()
 		return nil
 	}
 
@@ -599,9 +587,9 @@ func GetDeletableResources(discoveryClient discovery.ServerResourcesInterface) m
 	preferredResources, err := discoveryClient.ServerPreferredResources()
 	if err != nil {
 		if discovery.IsGroupDiscoveryFailedError(err) {
-			glog.Warning("failed to discover some groups: %v", err.(*discovery.ErrGroupDiscoveryFailed).Groups)
+			glog.Warningf("failed to discover some groups: %v", err.(*discovery.ErrGroupDiscoveryFailed).Groups)
 		} else {
-			glog.Warning("failed to discover preferred resources: %v", err)
+			glog.Warningf("failed to discover preferred resources: %v", err)
 		}
 	}
 	if preferredResources == nil {
@@ -615,7 +603,7 @@ func GetDeletableResources(discoveryClient discovery.ServerResourcesInterface) m
 	for _, rl := range deletableResources {
 		gv, err := schema.ParseGroupVersion(rl.GroupVersion)
 		if err != nil {
-			glog.Warning("ignoring invalid discovered resource %q: %v", rl.GroupVersion, err)
+			glog.Warningf("ignoring invalid discovered resource %q: %v", rl.GroupVersion, err)
 			continue
 		}
 		for i := range rl.APIResources {

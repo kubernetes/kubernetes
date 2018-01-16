@@ -11,7 +11,6 @@ go_library(
         "doc.go",
         "register.go",
         "types.go",
-        "well_known_labels.go",
         "zz_generated.deepcopy.go",
     ],
     importpath = "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm",

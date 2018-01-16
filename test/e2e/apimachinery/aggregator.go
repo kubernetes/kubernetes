@@ -41,6 +41,7 @@ import (
 	rbacapi "k8s.io/kubernetes/pkg/apis/rbac"
 	utilversion "k8s.io/kubernetes/pkg/util/version"
 	"k8s.io/kubernetes/test/e2e/framework"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 	samplev1alpha1 "k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1"
 
 	. "github.com/onsi/ginkgo"
@@ -52,14 +53,20 @@ var _ = SIGDescribe("Aggregator", func() {
 	var ns string
 	var c clientset.Interface
 	var aggrclient *aggregatorclient.Clientset
-	f := framework.NewDefaultFramework("aggregator")
-	framework.AddCleanupAction(func() {
-		// Cleanup actions will be called even when the tests are skipped and leaves namespace unset.
-		if len(ns) > 0 {
-			cleanTest(c, aggrclient, ns)
-		}
+
+	// BeforeEachs run in LIFO order, AfterEachs run in FIFO order.
+	// We want cleanTest to happen before the namespace cleanup AfterEach
+	// inserted by NewDefaultFramework, so we put this AfterEach in front
+	// of NewDefaultFramework.
+	AfterEach(func() {
+		cleanTest(c, aggrclient, ns)
 	})
 
+	f := framework.NewDefaultFramework("aggregator")
+
+	// We want namespace initialization BeforeEach inserted by
+	// NewDefaultFramework to happen before this, so we put this BeforeEach
+	// after NewDefaultFramework.
 	BeforeEach(func() {
 		c = f.ClientSet
 		ns = f.Namespace.Name
@@ -72,7 +79,7 @@ var _ = SIGDescribe("Aggregator", func() {
 		framework.SkipUnlessProviderIs("gce", "gke")
 
 		// Testing a 1.7 version of the sample-apiserver
-		TestSampleAPIServer(f, "gcr.io/kubernetes-e2e-test-images/k8s-aggregator-sample-apiserver-amd64:1.7v2")
+		TestSampleAPIServer(f, imageutils.GetE2EImage(imageutils.APIServer))
 	})
 })
 

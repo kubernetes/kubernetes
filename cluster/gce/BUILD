@@ -6,7 +6,6 @@ load("@io_kubernetes_build//defs:build.bzl", "release_filegroup")
 pkg_tar(
     name = "gci-trusty-manifests",
     files = [
-        "container-linux/configure-helper.sh",
         "gci/configure-helper.sh",
         "gci/health-monitor.sh",
         "//cluster/gce/gci/mounter",
@@ -15,7 +14,6 @@ pkg_tar(
     strip_prefix = ".",
     # pkg_tar doesn't support renaming the files we add, so instead create symlinks.
     symlinks = {
-        "container-linux-configure-helper.sh": "container-linux/configure-helper.sh",
         "gci-configure-helper.sh": "gci/configure-helper.sh",
         "health-monitor.sh": "gci/health-monitor.sh",
         "gci-mounter": "gci/mounter/mounter",
@@ -40,13 +38,12 @@ filegroup(
     tags = ["automanaged"],
 )
 
-# Having the configure-vm.sh script and and trusty code from the GCE cluster
-# deploy hosted with the release is useful for GKE.
-# This list should match the list in kubernetes/release/lib/releaselib.sh.
+# Having the COS code from the GCE cluster deploy hosted with the release is
+# useful for GKE.  This list should match the list in
+# kubernetes/release/lib/releaselib.sh.
 release_filegroup(
     name = "gcs-release-artifacts",
     srcs = [
-        "configure-vm.sh",
         "gci/configure.sh",
         "gci/master.yaml",
         "gci/node.yaml",

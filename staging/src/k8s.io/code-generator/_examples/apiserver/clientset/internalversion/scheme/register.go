@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2018 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,6 +17,8 @@ limitations under the License.
 package scheme
 
 import (
+	os "os"
+
 	announced "k8s.io/apimachinery/pkg/apimachinery/announced"
 	registered "k8s.io/apimachinery/pkg/apimachinery/registered"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -25,7 +27,6 @@ import (
 	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	example "k8s.io/code-generator/_examples/apiserver/apis/example/install"
 	secondexample "k8s.io/code-generator/_examples/apiserver/apis/example2/install"
-	os "os"
 )
 
 var Scheme = runtime.NewScheme()

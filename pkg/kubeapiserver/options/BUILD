@@ -21,7 +21,6 @@ go_library(
     deps = [
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/client/informers/informers_generated/internalversion:go_default_library",
-        "//pkg/cloudprovider:go_default_library",
         "//pkg/kubeapiserver/authenticator:go_default_library",
         "//pkg/kubeapiserver/authorizer:go_default_library",
         "//pkg/kubeapiserver/authorizer/modes:go_default_library",
@@ -29,7 +28,6 @@ go_library(
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/pborman/uuid:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",
-        "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/net:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/server:go_default_library",
@@ -54,7 +52,7 @@ filegroup(
 go_test(
     name = "go_default_test",
     srcs = ["storage_versions_test.go"],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/pkg/kubeapiserver/options",
-    library = ":go_default_library",
     deps = ["//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library"],
 )

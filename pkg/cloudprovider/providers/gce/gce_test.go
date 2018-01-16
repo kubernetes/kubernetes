@@ -175,42 +175,6 @@ func TestComparingHostURLs(t *testing.T) {
 	}
 }
 
-func TestScrubDNS(t *testing.T) {
-	tcs := []struct {
-		nameserversIn  []string
-		searchesIn     []string
-		nameserversOut []string
-		searchesOut    []string
-	}{
-		{
-			nameserversIn:  []string{"1.2.3.4", "5.6.7.8"},
-			nameserversOut: []string{"1.2.3.4", "5.6.7.8"},
-		},
-		{
-			searchesIn:  []string{"c.prj.internal.", "12345678910.google.internal.", "google.internal."},
-			searchesOut: []string{"c.prj.internal.", "google.internal."},
-		},
-		{
-			searchesIn:  []string{"c.prj.internal.", "12345678910.google.internal.", "zone.c.prj.internal.", "google.internal."},
-			searchesOut: []string{"c.prj.internal.", "zone.c.prj.internal.", "google.internal."},
-		},
-		{
-			searchesIn:  []string{"c.prj.internal.", "12345678910.google.internal.", "zone.c.prj.internal.", "google.internal.", "unexpected"},
-			searchesOut: []string{"c.prj.internal.", "zone.c.prj.internal.", "google.internal.", "unexpected"},
-		},
-	}
-	gce := &GCECloud{}
-	for i := range tcs {
-		n, s := gce.ScrubDNS(tcs[i].nameserversIn, tcs[i].searchesIn)
-		if !reflect.DeepEqual(n, tcs[i].nameserversOut) {
-			t.Errorf("Expected %v, got %v", tcs[i].nameserversOut, n)
-		}
-		if !reflect.DeepEqual(s, tcs[i].searchesOut) {
-			t.Errorf("Expected %v, got %v", tcs[i].searchesOut, s)
-		}
-	}
-}
-
 func TestSplitProviderID(t *testing.T) {
 	providers := []struct {
 		providerID string

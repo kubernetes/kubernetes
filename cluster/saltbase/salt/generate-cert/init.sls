@@ -1,17 +1,6 @@
 {% set master_extra_sans=grains.get('master_extra_sans', '') %}
-{% if grains.cloud is defined %}
-  {% if grains.cloud == 'gce' %}
-    {% set cert_ip='_use_gce_external_ip_' %}
-  {% endif %}
-  {% if grains.cloud == 'aws' %}
-    {% set cert_ip='_use_aws_external_ip_' %}
-  {% endif %}
-  {% if grains.cloud == 'azure-legacy' %}
-    {% set cert_ip='_use_azure_dns_name_' %}
-  {% endif %}
-  {% if grains.cloud == 'photon-controller' %}
-    {% set cert_ip=grains.ip_interfaces.eth0[0] %}
-  {% endif %}
+{% if grains.cloud is defined and grains.cloud == 'gce' %}
+  {% set cert_ip='_use_gce_external_ip_' %}
 {% endif %}
 
 # If there is a pillar defined, override any defaults.

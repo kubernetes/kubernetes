@@ -24,6 +24,7 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/cmd/kube-controller-manager/app",
     deps = [
+        "//cmd/controller-manager/app/options:go_default_library",
         "//cmd/kube-controller-manager/app/options:go_default_library",
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/apps/install:go_default_library",
@@ -57,8 +58,9 @@ go_library(
         "//pkg/controller/garbagecollector:go_default_library",
         "//pkg/controller/job:go_default_library",
         "//pkg/controller/namespace:go_default_library",
-        "//pkg/controller/node:go_default_library",
-        "//pkg/controller/node/ipam:go_default_library",
+        "//pkg/controller/nodeipam:go_default_library",
+        "//pkg/controller/nodeipam/ipam:go_default_library",
+        "//pkg/controller/nodelifecycle:go_default_library",
         "//pkg/controller/podautoscaler:go_default_library",
         "//pkg/controller/podautoscaler/metrics:go_default_library",
         "//pkg/controller/podgc:go_default_library",
@@ -153,8 +155,8 @@ filegroup(
 go_test(
     name = "go_default_test",
     srcs = ["controller_manager_test.go"],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/cmd/kube-controller-manager/app",
-    library = ":go_default_library",
     deps = [
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",

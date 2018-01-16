@@ -54,8 +54,8 @@ go_test(
         "helper_test.go",
         "stats_provider_test.go",
     ],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/pkg/kubelet/stats",
-    library = ":go_default_library",
     deps = [
         "//pkg/kubelet/apis/cri/testing:go_default_library",
         "//pkg/kubelet/apis/cri/v1alpha1/runtime:go_default_library",

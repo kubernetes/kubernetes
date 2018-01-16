@@ -23,10 +23,8 @@ import (
 	"io/ioutil"
 	"math/rand"
 	"reflect"
-	"strings"
 	"testing"
 
-	"github.com/golang/protobuf/proto"
 	jsoniter "github.com/json-iterator/go"
 
 	"k8s.io/api/core/v1"
@@ -64,17 +62,6 @@ func fuzzInternalObject(t *testing.T, forVersion schema.GroupVersion, item runti
 	j.SetAPIVersion("")
 
 	return item
-}
-
-// dataAsString returns the given byte array as a string; handles detecting
-// protocol buffers.
-func dataAsString(data []byte) string {
-	dataString := string(data)
-	if !strings.HasPrefix(dataString, "{") {
-		dataString = "\n" + hex.Dump(data)
-		proto.NewBuffer(make([]byte, 0, 1024)).DebugPrint("decoded object", data)
-	}
-	return dataString
 }
 
 func Convert_v1beta1_ReplicaSet_to_api_ReplicationController(in *v1beta1.ReplicaSet, out *api.ReplicationController, s conversion.Scope) error {
@@ -545,8 +532,9 @@ func BenchmarkDecodeIntoJSON(b *testing.B) {
 	b.StopTimer()
 }
 
-// BenchmarkDecodeJSON provides a baseline for JSON decode performance
-func BenchmarkDecodeIntoJSONCodecGen(b *testing.B) {
+// BenchmarkDecodeIntoJSONCodecGenConfigFast provides a baseline
+// for JSON decode performance with jsoniter.ConfigFast
+func BenchmarkDecodeIntoJSONCodecGenConfigFast(b *testing.B) {
 	kcodec := testapi.Default.Codec()
 	items := benchmarkItems(b)
 	width := len(items)
@@ -563,6 +551,32 @@ func BenchmarkDecodeIntoJSONCodecGen(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		obj := v1.Pod{}
 		if err := jsoniter.ConfigFastest.Unmarshal(encoded[i%width], &obj); err != nil {
+			b.Fatal(err)
+		}
+	}
+	b.StopTimer()
+}
+
+// BenchmarkDecodeIntoJSONCodecGenConfigCompatibleWithStandardLibrary
+//  provides a baseline for JSON decode performance
+// with jsoniter.ConfigCompatibleWithStandardLibrary
+func BenchmarkDecodeIntoJSONCodecGenConfigCompatibleWithStandardLibrary(b *testing.B) {
+	kcodec := testapi.Default.Codec()
+	items := benchmarkItems(b)
+	width := len(items)
+	encoded := make([][]byte, width)
+	for i := range items {
+		data, err := runtime.Encode(kcodec, &items[i])
+		if err != nil {
+			b.Fatal(err)
+		}
+		encoded[i] = data
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		obj := v1.Pod{}
+		if err := jsoniter.ConfigCompatibleWithStandardLibrary.Unmarshal(encoded[i%width], &obj); err != nil {
 			b.Fatal(err)
 		}
 	}

@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	clientset "k8s.io/client-go/kubernetes"
+	scaleclient "k8s.io/client-go/scale"
 	extensionsinternal "k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
@@ -178,8 +179,10 @@ func WatchRecreateDeployment(c clientset.Interface, d *extensions.Deployment) er
 	return err
 }
 
-func ScaleDeployment(clientset clientset.Interface, internalClientset internalclientset.Interface, ns, name string, size uint, wait bool) error {
-	return ScaleResource(clientset, internalClientset, ns, name, size, wait, extensionsinternal.Kind("Deployment"))
+//TODO(p0lyn0mial): remove internalClientset and kind.
+//TODO(p0lyn0mial): update the callers.
+func ScaleDeployment(clientset clientset.Interface, internalClientset internalclientset.Interface, scalesGetter scaleclient.ScalesGetter, ns, name string, size uint, wait bool) error {
+	return ScaleResource(clientset, internalClientset, scalesGetter, ns, name, size, wait, extensionsinternal.Kind("Deployment"), extensionsinternal.Resource("deployments"))
 }
 
 func RunDeployment(config testutils.DeploymentConfig) error {
@@ -215,7 +218,7 @@ func CheckDeploymentRevisionAndImage(c clientset.Interface, ns, deploymentName, 
 
 func CreateDeployment(client clientset.Interface, replicas int32, podLabels map[string]string, namespace string, pvclaims []*v1.PersistentVolumeClaim, command string) (*extensions.Deployment, error) {
 	deploymentSpec := MakeDeployment(replicas, podLabels, namespace, pvclaims, false, command)
-	deployment, err := client.Extensions().Deployments(namespace).Create(deploymentSpec)
+	deployment, err := client.ExtensionsV1beta1().Deployments(namespace).Create(deploymentSpec)
 	if err != nil {
 		return nil, fmt.Errorf("deployment %q Create API error: %v", deploymentSpec.Name, err)
 	}
@@ -286,7 +289,7 @@ func GetPodsForDeployment(client clientset.Interface, deployment *extensions.Dep
 		return nil, fmt.Errorf("expected a new replica set for deployment %q, found none", deployment.Name)
 	}
 	podListFunc := func(namespace string, options metav1.ListOptions) (*v1.PodList, error) {
-		return client.Core().Pods(namespace).List(options)
+		return client.CoreV1().Pods(namespace).List(options)
 	}
 	rsList := []*extensions.ReplicaSet{replicaSet}
 	podList, err := deploymentutil.ListPods(deployment, rsList, podListFunc)

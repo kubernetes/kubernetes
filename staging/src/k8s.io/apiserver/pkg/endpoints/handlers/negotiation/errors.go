@@ -41,7 +41,7 @@ func (e errNotAcceptable) Status() metav1.Status {
 	return metav1.Status{
 		Status:  metav1.StatusFailure,
 		Code:    http.StatusNotAcceptable,
-		Reason:  metav1.StatusReason("NotAcceptable"),
+		Reason:  metav1.StatusReasonNotAcceptable,
 		Message: e.Error(),
 	}
 }
@@ -63,7 +63,7 @@ func (e errUnsupportedMediaType) Status() metav1.Status {
 	return metav1.Status{
 		Status:  metav1.StatusFailure,
 		Code:    http.StatusUnsupportedMediaType,
-		Reason:  metav1.StatusReason("UnsupportedMediaType"),
+		Reason:  metav1.StatusReasonUnsupportedMediaType,
 		Message: e.Error(),
 	}
 }

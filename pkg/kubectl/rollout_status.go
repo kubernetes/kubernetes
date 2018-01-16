@@ -38,9 +38,9 @@ type StatusViewer interface {
 func StatusViewerFor(kind schema.GroupKind, c kubernetes.Interface) (StatusViewer, error) {
 	switch kind {
 	case extensionsv1beta1.SchemeGroupVersion.WithKind("Deployment").GroupKind(), apps.Kind("Deployment"):
-		return &DeploymentStatusViewer{c.Extensions()}, nil
+		return &DeploymentStatusViewer{c.ExtensionsV1beta1()}, nil
 	case extensionsv1beta1.SchemeGroupVersion.WithKind("DaemonSet").GroupKind(), apps.Kind("DaemonSet"):
-		return &DaemonSetStatusViewer{c.Extensions()}, nil
+		return &DaemonSetStatusViewer{c.ExtensionsV1beta1()}, nil
 	case apps.Kind("StatefulSet"):
 		return &StatefulSetStatusViewer{c.AppsV1beta1()}, nil
 	}

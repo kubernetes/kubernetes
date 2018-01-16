@@ -21,7 +21,7 @@ import (
 	pluginapi "k8s.io/kubernetes/pkg/kubelet/apis/deviceplugin/v1alpha"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
-	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
+	"k8s.io/kubernetes/pkg/scheduler/schedulercache"
 )
 
 // ManagerStub provides a simple stub implementation for the Device Manager.
@@ -58,6 +58,6 @@ func (h *ManagerStub) GetDeviceRunContainerOptions(pod *v1.Pod, container *v1.Co
 }
 
 // GetCapacity simply returns nil capacity and empty removed resource list.
-func (h *ManagerStub) GetCapacity() (v1.ResourceList, []string) {
-	return nil, []string{}
+func (h *ManagerStub) GetCapacity() (v1.ResourceList, v1.ResourceList, []string) {
+	return nil, nil, []string{}
 }

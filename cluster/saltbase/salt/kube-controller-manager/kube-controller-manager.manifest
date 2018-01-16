@@ -37,32 +37,23 @@
 {% set pv_recycler_mount = "" -%}
 {% set pv_recycler_volume = "" -%}
 {% set srv_kube_path = "/srv/kubernetes" -%}
+{% flex_vol_plugin_dir = "/usr/libexec/kubernetes/kubelet-plugins/volume/exec" -%}
 
 {% if grains.cloud is defined -%}
-  {% if grains.cloud not in ['vagrant', 'photon-controller', 'azure-legacy'] -%}
-    {% set cloud_provider = "--cloud-provider=" + grains.cloud -%}
-  {% endif -%}
+  {% set cloud_provider = "--cloud-provider=" + grains.cloud -%}
   {% set service_account_key = "--service-account-private-key-file=/srv/kubernetes/server.key" -%}
 
-  {% if grains.cloud in [ 'openstack' ] and grains.cloud_config is defined -%}
-    {% set cloud_config = "--cloud-config=" + grains.cloud_config -%}
-  {% endif -%}
-
-  {% if grains.cloud in [ 'aws', 'gce' ] and grains.cloud_config is defined -%}
+  {% if grains.cloud == 'gce' and grains.cloud_config is defined -%}
     {% set cloud_config = "--cloud-config=" + grains.cloud_config -%}
     {% set cloud_config_mount = "{\"name\": \"cloudconfigmount\",\"mountPath\": \"" + grains.cloud_config + "\", \"readOnly\": true}," -%}
     {% set cloud_config_volume = "{\"name\": \"cloudconfigmount\",\"hostPath\": {\"path\": \"" + grains.cloud_config + "\", \"type\": \"FileOrCreate\"}}," -%}
   {% endif -%}
 
-  {% if grains.cloud in ['openstack'] -%}
-    {% set cloud_config_mount = "{\"name\": \"instanceid\",\"mountPath\": \"/var/lib/cloud/data/instance-id\",\"readOnly\": true}," -%}
-    {% set cloud_config_volume = "{\"name\": \"instanceid\",\"hostPath\": {\"path\": \"/var/lib/cloud/data/instance-id\"}}," -%}
-  {% endif -%}
 {% endif -%}
 
 {% set root_ca_file = "" -%}
 
-{% if grains['cloud'] is defined and grains.cloud in [ 'aws', 'gce', 'vagrant', 'photon-controller', 'openstack', 'azure-legacy']    %}
+{% if grains.cloud is defined and grains.cloud == 'gce' %}
    {% set root_ca_file = "--root-ca-file=/srv/kubernetes/ca.crt" -%}
 {% endif -%}
 
@@ -118,7 +109,7 @@
     "command": [
                  "/bin/sh",
                  "-c",
-                 "/usr/local/bin/kube-controller-manager {{params}} 1>>/var/log/kube-controller-manager.log 2>&1"
+                 "exec /usr/local/bin/kube-controller-manager {{params}} 1>>/var/log/kube-controller-manager.log 2>&1"
                ],
     {{container_env}}
     "livenessProbe": {
@@ -137,6 +128,7 @@
         { "name": "srvkube",
         "mountPath": "{{srv_kube_path}}",
         "readOnly": true},
+        {{flexvolume_hostpath_mount}}
         { "name": "logfile",
         "mountPath": "/var/log/kube-controller-manager.log",
         "readOnly": false},
@@ -166,6 +158,7 @@
     "hostPath": {
         "path": "{{srv_kube_path}}"}
   },
+  {{flexvolume_hostpath}}
   { "name": "logfile",
     "hostPath": {
         "path": "/var/log/kube-controller-manager.log",

@@ -37,8 +37,8 @@ import (
 	nodeutilv1 "k8s.io/kubernetes/pkg/api/v1/node"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
+	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
-	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 )
 
 var UpdateNodeSpecBackoff = wait.Backoff{
@@ -192,7 +192,7 @@ func (cnc *CloudNodeController) updateNodeAddress(node *v1.Node, instances cloud
 	if !nodeAddressesChangeDetected(node.Status.Addresses, newNode.Status.Addresses) {
 		return
 	}
-	_, err = nodeutil.PatchNodeStatus(cnc.kubeClient.CoreV1(), types.NodeName(node.Name), node, newNode)
+	_, _, err = nodeutil.PatchNodeStatus(cnc.kubeClient.CoreV1(), types.NodeName(node.Name), node, newNode)
 	if err != nil {
 		glog.Errorf("Error patching node with cloud ip addresses = [%v]", err)
 	}

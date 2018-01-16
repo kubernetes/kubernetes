@@ -4,9 +4,9 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"syscall"
 
 	"github.com/vishvananda/netlink/nl"
+	"golang.org/x/sys/unix"
 )
 
 const (
@@ -123,15 +123,15 @@ func SocketGet(local, remote net.Addr) (*Socket, error) {
 		return nil, ErrNotImplemented
 	}
 
-	s, err := nl.Subscribe(syscall.NETLINK_INET_DIAG)
+	s, err := nl.Subscribe(unix.NETLINK_INET_DIAG)
 	if err != nil {
 		return nil, err
 	}
 	defer s.Close()
 	req := nl.NewNetlinkRequest(nl.SOCK_DIAG_BY_FAMILY, 0)
 	req.AddData(&socketRequest{
-		Family:   syscall.AF_INET,
-		Protocol: syscall.IPPROTO_TCP,
+		Family:   unix.AF_INET,
+		Protocol: unix.IPPROTO_TCP,
 		ID: SocketID{
 			SourcePort:      uint16(localTCP.Port),
 			DestinationPort: uint16(remoteTCP.Port),

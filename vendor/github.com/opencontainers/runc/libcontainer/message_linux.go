@@ -18,6 +18,8 @@ const (
 	SetgroupAttr    uint16 = 27285
 	OomScoreAdjAttr uint16 = 27286
 	RootlessAttr    uint16 = 27287
+	UidmapPathAttr  uint16 = 27288
+	GidmapPathAttr  uint16 = 27289
 )
 
 type Int32msg struct {

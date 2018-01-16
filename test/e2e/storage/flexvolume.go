@@ -28,6 +28,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/generated"
+	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
 const (
@@ -136,7 +137,7 @@ func sshAndLog(cmd, host string) {
 	}
 }
 
-var _ = SIGDescribe("Flexvolumes [Disruptive] [Feature:FlexVolume]", func() {
+var _ = utils.SIGDescribe("Flexvolumes [Disruptive] [Feature:FlexVolume]", func() {
 	f := framework.NewDefaultFramework("flexvolume")
 
 	// note that namespace deletion is handled by delete-namespace flag

@@ -802,7 +802,7 @@ func newEchoServerPodSpec(podName string) *v1.Pod {
 			Containers: []v1.Container{
 				{
 					Name:  "echoserver",
-					Image: "gcr.io/google_containers/echoserver:1.6",
+					Image: imageutils.GetE2EImage(imageutils.EchoServer),
 					Ports: []v1.ContainerPort{{ContainerPort: int32(port)}},
 				},
 			},
@@ -1105,22 +1105,6 @@ func GetContainerPortsByPodUID(endpoints *v1.Endpoints) PortsByPodUID {
 		for _, port := range ss.Ports {
 			for _, addr := range ss.Addresses {
 				containerPort := port.Port
-				hostPort := port.Port
-
-				// use endpoint annotations to recover the container port in a Mesos setup
-				// compare contrib/mesos/pkg/service/endpoints_controller.syncService
-				key := fmt.Sprintf("k8s.mesosphere.io/containerPort_%s_%s_%d", port.Protocol, addr.IP, hostPort)
-				mesosContainerPortString := endpoints.Annotations[key]
-				if mesosContainerPortString != "" {
-					mesosContainerPort, err := strconv.Atoi(mesosContainerPortString)
-					if err != nil {
-						continue
-					}
-					containerPort = int32(mesosContainerPort)
-					Logf("Mapped mesos host port %d to container port %d via annotation %s=%s", hostPort, containerPort, key, mesosContainerPortString)
-				}
-
-				// Logf("Found pod %v, host port %d and container port %d", addr.TargetRef.UID, hostPort, containerPort)
 				if _, ok := m[addr.TargetRef.UID]; !ok {
 					m[addr.TargetRef.UID] = make([]int, 0)
 				}

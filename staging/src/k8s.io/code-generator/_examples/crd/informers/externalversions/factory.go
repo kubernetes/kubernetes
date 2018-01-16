@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2018 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,6 +19,10 @@ limitations under the License.
 package externalversions
 
 import (
+	reflect "reflect"
+	sync "sync"
+	time "time"
+
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
@@ -27,9 +31,6 @@ import (
 	example "k8s.io/code-generator/_examples/crd/informers/externalversions/example"
 	example2 "k8s.io/code-generator/_examples/crd/informers/externalversions/example2"
 	internalinterfaces "k8s.io/code-generator/_examples/crd/informers/externalversions/internalinterfaces"
-	reflect "reflect"
-	sync "sync"
-	time "time"
 )
 
 type sharedInformerFactory struct {

@@ -33,6 +33,7 @@ import (
 // rest implements a RESTStorage for DaemonSets
 type REST struct {
 	*genericregistry.Store
+	categories []string
 }
 
 // NewREST returns a RESTStorage object that will work against DaemonSets.
@@ -56,7 +57,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST) {
 	statusStore := *store
 	statusStore.UpdateStrategy = daemonset.StatusStrategy
 
-	return &REST{store}, &StatusREST{store: &statusStore}
+	return &REST{store, []string{"all"}}, &StatusREST{store: &statusStore}
 }
 
 // Implement ShortNamesProvider
@@ -71,7 +72,12 @@ var _ rest.CategoriesProvider = &REST{}
 
 // Categories implements the CategoriesProvider interface. Returns a list of categories a resource is part of.
 func (r *REST) Categories() []string {
-	return []string{"all"}
+	return r.categories
+}
+
+func (r *REST) WithCategories(categories []string) *REST {
+	r.categories = categories
+	return r
 }
 
 // StatusREST implements the REST endpoint for changing the status of a daemonset

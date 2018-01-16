@@ -375,7 +375,7 @@ func (m *Master) InstallLegacyAPI(c *completedConfig, restOptionsGetter generic.
 	if c.ExtraConfig.EnableCoreControllers {
 		controllerName := "bootstrap-controller"
 		coreClient := coreclient.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig)
-		bootstrapController := c.NewBootstrapController(legacyRESTStorage, coreClient, coreClient)
+		bootstrapController := c.NewBootstrapController(legacyRESTStorage, coreClient, coreClient, coreClient)
 		m.GenericAPIServer.AddPostStartHookOrDie(controllerName, bootstrapController.PostStartHook)
 		m.GenericAPIServer.AddPreShutdownHookOrDie(controllerName, bootstrapController.PreShutdownHook)
 	}

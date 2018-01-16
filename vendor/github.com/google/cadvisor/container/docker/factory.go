@@ -340,7 +340,8 @@ func Register(factory info.MachineInfoFactory, fsInfo fs.FsInfo, ignoreMetrics c
 			glog.Errorf("devicemapper filesystem stats will not be reported: %v", err)
 		}
 
-		status := StatusFromDockerInfo(*dockerInfo)
+		// Safe to ignore error - driver status should always be populated.
+		status, _ := StatusFromDockerInfo(*dockerInfo)
 		thinPoolName = status.DriverStatus[dockerutil.DriverStatusPoolName]
 	}
 
@@ -352,7 +353,7 @@ func Register(factory info.MachineInfoFactory, fsInfo fs.FsInfo, ignoreMetrics c
 		}
 	}
 
-	glog.Infof("Registering Docker factory")
+	glog.V(1).Infof("Registering Docker factory")
 	f := &dockerFactory{
 		cgroupSubsystems:   cgroupSubsystems,
 		client:             client,

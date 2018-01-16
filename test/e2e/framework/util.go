@@ -33,7 +33,6 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
-	goruntime "runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -75,6 +74,7 @@ import (
 
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
+	scaleclient "k8s.io/client-go/scale"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
@@ -87,17 +87,17 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/azure"
 	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	"k8s.io/kubernetes/pkg/controller"
-	nodectlr "k8s.io/kubernetes/pkg/controller/node"
+	nodectlr "k8s.io/kubernetes/pkg/controller/nodelifecycle"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/master/ports"
+	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
+	"k8s.io/kubernetes/pkg/scheduler/schedulercache"
 	sshutil "k8s.io/kubernetes/pkg/ssh"
 	"k8s.io/kubernetes/pkg/util/system"
 	taintutils "k8s.io/kubernetes/pkg/util/taints"
 	utilversion "k8s.io/kubernetes/pkg/util/version"
-	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
-	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 	"k8s.io/kubernetes/test/e2e/framework/ginkgowrapper"
 	testutil "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -153,10 +153,6 @@ const (
 
 	// How long claims have to become dynamically provisioned
 	ClaimProvisionTimeout = 5 * time.Minute
-
-	// When these values are updated, also update cmd/kubelet/app/options/options.go
-	currentPodInfraContainerImageName    = "gcr.io/google_containers/pause"
-	currentPodInfraContainerImageVersion = "3.0"
 
 	// How long a node is allowed to become "Ready" after it is restarted before
 	// the test is considered failed.
@@ -230,13 +226,13 @@ func GetServerArchitecture(c clientset.Interface) string {
 
 // GetPauseImageName fetches the pause image name for the same architecture as the apiserver.
 func GetPauseImageName(c clientset.Interface) string {
-	return currentPodInfraContainerImageName + "-" + GetServerArchitecture(c) + ":" + currentPodInfraContainerImageVersion
+	return imageutils.GetE2EImageWithArch(imageutils.Pause, GetServerArchitecture(c))
 }
 
 // GetPauseImageNameForHostArch fetches the pause image name for the same architecture the test is running on.
 // TODO: move this function to the test/utils
 func GetPauseImageNameForHostArch() string {
-	return currentPodInfraContainerImageName + "-" + goruntime.GOARCH + ":" + currentPodInfraContainerImageVersion
+	return imageutils.GetE2EImage(imageutils.Pause)
 }
 
 func GetServicesProxyRequest(c clientset.Interface, request *restclient.Request) (*restclient.Request, error) {
@@ -2130,8 +2126,8 @@ func (b kubectlBuilder) Exec() (string, error) {
 		if err != nil {
 			var rc int = 127
 			if ee, ok := err.(*exec.ExitError); ok {
-				Logf("rc: %d", rc)
 				rc = int(ee.Sys().(syscall.WaitStatus).ExitStatus())
+				Logf("rc: %d", rc)
 			}
 			return "", uexec.CodeExitError{
 				Err:  fmt.Errorf("error running %v:\nCommand stdout:\n%v\nstderr:\n%v\nerror:\n%v\n", cmd, cmd.Stdout, cmd.Stderr, err),
@@ -2687,20 +2683,25 @@ func RemoveAvoidPodsOffNode(c clientset.Interface, nodeName string) {
 	ExpectNoError(err)
 }
 
-func getScalerForKind(internalClientset internalclientset.Interface, kind schema.GroupKind) (kubectl.Scaler, error) {
-	return kubectl.ScalerFor(kind, internalClientset)
+//TODO(p0lyn0mial): remove internalClientset and kind
+func getScalerForKind(internalClientset internalclientset.Interface, kind schema.GroupKind, scalesGetter scaleclient.ScalesGetter, gr schema.GroupResource) (kubectl.Scaler, error) {
+	return kubectl.ScalerFor(kind, internalClientset, scalesGetter, gr)
 }
 
+//TODO(p0lyn0mial): remove internalClientset and kind.
+//TODO(p0lyn0mial): update the callers.
 func ScaleResource(
 	clientset clientset.Interface,
 	internalClientset internalclientset.Interface,
+	scalesGetter scaleclient.ScalesGetter,
 	ns, name string,
 	size uint,
 	wait bool,
 	kind schema.GroupKind,
+	gr schema.GroupResource,
 ) error {
 	By(fmt.Sprintf("Scaling %v %s in namespace %s to %d", kind, name, ns, size))
-	scaler, err := getScalerForKind(internalClientset, kind)
+	scaler, err := getScalerForKind(internalClientset, kind, scalesGetter, gr)
 	if err != nil {
 		return err
 	}
@@ -3459,12 +3460,6 @@ func GetSigner(provider string) (ssh.Signer, error) {
 		}
 		// Otherwise revert to home dir
 		keyfile = "kube_aws_rsa"
-	case "vagrant":
-		keyfile = os.Getenv("VAGRANT_SSH_KEY")
-		if len(keyfile) != 0 {
-			return sshutil.MakePrivateKeySignerFromFile(keyfile)
-		}
-		return nil, fmt.Errorf("VAGRANT_SSH_KEY env variable should be provided")
 	case "local", "vsphere":
 		keyfile = os.Getenv("LOCAL_SSH_KEY") // maybe?
 		if len(keyfile) == 0 {
@@ -3905,9 +3900,7 @@ func sshRestartMaster() error {
 	}
 	var command string
 	if ProviderIs("gce") {
-		// `kube-apiserver_kube-apiserver` matches the name of the apiserver
-		// container.
-		command = "sudo docker ps | grep kube-apiserver_kube-apiserver | cut -d ' ' -f 1 | xargs sudo docker kill"
+		command = "pidof kube-apiserver | xargs sudo kill"
 	} else {
 		command = "sudo /etc/init.d/kube-apiserver restart"
 	}
@@ -3938,9 +3931,9 @@ func RestartControllerManager() error {
 	if ProviderIs("gce") && !MasterOSDistroIs("gci") {
 		return fmt.Errorf("unsupported master OS distro: %s", TestContext.MasterOSDistro)
 	}
-	cmd := "sudo docker ps | grep k8s_kube-controller-manager | cut -d ' ' -f 1 | xargs sudo docker kill"
+	cmd := "pidof kube-controller-manager | xargs sudo kill"
 	Logf("Restarting controller-manager via ssh, running: %v", cmd)
-	result, err := SSH(cmd, GetMasterHost()+":22", TestContext.Provider)
+	result, err := SSH(cmd, net.JoinHostPort(GetMasterHost(), sshPort), TestContext.Provider)
 	if err != nil || result.Code != 0 {
 		LogSSHResult(result)
 		return fmt.Errorf("couldn't restart controller-manager: %v", err)
@@ -3951,7 +3944,7 @@ func RestartControllerManager() error {
 func WaitForControllerManagerUp() error {
 	cmd := "curl http://localhost:" + strconv.Itoa(ports.ControllerManagerPort) + "/healthz"
 	for start := time.Now(); time.Since(start) < time.Minute; time.Sleep(5 * time.Second) {
-		result, err := SSH(cmd, GetMasterHost()+":22", TestContext.Provider)
+		result, err := SSH(cmd, net.JoinHostPort(GetMasterHost(), sshPort), TestContext.Provider)
 		if err != nil || result.Code != 0 {
 			LogSSHResult(result)
 		}
@@ -3965,9 +3958,9 @@ func WaitForControllerManagerUp() error {
 // CheckForControllerManagerHealthy checks that the controller manager does not crash within "duration"
 func CheckForControllerManagerHealthy(duration time.Duration) error {
 	var PID string
-	cmd := "sudo docker ps | grep k8s_kube-controller-manager | cut -d ' ' -f 1"
+	cmd := "pidof kube-controller-manager"
 	for start := time.Now(); time.Since(start) < duration; time.Sleep(5 * time.Second) {
-		result, err := SSH(cmd, GetMasterHost()+":22", TestContext.Provider)
+		result, err := SSH(cmd, net.JoinHostPort(GetMasterHost(), sshPort), TestContext.Provider)
 		if err != nil {
 			// We don't necessarily know that it crashed, pipe could just be broken
 			LogSSHResult(result)
@@ -4340,7 +4333,7 @@ func ensureGCELoadBalancerResourcesDeleted(ip, portRange string) error {
 	}
 
 	return wait.Poll(10*time.Second, 5*time.Minute, func() (bool, error) {
-		service := gceCloud.GetComputeService()
+		service := gceCloud.ComputeServices().GA
 		list, err := service.ForwardingRules.List(project, region).Do()
 		if err != nil {
 			return false, err

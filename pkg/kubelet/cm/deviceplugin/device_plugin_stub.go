@@ -38,6 +38,18 @@ type Stub struct {
 	update chan []*pluginapi.Device
 
 	server *grpc.Server
+
+	// allocFunc is used for handling allocation request
+	allocFunc stubAllocFunc
+}
+
+// stubAllocFunc is the function called when receive an allocation request from Kubelet
+type stubAllocFunc func(r *pluginapi.AllocateRequest, devs map[string]pluginapi.Device) (*pluginapi.AllocateResponse, error)
+
+func defaultAllocFunc(r *pluginapi.AllocateRequest, devs map[string]pluginapi.Device) (*pluginapi.AllocateResponse, error) {
+	var response pluginapi.AllocateResponse
+
+	return &response, nil
 }
 
 // NewDevicePluginStub returns an initialized DevicePlugin Stub.
@@ -48,7 +60,14 @@ func NewDevicePluginStub(devs []*pluginapi.Device, socket string) *Stub {
 
 		stop:   make(chan interface{}),
 		update: make(chan []*pluginapi.Device),
+
+		allocFunc: defaultAllocFunc,
 	}
+}
+
+// SetAllocFunc sets allocFunc of the device plugin
+func (m *Stub) SetAllocFunc(f stubAllocFunc) {
+	m.allocFunc = f
 }
 
 // Start starts the gRPC server of the device plugin
@@ -70,7 +89,7 @@ func (m *Stub) Start() error {
 	// Wait till grpc server is ready.
 	for i := 0; i < 10; i++ {
 		services := m.server.GetServiceInfo()
-		if len(services) > 1 {
+		if len(services) > 0 {
 			break
 		}
 		time.Sleep(1 * time.Second)
@@ -115,16 +134,8 @@ func (m *Stub) Register(kubeletEndpoint, resourceName string) error {
 // ListAndWatch lists devices and update that list according to the Update call
 func (m *Stub) ListAndWatch(e *pluginapi.Empty, s pluginapi.DevicePlugin_ListAndWatchServer) error {
 	log.Println("ListAndWatch")
-	var devs []*pluginapi.Device
 
-	for _, d := range m.devs {
-		devs = append(devs, &pluginapi.Device{
-			ID:     d.ID,
-			Health: pluginapi.Healthy,
-		})
-	}
-
-	s.Send(&pluginapi.ListAndWatchResponse{Devices: devs})
+	s.Send(&pluginapi.ListAndWatchResponse{Devices: m.devs})
 
 	for {
 		select {
@@ -145,8 +156,13 @@ func (m *Stub) Update(devs []*pluginapi.Device) {
 func (m *Stub) Allocate(ctx context.Context, r *pluginapi.AllocateRequest) (*pluginapi.AllocateResponse, error) {
 	log.Printf("Allocate, %+v", r)
 
-	var response pluginapi.AllocateResponse
-	return &response, nil
+	devs := make(map[string]pluginapi.Device)
+
+	for _, dev := range m.devs {
+		devs[dev.ID] = *dev
+	}
+
+	return m.allocFunc(r, devs)
 }
 
 func (m *Stub) cleanup() error {

@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"runtime"
 
-	apps "k8s.io/api/apps/v1beta2"
+	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
 	rbac "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -33,8 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	kubeproxyconfigscheme "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/scheme"
 	kubeproxyconfigv1alpha1 "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/v1alpha1"
-	"k8s.io/kubernetes/pkg/util/version"
-	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
+	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 )
 
 const (
@@ -63,58 +62,28 @@ func EnsureProxyAddon(cfg *kubeadmapi.MasterConfiguration, client clientset.Inte
 	if err != nil {
 		return fmt.Errorf("error when marshaling: %v", err)
 	}
-	// Parse the given kubernetes version
-	k8sVersion, err := version.ParseSemantic(cfg.KubernetesVersion)
-	if err != nil {
-		return fmt.Errorf("couldn't parse kubernetes version %q: %v", cfg.KubernetesVersion, err)
-	}
 	var proxyConfigMapBytes, proxyDaemonSetBytes []byte
-	if k8sVersion.AtLeast(kubeadmconstants.MinimumKubeProxyComponentConfigVersion) {
-		proxyConfigMapBytes, err = kubeadmutil.ParseTemplate(KubeProxyConfigMap19,
-			struct {
-				MasterEndpoint string
-				ProxyConfig    string
-			}{
-				MasterEndpoint: masterEndpoint,
-				ProxyConfig:    proxyBytes,
-			})
-		if err != nil {
-			return fmt.Errorf("error when parsing kube-proxy configmap template: %v", err)
-		}
-		proxyDaemonSetBytes, err = kubeadmutil.ParseTemplate(KubeProxyDaemonSet19, struct{ ImageRepository, Arch, Version, ImageOverride, ClusterCIDR, MasterTaintKey, CloudTaintKey string }{
-			ImageRepository: cfg.GetControlPlaneImageRepository(),
-			Arch:            runtime.GOARCH,
-			Version:         kubeadmutil.KubernetesVersionToImageTag(cfg.KubernetesVersion),
-			ImageOverride:   cfg.UnifiedControlPlaneImage,
-			MasterTaintKey:  kubeadmconstants.LabelNodeRoleMaster,
-			CloudTaintKey:   algorithm.TaintExternalCloudProvider,
+	proxyConfigMapBytes, err = kubeadmutil.ParseTemplate(KubeProxyConfigMap19,
+		struct {
+			MasterEndpoint string
+			ProxyConfig    string
+		}{
+			MasterEndpoint: masterEndpoint,
+			ProxyConfig:    proxyBytes,
 		})
-		if err != nil {
-			return fmt.Errorf("error when parsing kube-proxy daemonset template: %v", err)
-		}
-	} else {
-		proxyConfigMapBytes, err = kubeadmutil.ParseTemplate(KubeProxyConfigMap18,
-			struct {
-				MasterEndpoint string
-			}{
-				MasterEndpoint: masterEndpoint,
-			})
-		if err != nil {
-			return fmt.Errorf("error when parsing kube-proxy configmap template: %v", err)
-		}
-
-		proxyDaemonSetBytes, err = kubeadmutil.ParseTemplate(KubeProxyDaemonSet18, struct{ ImageRepository, Arch, Version, ImageOverride, ClusterCIDR, MasterTaintKey, CloudTaintKey string }{
-			ImageRepository: cfg.GetControlPlaneImageRepository(),
-			Arch:            runtime.GOARCH,
-			Version:         kubeadmutil.KubernetesVersionToImageTag(cfg.KubernetesVersion),
-			ImageOverride:   cfg.UnifiedControlPlaneImage,
-			ClusterCIDR:     getClusterCIDR(cfg.Networking.PodSubnet),
-			MasterTaintKey:  kubeadmconstants.LabelNodeRoleMaster,
-			CloudTaintKey:   algorithm.TaintExternalCloudProvider,
-		})
-		if err != nil {
-			return fmt.Errorf("error when parsing kube-proxy daemonset template: %v", err)
-		}
+	if err != nil {
+		return fmt.Errorf("error when parsing kube-proxy configmap template: %v", err)
+	}
+	proxyDaemonSetBytes, err = kubeadmutil.ParseTemplate(KubeProxyDaemonSet19, struct{ ImageRepository, Arch, Version, ImageOverride, ClusterCIDR, MasterTaintKey, CloudTaintKey string }{
+		ImageRepository: cfg.GetControlPlaneImageRepository(),
+		Arch:            runtime.GOARCH,
+		Version:         kubeadmutil.KubernetesVersionToImageTag(cfg.KubernetesVersion),
+		ImageOverride:   cfg.UnifiedControlPlaneImage,
+		MasterTaintKey:  kubeadmconstants.LabelNodeRoleMaster,
+		CloudTaintKey:   algorithm.TaintExternalCloudProvider,
+	})
+	if err != nil {
+		return fmt.Errorf("error when parsing kube-proxy daemonset template: %v", err)
 	}
 	if err := createKubeProxyAddon(proxyConfigMapBytes, proxyDaemonSetBytes, client); err != nil {
 		return err

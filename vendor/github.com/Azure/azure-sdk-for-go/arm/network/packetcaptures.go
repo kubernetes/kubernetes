@@ -122,6 +122,7 @@ func (client PacketCapturesClient) CreatePreparer(resourceGroupName string, netw
 func (client PacketCapturesClient) CreateSender(req *http.Request) (*http.Response, error) {
 	return autorest.SendWithSender(client,
 		req,
+		azure.DoRetryWithRegistration(client.Client),
 		azure.DoPollForAsynchronous(client.PollingDelay))
 }
 
@@ -205,6 +206,7 @@ func (client PacketCapturesClient) DeletePreparer(resourceGroupName string, netw
 func (client PacketCapturesClient) DeleteSender(req *http.Request) (*http.Response, error) {
 	return autorest.SendWithSender(client,
 		req,
+		azure.DoRetryWithRegistration(client.Client),
 		azure.DoPollForAsynchronous(client.PollingDelay))
 }
 
@@ -271,7 +273,9 @@ func (client PacketCapturesClient) GetPreparer(resourceGroupName string, network
 // GetSender sends the Get request. The method will close the
 // http.Response Body if it receives an error.
 func (client PacketCapturesClient) GetSender(req *http.Request) (*http.Response, error) {
-	return autorest.SendWithSender(client, req)
+	return autorest.SendWithSender(client,
+		req,
+		azure.DoRetryWithRegistration(client.Client))
 }
 
 // GetResponder handles the response to the Get request. The method always
@@ -355,6 +359,7 @@ func (client PacketCapturesClient) GetStatusPreparer(resourceGroupName string, n
 func (client PacketCapturesClient) GetStatusSender(req *http.Request) (*http.Response, error) {
 	return autorest.SendWithSender(client,
 		req,
+		azure.DoRetryWithRegistration(client.Client),
 		azure.DoPollForAsynchronous(client.PollingDelay))
 }
 
@@ -420,7 +425,9 @@ func (client PacketCapturesClient) ListPreparer(resourceGroupName string, networ
 // ListSender sends the List request. The method will close the
 // http.Response Body if it receives an error.
 func (client PacketCapturesClient) ListSender(req *http.Request) (*http.Response, error) {
-	return autorest.SendWithSender(client, req)
+	return autorest.SendWithSender(client,
+		req,
+		azure.DoRetryWithRegistration(client.Client))
 }
 
 // ListResponder handles the response to the List request. The method always
@@ -503,6 +510,7 @@ func (client PacketCapturesClient) StopPreparer(resourceGroupName string, networ
 func (client PacketCapturesClient) StopSender(req *http.Request) (*http.Response, error) {
 	return autorest.SendWithSender(client,
 		req,
+		azure.DoRetryWithRegistration(client.Client),
 		azure.DoPollForAsynchronous(client.PollingDelay))
 }
 

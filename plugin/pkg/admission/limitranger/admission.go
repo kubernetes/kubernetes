@@ -113,6 +113,18 @@ func (l *LimitRanger) runLimitFunc(a admission.Attributes, limitFn func(limitRan
 		}
 	}
 
+	// ignore all objects marked for deletion
+	oldObj := a.GetOldObject()
+	if oldObj != nil {
+		oldAccessor, err := meta.Accessor(oldObj)
+		if err != nil {
+			return admission.NewForbidden(a, err)
+		}
+		if oldAccessor.GetDeletionTimestamp() != nil {
+			return nil
+		}
+	}
+
 	items, err := l.GetLimitRanges(a)
 	if err != nil {
 		return err

@@ -8,8 +8,8 @@ load(
 
 go_binary(
     name = "explorer",
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/examples/explorer",
-    library = ":go_default_library",
 )
 
 go_library(

@@ -60,10 +60,10 @@ var (
 
 // Factory provides abstractions that allow the Kubectl command to be extended across multiple types
 // of resources and different API sets.
-// The rings are here for a reason.  In order for composers to be able to provide alternative factory implementations
+// The rings are here for a reason. In order for composers to be able to provide alternative factory implementations
 // they need to provide low level pieces of *certain* functions so that when the factory calls back into itself
-// it uses the custom version of the function.  Rather than try to enumerate everything that someone would want to override
-// we split the factory into rings, where each ring can depend on methods  an earlier ring, but cannot depend
+// it uses the custom version of the function. Rather than try to enumerate everything that someone would want to override
+// we split the factory into rings, where each ring can depend on methods in an earlier ring, but cannot depend
 // upon peer methods in its own ring.
 // TODO: make the functions interfaces
 // TODO: pass the various interfaces on the factory directly into the command constructors (so the
@@ -182,7 +182,7 @@ type ClientAccessFactory interface {
 	PrintObjectSpecificMessage(obj runtime.Object, out io.Writer)
 }
 
-// ObjectMappingFactory holds the second level of factory methods.  These functions depend upon ClientAccessFactory methods.
+// ObjectMappingFactory holds the second level of factory methods. These functions depend upon ClientAccessFactory methods.
 // Generally they provide object typing and functions that build requests based on the negotiated clients.
 type ObjectMappingFactory interface {
 	// Returns interfaces for dealing with arbitrary runtime.Objects.
@@ -224,7 +224,7 @@ type ObjectMappingFactory interface {
 	OpenAPISchema() (openapi.Resources, error)
 }
 
-// BuilderFactory holds the second level of factory methods.  These functions depend upon ObjectMappingFactory and ClientAccessFactory methods.
+// BuilderFactory holds the third level of factory methods. These functions depend upon ObjectMappingFactory and ClientAccessFactory methods.
 // Generally they depend upon client mapper functions
 type BuilderFactory interface {
 	// PrinterForCommand returns the default printer for the command. It requires that certain options

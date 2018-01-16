@@ -53,7 +53,6 @@ var defaultBackOff = kwait.Backoff{
 }
 
 type controllerCommon struct {
-	tenantID              string
 	subscriptionID        string
 	location              string
 	storageEndpointSuffix string
@@ -71,12 +70,11 @@ type controllerCommon struct {
 // AttachDisk attaches a vhd to vm
 // the vhd must exist, can be identified by diskName, diskURI, and lun.
 func (c *controllerCommon) AttachDisk(isManagedDisk bool, diskName, diskURI string, nodeName types.NodeName, lun int32, cachingMode compute.CachingTypes) error {
-	vm, exists, err := c.cloud.getVirtualMachine(nodeName)
+	vm, err := c.cloud.getVirtualMachine(nodeName)
 	if err != nil {
 		return err
-	} else if !exists {
-		return cloudprovider.InstanceNotFound
 	}
+
 	disks := *vm.StorageProfile.DataDisks
 	if isManagedDisk {
 		disks = append(disks,
@@ -112,7 +110,6 @@ func (c *controllerCommon) AttachDisk(isManagedDisk bool, diskName, diskURI stri
 	}
 	vmName := mapNodeNameToVMName(nodeName)
 	glog.V(2).Infof("azureDisk - update(%s): vm(%s) - attach disk", c.resourceGroup, vmName)
-	c.cloud.operationPollRateLimiter.Accept()
 	respChan, errChan := c.cloud.VirtualMachinesClient.CreateOrUpdate(c.resourceGroup, vmName, newVM, nil)
 	resp := <-respChan
 	err = <-errChan
@@ -134,6 +131,8 @@ func (c *controllerCommon) AttachDisk(isManagedDisk bool, diskName, diskURI stri
 		}
 	} else {
 		glog.V(4).Infof("azureDisk - azure attach succeeded")
+		// Invalidate the cache right after updating
+		vmCache.Delete(vmName)
 	}
 	return err
 }
@@ -141,8 +140,8 @@ func (c *controllerCommon) AttachDisk(isManagedDisk bool, diskName, diskURI stri
 // DetachDiskByName detaches a vhd from host
 // the vhd can be identified by diskName or diskURI
 func (c *controllerCommon) DetachDiskByName(diskName, diskURI string, nodeName types.NodeName) error {
-	vm, exists, err := c.cloud.getVirtualMachine(nodeName)
-	if err != nil || !exists {
+	vm, err := c.cloud.getVirtualMachine(nodeName)
+	if err != nil {
 		// if host doesn't exist, no need to detach
 		glog.Warningf("azureDisk - cannot find node %s, skip detaching disk %s", nodeName, diskName)
 		return nil
@@ -176,7 +175,6 @@ func (c *controllerCommon) DetachDiskByName(diskName, diskURI string, nodeName t
 	}
 	vmName := mapNodeNameToVMName(nodeName)
 	glog.V(2).Infof("azureDisk - update(%s): vm(%s) - detach disk", c.resourceGroup, vmName)
-	c.cloud.operationPollRateLimiter.Accept()
 	respChan, errChan := c.cloud.VirtualMachinesClient.CreateOrUpdate(c.resourceGroup, vmName, newVM, nil)
 	resp := <-respChan
 	err = <-errChan
@@ -192,17 +190,17 @@ func (c *controllerCommon) DetachDiskByName(diskName, diskURI string, nodeName t
 		glog.Errorf("azureDisk - azure disk detach failed, err: %v", err)
 	} else {
 		glog.V(4).Infof("azureDisk - azure disk detach succeeded")
+		// Invalidate the cache right after updating
+		vmCache.Delete(vmName)
 	}
 	return err
 }
 
 // GetDiskLun finds the lun on the host that the vhd is attached to, given a vhd's diskName and diskURI
 func (c *controllerCommon) GetDiskLun(diskName, diskURI string, nodeName types.NodeName) (int32, error) {
-	vm, exists, err := c.cloud.getVirtualMachine(nodeName)
+	vm, err := c.cloud.getVirtualMachine(nodeName)
 	if err != nil {
 		return -1, err
-	} else if !exists {
-		return -1, cloudprovider.InstanceNotFound
 	}
 	disks := *vm.StorageProfile.DataDisks
 	for _, disk := range disks {
@@ -220,11 +218,9 @@ func (c *controllerCommon) GetDiskLun(diskName, diskURI string, nodeName types.N
 // GetNextDiskLun searches all vhd attachment on the host and find unused lun
 // return -1 if all luns are used
 func (c *controllerCommon) GetNextDiskLun(nodeName types.NodeName) (int32, error) {
-	vm, exists, err := c.cloud.getVirtualMachine(nodeName)
+	vm, err := c.cloud.getVirtualMachine(nodeName)
 	if err != nil {
 		return -1, err
-	} else if !exists {
-		return -1, cloudprovider.InstanceNotFound
 	}
 	used := make([]bool, maxLUN)
 	disks := *vm.StorageProfile.DataDisks
@@ -247,8 +243,8 @@ func (c *controllerCommon) DisksAreAttached(diskNames []string, nodeName types.N
 	for _, diskName := range diskNames {
 		attached[diskName] = false
 	}
-	vm, exists, err := c.cloud.getVirtualMachine(nodeName)
-	if !exists {
+	vm, err := c.cloud.getVirtualMachine(nodeName)
+	if err == cloudprovider.InstanceNotFound {
 		// if host doesn't exist, no need to detach
 		glog.Warningf("azureDisk - Cannot find node %q, DisksAreAttached will assume disks %v are not attached to it.",
 			nodeName, diskNames)

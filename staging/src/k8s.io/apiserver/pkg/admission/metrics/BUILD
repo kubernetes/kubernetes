@@ -17,8 +17,8 @@ go_test(
         "metrics_test.go",
         "testutil_test.go",
     ],
+    embed = [":go_default_library"],
     importpath = "k8s.io/apiserver/pkg/admission/metrics",
-    library = ":go_default_library",
     deps = [
         "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",
         "//vendor/github.com/prometheus/client_model/go:go_default_library",

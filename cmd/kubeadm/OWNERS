@@ -1,11 +1,9 @@
 approvers:
 - jbeda
 - luxas
-- mikedanese
 - krousey
 - timothysc
 reviewers:
-- mikedanese
 - luxas
 - dmmcquay
 - krousey
@@ -15,3 +13,4 @@ reviewers:
 - kad
 - xiangpengzhao
 - mattmoyer
+- kargakis

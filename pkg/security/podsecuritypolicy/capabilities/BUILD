@@ -9,8 +9,8 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "capabilities.go",
         "doc.go",
-        "mustrunas.go",
         "types.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/security/podsecuritypolicy/capabilities",
@@ -24,9 +24,9 @@ go_library(
 
 go_test(
     name = "go_default_test",
-    srcs = ["mustrunas_test.go"],
+    srcs = ["capabilities_test.go"],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/pkg/security/podsecuritypolicy/capabilities",
-    library = ":go_default_library",
     deps = [
         "//pkg/apis/core:go_default_library",
         "//pkg/apis/extensions:go_default_library",

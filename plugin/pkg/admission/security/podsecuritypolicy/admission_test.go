@@ -32,6 +32,7 @@ import (
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	kapi "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
@@ -65,7 +66,7 @@ func NewTestAdmission(psps []*extensions.PodSecurityPolicy, authz authorizer.Aut
 	}
 }
 
-// TestAlwaysAllowedAuthorizer is a testing struct for testing that fulfills the authorizer interface.
+// TestAuthorizer is a testing struct for testing that fulfills the authorizer interface.
 type TestAuthorizer struct {
 	// usernameToNamespaceToAllowedPSPs contains the map of allowed PSPs.
 	// if nil, all PSPs are allowed.
@@ -344,15 +345,20 @@ func TestAdmitPreferNonmutating(t *testing.T) {
 	gcChangedPod.OwnerReferences = []metav1.OwnerReference{{Kind: "Foo", Name: "bar"}}
 	gcChangedPod.Finalizers = []string{"foo"}
 
+	podWithAnnotation := unprivilegedRunAsAnyPod.DeepCopy()
+	podWithAnnotation.ObjectMeta.Annotations = map[string]string{
+		// "mutating2" is lexicographically behind "mutating1", so "mutating1" should be
+		// chosen because it's the canonical PSP order.
+		psputil.ValidatedPSPAnnotation: mutating2.Name,
+	}
+
 	tests := map[string]struct {
 		operation             kadmission.Operation
 		pod                   *kapi.Pod
 		podBeforeUpdate       *kapi.Pod
 		psps                  []*extensions.PodSecurityPolicy
-		shouldPassAdmit       bool
 		shouldPassValidate    bool
 		expectMutation        bool
-		expectedPodUser       *int64
 		expectedContainerUser *int64
 		expectedPSP           string
 	}{
@@ -360,10 +366,8 @@ func TestAdmitPreferNonmutating(t *testing.T) {
 			operation:             kadmission.Create,
 			pod:                   unprivilegedRunAsAnyPod.DeepCopy(),
 			psps:                  []*extensions.PodSecurityPolicy{privilegedPSP},
-			shouldPassAdmit:       true,
 			shouldPassValidate:    true,
 			expectMutation:        false,
-			expectedPodUser:       nil,
 			expectedContainerUser: nil,
 			expectedPSP:           privilegedPSP.Name,
 		},
@@ -371,10 +375,8 @@ func TestAdmitPreferNonmutating(t *testing.T) {
 			operation:             kadmission.Create,
 			pod:                   unprivilegedRunAsAnyPod.DeepCopy(),
 			psps:                  []*extensions.PodSecurityPolicy{mutating2, mutating1, privilegedPSP},
-			shouldPassAdmit:       true,
 			shouldPassValidate:    true,
 			expectMutation:        false,
-			expectedPodUser:       nil,
 			expectedContainerUser: nil,
 			expectedPSP:           privilegedPSP.Name,
 		},
@@ -382,10 +384,17 @@ func TestAdmitPreferNonmutating(t *testing.T) {
 			operation:             kadmission.Create,
 			pod:                   unprivilegedRunAsAnyPod.DeepCopy(),
 			psps:                  []*extensions.PodSecurityPolicy{mutating2, mutating1},
-			shouldPassAdmit:       true,
 			shouldPassValidate:    true,
 			expectMutation:        true,
-			expectedPodUser:       nil,
+			expectedContainerUser: &mutating1.Spec.RunAsUser.Ranges[0].Min,
+			expectedPSP:           mutating1.Name,
+		},
+		"pod should use deterministic mutating PSP on create even if ValidatedPSPAnnotation is set": {
+			operation:             kadmission.Create,
+			pod:                   podWithAnnotation,
+			psps:                  []*extensions.PodSecurityPolicy{mutating2, mutating1},
+			shouldPassValidate:    true,
+			expectMutation:        true,
 			expectedContainerUser: &mutating1.Spec.RunAsUser.Ranges[0].Min,
 			expectedPSP:           mutating1.Name,
 		},
@@ -394,10 +403,8 @@ func TestAdmitPreferNonmutating(t *testing.T) {
 			pod:                   changedPodWithSC.DeepCopy(),
 			podBeforeUpdate:       podWithSC.DeepCopy(),
 			psps:                  []*extensions.PodSecurityPolicy{mutating2, mutating1, privilegedPSP},
-			shouldPassAdmit:       true,
 			shouldPassValidate:    true,
 			expectMutation:        false,
-			expectedPodUser:       nil,
 			expectedContainerUser: nil,
 			expectedPSP:           privilegedPSP.Name,
 		},
@@ -406,10 +413,8 @@ func TestAdmitPreferNonmutating(t *testing.T) {
 			pod:                   changedPod.DeepCopy(),
 			podBeforeUpdate:       unprivilegedRunAsAnyPod.DeepCopy(),
 			psps:                  []*extensions.PodSecurityPolicy{mutating2, mutating1},
-			shouldPassAdmit:       true,
 			shouldPassValidate:    false,
 			expectMutation:        false,
-			expectedPodUser:       nil,
 			expectedContainerUser: nil,
 			expectedPSP:           "",
 		},
@@ -418,10 +423,8 @@ func TestAdmitPreferNonmutating(t *testing.T) {
 			pod:                   unprivilegedRunAsAnyPod.DeepCopy(),
 			podBeforeUpdate:       unprivilegedRunAsAnyPod.DeepCopy(),
 			psps:                  []*extensions.PodSecurityPolicy{mutating2, mutating1},
-			shouldPassAdmit:       true,
 			shouldPassValidate:    true,
 			expectMutation:        false,
-			expectedPodUser:       nil,
 			expectedContainerUser: nil,
 			expectedPSP:           "",
 		},
@@ -430,38 +433,32 @@ func TestAdmitPreferNonmutating(t *testing.T) {
 			pod:                   gcChangedPod.DeepCopy(),
 			podBeforeUpdate:       unprivilegedRunAsAnyPod.DeepCopy(),
 			psps:                  []*extensions.PodSecurityPolicy{mutating2, mutating1},
-			shouldPassAdmit:       true,
 			shouldPassValidate:    true,
 			expectMutation:        false,
-			expectedPodUser:       nil,
 			expectedContainerUser: nil,
 			expectedPSP:           "",
 		},
 	}
 
 	for k, v := range tests {
-		testPSPAdmitAdvanced(k, v.operation, v.psps, nil, &user.DefaultInfo{}, v.pod, v.podBeforeUpdate, v.shouldPassAdmit, v.shouldPassValidate, v.expectMutation, v.expectedPSP, t)
+		testPSPAdmitAdvanced(k, v.operation, v.psps, nil, &user.DefaultInfo{}, v.pod, v.podBeforeUpdate, true, v.shouldPassValidate, v.expectMutation, v.expectedPSP, t)
 
-		if v.shouldPassAdmit {
-			actualPodUser := (*int64)(nil)
-			if v.pod.Spec.SecurityContext != nil {
-				actualPodUser = v.pod.Spec.SecurityContext.RunAsUser
-			}
-			if (actualPodUser == nil) != (v.expectedPodUser == nil) {
-				t.Errorf("%s expected pod user %v, got %v", k, v.expectedPodUser, actualPodUser)
-			} else if actualPodUser != nil && *actualPodUser != *v.expectedPodUser {
-				t.Errorf("%s expected pod user %v, got %v", k, *v.expectedPodUser, *actualPodUser)
-			}
+		actualPodUser := (*int64)(nil)
+		if v.pod.Spec.SecurityContext != nil {
+			actualPodUser = v.pod.Spec.SecurityContext.RunAsUser
+		}
+		if actualPodUser != nil {
+			t.Errorf("%s expected pod user nil, got %v", k, *actualPodUser)
+		}
 
-			actualContainerUser := (*int64)(nil)
-			if v.pod.Spec.Containers[0].SecurityContext != nil {
-				actualContainerUser = v.pod.Spec.Containers[0].SecurityContext.RunAsUser
-			}
-			if (actualContainerUser == nil) != (v.expectedContainerUser == nil) {
-				t.Errorf("%s expected container user %v, got %v", k, v.expectedContainerUser, actualContainerUser)
-			} else if actualContainerUser != nil && *actualContainerUser != *v.expectedContainerUser {
-				t.Errorf("%s expected container user %v, got %v", k, *v.expectedContainerUser, *actualContainerUser)
-			}
+		actualContainerUser := (*int64)(nil)
+		if v.pod.Spec.Containers[0].SecurityContext != nil {
+			actualContainerUser = v.pod.Spec.Containers[0].SecurityContext.RunAsUser
+		}
+		if (actualContainerUser == nil) != (v.expectedContainerUser == nil) {
+			t.Errorf("%s expected container user %v, got %v", k, v.expectedContainerUser, actualContainerUser)
+		} else if actualContainerUser != nil && *actualContainerUser != *v.expectedContainerUser {
+			t.Errorf("%s expected container user %v, got %v", k, *v.expectedContainerUser, *actualContainerUser)
 		}
 	}
 }
@@ -2150,7 +2147,6 @@ func TestPolicyAuthorizationErrors(t *testing.T) {
 	)
 
 	tests := map[string]struct {
-		priviliged           bool
 		inPolicies           []*extensions.PodSecurityPolicy
 		allowed              map[string]map[string]map[string]bool
 		expectValidationErrs int
@@ -2217,10 +2213,103 @@ func TestPolicyAuthorizationErrors(t *testing.T) {
 			plugin := NewTestAdmission(tc.inPolicies, authz)
 			attrs := kadmission.NewAttributesRecord(pod, nil, kapi.Kind("Pod").WithVersion("version"), ns, "", kapi.Resource("pods").WithVersion("version"), "", kadmission.Create, &user.DefaultInfo{Name: userName})
 
-			allowedPod, _, validationErrs, err := plugin.computeSecurityContext(attrs, pod, true)
+			allowedPod, _, validationErrs, err := plugin.computeSecurityContext(attrs, pod, true, "")
 			assert.Nil(t, allowedPod)
 			assert.NoError(t, err)
 			assert.Len(t, validationErrs, tc.expectValidationErrs)
+		})
+	}
+}
+
+func TestPreferValidatedPSP(t *testing.T) {
+	restrictivePSPWithName := func(name string) *extensions.PodSecurityPolicy {
+		p := restrictivePSP()
+		p.Name = name
+		return p
+	}
+
+	permissivePSPWithName := func(name string) *extensions.PodSecurityPolicy {
+		p := permissivePSP()
+		p.Name = name
+		return p
+	}
+
+	tests := map[string]struct {
+		inPolicies           []*extensions.PodSecurityPolicy
+		expectValidationErrs int
+		validatedPSPHint     string
+		expectedPSP          string
+	}{
+		"no policy saved in annotations, PSPs are ordered lexicographically": {
+			inPolicies: []*extensions.PodSecurityPolicy{
+				restrictivePSPWithName("001restrictive"),
+				restrictivePSPWithName("002restrictive"),
+				permissivePSPWithName("002permissive"),
+				permissivePSPWithName("001permissive"),
+				permissivePSPWithName("003permissive"),
+			},
+			expectValidationErrs: 0,
+			validatedPSPHint:     "",
+			expectedPSP:          "001permissive",
+		},
+		"policy saved in annotations is prefered": {
+			inPolicies: []*extensions.PodSecurityPolicy{
+				restrictivePSPWithName("001restrictive"),
+				restrictivePSPWithName("002restrictive"),
+				permissivePSPWithName("001permissive"),
+				permissivePSPWithName("002permissive"),
+				permissivePSPWithName("003permissive"),
+			},
+			expectValidationErrs: 0,
+			validatedPSPHint:     "002permissive",
+			expectedPSP:          "002permissive",
+		},
+		"policy saved in annotations is invalid": {
+			inPolicies: []*extensions.PodSecurityPolicy{
+				restrictivePSPWithName("001restrictive"),
+				restrictivePSPWithName("002restrictive"),
+			},
+			expectValidationErrs: 2,
+			validatedPSPHint:     "foo",
+			expectedPSP:          "",
+		},
+		"policy saved in annotations is disallowed anymore": {
+			inPolicies: []*extensions.PodSecurityPolicy{
+				restrictivePSPWithName("001restrictive"),
+				restrictivePSPWithName("002restrictive"),
+			},
+			expectValidationErrs: 2,
+			validatedPSPHint:     "001restrictive",
+			expectedPSP:          "",
+		},
+		"policy saved in annotations is disallowed anymore, but find another one": {
+			inPolicies: []*extensions.PodSecurityPolicy{
+				restrictivePSPWithName("001restrictive"),
+				restrictivePSPWithName("002restrictive"),
+				permissivePSPWithName("002permissive"),
+				permissivePSPWithName("001permissive"),
+			},
+			expectValidationErrs: 0,
+			validatedPSPHint:     "001restrictive",
+			expectedPSP:          "001permissive",
+		},
+	}
+	for desc, tc := range tests {
+		t.Run(desc, func(t *testing.T) {
+			authz := authorizerfactory.NewAlwaysAllowAuthorizer()
+			allowPrivilegeEscalation := true
+			pod := goodPod()
+			pod.Namespace = "ns"
+			pod.Spec.ServiceAccountName = "sa"
+			pod.Spec.Containers[0].SecurityContext.AllowPrivilegeEscalation = &allowPrivilegeEscalation
+
+			plugin := NewTestAdmission(tc.inPolicies, authz)
+			attrs := kadmission.NewAttributesRecord(pod, nil, kapi.Kind("Pod").WithVersion("version"), "ns", "", kapi.Resource("pods").WithVersion("version"), "", kadmission.Update, &user.DefaultInfo{Name: "test"})
+
+			_, pspName, validationErrs, err := plugin.computeSecurityContext(attrs, pod, false, tc.validatedPSPHint)
+			assert.NoError(t, err)
+			assert.Len(t, validationErrs, tc.expectValidationErrs)
+			assert.Equal(t, pspName, tc.expectedPSP)
 		})
 	}
 }

@@ -259,11 +259,6 @@ func (p *AttachOptions) Run() error {
 	}
 
 	fn := func() error {
-
-		if !p.Quiet && stderr != nil {
-			fmt.Fprintln(stderr, "If you don't see a command prompt, try pressing enter.")
-		}
-
 		restClient, err := restclient.RESTClientFor(p.Config)
 		if err != nil {
 			return err
@@ -285,6 +280,9 @@ func (p *AttachOptions) Run() error {
 		return p.Attach.Attach("POST", req.URL(), p.Config, p.In, p.Out, p.Err, t.Raw, sizeQueue)
 	}
 
+	if !p.Quiet && stderr != nil {
+		fmt.Fprintln(stderr, "If you don't see a command prompt, try pressing enter.")
+	}
 	if err := t.Safe(fn); err != nil {
 		return err
 	}

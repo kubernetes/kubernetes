@@ -21,8 +21,8 @@ go_library(
         "//pkg/apis/core:go_default_library",
         "//pkg/apis/extensions:go_default_library",
         "//pkg/quota/evaluator/core:go_default_library",
+        "//pkg/scheduler/algorithm/priorities/util:go_default_library",
         "//pkg/util/version:go_default_library",
-        "//plugin/pkg/scheduler/algorithm/priorities/util:go_default_library",
         "//test/e2e/common:go_default_library",
         "//test/e2e/framework:go_default_library",
         "//test/utils:go_default_library",
@@ -49,8 +49,8 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["taints_test.go"],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/test/e2e/scheduling",
-    library = ":go_default_library",
     deps = [
         "//test/e2e/framework:go_default_library",
         "//test/utils:go_default_library",

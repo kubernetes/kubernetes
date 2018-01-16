@@ -15,7 +15,7 @@
 # Build the etcd image
 #
 # Usage:
-# 	[TAGS=2.2.1 2.3.7 3.0.17 3.1.10] [REGISTRY=gcr.io/google_containers] [ARCH=amd64] [BASEIMAGE=busybox] make (build|push)
+# 	[TAGS=2.2.1 2.3.7 3.0.17 3.1.11] [REGISTRY=gcr.io/google_containers] [ARCH=amd64] [BASEIMAGE=busybox] make (build|push)
 
 # The image contains different etcd versions to simplify
 # upgrades. Thus be careful when removing any tag from here.
@@ -26,8 +26,8 @@
 # Except from etcd-$(tag) and etcdctl-$(tag) binaries, we also
 # need etcd and etcdctl binaries for backward compatibility reasons.
 # That binary will be set to the last tag from $(TAGS).
-TAGS?=2.2.1 2.3.7 3.0.17 3.1.10
-REGISTRY_TAG?=3.1.10
+TAGS?=2.2.1 2.3.7 3.0.17 3.1.11
+REGISTRY_TAG?=3.1.11
 ARCH?=amd64
 REGISTRY?=gcr.io/google_containers
 GOLANG_VERSION?=1.7.6
@@ -53,7 +53,7 @@ endif
 build:
 	# Copy the content in this dir to the temp dir,
 	# without copying the subdirectories.
-	find ./ -maxdepth 1 -type f | xargs cp -t $(TEMP_DIR)
+	find ./ -maxdepth 1 -type f | xargs -I {} cp {} $(TEMP_DIR)
 
 	# Compile attachlease
 	docker run -i -v $(shell pwd)/../../../:/go/src/k8s.io/kubernetes -v $(TEMP_DIR):/build -e GOARCH=$(ARCH) golang:$(GOLANG_VERSION) \

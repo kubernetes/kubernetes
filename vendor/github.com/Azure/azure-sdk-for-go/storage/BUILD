@@ -31,8 +31,6 @@ go_library(
         "table_batch.go",
         "tableserviceclient.go",
         "util.go",
-        "util_1.7.go",
-        "util_1.8.go",
         "version.go",
     ],
     importpath = "github.com/Azure/azure-sdk-for-go/storage",
@@ -40,7 +38,7 @@ go_library(
     deps = [
         "//vendor/github.com/Azure/go-autorest/autorest:go_default_library",
         "//vendor/github.com/Azure/go-autorest/autorest/azure:go_default_library",
-        "//vendor/github.com/satori/uuid:go_default_library",
+        "//vendor/github.com/satori/go.uuid:go_default_library",
     ],
 )
 

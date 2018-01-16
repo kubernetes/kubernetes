@@ -26,7 +26,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/satori/uuid"
+	"github.com/satori/go.uuid"
 )
 
 // Annotating as secure for gas scanning

@@ -54,6 +54,7 @@ go_library(
         "//vendor/k8s.io/apiserver/pkg/admission:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/endpoints/discovery:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/endpoints/handlers:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/endpoints/handlers/responsewriters:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/endpoints/request:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/registry/generic:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/registry/generic/registry:go_default_library",
@@ -85,7 +86,7 @@ filegroup(
 go_test(
     name = "go_default_test",
     srcs = ["customresource_handler_test.go"],
+    embed = [":go_default_library"],
     importpath = "k8s.io/apiextensions-apiserver/pkg/apiserver",
-    library = ":go_default_library",
     deps = ["//vendor/k8s.io/apimachinery/pkg/apis/meta/v1/unstructured:go_default_library"],
 )

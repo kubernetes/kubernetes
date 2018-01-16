@@ -92,24 +92,26 @@ function run-checks {
   local -r pattern=$1
   local -r runner=$2
 
+  local t
   for t in $(ls ${pattern})
   do
+    local check_name="$(basename "${t}")"
     if is-excluded "${t}" ; then
-      echo "Skipping ${t}"
+      echo "Skipping ${check_name}"
       continue
     fi
     if ${QUICK} && ! is-quick "${t}" ; then
-      echo "Skipping ${t} in quick mode"
+      echo "Skipping ${check_name} in quick mode"
       continue
     fi
-    echo -e "Verifying ${t}"
+    echo -e "Verifying ${check_name}"
     local start=$(date +%s)
     run-cmd "${runner}" "${t}" && tr=$? || tr=$?
     local elapsed=$(($(date +%s) - ${start}))
     if [[ ${tr} -eq 0 ]]; then
-      echo -e "${color_green}SUCCESS${color_norm}  ${t}\t${elapsed}s"
+      echo -e "${color_green}SUCCESS${color_norm}  ${check_name}\t${elapsed}s"
     else
-      echo -e "${color_red}FAILED${color_norm}   ${t}\t${elapsed}s"
+      echo -e "${color_red}FAILED${color_norm}   ${check_name}\t${elapsed}s"
       ret=1
       FAILED_TESTS+=(${t})
     fi

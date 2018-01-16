@@ -57,7 +57,6 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
 	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
-	kubeletconfigv1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	kubeletcertificate "k8s.io/kubernetes/pkg/kubelet/certificate"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
@@ -96,6 +95,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/util/queue"
 	"k8s.io/kubernetes/pkg/kubelet/util/sliceutils"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager"
+	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/pkg/security/apparmor"
 	utildbus "k8s.io/kubernetes/pkg/util/dbus"
 	kubeio "k8s.io/kubernetes/pkg/util/io"
@@ -104,7 +104,6 @@ import (
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/util/oom"
 	"k8s.io/kubernetes/pkg/volume"
-	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
 	utilexec "k8s.io/utils/exec"
 )
 
@@ -203,7 +202,6 @@ type Builder func(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	registerNode bool,
 	registerWithTaints []api.Taint,
 	allowedUnsafeSysctls []string,
-	containerized bool,
 	remoteRuntimeEndpoint string,
 	remoteImageEndpoint string,
 	experimentalMounterPath string,
@@ -225,27 +223,7 @@ type Builder func(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 // at runtime that are necessary for running the Kubelet. This is a temporary solution for grouping
 // these objects while we figure out a more comprehensive dependency injection story for the Kubelet.
 type Dependencies struct {
-	// TODO(mtaufen): KubeletBuilder:
-	//                Mesos currently uses this as a hook to let them make their own call to
-	//                let them wrap the KubeletBootstrap that CreateAndInitKubelet returns with
-	//                their own KubeletBootstrap. It's a useful hook. I need to think about what
-	//                a nice home for it would be. There seems to be a trend, between this and
-	//                the Options fields below, of providing hooks where you can add extra functionality
-	//                to the Kubelet for your solution. Maybe we should centralize these sorts of things?
-	Builder Builder
-
-	// TODO(mtaufen): ContainerRuntimeOptions and Options:
-	//                Arrays of functions that can do arbitrary things to the Kubelet and the Runtime
-	//                seem like a difficult path to trace when it's time to debug something.
-	//                I'm leaving these fields here for now, but there is likely an easier-to-follow
-	//                way to support their intended use cases. E.g. ContainerRuntimeOptions
-	//                is used by Mesos to set an environment variable in containers which has
-	//                some connection to their container GC. It seems that Mesos intends to use
-	//                Options to add additional node conditions that are updated as part of the
-	//                Kubelet lifecycle (see https://github.com/kubernetes/kubernetes/pull/21521).
-	//                We should think about providing more explicit ways of doing these things.
-	ContainerRuntimeOptions []kubecontainer.Option
-	Options                 []Option
+	Options []Option
 
 	// Injected Dependencies
 	Auth                    server.AuthInterface
@@ -344,7 +322,6 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	registerNode bool,
 	registerWithTaints []api.Taint,
 	allowedUnsafeSysctls []string,
-	containerized bool,
 	remoteRuntimeEndpoint string,
 	remoteImageEndpoint string,
 	experimentalMounterPath string,
@@ -521,7 +498,6 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		recorder:                       kubeDeps.Recorder,
 		cadvisor:                       kubeDeps.CAdvisorInterface,
 		cloud:                          kubeDeps.Cloud,
-		autoDetectCloudProvider:   (kubeletconfigv1alpha1.AutoDetectCloudProvider == cloudProvider),
 		externalCloudProvider:     cloudprovider.IsExternal(cloudProvider),
 		providerID:                providerID,
 		nodeRef:                   nodeRef,
@@ -899,6 +875,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	klet.softAdmitHandlers.AddPodAdmitHandler(lifecycle.NewNoNewPrivsAdmitHandler(klet.containerRuntime))
 	if utilfeature.DefaultFeatureGate.Enabled(features.Accelerators) {
 		if containerRuntime == kubetypes.DockerContainerRuntime {
+			glog.Warningln("Accelerators feature is deprecated and will be removed in v1.11. Please use device plugins instead. They can be enabled using the DevicePlugins feature gate.")
 			if klet.gpuManager, err = nvidia.NewNvidiaGPUManager(klet, kubeDeps.DockerClientConfig); err != nil {
 				return nil, err
 			}
@@ -1032,11 +1009,7 @@ type Kubelet struct {
 
 	// Cloud provider interface.
 	cloud cloudprovider.Interface
-	// DEPRECATED: auto detecting cloud providers goes against the initiative
-	// for out-of-tree cloud providers as we'll now depend on cAdvisor integrations
-	// with cloud providers instead of in the core repo.
-	// More details here: https://github.com/kubernetes/kubernetes/issues/50986
-	autoDetectCloudProvider bool
+
 	// Indicates that the node initialization happens in an external cloud controller
 	externalCloudProvider bool
 	// Reference to this node.

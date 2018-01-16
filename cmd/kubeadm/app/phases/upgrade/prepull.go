@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"time"
 
-	apps "k8s.io/api/apps/v1beta2"
+	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -41,7 +41,7 @@ type Prepuller interface {
 	DeleteFunc(string) error
 }
 
-// DaemonSetPrepuller makes sure the control plane images are availble on all masters
+// DaemonSetPrepuller makes sure the control plane images are available on all masters
 type DaemonSetPrepuller struct {
 	client clientset.Interface
 	cfg    *kubeadmapi.MasterConfiguration
@@ -99,11 +99,11 @@ func PrepullImagesInParallel(kubePrepuller Prepuller, timeout time.Duration) err
 		}
 	}
 
-	// Create a channel for streaming data from goroutines that run in parallell to a blocking for loop that cleans up
+	// Create a channel for streaming data from goroutines that run in parallel to a blocking for loop that cleans up
 	prePulledChan := make(chan string, len(componentsToPrepull))
 	for _, component := range componentsToPrepull {
 		go func(c string) {
-			// Wait as long as needed. This WaitFunc call should be blocking until completetion
+			// Wait as long as needed. This WaitFunc call should be blocking until completion
 			kubePrepuller.WaitFunc(c)
 			// When the task is done, go ahead and cleanup by sending the name to the channel
 			prePulledChan <- c

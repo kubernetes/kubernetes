@@ -89,8 +89,7 @@ type addressKey struct {
 // any existing ready state.
 func mapAddressByPort(addr *api.EndpointAddress, port api.EndpointPort, ready bool, allAddrs map[addressKey]*api.EndpointAddress, portToAddrReadyMap map[api.EndpointPort]addressSet) *api.EndpointAddress {
 	// use addressKey to distinguish between two endpoints that are identical addresses
-	// but may have come from different hosts, for attribution. For instance, Mesos
-	// assigns pods the node IP, but the pods are distinct.
+	// but may have come from different hosts, for attribution.
 	key := addressKey{ip: addr.IP}
 	if addr.TargetRef != nil {
 		key.uid = addr.TargetRef.UID
@@ -167,14 +166,6 @@ func LessEndpointAddress(a, b *api.EndpointAddress) bool {
 		return true
 	}
 	return a.TargetRef.UID < b.TargetRef.UID
-}
-
-type addrPtrsByIpAndUID []*api.EndpointAddress
-
-func (sl addrPtrsByIpAndUID) Len() int      { return len(sl) }
-func (sl addrPtrsByIpAndUID) Swap(i, j int) { sl[i], sl[j] = sl[j], sl[i] }
-func (sl addrPtrsByIpAndUID) Less(i, j int) bool {
-	return LessEndpointAddress(sl[i], sl[j])
 }
 
 // SortSubsets sorts an array of EndpointSubset objects in place.  For ease of

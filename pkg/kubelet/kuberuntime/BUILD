@@ -28,6 +28,7 @@ go_library(
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/core/v1/helper:go_default_library",
         "//pkg/credentialprovider:go_default_library",
+        "//pkg/credentialprovider/secrets:go_default_library",
         "//pkg/kubelet/apis/cri:go_default_library",
         "//pkg/kubelet/apis/cri/v1alpha1/runtime:go_default_library",
         "//pkg/kubelet/cm:go_default_library",
@@ -78,8 +79,8 @@ go_test(
         "legacy_test.go",
         "security_context_test.go",
     ],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/pkg/kubelet/kuberuntime",
-    library = ":go_default_library",
     deps = [
         "//pkg/credentialprovider:go_default_library",
         "//pkg/kubelet/apis/cri/testing:go_default_library",
