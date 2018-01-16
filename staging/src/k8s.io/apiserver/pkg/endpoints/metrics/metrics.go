@@ -71,7 +71,22 @@ var (
 		},
 		[]string{"verb", "resource", "subresource", "scope"},
 	)
+	// DroppedRequests is a number of requests dropped with 'Try again later' reponse"
+	DroppedRequests = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "apiserver_dropped_requests",
+			Help: "Number of requests dropped with 'Try again later' reponse",
+		},
+		[]string{"requestKind"},
+	)
 	kubectlExeRegexp = regexp.MustCompile(`^.*((?i:kubectl\.exe))`)
+)
+
+const (
+	// ReadOnlyKind is a string identifying read only request kind
+	ReadOnlyKind = "readOnly"
+	// MutatingKind is a string identifying mutating request kind
+	MutatingKind = "mutating"
 )
 
 // Register all metrics.
@@ -80,6 +95,7 @@ func Register() {
 	prometheus.MustRegister(requestLatencies)
 	prometheus.MustRegister(requestLatenciesSummary)
 	prometheus.MustRegister(responseSizes)
+	prometheus.MustRegister(DroppedRequests)
 }
 
 // Monitor records a request to the apiserver endpoints that follow the Kubernetes API conventions.  verb must be
