@@ -23,7 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-// Convertor converts objects to the desired version.
+// convertor converts objects to the desired version.
 type Convertor struct {
 	Scheme *runtime.Scheme
 }
@@ -61,7 +61,7 @@ func (c Convertor) ConvertToGVK(obj runtime.Object, gvk schema.GroupVersionKind)
 // Validate checks if the conversion has a scheme.
 func (c *Convertor) Validate() error {
 	if c.Scheme == nil {
-		return fmt.Errorf("the Convertor requires a scheme")
+		return fmt.Errorf("the convertor requires a scheme")
 	}
 	return nil
 }

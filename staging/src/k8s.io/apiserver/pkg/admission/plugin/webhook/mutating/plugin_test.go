@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/admission/configuration"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/config"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/testcerts"
 	"k8s.io/apiserver/pkg/authentication/user"
@@ -47,7 +48,7 @@ type fakeHookSource struct {
 	err   error
 }
 
-func (f *fakeHookSource) Webhooks() *registrationv1beta1.MutatingWebhookConfiguration {
+func (f *fakeHookSource) Webhooks() []registrationv1beta1.Webhook {
 	if f.err != nil {
 		return nil
 	}
@@ -56,7 +57,11 @@ func (f *fakeHookSource) Webhooks() *registrationv1beta1.MutatingWebhookConfigur
 			f.hooks[i].NamespaceSelector = &metav1.LabelSelector{}
 		}
 	}
-	return &registrationv1beta1.MutatingWebhookConfiguration{Webhooks: f.hooks}
+	return f.hooks
+}
+
+func (f *fakeHookSource) HasSynched() bool {
+	return true
 }
 
 func (f *fakeHookSource) Run(stopCh <-chan struct{}) {}
@@ -128,7 +133,7 @@ func TestAdmit(t *testing.T) {
 	if err != nil {
 		t.Fatalf("this should never happen? %v", err)
 	}
-	wh, err := NewMutatingWebhook(nil)
+	wh, err := NewMutatingWebhook(nil, configuration.NewMutatingWebhookConfigurationManager)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -138,9 +143,9 @@ func TestAdmit(t *testing.T) {
 	}
 	cm.SetAuthenticationInfoResolver(newFakeAuthenticationInfoResolver(new(int32)))
 	cm.SetServiceResolver(fakeServiceResolver{base: *serverURL})
-	wh.clientManager = cm
+	wh.Webhook.clientManager = cm
 	wh.SetScheme(scheme)
-	if err = wh.clientManager.Validate(); err != nil {
+	if err = wh.Webhook.clientManager.Validate(); err != nil {
 		t.Fatal(err)
 	}
 	namespace := "webhook-test"
@@ -369,7 +374,7 @@ func TestAdmit(t *testing.T) {
 			continue
 		}
 		t.Run(name, func(t *testing.T) {
-			wh.hookSource = &tt.hookSource
+			wh.Webhook.hookSource = &tt.hookSource
 			err = wh.Admit(admission.NewAttributesRecord(&object, &oldObject, kind, namespace, name, resource, subResource, operation, &userInfo))
 			if tt.expectAllow != (err == nil) {
 				t.Errorf("expected allowed=%v, but got err=%v", tt.expectAllow, err)
@@ -400,7 +405,7 @@ func TestAdmitCachedClient(t *testing.T) {
 	if err != nil {
 		t.Fatalf("this should never happen? %v", err)
 	}
-	wh, err := NewMutatingWebhook(nil)
+	wh, err := NewMutatingWebhook(nil, configuration.NewMutatingWebhookConfigurationManager)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -409,7 +414,7 @@ func TestAdmitCachedClient(t *testing.T) {
 		t.Fatalf("cannot create client manager: %v", err)
 	}
 	cm.SetServiceResolver(fakeServiceResolver{base: *serverURL})
-	wh.clientManager = cm
+	wh.Webhook.clientManager = cm
 	wh.SetScheme(scheme)
 	namespace := "webhook-test"
 	wh.namespaceMatcher.NamespaceLister = fakeNamespaceLister{map[string]*corev1.Namespace{
@@ -529,11 +534,11 @@ func TestAdmitCachedClient(t *testing.T) {
 
 	for _, testcase := range cases {
 		t.Run(testcase.name, func(t *testing.T) {
-			wh.hookSource = &testcase.hookSource
+			wh.Webhook.hookSource = &testcase.hookSource
 			authInfoResolverCount := new(int32)
 			r := newFakeAuthenticationInfoResolver(authInfoResolverCount)
-			wh.clientManager.SetAuthenticationInfoResolver(r)
-			if err = wh.clientManager.Validate(); err != nil {
+			wh.Webhook.clientManager.SetAuthenticationInfoResolver(r)
+			if err = wh.Webhook.clientManager.Validate(); err != nil {
 				t.Fatal(err)
 			}
 
