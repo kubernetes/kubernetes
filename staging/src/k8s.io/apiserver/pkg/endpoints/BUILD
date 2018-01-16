@@ -60,7 +60,6 @@ go_test(
 go_library(
     name = "go_default_library",
     srcs = [
-        "apiserver.go",
         "doc.go",
         "groupversion.go",
         "installer.go",
