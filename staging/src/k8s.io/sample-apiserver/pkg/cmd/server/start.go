@@ -103,7 +103,7 @@ func (o WardleServerOptions) Config() (*apiserver.Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := o.RecommendedOptions.SecureServing.MaybeDefaultWithSelfSignedCerts(advertiseAddr.String(), nil, []net.IP{net.ParseIP("127.0.0.1")}); err != nil {
+	if err := o.RecommendedOptions.SecureServing.MaybeDefaultWithSelfSignedCerts(advertiseAddr.String(), []string{"localhost"}, []net.IP{net.ParseIP("127.0.0.1")}); err != nil {
 		return nil, fmt.Errorf("error creating self-signed certificates: %v", err)
 	}
 
