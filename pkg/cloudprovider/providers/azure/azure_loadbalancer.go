@@ -1250,15 +1250,12 @@ func findSecurityRule(rules []network.SecurityRule, rule network.SecurityRule) b
 // participating in the specified LoadBalancer Backend Pool.
 func (az *Cloud) ensureHostInPool(serviceName string, nodeName types.NodeName, backendPoolID string, availabilitySetName string) error {
 	var machine compute.VirtualMachine
-	vmName := mapNodeNameToVMName(nodeName)
 	az.operationPollRateLimiter.Accept()
-	glog.V(10).Infof("VirtualMachinesClient.Get(%q): start", vmName)
-	machine, err := az.VirtualMachineClientGetWithRetry(az.ResourceGroup, vmName, "")
+	machine, err := az.GetVirtualMachineWithRetry(nodeName)
 	if err != nil {
 		glog.V(2).Infof("ensureHostInPool(%s, %s, %s) abort backoff", serviceName, nodeName, backendPoolID)
 		return err
 	}
-	glog.V(10).Infof("VirtualMachinesClient.Get(%q): end", vmName)
 
 	primaryNicID, err := getPrimaryInterfaceID(machine)
 	if err != nil {

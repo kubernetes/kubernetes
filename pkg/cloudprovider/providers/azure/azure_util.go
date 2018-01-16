@@ -416,10 +416,7 @@ func (az *Cloud) getIPForMachine(nodeName types.NodeName) (string, error) {
 
 func (az *Cloud) getIPForStandardMachine(nodeName types.NodeName) (string, error) {
 	az.operationPollRateLimiter.Accept()
-	machine, exists, err := az.getVirtualMachine(nodeName)
-	if !exists {
-		return "", cloudprovider.InstanceNotFound
-	}
+	machine, err := az.getVirtualMachine(nodeName)
 	if err != nil {
 		glog.Errorf("error: az.getIPForMachine(%s), az.getVirtualMachine(%s), err=%v", nodeName, nodeName, err)
 		return "", err
