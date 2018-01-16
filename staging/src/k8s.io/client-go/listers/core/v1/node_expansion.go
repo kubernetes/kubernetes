@@ -21,17 +21,17 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 )
 
-// NodeConditionPredicate is a function that indicates whether the given node's conditions meet
+// NodePredicate is a function that indicates whether the given node's conditions meet
 // some set of criteria defined by the function.
-type NodeConditionPredicate func(node *v1.Node) bool
+type NodePredicate func(node *v1.Node) bool
 
 // NodeListerExpansion allows custom methods to be added to
 // NodeLister.
 type NodeListerExpansion interface {
-	ListWithPredicate(predicate NodeConditionPredicate) ([]*v1.Node, error)
+	ListWithPredicate(predicate NodePredicate) ([]*v1.Node, error)
 }
 
-func (l *nodeLister) ListWithPredicate(predicate NodeConditionPredicate) ([]*v1.Node, error) {
+func (l *nodeLister) ListWithPredicate(predicate NodePredicate) ([]*v1.Node, error) {
 	nodes, err := l.List(labels.Everything())
 	if err != nil {
 		return nil, err

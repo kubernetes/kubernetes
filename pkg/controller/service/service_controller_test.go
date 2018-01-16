@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	fakecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
 	"k8s.io/kubernetes/pkg/controller"
+	algorithm "k8s.io/kubernetes/pkg/scheduler/algorithm"
 )
 
 const region = "us-central"
@@ -255,6 +256,67 @@ func TestUpdateNodesInExternalLoadBalancer(t *testing.T) {
 		}
 		if !reflect.DeepEqual(item.expectedUpdateCalls, cloud.UpdateCalls) {
 			t.Errorf("expected update calls mismatch, expected %+v, got %+v", item.expectedUpdateCalls, cloud.UpdateCalls)
+		}
+	}
+}
+
+func TestGetNodeTaintPredicate(t *testing.T) {
+	tests := []struct {
+		node         v1.Node
+		expectAccept bool
+		name         string
+	}{
+		{
+			node:         v1.Node{},
+			expectAccept: true,
+			name:         "noTaint",
+		},
+		{
+			node: v1.Node{
+				Spec: v1.NodeSpec{
+					Taints: []v1.Taint{
+						{Key: algorithm.TaintNodeNotReady, Effect: v1.TaintEffectNoExecute},
+					},
+				},
+			},
+			expectAccept: false,
+			name:         "basic",
+		},
+		{
+			node: v1.Node{
+				Spec: v1.NodeSpec{
+					Taints: []v1.Taint{
+						{Key: algorithm.TaintNodeUnreachable, Effect: v1.TaintEffectNoSchedule},
+					},
+				},
+			},
+			expectAccept: false,
+			name:         "NoSchedule",
+		},
+		{
+			node: v1.Node{
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{Type: v1.NodeReady, Status: v1.ConditionTrue},
+					},
+				},
+			},
+			expectAccept: true,
+			name:         "accept",
+		},
+		{
+			node: v1.Node{
+				Spec: v1.NodeSpec{Unschedulable: true},
+			},
+			expectAccept: false,
+			name:         "unschedulable",
+		},
+	}
+	pred := getNodeTaintPredicate()
+	for _, test := range tests {
+		accept := pred(&test.node)
+		if accept != test.expectAccept {
+			t.Errorf("Test failed for %s, expected %v, saw %v", test.name, test.expectAccept, accept)
 		}
 	}
 }

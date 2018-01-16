@@ -158,6 +158,51 @@ func TestTaintExists(t *testing.T) {
 	}
 }
 
+func TestTaintExistsWithEffect(t *testing.T) {
+	testingTaints := []v1.Taint{
+		{
+			Key:    "foo_1",
+			Value:  "bar_1",
+			Effect: v1.TaintEffectNoExecute,
+		},
+		{
+			Key:    "foo_2",
+			Value:  "bar_2",
+			Effect: v1.TaintEffectNoSchedule,
+		},
+	}
+
+	cases := []struct {
+		name           string
+		keyToFind      v1.TaintEffect
+		expectedResult bool
+	}{
+		{
+			name:           "key exist",
+			keyToFind:      v1.TaintEffectNoExecute,
+			expectedResult: true,
+		},
+		{
+			name:           "key exist",
+			keyToFind:      v1.TaintEffectNoSchedule,
+			expectedResult: true,
+		},
+		{
+			name:           "no key",
+			keyToFind:      v1.TaintEffectPreferNoSchedule,
+			expectedResult: false,
+		},
+	}
+
+	for _, c := range cases {
+		result := TaintExistsWithEffect(testingTaints, c.keyToFind)
+		if result != c.expectedResult {
+			t.Errorf("[%s] unexpected results: %v", c.name, result)
+			continue
+		}
+	}
+}
+
 func TestRemoveTaint(t *testing.T) {
 	cases := []struct {
 		name           string

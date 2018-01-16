@@ -42,7 +42,9 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
+	algorithm "k8s.io/kubernetes/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/pkg/util/metrics"
+	"k8s.io/kubernetes/pkg/util/taints"
 )
 
 const (
@@ -357,7 +359,14 @@ func (s *ServiceController) persistUpdate(service *v1.Service) error {
 }
 
 func (s *ServiceController) ensureLoadBalancer(service *v1.Service) (*v1.LoadBalancerStatus, error) {
-	nodes, err := s.nodeLister.ListWithPredicate(getNodeConditionPredicate())
+	var nodes []*v1.Node
+	var err error
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.TaintNodesByCondition) {
+		nodes, err = s.nodeLister.ListWithPredicate(getNodeTaintPredicate())
+	} else {
+		nodes, err = s.nodeLister.ListWithPredicate(getNodeConditionPredicate())
+	}
+
 	if err != nil {
 		return nil, err
 	}
@@ -581,7 +590,45 @@ func nodeSlicesEqualForLB(x, y []*v1.Node) bool {
 	return nodeNames(x).Equal(nodeNames(x))
 }
 
-func getNodeConditionPredicate() corelisters.NodeConditionPredicate {
+func getNodeTaintPredicate() corelisters.NodePredicate {
+	return func(node *v1.Node) bool {
+		// We add the master to the node list, but its unschedulable.  So we use this to filter
+		// the master.
+		if node.Spec.Unschedulable {
+			return false
+		}
+		// If no taint, accept
+		if len(node.Spec.Taints) == 0 {
+			return true
+		}
+		// As of 1.6, we will taint the master, but not necessarily mark it unschedulable.
+		// Recognize nodes labeled as master, and filter them also, as we were doing previously.
+		if _, hasMasterRoleLabel := node.Labels[LabelNodeRoleMaster]; hasMasterRoleLabel {
+			return false
+		}
+
+		if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.ServiceNodeExclusion) {
+			if _, hasExcludeBalancerLabel := node.Labels[LabelNodeRoleExcludeBalancer]; hasExcludeBalancerLabel {
+				return false
+			}
+		}
+		// Not Ready, no execute taint
+		notReadyTaintTemplate := &v1.Taint{
+			Key:    algorithm.TaintNodeNotReady,
+			Effect: v1.TaintEffectNoExecute,
+		}
+
+		// We consider the node for load balancing only when taint with Effect NoSchedule
+		// or with a specific Taint NotReady, NoExecute
+		if taints.TaintExists(node.Spec.Taints, notReadyTaintTemplate) || taints.TaintExistsWithEffect(node.Spec.Taints, v1.TaintEffectNoSchedule) {
+			glog.V(4).Infof("Ignoring node %v with %v key, effect %v", node.Name, notReadyTaintTemplate.Key, notReadyTaintTemplate.Effect)
+			return false
+		}
+		return true
+	}
+}
+
+func getNodeConditionPredicate() corelisters.NodePredicate {
 	return func(node *v1.Node) bool {
 		// We add the master to the node list, but its unschedulable.  So we use this to filter
 		// the master.
@@ -620,7 +667,14 @@ func getNodeConditionPredicate() corelisters.NodeConditionPredicate {
 // nodeSyncLoop handles updating the hosts pointed to by all load
 // balancers whenever the set of nodes in the cluster changes.
 func (s *ServiceController) nodeSyncLoop() {
-	newHosts, err := s.nodeLister.ListWithPredicate(getNodeConditionPredicate())
+	var newHosts []*v1.Node
+	var err error
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.TaintNodesByCondition) {
+		newHosts, err = s.nodeLister.ListWithPredicate(getNodeTaintPredicate())
+	} else {
+		newHosts, err = s.nodeLister.ListWithPredicate(getNodeConditionPredicate())
+	}
+
 	if err != nil {
 		glog.Errorf("Failed to retrieve current set of nodes from node lister: %v", err)
 		return
