@@ -142,6 +142,11 @@
 			"Rev": "c0ef4539dfab4d21c8ef20ba2924f9fc6f186d35"
 		},
 		{
+			"ImportPath": "github.com/agext/levenshtein",
+			"Comment": "v1.2.1",
+			"Rev": "5f10fee965225ac1eecdc234c09daf5cd9e7f7b6"
+		},
+		{
 			"ImportPath": "github.com/appc/spec/schema",
 			"Comment": "v0.8.9-17-gfc380db",
 			"Rev": "fc380db5fc13c6dd71a5b0bf2af0d182865d1b1d"
