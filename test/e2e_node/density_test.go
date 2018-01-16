@@ -468,13 +468,13 @@ func getPodStartLatency(node string) (framework.KubeletLatencyMetrics, error) {
 // within the threshold.
 func verifyPodStartupLatency(expect, actual framework.LatencyMetric) error {
 	if actual.Perc50 > expect.Perc50 {
-		return fmt.Errorf("too high pod startup latency 50th percentile: %v", actual.Perc50)
+		return fmt.Errorf("too high pod startup latency 50th percentile: %v, expected: %v", actual.Perc50, expect.Perc50)
 	}
 	if actual.Perc90 > expect.Perc90 {
-		return fmt.Errorf("too high pod startup latency 90th percentile: %v", actual.Perc90)
+		return fmt.Errorf("too high pod startup latency 90th percentile: %v, expected: %v", actual.Perc90, expect.Perc90)
 	}
 	if actual.Perc99 > expect.Perc99 {
-		return fmt.Errorf("too high pod startup latency 99th percentile: %v", actual.Perc99)
+		return fmt.Errorf("too high pod startup latency 99th percentile: %v, expected: %v", actual.Perc99, expect.Perc99)
 	}
 	return nil
 }
