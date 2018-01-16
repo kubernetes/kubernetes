@@ -29,7 +29,7 @@ filegroup(
 go_test(
     name = "go_default_test",
     srcs = ["files_test.go"],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/files",
-    library = ":go_default_library",
     deps = ["//pkg/util/filesystem:go_default_library"],
 )
