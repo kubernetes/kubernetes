@@ -128,6 +128,7 @@ func NewCmdCreateRole(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(c.Complete(f, cmd, args))
 			cmdutil.CheckErr(c.Validate())
+			cmdutil.ValidateOutputArgs(cmd, cmdutil.KubectlCreate)
 			cmdutil.CheckErr(c.RunCreateRole())
 		},
 	}

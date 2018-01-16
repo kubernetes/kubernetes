@@ -48,6 +48,7 @@ func NewCmdCreatePriorityClass(f cmdutil.Factory, cmdOut io.Writer) *cobra.Comma
 		Long:    pcLong,
 		Example: pcExample,
 		Run: func(cmd *cobra.Command, args []string) {
+			cmdutil.ValidateOutputArgs(cmd, cmdutil.KubectlCreate)
 			cmdutil.CheckErr(CreatePriorityClass(f, cmdOut, cmd, args))
 		},
 	}

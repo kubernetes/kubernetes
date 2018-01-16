@@ -30,6 +30,14 @@ import (
 	"github.com/spf13/cobra"
 )
 
+const (
+	KubectlDelete  = "delete"
+	KubectlCreate  = "create"
+	KubectlReplace = "replace"
+	KubectlScale   = "scale"
+	KubectlGet     = "get"
+)
+
 // AddPrinterFlags adds printing related flags to a command (e.g. output format, no headers, template path)
 func AddPrinterFlags(cmd *cobra.Command) {
 	AddNonDeprecatedPrinterFlags(cmd)
@@ -73,10 +81,25 @@ func AddNoHeadersFlags(cmd *cobra.Command) {
 }
 
 // ValidateOutputArgs validates -o flag args for mutations
-func ValidateOutputArgs(cmd *cobra.Command) error {
+func ValidateOutputArgs(cmd *cobra.Command, command string) error {
 	outputMode := GetFlagString(cmd, "output")
-	if outputMode != "" && outputMode != "name" {
-		return UsageErrorf(cmd, "Unexpected -o output mode: %v. We only support '-o name'.", outputMode)
+	switch command {
+	case KubectlDelete, KubectlScale, KubectlReplace:
+		if outputMode != "" && outputMode != "name" {
+			return UsageErrorf(cmd, "Unexpected -o output mode: %v. We only support '-o name'.", outputMode)
+		}
+	case KubectlCreate:
+		if outputMode != "wide" {
+			if GetFlagBool(cmd, "show-labels") {
+				return UsageErrorf(cmd, "--show-labels option cannot be used with -o output: %s", outputMode)
+			}
+		}
+	case KubectlGet:
+		if GetFlagBool(cmd, "show-labels") {
+			if outputMode != "" && outputMode != "wide" {
+				return UsageErrorf(cmd, "--show-labels option cannot be used with -o output: %s", outputMode)
+			}
+		}
 	}
 	return nil
 }

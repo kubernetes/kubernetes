@@ -76,6 +76,7 @@ func NewCmdCreate(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 				return
 			}
 			cmdutil.CheckErr(options.ValidateArgs(cmd, args))
+			cmdutil.ValidateOutputArgs(cmd, cmdutil.KubectlCreate)
 			cmdutil.CheckErr(RunCreate(f, cmd, out, errOut, &options))
 		},
 	}

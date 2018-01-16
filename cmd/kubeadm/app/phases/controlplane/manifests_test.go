@@ -113,9 +113,13 @@ func TestCreateStaticPodFilesAndWrappers(t *testing.T) {
 		tmpdir := testutil.SetupTempDir(t)
 		defer os.RemoveAll(tmpdir)
 
+		api := kubeadmapi.API{
+			AdvertiseAddress: "1.2.3.4",
+		}
 		// Creates a Master Configuration
 		cfg := &kubeadmapi.MasterConfiguration{
 			KubernetesVersion: "v1.8.0",
+			API:               api,
 		}
 
 		// Execute createStaticPodFunction
