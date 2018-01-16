@@ -43,7 +43,7 @@ func (os *OpenStack) Instances() (cloudprovider.Instances, bool) {
 		return nil, false
 	}
 
-	glog.V(1).Info("Claiming to support Instances")
+	glog.V(4).Info("Claiming to support Instances")
 
 	return &Instances{
 		compute: compute,
