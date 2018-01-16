@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package versioned
+package generic
 
 import (
 	"reflect"
@@ -39,7 +39,7 @@ func initiateScheme() *runtime.Scheme {
 
 func TestConvertToGVK(t *testing.T) {
 	scheme := initiateScheme()
-	c := Convertor{Scheme: scheme}
+	c := convertor{Scheme: scheme}
 	table := map[string]struct {
 		obj         runtime.Object
 		gvk         schema.GroupVersionKind
@@ -131,89 +131,21 @@ func TestConvertToGVK(t *testing.T) {
 	}
 }
 
-func TestConvert(t *testing.T) {
+// TestRuntimeSchemeConvert verifies that scheme.Convert(x, x, nil) for an unstructured x is a no-op.
+// This did not use to be like that and we had to wrap scheme.Convert before.
+func TestRuntimeSchemeConvert(t *testing.T) {
 	scheme := initiateScheme()
-	c := Convertor{Scheme: scheme}
-	sampleCRD := unstructured.Unstructured{
+	obj := &unstructured.Unstructured{
 		Object: map[string]interface{}{
-			"apiVersion": "mygroup.k8s.io/v1",
-			"kind":       "Flunder",
-			"data": map[string]interface{}{
-				"Key": "Value",
-			},
+			"foo": "bar",
 		},
 	}
+	clone := obj.DeepCopy()
 
-	table := map[string]struct {
-		in          runtime.Object
-		out         runtime.Object
-		expectedObj runtime.Object
-	}{
-		"convert example/v1#Pod to example#Pod": {
-			in: &examplev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "pod1",
-					Labels: map[string]string{
-						"key": "value",
-					},
-				},
-				Spec: examplev1.PodSpec{
-					RestartPolicy: examplev1.RestartPolicy("never"),
-				},
-			},
-			out: &example.Pod{},
-			expectedObj: &example.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "pod1",
-					Labels: map[string]string{
-						"key": "value",
-					},
-				},
-				Spec: example.PodSpec{
-					RestartPolicy: example.RestartPolicy("never"),
-				},
-			},
-		},
-		"convert example2/v1#replicaset to example#replicaset": {
-			in: &example2v1.ReplicaSet{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "rs1",
-					Labels: map[string]string{
-						"key": "value",
-					},
-				},
-				Spec: example2v1.ReplicaSetSpec{
-					Replicas: func() *int32 { var i int32; i = 1; return &i }(),
-				},
-			},
-			out: &example.ReplicaSet{},
-			expectedObj: &example.ReplicaSet{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "rs1",
-					Labels: map[string]string{
-						"key": "value",
-					},
-				},
-				Spec: example.ReplicaSetSpec{
-					Replicas: 1,
-				},
-			},
-		},
-		"no conversion if the object is the same": {
-			in:          &sampleCRD,
-			out:         &sampleCRD,
-			expectedObj: &sampleCRD,
-		},
+	if err := scheme.Convert(obj, obj, nil); err != nil {
+		t.Fatalf("unexpected convert error: %v", err)
 	}
-	for name, test := range table {
-		t.Run(name, func(t *testing.T) {
-			err := c.Convert(test.in, test.out)
-			if err != nil {
-				t.Error(err)
-			}
-			if !reflect.DeepEqual(test.out, test.expectedObj) {
-				t.Errorf("\nexpected:\n%#v\ngot:\n %#v\n", test.expectedObj, test.out)
-			}
-		})
+	if !reflect.DeepEqual(obj, clone) {
+		t.Errorf("unexpected mutation of self-converted Unstructured: obj=%#v, clone=%#v", obj, clone)
 	}
 }

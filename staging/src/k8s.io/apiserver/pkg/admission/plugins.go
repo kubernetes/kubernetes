@@ -172,16 +172,16 @@ func (ps *Plugins) InitPlugin(name string, config io.Reader, pluginInitializer P
 
 	plugin, found, err := ps.getPlugin(name, config)
 	if err != nil {
-		return nil, fmt.Errorf("Couldn't init admission plugin %q: %v", name, err)
+		return nil, fmt.Errorf("couldn't init admission plugin %q: %v", name, err)
 	}
 	if !found {
-		return nil, fmt.Errorf("Unknown admission plugin: %s", name)
+		return nil, fmt.Errorf("unknown admission plugin: %s", name)
 	}
 
 	pluginInitializer.Initialize(plugin)
 	// ensure that plugins have been properly initialized
 	if err := ValidateInitialization(plugin); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to initialize admission plugin %q: %v", name, err)
 	}
 
 	return plugin, nil

@@ -22,11 +22,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/uuid"
-	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/admission/plugin/webhook/generic"
 )
 
 // CreateAdmissionReview creates an AdmissionReview for the provided admission.Attributes
-func CreateAdmissionReview(attr admission.Attributes) admissionv1beta1.AdmissionReview {
+func CreateAdmissionReview(attr *generic.VersionedAttributes) admissionv1beta1.AdmissionReview {
 	gvk := attr.GetKind()
 	gvr := attr.GetResource()
 	aUserInfo := attr.GetUserInfo()
@@ -61,10 +61,10 @@ func CreateAdmissionReview(attr admission.Attributes) admissionv1beta1.Admission
 			Operation:   admissionv1beta1.Operation(attr.GetOperation()),
 			UserInfo:    userInfo,
 			Object: runtime.RawExtension{
-				Object: attr.GetObject(),
+				Object: attr.VersionedObject,
 			},
 			OldObject: runtime.RawExtension{
-				Object: attr.GetOldObject(),
+				Object: attr.VersionedOldObject,
 			},
 		},
 	}
