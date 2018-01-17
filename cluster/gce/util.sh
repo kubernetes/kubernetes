@@ -210,7 +210,6 @@ function copy-to-staging() {
 #   ZONE
 # Vars set:
 #   PREFERRED_REGION
-#   KUBE_ADDON_REGISTRY
 function set-preferred-region() {
   case ${ZONE} in
     asia-*)
@@ -223,25 +222,11 @@ function set-preferred-region() {
       PREFERRED_REGION=("us" "eu" "asia")
       ;;
   esac
-  local -r preferred="${PREFERRED_REGION[0]}"
 
   if [[ "${RELEASE_REGION_FALLBACK}" != "true" ]]; then
-    PREFERRED_REGION=( "${preferred}" )
-  fi
-
-  # If we're using regional GCR, and we're outside the US, go to the
-  # regional registry. The gcr.io/google_containers registry is
-  # appropriate for US (for now).
-  if [[ "${REGIONAL_KUBE_ADDONS}" == "true" ]] && [[ "${preferred}" != "us" ]]; then
-    KUBE_ADDON_REGISTRY="${preferred}.gcr.io/google_containers"
-  else
-    KUBE_ADDON_REGISTRY="gcr.io/google_containers"
+    PREFERRED_REGION=( "${PREFERRED_REGION[0]}" )
   fi
 }
-
-if [[ "${ENABLE_DOCKER_REGISTRY_CACHE:-}" == "true" ]]; then
-  DOCKER_REGISTRY_MIRROR_URL="https://mirror.gcr.io"
-fi
 
 # Take the local tar files and upload them to Google Storage.  They will then be
 # downloaded by the master as part of the start up script for the master.
@@ -274,6 +259,10 @@ function upload-server-tars() {
   project_hash=${project_hash:0:10}
 
   set-preferred-region
+
+  if [[ "${ENABLE_DOCKER_REGISTRY_CACHE:-}" == "true" ]]; then
+    DOCKER_REGISTRY_MIRROR_URL="https://mirror.gcr.io"
+  fi
 
   SERVER_BINARY_TAR_HASH=$(sha1sum-file "${SERVER_BINARY_TAR}")
   if [[ -n "${KUBE_MANIFESTS_TAR:-}" ]]; then

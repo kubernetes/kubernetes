@@ -10,4 +10,4 @@ spec:
     spec:
       containers:
       - name: nginx
-        image: gcr.io/google-containers/nginx:1.7.9
+        image: k8s.gcr.io/nginx:1.7.9

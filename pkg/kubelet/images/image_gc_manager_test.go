@@ -33,7 +33,7 @@ import (
 )
 
 var zero time.Time
-var sandboxImage = "gcr.io/google_containers/pause-amd64:latest"
+var sandboxImage = "k8s.gcr.io/pause-amd64:latest"
 
 func newRealImageGCManager(policy ImageGCPolicy) (*realImageGCManager, *containertest.FakeRuntime, *statstest.StatsProvider) {
 	fakeRuntime := &containertest.FakeRuntime{}

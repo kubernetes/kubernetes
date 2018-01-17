@@ -193,14 +193,14 @@ function create-and-upload-hollow-node-image {
     echo 'Cannot find cmd/kubemark binary'
     exit 1
   fi
-  
+
   echo "Copying kubemark binary to ${MAKE_DIR}"
   cp "${KUBEMARK_BIN}" "${MAKE_DIR}"
   CURR_DIR=`pwd`
   cd "${MAKE_DIR}"
   RETRIES=3
   for attempt in $(seq 1 ${RETRIES}); do
-    if ! REGISTRY="${CONTAINER_REGISTRY}" PROJECT="${PROJECT}" make "${KUBEMARK_IMAGE_MAKE_TARGET}"; then
+    if ! REGISTRY="${FULL_REGISTRY}" make "${KUBEMARK_IMAGE_MAKE_TARGET}"; then
       if [[ $((attempt)) -eq "${RETRIES}" ]]; then
         echo "${color_red}Make failed. Exiting.${color_norm}"
         exit 1
@@ -221,7 +221,7 @@ function create-and-upload-hollow-node-image {
 function create-and-upload-hollow-node-image-bazel {
   RETRIES=3
   for attempt in $(seq 1 ${RETRIES}); do
-    if ! bazel run //cluster/images/kubemark:push --define PROJECT="${PROJECT}"; then
+    if ! bazel run //cluster/images/kubemark:push --define REGISTRY="${FULL_REGISTRY}"; then
       if [[ $((attempt)) -eq "${RETRIES}" ]]; then
         echo "${color_red}Image push failed. Exiting.${color_norm}"
         exit 1
@@ -456,6 +456,15 @@ write-pki-config-to-master
 write-local-kubeconfig
 copy-resource-files-to-master
 start-master-components
+
+# TODO: Simplify. The caller should have to pass a full registry or nothing.
+if [[ -n "${CONTAINER_REGISTRY}" && -n "${PROJECT}" ]]; then
+  FULL_REGISTRY="${CONTAINER_REGISTRY}/${PROJECT}"
+elif [[ -n "${CONTAINER_REGISTRY}" ]]; then
+  FULL_REGISTRY="${CONTAINER_REGISTRY}"
+else
+  FULL_REGISTRY=staging-k8s.gcr.io
+fi
 
 # Setup for hollow-nodes.
 echo ""

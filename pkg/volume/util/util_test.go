@@ -164,7 +164,7 @@ metadata:
   name: testpod
 spec:
   containers:
-    - image: gcr.io/google_containers/busybox
+    - image: k8s.gcr.io/busybox
 `,
 			false,
 		},
@@ -181,7 +181,7 @@ spec:
   "spec": {
     "containers": [
       {
-        "image": "gcr.io/google_containers/busybox"
+        "image": "k8s.gcr.io/busybox"
       }
     ]
   }
@@ -197,7 +197,7 @@ kind: Pod
 metadata:
   name: testpod
 spec:
-  - image: gcr.io/google_containers/busybox
+  - image: k8s.gcr.io/busybox
 `,
 			true,
 		},
