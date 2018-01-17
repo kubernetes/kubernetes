@@ -17,4 +17,4 @@ limitations under the License.
 // Package api (pkg/bootstrap/api) contains constants and types needed for
 // bootstrap tokens as maintained by the BootstrapSigner and TokenCleaner
 // controllers (in pkg/controller/bootstrap)
-package api // import "k8s.io/kubernetes/pkg/bootstrap/api"
+package api // import "k8s.io/client-go/tools/bootstrap/api"
