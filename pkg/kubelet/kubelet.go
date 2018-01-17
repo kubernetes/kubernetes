@@ -590,6 +590,10 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	var nl *NoOpLegacyHost
 	pluginSettings.LegacyRuntimeHost = nl
 
+	if containerRuntime == kubetypes.RktContainerRuntime {
+		glog.Warningln("rktnetes has been deprecated in favor of rktlet. Please see https://github.com/kubernetes-incubator/rktlet for more information.")
+	}
+
 	// rktnetes cannot be run with CRI.
 	if containerRuntime != kubetypes.RktContainerRuntime {
 		// kubelet defers to the runtime shim to setup networking. Setting
