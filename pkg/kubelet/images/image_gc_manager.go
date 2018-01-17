@@ -33,7 +33,6 @@ import (
 	"k8s.io/client-go/tools/record"
 	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/container"
-	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 )
 
@@ -55,7 +54,7 @@ type ImageGCManager interface {
 	// Start async garbage collection of images.
 	Start()
 
-	GetImageList() ([]kubecontainer.Image, error)
+	GetImageList() ([]container.Image, error)
 
 	// Delete all unused images and returns the number of bytes freed. The number of bytes freed is always returned.
 	DeleteUnusedImages() (int64, error)
@@ -108,18 +107,18 @@ type imageCache struct {
 	// sync.RWMutex is the mutex protects the image cache.
 	sync.RWMutex
 	// images is the image cache.
-	images []kubecontainer.Image
+	images []container.Image
 }
 
 // set updates image cache.
-func (i *imageCache) set(images []kubecontainer.Image) {
+func (i *imageCache) set(images []container.Image) {
 	i.Lock()
 	defer i.Unlock()
 	i.images = images
 }
 
 // get gets image list from image cache.
-func (i *imageCache) get() []kubecontainer.Image {
+func (i *imageCache) get() []container.Image {
 	i.RLock()
 	defer i.RUnlock()
 	return i.images
@@ -190,7 +189,7 @@ func (im *realImageGCManager) Start() {
 }
 
 // Get a list of images on this node
-func (im *realImageGCManager) GetImageList() ([]kubecontainer.Image, error) {
+func (im *realImageGCManager) GetImageList() ([]container.Image, error) {
 	return im.imageCache.get(), nil
 }
 
