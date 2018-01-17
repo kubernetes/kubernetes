@@ -411,26 +411,32 @@
 [[constraint]]
   branch = "master"
   name = "k8s.io/api"
+#  source = "http://localhost:12345/staging/src/k8s.io/api"
 
 [[constraint]]
   branch = "master"
   name = "k8s.io/apiextensions-apiserver"
+#  source = "http://localhost:12345/staging/src/k8s.io/apiextensions-apiserver"
 
 [[constraint]]
   branch = "master"
   name = "k8s.io/apimachinery"
+#  source = "http://localhost:12345/staging/src/k8s.io/apimachinery"
 
 [[constraint]]
   branch = "master"
   name = "k8s.io/apiserver"
+#  source = "http://localhost:12345/staging/src/k8s.io/apiserver"
 
 [[constraint]]
+  branch = "master"
   name = "k8s.io/client-go"
-  version = "6.0.0"
+#  source = "http://localhost:12345/staging/src/k8s.io/client-go"
 
 [[constraint]]
   branch = "master"
   name = "k8s.io/code-generator"
+#  source = "http://localhost:12345/staging/src/k8s.io/code-generator"
 
 [[constraint]]
   name = "k8s.io/gengo"
@@ -442,6 +448,7 @@
 [[constraint]]
   branch = "master"
   name = "k8s.io/kube-aggregator"
+#  source = "http://localhost:12345/staging/src/k8s.io/kube-aggregator"
 
 [[constraint]]
   name = "k8s.io/kube-openapi"
@@ -449,14 +456,17 @@
 [[constraint]]
   branch = "master"
   name = "k8s.io/metrics"
+#  source = "http://localhost:12345/staging/src/k8s.io/metrics"
 
 [[constraint]]
   branch = "master"
   name = "k8s.io/sample-apiserver"
+#  source = "http://localhost:12345/staging/src/k8s.io/sample-apiserver"
 
 [[constraint]]
   branch = "master"
   name = "k8s.io/sample-controller"
+#  source = "http://localhost:12345/staging/src/k8s.io/sample-controller"
 
 [[constraint]]
   name = "k8s.io/utils"
