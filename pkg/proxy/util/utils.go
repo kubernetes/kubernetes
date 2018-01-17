@@ -21,11 +21,9 @@ import (
 	"net"
 
 	"k8s.io/apimachinery/pkg/types"
-	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
-	"k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig"
 	"k8s.io/kubernetes/pkg/util/conntrack"
 
 	"github.com/golang/glog"
@@ -74,11 +72,15 @@ func ShouldSkipService(svcName types.NamespacedName, service *api.Service) bool 
 	return false
 }
 
-// GetNodeAddresses list all match node IP addresses based on given cidr list.  Inject NetworkInterface for test purpose.
-// We expect the cidr list passed in is already validated.
-// Given `default-route`, it will the IP of host interface having default route.
+// GetNodeAddresses return all matched node IP addresses based on given cidr slice.
+// Some callers, e.g. IPVS proxier, need concrete IPs, not ranges, which is why this exists.
+// NetworkInterfacer is injected for test purpose.
+// We expect the cidrs passed in is already validated.
 // Given an empty input `[]`, it will return `0.0.0.0/0` and `::/0` directly.
-func GetNodeAddresses(cidrs []string, nw NetworkInterface) (sets.String, error) {
+// If multiple cidrs is given, it will return the minimal IP sets, e.g. given input `[1.2.0.0/16, 0.0.0.0/0]`, it will
+// only return `0.0.0.0/0`.
+// NOTE: GetNodeAddresses only accepts CIDRs, if you want concrete IPs, e.g. 1.2.3.4, then the input should be 1.2.3.4/32.
+func GetNodeAddresses(cidrs []string, nw NetworkInterfacer) (sets.String, error) {
 	uniqueAddressList := sets.NewString()
 	if len(cidrs) == 0 {
 		uniqueAddressList.Insert(IPv4ZeroCIDR)
@@ -94,19 +96,6 @@ func GetNodeAddresses(cidrs []string, nw NetworkInterface) (sets.String, error) 
 	// Second round of iteration to parse IPs based on cidr.
 	for _, cidr := range cidrs {
 		if IsZeroCIDR(cidr) {
-			continue
-		}
-		if cidr == string(kubeproxyconfig.DefaultRoute) {
-			hostIP, err := utilnet.ChooseHostInterface()
-			if err != nil {
-				return nil, fmt.Errorf("error selecting a host interface having default route, error: %v", err)
-			}
-			if conntrack.IsIPv6(hostIP) && !uniqueAddressList.Has(IPv6ZeroCIDR) {
-				uniqueAddressList.Insert(hostIP.String())
-			}
-			if !conntrack.IsIPv6(hostIP) && !uniqueAddressList.Has(IPv4ZeroCIDR) {
-				uniqueAddressList.Insert(hostIP.String())
-			}
 			continue
 		}
 		_, ipNet, _ := net.ParseCIDR(cidr)

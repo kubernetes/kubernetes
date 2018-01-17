@@ -34,6 +34,7 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/proxy"
 	utilproxy "k8s.io/kubernetes/pkg/proxy/util"
+	utilproxytest "k8s.io/kubernetes/pkg/proxy/util/testing"
 	"k8s.io/kubernetes/pkg/util/async"
 	"k8s.io/kubernetes/pkg/util/conntrack"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
@@ -405,6 +406,8 @@ func NewFakeProxier(ipt utiliptables.Interface) *Proxier {
 		filterRules:              bytes.NewBuffer(nil),
 		natChains:                bytes.NewBuffer(nil),
 		natRules:                 bytes.NewBuffer(nil),
+		nodePortAddresses:        make([]string, 0),
+		networkInterfacer:        utilproxytest.NewFakeNetwork(),
 	}
 	p.syncRunner = async.NewBoundedFrequencyRunner("test-sync-runner", p.syncProxyRules, 0, time.Minute, 1)
 	return p
@@ -769,6 +772,14 @@ func TestNodePort(t *testing.T) {
 		}),
 	)
 
+	itf := net.Interface{Index: 0, MTU: 0, Name: "lo", HardwareAddr: nil, Flags: 0}
+	addrs := []net.Addr{utilproxytest.AddrStruct{Val: "127.0.0.1/16"}}
+	itf1 := net.Interface{Index: 1, MTU: 0, Name: "eth1", HardwareAddr: nil, Flags: 0}
+	addrs1 := []net.Addr{utilproxytest.AddrStruct{Val: "::1/128"}}
+	fp.networkInterfacer.(*utilproxytest.FakeNetwork).AddInterfaceAddr(&itf, addrs)
+	fp.networkInterfacer.(*utilproxytest.FakeNetwork).AddInterfaceAddr(&itf1, addrs1)
+	fp.nodePortAddresses = []string{}
+
 	fp.syncProxyRules()
 
 	proto := strings.ToLower(string(api.ProtocolTCP))
@@ -1001,6 +1012,11 @@ func onlyLocalNodePorts(t *testing.T, fp *Proxier, ipt *iptablestest.FakeIPTable
 		}),
 	)
 
+	itf := net.Interface{Index: 0, MTU: 0, Name: "eth0", HardwareAddr: nil, Flags: 0}
+	addrs := []net.Addr{utilproxytest.AddrStruct{Val: "10.20.30.51/24"}}
+	fp.networkInterfacer.(*utilproxytest.FakeNetwork).AddInterfaceAddr(&itf, addrs)
+	fp.nodePortAddresses = []string{"10.20.30.0/24"}
+
 	fp.syncProxyRules()
 
 	proto := strings.ToLower(string(api.ProtocolTCP))
@@ -1013,9 +1029,13 @@ func onlyLocalNodePorts(t *testing.T, fp *Proxier, ipt *iptablestest.FakeIPTable
 	if !hasJump(kubeNodePortRules, lbChain, "", svcNodePort) {
 		errorf(fmt.Sprintf("Failed to find jump to lb chain %v", lbChain), kubeNodePortRules, t)
 	}
-
 	if !hasJump(kubeNodePortRules, string(KubeMarkMasqChain), "", svcNodePort) {
 		errorf(fmt.Sprintf("Failed to find jump to %s chain for destination IP %d", KubeMarkMasqChain, svcNodePort), kubeNodePortRules, t)
+	}
+
+	kubeServiceRules := ipt.GetRules(string(kubeServicesChain))
+	if !hasJump(kubeServiceRules, string(kubeNodePortsChain), "10.20.30.51", 0) {
+		errorf(fmt.Sprintf("Failed to find jump to KUBE-NODEPORTS chain %v", string(kubeNodePortsChain)), kubeServiceRules, t)
 	}
 
 	svcChain := string(servicePortChainName(svcPortName.String(), proto))

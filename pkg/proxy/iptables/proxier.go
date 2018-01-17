@@ -341,6 +341,12 @@ type Proxier struct {
 	filterRules  *bytes.Buffer
 	natChains    *bytes.Buffer
 	natRules     *bytes.Buffer
+
+	// Values are as a parameter to select the interfaces where nodeport works.
+	nodePortAddresses []string
+	// networkInterfacer defines an interface for several net library functions.
+	// Inject for test purpose.
+	networkInterfacer utilproxy.NetworkInterfacer
 }
 
 // listenPortOpener opens ports by calling bind() and listen().
@@ -371,6 +377,7 @@ func NewProxier(ipt utiliptables.Interface,
 	nodeIP net.IP,
 	recorder record.EventRecorder,
 	healthzServer healthcheck.HealthzUpdater,
+	nodePortAddresses []string,
 ) (*Proxier, error) {
 	// Set the route_localnet sysctl we need for
 	if err := sysctl.SetSysctl(sysctlRouteLocalnet, 1); err != nil {
@@ -422,6 +429,8 @@ func NewProxier(ipt utiliptables.Interface,
 		filterRules:              bytes.NewBuffer(nil),
 		natChains:                bytes.NewBuffer(nil),
 		natRules:                 bytes.NewBuffer(nil),
+		nodePortAddresses:        nodePortAddresses,
+		networkInterfacer:        utilproxy.RealNetwork{},
 	}
 	burstSyncs := 2
 	glog.V(3).Infof("minSyncPeriod: %v, syncPeriod: %v, burstSyncs: %d", minSyncPeriod, syncPeriod, burstSyncs)
@@ -1289,11 +1298,37 @@ func (proxier *Proxier) syncProxyRules() {
 
 	// Finally, tail-call to the nodeports chain.  This needs to be after all
 	// other service portal rules.
-	writeLine(proxier.natRules,
-		"-A", string(kubeServicesChain),
-		"-m", "comment", "--comment", `"kubernetes service nodeports; NOTE: this must be the last rule in this chain"`,
-		"-m", "addrtype", "--dst-type", "LOCAL",
-		"-j", string(kubeNodePortsChain))
+	addresses, err := utilproxy.GetNodeAddresses(proxier.nodePortAddresses, proxier.networkInterfacer)
+	if err != nil {
+		glog.Errorf("Failed to get node ip address matching nodeport cidr")
+	} else {
+		isIPv6 := proxier.iptables.IsIpv6()
+		for address := range addresses {
+			// TODO(thockin, m1093782566): If/when we have dual-stack support we will want to distinguish v4 from v6 zero-CIDRs.
+			if utilproxy.IsZeroCIDR(address) {
+				args = append(args[:0],
+					"-A", string(kubeServicesChain),
+					"-m", "comment", "--comment", `"kubernetes service nodeports; NOTE: this must be the last rule in this chain"`,
+					"-m", "addrtype", "--dst-type", "LOCAL",
+					"-j", string(kubeNodePortsChain))
+				writeLine(proxier.natRules, args...)
+				// Nothing else matters after the zero CIDR.
+				break
+			}
+			// Ignore IP addresses with incorrect version
+			if isIPv6 && !conntrack.IsIPv6String(address) || !isIPv6 && conntrack.IsIPv6String(address) {
+				glog.Errorf("IP address %s has incorrect IP version", address)
+				continue
+			}
+			// create nodeport rules for each IP one by one
+			args = append(args[:0],
+				"-A", string(kubeServicesChain),
+				"-m", "comment", "--comment", `"kubernetes service nodeports; NOTE: this must be the last rule in this chain"`,
+				"-d", address,
+				"-j", string(kubeNodePortsChain))
+			writeLine(proxier.natRules, args...)
+		}
+	}
 
 	// If the masqueradeMark has been added then we want to forward that same
 	// traffic, this allows NodePort traffic to be forwarded even if the default
