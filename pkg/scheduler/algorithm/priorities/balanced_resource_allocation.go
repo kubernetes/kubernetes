@@ -24,7 +24,7 @@ import (
 )
 
 var (
-	balanceResourcePriority = &ResourceAllocationPriority{"BalanceResourceAllocation", balancedResourceScorer}
+	balancedResourcePriority = &ResourceAllocationPriority{"BalancedResourceAllocation", balancedResourceScorer}
 
 	// BalancedResourceAllocationMap favors nodes with balanced resource usage rate.
 	// BalancedResourceAllocationMap should **NOT** be used alone, and **MUST** be used together
@@ -33,7 +33,7 @@ var (
 	// Detail: score = 10 - abs(cpuFraction-memoryFraction)*10. The algorithm is partly inspired by:
 	// "Wei Huang et al. An Energy Efficient Virtual Machine Placement Algorithm with Balanced
 	// Resource Utilization"
-	BalancedResourceAllocationMap = balanceResourcePriority.PriorityMap
+	BalancedResourceAllocationMap = balancedResourcePriority.PriorityMap
 )
 
 func balancedResourceScorer(requested, allocable *schedulercache.Resource) int64 {
