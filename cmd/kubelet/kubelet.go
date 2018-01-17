@@ -22,7 +22,9 @@ package main
 
 import (
 	"fmt"
+	"math/rand"
 	"os"
+	"time"
 
 	"github.com/spf13/pflag"
 
@@ -42,6 +44,8 @@ func die(err error) {
 }
 
 func main() {
+	rand.Seed(time.Now().UTC().UnixNano())
+
 	// construct KubeletFlags object and register command line flags mapping
 	kubeletFlags := options.NewKubeletFlags()
 	kubeletFlags.AddFlags(pflag.CommandLine)
