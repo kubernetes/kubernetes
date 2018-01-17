@@ -33,7 +33,7 @@ const (
 	DefaultHeapsterNamespace = "kube-system"
 	DefaultHeapsterScheme    = "http"
 	DefaultHeapsterService   = "heapster"
-	DefaultHeapsterPort      = "" // use the first exposed port on the service
+	DefaultHeapsterPort      = "80"
 )
 
 var (
