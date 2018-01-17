@@ -17,6 +17,8 @@ limitations under the License.
 package factory
 
 import (
+	"crypto/tls"
+
 	"github.com/coreos/etcd/clientv3"
 	"github.com/coreos/etcd/pkg/transport"
 	"golang.org/x/net/context"
@@ -28,19 +30,21 @@ import (
 )
 
 func newETCD3Storage(c storagebackend.Config) (storage.Interface, DestroyFunc, error) {
-	tlsInfo := transport.TLSInfo{
-		CertFile: c.CertFile,
-		KeyFile:  c.KeyFile,
-		CAFile:   c.CAFile,
-	}
-	tlsConfig, err := tlsInfo.ClientConfig()
-	if err != nil {
-		return nil, nil, err
-	}
-	// NOTE: Client relies on nil tlsConfig
-	// for non-secure connections, update the implicit variable
+	var tlsConfig *tls.Config
+
 	if len(c.CertFile) == 0 && len(c.KeyFile) == 0 && len(c.CAFile) == 0 {
 		tlsConfig = nil
+	} else {
+		tlsInfo := transport.TLSInfo{
+			CertFile: c.CertFile,
+			KeyFile:  c.KeyFile,
+			CAFile:   c.CAFile,
+		}
+		var err error
+		tlsConfig, err = tlsInfo.ClientConfig()
+		if err != nil {
+			return nil, nil, err
+		}
 	}
 	cfg := clientv3.Config{
 		Endpoints: c.ServerList,

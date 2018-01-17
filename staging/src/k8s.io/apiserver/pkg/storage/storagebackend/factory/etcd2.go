@@ -17,6 +17,7 @@ limitations under the License.
 package factory
 
 import (
+	"crypto/tls"
 	"net"
 	"net/http"
 	"time"
@@ -56,15 +57,23 @@ func newETCD2Client(tr *http.Transport, serverList []string) (etcd2client.Client
 }
 
 func newTransportForETCD2(certFile, keyFile, caFile string) (*http.Transport, error) {
-	info := transport.TLSInfo{
-		CertFile: certFile,
-		KeyFile:  keyFile,
-		CAFile:   caFile,
+	var cfg *tls.Config
+
+	if len(certFile) == 0 && len(keyFile) == 0 && len(caFile) == 0 {
+		cfg = nil
+	} else {
+		info := transport.TLSInfo{
+			CertFile: certFile,
+			KeyFile:  keyFile,
+			CAFile:   caFile,
+		}
+		var err error
+		cfg, err = info.ClientConfig()
+		if err != nil {
+			return nil, err
+		}
 	}
-	cfg, err := info.ClientConfig()
-	if err != nil {
-		return nil, err
-	}
+
 	// Copied from etcd.DefaultTransport declaration.
 	// TODO: Determine if transport needs optimization
 	tr := utilnet.SetTransportDefaults(&http.Transport{
