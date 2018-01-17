@@ -93,7 +93,7 @@ func (f *flexVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 	}
 
 	if !f.readOnly {
-		volume.SetVolumeOwnership(f, fsGroup)
+		volume.SetVolumeOwnership(f, fsGroup, true)
 	}
 
 	return nil

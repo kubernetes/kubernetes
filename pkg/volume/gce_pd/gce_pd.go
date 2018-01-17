@@ -340,7 +340,7 @@ func (b *gcePersistentDiskMounter) SetUpAt(dir string, fsGroup *int64) error {
 	}
 
 	if !b.readOnly {
-		volume.SetVolumeOwnership(b, fsGroup)
+		volume.SetVolumeOwnership(b, fsGroup, true)
 	}
 
 	glog.V(4).Infof("Successfully mounted %s", dir)

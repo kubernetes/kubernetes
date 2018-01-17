@@ -93,7 +93,7 @@ func diskSetUp(manager diskManager, b iscsiDiskMounter, volPath string, mounter 
 	}
 
 	if !b.readOnly {
-		volume.SetVolumeOwnership(&b, fsGroup)
+		volume.SetVolumeOwnership(&b, fsGroup, true)
 	}
 
 	return nil

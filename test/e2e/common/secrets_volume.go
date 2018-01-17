@@ -182,6 +182,123 @@ var _ = Describe("[sig-storage] Secrets", func() {
 	})
 
 	/*
+	   Testname: secret-file-mode
+	   Description: Ensure that secret files are mounted with the correct mode
+	*/
+	framework.ConformanceIt("should be mounted with the correct mode", func() {
+		// This test ensures that the specified file mode is honored, even when a fsGroup is present
+		var (
+			name            = "secret-test-" + string(uuid.NewUUID())
+			volumeName      = "secret-volume"
+			volumeMountPath = "/etc/secret-volume"
+			secret          = secretForTest(f.Namespace.Name, name)
+		)
+
+		By(fmt.Sprintf("Creating secret with name %s", secret.Name))
+		var err error
+		if secret, err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(secret); err != nil {
+			framework.Failf("unable to create test secret %s: %v", secret.Name, err)
+		}
+
+		ownerRO := int32(0400)
+		ownerRX := int32(0500)
+		ownerRW := int32(0600)
+
+		uid1000 := int64(1000)
+		uid2000 := int64(2000)
+
+		fsGroup := int64(3000)
+
+		pod := f.PodClient().Create(&v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: "pod-secrets-" + string(uuid.NewUUID())},
+			Spec: v1.PodSpec{
+				Volumes: []v1.Volume{{
+					Name: volumeName,
+					VolumeSource: v1.VolumeSource{
+						Secret: &v1.SecretVolumeSource{
+							SecretName:  name,
+							DefaultMode: &ownerRO,
+							Items: []v1.KeyToPath{
+								{Key: "data-1", Path: "data-1"}, // data-1 uses default mode
+								{Key: "data-2", Path: "data-2", Mode: &ownerRX},
+								{Key: "data-3", Path: "data-3", Mode: &ownerRW},
+							},
+						},
+					},
+				}},
+				SecurityContext: &v1.PodSecurityContext{FSGroup: &fsGroup},
+				Containers: []v1.Container{
+					{
+						Name:            "data-1-uid-1000",
+						Image:           mountImage,
+						Args:            []string{"--file_content=/etc/secret-volume/data-1", "--file_mode=/etc/secret-volume/data-1", "--file_owner=/etc/secret-volume/data-1"},
+						VolumeMounts:    []v1.VolumeMount{{Name: volumeName, MountPath: volumeMountPath, ReadOnly: true}},
+						SecurityContext: &v1.SecurityContext{RunAsUser: &uid1000},
+					},
+					{
+						Name:            "data-1-uid-2000",
+						Image:           mountImage,
+						Args:            []string{"--file_content=/etc/secret-volume/data-1", "--file_mode=/etc/secret-volume/data-1", "--file_owner=/etc/secret-volume/data-1"},
+						VolumeMounts:    []v1.VolumeMount{{Name: volumeName, MountPath: volumeMountPath, ReadOnly: true}},
+						SecurityContext: &v1.SecurityContext{RunAsUser: &uid2000},
+					},
+					{
+						Name:         "data-2",
+						Image:        mountImage,
+						Args:         []string{"--file_content=/etc/secret-volume/data-2", "--file_mode=/etc/secret-volume/data-2"},
+						VolumeMounts: []v1.VolumeMount{{Name: volumeName, MountPath: volumeMountPath, ReadOnly: true}},
+					},
+					{
+						Name:         "data-3",
+						Image:        mountImage,
+						Args:         []string{"--file_content=/etc/secret-volume/data-3", "--file_mode=/etc/secret-volume/data-3"},
+						VolumeMounts: []v1.VolumeMount{{Name: volumeName, MountPath: volumeMountPath, ReadOnly: true}},
+					},
+				},
+				RestartPolicy: v1.RestartPolicyNever,
+			},
+		})
+		errRun := framework.WaitForPodSuccessInNamespace(f.ClientSet, pod.Name, f.Namespace.Name)
+
+		data1uid1000Logs, err1 := framework.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, pod.Spec.Containers[0].Name)
+		framework.Logf("container[0]: %s", data1uid1000Logs)
+		data1uid2000Logs, err2 := framework.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, pod.Spec.Containers[1].Name)
+		framework.Logf("container[0]: %s", data1uid2000Logs)
+		data2Logs, err3 := framework.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, pod.Spec.Containers[2].Name)
+		framework.Logf("container[1]: %s", data2Logs)
+		data3Logs, err4 := framework.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, pod.Spec.Containers[3].Name)
+		framework.Logf("container[2]: %s", data3Logs)
+
+		Expect(errRun).NotTo(HaveOccurred())
+		Expect(err1).NotTo(HaveOccurred())
+		Expect(err2).NotTo(HaveOccurred())
+		Expect(err3).NotTo(HaveOccurred())
+		Expect(err4).NotTo(HaveOccurred())
+
+		Expect(data1uid1000Logs).To(ContainSubstring("value-1"))
+		Expect(data1uid1000Logs).To(ContainSubstring(`content of file "/etc/secret-volume/data-1": value-1`))
+		Expect(data1uid1000Logs).To(ContainSubstring(`mode of file "/etc/secret-volume/data-1": -r--------`))
+		Expect(data1uid1000Logs).To(ContainSubstring(`owner UID of file "/etc/secret-volume/data-1": 1000`))
+		Expect(data1uid1000Logs).To(ContainSubstring(`owner GID of file "/etc/secret-volume/data-1": 3000`))
+
+		Expect(data1uid2000Logs).To(ContainSubstring("value-1"))
+		Expect(data1uid2000Logs).To(ContainSubstring(`content of file "/etc/secret-volume/data-1": value-1`))
+		Expect(data1uid2000Logs).To(ContainSubstring(`mode of file "/etc/secret-volume/data-1": -r--------`))
+		Expect(data1uid2000Logs).To(ContainSubstring(`owner UID of file "/etc/secret-volume/data-1": 2000`))
+		Expect(data1uid2000Logs).To(ContainSubstring(`owner GID of file "/etc/secret-volume/data-1": 3000`))
+
+		Expect(data2Logs).To(ContainSubstring("value-2"))
+		Expect(data2Logs).To(ContainSubstring(`content of file "/etc/secret-volume/data-2": value-2`))
+		Expect(data2Logs).To(ContainSubstring(`mode of file "/etc/secret-volume/data-2": -r-x------`))
+		Expect(data2Logs).To(ContainSubstring(`owner GID of file "/etc/secret-volume/data-2": 3000`))
+
+		Expect(data3Logs).To(ContainSubstring("value-3"))
+		Expect(data3Logs).To(ContainSubstring(`content of file "/etc/secret-volume/data-3": value-3`))
+		Expect(data3Logs).To(ContainSubstring(`mode of file "/etc/secret-volume/data-3": -rw-------`))
+		Expect(data3Logs).To(ContainSubstring(`owner GID of file "/etc/secret-volume/data-3": 3000`))
+	})
+
+	/*
 		    Testname: secret-mounted-volume-optional-update-change
 		    Description: Ensure that optional update change to secret can be
 			reflected on a mounted volume.

@@ -211,7 +211,8 @@ func (s *projectedVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 		return err
 	}
 
-	err = volume.SetVolumeOwnership(s, fsGroup)
+	// Don't add permissions, since volume specifies a default mode and per-file permissions already
+	err = volume.SetVolumeOwnership(s, fsGroup, false)
 	if err != nil {
 		glog.Errorf("Error applying volume ownership settings for group: %v", fsGroup)
 		return err
