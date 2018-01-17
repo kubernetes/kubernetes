@@ -82,7 +82,7 @@ func main() {
 	// short-circuit on verflag
 	verflag.PrintAndExitIfRequested()
 
-	// TODO(mtaufen): won't need this this once dynamic config is GA
+	// TODO(mtaufen): won't need this once dynamic config is GA
 	// set feature gates so we can check if dynamic config is enabled
 	if err := utilfeature.DefaultFeatureGate.SetFromMap(defaultConfig.FeatureGates); err != nil {
 		die(err)
