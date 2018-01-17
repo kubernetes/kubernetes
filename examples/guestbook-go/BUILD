@@ -19,6 +19,8 @@ go_library(
     deps = [
         "//vendor/github.com/codegangsta/negroni:go_default_library",
         "//vendor/github.com/gorilla/mux:go_default_library",
+        "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",
+        "//vendor/github.com/prometheus/client_golang/prometheus/promhttp:go_default_library",
         "//vendor/github.com/xyproto/simpleredis:go_default_library",
     ],
 )
