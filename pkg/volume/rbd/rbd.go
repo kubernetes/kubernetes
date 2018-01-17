@@ -921,6 +921,12 @@ func (rbd *rbdDiskUnmapper) TearDownDevice(mapPath, _ string) error {
 	if err != nil {
 		return fmt.Errorf("rbd: failed to get loopback for device: %v, err: %v", device, err)
 	}
+	// Get loopback device which takes fd lock for device beofore detaching a volume from node.
+	// TODO: This is a workaround for issue #54108
+	// Currently local attach plugins such as FC, iSCSI, RBD can't obtain devicePath during
+	// GenerateUnmapDeviceFunc() in operation_generator. As a result, these plugins fail to get
+	// and remove loopback device then it will be remained on kubelet node. To avoid the problem,
+	// local attach plugins needs to remove loopback device during TearDownDevice().
 	blkUtil := volutil.NewBlockVolumePathHandler()
 	loop, err := volutil.BlockVolumePathHandler.GetLoopDevice(blkUtil, device)
 	if err != nil {
