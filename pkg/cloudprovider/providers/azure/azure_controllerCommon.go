@@ -43,6 +43,7 @@ const (
 	errLeaseFailed       = "AcquireDiskLeaseFailed"
 	errLeaseIDMissing    = "LeaseIdMissing"
 	errContainerNotFound = "ContainerNotFound"
+	errDiskBlobNotFound  = "DiskBlobNotFound"
 )
 
 var defaultBackOff = kwait.Backoff{
@@ -124,9 +125,9 @@ func (c *controllerCommon) AttachDisk(isManagedDisk bool, diskName, diskURI stri
 	if err != nil {
 		glog.Errorf("azureDisk - azure attach failed, err: %v", err)
 		detail := err.Error()
-		if strings.Contains(detail, errLeaseFailed) {
-			// if lease cannot be acquired, immediately detach the disk and return the original error
-			glog.Infof("azureDisk - failed to acquire disk lease, try detach")
+		if strings.Contains(detail, errLeaseFailed) || strings.Contains(detail, errDiskBlobNotFound) {
+			// if lease cannot be acquired or disk not found, immediately detach the disk and return the original error
+			glog.Infof("azureDisk - err %s, try detach", detail)
 			c.cloud.DetachDiskByName(diskName, diskURI, nodeName)
 		}
 	} else {
