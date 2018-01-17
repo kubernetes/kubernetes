@@ -37,6 +37,7 @@ import (
 // This is the comment tag that carries parameters for open API generation.
 const tagName = "k8s:openapi-gen"
 const tagOptional = "optional"
+const tagSchemaTypeFormat = tagName + ":schema-type-format"
 
 // Known values for the tag.
 const (
@@ -393,6 +394,7 @@ func (g openAPITypeWriter) generate(t *types.Type) error {
 		}
 		g.Do("return $.OpenAPIDefinition|raw${\nSchema: spec.Schema{\nSchemaProps: spec.SchemaProps{\n", args)
 		g.generateDescription(t.CommentLines)
+		g.Do("Type: []string{\"object\"},\n", nil)
 		g.Do("Properties: map[string]$.SpecSchemaType|raw${\n", args)
 		required, err := g.generateMembers(t, []string{})
 		if err != nil {
@@ -416,7 +418,11 @@ func (g openAPITypeWriter) generate(t *types.Type) error {
 		sort.Strings(keys)
 		for _, k := range keys {
 			v := g.refTypes[k]
-			if t, _ := openapi.GetOpenAPITypeFormat(v.String()); t != "" {
+			t, _, err := getOpenAPITypeFormat(v)
+			if err != nil {
+				return err
+			}
+			if t != "" {
 				// This is a known type, we do not need a reference to it
 				// Will eliminate special case of time.Time
 				continue
@@ -426,6 +432,25 @@ func (g openAPITypeWriter) generate(t *types.Type) error {
 		g.Do("},\n}\n}\n\n", nil)
 	}
 	return nil
+}
+
+func getOpenAPITypeFormat(t *types.Type) (string, string, error) {
+	schemaTypeFormatTag, err := getSingleTagsValue(t.CommentLines, tagSchemaTypeFormat)
+	if err != nil {
+		return "", "", err
+	}
+	if schemaTypeFormatTag == "" {
+		schemaType, format := openapi.GetOpenAPITypeFormat(t.String())
+		return schemaType, format, nil
+	}
+	typeFormatPair := strings.Split(schemaTypeFormatTag, ",")
+	if len(typeFormatPair) == 1 {
+		return typeFormatPair[0], "", nil
+	} else if len(typeFormatPair) == 2 {
+		return typeFormatPair[0], typeFormatPair[1], nil
+	} else {
+		return "", "", fmt.Errorf("tag %s should contain a type and an optional format separated by a comma", tagSchemaTypeFormat)
+	}
 }
 
 func (g openAPITypeWriter) generateStructExtensions(t *types.Type) error {
@@ -559,7 +584,10 @@ func (g openAPITypeWriter) generateProperty(m *types.Member, parent *types.Type)
 	}
 	t := resolveAliasAndPtrType(m.Type)
 	// If we can get a openAPI type and format for this type, we consider it to be simple property
-	typeString, format := openapi.GetOpenAPITypeFormat(t.String())
+	typeString, format, err := getOpenAPITypeFormat(t)
+	if err != nil {
+		return err
+	}
 	if typeString != "" {
 		g.generateSimpleProperty(typeString, format)
 		g.Do("},\n},\n", nil)
@@ -619,7 +647,10 @@ func (g openAPITypeWriter) generateMapProperty(t *types.Type) error {
 	}
 	g.Do("Type: []string{\"object\"},\n", nil)
 	g.Do("AdditionalProperties: &spec.SchemaOrBool{\nSchema: &spec.Schema{\nSchemaProps: spec.SchemaProps{\n", nil)
-	typeString, format := openapi.GetOpenAPITypeFormat(elemType.String())
+	typeString, format, err := getOpenAPITypeFormat(elemType)
+	if err != nil {
+		return err
+	}
 	if typeString != "" {
 		g.generateSimpleProperty(typeString, format)
 		g.Do("},\n},\n},\n", nil)
@@ -643,7 +674,10 @@ func (g openAPITypeWriter) generateSliceProperty(t *types.Type) error {
 	elemType := resolveAliasAndPtrType(t.Elem)
 	g.Do("Type: []string{\"array\"},\n", nil)
 	g.Do("Items: &spec.SchemaOrArray{\nSchema: &spec.Schema{\nSchemaProps: spec.SchemaProps{\n", nil)
-	typeString, format := openapi.GetOpenAPITypeFormat(elemType.String())
+	typeString, format, err := getOpenAPITypeFormat(elemType)
+	if err != nil {
+		return err
+	}
 	if typeString != "" {
 		g.generateSimpleProperty(typeString, format)
 		g.Do("},\n},\n},\n", nil)
