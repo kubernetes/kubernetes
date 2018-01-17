@@ -85,6 +85,24 @@ spec:
         - mountPath: /run/xtables.lock
           name: xtables-lock
           readOnly: false
+      initContainers:
+      - name: init-kube-proxy
+        image: gcr.io/google_containers/busybox:1.27.2
+        command:
+        - /bin/sh
+        - -c
+        - 'echo $(PROXY_CONFIG) | grep "mode: ipvs" && modprobe -a
+          ip_vs ip_vs_rr ip_vs_wrr ip_vs_sh nf_conntrack_ipv4 || echo "did not load
+          ipvs related kernel modules"'
+        env:
+        - name: PROXY_CONFIG
+          valueFrom:
+            configMapKeyRef:
+              name: kube-proxy
+              key: config.conf
+        securityContext:
+          privileged: true
+        volumeMounts:
         - mountPath: /lib/modules
           name: lib-modules
           readOnly: true
