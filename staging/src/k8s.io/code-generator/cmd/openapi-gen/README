@@ -2,6 +2,7 @@
 
 - To generate definition for a specific type or package add "+k8s:openapi-gen=true" tag to the type/package comment lines.
 - To exclude a type or a member from a tagged package/type, add "+k8s:openapi-gen=false" tag to the comment lines.
+- To map a type to an open API type,format pair, add "+k8s:openapi-gen:schema-type-format=type,format" tag to the comment lines.
 
 # OpenAPI Extensions
 OpenAPI spec can have extensions on types. To define one or more extensions on a type or its member

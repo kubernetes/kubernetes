@@ -89,6 +89,7 @@ const (
 // +k8s:deepcopy-gen=true
 // +protobuf=true
 // +k8s:openapi-gen=true
+// +k8s:openapi-gen:schema-type-format=object,
 type RawExtension struct {
 	// Raw is the underlying serialization of this object.
 	//

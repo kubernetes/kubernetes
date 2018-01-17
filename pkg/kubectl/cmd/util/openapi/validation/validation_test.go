@@ -406,4 +406,18 @@ spec:
 `))
 		Expect(err).To(BeNil())
 	})
+
+	It("validates a valid ControllerRevision (check if RawExtension properties are validated properly)", func() {
+		err := validator.ValidateBytes([]byte(`
+apiVersion: apps/v1beta2
+kind: ControllerRevision
+metadata:
+  name: name
+revision: 1
+data:
+  customProperty:
+    withSubProperty: someValue
+`))
+		Expect(err).To(BeNil())
+	})
 })
