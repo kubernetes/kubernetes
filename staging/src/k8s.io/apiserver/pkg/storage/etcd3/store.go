@@ -332,13 +332,16 @@ func (s *store) GuaranteedUpdate(
 				if err != nil {
 					return err
 				}
+				mustCheckData = false
 				if !bytes.Equal(data, origState.data) {
 					// original data changed, restart loop
-					mustCheckData = false
 					continue
 				}
 			}
-			return decode(s.codec, s.versioner, origState.data, out, origState.rev)
+			// recheck that the data from etcd is not stale before short-circuiting a write
+			if !origState.stale {
+				return decode(s.codec, s.versioner, origState.data, out, origState.rev)
+			}
 		}
 
 		newData, err := s.transformer.TransformToStorage(data, transformContext)
