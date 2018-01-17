@@ -512,8 +512,12 @@ func (util *ISCSIUtil) DetachBlockISCSIDisk(c iscsiDiskUnmapper, mapPath string)
 	if mappedDevicePath := c.deviceUtil.FindMultipathDeviceForDevice(devicePath); mappedDevicePath != "" {
 		devicePath = mappedDevicePath
 	}
-	// Get loopback device which takes fd lock for devicePath before
-	// detaching a volume from node.
+	// Get loopback device which takes fd lock for devicePath before detaching a volume from node.
+	// TODO: This is a workaround for issue #54108
+	// Currently local attach plugins such as FC, iSCSI, RBD can't obtain devicePath during
+	// GenerateUnmapDeviceFunc() in operation_generator. As a result, these plugins fail to get
+	// and remove loopback device then it will be remained on kubelet node. To avoid the problem,
+	// local attach plugins needs to remove loopback device during TearDownDevice().
 	blkUtil := volumeutil.NewBlockVolumePathHandler()
 	loop, err := volumeutil.BlockVolumePathHandler.GetLoopDevice(blkUtil, devicePath)
 	if err != nil {
