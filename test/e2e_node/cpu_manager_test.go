@@ -26,7 +26,6 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/features"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
@@ -137,7 +136,16 @@ func getCPUSiblingList(cpuRes int64) string {
 	return string(out)
 }
 
+func deleteStateFile() {
+	err := exec.Command("/bin/sh", "-c", "rm -f /var/lib/kubelet/cpu_manager_state").Run()
+	framework.ExpectNoError(err, "error deleting state file")
+}
+
 func setOldKubeletConfig(f *framework.Framework, oldCfg *kubeletconfig.KubeletConfiguration) {
+	// Delete the CPU Manager state file so that the old Kubelet configuration
+	// can take effect.i
+	deleteStateFile()
+
 	if oldCfg != nil {
 		framework.ExpectNoError(setKubeletConfiguration(f, oldCfg))
 	}
@@ -155,8 +163,15 @@ func enableCPUManagerInKubelet(f *framework.Framework) (oldCfg *kubeletconfig.Ku
 		newCfg.FeatureGates = make(map[string]bool)
 	}
 
-	// Enable CPU Manager using feature gate.
-	newCfg.FeatureGates[string(features.CPUManager)] = true
+	// After graduation of the CPU Manager feature to Beta, the CPU Manager
+	// "none" policy is ON by default. But when we set the CPU Manager policy to
+	// "static" in this test and the Kubelet is restarted so that "static"
+	// policy can take effect, there will always be a conflict with the state
+	// checkpointed in the disk (i.e., the policy checkpointed in the disk will
+	// be "none" whereas we are trying to restart Kubelet with "static"
+	// policy). Therefore, we delete the state file so that we can proceed
+	// with the tests.
+	deleteStateFile()
 
 	// Set the CPU Manager policy to static.
 	newCfg.CPUManagerPolicy = string(cpumanager.PolicyStatic)

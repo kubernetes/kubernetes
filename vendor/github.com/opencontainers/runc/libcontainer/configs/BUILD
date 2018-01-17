@@ -7,28 +7,25 @@ go_library(
         "config.go",
         "device.go",
         "hugepage_limit.go",
+        "intelrdt.go",
         "interface_priority_map.go",
         "mount.go",
         "namespaces.go",
         "network.go",
     ] + select({
         "@io_bazel_rules_go//go/platform:android": [
-            "cgroup_unsupported.go",
             "namespaces_syscall_unsupported.go",
             "namespaces_unsupported.go",
         ],
         "@io_bazel_rules_go//go/platform:darwin": [
-            "cgroup_unsupported.go",
             "namespaces_syscall_unsupported.go",
             "namespaces_unsupported.go",
         ],
         "@io_bazel_rules_go//go/platform:dragonfly": [
-            "cgroup_unsupported.go",
             "namespaces_syscall_unsupported.go",
             "namespaces_unsupported.go",
         ],
         "@io_bazel_rules_go//go/platform:freebsd": [
-            "device_defaults.go",
             "namespaces_syscall_unsupported.go",
             "namespaces_unsupported.go",
         ],
@@ -40,27 +37,22 @@ go_library(
             "namespaces_syscall.go",
         ],
         "@io_bazel_rules_go//go/platform:nacl": [
-            "cgroup_unsupported.go",
             "namespaces_syscall_unsupported.go",
             "namespaces_unsupported.go",
         ],
         "@io_bazel_rules_go//go/platform:netbsd": [
-            "cgroup_unsupported.go",
             "namespaces_syscall_unsupported.go",
             "namespaces_unsupported.go",
         ],
         "@io_bazel_rules_go//go/platform:openbsd": [
-            "cgroup_unsupported.go",
             "namespaces_syscall_unsupported.go",
             "namespaces_unsupported.go",
         ],
         "@io_bazel_rules_go//go/platform:plan9": [
-            "cgroup_unsupported.go",
             "namespaces_syscall_unsupported.go",
             "namespaces_unsupported.go",
         ],
         "@io_bazel_rules_go//go/platform:solaris": [
-            "cgroup_unsupported.go",
             "namespaces_syscall_unsupported.go",
             "namespaces_unsupported.go",
         ],

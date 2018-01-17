@@ -1315,11 +1315,13 @@ func describeContainerBasicInfo(container api.Container, status api.ContainerSta
 	if strings.Contains(portString, ",") {
 		w.Write(LEVEL_2, "Ports:\t%s\n", portString)
 	} else {
-		if len(portString) == 0 {
-			w.Write(LEVEL_2, "Port:\t<none>\n")
-		} else {
-			w.Write(LEVEL_2, "Port:\t%s\n", portString)
-		}
+		w.Write(LEVEL_2, "Port:\t%s\n", stringOrNone(portString))
+	}
+	hostPortString := describeContainerHostPorts(container.Ports)
+	if strings.Contains(hostPortString, ",") {
+		w.Write(LEVEL_2, "Host Ports:\t%s\n", hostPortString)
+	} else {
+		w.Write(LEVEL_2, "Host Port:\t%s\n", stringOrNone(hostPortString))
 	}
 }
 
@@ -1327,6 +1329,14 @@ func describeContainerPorts(cPorts []api.ContainerPort) string {
 	ports := make([]string, 0, len(cPorts))
 	for _, cPort := range cPorts {
 		ports = append(ports, fmt.Sprintf("%d/%s", cPort.ContainerPort, cPort.Protocol))
+	}
+	return strings.Join(ports, ", ")
+}
+
+func describeContainerHostPorts(cPorts []api.ContainerPort) string {
+	ports := make([]string, 0, len(cPorts))
+	for _, cPort := range cPorts {
+		ports = append(ports, fmt.Sprintf("%d/%s", cPort.HostPort, cPort.Protocol))
 	}
 	return strings.Join(ports, ", ")
 }

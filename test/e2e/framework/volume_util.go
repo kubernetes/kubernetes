@@ -244,7 +244,7 @@ func StartVolumeServer(client clientset.Interface, config VolumeTestConfig) *v1.
 		mountName := fmt.Sprintf("path%d", i)
 		volumes[i].Name = mountName
 		if src == "" {
-			volumes[i].VolumeSource.EmptyDir = &v1.EmptyDirVolumeSource{Medium: v1.StorageMediumMemory}
+			volumes[i].VolumeSource.EmptyDir = &v1.EmptyDirVolumeSource{}
 		} else {
 			volumes[i].VolumeSource.HostPath = &v1.HostPathVolumeSource{
 				Path: src,

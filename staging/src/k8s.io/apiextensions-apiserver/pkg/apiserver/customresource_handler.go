@@ -18,7 +18,6 @@ package apiserver
 
 import (
 	"fmt"
-	"io"
 	"net/http"
 	"path"
 	"sync"
@@ -227,7 +226,11 @@ func (r *crdHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			http.Error(w, fmt.Sprintf("%v not allowed while CustomResourceDefinition is terminating", requestInfo.Verb), http.StatusMethodNotAllowed)
 			return
 		}
-		handler := handlers.PatchResource(storage, requestScope, r.admission, unstructured.UnstructuredObjectConverter{})
+		supportedTypes := []string{
+			string(types.JSONPatchType),
+			string(types.MergePatchType),
+		}
+		handler := handlers.PatchResource(storage, requestScope, r.admission, unstructured.UnstructuredObjectConverter{}, supportedTypes)
 		handler(w, req)
 		return
 	case "delete":
@@ -471,27 +474,20 @@ func (s unstructuredNegotiatedSerializer) SupportedMediaTypes() []runtime.Serial
 				Framer:        json.Framer,
 			},
 		},
+		{
+			MediaType:     "application/yaml",
+			EncodesAsText: true,
+			Serializer:    json.NewYAMLSerializer(json.DefaultMetaFactory, s.creator, s.typer),
+		},
 	}
 }
 
-func (s unstructuredNegotiatedSerializer) EncoderForVersion(serializer runtime.Encoder, gv runtime.GroupVersioner) runtime.Encoder {
-	return versioning.NewDefaultingCodecForScheme(Scheme, crEncoderInstance, nil, gv, nil)
+func (s unstructuredNegotiatedSerializer) EncoderForVersion(encoder runtime.Encoder, gv runtime.GroupVersioner) runtime.Encoder {
+	return versioning.NewDefaultingCodecForScheme(Scheme, encoder, nil, gv, nil)
 }
 
-func (s unstructuredNegotiatedSerializer) DecoderToVersion(serializer runtime.Decoder, gv runtime.GroupVersioner) runtime.Decoder {
-	return unstructuredDecoder{delegate: Codecs.DecoderToVersion(serializer, gv)}
-}
-
-type unstructuredDecoder struct {
-	delegate runtime.Decoder
-}
-
-func (d unstructuredDecoder) Decode(data []byte, defaults *schema.GroupVersionKind, into runtime.Object) (runtime.Object, *schema.GroupVersionKind, error) {
-	// Delegate for things other than Unstructured.
-	if _, ok := into.(runtime.Unstructured); !ok && into != nil {
-		return d.delegate.Decode(data, defaults, into)
-	}
-	return unstructured.UnstructuredJSONScheme.Decode(data, defaults, into)
+func (s unstructuredNegotiatedSerializer) DecoderToVersion(decoder runtime.Decoder, gv runtime.GroupVersioner) runtime.Decoder {
+	return versioning.NewDefaultingCodecForScheme(Scheme, nil, decoder, nil, gv)
 }
 
 type unstructuredObjectTyper struct {
@@ -509,29 +505,6 @@ func (t unstructuredObjectTyper) ObjectKinds(obj runtime.Object) ([]schema.Group
 
 func (t unstructuredObjectTyper) Recognizes(gvk schema.GroupVersionKind) bool {
 	return t.delegate.Recognizes(gvk) || t.unstructuredTyper.Recognizes(gvk)
-}
-
-var crEncoderInstance = crEncoder{}
-
-// crEncoder *usually* encodes using the unstructured.UnstructuredJSONScheme, but if the type is Status or WatchEvent
-// it will serialize them out using the converting codec.
-type crEncoder struct{}
-
-func (crEncoder) Encode(obj runtime.Object, w io.Writer) error {
-	switch t := obj.(type) {
-	case *metav1.Status, *metav1.WatchEvent:
-		for _, info := range Codecs.SupportedMediaTypes() {
-			// we are always json
-			if info.MediaType == "application/json" {
-				return info.Serializer.Encode(obj, w)
-			}
-		}
-
-		return fmt.Errorf("unable to find json serializer for %T", t)
-
-	default:
-		return unstructured.UnstructuredJSONScheme.Encode(obj, w)
-	}
 }
 
 type unstructuredCreator struct{}

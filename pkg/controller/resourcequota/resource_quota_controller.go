@@ -306,7 +306,6 @@ func (rq *ResourceQuotaController) syncResourceQuotaFromKey(key string) (err err
 	}
 	if err != nil {
 		glog.Infof("Unable to retrieve resource quota %v from store: %v", key, err)
-		rq.queue.Add(key)
 		return err
 	}
 	return rq.syncResourceQuota(quota)

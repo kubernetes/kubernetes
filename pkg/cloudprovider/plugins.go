@@ -64,7 +64,7 @@ func IsCloudProvider(name string) bool {
 // the name is unknown.  The error return is only used if the named provider
 // was known but failed to initialize. The config parameter specifies the
 // io.Reader handler of the configuration file for the cloud provider, or nil
-// for no configuation.
+// for no configuration.
 func GetCloudProvider(name string, config io.Reader) (Interface, error) {
 	providersMutex.Lock()
 	defer providersMutex.Unlock()

@@ -18,7 +18,6 @@ go_library(
             "unsupported.go",
         ],
         "@io_bazel_rules_go//go/platform:freebsd": [
-            "sysconfig.go",
             "sysconfig_notcgo.go",
             "unsupported.go",
         ],
@@ -55,15 +54,27 @@ go_library(
         "//conditions:default": [],
     }) + select({
         "@io_bazel_rules_go//go/platform:linux_386": [
-            "syscall_linux_386.go",
+            "syscall_linux_32.go",
         ],
         "@io_bazel_rules_go//go/platform:linux_amd64": [
             "syscall_linux_64.go",
         ],
         "@io_bazel_rules_go//go/platform:linux_arm": [
-            "syscall_linux_arm.go",
+            "syscall_linux_32.go",
         ],
         "@io_bazel_rules_go//go/platform:linux_arm64": [
+            "syscall_linux_64.go",
+        ],
+        "@io_bazel_rules_go//go/platform:linux_mips": [
+            "syscall_linux_64.go",
+        ],
+        "@io_bazel_rules_go//go/platform:linux_mips64": [
+            "syscall_linux_64.go",
+        ],
+        "@io_bazel_rules_go//go/platform:linux_mips64le": [
+            "syscall_linux_64.go",
+        ],
+        "@io_bazel_rules_go//go/platform:linux_mipsle": [
             "syscall_linux_64.go",
         ],
         "@io_bazel_rules_go//go/platform:linux_ppc64": [
