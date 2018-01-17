@@ -20,32 +20,19 @@ filegroup(
         "//cluster/images/etcd/rollback:all-srcs",
         "//cluster/images/hyperkube:all-srcs",
         "//cluster/images/kubemark:all-srcs",
-        "//cluster/saltbase:all-srcs",
     ],
     tags = ["automanaged"],
-)
-
-# All of the manifests that are expected to be in a "gci-trusty"
-# subdir of the manifests tarball.
-pkg_tar(
-    name = "_manifests-gci-trusty",
-    package_dir = "gci-trusty",
-    visibility = ["//visibility:private"],
-    deps = [
-        "//cluster/addons",
-        "//cluster/gce:gci-trusty-manifests",
-        "//cluster/gce/addons",
-        "//cluster/saltbase:gci-trusty-salt-manifests",
-    ],
 )
 
 pkg_tar(
     name = "manifests",
     mode = "0644",
-    package_dir = "kubernetes",
+    package_dir = "kubernetes/gci-trusty",
     deps = [
-        ":_manifests-gci-trusty",
-        "//cluster/saltbase:salt-manifests",
+        "//cluster/addons",
+        "//cluster/gce:gce-master-manifests",
+        "//cluster/gce:gci-trusty-manifests",
+        "//cluster/gce/addons",
     ],
 )
 

@@ -33,11 +33,6 @@ mkdir -p "$cert_dir"
 
 use_cn=false
 
-# TODO: Add support for discovery on other providers?
-if [ "$cert_ip" == "_use_gce_external_ip_" ]; then
-  cert_ip=$(curl -s -H Metadata-Flavor:Google http://metadata.google.internal./computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip)
-fi
-
 sans="IP:${cert_ip}"
 if [[ -n "${extra_sans}" ]]; then
   sans="${sans},${extra_sans}"
