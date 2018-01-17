@@ -23,6 +23,7 @@ import (
 
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	cache "k8s.io/client-go/tools/cache"
+	v1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	v1beta1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1"
 )
 
@@ -52,7 +53,11 @@ func (f *genericInformer) Lister() cache.GenericLister {
 // TODO extend this to unknown resources with a client pool
 func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource) (GenericInformer, error) {
 	switch resource {
-	// Group=apiregistration.k8s.io, Version=v1beta1
+	// Group=apiregistration.k8s.io, Version=v1
+	case v1.SchemeGroupVersion.WithResource("apiservices"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Apiregistration().V1().APIServices().Informer()}, nil
+
+		// Group=apiregistration.k8s.io, Version=v1beta1
 	case v1beta1.SchemeGroupVersion.WithResource("apiservices"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Apiregistration().V1beta1().APIServices().Informer()}, nil
 

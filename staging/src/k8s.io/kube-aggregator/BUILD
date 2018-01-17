@@ -50,6 +50,7 @@ filegroup(
         "//staging/src/k8s.io/kube-aggregator/pkg/client/informers/externalversions:all-srcs",
         "//staging/src/k8s.io/kube-aggregator/pkg/client/informers/internalversion:all-srcs",
         "//staging/src/k8s.io/kube-aggregator/pkg/client/listers/apiregistration/internalversion:all-srcs",
+        "//staging/src/k8s.io/kube-aggregator/pkg/client/listers/apiregistration/v1:all-srcs",
         "//staging/src/k8s.io/kube-aggregator/pkg/client/listers/apiregistration/v1beta1:all-srcs",
         "//staging/src/k8s.io/kube-aggregator/pkg/cmd/server:all-srcs",
         "//staging/src/k8s.io/kube-aggregator/pkg/controllers:all-srcs",
