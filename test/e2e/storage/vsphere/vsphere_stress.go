@@ -28,7 +28,6 @@ import (
 	storageV1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	k8stype "k8s.io/apimachinery/pkg/types"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
@@ -175,7 +174,7 @@ func PerformVolumeLifeCycleInParallel(f *framework.Framework, client clientset.I
 		Expect(err).NotTo(HaveOccurred())
 
 		By(fmt.Sprintf("%v Waiting for volume: %v to be detached from the node: %v", logPrefix, persistentvolumes[0].Spec.VsphereVolume.VolumePath, pod.Spec.NodeName))
-		err = waitForVSphereDiskToDetach(client, vsp, persistentvolumes[0].Spec.VsphereVolume.VolumePath, k8stype.NodeName(pod.Spec.NodeName))
+		err = waitForVSphereDiskToDetach(client, vsp, persistentvolumes[0].Spec.VsphereVolume.VolumePath, types.NodeName(pod.Spec.NodeName))
 		Expect(err).NotTo(HaveOccurred())
 
 		By(fmt.Sprintf("%v Deleting the Claim: %v", logPrefix, pvclaim.Name))

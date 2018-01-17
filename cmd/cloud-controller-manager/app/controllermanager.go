@@ -32,7 +32,6 @@ import (
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
-	clientset "k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -120,7 +119,7 @@ func Run(s *options.CloudControllerManagerServer) error {
 	// Override kubeconfig qps/burst settings from flags
 	kubeconfig.QPS = s.KubeAPIQPS
 	kubeconfig.Burst = int(s.KubeAPIBurst)
-	kubeClient, err := clientset.NewForConfig(restclient.AddUserAgent(kubeconfig, "cloud-controller-manager"))
+	kubeClient, err := kubernetes.NewForConfig(restclient.AddUserAgent(kubeconfig, "cloud-controller-manager"))
 	if err != nil {
 		glog.Fatalf("Invalid API configuration: %v", err)
 	}
@@ -195,7 +194,7 @@ func Run(s *options.CloudControllerManagerServer) error {
 // StartControllers starts the cloud specific controller loops.
 func StartControllers(s *options.CloudControllerManagerServer, kubeconfig *restclient.Config, rootClientBuilder, clientBuilder controller.ControllerClientBuilder, stop <-chan struct{}, recorder record.EventRecorder, cloud cloudprovider.Interface) error {
 	// Function to build the kube client object
-	client := func(serviceAccountName string) clientset.Interface {
+	client := func(serviceAccountName string) kubernetes.Interface {
 		return clientBuilder.ClientOrDie(serviceAccountName)
 	}
 
@@ -299,7 +298,7 @@ func startHTTP(s *options.CloudControllerManagerServer) {
 	glog.Fatal(server.ListenAndServe())
 }
 
-func createRecorder(kubeClient *clientset.Clientset) record.EventRecorder {
+func createRecorder(kubeClient *kubernetes.Clientset) record.EventRecorder {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
 	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(kubeClient.CoreV1().RESTClient()).Events("")})

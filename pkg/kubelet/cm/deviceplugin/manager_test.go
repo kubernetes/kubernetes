@@ -497,9 +497,6 @@ type TestResource struct {
 
 func TestPodContainerDeviceAllocation(t *testing.T) {
 	flag.Set("alsologtostderr", fmt.Sprintf("%t", true))
-	var logLevel string
-	flag.StringVar(&logLevel, "logLevel", "4", "test")
-	flag.Lookup("v").Value.Set(logLevel)
 	res1 := TestResource{
 		resourceName:     "domain1.com/resource1",
 		resourceQuantity: *resource.NewQuantity(int64(2), resource.DecimalSI),

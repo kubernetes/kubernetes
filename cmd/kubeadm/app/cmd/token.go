@@ -36,6 +36,8 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
+	bootstrapapi "k8s.io/client-go/tools/bootstrap/token/api"
+	bootstraputil "k8s.io/client-go/tools/bootstrap/token/util"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcertutil "k8s.io/client-go/util/cert"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -48,7 +50,6 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pubkeypin"
 	tokenutil "k8s.io/kubernetes/cmd/kubeadm/app/util/token"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	bootstrapapi "k8s.io/kubernetes/pkg/bootstrap/api"
 	"k8s.io/kubernetes/pkg/printers"
 )
 
@@ -226,13 +227,13 @@ func RunCreateToken(out io.Writer, client clientset.Interface, token string, tok
 
 	// validate any extra group names
 	for _, group := range extraGroups {
-		if err := bootstrapapi.ValidateBootstrapGroupName(group); err != nil {
+		if err := bootstraputil.ValidateBootstrapGroupName(group); err != nil {
 			return err
 		}
 	}
 
 	// validate usages
-	if err := bootstrapapi.ValidateUsages(usages); err != nil {
+	if err := bootstraputil.ValidateUsages(usages); err != nil {
 		return err
 	}
 

@@ -255,21 +255,16 @@ fi
 # Assumed vars:
 #   PROJECT
 #   SERVER_BINARY_TAR
-#   SALT_TAR
 #   KUBE_MANIFESTS_TAR
 #   ZONE
 # Vars set:
 #   SERVER_BINARY_TAR_URL
 #   SERVER_BINARY_TAR_HASH
-#   SALT_TAR_URL
-#   SALT_TAR_HASH
 #   KUBE_MANIFESTS_TAR_URL
 #   KUBE_MANIFESTS_TAR_HASH
 function upload-server-tars() {
   SERVER_BINARY_TAR_URL=
   SERVER_BINARY_TAR_HASH=
-  SALT_TAR_URL=
-  SALT_TAR_HASH=
   KUBE_MANIFESTS_TAR_URL=
   KUBE_MANIFESTS_TAR_HASH=
 
@@ -287,13 +282,11 @@ function upload-server-tars() {
   set-preferred-region
 
   SERVER_BINARY_TAR_HASH=$(sha1sum-file "${SERVER_BINARY_TAR}")
-  SALT_TAR_HASH=$(sha1sum-file "${SALT_TAR}")
   if [[ -n "${KUBE_MANIFESTS_TAR:-}" ]]; then
     KUBE_MANIFESTS_TAR_HASH=$(sha1sum-file "${KUBE_MANIFESTS_TAR}")
   fi
 
   local server_binary_tar_urls=()
-  local salt_tar_urls=()
   local kube_manifest_tar_urls=()
 
   for region in "${PREFERRED_REGION[@]}"; do
@@ -313,13 +306,10 @@ function upload-server-tars() {
 
     echo "+++ Staging server tars to Google Storage: ${staging_path}"
     local server_binary_gs_url="${staging_path}/${SERVER_BINARY_TAR##*/}"
-    local salt_gs_url="${staging_path}/${SALT_TAR##*/}"
     copy-to-staging "${staging_path}" "${server_binary_gs_url}" "${SERVER_BINARY_TAR}" "${SERVER_BINARY_TAR_HASH}"
-    copy-to-staging "${staging_path}" "${salt_gs_url}" "${SALT_TAR}" "${SALT_TAR_HASH}"
 
     # Convert from gs:// URL to an https:// URL
     server_binary_tar_urls+=("${server_binary_gs_url/gs:\/\//https://storage.googleapis.com/}")
-    salt_tar_urls+=("${salt_gs_url/gs:\/\//https://storage.googleapis.com/}")
     if [[ -n "${KUBE_MANIFESTS_TAR:-}" ]]; then
       local kube_manifests_gs_url="${staging_path}/${KUBE_MANIFESTS_TAR##*/}"
       copy-to-staging "${staging_path}" "${kube_manifests_gs_url}" "${KUBE_MANIFESTS_TAR}" "${KUBE_MANIFESTS_TAR_HASH}"
@@ -329,7 +319,6 @@ function upload-server-tars() {
   done
 
   SERVER_BINARY_TAR_URL=$(join_csv "${server_binary_tar_urls[@]}")
-  SALT_TAR_URL=$(join_csv "${salt_tar_urls[@]}")
   if [[ -n "${KUBE_MANIFESTS_TAR:-}" ]]; then
     KUBE_MANIFESTS_TAR_URL=$(join_csv "${kube_manifests_tar_urls[@]}")
   fi

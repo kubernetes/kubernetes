@@ -23,11 +23,11 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+	bootstrapapi "k8s.io/client-go/tools/bootstrap/token/api"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
-	bootstrapapi "k8s.io/kubernetes/pkg/bootstrap/api"
 )
 
 // RetrieveValidatedClusterInfo connects to the API Server and makes sure it can talk

@@ -37,7 +37,6 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
-	clientfake "k8s.io/client-go/kubernetes/fake"
 	restclient "k8s.io/client-go/rest"
 	scalefake "k8s.io/client-go/scale/fake"
 	core "k8s.io/client-go/testing"
@@ -461,7 +460,7 @@ func (tc *legacyTestCase) runTest(t *testing.T) {
 	testClient, testScaleClient := tc.prepareTestClient(t)
 	metricsClient := metrics.NewHeapsterMetricsClient(testClient, metrics.DefaultHeapsterNamespace, metrics.DefaultHeapsterScheme, metrics.DefaultHeapsterService, metrics.DefaultHeapsterPort)
 
-	eventClient := &clientfake.Clientset{}
+	eventClient := &fake.Clientset{}
 	eventClient.AddReactor("*", "events", func(action core.Action) (handled bool, ret runtime.Object, err error) {
 		tc.Lock()
 		defer tc.Unlock()

@@ -29,7 +29,6 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	kubetypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/credentialprovider"
@@ -379,7 +378,7 @@ func TestGetPods(t *testing.T) {
 
 	expected := []*kubecontainer.Pod{
 		{
-			ID:         kubetypes.UID("12345678"),
+			ID:         types.UID("12345678"),
 			Name:       "foo",
 			Namespace:  "new",
 			Containers: []*kubecontainer.Container{containers[0], containers[1]},

@@ -86,14 +86,11 @@ func (m *Stub) Start() error {
 	pluginapi.RegisterDevicePluginServer(m.server, m)
 
 	go m.server.Serve(sock)
-	// Wait till grpc server is ready.
-	for i := 0; i < 10; i++ {
-		services := m.server.GetServiceInfo()
-		if len(services) > 0 {
-			break
-		}
-		time.Sleep(1 * time.Second)
+	_, conn, err := dial(m.socket)
+	if err != nil {
+		return err
 	}
+	conn.Close()
 	log.Println("Starting to serve on", m.socket)
 
 	return nil
@@ -109,7 +106,8 @@ func (m *Stub) Stop() error {
 
 // Register registers the device plugin for the given resourceName with Kubelet.
 func (m *Stub) Register(kubeletEndpoint, resourceName string) error {
-	conn, err := grpc.Dial(kubeletEndpoint, grpc.WithInsecure(),
+	conn, err := grpc.Dial(kubeletEndpoint, grpc.WithInsecure(), grpc.WithBlock(),
+		grpc.WithTimeout(10*time.Second),
 		grpc.WithDialer(func(addr string, timeout time.Duration) (net.Conn, error) {
 			return net.DialTimeout("unix", addr, timeout)
 		}))
