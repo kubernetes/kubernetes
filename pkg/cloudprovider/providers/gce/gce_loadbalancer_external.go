@@ -192,7 +192,7 @@ func (gce *GCECloud) ensureExternalLoadBalancer(clusterName, clusterID string, a
 		}
 	}
 
-	tpExists, tpNeedsUpdate, err := gce.targetPoolNeedsUpdate(loadBalancerName, gce.region, affinityType)
+	tpExists, tpNeedsRecreation, err := gce.targetPoolNeedsRecreation(loadBalancerName, gce.region, affinityType)
 	if err != nil {
 		return nil, err
 	}
@@ -211,24 +211,24 @@ func (gce *GCECloud) ensureExternalLoadBalancer(clusterName, clusterID string, a
 		glog.V(4).Infof("ensureExternalLoadBalancer(%s): Service needs local traffic health checks on: %d%s.", lbRefStr, healthCheckNodePort, path)
 		if hcLocalTrafficExisting == nil {
 			// This logic exists to detect a transition for non-OnlyLocal to OnlyLocal service
-			// turn on the tpNeedsUpdate flag to delete/recreate fwdrule/tpool updating the
+			// turn on the tpNeedsRecreation flag to delete/recreate fwdrule/tpool updating the
 			// target pool to use local traffic health check.
 			glog.V(2).Infof("ensureExternalLoadBalancer(%s): Updating from nodes health checks to local traffic health checks.", lbRefStr)
 			if supportsNodesHealthCheck {
 				hcToDelete = makeHttpHealthCheck(MakeNodesHealthCheckName(clusterID), GetNodesHealthCheckPath(), GetNodesHealthCheckPort())
 			}
-			tpNeedsUpdate = true
+			tpNeedsRecreation = true
 		}
 		hcToCreate = makeHttpHealthCheck(loadBalancerName, path, healthCheckNodePort)
 	} else {
 		glog.V(4).Infof("ensureExternalLoadBalancer(%s): Service needs nodes health checks.", lbRefStr)
 		if hcLocalTrafficExisting != nil {
 			// This logic exists to detect a transition from OnlyLocal to non-OnlyLocal service
-			// and turn on the tpNeedsUpdate flag to delete/recreate fwdrule/tpool updating the
+			// and turn on the tpNeedsRecreation flag to delete/recreate fwdrule/tpool updating the
 			// target pool to use nodes health check.
 			glog.V(2).Infof("ensureExternalLoadBalancer(%s): Updating from local traffic health checks to nodes health checks.", lbRefStr)
 			hcToDelete = hcLocalTrafficExisting
-			tpNeedsUpdate = true
+			tpNeedsRecreation = true
 		}
 		if supportsNodesHealthCheck {
 			hcToCreate = makeHttpHealthCheck(MakeNodesHealthCheckName(clusterID), GetNodesHealthCheckPath(), GetNodesHealthCheckPort())
@@ -241,7 +241,7 @@ func (gce *GCECloud) ensureExternalLoadBalancer(clusterName, clusterID string, a
 	// can't delete a target pool that's currently in use by a forwarding rule.
 	// Thus, we have to tear down the forwarding rule if either it or the target
 	// pool needs to be updated.
-	if fwdRuleExists && (fwdRuleNeedsUpdate || tpNeedsUpdate) {
+	if fwdRuleExists && (fwdRuleNeedsUpdate || tpNeedsRecreation) {
 		// Begin critical section. If we have to delete the forwarding rule,
 		// and something should fail before we recreate it, don't release the
 		// IP.  That way we can come back to it later.
@@ -251,7 +251,7 @@ func (gce *GCECloud) ensureExternalLoadBalancer(clusterName, clusterID string, a
 		}
 		glog.Infof("ensureExternalLoadBalancer(%s): Deleted forwarding rule.", lbRefStr)
 	}
-	if tpExists && tpNeedsUpdate {
+	if tpExists && tpNeedsRecreation {
 		// Pass healthchecks to DeleteExternalTargetPoolAndChecks to cleanup health checks after cleaning up the target pool itself.
 		var hcNames []string
 		if hcToDelete != nil {
@@ -265,7 +265,7 @@ func (gce *GCECloud) ensureExternalLoadBalancer(clusterName, clusterID string, a
 
 	// Once we've deleted the resources (if necessary), build them back up (or for
 	// the first time if they're new).
-	if tpNeedsUpdate {
+	if tpNeedsRecreation {
 		createInstances := hosts
 		if len(hosts) > maxTargetPoolCreateInstances {
 			createInstances = createInstances[:maxTargetPoolCreateInstances]
@@ -280,19 +280,20 @@ func (gce *GCECloud) ensureExternalLoadBalancer(clusterName, clusterID string, a
 		if len(hosts) <= maxTargetPoolCreateInstances {
 			glog.Infof("ensureExternalLoadBalancer(%s): Created target pool.", lbRefStr)
 		} else {
-			glog.Infof("ensureExternalLoadBalancer(%s): Created initial target pool (now updating with %d hosts).", lbRefStr, len(hosts)-maxTargetPoolCreateInstances)
-
-			created := sets.NewString()
-			for _, host := range createInstances {
-				created.Insert(host.makeComparableHostPath())
-			}
-			if err := gce.updateTargetPool(loadBalancerName, created, hosts); err != nil {
+			glog.Infof("ensureExternalLoadBalancer(%s): Created initial target pool (now updating the remaining %d hosts).", lbRefStr, len(hosts)-maxTargetPoolCreateInstances)
+			if err := gce.updateTargetPool(loadBalancerName, hosts); err != nil {
 				return nil, fmt.Errorf("failed to update target pool for load balancer (%s): %v", lbRefStr, err)
 			}
 			glog.Infof("ensureExternalLoadBalancer(%s): Updated target pool (with %d hosts).", lbRefStr, len(hosts)-maxTargetPoolCreateInstances)
 		}
+	} else if tpExists {
+		// Ensure hosts are updated even if there is no other changes required on target pool.
+		if err := gce.updateTargetPool(loadBalancerName, hosts); err != nil {
+			return nil, fmt.Errorf("failed to update target pool for load balancer (%s): %v", lbRefStr, err)
+		}
+		glog.Infof("ensureExternalLoadBalancer(%s): Updated target pool (with %d hosts).", lbRefStr, len(hosts))
 	}
-	if tpNeedsUpdate || fwdRuleNeedsUpdate {
+	if tpNeedsRecreation || fwdRuleNeedsUpdate {
 		glog.Infof("ensureExternalLoadBalancer(%s): Creating forwarding rule, IP %s (tier: %s).", lbRefStr, ipAddressToUse, netTier)
 		if err := createForwardingRule(gce, loadBalancerName, serviceName.String(), gce.region, ipAddressToUse, gce.targetPoolURL(loadBalancerName), ports, netTier); err != nil {
 			return nil, fmt.Errorf("failed to create forwarding rule for load balancer (%s): %v", lbRefStr, err)
@@ -319,16 +320,7 @@ func (gce *GCECloud) updateExternalLoadBalancer(clusterName string, service *v1.
 	}
 
 	loadBalancerName := cloudprovider.GetLoadBalancerName(service)
-	pool, err := gce.GetTargetPool(loadBalancerName, gce.region)
-	if err != nil {
-		return err
-	}
-	existing := sets.NewString()
-	for _, instance := range pool.Instances {
-		existing.Insert(hostURLToComparablePath(instance))
-	}
-
-	return gce.updateTargetPool(loadBalancerName, existing, hosts)
+	return gce.updateTargetPool(loadBalancerName, hosts)
 }
 
 // ensureExternalLoadBalancerDeleted is the external implementation of LoadBalancer.EnsureLoadBalancerDeleted
@@ -552,7 +544,16 @@ func (gce *GCECloud) createTargetPool(svc *v1.Service, name, serviceName, ipAddr
 	return nil
 }
 
-func (gce *GCECloud) updateTargetPool(loadBalancerName string, existing sets.String, hosts []*gceInstance) error {
+func (gce *GCECloud) updateTargetPool(loadBalancerName string, hosts []*gceInstance) error {
+	pool, err := gce.GetTargetPool(loadBalancerName, gce.region)
+	if err != nil {
+		return err
+	}
+	existing := sets.NewString()
+	for _, instance := range pool.Instances {
+		existing.Insert(hostURLToComparablePath(instance))
+	}
+
 	var toAdd []*compute.InstanceReference
 	var toRemove []*compute.InstanceReference
 	for _, host := range hosts {
@@ -686,7 +687,7 @@ func (gce *GCECloud) forwardingRuleNeedsUpdate(name, region string, loadBalancer
 
 // Doesn't check whether the hosts have changed, since host updating is handled
 // separately.
-func (gce *GCECloud) targetPoolNeedsUpdate(name, region string, affinityType v1.ServiceAffinity) (exists bool, needsUpdate bool, err error) {
+func (gce *GCECloud) targetPoolNeedsRecreation(name, region string, affinityType v1.ServiceAffinity) (exists bool, needsRecreation bool, err error) {
 	tp, err := gce.GetTargetPool(name, region)
 	if err != nil {
 		if isHTTPErrorCode(err, http.StatusNotFound) {
