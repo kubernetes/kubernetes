@@ -19580,6 +19580,10 @@
      "targetRef": {
       "$ref": "v1.ObjectReference",
       "description": "Reference to object providing the endpoint."
+     },
+     "topology": {
+      "type": "object",
+      "description": "Topology information that this endpoint carries."
      }
     }
    },
@@ -23952,6 +23956,10 @@
      "sessionAffinityConfig": {
       "$ref": "v1.SessionAffinityConfig",
       "description": "sessionAffinityConfig contains the configurations of session affinity."
+     },
+     "topology": {
+      "$ref": "v1.Topology",
+      "description": "topology is used to achieve \"local\" service in a given topology level. User can control what ever topology level they want. If the topology requirements specified by this field are not met, the LB, such as kube-proxy will not pick endpoints for the service."
      }
     }
    },
@@ -24004,6 +24012,20 @@
       "type": "integer",
       "format": "int32",
       "description": "timeoutSeconds specifies the seconds of ClientIP type session sticky time. The value must be \u003e0 \u0026\u0026 \u003c=86400(for 1 day) if ServiceAffinity == \"ClientIP\". Default value is 10800(for 3 hours)."
+     }
+    }
+   },
+   "v1.Topology": {
+    "id": "v1.Topology",
+    "description": "Defines a topology information.",
+    "properties": {
+     "mode": {
+      "type": "string",
+      "description": "Valid values for mode are \"ignored\", \"required\", \"preferred\". \"ignored\" is the default value and the associated topology key will have no effect. \"required\" is the \"hard\" requirement for topology key and an example would be \"only visit service backends in the same zone\". \"preferred\" is the \"soft\" requirement for topology key and an example would be \"prefer to visit service backends in the same rack, but OK to other racks if none match\""
+     },
+     "key": {
+      "type": "string",
+      "description": "key is the key for the node label that the system uses to denote such a topology domain. There are some built-in topology keys, e.g. kubernetes.io/hostname, failure-domain.beta.kubernetes.io/zone and failure-domain.beta.kubernetes.io/region etc. The built-in topology keys can be good examples and we recommend users switch to a similar mode for portability, but it's NOT enforced. Users can define whatever topology key they like since topology is arbitrary."
      }
     }
    },

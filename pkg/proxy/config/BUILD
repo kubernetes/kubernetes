@@ -15,11 +15,16 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/proxy/config",
     deps = [
         "//pkg/apis/core:go_default_library",
+        "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//pkg/client/informers/informers_generated/internalversion/core/internalversion:go_default_library",
         "//pkg/client/listers/core/internalversion:go_default_library",
         "//pkg/controller:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/fields:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/watch:go_default_library",
         "//vendor/k8s.io/client-go/tools/cache:go_default_library",
     ],
 )

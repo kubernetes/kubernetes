@@ -460,6 +460,7 @@ var map_EndpointAddress = map[string]string{
 	"hostname":  "The Hostname of this endpoint",
 	"nodeName":  "Optional: Node hosting this endpoint. This can be used to determine endpoints local to a node.",
 	"targetRef": "Reference to object providing the endpoint.",
+	"topology":  "Topology information that this endpoint carries.",
 }
 
 func (EndpointAddress) SwaggerDoc() map[string]string {
@@ -2049,6 +2050,7 @@ var map_ServiceSpec = map[string]string{
 	"healthCheckNodePort":      "healthCheckNodePort specifies the healthcheck nodePort for the service. If not specified, HealthCheckNodePort is created by the service api backend with the allocated nodePort. Will use user-specified nodePort value if specified by the client. Only effects when Type is set to LoadBalancer and ExternalTrafficPolicy is set to Local.",
 	"publishNotReadyAddresses": "publishNotReadyAddresses, when set to true, indicates that DNS implementations must publish the notReadyAddresses of subsets for the Endpoints associated with the Service. The default value is false. The primary use case for setting this field is to use a StatefulSet's Headless Service to propagate SRV records for its Pods without respect to their readiness for purpose of peer discovery. This field will replace the service.alpha.kubernetes.io/tolerate-unready-endpoints when that annotation is deprecated and all clients have been converted to use this field.",
 	"sessionAffinityConfig":    "sessionAffinityConfig contains the configurations of session affinity.",
+	"topology":                 "topology is used to achieve \"local\" service in a given topology level. User can control what ever topology level they want. If the topology requirements specified by this field are not met, the LB, such as kube-proxy will not pick endpoints for the service.",
 }
 
 func (ServiceSpec) SwaggerDoc() map[string]string {
@@ -2142,6 +2144,16 @@ var map_Toleration = map[string]string{
 
 func (Toleration) SwaggerDoc() map[string]string {
 	return map_Toleration
+}
+
+var map_Topology = map[string]string{
+	"":     "Defines a topology information.",
+	"mode": "Valid values for mode are \"ignored\", \"required\", \"preferred\". \"ignored\" is the default value and the associated topology key will have no effect. \"required\" is the \"hard\" requirement for topology key and an example would be \"only visit service backends in the same zone\". \"preferred\" is the \"soft\" requirement for topology key and an example would be \"prefer to visit service backends in the same rack, but OK to other racks if none match\"",
+	"key":  "key is the key for the node label that the system uses to denote such a topology domain. There are some built-in topology keys, e.g. kubernetes.io/hostname, failure-domain.beta.kubernetes.io/zone and failure-domain.beta.kubernetes.io/region etc. The built-in topology keys can be good examples and we recommend users switch to a similar mode for portability, but it's NOT enforced. Users can define whatever topology key they like since topology is arbitrary.",
+}
+
+func (Topology) SwaggerDoc() map[string]string {
+	return map_Topology
 }
 
 var map_Volume = map[string]string{

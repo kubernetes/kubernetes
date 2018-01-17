@@ -76811,6 +76811,13 @@
      "targetRef": {
       "description": "Reference to object providing the endpoint.",
       "$ref": "#/definitions/io.k8s.api.core.v1.ObjectReference"
+     },
+     "topology": {
+      "description": "Topology information that this endpoint carries.",
+      "type": "object",
+      "additionalProperties": {
+       "type": "string"
+      }
      }
     }
    },
@@ -80273,6 +80280,10 @@
       "description": "sessionAffinityConfig contains the configurations of session affinity.",
       "$ref": "#/definitions/io.k8s.api.core.v1.SessionAffinityConfig"
      },
+     "topology": {
+      "description": "topology is used to achieve \"local\" service in a given topology level. User can control what ever topology level they want. If the topology requirements specified by this field are not met, the LB, such as kube-proxy will not pick endpoints for the service.",
+      "$ref": "#/definitions/io.k8s.api.core.v1.Topology"
+     },
      "type": {
       "description": "type determines how the Service is exposed. Defaults to ClusterIP. Valid options are ExternalName, ClusterIP, NodePort, and LoadBalancer. \"ExternalName\" maps to the specified externalName. \"ClusterIP\" allocates a cluster-internal IP address for load-balancing to endpoints. Endpoints are determined by the selector or if that is not specified, by manual construction of an Endpoints object. If clusterIP is \"None\", no virtual IP is allocated and the endpoints are published as a set of endpoints rather than a stable IP. \"NodePort\" builds on ClusterIP and allocates a port on every node which routes to the clusterIP. \"LoadBalancer\" builds on NodePort and creates an external load-balancer (if supported in the current cloud) which routes to the clusterIP. More info: https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services---service-types",
       "type": "string"
@@ -80410,6 +80421,19 @@
      },
      "value": {
       "description": "Value is the taint value the toleration matches to. If the operator is Exists, the value should be empty, otherwise just a regular string.",
+      "type": "string"
+     }
+    }
+   },
+   "io.k8s.api.core.v1.Topology": {
+    "description": "Defines a topology information.",
+    "properties": {
+     "key": {
+      "description": "key is the key for the node label that the system uses to denote such a topology domain. There are some built-in topology keys, e.g. kubernetes.io/hostname, failure-domain.beta.kubernetes.io/zone and failure-domain.beta.kubernetes.io/region etc. The built-in topology keys can be good examples and we recommend users switch to a similar mode for portability, but it's NOT enforced. Users can define whatever topology key they like since topology is arbitrary.",
+      "type": "string"
+     },
+     "mode": {
+      "description": "Valid values for mode are \"ignored\", \"required\", \"preferred\". \"ignored\" is the default value and the associated topology key will have no effect. \"required\" is the \"hard\" requirement for topology key and an example would be \"only visit service backends in the same zone\". \"preferred\" is the \"soft\" requirement for topology key and an example would be \"prefer to visit service backends in the same rack, but OK to other racks if none match\"",
       "type": "string"
      }
     }

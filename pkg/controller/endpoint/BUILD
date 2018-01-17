@@ -9,6 +9,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "cache.go",
         "doc.go",
         "endpoints_controller.go",
     ],

@@ -6092,6 +6092,13 @@ Examples:<br>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_sessionaffinityconfig">v1.SessionAffinityConfig</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">topology</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">topology is used to achieve "local" service in a given topology level. User can control what ever topology level they want. If the topology requirements specified by this field are not met, the LB, such as kube-proxy will not pick endpoints for the service.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_topology">v1.Topology</a></p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
 </tbody>
 </table>
 
@@ -8206,6 +8213,47 @@ Examples:<br>
 <td class="tableblock halign-left valign-top"><p class="tableblock">List of ServiceAccounts. More info: <a href="https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/">https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_serviceaccount">v1.ServiceAccount</a> array</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect2">
+<h3 id="_v1_topology">v1.Topology</h3>
+<div class="paragraph">
+<p>Defines a topology information.</p>
+</div>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Name</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Required</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+<th class="tableblock halign-left valign-top">Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">mode</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Valid values for mode are "ignored", "required", "preferred". "ignored" is the default value and the associated topology key will have no effect. "required" is the "hard" requirement for topology key and an example would be "only visit service backends in the same zone". "preferred" is the "soft" requirement for topology key and an example would be "prefer to visit service backends in the same rack, but OK to other racks if none match"</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">key</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">key is the key for the node label that the system uses to denote such a topology domain. There are some built-in topology keys, e.g. kubernetes.io/hostname, failure-domain.beta.kubernetes.io/zone and failure-domain.beta.kubernetes.io/region etc. The built-in topology keys can be good examples and we recommend users switch to a similar mode for portability, but it&#8217;s NOT enforced. Users can define whatever topology key they like since topology is arbitrary.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 </tbody>
@@ -11258,6 +11306,13 @@ Examples:<br>
 <td class="tableblock halign-left valign-top"><p class="tableblock">Reference to object providing the endpoint.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_objectreference">v1.ObjectReference</a></p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">topology</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Topology information that this endpoint carries.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">object</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 </tbody>
