@@ -235,31 +235,91 @@ func (g *genericScheduler) Preempt(pod *v1.Pod, nodeLister algorithm.NodeLister,
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	nodeToVictims, err := selectNodesForPreemption(pod, g.cachedNodeInfoMap, potentialNodes, g.predicates, g.predicateMetaProducer, g.schedulingQueue, pdbs)
+	nodeToVictims, err := selectNodesForPreemption(pod, g.cachedNodeInfoMap, potentialNodes,
+		g.predicates, g.predicateMetaProducer, g.schedulingQueue, pdbs)
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	for len(nodeToVictims) > 0 {
-		node := pickOneNodeForPreemption(nodeToVictims)
-		if node == nil {
-			return nil, nil, nil, err
-		}
-		passes, pErr := nodePassesExtendersForPreemption(pod, node.Name, nodeToVictims[node].pods, g.cachedNodeInfoMap, g.extenders)
-		if passes && pErr == nil {
-			// Lower priority pods nominated to run on this node, may no longer fit on
-			// this node. So, we should remove their nomination. Removing their
-			// nomination updates these pods and moves them to the active queue. It
-			// lets scheduler find another place for them.
-			nominatedPods := g.getLowerPriorityNominatedPods(pod, node.Name)
-			return node, nodeToVictims[node].pods, nominatedPods, err
-		}
-		if pErr != nil {
-			glog.Errorf("Error occurred while checking extenders for preemption on node %v: %v", node, pErr)
-		}
-		// Remove the node from the map and try to pick a different node.
-		delete(nodeToVictims, node)
+
+	// Use extender.Filter() to check nodeToVictims and delete nodes which failed to pass: they are
+	// not eligible for preemption as they can't even run the preemptor pod.
+	nodeToVictims, err = g.filterNodeToVictimsByExtenders(pod, nodeToVictims, g.cachedNodeInfoMap)
+	if err != nil {
+		return nil, nil, nil, err
 	}
-	return nil, nil, nil, err
+
+	node := pickOneNodeForPreemption(nodeToVictims)
+	if node == nil {
+		return nil, nil, nil, err
+	}
+	// Lower priority pods nominated to run on this node, may no longer fit on
+	// this node. So, we should remove their nomination. Removing their
+	// nomination updates these pods and moves them to the active queue. It
+	// lets scheduler find another place for them.
+	nominatedPods := g.getLowerPriorityNominatedPods(pod, node.Name)
+
+	return node, nodeToVictims[node].pods, nominatedPods, err
+}
+
+// filterNodeToVictimsByExtenders passes given nodeToVictims to extenders and filter out nodes which can
+// not run the preemptor pod.
+// Returns: modified nodeToVictims.
+func (g *genericScheduler) filterNodeToVictimsByExtenders(
+	pod *v1.Pod,
+	nodeToVictims map[*v1.Node]*Victims,
+	nodeNameToInfo map[string]*schedulercache.NodeInfo,
+) (map[*v1.Node]*Victims, error) {
+	// If there is no extender, return nodeToVictims directly.
+	if len(g.extenders) == 0 {
+		return nodeToVictims, nil
+	}
+
+	candidateNodes := []*v1.Node{}
+
+	// Remove the victims from the corresponding nodeInfo and send nodes to the
+	// extenders for filtering.
+	// TODO(harry): actually extender.Filter() do not use nodeInfo.Pods(). We may want to remove the
+	// deep copy logic.
+	nodeNameToInfoCopy := map[string]*schedulercache.NodeInfo{}
+	for nodeName, nodeInfo := range nodeNameToInfo {
+		// We don't want to really change nodeNameToInfo, so let's create a copy of it
+		nodeNameToInfoCopy[nodeName] = nodeInfo.Clone()
+	}
+	for node, victims := range nodeToVictims {
+		for _, victim := range victims.pods {
+			nodeNameToInfoCopy[node.GetName()].RemovePod(victim)
+		}
+		candidateNodes = append(candidateNodes, nodeNameToInfo[node.GetName()].Node())
+	}
+
+	failedNodes := map[string]string{}
+
+	for _, extender := range g.extenders {
+		_, failedNodesMap, err := extender.Filter(pod, candidateNodes, nodeNameToInfoCopy)
+		if err != nil {
+			glog.Errorf("Error occurred when checking extender for preemption pod %v: %v",
+				pod.GetName(), err)
+		}
+
+		// Collect failed nodes
+		for nodeName, reason := range failedNodesMap {
+			failedNodes[nodeName] = reason
+		}
+	}
+
+	// If no nodes left after extenders filter, no preemption can happened for extender side.
+	// So just return a empty node to victims map.
+	if len(failedNodes) == len(nodeToVictims) {
+		return map[*v1.Node]*Victims{}, nil
+	}
+
+	// Remove the candidate which can not run the preemptor pod.
+	for node := range nodeToVictims {
+		if _, found := failedNodes[node.GetName()]; found {
+			delete(nodeToVictims, node)
+		}
+	}
+	return nodeToVictims, nil
 }
 
 // GetLowerPriorityNominatedPods returns pods whose priority is smaller than the
