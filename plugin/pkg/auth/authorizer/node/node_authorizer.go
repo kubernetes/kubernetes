@@ -26,6 +26,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	rbacapi "k8s.io/kubernetes/pkg/apis/rbac"
+	storageapi "k8s.io/kubernetes/pkg/apis/storage"
 	"k8s.io/kubernetes/pkg/auth/nodeidentifier"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac"
@@ -48,6 +49,9 @@ type NodeAuthorizer struct {
 	graph      *Graph
 	identifier nodeidentifier.NodeIdentifier
 	nodeRules  []rbacapi.PolicyRule
+
+	// allows overriding for testing
+	features utilfeature.FeatureGate
 }
 
 // NewAuthorizer returns a new node authorizer
@@ -56,6 +60,7 @@ func NewAuthorizer(graph *Graph, identifier nodeidentifier.NodeIdentifier, rules
 		graph:      graph,
 		identifier: identifier,
 		nodeRules:  rules,
+		features:   utilfeature.DefaultFeatureGate,
 	}
 }
 
@@ -64,6 +69,7 @@ var (
 	secretResource    = api.Resource("secrets")
 	pvcResource       = api.Resource("persistentvolumeclaims")
 	pvResource        = api.Resource("persistentvolumes")
+	vaResource        = storageapi.Resource("volumeattachments")
 )
 
 func (r *NodeAuthorizer) Authorize(attrs authorizer.Attributes) (authorizer.Decision, string, error) {
@@ -87,7 +93,7 @@ func (r *NodeAuthorizer) Authorize(attrs authorizer.Attributes) (authorizer.Deci
 		case configMapResource:
 			return r.authorizeGet(nodeName, configMapVertexType, attrs)
 		case pvcResource:
-			if utilfeature.DefaultFeatureGate.Enabled(features.ExpandPersistentVolumes) {
+			if r.features.Enabled(features.ExpandPersistentVolumes) {
 				if attrs.GetSubresource() == "status" {
 					return r.authorizeStatusUpdate(nodeName, pvcVertexType, attrs)
 				}
@@ -95,6 +101,11 @@ func (r *NodeAuthorizer) Authorize(attrs authorizer.Attributes) (authorizer.Deci
 			return r.authorizeGet(nodeName, pvcVertexType, attrs)
 		case pvResource:
 			return r.authorizeGet(nodeName, pvVertexType, attrs)
+		case vaResource:
+			if r.features.Enabled(features.CSIPersistentVolume) {
+				return r.authorizeGet(nodeName, vaVertexType, attrs)
+			}
+			return authorizer.DecisionNoOpinion, fmt.Sprintf("disabled by feature gate %s", features.CSIPersistentVolume), nil
 		}
 	}
 

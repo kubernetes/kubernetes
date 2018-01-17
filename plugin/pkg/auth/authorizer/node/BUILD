@@ -14,10 +14,13 @@ go_test(
     deps = [
         "//pkg/apis/core:go_default_library",
         "//pkg/auth/nodeidentifier:go_default_library",
+        "//pkg/features:go_default_library",
         "//plugin/pkg/auth/authorizer/rbac/bootstrappolicy:go_default_library",
+        "//vendor/k8s.io/api/storage/v1alpha1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/authentication/user:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/authorization/authorizer:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/util/feature:go_default_library",
     ],
 )
 
@@ -34,6 +37,7 @@ go_library(
         "//pkg/api/pod:go_default_library",
         "//pkg/apis/core:go_default_library",
         "//pkg/apis/rbac:go_default_library",
+        "//pkg/apis/storage:go_default_library",
         "//pkg/auth/nodeidentifier:go_default_library",
         "//pkg/client/informers/informers_generated/internalversion/core/internalversion:go_default_library",
         "//pkg/features:go_default_library",
@@ -42,9 +46,11 @@ go_library(
         "//third_party/forked/gonum/graph/simple:go_default_library",
         "//third_party/forked/gonum/graph/traverse:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/k8s.io/api/storage/v1alpha1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/authorization/authorizer:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/util/feature:go_default_library",
+        "//vendor/k8s.io/client-go/informers/storage/v1alpha1:go_default_library",
         "//vendor/k8s.io/client-go/tools/cache:go_default_library",
     ],
 )
