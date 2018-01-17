@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	netlinktest "k8s.io/kubernetes/pkg/proxy/ipvs/testing"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
+	proxyutiltest "k8s.io/kubernetes/pkg/proxy/util/testing"
 	utilipset "k8s.io/kubernetes/pkg/util/ipset"
 	ipsettest "k8s.io/kubernetes/pkg/util/ipset/testing"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
@@ -146,6 +147,8 @@ func NewFakeProxier(ipt utiliptables.Interface, ipvs utilipvs.Interface, ipset u
 		lbWhiteListCIDRSet: NewIPSet(ipset, KubeLoadBalancerSourceCIDRSet, utilipset.HashIPPortNet, false),
 		nodePortSetTCP:     NewIPSet(ipset, KubeNodePortSetTCP, utilipset.BitmapPort, false),
 		nodePortSetUDP:     NewIPSet(ipset, KubeNodePortSetUDP, utilipset.BitmapPort, false),
+		nodePortAddresses:  make([]string, 0),
+		networkInterfacer:  proxyutiltest.NewFakeNetwork(),
 	}
 }
 
@@ -386,6 +389,8 @@ func TestNodePort(t *testing.T) {
 		}),
 	)
 
+	fp.nodePortAddresses = []string{"0.0.0.0/0"}
+
 	fp.syncProxyRules()
 
 	// Check ipvs service and destinations
@@ -444,6 +449,8 @@ func TestNodePortNoEndpoint(t *testing.T) {
 		}),
 	)
 	makeEndpointsMap(fp)
+
+	fp.nodePortAddresses = []string{"0.0.0.0/0"}
 
 	fp.syncProxyRules()
 
@@ -847,15 +854,23 @@ func TestOnlyLocalNodePorts(t *testing.T) {
 		}),
 	)
 
+	itf := net.Interface{Index: 0, MTU: 0, Name: "eth0", HardwareAddr: nil, Flags: 0}
+	addrs := []net.Addr{proxyutiltest.AddrStruct{Val: "100.101.102.103/24"}}
+	itf1 := net.Interface{Index: 1, MTU: 0, Name: "eth1", HardwareAddr: nil, Flags: 0}
+	addrs1 := []net.Addr{proxyutiltest.AddrStruct{Val: "2001:db8::0/64"}}
+	fp.networkInterfacer.(*proxyutiltest.FakeNetwork).AddInterfaceAddr(&itf, addrs)
+	fp.networkInterfacer.(*proxyutiltest.FakeNetwork).AddInterfaceAddr(&itf1, addrs1)
+	fp.nodePortAddresses = []string{"100.101.102.0/24", "2001:db8::0/64"}
+
 	fp.syncProxyRules()
 
-	// Expect 2 services and 1 destination
+	// Expect 3 services and 1 destination
 	services, err := ipvs.GetVirtualServers()
 	if err != nil {
 		t.Errorf("Failed to get ipvs services, err: %v", err)
 	}
-	if len(services) != 2 {
-		t.Errorf("Expect 2 ipvs services, got %d", len(services))
+	if len(services) != 3 {
+		t.Errorf("Expect 3 ipvs services, got %d", len(services))
 	}
 	found := false
 	for _, svc := range services {
