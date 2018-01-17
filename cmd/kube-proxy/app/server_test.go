@@ -433,6 +433,9 @@ oomScoreAdj: 17
 portRange: "2-7"
 resourceContainer: /foo
 udpIdleTimeout: 123ms
+nodePortAddresses:
+  - "10.20.30.40/16"
+  - "fd00:1::0/64"
 `
 
 	testCases := []struct {
@@ -545,6 +548,7 @@ udpIdleTimeout: 123ms
 			PortRange:          "2-7",
 			ResourceContainer:  "/foo",
 			UDPIdleTimeout:     metav1.Duration{Duration: 123 * time.Millisecond},
+			NodePortAddresses:  []string{"10.20.30.40/16", "fd00:1::0/64"},
 		}
 
 		options := NewOptions()

@@ -161,6 +161,7 @@ func newProxyServer(
 			nodeIP,
 			recorder,
 			healthzUpdater,
+			config.NodePortAddresses,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("unable to create proxier: %v", err)
@@ -196,6 +197,7 @@ func newProxyServer(
 			recorder,
 			healthzServer,
 			config.IPVS.Scheduler,
+			config.NodePortAddresses,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("unable to create proxier: %v", err)
@@ -226,6 +228,7 @@ func newProxyServer(
 			config.IPTables.SyncPeriod.Duration,
 			config.IPTables.MinSyncPeriod.Duration,
 			config.UDPIdleTimeout.Duration,
+			config.NodePortAddresses,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("unable to create proxier: %v", err)

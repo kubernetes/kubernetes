@@ -140,6 +140,14 @@ type KubeProxyConfiguration struct {
 	// configSyncPeriod is how often configuration from the apiserver is refreshed. Must be greater
 	// than 0.
 	ConfigSyncPeriod metav1.Duration `json:"configSyncPeriod"`
+	// nodePortAddresses is the --nodeport-addresses value for kube-proxy process. Values must be valid
+	// IP blocks. These values are as a parameter to select the interfaces where nodeport works.
+	// In case someone would like to expose a service on localhost for local visit and some other interfaces for
+	// particular purpose, a list of IP blocks would do that.
+	// If set it to "127.0.0.0/8", kube-proxy will only select the loopback interface for NodePort.
+	// If set it to a non-zero IP block, kube-proxy will filter that down to just the IPs that applied to the node.
+	// An empty string slice is meant to select all network interfaces.
+	NodePortAddresses []string `json:"nodePortAddresses"`
 }
 
 // Currently, three modes of proxy are available in Linux platform: 'userspace' (older, going to be EOL), 'iptables'
