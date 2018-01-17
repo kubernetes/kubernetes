@@ -108,8 +108,8 @@ func NewNamedReflector(name string, lw ListerWatcher, expectedType interface{}, 
 	reflectorSuffix := atomic.AddInt64(&reflectorDisambiguator, 1)
 	r := &Reflector{
 		name: name,
-		// we need this to be unique per process (some names are still the same)but obvious who it belongs to
-		metrics:       newReflectorMetrics(makeValidPromethusMetricLabel(fmt.Sprintf("reflector_"+name+"_%d", reflectorSuffix))),
+		// we need this to be unique per process (some names are still the same) but obvious who it belongs to
+		metrics:       newReflectorMetrics(makeValidPrometheusMetricLabel(fmt.Sprintf("reflector_"+name+"_%d", reflectorSuffix))),
 		listerWatcher: lw,
 		store:         store,
 		expectedType:  reflect.TypeOf(expectedType),
@@ -120,7 +120,7 @@ func NewNamedReflector(name string, lw ListerWatcher, expectedType interface{}, 
 	return r
 }
 
-func makeValidPromethusMetricLabel(in string) string {
+func makeValidPrometheusMetricLabel(in string) string {
 	// this isn't perfect, but it removes our common characters
 	return strings.NewReplacer("/", "_", ".", "_", "-", "_", ":", "_").Replace(in)
 }
