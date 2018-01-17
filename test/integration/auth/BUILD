@@ -73,6 +73,8 @@ go_test(
         "//vendor/k8s.io/apiserver/pkg/util/feature/testing:go_default_library",
         "//vendor/k8s.io/apiserver/plugin/pkg/authenticator/token/tokentest:go_default_library",
         "//vendor/k8s.io/apiserver/plugin/pkg/authenticator/token/webhook:go_default_library",
+        "//vendor/k8s.io/client-go/informers:go_default_library",
+        "//vendor/k8s.io/client-go/kubernetes:go_default_library",
         "//vendor/k8s.io/client-go/rest:go_default_library",
         "//vendor/k8s.io/client-go/tools/clientcmd/api/v1:go_default_library",
         "//vendor/k8s.io/client-go/transport:go_default_library",

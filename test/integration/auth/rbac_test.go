@@ -36,6 +36,7 @@ import (
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/registry/generic"
+	externalclientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/transport"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -65,10 +66,10 @@ func clientForToken(user string) *http.Client {
 	}
 }
 
-func clientsetForToken(user string, config *restclient.Config) clientset.Interface {
+func clientsetForToken(user string, config *restclient.Config) (clientset.Interface, externalclientset.Interface) {
 	configCopy := *config
 	configCopy.BearerToken = user
-	return clientset.NewForConfigOrDie(&configCopy)
+	return clientset.NewForConfigOrDie(&configCopy), externalclientset.NewForConfigOrDie(&configCopy)
 }
 
 type testRESTOptionsGetter struct {
@@ -431,7 +432,8 @@ func TestRBAC(t *testing.T) {
 		clientConfig := &restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{NegotiatedSerializer: legacyscheme.Codecs}}
 
 		// Bootstrap the API Server with the test case's initial roles.
-		if err := tc.bootstrapRoles.bootstrap(clientsetForToken(superUser, clientConfig)); err != nil {
+		superuserClient, _ := clientsetForToken(superUser, clientConfig)
+		if err := tc.bootstrapRoles.bootstrap(superuserClient); err != nil {
 			t.Errorf("case %d: failed to apply initial roles: %v", i, err)
 			continue
 		}

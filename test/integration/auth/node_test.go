@@ -33,6 +33,7 @@ import (
 	"k8s.io/apiserver/pkg/authentication/user"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
+	versionedinformers "k8s.io/client-go/informers"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -71,13 +72,15 @@ func TestNodeAuthorizer(t *testing.T) {
 
 	// Build client config, clientset, and informers
 	clientConfig := &restclient.Config{Host: apiServer.URL, ContentConfig: restclient.ContentConfig{NegotiatedSerializer: legacyscheme.Codecs}}
-	superuserClient := clientsetForToken(tokenMaster, clientConfig)
+	superuserClient, superuserClientExternal := clientsetForToken(tokenMaster, clientConfig)
 	informerFactory := informers.NewSharedInformerFactory(superuserClient, time.Minute)
+	versionedInformerFactory := versionedinformers.NewSharedInformerFactory(superuserClientExternal, time.Minute)
 
 	// Set up Node+RBAC authorizer
 	authorizerConfig := &authorizer.AuthorizationConfig{
-		AuthorizationModes: []string{"Node", "RBAC"},
-		InformerFactory:    informerFactory,
+		AuthorizationModes:       []string{"Node", "RBAC"},
+		InformerFactory:          informerFactory,
+		VersionedInformerFactory: versionedInformerFactory,
 	}
 	nodeRBACAuthorizer, _, err := authorizerConfig.New()
 	if err != nil {
@@ -94,7 +97,6 @@ func TestNodeAuthorizer(t *testing.T) {
 	// Start the server
 	masterConfig := framework.NewIntegrationTestMasterConfig()
 	masterConfig.GenericConfig.Authenticator = authenticator
-
 	masterConfig.GenericConfig.Authorizer = nodeRBACAuthorizer
 	masterConfig.GenericConfig.AdmissionControl = nodeRestrictionAdmission
 	_, _, closeFn := framework.RunAMasterUsingServer(masterConfig, apiServer, h)
@@ -104,6 +106,7 @@ func TestNodeAuthorizer(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 	informerFactory.Start(stopCh)
+	versionedInformerFactory.Start(stopCh)
 
 	// Wait for a healthy server
 	for {
@@ -303,9 +306,9 @@ func TestNodeAuthorizer(t *testing.T) {
 		}
 	}
 
-	nodeanonClient := clientsetForToken(tokenNodeUnknown, clientConfig)
-	node1Client := clientsetForToken(tokenNode1, clientConfig)
-	node2Client := clientsetForToken(tokenNode2, clientConfig)
+	nodeanonClient, _ := clientsetForToken(tokenNodeUnknown, clientConfig)
+	node1Client, _ := clientsetForToken(tokenNode1, clientConfig)
+	node2Client, _ := clientsetForToken(tokenNode2, clientConfig)
 
 	// all node requests from node1 and unknown node fail
 	expectForbidden(t, getSecret(nodeanonClient))

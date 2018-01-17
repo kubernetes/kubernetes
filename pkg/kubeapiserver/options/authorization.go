@@ -22,6 +22,7 @@ import (
 
 	"github.com/spf13/pflag"
 
+	versionedinformers "k8s.io/client-go/informers"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 	"k8s.io/kubernetes/pkg/kubeapiserver/authorizer"
 	authzmodes "k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
@@ -83,7 +84,7 @@ func (s *BuiltInAuthorizationOptions) Modes() []string {
 	return modes
 }
 
-func (s *BuiltInAuthorizationOptions) ToAuthorizationConfig(informerFactory informers.SharedInformerFactory) authorizer.AuthorizationConfig {
+func (s *BuiltInAuthorizationOptions) ToAuthorizationConfig(informerFactory informers.SharedInformerFactory, versionedInformerFactory versionedinformers.SharedInformerFactory) authorizer.AuthorizationConfig {
 	return authorizer.AuthorizationConfig{
 		AuthorizationModes:          s.Modes(),
 		PolicyFile:                  s.PolicyFile,
@@ -91,5 +92,6 @@ func (s *BuiltInAuthorizationOptions) ToAuthorizationConfig(informerFactory info
 		WebhookCacheAuthorizedTTL:   s.WebhookCacheAuthorizedTTL,
 		WebhookCacheUnauthorizedTTL: s.WebhookCacheUnauthorizedTTL,
 		InformerFactory:             informerFactory,
+		VersionedInformerFactory:    versionedInformerFactory,
 	}
 }
