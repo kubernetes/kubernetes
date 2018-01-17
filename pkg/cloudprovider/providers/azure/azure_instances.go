@@ -156,14 +156,13 @@ func (az *Cloud) getVmssInstanceID(name types.NodeName) (string, error) {
 
 func (az *Cloud) getStandardInstanceID(name types.NodeName) (string, error) {
 	var machine compute.VirtualMachine
-	var exists bool
 	var err error
 	az.operationPollRateLimiter.Accept()
-	machine, exists, err = az.getVirtualMachine(name)
+	machine, err = az.getVirtualMachine(name)
 	if err != nil {
 		if az.CloudProviderBackoff {
 			glog.V(2).Infof("InstanceID(%s) backing off", name)
-			machine, exists, err = az.GetVirtualMachineWithRetry(name)
+			machine, err = az.GetVirtualMachineWithRetry(name)
 			if err != nil {
 				glog.V(2).Infof("InstanceID(%s) abort backoff", name)
 				return "", err
@@ -171,8 +170,6 @@ func (az *Cloud) getStandardInstanceID(name types.NodeName) (string, error) {
 		} else {
 			return "", err
 		}
-	} else if !exists {
-		return "", cloudprovider.InstanceNotFound
 	}
 	return *machine.ID, nil
 }
@@ -239,12 +236,10 @@ func (az *Cloud) getVmssInstanceType(name types.NodeName) (string, error) {
 
 // getStandardInstanceType gets instance with standard type.
 func (az *Cloud) getStandardInstanceType(name types.NodeName) (string, error) {
-	machine, exists, err := az.getVirtualMachine(name)
+	machine, err := az.getVirtualMachine(name)
 	if err != nil {
 		glog.Errorf("error: az.InstanceType(%s), az.getVirtualMachine(%s) err=%v", name, name, err)
 		return "", err
-	} else if !exists {
-		return "", cloudprovider.InstanceNotFound
 	}
 	return string(machine.HardwareProfile.VMSize), nil
 }
