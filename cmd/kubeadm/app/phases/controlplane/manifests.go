@@ -163,6 +163,8 @@ func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration, k8sVersion *versio
 		"requestheader-allowed-names":        "front-proxy-client",
 		"proxy-client-cert-file":             filepath.Join(cfg.CertificatesDir, kubeadmconstants.FrontProxyClientCertName),
 		"proxy-client-key-file":              filepath.Join(cfg.CertificatesDir, kubeadmconstants.FrontProxyClientKeyName),
+		// add "admissionregistration.k8s.io/v1alpha1" to the --runtime-config flag because Initializers are enabled
+		"runtime-config": "admissionregistration.k8s.io/v1alpha1",
 	}
 
 	command := []string{"kube-apiserver"}
