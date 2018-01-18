@@ -155,7 +155,7 @@ function is_leader() {
   fi
   KUBE_CONTROLLER_MANAGER_LEADER=`${KUBECTL} -n kube-system get ep kube-controller-manager \
     -o go-template=$'{{index .metadata.annotations "control-plane.alpha.kubernetes.io/leader"}}' \
-    | sed 's/^.*"holderIdentity":"\([^"]*\)".*/\1/'`
+    | sed 's/^.*"holderIdentity":"\([^"]*\)".*/\1/' | awk -F'_' '{print $1}'`
   # If there was any problem with getting the leader election results, var will
   # be empty. Since it's better to have multiple addon managers than no addon
   # managers at all, we're going to assume that we're the leader in such case.

@@ -30,6 +30,12 @@ import (
 )
 
 func TestValidateKubeProxyConfiguration(t *testing.T) {
+	var proxyMode kubeproxyconfig.ProxyMode
+	if runtime.GOOS == "windows" {
+		proxyMode = kubeproxyconfig.ProxyModeKernelspace
+	} else {
+		proxyMode = kubeproxyconfig.ProxyModeIPVS
+	}
 	successCases := []kubeproxyconfig.KubeProxyConfiguration{
 		{
 			BindAddress:        "192.168.59.103",
@@ -43,7 +49,7 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 				SyncPeriod:    metav1.Duration{Duration: 5 * time.Second},
 				MinSyncPeriod: metav1.Duration{Duration: 2 * time.Second},
 			},
-			Mode: kubeproxyconfig.ProxyModeIPVS,
+			Mode: proxyMode,
 			IPVS: kubeproxyconfig.KubeProxyIPVSConfiguration{
 				SyncPeriod:    metav1.Duration{Duration: 10 * time.Second},
 				MinSyncPeriod: metav1.Duration{Duration: 5 * time.Second},

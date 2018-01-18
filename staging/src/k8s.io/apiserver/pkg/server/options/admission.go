@@ -38,11 +38,11 @@ import (
 	"k8s.io/client-go/rest"
 )
 
-var scheme = runtime.NewScheme()
+var configScheme = runtime.NewScheme()
 
 func init() {
-	apiserverapi.AddToScheme(scheme)
-	apiserverapiv1alpha1.AddToScheme(scheme)
+	apiserverapi.AddToScheme(configScheme)
+	apiserverapiv1alpha1.AddToScheme(configScheme)
 }
 
 // AdmissionOptions holds the admission options
@@ -125,7 +125,7 @@ func (a *AdmissionOptions) ApplyTo(
 		pluginNames = a.enabledPluginNames()
 	}
 
-	pluginsConfigProvider, err := admission.ReadAdmissionConfiguration(pluginNames, a.ConfigFile, scheme)
+	pluginsConfigProvider, err := admission.ReadAdmissionConfiguration(pluginNames, a.ConfigFile, configScheme)
 	if err != nil {
 		return fmt.Errorf("failed to read plugin config: %v", err)
 	}

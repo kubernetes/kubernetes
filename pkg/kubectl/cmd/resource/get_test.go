@@ -83,17 +83,6 @@ func defaultClientConfig() *restclient.Config {
 	}
 }
 
-func defaultClientConfigForVersion(version *schema.GroupVersion) *restclient.Config {
-	return &restclient.Config{
-		APIPath: "/api",
-		ContentConfig: restclient.ContentConfig{
-			NegotiatedSerializer: scheme.Codecs,
-			ContentType:          runtime.ContentTypeJSON,
-			GroupVersion:         version,
-		},
-	}
-}
-
 type testPrinter struct {
 	Objects        []runtime.Object
 	Err            error

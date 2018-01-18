@@ -233,11 +233,6 @@ func TestUpdateCapacityAllocatable(t *testing.T) {
 
 }
 
-type stringPairType struct {
-	value1 string
-	value2 string
-}
-
 func constructDevices(devices []string) sets.String {
 	ret := sets.NewString()
 	for _, dev := range devices {
@@ -497,9 +492,6 @@ type TestResource struct {
 
 func TestPodContainerDeviceAllocation(t *testing.T) {
 	flag.Set("alsologtostderr", fmt.Sprintf("%t", true))
-	var logLevel string
-	flag.StringVar(&logLevel, "logLevel", "4", "test")
-	flag.Lookup("v").Value.Set(logLevel)
 	res1 := TestResource{
 		resourceName:     "domain1.com/resource1",
 		resourceQuantity: *resource.NewQuantity(int64(2), resource.DecimalSI),

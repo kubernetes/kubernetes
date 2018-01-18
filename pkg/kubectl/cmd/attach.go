@@ -71,7 +71,8 @@ func NewCmdAttach(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer) 
 		Attach: &DefaultRemoteAttach{},
 	}
 	cmd := &cobra.Command{
-		Use:     "attach (POD | TYPE/NAME) -c CONTAINER",
+		Use: "attach (POD | TYPE/NAME) -c CONTAINER",
+		DisableFlagsInUseLine: true,
 		Short:   i18n.T("Attach to a running container"),
 		Long:    "Attach to a process that is already running inside an existing container.",
 		Example: attachExample,

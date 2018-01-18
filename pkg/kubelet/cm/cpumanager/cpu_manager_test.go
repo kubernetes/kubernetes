@@ -28,7 +28,6 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state"
@@ -118,28 +117,6 @@ func (psp mockPodStatusProvider) GetPodStatus(uid types.UID) (v1.PodStatus, bool
 	return psp.podStatus, psp.found
 }
 
-type mockPodKiller struct {
-	killedPods []*v1.Pod
-}
-
-func (f *mockPodKiller) killPodNow(pod *v1.Pod, status v1.PodStatus, gracePeriodOverride *int64) error {
-	f.killedPods = append(f.killedPods, pod)
-	return nil
-}
-
-type mockPodProvider struct {
-	pods []*v1.Pod
-}
-
-func (f *mockPodProvider) getPods() []*v1.Pod {
-	return f.pods
-}
-
-type mockRecorder struct{}
-
-func (r *mockRecorder) Eventf(object runtime.Object, eventtype, reason, messageFmt string, args ...interface{}) {
-}
-
 func makePod(cpuRequest, cpuLimit string) *v1.Pod {
 	return &v1.Pod{
 		Spec: v1.PodSpec{
@@ -159,20 +136,6 @@ func makePod(cpuRequest, cpuLimit string) *v1.Pod {
 			},
 		},
 	}
-}
-
-// CpuAllocatable must be <= CpuCapacity
-func prepareCPUNodeStatus(CPUCapacity, CPUAllocatable string) v1.NodeStatus {
-	nodestatus := v1.NodeStatus{
-		Capacity:    make(v1.ResourceList, 1),
-		Allocatable: make(v1.ResourceList, 1),
-	}
-	cpucap, _ := resource.ParseQuantity(CPUCapacity)
-	cpuall, _ := resource.ParseQuantity(CPUAllocatable)
-
-	nodestatus.Capacity[v1.ResourceCPU] = cpucap
-	nodestatus.Allocatable[v1.ResourceCPU] = cpuall
-	return nodestatus
 }
 
 func TestCPUManagerAdd(t *testing.T) {

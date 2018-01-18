@@ -41,7 +41,6 @@ func TestTopPod(t *testing.T) {
 	testNS := "testns"
 	testCases := []struct {
 		name            string
-		namespace       string
 		flags           map[string]string
 		args            []string
 		expectedPath    string
@@ -176,7 +175,6 @@ func TestTopPodCustomDefaults(t *testing.T) {
 	testNS := "custom-namespace"
 	testCases := []struct {
 		name            string
-		namespace       string
 		flags           map[string]string
 		args            []string
 		expectedPath    string

@@ -135,7 +135,8 @@ func NewCmdEnv(f cmdutil.Factory, in io.Reader, out, errout io.Writer) *cobra.Co
 		In:  in,
 	}
 	cmd := &cobra.Command{
-		Use:     "env RESOURCE/NAME KEY_1=VAL_1 ... KEY_N=VAL_N",
+		Use: "env RESOURCE/NAME KEY_1=VAL_1 ... KEY_N=VAL_N",
+		DisableFlagsInUseLine: true,
 		Short:   "Update environment variables on a pod template",
 		Long:    envLong,
 		Example: fmt.Sprintf(envExample),

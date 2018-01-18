@@ -59,7 +59,6 @@ const (
 	offsetFsTotalUsageBytes
 	offsetFsBaseUsageBytes
 	offsetFsInodeUsage
-	offsetVolume
 )
 
 var (

@@ -32,7 +32,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
-	"k8s.io/apiserver/pkg/apis/audit"
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
@@ -88,7 +87,7 @@ func NewEventFromRequest(req *http.Request, level auditinternal.Level, attribs a
 
 // LogImpersonatedUser fills in the impersonated user attributes into an audit event.
 func LogImpersonatedUser(ae *auditinternal.Event, user user.Info) {
-	if ae == nil || ae.Level.Less(audit.LevelMetadata) {
+	if ae == nil || ae.Level.Less(auditinternal.LevelMetadata) {
 		return
 	}
 	ae.ImpersonatedUser = &auditinternal.UserInfo{
@@ -104,14 +103,14 @@ func LogImpersonatedUser(ae *auditinternal.Event, user user.Info) {
 
 // LogRequestObject fills in the request object into an audit event. The passed runtime.Object
 // will be converted to the given gv.
-func LogRequestObject(ae *audit.Event, obj runtime.Object, gvr schema.GroupVersionResource, subresource string, s runtime.NegotiatedSerializer) {
-	if ae == nil || ae.Level.Less(audit.LevelMetadata) {
+func LogRequestObject(ae *auditinternal.Event, obj runtime.Object, gvr schema.GroupVersionResource, subresource string, s runtime.NegotiatedSerializer) {
+	if ae == nil || ae.Level.Less(auditinternal.LevelMetadata) {
 		return
 	}
 
 	// complete ObjectRef
 	if ae.ObjectRef == nil {
-		ae.ObjectRef = &audit.ObjectReference{}
+		ae.ObjectRef = &auditinternal.ObjectReference{}
 	}
 	if acc, ok := obj.(metav1.ObjectMetaAccessor); ok {
 		meta := acc.GetObjectMeta()
@@ -140,7 +139,7 @@ func LogRequestObject(ae *audit.Event, obj runtime.Object, gvr schema.GroupVersi
 		ae.ObjectRef.Subresource = subresource
 	}
 
-	if ae.Level.Less(audit.LevelRequest) {
+	if ae.Level.Less(auditinternal.LevelRequest) {
 		return
 	}
 
@@ -155,8 +154,8 @@ func LogRequestObject(ae *audit.Event, obj runtime.Object, gvr schema.GroupVersi
 }
 
 // LogRquestPatch fills in the given patch as the request object into an audit event.
-func LogRequestPatch(ae *audit.Event, patch []byte) {
-	if ae == nil || ae.Level.Less(audit.LevelRequest) {
+func LogRequestPatch(ae *auditinternal.Event, patch []byte) {
+	if ae == nil || ae.Level.Less(auditinternal.LevelRequest) {
 		return
 	}
 
@@ -168,15 +167,15 @@ func LogRequestPatch(ae *audit.Event, patch []byte) {
 
 // LogResponseObject fills in the response object into an audit event. The passed runtime.Object
 // will be converted to the given gv.
-func LogResponseObject(ae *audit.Event, obj runtime.Object, gv schema.GroupVersion, s runtime.NegotiatedSerializer) {
-	if ae == nil || ae.Level.Less(audit.LevelMetadata) {
+func LogResponseObject(ae *auditinternal.Event, obj runtime.Object, gv schema.GroupVersion, s runtime.NegotiatedSerializer) {
+	if ae == nil || ae.Level.Less(auditinternal.LevelMetadata) {
 		return
 	}
 	if status, ok := obj.(*metav1.Status); ok {
 		ae.ResponseStatus = status
 	}
 
-	if ae.Level.Less(audit.LevelRequestResponse) {
+	if ae.Level.Less(auditinternal.LevelRequestResponse) {
 		return
 	}
 	// TODO(audit): hook into the serializer to avoid double conversion

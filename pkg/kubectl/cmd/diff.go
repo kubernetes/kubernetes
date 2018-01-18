@@ -109,7 +109,8 @@ func NewCmdDiff(f cmdutil.Factory, stdout, stderr io.Writer) *cobra.Command {
 		Stderr: stderr,
 	}
 	cmd := &cobra.Command{
-		Use:     "diff -f FILENAME",
+		Use: "diff -f FILENAME",
+		DisableFlagsInUseLine: true,
 		Short:   i18n.T("Diff different versions of configurations"),
 		Long:    diffLong,
 		Example: diffExample,

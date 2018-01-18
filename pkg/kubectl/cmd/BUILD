@@ -207,7 +207,6 @@ go_test(
     importpath = "k8s.io/kubernetes/pkg/kubectl/cmd",
     deps = [
         "//pkg/api/legacyscheme:go_default_library",
-        "//pkg/api/ref:go_default_library",
         "//pkg/api/testapi:go_default_library",
         "//pkg/api/testing:go_default_library",
         "//pkg/apis/batch:go_default_library",

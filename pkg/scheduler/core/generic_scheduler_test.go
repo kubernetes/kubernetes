@@ -33,7 +33,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	algorithmpredicates "k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	algorithmpriorities "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities"
 	priorityutil "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities/util"
@@ -43,7 +42,7 @@ import (
 )
 
 var (
-	order = []string{"false", "true", "matches", "nopods", predicates.MatchInterPodAffinityPred}
+	order = []string{"false", "true", "matches", "nopods", algorithmpredicates.MatchInterPodAffinityPred}
 )
 
 func falsePredicate(pod *v1.Pod, meta algorithm.PredicateMetadata, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
@@ -185,7 +184,7 @@ func TestSelectHost(t *testing.T) {
 }
 
 func TestGenericScheduler(t *testing.T) {
-	predicates.SetPredicatesOrdering(order)
+	algorithmpredicates.SetPredicatesOrdering(order)
 	tests := []struct {
 		name                     string
 		predicates               map[string]algorithm.FitPredicate
@@ -423,7 +422,7 @@ func TestGenericScheduler(t *testing.T) {
 }
 
 func TestFindFitAllError(t *testing.T) {
-	predicates.SetPredicatesOrdering(order)
+	algorithmpredicates.SetPredicatesOrdering(order)
 	nodes := []string{"3", "2", "1"}
 	predicates := map[string]algorithm.FitPredicate{"true": truePredicate, "false": falsePredicate}
 	nodeNameToInfo := map[string]*schedulercache.NodeInfo{
@@ -453,7 +452,7 @@ func TestFindFitAllError(t *testing.T) {
 }
 
 func TestFindFitSomeError(t *testing.T) {
-	predicates.SetPredicatesOrdering(order)
+	algorithmpredicates.SetPredicatesOrdering(order)
 	nodes := []string{"3", "2", "1"}
 	predicates := map[string]algorithm.FitPredicate{"true": truePredicate, "matches": matchesPredicate}
 	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "1"}}
@@ -765,7 +764,7 @@ var negPriority, lowPriority, midPriority, highPriority, veryHighPriority = int3
 // TestSelectNodesForPreemption tests selectNodesForPreemption. This test assumes
 // that podsFitsOnNode works correctly and is tested separately.
 func TestSelectNodesForPreemption(t *testing.T) {
-	predicates.SetPredicatesOrdering(order)
+	algorithmpredicates.SetPredicatesOrdering(order)
 	tests := []struct {
 		name                 string
 		predicates           map[string]algorithm.FitPredicate
@@ -889,7 +888,7 @@ func TestSelectNodesForPreemption(t *testing.T) {
 			nodes = append(nodes, node)
 		}
 		if test.addAffinityPredicate {
-			test.predicates[predicates.MatchInterPodAffinityPred] = algorithmpredicates.NewPodAffinityPredicate(FakeNodeInfo(*nodes[0]), schedulertesting.FakePodLister(test.pods))
+			test.predicates[algorithmpredicates.MatchInterPodAffinityPred] = algorithmpredicates.NewPodAffinityPredicate(FakeNodeInfo(*nodes[0]), schedulertesting.FakePodLister(test.pods))
 		}
 		nodeNameToInfo := schedulercache.CreateNodeNameToInfoMap(test.pods, nodes)
 		nodeToPods, err := selectNodesForPreemption(test.pod, nodeNameToInfo, nodes, test.predicates, PredicateMetadata, nil, nil)
@@ -904,7 +903,7 @@ func TestSelectNodesForPreemption(t *testing.T) {
 
 // TestPickOneNodeForPreemption tests pickOneNodeForPreemption.
 func TestPickOneNodeForPreemption(t *testing.T) {
-	predicates.SetPredicatesOrdering(order)
+	algorithmpredicates.SetPredicatesOrdering(order)
 	tests := []struct {
 		name       string
 		predicates map[string]algorithm.FitPredicate
@@ -1081,10 +1080,10 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 		{
 			name: "No node should be attempted",
 			failedPredMap: FailedPredicateMap{
-				"machine1": []algorithm.PredicateFailureReason{predicates.ErrNodeSelectorNotMatch},
-				"machine2": []algorithm.PredicateFailureReason{predicates.ErrPodNotMatchHostName},
-				"machine3": []algorithm.PredicateFailureReason{predicates.ErrTaintsTolerationsNotMatch},
-				"machine4": []algorithm.PredicateFailureReason{predicates.ErrNodeLabelPresenceViolated},
+				"machine1": []algorithm.PredicateFailureReason{algorithmpredicates.ErrNodeSelectorNotMatch},
+				"machine2": []algorithm.PredicateFailureReason{algorithmpredicates.ErrPodNotMatchHostName},
+				"machine3": []algorithm.PredicateFailureReason{algorithmpredicates.ErrTaintsTolerationsNotMatch},
+				"machine4": []algorithm.PredicateFailureReason{algorithmpredicates.ErrNodeLabelPresenceViolated},
 			},
 			pod:      &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1"}},
 			expected: map[string]bool{},
@@ -1092,9 +1091,9 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 		{
 			name: "pod affinity should be tried",
 			failedPredMap: FailedPredicateMap{
-				"machine1": []algorithm.PredicateFailureReason{predicates.ErrPodAffinityNotMatch},
-				"machine2": []algorithm.PredicateFailureReason{predicates.ErrPodNotMatchHostName},
-				"machine3": []algorithm.PredicateFailureReason{predicates.ErrNodeUnschedulable},
+				"machine1": []algorithm.PredicateFailureReason{algorithmpredicates.ErrPodAffinityNotMatch},
+				"machine2": []algorithm.PredicateFailureReason{algorithmpredicates.ErrPodNotMatchHostName},
+				"machine3": []algorithm.PredicateFailureReason{algorithmpredicates.ErrNodeUnschedulable},
 			},
 			pod: &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1"}, Spec: v1.PodSpec{Affinity: &v1.Affinity{
 				PodAffinity: &v1.PodAffinity{
@@ -1118,8 +1117,8 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 		{
 			name: "pod with both pod affinity and anti-affinity should be tried",
 			failedPredMap: FailedPredicateMap{
-				"machine1": []algorithm.PredicateFailureReason{predicates.ErrPodAffinityNotMatch},
-				"machine2": []algorithm.PredicateFailureReason{predicates.ErrPodNotMatchHostName},
+				"machine1": []algorithm.PredicateFailureReason{algorithmpredicates.ErrPodAffinityNotMatch},
+				"machine2": []algorithm.PredicateFailureReason{algorithmpredicates.ErrPodNotMatchHostName},
 			},
 			pod: &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1"}, Spec: v1.PodSpec{Affinity: &v1.Affinity{
 				PodAffinity: &v1.PodAffinity{
@@ -1160,9 +1159,9 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 		{
 			name: "Mix of failed predicates works fine",
 			failedPredMap: FailedPredicateMap{
-				"machine1": []algorithm.PredicateFailureReason{predicates.ErrNodeSelectorNotMatch, predicates.ErrNodeOutOfDisk, predicates.NewInsufficientResourceError(v1.ResourceMemory, 1000, 500, 300)},
-				"machine2": []algorithm.PredicateFailureReason{predicates.ErrPodNotMatchHostName, predicates.ErrDiskConflict},
-				"machine3": []algorithm.PredicateFailureReason{predicates.NewInsufficientResourceError(v1.ResourceMemory, 1000, 600, 400)},
+				"machine1": []algorithm.PredicateFailureReason{algorithmpredicates.ErrNodeSelectorNotMatch, algorithmpredicates.ErrNodeOutOfDisk, algorithmpredicates.NewInsufficientResourceError(v1.ResourceMemory, 1000, 500, 300)},
+				"machine2": []algorithm.PredicateFailureReason{algorithmpredicates.ErrPodNotMatchHostName, algorithmpredicates.ErrDiskConflict},
+				"machine3": []algorithm.PredicateFailureReason{algorithmpredicates.NewInsufficientResourceError(v1.ResourceMemory, 1000, 600, 400)},
 				"machine4": []algorithm.PredicateFailureReason{},
 			},
 			pod:      &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1"}},
@@ -1185,9 +1184,9 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 
 func TestPreempt(t *testing.T) {
 	failedPredMap := FailedPredicateMap{
-		"machine1": []algorithm.PredicateFailureReason{predicates.NewInsufficientResourceError(v1.ResourceMemory, 1000, 500, 300)},
-		"machine2": []algorithm.PredicateFailureReason{predicates.ErrDiskConflict},
-		"machine3": []algorithm.PredicateFailureReason{predicates.NewInsufficientResourceError(v1.ResourceMemory, 1000, 600, 400)},
+		"machine1": []algorithm.PredicateFailureReason{algorithmpredicates.NewInsufficientResourceError(v1.ResourceMemory, 1000, 500, 300)},
+		"machine2": []algorithm.PredicateFailureReason{algorithmpredicates.ErrDiskConflict},
+		"machine3": []algorithm.PredicateFailureReason{algorithmpredicates.NewInsufficientResourceError(v1.ResourceMemory, 1000, 600, 400)},
 	}
 	// Prepare 3 node names.
 	nodeNames := []string{}

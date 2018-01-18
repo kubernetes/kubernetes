@@ -50,7 +50,6 @@ filegroup(
         "//pkg/apis/storage:all-srcs",
         "//pkg/auth/authorizer/abac:all-srcs",
         "//pkg/auth/nodeidentifier:all-srcs",
-        "//pkg/bootstrap/api:all-srcs",
         "//pkg/capabilities:all-srcs",
         "//pkg/client/chaosclient:all-srcs",
         "//pkg/client/clientset_generated/internalclientset:all-srcs",

@@ -105,7 +105,8 @@ func NewCmdApply(baseName string, f cmdutil.Factory, out, errOut io.Writer) *cob
 	options.cmdBaseName = baseName
 
 	cmd := &cobra.Command{
-		Use:     "apply -f FILENAME",
+		Use: "apply -f FILENAME",
+		DisableFlagsInUseLine: true,
 		Short:   i18n.T("Apply a configuration to a resource by filename or stdin"),
 		Long:    applyLong,
 		Example: applyExample,

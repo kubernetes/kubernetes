@@ -65,7 +65,6 @@ func TestSandboxGC(t *testing.T) {
 		description         string              // description of the test case
 		sandboxes           []sandboxTemplate   // templates of sandboxes
 		containers          []containerTemplate // templates of containers
-		minAge              time.Duration       // sandboxMinGCAge
 		remain              []int               // template indexes of remaining sandboxes
 		evictTerminatedPods bool
 	}{

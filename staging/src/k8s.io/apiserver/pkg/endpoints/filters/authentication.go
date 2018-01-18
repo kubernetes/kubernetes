@@ -29,7 +29,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
-	"k8s.io/apiserver/pkg/endpoints/request"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 )
 
@@ -82,7 +81,7 @@ func WithAuthentication(handler http.Handler, mapper genericapirequest.RequestCo
 	)
 }
 
-func Unauthorized(requestContextMapper request.RequestContextMapper, s runtime.NegotiatedSerializer, supportsBasicAuth bool) http.Handler {
+func Unauthorized(requestContextMapper genericapirequest.RequestContextMapper, s runtime.NegotiatedSerializer, supportsBasicAuth bool) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		if supportsBasicAuth {
 			w.Header().Set("WWW-Authenticate", `Basic realm="kubernetes-master"`)
@@ -92,7 +91,7 @@ func Unauthorized(requestContextMapper request.RequestContextMapper, s runtime.N
 			responsewriters.InternalError(w, req, errors.New("no context found for request"))
 			return
 		}
-		requestInfo, found := request.RequestInfoFrom(ctx)
+		requestInfo, found := genericapirequest.RequestInfoFrom(ctx)
 		if !found {
 			responsewriters.InternalError(w, req, errors.New("no RequestInfo found in the context"))
 			return

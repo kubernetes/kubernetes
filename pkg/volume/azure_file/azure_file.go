@@ -227,7 +227,7 @@ func (b *azureFileMounter) SetUpAt(dir string, fsGroup *int64) error {
 			options = append(options, "ro")
 		}
 		mountOptions = volume.JoinMountOptions(b.mountOptions, options)
-		mountOptions = appendDefaultMountOptions(mountOptions)
+		mountOptions = appendDefaultMountOptions(mountOptions, fsGroup)
 	}
 
 	err = b.mounter.Mount(source, dir, "cifs", mountOptions)

@@ -34,7 +34,6 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -87,6 +86,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/oom"
 	"k8s.io/kubernetes/pkg/util/rlimit"
 	"k8s.io/kubernetes/pkg/version"
+	"k8s.io/kubernetes/pkg/version/verflag"
 )
 
 const (
@@ -96,9 +96,13 @@ const (
 
 // NewKubeletCommand creates a *cobra.Command object with default parameters
 func NewKubeletCommand() *cobra.Command {
-	// ignore the error, as this is just for generating docs and the like
-	s, _ := options.NewKubeletServer()
-	s.AddFlags(pflag.CommandLine)
+	kubeletFlags := options.NewKubeletFlags()
+	kubeletConfiguration, err := options.NewKubeletConfiguration()
+	// programmer error
+	if err != nil {
+		glog.Fatal(err)
+	}
+
 	cmd := &cobra.Command{
 		Use: componentKubelet,
 		Long: `The kubelet is the primary "node agent" that runs on each
@@ -121,8 +125,58 @@ is checked every 20 seconds (also configurable with a flag).
 HTTP server: The kubelet can also listen for HTTP and respond to a simple API
 (underspec'd currently) to submit a new manifest.`,
 		Run: func(cmd *cobra.Command, args []string) {
+			// short-circuit on verflag
+			verflag.PrintAndExitIfRequested()
+
+			// TODO(mtaufen): won't need this this once dynamic config is GA
+			// set feature gates so we can check if dynamic config is enabled
+			if err := utilfeature.DefaultFeatureGate.SetFromMap(kubeletConfiguration.FeatureGates); err != nil {
+				glog.Fatal(err)
+			}
+			// validate the initial KubeletFlags, to make sure the dynamic-config-related flags aren't used unless the feature gate is on
+			if err := options.ValidateKubeletFlags(kubeletFlags); err != nil {
+				glog.Fatal(err)
+			}
+			// bootstrap the kubelet config controller, app.BootstrapKubeletConfigController will check
+			// feature gates and only turn on relevant parts of the controller
+			kubeletConfig, kubeletConfigController, err := BootstrapKubeletConfigController(
+				kubeletConfiguration, kubeletFlags.KubeletConfigFile, kubeletFlags.DynamicConfigDir)
+			if err != nil {
+				glog.Fatal(err)
+			}
+
+			// construct a KubeletServer from kubeletFlags and kubeletConfig
+			kubeletServer := &options.KubeletServer{
+				KubeletFlags:         *kubeletFlags,
+				KubeletConfiguration: *kubeletConfig,
+			}
+
+			// use kubeletServer to construct the default KubeletDeps
+			kubeletDeps, err := UnsecuredDependencies(kubeletServer)
+			if err != nil {
+				glog.Fatal(err)
+			}
+
+			// add the kubelet config controller to kubeletDeps
+			kubeletDeps.KubeletConfigController = kubeletConfigController
+
+			// start the experimental docker shim, if enabled
+			if kubeletServer.KubeletFlags.ExperimentalDockershim {
+				if err := RunDockershim(&kubeletServer.KubeletFlags, kubeletConfig); err != nil {
+					glog.Fatal(err)
+				}
+			}
+
+			// run the kubelet
+			if err := Run(kubeletServer, kubeletDeps); err != nil {
+				glog.Fatal(err)
+			}
 		},
 	}
+
+	kubeletFlags.AddFlags(cmd.Flags())
+	options.AddKubeletConfigFlags(cmd.Flags(), kubeletConfiguration)
+	options.AddGlobalFlags(cmd.Flags())
 
 	return cmd
 }
@@ -567,12 +621,19 @@ func InitializeTLS(kf *options.KubeletFlags, kc *kubeletconfiginternal.KubeletCo
 			glog.V(4).Infof("Using self-signed cert (%s, %s)", kc.TLSCertFile, kc.TLSPrivateKeyFile)
 		}
 	}
+
+	tlsCipherSuites, err := flag.TLSCipherSuites(kc.TLSCipherSuites)
+	if err != nil {
+		return nil, err
+	}
+
 	tlsOptions := &server.TLSOptions{
 		Config: &tls.Config{
 			// Can't use SSLv3 because of POODLE and BEAST
 			// Can't use TLSv1.0 because of POODLE and BEAST using CBC cipher
 			// Can't use TLSv1.1 because of RC4 cipher usage
-			MinVersion: tls.VersionTLS12,
+			MinVersion:   tls.VersionTLS12,
+			CipherSuites: tlsCipherSuites,
 		},
 		CertFile: kc.TLSCertFile,
 		KeyFile:  kc.TLSPrivateKeyFile,
