@@ -32,7 +32,6 @@ go_library(
     srcs = [
         "cloud-controller-manager.go",
         "hyperkube.go",
-        "kube-aggregator.go",
         "kube-apiserver.go",
         "kube-controller-manager.go",
         "kube-proxy.go",
@@ -66,7 +65,6 @@ go_library(
         "//vendor/k8s.io/apiserver/pkg/server/healthz:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/util/flag:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/util/logs:go_default_library",
-        "//vendor/k8s.io/kube-aggregator/pkg/cmd/server:go_default_library",
     ],
 )
 

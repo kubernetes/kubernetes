@@ -341,8 +341,7 @@ through the API as necessary.`,
 		glog.Fatalf("unable to apply config defaults: %v", err)
 	}
 
-	opts.AddFlags(pflag.CommandLine)
-
+	opts.AddFlags(cmd.Flags())
 	cmd.MarkFlagFilename("config", "yaml", "yml", "json")
 
 	return cmd

@@ -22,7 +22,9 @@ package main
 
 import (
 	"fmt"
+	"math/rand"
 	"os"
+	"time"
 
 	"github.com/golang/glog"
 	"github.com/spf13/pflag"
@@ -53,6 +55,8 @@ func die(err error) {
 }
 
 func main() {
+	rand.Seed(time.Now().UTC().UnixNano())
+
 	fs := pflag.NewFlagSet(os.Args[0], pflag.ExitOnError)
 	// set the normalize func, similar to k8s.io/apiserver/pkg/util/flag/flags.go:InitFlags
 	fs.SetNormalizeFunc(flag.WordSepNormalizeFunc)
