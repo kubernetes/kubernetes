@@ -911,6 +911,10 @@ func selectVictimsOnNode(
 	// check if the given pod can be scheduled.
 	podPriority := util.GetPodPriority(pod)
 	for _, p := range nodeInfoCopy.Pods() {
+		if v1.IsMirrorPod(pod) {
+			continue
+		}
+
 		if util.GetPodPriority(p) < podPriority {
 			potentialVictims.Items = append(potentialVictims.Items, p)
 			removePod(p)
