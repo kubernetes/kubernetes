@@ -32,11 +32,14 @@ func (in *ExtenderArgs) DeepCopyInto(out *ExtenderArgs) {
 	in.Pod.DeepCopyInto(&out.Pod)
 	if in.Nodes != nil {
 		in, out := &in.Nodes, &out.Nodes
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(core_v1.NodeList)
-			(*in).DeepCopyInto(*out)
+		*out = make([]*core_v1.Node, len(*in))
+		for i := range *in {
+			if (*in)[i] == nil {
+				(*out)[i] = nil
+			} else {
+				(*out)[i] = new(core_v1.Node)
+				(*in)[i].DeepCopyInto((*out)[i])
+			}
 		}
 	}
 	if in.NodeNames != nil {
@@ -127,11 +130,14 @@ func (in *ExtenderFilterResult) DeepCopyInto(out *ExtenderFilterResult) {
 	*out = *in
 	if in.Nodes != nil {
 		in, out := &in.Nodes, &out.Nodes
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(core_v1.NodeList)
-			(*in).DeepCopyInto(*out)
+		*out = make([]*core_v1.Node, len(*in))
+		for i := range *in {
+			if (*in)[i] == nil {
+				(*out)[i] = nil
+			} else {
+				(*out)[i] = new(core_v1.Node)
+				(*in)[i].DeepCopyInto((*out)[i])
+			}
 		}
 	}
 	if in.NodeNames != nil {

@@ -166,7 +166,7 @@ type ExtenderArgs struct {
 	Pod v1.Pod
 	// List of candidate nodes where the pod can be scheduled; to be populated
 	// only if ExtenderConfig.NodeCacheCapable == false
-	Nodes *v1.NodeList
+	Nodes []*v1.Node
 	// List of candidate node names where the pod can be scheduled; to be
 	// populated only if ExtenderConfig.NodeCacheCapable == true
 	NodeNames *[]string
@@ -179,7 +179,7 @@ type FailedNodesMap map[string]string
 type ExtenderFilterResult struct {
 	// Filtered set of nodes where the pod can be scheduled; to be populated
 	// only if ExtenderConfig.NodeCacheCapable == false
-	Nodes *v1.NodeList
+	Nodes []*v1.Node
 	// Filtered set of nodes where the pod can be scheduled; to be populated
 	// only if ExtenderConfig.NodeCacheCapable == true
 	NodeNames *[]string
