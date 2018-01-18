@@ -29,16 +29,6 @@ new_http_archive(
     urls = ["https://github.com/coreos/etcd/releases/download/v%s/etcd-v%s-linux-amd64.tar.gz" % (ETCD_VERSION, ETCD_VERSION)],
 )
 
-# This contains a patch to not prepend ./ to tarfiles produced by pkg_tar.
-# When merged upstream, we'll no longer need to use ixdy's fork:
-# https://bazel-review.googlesource.com/#/c/10390/
-http_archive(
-    name = "io_bazel",
-    sha256 = "892a84aa1e7c1f99fb57bb056cb648745c513077252815324579a012d263defb",
-    strip_prefix = "bazel-df2c687c22bdd7c76f3cdcc85f38fefd02f0b844",
-    urls = ["https://github.com/ixdy/bazel/archive/df2c687c22bdd7c76f3cdcc85f38fefd02f0b844.tar.gz"],
-)
-
 http_archive(
     name = "io_bazel_rules_docker",
     sha256 = "c440717ee9b1b2f4a1e9bf5622539feb5aef9db83fc1fa1517818f13c041b0be",
