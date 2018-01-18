@@ -30,13 +30,6 @@ var (
 	rollout_long = templates.LongDesc(`
 		Manage the rollout of a resource.` + rollout_valid_resources)
 
-	rollout_example = templates.Examples(`
-		# Rollback to the previous deployment
-		kubectl rollout undo deployment/abc
-		
-		# Check the rollout status of a daemonset
-		kubectl rollout status daemonset/foo`)
-
 	rollout_valid_resources = dedent.Dedent(`
 		Valid resource types include:
 
@@ -49,13 +42,12 @@ var (
 func NewCmdRollout(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 
 	cmd := &cobra.Command{
-		Use:     "rollout SUBCOMMAND",
-		Short:   i18n.T("Manage the rollout of a resource"),
-		Long:    rollout_long,
-		Example: rollout_example,
-		Run:     cmdutil.DefaultSubCommandRun(errOut),
+		Use:   "rollout SUBCOMMAND",
+		Short: i18n.T("Manage the rollout of a resource"),
+		Long:  rollout_long,
+		Run:   cmdutil.DefaultSubCommandRun(errOut),
 	}
-	// subcommands
+	// add subcommands
 	cmd.AddCommand(NewCmdRolloutHistory(f, out))
 	cmd.AddCommand(NewCmdRolloutPause(f, out))
 	cmd.AddCommand(NewCmdRolloutResume(f, out))
