@@ -113,7 +113,8 @@ func NewCmdAnnotate(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	}
 
 	cmd := &cobra.Command{
-		Use:     "annotate [--overwrite] (-f FILENAME | TYPE NAME) KEY_1=VAL_1 ... KEY_N=VAL_N [--resource-version=version]",
+		Use: "annotate [--overwrite] (-f FILENAME | TYPE NAME) KEY_1=VAL_1 ... KEY_N=VAL_N [--resource-version=version]",
+		DisableFlagsInUseLine: true,
 		Short:   i18n.T("Update the annotations on a resource"),
 		Long:    annotateLong + "\n\n" + cmdutil.ValidResourceTypeList(f),
 		Example: annotateExample,

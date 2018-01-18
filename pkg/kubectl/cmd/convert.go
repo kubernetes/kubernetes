@@ -65,7 +65,8 @@ func NewCmdConvert(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	options := &ConvertOptions{}
 
 	cmd := &cobra.Command{
-		Use:     "convert -f FILENAME",
+		Use: "convert -f FILENAME",
+		DisableFlagsInUseLine: true,
 		Short:   i18n.T("Convert config files between different API versions"),
 		Long:    convert_long,
 		Example: convert_example,
