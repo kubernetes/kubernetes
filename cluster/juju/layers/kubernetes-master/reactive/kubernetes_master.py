@@ -137,6 +137,7 @@ def snap_resources_changed():
         any_file_changed(paths)
         return 'unknown'
 
+
 def upgrade_for_etcd():
     # we are upgrading the charm.
     # If this is an old deployment etcd_version is not set
