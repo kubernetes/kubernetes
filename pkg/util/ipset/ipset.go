@@ -356,8 +356,8 @@ func (runner *runner) FlushSet(set string) error {
 
 // DestroySet is used to destroy a named set.
 func (runner *runner) DestroySet(set string) error {
-	if _, err := runner.exec.Command(IPSetCmd, "destroy", set).CombinedOutput(); err != nil {
-		return fmt.Errorf("error destroying set %s:, error: %v", set, err)
+	if out, err := runner.exec.Command(IPSetCmd, "destroy", set).CombinedOutput(); err != nil {
+		return fmt.Errorf("error destroying set %s, error: %v(%s)", set, err, out)
 	}
 	return nil
 }
