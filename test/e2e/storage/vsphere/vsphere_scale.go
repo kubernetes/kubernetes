@@ -18,7 +18,6 @@ package vsphere
 
 import (
 	"fmt"
-	"os"
 	"strconv"
 
 	. "github.com/onsi/ginkgo"
@@ -63,12 +62,11 @@ var _ = utils.SIGDescribe("vcp at scale [Feature:vsphere] ", func() {
 		volumeCount       int
 		numberOfInstances int
 		volumesPerPod     int
-		nodeVolumeMapChan chan map[string][]string
-		nodes             *v1.NodeList
 		policyName        string
 		datastoreName     string
+		nodeVolumeMapChan chan map[string][]string
+		nodes             *v1.NodeList
 		scNames           = []string{storageclass1, storageclass2, storageclass3, storageclass4}
-		err               error
 	)
 
 	BeforeEach(func() {
@@ -78,27 +76,15 @@ var _ = utils.SIGDescribe("vcp at scale [Feature:vsphere] ", func() {
 		nodeVolumeMapChan = make(chan map[string][]string)
 
 		// Read the environment variables
-		volumeCountStr := os.Getenv("VCP_SCALE_VOLUME_COUNT")
-		Expect(volumeCountStr).NotTo(BeEmpty(), "ENV VCP_SCALE_VOLUME_COUNT is not set")
-		volumeCount, err = strconv.Atoi(volumeCountStr)
-		Expect(err).NotTo(HaveOccurred(), "Error Parsing VCP_SCALE_VOLUME_COUNT")
+		volumeCount = GetAndExpectIntEnvVar(VCPScaleVolumeCount)
+		volumesPerPod = GetAndExpectIntEnvVar(VCPScaleVolumesPerPod)
 
-		volumesPerPodStr := os.Getenv("VCP_SCALE_VOLUME_PER_POD")
-		Expect(volumesPerPodStr).NotTo(BeEmpty(), "ENV VCP_SCALE_VOLUME_PER_POD is not set")
-		volumesPerPod, err = strconv.Atoi(volumesPerPodStr)
-		Expect(err).NotTo(HaveOccurred(), "Error Parsing VCP_SCALE_VOLUME_PER_POD")
-
-		numberOfInstancesStr := os.Getenv("VCP_SCALE_INSTANCES")
-		Expect(numberOfInstancesStr).NotTo(BeEmpty(), "ENV VCP_SCALE_INSTANCES is not set")
-		numberOfInstances, err = strconv.Atoi(numberOfInstancesStr)
-		Expect(err).NotTo(HaveOccurred(), "Error Parsing VCP_SCALE_INSTANCES")
+		numberOfInstances = GetAndExpectIntEnvVar(VCPScaleInstances)
 		Expect(numberOfInstances > 5).NotTo(BeTrue(), "Maximum allowed instances are 5")
 		Expect(numberOfInstances > volumeCount).NotTo(BeTrue(), "Number of instances should be less than the total volume count")
 
-		policyName = os.Getenv("VSPHERE_SPBM_POLICY_NAME")
-		datastoreName = os.Getenv("VSPHERE_DATASTORE")
-		Expect(policyName).NotTo(BeEmpty(), "ENV VSPHERE_SPBM_POLICY_NAME is not set")
-		Expect(datastoreName).NotTo(BeEmpty(), "ENV VSPHERE_DATASTORE is not set")
+		policyName = GetAndExpectStringEnvVar(SPBMPolicyName)
+		datastoreName = GetAndExpectStringEnvVar(StorageClassDatastoreName)
 
 		nodes = framework.GetReadySchedulableNodesOrDie(client)
 		if len(nodes.Items) < 2 {
