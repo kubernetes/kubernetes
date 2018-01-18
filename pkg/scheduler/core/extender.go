@@ -100,7 +100,7 @@ func NewHTTPExtender(config *schedulerapi.ExtenderConfig) (algorithm.SchedulerEx
 func (h *HTTPExtender) Filter(pod *v1.Pod, nodes []*v1.Node, nodeNameToInfo map[string]*schedulercache.NodeInfo) ([]*v1.Node, schedulerapi.FailedNodesMap, error) {
 	var (
 		result     schedulerapi.ExtenderFilterResult
-		nodeList   *v1.NodeList
+		nodeList   []*v1.Node
 		nodeNames  *[]string
 		nodeResult []*v1.Node
 		args       *schedulerapi.ExtenderArgs
@@ -117,10 +117,7 @@ func (h *HTTPExtender) Filter(pod *v1.Pod, nodes []*v1.Node, nodeNameToInfo map[
 		}
 		nodeNames = &nodeNameSlice
 	} else {
-		nodeList = &v1.NodeList{}
-		for _, node := range nodes {
-			nodeList.Items = append(nodeList.Items, *node)
-		}
+		nodeList = nodes
 	}
 
 	args = &schedulerapi.ExtenderArgs{
@@ -142,10 +139,7 @@ func (h *HTTPExtender) Filter(pod *v1.Pod, nodes []*v1.Node, nodeNameToInfo map[
 			nodeResult = append(nodeResult, nodeNameToInfo[(*result.NodeNames)[i]].Node())
 		}
 	} else if result.Nodes != nil {
-		nodeResult = make([]*v1.Node, 0, len(result.Nodes.Items))
-		for i := range result.Nodes.Items {
-			nodeResult = append(nodeResult, &result.Nodes.Items[i])
-		}
+		nodeResult = result.Nodes
 	}
 
 	return nodeResult, result.FailedNodes, nil
@@ -157,7 +151,7 @@ func (h *HTTPExtender) Filter(pod *v1.Pod, nodes []*v1.Node, nodeNameToInfo map[
 func (h *HTTPExtender) Prioritize(pod *v1.Pod, nodes []*v1.Node) (*schedulerapi.HostPriorityList, int, error) {
 	var (
 		result    schedulerapi.HostPriorityList
-		nodeList  *v1.NodeList
+		nodeList  []*v1.Node
 		nodeNames *[]string
 		args      *schedulerapi.ExtenderArgs
 	)
@@ -177,10 +171,7 @@ func (h *HTTPExtender) Prioritize(pod *v1.Pod, nodes []*v1.Node) (*schedulerapi.
 		}
 		nodeNames = &nodeNameSlice
 	} else {
-		nodeList = &v1.NodeList{}
-		for _, node := range nodes {
-			nodeList.Items = append(nodeList.Items, *node)
-		}
+		nodeList = nodes
 	}
 
 	args = &schedulerapi.ExtenderArgs{
