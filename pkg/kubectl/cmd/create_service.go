@@ -124,7 +124,7 @@ var (
 // NewCmdCreateServiceNodePort is a macro command for creating a NodePort service
 func NewCmdCreateServiceNodePort(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "nodeport NAME [--tcp=port:targetPort] [--dry-run]",
+		Use:     "nodeport NAME [--ports=port:targetPort[:nodePort]] [--dry-run]",
 		Short:   i18n.T("Create a NodePort service."),
 		Long:    serviceNodePortLong,
 		Example: serviceNodePortExample,
@@ -138,7 +138,11 @@ func NewCmdCreateServiceNodePort(f cmdutil.Factory, cmdOut io.Writer) *cobra.Com
 	cmdutil.AddPrinterFlags(cmd)
 	cmdutil.AddGeneratorFlags(cmd, cmdutil.ServiceNodePortGeneratorV1Name)
 	cmd.Flags().Int("node-port", 0, "Port used to expose the service on each node in a cluster.")
-	addPortFlags(cmd)
+	cmd.Flags().MarkDeprecated("node-port", "This flag will be removed in a later release, please use --ports instead")
+	cmd.Flags().StringSlice("tcp", []string{}, "Port pairs can be specified as '<port>:<targetPort>'.")
+	cmd.Flags().MarkDeprecated("node-port", "This flag will be removed in a later release, please use --ports instead")
+	cmd.Flags().StringSlice("ports", []string{}, "Port pairs can be specified as '<port>:<targetPort>[:nodePort]'.")
+
 	return cmd
 }
 
@@ -153,10 +157,9 @@ func CreateServiceNodePort(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Comma
 	case cmdutil.ServiceNodePortGeneratorV1Name:
 		generator = &kubectl.ServiceCommonGeneratorV1{
 			Name:      name,
-			TCP:       cmdutil.GetFlagStringSlice(cmd, "tcp"),
+			TCP:       cmdutil.GetFlagStringSlice(cmd, "ports"),
 			Type:      v1.ServiceTypeNodePort,
 			ClusterIP: "",
-			NodePort:  cmdutil.GetFlagInt(cmd, "node-port"),
 		}
 	default:
 		return errUnsupportedGenerator(cmd, generatorName)
