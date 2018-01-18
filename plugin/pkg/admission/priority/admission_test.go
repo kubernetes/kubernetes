@@ -316,6 +316,39 @@ func TestPodAdmission(t *testing.T) {
 				PriorityClassName: "system-cluster-critical",
 			},
 		},
+		// pod[5]: mirror Pod with a system priority class name
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:        "mirror-pod-w-system-priority",
+				Namespace:   "namespace",
+				Annotations: map[string]string{api.MirrorPodAnnotationKey: ""},
+			},
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name: containerName,
+					},
+				},
+				PriorityClassName: "system-cluster-critical",
+			},
+		},
+		// pod[6]: mirror Pod with integer value of priority
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:        "mirror-pod-w-integer-priority",
+				Namespace:   "namespace",
+				Annotations: map[string]string{api.MirrorPodAnnotationKey: ""},
+			},
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name: containerName,
+					},
+				},
+				PriorityClassName: "default1",
+				Priority:          &intPriority,
+			},
+		},
 	}
 	// Enable PodPriority feature gate.
 	utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%s=true", features.PodPriority))
@@ -375,6 +408,20 @@ func TestPodAdmission(t *testing.T) {
 			"pod with integer priority",
 			[]*scheduling.PriorityClass{},
 			*pods[3],
+			0,
+			true,
+		},
+		{
+			"mirror pod with system priority class",
+			[]*scheduling.PriorityClass{},
+			*pods[5],
+			SystemCriticalPriority,
+			false,
+		},
+		{
+			"mirror pod with integer priority",
+			[]*scheduling.PriorityClass{},
+			*pods[6],
 			0,
 			true,
 		},
