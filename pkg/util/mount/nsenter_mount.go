@@ -165,7 +165,7 @@ func (n *NsenterMounter) IsLikelyNotMountPoint(file string) (bool, error) {
 	glog.V(5).Infof("nsenter findmnt args: %v", args)
 	out, err := n.ne.Exec("findmnt", args).CombinedOutput()
 	if err != nil {
-		glog.V(2).Infof("Failed findmnt command for path %s: %v", file, err)
+		glog.V(2).Infof("Failed findmnt command for path %s: %s %v", file, out, err)
 		// Different operating systems behave differently for paths which are not mount points.
 		// On older versions (e.g. 2.20.1) we'd get error, on newer ones (e.g. 2.26.2) we'd get "/".
 		// It's safer to assume that it's not a mount point.
