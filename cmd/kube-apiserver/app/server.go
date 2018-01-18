@@ -586,7 +586,7 @@ func BuildStorageFactory(s *options.ServerRunOptions, apiResourceConfig *servers
 		// FIXME (soltysh): this GroupVersionResource override should be configurable
 		[]schema.GroupVersionResource{
 			batch.Resource("cronjobs").WithVersion("v1beta1"),
-			storage.Resource("volumeattachments").WithVersion("v1alpha1"),
+			storage.Resource("volumeattachments").WithVersion("v1beta1"),
 			admissionregistration.Resource("initializerconfigurations").WithVersion("v1alpha1"),
 		},
 		apiResourceConfig)
