@@ -17,9 +17,13 @@ limitations under the License.
 package gce
 
 import (
+	"context"
 	"net/http"
 
 	compute "google.golang.org/api/compute/v1"
+
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud/filter"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud/meta"
 )
 
 func newUrlMapMetricContext(request string) *metricContext {
@@ -29,47 +33,35 @@ func newUrlMapMetricContext(request string) *metricContext {
 // GetUrlMap returns the UrlMap by name.
 func (gce *GCECloud) GetUrlMap(name string) (*compute.UrlMap, error) {
 	mc := newUrlMapMetricContext("get")
-	v, err := gce.service.UrlMaps.Get(gce.projectID, name).Do()
+	v, err := gce.c.UrlMaps().Get(context.Background(), meta.GlobalKey(name))
 	return v, mc.Observe(err)
 }
 
 // CreateUrlMap creates a url map
 func (gce *GCECloud) CreateUrlMap(urlMap *compute.UrlMap) error {
 	mc := newUrlMapMetricContext("create")
-	op, err := gce.service.UrlMaps.Insert(gce.projectID, urlMap).Do()
-	if err != nil {
-		return mc.Observe(err)
-	}
-	return gce.waitForGlobalOp(op, mc)
+	return mc.Observe(gce.c.UrlMaps().Insert(context.Background(), meta.GlobalKey(urlMap.Name), urlMap))
 }
 
 // UpdateUrlMap applies the given UrlMap as an update
 func (gce *GCECloud) UpdateUrlMap(urlMap *compute.UrlMap) error {
 	mc := newUrlMapMetricContext("update")
-	op, err := gce.service.UrlMaps.Update(gce.projectID, urlMap.Name, urlMap).Do()
-	if err != nil {
-		return mc.Observe(err)
-	}
-	return gce.waitForGlobalOp(op, mc)
+	return mc.Observe(gce.c.UrlMaps().Update(context.Background(), meta.GlobalKey(urlMap.Name), urlMap))
 }
 
 // DeleteUrlMap deletes a url map by name.
 func (gce *GCECloud) DeleteUrlMap(name string) error {
 	mc := newUrlMapMetricContext("delete")
-	op, err := gce.service.UrlMaps.Delete(gce.projectID, name).Do()
-	if err != nil {
-		if isHTTPErrorCode(err, http.StatusNotFound) {
-			return nil
-		}
-		return mc.Observe(err)
+	err := gce.c.UrlMaps().Delete(context.Background(), meta.GlobalKey(name))
+	if isHTTPErrorCode(err, http.StatusNotFound) {
+		err = nil
 	}
-	return gce.waitForGlobalOp(op, mc)
+	return mc.Observe(err)
 }
 
 // ListUrlMaps lists all UrlMaps in the project.
-func (gce *GCECloud) ListUrlMaps() (*compute.UrlMapList, error) {
+func (gce *GCECloud) ListUrlMaps() ([]*compute.UrlMap, error) {
 	mc := newUrlMapMetricContext("list")
-	// TODO: use PageToken to list all not just the first 500
-	v, err := gce.service.UrlMaps.List(gce.projectID).Do()
+	v, err := gce.c.UrlMaps().List(context.Background(), filter.None)
 	return v, mc.Observe(err)
 }
