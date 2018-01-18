@@ -24,17 +24,89 @@ limitations under the License.
 package main
 
 import (
+	"flag"
 	"fmt"
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"io/ioutil"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strconv"
 	"strings"
 )
 
+var (
+	baseURL                                           = flag.String("url", "https://github.com/kubernetes/kubernetes/tree/master/", "location of the current source")
+	confDoc                                           = flag.Bool("conformance", false, "write a conformance document")
+	totalConfTests, totalLegacyTests, missingComments int
+)
+
+const regexDescribe = "Describe|KubeDescribe|SIGDescribe"
+const regexContext = "Context"
+
 type visitor struct {
-	FileSet *token.FileSet
+	FileSet      *token.FileSet
+	lastDescribe describe
+	cMap         ast.CommentMap
+	//list of all the conformance tests in the path
+	tests []conformanceData
+}
+
+//describe contains text associated with ginkgo describe container
+type describe struct {
+	text        string
+	lastContext context
+}
+
+//context contain the text associated with the Context clause
+type context struct {
+	text string
+}
+
+type conformanceData struct {
+	// A URL to the line of code in the kube src repo for the test
+	URL string
+	// Extracted from the "Testname:" comment before the test
+	TestName string
+	// Extracted from the "Description:" comment before the test
+	Description string
+}
+
+func (v *visitor) convertToConformanceData(at *ast.BasicLit) {
+	cd := conformanceData{}
+
+	comment := v.comment(at)
+	pos := v.FileSet.Position(at.Pos())
+	cd.URL = fmt.Sprintf("%s%s#L%d", *baseURL, pos.Filename, pos.Line)
+
+	lines := strings.Split(comment, "\n")
+	cd.Description = ""
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "Testname:") {
+			line = strings.TrimSpace(line[9:])
+			cd.TestName = line
+			continue
+		}
+		if strings.HasPrefix(line, "Description:") {
+			line = strings.TrimSpace(line[12:])
+		}
+		cd.Description += line + "\n"
+	}
+
+	if cd.TestName == "" {
+		testName := v.getDescription(at.Value)
+		i := strings.Index(testName, "[Conformance]")
+		if i > 0 {
+			cd.TestName = strings.TrimSpace(testName[:i])
+		} else {
+			cd.TestName = testName
+		}
+	}
+
+	v.tests = append(v.tests, cd)
 }
 
 func newVisitor() *visitor {
@@ -84,7 +156,16 @@ func (v *visitor) isLegacyItCall(call *ast.CallExpr) bool {
 func (v *visitor) failf(expr ast.Expr, format string, a ...interface{}) {
 	msg := fmt.Sprintf(format, a...)
 	fmt.Fprintf(os.Stderr, "ERROR at %v: %s\n", v.FileSet.Position(expr.Pos()), msg)
-	os.Exit(65)
+}
+
+func (v *visitor) comment(x *ast.BasicLit) string {
+	for _, comm := range v.cMap.Comments() {
+		testOffset := int(x.Pos()-comm.End()) - len("framework.ConformanceIt(\"")
+		if 0 < testOffset && testOffset < 3 {
+			return comm.Text()
+		}
+	}
+	return ""
 }
 
 func (v *visitor) emit(arg ast.Expr) {
@@ -94,11 +175,92 @@ func (v *visitor) emit(arg ast.Expr) {
 			v.failf(at, "framework.ConformanceIt() called with non-string argument")
 			return
 		}
-		fmt.Printf("%s: %s\n", v.FileSet.Position(at.Pos()).Filename, at.Value)
+
+		if *confDoc {
+			v.convertToConformanceData(at)
+		} else {
+			fmt.Printf("%s: %s\n", v.FileSet.Position(at.Pos()).Filename, at.Value)
+		}
 	default:
 		v.failf(at, "framework.ConformanceIt() called with non-literal argument")
 		fmt.Fprintf(os.Stderr, "ERROR: non-literal argument %v at %v\n", arg, v.FileSet.Position(arg.Pos()))
 	}
+}
+
+func (v *visitor) getDescription(value string) string {
+	if len(v.lastDescribe.lastContext.text) > 0 {
+		return strings.Trim(v.lastDescribe.text, "\"") +
+			" " + strings.Trim(v.lastDescribe.lastContext.text, "\"") +
+			" " + strings.Trim(value, "\"")
+	}
+	return strings.Trim(v.lastDescribe.text, "\"") +
+		" " + strings.Trim(value, "\"")
+}
+
+// funcName converts a selectorExpr with two idents into a string,
+// x.y -> "x.y"
+func funcName(n ast.Expr) string {
+	if sel, ok := n.(*ast.SelectorExpr); ok {
+		if x, ok := sel.X.(*ast.Ident); ok {
+			return x.String() + "." + sel.Sel.String()
+		}
+	}
+	return ""
+}
+
+// isSprintf returns whether the given node is a call to fmt.Sprintf
+func isSprintf(n ast.Expr) bool {
+	call, ok := n.(*ast.CallExpr)
+	return ok && funcName(call.Fun) == "fmt.Sprintf" && len(call.Args) != 0
+}
+
+// firstArg attempts to statically determine the value of the first
+// argument. It only handles strings, and converts any unknown values
+// (fmt.Sprintf interpolations) into *.
+func (v *visitor) firstArg(n *ast.CallExpr) string {
+	if len(n.Args) == 0 {
+		return ""
+	}
+	var lit *ast.BasicLit
+	if isSprintf(n.Args[0]) {
+		return v.firstArg(n.Args[0].(*ast.CallExpr))
+	}
+	lit, ok := n.Args[0].(*ast.BasicLit)
+	if ok && lit.Kind == token.STRING {
+		val, err := strconv.Unquote(lit.Value)
+		if err != nil {
+			panic(err)
+		}
+		if strings.Contains(val, "%") {
+			val = strings.Replace(val, "%d", "*", -1)
+			val = strings.Replace(val, "%v", "*", -1)
+			val = strings.Replace(val, "%s", "*", -1)
+		}
+		return val
+	}
+	if ident, ok := n.Args[0].(*ast.Ident); ok {
+		return ident.String()
+	}
+	return "*"
+}
+
+// matchFuncName returns the first argument of a function if it's
+// a Ginkgo-relevant function (Describe/KubeDescribe/Context),
+// and the empty string otherwise.
+func (v *visitor) matchFuncName(n *ast.CallExpr, pattern string) string {
+	switch x := n.Fun.(type) {
+	case *ast.SelectorExpr:
+		if match, err := regexp.MatchString(pattern, x.Sel.Name); err == nil && match {
+			return v.firstArg(n)
+		}
+	case *ast.Ident:
+		if match, err := regexp.MatchString(pattern, x.Name); err == nil && match {
+			return v.firstArg(n)
+		}
+	default:
+		return ""
+	}
+	return ""
 }
 
 // Visit visits each node looking for either calls to framework.ConformanceIt,
@@ -108,9 +270,16 @@ func (v *visitor) emit(arg ast.Expr) {
 func (v *visitor) Visit(node ast.Node) (w ast.Visitor) {
 	switch t := node.(type) {
 	case *ast.CallExpr:
-		if v.isConformanceCall(t) {
+		if name := v.matchFuncName(t, regexDescribe); name != "" && len(t.Args) >= 2 {
+			v.lastDescribe = describe{text: name}
+		} else if name := v.matchFuncName(t, regexContext); name != "" && len(t.Args) >= 2 {
+			v.lastDescribe.lastContext = context{text: name}
+		} else if v.isConformanceCall(t) {
+			totalConfTests++
 			v.emit(t.Args[0])
+			return nil
 		} else if v.isLegacyItCall(t) {
+			totalLegacyTests++
 			v.failf(t, "Using It() with manual [Conformance] tag is no longer allowed.  Use framework.ConformanceIt() instead.")
 			return nil
 		}
@@ -120,7 +289,7 @@ func (v *visitor) Visit(node ast.Node) (w ast.Visitor) {
 
 func scandir(dir string) {
 	v := newVisitor()
-	pkg, err := parser.ParseDir(v.FileSet, dir, nil, 0)
+	pkg, err := parser.ParseDir(v.FileSet, dir, nil, parser.ParseComments)
 	if err != nil {
 		panic(err)
 	}
@@ -130,37 +299,58 @@ func scandir(dir string) {
 	}
 }
 
-func scanfile(path string) {
+func scanfile(path string, src interface{}) []conformanceData {
 	v := newVisitor()
-	file, err := parser.ParseFile(v.FileSet, path, nil, 0)
+	file, err := parser.ParseFile(v.FileSet, path, src, parser.ParseComments)
 	if err != nil {
 		panic(err)
 	}
 
+	v.cMap = ast.NewCommentMap(v.FileSet, file, file.Comments)
+
 	ast.Walk(v, file)
+	return v.tests
 }
 
 func main() {
-	args := os.Args[1:]
-	if len(args) < 1 {
+	flag.Parse()
+
+	if len(flag.Args()) < 1 {
 		fmt.Fprintf(os.Stderr, "USAGE: %s <DIR or FILE> [...]\n", os.Args[0])
 		os.Exit(64)
 	}
 
-	for _, arg := range args {
+	if *confDoc {
+		// Note: this assumes that you're running from the root of the kube src repo
+		header, err := ioutil.ReadFile("test/conformance/cf_header.md")
+		if err == nil {
+			fmt.Printf("%s\n\n", header)
+		}
+	}
+
+	totalConfTests = 0
+	totalLegacyTests = 0
+	missingComments = 0
+	for _, arg := range flag.Args() {
 		filepath.Walk(arg, func(path string, info os.FileInfo, err error) error {
 			if err != nil {
 				return err
 			}
-			if info.IsDir() {
-				scandir(path)
-			} else {
-				// TODO(mml): Remove this once we have all-go-srcs build rules.  See https://github.com/kubernetes/repo-infra/pull/45
-				if strings.HasSuffix(path, ".go") {
-					scanfile(path)
+			if strings.HasSuffix(path, ".go") {
+				tests := scanfile(path, nil)
+				for _, cd := range tests {
+					fmt.Printf("## [%s](%s)\n\n", cd.TestName, cd.URL)
+					fmt.Printf("%s\n\n", cd.Description)
+					if len(cd.Description) < 10 {
+						missingComments++
+					}
 				}
 			}
 			return nil
 		})
+	}
+	if *confDoc {
+		fmt.Println("\n## **Summary**")
+		fmt.Printf("\nTotal Conformance Tests: %d, total legacy tests that need conversion: %d, while total tests that need comment sections: %d\n\n", totalConfTests, totalLegacyTests, missingComments)
 	}
 }

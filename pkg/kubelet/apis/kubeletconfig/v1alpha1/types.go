@@ -85,6 +85,9 @@ type KubeletConfiguration struct {
 	// tlsPrivateKeyFile is the ile containing x509 private key matching
 	// tlsCertFile.
 	TLSPrivateKeyFile string `json:"tlsPrivateKeyFile"`
+	// TLSCipherSuites is the list of allowed cipher suites for the server.
+	// Values are from tls package constants (https://golang.org/pkg/crypto/tls/#pkg-constants).
+	TLSCipherSuites []string `json:"tlsCipherSuites"`
 	// authentication specifies how requests to the Kubelet's server are authenticated
 	Authentication KubeletAuthentication `json:"authentication"`
 	// authorization specifies how requests to the Kubelet's server are authorized
