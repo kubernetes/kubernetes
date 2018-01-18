@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2018 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	rest "k8s.io/client-go/rest"
-	api "k8s.io/kubernetes/pkg/api"
+	core "k8s.io/kubernetes/pkg/apis/core"
 	scheme "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/scheme"
 )
 
@@ -33,15 +33,15 @@ type PodsGetter interface {
 
 // PodInterface has methods to work with Pod resources.
 type PodInterface interface {
-	Create(*api.Pod) (*api.Pod, error)
-	Update(*api.Pod) (*api.Pod, error)
-	UpdateStatus(*api.Pod) (*api.Pod, error)
+	Create(*core.Pod) (*core.Pod, error)
+	Update(*core.Pod) (*core.Pod, error)
+	UpdateStatus(*core.Pod) (*core.Pod, error)
 	Delete(name string, options *v1.DeleteOptions) error
 	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
-	Get(name string, options v1.GetOptions) (*api.Pod, error)
-	List(opts v1.ListOptions) (*api.PodList, error)
+	Get(name string, options v1.GetOptions) (*core.Pod, error)
+	List(opts v1.ListOptions) (*core.PodList, error)
 	Watch(opts v1.ListOptions) (watch.Interface, error)
-	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *api.Pod, err error)
+	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *core.Pod, err error)
 	PodExpansion
 }
 
@@ -59,9 +59,44 @@ func newPods(c *CoreClient, namespace string) *pods {
 	}
 }
 
+// Get takes name of the pod, and returns the corresponding pod object, and an error if there is any.
+func (c *pods) Get(name string, options v1.GetOptions) (result *core.Pod, err error) {
+	result = &core.Pod{}
+	err = c.client.Get().
+		Namespace(c.ns).
+		Resource("pods").
+		Name(name).
+		VersionedParams(&options, scheme.ParameterCodec).
+		Do().
+		Into(result)
+	return
+}
+
+// List takes label and field selectors, and returns the list of Pods that match those selectors.
+func (c *pods) List(opts v1.ListOptions) (result *core.PodList, err error) {
+	result = &core.PodList{}
+	err = c.client.Get().
+		Namespace(c.ns).
+		Resource("pods").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Do().
+		Into(result)
+	return
+}
+
+// Watch returns a watch.Interface that watches the requested pods.
+func (c *pods) Watch(opts v1.ListOptions) (watch.Interface, error) {
+	opts.Watch = true
+	return c.client.Get().
+		Namespace(c.ns).
+		Resource("pods").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Watch()
+}
+
 // Create takes the representation of a pod and creates it.  Returns the server's representation of the pod, and an error, if there is any.
-func (c *pods) Create(pod *api.Pod) (result *api.Pod, err error) {
-	result = &api.Pod{}
+func (c *pods) Create(pod *core.Pod) (result *core.Pod, err error) {
+	result = &core.Pod{}
 	err = c.client.Post().
 		Namespace(c.ns).
 		Resource("pods").
@@ -72,8 +107,8 @@ func (c *pods) Create(pod *api.Pod) (result *api.Pod, err error) {
 }
 
 // Update takes the representation of a pod and updates it. Returns the server's representation of the pod, and an error, if there is any.
-func (c *pods) Update(pod *api.Pod) (result *api.Pod, err error) {
-	result = &api.Pod{}
+func (c *pods) Update(pod *core.Pod) (result *core.Pod, err error) {
+	result = &core.Pod{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("pods").
@@ -85,10 +120,10 @@ func (c *pods) Update(pod *api.Pod) (result *api.Pod, err error) {
 }
 
 // UpdateStatus was generated because the type contains a Status member.
-// Add a +genclientstatus=false comment above the type to avoid generating UpdateStatus().
+// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
 
-func (c *pods) UpdateStatus(pod *api.Pod) (result *api.Pod, err error) {
-	result = &api.Pod{}
+func (c *pods) UpdateStatus(pod *core.Pod) (result *core.Pod, err error) {
+	result = &core.Pod{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("pods").
@@ -122,44 +157,9 @@ func (c *pods) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOp
 		Error()
 }
 
-// Get takes name of the pod, and returns the corresponding pod object, and an error if there is any.
-func (c *pods) Get(name string, options v1.GetOptions) (result *api.Pod, err error) {
-	result = &api.Pod{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("pods").
-		Name(name).
-		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
-		Into(result)
-	return
-}
-
-// List takes label and field selectors, and returns the list of Pods that match those selectors.
-func (c *pods) List(opts v1.ListOptions) (result *api.PodList, err error) {
-	result = &api.PodList{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("pods").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Do().
-		Into(result)
-	return
-}
-
-// Watch returns a watch.Interface that watches the requested pods.
-func (c *pods) Watch(opts v1.ListOptions) (watch.Interface, error) {
-	opts.Watch = true
-	return c.client.Get().
-		Namespace(c.ns).
-		Resource("pods").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Watch()
-}
-
 // Patch applies the patch and returns the patched pod.
-func (c *pods) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *api.Pod, err error) {
-	result = &api.Pod{}
+func (c *pods) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *core.Pod, err error) {
+	result = &core.Pod{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
 		Resource("pods").

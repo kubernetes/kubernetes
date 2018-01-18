@@ -1,11 +1,4 @@
-package(default_visibility = ["//visibility:public"])
-
-licenses(["notice"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
@@ -13,13 +6,13 @@ go_library(
         "doc.go",
         "http.go",
     ],
-    tags = ["automanaged"],
+    importpath = "github.com/coreos/etcd/lease/leasehttp",
+    visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/coreos/etcd/etcdserver/etcdserverpb:go_default_library",
         "//vendor/github.com/coreos/etcd/lease:go_default_library",
         "//vendor/github.com/coreos/etcd/lease/leasepb:go_default_library",
         "//vendor/github.com/coreos/etcd/pkg/httputil:go_default_library",
-        "//vendor/golang.org/x/net/context:go_default_library",
     ],
 )
 
@@ -34,4 +27,5 @@ filegroup(
     name = "all-srcs",
     srcs = [":package-srcs"],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

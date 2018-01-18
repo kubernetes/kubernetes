@@ -21,67 +21,99 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apimachinery/pkg/labels"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/watch"
 )
 
 // Selector is a Visitor for resources that match a label selector.
 type Selector struct {
-	Client    RESTClient
-	Mapping   *meta.RESTMapping
-	Namespace string
-	Selector  labels.Selector
-	Export    bool
+	Client               RESTClient
+	Mapping              *meta.RESTMapping
+	Namespace            string
+	LabelSelector        string
+	FieldSelector        string
+	Export               bool
+	IncludeUninitialized bool
+	LimitChunks          int64
 }
 
 // NewSelector creates a resource selector which hides details of getting items by their label selector.
-func NewSelector(client RESTClient, mapping *meta.RESTMapping, namespace string, selector labels.Selector, export bool) *Selector {
+func NewSelector(client RESTClient, mapping *meta.RESTMapping, namespace, labelSelector, fieldSelector string, export, includeUninitialized bool, limitChunks int64) *Selector {
 	return &Selector{
-		Client:    client,
-		Mapping:   mapping,
-		Namespace: namespace,
-		Selector:  selector,
-		Export:    export,
+		Client:               client,
+		Mapping:              mapping,
+		Namespace:            namespace,
+		LabelSelector:        labelSelector,
+		FieldSelector:        fieldSelector,
+		Export:               export,
+		IncludeUninitialized: includeUninitialized,
+		LimitChunks:          limitChunks,
 	}
 }
 
-// Visit implements Visitor
+// Visit implements Visitor and uses request chunking by default.
 func (r *Selector) Visit(fn VisitorFunc) error {
-	list, err := NewHelper(r.Client, r.Mapping).List(r.Namespace, r.ResourceMapping().GroupVersionKind.GroupVersion().String(), r.Selector, r.Export)
-	if err != nil {
-		if errors.IsBadRequest(err) || errors.IsNotFound(err) {
-			if se, ok := err.(*errors.StatusError); ok {
-				// modify the message without hiding this is an API error
-				if r.Selector.Empty() {
-					se.ErrStatus.Message = fmt.Sprintf("Unable to list %q: %v", r.Mapping.Resource, se.ErrStatus.Message)
-				} else {
-					se.ErrStatus.Message = fmt.Sprintf("Unable to find %q that match the selector %q: %v", r.Mapping.Resource, r.Selector, se.ErrStatus.Message)
+	var continueToken string
+	for {
+		list, err := NewHelper(r.Client, r.Mapping).List(
+			r.Namespace,
+			r.ResourceMapping().GroupVersionKind.GroupVersion().String(),
+			r.Export,
+			&metav1.ListOptions{
+				LabelSelector:        r.LabelSelector,
+				FieldSelector:        r.FieldSelector,
+				IncludeUninitialized: r.IncludeUninitialized,
+				Limit:                r.LimitChunks,
+				Continue:             continueToken,
+			},
+		)
+		if err != nil {
+			if errors.IsResourceExpired(err) {
+				return err
+			}
+			if errors.IsBadRequest(err) || errors.IsNotFound(err) {
+				if se, ok := err.(*errors.StatusError); ok {
+					// modify the message without hiding this is an API error
+					if len(r.LabelSelector) == 0 && len(r.FieldSelector) == 0 {
+						se.ErrStatus.Message = fmt.Sprintf("Unable to list %q: %v", r.Mapping.Resource, se.ErrStatus.Message)
+					} else {
+						se.ErrStatus.Message = fmt.Sprintf("Unable to find %q that match label selector %q, field selector %q: %v", r.Mapping.Resource, r.LabelSelector, r.FieldSelector, se.ErrStatus.Message)
+					}
+					return se
 				}
-				return se
+				if len(r.LabelSelector) == 0 && len(r.FieldSelector) == 0 {
+					return fmt.Errorf("Unable to list %q: %v", r.Mapping.Resource, err)
+				}
+				return fmt.Errorf("Unable to find %q that match label selector %q, field selector %q: %v", r.Mapping.Resource, r.LabelSelector, r.FieldSelector, err)
 			}
-			if r.Selector.Empty() {
-				return fmt.Errorf("Unable to list %q: %v", r.Mapping.Resource, err)
-			} else {
-				return fmt.Errorf("Unable to find %q that match the selector %q: %v", r.Mapping.Resource, r.Selector, err)
-			}
+			return err
 		}
-		return err
-	}
-	accessor := r.Mapping.MetadataAccessor
-	resourceVersion, _ := accessor.ResourceVersion(list)
-	info := &Info{
-		Client:    r.Client,
-		Mapping:   r.Mapping,
-		Namespace: r.Namespace,
+		accessor := r.Mapping.MetadataAccessor
+		resourceVersion, _ := accessor.ResourceVersion(list)
+		nextContinueToken, _ := accessor.Continue(list)
+		info := &Info{
+			Client:  r.Client,
+			Mapping: r.Mapping,
 
-		Object:          list,
-		ResourceVersion: resourceVersion,
+			Namespace:       r.Namespace,
+			ResourceVersion: resourceVersion,
+
+			Object: list,
+		}
+
+		if err := fn(info, nil); err != nil {
+			return err
+		}
+		if len(nextContinueToken) == 0 {
+			return nil
+		}
+		continueToken = nextContinueToken
 	}
-	return fn(info, nil)
 }
 
 func (r *Selector) Watch(resourceVersion string) (watch.Interface, error) {
-	return NewHelper(r.Client, r.Mapping).Watch(r.Namespace, resourceVersion, r.ResourceMapping().GroupVersionKind.GroupVersion().String(), r.Selector)
+	return NewHelper(r.Client, r.Mapping).Watch(r.Namespace, r.ResourceMapping().GroupVersionKind.GroupVersion().String(),
+		&metav1.ListOptions{ResourceVersion: resourceVersion, LabelSelector: r.LabelSelector, FieldSelector: r.FieldSelector})
 }
 
 // ResourceMapping returns the mapping for this resource and implements ResourceMapping

@@ -23,6 +23,6 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 
 kube::golang::setup_env
 
-make -C "${KUBE_ROOT}" WHAT=cmd/libs/go2idl/import-boss
+make -C "${KUBE_ROOT}" WHAT=vendor/k8s.io/code-generator/cmd/import-boss
 
 $(kube::util::find-binary "import-boss") --verify-only

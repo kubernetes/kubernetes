@@ -23,12 +23,13 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
-	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
 // Validate PV/PVC, create and verify writer pod, delete the PVC, and validate the PV's
@@ -85,19 +86,7 @@ func completeMultiTest(f *framework.Framework, c clientset.Interface, ns string,
 	return nil
 }
 
-// initNFSserverPod wraps volumes.go's startVolumeServer to return a running nfs host pod
-// commonly used by persistent volume testing
-func initNFSserverPod(c clientset.Interface, ns string) *v1.Pod {
-	return framework.StartVolumeServer(c, framework.VolumeTestConfig{
-		Namespace:   ns,
-		Prefix:      "nfs",
-		ServerImage: framework.NfsServerImage,
-		ServerPorts: []int{2049},
-		ServerArgs:  []string{"-G", "777", "/exports"},
-	})
-}
-
-var _ = framework.KubeDescribe("PersistentVolumes [Feature:Volumes]", func() {
+var _ = utils.SIGDescribe("PersistentVolumes", func() {
 
 	// global vars for the Context()s and It()'s below
 	f := framework.NewDefaultFramework("pv")
@@ -123,7 +112,7 @@ var _ = framework.KubeDescribe("PersistentVolumes [Feature:Volumes]", func() {
 
 	// Testing configurations of a single a PV/PVC pair, multiple evenly paired PVs/PVCs,
 	// and multiple unevenly paired PV/PVCs
-	framework.KubeDescribe("PersistentVolumes:NFS", func() {
+	Describe("NFS", func() {
 
 		var (
 			nfsServerPod *v1.Pod
@@ -131,10 +120,7 @@ var _ = framework.KubeDescribe("PersistentVolumes [Feature:Volumes]", func() {
 		)
 
 		BeforeEach(func() {
-			framework.Logf("[BeforeEach] Creating NFS Server Pod")
-			nfsServerPod = initNFSserverPod(c, ns)
-			serverIP = nfsServerPod.Status.PodIP
-			framework.Logf("[BeforeEach] Configuring PersistentVolume")
+			_, nfsServerPod, serverIP = framework.NewNFSServer(c, ns, []string{"-G", "777", "/exports"})
 			pvConfig = framework.PersistentVolumeConfig{
 				NamePrefix: "nfs-",
 				Labels:     volLabel,
@@ -219,9 +205,6 @@ var _ = framework.KubeDescribe("PersistentVolumes [Feature:Volumes]", func() {
 		//   in different namespaces.
 		Context("with multiple PVs and PVCs all in same ns", func() {
 
-			// define the maximum number of PVs and PVCs supported by these tests
-			const maxNumPVs = 10
-			const maxNumPVCs = 10
 			// scope the pv and pvc maps to be available in the AfterEach
 			// note: these maps are created fresh in CreatePVsPVCs()
 			var pvols framework.PVMap
@@ -261,7 +244,7 @@ var _ = framework.KubeDescribe("PersistentVolumes [Feature:Volumes]", func() {
 
 			// Create 4 PVs and 2 PVCs.
 			// Note: PVs are created before claims and no pre-binding.
-			It("should create 4 PVs and 2 PVCs: test write access", func() {
+			It("should create 4 PVs and 2 PVCs: test write access [Slow]", func() {
 				numPVs, numPVCs := 4, 2
 				pvols, claims, err = framework.CreatePVsPVCs(numPVs, numPVCs, c, ns, pvConfig, pvcConfig)
 				Expect(err).NotTo(HaveOccurred())
@@ -291,7 +274,7 @@ var _ = framework.KubeDescribe("PersistentVolumes [Feature:Volumes]", func() {
 			// This It() tests a scenario where a PV is written to by a Pod, recycled, then the volume checked
 			// for files. If files are found, the checking Pod fails, failing the test.  Otherwise, the pod
 			// (and test) succeed.
-			It("should test that a PV becomes Available and is clean after the PVC is deleted. [Volume]", func() {
+			It("should test that a PV becomes Available and is clean after the PVC is deleted.", func() {
 				By("Writing to the volume.")
 				pod := framework.MakeWritePod(ns, pvc)
 				pod, err = c.CoreV1().Pods(ns).Create(pod)
@@ -310,7 +293,7 @@ var _ = framework.KubeDescribe("PersistentVolumes [Feature:Volumes]", func() {
 				// If a file is detected in /mnt, fail the pod and do not restart it.
 				By("Verifying the mount has been cleaned.")
 				mount := pod.Spec.Containers[0].VolumeMounts[0].MountPath
-				pod = framework.MakePod(ns, []*v1.PersistentVolumeClaim{pvc}, true, fmt.Sprintf("[ $(ls -A %s | wc -l) -eq 0 ] && exit 0 || exit 1", mount))
+				pod = framework.MakePod(ns, nil, []*v1.PersistentVolumeClaim{pvc}, true, fmt.Sprintf("[ $(ls -A %s | wc -l) -eq 0 ] && exit 0 || exit 1", mount))
 				pod, err = c.CoreV1().Pods(ns).Create(pod)
 				Expect(err).NotTo(HaveOccurred())
 				framework.ExpectNoError(framework.WaitForPodSuccessInNamespace(c, pod.Name, ns))

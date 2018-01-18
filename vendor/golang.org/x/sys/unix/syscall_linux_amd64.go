@@ -6,8 +6,6 @@
 
 package unix
 
-import "syscall"
-
 //sys	Dup2(oldfd int, newfd int) (err error)
 //sys	EpollWait(epfd int, events []EpollEvent, msec int) (n int, err error)
 //sys	Fadvise(fd int, offset int64, length int64, advice int) (err error) = SYS_FADVISE64
@@ -63,9 +61,6 @@ import "syscall"
 //sys	sendmsg(s int, msg *Msghdr, flags int) (n int, err error)
 //sys	mmap(addr uintptr, length uintptr, prot int, flags int, fd int, offset int64) (xaddr uintptr, err error)
 
-//go:noescape
-func gettimeofday(tv *Timeval) (err syscall.Errno)
-
 func Gettimeofday(tv *Timeval) (err error) {
 	errno := gettimeofday(tv)
 	if errno != 0 {
@@ -73,8 +68,6 @@ func Gettimeofday(tv *Timeval) (err error) {
 	}
 	return nil
 }
-
-func Getpagesize() int { return 4096 }
 
 func Time(t *Time_t) (tt Time_t, err error) {
 	var tv Timeval
@@ -90,19 +83,12 @@ func Time(t *Time_t) (tt Time_t, err error) {
 
 //sys	Utime(path string, buf *Utimbuf) (err error)
 
-func TimespecToNsec(ts Timespec) int64 { return int64(ts.Sec)*1e9 + int64(ts.Nsec) }
-
-func NsecToTimespec(nsec int64) (ts Timespec) {
-	ts.Sec = nsec / 1e9
-	ts.Nsec = nsec % 1e9
-	return
+func setTimespec(sec, nsec int64) Timespec {
+	return Timespec{Sec: sec, Nsec: nsec}
 }
 
-func NsecToTimeval(nsec int64) (tv Timeval) {
-	nsec += 999 // round up to microsecond
-	tv.Sec = nsec / 1e9
-	tv.Usec = nsec % 1e9 / 1e3
-	return
+func setTimeval(sec, usec int64) Timeval {
+	return Timeval{Sec: sec, Usec: usec}
 }
 
 //sysnb	pipe(p *[2]_C_int) (err error)

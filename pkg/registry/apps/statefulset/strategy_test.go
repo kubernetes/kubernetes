@@ -22,8 +22,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/apps"
+	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
 func TestStatefulSetStrategy(t *testing.T) {
@@ -51,8 +51,10 @@ func TestStatefulSetStrategy(t *testing.T) {
 	ps := &apps.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 		Spec: apps.StatefulSetSpec{
-			Selector: &metav1.LabelSelector{MatchLabels: validSelector},
-			Template: validPodTemplate.Template,
+			PodManagementPolicy: apps.OrderedReadyPodManagement,
+			Selector:            &metav1.LabelSelector{MatchLabels: validSelector},
+			Template:            validPodTemplate.Template,
+			UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
 		},
 		Status: apps.StatefulSetStatus{Replicas: 3},
 	}
@@ -70,8 +72,10 @@ func TestStatefulSetStrategy(t *testing.T) {
 	validPs := &apps.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{Name: ps.Name, Namespace: ps.Namespace, ResourceVersion: "1", Generation: 1},
 		Spec: apps.StatefulSetSpec{
-			Selector: ps.Spec.Selector,
-			Template: validPodTemplate.Template,
+			PodManagementPolicy: apps.OrderedReadyPodManagement,
+			Selector:            ps.Spec.Selector,
+			Template:            validPodTemplate.Template,
+			UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
 		},
 		Status: apps.StatefulSetStatus{Replicas: 4},
 	}
@@ -87,12 +91,59 @@ func TestStatefulSetStrategy(t *testing.T) {
 	if len(errs) == 0 {
 		t.Errorf("expected a validation error since updates are disallowed on statefulsets.")
 	}
+}
 
+func TestStatefulsetDefaultGarbageCollectionPolicy(t *testing.T) {
 	// Make sure we correctly implement the interface.
 	// Otherwise a typo could silently change the default.
 	var gcds rest.GarbageCollectionDeleteStrategy = Strategy
-	if got, want := gcds.DefaultGarbageCollectionPolicy(), rest.OrphanDependents; got != want {
-		t.Errorf("DefaultGarbageCollectionPolicy() = %#v, want %#v", got, want)
+	tests := []struct {
+		requestInfo      genericapirequest.RequestInfo
+		expectedGCPolicy rest.GarbageCollectionPolicy
+		isNilRequestInfo bool
+	}{
+		{
+			genericapirequest.RequestInfo{
+				APIGroup:   "apps",
+				APIVersion: "v1beta1",
+				Resource:   "statefulsets",
+			},
+			rest.OrphanDependents,
+			false,
+		},
+		{
+			genericapirequest.RequestInfo{
+				APIGroup:   "apps",
+				APIVersion: "v1beta2",
+				Resource:   "statefulsets",
+			},
+			rest.OrphanDependents,
+			false,
+		},
+		{
+			genericapirequest.RequestInfo{
+				APIGroup:   "apps",
+				APIVersion: "v1",
+				Resource:   "statefulsets",
+			},
+			rest.DeleteDependents,
+			false,
+		},
+		{
+			expectedGCPolicy: rest.OrphanDependents,
+			isNilRequestInfo: true,
+		},
+	}
+
+	for _, test := range tests {
+		context := genericapirequest.NewContext()
+		if !test.isNilRequestInfo {
+			context = genericapirequest.WithRequestInfo(context, &test.requestInfo)
+		}
+		if got, want := gcds.DefaultGarbageCollectionPolicy(context), test.expectedGCPolicy; got != want {
+			t.Errorf("%s/%s: DefaultGarbageCollectionPolicy() = %#v, want %#v", test.requestInfo.APIGroup,
+				test.requestInfo.APIVersion, got, want)
+		}
 	}
 }
 
@@ -120,9 +171,10 @@ func TestStatefulSetStatusStrategy(t *testing.T) {
 	oldPS := &apps.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault, ResourceVersion: "10"},
 		Spec: apps.StatefulSetSpec{
-			Replicas: 3,
-			Selector: &metav1.LabelSelector{MatchLabels: validSelector},
-			Template: validPodTemplate.Template,
+			Replicas:       3,
+			Selector:       &metav1.LabelSelector{MatchLabels: validSelector},
+			Template:       validPodTemplate.Template,
+			UpdateStrategy: apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
 		},
 		Status: apps.StatefulSetStatus{
 			Replicas: 1,
@@ -131,9 +183,10 @@ func TestStatefulSetStatusStrategy(t *testing.T) {
 	newPS := &apps.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault, ResourceVersion: "9"},
 		Spec: apps.StatefulSetSpec{
-			Replicas: 1,
-			Selector: &metav1.LabelSelector{MatchLabels: validSelector},
-			Template: validPodTemplate.Template,
+			Replicas:       1,
+			Selector:       &metav1.LabelSelector{MatchLabels: validSelector},
+			Template:       validPodTemplate.Template,
+			UpdateStrategy: apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
 		},
 		Status: apps.StatefulSetStatus{
 			Replicas: 2,

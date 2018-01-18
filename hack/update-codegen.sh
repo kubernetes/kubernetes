@@ -24,9 +24,9 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 kube::golang::setup_env
 
 BUILD_TARGETS=(
-  cmd/libs/go2idl/client-gen
-  cmd/libs/go2idl/lister-gen
-  cmd/libs/go2idl/informer-gen
+  vendor/k8s.io/code-generator/cmd/client-gen
+  vendor/k8s.io/code-generator/cmd/lister-gen
+  vendor/k8s.io/code-generator/cmd/informer-gen
 )
 make -C "${KUBE_ROOT}" WHAT="${BUILD_TARGETS[*]}"
 
@@ -40,11 +40,14 @@ informergen=$(kube::util::find-binary "informer-gen")
 
 GROUP_VERSIONS=(${KUBE_AVAILABLE_GROUP_VERSIONS})
 GV_DIRS=()
+INTERNAL_DIRS=()
 for gv in "${GROUP_VERSIONS[@]}"; do
 	# add items, but strip off any leading apis/ you find to match command expectations
 	api_dir=$(kube::util::group-version-to-pkg-path "${gv}")
 	nopkg_dir=${api_dir#pkg/}
+	nopkg_dir=${nopkg_dir#vendor/k8s.io/api/}
 	pkg_dir=${nopkg_dir#apis/}
+
 
 	# skip groups that aren't being served, clients for these don't matter
     if [[ " ${KUBE_NONSERVER_GROUP_VERSIONS} " == *" ${gv} "* ]]; then
@@ -52,55 +55,83 @@ for gv in "${GROUP_VERSIONS[@]}"; do
     fi
 
 	GV_DIRS+=("${pkg_dir}")
+
+	# collect internal groups
+	int_group="${pkg_dir%/*}/"
+	if [[ "${pkg_dir}" = core/* ]]; then
+	  int_group="api/"
+	fi
+    if ! [[ " ${INTERNAL_DIRS[@]:-} " =~ " ${int_group} " ]]; then
+      INTERNAL_DIRS+=("${int_group}")
+    fi
 done
 # delimit by commas for the command
 GV_DIRS_CSV=$(IFS=',';echo "${GV_DIRS[*]// /,}";IFS=$)
+INTERNAL_DIRS_CSV=$(IFS=',';echo "${INTERNAL_DIRS[*]// /,}";IFS=$)
 
 # This can be called with one flag, --verify-only, so it works for both the
 # update- and verify- scripts.
-${clientgen} "$@"
-${clientgen} -t "$@"
-${clientgen} --clientset-name="clientset" --input="${GV_DIRS_CSV}" "$@"
-# Clientgen for federation clientset.
-${clientgen} --clientset-name=federation_internalclientset --clientset-path=k8s.io/kubernetes/federation/client/clientset_generated --input="../../federation/apis/federation/","api/","extensions/","batch/","autoscaling/" --included-types-overrides="api/Service,api/Namespace,extensions/ReplicaSet,api/Secret,extensions/Ingress,extensions/Deployment,extensions/DaemonSet,api/ConfigMap,api/Event,batch/Job,autoscaling/HorizontalPodAutoscaler"   "$@"
-${clientgen} --clientset-name=federation_clientset --clientset-path=k8s.io/kubernetes/federation/client/clientset_generated --input="../../federation/apis/federation/v1beta1","api/v1","extensions/v1beta1","batch/v1","autoscaling/v1" --included-types-overrides="api/v1/Service,api/v1/Namespace,extensions/v1beta1/ReplicaSet,api/v1/Secret,extensions/v1beta1/Ingress,extensions/v1beta1/Deployment,extensions/v1beta1/DaemonSet,api/v1/ConfigMap,api/v1/Event,batch/v1/Job,autoscaling/v1/HorizontalPodAutoscaler"   "$@"
+${clientgen} --input-base="k8s.io/kubernetes/pkg/apis" --input="${INTERNAL_DIRS_CSV}" "$@"
+${clientgen} --output-base "${KUBE_ROOT}/vendor" --output-package="k8s.io/client-go" --clientset-name="kubernetes" --input-base="k8s.io/kubernetes/vendor/k8s.io/api" --input="${GV_DIRS_CSV}" "$@"
 
-LISTERGEN_APIS=(
-pkg/api
-pkg/api/v1
+listergen_internal_apis=(
 $(
   cd ${KUBE_ROOT}
-  find pkg/apis -name types.go | xargs -n1 dirname | sort
+  find pkg/apis -maxdepth 2 -name types.go | xargs -n1 dirname | sort
 )
 )
+listergen_internal_apis=(${listergen_internal_apis[@]/#/k8s.io/kubernetes/})
+listergen_internal_apis_csv=$(IFS=,; echo "${listergen_internal_apis[*]}")
+${listergen} --input-dirs "${listergen_internal_apis_csv}" "$@"
 
-LISTERGEN_APIS=(${LISTERGEN_APIS[@]/#/k8s.io/kubernetes/})
-LISTERGEN_APIS=$(IFS=,; echo "${LISTERGEN_APIS[*]}")
+listergen_external_apis=(
+$(
+  cd ${KUBE_ROOT}/staging/src
+  find k8s.io/api -name types.go | xargs -n1 dirname | sort
+)
+)
+listergen_external_apis_csv=$(IFS=,; echo "${listergen_external_apis[*]}")
+${listergen} --output-base "${KUBE_ROOT}/vendor" --output-package "k8s.io/client-go/listers" --input-dirs "${listergen_external_apis_csv}" "$@"
 
-${listergen} --input-dirs "${LISTERGEN_APIS}" "$@"
-
-INFORMERGEN_APIS=(
-pkg/api
-pkg/api/v1
+informergen_internal_apis=(
 $(
   cd ${KUBE_ROOT}
-  # because client-gen doesn't do policy/v1alpha1, we have to skip it too
-  find pkg/apis -name types.go | xargs -n1 dirname | sort | grep -v pkg.apis.policy.v1alpha1
+  find pkg/apis -maxdepth 2 -name types.go | xargs -n1 dirname | sort
 )
 )
-
-INFORMERGEN_APIS=(${INFORMERGEN_APIS[@]/#/k8s.io/kubernetes/})
-INFORMERGEN_APIS=$(IFS=,; echo "${INFORMERGEN_APIS[*]}")
+informergen_internal_apis=(${informergen_internal_apis[@]/#/k8s.io/kubernetes/})
+informergen_internal_apis_csv=$(IFS=,; echo "${informergen_internal_apis[*]}")
 ${informergen} \
-  --input-dirs "${INFORMERGEN_APIS}" \
-  --versioned-clientset-package k8s.io/kubernetes/pkg/client/clientset_generated/clientset \
+  --input-dirs "${informergen_internal_apis_csv}" \
   --internal-clientset-package k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset \
   --listers-package k8s.io/kubernetes/pkg/client/listers \
+  "$@"
+
+informergen_external_apis=(
+$(
+  cd ${KUBE_ROOT}/staging/src
+  # because client-gen doesn't do policy/v1alpha1, we have to skip it too
+  find k8s.io/api -name types.go | xargs -n1 dirname | sort | grep -v pkg.apis.policy.v1alpha1
+)
+)
+
+informergen_external_apis_csv=$(IFS=,; echo "${informergen_external_apis[*]}")
+
+${informergen} \
+  --output-base "${KUBE_ROOT}/vendor" \
+  --output-package "k8s.io/client-go/informers" \
+  --single-directory \
+  --input-dirs "${informergen_external_apis_csv}" \
+  --versioned-clientset-package k8s.io/client-go/kubernetes \
+  --listers-package k8s.io/client-go/listers \
   "$@"
 
 # You may add additional calls of code generators like set-gen above.
 
 # call generation on sub-project for now
-vendor/k8s.io/kube-aggregator/hack/update-codegen.sh
-vendor/k8s.io/sample-apiserver/hack/update-codegen.sh
-vendor/k8s.io/kube-apiextensions-server/hack/update-codegen.sh
+CODEGEN_PKG=./vendor/k8s.io/code-generator vendor/k8s.io/code-generator/hack/update-codegen.sh
+CODEGEN_PKG=./vendor/k8s.io/code-generator vendor/k8s.io/kube-aggregator/hack/update-codegen.sh
+CODEGEN_PKG=./vendor/k8s.io/code-generator vendor/k8s.io/sample-apiserver/hack/update-codegen.sh
+CODEGEN_PKG=./vendor/k8s.io/code-generator vendor/k8s.io/sample-controller/hack/update-codegen.sh
+CODEGEN_PKG=./vendor/k8s.io/code-generator vendor/k8s.io/apiextensions-apiserver/hack/update-codegen.sh
+CODEGEN_PKG=./vendor/k8s.io/code-generator vendor/k8s.io/metrics/hack/update-codegen.sh

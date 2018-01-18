@@ -21,7 +21,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 )
 
@@ -32,7 +32,7 @@ type ReplicaSetListerExpansion interface {
 }
 
 // ReplicaSetNamespaceListerExpansion allows custom methods to be added to
-// ReplicaSetNamespaeLister.
+// ReplicaSetNamespaceLister.
 type ReplicaSetNamespaceListerExpansion interface{}
 
 // GetPodReplicaSets returns a list of ReplicaSets that potentially match a pod.

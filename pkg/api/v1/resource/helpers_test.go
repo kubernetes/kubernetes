@@ -21,8 +21,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/api/v1"
 )
 
 func TestResourceHelpers(t *testing.T) {
@@ -30,9 +30,8 @@ func TestResourceHelpers(t *testing.T) {
 	memoryLimit := resource.MustParse("10G")
 	resourceSpec := v1.ResourceRequirements{
 		Limits: v1.ResourceList{
-			"cpu":             cpuLimit,
-			"memory":          memoryLimit,
-			"kube.io/storage": memoryLimit,
+			v1.ResourceCPU:    cpuLimit,
+			v1.ResourceMemory: memoryLimit,
 		},
 	}
 	if res := resourceSpec.Limits.Cpu(); res.Cmp(cpuLimit) != 0 {
@@ -43,8 +42,7 @@ func TestResourceHelpers(t *testing.T) {
 	}
 	resourceSpec = v1.ResourceRequirements{
 		Limits: v1.ResourceList{
-			"memory":          memoryLimit,
-			"kube.io/storage": memoryLimit,
+			v1.ResourceMemory: memoryLimit,
 		},
 	}
 	if res := resourceSpec.Limits.Cpu(); res.Value() != 0 {

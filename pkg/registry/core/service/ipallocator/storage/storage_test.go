@@ -25,7 +25,7 @@ import (
 	"k8s.io/apiserver/pkg/storage"
 	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
 	"k8s.io/apiserver/pkg/storage/storagebackend/factory"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/registry/core/service/allocator"
 	allocatorstore "k8s.io/kubernetes/pkg/registry/core/service/allocator/storage"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
@@ -78,7 +78,8 @@ func TestEmpty(t *testing.T) {
 func TestErrors(t *testing.T) {
 	_, storage, _, _, destroyFunc := newStorage(t)
 	defer destroyFunc()
-	if err := storage.Allocate(net.ParseIP("192.168.0.0")); err != ipallocator.ErrNotInRange {
+	err := storage.Allocate(net.ParseIP("192.168.0.0"))
+	if _, ok := err.(*ipallocator.ErrNotInRange); !ok {
 		t.Fatal(err)
 	}
 }

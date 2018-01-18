@@ -28,13 +28,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	restclient "k8s.io/client-go/rest"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/helper"
-	"k8s.io/kubernetes/pkg/api/validation"
+	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/kubectl/resource"
-	"k8s.io/kubernetes/pkg/util/i18n"
+	"k8s.io/kubernetes/pkg/kubectl/util"
+	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
 
 var (
@@ -75,10 +74,9 @@ type LogsOptions struct {
 	ResourceArg string
 	Options     runtime.Object
 
-	Mapper       meta.RESTMapper
-	Typer        runtime.ObjectTyper
-	ClientMapper resource.ClientMapper
-	Decoder      runtime.Decoder
+	Mapper  meta.RESTMapper
+	Typer   runtime.ObjectTyper
+	Decoder runtime.Decoder
 
 	Object        runtime.Object
 	GetPodTimeout time.Duration
@@ -87,7 +85,7 @@ type LogsOptions struct {
 	Out io.Writer
 }
 
-// NewCmdLog creates a new pod logs command
+// NewCmdLogs creates a new pod logs command
 func NewCmdLogs(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	o := &LogsOptions{}
 	cmd := &cobra.Command{
@@ -129,21 +127,21 @@ func (o *LogsOptions) Complete(f cmdutil.Factory, out io.Writer, cmd *cobra.Comm
 	switch len(args) {
 	case 0:
 		if len(selector) == 0 {
-			return cmdutil.UsageError(cmd, logsUsageStr)
+			return cmdutil.UsageErrorf(cmd, "%s", logsUsageStr)
 		}
 	case 1:
 		o.ResourceArg = args[0]
 		if len(selector) != 0 {
-			return cmdutil.UsageError(cmd, "only a selector (-l) or a POD name is allowed")
+			return cmdutil.UsageErrorf(cmd, "only a selector (-l) or a POD name is allowed")
 		}
 	case 2:
 		if cmd.Flag("container").Changed {
-			return cmdutil.UsageError(cmd, "only one of -c or an inline [CONTAINER] arg is allowed")
+			return cmdutil.UsageErrorf(cmd, "only one of -c or an inline [CONTAINER] arg is allowed")
 		}
 		o.ResourceArg = args[0]
 		containerName = args[1]
 	default:
-		return cmdutil.UsageError(cmd, logsUsageStr)
+		return cmdutil.UsageErrorf(cmd, "%s", logsUsageStr)
 	}
 	var err error
 	o.Namespace, _, err = f.DefaultNamespace()
@@ -158,7 +156,7 @@ func (o *LogsOptions) Complete(f cmdutil.Factory, out io.Writer, cmd *cobra.Comm
 		Timestamps: cmdutil.GetFlagBool(cmd, "timestamps"),
 	}
 	if sinceTime := cmdutil.GetFlagString(cmd, "since-time"); len(sinceTime) > 0 {
-		t, err := helper.ParseRFC3339(sinceTime, metav1.Now)
+		t, err := util.ParseRFC3339(sinceTime, metav1.Now)
 		if err != nil {
 			return err
 		}
@@ -167,7 +165,8 @@ func (o *LogsOptions) Complete(f cmdutil.Factory, out io.Writer, cmd *cobra.Comm
 	if limit := cmdutil.GetFlagInt64(cmd, "limit-bytes"); limit != 0 {
 		logOptions.LimitBytes = &limit
 	}
-	if tail := cmdutil.GetFlagInt64(cmd, "tail"); tail != -1 {
+	tail := cmdutil.GetFlagInt64(cmd, "tail")
+	if tail != -1 {
 		logOptions.TailLines = &tail
 	}
 	if sinceSeconds := cmdutil.GetFlagDuration(cmd, "since"); sinceSeconds != 0 {
@@ -181,32 +180,27 @@ func (o *LogsOptions) Complete(f cmdutil.Factory, out io.Writer, cmd *cobra.Comm
 	}
 	o.Options = logOptions
 	o.LogsForObject = f.LogsForObject
-	o.ClientMapper = resource.ClientMapperFunc(f.ClientForMapping)
 	o.Out = out
 
 	if len(selector) != 0 {
 		if logOptions.Follow {
-			return cmdutil.UsageError(cmd, "only one of follow (-f) or selector (-l) is allowed")
+			return cmdutil.UsageErrorf(cmd, "only one of follow (-f) or selector (-l) is allowed")
 		}
-		if len(logOptions.Container) != 0 {
-			return cmdutil.UsageError(cmd, "a container cannot be specified when using a selector (-l)")
-		}
-		if logOptions.TailLines == nil {
+		if logOptions.TailLines == nil && tail != -1 {
 			logOptions.TailLines = &selectorTail
 		}
 	}
 
-	mapper, typer := f.Object()
-	decoder := f.Decoder(true)
 	if o.Object == nil {
-		builder := resource.NewBuilder(mapper, f.CategoryExpander(), typer, o.ClientMapper, decoder).
+		builder := f.NewBuilder().
+			Internal().
 			NamespaceParam(o.Namespace).DefaultNamespace().
 			SingleResourceType()
 		if o.ResourceArg != "" {
 			builder.ResourceNames("pods", o.ResourceArg)
 		}
 		if selector != "" {
-			builder.ResourceTypes("pods").SelectorParam(selector)
+			builder.ResourceTypes("pods").LabelSelectorParam(selector)
 		}
 		infos, err := builder.Do().Infos()
 		if err != nil {

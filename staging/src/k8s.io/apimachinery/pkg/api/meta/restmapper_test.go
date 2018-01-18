@@ -131,7 +131,7 @@ func TestRESTMapperKindsFor(t *testing.T) {
 		ExpectedKindErr string
 	}{
 		{
-			// exact matches are prefered
+			// exact matches are preferred
 			Name: "groups, with group exact",
 			PreferredOrder: []schema.GroupVersion{
 				{Group: "first-group-1", Version: "first-version"},
@@ -300,7 +300,7 @@ func TestRESTMapperResourcesFor(t *testing.T) {
 		ExpectedResourceErr string
 	}{
 		{
-			// exact matches are prefered
+			// exact matches are preferred
 			Name: "groups, with group exact",
 			PreferredOrder: []schema.GroupVersion{
 				{Group: "first-group-1", Version: "first-version"},

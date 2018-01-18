@@ -29,23 +29,24 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utiltesting "k8s.io/client-go/util/testing"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/api/validation"
+	api "k8s.io/kubernetes/pkg/apis/core"
+	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
+	"k8s.io/kubernetes/pkg/apis/core/validation"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/securitycontext"
 )
 
 func TestExtractFromNonExistentFile(t *testing.T) {
 	ch := make(chan interface{}, 1)
-	c := new("/some/fake/file", "localhost", time.Millisecond, ch)
+	c := newSourceFile("/some/fake/file", "localhost", time.Millisecond, ch)
 	err := c.watch()
 	if err == nil {
 		t.Errorf("Expected error")
@@ -79,7 +80,7 @@ func TestReadPodsFromFileExistAlready(t *testing.T) {
 				t.Fatalf("unable to create temp dir: %v", err)
 			}
 			defer os.RemoveAll(dirName)
-			file := testCase.writeToFile(dirName, "test_pod_config", t)
+			file := testCase.writeToFile(dirName, "test_pod_manifest", t)
 
 			ch := make(chan interface{})
 			NewSourceFile(file, hostname, time.Millisecond, ch)
@@ -89,7 +90,7 @@ func TestReadPodsFromFileExistAlready(t *testing.T) {
 				for _, pod := range update.Pods {
 					// TODO: remove the conversion when validation is performed on versioned objects.
 					internalPod := &api.Pod{}
-					if err := v1.Convert_v1_Pod_To_api_Pod(pod, internalPod, nil); err != nil {
+					if err := k8s_api_v1.Convert_v1_Pod_To_core_Pod(pod, internalPod, nil); err != nil {
 						t.Fatalf("%s: Cannot convert pod %#v, %#v", testCase.desc, pod, err)
 					}
 					if errs := validation.ValidatePod(internalPod); len(errs) > 0 {
@@ -129,14 +130,14 @@ func TestExtractFromBadDataFile(t *testing.T) {
 	}
 	defer os.RemoveAll(dirName)
 
-	fileName := filepath.Join(dirName, "test_pod_config")
+	fileName := filepath.Join(dirName, "test_pod_manifest")
 	err = ioutil.WriteFile(fileName, []byte{1, 2, 3}, 0555)
 	if err != nil {
 		t.Fatalf("unable to write test file %#v", err)
 	}
 
 	ch := make(chan interface{}, 1)
-	c := new(fileName, "localhost", time.Millisecond, ch)
+	c := newSourceFile(fileName, "localhost", time.Millisecond, ch)
 	err = c.resetStoreFromPath()
 	if err == nil {
 		t.Fatalf("expected error, got nil")
@@ -152,7 +153,7 @@ func TestExtractFromEmptyDir(t *testing.T) {
 	defer os.RemoveAll(dirName)
 
 	ch := make(chan interface{}, 1)
-	c := new(dirName, "localhost", time.Millisecond, ch)
+	c := newSourceFile(dirName, "localhost", time.Millisecond, ch)
 	err = c.resetStoreFromPath()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -253,7 +254,7 @@ func watchFileAdded(watchDir bool, t *testing.T) {
 	hostname := types.NodeName("random-test-hostname")
 	var testCases = getTestCases(hostname)
 
-	fileNamePre := "test_pod_config"
+	fileNamePre := "test_pod_manifest"
 	for index, testCase := range testCases {
 		func() {
 			dirName, err := utiltesting.MkTmpdir("dir-test")
@@ -291,7 +292,7 @@ func watchFileChanged(watchDir bool, t *testing.T) {
 	hostname := types.NodeName("random-test-hostname")
 	var testCases = getTestCases(hostname)
 
-	fileNamePre := "test_pod_config"
+	fileNamePre := "test_pod_manifest"
 	for index, testCase := range testCases {
 		func() {
 			dirName, err := utiltesting.MkTmpdir("dir-test")
@@ -372,7 +373,7 @@ func expectUpdate(t *testing.T, ch chan interface{}, testCase *testCase) {
 			for _, pod := range update.Pods {
 				// TODO: remove the conversion when validation is performed on versioned objects.
 				internalPod := &api.Pod{}
-				if err := v1.Convert_v1_Pod_To_api_Pod(pod, internalPod, nil); err != nil {
+				if err := k8s_api_v1.Convert_v1_Pod_To_core_Pod(pod, internalPod, nil); err != nil {
 					t.Fatalf("%s: Cannot convert pod %#v, %#v", testCase.desc, pod, err)
 				}
 				if errs := validation.ValidatePod(internalPod); len(errs) > 0 {

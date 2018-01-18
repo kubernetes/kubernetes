@@ -34,38 +34,66 @@ const (
 
 var (
 	metricsLock        sync.Mutex
-	rateLimiterMetrics = make(map[string]prometheus.Gauge)
+	rateLimiterMetrics = make(map[string]rateLimiterMetric)
 )
+
+type rateLimiterMetric struct {
+	metric prometheus.Gauge
+	stopCh chan struct{}
+}
 
 func registerRateLimiterMetric(ownerName string) error {
 	metricsLock.Lock()
 	defer metricsLock.Unlock()
 
 	if _, ok := rateLimiterMetrics[ownerName]; ok {
-		glog.Errorf("Metric for %v already registered", ownerName)
-		return fmt.Errorf("Metric for %v already registered", ownerName)
+		return fmt.Errorf("Rate Limiter Metric for %v already registered", ownerName)
 	}
 	metric := prometheus.NewGauge(prometheus.GaugeOpts{
 		Name:      "rate_limiter_use",
 		Subsystem: ownerName,
 		Help:      fmt.Sprintf("A metric measuring the saturation of the rate limiter for %v", ownerName),
 	})
-	rateLimiterMetrics[ownerName] = metric
-	prometheus.MustRegister(metric)
+	if err := prometheus.Register(metric); err != nil {
+		return fmt.Errorf("error registering rate limiter usage metric: %v", err)
+	}
+	stopCh := make(chan struct{})
+	rateLimiterMetrics[ownerName] = rateLimiterMetric{
+		metric: metric,
+		stopCh: stopCh,
+	}
 	return nil
 }
 
 // RegisterMetricAndTrackRateLimiterUsage registers a metric ownerName_rate_limiter_use in prometheus to track
 // how much used rateLimiter is and starts a goroutine that updates this metric every updatePeriod
 func RegisterMetricAndTrackRateLimiterUsage(ownerName string, rateLimiter flowcontrol.RateLimiter) error {
-	err := registerRateLimiterMetric(ownerName)
-	if err != nil {
+	if err := registerRateLimiterMetric(ownerName); err != nil {
 		return err
 	}
-	go wait.Forever(func() {
+	go wait.Until(func() {
 		metricsLock.Lock()
 		defer metricsLock.Unlock()
-		rateLimiterMetrics[ownerName].Set(rateLimiter.Saturation())
-	}, updatePeriod)
+		rateLimiterMetrics[ownerName].metric.Set(rateLimiter.Saturation())
+	}, updatePeriod, rateLimiterMetrics[ownerName].stopCh)
 	return nil
+}
+
+// UnregisterMetricAndUntrackRateLimiterUsage unregisters a metric ownerName_rate_limiter_use from prometheus and
+// stops the goroutine that updates this metric
+func UnregisterMetricAndUntrackRateLimiterUsage(ownerName string) bool {
+	metricsLock.Lock()
+	defer metricsLock.Unlock()
+
+	rlm, ok := rateLimiterMetrics[ownerName]
+	if !ok {
+		glog.Warningf("Rate Limiter Metric for %v not registered", ownerName)
+		return false
+	}
+
+	close(rlm.stopCh)
+	prometheus.Unregister(rlm.metric)
+	delete(rateLimiterMetrics, ownerName)
+
+	return true
 }

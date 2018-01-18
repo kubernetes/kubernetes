@@ -46,36 +46,30 @@ done
 trap 'exit 1' SIGINT
 
 if $SILENT ; then
-	echo "Running in the silent mode, run with -v if you want to see script logs."
+	echo "Running in silent mode, run with -v if you want to see script logs."
 fi
 
 if ! $ALL ; then
 	echo "Running in short-circuit mode; run with -a to force all scripts to run."
 fi
 
-kube::util::ensure_godep_version v79
-
-if ! kube::util::godep_restored 2>&1 | sed 's/^/  /'; then
-	echo "Running godep restore"
-	"${KUBE_ROOT}/hack/godep-restore.sh" ${V}
-fi
+"${KUBE_ROOT}/hack/godep-restore.sh" ${V}
 
 BASH_TARGETS="
 	update-generated-protobuf
 	update-codegen
-	update-codecgen
+	update-generated-runtime
+	update-generated-device-plugin
 	update-generated-docs
 	update-generated-swagger-docs
 	update-swagger-spec
 	update-openapi-spec
 	update-api-reference-docs
-	update-federation-openapi-spec
-	update-staging-client-go
 	update-staging-godeps
 	update-bazel"
 
 for t in $BASH_TARGETS; do
-	echo -e "${color_yellow}Updating $t${color_norm}"
+	echo -e "${color_yellow}Running $t${color_norm}"
 	if $SILENT ; then
 		if ! bash "$KUBE_ROOT/hack/$t.sh" 1> /dev/null; then
 			echo -e "${color_red}Running $t FAILED${color_norm}"

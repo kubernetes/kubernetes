@@ -29,7 +29,9 @@ type index interface {
 	RangeSince(key, end []byte, rev int64) []revision
 	Compact(rev int64) map[revision]struct{}
 	Equal(b index) bool
+
 	Insert(ki *keyIndex)
+	KeyIndex(ki *keyIndex) *keyIndex
 }
 
 type treeIndex struct {
@@ -60,16 +62,25 @@ func (ti *treeIndex) Put(key []byte, rev revision) {
 
 func (ti *treeIndex) Get(key []byte, atRev int64) (modified, created revision, ver int64, err error) {
 	keyi := &keyIndex{key: key}
-
 	ti.RLock()
 	defer ti.RUnlock()
-	item := ti.tree.Get(keyi)
-	if item == nil {
+	if keyi = ti.keyIndex(keyi); keyi == nil {
 		return revision{}, revision{}, 0, ErrRevisionNotFound
 	}
-
-	keyi = item.(*keyIndex)
 	return keyi.get(atRev)
+}
+
+func (ti *treeIndex) KeyIndex(keyi *keyIndex) *keyIndex {
+	ti.RLock()
+	defer ti.RUnlock()
+	return ti.keyIndex(keyi)
+}
+
+func (ti *treeIndex) keyIndex(keyi *keyIndex) *keyIndex {
+	if item := ti.tree.Get(keyi); item != nil {
+		return item.(*keyIndex)
+	}
+	return nil
 }
 
 func (ti *treeIndex) Range(key, end []byte, atRev int64) (keys [][]byte, revs []revision) {

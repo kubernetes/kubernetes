@@ -21,11 +21,11 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/pkg/api/helper"
-	"k8s.io/client-go/pkg/api/v1"
 	core "k8s.io/client-go/testing"
-	bootstrapapi "k8s.io/kubernetes/pkg/bootstrap/api"
+	bootstrapapi "k8s.io/client-go/tools/bootstrap/token/api"
+	"k8s.io/kubernetes/pkg/apis/core/helper"
 )
 
 func newTokenSecret(tokenID, tokenSecret string) *v1.Secret {

@@ -20,37 +20,50 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"strings"
+	"time"
 
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/cloudprovider"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/azure/auth"
+	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/version"
 
-	"github.com/Azure/azure-sdk-for-go/arm/compute"
-	"github.com/Azure/azure-sdk-for-go/arm/network"
-	"github.com/Azure/azure-sdk-for-go/arm/storage"
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/ghodss/yaml"
-	"time"
+	"github.com/golang/glog"
 )
 
-// CloudProviderName is the value used for the --cloud-provider flag
-const CloudProviderName = "azure"
+const (
+	// CloudProviderName is the value used for the --cloud-provider flag
+	CloudProviderName            = "azure"
+	rateLimitQPSDefault          = 1.0
+	rateLimitBucketDefault       = 5
+	backoffRetriesDefault        = 6
+	backoffExponentDefault       = 1.5
+	backoffDurationDefault       = 5 // in seconds
+	backoffJitterDefault         = 1.0
+	maximumLoadBalancerRuleCount = 148 // According to Azure LB rule default limit
+
+	vmTypeVMSS     = "vmss"
+	vmTypeStandard = "standard"
+)
 
 // Config holds the configuration parsed from the --cloud-config flag
 // All fields are required unless otherwise specified
 type Config struct {
-	// The cloud environment identifier. Takes values from https://github.com/Azure/go-autorest/blob/ec5f4903f77ed9927ac95b19ab8e44ada64c1356/autorest/azure/environments.go#L13
-	Cloud string `json:"cloud" yaml:"cloud"`
-	// The AAD Tenant ID for the Subscription that the cluster is deployed in
-	TenantID string `json:"tenantId" yaml:"tenantId"`
-	// The ID of the Azure Subscription that the cluster is deployed in
-	SubscriptionID string `json:"subscriptionId" yaml:"subscriptionId"`
+	auth.AzureAuthConfig
+
 	// The name of the resource group that the cluster is deployed in
 	ResourceGroup string `json:"resourceGroup" yaml:"resourceGroup"`
 	// The location of the resource group that the cluster is deployed in
 	Location string `json:"location" yaml:"location"`
 	// The name of the VNet that the cluster is deployed in
 	VnetName string `json:"vnetName" yaml:"vnetName"`
+	// The name of the resource group that the Vnet is deployed in
+	VnetResourceGroup string `json:"vnetResourceGroup" yaml:"vnetResourceGroup"`
 	// The name of the subnet that the cluster is deployed in
 	SubnetName string `json:"subnetName" yaml:"subnetName"`
 	// The name of the security group attached to the cluster's subnet
@@ -63,26 +76,60 @@ type Config struct {
 	// the cloudprovider will try to add all nodes to a single backend pool which is forbidden.
 	// In other words, if you use multiple agent pools (availability sets), you MUST set this field.
 	PrimaryAvailabilitySetName string `json:"primaryAvailabilitySetName" yaml:"primaryAvailabilitySetName"`
+	// The type of azure nodes. Candidate valudes are: vmss and standard.
+	// If not set, it will be default to standard.
+	VMType string `json:"vmType" yaml:"vmType"`
+	// The name of the scale set that should be used as the load balancer backend.
+	// If this is set, the Azure cloudprovider will only add nodes from that scale set to the load
+	// balancer backend pool. If this is not set, and multiple agent pools (scale sets) are used, then
+	// the cloudprovider will try to add all nodes to a single backend pool which is forbidden.
+	// In other words, if you use multiple agent pools (scale sets), you MUST set this field.
+	PrimaryScaleSetName string `json:"primaryScaleSetName" yaml:"primaryScaleSetName"`
+	// Enable exponential backoff to manage resource request retries
+	CloudProviderBackoff bool `json:"cloudProviderBackoff" yaml:"cloudProviderBackoff"`
+	// Backoff retry limit
+	CloudProviderBackoffRetries int `json:"cloudProviderBackoffRetries" yaml:"cloudProviderBackoffRetries"`
+	// Backoff exponent
+	CloudProviderBackoffExponent float64 `json:"cloudProviderBackoffExponent" yaml:"cloudProviderBackoffExponent"`
+	// Backoff duration
+	CloudProviderBackoffDuration int `json:"cloudProviderBackoffDuration" yaml:"cloudProviderBackoffDuration"`
+	// Backoff jitter
+	CloudProviderBackoffJitter float64 `json:"cloudProviderBackoffJitter" yaml:"cloudProviderBackoffJitter"`
+	// Enable rate limiting
+	CloudProviderRateLimit bool `json:"cloudProviderRateLimit" yaml:"cloudProviderRateLimit"`
+	// Rate limit QPS
+	CloudProviderRateLimitQPS float32 `json:"cloudProviderRateLimitQPS" yaml:"cloudProviderRateLimitQPS"`
+	// Rate limit Bucket Size
+	CloudProviderRateLimitBucket int `json:"cloudProviderRateLimitBucket" yaml:"cloudProviderRateLimitBucket"`
 
-	// The ClientID for an AAD application with RBAC access to talk to Azure RM APIs
-	AADClientID string `json:"aadClientId" yaml:"aadClientId"`
-	// The ClientSecret for an AAD application with RBAC access to talk to Azure RM APIs
-	AADClientSecret string `json:"aadClientSecret" yaml:"aadClientSecret"`
+	// Maximum allowed LoadBalancer Rule Count is the limit enforced by Azure Load balancer
+	MaximumLoadBalancerRuleCount int `json:"maximumLoadBalancerRuleCount"`
 }
 
 // Cloud holds the config and clients
 type Cloud struct {
 	Config
 	Environment             azure.Environment
-	RoutesClient            network.RoutesClient
-	SubnetsClient           network.SubnetsClient
-	InterfacesClient        network.InterfacesClient
-	RouteTablesClient       network.RouteTablesClient
-	LoadBalancerClient      network.LoadBalancersClient
-	PublicIPAddressesClient network.PublicIPAddressesClient
-	SecurityGroupsClient    network.SecurityGroupsClient
-	VirtualMachinesClient   compute.VirtualMachinesClient
-	StorageAccountClient    storage.AccountsClient
+	RoutesClient            RoutesClient
+	SubnetsClient           SubnetsClient
+	InterfacesClient        InterfacesClient
+	RouteTablesClient       RouteTablesClient
+	LoadBalancerClient      LoadBalancersClient
+	PublicIPAddressesClient PublicIPAddressesClient
+	SecurityGroupsClient    SecurityGroupsClient
+	VirtualMachinesClient   VirtualMachinesClient
+	StorageAccountClient    StorageAccountClient
+	DisksClient             DisksClient
+	resourceRequestBackoff  wait.Backoff
+	vmSet                   VMSet
+
+	// Clients for vmss.
+	VirtualMachineScaleSetsClient   VirtualMachineScaleSetsClient
+	VirtualMachineScaleSetVMsClient VirtualMachineScaleSetVMsClient
+
+	*BlobDiskController
+	*ManagedDiskController
+	*controllerCommon
 }
 
 func init() {
@@ -91,93 +138,129 @@ func init() {
 
 // NewCloud returns a Cloud with initialized clients
 func NewCloud(configReader io.Reader) (cloudprovider.Interface, error) {
-	var az Cloud
+	config, err := parseConfig(configReader)
+	if err != nil {
+		return nil, err
+	}
+
+	env, err := auth.ParseAzureEnvironment(config.Cloud)
+	if err != nil {
+		return nil, err
+	}
+
+	servicePrincipalToken, err := auth.GetServicePrincipalToken(&config.AzureAuthConfig, env)
+	if err != nil {
+		return nil, err
+	}
+
+	// operationPollRateLimiter.Accept() is a no-op if rate limits are configured off.
+	operationPollRateLimiter := flowcontrol.NewFakeAlwaysRateLimiter()
+	if config.CloudProviderRateLimit {
+		// Assign rate limit defaults if no configuration was passed in
+		if config.CloudProviderRateLimitQPS == 0 {
+			config.CloudProviderRateLimitQPS = rateLimitQPSDefault
+		}
+		if config.CloudProviderRateLimitBucket == 0 {
+			config.CloudProviderRateLimitBucket = rateLimitBucketDefault
+		}
+		operationPollRateLimiter = flowcontrol.NewTokenBucketRateLimiter(
+			config.CloudProviderRateLimitQPS,
+			config.CloudProviderRateLimitBucket)
+		glog.V(2).Infof("Azure cloudprovider using rate limit config: QPS=%g, bucket=%d",
+			config.CloudProviderRateLimitQPS,
+			config.CloudProviderRateLimitBucket)
+	}
+
+	azClientConfig := &azClientConfig{
+		subscriptionID:          config.SubscriptionID,
+		resourceManagerEndpoint: env.ResourceManagerEndpoint,
+		servicePrincipalToken:   servicePrincipalToken,
+		rateLimiter:             operationPollRateLimiter,
+	}
+	az := Cloud{
+		Config:      *config,
+		Environment: *env,
+
+		DisksClient:                     newAzDisksClient(azClientConfig),
+		RoutesClient:                    newAzRoutesClient(azClientConfig),
+		SubnetsClient:                   newAzSubnetsClient(azClientConfig),
+		InterfacesClient:                newAzInterfacesClient(azClientConfig),
+		RouteTablesClient:               newAzRouteTablesClient(azClientConfig),
+		LoadBalancerClient:              newAzLoadBalancersClient(azClientConfig),
+		SecurityGroupsClient:            newAzSecurityGroupsClient(azClientConfig),
+		StorageAccountClient:            newAzStorageAccountClient(azClientConfig),
+		VirtualMachinesClient:           newAzVirtualMachinesClient(azClientConfig),
+		PublicIPAddressesClient:         newAzPublicIPAddressesClient(azClientConfig),
+		VirtualMachineScaleSetsClient:   newAzVirtualMachineScaleSetsClient(azClientConfig),
+		VirtualMachineScaleSetVMsClient: newAzVirtualMachineScaleSetVMsClient(azClientConfig),
+	}
+
+	// Conditionally configure resource request backoff
+	if az.CloudProviderBackoff {
+		// Assign backoff defaults if no configuration was passed in
+		if az.CloudProviderBackoffRetries == 0 {
+			az.CloudProviderBackoffRetries = backoffRetriesDefault
+		}
+		if az.CloudProviderBackoffExponent == 0 {
+			az.CloudProviderBackoffExponent = backoffExponentDefault
+		}
+		if az.CloudProviderBackoffDuration == 0 {
+			az.CloudProviderBackoffDuration = backoffDurationDefault
+		}
+		if az.CloudProviderBackoffJitter == 0 {
+			az.CloudProviderBackoffJitter = backoffJitterDefault
+		}
+		az.resourceRequestBackoff = wait.Backoff{
+			Steps:    az.CloudProviderBackoffRetries,
+			Factor:   az.CloudProviderBackoffExponent,
+			Duration: time.Duration(az.CloudProviderBackoffDuration) * time.Second,
+			Jitter:   az.CloudProviderBackoffJitter,
+		}
+		glog.V(2).Infof("Azure cloudprovider using retry backoff: retries=%d, exponent=%f, duration=%d, jitter=%f",
+			az.CloudProviderBackoffRetries,
+			az.CloudProviderBackoffExponent,
+			az.CloudProviderBackoffDuration,
+			az.CloudProviderBackoffJitter)
+	}
+
+	if az.MaximumLoadBalancerRuleCount == 0 {
+		az.MaximumLoadBalancerRuleCount = maximumLoadBalancerRuleCount
+	}
+
+	if strings.EqualFold(vmTypeVMSS, az.Config.VMType) {
+		az.vmSet = newScaleSet(&az)
+	} else {
+		az.vmSet = newAvailabilitySet(&az)
+	}
+
+	if err := initDiskControllers(&az); err != nil {
+		return nil, err
+	}
+	return &az, nil
+}
+
+// parseConfig returns a parsed configuration for an Azure cloudprovider config file
+func parseConfig(configReader io.Reader) (*Config, error) {
+	var config Config
+
+	if configReader == nil {
+		return &config, nil
+	}
 
 	configContents, err := ioutil.ReadAll(configReader)
 	if err != nil {
 		return nil, err
 	}
-	err = yaml.Unmarshal(configContents, &az)
+	err = yaml.Unmarshal(configContents, &config)
 	if err != nil {
 		return nil, err
 	}
 
-	if az.Cloud == "" {
-		az.Environment = azure.PublicCloud
-	} else {
-		az.Environment, err = azure.EnvironmentFromName(az.Cloud)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	oauthConfig, err := az.Environment.OAuthConfigForTenant(az.TenantID)
-	if err != nil {
-		return nil, err
-	}
-
-	servicePrincipalToken, err := azure.NewServicePrincipalToken(
-		*oauthConfig,
-		az.AADClientID,
-		az.AADClientSecret,
-		az.Environment.ServiceManagementEndpoint)
-	if err != nil {
-		return nil, err
-	}
-
-	az.SubnetsClient = network.NewSubnetsClient(az.SubscriptionID)
-	az.SubnetsClient.BaseURI = az.Environment.ResourceManagerEndpoint
-	az.SubnetsClient.Authorizer = servicePrincipalToken
-	az.SubnetsClient.PollingDelay = 5 * time.Second
-	configureUserAgent(&az.SubnetsClient.Client)
-
-	az.RouteTablesClient = network.NewRouteTablesClient(az.SubscriptionID)
-	az.RouteTablesClient.BaseURI = az.Environment.ResourceManagerEndpoint
-	az.RouteTablesClient.Authorizer = servicePrincipalToken
-	az.RouteTablesClient.PollingDelay = 5 * time.Second
-	configureUserAgent(&az.RouteTablesClient.Client)
-
-	az.RoutesClient = network.NewRoutesClient(az.SubscriptionID)
-	az.RoutesClient.BaseURI = az.Environment.ResourceManagerEndpoint
-	az.RoutesClient.Authorizer = servicePrincipalToken
-	az.RoutesClient.PollingDelay = 5 * time.Second
-	configureUserAgent(&az.RoutesClient.Client)
-
-	az.InterfacesClient = network.NewInterfacesClient(az.SubscriptionID)
-	az.InterfacesClient.BaseURI = az.Environment.ResourceManagerEndpoint
-	az.InterfacesClient.Authorizer = servicePrincipalToken
-	az.InterfacesClient.PollingDelay = 5 * time.Second
-	configureUserAgent(&az.InterfacesClient.Client)
-
-	az.LoadBalancerClient = network.NewLoadBalancersClient(az.SubscriptionID)
-	az.LoadBalancerClient.BaseURI = az.Environment.ResourceManagerEndpoint
-	az.LoadBalancerClient.Authorizer = servicePrincipalToken
-	az.LoadBalancerClient.PollingDelay = 5 * time.Second
-	configureUserAgent(&az.LoadBalancerClient.Client)
-
-	az.VirtualMachinesClient = compute.NewVirtualMachinesClient(az.SubscriptionID)
-	az.VirtualMachinesClient.BaseURI = az.Environment.ResourceManagerEndpoint
-	az.VirtualMachinesClient.Authorizer = servicePrincipalToken
-	az.VirtualMachinesClient.PollingDelay = 5 * time.Second
-	configureUserAgent(&az.VirtualMachinesClient.Client)
-
-	az.PublicIPAddressesClient = network.NewPublicIPAddressesClient(az.SubscriptionID)
-	az.PublicIPAddressesClient.BaseURI = az.Environment.ResourceManagerEndpoint
-	az.PublicIPAddressesClient.Authorizer = servicePrincipalToken
-	az.PublicIPAddressesClient.PollingDelay = 5 * time.Second
-	configureUserAgent(&az.PublicIPAddressesClient.Client)
-
-	az.SecurityGroupsClient = network.NewSecurityGroupsClient(az.SubscriptionID)
-	az.SecurityGroupsClient.BaseURI = az.Environment.ResourceManagerEndpoint
-	az.SecurityGroupsClient.Authorizer = servicePrincipalToken
-	az.SecurityGroupsClient.PollingDelay = 5 * time.Second
-	configureUserAgent(&az.SecurityGroupsClient.Client)
-
-	az.StorageAccountClient = storage.NewAccountsClientWithBaseURI(az.Environment.ResourceManagerEndpoint, az.SubscriptionID)
-	az.StorageAccountClient.Authorizer = servicePrincipalToken
-
-	return &az, nil
+	return &config, nil
 }
+
+// Initialize passes a Kubernetes clientBuilder interface to the cloud provider
+func (az *Cloud) Initialize(clientBuilder controller.ControllerClientBuilder) {}
 
 // LoadBalancer returns a balancer interface. Also returns true if the interface is supported, false otherwise.
 func (az *Cloud) LoadBalancer() (cloudprovider.LoadBalancer, bool) {
@@ -204,9 +287,9 @@ func (az *Cloud) Routes() (cloudprovider.Routes, bool) {
 	return az, true
 }
 
-// ScrubDNS provides an opportunity for cloud-provider-specific code to process DNS settings for pods.
-func (az *Cloud) ScrubDNS(nameservers, searches []string) (nsOut, srchOut []string) {
-	return nameservers, searches
+// HasClusterID returns true if the cluster has a clusterID
+func (az *Cloud) HasClusterID() bool {
+	return true
 }
 
 // ProviderName returns the cloud provider ID.
@@ -221,4 +304,42 @@ func (az *Cloud) ProviderName() string {
 func configureUserAgent(client *autorest.Client) {
 	k8sVersion := version.Get().GitVersion
 	client.UserAgent = fmt.Sprintf("%s; kubernetes-cloudprovider/%s", client.UserAgent, k8sVersion)
+}
+
+func initDiskControllers(az *Cloud) error {
+	// Common controller contains the function
+	// needed by both blob disk and managed disk controllers
+
+	common := &controllerCommon{
+		aadResourceEndPoint:   az.Environment.ServiceManagementEndpoint,
+		clientID:              az.AADClientID,
+		clientSecret:          az.AADClientSecret,
+		location:              az.Location,
+		storageEndpointSuffix: az.Environment.StorageEndpointSuffix,
+		managementEndpoint:    az.Environment.ResourceManagerEndpoint,
+		resourceGroup:         az.ResourceGroup,
+		tokenEndPoint:         az.Environment.ActiveDirectoryEndpoint,
+		subscriptionID:        az.SubscriptionID,
+		cloud:                 az,
+	}
+
+	// BlobDiskController: contains the function needed to
+	// create/attach/detach/delete blob based (unmanaged disks)
+	blobController, err := newBlobDiskController(common)
+	if err != nil {
+		return fmt.Errorf("AzureDisk -  failed to init Blob Disk Controller with error (%s)", err.Error())
+	}
+
+	// ManagedDiskController: contains the functions needed to
+	// create/attach/detach/delete managed disks
+	managedController, err := newManagedDiskController(common)
+	if err != nil {
+		return fmt.Errorf("AzureDisk -  failed to init Managed  Disk Controller with error (%s)", err.Error())
+	}
+
+	az.BlobDiskController = blobController
+	az.ManagedDiskController = managedController
+	az.controllerCommon = common
+
+	return nil
 }

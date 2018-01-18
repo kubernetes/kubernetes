@@ -23,7 +23,7 @@ import (
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	gcm "google.golang.org/api/cloudmonitoring/v2beta2"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
 func TestGCMReturnsErrorIfClientCannotConnect(t *testing.T) {

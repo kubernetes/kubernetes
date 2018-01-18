@@ -16,55 +16,154 @@ limitations under the License.
 
 package plugins
 
-import (
-	"strings"
-	"testing"
-)
+import "testing"
 
 func TestPlugin(t *testing.T) {
 	tests := []struct {
-		plugin        Plugin
-		expectedErr   string
-		expectedValid bool
+		plugin      *Plugin
+		expectedErr error
 	}{
 		{
-			plugin: Plugin{
+			plugin: &Plugin{
 				Description: Description{
 					Name:      "test",
 					ShortDesc: "The test",
 					Command:   "echo 1",
 				},
 			},
-			expectedValid: true,
 		},
 		{
-			plugin: Plugin{
+			plugin: &Plugin{
 				Description: Description{
 					Name:      "test",
 					ShortDesc: "The test",
 				},
 			},
-			expectedErr: "incomplete",
+			expectedErr: ErrIncompletePlugin,
 		},
 		{
-			plugin:      Plugin{},
-			expectedErr: "incomplete",
+			plugin:      &Plugin{},
+			expectedErr: ErrIncompletePlugin,
+		},
+		{
+			plugin: &Plugin{
+				Description: Description{
+					Name:      "test spaces",
+					ShortDesc: "The test",
+					Command:   "echo 1",
+				},
+			},
+			expectedErr: ErrInvalidPluginName,
+		},
+		{
+			plugin: &Plugin{
+				Description: Description{
+					Name:      "test",
+					ShortDesc: "The test",
+					Command:   "echo 1",
+					Flags: []Flag{
+						{
+							Name: "aflag",
+						},
+					},
+				},
+			},
+			expectedErr: ErrIncompleteFlag,
+		},
+		{
+			plugin: &Plugin{
+				Description: Description{
+					Name:      "test",
+					ShortDesc: "The test",
+					Command:   "echo 1",
+					Flags: []Flag{
+						{
+							Name: "a flag",
+							Desc: "Invalid flag",
+						},
+					},
+				},
+			},
+			expectedErr: ErrInvalidFlagName,
+		},
+		{
+			plugin: &Plugin{
+				Description: Description{
+					Name:      "test",
+					ShortDesc: "The test",
+					Command:   "echo 1",
+					Flags: []Flag{
+						{
+							Name:      "aflag",
+							Desc:      "Invalid shorthand",
+							Shorthand: "aa",
+						},
+					},
+				},
+			},
+			expectedErr: ErrInvalidFlagShorthand,
+		},
+		{
+			plugin: &Plugin{
+				Description: Description{
+					Name:      "test",
+					ShortDesc: "The test",
+					Command:   "echo 1",
+					Flags: []Flag{
+						{
+							Name:      "aflag",
+							Desc:      "Invalid shorthand",
+							Shorthand: "2",
+						},
+					},
+				},
+			},
+			expectedErr: ErrInvalidFlagShorthand,
+		},
+		{
+			plugin: &Plugin{
+				Description: Description{
+					Name:      "test",
+					ShortDesc: "The test",
+					Command:   "echo 1",
+					Flags: []Flag{
+						{
+							Name:      "aflag",
+							Desc:      "A flag",
+							Shorthand: "a",
+						},
+					},
+					Tree: Plugins{
+						&Plugin{
+							Description: Description{
+								Name:      "child",
+								ShortDesc: "The child",
+								LongDesc:  "The child long desc",
+								Example:   "You can use it like this but you're not supposed to",
+								Command:   "echo 1",
+								Flags: []Flag{
+									{
+										Name: "childflag",
+										Desc: "A child flag",
+									},
+									{
+										Name:      "childshorthand",
+										Desc:      "A child shorthand flag",
+										Shorthand: "s",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
 		},
 	}
 
 	for _, test := range tests {
-		if is := test.plugin.IsValid(); test.expectedValid != is {
-			t.Errorf("%s: expected valid=%v, got %v", test.plugin.Name, test.expectedValid, is)
-		}
 		err := test.plugin.Validate()
-		if len(test.expectedErr) > 0 {
-			if err == nil {
-				t.Errorf("%s: expected error, got none", test.plugin.Name)
-			} else if !strings.Contains(err.Error(), test.expectedErr) {
-				t.Errorf("%s: expected error containing %q, got %v", test.plugin.Name, test.expectedErr, err)
-			}
-		} else if err != nil {
-			t.Errorf("%s: expected no error, got %v", test.plugin.Name, err)
+		if err != test.expectedErr {
+			t.Errorf("%s: expected error %v, got %v", test.plugin.Name, test.expectedErr, err)
 		}
 	}
 }

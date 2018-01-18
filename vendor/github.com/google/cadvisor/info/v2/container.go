@@ -146,6 +146,8 @@ type ContainerStats struct {
 	Filesystem *FilesystemStats `json:"filesystem,omitempty"`
 	// Task load statistics
 	Load *v1.LoadStats `json:"load_stats,omitempty"`
+	// Metrics for Accelerators. Each Accelerator corresponds to one element in the array.
+	Accelerators []v1.AcceleratorStats `json:"accelerators,omitempty"`
 	// Custom Metrics
 	CustomMetrics map[string][]v1.MetricVal `json:"custom_metrics,omitempty"`
 }
@@ -199,6 +201,9 @@ type DerivedStats struct {
 }
 
 type FsInfo struct {
+	// Time of generation of these stats.
+	Timestamp time.Time `json:"timestamp"`
+
 	// The block device name associated with the filesystem.
 	Device string `json:"device"`
 
@@ -231,6 +236,9 @@ type RequestOptions struct {
 	Count int `json:"count"`
 	// Whether to include stats for child subcontainers.
 	Recursive bool `json:"recursive"`
+	// Update stats if they are older than MaxAge
+	// nil indicates no update, and 0 will always trigger an update.
+	MaxAge *time.Duration `json:"max_age"`
 }
 
 type ProcessInfo struct {
@@ -269,6 +277,10 @@ type NetworkStats struct {
 	Tcp TcpStat `json:"tcp"`
 	// TCP6 connection stats (Established, Listen...)
 	Tcp6 TcpStat `json:"tcp6"`
+	// UDP connection stats
+	Udp v1.UdpStat `json:"udp"`
+	// UDP6 connection stats
+	Udp6 v1.UdpStat `json:"udp6"`
 }
 
 // Instantaneous CPU stats

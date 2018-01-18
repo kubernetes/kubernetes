@@ -17,15 +17,15 @@ limitations under the License.
 package fake
 
 import (
-	"errors"
 	"fmt"
 	"net"
 	"regexp"
 	"sync"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/cloudprovider"
+	"k8s.io/kubernetes/pkg/controller"
 )
 
 const defaultProviderName = "fake"
@@ -46,8 +46,12 @@ type FakeUpdateBalancerCall struct {
 
 // FakeCloud is a test-double implementation of Interface, LoadBalancer, Instances, and Routes. It is useful for testing.
 type FakeCloud struct {
-	Exists        bool
-	Err           error
+	Exists bool
+	Err    error
+
+	ExistsByProviderID bool
+	ErrByProviderID    error
+
 	Calls         []string
 	Addresses     []v1.NodeAddress
 	ExtID         map[types.NodeName]string
@@ -64,6 +68,7 @@ type FakeCloud struct {
 	Provider      string
 	addCallLock   sync.Mutex
 	cloudprovider.Zone
+	VolumeLabelMap map[string]map[string]string
 }
 
 type FakeRoute struct {
@@ -81,6 +86,9 @@ func (f *FakeCloud) addCall(desc string) {
 func (f *FakeCloud) ClearCalls() {
 	f.Calls = []string{}
 }
+
+// Initialize passes a Kubernetes clientBuilder interface to the cloud provider
+func (f *FakeCloud) Initialize(clientBuilder controller.ControllerClientBuilder) {}
 
 func (f *FakeCloud) ListClusters() ([]string, error) {
 	return f.ClusterList, f.Err
@@ -102,9 +110,9 @@ func (f *FakeCloud) ProviderName() string {
 	return f.Provider
 }
 
-// ScrubDNS filters DNS settings for pods.
-func (f *FakeCloud) ScrubDNS(nameservers, searches []string) (nsOut, srchOut []string) {
-	return nameservers, searches
+// HasClusterID returns true if the cluster has a clusterID
+func (f *FakeCloud) HasClusterID() bool {
+	return true
 }
 
 // LoadBalancer returns a fake implementation of LoadBalancer.
@@ -177,7 +185,7 @@ func (f *FakeCloud) EnsureLoadBalancerDeleted(clusterName string, service *v1.Se
 }
 
 func (f *FakeCloud) AddSSHKeyToAllInstances(user string, keyData []byte) error {
-	return errors.New("unimplemented")
+	return cloudprovider.NotImplemented
 }
 
 // Implementation of Instances.CurrentNodeName
@@ -225,6 +233,13 @@ func (f *FakeCloud) InstanceTypeByProviderID(providerID string) (string, error) 
 	return f.InstanceTypes[types.NodeName(providerID)], nil
 }
 
+// InstanceExistsByProviderID returns true if the instance with the given provider id still exists and is running.
+// If false is returned with no error, the instance will be immediately deleted by the cloud controller manager.
+func (f *FakeCloud) InstanceExistsByProviderID(providerID string) (bool, error) {
+	f.addCall("instance-exists-by-provider-id")
+	return f.ExistsByProviderID, f.ErrByProviderID
+}
+
 // List is a test-spy implementation of Instances.List.
 // It adds an entry "list" into the internal method call record.
 func (f *FakeCloud) List(filter string) ([]types.NodeName, error) {
@@ -240,6 +255,22 @@ func (f *FakeCloud) List(filter string) ([]types.NodeName, error) {
 
 func (f *FakeCloud) GetZone() (cloudprovider.Zone, error) {
 	f.addCall("get-zone")
+	return f.Zone, f.Err
+}
+
+// GetZoneByProviderID implements Zones.GetZoneByProviderID
+// This is particularly useful in external cloud providers where the kubelet
+// does not initialize node data.
+func (f *FakeCloud) GetZoneByProviderID(providerID string) (cloudprovider.Zone, error) {
+	f.addCall("get-zone-by-provider-id")
+	return f.Zone, f.Err
+}
+
+// GetZoneByNodeName implements Zones.GetZoneByNodeName
+// This is particularly useful in external cloud providers where the kubelet
+// does not initialize node data.
+func (f *FakeCloud) GetZoneByNodeName(nodeName types.NodeName) (cloudprovider.Zone, error) {
+	f.addCall("get-zone-by-node-name")
 	return f.Zone, f.Err
 }
 
@@ -285,4 +316,11 @@ func (f *FakeCloud) DeleteRoute(clusterName string, route *cloudprovider.Route) 
 	}
 	delete(f.RouteMap, name)
 	return nil
+}
+
+func (c *FakeCloud) GetLabelsForVolume(pv *v1.PersistentVolume) (map[string]string, error) {
+	if val, ok := c.VolumeLabelMap[pv.Name]; ok {
+		return val, nil
+	}
+	return nil, fmt.Errorf("label not found for volume")
 }

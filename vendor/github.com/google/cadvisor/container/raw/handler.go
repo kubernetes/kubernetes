@@ -197,6 +197,7 @@ func fsToFsStats(fs *fs.Fs) info.FsStats {
 }
 
 func (self *rawContainerHandler) getFsStats(stats *info.ContainerStats) error {
+	var allFs []fs.Fs
 	// Get Filesystem information only for the root cgroup.
 	if isRootCgroup(self.name) {
 		filesystems, err := self.fsInfo.GetGlobalFsInfo()
@@ -207,6 +208,7 @@ func (self *rawContainerHandler) getFsStats(stats *info.ContainerStats) error {
 			fs := filesystems[i]
 			stats.Filesystem = append(stats.Filesystem, fsToFsStats(&fs))
 		}
+		allFs = filesystems
 	} else if len(self.externalMounts) > 0 {
 		var mountSet map[string]struct{}
 		mountSet = make(map[string]struct{})
@@ -221,7 +223,10 @@ func (self *rawContainerHandler) getFsStats(stats *info.ContainerStats) error {
 			fs := filesystems[i]
 			stats.Filesystem = append(stats.Filesystem, fsToFsStats(&fs))
 		}
+		allFs = filesystems
 	}
+
+	common.AssignDeviceNamesToDiskStats(&fsNamer{fs: allFs, factory: self.machineInfoFactory}, &stats.DiskIo)
 	return nil
 }
 
@@ -271,4 +276,26 @@ func (self *rawContainerHandler) Exists() bool {
 
 func (self *rawContainerHandler) Type() container.ContainerType {
 	return container.ContainerTypeRaw
+}
+
+type fsNamer struct {
+	fs      []fs.Fs
+	factory info.MachineInfoFactory
+	info    common.DeviceNamer
+}
+
+func (n *fsNamer) DeviceName(major, minor uint64) (string, bool) {
+	for _, info := range n.fs {
+		if uint64(info.Major) == major && uint64(info.Minor) == minor {
+			return info.Device, true
+		}
+	}
+	if n.info == nil {
+		mi, err := n.factory.GetMachineInfo()
+		if err != nil {
+			return "", false
+		}
+		n.info = (*common.MachineInfoNamer)(mi)
+	}
+	return n.info.DeviceName(major, minor)
 }

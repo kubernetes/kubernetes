@@ -27,7 +27,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/json"
@@ -36,8 +35,8 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 	"k8s.io/kubernetes/pkg/printers"
-	"k8s.io/kubernetes/pkg/util/i18n"
 )
 
 // AnnotateOptions have the data required to perform the annotate operation
@@ -66,14 +65,16 @@ type AnnotateOptions struct {
 
 var (
 	annotateLong = templates.LongDesc(`
-		Update the annotations on one or more resources.
+		Update the annotations on one or more resources
 
-		* An annotation is a key/value pair that can hold larger (compared to a label), and possibly not human-readable, data.
-		* It is intended to store non-identifying auxiliary data, especially data manipulated by tools and system extensions.
-		* If --overwrite is true, then existing annotations can be overwritten, otherwise attempting to overwrite an annotation will result in an error.
-		* If --resource-version is specified, then updates will use this resource version, otherwise the existing resource-version will be used.
+		All Kubernetes objects support the ability to store additional data with the object as
+		annotations. Annotations are key/value pairs that can be larger than labels and include
+		arbitrary string values such as structured JSON. Tools and system extensions may use
+		annotations to store their own data.  
 
-		` + validResources)
+		Attempting to set an annotation that already exists will fail unless --overwrite is set.
+		If --resource-version is specified and does not match the current resource version on
+		the server the command will fail.`)
 
 	annotateExample = templates.Examples(i18n.T(`
     # Update pod 'foo' with the annotation 'description' and the value 'my frontend'.
@@ -114,14 +115,14 @@ func NewCmdAnnotate(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "annotate [--overwrite] (-f FILENAME | TYPE NAME) KEY_1=VAL_1 ... KEY_N=VAL_N [--resource-version=version]",
 		Short:   i18n.T("Update the annotations on a resource"),
-		Long:    annotateLong,
+		Long:    annotateLong + "\n\n" + cmdutil.ValidResourceTypeList(f),
 		Example: annotateExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			if err := options.Complete(out, cmd, args); err != nil {
-				cmdutil.CheckErr(cmdutil.UsageError(cmd, err.Error()))
+				cmdutil.CheckErr(cmdutil.UsageErrorf(cmd, "%v", err))
 			}
 			if err := options.Validate(); err != nil {
-				cmdutil.CheckErr(cmdutil.UsageError(cmd, err.Error()))
+				cmdutil.CheckErr(cmdutil.UsageErrorf(cmd, "%v", err))
 			}
 			cmdutil.CheckErr(options.RunAnnotate(f, cmd))
 		},
@@ -129,10 +130,11 @@ func NewCmdAnnotate(f cmdutil.Factory, out io.Writer) *cobra.Command {
 		ArgAliases: argAliases,
 	}
 	cmdutil.AddPrinterFlags(cmd)
+	cmdutil.AddIncludeUninitializedFlag(cmd)
 	cmd.Flags().Bool("overwrite", false, "If true, allow annotations to be overwritten, otherwise reject annotation updates that overwrite existing annotations.")
 	cmd.Flags().Bool("local", false, "If true, annotation will NOT contact api-server but run locally.")
-	cmd.Flags().StringP("selector", "l", "", "Selector (label query) to filter on, supports '=', '==', and '!='.")
-	cmd.Flags().Bool("all", false, "select all resources in the namespace of the specified resource types")
+	cmd.Flags().StringP("selector", "l", "", "Selector (label query) to filter on, not including uninitialized ones, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2).")
+	cmd.Flags().Bool("all", false, "Select all resources, including uninitialized ones, in the namespace of the specified resource types.")
 	cmd.Flags().String("resource-version", "", i18n.T("If non-empty, the annotation update will only succeed if this is the current resource-version for the object. Only valid when specifying a single resource."))
 	usage := "identifying the resource to update the annotation"
 	cmdutil.AddFilenameOptionFlags(cmd, &options.FilenameOptions, usage)
@@ -168,7 +170,7 @@ func (o *AnnotateOptions) Complete(out io.Writer, cmd *cobra.Command, args []str
 
 // Validate checks to the AnnotateOptions to see if there is sufficient information run the command.
 func (o AnnotateOptions) Validate() error {
-	if len(o.resources) < 1 && cmdutil.IsFilenameEmpty(o.Filenames) {
+	if len(o.resources) < 1 && cmdutil.IsFilenameSliceEmpty(o.Filenames) {
 		return fmt.Errorf("one or more resources must be specified as <resource> <name> or <resource>/<name>")
 	}
 	if len(o.newAnnotations) < 1 && len(o.removeAnnotations) < 1 {
@@ -186,21 +188,22 @@ func (o AnnotateOptions) RunAnnotate(f cmdutil.Factory, cmd *cobra.Command) erro
 
 	changeCause := f.Command(cmd, false)
 
-	mapper, typer, err := f.UnstructuredObject()
-	if err != nil {
-		return err
-	}
-	b := resource.NewBuilder(mapper, f.CategoryExpander(), typer, resource.ClientMapperFunc(f.UnstructuredClientForMapping), unstructured.UnstructuredJSONScheme).
+	includeUninitialized := cmdutil.ShouldIncludeUninitialized(cmd, false)
+	b := f.NewBuilder().
+		Unstructured().
+		LocalParam(o.local).
 		ContinueOnError().
 		NamespaceParam(namespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, &o.FilenameOptions).
+		IncludeUninitialized(includeUninitialized).
 		Flatten()
 
 	if !o.local {
-		b = b.SelectorParam(o.selector).
+		b = b.LabelSelectorParam(o.selector).
 			ResourceTypeOrNameArgs(o.all, o.resources...).
 			Latest()
 	}
+
 	r := b.Do()
 	if err := r.Err(); err != nil {
 		return err
@@ -223,10 +226,13 @@ func (o AnnotateOptions) RunAnnotate(f cmdutil.Factory, cmd *cobra.Command) erro
 		}
 
 		var outputObj runtime.Object
-		obj, err := cmdutil.MaybeConvertObject(info.Object, info.Mapping.GroupVersionKind.GroupVersion(), info.Mapping)
+		var obj runtime.Object
+
+		obj, err = info.Mapping.ConvertToVersion(info.Object, info.Mapping.GroupVersionKind.GroupVersion())
 		if err != nil {
 			return err
 		}
+
 		if o.dryrun || o.local {
 			if err := o.updateAnnotations(obj); err != nil {
 				return err
@@ -271,10 +277,12 @@ func (o AnnotateOptions) RunAnnotate(f cmdutil.Factory, cmd *cobra.Command) erro
 				return err
 			}
 		}
-		if o.outputFormat != "" {
-			return f.PrintObject(cmd, mapper, outputObj, o.out)
+
+		mapper := r.Mapper().RESTMapper
+		if len(o.outputFormat) > 0 {
+			return f.PrintObject(cmd, o.local, mapper, outputObj, o.out)
 		}
-		cmdutil.PrintSuccess(mapper, false, o.out, info.Mapping.Resource, info.Name, o.dryrun, "annotated")
+		f.PrintSuccess(mapper, false, o.out, info.Mapping.Resource, info.Name, o.dryrun, "annotated")
 		return nil
 	})
 }

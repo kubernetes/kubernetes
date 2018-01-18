@@ -105,6 +105,34 @@ func TestCmdJoinDiscoveryToken(t *testing.T) {
 	}
 }
 
+func TestCmdJoinNodeName(t *testing.T) {
+	if *kubeadmCmdSkip {
+		t.Log("kubeadm cmd tests being skipped")
+		t.Skip()
+	}
+
+	var initTest = []struct {
+		args     string
+		expected bool
+	}{
+		{"--node-name=foobar", false},
+	}
+
+	for _, rt := range initTest {
+		_, _, actual := RunCmd(*kubeadmPath, "join", rt.args, "--skip-preflight-checks")
+		if (actual == nil) != rt.expected {
+			t.Errorf(
+				"failed CmdJoinNodeName running 'kubeadm join %s' with an error: %v\n\texpected: %t\n\t  actual: %t",
+				rt.args,
+				actual,
+				rt.expected,
+				(actual == nil),
+			)
+		}
+		kubeadmReset()
+	}
+}
+
 func TestCmdJoinTLSBootstrapToken(t *testing.T) {
 	if *kubeadmCmdSkip {
 		t.Log("kubeadm cmd tests being skipped")
@@ -182,6 +210,34 @@ func TestCmdJoinBadArgs(t *testing.T) {
 		if (actual == nil) != rt.expected {
 			t.Errorf(
 				"failed CmdJoinBadArgs 'kubeadm join %s' with an error: %v\n\texpected: %t\n\t  actual: %t",
+				rt.args,
+				actual,
+				rt.expected,
+				(actual == nil),
+			)
+		}
+		kubeadmReset()
+	}
+}
+
+func TestCmdJoinArgsMixed(t *testing.T) {
+	if *kubeadmCmdSkip {
+		t.Log("kubeadm cmd tests being skipped")
+		t.Skip()
+	}
+
+	var initTest = []struct {
+		args     string
+		expected bool
+	}{
+		{"--discovery-token=abcdef.1234567890abcdef --config=/etc/kubernets/kubeadm.config", false},
+	}
+
+	for _, rt := range initTest {
+		_, _, actual := RunCmd(*kubeadmPath, "join", rt.args, "--skip-preflight-checks")
+		if (actual == nil) != rt.expected {
+			t.Errorf(
+				"failed CmdJoinArgsMixed running 'kubeadm join %s' with an error: %v\n\texpected: %t\n\t  actual: %t",
 				rt.args,
 				actual,
 				rt.expected,

@@ -98,8 +98,8 @@ msgstr ""
 msgid ""
 "\n"
 "\t\t# Auto scale a deployment \"foo\", with the number of pods between 2 and "
-"10, target CPU utilization specified so a default autoscaling policy will be "
-"used:\n"
+"10, no target CPU utilization specified so a default autoscaling policy will "
+"be used:\n"
 "\t\tkubectl autoscale deployment foo --min=2 --max=10\n"
 "\n"
 "\t\t# Auto scale a replication controller \"foo\", with the number of pods "
@@ -1688,15 +1688,15 @@ msgid "Describe one or many contexts"
 msgstr ""
 
 #: pkg/kubectl/cmd/top_node.go:78
-msgid "Display Resource (CPU/Memory/Storage) usage of nodes"
+msgid "Display Resource (CPU/Memory) usage of nodes"
 msgstr ""
 
 #: pkg/kubectl/cmd/top_pod.go:80
-msgid "Display Resource (CPU/Memory/Storage) usage of pods"
+msgid "Display Resource (CPU/Memory) usage of pods"
 msgstr ""
 
 #: pkg/kubectl/cmd/top.go:44
-msgid "Display Resource (CPU/Memory/Storage) usage."
+msgid "Display Resource (CPU/Memory) usage."
 msgstr ""
 
 #: pkg/kubectl/cmd/clusterinfo.go:51

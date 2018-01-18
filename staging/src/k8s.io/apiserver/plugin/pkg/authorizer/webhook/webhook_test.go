@@ -32,11 +32,11 @@ import (
 	"text/template"
 	"time"
 
+	"k8s.io/api/authorization/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
-	"k8s.io/client-go/pkg/apis/authorization/v1beta1"
 	"k8s.io/client-go/tools/clientcmd/api/v1"
 )
 
@@ -396,13 +396,13 @@ func TestTLSConfig(t *testing.T) {
 
 			// Allow all and see if we get an error.
 			service.Allow()
-			authorized, _, err := wh.Authorize(attr)
+			decision, _, err := wh.Authorize(attr)
 			if tt.wantAuth {
-				if !authorized {
+				if decision != authorizer.DecisionAllow {
 					t.Errorf("expected successful authorization")
 				}
 			} else {
-				if authorized {
+				if decision == authorizer.DecisionAllow {
 					t.Errorf("expected failed authorization")
 				}
 			}
@@ -418,7 +418,7 @@ func TestTLSConfig(t *testing.T) {
 			}
 
 			service.Deny()
-			if authorized, _, _ := wh.Authorize(attr); authorized {
+			if decision, _, _ := wh.Authorize(attr); decision == authorizer.DecisionAllow {
 				t.Errorf("%s: incorrectly authorized with DenyAll policy", tt.test)
 			}
 		}()
@@ -505,6 +505,7 @@ func TestWebhook(t *testing.T) {
 				TypeMeta: expTypeMeta,
 				Spec: v1beta1.SubjectAccessReviewSpec{
 					User:   "jane",
+					UID:    "1",
 					Groups: []string{"group1", "group2"},
 					ResourceAttributes: &v1beta1.ResourceAttributes{
 						Verb:        "GET",
@@ -521,11 +522,11 @@ func TestWebhook(t *testing.T) {
 	}
 
 	for i, tt := range tests {
-		authorized, _, err := wh.Authorize(tt.attr)
+		decision, _, err := wh.Authorize(tt.attr)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !authorized {
+		if decision != authorizer.DecisionAllow {
 			t.Errorf("case %d: authorization failed", i)
 			continue
 		}
@@ -566,7 +567,7 @@ func testWebhookCacheCases(t *testing.T, serv *mockService, wh *WebhookAuthorize
 			continue
 		}
 
-		if test.expectedAuthorized != authorized {
+		if test.expectedAuthorized != (authorized == authorizer.DecisionAllow) {
 			t.Errorf("%d: expected authorized=%v, got %v", i, test.expectedAuthorized, authorized)
 		}
 

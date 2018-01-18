@@ -21,17 +21,17 @@ import (
 	"strconv"
 	"strings"
 
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/validation"
-	"k8s.io/kubernetes/pkg/api"
 )
 
 type ServiceCommonGeneratorV1 struct {
 	Name         string
 	TCP          []string
-	Type         api.ServiceType
+	Type         v1.ServiceType
 	ClusterIP    string
 	NodePort     int
 	ExternalName string
@@ -89,14 +89,25 @@ func parsePorts(portString string) (int32, intstr.IntOrString, error) {
 	if err != nil {
 		return 0, intstr.FromInt(0), err
 	}
+
+	if errs := validation.IsValidPortNum(port); len(errs) != 0 {
+		return 0, intstr.FromInt(0), fmt.Errorf(strings.Join(errs, ","))
+	}
+
 	if len(portStringSlice) == 1 {
 		return int32(port), intstr.FromInt(int(port)), nil
 	}
 
 	var targetPort intstr.IntOrString
 	if portNum, err := strconv.Atoi(portStringSlice[1]); err != nil {
+		if errs := validation.IsValidPortName(portStringSlice[1]); len(errs) != 0 {
+			return 0, intstr.FromInt(0), fmt.Errorf(strings.Join(errs, ","))
+		}
 		targetPort = intstr.FromString(portStringSlice[1])
 	} else {
+		if errs := validation.IsValidPortNum(portNum); len(errs) != 0 {
+			return 0, intstr.FromInt(0), fmt.Errorf(strings.Join(errs, ","))
+		}
 		targetPort = intstr.FromInt(portNum)
 	}
 	return int32(port), targetPort, nil
@@ -131,7 +142,7 @@ func (s ServiceLoadBalancerGeneratorV1) Generate(params map[string]interface{}) 
 	if err != nil {
 		return nil, err
 	}
-	delegate := &ServiceCommonGeneratorV1{Type: api.ServiceTypeLoadBalancer, ClusterIP: ""}
+	delegate := &ServiceCommonGeneratorV1{Type: v1.ServiceTypeLoadBalancer, ClusterIP: ""}
 	err = delegate.GenerateCommon(params)
 	if err != nil {
 		return nil, err
@@ -144,7 +155,7 @@ func (s ServiceNodePortGeneratorV1) Generate(params map[string]interface{}) (run
 	if err != nil {
 		return nil, err
 	}
-	delegate := &ServiceCommonGeneratorV1{Type: api.ServiceTypeNodePort, ClusterIP: ""}
+	delegate := &ServiceCommonGeneratorV1{Type: v1.ServiceTypeNodePort, ClusterIP: ""}
 	err = delegate.GenerateCommon(params)
 	if err != nil {
 		return nil, err
@@ -157,7 +168,7 @@ func (s ServiceClusterIPGeneratorV1) Generate(params map[string]interface{}) (ru
 	if err != nil {
 		return nil, err
 	}
-	delegate := &ServiceCommonGeneratorV1{Type: api.ServiceTypeClusterIP, ClusterIP: ""}
+	delegate := &ServiceCommonGeneratorV1{Type: v1.ServiceTypeClusterIP, ClusterIP: ""}
 	err = delegate.GenerateCommon(params)
 	if err != nil {
 		return nil, err
@@ -170,7 +181,7 @@ func (s ServiceExternalNameGeneratorV1) Generate(params map[string]interface{}) 
 	if err != nil {
 		return nil, err
 	}
-	delegate := &ServiceCommonGeneratorV1{Type: api.ServiceTypeExternalName, ClusterIP: ""}
+	delegate := &ServiceCommonGeneratorV1{Type: v1.ServiceTypeExternalName, ClusterIP: ""}
 	err = delegate.GenerateCommon(params)
 	if err != nil {
 		return nil, err
@@ -179,6 +190,7 @@ func (s ServiceExternalNameGeneratorV1) Generate(params map[string]interface{}) 
 }
 
 // validate validates required fields are set to support structured generation
+// TODO(xiangpengzhao): validate ports are identity mapped for headless service when we enforce that in validation.validateServicePort.
 func (s ServiceCommonGeneratorV1) validate() error {
 	if len(s.Name) == 0 {
 		return fmt.Errorf("name must be specified")
@@ -186,16 +198,13 @@ func (s ServiceCommonGeneratorV1) validate() error {
 	if len(s.Type) == 0 {
 		return fmt.Errorf("type must be specified")
 	}
-	if s.ClusterIP == api.ClusterIPNone && s.Type != api.ServiceTypeClusterIP {
+	if s.ClusterIP == v1.ClusterIPNone && s.Type != v1.ServiceTypeClusterIP {
 		return fmt.Errorf("ClusterIP=None can only be used with ClusterIP service type")
 	}
-	if s.ClusterIP == api.ClusterIPNone && len(s.TCP) > 0 {
-		return fmt.Errorf("can not map ports with clusterip=None")
-	}
-	if s.ClusterIP != api.ClusterIPNone && len(s.TCP) == 0 && s.Type != api.ServiceTypeExternalName {
+	if s.ClusterIP != v1.ClusterIPNone && len(s.TCP) == 0 && s.Type != v1.ServiceTypeExternalName {
 		return fmt.Errorf("at least one tcp port specifier must be provided")
 	}
-	if s.Type == api.ServiceTypeExternalName {
+	if s.Type == v1.ServiceTypeExternalName {
 		if errs := validation.IsDNS1123Subdomain(s.ExternalName); len(errs) != 0 {
 			return fmt.Errorf("invalid service external name %s", s.ExternalName)
 		}
@@ -208,7 +217,7 @@ func (s ServiceCommonGeneratorV1) StructuredGenerate() (runtime.Object, error) {
 	if err != nil {
 		return nil, err
 	}
-	ports := []api.ServicePort{}
+	ports := []v1.ServicePort{}
 	for _, tcpString := range s.TCP {
 		port, targetPort, err := parsePorts(tcpString)
 		if err != nil {
@@ -216,11 +225,11 @@ func (s ServiceCommonGeneratorV1) StructuredGenerate() (runtime.Object, error) {
 		}
 
 		portName := strings.Replace(tcpString, ":", "-", -1)
-		ports = append(ports, api.ServicePort{
+		ports = append(ports, v1.ServicePort{
 			Name:       portName,
 			Port:       port,
 			TargetPort: targetPort,
-			Protocol:   api.Protocol("TCP"),
+			Protocol:   v1.Protocol("TCP"),
 			NodePort:   int32(s.NodePort),
 		})
 	}
@@ -231,13 +240,13 @@ func (s ServiceCommonGeneratorV1) StructuredGenerate() (runtime.Object, error) {
 	selector := map[string]string{}
 	selector["app"] = s.Name
 
-	service := api.Service{
+	service := v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:   s.Name,
 			Labels: labels,
 		},
-		Spec: api.ServiceSpec{
-			Type:         api.ServiceType(s.Type),
+		Spec: v1.ServiceSpec{
+			Type:         v1.ServiceType(s.Type),
 			Selector:     selector,
 			Ports:        ports,
 			ExternalName: s.ExternalName,

@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -15,17 +13,50 @@ go_library(
         "port_allocator.go",
         "proxier.go",
         "proxysocket.go",
-        "rlimit.go",
         "roundrobin.go",
         "udp_server.go",
-    ],
-    tags = ["automanaged"],
+    ] + select({
+        "@io_bazel_rules_go//go/platform:android": [
+            "rlimit.go",
+        ],
+        "@io_bazel_rules_go//go/platform:darwin": [
+            "rlimit.go",
+        ],
+        "@io_bazel_rules_go//go/platform:dragonfly": [
+            "rlimit.go",
+        ],
+        "@io_bazel_rules_go//go/platform:freebsd": [
+            "rlimit.go",
+        ],
+        "@io_bazel_rules_go//go/platform:linux": [
+            "rlimit.go",
+        ],
+        "@io_bazel_rules_go//go/platform:nacl": [
+            "rlimit.go",
+        ],
+        "@io_bazel_rules_go//go/platform:netbsd": [
+            "rlimit.go",
+        ],
+        "@io_bazel_rules_go//go/platform:openbsd": [
+            "rlimit.go",
+        ],
+        "@io_bazel_rules_go//go/platform:plan9": [
+            "rlimit.go",
+        ],
+        "@io_bazel_rules_go//go/platform:solaris": [
+            "rlimit.go",
+        ],
+        "@io_bazel_rules_go//go/platform:windows": [
+            "rlimit_windows.go",
+        ],
+        "//conditions:default": [],
+    }),
+    importpath = "k8s.io/kubernetes/pkg/proxy/userspace",
     deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/api/helper:go_default_library",
+        "//pkg/apis/core:go_default_library",
+        "//pkg/apis/core/helper:go_default_library",
         "//pkg/proxy:go_default_library",
         "//pkg/proxy/util:go_default_library",
-        "//pkg/util/exec:go_default_library",
         "//pkg/util/iptables:go_default_library",
         "//pkg/util/slice:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
@@ -35,7 +66,40 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library",
-    ],
+        "//vendor/k8s.io/utils/exec:go_default_library",
+    ] + select({
+        "@io_bazel_rules_go//go/platform:android": [
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:darwin": [
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:dragonfly": [
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:freebsd": [
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:linux": [
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:nacl": [
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:netbsd": [
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:openbsd": [
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:plan9": [
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:solaris": [
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
+        "//conditions:default": [],
+    }),
 )
 
 go_test(
@@ -45,17 +109,18 @@ go_test(
         "proxier_test.go",
         "roundrobin_test.go",
     ],
-    library = ":go_default_library",
-    tags = ["automanaged"],
+    embed = [":go_default_library"],
+    importpath = "k8s.io/kubernetes/pkg/proxy/userspace",
     deps = [
-        "//pkg/api:go_default_library",
+        "//pkg/apis/core:go_default_library",
         "//pkg/proxy:go_default_library",
-        "//pkg/util/exec:go_default_library",
         "//pkg/util/iptables/testing:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/net:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
+        "//vendor/k8s.io/utils/exec:go_default_library",
+        "//vendor/k8s.io/utils/exec/testing:go_default_library",
     ],
 )
 

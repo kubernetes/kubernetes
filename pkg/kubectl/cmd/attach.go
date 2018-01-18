@@ -17,6 +17,7 @@ limitations under the License.
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"net/url"
@@ -27,15 +28,14 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
-	remotecommandconsts "k8s.io/apimachinery/pkg/util/remotecommand"
 	restclient "k8s.io/client-go/rest"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/client-go/tools/remotecommand"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
-	"k8s.io/kubernetes/pkg/client/unversioned/remotecommand"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/kubectl/resource"
-	"k8s.io/kubernetes/pkg/util/i18n"
+	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
 
 var (
@@ -97,17 +97,16 @@ type RemoteAttach interface {
 type DefaultRemoteAttach struct{}
 
 func (*DefaultRemoteAttach) Attach(method string, url *url.URL, config *restclient.Config, stdin io.Reader, stdout, stderr io.Writer, tty bool, terminalSizeQueue remotecommand.TerminalSizeQueue) error {
-	exec, err := remotecommand.NewExecutor(config, method, url)
+	exec, err := remotecommand.NewSPDYExecutor(config, method, url)
 	if err != nil {
 		return err
 	}
 	return exec.Stream(remotecommand.StreamOptions{
-		SupportedProtocols: remotecommandconsts.SupportedStreamingProtocols,
-		Stdin:              stdin,
-		Stdout:             stdout,
-		Stderr:             stderr,
-		Tty:                tty,
-		TerminalSizeQueue:  terminalSizeQueue,
+		Stdin:             stdin,
+		Stdout:            stdout,
+		Stderr:            stderr,
+		Tty:               tty,
+		TerminalSizeQueue: terminalSizeQueue,
 	})
 }
 
@@ -128,10 +127,10 @@ type AttachOptions struct {
 // Complete verifies command line arguments and loads data from the command environment
 func (p *AttachOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, argsIn []string) error {
 	if len(argsIn) == 0 {
-		return cmdutil.UsageError(cmd, "at least one argument is required for attach")
+		return cmdutil.UsageErrorf(cmd, "at least 1 argument is required for attach")
 	}
 	if len(argsIn) > 2 {
-		return cmdutil.UsageError(cmd, fmt.Sprintf("expected fewer than three arguments: POD or TYPE/NAME or TYPE NAME, saw %d: %s", len(argsIn), argsIn))
+		return cmdutil.UsageErrorf(cmd, "expected POD, TYPE/NAME, or TYPE NAME, (at most 2 arguments) saw %d: %v", len(argsIn), argsIn)
 	}
 
 	namespace, _, err := f.DefaultNamespace()
@@ -141,11 +140,11 @@ func (p *AttachOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, argsIn [
 
 	p.GetPodTimeout, err = cmdutil.GetPodRunningTimeoutFlag(cmd)
 	if err != nil {
-		return cmdutil.UsageError(cmd, err.Error())
+		return cmdutil.UsageErrorf(cmd, err.Error())
 	}
 
-	mapper, typer := f.Object()
-	builder := resource.NewBuilder(mapper, f.CategoryExpander(), typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
+	builder := f.NewBuilder().
+		Internal().
 		NamespaceParam(namespace).DefaultNamespace()
 
 	switch len(argsIn) {
@@ -191,13 +190,13 @@ func (p *AttachOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, argsIn [
 func (p *AttachOptions) Validate() error {
 	allErrs := []error{}
 	if len(p.PodName) == 0 {
-		allErrs = append(allErrs, fmt.Errorf("pod name must be specified"))
+		allErrs = append(allErrs, errors.New("pod name must be specified"))
 	}
 	if p.Out == nil || p.Err == nil {
-		allErrs = append(allErrs, fmt.Errorf("both output and error output must be provided"))
+		allErrs = append(allErrs, errors.New("both output and error output must be provided"))
 	}
 	if p.Attach == nil || p.PodClient == nil || p.Config == nil {
-		allErrs = append(allErrs, fmt.Errorf("client, client config, and attach must be provided"))
+		allErrs = append(allErrs, errors.New("client, client config, and attach must be provided"))
 	}
 	return utilerrors.NewAggregate(allErrs)
 }
@@ -260,11 +259,6 @@ func (p *AttachOptions) Run() error {
 	}
 
 	fn := func() error {
-
-		if !p.Quiet && stderr != nil {
-			fmt.Fprintln(stderr, "If you don't see a command prompt, try pressing enter.")
-		}
-
 		restClient, err := restclient.RESTClientFor(p.Config)
 		if err != nil {
 			return err
@@ -281,11 +275,14 @@ func (p *AttachOptions) Run() error {
 			Stdout:    p.Out != nil,
 			Stderr:    p.Err != nil,
 			TTY:       t.Raw,
-		}, api.ParameterCodec)
+		}, legacyscheme.ParameterCodec)
 
 		return p.Attach.Attach("POST", req.URL(), p.Config, p.In, p.Out, p.Err, t.Raw, sizeQueue)
 	}
 
+	if !p.Quiet && stderr != nil {
+		fmt.Fprintln(stderr, "If you don't see a command prompt, try pressing enter.")
+	}
 	if err := t.Safe(fn); err != nil {
 		return err
 	}

@@ -17,6 +17,7 @@ limitations under the License.
 package initializer
 
 import (
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/client-go/informers"
@@ -27,15 +28,23 @@ type pluginInitializer struct {
 	externalClient    kubernetes.Interface
 	externalInformers informers.SharedInformerFactory
 	authorizer        authorizer.Authorizer
+	scheme            *runtime.Scheme
 }
 
 // New creates an instance of admission plugins initializer.
-func New(extClientset kubernetes.Interface, extInformers informers.SharedInformerFactory, authz authorizer.Authorizer) (pluginInitializer, error) {
+// TODO(p0lyn0mial): make the parameters public, this construction seems to be redundant.
+func New(
+	extClientset kubernetes.Interface,
+	extInformers informers.SharedInformerFactory,
+	authz authorizer.Authorizer,
+	scheme *runtime.Scheme,
+) pluginInitializer {
 	return pluginInitializer{
 		externalClient:    extClientset,
 		externalInformers: extInformers,
 		authorizer:        authz,
-	}, nil
+		scheme:            scheme,
+	}
 }
 
 // Initialize checks the initialization interfaces implemented by a plugin
@@ -51,6 +60,10 @@ func (i pluginInitializer) Initialize(plugin admission.Interface) {
 
 	if wants, ok := plugin.(WantsAuthorizer); ok {
 		wants.SetAuthorizer(i.authorizer)
+	}
+
+	if wants, ok := plugin.(WantsScheme); ok {
+		wants.SetScheme(i.scheme)
 	}
 }
 

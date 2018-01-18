@@ -46,7 +46,7 @@ func (r *FixedItemIntervalRateLimiter) NumRequeues(item interface{}) int {
 func (r *FixedItemIntervalRateLimiter) Forget(item interface{}) {
 }
 
-// NewDefaultHPARateLimitter creates a rate limitter which limits overall (as per the
+// NewDefaultHPARateLimiter creates a rate limitter which limits overall (as per the
 // default controller rate limiter), as well as per the resync interval
 func NewDefaultHPARateLimiter(interval time.Duration) workqueue.RateLimiter {
 	return NewFixedItemIntervalRateLimiter(interval)

@@ -17,9 +17,9 @@ limitations under the License.
 package deployment
 
 import (
+	"k8s.io/api/core/v1"
+	extensions "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/api/v1"
-	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/deployment/util"
 )
@@ -61,6 +61,12 @@ func (dc *DeploymentController) rolloutRecreate(d *extensions.Deployment, rsList
 	// scale up new replica set.
 	if _, err := dc.scaleUpNewReplicaSetForRecreate(newRS, d); err != nil {
 		return err
+	}
+
+	if util.DeploymentComplete(d, &d.Status) {
+		if err := dc.cleanupDeployment(oldRSs, d); err != nil {
+			return err
+		}
 	}
 
 	// Sync deployment status.

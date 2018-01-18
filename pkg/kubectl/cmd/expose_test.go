@@ -25,12 +25,19 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/rest/fake"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
+	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/printers"
 )
+
+// This init should be removed after switching this command and its tests to user external types.
+func init() {
+	api.AddToScheme(scheme.Scheme)
+}
 
 func TestRunExposeService(t *testing.T) {
 	tests := []struct {
@@ -462,7 +469,7 @@ func TestRunExposeService(t *testing.T) {
 		f, tf, codec, ns := cmdtesting.NewAPIFactory()
 		tf.Printer = &printers.JSONPrinter{}
 		tf.Client = &fake.RESTClient{
-			APIRegistry:          api.Registry,
+			GroupVersion:         schema.GroupVersion{Version: "v1"},
 			NegotiatedSerializer: ns,
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 				switch p, m := req.URL.Path, req.Method; {

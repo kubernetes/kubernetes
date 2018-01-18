@@ -24,7 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/admission"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
 type fakeSource struct {
@@ -110,7 +110,7 @@ func expectNoAnnotation(t *testing.T, pod *api.Pod) {
 	}
 }
 
-func admit(t *testing.T, ir admission.Interface, pods []*api.Pod) {
+func admit(t *testing.T, ir admission.MutationInterface, pods []*api.Pod) {
 	for i := range pods {
 		p := pods[i]
 
@@ -123,7 +123,7 @@ func admit(t *testing.T, ir admission.Interface, pods []*api.Pod) {
 	}
 }
 
-func testAdminScenarios(t *testing.T, ir admission.Interface, p *api.Pod) {
+func testAdminScenarios(t *testing.T, ir admission.MutationInterface, p *api.Pod) {
 	podKind := api.Kind("Pod").WithVersion("version")
 	podRes := api.Resource("pods").WithVersion("version")
 
@@ -151,7 +151,7 @@ func testAdminScenarios(t *testing.T, ir admission.Interface, p *api.Pod) {
 	}
 }
 
-func performTest(t *testing.T, ir admission.Interface) {
+func performTest(t *testing.T, ir admission.MutationInterface) {
 	pods := getPods()
 	admit(t, ir, pods)
 	testAdminScenarios(t, ir, pods[0])

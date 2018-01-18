@@ -1,21 +1,16 @@
-package(default_visibility = ["//visibility:public"])
-
-licenses(["notice"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
     srcs = [
         "cluster.go",
+        "doc.go",
         "errors.go",
         "member.go",
         "store.go",
     ],
-    tags = ["automanaged"],
+    importpath = "github.com/coreos/etcd/etcdserver/membership",
+    visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/coreos/etcd/error:go_default_library",
         "//vendor/github.com/coreos/etcd/mvcc/backend:go_default_library",
@@ -42,4 +37,5 @@ filegroup(
     name = "all-srcs",
     srcs = [":package-srcs"],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

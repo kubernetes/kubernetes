@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2018 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,10 +19,12 @@ limitations under the License.
 package internalinterfaces
 
 import (
+	time "time"
+
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	cache "k8s.io/client-go/tools/cache"
 	internalclientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	time "time"
 )
 
 type NewInformerFunc func(internalclientset.Interface, time.Duration) cache.SharedIndexInformer
@@ -32,3 +34,5 @@ type SharedInformerFactory interface {
 	Start(stopCh <-chan struct{})
 	InformerFor(obj runtime.Object, newFunc NewInformerFunc) cache.SharedIndexInformer
 }
+
+type TweakListOptionsFunc func(*v1.ListOptions)

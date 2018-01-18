@@ -23,8 +23,7 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/registry/cachesize"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/registry/core/resourcequota"
 )
 
@@ -35,19 +34,16 @@ type REST struct {
 // NewREST returns a RESTStorage object that will work against resource quotas.
 func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST) {
 	store := &genericregistry.Store{
-		Copier:            api.Scheme,
-		NewFunc:           func() runtime.Object { return &api.ResourceQuota{} },
-		NewListFunc:       func() runtime.Object { return &api.ResourceQuotaList{} },
-		PredicateFunc:     resourcequota.MatchResourceQuota,
-		QualifiedResource: api.Resource("resourcequotas"),
-		WatchCacheSize:    cachesize.GetWatchCacheSizeByResource("resourcequotas"),
+		NewFunc:                  func() runtime.Object { return &api.ResourceQuota{} },
+		NewListFunc:              func() runtime.Object { return &api.ResourceQuotaList{} },
+		DefaultQualifiedResource: api.Resource("resourcequotas"),
 
 		CreateStrategy:      resourcequota.Strategy,
 		UpdateStrategy:      resourcequota.Strategy,
 		DeleteStrategy:      resourcequota.Strategy,
 		ReturnDeletedObject: true,
 	}
-	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: resourcequota.GetAttrs}
+	options := &generic.StoreOptions{RESTOptions: optsGetter}
 	if err := store.CompleteWithOptions(options); err != nil {
 		panic(err) // TODO: Propagate error up
 	}
@@ -81,6 +77,6 @@ func (r *StatusREST) Get(ctx genericapirequest.Context, name string, options *me
 }
 
 // Update alters the status subset of an object.
-func (r *StatusREST) Update(ctx genericapirequest.Context, name string, objInfo rest.UpdatedObjectInfo) (runtime.Object, bool, error) {
-	return r.store.Update(ctx, name, objInfo)
+func (r *StatusREST) Update(ctx genericapirequest.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (runtime.Object, bool, error) {
+	return r.store.Update(ctx, name, objInfo, createValidation, updateValidation)
 }

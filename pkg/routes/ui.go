@@ -22,9 +22,9 @@ import (
 	"k8s.io/apiserver/pkg/server/mux"
 )
 
-const dashboardPath = "/api/v1/namespaces/kube-system/services/kubernetes-dashboard/proxy"
+const dashboardPath = "/api/v1/namespaces/kube-system/services/https:kubernetes-dashboard:/proxy/"
 
-// UIRediect redirects /ui to the kube-ui proxy path.
+// UIRedirect redirects /ui to the kube-ui proxy path.
 type UIRedirect struct{}
 
 func (r UIRedirect) Install(c *mux.PathRecorderMux) {

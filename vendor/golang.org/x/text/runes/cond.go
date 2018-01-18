@@ -41,20 +41,35 @@ func If(s Set, tIn, tNotIn transform.Transformer) Transformer {
 	if tNotIn == nil {
 		tNotIn = transform.Nop
 	}
+	sIn, ok := tIn.(transform.SpanningTransformer)
+	if !ok {
+		sIn = dummySpan{tIn}
+	}
+	sNotIn, ok := tNotIn.(transform.SpanningTransformer)
+	if !ok {
+		sNotIn = dummySpan{tNotIn}
+	}
+
 	a := &cond{
-		tIn:    tIn,
-		tNotIn: tNotIn,
+		tIn:    sIn,
+		tNotIn: sNotIn,
 		f:      s.Contains,
 	}
 	a.Reset()
 	return Transformer{a}
 }
 
+type dummySpan struct{ transform.Transformer }
+
+func (d dummySpan) Span(src []byte, atEOF bool) (n int, err error) {
+	return 0, transform.ErrEndOfSpan
+}
+
 type cond struct {
-	tIn, tNotIn transform.Transformer
+	tIn, tNotIn transform.SpanningTransformer
 	f           func(rune) bool
-	check       func(rune) bool       // current check to perform
-	t           transform.Transformer // current transformer to use
+	check       func(rune) bool               // current check to perform
+	t           transform.SpanningTransformer // current transformer to use
 }
 
 // Reset implements transform.Transformer.
@@ -84,6 +99,51 @@ func (t *cond) isNot(r rune) bool {
 	return false
 }
 
+// This implementation of Span doesn't help all too much, but it needs to be
+// there to satisfy this package's Transformer interface.
+// TODO: there are certainly room for improvements, though. For example, if
+// t.t == transform.Nop (which will a common occurrence) it will save a bundle
+// to special-case that loop.
+func (t *cond) Span(src []byte, atEOF bool) (n int, err error) {
+	p := 0
+	for n < len(src) && err == nil {
+		// Don't process too much at a time as the Spanner that will be
+		// called on this block may terminate early.
+		const maxChunk = 4096
+		max := len(src)
+		if v := n + maxChunk; v < max {
+			max = v
+		}
+		atEnd := false
+		size := 0
+		current := t.t
+		for ; p < max; p += size {
+			r := rune(src[p])
+			if r < utf8.RuneSelf {
+				size = 1
+			} else if r, size = utf8.DecodeRune(src[p:]); size == 1 {
+				if !atEOF && !utf8.FullRune(src[p:]) {
+					err = transform.ErrShortSrc
+					break
+				}
+			}
+			if !t.check(r) {
+				// The next rune will be the start of a new run.
+				atEnd = true
+				break
+			}
+		}
+		n2, err2 := current.Span(src[n:p], atEnd || (atEOF && p == len(src)))
+		n += n2
+		if err2 != nil {
+			return n, err2
+		}
+		// At this point either err != nil or t.check will pass for the rune at p.
+		p = n + size
+	}
+	return n, err
+}
+
 func (t *cond) Transform(dst, src []byte, atEOF bool) (nDst, nSrc int, err error) {
 	p := 0
 	for nSrc < len(src) && err == nil {
@@ -99,9 +159,10 @@ func (t *cond) Transform(dst, src []byte, atEOF bool) (nDst, nSrc int, err error
 		size := 0
 		current := t.t
 		for ; p < max; p += size {
-			var r rune
-			r, size = utf8.DecodeRune(src[p:])
-			if r == utf8.RuneError && size == 1 {
+			r := rune(src[p])
+			if r < utf8.RuneSelf {
+				size = 1
+			} else if r, size = utf8.DecodeRune(src[p:]); size == 1 {
 				if !atEOF && !utf8.FullRune(src[p:]) {
 					err = transform.ErrShortSrc
 					break

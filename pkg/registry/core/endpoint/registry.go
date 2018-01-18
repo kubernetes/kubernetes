@@ -22,7 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
 // Registry is an interface for things that know how to store endpoints.
@@ -30,7 +30,7 @@ type Registry interface {
 	ListEndpoints(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (*api.EndpointsList, error)
 	GetEndpoints(ctx genericapirequest.Context, name string, options *metav1.GetOptions) (*api.Endpoints, error)
 	WatchEndpoints(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (watch.Interface, error)
-	UpdateEndpoints(ctx genericapirequest.Context, e *api.Endpoints) error
+	UpdateEndpoints(ctx genericapirequest.Context, e *api.Endpoints, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) error
 	DeleteEndpoints(ctx genericapirequest.Context, name string) error
 }
 
@@ -65,8 +65,8 @@ func (s *storage) GetEndpoints(ctx genericapirequest.Context, name string, optio
 	return obj.(*api.Endpoints), nil
 }
 
-func (s *storage) UpdateEndpoints(ctx genericapirequest.Context, endpoints *api.Endpoints) error {
-	_, _, err := s.Update(ctx, endpoints.Name, rest.DefaultUpdatedObjectInfo(endpoints, api.Scheme))
+func (s *storage) UpdateEndpoints(ctx genericapirequest.Context, endpoints *api.Endpoints, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) error {
+	_, _, err := s.Update(ctx, endpoints.Name, rest.DefaultUpdatedObjectInfo(endpoints), createValidation, updateValidation)
 	return err
 }
 

@@ -21,25 +21,33 @@ import (
 	"math"
 	"time"
 
+	autoscaling "k8s.io/api/autoscaling/v2beta1"
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/api/v1"
+	v1coreclient "k8s.io/client-go/kubernetes/typed/core/v1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	autoscaling "k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1"
-	v1coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
 	metricsclient "k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
+)
+
+const (
+	// defaultTestingTolerance is default value for calculating when to
+	// scale up/scale down.
+	defaultTestingTolerance = 0.1
 )
 
 type ReplicaCalculator struct {
 	metricsClient metricsclient.MetricsClient
 	podsGetter    v1coreclient.PodsGetter
+	tolerance     float64
 }
 
-func NewReplicaCalculator(metricsClient metricsclient.MetricsClient, podsGetter v1coreclient.PodsGetter) *ReplicaCalculator {
+func NewReplicaCalculator(metricsClient metricsclient.MetricsClient, podsGetter v1coreclient.PodsGetter, tolerance float64) *ReplicaCalculator {
 	return &ReplicaCalculator{
 		metricsClient: metricsClient,
 		podsGetter:    podsGetter,
+		tolerance:     tolerance,
 	}
 }
 
@@ -105,7 +113,7 @@ func (c *ReplicaCalculator) GetResourceReplicas(currentReplicas int32, targetUti
 
 	rebalanceUnready := len(unreadyPods) > 0 && usageRatio > 1.0
 	if !rebalanceUnready && len(missingPods) == 0 {
-		if math.Abs(1.0-usageRatio) <= tolerance {
+		if math.Abs(1.0-usageRatio) <= c.tolerance {
 			// return the current replicas if the change would be too small
 			return currentReplicas, utilization, rawUtilization, timestamp, nil
 		}
@@ -141,7 +149,7 @@ func (c *ReplicaCalculator) GetResourceReplicas(currentReplicas int32, targetUti
 		return 0, utilization, rawUtilization, time.Time{}, err
 	}
 
-	if math.Abs(1.0-newUsageRatio) <= tolerance || (usageRatio < 1.0 && newUsageRatio > 1.0) || (usageRatio > 1.0 && newUsageRatio < 1.0) {
+	if math.Abs(1.0-newUsageRatio) <= c.tolerance || (usageRatio < 1.0 && newUsageRatio > 1.0) || (usageRatio > 1.0 && newUsageRatio < 1.0) {
 		// return the current replicas if the change would be too small,
 		// or if the new usage ratio would cause a change in scale direction
 		return currentReplicas, utilization, rawUtilization, timestamp, nil
@@ -218,7 +226,7 @@ func (c *ReplicaCalculator) calcPlainMetricReplicas(metrics metricsclient.PodMet
 	rebalanceUnready := len(unreadyPods) > 0 && usageRatio > 1.0
 
 	if !rebalanceUnready && len(missingPods) == 0 {
-		if math.Abs(1.0-usageRatio) <= tolerance {
+		if math.Abs(1.0-usageRatio) <= c.tolerance {
 			// return the current replicas if the change would be too small
 			return currentReplicas, utilization, nil
 		}
@@ -250,11 +258,8 @@ func (c *ReplicaCalculator) calcPlainMetricReplicas(metrics metricsclient.PodMet
 
 	// re-run the utilization calculation with our new numbers
 	newUsageRatio, _ := metricsclient.GetMetricUtilizationRatio(metrics, targetUtilization)
-	if err != nil {
-		return 0, utilization, err
-	}
 
-	if math.Abs(1.0-newUsageRatio) <= tolerance || (usageRatio < 1.0 && newUsageRatio > 1.0) || (usageRatio > 1.0 && newUsageRatio < 1.0) {
+	if math.Abs(1.0-newUsageRatio) <= c.tolerance || (usageRatio < 1.0 && newUsageRatio > 1.0) || (usageRatio > 1.0 && newUsageRatio < 1.0) {
 		// return the current replicas if the change would be too small,
 		// or if the new usage ratio would cause a change in scale direction
 		return currentReplicas, utilization, nil
@@ -274,7 +279,7 @@ func (c *ReplicaCalculator) GetObjectMetricReplicas(currentReplicas int32, targe
 	}
 
 	usageRatio := float64(utilization) / float64(targetUtilization)
-	if math.Abs(1.0-usageRatio) <= tolerance {
+	if math.Abs(1.0-usageRatio) <= c.tolerance {
 		// return the current replicas if the change would be too small
 		return currentReplicas, utilization, timestamp, nil
 	}

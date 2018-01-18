@@ -24,7 +24,6 @@ usage() {
 	err "\t$0 waitforattach <mount device> <json params>"
 	err "\t$0 mountdevice <mount dir> <mount device> <json params>"
 	err "\t$0 unmountdevice <mount dir>"
-	err "\t$0 getvolumename <json params>"
 	err "\t$0 isattached <json params> <nodename>"
 	exit 1
 }
@@ -138,17 +137,6 @@ unmountdevice() {
 	exit 0
 }
 
-getvolumename() {
-	JSON_PARAMS=$1
-	DMDEV=$(getdevice)
-
-	# get lvm device UUID
-	UUID=`lvs -o lv_uuid --noheadings ${DMDEV} 2>/dev/null|tr -d " "`
-
-	log "{\"status\": \"Success\", \"volumeName\":\"${UUID}\"}"
-	exit 0
-}
-
 isattached() {
 	log "{\"status\": \"Success\", \"attached\":true}"
 	exit 0
@@ -183,15 +171,12 @@ case "$op" in
 	unmountdevice)
 		unmountdevice $*
 		;;
-	getvolumename)
-		getvolumename $*
-		;;
 	isattached)
                 isattached $*
                 ;;
 	*)
-		err "{ \"status\": \"Not supported\" }"
-		exit 1
+		log "{ \"status\": \"Not supported\" }"
+		exit 0
 esac
 
 exit 1

@@ -1,6 +1,1 @@
-# Show us information about failures.
-build --verbose_failures
-test --test_output=errors
-
-# Include git version info
-build --workspace_status_command hack/print-workspace-status.sh
+build/root/.bazelrc

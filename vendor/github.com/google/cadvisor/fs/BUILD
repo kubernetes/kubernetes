@@ -1,26 +1,28 @@
-package(default_visibility = ["//visibility:public"])
-
-licenses(["notice"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
     srcs = [
-        "fs.go",
         "types.go",
-    ],
-    tags = ["automanaged"],
-    deps = [
-        "//vendor/github.com/docker/docker/pkg/mount:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
-        "//vendor/github.com/google/cadvisor/devicemapper:go_default_library",
-        "//vendor/github.com/google/cadvisor/utils/docker:go_default_library",
-        "//vendor/github.com/mistifyio/go-zfs:go_default_library",
-    ],
+    ] + select({
+        "@io_bazel_rules_go//go/platform:linux": [
+            "fs.go",
+        ],
+        "//conditions:default": [],
+    }),
+    importpath = "github.com/google/cadvisor/fs",
+    visibility = ["//visibility:public"],
+    deps = select({
+        "@io_bazel_rules_go//go/platform:linux": [
+            "//vendor/github.com/docker/docker/pkg/mount:go_default_library",
+            "//vendor/github.com/golang/glog:go_default_library",
+            "//vendor/github.com/google/cadvisor/devicemapper:go_default_library",
+            "//vendor/github.com/google/cadvisor/utils:go_default_library",
+            "//vendor/github.com/google/cadvisor/utils/docker:go_default_library",
+            "//vendor/github.com/mistifyio/go-zfs:go_default_library",
+        ],
+        "//conditions:default": [],
+    }),
 )
 
 filegroup(
@@ -34,4 +36,5 @@ filegroup(
     name = "all-srcs",
     srcs = [":package-srcs"],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

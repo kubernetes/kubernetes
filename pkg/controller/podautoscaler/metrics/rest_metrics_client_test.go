@@ -21,27 +21,22 @@ import (
 	"testing"
 	"time"
 
+	autoscalingapi "k8s.io/api/autoscaling/v2beta1"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/client-go/pkg/api/v1"
 	core "k8s.io/client-go/testing"
-	"k8s.io/kubernetes/pkg/api"
-	kv1 "k8s.io/kubernetes/pkg/api/v1"
-	autoscalingapi "k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	_ "k8s.io/kubernetes/pkg/apis/extensions/install"
+	cmapi "k8s.io/metrics/pkg/apis/custom_metrics/v1beta1"
+	metricsapi "k8s.io/metrics/pkg/apis/metrics/v1beta1"
 	metricsfake "k8s.io/metrics/pkg/client/clientset_generated/clientset/fake"
 	cmfake "k8s.io/metrics/pkg/client/custom_metrics/fake"
 
-	cmapi "k8s.io/metrics/pkg/apis/custom_metrics/v1alpha1"
-	metricsapi "k8s.io/metrics/pkg/apis/metrics/v1alpha1"
-
 	"github.com/stretchr/testify/assert"
-
-	// we need the API types for rest mapping lookup
-	_ "k8s.io/client-go/pkg/api/install"
-	_ "k8s.io/client-go/pkg/apis/extensions/install"
 )
 
 type restClientTestCase struct {
@@ -74,7 +69,7 @@ func (tc *restClientTestCase) prepareTestClient(t *testing.T) (*metricsfake.Clie
 	fakeCMClient := &cmfake.FakeCustomMetricsClient{}
 
 	if isResource {
-		fakeMetricsClient.AddReactor("list", "podmetricses", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+		fakeMetricsClient.AddReactor("list", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
 			metrics := &metricsapi.PodMetricsList{}
 			for i, containers := range tc.reportedPodMetrics {
 				metric := metricsapi.PodMetrics{
@@ -133,7 +128,7 @@ func (tc *restClientTestCase) prepareTestClient(t *testing.T) (*metricsfake.Clie
 				return true, &metrics, nil
 			} else {
 				name := getForAction.GetName()
-				mapper := api.Registry.RESTMapper()
+				mapper := legacyscheme.Registry.RESTMapper()
 				assert.NotNil(t, tc.singleObject, "should have only requested a single-object metric when we asked for metrics for a single object")
 				gk := schema.FromAPIVersionAndKind(tc.singleObject.APIVersion, tc.singleObject.Kind).GroupKind()
 				mapping, err := mapper.RESTMapping(gk)
@@ -187,10 +182,10 @@ func (tc *restClientTestCase) verifyResults(t *testing.T, metrics PodMetricsInfo
 
 func (tc *restClientTestCase) runTest(t *testing.T) {
 	testMetricsClient, testCMClient := tc.prepareTestClient(t)
-	metricsClient := NewRESTMetricsClient(testMetricsClient.MetricsV1alpha1(), testCMClient)
+	metricsClient := NewRESTMetricsClient(testMetricsClient.MetricsV1beta1(), testCMClient)
 	isResource := len(tc.resourceName) > 0
 	if isResource {
-		info, timestamp, err := metricsClient.GetResourceMetric(kv1.ResourceName(tc.resourceName), tc.namespace, tc.selector)
+		info, timestamp, err := metricsClient.GetResourceMetric(v1.ResourceName(tc.resourceName), tc.namespace, tc.selector)
 		tc.verifyResults(t, info, timestamp, err)
 	} else if tc.singleObject == nil {
 		info, timestamp, err := metricsClient.GetRawMetric(tc.metricName, tc.namespace, tc.selector)
@@ -253,10 +248,20 @@ func TestRESTClientQpsSumEqualZero(t *testing.T) {
 	tc.runTest(t)
 }
 
+func TestRESTClientQpsEmptyMetrics(t *testing.T) {
+	tc := restClientTestCase{
+		metricName:           "qps",
+		desiredError:         fmt.Errorf("no metrics returned from custom metrics API"),
+		reportedMetricPoints: []metricPoint{},
+	}
+
+	tc.runTest(t)
+}
+
 func TestRESTClientCPUEmptyMetrics(t *testing.T) {
 	tc := restClientTestCase{
 		resourceName:         v1.ResourceCPU,
-		desiredError:         fmt.Errorf("no metrics returned from heapster"),
+		desiredError:         fmt.Errorf("no metrics returned from resource metrics API"),
 		reportedMetricPoints: []metricPoint{},
 		reportedPodMetrics:   [][]int64{},
 	}

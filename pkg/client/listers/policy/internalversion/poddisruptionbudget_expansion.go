@@ -22,7 +22,7 @@ import (
 	"github.com/golang/glog"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/policy"
 )
 
@@ -33,7 +33,7 @@ type PodDisruptionBudgetListerExpansion interface {
 }
 
 // PodDisruptionBudgetNamespaceListerExpansion allows custom methods to be added to
-// PodDisruptionBudgetNamespaeLister.
+// PodDisruptionBudgetNamespaceLister.
 type PodDisruptionBudgetNamespaceListerExpansion interface{}
 
 // GetPodPodDisruptionBudgets returns a list of PodDisruptionBudgets matching a pod.  Returns an error only if no matching PodDisruptionBudgets are found.

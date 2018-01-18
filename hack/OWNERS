@@ -1,4 +1,5 @@
 reviewers:
+  - cblecker
   - eparis
   - fejta
   - ixdy
@@ -6,7 +7,11 @@ reviewers:
   - lavalamp
   - spxtr
   - zmerlynn
+  - sttts
+  - gmarek
+  - vishh
 approvers:
+  - cblecker
   - deads2k
   - eparis
   - fejta
@@ -14,6 +19,10 @@ approvers:
   - jbeda
   - lavalamp
   - madhusudancs
+  - pwittrock
   - shashidharatd
   - spxtr
   - zmerlynn
+  - sttts
+  - gmarek
+  - vishh

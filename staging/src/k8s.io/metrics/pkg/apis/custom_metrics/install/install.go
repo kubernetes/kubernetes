@@ -23,7 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/metrics/pkg/apis/custom_metrics"
-	"k8s.io/metrics/pkg/apis/custom_metrics/v1alpha1"
+	"k8s.io/metrics/pkg/apis/custom_metrics/v1beta1"
 )
 
 // Install registers the API group and adds types to a scheme
@@ -31,12 +31,11 @@ func Install(groupFactoryRegistry announced.APIGroupFactoryRegistry, registry *r
 	if err := announced.NewGroupMetaFactory(
 		&announced.GroupMetaFactoryArgs{
 			GroupName:                  custom_metrics.GroupName,
-			VersionPreferenceOrder:     []string{v1alpha1.SchemeGroupVersion.Version},
-			ImportPrefix:               "k8s.io/metrics/pkg/apis/custom_metrics",
+			VersionPreferenceOrder:     []string{v1beta1.SchemeGroupVersion.Version},
 			AddInternalObjectsToScheme: custom_metrics.AddToScheme,
 		},
 		announced.VersionToSchemeFunc{
-			v1alpha1.SchemeGroupVersion.Version: v1alpha1.AddToScheme,
+			v1beta1.SchemeGroupVersion.Version: v1beta1.AddToScheme,
 		},
 	).Announce(groupFactoryRegistry).RegisterAndEnable(registry, scheme); err != nil {
 		panic(err)

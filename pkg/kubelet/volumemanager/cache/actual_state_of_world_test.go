@@ -19,8 +19,8 @@ package cache
 import (
 	"testing"
 
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetesting "k8s.io/kubernetes/pkg/volume/testing"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
@@ -204,9 +204,14 @@ func Test_AddPodToVolume_Positive_ExistingVolumeNewNode(t *testing.T) {
 		t.Fatalf("NewMounter failed. Expected: <no error> Actual: <%v>", err)
 	}
 
+	mapper, err := plugin.NewBlockVolumeMapper(volumeSpec, pod, volume.VolumeOptions{})
+	if err != nil {
+		t.Fatalf("NewBlockVolumeMapper failed. Expected: <no error> Actual: <%v>", err)
+	}
+
 	// Act
 	err = asw.AddPodToVolume(
-		podName, pod.UID, generatedVolumeName, mounter, volumeSpec.Name(), "" /* volumeGidValue */)
+		podName, pod.UID, generatedVolumeName, mounter, mapper, volumeSpec.Name(), "" /* volumeGidValue */)
 
 	// Assert
 	if err != nil {
@@ -263,15 +268,20 @@ func Test_AddPodToVolume_Positive_ExistingVolumeExistingNode(t *testing.T) {
 		t.Fatalf("NewMounter failed. Expected: <no error> Actual: <%v>", err)
 	}
 
+	mapper, err := plugin.NewBlockVolumeMapper(volumeSpec, pod, volume.VolumeOptions{})
+	if err != nil {
+		t.Fatalf("NewBlockVolumeMapper failed. Expected: <no error> Actual: <%v>", err)
+	}
+
 	err = asw.AddPodToVolume(
-		podName, pod.UID, generatedVolumeName, mounter, volumeSpec.Name(), "" /* volumeGidValue */)
+		podName, pod.UID, generatedVolumeName, mounter, mapper, volumeSpec.Name(), "" /* volumeGidValue */)
 	if err != nil {
 		t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: <%v>", err)
 	}
 
 	// Act
 	err = asw.AddPodToVolume(
-		podName, pod.UID, generatedVolumeName, mounter, volumeSpec.Name(), "" /* volumeGidValue */)
+		podName, pod.UID, generatedVolumeName, mounter, mapper, volumeSpec.Name(), "" /* volumeGidValue */)
 
 	// Assert
 	if err != nil {
@@ -318,6 +328,15 @@ func Test_AddPodToVolume_Negative_VolumeDoesntExist(t *testing.T) {
 			volumeSpec,
 			err)
 	}
+
+	blockplugin, err := volumePluginMgr.FindMapperPluginBySpec(volumeSpec)
+	if err != nil {
+		t.Fatalf(
+			"volumePluginMgr.FindMapperPluginBySpec failed to find volume plugin for %#v with: %v",
+			volumeSpec,
+			err)
+	}
+
 	volumeName, err := volumehelper.GetUniqueVolumeNameFromSpec(
 		plugin, volumeSpec)
 
@@ -328,9 +347,14 @@ func Test_AddPodToVolume_Negative_VolumeDoesntExist(t *testing.T) {
 		t.Fatalf("NewMounter failed. Expected: <no error> Actual: <%v>", err)
 	}
 
+	mapper, err := blockplugin.NewBlockVolumeMapper(volumeSpec, pod, volume.VolumeOptions{})
+	if err != nil {
+		t.Fatalf("NewBlockVolumeMapper failed. Expected: <no error> Actual: <%v>", err)
+	}
+
 	// Act
 	err = asw.AddPodToVolume(
-		podName, pod.UID, volumeName, mounter, volumeSpec.Name(), "" /* volumeGidValue */)
+		podName, pod.UID, volumeName, mounter, mapper, volumeSpec.Name(), "" /* volumeGidValue */)
 
 	// Assert
 	if err == nil {

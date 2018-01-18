@@ -32,8 +32,8 @@ import (
 
 	"k8s.io/apimachinery/pkg/types"
 	remotecommandconsts "k8s.io/apimachinery/pkg/util/remotecommand"
-	"k8s.io/kubernetes/pkg/client/unversioned/remotecommand"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	"k8s.io/client-go/tools/remotecommand"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 	"k8s.io/kubernetes/pkg/kubelet/server/portforward"
 	remotecommandserver "k8s.io/kubernetes/pkg/kubelet/server/remotecommand"
 )
@@ -101,7 +101,7 @@ var DefaultConfig = Config{
 	SupportedPortForwardProtocols:   portforward.SupportedProtocols,
 }
 
-// TODO(timstclair): Add auth(n/z) interface & handling.
+// TODO(tallclair): Add auth(n/z) interface & handling.
 func NewServer(config Config, runtime Runtime) (Server, error) {
 	s := &server{
 		config:  config,
@@ -141,6 +141,11 @@ func NewServer(config Config, runtime Runtime) (Server, error) {
 	handler := restful.NewContainer()
 	handler.Add(ws)
 	s.handler = handler
+	s.server = &http.Server{
+		Addr:      s.config.Addr,
+		Handler:   s.handler,
+		TLSConfig: s.config.TLSConfig,
+	}
 
 	return s, nil
 }
@@ -150,11 +155,27 @@ type server struct {
 	runtime *criAdapter
 	handler http.Handler
 	cache   *requestCache
+	server  *http.Server
+}
+
+func validateExecRequest(req *runtimeapi.ExecRequest) error {
+	if req.ContainerId == "" {
+		return grpc.Errorf(codes.InvalidArgument, "missing required container_id")
+	}
+	if req.Tty && req.Stderr {
+		// If TTY is set, stderr cannot be true because multiplexing is not
+		// supported.
+		return grpc.Errorf(codes.InvalidArgument, "tty and stderr cannot both be true")
+	}
+	if !req.Stdin && !req.Stdout && !req.Stderr {
+		return grpc.Errorf(codes.InvalidArgument, "one of stdin, stdout, or stderr must be set")
+	}
+	return nil
 }
 
 func (s *server) GetExec(req *runtimeapi.ExecRequest) (*runtimeapi.ExecResponse, error) {
-	if req.ContainerId == "" {
-		return nil, grpc.Errorf(codes.InvalidArgument, "missing required container_id")
+	if err := validateExecRequest(req); err != nil {
+		return nil, err
 	}
 	token, err := s.cache.Insert(req)
 	if err != nil {
@@ -165,9 +186,24 @@ func (s *server) GetExec(req *runtimeapi.ExecRequest) (*runtimeapi.ExecResponse,
 	}, nil
 }
 
-func (s *server) GetAttach(req *runtimeapi.AttachRequest) (*runtimeapi.AttachResponse, error) {
+func validateAttachRequest(req *runtimeapi.AttachRequest) error {
 	if req.ContainerId == "" {
-		return nil, grpc.Errorf(codes.InvalidArgument, "missing required container_id")
+		return grpc.Errorf(codes.InvalidArgument, "missing required container_id")
+	}
+	if req.Tty && req.Stderr {
+		// If TTY is set, stderr cannot be true because multiplexing is not
+		// supported.
+		return grpc.Errorf(codes.InvalidArgument, "tty and stderr cannot both be true")
+	}
+	if !req.Stdin && !req.Stdout && !req.Stderr {
+		return grpc.Errorf(codes.InvalidArgument, "one of stdin, stdout, and stderr must be set")
+	}
+	return nil
+}
+
+func (s *server) GetAttach(req *runtimeapi.AttachRequest) (*runtimeapi.AttachResponse, error) {
+	if err := validateAttachRequest(req); err != nil {
+		return nil, err
 	}
 	token, err := s.cache.Insert(req)
 	if err != nil {
@@ -193,25 +229,19 @@ func (s *server) GetPortForward(req *runtimeapi.PortForwardRequest) (*runtimeapi
 
 func (s *server) Start(stayUp bool) error {
 	if !stayUp {
-		// TODO(timstclair): Implement this.
+		// TODO(tallclair): Implement this.
 		return errors.New("stayUp=false is not yet implemented")
 	}
 
-	server := &http.Server{
-		Addr:      s.config.Addr,
-		Handler:   s.handler,
-		TLSConfig: s.config.TLSConfig,
-	}
 	if s.config.TLSConfig != nil {
-		return server.ListenAndServeTLS("", "") // Use certs from TLSConfig.
+		return s.server.ListenAndServeTLS("", "") // Use certs from TLSConfig.
 	} else {
-		return server.ListenAndServe()
+		return s.server.ListenAndServe()
 	}
 }
 
 func (s *server) Stop() error {
-	// TODO(timstclair): Implement this.
-	return errors.New("not yet implemented")
+	return s.server.Close()
 }
 
 func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -239,8 +269,8 @@ func (s *server) serveExec(req *restful.Request, resp *restful.Response) {
 
 	streamOpts := &remotecommandserver.Options{
 		Stdin:  exec.Stdin,
-		Stdout: true,
-		Stderr: !exec.Tty,
+		Stdout: exec.Stdout,
+		Stderr: exec.Stderr,
 		TTY:    exec.Tty,
 	}
 
@@ -273,8 +303,8 @@ func (s *server) serveAttach(req *restful.Request, resp *restful.Response) {
 
 	streamOpts := &remotecommandserver.Options{
 		Stdin:  attach.Stdin,
-		Stdout: true,
-		Stderr: !attach.Tty,
+		Stdout: attach.Stdout,
+		Stderr: attach.Stderr,
 		TTY:    attach.Tty,
 	}
 	remotecommandserver.ServeAttach(
@@ -332,11 +362,11 @@ var _ remotecommandserver.Attacher = &criAdapter{}
 var _ portforward.PortForwarder = &criAdapter{}
 
 func (a *criAdapter) ExecInContainer(podName string, podUID types.UID, container string, cmd []string, in io.Reader, out, err io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize, timeout time.Duration) error {
-	return a.Exec(container, cmd, in, out, err, tty, resize)
+	return a.Runtime.Exec(container, cmd, in, out, err, tty, resize)
 }
 
 func (a *criAdapter) AttachContainer(podName string, podUID types.UID, container string, in io.Reader, out, err io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize) error {
-	return a.Attach(container, in, out, err, tty, resize)
+	return a.Runtime.Attach(container, in, out, err, tty, resize)
 }
 
 func (a *criAdapter) PortForward(podName string, podUID types.UID, port int32, stream io.ReadWriteCloser) error {

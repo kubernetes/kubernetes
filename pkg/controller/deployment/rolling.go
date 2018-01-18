@@ -21,10 +21,10 @@ import (
 	"sort"
 
 	"github.com/golang/glog"
+	"k8s.io/api/core/v1"
+	extensions "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/integer"
-	"k8s.io/kubernetes/pkg/api/v1"
-	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/controller"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 )
@@ -55,6 +55,12 @@ func (dc *DeploymentController) rolloutRolling(d *extensions.Deployment, rsList 
 	if scaledDown {
 		// Update DeploymentStatus
 		return dc.syncRolloutStatus(allRSs, newRS, d)
+	}
+
+	if deploymentutil.DeploymentComplete(d, &d.Status) {
+		if err := dc.cleanupDeployment(oldRSs, d); err != nil {
+			return err
+		}
 	}
 
 	// Sync deployment status

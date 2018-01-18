@@ -22,7 +22,8 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api/v1"
+	"github.com/stretchr/testify/assert"
+	"k8s.io/api/core/v1"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 )
 
@@ -222,4 +223,90 @@ func matchRule(chain *fakeChain, match string) bool {
 		}
 	}
 	return false
+}
+
+func TestHostportChainName(t *testing.T) {
+	m := make(map[string]int)
+	chain := hostportChainName(&PortMapping{HostPort: 57119, Protocol: "TCP", ContainerPort: 57119}, "testrdma-2")
+	m[string(chain)] = 1
+	chain = hostportChainName(&PortMapping{HostPort: 55429, Protocol: "TCP", ContainerPort: 55429}, "testrdma-2")
+	m[string(chain)] = 1
+	chain = hostportChainName(&PortMapping{HostPort: 56833, Protocol: "TCP", ContainerPort: 56833}, "testrdma-2")
+	m[string(chain)] = 1
+	if len(m) != 3 {
+		t.Fatal(m)
+	}
+}
+
+func TestHostPortSyncerRemoveLegacyRules(t *testing.T) {
+	iptables := NewFakeIPTables()
+	legacyRules := [][]string{
+		{"-A", "KUBE-HOSTPORTS", "-m comment --comment \"pod3_ns1 hostport 8443\" -m tcp -p tcp --dport 8443 -j KUBE-HP-5N7UH5JAXCVP5UJR"},
+		{"-A", "KUBE-HOSTPORTS", "-m comment --comment \"pod1_ns1 hostport 8081\" -m udp -p udp --dport 8081 -j KUBE-HP-7THKRFSEH4GIIXK7"},
+		{"-A", "KUBE-HOSTPORTS", "-m comment --comment \"pod1_ns1 hostport 8080\" -m tcp -p tcp --dport 8080 -j KUBE-HP-4YVONL46AKYWSKS3"},
+		{"-A", "OUTPUT", "-m comment --comment \"kube hostport portals\" -m addrtype --dst-type LOCAL -j KUBE-HOSTPORTS"},
+		{"-A", "PREROUTING", "-m comment --comment \"kube hostport portals\" -m addrtype --dst-type LOCAL -j KUBE-HOSTPORTS"},
+		{"-A", "POSTROUTING", "-m comment --comment \"SNAT for localhost access to hostports\" -o cbr0 -s 127.0.0.0/8 -j MASQUERADE"},
+		{"-A", "KUBE-HP-4YVONL46AKYWSKS3", "-m comment --comment \"pod1_ns1 hostport 8080\" -s 10.1.1.2/32 -j KUBE-MARK-MASQ"},
+		{"-A", "KUBE-HP-4YVONL46AKYWSKS3", "-m comment --comment \"pod1_ns1 hostport 8080\" -m tcp -p tcp -j DNAT --to-destination 10.1.1.2:80"},
+		{"-A", "KUBE-HP-7THKRFSEH4GIIXK7", "-m comment --comment \"pod1_ns1 hostport 8081\" -s 10.1.1.2/32 -j KUBE-MARK-MASQ"},
+		{"-A", "KUBE-HP-7THKRFSEH4GIIXK7", "-m comment --comment \"pod1_ns1 hostport 8081\" -m udp -p udp -j DNAT --to-destination 10.1.1.2:81"},
+		{"-A", "KUBE-HP-5N7UH5JAXCVP5UJR", "-m comment --comment \"pod3_ns1 hostport 8443\" -s 10.1.1.4/32 -j KUBE-MARK-MASQ"},
+		{"-A", "KUBE-HP-5N7UH5JAXCVP5UJR", "-m comment --comment \"pod3_ns1 hostport 8443\" -m tcp -p tcp -j DNAT --to-destination 10.1.1.4:443"},
+	}
+	for _, rule := range legacyRules {
+		_, err := iptables.EnsureChain(utiliptables.TableNAT, utiliptables.Chain(rule[1]))
+		assert.NoError(t, err)
+		_, err = iptables.ensureRule(utiliptables.RulePosition(rule[0]), utiliptables.TableNAT, utiliptables.Chain(rule[1]), rule[2])
+		assert.NoError(t, err)
+	}
+	portOpener := NewFakeSocketManager()
+	h := &hostportSyncer{
+		hostPortMap: make(map[hostport]closeable),
+		iptables:    iptables,
+		portOpener:  portOpener.openFakeSocket,
+	}
+	// check preserve pod3's rules and remove pod1's rules
+	pod3PortMapping := &PodPortMapping{
+		Name:        "pod3",
+		Namespace:   "ns1",
+		IP:          net.ParseIP("10.1.1.4"),
+		HostNetwork: false,
+		PortMappings: []*PortMapping{
+			{
+				HostPort:      8443,
+				ContainerPort: 443,
+				Protocol:      v1.ProtocolTCP,
+			},
+		},
+	}
+	h.SyncHostports("cbr0", []*PodPortMapping{pod3PortMapping})
+
+	newChainName := string(hostportChainName(pod3PortMapping.PortMappings[0], getPodFullName(pod3PortMapping)))
+	expectRules := [][]string{
+		{"KUBE-HOSTPORTS", "-m comment --comment \"pod3_ns1 hostport 8443\" -m tcp -p tcp --dport 8443 -j " + newChainName},
+		{newChainName, "-m comment --comment \"pod3_ns1 hostport 8443\" -s 10.1.1.4/32 -j KUBE-MARK-MASQ"},
+		{newChainName, "-m comment --comment \"pod3_ns1 hostport 8443\" -m tcp -p tcp -j DNAT --to-destination 10.1.1.4:443"},
+	}
+
+	natTable, ok := iptables.tables[string(utiliptables.TableNAT)]
+	assert.True(t, ok)
+	// check pod1's rules in KUBE-HOSTPORTS chain should be cleaned up
+	hostportChain, ok := natTable.chains["KUBE-HOSTPORTS"]
+	assert.True(t, ok, string(hostportChain.name))
+	assert.Equal(t, 1, len(hostportChain.rules), "%v", hostportChain.rules)
+
+	// check pod3's rules left
+	assert.Equal(t, expectRules[0][1], hostportChain.rules[0])
+	chain, ok := natTable.chains[newChainName]
+	assert.True(t, ok)
+	assert.Equal(t, 2, len(chain.rules))
+	assert.Equal(t, expectRules[1][1], chain.rules[0])
+	assert.Equal(t, expectRules[2][1], chain.rules[1])
+
+	// check legacy KUBE-HP-* chains should be deleted
+	for _, name := range []string{"KUBE-HP-4YVONL46AKYWSKS3", "KUBE-HP-7THKRFSEH4GIIXK7", "KUBE-HP-5N7UH5JAXCVP5UJR"} {
+		_, ok := natTable.chains[name]
+		assert.False(t, ok)
+	}
 }

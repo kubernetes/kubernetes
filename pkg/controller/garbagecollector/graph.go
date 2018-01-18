@@ -34,8 +34,8 @@ func (s objectReference) String() string {
 	return fmt.Sprintf("[%s/%s, namespace: %s, name: %s, uid: %s]", s.APIVersion, s.Kind, s.Namespace, s.Name, s.UID)
 }
 
-// The single-threaded GraphBuilder.processEvent() is the sole writer of the
-// nodes. The multi-threaded GarbageCollector.processItem() reads the nodes.
+// The single-threaded GraphBuilder.processGraphChanges() is the sole writer of the
+// nodes. The multi-threaded GarbageCollector.attemptToDeleteItem() reads the nodes.
 // WARNING: node has different locks on different fields. setters and getters
 // use the respective locks, so the return values of the getters can be
 // inconsistent.
@@ -46,13 +46,16 @@ type node struct {
 	// dependents are the nodes that have node.identity as a
 	// metadata.ownerReference.
 	dependents map[*node]struct{}
-	// this is set by processEvent() if the object has non-nil DeletionTimestamp
+	// this is set by processGraphChanges() if the object has non-nil DeletionTimestamp
 	// and has the FinalizerDeleteDependents.
 	deletingDependents     bool
 	deletingDependentsLock sync.RWMutex
 	// this records if the object's deletionTimestamp is non-nil.
 	beingDeleted     bool
 	beingDeletedLock sync.RWMutex
+	// this records if the object was constructed virtually and never observed via informer event
+	virtual     bool
+	virtualLock sync.RWMutex
 	// when processing an Update event, we need to compare the updated
 	// ownerReferences with the owners recorded in the graph.
 	owners []metav1.OwnerReference
@@ -70,6 +73,17 @@ func (n *node) isBeingDeleted() bool {
 	n.beingDeletedLock.RLock()
 	defer n.beingDeletedLock.RUnlock()
 	return n.beingDeleted
+}
+
+func (n *node) markObserved() {
+	n.virtualLock.Lock()
+	defer n.virtualLock.Unlock()
+	n.virtual = false
+}
+func (n *node) isObserved() bool {
+	n.virtualLock.RLock()
+	defer n.virtualLock.RUnlock()
+	return n.virtual == false
 }
 
 func (n *node) markDeletingDependents() {
@@ -132,6 +146,14 @@ func (n *node) blockingDependents() []*node {
 		}
 	}
 	return ret
+}
+
+// String renders node as a string using fmt. Acquires a read lock to ensure the
+// reflective dump of dependents doesn't race with any concurrent writes.
+func (n *node) String() string {
+	n.dependentsLock.RLock()
+	defer n.dependentsLock.RUnlock()
+	return fmt.Sprintf("%#v", n)
 }
 
 type concurrentUIDToNode struct {

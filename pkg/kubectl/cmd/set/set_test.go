@@ -23,13 +23,14 @@ import (
 	"github.com/spf13/cobra"
 
 	clientcmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"os"
 )
 
 func TestLocalAndDryRunFlags(t *testing.T) {
 	out := &bytes.Buffer{}
 	errout := &bytes.Buffer{}
 	f := clientcmdutil.NewFactory(nil)
-	setCmd := NewCmdSet(f, out, errout)
+	setCmd := NewCmdSet(f, os.Stdin, out, errout)
 	ensureLocalAndDryRunFlagsOnChildren(t, setCmd, "")
 }
 

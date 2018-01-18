@@ -25,8 +25,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apiserver/pkg/admission"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage/names"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 )
 
 // RESTCreateStrategy defines the minimum validation, accepted input, and
@@ -44,6 +47,11 @@ type RESTCreateStrategy interface {
 	// the object.  For example: remove fields that are not to be persisted,
 	// sort order-insensitive list fields, etc.  This should not remove fields
 	// whose presence would be considered a validation error.
+	//
+	// Often implemented as a type check and an initailization or clearing of
+	// status. Clear the status because status changes are internal. External
+	// callers of an api (users) should not be setting an initial status on
+	// newly created objects.
 	PrepareForCreate(ctx genericapirequest.Context, obj runtime.Object)
 	// Validate returns an ErrorList with validation errors or nil.  Validate
 	// is invoked after default fields in the object have been filled in
@@ -54,7 +62,8 @@ type RESTCreateStrategy interface {
 	// ensures that code that operates on these objects can rely on the common
 	// form for things like comparison.  Canonicalize is invoked after
 	// validation has succeeded but before the object has been persisted.
-	// This method may mutate the object.
+	// This method may mutate the object. Often implemented as a type check or
+	// empty method.
 	Canonicalize(obj runtime.Object)
 }
 
@@ -80,6 +89,11 @@ func BeforeCreate(strategy RESTCreateStrategy, ctx genericapirequest.Context, ob
 	FillObjectMetaSystemFields(ctx, objectMeta)
 	if len(objectMeta.GetGenerateName()) > 0 && len(objectMeta.GetName()) == 0 {
 		objectMeta.SetName(strategy.GenerateName(objectMeta.GetGenerateName()))
+	}
+
+	// Ensure Initializers are not set unless the feature is enabled
+	if !utilfeature.DefaultFeatureGate.Enabled(features.Initializers) {
+		objectMeta.SetInitializers(nil)
 	}
 
 	// ClusterName is ignored and should not be saved
@@ -137,4 +151,29 @@ func objectMetaAndKind(typer runtime.ObjectTyper, obj runtime.Object) (metav1.Ob
 type NamespaceScopedStrategy interface {
 	// NamespaceScoped returns if the object must be in a namespace.
 	NamespaceScoped() bool
+}
+
+// AdmissionToValidateObjectFunc converts validating admission to a rest validate object func
+func AdmissionToValidateObjectFunc(admit admission.Interface, staticAttributes admission.Attributes) ValidateObjectFunc {
+	validatingAdmission, ok := admit.(admission.ValidationInterface)
+	if !ok {
+		return func(obj runtime.Object) error { return nil }
+	}
+	return func(obj runtime.Object) error {
+		finalAttributes := admission.NewAttributesRecord(
+			obj,
+			staticAttributes.GetOldObject(),
+			staticAttributes.GetKind(),
+			staticAttributes.GetNamespace(),
+			staticAttributes.GetName(),
+			staticAttributes.GetResource(),
+			staticAttributes.GetSubresource(),
+			staticAttributes.GetOperation(),
+			staticAttributes.GetUserInfo(),
+		)
+		if !validatingAdmission.Handles(finalAttributes.GetOperation()) {
+			return nil
+		}
+		return validatingAdmission.Validate(finalAttributes)
+	}
 }

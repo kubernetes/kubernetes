@@ -22,15 +22,15 @@ import (
 	"path"
 
 	"github.com/golang/glog"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/mount"
 	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
+	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
 )
 
 // This is the primary entrypoint for volume plugins.
@@ -88,11 +88,11 @@ func (plugin *photonPersistentDiskPlugin) SupportsBulkVolumeVerification() bool 
 }
 
 func (plugin *photonPersistentDiskPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ volume.VolumeOptions) (volume.Mounter, error) {
-	return plugin.newMounterInternal(spec, pod.UID, &PhotonDiskUtil{}, plugin.host.GetMounter())
+	return plugin.newMounterInternal(spec, pod.UID, &PhotonDiskUtil{}, plugin.host.GetMounter(plugin.GetPluginName()))
 }
 
 func (plugin *photonPersistentDiskPlugin) NewUnmounter(volName string, podUID types.UID) (volume.Unmounter, error) {
-	return plugin.newUnmounterInternal(volName, podUID, &PhotonDiskUtil{}, plugin.host.GetMounter())
+	return plugin.newUnmounterInternal(volName, podUID, &PhotonDiskUtil{}, plugin.host.GetMounter(plugin.GetPluginName()))
 }
 
 func (plugin *photonPersistentDiskPlugin) newMounterInternal(spec *volume.Spec, podUID types.UID, manager pdManager, mounter mount.Interface) (volume.Mounter, error) {
@@ -115,7 +115,7 @@ func (plugin *photonPersistentDiskPlugin) newMounterInternal(spec *volume.Spec, 
 			plugin:  plugin,
 		},
 		fsType:      fsType,
-		diskMounter: &mount.SafeFormatAndMount{Interface: mounter, Runner: exec.New()}}, nil
+		diskMounter: volumehelper.NewSafeFormatAndMountFromHost(plugin.GetPluginName(), plugin.host)}, nil
 }
 
 func (plugin *photonPersistentDiskPlugin) newUnmounterInternal(volName string, podUID types.UID, manager pdManager, mounter mount.Interface) (volume.Unmounter, error) {
@@ -130,7 +130,7 @@ func (plugin *photonPersistentDiskPlugin) newUnmounterInternal(volName string, p
 }
 
 func (plugin *photonPersistentDiskPlugin) ConstructVolumeSpec(volumeSpecName, mountPath string) (*volume.Spec, error) {
-	mounter := plugin.host.GetMounter()
+	mounter := plugin.host.GetMounter(plugin.GetPluginName())
 	pluginDir := plugin.host.GetPluginDir(plugin.GetPluginName())
 	pdID, err := mounter.GetDeviceNameFromMount(mountPath, pluginDir)
 	if err != nil {
@@ -194,12 +194,12 @@ func (b *photonPersistentDiskMounter) CanMount() error {
 }
 
 // SetUp attaches the disk and bind mounts to the volume path.
-func (b *photonPersistentDiskMounter) SetUp(fsGroup *types.UnixGroupID) error {
+func (b *photonPersistentDiskMounter) SetUp(fsGroup *int64) error {
 	return b.SetUpAt(b.GetPath(), fsGroup)
 }
 
 // SetUp attaches the disk and bind mounts to the volume path.
-func (b *photonPersistentDiskMounter) SetUpAt(dir string, fsGroup *types.UnixGroupID) error {
+func (b *photonPersistentDiskMounter) SetUpAt(dir string, fsGroup *int64) error {
 	glog.V(4).Infof("Photon Persistent Disk setup %s to %s", b.pdID, dir)
 
 	// TODO: handle failed mounts here.
@@ -342,6 +342,10 @@ func (plugin *photonPersistentDiskPlugin) newProvisionerInternal(options volume.
 }
 
 func (p *photonPersistentDiskProvisioner) Provision() (*v1.PersistentVolume, error) {
+	if !volume.AccessModesContainedInAll(p.plugin.GetAccessModes(), p.options.PVC.Spec.AccessModes) {
+		return nil, fmt.Errorf("invalid AccessModes %v: only AccessModes %v are supported", p.options.PVC.Spec.AccessModes, p.plugin.GetAccessModes())
+	}
+
 	pdID, sizeGB, fstype, err := p.manager.CreateVolume(p)
 	if err != nil {
 		return nil, err
@@ -356,7 +360,7 @@ func (p *photonPersistentDiskProvisioner) Provision() (*v1.PersistentVolume, err
 			Name:   p.options.PVName,
 			Labels: map[string]string{},
 			Annotations: map[string]string{
-				"kubernetes.io/createdby": "photon-volume-dynamic-provisioner",
+				volumehelper.VolumeDynamicallyCreatedByKey: "photon-volume-dynamic-provisioner",
 			},
 		},
 		Spec: v1.PersistentVolumeSpec{
@@ -371,6 +375,7 @@ func (p *photonPersistentDiskProvisioner) Provision() (*v1.PersistentVolume, err
 					FSType: fstype,
 				},
 			},
+			MountOptions: p.options.MountOptions,
 		},
 	}
 	if len(p.options.PVC.Spec.AccessModes) == 0 {

@@ -6,26 +6,33 @@ import (
 )
 
 // ListOptsBuilder allows extensions to add additional parameters to the
-// List request.
+// ListDetail request.
 type ListOptsBuilder interface {
 	ToImageListQuery() (string, error)
 }
 
-// ListOpts contain options for limiting the number of Images returned from a call to ListDetail.
+// ListOpts contain options filtering Images returned from a call to ListDetail.
 type ListOpts struct {
-	// When the image last changed status (in date-time format).
+	// ChangesSince filters Images based on the last changed status (in date-time
+	// format).
 	ChangesSince string `q:"changes-since"`
-	// The number of Images to return.
+
+	// Limit limits the number of Images to return.
 	Limit int `q:"limit"`
-	// UUID of the Image at which to set a marker.
+
+	// Mark is an Image UUID at which to set a marker.
 	Marker string `q:"marker"`
-	// The name of the Image.
+
+	// Name is the name of the Image.
 	Name string `q:"name"`
-	// The name of the Server (in URL format).
+
+	// Server is the name of the Server (in URL format).
 	Server string `q:"server"`
-	// The current status of the Image.
+
+	// Status is the current status of the Image.
 	Status string `q:"status"`
-	// The value of the type of image (e.g. BASE, SERVER, ALL)
+
+	// Type is the type of image (e.g. BASE, SERVER, ALL).
 	Type string `q:"type"`
 }
 
@@ -50,8 +57,7 @@ func ListDetail(client *gophercloud.ServiceClient, opts ListOptsBuilder) paginat
 	})
 }
 
-// Get acquires additional detail about a specific image by ID.
-// Use ExtractImage() to interpret the result as an openstack Image.
+// Get returns data about a specific image by its ID.
 func Get(client *gophercloud.ServiceClient, id string) (r GetResult) {
 	_, r.Err = client.Get(getURL(client, id), &r.Body, nil)
 	return
@@ -63,7 +69,8 @@ func Delete(client *gophercloud.ServiceClient, id string) (r DeleteResult) {
 	return
 }
 
-// IDFromName is a convienience function that returns an image's ID given its name.
+// IDFromName is a convienience function that returns an image's ID given its
+// name.
 func IDFromName(client *gophercloud.ServiceClient, name string) (string, error) {
 	count := 0
 	id := ""

@@ -18,9 +18,13 @@ package azure
 
 import (
 	"fmt"
-	"strconv"
 
 	azs "github.com/Azure/azure-sdk-for-go/storage"
+	"github.com/golang/glog"
+)
+
+const (
+	useHTTPS = true
 )
 
 // create file share
@@ -34,11 +38,15 @@ func (az *Cloud) createFileShare(accountName, accountKey, name string, sizeGB in
 	// setting x-ms-share-quota can set quota on the new share, but in reality, setting quota in CreateShare
 	// receives error "The metadata specified is invalid. It has characters that are not permitted."
 	// As a result,breaking into two API calls: create share and set quota
-	if err = fileClient.CreateShare(name, nil); err != nil {
+	share := fileClient.GetShareReference(name)
+	if err = share.Create(nil); err != nil {
 		return fmt.Errorf("failed to create file share, err: %v", err)
 	}
-	if err = fileClient.SetShareProperties(name, azs.ShareHeaders{Quota: strconv.Itoa(sizeGB)}); err != nil {
-		az.deleteFileShare(accountName, accountKey, name)
+	share.Properties.Quota = sizeGB
+	if err = share.SetProperties(nil); err != nil {
+		if err := share.Delete(nil); err != nil {
+			glog.Errorf("Error deleting share: %v", err)
+		}
 		return fmt.Errorf("failed to set quota on file share %s, err: %v", name, err)
 	}
 	return nil
@@ -48,9 +56,10 @@ func (az *Cloud) createFileShare(accountName, accountKey, name string, sizeGB in
 func (az *Cloud) deleteFileShare(accountName, accountKey, name string) error {
 	fileClient, err := az.getFileSvcClient(accountName, accountKey)
 	if err == nil {
-		return fileClient.DeleteShare(name)
+		share := fileClient.GetShareReference(name)
+		return share.Delete(nil)
 	}
-	return err
+	return nil
 }
 
 func (az *Cloud) getFileSvcClient(accountName, accountKey string) (*azs.FileServiceClient, error) {

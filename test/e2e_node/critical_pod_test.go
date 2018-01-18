@@ -19,11 +19,12 @@ package e2e_node
 import (
 	"fmt"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	kubeapi "k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
+	kubeapi "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
 	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -42,8 +43,8 @@ var _ = framework.KubeDescribe("CriticalPod [Serial] [Disruptive]", func() {
 	f := framework.NewDefaultFramework("critical-pod-test")
 
 	Context("when we need to admit a critical pod", func() {
-		tempSetCurrentKubeletConfig(f, func(initialConfig *componentconfig.KubeletConfiguration) {
-			initialConfig.FeatureGates += ", ExperimentalCriticalPodAnnotation=true"
+		tempSetCurrentKubeletConfig(f, func(initialConfig *kubeletconfig.KubeletConfiguration) {
+			initialConfig.FeatureGates[string(features.ExperimentalCriticalPodAnnotation)] = true
 		})
 
 		It("should be able to create and delete a critical pod", func() {
@@ -56,18 +57,18 @@ var _ = framework.KubeDescribe("CriticalPod [Serial] [Disruptive]", func() {
 			// Define test pods
 			nonCriticalGuaranteed := getTestPod(false, guaranteedPodName, v1.ResourceRequirements{
 				Requests: v1.ResourceList{
-					"cpu":    resource.MustParse("100m"),
-					"memory": resource.MustParse("100Mi"),
+					v1.ResourceCPU:    resource.MustParse("100m"),
+					v1.ResourceMemory: resource.MustParse("100Mi"),
 				},
 				Limits: v1.ResourceList{
-					"cpu":    resource.MustParse("100m"),
-					"memory": resource.MustParse("100Mi"),
+					v1.ResourceCPU:    resource.MustParse("100m"),
+					v1.ResourceMemory: resource.MustParse("100Mi"),
 				},
 			})
 			nonCriticalBurstable := getTestPod(false, burstablePodName, v1.ResourceRequirements{
 				Requests: v1.ResourceList{
-					"cpu":    resource.MustParse("100m"),
-					"memory": resource.MustParse("100Mi"),
+					v1.ResourceCPU:    resource.MustParse("100m"),
+					v1.ResourceMemory: resource.MustParse("100Mi"),
 				},
 			})
 			nonCriticalBestEffort := getTestPod(false, bestEffortPodName, v1.ResourceRequirements{})
@@ -82,7 +83,7 @@ var _ = framework.KubeDescribe("CriticalPod [Serial] [Disruptive]", func() {
 			f.PodClientNS(kubeapi.NamespaceSystem).CreateSyncInNamespace(criticalPod, kubeapi.NamespaceSystem)
 
 			// Check that non-critical pods other than the besteffort have been evicted
-			updatedPodList, err := f.ClientSet.Core().Pods(f.Namespace.Name).List(metav1.ListOptions{})
+			updatedPodList, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).List(metav1.ListOptions{})
 			framework.ExpectNoError(err)
 			for _, p := range updatedPodList.Items {
 				if p.Name == nonCriticalBestEffort.Name {
@@ -107,7 +108,7 @@ var _ = framework.KubeDescribe("CriticalPod [Serial] [Disruptive]", func() {
 })
 
 func getNodeCPUAndMemoryCapacity(f *framework.Framework) v1.ResourceList {
-	nodeList, err := f.ClientSet.Core().Nodes().List(metav1.ListOptions{})
+	nodeList, err := f.ClientSet.CoreV1().Nodes().List(metav1.ListOptions{})
 	framework.ExpectNoError(err)
 	// Assuming that there is only one node, because this is a node e2e test.
 	Expect(len(nodeList.Items)).To(Equal(1))

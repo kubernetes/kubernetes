@@ -1,4 +1,4 @@
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: l7-default-backend
@@ -24,7 +24,7 @@ spec:
         # Any image is permissible as long as:
         # 1. It serves a 404 page at /
         # 2. It serves 200 on a /healthz endpoint
-        image: gcr.io/google_containers/defaultbackend:1.3
+        image: gcr.io/google_containers/defaultbackend:1.4
         livenessProbe:
           httpGet:
             path: /healthz

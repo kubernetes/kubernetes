@@ -26,19 +26,20 @@ import (
 
 	"golang.org/x/net/websocket"
 
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/kubernetes/pkg/api/v1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/kubelet"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 var (
@@ -127,7 +128,12 @@ var _ = framework.KubeDescribe("Pods", func() {
 		podClient = f.PodClient()
 	})
 
-	It("should get a host IP [Conformance]", func() {
+	/*
+		    Testname: pods-created-pod-assigned-hostip
+		    Description: Make sure when a pod is created that it is assigned a host IP
+			Address.
+	*/
+	framework.ConformanceIt("should get a host IP ", func() {
 		name := "pod-hostip-" + string(uuid.NewUUID())
 		testHostIP(podClient, &v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
@@ -144,7 +150,12 @@ var _ = framework.KubeDescribe("Pods", func() {
 		})
 	})
 
-	It("should be submitted and removed [Conformance]", func() {
+	/*
+		    Testname: pods-submitted-removed
+		    Description: Makes sure a pod is created, a watch can be setup for the pod,
+			pod creation was observed, pod is deleted, and pod deletion is observed.
+	*/
+	framework.ConformanceIt("should be submitted and removed ", func() {
 		By("creating the pod")
 		name := "pod-submit-remove-" + string(uuid.NewUUID())
 		value := strconv.Itoa(time.Now().Nanosecond())
@@ -160,7 +171,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 				Containers: []v1.Container{
 					{
 						Name:  "nginx",
-						Image: "gcr.io/google_containers/nginx-slim:0.7",
+						Image: imageutils.GetE2EImage(imageutils.NginxSlim),
 					},
 				},
 			},
@@ -196,7 +207,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 				framework.Failf("Failed to observe pod creation: %v", event)
 			}
 		case <-time.After(framework.PodStartTimeout):
-			Fail("Timeout while waiting for pod creation")
+			framework.Failf("Timeout while waiting for pod creation")
 		}
 
 		// We need to wait for the pod to be running, otherwise the deletion
@@ -245,14 +256,14 @@ var _ = framework.KubeDescribe("Pods", func() {
 					deleted = true
 				case watch.Error:
 					framework.Logf("received a watch error: %v", event.Object)
-					Fail("watch closed with error")
+					framework.Failf("watch closed with error")
 				}
 			case <-timer:
-				Fail("timed out waiting for pod deletion")
+				framework.Failf("timed out waiting for pod deletion")
 			}
 		}
 		if !deleted {
-			Fail("Failed to observe pod deletion")
+			framework.Failf("Failed to observe pod deletion")
 		}
 
 		Expect(lastPod.DeletionTimestamp).ToNot(BeNil())
@@ -265,7 +276,11 @@ var _ = framework.KubeDescribe("Pods", func() {
 		Expect(len(pods.Items)).To(Equal(0))
 	})
 
-	It("should be updated [Conformance]", func() {
+	/*
+	   Testname: pods-updated-successfully
+	   Description: Make sure it is possible to successfully update a pod's labels.
+	*/
+	framework.ConformanceIt("should be updated ", func() {
 		By("creating the pod")
 		name := "pod-update-" + string(uuid.NewUUID())
 		value := strconv.Itoa(time.Now().Nanosecond())
@@ -281,7 +296,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 				Containers: []v1.Container{
 					{
 						Name:  "nginx",
-						Image: "gcr.io/google_containers/nginx-slim:0.7",
+						Image: imageutils.GetE2EImage(imageutils.NginxSlim),
 					},
 				},
 			},
@@ -314,7 +329,13 @@ var _ = framework.KubeDescribe("Pods", func() {
 		framework.Logf("Pod update OK")
 	})
 
-	It("should allow activeDeadlineSeconds to be updated [Conformance]", func() {
+	/*
+		    Testname: pods-update-active-deadline-seconds
+		    Description: Make sure it is possible to create a pod, update its
+			activeDeadlineSecondsValue, and then waits for the deadline to pass
+			and verifies the pod is terminated.
+	*/
+	framework.ConformanceIt("should allow activeDeadlineSeconds to be updated ", func() {
 		By("creating the pod")
 		name := "pod-update-activedeadlineseconds-" + string(uuid.NewUUID())
 		value := strconv.Itoa(time.Now().Nanosecond())
@@ -330,7 +351,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 				Containers: []v1.Container{
 					{
 						Name:  "nginx",
-						Image: "gcr.io/google_containers/nginx-slim:0.7",
+						Image: imageutils.GetE2EImage(imageutils.NginxSlim),
 					},
 				},
 			},
@@ -355,7 +376,12 @@ var _ = framework.KubeDescribe("Pods", func() {
 		framework.ExpectNoError(f.WaitForPodTerminated(pod.Name, "DeadlineExceeded"))
 	})
 
-	It("should contain environment variables for services [Conformance]", func() {
+	/*
+		    Testname: pods-contain-services-environment-variables
+		    Description: Make sure that when a pod is created it contains environment
+			variables for each active service.
+	*/
+	framework.ConformanceIt("should contain environment variables for services ", func() {
 		// Make a pod that will be a service.
 		// This pod serves its hostname via HTTP.
 		serverName := "server-envvars-" + string(uuid.NewUUID())
@@ -401,7 +427,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 				},
 			},
 		}
-		_, err := f.ClientSet.Core().Services(f.Namespace.Name).Create(svc)
+		_, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(svc)
 		Expect(err).NotTo(HaveOccurred(), "failed to create service")
 
 		// Make a client pod that verifies that it has the service environment variables.
@@ -416,7 +442,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 				Containers: []v1.Container{
 					{
 						Name:    containerName,
-						Image:   "gcr.io/google_containers/busybox:1.24",
+						Image:   busyboxImage,
 						Command: []string{"sh", "-c", "env"},
 					},
 				},
@@ -455,7 +481,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 				Containers: []v1.Container{
 					{
 						Name:    "main",
-						Image:   "gcr.io/google_containers/busybox:1.24",
+						Image:   busyboxImage,
 						Command: []string{"/bin/sh", "-c", "echo container is alive; sleep 600"},
 					},
 				},
@@ -465,7 +491,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 		By("submitting the pod to kubernetes")
 		pod = podClient.CreateSync(pod)
 
-		req := f.ClientSet.Core().RESTClient().Get().
+		req := f.ClientSet.CoreV1().RESTClient().Get().
 			Namespace(f.Namespace.Name).
 			Resource("pods").
 			Name(pod.Name).
@@ -525,7 +551,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 				Containers: []v1.Container{
 					{
 						Name:    "main",
-						Image:   "gcr.io/google_containers/busybox:1.24",
+						Image:   busyboxImage,
 						Command: []string{"/bin/sh", "-c", "echo container is alive; sleep 10000"},
 					},
 				},
@@ -535,7 +561,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 		By("submitting the pod to kubernetes")
 		podClient.CreateSync(pod)
 
-		req := f.ClientSet.Core().RESTClient().Get().
+		req := f.ClientSet.CoreV1().RESTClient().Get().
 			Namespace(f.Namespace.Name).
 			Resource("pods").
 			Name(pod.Name).
@@ -580,7 +606,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 				Containers: []v1.Container{
 					{
 						Name:    containerName,
-						Image:   "gcr.io/google_containers/busybox:1.24",
+						Image:   busyboxImage,
 						Command: []string{"/bin/sh", "-c", "sleep 5", "/crash/missing"},
 					},
 				},
@@ -591,7 +617,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 
 		By("updating the image")
 		podClient.Update(podName, func(pod *v1.Pod) {
-			pod.Spec.Containers[0].Image = "gcr.io/google_containers/nginx-slim:0.7"
+			pod.Spec.Containers[0].Image = imageutils.GetE2EImage(imageutils.NginxSlim)
 		})
 
 		time.Sleep(syncLoopFrequency)
@@ -621,7 +647,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 				Containers: []v1.Container{
 					{
 						Name:    containerName,
-						Image:   "gcr.io/google_containers/busybox:1.24",
+						Image:   busyboxImage,
 						Command: []string{"/bin/sh", "-c", "sleep 5", "/crash/missing"},
 					},
 				},

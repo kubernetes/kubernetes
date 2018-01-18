@@ -20,7 +20,7 @@ import (
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
 // ReplicationControllerListerExpansion allows custom methods to be added to
@@ -30,7 +30,7 @@ type ReplicationControllerListerExpansion interface {
 }
 
 // ReplicationControllerNamespaceListerExpansion allows custom methods to be added to
-// ReplicationControllerNamespaeLister.
+// ReplicationControllerNamespaceLister.
 type ReplicationControllerNamespaceListerExpansion interface{}
 
 // GetPodControllers returns a list of ReplicationControllers that potentially match a pod.

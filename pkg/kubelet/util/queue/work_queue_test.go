@@ -21,8 +21,8 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/client-go/util/clock"
 )
 
 func newTestBasicWorkQueue() (*basicWorkQueue, *clock.FakeClock) {

@@ -1,91 +1,56 @@
 /*
  *
- * Copyright 2014, Google Inc.
- * All rights reserved.
+ * Copyright 2014 gRPC authors.
  *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are
- * met:
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- *     * Redistributions of source code must retain the above copyright
- * notice, this list of conditions and the following disclaimer.
- *     * Redistributions in binary form must reproduce the above
- * copyright notice, this list of conditions and the following disclaimer
- * in the documentation and/or other materials provided with the
- * distribution.
- *     * Neither the name of Google Inc. nor the names of its
- * contributors may be used to endorse or promote products derived from
- * this software without specific prior written permission.
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
- * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
- * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
- * OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
- * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
- * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
- * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
- * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
  */
 
 // Package metadata define the structure of the metadata supported by gRPC library.
+// Please refer to https://grpc.io/docs/guides/wire.html for more information about custom-metadata.
 package metadata
 
 import (
-	"encoding/base64"
 	"fmt"
 	"strings"
 
 	"golang.org/x/net/context"
 )
 
-const (
-	binHdrSuffix = "-bin"
-)
-
-// encodeKeyValue encodes key and value qualified for transmission via gRPC.
-// Transmitting binary headers violates HTTP/2 spec.
-// TODO(zhaoq): Maybe check if k is ASCII also.
-func encodeKeyValue(k, v string) (string, string) {
-	k = strings.ToLower(k)
-	if strings.HasSuffix(k, binHdrSuffix) {
-		val := base64.StdEncoding.EncodeToString([]byte(v))
-		v = string(val)
-	}
-	return k, v
-}
-
-// DecodeKeyValue returns the original key and value corresponding to the
-// encoded data in k, v.
-// If k is a binary header and v contains comma, v is split on comma before decoded,
-// and the decoded v will be joined with comma before returned.
+// DecodeKeyValue returns k, v, nil.  It is deprecated and should not be used.
 func DecodeKeyValue(k, v string) (string, string, error) {
-	if !strings.HasSuffix(k, binHdrSuffix) {
-		return k, v, nil
-	}
-	vvs := strings.Split(v, ",")
-	for i, vv := range vvs {
-		val, err := base64.StdEncoding.DecodeString(vv)
-		if err != nil {
-			return "", "", err
-		}
-		vvs[i] = string(val)
-	}
-	return k, strings.Join(vvs, ","), nil
+	return k, v, nil
 }
 
 // MD is a mapping from metadata keys to values. Users should use the following
 // two convenience functions New and Pairs to generate MD.
 type MD map[string][]string
 
-// New creates a MD from given key-value map.
+// New creates an MD from a given key-value map.
+//
+// Only the following ASCII characters are allowed in keys:
+//  - digits: 0-9
+//  - uppercase letters: A-Z (normalized to lower)
+//  - lowercase letters: a-z
+//  - special characters: -_.
+// Uppercase letters are automatically converted to lowercase.
+//
+// Keys beginning with "grpc-" are reserved for grpc-internal use only and may
+// result in errors if set in metadata.
 func New(m map[string]string) MD {
 	md := MD{}
-	for k, v := range m {
-		key, val := encodeKeyValue(k, v)
+	for k, val := range m {
+		key := strings.ToLower(k)
 		md[key] = append(md[key], val)
 	}
 	return md
@@ -93,19 +58,28 @@ func New(m map[string]string) MD {
 
 // Pairs returns an MD formed by the mapping of key, value ...
 // Pairs panics if len(kv) is odd.
+//
+// Only the following ASCII characters are allowed in keys:
+//  - digits: 0-9
+//  - uppercase letters: A-Z (normalized to lower)
+//  - lowercase letters: a-z
+//  - special characters: -_.
+// Uppercase letters are automatically converted to lowercase.
+//
+// Keys beginning with "grpc-" are reserved for grpc-internal use only and may
+// result in errors if set in metadata.
 func Pairs(kv ...string) MD {
 	if len(kv)%2 == 1 {
 		panic(fmt.Sprintf("metadata: Pairs got the odd number of input pairs for metadata: %d", len(kv)))
 	}
 	md := MD{}
-	var k string
+	var key string
 	for i, s := range kv {
 		if i%2 == 0 {
-			k = s
+			key = strings.ToLower(s)
 			continue
 		}
-		key, val := encodeKeyValue(k, s)
-		md[key] = append(md[key], val)
+		md[key] = append(md[key], s)
 	}
 	return md
 }
@@ -120,9 +94,9 @@ func (md MD) Copy() MD {
 	return Join(md)
 }
 
-// Join joins any number of MDs into a single MD.
+// Join joins any number of mds into a single MD.
 // The order of values for each key is determined by the order in which
-// the MDs containing those values are presented to Join.
+// the mds containing those values are presented to Join.
 func Join(mds ...MD) MD {
 	out := MD{}
 	for _, md := range mds {
@@ -133,15 +107,31 @@ func Join(mds ...MD) MD {
 	return out
 }
 
-type mdKey struct{}
+type mdIncomingKey struct{}
+type mdOutgoingKey struct{}
 
-// NewContext creates a new context with md attached.
-func NewContext(ctx context.Context, md MD) context.Context {
-	return context.WithValue(ctx, mdKey{}, md)
+// NewIncomingContext creates a new context with incoming md attached.
+func NewIncomingContext(ctx context.Context, md MD) context.Context {
+	return context.WithValue(ctx, mdIncomingKey{}, md)
 }
 
-// FromContext returns the MD in ctx if it exists.
-func FromContext(ctx context.Context) (md MD, ok bool) {
-	md, ok = ctx.Value(mdKey{}).(MD)
+// NewOutgoingContext creates a new context with outgoing md attached.
+func NewOutgoingContext(ctx context.Context, md MD) context.Context {
+	return context.WithValue(ctx, mdOutgoingKey{}, md)
+}
+
+// FromIncomingContext returns the incoming metadata in ctx if it exists.  The
+// returned MD should not be modified. Writing to it may cause races.
+// Modification should be made to copies of the returned MD.
+func FromIncomingContext(ctx context.Context) (md MD, ok bool) {
+	md, ok = ctx.Value(mdIncomingKey{}).(MD)
+	return
+}
+
+// FromOutgoingContext returns the outgoing metadata in ctx if it exists.  The
+// returned MD should not be modified. Writing to it may cause races.
+// Modification should be made to the copies of the returned MD.
+func FromOutgoingContext(ctx context.Context) (md MD, ok bool) {
+	md, ok = ctx.Value(mdOutgoingKey{}).(MD)
 	return
 }

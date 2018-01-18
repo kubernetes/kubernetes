@@ -91,7 +91,7 @@ func TestNew(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		_, err := tt.config.New()
+		_, _, err := tt.config.New()
 		if tt.wantErr && (err == nil) {
 			t.Errorf("New %s", tt.msg)
 		} else if !tt.wantErr && (err != nil) {

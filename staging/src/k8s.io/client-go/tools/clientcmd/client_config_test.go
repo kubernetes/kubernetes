@@ -504,3 +504,25 @@ func matchByteArg(expected, got []byte, t *testing.T) {
 		t.Errorf("Expected %v, got %v", expected, got)
 	}
 }
+
+func TestNamespaceOverride(t *testing.T) {
+	config := &DirectClientConfig{
+		overrides: &ConfigOverrides{
+			Context: clientcmdapi.Context{
+				Namespace: "foo",
+			},
+		},
+	}
+
+	ns, overridden, err := config.Namespace()
+
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+
+	if !overridden {
+		t.Errorf("Expected overridden = true")
+	}
+
+	matchStringArg("foo", ns, t)
+}

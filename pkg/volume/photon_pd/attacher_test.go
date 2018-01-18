@@ -20,7 +20,7 @@ import (
 	"errors"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/photon"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
@@ -78,14 +78,14 @@ func TestAttachDetach(t *testing.T) {
 	nodeName := types.NodeName("instance")
 	readOnly := false
 	spec := createVolSpec(diskName, readOnly)
-	attachError := errors.New("Fake attach error")
 	detachError := errors.New("Fake detach error")
 	diskCheckError := errors.New("Fake DiskIsAttached error")
 	tests := []testcase{
 		// Successful Attach call
 		{
-			name:   "Attach_Positive",
-			attach: attachCall{diskName, nodeName, nil},
+			name:           "Attach_Positive",
+			diskIsAttached: diskIsAttachedCall{diskName, nodeName, false, diskCheckError},
+			attach:         attachCall{diskName, nodeName, nil},
 			test: func(testcase *testcase) (string, error) {
 				attacher := newAttacher(testcase)
 				return attacher.Attach(spec, nodeName)
@@ -93,15 +93,16 @@ func TestAttachDetach(t *testing.T) {
 			expectedDevice: "/dev/disk/by-id/wwn-0x000000000",
 		},
 
-		// Attach call fails
+		// Disk is already attached
 		{
-			name:   "Attach_Negative",
-			attach: attachCall{diskName, nodeName, attachError},
+			name:           "Attach_Positive_AlreadyAttached",
+			diskIsAttached: diskIsAttachedCall{diskName, nodeName, false, diskCheckError},
+			attach:         attachCall{diskName, nodeName, nil},
 			test: func(testcase *testcase) (string, error) {
 				attacher := newAttacher(testcase)
 				return attacher.Attach(spec, nodeName)
 			},
-			expectedError: attachError,
+			expectedDevice: "/dev/disk/by-id/wwn-0x000000000",
 		},
 
 		// Detach succeeds

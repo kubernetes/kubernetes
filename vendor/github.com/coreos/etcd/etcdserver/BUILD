@@ -1,11 +1,4 @@
-package(default_visibility = ["//visibility:public"])
-
-licenses(["notice"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
@@ -13,6 +6,7 @@ go_library(
         "apply.go",
         "apply_auth.go",
         "apply_v2.go",
+        "backend.go",
         "cluster_util.go",
         "config.go",
         "consistent_index.go",
@@ -28,7 +22,8 @@ go_library(
         "v2_server.go",
         "v3_server.go",
     ],
-    tags = ["automanaged"],
+    importpath = "github.com/coreos/etcd/etcdserver",
+    visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/coreos/etcd/alarm:go_default_library",
         "//vendor/github.com/coreos/etcd/auth:go_default_library",
@@ -46,7 +41,6 @@ go_library(
         "//vendor/github.com/coreos/etcd/mvcc/mvccpb:go_default_library",
         "//vendor/github.com/coreos/etcd/pkg/contention:go_default_library",
         "//vendor/github.com/coreos/etcd/pkg/fileutil:go_default_library",
-        "//vendor/github.com/coreos/etcd/pkg/httputil:go_default_library",
         "//vendor/github.com/coreos/etcd/pkg/idutil:go_default_library",
         "//vendor/github.com/coreos/etcd/pkg/netutil:go_default_library",
         "//vendor/github.com/coreos/etcd/pkg/pbutil:go_default_library",
@@ -89,4 +83,5 @@ filegroup(
         "//vendor/github.com/coreos/etcd/etcdserver/stats:all-srcs",
     ],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

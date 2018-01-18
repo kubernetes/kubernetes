@@ -25,16 +25,17 @@ import (
 
 	"github.com/ghodss/yaml"
 
+	"k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/api"
-	_ "k8s.io/kubernetes/pkg/api/install"
-	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	api "k8s.io/kubernetes/pkg/apis/core"
+	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	_ "k8s.io/kubernetes/pkg/apis/rbac/install"
-	rbacv1beta1 "k8s.io/kubernetes/pkg/apis/rbac/v1beta1"
 	rbacregistryvalidation "k8s.io/kubernetes/pkg/registry/rbac/validation"
 	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac/bootstrappolicy"
 )
@@ -52,11 +53,11 @@ func getSemanticRoles(roles []rbac.ClusterRole) semanticRoles {
 	for i := range roles {
 		role := roles[i]
 		switch role.Name {
-		case "admin":
+		case "system:aggregate-to-admin":
 			ret.admin = &role
-		case "edit":
+		case "system:aggregate-to-edit":
 			ret.edit = &role
-		case "view":
+		case "system:aggregate-to-view":
 			ret.view = &role
 		}
 	}
@@ -280,11 +281,11 @@ func testObjects(t *testing.T, list *api.List, fixtureFilename string) {
 		t.Fatal(err)
 	}
 
-	if err := runtime.EncodeList(api.Codecs.LegacyCodec(v1.SchemeGroupVersion, rbacv1beta1.SchemeGroupVersion), list.Items); err != nil {
+	if err := runtime.EncodeList(legacyscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion, rbacv1.SchemeGroupVersion), list.Items); err != nil {
 		t.Fatal(err)
 	}
 
-	jsonData, err := runtime.Encode(api.Codecs.LegacyCodec(v1.SchemeGroupVersion, rbacv1beta1.SchemeGroupVersion), list)
+	jsonData, err := runtime.Encode(legacyscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion, rbacv1.SchemeGroupVersion), list)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -318,8 +319,9 @@ func TestClusterRoleLabel(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		if got, want := accessor.GetLabels(), map[string]string{"kubernetes.io/bootstrapping": "rbac-defaults"}; !reflect.DeepEqual(got, want) {
-			t.Errorf("ClusterRole: %s GetLabels() = %s, want %s", accessor.GetName(), got, want)
+
+		if accessor.GetLabels()["kubernetes.io/bootstrapping"] != "rbac-defaults" {
+			t.Errorf("ClusterRole: %s GetLabels() = %s, want %s", accessor.GetName(), accessor.GetLabels(), map[string]string{"kubernetes.io/bootstrapping": "rbac-defaults"})
 		}
 	}
 

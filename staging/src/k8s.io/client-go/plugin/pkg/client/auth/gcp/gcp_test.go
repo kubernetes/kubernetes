@@ -18,6 +18,7 @@ package gcp
 
 import (
 	"fmt"
+	"net/http"
 	"os"
 	"os/exec"
 	"reflect"
@@ -322,4 +323,66 @@ func TestCachedTokenSource(t *testing.T) {
 	if got := persister.read(); !reflect.DeepEqual(got, cache) {
 		t.Errorf("got cache %v, want %v", got, cache)
 	}
+}
+
+type MockTransport struct {
+	res *http.Response
+}
+
+func (t *MockTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	return t.res, nil
+}
+
+func TestClearingCredentials(t *testing.T) {
+
+	fakeExpiry := time.Now().Add(time.Hour)
+
+	cache := map[string]string{
+		"access-token": "fakeToken",
+		"expiry":       fakeExpiry.String(),
+	}
+
+	cts := cachedTokenSource{
+		source:      nil,
+		accessToken: cache["access-token"],
+		expiry:      fakeExpiry,
+		persister:   nil,
+		cache:       nil,
+	}
+
+	tests := []struct {
+		name  string
+		res   http.Response
+		cache map[string]string
+	}{
+		{
+			"Unauthorized",
+			http.Response{StatusCode: 401},
+			make(map[string]string),
+		},
+		{
+			"Authorized",
+			http.Response{StatusCode: 200},
+			cache,
+		},
+	}
+
+	persister := &fakePersister{}
+	req := http.Request{Header: http.Header{}}
+
+	for _, tc := range tests {
+		authProvider := gcpAuthProvider{&cts, persister}
+
+		fakeTransport := MockTransport{&tc.res}
+
+		transport := (authProvider.WrapTransport(&fakeTransport))
+		persister.Persist(cache)
+
+		transport.RoundTrip(&req)
+
+		if got := persister.read(); !reflect.DeepEqual(got, tc.cache) {
+			t.Errorf("got cache %v, want %v", got, tc.cache)
+		}
+	}
+
 }

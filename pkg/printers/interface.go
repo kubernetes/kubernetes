@@ -31,6 +31,8 @@ type ResourcePrinter interface {
 	//Can be used to print out warning/clarifications if needed
 	//after all objects were printed
 	AfterPrint(io.Writer, string) error
+	// Identify if it is a generic printer
+	IsGeneric() bool
 }
 
 // ResourcePrinterFunc is a function that can print objects
@@ -50,7 +52,15 @@ func (fn ResourcePrinterFunc) AfterPrint(io.Writer, string) error {
 	return nil
 }
 
+func (fn ResourcePrinterFunc) IsGeneric() bool {
+	return true
+}
+
 type PrintOptions struct {
+	// supported Format types can be found in pkg/printers/printers.go
+	OutputFormatType     string
+	OutputFormatArgument string
+
 	NoHeaders          bool
 	WithNamespace      bool
 	WithKind           bool
@@ -60,6 +70,11 @@ type PrintOptions struct {
 	AbsoluteTimestamps bool
 	Kind               string
 	ColumnLabels       []string
+
+	SortBy string
+
+	// indicates if it is OK to ignore missing keys for rendering an output template.
+	AllowMissingKeys bool
 }
 
 // Describer generates output for the named resource or an error

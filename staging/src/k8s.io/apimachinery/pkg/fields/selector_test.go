@@ -325,3 +325,73 @@ func TestRequiresExactMatch(t *testing.T) {
 		}
 	}
 }
+
+func TestTransform(t *testing.T) {
+	testCases := []struct {
+		name      string
+		selector  string
+		transform func(field, value string) (string, string, error)
+		result    string
+		isEmpty   bool
+	}{
+		{
+			name:      "empty selector",
+			selector:  "",
+			transform: func(field, value string) (string, string, error) { return field, value, nil },
+			result:    "",
+			isEmpty:   true,
+		},
+		{
+			name:      "no-op transform",
+			selector:  "a=b,c=d",
+			transform: func(field, value string) (string, string, error) { return field, value, nil },
+			result:    "a=b,c=d",
+			isEmpty:   false,
+		},
+		{
+			name:     "transform one field",
+			selector: "a=b,c=d",
+			transform: func(field, value string) (string, string, error) {
+				if field == "a" {
+					return "e", "f", nil
+				}
+				return field, value, nil
+			},
+			result:  "e=f,c=d",
+			isEmpty: false,
+		},
+		{
+			name:      "remove field to make empty",
+			selector:  "a=b",
+			transform: func(field, value string) (string, string, error) { return "", "", nil },
+			result:    "",
+			isEmpty:   true,
+		},
+		{
+			name:     "remove only one field",
+			selector: "a=b,c=d,e=f",
+			transform: func(field, value string) (string, string, error) {
+				if field == "c" {
+					return "", "", nil
+				}
+				return field, value, nil
+			},
+			result:  "a=b,e=f",
+			isEmpty: false,
+		},
+	}
+
+	for i, tc := range testCases {
+		result, err := ParseAndTransformSelector(tc.selector, tc.transform)
+		if err != nil {
+			t.Errorf("[%d] unexpected error during Transform: %v", i, err)
+		}
+		if result.Empty() != tc.isEmpty {
+			t.Errorf("[%d] expected empty: %t, got: %t", i, tc.isEmpty, result.Empty())
+		}
+		if result.String() != tc.result {
+			t.Errorf("[%d] unexpected result: %s", i, result.String())
+		}
+	}
+
+}

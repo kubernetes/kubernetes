@@ -22,53 +22,50 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
+	"k8s.io/api/core/v1"
 )
 
 func Test(t *testing.T) {
 	tests := []struct {
-		input    string
+		input    map[string]string
 		expected *map[v1.ResourceName]int64
 	}{
 		{
-			input:    "memory",
+			input:    map[string]string{"memory": ""},
 			expected: nil,
 		},
 		{
-			input:    "memory=a",
+			input:    map[string]string{"memory": "a"},
 			expected: nil,
 		},
 		{
-			input:    "memory=a%",
+			input:    map[string]string{"memory": "a%"},
 			expected: nil,
 		},
 		{
-			input:    "memory=200%",
+			input:    map[string]string{"memory": "200%"},
 			expected: nil,
 		},
 		{
-			input: "memory=0%",
+			input: map[string]string{"memory": "0%"},
 			expected: &map[v1.ResourceName]int64{
 				v1.ResourceMemory: 0,
 			},
 		},
 		{
-			input: "memory=100%",
+			input: map[string]string{"memory": "100%"},
 			expected: &map[v1.ResourceName]int64{
 				v1.ResourceMemory: 100,
 			},
 		},
 		{
 			// need to change this when CPU is added as a supported resource
-			input:    "memory=100%,cpu=50%",
+			input:    map[string]string{"memory": "100%", "cpu": "50%"},
 			expected: nil,
 		},
 	}
 	for _, test := range tests {
-		m := componentconfig.ConfigurationMap{}
-		m.Set(test.input)
-		actual, err := ParseQOSReserved(m)
+		actual, err := ParseQOSReserved(test.input)
 		if actual != nil && test.expected == nil {
 			t.Errorf("Unexpected success, input: %v, expected: %v, actual: %v, err: %v", test.input, test.expected, actual, err)
 		}

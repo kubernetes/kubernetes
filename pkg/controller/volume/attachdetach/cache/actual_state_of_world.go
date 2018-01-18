@@ -28,8 +28,8 @@ import (
 
 	"github.com/golang/glog"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
 	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
@@ -68,7 +68,7 @@ type ActualStateOfWorld interface {
 	// returned.
 	// If no node with the name nodeName exists in list of attached nodes for
 	// the specified volume, an error is returned.
-	SetVolumeMountedByNode(volumeName v1.UniqueVolumeName, nodeName types.NodeName, mounted bool, forceUnmount bool) error
+	SetVolumeMountedByNode(volumeName v1.UniqueVolumeName, nodeName types.NodeName, mounted bool) error
 
 	// SetNodeStatusUpdateNeeded sets statusUpdateNeeded for the specified
 	// node to true indicating the AttachedVolume field in the Node's Status
@@ -110,6 +110,9 @@ type ActualStateOfWorld interface {
 	GetAttachedVolumesForNode(nodeName types.NodeName) []AttachedVolume
 
 	GetAttachedVolumesPerNode() map[types.NodeName][]operationexecutor.AttachedVolume
+
+	// GetNodesForVolume returns the nodes on which the volume is attached
+	GetNodesForVolume(volumeName v1.UniqueVolumeName) []types.NodeName
 
 	// GetVolumesToReportAttached returns a map containing the set of nodes for
 	// which the VolumesAttached Status field in the Node API object should be
@@ -170,7 +173,7 @@ type actualStateOfWorld struct {
 	sync.RWMutex
 }
 
-// The volume object represents a volume the the attach/detach controller
+// The volume object represents a volume the attach/detach controller
 // believes to be successfully attached to a node it is managing.
 type attachedVolume struct {
 	// volumeName contains the unique identifier for this volume.
@@ -328,7 +331,7 @@ func (asw *actualStateOfWorld) AddVolumeNode(
 }
 
 func (asw *actualStateOfWorld) SetVolumeMountedByNode(
-	volumeName v1.UniqueVolumeName, nodeName types.NodeName, mounted bool, forceUnmount bool) error {
+	volumeName v1.UniqueVolumeName, nodeName types.NodeName, mounted bool) error {
 	asw.Lock()
 	defer asw.Unlock()
 
@@ -340,11 +343,6 @@ func (asw *actualStateOfWorld) SetVolumeMountedByNode(
 	if mounted {
 		// Increment set count
 		nodeObj.mountedByNodeSetCount = nodeObj.mountedByNodeSetCount + 1
-	} else {
-		// Do not allow value to be reset unless it has been set at least once
-		if nodeObj.mountedByNodeSetCount == 0 && !forceUnmount {
-			return nil
-		}
 	}
 
 	nodeObj.mountedByNode = mounted
@@ -392,6 +390,13 @@ func (asw *actualStateOfWorld) SetDetachRequestTime(
 
 // Get the volume and node object from actual state of world
 // This is an internal function and caller should acquire and release the lock
+//
+// Note that this returns disconnected objects, so if you change the volume object you must set it back with
+// `asw.attachedVolumes[volumeName]=volumeObj`.
+//
+// If you change the node object you must use `volumeObj.nodesAttachedTo[nodeName] = nodeObj`
+// This is correct, because if volumeObj is empty this function returns an error, and nodesAttachedTo
+// map is a reference type, and thus mutating the copy changes the original map.
 func (asw *actualStateOfWorld) getNodeAndVolume(
 	volumeName v1.UniqueVolumeName, nodeName types.NodeName) (attachedVolume, nodeAttachedTo, error) {
 
@@ -470,7 +475,6 @@ func (asw *actualStateOfWorld) updateNodeStatusUpdateNeeded(nodeName types.NodeN
 		// should not happen
 		errMsg := fmt.Sprintf("Failed to set statusUpdateNeeded to needed %t because nodeName=%q  does not exist",
 			needed, nodeName)
-		glog.Errorf(errMsg)
 		return fmt.Errorf(errMsg)
 	}
 
@@ -484,7 +488,7 @@ func (asw *actualStateOfWorld) SetNodeStatusUpdateNeeded(nodeName types.NodeName
 	asw.Lock()
 	defer asw.Unlock()
 	if err := asw.updateNodeStatusUpdateNeeded(nodeName, true); err != nil {
-		glog.Errorf("Failed to update statusUpdateNeeded field in actual state of world: %v", err)
+		glog.Warningf("Failed to update statusUpdateNeeded field in actual state of world: %v", err)
 	}
 }
 
@@ -569,16 +573,29 @@ func (asw *actualStateOfWorld) GetAttachedVolumesPerNode() map[types.NodeName][]
 	attachedVolumesPerNode := make(map[types.NodeName][]operationexecutor.AttachedVolume)
 	for _, volumeObj := range asw.attachedVolumes {
 		for nodeName, nodeObj := range volumeObj.nodesAttachedTo {
-			volumes, exists := attachedVolumesPerNode[nodeName]
-			if !exists {
-				volumes = []operationexecutor.AttachedVolume{}
-			}
+			volumes := attachedVolumesPerNode[nodeName]
 			volumes = append(volumes, getAttachedVolume(&volumeObj, &nodeObj).AttachedVolume)
 			attachedVolumesPerNode[nodeName] = volumes
 		}
 	}
 
 	return attachedVolumesPerNode
+}
+
+func (asw *actualStateOfWorld) GetNodesForVolume(volumeName v1.UniqueVolumeName) []types.NodeName {
+	asw.RLock()
+	defer asw.RUnlock()
+
+	volumeObj, volumeExists := asw.attachedVolumes[volumeName]
+	if !volumeExists || len(volumeObj.nodesAttachedTo) == 0 {
+		return []types.NodeName{}
+	}
+
+	nodes := []types.NodeName{}
+	for k := range volumeObj.nodesAttachedTo {
+		nodes = append(nodes, k)
+	}
+	return nodes
 }
 
 func (asw *actualStateOfWorld) GetVolumesToReportAttached() map[types.NodeName][]v1.AttachedVolume {

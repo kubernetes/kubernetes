@@ -28,11 +28,11 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 
-	"k8s.io/kubernetes/pkg/api/v1"
-	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
-	appslisters "k8s.io/kubernetes/pkg/client/listers/apps/v1beta1"
-	corelisters "k8s.io/kubernetes/pkg/client/listers/core/v1"
+	"k8s.io/api/core/v1"
+	"k8s.io/client-go/kubernetes/fake"
+	corelisters "k8s.io/client-go/listers/core/v1"
+	_ "k8s.io/kubernetes/pkg/apis/apps/install"
+	_ "k8s.io/kubernetes/pkg/apis/core/install"
 )
 
 func TestStatefulPodControlCreatesPods(t *testing.T) {
@@ -63,7 +63,7 @@ func TestStatefulPodControlCreatesPods(t *testing.T) {
 	}
 	for i := range events {
 		if !strings.Contains(events[i], v1.EventTypeNormal) {
-			t.Errorf("Expected normal events found %s", events[i])
+			t.Errorf("Found unexpected non-normal event %s", events[i])
 		}
 	}
 }
@@ -93,7 +93,7 @@ func TestStatefulPodControlCreatePodExists(t *testing.T) {
 	}
 	events := collectEvents(recorder.Events)
 	if eventCount := len(events); eventCount != 0 {
-		t.Errorf("Expected 0 events when Pod and PVC exist found %d", eventCount)
+		t.Errorf("Pod and PVC exist: got %d events, but want 0", eventCount)
 		for i := range events {
 			t.Log(events[i])
 		}
@@ -120,11 +120,11 @@ func TestStatefulPodControlCreatePodPvcCreateFailure(t *testing.T) {
 	}
 	events := collectEvents(recorder.Events)
 	if eventCount := len(events); eventCount != 2 {
-		t.Errorf("Expected 2 events for PVC create failure found %d", eventCount)
+		t.Errorf("PVC create failure: got %d events, but want 2", eventCount)
 	}
 	for i := range events {
 		if !strings.Contains(events[i], v1.EventTypeWarning) {
-			t.Errorf("Expected normal events found %s", events[i])
+			t.Errorf("Found unexpected non-warning event %s", events[i])
 		}
 	}
 }
@@ -158,11 +158,11 @@ func TestStatefulPodControlCreatePodPvcGetFailure(t *testing.T) {
 	}
 	events := collectEvents(recorder.Events)
 	if eventCount := len(events); eventCount != 2 {
-		t.Errorf("Expected 2 events for PVC create failure found %d", eventCount)
+		t.Errorf("PVC create failure: got %d events, but want 2", eventCount)
 	}
 	for i := range events {
 		if !strings.Contains(events[i], v1.EventTypeWarning) {
-			t.Errorf("Expected normal events found %s", events[i])
+			t.Errorf("Found unexpected non-warning event: %s", events[i])
 		}
 	}
 }
@@ -187,12 +187,12 @@ func TestStatefulPodControlCreatePodFailed(t *testing.T) {
 	}
 	events := collectEvents(recorder.Events)
 	if eventCount := len(events); eventCount != 2 {
-		t.Errorf("Expected 2 events for failed Pod create found %d", eventCount)
+		t.Errorf("Pod create failed: got %d events, but want 2", eventCount)
 	} else if !strings.Contains(events[0], v1.EventTypeNormal) {
-		t.Errorf("Expected normal event found %s", events[0])
+		t.Errorf("Found unexpected non-normal event %s", events[0])
 
 	} else if !strings.Contains(events[1], v1.EventTypeWarning) {
-		t.Errorf("Expected warning event found %s", events[1])
+		t.Errorf("Found unexpected non-warning event %s", events[1])
 
 	}
 }
@@ -212,7 +212,7 @@ func TestStatefulPodControlNoOpUpdate(t *testing.T) {
 	}
 	events := collectEvents(recorder.Events)
 	if eventCount := len(events); eventCount != 0 {
-		t.Errorf("Expected 0 events for no-op update found %d", eventCount)
+		t.Errorf("no-op update: got %d events, but want 0", eventCount)
 	}
 }
 
@@ -234,9 +234,9 @@ func TestStatefulPodControlUpdatesIdentity(t *testing.T) {
 	}
 	events := collectEvents(recorder.Events)
 	if eventCount := len(events); eventCount != 1 {
-		t.Errorf("Expected 1 event for successful Pod update found %d", eventCount)
+		t.Errorf("Pod update successful:got %d events,but want 1", eventCount)
 	} else if !strings.Contains(events[0], v1.EventTypeNormal) {
-		t.Errorf("Expected normal event found %s", events[0])
+		t.Errorf("Found unexpected non-normal event %s", events[0])
 	}
 	if !identityMatches(set, updated) {
 		t.Error("Name update failed identity does not match")
@@ -264,9 +264,9 @@ func TestStatefulPodControlUpdateIdentityFailure(t *testing.T) {
 	}
 	events := collectEvents(recorder.Events)
 	if eventCount := len(events); eventCount != 1 {
-		t.Errorf("Expected 1 event for failed Pod update found %d", eventCount)
+		t.Errorf("Pod update failed: got %d events, but want 1", eventCount)
 	} else if !strings.Contains(events[0], v1.EventTypeWarning) {
-		t.Errorf("Expected warning event found %s", events[0])
+		t.Errorf("Found unexpected non-warning event %s", events[0])
 	}
 	if identityMatches(set, pod) {
 		t.Error("Failed update mutated Pod identity")
@@ -282,7 +282,7 @@ func TestStatefulPodControlUpdatesPodStorage(t *testing.T) {
 	pvcLister := corelisters.NewPersistentVolumeClaimLister(pvcIndexer)
 	control := NewRealStatefulPodControl(fakeClient, nil, nil, pvcLister, recorder)
 	pvcs := getPersistentVolumeClaims(set, pod)
-	volumes := make([]v1.Volume, len(pod.Spec.Volumes))
+	volumes := make([]v1.Volume, 0, len(pod.Spec.Volumes))
 	for i := range pod.Spec.Volumes {
 		if _, contains := pvcs[pod.Spec.Volumes[i].Name]; !contains {
 			volumes = append(volumes, pod.Spec.Volumes[i])
@@ -308,11 +308,11 @@ func TestStatefulPodControlUpdatesPodStorage(t *testing.T) {
 	}
 	events := collectEvents(recorder.Events)
 	if eventCount := len(events); eventCount != 2 {
-		t.Errorf("Expected 2 event for successful Pod storage update found %d", eventCount)
+		t.Errorf("Pod storage update successful: got %d events, but want 2", eventCount)
 	}
 	for i := range events {
 		if !strings.Contains(events[i], v1.EventTypeNormal) {
-			t.Errorf("Expected normal event found %s", events[i])
+			t.Errorf("Found unexpected non-normal event %s", events[i])
 		}
 	}
 	if !storageMatches(set, updated) {
@@ -329,7 +329,7 @@ func TestStatefulPodControlUpdatePodStorageFailure(t *testing.T) {
 	pvcLister := corelisters.NewPersistentVolumeClaimLister(pvcIndexer)
 	control := NewRealStatefulPodControl(fakeClient, nil, nil, pvcLister, recorder)
 	pvcs := getPersistentVolumeClaims(set, pod)
-	volumes := make([]v1.Volume, len(pod.Spec.Volumes))
+	volumes := make([]v1.Volume, 0, len(pod.Spec.Volumes))
 	for i := range pod.Spec.Volumes {
 		if _, contains := pvcs[pod.Spec.Volumes[i].Name]; !contains {
 			volumes = append(volumes, pod.Spec.Volumes[i])
@@ -348,11 +348,11 @@ func TestStatefulPodControlUpdatePodStorageFailure(t *testing.T) {
 	}
 	events := collectEvents(recorder.Events)
 	if eventCount := len(events); eventCount != 2 {
-		t.Errorf("Expected 2 event for failed Pod storage update found %d", eventCount)
+		t.Errorf("Pod storage update failed: got %d events, but want 2", eventCount)
 	}
 	for i := range events {
 		if !strings.Contains(events[i], v1.EventTypeWarning) {
-			t.Errorf("Expected normal event found %s", events[i])
+			t.Errorf("Found unexpected non-normal event %s", events[i])
 		}
 	}
 }
@@ -384,40 +384,12 @@ func TestStatefulPodControlUpdatePodConflictSuccess(t *testing.T) {
 	}
 	events := collectEvents(recorder.Events)
 	if eventCount := len(events); eventCount != 1 {
-		t.Errorf("Expected 1 event for successful Pod update found %d", eventCount)
+		t.Errorf("Pod update successful: got %d, but want 1", eventCount)
 	} else if !strings.Contains(events[0], v1.EventTypeNormal) {
-		t.Errorf("Expected normal event found %s", events[0])
+		t.Errorf("Found unexpected non-normal event %s", events[0])
 	}
 	if !identityMatches(set, pod) {
 		t.Error("Name update failed identity does not match")
-	}
-}
-
-func TestStatefulPodControlUpdatePodConflictFailure(t *testing.T) {
-	recorder := record.NewFakeRecorder(10)
-	set := newStatefulSet(3)
-	pod := newStatefulSetPod(set, 0)
-	fakeClient := &fake.Clientset{}
-	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
-	updatedPod := newStatefulSetPod(set, 0)
-	updatedPod.Spec.Hostname = "wrong"
-	indexer.Add(updatedPod)
-	podLister := corelisters.NewPodLister(indexer)
-	control := NewRealStatefulPodControl(fakeClient, nil, podLister, nil, recorder)
-	fakeClient.AddReactor("update", "pods", func(action core.Action) (bool, runtime.Object, error) {
-		update := action.(core.UpdateAction)
-		return true, update.GetObject(), apierrors.NewConflict(action.GetResource().GroupResource(), pod.Name, errors.New("conflict"))
-
-	})
-	pod.Name = "goo-0"
-	if err := control.UpdateStatefulPod(set, pod); err == nil {
-		t.Error("Failed update did not return an error")
-	}
-	events := collectEvents(recorder.Events)
-	if eventCount := len(events); eventCount != 1 {
-		t.Errorf("Expected 1 event for failed Pod update found %d", eventCount)
-	} else if !strings.Contains(events[0], v1.EventTypeWarning) {
-		t.Errorf("Expected normal event found %s", events[0])
 	}
 }
 
@@ -435,9 +407,9 @@ func TestStatefulPodControlDeletesStatefulPod(t *testing.T) {
 	}
 	events := collectEvents(recorder.Events)
 	if eventCount := len(events); eventCount != 1 {
-		t.Errorf("Expected 1 events for successful delete found %d", eventCount)
+		t.Errorf("delete successful: got %d events, but want 1", eventCount)
 	} else if !strings.Contains(events[0], v1.EventTypeNormal) {
-		t.Errorf("Expected normal event found %s", events[0])
+		t.Errorf("Found unexpected non-normal event %s", events[0])
 	}
 }
 
@@ -451,123 +423,13 @@ func TestStatefulPodControlDeleteFailure(t *testing.T) {
 		return true, nil, apierrors.NewInternalError(errors.New("API server down"))
 	})
 	if err := control.DeleteStatefulPod(set, pod); err == nil {
-		t.Error("Fialed to return error on failed delete")
+		t.Error("Failed to return error on failed delete")
 	}
 	events := collectEvents(recorder.Events)
 	if eventCount := len(events); eventCount != 1 {
-		t.Errorf("Expected 1 events for failed delete found %d", eventCount)
+		t.Errorf("delete failed: got %d events, but want 1", eventCount)
 	} else if !strings.Contains(events[0], v1.EventTypeWarning) {
-		t.Errorf("Expected warning event found %s", events[0])
-	}
-}
-
-func TestStatefulPodControlUpdatesSetStatus(t *testing.T) {
-	recorder := record.NewFakeRecorder(10)
-	set := newStatefulSet(3)
-	fakeClient := &fake.Clientset{}
-	control := NewRealStatefulPodControl(fakeClient, nil, nil, nil, recorder)
-	fakeClient.AddReactor("update", "statefulsets", func(action core.Action) (bool, runtime.Object, error) {
-		update := action.(core.UpdateAction)
-		return true, update.GetObject(), nil
-	})
-	if err := control.UpdateStatefulSetStatus(set, 2, 1); err != nil {
-		t.Errorf("Error returned on successful status update: %s", err)
-	}
-	if set.Status.Replicas != 2 {
-		t.Errorf("UpdateStatefulSetStatus mutated the sets replicas %d", set.Status.Replicas)
-	}
-	events := collectEvents(recorder.Events)
-	if eventCount := len(events); eventCount != 0 {
-		t.Errorf("Expected 0 events for successful status update %d", eventCount)
-	}
-}
-
-func TestStatefulPodControlUpdatesObservedGeneration(t *testing.T) {
-	recorder := record.NewFakeRecorder(10)
-	set := newStatefulSet(3)
-	fakeClient := &fake.Clientset{}
-	control := NewRealStatefulPodControl(fakeClient, nil, nil, nil, recorder)
-	fakeClient.AddReactor("update", "statefulsets", func(action core.Action) (bool, runtime.Object, error) {
-		update := action.(core.UpdateAction)
-		sts := update.GetObject().(*apps.StatefulSet)
-		if sts.Status.ObservedGeneration == nil || *sts.Status.ObservedGeneration != int64(3) {
-			t.Errorf("expected observedGeneration to be synced with generation for statefulset %q", sts.Name)
-		}
-		return true, sts, nil
-	})
-	if err := control.UpdateStatefulSetStatus(set, 2, 3); err != nil {
-		t.Errorf("Error returned on successful status update: %s", err)
-	}
-}
-
-func TestStatefulPodControlUpdateReplicasFailure(t *testing.T) {
-	recorder := record.NewFakeRecorder(10)
-	set := newStatefulSet(3)
-	fakeClient := &fake.Clientset{}
-	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
-	indexer.Add(set)
-	setLister := appslisters.NewStatefulSetLister(indexer)
-	control := NewRealStatefulPodControl(fakeClient, setLister, nil, nil, recorder)
-	fakeClient.AddReactor("update", "statefulsets", func(action core.Action) (bool, runtime.Object, error) {
-		return true, nil, apierrors.NewInternalError(errors.New("API server down"))
-	})
-	if err := control.UpdateStatefulSetStatus(set, 2, 1); err == nil {
-		t.Error("Failed update did not return error")
-	}
-	events := collectEvents(recorder.Events)
-	if eventCount := len(events); eventCount != 0 {
-		t.Errorf("Expected 0 events for successful status update %d", eventCount)
-	}
-}
-
-func TestStatefulPodControlUpdateReplicasConflict(t *testing.T) {
-	recorder := record.NewFakeRecorder(10)
-	set := newStatefulSet(3)
-	conflict := false
-	fakeClient := &fake.Clientset{}
-	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
-	indexer.Add(set)
-	setLister := appslisters.NewStatefulSetLister(indexer)
-	control := NewRealStatefulPodControl(fakeClient, setLister, nil, nil, recorder)
-	fakeClient.AddReactor("update", "statefulsets", func(action core.Action) (bool, runtime.Object, error) {
-		update := action.(core.UpdateAction)
-		if !conflict {
-			conflict = true
-			return true, update.GetObject(), apierrors.NewConflict(action.GetResource().GroupResource(), set.Name, errors.New("Object already exists"))
-		} else {
-			return true, update.GetObject(), nil
-		}
-	})
-	if err := control.UpdateStatefulSetStatus(set, 2, 1); err != nil {
-		t.Errorf("UpdateStatefulSetStatus returned an error: %s", err)
-	}
-	if set.Status.Replicas != 2 {
-		t.Errorf("UpdateStatefulSetStatus mutated the sets replicas %d", set.Status.Replicas)
-	}
-	events := collectEvents(recorder.Events)
-	if eventCount := len(events); eventCount != 0 {
-		t.Errorf("Expected 0 events for successful status update %d", eventCount)
-	}
-}
-
-func TestStatefulPodControlUpdateReplicasConflictFailure(t *testing.T) {
-	recorder := record.NewFakeRecorder(10)
-	set := newStatefulSet(3)
-	fakeClient := &fake.Clientset{}
-	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
-	indexer.Add(set)
-	setLister := appslisters.NewStatefulSetLister(indexer)
-	control := NewRealStatefulPodControl(fakeClient, setLister, nil, nil, recorder)
-	fakeClient.AddReactor("update", "statefulsets", func(action core.Action) (bool, runtime.Object, error) {
-		update := action.(core.UpdateAction)
-		return true, update.GetObject(), apierrors.NewConflict(action.GetResource().GroupResource(), set.Name, errors.New("Object already exists"))
-	})
-	if err := control.UpdateStatefulSetStatus(set, 2, 1); err == nil {
-		t.Error("UpdateStatefulSetStatus failed to return an error on get failure")
-	}
-	events := collectEvents(recorder.Events)
-	if eventCount := len(events); eventCount != 0 {
-		t.Errorf("Expected 0 events for successful status update %d", eventCount)
+		t.Errorf("Found unexpected non-warning event %s", events[0])
 	}
 }
 

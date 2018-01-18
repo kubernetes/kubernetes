@@ -26,8 +26,8 @@ import (
 	"k8s.io/apiserver/pkg/storage"
 	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
 	"k8s.io/apiserver/pkg/storage/storagebackend/factory"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/apis/autoscaling"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 )
 
@@ -74,16 +74,14 @@ var validController = api.ReplicationController{
 	Spec:       validControllerSpec,
 }
 
-var validScale = extensions.Scale{
+var validScale = autoscaling.Scale{
 	ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test"},
-	Spec: extensions.ScaleSpec{
+	Spec: autoscaling.ScaleSpec{
 		Replicas: validReplicas,
 	},
-	Status: extensions.ScaleStatus{
+	Status: autoscaling.ScaleStatus{
 		Replicas: 0,
-		Selector: &metav1.LabelSelector{
-			MatchLabels: validPodTemplate.Template.Labels,
-		},
+		Selector: "a=b",
 	},
 }
 
@@ -100,7 +98,7 @@ func TestGet(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	scale := obj.(*extensions.Scale)
+	scale := obj.(*autoscaling.Scale)
 	if scale.Spec.Replicas != validReplicas {
 		t.Errorf("wrong replicas count expected: %d got: %d", validReplicas, scale.Spec.Replicas)
 	}
@@ -116,14 +114,14 @@ func TestUpdate(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	replicas := int32(12)
-	update := extensions.Scale{
+	update := autoscaling.Scale{
 		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test"},
-		Spec: extensions.ScaleSpec{
+		Spec: autoscaling.ScaleSpec{
 			Replicas: replicas,
 		},
 	}
 
-	if _, _, err := storage.Update(ctx, update.Name, rest.DefaultUpdatedObjectInfo(&update, api.Scheme)); err != nil {
+	if _, _, err := storage.Update(ctx, update.Name, rest.DefaultUpdatedObjectInfo(&update), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	obj, err := storage.Get(ctx, "foo", &metav1.GetOptions{})
@@ -131,7 +129,7 @@ func TestUpdate(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	updated := obj.(*extensions.Scale)
+	updated := obj.(*autoscaling.Scale)
 	if updated.Spec.Replicas != replicas {
 		t.Errorf("wrong replicas count expected: %d got: %d", replicas, updated.Spec.Replicas)
 	}

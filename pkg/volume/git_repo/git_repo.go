@@ -22,9 +22,9 @@ import (
 	"path"
 	"strings"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/util/exec"
+	"k8s.io/kubernetes/pkg/util/mount"
 	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
@@ -100,7 +100,8 @@ func (plugin *gitRepoPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, opts vol
 		source:   spec.Volume.GitRepo.Repository,
 		revision: spec.Volume.GitRepo.Revision,
 		target:   spec.Volume.GitRepo.Directory,
-		exec:     exec.New(),
+		mounter:  plugin.host.GetMounter(plugin.GetPluginName()),
+		exec:     plugin.host.GetExec(plugin.GetPluginName()),
 		opts:     opts,
 	}, nil
 }
@@ -149,7 +150,8 @@ type gitRepoVolumeMounter struct {
 	source   string
 	revision string
 	target   string
-	exec     exec.Interface
+	mounter  mount.Interface
+	exec     mount.Exec
 	opts     volume.VolumeOptions
 }
 
@@ -171,12 +173,12 @@ func (b *gitRepoVolumeMounter) CanMount() error {
 }
 
 // SetUp creates new directory and clones a git repo.
-func (b *gitRepoVolumeMounter) SetUp(fsGroup *types.UnixGroupID) error {
+func (b *gitRepoVolumeMounter) SetUp(fsGroup *int64) error {
 	return b.SetUpAt(b.GetPath(), fsGroup)
 }
 
 // SetUpAt creates new directory and clones a git repo.
-func (b *gitRepoVolumeMounter) SetUpAt(dir string, fsGroup *types.UnixGroupID) error {
+func (b *gitRepoVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 	if volumeutil.IsReady(b.getMetaDir()) {
 		return nil
 	}
@@ -195,7 +197,7 @@ func (b *gitRepoVolumeMounter) SetUpAt(dir string, fsGroup *types.UnixGroupID) e
 	if len(b.target) != 0 {
 		args = append(args, b.target)
 	}
-	if output, err := b.execCommand("git", args, dir); err != nil {
+	if output, err := b.execGit(args, dir); err != nil {
 		return fmt.Errorf("failed to exec 'git %s': %s: %v",
 			strings.Join(args, " "), output, err)
 	}
@@ -225,10 +227,10 @@ func (b *gitRepoVolumeMounter) SetUpAt(dir string, fsGroup *types.UnixGroupID) e
 		return fmt.Errorf("unexpected directory contents: %v", files)
 	}
 
-	if output, err := b.execCommand("git", []string{"checkout", b.revision}, subdir); err != nil {
+	if output, err := b.execGit([]string{"checkout", b.revision}, subdir); err != nil {
 		return fmt.Errorf("failed to exec 'git checkout %s': %s: %v", b.revision, output, err)
 	}
-	if output, err := b.execCommand("git", []string{"reset", "--hard"}, subdir); err != nil {
+	if output, err := b.execGit([]string{"reset", "--hard"}, subdir); err != nil {
 		return fmt.Errorf("failed to exec 'git reset --hard': %s: %v", output, err)
 	}
 
@@ -242,10 +244,10 @@ func (b *gitRepoVolumeMounter) getMetaDir() string {
 	return path.Join(b.plugin.host.GetPodPluginDir(b.podUID, utilstrings.EscapeQualifiedNameForDisk(gitRepoPluginName)), b.volName)
 }
 
-func (b *gitRepoVolumeMounter) execCommand(command string, args []string, dir string) ([]byte, error) {
-	cmd := b.exec.Command(command, args...)
-	cmd.SetDir(dir)
-	return cmd.CombinedOutput()
+func (b *gitRepoVolumeMounter) execGit(args []string, dir string) ([]byte, error) {
+	// run git -C <dir> <args>
+	fullArgs := append([]string{"-C", dir}, args...)
+	return b.exec.Run("git", fullArgs...)
 }
 
 // gitRepoVolumeUnmounter cleans git repo volumes.

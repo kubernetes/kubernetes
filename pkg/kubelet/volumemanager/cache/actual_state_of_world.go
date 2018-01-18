@@ -26,8 +26,8 @@ import (
 
 	"github.com/golang/glog"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
@@ -58,7 +58,7 @@ type ActualStateOfWorld interface {
 	// volume, reset the pod's remountRequired value.
 	// If a volume with the name volumeName does not exist in the list of
 	// attached volumes, an error is returned.
-	AddPodToVolume(podName volumetypes.UniquePodName, podUID types.UID, volumeName v1.UniqueVolumeName, mounter volume.Mounter, outerVolumeSpecName string, volumeGidValue string) error
+	AddPodToVolume(podName volumetypes.UniquePodName, podUID types.UID, volumeName v1.UniqueVolumeName, mounter volume.Mounter, blockVolumeMapper volume.BlockVolumeMapper, outerVolumeSpecName string, volumeGidValue string) error
 
 	// MarkRemountRequired marks each volume that is successfully attached and
 	// mounted for the specified pod as requiring remount (if the plugin for the
@@ -254,6 +254,9 @@ type mountedPod struct {
 	// mounter used to mount
 	mounter volume.Mounter
 
+	// mapper used to block volumes support
+	blockVolumeMapper volume.BlockVolumeMapper
+
 	// outerVolumeSpecName is the volume.Spec.Name() of the volume as referenced
 	// directly in the pod. If the volume was referenced through a persistent
 	// volume claim, this contains the volume.Spec.Name() of the persistent
@@ -287,6 +290,7 @@ func (asw *actualStateOfWorld) MarkVolumeAsMounted(
 	podUID types.UID,
 	volumeName v1.UniqueVolumeName,
 	mounter volume.Mounter,
+	blockVolumeMapper volume.BlockVolumeMapper,
 	outerVolumeSpecName string,
 	volumeGidValue string) error {
 	return asw.AddPodToVolume(
@@ -294,6 +298,7 @@ func (asw *actualStateOfWorld) MarkVolumeAsMounted(
 		podUID,
 		volumeName,
 		mounter,
+		blockVolumeMapper,
 		outerVolumeSpecName,
 		volumeGidValue)
 }
@@ -385,6 +390,7 @@ func (asw *actualStateOfWorld) AddPodToVolume(
 	podUID types.UID,
 	volumeName v1.UniqueVolumeName,
 	mounter volume.Mounter,
+	blockVolumeMapper volume.BlockVolumeMapper,
 	outerVolumeSpecName string,
 	volumeGidValue string) error {
 	asw.Lock()
@@ -403,6 +409,7 @@ func (asw *actualStateOfWorld) AddPodToVolume(
 			podName:             podName,
 			podUID:              podUID,
 			mounter:             mounter,
+			blockVolumeMapper:   blockVolumeMapper,
 			outerVolumeSpecName: outerVolumeSpecName,
 			volumeGidValue:      volumeGidValue,
 		}
@@ -682,5 +689,7 @@ func getMountedVolume(
 			PluginName:          attachedVolume.pluginName,
 			PodUID:              mountedPod.podUID,
 			Mounter:             mountedPod.mounter,
-			VolumeGidValue:      mountedPod.volumeGidValue}}
+			BlockVolumeMapper:   mountedPod.blockVolumeMapper,
+			VolumeGidValue:      mountedPod.volumeGidValue,
+			VolumeSpec:          attachedVolume.spec}}
 }

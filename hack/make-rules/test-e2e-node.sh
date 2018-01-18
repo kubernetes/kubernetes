@@ -33,6 +33,7 @@ container_runtime_endpoint=${CONTAINER_RUNTIME_ENDPOINT:-""}
 image_service_endpoint=${IMAGE_SERVICE_ENDPOINT:-""}
 run_until_failure=${RUN_UNTIL_FAILURE:-"false"}
 test_args=${TEST_ARGS:-""}
+system_spec_name=${SYSTEM_SPEC_NAME:-}
 
 # Parse the flags to pass to ginkgo
 ginkgoflags=""
@@ -59,6 +60,16 @@ if [ ! -d "${artifacts}" ]; then
 fi
 echo "Test artifacts will be written to ${artifacts}"
 
+if [[ $runtime == "remote" ]] ; then
+  if [[ ! -z $container_runtime_endpoint ]] ; then
+    test_args="--container-runtime-endpoint=${container_runtime_endpoint} $test_args"
+  fi
+  if [[ ! -z $image_service_endpoint ]] ; then
+    test_args="--image-service-endpoint=$image_service_endpoint $test_args"
+  fi
+fi
+
+
 if [ $remote = true ] ; then
   # The following options are only valid in remote run.
   images=${IMAGES:-""}
@@ -71,10 +82,11 @@ if [ $remote = true ] ; then
     exit 0
   fi
   gubernator=${GUBERNATOR:-"false"}
-  if [[ $hosts == "" && $images == "" ]]; then
-    image_project=${IMAGE_PROJECT:-"google-containers"}
+  image_config_file=${IMAGE_CONFIG_FILE:-""}
+  if [[ $hosts == "" && $images == "" && $image_config_file == "" ]]; then
+    image_project=${IMAGE_PROJECT:-"cos-cloud"}
     gci_image=$(gcloud compute images list --project $image_project \
-    --no-standard-images --regexp="gci-dev.*" --format="table[no-heading](name)")
+    --no-standard-images --filter="name ~ 'cos-beta.*'" --format="table[no-heading](name)")
     images=$gci_image
     metadata="user-data<${KUBE_ROOT}/test/e2e_node/jenkins/gci-init.yaml,gci-update-strategy=update_disabled"
   fi
@@ -126,6 +138,7 @@ if [ $remote = true ] ; then
   echo "Hosts: $hosts"
   echo "Ginkgo Flags: $ginkgoflags"
   echo "Instance Metadata: $metadata"
+  echo "Image Config File: $image_config_file"
   # Invoke the runner
   go run test/e2e_node/runner/remote/run_remote.go  --logtostderr --vmodule=*=4 --ssh-env="gce" \
     --zone="$zone" --project="$project" --gubernator="$gubernator" \
@@ -133,6 +146,7 @@ if [ $remote = true ] ; then
     --results-dir="$artifacts" --ginkgo-flags="$ginkgoflags" \
     --image-project="$image_project" --instance-name-prefix="$instance_prefix" \
     --delete-instances="$delete_instances" --test_args="$test_args" --instance-metadata="$metadata" \
+    --image-config-file="$image_config_file" --system-spec-name="$system_spec_name" \
     2>&1 | tee -i "${artifacts}/build-log.txt"
   exit $?
 
@@ -145,26 +159,16 @@ else
 
   # Do not use any network plugin by default. User could override the flags with
   # test_args.
-  test_args='--kubelet-flags="--network-plugin= --network-plugin-dir=" '$test_args
+  test_args='--kubelet-flags="--network-plugin= --cni-bin-dir=" '$test_args
 
   # Runtime flags
   test_args='--kubelet-flags="--container-runtime='$runtime'" '$test_args
-  if [[ $runtime == "remote" ]] ; then
-      test_args='--kubelet-flags="--experimental-cri=true" '$test_args
-      if [[ ! -z $container_runtime_endpoint ]] ; then
-	      test_args='--kubelet-flags="--container-runtime-endpoint='$container_runtime_endpoint'" '$test_args
-      fi
-      if [[ ! -z $image_service_endpoint ]] ; then
-	      test_args='--kubelet-flags="--image-service-endpoint='$image_service_endpoint'" '$test_args
-      fi
-  fi
 
   # Test using the host the script was run on
   # Provided for backwards compatibility
-  go run test/e2e_node/runner/local/run_local.go --ginkgo-flags="$ginkgoflags" \
+  go run test/e2e_node/runner/local/run_local.go \
+    --system-spec-name="$system_spec_name" --ginkgo-flags="$ginkgoflags" \
     --test-flags="--container-runtime=${runtime} \
-    --container-runtime-endpoint=${container_runtime_endpoint} \
-    --image-service-endpoint=${image_service_endpoint} \
     --alsologtostderr --v 4 --report-dir=${artifacts} --node-name $(hostname) \
     $test_args" --build-dependencies=true 2>&1 | tee -i "${artifacts}/build-log.txt"
   exit $?

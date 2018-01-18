@@ -23,6 +23,7 @@ spec:
       initContainers:
       - name: bootstrap
         image: cockroachdb/cockroach-k8s-init:0.1
+        imagePullPolicy: IfNotPresent
         args:
         - "-on-start=/on-start.sh"
         - "-service=cockroachdb"
@@ -30,19 +31,25 @@ spec:
         - name: POD_NAMESPACE
           valueFrom:
             fieldRef:
-              apiVersion: v1
               fieldPath: metadata.namespace
         volumeMounts:
         - name: datadir
           mountPath: "/cockroach/cockroach-data"
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - cockroachdb
+              topologyKey: kubernetes.io/hostname
       containers:
       - name: cockroachdb
-        # Runs the master branch. Not recommended for production, but since
-        # CockroachDB is in Beta, you don't want to run it in production
-        # anyway. See
-        # https://hub.docker.com/r/cockroachdb/cockroach/tags/
-        # if you prefer to run a beta release.
-        image: cockroachdb/cockroach
+        image: cockroachdb/cockroach:v1.0
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 26257
@@ -72,7 +79,7 @@ spec:
               # We don't join cockroachdb in order to avoid a node attempting
               # to join itself, which currently doesn't work
               # (https://github.com/cockroachdb/cockroach/issues/9625).
-              CRARGS+=("--join" "cockroachdb-public")
+              CRARGS+=("--join" "cockroachdb-0.cockroachdb,cockroachdb-1.cockroachdb,cockroachdb-2.cockroachdb")
             fi
             exec /cockroach/cockroach ${CRARGS[*]}
       # No pre-stop hook is required, a SIGTERM plus some time is all that's
@@ -85,8 +92,6 @@ spec:
   volumeClaimTemplates:
   - metadata:
       name: datadir
-      annotations:
-        volume.alpha.kubernetes.io/storage-class: anything
     spec:
       accessModes:
         - "ReadWriteOnce"

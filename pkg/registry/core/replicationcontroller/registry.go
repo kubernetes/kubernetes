@@ -26,7 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
 // Registry is an interface for things that know how to store ReplicationControllers.
@@ -34,8 +34,8 @@ type Registry interface {
 	ListControllers(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (*api.ReplicationControllerList, error)
 	WatchControllers(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (watch.Interface, error)
 	GetController(ctx genericapirequest.Context, controllerID string, options *metav1.GetOptions) (*api.ReplicationController, error)
-	CreateController(ctx genericapirequest.Context, controller *api.ReplicationController) (*api.ReplicationController, error)
-	UpdateController(ctx genericapirequest.Context, controller *api.ReplicationController) (*api.ReplicationController, error)
+	CreateController(ctx genericapirequest.Context, controller *api.ReplicationController, createValidation rest.ValidateObjectFunc) (*api.ReplicationController, error)
+	UpdateController(ctx genericapirequest.Context, controller *api.ReplicationController, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (*api.ReplicationController, error)
 	DeleteController(ctx genericapirequest.Context, controllerID string) error
 }
 
@@ -73,16 +73,16 @@ func (s *storage) GetController(ctx genericapirequest.Context, controllerID stri
 	return obj.(*api.ReplicationController), nil
 }
 
-func (s *storage) CreateController(ctx genericapirequest.Context, controller *api.ReplicationController) (*api.ReplicationController, error) {
-	obj, err := s.Create(ctx, controller)
+func (s *storage) CreateController(ctx genericapirequest.Context, controller *api.ReplicationController, createValidation rest.ValidateObjectFunc) (*api.ReplicationController, error) {
+	obj, err := s.Create(ctx, controller, createValidation, false)
 	if err != nil {
 		return nil, err
 	}
 	return obj.(*api.ReplicationController), nil
 }
 
-func (s *storage) UpdateController(ctx genericapirequest.Context, controller *api.ReplicationController) (*api.ReplicationController, error) {
-	obj, _, err := s.Update(ctx, controller.Name, rest.DefaultUpdatedObjectInfo(controller, api.Scheme))
+func (s *storage) UpdateController(ctx genericapirequest.Context, controller *api.ReplicationController, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (*api.ReplicationController, error) {
+	obj, _, err := s.Update(ctx, controller.Name, rest.DefaultUpdatedObjectInfo(controller), createValidation, updateValidation)
 	if err != nil {
 		return nil, err
 	}

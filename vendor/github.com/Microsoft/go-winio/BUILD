@@ -1,26 +1,31 @@
-package(default_visibility = ["//visibility:public"])
-
-licenses(["notice"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
     srcs = [
-        "backup.go",
-        "file.go",
-        "fileinfo.go",
-        "pipe.go",
-        "privilege.go",
+        "ea.go",
         "reparse.go",
-        "sd.go",
         "syscall.go",
-        "zsyscall.go",
-    ],
-    tags = ["automanaged"],
+    ] + select({
+        "@io_bazel_rules_go//go/platform:windows": [
+            "backup.go",
+            "file.go",
+            "fileinfo.go",
+            "pipe.go",
+            "privilege.go",
+            "sd.go",
+            "zsyscall_windows.go",
+        ],
+        "//conditions:default": [],
+    }),
+    importpath = "github.com/Microsoft/go-winio",
+    visibility = ["//visibility:public"],
+    deps = select({
+        "@io_bazel_rules_go//go/platform:windows": [
+            "//vendor/golang.org/x/sys/windows:go_default_library",
+        ],
+        "//conditions:default": [],
+    }),
 )
 
 filegroup(
@@ -34,4 +39,5 @@ filegroup(
     name = "all-srcs",
     srcs = [":package-srcs"],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

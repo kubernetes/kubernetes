@@ -21,7 +21,7 @@ import (
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/util/net"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/registry/core/service/allocator"
 
 	"github.com/golang/glog"
@@ -34,6 +34,9 @@ type Interface interface {
 	AllocateNext() (int, error)
 	Release(int) error
 	ForEach(func(int))
+
+	// For testing
+	Has(int) bool
 }
 
 var (

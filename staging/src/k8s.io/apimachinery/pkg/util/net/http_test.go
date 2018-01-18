@@ -20,6 +20,7 @@ package net
 
 import (
 	"crypto/tls"
+	"fmt"
 	"net"
 	"net/http"
 	"net/url"
@@ -108,6 +109,32 @@ func TestGetClientIP(t *testing.T) {
 	}
 }
 
+func TestAppendForwardedForHeader(t *testing.T) {
+	testCases := []struct {
+		addr, forwarded, expected string
+	}{
+		{"1.2.3.4:8000", "", "1.2.3.4"},
+		{"1.2.3.4:8000", "8.8.8.8", "8.8.8.8, 1.2.3.4"},
+		{"1.2.3.4:8000", "8.8.8.8, 1.2.3.4", "8.8.8.8, 1.2.3.4, 1.2.3.4"},
+		{"1.2.3.4:8000", "foo,bar", "foo,bar, 1.2.3.4"},
+	}
+	for i, test := range testCases {
+		req := &http.Request{
+			RemoteAddr: test.addr,
+			Header:     make(http.Header),
+		}
+		if test.forwarded != "" {
+			req.Header.Set("X-Forwarded-For", test.forwarded)
+		}
+
+		AppendForwardedForHeader(req)
+		actual := req.Header.Get("X-Forwarded-For")
+		if actual != test.expected {
+			t.Errorf("[%d] Expected %q, Got %q", i, test.expected, actual)
+		}
+	}
+}
+
 func TestProxierWithNoProxyCIDR(t *testing.T) {
 	testCases := []struct {
 		name    string
@@ -144,6 +171,30 @@ func TestProxierWithNoProxyCIDR(t *testing.T) {
 			noProxy:           "192.168.63.0/24,192.168.143.0/24",
 			url:               "https://192.168.143.1:8443/api",
 			expectedDelegated: false,
+		},
+		{
+			name:              "IPv6 cidr",
+			noProxy:           "2001:db8::/48",
+			url:               "https://[2001:db8::1]/api",
+			expectedDelegated: false,
+		},
+		{
+			name:              "IPv6+port cidr",
+			noProxy:           "2001:db8::/48",
+			url:               "https://[2001:db8::1]:8443/api",
+			expectedDelegated: false,
+		},
+		{
+			name:              "IPv6, not matching cidr",
+			noProxy:           "2001:db8::/48",
+			url:               "https://[2001:db8:1::1]/api",
+			expectedDelegated: true,
+		},
+		{
+			name:              "IPv6+port, not matching cidr",
+			noProxy:           "2001:db8::/48",
+			url:               "https://[2001:db8:1::1]:8443/api",
+			expectedDelegated: true,
 		},
 	}
 
@@ -190,5 +241,42 @@ func TestTLSClientConfigHolder(t *testing.T) {
 
 	if !rt.called {
 		t.Errorf("didn't find tls config")
+	}
+}
+
+func TestJoinPreservingTrailingSlash(t *testing.T) {
+	tests := []struct {
+		a    string
+		b    string
+		want string
+	}{
+		// All empty
+		{"", "", ""},
+
+		// Empty a
+		{"", "/", "/"},
+		{"", "foo", "foo"},
+		{"", "/foo", "/foo"},
+		{"", "/foo/", "/foo/"},
+
+		// Empty b
+		{"/", "", "/"},
+		{"foo", "", "foo"},
+		{"/foo", "", "/foo"},
+		{"/foo/", "", "/foo/"},
+
+		// Both populated
+		{"/", "/", "/"},
+		{"foo", "foo", "foo/foo"},
+		{"/foo", "/foo", "/foo/foo"},
+		{"/foo/", "/foo/", "/foo/foo/"},
+	}
+	for _, tt := range tests {
+		name := fmt.Sprintf("%q+%q=%q", tt.a, tt.b, tt.want)
+		t.Run(name, func(t *testing.T) {
+			if got := JoinPreservingTrailingSlash(tt.a, tt.b); got != tt.want {
+				t.Errorf("JoinPreservingTrailingSlash() = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }

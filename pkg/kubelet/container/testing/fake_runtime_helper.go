@@ -17,8 +17,9 @@ limitations under the License.
 package testing
 
 import (
+	"k8s.io/api/core/v1"
 	kubetypes "k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/api/v1"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
@@ -26,26 +27,30 @@ import (
 type FakeRuntimeHelper struct {
 	DNSServers      []string
 	DNSSearches     []string
+	DNSOptions      []string
 	HostName        string
 	HostDomain      string
 	PodContainerDir string
 	Err             error
 }
 
-func (f *FakeRuntimeHelper) GenerateRunContainerOptions(pod *v1.Pod, container *v1.Container, podIP string) (*kubecontainer.RunContainerOptions, bool, error) {
+func (f *FakeRuntimeHelper) GenerateRunContainerOptions(pod *v1.Pod, container *v1.Container, podIP string) (*kubecontainer.RunContainerOptions, error) {
 	var opts kubecontainer.RunContainerOptions
 	if len(container.TerminationMessagePath) != 0 {
 		opts.PodContainerDir = f.PodContainerDir
 	}
-	return &opts, false, nil
+	return &opts, nil
 }
 
 func (f *FakeRuntimeHelper) GetPodCgroupParent(pod *v1.Pod) string {
 	return ""
 }
 
-func (f *FakeRuntimeHelper) GetClusterDNS(pod *v1.Pod) ([]string, []string, bool, error) {
-	return f.DNSServers, f.DNSSearches, false, f.Err
+func (f *FakeRuntimeHelper) GetPodDNS(pod *v1.Pod) (*runtimeapi.DNSConfig, error) {
+	return &runtimeapi.DNSConfig{
+		Servers:  f.DNSServers,
+		Searches: f.DNSSearches,
+		Options:  f.DNSOptions}, f.Err
 }
 
 // This is not used by docker runtime.

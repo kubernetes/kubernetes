@@ -19,7 +19,7 @@ limitations under the License.
 package node
 
 import (
-	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/api/core/v1"
 )
 
 // GetNodeCondition extracts the provided condition from the given status and returns that.

@@ -34,8 +34,11 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	pkgstorage "k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/validation"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/apis/core/validation"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/client"
 )
 
@@ -47,7 +50,7 @@ type nodeStrategy struct {
 
 // Nodes is the default logic that applies when creating and updating Node
 // objects.
-var Strategy = nodeStrategy{api.Scheme, names.SimpleNameGenerator}
+var Strategy = nodeStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
 
 // NamespaceScoped is false for nodes.
 func (nodeStrategy) NamespaceScoped() bool {
@@ -61,8 +64,12 @@ func (nodeStrategy) AllowCreateOnUpdate() bool {
 
 // PrepareForCreate clears fields that are not allowed to be set by end users on creation.
 func (nodeStrategy) PrepareForCreate(ctx genericapirequest.Context, obj runtime.Object) {
-	_ = obj.(*api.Node)
+	node := obj.(*api.Node)
 	// Nodes allow *all* fields, including status, to be set on create.
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.DynamicKubeletConfig) {
+		node.Spec.ConfigSource = nil
+	}
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
@@ -70,6 +77,11 @@ func (nodeStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old run
 	newNode := obj.(*api.Node)
 	oldNode := old.(*api.Node)
 	newNode.Status = oldNode.Status
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.DynamicKubeletConfig) {
+		newNode.Spec.ConfigSource = nil
+		oldNode.Spec.ConfigSource = nil
+	}
 }
 
 // Validate validates a new node.
@@ -148,12 +160,12 @@ func NodeToSelectableFields(node *api.Node) fields.Set {
 }
 
 // GetAttrs returns labels and fields of a given object for filtering purposes.
-func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
+func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
 	nodeObj, ok := obj.(*api.Node)
 	if !ok {
-		return nil, nil, fmt.Errorf("not a node")
+		return nil, nil, false, fmt.Errorf("not a node")
 	}
-	return labels.Set(nodeObj.ObjectMeta.Labels), NodeToSelectableFields(nodeObj), nil
+	return labels.Set(nodeObj.ObjectMeta.Labels), NodeToSelectableFields(nodeObj), nodeObj.Initializers != nil, nil
 }
 
 // MatchNode returns a generic matcher for a given label and field selector.

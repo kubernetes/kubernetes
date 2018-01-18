@@ -25,7 +25,7 @@ import (
 )
 
 func TestSecretHandlers(t *testing.T) {
-	c := NewPathRecorderMux()
+	c := NewPathRecorderMux("test")
 	c.UnlistedHandleFunc("/secret", func(http.ResponseWriter, *http.Request) {})
 	c.HandleFunc("/nonswagger", func(http.ResponseWriter, *http.Request) {})
 	assert.NotContains(t, c.ListedPaths(), "/secret")
@@ -36,7 +36,7 @@ func TestUnregisterHandlers(t *testing.T) {
 	first := 0
 	second := 0
 
-	c := NewPathRecorderMux()
+	c := NewPathRecorderMux("test")
 	s := httptest.NewServer(c)
 	defer s.Close()
 
@@ -69,7 +69,7 @@ func TestUnregisterHandlers(t *testing.T) {
 }
 
 func TestPrefixHandlers(t *testing.T) {
-	c := NewPathRecorderMux()
+	c := NewPathRecorderMux("test")
 	s := httptest.NewServer(c)
 	defer s.Close()
 

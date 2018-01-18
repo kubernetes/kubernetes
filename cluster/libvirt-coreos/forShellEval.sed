@@ -1,3 +1,0 @@
-s/\"/\\"/g
-s/DNS_SERVER_IP/{DNS_SERVER_IP}/g
-s/DNS_DOMAIN/{DNS_DOMAIN}/g

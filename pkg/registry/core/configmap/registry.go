@@ -22,7 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
 // Registry is an interface for things that know how to store ConfigMaps.
@@ -30,8 +30,8 @@ type Registry interface {
 	ListConfigMaps(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (*api.ConfigMapList, error)
 	WatchConfigMaps(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (watch.Interface, error)
 	GetConfigMap(ctx genericapirequest.Context, name string, options *metav1.GetOptions) (*api.ConfigMap, error)
-	CreateConfigMap(ctx genericapirequest.Context, cfg *api.ConfigMap) (*api.ConfigMap, error)
-	UpdateConfigMap(ctx genericapirequest.Context, cfg *api.ConfigMap) (*api.ConfigMap, error)
+	CreateConfigMap(ctx genericapirequest.Context, cfg *api.ConfigMap, createValidation rest.ValidateObjectFunc) (*api.ConfigMap, error)
+	UpdateConfigMap(ctx genericapirequest.Context, cfg *api.ConfigMap, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (*api.ConfigMap, error)
 	DeleteConfigMap(ctx genericapirequest.Context, name string) error
 }
 
@@ -68,8 +68,8 @@ func (s *storage) GetConfigMap(ctx genericapirequest.Context, name string, optio
 	return obj.(*api.ConfigMap), nil
 }
 
-func (s *storage) CreateConfigMap(ctx genericapirequest.Context, cfg *api.ConfigMap) (*api.ConfigMap, error) {
-	obj, err := s.Create(ctx, cfg)
+func (s *storage) CreateConfigMap(ctx genericapirequest.Context, cfg *api.ConfigMap, createValidation rest.ValidateObjectFunc) (*api.ConfigMap, error) {
+	obj, err := s.Create(ctx, cfg, createValidation, false)
 	if err != nil {
 		return nil, err
 	}
@@ -77,8 +77,8 @@ func (s *storage) CreateConfigMap(ctx genericapirequest.Context, cfg *api.Config
 	return obj.(*api.ConfigMap), nil
 }
 
-func (s *storage) UpdateConfigMap(ctx genericapirequest.Context, cfg *api.ConfigMap) (*api.ConfigMap, error) {
-	obj, _, err := s.Update(ctx, cfg.Name, rest.DefaultUpdatedObjectInfo(cfg, api.Scheme))
+func (s *storage) UpdateConfigMap(ctx genericapirequest.Context, cfg *api.ConfigMap, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (*api.ConfigMap, error) {
+	obj, _, err := s.Update(ctx, cfg.Name, rest.DefaultUpdatedObjectInfo(cfg), createValidation, updateValidation)
 	if err != nil {
 		return nil, err
 	}

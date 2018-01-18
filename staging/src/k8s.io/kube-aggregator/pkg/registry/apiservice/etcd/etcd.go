@@ -35,11 +35,10 @@ type REST struct {
 func NewREST(scheme *runtime.Scheme, optsGetter generic.RESTOptionsGetter) *REST {
 	strategy := apiservice.NewStrategy(scheme)
 	store := &genericregistry.Store{
-		Copier:            scheme,
-		NewFunc:           func() runtime.Object { return &apiregistration.APIService{} },
-		NewListFunc:       func() runtime.Object { return &apiregistration.APIServiceList{} },
-		PredicateFunc:     apiservice.MatchAPIService,
-		QualifiedResource: apiregistration.Resource("apiservices"),
+		NewFunc:                  func() runtime.Object { return &apiregistration.APIService{} },
+		NewListFunc:              func() runtime.Object { return &apiregistration.APIServiceList{} },
+		PredicateFunc:            apiservice.MatchAPIService,
+		DefaultQualifiedResource: apiregistration.Resource("apiservices"),
 
 		CreateStrategy: strategy,
 		UpdateStrategy: strategy,
@@ -73,6 +72,6 @@ func (r *StatusREST) New() runtime.Object {
 }
 
 // Update alters the status subset of an object.
-func (r *StatusREST) Update(ctx genericapirequest.Context, name string, objInfo rest.UpdatedObjectInfo) (runtime.Object, bool, error) {
-	return r.store.Update(ctx, name, objInfo)
+func (r *StatusREST) Update(ctx genericapirequest.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (runtime.Object, bool, error) {
+	return r.store.Update(ctx, name, objInfo, createValidation, updateValidation)
 }

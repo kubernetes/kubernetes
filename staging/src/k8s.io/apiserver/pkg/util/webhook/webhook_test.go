@@ -114,15 +114,15 @@ func TestKubeConfigFile(t *testing.T) {
 			errRegex: errNoConfiguration,
 		},
 		{
-			test:           "missing context (specified context is missing)",
-			cluster:        &namedCluster,
-			currentContext: "missing-context",
-			errRegex:       errNoConfiguration,
+			test:     "missing context (specified context is missing)",
+			cluster:  &namedCluster,
+			errRegex: errNoConfiguration,
 		},
 		{
 			test: "context without cluster",
 			context: &v1.NamedContext{
 				Context: v1.Context{},
+				Name:    "testing-context",
 			},
 			currentContext: "testing-context",
 			errRegex:       errNoConfiguration,
@@ -134,6 +134,7 @@ func TestKubeConfigFile(t *testing.T) {
 				Context: v1.Context{
 					Cluster: namedCluster.Name,
 				},
+				Name: "testing-context",
 			},
 			currentContext: "testing-context",
 			errRegex:       "", // Not an error at parse time, only when using the webhook
@@ -145,6 +146,7 @@ func TestKubeConfigFile(t *testing.T) {
 				Context: v1.Context{
 					Cluster: "missing-cluster",
 				},
+				Name: "fake",
 			},
 			errRegex: errNoConfiguration,
 		},
@@ -156,6 +158,7 @@ func TestKubeConfigFile(t *testing.T) {
 					Cluster:  namedCluster.Name,
 					AuthInfo: "missing-user",
 				},
+				Name: "testing-context",
 			},
 			currentContext: "testing-context",
 			errRegex:       "", // Not an error at parse time, only when using the webhook
@@ -266,6 +269,8 @@ func TestKubeConfigFile(t *testing.T) {
 			if tt.user != nil {
 				kubeConfig.AuthInfos = []v1.NamedAuthInfo{*tt.user}
 			}
+
+			kubeConfig.CurrentContext = tt.currentContext
 
 			kubeConfigFile, err := newKubeConfigFile(kubeConfig)
 
@@ -425,6 +430,65 @@ func TestTLSConfig(t *testing.T) {
 				}
 			}
 		}()
+	}
+}
+
+func TestRequestTimeout(t *testing.T) {
+	done := make(chan struct{})
+
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		<-done
+		return
+	}
+
+	// Create and start a simple HTTPS server
+	server, err := newTestServer(clientCert, clientKey, caCert, handler)
+	if err != nil {
+		t.Errorf("failed to create server: %v", err)
+		return
+	}
+	defer server.Close()
+	defer close(done) // done channel must be closed before server is.
+
+	// Create a Kubernetes client configuration file
+	configFile, err := newKubeConfigFile(v1.Config{
+		Clusters: []v1.NamedCluster{
+			{
+				Cluster: v1.Cluster{
+					Server: server.URL,
+					CertificateAuthorityData: caCert,
+				},
+			},
+		},
+		AuthInfos: []v1.NamedAuthInfo{
+			{
+				AuthInfo: v1.AuthInfo{
+					ClientCertificateData: clientCert,
+					ClientKeyData:         clientKey,
+				},
+			},
+		},
+	})
+	if err != nil {
+		t.Errorf("failed to create the client config file: %v", err)
+		return
+	}
+	defer os.Remove(configFile)
+
+	var requestTimeout = 10 * time.Millisecond
+
+	wh, err := newGenericWebhook(registered.NewOrDie(""), scheme.Codecs, configFile, groupVersions, retryBackoff, requestTimeout)
+	if err != nil {
+		t.Fatalf("failed to create the webhook: %v", err)
+	}
+
+	resultCh := make(chan rest.Result)
+
+	go func() { resultCh <- wh.RestClient.Get().Do() }()
+	select {
+	case <-time.After(time.Second * 5):
+		t.Errorf("expected request to timeout after %s", requestTimeout)
+	case <-resultCh:
 	}
 }
 

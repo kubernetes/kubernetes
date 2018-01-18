@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2018 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,11 +21,12 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/discovery"
 	fakediscovery "k8s.io/client-go/discovery/fake"
-	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/testing"
 	clientset "k8s.io/metrics/pkg/client/clientset_generated/clientset"
 	metricsv1alpha1 "k8s.io/metrics/pkg/client/clientset_generated/clientset/typed/metrics/v1alpha1"
 	fakemetricsv1alpha1 "k8s.io/metrics/pkg/client/clientset_generated/clientset/typed/metrics/v1alpha1/fake"
+	metricsv1beta1 "k8s.io/metrics/pkg/client/clientset_generated/clientset/typed/metrics/v1beta1"
+	fakemetricsv1beta1 "k8s.io/metrics/pkg/client/clientset_generated/clientset/typed/metrics/v1beta1/fake"
 )
 
 // NewSimpleClientset returns a clientset that will respond with the provided objects.
@@ -33,7 +34,7 @@ import (
 // without applying any validations and/or defaults. It shouldn't be considered a replacement
 // for a real clientset and is mostly useful in simple unit tests.
 func NewSimpleClientset(objects ...runtime.Object) *Clientset {
-	o := testing.NewObjectTracker(api.Scheme, api.Codecs.UniversalDecoder())
+	o := testing.NewObjectTracker(scheme, codecs.UniversalDecoder())
 	for _, obj := range objects {
 		if err := o.Add(obj); err != nil {
 			panic(err)
@@ -42,10 +43,17 @@ func NewSimpleClientset(objects ...runtime.Object) *Clientset {
 
 	fakePtr := testing.Fake{}
 	fakePtr.AddReactor("*", "*", testing.ObjectReaction(o))
+	fakePtr.AddWatchReactor("*", func(action testing.Action) (handled bool, ret watch.Interface, err error) {
+		gvr := action.GetResource()
+		ns := action.GetNamespace()
+		watch, err := o.Watch(gvr, ns)
+		if err != nil {
+			return false, nil, err
+		}
+		return true, watch, nil
+	})
 
-	fakePtr.AddWatchReactor("*", testing.DefaultWatchReactor(watch.NewFake(), nil))
-
-	return &Clientset{fakePtr}
+	return &Clientset{fakePtr, &fakediscovery.FakeDiscovery{Fake: &fakePtr}}
 }
 
 // Clientset implements clientset.Interface. Meant to be embedded into a
@@ -53,10 +61,11 @@ func NewSimpleClientset(objects ...runtime.Object) *Clientset {
 // you want to test easier.
 type Clientset struct {
 	testing.Fake
+	discovery *fakediscovery.FakeDiscovery
 }
 
 func (c *Clientset) Discovery() discovery.DiscoveryInterface {
-	return &fakediscovery.FakeDiscovery{Fake: &c.Fake}
+	return c.discovery
 }
 
 var _ clientset.Interface = &Clientset{}
@@ -66,7 +75,12 @@ func (c *Clientset) MetricsV1alpha1() metricsv1alpha1.MetricsV1alpha1Interface {
 	return &fakemetricsv1alpha1.FakeMetricsV1alpha1{Fake: &c.Fake}
 }
 
-// Metrics retrieves the MetricsV1alpha1Client
-func (c *Clientset) Metrics() metricsv1alpha1.MetricsV1alpha1Interface {
-	return &fakemetricsv1alpha1.FakeMetricsV1alpha1{Fake: &c.Fake}
+// MetricsV1beta1 retrieves the MetricsV1beta1Client
+func (c *Clientset) MetricsV1beta1() metricsv1beta1.MetricsV1beta1Interface {
+	return &fakemetricsv1beta1.FakeMetricsV1beta1{Fake: &c.Fake}
+}
+
+// Metrics retrieves the MetricsV1beta1Client
+func (c *Clientset) Metrics() metricsv1beta1.MetricsV1beta1Interface {
+	return &fakemetricsv1beta1.FakeMetricsV1beta1{Fake: &c.Fake}
 }

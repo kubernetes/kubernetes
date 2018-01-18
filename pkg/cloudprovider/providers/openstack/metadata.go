@@ -28,34 +28,54 @@ import (
 	"strings"
 
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/mount"
+	"k8s.io/utils/exec"
 )
 
-// metadataUrl is URL to OpenStack metadata server. It's hardcoded IPv4
-// link-local address as documented in "OpenStack Cloud Administrator Guide",
-// chapter Compute - Networking with nova-network.
-// http://docs.openstack.org/admin-guide-cloud/compute-networking-nova.html#metadata-service
-const metadataUrl = "http://169.254.169.254/openstack/2012-08-10/meta_data.json"
+const (
+	// metadataUrlTemplate allows building an OpenStack Metadata service URL.
+	// It's a hardcoded IPv4 link-local address as documented in "OpenStack Cloud
+	// Administrator Guide", chapter Compute - Networking with nova-network.
+	// https://docs.openstack.org/admin-guide/compute-networking-nova.html#metadata-service
+	defaultMetadataVersion = "2012-08-10"
+	metadataUrlTemplate    = "http://169.254.169.254/openstack/%s/meta_data.json"
 
-// Config drive is defined as an iso9660 or vfat (deprecated) drive
-// with the "config-2" label.
-// http://docs.openstack.org/user-guide/cli-config-drive.html
-const configDriveLabel = "config-2"
-const configDrivePath = "openstack/2012-08-10/meta_data.json"
+	// metadataID is used as an identifier on the metadata search order configuration.
+	metadataID = "metadataService"
 
-var ErrBadMetadata = errors.New("Invalid OpenStack metadata, got empty uuid")
+	// Config drive is defined as an iso9660 or vfat (deprecated) drive
+	// with the "config-2" label.
+	// http://docs.openstack.org/user-guide/cli-config-drive.html
+	configDriveLabel        = "config-2"
+	configDrivePathTemplate = "openstack/%s/meta_data.json"
+
+	// configDriveID is used as an identifier on the metadata search order configuration.
+	configDriveID = "configDrive"
+)
+
+var ErrBadMetadata = errors.New("invalid OpenStack metadata, got empty uuid")
+
+// There are multiple device types. To keep it simple, we're using a single structure
+// for all device metadata types.
+type DeviceMetadata struct {
+	Type    string `json:"type"`
+	Bus     string `json:"bus,omitempty"`
+	Serial  string `json:"serial,omitempty"`
+	Address string `json:"address,omitempty"`
+	// .. and other fields.
+}
 
 // Assumes the "2012-08-10" meta_data.json format.
 // See http://docs.openstack.org/user-guide/cli_config_drive.html
 type Metadata struct {
-	Uuid             string `json:"uuid"`
-	Name             string `json:"name"`
-	AvailabilityZone string `json:"availability_zone"`
+	Uuid             string           `json:"uuid"`
+	Name             string           `json:"name"`
+	AvailabilityZone string           `json:"availability_zone"`
+	Devices          []DeviceMetadata `json:"devices,omitempty"`
 	// .. and other fields we don't care about.  Expand as necessary.
 }
 
-// parseMetadataUUID reads JSON from OpenStack metadata server and parses
+// parseMetadata reads JSON from OpenStack metadata server and parses
 // instance ID out of it.
 func parseMetadata(r io.Reader) (*Metadata, error) {
 	var metadata Metadata
@@ -71,7 +91,15 @@ func parseMetadata(r io.Reader) (*Metadata, error) {
 	return &metadata, nil
 }
 
-func getMetadataFromConfigDrive() (*Metadata, error) {
+func getMetadataUrl(metadataVersion string) string {
+	return fmt.Sprintf(metadataUrlTemplate, metadataVersion)
+}
+
+func getConfigDrivePath(metadataVersion string) string {
+	return fmt.Sprintf(configDrivePathTemplate, metadataVersion)
+}
+
+func getMetadataFromConfigDrive(metadataVersion string) (*Metadata, error) {
 	// Try to read instance UUID from config drive.
 	dev := "/dev/disk/by-label/" + configDriveLabel
 	if _, err := os.Stat(dev); os.IsNotExist(err) {
@@ -81,8 +109,7 @@ func getMetadataFromConfigDrive() (*Metadata, error) {
 			"-o", "device",
 		).CombinedOutput()
 		if err != nil {
-			glog.V(2).Infof("Unable to run blkid: %v", err)
-			return nil, err
+			return nil, fmt.Errorf("unable to run blkid: %v", err)
 		}
 		dev = strings.TrimSpace(string(out))
 	}
@@ -101,37 +128,35 @@ func getMetadataFromConfigDrive() (*Metadata, error) {
 		err = mounter.Mount(dev, mntdir, "vfat", []string{"ro"})
 	}
 	if err != nil {
-		glog.Errorf("Error mounting configdrive %s: %v", dev, err)
-		return nil, err
+		return nil, fmt.Errorf("error mounting configdrive %s: %v", dev, err)
 	}
 	defer mounter.Unmount(mntdir)
 
 	glog.V(4).Infof("Configdrive mounted on %s", mntdir)
 
+	configDrivePath := getConfigDrivePath(metadataVersion)
 	f, err := os.Open(
 		filepath.Join(mntdir, configDrivePath))
 	if err != nil {
-		glog.Errorf("Error reading %s on config drive: %v", configDrivePath, err)
-		return nil, err
+		return nil, fmt.Errorf("error reading %s on config drive: %v", configDrivePath, err)
 	}
 	defer f.Close()
 
 	return parseMetadata(f)
 }
 
-func getMetadataFromMetadataService() (*Metadata, error) {
-	// Try to get JSON from metdata server.
+func getMetadataFromMetadataService(metadataVersion string) (*Metadata, error) {
+	// Try to get JSON from metadata server.
+	metadataUrl := getMetadataUrl(metadataVersion)
 	glog.V(4).Infof("Attempting to fetch metadata from %s", metadataUrl)
 	resp, err := http.Get(metadataUrl)
 	if err != nil {
-		glog.V(3).Infof("Cannot read %s: %v", metadataUrl, err)
-		return nil, err
+		return nil, fmt.Errorf("error fetching %s: %v", metadataUrl, err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		err = fmt.Errorf("Unexpected status code when reading metadata from %s: %s", metadataUrl, resp.Status)
-		glog.V(3).Infof("%v", err)
+		err = fmt.Errorf("unexpected status code when reading metadata from %s: %s", metadataUrl, resp.Status)
 		return nil, err
 	}
 
@@ -141,12 +166,28 @@ func getMetadataFromMetadataService() (*Metadata, error) {
 // Metadata is fixed for the current host, so cache the value process-wide
 var metadataCache *Metadata
 
-func getMetadata() (*Metadata, error) {
+func getMetadata(order string) (*Metadata, error) {
 	if metadataCache == nil {
-		md, err := getMetadataFromConfigDrive()
-		if err != nil {
-			md, err = getMetadataFromMetadataService()
+		var md *Metadata
+		var err error
+
+		elements := strings.Split(order, ",")
+		for _, id := range elements {
+			id = strings.TrimSpace(id)
+			switch id {
+			case configDriveID:
+				md, err = getMetadataFromConfigDrive(defaultMetadataVersion)
+			case metadataID:
+				md, err = getMetadataFromMetadataService(defaultMetadataVersion)
+			default:
+				err = fmt.Errorf("%s is not a valid metadata search order option. Supported options are %s and %s", id, configDriveID, metadataID)
+			}
+
+			if err == nil {
+				break
+			}
 		}
+
 		if err != nil {
 			return nil, err
 		}

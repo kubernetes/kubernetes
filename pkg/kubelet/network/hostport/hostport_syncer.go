@@ -21,14 +21,13 @@ import (
 	"crypto/sha256"
 	"encoding/base32"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/golang/glog"
 
 	iptablesproxy "k8s.io/kubernetes/pkg/proxy/iptables"
-	utildbus "k8s.io/kubernetes/pkg/util/dbus"
-	utilexec "k8s.io/kubernetes/pkg/util/exec"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 )
 
@@ -49,11 +48,10 @@ type hostportSyncer struct {
 	portOpener  hostportOpener
 }
 
-func NewHostportSyncer() HostportSyncer {
-	iptInterface := utiliptables.New(utilexec.New(), utildbus.New(), utiliptables.ProtocolIpv4)
+func NewHostportSyncer(iptables utiliptables.Interface) HostportSyncer {
 	return &hostportSyncer{
 		hostPortMap: make(map[hostport]closeable),
-		iptables:    iptInterface,
+		iptables:    iptables,
 		portOpener:  openLocalPort,
 	}
 }
@@ -67,7 +65,7 @@ func (hp *hostport) String() string {
 	return fmt.Sprintf("%s:%d", hp.protocol, hp.port)
 }
 
-//openPodHostports opens all hostport for pod and returns the map of hostport and socket
+// openHostports opens all hostport for pod and returns the map of hostport and socket
 func (h *hostportSyncer) openHostports(podHostportMapping *PodPortMapping) error {
 	var retErr error
 	ports := make(map[hostport]closeable)
@@ -145,7 +143,7 @@ func writeLine(buf *bytes.Buffer, words ...string) {
 // this because IPTables Chain Names must be <= 28 chars long, and the longer
 // they are the harder they are to read.
 func hostportChainName(pm *PortMapping, podFullName string) utiliptables.Chain {
-	hash := sha256.Sum256([]byte(string(pm.HostPort) + string(pm.Protocol) + podFullName))
+	hash := sha256.Sum256([]byte(strconv.Itoa(int(pm.HostPort)) + string(pm.Protocol) + podFullName))
 	encoded := base32.StdEncoding.EncodeToString(hash[:])
 	return utiliptables.Chain(kubeHostportChainPrefix + encoded[:16])
 }
@@ -192,11 +190,12 @@ func (h *hostportSyncer) SyncHostports(natInterfaceName string, activePodPortMap
 	// Get iptables-save output so we can check for existing chains and rules.
 	// This will be a map of chain name to chain with rules as stored in iptables-save/iptables-restore
 	existingNATChains := make(map[utiliptables.Chain]string)
-	iptablesSaveRaw, err := h.iptables.Save(utiliptables.TableNAT)
+	iptablesData := bytes.NewBuffer(nil)
+	err = h.iptables.SaveInto(utiliptables.TableNAT, iptablesData)
 	if err != nil { // if we failed to get any rules
 		glog.Errorf("Failed to execute iptables-save, syncing all rules: %v", err)
 	} else { // otherwise parse the output
-		existingNATChains = utiliptables.GetChainLines(utiliptables.TableNAT, iptablesSaveRaw)
+		existingNATChains = utiliptables.GetChainLines(utiliptables.TableNAT, iptablesData.Bytes())
 	}
 
 	natChains := bytes.NewBuffer(nil)

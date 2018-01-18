@@ -15,6 +15,8 @@ type JSONLog struct {
 	Stream string `json:"stream,omitempty"`
 	// Created is the created timestamp of log
 	Created time.Time `json:"time"`
+	// Attrs is the list of extra attributes provided by the user
+	Attrs map[string]string `json:"attrs,omitempty"`
 }
 
 // Format returns the log formatted according to format

@@ -17,16 +17,15 @@ limitations under the License.
 package cmd
 
 import (
-	"fmt"
 	"io"
 
 	"github.com/spf13/cobra"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/util/i18n"
+	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
 
 // NewCmdCreateService is a macro command to create a new service
@@ -48,13 +47,13 @@ func NewCmdCreateService(f cmdutil.Factory, cmdOut, errOut io.Writer) *cobra.Com
 
 var (
 	serviceClusterIPLong = templates.LongDesc(i18n.T(`
-    Create a clusterIP service with the specified name.`))
+    Create a ClusterIP service with the specified name.`))
 
 	serviceClusterIPExample = templates.Examples(i18n.T(`
-    # Create a new clusterIP service named my-cs
+    # Create a new ClusterIP service named my-cs
     kubectl create service clusterip my-cs --tcp=5678:8080
 
-    # Create a new clusterIP service named my-cs (in headless mode)
+    # Create a new ClusterIP service named my-cs (in headless mode)
     kubectl create service clusterip my-cs --clusterip="None"`))
 )
 
@@ -62,11 +61,11 @@ func addPortFlags(cmd *cobra.Command) {
 	cmd.Flags().StringSlice("tcp", []string{}, "Port pairs can be specified as '<port>:<targetPort>'.")
 }
 
-// NewCmdCreateServiceClusterIP is a command to create a clusterIP service
+// NewCmdCreateServiceClusterIP is a command to create a ClusterIP service
 func NewCmdCreateServiceClusterIP(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "clusterip NAME [--tcp=<port>:<targetPort>] [--dry-run]",
-		Short:   i18n.T("Create a clusterIP service."),
+		Short:   i18n.T("Create a ClusterIP service."),
 		Long:    serviceClusterIPLong,
 		Example: serviceClusterIPExample,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -83,7 +82,11 @@ func NewCmdCreateServiceClusterIP(f cmdutil.Factory, cmdOut io.Writer) *cobra.Co
 	return cmd
 }
 
-// CreateServiceClusterIP implements the behavior to run the create service clusterIP command
+func errUnsupportedGenerator(cmd *cobra.Command, generatorName string) error {
+	return cmdutil.UsageErrorf(cmd, "Generator %s not supported. ", generatorName)
+}
+
+// CreateServiceClusterIP is the implementation of the create service clusterip command
 func CreateServiceClusterIP(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Command, args []string) error {
 	name, err := NameFromCommandArgs(cmd, args)
 	if err != nil {
@@ -95,11 +98,11 @@ func CreateServiceClusterIP(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Comm
 		generator = &kubectl.ServiceCommonGeneratorV1{
 			Name:      name,
 			TCP:       cmdutil.GetFlagStringSlice(cmd, "tcp"),
-			Type:      api.ServiceTypeClusterIP,
+			Type:      v1.ServiceTypeClusterIP,
 			ClusterIP: cmdutil.GetFlagString(cmd, "clusterip"),
 		}
 	default:
-		return cmdutil.UsageError(cmd, fmt.Sprintf("Generator: %s not supported.", generatorName))
+		return errUnsupportedGenerator(cmd, generatorName)
 	}
 	return RunCreateSubcommand(f, cmd, cmdOut, &CreateSubcommandOptions{
 		Name:                name,
@@ -111,10 +114,10 @@ func CreateServiceClusterIP(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Comm
 
 var (
 	serviceNodePortLong = templates.LongDesc(i18n.T(`
-    Create a nodeport service with the specified name.`))
+    Create a NodePort service with the specified name.`))
 
 	serviceNodePortExample = templates.Examples(i18n.T(`
-    # Create a new nodeport service named my-ns
+    # Create a new NodePort service named my-ns
     kubectl create service nodeport my-ns --tcp=5678:8080`))
 )
 
@@ -151,12 +154,12 @@ func CreateServiceNodePort(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Comma
 		generator = &kubectl.ServiceCommonGeneratorV1{
 			Name:      name,
 			TCP:       cmdutil.GetFlagStringSlice(cmd, "tcp"),
-			Type:      api.ServiceTypeNodePort,
+			Type:      v1.ServiceTypeNodePort,
 			ClusterIP: "",
 			NodePort:  cmdutil.GetFlagInt(cmd, "node-port"),
 		}
 	default:
-		return cmdutil.UsageError(cmd, fmt.Sprintf("Generator: %s not supported.", generatorName))
+		return errUnsupportedGenerator(cmd, generatorName)
 	}
 	return RunCreateSubcommand(f, cmd, cmdOut, &CreateSubcommandOptions{
 		Name:                name,
@@ -195,7 +198,7 @@ func NewCmdCreateServiceLoadBalancer(f cmdutil.Factory, cmdOut io.Writer) *cobra
 	return cmd
 }
 
-// CreateServiceLoadBalancer is the implementation of the service loadbalancer command
+// CreateServiceLoadBalancer is the implementation of the create service loadbalancer command
 func CreateServiceLoadBalancer(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Command, args []string) error {
 	name, err := NameFromCommandArgs(cmd, args)
 	if err != nil {
@@ -207,11 +210,11 @@ func CreateServiceLoadBalancer(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.C
 		generator = &kubectl.ServiceCommonGeneratorV1{
 			Name:      name,
 			TCP:       cmdutil.GetFlagStringSlice(cmd, "tcp"),
-			Type:      api.ServiceTypeLoadBalancer,
+			Type:      v1.ServiceTypeLoadBalancer,
 			ClusterIP: "",
 		}
 	default:
-		return cmdutil.UsageError(cmd, fmt.Sprintf("Generator: %s not supported.", generatorName))
+		return errUnsupportedGenerator(cmd, generatorName)
 	}
 	return RunCreateSubcommand(f, cmd, cmdOut, &CreateSubcommandOptions{
 		Name:                name,
@@ -234,7 +237,7 @@ var (
 	kubectl create service externalname my-ns --external-name bar.com`))
 )
 
-// NewCmdCreateServiceExternalName is a macro command for creating a ExternalName service
+// NewCmdCreateServiceExternalName is a macro command for creating an ExternalName service
 func NewCmdCreateServiceExternalName(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "externalname NAME --external-name external.name [--dry-run]",
@@ -251,12 +254,12 @@ func NewCmdCreateServiceExternalName(f cmdutil.Factory, cmdOut io.Writer) *cobra
 	cmdutil.AddPrinterFlags(cmd)
 	cmdutil.AddGeneratorFlags(cmd, cmdutil.ServiceExternalNameGeneratorV1Name)
 	addPortFlags(cmd)
-	cmd.Flags().String("external-name", "", i18n.T("external name of service"))
+	cmd.Flags().String("external-name", "", i18n.T("External name of service"))
 	cmd.MarkFlagRequired("external-name")
 	return cmd
 }
 
-// CreateExternalNameService is the implementation of the service externalname command
+// CreateExternalNameService is the implementation of the create service externalname command
 func CreateExternalNameService(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Command, args []string) error {
 	name, err := NameFromCommandArgs(cmd, args)
 	if err != nil {
@@ -267,12 +270,12 @@ func CreateExternalNameService(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.C
 	case cmdutil.ServiceExternalNameGeneratorV1Name:
 		generator = &kubectl.ServiceCommonGeneratorV1{
 			Name:         name,
-			Type:         api.ServiceTypeExternalName,
+			Type:         v1.ServiceTypeExternalName,
 			ExternalName: cmdutil.GetFlagString(cmd, "external-name"),
 			ClusterIP:    "",
 		}
 	default:
-		return cmdutil.UsageError(cmd, fmt.Sprintf("Generator: %s not supported.", generatorName))
+		return errUnsupportedGenerator(cmd, generatorName)
 	}
 	return RunCreateSubcommand(f, cmd, cmdOut, &CreateSubcommandOptions{
 		Name:                name,

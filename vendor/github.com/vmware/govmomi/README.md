@@ -61,7 +61,17 @@ Refer to the [CHANGELOG](CHANGELOG.md) for version to version changes.
 
 * [Travis CI](https://github.com/travis-ci/jupiter-brain)
 
+* [collectd-vsphere](https://github.com/travis-ci/collectd-vsphere)
+
 * [Gru](https://github.com/dnaeon/gru)
+
+* [Libretto](https://github.com/apcera/libretto/tree/master/virtualmachine/vsphere)
+
+## Related projects
+
+* [rbvmomi](https://github.com/vmware/rbvmomi)
+
+* [pyvmomi](https://github.com/vmware/pyvmomi)
 
 ## License
 

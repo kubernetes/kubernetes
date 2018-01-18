@@ -8,7 +8,7 @@ the kernel. It can be used to add and remove interfaces, set ip addresses
 and routes, and configure ipsec. Netlink communication requires elevated
 privileges, so in most cases this code needs to be run as root. Since
 low-level netlink messages are inscrutable at best, the library attempts
-to provide an api that is loosely modeled on the CLI provied by iproute2.
+to provide an api that is loosely modeled on the CLI provided by iproute2.
 Actions like `ip link add` will be accomplished via a similarly named
 function like AddLink(). This library began its life as a fork of the
 netlink functionality in
@@ -38,15 +38,18 @@ Add a new bridge and add eth1 into it:
 package main
 
 import (
-    "net"
+    "fmt"
     "github.com/vishvananda/netlink"
 )
 
 func main() {
     la := netlink.NewLinkAttrs()
     la.Name = "foo"
-    mybridge := &netlink.Bridge{la}}
-    _ := netlink.LinkAdd(mybridge)
+    mybridge := &netlink.Bridge{LinkAttrs: la}
+    err := netlink.LinkAdd(mybridge)
+    if err != nil  {
+        fmt.Printf("could not add %s: %v\n", la.Name, err)
+    }
     eth1, _ := netlink.LinkByName("eth1")
     netlink.LinkSetMaster(eth1, mybridge)
 }
@@ -63,7 +66,6 @@ Add a new ip address to loopback:
 package main
 
 import (
-    "net"
     "github.com/vishvananda/netlink"
 )
 
@@ -87,3 +89,4 @@ There are also a few pieces of low level netlink functionality that still
 need to be implemented. Routing rules are not in place and some of the
 more advanced link types. Hopefully there is decent structure and testing
 in place to make these fairly straightforward to add.
+

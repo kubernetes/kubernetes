@@ -17,19 +17,18 @@ limitations under the License.
 package daemonset
 
 import (
-	"fmt"
-
+	appsv1beta2 "k8s.io/api/apps/v1beta2"
+	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
-	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/labels"
+	apivalidation "k8s.io/apimachinery/pkg/api/validation"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
-	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	"k8s.io/kubernetes/pkg/api/pod"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/extensions/validation"
 )
@@ -41,11 +40,20 @@ type daemonSetStrategy struct {
 }
 
 // Strategy is the default logic that applies when creating and updating DaemonSet objects.
-var Strategy = daemonSetStrategy{api.Scheme, names.SimpleNameGenerator}
+var Strategy = daemonSetStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
 
-// DefaultGarbageCollectionPolicy returns Orphan because that was the default
-// behavior before the server-side garbage collection was implemented.
-func (daemonSetStrategy) DefaultGarbageCollectionPolicy() rest.GarbageCollectionPolicy {
+// DefaultGarbageCollectionPolicy returns OrphanDependents by default. For apps/v1, returns DeleteDependents.
+func (daemonSetStrategy) DefaultGarbageCollectionPolicy(ctx genericapirequest.Context) rest.GarbageCollectionPolicy {
+	if requestInfo, found := genericapirequest.RequestInfoFrom(ctx); found {
+		groupVersion := schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}
+		switch groupVersion {
+		case extensionsv1beta1.SchemeGroupVersion, appsv1beta2.SchemeGroupVersion:
+			// for back compatibility
+			return rest.OrphanDependents
+		default:
+			return rest.DeleteDependents
+		}
+	}
 	return rest.OrphanDependents
 }
 
@@ -63,12 +71,17 @@ func (daemonSetStrategy) PrepareForCreate(ctx genericapirequest.Context, obj run
 	if daemonSet.Spec.TemplateGeneration < 1 {
 		daemonSet.Spec.TemplateGeneration = 1
 	}
+
+	pod.DropDisabledAlphaFields(&daemonSet.Spec.Template.Spec)
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
 func (daemonSetStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runtime.Object) {
 	newDaemonSet := obj.(*extensions.DaemonSet)
 	oldDaemonSet := old.(*extensions.DaemonSet)
+
+	pod.DropDisabledAlphaFields(&newDaemonSet.Spec.Template.Spec)
+	pod.DropDisabledAlphaFields(&oldDaemonSet.Spec.Template.Spec)
 
 	// update is not allowed to set status
 	newDaemonSet.Status = oldDaemonSet.Status
@@ -115,39 +128,32 @@ func (daemonSetStrategy) AllowCreateOnUpdate() bool {
 
 // ValidateUpdate is the default update validation for an end user.
 func (daemonSetStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
-	validationErrorList := validation.ValidateDaemonSet(obj.(*extensions.DaemonSet))
-	updateErrorList := validation.ValidateDaemonSetUpdate(obj.(*extensions.DaemonSet), old.(*extensions.DaemonSet))
-	return append(validationErrorList, updateErrorList...)
+	newDaemonSet := obj.(*extensions.DaemonSet)
+	oldDaemonSet := old.(*extensions.DaemonSet)
+	allErrs := validation.ValidateDaemonSet(obj.(*extensions.DaemonSet))
+	allErrs = append(allErrs, validation.ValidateDaemonSetUpdate(newDaemonSet, oldDaemonSet)...)
+
+	// Update is not allowed to set Spec.Selector for apps/v1 and apps/v1beta2 (allowed for extensions/v1beta1).
+	// If RequestInfo is nil, it is better to revert to old behavior (i.e. allow update to set Spec.Selector)
+	// to prevent unintentionally breaking users who may rely on the old behavior.
+	// TODO(#50791): after extensions/v1beta1 is removed, move selector immutability check inside ValidateDaemonSetUpdate().
+	if requestInfo, found := genericapirequest.RequestInfoFrom(ctx); found {
+		groupVersion := schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}
+		switch groupVersion {
+		case extensionsv1beta1.SchemeGroupVersion:
+			// no-op for compatibility
+		default:
+			// disallow mutation of selector
+			allErrs = append(allErrs, apivalidation.ValidateImmutableField(newDaemonSet.Spec.Selector, oldDaemonSet.Spec.Selector, field.NewPath("spec").Child("selector"))...)
+		}
+	}
+
+	return allErrs
 }
 
 // AllowUnconditionalUpdate is the default update policy for daemon set objects.
 func (daemonSetStrategy) AllowUnconditionalUpdate() bool {
 	return true
-}
-
-// DaemonSetToSelectableFields returns a field set that represents the object.
-func DaemonSetToSelectableFields(daemon *extensions.DaemonSet) fields.Set {
-	return generic.ObjectMetaFieldsSet(&daemon.ObjectMeta, true)
-}
-
-// GetAttrs returns labels and fields of a given object for filtering purposes.
-func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
-	ds, ok := obj.(*extensions.DaemonSet)
-	if !ok {
-		return nil, nil, fmt.Errorf("given object is not a ds.")
-	}
-	return labels.Set(ds.ObjectMeta.Labels), DaemonSetToSelectableFields(ds), nil
-}
-
-// MatchSetDaemon is the filter used by the generic etcd backend to route
-// watch events from etcd to clients of the apiserver only interested in specific
-// labels/fields.
-func MatchDaemonSet(label labels.Selector, field fields.Selector) storage.SelectionPredicate {
-	return storage.SelectionPredicate{
-		Label:    label,
-		Field:    field,
-		GetAttrs: GetAttrs,
-	}
 }
 
 type daemonSetStatusStrategy struct {

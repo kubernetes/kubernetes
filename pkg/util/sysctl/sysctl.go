@@ -29,12 +29,17 @@ const (
 	VmPanicOnOOM       = "vm/panic_on_oom"
 	KernelPanic        = "kernel/panic"
 	KernelPanicOnOops  = "kernel/panic_on_oops"
+	RootMaxKeys        = "kernel/keys/root_maxkeys"
+	RootMaxBytes       = "kernel/keys/root_maxbytes"
 
 	VmOvercommitMemoryAlways    = 1 // kernel performs no memory over-commit handling
 	VmPanicOnOOMInvokeOOMKiller = 0 // kernel calls the oom_killer function when OOM occurs
 
 	KernelPanicOnOopsAlways  = 1  // kernel panics on kernel oops
 	KernelPanicRebootTimeout = 10 // seconds after a panic for the kernel to reboot
+
+	RootMaxKeysSetting  = 1000000                 // Needed since docker creates a new key per container
+	RootMaxBytesSetting = RootMaxKeysSetting * 25 // allocate 25 bytes per key * number of MaxKeys
 )
 
 // An injectable interface for running sysctl commands.

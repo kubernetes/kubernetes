@@ -14,12 +14,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 MASTER_ADDRESS=${1:-"8.8.8.18"}
 NODE_ADDRESS=${2:-"8.8.8.20"}
 DNS_SERVER_IP=${3:-"192.168.3.100"}
 DNS_DOMAIN=${4:-"cluster.local"}
+KUBECONFIG_DIR=${KUBECONFIG_DIR:-/opt/kubernetes/cfg}
 
+# Generate a kubeconfig file
+cat <<EOF > "${KUBECONFIG_DIR}/kubelet.kubeconfig"
+apiVersion: v1
+kind: Config
+clusters:
+  - cluster:
+      server: http://${MASTER_ADDRESS}:8080/
+    name: local
+contexts:
+  - context:
+      cluster: local
+    name: local
+current-context: local
+EOF
 
 cat <<EOF >/opt/kubernetes/cfg/kubelet
 # --logtostderr=true: log to standard error instead of files
@@ -37,9 +51,8 @@ NODE_PORT="--port=10250"
 # --hostname-override="": If non-empty, will use this string as identification instead of the actual hostname.
 NODE_HOSTNAME="--hostname-override=${NODE_ADDRESS}"
 
-# --api-servers=[]: List of Kubernetes API servers for publishing events,
-# and reading pods and services. (ip:port), comma separated.
-KUBELET_API_SERVER="--api-servers=${MASTER_ADDRESS}:8080"
+# Path to a kubeconfig file, specifying how to connect to the API server.
+KUBELET_KUBECONFIG="--kubeconfig=${KUBECONFIG_DIR}/kubelet.kubeconfig"
 
 # --allow-privileged=false: If true, allow containers to request privileged mode. [default=false]
 KUBE_ALLOW_PRIV="--allow-privileged=false"
@@ -52,16 +65,16 @@ KUBELET_DNS_DOMAIN="--cluster-domain=${DNS_DOMAIN}"
 KUBELET_ARGS=""
 EOF
 
-KUBE_PROXY_OPTS="   \${KUBE_LOGTOSTDERR}     \\
+KUBELET_OPTS="      \${KUBE_LOGTOSTDERR}     \\
                     \${KUBE_LOG_LEVEL}       \\
                     \${NODE_ADDRESS}         \\
                     \${NODE_PORT}            \\
                     \${NODE_HOSTNAME}        \\
-                    \${KUBELET_API_SERVER}   \\
+                    \${KUBELET_KUBECONFIG}   \\
                     \${KUBE_ALLOW_PRIV}      \\
                     \${KUBELET__DNS_IP}      \\
-                    \${KUBELET_DNS_DOMAIN}      \\
-                    \${KUBELET_ARGS}"
+                    \${KUBELET_DNS_DOMAIN}   \\
+                    \$KUBELET_ARGS"
 
 cat <<EOF >/usr/lib/systemd/system/kubelet.service
 [Unit]
@@ -71,7 +84,7 @@ Requires=docker.service
 
 [Service]
 EnvironmentFile=-/opt/kubernetes/cfg/kubelet
-ExecStart=/opt/kubernetes/bin/kubelet ${KUBE_PROXY_OPTS}
+ExecStart=/opt/kubernetes/bin/kubelet ${KUBELET_OPTS}
 Restart=on-failure
 KillMode=process
 

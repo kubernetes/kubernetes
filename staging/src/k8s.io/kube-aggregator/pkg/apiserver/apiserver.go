@@ -30,16 +30,15 @@ import (
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
-	kubeinformers "k8s.io/client-go/informers"
-	kubeclientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/pkg/version"
 
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration"
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration/install"
-	"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1alpha1"
+	"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1"
 	"k8s.io/kube-aggregator/pkg/client/clientset_generated/internalclientset"
 	informers "k8s.io/kube-aggregator/pkg/client/informers/internalversion"
 	listers "k8s.io/kube-aggregator/pkg/client/listers/apiregistration/internalversion"
+	openapicontroller "k8s.io/kube-aggregator/pkg/controllers/openapi"
 	statuscontrollers "k8s.io/kube-aggregator/pkg/controllers/status"
 	apiservicestorage "k8s.io/kube-aggregator/pkg/registry/apiservice/etcd"
 )
@@ -70,14 +69,33 @@ func init() {
 // legacyAPIServiceName is the fixed name of the only non-groupified API version
 const legacyAPIServiceName = "v1."
 
-type Config struct {
-	GenericConfig       *genericapiserver.Config
-	CoreAPIServerClient kubeclientset.Interface
-
+type ExtraConfig struct {
 	// ProxyClientCert/Key are the client cert used to identify this proxy. Backing APIServices use
 	// this to confirm the proxy's identity
 	ProxyClientCert []byte
 	ProxyClientKey  []byte
+
+	// If present, the Dial method will be used for dialing out to delegate
+	// apiservers.
+	ProxyTransport *http.Transport
+
+	// Mechanism by which the Aggregator will resolve services. Required.
+	ServiceResolver ServiceResolver
+}
+
+type Config struct {
+	GenericConfig *genericapiserver.RecommendedConfig
+	ExtraConfig   ExtraConfig
+}
+
+type completedConfig struct {
+	GenericConfig genericapiserver.CompletedConfig
+	ExtraConfig   *ExtraConfig
+}
+
+type CompletedConfig struct {
+	// Embed a private pointer that cannot be instantiated outside of this package.
+	*completedConfig
 }
 
 // APIAggregator contains state for a Kubernetes cluster master/api server.
@@ -92,6 +110,7 @@ type APIAggregator struct {
 	// this to confirm the proxy's identity
 	proxyClientCert []byte
 	proxyClientKey  []byte
+	proxyTransport  *http.Transport
 
 	// proxyHandlers are the proxy handlers that are currently registered, keyed by apiservice.name
 	proxyHandlers map[string]*proxyHandler
@@ -104,38 +123,42 @@ type APIAggregator struct {
 
 	// provided for easier embedding
 	APIRegistrationInformers informers.SharedInformerFactory
-}
 
-type completedConfig struct {
-	*Config
+	// Information needed to determine routing for the aggregator
+	serviceResolver ServiceResolver
+
+	openAPIAggregationController *openapicontroller.AggregationController
 }
 
 // Complete fills in any fields not set that are required to have valid data. It's mutating the receiver.
-func (c *Config) Complete() completedConfig {
+func (cfg *Config) Complete() CompletedConfig {
+	c := completedConfig{
+		cfg.GenericConfig.Complete(),
+		&cfg.ExtraConfig,
+	}
+
 	// the kube aggregator wires its own discovery mechanism
 	// TODO eventually collapse this by extracting all of the discovery out
 	c.GenericConfig.EnableDiscovery = false
-	c.GenericConfig.Complete()
-
 	version := version.Get()
 	c.GenericConfig.Version = &version
 
-	return completedConfig{c}
-}
-
-// SkipComplete provides a way to construct a server instance without config completion.
-func (c *Config) SkipComplete() completedConfig {
-	return completedConfig{c}
+	return CompletedConfig{&c}
 }
 
 // New returns a new instance of APIAggregator from the given config.
-func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.DelegationTarget, stopCh <-chan struct{}) (*APIAggregator, error) {
-	genericServer, err := c.Config.GenericConfig.SkipComplete().New(delegationTarget) // completion is done in Complete, no need for a second time
+func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.DelegationTarget) (*APIAggregator, error) {
+	// Prevent generic API server to install OpenAPI handler. Aggregator server
+	// has its own customized OpenAPI handler.
+	openApiConfig := c.GenericConfig.OpenAPIConfig
+	c.GenericConfig.OpenAPIConfig = nil
+
+	genericServer, err := c.GenericConfig.New("kube-aggregator", delegationTarget)
 	if err != nil {
 		return nil, err
 	}
 
-	apiregistrationClient, err := internalclientset.NewForConfig(c.Config.GenericConfig.LoopbackClientConfig)
+	apiregistrationClient, err := internalclientset.NewForConfig(c.GenericConfig.LoopbackClientConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -143,27 +166,28 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 		apiregistrationClient,
 		5*time.Minute, // this is effectively used as a refresh interval right now.  Might want to do something nicer later on.
 	)
-	kubeInformers := kubeinformers.NewSharedInformerFactory(c.CoreAPIServerClient, 5*time.Minute)
 
 	s := &APIAggregator{
 		GenericAPIServer: genericServer,
 		delegateHandler:  delegationTarget.UnprotectedHandler(),
 		contextMapper:    c.GenericConfig.RequestContextMapper,
-		proxyClientCert:  c.ProxyClientCert,
-		proxyClientKey:   c.ProxyClientKey,
+		proxyClientCert:  c.ExtraConfig.ProxyClientCert,
+		proxyClientKey:   c.ExtraConfig.ProxyClientKey,
+		proxyTransport:   c.ExtraConfig.ProxyTransport,
 		proxyHandlers:    map[string]*proxyHandler{},
 		handledGroups:    sets.String{},
 		lister:           informerFactory.Apiregistration().InternalVersion().APIServices().Lister(),
 		APIRegistrationInformers: informerFactory,
+		serviceResolver:          c.ExtraConfig.ServiceResolver,
 	}
 
 	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(apiregistration.GroupName, registry, Scheme, metav1.ParameterCodec, Codecs)
-	apiGroupInfo.GroupMeta.GroupVersion = v1alpha1.SchemeGroupVersion
-	v1alpha1storage := map[string]rest.Storage{}
+	apiGroupInfo.GroupMeta.GroupVersion = v1beta1.SchemeGroupVersion
+	v1beta1storage := map[string]rest.Storage{}
 	apiServiceREST := apiservicestorage.NewREST(Scheme, c.GenericConfig.RESTOptionsGetter)
-	v1alpha1storage["apiservices"] = apiServiceREST
-	v1alpha1storage["apiservices/status"] = apiservicestorage.NewStatusREST(Scheme, apiServiceREST)
-	apiGroupInfo.VersionedResourcesStorageMap["v1alpha1"] = v1alpha1storage
+	v1beta1storage["apiservices"] = apiServiceREST
+	v1beta1storage["apiservices/status"] = apiservicestorage.NewStatusREST(Scheme, apiServiceREST)
+	apiGroupInfo.VersionedResourcesStorageMap["v1beta1"] = v1beta1storage
 
 	if err := s.GenericAPIServer.InstallAPIGroup(&apiGroupInfo); err != nil {
 		return nil, err
@@ -172,43 +196,69 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 	apisHandler := &apisHandler{
 		codecs: Codecs,
 		lister: s.lister,
+		mapper: s.contextMapper,
 	}
-	s.GenericAPIServer.Handler.PostGoRestfulMux.Handle("/apis", apisHandler)
-	s.GenericAPIServer.Handler.PostGoRestfulMux.UnlistedHandle("/apis/", apisHandler)
+	s.GenericAPIServer.Handler.NonGoRestfulMux.Handle("/apis", apisHandler)
+	s.GenericAPIServer.Handler.NonGoRestfulMux.UnlistedHandle("/apis/", apisHandler)
 
-	apiserviceRegistrationController := NewAPIServiceRegistrationController(informerFactory.Apiregistration().InternalVersion().APIServices(), kubeInformers.Core().V1().Services(), s)
+	apiserviceRegistrationController := NewAPIServiceRegistrationController(informerFactory.Apiregistration().InternalVersion().APIServices(), s)
 	availableController := statuscontrollers.NewAvailableConditionController(
 		informerFactory.Apiregistration().InternalVersion().APIServices(),
-		kubeInformers.Core().V1().Services(),
-		kubeInformers.Core().V1().Endpoints(),
+		c.GenericConfig.SharedInformerFactory.Core().V1().Services(),
+		c.GenericConfig.SharedInformerFactory.Core().V1().Endpoints(),
 		apiregistrationClient.Apiregistration(),
+		c.ExtraConfig.ProxyTransport,
+		s.serviceResolver,
 	)
 
 	s.GenericAPIServer.AddPostStartHook("start-kube-aggregator-informers", func(context genericapiserver.PostStartHookContext) error {
-		informerFactory.Start(stopCh)
-		kubeInformers.Start(stopCh)
+		informerFactory.Start(context.StopCh)
+		c.GenericConfig.SharedInformerFactory.Start(context.StopCh)
 		return nil
 	})
 	s.GenericAPIServer.AddPostStartHook("apiservice-registration-controller", func(context genericapiserver.PostStartHookContext) error {
-		go apiserviceRegistrationController.Run(stopCh)
+		go apiserviceRegistrationController.Run(context.StopCh)
 		return nil
 	})
 	s.GenericAPIServer.AddPostStartHook("apiservice-status-available-controller", func(context genericapiserver.PostStartHookContext) error {
-		go availableController.Run(stopCh)
+		// if we end up blocking for long periods of time, we may need to increase threadiness.
+		go availableController.Run(5, context.StopCh)
 		return nil
 	})
+
+	if openApiConfig != nil {
+		specDownloader := openapicontroller.NewDownloader(s.contextMapper)
+		openAPIAggregator, err := openapicontroller.BuildAndRegisterAggregator(
+			&specDownloader,
+			delegationTarget,
+			s.GenericAPIServer.Handler.GoRestfulContainer.RegisteredWebServices(),
+			openApiConfig,
+			s.GenericAPIServer.Handler.NonGoRestfulMux)
+		if err != nil {
+			return nil, err
+		}
+		s.openAPIAggregationController = openapicontroller.NewAggregationController(&specDownloader, openAPIAggregator)
+
+		s.GenericAPIServer.AddPostStartHook("apiservice-openapi-controller", func(context genericapiserver.PostStartHookContext) error {
+			go s.openAPIAggregationController.Run(context.StopCh)
+			return nil
+		})
+	}
 
 	return s, nil
 }
 
 // AddAPIService adds an API service.  It is not thread-safe, so only call it on one thread at a time please.
 // It's a slow moving API, so its ok to run the controller on a single thread
-func (s *APIAggregator) AddAPIService(apiService *apiregistration.APIService, destinationHost string) {
+func (s *APIAggregator) AddAPIService(apiService *apiregistration.APIService) error {
 	// if the proxyHandler already exists, it needs to be updated. The aggregation bits do not
 	// since they are wired against listers because they require multiple resources to respond
 	if proxyHandler, exists := s.proxyHandlers[apiService.Name]; exists {
-		proxyHandler.updateAPIService(apiService, destinationHost)
-		return
+		proxyHandler.updateAPIService(apiService)
+		if s.openAPIAggregationController != nil {
+			s.openAPIAggregationController.UpdateAPIService(proxyHandler, apiService)
+		}
+		return nil
 	}
 
 	proxyPath := "/apis/" + apiService.Spec.Group + "/" + apiService.Spec.Version
@@ -223,34 +273,41 @@ func (s *APIAggregator) AddAPIService(apiService *apiregistration.APIService, de
 		localDelegate:   s.delegateHandler,
 		proxyClientCert: s.proxyClientCert,
 		proxyClientKey:  s.proxyClientKey,
+		proxyTransport:  s.proxyTransport,
+		serviceResolver: s.serviceResolver,
 	}
-	proxyHandler.updateAPIService(apiService, destinationHost)
+	proxyHandler.updateAPIService(apiService)
+	if s.openAPIAggregationController != nil {
+		s.openAPIAggregationController.AddAPIService(proxyHandler, apiService)
+	}
 	s.proxyHandlers[apiService.Name] = proxyHandler
-	s.GenericAPIServer.Handler.PostGoRestfulMux.Handle(proxyPath, proxyHandler)
-	s.GenericAPIServer.Handler.PostGoRestfulMux.UnlistedHandlePrefix(proxyPath+"/", proxyHandler)
+	s.GenericAPIServer.Handler.NonGoRestfulMux.Handle(proxyPath, proxyHandler)
+	s.GenericAPIServer.Handler.NonGoRestfulMux.UnlistedHandlePrefix(proxyPath+"/", proxyHandler)
 
 	// if we're dealing with the legacy group, we're done here
 	if apiService.Name == legacyAPIServiceName {
-		return
+		return nil
 	}
 
 	// if we've already registered the path with the handler, we don't want to do it again.
 	if s.handledGroups.Has(apiService.Spec.Group) {
-		return
+		return nil
 	}
 
 	// it's time to register the group aggregation endpoint
 	groupPath := "/apis/" + apiService.Spec.Group
 	groupDiscoveryHandler := &apiGroupHandler{
-		codecs:    Codecs,
-		groupName: apiService.Spec.Group,
-		lister:    s.lister,
-		delegate:  s.delegateHandler,
+		codecs:        Codecs,
+		groupName:     apiService.Spec.Group,
+		lister:        s.lister,
+		delegate:      s.delegateHandler,
+		contextMapper: s.contextMapper,
 	}
 	// aggregation is protected
-	s.GenericAPIServer.Handler.PostGoRestfulMux.Handle(groupPath, groupDiscoveryHandler)
-	s.GenericAPIServer.Handler.PostGoRestfulMux.UnlistedHandle(groupPath+"/", groupDiscoveryHandler)
+	s.GenericAPIServer.Handler.NonGoRestfulMux.Handle(groupPath, groupDiscoveryHandler)
+	s.GenericAPIServer.Handler.NonGoRestfulMux.UnlistedHandle(groupPath+"/", groupDiscoveryHandler)
 	s.handledGroups.Insert(apiService.Spec.Group)
+	return nil
 }
 
 // RemoveAPIService removes the APIService from being handled.  It is not thread-safe, so only call it on one thread at a time please.
@@ -263,8 +320,11 @@ func (s *APIAggregator) RemoveAPIService(apiServiceName string) {
 	if apiServiceName == legacyAPIServiceName {
 		proxyPath = "/api"
 	}
-	s.GenericAPIServer.Handler.PostGoRestfulMux.Unregister(proxyPath)
-	s.GenericAPIServer.Handler.PostGoRestfulMux.Unregister(proxyPath + "/")
+	s.GenericAPIServer.Handler.NonGoRestfulMux.Unregister(proxyPath)
+	s.GenericAPIServer.Handler.NonGoRestfulMux.Unregister(proxyPath + "/")
+	if s.openAPIAggregationController != nil {
+		s.openAPIAggregationController.RemoveAPIService(apiServiceName)
+	}
 	delete(s.proxyHandlers, apiServiceName)
 
 	// TODO unregister group level discovery when there are no more versions for the group

@@ -26,40 +26,32 @@ export KUBE_CONFIG_FILE=${KUBE_CONFIG_FILE:-${KUBE_ROOT}/cluster/centos/config-d
 
 function deploy_dns {
   echo "Deploying DNS on Kubernetes"
-  sed -e "s/\\\$DNS_DOMAIN/${DNS_DOMAIN}/g" "${KUBE_ROOT}/cluster/addons/dns/kubedns-controller.yaml.sed" > kubedns-controller.yaml
-  sed -e "s/\\\$DNS_SERVER_IP/${DNS_SERVER_IP}/g" "${KUBE_ROOT}/cluster/addons/dns/kubedns-svc.yaml.sed" > kubedns-svc.yaml
+  cp "${KUBE_ROOT}/cluster/addons/dns/kube-dns.yaml.sed" kube-dns.yaml
+  sed -i -e "s/\\\$DNS_DOMAIN/${DNS_DOMAIN}/g" kube-dns.yaml
+  sed -i -e "s/\\\$DNS_SERVER_IP/${DNS_SERVER_IP}/g" kube-dns.yaml
 
   KUBEDNS=`eval "${KUBECTL} get services --namespace=kube-system | grep kube-dns | cat"`
       
   if [ ! "$KUBEDNS" ]; then
-    # use kubectl to create kube-dns deployment and service
-    ${KUBECTL} --namespace=kube-system create -f kubedns-sa.yaml
-    ${KUBECTL} --namespace=kube-system create -f kubedns-cm.yaml
-    ${KUBECTL} --namespace=kube-system create -f kubedns-controller.yaml
-    ${KUBECTL} --namespace=kube-system create -f kubedns-svc.yaml
+    # use kubectl to create kube-dns addon
+    ${KUBECTL} --namespace=kube-system create -f kube-dns.yaml
 
-    echo "Kube-dns deployment and service is successfully deployed."
+    echo "Kube-dns addon is successfully deployed."
   else
-    echo "Kube-dns deployment and service is already deployed. Skipping."
+    echo "Kube-dns addon is already deployed. Skipping."
   fi
 
   echo
 }
 
 function deploy_dashboard {
-    if ${KUBECTL} get rc -l k8s-app=kubernetes-dashboard --namespace=kube-system | grep kubernetes-dashboard-v &> /dev/null; then
-        echo "Kubernetes Dashboard replicationController already exists"
-    else
-        echo "Creating Kubernetes Dashboard replicationController"
-        ${KUBECTL} create -f ${KUBE_ROOT}/cluster/addons/dashboard/dashboard-controller.yaml
-    fi
+  echo "Deploying Kubernetes Dashboard"
 
-    if ${KUBECTL} get service/kubernetes-dashboard --namespace=kube-system &> /dev/null; then
-        echo "Kubernetes Dashboard service already exists"
-    else
-        echo "Creating Kubernetes Dashboard service"
-        ${KUBECTL} create -f ${KUBE_ROOT}/cluster/addons/dashboard/dashboard-service.yaml
-    fi
+  ${KUBECTL} apply -f ${KUBE_ROOT}/cluster/addons/dashboard/dashboard-secret.yaml
+  ${KUBECTL} apply -f ${KUBE_ROOT}/cluster/addons/dashboard/dashboard-configmap.yaml
+  ${KUBECTL} apply -f ${KUBE_ROOT}/cluster/addons/dashboard/dashboard-rbac.yaml
+  ${KUBECTL} apply -f ${KUBE_ROOT}/cluster/addons/dashboard/dashboard-controller.yaml
+  ${KUBECTL} apply -f ${KUBE_ROOT}/cluster/addons/dashboard/dashboard-service.yaml
 
   echo
 }

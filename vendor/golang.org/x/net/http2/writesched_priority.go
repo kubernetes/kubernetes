@@ -53,7 +53,7 @@ type PriorityWriteSchedulerConfig struct {
 }
 
 // NewPriorityWriteScheduler constructs a WriteScheduler that schedules
-// frames by following HTTP/2 priorities as described in RFC 7340 Section 5.3.
+// frames by following HTTP/2 priorities as described in RFC 7540 Section 5.3.
 // If cfg is nil, default options are used.
 func NewPriorityWriteScheduler(cfg *PriorityWriteSchedulerConfig) WriteScheduler {
 	if cfg == nil {

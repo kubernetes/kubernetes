@@ -20,119 +20,146 @@ import (
 	"reflect"
 	"testing"
 
+	batchv1 "k8s.io/api/batch/v1"
+
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/pkg/api"
-	_ "k8s.io/kubernetes/pkg/api/install"
-	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	_ "k8s.io/kubernetes/pkg/apis/batch/install"
 	. "k8s.io/kubernetes/pkg/apis/batch/v1"
+	_ "k8s.io/kubernetes/pkg/apis/core/install"
 )
 
 func TestSetDefaultJob(t *testing.T) {
 	defaultLabels := map[string]string{"default": "default"}
 	tests := map[string]struct {
-		original     *Job
-		expected     *Job
+		original     *batchv1.Job
+		expected     *batchv1.Job
 		expectLabels bool
 	}{
-		"both unspecified -> sets both to 1": {
-			original: &Job{
-				Spec: JobSpec{
+		"All unspecified -> sets all to default values": {
+			original: &batchv1.Job{
+				Spec: batchv1.JobSpec{
 					Template: v1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{Labels: defaultLabels},
 					},
 				},
 			},
-			expected: &Job{
-				Spec: JobSpec{
-					Completions: newInt32(1),
-					Parallelism: newInt32(1),
+			expected: &batchv1.Job{
+				Spec: batchv1.JobSpec{
+					Completions:  newInt32(1),
+					Parallelism:  newInt32(1),
+					BackoffLimit: newInt32(6),
 				},
 			},
 			expectLabels: true,
 		},
-		"both unspecified -> sets both to 1 and no default labels": {
-			original: &Job{
+		"All unspecified -> all integers are defaulted and no default labels": {
+			original: &batchv1.Job{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{"mylabel": "myvalue"},
 				},
-				Spec: JobSpec{
+				Spec: batchv1.JobSpec{
 					Template: v1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{Labels: defaultLabels},
 					},
 				},
 			},
-			expected: &Job{
-				Spec: JobSpec{
-					Completions: newInt32(1),
-					Parallelism: newInt32(1),
+			expected: &batchv1.Job{
+				Spec: batchv1.JobSpec{
+					Completions:  newInt32(1),
+					Parallelism:  newInt32(1),
+					BackoffLimit: newInt32(6),
 				},
 			},
 		},
-		"WQ: Parallelism explicitly 0 and completions unset -> no change": {
-			original: &Job{
-				Spec: JobSpec{
+		"WQ: Parallelism explicitly 0 and completions unset -> BackoffLimit is defaulted": {
+			original: &batchv1.Job{
+				Spec: batchv1.JobSpec{
 					Parallelism: newInt32(0),
 					Template: v1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{Labels: defaultLabels},
 					},
 				},
 			},
-			expected: &Job{
-				Spec: JobSpec{
-					Parallelism: newInt32(0),
+			expected: &batchv1.Job{
+				Spec: batchv1.JobSpec{
+					Parallelism:  newInt32(0),
+					BackoffLimit: newInt32(6),
 				},
 			},
 			expectLabels: true,
 		},
-		"WQ: Parallelism explicitly 2 and completions unset -> no change": {
-			original: &Job{
-				Spec: JobSpec{
+		"WQ: Parallelism explicitly 2 and completions unset -> BackoffLimit is defaulted": {
+			original: &batchv1.Job{
+				Spec: batchv1.JobSpec{
 					Parallelism: newInt32(2),
 					Template: v1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{Labels: defaultLabels},
 					},
 				},
 			},
-			expected: &Job{
-				Spec: JobSpec{
-					Parallelism: newInt32(2),
+			expected: &batchv1.Job{
+				Spec: batchv1.JobSpec{
+					Parallelism:  newInt32(2),
+					BackoffLimit: newInt32(6),
 				},
 			},
 			expectLabels: true,
 		},
-		"Completions explicitly 2 and parallelism unset -> parallelism is defaulted": {
-			original: &Job{
-				Spec: JobSpec{
+		"Completions explicitly 2 and others unset -> parallelism and BackoffLimit are defaulted": {
+			original: &batchv1.Job{
+				Spec: batchv1.JobSpec{
 					Completions: newInt32(2),
 					Template: v1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{Labels: defaultLabels},
 					},
 				},
 			},
-			expected: &Job{
-				Spec: JobSpec{
-					Completions: newInt32(2),
-					Parallelism: newInt32(1),
+			expected: &batchv1.Job{
+				Spec: batchv1.JobSpec{
+					Completions:  newInt32(2),
+					Parallelism:  newInt32(1),
+					BackoffLimit: newInt32(6),
 				},
 			},
 			expectLabels: true,
 		},
-		"Both set -> no change": {
-			original: &Job{
-				Spec: JobSpec{
-					Completions: newInt32(10),
-					Parallelism: newInt32(11),
+		"BackoffLimit explicitly 5 and others unset -> parallelism and completions are defaulted": {
+			original: &batchv1.Job{
+				Spec: batchv1.JobSpec{
+					BackoffLimit: newInt32(5),
 					Template: v1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{Labels: defaultLabels},
 					},
 				},
 			},
-			expected: &Job{
-				Spec: JobSpec{
-					Completions: newInt32(10),
-					Parallelism: newInt32(11),
+			expected: &batchv1.Job{
+				Spec: batchv1.JobSpec{
+					Completions:  newInt32(1),
+					Parallelism:  newInt32(1),
+					BackoffLimit: newInt32(5),
+				},
+			},
+			expectLabels: true,
+		},
+		"All set -> no change": {
+			original: &batchv1.Job{
+				Spec: batchv1.JobSpec{
+					Completions:  newInt32(8),
+					Parallelism:  newInt32(9),
+					BackoffLimit: newInt32(10),
+					Template: v1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{Labels: defaultLabels},
+					},
+				},
+			},
+			expected: &batchv1.Job{
+				Spec: batchv1.JobSpec{
+					Completions:  newInt32(8),
+					Parallelism:  newInt32(9),
+					BackoffLimit: newInt32(10),
 					Template: v1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{Labels: defaultLabels},
 					},
@@ -140,20 +167,22 @@ func TestSetDefaultJob(t *testing.T) {
 			},
 			expectLabels: true,
 		},
-		"Both set, flipped -> no change": {
-			original: &Job{
-				Spec: JobSpec{
-					Completions: newInt32(11),
-					Parallelism: newInt32(10),
+		"All set, flipped -> no change": {
+			original: &batchv1.Job{
+				Spec: batchv1.JobSpec{
+					Completions:  newInt32(11),
+					Parallelism:  newInt32(10),
+					BackoffLimit: newInt32(9),
 					Template: v1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{Labels: defaultLabels},
 					},
 				},
 			},
-			expected: &Job{
-				Spec: JobSpec{
-					Completions: newInt32(11),
-					Parallelism: newInt32(10),
+			expected: &batchv1.Job{
+				Spec: batchv1.JobSpec{
+					Completions:  newInt32(11),
+					Parallelism:  newInt32(10),
+					BackoffLimit: newInt32(9),
 				},
 			},
 			expectLabels: true,
@@ -164,27 +193,16 @@ func TestSetDefaultJob(t *testing.T) {
 		original := test.original
 		expected := test.expected
 		obj2 := roundTrip(t, runtime.Object(original))
-		actual, ok := obj2.(*Job)
+		actual, ok := obj2.(*batchv1.Job)
 		if !ok {
 			t.Errorf("%s: unexpected object: %v", name, actual)
 			t.FailNow()
 		}
-		if (actual.Spec.Completions == nil) != (expected.Spec.Completions == nil) {
-			t.Errorf("%s: got different *completions than expected: %v %v", name, actual.Spec.Completions, expected.Spec.Completions)
-		}
-		if actual.Spec.Completions != nil && expected.Spec.Completions != nil {
-			if *actual.Spec.Completions != *expected.Spec.Completions {
-				t.Errorf("%s: got different completions than expected: %d %d", name, *actual.Spec.Completions, *expected.Spec.Completions)
-			}
-		}
-		if (actual.Spec.Parallelism == nil) != (expected.Spec.Parallelism == nil) {
-			t.Errorf("%s: got different *Parallelism than expected: %v %v", name, actual.Spec.Parallelism, expected.Spec.Parallelism)
-		}
-		if actual.Spec.Parallelism != nil && expected.Spec.Parallelism != nil {
-			if *actual.Spec.Parallelism != *expected.Spec.Parallelism {
-				t.Errorf("%s: got different parallelism than expected: %d %d", name, *actual.Spec.Parallelism, *expected.Spec.Parallelism)
-			}
-		}
+
+		validateDefaultInt32(t, name, "Completions", actual.Spec.Completions, expected.Spec.Completions)
+		validateDefaultInt32(t, name, "Parallelism", actual.Spec.Parallelism, expected.Spec.Parallelism)
+		validateDefaultInt32(t, name, "BackoffLimit", actual.Spec.BackoffLimit, expected.Spec.BackoffLimit)
+
 		if test.expectLabels != reflect.DeepEqual(actual.Labels, actual.Spec.Template.Labels) {
 			if test.expectLabels {
 				t.Errorf("%s: expected: %v, got: %v", name, actual.Spec.Template.Labels, actual.Labels)
@@ -196,19 +214,30 @@ func TestSetDefaultJob(t *testing.T) {
 	}
 }
 
+func validateDefaultInt32(t *testing.T, name string, field string, actual *int32, expected *int32) {
+	if (actual == nil) != (expected == nil) {
+		t.Errorf("%s: got different *%s than expected: %v %v", name, field, actual, expected)
+	}
+	if actual != nil && expected != nil {
+		if *actual != *expected {
+			t.Errorf("%s: got different %s than expected: %d %d", name, field, *actual, *expected)
+		}
+	}
+}
+
 func roundTrip(t *testing.T, obj runtime.Object) runtime.Object {
-	data, err := runtime.Encode(api.Codecs.LegacyCodec(SchemeGroupVersion), obj)
+	data, err := runtime.Encode(legacyscheme.Codecs.LegacyCodec(SchemeGroupVersion), obj)
 	if err != nil {
 		t.Errorf("%v\n %#v", err, obj)
 		return nil
 	}
-	obj2, err := runtime.Decode(api.Codecs.UniversalDecoder(), data)
+	obj2, err := runtime.Decode(legacyscheme.Codecs.UniversalDecoder(), data)
 	if err != nil {
 		t.Errorf("%v\nData: %s\nSource: %#v", err, string(data), obj)
 		return nil
 	}
 	obj3 := reflect.New(reflect.TypeOf(obj).Elem()).Interface().(runtime.Object)
-	err = api.Scheme.Convert(obj2, obj3, nil)
+	err = legacyscheme.Scheme.Convert(obj2, obj3, nil)
 	if err != nil {
 		t.Errorf("%v\nSource: %#v", err, obj2)
 		return nil

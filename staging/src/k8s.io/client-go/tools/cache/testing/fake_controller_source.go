@@ -22,13 +22,12 @@ import (
 	"strconv"
 	"sync"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/client-go/pkg/api/v1"
 )
 
 func NewFakeControllerSource() *FakeControllerSource {
@@ -153,11 +152,7 @@ func (f *FakeControllerSource) getListItemsLocked() ([]runtime.Object, error) {
 		// Otherwise, if they make a change and write it back, they
 		// will inadvertently change our canonical copy (in
 		// addition to racing with other clients).
-		objCopy, err := scheme.Scheme.DeepCopy(obj)
-		if err != nil {
-			return nil, err
-		}
-		list = append(list, objCopy.(runtime.Object))
+		list = append(list, obj.DeepCopyObject())
 	}
 	return list, nil
 }
@@ -242,11 +237,7 @@ func (f *FakeControllerSource) Watch(options metav1.ListOptions) (watch.Interfac
 			// it back, they will inadvertently change the our
 			// canonical copy (in addition to racing with other
 			// clients).
-			objCopy, err := scheme.Scheme.DeepCopy(c.Object)
-			if err != nil {
-				return nil, err
-			}
-			changes = append(changes, watch.Event{Type: c.Type, Object: objCopy.(runtime.Object)})
+			changes = append(changes, watch.Event{Type: c.Type, Object: c.Object.DeepCopyObject()})
 		}
 		return f.Broadcaster.WatchWithPrefix(changes), nil
 	} else if rc > len(f.changes) {

@@ -19,10 +19,11 @@ package upgrades
 import (
 	"fmt"
 
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	. "github.com/onsi/ginkgo"
 )
@@ -33,7 +34,7 @@ type SecretUpgradeTest struct {
 	secret *v1.Secret
 }
 
-func (SecretUpgradeTest) Name() string { return "secret-upgrade" }
+func (SecretUpgradeTest) Name() string { return "secret-upgrade [sig-storage] [sig-api-machinery]" }
 
 // Setup creates a secret and then verifies that a pod can consume it.
 func (t *SecretUpgradeTest) Setup(f *framework.Framework) {
@@ -53,7 +54,7 @@ func (t *SecretUpgradeTest) Setup(f *framework.Framework) {
 
 	By("Creating a secret")
 	var err error
-	if t.secret, err = f.ClientSet.Core().Secrets(ns.Name).Create(t.secret); err != nil {
+	if t.secret, err = f.ClientSet.CoreV1().Secrets(ns.Name).Create(t.secret); err != nil {
 		framework.Failf("unable to create test secret %s: %v", t.secret.Name, err)
 	}
 
@@ -99,7 +100,7 @@ func (t *SecretUpgradeTest) testPod(f *framework.Framework) {
 			Containers: []v1.Container{
 				{
 					Name:  "secret-volume-test",
-					Image: "gcr.io/google_containers/mounttest:0.7",
+					Image: imageutils.GetE2EImage(imageutils.Mounttest),
 					Args: []string{
 						fmt.Sprintf("--file_content=%s/data", volumeMountPath),
 						fmt.Sprintf("--file_mode=%s/data", volumeMountPath),
@@ -113,7 +114,7 @@ func (t *SecretUpgradeTest) testPod(f *framework.Framework) {
 				},
 				{
 					Name:    "secret-env-test",
-					Image:   "gcr.io/google_containers/busybox:1.24",
+					Image:   "busybox",
 					Command: []string{"sh", "-c", "env"},
 					Env: []v1.EnvVar{
 						{

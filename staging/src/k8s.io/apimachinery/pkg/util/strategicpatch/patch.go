@@ -22,9 +22,9 @@ import (
 	"sort"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/mergepatch"
-	forkedjson "k8s.io/apimachinery/third_party/forked/golang/json"
 )
 
 // An alternate implementation of JSON Merge Patch
@@ -43,7 +43,11 @@ const (
 	replaceDirective = "replace"
 	mergeDirective   = "merge"
 
+	retainKeysStrategy = "retainKeys"
+
 	deleteFromPrimitiveListDirectivePrefix = "$deleteFromPrimitiveList"
+	retainKeysDirective                    = "$" + retainKeysStrategy
+	setElementOrderDirectivePrefix         = "$setElementOrder"
 )
 
 // JSONMap is a representations of JSON object encoded as map[string]interface{}
@@ -54,15 +58,27 @@ const (
 type JSONMap map[string]interface{}
 
 type DiffOptions struct {
+	// SetElementOrder determines whether we generate the $setElementOrder parallel list.
+	SetElementOrder bool
 	// IgnoreChangesAndAdditions indicates if we keep the changes and additions in the patch.
 	IgnoreChangesAndAdditions bool
 	// IgnoreDeletions indicates if we keep the deletions in the patch.
 	IgnoreDeletions bool
+	// We introduce a new value retainKeys for patchStrategy.
+	// It indicates that all fields needing to be preserved must be
+	// present in the `retainKeys` list.
+	// And the fields that are present will be merged with live object.
+	// All the missing fields will be cleared when patching.
+	BuildRetainKeysDirective bool
 }
 
 type MergeOptions struct {
-	// MergeDeleteList indicates if we are merging the delete parallel list.
-	MergeDeleteList bool
+	// MergeParallelList indicates if we are merging the parallel list.
+	// We don't merge parallel list when calling mergeMap() in CreateThreeWayMergePatch()
+	// which is called client-side.
+	// We merge parallel list iff when calling mergeMap() in StrategicMergeMapPatch()
+	// which is called server-side
+	MergeParallelList bool
 	// IgnoreUnmatchedNulls indicates if we should process the unmatched nulls.
 	IgnoreUnmatchedNulls bool
 }
@@ -76,6 +92,16 @@ type MergeOptions struct {
 // return a patch that yields the modified document when applied to the original document, or an error
 // if either of the two documents is invalid.
 func CreateTwoWayMergePatch(original, modified []byte, dataStruct interface{}, fns ...mergepatch.PreconditionFunc) ([]byte, error) {
+	schema, err := NewPatchMetaFromStruct(dataStruct)
+	if err != nil {
+		return nil, err
+	}
+
+	return CreateTwoWayMergePatchUsingLookupPatchMeta(original, modified, schema, fns...)
+}
+
+func CreateTwoWayMergePatchUsingLookupPatchMeta(
+	original, modified []byte, schema LookupPatchMeta, fns ...mergepatch.PreconditionFunc) ([]byte, error) {
 	originalMap := map[string]interface{}{}
 	if len(original) > 0 {
 		if err := json.Unmarshal(original, &originalMap); err != nil {
@@ -90,7 +116,7 @@ func CreateTwoWayMergePatch(original, modified []byte, dataStruct interface{}, f
 		}
 	}
 
-	patchMap, err := CreateTwoWayMergeMapPatch(originalMap, modifiedMap, dataStruct, fns...)
+	patchMap, err := CreateTwoWayMergeMapPatchUsingLookupPatchMeta(originalMap, modifiedMap, schema, fns...)
 	if err != nil {
 		return nil, err
 	}
@@ -102,16 +128,19 @@ func CreateTwoWayMergePatch(original, modified []byte, dataStruct interface{}, f
 // encoded JSONMap.
 // The serialized version of the map can then be passed to StrategicMergeMapPatch.
 func CreateTwoWayMergeMapPatch(original, modified JSONMap, dataStruct interface{}, fns ...mergepatch.PreconditionFunc) (JSONMap, error) {
-	t, err := getTagStructType(dataStruct)
+	schema, err := NewPatchMetaFromStruct(dataStruct)
 	if err != nil {
 		return nil, err
 	}
 
+	return CreateTwoWayMergeMapPatchUsingLookupPatchMeta(original, modified, schema, fns...)
+}
+
+func CreateTwoWayMergeMapPatchUsingLookupPatchMeta(original, modified JSONMap, schema LookupPatchMeta, fns ...mergepatch.PreconditionFunc) (JSONMap, error) {
 	diffOptions := DiffOptions{
-		IgnoreChangesAndAdditions: false,
-		IgnoreDeletions:           false,
+		SetElementOrder: true,
 	}
-	patchMap, err := diffMaps(original, modified, t, diffOptions)
+	patchMap, err := diffMaps(original, modified, schema, diffOptions)
 	if err != nil {
 		return nil, err
 	}
@@ -127,13 +156,28 @@ func CreateTwoWayMergeMapPatch(original, modified JSONMap, dataStruct interface{
 }
 
 // Returns a (recursive) strategic merge patch that yields modified when applied to original.
-func diffMaps(original, modified map[string]interface{}, t reflect.Type, diffOptions DiffOptions) (map[string]interface{}, error) {
+// Including:
+// - Adding fields to the patch present in modified, missing from original
+// - Setting fields to the patch present in modified and original with different values
+// - Delete fields present in original, missing from modified through
+// - IFF map field - set to nil in patch
+// - IFF list of maps && merge strategy - use deleteDirective for the elements
+// - IFF list of primitives && merge strategy - use parallel deletion list
+// - IFF list of maps or primitives with replace strategy (default) - set patch value to the value in modified
+// - Build $retainKeys directive for fields with retainKeys patch strategy
+func diffMaps(original, modified map[string]interface{}, schema LookupPatchMeta, diffOptions DiffOptions) (map[string]interface{}, error) {
 	patch := map[string]interface{}{}
-	if t.Kind() == reflect.Ptr {
-		t = t.Elem()
-	}
 
+	// This will be used to build the $retainKeys directive sent in the patch
+	retainKeysList := make([]interface{}, 0, len(modified))
+
+	// Compare each value in the modified map against the value in the original map
 	for key, modifiedValue := range modified {
+		// Get the underlying type for pointers
+		if diffOptions.BuildRetainKeysDirective && modifiedValue != nil {
+			retainKeysList = append(retainKeysList, key)
+		}
+
 		originalValue, ok := original[key]
 		if !ok {
 			// Key was added, so add to patch
@@ -144,6 +188,7 @@ func diffMaps(original, modified map[string]interface{}, t reflect.Type, diffOpt
 		}
 
 		// The patch may have a patch directive
+		// TODO: figure out if we need this. This shouldn't be needed by apply. When would the original map have patch directives in it?
 		foundDirectiveMarker, err := handleDirectiveMarker(key, originalValue, modifiedValue, patch)
 		if err != nil {
 			return nil, err
@@ -164,10 +209,10 @@ func diffMaps(original, modified map[string]interface{}, t reflect.Type, diffOpt
 		switch originalValueTyped := originalValue.(type) {
 		case map[string]interface{}:
 			modifiedValueTyped := modifiedValue.(map[string]interface{})
-			err = handleMapDiff(key, originalValueTyped, modifiedValueTyped, patch, t, diffOptions)
+			err = handleMapDiff(key, originalValueTyped, modifiedValueTyped, patch, schema, diffOptions)
 		case []interface{}:
 			modifiedValueTyped := modifiedValue.([]interface{})
-			err = handleSliceDiff(key, originalValueTyped, modifiedValueTyped, patch, t, diffOptions)
+			err = handleSliceDiff(key, originalValueTyped, modifiedValueTyped, patch, schema, diffOptions)
 		default:
 			replacePatchFieldIfNotEqual(key, originalValue, modifiedValue, patch, diffOptions)
 		}
@@ -177,6 +222,14 @@ func diffMaps(original, modified map[string]interface{}, t reflect.Type, diffOpt
 	}
 
 	updatePatchIfMissing(original, modified, patch, diffOptions)
+	// Insert the retainKeysList iff there are values present in the retainKeysList and
+	// either of the following is true:
+	// - the patch is not empty
+	// - there are additional field in original that need to be cleared
+	if len(retainKeysList) > 0 &&
+		(len(patch) > 0 || hasAdditionalNewField(original, modified)) {
+		patch[retainKeysDirective] = sortScalars(retainKeysList)
+	}
 	return patch, nil
 }
 
@@ -206,8 +259,9 @@ func handleDirectiveMarker(key string, originalValue, modifiedValue interface{},
 // patch is the patch map that contains key and the updated value, and it is the parent of originalValue, modifiedValue
 // diffOptions contains multiple options to control how we do the diff.
 func handleMapDiff(key string, originalValue, modifiedValue, patch map[string]interface{},
-	t reflect.Type, diffOptions DiffOptions) error {
-	fieldType, fieldPatchStrategy, _, err := forkedjson.LookupPatchMetadata(t, key)
+	schema LookupPatchMeta, diffOptions DiffOptions) error {
+	subschema, patchMeta, err := schema.LookupPatchMetadataForStruct(key)
+
 	if err != nil {
 		// We couldn't look up metadata for the field
 		// If the values are identical, this doesn't matter, no patch is needed
@@ -217,14 +271,19 @@ func handleMapDiff(key string, originalValue, modifiedValue, patch map[string]in
 		// Otherwise, return the error
 		return err
 	}
-	switch fieldPatchStrategy {
+	retainKeys, patchStrategy, err := extractRetainKeysPatchStrategy(patchMeta.GetPatchStrategies())
+	if err != nil {
+		return err
+	}
+	diffOptions.BuildRetainKeysDirective = retainKeys
+	switch patchStrategy {
 	// The patch strategic from metadata tells us to replace the entire object instead of diffing it
 	case replaceDirective:
 		if !diffOptions.IgnoreChangesAndAdditions {
 			patch[key] = modifiedValue
 		}
 	default:
-		patchValue, err := diffMaps(originalValue, modifiedValue, fieldType, diffOptions)
+		patchValue, err := diffMaps(originalValue, modifiedValue, subschema, diffOptions)
 		if err != nil {
 			return err
 		}
@@ -243,8 +302,8 @@ func handleMapDiff(key string, originalValue, modifiedValue, patch map[string]in
 // patch is the patch map that contains key and the updated value, and it is the parent of originalValue, modifiedValue
 // diffOptions contains multiple options to control how we do the diff.
 func handleSliceDiff(key string, originalValue, modifiedValue []interface{}, patch map[string]interface{},
-	t reflect.Type, diffOptions DiffOptions) error {
-	fieldType, fieldPatchStrategy, fieldPatchMergeKey, err := forkedjson.LookupPatchMetadata(t, key)
+	schema LookupPatchMeta, diffOptions DiffOptions) error {
+	subschema, patchMeta, err := schema.LookupPatchMetadataForSlice(key)
 	if err != nil {
 		// We couldn't look up metadata for the field
 		// If the values are identical, this doesn't matter, no patch is needed
@@ -254,11 +313,15 @@ func handleSliceDiff(key string, originalValue, modifiedValue []interface{}, pat
 		// Otherwise, return the error
 		return err
 	}
-
-	switch fieldPatchStrategy {
+	retainKeys, patchStrategy, err := extractRetainKeysPatchStrategy(patchMeta.GetPatchStrategies())
+	if err != nil {
+		return err
+	}
+	switch patchStrategy {
 	// Merge the 2 slices using mergePatchKey
 	case mergeDirective:
-		addList, deletionList, err := diffLists(originalValue, modifiedValue, fieldType.Elem(), fieldPatchMergeKey, diffOptions)
+		diffOptions.BuildRetainKeysDirective = retainKeys
+		addList, deletionList, setOrderList, err := diffLists(originalValue, modifiedValue, subschema, patchMeta.GetPatchMergeKey(), diffOptions)
 		if err != nil {
 			return err
 		}
@@ -269,6 +332,10 @@ func handleSliceDiff(key string, originalValue, modifiedValue []interface{}, pat
 		if len(deletionList) > 0 {
 			parallelDeletionListKey := fmt.Sprintf("%s/%s", deleteFromPrimitiveListDirectivePrefix, key)
 			patch[parallelDeletionListKey] = deletionList
+		}
+		if len(setOrderList) > 0 {
+			parallelSetOrderListKey := fmt.Sprintf("%s/%s", setElementOrderDirectivePrefix, key)
+			patch[parallelSetOrderListKey] = setOrderList
 		}
 	default:
 		replacePatchFieldIfNotEqual(key, originalValue, modifiedValue, patch, diffOptions)
@@ -311,44 +378,266 @@ func updatePatchIfMissing(original, modified, patch map[string]interface{}, diff
 	}
 }
 
-// Returns a (recursive) strategic merge patch and a parallel deletion list if necessary.
+// validateMergeKeyInLists checks if each map in the list has the mentryerge key.
+func validateMergeKeyInLists(mergeKey string, lists ...[]interface{}) error {
+	for _, list := range lists {
+		for _, item := range list {
+			m, ok := item.(map[string]interface{})
+			if !ok {
+				return mergepatch.ErrBadArgType(m, item)
+			}
+			if _, ok = m[mergeKey]; !ok {
+				return mergepatch.ErrNoMergeKey(m, mergeKey)
+			}
+		}
+	}
+	return nil
+}
+
+// normalizeElementOrder sort `patch` list by `patchOrder` and sort `serverOnly` list by `serverOrder`.
+// Then it merges the 2 sorted lists.
+// It guarantee the relative order in the patch list and in the serverOnly list is kept.
+// `patch` is a list of items in the patch, and `serverOnly` is a list of items in the live object.
+// `patchOrder` is the order we want `patch` list to have and
+// `serverOrder` is the order we want `serverOnly` list to have.
+// kind is the kind of each item in the lists `patch` and `serverOnly`.
+func normalizeElementOrder(patch, serverOnly, patchOrder, serverOrder []interface{}, mergeKey string, kind reflect.Kind) ([]interface{}, error) {
+	patch, err := normalizeSliceOrder(patch, patchOrder, mergeKey, kind)
+	if err != nil {
+		return nil, err
+	}
+	serverOnly, err = normalizeSliceOrder(serverOnly, serverOrder, mergeKey, kind)
+	if err != nil {
+		return nil, err
+	}
+	all := mergeSortedSlice(serverOnly, patch, serverOrder, mergeKey, kind)
+
+	return all, nil
+}
+
+// mergeSortedSlice merges the 2 sorted lists by serverOrder with best effort.
+// It will insert each item in `left` list to `right` list. In most cases, the 2 lists will be interleaved.
+// The relative order of left and right are guaranteed to be kept.
+// They have higher precedence than the order in the live list.
+// The place for a item in `left` is found by:
+// scan from the place of last insertion in `right` to the end of `right`,
+// the place is before the first item that is greater than the item we want to insert.
+// example usage: using server-only items as left and patch items as right. We insert server-only items
+// to patch list. We use the order of live object as record for comparision.
+func mergeSortedSlice(left, right, serverOrder []interface{}, mergeKey string, kind reflect.Kind) []interface{} {
+	// Returns if l is less than r, and if both have been found.
+	// If l and r both present and l is in front of r, l is less than r.
+	less := func(l, r interface{}) (bool, bool) {
+		li := index(serverOrder, l, mergeKey, kind)
+		ri := index(serverOrder, r, mergeKey, kind)
+		if li >= 0 && ri >= 0 {
+			return li < ri, true
+		} else {
+			return false, false
+		}
+	}
+
+	// left and right should be non-overlapping.
+	size := len(left) + len(right)
+	i, j := 0, 0
+	s := make([]interface{}, size, size)
+
+	for k := 0; k < size; k++ {
+		if i >= len(left) && j < len(right) {
+			// have items left in `right` list
+			s[k] = right[j]
+			j++
+		} else if j >= len(right) && i < len(left) {
+			// have items left in `left` list
+			s[k] = left[i]
+			i++
+		} else {
+			// compare them if i and j are both in bound
+			less, foundBoth := less(left[i], right[j])
+			if foundBoth && less {
+				s[k] = left[i]
+				i++
+			} else {
+				s[k] = right[j]
+				j++
+			}
+		}
+	}
+	return s
+}
+
+// index returns the index of the item in the given items, or -1 if it doesn't exist
+// l must NOT be a slice of slices, this should be checked before calling.
+func index(l []interface{}, valToLookUp interface{}, mergeKey string, kind reflect.Kind) int {
+	var getValFn func(interface{}) interface{}
+	// Get the correct `getValFn` based on item `kind`.
+	// It should return the value of merge key for maps and
+	// return the item for other kinds.
+	switch kind {
+	case reflect.Map:
+		getValFn = func(item interface{}) interface{} {
+			typedItem, ok := item.(map[string]interface{})
+			if !ok {
+				return nil
+			}
+			val := typedItem[mergeKey]
+			return val
+		}
+	default:
+		getValFn = func(item interface{}) interface{} {
+			return item
+		}
+	}
+
+	for i, v := range l {
+		if getValFn(valToLookUp) == getValFn(v) {
+			return i
+		}
+	}
+	return -1
+}
+
+// extractToDeleteItems takes a list and
+// returns 2 lists: one contains items that should be kept and the other contains items to be deleted.
+func extractToDeleteItems(l []interface{}) ([]interface{}, []interface{}, error) {
+	var nonDelete, toDelete []interface{}
+	for _, v := range l {
+		m, ok := v.(map[string]interface{})
+		if !ok {
+			return nil, nil, mergepatch.ErrBadArgType(m, v)
+		}
+
+		directive, foundDirective := m[directiveMarker]
+		if foundDirective && directive == deleteDirective {
+			toDelete = append(toDelete, v)
+		} else {
+			nonDelete = append(nonDelete, v)
+		}
+	}
+	return nonDelete, toDelete, nil
+}
+
+// normalizeSliceOrder sort `toSort` list by `order`
+func normalizeSliceOrder(toSort, order []interface{}, mergeKey string, kind reflect.Kind) ([]interface{}, error) {
+	var toDelete []interface{}
+	if kind == reflect.Map {
+		// make sure each item in toSort, order has merge key
+		err := validateMergeKeyInLists(mergeKey, toSort, order)
+		if err != nil {
+			return nil, err
+		}
+		toSort, toDelete, err = extractToDeleteItems(toSort)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	sort.SliceStable(toSort, func(i, j int) bool {
+		if ii := index(order, toSort[i], mergeKey, kind); ii >= 0 {
+			if ij := index(order, toSort[j], mergeKey, kind); ij >= 0 {
+				return ii < ij
+			}
+		}
+		return true
+	})
+	toSort = append(toSort, toDelete...)
+	return toSort, nil
+}
+
+// Returns a (recursive) strategic merge patch, a parallel deletion list if necessary and
+// another list to set the order of the list
 // Only list of primitives with merge strategy will generate a parallel deletion list.
 // These two lists should yield modified when applied to original, for lists with merge semantics.
-func diffLists(original, modified []interface{}, t reflect.Type, mergeKey string, diffOptions DiffOptions) ([]interface{}, []interface{}, error) {
+func diffLists(original, modified []interface{}, schema LookupPatchMeta, mergeKey string, diffOptions DiffOptions) ([]interface{}, []interface{}, []interface{}, error) {
 	if len(original) == 0 {
 		// Both slices are empty - do nothing
 		if len(modified) == 0 || diffOptions.IgnoreChangesAndAdditions {
-			return nil, nil, nil
+			return nil, nil, nil, nil
 		}
 
 		// Old slice was empty - add all elements from the new slice
-		return modified, nil, nil
+		return modified, nil, nil, nil
 	}
 
 	elementType, err := sliceElementType(original, modified)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
-	switch elementType.Kind() {
+	var patchList, deleteList, setOrderList []interface{}
+	kind := elementType.Kind()
+	switch kind {
 	case reflect.Map:
-		patchList, err := diffListsOfMaps(original, modified, t, mergeKey, diffOptions)
-		return patchList, nil, err
+		patchList, deleteList, err = diffListsOfMaps(original, modified, schema, mergeKey, diffOptions)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+		patchList, err = normalizeSliceOrder(patchList, modified, mergeKey, kind)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+		orderSame, err := isOrderSame(original, modified, mergeKey)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+		// append the deletions to the end of the patch list.
+		patchList = append(patchList, deleteList...)
+		deleteList = nil
+		// generate the setElementOrder list when there are content changes or order changes
+		if diffOptions.SetElementOrder &&
+			((!diffOptions.IgnoreChangesAndAdditions && (len(patchList) > 0 || !orderSame)) ||
+				(!diffOptions.IgnoreDeletions && len(patchList) > 0)) {
+			// Generate a list of maps that each item contains only the merge key.
+			setOrderList = make([]interface{}, len(modified))
+			for i, v := range modified {
+				typedV := v.(map[string]interface{})
+				setOrderList[i] = map[string]interface{}{
+					mergeKey: typedV[mergeKey],
+				}
+			}
+		}
 	case reflect.Slice:
 		// Lists of Lists are not permitted by the api
-		return nil, nil, mergepatch.ErrNoListOfLists
+		return nil, nil, nil, mergepatch.ErrNoListOfLists
 	default:
-		return diffListsOfScalars(original, modified, diffOptions)
+		patchList, deleteList, err = diffListsOfScalars(original, modified, diffOptions)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+		patchList, err = normalizeSliceOrder(patchList, modified, mergeKey, kind)
+		// generate the setElementOrder list when there are content changes or order changes
+		if diffOptions.SetElementOrder && ((!diffOptions.IgnoreDeletions && len(deleteList) > 0) ||
+			(!diffOptions.IgnoreChangesAndAdditions && !reflect.DeepEqual(original, modified))) {
+			setOrderList = modified
+		}
 	}
+	return patchList, deleteList, setOrderList, err
+}
+
+// isOrderSame checks if the order in a list has changed
+func isOrderSame(original, modified []interface{}, mergeKey string) (bool, error) {
+	if len(original) != len(modified) {
+		return false, nil
+	}
+	for i, modifiedItem := range modified {
+		equal, err := mergeKeyValueEqual(original[i], modifiedItem, mergeKey)
+		if err != nil || !equal {
+			return equal, err
+		}
+	}
+	return true, nil
 }
 
 // diffListsOfScalars returns 2 lists, the first one is addList and the second one is deletionList.
 // Argument diffOptions.IgnoreChangesAndAdditions controls if calculate addList. true means not calculate.
 // Argument diffOptions.IgnoreDeletions controls if calculate deletionList. true means not calculate.
+// original may be changed, but modified is guaranteed to not be changed
 func diffListsOfScalars(original, modified []interface{}, diffOptions DiffOptions) ([]interface{}, []interface{}, error) {
+	modifiedCopy := make([]interface{}, len(modified))
+	copy(modifiedCopy, modified)
 	// Sort the scalars for easier calculating the diff
 	originalScalars := sortScalars(original)
-	modifiedScalars := sortScalars(modified)
+	modifiedScalars := sortScalars(modifiedCopy)
 
 	originalIndex, modifiedIndex := 0, 0
 	addList := []interface{}{}
@@ -394,7 +683,7 @@ func diffListsOfScalars(original, modified []interface{}, diffOptions DiffOption
 		}
 	}
 
-	return addList, deletionList, nil
+	return addList, deduplicateScalars(deletionList), nil
 }
 
 // If first return value is non-nil, list1 contains an element not present in list2
@@ -422,18 +711,20 @@ func compareListValuesAtIndex(list1Inbounds, list2Inbounds bool, list1Value, lis
 	}
 }
 
-// Returns a (recursive) strategic merge patch that yields modified when applied to original,
-// for a pair of lists of maps with merge semantics.
-func diffListsOfMaps(original, modified []interface{}, t reflect.Type, mergeKey string, diffOptions DiffOptions) ([]interface{}, error) {
-	patch := make([]interface{}, 0)
+// diffListsOfMaps takes a pair of lists and
+// returns a (recursive) strategic merge patch list contains additions and changes and
+// a deletion list contains deletions
+func diffListsOfMaps(original, modified []interface{}, schema LookupPatchMeta, mergeKey string, diffOptions DiffOptions) ([]interface{}, []interface{}, error) {
+	patch := make([]interface{}, 0, len(modified))
+	deletionList := make([]interface{}, 0, len(original))
 
-	originalSorted, err := sortMergeListsByNameArray(original, t, mergeKey, false)
+	originalSorted, err := sortMergeListsByNameArray(original, schema, mergeKey, false)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	modifiedSorted, err := sortMergeListsByNameArray(modified, t, mergeKey, false)
+	modifiedSorted, err := sortMergeListsByNameArray(modified, schema, mergeKey, false)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	originalIndex, modifiedIndex := 0, 0
@@ -451,14 +742,14 @@ func diffListsOfMaps(original, modified []interface{}, t reflect.Type, mergeKey 
 		if originalInBounds {
 			originalElement, originalElementMergeKeyValue, err = getMapAndMergeKeyValueByIndex(originalIndex, mergeKey, originalSorted)
 			if err != nil {
-				return nil, err
+				return nil, nil, err
 			}
 			originalElementMergeKeyValueString = fmt.Sprintf("%v", originalElementMergeKeyValue)
 		}
 		if modifiedInBounds {
 			modifiedElement, modifiedElementMergeKeyValue, err = getMapAndMergeKeyValueByIndex(modifiedIndex, mergeKey, modifiedSorted)
 			if err != nil {
-				return nil, err
+				return nil, nil, err
 			}
 			modifiedElementMergeKeyValueString = fmt.Sprintf("%v", modifiedElementMergeKeyValue)
 		}
@@ -466,9 +757,9 @@ func diffListsOfMaps(original, modified []interface{}, t reflect.Type, mergeKey 
 		switch {
 		case bothInBounds && ItemMatchesOriginalAndModifiedSlice(originalElementMergeKeyValueString, modifiedElementMergeKeyValueString):
 			// Merge key values are equal, so recurse
-			patchValue, err := diffMaps(originalElement, modifiedElement, t, diffOptions)
+			patchValue, err := diffMaps(originalElement, modifiedElement, schema, diffOptions)
 			if err != nil {
-				return nil, err
+				return nil, nil, err
 			}
 			if len(patchValue) > 0 {
 				patchValue[mergeKey] = modifiedElementMergeKeyValue
@@ -492,21 +783,20 @@ func diffListsOfMaps(original, modified []interface{}, t reflect.Type, mergeKey 
 		case bothInBounds && ItemRemovedFromModifiedSlice(originalElementMergeKeyValueString, modifiedElementMergeKeyValueString):
 			if !diffOptions.IgnoreDeletions {
 				// Item was deleted, so add delete directive
-				patch = append(patch, CreateDeleteDirective(mergeKey, originalElementMergeKeyValue))
+				deletionList = append(deletionList, CreateDeleteDirective(mergeKey, originalElementMergeKeyValue))
 			}
 			originalIndex++
 		}
 	}
 
-	return patch, nil
+	return patch, deletionList, nil
 }
 
 // getMapAndMergeKeyValueByIndex return a map in the list and its merge key value given the index of the map.
 func getMapAndMergeKeyValueByIndex(index int, mergeKey string, listOfMaps []interface{}) (map[string]interface{}, interface{}, error) {
 	m, ok := listOfMaps[index].(map[string]interface{})
 	if !ok {
-		t := reflect.TypeOf(listOfMaps[index])
-		return nil, nil, mergepatch.ErrBadArgType("map[string]interface{}", t.Kind().String())
+		return nil, nil, mergepatch.ErrBadArgType(m, listOfMaps[index])
 	}
 
 	val, ok := m[mergeKey]
@@ -520,6 +810,15 @@ func getMapAndMergeKeyValueByIndex(index int, mergeKey string, listOfMaps []inte
 // must be json encoded content. A patch can be created from an original and a modified document
 // by calling CreateStrategicMergePatch.
 func StrategicMergePatch(original, patch []byte, dataStruct interface{}) ([]byte, error) {
+	schema, err := NewPatchMetaFromStruct(dataStruct)
+	if err != nil {
+		return nil, err
+	}
+
+	return StrategicMergePatchUsingLookupPatchMeta(original, patch, schema)
+}
+
+func StrategicMergePatchUsingLookupPatchMeta(original, patch []byte, schema LookupPatchMeta) ([]byte, error) {
 	originalMap, err := handleUnmarshal(original)
 	if err != nil {
 		return nil, err
@@ -529,7 +828,7 @@ func StrategicMergePatch(original, patch []byte, dataStruct interface{}) ([]byte
 		return nil, err
 	}
 
-	result, err := StrategicMergeMapPatch(originalMap, patchMap, dataStruct)
+	result, err := StrategicMergeMapPatchUsingLookupPatchMeta(originalMap, patchMap, schema)
 	if err != nil {
 		return nil, err
 	}
@@ -550,37 +849,35 @@ func handleUnmarshal(j []byte) (map[string]interface{}, error) {
 	return m, nil
 }
 
-// StrategicMergePatch applies a strategic merge patch. The original and patch documents
+// StrategicMergeMapPatch applies a strategic merge patch. The original and patch documents
 // must be JSONMap. A patch can be created from an original and modified document by
 // calling CreateTwoWayMergeMapPatch.
 // Warning: the original and patch JSONMap objects are mutated by this function and should not be reused.
 func StrategicMergeMapPatch(original, patch JSONMap, dataStruct interface{}) (JSONMap, error) {
-	t, err := getTagStructType(dataStruct)
+	schema, err := NewPatchMetaFromStruct(dataStruct)
 	if err != nil {
 		return nil, err
 	}
-	mergeOptions := MergeOptions{
-		MergeDeleteList:      true,
-		IgnoreUnmatchedNulls: true,
+
+	// We need the go struct tags `patchMergeKey` and `patchStrategy` for fields that support a strategic merge patch.
+	// For native resources, we can easily figure out these tags since we know the fields.
+
+	// Because custom resources are decoded as Unstructured and because we're missing the metadata about how to handle
+	// each field in a strategic merge patch, we can't find the go struct tags. Hence, we can't easily  do a strategic merge
+	// for custom resources. So we should fail fast and return an error.
+	if _, ok := dataStruct.(*unstructured.Unstructured); ok {
+		return nil, mergepatch.ErrUnsupportedStrategicMergePatchFormat
 	}
-	return mergeMap(original, patch, t, mergeOptions)
+
+	return StrategicMergeMapPatchUsingLookupPatchMeta(original, patch, schema)
 }
 
-func getTagStructType(dataStruct interface{}) (reflect.Type, error) {
-	if dataStruct == nil {
-		return nil, mergepatch.ErrBadArgType("struct", "nil")
+func StrategicMergeMapPatchUsingLookupPatchMeta(original, patch JSONMap, schema LookupPatchMeta) (JSONMap, error) {
+	mergeOptions := MergeOptions{
+		MergeParallelList:    true,
+		IgnoreUnmatchedNulls: true,
 	}
-
-	t := reflect.TypeOf(dataStruct)
-	if t.Kind() == reflect.Ptr {
-		t = t.Elem()
-	}
-
-	if t.Kind() != reflect.Struct {
-		return nil, mergepatch.ErrBadArgType("struct", t.Kind().String())
-	}
-
-	return t, nil
+	return mergeMap(original, patch, schema, mergeOptions)
 }
 
 // handleDirectiveInMergeMap handles the patch directive when merging 2 maps.
@@ -602,6 +899,106 @@ func handleDirectiveInMergeMap(directive interface{}, patch map[string]interface
 	return nil, mergepatch.ErrBadPatchType(directive, patch)
 }
 
+func containsDirectiveMarker(item interface{}) bool {
+	m, ok := item.(map[string]interface{})
+	if ok {
+		if _, foundDirectiveMarker := m[directiveMarker]; foundDirectiveMarker {
+			return true
+		}
+	}
+	return false
+}
+
+func mergeKeyValueEqual(left, right interface{}, mergeKey string) (bool, error) {
+	if len(mergeKey) == 0 {
+		return left == right, nil
+	}
+	typedLeft, ok := left.(map[string]interface{})
+	if !ok {
+		return false, mergepatch.ErrBadArgType(typedLeft, left)
+	}
+	typedRight, ok := right.(map[string]interface{})
+	if !ok {
+		return false, mergepatch.ErrBadArgType(typedRight, right)
+	}
+	mergeKeyLeft, ok := typedLeft[mergeKey]
+	if !ok {
+		return false, mergepatch.ErrNoMergeKey(typedLeft, mergeKey)
+	}
+	mergeKeyRight, ok := typedRight[mergeKey]
+	if !ok {
+		return false, mergepatch.ErrNoMergeKey(typedRight, mergeKey)
+	}
+	return mergeKeyLeft == mergeKeyRight, nil
+}
+
+// extractKey trims the prefix and return the original key
+func extractKey(s, prefix string) (string, error) {
+	substrings := strings.SplitN(s, "/", 2)
+	if len(substrings) <= 1 || substrings[0] != prefix {
+		switch prefix {
+		case deleteFromPrimitiveListDirectivePrefix:
+			return "", mergepatch.ErrBadPatchFormatForPrimitiveList
+		case setElementOrderDirectivePrefix:
+			return "", mergepatch.ErrBadPatchFormatForSetElementOrderList
+		default:
+			return "", fmt.Errorf("fail to find unknown prefix %q in %s\n", prefix, s)
+		}
+	}
+	return substrings[1], nil
+}
+
+// validatePatchUsingSetOrderList verifies:
+// the relative order of any two items in the setOrderList list matches that in the patch list.
+// the items in the patch list must be a subset or the same as the $setElementOrder list (deletions are ignored).
+func validatePatchWithSetOrderList(patchList, setOrderList interface{}, mergeKey string) error {
+	typedSetOrderList, ok := setOrderList.([]interface{})
+	if !ok {
+		return mergepatch.ErrBadPatchFormatForSetElementOrderList
+	}
+	typedPatchList, ok := patchList.([]interface{})
+	if !ok {
+		return mergepatch.ErrBadPatchFormatForSetElementOrderList
+	}
+	if len(typedSetOrderList) == 0 || len(typedPatchList) == 0 {
+		return nil
+	}
+
+	var nonDeleteList, toDeleteList []interface{}
+	var err error
+	if len(mergeKey) > 0 {
+		nonDeleteList, toDeleteList, err = extractToDeleteItems(typedPatchList)
+		if err != nil {
+			return err
+		}
+	} else {
+		nonDeleteList = typedPatchList
+	}
+
+	patchIndex, setOrderIndex := 0, 0
+	for patchIndex < len(nonDeleteList) && setOrderIndex < len(typedSetOrderList) {
+		if containsDirectiveMarker(nonDeleteList[patchIndex]) {
+			patchIndex++
+			continue
+		}
+		mergeKeyEqual, err := mergeKeyValueEqual(nonDeleteList[patchIndex], typedSetOrderList[setOrderIndex], mergeKey)
+		if err != nil {
+			return err
+		}
+		if mergeKeyEqual {
+			patchIndex++
+		}
+		setOrderIndex++
+	}
+	// If patchIndex is inbound but setOrderIndex if out of bound mean there are items mismatching between the patch list and setElementOrder list.
+	// the second check is is a sanity check, and should always be true if the first is true.
+	if patchIndex < len(nonDeleteList) && setOrderIndex >= len(typedSetOrderList) {
+		return fmt.Errorf("The order in patch list:\n%v\n doesn't match %s list:\n%v\n", typedPatchList, setElementOrderDirectivePrefix, setOrderList)
+	}
+	typedPatchList = append(nonDeleteList, toDeleteList...)
+	return nil
+}
+
 // preprocessDeletionListForMerging preprocesses the deletion list.
 // it returns shouldContinue, isDeletionList, noPrefixKey
 func preprocessDeletionListForMerging(key string, original map[string]interface{},
@@ -614,23 +1011,251 @@ func preprocessDeletionListForMerging(key string, original map[string]interface{
 			original[key] = patchVal
 			return true, false, "", nil
 		}
-		substrings := strings.SplitN(key, "/", 2)
-		if len(substrings) <= 1 {
-			return false, false, "", mergepatch.ErrBadPatchFormatForPrimitiveList
-		}
-		return false, true, substrings[1], nil
+		originalKey, err := extractKey(key, deleteFromPrimitiveListDirectivePrefix)
+		return false, true, originalKey, err
 	}
 	return false, false, "", nil
+}
+
+// applyRetainKeysDirective looks for a retainKeys directive and applies to original
+// - if no directive exists do nothing
+// - if directive is found, clear keys in original missing from the directive list
+// - validate that all keys present in the patch are present in the retainKeys directive
+// note: original may be another patch request, e.g. applying the add+modified patch to the deletions patch. In this case it may have directives
+func applyRetainKeysDirective(original, patch map[string]interface{}, options MergeOptions) error {
+	retainKeysInPatch, foundInPatch := patch[retainKeysDirective]
+	if !foundInPatch {
+		return nil
+	}
+	// cleanup the directive
+	delete(patch, retainKeysDirective)
+
+	if !options.MergeParallelList {
+		// If original is actually a patch, make sure the retainKeys directives are the same in both patches if present in both.
+		// If not present in the original patch, copy from the modified patch.
+		retainKeysInOriginal, foundInOriginal := original[retainKeysDirective]
+		if foundInOriginal {
+			if !reflect.DeepEqual(retainKeysInOriginal, retainKeysInPatch) {
+				// This error actually should never happen.
+				return fmt.Errorf("%v and %v are not deep equal: this may happen when calculating the 3-way diff patch", retainKeysInOriginal, retainKeysInPatch)
+			}
+		} else {
+			original[retainKeysDirective] = retainKeysInPatch
+		}
+		return nil
+	}
+
+	retainKeysList, ok := retainKeysInPatch.([]interface{})
+	if !ok {
+		return mergepatch.ErrBadPatchFormatForRetainKeys
+	}
+
+	// validate patch to make sure all fields in the patch are present in the retainKeysList.
+	// The map is used only as a set, the value is never referenced
+	m := map[interface{}]struct{}{}
+	for _, v := range retainKeysList {
+		m[v] = struct{}{}
+	}
+	for k, v := range patch {
+		if v == nil || strings.HasPrefix(k, deleteFromPrimitiveListDirectivePrefix) ||
+			strings.HasPrefix(k, setElementOrderDirectivePrefix) {
+			continue
+		}
+		// If there is an item present in the patch but not in the retainKeys list,
+		// the patch is invalid.
+		if _, found := m[k]; !found {
+			return mergepatch.ErrBadPatchFormatForRetainKeys
+		}
+	}
+
+	// clear not present fields
+	for k := range original {
+		if _, found := m[k]; !found {
+			delete(original, k)
+		}
+	}
+	return nil
+}
+
+// mergePatchIntoOriginal processes $setElementOrder list.
+// When not merging the directive, it will make sure $setElementOrder list exist only in original.
+// When merging the directive, it will try to find the $setElementOrder list and
+// its corresponding patch list, validate it and merge it.
+// Then, sort them by the relative order in setElementOrder, patch list and live list.
+// The precedence is $setElementOrder > order in patch list > order in live list.
+// This function will delete the item after merging it to prevent process it again in the future.
+// Ref: https://git.k8s.io/community/contributors/design-proposals/cli/preserve-order-in-strategic-merge-patch.md
+func mergePatchIntoOriginal(original, patch map[string]interface{}, schema LookupPatchMeta, mergeOptions MergeOptions) error {
+	for key, patchV := range patch {
+		// Do nothing if there is no ordering directive
+		if !strings.HasPrefix(key, setElementOrderDirectivePrefix) {
+			continue
+		}
+
+		setElementOrderInPatch := patchV
+		// Copies directive from the second patch (`patch`) to the first patch (`original`)
+		// and checks they are equal and delete the directive in the second patch
+		if !mergeOptions.MergeParallelList {
+			setElementOrderListInOriginal, ok := original[key]
+			if ok {
+				// check if the setElementOrder list in original and the one in patch matches
+				if !reflect.DeepEqual(setElementOrderListInOriginal, setElementOrderInPatch) {
+					return mergepatch.ErrBadPatchFormatForSetElementOrderList
+				}
+			} else {
+				// move the setElementOrder list from patch to original
+				original[key] = setElementOrderInPatch
+			}
+		}
+		delete(patch, key)
+
+		var (
+			ok                                          bool
+			originalFieldValue, patchFieldValue, merged []interface{}
+			patchStrategy                               string
+			patchMeta                                   PatchMeta
+			subschema                                   LookupPatchMeta
+		)
+		typedSetElementOrderList, ok := setElementOrderInPatch.([]interface{})
+		if !ok {
+			return mergepatch.ErrBadArgType(typedSetElementOrderList, setElementOrderInPatch)
+		}
+		// Trim the setElementOrderDirectivePrefix to get the key of the list field in original.
+		originalKey, err := extractKey(key, setElementOrderDirectivePrefix)
+		if err != nil {
+			return err
+		}
+		// try to find the list with `originalKey` in `original` and `modified` and merge them.
+		originalList, foundOriginal := original[originalKey]
+		patchList, foundPatch := patch[originalKey]
+		if foundOriginal {
+			originalFieldValue, ok = originalList.([]interface{})
+			if !ok {
+				return mergepatch.ErrBadArgType(originalFieldValue, originalList)
+			}
+		}
+		if foundPatch {
+			patchFieldValue, ok = patchList.([]interface{})
+			if !ok {
+				return mergepatch.ErrBadArgType(patchFieldValue, patchList)
+			}
+		}
+		subschema, patchMeta, err = schema.LookupPatchMetadataForSlice(originalKey)
+		if err != nil {
+			return err
+		}
+		_, patchStrategy, err = extractRetainKeysPatchStrategy(patchMeta.GetPatchStrategies())
+		if err != nil {
+			return err
+		}
+		// Check for consistency between the element order list and the field it applies to
+		err = validatePatchWithSetOrderList(patchFieldValue, typedSetElementOrderList, patchMeta.GetPatchMergeKey())
+		if err != nil {
+			return err
+		}
+
+		switch {
+		case foundOriginal && !foundPatch:
+			// no change to list contents
+			merged = originalFieldValue
+		case !foundOriginal && foundPatch:
+			// list was added
+			merged = patchFieldValue
+		case foundOriginal && foundPatch:
+			merged, err = mergeSliceHandler(originalList, patchList, subschema,
+				patchStrategy, patchMeta.GetPatchMergeKey(), false, mergeOptions)
+			if err != nil {
+				return err
+			}
+		case !foundOriginal && !foundPatch:
+			continue
+		}
+
+		// Split all items into patch items and server-only items and then enforce the order.
+		var patchItems, serverOnlyItems []interface{}
+		if len(patchMeta.GetPatchMergeKey()) == 0 {
+			// Primitives doesn't need merge key to do partitioning.
+			patchItems, serverOnlyItems = partitionPrimitivesByPresentInList(merged, typedSetElementOrderList)
+
+		} else {
+			// Maps need merge key to do partitioning.
+			patchItems, serverOnlyItems, err = partitionMapsByPresentInList(merged, typedSetElementOrderList, patchMeta.GetPatchMergeKey())
+			if err != nil {
+				return err
+			}
+		}
+
+		elementType, err := sliceElementType(originalFieldValue, patchFieldValue)
+		if err != nil {
+			return err
+		}
+		kind := elementType.Kind()
+		// normalize merged list
+		// typedSetElementOrderList contains all the relative order in typedPatchList,
+		// so don't need to use typedPatchList
+		both, err := normalizeElementOrder(patchItems, serverOnlyItems, typedSetElementOrderList, originalFieldValue, patchMeta.GetPatchMergeKey(), kind)
+		if err != nil {
+			return err
+		}
+		original[originalKey] = both
+		// delete patch list from patch to prevent process again in the future
+		delete(patch, originalKey)
+	}
+	return nil
+}
+
+// partitionPrimitivesByPresentInList partitions elements into 2 slices, the first containing items present in partitionBy, the other not.
+func partitionPrimitivesByPresentInList(original, partitionBy []interface{}) ([]interface{}, []interface{}) {
+	patch := make([]interface{}, 0, len(original))
+	serverOnly := make([]interface{}, 0, len(original))
+	inPatch := map[interface{}]bool{}
+	for _, v := range partitionBy {
+		inPatch[v] = true
+	}
+	for _, v := range original {
+		if !inPatch[v] {
+			serverOnly = append(serverOnly, v)
+		} else {
+			patch = append(patch, v)
+		}
+	}
+	return patch, serverOnly
+}
+
+// partitionMapsByPresentInList partitions elements into 2 slices, the first containing items present in partitionBy, the other not.
+func partitionMapsByPresentInList(original, partitionBy []interface{}, mergeKey string) ([]interface{}, []interface{}, error) {
+	patch := make([]interface{}, 0, len(original))
+	serverOnly := make([]interface{}, 0, len(original))
+	for _, v := range original {
+		typedV, ok := v.(map[string]interface{})
+		if !ok {
+			return nil, nil, mergepatch.ErrBadArgType(typedV, v)
+		}
+		mergeKeyValue, foundMergeKey := typedV[mergeKey]
+		if !foundMergeKey {
+			return nil, nil, mergepatch.ErrNoMergeKey(typedV, mergeKey)
+		}
+		_, _, found, err := findMapInSliceBasedOnKeyValue(partitionBy, mergeKey, mergeKeyValue)
+		if err != nil {
+			return nil, nil, err
+		}
+		if !found {
+			serverOnly = append(serverOnly, v)
+		} else {
+			patch = append(patch, v)
+		}
+	}
+	return patch, serverOnly, nil
 }
 
 // Merge fields from a patch map into the original map. Note: This may modify
 // both the original map and the patch because getting a deep copy of a map in
 // golang is highly non-trivial.
-// flag mergeOptions.MergeDeleteList controls if using the parallel list to delete or keeping the list.
+// flag mergeOptions.MergeParallelList controls if using the parallel list to delete or keeping the list.
 // If patch contains any null field (e.g. field_1: null) that is not
 // present in original, then to propagate it to the end result use
 // mergeOptions.IgnoreUnmatchedNulls == false.
-func mergeMap(original, patch map[string]interface{}, t reflect.Type, mergeOptions MergeOptions) (map[string]interface{}, error) {
+func mergeMap(original, patch map[string]interface{}, schema LookupPatchMeta, mergeOptions MergeOptions) (map[string]interface{}, error) {
 	if v, ok := patch[directiveMarker]; ok {
 		return handleDirectiveInMergeMap(v, patch)
 	}
@@ -641,9 +1266,23 @@ func mergeMap(original, patch map[string]interface{}, t reflect.Type, mergeOptio
 		original = map[string]interface{}{}
 	}
 
+	err := applyRetainKeysDirective(original, patch, mergeOptions)
+	if err != nil {
+		return nil, err
+	}
+
+	// Process $setElementOrder list and other lists sharing the same key.
+	// When not merging the directive, it will make sure $setElementOrder list exist only in original.
+	// When merging the directive, it will process $setElementOrder and its patch list together.
+	// This function will delete the merged elements from patch so they will not be reprocessed
+	err = mergePatchIntoOriginal(original, patch, schema, mergeOptions)
+	if err != nil {
+		return nil, err
+	}
+
 	// Start merging the patch into the original.
 	for k, patchV := range patch {
-		skipProcessing, isDeleteList, noPrefixKey, err := preprocessDeletionListForMerging(k, original, patchV, mergeOptions.MergeDeleteList)
+		skipProcessing, isDeleteList, noPrefixKey, err := preprocessDeletionListForMerging(k, original, patchV, mergeOptions.MergeParallelList)
 		if err != nil {
 			return nil, err
 		}
@@ -674,11 +1313,6 @@ func mergeMap(original, patch map[string]interface{}, t reflect.Type, mergeOptio
 			continue
 		}
 
-		// If the data type is a pointer, resolve the element.
-		if t.Kind() == reflect.Ptr {
-			t = t.Elem()
-		}
-
 		originalType := reflect.TypeOf(original[k])
 		patchType := reflect.TypeOf(patchV)
 		if originalType != patchType {
@@ -686,17 +1320,27 @@ func mergeMap(original, patch map[string]interface{}, t reflect.Type, mergeOptio
 			continue
 		}
 		// If they're both maps or lists, recurse into the value.
-		// First find the fieldPatchStrategy and fieldPatchMergeKey.
-		fieldType, fieldPatchStrategy, fieldPatchMergeKey, err := forkedjson.LookupPatchMetadata(t, k)
-		if err != nil {
-			return nil, err
-		}
 		switch originalType.Kind() {
 		case reflect.Map:
-
-			original[k], err = mergeMapHandler(original[k], patchV, fieldType, fieldPatchStrategy, mergeOptions)
+			subschema, patchMeta, err2 := schema.LookupPatchMetadataForStruct(k)
+			if err2 != nil {
+				return nil, err2
+			}
+			_, patchStrategy, err2 := extractRetainKeysPatchStrategy(patchMeta.GetPatchStrategies())
+			if err2 != nil {
+				return nil, err2
+			}
+			original[k], err = mergeMapHandler(original[k], patchV, subschema, patchStrategy, mergeOptions)
 		case reflect.Slice:
-			original[k], err = mergeSliceHandler(original[k], patchV, fieldType, fieldPatchStrategy, fieldPatchMergeKey, isDeleteList, mergeOptions)
+			subschema, patchMeta, err2 := schema.LookupPatchMetadataForSlice(k)
+			if err2 != nil {
+				return nil, err2
+			}
+			_, patchStrategy, err2 := extractRetainKeysPatchStrategy(patchMeta.GetPatchStrategies())
+			if err2 != nil {
+				return nil, err2
+			}
+			original[k], err = mergeSliceHandler(original[k], patchV, subschema, patchStrategy, patchMeta.GetPatchMergeKey(), isDeleteList, mergeOptions)
 		default:
 			original[k] = patchV
 		}
@@ -709,7 +1353,7 @@ func mergeMap(original, patch map[string]interface{}, t reflect.Type, mergeOptio
 
 // mergeMapHandler handles how to merge `patchV` whose key is `key` with `original` respecting
 // fieldPatchStrategy and mergeOptions.
-func mergeMapHandler(original, patch interface{}, fieldType reflect.Type,
+func mergeMapHandler(original, patch interface{}, schema LookupPatchMeta,
 	fieldPatchStrategy string, mergeOptions MergeOptions) (map[string]interface{}, error) {
 	typedOriginal, typedPatch, err := mapTypeAssertion(original, patch)
 	if err != nil {
@@ -717,7 +1361,7 @@ func mergeMapHandler(original, patch interface{}, fieldType reflect.Type,
 	}
 
 	if fieldPatchStrategy != replaceDirective {
-		return mergeMap(typedOriginal, typedPatch, fieldType, mergeOptions)
+		return mergeMap(typedOriginal, typedPatch, schema, mergeOptions)
 	} else {
 		return typedPatch, nil
 	}
@@ -725,7 +1369,7 @@ func mergeMapHandler(original, patch interface{}, fieldType reflect.Type,
 
 // mergeSliceHandler handles how to merge `patchV` whose key is `key` with `original` respecting
 // fieldPatchStrategy, fieldPatchMergeKey, isDeleteList and mergeOptions.
-func mergeSliceHandler(original, patch interface{}, fieldType reflect.Type,
+func mergeSliceHandler(original, patch interface{}, schema LookupPatchMeta,
 	fieldPatchStrategy, fieldPatchMergeKey string, isDeleteList bool, mergeOptions MergeOptions) ([]interface{}, error) {
 	typedOriginal, typedPatch, err := sliceTypeAssertion(original, patch)
 	if err != nil {
@@ -733,8 +1377,7 @@ func mergeSliceHandler(original, patch interface{}, fieldType reflect.Type,
 	}
 
 	if fieldPatchStrategy == mergeDirective {
-		elemType := fieldType.Elem()
-		return mergeSlice(typedOriginal, typedPatch, elemType, fieldPatchMergeKey, mergeOptions, isDeleteList)
+		return mergeSlice(typedOriginal, typedPatch, schema, fieldPatchMergeKey, mergeOptions, isDeleteList)
 	} else {
 		return typedPatch, nil
 	}
@@ -743,7 +1386,7 @@ func mergeSliceHandler(original, patch interface{}, fieldType reflect.Type,
 // Merge two slices together. Note: This may modify both the original slice and
 // the patch because getting a deep copy of a slice in golang is highly
 // non-trivial.
-func mergeSlice(original, patch []interface{}, elemType reflect.Type, mergeKey string, mergeOptions MergeOptions, isDeleteList bool) ([]interface{}, error) {
+func mergeSlice(original, patch []interface{}, schema LookupPatchMeta, mergeKey string, mergeOptions MergeOptions, isDeleteList bool) ([]interface{}, error) {
 	if len(original) == 0 && len(patch) == 0 {
 		return original, nil
 	}
@@ -754,27 +1397,45 @@ func mergeSlice(original, patch []interface{}, elemType reflect.Type, mergeKey s
 		return nil, err
 	}
 
+	var merged []interface{}
+	kind := t.Kind()
 	// If the elements are not maps, merge the slices of scalars.
-	if t.Kind() != reflect.Map {
-		if mergeOptions.MergeDeleteList && isDeleteList {
+	if kind != reflect.Map {
+		if mergeOptions.MergeParallelList && isDeleteList {
 			return deleteFromSlice(original, patch), nil
 		}
 		// Maybe in the future add a "concat" mode that doesn't
-		// uniqify.
+		// deduplicate.
 		both := append(original, patch...)
-		return uniqifyScalars(both), nil
+		merged = deduplicateScalars(both)
+
+	} else {
+		if mergeKey == "" {
+			return nil, fmt.Errorf("cannot merge lists without merge key for %s", schema.Name())
+		}
+
+		original, patch, err = mergeSliceWithSpecialElements(original, patch, mergeKey)
+		if err != nil {
+			return nil, err
+		}
+
+		merged, err = mergeSliceWithoutSpecialElements(original, patch, mergeKey, schema, mergeOptions)
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	if mergeKey == "" {
-		return nil, fmt.Errorf("cannot merge lists without merge key for type %s", elemType.Kind().String())
+	// enforce the order
+	var patchItems, serverOnlyItems []interface{}
+	if len(mergeKey) == 0 {
+		patchItems, serverOnlyItems = partitionPrimitivesByPresentInList(merged, patch)
+	} else {
+		patchItems, serverOnlyItems, err = partitionMapsByPresentInList(merged, patch, mergeKey)
+		if err != nil {
+			return nil, err
+		}
 	}
-
-	original, patch, err = mergeSliceWithSpecialElements(original, patch, mergeKey)
-	if err != nil {
-		return nil, err
-	}
-
-	return mergeSliceWithoutSpecialElements(original, patch, mergeKey, elemType, mergeOptions)
+	return normalizeElementOrder(patchItems, serverOnlyItems, patch, original, mergeKey, kind)
 }
 
 // mergeSliceWithSpecialElements handles special elements with directiveMarker
@@ -799,7 +1460,7 @@ func mergeSliceWithSpecialElements(original, patch []interface{}, mergeKey strin
 						return nil, nil, err
 					}
 				} else {
-					return nil, nil, fmt.Errorf("delete patch type with no merge key defined")
+					return nil, nil, mergepatch.ErrNoMergeKey(typedV, mergeKey)
 				}
 			case replaceDirective:
 				replace = true
@@ -836,7 +1497,7 @@ func deleteMatchingEntries(original []interface{}, mergeKey string, mergeValue i
 
 // mergeSliceWithoutSpecialElements merges slices with non-special elements.
 // original and patch must be slices of maps, they should be checked before calling this function.
-func mergeSliceWithoutSpecialElements(original, patch []interface{}, mergeKey string, elemType reflect.Type, mergeOptions MergeOptions) ([]interface{}, error) {
+func mergeSliceWithoutSpecialElements(original, patch []interface{}, mergeKey string, schema LookupPatchMeta, mergeOptions MergeOptions) ([]interface{}, error) {
 	for _, v := range patch {
 		typedV := v.(map[string]interface{})
 		mergeValue, ok := typedV[mergeKey]
@@ -855,7 +1516,7 @@ func mergeSliceWithoutSpecialElements(original, patch []interface{}, mergeKey st
 			var mergedMaps interface{}
 			var err error
 			// Merge into original.
-			mergedMaps, err = mergeMap(originalMap, typedV, elemType, mergeOptions)
+			mergedMaps, err = mergeMap(originalMap, typedV, schema, mergeOptions)
 			if err != nil {
 				return nil, err
 			}
@@ -870,30 +1531,17 @@ func mergeSliceWithoutSpecialElements(original, patch []interface{}, mergeKey st
 
 // deleteFromSlice uses the parallel list to delete the items in a list of scalars
 func deleteFromSlice(current, toDelete []interface{}) []interface{} {
-	currentScalars := uniqifyAndSortScalars(current)
-	toDeleteScalars := uniqifyAndSortScalars(toDelete)
-
-	currentIndex, toDeleteIndex := 0, 0
-	mergedList := []interface{}{}
-
-	for currentIndex < len(currentScalars) && toDeleteIndex < len(toDeleteScalars) {
-		originalString := fmt.Sprintf("%v", currentScalars[currentIndex])
-		modifiedString := fmt.Sprintf("%v", toDeleteScalars[toDeleteIndex])
-
-		switch {
-		// found an item to delete
-		case originalString == modifiedString:
-			currentIndex++
-		// Request to delete an item that was not found in the current list
-		case originalString > modifiedString:
-			toDeleteIndex++
-		// Found an item that was not part of the deletion list, keep it
-		case originalString < modifiedString:
-			mergedList = append(mergedList, currentScalars[currentIndex])
-			currentIndex++
+	toDeleteMap := map[interface{}]interface{}{}
+	processed := make([]interface{}, 0, len(current))
+	for _, v := range toDelete {
+		toDeleteMap[v] = true
+	}
+	for _, v := range current {
+		if _, found := toDeleteMap[v]; !found {
+			processed = append(processed, v)
 		}
 	}
-	return append(mergedList, currentScalars[currentIndex:]...)
+	return processed
 }
 
 // This method no longer panics if any element of the slice is not a map.
@@ -901,7 +1549,7 @@ func findMapInSliceBasedOnKeyValue(m []interface{}, key string, value interface{
 	for k, v := range m {
 		typedV, ok := v.(map[string]interface{})
 		if !ok {
-			return nil, 0, false, fmt.Errorf("value for key %v is not a map.", k)
+			return nil, 0, false, fmt.Errorf("value for key %v is not a map", k)
 		}
 
 		valueToMatch, ok := typedV[key]
@@ -917,14 +1565,14 @@ func findMapInSliceBasedOnKeyValue(m []interface{}, key string, value interface{
 // by key. This is needed by tests because in JSON, list order is significant,
 // but in Strategic Merge Patch, merge lists do not have significant order.
 // Sorting the lists allows for order-insensitive comparison of patched maps.
-func sortMergeListsByName(mapJSON []byte, dataStruct interface{}) ([]byte, error) {
+func sortMergeListsByName(mapJSON []byte, schema LookupPatchMeta) ([]byte, error) {
 	var m map[string]interface{}
 	err := json.Unmarshal(mapJSON, &m)
 	if err != nil {
-		return nil, err
+		return nil, mergepatch.ErrBadJSONDoc
 	}
 
-	newM, err := sortMergeListsByNameMap(m, reflect.TypeOf(dataStruct))
+	newM, err := sortMergeListsByNameMap(m, schema)
 	if err != nil {
 		return nil, err
 	}
@@ -933,32 +1581,50 @@ func sortMergeListsByName(mapJSON []byte, dataStruct interface{}) ([]byte, error
 }
 
 // Function sortMergeListsByNameMap recursively sorts the merge lists by its mergeKey in a map.
-func sortMergeListsByNameMap(s map[string]interface{}, t reflect.Type) (map[string]interface{}, error) {
+func sortMergeListsByNameMap(s map[string]interface{}, schema LookupPatchMeta) (map[string]interface{}, error) {
 	newS := map[string]interface{}{}
 	for k, v := range s {
-		if strings.HasPrefix(k, deleteFromPrimitiveListDirectivePrefix) {
+		if k == retainKeysDirective {
+			typedV, ok := v.([]interface{})
+			if !ok {
+				return nil, mergepatch.ErrBadPatchFormatForRetainKeys
+			}
+			v = sortScalars(typedV)
+		} else if strings.HasPrefix(k, deleteFromPrimitiveListDirectivePrefix) {
 			typedV, ok := v.([]interface{})
 			if !ok {
 				return nil, mergepatch.ErrBadPatchFormatForPrimitiveList
 			}
-			v = uniqifyAndSortScalars(typedV)
-		} else if k != directiveMarker {
-			fieldType, fieldPatchStrategy, fieldPatchMergeKey, err := forkedjson.LookupPatchMetadata(t, k)
-			if err != nil {
-				return nil, err
+			v = sortScalars(typedV)
+		} else if strings.HasPrefix(k, setElementOrderDirectivePrefix) {
+			_, ok := v.([]interface{})
+			if !ok {
+				return nil, mergepatch.ErrBadPatchFormatForSetElementOrderList
 			}
-
-			// If v is a map or a merge slice, recurse.
-			if typedV, ok := v.(map[string]interface{}); ok {
-				var err error
-				v, err = sortMergeListsByNameMap(typedV, fieldType)
+		} else if k != directiveMarker {
+			// recurse for map and slice.
+			switch typedV := v.(type) {
+			case map[string]interface{}:
+				subschema, _, err := schema.LookupPatchMetadataForStruct(k)
 				if err != nil {
 					return nil, err
 				}
-			} else if typedV, ok := v.([]interface{}); ok {
-				if fieldPatchStrategy == mergeDirective {
+				v, err = sortMergeListsByNameMap(typedV, subschema)
+				if err != nil {
+					return nil, err
+				}
+			case []interface{}:
+				subschema, patchMeta, err := schema.LookupPatchMetadataForSlice(k)
+				if err != nil {
+					return nil, err
+				}
+				_, patchStrategy, err := extractRetainKeysPatchStrategy(patchMeta.GetPatchStrategies())
+				if err != nil {
+					return nil, err
+				}
+				if patchStrategy == mergeDirective {
 					var err error
-					v, err = sortMergeListsByNameArray(typedV, fieldType.Elem(), fieldPatchMergeKey, true)
+					v, err = sortMergeListsByNameArray(typedV, subschema, patchMeta.GetPatchMergeKey(), true)
 					if err != nil {
 						return nil, err
 					}
@@ -973,7 +1639,7 @@ func sortMergeListsByNameMap(s map[string]interface{}, t reflect.Type) (map[stri
 }
 
 // Function sortMergeListsByNameMap recursively sorts the merge lists by its mergeKey in an array.
-func sortMergeListsByNameArray(s []interface{}, elemType reflect.Type, mergeKey string, recurse bool) ([]interface{}, error) {
+func sortMergeListsByNameArray(s []interface{}, schema LookupPatchMeta, mergeKey string, recurse bool) ([]interface{}, error) {
 	if len(s) == 0 {
 		return s, nil
 	}
@@ -987,7 +1653,7 @@ func sortMergeListsByNameArray(s []interface{}, elemType reflect.Type, mergeKey 
 	// If the elements are not maps...
 	if t.Kind() != reflect.Map {
 		// Sort the elements, because they may have been merged out of order.
-		return uniqifyAndSortScalars(s), nil
+		return deduplicateAndSortScalars(s), nil
 	}
 
 	// Elements are maps - if one of the keys of the map is a map or a
@@ -996,7 +1662,7 @@ func sortMergeListsByNameArray(s []interface{}, elemType reflect.Type, mergeKey 
 	for _, elem := range s {
 		if recurse {
 			typedElem := elem.(map[string]interface{})
-			newElem, err := sortMergeListsByNameMap(typedElem, elemType)
+			newElem, err := sortMergeListsByNameMap(typedElem, schema)
 			if err != nil {
 				return nil, err
 			}
@@ -1060,8 +1726,8 @@ func (ss SortableSliceOfMaps) Swap(i, j int) {
 	ss.s[j] = tmp
 }
 
-func uniqifyAndSortScalars(s []interface{}) []interface{} {
-	s = uniqifyScalars(s)
+func deduplicateAndSortScalars(s []interface{}) []interface{} {
+	s = deduplicateScalars(s)
 	return sortScalars(s)
 }
 
@@ -1071,8 +1737,8 @@ func sortScalars(s []interface{}) []interface{} {
 	return ss.s
 }
 
-func uniqifyScalars(s []interface{}) []interface{} {
-	// Clever algorithm to uniqify.
+func deduplicateScalars(s []interface{}) []interface{} {
+	// Clever algorithm to deduplicate.
 	length := len(s) - 1
 	for i := 0; i < length; i++ {
 		for j := i + 1; j <= length; j++ {
@@ -1142,18 +1808,13 @@ func sliceElementType(slices ...[]interface{}) (reflect.Type, error) {
 // objects overlap with different values in any key. All keys are required to be
 // strings. Since patches of the same Type have congruent keys, this is valid
 // for multiple patch types. This method supports strategic merge patch semantics.
-func MergingMapsHaveConflicts(left, right map[string]interface{}, dataStruct interface{}) (bool, error) {
-	t, err := getTagStructType(dataStruct)
-	if err != nil {
-		return true, err
-	}
-
-	return mergingMapFieldsHaveConflicts(left, right, t, "", "")
+func MergingMapsHaveConflicts(left, right map[string]interface{}, schema LookupPatchMeta) (bool, error) {
+	return mergingMapFieldsHaveConflicts(left, right, schema, "", "")
 }
 
 func mergingMapFieldsHaveConflicts(
 	left, right interface{},
-	fieldType reflect.Type,
+	schema LookupPatchMeta,
 	fieldPatchStrategy, fieldPatchMergeKey string,
 ) (bool, error) {
 	switch leftType := left.(type) {
@@ -1184,15 +1845,14 @@ func mergingMapFieldsHaveConflicts(
 			return false, nil
 		}
 		// Check the individual keys.
-		return mapsHaveConflicts(leftType, rightType, fieldType)
+		return mapsHaveConflicts(leftType, rightType, schema)
 
 	case []interface{}:
 		rightType, ok := right.([]interface{})
 		if !ok {
 			return true, nil
 		}
-		return slicesHaveConflicts(leftType, rightType, fieldType, fieldPatchStrategy, fieldPatchMergeKey)
-
+		return slicesHaveConflicts(leftType, rightType, schema, fieldPatchStrategy, fieldPatchMergeKey)
 	case string, float64, bool, int, int64, nil:
 		return !reflect.DeepEqual(left, right), nil
 	default:
@@ -1200,17 +1860,37 @@ func mergingMapFieldsHaveConflicts(
 	}
 }
 
-func mapsHaveConflicts(typedLeft, typedRight map[string]interface{}, structType reflect.Type) (bool, error) {
+func mapsHaveConflicts(typedLeft, typedRight map[string]interface{}, schema LookupPatchMeta) (bool, error) {
 	for key, leftValue := range typedLeft {
-		if key != directiveMarker {
+		if key != directiveMarker && key != retainKeysDirective {
 			if rightValue, ok := typedRight[key]; ok {
-				fieldType, fieldPatchStrategy, fieldPatchMergeKey, err := forkedjson.LookupPatchMetadata(structType, key)
-				if err != nil {
-					return true, err
+				var subschema LookupPatchMeta
+				var patchMeta PatchMeta
+				var patchStrategy string
+				var err error
+				switch leftValue.(type) {
+				case []interface{}:
+					subschema, patchMeta, err = schema.LookupPatchMetadataForSlice(key)
+					if err != nil {
+						return true, err
+					}
+					_, patchStrategy, err = extractRetainKeysPatchStrategy(patchMeta.patchStrategies)
+					if err != nil {
+						return true, err
+					}
+				case map[string]interface{}:
+					subschema, patchMeta, err = schema.LookupPatchMetadataForStruct(key)
+					if err != nil {
+						return true, err
+					}
+					_, patchStrategy, err = extractRetainKeysPatchStrategy(patchMeta.patchStrategies)
+					if err != nil {
+						return true, err
+					}
 				}
 
 				if hasConflicts, err := mergingMapFieldsHaveConflicts(leftValue, rightValue,
-					fieldType, fieldPatchStrategy, fieldPatchMergeKey); hasConflicts {
+					subschema, patchStrategy, patchMeta.GetPatchMergeKey()); hasConflicts {
 					return true, err
 				}
 			}
@@ -1222,7 +1902,7 @@ func mapsHaveConflicts(typedLeft, typedRight map[string]interface{}, structType 
 
 func slicesHaveConflicts(
 	typedLeft, typedRight []interface{},
-	fieldType reflect.Type,
+	schema LookupPatchMeta,
 	fieldPatchStrategy, fieldPatchMergeKey string,
 ) (bool, error) {
 	elementType, err := sliceElementType(typedLeft, typedRight)
@@ -1230,7 +1910,6 @@ func slicesHaveConflicts(
 		return true, err
 	}
 
-	valueType := fieldType.Elem()
 	if fieldPatchStrategy == mergeDirective {
 		// Merging lists of scalars have no conflicts by definition
 		// So we only need to check further if the elements are maps
@@ -1249,7 +1928,7 @@ func slicesHaveConflicts(
 			return true, err
 		}
 
-		return mapsOfMapsHaveConflicts(leftMap, rightMap, valueType)
+		return mapsOfMapsHaveConflicts(leftMap, rightMap, schema)
 	}
 
 	// Either we don't have type information, or these are non-merging lists
@@ -1260,14 +1939,14 @@ func slicesHaveConflicts(
 	// Sort scalar slices to prevent ordering issues
 	// We have no way to sort non-merging lists of maps
 	if elementType.Kind() != reflect.Map {
-		typedLeft = uniqifyAndSortScalars(typedLeft)
-		typedRight = uniqifyAndSortScalars(typedRight)
+		typedLeft = deduplicateAndSortScalars(typedLeft)
+		typedRight = deduplicateAndSortScalars(typedRight)
 	}
 
 	// Compare the slices element by element in order
 	// This test will fail if the slices are not sorted
 	for i := range typedLeft {
-		if hasConflicts, err := mergingMapFieldsHaveConflicts(typedLeft[i], typedRight[i], valueType, "", ""); hasConflicts {
+		if hasConflicts, err := mergingMapFieldsHaveConflicts(typedLeft[i], typedRight[i], schema, "", ""); hasConflicts {
 			return true, err
 		}
 	}
@@ -1294,10 +1973,10 @@ func sliceOfMapsToMapOfMaps(slice []interface{}, mergeKey string) (map[string]in
 	return result, nil
 }
 
-func mapsOfMapsHaveConflicts(typedLeft, typedRight map[string]interface{}, structType reflect.Type) (bool, error) {
+func mapsOfMapsHaveConflicts(typedLeft, typedRight map[string]interface{}, schema LookupPatchMeta) (bool, error) {
 	for key, leftValue := range typedLeft {
 		if rightValue, ok := typedRight[key]; ok {
-			if hasConflicts, err := mergingMapFieldsHaveConflicts(leftValue, rightValue, structType, "", ""); hasConflicts {
+			if hasConflicts, err := mergingMapFieldsHaveConflicts(leftValue, rightValue, schema, "", ""); hasConflicts {
 				return true, err
 			}
 		}
@@ -1317,7 +1996,7 @@ func mapsOfMapsHaveConflicts(typedLeft, typedRight map[string]interface{}, struc
 // in a way that is different from how it is changed in current (e.g., deleting it, changing its
 // value). We also propagate values fields that do not exist in original but are explicitly
 // defined in modified.
-func CreateThreeWayMergePatch(original, modified, current []byte, dataStruct interface{}, overwrite bool, fns ...mergepatch.PreconditionFunc) ([]byte, error) {
+func CreateThreeWayMergePatch(original, modified, current []byte, schema LookupPatchMeta, overwrite bool, fns ...mergepatch.PreconditionFunc) ([]byte, error) {
 	originalMap := map[string]interface{}{}
 	if len(original) > 0 {
 		if err := json.Unmarshal(original, &originalMap); err != nil {
@@ -1339,37 +2018,29 @@ func CreateThreeWayMergePatch(original, modified, current []byte, dataStruct int
 		}
 	}
 
-	t, err := getTagStructType(dataStruct)
-	if err != nil {
-		return nil, err
-	}
-
 	// The patch is the difference from current to modified without deletions, plus deletions
 	// from original to modified. To find it, we compute deletions, which are the deletions from
 	// original to modified, and delta, which is the difference from current to modified without
 	// deletions, and then apply delta to deletions as a patch, which should be strictly additive.
 	deltaMapDiffOptions := DiffOptions{
-		IgnoreChangesAndAdditions: false,
-		IgnoreDeletions:           true,
+		IgnoreDeletions: true,
+		SetElementOrder: true,
 	}
-	deltaMap, err := diffMaps(currentMap, modifiedMap, t, deltaMapDiffOptions)
+	deltaMap, err := diffMaps(currentMap, modifiedMap, schema, deltaMapDiffOptions)
 	if err != nil {
 		return nil, err
 	}
 	deletionsMapDiffOptions := DiffOptions{
+		SetElementOrder:           true,
 		IgnoreChangesAndAdditions: true,
-		IgnoreDeletions:           false,
 	}
-	deletionsMap, err := diffMaps(originalMap, modifiedMap, t, deletionsMapDiffOptions)
+	deletionsMap, err := diffMaps(originalMap, modifiedMap, schema, deletionsMapDiffOptions)
 	if err != nil {
 		return nil, err
 	}
 
-	mergeOptions := MergeOptions{
-		MergeDeleteList:      false,
-		IgnoreUnmatchedNulls: false,
-	}
-	patchMap, err := mergeMap(deletionsMap, deltaMap, t, mergeOptions)
+	mergeOptions := MergeOptions{}
+	patchMap, err := mergeMap(deletionsMap, deltaMap, schema, mergeOptions)
 	if err != nil {
 		return nil, err
 	}
@@ -1384,16 +2055,13 @@ func CreateThreeWayMergePatch(original, modified, current []byte, dataStruct int
 	// If overwrite is false, and the patch contains any keys that were changed differently,
 	// then return a conflict error.
 	if !overwrite {
-		changeMapDiffOptions := DiffOptions{
-			IgnoreChangesAndAdditions: false,
-			IgnoreDeletions:           false,
-		}
-		changedMap, err := diffMaps(originalMap, currentMap, t, changeMapDiffOptions)
+		changeMapDiffOptions := DiffOptions{}
+		changedMap, err := diffMaps(originalMap, currentMap, schema, changeMapDiffOptions)
 		if err != nil {
 			return nil, err
 		}
 
-		hasConflicts, err := MergingMapsHaveConflicts(patchMap, changedMap, dataStruct)
+		hasConflicts, err := MergingMapsHaveConflicts(patchMap, changedMap, schema)
 		if err != nil {
 			return nil, err
 		}
@@ -1419,13 +2087,11 @@ func CreateDeleteDirective(mergeKey string, mergeKeyValue interface{}) map[strin
 func mapTypeAssertion(original, patch interface{}) (map[string]interface{}, map[string]interface{}, error) {
 	typedOriginal, ok := original.(map[string]interface{})
 	if !ok {
-		t := reflect.TypeOf(original)
-		return nil, nil, mergepatch.ErrBadArgType("map[string]interface{}", t.String())
+		return nil, nil, mergepatch.ErrBadArgType(typedOriginal, original)
 	}
 	typedPatch, ok := patch.(map[string]interface{})
 	if !ok {
-		t := reflect.TypeOf(patch)
-		return nil, nil, mergepatch.ErrBadArgType("map[string]interface{}", t.String())
+		return nil, nil, mergepatch.ErrBadArgType(typedPatch, patch)
 	}
 	return typedOriginal, typedPatch, nil
 }
@@ -1433,13 +2099,53 @@ func mapTypeAssertion(original, patch interface{}) (map[string]interface{}, map[
 func sliceTypeAssertion(original, patch interface{}) ([]interface{}, []interface{}, error) {
 	typedOriginal, ok := original.([]interface{})
 	if !ok {
-		t := reflect.TypeOf(original)
-		return nil, nil, mergepatch.ErrBadArgType("[]interface{}", t.String())
+		return nil, nil, mergepatch.ErrBadArgType(typedOriginal, original)
 	}
 	typedPatch, ok := patch.([]interface{})
 	if !ok {
-		t := reflect.TypeOf(patch)
-		return nil, nil, mergepatch.ErrBadArgType("[]interface{}", t.String())
+		return nil, nil, mergepatch.ErrBadArgType(typedPatch, patch)
 	}
 	return typedOriginal, typedPatch, nil
+}
+
+// extractRetainKeysPatchStrategy process patch strategy, which is a string may contains multiple
+// patch strategies seperated by ",". It returns a boolean var indicating if it has
+// retainKeys strategies and a string for the other strategy.
+func extractRetainKeysPatchStrategy(strategies []string) (bool, string, error) {
+	switch len(strategies) {
+	case 0:
+		return false, "", nil
+	case 1:
+		singleStrategy := strategies[0]
+		switch singleStrategy {
+		case retainKeysStrategy:
+			return true, "", nil
+		default:
+			return false, singleStrategy, nil
+		}
+	case 2:
+		switch {
+		case strategies[0] == retainKeysStrategy:
+			return true, strategies[1], nil
+		case strategies[1] == retainKeysStrategy:
+			return true, strategies[0], nil
+		default:
+			return false, "", fmt.Errorf("unexpected patch strategy: %v", strategies)
+		}
+	default:
+		return false, "", fmt.Errorf("unexpected patch strategy: %v", strategies)
+	}
+}
+
+// hasAdditionalNewField returns if original map has additional key with non-nil value than modified.
+func hasAdditionalNewField(original, modified map[string]interface{}) bool {
+	for k, v := range original {
+		if v == nil {
+			continue
+		}
+		if _, found := modified[k]; !found {
+			return true
+		}
+	}
+	return false
 }

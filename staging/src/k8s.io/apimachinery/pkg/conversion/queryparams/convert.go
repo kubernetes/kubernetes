@@ -90,7 +90,14 @@ func customMarshalValue(value reflect.Value) (reflect.Value, bool) {
 
 	marshaler, ok := value.Interface().(Marshaler)
 	if !ok {
-		return reflect.Value{}, false
+		if !isPointerKind(value.Kind()) && value.CanAddr() {
+			marshaler, ok = value.Addr().Interface().(Marshaler)
+			if !ok {
+				return reflect.Value{}, false
+			}
+		} else {
+			return reflect.Value{}, false
+		}
 	}
 
 	// Don't invoke functions on nil pointers

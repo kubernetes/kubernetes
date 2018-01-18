@@ -18,107 +18,68 @@ package kubectl
 
 import (
 	"fmt"
-	"strconv"
 
+	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apis/autoscaling"
 )
 
-type HorizontalPodAutoscalerV1 struct{}
-
-func (HorizontalPodAutoscalerV1) ParamNames() []GeneratorParam {
-	return []GeneratorParam{
-		{"default-name", true},
-		{"name", false},
-		{"scaleRef-kind", false},
-		{"scaleRef-name", false},
-		{"scaleRef-apiVersion", false},
-		{"min", false},
-		{"max", true},
-		{"cpu-percent", false},
-	}
+// HorizontalPodAutoscalerV1Generator supports stable generation of a horizontal pod autoscaler.
+type HorizontalPodAutoscalerGeneratorV1 struct {
+	Name               string
+	ScaleRefKind       string
+	ScaleRefName       string
+	ScaleRefApiVersion string
+	MinReplicas        int32
+	MaxReplicas        int32
+	CPUPercent         int32
 }
 
-func (HorizontalPodAutoscalerV1) Generate(genericParams map[string]interface{}) (runtime.Object, error) {
-	return generateHPA(genericParams)
-}
+// Ensure it supports the generator pattern that uses parameters specified during construction.
+var _ StructuredGenerator = &HorizontalPodAutoscalerGeneratorV1{}
 
-func generateHPA(genericParams map[string]interface{}) (runtime.Object, error) {
-	params := map[string]string{}
-	for key, value := range genericParams {
-		strVal, isString := value.(string)
-		if !isString {
-			return nil, fmt.Errorf("expected string, saw %v for '%s'", value, key)
-		}
-		params[key] = strVal
-	}
-
-	name, found := params["name"]
-	if !found || len(name) == 0 {
-		name, found = params["default-name"]
-		if !found || len(name) == 0 {
-			return nil, fmt.Errorf("'name' is a required parameter.")
-		}
-	}
-	minString, found := params["min"]
-	min := -1
-	var err error
-	if found {
-		if min, err = strconv.Atoi(minString); err != nil {
-			return nil, err
-		}
-	}
-	maxString, found := params["max"]
-	if !found {
-		return nil, fmt.Errorf("'max' is a required parameter.")
-	}
-	max, err := strconv.Atoi(maxString)
-	if err != nil {
+// StructuredGenerate outputs a horizontal pod autoscaler object using the configured fields.
+func (s *HorizontalPodAutoscalerGeneratorV1) StructuredGenerate() (runtime.Object, error) {
+	if err := s.validate(); err != nil {
 		return nil, err
 	}
 
-	if min > max {
-		return nil, fmt.Errorf("'max' must be greater than or equal to 'min'.")
-	}
-
-	cpuString, found := params["cpu-percent"]
-	cpu := -1
-	if found {
-		if cpu, err = strconv.Atoi(cpuString); err != nil {
-			return nil, err
-		}
-	}
-
-	scaler := autoscaling.HorizontalPodAutoscaler{
+	scaler := autoscalingv1.HorizontalPodAutoscaler{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: name,
+			Name: s.Name,
 		},
-		Spec: autoscaling.HorizontalPodAutoscalerSpec{
-			ScaleTargetRef: autoscaling.CrossVersionObjectReference{
-				Kind:       params["scaleRef-kind"],
-				Name:       params["scaleRef-name"],
-				APIVersion: params["scaleRef-apiVersion"],
+		Spec: autoscalingv1.HorizontalPodAutoscalerSpec{
+			ScaleTargetRef: autoscalingv1.CrossVersionObjectReference{
+				Kind:       s.ScaleRefKind,
+				Name:       s.ScaleRefName,
+				APIVersion: s.ScaleRefApiVersion,
 			},
-			MaxReplicas: int32(max),
+			MaxReplicas: s.MaxReplicas,
 		},
 	}
-	if min > 0 {
-		v := int32(min)
+
+	if s.MinReplicas > 0 {
+		v := int32(s.MinReplicas)
 		scaler.Spec.MinReplicas = &v
 	}
-	if cpu >= 0 {
-		c := int32(cpu)
-		scaler.Spec.Metrics = []autoscaling.MetricSpec{
-			{
-				Type: autoscaling.ResourceMetricSourceType,
-				Resource: &autoscaling.ResourceMetricSource{
-					Name: api.ResourceCPU,
-					TargetAverageUtilization: &c,
-				},
-			},
-		}
+	if s.CPUPercent >= 0 {
+		c := int32(s.CPUPercent)
+		scaler.Spec.TargetCPUUtilizationPercentage = &c
 	}
+
 	return &scaler, nil
+}
+
+// validate check if the caller has set the right fields.
+func (s HorizontalPodAutoscalerGeneratorV1) validate() error {
+	if len(s.Name) == 0 {
+		return fmt.Errorf("name must be specified")
+	}
+	if s.MaxReplicas < 1 {
+		return fmt.Errorf("'max' is a required parameter and must be at least 1")
+	}
+	if s.MinReplicas > s.MaxReplicas {
+		return fmt.Errorf("'max' must be greater than or equal to 'min'")
+	}
+	return nil
 }

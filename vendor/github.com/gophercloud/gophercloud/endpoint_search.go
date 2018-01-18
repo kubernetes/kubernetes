@@ -27,7 +27,7 @@ const (
 // unambiguously identify one, and only one, endpoint within the catalog.
 //
 // Usually, these are passed to service client factory functions in a provider
-// package, like "rackspace.NewComputeV2()".
+// package, like "openstack.NewComputeV2()".
 type EndpointOpts struct {
 	// Type [required] is the service type for the client (e.g., "compute",
 	// "object-store"). Generally, this will be supplied by the service client

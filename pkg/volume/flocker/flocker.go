@@ -23,8 +23,8 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/util/env"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/strings"
@@ -138,7 +138,7 @@ func (p *flockerPlugin) getFlockerVolumeSource(spec *volume.Spec) (*v1.FlockerVo
 
 func (plugin *flockerPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ volume.VolumeOptions) (volume.Mounter, error) {
 	// Inject real implementations here, test through the internal function.
-	return plugin.newMounterInternal(spec, pod.UID, &FlockerUtil{}, plugin.host.GetMounter())
+	return plugin.newMounterInternal(spec, pod.UID, &FlockerUtil{}, plugin.host.GetMounter(plugin.GetPluginName()))
 }
 
 func (plugin *flockerPlugin) newMounterInternal(spec *volume.Spec, podUID types.UID, manager volumeManager, mounter mount.Interface) (volume.Mounter, error) {
@@ -166,7 +166,7 @@ func (plugin *flockerPlugin) newMounterInternal(spec *volume.Spec, podUID types.
 
 func (p *flockerPlugin) NewUnmounter(volName string, podUID types.UID) (volume.Unmounter, error) {
 	// Inject real implementations here, test through the internal function.
-	return p.newUnmounterInternal(volName, podUID, &FlockerUtil{}, p.host.GetMounter())
+	return p.newUnmounterInternal(volName, podUID, &FlockerUtil{}, p.host.GetMounter(p.GetPluginName()))
 }
 
 func (p *flockerPlugin) newUnmounterInternal(volName string, podUID types.UID, manager volumeManager, mounter mount.Interface) (volume.Unmounter, error) {
@@ -232,7 +232,7 @@ func (b *flockerVolumeMounter) GetPath() string {
 }
 
 // SetUp bind mounts the disk global mount to the volume path.
-func (b *flockerVolumeMounter) SetUp(fsGroup *types.UnixGroupID) error {
+func (b *flockerVolumeMounter) SetUp(fsGroup *int64) error {
 	return b.SetUpAt(b.GetPath(), fsGroup)
 }
 
@@ -274,7 +274,7 @@ control service:
    need to update the Primary UUID for this volume.
 5. Wait until the Primary UUID was updated or timeout.
 */
-func (b *flockerVolumeMounter) SetUpAt(dir string, fsGroup *types.UnixGroupID) error {
+func (b *flockerVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 	var err error
 	if b.flockerClient == nil {
 		b.flockerClient, err = b.newFlockerClient()

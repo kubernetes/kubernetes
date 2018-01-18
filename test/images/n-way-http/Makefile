@@ -12,20 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-all: push
+SRCS=n-way-http
+ARCH ?= amd64
+TARGET ?= $(CURDIR)
+GOLANG_VERSION ?= latest
+SRC_DIR = $(notdir $(shell pwd))
+export
 
-# 0.0 shouldn't clobber any released builds
-TAG = 0.0
-PREFIX = gcr.io/google_containers/n-way-http
+bin:
+	../image-util.sh bin $(SRCS)
 
-server: server.go
-	CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags '-w' -o server ./server.go
-
-container: server
-	docker build --pull -t $(PREFIX):$(TAG) .
-
-push: container
-	gcloud docker -- push $(PREFIX):$(TAG)
-
-clean:
-	rm -f server
+.PHONY: bin

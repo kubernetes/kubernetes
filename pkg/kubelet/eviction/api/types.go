@@ -38,6 +38,8 @@ const (
 	SignalImageFsInodesFree Signal = "imagefs.inodesFree"
 	// SignalAllocatableMemoryAvailable is amount of memory available for pod allocation (i.e. allocatable - workingSet (of pods), in bytes.
 	SignalAllocatableMemoryAvailable Signal = "allocatableMemory.available"
+	// SignalAllocatableNodeFsAvailable is amount of local storage available for pod allocation
+	SignalAllocatableNodeFsAvailable Signal = "allocatableNodeFs.available"
 )
 
 // ThresholdOperator is the operator used to express a Threshold.
@@ -47,6 +49,23 @@ const (
 	// OpLessThan is the operator that expresses a less than operator.
 	OpLessThan ThresholdOperator = "LessThan"
 )
+
+// OpForSignal maps Signals to ThresholdOperators.
+// Today, the only supported operator is "LessThan". This may change in the future,
+// for example if "consumed" (as opposed to "available") type signals are added.
+// In both cases the directionality of the threshold is implicit to the signal type
+// (for a given signal, the decision to evict will be made when crossing the threshold
+// from either above or below, never both). There is thus no reason to expose the
+// operator in the Kubelet's public API. Instead, we internally map signal types to operators.
+var OpForSignal = map[Signal]ThresholdOperator{
+	SignalMemoryAvailable:            OpLessThan,
+	SignalNodeFsAvailable:            OpLessThan,
+	SignalNodeFsInodesFree:           OpLessThan,
+	SignalImageFsAvailable:           OpLessThan,
+	SignalImageFsInodesFree:          OpLessThan,
+	SignalAllocatableMemoryAvailable: OpLessThan,
+	SignalAllocatableNodeFsAvailable: OpLessThan,
+}
 
 // ThresholdValue is a value holder that abstracts literal versus percentage based quantity
 type ThresholdValue struct {

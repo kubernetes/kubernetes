@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2018 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -38,24 +38,12 @@ func (c *FakeExtensions) Ingresses(namespace string) internalversion.IngressInte
 	return &FakeIngresses{c, namespace}
 }
 
-func (c *FakeExtensions) NetworkPolicies(namespace string) internalversion.NetworkPolicyInterface {
-	return &FakeNetworkPolicies{c, namespace}
-}
-
 func (c *FakeExtensions) PodSecurityPolicies() internalversion.PodSecurityPolicyInterface {
 	return &FakePodSecurityPolicies{c}
 }
 
 func (c *FakeExtensions) ReplicaSets(namespace string) internalversion.ReplicaSetInterface {
 	return &FakeReplicaSets{c, namespace}
-}
-
-func (c *FakeExtensions) Scales(namespace string) internalversion.ScaleInterface {
-	return &FakeScales{c, namespace}
-}
-
-func (c *FakeExtensions) ThirdPartyResources() internalversion.ThirdPartyResourceInterface {
-	return &FakeThirdPartyResources{c}
 }
 
 // RESTClient returns a RESTClient that is used to communicate

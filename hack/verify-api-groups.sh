@@ -31,7 +31,7 @@ while IFS= read -d $'\0' -r file ; do
 done < <(find "${KUBE_ROOT}"/pkg/apis -name register.go -print0)
 
 # every register file should contain a GroupName.  Gather the different representations.
-# 1. group directory name for go2idl client gen
+# 1. group directory name for client gen
 # 2. external group versions for init.sh all APIs list
 # 3. install packages for inclusion in import_known_versions files
 group_dirnames=()
@@ -69,8 +69,9 @@ groups_without_codegen=(
 	"abac"
 	"componentconfig"
 	"imagepolicy"
+	"admission"
 )
-client_gen_file="${KUBE_ROOT}/cmd/libs/go2idl/client-gen/main.go"
+client_gen_file="${KUBE_ROOT}/vendor/k8s.io/code-generator/cmd/client-gen/main.go"
 
 for group_dirname in "${group_dirnames[@]}"; do
 	if ! grep -q "${group_dirname}/" "${client_gen_file}" ; then
@@ -80,7 +81,7 @@ for group_dirname in "${group_dirnames[@]}"; do
 				found=1
 			fi
 		done
-		if [ "${found}" -ne "1" ] ; then
+		if [[ "${found}" -ne "1" && -f "${group_dirname}/types.go" ]] ; then
 			echo "need to add ${group_dirname}/ to ${client_gen_file}"
 			exit 1
 		fi
@@ -92,6 +93,7 @@ done
 # them.  This happens for types that aren't served from the API server
 packages_without_install=(
 	"k8s.io/kubernetes/pkg/apis/abac"
+	"k8s.io/kubernetes/pkg/apis/admission"
 )
 known_version_files=(
 	"pkg/master/import_known_versions.go"
@@ -116,7 +118,7 @@ for expected_install_package in "${expected_install_packages[@]}"; do
 	done
 done
 
-# check all groupversions to make sure they're in the init.sh file.  This isn't perfect, but its slightly 
+# check all groupversions to make sure they're in the init.sh file.  This isn't perfect, but its slightly
 # better than nothing
 for external_group_version in "${external_group_versions[@]}"; do
 	if ! grep -q "${external_group_version}" "${KUBE_ROOT}/hack/lib/init.sh" ; then

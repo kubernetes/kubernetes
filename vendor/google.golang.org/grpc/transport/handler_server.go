@@ -1,32 +1,18 @@
 /*
- * Copyright 2016, Google Inc.
- * All rights reserved.
  *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are
- * met:
+ * Copyright 2016 gRPC authors.
  *
- *     * Redistributions of source code must retain the above copyright
- * notice, this list of conditions and the following disclaimer.
- *     * Redistributions in binary form must reproduce the above
- * copyright notice, this list of conditions and the following disclaimer
- * in the documentation and/or other materials provided with the
- * distribution.
- *     * Neither the name of Google Inc. nor the names of its
- * contributors may be used to endorse or promote products derived from
- * this software without specific prior written permission.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
- * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
- * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
- * OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
- * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
- * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
- * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
- * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
  */
 
@@ -47,12 +33,14 @@ import (
 	"sync"
 	"time"
 
+	"github.com/golang/protobuf/proto"
 	"golang.org/x/net/context"
 	"golang.org/x/net/http2"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/peer"
+	"google.golang.org/grpc/status"
 )
 
 // NewServerHandlerTransport returns a ServerTransport handling gRPC
@@ -101,14 +89,9 @@ func NewServerHandlerTransport(w http.ResponseWriter, r *http.Request) (ServerTr
 			continue
 		}
 		for _, v := range vv {
-			if k == "user-agent" {
-				// user-agent is special. Copying logic of http_util.go.
-				if i := strings.LastIndex(v, " "); i == -1 {
-					// There is no application user agent string being set
-					continue
-				} else {
-					v = v[:i]
-				}
+			v, err := decodeMetadataHeader(k, v)
+			if err != nil {
+				return nil, streamErrorf(codes.InvalidArgument, "malformed binary metadata: %v", err)
 			}
 			metakv = append(metakv, k, v)
 		}
@@ -139,6 +122,10 @@ type serverHandlerTransport struct {
 	// ServeHTTP (HandleStreams) goroutine. The channel is closed
 	// when WriteStatus is called.
 	writes chan func()
+
+	// block concurrent WriteStatus calls
+	// e.g. grpc/(*serverStream).SendMsg/RecvMsg
+	writeStatusMu sync.Mutex
 }
 
 func (ht *serverHandlerTransport) Close() error {
@@ -174,15 +161,24 @@ func (a strAddr) String() string { return string(a) }
 
 // do runs fn in the ServeHTTP goroutine.
 func (ht *serverHandlerTransport) do(fn func()) error {
+	// Avoid a panic writing to closed channel. Imperfect but maybe good enough.
 	select {
-	case ht.writes <- fn:
-		return nil
 	case <-ht.closedCh:
 		return ErrConnClosing
+	default:
+		select {
+		case ht.writes <- fn:
+			return nil
+		case <-ht.closedCh:
+			return ErrConnClosing
+		}
 	}
 }
 
-func (ht *serverHandlerTransport) WriteStatus(s *Stream, statusCode codes.Code, statusDesc string) error {
+func (ht *serverHandlerTransport) WriteStatus(s *Stream, st *status.Status) error {
+	ht.writeStatusMu.Lock()
+	defer ht.writeStatusMu.Unlock()
+
 	err := ht.do(func() {
 		ht.writeCommonHeaders(s)
 
@@ -192,10 +188,21 @@ func (ht *serverHandlerTransport) WriteStatus(s *Stream, statusCode codes.Code, 
 		ht.rw.(http.Flusher).Flush()
 
 		h := ht.rw.Header()
-		h.Set("Grpc-Status", fmt.Sprintf("%d", statusCode))
-		if statusDesc != "" {
-			h.Set("Grpc-Message", encodeGrpcMessage(statusDesc))
+		h.Set("Grpc-Status", fmt.Sprintf("%d", st.Code()))
+		if m := st.Message(); m != "" {
+			h.Set("Grpc-Message", encodeGrpcMessage(m))
 		}
+
+		if p := st.Proto(); p != nil && len(p.Details) > 0 {
+			stBytes, err := proto.Marshal(p)
+			if err != nil {
+				// TODO: return error instead, when callers are able to handle it.
+				panic(err)
+			}
+
+			h.Set("Grpc-Status-Details-Bin", encodeBinHeader(stBytes))
+		}
+
 		if md := s.Trailer(); len(md) > 0 {
 			for k, vv := range md {
 				// Clients don't tolerate reading restricted headers after some non restricted ones were sent.
@@ -203,15 +210,18 @@ func (ht *serverHandlerTransport) WriteStatus(s *Stream, statusCode codes.Code, 
 					continue
 				}
 				for _, v := range vv {
-					// http2 ResponseWriter mechanism to
-					// send undeclared Trailers after the
-					// headers have possibly been written.
-					h.Add(http2.TrailerPrefix+k, v)
+					// http2 ResponseWriter mechanism to send undeclared Trailers after
+					// the headers have possibly been written.
+					h.Add(http2.TrailerPrefix+k, encodeMetadataHeader(k, v))
 				}
 			}
 		}
 	})
-	close(ht.writes)
+
+	if err == nil { // transport has not been closed
+		ht.Close()
+		close(ht.writes)
+	}
 	return err
 }
 
@@ -234,15 +244,17 @@ func (ht *serverHandlerTransport) writeCommonHeaders(s *Stream) {
 	// and https://golang.org/pkg/net/http/#example_ResponseWriter_trailers
 	h.Add("Trailer", "Grpc-Status")
 	h.Add("Trailer", "Grpc-Message")
+	h.Add("Trailer", "Grpc-Status-Details-Bin")
 
 	if s.sendCompress != "" {
 		h.Set("Grpc-Encoding", s.sendCompress)
 	}
 }
 
-func (ht *serverHandlerTransport) Write(s *Stream, data []byte, opts *Options) error {
+func (ht *serverHandlerTransport) Write(s *Stream, hdr []byte, data []byte, opts *Options) error {
 	return ht.do(func() {
 		ht.writeCommonHeaders(s)
+		ht.rw.Write(hdr)
 		ht.rw.Write(data)
 		if !opts.Delay {
 			ht.rw.(http.Flusher).Flush()
@@ -260,6 +272,7 @@ func (ht *serverHandlerTransport) WriteHeader(s *Stream, md metadata.MD) error {
 				continue
 			}
 			for _, v := range vv {
+				v = encodeMetadataHeader(k, v)
 				h.Add(k, v)
 			}
 		}
@@ -268,7 +281,7 @@ func (ht *serverHandlerTransport) WriteHeader(s *Stream, md metadata.MD) error {
 	})
 }
 
-func (ht *serverHandlerTransport) HandleStreams(startStream func(*Stream)) {
+func (ht *serverHandlerTransport) HandleStreams(startStream func(*Stream), traceCtx func(context.Context, string) context.Context) {
 	// With this transport type there will be exactly 1 stream: this HTTP request.
 
 	var ctx context.Context
@@ -300,13 +313,13 @@ func (ht *serverHandlerTransport) HandleStreams(startStream func(*Stream)) {
 	req := ht.req
 
 	s := &Stream{
-		id:            0,            // irrelevant
-		windowHandler: func(int) {}, // nothing
-		cancel:        cancel,
-		buf:           newRecvBuffer(),
-		st:            ht,
-		method:        req.URL.Path,
-		recvCompress:  req.Header.Get("grpc-encoding"),
+		id:           0, // irrelevant
+		requestRead:  func(int) {},
+		cancel:       cancel,
+		buf:          newRecvBuffer(),
+		st:           ht,
+		method:       req.URL.Path,
+		recvCompress: req.Header.Get("grpc-encoding"),
 	}
 	pr := &peer.Peer{
 		Addr: ht.RemoteAddr(),
@@ -314,10 +327,13 @@ func (ht *serverHandlerTransport) HandleStreams(startStream func(*Stream)) {
 	if req.TLS != nil {
 		pr.AuthInfo = credentials.TLSInfo{State: *req.TLS}
 	}
-	ctx = metadata.NewContext(ctx, ht.headerMD)
+	ctx = metadata.NewIncomingContext(ctx, ht.headerMD)
 	ctx = peer.NewContext(ctx, pr)
 	s.ctx = newContextWithStream(ctx, s)
-	s.dec = &recvBufferReader{ctx: s.ctx, recv: s.buf}
+	s.trReader = &transportReader{
+		reader:        &recvBufferReader{ctx: s.ctx, recv: s.buf},
+		windowHandler: func(int) {},
+	}
 
 	// readerDone is closed when the Body.Read-ing goroutine exits.
 	readerDone := make(chan struct{})
@@ -329,11 +345,11 @@ func (ht *serverHandlerTransport) HandleStreams(startStream func(*Stream)) {
 		for buf := make([]byte, readSize); ; {
 			n, err := req.Body.Read(buf)
 			if n > 0 {
-				s.buf.put(&recvMsg{data: buf[:n:n]})
+				s.buf.put(recvMsg{data: buf[:n:n]})
 				buf = buf[n:]
 			}
 			if err != nil {
-				s.buf.put(&recvMsg{err: mapRecvMsgError(err)})
+				s.buf.put(recvMsg{err: mapRecvMsgError(err)})
 				return
 			}
 			if len(buf) == 0 {

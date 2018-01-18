@@ -22,14 +22,14 @@ import (
 	"sync"
 	"time"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
-	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
+	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/sysctl"
 
@@ -50,7 +50,7 @@ var ImageWhiteList sets.String
 func (f *Framework) PodClient() *PodClient {
 	return &PodClient{
 		f:            f,
-		PodInterface: f.ClientSet.Core().Pods(f.Namespace.Name),
+		PodInterface: f.ClientSet.CoreV1().Pods(f.Namespace.Name),
 	}
 }
 
@@ -60,7 +60,7 @@ func (f *Framework) PodClient() *PodClient {
 func (f *Framework) PodClientNS(namespace string) *PodClient {
 	return &PodClient{
 		f:            f,
-		PodInterface: f.ClientSet.Core().Pods(namespace),
+		PodInterface: f.ClientSet.CoreV1().Pods(namespace),
 	}
 }
 
@@ -202,11 +202,28 @@ func (c *PodClient) WaitForSuccess(name string, timeout time.Duration) {
 	)).To(Succeed(), "wait for pod %q to success", name)
 }
 
+// WaitForFailure waits for pod to fail.
+func (c *PodClient) WaitForFailure(name string, timeout time.Duration) {
+	f := c.f
+	Expect(WaitForPodCondition(f.ClientSet, f.Namespace.Name, name, "success or failure", timeout,
+		func(pod *v1.Pod) (bool, error) {
+			switch pod.Status.Phase {
+			case v1.PodFailed:
+				return true, nil
+			case v1.PodSucceeded:
+				return true, fmt.Errorf("pod %q successed with reason: %q, message: %q", name, pod.Status.Reason, pod.Status.Message)
+			default:
+				return false, nil
+			}
+		},
+	)).To(Succeed(), "wait for pod %q to fail", name)
+}
+
 // WaitForSuccess waits for pod to succeed or an error event for that pod.
 func (c *PodClient) WaitForErrorEventOrSuccess(pod *v1.Pod) (*v1.Event, error) {
 	var ev *v1.Event
 	err := wait.Poll(Poll, PodStartTimeout, func() (bool, error) {
-		evnts, err := c.f.ClientSet.Core().Events(pod.Namespace).Search(api.Scheme, pod)
+		evnts, err := c.f.ClientSet.CoreV1().Events(pod.Namespace).Search(legacyscheme.Scheme, pod)
 		if err != nil {
 			return false, fmt.Errorf("error in listing events: %s", err)
 		}

@@ -17,8 +17,8 @@ limitations under the License.
 package lifecycle
 
 import (
-	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
+	"k8s.io/api/core/v1"
+	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 )
 
 // AdmissionFailureHandlerStub is an AdmissionFailureHandler that does not perform any handling of admission failure.

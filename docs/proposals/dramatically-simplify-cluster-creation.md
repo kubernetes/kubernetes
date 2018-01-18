@@ -1,1 +1,0 @@
-This file has moved to [https://github.com/kubernetes/community/blob/master/contributors/design-proposals/dramatically-simplify-cluster-creation.md](https://github.com/kubernetes/community/blob/master/contributors/design-proposals/dramatically-simplify-cluster-creation.md)

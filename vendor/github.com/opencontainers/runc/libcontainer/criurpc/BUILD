@@ -1,16 +1,16 @@
-package(default_visibility = ["//visibility:public"])
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
-licenses(["notice"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
+filegroup(
+    name = "go_default_library_protos",
+    srcs = ["criurpc.proto"],
+    visibility = ["//visibility:public"],
 )
 
 go_library(
     name = "go_default_library",
     srcs = ["criurpc.pb.go"],
-    tags = ["automanaged"],
+    importpath = "github.com/opencontainers/runc/libcontainer/criurpc",
+    visibility = ["//visibility:public"],
     deps = ["//vendor/github.com/golang/protobuf/proto:go_default_library"],
 )
 
@@ -25,4 +25,5 @@ filegroup(
     name = "all-srcs",
     srcs = [":package-srcs"],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

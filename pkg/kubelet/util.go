@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"os"
 
-	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/capabilities"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/securitycontext"
@@ -88,7 +88,7 @@ func allowHostNetwork(pod *v1.Pod) (bool, error) {
 	return false, nil
 }
 
-// Determined whether the specified pod is allowed to use host networking
+// Determined whether the specified pod is allowed to use host PID
 func allowHostPID(pod *v1.Pod) (bool, error) {
 	podSource, err := kubetypes.GetPodSource(pod)
 	if err != nil {

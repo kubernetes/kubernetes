@@ -1,4 +1,5 @@
-// Alternative testing tools which stop test execution if test failed.
+// Package require implements the same assertions as the `assert` package but
+// stops test execution when a test fails.
 //
 // Example Usage
 //

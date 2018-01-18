@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -17,26 +15,29 @@ go_library(
         "pod_update.go",
         "types.go",
     ],
-    tags = ["automanaged"],
+    importpath = "k8s.io/kubernetes/pkg/kubelet/types",
     deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/api/v1:go_default_library",
+        "//pkg/apis/core:go_default_library",
+        "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
     ],
 )
 
 go_test(
     name = "go_default_test",
     srcs = [
+        "labels_test.go",
         "pod_update_test.go",
         "types_test.go",
     ],
-    library = ":go_default_library",
-    tags = ["automanaged"],
+    embed = [":go_default_library"],
+    importpath = "k8s.io/kubernetes/pkg/kubelet/types",
     deps = [
-        "//pkg/api/v1:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
         "//vendor/github.com/stretchr/testify/require:go_default_library",
+        "//vendor/k8s.io/api/core/v1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
     ],
 )
 

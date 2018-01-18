@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2018 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -32,6 +32,10 @@ func (c *FakeAuthorizationV1) LocalSubjectAccessReviews(namespace string) v1.Loc
 
 func (c *FakeAuthorizationV1) SelfSubjectAccessReviews() v1.SelfSubjectAccessReviewInterface {
 	return &FakeSelfSubjectAccessReviews{c}
+}
+
+func (c *FakeAuthorizationV1) SelfSubjectRulesReviews() v1.SelfSubjectRulesReviewInterface {
+	return &FakeSelfSubjectRulesReviews{c}
 }
 
 func (c *FakeAuthorizationV1) SubjectAccessReviews() v1.SubjectAccessReviewInterface {

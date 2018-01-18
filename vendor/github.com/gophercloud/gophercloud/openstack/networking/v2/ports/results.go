@@ -11,29 +11,35 @@ type commonResult struct {
 
 // Extract is a function that accepts a result and extracts a port resource.
 func (r commonResult) Extract() (*Port, error) {
-	var s struct {
-		Port *Port `json:"port"`
-	}
+	var s Port
 	err := r.ExtractInto(&s)
-	return s.Port, err
+	return &s, err
 }
 
-// CreateResult represents the result of a create operation.
+func (r commonResult) ExtractInto(v interface{}) error {
+	return r.Result.ExtractIntoStructPtr(v, "port")
+}
+
+// CreateResult represents the result of a create operation. Call its Extract
+// method to interpret it as a Port.
 type CreateResult struct {
 	commonResult
 }
 
-// GetResult represents the result of a get operation.
+// GetResult represents the result of a get operation. Call its Extract
+// method to interpret it as a Port.
 type GetResult struct {
 	commonResult
 }
 
-// UpdateResult represents the result of an update operation.
+// UpdateResult represents the result of an update operation. Call its Extract
+// method to interpret it as a Port.
 type UpdateResult struct {
 	commonResult
 }
 
-// DeleteResult represents the result of a delete operation.
+// DeleteResult represents the result of a delete operation. Call its
+// ExtractErr method to determine if the request succeeded or failed.
 type DeleteResult struct {
 	gophercloud.ErrResult
 }
@@ -55,28 +61,41 @@ type AddressPair struct {
 type Port struct {
 	// UUID for the port.
 	ID string `json:"id"`
+
 	// Network that this port is associated with.
 	NetworkID string `json:"network_id"`
+
 	// Human-readable name for the port. Might not be unique.
 	Name string `json:"name"`
-	// Administrative state of port. If false (down), port does not forward packets.
+
+	// Administrative state of port. If false (down), port does not forward
+	// packets.
 	AdminStateUp bool `json:"admin_state_up"`
+
 	// Indicates whether network is currently operational. Possible values include
-	// `ACTIVE', `DOWN', `BUILD', or `ERROR'. Plug-ins might define additional values.
+	// `ACTIVE', `DOWN', `BUILD', or `ERROR'. Plug-ins might define additional
+	// values.
 	Status string `json:"status"`
+
 	// Mac address to use on this port.
 	MACAddress string `json:"mac_address"`
+
 	// Specifies IP addresses for the port thus associating the port itself with
 	// the subnets where the IP addresses are picked from
 	FixedIPs []IP `json:"fixed_ips"`
-	// Owner of network. Only admin users can specify a tenant_id other than its own.
+
+	// Owner of network.
 	TenantID string `json:"tenant_id"`
+
 	// Identifies the entity (e.g.: dhcp agent) using this port.
 	DeviceOwner string `json:"device_owner"`
+
 	// Specifies the IDs of any security groups associated with a port.
 	SecurityGroups []string `json:"security_groups"`
+
 	// Identifies the device (e.g., virtual server) using this port.
 	DeviceID string `json:"device_id"`
+
 	// Identifies the list of IP addresses the port will recognize/accept
 	AllowedAddressPairs []AddressPair `json:"allowed_address_pairs"`
 }
@@ -111,9 +130,11 @@ func (r PortPage) IsEmpty() (bool, error) {
 // and extracts the elements into a slice of Port structs. In other words,
 // a generic collection is mapped into a relevant slice.
 func ExtractPorts(r pagination.Page) ([]Port, error) {
-	var s struct {
-		Ports []Port `json:"ports"`
-	}
-	err := (r.(PortPage)).ExtractInto(&s)
-	return s.Ports, err
+	var s []Port
+	err := ExtractPortsInto(r, &s)
+	return s, err
+}
+
+func ExtractPortsInto(r pagination.Page, v interface{}) error {
+	return r.(PortPage).Result.ExtractIntoSlicePtr(v, "ports")
 }

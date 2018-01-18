@@ -28,6 +28,9 @@ import (
 type A struct{}
 
 func (A) GetObjectKind() schema.ObjectKind { return schema.EmptyObjectKind }
+func (a A) DeepCopyObject() runtime.Object {
+	return a
+}
 
 func TestRecognizer(t *testing.T) {
 	s := runtime.NewScheme()

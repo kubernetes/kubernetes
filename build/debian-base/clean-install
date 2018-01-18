@@ -31,4 +31,6 @@ apt-get clean -y
 rm -rf \
    /var/cache/debconf/* \
    /var/lib/apt/lists/* \
-   /var/log/*
+   /var/log/* \
+   /tmp/* \
+   /var/tmp/*

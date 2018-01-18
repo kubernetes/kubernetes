@@ -22,6 +22,7 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -29,9 +30,8 @@ import (
 	restclient "k8s.io/client-go/rest"
 	. "k8s.io/client-go/tools/cache"
 	utiltesting "k8s.io/client-go/util/testing"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/api/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 )
 
@@ -61,7 +61,7 @@ func buildLocation(resourcePath string, query url.Values) string {
 }
 
 func TestListWatchesCanList(t *testing.T) {
-	fieldSelectorQueryParamName := metav1.FieldSelectorQueryParam(api.Registry.GroupOrDie(v1.GroupName).GroupVersion.String())
+	fieldSelectorQueryParamName := metav1.FieldSelectorQueryParam(legacyscheme.Registry.GroupOrDie(v1.GroupName).GroupVersion.String())
 	table := []struct {
 		location      string
 		resource      string
@@ -102,8 +102,9 @@ func TestListWatchesCanList(t *testing.T) {
 		}
 		server := httptest.NewServer(&handler)
 		defer server.Close()
-		client := clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
+		client := clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &legacyscheme.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
 		lw := NewListWatchFromClient(client.Core().RESTClient(), item.resource, item.namespace, item.fieldSelector)
+		lw.DisableChunking = true
 		// This test merely tests that the correct request is made.
 		lw.List(metav1.ListOptions{})
 		handler.ValidateRequest(t, item.location, "GET", nil)
@@ -111,7 +112,7 @@ func TestListWatchesCanList(t *testing.T) {
 }
 
 func TestListWatchesCanWatch(t *testing.T) {
-	fieldSelectorQueryParamName := metav1.FieldSelectorQueryParam(api.Registry.GroupOrDie(v1.GroupName).GroupVersion.String())
+	fieldSelectorQueryParamName := metav1.FieldSelectorQueryParam(legacyscheme.Registry.GroupOrDie(v1.GroupName).GroupVersion.String())
 	table := []struct {
 		rv            string
 		location      string
@@ -168,7 +169,7 @@ func TestListWatchesCanWatch(t *testing.T) {
 		}
 		server := httptest.NewServer(&handler)
 		defer server.Close()
-		client := clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
+		client := clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &legacyscheme.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
 		lw := NewListWatchFromClient(client.Core().RESTClient(), item.resource, item.namespace, item.fieldSelector)
 		// This test merely tests that the correct request is made.
 		lw.Watch(metav1.ListOptions{ResourceVersion: item.rv})

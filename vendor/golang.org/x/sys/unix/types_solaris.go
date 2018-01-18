@@ -5,7 +5,7 @@
 // +build ignore
 
 /*
-Input to cgo -godefs.  See also mkerrors.sh and mkall.sh
+Input to cgo -godefs.  See README.md
 */
 
 // +godefs map struct_in_addr [4]byte /* in_addr */
@@ -24,6 +24,7 @@ package unix
 #include <fcntl.h>
 #include <netdb.h>
 #include <limits.h>
+#include <poll.h>
 #include <signal.h>
 #include <termios.h>
 #include <termio.h>
@@ -37,6 +38,7 @@ package unix
 #include <sys/signal.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
+#include <sys/statvfs.h>
 #include <sys/time.h>
 #include <sys/times.h>
 #include <sys/types.h>
@@ -138,6 +140,12 @@ type Stat_t C.struct_stat
 type Flock_t C.struct_flock
 
 type Dirent C.struct_dirent
+
+// Filesystems
+
+type _Fsblkcnt_t C.fsblkcnt_t
+
+type Statvfs_t C.struct_statvfs
 
 // Sockets
 
@@ -249,10 +257,6 @@ type BpfTimeval C.struct_bpf_timeval
 
 type BpfHdr C.struct_bpf_hdr
 
-// sysconf information
-
-const _SC_PAGESIZE = C._SC_PAGESIZE
-
 // Terminal handling
 
 type Termios C.struct_termios
@@ -260,3 +264,20 @@ type Termios C.struct_termios
 type Termio C.struct_termio
 
 type Winsize C.struct_winsize
+
+// poll
+
+type PollFd C.struct_pollfd
+
+const (
+	POLLERR    = C.POLLERR
+	POLLHUP    = C.POLLHUP
+	POLLIN     = C.POLLIN
+	POLLNVAL   = C.POLLNVAL
+	POLLOUT    = C.POLLOUT
+	POLLPRI    = C.POLLPRI
+	POLLRDBAND = C.POLLRDBAND
+	POLLRDNORM = C.POLLRDNORM
+	POLLWRBAND = C.POLLWRBAND
+	POLLWRNORM = C.POLLWRNORM
+)

@@ -19,26 +19,29 @@ package util
 import (
 	"fmt"
 
+	"k8s.io/api/core/v1"
+	extensions "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
-	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	"k8s.io/kubernetes/pkg/features"
+	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
+	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
 )
 
-// GetPodTemplateWithHash returns copy of provided template with additional
-// label which contains hash of provided template and sets default daemon tolerations.
-func GetPodTemplateWithGeneration(template v1.PodTemplateSpec, generation int64) v1.PodTemplateSpec {
-	obj, _ := api.Scheme.DeepCopy(template)
-	newTemplate := obj.(v1.PodTemplateSpec)
+// CreatePodTemplate returns copy of provided template with additional
+// label which contains templateGeneration (for backward compatibility),
+// hash of provided template and sets default daemon tolerations.
+func CreatePodTemplate(template v1.PodTemplateSpec, generation int64, hash string) v1.PodTemplateSpec {
+	newTemplate := *template.DeepCopy()
 	// DaemonSet pods shouldn't be deleted by NodeController in case of node problems.
 	// Add infinite toleration for taint notReady:NoExecute here
 	// to survive taint-based eviction enforced by NodeController
 	// when node turns not ready.
 	v1helper.AddOrUpdateTolerationInPodSpec(&newTemplate.Spec, &v1.Toleration{
-		Key:      metav1.TaintNodeNotReady,
+		Key:      algorithm.TaintNodeNotReady,
 		Operator: v1.TolerationOpExists,
 		Effect:   v1.TaintEffectNoExecute,
 	})
@@ -48,10 +51,35 @@ func GetPodTemplateWithGeneration(template v1.PodTemplateSpec, generation int64)
 	// to survive taint-based eviction enforced by NodeController
 	// when node turns unreachable.
 	v1helper.AddOrUpdateTolerationInPodSpec(&newTemplate.Spec, &v1.Toleration{
-		Key:      metav1.TaintNodeUnreachable,
+		Key:      algorithm.TaintNodeUnreachable,
 		Operator: v1.TolerationOpExists,
 		Effect:   v1.TaintEffectNoExecute,
 	})
+
+	// According to TaintNodesByCondition feature, all DaemonSet pods should tolerate
+	// MemoryPressure and DisPressure taints, and the critical pods should tolerate
+	// OutOfDisk taint.
+	v1helper.AddOrUpdateTolerationInPodSpec(&newTemplate.Spec, &v1.Toleration{
+		Key:      algorithm.TaintNodeDiskPressure,
+		Operator: v1.TolerationOpExists,
+		Effect:   v1.TaintEffectNoSchedule,
+	})
+
+	v1helper.AddOrUpdateTolerationInPodSpec(&newTemplate.Spec, &v1.Toleration{
+		Key:      algorithm.TaintNodeMemoryPressure,
+		Operator: v1.TolerationOpExists,
+		Effect:   v1.TaintEffectNoSchedule,
+	})
+
+	// TODO(#48843) OutOfDisk taints will be removed in 1.10
+	if utilfeature.DefaultFeatureGate.Enabled(features.ExperimentalCriticalPodAnnotation) &&
+		kubelettypes.IsCritical(newTemplate.Namespace, newTemplate.Annotations) {
+		v1helper.AddOrUpdateTolerationInPodSpec(&newTemplate.Spec, &v1.Toleration{
+			Key:      algorithm.TaintNodeOutOfDisk,
+			Operator: v1.TolerationOpExists,
+			Effect:   v1.TaintEffectNoExecute,
+		})
+	}
 
 	templateGenerationStr := fmt.Sprint(generation)
 	newTemplate.ObjectMeta.Labels = labelsutil.CloneAndAddLabel(
@@ -59,14 +87,19 @@ func GetPodTemplateWithGeneration(template v1.PodTemplateSpec, generation int64)
 		extensions.DaemonSetTemplateGenerationKey,
 		templateGenerationStr,
 	)
+	// TODO: do we need to validate if the DaemonSet is RollingUpdate or not?
+	if len(hash) > 0 {
+		newTemplate.ObjectMeta.Labels[extensions.DefaultDaemonSetUniqueLabelKey] = hash
+	}
 	return newTemplate
 }
 
-// IsPodUpdate checks if pod contains label with provided hash
-func IsPodUpdated(dsTemplateGeneration int64, pod *v1.Pod) bool {
-	podTemplateGeneration, generationExists := pod.ObjectMeta.Labels[extensions.DaemonSetTemplateGenerationKey]
-	dsTemplateGenerationStr := fmt.Sprint(dsTemplateGeneration)
-	return generationExists && podTemplateGeneration == dsTemplateGenerationStr
+// IsPodUpdate checks if pod contains label value that either matches templateGeneration or hash
+func IsPodUpdated(dsTemplateGeneration int64, pod *v1.Pod, hash string) bool {
+	// Compare with hash to see if the pod is updated, need to maintain backward compatibility of templateGeneration
+	templateMatches := pod.Labels[extensions.DaemonSetTemplateGenerationKey] == fmt.Sprint(dsTemplateGeneration)
+	hashMatches := len(hash) > 0 && pod.Labels[extensions.DefaultDaemonSetUniqueLabelKey] == hash
+	return hashMatches || templateMatches
 }
 
 // SplitByAvailablePods splits provided daemon set pods by availabilty

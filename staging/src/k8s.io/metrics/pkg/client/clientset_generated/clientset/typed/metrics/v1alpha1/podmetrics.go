@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2018 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -35,7 +35,6 @@ type PodMetricsInterface interface {
 	Get(name string, options v1.GetOptions) (*v1alpha1.PodMetrics, error)
 	List(opts v1.ListOptions) (*v1alpha1.PodMetricsList, error)
 	Watch(opts v1.ListOptions) (watch.Interface, error)
-
 	PodMetricsExpansion
 }
 
@@ -80,8 +79,8 @@ func (c *podMetricses) List(opts v1.ListOptions) (result *v1alpha1.PodMetricsLis
 
 // Watch returns a watch.Interface that watches the requested podMetricses.
 func (c *podMetricses) Watch(opts v1.ListOptions) (watch.Interface, error) {
+	opts.Watch = true
 	return c.client.Get().
-		Prefix("watch").
 		Namespace(c.ns).
 		Resource("pods").
 		VersionedParams(&opts, scheme.ParameterCodec).

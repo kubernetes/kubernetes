@@ -21,8 +21,8 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
-	"k8s.io/kubernetes/pkg/client/leaderelection"
+	cmoptions "k8s.io/kubernetes/cmd/controller-manager/app/options"
+	"k8s.io/kubernetes/pkg/client/leaderelectionconfig"
 	"k8s.io/kubernetes/pkg/master/ports"
 
 	// add the kubernetes feature gates
@@ -31,33 +31,21 @@ import (
 	"github.com/spf13/pflag"
 )
 
-// CloudControllerMangerServer is the main context object for the controller manager.
+// CloudControllerManagerServer is the main context object for the controller manager.
 type CloudControllerManagerServer struct {
-	componentconfig.KubeControllerManagerConfiguration
+	cmoptions.ControllerManagerServer
 
-	Master     string
-	Kubeconfig string
-
-	// NodeStatusUpdateFrequency is the freuency at which the controller updates nodes' status
+	// NodeStatusUpdateFrequency is the frequency at which the controller updates nodes' status
 	NodeStatusUpdateFrequency metav1.Duration
 }
 
 // NewCloudControllerManagerServer creates a new ExternalCMServer with a default config.
 func NewCloudControllerManagerServer() *CloudControllerManagerServer {
 	s := CloudControllerManagerServer{
-		KubeControllerManagerConfiguration: componentconfig.KubeControllerManagerConfiguration{
-			Port:                    ports.CloudControllerManagerPort,
-			Address:                 "0.0.0.0",
-			ConcurrentServiceSyncs:  1,
-			MinResyncPeriod:         metav1.Duration{Duration: 12 * time.Hour},
-			NodeMonitorPeriod:       metav1.Duration{Duration: 5 * time.Second},
-			ClusterName:             "kubernetes",
-			ConfigureCloudRoutes:    true,
-			ContentType:             "application/vnd.kubernetes.protobuf",
-			KubeAPIQPS:              20.0,
-			KubeAPIBurst:            30,
-			LeaderElection:          leaderelection.DefaultLeaderElectionConfiguration(),
-			ControllerStartInterval: metav1.Duration{Duration: 0 * time.Second},
+		// The common/default are kept in 'cmd/kube-controller-manager/app/options/util.go'.
+		// Please make common changes there and put anything cloud specific here.
+		ControllerManagerServer: cmoptions.ControllerManagerServer{
+			KubeControllerManagerConfiguration: cmoptions.GetDefaultControllerOptions(ports.CloudControllerManagerPort),
 		},
 		NodeStatusUpdateFrequency: metav1.Duration{Duration: 5 * time.Minute},
 	}
@@ -67,30 +55,15 @@ func NewCloudControllerManagerServer() *CloudControllerManagerServer {
 
 // AddFlags adds flags for a specific ExternalCMServer to the specified FlagSet
 func (s *CloudControllerManagerServer) AddFlags(fs *pflag.FlagSet) {
-	fs.Int32Var(&s.Port, "port", s.Port, "The port that the cloud-controller-manager's http service runs on")
-	fs.Var(componentconfig.IPVar{Val: &s.Address}, "address", "The IP address to serve on (set to 0.0.0.0 for all interfaces)")
+	cmoptions.AddDefaultControllerFlags(&s.ControllerManagerServer, fs)
 	fs.StringVar(&s.CloudProvider, "cloud-provider", s.CloudProvider, "The provider of cloud services. Cannot be empty.")
-	fs.StringVar(&s.CloudConfigFile, "cloud-config", s.CloudConfigFile, "The path to the cloud provider configuration file.  Empty string for no configuration file.")
-	fs.DurationVar(&s.MinResyncPeriod.Duration, "min-resync-period", s.MinResyncPeriod.Duration, "The resync period in reflectors will be random between MinResyncPeriod and 2*MinResyncPeriod")
-	fs.DurationVar(&s.NodeMonitorPeriod.Duration, "node-monitor-period", s.NodeMonitorPeriod.Duration,
-		"The period for syncing NodeStatus in NodeController.")
 	fs.DurationVar(&s.NodeStatusUpdateFrequency.Duration, "node-status-update-frequency", s.NodeStatusUpdateFrequency.Duration, "Specifies how often the controller updates nodes' status.")
+	// TODO: remove --service-account-private-key-file 6 months after 1.8 is released (~1.10)
 	fs.StringVar(&s.ServiceAccountKeyFile, "service-account-private-key-file", s.ServiceAccountKeyFile, "Filename containing a PEM-encoded private RSA or ECDSA key used to sign service account tokens.")
-	fs.BoolVar(&s.UseServiceAccountCredentials, "use-service-account-credentials", s.UseServiceAccountCredentials, "If true, use individual service account credentials for each controller.")
-	fs.DurationVar(&s.RouteReconciliationPeriod.Duration, "route-reconciliation-period", s.RouteReconciliationPeriod.Duration, "The period for reconciling routes created for Nodes by cloud provider.")
-	fs.BoolVar(&s.ConfigureCloudRoutes, "configure-cloud-routes", true, "Should CIDRs allocated by allocate-node-cidrs be configured on the cloud provider.")
-	fs.BoolVar(&s.EnableProfiling, "profiling", true, "Enable profiling via web interface host:port/debug/pprof/")
-	fs.BoolVar(&s.EnableContentionProfiling, "contention-profiling", false, "Enable lock contention profiling, if profiling is enabled")
-	fs.StringVar(&s.ClusterCIDR, "cluster-cidr", s.ClusterCIDR, "CIDR Range for Pods in cluster.")
-	fs.BoolVar(&s.AllocateNodeCIDRs, "allocate-node-cidrs", false, "Should CIDRs for Pods be allocated and set on the cloud provider.")
-	fs.StringVar(&s.Master, "master", s.Master, "The address of the Kubernetes API server (overrides any value in kubeconfig)")
-	fs.StringVar(&s.Kubeconfig, "kubeconfig", s.Kubeconfig, "Path to kubeconfig file with authorization and master location information.")
-	fs.StringVar(&s.ContentType, "kube-api-content-type", s.ContentType, "Content type of requests sent to apiserver.")
-	fs.Float32Var(&s.KubeAPIQPS, "kube-api-qps", s.KubeAPIQPS, "QPS to use while talking with kubernetes apiserver")
-	fs.Int32Var(&s.KubeAPIBurst, "kube-api-burst", s.KubeAPIBurst, "Burst to use while talking with kubernetes apiserver")
-	fs.DurationVar(&s.ControllerStartInterval.Duration, "controller-start-interval", s.ControllerStartInterval.Duration, "Interval between starting controller managers.")
+	fs.MarkDeprecated("service-account-private-key-file", "This flag is currently no-op and will be deleted.")
+	fs.Int32Var(&s.ConcurrentServiceSyncs, "concurrent-service-syncs", s.ConcurrentServiceSyncs, "The number of services that are allowed to sync concurrently. Larger number = more responsive service management, but more CPU (and network) load")
 
-	leaderelection.BindFlags(&s.LeaderElection, fs)
+	leaderelectionconfig.BindFlags(&s.LeaderElection, fs)
 
 	utilfeature.DefaultFeatureGate.AddFlag(fs)
 }

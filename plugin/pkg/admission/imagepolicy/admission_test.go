@@ -28,11 +28,11 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/api/imagepolicy/v1alpha1"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/client-go/tools/clientcmd/api/v1"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apis/imagepolicy/v1alpha1"
+	api "k8s.io/kubernetes/pkg/apis/core"
 
 	"fmt"
 	"io/ioutil"
@@ -346,7 +346,7 @@ func (m *mockService) HTTPStatusCode() int { return m.statusCode }
 
 // newImagePolicyWebhook creates a temporary kubeconfig file from the provided arguments and attempts to load
 // a new newImagePolicyWebhook from it.
-func newImagePolicyWebhook(callbackURL string, clientCert, clientKey, ca []byte, cacheTime time.Duration, defaultAllow bool) (*imagePolicyWebhook, error) {
+func newImagePolicyWebhook(callbackURL string, clientCert, clientKey, ca []byte, cacheTime time.Duration, defaultAllow bool) (*Plugin, error) {
 	tempfile, err := ioutil.TempFile("", "")
 	if err != nil {
 		return nil, err
@@ -404,7 +404,10 @@ func newImagePolicyWebhook(callbackURL string, clientCert, clientKey, ca []byte,
 	}
 	defer configFile.Close()
 	wh, err := NewImagePolicyWebhook(configFile)
-	return wh.(*imagePolicyWebhook), err
+	if err != nil {
+		return nil, err
+	}
+	return wh, err
 }
 
 func TestTLSConfig(t *testing.T) {
@@ -474,7 +477,7 @@ func TestTLSConfig(t *testing.T) {
 			// Allow all and see if we get an error.
 			service.Allow()
 
-			err = wh.Admit(attr)
+			err = wh.Validate(attr)
 			if tt.wantAllowed {
 				if err != nil {
 					t.Errorf("expected successful admission")
@@ -496,7 +499,7 @@ func TestTLSConfig(t *testing.T) {
 			}
 
 			service.Deny()
-			if err := wh.Admit(attr); err == nil {
+			if err := wh.Validate(attr); err == nil {
 				t.Errorf("%s: incorrectly admitted with DenyAll policy", tt.test)
 			}
 		}()
@@ -510,10 +513,10 @@ type webhookCacheTestCase struct {
 	expectedCached     bool
 }
 
-func testWebhookCacheCases(t *testing.T, serv *mockService, wh *imagePolicyWebhook, attr admission.Attributes, tests []webhookCacheTestCase) {
+func testWebhookCacheCases(t *testing.T, serv *mockService, wh *Plugin, attr admission.Attributes, tests []webhookCacheTestCase) {
 	for _, test := range tests {
 		serv.statusCode = test.statusCode
-		err := wh.Admit(attr)
+		err := wh.Validate(attr)
 		authorized := err == nil
 
 		if test.expectedErr && err == nil {
@@ -746,7 +749,7 @@ func TestContainerCombinations(t *testing.T) {
 
 			attr := admission.NewAttributesRecord(tt.pod, nil, api.Kind("Pod").WithVersion("version"), "namespace", "", api.Resource("pods").WithVersion("version"), "", admission.Create, &user.DefaultInfo{})
 
-			err = wh.Admit(attr)
+			err = wh.Validate(attr)
 			if tt.wantAllowed {
 				if err != nil {
 					t.Errorf("expected successful admission: %s", tt.test)
@@ -824,7 +827,7 @@ func TestDefaultAllow(t *testing.T) {
 
 			attr := admission.NewAttributesRecord(tt.pod, nil, api.Kind("Pod").WithVersion("version"), "namespace", "", api.Resource("pods").WithVersion("version"), "", admission.Create, &user.DefaultInfo{})
 
-			err = wh.Admit(attr)
+			err = wh.Validate(attr)
 			if tt.wantAllowed {
 				if err != nil {
 					t.Errorf("expected successful admission")
@@ -916,7 +919,7 @@ func TestAnnotationFiltering(t *testing.T) {
 
 			attr := admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), "namespace", "", api.Resource("pods").WithVersion("version"), "", admission.Create, &user.DefaultInfo{})
 
-			err = wh.Admit(attr)
+			err = wh.Validate(attr)
 			if err != nil {
 				t.Errorf("expected successful admission")
 			}

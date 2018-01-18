@@ -14,8 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// +k8s:deepcopy-gen=package,register
-// +k8s:conversion-gen=k8s.io/kubernetes/vendor/k8s.io/metrics/pkg/apis/metrics
+// +k8s:deepcopy-gen=package
+// +k8s:conversion-gen=k8s.io/metrics/pkg/apis/metrics
 // +k8s:openapi-gen=true
 
 package v1alpha1

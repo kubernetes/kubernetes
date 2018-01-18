@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"testing"
 
-	dockertypes "github.com/docker/engine-api/types"
+	dockertypes "github.com/docker/docker/api/types"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -99,6 +99,14 @@ func TestMatchImageTagOrSHA(t *testing.T) {
 				RepoDigests: []string{"centos/ruby-23-centos7@sha256:940584acbbfb0347272112d2eb95574625c0c60b4e2fdadb139de5859cf754bf"},
 			},
 			Image:  "centos/ruby-23-centos7@sha256:940584acbbfb0347272112d2eb95574625c0c60b4e2fdadb139de5859cf754bf",
+			Output: true,
+		},
+		{
+			Inspected: dockertypes.ImageInspect{
+				ID:       "sha256:9bbdf247c91345f0789c10f50a57e36a667af1189687ad1de88a6243d05a2227",
+				RepoTags: []string{"docker.io/busybox:latest"},
+			},
+			Image:  "docker.io/library/busybox:latest",
 			Output: true,
 		},
 		{

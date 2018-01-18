@@ -17,7 +17,6 @@ limitations under the License.
 package oidc
 
 import (
-	"fmt"
 	"os"
 	"path"
 	"reflect"
@@ -213,7 +212,7 @@ func TestOIDCAuthentication(t *testing.T) {
 				"sub",
 				"",
 				generateGoodToken(t, op, srv.URL, "client-foo", "client-foo", "sub", "user-foo", "", nil),
-				&user.DefaultInfo{Name: fmt.Sprintf("%s#%s", srv.URL, "user-foo")},
+				&user.DefaultInfo{Name: "user-foo"},
 				true,
 				"",
 			},
@@ -308,7 +307,7 @@ func TestOIDCAuthentication(t *testing.T) {
 		}
 
 		for i, tt := range tests {
-			client, err := New(OIDCOptions{srv.URL, "client-foo", cert, tt.userClaim, tt.groupsClaim})
+			client, err := New(OIDCOptions{srv.URL, "client-foo", cert, tt.userClaim, "", tt.groupsClaim, ""})
 			if err != nil {
 				t.Errorf("Unexpected error: %v", err)
 				continue
@@ -332,5 +331,205 @@ func TestOIDCAuthentication(t *testing.T) {
 			}
 			client.Close()
 		}
+	}
+}
+
+func TestParseTokenClaims(t *testing.T) {
+	tests := []struct {
+		name string
+
+		// Note this is missing a lot of configuration options because
+		// parseTokenClaim doesn't handle:
+		//
+		// - 'iss' claim matching issuer URL
+		// - 'exp' claim having not expired
+		// - 'sub' claim matching a trusted client id
+		//
+		// That logic has coverage in other tests.
+
+		issuerURL      string
+		usernameClaim  string
+		usernamePrefix string
+		groupsClaim    string
+		groupsPrefix   string
+
+		claims jose.Claims
+
+		wantUser *user.DefaultInfo
+		wantErr  bool
+	}{
+		{
+			name:          "email username",
+			issuerURL:     "https://foo.com/",
+			usernameClaim: "email",
+			claims: jose.Claims{
+				"email":          "jane.doe@example.com",
+				"email_verified": true,
+			},
+			wantUser: &user.DefaultInfo{
+				Name: "jane.doe@example.com",
+			},
+		},
+		{
+			name:          "no email_verified claim",
+			issuerURL:     "https://foo.com/",
+			usernameClaim: "email",
+			claims: jose.Claims{
+				"email": "jane.doe@example.com",
+			},
+			wantErr: true,
+		},
+		{
+			name:          "email unverified",
+			issuerURL:     "https://foo.com/",
+			usernameClaim: "email",
+			claims: jose.Claims{
+				"email":          "jane.doe@example.com",
+				"email_verified": false,
+			},
+			wantErr: true,
+		},
+		{
+			name:          "non-email user claim",
+			issuerURL:     "https://foo.com/",
+			usernameClaim: "name",
+			claims: jose.Claims{
+				"name": "janedoe",
+			},
+			wantUser: &user.DefaultInfo{
+				Name: "janedoe",
+			},
+		},
+		{
+			name:          "groups claim",
+			issuerURL:     "https://foo.com/",
+			usernameClaim: "name",
+			groupsClaim:   "groups",
+			claims: jose.Claims{
+				"name":   "janedoe",
+				"groups": []string{"foo", "bar"},
+			},
+			wantUser: &user.DefaultInfo{
+				Name:   "janedoe",
+				Groups: []string{"foo", "bar"},
+			},
+		},
+		{
+			name:          "groups claim string",
+			issuerURL:     "https://foo.com/",
+			usernameClaim: "name",
+			groupsClaim:   "groups",
+			claims: jose.Claims{
+				"name":   "janedoe",
+				"groups": "foo",
+			},
+			wantUser: &user.DefaultInfo{
+				Name:   "janedoe",
+				Groups: []string{"foo"},
+			},
+		},
+		{
+			name:           "username prefix",
+			issuerURL:      "https://foo.com/",
+			usernameClaim:  "name",
+			groupsClaim:    "groups",
+			usernamePrefix: "oidc:",
+			claims: jose.Claims{
+				"name":   "janedoe",
+				"groups": []string{"foo", "bar"},
+			},
+			wantUser: &user.DefaultInfo{
+				Name:   "oidc:janedoe",
+				Groups: []string{"foo", "bar"},
+			},
+		},
+		{
+			name:           "username prefix with email",
+			issuerURL:      "https://foo.com/",
+			usernameClaim:  "email",
+			groupsClaim:    "groups",
+			usernamePrefix: "oidc:",
+			claims: jose.Claims{
+				"email":          "jane.doe@example.com",
+				"email_verified": true,
+				"groups":         []string{"foo", "bar"},
+			},
+			wantUser: &user.DefaultInfo{
+				Name:   "oidc:jane.doe@example.com",
+				Groups: []string{"foo", "bar"},
+			},
+		},
+		{
+			name:          "groups prefix",
+			issuerURL:     "https://foo.com/",
+			usernameClaim: "name",
+			groupsClaim:   "groups",
+			groupsPrefix:  "oidc:",
+			claims: jose.Claims{
+				"name":   "janedoe",
+				"groups": []string{"foo", "bar"},
+			},
+			wantUser: &user.DefaultInfo{
+				Name:   "janedoe",
+				Groups: []string{"oidc:foo", "oidc:bar"},
+			},
+		},
+		{
+			name:           "username and groups prefix",
+			issuerURL:      "https://foo.com/",
+			usernameClaim:  "name",
+			groupsClaim:    "groups",
+			usernamePrefix: "oidc-user:",
+			groupsPrefix:   "oidc:",
+			claims: jose.Claims{
+				"name":   "janedoe",
+				"groups": []string{"foo", "bar"},
+			},
+			wantUser: &user.DefaultInfo{
+				Name:   "oidc-user:janedoe",
+				Groups: []string{"oidc:foo", "oidc:bar"},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			o := OIDCAuthenticator{
+				issuerURL:      test.issuerURL,
+				usernameClaim:  test.usernameClaim,
+				usernamePrefix: test.usernamePrefix,
+				groupsClaim:    test.groupsClaim,
+				groupsPrefix:   test.groupsPrefix,
+			}
+
+			u, ok, err := o.parseTokenClaims(test.claims)
+			if err != nil {
+				if !test.wantErr {
+					t.Errorf("failed to authenticate user: %v", err)
+				}
+				return
+			}
+			if test.wantErr {
+				t.Fatalf("expected authentication to fail")
+			}
+
+			if !ok {
+				// We don't have any cases today when the claims can return
+				// no error with an unauthenticated signal.
+				//
+				// In the future we might.
+				t.Fatalf("user wasn't authenticated")
+			}
+
+			got := &user.DefaultInfo{
+				Name:   u.GetName(),
+				UID:    u.GetUID(),
+				Groups: u.GetGroups(),
+				Extra:  u.GetExtra(),
+			}
+			if !reflect.DeepEqual(got, test.wantUser) {
+				t.Errorf("wanted user=%#v, got=%#v", test.wantUser, got)
+			}
+		})
 	}
 }

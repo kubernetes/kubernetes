@@ -23,44 +23,57 @@ limitations under the License.
 package rbd
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/golang/glog"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
 // Abstract interface to disk operations.
 type diskManager interface {
+	// MakeGlobalPDName creates global persistent disk path.
 	MakeGlobalPDName(disk rbd) string
+	// MakeGlobalVDPDName creates global block disk path.
+	MakeGlobalVDPDName(disk rbd) string
 	// Attaches the disk to the kubelet's host machine.
-	AttachDisk(disk rbdMounter) error
+	// If it successfully attaches, the path to the device
+	// is returned. Otherwise, an error will be returned.
+	AttachDisk(disk rbdMounter) (string, error)
 	// Detaches the disk from the kubelet's host machine.
-	DetachDisk(disk rbdUnmounter, mntPath string) error
-	// Creates a rbd image
-	CreateImage(provisioner *rbdVolumeProvisioner) (r *v1.RBDVolumeSource, volumeSizeGB int, err error)
-	// Deletes a rbd image
+	DetachDisk(plugin *rbdPlugin, deviceMountPath string, device string) error
+	// Detaches the block disk from the kubelet's host machine.
+	DetachBlockDisk(disk rbdDiskUnmapper, mntPath string) error
+	// Creates a rbd image.
+	CreateImage(provisioner *rbdVolumeProvisioner) (r *v1.RBDPersistentVolumeSource, volumeSizeGB int, err error)
+	// Deletes a rbd image.
 	DeleteImage(deleter *rbdVolumeDeleter) error
+	// Expands a rbd image
+	ExpandImage(expander *rbdVolumeExpander, oldSize resource.Quantity, newSize resource.Quantity) (resource.Quantity, error)
 }
 
 // utility to mount a disk based filesystem
-func diskSetUp(manager diskManager, b rbdMounter, volPath string, mounter mount.Interface, fsGroup *types.UnixGroupID) error {
+func diskSetUp(manager diskManager, b rbdMounter, volPath string, mounter mount.Interface, fsGroup *int64) error {
 	globalPDPath := manager.MakeGlobalPDName(*b.rbd)
-	// TODO: handle failed mounts here.
-	notMnt, err := mounter.IsLikelyNotMountPoint(volPath)
+	notMnt, err := mounter.IsLikelyNotMountPoint(globalPDPath)
+	if err != nil && !os.IsNotExist(err) {
+		glog.Errorf("cannot validate mountpoint: %s", globalPDPath)
+		return err
+	}
+	if notMnt {
+		return fmt.Errorf("no device is mounted at %s", globalPDPath)
+	}
 
+	notMnt, err = mounter.IsLikelyNotMountPoint(volPath)
 	if err != nil && !os.IsNotExist(err) {
 		glog.Errorf("cannot validate mountpoint: %s", volPath)
 		return err
 	}
 	if !notMnt {
 		return nil
-	}
-	if err := manager.AttachDisk(b); err != nil {
-		glog.Errorf("failed to attach disk")
-		return err
 	}
 
 	if err := os.MkdirAll(volPath, 0750); err != nil {
@@ -78,6 +91,7 @@ func diskSetUp(manager diskManager, b rbdMounter, volPath string, mounter mount.
 		glog.Errorf("failed to bind mount:%s", globalPDPath)
 		return err
 	}
+	glog.V(3).Infof("rbd: successfully bind mount %s to %s with options %v", globalPDPath, volPath, mountOptions)
 
 	if !b.ReadOnly {
 		volume.SetVolumeOwnership(&b, fsGroup)
@@ -89,43 +103,31 @@ func diskSetUp(manager diskManager, b rbdMounter, volPath string, mounter mount.
 // utility to tear down a disk based filesystem
 func diskTearDown(manager diskManager, c rbdUnmounter, volPath string, mounter mount.Interface) error {
 	notMnt, err := mounter.IsLikelyNotMountPoint(volPath)
-	if err != nil {
-		glog.Errorf("cannot validate mountpoint %s", volPath)
+	if err != nil && !os.IsNotExist(err) {
+		glog.Errorf("cannot validate mountpoint: %s", volPath)
 		return err
 	}
 	if notMnt {
+		glog.V(3).Infof("volume path %s is not a mountpoint, deleting", volPath)
 		return os.Remove(volPath)
 	}
 
-	refs, err := mount.GetMountRefs(mounter, volPath)
-	if err != nil {
-		glog.Errorf("failed to get reference count %s", volPath)
-		return err
-	}
+	// Unmount the bind-mount inside this pod.
 	if err := mounter.Unmount(volPath); err != nil {
 		glog.Errorf("failed to umount %s", volPath)
 		return err
 	}
-	// If len(refs) is 1, then all bind mounts have been removed, and the
-	// remaining reference is the global mount. It is safe to detach.
-	if len(refs) == 1 {
-		mntPath := refs[0]
-		if err := manager.DetachDisk(c, mntPath); err != nil {
-			glog.Errorf("failed to detach disk from %s", mntPath)
-			return err
-		}
-	}
 
 	notMnt, mntErr := mounter.IsLikelyNotMountPoint(volPath)
-	if mntErr != nil {
+	if mntErr != nil && !os.IsNotExist(mntErr) {
 		glog.Errorf("IsLikelyNotMountPoint check failed: %v", mntErr)
-		return err
+		return mntErr
 	}
 	if notMnt {
 		if err := os.Remove(volPath); err != nil {
+			glog.V(2).Info("Error removing mountpoint ", volPath, ": ", err)
 			return err
 		}
 	}
 	return nil
-
 }

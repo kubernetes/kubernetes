@@ -31,8 +31,11 @@ Currently the test suite has the following:
 
 How To Run
 ------
-```
-cd kubernetes/test/integration/scheduler_perf
+```shell
+# In Kubernetes root path
+make generated_files
+
+cd test/integration/scheduler_perf
 ./test-performance.sh
 ```
 

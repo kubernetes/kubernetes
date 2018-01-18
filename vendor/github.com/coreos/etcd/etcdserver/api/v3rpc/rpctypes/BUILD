@@ -1,11 +1,4 @@
-package(default_visibility = ["//visibility:public"])
-
-licenses(["notice"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
@@ -14,10 +7,12 @@ go_library(
         "error.go",
         "md.go",
     ],
-    tags = ["automanaged"],
+    importpath = "github.com/coreos/etcd/etcdserver/api/v3rpc/rpctypes",
+    visibility = ["//visibility:public"],
     deps = [
         "//vendor/google.golang.org/grpc:go_default_library",
         "//vendor/google.golang.org/grpc/codes:go_default_library",
+        "//vendor/google.golang.org/grpc/status:go_default_library",
     ],
 )
 
@@ -32,4 +27,5 @@ filegroup(
     name = "all-srcs",
     srcs = [":package-srcs"],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

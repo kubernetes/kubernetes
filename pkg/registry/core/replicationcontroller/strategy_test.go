@@ -22,8 +22,12 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
+	api "k8s.io/kubernetes/pkg/apis/core"
+
+	// install all api groups for testing
+	_ "k8s.io/kubernetes/pkg/api/testapi"
 )
 
 func TestControllerStrategy(t *testing.T) {
@@ -145,7 +149,7 @@ func TestControllerStatusStrategy(t *testing.T) {
 
 func TestSelectableFieldLabelConversions(t *testing.T) {
 	apitesting.TestSelectableFieldLabelConversionsOfKind(t,
-		api.Registry.GroupOrDie(api.GroupName).GroupVersion.String(),
+		legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion.String(),
 		"ReplicationController",
 		ControllerToSelectableFields(&api.ReplicationController{}),
 		nil,
@@ -183,14 +187,8 @@ func TestValidateUpdate(t *testing.T) {
 	oldController.Annotations[api.NonConvertibleAnnotationPrefix+"/"+"spec.selector"] = "no way"
 
 	// Deep-copy so we won't mutate both selectors.
-	objCopy, err := api.Scheme.DeepCopy(oldController)
-	if err != nil {
-		t.Fatalf("unexpected deep-copy error: %v", err)
-	}
-	newController, ok := objCopy.(*api.ReplicationController)
-	if !ok {
-		t.Fatalf("unexpected object: %#v", objCopy)
-	}
+	newController := oldController.DeepCopy()
+
 	// Irrelevant (to the selector) update for the replication controller.
 	newController.Spec.Replicas = 5
 

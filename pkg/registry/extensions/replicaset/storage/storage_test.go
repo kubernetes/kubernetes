@@ -28,9 +28,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/diff"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
+	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
 	"k8s.io/apiserver/pkg/registry/rest"
 	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/apis/autoscaling"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 )
@@ -47,7 +49,7 @@ func newStorage(t *testing.T) (*ReplicaSetStorage, *etcdtesting.EtcdTestServer) 
 // createReplicaSet is a helper function that returns a ReplicaSet with the updated resource version.
 func createReplicaSet(storage *REST, rs extensions.ReplicaSet, t *testing.T) (extensions.ReplicaSet, error) {
 	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), rs.Namespace)
-	obj, err := storage.Create(ctx, &rs)
+	obj, err := storage.Create(ctx, &rs, rest.ValidateAllObjectFunc, false)
 	if err != nil {
 		t.Errorf("Failed to create ReplicaSet, %v", err)
 	}
@@ -94,7 +96,7 @@ func TestCreate(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.ReplicaSet.Store.DestroyFunc()
-	test := registrytest.New(t, storage.ReplicaSet.Store)
+	test := genericregistrytest.New(t, storage.ReplicaSet.Store)
 	rs := validNewReplicaSet()
 	rs.ObjectMeta = metav1.ObjectMeta{}
 	test.TestCreate(
@@ -115,7 +117,7 @@ func TestUpdate(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.ReplicaSet.Store.DestroyFunc()
-	test := registrytest.New(t, storage.ReplicaSet.Store)
+	test := genericregistrytest.New(t, storage.ReplicaSet.Store)
 	test.TestUpdate(
 		// valid
 		validNewReplicaSet(),
@@ -143,7 +145,7 @@ func TestDelete(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.ReplicaSet.Store.DestroyFunc()
-	test := registrytest.New(t, storage.ReplicaSet.Store)
+	test := genericregistrytest.New(t, storage.ReplicaSet.Store)
 	test.TestDelete(validNewReplicaSet())
 }
 
@@ -169,7 +171,7 @@ func TestGenerationNumber(t *testing.T) {
 
 	// Updates to spec should increment the generation number
 	storedRS.Spec.Replicas += 1
-	storage.ReplicaSet.Update(ctx, storedRS.Name, rest.DefaultUpdatedObjectInfo(storedRS, api.Scheme))
+	storage.ReplicaSet.Update(ctx, storedRS.Name, rest.DefaultUpdatedObjectInfo(storedRS), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -184,7 +186,7 @@ func TestGenerationNumber(t *testing.T) {
 
 	// Updates to status should not increment either spec or status generation numbers
 	storedRS.Status.Replicas += 1
-	storage.ReplicaSet.Update(ctx, storedRS.Name, rest.DefaultUpdatedObjectInfo(storedRS, api.Scheme))
+	storage.ReplicaSet.Update(ctx, storedRS.Name, rest.DefaultUpdatedObjectInfo(storedRS), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -202,7 +204,7 @@ func TestGet(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.ReplicaSet.Store.DestroyFunc()
-	test := registrytest.New(t, storage.ReplicaSet.Store)
+	test := genericregistrytest.New(t, storage.ReplicaSet.Store)
 	test.TestGet(validNewReplicaSet())
 }
 
@@ -210,7 +212,7 @@ func TestList(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.ReplicaSet.Store.DestroyFunc()
-	test := registrytest.New(t, storage.ReplicaSet.Store)
+	test := genericregistrytest.New(t, storage.ReplicaSet.Store)
 	test.TestList(validNewReplicaSet())
 }
 
@@ -218,7 +220,7 @@ func TestWatch(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.ReplicaSet.Store.DestroyFunc()
-	test := registrytest.New(t, storage.ReplicaSet.Store)
+	test := genericregistrytest.New(t, storage.ReplicaSet.Store)
 	test.TestWatch(
 		validNewReplicaSet(),
 		// matching labels
@@ -261,7 +263,12 @@ func TestScaleGet(t *testing.T) {
 		t.Fatalf("error setting new replica set (key: %s) %v: %v", key, validReplicaSet, err)
 	}
 
-	want := &extensions.Scale{
+	selector, err := metav1.LabelSelectorAsSelector(validReplicaSet.Spec.Selector)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	want := &autoscaling.Scale{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              name,
 			Namespace:         metav1.NamespaceDefault,
@@ -269,16 +276,16 @@ func TestScaleGet(t *testing.T) {
 			ResourceVersion:   rs.ResourceVersion,
 			CreationTimestamp: rs.CreationTimestamp,
 		},
-		Spec: extensions.ScaleSpec{
+		Spec: autoscaling.ScaleSpec{
 			Replicas: validReplicaSet.Spec.Replicas,
 		},
-		Status: extensions.ScaleStatus{
+		Status: autoscaling.ScaleStatus{
 			Replicas: validReplicaSet.Status.Replicas,
-			Selector: validReplicaSet.Spec.Selector,
+			Selector: selector.String(),
 		},
 	}
 	obj, err := storage.Scale.Get(ctx, name, &metav1.GetOptions{})
-	got := obj.(*extensions.Scale)
+	got := obj.(*autoscaling.Scale)
 	if err != nil {
 		t.Fatalf("error fetching scale for %s: %v", name, err)
 	}
@@ -301,17 +308,17 @@ func TestScaleUpdate(t *testing.T) {
 		t.Fatalf("error setting new replica set (key: %s) %v: %v", key, validReplicaSet, err)
 	}
 	replicas := 12
-	update := extensions.Scale{
+	update := autoscaling.Scale{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: metav1.NamespaceDefault,
 		},
-		Spec: extensions.ScaleSpec{
+		Spec: autoscaling.ScaleSpec{
 			Replicas: int32(replicas),
 		},
 	}
 
-	if _, _, err := storage.Scale.Update(ctx, update.Name, rest.DefaultUpdatedObjectInfo(&update, api.Scheme)); err != nil {
+	if _, _, err := storage.Scale.Update(ctx, update.Name, rest.DefaultUpdatedObjectInfo(&update), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc); err != nil {
 		t.Fatalf("error updating scale %v: %v", update, err)
 	}
 
@@ -319,7 +326,7 @@ func TestScaleUpdate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error fetching scale for %s: %v", name, err)
 	}
-	scale := obj.(*extensions.Scale)
+	scale := obj.(*autoscaling.Scale)
 	if scale.Spec.Replicas != int32(replicas) {
 		t.Errorf("wrong replicas count expected: %d got: %d", replicas, scale.Spec.Replicas)
 	}
@@ -327,7 +334,7 @@ func TestScaleUpdate(t *testing.T) {
 	update.ResourceVersion = rs.ResourceVersion
 	update.Spec.Replicas = 15
 
-	if _, _, err = storage.Scale.Update(ctx, update.Name, rest.DefaultUpdatedObjectInfo(&update, api.Scheme)); err != nil && !errors.IsConflict(err) {
+	if _, _, err = storage.Scale.Update(ctx, update.Name, rest.DefaultUpdatedObjectInfo(&update), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc); err != nil && !errors.IsConflict(err) {
 		t.Fatalf("unexpected error, expecting an update conflict but got %v", err)
 	}
 }
@@ -352,7 +359,7 @@ func TestStatusUpdate(t *testing.T) {
 		},
 	}
 
-	if _, _, err := storage.Status.Update(ctx, update.Name, rest.DefaultUpdatedObjectInfo(&update, api.Scheme)); err != nil {
+	if _, _, err := storage.Status.Update(ctx, update.Name, rest.DefaultUpdatedObjectInfo(&update), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	obj, err := storage.ReplicaSet.Get(ctx, "foo", &metav1.GetOptions{})
@@ -375,4 +382,12 @@ func TestShortNames(t *testing.T) {
 	defer storage.ReplicaSet.DestroyFunc()
 	expected := []string{"rs"}
 	registrytest.AssertShortNames(t, storage.ReplicaSet, expected)
+}
+
+func TestCategories(t *testing.T) {
+	storage, server := newStorage(t)
+	defer server.Terminate(t)
+	defer storage.ReplicaSet.Store.DestroyFunc()
+	expected := []string{"all"}
+	registrytest.AssertCategories(t, storage.ReplicaSet, expected)
 }

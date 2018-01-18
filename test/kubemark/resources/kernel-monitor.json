@@ -9,6 +9,12 @@
 	"lookback": "10m",
 	"bufferSize": 10,
 	"source": "kernel-monitor",
-	"conditions": [],
+	"conditions": [
+		{
+			"type": "KernelDeadlock",
+			"reason": "KernelHasNoDeadlock",
+			"message": "kernel has no deadlock"
+		}
+	],
 	"rules": []
 }

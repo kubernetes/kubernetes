@@ -24,7 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/diff"
 	clienttesting "k8s.io/client-go/testing"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 )
 
@@ -190,7 +190,7 @@ func TestWriteClientCAs(t *testing.T) {
 
 	for _, test := range tests {
 		client := fake.NewSimpleClientset(test.preexistingObjs...)
-		test.hook.writeClientCAs(client.Core())
+		test.hook.tryToWriteClientCAs(client.Core())
 
 		actualConfigMaps, updated := getFinalConfiMaps(client)
 		if !reflect.DeepEqual(test.expectedConfigMaps, actualConfigMaps) {

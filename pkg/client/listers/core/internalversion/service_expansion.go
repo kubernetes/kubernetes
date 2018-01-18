@@ -18,7 +18,7 @@ package internalversion
 
 import (
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
 // ServiceListerExpansion allows custom methods to be added to
@@ -28,7 +28,7 @@ type ServiceListerExpansion interface {
 }
 
 // ServiceNamespaceListerExpansion allows custom methods to be added to
-// ServiceNamespaeLister.
+// ServiceNamespaceLister.
 type ServiceNamespaceListerExpansion interface{}
 
 // TODO: Move this back to scheduler as a helper function that takes a Store,

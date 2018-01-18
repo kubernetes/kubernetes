@@ -12,11 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM gcr.io/google_containers/ubuntu-slim:0.6
+FROM BASEIMAGE
 
+ENV LOGS_GENERATOR_LINES_TOTAL 1
+ENV LOGS_GENERATOR_DURATION 1s
 
 COPY logs-generator /
 
-CMD /logs-generator --logtostderr \
-  --log-lines-total=${LOGS_GENERATOR_LINES_TOTAL} \
-  --run-duration=${LOGS_GENERATOR_DURATION}
+CMD ["sh", "-c", "/logs-generator --logtostderr --log-lines-total=${LOGS_GENERATOR_LINES_TOTAL} --run-duration=${LOGS_GENERATOR_DURATION}"]

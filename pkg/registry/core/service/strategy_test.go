@@ -26,8 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
-	"k8s.io/kubernetes/pkg/api"
-	apitesting "k8s.io/kubernetes/pkg/api/testing"
+	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
 func TestExportService(t *testing.T) {
@@ -82,7 +81,7 @@ func TestExportService(t *testing.T) {
 					Namespace: "bar",
 				},
 				Spec: api.ServiceSpec{
-					ClusterIP: "<unknown>",
+					ClusterIP: "",
 				},
 			},
 		},
@@ -210,15 +209,6 @@ func TestBeforeUpdate(t *testing.T) {
 			t.Errorf("unexpected error for %q: %v", tc.name, err)
 		}
 	}
-}
-
-func TestSelectableFieldLabelConversions(t *testing.T) {
-	apitesting.TestSelectableFieldLabelConversionsOfKind(t,
-		api.Registry.GroupOrDie(api.GroupName).GroupVersion.String(),
-		"Service",
-		ServiceToSelectableFields(&api.Service{}),
-		nil,
-	)
 }
 
 func TestServiceStatusStrategy(t *testing.T) {

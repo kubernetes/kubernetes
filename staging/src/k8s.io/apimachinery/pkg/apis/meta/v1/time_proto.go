@@ -25,7 +25,7 @@ import (
 // that matches Time. Do not use in Go structs.
 type Timestamp struct {
 	// Represents seconds of UTC time since Unix epoch
-	// 1970-01-01T00:00:00Z. Must be from from 0001-01-01T00:00:00Z to
+	// 1970-01-01T00:00:00Z. Must be from 0001-01-01T00:00:00Z to
 	// 9999-12-31T23:59:59Z inclusive.
 	Seconds int64 `json:"seconds" protobuf:"varint,1,opt,name=seconds"`
 	// Non-negative fractions of a second at nanosecond resolution. Negative
@@ -42,7 +42,10 @@ func (m *Time) ProtoTime() *Timestamp {
 	}
 	return &Timestamp{
 		Seconds: m.Time.Unix(),
-		Nanos:   int32(m.Time.Nanosecond()),
+		// leaving this here for the record.  our JSON only handled seconds, so this results in writes by
+		// protobuf clients storing values that aren't read by json clients, which results in unexpected
+		// field mutation, which fails various validation and equality code.
+		// Nanos:   int32(m.Time.Nanosecond()),
 	}
 }
 
@@ -64,7 +67,11 @@ func (m *Time) Unmarshal(data []byte) error {
 	if err := p.Unmarshal(data); err != nil {
 		return err
 	}
-	m.Time = time.Unix(p.Seconds, int64(p.Nanos)).Local()
+	// leaving this here for the record.  our JSON only handled seconds, so this results in writes by
+	// protobuf clients storing values that aren't read by json clients, which results in unexpected
+	// field mutation, which fails various validation and equality code.
+	// m.Time = time.Unix(p.Seconds, int64(p.Nanos)).Local()
+	m.Time = time.Unix(p.Seconds, int64(0)).Local()
 	return nil
 }
 

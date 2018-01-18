@@ -22,7 +22,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
@@ -58,30 +57,30 @@ func (m *Helper) Get(namespace, name string, export bool) (runtime.Object, error
 		Resource(m.Resource).
 		Name(name)
 	if export {
+		// TODO: I should be part of GetOptions
 		req.Param("export", strconv.FormatBool(export))
 	}
 	return req.Do().Get()
 }
 
-// TODO: add field selector
-func (m *Helper) List(namespace, apiVersion string, selector labels.Selector, export bool) (runtime.Object, error) {
+func (m *Helper) List(namespace, apiVersion string, export bool, options *metav1.ListOptions) (runtime.Object, error) {
 	req := m.RESTClient.Get().
 		NamespaceIfScoped(namespace, m.NamespaceScoped).
 		Resource(m.Resource).
-		LabelsSelectorParam(selector)
+		VersionedParams(options, metav1.ParameterCodec)
 	if export {
+		// TODO: I should be part of ListOptions
 		req.Param("export", strconv.FormatBool(export))
 	}
 	return req.Do().Get()
 }
 
-func (m *Helper) Watch(namespace, resourceVersion, apiVersion string, labelSelector labels.Selector) (watch.Interface, error) {
+func (m *Helper) Watch(namespace, apiVersion string, options *metav1.ListOptions) (watch.Interface, error) {
+	options.Watch = true
 	return m.RESTClient.Get().
 		NamespaceIfScoped(namespace, m.NamespaceScoped).
 		Resource(m.Resource).
-		Param("resourceVersion", resourceVersion).
-		Param("watch", "true").
-		LabelsSelectorParam(labelSelector).
+		VersionedParams(options, metav1.ParameterCodec).
 		Watch()
 }
 
@@ -89,9 +88,11 @@ func (m *Helper) WatchSingle(namespace, name, resourceVersion string) (watch.Int
 	return m.RESTClient.Get().
 		NamespaceIfScoped(namespace, m.NamespaceScoped).
 		Resource(m.Resource).
-		Param("resourceVersion", resourceVersion).
-		Param("watch", "true").
-		FieldsSelectorParam(fields.OneTermEqualSelector("metadata.name", name)).
+		VersionedParams(&metav1.ListOptions{
+			ResourceVersion: resourceVersion,
+			Watch:           true,
+			FieldSelector:   fields.OneTermEqualSelector("metadata.name", name).String(),
+		}, metav1.ParameterCodec).
 		Watch()
 }
 

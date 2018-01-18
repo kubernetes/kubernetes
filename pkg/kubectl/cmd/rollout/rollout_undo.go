@@ -26,7 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
-	"k8s.io/kubernetes/pkg/util/i18n"
+	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 
 	"github.com/spf13/cobra"
 )
@@ -43,7 +43,8 @@ type UndoOptions struct {
 	ToRevision  int64
 	DryRun      bool
 
-	Out io.Writer
+	PrintSuccess func(mapper meta.RESTMapper, shortOutput bool, out io.Writer, resource, name string, dryRun bool, operation string)
+	Out          io.Writer
 }
 
 var (
@@ -54,8 +55,8 @@ var (
 		# Rollback to the previous deployment
 		kubectl rollout undo deployment/abc
 
-		# Rollback to deployment revision 3
-		kubectl rollout undo deployment/abc --to-revision=3
+		# Rollback to daemonset revision 3
+		kubectl rollout undo daemonset/abc --to-revision=3
 
 		# Rollback to the previous deployment with dry-run
 		kubectl rollout undo --dry-run=true deployment/abc`)
@@ -64,7 +65,7 @@ var (
 func NewCmdRolloutUndo(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	options := &UndoOptions{}
 
-	validArgs := []string{"deployment"}
+	validArgs := []string{"deployment", "daemonset", "statefulset"}
 	argAliases := kubectl.ResourceAliases(validArgs)
 
 	cmd := &cobra.Command{
@@ -96,10 +97,11 @@ func NewCmdRolloutUndo(f cmdutil.Factory, out io.Writer) *cobra.Command {
 }
 
 func (o *UndoOptions) CompleteUndo(f cmdutil.Factory, cmd *cobra.Command, out io.Writer, args []string) error {
-	if len(args) == 0 && cmdutil.IsFilenameEmpty(o.Filenames) {
-		return cmdutil.UsageError(cmd, "Required resource not specified.")
+	if len(args) == 0 && cmdutil.IsFilenameSliceEmpty(o.Filenames) {
+		return cmdutil.UsageErrorf(cmd, "Required resource not specified.")
 	}
 
+	o.PrintSuccess = f.PrintSuccess
 	o.ToRevision = cmdutil.GetFlagInt64(cmd, "to-revision")
 	o.Mapper, o.Typer = f.Object()
 	o.Out = out
@@ -110,7 +112,8 @@ func (o *UndoOptions) CompleteUndo(f cmdutil.Factory, cmd *cobra.Command, out io
 		return err
 	}
 
-	r := resource.NewBuilder(o.Mapper, f.CategoryExpander(), o.Typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
+	r := f.NewBuilder().
+		Internal().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, &o.FilenameOptions).
 		ResourceTypeOrNameArgs(true, args...).
@@ -146,7 +149,7 @@ func (o *UndoOptions) RunUndo() error {
 			allErrs = append(allErrs, cmdutil.AddSourceToErr("undoing", info.Source, err))
 			continue
 		}
-		cmdutil.PrintSuccess(o.Mapper, false, o.Out, info.Mapping.Resource, info.Name, false, result)
+		o.PrintSuccess(o.Mapper, false, o.Out, info.Mapping.Resource, info.Name, false, result)
 	}
 	return utilerrors.NewAggregate(allErrs)
 }

@@ -18,14 +18,19 @@ package pod
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/api"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/features"
 )
+
+// Visitor is called with each object name, and returns true if visiting should continue
+type Visitor func(name string) (shouldContinue bool)
 
 // VisitPodSecretNames invokes the visitor function with the name of every secret
 // referenced by the pod spec. If visitor returns false, visiting is short-circuited.
 // Transitive references (e.g. pod -> pvc -> pv -> secret) are not visited.
 // Returns true if visiting completed, false if visiting was short-circuited.
-func VisitPodSecretNames(pod *api.Pod, visitor func(string) bool) bool {
+func VisitPodSecretNames(pod *api.Pod, visitor Visitor) bool {
 	for _, reference := range pod.Spec.ImagePullSecrets {
 		if !visitor(reference.Name) {
 			return false
@@ -81,12 +86,16 @@ func VisitPodSecretNames(pod *api.Pod, visitor func(string) bool) bool {
 			if source.ISCSI.SecretRef != nil && !visitor(source.ISCSI.SecretRef.Name) {
 				return false
 			}
+		case source.StorageOS != nil:
+			if source.StorageOS.SecretRef != nil && !visitor(source.StorageOS.SecretRef.Name) {
+				return false
+			}
 		}
 	}
 	return true
 }
 
-func visitContainerSecretNames(container *api.Container, visitor func(string) bool) bool {
+func visitContainerSecretNames(container *api.Container, visitor Visitor) bool {
 	for _, env := range container.EnvFrom {
 		if env.SecretRef != nil {
 			if !visitor(env.SecretRef.Name) {
@@ -97,6 +106,60 @@ func visitContainerSecretNames(container *api.Container, visitor func(string) bo
 	for _, envVar := range container.Env {
 		if envVar.ValueFrom != nil && envVar.ValueFrom.SecretKeyRef != nil {
 			if !visitor(envVar.ValueFrom.SecretKeyRef.Name) {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+// VisitPodConfigmapNames invokes the visitor function with the name of every configmap
+// referenced by the pod spec. If visitor returns false, visiting is short-circuited.
+// Transitive references (e.g. pod -> pvc -> pv -> secret) are not visited.
+// Returns true if visiting completed, false if visiting was short-circuited.
+func VisitPodConfigmapNames(pod *api.Pod, visitor Visitor) bool {
+	for i := range pod.Spec.InitContainers {
+		if !visitContainerConfigmapNames(&pod.Spec.InitContainers[i], visitor) {
+			return false
+		}
+	}
+	for i := range pod.Spec.Containers {
+		if !visitContainerConfigmapNames(&pod.Spec.Containers[i], visitor) {
+			return false
+		}
+	}
+	var source *api.VolumeSource
+	for i := range pod.Spec.Volumes {
+		source = &pod.Spec.Volumes[i].VolumeSource
+		switch {
+		case source.Projected != nil:
+			for j := range source.Projected.Sources {
+				if source.Projected.Sources[j].ConfigMap != nil {
+					if !visitor(source.Projected.Sources[j].ConfigMap.Name) {
+						return false
+					}
+				}
+			}
+		case source.ConfigMap != nil:
+			if !visitor(source.ConfigMap.Name) {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+func visitContainerConfigmapNames(container *api.Container, visitor Visitor) bool {
+	for _, env := range container.EnvFrom {
+		if env.ConfigMapRef != nil {
+			if !visitor(env.ConfigMapRef.Name) {
+				return false
+			}
+		}
+	}
+	for _, envVar := range container.Env {
+		if envVar.ValueFrom != nil && envVar.ValueFrom.ConfigMapKeyRef != nil {
+			if !visitor(envVar.ValueFrom.ConfigMapKeyRef.Name) {
 				return false
 			}
 		}
@@ -157,10 +220,59 @@ func UpdatePodCondition(status *api.PodStatus, condition *api.PodCondition) bool
 	isEqual := condition.Status == oldCondition.Status &&
 		condition.Reason == oldCondition.Reason &&
 		condition.Message == oldCondition.Message &&
-		condition.LastProbeTime.Equal(oldCondition.LastProbeTime) &&
-		condition.LastTransitionTime.Equal(oldCondition.LastTransitionTime)
+		condition.LastProbeTime.Equal(&oldCondition.LastProbeTime) &&
+		condition.LastTransitionTime.Equal(&oldCondition.LastTransitionTime)
 
 	status.Conditions[conditionIndex] = *condition
 	// Return true if one of the fields have changed.
 	return !isEqual
+}
+
+// DropDisabledAlphaFields removes disabled fields from the pod spec.
+// This should be called from PrepareForCreate/PrepareForUpdate for all resources containing a pod spec.
+func DropDisabledAlphaFields(podSpec *api.PodSpec) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.PodPriority) {
+		podSpec.Priority = nil
+		podSpec.PriorityClassName = ""
+	}
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) {
+		for i := range podSpec.Volumes {
+			if podSpec.Volumes[i].EmptyDir != nil {
+				podSpec.Volumes[i].EmptyDir.SizeLimit = nil
+			}
+		}
+	}
+
+	for i := range podSpec.Containers {
+		DropDisabledVolumeMountsAlphaFields(podSpec.Containers[i].VolumeMounts)
+	}
+	for i := range podSpec.InitContainers {
+		DropDisabledVolumeMountsAlphaFields(podSpec.InitContainers[i].VolumeMounts)
+	}
+
+	DropDisabledVolumeDevicesAlphaFields(podSpec)
+}
+
+// DropDisabledVolumeMountsAlphaFields removes disabled fields from []VolumeMount.
+// This should be called from PrepareForCreate/PrepareForUpdate for all resources containing a VolumeMount
+func DropDisabledVolumeMountsAlphaFields(volumeMounts []api.VolumeMount) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.MountPropagation) {
+		for i := range volumeMounts {
+			volumeMounts[i].MountPropagation = nil
+		}
+	}
+}
+
+// DropDisabledVolumeDevicesAlphaFields removes disabled fields from []VolumeDevice.
+// This should be called from PrepareForCreate/PrepareForUpdate for all resources containing a VolumeDevice
+func DropDisabledVolumeDevicesAlphaFields(podSpec *api.PodSpec) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) {
+		for i := range podSpec.Containers {
+			podSpec.Containers[i].VolumeDevices = nil
+		}
+		for i := range podSpec.InitContainers {
+			podSpec.InitContainers[i].VolumeDevices = nil
+		}
+	}
 }

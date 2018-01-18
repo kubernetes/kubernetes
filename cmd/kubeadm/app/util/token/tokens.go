@@ -17,8 +17,8 @@ limitations under the License.
 package token
 
 import (
+	"bufio"
 	"crypto/rand"
-	"encoding/hex"
 	"fmt"
 	"regexp"
 
@@ -26,24 +26,52 @@ import (
 )
 
 const (
-	TokenIDBytes     = 3
-	TokenSecretBytes = 8
+	// TokenIDBytes defines a number of bytes used for a token id
+	TokenIDBytes = 6
+	// TokenSecretBytes defines a number of bytes used for a secret
+	TokenSecretBytes = 16
 )
 
 var (
+	// TokenIDRegexpString defines token's id regular expression pattern
 	TokenIDRegexpString = "^([a-z0-9]{6})$"
-	TokenIDRegexp       = regexp.MustCompile(TokenIDRegexpString)
-	TokenRegexpString   = "^([a-z0-9]{6})\\.([a-z0-9]{16})$"
-	TokenRegexp         = regexp.MustCompile(TokenRegexpString)
+	// TokenIDRegexp is a compiled regular expression of TokenIDRegexpString
+	TokenIDRegexp = regexp.MustCompile(TokenIDRegexpString)
+	// TokenRegexpString defines id.secret regular expression pattern
+	TokenRegexpString = "^([a-z0-9]{6})\\.([a-z0-9]{16})$"
+	// TokenRegexp is a compiled regular expression of TokenRegexpString
+	TokenRegexp = regexp.MustCompile(TokenRegexpString)
 )
 
+const validBootstrapTokenChars = "0123456789abcdefghijklmnopqrstuvwxyz"
+
 func randBytes(length int) (string, error) {
-	b := make([]byte, length)
-	_, err := rand.Read(b)
-	if err != nil {
-		return "", err
+	// len("0123456789abcdefghijklmnopqrstuvwxyz") = 36 which doesn't evenly divide
+	// the possible values of a byte: 256 mod 36 = 4. Discard any random bytes we
+	// read that are >= 252 so the bytes we evenly divide the character set.
+	const maxByteValue = 252
+
+	var (
+		b     byte
+		err   error
+		token = make([]byte, length)
+	)
+
+	reader := bufio.NewReaderSize(rand.Reader, length*2)
+	for i := range token {
+		for {
+			if b, err = reader.ReadByte(); err != nil {
+				return "", err
+			}
+			if b < maxByteValue {
+				break
+			}
+		}
+
+		token[i] = validBootstrapTokenChars[int(b)%len(validBootstrapTokenChars)]
 	}
-	return hex.EncodeToString(b), nil
+
+	return string(token), nil
 }
 
 // GenerateToken generates a new token with a token ID that is valid as a

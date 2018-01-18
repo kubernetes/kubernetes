@@ -21,6 +21,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // AdmissionConfiguration provides versioned configuration for admission controllers.
 type AdmissionConfiguration struct {
 	metav1.TypeMeta `json:",inline"`
@@ -44,5 +46,5 @@ type AdmissionPluginConfiguration struct {
 	// Configuration is an embedded configuration object to be used as the plugin's
 	// configuration. If present, it will be used instead of the path to the configuration file.
 	// +optional
-	Configuration runtime.RawExtension `json:"configuration"`
+	Configuration *runtime.Unknown `json:"configuration"`
 }

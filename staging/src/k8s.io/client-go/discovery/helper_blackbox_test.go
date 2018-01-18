@@ -26,14 +26,13 @@ import (
 	"strings"
 	"testing"
 
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	uapi "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/client-go/pkg/api/v1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
 )
@@ -46,80 +45,39 @@ func objBody(object interface{}) io.ReadCloser {
 	return ioutil.NopCloser(bytes.NewReader([]byte(output)))
 }
 
-func TestNegotiateVersion(t *testing.T) {
+func TestServerSupportsVersion(t *testing.T) {
 	tests := []struct {
 		name            string
-		requiredVersion *schema.GroupVersion
-		expectedVersion *schema.GroupVersion
+		requiredVersion schema.GroupVersion
 		serverVersions  []string
-		clientVersions  []schema.GroupVersion
 		expectErr       func(err error) bool
 		sendErr         error
 		statusCode      int
 	}{
 		{
-			name:            "server supports client default",
-			serverVersions:  []string{"version1", v1.SchemeGroupVersion.String()},
-			clientVersions:  []schema.GroupVersion{{Version: "version1"}, v1.SchemeGroupVersion},
-			expectedVersion: &schema.GroupVersion{Version: "version1"},
-			statusCode:      http.StatusOK,
-		},
-		{
-			name:            "server falls back to client supported",
-			serverVersions:  []string{"version1"},
-			clientVersions:  []schema.GroupVersion{{Version: "version1"}, v1.SchemeGroupVersion},
-			expectedVersion: &schema.GroupVersion{Version: "version1"},
-			statusCode:      http.StatusOK,
-		},
-		{
 			name:            "explicit version supported",
-			requiredVersion: &schema.GroupVersion{Version: "v1"},
+			requiredVersion: schema.GroupVersion{Version: "v1"},
 			serverVersions:  []string{"/version1", v1.SchemeGroupVersion.String()},
-			clientVersions:  []schema.GroupVersion{{Version: "version1"}, v1.SchemeGroupVersion},
-			expectedVersion: &schema.GroupVersion{Version: "v1"},
 			statusCode:      http.StatusOK,
 		},
 		{
 			name:            "explicit version not supported on server",
-			requiredVersion: &schema.GroupVersion{Version: "v1"},
+			requiredVersion: schema.GroupVersion{Version: "v1"},
 			serverVersions:  []string{"version1"},
-			clientVersions:  []schema.GroupVersion{{Version: "version1"}, v1.SchemeGroupVersion},
 			expectErr:       func(err error) bool { return strings.Contains(err.Error(), `server does not support API version "v1"`) },
-			statusCode:      http.StatusOK,
-		},
-		{
-			name:            "explicit version not supported on client",
-			requiredVersion: &schema.GroupVersion{Version: "v1"},
-			serverVersions:  []string{"v1"},
-			clientVersions:  []schema.GroupVersion{{Version: "version1"}},
-			expectErr:       func(err error) bool { return strings.Contains(err.Error(), `client does not support API version "v1"`) },
 			statusCode:      http.StatusOK,
 		},
 		{
 			name:           "connection refused error",
 			serverVersions: []string{"version1"},
-			clientVersions: []schema.GroupVersion{{Version: "version1"}, v1.SchemeGroupVersion},
 			sendErr:        errors.New("connection refused"),
 			expectErr:      func(err error) bool { return strings.Contains(err.Error(), "connection refused") },
 			statusCode:     http.StatusOK,
 		},
 		{
-			name:            "discovery fails due to 403 Forbidden errors and thus serverVersions is empty, use default GroupVersion",
-			clientVersions:  []schema.GroupVersion{{Version: "version1"}, v1.SchemeGroupVersion},
-			expectedVersion: &schema.GroupVersion{Version: "version1"},
-			statusCode:      http.StatusForbidden,
-		},
-		{
 			name:            "discovery fails due to 404 Not Found errors and thus serverVersions is empty, use requested GroupVersion",
-			requiredVersion: &schema.GroupVersion{Version: "version1"},
-			clientVersions:  []schema.GroupVersion{{Version: "version1"}, v1.SchemeGroupVersion},
-			expectedVersion: &schema.GroupVersion{Version: "version1"},
+			requiredVersion: schema.GroupVersion{Version: "version1"},
 			statusCode:      http.StatusNotFound,
-		},
-		{
-			name:            "discovery fails due to 403 Forbidden errors and thus serverVersions is empty, fallback to empty GroupVersion",
-			expectedVersion: &schema.GroupVersion{},
-			statusCode:      http.StatusForbidden,
 		},
 	}
 
@@ -128,7 +86,7 @@ func TestNegotiateVersion(t *testing.T) {
 			NegotiatedSerializer: scheme.Codecs,
 			Resp: &http.Response{
 				StatusCode: test.statusCode,
-				Body:       objBody(&uapi.APIVersions{Versions: test.serverVersions}),
+				Body:       objBody(&metav1.APIVersions{Versions: test.serverVersions}),
 			},
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 				if test.sendErr != nil {
@@ -136,12 +94,12 @@ func TestNegotiateVersion(t *testing.T) {
 				}
 				header := http.Header{}
 				header.Set("Content-Type", runtime.ContentTypeJSON)
-				return &http.Response{StatusCode: test.statusCode, Header: header, Body: objBody(&uapi.APIVersions{Versions: test.serverVersions})}, nil
+				return &http.Response{StatusCode: test.statusCode, Header: header, Body: objBody(&metav1.APIVersions{Versions: test.serverVersions})}, nil
 			}),
 		}
 		c := discovery.NewDiscoveryClientForConfigOrDie(&restclient.Config{})
 		c.RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
-		response, err := discovery.NegotiateVersion(c, test.requiredVersion, test.clientVersions)
+		err := discovery.ServerSupportsVersion(c, test.requiredVersion)
 		if err == nil && test.expectErr != nil {
 			t.Errorf("expected error, got nil for [%s].", test.name)
 		}
@@ -150,9 +108,6 @@ func TestNegotiateVersion(t *testing.T) {
 				t.Errorf("unexpected error for [%s]: %v.", test.name, err)
 			}
 			continue
-		}
-		if *response != *test.expectedVersion {
-			t.Errorf("%s: expected version %s, got %s.", test.name, test.expectedVersion, response)
 		}
 	}
 }

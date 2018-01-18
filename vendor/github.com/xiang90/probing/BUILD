@@ -1,11 +1,4 @@
-package(default_visibility = ["//visibility:public"])
-
-licenses(["notice"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
@@ -14,7 +7,8 @@ go_library(
         "server.go",
         "status.go",
     ],
-    tags = ["automanaged"],
+    importpath = "github.com/xiang90/probing",
+    visibility = ["//visibility:public"],
 )
 
 filegroup(
@@ -28,4 +22,5 @@ filegroup(
     name = "all-srcs",
     srcs = [":package-srcs"],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

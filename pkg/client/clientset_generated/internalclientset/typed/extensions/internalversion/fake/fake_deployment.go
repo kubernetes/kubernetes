@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2018 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -23,6 +23,7 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
+	autoscaling "k8s.io/kubernetes/pkg/apis/autoscaling"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions"
 )
 
@@ -36,50 +37,7 @@ var deploymentsResource = schema.GroupVersionResource{Group: "extensions", Versi
 
 var deploymentsKind = schema.GroupVersionKind{Group: "extensions", Version: "", Kind: "Deployment"}
 
-func (c *FakeDeployments) Create(deployment *extensions.Deployment) (result *extensions.Deployment, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(deploymentsResource, c.ns, deployment), &extensions.Deployment{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*extensions.Deployment), err
-}
-
-func (c *FakeDeployments) Update(deployment *extensions.Deployment) (result *extensions.Deployment, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(deploymentsResource, c.ns, deployment), &extensions.Deployment{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*extensions.Deployment), err
-}
-
-func (c *FakeDeployments) UpdateStatus(deployment *extensions.Deployment) (*extensions.Deployment, error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(deploymentsResource, "status", c.ns, deployment), &extensions.Deployment{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*extensions.Deployment), err
-}
-
-func (c *FakeDeployments) Delete(name string, options *v1.DeleteOptions) error {
-	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(deploymentsResource, c.ns, name), &extensions.Deployment{})
-
-	return err
-}
-
-func (c *FakeDeployments) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(deploymentsResource, c.ns, listOptions)
-
-	_, err := c.Fake.Invokes(action, &extensions.DeploymentList{})
-	return err
-}
-
+// Get takes name of the deployment, and returns the corresponding deployment object, and an error if there is any.
 func (c *FakeDeployments) Get(name string, options v1.GetOptions) (result *extensions.Deployment, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewGetAction(deploymentsResource, c.ns, name), &extensions.Deployment{})
@@ -90,6 +48,7 @@ func (c *FakeDeployments) Get(name string, options v1.GetOptions) (result *exten
 	return obj.(*extensions.Deployment), err
 }
 
+// List takes label and field selectors, and returns the list of Deployments that match those selectors.
 func (c *FakeDeployments) List(opts v1.ListOptions) (result *extensions.DeploymentList, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewListAction(deploymentsResource, deploymentsKind, c.ns, opts), &extensions.DeploymentList{})
@@ -118,6 +77,56 @@ func (c *FakeDeployments) Watch(opts v1.ListOptions) (watch.Interface, error) {
 
 }
 
+// Create takes the representation of a deployment and creates it.  Returns the server's representation of the deployment, and an error, if there is any.
+func (c *FakeDeployments) Create(deployment *extensions.Deployment) (result *extensions.Deployment, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewCreateAction(deploymentsResource, c.ns, deployment), &extensions.Deployment{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*extensions.Deployment), err
+}
+
+// Update takes the representation of a deployment and updates it. Returns the server's representation of the deployment, and an error, if there is any.
+func (c *FakeDeployments) Update(deployment *extensions.Deployment) (result *extensions.Deployment, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewUpdateAction(deploymentsResource, c.ns, deployment), &extensions.Deployment{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*extensions.Deployment), err
+}
+
+// UpdateStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
+func (c *FakeDeployments) UpdateStatus(deployment *extensions.Deployment) (*extensions.Deployment, error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewUpdateSubresourceAction(deploymentsResource, "status", c.ns, deployment), &extensions.Deployment{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*extensions.Deployment), err
+}
+
+// Delete takes name of the deployment and deletes it. Returns an error if one occurs.
+func (c *FakeDeployments) Delete(name string, options *v1.DeleteOptions) error {
+	_, err := c.Fake.
+		Invokes(testing.NewDeleteAction(deploymentsResource, c.ns, name), &extensions.Deployment{})
+
+	return err
+}
+
+// DeleteCollection deletes a collection of objects.
+func (c *FakeDeployments) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+	action := testing.NewDeleteCollectionAction(deploymentsResource, c.ns, listOptions)
+
+	_, err := c.Fake.Invokes(action, &extensions.DeploymentList{})
+	return err
+}
+
 // Patch applies the patch and returns the patched deployment.
 func (c *FakeDeployments) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *extensions.Deployment, err error) {
 	obj, err := c.Fake.
@@ -127,4 +136,26 @@ func (c *FakeDeployments) Patch(name string, pt types.PatchType, data []byte, su
 		return nil, err
 	}
 	return obj.(*extensions.Deployment), err
+}
+
+// GetScale takes name of the deployment, and returns the corresponding scale object, and an error if there is any.
+func (c *FakeDeployments) GetScale(deploymentName string, options v1.GetOptions) (result *autoscaling.Scale, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewGetSubresourceAction(deploymentsResource, c.ns, "scale", deploymentName), &autoscaling.Scale{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*autoscaling.Scale), err
+}
+
+// UpdateScale takes the representation of a scale and updates it. Returns the server's representation of the scale, and an error, if there is any.
+func (c *FakeDeployments) UpdateScale(deploymentName string, scale *autoscaling.Scale) (result *autoscaling.Scale, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewUpdateSubresourceAction(deploymentsResource, "scale", c.ns, scale), &autoscaling.Scale{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*autoscaling.Scale), err
 }

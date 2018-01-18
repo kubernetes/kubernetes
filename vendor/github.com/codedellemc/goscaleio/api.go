@@ -16,8 +16,8 @@ import (
 	"strings"
 	"time"
 
-	log "github.com/Sirupsen/logrus"
 	types "github.com/codedellemc/goscaleio/types/v1"
+	log "github.com/sirupsen/logrus"
 )
 
 type Client struct {

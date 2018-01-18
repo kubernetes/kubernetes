@@ -17,8 +17,8 @@ limitations under the License.
 package upgrades
 
 import (
+	api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	api "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -55,7 +55,7 @@ func (t *AppArmorUpgradeTest) Setup(f *framework.Framework) {
 
 	// Create the initial test pod.
 	By("Creating a long-running AppArmor enabled pod.")
-	t.pod = common.CreateAppArmorTestPod(f, false)
+	t.pod = common.CreateAppArmorTestPod(f, false, false)
 
 	// Verify initial state.
 	t.verifyNodesAppArmorEnabled(f)
@@ -91,12 +91,12 @@ func (t *AppArmorUpgradeTest) verifyPodStillUp(f *framework.Framework) {
 
 func (t *AppArmorUpgradeTest) verifyNewPodSucceeds(f *framework.Framework) {
 	By("Verifying an AppArmor profile is enforced for a new pod")
-	common.CreateAppArmorTestPod(f, true)
+	common.CreateAppArmorTestPod(f, false, true)
 }
 
 func (t *AppArmorUpgradeTest) verifyNodesAppArmorEnabled(f *framework.Framework) {
 	By("Verifying nodes are AppArmor enabled")
-	nodes, err := f.ClientSet.Core().Nodes().List(metav1.ListOptions{})
+	nodes, err := f.ClientSet.CoreV1().Nodes().List(metav1.ListOptions{})
 	framework.ExpectNoError(err, "Failed to list nodes")
 	for _, node := range nodes.Items {
 		Expect(node.Status.Conditions).To(gstruct.MatchElements(conditionType, gstruct.IgnoreExtras, gstruct.Elements{

@@ -24,14 +24,14 @@ import (
 
 	"github.com/golang/glog"
 	heapster "k8s.io/heapster/metrics/api/v1/types"
-	metricsapi "k8s.io/heapster/metrics/apis/metrics/v1alpha1"
+	metricsapi "k8s.io/metrics/pkg/apis/metrics/v1alpha1"
 
+	autoscaling "k8s.io/api/autoscaling/v2beta1"
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/kubernetes/pkg/api/v1"
-	autoscaling "k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
+	clientset "k8s.io/client-go/kubernetes"
+	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 )
 
 const (
@@ -53,8 +53,8 @@ type HeapsterMetricsClient struct {
 
 func NewHeapsterMetricsClient(client clientset.Interface, namespace, scheme, service, port string) MetricsClient {
 	return &HeapsterMetricsClient{
-		services:        client.Core().Services(namespace),
-		podsGetter:      client.Core(),
+		services:        client.CoreV1().Services(namespace),
+		podsGetter:      client.CoreV1(),
 		heapsterScheme:  scheme,
 		heapsterService: service,
 		heapsterPort:    port,

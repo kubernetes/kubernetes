@@ -20,9 +20,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/rbac"
-	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/registry/rbac/clusterrole"
 )
 
@@ -34,18 +32,15 @@ type REST struct {
 // NewREST returns a RESTStorage object that will work against ClusterRole objects.
 func NewREST(optsGetter generic.RESTOptionsGetter) *REST {
 	store := &genericregistry.Store{
-		Copier:            api.Scheme,
-		NewFunc:           func() runtime.Object { return &rbac.ClusterRole{} },
-		NewListFunc:       func() runtime.Object { return &rbac.ClusterRoleList{} },
-		PredicateFunc:     clusterrole.Matcher,
-		QualifiedResource: rbac.Resource("clusterroles"),
-		WatchCacheSize:    cachesize.GetWatchCacheSizeByResource("clusterroles"),
+		NewFunc:                  func() runtime.Object { return &rbac.ClusterRole{} },
+		NewListFunc:              func() runtime.Object { return &rbac.ClusterRoleList{} },
+		DefaultQualifiedResource: rbac.Resource("clusterroles"),
 
 		CreateStrategy: clusterrole.Strategy,
 		UpdateStrategy: clusterrole.Strategy,
 		DeleteStrategy: clusterrole.Strategy,
 	}
-	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: clusterrole.GetAttrs}
+	options := &generic.StoreOptions{RESTOptions: optsGetter}
 	if err := store.CompleteWithOptions(options); err != nil {
 		panic(err) // TODO: Propagate error up
 	}

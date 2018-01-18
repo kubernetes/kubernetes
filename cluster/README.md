@@ -4,7 +4,7 @@
 
 The scripts and data in this directory automate creation and configuration of a Kubernetes cluster, including networking, DNS, nodes, and master components.
 
-See the [getting-started guides](../docs/getting-started-guides) for examples of how to use the scripts.
+See the [getting-started guides](https://kubernetes.io/docs/getting-started-guides) for examples of how to use the scripts.
 
 *cloudprovider*/`config-default.sh` contains a set of tweakable definitions/parameters for the cluster.
 

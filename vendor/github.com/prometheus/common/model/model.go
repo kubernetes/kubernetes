@@ -12,5 +12,5 @@
 // limitations under the License.
 
 // Package model contains common data structures that are shared across
-// Prometheus componenets and libraries.
+// Prometheus components and libraries.
 package model

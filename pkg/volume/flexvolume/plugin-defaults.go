@@ -29,6 +29,6 @@ func logPrefix(plugin *flexVolumePlugin) string {
 }
 
 func (plugin *pluginDefaults) GetVolumeName(spec *volume.Spec) (string, error) {
-	glog.Warning(logPrefix((*flexVolumePlugin)(plugin)), "using default GetVolumeName for volume ", spec.Name)
+	glog.Warning(logPrefix((*flexVolumePlugin)(plugin)), "using default GetVolumeName for volume ", spec.Name())
 	return spec.Name(), nil
 }

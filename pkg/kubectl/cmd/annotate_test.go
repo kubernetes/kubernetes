@@ -23,11 +23,11 @@ import (
 	"strings"
 	"testing"
 
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	restclient "k8s.io/client-go/rest"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/rest/fake"
-	"k8s.io/kubernetes/pkg/api"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 )
 
@@ -117,8 +117,8 @@ func TestParseAnnotations(t *testing.T) {
 			expectErr:      false,
 		},
 		{
-			annotations:    []string{"url=" + testURL, api.CreatedByAnnotation + "=" + testJSON},
-			expected:       map[string]string{"url": testURL, api.CreatedByAnnotation: testJSON},
+			annotations:    []string{"url=" + testURL, "fake.kubernetes.io/annotation=" + testJSON},
+			expected:       map[string]string{"url": testURL, "fake.kubernetes.io/annotation": testJSON},
 			expectedRemove: []string{},
 			scenario:       "add annotations with special characters",
 			expectErr:      false,
@@ -154,6 +154,18 @@ func TestParseAnnotations(t *testing.T) {
 			annotations: []string{"ab", "a="},
 			expectedErr: "invalid annotation format: ab",
 			scenario:    "incorrect annotation input (missing =value)",
+			expectErr:   true,
+		},
+		{
+			annotations: []string{"-"},
+			expectedErr: "invalid annotation format: -",
+			scenario:    "incorrect annotation input (missing key)",
+			expectErr:   true,
+		},
+		{
+			annotations: []string{"=bar"},
+			expectedErr: "invalid annotation format: =bar",
+			scenario:    "incorrect annotation input (missing key)",
 			expectErr:   true,
 		},
 	}
@@ -214,7 +226,7 @@ func TestUpdateAnnotations(t *testing.T) {
 		expectErr   bool
 	}{
 		{
-			obj: &api.Pod{
+			obj: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{"a": "b"},
 				},
@@ -223,41 +235,41 @@ func TestUpdateAnnotations(t *testing.T) {
 			expectErr:   true,
 		},
 		{
-			obj: &api.Pod{
+			obj: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{"a": "b"},
 				},
 			},
 			annotations: map[string]string{"a": "c"},
 			overwrite:   true,
-			expected: &api.Pod{
+			expected: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{"a": "c"},
 				},
 			},
 		},
 		{
-			obj: &api.Pod{
+			obj: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{"a": "b"},
 				},
 			},
 			annotations: map[string]string{"c": "d"},
-			expected: &api.Pod{
+			expected: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{"a": "b", "c": "d"},
 				},
 			},
 		},
 		{
-			obj: &api.Pod{
+			obj: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{"a": "b"},
 				},
 			},
 			annotations: map[string]string{"c": "d"},
 			version:     "2",
-			expected: &api.Pod{
+			expected: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations:     map[string]string{"a": "b", "c": "d"},
 					ResourceVersion: "2",
@@ -265,28 +277,28 @@ func TestUpdateAnnotations(t *testing.T) {
 			},
 		},
 		{
-			obj: &api.Pod{
+			obj: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{"a": "b"},
 				},
 			},
 			annotations: map[string]string{},
 			remove:      []string{"a"},
-			expected: &api.Pod{
+			expected: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{},
 				},
 			},
 		},
 		{
-			obj: &api.Pod{
+			obj: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{"a": "b", "c": "d"},
 				},
 			},
 			annotations: map[string]string{"e": "f"},
 			remove:      []string{"a"},
-			expected: &api.Pod{
+			expected: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
 						"c": "d",
@@ -296,14 +308,14 @@ func TestUpdateAnnotations(t *testing.T) {
 			},
 		},
 		{
-			obj: &api.Pod{
+			obj: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{"a": "b", "c": "d"},
 				},
 			},
 			annotations: map[string]string{"e": "f"},
 			remove:      []string{"g"},
-			expected: &api.Pod{
+			expected: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
 						"a": "b",
@@ -314,13 +326,13 @@ func TestUpdateAnnotations(t *testing.T) {
 			},
 		},
 		{
-			obj: &api.Pod{
+			obj: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{"a": "b", "c": "d"},
 				},
 			},
 			remove: []string{"e"},
-			expected: &api.Pod{
+			expected: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
 						"a": "b",
@@ -330,11 +342,11 @@ func TestUpdateAnnotations(t *testing.T) {
 			},
 		},
 		{
-			obj: &api.Pod{
+			obj: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{},
 			},
 			annotations: map[string]string{"a": "b"},
-			expected: &api.Pod{
+			expected: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{"a": "b"},
 				},
@@ -380,6 +392,18 @@ func TestAnnotateErrors(t *testing.T) {
 				return strings.Contains(err.Error(), "at least one annotation update is required")
 			},
 		},
+		"wrong annotations": {
+			args: []string{"pods", "-"},
+			errFn: func(err error) bool {
+				return strings.Contains(err.Error(), "at least one annotation update is required")
+			},
+		},
+		"wrong annotations 2": {
+			args: []string{"pods", "=bar"},
+			errFn: func(err error) bool {
+				return strings.Contains(err.Error(), "at least one annotation update is required")
+			},
+		},
 		"no resources remove annotations": {
 			args:  []string{"pods-"},
 			errFn: func(err error) bool { return strings.Contains(err.Error(), "one or more resources must be specified") },
@@ -394,7 +418,7 @@ func TestAnnotateErrors(t *testing.T) {
 		f, tf, _, _ := cmdtesting.NewAPIFactory()
 		tf.Printer = &testPrinter{}
 		tf.Namespace = "test"
-		tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(api.GroupName).GroupVersion}}
+		tf.ClientConfig = defaultClientConfig()
 
 		buf := bytes.NewBuffer([]byte{})
 		cmd := NewCmdAnnotate(f, buf)
@@ -427,7 +451,7 @@ func TestAnnotateObject(t *testing.T) {
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.UnstructuredClient = &fake.RESTClient{
-		APIRegistry:          api.Registry,
+		GroupVersion:         schema.GroupVersion{Group: "testgroup", Version: "v1"},
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch req.Method {
@@ -454,7 +478,7 @@ func TestAnnotateObject(t *testing.T) {
 		}),
 	}
 	tf.Namespace = "test"
-	tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(api.GroupName).GroupVersion}}
+	tf.ClientConfig = defaultClientConfig()
 
 	buf := bytes.NewBuffer([]byte{})
 	cmd := NewCmdAnnotate(f, buf)
@@ -478,7 +502,7 @@ func TestAnnotateObjectFromFile(t *testing.T) {
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.UnstructuredClient = &fake.RESTClient{
-		APIRegistry:          api.Registry,
+		GroupVersion:         schema.GroupVersion{Group: "testgroup", Version: "v1"},
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch req.Method {
@@ -505,7 +529,7 @@ func TestAnnotateObjectFromFile(t *testing.T) {
 		}),
 	}
 	tf.Namespace = "test"
-	tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(api.GroupName).GroupVersion}}
+	tf.ClientConfig = defaultClientConfig()
 
 	buf := bytes.NewBuffer([]byte{})
 	cmd := NewCmdAnnotate(f, buf)
@@ -527,7 +551,7 @@ func TestAnnotateObjectFromFile(t *testing.T) {
 func TestAnnotateLocal(t *testing.T) {
 	f, tf, _, _ := cmdtesting.NewAPIFactory()
 	tf.UnstructuredClient = &fake.RESTClient{
-		APIRegistry:          api.Registry,
+		GroupVersion:         schema.GroupVersion{Group: "testgroup", Version: "v1"},
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			t.Fatalf("unexpected request: %s %#v\n%#v", req.Method, req.URL, req)
@@ -535,7 +559,7 @@ func TestAnnotateLocal(t *testing.T) {
 		}),
 	}
 	tf.Namespace = "test"
-	tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(api.GroupName).GroupVersion}}
+	tf.ClientConfig = defaultClientConfig()
 
 	buf := bytes.NewBuffer([]byte{})
 	cmd := NewCmdAnnotate(f, buf)
@@ -560,7 +584,7 @@ func TestAnnotateMultipleObjects(t *testing.T) {
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.UnstructuredClient = &fake.RESTClient{
-		APIRegistry:          api.Registry,
+		GroupVersion:         schema.GroupVersion{Group: "testgroup", Version: "v1"},
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch req.Method {
@@ -589,7 +613,7 @@ func TestAnnotateMultipleObjects(t *testing.T) {
 		}),
 	}
 	tf.Namespace = "test"
-	tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(api.GroupName).GroupVersion}}
+	tf.ClientConfig = defaultClientConfig()
 
 	buf := bytes.NewBuffer([]byte{})
 	cmd := NewCmdAnnotate(f, buf)

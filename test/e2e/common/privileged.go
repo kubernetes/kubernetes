@@ -21,8 +21,8 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
@@ -81,8 +81,6 @@ func (c *PrivilegedPodTestConfig) createPodsSpec() *v1.Pod {
 	isPrivileged := true
 	notPrivileged := false
 
-	const image = "gcr.io/google_containers/busybox:1.24"
-
 	return &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      c.privilegedPod,
@@ -92,14 +90,14 @@ func (c *PrivilegedPodTestConfig) createPodsSpec() *v1.Pod {
 			Containers: []v1.Container{
 				{
 					Name:            c.privilegedContainer,
-					Image:           image,
+					Image:           busyboxImage,
 					ImagePullPolicy: v1.PullIfNotPresent,
 					SecurityContext: &v1.SecurityContext{Privileged: &isPrivileged},
 					Command:         []string{"/bin/sleep", "10000"},
 				},
 				{
 					Name:            c.notPrivilegedContainer,
-					Image:           image,
+					Image:           busyboxImage,
 					ImagePullPolicy: v1.PullIfNotPresent,
 					SecurityContext: &v1.SecurityContext{Privileged: &notPrivileged},
 					Command:         []string{"/bin/sleep", "10000"},

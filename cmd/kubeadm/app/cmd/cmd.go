@@ -24,10 +24,15 @@ import (
 
 	"k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases"
-	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/upgrade"
+
+	// Register the kubeadm configuration types because CLI flag generation
+	// depends on the generated defaults.
+	_ "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/install"
 )
 
-func NewKubeadmCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cobra.Command {
+// NewKubeadmCommand return cobra.Command to run kubeadm command
+func NewKubeadmCommand(_ io.Reader, out, err io.Writer) *cobra.Command {
 	cmds := &cobra.Command{
 		Use:   "kubeadm",
 		Short: "kubeadm: easily bootstrap a secure Kubernetes cluster",
@@ -35,55 +40,47 @@ func NewKubeadmCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 			kubeadm: easily bootstrap a secure Kubernetes cluster.
 
 			    ┌──────────────────────────────────────────────────────────┐
-			    │ KUBEADM IS BETA, DO NOT USE IT FOR PRODUCTION CLUSTERS!  │
+			    │ KUBEADM IS CURRENTLY IN BETA                             │
 			    │                                                          │
-			    │ But, please try it out! Give us feedback at:             │
+			    │ But please, try it out and give us feedback at:          │
 			    │ https://github.com/kubernetes/kubeadm/issues             │
-			    │ and at-mention @kubernetes/sig-cluster-lifecycle-misc    │
+			    │ and at-mention @kubernetes/sig-cluster-lifecycle-bugs    │
+			    │ or @kubernetes/sig-cluster-lifecycle-feature-requests    │
 			    └──────────────────────────────────────────────────────────┘
 
 			Example usage:
 
 			    Create a two-machine cluster with one master (which controls the cluster),
-			    and one node (where your workloads, like Pods and ReplicaSets run).
+			    and one node (where your workloads, like Pods and Deployments run).
 
 			    ┌──────────────────────────────────────────────────────────┐
-			    │ On the first machine                                     │
+			    │ On the first machine:                                    │
 			    ├──────────────────────────────────────────────────────────┤
 			    │ master# kubeadm init                                     │
 			    └──────────────────────────────────────────────────────────┘
 
 			    ┌──────────────────────────────────────────────────────────┐
-			    │ On the second machine                                    │
+			    │ On the second machine:                                   │
 			    ├──────────────────────────────────────────────────────────┤
-			    │ node# kubeadm join --token=<token> <ip-of-master>:<port> │
+			    │ node# kubeadm join <arguments-returned-from-init>        │
 			    └──────────────────────────────────────────────────────────┘
 
 			    You can then repeat the second step on as many other machines as you like.
 
 		`),
 	}
-	// TODO(phase2+) figure out how to avoid running as root
-	//
-	// TODO(phase2) detect interactive vs non-interactive use and adjust output accordingly
-	// i.e. make it automation friendly
-	//
-	// TODO(phase2) create an abstraction that defines files and the content that needs to
-	// be written to disc and write it all in one go at the end as we have a lot of
-	// crappy little files written from different parts of this code; this could also
-	// be useful for testing by having this model we can allow users to create some files before
-	// `kubeadm init` runs, e.g. PKI assets, we would then be able to look at files users has
-	// given an diff or validate if those are sane, we could also warn if any of the files had been deprecated
 
 	cmds.ResetFlags()
 	cmds.SetGlobalNormalizationFunc(flag.WarnWordSepNormalizeFunc)
 
 	cmds.AddCommand(NewCmdCompletion(out, ""))
+	cmds.AddCommand(NewCmdConfig(out))
 	cmds.AddCommand(NewCmdInit(out))
 	cmds.AddCommand(NewCmdJoin(out))
 	cmds.AddCommand(NewCmdReset(out))
 	cmds.AddCommand(NewCmdVersion(out))
 	cmds.AddCommand(NewCmdToken(out, err))
+	cmds.AddCommand(upgrade.NewCmdUpgrade(out))
 
 	// Wrap not yet fully supported commands in an alpha subcommand
 	experimentalCmd := &cobra.Command{

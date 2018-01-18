@@ -31,7 +31,7 @@ func NewKubeControllerManager() *Server {
 		AlternativeName: "kube-controller-manager",
 		SimpleUsage:     "controller-manager",
 		Long:            "A server that runs a set of active components. This includes replication controllers, service endpoints and nodes.",
-		Run: func(_ *Server, args []string) error {
+		Run: func(_ *Server, args []string, stopCh <-chan struct{}) error {
 			return app.Run(s)
 		},
 	}

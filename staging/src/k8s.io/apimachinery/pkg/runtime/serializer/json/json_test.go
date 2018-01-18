@@ -37,6 +37,9 @@ type testDecodable struct {
 func (d *testDecodable) GetObjectKind() schema.ObjectKind                { return d }
 func (d *testDecodable) SetGroupVersionKind(gvk schema.GroupVersionKind) { d.gvk = gvk }
 func (d *testDecodable) GroupVersionKind() schema.GroupVersionKind       { return d.gvk }
+func (d *testDecodable) DeepCopyObject() runtime.Object {
+	panic("testDecodable does not support DeepCopy")
+}
 
 func TestDecode(t *testing.T) {
 	testCases := []struct {
@@ -91,6 +94,32 @@ func TestDecode(t *testing.T) {
 			expectedObject: &testDecodable{},
 			expectedGVK:    &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"},
 		},
+		// group version, kind is defaulted
+		{
+			data:           []byte(`{"apiVersion":"other1/blah1"}`),
+			defaultGVK:     &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"},
+			creater:        &mockCreater{obj: &testDecodable{}},
+			expectedObject: &testDecodable{},
+			expectedGVK:    &schema.GroupVersionKind{Kind: "Test", Group: "other1", Version: "blah1"},
+		},
+		// gvk all provided then not defaulted at all
+		{
+			data:           []byte(`{"kind":"Test","apiVersion":"other/blah"}`),
+			defaultGVK:     &schema.GroupVersionKind{Kind: "Test1", Group: "other1", Version: "blah1"},
+			creater:        &mockCreater{obj: &testDecodable{}},
+			expectedObject: &testDecodable{},
+			expectedGVK:    &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"},
+		},
+		//gvk defaulting if kind not provided in data and defaultGVK use into's kind
+		{
+			data:           []byte(`{"apiVersion":"b1/c1"}`),
+			into:           &testDecodable{gvk: schema.GroupVersionKind{Kind: "a3", Group: "b1", Version: "c1"}},
+			typer:          &mockTyper{gvk: &schema.GroupVersionKind{Kind: "a3", Group: "b1", Version: "c1"}},
+			defaultGVK:     nil,
+			creater:        &mockCreater{obj: &testDecodable{}},
+			expectedObject: &testDecodable{gvk: schema.GroupVersionKind{Kind: "a3", Group: "b1", Version: "c1"}},
+			expectedGVK:    &schema.GroupVersionKind{Kind: "a3", Group: "b1", Version: "c1"},
+		},
 
 		// accept runtime.Unknown as into and bypass creator
 		{
@@ -129,7 +158,7 @@ func TestDecode(t *testing.T) {
 		{
 			data:        []byte(`{"kind":"Test","apiVersion":"other/blah","value":1,"Other":"test"}`),
 			into:        &testDecodable{},
-			typer:       &mockTyper{err: runtime.NewNotRegisteredErr(schema.GroupVersionKind{}, nil)},
+			typer:       &mockTyper{err: runtime.NewNotRegisteredErrForKind(schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"})},
 			expectedGVK: &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"},
 			expectedObject: &testDecodable{
 				Other: "test",

@@ -26,11 +26,8 @@ import (
 
 // StorageDecorator is a function signature for producing a storage.Interface
 // and an associated DestroyFunc from given parameters.
-// A zero capacity means to disable caching, nil means to use a default.
 type StorageDecorator func(
-	copier runtime.ObjectCopier,
 	config *storagebackend.Config,
-	capacity *int,
 	objectType runtime.Object,
 	resourcePrefix string,
 	keyFunc func(obj runtime.Object) (string, error),
@@ -41,9 +38,7 @@ type StorageDecorator func(
 // UndecoratedStorage returns the given a new storage from the given config
 // without any decoration.
 func UndecoratedStorage(
-	copier runtime.ObjectCopier,
 	config *storagebackend.Config,
-	capacity *int,
 	objectType runtime.Object,
 	resourcePrefix string,
 	keyFunc func(obj runtime.Object) (string, error),

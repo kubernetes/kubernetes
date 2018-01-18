@@ -27,13 +27,12 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
-	"k8s.io/kubernetes/pkg/util/i18n"
+	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
 
 var (
@@ -65,9 +64,7 @@ func NewCmdReplace(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	options := &resource.FilenameOptions{}
 
 	cmd := &cobra.Command{
-		Use: "replace -f FILENAME",
-		// update is deprecated.
-		Aliases: []string{"update"},
+		Use:     "replace -f FILENAME",
 		Short:   i18n.T("Replace a resource by filename or stdin"),
 		Long:    replaceLong,
 		Example: replaceExample,
@@ -94,10 +91,7 @@ func NewCmdReplace(f cmdutil.Factory, out io.Writer) *cobra.Command {
 }
 
 func RunReplace(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string, options *resource.FilenameOptions) error {
-	if len(os.Args) > 1 && os.Args[1] == "update" {
-		printDeprecationWarning("replace", "update")
-	}
-	schema, err := f.Validator(cmdutil.GetFlagBool(cmd, "validate"), cmdutil.GetFlagString(cmd, "schema-cache-dir"))
+	schema, err := f.Validator(cmdutil.GetFlagBool(cmd, "validate"))
 	if err != nil {
 		return err
 	}
@@ -108,8 +102,8 @@ func RunReplace(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 	}
 
 	force := cmdutil.GetFlagBool(cmd, "force")
-	if cmdutil.IsFilenameEmpty(options.Filenames) {
-		return cmdutil.UsageError(cmd, "Must specify --filename to replace")
+	if cmdutil.IsFilenameSliceEmpty(options.Filenames) {
+		return cmdutil.UsageErrorf(cmd, "Must specify --filename to replace")
 	}
 
 	shortOutput := cmdutil.GetFlagString(cmd, "output") == "name"
@@ -125,21 +119,19 @@ func RunReplace(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 		return fmt.Errorf("--timeout must have --force specified")
 	}
 
-	mapper, typer, err := f.UnstructuredObject()
-	if err != nil {
-		return err
-	}
-	r := resource.NewBuilder(mapper, f.CategoryExpander(), typer, resource.ClientMapperFunc(f.UnstructuredClientForMapping), unstructured.UnstructuredJSONScheme).
+	r := f.NewBuilder().
+		Unstructured().
 		Schema(schema).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, options).
 		Flatten().
 		Do()
-	err = r.Err()
-	if err != nil {
+	if err := r.Err(); err != nil {
 		return err
 	}
+
+	mapper := r.Mapper().RESTMapper
 
 	return r.Visit(func(info *resource.Info, err error) error {
 		if err != nil {
@@ -164,13 +156,13 @@ func RunReplace(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 
 		info.Refresh(obj, true)
 		f.PrintObjectSpecificMessage(obj, out)
-		cmdutil.PrintSuccess(mapper, shortOutput, out, info.Mapping.Resource, info.Name, false, "replaced")
+		f.PrintSuccess(mapper, shortOutput, out, info.Mapping.Resource, info.Name, false, "replaced")
 		return nil
 	})
 }
 
 func forceReplace(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string, shortOutput bool, options *resource.FilenameOptions) error {
-	schema, err := f.Validator(cmdutil.GetFlagBool(cmd, "validate"), cmdutil.GetFlagString(cmd, "schema-cache-dir"))
+	schema, err := f.Validator(cmdutil.GetFlagBool(cmd, "validate"))
 	if err != nil {
 		return err
 	}
@@ -196,21 +188,20 @@ func forceReplace(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []s
 		}
 	}
 
-	mapper, typer, err := f.UnstructuredObject()
-	if err != nil {
-		return err
-	}
-	r := resource.NewBuilder(mapper, f.CategoryExpander(), typer, resource.ClientMapperFunc(f.UnstructuredClientForMapping), unstructured.UnstructuredJSONScheme).
+	r := f.NewBuilder().
+		Unstructured().
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, options).
 		ResourceTypeOrNameArgs(false, args...).RequireObject(false).
 		Flatten().
 		Do()
-	err = r.Err()
-	if err != nil {
+	if err := r.Err(); err != nil {
 		return err
 	}
+
+	mapper := r.Mapper().RESTMapper
+
 	//Replace will create a resource if it doesn't exist already, so ignore not found error
 	ignoreNotFound := true
 	timeout := cmdutil.GetFlagDuration(cmd, "timeout")
@@ -227,7 +218,7 @@ func forceReplace(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []s
 		glog.Warningf("\"cascade\" is set, kubectl will delete and re-create all resources managed by this resource (e.g. Pods created by a ReplicationController). Consider using \"kubectl rolling-update\" if you want to update a ReplicationController together with its Pods.")
 		err = ReapResult(r, f, out, cmdutil.GetFlagBool(cmd, "cascade"), ignoreNotFound, timeout, gracePeriod, waitForDeletion, shortOutput, mapper, false)
 	} else {
-		err = DeleteResult(r, out, ignoreNotFound, shortOutput, mapper)
+		err = DeleteResult(r, f, out, ignoreNotFound, gracePeriod, shortOutput, mapper)
 	}
 	if err != nil {
 		return err
@@ -236,7 +227,7 @@ func forceReplace(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []s
 	if timeout == 0 {
 		timeout = kubectl.Timeout
 	}
-	r.Visit(func(info *resource.Info, err error) error {
+	err = r.Visit(func(info *resource.Info, err error) error {
 		if err != nil {
 			return err
 		}
@@ -248,8 +239,12 @@ func forceReplace(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []s
 			return true, nil
 		})
 	})
+	if err != nil {
+		return err
+	}
 
-	r = resource.NewBuilder(mapper, f.CategoryExpander(), typer, resource.ClientMapperFunc(f.UnstructuredClientForMapping), unstructured.UnstructuredJSONScheme).
+	r = f.NewBuilder().
+		Unstructured().
 		Schema(schema).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
@@ -285,7 +280,7 @@ func forceReplace(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []s
 		count++
 		info.Refresh(obj, true)
 		f.PrintObjectSpecificMessage(obj, out)
-		cmdutil.PrintSuccess(mapper, shortOutput, out, info.Mapping.Resource, info.Name, false, "replaced")
+		f.PrintSuccess(mapper, shortOutput, out, info.Mapping.Resource, info.Name, false, "replaced")
 		return nil
 	})
 	if err != nil {

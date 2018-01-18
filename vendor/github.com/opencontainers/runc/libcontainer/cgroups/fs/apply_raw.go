@@ -114,8 +114,8 @@ func (m *Manager) Apply(pid int) (err error) {
 		return err
 	}
 
+	m.Paths = make(map[string]string)
 	if c.Paths != nil {
-		paths := make(map[string]string)
 		for name, path := range c.Paths {
 			_, err := d.path(name)
 			if err != nil {
@@ -124,17 +124,12 @@ func (m *Manager) Apply(pid int) (err error) {
 				}
 				return err
 			}
-			paths[name] = path
+			m.Paths[name] = path
 		}
-		m.Paths = paths
 		return cgroups.EnterPid(m.Paths, pid)
 	}
 
-	paths := make(map[string]string)
 	for _, sys := range subsystems {
-		if err := sys.Apply(d); err != nil {
-			return err
-		}
 		// TODO: Apply should, ideally, be reentrant or be broken up into a separate
 		// create and join phase so that the cgroup hierarchy for a container can be
 		// created then join consists of writing the process pids to cgroup.procs
@@ -147,9 +142,21 @@ func (m *Manager) Apply(pid int) (err error) {
 			}
 			return err
 		}
-		paths[sys.Name()] = p
+		m.Paths[sys.Name()] = p
+
+		if err := sys.Apply(d); err != nil {
+			if os.IsPermission(err) && m.Cgroups.Path == "" {
+				// If we didn't set a cgroup path, then let's defer the error here
+				// until we know whether we have set limits or not.
+				// If we hadn't set limits, then it's ok that we couldn't join this cgroup, because
+				// it will have the same limits as its parent.
+				delete(m.Paths, sys.Name())
+				continue
+			}
+			return err
+		}
+
 	}
-	m.Paths = paths
 	return nil
 }
 
@@ -200,6 +207,10 @@ func (m *Manager) Set(container *configs.Config) error {
 	for _, sys := range subsystems {
 		path := paths[sys.Name()]
 		if err := sys.Set(path, container.Cgroups); err != nil {
+			if path == "" {
+				// cgroup never applied
+				return fmt.Errorf("cannot set limits on the %s cgroup, as the container has not joined it", sys.Name())
+			}
 			return err
 		}
 	}
@@ -269,25 +280,8 @@ func getCgroupData(c *configs.Cgroup, pid int) (*cgroupData, error) {
 	}, nil
 }
 
-func (raw *cgroupData) parentPath(subsystem, mountpoint, root string) (string, error) {
-	// Use GetThisCgroupDir instead of GetInitCgroupDir, because the creating
-	// process could in container and shared pid namespace with host, and
-	// /proc/1/cgroup could point to whole other world of cgroups.
-	initPath, err := cgroups.GetThisCgroupDir(subsystem)
-	if err != nil {
-		return "", err
-	}
-	// This is needed for nested containers, because in /proc/self/cgroup we
-	// see pathes from host, which don't exist in container.
-	relDir, err := filepath.Rel(root, initPath)
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(mountpoint, relDir), nil
-}
-
 func (raw *cgroupData) path(subsystem string) (string, error) {
-	mnt, root, err := cgroups.FindCgroupMountpointAndRoot(subsystem)
+	mnt, err := cgroups.FindCgroupMountpoint(subsystem)
 	// If we didn't mount the subsystem, there is no point we make the path.
 	if err != nil {
 		return "", err
@@ -299,7 +293,10 @@ func (raw *cgroupData) path(subsystem string) (string, error) {
 		return filepath.Join(raw.root, filepath.Base(mnt), raw.innerPath), nil
 	}
 
-	parentPath, err := raw.parentPath(subsystem, mnt, root)
+	// Use GetOwnCgroupPath instead of GetInitCgroupPath, because the creating
+	// process could in container and shared pid namespace with host, and
+	// /proc/1/cgroup could point to whole other world of cgroups.
+	parentPath, err := cgroups.GetOwnCgroupPath(subsystem)
 	if err != nil {
 		return "", err
 	}
@@ -348,8 +345,8 @@ func removePath(p string, err error) error {
 	return nil
 }
 
-func CheckCpushares(path string, c int64) error {
-	var cpuShares int64
+func CheckCpushares(path string, c uint64) error {
+	var cpuShares uint64
 
 	if c == 0 {
 		return nil

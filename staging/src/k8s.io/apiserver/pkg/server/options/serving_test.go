@@ -17,16 +17,24 @@ limitations under the License.
 package options
 
 import (
+	"bytes"
+	cryptorand "crypto/rand"
+	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
+	"crypto/x509/pkix"
 	"encoding/base64"
 	"encoding/pem"
 	"fmt"
 	"io/ioutil"
+	"math/big"
 	"net"
 	"os"
+	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 
@@ -39,7 +47,7 @@ import (
 	utilflag "k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/client-go/discovery"
 	restclient "k8s.io/client-go/rest"
-	utilcert "k8s.io/client-go/util/cert"
+	"strconv"
 )
 
 func setUp(t *testing.T) Config {
@@ -387,16 +395,18 @@ func TestServerRunWithSNI(t *testing.T) {
 		},
 	}
 
-	tempDir, err := ioutil.TempDir("", "")
-	if err != nil {
-		t.Fatal(err)
+	specToName := func(spec TestCertSpec) string {
+		name := spec.host + "_" + strings.Join(spec.names, ",") + "_" + strings.Join(spec.ips, ",")
+		return strings.Replace(name, "*", "star", -1)
 	}
-	defer os.RemoveAll(tempDir)
 
 NextTest:
 	for title, test := range tests {
 		// create server cert
-		serverCertBundleFile, serverKeyFile, err := createTestCertFiles(tempDir, test.Cert)
+		certDir := "testdata/" + specToName(test.Cert)
+		serverCertBundleFile := filepath.Join(certDir, "cert")
+		serverKeyFile := filepath.Join(certDir, "key")
+		err := getOrCreateTestCertFiles(serverCertBundleFile, serverKeyFile, test.Cert)
 		if err != nil {
 			t.Errorf("%q - failed to create server cert: %v", title, err)
 			continue NextTest
@@ -419,7 +429,10 @@ NextTest:
 			serverSig: -1,
 		}
 		for j, c := range test.SNICerts {
-			certBundleFile, keyFile, err := createTestCertFiles(tempDir, c.TestCertSpec)
+			sniDir := filepath.Join(certDir, specToName(c.TestCertSpec))
+			certBundleFile := filepath.Join(sniDir, "cert")
+			keyFile := filepath.Join(sniDir, "key")
+			err := getOrCreateTestCertFiles(certBundleFile, keyFile, c.TestCertSpec)
 			if err != nil {
 				t.Errorf("%q - failed to create SNI cert %d: %v", title, j, err)
 				continue NextTest
@@ -469,20 +482,26 @@ NextTest:
 				},
 				SNICertKeys: namedCertKeys,
 			}
+			// use a random free port
+			ln, err := net.Listen("tcp", "127.0.0.1:0")
+			if err != nil {
+				t.Errorf("failed to listen on 127.0.0.1:0")
+			}
+
+			secureOptions.Listener = ln
+			// get port
+			secureOptions.BindPort = ln.Addr().(*net.TCPAddr).Port
 			config.LoopbackClientConfig = &restclient.Config{}
 			if err := secureOptions.ApplyTo(&config); err != nil {
 				t.Errorf("%q - failed applying the SecureServingOptions: %v", title, err)
 				return
 			}
 
-			s, err := config.Complete().New(server.EmptyDelegate)
+			s, err := config.Complete(nil).New("test", server.EmptyDelegate)
 			if err != nil {
 				t.Errorf("%q - failed creating the server: %v", title, err)
 				return
 			}
-
-			// patch in a 0-port to enable auto port allocation
-			s.SecureServingInfo.BindAddress = "127.0.0.1:0"
 
 			// add poststart hook to know when the server is up.
 			startedCh := make(chan struct{})
@@ -505,9 +524,8 @@ NextTest:
 
 			<-startedCh
 
-			effectiveSecurePort := fmt.Sprintf("%d", preparedServer.EffectiveSecurePort())
 			// try to dial
-			addr := fmt.Sprintf("localhost:%s", effectiveSecurePort)
+			addr := fmt.Sprintf("localhost:%d", secureOptions.BindPort)
 			t.Logf("Dialing %s as %q", addr, test.ServerName)
 			conn, err := tls.Dial("tcp", addr, &tls.Config{
 				RootCAs:    roots,
@@ -535,7 +553,7 @@ NextTest:
 			if len(test.LoopbackClientBindAddressOverride) != 0 {
 				host = test.LoopbackClientBindAddressOverride
 			}
-			s.LoopbackClientConfig.Host = net.JoinHostPort(host, effectiveSecurePort)
+			s.LoopbackClientConfig.Host = net.JoinHostPort(host, strconv.Itoa(secureOptions.BindPort))
 			if test.ExpectLoopbackClientError {
 				if err == nil {
 					t.Errorf("%q - expected error creating loopback client config", title)
@@ -572,7 +590,7 @@ func parseIPList(ips []string) []net.IP {
 }
 
 func createTestTLSCerts(spec TestCertSpec) (tlsCert tls.Certificate, err error) {
-	certPem, keyPem, err := utilcert.GenerateSelfSignedCertKey(spec.host, parseIPList(spec.ips), spec.names)
+	certPem, keyPem, err := generateSelfSignedCertKey(spec.host, parseIPList(spec.ips), spec.names)
 	if err != nil {
 		return tlsCert, err
 	}
@@ -581,35 +599,31 @@ func createTestTLSCerts(spec TestCertSpec) (tlsCert tls.Certificate, err error) 
 	return tlsCert, err
 }
 
-func createTestCertFiles(dir string, spec TestCertSpec) (certFilePath, keyFilePath string, err error) {
-	certPem, keyPem, err := utilcert.GenerateSelfSignedCertKey(spec.host, parseIPList(spec.ips), spec.names)
-	if err != nil {
-		return "", "", err
+func getOrCreateTestCertFiles(certFileName, keyFileName string, spec TestCertSpec) (err error) {
+	if _, err := os.Stat(certFileName); err == nil {
+		if _, err := os.Stat(keyFileName); err == nil {
+			return nil
+		}
 	}
 
-	certFile, err := ioutil.TempFile(dir, "cert")
+	certPem, keyPem, err := generateSelfSignedCertKey(spec.host, parseIPList(spec.ips), spec.names)
 	if err != nil {
-		return "", "", err
+		return err
 	}
 
-	keyFile, err := ioutil.TempFile(dir, "key")
+	os.MkdirAll(filepath.Dir(certFileName), os.FileMode(0755))
+	err = ioutil.WriteFile(certFileName, certPem, os.FileMode(0755))
 	if err != nil {
-		return "", "", err
+		return err
 	}
 
-	_, err = certFile.Write(certPem)
+	os.MkdirAll(filepath.Dir(keyFileName), os.FileMode(0755))
+	err = ioutil.WriteFile(keyFileName, keyPem, os.FileMode(0755))
 	if err != nil {
-		return "", "", err
+		return err
 	}
-	certFile.Close()
 
-	_, err = keyFile.Write(keyPem)
-	if err != nil {
-		return "", "", err
-	}
-	keyFile.Close()
-
-	return certFile.Name(), keyFile.Name(), nil
+	return nil
 }
 
 func caCertFromBundle(bundlePath string) (*x509.Certificate, error) {
@@ -662,4 +676,56 @@ func fakeVersion() version.Info {
 		GitCommit:    "34973274ccef6ab4dfaaf86599792fa9c3fe4689",
 		GitTreeState: "Dirty",
 	}
+}
+
+// generateSelfSignedCertKey creates a self-signed certificate and key for the given host.
+// Host may be an IP or a DNS name
+// You may also specify additional subject alt names (either ip or dns names) for the certificate
+func generateSelfSignedCertKey(host string, alternateIPs []net.IP, alternateDNS []string) ([]byte, []byte, error) {
+	priv, err := rsa.GenerateKey(cryptorand.Reader, 2048)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	template := x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject: pkix.Name{
+			CommonName: fmt.Sprintf("%s@%d", host, time.Now().Unix()),
+		},
+		NotBefore: time.Unix(0, 0),
+		NotAfter:  time.Now().Add(time.Hour * 24 * 365 * 100),
+
+		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+		BasicConstraintsValid: true,
+		IsCA: true,
+	}
+
+	if ip := net.ParseIP(host); ip != nil {
+		template.IPAddresses = append(template.IPAddresses, ip)
+	} else {
+		template.DNSNames = append(template.DNSNames, host)
+	}
+
+	template.IPAddresses = append(template.IPAddresses, alternateIPs...)
+	template.DNSNames = append(template.DNSNames, alternateDNS...)
+
+	derBytes, err := x509.CreateCertificate(cryptorand.Reader, &template, &template, &priv.PublicKey, priv)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Generate cert
+	certBuffer := bytes.Buffer{}
+	if err := pem.Encode(&certBuffer, &pem.Block{Type: "CERTIFICATE", Bytes: derBytes}); err != nil {
+		return nil, nil, err
+	}
+
+	// Generate key
+	keyBuffer := bytes.Buffer{}
+	if err := pem.Encode(&keyBuffer, &pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(priv)}); err != nil {
+		return nil, nil, err
+	}
+
+	return certBuffer.Bytes(), keyBuffer.Bytes(), nil
 }

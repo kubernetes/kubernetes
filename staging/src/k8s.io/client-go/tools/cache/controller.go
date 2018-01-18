@@ -21,9 +21,9 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/clock"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/util/clock"
 )
 
 // Config contains all the settings for a Controller.
@@ -116,7 +116,10 @@ func (c *controller) Run(stopCh <-chan struct{}) {
 	c.reflector = r
 	c.reflectorMutex.Unlock()
 
-	r.RunUntil(stopCh)
+	var wg wait.Group
+	defer wg.Wait()
+
+	wg.StartWithChannel(stopCh, r.Run)
 
 	wait.Until(c.processLoop, time.Second, stopCh)
 }
@@ -205,6 +208,47 @@ func (r ResourceEventHandlerFuncs) OnDelete(obj interface{}) {
 	if r.DeleteFunc != nil {
 		r.DeleteFunc(obj)
 	}
+}
+
+// FilteringResourceEventHandler applies the provided filter to all events coming
+// in, ensuring the appropriate nested handler method is invoked. An object
+// that starts passing the filter after an update is considered an add, and an
+// object that stops passing the filter after an update is considered a delete.
+type FilteringResourceEventHandler struct {
+	FilterFunc func(obj interface{}) bool
+	Handler    ResourceEventHandler
+}
+
+// OnAdd calls the nested handler only if the filter succeeds
+func (r FilteringResourceEventHandler) OnAdd(obj interface{}) {
+	if !r.FilterFunc(obj) {
+		return
+	}
+	r.Handler.OnAdd(obj)
+}
+
+// OnUpdate ensures the proper handler is called depending on whether the filter matches
+func (r FilteringResourceEventHandler) OnUpdate(oldObj, newObj interface{}) {
+	newer := r.FilterFunc(newObj)
+	older := r.FilterFunc(oldObj)
+	switch {
+	case newer && older:
+		r.Handler.OnUpdate(oldObj, newObj)
+	case newer && !older:
+		r.Handler.OnAdd(newObj)
+	case !newer && older:
+		r.Handler.OnDelete(oldObj)
+	default:
+		// do nothing
+	}
+}
+
+// OnDelete calls the nested handler only if the filter succeeds
+func (r FilteringResourceEventHandler) OnDelete(obj interface{}) {
+	if !r.FilterFunc(obj) {
+		return
+	}
+	r.Handler.OnDelete(obj)
 }
 
 // DeletionHandlingMetaNamespaceKeyFunc checks for
@@ -296,6 +340,7 @@ func NewInformer(
 //    long as possible (until the upstream source closes the watch or times out,
 //    or you stop the controller).
 //  * h is the object you want notifications sent to.
+//  * indexers is the indexer for the received object type.
 //
 func NewIndexerInformer(
 	lw ListerWatcher,

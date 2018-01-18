@@ -22,9 +22,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
-	"k8s.io/kubernetes/pkg/api"
-	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/apis/batch"
+	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
 func newBool(a bool) *bool {
@@ -97,7 +96,7 @@ func TestCronJobStrategy(t *testing.T) {
 	// Make sure we correctly implement the interface.
 	// Otherwise a typo could silently change the default.
 	var gcds rest.GarbageCollectionDeleteStrategy = Strategy
-	if got, want := gcds.DefaultGarbageCollectionPolicy(), rest.OrphanDependents; got != want {
+	if got, want := gcds.DefaultGarbageCollectionPolicy(genericapirequest.NewContext()), rest.OrphanDependents; got != want {
 		t.Errorf("DefaultGarbageCollectionPolicy() = %#v, want %#v", got, want)
 	}
 }
@@ -169,14 +168,4 @@ func TestCronJobStatusStrategy(t *testing.T) {
 	if newCronJob.ResourceVersion != "9" {
 		t.Errorf("Incoming resource version on update should not be mutated")
 	}
-}
-
-// FIXME: this is failing conversion.go
-func TestSelectableFieldLabelConversions(t *testing.T) {
-	apitesting.TestSelectableFieldLabelConversionsOfKind(t,
-		"batch/v2alpha1",
-		"CronJob",
-		CronJobToSelectableFields(&batch.CronJob{}),
-		nil,
-	)
 }

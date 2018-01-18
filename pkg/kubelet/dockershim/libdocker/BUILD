@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -13,16 +11,12 @@ go_test(
     srcs = [
         "helpers_test.go",
         "kube_docker_client_test.go",
-        "legacy_test.go",
     ],
-    library = ":go_default_library",
-    tags = ["automanaged"],
+    embed = [":go_default_library"],
+    importpath = "k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker",
     deps = [
-        "//pkg/api/v1:go_default_library",
-        "//pkg/util/hash:go_default_library",
-        "//vendor/github.com/docker/engine-api/types:go_default_library",
+        "//vendor/github.com/docker/docker/api/types:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
     ],
 )
 
@@ -34,24 +28,22 @@ go_library(
         "helpers.go",
         "instrumented_client.go",
         "kube_docker_client.go",
-        "legacy.go",
     ],
-    tags = ["automanaged"],
+    importpath = "k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker",
     deps = [
-        "//pkg/api/v1:go_default_library",
-        "//pkg/kubelet/container:go_default_library",
-        "//pkg/kubelet/metrics:go_default_library",
-        "//vendor/github.com/docker/distribution/digest:go_default_library",
+        "//pkg/kubelet/dockershim/metrics:go_default_library",
         "//vendor/github.com/docker/distribution/reference:go_default_library",
+        "//vendor/github.com/docker/docker/api/types:go_default_library",
+        "//vendor/github.com/docker/docker/api/types/container:go_default_library",
+        "//vendor/github.com/docker/docker/api/types/image:go_default_library",
+        "//vendor/github.com/docker/docker/client:go_default_library",
         "//vendor/github.com/docker/docker/pkg/jsonmessage:go_default_library",
         "//vendor/github.com/docker/docker/pkg/stdcopy:go_default_library",
-        "//vendor/github.com/docker/engine-api/client:go_default_library",
-        "//vendor/github.com/docker/engine-api/types:go_default_library",
-        "//vendor/github.com/docker/engine-api/types/container:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/github.com/opencontainers/go-digest:go_default_library",
         "//vendor/golang.org/x/net/context:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
-        "//vendor/k8s.io/client-go/util/clock:go_default_library",
+        "//vendor/k8s.io/api/core/v1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/clock:go_default_library",
     ],
 )
 

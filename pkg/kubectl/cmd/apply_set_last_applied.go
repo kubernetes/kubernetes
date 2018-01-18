@@ -27,16 +27,16 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	apijson "k8s.io/apimachinery/pkg/util/json"
-	"k8s.io/kubernetes/pkg/api/annotations"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/util/editor"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
-	"k8s.io/kubernetes/pkg/util/i18n"
+	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
 
 type SetLastAppliedOptions struct {
@@ -52,10 +52,15 @@ type SetLastAppliedOptions struct {
 	CreateAnnotation bool
 	Output           string
 	Codec            runtime.Encoder
-	PatchBufferList  [][]byte
+	PatchBufferList  []PatchBuffer
 	Factory          cmdutil.Factory
 	Out              io.Writer
 	ErrOut           io.Writer
+}
+
+type PatchBuffer struct {
+	Patch     []byte
+	PatchType types.PatchType
 }
 
 var (
@@ -107,38 +112,28 @@ func (o *SetLastAppliedOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) 
 	o.Codec = f.JSONEncoder()
 
 	var err error
-	o.Mapper, o.Typer, err = f.UnstructuredObject()
+	o.Mapper, o.Typer = f.Object()
 	if err != nil {
 		return err
 	}
 
 	o.Namespace, o.EnforceNamespace, err = f.DefaultNamespace()
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 func (o *SetLastAppliedOptions) Validate(f cmdutil.Factory, cmd *cobra.Command) error {
-	r := resource.NewBuilder(o.Mapper, f.CategoryExpander(), o.Typer, resource.ClientMapperFunc(f.UnstructuredClientForMapping), unstructured.UnstructuredJSONScheme).
+	r := f.NewBuilder().
+		Unstructured().
 		NamespaceParam(o.Namespace).DefaultNamespace().
 		FilenameParam(o.EnforceNamespace, &o.FilenameOptions).
-		Latest().
 		Flatten().
 		Do()
-	err := r.Err()
-	if err != nil {
-		return err
-	}
 
-	err = r.Visit(func(info *resource.Info, err error) error {
+	err := r.Visit(func(info *resource.Info, err error) error {
 		if err != nil {
 			return err
 		}
-
-		var diffBuf, patchBuf []byte
-		patchBuf, diffBuf, err = o.getPatch(info)
+		patchBuf, diffBuf, patchType, err := editor.GetApplyPatch(info.Object, o.Codec)
 		if err != nil {
 			return err
 		}
@@ -151,17 +146,18 @@ func (o *SetLastAppliedOptions) Validate(f cmdutil.Factory, cmd *cobra.Command) 
 				return cmdutil.AddSourceToErr(fmt.Sprintf("retrieving current configuration of:\n%v\nfrom server for:", info), info.Source, err)
 			}
 		}
-		oringalBuf, err := kubectl.GetOriginalConfiguration(info.Mapping, info.Object)
+		originalBuf, err := kubectl.GetOriginalConfiguration(info.Mapping, info.Object)
 		if err != nil {
 			return cmdutil.AddSourceToErr(fmt.Sprintf("retrieving current configuration of:\n%v\nfrom server for:", info), info.Source, err)
 		}
-		if oringalBuf == nil && !o.CreateAnnotation {
-			return cmdutil.UsageError(cmd, "no last-applied-configuration annotation found on resource: %s, to create the annotation, run the command with --create-annotation", info.Name)
+		if originalBuf == nil && !o.CreateAnnotation {
+			return cmdutil.UsageErrorf(cmd, "no last-applied-configuration annotation found on resource: %s, to create the annotation, run the command with --create-annotation", info.Name)
 		}
 
 		//only add to PatchBufferList when changed
-		if !bytes.Equal(cmdutil.StripComments(oringalBuf), cmdutil.StripComments(diffBuf)) {
-			o.PatchBufferList = append(o.PatchBufferList, patchBuf)
+		if !bytes.Equal(cmdutil.StripComments(originalBuf), cmdutil.StripComments(diffBuf)) {
+			p := PatchBuffer{Patch: patchBuf, PatchType: patchType}
+			o.PatchBufferList = append(o.PatchBufferList, p)
 			o.InfoList = append(o.InfoList, info)
 		} else {
 			fmt.Fprintf(o.Out, "set-last-applied %s: no changes required.\n", info.Name)
@@ -169,10 +165,7 @@ func (o *SetLastAppliedOptions) Validate(f cmdutil.Factory, cmd *cobra.Command) 
 
 		return nil
 	})
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
 
 func (o *SetLastAppliedOptions) RunSetLastApplied(f cmdutil.Factory, cmd *cobra.Command) error {
@@ -185,29 +178,29 @@ func (o *SetLastAppliedOptions) RunSetLastApplied(f cmdutil.Factory, cmd *cobra.
 				return err
 			}
 			helper := resource.NewHelper(client, mapping)
-			patchedObj, err := helper.Patch(o.Namespace, info.Name, types.MergePatchType, patch)
+			patchedObj, err := helper.Patch(o.Namespace, info.Name, patch.PatchType, patch.Patch)
 			if err != nil {
 				return err
 			}
 
 			if len(o.Output) > 0 && !o.ShortOutput {
 				info.Refresh(patchedObj, false)
-				return cmdutil.PrintResourceInfoForCommand(cmd, info, f, o.Out)
+				return f.PrintResourceInfoForCommand(cmd, info, o.Out)
 			}
-			cmdutil.PrintSuccess(o.Mapper, o.ShortOutput, o.Out, info.Mapping.Resource, info.Name, o.DryRun, "configured")
+			f.PrintSuccess(o.Mapper, o.ShortOutput, o.Out, info.Mapping.Resource, info.Name, o.DryRun, "configured")
 
 		} else {
-			err := o.formatPrinter(o.Output, patch)
+			err := o.formatPrinter(o.Output, patch.Patch, o.Out)
 			if err != nil {
 				return err
 			}
-			cmdutil.PrintSuccess(o.Mapper, o.ShortOutput, o.Out, info.Mapping.Resource, info.Name, o.DryRun, "configured")
+			f.PrintSuccess(o.Mapper, o.ShortOutput, o.Out, info.Mapping.Resource, info.Name, o.DryRun, "configured")
 		}
 	}
 	return nil
 }
 
-func (o *SetLastAppliedOptions) formatPrinter(output string, buf []byte) error {
+func (o *SetLastAppliedOptions) formatPrinter(output string, buf []byte, w io.Writer) error {
 	yamlOutput, err := yaml.JSONToYAML(buf)
 	if err != nil {
 		return err
@@ -219,9 +212,9 @@ func (o *SetLastAppliedOptions) formatPrinter(output string, buf []byte) error {
 		if err != nil {
 			return err
 		}
-		fmt.Fprintf(o.Out, string(jsonBuffer.Bytes()))
+		fmt.Fprintf(w, "%s\n", jsonBuffer.String())
 	case "yaml":
-		fmt.Fprintf(o.Out, string(yamlOutput))
+		fmt.Fprintf(w, "%s\n", string(yamlOutput))
 	}
 	return nil
 }
@@ -230,11 +223,11 @@ func (o *SetLastAppliedOptions) getPatch(info *resource.Info) ([]byte, []byte, e
 	objMap := map[string]map[string]map[string]string{}
 	metadataMap := map[string]map[string]string{}
 	annotationsMap := map[string]string{}
-	localFile, err := runtime.Encode(o.Codec, info.VersionedObject)
+	localFile, err := runtime.Encode(o.Codec, info.Object)
 	if err != nil {
 		return nil, localFile, err
 	}
-	annotationsMap[annotations.LastAppliedConfigAnnotation] = string(localFile)
+	annotationsMap[api.LastAppliedConfigAnnotation] = string(localFile)
 	metadataMap["annotations"] = annotationsMap
 	objMap["metadata"] = metadataMap
 	jsonString, err := apijson.Marshal(objMap)

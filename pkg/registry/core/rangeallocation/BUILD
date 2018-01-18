@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -13,8 +11,8 @@ go_library(
         "doc.go",
         "registry.go",
     ],
-    tags = ["automanaged"],
-    deps = ["//pkg/api:go_default_library"],
+    importpath = "k8s.io/kubernetes/pkg/registry/core/rangeallocation",
+    deps = ["//pkg/apis/core:go_default_library"],
 )
 
 filegroup(

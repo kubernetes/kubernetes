@@ -1,21 +1,15 @@
-package(default_visibility = ["//visibility:public"])
-
-licenses(["notice"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
     srcs = ["store.go"],
-    tags = ["automanaged"],
+    importpath = "github.com/coreos/etcd/proxy/grpcproxy/cache",
+    visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/coreos/etcd/etcdserver/api/v3rpc/rpctypes:go_default_library",
         "//vendor/github.com/coreos/etcd/etcdserver/etcdserverpb:go_default_library",
         "//vendor/github.com/coreos/etcd/pkg/adt:go_default_library",
-        "//vendor/github.com/karlseguin/ccache:go_default_library",
+        "//vendor/github.com/golang/groupcache/lru:go_default_library",
     ],
 )
 
@@ -30,4 +24,5 @@ filegroup(
     name = "all-srcs",
     srcs = [":package-srcs"],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

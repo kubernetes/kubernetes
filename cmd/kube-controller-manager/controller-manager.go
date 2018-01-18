@@ -22,14 +22,16 @@ package main
 
 import (
 	"fmt"
+	"math/rand"
 	"os"
+	"time"
 
-	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/apiserver/pkg/util/logs"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app/options"
 	_ "k8s.io/kubernetes/pkg/client/metrics/prometheus" // for client metric registration
+	_ "k8s.io/kubernetes/pkg/util/reflector/prometheus" // for reflector metric registration
 	_ "k8s.io/kubernetes/pkg/util/workqueue/prometheus" // for workqueue metric registration
 	_ "k8s.io/kubernetes/pkg/version/prometheus"        // for version metric registration
 	"k8s.io/kubernetes/pkg/version/verflag"
@@ -37,11 +39,9 @@ import (
 	"github.com/spf13/pflag"
 )
 
-func init() {
-	healthz.DefaultHealthz()
-}
-
 func main() {
+	rand.Seed(time.Now().UTC().UnixNano())
+
 	s := options.NewCMServer()
 	s.AddFlags(pflag.CommandLine, app.KnownControllers(), app.ControllersDisabledByDefault.List())
 

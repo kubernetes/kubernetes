@@ -21,7 +21,9 @@ import (
 	"fmt"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 
@@ -202,7 +204,8 @@ func newPlugin() *gcePersistentDiskPlugin {
 	host := volumetest.NewFakeVolumeHost(
 		"/tmp", /* rootDir */
 		nil,    /* kubeClient */
-		nil /* plugins */)
+		nil,    /* plugins */
+	)
 	plugins := ProbeVolumePlugins()
 	plugin := plugins[0]
 	plugin.Init(host)
@@ -360,10 +363,21 @@ func (testcase *testcase) CreateDisk(name string, diskType string, zone string, 
 	return errors.New("Not implemented")
 }
 
+func (testcase *testcase) CreateRegionalDisk(name string, diskType string, replicaZones sets.String, sizeGb int64, tags map[string]string) error {
+	return errors.New("Not implemented")
+}
+
 func (testcase *testcase) DeleteDisk(diskToDelete string) error {
 	return errors.New("Not implemented")
 }
 
 func (testcase *testcase) GetAutoLabelsForPD(name string, zone string) (map[string]string, error) {
 	return map[string]string{}, errors.New("Not implemented")
+}
+
+func (testcase *testcase) ResizeDisk(
+	diskName string,
+	oldSize resource.Quantity,
+	newSize resource.Quantity) (resource.Quantity, error) {
+	return oldSize, errors.New("Not implemented")
 }

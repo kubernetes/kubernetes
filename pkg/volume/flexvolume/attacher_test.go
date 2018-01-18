@@ -17,9 +17,11 @@ limitations under the License.
 package flexvolume
 
 import (
-	"k8s.io/kubernetes/pkg/volume"
 	"testing"
 	"time"
+
+	"k8s.io/api/core/v1"
+	"k8s.io/kubernetes/pkg/volume"
 )
 
 func TestAttach(t *testing.T) {
@@ -37,7 +39,7 @@ func TestAttach(t *testing.T) {
 
 func TestWaitForAttach(t *testing.T) {
 	spec := fakeVolumeSpec()
-
+	var pod *v1.Pod
 	plugin, _ := testPlugin()
 	plugin.runner = fakeRunner(
 		assertDriverCall(t, notSupportedOutput(), waitForAttachCmd, "/dev/sdx",
@@ -45,7 +47,7 @@ func TestWaitForAttach(t *testing.T) {
 	)
 
 	a, _ := plugin.NewAttacher()
-	a.WaitForAttach(spec, "/dev/sdx", 1*time.Second)
+	a.WaitForAttach(spec, "/dev/sdx", pod, 1*time.Second)
 }
 
 func TestMountDevice(t *testing.T) {

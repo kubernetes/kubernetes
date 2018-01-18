@@ -142,10 +142,6 @@ func objectReflectDiff(path *field.Path, a, b reflect.Value) []diff {
 			}
 			if sub := objectReflectDiff(path.Child(a.Type().Field(i).Name), a.Field(i), b.Field(i)); len(sub) > 0 {
 				changes = append(changes, sub...)
-			} else {
-				if !reflect.DeepEqual(a.Field(i).Interface(), b.Field(i).Interface()) {
-					changes = append(changes, diff{path: path, a: a.Field(i).Interface(), b: b.Field(i).Interface()})
-				}
 			}
 		}
 		return changes
@@ -178,20 +174,17 @@ func objectReflectDiff(path *field.Path, a, b reflect.Value) []diff {
 			}
 			return nil
 		}
+		var diffs []diff
 		for i := 0; i < l; i++ {
 			if !reflect.DeepEqual(a.Index(i), b.Index(i)) {
-				return objectReflectDiff(path.Index(i), a.Index(i), b.Index(i))
+				diffs = append(diffs, objectReflectDiff(path.Index(i), a.Index(i), b.Index(i))...)
 			}
 		}
-		var diffs []diff
 		for i := l; i < lA; i++ {
 			diffs = append(diffs, diff{path: path.Index(i), a: a.Index(i), b: nil})
 		}
 		for i := l; i < lB; i++ {
 			diffs = append(diffs, diff{path: path.Index(i), a: nil, b: b.Index(i)})
-		}
-		if len(diffs) == 0 {
-			diffs = append(diffs, diff{path: path, a: a, b: b})
 		}
 		return diffs
 	case reflect.Map:

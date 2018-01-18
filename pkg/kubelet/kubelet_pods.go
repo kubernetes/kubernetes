@@ -33,33 +33,38 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
-	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
-	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/tools/remotecommand"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/api/v1/resource"
-	"k8s.io/kubernetes/pkg/api/v1/validation"
-	"k8s.io/kubernetes/pkg/client/unversioned/remotecommand"
+	podshelper "k8s.io/kubernetes/pkg/apis/core/pods"
+	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/fieldpath"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/envvars"
+	"k8s.io/kubernetes/pkg/kubelet/eviction"
 	"k8s.io/kubernetes/pkg/kubelet/images"
-	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/kubelet/server/portforward"
 	remotecommandserver "k8s.io/kubernetes/pkg/kubelet/server/remotecommand"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
+	utilfile "k8s.io/kubernetes/pkg/util/file"
 	"k8s.io/kubernetes/pkg/volume"
+	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
+	volumevalidation "k8s.io/kubernetes/pkg/volume/validation"
 	"k8s.io/kubernetes/third_party/forked/golang/expansion"
 )
 
@@ -85,9 +90,9 @@ func (kl *Kubelet) GetActivePods() []*v1.Pod {
 	return activePods
 }
 
-// makeDevices determines the devices for the given container.
+// makeGPUDevices determines the devices for the given container.
 // Experimental.
-func (kl *Kubelet) makeDevices(pod *v1.Pod, container *v1.Container) ([]kubecontainer.DeviceInfo, error) {
+func (kl *Kubelet) makeGPUDevices(pod *v1.Pod, container *v1.Container) ([]kubecontainer.DeviceInfo, error) {
 	if container.Resources.Limits.NvidiaGPU().IsZero() {
 		return nil, nil
 	}
@@ -105,23 +110,74 @@ func (kl *Kubelet) makeDevices(pod *v1.Pod, container *v1.Container) ([]kubecont
 	return devices, nil
 }
 
+func makeAbsolutePath(goos, path string) string {
+	if goos != "windows" {
+		return "/" + path
+	}
+	// These are all for windows
+	// If there is a colon, give up.
+	if strings.Contains(path, ":") {
+		return path
+	}
+	// If there is a slash, but no drive, add 'c:'
+	if strings.HasPrefix(path, "/") || strings.HasPrefix(path, "\\") {
+		return "c:" + path
+	}
+	// Otherwise, add 'c:\'
+	return "c:\\" + path
+}
+
+// makeBlockVolumes maps the raw block devices specified in the path of the container
+// Experimental
+func (kl *Kubelet) makeBlockVolumes(pod *v1.Pod, container *v1.Container, podVolumes kubecontainer.VolumeMap, blkutil volumeutil.BlockVolumePathHandler) ([]kubecontainer.DeviceInfo, error) {
+	var devices []kubecontainer.DeviceInfo
+	for _, device := range container.VolumeDevices {
+		// check path is absolute
+		if !filepath.IsAbs(device.DevicePath) {
+			return nil, fmt.Errorf("error DevicePath `%s` must be an absolute path", device.DevicePath)
+		}
+		vol, ok := podVolumes[device.Name]
+		if !ok || vol.BlockVolumeMapper == nil {
+			glog.Errorf("Block volume cannot be satisfied for container %q, because the volume is missing or the volume mapper is nil: %+v", container.Name, device)
+			return nil, fmt.Errorf("cannot find volume %q to pass into container %q", device.Name, container.Name)
+		}
+		// Get a symbolic link associated to a block device under pod device path
+		dirPath, volName := vol.BlockVolumeMapper.GetPodDeviceMapPath()
+		symlinkPath := path.Join(dirPath, volName)
+		if islinkExist, checkErr := blkutil.IsSymlinkExist(symlinkPath); checkErr != nil {
+			return nil, checkErr
+		} else if islinkExist {
+			// Check readOnly in PVCVolumeSource and set read only permission if it's true.
+			permission := "mrw"
+			if vol.ReadOnly {
+				permission = "r"
+			}
+			glog.V(4).Infof("Device will be attached to container %q. Path on host: %v", container.Name, symlinkPath)
+			devices = append(devices, kubecontainer.DeviceInfo{PathOnHost: symlinkPath, PathInContainer: device.DevicePath, Permissions: permission})
+		}
+	}
+
+	return devices, nil
+}
+
 // makeMounts determines the mount points for the given container.
 func makeMounts(pod *v1.Pod, podDir string, container *v1.Container, hostName, hostDomain, podIP string, podVolumes kubecontainer.VolumeMap) ([]kubecontainer.Mount, error) {
-	// Kubernetes only mounts on /etc/hosts if :
-	// - container does not use hostNetwork and
-	// - container is not an infrastructure(pause) container
+	// Kubernetes only mounts on /etc/hosts if:
+	// - container is not an infrastructure (pause) container
 	// - container is not already mounting on /etc/hosts
-	// When the pause container is being created, its IP is still unknown. Hence, PodIP will not have been set.
-	// OS is not Windows
-	mountEtcHostsFile := (pod.Spec.SecurityContext == nil || !pod.Spec.HostNetwork) && len(podIP) > 0 && runtime.GOOS != "windows"
+	// - OS is not Windows
+	// Kubernetes will not mount /etc/hosts if:
+	// - when the Pod sandbox is being created, its IP is still unknown. Hence, PodIP will not have been set.
+	mountEtcHostsFile := len(podIP) > 0 && runtime.GOOS != "windows"
 	glog.V(3).Infof("container: %v/%v/%v podIP: %q creating hosts mount: %v", pod.Namespace, pod.Name, container.Name, podIP, mountEtcHostsFile)
 	mounts := []kubecontainer.Mount{}
 	for _, mount := range container.VolumeMounts {
+		// do not mount /etc/hosts if container is already mounting on the path
 		mountEtcHostsFile = mountEtcHostsFile && (mount.MountPath != etcHostsPath)
 		vol, ok := podVolumes[mount.Name]
 		if !ok || vol.Mounter == nil {
-			glog.Warningf("Mount cannot be satisfied for container %q, because the volume is missing or the volume mounter is nil: %q", container.Name, mount)
-			continue
+			glog.Errorf("Mount cannot be satisfied for container %q, because the volume is missing or the volume mounter is nil: %+v", container.Name, mount)
+			return nil, fmt.Errorf("cannot find volume %q to mount into container %q", mount.Name, container.Name)
 		}
 
 		relabelVolume := false
@@ -137,6 +193,15 @@ func makeMounts(pod *v1.Pod, podDir string, container *v1.Container, hostName, h
 			return nil, err
 		}
 		if mount.SubPath != "" {
+			if filepath.IsAbs(mount.SubPath) {
+				return nil, fmt.Errorf("error SubPath `%s` must not be an absolute path", mount.SubPath)
+			}
+
+			err = volumevalidation.ValidatePathNoBacksteps(mount.SubPath)
+			if err != nil {
+				return nil, fmt.Errorf("unable to provision SubPath `%s`: %v", mount.SubPath, err)
+			}
+
 			fileinfo, err := os.Lstat(hostPath)
 			if err != nil {
 				return nil, err
@@ -145,19 +210,23 @@ func makeMounts(pod *v1.Pod, podDir string, container *v1.Container, hostName, h
 
 			hostPath = filepath.Join(hostPath, mount.SubPath)
 
-			// Create the sub path now because if it's auto-created later when referenced, it may have an
-			// incorrect ownership and mode. For example, the sub path directory must have at least g+rwx
-			// when the pod specifies an fsGroup, and if the directory is not created here, Docker will
-			// later auto-create it with the incorrect mode 0750
-			if err := os.MkdirAll(hostPath, perm); err != nil {
-				glog.Errorf("failed to mkdir:%s", hostPath)
-				return nil, err
-			}
+			if subPathExists, err := utilfile.FileOrSymlinkExists(hostPath); err != nil {
+				glog.Errorf("Could not determine if subPath %s exists; will not attempt to change its permissions", hostPath)
+			} else if !subPathExists {
+				// Create the sub path now because if it's auto-created later when referenced, it may have an
+				// incorrect ownership and mode. For example, the sub path directory must have at least g+rwx
+				// when the pod specifies an fsGroup, and if the directory is not created here, Docker will
+				// later auto-create it with the incorrect mode 0750
+				if err := os.MkdirAll(hostPath, perm); err != nil {
+					glog.Errorf("failed to mkdir:%s", hostPath)
+					return nil, err
+				}
 
-			// chmod the sub path because umask may have prevented us from making the sub path with the same
-			// permissions as the mounter path
-			if err := os.Chmod(hostPath, perm); err != nil {
-				return nil, err
+				// chmod the sub path because umask may have prevented us from making the sub path with the same
+				// permissions as the mounter path
+				if err := os.Chmod(hostPath, perm); err != nil {
+					return nil, err
+				}
 			}
 		}
 
@@ -167,10 +236,16 @@ func makeMounts(pod *v1.Pod, podDir string, container *v1.Container, hostName, h
 			if (strings.HasPrefix(hostPath, "/") || strings.HasPrefix(hostPath, "\\")) && !strings.Contains(hostPath, ":") {
 				hostPath = "c:" + hostPath
 			}
-			if (strings.HasPrefix(containerPath, "/") || strings.HasPrefix(containerPath, "\\")) && !strings.Contains(containerPath, ":") {
-				containerPath = "c:" + containerPath
-			}
 		}
+		if !filepath.IsAbs(containerPath) {
+			containerPath = makeAbsolutePath(runtime.GOOS, containerPath)
+		}
+
+		propagation, err := translateMountPropagation(mount.MountPropagation)
+		if err != nil {
+			return nil, err
+		}
+		glog.V(5).Infof("Pod %q container %q mount %q has propagation %q", format.Pod(pod), container.Name, mount.Name, propagation)
 
 		mounts = append(mounts, kubecontainer.Mount{
 			Name:           mount.Name,
@@ -178,11 +253,12 @@ func makeMounts(pod *v1.Pod, podDir string, container *v1.Container, hostName, h
 			HostPath:       hostPath,
 			ReadOnly:       mount.ReadOnly,
 			SELinuxRelabel: relabelVolume,
+			Propagation:    propagation,
 		})
 	}
 	if mountEtcHostsFile {
 		hostAliases := pod.Spec.HostAliases
-		hostsMount, err := makeHostsMount(podDir, podIP, hostName, hostDomain, hostAliases)
+		hostsMount, err := makeHostsMount(podDir, podIP, hostName, hostDomain, hostAliases, pod.Spec.HostNetwork)
 		if err != nil {
 			return nil, err
 		}
@@ -191,11 +267,31 @@ func makeMounts(pod *v1.Pod, podDir string, container *v1.Container, hostName, h
 	return mounts, nil
 }
 
+// translateMountPropagation transforms v1.MountPropagationMode to
+// runtimeapi.MountPropagation.
+func translateMountPropagation(mountMode *v1.MountPropagationMode) (runtimeapi.MountPropagation, error) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.MountPropagation) {
+		// mount propagation is disabled, use private as in the old versions
+		return runtimeapi.MountPropagation_PROPAGATION_PRIVATE, nil
+	}
+	switch {
+	case mountMode == nil:
+		// HostToContainer is the default
+		return runtimeapi.MountPropagation_PROPAGATION_HOST_TO_CONTAINER, nil
+	case *mountMode == v1.MountPropagationHostToContainer:
+		return runtimeapi.MountPropagation_PROPAGATION_HOST_TO_CONTAINER, nil
+	case *mountMode == v1.MountPropagationBidirectional:
+		return runtimeapi.MountPropagation_PROPAGATION_BIDIRECTIONAL, nil
+	default:
+		return 0, fmt.Errorf("invalid MountPropagation mode: %q", mountMode)
+	}
+}
+
 // makeHostsMount makes the mountpoint for the hosts file that the containers
 // in a pod are injected with.
-func makeHostsMount(podDir, podIP, hostName, hostDomainName string, hostAliases []v1.HostAlias) (*kubecontainer.Mount, error) {
+func makeHostsMount(podDir, podIP, hostName, hostDomainName string, hostAliases []v1.HostAlias, useHostNetwork bool) (*kubecontainer.Mount, error) {
 	hostsFilePath := path.Join(podDir, "etc-hosts")
-	if err := ensureHostsFile(hostsFilePath, podIP, hostName, hostDomainName, hostAliases); err != nil {
+	if err := ensureHostsFile(hostsFilePath, podIP, hostName, hostDomainName, hostAliases, useHostNetwork); err != nil {
 		return nil, err
 	}
 	return &kubecontainer.Mount{
@@ -209,13 +305,39 @@ func makeHostsMount(podDir, podIP, hostName, hostDomainName string, hostAliases 
 
 // ensureHostsFile ensures that the given host file has an up-to-date ip, host
 // name, and domain name.
-func ensureHostsFile(fileName, hostIP, hostName, hostDomainName string, hostAliases []v1.HostAlias) error {
-	content := hostsFileContent(hostIP, hostName, hostDomainName, hostAliases)
-	return ioutil.WriteFile(fileName, content, 0644)
+func ensureHostsFile(fileName, hostIP, hostName, hostDomainName string, hostAliases []v1.HostAlias, useHostNetwork bool) error {
+	var hostsFileContent []byte
+	var err error
+
+	if useHostNetwork {
+		// if Pod is using host network, read hosts file from the node's filesystem.
+		// `etcHostsPath` references the location of the hosts file on the node.
+		// `/etc/hosts` for *nix systems.
+		hostsFileContent, err = nodeHostsFileContent(etcHostsPath, hostAliases)
+		if err != nil {
+			return err
+		}
+	} else {
+		// if Pod is not using host network, create a managed hosts file with Pod IP and other information.
+		hostsFileContent = managedHostsFileContent(hostIP, hostName, hostDomainName, hostAliases)
+	}
+
+	return ioutil.WriteFile(fileName, hostsFileContent, 0644)
 }
 
-// hostsFileContent is the content of the managed etc hosts
-func hostsFileContent(hostIP, hostName, hostDomainName string, hostAliases []v1.HostAlias) []byte {
+// nodeHostsFileContent reads the content of node's hosts file.
+func nodeHostsFileContent(hostsFilePath string, hostAliases []v1.HostAlias) ([]byte, error) {
+	hostsFileContent, err := ioutil.ReadFile(hostsFilePath)
+	if err != nil {
+		return nil, err
+	}
+	hostsFileContent = append(hostsFileContent, hostsEntriesFromHostAliases(hostAliases)...)
+	return hostsFileContent, nil
+}
+
+// managedHostsFileContent generates the content of the managed etc hosts based on Pod IP and other
+// information.
+func managedHostsFileContent(hostIP, hostName, hostDomainName string, hostAliases []v1.HostAlias) []byte {
 	var buffer bytes.Buffer
 	buffer.WriteString("# Kubernetes-managed hosts file.\n")
 	buffer.WriteString("127.0.0.1\tlocalhost\n")                      // ipv4 localhost
@@ -229,6 +351,19 @@ func hostsFileContent(hostIP, hostName, hostDomainName string, hostAliases []v1.
 	} else {
 		buffer.WriteString(fmt.Sprintf("%s\t%s\n", hostIP, hostName))
 	}
+	hostsFileContent := buffer.Bytes()
+	hostsFileContent = append(hostsFileContent, hostsEntriesFromHostAliases(hostAliases)...)
+	return hostsFileContent
+}
+
+func hostsEntriesFromHostAliases(hostAliases []v1.HostAlias) []byte {
+	if len(hostAliases) == 0 {
+		return []byte{}
+	}
+
+	var buffer bytes.Buffer
+	buffer.WriteString("\n")
+	buffer.WriteString("# Entries added by HostAliases.\n")
 	// write each IP/hostname pair as an entry into hosts file
 	for _, hostAlias := range hostAliases {
 		for _, hostname := range hostAlias.Hostnames {
@@ -260,7 +395,7 @@ func truncatePodHostnameIfNeeded(podName, hostname string) (string, error) {
 // given that pod's spec and annotations or returns an error.
 func (kl *Kubelet) GeneratePodHostNameAndDomain(pod *v1.Pod) (string, string, error) {
 	// TODO(vmarmol): Handle better.
-	clusterDomain := kl.clusterDomain
+	clusterDomain := kl.dnsConfigurer.ClusterDomain
 
 	hostname := pod.Name
 	if len(pod.Spec.Hostname) > 0 {
@@ -295,14 +430,17 @@ func (kl *Kubelet) GetPodCgroupParent(pod *v1.Pod) string {
 
 // GenerateRunContainerOptions generates the RunContainerOptions, which can be used by
 // the container runtime to set parameters for launching a container.
-func (kl *Kubelet) GenerateRunContainerOptions(pod *v1.Pod, container *v1.Container, podIP string) (*kubecontainer.RunContainerOptions, bool, error) {
-	var err error
-	useClusterFirstPolicy := false
+func (kl *Kubelet) GenerateRunContainerOptions(pod *v1.Pod, container *v1.Container, podIP string) (*kubecontainer.RunContainerOptions, error) {
+	opts, err := kl.containerManager.GetResources(pod, container)
+	if err != nil {
+		return nil, err
+	}
+
 	cgroupParent := kl.GetPodCgroupParent(pod)
-	opts := &kubecontainer.RunContainerOptions{CgroupParent: cgroupParent}
+	opts.CgroupParent = cgroupParent
 	hostname, hostDomainName, err := kl.GeneratePodHostNameAndDomain(pod)
 	if err != nil {
-		return nil, false, err
+		return nil, err
 	}
 	opts.Hostname = hostname
 	podName := volumehelper.GetUniquePodName(pod)
@@ -310,19 +448,33 @@ func (kl *Kubelet) GenerateRunContainerOptions(pod *v1.Pod, container *v1.Contai
 
 	opts.PortMappings = kubecontainer.MakePortMappings(container)
 	// TODO(random-liu): Move following convert functions into pkg/kubelet/container
-	opts.Devices, err = kl.makeDevices(pod, container)
+	devices, err := kl.makeGPUDevices(pod, container)
 	if err != nil {
-		return nil, false, err
+		return nil, err
+	}
+	opts.Devices = append(opts.Devices, devices...)
+
+	// TODO: remove feature gate check after no longer needed
+	if utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) {
+		blkutil := volumeutil.NewBlockVolumePathHandler()
+		blkVolumes, err := kl.makeBlockVolumes(pod, container, volumes, blkutil)
+		if err != nil {
+			return nil, err
+		}
+		opts.Devices = append(opts.Devices, blkVolumes...)
 	}
 
-	opts.Mounts, err = makeMounts(pod, kl.getPodDir(pod.UID), container, hostname, hostDomainName, podIP, volumes)
+	mounts, err := makeMounts(pod, kl.getPodDir(pod.UID), container, hostname, hostDomainName, podIP, volumes)
 	if err != nil {
-		return nil, false, err
+		return nil, err
 	}
-	opts.Envs, err = kl.makeEnvironmentVariables(pod, container, podIP)
+	opts.Mounts = append(opts.Mounts, mounts...)
+
+	envs, err := kl.makeEnvironmentVariables(pod, container, podIP)
 	if err != nil {
-		return nil, false, err
+		return nil, err
 	}
+	opts.Envs = append(opts.Envs, envs...)
 
 	// Disabling adding TerminationMessagePath on Windows as these files would be mounted as docker volume and
 	// Docker for Windows has a bug where only directories can be mounted
@@ -335,17 +487,12 @@ func (kl *Kubelet) GenerateRunContainerOptions(pod *v1.Pod, container *v1.Contai
 		}
 	}
 
-	opts.DNS, opts.DNSSearch, useClusterFirstPolicy, err = kl.GetClusterDNS(pod)
-	if err != nil {
-		return nil, false, err
-	}
-
 	// only do this check if the experimental behavior is enabled, otherwise allow it to default to false
 	if kl.experimentalHostUserNamespaceDefaulting {
 		opts.EnableHostUserNamespace = kl.enableHostUserNamespace(pod)
 	}
 
-	return opts, useClusterFirstPolicy, nil
+	return opts, nil
 }
 
 var masterServices = sets.NewString("kubernetes")
@@ -366,7 +513,7 @@ func (kl *Kubelet) getServiceEnvVarMap(ns string) (map[string]string, error) {
 	}
 	services, err := kl.serviceLister.List(labels.Everything())
 	if err != nil {
-		return m, fmt.Errorf("failed to list services when setting up env vars.")
+		return m, fmt.Errorf("failed to list services when setting up env vars")
 	}
 
 	// project the services in namespace ns onto the master services
@@ -409,7 +556,7 @@ func (kl *Kubelet) getServiceEnvVarMap(ns string) (map[string]string, error) {
 func (kl *Kubelet) makeEnvironmentVariables(pod *v1.Pod, container *v1.Container, podIP string) ([]kubecontainer.EnvVar, error) {
 	var result []kubecontainer.EnvVar
 	// Note:  These are added to the docker Config, but are not included in the checksum computed
-	// by dockertools.BuildDockerName(...).  That way, we can still determine whether an
+	// by kubecontainer.HashContainer(...).  That way, we can still determine whether an
 	// v1.Container is already running by its hash. (We don't want to restart a container just
 	// because some service changed.)
 	//
@@ -441,7 +588,7 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *v1.Pod, container *v1.Container
 					return result, fmt.Errorf("Couldn't get configMap %v/%v, no kubeClient defined", pod.Namespace, name)
 				}
 				optional := cm.Optional != nil && *cm.Optional
-				configMap, err = kl.kubeClient.Core().ConfigMaps(pod.Namespace).Get(name, metav1.GetOptions{})
+				configMap, err = kl.configMapManager.GetConfigMap(pod.Namespace, name)
 				if err != nil {
 					if errors.IsNotFound(err) && optional {
 						// ignore error when marked optional
@@ -457,7 +604,7 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *v1.Pod, container *v1.Container
 				if len(envFrom.Prefix) > 0 {
 					k = envFrom.Prefix + k
 				}
-				if errMsgs := utilvalidation.IsCIdentifier(k); len(errMsgs) != 0 {
+				if errMsgs := utilvalidation.IsEnvVarName(k); len(errMsgs) != 0 {
 					invalidKeys = append(invalidKeys, k)
 					continue
 				}
@@ -492,7 +639,7 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *v1.Pod, container *v1.Container
 				if len(envFrom.Prefix) > 0 {
 					k = envFrom.Prefix + k
 				}
-				if errMsgs := utilvalidation.IsCIdentifier(k); len(errMsgs) != 0 {
+				if errMsgs := utilvalidation.IsEnvVarName(k); len(errMsgs) != 0 {
 					invalidKeys = append(invalidKeys, k)
 					continue
 				}
@@ -531,7 +678,7 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *v1.Pod, container *v1.Container
 					return result, err
 				}
 			case envVar.ValueFrom.ResourceFieldRef != nil:
-				defaultedPod, defaultedContainer, err := kl.defaultPodLimitsForDownwardApi(pod, container)
+				defaultedPod, defaultedContainer, err := kl.defaultPodLimitsForDownwardAPI(pod, container)
 				if err != nil {
 					return result, err
 				}
@@ -549,7 +696,7 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *v1.Pod, container *v1.Container
 					if kl.kubeClient == nil {
 						return result, fmt.Errorf("Couldn't get configMap %v/%v, no kubeClient defined", pod.Namespace, name)
 					}
-					configMap, err = kl.kubeClient.Core().ConfigMaps(pod.Namespace).Get(name, metav1.GetOptions{})
+					configMap, err = kl.configMapManager.GetConfigMap(pod.Namespace, name)
 					if err != nil {
 						if errors.IsNotFound(err) && optional {
 							// ignore error when marked optional
@@ -628,7 +775,7 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *v1.Pod, container *v1.Container
 // podFieldSelectorRuntimeValue returns the runtime value of the given
 // selector for a pod.
 func (kl *Kubelet) podFieldSelectorRuntimeValue(fs *v1.ObjectFieldSelector, pod *v1.Pod, podIP string) (string, error) {
-	internalFieldPath, _, err := api.Scheme.ConvertFieldLabel(fs.APIVersion, "Pod", fs.FieldPath, "")
+	internalFieldPath, _, err := podshelper.ConvertDownwardAPIFieldLabel(fs.APIVersion, fs.FieldPath, "")
 	if err != nil {
 		return "", err
 	}
@@ -654,9 +801,8 @@ func containerResourceRuntimeValue(fs *v1.ResourceFieldSelector, pod *v1.Pod, co
 	containerName := fs.ContainerName
 	if len(containerName) == 0 {
 		return resource.ExtractContainerResourceValue(fs, container)
-	} else {
-		return resource.ExtractResourceValueByContainerName(fs, pod, containerName)
 	}
+	return resource.ExtractResourceValueByContainerName(fs, pod, containerName)
 }
 
 // One of the following arguments must be non-nil: runningPod, status.
@@ -666,7 +812,7 @@ func (kl *Kubelet) killPod(pod *v1.Pod, runningPod *kubecontainer.Pod, status *k
 	if runningPod != nil {
 		p = *runningPod
 	} else if status != nil {
-		p = kubecontainer.ConvertPodStatusToRunningPod(kl.GetRuntime().Type(), status)
+		p = kubecontainer.ConvertPodStatusToRunningPod(kl.getRuntime().Type(), status)
 	} else {
 		return fmt.Errorf("one of the two arguments must be non-nil: runningPod, status")
 	}
@@ -714,9 +860,8 @@ func (kl *Kubelet) getPullSecretsForPod(pod *v1.Pod) []v1.Secret {
 	return pullSecrets
 }
 
-// Returns true if pod is in the terminated state ("Failed" or "Succeeded").
+// podIsTerminated returns true if pod is in the terminated state ("Failed" or "Succeeded").
 func (kl *Kubelet) podIsTerminated(pod *v1.Pod) bool {
-	var status v1.PodStatus
 	// Check the cached pod status which was set after the last sync.
 	status, ok := kl.statusManager.GetPodStatus(pod.UID)
 	if !ok {
@@ -728,20 +873,51 @@ func (kl *Kubelet) podIsTerminated(pod *v1.Pod) bool {
 	return status.Phase == v1.PodFailed || status.Phase == v1.PodSucceeded || (pod.DeletionTimestamp != nil && notRunning(status.ContainerStatuses))
 }
 
-// OkToDeletePod returns true if all required node-level resources that a pod was consuming have
-// been reclaimed by the kubelet.  Reclaiming resources is a prerequisite to deleting a pod from the
-// API server.
-func (kl *Kubelet) OkToDeletePod(pod *v1.Pod) bool {
-	if pod.DeletionTimestamp == nil {
-		// We shouldnt delete pods whose DeletionTimestamp is not set
-		return false
+// IsPodTerminated returns trus if the pod with the provided UID is in a terminated state ("Failed" or "Succeeded")
+// or if the pod has been deleted or removed
+func (kl *Kubelet) IsPodTerminated(uid types.UID) bool {
+	pod, podFound := kl.podManager.GetPodByUID(uid)
+	if !podFound {
+		return true
 	}
-	if !notRunning(pod.Status.ContainerStatuses) {
+	return kl.podIsTerminated(pod)
+}
+
+// IsPodDeleted returns true if the pod is deleted.  For the pod to be deleted, either:
+// 1. The pod object is deleted
+// 2. The pod's status is evicted
+// 3. The pod's deletion timestamp is set, and containers are not running
+func (kl *Kubelet) IsPodDeleted(uid types.UID) bool {
+	pod, podFound := kl.podManager.GetPodByUID(uid)
+	if !podFound {
+		return true
+	}
+	status, statusFound := kl.statusManager.GetPodStatus(pod.UID)
+	if !statusFound {
+		status = pod.Status
+	}
+	return eviction.PodIsEvicted(status) || (pod.DeletionTimestamp != nil && notRunning(status.ContainerStatuses))
+}
+
+// PodResourcesAreReclaimed returns true if all required node-level resources that a pod was consuming have
+// been reclaimed by the kubelet.  Reclaiming resources is a prerequisite to deleting a pod from the API server.
+func (kl *Kubelet) PodResourcesAreReclaimed(pod *v1.Pod, status v1.PodStatus) bool {
+	if !notRunning(status.ContainerStatuses) {
 		// We shouldnt delete pods that still have running containers
 		glog.V(3).Infof("Pod %q is terminated, but some containers are still running", format.Pod(pod))
 		return false
 	}
-	if kl.podVolumesExist(pod.UID) && !kl.kubeletConfiguration.KeepTerminatedPodVolumes {
+	// pod's containers should be deleted
+	runtimeStatus, err := kl.podCache.Get(pod.UID)
+	if err != nil {
+		glog.V(3).Infof("Pod %q is terminated, Error getting runtimeStatus from the podCache: %s", format.Pod(pod), err)
+		return false
+	}
+	if len(runtimeStatus.ContainerStatuses) > 0 {
+		glog.V(3).Infof("Pod %q is terminated, but some containers have not been cleaned up: %+v", format.Pod(pod), runtimeStatus.ContainerStatuses)
+		return false
+	}
+	if kl.podVolumesExist(pod.UID) && !kl.keepTerminatedPodVolumes {
 		// We shouldnt delete pods whose volumes have not been cleaned up if we are not keeping terminated pod volumes
 		glog.V(3).Infof("Pod %q is terminated, but some volumes have not been cleaned up", format.Pod(pod))
 		return false
@@ -754,6 +930,15 @@ func (kl *Kubelet) OkToDeletePod(pod *v1.Pod) bool {
 		}
 	}
 	return true
+}
+
+// podResourcesAreReclaimed simply calls PodResourcesAreReclaimed with the most up-to-date status.
+func (kl *Kubelet) podResourcesAreReclaimed(pod *v1.Pod) bool {
+	status, ok := kl.statusManager.GetPodStatus(pod.UID)
+	if !ok {
+		status = pod.Status
+	}
+	return kl.PodResourcesAreReclaimed(pod, status)
 }
 
 // notRunning returns true if every status is terminated or waiting, or the status list
@@ -874,12 +1059,6 @@ func (kl *Kubelet) HandlePodCleanups() error {
 	// Remove any orphaned mirror pods.
 	kl.podManager.DeleteOrphanedMirrorPods()
 
-	// Clear out any old bandwidth rules
-	err = kl.cleanupBandwidthLimits(allPods)
-	if err != nil {
-		glog.Errorf("Failed cleaning up bandwidth limits: %v", err)
-	}
-
 	// Remove any cgroups in the hierarchy for pods that are no longer running.
 	if kl.cgroupsPerQOS {
 		kl.cleanupOrphanedPodCgroups(cgroupPods, activePods)
@@ -926,22 +1105,6 @@ func (kl *Kubelet) podKiller() {
 			}
 		}
 	}
-}
-
-// checkHostPortConflicts detects pods with conflicted host ports.
-func hasHostPortConflicts(pods []*v1.Pod) bool {
-	ports := sets.String{}
-	for _, pod := range pods {
-		if errs := validation.AccumulateUniqueHostPorts(pod.Spec.Containers, &ports, field.NewPath("spec", "containers")); len(errs) > 0 {
-			glog.Errorf("Pod %q: HostPort is already allocated, ignoring: %v", format.Pod(pod), errs)
-			return true
-		}
-		if errs := validation.AccumulateUniqueHostPorts(pod.Spec.InitContainers, &ports, field.NewPath("spec", "initContainers")); len(errs) > 0 {
-			glog.Errorf("Pod %q: HostPort is already allocated, ignoring: %v", format.Pod(pod), errs)
-			return true
-		}
-	}
-	return false
 }
 
 // validateContainerLogStatus returns the container ID for the desired container to retrieve logs for, based on the state
@@ -1050,10 +1213,8 @@ func (kl *Kubelet) GetKubeletContainerLogs(podFullName, containerName string, lo
 	return kl.containerRuntime.GetContainerLogs(pod, containerID, logOptions, stdout, stderr)
 }
 
-// GetPhase returns the phase of a pod given its container info.
-// This func is exported to simplify integration with 3rd party kubelet
-// integrations like kubernetes-mesos.
-func GetPhase(spec *v1.PodSpec, info []v1.ContainerStatus) v1.PodPhase {
+// getPhase returns the phase of a pod given its container info.
+func getPhase(spec *v1.PodSpec, info []v1.ContainerStatus) v1.PodPhase {
 	initialized := 0
 	pendingInitialization := 0
 	failedInitialization := 0
@@ -1183,7 +1344,7 @@ func (kl *Kubelet) generateAPIPodStatus(pod *v1.Pod, podStatus *kubecontainer.Po
 	// Assume info is ready to process
 	spec := &pod.Spec
 	allStatus := append(append([]v1.ContainerStatus{}, s.ContainerStatuses...), s.InitContainerStatuses...)
-	s.Phase = GetPhase(spec, allStatus)
+	s.Phase = getPhase(spec, allStatus)
 	kl.probeManager.UpdatePodStatus(pod.UID, s)
 	s.Conditions = append(s.Conditions, status.GeneratePodInitializedCondition(spec, s.InitContainerStatuses, s.Phase))
 	s.Conditions = append(s.Conditions, status.GeneratePodReadyCondition(spec, s.ContainerStatuses, s.Phase))
@@ -1198,7 +1359,7 @@ func (kl *Kubelet) generateAPIPodStatus(pod *v1.Pod, podStatus *kubecontainer.Po
 		Status: v1.ConditionTrue,
 	})
 
-	if !kl.standaloneMode {
+	if kl.kubeClient != nil {
 		hostIP, err := kl.getHostIPAnyWay()
 		if err != nil {
 			glog.V(4).Infof("Cannot get host IP: %v", err)
@@ -1220,18 +1381,23 @@ func (kl *Kubelet) convertStatusToAPIStatus(pod *v1.Pod, podStatus *kubecontaine
 	var apiPodStatus v1.PodStatus
 	apiPodStatus.PodIP = podStatus.IP
 	// set status for Pods created on versions of kube older than 1.6
-	apiPodStatus.QOSClass = qos.GetPodQOS(pod)
+	apiPodStatus.QOSClass = v1qos.GetPodQOS(pod)
+
+	oldPodStatus, found := kl.statusManager.GetPodStatus(pod.UID)
+	if !found {
+		oldPodStatus = pod.Status
+	}
 
 	apiPodStatus.ContainerStatuses = kl.convertToAPIContainerStatuses(
 		pod, podStatus,
-		pod.Status.ContainerStatuses,
+		oldPodStatus.ContainerStatuses,
 		pod.Spec.Containers,
 		len(pod.Spec.InitContainers) > 0,
 		false,
 	)
 	apiPodStatus.InitContainerStatuses = kl.convertToAPIContainerStatuses(
 		pod, podStatus,
-		pod.Status.InitContainerStatuses,
+		oldPodStatus.InitContainerStatuses,
 		pod.Spec.InitContainers,
 		len(pod.Spec.InitContainers) > 0,
 		true,
@@ -1296,10 +1462,17 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 			Image: container.Image,
 			State: defaultWaitingState,
 		}
-		// Apply some values from the old statuses as the default values.
-		if oldStatus, found := oldStatuses[container.Name]; found {
-			status.RestartCount = oldStatus.RestartCount
-			status.LastTerminationState = oldStatus.LastTerminationState
+		oldStatus, found := oldStatuses[container.Name]
+		if found {
+			if oldStatus.State.Terminated != nil {
+				// Do not update status on terminated init containers as
+				// they be removed at any time.
+				status = &oldStatus
+			} else {
+				// Apply some values from the old statuses as the default values.
+				status.RestartCount = oldStatus.RestartCount
+				status.LastTerminationState = oldStatus.LastTerminationState
+			}
 		}
 		statuses[container.Name] = status
 	}
@@ -1341,7 +1514,7 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 			continue
 		}
 		status := statuses[container.Name]
-		reason, message, ok := kl.reasonCache.Get(pod.UID, container.Name)
+		reason, ok := kl.reasonCache.Get(pod.UID, container.Name)
 		if !ok {
 			// In fact, we could also apply Waiting state here, but it is less informative,
 			// and the container will be restarted soon, so we prefer the original state here.
@@ -1356,8 +1529,8 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 		}
 		status.State = v1.ContainerState{
 			Waiting: &v1.ContainerStateWaiting{
-				Reason:  reason.Error(),
-				Message: message,
+				Reason:  reason.Err.Error(),
+				Message: reason.Message,
 			},
 		}
 		statuses[container.Name] = status
@@ -1378,7 +1551,7 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 	return containerStatuses
 }
 
-// Returns logs of current machine.
+// ServeLogs returns logs of current machine.
 func (kl *Kubelet) ServeLogs(w http.ResponseWriter, req *http.Request) {
 	// TODO: whitelist logs we are willing to serve
 	kl.logServer.ServeHTTP(w, req)
@@ -1391,12 +1564,14 @@ func (kl *Kubelet) findContainer(podFullName string, podUID types.UID, container
 	if err != nil {
 		return nil, err
 	}
-	podUID = kl.podManager.TranslatePodUID(podUID)
+	// Resolve and type convert back again.
+	// We need the static pod UID but the kubecontainer API works with types.UID.
+	podUID = types.UID(kl.podManager.TranslatePodUID(podUID))
 	pod := kubecontainer.Pods(pods).FindPod(podFullName, podUID)
 	return pod.FindContainerByName(containerName), nil
 }
 
-// Run a command in a container, returns the combined stdout, stderr as an array of bytes
+// RunInContainer runs a command in a container, returns the combined stdout, stderr as an array of bytes
 func (kl *Kubelet) RunInContainer(podFullName string, podUID types.UID, containerName string, cmd []string) ([]byte, error) {
 	container, err := kl.findContainer(podFullName, podUID, containerName)
 	if err != nil {
@@ -1405,7 +1580,7 @@ func (kl *Kubelet) RunInContainer(podFullName string, podUID types.UID, containe
 	if container == nil {
 		return nil, fmt.Errorf("container not found (%q)", containerName)
 	}
-	// TODO(timstclair): Pass a proper timeout value.
+	// TODO(tallclair): Pass a proper timeout value.
 	return kl.runner.RunInContainer(container.ID, cmd, 0)
 }
 
@@ -1457,7 +1632,9 @@ func (kl *Kubelet) PortForward(podFullName string, podUID types.UID, port int32,
 	if err != nil {
 		return err
 	}
-	podUID = kl.podManager.TranslatePodUID(podUID)
+	// Resolve and type convert back again.
+	// We need the static pod UID but the kubecontainer API works with types.UID.
+	podUID = types.UID(kl.podManager.TranslatePodUID(podUID))
 	pod := kubecontainer.Pods(pods).FindPod(podFullName, podUID)
 	if pod.IsEmpty() {
 		return fmt.Errorf("pod not found (%q)", podFullName)
@@ -1530,7 +1707,9 @@ func (kl *Kubelet) GetPortForward(podName, podNamespace string, podUID types.UID
 		if err != nil {
 			return nil, err
 		}
-		podUID = kl.podManager.TranslatePodUID(podUID)
+		// Resolve and type convert back again.
+		// We need the static pod UID but the kubecontainer API works with types.UID.
+		podUID = types.UID(kl.podManager.TranslatePodUID(podUID))
 		podFullName := kubecontainer.BuildPodFullName(podName, podNamespace)
 		pod := kubecontainer.Pods(pods).FindPod(podFullName, podUID)
 		if pod.IsEmpty() {
@@ -1565,7 +1744,7 @@ func (kl *Kubelet) cleanupOrphanedPodCgroups(cgroupPods map[types.UID]cm.CgroupN
 		// parent croup.  If the volumes still exist, reduce the cpu shares for any
 		// process in the cgroup to the minimum value while we wait.  if the kubelet
 		// is configured to keep terminated volumes, we will delete the cgroup and not block.
-		if podVolumesExist := kl.podVolumesExist(uid); podVolumesExist && !kl.kubeletConfiguration.KeepTerminatedPodVolumes {
+		if podVolumesExist := kl.podVolumesExist(uid); podVolumesExist && !kl.keepTerminatedPodVolumes {
 			glog.V(3).Infof("Orphaned pod %q found, but volumes not yet removed.  Reducing cpu to minimum", uid)
 			if err := pcm.ReduceCPULimits(val); err != nil {
 				glog.Warningf("Failed to reduce cpu time for pod %q pending volume cleanup due to %v", uid, err)
@@ -1633,15 +1812,15 @@ func hasHostNamespace(pod *v1.Pod) bool {
 func (kl *Kubelet) hasHostMountPVC(pod *v1.Pod) bool {
 	for _, volume := range pod.Spec.Volumes {
 		if volume.PersistentVolumeClaim != nil {
-			pvc, err := kl.kubeClient.Core().PersistentVolumeClaims(pod.Namespace).Get(volume.PersistentVolumeClaim.ClaimName, metav1.GetOptions{})
+			pvc, err := kl.kubeClient.CoreV1().PersistentVolumeClaims(pod.Namespace).Get(volume.PersistentVolumeClaim.ClaimName, metav1.GetOptions{})
 			if err != nil {
 				glog.Warningf("unable to retrieve pvc %s:%s - %v", pod.Namespace, volume.PersistentVolumeClaim.ClaimName, err)
 				continue
 			}
 			if pvc != nil {
-				referencedVolume, err := kl.kubeClient.Core().PersistentVolumes().Get(pvc.Spec.VolumeName, metav1.GetOptions{})
+				referencedVolume, err := kl.kubeClient.CoreV1().PersistentVolumes().Get(pvc.Spec.VolumeName, metav1.GetOptions{})
 				if err != nil {
-					glog.Warningf("unable to retrieve pvc %s - %v", pvc.Spec.VolumeName, err)
+					glog.Warningf("unable to retrieve pv %s - %v", pvc.Spec.VolumeName, err)
 					continue
 				}
 				if referencedVolume != nil && referencedVolume.Spec.HostPath != nil {

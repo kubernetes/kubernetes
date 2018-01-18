@@ -117,7 +117,10 @@ func NewDefaultRESTMapper(defaultGroupVersions []schema.GroupVersion, f VersionI
 
 func (m *DefaultRESTMapper) Add(kind schema.GroupVersionKind, scope RESTScope) {
 	plural, singular := UnsafeGuessKindToResource(kind)
+	m.AddSpecific(kind, plural, singular, scope)
+}
 
+func (m *DefaultRESTMapper) AddSpecific(kind schema.GroupVersionKind, plural, singular schema.GroupVersionResource, scope RESTScope) {
 	m.singularToPlural[singular] = plural
 	m.pluralToSingular[plural] = singular
 
@@ -469,7 +472,7 @@ func (m *DefaultRESTMapper) RESTMapping(gk schema.GroupKind, versions ...string)
 		return nil, err
 	}
 	if len(mappings) == 0 {
-		return nil, &NoKindMatchError{PartialKind: gk.WithVersion("")}
+		return nil, &NoKindMatchError{GroupKind: gk, SearchedVersions: versions}
 	}
 	// since we rely on RESTMappings method
 	// take the first match and return to the caller
@@ -507,7 +510,7 @@ func (m *DefaultRESTMapper) RESTMappings(gk schema.GroupKind, versions ...string
 	}
 
 	if len(potentialGVK) == 0 {
-		return nil, &NoKindMatchError{PartialKind: gk.WithVersion("")}
+		return nil, &NoKindMatchError{GroupKind: gk, SearchedVersions: versions}
 	}
 
 	for _, gvk := range potentialGVK {

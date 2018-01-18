@@ -21,7 +21,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 )
 
@@ -32,7 +32,7 @@ type DaemonSetListerExpansion interface {
 }
 
 // DaemonSetNamespaceListerExpansion allows custom methods to be added to
-// DaemonSetNamespaeLister.
+// DaemonSetNamespaceLister.
 type DaemonSetNamespaceListerExpansion interface{}
 
 // GetPodDaemonSets returns a list of DaemonSets that potentially match a pod.

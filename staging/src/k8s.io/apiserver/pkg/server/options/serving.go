@@ -38,11 +38,22 @@ import (
 type SecureServingOptions struct {
 	BindAddress net.IP
 	BindPort    int
+	// BindNetwork is the type of network to bind to - defaults to "tcp", accepts "tcp",
+	// "tcp4", and "tcp6".
+	BindNetwork string
+
+	// Listener is the secure server network listener.
+	// either Listener or BindAddress/BindPort/BindNetwork is set,
+	// if Listener is set, use it and omit BindAddress/BindPort/BindNetwork.
+	Listener net.Listener
 
 	// ServerCert is the TLS cert info for serving secure traffic
 	ServerCert GeneratableKeyCert
 	// SNICertKeys are named CertKeys for serving secure traffic with SNI support.
 	SNICertKeys []utilflag.NamedCertKey
+	// CipherSuites is the list of allowed cipher suites for the server.
+	// Values are from tls package constants (https://golang.org/pkg/crypto/tls/#pkg-constants).
+	CipherSuites []string
 }
 
 type CertKey struct {
@@ -81,6 +92,10 @@ func (s *SecureServingOptions) DefaultExternalAddress() (net.IP, error) {
 }
 
 func (s *SecureServingOptions) Validate() []error {
+	if s == nil {
+		return nil
+	}
+
 	errors := []error{}
 
 	if s.BindPort < 0 || s.BindPort > 65535 {
@@ -91,6 +106,10 @@ func (s *SecureServingOptions) Validate() []error {
 }
 
 func (s *SecureServingOptions) AddFlags(fs *pflag.FlagSet) {
+	if s == nil {
+		return
+	}
+
 	fs.IPVar(&s.BindAddress, "bind-address", s.BindAddress, ""+
 		"The IP address on which to listen for the --secure-port port. The "+
 		"associated interface(s) must be reachable by the rest of the cluster, and by CLI/web "+
@@ -108,7 +127,7 @@ func (s *SecureServingOptions) AddFlags(fs *pflag.FlagSet) {
 		"File containing the default x509 Certificate for HTTPS. (CA cert, if any, concatenated "+
 		"after server cert). If HTTPS serving is enabled, and --tls-cert-file and "+
 		"--tls-private-key-file are not provided, a self-signed certificate and key "+
-		"are generated for the public address and saved to /var/run/kubernetes.")
+		"are generated for the public address and saved to the directory specified by --cert-dir.")
 
 	fs.StringVar(&s.ServerCert.CertKey.KeyFile, "tls-private-key-file", s.ServerCert.CertKey.KeyFile,
 		"File containing the default x509 private key matching --tls-cert-file.")
@@ -117,6 +136,11 @@ func (s *SecureServingOptions) AddFlags(fs *pflag.FlagSet) {
 		"certificate authority will used for secure access from Admission "+
 		"Controllers. This must be a valid PEM-encoded CA bundle. Altneratively, the certificate authority "+
 		"can be appended to the certificate provided by --tls-cert-file.")
+
+	fs.StringSliceVar(&s.CipherSuites, "tls-cipher-suites", s.CipherSuites,
+		"Comma-separated list of cipher suites for the server. "+
+			"Values are from tls package constants (https://golang.org/pkg/crypto/tls/#pkg-constants). "+
+			"If omitted, the default Go cipher suites will be used")
 
 	fs.Var(utilflag.NewNamedCertKeyArray(&s.SNICertKeys), "tls-sni-cert-key", ""+
 		"A pair of x509 certificate and private key file paths, optionally suffixed with a list of "+
@@ -134,13 +158,29 @@ func (s *SecureServingOptions) AddDeprecatedFlags(fs *pflag.FlagSet) {
 	fs.MarkDeprecated("public-address-override", "see --bind-address instead.")
 }
 
+// ApplyTo fills up serving information in the server configuration.
 func (s *SecureServingOptions) ApplyTo(c *server.Config) error {
+	if s == nil {
+		return nil
+	}
 	if s.BindPort <= 0 {
 		return nil
 	}
+
+	if s.Listener == nil {
+		var err error
+		addr := net.JoinHostPort(s.BindAddress.String(), strconv.Itoa(s.BindPort))
+		s.Listener, s.BindPort, err = CreateListener(s.BindNetwork, addr)
+		if err != nil {
+			return fmt.Errorf("failed to create listener: %v", err)
+		}
+	}
+
 	if err := s.applyServingInfoTo(c); err != nil {
 		return err
 	}
+
+	c.SecureServingInfo.Listener = s.Listener
 
 	// create self-signed cert+key with the fake server.LoopbackClientServerNameOverride and
 	// let the server return it when the loopback client connects.
@@ -171,16 +211,9 @@ func (s *SecureServingOptions) ApplyTo(c *server.Config) error {
 }
 
 func (s *SecureServingOptions) applyServingInfoTo(c *server.Config) error {
-	if s.BindPort <= 0 {
-		return nil
-	}
-
-	secureServingInfo := &server.SecureServingInfo{
-		BindAddress: net.JoinHostPort(s.BindAddress.String(), strconv.Itoa(s.BindPort)),
-	}
+	secureServingInfo := &server.SecureServingInfo{}
 
 	serverCertFile, serverKeyFile := s.ServerCert.CertKey.CertFile, s.ServerCert.CertKey.KeyFile
-
 	// load main cert
 	if len(serverCertFile) != 0 || len(serverKeyFile) != 0 {
 		tlsCert, err := tls.LoadX509KeyPair(serverCertFile, serverKeyFile)
@@ -206,6 +239,14 @@ func (s *SecureServingOptions) applyServingInfoTo(c *server.Config) error {
 		secureServingInfo.CACert = &tls.Certificate{
 			Certificate: [][]byte{block.Bytes},
 		}
+	}
+
+	if len(s.CipherSuites) != 0 {
+		cipherSuites, err := utilflag.TLSCipherSuites(s.CipherSuites)
+		if err != nil {
+			return err
+		}
+		secureServingInfo.CipherSuites = cipherSuites
 	}
 
 	// load SNI certs
@@ -237,7 +278,7 @@ func (s *SecureServingOptions) MaybeDefaultWithSelfSignedCerts(publicAddress str
 		return nil
 	}
 	keyCert := &s.ServerCert.CertKey
-	if s.BindPort == 0 || len(keyCert.CertFile) != 0 || len(keyCert.KeyFile) != 0 {
+	if len(keyCert.CertFile) != 0 || len(keyCert.KeyFile) != 0 {
 		return nil
 	}
 
@@ -272,4 +313,23 @@ func (s *SecureServingOptions) MaybeDefaultWithSelfSignedCerts(publicAddress str
 	}
 
 	return nil
+}
+
+func CreateListener(network, addr string) (net.Listener, int, error) {
+	if len(network) == 0 {
+		network = "tcp"
+	}
+	ln, err := net.Listen(network, addr)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to listen on %v: %v", addr, err)
+	}
+
+	// get port
+	tcpAddr, ok := ln.Addr().(*net.TCPAddr)
+	if !ok {
+		ln.Close()
+		return nil, 0, fmt.Errorf("invalid listen address: %q", ln.Addr().String())
+	}
+
+	return ln, tcpAddr.Port, nil
 }

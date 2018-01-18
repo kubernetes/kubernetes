@@ -19,10 +19,10 @@ package volume
 import (
 	"time"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/api/v1"
 )
 
 // Volume represents a directory used by pods or hosts on a node. All method
@@ -35,6 +35,19 @@ type Volume interface {
 	// MetricsProvider embeds methods for exposing metrics (e.g.
 	// used, available space).
 	MetricsProvider
+}
+
+// BlockVolume interface provides methods to generate global map path
+// and pod device map path.
+type BlockVolume interface {
+	// GetGlobalMapPath returns a global map path which contains
+	// symbolic links associated to a block device.
+	// ex. plugins/kubernetes.io/{PluginName}/{DefaultKubeletVolumeDevicesDirName}/{volumePluginDependentPath}/{pod uuid}
+	GetGlobalMapPath(spec *Spec) (string, error)
+	// GetPodDeviceMapPath returns a pod device map path
+	// and name of a symbolic link associated to a block device.
+	// ex. pods/{podUid}}/{DefaultKubeletVolumeDevicesDirName}/{escapeQualifiedPluginName}/{volumeName}
+	GetPodDeviceMapPath() (string, string)
 }
 
 // MetricsProvider exposes metrics (e.g. used,available space) related to a
@@ -109,14 +122,14 @@ type Mounter interface {
 	// content should be owned by 'fsGroup' so that it can be
 	// accessed by the pod. This may be called more than once, so
 	// implementations must be idempotent.
-	SetUp(fsGroup *types.UnixGroupID) error
+	SetUp(fsGroup *int64) error
 	// SetUpAt prepares and mounts/unpacks the volume to the
 	// specified directory path, which may or may not exist yet.
 	// The mount point and its content should be owned by
 	// 'fsGroup' so that it can be accessed by the pod. This may
 	// be called more than once, so implementations must be
 	// idempotent.
-	SetUpAt(dir string, fsGroup *types.UnixGroupID) error
+	SetUpAt(dir string, fsGroup *int64) error
 	// GetAttributes returns the attributes of the mounter.
 	GetAttributes() Attributes
 }
@@ -130,6 +143,34 @@ type Unmounter interface {
 	// TearDown unmounts the volume from the specified directory and
 	// removes traces of the SetUp procedure.
 	TearDownAt(dir string) error
+}
+
+// BlockVolumeMapper interface provides methods to set up/map the volume.
+type BlockVolumeMapper interface {
+	BlockVolume
+	// SetUpDevice prepares the volume to a self-determined directory path,
+	// which may or may not exist yet and returns combination of physical
+	// device path of a block volume and error.
+	// If the plugin is non-attachable, it should prepare the device
+	// in /dev/ (or where appropriate) and return unique device path.
+	// Unique device path across kubelet node reboot is required to avoid
+	// unexpected block volume destruction.
+	// If the plugin is attachable, it should not do anything here,
+	// just return empty string for device path.
+	// Instead, attachable plugin have to return unique device path
+	// at attacher.Attach() and attacher.WaitForAttach().
+	// This may be called more than once, so implementations must be idempotent.
+	SetUpDevice() (string, error)
+}
+
+// BlockVolumeUnmapper interface provides methods to cleanup/unmap the volumes.
+type BlockVolumeUnmapper interface {
+	BlockVolume
+	// TearDownDevice removes traces of the SetUpDevice procedure under
+	// a self-determined directory.
+	// If the plugin is non-attachable, this method detaches the volume
+	// from a node.
+	TearDownDevice(mapPath string, devicePath string) error
 }
 
 // Provisioner is an interface that creates templates for PersistentVolumes
@@ -173,7 +214,7 @@ type Attacher interface {
 	// node. If it successfully attaches, the path to the device
 	// is returned. Otherwise, if the device does not attach after
 	// the given timeout period, an error will be returned.
-	WaitForAttach(spec *Spec, devicePath string, timeout time.Duration) (string, error)
+	WaitForAttach(spec *Spec, devicePath string, pod *v1.Pod, timeout time.Duration) (string, error)
 
 	// GetDeviceMountPath returns a path where the device should
 	// be mounted after it is attached. This is a global mount
@@ -195,8 +236,10 @@ type BulkVolumeVerifier interface {
 
 // Detacher can detach a volume from a node.
 type Detacher interface {
-	// Detach the given device from the node with the given Name.
-	Detach(deviceName string, nodeName types.NodeName) error
+	// Detach the given volume from the node with the given Name.
+	// volumeName is name of the volume as returned from plugin's
+	// GetVolumeName().
+	Detach(volumeName string, nodeName types.NodeName) error
 
 	// UnmountDevice unmounts the global mount of the disk. This
 	// should only be called once all bind mounts have been

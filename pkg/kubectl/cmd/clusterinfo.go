@@ -19,17 +19,17 @@ package cmd
 import (
 	"fmt"
 	"io"
-	"os"
 	"strconv"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/api"
+	utilnet "k8s.io/apimachinery/pkg/util/net"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
-	"k8s.io/kubernetes/pkg/util/i18n"
+	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 
-	"github.com/daviddengcn/go-colortext"
+	ct "github.com/daviddengcn/go-colortext"
 	"github.com/spf13/cobra"
 )
 
@@ -45,9 +45,7 @@ var (
 
 func NewCmdClusterInfo(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use: "cluster-info",
-		// clusterinfo is deprecated.
-		Aliases: []string{"clusterinfo"},
+		Use:     "cluster-info",
 		Short:   i18n.T("Display cluster info"),
 		Long:    longDescr,
 		Example: clusterinfoExample,
@@ -62,29 +60,25 @@ func NewCmdClusterInfo(f cmdutil.Factory, out io.Writer) *cobra.Command {
 }
 
 func RunClusterInfo(f cmdutil.Factory, out io.Writer, cmd *cobra.Command) error {
-	if len(os.Args) > 1 && os.Args[1] == "clusterinfo" {
-		printDeprecationWarning("cluster-info", "clusterinfo")
-	}
-
 	client, err := f.ClientConfig()
 	if err != nil {
 		return err
 	}
 	printService(out, "Kubernetes master", client.Host)
 
-	mapper, typer := f.Object()
 	cmdNamespace := cmdutil.GetFlagString(cmd, "namespace")
 	if cmdNamespace == "" {
 		cmdNamespace = metav1.NamespaceSystem
 	}
 
 	// TODO use generalized labels once they are implemented (#341)
-	b := resource.NewBuilder(mapper, f.CategoryExpander(), typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
+	b := f.NewBuilder().
+		Internal().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
-		SelectorParam("kubernetes.io/cluster-service=true").
+		LabelSelectorParam("kubernetes.io/cluster-service=true").
 		ResourceTypeOrNameArgs(false, []string{"services"}...).
 		Latest()
-	b.Do().Visit(func(r *resource.Info, err error) error {
+	err = b.Do().Visit(func(r *resource.Info, err error) error {
 		if err != nil {
 			return err
 		}
@@ -101,10 +95,25 @@ func RunClusterInfo(f cmdutil.Factory, out io.Writer, cmd *cobra.Command) error 
 					link += "http://" + ip + ":" + strconv.Itoa(int(port.Port)) + " "
 				}
 			} else {
+				name := service.ObjectMeta.Name
+
+				if len(service.Spec.Ports) > 0 {
+					port := service.Spec.Ports[0]
+
+					// guess if the scheme is https
+					scheme := ""
+					if port.Name == "https" || port.Port == 443 {
+						scheme = "https"
+					}
+
+					// format is <scheme>:<service-name>:<service-port-name>
+					name = utilnet.JoinSchemeNamePort(scheme, service.ObjectMeta.Name, port.Name)
+				}
+
 				if len(client.GroupVersion.Group) == 0 {
-					link = client.Host + "/api/" + client.GroupVersion.Version + "/namespaces/" + service.ObjectMeta.Namespace + "/services/" + service.ObjectMeta.Name + "/proxy"
+					link = client.Host + "/api/" + client.GroupVersion.Version + "/namespaces/" + service.ObjectMeta.Namespace + "/services/" + name + "/proxy"
 				} else {
-					link = client.Host + "/api/" + client.GroupVersion.Group + "/" + client.GroupVersion.Version + "/namespaces/" + service.ObjectMeta.Namespace + "/services/" + service.ObjectMeta.Name + "/proxy"
+					link = client.Host + "/api/" + client.GroupVersion.Group + "/" + client.GroupVersion.Version + "/namespaces/" + service.ObjectMeta.Namespace + "/services/" + name + "/proxy"
 
 				}
 			}
@@ -117,7 +126,7 @@ func RunClusterInfo(f cmdutil.Factory, out io.Writer, cmd *cobra.Command) error 
 		return nil
 	})
 	out.Write([]byte("\nTo further debug and diagnose cluster problems, use 'kubectl cluster-info dump'.\n"))
-	return nil
+	return err
 
 	// TODO consider printing more information about cluster
 }
@@ -126,7 +135,7 @@ func printService(out io.Writer, name, link string) {
 	ct.ChangeColor(ct.Green, false, ct.None, false)
 	fmt.Fprint(out, name)
 	ct.ResetColor()
-	fmt.Fprintf(out, " is running at ")
+	fmt.Fprint(out, " is running at ")
 	ct.ChangeColor(ct.Yellow, false, ct.None, false)
 	fmt.Fprint(out, link)
 	ct.ResetColor()

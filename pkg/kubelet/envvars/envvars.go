@@ -18,11 +18,12 @@ package envvars
 
 import (
 	"fmt"
+	"net"
 	"strconv"
 	"strings"
 
-	"k8s.io/kubernetes/pkg/api/v1"
-	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
+	"k8s.io/api/core/v1"
+	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 )
 
 // FromServices builds environment variables that a container is started with,
@@ -78,18 +79,21 @@ func makeLinkVariables(service *v1.Service) []v1.EnvVar {
 		if sp.Protocol != "" {
 			protocol = string(sp.Protocol)
 		}
+
+		hostPort := net.JoinHostPort(service.Spec.ClusterIP, strconv.Itoa(int(sp.Port)))
+
 		if i == 0 {
 			// Docker special-cases the first port.
 			all = append(all, v1.EnvVar{
 				Name:  prefix + "_PORT",
-				Value: fmt.Sprintf("%s://%s:%d", strings.ToLower(protocol), service.Spec.ClusterIP, sp.Port),
+				Value: fmt.Sprintf("%s://%s", strings.ToLower(protocol), hostPort),
 			})
 		}
 		portPrefix := fmt.Sprintf("%s_PORT_%d_%s", prefix, sp.Port, strings.ToUpper(protocol))
 		all = append(all, []v1.EnvVar{
 			{
 				Name:  portPrefix,
-				Value: fmt.Sprintf("%s://%s:%d", strings.ToLower(protocol), service.Spec.ClusterIP, sp.Port),
+				Value: fmt.Sprintf("%s://%s", strings.ToLower(protocol), hostPort),
 			},
 			{
 				Name:  portPrefix + "_PROTO",

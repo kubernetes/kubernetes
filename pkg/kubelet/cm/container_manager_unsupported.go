@@ -21,53 +21,25 @@ package cm
 import (
 	"fmt"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/kubernetes/pkg/api/v1"
+	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
+	"k8s.io/kubernetes/pkg/kubelet/config"
+	"k8s.io/kubernetes/pkg/kubelet/status"
 	"k8s.io/kubernetes/pkg/util/mount"
 )
 
 type unsupportedContainerManager struct {
+	containerManagerStub
 }
 
 var _ ContainerManager = &unsupportedContainerManager{}
 
-func (unsupportedContainerManager) Start(_ *v1.Node, _ ActivePodsFunc) error {
+func (unsupportedContainerManager) Start(_ *v1.Node, _ ActivePodsFunc, _ config.SourcesReady, _ status.PodStatusProvider, _ internalapi.RuntimeService) error {
 	return fmt.Errorf("Container Manager is unsupported in this build")
 }
 
-func (unsupportedContainerManager) SystemCgroupsLimit() v1.ResourceList {
-	return v1.ResourceList{}
-}
-
-func (unsupportedContainerManager) GetNodeConfig() NodeConfig {
-	return NodeConfig{}
-}
-
-func (unsupportedContainerManager) GetMountedSubsystems() *CgroupSubsystems {
-	return &CgroupSubsystems{}
-}
-
-func (unsupportedContainerManager) GetQOSContainersInfo() QOSContainersInfo {
-	return QOSContainersInfo{}
-}
-
-func (unsupportedContainerManager) UpdateQOSCgroups() error {
-	return nil
-}
-
-func (cm *unsupportedContainerManager) Status() Status {
-	return Status{}
-}
-
-func (cm *unsupportedContainerManager) GetNodeAllocatableReservation() v1.ResourceList {
-	return nil
-}
-
-func (cm *unsupportedContainerManager) NewPodContainerManager() PodContainerManager {
-	return &unsupportedPodContainerManager{}
-}
-
-func NewContainerManager(_ mount.Interface, _ cadvisor.Interface, _ NodeConfig, failSwapOn bool, recorder record.EventRecorder) (ContainerManager, error) {
+func NewContainerManager(_ mount.Interface, _ cadvisor.Interface, _ NodeConfig, failSwapOn bool, devicePluginEnabled bool, recorder record.EventRecorder) (ContainerManager, error) {
 	return &unsupportedContainerManager{}, nil
 }

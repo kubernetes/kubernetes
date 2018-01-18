@@ -17,6 +17,7 @@ limitations under the License.
 package testing
 
 import (
+	"bytes"
 	"fmt"
 	"strings"
 
@@ -31,6 +32,7 @@ const (
 	Jump        = "-j "
 	Reject      = "REJECT"
 	ToDest      = "--to-destination "
+	Recent      = "recent "
 )
 
 type Rule map[string]string
@@ -72,12 +74,15 @@ func (*FakeIPTables) IsIpv6() bool {
 	return false
 }
 
-func (*FakeIPTables) Save(table iptables.Table) ([]byte, error) {
-	return make([]byte, 0), nil
+func (f *FakeIPTables) Save(table iptables.Table) ([]byte, error) {
+	lines := make([]byte, len(f.Lines))
+	copy(lines, f.Lines)
+	return lines, nil
 }
 
-func (*FakeIPTables) SaveAll() ([]byte, error) {
-	return make([]byte, 0), nil
+func (f *FakeIPTables) SaveInto(table iptables.Table, buffer *bytes.Buffer) error {
+	buffer.Write(f.Lines)
+	return nil
 }
 
 func (*FakeIPTables) Restore(table iptables.Table, data []byte, flush iptables.FlushFlag, counters iptables.RestoreCountersFlag) error {
@@ -107,7 +112,7 @@ func (f *FakeIPTables) GetRules(chainName string) (rules []Rule) {
 	for _, l := range strings.Split(string(f.Lines), "\n") {
 		if strings.Contains(l, fmt.Sprintf("-A %v", chainName)) {
 			newRule := Rule(map[string]string{})
-			for _, arg := range []string{Destination, Source, DPort, Protocol, Jump, ToDest} {
+			for _, arg := range []string{Destination, Source, DPort, Protocol, Jump, ToDest, Recent} {
 				tok := getToken(l, arg)
 				if tok != "" {
 					newRule[arg] = tok

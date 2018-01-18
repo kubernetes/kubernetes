@@ -26,6 +26,9 @@ import (
 // CopyStrings copies the contents of the specified string slice
 // into a new slice.
 func CopyStrings(s []string) []string {
+	if s == nil {
+		return nil
+	}
 	c := make([]string, len(s))
 	copy(c, s)
 	return c
@@ -41,6 +44,9 @@ func SortStrings(s []string) []string {
 // ShuffleStrings copies strings from the specified slice into a copy in random
 // order. It returns a new slice.
 func ShuffleStrings(s []string) []string {
+	if s == nil {
+		return nil
+	}
 	shuffled := make([]string, len(s))
 	perm := utilrand.Perm(len(s))
 	for i, j := range perm {
@@ -63,13 +69,23 @@ func ContainsString(slice []string, s string, modifier func(s string) string) bo
 	return false
 }
 
-// Int64Slice attaches the methods of Interface to []int64,
-// sorting in increasing order.
-type Int64Slice []int64
-
-func (p Int64Slice) Len() int           { return len(p) }
-func (p Int64Slice) Less(i, j int) bool { return p[i] < p[j] }
-func (p Int64Slice) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
-
-// Sorts []int64 in increasing order
-func SortInts64(a []int64) { sort.Sort(Int64Slice(a)) }
+// RemoveString returns a newly created []string that contains all items from slice that
+// are not equal to s and modifier(s) in case modifier func is provided.
+func RemoveString(slice []string, s string, modifier func(s string) string) []string {
+	newSlice := make([]string, 0)
+	for _, item := range slice {
+		if item == s {
+			continue
+		}
+		if modifier != nil && modifier(item) == s {
+			continue
+		}
+		newSlice = append(newSlice, item)
+	}
+	if len(newSlice) == 0 {
+		// Sanitize for unit tests so we don't need to distinguish empty array
+		// and nil.
+		newSlice = nil
+	}
+	return newSlice
+}

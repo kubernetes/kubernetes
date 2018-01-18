@@ -1,19 +1,41 @@
-package(default_visibility = ["//visibility:public"])
-
-licenses(["notice"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
     srcs = [
         "osext.go",
-        "osext_procfs.go",
-    ],
-    tags = ["automanaged"],
+    ] + select({
+        "@io_bazel_rules_go//go/platform:darwin": [
+            "osext_sysctl.go",
+        ],
+        "@io_bazel_rules_go//go/platform:dragonfly": [
+            "osext_procfs.go",
+        ],
+        "@io_bazel_rules_go//go/platform:freebsd": [
+            "osext_sysctl.go",
+        ],
+        "@io_bazel_rules_go//go/platform:linux": [
+            "osext_procfs.go",
+        ],
+        "@io_bazel_rules_go//go/platform:netbsd": [
+            "osext_procfs.go",
+        ],
+        "@io_bazel_rules_go//go/platform:openbsd": [
+            "osext_procfs.go",
+        ],
+        "@io_bazel_rules_go//go/platform:plan9": [
+            "osext_plan9.go",
+        ],
+        "@io_bazel_rules_go//go/platform:solaris": [
+            "osext_procfs.go",
+        ],
+        "@io_bazel_rules_go//go/platform:windows": [
+            "osext_windows.go",
+        ],
+        "//conditions:default": [],
+    }),
+    importpath = "github.com/kardianos/osext",
+    visibility = ["//visibility:public"],
 )
 
 filegroup(
@@ -27,4 +49,5 @@ filegroup(
     name = "all-srcs",
     srcs = [":package-srcs"],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

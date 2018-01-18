@@ -20,10 +20,12 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"unicode"
 )
 
-// Taken from https://github.com/golang/lint/blob/1fab560e16097e5b69afb66eb93aab843ef77845/lint.go#L663-L698
+// Taken from https://github.com/golang/lint/blob/3390df4df2787994aea98de825b964ac7944b817/lint.go#L732-L769
 var commonInitialisms = map[string]bool{
+	"ACL":   true,
 	"API":   true,
 	"ASCII": true,
 	"CPU":   true,
@@ -44,19 +46,21 @@ var commonInitialisms = map[string]bool{
 	"RPC":   true,
 	"SLA":   true,
 	"SMTP":  true,
+	"SQL":   true,
 	"SSH":   true,
 	"TCP":   true,
 	"TLS":   true,
 	"TTL":   true,
 	"UDP":   true,
-	"UUID":  true,
-	"UID":   true,
 	"UI":    true,
+	"UID":   true,
+	"UUID":  true,
 	"URI":   true,
 	"URL":   true,
 	"UTF8":  true,
 	"VM":    true,
 	"XML":   true,
+	"XMPP":  true,
 	"XSRF":  true,
 	"XSS":   true,
 }
@@ -246,6 +250,9 @@ func ToJSONName(name string) string {
 // ToVarName camelcases a name which can be underscored or pascal cased
 func ToVarName(name string) string {
 	res := ToGoName(name)
+	if _, ok := commonInitialisms[res]; ok {
+		return lower(res)
+	}
 	if len(res) <= 1 {
 		return lower(res)
 	}
@@ -263,7 +270,18 @@ func ToGoName(name string) string {
 		}
 		out = append(out, uw)
 	}
-	return strings.Join(out, "")
+
+	result := strings.Join(out, "")
+	if len(result) > 0 {
+		ud := upper(result[:1])
+		ru := []rune(ud)
+		if unicode.IsUpper(ru[0]) {
+			result = ud + result[1:]
+		} else {
+			result = "X" + ud + result[1:]
+		}
+	}
+	return result
 }
 
 // ContainsStringsCI searches a slice of strings for a case-insensitive match

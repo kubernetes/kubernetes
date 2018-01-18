@@ -1,23 +1,24 @@
-package(default_visibility = ["//visibility:public"])
-
-licenses(["notice"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
     srcs = [
         "config.go",
+        "context.go",
+        "context_1_6.go",
+        "context_1_7.go",
         "convert_types.go",
+        "doc.go",
         "errors.go",
+        "jsonvalue.go",
         "logger.go",
         "types.go",
+        "url.go",
+        "url_1_7.go",
         "version.go",
     ],
-    tags = ["automanaged"],
+    importpath = "github.com/aws/aws-sdk-go/aws",
+    visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/aws/aws-sdk-go/aws/awserr:go_default_library",
         "//vendor/github.com/aws/aws-sdk-go/aws/credentials:go_default_library",
@@ -49,4 +50,5 @@ filegroup(
         "//vendor/github.com/aws/aws-sdk-go/aws/signer/v4:all-srcs",
     ],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

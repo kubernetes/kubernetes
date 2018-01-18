@@ -24,16 +24,15 @@ import (
 
 	"github.com/golang/glog"
 
+	authorization "k8s.io/api/authorization/v1beta1"
 	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/cache"
+	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
-	"k8s.io/apiserver/pkg/util/cache"
 	"k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/client-go/kubernetes/scheme"
 	authorizationclient "k8s.io/client-go/kubernetes/typed/authorization/v1beta1"
-	authorization "k8s.io/client-go/pkg/apis/authorization/v1beta1"
-
-	_ "k8s.io/client-go/pkg/apis/authorization/install"
 )
 
 var (
@@ -51,6 +50,7 @@ type WebhookAuthorizer struct {
 	authorizedTTL       time.Duration
 	unauthorizedTTL     time.Duration
 	initialBackoff      time.Duration
+	decisionOnError     authorizer.Decision
 }
 
 // NewFromInterface creates a WebhookAuthorizer using the given subjectAccessReview client
@@ -94,6 +94,7 @@ func newWithBackoff(subjectAccessReview authorizationclient.SubjectAccessReviewI
 		authorizedTTL:       authorizedTTL,
 		unauthorizedTTL:     unauthorizedTTL,
 		initialBackoff:      initialBackoff,
+		decisionOnError:     authorizer.DecisionNoOpinion,
 	}, nil
 }
 
@@ -141,11 +142,15 @@ func newWithBackoff(subjectAccessReview authorizationclient.SubjectAccessReviewI
 //       }
 //     }
 //
-func (w *WebhookAuthorizer) Authorize(attr authorizer.Attributes) (authorized bool, reason string, err error) {
+// TODO(mikedanese): We should eventually support failing closed when we
+// encounter an error. We are failing open now to preserve backwards compatible
+// behavior.
+func (w *WebhookAuthorizer) Authorize(attr authorizer.Attributes) (decision authorizer.Decision, reason string, err error) {
 	r := &authorization.SubjectAccessReview{}
 	if user := attr.GetUser(); user != nil {
 		r.Spec = authorization.SubjectAccessReviewSpec{
 			User:   user.GetName(),
+			UID:    user.GetUID(),
 			Groups: user.GetGroups(),
 			Extra:  convertToSARExtra(user.GetExtra()),
 		}
@@ -169,7 +174,7 @@ func (w *WebhookAuthorizer) Authorize(attr authorizer.Attributes) (authorized bo
 	}
 	key, err := json.Marshal(r.Spec)
 	if err != nil {
-		return false, "", err
+		return w.decisionOnError, "", err
 	}
 	if entry, ok := w.responseCache.Get(string(key)); ok {
 		r.Status = entry.(authorization.SubjectAccessReviewStatus)
@@ -185,7 +190,7 @@ func (w *WebhookAuthorizer) Authorize(attr authorizer.Attributes) (authorized bo
 		if err != nil {
 			// An error here indicates bad configuration or an outage. Log for debugging.
 			glog.Errorf("Failed to make webhook authorizer request: %v", err)
-			return false, "", err
+			return w.decisionOnError, "", err
 		}
 		r.Status = result.Status
 		if r.Status.Allowed {
@@ -194,7 +199,27 @@ func (w *WebhookAuthorizer) Authorize(attr authorizer.Attributes) (authorized bo
 			w.responseCache.Add(string(key), r.Status, w.unauthorizedTTL)
 		}
 	}
-	return r.Status.Allowed, r.Status.Reason, nil
+	switch {
+	case r.Status.Denied && r.Status.Allowed:
+		return authorizer.DecisionDeny, r.Status.Reason, fmt.Errorf("webhook subject access review returned both allow and deny response")
+	case r.Status.Denied:
+		return authorizer.DecisionDeny, r.Status.Reason, nil
+	case r.Status.Allowed:
+		return authorizer.DecisionAllow, r.Status.Reason, nil
+	default:
+		return authorizer.DecisionNoOpinion, r.Status.Reason, nil
+	}
+
+}
+
+//TODO: need to finish the method to get the rules when using webhook mode
+func (w *WebhookAuthorizer) RulesFor(user user.Info, namespace string) ([]authorizer.ResourceRuleInfo, []authorizer.NonResourceRuleInfo, bool, error) {
+	var (
+		resourceRules    []authorizer.ResourceRuleInfo
+		nonResourceRules []authorizer.NonResourceRuleInfo
+	)
+	incomplete := true
+	return resourceRules, nonResourceRules, incomplete, fmt.Errorf("webhook authorizer does not support user rule resolution")
 }
 
 func convertToSARExtra(extra map[string][]string) map[string]authorization.ExtraValue {

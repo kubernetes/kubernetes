@@ -66,21 +66,21 @@ const (
 	// -- The attributes are combined to produce various colors (e.g., Blue + Green will create Cyan).
 	//    Clearing all foreground or background colors results in black; setting all creates white.
 	// See https://msdn.microsoft.com/en-us/library/windows/desktop/ms682088(v=vs.85).aspx#_win32_character_attributes.
-	FOREGROUND_BLUE      WORD = 0x0001
-	FOREGROUND_GREEN     WORD = 0x0002
-	FOREGROUND_RED       WORD = 0x0004
-	FOREGROUND_INTENSITY WORD = 0x0008
-	FOREGROUND_MASK      WORD = 0x000F
+	FOREGROUND_BLUE      uint16 = 0x0001
+	FOREGROUND_GREEN     uint16 = 0x0002
+	FOREGROUND_RED       uint16 = 0x0004
+	FOREGROUND_INTENSITY uint16 = 0x0008
+	FOREGROUND_MASK      uint16 = 0x000F
 
-	BACKGROUND_BLUE      WORD = 0x0010
-	BACKGROUND_GREEN     WORD = 0x0020
-	BACKGROUND_RED       WORD = 0x0040
-	BACKGROUND_INTENSITY WORD = 0x0080
-	BACKGROUND_MASK      WORD = 0x00F0
+	BACKGROUND_BLUE      uint16 = 0x0010
+	BACKGROUND_GREEN     uint16 = 0x0020
+	BACKGROUND_RED       uint16 = 0x0040
+	BACKGROUND_INTENSITY uint16 = 0x0080
+	BACKGROUND_MASK      uint16 = 0x00F0
 
-	COMMON_LVB_MASK          WORD = 0xFF00
-	COMMON_LVB_REVERSE_VIDEO WORD = 0x4000
-	COMMON_LVB_UNDERSCORE    WORD = 0x8000
+	COMMON_LVB_MASK          uint16 = 0xFF00
+	COMMON_LVB_REVERSE_VIDEO uint16 = 0x4000
+	COMMON_LVB_UNDERSCORE    uint16 = 0x8000
 
 	// Input event types
 	// See https://msdn.microsoft.com/en-us/library/windows/desktop/ms683499(v=vs.85).aspx.
@@ -104,60 +104,53 @@ const (
 )
 
 // Windows API Console types
-// -- See https://msdn.microsoft.com/en-us/library/windows/desktop/aa383751(v=vs.85).aspx for core types (e.g., SHORT)
 // -- See https://msdn.microsoft.com/en-us/library/windows/desktop/ms682101(v=vs.85).aspx for Console specific types (e.g., COORD)
 // -- See https://msdn.microsoft.com/en-us/library/aa296569(v=vs.60).aspx for comments on alignment
 type (
-	SHORT int16
-	BOOL  int32
-	WORD  uint16
-	WCHAR uint16
-	DWORD uint32
-
 	CHAR_INFO struct {
-		UnicodeChar WCHAR
-		Attributes  WORD
+		UnicodeChar uint16
+		Attributes  uint16
 	}
 
 	CONSOLE_CURSOR_INFO struct {
-		Size    DWORD
-		Visible BOOL
+		Size    uint32
+		Visible int32
 	}
 
 	CONSOLE_SCREEN_BUFFER_INFO struct {
 		Size              COORD
 		CursorPosition    COORD
-		Attributes        WORD
+		Attributes        uint16
 		Window            SMALL_RECT
 		MaximumWindowSize COORD
 	}
 
 	COORD struct {
-		X SHORT
-		Y SHORT
+		X int16
+		Y int16
 	}
 
 	SMALL_RECT struct {
-		Left   SHORT
-		Top    SHORT
-		Right  SHORT
-		Bottom SHORT
+		Left   int16
+		Top    int16
+		Right  int16
+		Bottom int16
 	}
 
 	// INPUT_RECORD is a C/C++ union of which KEY_EVENT_RECORD is one case, it is also the largest
 	// See https://msdn.microsoft.com/en-us/library/windows/desktop/ms683499(v=vs.85).aspx.
 	INPUT_RECORD struct {
-		EventType WORD
+		EventType uint16
 		KeyEvent  KEY_EVENT_RECORD
 	}
 
 	KEY_EVENT_RECORD struct {
-		KeyDown         BOOL
-		RepeatCount     WORD
-		VirtualKeyCode  WORD
-		VirtualScanCode WORD
-		UnicodeChar     WCHAR
-		ControlKeyState DWORD
+		KeyDown         int32
+		RepeatCount     uint16
+		VirtualKeyCode  uint16
+		VirtualScanCode uint16
+		UnicodeChar     uint16
+		ControlKeyState uint32
 	}
 
 	WINDOW_BUFFER_SIZE struct {
@@ -165,12 +158,12 @@ type (
 	}
 )
 
-// boolToBOOL converts a Go bool into a Windows BOOL.
-func boolToBOOL(f bool) BOOL {
+// boolToBOOL converts a Go bool into a Windows int32.
+func boolToBOOL(f bool) int32 {
 	if f {
-		return BOOL(1)
+		return int32(1)
 	} else {
-		return BOOL(0)
+		return int32(0)
 	}
 }
 
@@ -242,7 +235,7 @@ func SetConsoleScreenBufferSize(handle uintptr, coord COORD) error {
 // SetConsoleTextAttribute sets the attributes of characters written to the
 // console screen buffer by the WriteFile or WriteConsole function.
 // See http://msdn.microsoft.com/en-us/library/windows/desktop/ms686047(v=vs.85).aspx.
-func SetConsoleTextAttribute(handle uintptr, attribute WORD) error {
+func SetConsoleTextAttribute(handle uintptr, attribute uint16) error {
 	r1, r2, err := setConsoleTextAttributeProc.Call(handle, uintptr(attribute), 0)
 	use(attribute)
 	return checkError(r1, r2, err)
@@ -280,7 +273,7 @@ func ReadConsoleInput(handle uintptr, buffer []INPUT_RECORD, count *uint32) erro
 // It returns true if the handle was signaled; false otherwise.
 // See https://msdn.microsoft.com/en-us/library/windows/desktop/ms687032(v=vs.85).aspx.
 func WaitForSingleObject(handle uintptr, msWait uint32) (bool, error) {
-	r1, _, err := waitForSingleObjectProc.Call(handle, uintptr(DWORD(msWait)))
+	r1, _, err := waitForSingleObjectProc.Call(handle, uintptr(uint32(msWait)))
 	switch r1 {
 	case WAIT_ABANDONED, WAIT_TIMEOUT:
 		return false, nil
@@ -320,8 +313,8 @@ func checkError(r1, r2 uintptr, err error) error {
 
 // coordToPointer converts a COORD into a uintptr (by fooling the type system).
 func coordToPointer(c COORD) uintptr {
-	// Note: This code assumes the two SHORTs are correctly laid out; the "cast" to DWORD is just to get a pointer to pass.
-	return uintptr(*((*DWORD)(unsafe.Pointer(&c))))
+	// Note: This code assumes the two SHORTs are correctly laid out; the "cast" to uint32 is just to get a pointer to pass.
+	return uintptr(*((*uint32)(unsafe.Pointer(&c))))
 }
 
 // use is a no-op, but the compiler cannot see that it is.

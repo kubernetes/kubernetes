@@ -23,6 +23,7 @@ import (
 	"net/http"
 	"sync"
 
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 )
 
@@ -40,6 +41,7 @@ type instanceInfo struct {
 // GetZone returns the Zone containing the current failure zone and locality region that the program is running in
 func (az *Cloud) GetZone() (cloudprovider.Zone, error) {
 	faultMutex.Lock()
+	defer faultMutex.Unlock()
 	if faultDomain == nil {
 		var err error
 		faultDomain, err = fetchFaultDomain()
@@ -51,8 +53,26 @@ func (az *Cloud) GetZone() (cloudprovider.Zone, error) {
 		FailureDomain: *faultDomain,
 		Region:        az.Location,
 	}
-	faultMutex.Unlock()
 	return zone, nil
+}
+
+// GetZoneByProviderID implements Zones.GetZoneByProviderID
+// This is particularly useful in external cloud providers where the kubelet
+// does not initialize node data.
+func (az *Cloud) GetZoneByProviderID(providerID string) (cloudprovider.Zone, error) {
+	nodeName, err := az.vmSet.GetNodeNameByProviderID(providerID)
+	if err != nil {
+		return cloudprovider.Zone{}, err
+	}
+
+	return az.GetZoneByNodeName(nodeName)
+}
+
+// GetZoneByNodeName implements Zones.GetZoneByNodeName
+// This is particularly useful in external cloud providers where the kubelet
+// does not initialize node data.
+func (az *Cloud) GetZoneByNodeName(nodeName types.NodeName) (cloudprovider.Zone, error) {
+	return az.vmSet.GetZoneByNodeName(string(nodeName))
 }
 
 func fetchFaultDomain() (*string, error) {

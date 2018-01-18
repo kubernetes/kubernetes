@@ -60,9 +60,9 @@ func (c ErrorCode) String() string {
 type Error interface {
 	error
 
-	// Returns a verbose string including the error message
-	// and a representation of the stack trace suitable for
-	// printing.
+	// Returns an error if it failed to write the detail of the Error to w.
+	// The detail of the Error may include the error message and a
+	// representation of the stack trace.
 	Detail(w io.Writer) error
 
 	// Returns the error code for this error.

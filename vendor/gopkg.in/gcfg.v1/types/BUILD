@@ -1,11 +1,4 @@
-package(default_visibility = ["//visibility:public"])
-
-licenses(["notice"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
@@ -16,7 +9,8 @@ go_library(
         "int.go",
         "scan.go",
     ],
-    tags = ["automanaged"],
+    importpath = "gopkg.in/gcfg.v1/types",
+    visibility = ["//visibility:public"],
 )
 
 filegroup(
@@ -30,4 +24,5 @@ filegroup(
     name = "all-srcs",
     srcs = [":package-srcs"],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

@@ -21,61 +21,64 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"reflect"
+	"strings"
 	"sync"
 	"testing"
 
+	authenticationapi "k8s.io/api/authentication/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/endpoints/request"
-	authenticationapi "k8s.io/client-go/pkg/apis/authentication"
 )
 
 type impersonateAuthorizer struct{}
 
-func (impersonateAuthorizer) Authorize(a authorizer.Attributes) (authorized bool, reason string, err error) {
+func (impersonateAuthorizer) Authorize(a authorizer.Attributes) (authorized authorizer.Decision, reason string, err error) {
 	user := a.GetUser()
 
 	switch {
 	case user.GetName() == "system:admin":
-		return true, "", nil
+		return authorizer.DecisionAllow, "", nil
 
 	case user.GetName() == "tester":
-		return false, "", fmt.Errorf("works on my machine")
+		return authorizer.DecisionNoOpinion, "", fmt.Errorf("works on my machine")
 
 	case user.GetName() == "deny-me":
-		return false, "denied", nil
+		return authorizer.DecisionNoOpinion, "denied", nil
 	}
 
 	if len(user.GetGroups()) > 0 && user.GetGroups()[0] == "wheel" && a.GetVerb() == "impersonate" && a.GetResource() == "users" {
-		return true, "", nil
+		return authorizer.DecisionAllow, "", nil
 	}
 
 	if len(user.GetGroups()) > 0 && user.GetGroups()[0] == "sa-impersonater" && a.GetVerb() == "impersonate" && a.GetResource() == "serviceaccounts" {
-		return true, "", nil
+		return authorizer.DecisionAllow, "", nil
 	}
 
 	if len(user.GetGroups()) > 0 && user.GetGroups()[0] == "regular-impersonater" && a.GetVerb() == "impersonate" && a.GetResource() == "users" {
-		return true, "", nil
+		return authorizer.DecisionAllow, "", nil
 	}
 
 	if len(user.GetGroups()) > 1 && user.GetGroups()[1] == "group-impersonater" && a.GetVerb() == "impersonate" && a.GetResource() == "groups" {
-		return true, "", nil
+		return authorizer.DecisionAllow, "", nil
 	}
 
 	if len(user.GetGroups()) > 1 && user.GetGroups()[1] == "extra-setter-scopes" && a.GetVerb() == "impersonate" && a.GetResource() == "userextras" && a.GetSubresource() == "scopes" {
-		return true, "", nil
+		return authorizer.DecisionAllow, "", nil
 	}
 
 	if len(user.GetGroups()) > 1 && user.GetGroups()[1] == "extra-setter-particular-scopes" &&
 		a.GetVerb() == "impersonate" && a.GetResource() == "userextras" && a.GetSubresource() == "scopes" && a.GetName() == "scope-a" {
-		return true, "", nil
+		return authorizer.DecisionAllow, "", nil
 	}
 
 	if len(user.GetGroups()) > 1 && user.GetGroups()[1] == "extra-setter-project" && a.GetVerb() == "impersonate" && a.GetResource() == "userextras" && a.GetSubresource() == "project" {
-		return true, "", nil
+		return authorizer.DecisionAllow, "", nil
 	}
 
-	return false, "deny by default", nil
+	return authorizer.DecisionNoOpinion, "deny by default", nil
 }
 
 func TestImpersonationFilter(t *testing.T) {
@@ -319,6 +322,19 @@ func TestImpersonationFilter(t *testing.T) {
 		}
 
 		actualUser = user
+
+		if _, ok := req.Header[authenticationapi.ImpersonateUserHeader]; ok {
+			t.Fatal("user header still present")
+		}
+		if _, ok := req.Header[authenticationapi.ImpersonateGroupHeader]; ok {
+			t.Fatal("group header still present")
+		}
+		for key := range req.Header {
+			if strings.HasPrefix(key, authenticationapi.ImpersonateUserExtraHeaderPrefix) {
+				t.Fatalf("extra header still present: %v", key)
+			}
+		}
+
 	})
 	handler := func(delegate http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
@@ -342,7 +358,7 @@ func TestImpersonationFilter(t *testing.T) {
 
 			delegate.ServeHTTP(w, req)
 		})
-	}(WithImpersonation(doNothingHandler, requestContextMapper, impersonateAuthorizer{}))
+	}(WithImpersonation(doNothingHandler, requestContextMapper, impersonateAuthorizer{}, serializer.NewCodecFactory(runtime.NewScheme())))
 	handler = request.WithRequestContext(handler, requestContextMapper)
 
 	server := httptest.NewServer(handler)
@@ -360,7 +376,9 @@ func TestImpersonationFilter(t *testing.T) {
 			t.Errorf("%s: unexpected error: %v", tc.name, err)
 			continue
 		}
-		req.Header.Add(authenticationapi.ImpersonateUserHeader, tc.impersonationUser)
+		if len(tc.impersonationUser) > 0 {
+			req.Header.Add(authenticationapi.ImpersonateUserHeader, tc.impersonationUser)
+		}
 		for _, group := range tc.impersonationGroups {
 			req.Header.Add(authenticationapi.ImpersonateGroupHeader, group)
 		}

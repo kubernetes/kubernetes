@@ -17,8 +17,8 @@ limitations under the License.
 package cm
 
 import (
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/api/v1"
 )
 
 // ResourceConfig holds information about all the supported cgroup resource parameters.
@@ -26,11 +26,13 @@ type ResourceConfig struct {
 	// Memory limit (in bytes).
 	Memory *int64
 	// CPU shares (relative weight vs. other containers).
-	CpuShares *int64
+	CpuShares *uint64
 	// CPU hardcap limit (in usecs). Allowed cpu time in a given period.
 	CpuQuota *int64
 	// CPU quota period.
-	CpuPeriod *int64
+	CpuPeriod *uint64
+	// HugePageLimit map from page size (in bytes) to limit (in bytes)
+	HugePageLimit map[int64]int64
 }
 
 // CgroupName is the abstract name of a cgroup prior to any driver specific conversion.
@@ -47,13 +49,13 @@ type CgroupConfig struct {
 	ResourceParameters *ResourceConfig
 }
 
-// MemoryStats holds the on-demand stastistics from the memory cgroup
+// MemoryStats holds the on-demand statistics from the memory cgroup
 type MemoryStats struct {
 	// Memory usage (in bytes).
 	Usage int64
 }
 
-// ResourceStats holds on-demand stastistics from various cgroup subsystems
+// ResourceStats holds on-demand statistics from various cgroup subsystems
 type ResourceStats struct {
 	// Memory statistics.
 	MemoryStats *MemoryStats
@@ -80,7 +82,7 @@ type CgroupManager interface {
 	Name(name CgroupName) string
 	// CgroupName converts the literal cgroupfs name on the host to an internal identifier.
 	CgroupName(name string) CgroupName
-	// Pids scans through all subsytems to find pids associated with specified cgroup.
+	// Pids scans through all subsystems to find pids associated with specified cgroup.
 	Pids(name CgroupName) []int
 	// ReduceCPULimits reduces the CPU CFS values to the minimum amount of shares.
 	ReduceCPULimits(cgroupName CgroupName) error
@@ -99,12 +101,12 @@ type QOSContainersInfo struct {
 // The Pod workers interact with the PodContainerManager to create and destroy
 // containers for the pod.
 type PodContainerManager interface {
-	// GetPodContainerName returns the CgroupName identifer, and its literal cgroupfs form on the host.
+	// GetPodContainerName returns the CgroupName identifier, and its literal cgroupfs form on the host.
 	GetPodContainerName(*v1.Pod) (CgroupName, string)
 
 	// EnsureExists takes a pod as argument and makes sure that
 	// pod cgroup exists if qos cgroup hierarchy flag is enabled.
-	// If the pod cgroup doesen't already exist this method creates it.
+	// If the pod cgroup doesn't already exist this method creates it.
 	EnsureExists(*v1.Pod) error
 
 	// Exists returns true if the pod cgroup exists.

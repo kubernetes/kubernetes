@@ -85,14 +85,10 @@ func (p Port) Port() string {
 // Int returns the port number of a Port as an int
 func (p Port) Int() int {
 	portStr := p.Port()
-	if len(portStr) == 0 {
-		return 0
-	}
-
 	// We don't need to check for an error because we're going to
 	// assume that any error would have been found, and reported, in NewPort()
-	port, _ := strconv.ParseUint(portStr, 10, 16)
-	return int(port)
+	port, _ := ParsePort(portStr)
+	return port
 }
 
 // Range returns the start/end port numbers of a Port range as ints
@@ -132,92 +128,115 @@ func ParsePortSpecs(ports []string) (map[Port]struct{}, map[Port][]PortBinding, 
 		exposedPorts = make(map[Port]struct{}, len(ports))
 		bindings     = make(map[Port][]PortBinding)
 	)
-
 	for _, rawPort := range ports {
-		proto := "tcp"
-
-		if i := strings.LastIndex(rawPort, "/"); i != -1 {
-			proto = rawPort[i+1:]
-			rawPort = rawPort[:i]
-		}
-		if !strings.Contains(rawPort, ":") {
-			rawPort = fmt.Sprintf("::%s", rawPort)
-		} else if len(strings.Split(rawPort, ":")) == 2 {
-			rawPort = fmt.Sprintf(":%s", rawPort)
-		}
-
-		parts, err := PartParser(portSpecTemplate, rawPort)
+		portMappings, err := ParsePortSpec(rawPort)
 		if err != nil {
 			return nil, nil, err
 		}
 
-		var (
-			containerPort = parts["containerPort"]
-			rawIP         = parts["ip"]
-			hostPort      = parts["hostPort"]
-		)
-
-		if rawIP != "" && net.ParseIP(rawIP) == nil {
-			return nil, nil, fmt.Errorf("Invalid ip address: %s", rawIP)
-		}
-		if containerPort == "" {
-			return nil, nil, fmt.Errorf("No port specified: %s<empty>", rawPort)
-		}
-
-		startPort, endPort, err := ParsePortRange(containerPort)
-		if err != nil {
-			return nil, nil, fmt.Errorf("Invalid containerPort: %s", containerPort)
-		}
-
-		var startHostPort, endHostPort uint64 = 0, 0
-		if len(hostPort) > 0 {
-			startHostPort, endHostPort, err = ParsePortRange(hostPort)
-			if err != nil {
-				return nil, nil, fmt.Errorf("Invalid hostPort: %s", hostPort)
-			}
-		}
-
-		if hostPort != "" && (endPort-startPort) != (endHostPort-startHostPort) {
-			// Allow host port range iff containerPort is not a range.
-			// In this case, use the host port range as the dynamic
-			// host port range to allocate into.
-			if endPort != startPort {
-				return nil, nil, fmt.Errorf("Invalid ranges specified for container and host Ports: %s and %s", containerPort, hostPort)
-			}
-		}
-
-		if !validateProto(strings.ToLower(proto)) {
-			return nil, nil, fmt.Errorf("Invalid proto: %s", proto)
-		}
-
-		for i := uint64(0); i <= (endPort - startPort); i++ {
-			containerPort = strconv.FormatUint(startPort+i, 10)
-			if len(hostPort) > 0 {
-				hostPort = strconv.FormatUint(startHostPort+i, 10)
-			}
-			// Set hostPort to a range only if there is a single container port
-			// and a dynamic host port.
-			if startPort == endPort && startHostPort != endHostPort {
-				hostPort = fmt.Sprintf("%s-%s", hostPort, strconv.FormatUint(endHostPort, 10))
-			}
-			port, err := NewPort(strings.ToLower(proto), containerPort)
-			if err != nil {
-				return nil, nil, err
-			}
+		for _, portMapping := range portMappings {
+			port := portMapping.Port
 			if _, exists := exposedPorts[port]; !exists {
 				exposedPorts[port] = struct{}{}
-			}
-
-			binding := PortBinding{
-				HostIP:   rawIP,
-				HostPort: hostPort,
 			}
 			bslice, exists := bindings[port]
 			if !exists {
 				bslice = []PortBinding{}
 			}
-			bindings[port] = append(bslice, binding)
+			bindings[port] = append(bslice, portMapping.Binding)
 		}
 	}
 	return exposedPorts, bindings, nil
+}
+
+// PortMapping is a data object mapping a Port to a PortBinding
+type PortMapping struct {
+	Port    Port
+	Binding PortBinding
+}
+
+func splitParts(rawport string) (string, string, string) {
+	parts := strings.Split(rawport, ":")
+	n := len(parts)
+	containerport := parts[n-1]
+
+	switch n {
+	case 1:
+		return "", "", containerport
+	case 2:
+		return "", parts[0], containerport
+	case 3:
+		return parts[0], parts[1], containerport
+	default:
+		return strings.Join(parts[:n-2], ":"), parts[n-2], containerport
+	}
+}
+
+// ParsePortSpec parses a port specification string into a slice of PortMappings
+func ParsePortSpec(rawPort string) ([]PortMapping, error) {
+	var proto string
+	rawIP, hostPort, containerPort := splitParts(rawPort)
+	proto, containerPort = SplitProtoPort(containerPort)
+
+	// Strip [] from IPV6 addresses
+	ip, _, err := net.SplitHostPort(rawIP + ":")
+	if err != nil {
+		return nil, fmt.Errorf("Invalid ip address %v: %s", rawIP, err)
+	}
+	if ip != "" && net.ParseIP(ip) == nil {
+		return nil, fmt.Errorf("Invalid ip address: %s", ip)
+	}
+	if containerPort == "" {
+		return nil, fmt.Errorf("No port specified: %s<empty>", rawPort)
+	}
+
+	startPort, endPort, err := ParsePortRange(containerPort)
+	if err != nil {
+		return nil, fmt.Errorf("Invalid containerPort: %s", containerPort)
+	}
+
+	var startHostPort, endHostPort uint64 = 0, 0
+	if len(hostPort) > 0 {
+		startHostPort, endHostPort, err = ParsePortRange(hostPort)
+		if err != nil {
+			return nil, fmt.Errorf("Invalid hostPort: %s", hostPort)
+		}
+	}
+
+	if hostPort != "" && (endPort-startPort) != (endHostPort-startHostPort) {
+		// Allow host port range iff containerPort is not a range.
+		// In this case, use the host port range as the dynamic
+		// host port range to allocate into.
+		if endPort != startPort {
+			return nil, fmt.Errorf("Invalid ranges specified for container and host Ports: %s and %s", containerPort, hostPort)
+		}
+	}
+
+	if !validateProto(strings.ToLower(proto)) {
+		return nil, fmt.Errorf("Invalid proto: %s", proto)
+	}
+
+	ports := []PortMapping{}
+	for i := uint64(0); i <= (endPort - startPort); i++ {
+		containerPort = strconv.FormatUint(startPort+i, 10)
+		if len(hostPort) > 0 {
+			hostPort = strconv.FormatUint(startHostPort+i, 10)
+		}
+		// Set hostPort to a range only if there is a single container port
+		// and a dynamic host port.
+		if startPort == endPort && startHostPort != endHostPort {
+			hostPort = fmt.Sprintf("%s-%s", hostPort, strconv.FormatUint(endHostPort, 10))
+		}
+		port, err := NewPort(strings.ToLower(proto), containerPort)
+		if err != nil {
+			return nil, err
+		}
+
+		binding := PortBinding{
+			HostIP:   ip,
+			HostPort: hostPort,
+		}
+		ports = append(ports, PortMapping{Port: port, Binding: binding})
+	}
+	return ports, nil
 }

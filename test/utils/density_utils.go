@@ -22,11 +22,11 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	clientset "k8s.io/client-go/kubernetes"
 )
 
 const (
@@ -42,7 +42,7 @@ func AddLabelsToNode(c clientset.Interface, nodeName string, labels map[string]s
 	patch := fmt.Sprintf(`{"metadata":{"labels":%v}}`, labelString)
 	var err error
 	for attempt := 0; attempt < retries; attempt++ {
-		_, err = c.Core().Nodes().Patch(nodeName, types.MergePatchType, []byte(patch))
+		_, err = c.CoreV1().Nodes().Patch(nodeName, types.MergePatchType, []byte(patch))
 		if err != nil {
 			if !apierrs.IsConflict(err) {
 				return err
@@ -61,7 +61,7 @@ func RemoveLabelOffNode(c clientset.Interface, nodeName string, labelKeys []stri
 	var node *v1.Node
 	var err error
 	for attempt := 0; attempt < retries; attempt++ {
-		node, err = c.Core().Nodes().Get(nodeName, metav1.GetOptions{})
+		node, err = c.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
@@ -74,7 +74,7 @@ func RemoveLabelOffNode(c clientset.Interface, nodeName string, labelKeys []stri
 			}
 			delete(node.Labels, labelKey)
 		}
-		_, err = c.Core().Nodes().Update(node)
+		_, err = c.CoreV1().Nodes().Update(node)
 		if err != nil {
 			if !apierrs.IsConflict(err) {
 				return err
@@ -92,7 +92,7 @@ func RemoveLabelOffNode(c clientset.Interface, nodeName string, labelKeys []stri
 // VerifyLabelsRemoved checks if Node for given nodeName does not have any of labels from labelKeys.
 // Return non-nil error if it does.
 func VerifyLabelsRemoved(c clientset.Interface, nodeName string, labelKeys []string) error {
-	node, err := c.Core().Nodes().Get(nodeName, metav1.GetOptions{})
+	node, err := c.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}

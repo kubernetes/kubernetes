@@ -24,17 +24,17 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/api/core/v1"
+	"k8s.io/api/policy/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/informers"
+	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/apis/policy/v1beta1"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
 	"k8s.io/kubernetes/pkg/controller/disruption"
 	"k8s.io/kubernetes/test/integration/framework"
 )
@@ -48,8 +48,8 @@ const (
 func TestConcurrentEvictionRequests(t *testing.T) {
 	podNameFormat := "test-pod-%d"
 
-	s, rm, informers, clientSet := rmSetup(t)
-	defer s.Close()
+	s, closeFn, rm, informers, clientSet := rmSetup(t)
+	defer closeFn()
 
 	ns := framework.CreateTestingNamespace("concurrent-eviction-requests", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
@@ -75,12 +75,12 @@ func TestConcurrentEvictionRequests(t *testing.T) {
 		podName := fmt.Sprintf(podNameFormat, i)
 		pod := newPod(podName)
 
-		if _, err := clientSet.Core().Pods(ns.Name).Create(pod); err != nil {
+		if _, err := clientSet.CoreV1().Pods(ns.Name).Create(pod); err != nil {
 			t.Errorf("Failed to create pod: %v", err)
 		}
 
 		addPodConditionReady(pod)
-		if _, err := clientSet.Core().Pods(ns.Name).UpdateStatus(pod); err != nil {
+		if _, err := clientSet.CoreV1().Pods(ns.Name).UpdateStatus(pod); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -124,7 +124,7 @@ func TestConcurrentEvictionRequests(t *testing.T) {
 				// should not return here otherwise we would leak the pod
 			}
 
-			_, err = clientSet.Core().Pods(ns.Name).Get(podName, metav1.GetOptions{})
+			_, err = clientSet.CoreV1().Pods(ns.Name).Get(podName, metav1.GetOptions{})
 			switch {
 			case errors.IsNotFound(err):
 				atomic.AddUint32(&numberPodsEvicted, 1)
@@ -138,7 +138,7 @@ func TestConcurrentEvictionRequests(t *testing.T) {
 			}
 
 			// delete pod which still exists due to error
-			e := clientSet.Core().Pods(ns.Name).Delete(podName, deleteOption)
+			e := clientSet.CoreV1().Pods(ns.Name).Delete(podName, deleteOption)
 			if e != nil {
 				errCh <- e
 			}
@@ -200,7 +200,7 @@ func newPDB() *v1beta1.PodDisruptionBudget {
 			Name: "test-pdb",
 		},
 		Spec: v1beta1.PodDisruptionBudgetSpec{
-			MinAvailable: intstr.IntOrString{
+			MinAvailable: &intstr.IntOrString{
 				Type:   intstr.Int,
 				IntVal: 0,
 			},
@@ -225,9 +225,9 @@ func newEviction(ns, evictionName string, deleteOption *metav1.DeleteOptions) *v
 	}
 }
 
-func rmSetup(t *testing.T) (*httptest.Server, *disruption.DisruptionController, informers.SharedInformerFactory, clientset.Interface) {
+func rmSetup(t *testing.T) (*httptest.Server, framework.CloseFunc, *disruption.DisruptionController, informers.SharedInformerFactory, clientset.Interface) {
 	masterConfig := framework.NewIntegrationTestMasterConfig()
-	_, s := framework.RunAMaster(masterConfig)
+	_, s, closeFn := framework.RunAMaster(masterConfig)
 
 	config := restclient.Config{Host: s.URL}
 	clientSet, err := clientset.NewForConfig(&config)
@@ -246,7 +246,7 @@ func rmSetup(t *testing.T) (*httptest.Server, *disruption.DisruptionController, 
 		informers.Apps().V1beta1().StatefulSets(),
 		clientset.NewForConfigOrDie(restclient.AddUserAgent(&config, "disruption-controller")),
 	)
-	return s, rm, informers, clientSet
+	return s, closeFn, rm, informers, clientSet
 }
 
 // wait for the podInformer to observe the pods. Call this function before

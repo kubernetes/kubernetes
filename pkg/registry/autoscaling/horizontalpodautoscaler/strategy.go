@@ -17,16 +17,11 @@ limitations under the License.
 package horizontalpodautoscaler
 
 import (
-	"fmt"
-
-	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/autoscaling/validation"
 )
@@ -39,7 +34,7 @@ type autoscalerStrategy struct {
 
 // Strategy is the default logic that applies when creating and updating HorizontalPodAutoscaler
 // objects via the REST API.
-var Strategy = autoscalerStrategy{api.Scheme, names.SimpleNameGenerator}
+var Strategy = autoscalerStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
 
 // NamespaceScoped is true for autoscaler.
 func (autoscalerStrategy) NamespaceScoped() bool {
@@ -84,27 +79,6 @@ func (autoscalerStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old
 
 func (autoscalerStrategy) AllowUnconditionalUpdate() bool {
 	return true
-}
-
-func AutoscalerToSelectableFields(hpa *autoscaling.HorizontalPodAutoscaler) fields.Set {
-	return nil
-}
-
-// GetAttrs returns labels and fields of a given object for filtering purposes.
-func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
-	hpa, ok := obj.(*autoscaling.HorizontalPodAutoscaler)
-	if !ok {
-		return nil, nil, fmt.Errorf("given object is not a horizontal pod autoscaler.")
-	}
-	return labels.Set(hpa.ObjectMeta.Labels), AutoscalerToSelectableFields(hpa), nil
-}
-
-func MatchAutoscaler(label labels.Selector, field fields.Selector) storage.SelectionPredicate {
-	return storage.SelectionPredicate{
-		Label:    label,
-		Field:    field,
-		GetAttrs: GetAttrs,
-	}
 }
 
 type autoscalerStatusStrategy struct {

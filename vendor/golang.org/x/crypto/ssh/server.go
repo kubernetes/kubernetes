@@ -10,26 +10,38 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"strings"
 )
 
 // The Permissions type holds fine-grained permissions that are
-// specific to a user or a specific authentication method for a
-// user. Permissions, except for "source-address", must be enforced in
-// the server application layer, after successful authentication. The
-// Permissions are passed on in ServerConn so a server implementation
-// can honor them.
+// specific to a user or a specific authentication method for a user.
+// The Permissions value for a successful authentication attempt is
+// available in ServerConn, so it can be used to pass information from
+// the user-authentication phase to the application layer.
 type Permissions struct {
-	// Critical options restrict default permissions. Common
-	// restrictions are "source-address" and "force-command". If
-	// the server cannot enforce the restriction, or does not
-	// recognize it, the user should not authenticate.
+	// CriticalOptions indicate restrictions to the default
+	// permissions, and are typically used in conjunction with
+	// user certificates. The standard for SSH certificates
+	// defines "force-command" (only allow the given command to
+	// execute) and "source-address" (only allow connections from
+	// the given address). The SSH package currently only enforces
+	// the "source-address" critical option. It is up to server
+	// implementations to enforce other critical options, such as
+	// "force-command", by checking them after the SSH handshake
+	// is successful. In general, SSH servers should reject
+	// connections that specify critical options that are unknown
+	// or not supported.
 	CriticalOptions map[string]string
 
 	// Extensions are extra functionality that the server may
-	// offer on authenticated connections. Common extensions are
-	// "permit-agent-forwarding", "permit-X11-forwarding". Lack of
-	// support for an extension does not preclude authenticating a
-	// user.
+	// offer on authenticated connections. Lack of support for an
+	// extension does not preclude authenticating a user. Common
+	// extensions are "permit-agent-forwarding",
+	// "permit-X11-forwarding". The Go SSH library currently does
+	// not act on any extension, and it is up to server
+	// implementations to honor them. Extensions can be used to
+	// pass data from the authentication callbacks to the server
+	// application layer.
 	Extensions map[string]string
 }
 
@@ -44,13 +56,24 @@ type ServerConfig struct {
 	// authenticating.
 	NoClientAuth bool
 
+	// MaxAuthTries specifies the maximum number of authentication attempts
+	// permitted per connection. If set to a negative number, the number of
+	// attempts are unlimited. If set to zero, the number of attempts are limited
+	// to 6.
+	MaxAuthTries int
+
 	// PasswordCallback, if non-nil, is called when a user
 	// attempts to authenticate using a password.
 	PasswordCallback func(conn ConnMetadata, password []byte) (*Permissions, error)
 
-	// PublicKeyCallback, if non-nil, is called when a client attempts public
-	// key authentication. It must return true if the given public key is
-	// valid for the given user. For example, see CertChecker.Authenticate.
+	// PublicKeyCallback, if non-nil, is called when a client
+	// offers a public key for authentication. It must return a nil error
+	// if the given public key can be used to authenticate the
+	// given user. For example, see CertChecker.Authenticate. A
+	// call to this function does not guarantee that the key
+	// offered is in fact used to authenticate. To record any data
+	// depending on the public key, store it inside a
+	// Permissions.Extensions entry.
 	PublicKeyCallback func(conn ConnMetadata, key PublicKey) (*Permissions, error)
 
 	// KeyboardInteractiveCallback, if non-nil, is called when
@@ -142,6 +165,10 @@ type ServerConn struct {
 func NewServerConn(c net.Conn, config *ServerConfig) (*ServerConn, <-chan NewChannel, <-chan *Request, error) {
 	fullConf := *config
 	fullConf.SetDefaults()
+	if fullConf.MaxAuthTries == 0 {
+		fullConf.MaxAuthTries = 6
+	}
+
 	s := &connection{
 		sshConn: sshConn{conn: c},
 	}
@@ -188,7 +215,7 @@ func (s *connection) serverHandshake(config *ServerConfig) (*Permissions, error)
 	tr := newTransport(s.sshConn.conn, config.Rand, false /* not client */)
 	s.transport = newServerTransport(tr, s.clientVersion, s.serverVersion, config)
 
-	if err := s.transport.requestInitialKeyChange(); err != nil {
+	if err := s.transport.waitSession(); err != nil {
 		return nil, err
 	}
 
@@ -231,7 +258,7 @@ func isAcceptableAlgo(algo string) bool {
 	return false
 }
 
-func checkSourceAddress(addr net.Addr, sourceAddr string) error {
+func checkSourceAddress(addr net.Addr, sourceAddrs string) error {
 	if addr == nil {
 		return errors.New("ssh: no address known for client, but source-address match required")
 	}
@@ -241,33 +268,71 @@ func checkSourceAddress(addr net.Addr, sourceAddr string) error {
 		return fmt.Errorf("ssh: remote address %v is not an TCP address when checking source-address match", addr)
 	}
 
-	if allowedIP := net.ParseIP(sourceAddr); allowedIP != nil {
-		if bytes.Equal(allowedIP, tcpAddr.IP) {
-			return nil
-		}
-	} else {
-		_, ipNet, err := net.ParseCIDR(sourceAddr)
-		if err != nil {
-			return fmt.Errorf("ssh: error parsing source-address restriction %q: %v", sourceAddr, err)
-		}
+	for _, sourceAddr := range strings.Split(sourceAddrs, ",") {
+		if allowedIP := net.ParseIP(sourceAddr); allowedIP != nil {
+			if allowedIP.Equal(tcpAddr.IP) {
+				return nil
+			}
+		} else {
+			_, ipNet, err := net.ParseCIDR(sourceAddr)
+			if err != nil {
+				return fmt.Errorf("ssh: error parsing source-address restriction %q: %v", sourceAddr, err)
+			}
 
-		if ipNet.Contains(tcpAddr.IP) {
-			return nil
+			if ipNet.Contains(tcpAddr.IP) {
+				return nil
+			}
 		}
 	}
 
 	return fmt.Errorf("ssh: remote address %v is not allowed because of source-address restriction", addr)
 }
 
+// ServerAuthError implements the error interface. It appends any authentication
+// errors that may occur, and is returned if all of the authentication methods
+// provided by the user failed to authenticate.
+type ServerAuthError struct {
+	// Errors contains authentication errors returned by the authentication
+	// callback methods.
+	Errors []error
+}
+
+func (l ServerAuthError) Error() string {
+	var errs []string
+	for _, err := range l.Errors {
+		errs = append(errs, err.Error())
+	}
+	return "[" + strings.Join(errs, ", ") + "]"
+}
+
 func (s *connection) serverAuthenticate(config *ServerConfig) (*Permissions, error) {
-	var err error
+	sessionID := s.transport.getSessionID()
 	var cache pubKeyCache
 	var perms *Permissions
 
+	authFailures := 0
+	var authErrs []error
+
 userAuthLoop:
 	for {
+		if authFailures >= config.MaxAuthTries && config.MaxAuthTries > 0 {
+			discMsg := &disconnectMsg{
+				Reason:  2,
+				Message: "too many authentication failures",
+			}
+
+			if err := s.transport.writePacket(Marshal(discMsg)); err != nil {
+				return nil, err
+			}
+
+			return nil, discMsg
+		}
+
 		var userAuthReq userAuthRequestMsg
 		if packet, err := s.transport.readPacket(); err != nil {
+			if err == io.EOF {
+				return nil, &ServerAuthError{Errors: authErrs}
+			}
 			return nil, err
 		} else if err = Unmarshal(packet, &userAuthReq); err != nil {
 			return nil, err
@@ -285,6 +350,11 @@ userAuthLoop:
 		case "none":
 			if config.NoClientAuth {
 				authErr = nil
+			}
+
+			// allow initial attempt of 'none' without penalty
+			if authFailures == 0 {
+				authFailures--
 			}
 		case "password":
 			if config.PasswordCallback == nil {
@@ -357,6 +427,7 @@ userAuthLoop:
 			if isQuery {
 				// The client can query if the given public key
 				// would be okay.
+
 				if len(payload) > 0 {
 					return nil, parseError(msgUserAuthRequest)
 				}
@@ -385,7 +456,7 @@ userAuthLoop:
 				if !isAcceptableAlgo(sig.Format) {
 					break
 				}
-				signedData := buildDataSignedForAuth(s.transport.getSessionID(), userAuthReq, algoBytes, pubKeyData)
+				signedData := buildDataSignedForAuth(sessionID, userAuthReq, algoBytes, pubKeyData)
 
 				if err := pubKey.Verify(signedData, sig); err != nil {
 					return nil, err
@@ -398,6 +469,8 @@ userAuthLoop:
 			authErr = fmt.Errorf("ssh: unknown method %q", userAuthReq.Method)
 		}
 
+		authErrs = append(authErrs, authErr)
+
 		if config.AuthLogCallback != nil {
 			config.AuthLogCallback(s, userAuthReq.Method, authErr)
 		}
@@ -405,6 +478,8 @@ userAuthLoop:
 		if authErr == nil {
 			break userAuthLoop
 		}
+
+		authFailures++
 
 		var failureMsg userAuthFailureMsg
 		if config.PasswordCallback != nil {
@@ -421,12 +496,12 @@ userAuthLoop:
 			return nil, errors.New("ssh: no authentication methods configured but NoClientAuth is also false")
 		}
 
-		if err = s.transport.writePacket(Marshal(&failureMsg)); err != nil {
+		if err := s.transport.writePacket(Marshal(&failureMsg)); err != nil {
 			return nil, err
 		}
 	}
 
-	if err = s.transport.writePacket([]byte{msgUserAuthSuccess}); err != nil {
+	if err := s.transport.writePacket([]byte{msgUserAuthSuccess}); err != nil {
 		return nil, err
 	}
 	return perms, nil

@@ -28,8 +28,9 @@ import (
 	"github.com/golang/glog"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
-	api "k8s.io/kubernetes/pkg/apis/abac"
+	"k8s.io/kubernetes/pkg/apis/abac"
 	_ "k8s.io/kubernetes/pkg/apis/abac/latest"
 	"k8s.io/kubernetes/pkg/apis/abac/v0"
 )
@@ -48,7 +49,7 @@ func (p policyLoadError) Error() string {
 	return fmt.Sprintf("error reading policy file %s: %v", p.path, p.err)
 }
 
-type policyList []*api.Policy
+type policyList []*abac.Policy
 
 // TODO: Have policies be created via an API call and stored in REST storage.
 func NewFromFile(path string) (policyList, error) {
@@ -63,13 +64,13 @@ func NewFromFile(path string) (policyList, error) {
 	scanner := bufio.NewScanner(file)
 	pl := make(policyList, 0)
 
-	decoder := api.Codecs.UniversalDecoder()
+	decoder := abac.Codecs.UniversalDecoder()
 
 	i := 0
 	unversionedLines := 0
 	for scanner.Scan() {
 		i++
-		p := &api.Policy{}
+		p := &abac.Policy{}
 		b := scanner.Bytes()
 
 		// skip comment lines and blank lines
@@ -89,14 +90,14 @@ func NewFromFile(path string) (policyList, error) {
 			if err := runtime.DecodeInto(decoder, b, oldPolicy); err != nil {
 				return nil, policyLoadError{path, i, b, err}
 			}
-			if err := api.Scheme.Convert(oldPolicy, p, nil); err != nil {
+			if err := abac.Scheme.Convert(oldPolicy, p, nil); err != nil {
 				return nil, policyLoadError{path, i, b, err}
 			}
 			pl = append(pl, p)
 			continue
 		}
 
-		decodedPolicy, ok := decodedObj.(*api.Policy)
+		decodedPolicy, ok := decodedObj.(*abac.Policy)
 		if !ok {
 			return nil, policyLoadError{path, i, b, fmt.Errorf("unrecognized object: %#v", decodedObj)}
 		}
@@ -113,8 +114,8 @@ func NewFromFile(path string) (policyList, error) {
 	return pl, nil
 }
 
-func matches(p api.Policy, a authorizer.Attributes) bool {
-	if subjectMatches(p, a) {
+func matches(p abac.Policy, a authorizer.Attributes) bool {
+	if subjectMatches(p, a.GetUser()) {
 		if verbMatches(p, a) {
 			// Resource and non-resource requests are mutually exclusive, at most one will match a policy
 			if resourceMatches(p, a) {
@@ -129,15 +130,14 @@ func matches(p api.Policy, a authorizer.Attributes) bool {
 }
 
 // subjectMatches returns true if specified user and group properties in the policy match the attributes
-func subjectMatches(p api.Policy, a authorizer.Attributes) bool {
+func subjectMatches(p abac.Policy, user user.Info) bool {
 	matched := false
 
-	username := ""
-	groups := []string{}
-	if user := a.GetUser(); user != nil {
-		username = user.GetName()
-		groups = user.GetGroups()
+	if user == nil {
+		return false
 	}
+	username := user.GetName()
+	groups := user.GetGroups()
 
 	// If the policy specified a user, ensure it matches
 	if len(p.Spec.User) > 0 {
@@ -171,7 +171,7 @@ func subjectMatches(p api.Policy, a authorizer.Attributes) bool {
 	return matched
 }
 
-func verbMatches(p api.Policy, a authorizer.Attributes) bool {
+func verbMatches(p abac.Policy, a authorizer.Attributes) bool {
 	// TODO: match on verb
 
 	// All policies allow read only requests
@@ -187,7 +187,7 @@ func verbMatches(p api.Policy, a authorizer.Attributes) bool {
 	return false
 }
 
-func nonResourceMatches(p api.Policy, a authorizer.Attributes) bool {
+func nonResourceMatches(p abac.Policy, a authorizer.Attributes) bool {
 	// A non-resource policy cannot match a resource request
 	if !a.IsResourceRequest() {
 		// Allow wildcard match
@@ -206,7 +206,7 @@ func nonResourceMatches(p api.Policy, a authorizer.Attributes) bool {
 	return false
 }
 
-func resourceMatches(p api.Policy, a authorizer.Attributes) bool {
+func resourceMatches(p abac.Policy, a authorizer.Attributes) bool {
 	// A resource policy cannot match a non-resource request
 	if a.IsResourceRequest() {
 		if p.Spec.Namespace == "*" || p.Spec.Namespace == a.GetNamespace() {
@@ -221,14 +221,53 @@ func resourceMatches(p api.Policy, a authorizer.Attributes) bool {
 }
 
 // Authorizer implements authorizer.Authorize
-func (pl policyList) Authorize(a authorizer.Attributes) (bool, string, error) {
+func (pl policyList) Authorize(a authorizer.Attributes) (authorizer.Decision, string, error) {
 	for _, p := range pl {
 		if matches(*p, a) {
-			return true, "", nil
+			return authorizer.DecisionAllow, "", nil
 		}
 	}
-	return false, "No policy matched.", nil
+	return authorizer.DecisionNoOpinion, "No policy matched.", nil
 	// TODO: Benchmark how much time policy matching takes with a medium size
 	// policy file, compared to other steps such as encoding/decoding.
 	// Then, add Caching only if needed.
+}
+
+func (pl policyList) RulesFor(user user.Info, namespace string) ([]authorizer.ResourceRuleInfo, []authorizer.NonResourceRuleInfo, bool, error) {
+	var (
+		resourceRules    []authorizer.ResourceRuleInfo
+		nonResourceRules []authorizer.NonResourceRuleInfo
+	)
+
+	for _, p := range pl {
+		if subjectMatches(*p, user) {
+			if p.Spec.Namespace == "*" || p.Spec.Namespace == namespace {
+				if len(p.Spec.Resource) > 0 {
+					r := authorizer.DefaultResourceRuleInfo{
+						Verbs:     getVerbs(p.Spec.Readonly),
+						APIGroups: []string{p.Spec.APIGroup},
+						Resources: []string{p.Spec.Resource},
+					}
+					var resourceRule authorizer.ResourceRuleInfo = &r
+					resourceRules = append(resourceRules, resourceRule)
+				}
+				if len(p.Spec.NonResourcePath) > 0 {
+					r := authorizer.DefaultNonResourceRuleInfo{
+						Verbs:           getVerbs(p.Spec.Readonly),
+						NonResourceURLs: []string{p.Spec.NonResourcePath},
+					}
+					var nonResourceRule authorizer.NonResourceRuleInfo = &r
+					nonResourceRules = append(nonResourceRules, nonResourceRule)
+				}
+			}
+		}
+	}
+	return resourceRules, nonResourceRules, false, nil
+}
+
+func getVerbs(isReadOnly bool) []string {
+	if isReadOnly {
+		return []string{"get", "list", "watch"}
+	}
+	return []string{"*"}
 }

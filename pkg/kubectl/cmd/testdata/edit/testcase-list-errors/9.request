@@ -5,16 +5,21 @@
 		}
 	},
 	"spec": {
-		"ports": [
+		"$setElementOrder/ports": [
 			{
-				"$patch": "delete",
-				"port": 82
-			},
+				"port": 83
+			}
+		],
+		"ports": [
 			{
 				"name": "80",
 				"port": 83,
 				"protocol": "TCP",
 				"targetPort": 81
+			},
+			{
+				"$patch": "delete",
+				"port": 82
 			}
 		]
 	}

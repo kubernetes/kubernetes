@@ -20,12 +20,12 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
-	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
-	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
 	"k8s.io/kubernetes/pkg/controller"
 )
 
@@ -165,12 +165,15 @@ func TestServiceAccountCreation(t *testing.T) {
 		}
 		saInformer := informers.Core().V1().ServiceAccounts()
 		nsInformer := informers.Core().V1().Namespaces()
-		controller := NewServiceAccountsController(
+		controller, err := NewServiceAccountsController(
 			saInformer,
 			nsInformer,
 			client,
 			options,
 		)
+		if err != nil {
+			t.Fatalf("error creating ServiceAccounts controller: %v", err)
+		}
 		controller.saListerSynced = alwaysReady
 		controller.nsListerSynced = alwaysReady
 

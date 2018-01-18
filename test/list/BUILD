@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_binary",
@@ -11,21 +9,21 @@ load(
 
 go_binary(
     name = "list",
-    library = ":go_default_library",
-    tags = ["automanaged"],
+    embed = [":go_default_library"],
+    importpath = "k8s.io/kubernetes/test/list",
 )
 
 go_test(
     name = "go_default_test",
     srcs = ["main_test.go"],
-    library = ":go_default_library",
-    tags = ["automanaged"],
+    embed = [":go_default_library"],
+    importpath = "k8s.io/kubernetes/test/list",
 )
 
 go_library(
     name = "go_default_library",
     srcs = ["main.go"],
-    tags = ["automanaged"],
+    importpath = "k8s.io/kubernetes/test/list",
 )
 
 filegroup(

@@ -22,16 +22,19 @@ import (
 	"github.com/google/cadvisor/events"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
+	"k8s.io/kubernetes/pkg/kubelet/winstats"
 )
 
 type cadvisorClient struct {
+	winStatsClient winstats.Client
 }
 
 var _ Interface = new(cadvisorClient)
 
 // New creates a cAdvisor and exports its API on the specified port if port > 0.
-func New(port uint, runtime string, rootPath string) (Interface, error) {
-	return &cadvisorClient{}, nil
+func New(address string, port uint, imageFsInfoProvider ImageFsInfoProvider, rootPath string, usingLegacyStats bool) (Interface, error) {
+	client, err := winstats.NewPerfCounterClient()
+	return &cadvisorClient{winStatsClient: client}, err
 }
 
 func (cu *cadvisorClient) Start() error {
@@ -47,7 +50,7 @@ func (cu *cadvisorClient) ContainerInfo(name string, req *cadvisorapi.ContainerI
 }
 
 func (cu *cadvisorClient) ContainerInfoV2(name string, options cadvisorapiv2.RequestOptions) (map[string]cadvisorapiv2.ContainerInfo, error) {
-	return make(map[string]cadvisorapiv2.ContainerInfo), nil
+	return cu.winStatsClient.WinContainerInfos()
 }
 
 func (cu *cadvisorClient) SubcontainerInfo(name string, req *cadvisorapi.ContainerInfoRequest) (map[string]*cadvisorapi.ContainerInfo, error) {
@@ -55,11 +58,11 @@ func (cu *cadvisorClient) SubcontainerInfo(name string, req *cadvisorapi.Contain
 }
 
 func (cu *cadvisorClient) MachineInfo() (*cadvisorapi.MachineInfo, error) {
-	return &cadvisorapi.MachineInfo{}, nil
+	return cu.winStatsClient.WinMachineInfo()
 }
 
 func (cu *cadvisorClient) VersionInfo() (*cadvisorapi.VersionInfo, error) {
-	return &cadvisorapi.VersionInfo{}, nil
+	return cu.winStatsClient.WinVersionInfo()
 }
 
 func (cu *cadvisorClient) ImagesFsInfo() (cadvisorapiv2.FsInfo, error) {
@@ -72,4 +75,12 @@ func (cu *cadvisorClient) RootFsInfo() (cadvisorapiv2.FsInfo, error) {
 
 func (cu *cadvisorClient) WatchEvents(request *events.Request) (*events.EventChannel, error) {
 	return &events.EventChannel{}, nil
+}
+
+func (cu *cadvisorClient) HasDedicatedImageFs() (bool, error) {
+	return false, nil
+}
+
+func (c *cadvisorClient) GetFsInfoByFsUUID(uuid string) (cadvisorapiv2.FsInfo, error) {
+	return cadvisorapiv2.FsInfo{}, nil
 }

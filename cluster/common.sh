@@ -22,10 +22,9 @@ set -o pipefail
 
 KUBE_ROOT=$(cd $(dirname "${BASH_SOURCE}")/.. && pwd)
 
-DEFAULT_KUBECONFIG="${HOME}/.kube/config"
+DEFAULT_KUBECONFIG="${HOME:-.}/.kube/config"
 
 source "${KUBE_ROOT}/hack/lib/util.sh"
-source "${KUBE_ROOT}/cluster/lib/logging.sh"
 # KUBE_RELEASE_VERSION_REGEX matches things like "v1.2.3" or "v1.2.3-alpha.4"
 #
 # NOTE This must match the version_regex in build/common.sh
@@ -158,20 +157,6 @@ function clear-kubeconfig() {
   "${kubectl}" config unset "contexts.${CONTEXT}"
 
   echo "Cleared config for ${CONTEXT} from ${KUBECONFIG}"
-}
-
-# Creates a kubeconfig file with the credentials for only the current-context
-# cluster. This is used by federation to create secrets in test setup.
-function create-kubeconfig-for-federation() {
-  if [[ "${FEDERATION:-}" == "true" ]]; then
-    echo "creating kubeconfig for federation secret"
-    local kubectl="${KUBE_ROOT}/cluster/kubectl.sh"
-    local cc=$("${kubectl}" config view -o jsonpath='{.current-context}')
-    KUBECONFIG_DIR=$(dirname ${KUBECONFIG:-$DEFAULT_KUBECONFIG})
-    KUBECONFIG_PATH="${KUBECONFIG_DIR}/federation/kubernetes-apiserver/${cc}"
-    mkdir -p "${KUBECONFIG_PATH}"
-    "${kubectl}" config view --minify --flatten > "${KUBECONFIG_PATH}/kubeconfig"
-  fi
 }
 
 function tear_down_alive_resources() {
@@ -366,8 +351,6 @@ function set_binary_version() {
 #   KUBE_TAR_HASH
 #   SERVER_BINARY_TAR_URL
 #   SERVER_BINARY_TAR_HASH
-#   SALT_TAR_URL
-#   SALT_TAR_HASH
 function tars_from_version() {
   local sha1sum=""
   if which sha1sum >/dev/null 2>&1; then
@@ -381,13 +364,11 @@ function tars_from_version() {
     upload-server-tars
   elif [[ ${KUBE_VERSION} =~ ${KUBE_RELEASE_VERSION_REGEX} ]]; then
     SERVER_BINARY_TAR_URL="https://storage.googleapis.com/kubernetes-release/release/${KUBE_VERSION}/kubernetes-server-linux-amd64.tar.gz"
-    SALT_TAR_URL="https://storage.googleapis.com/kubernetes-release/release/${KUBE_VERSION}/kubernetes-salt.tar.gz"
     # TODO: Clean this up.
     KUBE_MANIFESTS_TAR_URL="${SERVER_BINARY_TAR_URL/server-linux-amd64/manifests}"
     KUBE_MANIFESTS_TAR_HASH=$(curl ${KUBE_MANIFESTS_TAR_URL} --silent --show-error | ${sha1sum} | awk '{print $1}')
   elif [[ ${KUBE_VERSION} =~ ${KUBE_CI_VERSION_REGEX} ]]; then
     SERVER_BINARY_TAR_URL="https://storage.googleapis.com/kubernetes-release-dev/ci/${KUBE_VERSION}/kubernetes-server-linux-amd64.tar.gz"
-    SALT_TAR_URL="https://storage.googleapis.com/kubernetes-release-dev/ci/${KUBE_VERSION}/kubernetes-salt.tar.gz"
     # TODO: Clean this up.
     KUBE_MANIFESTS_TAR_URL="${SERVER_BINARY_TAR_URL/server-linux-amd64/manifests}"
     KUBE_MANIFESTS_TAR_HASH=$(curl ${KUBE_MANIFESTS_TAR_URL} --silent --show-error | ${sha1sum} | awk '{print $1}')
@@ -398,16 +379,9 @@ function tars_from_version() {
   if ! SERVER_BINARY_TAR_HASH=$(curl -Ss --fail "${SERVER_BINARY_TAR_URL}.sha1"); then
     echo "Failure trying to curl release .sha1"
   fi
-  if ! SALT_TAR_HASH=$(curl -Ss --fail "${SALT_TAR_URL}.sha1"); then
-    echo "Failure trying to curl Salt tar .sha1"
-  fi
 
   if ! curl -Ss --head "${SERVER_BINARY_TAR_URL}" >&/dev/null; then
     echo "Can't find release at ${SERVER_BINARY_TAR_URL}" >&2
-    exit 1
-  fi
-  if ! curl -Ss --head "${SALT_TAR_URL}" >&/dev/null; then
-    echo "Can't find Salt tar at ${SALT_TAR_URL}" >&2
     exit 1
   fi
 }
@@ -442,16 +416,14 @@ function find-tar() {
 #   KUBE_ROOT
 # Vars set:
 #   SERVER_BINARY_TAR
-#   SALT_TAR
 #   KUBE_MANIFESTS_TAR
 function find-release-tars() {
   SERVER_BINARY_TAR=$(find-tar kubernetes-server-linux-amd64.tar.gz)
-  SALT_TAR=$(find-tar kubernetes-salt.tar.gz)
 
   # This tarball is used by GCI, Ubuntu Trusty, and Container Linux.
   KUBE_MANIFESTS_TAR=
-  if [[ "${MASTER_OS_DISTRIBUTION:-}" == "trusty" || "${MASTER_OS_DISTRIBUTION:-}" == "gci" || "${MASTER_OS_DISTRIBUTION:-}" == "container-linux" || "${MASTER_OS_DISTRIBUTION:-}" == "ubuntu" ]] || \
-     [[ "${NODE_OS_DISTRIBUTION:-}" == "trusty" || "${NODE_OS_DISTRIBUTION:-}" == "gci" || "${NODE_OS_DISTRIBUTION:-}" == "container-linux" || "${NODE_OS_DISTRIBUTION:-}" == "ubuntu" ]] ; then
+  if [[ "${MASTER_OS_DISTRIBUTION:-}" == "trusty" || "${MASTER_OS_DISTRIBUTION:-}" == "gci" || "${MASTER_OS_DISTRIBUTION:-}" == "ubuntu" ]] || \
+     [[ "${NODE_OS_DISTRIBUTION:-}" == "trusty" || "${NODE_OS_DISTRIBUTION:-}" == "gci" || "${NODE_OS_DISTRIBUTION:-}" == "ubuntu" ]] ; then
     KUBE_MANIFESTS_TAR=$(find-tar kubernetes-manifests.tar.gz)
   fi
 }
@@ -513,7 +485,7 @@ function stage-images() {
   done
 
   kube::util::wait-for-jobs || {
-    kube::log::error "unable to push images. See ${temp_dir}/*.log for more info."
+    echo "!!! unable to push images. See ${temp_dir}/*.log for more info." 1>&2
     return 1
   }
 
@@ -575,6 +547,10 @@ function build-kube-master-certs {
 KUBEAPISERVER_CERT: $(yaml-quote ${KUBEAPISERVER_CERT_BASE64:-})
 KUBEAPISERVER_KEY: $(yaml-quote ${KUBEAPISERVER_KEY_BASE64:-})
 CA_KEY: $(yaml-quote ${CA_KEY_BASE64:-})
+AGGREGATOR_CA_KEY: $(yaml-quote ${AGGREGATOR_CA_KEY_BASE64:-})
+REQUESTHEADER_CA_CERT: $(yaml-quote ${REQUESTHEADER_CA_CERT_BASE64:-})
+PROXY_CLIENT_CERT: $(yaml-quote ${PROXY_CLIENT_CERT_BASE64:-})
+PROXY_CLIENT_KEY: $(yaml-quote ${PROXY_CLIENT_KEY_BASE64:-})
 EOF
 }
 
@@ -584,15 +560,11 @@ function build-kube-env {
   local file=$2
 
   local server_binary_tar_url=$SERVER_BINARY_TAR_URL
-  local salt_tar_url=$SALT_TAR_URL
   local kube_manifests_tar_url="${KUBE_MANIFESTS_TAR_URL:-}"
-  if [[ "${master}" == "true" && "${MASTER_OS_DISTRIBUTION}" == "container-linux" ]] || \
-     [[ "${master}" == "false" && "${NODE_OS_DISTRIBUTION}" == "container-linux" ]] || \
-     [[ "${master}" == "true" && "${MASTER_OS_DISTRIBUTION}" == "ubuntu" ]] || \
+  if [[ "${master}" == "true" && "${MASTER_OS_DISTRIBUTION}" == "ubuntu" ]] || \
      [[ "${master}" == "false" && "${NODE_OS_DISTRIBUTION}" == "ubuntu" ]] ; then
     # TODO: Support fallback .tar.gz settings on Container Linux
     server_binary_tar_url=$(split_csv "${SERVER_BINARY_TAR_URL}")
-    salt_tar_url=$(split_csv "${SALT_TAR_URL}")
     kube_manifests_tar_url=$(split_csv "${KUBE_MANIFESTS_TAR_URL}")
   fi
 
@@ -601,29 +573,38 @@ function build-kube-env {
 
   rm -f ${file}
   cat >$file <<EOF
+CLUSTER_NAME: $(yaml-quote ${CLUSTER_NAME})
 ENV_TIMESTAMP: $(yaml-quote $(date -u +%Y-%m-%dT%T%z))
 INSTANCE_PREFIX: $(yaml-quote ${INSTANCE_PREFIX})
 NODE_INSTANCE_PREFIX: $(yaml-quote ${NODE_INSTANCE_PREFIX})
 NODE_TAGS: $(yaml-quote ${NODE_TAGS:-})
+NODE_NETWORK: $(yaml-quote ${NETWORK:-})
+NODE_SUBNETWORK: $(yaml-quote ${SUBNETWORK:-})
 CLUSTER_IP_RANGE: $(yaml-quote ${CLUSTER_IP_RANGE:-10.244.0.0/16})
 SERVER_BINARY_TAR_URL: $(yaml-quote ${server_binary_tar_url})
 SERVER_BINARY_TAR_HASH: $(yaml-quote ${SERVER_BINARY_TAR_HASH})
-SALT_TAR_URL: $(yaml-quote ${salt_tar_url})
-SALT_TAR_HASH: $(yaml-quote ${SALT_TAR_HASH})
+PROJECT_ID: $(yaml-quote ${PROJECT})
+NETWORK_PROJECT_ID: $(yaml-quote ${NETWORK_PROJECT})
 SERVICE_CLUSTER_IP_RANGE: $(yaml-quote ${SERVICE_CLUSTER_IP_RANGE})
 KUBERNETES_MASTER_NAME: $(yaml-quote ${KUBERNETES_MASTER_NAME})
 ALLOCATE_NODE_CIDRS: $(yaml-quote ${ALLOCATE_NODE_CIDRS:-false})
 ENABLE_CLUSTER_MONITORING: $(yaml-quote ${ENABLE_CLUSTER_MONITORING:-none})
+ENABLE_METRICS_SERVER: $(yaml-quote ${ENABLE_METRICS_SERVER:-false})
+ENABLE_METADATA_AGENT: $(yaml-quote ${ENABLE_METADATA_AGENT:-none})
+METADATA_AGENT_VERSION: $(yaml-quote ${METADATA_AGENT_VERSION:-})
 DOCKER_REGISTRY_MIRROR_URL: $(yaml-quote ${DOCKER_REGISTRY_MIRROR_URL:-})
 ENABLE_L7_LOADBALANCING: $(yaml-quote ${ENABLE_L7_LOADBALANCING:-none})
 ENABLE_CLUSTER_LOGGING: $(yaml-quote ${ENABLE_CLUSTER_LOGGING:-false})
 ENABLE_CLUSTER_UI: $(yaml-quote ${ENABLE_CLUSTER_UI:-false})
 ENABLE_NODE_PROBLEM_DETECTOR: $(yaml-quote ${ENABLE_NODE_PROBLEM_DETECTOR:-none})
+NODE_PROBLEM_DETECTOR_VERSION: $(yaml-quote ${NODE_PROBLEM_DETECTOR_VERSION:-})
+NODE_PROBLEM_DETECTOR_TAR_HASH: $(yaml-quote ${NODE_PROBLEM_DETECTOR_TAR_HASH:-})
 ENABLE_NODE_LOGGING: $(yaml-quote ${ENABLE_NODE_LOGGING:-false})
 ENABLE_RESCHEDULER: $(yaml-quote ${ENABLE_RESCHEDULER:-false})
 LOGGING_DESTINATION: $(yaml-quote ${LOGGING_DESTINATION:-})
 ELASTICSEARCH_LOGGING_REPLICAS: $(yaml-quote ${ELASTICSEARCH_LOGGING_REPLICAS:-})
 ENABLE_CLUSTER_DNS: $(yaml-quote ${ENABLE_CLUSTER_DNS:-false})
+CLUSTER_DNS_CORE_DNS: $(yaml-quote ${CLUSTER_DNS_CORE_DNS:-false})
 ENABLE_CLUSTER_REGISTRY: $(yaml-quote ${ENABLE_CLUSTER_REGISTRY:-false})
 CLUSTER_REGISTRY_DISK: $(yaml-quote ${CLUSTER_REGISTRY_DISK:-})
 CLUSTER_REGISTRY_DISK_SIZE: $(yaml-quote ${CLUSTER_REGISTRY_DISK_SIZE:-})
@@ -631,9 +612,11 @@ DNS_SERVER_IP: $(yaml-quote ${DNS_SERVER_IP:-})
 DNS_DOMAIN: $(yaml-quote ${DNS_DOMAIN:-})
 ENABLE_DNS_HORIZONTAL_AUTOSCALER: $(yaml-quote ${ENABLE_DNS_HORIZONTAL_AUTOSCALER:-false})
 KUBELET_TOKEN: $(yaml-quote ${KUBELET_TOKEN:-})
+KUBE_PROXY_DAEMONSET: $(yaml-quote ${KUBE_PROXY_DAEMONSET:-false})
 KUBE_PROXY_TOKEN: $(yaml-quote ${KUBE_PROXY_TOKEN:-})
 NODE_PROBLEM_DETECTOR_TOKEN: $(yaml-quote ${NODE_PROBLEM_DETECTOR_TOKEN:-})
 ADMISSION_CONTROL: $(yaml-quote ${ADMISSION_CONTROL:-})
+ENABLE_POD_SECURITY_POLICY: $(yaml-quote ${ENABLE_POD_SECURITY_POLICY:-})
 MASTER_IP_RANGE: $(yaml-quote ${MASTER_IP_RANGE})
 RUNTIME_CONFIG: $(yaml-quote ${RUNTIME_CONFIG})
 CA_CERT: $(yaml-quote ${CA_CERT_BASE64:-})
@@ -656,7 +639,27 @@ NON_MASQUERADE_CIDR: $(yaml-quote ${NON_MASQUERADE_CIDR:-})
 KUBE_UID: $(yaml-quote ${KUBE_UID:-})
 ENABLE_DEFAULT_STORAGE_CLASS: $(yaml-quote ${ENABLE_DEFAULT_STORAGE_CLASS:-})
 ENABLE_APISERVER_BASIC_AUDIT: $(yaml-quote ${ENABLE_APISERVER_BASIC_AUDIT:-})
+ENABLE_APISERVER_ADVANCED_AUDIT: $(yaml-quote ${ENABLE_APISERVER_ADVANCED_AUDIT:-})
 ENABLE_CACHE_MUTATION_DETECTOR: $(yaml-quote ${ENABLE_CACHE_MUTATION_DETECTOR:-false})
+ENABLE_PATCH_CONVERSION_DETECTOR: $(yaml-quote ${ENABLE_PATCH_CONVERSION_DETECTOR:-false})
+ADVANCED_AUDIT_POLICY: $(yaml-quote ${ADVANCED_AUDIT_POLICY:-})
+ADVANCED_AUDIT_BACKEND: $(yaml-quote ${ADVANCED_AUDIT_BACKEND:-log})
+ADVANCED_AUDIT_WEBHOOK_BUFFER_SIZE: $(yaml-quote ${ADVANCED_AUDIT_WEBHOOK_BUFFER_SIZE:-})
+ADVANCED_AUDIT_WEBHOOK_MAX_BATCH_SIZE: $(yaml-quote ${ADVANCED_AUDIT_WEBHOOK_MAX_BATCH_SIZE:-})
+ADVANCED_AUDIT_WEBHOOK_MAX_BATCH_WAIT: $(yaml-quote ${ADVANCED_AUDIT_WEBHOOK_MAX_BATCH_WAIT:-})
+ADVANCED_AUDIT_WEBHOOK_THROTTLE_QPS: $(yaml-quote ${ADVANCED_AUDIT_WEBHOOK_THROTTLE_QPS:-})
+ADVANCED_AUDIT_WEBHOOK_THROTTLE_BURST: $(yaml-quote ${ADVANCED_AUDIT_WEBHOOK_THROTTLE_BURST:-})
+ADVANCED_AUDIT_WEBHOOK_INITIAL_BACKOFF: $(yaml-quote ${ADVANCED_AUDIT_WEBHOOK_INITIAL_BACKOFF:-})
+GCE_API_ENDPOINT: $(yaml-quote ${GCE_API_ENDPOINT:-})
+GCE_GLBC_IMAGE: $(yaml-quote ${GCE_GLBC_IMAGE:-})
+PROMETHEUS_TO_SD_ENDPOINT: $(yaml-quote ${PROMETHEUS_TO_SD_ENDPOINT:-})
+PROMETHEUS_TO_SD_PREFIX: $(yaml-quote ${PROMETHEUS_TO_SD_PREFIX:-})
+ENABLE_PROMETHEUS_TO_SD: $(yaml-quote ${ENABLE_PROMETHEUS_TO_SD:-false})
+ENABLE_POD_PRIORITY: $(yaml-quote ${ENABLE_POD_PRIORITY:-})
+CONTAINER_RUNTIME: $(yaml-quote ${CONTAINER_RUNTIME:-})
+CONTAINER_RUNTIME_ENDPOINT: $(yaml-quote ${CONTAINER_RUNTIME_ENDPOINT:-})
+NODE_LOCAL_SSDS_EXT: $(yaml-quote ${NODE_LOCAL_SSDS_EXT:-})
+LOAD_IMAGE_COMMAND: $(yaml-quote ${LOAD_IMAGE_COMMAND:-})
 EOF
   if [ -n "${KUBELET_PORT:-}" ]; then
     cat >>$file <<EOF
@@ -673,8 +676,8 @@ EOF
 TERMINATED_POD_GC_THRESHOLD: $(yaml-quote ${TERMINATED_POD_GC_THRESHOLD})
 EOF
   fi
-  if [[ "${master}" == "true" && ("${MASTER_OS_DISTRIBUTION}" == "trusty" || "${MASTER_OS_DISTRIBUTION}" == "gci" || "${MASTER_OS_DISTRIBUTION}" == "container-linux") || "${MASTER_OS_DISTRIBUTION}" == "ubuntu" ]] || \
-     [[ "${master}" == "false" && ("${NODE_OS_DISTRIBUTION}" == "trusty" || "${NODE_OS_DISTRIBUTION}" == "gci" || "${NODE_OS_DISTRIBUTION}" == "container-linux") || "${NODE_OS_DISTRIBUTION}" = "ubuntu" ]] ; then
+  if [[ "${master}" == "true" && ("${MASTER_OS_DISTRIBUTION}" == "trusty" || "${MASTER_OS_DISTRIBUTION}" == "gci") || "${MASTER_OS_DISTRIBUTION}" == "ubuntu" ]] || \
+     [[ "${master}" == "false" && ("${NODE_OS_DISTRIBUTION}" == "trusty" || "${NODE_OS_DISTRIBUTION}" == "gci") || "${NODE_OS_DISTRIBUTION}" = "ubuntu" ]] ; then
     cat >>$file <<EOF
 KUBE_MANIFESTS_TAR_URL: $(yaml-quote ${kube_manifests_tar_url})
 KUBE_MANIFESTS_TAR_HASH: $(yaml-quote ${KUBE_MANIFESTS_TAR_HASH})
@@ -688,6 +691,16 @@ EOF
   if [ -n "${KUBELET_TEST_ARGS:-}" ]; then
       cat >>$file <<EOF
 KUBELET_TEST_ARGS: $(yaml-quote ${KUBELET_TEST_ARGS})
+EOF
+  fi
+  if [ -n "${NODE_KUBELET_TEST_ARGS:-}" ]; then
+      cat >>$file <<EOF
+NODE_KUBELET_TEST_ARGS: $(yaml-quote ${NODE_KUBELET_TEST_ARGS})
+EOF
+  fi
+  if [ -n "${MASTER_KUBELET_TEST_ARGS:-}" ]; then
+      cat >>$file <<EOF
+MASTER_KUBELET_TEST_ARGS: $(yaml-quote ${MASTER_KUBELET_TEST_ARGS})
 EOF
   fi
   if [ -n "${KUBELET_TEST_LOG_LEVEL:-}" ]; then
@@ -725,6 +738,17 @@ EOF
 FEATURE_GATES: $(yaml-quote ${FEATURE_GATES})
 EOF
   fi
+  if [ -n "${ROTATE_CERTIFICATES:-}" ]; then
+    cat >>$file <<EOF
+ROTATE_CERTIFICATES: $(yaml-quote ${ROTATE_CERTIFICATES})
+EOF
+  fi
+  if [[ "${master}" == "true" && "${MASTER_OS_DISTRIBUTION}" == "gci" ]] ||
+     [[ "${master}" == "false" && "${NODE_OS_DISTRIBUTION}" == "gci" ]]; then
+    cat >>$file <<EOF
+VOLUME_PLUGIN_DIR: $(yaml-quote ${VOLUME_PLUGIN_DIR:-/etc/srv/kubernetes/kubelet-plugins/volume/exec})
+EOF
+  fi
 
   if [ -n "${PROVIDER_VARS:-}" ]; then
     local var_name
@@ -732,7 +756,9 @@ EOF
 
     for var_name in ${PROVIDER_VARS}; do
       eval "local var_value=\$(yaml-quote \${${var_name}})"
-      echo "${var_name}: ${var_value}" >>$file
+      cat >>$file <<EOF
+${var_name}: ${var_value}
+EOF
     done
   fi
 
@@ -762,10 +788,23 @@ ETCD_CA_CERT: $(yaml-quote ${ETCD_CA_CERT_BASE64:-})
 ETCD_PEER_KEY: $(yaml-quote ${ETCD_PEER_KEY_BASE64:-})
 ETCD_PEER_CERT: $(yaml-quote ${ETCD_PEER_CERT_BASE64:-})
 EOF
+    # KUBE_APISERVER_REQUEST_TIMEOUT_SEC (if set) controls the --request-timeout
+    # flag
+    if [ -n "${KUBE_APISERVER_REQUEST_TIMEOUT_SEC:-}" ]; then
+      cat >>$file <<EOF
+KUBE_APISERVER_REQUEST_TIMEOUT_SEC: $(yaml-quote ${KUBE_APISERVER_REQUEST_TIMEOUT_SEC})
+EOF
+    fi
     # ETCD_IMAGE (if set) allows to use a custom etcd image.
     if [ -n "${ETCD_IMAGE:-}" ]; then
       cat >>$file <<EOF
 ETCD_IMAGE: $(yaml-quote ${ETCD_IMAGE})
+EOF
+    fi
+    # ETCD_DOCKER_REPOSITORY (if set) allows to use a custom etcd docker repository to pull the etcd image from.
+    if [ -n "${ETCD_DOCKER_REPOSITORY:-}" ]; then
+      cat >>$file <<EOF
+ETCD_DOCKER_REPOSITORY: $(yaml-quote ${ETCD_DOCKER_REPOSITORY})
 EOF
     fi
     # ETCD_VERSION (if set) allows you to use custom version of etcd.
@@ -774,6 +813,21 @@ EOF
     if [ -n "${ETCD_VERSION:-}" ]; then
       cat >>$file <<EOF
 ETCD_VERSION: $(yaml-quote ${ETCD_VERSION})
+EOF
+    fi
+    if [ -n "${ETCD_HOSTNAME:-}" ]; then
+      cat >>$file <<EOF
+ETCD_HOSTNAME: $(yaml-quote ${ETCD_HOSTNAME})
+EOF
+    fi
+    if [ -n "${ETCD_LIVENESS_PROBE_INITIAL_DELAY_SEC:-}" ]; then
+      cat >>$file <<EOF
+ETCD_LIVENESS_PROBE_INITIAL_DELAY_SEC: $(yaml-quote ${ETCD_LIVENESS_PROBE_INITIAL_DELAY_SEC})
+EOF
+    fi
+    if [ -n "${KUBE_APISERVER_LIVENESS_PROBE_INITIAL_DELAY_SEC:-}" ]; then
+      cat >>$file <<EOF
+KUBE_APISERVER_LIVENESS_PROBE_INITIAL_DELAY_SEC: $(yaml-quote ${KUBE_APISERVER_LIVENESS_PROBE_INITIAL_DELAY_SEC})
 EOF
     fi
     if [ -n "${APISERVER_TEST_ARGS:-}" ]; then
@@ -821,6 +875,21 @@ EOF
 ETCD_QUORUM_READ: $(yaml-quote ${ETCD_QUORUM_READ})
 EOF
     fi
+    if [ -n "${CLUSTER_SIGNING_DURATION:-}" ]; then
+      cat >>$file <<EOF
+CLUSTER_SIGNING_DURATION: $(yaml-quote ${CLUSTER_SIGNING_DURATION})
+EOF
+    fi
+    if [[ "${NODE_ACCELERATORS:-}" == *"type=nvidia"* ]]; then
+      cat >>$file <<EOF
+ENABLE_NVIDIA_GPU_DEVICE_PLUGIN: $(yaml-quote "true")
+EOF
+    fi
+    if [ -n "${ADDON_MANAGER_LEADER_ELECTION:-}" ]; then
+      cat >>$file <<EOF
+ADDON_MANAGER_LEADER_ELECTION: $(yaml-quote ${ADDON_MANAGER_LEADER_ELECTION})
+EOF
+    fi
 
   else
     # Node-only env vars.
@@ -844,40 +913,25 @@ EOF
       cat >>$file <<EOF
 NODE_LABELS: $(yaml-quote ${NODE_LABELS})
 EOF
-    fi
+  fi
+  if [ -n "${NON_MASTER_NODE_LABELS:-}" ]; then
+    cat >>$file <<EOF
+NON_MASTER_NODE_LABELS: $(yaml-quote ${NON_MASTER_NODE_LABELS})
+EOF
+  fi
   if [ -n "${EVICTION_HARD:-}" ]; then
       cat >>$file <<EOF
 EVICTION_HARD: $(yaml-quote ${EVICTION_HARD})
-EOF
-    fi
-  if [[ "${master}" == "true" && "${MASTER_OS_DISTRIBUTION}" == "container-linux" ]] || \
-     [[ "${master}" == "false" && "${NODE_OS_DISTRIBUTION}" == "container-linux" ]]; then
-    # Container-Linux-only env vars. TODO(yifan): Make them available on other distros.
-    cat >>$file <<EOF
-KUBERNETES_CONTAINER_RUNTIME: $(yaml-quote ${CONTAINER_RUNTIME:-rkt})
-RKT_VERSION: $(yaml-quote ${RKT_VERSION:-})
-RKT_PATH: $(yaml-quote ${RKT_PATH:-})
-RKT_STAGE1_IMAGE: $(yaml-quote ${RKT_STAGE1_IMAGE:-})
 EOF
   fi
   if [[ "${ENABLE_CLUSTER_AUTOSCALER}" == "true" ]]; then
       cat >>$file <<EOF
 ENABLE_CLUSTER_AUTOSCALER: $(yaml-quote ${ENABLE_CLUSTER_AUTOSCALER})
 AUTOSCALER_MIG_CONFIG: $(yaml-quote ${AUTOSCALER_MIG_CONFIG})
+AUTOSCALER_EXPANDER_CONFIG: $(yaml-quote ${AUTOSCALER_EXPANDER_CONFIG})
 EOF
   fi
 
-  # Federation specific environment variables.
-  if [[ -n "${FEDERATION:-}" ]]; then
-    cat >>$file <<EOF
-FEDERATION: $(yaml-quote ${FEDERATION})
-EOF
-  fi
-  if [ -n "${FEDERATION_NAME:-}" ]; then
-    cat >>$file <<EOF
-FEDERATION_NAME: $(yaml-quote ${FEDERATION_NAME})
-EOF
-  fi
   if [ -n "${DNS_ZONE_NAME:-}" ]; then
     cat >>$file <<EOF
 DNS_ZONE_NAME: $(yaml-quote ${DNS_ZONE_NAME})
@@ -945,9 +999,10 @@ function create-certs {
 
   echo "Generating certs for alternate-names: ${sans}"
 
+  setup-easyrsa
   PRIMARY_CN="${primary_cn}" SANS="${sans}" generate-certs
+  AGGREGATOR_PRIMARY_CN="${primary_cn}" AGGREGATOR_SANS="${sans}" generate-aggregator-certs
 
-  CERT_DIR="${KUBE_TEMP}/easy-rsa-master/easyrsa3"
   # By default, linux wraps base64 output every 76 cols, so we use 'tr -d' to remove whitespaces.
   # Note 'base64 -w0' doesn't work on Mac OS X, which has different flags.
   CA_KEY_BASE64=$(cat "${CERT_DIR}/pki/private/ca.key" | base64 | tr -d '\r\n')
@@ -960,19 +1015,25 @@ function create-certs {
   KUBECFG_KEY_BASE64=$(cat "${CERT_DIR}/pki/private/kubecfg.key" | base64 | tr -d '\r\n')
   KUBEAPISERVER_CERT_BASE64=$(cat "${CERT_DIR}/pki/issued/kube-apiserver.crt" | base64 | tr -d '\r\n')
   KUBEAPISERVER_KEY_BASE64=$(cat "${CERT_DIR}/pki/private/kube-apiserver.key" | base64 | tr -d '\r\n')
+
+  # Setting up an addition directory (beyond pki) as it is the simplest way to
+  # ensure we get a different CA pair to sign the proxy-client certs and which
+  # we can send CA public key to the user-apiserver to validate communication.
+  AGGREGATOR_CA_KEY_BASE64=$(cat "${AGGREGATOR_CERT_DIR}/pki/private/ca.key" | base64 | tr -d '\r\n')
+  REQUESTHEADER_CA_CERT_BASE64=$(cat "${AGGREGATOR_CERT_DIR}/pki/ca.crt" | base64 | tr -d '\r\n')
+  PROXY_CLIENT_CERT_BASE64=$(cat "${AGGREGATOR_CERT_DIR}/pki/issued/proxy-client.crt" | base64 | tr -d '\r\n')
+  PROXY_CLIENT_KEY_BASE64=$(cat "${AGGREGATOR_CERT_DIR}/pki/private/proxy-client.key" | base64 | tr -d '\r\n')
 }
 
-# Runs the easy RSA commands to generate certificate files.
-# The generated files are at ${KUBE_TEMP}/easy-rsa-master/easyrsa3
+# Set up easy-rsa directory structure.
 #
 # Assumed vars
 #   KUBE_TEMP
-#   MASTER_NAME
-#   PRIMARY_CN: Primary canonical name
-#   SANS: Subject alternate names
 #
-#
-function generate-certs {
+# Vars set:
+#   CERT_DIR
+#   AGGREGATOR_CERT_DIR
+function setup-easyrsa {
   local -r cert_create_debug_output=$(mktemp "${KUBE_TEMP}/cert_create_debug_output.XXX")
   # Note: This was heavily cribbed from make-ca-cert.sh
   (set -x
@@ -981,7 +1042,35 @@ function generate-certs {
     tar xzf easy-rsa.tar.gz
     mkdir easy-rsa-master/kubelet
     cp -r easy-rsa-master/easyrsa3/* easy-rsa-master/kubelet
-    cd easy-rsa-master/easyrsa3
+    mkdir easy-rsa-master/aggregator
+    cp -r easy-rsa-master/easyrsa3/* easy-rsa-master/aggregator) &>${cert_create_debug_output} || true
+  CERT_DIR="${KUBE_TEMP}/easy-rsa-master/easyrsa3"
+  AGGREGATOR_CERT_DIR="${KUBE_TEMP}/easy-rsa-master/aggregator"
+  if [ ! -x "${CERT_DIR}/easyrsa" -o ! -x "${AGGREGATOR_CERT_DIR}/easyrsa" ]; then
+    # TODO(roberthbailey,porridge): add better error handling here,
+    # see https://github.com/kubernetes/kubernetes/issues/55229
+    cat "${cert_create_debug_output}" >&2
+    echo "=== Failed to setup easy-rsa: Aborting ===" >&2
+    exit 2
+  fi
+}
+
+# Runs the easy RSA commands to generate certificate files.
+# The generated files are IN ${CERT_DIR}
+#
+# Assumed vars
+#   KUBE_TEMP
+#   MASTER_NAME
+#   CERT_DIR
+#   PRIMARY_CN: Primary canonical name
+#   SANS: Subject alternate names
+#
+#
+function generate-certs {
+  local -r cert_create_debug_output=$(mktemp "${KUBE_TEMP}/cert_create_debug_output.XXX")
+  # Note: This was heavily cribbed from make-ca-cert.sh
+  (set -x
+    cd "${CERT_DIR}"
     ./easyrsa init-pki
     # this puts the cert into pki/ca.crt and the key into pki/private/ca.key
     ./easyrsa --batch "--req-cn=${PRIMARY_CN}@$(date +%s)" build-ca nopass
@@ -1002,13 +1091,92 @@ function generate-certs {
     ./easyrsa --dn-mode=org \
       --req-cn=kubecfg --req-org=system:masters \
       --req-c= --req-st= --req-city= --req-email= --req-ou= \
-      build-client-full kubecfg nopass) &>${cert_create_debug_output} || {
-    # If there was an error in the subshell, just die.
-    # TODO(roberthbailey): add better error handling here
+      build-client-full kubecfg nopass) &>${cert_create_debug_output} || true
+  local output_file_missing=0
+  local output_file
+  for output_file in \
+    "${CERT_DIR}/pki/private/ca.key" \
+    "${CERT_DIR}/pki/ca.crt" \
+    "${CERT_DIR}/pki/issued/${MASTER_NAME}.crt" \
+    "${CERT_DIR}/pki/private/${MASTER_NAME}.key" \
+    "${CERT_DIR}/pki/issued/kubelet.crt" \
+    "${CERT_DIR}/pki/private/kubelet.key" \
+    "${CERT_DIR}/pki/issued/kubecfg.crt" \
+    "${CERT_DIR}/pki/private/kubecfg.key" \
+    "${CERT_DIR}/pki/issued/kube-apiserver.crt" \
+    "${CERT_DIR}/pki/private/kube-apiserver.key"
+  do
+    if [[ ! -s "${output_file}" ]]; then
+      echo "Expected file ${output_file} not created" >&2
+      output_file_missing=1
+    fi
+  done
+  if (( $output_file_missing )); then
+    # TODO(roberthbailey,porridge): add better error handling here,
+    # see https://github.com/kubernetes/kubernetes/issues/55229
     cat "${cert_create_debug_output}" >&2
-    echo "=== Failed to generate certificates: Aborting ===" >&2
+    echo "=== Failed to generate master certificates: Aborting ===" >&2
     exit 2
-  }
+  fi
+}
+
+# Runs the easy RSA commands to generate aggregator certificate files.
+# The generated files are in ${AGGREGATOR_CERT_DIR}
+#
+# Assumed vars
+#   KUBE_TEMP
+#   AGGREGATOR_MASTER_NAME
+#   AGGREGATOR_CERT_DIR
+#   AGGREGATOR_PRIMARY_CN: Primary canonical name
+#   AGGREGATOR_SANS: Subject alternate names
+#
+#
+function generate-aggregator-certs {
+  local -r cert_create_debug_output=$(mktemp "${KUBE_TEMP}/cert_create_debug_output.XXX")
+  # Note: This was heavily cribbed from make-ca-cert.sh
+  (set -x
+    cd "${KUBE_TEMP}/easy-rsa-master/aggregator"
+    ./easyrsa init-pki
+    # this puts the cert into pki/ca.crt and the key into pki/private/ca.key
+    ./easyrsa --batch "--req-cn=${AGGREGATOR_PRIMARY_CN}@$(date +%s)" build-ca nopass
+    ./easyrsa --subject-alt-name="${AGGREGATOR_SANS}" build-server-full "${AGGREGATOR_MASTER_NAME}" nopass
+    ./easyrsa build-client-full aggregator-apiserver nopass
+
+    kube::util::ensure-cfssl "${KUBE_TEMP}/cfssl"
+
+    # make the config for the signer
+    echo '{"signing":{"default":{"expiry":"43800h","usages":["signing","key encipherment","client auth"]}}}' > "ca-config.json"
+    # create the aggregator client cert with the correct groups
+    echo '{"CN":"aggregator","hosts":[""],"key":{"algo":"rsa","size":2048}}' | "${CFSSL_BIN}" gencert -ca=pki/ca.crt -ca-key=pki/private/ca.key -config=ca-config.json - | "${CFSSLJSON_BIN}" -bare proxy-client
+    mv "proxy-client-key.pem" "pki/private/proxy-client.key"
+    mv "proxy-client.pem" "pki/issued/proxy-client.crt"
+    rm -f "proxy-client.csr"
+
+    # Make a superuser client cert with subject "O=system:masters, CN=kubecfg"
+    ./easyrsa --dn-mode=org \
+      --req-cn=proxy-clientcfg --req-org=system:aggregator \
+      --req-c= --req-st= --req-city= --req-email= --req-ou= \
+      build-client-full proxy-clientcfg nopass) &>${cert_create_debug_output} || true
+  local output_file_missing=0
+  local output_file
+  for output_file in \
+    "${AGGREGATOR_CERT_DIR}/pki/private/ca.key" \
+    "${AGGREGATOR_CERT_DIR}/pki/ca.crt" \
+    "${AGGREGATOR_CERT_DIR}/pki/issued/proxy-client.crt" \
+    "${AGGREGATOR_CERT_DIR}/pki/private/proxy-client.key"
+  do
+    if [[ ! -s "${output_file}" ]]; then
+      echo "Expected file ${output_file} not created" >&2
+      output_file_missing=1
+    fi
+  done
+  if (( $output_file_missing )); then
+    # TODO(roberthbailey,porridge): add better error handling here,
+    # see https://github.com/kubernetes/kubernetes/issues/55229
+    cat "${cert_create_debug_output}" >&2
+    echo "=== Failed to generate aggregator certificates: Aborting ===" >&2
+    exit 2
+  fi
 }
 
 # Run the cfssl command to generates certificate files for etcd service, the
@@ -1164,6 +1332,11 @@ function parse-master-env() {
   KUBELET_KEY_BASE64=$(get-env-val "${master_env}" "KUBELET_KEY")
   MASTER_CERT_BASE64=$(get-env-val "${master_env}" "MASTER_CERT")
   MASTER_KEY_BASE64=$(get-env-val "${master_env}" "MASTER_KEY")
+  AGGREGATOR_CA_KEY_BASE64=$(get-env-val "${master_env}" "AGGREGATOR_CA_KEY")
+  REQUESTHEADER_CA_CERT_BASE64=$(get-env-val "${master_env}" "REQUESTHEADER_CA_CERT")
+  PROXY_CLIENT_CERT_BASE64=$(get-env-val "${master_env}" "PROXY_CLIENT_CERT")
+  PROXY_CLIENT_KEY_BASE64=$(get-env-val "${master_env}" "PROXY_CLIENT_KEY")
+  ENABLE_LEGACY_ABAC=$(get-env-val "${master_env}" "ENABLE_LEGACY_ABAC")
 }
 
 # Update or verify required gcloud components are installed

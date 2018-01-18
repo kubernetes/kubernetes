@@ -30,6 +30,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
+	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/server/httplog"
 	"k8s.io/apiserver/pkg/util/wsstream"
 
@@ -49,7 +50,7 @@ type realTimeoutFactory struct {
 	timeout time.Duration
 }
 
-// TimeoutChan returns a channel which will receive something when the watch times out,
+// TimeoutCh returns a channel which will receive something when the watch times out,
 // and a cleanup function to call when this happens.
 func (w *realTimeoutFactory) TimeoutCh() (<-chan time.Time, func() bool) {
 	if w.timeout == 0 {
@@ -88,6 +89,13 @@ func serveWatch(watcher watch.Interface, scope RequestScope, req *http.Request, 
 		mediaType += ";stream=watch"
 	}
 
+	ctx := scope.ContextFunc(req)
+	requestInfo, ok := request.RequestInfoFrom(ctx)
+	if !ok {
+		scope.err(fmt.Errorf("missing requestInfo"), w, req)
+		return
+	}
+
 	server := &WatchServer{
 		Watching: watcher,
 		Scope:    scope,
@@ -98,7 +106,7 @@ func serveWatch(watcher watch.Interface, scope RequestScope, req *http.Request, 
 		Encoder:         encoder,
 		EmbeddedEncoder: embeddedEncoder,
 		Fixup: func(obj runtime.Object) {
-			if err := setSelfLink(obj, req, scope.Namer); err != nil {
+			if err := setSelfLink(obj, requestInfo, scope.Namer); err != nil {
 				utilruntime.HandleError(fmt.Errorf("failed to set link for object %v: %v", reflect.TypeOf(obj), err))
 			}
 		},

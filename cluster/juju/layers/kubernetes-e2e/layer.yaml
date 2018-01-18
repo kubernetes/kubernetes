@@ -4,6 +4,7 @@ includes:
   - layer:tls-client
   - layer:snap
   - interface:http
+  - interface:kube-control
 options:
   tls-client:
     ca_certificate_path: '/srv/kubernetes/ca.crt'

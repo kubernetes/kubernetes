@@ -27,49 +27,49 @@ func TestValidateArgs(t *testing.T) {
 	f, _, _, _ := cmdtesting.NewAPIFactory()
 
 	tests := []struct {
+		testName  string
 		flags     map[string]string
 		filenames []string
 		args      []string
 		expectErr bool
-		testName  string
 	}{
 		{
-			expectErr: true,
 			testName:  "nothing",
+			expectErr: true,
 		},
 		{
+			testName:  "no file, no image",
 			flags:     map[string]string{},
 			args:      []string{"foo"},
 			expectErr: true,
-			testName:  "no file, no image",
 		},
 		{
+			testName:  "valid file example",
 			filenames: []string{"bar.yaml"},
 			args:      []string{"foo"},
-			testName:  "valid file example",
 		},
 		{
-			flags: map[string]string{
-				"image": "foo:v2",
-			},
-			args:     []string{"foo"},
 			testName: "missing second image name",
-		},
-		{
 			flags: map[string]string{
 				"image": "foo:v2",
 			},
-			args:     []string{"foo", "foo-v2"},
-			testName: "valid image example",
+			args: []string{"foo"},
 		},
 		{
+			testName: "valid image example",
+			flags: map[string]string{
+				"image": "foo:v2",
+			},
+			args: []string{"foo", "foo-v2"},
+		},
+		{
+			testName: "both filename and image example",
 			flags: map[string]string{
 				"image": "foo:v2",
 			},
 			filenames: []string{"bar.yaml"},
 			args:      []string{"foo", "foo-v2"},
 			expectErr: true,
-			testName:  "both filename and image example",
 		},
 	}
 	for _, test := range tests {
@@ -83,10 +83,10 @@ func TestValidateArgs(t *testing.T) {
 		}
 		err := validateArguments(cmd, test.filenames, test.args)
 		if err != nil && !test.expectErr {
-			t.Errorf("unexpected error: %v (%s)", err, test.testName)
+			t.Errorf("%s: unexpected error: %v", test.testName, err)
 		}
 		if err == nil && test.expectErr {
-			t.Errorf("unexpected non-error (%s)", test.testName)
+			t.Errorf("%s: unexpected non-error", test.testName)
 		}
 	}
 }

@@ -39,6 +39,7 @@ function usage() {
   echo "  -M:  Upgrade master only"
   echo "  -N:  Upgrade nodes only"
   echo "  -P:  Node upgrade prerequisites only (create a new instance template)"
+  echo "  -c:  Upgrade NODE_UPGRADE_PARALLELISM nodes in parallel (default=1) within a single instance group. The MIGs themselves are dealt serially."
   echo "  -o:  Use os distro sepcified in KUBE_NODE_OS_DISTRIBUTION for new nodes. Options include 'debian' or 'gci'"
   echo "  -l:  Use local(dev) binaries. This is only supported for master upgrades."
   echo ""
@@ -98,8 +99,6 @@ function upgrade-master() {
   parse-master-env
   upgrade-master-env
 
-  backfile-kubeletauth-certs
-
   # Delete the master instance. Note that the master-pd is created
   # with auto-delete=no, so it should not be deleted.
   gcloud compute instances delete \
@@ -119,51 +118,6 @@ function upgrade-master-env() {
  if [[ "${ENABLE_NODE_PROBLEM_DETECTOR:-}" == "standalone" && "${NODE_PROBLEM_DETECTOR_TOKEN:-}" == "" ]]; then
     NODE_PROBLEM_DETECTOR_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
   fi
-}
-
-# TODO(mikedanese): delete when we don't support < 1.6
-function backfile-kubeletauth-certs() {
-  if [[ ! -z "${KUBEAPISERVER_CERT_BASE64:-}" && ! -z "${KUBEAPISERVER_CERT_BASE64:-}" ]]; then
-    return 0
-  fi
-
-  mkdir -p "${KUBE_TEMP}/pki"
-  echo "${CA_KEY_BASE64}" | base64 -d > "${KUBE_TEMP}/pki/ca.key"
-  echo "${CA_CERT_BASE64}" | base64 -d > "${KUBE_TEMP}/pki/ca.crt"
-  (cd "${KUBE_TEMP}/pki"
-    kube::util::ensure-cfssl "${KUBE_TEMP}/cfssl"
-    cat <<EOF > ca-config.json
-{
-  "signing": {
-    "client": {
-      "expiry": "43800h",
-      "usages": [
-        "signing",
-        "key encipherment",
-        "client auth"
-      ]
-    }
-  }
-}
-EOF
-    # the name kube-apiserver is bound to the node proxy
-    # subpaths required for the apiserver to hit proxy
-    # endpoints on the kubelet's handler.
-    cat <<EOF \
-      | "${CFSSL_BIN}" gencert \
-        -ca=ca.crt \
-        -ca-key=ca.key \
-        -config=ca-config.json \
-        -profile=client \
-        - \
-      | "${CFSSLJSON_BIN}" -bare kube-apiserver
-{
-  "CN": "kube-apiserver"
-}
-EOF
-  )
-  KUBEAPISERVER_CERT_BASE64=$(cat "${KUBE_TEMP}/pki/kube-apiserver.pem" | base64 | tr -d '\r\n')
-  KUBEAPISERVER_KEY_BASE64=$(cat "${KUBE_TEMP}/pki/kube-apiserver-key.pem" | base64 | tr -d '\r\n')
 }
 
 function wait-for-master() {
@@ -195,6 +149,7 @@ function wait-for-master() {
 function prepare-upgrade() {
   kube::util::ensure-temp-dir
   detect-project
+  detect-subnetworks
   detect-node-names # sets INSTANCE_GROUPS
   write-cluster-name
   tars_from_version
@@ -251,10 +206,15 @@ function setup-base-image() {
   if [[ "${env_os_distro}" == "false" ]]; then
     echo "== Ensuring that new Node base OS image matched the existing Node base OS image"
     NODE_OS_DISTRIBUTION=$(get-node-os "${NODE_NAMES[0]}")
+
+    if [[ "${NODE_OS_DISTRIBUTION}" == "cos" ]]; then
+        NODE_OS_DISTRIBUTION="gci"
+    fi
+    
     source "${KUBE_ROOT}/cluster/gce/${NODE_OS_DISTRIBUTION}/node-helper.sh"
     # Reset the node image based on current os distro
     set-node-image
-fi
+  fi
 }
 
 # prepare-node-upgrade creates a new instance template suitable for upgrading
@@ -327,10 +287,105 @@ function upgrade-node-env() {
   fi
 }
 
+# Upgrades a single node.
+# $1: The name of the node
+#
+# Note: This is called multiple times from do-node-upgrade() in parallel, so should be thread-safe.
+function do-single-node-upgrade() {
+  local -r instance="$1"
+  instance_id=$(gcloud compute instances describe "${instance}" \
+    --format='get(id)' \
+    --project="${PROJECT}" \
+    --zone="${ZONE}" 2>&1) && describe_rc=$? || describe_rc=$?
+  if [[ "${describe_rc}" != 0 ]]; then
+    echo "== FAILED to describe ${instance} =="
+    echo "${instance_id}"
+    return ${describe_rc}
+  fi
+
+  # Drain node
+  echo "== Draining ${instance}. == " >&2
+  "${KUBE_ROOT}/cluster/kubectl.sh" drain --delete-local-data --force --ignore-daemonsets "${instance}" \
+    && drain_rc=$? || drain_rc=$?
+  if [[ "${drain_rc}" != 0 ]]; then
+    echo "== FAILED to drain ${instance} =="
+    return ${drain_rc}
+  fi
+
+  # Recreate instance
+  echo "== Recreating instance ${instance}. ==" >&2
+  recreate=$(gcloud compute instance-groups managed recreate-instances "${group}" \
+    --project="${PROJECT}" \
+    --zone="${ZONE}" \
+    --instances="${instance}" 2>&1) && recreate_rc=$? || recreate_rc=$?
+  if [[ "${recreate_rc}" != 0 ]]; then
+    echo "== FAILED to recreate ${instance} =="
+    echo "${recreate}"
+    return ${recreate_rc}
+  fi
+
+  # Wait for instance to be recreated
+  echo "== Waiting for instance ${instance} to be recreated. ==" >&2
+  while true; do
+    new_instance_id=$(gcloud compute instances describe "${instance}" \
+      --format='get(id)' \
+      --project="${PROJECT}" \
+      --zone="${ZONE}" 2>&1) && describe_rc=$? || describe_rc=$?
+    if [[ "${describe_rc}" != 0 ]]; then
+      echo "== FAILED to describe ${instance} =="
+      echo "${new_instance_id}"
+      echo "  (Will retry.)"
+    elif [[ "${new_instance_id}" == "${instance_id}" ]]; then
+      echo -n .
+    else
+      echo "Instance ${instance} recreated."
+      break
+    fi
+    sleep 1
+  done
+
+  # Wait for k8s node object to reflect new instance id
+  echo "== Waiting for new node to be added to k8s.  ==" >&2
+  while true; do
+    external_id=$("${KUBE_ROOT}/cluster/kubectl.sh" get node "${instance}" --output=jsonpath='{.spec.externalID}' 2>&1) && kubectl_rc=$? || kubectl_rc=$?
+    if [[ "${kubectl_rc}" != 0 ]]; then
+      echo "== FAILED to get node ${instance} =="
+      echo "${external_id}"
+      echo "  (Will retry.)"
+    elif [[ "${external_id}" == "${new_instance_id}" ]]; then
+      echo "Node ${instance} recreated."
+      break
+    elif [[ "${external_id}" == "${instance_id}" ]]; then
+      echo -n .
+    else
+      echo "Unexpected external_id '${external_id}' matches neither old ('${instance_id}') nor new ('${new_instance_id}')."
+      echo "  (Will retry.)"
+    fi
+    sleep 1
+  done
+
+  # Wait for the node to not have SchedulingDisabled=True and also to have
+  # Ready=True.
+  echo "== Waiting for ${instance} to become ready. ==" >&2
+  while true; do
+    cordoned=$("${KUBE_ROOT}/cluster/kubectl.sh" get node "${instance}" --output='jsonpath={.status.conditions[?(@.type == "SchedulingDisabled")].status}')
+    ready=$("${KUBE_ROOT}/cluster/kubectl.sh" get node "${instance}" --output='jsonpath={.status.conditions[?(@.type == "Ready")].status}')
+    if [[ "${cordoned}" == 'True' ]]; then
+      echo "Node ${instance} is still not ready: SchedulingDisabled=${ready}"
+    elif [[ "${ready}" != 'True' ]]; then
+      echo "Node ${instance} is still not ready: Ready=${ready}"
+    else
+      echo "Node ${instance} Ready=${ready}"
+      break
+    fi
+    sleep 1
+  done
+}
+
 # Prereqs:
 # - prepare-node-upgrade should have been called successfully
 function do-node-upgrade() {
-  echo "== Upgrading nodes to ${KUBE_VERSION}. ==" >&2
+  echo "== Upgrading nodes to ${KUBE_VERSION} with max parallelism of ${node_upgrade_parallelism}. ==" >&2
   # Do the actual upgrade.
   # NOTE(zmerlynn): If you are changing this gcloud command, update
   #                 test/e2e/cluster_upgrade.go to match this EXACTLY.
@@ -340,54 +395,51 @@ function do-node-upgrade() {
   for group in ${INSTANCE_GROUPS[@]}; do
     old_templates+=($(gcloud compute instance-groups managed list \
         --project="${PROJECT}" \
-        --zones="${ZONE}" \
-        --regexp="${group}" \
+        --filter="name ~ '${group}' AND zone:(${ZONE})" \
         --format='value(instanceTemplate)' || true))
-    echo "== Calling rolling-update for ${group}. ==" >&2
-    update=$(gcloud alpha compute rolling-updates \
+    set_instance_template_out=$(gcloud compute instance-groups managed set-instance-template "${group}" \
+      --template="${template_name}" \
+      --project="${PROJECT}" \
+      --zone="${ZONE}" 2>&1) && set_instance_template_rc=$? || set_instance_template_rc=$?
+    if [[ "${set_instance_template_rc}" != 0 ]]; then
+      echo "== FAILED to set-instance-template for ${group} to ${template_name} =="
+      echo "${set_instance_template_out}"
+      return ${set_instance_template_rc}
+    fi
+    instances=()
+    instances+=($(gcloud compute instance-groups managed list-instances "${group}" \
+        --format='value(instance)' \
         --project="${PROJECT}" \
-        --zone="${ZONE}" \
-        start \
-        --group="${group}" \
-        --template="${template_name}" \
-        --instance-startup-timeout=300s \
-        --max-num-concurrent-instances=1 \
-        --max-num-failed-instances=0 \
-        --min-instance-update-time=0s 2>&1) && update_rc=$? || update_rc=$?
-
-    if [[ "${update_rc}" != 0 ]]; then
-      echo "== FAILED to start rolling-update: =="
-      echo "${update}"
-      echo "  This may be due to a preexisting rolling-update;"
-      echo "  see https://github.com/kubernetes/kubernetes/issues/33113 for details."
-      echo "  All rolling-updates in project ${PROJECT} zone ${ZONE}:"
-      gcloud alpha compute rolling-updates \
-        --project="${PROJECT}" \
-        --zone="${ZONE}" \
-        list || true
-      return ${update_rc}
+        --zone="${ZONE}" 2>&1)) && list_instances_rc=$? || list_instances_rc=$?
+    if [[ "${list_instances_rc}" != 0 ]]; then
+      echo "== FAILED to list instances in group ${group} =="
+      echo "${instances}"
+      return ${list_instances_rc}
     fi
 
-    id=$(echo "${update}" | grep "Started" | cut -d '/' -f 11 | cut -d ']' -f 1)
-    updates+=("${id}")
-  done
+    process_count_left=${node_upgrade_parallelism}
+    pids=()
+    ret_code_sum=0  # Should stay 0 in the loop iff all parallel node upgrades succeed.
+    for instance in ${instances[@]}; do
+      do-single-node-upgrade "${instance}" & pids+=("$!")
 
-  echo "== Waiting for Upgrading nodes to be finished. ==" >&2
-  # Wait until rolling updates are finished.
-  for update in ${updates[@]}; do
-    while true; do
-      result=$(gcloud alpha compute rolling-updates \
-          --project="${PROJECT}" \
-          --zone="${ZONE}" \
-          describe \
-          ${update} \
-          --format='value(status)' || true)
-      if [ $result = "ROLLED_OUT" ]; then
-        echo "Rolling update ${update} is ${result} state and finished."
-        break
+      # We don't want to run more than ${node_upgrade_parallelism} upgrades at a time,
+      # so wait once we hit that many nodes. This isn't ideal, since one might take much
+      # longer than the others, but it should help.
+      process_count_left=$((process_count_left - 1))
+      if [[ process_count_left -eq 0 || "${instance}" == "${instances[-1]}" ]]; then
+        # Wait for each of the parallel node upgrades to finish.
+        for pid in "${pids[@]}"; do
+          wait $pid
+          ret_code_sum=$(( ret_code_sum + $? ))
+        done
+        # Return even if at least one of the node upgrades failed.
+        if [[ ${ret_code_sum} != 0 ]]; then
+          echo "== Some of the ${node_upgrade_parallelism} parallel node upgrades failed. =="
+          return ${ret_code_sum}
+        fi
+        process_count_left=${node_upgrade_parallelism}
       fi
-      echo "Rolling update ${update} is still in ${result} state."
-      sleep 10
     done
   done
 
@@ -408,8 +460,9 @@ node_upgrade=true
 node_prereqs=false
 local_binaries=false
 env_os_distro=false
+node_upgrade_parallelism=1
 
-while getopts ":MNPlho" opt; do
+while getopts ":MNPlcho" opt; do
   case ${opt} in
     M)
       node_upgrade=false
@@ -422,6 +475,9 @@ while getopts ":MNPlho" opt; do
       ;;
     l)
       local_binaries=true
+      ;;
+    c)
+      node_upgrade_parallelism=${NODE_UPGRADE_PARALLELISM:-1}
       ;;
     o)
       env_os_distro=true
@@ -478,6 +534,39 @@ if [[ -z "${STORAGE_MEDIA_TYPE:-}" ]] && [[ "${STORAGE_BACKEND:-}" != "etcd2" ]]
     echo ""
     echo "STORAGE_MEDIA_TYPE must be specified when run non-interactively." >&2
     exit 1
+  fi
+fi
+
+# Prompt if etcd image/version is unspecified when doing master upgrade.
+# In e2e tests, we use TEST_ALLOW_IMPLICIT_ETCD_UPGRADE=true to skip this
+# prompt, simulating the behavior when the user confirms interactively.
+# All other automated use of this script should explicitly specify a version.
+if [[ "${master_upgrade}" == "true" ]]; then
+  if [[ -z "${ETCD_IMAGE:-}" && -z "${TEST_ETCD_IMAGE:-}" ]] || [[ -z "${ETCD_VERSION:-}" && -z "${TEST_ETCD_VERSION:-}" ]]; then
+    echo
+    echo "***WARNING***"
+    echo "Upgrading Kubernetes with this script might result in an upgrade to a new etcd version."
+    echo "Some etcd version upgrades, such as 3.0.x to 3.1.x, DO NOT offer a downgrade path."
+    echo "To pin the etcd version to your current one (e.g. v3.0.17), set the following variables"
+    echo "before running this script:"
+    echo
+    echo "# example: pin to etcd v3.0.17"
+    echo "export ETCD_IMAGE=3.0.17"
+    echo "export ETCD_VERSION=3.0.17"
+    echo
+    echo "Alternatively, if you choose to allow an etcd upgrade that doesn't support downgrade,"
+    echo "you might still be able to downgrade Kubernetes by pinning to the newer etcd version."
+    echo "In all cases, it is strongly recommended to have an etcd backup before upgrading."
+    echo
+    if [ -t 0 ] && [ -t 1 ]; then
+      read -p "Continue with default etcd version, which might upgrade etcd? [y/N] " confirm
+      if [[ "${confirm}" != "y" ]]; then
+        exit 1
+      fi
+    elif [[ "${TEST_ALLOW_IMPLICIT_ETCD_UPGRADE:-}" != "true" ]]; then
+      echo "ETCD_IMAGE and ETCD_VERSION must be specified when run non-interactively." >&2
+      exit 1
+    fi
   fi
 fi
 

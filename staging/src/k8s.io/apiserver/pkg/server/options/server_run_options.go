@@ -19,6 +19,7 @@ package options
 import (
 	"fmt"
 	"net"
+	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
@@ -39,9 +40,9 @@ type ServerRunOptions struct {
 	ExternalHost                string
 	MaxRequestsInFlight         int
 	MaxMutatingRequestsInFlight int
+	RequestTimeout              time.Duration
 	MinRequestTimeout           int
 	TargetRAMMB                 int
-	WatchCacheSizes             []string
 }
 
 func NewServerRunOptions() *ServerRunOptions {
@@ -49,6 +50,7 @@ func NewServerRunOptions() *ServerRunOptions {
 	return &ServerRunOptions{
 		MaxRequestsInFlight:         defaults.MaxRequestsInFlight,
 		MaxMutatingRequestsInFlight: defaults.MaxMutatingRequestsInFlight,
+		RequestTimeout:              defaults.RequestTimeout,
 		MinRequestTimeout:           defaults.MinRequestTimeout,
 	}
 }
@@ -59,6 +61,7 @@ func (s *ServerRunOptions) ApplyTo(c *server.Config) error {
 	c.ExternalAddress = s.ExternalHost
 	c.MaxRequestsInFlight = s.MaxRequestsInFlight
 	c.MaxMutatingRequestsInFlight = s.MaxMutatingRequestsInFlight
+	c.RequestTimeout = s.RequestTimeout
 	c.MinRequestTimeout = s.MinRequestTimeout
 	c.PublicAddress = s.AdvertiseAddress
 
@@ -83,6 +86,26 @@ func (s *ServerRunOptions) DefaultAdvertiseAddress(secure *SecureServingOptions)
 	return nil
 }
 
+// Validate checks validation of ServerRunOptions
+func (s *ServerRunOptions) Validate() []error {
+	errors := []error{}
+	if s.TargetRAMMB < 0 {
+		errors = append(errors, fmt.Errorf("--target-ram-mb can not be negative value"))
+	}
+	if s.MaxRequestsInFlight < 0 {
+		errors = append(errors, fmt.Errorf("--max-requests-inflight can not be negative value"))
+	}
+	if s.MaxMutatingRequestsInFlight < 0 {
+		errors = append(errors, fmt.Errorf("--max-mutating-requests-inflight can not be negative value"))
+	}
+
+	if s.RequestTimeout.Nanoseconds() < 0 {
+		errors = append(errors, fmt.Errorf("--request-timeout can not be negative value"))
+	}
+
+	return errors
+}
+
 // AddFlags adds flags for a specific APIServer to the specified FlagSet
 func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 	// Note: the weird ""+ in below lines seems to be the only way to get gofmt to
@@ -104,12 +127,6 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.ExternalHost, "external-hostname", s.ExternalHost,
 		"The hostname to use when generating externalized URLs for this master (e.g. Swagger API Docs).")
 
-	// TODO: remove post-1.6
-	fs.String("long-running-request-regexp", "", ""+
-		"A regular expression matching long running requests which should "+
-		"be excluded from maximum inflight request handling.")
-	fs.MarkDeprecated("long-running-request-regexp", "regular expression matching of long-running requests is no longer supported")
-
 	deprecatedMasterServiceNamespace := metav1.NamespaceDefault
 	fs.StringVar(&deprecatedMasterServiceNamespace, "master-service-namespace", deprecatedMasterServiceNamespace, ""+
 		"DEPRECATED: the namespace from which the kubernetes master services should be injected into pods.")
@@ -122,16 +139,16 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 		"The maximum number of mutating requests in flight at a given time. When the server exceeds this, "+
 		"it rejects requests. Zero for no limit.")
 
+	fs.DurationVar(&s.RequestTimeout, "request-timeout", s.RequestTimeout, ""+
+		"An optional field indicating the duration a handler must keep a request open before timing "+
+		"it out. This is the default request timeout for requests but may be overridden by flags such as "+
+		"--min-request-timeout for specific types of requests.")
+
 	fs.IntVar(&s.MinRequestTimeout, "min-request-timeout", s.MinRequestTimeout, ""+
 		"An optional field indicating the minimum number of seconds a handler must keep "+
 		"a request open before timing it out. Currently only honored by the watch request "+
 		"handler, which picks a randomized value above this number as the connection timeout, "+
 		"to spread out load.")
-
-	fs.StringSliceVar(&s.WatchCacheSizes, "watch-cache-sizes", s.WatchCacheSizes, ""+
-		"List of watch cache sizes for every resource (pods, nodes, etc.), comma separated. "+
-		"The individual override format: resource#size, where size is a number. It takes effect "+
-		"when watch-cache is enabled.")
 
 	utilfeature.DefaultFeatureGate.AddFlag(fs)
 }

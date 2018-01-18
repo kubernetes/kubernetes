@@ -26,12 +26,33 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path"
 	"strconv"
 	"strings"
 
 	"github.com/golang/glog"
 	"golang.org/x/net/http2"
 )
+
+// JoinPreservingTrailingSlash does a path.Join of the specified elements,
+// preserving any trailing slash on the last non-empty segment
+func JoinPreservingTrailingSlash(elem ...string) string {
+	// do the basic path join
+	result := path.Join(elem...)
+
+	// find the last non-empty segment
+	for i := len(elem) - 1; i >= 0; i-- {
+		if len(elem[i]) > 0 {
+			// if the last segment ended in a slash, ensure our result does as well
+			if strings.HasSuffix(elem[i], "/") && !strings.HasSuffix(result, "/") {
+				result += "/"
+			}
+			break
+		}
+	}
+
+	return result
+}
 
 // IsProbableEOF returns true if the given error resembles a connection termination
 // scenario that would justify assuming that the watch is empty.
@@ -108,7 +129,7 @@ func DialerFor(transport http.RoundTripper) (DialFunc, error) {
 	case RoundTripperWrapper:
 		return DialerFor(transport.WrappedRoundTripper())
 	default:
-		return nil, fmt.Errorf("unknown transport type: %v", transport)
+		return nil, fmt.Errorf("unknown transport type: %T", transport)
 	}
 }
 
@@ -129,7 +150,7 @@ func TLSClientConfig(transport http.RoundTripper) (*tls.Config, error) {
 	case RoundTripperWrapper:
 		return TLSClientConfig(transport.WrappedRoundTripper())
 	default:
-		return nil, fmt.Errorf("unknown transport type: %v", transport)
+		return nil, fmt.Errorf("unknown transport type: %T", transport)
 	}
 }
 
@@ -150,13 +171,13 @@ func GetHTTPClient(req *http.Request) string {
 	return "unknown"
 }
 
-// Extracts and returns the clients IP from the given request.
-// Looks at X-Forwarded-For header, X-Real-Ip header and request.RemoteAddr in that order.
-// Returns nil if none of them are set or is set to an invalid value.
-func GetClientIP(req *http.Request) net.IP {
+// SourceIPs splits the comma separated X-Forwarded-For header or returns the X-Real-Ip header or req.RemoteAddr,
+// in that order, ignoring invalid IPs. It returns nil if all of these are empty or invalid.
+func SourceIPs(req *http.Request) []net.IP {
 	hdr := req.Header
 	// First check the X-Forwarded-For header for requests via proxy.
 	hdrForwardedFor := hdr.Get("X-Forwarded-For")
+	forwardedForIPs := []net.IP{}
 	if hdrForwardedFor != "" {
 		// X-Forwarded-For can be a csv of IPs in case of multiple proxies.
 		// Use the first valid one.
@@ -164,9 +185,12 @@ func GetClientIP(req *http.Request) net.IP {
 		for _, part := range parts {
 			ip := net.ParseIP(strings.TrimSpace(part))
 			if ip != nil {
-				return ip
+				forwardedForIPs = append(forwardedForIPs, ip)
 			}
 		}
+	}
+	if len(forwardedForIPs) > 0 {
+		return forwardedForIPs
 	}
 
 	// Try the X-Real-Ip header.
@@ -174,7 +198,7 @@ func GetClientIP(req *http.Request) net.IP {
 	if hdrRealIp != "" {
 		ip := net.ParseIP(hdrRealIp)
 		if ip != nil {
-			return ip
+			return []net.IP{ip}
 		}
 	}
 
@@ -182,11 +206,43 @@ func GetClientIP(req *http.Request) net.IP {
 	// Remote Address in Go's HTTP server is in the form host:port so we need to split that first.
 	host, _, err := net.SplitHostPort(req.RemoteAddr)
 	if err == nil {
-		return net.ParseIP(host)
+		if remoteIP := net.ParseIP(host); remoteIP != nil {
+			return []net.IP{remoteIP}
+		}
 	}
 
 	// Fallback if Remote Address was just IP.
-	return net.ParseIP(req.RemoteAddr)
+	if remoteIP := net.ParseIP(req.RemoteAddr); remoteIP != nil {
+		return []net.IP{remoteIP}
+	}
+
+	return nil
+}
+
+// Extracts and returns the clients IP from the given request.
+// Looks at X-Forwarded-For header, X-Real-Ip header and request.RemoteAddr in that order.
+// Returns nil if none of them are set or is set to an invalid value.
+func GetClientIP(req *http.Request) net.IP {
+	ips := SourceIPs(req)
+	if len(ips) == 0 {
+		return nil
+	}
+	return ips[0]
+}
+
+// Prepares the X-Forwarded-For header for another forwarding hop by appending the previous sender's
+// IP address to the X-Forwarded-For chain.
+func AppendForwardedForHeader(req *http.Request) {
+	// Copied from net/http/httputil/reverseproxy.go:
+	if clientIP, _, err := net.SplitHostPort(req.RemoteAddr); err == nil {
+		// If we aren't the first proxy retain prior
+		// X-Forwarded-For information as a comma+space
+		// separated list and fold multiple headers into one.
+		if prior, ok := req.Header["X-Forwarded-For"]; ok {
+			clientIP = strings.Join(prior, ", ") + ", " + clientIP
+		}
+		req.Header.Set("X-Forwarded-For", clientIP)
+	}
 }
 
 var defaultProxyFuncPointer = fmt.Sprintf("%p", http.ProxyFromEnvironment)
@@ -200,8 +256,11 @@ func isDefault(transportProxier func(*http.Request) (*url.URL, error)) bool {
 // NewProxierWithNoProxyCIDR constructs a Proxier function that respects CIDRs in NO_PROXY and delegates if
 // no matching CIDRs are found
 func NewProxierWithNoProxyCIDR(delegate func(req *http.Request) (*url.URL, error)) func(req *http.Request) (*url.URL, error) {
-	// we wrap the default method, so we only need to perform our check if the NO_PROXY envvar has a CIDR in it
+	// we wrap the default method, so we only need to perform our check if the NO_PROXY (or no_proxy) envvar has a CIDR in it
 	noProxyEnv := os.Getenv("NO_PROXY")
+	if noProxyEnv == "" {
+		noProxyEnv = os.Getenv("no_proxy")
+	}
 	noProxyRules := strings.Split(noProxyEnv, ",")
 
 	cidrs := []*net.IPNet{}
@@ -217,17 +276,7 @@ func NewProxierWithNoProxyCIDR(delegate func(req *http.Request) (*url.URL, error
 	}
 
 	return func(req *http.Request) (*url.URL, error) {
-		host := req.URL.Host
-		// for some urls, the Host is already the host, not the host:port
-		if net.ParseIP(host) == nil {
-			var err error
-			host, _, err = net.SplitHostPort(req.URL.Host)
-			if err != nil {
-				return delegate(req)
-			}
-		}
-
-		ip := net.ParseIP(host)
+		ip := net.ParseIP(req.URL.Hostname())
 		if ip == nil {
 			return delegate(req)
 		}
@@ -240,6 +289,13 @@ func NewProxierWithNoProxyCIDR(delegate func(req *http.Request) (*url.URL, error
 
 		return delegate(req)
 	}
+}
+
+// DialerFunc implements Dialer for the provided function.
+type DialerFunc func(req *http.Request) (net.Conn, error)
+
+func (fn DialerFunc) Dial(req *http.Request) (net.Conn, error) {
+	return fn(req)
 }
 
 // Dialer dials a host and writes a request to it.

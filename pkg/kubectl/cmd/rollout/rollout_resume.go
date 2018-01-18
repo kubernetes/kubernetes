@@ -31,7 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
-	"k8s.io/kubernetes/pkg/util/i18n"
+	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
 
 // ResumeConfig is the start of the data required to perform the operation.  As new fields are added, add them here instead of
@@ -45,7 +45,8 @@ type ResumeConfig struct {
 	Encoder runtime.Encoder
 	Infos   []*resource.Info
 
-	Out io.Writer
+	PrintSuccess func(mapper meta.RESTMapper, shortOutput bool, out io.Writer, resource, name string, dryRun bool, operation string)
+	Out          io.Writer
 }
 
 var (
@@ -94,10 +95,11 @@ func NewCmdRolloutResume(f cmdutil.Factory, out io.Writer) *cobra.Command {
 }
 
 func (o *ResumeConfig) CompleteResume(f cmdutil.Factory, cmd *cobra.Command, out io.Writer, args []string) error {
-	if len(args) == 0 && cmdutil.IsFilenameEmpty(o.Filenames) {
-		return cmdutil.UsageError(cmd, cmd.Use)
+	if len(args) == 0 && cmdutil.IsFilenameSliceEmpty(o.Filenames) {
+		return cmdutil.UsageErrorf(cmd, "%s", cmd.Use)
 	}
 
+	o.PrintSuccess = f.PrintSuccess
 	o.Mapper, o.Typer = f.Object()
 	o.Encoder = f.JSONEncoder()
 
@@ -109,7 +111,8 @@ func (o *ResumeConfig) CompleteResume(f cmdutil.Factory, cmd *cobra.Command, out
 		return err
 	}
 
-	r := resource.NewBuilder(o.Mapper, f.CategoryExpander(), o.Typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
+	r := f.NewBuilder().
+		Internal().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, &o.FilenameOptions).
 		ResourceTypeOrNameArgs(true, args...).
@@ -146,7 +149,7 @@ func (o ResumeConfig) RunResume() error {
 		}
 
 		if string(patch.Patch) == "{}" || len(patch.Patch) == 0 {
-			cmdutil.PrintSuccess(o.Mapper, false, o.Out, info.Mapping.Resource, info.Name, false, "already resumed")
+			o.PrintSuccess(o.Mapper, false, o.Out, info.Mapping.Resource, info.Name, false, "already resumed")
 			continue
 		}
 
@@ -157,7 +160,7 @@ func (o ResumeConfig) RunResume() error {
 		}
 
 		info.Refresh(obj, true)
-		cmdutil.PrintSuccess(o.Mapper, false, o.Out, info.Mapping.Resource, info.Name, false, "resumed")
+		o.PrintSuccess(o.Mapper, false, o.Out, info.Mapping.Resource, info.Name, false, "resumed")
 	}
 
 	return utilerrors.NewAggregate(allErrs)

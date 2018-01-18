@@ -111,6 +111,20 @@ func TestRequestHeader(t *testing.T) {
 			},
 			expectedOk: true,
 		},
+		"groups case-insensitive": {
+			nameHeaders:  []string{"X-REMOTE-User"},
+			groupHeaders: []string{"X-REMOTE-Group"},
+			requestHeaders: http.Header{
+				"X-Remote-User":  {"Bob"},
+				"X-Remote-Group": {"Users"},
+			},
+			expectedUser: &user.DefaultInfo{
+				Name:   "Bob",
+				Groups: []string{"Users"},
+				Extra:  map[string][]string{},
+			},
+			expectedOk: true,
+		},
 
 		"extra prefix matches case-insensitive": {
 			nameHeaders:        []string{"X-Remote-User"},

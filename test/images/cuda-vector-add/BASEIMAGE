@@ -1,0 +1,2 @@
+amd64=nvidia/cuda:8.0-devel-ubuntu16.04
+ppc64le=nvidia/cuda-ppc64le:8.0-devel-ubuntu16.04

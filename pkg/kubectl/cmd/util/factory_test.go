@@ -18,38 +18,33 @@ package util
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
-	"io/ioutil"
-	"net/http"
-	"os"
-	"os/user"
-	"path"
 	"sort"
 	"strings"
 	"testing"
 	"time"
 
+	"k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/util/flag"
 	manualfake "k8s.io/client-go/rest/fake"
 	testcore "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/api/validation"
-	"k8s.io/kubernetes/pkg/apis/extensions"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/kubectl"
+	"k8s.io/kubernetes/pkg/kubectl/categories"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 )
 
@@ -88,22 +83,16 @@ func TestPortsForObject(t *testing.T) {
 		},
 	}
 
-	expected := []string{"101"}
-	got, err := f.PortsForObject(pod)
+	expected := sets.NewString("101")
+	ports, err := f.PortsForObject(pod)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-	if len(expected) != len(got) {
-		t.Fatalf("Ports size mismatch! Expected %d, got %d", len(expected), len(got))
-	}
 
-	sort.Strings(expected)
-	sort.Strings(got)
+	got := sets.NewString(ports...)
 
-	for i, port := range got {
-		if port != expected[i] {
-			t.Fatalf("Port mismatch! Expected %s, got %s", expected[i], port)
-		}
+	if !expected.Equal(got) {
+		t.Fatalf("Ports mismatch! Expected %v, got %v", expected, got)
 	}
 }
 
@@ -130,22 +119,18 @@ func TestProtocolsForObject(t *testing.T) {
 		},
 	}
 
-	expected := "101/TCP,102/UDP"
+	expected := sets.NewString("101/TCP", "102/UDP")
 	protocolsMap, err := f.ProtocolsForObject(pod)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-	got := kubectl.MakeProtocols(protocolsMap)
-	expectedSlice := strings.Split(expected, ",")
-	gotSlice := strings.Split(got, ",")
 
-	sort.Strings(expectedSlice)
-	sort.Strings(gotSlice)
+	protocolsString := kubectl.MakeProtocols(protocolsMap)
+	protocolsStrings := strings.Split(protocolsString, ",")
+	got := sets.NewString(protocolsStrings...)
 
-	for i, protocol := range gotSlice {
-		if protocol != expectedSlice[i] {
-			t.Fatalf("Protocols mismatch! Expected %s, got %s", expectedSlice[i], protocol)
-		}
+	if !expected.Equal(got) {
+		t.Fatalf("Protocols mismatch! Expected %v, got %v", expected, got)
 	}
 }
 
@@ -236,202 +221,6 @@ func TestFlagUnderscoreRenaming(t *testing.T) {
 	// In case of failure of this test check this PR: spf13/pflag#23
 	if factory.FlagSet().Lookup("valid_flag").Name != "valid-flag" {
 		t.Fatalf("Expected flag name to be valid-flag, got %s", factory.FlagSet().Lookup("valid_flag").Name)
-	}
-}
-
-func loadSchemaForTest() (validation.Schema, error) {
-	pathToSwaggerSpec := "../../../../api/swagger-spec/" + api.Registry.GroupOrDie(api.GroupName).GroupVersion.Version + ".json"
-	data, err := ioutil.ReadFile(pathToSwaggerSpec)
-	if err != nil {
-		return nil, err
-	}
-	return validation.NewSwaggerSchemaFromBytes(data, nil)
-}
-
-func header() http.Header {
-	header := http.Header{}
-	header.Set("Content-Type", runtime.ContentTypeJSON)
-	return header
-}
-
-func TestRefetchSchemaWhenValidationFails(t *testing.T) {
-	schema, err := loadSchemaForTest()
-	if err != nil {
-		t.Errorf("Error loading schema: %v", err)
-		t.FailNow()
-	}
-	output, err := json.Marshal(schema)
-	if err != nil {
-		t.Errorf("Error serializing schema: %v", err)
-		t.FailNow()
-	}
-	requests := map[string]int{}
-
-	c := &manualfake.RESTClient{
-		APIRegistry:          api.Registry,
-		NegotiatedSerializer: testapi.Default.NegotiatedSerializer(),
-		Client: manualfake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-			switch p, m := req.URL.Path, req.Method; {
-			case strings.HasPrefix(p, "/swaggerapi") && m == "GET":
-				requests[p] = requests[p] + 1
-				return &http.Response{StatusCode: 200, Header: header(), Body: ioutil.NopCloser(bytes.NewBuffer(output))}, nil
-			default:
-				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
-				return nil, nil
-			}
-		}),
-	}
-	dir := os.TempDir() + "/schemaCache"
-	os.RemoveAll(dir)
-
-	fullDir, err := substituteUserHome(dir)
-	if err != nil {
-		t.Errorf("Error getting fullDir: %v", err)
-		t.FailNow()
-	}
-	cacheFile := path.Join(fullDir, "foo", "bar", schemaFileName)
-	err = writeSchemaFile(output, fullDir, cacheFile, "foo", "bar")
-	if err != nil {
-		t.Errorf("Error building old cache schema: %v", err)
-		t.FailNow()
-	}
-
-	obj := &extensions.Deployment{}
-	data, err := runtime.Encode(testapi.Extensions.Codec(), obj)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-		t.FailNow()
-	}
-
-	// Re-get request, should use HTTP and write
-	if getSchemaAndValidate(c, data, "foo", "bar", dir, nil); err != nil {
-		t.Errorf("unexpected error validating: %v", err)
-	}
-	if requests["/swaggerapi/foo/bar"] != 1 {
-		t.Errorf("expected 1 schema request, saw: %d", requests["/swaggerapi/foo/bar"])
-	}
-}
-
-func TestValidateCachesSchema(t *testing.T) {
-	schema, err := loadSchemaForTest()
-	if err != nil {
-		t.Errorf("Error loading schema: %v", err)
-		t.FailNow()
-	}
-	output, err := json.Marshal(schema)
-	if err != nil {
-		t.Errorf("Error serializing schema: %v", err)
-		t.FailNow()
-	}
-	requests := map[string]int{}
-
-	c := &manualfake.RESTClient{
-		APIRegistry:          api.Registry,
-		NegotiatedSerializer: testapi.Default.NegotiatedSerializer(),
-		Client: manualfake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-			switch p, m := req.URL.Path, req.Method; {
-			case strings.HasPrefix(p, "/swaggerapi") && m == "GET":
-				requests[p] = requests[p] + 1
-				return &http.Response{StatusCode: 200, Header: header(), Body: ioutil.NopCloser(bytes.NewBuffer(output))}, nil
-			default:
-				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
-				return nil, nil
-			}
-		}),
-	}
-	dir := os.TempDir() + "/schemaCache"
-	os.RemoveAll(dir)
-
-	obj := &api.Pod{}
-	data, err := runtime.Encode(testapi.Default.Codec(), obj)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-		t.FailNow()
-	}
-
-	// Initial request, should use HTTP and write
-	if getSchemaAndValidate(c, data, "foo", "bar", dir, nil); err != nil {
-		t.Errorf("unexpected error validating: %v", err)
-	}
-	if _, err := os.Stat(path.Join(dir, "foo", "bar", schemaFileName)); err != nil {
-		t.Errorf("unexpected missing cache file: %v", err)
-	}
-	if requests["/swaggerapi/foo/bar"] != 1 {
-		t.Errorf("expected 1 schema request, saw: %d", requests["/swaggerapi/foo/bar"])
-	}
-
-	// Same version and group, should skip HTTP
-	if getSchemaAndValidate(c, data, "foo", "bar", dir, nil); err != nil {
-		t.Errorf("unexpected error validating: %v", err)
-	}
-	if requests["/swaggerapi/foo/bar"] != 2 {
-		t.Errorf("expected 1 schema request, saw: %d", requests["/swaggerapi/foo/bar"])
-	}
-
-	// Different API group, should go to HTTP and write
-	if getSchemaAndValidate(c, data, "foo", "baz", dir, nil); err != nil {
-		t.Errorf("unexpected error validating: %v", err)
-	}
-	if _, err := os.Stat(path.Join(dir, "foo", "baz", schemaFileName)); err != nil {
-		t.Errorf("unexpected missing cache file: %v", err)
-	}
-	if requests["/swaggerapi/foo/baz"] != 1 {
-		t.Errorf("expected 1 schema request, saw: %d", requests["/swaggerapi/foo/baz"])
-	}
-
-	// Different version, should go to HTTP and write
-	if getSchemaAndValidate(c, data, "foo2", "bar", dir, nil); err != nil {
-		t.Errorf("unexpected error validating: %v", err)
-	}
-	if _, err := os.Stat(path.Join(dir, "foo2", "bar", schemaFileName)); err != nil {
-		t.Errorf("unexpected missing cache file: %v", err)
-	}
-	if requests["/swaggerapi/foo2/bar"] != 1 {
-		t.Errorf("expected 1 schema request, saw: %d", requests["/swaggerapi/foo2/bar"])
-	}
-
-	// No cache dir, should go straight to HTTP and not write
-	if getSchemaAndValidate(c, data, "foo", "blah", "", nil); err != nil {
-		t.Errorf("unexpected error validating: %v", err)
-	}
-	if requests["/swaggerapi/foo/blah"] != 1 {
-		t.Errorf("expected 1 schema request, saw: %d", requests["/swaggerapi/foo/blah"])
-	}
-	if _, err := os.Stat(path.Join(dir, "foo", "blah", schemaFileName)); err == nil || !os.IsNotExist(err) {
-		t.Errorf("unexpected cache file error: %v", err)
-	}
-}
-
-func TestSubstitueUser(t *testing.T) {
-	usr, err := user.Current()
-	if err != nil {
-		t.Logf("SKIPPING TEST: unexpected error: %v", err)
-		return
-	}
-	tests := []struct {
-		input     string
-		expected  string
-		expectErr bool
-	}{
-		{input: "~/foo", expected: path.Join(os.Getenv("HOME"), "foo")},
-		{input: "~" + usr.Username + "/bar", expected: usr.HomeDir + "/bar"},
-		{input: "/foo/bar", expected: "/foo/bar"},
-		{input: "~doesntexit/bar", expectErr: true},
-	}
-	for _, test := range tests {
-		output, err := substituteUserHome(test.input)
-		if test.expectErr {
-			if err == nil {
-				t.Error("unexpected non-error")
-			}
-			continue
-		}
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-		if output != test.expected {
-			t.Errorf("expected: %s, saw: %s", test.expected, output)
-		}
 	}
 }
 
@@ -609,7 +398,7 @@ func TestGetFirstPod(t *testing.T) {
 		}
 		selector := labels.Set(labelSet).AsSelector()
 
-		pod, numPods, err := GetFirstPod(fake.Core(), metav1.NamespaceDefault, selector, 1*time.Minute, test.sortBy)
+		pod, numPods, err := GetFirstPod(fake.Core(), metav1.NamespaceDefault, selector.String(), 1*time.Minute, test.sortBy)
 		pod.Spec.SecurityContext = nil
 		if !test.expectedErr && err != nil {
 			t.Errorf("%s: unexpected error: %v", test.name, err)
@@ -740,21 +529,27 @@ func TestDiscoveryReplaceAliases(t *testing.T) {
 		{
 			name:     "all-replacement",
 			arg:      "all",
-			expected: "pods,replicationcontrollers,services,statefulsets.apps,horizontalpodautoscalers.autoscaling,jobs.batch,deployments.extensions,replicasets.extensions",
+			expected: "pods,replicationcontrollers,services,statefulsets.apps,horizontalpodautoscalers.autoscaling,jobs.batch,cronjobs.batch,daemonsets.extensions,deployments.extensions,replicasets.extensions",
 		},
 		{
 			name:     "alias-in-comma-separated-arg",
 			arg:      "all,secrets",
-			expected: "pods,replicationcontrollers,services,statefulsets.apps,horizontalpodautoscalers.autoscaling,jobs.batch,deployments.extensions,replicasets.extensions,secrets",
+			expected: "pods,replicationcontrollers,services,statefulsets.apps,horizontalpodautoscalers.autoscaling,jobs.batch,cronjobs.batch,daemonsets.extensions,deployments.extensions,replicasets.extensions,secrets",
 		},
 	}
 
 	ds := &fakeDiscoveryClient{}
-	mapper, err := NewShortcutExpander(testapi.Default.RESTMapper(), ds)
-	if err != nil {
-		t.Fatalf("Unable to create shortcut expander, err = %s", err.Error())
-	}
-	b := resource.NewBuilder(mapper, resource.LegacyCategoryExpander, api.Scheme, fakeClient(), testapi.Default.Codec())
+	mapper := NewShortcutExpander(testapi.Default.RESTMapper(), ds)
+	b := resource.NewBuilder(
+		&resource.Mapper{
+			RESTMapper:   mapper,
+			ObjectTyper:  legacyscheme.Scheme,
+			ClientMapper: fakeClient(),
+			Decoder:      testapi.Default.Codec(),
+		},
+		nil,
+		categories.LegacyCategoryExpander,
+	)
 
 	for _, test := range tests {
 		replaced := b.ReplaceAliases(test.arg)

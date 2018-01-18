@@ -24,15 +24,15 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/pborman/uuid"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
+	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
 )
 
 // ProbeVolumePlugins is the primary entrypoint for volume plugins.
@@ -91,7 +91,7 @@ func (plugin *quobytePlugin) CanSupport(spec *volume.Spec) bool {
 	}
 
 	// If Quobyte is already mounted we don't need to check if the binary is installed
-	if mounter, err := plugin.newMounterInternal(spec, nil, plugin.host.GetMounter()); err == nil {
+	if mounter, err := plugin.newMounterInternal(spec, nil, plugin.host.GetMounter(plugin.GetPluginName())); err == nil {
 		qm, _ := mounter.(*quobyteMounter)
 		pluginDir := plugin.host.GetPluginDir(strings.EscapeQualifiedNameForDisk(quobytePluginName))
 		if mounted, err := qm.pluginDirIsMounted(pluginDir); mounted && err == nil {
@@ -102,7 +102,8 @@ func (plugin *quobytePlugin) CanSupport(spec *volume.Spec) bool {
 		glog.V(4).Infof("quobyte: Error: %v", err)
 	}
 
-	if out, err := exec.New().Command("ls", "/sbin/mount.quobyte").CombinedOutput(); err == nil {
+	exec := plugin.host.GetExec(plugin.GetPluginName())
+	if out, err := exec.Run("ls", "/sbin/mount.quobyte"); err == nil {
 		glog.V(4).Infof("quobyte: can support: %s", string(out))
 		return true
 	}
@@ -154,7 +155,7 @@ func (plugin *quobytePlugin) ConstructVolumeSpec(volumeName, mountPath string) (
 }
 
 func (plugin *quobytePlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ volume.VolumeOptions) (volume.Mounter, error) {
-	return plugin.newMounterInternal(spec, pod, plugin.host.GetMounter())
+	return plugin.newMounterInternal(spec, pod, plugin.host.GetMounter(plugin.GetPluginName()))
 }
 
 func (plugin *quobytePlugin) newMounterInternal(spec *volume.Spec, pod *v1.Pod, mounter mount.Interface) (volume.Mounter, error) {
@@ -180,7 +181,7 @@ func (plugin *quobytePlugin) newMounterInternal(spec *volume.Spec, pod *v1.Pod, 
 }
 
 func (plugin *quobytePlugin) NewUnmounter(volName string, podUID types.UID) (volume.Unmounter, error) {
-	return plugin.newUnmounterInternal(volName, podUID, plugin.host.GetMounter())
+	return plugin.newUnmounterInternal(volName, podUID, plugin.host.GetMounter(plugin.GetPluginName()))
 }
 
 func (plugin *quobytePlugin) newUnmounterInternal(volName string, podUID types.UID, mounter mount.Interface) (volume.Unmounter, error) {
@@ -233,12 +234,12 @@ func (mounter *quobyteMounter) CanMount() error {
 }
 
 // SetUp attaches the disk and bind mounts to the volume path.
-func (mounter *quobyteMounter) SetUp(fsGroup *types.UnixGroupID) error {
+func (mounter *quobyteMounter) SetUp(fsGroup *int64) error {
 	pluginDir := mounter.plugin.host.GetPluginDir(strings.EscapeQualifiedNameForDisk(quobytePluginName))
 	return mounter.SetUpAt(pluginDir, fsGroup)
 }
 
-func (mounter *quobyteMounter) SetUpAt(dir string, fsGroup *types.UnixGroupID) error {
+func (mounter *quobyteMounter) SetUpAt(dir string, fsGroup *int64) error {
 	// Check if Quobyte is already mounted on the host in the Plugin Dir
 	// if so we can use this mountpoint instead of creating a new one
 	// IsLikelyNotMountPoint wouldn't check the mount type
@@ -355,11 +356,16 @@ type quobyteVolumeProvisioner struct {
 }
 
 func (provisioner *quobyteVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
+	if !volume.AccessModesContainedInAll(provisioner.plugin.GetAccessModes(), provisioner.options.PVC.Spec.AccessModes) {
+		return nil, fmt.Errorf("invalid AccessModes %v: only AccessModes %v are supported", provisioner.options.PVC.Spec.AccessModes, provisioner.plugin.GetAccessModes())
+	}
+
 	if provisioner.options.PVC.Spec.Selector != nil {
 		return nil, fmt.Errorf("claim Selector is not supported")
 	}
 	provisioner.config = "BASE"
 	provisioner.tenant = "DEFAULT"
+	createQuota := false
 
 	cfg, err := parseAPIConfig(provisioner.plugin, provisioner.options.Parameters)
 	if err != nil {
@@ -377,6 +383,8 @@ func (provisioner *quobyteVolumeProvisioner) Provision() (*v1.PersistentVolume, 
 			provisioner.tenant = v
 		case "quobyteconfig":
 			provisioner.config = v
+		case "createquota":
+			createQuota = gostrings.ToLower(v) == "true"
 		case "adminsecretname",
 			"adminsecretnamespace",
 			"quobyteapiserver":
@@ -387,7 +395,7 @@ func (provisioner *quobyteVolumeProvisioner) Provision() (*v1.PersistentVolume, 
 	}
 
 	if !validateRegistry(provisioner.registry) {
-		return nil, fmt.Errorf("Quoybte registry missing or malformed: must be a host:port pair or multiple pairs separated by commas")
+		return nil, fmt.Errorf("Quobyte registry missing or malformed: must be a host:port pair or multiple pairs separated by commas")
 	}
 
 	// create random image name
@@ -397,11 +405,12 @@ func (provisioner *quobyteVolumeProvisioner) Provision() (*v1.PersistentVolume, 
 		config: cfg,
 	}
 
-	vol, sizeGB, err := manager.createVolume(provisioner)
+	vol, sizeGB, err := manager.createVolume(provisioner, createQuota)
 	if err != nil {
 		return nil, err
 	}
 	pv := new(v1.PersistentVolume)
+	metav1.SetMetaDataAnnotation(&pv.ObjectMeta, volumehelper.VolumeDynamicallyCreatedByKey, "quobyte-dynamic-provisioner")
 	pv.Spec.PersistentVolumeSource.Quobyte = vol
 	pv.Spec.PersistentVolumeReclaimPolicy = provisioner.options.PersistentVolumeReclaimPolicy
 	pv.Spec.AccessModes = provisioner.options.PVC.Spec.AccessModes
@@ -411,6 +420,7 @@ func (provisioner *quobyteVolumeProvisioner) Provision() (*v1.PersistentVolume, 
 	pv.Spec.Capacity = v1.ResourceList{
 		v1.ResourceName(v1.ResourceStorage): resource.MustParse(fmt.Sprintf("%dGi", sizeGB)),
 	}
+	pv.Spec.MountOptions = provisioner.options.MountOptions
 	return pv, nil
 }
 
@@ -456,7 +466,7 @@ func parseAPIConfig(plugin *quobytePlugin, params map[string]string) (*quobyteAP
 	}
 
 	if len(apiServer) == 0 {
-		return nil, fmt.Errorf("Quoybte API server missing or malformed: must be a http(s)://host:port pair or multiple pairs separated by commas")
+		return nil, fmt.Errorf("Quobyte API server missing or malformed: must be a http(s)://host:port pair or multiple pairs separated by commas")
 	}
 
 	secretMap, err := util.GetSecretForPV(secretNamespace, secretName, quobytePluginName, plugin.host.GetKubeClient())

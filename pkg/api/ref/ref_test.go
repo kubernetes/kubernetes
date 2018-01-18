@@ -23,27 +23,37 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
 type FakeAPIObject struct{}
 
 func (obj *FakeAPIObject) GetObjectKind() schema.ObjectKind { return schema.EmptyObjectKind }
+func (obj *FakeAPIObject) DeepCopyObject() runtime.Object {
+	if obj == nil {
+		return nil
+	}
+	clone := *obj
+	return &clone
+}
 
 type ExtensionAPIObject struct {
 	metav1.TypeMeta
 	metav1.ObjectMeta
 }
 
-func (obj *ExtensionAPIObject) GetObjectKind() schema.ObjectKind { return &obj.TypeMeta }
+func (obj *ExtensionAPIObject) DeepCopyObject() runtime.Object {
+	panic("ExtensionAPIObject does not support DeepCopy")
+}
 
 func TestGetReference(t *testing.T) {
 
 	// when vendoring kube, if you don't force the set of registered versions (like make test does)
 	// then you run into trouble because the types aren't registered in the scheme by anything.  This does the
 	// register manually to allow unit test execution
-	if _, _, err := api.Scheme.ObjectKinds(&api.Pod{}); err != nil {
-		api.AddToScheme(api.Scheme)
+	if _, _, err := legacyscheme.Scheme.ObjectKinds(&api.Pod{}); err != nil {
+		api.AddToScheme(legacyscheme.Scheme)
 	}
 
 	table := map[string]struct {
@@ -126,7 +136,7 @@ func TestGetReference(t *testing.T) {
 	}
 
 	for name, item := range table {
-		ref, err := GetPartialReference(api.Scheme, item.obj, item.fieldPath)
+		ref, err := GetPartialReference(legacyscheme.Scheme, item.obj, item.fieldPath)
 		if e, a := item.shouldErr, (err != nil); e != a {
 			t.Errorf("%v: expected %v, got %v, err %v", name, e, a, err)
 			continue

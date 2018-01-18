@@ -24,20 +24,23 @@ import (
 	"reflect"
 	"testing"
 
+	rbac "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apis/rbac"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 )
 
-var groupVersion = schema.GroupVersion{Group: "rbac.authorization.k8s.io", Version: "v1alpha1"}
+var groupVersion = schema.GroupVersion{Group: "rbac.authorization.k8s.io", Version: "v1"}
 
 func TestCreateRoleBinding(t *testing.T) {
 	expectBinding := &rbac.RoleBinding{
+		TypeMeta: v1.TypeMeta{
+			APIVersion: "rbac.authorization.k8s.io/v1",
+			Kind:       "RoleBinding",
+		},
 		ObjectMeta: v1.ObjectMeta{
 			Name: "fake-binding",
 		},
@@ -75,7 +78,6 @@ func TestCreateRoleBinding(t *testing.T) {
 	tf.Printer = &testPrinter{}
 	tf.Client = &RoleBindingRESTClient{
 		RESTClient: &fake.RESTClient{
-			APIRegistry:          api.Registry,
 			NegotiatedSerializer: ns,
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 				switch p, m := req.URL.Path, req.Method; {

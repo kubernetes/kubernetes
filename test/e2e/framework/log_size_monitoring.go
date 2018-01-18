@@ -25,7 +25,7 @@ import (
 	"text/tabwriter"
 	"time"
 
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	clientset "k8s.io/client-go/kubernetes"
 )
 
 const (
@@ -249,9 +249,13 @@ func (g *LogSizeGatherer) Work() bool {
 	)
 	if err != nil {
 		Logf("Error while trying to SSH to %v, skipping probe. Error: %v", workItem.ip, err)
-		if workItem.backoffMultiplier < 128 {
-			workItem.backoffMultiplier *= 2
+		// In case of repeated error give up.
+		if workItem.backoffMultiplier >= 128 {
+			Logf("Failed to ssh to a node %v multiple times in a row. Giving up.", workItem.ip)
+			g.wg.Done()
+			return false
 		}
+		workItem.backoffMultiplier *= 2
 		go g.pushWorkItem(workItem)
 		return true
 	}

@@ -21,7 +21,9 @@ import (
 	"time"
 
 	"golang.org/x/net/context"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apiserver/pkg/apis/audit"
 	"k8s.io/apiserver/pkg/authentication/user"
 )
 
@@ -63,7 +65,8 @@ const (
 	// userAgentKey is the context key for the request user agent.
 	userAgentKey
 
-	namespaceDefault = "default" // TODO(sttts): solve import cycle when using metav1.NamespaceDefault
+	// auditKey is the context key for the audit event.
+	auditKey
 )
 
 // NewContext instantiates a base context object for request flows.
@@ -73,7 +76,7 @@ func NewContext() Context {
 
 // NewDefaultContext instantiates a base context object for request flows in the default namespace
 func NewDefaultContext() Context {
-	return WithNamespace(NewContext(), namespaceDefault)
+	return WithNamespace(NewContext(), metav1.NamespaceDefault)
 }
 
 // WithValue returns a copy of parent in which the value associated with key is val.
@@ -106,7 +109,7 @@ func NamespaceValue(ctx Context) string {
 func WithNamespaceDefaultIfNone(parent Context) Context {
 	namespace, ok := NamespaceFrom(parent)
 	if !ok || len(namespace) == 0 {
-		return WithNamespace(parent, namespaceDefault)
+		return WithNamespace(parent, metav1.NamespaceDefault)
 	}
 	return parent
 }
@@ -142,4 +145,15 @@ func WithUserAgent(parent Context, userAgent string) Context {
 func UserAgentFrom(ctx Context) (string, bool) {
 	userAgent, ok := ctx.Value(userAgentKey).(string)
 	return userAgent, ok
+}
+
+// WithAuditEvent returns set audit event struct.
+func WithAuditEvent(parent Context, ev *audit.Event) Context {
+	return WithValue(parent, auditKey, ev)
+}
+
+// AuditEventFrom returns the audit event struct on the ctx
+func AuditEventFrom(ctx Context) *audit.Event {
+	ev, _ := ctx.Value(auditKey).(*audit.Event)
+	return ev
 }

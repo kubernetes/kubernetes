@@ -18,8 +18,10 @@ package podtolerationrestriction
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 )
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // Configuration provides configuration for the PodTolerationRestriction admission controller.
 type Configuration struct {

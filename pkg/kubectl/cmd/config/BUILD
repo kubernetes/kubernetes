@@ -1,7 +1,3 @@
-package(default_visibility = ["//visibility:public"])
-
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -21,20 +17,22 @@ go_library(
         "get_clusters.go",
         "get_contexts.go",
         "navigation_step_parser.go",
+        "rename_context.go",
         "set.go",
         "unset.go",
         "use_context.go",
         "view.go",
     ],
-    tags = ["automanaged"],
+    importpath = "k8s.io/kubernetes/pkg/kubectl/cmd/config",
+    visibility = [
+        "//build/visible_to:pkg_kubectl_cmd_config_CONSUMERS",
+    ],
     deps = [
         "//pkg/kubectl/cmd/templates:go_default_library",
         "//pkg/kubectl/cmd/util:go_default_library",
+        "//pkg/kubectl/util/i18n:go_default_library",
         "//pkg/printers:go_default_library",
-        "//pkg/util/i18n:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/api/meta:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/errors:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/util/flag:go_default_library",
@@ -49,6 +47,7 @@ go_test(
     srcs = [
         "config_test.go",
         "create_authinfo_test.go",
+        "create_cluster_test.go",
         "create_context_test.go",
         "current_context_test.go",
         "delete_cluster_test.go",
@@ -56,13 +55,14 @@ go_test(
         "get_clusters_test.go",
         "get_contexts_test.go",
         "navigation_step_parser_test.go",
+        "rename_context_test.go",
         "set_test.go",
         "unset_test.go",
         "use_context_test.go",
         "view_test.go",
     ],
-    library = ":go_default_library",
-    tags = ["automanaged"],
+    embed = [":go_default_library"],
+    importpath = "k8s.io/kubernetes/pkg/kubectl/cmd/config",
     deps = [
         "//pkg/kubectl/cmd/util:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/equality:go_default_library",
@@ -77,11 +77,13 @@ filegroup(
     name = "package-srcs",
     srcs = glob(["**"]),
     tags = ["automanaged"],
-    visibility = ["//visibility:private"],
 )
 
 filegroup(
     name = "all-srcs",
     srcs = [":package-srcs"],
     tags = ["automanaged"],
+    visibility = [
+        "//build/visible_to:pkg_kubectl_cmd_config_CONSUMERS",
+    ],
 )

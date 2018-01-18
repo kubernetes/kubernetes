@@ -25,22 +25,32 @@ import (
 	"net/http"
 	"os"
 	"reflect"
+	stdstrings "strings"
 	"testing"
 	"time"
+
+	"github.com/spf13/cobra"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	apitesting "k8s.io/kubernetes/pkg/api/testing"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/printers"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 	"k8s.io/kubernetes/pkg/util/strings"
 )
+
+// This init should be removed after switching this command and its tests to user external types.
+func init() {
+	api.AddToScheme(scheme.Scheme)
+}
 
 func initTestErrorHandler(t *testing.T) {
 	cmdutil.BehaviorOnFatal(func(str string, code int) {
@@ -58,27 +68,63 @@ func defaultClientConfig() *restclient.Config {
 	return &restclient.Config{
 		APIPath: "/api",
 		ContentConfig: restclient.ContentConfig{
-			NegotiatedSerializer: api.Codecs,
+			NegotiatedSerializer: scheme.Codecs,
 			ContentType:          runtime.ContentTypeJSON,
-			GroupVersion:         &api.Registry.GroupOrDie(api.GroupName).GroupVersion,
+			GroupVersion:         &schema.GroupVersion{Version: "v1"},
 		},
 	}
 }
 
-func defaultClientConfigForVersion(version *schema.GroupVersion) *restclient.Config {
-	return &restclient.Config{
-		APIPath: "/api",
-		ContentConfig: restclient.ContentConfig{
-			NegotiatedSerializer: api.Codecs,
-			ContentType:          runtime.ContentTypeJSON,
-			GroupVersion:         version,
+func testData() (*api.PodList, *api.ServiceList, *api.ReplicationControllerList) {
+	pods := &api.PodList{
+		ListMeta: metav1.ListMeta{
+			ResourceVersion: "15",
+		},
+		Items: []api.Pod{
+			{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test", ResourceVersion: "10"},
+				Spec:       apitesting.DeepEqualSafePodSpec(),
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{Name: "bar", Namespace: "test", ResourceVersion: "11"},
+				Spec:       apitesting.DeepEqualSafePodSpec(),
+			},
 		},
 	}
+	svc := &api.ServiceList{
+		ListMeta: metav1.ListMeta{
+			ResourceVersion: "16",
+		},
+		Items: []api.Service{
+			{
+				ObjectMeta: metav1.ObjectMeta{Name: "baz", Namespace: "test", ResourceVersion: "12"},
+				Spec: api.ServiceSpec{
+					SessionAffinity: "None",
+					Type:            api.ServiceTypeClusterIP,
+				},
+			},
+		},
+	}
+	rc := &api.ReplicationControllerList{
+		ListMeta: metav1.ListMeta{
+			ResourceVersion: "17",
+		},
+		Items: []api.ReplicationController{
+			{
+				ObjectMeta: metav1.ObjectMeta{Name: "rc1", Namespace: "test", ResourceVersion: "18"},
+				Spec: api.ReplicationControllerSpec{
+					Replicas: 1,
+				},
+			},
+		},
+	}
+	return pods, svc, rc
 }
 
 type testPrinter struct {
-	Objects []runtime.Object
-	Err     error
+	Objects        []runtime.Object
+	Err            error
+	GenericPrinter bool
 }
 
 func (t *testPrinter) PrintObj(obj runtime.Object, out io.Writer) error {
@@ -94,6 +140,10 @@ func (t *testPrinter) HandledResources() []string {
 
 func (t *testPrinter) AfterPrint(output io.Writer, res string) error {
 	return nil
+}
+
+func (t *testPrinter) IsGeneric() bool {
+	return t.GenericPrinter
 }
 
 type testDescriber struct {
@@ -154,7 +204,6 @@ func Example_printReplicationControllerWithNamespace() {
 	printersinternal.AddHandlers(p)
 	tf.Printer = p
 	tf.Client = &fake.RESTClient{
-		APIRegistry:          api.Registry,
 		NegotiatedSerializer: ns,
 		Client:               nil,
 	}
@@ -189,7 +238,7 @@ func Example_printReplicationControllerWithNamespace() {
 		},
 	}
 	mapper, _ := f.Object()
-	err := f.PrintObject(cmd, mapper, ctrl, os.Stdout)
+	err := f.PrintObject(cmd, false, mapper, ctrl, os.Stdout)
 	if err != nil {
 		fmt.Printf("Unexpected error: %v", err)
 	}
@@ -207,7 +256,6 @@ func Example_printMultiContainersReplicationControllerWithWide() {
 	printersinternal.AddHandlers(p)
 	tf.Printer = p
 	tf.Client = &fake.RESTClient{
-		APIRegistry:          api.Registry,
 		NegotiatedSerializer: ns,
 		Client:               nil,
 	}
@@ -244,13 +292,13 @@ func Example_printMultiContainersReplicationControllerWithWide() {
 		},
 	}
 	mapper, _ := f.Object()
-	err := f.PrintObject(cmd, mapper, ctrl, os.Stdout)
+	err := f.PrintObject(cmd, false, mapper, ctrl, os.Stdout)
 	if err != nil {
 		fmt.Printf("Unexpected error: %v", err)
 	}
 	// Output:
-	// NAME      DESIRED   CURRENT   READY     AGE       CONTAINER(S)   IMAGE(S)               SELECTOR
-	// foo       1         1         0         10y       foo,foo2       someimage,someimage2   foo=bar
+	// NAME      DESIRED   CURRENT   READY     AGE       CONTAINERS   IMAGES                 SELECTOR
+	// foo       1         1         0         10y       foo,foo2     someimage,someimage2   foo=bar
 }
 
 func Example_printReplicationController() {
@@ -261,7 +309,6 @@ func Example_printReplicationController() {
 	printersinternal.AddHandlers(p)
 	tf.Printer = p
 	tf.Client = &fake.RESTClient{
-		APIRegistry:          api.Registry,
 		NegotiatedSerializer: ns,
 		Client:               nil,
 	}
@@ -298,7 +345,7 @@ func Example_printReplicationController() {
 		},
 	}
 	mapper, _ := f.Object()
-	err := f.PrintObject(cmd, mapper, ctrl, os.Stdout)
+	err := f.PrintObject(cmd, false, mapper, ctrl, os.Stdout)
 	if err != nil {
 		fmt.Printf("Unexpected error: %v", err)
 	}
@@ -316,7 +363,6 @@ func Example_printPodWithWideFormat() {
 	printersinternal.AddHandlers(p)
 	tf.Printer = p
 	tf.Client = &fake.RESTClient{
-		APIRegistry:          api.Registry,
 		NegotiatedSerializer: ns,
 		Client:               nil,
 	}
@@ -341,7 +387,7 @@ func Example_printPodWithWideFormat() {
 		},
 	}
 	mapper, _ := f.Object()
-	err := f.PrintObject(cmd, mapper, pod, os.Stdout)
+	err := f.PrintObject(cmd, false, mapper, pod, os.Stdout)
 	if err != nil {
 		fmt.Printf("Unexpected error: %v", err)
 	}
@@ -359,7 +405,6 @@ func Example_printPodWithShowLabels() {
 	printersinternal.AddHandlers(p)
 	tf.Printer = p
 	tf.Client = &fake.RESTClient{
-		APIRegistry:          api.Registry,
 		NegotiatedSerializer: ns,
 		Client:               nil,
 	}
@@ -387,7 +432,7 @@ func Example_printPodWithShowLabels() {
 		},
 	}
 	mapper, _ := f.Object()
-	err := f.PrintObject(cmd, mapper, pod, os.Stdout)
+	err := f.PrintObject(cmd, false, mapper, pod, os.Stdout)
 	if err != nil {
 		fmt.Printf("Unexpected error: %v", err)
 	}
@@ -496,7 +541,6 @@ func Example_printPodHideTerminated() {
 	printersinternal.AddHandlers(p)
 	tf.Printer = p
 	tf.Client = &fake.RESTClient{
-		APIRegistry:          api.Registry,
 		NegotiatedSerializer: ns,
 		Client:               nil,
 	}
@@ -504,14 +548,14 @@ func Example_printPodHideTerminated() {
 	podList := newAllPhasePodList()
 	// filter pods
 	filterFuncs := f.DefaultResourceFilterFunc()
-	filterOpts := f.DefaultResourceFilterOptions(cmd, false)
+	filterOpts := cmdutil.ExtractCmdPrintOptions(cmd, false)
 	_, filteredPodList, errs := cmdutil.FilterResourceList(podList, filterFuncs, filterOpts)
 	if errs != nil {
 		fmt.Printf("Unexpected filter error: %v\n", errs)
 	}
 	for _, pod := range filteredPodList {
 		mapper, _ := f.Object()
-		err := f.PrintObject(cmd, mapper, pod, os.Stdout)
+		err := f.PrintObject(cmd, false, mapper, pod, os.Stdout)
 		if err != nil {
 			fmt.Printf("Unexpected error: %v", err)
 		}
@@ -532,14 +576,13 @@ func Example_printPodShowAll() {
 	printersinternal.AddHandlers(p)
 	tf.Printer = p
 	tf.Client = &fake.RESTClient{
-		APIRegistry:          api.Registry,
 		NegotiatedSerializer: ns,
 		Client:               nil,
 	}
 	cmd := NewCmdRun(f, os.Stdin, os.Stdout, os.Stderr)
 	podList := newAllPhasePodList()
 	mapper, _ := f.Object()
-	err := f.PrintObject(cmd, mapper, podList, os.Stdout)
+	err := f.PrintObject(cmd, false, mapper, podList, os.Stdout)
 	if err != nil {
 		fmt.Printf("Unexpected error: %v", err)
 	}
@@ -561,7 +604,6 @@ func Example_printServiceWithNamespacesAndLabels() {
 	printersinternal.AddHandlers(p)
 	tf.Printer = p
 	tf.Client = &fake.RESTClient{
-		APIRegistry:          api.Registry,
 		NegotiatedSerializer: ns,
 		Client:               nil,
 	}
@@ -586,6 +628,7 @@ func Example_printServiceWithNamespacesAndLabels() {
 						"s": "magic",
 					},
 					ClusterIP: "10.1.1.1",
+					Type:      api.ServiceTypeClusterIP,
 				},
 				Status: api.ServiceStatus{},
 			},
@@ -607,22 +650,22 @@ func Example_printServiceWithNamespacesAndLabels() {
 						"s": "kazam",
 					},
 					ClusterIP: "10.1.1.2",
+					Type:      api.ServiceTypeClusterIP,
 				},
 				Status: api.ServiceStatus{},
 			}},
 	}
 	ld := strings.NewLineDelimiter(os.Stdout, "|")
 	defer ld.Flush()
-
 	mapper, _ := f.Object()
-	err := f.PrintObject(cmd, mapper, svc, ld)
+	err := f.PrintObject(cmd, false, mapper, svc, ld)
 	if err != nil {
 		fmt.Printf("Unexpected error: %v", err)
 	}
 	// Output:
-	// |NAMESPACE   NAME      CLUSTER-IP   EXTERNAL-IP   PORT(S)           AGE       L1|
-	// |ns1         svc1      10.1.1.1     <unknown>     53/UDP,53/TCP     10y       value|
-	// |ns2         svc2      10.1.1.2     <unknown>     80/TCP,8080/TCP   10y       dolla-bill-yall|
+	// |NAMESPACE   NAME      TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)           AGE       L1|
+	// |ns1         svc1      ClusterIP   10.1.1.1     <none>        53/UDP,53/TCP     10y       value|
+	// |ns2         svc2      ClusterIP   10.1.1.2     <none>        80/TCP,8080/TCP   10y       dolla-bill-yall|
 	// ||
 }
 
@@ -658,4 +701,54 @@ func genResponseWithJsonEncodedBody(bodyStruct interface{}) (*http.Response, err
 		return nil, err
 	}
 	return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: bytesBody(jsonBytes)}, nil
+}
+
+func Test_deprecatedAlias(t *testing.T) {
+	var correctCommandCalled bool
+	makeCobraCommand := func() *cobra.Command {
+		cobraCmd := new(cobra.Command)
+		cobraCmd.Use = "print five lines"
+		cobraCmd.Run = func(*cobra.Command, []string) {
+			correctCommandCalled = true
+		}
+		return cobraCmd
+	}
+
+	original := makeCobraCommand()
+	alias := deprecatedAlias("echo", makeCobraCommand())
+
+	if len(alias.Deprecated) == 0 {
+		t.Error("deprecatedAlias should always have a non-empty .Deprecated")
+	}
+	if !stdstrings.Contains(alias.Deprecated, "print") {
+		t.Error("deprecatedAlias should give the name of the new function in its .Deprecated field")
+	}
+	if !alias.Hidden {
+		t.Error("deprecatedAlias should never have .Hidden == false (deprecated aliases should be hidden)")
+	}
+
+	if alias.Name() != "echo" {
+		t.Errorf("deprecatedAlias has name %q, expected %q",
+			alias.Name(), "echo")
+	}
+	if original.Name() != "print" {
+		t.Errorf("original command has name %q, expected %q",
+			original.Name(), "print")
+	}
+
+	buffer := new(bytes.Buffer)
+	alias.SetOutput(buffer)
+	alias.Execute()
+	str := buffer.String()
+	if !stdstrings.Contains(str, "deprecated") || !stdstrings.Contains(str, "print") {
+		t.Errorf("deprecation warning %q does not include enough information", str)
+	}
+
+	// It would be nice to test to see that original.Run == alias.Run
+	// Unfortunately Golang does not allow comparing functions. I could do
+	// this with reflect, but that's technically invoking undefined
+	// behavior. Best we can do is make sure that the function is called.
+	if !correctCommandCalled {
+		t.Errorf("original function doesn't appear to have been called by alias")
+	}
 }

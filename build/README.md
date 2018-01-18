@@ -5,10 +5,10 @@ Building Kubernetes is easy if you take advantage of the containerized build env
 ## Requirements
 
 1. Docker, using one of the following configurations:
-  1. **Mac OS X** You can either use Docker for Mac or docker-machine. See installation instructions [here](https://docs.docker.com/docker-for-mac/).
+  * **Mac OS X** You can either use Docker for Mac or docker-machine. See installation instructions [here](https://docs.docker.com/docker-for-mac/).
      **Note**: You will want to set the Docker VM to have at least 3GB of initial memory or building will likely fail. (See: [#11852]( http://issue.k8s.io/11852)).
-  2. **Linux with local Docker**  Install Docker according to the [instructions](https://docs.docker.com/installation/#installation) for your OS.
-  3. **Remote Docker engine** Use a big machine in the cloud to build faster. This is a little trickier so look at the section later on.
+  * **Linux with local Docker**  Install Docker according to the [instructions](https://docs.docker.com/installation/#installation) for your OS.
+  * **Remote Docker engine** Use a big machine in the cloud to build faster. This is a little trickier so look at the section later on.
 2. **Optional** [Google Cloud SDK](https://developers.google.com/cloud/sdk/)
 
 You must install and configure Google Cloud SDK if you want to upload your release to Google Cloud Storage and may safely omit this otherwise.
@@ -100,12 +100,10 @@ The main output is a tar file: `kubernetes.tar.gz`.  This includes:
 * Examples
 * Cluster deployment scripts for various clouds
 * Tar file containing all server binaries
-* Tar file containing salt deployment tree shared across multiple cloud deployments.
 
 In addition, there are some other tar files that are created:
 * `kubernetes-client-*.tar.gz` Client binaries for a specific platform.
 * `kubernetes-server-*.tar.gz` Server binaries for a specific platform.
-* `kubernetes-salt.tar.gz` The salt script/tree shared across multiple deployment scripts.
 
 When building final release tars, they are first staged into `_output/release-stage` before being tar'd up and put into `_output/release-tars`.
 

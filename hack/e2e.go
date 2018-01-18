@@ -25,6 +25,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"strings"
 	"time"
@@ -81,12 +82,21 @@ func main() {
 }
 
 func wait(cmd string, args ...string) error {
+	sigChannel := make(chan os.Signal, 1)
+	signal.Notify(sigChannel, os.Interrupt)
+
 	c := exec.Command(cmd, args...)
 	c.Stdout = os.Stdout
 	c.Stderr = os.Stderr
 	if err := c.Start(); err != nil {
 		return err
 	}
+	go func() {
+		sig := <-sigChannel
+		if err := c.Process.Signal(sig); err != nil {
+			log.Fatalf("could not send %s signal %s: %v", cmd, sig, err)
+		}
+	}()
 	return c.Wait()
 }
 
@@ -112,7 +122,7 @@ func (t tester) lookKubetest() (string, error) {
 		p := filepath.Join(t.goPath, "bin", "kubetest")
 		_, err := t.stat(p)
 		if err == nil {
-			return p, err
+			return p, nil
 		}
 	}
 
@@ -144,8 +154,9 @@ func (t tester) getKubetest(get bool, old time.Duration) (string, error) {
 		return "", fmt.Errorf("Cannot install kubetest until $GOPATH is set")
 	}
 	log.Print("Updating kubetest binary...")
-	if err = t.wait("go", "get", "-u", "k8s.io/test-infra/kubetest"); err != nil {
-		return "", err // Could not upgrade
+	cmd := []string{"go", "get", "-u", "k8s.io/test-infra/kubetest"}
+	if err = t.wait(cmd[0], cmd[1:]...); err != nil {
+		return "", fmt.Errorf("%s: %v", strings.Join(cmd, " "), err) // Could not upgrade
 	}
 	if p, err = t.lookKubetest(); err != nil {
 		return "", err // Cannot find kubetest

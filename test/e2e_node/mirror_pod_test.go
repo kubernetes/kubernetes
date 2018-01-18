@@ -23,16 +23,17 @@ import (
 	"path/filepath"
 	"time"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
-	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 var _ = framework.KubeDescribe("MirrorPod", func() {
@@ -48,7 +49,7 @@ var _ = framework.KubeDescribe("MirrorPod", func() {
 
 			By("create the static pod")
 			err := createStaticPod(manifestPath, staticPodName, ns,
-				"gcr.io/google_containers/nginx-slim:0.7", v1.RestartPolicyAlways)
+				imageutils.GetE2EImage(imageutils.NginxSlim), v1.RestartPolicyAlways)
 			Expect(err).ShouldNot(HaveOccurred())
 
 			By("wait for the mirror pod to be running")
@@ -56,9 +57,9 @@ var _ = framework.KubeDescribe("MirrorPod", func() {
 				return checkMirrorPodRunning(f.ClientSet, mirrorPodName, ns)
 			}, 2*time.Minute, time.Second*4).Should(BeNil())
 		})
-		It("should be updated when static pod updated [Conformance]", func() {
+		framework.ConformanceIt("should be updated when static pod updated", func() {
 			By("get mirror pod uid")
-			pod, err := f.ClientSet.Core().Pods(ns).Get(mirrorPodName, metav1.GetOptions{})
+			pod, err := f.ClientSet.CoreV1().Pods(ns).Get(mirrorPodName, metav1.GetOptions{})
 			Expect(err).ShouldNot(HaveOccurred())
 			uid := pod.UID
 
@@ -73,19 +74,19 @@ var _ = framework.KubeDescribe("MirrorPod", func() {
 			}, 2*time.Minute, time.Second*4).Should(BeNil())
 
 			By("check the mirror pod container image is updated")
-			pod, err = f.ClientSet.Core().Pods(ns).Get(mirrorPodName, metav1.GetOptions{})
+			pod, err = f.ClientSet.CoreV1().Pods(ns).Get(mirrorPodName, metav1.GetOptions{})
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(len(pod.Spec.Containers)).Should(Equal(1))
 			Expect(pod.Spec.Containers[0].Image).Should(Equal(image))
 		})
-		It("should be recreated when mirror pod gracefully deleted [Conformance]", func() {
+		framework.ConformanceIt("should be recreated when mirror pod gracefully deleted", func() {
 			By("get mirror pod uid")
-			pod, err := f.ClientSet.Core().Pods(ns).Get(mirrorPodName, metav1.GetOptions{})
+			pod, err := f.ClientSet.CoreV1().Pods(ns).Get(mirrorPodName, metav1.GetOptions{})
 			Expect(err).ShouldNot(HaveOccurred())
 			uid := pod.UID
 
 			By("delete the mirror pod with grace period 30s")
-			err = f.ClientSet.Core().Pods(ns).Delete(mirrorPodName, metav1.NewDeleteOptions(30))
+			err = f.ClientSet.CoreV1().Pods(ns).Delete(mirrorPodName, metav1.NewDeleteOptions(30))
 			Expect(err).ShouldNot(HaveOccurred())
 
 			By("wait for the mirror pod to be recreated")
@@ -93,14 +94,14 @@ var _ = framework.KubeDescribe("MirrorPod", func() {
 				return checkMirrorPodRecreatedAndRunnig(f.ClientSet, mirrorPodName, ns, uid)
 			}, 2*time.Minute, time.Second*4).Should(BeNil())
 		})
-		It("should be recreated when mirror pod forcibly deleted [Conformance]", func() {
+		framework.ConformanceIt("should be recreated when mirror pod forcibly deleted", func() {
 			By("get mirror pod uid")
-			pod, err := f.ClientSet.Core().Pods(ns).Get(mirrorPodName, metav1.GetOptions{})
+			pod, err := f.ClientSet.CoreV1().Pods(ns).Get(mirrorPodName, metav1.GetOptions{})
 			Expect(err).ShouldNot(HaveOccurred())
 			uid := pod.UID
 
 			By("delete the mirror pod with grace period 0s")
-			err = f.ClientSet.Core().Pods(ns).Delete(mirrorPodName, metav1.NewDeleteOptions(0))
+			err = f.ClientSet.CoreV1().Pods(ns).Delete(mirrorPodName, metav1.NewDeleteOptions(0))
 			Expect(err).ShouldNot(HaveOccurred())
 
 			By("wait for the mirror pod to be recreated")
@@ -157,7 +158,7 @@ func deleteStaticPod(dir, name, namespace string) error {
 }
 
 func checkMirrorPodDisappear(cl clientset.Interface, name, namespace string) error {
-	_, err := cl.Core().Pods(namespace).Get(name, metav1.GetOptions{})
+	_, err := cl.CoreV1().Pods(namespace).Get(name, metav1.GetOptions{})
 	if errors.IsNotFound(err) {
 		return nil
 	}
@@ -165,7 +166,7 @@ func checkMirrorPodDisappear(cl clientset.Interface, name, namespace string) err
 }
 
 func checkMirrorPodRunning(cl clientset.Interface, name, namespace string) error {
-	pod, err := cl.Core().Pods(namespace).Get(name, metav1.GetOptions{})
+	pod, err := cl.CoreV1().Pods(namespace).Get(name, metav1.GetOptions{})
 	if err != nil {
 		return fmt.Errorf("expected the mirror pod %q to appear: %v", name, err)
 	}
@@ -176,7 +177,7 @@ func checkMirrorPodRunning(cl clientset.Interface, name, namespace string) error
 }
 
 func checkMirrorPodRecreatedAndRunnig(cl clientset.Interface, name, namespace string, oUID types.UID) error {
-	pod, err := cl.Core().Pods(namespace).Get(name, metav1.GetOptions{})
+	pod, err := cl.CoreV1().Pods(namespace).Get(name, metav1.GetOptions{})
 	if err != nil {
 		return fmt.Errorf("expected the mirror pod %q to appear: %v", name, err)
 	}

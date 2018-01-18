@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2018 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -35,7 +35,6 @@ type NodeMetricsInterface interface {
 	Get(name string, options v1.GetOptions) (*v1alpha1.NodeMetrics, error)
 	List(opts v1.ListOptions) (*v1alpha1.NodeMetricsList, error)
 	Watch(opts v1.ListOptions) (watch.Interface, error)
-
 	NodeMetricsExpansion
 }
 
@@ -76,8 +75,8 @@ func (c *nodeMetricses) List(opts v1.ListOptions) (result *v1alpha1.NodeMetricsL
 
 // Watch returns a watch.Interface that watches the requested nodeMetricses.
 func (c *nodeMetricses) Watch(opts v1.ListOptions) (watch.Interface, error) {
+	opts.Watch = true
 	return c.client.Get().
-		Prefix("watch").
 		Resource("nodes").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Watch()

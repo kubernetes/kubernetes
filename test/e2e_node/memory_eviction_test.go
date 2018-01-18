@@ -22,11 +22,11 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/api/v1"
 	nodeutil "k8s.io/kubernetes/pkg/api/v1/node"
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
+	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -37,8 +37,8 @@ import (
 // https://github.com/kubernetes/kubernetes/blob/master/docs/proposals/kubelet-eviction.md
 
 var _ = framework.KubeDescribe("MemoryEviction [Slow] [Serial] [Disruptive]", func() {
-	const (
-		evictionHard = "memory.available<40%"
+	var (
+		evictionHard = map[string]string{"memory.available": "40%"}
 	)
 
 	f := framework.NewDefaultFramework("eviction-test")
@@ -54,7 +54,7 @@ var _ = framework.KubeDescribe("MemoryEviction [Slow] [Serial] [Disruptive]", fu
 			logPodEvents(f)
 		})
 		Context("", func() {
-			tempSetCurrentKubeletConfig(f, func(c *componentconfig.KubeletConfiguration) {
+			tempSetCurrentKubeletConfig(f, func(c *kubeletconfig.KubeletConfiguration) {
 				c.EvictionHard = evictionHard
 			})
 
@@ -63,7 +63,7 @@ var _ = framework.KubeDescribe("MemoryEviction [Slow] [Serial] [Disruptive]", fu
 					// Wait for the memory pressure condition to disappear from the node status before continuing.
 					By("waiting for the memory pressure condition on the node to disappear before ending the test.")
 					Eventually(func() error {
-						nodeList, err := f.ClientSet.Core().Nodes().List(metav1.ListOptions{})
+						nodeList, err := f.ClientSet.CoreV1().Nodes().List(metav1.ListOptions{})
 						if err != nil {
 							return fmt.Errorf("tried to get node list but got error: %v", err)
 						}
@@ -139,12 +139,12 @@ var _ = framework.KubeDescribe("MemoryEviction [Slow] [Serial] [Disruptive]", fu
 					// A pod is guaranteed only when requests and limits are specified for all the containers and they are equal.
 					guaranteed := getMemhogPod("guaranteed-pod", "guaranteed", v1.ResourceRequirements{
 						Requests: v1.ResourceList{
-							"cpu":    resource.MustParse("100m"),
-							"memory": resource.MustParse("100Mi"),
+							v1.ResourceCPU:    resource.MustParse("100m"),
+							v1.ResourceMemory: resource.MustParse("100Mi"),
 						},
 						Limits: v1.ResourceList{
-							"cpu":    resource.MustParse("100m"),
-							"memory": resource.MustParse("100Mi"),
+							v1.ResourceCPU:    resource.MustParse("100m"),
+							v1.ResourceMemory: resource.MustParse("100Mi"),
 						}})
 					guaranteed = f.PodClient().CreateSync(guaranteed)
 					glog.Infof("pod created with name: %s", guaranteed.Name)
@@ -152,8 +152,8 @@ var _ = framework.KubeDescribe("MemoryEviction [Slow] [Serial] [Disruptive]", fu
 					// A pod is burstable if limits and requests do not match across all containers.
 					burstable := getMemhogPod("burstable-pod", "burstable", v1.ResourceRequirements{
 						Requests: v1.ResourceList{
-							"cpu":    resource.MustParse("100m"),
-							"memory": resource.MustParse("100Mi"),
+							v1.ResourceCPU:    resource.MustParse("100m"),
+							v1.ResourceMemory: resource.MustParse("100Mi"),
 						}})
 					burstable = f.PodClient().CreateSync(burstable)
 					glog.Infof("pod created with name: %s", burstable.Name)
@@ -169,15 +169,15 @@ var _ = framework.KubeDescribe("MemoryEviction [Slow] [Serial] [Disruptive]", fu
 					By("polling the Status.Phase of each pod and checking for violations of the eviction order.")
 					Eventually(func() error {
 
-						gteed, gtErr := f.ClientSet.Core().Pods(f.Namespace.Name).Get(guaranteed.Name, metav1.GetOptions{})
+						gteed, gtErr := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(guaranteed.Name, metav1.GetOptions{})
 						framework.ExpectNoError(gtErr, fmt.Sprintf("getting pod %s", guaranteed.Name))
 						gteedPh := gteed.Status.Phase
 
-						burst, buErr := f.ClientSet.Core().Pods(f.Namespace.Name).Get(burstable.Name, metav1.GetOptions{})
+						burst, buErr := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(burstable.Name, metav1.GetOptions{})
 						framework.ExpectNoError(buErr, fmt.Sprintf("getting pod %s", burstable.Name))
 						burstPh := burst.Status.Phase
 
-						best, beErr := f.ClientSet.Core().Pods(f.Namespace.Name).Get(besteffort.Name, metav1.GetOptions{})
+						best, beErr := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(besteffort.Name, metav1.GetOptions{})
 						framework.ExpectNoError(beErr, fmt.Sprintf("getting pod %s", besteffort.Name))
 						bestPh := best.Status.Phase
 
@@ -193,7 +193,7 @@ var _ = framework.KubeDescribe("MemoryEviction [Slow] [Serial] [Disruptive]", fu
 						//                     see the eviction manager reporting a pressure condition for a while without the besteffort failing,
 						//                     and we see that the manager did in fact evict the besteffort (this should be in the Kubelet log), we
 						//                     will have more reason to believe the phase is out of date.
-						nodeList, err := f.ClientSet.Core().Nodes().List(metav1.ListOptions{})
+						nodeList, err := f.ClientSet.CoreV1().Nodes().List(metav1.ListOptions{})
 						if err != nil {
 							glog.Errorf("tried to get node list but got error: %v", err)
 						}
@@ -256,7 +256,7 @@ func getMemhogPod(podName string, ctnName string, res v1.ResourceRequirements) *
 	// This helps prevent a guaranteed pod from triggering an OOM kill due to it's low memory limit,
 	// which will cause the test to fail inappropriately.
 	var memLimit string
-	if limit, ok := res.Limits["memory"]; ok {
+	if limit, ok := res.Limits[v1.ResourceMemory]; ok {
 		memLimit = strconv.Itoa(int(
 			float64(limit.Value()) * 0.8))
 	} else {

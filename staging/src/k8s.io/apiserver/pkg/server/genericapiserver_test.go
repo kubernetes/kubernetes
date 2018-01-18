@@ -25,6 +25,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	goruntime "runtime"
+	"strconv"
+	"sync"
 	"testing"
 	"time"
 
@@ -34,7 +36,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apimachinery"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/openapi"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
@@ -45,10 +46,15 @@ import (
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/endpoints/discovery"
-	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	genericapifilters "k8s.io/apiserver/pkg/endpoints/filters"
+	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
+	genericfilters "k8s.io/apiserver/pkg/server/filters"
 	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
+	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes/fake"
 	restclient "k8s.io/client-go/rest"
+	openapi "k8s.io/kube-openapi/pkg/common"
 )
 
 const (
@@ -82,13 +88,18 @@ func testGetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi
 
 // setUp is a convience function for setting up for (most) tests.
 func setUp(t *testing.T) (*etcdtesting.EtcdTestServer, Config, *assert.Assertions) {
-	etcdServer, _ := etcdtesting.NewUnsecuredEtcd3TestClientServer(t, scheme)
+	etcdServer, _ := etcdtesting.NewUnsecuredEtcd3TestClientServer(t)
 
 	config := NewConfig(codecs)
 	config.PublicAddress = net.ParseIP("192.168.10.4")
-	config.RequestContextMapper = genericapirequest.NewRequestContextMapper()
+	config.RequestContextMapper = apirequest.NewRequestContextMapper()
 	config.LegacyAPIGroupPrefixes = sets.NewString("/api")
 	config.LoopbackClientConfig = &restclient.Config{}
+
+	clientset := fake.NewSimpleClientset()
+	if clientset == nil {
+		t.Fatal("unable to create fake client set")
+	}
 
 	// TODO restore this test, but right now, eliminate our cycle
 	// config.OpenAPIConfig = DefaultOpenAPIConfig(testGetOpenAPIDefinitions, runtime.NewScheme())
@@ -99,6 +110,8 @@ func setUp(t *testing.T) (*etcdtesting.EtcdTestServer, Config, *assert.Assertion
 	// 	},
 	// }
 	config.SwaggerConfig = DefaultSwaggerConfig()
+	sharedInformers := informers.NewSharedInformerFactory(clientset, config.LoopbackClientConfig.Timeout)
+	config.Complete(sharedInformers)
 
 	return etcdServer, *config, assert.New(t)
 }
@@ -106,7 +119,7 @@ func setUp(t *testing.T) (*etcdtesting.EtcdTestServer, Config, *assert.Assertion
 func newMaster(t *testing.T) (*GenericAPIServer, *etcdtesting.EtcdTestServer, Config, *assert.Assertions) {
 	etcdserver, config, assert := setUp(t)
 
-	s, err := config.Complete().New(EmptyDelegate)
+	s, err := config.Complete(nil).New("test", EmptyDelegate)
 	if err != nil {
 		t.Fatalf("Error in bringing up the server: %v", err)
 	}
@@ -138,7 +151,7 @@ func TestInstallAPIGroups(t *testing.T) {
 	config.LegacyAPIGroupPrefixes = sets.NewString("/apiPrefix")
 	config.DiscoveryAddresses = discovery.DefaultAddresses{DefaultAddress: "ExternalAddress"}
 
-	s, err := config.SkipComplete().New(EmptyDelegate)
+	s, err := config.Complete(nil).New("test", EmptyDelegate)
 	if err != nil {
 		t.Fatalf("Error in bringing up the server: %v", err)
 	}
@@ -159,7 +172,10 @@ func TestInstallAPIGroups(t *testing.T) {
 			}, nil
 		}
 
-		mapper := meta.NewDefaultRESTMapperFromScheme([]schema.GroupVersion{gv}, interfacesFor, "", sets.NewString(), sets.NewString(), scheme)
+		mapper := meta.NewDefaultRESTMapper([]schema.GroupVersion{gv}, interfacesFor)
+		for kind := range scheme.KnownTypes(gv) {
+			mapper.Add(gv.WithKind(kind), meta.RESTScopeNamespace)
+		}
 		groupMeta := apimachinery.GroupMeta{
 			GroupVersion:  gv,
 			GroupVersions: []schema.GroupVersion{gv},
@@ -300,17 +316,13 @@ func TestPrepareRun(t *testing.T) {
 	defer etcdserver.Terminate(t)
 
 	assert.NotNil(config.SwaggerConfig)
-	// assert.NotNil(config.OpenAPIConfig)
 
-	server := httptest.NewServer(s.Handler.GoRestfulContainer.ServeMux)
+	server := httptest.NewServer(s.Handler.Director)
 	defer server.Close()
+	done := make(chan struct{})
 
 	s.PrepareRun()
-
-	// openapi is installed in PrepareRun
-	// resp, err := http.Get(server.URL + "/swagger.json")
-	// assert.NoError(err)
-	// assert.Equal(http.StatusOK, resp.StatusCode)
+	s.RunPostStartHooks(done)
 
 	// swagger is installed in PrepareRun
 	resp, err := http.Get(server.URL + "/swaggerapi/")
@@ -343,13 +355,13 @@ func TestCustomHandlerChain(t *testing.T) {
 		called = true
 	})
 
-	s, err := config.SkipComplete().New(EmptyDelegate)
+	s, err := config.Complete(nil).New("test", EmptyDelegate)
 	if err != nil {
 		t.Fatalf("Error in bringing up the server: %v", err)
 	}
 
-	s.Handler.PostGoRestfulMux.Handle("/nonswagger", handler)
-	s.Handler.PostGoRestfulMux.Handle("/secret", handler)
+	s.Handler.NonGoRestfulMux.Handle("/nonswagger", handler)
+	s.Handler.NonGoRestfulMux.Handle("/secret", handler)
 
 	type Test struct {
 		handler   http.Handler
@@ -398,7 +410,7 @@ func TestNotRestRoutesHaveAuth(t *testing.T) {
 	kubeVersion := fakeVersion()
 	config.Version = &kubeVersion
 
-	s, err := config.SkipComplete().New(EmptyDelegate)
+	s, err := config.Complete(nil).New("test", EmptyDelegate)
 	if err != nil {
 		t.Fatalf("Error in bringing up the server: %v", err)
 	}
@@ -429,9 +441,9 @@ type mockAuthorizer struct {
 	lastURI string
 }
 
-func (authz *mockAuthorizer) Authorize(a authorizer.Attributes) (authorized bool, reason string, err error) {
+func (authz *mockAuthorizer) Authorize(a authorizer.Attributes) (authorized authorizer.Decision, reason string, err error) {
 	authz.lastURI = a.GetPath()
-	return true, "", nil
+	return authorizer.DecisionAllow, "", nil
 }
 
 type mockAuthenticator struct {
@@ -471,7 +483,7 @@ func (p *testGetterStorage) New() runtime.Object {
 	}
 }
 
-func (p *testGetterStorage) Get(ctx genericapirequest.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
+func (p *testGetterStorage) Get(ctx apirequest.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
 	return nil, nil
 }
 
@@ -499,5 +511,85 @@ func fakeVersion() version.Info {
 		GoVersion:    goruntime.Version(),
 		Compiler:     goruntime.Compiler,
 		Platform:     fmt.Sprintf("%s/%s", goruntime.GOOS, goruntime.GOARCH),
+	}
+}
+
+// TestGracefulShutdown verifies server shutdown after request handler finish.
+func TestGracefulShutdown(t *testing.T) {
+	etcdserver, config, _ := setUp(t)
+	defer etcdserver.Terminate(t)
+
+	var graceShutdown bool
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+
+	config.BuildHandlerChainFunc = func(apiHandler http.Handler, c *Config) http.Handler {
+		handler := genericfilters.WithWaitGroup(apiHandler, c.RequestContextMapper, c.LongRunningFunc, c.HandlerChainWaitGroup)
+		handler = genericapifilters.WithRequestInfo(handler, c.RequestInfoResolver, c.RequestContextMapper)
+		handler = apirequest.WithRequestContext(handler, c.RequestContextMapper)
+		return handler
+	}
+
+	handler := http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		wg.Done()
+		time.Sleep(2 * time.Second)
+		w.WriteHeader(http.StatusOK)
+		graceShutdown = true
+	})
+
+	s, err := config.Complete(nil).New("test", EmptyDelegate)
+	if err != nil {
+		t.Fatalf("Error in bringing up the server: %v", err)
+	}
+
+	s.Handler.NonGoRestfulMux.Handle("/test", handler)
+
+	insecureServer := &http.Server{
+		Addr:    "0.0.0.0:0",
+		Handler: s.Handler,
+	}
+	stopCh := make(chan struct{})
+
+	ln, err := net.Listen("tcp", insecureServer.Addr)
+	if err != nil {
+		t.Errorf("failed to listen on %v: %v", insecureServer.Addr, err)
+	}
+
+	// get port
+	serverPort := ln.Addr().(*net.TCPAddr).Port
+	err = RunServer(insecureServer, ln, 10*time.Second, stopCh)
+	if err != nil {
+		t.Errorf("RunServer err: %v", err)
+	}
+
+	graceCh := make(chan struct{})
+	// mock a client request
+	go func() {
+		resp, err := http.Get("http://127.0.0.1:" + strconv.Itoa(serverPort) + "/test")
+		if err != nil {
+			t.Errorf("Unexpected http error: %v", err)
+		}
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("Unexpected http status code: %v", resp.StatusCode)
+		}
+		close(graceCh)
+	}()
+
+	// close stopCh after request sent to server to guarantee request handler is running.
+	wg.Wait()
+	close(stopCh)
+	// wait for wait group handler finish
+	s.HandlerChainWaitGroup.Wait()
+
+	// check server all handlers finished.
+	if !graceShutdown {
+		t.Errorf("server shutdown not gracefully.")
+	}
+	// check client to make sure receive response.
+	select {
+	case <-graceCh:
+		t.Logf("server shutdown gracefully.")
+	case <-time.After(30 * time.Second):
+		t.Errorf("Timed out waiting for response.")
 	}
 }

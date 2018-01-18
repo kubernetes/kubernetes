@@ -1,8 +1,12 @@
 name: kubernetes-e2e
 summary: Run end-2-end validation of a clusters conformance
 maintainers:
-    - Matthew Bruzek <matthew.bruzek@canonical.com>
-    - Charles Butler <charles.butler@canonical.com>
+    - Tim Van Steenburgh <tim.van.steenburgh@canonical.com>
+    - George Kraft <george.kraft@canonical.com>
+    - Rye Terrell <rye.terrell@canonical.com>
+    - Konstantinos Tsakalozos <kos.tsakalozos@canonical.com>
+    - Charles Butler <Chuck@dasroot.net>
+    - Matthew Bruzek <mbruzek@ubuntu.com>
 description: |
   Deploy the Kubernetes e2e framework and validate the conformance of a
   deployed kubernetes cluster
@@ -14,6 +18,8 @@ series:
 requires:
   kubernetes-master:
     interface: http
+  kube-control:
+    interface: kube-control
 resources:
   kubectl:
     type: file

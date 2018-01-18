@@ -20,9 +20,7 @@ import (
 	"fmt"
 	"strings"
 
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/api/core/v1"
 )
 
 // HasPrivilegedRequest returns the value of SecurityContext.Privileged, taking into account
@@ -120,7 +118,7 @@ func DetermineEffectiveSecurityContext(pod *v1.Pod, container *v1.Container) *v1
 	}
 
 	if containerSc.RunAsUser != nil {
-		effectiveSc.RunAsUser = new(types.UnixUserID)
+		effectiveSc.RunAsUser = new(int64)
 		*effectiveSc.RunAsUser = *containerSc.RunAsUser
 	}
 
@@ -132,6 +130,11 @@ func DetermineEffectiveSecurityContext(pod *v1.Pod, container *v1.Container) *v1
 	if containerSc.ReadOnlyRootFilesystem != nil {
 		effectiveSc.ReadOnlyRootFilesystem = new(bool)
 		*effectiveSc.ReadOnlyRootFilesystem = *containerSc.ReadOnlyRootFilesystem
+	}
+
+	if containerSc.AllowPrivilegeEscalation != nil {
+		effectiveSc.AllowPrivilegeEscalation = new(bool)
+		*effectiveSc.AllowPrivilegeEscalation = *containerSc.AllowPrivilegeEscalation
 	}
 
 	return effectiveSc
@@ -149,7 +152,7 @@ func securityContextFromPodSecurityContext(pod *v1.Pod) *v1.SecurityContext {
 		*synthesized.SELinuxOptions = *pod.Spec.SecurityContext.SELinuxOptions
 	}
 	if pod.Spec.SecurityContext.RunAsUser != nil {
-		synthesized.RunAsUser = new(types.UnixUserID)
+		synthesized.RunAsUser = new(int64)
 		*synthesized.RunAsUser = *pod.Spec.SecurityContext.RunAsUser
 	}
 
@@ -161,74 +164,17 @@ func securityContextFromPodSecurityContext(pod *v1.Pod) *v1.SecurityContext {
 	return synthesized
 }
 
-// TODO: remove the duplicate code
-func InternalDetermineEffectiveSecurityContext(pod *api.Pod, container *api.Container) *api.SecurityContext {
-	effectiveSc := internalSecurityContextFromPodSecurityContext(pod)
-	containerSc := container.SecurityContext
-
-	if effectiveSc == nil && containerSc == nil {
-		return nil
-	}
-	if effectiveSc != nil && containerSc == nil {
-		return effectiveSc
-	}
-	if effectiveSc == nil && containerSc != nil {
-		return containerSc
+// AddNoNewPrivileges returns if we should add the no_new_privs option.
+func AddNoNewPrivileges(sc *v1.SecurityContext) bool {
+	if sc == nil {
+		return false
 	}
 
-	if containerSc.SELinuxOptions != nil {
-		effectiveSc.SELinuxOptions = new(api.SELinuxOptions)
-		*effectiveSc.SELinuxOptions = *containerSc.SELinuxOptions
+	// handle the case where the user did not set the default and did not explicitly set allowPrivilegeEscalation
+	if sc.AllowPrivilegeEscalation == nil {
+		return false
 	}
 
-	if containerSc.Capabilities != nil {
-		effectiveSc.Capabilities = new(api.Capabilities)
-		*effectiveSc.Capabilities = *containerSc.Capabilities
-	}
-
-	if containerSc.Privileged != nil {
-		effectiveSc.Privileged = new(bool)
-		*effectiveSc.Privileged = *containerSc.Privileged
-	}
-
-	if containerSc.RunAsUser != nil {
-		effectiveSc.RunAsUser = new(types.UnixUserID)
-		*effectiveSc.RunAsUser = *containerSc.RunAsUser
-	}
-
-	if containerSc.RunAsNonRoot != nil {
-		effectiveSc.RunAsNonRoot = new(bool)
-		*effectiveSc.RunAsNonRoot = *containerSc.RunAsNonRoot
-	}
-
-	if containerSc.ReadOnlyRootFilesystem != nil {
-		effectiveSc.ReadOnlyRootFilesystem = new(bool)
-		*effectiveSc.ReadOnlyRootFilesystem = *containerSc.ReadOnlyRootFilesystem
-	}
-
-	return effectiveSc
-}
-
-func internalSecurityContextFromPodSecurityContext(pod *api.Pod) *api.SecurityContext {
-	if pod.Spec.SecurityContext == nil {
-		return nil
-	}
-
-	synthesized := &api.SecurityContext{}
-
-	if pod.Spec.SecurityContext.SELinuxOptions != nil {
-		synthesized.SELinuxOptions = &api.SELinuxOptions{}
-		*synthesized.SELinuxOptions = *pod.Spec.SecurityContext.SELinuxOptions
-	}
-	if pod.Spec.SecurityContext.RunAsUser != nil {
-		synthesized.RunAsUser = new(types.UnixUserID)
-		*synthesized.RunAsUser = *pod.Spec.SecurityContext.RunAsUser
-	}
-
-	if pod.Spec.SecurityContext.RunAsNonRoot != nil {
-		synthesized.RunAsNonRoot = new(bool)
-		*synthesized.RunAsNonRoot = *pod.Spec.SecurityContext.RunAsNonRoot
-	}
-
-	return synthesized
+	// handle the case where defaultAllowPrivilegeEscalation is false or the user explicitly set allowPrivilegeEscalation to true/false
+	return !*sc.AllowPrivilegeEscalation
 }

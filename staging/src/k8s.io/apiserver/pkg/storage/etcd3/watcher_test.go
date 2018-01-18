@@ -17,7 +17,6 @@ limitations under the License.
 package etcd3
 
 import (
-	"errors"
 	"fmt"
 	"reflect"
 	"strconv"
@@ -74,9 +73,9 @@ func testWatch(t *testing.T, recursive bool) {
 		pred: storage.SelectionPredicate{
 			Label: labels.Everything(),
 			Field: fields.ParseSelectorOrDie("metadata.name=bar"),
-			GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
+			GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
 				pod := obj.(*example.Pod)
-				return nil, fields.Set{"metadata.name": pod.Name}, nil
+				return nil, fields.Set{"metadata.name": pod.Name}, pod.Initializers != nil, nil
 			},
 		},
 	}, { // update
@@ -89,9 +88,9 @@ func testWatch(t *testing.T, recursive bool) {
 		pred: storage.SelectionPredicate{
 			Label: labels.Everything(),
 			Field: fields.ParseSelectorOrDie("metadata.name!=bar"),
-			GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
+			GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
 				pod := obj.(*example.Pod)
-				return nil, fields.Set{"metadata.name": pod.Name}, nil
+				return nil, fields.Set{"metadata.name": pod.Name}, pod.Initializers != nil, nil
 			},
 		},
 	}}
@@ -227,13 +226,13 @@ func TestWatchError(t *testing.T) {
 	codec := &testCodec{apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)}
 	cluster := integration.NewClusterV3(t, &integration.ClusterConfig{Size: 1})
 	defer cluster.Terminate(t)
-	invalidStore := newStore(cluster.RandClient(), false, codec, "", prefixTransformer{prefix: []byte("test!")})
+	invalidStore := newStore(cluster.RandClient(), false, true, codec, "", prefixTransformer{prefix: []byte("test!")})
 	ctx := context.Background()
 	w, err := invalidStore.Watch(ctx, "/abc", "0", storage.Everything)
 	if err != nil {
 		t.Fatalf("Watch failed: %v", err)
 	}
-	validStore := newStore(cluster.RandClient(), false, codec, "", prefixTransformer{prefix: []byte("test!")})
+	validStore := newStore(cluster.RandClient(), false, true, codec, "", prefixTransformer{prefix: []byte("test!")})
 	validStore.GuaranteedUpdate(ctx, "/abc", &example.Pod{}, true, nil, storage.SimpleUpdate(
 		func(runtime.Object) (runtime.Object, error) {
 			return &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}, nil
@@ -327,7 +326,7 @@ type testCodec struct {
 }
 
 func (c *testCodec) Decode(data []byte, defaults *schema.GroupVersionKind, into runtime.Object) (runtime.Object, *schema.GroupVersionKind, error) {
-	return nil, nil, errors.New("Expected decoding failure")
+	return nil, nil, errTestingDecode
 }
 
 func testCheckEventType(t *testing.T, expectEventType watch.EventType, w watch.Interface) {

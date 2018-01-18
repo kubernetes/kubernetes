@@ -22,23 +22,33 @@ func MarshalJSON(schema interface{}, forceSendFields, nullFields []string) ([]by
 		return json.Marshal(schema)
 	}
 
-	mustInclude := make(map[string]struct{})
+	mustInclude := make(map[string]bool)
 	for _, f := range forceSendFields {
-		mustInclude[f] = struct{}{}
+		mustInclude[f] = true
 	}
-	useNull := make(map[string]struct{})
-	for _, f := range nullFields {
-		useNull[f] = struct{}{}
+	useNull := make(map[string]bool)
+	useNullMaps := make(map[string]map[string]bool)
+	for _, nf := range nullFields {
+		parts := strings.SplitN(nf, ".", 2)
+		field := parts[0]
+		if len(parts) == 1 {
+			useNull[field] = true
+		} else {
+			if useNullMaps[field] == nil {
+				useNullMaps[field] = map[string]bool{}
+			}
+			useNullMaps[field][parts[1]] = true
+		}
 	}
 
-	dataMap, err := schemaToMap(schema, mustInclude, useNull)
+	dataMap, err := schemaToMap(schema, mustInclude, useNull, useNullMaps)
 	if err != nil {
 		return nil, err
 	}
 	return json.Marshal(dataMap)
 }
 
-func schemaToMap(schema interface{}, mustInclude, useNull map[string]struct{}) (map[string]interface{}, error) {
+func schemaToMap(schema interface{}, mustInclude, useNull map[string]bool, useNullMaps map[string]map[string]bool) (map[string]interface{}, error) {
 	m := make(map[string]interface{})
 	s := reflect.ValueOf(schema)
 	st := s.Type()
@@ -59,14 +69,32 @@ func schemaToMap(schema interface{}, mustInclude, useNull map[string]struct{}) (
 		v := s.Field(i)
 		f := st.Field(i)
 
-		if _, ok := useNull[f.Name]; ok {
+		if useNull[f.Name] {
 			if !isEmptyValue(v) {
 				return nil, fmt.Errorf("field %q in NullFields has non-empty value", f.Name)
 			}
 			m[tag.apiName] = nil
 			continue
 		}
+
 		if !includeField(v, f, mustInclude) {
+			continue
+		}
+
+		// If map fields are explicitly set to null, use a map[string]interface{}.
+		if f.Type.Kind() == reflect.Map && useNullMaps[f.Name] != nil {
+			ms, ok := v.Interface().(map[string]string)
+			if !ok {
+				return nil, fmt.Errorf("field %q has keys in NullFields but is not a map[string]string", f.Name)
+			}
+			mi := map[string]interface{}{}
+			for k, v := range ms {
+				mi[k] = v
+			}
+			for k := range useNullMaps[f.Name] {
+				mi[k] = nil
+			}
+			m[tag.apiName] = mi
 			continue
 		}
 
@@ -139,7 +167,7 @@ func parseJSONTag(val string) (jsonTag, error) {
 }
 
 // Reports whether the struct field "f" with value "v" should be included in JSON output.
-func includeField(v reflect.Value, f reflect.StructField, mustInclude map[string]struct{}) bool {
+func includeField(v reflect.Value, f reflect.StructField, mustInclude map[string]bool) bool {
 	// The regular JSON encoding of a nil pointer is "null", which means "delete this field".
 	// Therefore, we could enable field deletion by honoring pointer fields' presence in the mustInclude set.
 	// However, many fields are not pointers, so there would be no way to delete these fields.
@@ -156,8 +184,7 @@ func includeField(v reflect.Value, f reflect.StructField, mustInclude map[string
 		return false
 	}
 
-	_, ok := mustInclude[f.Name]
-	return ok || !isEmptyValue(v)
+	return mustInclude[f.Name] || !isEmptyValue(v)
 }
 
 // isEmptyValue reports whether v is the empty value for its type.  This

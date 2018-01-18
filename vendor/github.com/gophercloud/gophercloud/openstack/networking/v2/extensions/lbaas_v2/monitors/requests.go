@@ -79,10 +79,8 @@ var (
 	errDelayMustGETimeout = fmt.Errorf("Delay must be greater than or equal to timeout")
 )
 
-// CreateOptsBuilder is the interface options structs have to satisfy in order
-// to be used in the main Create operation in this package. Since many
-// extensions decorate or modify the common logic, it is useful for them to
-// satisfy a basic interface in order for them to be used.
+// CreateOptsBuilder allows extensions to add additional parameters to the
+// List request.
 type CreateOptsBuilder interface {
 	ToMonitorCreateMap() (map[string]interface{}, error)
 }
@@ -90,37 +88,50 @@ type CreateOptsBuilder interface {
 // CreateOpts is the common options struct used in this package's Create
 // operation.
 type CreateOpts struct {
-	// Required. The Pool to Monitor.
+	// The Pool to Monitor.
 	PoolID string `json:"pool_id" required:"true"`
-	// Required. The type of probe, which is PING, TCP, HTTP, or HTTPS, that is
+
+	// The type of probe, which is PING, TCP, HTTP, or HTTPS, that is
 	// sent by the load balancer to verify the member state.
 	Type string `json:"type" required:"true"`
-	// Required. The time, in seconds, between sending probes to members.
+
+	// The time, in seconds, between sending probes to members.
 	Delay int `json:"delay" required:"true"`
-	// Required. Maximum number of seconds for a Monitor to wait for a ping reply
+
+	// Maximum number of seconds for a Monitor to wait for a ping reply
 	// before it times out. The value must be less than the delay value.
 	Timeout int `json:"timeout" required:"true"`
-	// Required. Number of permissible ping failures before changing the member's
+
+	// Number of permissible ping failures before changing the member's
 	// status to INACTIVE. Must be a number between 1 and 10.
 	MaxRetries int `json:"max_retries" required:"true"`
-	// Required for HTTP(S) types. URI path that will be accessed if Monitor type
-	// is HTTP or HTTPS.
+
+	// URI path that will be accessed if Monitor type is HTTP or HTTPS.
+	// Required for HTTP(S) types.
 	URLPath string `json:"url_path,omitempty"`
-	// Required for HTTP(S) types. The HTTP method used for requests by the
-	// Monitor. If this attribute is not specified, it defaults to "GET".
+
+	// The HTTP method used for requests by the Monitor. If this attribute
+	// is not specified, it defaults to "GET". Required for HTTP(S) types.
 	HTTPMethod string `json:"http_method,omitempty"`
-	// Required for HTTP(S) types. Expected HTTP codes for a passing HTTP(S)
-	// Monitor. You can either specify a single status like "200", or a range
-	// like "200-202".
+
+	// Expected HTTP codes for a passing HTTP(S) Monitor. You can either specify
+	// a single status like "200", or a range like "200-202". Required for HTTP(S)
+	// types.
 	ExpectedCodes string `json:"expected_codes,omitempty"`
-	// Indicates the owner of the Loadbalancer. Required for admins.
+
+	// The UUID of the tenant who owns the Monitor. Only administrative users
+	// can specify a tenant UUID other than their own.
 	TenantID string `json:"tenant_id,omitempty"`
-	// Optional. The Name of the Monitor.
-	Name         string `json:"name,omitempty"`
-	AdminStateUp *bool  `json:"admin_state_up,omitempty"`
+
+	// The Name of the Monitor.
+	Name string `json:"name,omitempty"`
+
+	// The administrative state of the Monitor. A valid value is true (UP)
+	// or false (DOWN).
+	AdminStateUp *bool `json:"admin_state_up,omitempty"`
 }
 
-// ToMonitorCreateMap casts a CreateOpts struct to a map.
+// ToMonitorCreateMap builds a request body from CreateOpts.
 func (opts CreateOpts) ToMonitorCreateMap() (map[string]interface{}, error) {
 	b, err := gophercloud.BuildRequestBody(opts, "healthmonitor")
 	if err != nil {
@@ -173,10 +184,8 @@ func Get(c *gophercloud.ServiceClient, id string) (r GetResult) {
 	return
 }
 
-// UpdateOptsBuilder is the interface options structs have to satisfy in order
-// to be used in the main Update operation in this package. Since many
-// extensions decorate or modify the common logic, it is useful for them to
-// satisfy a basic interface in order for them to be used.
+// UpdateOptsBuilder allows extensions to add additional parameters to the
+// Update request.
 type UpdateOptsBuilder interface {
 	ToMonitorUpdateMap() (map[string]interface{}, error)
 }
@@ -184,35 +193,45 @@ type UpdateOptsBuilder interface {
 // UpdateOpts is the common options struct used in this package's Update
 // operation.
 type UpdateOpts struct {
-	// Required. The time, in seconds, between sending probes to members.
+	// The time, in seconds, between sending probes to members.
 	Delay int `json:"delay,omitempty"`
-	// Required. Maximum number of seconds for a Monitor to wait for a ping reply
+
+	// Maximum number of seconds for a Monitor to wait for a ping reply
 	// before it times out. The value must be less than the delay value.
 	Timeout int `json:"timeout,omitempty"`
-	// Required. Number of permissible ping failures before changing the member's
+
+	// Number of permissible ping failures before changing the member's
 	// status to INACTIVE. Must be a number between 1 and 10.
 	MaxRetries int `json:"max_retries,omitempty"`
-	// Required for HTTP(S) types. URI path that will be accessed if Monitor type
-	// is HTTP or HTTPS.
+
+	// URI path that will be accessed if Monitor type is HTTP or HTTPS.
+	// Required for HTTP(S) types.
 	URLPath string `json:"url_path,omitempty"`
-	// Required for HTTP(S) types. The HTTP method used for requests by the
-	// Monitor. If this attribute is not specified, it defaults to "GET".
+
+	// The HTTP method used for requests by the Monitor. If this attribute
+	// is not specified, it defaults to "GET". Required for HTTP(S) types.
 	HTTPMethod string `json:"http_method,omitempty"`
-	// Required for HTTP(S) types. Expected HTTP codes for a passing HTTP(S)
-	// Monitor. You can either specify a single status like "200", or a range
-	// like "200-202".
+
+	// Expected HTTP codes for a passing HTTP(S) Monitor. You can either specify
+	// a single status like "200", or a range like "200-202". Required for HTTP(S)
+	// types.
 	ExpectedCodes string `json:"expected_codes,omitempty"`
-	// Optional. The Name of the Monitor.
-	Name         string `json:"name,omitempty"`
-	AdminStateUp *bool  `json:"admin_state_up,omitempty"`
+
+	// The Name of the Monitor.
+	Name string `json:"name,omitempty"`
+
+	// The administrative state of the Monitor. A valid value is true (UP)
+	// or false (DOWN).
+	AdminStateUp *bool `json:"admin_state_up,omitempty"`
 }
 
-// ToMonitorUpdateMap casts a UpdateOpts struct to a map.
+// ToMonitorUpdateMap builds a request body from UpdateOpts.
 func (opts UpdateOpts) ToMonitorUpdateMap() (map[string]interface{}, error) {
 	return gophercloud.BuildRequestBody(opts, "healthmonitor")
 }
 
-// Update is an operation which modifies the attributes of the specified Monitor.
+// Update is an operation which modifies the attributes of the specified
+// Monitor.
 func Update(c *gophercloud.ServiceClient, id string, opts UpdateOptsBuilder) (r UpdateResult) {
 	b, err := opts.ToMonitorUpdateMap()
 	if err != nil {

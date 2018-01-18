@@ -22,7 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
 // Registry is an interface implemented by things that know how to store ServiceAccount objects.
@@ -30,8 +30,8 @@ type Registry interface {
 	ListServiceAccounts(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (*api.ServiceAccountList, error)
 	WatchServiceAccounts(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (watch.Interface, error)
 	GetServiceAccount(ctx genericapirequest.Context, name string, options *metav1.GetOptions) (*api.ServiceAccount, error)
-	CreateServiceAccount(ctx genericapirequest.Context, ServiceAccount *api.ServiceAccount) error
-	UpdateServiceAccount(ctx genericapirequest.Context, ServiceAccount *api.ServiceAccount) error
+	CreateServiceAccount(ctx genericapirequest.Context, ServiceAccount *api.ServiceAccount, createValidation rest.ValidateObjectFunc) error
+	UpdateServiceAccount(ctx genericapirequest.Context, ServiceAccount *api.ServiceAccount, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) error
 	DeleteServiceAccount(ctx genericapirequest.Context, name string) error
 }
 
@@ -66,13 +66,13 @@ func (s *storage) GetServiceAccount(ctx genericapirequest.Context, name string, 
 	return obj.(*api.ServiceAccount), nil
 }
 
-func (s *storage) CreateServiceAccount(ctx genericapirequest.Context, serviceAccount *api.ServiceAccount) error {
-	_, err := s.Create(ctx, serviceAccount)
+func (s *storage) CreateServiceAccount(ctx genericapirequest.Context, serviceAccount *api.ServiceAccount, createValidation rest.ValidateObjectFunc) error {
+	_, err := s.Create(ctx, serviceAccount, createValidation, false)
 	return err
 }
 
-func (s *storage) UpdateServiceAccount(ctx genericapirequest.Context, serviceAccount *api.ServiceAccount) error {
-	_, _, err := s.Update(ctx, serviceAccount.Name, rest.DefaultUpdatedObjectInfo(serviceAccount, api.Scheme))
+func (s *storage) UpdateServiceAccount(ctx genericapirequest.Context, serviceAccount *api.ServiceAccount, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) error {
+	_, _, err := s.Update(ctx, serviceAccount.Name, rest.DefaultUpdatedObjectInfo(serviceAccount), createValidation, updateValidation)
 	return err
 }
 

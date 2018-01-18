@@ -42,7 +42,7 @@ func GetKubemarkMasterComponentsResourceUsage() map[string]*KubemarkResourceUsag
 	// Get kuberenetes component resource usage
 	sshResult, err := getMasterUsageByPrefix("kube")
 	if err != nil {
-		Logf("Error when trying to SSH to master machine. Skipping probe")
+		Logf("Error when trying to SSH to master machine. Skipping probe. %v", err)
 		return nil
 	}
 	scanner := bufio.NewScanner(strings.NewReader(sshResult))

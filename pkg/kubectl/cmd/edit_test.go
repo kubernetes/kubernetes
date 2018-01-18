@@ -36,7 +36,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/rest/fake"
-	"k8s.io/kubernetes/pkg/api"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
@@ -49,6 +48,7 @@ type EditTestCase struct {
 	Args             []string `yaml:"args"`
 	Filename         string   `yaml:"filename"`
 	Output           string   `yaml:"outputFormat"`
+	OutputPatch      string   `yaml:"outputPatch"`
 	SaveConfig       string   `yaml:"saveConfig"`
 	Namespace        string   `yaml:"namespace"`
 	ExpectedStdout   []string `yaml:"expectedStdout"`
@@ -116,7 +116,7 @@ func TestEdit(t *testing.T) {
 			if step.StepType != "edit" {
 				t.Fatalf("%s, step %d: expected edit step, got %s %s", name, i, req.Method, req.URL.Path)
 			}
-			if bytes.Compare(body, expectedInput) != 0 {
+			if !bytes.Equal(body, expectedInput) {
 				if updateInputFixtures {
 					// Convenience to allow recapturing the input and persisting it here
 					ioutil.WriteFile(inputFile, body, os.FileMode(0644))
@@ -139,7 +139,7 @@ func TestEdit(t *testing.T) {
 					req.Method, req.URL.Path, req.Header.Get("Content-Type"),
 				)
 			}
-			if bytes.Compare(body, expectedInput) != 0 {
+			if !bytes.Equal(body, expectedInput) {
 				if updateInputFixtures {
 					// Convenience to allow recapturing the input and persisting it here
 					ioutil.WriteFile(inputFile, body, os.FileMode(0644))
@@ -193,87 +193,94 @@ func TestEdit(t *testing.T) {
 	}
 
 	for _, testcaseName := range testcases.List() {
-		t.Logf("Running testcase: %s", testcaseName)
-		i = 0
-		name = testcaseName
-		testcase = EditTestCase{}
-		testcaseDir := filepath.Join("testdata", "edit", "testcase-"+name)
-		testcaseData, err := ioutil.ReadFile(filepath.Join(testcaseDir, "test.yaml"))
-		if err != nil {
-			t.Fatalf("%s: %v", name, err)
-		}
-		if err := yaml.Unmarshal(testcaseData, &testcase); err != nil {
-			t.Fatalf("%s: %v", name, err)
-		}
-
-		f, tf, _, _ := cmdtesting.NewAPIFactory()
-		tf.Printer = &testPrinter{}
-		tf.UnstructuredClientForMappingFunc = func(mapping *meta.RESTMapping) (resource.RESTClient, error) {
-			versionedAPIPath := ""
-			if mapping.GroupVersionKind.Group == "" {
-				versionedAPIPath = "/api/" + mapping.GroupVersionKind.Version
-			} else {
-				versionedAPIPath = "/apis/" + mapping.GroupVersionKind.Group + "/" + mapping.GroupVersionKind.Version
+		t.Run(testcaseName, func(t *testing.T) {
+			i = 0
+			name = testcaseName
+			testcase = EditTestCase{}
+			testcaseDir := filepath.Join("testdata", "edit", "testcase-"+name)
+			testcaseData, err := ioutil.ReadFile(filepath.Join(testcaseDir, "test.yaml"))
+			if err != nil {
+				t.Fatalf("%s: %v", name, err)
 			}
-			return &fake.RESTClient{
-				APIRegistry:          api.Registry,
-				VersionedAPIPath:     versionedAPIPath,
-				NegotiatedSerializer: unstructuredSerializer,
-				Client:               fake.CreateHTTPClient(reqResp),
-			}, nil
-		}
+			if err := yaml.Unmarshal(testcaseData, &testcase); err != nil {
+				t.Fatalf("%s: %v", name, err)
+			}
 
-		if len(testcase.Namespace) > 0 {
-			tf.Namespace = testcase.Namespace
-		}
-		tf.ClientConfig = defaultClientConfig()
-		tf.Command = "edit test cmd invocation"
-		buf := bytes.NewBuffer([]byte{})
-		errBuf := bytes.NewBuffer([]byte{})
+			f, tf, _, _ := cmdtesting.NewAPIFactory()
+			tf.Printer = &testPrinter{}
+			tf.UnstructuredClientForMappingFunc = func(mapping *meta.RESTMapping) (resource.RESTClient, error) {
+				versionedAPIPath := ""
+				if mapping.GroupVersionKind.Group == "" {
+					versionedAPIPath = "/api/" + mapping.GroupVersionKind.Version
+				} else {
+					versionedAPIPath = "/apis/" + mapping.GroupVersionKind.Group + "/" + mapping.GroupVersionKind.Version
+				}
+				return &fake.RESTClient{
+					VersionedAPIPath:     versionedAPIPath,
+					NegotiatedSerializer: unstructuredSerializer,
+					Client:               fake.CreateHTTPClient(reqResp),
+				}, nil
+			}
 
-		var cmd *cobra.Command
-		switch testcase.Mode {
-		case "edit":
-			cmd = NewCmdEdit(f, buf, errBuf)
-		case "create":
-			cmd = NewCmdCreate(f, buf, errBuf)
-			cmd.Flags().Set("edit", "true")
-		default:
-			t.Errorf("%s: unexpected mode %s", name, testcase.Mode)
-			continue
-		}
-		if len(testcase.Filename) > 0 {
-			cmd.Flags().Set("filename", filepath.Join(testcaseDir, testcase.Filename))
-		}
-		if len(testcase.Output) > 0 {
-			cmd.Flags().Set("output", testcase.Output)
-		}
-		if len(testcase.SaveConfig) > 0 {
-			cmd.Flags().Set("save-config", testcase.SaveConfig)
-		}
+			if len(testcase.Namespace) > 0 {
+				tf.Namespace = testcase.Namespace
+			}
+			tf.ClientConfig = defaultClientConfig()
+			tf.Command = "edit test cmd invocation"
+			buf := bytes.NewBuffer([]byte{})
+			errBuf := bytes.NewBuffer([]byte{})
 
-		cmdutil.BehaviorOnFatal(func(str string, code int) {
-			errBuf.WriteString(str)
-			if testcase.ExpectedExitCode != code {
-				t.Errorf("%s: expected exit code %d, got %d: %s", name, testcase.ExpectedExitCode, code, str)
+			var cmd *cobra.Command
+			switch testcase.Mode {
+			case "edit":
+				cmd = NewCmdEdit(f, buf, errBuf)
+			case "create":
+				cmd = NewCmdCreate(f, buf, errBuf)
+				cmd.Flags().Set("edit", "true")
+			case "edit-last-applied":
+				cmd = NewCmdApplyEditLastApplied(f, buf, errBuf)
+			default:
+				t.Fatalf("%s: unexpected mode %s", name, testcase.Mode)
+			}
+			if len(testcase.Filename) > 0 {
+				cmd.Flags().Set("filename", filepath.Join(testcaseDir, testcase.Filename))
+			}
+			if len(testcase.Output) > 0 {
+				cmd.Flags().Set("output", testcase.Output)
+			}
+			if len(testcase.OutputPatch) > 0 {
+				cmd.Flags().Set("output-patch", testcase.OutputPatch)
+			}
+			if len(testcase.SaveConfig) > 0 {
+				cmd.Flags().Set("save-config", testcase.SaveConfig)
+			}
+
+			cmdutil.BehaviorOnFatal(func(str string, code int) {
+				errBuf.WriteString(str)
+				if testcase.ExpectedExitCode != code {
+					t.Errorf("%s: expected exit code %d, got %d: %s", name, testcase.ExpectedExitCode, code, str)
+				}
+			})
+
+			cmd.Run(cmd, testcase.Args)
+
+			stdout := buf.String()
+			stderr := errBuf.String()
+
+			for _, s := range testcase.ExpectedStdout {
+				if !strings.Contains(stdout, s) {
+					t.Errorf("%s: expected to see '%s' in stdout\n\nstdout:\n%s\n\nstderr:\n%s", name, s, stdout, stderr)
+				}
+			}
+			for _, s := range testcase.ExpectedStderr {
+				if !strings.Contains(stderr, s) {
+					t.Errorf("%s: expected to see '%s' in stderr\n\nstdout:\n%s\n\nstderr:\n%s", name, s, stdout, stderr)
+				}
+			}
+			if i < len(testcase.Steps) {
+				t.Errorf("%s: saw %d steps, testcase included %d additional steps that were not exercised", name, i, len(testcase.Steps)-i)
 			}
 		})
-
-		cmd.Run(cmd, testcase.Args)
-
-		stdout := buf.String()
-		stderr := errBuf.String()
-
-		for _, s := range testcase.ExpectedStdout {
-			if !strings.Contains(stdout, s) {
-				t.Errorf("%s: expected to see '%s' in stdout\n\nstdout:\n%s\n\nstderr:\n%s", name, s, stdout, stderr)
-			}
-		}
-		for _, s := range testcase.ExpectedStderr {
-			if !strings.Contains(stderr, s) {
-				t.Errorf("%s: expected to see '%s' in stderr\n\nstdout:\n%s\n\nstderr:\n%s", name, s, stdout, stderr)
-			}
-		}
 	}
 }
 

@@ -23,10 +23,16 @@ import (
 
 	"github.com/spf13/cobra"
 
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apiserver/pkg/admission"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
+	"k8s.io/sample-apiserver/pkg/admission/plugin/banflunder"
+	"k8s.io/sample-apiserver/pkg/admission/wardleinitializer"
 	"k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1"
 	"k8s.io/sample-apiserver/pkg/apiserver"
+	clientset "k8s.io/sample-apiserver/pkg/client/clientset/internalversion"
+	informers "k8s.io/sample-apiserver/pkg/client/informers/internalversion"
 )
 
 const defaultEtcdPathPrefix = "/registry/wardle.kubernetes.io"
@@ -34,13 +40,14 @@ const defaultEtcdPathPrefix = "/registry/wardle.kubernetes.io"
 type WardleServerOptions struct {
 	RecommendedOptions *genericoptions.RecommendedOptions
 
-	StdOut io.Writer
-	StdErr io.Writer
+	SharedInformerFactory informers.SharedInformerFactory
+	StdOut                io.Writer
+	StdErr                io.Writer
 }
 
 func NewWardleServerOptions(out, errOut io.Writer) *WardleServerOptions {
 	o := &WardleServerOptions{
-		RecommendedOptions: genericoptions.NewRecommendedOptions(defaultEtcdPathPrefix, apiserver.Scheme, apiserver.Codecs.LegacyCodec(v1alpha1.SchemeGroupVersion)),
+		RecommendedOptions: genericoptions.NewRecommendedOptions(defaultEtcdPathPrefix, apiserver.Codecs.LegacyCodec(v1alpha1.SchemeGroupVersion)),
 
 		StdOut: out,
 		StdErr: errOut,
@@ -49,7 +56,7 @@ func NewWardleServerOptions(out, errOut io.Writer) *WardleServerOptions {
 	return o
 }
 
-// NewCommandStartMaster provides a CLI handler for 'start master' command
+// NewCommandStartWardleServer provides a CLI handler for 'start master' command
 func NewCommandStartWardleServer(out, errOut io.Writer, stopCh <-chan struct{}) *cobra.Command {
 	o := NewWardleServerOptions(out, errOut)
 
@@ -77,26 +84,42 @@ func NewCommandStartWardleServer(out, errOut io.Writer, stopCh <-chan struct{}) 
 }
 
 func (o WardleServerOptions) Validate(args []string) error {
-	return nil
+	errors := []error{}
+	errors = append(errors, o.RecommendedOptions.Validate()...)
+	return utilerrors.NewAggregate(errors)
 }
 
 func (o *WardleServerOptions) Complete() error {
 	return nil
 }
 
-func (o WardleServerOptions) Config() (*apiserver.Config, error) {
+func (o *WardleServerOptions) Config() (*apiserver.Config, error) {
+	// register admission plugins
+	banflunder.Register(o.RecommendedOptions.Admission.Plugins)
+
 	// TODO have a "real" external address
 	if err := o.RecommendedOptions.SecureServing.MaybeDefaultWithSelfSignedCerts("localhost", nil, []net.IP{net.ParseIP("127.0.0.1")}); err != nil {
 		return nil, fmt.Errorf("error creating self-signed certificates: %v", err)
 	}
 
-	serverConfig := genericapiserver.NewConfig(apiserver.Codecs)
-	if err := o.RecommendedOptions.ApplyTo(serverConfig); err != nil {
+	o.RecommendedOptions.ExtraAdmissionInitializers = func(c *genericapiserver.RecommendedConfig) ([]admission.PluginInitializer, error) {
+		client, err := clientset.NewForConfig(c.LoopbackClientConfig)
+		if err != nil {
+			return nil, err
+		}
+		informerFactory := informers.NewSharedInformerFactory(client, c.LoopbackClientConfig.Timeout)
+		o.SharedInformerFactory = informerFactory
+		return []admission.PluginInitializer{wardleinitializer.New(informerFactory)}, nil
+	}
+
+	serverConfig := genericapiserver.NewRecommendedConfig(apiserver.Codecs)
+	if err := o.RecommendedOptions.ApplyTo(serverConfig, apiserver.Scheme); err != nil {
 		return nil, err
 	}
 
 	config := &apiserver.Config{
 		GenericConfig: serverConfig,
+		ExtraConfig:   apiserver.ExtraConfig{},
 	}
 	return config, nil
 }
@@ -111,5 +134,11 @@ func (o WardleServerOptions) RunWardleServer(stopCh <-chan struct{}) error {
 	if err != nil {
 		return err
 	}
+
+	server.GenericAPIServer.AddPostStartHook("start-sample-server-informers", func(context genericapiserver.PostStartHookContext) error {
+		config.GenericConfig.SharedInformerFactory.Start(context.StopCh)
+		return nil
+	})
+
 	return server.GenericAPIServer.PrepareRun().Run(stopCh)
 }

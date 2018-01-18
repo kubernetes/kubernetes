@@ -28,18 +28,16 @@ import (
 
 	"github.com/golang/glog"
 
+	"k8s.io/api/imagepolicy/v1alpha1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	kubeschema "k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/cache"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/apiserver/pkg/admission"
-	"k8s.io/apiserver/pkg/util/cache"
 	"k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/client-go/rest"
-
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apis/imagepolicy/v1alpha1"
-	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	api "k8s.io/kubernetes/pkg/apis/core"
 
 	// install the clientgo image policy API for use with api registry
 	_ "k8s.io/kubernetes/pkg/apis/imagepolicy/install"
@@ -49,8 +47,9 @@ var (
 	groupVersions = []schema.GroupVersion{v1alpha1.SchemeGroupVersion}
 )
 
-func init() {
-	kubeapiserveradmission.Plugins.Register("ImagePolicyWebhook", func(config io.Reader) (admission.Interface, error) {
+// Register registers a plugin
+func Register(plugins *admission.Plugins) {
+	plugins.Register("ImagePolicyWebhook", func(config io.Reader) (admission.Interface, error) {
 		newImagePolicyWebhook, err := NewImagePolicyWebhook(config)
 		if err != nil {
 			return nil, err
@@ -59,8 +58,8 @@ func init() {
 	})
 }
 
-// imagePolicyWebhook is an implementation of admission.Interface.
-type imagePolicyWebhook struct {
+// Plugin is an implementation of admission.Interface.
+type Plugin struct {
 	*admission.Handler
 	webhook       *webhook.GenericWebhook
 	responseCache *cache.LRUExpireCache
@@ -70,7 +69,9 @@ type imagePolicyWebhook struct {
 	defaultAllow  bool
 }
 
-func (a *imagePolicyWebhook) statusTTL(status v1alpha1.ImageReviewStatus) time.Duration {
+var _ admission.ValidationInterface = &Plugin{}
+
+func (a *Plugin) statusTTL(status v1alpha1.ImageReviewStatus) time.Duration {
 	if status.Allowed {
 		return a.allowTTL
 	}
@@ -78,7 +79,7 @@ func (a *imagePolicyWebhook) statusTTL(status v1alpha1.ImageReviewStatus) time.D
 }
 
 // Filter out annotations that don't match *.image-policy.k8s.io/*
-func (a *imagePolicyWebhook) filterAnnotations(allAnnotations map[string]string) map[string]string {
+func (a *Plugin) filterAnnotations(allAnnotations map[string]string) map[string]string {
 	annotations := make(map[string]string)
 	for k, v := range allAnnotations {
 		if strings.Contains(k, ".image-policy.k8s.io/") {
@@ -89,10 +90,16 @@ func (a *imagePolicyWebhook) filterAnnotations(allAnnotations map[string]string)
 }
 
 // Function to call on webhook failure; behavior determined by defaultAllow flag
-func (a *imagePolicyWebhook) webhookError(attributes admission.Attributes, err error) error {
+func (a *Plugin) webhookError(pod *api.Pod, attributes admission.Attributes, err error) error {
 	if err != nil {
 		glog.V(2).Infof("error contacting webhook backend: %s", err)
 		if a.defaultAllow {
+			annotations := pod.GetAnnotations()
+			if annotations == nil {
+				annotations = make(map[string]string)
+			}
+			annotations[api.ImagePolicyFailedOpenKey] = "true"
+			pod.ObjectMeta.SetAnnotations(annotations)
 			glog.V(2).Infof("resource allowed in spite of webhook backend failure")
 			return nil
 		}
@@ -102,13 +109,10 @@ func (a *imagePolicyWebhook) webhookError(attributes admission.Attributes, err e
 	return nil
 }
 
-func (a *imagePolicyWebhook) Admit(attributes admission.Attributes) (err error) {
+// Validate makes an admission decision based on the request attributes
+func (a *Plugin) Validate(attributes admission.Attributes) (err error) {
 	// Ignore all calls to subresources or resources other than pods.
-	allowedResources := map[kubeschema.GroupResource]bool{
-		api.Resource("pods"): true,
-	}
-
-	if len(attributes.GetSubresource()) != 0 || !allowedResources[attributes.GetResource().GroupResource()] {
+	if attributes.GetSubresource() != "" || attributes.GetResource().GroupResource() != api.Resource("pods") {
 		return nil
 	}
 
@@ -134,13 +138,13 @@ func (a *imagePolicyWebhook) Admit(attributes admission.Attributes) (err error) 
 			Namespace:   attributes.GetNamespace(),
 		},
 	}
-	if err := a.admitPod(attributes, &imageReview); err != nil {
+	if err := a.admitPod(pod, attributes, &imageReview); err != nil {
 		return admission.NewForbidden(attributes, err)
 	}
 	return nil
 }
 
-func (a *imagePolicyWebhook) admitPod(attributes admission.Attributes, review *v1alpha1.ImageReview) error {
+func (a *Plugin) admitPod(pod *api.Pod, attributes admission.Attributes, review *v1alpha1.ImageReview) error {
 	cacheKey, err := json.Marshal(review.Spec)
 	if err != nil {
 		return err
@@ -153,15 +157,15 @@ func (a *imagePolicyWebhook) admitPod(attributes admission.Attributes, review *v
 		})
 
 		if err := result.Error(); err != nil {
-			return a.webhookError(attributes, err)
+			return a.webhookError(pod, attributes, err)
 		}
 		var statusCode int
 		if result.StatusCode(&statusCode); statusCode < 200 || statusCode >= 300 {
-			return a.webhookError(attributes, fmt.Errorf("Error contacting webhook: %d", statusCode))
+			return a.webhookError(pod, attributes, fmt.Errorf("Error contacting webhook: %d", statusCode))
 		}
 
 		if err := result.Into(review); err != nil {
-			return a.webhookError(attributes, err)
+			return a.webhookError(pod, attributes, err)
 		}
 
 		a.responseCache.Add(string(cacheKey), review.Status, a.statusTTL(review.Status))
@@ -169,7 +173,7 @@ func (a *imagePolicyWebhook) admitPod(attributes admission.Attributes, review *v
 
 	if !review.Status.Allowed {
 		if len(review.Status.Reason) > 0 {
-			return fmt.Errorf("image policy webook backend denied one or more images: %s", review.Status.Reason)
+			return fmt.Errorf("image policy webhook backend denied one or more images: %s", review.Status.Reason)
 		}
 		return errors.New("one or more images rejected by webhook backend")
 	}
@@ -177,8 +181,8 @@ func (a *imagePolicyWebhook) admitPod(attributes admission.Attributes, review *v
 	return nil
 }
 
-// NewImagePolicyWebhook a new imagePolicyWebhook from the provided config file.
-// The config file is specified by --admission-controller-config-file and has the
+// NewImagePolicyWebhook a new ImagePolicyWebhook plugin from the provided config file.
+// The config file is specified by --admission-control-config-file and has the
 // following format for a webhook:
 //
 //   {
@@ -214,7 +218,11 @@ func (a *imagePolicyWebhook) admitPod(attributes admission.Attributes, review *v
 //
 // For additional HTTP configuration, refer to the kubeconfig documentation
 // http://kubernetes.io/v1.1/docs/user-guide/kubeconfig-file.html.
-func NewImagePolicyWebhook(configFile io.Reader) (admission.Interface, error) {
+func NewImagePolicyWebhook(configFile io.Reader) (*Plugin, error) {
+	if configFile == nil {
+		return nil, fmt.Errorf("no config specified")
+	}
+
 	// TODO: move this to a versioned configuration file format
 	var config AdmissionConfig
 	d := yaml.NewYAMLOrJSONDecoder(configFile, 4096)
@@ -228,11 +236,11 @@ func NewImagePolicyWebhook(configFile io.Reader) (admission.Interface, error) {
 		return nil, err
 	}
 
-	gw, err := webhook.NewGenericWebhook(api.Registry, api.Codecs, whConfig.KubeConfigFile, groupVersions, whConfig.RetryBackoff)
+	gw, err := webhook.NewGenericWebhook(legacyscheme.Registry, legacyscheme.Codecs, whConfig.KubeConfigFile, groupVersions, whConfig.RetryBackoff)
 	if err != nil {
 		return nil, err
 	}
-	return &imagePolicyWebhook{
+	return &Plugin{
 		Handler:       admission.NewHandler(admission.Create, admission.Update),
 		webhook:       gw,
 		responseCache: cache.NewLRUExpireCache(1024),

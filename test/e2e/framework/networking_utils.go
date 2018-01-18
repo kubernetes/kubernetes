@@ -29,6 +29,7 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -37,23 +38,22 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	coreclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
+	clientset "k8s.io/client-go/kubernetes"
+	coreclientset "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/kubernetes/pkg/api/testapi"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 const (
-	EndpointHttpPort      = 8080
-	EndpointUdpPort       = 8081
-	TestContainerHttpPort = 8080
-	ClusterHttpPort       = 80
-	ClusterUdpPort        = 90
-	NetexecImageName      = "gcr.io/google_containers/netexec:1.7"
-	HostexecImageName     = "gcr.io/google_containers/hostexec:1.2"
-	testPodName           = "test-container-pod"
-	hostTestPodName       = "host-test-container-pod"
-	nodePortServiceName   = "node-port-service"
+	EndpointHttpPort           = 8080
+	EndpointUdpPort            = 8081
+	TestContainerHttpPort      = 8080
+	ClusterHttpPort            = 80
+	ClusterUdpPort             = 90
+	testPodName                = "test-container-pod"
+	hostTestPodName            = "host-test-container-pod"
+	nodePortServiceName        = "node-port-service"
+	sessionAffinityServiceName = "session-affinity-service"
 	// wait time between poll attempts of a Service vip and/or nodePort.
 	// coupled with testTries to produce a net timeout value.
 	hitEndpointRetryDelay = 2 * time.Second
@@ -62,7 +62,11 @@ const (
 	testTries = 30
 	// Maximum number of pods in a test, to make test work in large clusters.
 	maxNetProxyPodsCount = 10
+	// Number of checks to hit a given set of endpoints when enable session affinity.
+	SessionAffinityChecks = 10
 )
+
+var NetexecImageName = imageutils.GetE2EImage(imageutils.Netexec)
 
 // NewNetworkingTestConfig creates and sets up a new test config helper.
 func NewNetworkingTestConfig(f *Framework) *NetworkingTestConfig {
@@ -107,6 +111,9 @@ type NetworkingTestConfig struct {
 	// NodePortService is a Service with Type=NodePort spanning over all
 	// endpointPods.
 	NodePortService *v1.Service
+	// SessionAffinityService is a Service with SessionAffinity=ClientIP
+	// spanning over all endpointPods.
+	SessionAffinityService *v1.Service
 	// ExternalAddrs is a list of external IPs of nodes in the cluster.
 	ExternalAddrs []string
 	// Nodes is a list of nodes in the cluster.
@@ -172,9 +179,12 @@ func (config *NetworkingTestConfig) EndpointHostnames() sets.String {
 // more for maxTries. Use this if you want to eg: fail a readiness check on a
 // pod and confirm it doesn't show up as an endpoint.
 func (config *NetworkingTestConfig) DialFromContainer(protocol, containerIP, targetIP string, containerHttpPort, targetPort, maxTries, minTries int, expectedEps sets.String) {
-	cmd := fmt.Sprintf("curl -q -s 'http://%s:%d/dial?request=hostName&protocol=%s&host=%s&port=%d&tries=1'",
-		containerIP,
-		containerHttpPort,
+	ipPort := net.JoinHostPort(containerIP, strconv.Itoa(containerHttpPort))
+	// The current versions of curl included in CentOS and RHEL distros
+	// misinterpret square brackets around IPv6 as globbing, so use the -g
+	// argument to disable globbing to handle the IPv6 case.
+	cmd := fmt.Sprintf("curl -g -q -s 'http://%s/dial?request=hostName&protocol=%s&host=%s&port=%d&tries=1'",
+		ipPort,
 		protocol,
 		targetIP,
 		targetPort)
@@ -214,7 +224,58 @@ func (config *NetworkingTestConfig) DialFromContainer(protocol, containerIP, tar
 	}
 
 	config.diagnoseMissingEndpoints(eps)
-	Failf("Failed to find expected endpoints:\nTries %d\nCommand %v\nretrieved %v\nexpected %v\n", minTries, cmd, eps, expectedEps)
+	Failf("Failed to find expected endpoints:\nTries %d\nCommand %v\nretrieved %v\nexpected %v\n", maxTries, cmd, eps, expectedEps)
+}
+
+func (config *NetworkingTestConfig) GetEndpointsFromTestContainer(protocol, targetIP string, targetPort, tries int) (sets.String, error) {
+	return config.GetEndpointsFromContainer(protocol, config.TestContainerPod.Status.PodIP, targetIP, TestContainerHttpPort, targetPort, tries)
+}
+
+// GetEndpointsFromContainer executes a curl via kubectl exec in a test container,
+// which might then translate to a tcp or udp request based on the protocol argument
+// in the url. It returns all different endpoints from multiple retries.
+// - tries is the number of curl attempts. If this many attempts pass and
+//   we don't see any endpoints, the test fails.
+func (config *NetworkingTestConfig) GetEndpointsFromContainer(protocol, containerIP, targetIP string, containerHttpPort, targetPort, tries int) (sets.String, error) {
+	ipPort := net.JoinHostPort(containerIP, strconv.Itoa(containerHttpPort))
+	// The current versions of curl included in CentOS and RHEL distros
+	// misinterpret square brackets around IPv6 as globbing, so use the -g
+	// argument to disable globbing to handle the IPv6 case.
+	cmd := fmt.Sprintf("curl -g -q -s 'http://%s/dial?request=hostName&protocol=%s&host=%s&port=%d&tries=1'",
+		ipPort,
+		protocol,
+		targetIP,
+		targetPort)
+
+	eps := sets.NewString()
+
+	for i := 0; i < tries; i++ {
+		stdout, stderr, err := config.f.ExecShellInPodWithFullOutput(config.HostTestContainerPod.Name, cmd)
+		if err != nil {
+			// A failure to kubectl exec counts as a try, not a hard fail.
+			// Also note that we will keep failing for maxTries in tests where
+			// we confirm unreachability.
+			Logf("Failed to execute %q: %v, stdout: %q, stderr: %q", cmd, err, stdout, stderr)
+		} else {
+			Logf("Tries: %d, in try: %d, stdout: %v, stderr: %v, command run in: %#v", tries, i, stdout, stderr, config.HostTestContainerPod)
+			var output map[string][]string
+			if err := json.Unmarshal([]byte(stdout), &output); err != nil {
+				Logf("WARNING: Failed to unmarshal curl response. Cmd %v run in %v, output: %s, err: %v",
+					cmd, config.HostTestContainerPod.Name, stdout, err)
+				continue
+			}
+
+			for _, hostName := range output["responses"] {
+				trimmed := strings.TrimSpace(hostName)
+				if trimmed != "" {
+					eps.Insert(trimmed)
+				}
+			}
+			// TODO: get rid of this delay #36281
+			time.Sleep(hitEndpointRetryDelay)
+		}
+	}
+	return eps, nil
 }
 
 // DialFromNode executes a tcp or udp request based on protocol via kubectl exec
@@ -234,7 +295,11 @@ func (config *NetworkingTestConfig) DialFromNode(protocol, targetIP string, targ
 		// busybox timeout doesn't support non-integer values.
 		cmd = fmt.Sprintf("echo 'hostName' | timeout -t 2 nc -w 1 -u %s %d", targetIP, targetPort)
 	} else {
-		cmd = fmt.Sprintf("timeout -t 15 curl -q -s --connect-timeout 1 http://%s:%d/hostName", targetIP, targetPort)
+		ipPort := net.JoinHostPort(targetIP, strconv.Itoa(targetPort))
+		// The current versions of curl included in CentOS and RHEL distros
+		// misinterpret square brackets around IPv6 as globbing, so use the -g
+		// argument to disable globbing to handle the IPv6 case.
+		cmd = fmt.Sprintf("timeout -t 15 curl -g -q -s --connect-timeout 1 http://%s/hostName", ipPort)
 	}
 
 	// TODO: This simply tells us that we can reach the endpoints. Check that
@@ -270,7 +335,7 @@ func (config *NetworkingTestConfig) DialFromNode(protocol, targetIP string, targ
 	}
 
 	config.diagnoseMissingEndpoints(eps)
-	Failf("Failed to find expected endpoints:\nTries %d\nCommand %v\nretrieved %v\nexpected %v\n", minTries, cmd, eps, expectedEps)
+	Failf("Failed to find expected endpoints:\nTries %d\nCommand %v\nretrieved %v\nexpected %v\n", maxTries, cmd, eps, expectedEps)
 }
 
 // GetSelfURL executes a curl against the given path via kubectl exec into a
@@ -279,9 +344,22 @@ func (config *NetworkingTestConfig) DialFromNode(protocol, targetIP string, targ
 func (config *NetworkingTestConfig) GetSelfURL(port int32, path string, expected string) {
 	cmd := fmt.Sprintf("curl -i -q -s --connect-timeout 1 http://localhost:%d%s", port, path)
 	By(fmt.Sprintf("Getting kube-proxy self URL %s", path))
+	config.executeCurlCmd(cmd, expected)
+}
 
+// GetSelfStatusCode executes a curl against the given path via kubectl exec into a
+// test container running with host networking, and fails if the returned status
+// code doesn't match the expected string.
+func (config *NetworkingTestConfig) GetSelfURLStatusCode(port int32, path string, expected string) {
+	// check status code
+	cmd := fmt.Sprintf("curl -o /dev/null -i -q -s -w %%{http_code} --connect-timeout 1 http://localhost:%d%s", port, path)
+	By(fmt.Sprintf("Checking status code against http://localhost:%d%s", port, path))
+	config.executeCurlCmd(cmd, expected)
+}
+
+func (config *NetworkingTestConfig) executeCurlCmd(cmd string, expected string) {
 	// These are arbitrary timeouts. The curl command should pass on first try,
-	// unless kubeproxy is starved/bootstrapping/restarting etc.
+	// unless remote server is starved/bootstrapping/restarting etc.
 	const retryInterval = 1 * time.Second
 	const retryTimeout = 30 * time.Second
 	podName := config.HostTestContainerPod.Name
@@ -308,7 +386,7 @@ func (config *NetworkingTestConfig) GetSelfURL(port int32, path string, expected
 	}
 }
 
-func (config *NetworkingTestConfig) createNetShellPodSpec(podName string, node string) *v1.Pod {
+func (config *NetworkingTestConfig) createNetShellPodSpec(podName, hostname string) *v1.Pod {
 	probe := &v1.Probe{
 		InitialDelaySeconds: 10,
 		TimeoutSeconds:      30,
@@ -325,7 +403,7 @@ func (config *NetworkingTestConfig) createNetShellPodSpec(podName string, node s
 	pod := &v1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
-			APIVersion: api.Registry.GroupOrDie(v1.GroupName).GroupVersion.String(),
+			APIVersion: testapi.Groups[v1.GroupName].GroupVersion().String(),
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      podName,
@@ -358,7 +436,7 @@ func (config *NetworkingTestConfig) createNetShellPodSpec(podName string, node s
 				},
 			},
 			NodeSelector: map[string]string{
-				"kubernetes.io/hostname": node,
+				"kubernetes.io/hostname": hostname,
 			},
 		},
 	}
@@ -369,7 +447,7 @@ func (config *NetworkingTestConfig) createTestPodSpec() *v1.Pod {
 	pod := &v1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
-			APIVersion: api.Registry.GroupOrDie(v1.GroupName).GroupVersion.String(),
+			APIVersion: testapi.Groups[v1.GroupName].GroupVersion().String(),
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      testPodName,
@@ -399,10 +477,14 @@ func (config *NetworkingTestConfig) createTestPodSpec() *v1.Pod {
 	return pod
 }
 
-func (config *NetworkingTestConfig) createNodePortService(selector map[string]string) {
-	serviceSpec := &v1.Service{
+func (config *NetworkingTestConfig) createNodePortServiceSpec(svcName string, selector map[string]string, enableSessionAffinity bool) *v1.Service {
+	sessionAffinity := v1.ServiceAffinityNone
+	if enableSessionAffinity {
+		sessionAffinity = v1.ServiceAffinityClientIP
+	}
+	return &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: nodePortServiceName,
+			Name: svcName,
 		},
 		Spec: v1.ServiceSpec{
 			Type: v1.ServiceTypeNodePort,
@@ -410,10 +492,18 @@ func (config *NetworkingTestConfig) createNodePortService(selector map[string]st
 				{Port: ClusterHttpPort, Name: "http", Protocol: v1.ProtocolTCP, TargetPort: intstr.FromInt(EndpointHttpPort)},
 				{Port: ClusterUdpPort, Name: "udp", Protocol: v1.ProtocolUDP, TargetPort: intstr.FromInt(EndpointUdpPort)},
 			},
-			Selector: selector,
+			Selector:        selector,
+			SessionAffinity: sessionAffinity,
 		},
 	}
-	config.NodePortService = config.createService(serviceSpec)
+}
+
+func (config *NetworkingTestConfig) createNodePortService(selector map[string]string) {
+	config.NodePortService = config.createService(config.createNodePortServiceSpec(nodePortServiceName, selector, false))
+}
+
+func (config *NetworkingTestConfig) createSessionAffinityService(selector map[string]string) {
+	config.SessionAffinityService = config.createService(config.createNodePortServiceSpec(sessionAffinityServiceName, selector, true))
 }
 
 func (config *NetworkingTestConfig) DeleteNodePortService() {
@@ -485,6 +575,7 @@ func (config *NetworkingTestConfig) setup(selector map[string]string) {
 
 	By("Creating the service on top of the pods in kubernetes")
 	config.createNodePortService(selector)
+	config.createSessionAffinityService(selector)
 
 	for _, p := range config.NodePortService.Spec.Ports {
 		switch p.Protocol {
@@ -497,7 +588,12 @@ func (config *NetworkingTestConfig) setup(selector map[string]string) {
 		}
 	}
 	config.ClusterIP = config.NodePortService.Spec.ClusterIP
-	config.NodeIP = config.ExternalAddrs[0]
+	if len(config.ExternalAddrs) != 0 {
+		config.NodeIP = config.ExternalAddrs[0]
+	} else {
+		internalAddrs := NodeAddresses(nodeList, v1.NodeInternalIP)
+		config.NodeIP = internalAddrs[0]
+	}
 }
 
 func (config *NetworkingTestConfig) cleanup() {
@@ -539,7 +635,8 @@ func (config *NetworkingTestConfig) createNetProxyPods(podName string, selector 
 	createdPods := make([]*v1.Pod, 0, len(nodes))
 	for i, n := range nodes {
 		podName := fmt.Sprintf("%s-%d", podName, i)
-		pod := config.createNetShellPodSpec(podName, n.Name)
+		hostname, _ := n.Labels["kubernetes.io/hostname"]
+		pod := config.createNetShellPodSpec(podName, hostname)
 		pod.ObjectMeta.Labels = selector
 		createdPod := config.createPod(pod)
 		createdPods = append(createdPods, createdPod)
@@ -587,11 +684,11 @@ func (config *NetworkingTestConfig) getPodClient() *PodClient {
 }
 
 func (config *NetworkingTestConfig) getServiceClient() coreclientset.ServiceInterface {
-	return config.f.ClientSet.Core().Services(config.Namespace)
+	return config.f.ClientSet.CoreV1().Services(config.Namespace)
 }
 
 func (config *NetworkingTestConfig) getNamespacesClient() coreclientset.NamespaceInterface {
-	return config.f.ClientSet.Core().Namespaces()
+	return config.f.ClientSet.CoreV1().Namespaces()
 }
 
 func CheckReachabilityFromPod(expectToBeReachable bool, timeout time.Duration, namespace, pod, target string) {
@@ -635,12 +732,22 @@ func TestReachableHTTP(ip string, port int, request string, expect string) (bool
 	return TestReachableHTTPWithContent(ip, port, request, expect, nil)
 }
 
+func TestReachableHTTPWithRetriableErrorCodes(ip string, port int, request string, expect string, retriableErrCodes []int) (bool, error) {
+	return TestReachableHTTPWithContentTimeoutWithRetriableErrorCodes(ip, port, request, expect, nil, retriableErrCodes, time.Second*5)
+}
+
 func TestReachableHTTPWithContent(ip string, port int, request string, expect string, content *bytes.Buffer) (bool, error) {
 	return TestReachableHTTPWithContentTimeout(ip, port, request, expect, content, 5*time.Second)
 }
 
 func TestReachableHTTPWithContentTimeout(ip string, port int, request string, expect string, content *bytes.Buffer, timeout time.Duration) (bool, error) {
-	url := fmt.Sprintf("http://%s:%d%s", ip, port, request)
+	return TestReachableHTTPWithContentTimeoutWithRetriableErrorCodes(ip, port, request, expect, content, []int{}, timeout)
+}
+
+func TestReachableHTTPWithContentTimeoutWithRetriableErrorCodes(ip string, port int, request string, expect string, content *bytes.Buffer, retriableErrCodes []int, timeout time.Duration) (bool, error) {
+
+	ipPort := net.JoinHostPort(ip, strconv.Itoa(port))
+	url := fmt.Sprintf("http://%s%s", ipPort, request)
 	if ip == "" {
 		Failf("Got empty IP for reachability check (%s)", url)
 		return false, nil
@@ -664,6 +771,12 @@ func TestReachableHTTPWithContentTimeout(ip string, port int, request string, ex
 		return false, nil
 	}
 	if resp.StatusCode != 200 {
+		for _, code := range retriableErrCodes {
+			if resp.StatusCode == code {
+				Logf("Got non-success status %q when trying to access %s, but the error code is retriable", resp.Status, url)
+				return false, nil
+			}
+		}
 		return false, fmt.Errorf("received non-success return status %q trying to access %s; got body: %s",
 			resp.Status, url, string(body))
 	}
@@ -681,7 +794,8 @@ func TestNotReachableHTTP(ip string, port int) (bool, error) {
 }
 
 func TestNotReachableHTTPTimeout(ip string, port int, timeout time.Duration) (bool, error) {
-	url := fmt.Sprintf("http://%s:%d", ip, port)
+	ipPort := net.JoinHostPort(ip, strconv.Itoa(port))
+	url := fmt.Sprintf("http://%s", ipPort)
 	if ip == "" {
 		Failf("Got empty IP for non-reachability check (%s)", url)
 		return false, nil
@@ -703,7 +817,8 @@ func TestNotReachableHTTPTimeout(ip string, port int, timeout time.Duration) (bo
 }
 
 func TestReachableUDP(ip string, port int, request string, expect string) (bool, error) {
-	uri := fmt.Sprintf("udp://%s:%d", ip, port)
+	ipPort := net.JoinHostPort(ip, strconv.Itoa(port))
+	uri := fmt.Sprintf("udp://%s", ipPort)
 	if ip == "" {
 		Failf("Got empty IP for reachability check (%s)", uri)
 		return false, nil
@@ -715,9 +830,9 @@ func TestReachableUDP(ip string, port int, request string, expect string) (bool,
 
 	Logf("Testing UDP reachability of %v", uri)
 
-	con, err := net.Dial("udp", ip+":"+strconv.Itoa(port))
+	con, err := net.Dial("udp", ipPort)
 	if err != nil {
-		return false, fmt.Errorf("Failed to dial %s:%d: %v", ip, port, err)
+		return false, fmt.Errorf("Failed to dial %s: %v", ipPort, err)
 	}
 
 	_, err = con.Write([]byte(fmt.Sprintf("%s\n", request)))
@@ -746,7 +861,8 @@ func TestReachableUDP(ip string, port int, request string, expect string) (bool,
 }
 
 func TestNotReachableUDP(ip string, port int, request string) (bool, error) {
-	uri := fmt.Sprintf("udp://%s:%d", ip, port)
+	ipPort := net.JoinHostPort(ip, strconv.Itoa(port))
+	uri := fmt.Sprintf("udp://%s", ipPort)
 	if ip == "" {
 		Failf("Got empty IP for reachability check (%s)", uri)
 		return false, nil
@@ -758,7 +874,7 @@ func TestNotReachableUDP(ip string, port int, request string) (bool, error) {
 
 	Logf("Testing UDP non-reachability of %v", uri)
 
-	con, err := net.Dial("udp", ip+":"+strconv.Itoa(port))
+	con, err := net.Dial("udp", ipPort)
 	if err != nil {
 		Logf("Confirmed that %s is not reachable", uri)
 		return true, nil

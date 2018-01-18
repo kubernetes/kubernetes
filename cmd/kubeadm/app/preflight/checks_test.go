@@ -20,14 +20,18 @@ import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/renstrom/dedent"
 
+	"net/http"
 	"os"
 
-	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	"k8s.io/apimachinery/pkg/util/sets"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	"k8s.io/utils/exec"
 )
 
 var (
@@ -163,6 +167,10 @@ type preflightCheckTest struct {
 	msg string
 }
 
+func (pfct preflightCheckTest) Name() string {
+	return "preflightCheckTest"
+}
+
 func (pfct preflightCheckTest) Check() (warning, errors []error) {
 	if pfct.msg == "warning" {
 		return []error{fmt.Errorf("warning")}, nil
@@ -175,24 +183,53 @@ func (pfct preflightCheckTest) Check() (warning, errors []error) {
 
 func TestRunInitMasterChecks(t *testing.T) {
 	var tests = []struct {
+		name     string
 		cfg      *kubeadmapi.MasterConfiguration
 		expected bool
 	}{
+		{name: "Test valid advertised address",
+			cfg: &kubeadmapi.MasterConfiguration{
+				API: kubeadmapi.API{AdvertiseAddress: "foo"},
+			},
+			expected: false,
+		},
+		{
+			name: "Test CA file exists if specfied",
+			cfg: &kubeadmapi.MasterConfiguration{
+				Etcd: kubeadmapi.Etcd{CAFile: "/foo"},
+			},
+			expected: false,
+		},
+		{
+			name: "Test Cert file exists if specfied",
+			cfg: &kubeadmapi.MasterConfiguration{
+				Etcd: kubeadmapi.Etcd{CertFile: "/foo"},
+			},
+			expected: false,
+		},
+		{
+			name: "Test Key file exists if specfied",
+			cfg: &kubeadmapi.MasterConfiguration{
+				Etcd: kubeadmapi.Etcd{CertFile: "/foo"},
+			},
+			expected: false,
+		},
 		{
 			cfg: &kubeadmapi.MasterConfiguration{
-				API: kubeadm.API{AdvertiseAddress: "foo"},
+				API: kubeadmapi.API{AdvertiseAddress: "2001:1234::1:15"},
 			},
 			expected: false,
 		},
 	}
 
 	for _, rt := range tests {
-		actual := RunInitMasterChecks(rt.cfg)
+		actual := RunInitMasterChecks(exec.New(), rt.cfg, "", sets.NewString())
 		if (actual == nil) != rt.expected {
 			t.Errorf(
-				"failed RunInitMasterChecks:\n\texpected: %t\n\t  actual: %t",
+				"failed RunInitMasterChecks:\n\texpected: %t\n\t  actual: %t\n\t error: %v",
 				rt.expected,
-				(actual != nil),
+				(actual == nil),
+				actual,
 			)
 		}
 	}
@@ -207,10 +244,22 @@ func TestRunJoinNodeChecks(t *testing.T) {
 			cfg:      &kubeadmapi.NodeConfiguration{},
 			expected: false,
 		},
+		{
+			cfg: &kubeadmapi.NodeConfiguration{
+				DiscoveryTokenAPIServers: []string{"192.168.1.15"},
+			},
+			expected: false,
+		},
+		{
+			cfg: &kubeadmapi.NodeConfiguration{
+				DiscoveryTokenAPIServers: []string{"2001:1234::1:15"},
+			},
+			expected: false,
+		},
 	}
 
 	for _, rt := range tests {
-		actual := RunJoinNodeChecks(rt.cfg)
+		actual := RunJoinNodeChecks(exec.New(), rt.cfg, "", sets.NewString())
 		if (actual == nil) != rt.expected {
 			t.Errorf(
 				"failed RunJoinNodeChecks:\n\texpected: %t\n\t  actual: %t",
@@ -228,7 +277,7 @@ func TestRunChecks(t *testing.T) {
 		output   string
 	}{
 		{[]Checker{}, true, ""},
-		{[]Checker{preflightCheckTest{"warning"}}, true, "[preflight] WARNING: warning\n"}, // should just print warning
+		{[]Checker{preflightCheckTest{"warning"}}, true, "\t[WARNING preflightCheckTest]: warning\n"}, // should just print warning
 		{[]Checker{preflightCheckTest{"error"}}, false, ""},
 		{[]Checker{preflightCheckTest{"test"}}, false, ""},
 		{[]Checker{DirAvailableCheck{Path: "/does/not/exist"}}, true, ""},
@@ -237,12 +286,23 @@ func TestRunChecks(t *testing.T) {
 		{[]Checker{FileContentCheck{Path: "/does/not/exist"}}, false, ""},
 		{[]Checker{FileContentCheck{Path: "/"}}, true, ""},
 		{[]Checker{FileContentCheck{Path: "/", Content: []byte("does not exist")}}, false, ""},
-		{[]Checker{InPathCheck{executable: "foobarbaz"}}, true, "[preflight] WARNING: foobarbaz not found in system path\n"},
-		{[]Checker{InPathCheck{executable: "foobarbaz", mandatory: true}}, false, ""},
+		{[]Checker{InPathCheck{executable: "foobarbaz", exec: exec.New()}}, true, "\t[WARNING FileExisting-foobarbaz]: foobarbaz not found in system path\n"},
+		{[]Checker{InPathCheck{executable: "foobarbaz", mandatory: true, exec: exec.New()}}, false, ""},
+		{[]Checker{ExtraArgsCheck{
+			APIServerExtraArgs:         map[string]string{"secure-port": "1234"},
+			ControllerManagerExtraArgs: map[string]string{"use-service-account-credentials": "true"},
+			SchedulerExtraArgs:         map[string]string{"leader-elect": "true"},
+		}}, true, ""},
+		{[]Checker{ExtraArgsCheck{
+			APIServerExtraArgs: map[string]string{"secure-port": "foo"},
+		}}, true, "\t[WARNING ExtraArgs]: kube-apiserver: failed to parse extra argument --secure-port=foo\n"},
+		{[]Checker{ExtraArgsCheck{
+			APIServerExtraArgs: map[string]string{"invalid-argument": "foo"},
+		}}, true, "\t[WARNING ExtraArgs]: kube-apiserver: failed to parse extra argument --invalid-argument=foo\n"},
 	}
 	for _, rt := range tokenTest {
 		buf := new(bytes.Buffer)
-		actual := RunChecks(rt.p, buf)
+		actual := RunChecks(rt.p, buf, sets.NewString())
 		if (actual == nil) != rt.expected {
 			t.Errorf(
 				"failed RunChecks:\n\texpected: %t\n\t  actual: %t",
@@ -334,5 +394,255 @@ func TestConfigCertAndKey(t *testing.T) {
 			"failed configCertAndKey:\n\texpected: Certificates not equal to nil\n\tactual:%v",
 			config.Certificates,
 		)
+	}
+}
+
+func TestKubernetesVersionCheck(t *testing.T) {
+	var tests = []struct {
+		check          KubernetesVersionCheck
+		expectWarnings bool
+	}{
+		{
+			check: KubernetesVersionCheck{
+				KubeadmVersion:    "v1.6.6", //Same version
+				KubernetesVersion: "v1.6.6",
+			},
+			expectWarnings: false,
+		},
+		{
+			check: KubernetesVersionCheck{
+				KubeadmVersion:    "v1.6.6", //KubernetesVersion version older than KubeadmVersion
+				KubernetesVersion: "v1.5.5",
+			},
+			expectWarnings: false,
+		},
+		{
+			check: KubernetesVersionCheck{
+				KubeadmVersion:    "v1.6.6", //KubernetesVersion newer than KubeadmVersion, within the same minor release (new patch)
+				KubernetesVersion: "v1.6.7",
+			},
+			expectWarnings: false,
+		},
+		{
+			check: KubernetesVersionCheck{
+				KubeadmVersion:    "v1.6.6", //KubernetesVersion newer than KubeadmVersion, in a different minor/in pre-release
+				KubernetesVersion: "v1.7.0-alpha.0",
+			},
+			expectWarnings: true,
+		},
+		{
+			check: KubernetesVersionCheck{
+				KubeadmVersion:    "v1.6.6", //KubernetesVersion newer than KubeadmVersion, in a different minor/stable
+				KubernetesVersion: "v1.7.0",
+			},
+			expectWarnings: true,
+		},
+		{
+			check: KubernetesVersionCheck{
+				KubeadmVersion:    "v0.0.0", //"super-custom" builds - Skip this check
+				KubernetesVersion: "v1.7.0",
+			},
+			expectWarnings: false,
+		},
+	}
+
+	for _, rt := range tests {
+		warning, _ := rt.check.Check()
+		if (warning != nil) != rt.expectWarnings {
+			t.Errorf(
+				"failed KubernetesVersionCheck:\n\texpected: %t\n\t  actual: %t (KubeadmVersion:%s, KubernetesVersion: %s)",
+				rt.expectWarnings,
+				(warning != nil),
+				rt.check.KubeadmVersion,
+				rt.check.KubernetesVersion,
+			)
+		}
+	}
+}
+
+func TestHTTPProxyCIDRCheck(t *testing.T) {
+	var tests = []struct {
+		check          HTTPProxyCIDRCheck
+		expectWarnings bool
+	}{
+		{
+			check: HTTPProxyCIDRCheck{
+				Proto: "https",
+				CIDR:  "127.0.0.0/8",
+			}, // Loopback addresses never should produce proxy warnings
+			expectWarnings: false,
+		},
+		{
+			check: HTTPProxyCIDRCheck{
+				Proto: "https",
+				CIDR:  "10.96.0.0/12",
+			}, // Expected to be accessed directly, we set NO_PROXY to 10.0.0.0/8
+			expectWarnings: false,
+		},
+		{
+			check: HTTPProxyCIDRCheck{
+				Proto: "https",
+				CIDR:  "192.168.0.0/16",
+			}, // Expected to go via proxy as this range is not listed in NO_PROXY
+			expectWarnings: true,
+		},
+		{
+			check: HTTPProxyCIDRCheck{
+				Proto: "https",
+				CIDR:  "2001:db8::/56",
+			}, // Expected to be accessed directly, part of 2001:db8::/48 in NO_PROXY
+			expectWarnings: false,
+		},
+		{
+			check: HTTPProxyCIDRCheck{
+				Proto: "https",
+				CIDR:  "2001:db8:1::/56",
+			}, // Expected to go via proxy, range is not in 2001:db8::/48
+			expectWarnings: true,
+		},
+	}
+
+	// Save current content of *_proxy and *_PROXY variables.
+	savedEnv := resetProxyEnv()
+	defer restoreEnv(savedEnv)
+	t.Log("Saved environment: ", savedEnv)
+
+	os.Setenv("HTTP_PROXY", "http://proxy.example.com:3128")
+	os.Setenv("NO_PROXY", "example.com,10.0.0.0/8,2001:db8::/48")
+
+	// Check if we can reliably execute tests:
+	// ProxyFromEnvironment caches the *_proxy environment variables and
+	// if ProxyFromEnvironment already executed before our test with empty
+	// HTTP_PROXY it will make these tests return false positive failures
+	req, err := http.NewRequest("GET", "http://host.fake.tld/", nil)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	proxy, err := http.ProxyFromEnvironment(req)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	if proxy == nil {
+		t.Skip("test skipped as ProxyFromEnvironment already initialized in environment without defined HTTP proxy")
+	}
+	t.Log("http.ProxyFromEnvironment is usable, continue executing test")
+
+	for _, rt := range tests {
+		warning, _ := rt.check.Check()
+		if (warning != nil) != rt.expectWarnings {
+			t.Errorf(
+				"failed HTTPProxyCIDRCheck:\n\texpected: %t\n\t  actual: %t (CIDR:%s). Warnings: %v",
+				rt.expectWarnings,
+				(warning != nil),
+				rt.check.CIDR,
+				warning,
+			)
+		}
+	}
+}
+
+// resetProxyEnv is helper function that unsets all *_proxy variables
+// and return previously set values as map. This can be used to restore
+// original state of the environment.
+func resetProxyEnv() map[string]string {
+	savedEnv := make(map[string]string)
+	for _, e := range os.Environ() {
+		pair := strings.Split(e, "=")
+		if strings.HasSuffix(strings.ToLower(pair[0]), "_proxy") {
+			savedEnv[pair[0]] = pair[1]
+			os.Unsetenv(pair[0])
+		}
+	}
+	return savedEnv
+}
+
+// restoreEnv is helper function to restores values
+// of environment variables from saved state in the map
+func restoreEnv(e map[string]string) {
+	for k, v := range e {
+		os.Setenv(k, v)
+	}
+}
+
+func TestKubeletVersionCheck(t *testing.T) {
+	type T struct {
+		kubeletVersion string
+		k8sVersion     string
+		expectErrors   bool
+		expectWarnings bool
+	}
+
+	cases := []T{
+		{"v1.10.2", "", false, false},              // check minimally supported version when there is no information about control plane
+		{"v1.7.3", "v1.7.8", true, false},          // too old kubelet (older than kubeadmconstants.MinimumKubeletVersion), should fail.
+		{"v1.9.0", "v1.9.5", false, false},         // kubelet within same major.minor as control plane
+		{"v1.9.5", "v1.9.1", false, false},         // kubelet is newer, but still within same major.minor as control plane
+		{"v1.9.0", "v1.10.1", false, false},        // kubelet is lower than control plane, but newer than minimally supported
+		{"v1.10.0-alpha.1", "v1.9.1", true, false}, // kubelet is newer (development build) than control plane, should fail.
+		{"v1.10.0", "v1.9.5", true, false},         // kubelet is newer (release) than control plane, should fail.
+	}
+
+	dir, err := ioutil.TempDir("", "test-kubelet-version-check")
+	if err != nil {
+		t.Errorf("Failed to create directory for testing GetKubeletVersion: %v", err)
+	}
+	defer os.RemoveAll(dir)
+
+	// We don't want to call real kubelet or something else in $PATH
+	oldPATH := os.Getenv("PATH")
+	defer os.Setenv("PATH", oldPATH)
+
+	os.Setenv("PATH", dir)
+
+	kubeletFn := filepath.Join(dir, "kubelet")
+	for _, tc := range cases {
+
+		content := []byte(fmt.Sprintf("#!/bin/sh\necho 'Kubernetes %s'", tc.kubeletVersion))
+		if err := ioutil.WriteFile(kubeletFn, content, 0755); err != nil {
+			t.Errorf("Error creating test stub file %s: %v", kubeletFn, err)
+		}
+
+		check := KubeletVersionCheck{KubernetesVersion: tc.k8sVersion}
+		warnings, errors := check.Check()
+
+		switch {
+		case warnings != nil && !tc.expectWarnings:
+			t.Errorf("KubeletVersionCheck: unexpected warnings for kubelet version %q and kubernetes version %q. Warnings: %v", tc.kubeletVersion, tc.k8sVersion, warnings)
+		case warnings == nil && tc.expectWarnings:
+			t.Errorf("KubeletVersionCheck: expected warnings for kubelet version %q and kubernetes version %q but got nothing", tc.kubeletVersion, tc.k8sVersion)
+		case errors != nil && !tc.expectErrors:
+			t.Errorf("KubeletVersionCheck: unexpected errors for kubelet version %q and kubernetes version %q. errors: %v", tc.kubeletVersion, tc.k8sVersion, errors)
+		case errors == nil && tc.expectErrors:
+			t.Errorf("KubeletVersionCheck: expected errors for kubelet version %q and kubernetes version %q but got nothing", tc.kubeletVersion, tc.k8sVersion)
+		}
+
+	}
+
+}
+
+func TestSetHasItemOrAll(t *testing.T) {
+	var tests = []struct {
+		ignoreSet      sets.String
+		testString     string
+		expectedResult bool
+	}{
+		{sets.NewString(), "foo", false},
+		{sets.NewString("all"), "foo", true},
+		{sets.NewString("all", "bar"), "foo", true},
+		{sets.NewString("bar"), "foo", false},
+		{sets.NewString("baz", "foo", "bar"), "foo", true},
+		{sets.NewString("baz", "bar", "foo"), "Foo", true},
+	}
+
+	for _, rt := range tests {
+		result := setHasItemOrAll(rt.ignoreSet, rt.testString)
+		if result != rt.expectedResult {
+			t.Errorf(
+				"setHasItemOrAll: expected: %v actual: %v (arguments: %q, %q)",
+				rt.expectedResult, result,
+				rt.ignoreSet,
+				rt.testString,
+			)
+		}
 	}
 }

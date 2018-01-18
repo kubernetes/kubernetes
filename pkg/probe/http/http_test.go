@@ -40,12 +40,35 @@ func TestHTTPProbeChecker(t *testing.T) {
 		}
 	}
 
+	// Echo handler that returns the contents of request headers in the body
+	headerEchoHandler := func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(200)
+		output := ""
+		for k, arr := range r.Header {
+			for _, v := range arr {
+				output += fmt.Sprintf("%s: %s\n", k, v)
+			}
+		}
+		w.Write([]byte(output))
+	}
+
+	redirectHandler := func(s int, bad bool) func(w http.ResponseWriter, r *http.Request) {
+		return func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Path == "/" {
+				http.Redirect(w, r, "/new", s)
+			} else if bad && r.URL.Path == "/new" {
+				w.WriteHeader(http.StatusInternalServerError)
+			}
+		}
+	}
+
 	prober := New()
 	testCases := []struct {
 		handler    func(w http.ResponseWriter, r *http.Request)
 		reqHeaders http.Header
 		health     probe.Result
 		accBody    string
+		notBody    string
 	}{
 		// The probe will be filled in below.  This is primarily testing that an HTTP GET happens.
 		{
@@ -54,22 +77,34 @@ func TestHTTPProbeChecker(t *testing.T) {
 			accBody: "ok body",
 		},
 		{
-			// Echo handler that returns the contents of request headers in the body
-			handler: func(w http.ResponseWriter, r *http.Request) {
-				w.WriteHeader(200)
-				output := ""
-				for k, arr := range r.Header {
-					for _, v := range arr {
-						output += fmt.Sprintf("%s: %s\n", k, v)
-					}
-				}
-				w.Write([]byte(output))
-			},
+			handler: headerEchoHandler,
 			reqHeaders: http.Header{
 				"X-Muffins-Or-Cupcakes": {"muffins"},
 			},
 			health:  probe.Success,
 			accBody: "X-Muffins-Or-Cupcakes: muffins",
+		},
+		{
+			handler: headerEchoHandler,
+			reqHeaders: http.Header{
+				"User-Agent": {"foo/1.0"},
+			},
+			health:  probe.Success,
+			accBody: "User-Agent: foo/1.0",
+		},
+		{
+			handler: headerEchoHandler,
+			reqHeaders: http.Header{
+				"User-Agent": {""},
+			},
+			health:  probe.Success,
+			notBody: "User-Agent",
+		},
+		{
+			handler:    headerEchoHandler,
+			reqHeaders: http.Header{},
+			health:     probe.Success,
+			accBody:    "User-Agent: kube-probe/",
 		},
 		{
 			// Echo handler that returns the contents of Host in the body
@@ -96,6 +131,38 @@ func TestHTTPProbeChecker(t *testing.T) {
 				time.Sleep(3 * time.Second)
 			},
 			health: probe.Failure,
+		},
+		{
+			handler: redirectHandler(http.StatusMovedPermanently, false), // 301
+			health:  probe.Success,
+		},
+		{
+			handler: redirectHandler(http.StatusMovedPermanently, true), // 301
+			health:  probe.Failure,
+		},
+		{
+			handler: redirectHandler(http.StatusFound, false), // 302
+			health:  probe.Success,
+		},
+		{
+			handler: redirectHandler(http.StatusFound, true), // 302
+			health:  probe.Failure,
+		},
+		{
+			handler: redirectHandler(http.StatusTemporaryRedirect, false), // 307
+			health:  probe.Success,
+		},
+		{
+			handler: redirectHandler(http.StatusTemporaryRedirect, true), // 307
+			health:  probe.Failure,
+		},
+		{
+			handler: redirectHandler(http.StatusPermanentRedirect, false), // 308
+			health:  probe.Success,
+		},
+		{
+			handler: redirectHandler(http.StatusPermanentRedirect, true), // 308
+			health:  probe.Failure,
 		},
 	}
 	for i, test := range testCases {
@@ -129,6 +196,9 @@ func TestHTTPProbeChecker(t *testing.T) {
 			if health != probe.Failure && test.health != probe.Failure {
 				if !strings.Contains(output, test.accBody) {
 					t.Errorf("Expected response body to contain %v, got %v", test.accBody, output)
+				}
+				if test.notBody != "" && strings.Contains(output, test.notBody) {
+					t.Errorf("Expected response not to contain %v, got %v", test.notBody, output)
 				}
 			}
 		}()

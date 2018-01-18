@@ -48,3 +48,4 @@ spec:
   - name: varlogetcd
     hostPath:
       path: /var/log/etcd-events.log
+      type: FileOrCreate

@@ -2,7 +2,7 @@
 // Licensed under the LGPLv3 with static-linking exception.
 // See LICENCE file for details.
 
-// The ratelimit package provides an efficient token bucket implementation
+// Package ratelimit provides an efficient token bucket implementation
 // that can be used to limit the rate of arbitrary things.
 // See http://en.wikipedia.org/wiki/Token_bucket.
 package ratelimit
@@ -21,6 +21,7 @@ type Bucket struct {
 	capacity     int64
 	quantum      int64
 	fillInterval time.Duration
+	clock        Clock
 
 	// The mutex guards the fields following it.
 	mu sync.Mutex
@@ -33,12 +34,37 @@ type Bucket struct {
 	availTick int64
 }
 
+// Clock is used to inject testable fakes.
+type Clock interface {
+	Now() time.Time
+	Sleep(d time.Duration)
+}
+
+// realClock implements Clock in terms of standard time functions.
+type realClock struct{}
+
+// Now is identical to time.Now.
+func (realClock) Now() time.Time {
+	return time.Now()
+}
+
+// Sleep is identical to time.Sleep.
+func (realClock) Sleep(d time.Duration) {
+	time.Sleep(d)
+}
+
 // NewBucket returns a new token bucket that fills at the
 // rate of one token every fillInterval, up to the given
 // maximum capacity. Both arguments must be
 // positive. The bucket is initially full.
 func NewBucket(fillInterval time.Duration, capacity int64) *Bucket {
-	return NewBucketWithQuantum(fillInterval, capacity, 1)
+	return NewBucketWithClock(fillInterval, capacity, realClock{})
+}
+
+// NewBucketWithClock is identical to NewBucket but injects a testable clock
+// interface.
+func NewBucketWithClock(fillInterval time.Duration, capacity int64, clock Clock) *Bucket {
+	return NewBucketWithQuantumAndClock(fillInterval, capacity, 1, clock)
 }
 
 // rateMargin specifes the allowed variance of actual
@@ -51,12 +77,18 @@ const rateMargin = 0.01
 // at high rates, the actual rate may be up to 1% different from the
 // specified rate.
 func NewBucketWithRate(rate float64, capacity int64) *Bucket {
+	return NewBucketWithRateAndClock(rate, capacity, realClock{})
+}
+
+// NewBucketWithRateAndClock is identical to NewBucketWithRate but injects a
+// testable clock interface.
+func NewBucketWithRateAndClock(rate float64, capacity int64, clock Clock) *Bucket {
 	for quantum := int64(1); quantum < 1<<50; quantum = nextQuantum(quantum) {
 		fillInterval := time.Duration(1e9 * float64(quantum) / rate)
 		if fillInterval <= 0 {
 			continue
 		}
-		tb := NewBucketWithQuantum(fillInterval, capacity, quantum)
+		tb := NewBucketWithQuantumAndClock(fillInterval, capacity, quantum, clock)
 		if diff := math.Abs(tb.Rate() - rate); diff/rate <= rateMargin {
 			return tb
 		}
@@ -79,6 +111,12 @@ func nextQuantum(q int64) int64 {
 // the specification of the quantum size - quantum tokens
 // are added every fillInterval.
 func NewBucketWithQuantum(fillInterval time.Duration, capacity, quantum int64) *Bucket {
+	return NewBucketWithQuantumAndClock(fillInterval, capacity, quantum, realClock{})
+}
+
+// NewBucketWithQuantumAndClock is identical to NewBucketWithQuantum but injects
+// a testable clock interface.
+func NewBucketWithQuantumAndClock(fillInterval time.Duration, capacity, quantum int64, clock Clock) *Bucket {
 	if fillInterval <= 0 {
 		panic("token bucket fill interval is not > 0")
 	}
@@ -89,7 +127,8 @@ func NewBucketWithQuantum(fillInterval time.Duration, capacity, quantum int64) *
 		panic("token bucket quantum is not > 0")
 	}
 	return &Bucket{
-		startTime:    time.Now(),
+		clock:        clock,
+		startTime:    clock.Now(),
 		capacity:     capacity,
 		quantum:      quantum,
 		avail:        capacity,
@@ -101,7 +140,7 @@ func NewBucketWithQuantum(fillInterval time.Duration, capacity, quantum int64) *
 // available.
 func (tb *Bucket) Wait(count int64) {
 	if d := tb.Take(count); d > 0 {
-		time.Sleep(d)
+		tb.clock.Sleep(d)
 	}
 }
 
@@ -113,7 +152,7 @@ func (tb *Bucket) Wait(count int64) {
 func (tb *Bucket) WaitMaxDuration(count int64, maxWait time.Duration) bool {
 	d, ok := tb.TakeMaxDuration(count, maxWait)
 	if d > 0 {
-		time.Sleep(d)
+		tb.clock.Sleep(d)
 	}
 	return ok
 }
@@ -127,7 +166,7 @@ const infinityDuration time.Duration = 0x7fffffffffffffff
 // Note that if the request is irrevocable - there is no way to return
 // tokens to the bucket once this method commits us to taking them.
 func (tb *Bucket) Take(count int64) time.Duration {
-	d, _ := tb.take(time.Now(), count, infinityDuration)
+	d, _ := tb.take(tb.clock.Now(), count, infinityDuration)
 	return d
 }
 
@@ -141,14 +180,14 @@ func (tb *Bucket) Take(count int64) time.Duration {
 // wait until the tokens are actually available, and reports
 // true.
 func (tb *Bucket) TakeMaxDuration(count int64, maxWait time.Duration) (time.Duration, bool) {
-	return tb.take(time.Now(), count, maxWait)
+	return tb.take(tb.clock.Now(), count, maxWait)
 }
 
 // TakeAvailable takes up to count immediately available tokens from the
 // bucket. It returns the number of tokens removed, or zero if there are
 // no available tokens. It does not block.
 func (tb *Bucket) TakeAvailable(count int64) int64 {
-	return tb.takeAvailable(time.Now(), count)
+	return tb.takeAvailable(tb.clock.Now(), count)
 }
 
 // takeAvailable is the internal version of TakeAvailable - it takes the
@@ -178,7 +217,7 @@ func (tb *Bucket) takeAvailable(now time.Time, count int64) int64 {
 // tokens could have changed in the meantime. This method is intended
 // primarily for metrics reporting and debugging.
 func (tb *Bucket) Available() int64 {
-	return tb.available(time.Now())
+	return tb.available(tb.clock.Now())
 }
 
 // available is the internal version of available - it takes the current time as

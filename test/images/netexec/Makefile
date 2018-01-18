@@ -12,22 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-.PHONY: all netexec image push clean
+SRCS=netexec
+ARCH ?= amd64
+TARGET ?= $(CURDIR)
+GOLANG_VERSION ?= latest
+SRC_DIR = $(notdir $(shell pwd))
+export
 
-TAG = 1.7
-PREFIX = gcr.io/google_containers
+bin:
+	../image-util.sh bin $(SRCS)
 
-
-all: push
-
-netexec: netexec.go
-	CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags '-w' ./netexec.go
-
-image: netexec
-	docker build --pull -t $(PREFIX)/netexec:$(TAG) .
-
-push: image
-	gcloud docker -- push $(PREFIX)/netexec:$(TAG)
-
-clean:
-	rm -f netexec
+.PHONY: bin

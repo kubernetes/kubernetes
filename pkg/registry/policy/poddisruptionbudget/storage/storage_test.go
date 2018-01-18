@@ -25,9 +25,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
+	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
 	"k8s.io/apiserver/pkg/registry/rest"
 	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 )
@@ -42,7 +42,7 @@ func newStorage(t *testing.T) (*REST, *StatusREST, *etcdtesting.EtcdTestServer) 
 // createPodDisruptionBudget is a helper function that returns a PodDisruptionBudget with the updated resource version.
 func createPodDisruptionBudget(storage *REST, pdb policy.PodDisruptionBudget, t *testing.T) (policy.PodDisruptionBudget, error) {
 	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), pdb.Namespace)
-	obj, err := storage.Create(ctx, &pdb)
+	obj, err := storage.Create(ctx, &pdb, rest.ValidateAllObjectFunc, false)
 	if err != nil {
 		t.Errorf("Failed to create PodDisruptionBudget, %v", err)
 	}
@@ -51,6 +51,7 @@ func createPodDisruptionBudget(storage *REST, pdb policy.PodDisruptionBudget, t 
 }
 
 func validNewPodDisruptionBudget() *policy.PodDisruptionBudget {
+	minAvailable := intstr.FromInt(7)
 	return &policy.PodDisruptionBudget{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "foo",
@@ -59,7 +60,7 @@ func validNewPodDisruptionBudget() *policy.PodDisruptionBudget {
 		},
 		Spec: policy.PodDisruptionBudgetSpec{
 			Selector:     &metav1.LabelSelector{MatchLabels: map[string]string{"a": "b"}},
-			MinAvailable: intstr.FromInt(7),
+			MinAvailable: &minAvailable,
 		},
 		Status: policy.PodDisruptionBudgetStatus{},
 	}
@@ -69,7 +70,7 @@ func TestCreate(t *testing.T) {
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Store)
+	test := genericregistrytest.New(t, storage.Store)
 	pdb := validNewPodDisruptionBudget()
 	pdb.ObjectMeta = metav1.ObjectMeta{}
 	test.TestCreate(
@@ -98,17 +99,18 @@ func TestStatusUpdate(t *testing.T) {
 	}
 	obtainedPdb := obj.(*policy.PodDisruptionBudget)
 
+	minAvailable := intstr.FromInt(8)
 	update := policy.PodDisruptionBudget{
 		ObjectMeta: obtainedPdb.ObjectMeta,
 		Spec: policy.PodDisruptionBudgetSpec{
-			MinAvailable: intstr.FromInt(8),
+			MinAvailable: &minAvailable,
 		},
 		Status: policy.PodDisruptionBudgetStatus{
 			ExpectedPods: 8,
 		},
 	}
 
-	if _, _, err := statusStorage.Update(ctx, update.Name, rest.DefaultUpdatedObjectInfo(&update, api.Scheme)); err != nil {
+	if _, _, err := statusStorage.Update(ctx, update.Name, rest.DefaultUpdatedObjectInfo(&update), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	obj, err = storage.Get(ctx, "foo", &metav1.GetOptions{})
@@ -129,7 +131,7 @@ func TestGet(t *testing.T) {
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Store)
+	test := genericregistrytest.New(t, storage.Store)
 	test.TestGet(validNewPodDisruptionBudget())
 }
 
@@ -137,7 +139,7 @@ func TestList(t *testing.T) {
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Store)
+	test := genericregistrytest.New(t, storage.Store)
 	test.TestList(validNewPodDisruptionBudget())
 }
 
@@ -145,7 +147,7 @@ func TestDelete(t *testing.T) {
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Store)
+	test := genericregistrytest.New(t, storage.Store)
 	test.TestDelete(validNewPodDisruptionBudget())
 }
 
@@ -153,7 +155,7 @@ func TestWatch(t *testing.T) {
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Store)
+	test := genericregistrytest.New(t, storage.Store)
 	test.TestWatch(
 		validNewPodDisruptionBudget(),
 		// matching labels

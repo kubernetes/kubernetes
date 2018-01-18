@@ -25,15 +25,20 @@ DOCKERIZE_KUBELET=${DOCKERIZE_KUBELET:-""}
 ALLOW_PRIVILEGED=${ALLOW_PRIVILEGED:-""}
 ALLOW_SECURITY_CONTEXT=${ALLOW_SECURITY_CONTEXT:-""}
 PSP_ADMISSION=${PSP_ADMISSION:-""}
+NODE_ADMISSION=${NODE_ADMISSION:-""}
 RUNTIME_CONFIG=${RUNTIME_CONFIG:-""}
 KUBELET_AUTHORIZATION_WEBHOOK=${KUBELET_AUTHORIZATION_WEBHOOK:-""}
 KUBELET_AUTHENTICATION_WEBHOOK=${KUBELET_AUTHENTICATION_WEBHOOK:-""}
 POD_MANIFEST_PATH=${POD_MANIFEST_PATH:-"/var/run/kubernetes/static-pods"}
 KUBELET_FLAGS=${KUBELET_FLAGS:-""}
+# many dev environments run with swap on, so we don't fail in this env
+FAIL_SWAP_ON=${FAIL_SWAP_ON:-"false"}
 # Name of the network plugin, eg: "kubenet"
 NET_PLUGIN=${NET_PLUGIN:-""}
-# Place the binaries required by NET_PLUGIN in this directory, eg: "/home/kubernetes/bin".
-NET_PLUGIN_DIR=${NET_PLUGIN_DIR:-""}
+# Place the config files and binaries required by NET_PLUGIN in these directory,
+# eg: "/etc/cni/net.d" for config files, and "/opt/cni/bin" for binaries.
+CNI_CONF_DIR=${CNI_CONF_DIR:-""}
+CNI_BIN_DIR=${CNI_BIN_DIR:-""}
 SERVICE_CLUSTER_IP_RANGE=${SERVICE_CLUSTER_IP_RANGE:-10.0.0.0/24}
 FIRST_SERVICE_CLUSTER_IP=${FIRST_SERVICE_CLUSTER_IP:-10.0.0.1}
 # if enabled, must set CGROUP_ROOT
@@ -44,7 +49,7 @@ CGROUP_DRIVER=${CGROUP_DRIVER:-""}
 USER=${USER:-$(whoami)}
 
 # enables testing eviction scenarios locally.
-EVICTION_HARD=${EVICTION_HARD:-"memory.available<100Mi"}
+EVICTION_HARD=${EVICTION_HARD:-"memory.available<100Mi,nodefs.available<10%,nodefs.inodesFree<5%"}
 EVICTION_SOFT=${EVICTION_SOFT:-""}
 EVICTION_PRESSURE_TRANSITION_PERIOD=${EVICTION_PRESSURE_TRANSITION_PERIOD:-"1m"}
 
@@ -52,19 +57,23 @@ EVICTION_PRESSURE_TRANSITION_PERIOD=${EVICTION_PRESSURE_TRANSITION_PERIOD:-"1m"}
 # and we don't know the IP of the DNS pod to pass in as --cluster-dns.
 # To set this up by hand, set this flag and change DNS_SERVER_IP.
 # Note also that you need API_HOST (defined above) for correct DNS.
+KUBEPROXY_MODE=${KUBEPROXY_MODE:-""}
 ENABLE_CLUSTER_DNS=${KUBE_ENABLE_CLUSTER_DNS:-true}
 DNS_SERVER_IP=${KUBE_DNS_SERVER_IP:-10.0.0.10}
 DNS_DOMAIN=${KUBE_DNS_NAME:-"cluster.local"}
 KUBECTL=${KUBECTL:-cluster/kubectl.sh}
-WAIT_FOR_URL_API_SERVER=${WAIT_FOR_URL_API_SERVER:-10}
+WAIT_FOR_URL_API_SERVER=${WAIT_FOR_URL_API_SERVER:-20}
 ENABLE_DAEMON=${ENABLE_DAEMON:-false}
 HOSTNAME_OVERRIDE=${HOSTNAME_OVERRIDE:-"127.0.0.1"}
+EXTERNAL_CLOUD_PROVIDER=${EXTERNAL_CLOUD_PROVIDER:-false}
 CLOUD_PROVIDER=${CLOUD_PROVIDER:-""}
 CLOUD_CONFIG=${CLOUD_CONFIG:-""}
-FEATURE_GATES=${FEATURE_GATES:-"AllAlpha=true"}
+FEATURE_GATES=${FEATURE_GATES:-"AllAlpha=false"}
 STORAGE_BACKEND=${STORAGE_BACKEND:-"etcd3"}
 # enable swagger ui
 ENABLE_SWAGGER_UI=${ENABLE_SWAGGER_UI:-false}
+# enable Pod priority and preemption
+ENABLE_POD_PRIORITY_PREEMPTION=${ENABLE_POD_PRIORITY_PREEMPTION:-""}
 
 # enable kubernetes dashboard
 ENABLE_CLUSTER_DASHBOARD=${KUBE_ENABLE_CLUSTER_DASHBOARD:-false}
@@ -73,8 +82,7 @@ ENABLE_CLUSTER_DASHBOARD=${KUBE_ENABLE_CLUSTER_DASHBOARD:-false}
 ENABLE_APISERVER_BASIC_AUDIT=${ENABLE_APISERVER_BASIC_AUDIT:-false}
 
 # RBAC Mode options
-ALLOW_ANY_TOKEN=${ALLOW_ANY_TOKEN:-false}
-ENABLE_RBAC=${ENABLE_RBAC:-false}
+AUTHORIZATION_MODE=${AUTHORIZATION_MODE:-"Node,RBAC"}
 KUBECONFIG_TOKEN=${KUBECONFIG_TOKEN:-""}
 AUTH_ARGS=${AUTH_ARGS:-""}
 
@@ -85,10 +93,18 @@ DEFAULT_STORAGE_CLASS=${KUBE_DEFAULT_STORAGE_CLASS:-true}
 KUBE_CACHE_MUTATION_DETECTOR="${KUBE_CACHE_MUTATION_DETECTOR:-true}"
 export KUBE_CACHE_MUTATION_DETECTOR
 
+# panic the server on watch decode errors since they are considered coder mistakes
+KUBE_PANIC_WATCH_DECODE_ERROR="${KUBE_PANIC_WATCH_DECODE_ERROR:-true}"
+export KUBE_PANIC_WATCH_DECODE_ERROR
+
+ADMISSION_CONTROL=${ADMISSION_CONTROL:-""}
 ADMISSION_CONTROL_CONFIG_FILE=${ADMISSION_CONTROL_CONFIG_FILE:-""}
 
 # START_MODE can be 'all', 'kubeletonly', or 'nokubelet'
 START_MODE=${START_MODE:-"all"}
+
+# A list of controllers to enable
+KUBE_CONTROLLERS="${KUBE_CONTROLLERS:-"*"}"
 
 # sanity check for OpenStack provider
 if [ "${CLOUD_PROVIDER}" == "openstack" ]; then
@@ -100,6 +116,21 @@ if [ "${CLOUD_PROVIDER}" == "openstack" ]; then
         echo "Cloud config ${CLOUD_CONFIG} doesn't exist"
         exit 1
     fi
+fi
+
+# set feature gates if using ipvs mode
+if [ "${KUBEPROXY_MODE}" == "ipvs" ]; then
+    FEATURE_GATES="$FEATURE_GATES,SupportIPVSProxyMode=true"
+fi
+
+# set feature gates if enable Pod priority and preemption
+if [ "${ENABLE_POD_PRIORITY_PREEMPTION}" == true ]; then
+    FEATURE_GATES="$FEATURE_GATES,PodPriority=true"
+fi
+
+# warn if users are running with swap allowed
+if [ "${FAIL_SWAP_ON}" == "false" ]; then
+    echo "WARNING : The kubelet is configured to not fail if swap is enabled; production deployments should disable swap."
 fi
 
 if [ "$(id -u)" != "0" ]; then
@@ -141,7 +172,7 @@ do
             ;;
         O)
             GO_OUT=$(guess_built_binary_path)
-            if [ $GO_OUT == "" ]; then
+            if [ "$GO_OUT" == "" ]; then
                 echo "Could not guess the correct output directory to use."
                 exit 1
             fi
@@ -189,18 +220,21 @@ API_SECURE_PORT=${API_SECURE_PORT:-6443}
 # WARNING: For DNS to work on most setups you should export API_HOST as the docker0 ip address,
 API_HOST=${API_HOST:-localhost}
 API_HOST_IP=${API_HOST_IP:-"127.0.0.1"}
+ADVERTISE_ADDRESS=${ADVERTISE_ADDRESS:-""}
 API_BIND_ADDR=${API_BIND_ADDR:-"0.0.0.0"}
+EXTERNAL_HOSTNAME=${EXTERNAL_HOSTNAME:-localhost}
 
 KUBELET_HOST=${KUBELET_HOST:-"127.0.0.1"}
 # By default only allow CORS for requests on localhost
 API_CORS_ALLOWED_ORIGINS=${API_CORS_ALLOWED_ORIGINS:-/127.0.0.1(:[0-9]+)?$,/localhost(:[0-9]+)?$}
 KUBELET_PORT=${KUBELET_PORT:-10250}
 LOG_LEVEL=${LOG_LEVEL:-3}
+# Use to increase verbosity on particular files, e.g. LOG_SPEC=token_controller*=5,other_controller*=4
+LOG_SPEC=${LOG_SPEC:-""}
 LOG_DIR=${LOG_DIR:-"/tmp"}
 CONTAINER_RUNTIME=${CONTAINER_RUNTIME:-"docker"}
 CONTAINER_RUNTIME_ENDPOINT=${CONTAINER_RUNTIME_ENDPOINT:-""}
 IMAGE_SERVICE_ENDPOINT=${IMAGE_SERVICE_ENDPOINT:-""}
-ENABLE_CRI=${ENABLE_CRI:-"true"}
 RKT_PATH=${RKT_PATH:-""}
 RKT_STAGE1_IMAGE=${RKT_STAGE1_IMAGE:-""}
 CHAOS_CHANCE=${CHAOS_CHANCE:-0.0}
@@ -208,6 +242,7 @@ CPU_CFS_QUOTA=${CPU_CFS_QUOTA:-true}
 ENABLE_HOSTPATH_PROVISIONER=${ENABLE_HOSTPATH_PROVISIONER:-"false"}
 CLAIM_BINDER_SYNC_PERIOD=${CLAIM_BINDER_SYNC_PERIOD:-"15s"} # current k8s default
 ENABLE_CONTROLLER_ATTACH_DETACH=${ENABLE_CONTROLLER_ATTACH_DETACH:-"true"} # current default
+KEEP_TERMINATED_POD_VOLUMES=${KEEP_TERMINATED_POD_VOLUMES:-"true"}
 # This is the default dir and filename where the apiserver will generate a self-signed cert
 # which should be able to be used as the CA to verify itself
 CERT_DIR=${CERT_DIR:-"/var/run/kubernetes"}
@@ -387,10 +422,22 @@ function start_apiserver {
     if [[ -n "${PSP_ADMISSION}" ]]; then
       security_admission=",PodSecurityPolicy"
     fi
+    if [[ -n "${NODE_ADMISSION}" ]]; then
+      security_admission=",NodeRestriction"
+    fi
+    if [ "${ENABLE_POD_PRIORITY_PREEMPTION}" == true ]; then
+      security_admission=",Priority"
+      if [[ -n "${RUNTIME_CONFIG}" ]]; then
+          RUNTIME_CONFIG+=","
+      fi
+      RUNTIME_CONFIG+="scheduling.k8s.io/v1alpha1=true"
+    fi
+    
 
     # Admission Controllers to invoke prior to persisting objects in cluster
-    ADMISSION_CONTROL=NamespaceLifecycle,LimitRanger,ServiceAccount${security_admission},ResourceQuota,DefaultStorageClass,DefaultTolerationSeconds
-
+    #
+    # ResourceQuota must come last, or a creation is recorded, but the pod may be forbidden.
+    ADMISSION_CONTROL=Initializers,NamespaceLifecycle,LimitRanger,ServiceAccount${security_admission},DefaultStorageClass,DefaultTolerationSeconds,MutatingAdmissionWebhook,ValidatingAdmissionWebhook,ResourceQuota,PodPreset
     # This is the default dir and filename where the apiserver will generate a self-signed cert
     # which should be able to be used as the CA to verify itself
 
@@ -417,19 +464,29 @@ function start_apiserver {
       swagger_arg="--enable-swagger-ui=true "
     fi
 
-    anytoken_arg=""
-    if [[ "${ALLOW_ANY_TOKEN}" = true ]]; then
-      anytoken_arg="--insecure-allow-any-token "
-      KUBECONFIG_TOKEN="${KUBECONFIG_TOKEN:-system:admin/system:masters}"
-    fi
     authorizer_arg=""
-    if [[ "${ENABLE_RBAC}" = true ]]; then
-      authorizer_arg="--authorization-mode=RBAC "
+    if [[ -n "${AUTHORIZATION_MODE}" ]]; then
+      authorizer_arg="--authorization-mode=${AUTHORIZATION_MODE} "
     fi
     priv_arg=""
     if [[ -n "${ALLOW_PRIVILEGED}" ]]; then
       priv_arg="--allow-privileged "
     fi
+
+    if [[ ${ADMISSION_CONTROL} == *"Initializers"* ]]; then
+        if [[ -n "${RUNTIME_CONFIG}" ]]; then
+          RUNTIME_CONFIG+=","
+        fi
+        RUNTIME_CONFIG+="admissionregistration.k8s.io/v1alpha1"
+    fi
+
+    if [[ ${ADMISSION_CONTROL} == *"PodPreset"* ]]; then
+        if [[ -n "${RUNTIME_CONFIG}" ]]; then
+            RUNTIME_CONFIG+=","
+        fi
+        RUNTIME_CONFIG+="settings.k8s.io/v1alpha1"
+    fi
+
     runtime_config=""
     if [[ -n "${RUNTIME_CONFIG}" ]]; then
       runtime_config="--runtime-config=${RUNTIME_CONFIG}"
@@ -440,6 +497,9 @@ function start_apiserver {
     advertise_address=""
     if [[ "${API_HOST_IP}" != "127.0.0.1" ]]; then
         advertise_address="--advertise_address=${API_HOST_IP}"
+    fi
+    if [[ "${ADVERTISE_ADDRESS}" != "" ]] ; then
+        advertise_address="--advertise_address=${ADVERTISE_ADDRESS}"
     fi
 
     # Create CA signers
@@ -473,11 +533,17 @@ function start_apiserver {
     kube::util::create_client_certkey "${CONTROLPLANE_SUDO}" "${CERT_DIR}" 'client-ca' kube-aggregator system:kube-aggregator system:masters
     kube::util::write_client_kubeconfig "${CONTROLPLANE_SUDO}" "${CERT_DIR}" "${ROOT_CA_FILE}" "${API_HOST}" "${API_SECURE_PORT}" kube-aggregator
 
+    cloud_config_arg="--cloud-provider=${CLOUD_PROVIDER} --cloud-config=${CLOUD_CONFIG}"
+    if [[ "${EXTERNAL_CLOUD_PROVIDER:-}" == "true" ]]; then
+      cloud_config_arg="--cloud-provider=external"
+    fi
 
     APISERVER_LOG=${LOG_DIR}/kube-apiserver.log
-    ${CONTROLPLANE_SUDO} "${GO_OUT}/hyperkube" apiserver ${swagger_arg} ${audit_arg} ${anytoken_arg} ${authorizer_arg} ${priv_arg} ${runtime_config}\
+    ${CONTROLPLANE_SUDO} "${GO_OUT}/hyperkube" apiserver ${swagger_arg} ${audit_arg} ${authorizer_arg} ${priv_arg} ${runtime_config} \
+      ${cloud_config_arg} \
       ${advertise_address} \
       --v=${LOG_LEVEL} \
+      --vmodule="${LOG_SPEC}" \
       --cert-dir="${CERT_DIR}" \
       --client-ca-file="${CERT_DIR}/client-ca.crt" \
       --service-account-key-file="${SERVICE_ACCOUNT_KEY}" \
@@ -495,8 +561,7 @@ function start_apiserver {
       --etcd-servers="http://${ETCD_HOST}:${ETCD_PORT}" \
       --service-cluster-ip-range="${SERVICE_CLUSTER_IP_RANGE}" \
       --feature-gates="${FEATURE_GATES}" \
-      --cloud-provider="${CLOUD_PROVIDER}" \
-      --cloud-config="${CLOUD_CONFIG}" \
+      --external-hostname="${EXTERNAL_HOSTNAME}" \
       --requestheader-username-headers=X-Remote-User \
       --requestheader-group-headers=X-Remote-Group \
       --requestheader-extra-headers-prefix=X-Remote-Extra- \
@@ -512,7 +577,7 @@ function start_apiserver {
     # this uses the API port because if you don't have any authenticator, you can't seem to use the secure port at all.
     # this matches what happened with the combination in 1.4.
     # TODO change this conditionally based on whether API_PORT is on or off
-    kube::util::wait_for_url "http://${API_HOST_IP}:${API_SECURE_PORT}/healthz" "apiserver: " 1 ${WAIT_FOR_URL_API_SERVER} \
+    kube::util::wait_for_url "https://${API_HOST_IP}:${API_SECURE_PORT}/healthz" "apiserver: " 1 ${WAIT_FOR_URL_API_SERVER} \
         || { echo "check apiserver logs: ${APISERVER_LOG}" ; exit 1 ; }
 
     # Create kubeconfigs for all components, using client certs
@@ -524,17 +589,7 @@ function start_apiserver {
     kube::util::write_client_kubeconfig "${CONTROLPLANE_SUDO}" "${CERT_DIR}" "${ROOT_CA_FILE}" "${API_HOST}" "${API_SECURE_PORT}" scheduler
 
     if [[ -z "${AUTH_ARGS}" ]]; then
-        if [[ "${ALLOW_ANY_TOKEN}" = true ]]; then
-            # use token authentication
-            if [[ -n "${KUBECONFIG_TOKEN}" ]]; then
-                AUTH_ARGS="--token=${KUBECONFIG_TOKEN}"
-            else
-                AUTH_ARGS="--token=system:admin/system:masters"
-            fi
-        else
-            # default to the admin client cert/key
-            AUTH_ARGS="--client-key=${CERT_DIR}/client-admin.key --client-certificate=${CERT_DIR}/client-admin.crt"
-        fi
+        AUTH_ARGS="--client-key=${CERT_DIR}/client-admin.key --client-certificate=${CERT_DIR}/client-admin.crt"
     fi
 
     ${CONTROLPLANE_SUDO} cp "${CERT_DIR}/admin.kubeconfig" "${CERT_DIR}/admin-kube-aggregator.kubeconfig"
@@ -550,9 +605,15 @@ function start_controller_manager {
       node_cidr_args="--allocate-node-cidrs=true --cluster-cidr=10.1.0.0/16 "
     fi
 
+    cloud_config_arg="--cloud-provider=${CLOUD_PROVIDER} --cloud-config=${CLOUD_CONFIG}"
+    if [[ "${EXTERNAL_CLOUD_PROVIDER:-}" == "true" ]]; then
+      cloud_config_arg="--cloud-provider=external"
+    fi
+
     CTLRMGR_LOG=${LOG_DIR}/kube-controller-manager.log
     ${CONTROLPLANE_SUDO} "${GO_OUT}/hyperkube" controller-manager \
       --v=${LOG_LEVEL} \
+      --vmodule="${LOG_SPEC}" \
       --service-account-private-key-file="${SERVICE_ACCOUNT_KEY}" \
       --root-ca-file="${ROOT_CA_FILE}" \
       --cluster-signing-cert-file="${CLUSTER_SIGNING_CERT_FILE}" \
@@ -561,24 +622,58 @@ function start_controller_manager {
       ${node_cidr_args} \
       --pvclaimbinder-sync-period="${CLAIM_BINDER_SYNC_PERIOD}" \
       --feature-gates="${FEATURE_GATES}" \
-      --cloud-provider="${CLOUD_PROVIDER}" \
-      --cloud-config="${CLOUD_CONFIG}" \
+      ${cloud_config_arg} \
       --kubeconfig "$CERT_DIR"/controller.kubeconfig \
       --use-service-account-credentials \
+      --controllers="${KUBE_CONTROLLERS}" \
       --master="https://${API_HOST}:${API_SECURE_PORT}" >"${CTLRMGR_LOG}" 2>&1 &
     CTLRMGR_PID=$!
 }
 
+function start_cloud_controller_manager {
+    if [ -z "${CLOUD_CONFIG}" ]; then
+      echo "CLOUD_CONFIG cannot be empty!"
+      exit 1
+    fi
+    if [ ! -f "${CLOUD_CONFIG}" ]; then
+      echo "Cloud config ${CLOUD_CONFIG} doesn't exist"
+      exit 1
+    fi
+
+    node_cidr_args=""
+    if [[ "${NET_PLUGIN}" == "kubenet" ]]; then
+      node_cidr_args="--allocate-node-cidrs=true --cluster-cidr=10.1.0.0/16 "
+    fi
+
+    CLOUD_CTLRMGR_LOG=${LOG_DIR}/cloud-controller-manager.log
+    ${CONTROLPLANE_SUDO} "${GO_OUT}/hyperkube" alpha cloud-controller-manager \
+      --v=${LOG_LEVEL} \
+      --vmodule="${LOG_SPEC}" \
+      ${node_cidr_args} \
+      --feature-gates="${FEATURE_GATES}" \
+      --cloud-provider=${CLOUD_PROVIDER} \
+      --cloud-config=${CLOUD_CONFIG} \
+      --kubeconfig "$CERT_DIR"/controller.kubeconfig \
+      --use-service-account-credentials \
+      --master="https://${API_HOST}:${API_SECURE_PORT}" >"${CLOUD_CTLRMGR_LOG}" 2>&1 &
+    CLOUD_CTLRMGR_PID=$!
+}
+
 function start_kubelet {
     KUBELET_LOG=${LOG_DIR}/kubelet.log
-    mkdir -p ${POD_MANIFEST_PATH} || true
+    mkdir -p "${POD_MANIFEST_PATH}" &>/dev/null || sudo mkdir -p "${POD_MANIFEST_PATH}"
 
     priv_arg=""
     if [[ -n "${ALLOW_PRIVILEGED}" ]]; then
       priv_arg="--allow-privileged "
     fi
 
-    mkdir -p /var/lib/kubelet
+    cloud_config_arg="--cloud-provider=${CLOUD_PROVIDER} --cloud-config=${CLOUD_CONFIG}"
+    if [[ "${EXTERNAL_CLOUD_PROVIDER:-}" == "true" ]]; then
+       cloud_config_arg="--cloud-provider=external"
+    fi
+
+    mkdir -p "/var/lib/kubelet" &>/dev/null || sudo mkdir -p "/var/lib/kubelet"
     if [[ -z "${DOCKERIZE_KUBELET}" ]]; then
       # Enable dns
       if [[ "${ENABLE_CLUSTER_DNS}" = true ]]; then
@@ -606,9 +701,14 @@ function start_kubelet {
         auth_args="${auth_args} --client-ca-file=${CLIENT_CA_FILE}"
       fi
 
-      net_plugin_dir_args=""
-      if [[ -n "${NET_PLUGIN_DIR}" ]]; then
-        net_plugin_dir_args="--network-plugin-dir=${NET_PLUGIN_DIR}"
+      cni_conf_dir_args=""
+      if [[ -n "${CNI_CONF_DIR}" ]]; then
+        cni_conf_dir_args="--cni-conf-dir=${CNI_CONF_DIR}"
+      fi
+
+      cni_bin_dir_args=""
+      if [[ -n "${CNI_BIN_DIR}" ]]; then
+        cni_bin_dir_args="--cni-bin-dir=${CNI_BIN_DIR}"
       fi
 
       container_runtime_endpoint_args=""
@@ -623,29 +723,30 @@ function start_kubelet {
 
       sudo -E "${GO_OUT}/hyperkube" kubelet ${priv_arg}\
         --v=${LOG_LEVEL} \
+        --vmodule="${LOG_SPEC}" \
         --chaos-chance="${CHAOS_CHANCE}" \
         --container-runtime="${CONTAINER_RUNTIME}" \
         --rkt-path="${RKT_PATH}" \
         --rkt-stage1-image="${RKT_STAGE1_IMAGE}" \
         --hostname-override="${HOSTNAME_OVERRIDE}" \
-        --cloud-provider="${CLOUD_PROVIDER}" \
-        --cloud-config="${CLOUD_CONFIG}" \
+        ${cloud_config_arg} \
         --address="${KUBELET_HOST}" \
-        --require-kubeconfig \
         --kubeconfig "$CERT_DIR"/kubelet.kubeconfig \
         --feature-gates="${FEATURE_GATES}" \
         --cpu-cfs-quota=${CPU_CFS_QUOTA} \
         --enable-controller-attach-detach="${ENABLE_CONTROLLER_ATTACH_DETACH}" \
         --cgroups-per-qos=${CGROUPS_PER_QOS} \
         --cgroup-driver=${CGROUP_DRIVER} \
-        --keep-terminated-pod-volumes=true \
+        --keep-terminated-pod-volumes=${KEEP_TERMINATED_POD_VOLUMES} \
         --eviction-hard=${EVICTION_HARD} \
         --eviction-soft=${EVICTION_SOFT} \
         --eviction-pressure-transition-period=${EVICTION_PRESSURE_TRANSITION_PERIOD} \
         --pod-manifest-path="${POD_MANIFEST_PATH}" \
+        --fail-swap-on="${FAIL_SWAP_ON}" \
         ${auth_args} \
         ${dns_args} \
-        ${net_plugin_dir_args} \
+        ${cni_conf_dir_args} \
+        ${cni_bin_dir_args} \
         ${net_plugin_args} \
         ${container_runtime_endpoint_args} \
         ${image_service_endpoint_args} \
@@ -653,11 +754,11 @@ function start_kubelet {
 	${KUBELET_FLAGS} >"${KUBELET_LOG}" 2>&1 &
       KUBELET_PID=$!
       # Quick check that kubelet is running.
-      if ps -p $KUBELET_PID > /dev/null ; then 
+      if ps -p $KUBELET_PID > /dev/null ; then
 	echo "kubelet ( $KUBELET_PID ) is running."
       else
 	cat ${KUBELET_LOG} ; exit 1
-      fi	
+      fi
     else
       # Docker won't run a container with a cidfile (container id file)
       # unless that file does not already exist; clean up an existing
@@ -693,7 +794,7 @@ function start_kubelet {
         -i \
         --cidfile=$KUBELET_CIDFILE \
         gcr.io/google_containers/kubelet \
-        /kubelet --v=${LOG_LEVEL} --containerized ${priv_arg}--chaos-chance="${CHAOS_CHANCE}" --pod-manifest-path="${POD_MANIFEST_PATH}" --hostname-override="${HOSTNAME_OVERRIDE}" --cloud-provider="${CLOUD_PROVIDER}" --cloud-config="${CLOUD_CONFIG}" \ --address="127.0.0.1" --require-kubeconfig --kubeconfig "$CERT_DIR"/kubelet.kubeconfig --api-servers="https://${API_HOST}:${API_SECURE_PORT}" --port="$KUBELET_PORT"  --enable-controller-attach-detach="${ENABLE_CONTROLLER_ATTACH_DETACH}" &> $KUBELET_LOG &
+        /kubelet --v=${LOG_LEVEL} --containerized ${priv_arg}--chaos-chance="${CHAOS_CHANCE}" --pod-manifest-path="${POD_MANIFEST_PATH}" --hostname-override="${HOSTNAME_OVERRIDE}" ${cloud_config_arg} \ --address="127.0.0.1" --kubeconfig "$CERT_DIR"/kubelet.kubeconfig --port="$KUBELET_PORT"  --enable-controller-attach-detach="${ENABLE_CONTROLLER_ATTACH_DETACH}" &> $KUBELET_LOG &
     fi
 }
 
@@ -701,13 +802,18 @@ function start_kubeproxy {
     PROXY_LOG=${LOG_DIR}/kube-proxy.log
 
     cat <<EOF > /tmp/kube-proxy.yaml
-apiVersion: componentconfig/v1alpha1
+apiVersion: kubeproxy.config.k8s.io/v1alpha1
 kind: KubeProxyConfiguration
 clientConnection:
   kubeconfig: ${CERT_DIR}/kube-proxy.kubeconfig
 hostnameOverride: ${HOSTNAME_OVERRIDE}
 featureGates: ${FEATURE_GATES}
+mode: ${KUBEPROXY_MODE}
 EOF
+    if [ "${KUBEPROXY_MODE}" == "ipvs" ]; then
+	# Load kernel modules required by IPVS proxier
+        sudo modprobe -a ip_vs ip_vs_rr ip_vs_wrr ip_vs_sh nf_conntrack_ipv4
+    fi
 
     sudo "${GO_OUT}/hyperkube" proxy \
       --config=/tmp/kube-proxy.yaml \
@@ -719,34 +825,34 @@ EOF
     ${CONTROLPLANE_SUDO} "${GO_OUT}/hyperkube" scheduler \
       --v=${LOG_LEVEL} \
       --kubeconfig "$CERT_DIR"/scheduler.kubeconfig \
+      --feature-gates="${FEATURE_GATES}" \
       --master="https://${API_HOST}:${API_SECURE_PORT}" >"${SCHEDULER_LOG}" 2>&1 &
     SCHEDULER_PID=$!
 }
 
 function start_kubedns {
     if [[ "${ENABLE_CLUSTER_DNS}" = true ]]; then
-        echo "Creating kube-system namespace"
-        sed -e "s/{{ pillar\['dns_domain'\] }}/${DNS_DOMAIN}/g" "${KUBE_ROOT}/cluster/addons/dns/kubedns-controller.yaml.in" >| kubedns-deployment.yaml
-        sed -e "s/{{ pillar\['dns_server'\] }}/${DNS_SERVER_IP}/g" "${KUBE_ROOT}/cluster/addons/dns/kubedns-svc.yaml.in" >| kubedns-svc.yaml
-        
+        cp "${KUBE_ROOT}/cluster/addons/dns/kube-dns.yaml.in" kube-dns.yaml
+        sed -i -e "s/{{ pillar\['dns_domain'\] }}/${DNS_DOMAIN}/g" kube-dns.yaml
+        sed -i -e "s/{{ pillar\['dns_server'\] }}/${DNS_SERVER_IP}/g" kube-dns.yaml
+
         # TODO update to dns role once we have one.
-        ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" create clusterrolebinding system:kube-dns --clusterrole=cluster-admin --serviceaccount=kube-system:default
-        # use kubectl to create kubedns deployment and service
-        ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" --namespace=kube-system create -f ${KUBE_ROOT}/cluster/addons/dns/kubedns-sa.yaml
-        ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" --namespace=kube-system create -f ${KUBE_ROOT}/cluster/addons/dns/kubedns-cm.yaml
-        ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" --namespace=kube-system create -f kubedns-deployment.yaml
-        ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" --namespace=kube-system create -f kubedns-svc.yaml
-        echo "Kube-dns deployment and service successfully deployed."
-        rm  kubedns-deployment.yaml kubedns-svc.yaml
+        # use kubectl to create kubedns addon
+        ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" --namespace=kube-system create -f kube-dns.yaml
+        echo "Kube-dns addon successfully deployed."
+        rm kube-dns.yaml
     fi
 }
 
 function start_kubedashboard {
     if [[ "${ENABLE_CLUSTER_DASHBOARD}" = true ]]; then
-        echo "Creating kubernetes-dashboard"       
+        echo "Creating kubernetes-dashboard"
         # use kubectl to create the dashboard
-        ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" create -f ${KUBE_ROOT}/cluster/addons/dashboard/dashboard-controller.yaml
-        ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" create -f ${KUBE_ROOT}/cluster/addons/dashboard/dashboard-service.yaml
+        ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" apply -f ${KUBE_ROOT}/cluster/addons/dashboard/dashboard-secret.yaml
+        ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" apply -f ${KUBE_ROOT}/cluster/addons/dashboard/dashboard-configmap.yaml
+        ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" apply -f ${KUBE_ROOT}/cluster/addons/dashboard/dashboard-rbac.yaml
+        ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" apply -f ${KUBE_ROOT}/cluster/addons/dashboard/dashboard-controller.yaml
+        ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" apply -f ${KUBE_ROOT}/cluster/addons/dashboard/dashboard-service.yaml
         echo "kubernetes-dashboard deployment and service successfully deployed."
     fi
 }
@@ -760,11 +866,11 @@ function create_psp_policy {
 
 function create_storage_class {
     if [ -z "$CLOUD_PROVIDER" ]; then
-        # No cloud provider -> no default storage class
-        return
+        CLASS_FILE=${KUBE_ROOT}/cluster/addons/storage-class/local/default.yaml
+    else
+        CLASS_FILE=${KUBE_ROOT}/cluster/addons/storage-class/${CLOUD_PROVIDER}/default.yaml
     fi
 
-    CLASS_FILE=${KUBE_ROOT}/cluster/addons/storage-class/${CLOUD_PROVIDER}/default.yaml
     if [ -e $CLASS_FILE ]; then
         echo "Create default storage class for $CLOUD_PROVIDER"
         ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" create -f $CLASS_FILE
@@ -775,12 +881,17 @@ function create_storage_class {
 
 function print_success {
 if [[ "${START_MODE}" != "kubeletonly" ]]; then
+  if [[ "${ENABLE_DAEMON}" = false ]]; then
+    echo "Local Kubernetes cluster is running. Press Ctrl-C to shut it down."
+  else
+    echo "Local Kubernetes cluster is running."
+  fi
   cat <<EOF
-Local Kubernetes cluster is running. Press Ctrl-C to shut it down.
 
 Logs:
   ${APISERVER_LOG:-}
   ${CTLRMGR_LOG:-}
+  ${CLOUD_CTLRMGR_LOG:-}
   ${PROXY_LOG:-}
   ${SCHEDULER_LOG:-}
 EOF
@@ -800,8 +911,12 @@ fi
 
 if [[ "${START_MODE}" != "kubeletonly" ]]; then
   echo
+  if [[ "${ENABLE_DAEMON}" = false ]]; then
+    echo "To start using your cluster, you can open up another terminal/tab and run:"
+  else
+    echo "To start using your cluster, run:"
+  fi
   cat <<EOF
-To start using your cluster, you can open up another terminal/tab and run:
 
   export KUBECONFIG=${CERT_DIR}/admin.kubeconfig
   cluster/kubectl.sh
@@ -863,6 +978,9 @@ if [[ "${START_MODE}" != "kubeletonly" ]]; then
   set_service_accounts
   start_apiserver
   start_controller_manager
+  if [[ "${EXTERNAL_CLOUD_PROVIDER:-}" == "true" ]]; then
+    start_cloud_controller_manager
+  fi
   start_kubeproxy
   start_kubedns
   start_kubedashboard
@@ -885,7 +1003,7 @@ if [[ "${START_MODE}" != "nokubelet" ]]; then
     esac
 fi
 
-if [[ -n "${PSP_ADMISSION}" && "${ENABLE_RBAC}" = true ]]; then
+if [[ -n "${PSP_ADMISSION}" && "${AUTHORIZATION_MODE}" = *RBAC* ]]; then
   create_psp_policy
 fi
 

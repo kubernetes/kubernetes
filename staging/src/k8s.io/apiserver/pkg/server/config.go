@@ -33,12 +33,14 @@ import (
 	"github.com/go-openapi/spec"
 	"github.com/pborman/uuid"
 
-	openapicommon "k8s.io/apimachinery/pkg/openapi"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilwaitgroup "k8s.io/apimachinery/pkg/util/waitgroup"
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/audit"
+	auditpolicy "k8s.io/apiserver/pkg/audit/policy"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/authenticatorfactory"
 	authenticatorunion "k8s.io/apiserver/pkg/authentication/request/union"
@@ -50,18 +52,23 @@ import (
 	genericapifilters "k8s.io/apiserver/pkg/endpoints/filters"
 	apiopenapi "k8s.io/apiserver/pkg/endpoints/openapi"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/features"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic"
 	genericfilters "k8s.io/apiserver/pkg/server/filters"
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/server/routes"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/informers"
 	restclient "k8s.io/client-go/rest"
 	certutil "k8s.io/client-go/util/cert"
+	openapicommon "k8s.io/kube-openapi/pkg/common"
 
+	// install apis
 	_ "k8s.io/apiserver/pkg/apis/apiserver/install"
 )
 
 const (
-	// DefaultLegacyAPIPrefix is where the the legacy APIs will be located.
+	// DefaultLegacyAPIPrefix is where the legacy APIs will be located.
 	DefaultLegacyAPIPrefix = "/api"
 
 	// APIGroupPrefix is where non-legacy API group will be located.
@@ -69,7 +76,7 @@ const (
 )
 
 // Config is a structure used to configure a GenericAPIServer.
-// It's members are sorted roughly in order of importance for composers.
+// Its members are sorted roughly in order of importance for composers.
 type Config struct {
 	// SecureServingInfo is required to serve https
 	SecureServingInfo *SecureServingInfo
@@ -82,6 +89,9 @@ type Config struct {
 	// Authorizer determines whether the subject is allowed to make the request based only
 	// on the RequestURI
 	Authorizer authorizer.Authorizer
+	// RuleResolver is required to get the list of rules that apply to a given user
+	// in a given namespace
+	RuleResolver authorizer.RuleResolver
 	// AdmissionControl performs deep inspection of a given request (including content)
 	// to set values and determine whether its allowed
 	AdmissionControl      admission.Interface
@@ -99,8 +109,12 @@ type Config struct {
 
 	// Version will enable the /version endpoint if non-nil
 	Version *version.Info
-	// AuditWriter is the destination for audit logs.  If nil, they will not be written.
-	AuditWriter io.Writer
+	// LegacyAuditWriter is the destination for audit logs. If nil, they will not be written.
+	LegacyAuditWriter io.Writer
+	// AuditBackend is where audit events are sent to.
+	AuditBackend audit.Backend
+	// AuditPolicyChecker makes the decision of whether and how to audit log a request.
+	AuditPolicyChecker auditpolicy.Checker
 	// SupportsBasicAuth indicates that's at least one Authenticator supports basic auth
 	// If this is true, a basic auth challenge is returned on authentication failure
 	// TODO(roberthbailey): Remove once the server no longer supports http basic auth.
@@ -115,17 +129,22 @@ type Config struct {
 
 	// BuildHandlerChainFunc allows you to build custom handler chains by decorating the apiHandler.
 	BuildHandlerChainFunc func(apiHandler http.Handler, c *Config) (secure http.Handler)
-	// DiscoveryAddresses is used to build the IPs pass to discovery.  If nil, the ExternalAddress is
+	// HandlerChainWaitGroup allows you to wait for all chain handlers exit after the server shutdown.
+	HandlerChainWaitGroup *utilwaitgroup.SafeWaitGroup
+	// DiscoveryAddresses is used to build the IPs pass to discovery. If nil, the ExternalAddress is
 	// always reported
 	DiscoveryAddresses discovery.Addresses
 	// The default set of healthz checks. There might be more added via AddHealthzChecks dynamically.
 	HealthzChecks []healthz.HealthzChecker
 	// LegacyAPIGroupPrefixes is used to set up URL parsing for authorization and for validating requests
-	// to InstallLegacyAPIGroup.  New API servers don't generally have legacy groups at all.
+	// to InstallLegacyAPIGroup. New API servers don't generally have legacy groups at all.
 	LegacyAPIGroupPrefixes sets.String
 	// RequestContextMapper maps requests to contexts. Exported so downstream consumers can provider their own mappers
 	// TODO confirm that anyone downstream actually uses this and doesn't just need an accessor
 	RequestContextMapper apirequest.RequestContextMapper
+	// RequestInfoResolver is used to assign attributes (used by admission and authorization) based on a request URL.
+	// Use-cases that are like kubelets may need to customize this.
+	RequestInfoResolver apirequest.RequestInfoResolver
 	// Serializer is required and provides the interface for serializing and converting objects to and from the wire
 	// The default (api.Codecs) usually works fine.
 	Serializer runtime.NegotiatedSerializer
@@ -137,8 +156,11 @@ type Config struct {
 	// RESTOptionsGetter is used to construct RESTStorage types via the generic registry.
 	RESTOptionsGetter genericregistry.RESTOptionsGetter
 
-	// If specified, requests will be allocated a random timeout between this value, and twice this value.
-	// Note that it is up to the request handlers to ignore or honor this timeout. In seconds.
+	// If specified, all requests except those which match the LongRunningFunc predicate will timeout
+	// after this duration.
+	RequestTimeout time.Duration
+	// If specified, long running requests such as watch will be allocated a random timeout between this value, and
+	// twice this value.  Note that it is up to the request handlers to ignore or honor this timeout. In seconds.
 	MinRequestTimeout int
 	// MaxRequestsInFlight is the maximum number of parallel non-long-running requests. Every further
 	// request has to wait. Applies only to non-mutating requests.
@@ -147,7 +169,11 @@ type Config struct {
 	// request has to wait.
 	MaxMutatingRequestsInFlight int
 	// Predicate which is true for paths of long-running http requests
-	LongRunningFunc genericfilters.LongRunningRequestCheck
+	LongRunningFunc apirequest.LongRunningRequestCheck
+
+	// EnableAPIResponseCompression indicates whether API Responses should support compression
+	// if the client requests it via Accept-Encoding
+	EnableAPIResponseCompression bool
 
 	//===========================================================================
 	// values below here are targets for removal
@@ -162,12 +188,23 @@ type Config struct {
 	PublicAddress net.IP
 }
 
+type RecommendedConfig struct {
+	Config
+
+	// SharedInformerFactory provides shared informers for Kubernetes resources. This value is set by
+	// RecommendedOptions.CoreAPI.ApplyTo called by RecommendedOptions.ApplyTo. It uses an in-cluster client config
+	// by default, or the kubeconfig given with kubeconfig command line flag.
+	SharedInformerFactory informers.SharedInformerFactory
+
+	// ClientConfig holds the kubernetes client configuration.
+	// This value is set by RecommendedOptions.CoreAPI.ApplyTo called by RecommendedOptions.ApplyTo.
+	// By default in-cluster client config is used.
+	ClientConfig *restclient.Config
+}
+
 type SecureServingInfo struct {
-	// BindAddress is the ip:port to serve on
-	BindAddress string
-	// BindNetwork is the type of network to bind to - defaults to "tcp", accepts "tcp",
-	// "tcp4", and "tcp6".
-	BindNetwork string
+	// Listener is the secure server network listener.
+	Listener net.Listener
 
 	// Cert is the main server cert which is used if SNI does not match. Cert must be non-nil and is
 	// allowed to be in SNICerts.
@@ -195,23 +232,33 @@ type SecureServingInfo struct {
 // NewConfig returns a Config struct with the default values
 func NewConfig(codecs serializer.CodecFactory) *Config {
 	return &Config{
-		Serializer:                  codecs,
-		ReadWritePort:               443,
-		RequestContextMapper:        apirequest.NewRequestContextMapper(),
-		BuildHandlerChainFunc:       DefaultBuildHandlerChain,
-		LegacyAPIGroupPrefixes:      sets.NewString(DefaultLegacyAPIPrefix),
-		DisabledPostStartHooks:      sets.NewString(),
-		HealthzChecks:               []healthz.HealthzChecker{healthz.PingHealthz},
-		EnableIndex:                 true,
-		EnableDiscovery:             true,
-		EnableProfiling:             true,
-		MaxRequestsInFlight:         400,
-		MaxMutatingRequestsInFlight: 200,
-		MinRequestTimeout:           1800,
+		Serializer:                   codecs,
+		ReadWritePort:                443,
+		RequestContextMapper:         apirequest.NewRequestContextMapper(),
+		BuildHandlerChainFunc:        DefaultBuildHandlerChain,
+		HandlerChainWaitGroup:        new(utilwaitgroup.SafeWaitGroup),
+		LegacyAPIGroupPrefixes:       sets.NewString(DefaultLegacyAPIPrefix),
+		DisabledPostStartHooks:       sets.NewString(),
+		HealthzChecks:                []healthz.HealthzChecker{healthz.PingHealthz},
+		EnableIndex:                  true,
+		EnableDiscovery:              true,
+		EnableProfiling:              true,
+		MaxRequestsInFlight:          400,
+		MaxMutatingRequestsInFlight:  200,
+		RequestTimeout:               time.Duration(60) * time.Second,
+		MinRequestTimeout:            1800,
+		EnableAPIResponseCompression: utilfeature.DefaultFeatureGate.Enabled(features.APIResponseCompression),
 
 		// Default to treating watch as a long-running operation
 		// Generic API servers have no inherent long-running subresources
 		LongRunningFunc: genericfilters.BasicLongRunningRequestCheck(sets.NewString("watch"), sets.NewString()),
+	}
+}
+
+// NewRecommendedConfig returns a RecommendedConfig struct with the default values
+func NewRecommendedConfig(codecs serializer.CodecFactory) *RecommendedConfig {
+	return &RecommendedConfig{
+		Config: *NewConfig(codecs),
 	}
 }
 
@@ -240,7 +287,7 @@ func DefaultOpenAPIConfig(getDefinitions openapicommon.GetOpenAPIDefinitions, sc
 // WebServices set.
 func DefaultSwaggerConfig() *swagger.Config {
 	return &swagger.Config{
-		ApiPath:         "/swaggerapi/",
+		ApiPath:         "/swaggerapi",
 		SwaggerPath:     "/swaggerui/",
 		SwaggerFilePath: "/swagger-ui/",
 		SchemaFormatHandler: func(typeName string) string {
@@ -274,18 +321,34 @@ func (c *Config) ApplyClientCert(clientCAFile string) (*Config, error) {
 
 type completedConfig struct {
 	*Config
+
+	//===========================================================================
+	// values below here are filled in during completion
+	//===========================================================================
+
+	// SharedInformerFactory provides shared informers for resources
+	SharedInformerFactory informers.SharedInformerFactory
+}
+
+type CompletedConfig struct {
+	// Embed a private pointer that cannot be instantiated outside of this package.
+	*completedConfig
 }
 
 // Complete fills in any fields not set that are required to have valid data and can be derived
-// from other fields.  If you're going to `ApplyOptions`, do that first.  It's mutating the receiver.
-func (c *Config) Complete() completedConfig {
-	if len(c.ExternalAddress) == 0 && c.PublicAddress != nil {
-		hostAndPort := c.PublicAddress.String()
-		if c.ReadWritePort != 0 {
-			hostAndPort = net.JoinHostPort(hostAndPort, strconv.Itoa(c.ReadWritePort))
-		}
-		c.ExternalAddress = hostAndPort
+// from other fields. If you're going to `ApplyOptions`, do that first. It's mutating the receiver.
+func (c *Config) Complete(informers informers.SharedInformerFactory) CompletedConfig {
+	host := c.ExternalAddress
+	if host == "" && c.PublicAddress != nil {
+		host = c.PublicAddress.String()
 	}
+
+	// if there is no port, and we have a ReadWritePort, use that
+	if _, _, err := net.SplitHostPort(host); err != nil && c.ReadWritePort != 0 {
+		host = net.JoinHostPort(host, strconv.Itoa(c.ReadWritePort))
+	}
+	c.ExternalAddress = host
+
 	if c.OpenAPIConfig != nil && c.OpenAPIConfig.SecurityDefinitions != nil {
 		// Setup OpenAPI security: all APIs will have the same authentication for now.
 		c.OpenAPIConfig.DefaultSecurity = []map[string][]string{}
@@ -349,16 +412,22 @@ func (c *Config) Complete() completedConfig {
 		c.Authorizer = authorizerunion.New(tokenAuthorizer, c.Authorizer)
 	}
 
-	return completedConfig{c}
+	if c.RequestInfoResolver == nil {
+		c.RequestInfoResolver = NewRequestInfoResolver(c)
+	}
+
+	return CompletedConfig{&completedConfig{c, informers}}
 }
 
-// SkipComplete provides a way to construct a server instance without config completion.
-func (c *Config) SkipComplete() completedConfig {
-	return completedConfig{c}
+// Complete fills in any fields not set that are required to have valid data and can be derived
+// from other fields. If you're going to `ApplyOptions`, do that first. It's mutating the receiver.
+func (c *RecommendedConfig) Complete() CompletedConfig {
+	return c.Config.Complete(c.SharedInformerFactory)
 }
 
 // New creates a new server which logically combines the handling chain with the passed server.
-func (c completedConfig) New(delegationTarget DelegationTarget) (*GenericAPIServer, error) {
+// name is used to differentiate for logging. The handler chain in particular can be difficult as it starts delgating.
+func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*GenericAPIServer, error) {
 	// The delegationTarget and the config must agree on the RequestContextMapper
 
 	if c.Serializer == nil {
@@ -371,7 +440,7 @@ func (c completedConfig) New(delegationTarget DelegationTarget) (*GenericAPIServ
 	handlerChainBuilder := func(handler http.Handler) http.Handler {
 		return c.BuildHandlerChainFunc(handler, c.Config)
 	}
-	apiServerHandler := NewAPIServerHandler(c.Serializer, handlerChainBuilder, delegationTarget.UnprotectedHandler())
+	apiServerHandler := NewAPIServerHandler(name, c.RequestContextMapper, c.Serializer, handlerChainBuilder, delegationTarget.UnprotectedHandler())
 
 	s := &GenericAPIServer{
 		discoveryAddresses:     c.DiscoveryAddresses,
@@ -380,8 +449,12 @@ func (c completedConfig) New(delegationTarget DelegationTarget) (*GenericAPIServ
 		admissionControl:       c.AdmissionControl,
 		requestContextMapper:   c.RequestContextMapper,
 		Serializer:             c.Serializer,
+		AuditBackend:           c.AuditBackend,
+		delegationTarget:       delegationTarget,
+		HandlerChainWaitGroup:  c.HandlerChainWaitGroup,
 
 		minRequestTimeout: time.Duration(c.MinRequestTimeout) * time.Second,
+		ShutdownTimeout:   c.RequestTimeout,
 
 		SecureServingInfo: c.SecureServingInfo,
 		ExternalAddress:   c.ExternalAddress,
@@ -394,15 +467,33 @@ func (c completedConfig) New(delegationTarget DelegationTarget) (*GenericAPIServ
 		openAPIConfig: c.OpenAPIConfig,
 
 		postStartHooks:         map[string]postStartHookEntry{},
+		preShutdownHooks:       map[string]preShutdownHookEntry{},
 		disabledPostStartHooks: c.DisabledPostStartHooks,
 
 		healthzChecks: c.HealthzChecks,
 
-		DiscoveryGroupManager: discovery.NewRootAPIsHandler(c.DiscoveryAddresses, c.Serializer),
+		DiscoveryGroupManager: discovery.NewRootAPIsHandler(c.DiscoveryAddresses, c.Serializer, c.RequestContextMapper),
+
+		enableAPIResponseCompression: c.EnableAPIResponseCompression,
 	}
 
 	for k, v := range delegationTarget.PostStartHooks() {
 		s.postStartHooks[k] = v
+	}
+
+	for k, v := range delegationTarget.PreShutdownHooks() {
+		s.preShutdownHooks[k] = v
+	}
+
+	genericApiServerHookName := "generic-apiserver-start-informers"
+	if c.SharedInformerFactory != nil && !s.isPostStartHookRegistered(genericApiServerHookName) {
+		err := s.AddPostStartHook(genericApiServerHookName, func(context PostStartHookContext) error {
+			c.SharedInformerFactory.Start(context.StopCh)
+			return nil
+		})
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	for _, delegateCheck := range delegationTarget.HealthzChecks() {
@@ -427,7 +518,7 @@ func (c completedConfig) New(delegationTarget DelegationTarget) (*GenericAPIServ
 	// use the UnprotectedHandler from the delegation target to ensure that we don't attempt to double authenticator, authorize,
 	// or some other part of the filter chain in delegation cases.
 	if delegationTarget.UnprotectedHandler() == nil && c.EnableIndex {
-		s.Handler.PostGoRestfulMux.NotFoundHandler(routes.IndexLister{
+		s.Handler.NonGoRestfulMux.NotFoundHandler(routes.IndexLister{
 			StatusCode:   http.StatusNotFound,
 			PathProvider: s.listedPathProvider,
 		})
@@ -437,37 +528,46 @@ func (c completedConfig) New(delegationTarget DelegationTarget) (*GenericAPIServ
 }
 
 func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) http.Handler {
-	handler := genericapifilters.WithAuthorization(apiHandler, c.RequestContextMapper, c.Authorizer)
-	handler = genericapifilters.WithImpersonation(handler, c.RequestContextMapper, c.Authorizer)
-	handler = genericapifilters.WithAudit(handler, c.RequestContextMapper, c.AuditWriter)
-	handler = genericapifilters.WithAuthentication(handler, c.RequestContextMapper, c.Authenticator, genericapifilters.Unauthorized(c.SupportsBasicAuth))
-	handler = genericfilters.WithCORS(handler, c.CorsAllowedOriginList, nil, nil, nil, "true")
-	handler = genericfilters.WithPanicRecovery(handler)
-	handler = genericfilters.WithTimeoutForNonLongRunningRequests(handler, c.RequestContextMapper, c.LongRunningFunc)
+	handler := genericapifilters.WithAuthorization(apiHandler, c.RequestContextMapper, c.Authorizer, c.Serializer)
 	handler = genericfilters.WithMaxInFlightLimit(handler, c.MaxRequestsInFlight, c.MaxMutatingRequestsInFlight, c.RequestContextMapper, c.LongRunningFunc)
-	handler = genericapifilters.WithRequestInfo(handler, NewRequestInfoResolver(c), c.RequestContextMapper)
+	handler = genericapifilters.WithImpersonation(handler, c.RequestContextMapper, c.Authorizer, c.Serializer)
+	if utilfeature.DefaultFeatureGate.Enabled(features.AdvancedAuditing) {
+		handler = genericapifilters.WithAudit(handler, c.RequestContextMapper, c.AuditBackend, c.AuditPolicyChecker, c.LongRunningFunc)
+	} else {
+		handler = genericapifilters.WithLegacyAudit(handler, c.RequestContextMapper, c.LegacyAuditWriter)
+	}
+	failedHandler := genericapifilters.Unauthorized(c.RequestContextMapper, c.Serializer, c.SupportsBasicAuth)
+	if utilfeature.DefaultFeatureGate.Enabled(features.AdvancedAuditing) {
+		failedHandler = genericapifilters.WithFailedAuthenticationAudit(failedHandler, c.RequestContextMapper, c.AuditBackend, c.AuditPolicyChecker)
+	}
+	handler = genericapifilters.WithAuthentication(handler, c.RequestContextMapper, c.Authenticator, failedHandler)
+	handler = genericfilters.WithCORS(handler, c.CorsAllowedOriginList, nil, nil, nil, "true")
+	handler = genericfilters.WithTimeoutForNonLongRunningRequests(handler, c.RequestContextMapper, c.LongRunningFunc, c.RequestTimeout)
+	handler = genericfilters.WithWaitGroup(handler, c.RequestContextMapper, c.LongRunningFunc, c.HandlerChainWaitGroup)
+	handler = genericapifilters.WithRequestInfo(handler, c.RequestInfoResolver, c.RequestContextMapper)
 	handler = apirequest.WithRequestContext(handler, c.RequestContextMapper)
+	handler = genericfilters.WithPanicRecovery(handler)
 	return handler
 }
 
 func installAPI(s *GenericAPIServer, c *Config) {
 	if c.EnableIndex {
-		routes.Index{}.Install(s.listedPathProvider, s.Handler.PostGoRestfulMux)
+		routes.Index{}.Install(s.listedPathProvider, s.Handler.NonGoRestfulMux)
 	}
 	if c.SwaggerConfig != nil && c.EnableSwaggerUI {
-		routes.SwaggerUI{}.Install(s.Handler.PostGoRestfulMux)
+		routes.SwaggerUI{}.Install(s.Handler.NonGoRestfulMux)
 	}
 	if c.EnableProfiling {
-		routes.Profiling{}.Install(s.Handler.PostGoRestfulMux)
+		routes.Profiling{}.Install(s.Handler.NonGoRestfulMux)
 		if c.EnableContentionProfiling {
 			goruntime.SetBlockProfileRate(1)
 		}
 	}
 	if c.EnableMetrics {
 		if c.EnableProfiling {
-			routes.MetricsWithReset{}.Install(s.Handler.PostGoRestfulMux)
+			routes.MetricsWithReset{}.Install(s.Handler.NonGoRestfulMux)
 		} else {
-			routes.DefaultMetrics{}.Install(s.Handler.PostGoRestfulMux)
+			routes.DefaultMetrics{}.Install(s.Handler.NonGoRestfulMux)
 		}
 	}
 	routes.Version{Version: c.Version}.Install(s.Handler.GoRestfulContainer)

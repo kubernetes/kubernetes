@@ -75,6 +75,14 @@ process_content () {
     go4.org/*)
      package_root=$(echo ${package} |awk -F/ '{ print $1 }')
      ;;
+    gopkg.in/*)
+     # Root of gopkg.in package always ends with '.v(number)' and my contain
+     # more than two path elements. For example:
+     # - gopkg.in/yaml.v2
+     # - gopkg.in/inf.v0
+     # - gopkg.in/square/go-jose.v2
+     package_root=$(echo ${package} |grep -oh '.*\.v[0-9]')
+     ;;
     *)
      package_root=$(echo ${package} |awk -F/ '{ print $1"/"$2 }')
      ;;
@@ -141,7 +149,7 @@ echo "= Kubernetes licensed under: ="
 echo
 cat ${LICENSE_ROOT}/LICENSE
 echo
-echo "= LICENSE $(cat ${LICENSE_ROOT}/LICENSE | md5sum)"
+echo "= LICENSE $(cat ${LICENSE_ROOT}/LICENSE | md5sum | awk '{print $1}')"
 echo "================================================================================"
 ) > ${TMP_LICENSE_FILE}
 
@@ -180,7 +188,7 @@ __EOF__
   cat "${file}"
 
   echo
-  echo "= ${file} $(cat ${file} | md5sum)"
+  echo "= ${file} $(cat ${file} | md5sum | awk '{print $1}')"
   echo "================================================================================"
   echo
 done >> ${TMP_LICENSE_FILE}

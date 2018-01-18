@@ -1,8 +1,8 @@
 reviewers:
-  - mwielgus
   - jszczepkowski
-  - MaciekPytel
+  - sig-autoscaling-maintainers
+  - wasylkowski
 approvers:
-  - mwielgus
   - jszczepkowski
-  - MaciekPytel
+  - sig-autoscaling-maintainers
+  - wasylkowski

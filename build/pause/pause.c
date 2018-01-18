@@ -17,9 +17,17 @@ limitations under the License.
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
+
+#define STRINGIFY(x) #x
+#define VERSION_STRING(x) STRINGIFY(x)
+
+#ifndef VERSION
+#define VERSION HEAD
+#endif
 
 static void sigdown(int signo) {
   psignal(signo, "Shutting down, got signal");
@@ -31,10 +39,18 @@ static void sigreap(int signo) {
     ;
 }
 
-int main() {
+int main(int argc, char **argv) {
+  int i;
+  for (i = 1; i < argc; ++i) {
+    if (!strcasecmp(argv[i], "-v")) {
+      printf("pause.c %s\n", VERSION_STRING(VERSION));
+      return 0;
+    }
+  }
+
   if (getpid() != 1)
     /* Not an error because pause sees use outside of infra containers. */
-    fprintf(stderr, "Warning: pause should be the first process in a pod\n");
+    fprintf(stderr, "Warning: pause should be the first process\n");
 
   if (sigaction(SIGINT, &(struct sigaction){.sa_handler = sigdown}, NULL) < 0)
     return 1;

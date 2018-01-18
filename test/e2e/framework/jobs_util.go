@@ -20,13 +20,13 @@ import (
 	"fmt"
 	"time"
 
+	batch "k8s.io/api/batch/v1"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/kubernetes/pkg/api/v1"
-	batch "k8s.io/kubernetes/pkg/apis/batch/v1"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	clientset "k8s.io/client-go/kubernetes"
 )
 
 const (
@@ -43,7 +43,7 @@ const (
 // first time it is run and succeeds subsequently. name is the Name of the Job. RestartPolicy indicates the restart
 // policy of the containers in which the Pod is running. Parallelism is the Job's parallelism, and completions is the
 // Job's required number of completions.
-func NewTestJob(behavior, name string, rPol v1.RestartPolicy, parallelism, completions int32) *batch.Job {
+func NewTestJob(behavior, name string, rPol v1.RestartPolicy, parallelism, completions int32, activeDeadlineSeconds *int64, backoffLimit int32) *batch.Job {
 	job := &batch.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
@@ -52,9 +52,11 @@ func NewTestJob(behavior, name string, rPol v1.RestartPolicy, parallelism, compl
 			Kind: "Job",
 		},
 		Spec: batch.JobSpec{
-			Parallelism:    &parallelism,
-			Completions:    &completions,
-			ManualSelector: newBool(false),
+			ActiveDeadlineSeconds: activeDeadlineSeconds,
+			Parallelism:           &parallelism,
+			Completions:           &completions,
+			BackoffLimit:          &backoffLimit,
+			ManualSelector:        newBool(false),
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{JobSelectorKey: name},
@@ -72,7 +74,7 @@ func NewTestJob(behavior, name string, rPol v1.RestartPolicy, parallelism, compl
 					Containers: []v1.Container{
 						{
 							Name:    "c",
-							Image:   "gcr.io/google_containers/busybox:1.24",
+							Image:   BusyBoxImage,
 							Command: []string{},
 							VolumeMounts: []v1.VolumeMount{
 								{
@@ -110,19 +112,19 @@ func NewTestJob(behavior, name string, rPol v1.RestartPolicy, parallelism, compl
 
 // GetJob uses c to get the Job in namespace ns named name. If the returned error is nil, the returned Job is valid.
 func GetJob(c clientset.Interface, ns, name string) (*batch.Job, error) {
-	return c.Batch().Jobs(ns).Get(name, metav1.GetOptions{})
+	return c.BatchV1().Jobs(ns).Get(name, metav1.GetOptions{})
 }
 
 // CreateJob uses c to create job in namespace ns. If the returned error is nil, the returned Job is valid and has
 // been created.
 func CreateJob(c clientset.Interface, ns string, job *batch.Job) (*batch.Job, error) {
-	return c.Batch().Jobs(ns).Create(job)
+	return c.BatchV1().Jobs(ns).Create(job)
 }
 
 // UpdateJob uses c to updated job in namespace ns. If the returned error is nil, the returned Job is valid and has
 // been updated.
 func UpdateJob(c clientset.Interface, ns string, job *batch.Job) (*batch.Job, error) {
-	return c.Batch().Jobs(ns).Update(job)
+	return c.BatchV1().Jobs(ns).Update(job)
 }
 
 // UpdateJobFunc updates the job object. It retries if there is a conflict, throw out error if
@@ -151,7 +153,7 @@ func UpdateJobFunc(c clientset.Interface, ns, name string, updateFn func(job *ba
 // DeleteJob uses c to delete the Job named name in namespace ns. If the returned error is nil, the Job has been
 // deleted.
 func DeleteJob(c clientset.Interface, ns, name string) error {
-	return c.Batch().Jobs(ns).Delete(name, nil)
+	return c.BatchV1().Jobs(ns).Delete(name, nil)
 }
 
 // GetJobPods returns a list of Pods belonging to a Job.
@@ -182,7 +184,7 @@ func WaitForAllJobPodsRunning(c clientset.Interface, ns, jobName string, paralle
 // WaitForJobFinish uses c to wait for compeletions to complete for the Job jobName in namespace ns.
 func WaitForJobFinish(c clientset.Interface, ns, jobName string, completions int32) error {
 	return wait.Poll(Poll, JobTimeout, func() (bool, error) {
-		curr, err := c.Batch().Jobs(ns).Get(jobName, metav1.GetOptions{})
+		curr, err := c.BatchV1().Jobs(ns).Get(jobName, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -191,15 +193,17 @@ func WaitForJobFinish(c clientset.Interface, ns, jobName string, completions int
 }
 
 // WaitForJobFailure uses c to wait for up to timeout for the Job named jobName in namespace ns to fail.
-func WaitForJobFailure(c clientset.Interface, ns, jobName string, timeout time.Duration) error {
+func WaitForJobFailure(c clientset.Interface, ns, jobName string, timeout time.Duration, reason string) error {
 	return wait.Poll(Poll, timeout, func() (bool, error) {
-		curr, err := c.Batch().Jobs(ns).Get(jobName, metav1.GetOptions{})
+		curr, err := c.BatchV1().Jobs(ns).Get(jobName, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
 		for _, c := range curr.Status.Conditions {
 			if c.Type == batch.JobFailed && c.Status == v1.ConditionTrue {
-				return true, nil
+				if reason == "" || reason == c.Reason {
+					return true, nil
+				}
 			}
 		}
 		return false, nil
@@ -211,7 +215,7 @@ func WaitForJobFailure(c clientset.Interface, ns, jobName string, timeout time.D
 func CheckForAllJobPodsRunning(c clientset.Interface, ns, jobName string, parallelism int32) (bool, error) {
 	label := labels.SelectorFromSet(labels.Set(map[string]string{JobSelectorKey: jobName}))
 	options := metav1.ListOptions{LabelSelector: label.String()}
-	pods, err := c.Core().Pods(ns).List(options)
+	pods, err := c.CoreV1().Pods(ns).List(options)
 	if err != nil {
 		return false, err
 	}
@@ -228,4 +232,28 @@ func newBool(val bool) *bool {
 	p := new(bool)
 	*p = val
 	return p
+}
+
+type updateJobFunc func(*batch.Job)
+
+func UpdateJobWithRetries(c clientset.Interface, namespace, name string, applyUpdate updateJobFunc) (job *batch.Job, err error) {
+	jobs := c.BatchV1().Jobs(namespace)
+	var updateErr error
+	pollErr := wait.PollImmediate(10*time.Millisecond, 1*time.Minute, func() (bool, error) {
+		if job, err = jobs.Get(name, metav1.GetOptions{}); err != nil {
+			return false, err
+		}
+		// Apply the update, then attempt to push it to the apiserver.
+		applyUpdate(job)
+		if job, err = jobs.Update(job); err == nil {
+			Logf("Updating job %s", name)
+			return true, nil
+		}
+		updateErr = err
+		return false, nil
+	})
+	if pollErr == wait.ErrWaitTimeout {
+		pollErr = fmt.Errorf("couldn't apply the provided updated to job %q: %v", name, updateErr)
+	}
+	return job, pollErr
 }

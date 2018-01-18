@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2018 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,30 +19,38 @@ limitations under the License.
 package informers
 
 import (
+	reflect "reflect"
+	sync "sync"
+	time "time"
+
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
+	admissionregistration "k8s.io/client-go/informers/admissionregistration"
 	apps "k8s.io/client-go/informers/apps"
 	autoscaling "k8s.io/client-go/informers/autoscaling"
 	batch "k8s.io/client-go/informers/batch"
 	certificates "k8s.io/client-go/informers/certificates"
 	core "k8s.io/client-go/informers/core"
+	events "k8s.io/client-go/informers/events"
 	extensions "k8s.io/client-go/informers/extensions"
 	internalinterfaces "k8s.io/client-go/informers/internalinterfaces"
+	networking "k8s.io/client-go/informers/networking"
 	policy "k8s.io/client-go/informers/policy"
 	rbac "k8s.io/client-go/informers/rbac"
+	scheduling "k8s.io/client-go/informers/scheduling"
 	settings "k8s.io/client-go/informers/settings"
 	storage "k8s.io/client-go/informers/storage"
 	kubernetes "k8s.io/client-go/kubernetes"
 	cache "k8s.io/client-go/tools/cache"
-	reflect "reflect"
-	sync "sync"
-	time "time"
 )
 
 type sharedInformerFactory struct {
-	client        kubernetes.Interface
-	lock          sync.Mutex
-	defaultResync time.Duration
+	client           kubernetes.Interface
+	namespace        string
+	tweakListOptions internalinterfaces.TweakListOptionsFunc
+	lock             sync.Mutex
+	defaultResync    time.Duration
 
 	informers map[reflect.Type]cache.SharedIndexInformer
 	// startedInformers is used for tracking which informers have been started.
@@ -52,8 +60,17 @@ type sharedInformerFactory struct {
 
 // NewSharedInformerFactory constructs a new instance of sharedInformerFactory
 func NewSharedInformerFactory(client kubernetes.Interface, defaultResync time.Duration) SharedInformerFactory {
+	return NewFilteredSharedInformerFactory(client, defaultResync, v1.NamespaceAll, nil)
+}
+
+// NewFilteredSharedInformerFactory constructs a new instance of sharedInformerFactory.
+// Listers obtained via this SharedInformerFactory will be subject to the same filters
+// as specified here.
+func NewFilteredSharedInformerFactory(client kubernetes.Interface, defaultResync time.Duration, namespace string, tweakListOptions internalinterfaces.TweakListOptionsFunc) SharedInformerFactory {
 	return &sharedInformerFactory{
 		client:           client,
+		namespace:        namespace,
+		tweakListOptions: tweakListOptions,
 		defaultResync:    defaultResync,
 		informers:        make(map[reflect.Type]cache.SharedIndexInformer),
 		startedInformers: make(map[reflect.Type]bool),
@@ -119,54 +136,74 @@ type SharedInformerFactory interface {
 	ForResource(resource schema.GroupVersionResource) (GenericInformer, error)
 	WaitForCacheSync(stopCh <-chan struct{}) map[reflect.Type]bool
 
+	Admissionregistration() admissionregistration.Interface
 	Apps() apps.Interface
 	Autoscaling() autoscaling.Interface
 	Batch() batch.Interface
 	Certificates() certificates.Interface
 	Core() core.Interface
+	Events() events.Interface
 	Extensions() extensions.Interface
+	Networking() networking.Interface
 	Policy() policy.Interface
 	Rbac() rbac.Interface
+	Scheduling() scheduling.Interface
 	Settings() settings.Interface
 	Storage() storage.Interface
 }
 
+func (f *sharedInformerFactory) Admissionregistration() admissionregistration.Interface {
+	return admissionregistration.New(f, f.namespace, f.tweakListOptions)
+}
+
 func (f *sharedInformerFactory) Apps() apps.Interface {
-	return apps.New(f)
+	return apps.New(f, f.namespace, f.tweakListOptions)
 }
 
 func (f *sharedInformerFactory) Autoscaling() autoscaling.Interface {
-	return autoscaling.New(f)
+	return autoscaling.New(f, f.namespace, f.tweakListOptions)
 }
 
 func (f *sharedInformerFactory) Batch() batch.Interface {
-	return batch.New(f)
+	return batch.New(f, f.namespace, f.tweakListOptions)
 }
 
 func (f *sharedInformerFactory) Certificates() certificates.Interface {
-	return certificates.New(f)
+	return certificates.New(f, f.namespace, f.tweakListOptions)
 }
 
 func (f *sharedInformerFactory) Core() core.Interface {
-	return core.New(f)
+	return core.New(f, f.namespace, f.tweakListOptions)
+}
+
+func (f *sharedInformerFactory) Events() events.Interface {
+	return events.New(f, f.namespace, f.tweakListOptions)
 }
 
 func (f *sharedInformerFactory) Extensions() extensions.Interface {
-	return extensions.New(f)
+	return extensions.New(f, f.namespace, f.tweakListOptions)
+}
+
+func (f *sharedInformerFactory) Networking() networking.Interface {
+	return networking.New(f, f.namespace, f.tweakListOptions)
 }
 
 func (f *sharedInformerFactory) Policy() policy.Interface {
-	return policy.New(f)
+	return policy.New(f, f.namespace, f.tweakListOptions)
 }
 
 func (f *sharedInformerFactory) Rbac() rbac.Interface {
-	return rbac.New(f)
+	return rbac.New(f, f.namespace, f.tweakListOptions)
+}
+
+func (f *sharedInformerFactory) Scheduling() scheduling.Interface {
+	return scheduling.New(f, f.namespace, f.tweakListOptions)
 }
 
 func (f *sharedInformerFactory) Settings() settings.Interface {
-	return settings.New(f)
+	return settings.New(f, f.namespace, f.tweakListOptions)
 }
 
 func (f *sharedInformerFactory) Storage() storage.Interface {
-	return storage.New(f)
+	return storage.New(f, f.namespace, f.tweakListOptions)
 }

@@ -25,11 +25,11 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/tools/remotecommand"
 	"k8s.io/client-go/util/flowcontrol"
-	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/unversioned/remotecommand"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -82,8 +82,10 @@ type Runtime interface {
 	// complete list of pods from all avialble sources (e.g., apiserver, http,
 	// file). In this case, garbage collector should refrain itself from aggressive
 	// behavior such as removing all containers of unrecognized pods (yet).
+	// If evictNonDeletedPods is set to true, containers and sandboxes belonging to pods
+	// that are terminated, but not deleted will be evicted.  Otherwise, only deleted pods will be GC'd.
 	// TODO: Revisit this method and make it cleaner.
-	GarbageCollect(gcPolicy ContainerGCPolicy, allSourcesReady bool) error
+	GarbageCollect(gcPolicy ContainerGCPolicy, allSourcesReady bool, evictNonDeletedPods bool) error
 	// Syncs the running pod into the desired pod.
 	SyncPod(pod *v1.Pod, apiPodStatus v1.PodStatus, podStatus *PodStatus, pullSecrets []v1.Secret, backOff *flowcontrol.Backoff) PodSyncResult
 	// KillPod kills all the containers of a pod. Pod may be nil, running pod must not be.
@@ -125,9 +127,8 @@ type Runtime interface {
 // DirectStreamingRuntime is the interface implemented by runtimes for which the streaming calls
 // (exec/attach/port-forward) should be served directly by the Kubelet.
 type DirectStreamingRuntime interface {
-	// Runs the command in the container of the specified pod using nsenter.
-	// Attaches the processes stdin, stdout, and stderr. Optionally uses a
-	// tty.
+	// Runs the command in the container of the specified pod. Attaches
+	// the processes stdin, stdout, and stderr. Optionally uses a tty.
 	ExecInContainer(containerID ContainerID, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize, timeout time.Duration) error
 	// Forward the specified port from the specified pod to the stream.
 	PortForward(pod *Pod, port int32, stream io.ReadWriteCloser) error
@@ -387,6 +388,8 @@ type Mount struct {
 	ReadOnly bool
 	// Whether the mount needs SELinux relabeling
 	SELinuxRelabel bool
+	// Requested propagation mode
+	Propagation runtimeapi.MountPropagation
 }
 
 type PortMapping struct {
@@ -425,10 +428,6 @@ type RunContainerOptions struct {
 	// this directory will be used to create and mount the log file to
 	// container.TerminationMessagePath
 	PodContainerDir string
-	// The list of DNS servers for the container to use.
-	DNS []string
-	// The list of DNS search domains.
-	DNSSearch []string
 	// The parent cgroup to pass to Docker
 	CgroupParent string
 	// The type of container rootfs
@@ -447,9 +446,14 @@ type RunContainerOptions struct {
 type VolumeInfo struct {
 	// Mounter is the volume's mounter
 	Mounter volume.Mounter
+	// BlockVolumeMapper is the Block volume's mapper
+	BlockVolumeMapper volume.BlockVolumeMapper
 	// SELinuxLabeled indicates whether this volume has had the
 	// pod's SELinux label applied to it or not
 	SELinuxLabeled bool
+	// Whether the volume permission is set to read-only or not
+	// This value is passed from volume.spec
+	ReadOnly bool
 }
 
 type VolumeMap map[string]VolumeInfo
@@ -608,7 +612,7 @@ func BuildPodFullName(name, namespace string) string {
 // Parse the pod full name.
 func ParsePodFullName(podFullName string) (string, string, error) {
 	parts := strings.Split(podFullName, "_")
-	if len(parts) != 2 {
+	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
 		return "", "", fmt.Errorf("failed to parse the pod full name %q", podFullName)
 	}
 	return parts[0], parts[1], nil

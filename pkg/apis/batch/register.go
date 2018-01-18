@@ -42,7 +42,7 @@ var (
 	AddToScheme   = SchemeBuilder.AddToScheme
 )
 
-// Adds the list of known types to api.Scheme.
+// Adds the list of known types to the given scheme.
 func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
 		&Job{},
@@ -51,7 +51,5 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&CronJob{},
 		&CronJobList{},
 	)
-	scheme.AddKnownTypeWithName(SchemeGroupVersion.WithKind("ScheduledJob"), &CronJob{})
-	scheme.AddKnownTypeWithName(SchemeGroupVersion.WithKind("ScheduledJobList"), &CronJobList{})
 	return nil
 }

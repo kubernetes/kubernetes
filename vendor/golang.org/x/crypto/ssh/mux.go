@@ -116,9 +116,9 @@ func (m *mux) Wait() error {
 func newMux(p packetConn) *mux {
 	m := &mux{
 		conn:             p,
-		incomingChannels: make(chan NewChannel, 16),
+		incomingChannels: make(chan NewChannel, chanSize),
 		globalResponses:  make(chan interface{}, 1),
-		incomingRequests: make(chan *Request, 16),
+		incomingRequests: make(chan *Request, chanSize),
 		errCond:          newCond(),
 	}
 	if debugMux {

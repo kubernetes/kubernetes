@@ -1,37 +1,95 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
-    "go_test",
 )
 
 go_library(
     name = "go_default_library",
-    srcs = [
-        "resize.go",
-        "resizeevents.go",
-        "setsize.go",
-        "term.go",
-        "term_writer.go",
-    ],
-    tags = ["automanaged"],
-    deps = [
-        "//pkg/client/unversioned/remotecommand:go_default_library",
-        "//pkg/util/interrupt:go_default_library",
-        "//vendor/github.com/docker/docker/pkg/term:go_default_library",
-        "//vendor/github.com/mitchellh/go-wordwrap:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
-    ],
-)
-
-go_test(
-    name = "go_default_test",
-    srcs = ["term_writer_test.go"],
-    library = ":go_default_library",
-    tags = ["automanaged"],
+    srcs = select({
+        "@io_bazel_rules_go//go/platform:android": [
+            "setsize.go",
+        ],
+        "@io_bazel_rules_go//go/platform:darwin": [
+            "setsize.go",
+        ],
+        "@io_bazel_rules_go//go/platform:dragonfly": [
+            "setsize.go",
+        ],
+        "@io_bazel_rules_go//go/platform:freebsd": [
+            "setsize.go",
+        ],
+        "@io_bazel_rules_go//go/platform:linux": [
+            "setsize.go",
+        ],
+        "@io_bazel_rules_go//go/platform:nacl": [
+            "setsize.go",
+        ],
+        "@io_bazel_rules_go//go/platform:netbsd": [
+            "setsize.go",
+        ],
+        "@io_bazel_rules_go//go/platform:openbsd": [
+            "setsize.go",
+        ],
+        "@io_bazel_rules_go//go/platform:plan9": [
+            "setsize.go",
+        ],
+        "@io_bazel_rules_go//go/platform:solaris": [
+            "setsize.go",
+        ],
+        "@io_bazel_rules_go//go/platform:windows": [
+            "setsize_unsupported.go",
+        ],
+        "//conditions:default": [],
+    }),
+    importpath = "k8s.io/kubernetes/pkg/util/term",
+    deps = select({
+        "@io_bazel_rules_go//go/platform:android": [
+            "//vendor/github.com/docker/docker/pkg/term:go_default_library",
+            "//vendor/k8s.io/client-go/tools/remotecommand:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:darwin": [
+            "//vendor/github.com/docker/docker/pkg/term:go_default_library",
+            "//vendor/k8s.io/client-go/tools/remotecommand:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:dragonfly": [
+            "//vendor/github.com/docker/docker/pkg/term:go_default_library",
+            "//vendor/k8s.io/client-go/tools/remotecommand:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:freebsd": [
+            "//vendor/github.com/docker/docker/pkg/term:go_default_library",
+            "//vendor/k8s.io/client-go/tools/remotecommand:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:linux": [
+            "//vendor/github.com/docker/docker/pkg/term:go_default_library",
+            "//vendor/k8s.io/client-go/tools/remotecommand:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:nacl": [
+            "//vendor/github.com/docker/docker/pkg/term:go_default_library",
+            "//vendor/k8s.io/client-go/tools/remotecommand:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:netbsd": [
+            "//vendor/github.com/docker/docker/pkg/term:go_default_library",
+            "//vendor/k8s.io/client-go/tools/remotecommand:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:openbsd": [
+            "//vendor/github.com/docker/docker/pkg/term:go_default_library",
+            "//vendor/k8s.io/client-go/tools/remotecommand:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:plan9": [
+            "//vendor/github.com/docker/docker/pkg/term:go_default_library",
+            "//vendor/k8s.io/client-go/tools/remotecommand:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:solaris": [
+            "//vendor/github.com/docker/docker/pkg/term:go_default_library",
+            "//vendor/k8s.io/client-go/tools/remotecommand:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:windows": [
+            "//vendor/k8s.io/client-go/tools/remotecommand:go_default_library",
+        ],
+        "//conditions:default": [],
+    }),
 )
 
 filegroup(

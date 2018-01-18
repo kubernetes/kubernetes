@@ -26,6 +26,7 @@ package main
 //            Only 13..8 are used for XOR patterns.
 //         7  inverseFold (fold to upper, not to lower)
 //         6  index: interpret the XOR pattern as an index
+//            or isMid if case mode is cIgnorableUncased.
 //      5..4  CCC: zero (normal or break), above or other
 //   }
 //      3  exception: interpret this value as an exception index
@@ -48,6 +49,7 @@ const (
 	ignorableValue = 0x0004
 
 	inverseFoldBit = 1 << 7
+	isMidBit       = 1 << 6
 
 	exceptionBit     = 1 << 3
 	exceptionShift   = 5
@@ -57,7 +59,7 @@ const (
 	xorShift    = 8
 
 	// There is no mapping if all xor bits and the exception bit are zero.
-	hasMappingMask = 0xffc0 | exceptionBit
+	hasMappingMask = 0xff80 | exceptionBit
 )
 
 // The case mode bits encodes the case type of a rune. This includes uncased,
@@ -95,16 +97,16 @@ func (c info) isCaseIgnorable() bool {
 	return c&ignorableMask == ignorableValue
 }
 
-func (c info) isCaseIgnorableAndNonBreakStarter() bool {
-	return c&(fullCasedMask|cccMask) == (ignorableValue | cccZero)
-}
-
 func (c info) isNotCasedAndNotCaseIgnorable() bool {
 	return c&fullCasedMask == 0
 }
 
 func (c info) isCaseIgnorableAndNotCased() bool {
 	return c&fullCasedMask == cIgnorableUncased
+}
+
+func (c info) isMid() bool {
+	return c&(fullCasedMask|isMidBit) == isMidBit|cIgnorableUncased
 }
 
 // The case mapping implementation will need to know about various Canonical

@@ -20,7 +20,7 @@ import (
 	"io"
 
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/util/i18n"
+	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 
 	"github.com/spf13/cobra"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
@@ -47,7 +47,7 @@ func NewCmdTop(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 	}
 
 	// create subcommands
-	cmd.AddCommand(NewCmdTopNode(f, out))
-	cmd.AddCommand(NewCmdTopPod(f, out))
+	cmd.AddCommand(NewCmdTopNode(f, nil, out))
+	cmd.AddCommand(NewCmdTopPod(f, nil, out))
 	return cmd
 }

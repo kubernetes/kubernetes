@@ -25,12 +25,14 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	clientset "k8s.io/client-go/kubernetes"
+	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
+	api "k8s.io/kubernetes/pkg/apis/core"
+	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 )
 
 const (
@@ -40,8 +42,9 @@ const (
 	NodeUnreachablePodMessage = "Node %v which was running pod %v is unresponsive"
 )
 
+// GetHostname returns OS's hostname if 'hostnameOverride' is empty; otherwise, return 'hostnameOverride'.
 func GetHostname(hostnameOverride string) string {
-	var hostname string = hostnameOverride
+	hostname := hostnameOverride
 	if hostname == "" {
 		nodename, err := os.Hostname()
 		if err != nil {
@@ -64,7 +67,7 @@ func GetPreferredNodeAddress(node *v1.Node, preferredAddressTypes []v1.NodeAddre
 		// If hostname was requested and no Hostname address was registered...
 		if addressType == v1.NodeHostName {
 			// ...fall back to the kubernetes.io/hostname label for compatibility with kubelets before 1.5
-			if hostname, ok := node.Labels[metav1.LabelHostname]; ok && len(hostname) > 0 {
+			if hostname, ok := node.Labels[kubeletapis.LabelHostname]; ok && len(hostname) > 0 {
 				return hostname, nil
 			}
 		}
@@ -108,16 +111,16 @@ func InternalGetNodeHostIP(node *api.Node) (net.IP, error) {
 	return nil, fmt.Errorf("host IP unknown; known addresses: %v", addresses)
 }
 
-// Helper function that builds a string identifier that is unique per failure-zone
-// Returns empty-string for no zone
+// GetZoneKey is a helper function that builds a string identifier that is unique per failure-zone;
+// it returns empty-string for no zone.
 func GetZoneKey(node *v1.Node) string {
 	labels := node.Labels
 	if labels == nil {
 		return ""
 	}
 
-	region, _ := labels[metav1.LabelZoneRegion]
-	failureDomain, _ := labels[metav1.LabelZoneFailureDomain]
+	region, _ := labels[kubeletapis.LabelZoneRegion]
+	failureDomain, _ := labels[kubeletapis.LabelZoneFailureDomain]
 
 	if region == "" && failureDomain == "" {
 		return ""
@@ -143,15 +146,43 @@ func SetNodeCondition(c clientset.Interface, node types.NodeName, condition v1.N
 	if err != nil {
 		return nil
 	}
-	_, err = c.Core().Nodes().PatchStatus(string(node), patch)
+	_, err = c.CoreV1().Nodes().PatchStatus(string(node), patch)
 	return err
 }
 
+// PatchNodeCIDR patches the specified node's CIDR to the given value.
+func PatchNodeCIDR(c clientset.Interface, node types.NodeName, cidr string) error {
+	raw, err := json.Marshal(cidr)
+	if err != nil {
+		return fmt.Errorf("failed to json.Marshal CIDR: %v", err)
+	}
+
+	patchBytes := []byte(fmt.Sprintf(`{"spec":{"podCIDR":%s}}`, raw))
+
+	if _, err := c.CoreV1().Nodes().Patch(string(node), types.StrategicMergePatchType, patchBytes); err != nil {
+		return fmt.Errorf("failed to patch node CIDR: %v", err)
+	}
+	return nil
+}
+
 // PatchNodeStatus patches node status.
-func PatchNodeStatus(c clientset.Interface, nodeName types.NodeName, oldNode *v1.Node, newNode *v1.Node) (*v1.Node, error) {
+func PatchNodeStatus(c v1core.CoreV1Interface, nodeName types.NodeName, oldNode *v1.Node, newNode *v1.Node) (*v1.Node, []byte, error) {
+	patchBytes, err := preparePatchBytesforNodeStatus(nodeName, oldNode, newNode)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	updatedNode, err := c.Nodes().Patch(string(nodeName), types.StrategicMergePatchType, patchBytes, "status")
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to patch status %q for node %q: %v", patchBytes, nodeName, err)
+	}
+	return updatedNode, patchBytes, nil
+}
+
+func preparePatchBytesforNodeStatus(nodeName types.NodeName, oldNode *v1.Node, newNode *v1.Node) ([]byte, error) {
 	oldData, err := json.Marshal(oldNode)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal old node %#v for node %q: %v", oldNode, nodeName, err)
+		return nil, fmt.Errorf("failed to Marshal oldData for node %q: %v", nodeName, err)
 	}
 
 	// Reset spec to make sure only patch for Status or ObjectMeta is generated.
@@ -161,17 +192,12 @@ func PatchNodeStatus(c clientset.Interface, nodeName types.NodeName, oldNode *v1
 	newNode.Spec = oldNode.Spec
 	newData, err := json.Marshal(newNode)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal new node %#v for node %q: %v", newNode, nodeName, err)
+		return nil, fmt.Errorf("failed to Marshal newData for node %q: %v", nodeName, err)
 	}
 
 	patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, v1.Node{})
 	if err != nil {
-		return nil, fmt.Errorf("failed to create patch for node %q: %v", nodeName, err)
+		return nil, fmt.Errorf("failed to CreateTwoWayMergePatch for node %q: %v", nodeName, err)
 	}
-
-	updatedNode, err := c.Core().Nodes().Patch(string(nodeName), types.StrategicMergePatchType, patchBytes, "status")
-	if err != nil {
-		return nil, fmt.Errorf("failed to patch status %q for node %q: %v", patchBytes, nodeName, err)
-	}
-	return updatedNode, nil
+	return patchBytes, nil
 }

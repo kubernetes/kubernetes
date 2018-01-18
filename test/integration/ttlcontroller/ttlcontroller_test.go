@@ -24,14 +24,14 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/informers"
+	clientset "k8s.io/client-go/kubernetes"
+	listers "k8s.io/client-go/listers/core/v1"
 	restclient "k8s.io/client-go/rest"
-	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
-	listers "k8s.io/kubernetes/pkg/client/listers/core/v1"
 	"k8s.io/kubernetes/pkg/controller/ttl"
 	"k8s.io/kubernetes/test/integration/framework"
 )
@@ -109,8 +109,8 @@ func waitForNodesWithTTLAnnotation(t *testing.T, nodeLister listers.NodeLister, 
 
 // Test whether ttlcontroller sets correct ttl annotations.
 func TestTTLAnnotations(t *testing.T) {
-	_, server := framework.RunAMaster(nil)
-	defer server.Close()
+	_, server, closeFn := framework.RunAMaster(nil)
+	defer closeFn()
 
 	testClient, informers := createClientAndInformers(t, server)
 	nodeInformer := informers.Core().V1().Nodes()

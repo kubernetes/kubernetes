@@ -1,22 +1,22 @@
 package ansiterm
 
-type GroundState struct {
-	BaseState
+type groundState struct {
+	baseState
 }
 
-func (gs GroundState) Handle(b byte) (s State, e error) {
+func (gs groundState) Handle(b byte) (s state, e error) {
 	gs.parser.context.currentChar = b
 
-	nextState, err := gs.BaseState.Handle(b)
+	nextState, err := gs.baseState.Handle(b)
 	if nextState != nil || err != nil {
 		return nextState, err
 	}
 
 	switch {
-	case sliceContains(Printables, b):
+	case sliceContains(printables, b):
 		return gs, gs.parser.print()
 
-	case sliceContains(Executors, b):
+	case sliceContains(executors, b):
 		return gs, gs.parser.execute()
 	}
 

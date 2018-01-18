@@ -21,19 +21,21 @@ import (
 	"net"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/golang/glog"
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilsets "k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
-	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/network/hostport"
-	utilexec "k8s.io/kubernetes/pkg/util/exec"
+	"k8s.io/kubernetes/pkg/kubelet/network/metrics"
 	utilsysctl "k8s.io/kubernetes/pkg/util/sysctl"
+	utilexec "k8s.io/utils/exec"
 )
 
 const DefaultPluginName = "kubernetes.io/no-op"
@@ -43,17 +45,11 @@ const DefaultPluginName = "kubernetes.io/no-op"
 const NET_PLUGIN_EVENT_POD_CIDR_CHANGE = "pod-cidr-change"
 const NET_PLUGIN_EVENT_POD_CIDR_CHANGE_DETAIL_CIDR = "pod-cidr"
 
-// Plugin capabilities
-const (
-	// Indicates the plugin handles Kubernetes bandwidth shaping annotations internally
-	NET_PLUGIN_CAPABILITY_SHAPING int = 1
-)
-
 // Plugin is an interface to network plugins for the kubelet
 type NetworkPlugin interface {
 	// Init initializes the plugin.  This will be called exactly once
 	// before any other methods are called.
-	Init(host Host, hairpinMode componentconfig.HairpinMode, nonMasqueradeCIDR string, mtu int) error
+	Init(host Host, hairpinMode kubeletconfig.HairpinMode, nonMasqueradeCIDR string, mtu int) error
 
 	// Called on various events like:
 	// NET_PLUGIN_EVENT_POD_CIDR_CHANGE
@@ -69,20 +65,19 @@ type NetworkPlugin interface {
 	// SetUpPod is the method called after the infra container of
 	// the pod has been created but before the other containers of the
 	// pod are launched.
-	// TODO: rename podInfraContainerID to sandboxID
-	SetUpPod(namespace string, name string, podInfraContainerID kubecontainer.ContainerID, annotations map[string]string) error
+	SetUpPod(namespace string, name string, podSandboxID kubecontainer.ContainerID, annotations map[string]string) error
 
 	// TearDownPod is the method called before a pod's infra container will be deleted
-	// TODO: rename podInfraContainerID to sandboxID
-	TearDownPod(namespace string, name string, podInfraContainerID kubecontainer.ContainerID) error
+	TearDownPod(namespace string, name string, podSandboxID kubecontainer.ContainerID) error
 
 	// GetPodNetworkStatus is the method called to obtain the ipv4 or ipv6 addresses of the container
-	// TODO: rename podInfraContainerID to sandboxID
-	GetPodNetworkStatus(namespace string, name string, podInfraContainerID kubecontainer.ContainerID) (*PodNetworkStatus, error)
+	GetPodNetworkStatus(namespace string, name string, podSandboxID kubecontainer.ContainerID) (*PodNetworkStatus, error)
 
 	// Status returns error if the network plugin is in error state
 	Status() error
 }
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // PodNetworkStatus stores the network status of a pod (currently just the primary IP address)
 // This struct represents version "v1beta1"
@@ -140,15 +135,17 @@ type Host interface {
 }
 
 // NamespaceGetter is an interface to retrieve namespace information for a given
-// sandboxID. Typically implemented by runtime shims that are closely coupled to
+// podSandboxID. Typically implemented by runtime shims that are closely coupled to
 // CNI plugin wrappers like kubenet.
 type NamespaceGetter interface {
 	// GetNetNS returns network namespace information for the given containerID.
+	// Runtimes should *never* return an empty namespace and nil error for
+	// a container; if error is nil then the namespace string must be valid.
 	GetNetNS(containerID string) (string, error)
 }
 
 // PortMappingGetter is an interface to retrieve port mapping information for a given
-// sandboxID. Typically implemented by runtime shims that are closely coupled to
+// podSandboxID. Typically implemented by runtime shims that are closely coupled to
 // CNI plugin wrappers like kubenet.
 type PortMappingGetter interface {
 	// GetPodPortMappings returns sandbox port mappings information.
@@ -156,10 +153,11 @@ type PortMappingGetter interface {
 }
 
 // InitNetworkPlugin inits the plugin that matches networkPluginName. Plugins must have unique names.
-func InitNetworkPlugin(plugins []NetworkPlugin, networkPluginName string, host Host, hairpinMode componentconfig.HairpinMode, nonMasqueradeCIDR string, mtu int) (NetworkPlugin, error) {
+func InitNetworkPlugin(plugins []NetworkPlugin, networkPluginName string, host Host, hairpinMode kubeletconfig.HairpinMode, nonMasqueradeCIDR string, mtu int) (NetworkPlugin, error) {
 	if networkPluginName == "" {
 		// default to the no_op plugin
 		plug := &NoopNetworkPlugin{}
+		plug.Sysctl = utilsysctl.New()
 		if err := plug.Init(host, hairpinMode, nonMasqueradeCIDR, mtu); err != nil {
 			return nil, err
 		}
@@ -203,11 +201,13 @@ func UnescapePluginName(in string) string {
 }
 
 type NoopNetworkPlugin struct {
+	Sysctl utilsysctl.Interface
 }
 
 const sysctlBridgeCallIPTables = "net/bridge/bridge-nf-call-iptables"
+const sysctlBridgeCallIP6Tables = "net/bridge/bridge-nf-call-ip6tables"
 
-func (plugin *NoopNetworkPlugin) Init(host Host, hairpinMode componentconfig.HairpinMode, nonMasqueradeCIDR string, mtu int) error {
+func (plugin *NoopNetworkPlugin) Init(host Host, hairpinMode kubeletconfig.HairpinMode, nonMasqueradeCIDR string, mtu int) error {
 	// Set bridge-nf-call-iptables=1 to maintain compatibility with older
 	// kubernetes versions to ensure the iptables-based kube proxy functions
 	// correctly.  Other plugins are responsible for setting this correctly
@@ -217,8 +217,15 @@ func (plugin *NoopNetworkPlugin) Init(host Host, hairpinMode componentconfig.Hai
 	// Ensure the netfilter module is loaded on kernel >= 3.18; previously
 	// it was built-in.
 	utilexec.New().Command("modprobe", "br-netfilter").CombinedOutput()
-	if err := utilsysctl.New().SetSysctl(sysctlBridgeCallIPTables, 1); err != nil {
+	if err := plugin.Sysctl.SetSysctl(sysctlBridgeCallIPTables, 1); err != nil {
 		glog.Warningf("can't set sysctl %s: %v", sysctlBridgeCallIPTables, err)
+	}
+	if val, err := plugin.Sysctl.GetSysctl(sysctlBridgeCallIP6Tables); err == nil {
+		if val != 1 {
+			if err = plugin.Sysctl.SetSysctl(sysctlBridgeCallIP6Tables, 1); err != nil {
+				glog.Warningf("can't set sysctl %s: %v", sysctlBridgeCallIP6Tables, err)
+			}
+		}
 	}
 
 	return nil
@@ -309,6 +316,7 @@ type PluginManager struct {
 }
 
 func NewPluginManager(plugin NetworkPlugin) *PluginManager {
+	metrics.Register()
 	return &PluginManager{
 		plugin: plugin,
 		pods:   make(map[string]*podLock),
@@ -376,7 +384,13 @@ func (pm *PluginManager) podUnlock(fullPodName string) {
 	}
 }
 
+// recordOperation records operation and duration
+func recordOperation(operation string, start time.Time) {
+	metrics.NetworkPluginOperationsLatency.WithLabelValues(operation).Observe(metrics.SinceInMicroseconds(start))
+}
+
 func (pm *PluginManager) GetPodNetworkStatus(podNamespace, podName string, id kubecontainer.ContainerID) (*PodNetworkStatus, error) {
+	defer recordOperation("get_pod_network_status", time.Now())
 	fullPodName := kubecontainer.BuildPodFullName(podName, podNamespace)
 	pm.podLock(fullPodName).Lock()
 	defer pm.podUnlock(fullPodName)
@@ -390,6 +404,7 @@ func (pm *PluginManager) GetPodNetworkStatus(podNamespace, podName string, id ku
 }
 
 func (pm *PluginManager) SetUpPod(podNamespace, podName string, id kubecontainer.ContainerID, annotations map[string]string) error {
+	defer recordOperation("set_up_pod", time.Now())
 	fullPodName := kubecontainer.BuildPodFullName(podName, podNamespace)
 	pm.podLock(fullPodName).Lock()
 	defer pm.podUnlock(fullPodName)
@@ -403,6 +418,7 @@ func (pm *PluginManager) SetUpPod(podNamespace, podName string, id kubecontainer
 }
 
 func (pm *PluginManager) TearDownPod(podNamespace, podName string, id kubecontainer.ContainerID) error {
+	defer recordOperation("tear_down_pod", time.Now())
 	fullPodName := kubecontainer.BuildPodFullName(podName, podNamespace)
 	pm.podLock(fullPodName).Lock()
 	defer pm.podUnlock(fullPodName)

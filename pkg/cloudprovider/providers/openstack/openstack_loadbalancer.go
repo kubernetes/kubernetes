@@ -25,22 +25,22 @@ import (
 	"github.com/golang/glog"
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions"
+	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/external"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/layer3/floatingips"
-	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/lbaas/members"
-	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/lbaas/monitors"
-	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/lbaas/pools"
-	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/lbaas/vips"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/lbaas_v2/listeners"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/lbaas_v2/loadbalancers"
 	v2monitors "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/lbaas_v2/monitors"
 	v2pools "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/lbaas_v2/pools"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/security/groups"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/security/rules"
+	"github.com/gophercloud/gophercloud/openstack/networking/v2/networks"
 	neutronports "github.com/gophercloud/gophercloud/openstack/networking/v2/ports"
 	"github.com/gophercloud/gophercloud/pagination"
 
+	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/api/v1/service"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 )
@@ -52,7 +52,7 @@ const (
 	// going into ACTIVE loadbalancer provisioning status. Starting with 1
 	// seconds, multiplying by 1.2 with each step and taking 19 steps at maximum
 	// it will time out after 128s, which roughly corresponds to 120s
-	loadbalancerActiveInitDealy = 1 * time.Second
+	loadbalancerActiveInitDelay = 1 * time.Second
 	loadbalancerActiveFactor    = 1.2
 	loadbalancerActiveSteps     = 19
 
@@ -60,18 +60,20 @@ const (
 	// waiting for delete operation to complete. Starting with 1
 	// seconds, multiplying by 1.2 with each step and taking 13 steps at maximum
 	// it will time out after 32s, which roughly corresponds to 30s
-	loadbalancerDeleteInitDealy = 1 * time.Second
+	loadbalancerDeleteInitDelay = 1 * time.Second
 	loadbalancerDeleteFactor    = 1.2
 	loadbalancerDeleteSteps     = 13
 
 	activeStatus = "ACTIVE"
 	errorStatus  = "ERROR"
-)
 
-// LoadBalancer implementation for LBaaS v1
-type LbaasV1 struct {
-	LoadBalancer
-}
+	ServiceAnnotationLoadBalancerFloatingNetworkId = "loadbalancer.openstack.org/floating-network-id"
+
+	// ServiceAnnotationLoadBalancerInternal is the annotation used on the service
+	// to indicate that we want an internal loadbalancer service.
+	// If the value of ServiceAnnotationLoadBalancerInternal is false, it indicates that we want an external loadbalancer service. Default to false.
+	ServiceAnnotationLoadBalancerInternal = "service.beta.kubernetes.io/openstack-internal-load-balancer"
+)
 
 // LoadBalancer implementation for LBaaS v2
 type LbaasV2 struct {
@@ -96,34 +98,6 @@ func networkExtensions(client *gophercloud.ServiceClient) (map[string]bool, erro
 	})
 
 	return seen, err
-}
-
-func getPortByIP(client *gophercloud.ServiceClient, ipAddress string) (neutronports.Port, error) {
-	var targetPort neutronports.Port
-	var portFound = false
-
-	err := neutronports.List(client, neutronports.ListOpts{}).EachPage(func(page pagination.Page) (bool, error) {
-		portList, err := neutronports.ExtractPorts(page)
-		if err != nil {
-			return false, err
-		}
-
-		for _, port := range portList {
-			for _, ip := range port.FixedIPs {
-				if ip.IPAddress == ipAddress {
-					targetPort = port
-					portFound = true
-					return false, nil
-				}
-			}
-		}
-
-		return true, nil
-	})
-	if err == nil && !portFound {
-		err = ErrNotFound
-	}
-	return targetPort, err
 }
 
 func getFloatingIPByPortID(client *gophercloud.ServiceClient, portID string) (*floatingips.FloatingIP, error) {
@@ -159,76 +133,6 @@ func getFloatingIPByPortID(client *gophercloud.ServiceClient, portID string) (*f
 	}
 
 	return &floatingIPList[0], nil
-}
-
-func getPoolByName(client *gophercloud.ServiceClient, name string) (*pools.Pool, error) {
-	opts := pools.ListOpts{
-		Name: name,
-	}
-	pager := pools.List(client, opts)
-
-	poolList := make([]pools.Pool, 0, 1)
-
-	err := pager.EachPage(func(page pagination.Page) (bool, error) {
-		p, err := pools.ExtractPools(page)
-		if err != nil {
-			return false, err
-		}
-		poolList = append(poolList, p...)
-		if len(poolList) > 1 {
-			return false, ErrMultipleResults
-		}
-		return true, nil
-	})
-	if err != nil {
-		if isNotFound(err) {
-			return nil, ErrNotFound
-		}
-		return nil, err
-	}
-
-	if len(poolList) == 0 {
-		return nil, ErrNotFound
-	} else if len(poolList) > 1 {
-		return nil, ErrMultipleResults
-	}
-
-	return &poolList[0], nil
-}
-
-func getVipByName(client *gophercloud.ServiceClient, name string) (*vips.VirtualIP, error) {
-	opts := vips.ListOpts{
-		Name: name,
-	}
-	pager := vips.List(client, opts)
-
-	vipList := make([]vips.VirtualIP, 0, 1)
-
-	err := pager.EachPage(func(page pagination.Page) (bool, error) {
-		v, err := vips.ExtractVIPs(page)
-		if err != nil {
-			return false, err
-		}
-		vipList = append(vipList, v...)
-		if len(vipList) > 1 {
-			return false, ErrMultipleResults
-		}
-		return true, nil
-	})
-	if err != nil {
-		if isNotFound(err) {
-			return nil, ErrNotFound
-		}
-		return nil, err
-	}
-
-	if len(vipList) == 0 {
-		return nil, ErrNotFound
-	} else if len(vipList) > 1 {
-		return nil, ErrMultipleResults
-	}
-
-	return &vipList[0], nil
 }
 
 func getLoadbalancerByName(client *gophercloud.ServiceClient, name string) (*loadbalancers.LoadBalancer, error) {
@@ -390,8 +294,14 @@ func popMember(members []v2pools.Member, addr string, port int) []v2pools.Member
 	return members
 }
 
-func getSecurityGroupName(clusterName string, service *v1.Service) string {
-	return fmt.Sprintf("lb-sg-%s-%v", clusterName, service.Name)
+func getSecurityGroupName(service *v1.Service) string {
+	securityGroupName := fmt.Sprintf("lb-sg-%s-%s-%s", service.UID, service.Namespace, service.Name)
+	//OpenStack requires that the name of a security group is shorter than 255 bytes.
+	if len(securityGroupName) > 255 {
+		securityGroupName = securityGroupName[:255]
+	}
+
+	return securityGroupName
 }
 
 func getSecurityGroupRules(client *gophercloud.ServiceClient, opts rules.ListOpts) ([]rules.SecGroupRule, error) {
@@ -418,7 +328,7 @@ func getSecurityGroupRules(client *gophercloud.ServiceClient, opts rules.ListOpt
 
 func waitLoadbalancerActiveProvisioningStatus(client *gophercloud.ServiceClient, loadbalancerID string) (string, error) {
 	backoff := wait.Backoff{
-		Duration: loadbalancerActiveInitDealy,
+		Duration: loadbalancerActiveInitDelay,
 		Factor:   loadbalancerActiveFactor,
 		Steps:    loadbalancerActiveSteps,
 	}
@@ -433,7 +343,7 @@ func waitLoadbalancerActiveProvisioningStatus(client *gophercloud.ServiceClient,
 		if loadbalancer.ProvisioningStatus == activeStatus {
 			return true, nil
 		} else if loadbalancer.ProvisioningStatus == errorStatus {
-			return true, fmt.Errorf("Loadbalancer has gone into ERROR state")
+			return true, fmt.Errorf("loadbalancer has gone into ERROR state")
 		} else {
 			return false, nil
 		}
@@ -441,14 +351,14 @@ func waitLoadbalancerActiveProvisioningStatus(client *gophercloud.ServiceClient,
 	})
 
 	if err == wait.ErrWaitTimeout {
-		err = fmt.Errorf("Loadbalancer failed to go into ACTIVE provisioning status within alloted time")
+		err = fmt.Errorf("loadbalancer failed to go into ACTIVE provisioning status within alloted time")
 	}
 	return provisioningStatus, err
 }
 
 func waitLoadbalancerDeleted(client *gophercloud.ServiceClient, loadbalancerID string) error {
 	backoff := wait.Backoff{
-		Duration: loadbalancerDeleteInitDealy,
+		Duration: loadbalancerDeleteInitDelay,
 		Factor:   loadbalancerDeleteFactor,
 		Steps:    loadbalancerDeleteSteps,
 	}
@@ -466,7 +376,7 @@ func waitLoadbalancerDeleted(client *gophercloud.ServiceClient, loadbalancerID s
 	})
 
 	if err == wait.ErrWaitTimeout {
-		err = fmt.Errorf("Loadbalancer failed to delete within the alloted time")
+		err = fmt.Errorf("loadbalancer failed to delete within the alloted time")
 	}
 
 	return err
@@ -527,37 +437,29 @@ func createNodeSecurityGroup(client *gophercloud.ServiceClient, nodeSecurityGrou
 	return nil
 }
 
-func (lbaas *LbaasV2) createLoadBalancer(service *v1.Service, name string) (*loadbalancers.LoadBalancer, error) {
+func (lbaas *LbaasV2) createLoadBalancer(service *v1.Service, name string, internalAnnotation bool) (*loadbalancers.LoadBalancer, error) {
 	createOpts := loadbalancers.CreateOpts{
 		Name:        name,
 		Description: fmt.Sprintf("Kubernetes external service %s", name),
 		VipSubnetID: lbaas.opts.SubnetId,
+		Provider:    lbaas.opts.LBProvider,
 	}
 
 	loadBalancerIP := service.Spec.LoadBalancerIP
-	if loadBalancerIP != "" {
+	if loadBalancerIP != "" && internalAnnotation {
 		createOpts.VipAddress = loadBalancerIP
 	}
 
-	loadbalancer, err := loadbalancers.Create(lbaas.network, createOpts).Extract()
+	loadbalancer, err := loadbalancers.Create(lbaas.lb, createOpts).Extract()
 	if err != nil {
-		return nil, fmt.Errorf("Error creating loadbalancer %v: %v", createOpts, err)
+		return nil, fmt.Errorf("error creating loadbalancer %v: %v", createOpts, err)
 	}
 	return loadbalancer, nil
 }
 
-func stringInArray(x string, list []string) bool {
-	for _, y := range list {
-		if y == x {
-			return true
-		}
-	}
-	return false
-}
-
 func (lbaas *LbaasV2) GetLoadBalancer(clusterName string, service *v1.Service) (*v1.LoadBalancerStatus, bool, error) {
 	loadBalancerName := cloudprovider.GetLoadBalancerName(service)
-	loadbalancer, err := getLoadbalancerByName(lbaas.network, loadBalancerName)
+	loadbalancer, err := getLoadbalancerByName(lbaas.lb, loadBalancerName)
 	if err == ErrNotFound {
 		return nil, false, nil
 	}
@@ -566,7 +468,17 @@ func (lbaas *LbaasV2) GetLoadBalancer(clusterName string, service *v1.Service) (
 	}
 
 	status := &v1.LoadBalancerStatus{}
-	status.Ingress = []v1.LoadBalancerIngress{{IP: loadbalancer.VipAddress}}
+
+	portID := loadbalancer.VipPortID
+	if portID != "" {
+		floatIP, err := getFloatingIPByPortID(lbaas.network, portID)
+		if err != nil {
+			return nil, false, fmt.Errorf("error getting floating ip for port %s: %v", portID, err)
+		}
+		status.Ingress = []v1.LoadBalancerIngress{{IP: floatIP.FloatingIP}}
+	} else {
+		status.Ingress = []v1.LoadBalancerIngress{{IP: loadbalancer.VipAddress}}
+	}
 
 	return status, true, err
 }
@@ -590,6 +502,118 @@ func nodeAddressForLB(node *v1.Node) (string, error) {
 	return addrs[0].Address, nil
 }
 
+//getStringFromServiceAnnotation searches a given v1.Service for a specific annotationKey and either returns the annotation's value or a specified defaultSetting
+func getStringFromServiceAnnotation(service *v1.Service, annotationKey string, defaultSetting string) string {
+	glog.V(4).Infof("getStringFromServiceAnnotation(%v, %v, %v)", service, annotationKey, defaultSetting)
+	if annotationValue, ok := service.Annotations[annotationKey]; ok {
+		//if there is an annotation for this setting, set the "setting" var to it
+		// annotationValue can be empty, it is working as designed
+		// it makes possible for instance provisioning loadbalancer without floatingip
+		glog.V(4).Infof("Found a Service Annotation: %v = %v", annotationKey, annotationValue)
+		return annotationValue
+	}
+	//if there is no annotation, set "settings" var to the value from cloud config
+	glog.V(4).Infof("Could not find a Service Annotation; falling back on cloud-config setting: %v = %v", annotationKey, defaultSetting)
+	return defaultSetting
+}
+
+// getSubnetIDForLB returns subnet-id for a specific node
+func getSubnetIDForLB(compute *gophercloud.ServiceClient, node v1.Node) (string, error) {
+	ipAddress, err := nodeAddressForLB(&node)
+	if err != nil {
+		return "", err
+	}
+
+	instanceID := node.Spec.ProviderID
+	if ind := strings.LastIndex(instanceID, "/"); ind >= 0 {
+		instanceID = instanceID[(ind + 1):]
+	}
+
+	interfaces, err := getAttachedInterfacesByID(compute, instanceID)
+	if err != nil {
+		return "", err
+	}
+
+	for _, intf := range interfaces {
+		for _, fixedIP := range intf.FixedIPs {
+			if fixedIP.IPAddress == ipAddress {
+				return fixedIP.SubnetID, nil
+			}
+		}
+	}
+
+	return "", ErrNotFound
+}
+
+// getNodeSecurityGroupIDForLB lists node-security-groups for specific nodes
+func getNodeSecurityGroupIDForLB(compute *gophercloud.ServiceClient, nodes []*v1.Node) ([]string, error) {
+	nodeSecurityGroupIDs := sets.NewString()
+
+	for _, node := range nodes {
+		nodeName := types.NodeName(node.Name)
+		srv, err := getServerByName(compute, nodeName, true)
+		if err != nil {
+			return nodeSecurityGroupIDs.List(), err
+		}
+
+		// use the first node-security-groups
+		// case 0: node1:SG1  node2:SG1  return SG1
+		// case 1: node1:SG1  node2:SG2  return SG1,SG2
+		// case 2: node1:SG1,SG2  node2:SG3,SG4  return SG1,SG3
+		// case 3: node1:SG1,SG2  node2:SG2,SG3  return SG1,SG2
+		securityGroupName := srv.SecurityGroups[0]["name"]
+		nodeSecurityGroupIDs.Insert(securityGroupName.(string))
+	}
+
+	return nodeSecurityGroupIDs.List(), nil
+}
+
+// getFloatingNetworkIdForLB returns a floating-network-id for cluster.
+func getFloatingNetworkIdForLB(client *gophercloud.ServiceClient) (string, error) {
+	var floatingNetworkIds []string
+
+	type NetworkWithExternalExt struct {
+		networks.Network
+		external.NetworkExternalExt
+	}
+
+	err := networks.List(client, networks.ListOpts{}).EachPage(func(page pagination.Page) (bool, error) {
+		var externalNetwork []NetworkWithExternalExt
+		err := networks.ExtractNetworksInto(page, &externalNetwork)
+		if err != nil {
+			return false, err
+		}
+
+		for _, externalNet := range externalNetwork {
+			if externalNet.External {
+				floatingNetworkIds = append(floatingNetworkIds, externalNet.ID)
+			}
+		}
+
+		if len(floatingNetworkIds) > 1 {
+			return false, ErrMultipleResults
+		}
+		return true, nil
+	})
+	if err != nil {
+		if isNotFound(err) {
+			return "", ErrNotFound
+		}
+
+		if err == ErrMultipleResults {
+			glog.V(4).Infof("find multiple external networks, pick the first one when there are no explicit configuration.")
+			return floatingNetworkIds[0], nil
+		}
+		return "", err
+	}
+
+	if len(floatingNetworkIds) == 0 {
+		return "", ErrNotFound
+	}
+
+	return floatingNetworkIds[0], nil
+}
+
 // TODO: This code currently ignores 'region' and always creates a
 // loadbalancer in only the current OpenStack region.  We should take
 // a list of regions (from config) and query/create loadbalancers in
@@ -598,29 +622,72 @@ func nodeAddressForLB(node *v1.Node) (string, error) {
 func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *v1.Service, nodes []*v1.Node) (*v1.LoadBalancerStatus, error) {
 	glog.V(4).Infof("EnsureLoadBalancer(%v, %v, %v, %v, %v, %v, %v)", clusterName, apiService.Namespace, apiService.Name, apiService.Spec.LoadBalancerIP, apiService.Spec.Ports, nodes, apiService.Annotations)
 
+	if len(nodes) == 0 {
+		return nil, fmt.Errorf("there are no available nodes for LoadBalancer service %s/%s", apiService.Namespace, apiService.Name)
+	}
+
+	if len(lbaas.opts.SubnetId) == 0 {
+		// Get SubnetId automatically.
+		// The LB needs to be configured with instance addresses on the same subnet, so get SubnetId by one node.
+		subnetID, err := getSubnetIDForLB(lbaas.compute, *nodes[0])
+		if err != nil {
+			glog.Warningf("Failed to find subnet-id for loadbalancer service %s/%s: %v", apiService.Namespace, apiService.Name, err)
+			return nil, fmt.Errorf("no subnet-id for service %s/%s : subnet-id not set in cloud provider config, "+
+				"and failed to find subnet-id from OpenStack: %v", apiService.Namespace, apiService.Name, err)
+		}
+		lbaas.opts.SubnetId = subnetID
+	}
+
 	ports := apiService.Spec.Ports
 	if len(ports) == 0 {
 		return nil, fmt.Errorf("no ports provided to openstack load balancer")
+	}
+
+	floatingPool := getStringFromServiceAnnotation(apiService, ServiceAnnotationLoadBalancerFloatingNetworkId, lbaas.opts.FloatingNetworkId)
+	if len(floatingPool) == 0 {
+		var err error
+		floatingPool, err = getFloatingNetworkIdForLB(lbaas.network)
+		if err != nil {
+			glog.Warningf("Failed to find floating-network-id for loadbalancer service %s/%s: %v", apiService.Namespace, apiService.Name, err)
+		}
+	}
+
+	var internalAnnotation bool
+	internal := getStringFromServiceAnnotation(apiService, ServiceAnnotationLoadBalancerInternal, "false")
+	switch internal {
+	case "true":
+		glog.V(4).Infof("Ensure an internal loadbalancer service.")
+		internalAnnotation = true
+	case "false":
+		if len(floatingPool) != 0 {
+			glog.V(4).Infof("Ensure an external loadbalancer service, using floatingPool: %v", floatingPool)
+			internalAnnotation = false
+		} else {
+			return nil, fmt.Errorf("floating-network-id or loadbalancer.openstack.org/floating-network-id should be specified when ensuring an external loadbalancer service")
+		}
+	default:
+		return nil, fmt.Errorf("unknown service.beta.kubernetes.io/openstack-internal-load-balancer annotation: %v, specify \"true\" or \"false\" ",
+			internal)
 	}
 
 	// Check for TCP protocol on each port
 	// TODO: Convert all error messages to use an event recorder
 	for _, port := range ports {
 		if port.Protocol != v1.ProtocolTCP {
-			return nil, fmt.Errorf("Only TCP LoadBalancer is supported for openstack load balancers")
+			return nil, fmt.Errorf("only TCP LoadBalancer is supported for openstack load balancers")
 		}
 	}
 
 	sourceRanges, err := service.GetLoadBalancerSourceRanges(apiService)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get source ranges for loadbalancer service %s/%s: %v", apiService.Namespace, apiService.Name, err)
 	}
 
 	if !service.IsAllowAll(sourceRanges) && !lbaas.opts.ManageSecurityGroups {
-		return nil, fmt.Errorf("Source range restrictions are not supported for openstack load balancers without managing security groups")
+		return nil, fmt.Errorf("source range restrictions are not supported for openstack load balancers without managing security groups")
 	}
 
-	affinity := v1.ServiceAffinityNone
+	affinity := apiService.Spec.SessionAffinity
 	var persistence *v2pools.SessionPersistence
 	switch affinity {
 	case v1.ServiceAffinityNone:
@@ -632,37 +699,40 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *v1.Serv
 	}
 
 	name := cloudprovider.GetLoadBalancerName(apiService)
-	loadbalancer, err := getLoadbalancerByName(lbaas.network, name)
+	loadbalancer, err := getLoadbalancerByName(lbaas.lb, name)
 	if err != nil {
 		if err != ErrNotFound {
-			return nil, fmt.Errorf("Error getting loadbalancer %s: %v", name, err)
+			return nil, fmt.Errorf("error getting loadbalancer %s: %v", name, err)
 		}
 		glog.V(2).Infof("Creating loadbalancer %s", name)
-		loadbalancer, err = lbaas.createLoadBalancer(apiService, name)
+		loadbalancer, err = lbaas.createLoadBalancer(apiService, name, internalAnnotation)
 		if err != nil {
 			// Unknown error, retry later
-			return nil, fmt.Errorf("Error creating loadbalancer %s: %v", name, err)
+			return nil, fmt.Errorf("error creating loadbalancer %s: %v", name, err)
 		}
 	} else {
 		glog.V(2).Infof("LoadBalancer %s already exists", name)
 	}
 
-	waitLoadbalancerActiveProvisioningStatus(lbaas.network, loadbalancer.ID)
+	provisioningStatus, err := waitLoadbalancerActiveProvisioningStatus(lbaas.lb, loadbalancer.ID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to loadbalance ACTIVE provisioning status %v: %v", provisioningStatus, err)
+	}
 
 	lbmethod := v2pools.LBMethod(lbaas.opts.LBMethod)
 	if lbmethod == "" {
 		lbmethod = v2pools.LBMethodRoundRobin
 	}
 
-	oldListeners, err := getListenersByLoadBalancerID(lbaas.network, loadbalancer.ID)
+	oldListeners, err := getListenersByLoadBalancerID(lbaas.lb, loadbalancer.ID)
 	if err != nil {
-		return nil, fmt.Errorf("Error getting LB %s listeners: %v", name, err)
+		return nil, fmt.Errorf("error getting LB %s listeners: %v", name, err)
 	}
 	for portIndex, port := range ports {
 		listener := getListenerForPort(oldListeners, port)
 		if listener == nil {
 			glog.V(4).Infof("Creating listener for port %d", int(port.Port))
-			listener, err = listeners.Create(lbaas.network, listeners.CreateOpts{
+			listener, err = listeners.Create(lbaas.lb, listeners.CreateOpts{
 				Name:           fmt.Sprintf("listener_%s_%d", name, portIndex),
 				Protocol:       listeners.Protocol(port.Protocol),
 				ProtocolPort:   int(port.Port),
@@ -670,9 +740,12 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *v1.Serv
 			}).Extract()
 			if err != nil {
 				// Unknown error, retry later
-				return nil, fmt.Errorf("Error creating LB listener: %v", err)
+				return nil, fmt.Errorf("error creating LB listener: %v", err)
 			}
-			waitLoadbalancerActiveProvisioningStatus(lbaas.network, loadbalancer.ID)
+			provisioningStatus, err := waitLoadbalancerActiveProvisioningStatus(lbaas.lb, loadbalancer.ID)
+			if err != nil {
+				return nil, fmt.Errorf("failed to loadbalance ACTIVE provisioning status %v: %v", provisioningStatus, err)
+			}
 		}
 
 		glog.V(4).Infof("Listener for %s port %d: %s", string(port.Protocol), int(port.Port), listener.ID)
@@ -680,14 +753,14 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *v1.Serv
 		// After all ports have been processed, remaining listeners are removed as obsolete.
 		// Pop valid listeners.
 		oldListeners = popListener(oldListeners, listener.ID)
-		pool, err := getPoolByListenerID(lbaas.network, loadbalancer.ID, listener.ID)
+		pool, err := getPoolByListenerID(lbaas.lb, loadbalancer.ID, listener.ID)
 		if err != nil && err != ErrNotFound {
 			// Unknown error, retry later
-			return nil, fmt.Errorf("Error getting pool for listener %s: %v", listener.ID, err)
+			return nil, fmt.Errorf("error getting pool for listener %s: %v", listener.ID, err)
 		}
 		if pool == nil {
 			glog.V(4).Infof("Creating pool for listener %s", listener.ID)
-			pool, err = v2pools.Create(lbaas.network, v2pools.CreateOpts{
+			pool, err = v2pools.Create(lbaas.lb, v2pools.CreateOpts{
 				Name:        fmt.Sprintf("pool_%s_%d", name, portIndex),
 				Protocol:    v2pools.Protocol(port.Protocol),
 				LBMethod:    lbmethod,
@@ -696,15 +769,19 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *v1.Serv
 			}).Extract()
 			if err != nil {
 				// Unknown error, retry later
-				return nil, fmt.Errorf("Error creating pool for listener %s: %v", listener.ID, err)
+				return nil, fmt.Errorf("error creating pool for listener %s: %v", listener.ID, err)
 			}
-			waitLoadbalancerActiveProvisioningStatus(lbaas.network, loadbalancer.ID)
+			provisioningStatus, err := waitLoadbalancerActiveProvisioningStatus(lbaas.lb, loadbalancer.ID)
+			if err != nil {
+				return nil, fmt.Errorf("failed to loadbalance ACTIVE provisioning status %v: %v", provisioningStatus, err)
+			}
+
 		}
 
 		glog.V(4).Infof("Pool for listener %s: %s", listener.ID, pool.ID)
-		members, err := getMembersByPoolID(lbaas.network, pool.ID)
+		members, err := getMembersByPoolID(lbaas.lb, pool.ID)
 		if err != nil && !isNotFound(err) {
-			return nil, fmt.Errorf("Error getting pool members %s: %v", pool.ID, err)
+			return nil, fmt.Errorf("error getting pool members %s: %v", pool.ID, err)
 		}
 		for _, node := range nodes {
 			addr, err := nodeAddressForLB(node)
@@ -714,22 +791,25 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *v1.Serv
 					glog.Warningf("Failed to create LB pool member for node %s: %v", node.Name, err)
 					continue
 				} else {
-					return nil, fmt.Errorf("Error getting address for node %s: %v", node.Name, err)
+					return nil, fmt.Errorf("error getting address for node %s: %v", node.Name, err)
 				}
 			}
 
 			if !memberExists(members, addr, int(port.NodePort)) {
 				glog.V(4).Infof("Creating member for pool %s", pool.ID)
-				_, err := v2pools.CreateMember(lbaas.network, pool.ID, v2pools.CreateMemberOpts{
+				_, err := v2pools.CreateMember(lbaas.lb, pool.ID, v2pools.CreateMemberOpts{
 					ProtocolPort: int(port.NodePort),
 					Address:      addr,
 					SubnetID:     lbaas.opts.SubnetId,
 				}).Extract()
 				if err != nil {
-					return nil, fmt.Errorf("Error creating LB pool member for node: %s, %v", node.Name, err)
+					return nil, fmt.Errorf("error creating LB pool member for node: %s, %v", node.Name, err)
 				}
 
-				waitLoadbalancerActiveProvisioningStatus(lbaas.network, loadbalancer.ID)
+				provisioningStatus, err := waitLoadbalancerActiveProvisioningStatus(lbaas.lb, loadbalancer.ID)
+				if err != nil {
+					return nil, fmt.Errorf("failed to loadbalance ACTIVE provisioning status %v: %v", provisioningStatus, err)
+				}
 			} else {
 				// After all members have been processed, remaining members are deleted as obsolete.
 				members = popMember(members, addr, int(port.NodePort))
@@ -741,17 +821,20 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *v1.Serv
 		// Delete obsolete members for this pool
 		for _, member := range members {
 			glog.V(4).Infof("Deleting obsolete member %s for pool %s address %s", member.ID, pool.ID, member.Address)
-			err := v2pools.DeleteMember(lbaas.network, pool.ID, member.ID).ExtractErr()
+			err := v2pools.DeleteMember(lbaas.lb, pool.ID, member.ID).ExtractErr()
 			if err != nil && !isNotFound(err) {
-				return nil, fmt.Errorf("Error deleting obsolete member %s for pool %s address %s: %v", member.ID, pool.ID, member.Address, err)
+				return nil, fmt.Errorf("error deleting obsolete member %s for pool %s address %s: %v", member.ID, pool.ID, member.Address, err)
 			}
-			waitLoadbalancerActiveProvisioningStatus(lbaas.network, loadbalancer.ID)
+			provisioningStatus, err := waitLoadbalancerActiveProvisioningStatus(lbaas.lb, loadbalancer.ID)
+			if err != nil {
+				return nil, fmt.Errorf("failed to loadbalance ACTIVE provisioning status %v: %v", provisioningStatus, err)
+			}
 		}
 
 		monitorID := pool.MonitorID
 		if monitorID == "" && lbaas.opts.CreateMonitor {
 			glog.V(4).Infof("Creating monitor for pool %s", pool.ID)
-			monitor, err := v2monitors.Create(lbaas.network, v2monitors.CreateOpts{
+			monitor, err := v2monitors.Create(lbaas.lb, v2monitors.CreateOpts{
 				PoolID:     pool.ID,
 				Type:       string(port.Protocol),
 				Delay:      int(lbaas.opts.MonitorDelay.Duration.Seconds()),
@@ -759,115 +842,195 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *v1.Serv
 				MaxRetries: int(lbaas.opts.MonitorMaxRetries),
 			}).Extract()
 			if err != nil {
-				return nil, fmt.Errorf("Error creating LB pool healthmonitor: %v", err)
+				return nil, fmt.Errorf("error creating LB pool healthmonitor: %v", err)
 			}
-			waitLoadbalancerActiveProvisioningStatus(lbaas.network, loadbalancer.ID)
+			provisioningStatus, err := waitLoadbalancerActiveProvisioningStatus(lbaas.lb, loadbalancer.ID)
+			if err != nil {
+				return nil, fmt.Errorf("failed to loadbalance ACTIVE provisioning status %v: %v", provisioningStatus, err)
+			}
 			monitorID = monitor.ID
+		} else if lbaas.opts.CreateMonitor == false {
+			glog.V(4).Infof("Do not create monitor for pool %s when create-monitor is false", pool.ID)
 		}
 
-		glog.V(4).Infof("Monitor for pool %s: %s", pool.ID, monitorID)
+		if monitorID != "" {
+			glog.V(4).Infof("Monitor for pool %s: %s", pool.ID, monitorID)
+		}
 	}
 
 	// All remaining listeners are obsolete, delete
 	for _, listener := range oldListeners {
 		glog.V(4).Infof("Deleting obsolete listener %s:", listener.ID)
 		// get pool for listener
-		pool, err := getPoolByListenerID(lbaas.network, loadbalancer.ID, listener.ID)
+		pool, err := getPoolByListenerID(lbaas.lb, loadbalancer.ID, listener.ID)
 		if err != nil && err != ErrNotFound {
-			return nil, fmt.Errorf("Error getting pool for obsolete listener %s: %v", listener.ID, err)
+			return nil, fmt.Errorf("error getting pool for obsolete listener %s: %v", listener.ID, err)
 		}
 		if pool != nil {
 			// get and delete monitor
 			monitorID := pool.MonitorID
 			if monitorID != "" {
 				glog.V(4).Infof("Deleting obsolete monitor %s for pool %s", monitorID, pool.ID)
-				err = v2monitors.Delete(lbaas.network, monitorID).ExtractErr()
+				err = v2monitors.Delete(lbaas.lb, monitorID).ExtractErr()
 				if err != nil && !isNotFound(err) {
-					return nil, fmt.Errorf("Error deleting obsolete monitor %s for pool %s: %v", monitorID, pool.ID, err)
+					return nil, fmt.Errorf("error deleting obsolete monitor %s for pool %s: %v", monitorID, pool.ID, err)
 				}
-				waitLoadbalancerActiveProvisioningStatus(lbaas.network, loadbalancer.ID)
+				provisioningStatus, err := waitLoadbalancerActiveProvisioningStatus(lbaas.lb, loadbalancer.ID)
+				if err != nil {
+					return nil, fmt.Errorf("failed to loadbalance ACTIVE provisioning status %v: %v", provisioningStatus, err)
+				}
 			}
 			// get and delete pool members
-			members, err := getMembersByPoolID(lbaas.network, pool.ID)
+			members, err := getMembersByPoolID(lbaas.lb, pool.ID)
 			if err != nil && !isNotFound(err) {
-				return nil, fmt.Errorf("Error getting members for pool %s: %v", pool.ID, err)
+				return nil, fmt.Errorf("error getting members for pool %s: %v", pool.ID, err)
 			}
 			if members != nil {
 				for _, member := range members {
 					glog.V(4).Infof("Deleting obsolete member %s for pool %s address %s", member.ID, pool.ID, member.Address)
-					err := v2pools.DeleteMember(lbaas.network, pool.ID, member.ID).ExtractErr()
+					err := v2pools.DeleteMember(lbaas.lb, pool.ID, member.ID).ExtractErr()
 					if err != nil && !isNotFound(err) {
-						return nil, fmt.Errorf("Error deleting obsolete member %s for pool %s address %s: %v", member.ID, pool.ID, member.Address, err)
+						return nil, fmt.Errorf("error deleting obsolete member %s for pool %s address %s: %v", member.ID, pool.ID, member.Address, err)
 					}
-					waitLoadbalancerActiveProvisioningStatus(lbaas.network, loadbalancer.ID)
+					provisioningStatus, err := waitLoadbalancerActiveProvisioningStatus(lbaas.lb, loadbalancer.ID)
+					if err != nil {
+						return nil, fmt.Errorf("failed to loadbalance ACTIVE provisioning status %v: %v", provisioningStatus, err)
+					}
 				}
 			}
 			glog.V(4).Infof("Deleting obsolete pool %s for listener %s", pool.ID, listener.ID)
 			// delete pool
-			err = v2pools.Delete(lbaas.network, pool.ID).ExtractErr()
+			err = v2pools.Delete(lbaas.lb, pool.ID).ExtractErr()
 			if err != nil && !isNotFound(err) {
-				return nil, fmt.Errorf("Error deleting obsolete pool %s for listener %s: %v", pool.ID, listener.ID, err)
+				return nil, fmt.Errorf("error deleting obsolete pool %s for listener %s: %v", pool.ID, listener.ID, err)
 			}
-			waitLoadbalancerActiveProvisioningStatus(lbaas.network, loadbalancer.ID)
+			provisioningStatus, err := waitLoadbalancerActiveProvisioningStatus(lbaas.lb, loadbalancer.ID)
+			if err != nil {
+				return nil, fmt.Errorf("failed to loadbalance ACTIVE provisioning status %v: %v", provisioningStatus, err)
+			}
 		}
 		// delete listener
-		err = listeners.Delete(lbaas.network, listener.ID).ExtractErr()
+		err = listeners.Delete(lbaas.lb, listener.ID).ExtractErr()
 		if err != nil && !isNotFound(err) {
-			return nil, fmt.Errorf("Error deleteting obsolete listener: %v", err)
+			return nil, fmt.Errorf("error deleteting obsolete listener: %v", err)
 		}
-		waitLoadbalancerActiveProvisioningStatus(lbaas.network, loadbalancer.ID)
+		provisioningStatus, err := waitLoadbalancerActiveProvisioningStatus(lbaas.lb, loadbalancer.ID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to loadbalance ACTIVE provisioning status %v: %v", provisioningStatus, err)
+		}
 		glog.V(2).Infof("Deleted obsolete listener: %s", listener.ID)
+	}
+
+	portID := loadbalancer.VipPortID
+	floatIP, err := getFloatingIPByPortID(lbaas.lb, portID)
+	if err != nil && err != ErrNotFound {
+		return nil, fmt.Errorf("error getting floating ip for port %s: %v", portID, err)
+	}
+	if floatIP == nil && floatingPool != "" && !internalAnnotation {
+		glog.V(4).Infof("Creating floating ip for loadbalancer %s port %s", loadbalancer.ID, portID)
+		floatIPOpts := floatingips.CreateOpts{
+			FloatingNetworkID: floatingPool,
+			PortID:            portID,
+		}
+
+		loadBalancerIP := apiService.Spec.LoadBalancerIP
+		if loadBalancerIP != "" {
+			floatIPOpts.FloatingIP = loadBalancerIP
+		}
+
+		floatIP, err = floatingips.Create(lbaas.network, floatIPOpts).Extract()
+		if err != nil {
+			return nil, fmt.Errorf("error creating LB floatingip %+v: %v", floatIPOpts, err)
+		}
 	}
 
 	status := &v1.LoadBalancerStatus{}
 
-	status.Ingress = []v1.LoadBalancerIngress{{IP: loadbalancer.VipAddress}}
-
-	portID := loadbalancer.VipPortID
-	floatIP, err := getFloatingIPByPortID(lbaas.network, portID)
-	if err != nil && err != ErrNotFound {
-		return nil, fmt.Errorf("Error getting floating ip for port %s: %v", portID, err)
-	}
-	if floatIP == nil && lbaas.opts.FloatingNetworkId != "" {
-		glog.V(4).Infof("Creating floating ip for loadbalancer %s port %s", loadbalancer.ID, portID)
-		floatIPOpts := floatingips.CreateOpts{
-			FloatingNetworkID: lbaas.opts.FloatingNetworkId,
-			PortID:            portID,
-		}
-		floatIP, err = floatingips.Create(lbaas.network, floatIPOpts).Extract()
-		if err != nil {
-			return nil, fmt.Errorf("Error creating LB floatingip %+v: %v", floatIPOpts, err)
-		}
-	}
 	if floatIP != nil {
-		status.Ingress = append(status.Ingress, v1.LoadBalancerIngress{IP: floatIP.FloatingIP})
+		status.Ingress = []v1.LoadBalancerIngress{{IP: floatIP.FloatingIP}}
+	} else {
+		status.Ingress = []v1.LoadBalancerIngress{{IP: loadbalancer.VipAddress}}
 	}
 
 	if lbaas.opts.ManageSecurityGroups {
-		lbSecGroupCreateOpts := groups.CreateOpts{
-			Name:        getSecurityGroupName(clusterName, apiService),
-			Description: fmt.Sprintf("Securty Group for %v Service LoadBalancer", apiService.Name),
-		}
-
-		lbSecGroup, err := groups.Create(lbaas.network, lbSecGroupCreateOpts).Extract()
-
+		err := lbaas.ensureSecurityGroup(clusterName, apiService, nodes, loadbalancer)
 		if err != nil {
 			// cleanup what was created so far
 			_ = lbaas.EnsureLoadBalancerDeleted(clusterName, apiService)
-			return nil, err
+			return status, err
 		}
 
-		for _, port := range ports {
+		// delete the old Security Group for the service
+		// Related to #53764
+		// TODO(FengyunPan): Remove it at V1.10
+		err = lbaas.EnsureOldSecurityGroupDeleted(clusterName, apiService)
+		if err != nil {
+			return status, fmt.Errorf("Failed to delete the Security Group for loadbalancer service %s/%s: %v", apiService.Namespace, apiService.Name, err)
+		}
+	}
 
+	return status, nil
+}
+
+// ensureSecurityGroup ensures security group exist for specific loadbalancer service.
+// Creating security group for specific loadbalancer service when it does not exist.
+func (lbaas *LbaasV2) ensureSecurityGroup(clusterName string, apiService *v1.Service, nodes []*v1.Node, loadbalancer *loadbalancers.LoadBalancer) error {
+	// find node-security-group for service
+	var err error
+	if len(lbaas.opts.NodeSecurityGroupIDs) == 0 {
+		lbaas.opts.NodeSecurityGroupIDs, err = getNodeSecurityGroupIDForLB(lbaas.compute, nodes)
+		if err != nil {
+			return fmt.Errorf("failed to find node-security-group for loadbalancer service %s/%s: %v", apiService.Namespace, apiService.Name, err)
+		}
+	}
+	glog.V(4).Infof("find node-security-group %v for loadbalancer service %s/%s", lbaas.opts.NodeSecurityGroupIDs, apiService.Namespace, apiService.Name)
+
+	// get service ports
+	ports := apiService.Spec.Ports
+	if len(ports) == 0 {
+		return fmt.Errorf("no ports provided to openstack load balancer")
+	}
+
+	// get service source ranges
+	sourceRanges, err := service.GetLoadBalancerSourceRanges(apiService)
+	if err != nil {
+		return fmt.Errorf("failed to get source ranges for loadbalancer service %s/%s: %v", apiService.Namespace, apiService.Name, err)
+	}
+
+	// ensure security group for LB
+	lbSecGroupName := getSecurityGroupName(apiService)
+	lbSecGroupID, err := groups.IDFromName(lbaas.network, lbSecGroupName)
+	if err != nil {
+		// check whether security group does not exist
+		_, ok := err.(*gophercloud.ErrResourceNotFound)
+		if ok {
+			// create it later
+			lbSecGroupID = ""
+		} else {
+			return fmt.Errorf("error occurred finding security group: %s: %v", lbSecGroupName, err)
+		}
+	}
+	if len(lbSecGroupID) == 0 {
+		// create security group
+		lbSecGroupCreateOpts := groups.CreateOpts{
+			Name:        getSecurityGroupName(apiService),
+			Description: fmt.Sprintf("Security Group for %s/%s Service LoadBalancer in cluster %s", apiService.Namespace, apiService.Name, clusterName),
+		}
+
+		lbSecGroup, err := groups.Create(lbaas.network, lbSecGroupCreateOpts).Extract()
+		if err != nil {
+			return fmt.Errorf("failed to create Security Group for loadbalancer service %s/%s: %v", apiService.Namespace, apiService.Name, err)
+		}
+		lbSecGroupID = lbSecGroup.ID
+
+		//add rule in security group
+		for _, port := range ports {
 			for _, sourceRange := range sourceRanges.StringSlice() {
 				ethertype := rules.EtherType4
 				network, _, err := net.ParseCIDR(sourceRange)
 
 				if err != nil {
-					// cleanup what was created so far
-					glog.Errorf("Error parsing source range %s as a CIDR", sourceRange)
-					_ = lbaas.EnsureLoadBalancerDeleted(clusterName, apiService)
-					return nil, err
+					return fmt.Errorf("error parsing source range %s as a CIDR: %v", sourceRange, err)
 				}
 
 				if network.To4() == nil {
@@ -887,17 +1050,8 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *v1.Serv
 				_, err = rules.Create(lbaas.network, lbSecGroupRuleCreateOpts).Extract()
 
 				if err != nil {
-					// cleanup what was created so far
-					_ = lbaas.EnsureLoadBalancerDeleted(clusterName, apiService)
-					return nil, err
+					return fmt.Errorf("error occured creating rule for SecGroup %s: %v", lbSecGroup.ID, err)
 				}
-			}
-
-			err := createNodeSecurityGroup(lbaas.network, lbaas.opts.NodeSecurityGroupID, int(port.NodePort), port.Protocol, lbSecGroup.ID)
-			if err != nil {
-				glog.Errorf("Error occured creating security group for loadbalancer %s:", loadbalancer.ID)
-				_ = lbaas.EnsureLoadBalancerDeleted(clusterName, apiService)
-				return nil, err
 			}
 		}
 
@@ -914,9 +1068,7 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *v1.Serv
 		_, err = rules.Create(lbaas.network, lbSecGroupRuleCreateOpts).Extract()
 
 		if err != nil {
-			// cleanup what was created so far
-			_ = lbaas.EnsureLoadBalancerDeleted(clusterName, apiService)
-			return nil, err
+			return fmt.Errorf("error occured creating rule for SecGroup %s: %v", lbSecGroup.ID, err)
 		}
 
 		lbSecGroupRuleCreateOpts = rules.CreateOpts{
@@ -930,42 +1082,97 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *v1.Serv
 		}
 
 		_, err = rules.Create(lbaas.network, lbSecGroupRuleCreateOpts).Extract()
-
 		if err != nil {
-			// cleanup what was created so far
-			_ = lbaas.EnsureLoadBalancerDeleted(clusterName, apiService)
-			return nil, err
+			return fmt.Errorf("error occured creating rule for SecGroup %s: %v", lbSecGroup.ID, err)
 		}
 
+		// get security groups of port
 		portID := loadbalancer.VipPortID
-		update_opts := neutronports.UpdateOpts{SecurityGroups: []string{lbSecGroup.ID}}
-		res := neutronports.Update(lbaas.network, portID, update_opts)
-		if res.Err != nil {
-			glog.Errorf("Error occured updating port: %s", portID)
-			// cleanup what was created so far
-			_ = lbaas.EnsureLoadBalancerDeleted(clusterName, apiService)
-			return nil, res.Err
+		port, err := getPortByID(lbaas.network, portID)
+		if err != nil {
+			return err
+		}
+
+		// ensure the vip port has the security groups
+		found := false
+		for _, portSecurityGroups := range port.SecurityGroups {
+			if portSecurityGroups == lbSecGroup.ID {
+				found = true
+				break
+			}
+		}
+
+		// update loadbalancer vip port
+		if !found {
+			port.SecurityGroups = append(port.SecurityGroups, lbSecGroup.ID)
+			update_opts := neutronports.UpdateOpts{SecurityGroups: &port.SecurityGroups}
+			res := neutronports.Update(lbaas.network, portID, update_opts)
+			if res.Err != nil {
+				msg := fmt.Sprintf("Error occured updating port %s for loadbalancer service %s/%s: %v", portID, apiService.Namespace, apiService.Name, res.Err)
+				return fmt.Errorf(msg)
+			}
 		}
 	}
 
-	return status, nil
+	// ensure rules for every node security group
+	for _, port := range ports {
+		for _, nodeSecurityGroupID := range lbaas.opts.NodeSecurityGroupIDs {
+			opts := rules.ListOpts{
+				Direction:     string(rules.DirIngress),
+				SecGroupID:    nodeSecurityGroupID,
+				RemoteGroupID: lbSecGroupID,
+				PortRangeMax:  int(port.NodePort),
+				PortRangeMin:  int(port.NodePort),
+				Protocol:      string(port.Protocol),
+			}
+			secGroupRules, err := getSecurityGroupRules(lbaas.network, opts)
+			if err != nil && !isNotFound(err) {
+				msg := fmt.Sprintf("Error finding rules for remote group id %s in security group id %s: %v", lbSecGroupID, nodeSecurityGroupID, err)
+				return fmt.Errorf(msg)
+			}
+			if len(secGroupRules) != 0 {
+				// Do not add rule when find rules for remote group in the Node Security Group
+				continue
+			}
+
+			// Add the rules in the Node Security Group
+			err = createNodeSecurityGroup(lbaas.network, nodeSecurityGroupID, int(port.NodePort), port.Protocol, lbSecGroupID)
+			if err != nil {
+				return fmt.Errorf("error occured creating security group for loadbalancer service %s/%s: %v", apiService.Namespace, apiService.Name, err)
+			}
+		}
+	}
+
+	return nil
 }
 
 func (lbaas *LbaasV2) UpdateLoadBalancer(clusterName string, service *v1.Service, nodes []*v1.Node) error {
 	loadBalancerName := cloudprovider.GetLoadBalancerName(service)
 	glog.V(4).Infof("UpdateLoadBalancer(%v, %v, %v)", clusterName, loadBalancerName, nodes)
 
+	if len(lbaas.opts.SubnetId) == 0 && len(nodes) > 0 {
+		// Get SubnetId automatically.
+		// The LB needs to be configured with instance addresses on the same subnet, so get SubnetId by one node.
+		subnetID, err := getSubnetIDForLB(lbaas.compute, *nodes[0])
+		if err != nil {
+			glog.Warningf("Failed to find subnet-id for loadbalancer service %s/%s: %v", service.Namespace, service.Name, err)
+			return fmt.Errorf("no subnet-id for service %s/%s : subnet-id not set in cloud provider config, "+
+				"and failed to find subnet-id from OpenStack: %v", service.Namespace, service.Name, err)
+		}
+		lbaas.opts.SubnetId = subnetID
+	}
+
 	ports := service.Spec.Ports
 	if len(ports) == 0 {
 		return fmt.Errorf("no ports provided to openstack load balancer")
 	}
 
-	loadbalancer, err := getLoadbalancerByName(lbaas.network, loadBalancerName)
+	loadbalancer, err := getLoadbalancerByName(lbaas.lb, loadBalancerName)
 	if err != nil {
 		return err
 	}
 	if loadbalancer == nil {
-		return fmt.Errorf("Loadbalancer %s does not exist", loadBalancerName)
+		return fmt.Errorf("loadbalancer %s does not exist", loadBalancerName)
 	}
 
 	// Get all listeners for this loadbalancer, by "port key".
@@ -973,53 +1180,26 @@ func (lbaas *LbaasV2) UpdateLoadBalancer(clusterName string, service *v1.Service
 		Protocol listeners.Protocol
 		Port     int
 	}
-
+	var listenerIDs []string
 	lbListeners := make(map[portKey]listeners.Listener)
-	err = listeners.List(lbaas.network, listeners.ListOpts{LoadbalancerID: loadbalancer.ID}).EachPage(func(page pagination.Page) (bool, error) {
-		listenersList, err := listeners.ExtractListeners(page)
-		if err != nil {
-			return false, err
-		}
-		for _, l := range listenersList {
-			for _, lb := range l.Loadbalancers {
-				// Double check this Listener belongs to the LB we're updating. Neutron's API filtering
-				// can't be counted on in older releases (i.e Liberty).
-				if loadbalancer.ID == lb.ID {
-					key := portKey{Protocol: listeners.Protocol(l.Protocol), Port: l.ProtocolPort}
-					lbListeners[key] = l
-					break
-				}
-			}
-		}
-		return true, nil
-	})
+	allListeners, err := getListenersByLoadBalancerID(lbaas.lb, loadbalancer.ID)
 	if err != nil {
-		return err
+		return fmt.Errorf("error getting listeners for LB %s: %v", loadBalancerName, err)
+	}
+	for _, l := range allListeners {
+		key := portKey{Protocol: listeners.Protocol(l.Protocol), Port: l.ProtocolPort}
+		lbListeners[key] = l
+		listenerIDs = append(listenerIDs, l.ID)
 	}
 
 	// Get all pools for this loadbalancer, by listener ID.
 	lbPools := make(map[string]v2pools.Pool)
-	err = v2pools.List(lbaas.network, v2pools.ListOpts{LoadbalancerID: loadbalancer.ID}).EachPage(func(page pagination.Page) (bool, error) {
-		poolsList, err := v2pools.ExtractPools(page)
+	for _, listenerID := range listenerIDs {
+		pool, err := getPoolByListenerID(lbaas.lb, loadbalancer.ID, listenerID)
 		if err != nil {
-			return false, err
+			return fmt.Errorf("error getting pool for listener %s: %v", listenerID, err)
 		}
-		for _, p := range poolsList {
-			for _, l := range p.Listeners {
-				// Double check this Pool belongs to the LB we're deleting. Neutron's API filtering
-				// can't be counted on in older releases (i.e Liberty).
-				for _, val := range lbListeners {
-					if val.ID == l.ID {
-						lbPools[l.ID] = p
-						break
-					}
-				}
-			}
-		}
-		return true, nil
-	})
-	if err != nil {
-		return err
+		lbPools[listenerID] = *pool
 	}
 
 	// Compose Set of member (addresses) that _should_ exist
@@ -1040,29 +1220,23 @@ func (lbaas *LbaasV2) UpdateLoadBalancer(clusterName string, service *v1.Service
 			Port:     int(port.Port),
 		}]
 		if !ok {
-			return fmt.Errorf("Loadbalancer %s does not contain required listener for port %d and protocol %s", loadBalancerName, port.Port, port.Protocol)
+			return fmt.Errorf("loadbalancer %s does not contain required listener for port %d and protocol %s", loadBalancerName, port.Port, port.Protocol)
 		}
 
 		// Get pool associated with this listener
 		pool, ok := lbPools[listener.ID]
 		if !ok {
-			return fmt.Errorf("Loadbalancer %s does not contain required pool for listener %s", loadBalancerName, listener.ID)
+			return fmt.Errorf("loadbalancer %s does not contain required pool for listener %s", loadBalancerName, listener.ID)
 		}
 
 		// Find existing pool members (by address) for this port
-		members := make(map[string]v2pools.Member)
-		err := v2pools.ListMembers(lbaas.network, pool.ID, v2pools.ListMembersOpts{}).EachPage(func(page pagination.Page) (bool, error) {
-			membersList, err := v2pools.ExtractMembers(page)
-			if err != nil {
-				return false, err
-			}
-			for _, member := range membersList {
-				members[member.Address] = member
-			}
-			return true, nil
-		})
+		getMembers, err := getMembersByPoolID(lbaas.lb, pool.ID)
 		if err != nil {
-			return err
+			return fmt.Errorf("error getting pool members %s: %v", pool.ID, err)
+		}
+		members := make(map[string]v2pools.Member)
+		for _, member := range getMembers {
+			members[member.Address] = member
 		}
 
 		// Add any new members for this port
@@ -1071,7 +1245,7 @@ func (lbaas *LbaasV2) UpdateLoadBalancer(clusterName string, service *v1.Service
 				// Already exists, do not create member
 				continue
 			}
-			_, err := v2pools.CreateMember(lbaas.network, pool.ID, v2pools.CreateMemberOpts{
+			_, err := v2pools.CreateMember(lbaas.lb, pool.ID, v2pools.CreateMemberOpts{
 				Address:      addr,
 				ProtocolPort: int(port.NodePort),
 				SubnetID:     lbaas.opts.SubnetId,
@@ -1079,7 +1253,10 @@ func (lbaas *LbaasV2) UpdateLoadBalancer(clusterName string, service *v1.Service
 			if err != nil {
 				return err
 			}
-			waitLoadbalancerActiveProvisioningStatus(lbaas.network, loadbalancer.ID)
+			provisioningStatus, err := waitLoadbalancerActiveProvisioningStatus(lbaas.lb, loadbalancer.ID)
+			if err != nil {
+				return fmt.Errorf("failed to loadbalance ACTIVE provisioning status %v: %v", provisioningStatus, err)
+			}
 		}
 
 		// Remove any old members for this port
@@ -1088,13 +1265,104 @@ func (lbaas *LbaasV2) UpdateLoadBalancer(clusterName string, service *v1.Service
 				// Still present, do not delete member
 				continue
 			}
-			err = v2pools.DeleteMember(lbaas.network, pool.ID, member.ID).ExtractErr()
+			err = v2pools.DeleteMember(lbaas.lb, pool.ID, member.ID).ExtractErr()
 			if err != nil && !isNotFound(err) {
 				return err
 			}
-			waitLoadbalancerActiveProvisioningStatus(lbaas.network, loadbalancer.ID)
+			provisioningStatus, err := waitLoadbalancerActiveProvisioningStatus(lbaas.lb, loadbalancer.ID)
+			if err != nil {
+				return fmt.Errorf("failed to loadbalance ACTIVE provisioning status %v: %v", provisioningStatus, err)
+			}
 		}
 	}
+
+	if lbaas.opts.ManageSecurityGroups {
+		err := lbaas.updateSecurityGroup(clusterName, service, nodes, loadbalancer)
+		if err != nil {
+			return fmt.Errorf("failed to update Security Group for loadbalancer service %s/%s: %v", service.Namespace, service.Name, err)
+		}
+	}
+
+	return nil
+}
+
+// updateSecurityGroup updating security group for specific loadbalancer service.
+func (lbaas *LbaasV2) updateSecurityGroup(clusterName string, apiService *v1.Service, nodes []*v1.Node, loadbalancer *loadbalancers.LoadBalancer) error {
+	originalNodeSecurityGroupIDs := lbaas.opts.NodeSecurityGroupIDs
+
+	var err error
+	lbaas.opts.NodeSecurityGroupIDs, err = getNodeSecurityGroupIDForLB(lbaas.compute, nodes)
+	if err != nil {
+		return fmt.Errorf("failed to find node-security-group for loadbalancer service %s/%s: %v", apiService.Namespace, apiService.Name, err)
+	}
+	glog.V(4).Infof("find node-security-group %v for loadbalancer service %s/%s", lbaas.opts.NodeSecurityGroupIDs, apiService.Namespace, apiService.Name)
+
+	original := sets.NewString(originalNodeSecurityGroupIDs...)
+	current := sets.NewString(lbaas.opts.NodeSecurityGroupIDs...)
+	removals := original.Difference(current)
+
+	// Generate Name
+	lbSecGroupName := getSecurityGroupName(apiService)
+	lbSecGroupID, err := groups.IDFromName(lbaas.network, lbSecGroupName)
+	if err != nil {
+		return fmt.Errorf("error occurred finding security group: %s: %v", lbSecGroupName, err)
+	}
+
+	ports := apiService.Spec.Ports
+	if len(ports) == 0 {
+		return fmt.Errorf("no ports provided to openstack load balancer")
+	}
+
+	for _, port := range ports {
+		for removal := range removals {
+			// Delete the rules in the Node Security Group
+			opts := rules.ListOpts{
+				Direction:     string(rules.DirIngress),
+				SecGroupID:    removal,
+				RemoteGroupID: lbSecGroupID,
+				PortRangeMax:  int(port.NodePort),
+				PortRangeMin:  int(port.NodePort),
+				Protocol:      string(port.Protocol),
+			}
+			secGroupRules, err := getSecurityGroupRules(lbaas.network, opts)
+			if err != nil && !isNotFound(err) {
+				return fmt.Errorf("error finding rules for remote group id %s in security group id %s: %v", lbSecGroupID, removal, err)
+			}
+
+			for _, rule := range secGroupRules {
+				res := rules.Delete(lbaas.network, rule.ID)
+				if res.Err != nil && !isNotFound(res.Err) {
+					return fmt.Errorf("error occurred deleting security group rule: %s: %v", rule.ID, res.Err)
+				}
+			}
+		}
+
+		for _, nodeSecurityGroupID := range lbaas.opts.NodeSecurityGroupIDs {
+			opts := rules.ListOpts{
+				Direction:     string(rules.DirIngress),
+				SecGroupID:    nodeSecurityGroupID,
+				RemoteGroupID: lbSecGroupID,
+				PortRangeMax:  int(port.NodePort),
+				PortRangeMin:  int(port.NodePort),
+				Protocol:      string(port.Protocol),
+			}
+			secGroupRules, err := getSecurityGroupRules(lbaas.network, opts)
+			if err != nil && !isNotFound(err) {
+				return fmt.Errorf("error finding rules for remote group id %s in security group id %s: %v", lbSecGroupID, nodeSecurityGroupID, err)
+			}
+			if len(secGroupRules) != 0 {
+				// Do not add rule when find rules for remote group in the Node Security Group
+				continue
+			}
+
+			// Add the rules in the Node Security Group
+			err = createNodeSecurityGroup(lbaas.network, nodeSecurityGroupID, int(port.NodePort), port.Protocol, lbSecGroupID)
+			if err != nil {
+				return fmt.Errorf("error occured creating security group for loadbalancer service %s/%s: %v", apiService.Namespace, apiService.Name, err)
+			}
+		}
+	}
+
 	return nil
 }
 
@@ -1102,7 +1370,7 @@ func (lbaas *LbaasV2) EnsureLoadBalancerDeleted(clusterName string, service *v1.
 	loadBalancerName := cloudprovider.GetLoadBalancerName(service)
 	glog.V(4).Infof("EnsureLoadBalancerDeleted(%v, %v)", clusterName, loadBalancerName)
 
-	loadbalancer, err := getLoadbalancerByName(lbaas.network, loadBalancerName)
+	loadbalancer, err := getLoadbalancerByName(lbaas.lb, loadBalancerName)
 	if err != nil && err != ErrNotFound {
 		return err
 	}
@@ -1110,7 +1378,7 @@ func (lbaas *LbaasV2) EnsureLoadBalancerDeleted(clusterName string, service *v1.
 		return nil
 	}
 
-	if lbaas.opts.FloatingNetworkId != "" && loadbalancer != nil {
+	if loadbalancer.VipPortID != "" {
 		portID := loadbalancer.VipPortID
 		floatingIP, err := getFloatingIPByPortID(lbaas.network, portID)
 		if err != nil && err != ErrNotFound {
@@ -1125,446 +1393,228 @@ func (lbaas *LbaasV2) EnsureLoadBalancerDeleted(clusterName string, service *v1.
 	}
 
 	// get all listeners associated with this loadbalancer
-	var listenerIDs []string
-	err = listeners.List(lbaas.network, listeners.ListOpts{LoadbalancerID: loadbalancer.ID}).EachPage(func(page pagination.Page) (bool, error) {
-		listenerList, err := listeners.ExtractListeners(page)
-		if err != nil {
-			return false, err
-		}
-
-		for _, listener := range listenerList {
-			listenerIDs = append(listenerIDs, listener.ID)
-		}
-
-		return true, nil
-	})
+	listenerList, err := getListenersByLoadBalancerID(lbaas.lb, loadbalancer.ID)
 	if err != nil {
-		return err
+		return fmt.Errorf("error getting LB %s listeners: %v", loadbalancer.ID, err)
 	}
 
 	// get all pools (and health monitors) associated with this loadbalancer
 	var poolIDs []string
 	var monitorIDs []string
-	err = v2pools.List(lbaas.network, v2pools.ListOpts{LoadbalancerID: loadbalancer.ID}).EachPage(func(page pagination.Page) (bool, error) {
-		poolsList, err := v2pools.ExtractPools(page)
-		if err != nil {
-			return false, err
+	for _, listener := range listenerList {
+		pool, err := getPoolByListenerID(lbaas.lb, loadbalancer.ID, listener.ID)
+		if err != nil && err != ErrNotFound {
+			return fmt.Errorf("error getting pool for listener %s: %v", listener.ID, err)
 		}
-
-		for _, pool := range poolsList {
+		if pool != nil {
 			poolIDs = append(poolIDs, pool.ID)
-			monitorIDs = append(monitorIDs, pool.MonitorID)
+			// If create-monitor of cloud-config is false, pool has not monitor.
+			if pool.MonitorID != "" {
+				monitorIDs = append(monitorIDs, pool.MonitorID)
+			}
 		}
-
-		return true, nil
-	})
-	if err != nil {
-		return err
 	}
 
 	// get all members associated with each poolIDs
 	var memberIDs []string
-	for _, poolID := range poolIDs {
-		err := v2pools.ListMembers(lbaas.network, poolID, v2pools.ListMembersOpts{}).EachPage(func(page pagination.Page) (bool, error) {
-			membersList, err := v2pools.ExtractMembers(page)
-			if err != nil {
-				return false, err
-			}
-
-			for _, member := range membersList {
-				memberIDs = append(memberIDs, member.ID)
-			}
-
-			return true, nil
-		})
-		if err != nil {
-			return err
+	for _, pool := range poolIDs {
+		membersList, err := getMembersByPoolID(lbaas.lb, pool)
+		if err != nil && !isNotFound(err) {
+			return fmt.Errorf("error getting pool members %s: %v", pool, err)
+		}
+		for _, member := range membersList {
+			memberIDs = append(memberIDs, member.ID)
 		}
 	}
 
 	// delete all monitors
 	for _, monitorID := range monitorIDs {
-		err := v2monitors.Delete(lbaas.network, monitorID).ExtractErr()
+		err := v2monitors.Delete(lbaas.lb, monitorID).ExtractErr()
 		if err != nil && !isNotFound(err) {
 			return err
 		}
-		waitLoadbalancerActiveProvisioningStatus(lbaas.network, loadbalancer.ID)
+		provisioningStatus, err := waitLoadbalancerActiveProvisioningStatus(lbaas.lb, loadbalancer.ID)
+		if err != nil {
+			return fmt.Errorf("failed to loadbalance ACTIVE provisioning status %v: %v", provisioningStatus, err)
+		}
 	}
 
 	// delete all members and pools
 	for _, poolID := range poolIDs {
 		// delete all members for this pool
 		for _, memberID := range memberIDs {
-			err := v2pools.DeleteMember(lbaas.network, poolID, memberID).ExtractErr()
+			err := v2pools.DeleteMember(lbaas.lb, poolID, memberID).ExtractErr()
 			if err != nil && !isNotFound(err) {
 				return err
 			}
-			waitLoadbalancerActiveProvisioningStatus(lbaas.network, loadbalancer.ID)
+			provisioningStatus, err := waitLoadbalancerActiveProvisioningStatus(lbaas.lb, loadbalancer.ID)
+			if err != nil {
+				return fmt.Errorf("failed to loadbalance ACTIVE provisioning status %v: %v", provisioningStatus, err)
+			}
 		}
 
 		// delete pool
-		err := v2pools.Delete(lbaas.network, poolID).ExtractErr()
+		err := v2pools.Delete(lbaas.lb, poolID).ExtractErr()
 		if err != nil && !isNotFound(err) {
 			return err
 		}
-		waitLoadbalancerActiveProvisioningStatus(lbaas.network, loadbalancer.ID)
+		provisioningStatus, err := waitLoadbalancerActiveProvisioningStatus(lbaas.lb, loadbalancer.ID)
+		if err != nil {
+			return fmt.Errorf("failed to loadbalance ACTIVE provisioning status %v: %v", provisioningStatus, err)
+		}
 	}
 
 	// delete all listeners
-	for _, listenerID := range listenerIDs {
-		err := listeners.Delete(lbaas.network, listenerID).ExtractErr()
+	for _, listener := range listenerList {
+		err := listeners.Delete(lbaas.lb, listener.ID).ExtractErr()
 		if err != nil && !isNotFound(err) {
 			return err
 		}
-		waitLoadbalancerActiveProvisioningStatus(lbaas.network, loadbalancer.ID)
+		provisioningStatus, err := waitLoadbalancerActiveProvisioningStatus(lbaas.lb, loadbalancer.ID)
+		if err != nil {
+			return fmt.Errorf("failed to loadbalance ACTIVE provisioning status %v: %v", provisioningStatus, err)
+		}
 	}
 
 	// delete loadbalancer
-	err = loadbalancers.Delete(lbaas.network, loadbalancer.ID).ExtractErr()
+	err = loadbalancers.Delete(lbaas.lb, loadbalancer.ID).ExtractErr()
 	if err != nil && !isNotFound(err) {
 		return err
 	}
-	waitLoadbalancerDeleted(lbaas.network, loadbalancer.ID)
+	err = waitLoadbalancerDeleted(lbaas.lb, loadbalancer.ID)
+	if err != nil {
+		return fmt.Errorf("failed to delete loadbalancer: %v", err)
+	}
 
 	// Delete the Security Group
 	if lbaas.opts.ManageSecurityGroups {
-		// Generate Name
-		lbSecGroupName := getSecurityGroupName(clusterName, service)
-		lbSecGroupID, err := groups.IDFromName(lbaas.network, lbSecGroupName)
+		err := lbaas.EnsureSecurityGroupDeleted(clusterName, service)
 		if err != nil {
-			glog.V(1).Infof("Error occurred finding security group: %s: %v", lbSecGroupName, err)
-			return nil
+			return fmt.Errorf("Failed to delete Security Group for loadbalancer service %s/%s: %v", service.Namespace, service.Name, err)
 		}
 
-		lbSecGroup := groups.Delete(lbaas.network, lbSecGroupID)
-		if lbSecGroup.Err != nil && !isNotFound(lbSecGroup.Err) {
-			return lbSecGroup.Err
-		}
-
-		// Delete the rules in the Node Security Group
-		opts := rules.ListOpts{
-			SecGroupID:    lbaas.opts.NodeSecurityGroupID,
-			RemoteGroupID: lbSecGroupID,
-		}
-		secGroupRules, err := getSecurityGroupRules(lbaas.network, opts)
-
-		if err != nil && !isNotFound(err) {
-			glog.Errorf("Error finding rules for remote group id %s in security group id %s", lbSecGroupID, lbaas.opts.NodeSecurityGroupID)
-			return err
-		}
-
-		for _, rule := range secGroupRules {
-			res := rules.Delete(lbaas.network, rule.ID)
-			if res.Err != nil && !isNotFound(res.Err) {
-				glog.V(1).Infof("Error occurred deleting security group rule: %s: %v", rule.ID, res.Err)
-			}
+		// delete the old Security Group for the service
+		// Related to #53764
+		// TODO(FengyunPan): Remove it at V1.10
+		err = lbaas.EnsureOldSecurityGroupDeleted(clusterName, service)
+		if err != nil {
+			return fmt.Errorf("Failed to delete the Security Group for loadbalancer service %s/%s: %v", service.Namespace, service.Name, err)
 		}
 	}
 
 	return nil
 }
 
-func (lb *LbaasV1) GetLoadBalancer(clusterName string, service *v1.Service) (*v1.LoadBalancerStatus, bool, error) {
-	loadBalancerName := cloudprovider.GetLoadBalancerName(service)
-	vip, err := getVipByName(lb.network, loadBalancerName)
-	if err == ErrNotFound {
-		return nil, false, nil
-	}
-	if vip == nil {
-		return nil, false, err
-	}
-
-	status := &v1.LoadBalancerStatus{}
-	status.Ingress = []v1.LoadBalancerIngress{{IP: vip.Address}}
-
-	return status, true, err
-}
-
-// TODO: This code currently ignores 'region' and always creates a
-// loadbalancer in only the current OpenStack region.  We should take
-// a list of regions (from config) and query/create loadbalancers in
-// each region.
-
-func (lb *LbaasV1) EnsureLoadBalancer(clusterName string, apiService *v1.Service, nodes []*v1.Node) (*v1.LoadBalancerStatus, error) {
-	glog.V(4).Infof("EnsureLoadBalancer(%v, %v, %v, %v, %v, %v, %v)", clusterName, apiService.Namespace, apiService.Name, apiService.Spec.LoadBalancerIP, apiService.Spec.Ports, nodes, apiService.Annotations)
-
-	ports := apiService.Spec.Ports
-	if len(ports) > 1 {
-		return nil, fmt.Errorf("multiple ports are not supported in openstack v1 load balancers")
-	} else if len(ports) == 0 {
-		return nil, fmt.Errorf("no ports provided to openstack load balancer")
-	}
-
-	// The service controller verified all the protocols match on the ports, just check and use the first one
-	// TODO: Convert all error messages to use an event recorder
-	if ports[0].Protocol != v1.ProtocolTCP {
-		return nil, fmt.Errorf("Only TCP LoadBalancer is supported for openstack load balancers")
-	}
-
-	affinity := apiService.Spec.SessionAffinity
-	var persistence *vips.SessionPersistence
-	switch affinity {
-	case v1.ServiceAffinityNone:
-		persistence = nil
-	case v1.ServiceAffinityClientIP:
-		persistence = &vips.SessionPersistence{Type: "SOURCE_IP"}
-	default:
-		return nil, fmt.Errorf("unsupported load balancer affinity: %v", affinity)
-	}
-
-	sourceRanges, err := service.GetLoadBalancerSourceRanges(apiService)
+// EnsureSecurityGroupDeleted deleting security group for specific loadbalancer service.
+func (lbaas *LbaasV2) EnsureSecurityGroupDeleted(clusterName string, service *v1.Service) error {
+	// Generate Name
+	lbSecGroupName := getSecurityGroupName(service)
+	lbSecGroupID, err := groups.IDFromName(lbaas.network, lbSecGroupName)
 	if err != nil {
-		return nil, err
-	}
-
-	if !service.IsAllowAll(sourceRanges) {
-		return nil, fmt.Errorf("Source range restrictions are not supported for openstack load balancers")
-	}
-
-	glog.V(2).Infof("Checking if openstack load balancer already exists: %s", cloudprovider.GetLoadBalancerName(apiService))
-	_, exists, err := lb.GetLoadBalancer(clusterName, apiService)
-	if err != nil {
-		return nil, fmt.Errorf("error checking if openstack load balancer already exists: %v", err)
-	}
-
-	// TODO: Implement a more efficient update strategy for common changes than delete & create
-	// In particular, if we implement hosts update, we can get rid of UpdateHosts
-	if exists {
-		err := lb.EnsureLoadBalancerDeleted(clusterName, apiService)
-		if err != nil {
-			return nil, fmt.Errorf("error deleting existing openstack load balancer: %v", err)
+		// check whether security group does not exist
+		_, ok := err.(*gophercloud.ErrResourceNotFound)
+		if ok {
+			// It is OK when the security group has been deleted by others.
+			return nil
+		} else {
+			return fmt.Errorf("Error occurred finding security group: %s: %v", lbSecGroupName, err)
 		}
 	}
 
-	lbmethod := pools.LBMethod(lb.opts.LBMethod)
-	if lbmethod == "" {
-		lbmethod = pools.LBMethodRoundRobin
-	}
-	name := cloudprovider.GetLoadBalancerName(apiService)
-	pool, err := pools.Create(lb.network, pools.CreateOpts{
-		Name:     name,
-		Protocol: pools.ProtocolTCP,
-		SubnetID: lb.opts.SubnetId,
-		LBMethod: lbmethod,
-	}).Extract()
-	if err != nil {
-		return nil, err
+	lbSecGroup := groups.Delete(lbaas.network, lbSecGroupID)
+	if lbSecGroup.Err != nil && !isNotFound(lbSecGroup.Err) {
+		return lbSecGroup.Err
 	}
 
-	for _, node := range nodes {
-		addr, err := nodeAddressForLB(node)
-		if err != nil {
-			return nil, err
-		}
+	if len(lbaas.opts.NodeSecurityGroupIDs) == 0 {
+		// Just happen when nodes have not Security Group, or should not happen
+		// UpdateLoadBalancer and EnsureLoadBalancer can set lbaas.opts.NodeSecurityGroupIDs when it is empty
+		// And service controller call UpdateLoadBalancer to set lbaas.opts.NodeSecurityGroupIDs when controller manager service is restarted.
+		glog.Warningf("Can not find node-security-group from all the nodes of this cluster when delete loadbalancer service %s/%s",
+			service.Namespace, service.Name)
+	} else {
+		// Delete the rules in the Node Security Group
+		for _, nodeSecurityGroupID := range lbaas.opts.NodeSecurityGroupIDs {
+			opts := rules.ListOpts{
+				SecGroupID:    nodeSecurityGroupID,
+				RemoteGroupID: lbSecGroupID,
+			}
+			secGroupRules, err := getSecurityGroupRules(lbaas.network, opts)
 
-		_, err = members.Create(lb.network, members.CreateOpts{
-			PoolID:       pool.ID,
-			ProtocolPort: int(ports[0].NodePort), //Note: only handles single port
-			Address:      addr,
-		}).Extract()
-		if err != nil {
-			pools.Delete(lb.network, pool.ID)
-			return nil, err
-		}
-	}
+			if err != nil && !isNotFound(err) {
+				msg := fmt.Sprintf("Error finding rules for remote group id %s in security group id %s: %v", lbSecGroupID, nodeSecurityGroupID, err)
+				return fmt.Errorf(msg)
+			}
 
-	var mon *monitors.Monitor
-	if lb.opts.CreateMonitor {
-		mon, err = monitors.Create(lb.network, monitors.CreateOpts{
-			Type:       monitors.TypeTCP,
-			Delay:      int(lb.opts.MonitorDelay.Duration.Seconds()),
-			Timeout:    int(lb.opts.MonitorTimeout.Duration.Seconds()),
-			MaxRetries: int(lb.opts.MonitorMaxRetries),
-		}).Extract()
-		if err != nil {
-			pools.Delete(lb.network, pool.ID)
-			return nil, err
-		}
-
-		_, err = pools.AssociateMonitor(lb.network, pool.ID, mon.ID).Extract()
-		if err != nil {
-			monitors.Delete(lb.network, mon.ID)
-			pools.Delete(lb.network, pool.ID)
-			return nil, err
-		}
-	}
-
-	createOpts := vips.CreateOpts{
-		Name:         name,
-		Description:  fmt.Sprintf("Kubernetes external service %s", name),
-		Protocol:     "TCP",
-		ProtocolPort: int(ports[0].Port), //TODO: need to handle multi-port
-		PoolID:       pool.ID,
-		SubnetID:     lb.opts.SubnetId,
-		Persistence:  persistence,
-	}
-
-	loadBalancerIP := apiService.Spec.LoadBalancerIP
-	if loadBalancerIP != "" {
-		createOpts.Address = loadBalancerIP
-	}
-
-	vip, err := vips.Create(lb.network, createOpts).Extract()
-	if err != nil {
-		if mon != nil {
-			monitors.Delete(lb.network, mon.ID)
-		}
-		pools.Delete(lb.network, pool.ID)
-		return nil, err
-	}
-
-	status := &v1.LoadBalancerStatus{}
-
-	status.Ingress = []v1.LoadBalancerIngress{{IP: vip.Address}}
-
-	if lb.opts.FloatingNetworkId != "" {
-		floatIPOpts := floatingips.CreateOpts{
-			FloatingNetworkID: lb.opts.FloatingNetworkId,
-			PortID:            vip.PortID,
-		}
-		floatIP, err := floatingips.Create(lb.network, floatIPOpts).Extract()
-		if err != nil {
-			return nil, err
-		}
-
-		status.Ingress = append(status.Ingress, v1.LoadBalancerIngress{IP: floatIP.FloatingIP})
-	}
-
-	return status, nil
-
-}
-
-func (lb *LbaasV1) UpdateLoadBalancer(clusterName string, service *v1.Service, nodes []*v1.Node) error {
-	loadBalancerName := cloudprovider.GetLoadBalancerName(service)
-	glog.V(4).Infof("UpdateLoadBalancer(%v, %v, %v)", clusterName, loadBalancerName, nodes)
-
-	vip, err := getVipByName(lb.network, loadBalancerName)
-	if err != nil {
-		return err
-	}
-
-	// Set of member (addresses) that _should_ exist
-	addrs := map[string]bool{}
-	for _, node := range nodes {
-		addr, err := nodeAddressForLB(node)
-		if err != nil {
-			return err
-		}
-
-		addrs[addr] = true
-	}
-
-	// Iterate over members that _do_ exist
-	pager := members.List(lb.network, members.ListOpts{PoolID: vip.PoolID})
-	err = pager.EachPage(func(page pagination.Page) (bool, error) {
-		memList, err := members.ExtractMembers(page)
-		if err != nil {
-			return false, err
-		}
-
-		for _, member := range memList {
-			if _, found := addrs[member.Address]; found {
-				// Member already exists
-				delete(addrs, member.Address)
-			} else {
-				// Member needs to be deleted
-				err = members.Delete(lb.network, member.ID).ExtractErr()
-				if err != nil {
-					return false, err
+			for _, rule := range secGroupRules {
+				res := rules.Delete(lbaas.network, rule.ID)
+				if res.Err != nil && !isNotFound(res.Err) {
+					return fmt.Errorf("Error occurred deleting security group rule: %s: %v", rule.ID, res.Err)
 				}
 			}
 		}
-
-		return true, nil
-	})
-	if err != nil {
-		return err
-	}
-
-	// Anything left in addrs is a new member that needs to be added
-	for addr := range addrs {
-		_, err := members.Create(lb.network, members.CreateOpts{
-			PoolID:       vip.PoolID,
-			Address:      addr,
-			ProtocolPort: vip.ProtocolPort,
-		}).Extract()
-		if err != nil {
-			return err
-		}
 	}
 
 	return nil
 }
 
-func (lb *LbaasV1) EnsureLoadBalancerDeleted(clusterName string, service *v1.Service) error {
-	loadBalancerName := cloudprovider.GetLoadBalancerName(service)
-	glog.V(4).Infof("EnsureLoadBalancerDeleted(%v, %v)", clusterName, loadBalancerName)
+// getOldSecurityGroupName is used to get the old security group name
+// Related to #53764
+// TODO(FengyunPan): Remove it at V1.10
+func getOldSecurityGroupName(clusterName string, service *v1.Service) string {
+	return fmt.Sprintf("lb-sg-%s-%v", clusterName, service.Name)
+}
 
-	vip, err := getVipByName(lb.network, loadBalancerName)
-	if err != nil && err != ErrNotFound {
-		return err
-	}
-
-	if lb.opts.FloatingNetworkId != "" && vip != nil {
-		floatingIP, err := getFloatingIPByPortID(lb.network, vip.PortID)
-		if err != nil && !isNotFound(err) {
-			return err
-		}
-		if floatingIP != nil {
-			err = floatingips.Delete(lb.network, floatingIP.ID).ExtractErr()
-			if err != nil && !isNotFound(err) {
-				return err
-			}
-		}
-	}
-
-	// We have to delete the VIP before the pool can be deleted,
-	// so no point continuing if this fails.
-	if vip != nil {
-		err := vips.Delete(lb.network, vip.ID).ExtractErr()
-		if err != nil && !isNotFound(err) {
-			return err
+// EnsureOldSecurityGroupDeleted deleting old security group for specific loadbalancer service.
+// Related to #53764
+// TODO(FengyunPan): Remove it at V1.10
+func (lbaas *LbaasV2) EnsureOldSecurityGroupDeleted(clusterName string, service *v1.Service) error {
+	glog.V(4).Infof("EnsureOldSecurityGroupDeleted(%v, %v)", clusterName, service)
+	// Generate Name
+	lbSecGroupName := getOldSecurityGroupName(clusterName, service)
+	lbSecGroupID, err := groups.IDFromName(lbaas.network, lbSecGroupName)
+	if err != nil {
+		// check whether security group does not exist
+		_, ok := err.(*gophercloud.ErrResourceNotFound)
+		if ok {
+			// It is OK when the security group has been deleted by others.
+			return nil
+		} else {
+			return fmt.Errorf("Error occurred finding security group: %s: %v", lbSecGroupName, err)
 		}
 	}
 
-	var pool *pools.Pool
-	if vip != nil {
-		pool, err = pools.Get(lb.network, vip.PoolID).Extract()
-		if err != nil && !isNotFound(err) {
-			return err
-		}
+	lbSecGroup := groups.Delete(lbaas.network, lbSecGroupID)
+	if lbSecGroup.Err != nil && !isNotFound(lbSecGroup.Err) {
+		return lbSecGroup.Err
+	}
+
+	if len(lbaas.opts.NodeSecurityGroupIDs) == 0 {
+		// Just happen when nodes have not Security Group, or should not happen
+		// UpdateLoadBalancer and EnsureLoadBalancer can set lbaas.opts.NodeSecurityGroupIDs when it is empty
+		// And service controller call UpdateLoadBalancer to set lbaas.opts.NodeSecurityGroupIDs when controller manager service is restarted.
+		glog.Warningf("Can not find node-security-group from all the nodes of this cluster when delete loadbalancer service %s/%s",
+			service.Namespace, service.Name)
 	} else {
-		// The VIP is gone, but it is conceivable that a Pool
-		// still exists that we failed to delete on some
-		// previous occasion.  Make a best effort attempt to
-		// cleanup any pools with the same name as the VIP.
-		pool, err = getPoolByName(lb.network, service.Name)
-		if err != nil && err != ErrNotFound {
-			return err
-		}
-	}
+		// Delete the rules in the Node Security Group
+		for _, nodeSecurityGroupID := range lbaas.opts.NodeSecurityGroupIDs {
+			opts := rules.ListOpts{
+				SecGroupID:    nodeSecurityGroupID,
+				RemoteGroupID: lbSecGroupID,
+			}
+			secGroupRules, err := getSecurityGroupRules(lbaas.network, opts)
 
-	if pool != nil {
-		for _, monId := range pool.MonitorIDs {
-			_, err = pools.DisassociateMonitor(lb.network, pool.ID, monId).Extract()
-			if err != nil {
-				return err
+			if err != nil && !isNotFound(err) {
+				msg := fmt.Sprintf("Error finding rules for remote group id %s in security group id %s: %v", lbSecGroupID, nodeSecurityGroupID, err)
+				return fmt.Errorf(msg)
 			}
 
-			err = monitors.Delete(lb.network, monId).ExtractErr()
-			if err != nil && !isNotFound(err) {
-				return err
+			for _, rule := range secGroupRules {
+				res := rules.Delete(lbaas.network, rule.ID)
+				if res.Err != nil && !isNotFound(res.Err) {
+					return fmt.Errorf("Error occurred deleting security group rule: %s: %v", rule.ID, res.Err)
+				}
 			}
-		}
-		for _, memberId := range pool.MemberIDs {
-			err = members.Delete(lb.network, memberId).ExtractErr()
-			if err != nil && !isNotFound(err) {
-				return err
-			}
-		}
-		err = pools.Delete(lb.network, pool.ID).ExtractErr()
-		if err != nil && !isNotFound(err) {
-			return err
 		}
 	}
 

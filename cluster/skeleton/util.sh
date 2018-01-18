@@ -55,11 +55,6 @@ function kube-down {
 	echo "Skeleton Provider: kube-down not implemented" 1>&2
 }
 
-# Update a kubernetes cluster
-function kube-push {
-	echo "Skeleton Provider: kube-push not implemented" 1>&2
-}
-
 # Prepare update a kubernetes component
 function prepare-push {
 	echo "Skeleton Provider: prepare-push not implemented" 1>&2
@@ -92,4 +87,8 @@ function test-teardown {
 
 function prepare-e2e {
 	echo "Skeleton Provider: prepare-e2e not implemented" 1>&2
+}
+
+function detect-project {
+	echo "Skeleton Provider: detect-project not implemented" 1>&2
 }

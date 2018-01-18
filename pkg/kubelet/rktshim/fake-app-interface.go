@@ -23,8 +23,8 @@ import (
 	"math/rand"
 	"time"
 
-	kubeletapi "k8s.io/kubernetes/pkg/kubelet/api"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	kubeletapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 	"k8s.io/kubernetes/pkg/kubelet/util/ioutils"
 )
 
@@ -203,6 +203,10 @@ func (r *FakeRuntime) ContainerStatus(id string) (*runtimeapi.ContainerStatus, e
 	}
 
 	return &c.Status, nil
+}
+
+func (r *FakeRuntime) UpdateContainerResources(string, *runtimeapi.LinuxContainerResources) error {
+	return nil
 }
 
 func (r *FakeRuntime) ExecSync(containerID string, cmd []string, timeout time.Duration) (stdout []byte, stderr []byte, err error) {

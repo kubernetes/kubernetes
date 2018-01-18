@@ -33,8 +33,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/client/unversioned/remotecommand"
+	"k8s.io/client-go/tools/remotecommand"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
@@ -139,7 +140,7 @@ func TestPodAndContainerAttach(t *testing.T) {
 	for _, test := range tests {
 		f, tf, codec, ns := cmdtesting.NewAPIFactory()
 		tf.Client = &fake.RESTClient{
-			APIRegistry:          api.Registry,
+			GroupVersion:         legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion,
 			NegotiatedSerializer: ns,
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 				if test.obj != nil {
@@ -157,25 +158,25 @@ func TestPodAndContainerAttach(t *testing.T) {
 
 		err := options.Complete(f, cmd, test.args)
 		if test.expectError && err == nil {
-			t.Errorf("unexpected non-error (%s)", test.name)
+			t.Errorf("%s: unexpected non-error", test.name)
 		}
 		if !test.expectError && err != nil {
-			t.Errorf("unexpected error: %v (%s)", err, test.name)
+			t.Errorf("%s: unexpected error: %v", test.name, err)
 		}
 		if err != nil {
 			continue
 		}
 		if options.PodName != test.expectedPod {
-			t.Errorf("expected: %s, got: %s (%s)", test.expectedPod, options.PodName, test.name)
+			t.Errorf("%s: expected: %s, got: %s", test.name, test.expectedPod, options.PodName)
 		}
 		if options.ContainerName != test.expectedContainer {
-			t.Errorf("expected: %s, got: %s (%s)", test.expectedContainer, options.ContainerName, test.name)
+			t.Errorf("%s: expected: %s, got: %s", test.name, test.expectedContainer, options.ContainerName)
 		}
 	}
 }
 
 func TestAttach(t *testing.T) {
-	version := api.Registry.GroupOrDie(api.GroupName).GroupVersion.Version
+	version := legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion.Version
 	tests := []struct {
 		name, version, podPath, fetchPodPath, attachPath, container string
 		pod                                                         *api.Pod
@@ -216,7 +217,7 @@ func TestAttach(t *testing.T) {
 	for _, test := range tests {
 		f, tf, codec, ns := cmdtesting.NewAPIFactory()
 		tf.Client = &fake.RESTClient{
-			APIRegistry:          api.Registry,
+			GroupVersion:         legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion,
 			NegotiatedSerializer: ns,
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 				switch p, m := req.URL.Path, req.Method; {
@@ -234,7 +235,7 @@ func TestAttach(t *testing.T) {
 			}),
 		}
 		tf.Namespace = "test"
-		tf.ClientConfig = &restclient.Config{APIPath: "/api", ContentConfig: restclient.ContentConfig{NegotiatedSerializer: api.Codecs, GroupVersion: &schema.GroupVersion{Version: test.version}}}
+		tf.ClientConfig = &restclient.Config{APIPath: "/api", ContentConfig: restclient.ContentConfig{NegotiatedSerializer: legacyscheme.Codecs, GroupVersion: &schema.GroupVersion{Version: test.version}}}
 		bufOut := bytes.NewBuffer([]byte{})
 		bufErr := bytes.NewBuffer([]byte{})
 		bufIn := bytes.NewBuffer([]byte{})
@@ -283,7 +284,7 @@ func TestAttach(t *testing.T) {
 }
 
 func TestAttachWarnings(t *testing.T) {
-	version := api.Registry.GroupOrDie(api.GroupName).GroupVersion.Version
+	version := legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion.Version
 	tests := []struct {
 		name, container, version, podPath, fetchPodPath, expectedErr, expectedOut string
 		pod                                                                       *api.Pod
@@ -303,7 +304,7 @@ func TestAttachWarnings(t *testing.T) {
 	for _, test := range tests {
 		f, tf, codec, ns := cmdtesting.NewAPIFactory()
 		tf.Client = &fake.RESTClient{
-			APIRegistry:          api.Registry,
+			GroupVersion:         legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion,
 			NegotiatedSerializer: ns,
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 				switch p, m := req.URL.Path, req.Method; {
@@ -320,7 +321,7 @@ func TestAttachWarnings(t *testing.T) {
 			}),
 		}
 		tf.Namespace = "test"
-		tf.ClientConfig = &restclient.Config{APIPath: "/api", ContentConfig: restclient.ContentConfig{NegotiatedSerializer: api.Codecs, GroupVersion: &schema.GroupVersion{Version: test.version}}}
+		tf.ClientConfig = &restclient.Config{APIPath: "/api", ContentConfig: restclient.ContentConfig{NegotiatedSerializer: legacyscheme.Codecs, GroupVersion: &schema.GroupVersion{Version: test.version}}}
 		bufOut := bytes.NewBuffer([]byte{})
 		bufErr := bytes.NewBuffer([]byte{})
 		bufIn := bytes.NewBuffer([]byte{})

@@ -30,7 +30,7 @@ package runtime
 // TypeMeta is provided here for convenience. You may use it directly from this package or define
 // your own with the same fields.
 //
-// +k8s:deepcopy-gen=true
+// +k8s:deepcopy-gen=false
 // +protobuf=true
 // +k8s:openapi-gen=true
 type TypeMeta struct {
@@ -106,6 +106,7 @@ type RawExtension struct {
 // metadata and field mutatation.
 //
 // +k8s:deepcopy-gen=true
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +protobuf=true
 // +k8s:openapi-gen=true
 type Unknown struct {
@@ -124,6 +125,9 @@ type Unknown struct {
 
 // VersionedObjects is used by Decoders to give callers a way to access all versions
 // of an object during the decoding process.
+//
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:deepcopy-gen=true
 type VersionedObjects struct {
 	// Objects is the set of objects retrieved during decoding, in order of conversion.
 	// The 0 index is the object as serialized on the wire. If conversion has occurred,

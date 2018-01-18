@@ -7,11 +7,6 @@ SoundCloud Ltd. (http://soundcloud.com/).
 
 The following components are included in this product:
 
-goautoneg
-http://bitbucket.org/ww/goautoneg
-Copyright 2011, Open Knowledge Foundation Ltd.
-See README.txt for license details.
-
 perks - a fork of https://github.com/bmizerany/perks
 https://github.com/beorn7/perks
 Copyright 2013-2015 Blake Mizerany, Björn Rabenstein

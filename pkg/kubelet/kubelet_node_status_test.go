@@ -19,9 +19,11 @@ package kubelet
 import (
 	"encoding/json"
 	"fmt"
+	"net"
 	goruntime "runtime"
 	"sort"
 	"strconv"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -30,6 +32,7 @@ import (
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
+	"k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -40,9 +43,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/kubernetes/fake"
+	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/client-go/rest"
 	core "k8s.io/client-go/testing"
-	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
+	fakecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
+	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/util/sliceutils"
@@ -115,10 +121,95 @@ func applyNodeStatusPatch(originalNode *v1.Node, patch []byte) (*v1.Node, error)
 type localCM struct {
 	cm.ContainerManager
 	allocatable v1.ResourceList
+	capacity    v1.ResourceList
 }
 
 func (lcm *localCM) GetNodeAllocatableReservation() v1.ResourceList {
 	return lcm.allocatable
+}
+
+func (lcm *localCM) GetCapacity() v1.ResourceList {
+	return lcm.capacity
+}
+
+func TestNodeStatusWithCloudProviderNodeIP(t *testing.T) {
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
+	kubelet := testKubelet.kubelet
+	kubelet.kubeClient = nil // ensure only the heartbeat client is used
+	kubelet.hostname = testKubeletHostname
+
+	existingNode := v1.Node{
+		ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname, Annotations: make(map[string]string)},
+		Spec:       v1.NodeSpec{},
+	}
+
+	// TODO : is it possible to mock validateNodeIP() to avoid relying on the host interface addresses ?
+	addrs, err := net.InterfaceAddrs()
+	assert.NoError(t, err)
+	for _, addr := range addrs {
+		var ip net.IP
+		switch v := addr.(type) {
+		case *net.IPNet:
+			ip = v.IP
+		case *net.IPAddr:
+			ip = v.IP
+		}
+		if ip != nil && !ip.IsLoopback() && ip.To4() != nil {
+			kubelet.nodeIP = ip
+			break
+		}
+	}
+	assert.NotNil(t, kubelet.nodeIP)
+
+	fakeCloud := &fakecloud.FakeCloud{
+		Addresses: []v1.NodeAddress{
+			{
+				Type:    v1.NodeExternalIP,
+				Address: "132.143.154.163",
+			},
+			{
+				Type:    v1.NodeExternalIP,
+				Address: kubelet.nodeIP.String(),
+			},
+			{
+				Type:    v1.NodeInternalIP,
+				Address: "132.143.154.164",
+			},
+			{
+				Type:    v1.NodeInternalIP,
+				Address: kubelet.nodeIP.String(),
+			},
+			{
+				Type:    v1.NodeInternalIP,
+				Address: "132.143.154.165",
+			},
+			{
+				Type:    v1.NodeHostName,
+				Address: testKubeletHostname,
+			},
+		},
+		Err: nil,
+	}
+	kubelet.cloud = fakeCloud
+
+	kubelet.setNodeAddress(&existingNode)
+
+	expectedAddresses := []v1.NodeAddress{
+		{
+			Type:    v1.NodeExternalIP,
+			Address: kubelet.nodeIP.String(),
+		},
+		{
+			Type:    v1.NodeInternalIP,
+			Address: kubelet.nodeIP.String(),
+		},
+		{
+			Type:    v1.NodeHostName,
+			Address: testKubeletHostname,
+		},
+	}
+	assert.True(t, apiequality.Semantic.DeepEqual(expectedAddresses, existingNode.Status.Addresses), "%s", diff.ObjectDiff(expectedAddresses, existingNode.Status.Addresses))
 }
 
 func TestUpdateNewNodeStatus(t *testing.T) {
@@ -128,11 +219,16 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 		t, inputImageList, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
+	kubelet.kubeClient = nil // ensure only the heartbeat client is used
 	kubelet.containerManager = &localCM{
 		ContainerManager: cm.NewStubContainerManager(),
 		allocatable: v1.ResourceList{
 			v1.ResourceCPU:    *resource.NewMilliQuantity(200, resource.DecimalSI),
 			v1.ResourceMemory: *resource.NewQuantity(100E6, resource.BinarySI),
+		},
+		capacity: v1.ResourceList{
+			v1.ResourceCPU:    *resource.NewMilliQuantity(2000, resource.DecimalSI),
+			v1.ResourceMemory: *resource.NewQuantity(10E9, resource.BinarySI),
 		},
 	}
 	kubeClient := testKubelet.fakeKubeClient
@@ -153,9 +249,6 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 		ContainerOsVersion: "Debian GNU/Linux 7 (wheezy)",
 	}
 	mockCadvisor.On("VersionInfo").Return(versionInfo, nil)
-
-	// Make kubelet report that it has sufficient disk space.
-	require.NoError(t, updateDiskSpacePolicy(kubelet, mockCadvisor, 500, 500, 200, 200, 100, 100))
 
 	expectedNode := &v1.Node{
 		ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname},
@@ -247,77 +340,20 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 	assert.True(t, apiequality.Semantic.DeepEqual(expectedNode, updatedNode), "%s", diff.ObjectDiff(expectedNode, updatedNode))
 }
 
-func TestUpdateNewNodeOutOfDiskStatusWithTransitionFrequency(t *testing.T) {
-	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
-	defer testKubelet.Cleanup()
-	kubelet := testKubelet.kubelet
-	kubeClient := testKubelet.fakeKubeClient
-	existingNode := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname}}
-	kubeClient.ReactionChain = fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{existingNode}}).ReactionChain
-	machineInfo := &cadvisorapi.MachineInfo{
-		MachineID:      "123",
-		SystemUUID:     "abc",
-		BootID:         "1b3",
-		NumCores:       2,
-		MemoryCapacity: 1024,
-	}
-	mockCadvisor := testKubelet.fakeCadvisor
-	mockCadvisor.On("Start").Return(nil)
-	mockCadvisor.On("MachineInfo").Return(machineInfo, nil)
-	versionInfo := &cadvisorapi.VersionInfo{
-		KernelVersion:      "3.16.0-0.bpo.4-amd64",
-		ContainerOsVersion: "Debian GNU/Linux 7 (wheezy)",
-	}
-	mockCadvisor.On("VersionInfo").Return(versionInfo, nil)
-
-	// Make Kubelet report that it has sufficient disk space.
-	err := updateDiskSpacePolicy(kubelet, mockCadvisor, 500, 500, 200, 200, 100, 100)
-	require.NoError(t, err, "update the disk space manager")
-
-	kubelet.outOfDiskTransitionFrequency = 10 * time.Second
-
-	expectedNodeOutOfDiskCondition := v1.NodeCondition{
-		Type:               v1.NodeOutOfDisk,
-		Status:             v1.ConditionFalse,
-		Reason:             "KubeletHasSufficientDisk",
-		Message:            fmt.Sprintf("kubelet has sufficient disk space available"),
-		LastHeartbeatTime:  metav1.Time{},
-		LastTransitionTime: metav1.Time{},
-	}
-
-	kubelet.updateRuntimeUp()
-	assert.NoError(t, kubelet.updateNodeStatus())
-
-	actions := kubeClient.Actions()
-	require.Len(t, actions, 2)
-	require.True(t, actions[1].Matches("patch", "nodes"))
-	require.Equal(t, "status", actions[1].GetSubresource())
-
-	updatedNode, err := applyNodeStatusPatch(&existingNode, actions[1].(core.PatchActionImpl).GetPatch())
-	assert.NoError(t, err, "apply the node status patch")
-
-	var oodCondition v1.NodeCondition
-	for i, cond := range updatedNode.Status.Conditions {
-		assert.False(t, cond.LastHeartbeatTime.IsZero(), "LastHeartbeatTime for %v condition is zero", cond.Type)
-		assert.False(t, cond.LastTransitionTime.IsZero(), "LastTransitionTime for %v condition  is zero", cond.Type)
-		updatedNode.Status.Conditions[i].LastHeartbeatTime = metav1.Time{}
-		updatedNode.Status.Conditions[i].LastTransitionTime = metav1.Time{}
-		if cond.Type == v1.NodeOutOfDisk {
-			oodCondition = updatedNode.Status.Conditions[i]
-		}
-	}
-	assert.EqualValues(t, expectedNodeOutOfDiskCondition, oodCondition)
-}
-
 func TestUpdateExistingNodeStatus(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
+	kubelet.kubeClient = nil // ensure only the heartbeat client is used
 	kubelet.containerManager = &localCM{
 		ContainerManager: cm.NewStubContainerManager(),
 		allocatable: v1.ResourceList{
 			v1.ResourceCPU:    *resource.NewMilliQuantity(200, resource.DecimalSI),
 			v1.ResourceMemory: *resource.NewQuantity(100E6, resource.BinarySI),
+		},
+		capacity: v1.ResourceList{
+			v1.ResourceCPU:    *resource.NewMilliQuantity(2000, resource.DecimalSI),
+			v1.ResourceMemory: *resource.NewQuantity(20E9, resource.BinarySI),
 		},
 	}
 
@@ -329,9 +365,9 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 			Conditions: []v1.NodeCondition{
 				{
 					Type:               v1.NodeOutOfDisk,
-					Status:             v1.ConditionTrue,
-					Reason:             "KubeletOutOfDisk",
-					Message:            "out of disk space",
+					Status:             v1.ConditionFalse,
+					Reason:             "KubeletHasSufficientDisk",
+					Message:            fmt.Sprintf("kubelet has sufficient disk space available"),
 					LastHeartbeatTime:  metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 					LastTransitionTime: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 				},
@@ -389,10 +425,6 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 	}
 	mockCadvisor.On("VersionInfo").Return(versionInfo, nil)
 
-	// Make kubelet report that it is out of disk space.
-	err := updateDiskSpacePolicy(kubelet, mockCadvisor, 500, 500, 50, 50, 100, 100)
-	require.NoError(t, err, "update the disk space manager")
-
 	expectedNode := &v1.Node{
 		ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname},
 		Spec:       v1.NodeSpec{},
@@ -400,11 +432,11 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 			Conditions: []v1.NodeCondition{
 				{
 					Type:               v1.NodeOutOfDisk,
-					Status:             v1.ConditionTrue,
-					Reason:             "KubeletOutOfDisk",
-					Message:            "out of disk space",
-					LastHeartbeatTime:  metav1.Time{}, // placeholder
-					LastTransitionTime: metav1.Time{}, // placeholder
+					Status:             v1.ConditionFalse,
+					Reason:             "KubeletHasSufficientDisk",
+					Message:            fmt.Sprintf("kubelet has sufficient disk space available"),
+					LastHeartbeatTime:  metav1.Time{},
+					LastTransitionTime: metav1.Time{},
 				},
 				{
 					Type:               v1.NodeMemoryPressure,
@@ -499,152 +531,56 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 	assert.True(t, apiequality.Semantic.DeepEqual(expectedNode, updatedNode), "%s", diff.ObjectDiff(expectedNode, updatedNode))
 }
 
-func TestUpdateExistingNodeOutOfDiskStatusWithTransitionFrequency(t *testing.T) {
+func TestUpdateExistingNodeStatusTimeout(t *testing.T) {
+	attempts := int64(0)
+
+	// set up a listener that hangs connections
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	assert.NoError(t, err)
+	defer ln.Close()
+	go func() {
+		// accept connections and just let them hang
+		for {
+			_, err := ln.Accept()
+			if err != nil {
+				t.Log(err)
+				return
+			}
+			t.Log("accepted connection")
+			atomic.AddInt64(&attempts, 1)
+		}
+	}()
+
+	config := &rest.Config{
+		Host:    "http://" + ln.Addr().String(),
+		QPS:     -1,
+		Timeout: time.Second,
+	}
+	assert.NoError(t, err)
+
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
-	clock := testKubelet.fakeClock
-	// Do not set nano second, because apiserver function doesn't support nano second. (Only support
-	// RFC3339).
-	clock.SetTime(time.Unix(123456, 0))
-	kubeClient := testKubelet.fakeKubeClient
-	existingNode := v1.Node{
-		ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname},
-		Spec:       v1.NodeSpec{},
-		Status: v1.NodeStatus{
-			Conditions: []v1.NodeCondition{
-				{
-					Type:               v1.NodeReady,
-					Status:             v1.ConditionTrue,
-					Reason:             "KubeletReady",
-					Message:            fmt.Sprintf("kubelet is posting ready status"),
-					LastHeartbeatTime:  metav1.NewTime(clock.Now()),
-					LastTransitionTime: metav1.NewTime(clock.Now()),
-				},
-				{
-					Type:               v1.NodeOutOfDisk,
-					Status:             v1.ConditionTrue,
-					Reason:             "KubeletOutOfDisk",
-					Message:            "out of disk space",
-					LastHeartbeatTime:  metav1.NewTime(clock.Now()),
-					LastTransitionTime: metav1.NewTime(clock.Now()),
-				},
-			},
+	kubelet.kubeClient = nil // ensure only the heartbeat client is used
+	kubelet.heartbeatClient, err = v1core.NewForConfig(config)
+	kubelet.containerManager = &localCM{
+		ContainerManager: cm.NewStubContainerManager(),
+		allocatable: v1.ResourceList{
+			v1.ResourceCPU:    *resource.NewMilliQuantity(200, resource.DecimalSI),
+			v1.ResourceMemory: *resource.NewQuantity(100E6, resource.BinarySI),
 		},
-	}
-	kubeClient.ReactionChain = fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{existingNode}}).ReactionChain
-	mockCadvisor := testKubelet.fakeCadvisor
-	machineInfo := &cadvisorapi.MachineInfo{
-		MachineID:      "123",
-		SystemUUID:     "abc",
-		BootID:         "1b3",
-		NumCores:       2,
-		MemoryCapacity: 1024,
-	}
-	fsInfo := cadvisorapiv2.FsInfo{
-		Device: "123",
-	}
-	mockCadvisor.On("Start").Return(nil)
-	mockCadvisor.On("MachineInfo").Return(machineInfo, nil)
-	mockCadvisor.On("ImagesFsInfo").Return(fsInfo, nil)
-	mockCadvisor.On("RootFsInfo").Return(fsInfo, nil)
-	versionInfo := &cadvisorapi.VersionInfo{
-		KernelVersion:      "3.16.0-0.bpo.4-amd64",
-		ContainerOsVersion: "Debian GNU/Linux 7 (wheezy)",
-		DockerVersion:      "1.5.0",
-	}
-	mockCadvisor.On("VersionInfo").Return(versionInfo, nil)
-
-	kubelet.outOfDiskTransitionFrequency = 5 * time.Second
-
-	ood := v1.NodeCondition{
-		Type:               v1.NodeOutOfDisk,
-		Status:             v1.ConditionTrue,
-		Reason:             "KubeletOutOfDisk",
-		Message:            "out of disk space",
-		LastHeartbeatTime:  metav1.NewTime(clock.Now()), // placeholder
-		LastTransitionTime: metav1.NewTime(clock.Now()), // placeholder
-	}
-	noOod := v1.NodeCondition{
-		Type:               v1.NodeOutOfDisk,
-		Status:             v1.ConditionFalse,
-		Reason:             "KubeletHasSufficientDisk",
-		Message:            fmt.Sprintf("kubelet has sufficient disk space available"),
-		LastHeartbeatTime:  metav1.NewTime(clock.Now()), // placeholder
-		LastTransitionTime: metav1.NewTime(clock.Now()), // placeholder
-	}
-
-	testCases := []struct {
-		rootFsAvail   uint64
-		dockerFsAvail uint64
-		expected      v1.NodeCondition
-	}{
-		{
-			// NodeOutOfDisk==false
-			rootFsAvail:   200,
-			dockerFsAvail: 200,
-			expected:      ood,
-		},
-		{
-			// NodeOutOfDisk==true
-			rootFsAvail:   50,
-			dockerFsAvail: 200,
-			expected:      ood,
-		},
-		{
-			// NodeOutOfDisk==false
-			rootFsAvail:   200,
-			dockerFsAvail: 200,
-			expected:      ood,
-		},
-		{
-			// NodeOutOfDisk==true
-			rootFsAvail:   200,
-			dockerFsAvail: 50,
-			expected:      ood,
-		},
-		{
-			// NodeOutOfDisk==false
-			rootFsAvail:   200,
-			dockerFsAvail: 200,
-			expected:      noOod,
+		capacity: v1.ResourceList{
+			v1.ResourceCPU:    *resource.NewMilliQuantity(2000, resource.DecimalSI),
+			v1.ResourceMemory: *resource.NewQuantity(20E9, resource.BinarySI),
 		},
 	}
 
-	kubelet.updateRuntimeUp()
-	for tcIdx, tc := range testCases {
-		// Step by a second
-		clock.Step(1 * time.Second)
+	// should return an error, but not hang
+	assert.Error(t, kubelet.updateNodeStatus())
 
-		// Setup expected times.
-		tc.expected.LastHeartbeatTime = metav1.NewTime(clock.Now())
-		// In the last case, there should be a status transition for NodeOutOfDisk
-		if tcIdx == len(testCases)-1 {
-			tc.expected.LastTransitionTime = metav1.NewTime(clock.Now())
-		}
-
-		// Make kubelet report that it has sufficient disk space
-		err := updateDiskSpacePolicy(kubelet, mockCadvisor, 500, 500, tc.rootFsAvail, tc.dockerFsAvail, 100, 100)
-		require.NoError(t, err, "can't update disk space manager")
-		assert.NoError(t, kubelet.updateNodeStatus())
-
-		actions := kubeClient.Actions()
-		assert.Len(t, actions, 2, "test [%d]", tcIdx)
-
-		assert.IsType(t, core.PatchActionImpl{}, actions[1])
-		patchAction := actions[1].(core.PatchActionImpl)
-
-		updatedNode, err := applyNodeStatusPatch(&existingNode, patchAction.GetPatch())
-		require.NoError(t, err, "can't apply node status patch")
-		kubeClient.ClearActions()
-
-		var oodCondition v1.NodeCondition
-		for i, cond := range updatedNode.Status.Conditions {
-			if cond.Type == v1.NodeOutOfDisk {
-				oodCondition = updatedNode.Status.Conditions[i]
-			}
-		}
-		assert.EqualValues(t, tc.expected, oodCondition)
+	// should have attempted multiple times
+	if actualAttempts := atomic.LoadInt64(&attempts); actualAttempts != nodeStatusUpdateRetry {
+		t.Errorf("Expected %d attempts, got %d", nodeStatusUpdateRetry, actualAttempts)
 	}
 }
 
@@ -652,11 +588,16 @@ func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
+	kubelet.kubeClient = nil // ensure only the heartbeat client is used
 	kubelet.containerManager = &localCM{
 		ContainerManager: cm.NewStubContainerManager(),
 		allocatable: v1.ResourceList{
 			v1.ResourceCPU:    *resource.NewMilliQuantity(200, resource.DecimalSI),
 			v1.ResourceMemory: *resource.NewQuantity(100E6, resource.BinarySI),
+		},
+		capacity: v1.ResourceList{
+			v1.ResourceCPU:    *resource.NewMilliQuantity(2000, resource.DecimalSI),
+			v1.ResourceMemory: *resource.NewQuantity(10E9, resource.BinarySI),
 		},
 	}
 
@@ -680,9 +621,6 @@ func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
 	}
 	mockCadvisor.On("VersionInfo").Return(versionInfo, nil)
 
-	// Make kubelet report that it has sufficient disk space.
-	require.NoError(t, updateDiskSpacePolicy(kubelet, mockCadvisor, 500, 500, 200, 200, 100, 100))
-
 	expectedNode := &v1.Node{
 		ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname},
 		Spec:       v1.NodeSpec{},
@@ -692,7 +630,7 @@ func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
 					Type:               v1.NodeOutOfDisk,
 					Status:             v1.ConditionFalse,
 					Reason:             "KubeletHasSufficientDisk",
-					Message:            "kubelet has sufficient disk space available",
+					Message:            fmt.Sprintf("kubelet has sufficient disk space available"),
 					LastHeartbeatTime:  metav1.Time{},
 					LastTransitionTime: metav1.Time{},
 				},
@@ -859,6 +797,7 @@ func TestUpdateNodeStatusError(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
+	kubelet.kubeClient = nil // ensure only the heartbeat client is used
 	// No matching node for the kubelet
 	testKubelet.fakeKubeClient.ReactionChain = fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{}}).ReactionChain
 	assert.Error(t, kubelet.updateNodeStatus())
@@ -879,8 +818,15 @@ func TestRegisterWithApiServer(t *testing.T) {
 	kubeClient.AddReactor("get", "nodes", func(action core.Action) (bool, runtime.Object, error) {
 		// Return an existing (matching) node on get.
 		return true, &v1.Node{
-			ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname},
-			Spec:       v1.NodeSpec{ExternalID: testKubeletHostname},
+			ObjectMeta: metav1.ObjectMeta{
+				Name: testKubeletHostname,
+				Labels: map[string]string{
+					kubeletapis.LabelHostname: testKubeletHostname,
+					kubeletapis.LabelOS:       goruntime.GOOS,
+					kubeletapis.LabelArch:     goruntime.GOARCH,
+				},
+			},
+			Spec: v1.NodeSpec{ExternalID: testKubeletHostname},
 		}, nil
 	})
 	kubeClient.AddReactor("*", "*", func(action core.Action) (bool, runtime.Object, error) {
@@ -902,18 +848,18 @@ func TestRegisterWithApiServer(t *testing.T) {
 	}
 	mockCadvisor.On("VersionInfo").Return(versionInfo, nil)
 	mockCadvisor.On("ImagesFsInfo").Return(cadvisorapiv2.FsInfo{
-		Usage:     400 * mb,
-		Capacity:  1000 * mb,
-		Available: 600 * mb,
+		Usage:     400,
+		Capacity:  1000,
+		Available: 600,
 	}, nil)
 	mockCadvisor.On("RootFsInfo").Return(cadvisorapiv2.FsInfo{
-		Usage:    9 * mb,
-		Capacity: 10 * mb,
+		Usage:    9,
+		Capacity: 10,
 	}, nil)
 
 	done := make(chan struct{})
 	go func() {
-		kubelet.registerWithApiServer()
+		kubelet.registerWithAPIServer()
 		done <- struct{}{}
 	}()
 	select {
@@ -935,7 +881,13 @@ func TestTryRegisterWithApiServer(t *testing.T) {
 
 	newNode := func(cmad bool, externalID string) *v1.Node {
 		node := &v1.Node{
-			ObjectMeta: metav1.ObjectMeta{},
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: map[string]string{
+					kubeletapis.LabelHostname: testKubeletHostname,
+					kubeletapis.LabelOS:       goruntime.GOOS,
+					kubeletapis.LabelArch:     goruntime.GOARCH,
+				},
+			},
 			Spec: v1.NodeSpec{
 				ExternalID: externalID,
 			},
@@ -1072,7 +1024,7 @@ func TestTryRegisterWithApiServer(t *testing.T) {
 			return notImplemented(action)
 		})
 
-		result := kubelet.tryRegisterWithApiServer(tc.newNode)
+		result := kubelet.tryRegisterWithAPIServer(tc.newNode)
 		require.Equal(t, tc.expectedResult, result, "test [%s]", tc.name)
 
 		actions := kubeClient.Actions()
@@ -1098,5 +1050,264 @@ func TestTryRegisterWithApiServer(t *testing.T) {
 			actualCMAD, _ := strconv.ParseBool(savedNode.Annotations[volumehelper.ControllerManagedAttachAnnotation])
 			assert.Equal(t, tc.savedNodeCMAD, actualCMAD, "test [%s]", tc.name)
 		}
+	}
+}
+
+func TestUpdateNewNodeStatusTooLargeReservation(t *testing.T) {
+	// generate one more than maxImagesInNodeStatus in inputImageList
+	inputImageList, _ := generateTestingImageList(maxImagesInNodeStatus + 1)
+	testKubelet := newTestKubeletWithImageList(
+		t, inputImageList, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
+	kubelet := testKubelet.kubelet
+	kubelet.kubeClient = nil // ensure only the heartbeat client is used
+	kubelet.containerManager = &localCM{
+		ContainerManager: cm.NewStubContainerManager(),
+		allocatable: v1.ResourceList{
+			v1.ResourceCPU: *resource.NewMilliQuantity(40000, resource.DecimalSI),
+		},
+		capacity: v1.ResourceList{
+			v1.ResourceCPU:    *resource.NewMilliQuantity(2000, resource.DecimalSI),
+			v1.ResourceMemory: *resource.NewQuantity(10E9, resource.BinarySI),
+		},
+	}
+	kubeClient := testKubelet.fakeKubeClient
+	existingNode := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname}}
+	kubeClient.ReactionChain = fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{existingNode}}).ReactionChain
+	machineInfo := &cadvisorapi.MachineInfo{
+		MachineID:      "123",
+		SystemUUID:     "abc",
+		BootID:         "1b3",
+		NumCores:       2,
+		MemoryCapacity: 10E9, // 10G
+	}
+	mockCadvisor := testKubelet.fakeCadvisor
+	mockCadvisor.On("Start").Return(nil)
+	mockCadvisor.On("MachineInfo").Return(machineInfo, nil)
+	versionInfo := &cadvisorapi.VersionInfo{
+		KernelVersion:      "3.16.0-0.bpo.4-amd64",
+		ContainerOsVersion: "Debian GNU/Linux 7 (wheezy)",
+	}
+	mockCadvisor.On("VersionInfo").Return(versionInfo, nil)
+
+	expectedNode := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname},
+		Spec:       v1.NodeSpec{},
+		Status: v1.NodeStatus{
+			Capacity: v1.ResourceList{
+				v1.ResourceCPU:    *resource.NewMilliQuantity(2000, resource.DecimalSI),
+				v1.ResourceMemory: *resource.NewQuantity(10E9, resource.BinarySI),
+				v1.ResourcePods:   *resource.NewQuantity(0, resource.DecimalSI),
+			},
+			Allocatable: v1.ResourceList{
+				v1.ResourceCPU:    *resource.NewMilliQuantity(0, resource.DecimalSI),
+				v1.ResourceMemory: *resource.NewQuantity(10E9, resource.BinarySI),
+				v1.ResourcePods:   *resource.NewQuantity(0, resource.DecimalSI),
+			},
+		},
+	}
+
+	kubelet.updateRuntimeUp()
+	assert.NoError(t, kubelet.updateNodeStatus())
+	actions := kubeClient.Actions()
+	require.Len(t, actions, 2)
+	require.True(t, actions[1].Matches("patch", "nodes"))
+	require.Equal(t, actions[1].GetSubresource(), "status")
+
+	updatedNode, err := applyNodeStatusPatch(&existingNode, actions[1].(core.PatchActionImpl).GetPatch())
+	assert.NoError(t, err)
+	assert.True(t, apiequality.Semantic.DeepEqual(expectedNode.Status.Allocatable, updatedNode.Status.Allocatable), "%s", diff.ObjectDiff(expectedNode.Status.Allocatable, updatedNode.Status.Allocatable))
+}
+
+func TestUpdateDefaultLabels(t *testing.T) {
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	testKubelet.kubelet.kubeClient = nil // ensure only the heartbeat client is used
+
+	cases := []struct {
+		name         string
+		initialNode  *v1.Node
+		existingNode *v1.Node
+		needsUpdate  bool
+		finalLabels  map[string]string
+	}{
+		{
+			name: "make sure default labels exist",
+			initialNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						kubeletapis.LabelHostname:          "new-hostname",
+						kubeletapis.LabelZoneFailureDomain: "new-zone-failure-domain",
+						kubeletapis.LabelZoneRegion:        "new-zone-region",
+						kubeletapis.LabelInstanceType:      "new-instance-type",
+						kubeletapis.LabelOS:                "new-os",
+						kubeletapis.LabelArch:              "new-arch",
+					},
+				},
+			},
+			existingNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{},
+				},
+			},
+			needsUpdate: true,
+			finalLabels: map[string]string{
+				kubeletapis.LabelHostname:          "new-hostname",
+				kubeletapis.LabelZoneFailureDomain: "new-zone-failure-domain",
+				kubeletapis.LabelZoneRegion:        "new-zone-region",
+				kubeletapis.LabelInstanceType:      "new-instance-type",
+				kubeletapis.LabelOS:                "new-os",
+				kubeletapis.LabelArch:              "new-arch",
+			},
+		},
+		{
+			name: "make sure default labels are up to date",
+			initialNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						kubeletapis.LabelHostname:          "new-hostname",
+						kubeletapis.LabelZoneFailureDomain: "new-zone-failure-domain",
+						kubeletapis.LabelZoneRegion:        "new-zone-region",
+						kubeletapis.LabelInstanceType:      "new-instance-type",
+						kubeletapis.LabelOS:                "new-os",
+						kubeletapis.LabelArch:              "new-arch",
+					},
+				},
+			},
+			existingNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						kubeletapis.LabelHostname:          "old-hostname",
+						kubeletapis.LabelZoneFailureDomain: "old-zone-failure-domain",
+						kubeletapis.LabelZoneRegion:        "old-zone-region",
+						kubeletapis.LabelInstanceType:      "old-instance-type",
+						kubeletapis.LabelOS:                "old-os",
+						kubeletapis.LabelArch:              "old-arch",
+					},
+				},
+			},
+			needsUpdate: true,
+			finalLabels: map[string]string{
+				kubeletapis.LabelHostname:          "new-hostname",
+				kubeletapis.LabelZoneFailureDomain: "new-zone-failure-domain",
+				kubeletapis.LabelZoneRegion:        "new-zone-region",
+				kubeletapis.LabelInstanceType:      "new-instance-type",
+				kubeletapis.LabelOS:                "new-os",
+				kubeletapis.LabelArch:              "new-arch",
+			},
+		},
+		{
+			name: "make sure existing labels do not get deleted",
+			initialNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						kubeletapis.LabelHostname:          "new-hostname",
+						kubeletapis.LabelZoneFailureDomain: "new-zone-failure-domain",
+						kubeletapis.LabelZoneRegion:        "new-zone-region",
+						kubeletapis.LabelInstanceType:      "new-instance-type",
+						kubeletapis.LabelOS:                "new-os",
+						kubeletapis.LabelArch:              "new-arch",
+					},
+				},
+			},
+			existingNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						kubeletapis.LabelHostname:          "new-hostname",
+						kubeletapis.LabelZoneFailureDomain: "new-zone-failure-domain",
+						kubeletapis.LabelZoneRegion:        "new-zone-region",
+						kubeletapis.LabelInstanceType:      "new-instance-type",
+						kubeletapis.LabelOS:                "new-os",
+						kubeletapis.LabelArch:              "new-arch",
+						"please-persist":                   "foo",
+					},
+				},
+			},
+			needsUpdate: false,
+			finalLabels: map[string]string{
+				kubeletapis.LabelHostname:          "new-hostname",
+				kubeletapis.LabelZoneFailureDomain: "new-zone-failure-domain",
+				kubeletapis.LabelZoneRegion:        "new-zone-region",
+				kubeletapis.LabelInstanceType:      "new-instance-type",
+				kubeletapis.LabelOS:                "new-os",
+				kubeletapis.LabelArch:              "new-arch",
+				"please-persist":                   "foo",
+			},
+		},
+		{
+			name: "make sure existing labels do not get deleted when initial node has no opinion",
+			initialNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{},
+				},
+			},
+			existingNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						kubeletapis.LabelHostname:          "new-hostname",
+						kubeletapis.LabelZoneFailureDomain: "new-zone-failure-domain",
+						kubeletapis.LabelZoneRegion:        "new-zone-region",
+						kubeletapis.LabelInstanceType:      "new-instance-type",
+						kubeletapis.LabelOS:                "new-os",
+						kubeletapis.LabelArch:              "new-arch",
+						"please-persist":                   "foo",
+					},
+				},
+			},
+			needsUpdate: false,
+			finalLabels: map[string]string{
+				kubeletapis.LabelHostname:          "new-hostname",
+				kubeletapis.LabelZoneFailureDomain: "new-zone-failure-domain",
+				kubeletapis.LabelZoneRegion:        "new-zone-region",
+				kubeletapis.LabelInstanceType:      "new-instance-type",
+				kubeletapis.LabelOS:                "new-os",
+				kubeletapis.LabelArch:              "new-arch",
+				"please-persist":                   "foo",
+			},
+		},
+		{
+			name: "no update needed",
+			initialNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						kubeletapis.LabelHostname:          "new-hostname",
+						kubeletapis.LabelZoneFailureDomain: "new-zone-failure-domain",
+						kubeletapis.LabelZoneRegion:        "new-zone-region",
+						kubeletapis.LabelInstanceType:      "new-instance-type",
+						kubeletapis.LabelOS:                "new-os",
+						kubeletapis.LabelArch:              "new-arch",
+					},
+				},
+			},
+			existingNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						kubeletapis.LabelHostname:          "new-hostname",
+						kubeletapis.LabelZoneFailureDomain: "new-zone-failure-domain",
+						kubeletapis.LabelZoneRegion:        "new-zone-region",
+						kubeletapis.LabelInstanceType:      "new-instance-type",
+						kubeletapis.LabelOS:                "new-os",
+						kubeletapis.LabelArch:              "new-arch",
+					},
+				},
+			},
+			needsUpdate: false,
+			finalLabels: map[string]string{
+				kubeletapis.LabelHostname:          "new-hostname",
+				kubeletapis.LabelZoneFailureDomain: "new-zone-failure-domain",
+				kubeletapis.LabelZoneRegion:        "new-zone-region",
+				kubeletapis.LabelInstanceType:      "new-instance-type",
+				kubeletapis.LabelOS:                "new-os",
+				kubeletapis.LabelArch:              "new-arch",
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		defer testKubelet.Cleanup()
+		kubelet := testKubelet.kubelet
+
+		needsUpdate := kubelet.updateDefaultLabels(tc.initialNode, tc.existingNode)
+		assert.Equal(t, tc.needsUpdate, needsUpdate, tc.name)
+		assert.Equal(t, tc.finalLabels, tc.existingNode.Labels, tc.name)
 	}
 }

@@ -25,6 +25,8 @@ import (
 
 	"github.com/golang/glog"
 
+	"k8s.io/api/core/v1"
+	extensions "k8s.io/api/extensions/v1beta1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -33,15 +35,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/errors"
 	intstrutil "k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
+	clientset "k8s.io/client-go/kubernetes"
+	extensionsv1beta1 "k8s.io/client-go/kubernetes/typed/extensions/v1beta1"
+	corelisters "k8s.io/client-go/listers/core/v1"
+	extensionslisters "k8s.io/client-go/listers/extensions/v1beta1"
 	"k8s.io/client-go/util/integer"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/annotations"
-	"k8s.io/kubernetes/pkg/api/v1"
 	internalextensions "k8s.io/kubernetes/pkg/apis/extensions"
-	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	corelisters "k8s.io/kubernetes/pkg/client/listers/core/v1"
-	extensionslisters "k8s.io/kubernetes/pkg/client/listers/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/controller"
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
 )
@@ -66,11 +65,6 @@ const (
 	RollbackTemplateUnchanged = "DeploymentRollbackTemplateUnchanged"
 	// RollbackDone is the done rollback event reason
 	RollbackDone = "DeploymentRollback"
-	// OverlapAnnotation marks deployments with overlapping selector with other deployments
-	// TODO: Delete this annotation when we no longer need to support a client
-	//       talking to a server older than v1.6.
-	OverlapAnnotation = "deployment.kubernetes.io/error-selector-overlapping-with"
-
 	// Reasons for deployment conditions
 	//
 	// Progressing:
@@ -121,18 +115,6 @@ func NewDeploymentCondition(condType extensions.DeploymentConditionType, status 
 
 // GetDeploymentCondition returns the condition with the provided type.
 func GetDeploymentCondition(status extensions.DeploymentStatus, condType extensions.DeploymentConditionType) *extensions.DeploymentCondition {
-	for i := range status.Conditions {
-		c := status.Conditions[i]
-		if c.Type == condType {
-			return &c
-		}
-	}
-	return nil
-}
-
-// TODO: remove the duplicate
-// GetDeploymentConditionInternal returns the condition with the provided type.
-func GetDeploymentConditionInternal(status internalextensions.DeploymentStatus, condType internalextensions.DeploymentConditionType) *internalextensions.DeploymentCondition {
 	for i := range status.Conditions {
 		c := status.Conditions[i]
 		if c.Type == condType {
@@ -259,7 +241,22 @@ func SetNewReplicaSetAnnotations(deployment *extensions.Deployment, newRS *exten
 	// The newRS's revision should be the greatest among all RSes. Usually, its revision number is newRevision (the max revision number
 	// of all old RSes + 1). However, it's possible that some of the old RSes are deleted after the newRS revision being updated, and
 	// newRevision becomes smaller than newRS's revision. We should only update newRS revision when it's smaller than newRevision.
-	if oldRevision < newRevision {
+
+	oldRevisionInt, err := strconv.ParseInt(oldRevision, 10, 64)
+	if err != nil {
+		if oldRevision != "" {
+			glog.Warningf("Updating replica set revision OldRevision not int %s", err)
+			return false
+		}
+		//If the RS annotation is empty then initialise it to 0
+		oldRevisionInt = 0
+	}
+	newRevisionInt, err := strconv.ParseInt(newRevision, 10, 64)
+	if err != nil {
+		glog.Warningf("Updating replica set revision NewRevision not int %s", err)
+		return false
+	}
+	if oldRevisionInt < newRevisionInt {
 		newRS.Annotations[RevisionAnnotation] = newRevision
 		annotationChanged = true
 		glog.V(4).Infof("Updating replica set %q revision to %s", newRS.Name, newRevision)
@@ -285,12 +282,11 @@ func SetNewReplicaSetAnnotations(deployment *extensions.Deployment, newRS *exten
 }
 
 var annotationsToSkip = map[string]bool{
-	annotations.LastAppliedConfigAnnotation: true,
-	RevisionAnnotation:                      true,
-	RevisionHistoryAnnotation:               true,
-	DesiredReplicasAnnotation:               true,
-	MaxReplicasAnnotation:                   true,
-	OverlapAnnotation:                       true,
+	v1.LastAppliedConfigAnnotation: true,
+	RevisionAnnotation:             true,
+	RevisionHistoryAnnotation:      true,
+	DesiredReplicasAnnotation:      true,
+	MaxReplicasAnnotation:          true,
 }
 
 // skipCopyAnnotation returns true if we should skip copying the annotation with the given annotation key
@@ -489,46 +485,41 @@ func getReplicaSetFraction(rs extensions.ReplicaSet, d extensions.Deployment) in
 // GetAllReplicaSets returns the old and new replica sets targeted by the given Deployment. It gets PodList and ReplicaSetList from client interface.
 // Note that the first set of old replica sets doesn't include the ones with no pods, and the second set of old replica sets include all old replica sets.
 // The third returned value is the new replica set, and it may be nil if it doesn't exist yet.
-func GetAllReplicaSets(deployment *extensions.Deployment, c clientset.Interface) ([]*extensions.ReplicaSet, []*extensions.ReplicaSet, *extensions.ReplicaSet, error) {
-	rsList, err := ListReplicaSets(deployment, rsListFromClient(c))
+func GetAllReplicaSets(deployment *extensions.Deployment, c extensionsv1beta1.ExtensionsV1beta1Interface) ([]*extensions.ReplicaSet, []*extensions.ReplicaSet, *extensions.ReplicaSet, error) {
+	rsList, err := ListReplicaSets(deployment, RsListFromClient(c))
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	oldRSes, allOldRSes, err := FindOldReplicaSets(deployment, rsList)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	newRS, err := FindNewReplicaSet(deployment, rsList)
-	if err != nil {
-		return nil, nil, nil, err
-	}
+	oldRSes, allOldRSes := FindOldReplicaSets(deployment, rsList)
+	newRS := FindNewReplicaSet(deployment, rsList)
 	return oldRSes, allOldRSes, newRS, nil
 }
 
 // GetOldReplicaSets returns the old replica sets targeted by the given Deployment; get PodList and ReplicaSetList from client interface.
 // Note that the first set of old replica sets doesn't include the ones with no pods, and the second set of old replica sets include all old replica sets.
-func GetOldReplicaSets(deployment *extensions.Deployment, c clientset.Interface) ([]*extensions.ReplicaSet, []*extensions.ReplicaSet, error) {
-	rsList, err := ListReplicaSets(deployment, rsListFromClient(c))
+func GetOldReplicaSets(deployment *extensions.Deployment, c extensionsv1beta1.ExtensionsV1beta1Interface) ([]*extensions.ReplicaSet, []*extensions.ReplicaSet, error) {
+	rsList, err := ListReplicaSets(deployment, RsListFromClient(c))
 	if err != nil {
 		return nil, nil, err
 	}
-	return FindOldReplicaSets(deployment, rsList)
+	oldRSes, allOldRSes := FindOldReplicaSets(deployment, rsList)
+	return oldRSes, allOldRSes, nil
 }
 
 // GetNewReplicaSet returns a replica set that matches the intent of the given deployment; get ReplicaSetList from client interface.
 // Returns nil if the new replica set doesn't exist yet.
-func GetNewReplicaSet(deployment *extensions.Deployment, c clientset.Interface) (*extensions.ReplicaSet, error) {
-	rsList, err := ListReplicaSets(deployment, rsListFromClient(c))
+func GetNewReplicaSet(deployment *extensions.Deployment, c extensionsv1beta1.ExtensionsV1beta1Interface) (*extensions.ReplicaSet, error) {
+	rsList, err := ListReplicaSets(deployment, RsListFromClient(c))
 	if err != nil {
 		return nil, err
 	}
-	return FindNewReplicaSet(deployment, rsList)
+	return FindNewReplicaSet(deployment, rsList), nil
 }
 
-// rsListFromClient returns an rsListFunc that wraps the given client.
-func rsListFromClient(c clientset.Interface) rsListFunc {
+// RsListFromClient returns an rsListFunc that wraps the given client.
+func RsListFromClient(c extensionsv1beta1.ExtensionsV1beta1Interface) RsListFunc {
 	return func(namespace string, options metav1.ListOptions) ([]*extensions.ReplicaSet, error) {
-		rsList, err := c.Extensions().ReplicaSets(namespace).List(options)
+		rsList, err := c.ReplicaSets(namespace).List(options)
 		if err != nil {
 			return nil, err
 		}
@@ -540,22 +531,15 @@ func rsListFromClient(c clientset.Interface) rsListFunc {
 	}
 }
 
-// podListFromClient returns a podListFunc that wraps the given client.
-func podListFromClient(c clientset.Interface) podListFunc {
-	return func(namespace string, options metav1.ListOptions) (*v1.PodList, error) {
-		return c.Core().Pods(namespace).List(options)
-	}
-}
-
 // TODO: switch this to full namespacers
-type rsListFunc func(string, metav1.ListOptions) ([]*extensions.ReplicaSet, error)
+type RsListFunc func(string, metav1.ListOptions) ([]*extensions.ReplicaSet, error)
 type podListFunc func(string, metav1.ListOptions) (*v1.PodList, error)
 
 // ListReplicaSets returns a slice of RSes the given deployment targets.
 // Note that this does NOT attempt to reconcile ControllerRef (adopt/orphan),
 // because only the controller itself should do that.
 // However, it does filter out anything whose ControllerRef doesn't match.
-func ListReplicaSets(deployment *extensions.Deployment, getRSList rsListFunc) ([]*extensions.ReplicaSet, error) {
+func ListReplicaSets(deployment *extensions.Deployment, getRSList RsListFunc) ([]*extensions.ReplicaSet, error) {
 	// TODO: Right now we list replica sets by their labels. We should list them by selector, i.e. the replica set's selector
 	//       should be a superset of the deployment's selector, see https://github.com/kubernetes/kubernetes/issues/19830.
 	namespace := deployment.Namespace
@@ -566,13 +550,12 @@ func ListReplicaSets(deployment *extensions.Deployment, getRSList rsListFunc) ([
 	options := metav1.ListOptions{LabelSelector: selector.String()}
 	all, err := getRSList(namespace, options)
 	if err != nil {
-		return all, err
+		return nil, err
 	}
 	// Only include those whose ControllerRef matches the Deployment.
 	owned := make([]*extensions.ReplicaSet, 0, len(all))
 	for _, rs := range all {
-		controllerRef := controller.GetControllerOf(rs)
-		if controllerRef != nil && controllerRef.UID == deployment.UID {
+		if metav1.IsControlledBy(rs, deployment) {
 			owned = append(owned, rs)
 		}
 	}
@@ -595,8 +578,7 @@ func ListReplicaSetsInternal(deployment *internalextensions.Deployment, getRSLis
 	// Only include those whose ControllerRef matches the Deployment.
 	filtered := make([]*internalextensions.ReplicaSet, 0, len(all))
 	for _, rs := range all {
-		controllerRef := controller.GetControllerOf(rs)
-		if controllerRef != nil && controllerRef.UID == deployment.UID {
+		if metav1.IsControlledBy(rs, deployment) {
 			filtered = append(filtered, rs)
 		}
 	}
@@ -629,7 +611,7 @@ func ListPods(deployment *extensions.Deployment, rsList []*extensions.ReplicaSet
 	owned := &v1.PodList{Items: make([]v1.Pod, 0, len(all.Items))}
 	for i := range all.Items {
 		pod := &all.Items[i]
-		controllerRef := controller.GetControllerOf(pod)
+		controllerRef := metav1.GetControllerOf(pod)
 		if controllerRef != nil && rsMap[controllerRef.UID] {
 			owned.Items = append(owned.Items, *pod)
 		}
@@ -641,9 +623,11 @@ func ListPods(deployment *extensions.Deployment, rsList []*extensions.ReplicaSet
 // We ignore pod-template-hash because the hash result would be different upon podTemplateSpec API changes
 // (e.g. the addition of a new field will cause the hash code to change)
 // Note that we assume input podTemplateSpecs contain non-empty labels
-func EqualIgnoreHash(template1, template2 v1.PodTemplateSpec) bool {
+func EqualIgnoreHash(template1, template2 *v1.PodTemplateSpec) bool {
+	t1Copy := template1.DeepCopy()
+	t2Copy := template2.DeepCopy()
 	// First, compare template.Labels (ignoring hash)
-	labels1, labels2 := template1.Labels, template2.Labels
+	labels1, labels2 := t1Copy.Labels, t2Copy.Labels
 	if len(labels1) > len(labels2) {
 		labels1, labels2 = labels2, labels1
 	}
@@ -654,36 +638,32 @@ func EqualIgnoreHash(template1, template2 v1.PodTemplateSpec) bool {
 		}
 	}
 	// Then, compare the templates without comparing their labels
-	template1.Labels, template2.Labels = nil, nil
-	return apiequality.Semantic.DeepEqual(template1, template2)
+	t1Copy.Labels, t2Copy.Labels = nil, nil
+	return apiequality.Semantic.DeepEqual(t1Copy, t2Copy)
 }
 
 // FindNewReplicaSet returns the new RS this given deployment targets (the one with the same pod template).
-func FindNewReplicaSet(deployment *extensions.Deployment, rsList []*extensions.ReplicaSet) (*extensions.ReplicaSet, error) {
-	newRSTemplate := GetNewReplicaSetTemplate(deployment)
+func FindNewReplicaSet(deployment *extensions.Deployment, rsList []*extensions.ReplicaSet) *extensions.ReplicaSet {
 	sort.Sort(controller.ReplicaSetsByCreationTimestamp(rsList))
 	for i := range rsList {
-		if EqualIgnoreHash(rsList[i].Spec.Template, newRSTemplate) {
+		if EqualIgnoreHash(&rsList[i].Spec.Template, &deployment.Spec.Template) {
 			// In rare cases, such as after cluster upgrades, Deployment may end up with
 			// having more than one new ReplicaSets that have the same template as its template,
 			// see https://github.com/kubernetes/kubernetes/issues/40415
 			// We deterministically choose the oldest new ReplicaSet.
-			return rsList[i], nil
+			return rsList[i]
 		}
 	}
 	// new ReplicaSet does not exist.
-	return nil, nil
+	return nil
 }
 
 // FindOldReplicaSets returns the old replica sets targeted by the given Deployment, with the given slice of RSes.
 // Note that the first set of old replica sets doesn't include the ones with no pods, and the second set of old replica sets include all old replica sets.
-func FindOldReplicaSets(deployment *extensions.Deployment, rsList []*extensions.ReplicaSet) ([]*extensions.ReplicaSet, []*extensions.ReplicaSet, error) {
+func FindOldReplicaSets(deployment *extensions.Deployment, rsList []*extensions.ReplicaSet) ([]*extensions.ReplicaSet, []*extensions.ReplicaSet) {
 	var requiredRSs []*extensions.ReplicaSet
 	var allRSs []*extensions.ReplicaSet
-	newRS, err := FindNewReplicaSet(deployment, rsList)
-	if err != nil {
-		return nil, nil, err
-	}
+	newRS := FindNewReplicaSet(deployment, rsList)
 	for _, rs := range rsList {
 		// Filter out new replica set
 		if newRS != nil && rs.UID == newRS.UID {
@@ -694,7 +674,7 @@ func FindOldReplicaSets(deployment *extensions.Deployment, rsList []*extensions.
 			requiredRSs = append(requiredRSs, rs)
 		}
 	}
-	return requiredRSs, allRSs, nil
+	return requiredRSs, allRSs
 }
 
 // WaitForReplicaSetUpdated polls the replica set until it is updated.
@@ -729,7 +709,7 @@ func LabelPodsWithHash(podList *v1.PodList, c clientset.Interface, podLister cor
 		}
 		// Only label the pod that doesn't already have the new hash
 		if pod.Labels[extensions.DefaultDeploymentUniqueLabelKey] != hash {
-			_, err := UpdatePodWithRetries(c.Core().Pods(namespace), podLister, pod.Namespace, pod.Name,
+			_, err := UpdatePodWithRetries(c.CoreV1().Pods(namespace), podLister, pod.Namespace, pod.Name,
 				func(podToUpdate *v1.Pod) error {
 					// Precondition: the pod doesn't contain the new hash in its label.
 					if podToUpdate.Labels[extensions.DefaultDeploymentUniqueLabelKey] == hash {
@@ -745,31 +725,6 @@ func LabelPodsWithHash(podList *v1.PodList, c clientset.Interface, podLister cor
 		}
 	}
 	return nil
-}
-
-// GetNewReplicaSetTemplate returns the desired PodTemplateSpec for the new ReplicaSet corresponding to the given ReplicaSet.
-// Callers of this helper need to set the DefaultDeploymentUniqueLabelKey k/v pair.
-func GetNewReplicaSetTemplate(deployment *extensions.Deployment) v1.PodTemplateSpec {
-	// newRS will have the same template as in deployment spec.
-	return v1.PodTemplateSpec{
-		ObjectMeta: deployment.Spec.Template.ObjectMeta,
-		Spec:       deployment.Spec.Template.Spec,
-	}
-}
-
-// TODO: remove the duplicate
-// GetNewReplicaSetTemplateInternal returns the desired PodTemplateSpec for the new ReplicaSet corresponding to the given ReplicaSet.
-func GetNewReplicaSetTemplateInternal(deployment *internalextensions.Deployment) api.PodTemplateSpec {
-	// newRS will have the same template as in deployment spec, plus a unique label in some cases.
-	newRSTemplate := api.PodTemplateSpec{
-		ObjectMeta: deployment.Spec.Template.ObjectMeta,
-		Spec:       deployment.Spec.Template.Spec,
-	}
-	newRSTemplate.ObjectMeta.Labels = labelsutil.CloneAndAddLabel(
-		deployment.Spec.Template.ObjectMeta.Labels,
-		internalextensions.DefaultDeploymentUniqueLabelKey,
-		fmt.Sprintf("%d", GetInternalPodTemplateSpecHash(newRSTemplate)))
-	return newRSTemplate
 }
 
 // SetFromReplicaSetTemplate sets the desired PodTemplateSpec from a replica set template to the given deployment.
@@ -842,8 +797,8 @@ func DeploymentComplete(deployment *extensions.Deployment, newStatus *extensions
 
 // DeploymentProgressing reports progress for a deployment. Progress is estimated by comparing the
 // current with the new status of the deployment that the controller is observing. More specifically,
-// when new pods are scaled up or become available, or old pods are scaled down, then we consider the
-// deployment is progressing.
+// when new pods are scaled up or become ready or available, or old pods are scaled down, then we
+// consider the deployment is progressing.
 func DeploymentProgressing(deployment *extensions.Deployment, newStatus *extensions.DeploymentStatus) bool {
 	oldStatus := deployment.Status
 
@@ -853,6 +808,7 @@ func DeploymentProgressing(deployment *extensions.Deployment, newStatus *extensi
 
 	return (newStatus.UpdatedReplicas > oldStatus.UpdatedReplicas) ||
 		(newStatusOldReplicas < oldStatusOldReplicas) ||
+		newStatus.ReadyReplicas > deployment.Status.ReadyReplicas ||
 		newStatus.AvailableReplicas > deployment.Status.AvailableReplicas
 }
 
@@ -872,6 +828,20 @@ func DeploymentTimedOut(deployment *extensions.Deployment, newStatus *extensions
 	// again.
 	condition := GetDeploymentCondition(*newStatus, extensions.DeploymentProgressing)
 	if condition == nil {
+		return false
+	}
+	// If the previous condition has been a successful rollout then we shouldn't try to
+	// estimate any progress. Scenario:
+	//
+	// * progressDeadlineSeconds is smaller than the difference between now and the time
+	//   the last rollout finished in the past.
+	// * the creation of a new ReplicaSet triggers a resync of the Deployment prior to the
+	//   cached copy of the Deployment getting updated with the status.condition that indicates
+	//   the creation of the new ReplicaSet.
+	//
+	// The Deployment will be resynced and eventually its Progressing condition will catch
+	// up with the state of the world.
+	if condition.Reason == NewRSAvailableReason {
 		return false
 	}
 	if condition.Reason == TimedOutReason {
@@ -943,7 +913,7 @@ func IsSaturated(deployment *extensions.Deployment, rs *extensions.ReplicaSet) b
 // Returns error if polling timesout.
 func WaitForObservedDeployment(getDeploymentFunc func() (*extensions.Deployment, error), desiredGeneration int64, interval, timeout time.Duration) error {
 	// TODO: This should take clientset.Interface when all code is updated to use clientset. Keeping it this way allows the function to be used by callers who have client.Interface.
-	return wait.Poll(interval, timeout, func() (bool, error) {
+	return wait.PollImmediate(interval, timeout, func() (bool, error) {
 		deployment, err := getDeploymentFunc()
 		if err != nil {
 			return false, err
@@ -993,16 +963,4 @@ func ResolveFenceposts(maxSurge, maxUnavailable *intstrutil.IntOrString, desired
 	}
 
 	return int32(surge), int32(unavailable), nil
-}
-
-func DeploymentDeepCopy(deployment *extensions.Deployment) (*extensions.Deployment, error) {
-	objCopy, err := api.Scheme.DeepCopy(deployment)
-	if err != nil {
-		return nil, err
-	}
-	copied, ok := objCopy.(*extensions.Deployment)
-	if !ok {
-		return nil, fmt.Errorf("expected Deployment, got %#v", objCopy)
-	}
-	return copied, nil
 }

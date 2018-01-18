@@ -19,8 +19,9 @@ package node
 import (
 	"testing"
 
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/api/v1"
+	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 )
 
 func TestGetPreferredAddress(t *testing.T) {
@@ -52,7 +53,7 @@ func TestGetPreferredAddress(t *testing.T) {
 			ExpectAddress: "1.2.3.5",
 		},
 		"found hostname address": {
-			Labels: map[string]string{metav1.LabelHostname: "label-hostname"},
+			Labels: map[string]string{kubeletapis.LabelHostname: "label-hostname"},
 			Addresses: []v1.NodeAddress{
 				{Type: v1.NodeExternalIP, Address: "1.2.3.5"},
 				{Type: v1.NodeHostName, Address: "status-hostname"},
@@ -61,7 +62,7 @@ func TestGetPreferredAddress(t *testing.T) {
 			ExpectAddress: "status-hostname",
 		},
 		"found label address": {
-			Labels: map[string]string{metav1.LabelHostname: "label-hostname"},
+			Labels: map[string]string{kubeletapis.LabelHostname: "label-hostname"},
 			Addresses: []v1.NodeAddress{
 				{Type: v1.NodeExternalIP, Address: "1.2.3.5"},
 			},

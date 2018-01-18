@@ -19,8 +19,8 @@ package kubectl
 import (
 	"fmt"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/pkg/api"
 )
 
 // ServiceAccountGeneratorV1 supports stable generation of a service account
@@ -37,7 +37,7 @@ func (g *ServiceAccountGeneratorV1) StructuredGenerate() (runtime.Object, error)
 	if err := g.validate(); err != nil {
 		return nil, err
 	}
-	serviceAccount := &api.ServiceAccount{}
+	serviceAccount := &v1.ServiceAccount{}
 	serviceAccount.Name = g.Name
 	return serviceAccount, nil
 }

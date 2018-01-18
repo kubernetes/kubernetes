@@ -67,13 +67,19 @@ type Attributes interface {
 // zero or more calls to methods of the Attributes interface.  It returns nil when an action is
 // authorized, otherwise it returns an error.
 type Authorizer interface {
-	Authorize(a Attributes) (authorized bool, reason string, err error)
+	Authorize(a Attributes) (authorized Decision, reason string, err error)
 }
 
-type AuthorizerFunc func(a Attributes) (bool, string, error)
+type AuthorizerFunc func(a Attributes) (Decision, string, error)
 
-func (f AuthorizerFunc) Authorize(a Attributes) (bool, string, error) {
+func (f AuthorizerFunc) Authorize(a Attributes) (Decision, string, error) {
 	return f(a)
+}
+
+// RuleResolver provides a mechanism for resolving the list of rules that apply to a given user within a namespace.
+type RuleResolver interface {
+	// RulesFor get the list of cluster wide rules, the list of rules in the specific namespace, incomplete status and errors.
+	RulesFor(user user.Info, namespace string) ([]ResourceRuleInfo, []NonResourceRuleInfo, bool, error)
 }
 
 // RequestAttributesGetter provides a function that extracts Attributes from an http.Request
@@ -138,3 +144,15 @@ func (a AttributesRecord) IsResourceRequest() bool {
 func (a AttributesRecord) GetPath() string {
 	return a.Path
 }
+
+type Decision int
+
+const (
+	// DecisionDeny means that an authorizer decided to deny the action.
+	DecisionDeny Decision = iota
+	// DecisionAllow means that an authorizer decided to allow the action.
+	DecisionAllow
+	// DecisionNoOpionion means that an authorizer has no opinion on wether
+	// to allow or deny an action.
+	DecisionNoOpinion
+)

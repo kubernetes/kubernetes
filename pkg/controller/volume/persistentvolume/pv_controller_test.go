@@ -21,12 +21,16 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+
+	"k8s.io/api/core/v1"
+	storagev1 "k8s.io/api/storage/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/watch"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
-	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
 	"k8s.io/kubernetes/pkg/controller"
 )
 
@@ -145,8 +149,7 @@ func TestControllerSync(t *testing.T) {
 		}
 		// Simulate a periodic resync, just in case some events arrived in a
 		// wrong order.
-		ctrl.claims.Resync()
-		ctrl.volumes.store.Resync()
+		ctrl.resync()
 
 		err = reactor.waitTest(test)
 		if err != nil {
@@ -232,4 +235,107 @@ func addVolumeAnnotation(volume *v1.PersistentVolume, annName, annValue string) 
 	}
 	volume.Annotations[annName] = annValue
 	return volume
+}
+
+func makePVCClass(scName *string) *v1.PersistentVolumeClaim {
+	return &v1.PersistentVolumeClaim{
+		Spec: v1.PersistentVolumeClaimSpec{
+			StorageClassName: scName,
+		},
+	}
+}
+
+func makeStorageClass(scName string, mode *storagev1.VolumeBindingMode) *storagev1.StorageClass {
+	return &storagev1.StorageClass{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: scName,
+		},
+		VolumeBindingMode: mode,
+	}
+}
+
+func TestDelayBinding(t *testing.T) {
+	var (
+		classNotHere       = "not-here"
+		classNoMode        = "no-mode"
+		classImmediateMode = "immediate-mode"
+		classWaitMode      = "wait-mode"
+
+		modeImmediate = storagev1.VolumeBindingImmediate
+		modeWait      = storagev1.VolumeBindingWaitForFirstConsumer
+	)
+
+	tests := map[string]struct {
+		pvc         *v1.PersistentVolumeClaim
+		shouldDelay bool
+		shouldFail  bool
+	}{
+		"nil-class": {
+			pvc:         makePVCClass(nil),
+			shouldDelay: false,
+		},
+		"class-not-found": {
+			pvc:         makePVCClass(&classNotHere),
+			shouldDelay: false,
+		},
+		"no-mode-class": {
+			pvc:         makePVCClass(&classNoMode),
+			shouldDelay: false,
+			shouldFail:  true,
+		},
+		"immediate-mode-class": {
+			pvc:         makePVCClass(&classImmediateMode),
+			shouldDelay: false,
+		},
+		"wait-mode-class": {
+			pvc:         makePVCClass(&classWaitMode),
+			shouldDelay: true,
+		},
+	}
+
+	classes := []*storagev1.StorageClass{
+		makeStorageClass(classNoMode, nil),
+		makeStorageClass(classImmediateMode, &modeImmediate),
+		makeStorageClass(classWaitMode, &modeWait),
+	}
+
+	client := &fake.Clientset{}
+	informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
+	classInformer := informerFactory.Storage().V1().StorageClasses()
+	ctrl := &PersistentVolumeController{
+		classLister: classInformer.Lister(),
+	}
+
+	for _, class := range classes {
+		if err := classInformer.Informer().GetIndexer().Add(class); err != nil {
+			t.Fatalf("Failed to add storage class %q: %v", class.Name, err)
+		}
+	}
+
+	// When feature gate is disabled, should always be delayed
+	name := "feature-disabled"
+	shouldDelay, err := ctrl.shouldDelayBinding(makePVCClass(&classWaitMode))
+	if err != nil {
+		t.Errorf("Test %q returned error: %v", name, err)
+	}
+	if shouldDelay {
+		t.Errorf("Test %q returned true, expected false", name)
+	}
+
+	// Enable feature gate
+	utilfeature.DefaultFeatureGate.Set("VolumeScheduling=true")
+	defer utilfeature.DefaultFeatureGate.Set("VolumeScheduling=false")
+
+	for name, test := range tests {
+		shouldDelay, err = ctrl.shouldDelayBinding(test.pvc)
+		if err != nil && !test.shouldFail {
+			t.Errorf("Test %q returned error: %v", name, err)
+		}
+		if err == nil && test.shouldFail {
+			t.Errorf("Test %q returned success, expected error", name)
+		}
+		if shouldDelay != test.shouldDelay {
+			t.Errorf("Test %q returned unexpected %v", name, test.shouldDelay)
+		}
+	}
 }

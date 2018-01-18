@@ -75,8 +75,15 @@ function replicate-master-instance() {
 
 function create-master-instance-internal() {
   local gcloud="gcloud"
+  local retries=5
+  local sleep_sec=10
+  if [[ "${MASTER_SIZE##*-}" -ge 64 ]]; then  # remove everything up to last dash (inclusive)
+    # Workaround for #55777
+    retries=30
+    sleep_sec=60
+  fi
   if [[ "${ENABLE_IP_ALIASES:-}" == 'true' ]]; then
-    gcloud="gcloud alpha"
+    gcloud="gcloud beta"
   fi
 
   local -r master_name="${1}"
@@ -88,8 +95,8 @@ function create-master-instance-internal() {
   fi
 
   local network=$(make-gcloud-network-argument \
-    "${NETWORK}" "${address:-}" \
-    "${ENABLE_IP_ALIASES:-}" "${IP_ALIAS_SUBNETWORK:-}" "${IP_ALIAS_SIZE:-}")
+    "${NETWORK_PROJECT}" "${REGION}" "${NETWORK}" "${SUBNETWORK:-}" \
+    "${address:-}" "${ENABLE_IP_ALIASES:-}" "${IP_ALIAS_SIZE:-}")
 
   local metadata="kube-env=${KUBE_TEMP}/master-kube-env.yaml"
   metadata="${metadata},user-data=${KUBE_ROOT}/cluster/gce/gci/master.yaml"
@@ -99,6 +106,7 @@ function create-master-instance-internal() {
   metadata="${metadata},gci-ensure-gke-docker=${KUBE_TEMP}/gci-ensure-gke-docker.txt"
   metadata="${metadata},gci-docker-version=${KUBE_TEMP}/gci-docker-version.txt"
   metadata="${metadata},kube-master-certs=${KUBE_TEMP}/kube-master-certs.yaml"
+  metadata="${metadata},${MASTER_EXTRA_METADATA}"
 
   local disk="name=${master_name}-pd"
   disk="${disk},device-name=master-pd"
@@ -106,19 +114,35 @@ function create-master-instance-internal() {
   disk="${disk},boot=no"
   disk="${disk},auto-delete=no"
 
-  ${gcloud} compute instances create "${master_name}" \
-    --project "${PROJECT}" \
-    --zone "${ZONE}" \
-    --machine-type "${MASTER_SIZE}" \
-    --image-project="${MASTER_IMAGE_PROJECT}" \
-    --image "${MASTER_IMAGE}" \
-    --tags "${MASTER_TAG}" \
-    --scopes "storage-ro,compute-rw,monitoring,logging-write" \
-    --metadata-from-file "${metadata}" \
-    --disk "${disk}" \
-    --boot-disk-size "${MASTER_ROOT_DISK_SIZE:-10}" \
-    ${preemptible_master} \
-    ${network}
+  for attempt in $(seq 1 ${retries}); do
+    if result=$(${gcloud} compute instances create "${master_name}" \
+      --project "${PROJECT}" \
+      --zone "${ZONE}" \
+      --machine-type "${MASTER_SIZE}" \
+      --image-project="${MASTER_IMAGE_PROJECT}" \
+      --image "${MASTER_IMAGE}" \
+      --tags "${MASTER_TAG}" \
+      --scopes "storage-ro,compute-rw,monitoring,logging-write" \
+      --metadata-from-file "${metadata}" \
+      --disk "${disk}" \
+      --boot-disk-size "${MASTER_ROOT_DISK_SIZE}" \
+      ${MASTER_MIN_CPU_ARCHITECTURE:+"--min-cpu-platform=${MASTER_MIN_CPU_ARCHITECTURE}"} \
+      ${preemptible_master} \
+      ${network} 2>&1); then
+      echo "${result}" >&2
+      return 0
+    else
+      echo "${result}" >&2
+      if [[ ! "${result}" =~ "try again later" ]]; then
+        echo "Failed to create master instance due to non-retryable error" >&2
+        return 1
+      fi
+      sleep $sleep_sec
+    fi
+  done
+
+  echo "Failed to create master instance despite ${retries} attempts" >&2
+  return 1
 }
 
 function get-metadata() {

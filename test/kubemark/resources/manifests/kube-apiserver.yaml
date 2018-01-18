@@ -36,6 +36,7 @@ spec:
       hostPort: 8080
       protocol: TCP
     volumeMounts:
+{{audit_policy_config_mount}}
     - name: srvkube
       mountPath: /etc/srv/kubernetes
       readOnly: true
@@ -50,12 +51,14 @@ spec:
     - name: srvsshproxy
       mountPath: /etc/srv/sshproxy
   volumes:
+{{audit_policy_config_volume}}
   - name: srvkube
     hostPath:
       path: /etc/srv/kubernetes
   - name: logfile
     hostPath:
       path: /var/log/kube-apiserver.log
+      type: FileOrCreate
   - name: etcssl
     hostPath:
       path: /etc/ssl

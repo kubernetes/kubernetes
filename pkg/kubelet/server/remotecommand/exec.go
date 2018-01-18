@@ -27,8 +27,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	remotecommandconsts "k8s.io/apimachinery/pkg/util/remotecommand"
 	"k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/kubernetes/pkg/client/unversioned/remotecommand"
-	utilexec "k8s.io/kubernetes/pkg/util/exec"
+	"k8s.io/client-go/tools/remotecommand"
+	utilexec "k8s.io/utils/exec"
 )
 
 // Executor knows how to execute a command in a container in a pod.

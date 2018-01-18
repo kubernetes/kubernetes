@@ -43,11 +43,12 @@ fi
 GREP_REGEX=""
 function gcloud-compute-list() {
   local -r resource=$1
+  local -r filter=${2:-}
   echo -e "\n\n[ ${resource} ]"
   local attempt=1
   local result=""
   while true; do
-    if result=$(gcloud compute ${resource} list --project=${PROJECT} ${@:2}); then
+    if result=$(gcloud compute ${resource} list --project=${PROJECT} ${filter:+--filter="$filter"} ${@:3}); then
       if [[ ! -z "${GREP_REGEX}" ]]; then
         result=$(echo "${result}" | grep "${GREP_REGEX}" || true)
       fi
@@ -73,21 +74,21 @@ echo "Provider: ${KUBERNETES_PROVIDER:-}"
 
 # List resources related to instances, filtering by the instance prefix if
 # provided.
-gcloud-compute-list instance-templates --regexp="${INSTANCE_PREFIX}.*"
-gcloud-compute-list instance-groups ${ZONE:+"--zones=${ZONE}"} --regexp="${INSTANCE_PREFIX}.*"
-gcloud-compute-list instances ${ZONE:+"--zones=${ZONE}"} --regexp="${INSTANCE_PREFIX}.*"
+gcloud-compute-list instance-templates "name ~ '${INSTANCE_PREFIX}.*'"
+gcloud-compute-list instance-groups "${ZONE:+"zone:(${ZONE}) AND "}name ~ '${INSTANCE_PREFIX}.*'"
+gcloud-compute-list instances "${ZONE:+"zone:(${ZONE}) AND "}name ~ '${INSTANCE_PREFIX}.*'"
 
-# List disk resources, filterying by instance prefix if provided.
-gcloud-compute-list disks ${ZONE:+"--zones=${ZONE}"} --regexp="${INSTANCE_PREFIX}.*"
+# List disk resources, filtering by instance prefix if provided.
+gcloud-compute-list disks "${ZONE:+"zone:(${ZONE}) AND "}name ~ '${INSTANCE_PREFIX}.*'"
 
 # List network resources. We include names starting with "a", corresponding to
 # those that Kubernetes creates.
-gcloud-compute-list addresses ${REGION:+"--regions=${REGION}"} --regexp="a.*|${INSTANCE_PREFIX}.*"
+gcloud-compute-list addresses "${REGION:+"region=(${REGION}) AND "}name ~ 'a.*|${INSTANCE_PREFIX}.*'"
 # Match either the header or a line with the specified e2e network.
 # This assumes that the network name is the second field in the output.
 GREP_REGEX="^NAME\|^[^ ]\+[ ]\+\(default\|${NETWORK}\) "
-gcloud-compute-list routes --regexp="default.*|${INSTANCE_PREFIX}.*"
-gcloud-compute-list firewall-rules --regexp="default.*|k8s-fw.*|${INSTANCE_PREFIX}.*"
+gcloud-compute-list routes "name ~ 'default.*|${INSTANCE_PREFIX}.*'"
+gcloud-compute-list firewall-rules "name ~ 'default.*|k8s-fw.*|${INSTANCE_PREFIX}.*'"
 GREP_REGEX=""
-gcloud-compute-list forwarding-rules ${REGION:+"--regions=${REGION}"}
-gcloud-compute-list target-pools ${REGION:+"--regions=${REGION}"}
+gcloud-compute-list forwarding-rules ${REGION:+"region=(${REGION})"}
+gcloud-compute-list target-pools ${REGION:+"region=(${REGION})"}

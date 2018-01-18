@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2018 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	rest "k8s.io/client-go/rest"
-	api "k8s.io/kubernetes/pkg/api"
+	core "k8s.io/kubernetes/pkg/apis/core"
 	scheme "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/scheme"
 )
 
@@ -33,15 +33,15 @@ type ResourceQuotasGetter interface {
 
 // ResourceQuotaInterface has methods to work with ResourceQuota resources.
 type ResourceQuotaInterface interface {
-	Create(*api.ResourceQuota) (*api.ResourceQuota, error)
-	Update(*api.ResourceQuota) (*api.ResourceQuota, error)
-	UpdateStatus(*api.ResourceQuota) (*api.ResourceQuota, error)
+	Create(*core.ResourceQuota) (*core.ResourceQuota, error)
+	Update(*core.ResourceQuota) (*core.ResourceQuota, error)
+	UpdateStatus(*core.ResourceQuota) (*core.ResourceQuota, error)
 	Delete(name string, options *v1.DeleteOptions) error
 	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
-	Get(name string, options v1.GetOptions) (*api.ResourceQuota, error)
-	List(opts v1.ListOptions) (*api.ResourceQuotaList, error)
+	Get(name string, options v1.GetOptions) (*core.ResourceQuota, error)
+	List(opts v1.ListOptions) (*core.ResourceQuotaList, error)
 	Watch(opts v1.ListOptions) (watch.Interface, error)
-	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *api.ResourceQuota, err error)
+	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *core.ResourceQuota, err error)
 	ResourceQuotaExpansion
 }
 
@@ -59,9 +59,44 @@ func newResourceQuotas(c *CoreClient, namespace string) *resourceQuotas {
 	}
 }
 
+// Get takes name of the resourceQuota, and returns the corresponding resourceQuota object, and an error if there is any.
+func (c *resourceQuotas) Get(name string, options v1.GetOptions) (result *core.ResourceQuota, err error) {
+	result = &core.ResourceQuota{}
+	err = c.client.Get().
+		Namespace(c.ns).
+		Resource("resourcequotas").
+		Name(name).
+		VersionedParams(&options, scheme.ParameterCodec).
+		Do().
+		Into(result)
+	return
+}
+
+// List takes label and field selectors, and returns the list of ResourceQuotas that match those selectors.
+func (c *resourceQuotas) List(opts v1.ListOptions) (result *core.ResourceQuotaList, err error) {
+	result = &core.ResourceQuotaList{}
+	err = c.client.Get().
+		Namespace(c.ns).
+		Resource("resourcequotas").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Do().
+		Into(result)
+	return
+}
+
+// Watch returns a watch.Interface that watches the requested resourceQuotas.
+func (c *resourceQuotas) Watch(opts v1.ListOptions) (watch.Interface, error) {
+	opts.Watch = true
+	return c.client.Get().
+		Namespace(c.ns).
+		Resource("resourcequotas").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Watch()
+}
+
 // Create takes the representation of a resourceQuota and creates it.  Returns the server's representation of the resourceQuota, and an error, if there is any.
-func (c *resourceQuotas) Create(resourceQuota *api.ResourceQuota) (result *api.ResourceQuota, err error) {
-	result = &api.ResourceQuota{}
+func (c *resourceQuotas) Create(resourceQuota *core.ResourceQuota) (result *core.ResourceQuota, err error) {
+	result = &core.ResourceQuota{}
 	err = c.client.Post().
 		Namespace(c.ns).
 		Resource("resourcequotas").
@@ -72,8 +107,8 @@ func (c *resourceQuotas) Create(resourceQuota *api.ResourceQuota) (result *api.R
 }
 
 // Update takes the representation of a resourceQuota and updates it. Returns the server's representation of the resourceQuota, and an error, if there is any.
-func (c *resourceQuotas) Update(resourceQuota *api.ResourceQuota) (result *api.ResourceQuota, err error) {
-	result = &api.ResourceQuota{}
+func (c *resourceQuotas) Update(resourceQuota *core.ResourceQuota) (result *core.ResourceQuota, err error) {
+	result = &core.ResourceQuota{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("resourcequotas").
@@ -85,10 +120,10 @@ func (c *resourceQuotas) Update(resourceQuota *api.ResourceQuota) (result *api.R
 }
 
 // UpdateStatus was generated because the type contains a Status member.
-// Add a +genclientstatus=false comment above the type to avoid generating UpdateStatus().
+// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
 
-func (c *resourceQuotas) UpdateStatus(resourceQuota *api.ResourceQuota) (result *api.ResourceQuota, err error) {
-	result = &api.ResourceQuota{}
+func (c *resourceQuotas) UpdateStatus(resourceQuota *core.ResourceQuota) (result *core.ResourceQuota, err error) {
+	result = &core.ResourceQuota{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("resourcequotas").
@@ -122,44 +157,9 @@ func (c *resourceQuotas) DeleteCollection(options *v1.DeleteOptions, listOptions
 		Error()
 }
 
-// Get takes name of the resourceQuota, and returns the corresponding resourceQuota object, and an error if there is any.
-func (c *resourceQuotas) Get(name string, options v1.GetOptions) (result *api.ResourceQuota, err error) {
-	result = &api.ResourceQuota{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("resourcequotas").
-		Name(name).
-		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
-		Into(result)
-	return
-}
-
-// List takes label and field selectors, and returns the list of ResourceQuotas that match those selectors.
-func (c *resourceQuotas) List(opts v1.ListOptions) (result *api.ResourceQuotaList, err error) {
-	result = &api.ResourceQuotaList{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("resourcequotas").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Do().
-		Into(result)
-	return
-}
-
-// Watch returns a watch.Interface that watches the requested resourceQuotas.
-func (c *resourceQuotas) Watch(opts v1.ListOptions) (watch.Interface, error) {
-	opts.Watch = true
-	return c.client.Get().
-		Namespace(c.ns).
-		Resource("resourcequotas").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Watch()
-}
-
 // Patch applies the patch and returns the patched resourceQuota.
-func (c *resourceQuotas) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *api.ResourceQuota, err error) {
-	result = &api.ResourceQuota{}
+func (c *resourceQuotas) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *core.ResourceQuota, err error) {
+	result = &core.ResourceQuota{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
 		Resource("resourcequotas").

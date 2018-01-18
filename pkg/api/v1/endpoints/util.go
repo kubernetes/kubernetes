@@ -23,8 +23,8 @@ import (
 	"hash"
 	"sort"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/api/v1"
 	hashutil "k8s.io/kubernetes/pkg/util/hash"
 )
 
@@ -167,14 +167,6 @@ func LessEndpointAddress(a, b *v1.EndpointAddress) bool {
 		return true
 	}
 	return a.TargetRef.UID < b.TargetRef.UID
-}
-
-type addrPtrsByIpAndUID []*v1.EndpointAddress
-
-func (sl addrPtrsByIpAndUID) Len() int      { return len(sl) }
-func (sl addrPtrsByIpAndUID) Swap(i, j int) { sl[i], sl[j] = sl[j], sl[i] }
-func (sl addrPtrsByIpAndUID) Less(i, j int) bool {
-	return LessEndpointAddress(sl[i], sl[j])
 }
 
 // SortSubsets sorts an array of EndpointSubset objects in place.  For ease of

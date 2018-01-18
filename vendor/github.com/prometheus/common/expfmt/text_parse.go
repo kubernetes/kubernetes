@@ -47,7 +47,7 @@ func (e ParseError) Error() string {
 }
 
 // TextParser is used to parse the simple and flat text-based exchange format. Its
-// nil value is ready to use.
+// zero value is ready to use.
 type TextParser struct {
 	metricFamiliesByName map[string]*dto.MetricFamily
 	buf                  *bufio.Reader // Where the parsed input is read through.
@@ -107,6 +107,13 @@ func (p *TextParser) TextToMetricFamilies(in io.Reader) (map[string]*dto.MetricF
 		if len(mf.GetMetric()) == 0 {
 			delete(p.metricFamiliesByName, k)
 		}
+	}
+	// If p.err is io.EOF now, we have run into a premature end of the input
+	// stream. Turn this error into something nicer and more
+	// meaningful. (io.EOF is often used as a signal for the legitimate end
+	// of an input stream.)
+	if p.err == io.EOF {
+		p.parseError("unexpected end of input stream")
 	}
 	return p.metricFamiliesByName, p.err
 }

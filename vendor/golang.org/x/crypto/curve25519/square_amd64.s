@@ -3,28 +3,17 @@
 // license that can be found in the LICENSE file.
 
 // This code was translated into a form compatible with 6a from the public
-// domain sources in SUPERCOP: http://bench.cr.yp.to/supercop.html
+// domain sources in SUPERCOP: https://bench.cr.yp.to/supercop.html
 
 // +build amd64,!gccgo,!appengine
 
+#include "const_amd64.h"
+
 // func square(out, in *[5]uint64)
-TEXT ·square(SB),7,$96-16
+TEXT ·square(SB),7,$0-16
 	MOVQ out+0(FP), DI
 	MOVQ in+8(FP), SI
 
-	MOVQ SP,R11
-	MOVQ $31,CX
-	NOTQ CX
-	ANDQ CX,SP
-	ADDQ $32, SP
-
-	MOVQ R11,0(SP)
-	MOVQ R12,8(SP)
-	MOVQ R13,16(SP)
-	MOVQ R14,24(SP)
-	MOVQ R15,32(SP)
-	MOVQ BX,40(SP)
-	MOVQ BP,48(SP)
 	MOVQ 0(SI),AX
 	MULQ 0(SI)
 	MOVQ AX,CX
@@ -97,7 +86,7 @@ TEXT ·square(SB),7,$96-16
 	MULQ 32(SI)
 	ADDQ AX,R13
 	ADCQ DX,R14
-	MOVQ ·REDMASK51(SB),SI
+	MOVQ $REDMASK51,SI
 	SHLQ $13,R8:CX
 	ANDQ SI,CX
 	SHLQ $13,R10:R9
@@ -140,14 +129,4 @@ TEXT ·square(SB),7,$96-16
 	MOVQ R9,16(DI)
 	MOVQ AX,24(DI)
 	MOVQ R10,32(DI)
-	MOVQ 0(SP),R11
-	MOVQ 8(SP),R12
-	MOVQ 16(SP),R13
-	MOVQ 24(SP),R14
-	MOVQ 32(SP),R15
-	MOVQ 40(SP),BX
-	MOVQ 48(SP),BP
-	MOVQ R11,SP
-	MOVQ DI,AX
-	MOVQ SI,DX
 	RET

@@ -26,14 +26,13 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 	"k8s.io/kubernetes/pkg/printers"
-	"k8s.io/kubernetes/pkg/util/i18n"
 )
 
 var (
@@ -48,7 +47,7 @@ var (
 		the --grace-period flag, or pass --now to set a grace-period of 1. Because these resources often
 		represent entities in the cluster, deletion may not be acknowledged immediately. If the node
 		hosting a pod is down or cannot reach the API server, termination may take significantly longer
-		than the grace period. To force delete a resource,	you must pass a grace	period of 0 and specify
+		than the grace period. To force delete a resource, you must pass a grace period of 0 and specify
 		the --force flag.
 
 		IMPORTANT: Force deleting pods does not wait for confirmation that the pod's processes have been
@@ -61,9 +60,9 @@ var (
 		Also, if you force delete pods the scheduler may place new pods on those nodes before the node
 		has released those resources and causing those pods to be evicted immediately.
 
-		Note that the delete command does NOT do resource version checks, so if someone
-		submits an update to a resource right when you submit a delete, their update
-		will be lost along with the rest of the resource.`))
+		Note that the delete command does NOT do resource version checks, so if someone submits an
+		update to a resource right when you submit a delete, their update will be lost along with the
+		rest of the resource.`))
 
 	delete_example = templates.Examples(i18n.T(`
 		# Delete a pod using the type and name specified in pod.json.
@@ -134,11 +133,11 @@ func NewCmdDelete(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 		Example: delete_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(cmdutil.ValidateOutputArgs(cmd))
-			if err := options.Complete(f, out, errOut, args); err != nil {
+			if err := options.Complete(f, out, errOut, args, cmd); err != nil {
 				cmdutil.CheckErr(err)
 			}
 			if err := options.Validate(cmd); err != nil {
-				cmdutil.CheckErr(cmdutil.UsageError(cmd, err.Error()))
+				cmdutil.CheckErr(cmdutil.UsageErrorf(cmd, err.Error()))
 			}
 			if err := options.RunDelete(); err != nil {
 				cmdutil.CheckErr(err)
@@ -150,8 +149,8 @@ func NewCmdDelete(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 	}
 	usage := "containing the resource to delete."
 	cmdutil.AddFilenameOptionFlags(cmd, &options.FilenameOptions, usage)
-	cmd.Flags().StringVarP(&options.Selector, "selector", "l", "", "Selector (label query) to filter on.")
-	cmd.Flags().BoolVar(&options.DeleteAll, "all", false, "select all resources in the namespace of the specified resource types.")
+	cmd.Flags().StringVarP(&options.Selector, "selector", "l", "", "Selector (label query) to filter on, not including uninitialized ones.")
+	cmd.Flags().BoolVar(&options.DeleteAll, "all", false, "Delete all resources, including uninitialized ones, in the namespace of the specified resource types.")
 	cmd.Flags().BoolVar(&options.IgnoreNotFound, "ignore-not-found", false, "Treat \"resource not found\" as a successful delete. Defaults to \"true\" when --all is specified.")
 	cmd.Flags().BoolVar(&options.Cascade, "cascade", true, "If true, cascade the deletion of the resources managed by this resource (e.g. Pods created by a ReplicationController).  Default true.")
 	cmd.Flags().IntVar(&options.GracePeriod, "grace-period", -1, "Period of time in seconds given to the resource to terminate gracefully. Ignored if negative.")
@@ -160,26 +159,24 @@ func NewCmdDelete(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 	cmd.Flags().DurationVar(&options.Timeout, "timeout", 0, "The length of time to wait before giving up on a delete, zero means determine a timeout from the size of the object")
 	cmdutil.AddOutputVarFlagsForMutation(cmd, &options.Output)
 	cmdutil.AddInclude3rdPartyVarFlags(cmd, &options.Include3rdParty)
+	cmdutil.AddIncludeUninitializedFlag(cmd)
 	return cmd
 }
 
-func (o *DeleteOptions) Complete(f cmdutil.Factory, out, errOut io.Writer, args []string) error {
+func (o *DeleteOptions) Complete(f cmdutil.Factory, out, errOut io.Writer, args []string, cmd *cobra.Command) error {
 	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
 		return err
 	}
 
-	// Set up client based support.
-	mapper, typer, err := f.UnstructuredObject()
-	if err != nil {
-		return err
-	}
-	o.Mapper = mapper
-	r := resource.NewBuilder(mapper, f.CategoryExpander(), typer, resource.ClientMapperFunc(f.UnstructuredClientForMapping), unstructured.UnstructuredJSONScheme).
+	includeUninitialized := cmdutil.ShouldIncludeUninitialized(cmd, false)
+	r := f.NewBuilder().
+		Unstructured().
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, &o.FilenameOptions).
-		SelectorParam(o.Selector).
+		LabelSelectorParam(o.Selector).
+		IncludeUninitialized(includeUninitialized).
 		SelectAllParam(o.DeleteAll).
 		ResourceTypeOrNameArgs(false, args...).RequireObject(false).
 		Flatten().
@@ -189,6 +186,7 @@ func (o *DeleteOptions) Complete(f cmdutil.Factory, out, errOut io.Writer, args 
 		return err
 	}
 	o.Result = r
+	o.Mapper = r.Mapper().RESTMapper
 
 	o.f = f
 	// Set up writer
@@ -236,7 +234,7 @@ func (o *DeleteOptions) RunDelete() error {
 	if o.Cascade {
 		return ReapResult(o.Result, o.f, o.Out, true, o.IgnoreNotFound, o.Timeout, o.GracePeriod, o.WaitForDeletion, shortOutput, o.Mapper, false)
 	}
-	return DeleteResult(o.Result, o.Out, o.IgnoreNotFound, shortOutput, o.Mapper)
+	return DeleteResult(o.Result, o.f, o.Out, o.IgnoreNotFound, o.GracePeriod, shortOutput, o.Mapper)
 }
 
 func ReapResult(r *resource.Result, f cmdutil.Factory, out io.Writer, isDefaultDelete, ignoreNotFound bool, timeout time.Duration, gracePeriod int, waitForDeletion, shortOutput bool, mapper meta.RESTMapper, quiet bool) error {
@@ -254,7 +252,7 @@ func ReapResult(r *resource.Result, f cmdutil.Factory, out io.Writer, isDefaultD
 			// If there is no reaper for this resources and the user didn't explicitly ask for stop.
 			if kubectl.IsNoSuchReaperError(err) && isDefaultDelete {
 				// No client side reaper found. Let the server do cascading deletion.
-				return cascadingDeleteResource(info, out, shortOutput, mapper)
+				return cascadingDeleteResource(info, f, out, shortOutput, mapper)
 			}
 			return cmdutil.AddSourceToErr("reaping", info.Source, err)
 		}
@@ -271,7 +269,7 @@ func ReapResult(r *resource.Result, f cmdutil.Factory, out io.Writer, isDefaultD
 			}
 		}
 		if !quiet {
-			cmdutil.PrintSuccess(mapper, shortOutput, out, info.Mapping.Resource, info.Name, false, "deleted")
+			f.PrintSuccess(mapper, shortOutput, out, info.Mapping.Resource, info.Name, false, "deleted")
 		}
 		return nil
 	})
@@ -284,7 +282,7 @@ func ReapResult(r *resource.Result, f cmdutil.Factory, out io.Writer, isDefaultD
 	return nil
 }
 
-func DeleteResult(r *resource.Result, out io.Writer, ignoreNotFound bool, shortOutput bool, mapper meta.RESTMapper) error {
+func DeleteResult(r *resource.Result, f cmdutil.Factory, out io.Writer, ignoreNotFound bool, gracePeriod int, shortOutput bool, mapper meta.RESTMapper) error {
 	found := 0
 	if ignoreNotFound {
 		r = r.IgnoreErrors(errors.IsNotFound)
@@ -294,7 +292,15 @@ func DeleteResult(r *resource.Result, out io.Writer, ignoreNotFound bool, shortO
 			return err
 		}
 		found++
-		return deleteResource(info, out, shortOutput, mapper, nil)
+
+		// if we're here, it means that cascade=false (not the default), so we should orphan as requested
+		orphan := true
+		options := &metav1.DeleteOptions{}
+		if gracePeriod >= 0 {
+			options = metav1.NewDeleteOptions(int64(gracePeriod))
+		}
+		options.OrphanDependents = &orphan
+		return deleteResource(info, f, out, shortOutput, mapper, options)
 	})
 	if err != nil {
 		return err
@@ -305,21 +311,21 @@ func DeleteResult(r *resource.Result, out io.Writer, ignoreNotFound bool, shortO
 	return nil
 }
 
-func cascadingDeleteResource(info *resource.Info, out io.Writer, shortOutput bool, mapper meta.RESTMapper) error {
+func cascadingDeleteResource(info *resource.Info, f cmdutil.Factory, out io.Writer, shortOutput bool, mapper meta.RESTMapper) error {
 	falseVar := false
 	deleteOptions := &metav1.DeleteOptions{OrphanDependents: &falseVar}
-	return deleteResource(info, out, shortOutput, mapper, deleteOptions)
+	return deleteResource(info, f, out, shortOutput, mapper, deleteOptions)
 }
 
-func deleteResource(info *resource.Info, out io.Writer, shortOutput bool, mapper meta.RESTMapper, deleteOptions *metav1.DeleteOptions) error {
+func deleteResource(info *resource.Info, f cmdutil.Factory, out io.Writer, shortOutput bool, mapper meta.RESTMapper, deleteOptions *metav1.DeleteOptions) error {
 	if err := resource.NewHelper(info.Client, info.Mapping).DeleteWithOptions(info.Namespace, info.Name, deleteOptions); err != nil {
 		return cmdutil.AddSourceToErr("deleting", info.Source, err)
 	}
-	cmdutil.PrintSuccess(mapper, shortOutput, out, info.Mapping.Resource, info.Name, false, "deleted")
+	f.PrintSuccess(mapper, shortOutput, out, info.Mapping.Resource, info.Name, false, "deleted")
 	return nil
 }
 
-// objectDeletionWaitInterval is the interval to wait between checks for deletion. Exposed for testing.
+// objectDeletionWaitInterval is the interval to wait between checks for deletion.
 var objectDeletionWaitInterval = time.Second
 
 // waitForObjectDeletion refreshes the object, waiting until it is deleted, a timeout is reached, or

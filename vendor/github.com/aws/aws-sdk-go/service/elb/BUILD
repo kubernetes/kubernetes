@@ -1,20 +1,16 @@
-package(default_visibility = ["//visibility:public"])
-
-licenses(["notice"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
     srcs = [
         "api.go",
+        "doc.go",
+        "errors.go",
         "service.go",
         "waiters.go",
     ],
-    tags = ["automanaged"],
+    importpath = "github.com/aws/aws-sdk-go/service/elb",
+    visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/aws/aws-sdk-go/aws:go_default_library",
         "//vendor/github.com/aws/aws-sdk-go/aws/awsutil:go_default_library",
@@ -23,7 +19,6 @@ go_library(
         "//vendor/github.com/aws/aws-sdk-go/aws/request:go_default_library",
         "//vendor/github.com/aws/aws-sdk-go/aws/signer/v4:go_default_library",
         "//vendor/github.com/aws/aws-sdk-go/private/protocol/query:go_default_library",
-        "//vendor/github.com/aws/aws-sdk-go/private/waiter:go_default_library",
     ],
 )
 
@@ -38,4 +33,5 @@ filegroup(
     name = "all-srcs",
     srcs = [":package-srcs"],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

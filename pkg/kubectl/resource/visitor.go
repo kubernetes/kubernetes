@@ -32,13 +32,14 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/kubernetes/pkg/api/validation"
+	"k8s.io/kubernetes/pkg/kubectl/validation"
 )
 
 const (
@@ -73,19 +74,22 @@ type ResourceMapping interface {
 // Info contains temporary info to execute a REST call, or show the results
 // of an already completed REST call.
 type Info struct {
-	Client    RESTClient
-	Mapping   *meta.RESTMapping
+	Client RESTClient
+	// Mapping may be nil if the object has no available metadata, but is still parseable
+	// from disk.
+	Mapping *meta.RESTMapping
+	// Namespace will be set if the object is namespaced and has a specified value.
 	Namespace string
 	Name      string
 
 	// Optional, Source is the filename or URL to template file (.json or .yaml),
 	// or stdin to use to handle the resource
 	Source string
-	// Optional, this is the provided object in a versioned type before defaulting
-	// and conversions into its corresponding internal type. This is useful for
-	// reflecting on user intent which may be lost after defaulting and conversions.
-	VersionedObject runtime.Object
-	// Optional, this is the most recent value returned by the server if available
+	// Optional, this is the most recent value returned by the server if available. It will
+	// typically be in unstructured or internal forms, depending on how the Builder was
+	// defined. If retrieved from the server, the Builder expects the mapping client to
+	// decide the final form. Use the AsVersioned, AsUnstructured, and AsInternal helpers
+	// to alter the object versions.
 	Object runtime.Object
 	// Optional, this is the most recent resource version the server knows about for
 	// this type of resource. It may not match the resource version of the object,
@@ -94,17 +98,6 @@ type Info struct {
 	ResourceVersion string
 	// Optional, should this resource be exported, stripped of cluster-specific and instance specific fields
 	Export bool
-}
-
-// NewInfo returns a new info object
-func NewInfo(client RESTClient, mapping *meta.RESTMapping, namespace, name string, export bool) *Info {
-	return &Info{
-		Client:    client,
-		Mapping:   mapping,
-		Namespace: namespace,
-		Name:      name,
-		Export:    export,
-	}
 }
 
 // Visit implements Visitor
@@ -174,6 +167,61 @@ func (i *Info) Watch(resourceVersion string) (watch.Interface, error) {
 // ResourceMapping returns the mapping for this resource and implements ResourceMapping
 func (i *Info) ResourceMapping() *meta.RESTMapping {
 	return i.Mapping
+}
+
+// Internal attempts to convert the provided object to an internal type or returns an error.
+func (i *Info) Internal() (runtime.Object, error) {
+	return i.Mapping.ConvertToVersion(i.Object, i.Mapping.GroupVersionKind.GroupKind().WithVersion(runtime.APIVersionInternal).GroupVersion())
+}
+
+// AsInternal returns the object in internal form if possible, or i.Object if it cannot be
+// converted.
+func (i *Info) AsInternal() runtime.Object {
+	if obj, err := i.Internal(); err == nil {
+		return obj
+	}
+	return i.Object
+}
+
+// Versioned returns the object as a Go type in the mapping's version or returns an error.
+func (i *Info) Versioned() (runtime.Object, error) {
+	return i.Mapping.ConvertToVersion(i.Object, i.Mapping.GroupVersionKind.GroupVersion())
+}
+
+// AsVersioned returns the object as a Go object in the external form if possible (matching the
+// group version kind of the mapping, or i.Object if it cannot be converted.
+func (i *Info) AsVersioned() runtime.Object {
+	if obj, err := i.Versioned(); err == nil {
+		return obj
+	}
+	return i.Object
+}
+
+// Unstructured returns the current object in unstructured form (as a runtime.Unstructured)
+func (i *Info) Unstructured() (runtime.Unstructured, error) {
+	switch t := i.Object.(type) {
+	case runtime.Unstructured:
+		return t, nil
+	case *runtime.Unknown:
+		gvk := i.Mapping.GroupVersionKind
+		out, _, err := unstructured.UnstructuredJSONScheme.Decode(t.Raw, &gvk, nil)
+		return out.(runtime.Unstructured), err
+	default:
+		out := &unstructured.Unstructured{}
+		if err := i.Mapping.Convert(i.Object, out, nil); err != nil {
+			return nil, err
+		}
+		return out, nil
+	}
+}
+
+// AsUnstructured returns the object as a Go object in external form as a runtime.Unstructured
+// (map of JSON equivalent values) or as i.Object if it cannot be converted.
+func (i *Info) AsUnstructured() runtime.Object {
+	if out, err := i.Unstructured(); err == nil {
+		return out
+	}
+	return i.Object
 }
 
 // VisitorList implements Visit for the sub visitors it contains. The first error
@@ -388,10 +436,7 @@ func (v FlattenListVisitor) Visit(fn VisitorFunc) error {
 		if err != nil {
 			return fn(info, nil)
 		}
-		if errs := runtime.DecodeList(items, struct {
-			runtime.ObjectTyper
-			runtime.Decoder
-		}{v.Mapper, v.Mapper.Decoder}); len(errs) > 0 {
+		if errs := runtime.DecodeList(items, v.Mapper.Decoder); len(errs) > 0 {
 			return utilerrors.NewAggregate(errs)
 		}
 
@@ -487,11 +532,12 @@ func (v *FileVisitor) Visit(fn VisitorFunc) error {
 		f = os.Stdin
 	} else {
 		var err error
-		if f, err = os.Open(v.Path); err != nil {
+		f, err = os.Open(v.Path)
+		if err != nil {
 			return err
 		}
+		defer f.Close()
 	}
-	defer f.Close()
 
 	// TODO: Consider adding a flag to force to UTF16, apparently some
 	// Windows tools don't write the BOM
@@ -690,7 +736,7 @@ func (v FilteredVisitor) Visit(fn VisitorFunc) error {
 	})
 }
 
-func FilterBySelector(s labels.Selector) FilterFunc {
+func FilterByLabelSelector(s labels.Selector) FilterFunc {
 	return func(info *Info, err error) (bool, error) {
 		if err != nil {
 			return false, err

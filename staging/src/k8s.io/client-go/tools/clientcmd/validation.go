@@ -242,12 +242,20 @@ func validateAuthInfo(authInfoName string, authInfo clientcmdapi.AuthInfo) []err
 		validationErrors = append(validationErrors, fmt.Errorf("more than one authentication method found for %v; found %v, only one is allowed", authInfoName, methods))
 	}
 
+	// ImpersonateGroups or ImpersonateUserExtra should be requested with a user
+	if (len(authInfo.ImpersonateGroups) > 0 || len(authInfo.ImpersonateUserExtra) > 0) && (len(authInfo.Impersonate) == 0) {
+		validationErrors = append(validationErrors, fmt.Errorf("requesting groups or user-extra for %v without impersonating a user", authInfoName))
+	}
 	return validationErrors
 }
 
 // validateContext looks for errors in the context.  It is not transitive, so errors in the reference authInfo or cluster configs are not included in this return
 func validateContext(contextName string, context clientcmdapi.Context, config clientcmdapi.Config) []error {
 	validationErrors := make([]error, 0)
+
+	if len(contextName) == 0 {
+		validationErrors = append(validationErrors, fmt.Errorf("empty context name for %#v is not allowed", context))
+	}
 
 	if len(context.AuthInfo) == 0 {
 		validationErrors = append(validationErrors, fmt.Errorf("user was not specified for context %q", contextName))

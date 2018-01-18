@@ -17,7 +17,7 @@ limitations under the License.
 package sliceutils
 
 import (
-	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/api/core/v1"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
@@ -44,7 +44,7 @@ func (s PodsByCreationTime) Swap(i, j int) {
 }
 
 func (s PodsByCreationTime) Less(i, j int) bool {
-	return s[i].CreationTimestamp.Before(s[j].CreationTimestamp)
+	return s[i].CreationTimestamp.Before(&s[j].CreationTimestamp)
 }
 
 // ByImageSize makes an array of images sortable by their size in descending

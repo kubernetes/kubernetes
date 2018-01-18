@@ -22,10 +22,9 @@ import (
 	"runtime"
 
 	"github.com/golang/glog"
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
@@ -105,7 +104,7 @@ func (plugin *nfsPlugin) GetAccessModes() []v1.PersistentVolumeAccessMode {
 }
 
 func (plugin *nfsPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ volume.VolumeOptions) (volume.Mounter, error) {
-	return plugin.newMounterInternal(spec, pod, plugin.host.GetMounter())
+	return plugin.newMounterInternal(spec, pod, plugin.host.GetMounter(plugin.GetPluginName()))
 }
 
 func (plugin *nfsPlugin) newMounterInternal(spec *volume.Spec, pod *v1.Pod, mounter mount.Interface) (volume.Mounter, error) {
@@ -129,7 +128,7 @@ func (plugin *nfsPlugin) newMounterInternal(spec *volume.Spec, pod *v1.Pod, moun
 }
 
 func (plugin *nfsPlugin) NewUnmounter(volName string, podUID types.UID) (volume.Unmounter, error) {
-	return plugin.newUnmounterInternal(volName, podUID, plugin.host.GetMounter())
+	return plugin.newUnmounterInternal(volName, podUID, plugin.host.GetMounter(plugin.GetPluginName()))
 }
 
 func (plugin *nfsPlugin) newUnmounterInternal(volName string, podUID types.UID, mounter mount.Interface) (volume.Unmounter, error) {
@@ -192,18 +191,18 @@ func (nfsVolume *nfs) GetPath() string {
 // to mount the volume are available on the underlying node.
 // If not, it returns an error
 func (nfsMounter *nfsMounter) CanMount() error {
-	exe := exec.New()
+	exec := nfsMounter.plugin.host.GetExec(nfsMounter.plugin.GetPluginName())
 	switch runtime.GOOS {
 	case "linux":
-		if _, err := exe.Command("/bin/ls", "/sbin/mount.nfs").CombinedOutput(); err != nil {
+		if _, err := exec.Run("test", "-x", "/sbin/mount.nfs"); err != nil {
 			return fmt.Errorf("Required binary /sbin/mount.nfs is missing")
 		}
-		if _, err := exe.Command("/bin/ls", "/sbin/mount.nfs4").CombinedOutput(); err != nil {
+		if _, err := exec.Run("test", "-x", "/sbin/mount.nfs4"); err != nil {
 			return fmt.Errorf("Required binary /sbin/mount.nfs4 is missing")
 		}
 		return nil
 	case "darwin":
-		if _, err := exe.Command("/bin/ls", "/sbin/mount_nfs").CombinedOutput(); err != nil {
+		if _, err := exec.Run("test", "-x", "/sbin/mount_nfs"); err != nil {
 			return fmt.Errorf("Required binary /sbin/mount_nfs is missing")
 		}
 	}
@@ -229,12 +228,12 @@ func (b *nfsMounter) GetAttributes() volume.Attributes {
 }
 
 // SetUp attaches the disk and bind mounts to the volume path.
-func (b *nfsMounter) SetUp(fsGroup *types.UnixGroupID) error {
+func (b *nfsMounter) SetUp(fsGroup *int64) error {
 	return b.SetUpAt(b.GetPath(), fsGroup)
 }
 
-func (b *nfsMounter) SetUpAt(dir string, fsGroup *types.UnixGroupID) error {
-	notMnt, err := b.mounter.IsLikelyNotMountPoint(dir)
+func (b *nfsMounter) SetUpAt(dir string, fsGroup *int64) error {
+	notMnt, err := b.mounter.IsNotMountPoint(dir)
 	glog.V(4).Infof("NFS mount set up: %s %v %v", dir, !notMnt, err)
 	if err != nil && !os.IsNotExist(err) {
 		return err
@@ -253,7 +252,7 @@ func (b *nfsMounter) SetUpAt(dir string, fsGroup *types.UnixGroupID) error {
 	mountOptions := volume.JoinMountOptions(b.mountOptions, options)
 	err = b.mounter.Mount(source, dir, "nfs", mountOptions)
 	if err != nil {
-		notMnt, mntErr := b.mounter.IsLikelyNotMountPoint(dir)
+		notMnt, mntErr := b.mounter.IsNotMountPoint(dir)
 		if mntErr != nil {
 			glog.Errorf("IsLikelyNotMountPoint check failed: %v", mntErr)
 			return err
@@ -263,7 +262,7 @@ func (b *nfsMounter) SetUpAt(dir string, fsGroup *types.UnixGroupID) error {
 				glog.Errorf("Failed to unmount: %v", mntErr)
 				return err
 			}
-			notMnt, mntErr := b.mounter.IsLikelyNotMountPoint(dir)
+			notMnt, mntErr := b.mounter.IsNotMountPoint(dir)
 			if mntErr != nil {
 				glog.Errorf("IsLikelyNotMountPoint check failed: %v", mntErr)
 				return err
@@ -291,7 +290,10 @@ func (c *nfsUnmounter) TearDown() error {
 }
 
 func (c *nfsUnmounter) TearDownAt(dir string) error {
-	return util.UnmountPath(dir, c.mounter)
+	// Use extensiveMountPointCheck to consult /proc/mounts. We can't use faster
+	// IsLikelyNotMountPoint (lstat()), since there may be root_squash on the
+	// NFS server and kubelet may not be able to do lstat/stat() there.
+	return util.UnmountMountPoint(dir, c.mounter, true /* extensiveMountPointCheck */)
 }
 
 func getVolumeSource(spec *volume.Spec) (*v1.NFSVolumeSource, bool, error) {

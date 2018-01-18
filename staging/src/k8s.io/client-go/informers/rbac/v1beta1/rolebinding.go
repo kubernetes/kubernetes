@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2018 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,15 +19,16 @@ limitations under the License.
 package v1beta1
 
 import (
+	time "time"
+
+	rbac_v1beta1 "k8s.io/api/rbac/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	internalinterfaces "k8s.io/client-go/informers/internalinterfaces"
 	kubernetes "k8s.io/client-go/kubernetes"
 	v1beta1 "k8s.io/client-go/listers/rbac/v1beta1"
-	rbac_v1beta1 "k8s.io/client-go/pkg/apis/rbac/v1beta1"
 	cache "k8s.io/client-go/tools/cache"
-	time "time"
 )
 
 // RoleBindingInformer provides access to a shared informer and lister for
@@ -38,29 +39,49 @@ type RoleBindingInformer interface {
 }
 
 type roleBindingInformer struct {
-	factory internalinterfaces.SharedInformerFactory
+	factory          internalinterfaces.SharedInformerFactory
+	tweakListOptions internalinterfaces.TweakListOptionsFunc
+	namespace        string
 }
 
-func newRoleBindingInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	sharedIndexInformer := cache.NewSharedIndexInformer(
+// NewRoleBindingInformer constructs a new informer for RoleBinding type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewRoleBindingInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return NewFilteredRoleBindingInformer(client, namespace, resyncPeriod, indexers, nil)
+}
+
+// NewFilteredRoleBindingInformer constructs a new informer for RoleBinding type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewFilteredRoleBindingInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
-				return client.RbacV1beta1().RoleBindings(v1.NamespaceAll).List(options)
+				if tweakListOptions != nil {
+					tweakListOptions(&options)
+				}
+				return client.RbacV1beta1().RoleBindings(namespace).List(options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
-				return client.RbacV1beta1().RoleBindings(v1.NamespaceAll).Watch(options)
+				if tweakListOptions != nil {
+					tweakListOptions(&options)
+				}
+				return client.RbacV1beta1().RoleBindings(namespace).Watch(options)
 			},
 		},
 		&rbac_v1beta1.RoleBinding{},
 		resyncPeriod,
-		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
+		indexers,
 	)
+}
 
-	return sharedIndexInformer
+func (f *roleBindingInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewFilteredRoleBindingInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
 func (f *roleBindingInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&rbac_v1beta1.RoleBinding{}, newRoleBindingInformer)
+	return f.factory.InformerFor(&rbac_v1beta1.RoleBinding{}, f.defaultInformer)
 }
 
 func (f *roleBindingInformer) Lister() v1beta1.RoleBindingLister {

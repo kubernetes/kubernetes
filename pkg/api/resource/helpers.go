@@ -22,12 +22,12 @@ import (
 	"strconv"
 
 	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
 // PodRequestsAndLimits returns a dictionary of all defined resources summed up for all
 // containers of the pod.
-func PodRequestsAndLimits(pod *api.Pod) (reqs map[api.ResourceName]resource.Quantity, limits map[api.ResourceName]resource.Quantity, err error) {
+func PodRequestsAndLimits(pod *api.Pod) (reqs map[api.ResourceName]resource.Quantity, limits map[api.ResourceName]resource.Quantity) {
 	reqs, limits = map[api.ResourceName]resource.Quantity{}, map[api.ResourceName]resource.Quantity{}
 	for _, container := range pod.Spec.Containers {
 		for name, quantity := range container.Resources.Requests {
@@ -88,10 +88,14 @@ func ExtractContainerResourceValue(fs *api.ResourceFieldSelector, container *api
 		return convertResourceCPUToString(container.Resources.Limits.Cpu(), divisor)
 	case "limits.memory":
 		return convertResourceMemoryToString(container.Resources.Limits.Memory(), divisor)
+	case "limits.ephemeral-storage":
+		return convertResourceEphemeralStorageToString(container.Resources.Limits.StorageEphemeral(), divisor)
 	case "requests.cpu":
 		return convertResourceCPUToString(container.Resources.Requests.Cpu(), divisor)
 	case "requests.memory":
 		return convertResourceMemoryToString(container.Resources.Requests.Memory(), divisor)
+	case "requests.ephemeral-storage":
+		return convertResourceEphemeralStorageToString(container.Resources.Requests.StorageEphemeral(), divisor)
 	}
 
 	return "", fmt.Errorf("unsupported container resource : %v", fs.Resource)
@@ -108,5 +112,12 @@ func convertResourceCPUToString(cpu *resource.Quantity, divisor resource.Quantit
 // ceiling of the value.
 func convertResourceMemoryToString(memory *resource.Quantity, divisor resource.Quantity) (string, error) {
 	m := int64(math.Ceil(float64(memory.Value()) / float64(divisor.Value())))
+	return strconv.FormatInt(m, 10), nil
+}
+
+// convertResourceEphemeralStorageToString converts ephemeral storage value to the format of divisor and returns
+// ceiling of the value.
+func convertResourceEphemeralStorageToString(ephemeralStorage *resource.Quantity, divisor resource.Quantity) (string, error) {
+	m := int64(math.Ceil(float64(ephemeralStorage.Value()) / float64(divisor.Value())))
 	return strconv.FormatInt(m, 10), nil
 }

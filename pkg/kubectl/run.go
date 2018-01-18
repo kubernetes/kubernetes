@@ -21,16 +21,16 @@ import (
 	"strconv"
 	"strings"
 
+	appsv1beta1 "k8s.io/api/apps/v1beta1"
+	batchv1 "k8s.io/api/batch/v1"
+	batchv1beta1 "k8s.io/api/batch/v1beta1"
+	batchv2alpha1 "k8s.io/api/batch/v2alpha1"
+	"k8s.io/api/core/v1"
+	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
-	appsv1beta1 "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
-	batchv1 "k8s.io/kubernetes/pkg/apis/batch/v1"
-	batchv2alpha1 "k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
-	extensionsv1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 )
 
 type DeploymentV1Beta1 struct{}
@@ -52,6 +52,7 @@ func (DeploymentV1Beta1) ParamNames() []GeneratorParam {
 		{"env", false},
 		{"requests", false},
 		{"limits", false},
+		{"serviceaccount", false},
 	}
 }
 
@@ -76,7 +77,7 @@ func (DeploymentV1Beta1) Generate(genericParams map[string]interface{}) (runtime
 		return nil, err
 	}
 
-	labels, err := getLabels(params, true, name)
+	labels, err := getLabels(params, name)
 	if err != nil {
 		return nil, err
 	}
@@ -100,8 +101,6 @@ func (DeploymentV1Beta1) Generate(genericParams map[string]interface{}) (runtime
 		return nil, err
 	}
 
-	// TODO: use versioned types for generators so that we don't need to
-	// set default values manually (see issue #17384)
 	count32 := int32(count)
 	deployment := extensionsv1beta1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
@@ -141,6 +140,7 @@ func (DeploymentAppsV1Beta1) ParamNames() []GeneratorParam {
 		{"env", false},
 		{"requests", false},
 		{"limits", false},
+		{"serviceaccount", false},
 	}
 }
 
@@ -165,7 +165,7 @@ func (DeploymentAppsV1Beta1) Generate(genericParams map[string]interface{}) (run
 		return nil, err
 	}
 
-	labels, err := getLabels(params, true, name)
+	labels, err := getLabels(params, name)
 	if err != nil {
 		return nil, err
 	}
@@ -210,7 +210,7 @@ func (DeploymentAppsV1Beta1) Generate(genericParams map[string]interface{}) (run
 }
 
 // getLabels returns map of labels.
-func getLabels(params map[string]string, defaultRunLabel bool, name string) (map[string]string, error) {
+func getLabels(params map[string]string, name string) (map[string]string, error) {
 	labelString, found := params["labels"]
 	var labels map[string]string
 	var err error
@@ -219,7 +219,7 @@ func getLabels(params map[string]string, defaultRunLabel bool, name string) (map
 		if err != nil {
 			return nil, err
 		}
-	} else if defaultRunLabel {
+	} else {
 		labels = map[string]string{
 			"run": name,
 		}
@@ -306,6 +306,7 @@ func (JobV1) ParamNames() []GeneratorParam {
 		{"requests", false},
 		{"limits", false},
 		{"restart", false},
+		{"serviceaccount", false},
 	}
 }
 
@@ -330,7 +331,7 @@ func (JobV1) Generate(genericParams map[string]interface{}) (runtime.Object, err
 		return nil, err
 	}
 
-	labels, err := getLabels(params, true, name)
+	labels, err := getLabels(params, name)
 	if err != nil {
 		return nil, err
 	}
@@ -400,6 +401,7 @@ func (CronJobV2Alpha1) ParamNames() []GeneratorParam {
 		{"limits", false},
 		{"restart", false},
 		{"schedule", true},
+		{"serviceaccount", false},
 	}
 }
 
@@ -424,7 +426,7 @@ func (CronJobV2Alpha1) Generate(genericParams map[string]interface{}) (runtime.O
 		return nil, err
 	}
 
-	labels, err := getLabels(params, true, name)
+	labels, err := getLabels(params, name)
 	if err != nil {
 		return nil, err
 	}
@@ -479,6 +481,107 @@ func (CronJobV2Alpha1) Generate(genericParams map[string]interface{}) (runtime.O
 	return &cronJob, nil
 }
 
+type CronJobV1Beta1 struct{}
+
+func (CronJobV1Beta1) ParamNames() []GeneratorParam {
+	return []GeneratorParam{
+		{"labels", false},
+		{"default-name", false},
+		{"name", true},
+		{"image", true},
+		{"image-pull-policy", false},
+		{"port", false},
+		{"hostport", false},
+		{"stdin", false},
+		{"leave-stdin-open", false},
+		{"tty", false},
+		{"command", false},
+		{"args", false},
+		{"env", false},
+		{"requests", false},
+		{"limits", false},
+		{"restart", false},
+		{"schedule", true},
+		{"serviceaccount", false},
+	}
+}
+
+func (CronJobV1Beta1) Generate(genericParams map[string]interface{}) (runtime.Object, error) {
+	args, err := getArgs(genericParams)
+	if err != nil {
+		return nil, err
+	}
+
+	envs, err := getEnvs(genericParams)
+	if err != nil {
+		return nil, err
+	}
+
+	params, err := getParams(genericParams)
+	if err != nil {
+		return nil, err
+	}
+
+	name, err := getName(params)
+	if err != nil {
+		return nil, err
+	}
+
+	labels, err := getLabels(params, name)
+	if err != nil {
+		return nil, err
+	}
+
+	podSpec, err := makePodSpec(params, name)
+	if err != nil {
+		return nil, err
+	}
+
+	imagePullPolicy := v1.PullPolicy(params["image-pull-policy"])
+	if err = updatePodContainers(params, args, envs, imagePullPolicy, podSpec); err != nil {
+		return nil, err
+	}
+
+	leaveStdinOpen, err := GetBool(params, "leave-stdin-open", false)
+	if err != nil {
+		return nil, err
+	}
+	podSpec.Containers[0].StdinOnce = !leaveStdinOpen && podSpec.Containers[0].Stdin
+
+	if err := updatePodPorts(params, podSpec); err != nil {
+		return nil, err
+	}
+
+	restartPolicy := v1.RestartPolicy(params["restart"])
+	if len(restartPolicy) == 0 {
+		restartPolicy = v1.RestartPolicyNever
+	}
+	podSpec.RestartPolicy = restartPolicy
+
+	cronJob := batchv1beta1.CronJob{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   name,
+			Labels: labels,
+		},
+		Spec: batchv1beta1.CronJobSpec{
+			Schedule:          params["schedule"],
+			ConcurrencyPolicy: batchv1beta1.AllowConcurrent,
+			JobTemplate: batchv1beta1.JobTemplateSpec{
+				Spec: batchv1.JobSpec{
+					Template: v1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: labels,
+						},
+						Spec: *podSpec,
+					},
+				},
+			},
+		},
+	}
+
+	return &cronJob, nil
+}
+
 type BasicReplicationController struct{}
 
 func (BasicReplicationController) ParamNames() []GeneratorParam {
@@ -498,32 +601,8 @@ func (BasicReplicationController) ParamNames() []GeneratorParam {
 		{"env", false},
 		{"requests", false},
 		{"limits", false},
+		{"serviceaccount", false},
 	}
-}
-
-// populateResourceList takes strings of form <resourceName1>=<value1>,<resourceName1>=<value2>
-// and returns ResourceList.
-func populateResourceList(spec string) (api.ResourceList, error) {
-	// empty input gets a nil response to preserve generator test expected behaviors
-	if spec == "" {
-		return nil, nil
-	}
-
-	result := api.ResourceList{}
-	resourceStatements := strings.Split(spec, ",")
-	for _, resourceStatement := range resourceStatements {
-		parts := strings.Split(resourceStatement, "=")
-		if len(parts) != 2 {
-			return nil, fmt.Errorf("Invalid argument syntax %v, expected <resource>=<value>", resourceStatement)
-		}
-		resourceName := api.ResourceName(parts[0])
-		resourceQuantity, err := resource.ParseQuantity(parts[1])
-		if err != nil {
-			return nil, err
-		}
-		result[resourceName] = resourceQuantity
-	}
-	return result, nil
 }
 
 // populateResourceListV1 takes strings of form <resourceName1>=<value1>,<resourceName1>=<value2>
@@ -548,23 +627,6 @@ func populateResourceListV1(spec string) (v1.ResourceList, error) {
 		}
 		result[resourceName] = resourceQuantity
 	}
-	return result, nil
-}
-
-// HandleResourceRequirements parses the limits and requests parameters if specified
-// and returns ResourceRequirements.
-func HandleResourceRequirements(params map[string]string) (api.ResourceRequirements, error) {
-	result := api.ResourceRequirements{}
-	limits, err := populateResourceList(params["limits"])
-	if err != nil {
-		return result, err
-	}
-	result.Limits = limits
-	requests, err := populateResourceList(params["requests"])
-	if err != nil {
-		return result, err
-	}
-	result.Requests = requests
 	return result, nil
 }
 
@@ -603,6 +665,7 @@ func makePodSpec(params map[string]string, name string) (*v1.PodSpec, error) {
 	}
 
 	spec := v1.PodSpec{
+		ServiceAccountName: params["serviceaccount"],
 		Containers: []v1.Container{
 			{
 				Name:      name,
@@ -637,7 +700,7 @@ func (BasicReplicationController) Generate(genericParams map[string]interface{})
 		return nil, err
 	}
 
-	labels, err := getLabels(params, true, name)
+	labels, err := getLabels(params, name)
 	if err != nil {
 		return nil, err
 	}
@@ -761,6 +824,7 @@ func (BasicPod) ParamNames() []GeneratorParam {
 		{"env", false},
 		{"requests", false},
 		{"limits", false},
+		{"serviceaccount", false},
 	}
 }
 
@@ -785,7 +849,7 @@ func (BasicPod) Generate(genericParams map[string]interface{}) (runtime.Object, 
 		return nil, err
 	}
 
-	labels, err := getLabels(params, false, name)
+	labels, err := getLabels(params, name)
 	if err != nil {
 		return nil, err
 	}
@@ -821,6 +885,7 @@ func (BasicPod) Generate(genericParams map[string]interface{}) (runtime.Object, 
 			Labels: labels,
 		},
 		Spec: v1.PodSpec{
+			ServiceAccountName: params["serviceaccount"],
 			Containers: []v1.Container{
 				{
 					Name:            name,
@@ -860,17 +925,11 @@ func parseEnvs(envArray []string) ([]v1.EnvVar, error) {
 		if len(name) == 0 {
 			return nil, fmt.Errorf("invalid env: %v", env)
 		}
-		if len(validation.IsCIdentifier(name)) != 0 {
+		if len(validation.IsEnvVarName(name)) != 0 {
 			return nil, fmt.Errorf("invalid env: %v", env)
 		}
 		envVar := v1.EnvVar{Name: name, Value: value}
 		envs = append(envs, envVar)
 	}
 	return envs, nil
-}
-
-func newBool(val bool) *bool {
-	p := new(bool)
-	*p = val
-	return p
 }

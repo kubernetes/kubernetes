@@ -1,11 +1,10 @@
-// +build linux
+// +build linux,!static_build
 
 package systemd
 
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -266,7 +265,21 @@ func (m *Manager) Apply(pid int) error {
 
 	if c.Resources.CpuShares != 0 {
 		properties = append(properties,
-			newProp("CPUShares", uint64(c.Resources.CpuShares)))
+			newProp("CPUShares", c.Resources.CpuShares))
+	}
+
+	// cpu.cfs_quota_us and cpu.cfs_period_us are controlled by systemd.
+	if c.Resources.CpuQuota != 0 && c.Resources.CpuPeriod != 0 {
+		cpuQuotaPerSecUSec := uint64(c.Resources.CpuQuota*1000000) / c.Resources.CpuPeriod
+		// systemd converts CPUQuotaPerSecUSec (microseconds per CPU second) to CPUQuota
+		// (integer percentage of CPU) internally.  This means that if a fractional percent of
+		// CPU is indicated by Resources.CpuQuota, we need to round up to the nearest
+		// 10ms (1% of a second) such that child cgroups can set the cpu.cfs_quota_us they expect.
+		if cpuQuotaPerSecUSec%10000 != 0 {
+			cpuQuotaPerSecUSec = ((cpuQuotaPerSecUSec / 10000) + 1) * 10000
+		}
+		properties = append(properties,
+			newProp("CPUQuotaPerSecUSec", cpuQuotaPerSecUSec))
 	}
 
 	if c.Resources.BlkioWeight != 0 {
@@ -282,9 +295,12 @@ func (m *Manager) Apply(pid int) error {
 		}
 	}
 
-	if _, err := theConn.StartTransientUnit(unitName, "replace", properties, nil); err != nil && !isUnitExists(err) {
+	statusChan := make(chan string)
+	if _, err := theConn.StartTransientUnit(unitName, "replace", properties, statusChan); err != nil && !isUnitExists(err) {
 		return err
 	}
+
+	<-statusChan
 
 	if err := joinCgroups(c, pid); err != nil {
 		return err
@@ -327,15 +343,6 @@ func (m *Manager) GetPaths() map[string]string {
 	return paths
 }
 
-func writeFile(dir, file, data string) error {
-	// Normally dir should not be empty, one case is that cgroup subsystem
-	// is not mounted, we will get empty dir, and we want it fail here.
-	if dir == "" {
-		return fmt.Errorf("no such directory for %s", file)
-	}
-	return ioutil.WriteFile(filepath.Join(dir, file), []byte(data), 0700)
-}
-
 func join(c *configs.Cgroup, subsystem string, pid int) (string, error) {
 	path, err := getSubsystemPath(c, subsystem)
 	if err != nil {
@@ -356,7 +363,6 @@ func joinCgroups(c *configs.Cgroup, pid int) error {
 		switch name {
 		case "name=systemd":
 			// let systemd handle this
-			break
 		case "cpuset":
 			path, err := getSubsystemPath(c, name)
 			if err != nil && !cgroups.IsNotFound(err) {
@@ -366,7 +372,6 @@ func joinCgroups(c *configs.Cgroup, pid int) error {
 			if err := s.ApplyDir(path, c, pid); err != nil {
 				return err
 			}
-			break
 		default:
 			_, err := join(c, name, pid)
 			if err != nil {
@@ -429,7 +434,7 @@ func getSubsystemPath(c *configs.Cgroup, subsystem string) (string, error) {
 		return "", err
 	}
 
-	initPath, err := cgroups.GetInitCgroupDir(subsystem)
+	initPath, err := cgroups.GetInitCgroup(subsystem)
 	if err != nil {
 		return "", err
 	}

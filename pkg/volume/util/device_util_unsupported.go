@@ -22,3 +22,9 @@ package util
 func (handler *deviceHandler) FindMultipathDeviceForDevice(device string) string {
 	return ""
 }
+
+// FindSlaveDevicesOnMultipath unsupported returns ""
+func (handler *deviceHandler) FindSlaveDevicesOnMultipath(disk string) []string {
+	out := []string{}
+	return out
+}

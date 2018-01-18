@@ -22,14 +22,14 @@ import (
 	"io"
 	"time"
 
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/kubernetes/pkg/api"
-	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
+	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/metricsutil"
-	"k8s.io/kubernetes/pkg/util/i18n"
+	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
@@ -41,7 +41,7 @@ type TopPodOptions struct {
 	Selector        string
 	AllNamespaces   bool
 	PrintContainers bool
-	PodClient       coreclient.PodsGetter
+	PodClient       corev1.PodsGetter
 	HeapsterOptions HeapsterTopOptions
 	Client          *metricsutil.HeapsterMetricsClient
 	Printer         *metricsutil.TopCmdPrinter
@@ -72,8 +72,10 @@ var (
 		kubectl top pod -l name=myLabel`))
 )
 
-func NewCmdTopPod(f cmdutil.Factory, out io.Writer) *cobra.Command {
-	options := &TopPodOptions{}
+func NewCmdTopPod(f cmdutil.Factory, options *TopPodOptions, out io.Writer) *cobra.Command {
+	if options == nil {
+		options = &TopPodOptions{}
+	}
 
 	cmd := &cobra.Command{
 		Use:     "pod [NAME | -l label]",
@@ -85,7 +87,7 @@ func NewCmdTopPod(f cmdutil.Factory, out io.Writer) *cobra.Command {
 				cmdutil.CheckErr(err)
 			}
 			if err := options.Validate(); err != nil {
-				cmdutil.CheckErr(cmdutil.UsageError(cmd, err.Error()))
+				cmdutil.CheckErr(cmdutil.UsageErrorf(cmd, "%v", err))
 			}
 			if err := options.RunTopPod(); err != nil {
 				cmdutil.CheckErr(err)
@@ -93,7 +95,7 @@ func NewCmdTopPod(f cmdutil.Factory, out io.Writer) *cobra.Command {
 		},
 		Aliases: []string{"pods", "po"},
 	}
-	cmd.Flags().StringVarP(&options.Selector, "selector", "l", "", "Selector (label query) to filter on, supports '=', '==', and '!='.")
+	cmd.Flags().StringVarP(&options.Selector, "selector", "l", "", "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
 	cmd.Flags().BoolVar(&options.PrintContainers, "containers", false, "If present, print usage of containers within a pod.")
 	cmd.Flags().BoolVar(&options.AllNamespaces, "all-namespaces", false, "If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.")
 	options.HeapsterOptions.Bind(cmd.Flags())
@@ -105,19 +107,19 @@ func (o *TopPodOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []s
 	if len(args) == 1 {
 		o.ResourceName = args[0]
 	} else if len(args) > 1 {
-		return cmdutil.UsageError(cmd, cmd.Use)
+		return cmdutil.UsageErrorf(cmd, "%s", cmd.Use)
 	}
 
 	o.Namespace, _, err = f.DefaultNamespace()
 	if err != nil {
 		return err
 	}
-	clientset, err := f.ClientSet()
+	clientset, err := f.KubernetesClientSet()
 	if err != nil {
 		return err
 	}
-	o.PodClient = clientset.Core()
-	o.Client = metricsutil.NewHeapsterMetricsClient(clientset.Core(), o.HeapsterOptions.Namespace, o.HeapsterOptions.Scheme, o.HeapsterOptions.Service, o.HeapsterOptions.Port)
+	o.PodClient = clientset.CoreV1()
+	o.Client = metricsutil.NewHeapsterMetricsClient(clientset.CoreV1(), o.HeapsterOptions.Namespace, o.HeapsterOptions.Scheme, o.HeapsterOptions.Service, o.HeapsterOptions.Port)
 	o.Printer = metricsutil.NewTopCmdPrinter(out)
 	return nil
 }
@@ -183,7 +185,7 @@ func verifyEmptyMetrics(o TopPodOptions, selector labels.Selector) error {
 	return errors.New("metrics not available yet")
 }
 
-func checkPodAge(pod *api.Pod) error {
+func checkPodAge(pod *v1.Pod) error {
 	age := time.Since(pod.CreationTimestamp.Time)
 	if age > metricsCreationDelay {
 		message := fmt.Sprintf("Metrics not available for pod %s/%s, age: %s", pod.Namespace, pod.Name, age.String())

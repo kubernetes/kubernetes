@@ -1,1 +1,0 @@
-This file has moved to [https://github.com/kubernetes/community/blob/master/contributors/design-proposals/scheduler_extender.md](https://github.com/kubernetes/community/blob/master/contributors/design-proposals/scheduler_extender.md)

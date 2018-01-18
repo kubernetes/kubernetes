@@ -17,22 +17,15 @@ limitations under the License.
 package hostport
 
 import (
+	"bytes"
 	"net"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/api/core/v1"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
-	"strings"
 )
-
-func NewFakeHostportManager() HostPortManager {
-	return &hostportManager{
-		hostPortMap: make(map[hostport]closeable),
-		iptables:    NewFakeIPTables(),
-		portOpener:  NewFakeSocketManager().openFakeSocket,
-	}
-}
 
 func TestHostportManager(t *testing.T) {
 	iptables := NewFakeIPTables()
@@ -132,31 +125,32 @@ func TestHostportManager(t *testing.T) {
 	}
 
 	// Check Iptables-save result after adding hostports
-	raw, err := iptables.Save(utiliptables.TableNAT)
+	raw := bytes.NewBuffer(nil)
+	err := iptables.SaveInto(utiliptables.TableNAT, raw)
 	assert.NoError(t, err)
 
-	lines := strings.Split(string(raw), "\n")
+	lines := strings.Split(string(raw.Bytes()), "\n")
 	expectedLines := map[string]bool{
 		`*nat`: true,
 		`:KUBE-HOSTPORTS - [0:0]`:                                                                                                         true,
 		`:OUTPUT - [0:0]`:                                                                                                                 true,
 		`:PREROUTING - [0:0]`:                                                                                                             true,
 		`:POSTROUTING - [0:0]`:                                                                                                            true,
-		`:KUBE-HP-4YVONL46AKYWSKS3 - [0:0]`:                                                                                               true,
-		`:KUBE-HP-7THKRFSEH4GIIXK7 - [0:0]`:                                                                                               true,
-		`:KUBE-HP-5N7UH5JAXCVP5UJR - [0:0]`:                                                                                               true,
-		"-A KUBE-HOSTPORTS -m comment --comment \"pod3_ns1 hostport 8443\" -m tcp -p tcp --dport 8443 -j KUBE-HP-5N7UH5JAXCVP5UJR":        true,
-		"-A KUBE-HOSTPORTS -m comment --comment \"pod1_ns1 hostport 8081\" -m udp -p udp --dport 8081 -j KUBE-HP-7THKRFSEH4GIIXK7":        true,
-		"-A KUBE-HOSTPORTS -m comment --comment \"pod1_ns1 hostport 8080\" -m tcp -p tcp --dport 8080 -j KUBE-HP-4YVONL46AKYWSKS3":        true,
+		`:KUBE-HP-IJHALPHTORMHHPPK - [0:0]`:                                                                                               true,
+		`:KUBE-HP-63UPIDJXVRSZGSUZ - [0:0]`:                                                                                               true,
+		`:KUBE-HP-WFBOALXEP42XEMJK - [0:0]`:                                                                                               true,
+		"-A KUBE-HOSTPORTS -m comment --comment \"pod3_ns1 hostport 8443\" -m tcp -p tcp --dport 8443 -j KUBE-HP-WFBOALXEP42XEMJK":        true,
+		"-A KUBE-HOSTPORTS -m comment --comment \"pod1_ns1 hostport 8081\" -m udp -p udp --dport 8081 -j KUBE-HP-63UPIDJXVRSZGSUZ":        true,
+		"-A KUBE-HOSTPORTS -m comment --comment \"pod1_ns1 hostport 8080\" -m tcp -p tcp --dport 8080 -j KUBE-HP-IJHALPHTORMHHPPK":        true,
 		"-A OUTPUT -m comment --comment \"kube hostport portals\" -m addrtype --dst-type LOCAL -j KUBE-HOSTPORTS":                         true,
 		"-A PREROUTING -m comment --comment \"kube hostport portals\" -m addrtype --dst-type LOCAL -j KUBE-HOSTPORTS":                     true,
 		"-A POSTROUTING -m comment --comment \"SNAT for localhost access to hostports\" -o cbr0 -s 127.0.0.0/8 -j MASQUERADE":             true,
-		"-A KUBE-HP-4YVONL46AKYWSKS3 -m comment --comment \"pod1_ns1 hostport 8080\" -s 10.1.1.2/32 -j KUBE-MARK-MASQ":                    true,
-		"-A KUBE-HP-4YVONL46AKYWSKS3 -m comment --comment \"pod1_ns1 hostport 8080\" -m tcp -p tcp -j DNAT --to-destination 10.1.1.2:80":  true,
-		"-A KUBE-HP-7THKRFSEH4GIIXK7 -m comment --comment \"pod1_ns1 hostport 8081\" -s 10.1.1.2/32 -j KUBE-MARK-MASQ":                    true,
-		"-A KUBE-HP-7THKRFSEH4GIIXK7 -m comment --comment \"pod1_ns1 hostport 8081\" -m udp -p udp -j DNAT --to-destination 10.1.1.2:81":  true,
-		"-A KUBE-HP-5N7UH5JAXCVP5UJR -m comment --comment \"pod3_ns1 hostport 8443\" -s 10.1.1.4/32 -j KUBE-MARK-MASQ":                    true,
-		"-A KUBE-HP-5N7UH5JAXCVP5UJR -m comment --comment \"pod3_ns1 hostport 8443\" -m tcp -p tcp -j DNAT --to-destination 10.1.1.4:443": true,
+		"-A KUBE-HP-IJHALPHTORMHHPPK -m comment --comment \"pod1_ns1 hostport 8080\" -s 10.1.1.2/32 -j KUBE-MARK-MASQ":                    true,
+		"-A KUBE-HP-IJHALPHTORMHHPPK -m comment --comment \"pod1_ns1 hostport 8080\" -m tcp -p tcp -j DNAT --to-destination 10.1.1.2:80":  true,
+		"-A KUBE-HP-63UPIDJXVRSZGSUZ -m comment --comment \"pod1_ns1 hostport 8081\" -s 10.1.1.2/32 -j KUBE-MARK-MASQ":                    true,
+		"-A KUBE-HP-63UPIDJXVRSZGSUZ -m comment --comment \"pod1_ns1 hostport 8081\" -m udp -p udp -j DNAT --to-destination 10.1.1.2:81":  true,
+		"-A KUBE-HP-WFBOALXEP42XEMJK -m comment --comment \"pod3_ns1 hostport 8443\" -s 10.1.1.4/32 -j KUBE-MARK-MASQ":                    true,
+		"-A KUBE-HP-WFBOALXEP42XEMJK -m comment --comment \"pod3_ns1 hostport 8443\" -m tcp -p tcp -j DNAT --to-destination 10.1.1.4:443": true,
 		`COMMIT`: true,
 	}
 	for _, line := range lines {
@@ -175,9 +169,10 @@ func TestHostportManager(t *testing.T) {
 	}
 
 	// Check Iptables-save result after deleting hostports
-	raw, err = iptables.Save(utiliptables.TableNAT)
+	raw.Reset()
+	err = iptables.SaveInto(utiliptables.TableNAT, raw)
 	assert.NoError(t, err)
-	lines = strings.Split(string(raw), "\n")
+	lines = strings.Split(string(raw.Bytes()), "\n")
 	remainingChains := make(map[string]bool)
 	for _, line := range lines {
 		if strings.HasPrefix(line, ":") {
@@ -193,5 +188,18 @@ func TestHostportManager(t *testing.T) {
 	// check if all ports are closed
 	for _, port := range portOpener.mem {
 		assert.EqualValues(t, true, port.closed)
+	}
+}
+
+func TestGetHostportChain(t *testing.T) {
+	m := make(map[string]int)
+	chain := getHostportChain("testrdma-2", &PortMapping{HostPort: 57119, Protocol: "TCP", ContainerPort: 57119})
+	m[string(chain)] = 1
+	chain = getHostportChain("testrdma-2", &PortMapping{HostPort: 55429, Protocol: "TCP", ContainerPort: 55429})
+	m[string(chain)] = 1
+	chain = getHostportChain("testrdma-2", &PortMapping{HostPort: 56833, Protocol: "TCP", ContainerPort: 56833})
+	m[string(chain)] = 1
+	if len(m) != 3 {
+		t.Fatal(m)
 	}
 }

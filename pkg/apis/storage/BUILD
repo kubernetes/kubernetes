@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -15,10 +13,10 @@ go_library(
         "types.go",
         "zz_generated.deepcopy.go",
     ],
-    tags = ["automanaged"],
+    importpath = "k8s.io/kubernetes/pkg/apis/storage",
     deps = [
+        "//pkg/apis/core:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/conversion:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
     ],
@@ -35,9 +33,11 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//pkg/apis/storage/fuzzer:all-srcs",
         "//pkg/apis/storage/install:all-srcs",
         "//pkg/apis/storage/util:all-srcs",
         "//pkg/apis/storage/v1:all-srcs",
+        "//pkg/apis/storage/v1alpha1:all-srcs",
         "//pkg/apis/storage/v1beta1:all-srcs",
         "//pkg/apis/storage/validation:all-srcs",
     ],

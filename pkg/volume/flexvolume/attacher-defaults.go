@@ -17,14 +17,11 @@ limitations under the License.
 package flexvolume
 
 import (
-	"fmt"
-	"path"
 	"time"
 
 	"github.com/golang/glog"
 
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 )
@@ -33,31 +30,34 @@ type attacherDefaults flexVolumeAttacher
 
 // Attach is part of the volume.Attacher interface
 func (a *attacherDefaults) Attach(spec *volume.Spec, hostName types.NodeName) (string, error) {
-	glog.Warning(logPrefix(a.plugin), "using default Attach for volume ", spec.Name, ", host ", hostName)
+	glog.Warning(logPrefix(a.plugin.flexVolumePlugin), "using default Attach for volume ", spec.Name, ", host ", hostName)
 	return "", nil
 }
 
 // WaitForAttach is part of the volume.Attacher interface
 func (a *attacherDefaults) WaitForAttach(spec *volume.Spec, devicePath string, timeout time.Duration) (string, error) {
-	glog.Warning(logPrefix(a.plugin), "using default WaitForAttach for volume ", spec.Name, ", device ", devicePath)
+	glog.Warning(logPrefix(a.plugin.flexVolumePlugin), "using default WaitForAttach for volume ", spec.Name, ", device ", devicePath)
 	return devicePath, nil
 }
 
 // GetDeviceMountPath is part of the volume.Attacher interface
 func (a *attacherDefaults) GetDeviceMountPath(spec *volume.Spec, mountsDir string) (string, error) {
-	glog.Warning(logPrefix(a.plugin), "using default GetDeviceMountPath for volume ", spec.Name, ", mountsDir ", mountsDir)
-	volumeName, err := a.plugin.GetVolumeName(spec)
-	if err != nil {
-		return "", fmt.Errorf("GetVolumeName failed from GetDeviceMountPath: %s", err)
-	}
-
-	return path.Join(mountsDir, volumeName), nil
+	return a.plugin.getDeviceMountPath(spec)
 }
 
 // MountDevice is part of the volume.Attacher interface
 func (a *attacherDefaults) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string, mounter mount.Interface) error {
-	glog.Warning(logPrefix(a.plugin), "using default MountDevice for volume ", spec.Name, ", device ", devicePath, ", deviceMountPath ", deviceMountPath)
-	volSource, readOnly := getVolumeSource(spec)
+	glog.Warning(logPrefix(a.plugin.flexVolumePlugin), "using default MountDevice for volume ", spec.Name, ", device ", devicePath, ", deviceMountPath ", deviceMountPath)
+
+	volSourceFSType, err := getFSType(spec)
+	if err != nil {
+		return err
+	}
+
+	readOnly, err := getReadOnly(spec)
+	if err != nil {
+		return err
+	}
 
 	options := make([]string, 0)
 
@@ -67,7 +67,7 @@ func (a *attacherDefaults) MountDevice(spec *volume.Spec, devicePath string, dev
 		options = append(options, "rw")
 	}
 
-	diskMounter := &mount.SafeFormatAndMount{Interface: mounter, Runner: exec.New()}
+	diskMounter := &mount.SafeFormatAndMount{Interface: mounter, Exec: a.plugin.host.GetExec(a.plugin.GetPluginName())}
 
-	return diskMounter.FormatAndMount(devicePath, deviceMountPath, volSource.FSType, options)
+	return diskMounter.FormatAndMount(devicePath, deviceMountPath, volSourceFSType, options)
 }

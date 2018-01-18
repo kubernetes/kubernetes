@@ -24,14 +24,12 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/filters"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
-	kubeclientset "k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1alpha1"
+	"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1"
 	"k8s.io/kube-aggregator/pkg/apiserver"
 )
 
@@ -44,10 +42,6 @@ type AggregatorOptions struct {
 	// this to confirm the proxy's identity
 	ProxyClientCertFile string
 	ProxyClientKeyFile  string
-
-	// CoreAPIKubeconfig is a filename for a kubeconfig file to contact the core API server wtih
-	// If it is not set, the in cluster config is used
-	CoreAPIKubeconfig string
 
 	StdOut io.Writer
 	StdErr io.Writer
@@ -83,24 +77,24 @@ func (o *AggregatorOptions) AddFlags(fs *pflag.FlagSet) {
 	o.RecommendedOptions.AddFlags(fs)
 	fs.StringVar(&o.ProxyClientCertFile, "proxy-client-cert-file", o.ProxyClientCertFile, "client certificate used identify the proxy to the API server")
 	fs.StringVar(&o.ProxyClientKeyFile, "proxy-client-key-file", o.ProxyClientKeyFile, "client certificate key used identify the proxy to the API server")
-	fs.StringVar(&o.CoreAPIKubeconfig, "core-kubeconfig", o.CoreAPIKubeconfig, ""+
-		"kubeconfig file pointing at the 'core' kubernetes server with enough rights to get,list,watch "+
-		" services,endpoints.  If not set, the in-cluster config is used")
 }
 
 // NewDefaultOptions builds a "normal" set of options.  You wouldn't normally expose this, but hyperkube isn't cobra compatible
 func NewDefaultOptions(out, err io.Writer) *AggregatorOptions {
 	o := &AggregatorOptions{
-		RecommendedOptions: genericoptions.NewRecommendedOptions(defaultEtcdPathPrefix, apiserver.Scheme, apiserver.Codecs.LegacyCodec(v1alpha1.SchemeGroupVersion)),
+		RecommendedOptions: genericoptions.NewRecommendedOptions(defaultEtcdPathPrefix, apiserver.Codecs.LegacyCodec(v1beta1.SchemeGroupVersion)),
 
 		StdOut: out,
 		StdErr: err,
 	}
+
 	return o
 }
 
 func (o AggregatorOptions) Validate(args []string) error {
-	return nil
+	errors := []error{}
+	errors = append(errors, o.RecommendedOptions.Validate()...)
+	return utilerrors.NewAggregate(errors)
 }
 
 func (o *AggregatorOptions) Complete() error {
@@ -113,9 +107,9 @@ func (o AggregatorOptions) RunAggregator(stopCh <-chan struct{}) error {
 		return fmt.Errorf("error creating self-signed certificates: %v", err)
 	}
 
-	serverConfig := genericapiserver.NewConfig(apiserver.Codecs)
+	serverConfig := genericapiserver.NewRecommendedConfig(apiserver.Codecs)
 
-	if err := o.RecommendedOptions.ApplyTo(serverConfig); err != nil {
+	if err := o.RecommendedOptions.ApplyTo(serverConfig, apiserver.Scheme); err != nil {
 		return err
 	}
 	serverConfig.LongRunningFunc = filters.BasicLongRunningRequestCheck(
@@ -123,41 +117,26 @@ func (o AggregatorOptions) RunAggregator(stopCh <-chan struct{}) error {
 		sets.NewString("attach", "exec", "proxy", "log", "portforward"),
 	)
 
-	var kubeconfig *rest.Config
-	var err error
-	if len(o.CoreAPIKubeconfig) > 0 {
-		loadingRules := &clientcmd.ClientConfigLoadingRules{ExplicitPath: o.CoreAPIKubeconfig}
-		loader := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, &clientcmd.ConfigOverrides{})
-
-		kubeconfig, err = loader.ClientConfig()
-
-	} else {
-		kubeconfig, err = rest.InClusterConfig()
-	}
-	if err != nil {
-		return err
-	}
-
-	coreAPIServerClient, err := kubeclientset.NewForConfig(kubeconfig)
-	if err != nil {
-		return err
-	}
+	serviceResolver := apiserver.NewClusterIPServiceResolver(serverConfig.SharedInformerFactory.Core().V1().Services().Lister())
 
 	config := apiserver.Config{
-		GenericConfig:       serverConfig,
-		CoreAPIServerClient: coreAPIServerClient,
+		GenericConfig: serverConfig,
+		ExtraConfig: apiserver.ExtraConfig{
+			ServiceResolver: serviceResolver,
+		},
 	}
 
-	config.ProxyClientCert, err = ioutil.ReadFile(o.ProxyClientCertFile)
+	var err error
+	config.ExtraConfig.ProxyClientCert, err = ioutil.ReadFile(o.ProxyClientCertFile)
 	if err != nil {
 		return err
 	}
-	config.ProxyClientKey, err = ioutil.ReadFile(o.ProxyClientKeyFile)
+	config.ExtraConfig.ProxyClientKey, err = ioutil.ReadFile(o.ProxyClientKeyFile)
 	if err != nil {
 		return err
 	}
 
-	server, err := config.Complete().NewWithDelegate(genericapiserver.EmptyDelegate, stopCh)
+	server, err := config.Complete().NewWithDelegate(genericapiserver.EmptyDelegate)
 	if err != nil {
 		return err
 	}

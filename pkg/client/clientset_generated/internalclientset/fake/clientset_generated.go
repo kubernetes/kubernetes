@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2018 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -23,6 +23,8 @@ import (
 	fakediscovery "k8s.io/client-go/discovery/fake"
 	"k8s.io/client-go/testing"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	admissionregistrationinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/admissionregistration/internalversion"
+	fakeadmissionregistrationinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/admissionregistration/internalversion/fake"
 	appsinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/apps/internalversion"
 	fakeappsinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/apps/internalversion/fake"
 	authenticationinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/authentication/internalversion"
@@ -37,12 +39,18 @@ import (
 	fakecertificatesinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/certificates/internalversion/fake"
 	coreinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	fakecoreinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion/fake"
+	eventsinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/events/internalversion"
+	fakeeventsinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/events/internalversion/fake"
 	extensionsinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/extensions/internalversion"
 	fakeextensionsinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/extensions/internalversion/fake"
+	networkinginternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/networking/internalversion"
+	fakenetworkinginternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/networking/internalversion/fake"
 	policyinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/policy/internalversion"
 	fakepolicyinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/policy/internalversion/fake"
 	rbacinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/rbac/internalversion"
 	fakerbacinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/rbac/internalversion/fake"
+	schedulinginternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/scheduling/internalversion"
+	fakeschedulinginternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/scheduling/internalversion/fake"
 	settingsinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/settings/internalversion"
 	fakesettingsinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/settings/internalversion/fake"
 	storageinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/storage/internalversion"
@@ -63,10 +71,17 @@ func NewSimpleClientset(objects ...runtime.Object) *Clientset {
 
 	fakePtr := testing.Fake{}
 	fakePtr.AddReactor("*", "*", testing.ObjectReaction(o))
+	fakePtr.AddWatchReactor("*", func(action testing.Action) (handled bool, ret watch.Interface, err error) {
+		gvr := action.GetResource()
+		ns := action.GetNamespace()
+		watch, err := o.Watch(gvr, ns)
+		if err != nil {
+			return false, nil, err
+		}
+		return true, watch, nil
+	})
 
-	fakePtr.AddWatchReactor("*", testing.DefaultWatchReactor(watch.NewFake(), nil))
-
-	return &Clientset{fakePtr}
+	return &Clientset{fakePtr, &fakediscovery.FakeDiscovery{Fake: &fakePtr}}
 }
 
 // Clientset implements clientset.Interface. Meant to be embedded into a
@@ -74,13 +89,19 @@ func NewSimpleClientset(objects ...runtime.Object) *Clientset {
 // you want to test easier.
 type Clientset struct {
 	testing.Fake
+	discovery *fakediscovery.FakeDiscovery
 }
 
 func (c *Clientset) Discovery() discovery.DiscoveryInterface {
-	return &fakediscovery.FakeDiscovery{Fake: &c.Fake}
+	return c.discovery
 }
 
 var _ clientset.Interface = &Clientset{}
+
+// Admissionregistration retrieves the AdmissionregistrationClient
+func (c *Clientset) Admissionregistration() admissionregistrationinternalversion.AdmissionregistrationInterface {
+	return &fakeadmissionregistrationinternalversion.FakeAdmissionregistration{Fake: &c.Fake}
+}
 
 // Core retrieves the CoreClient
 func (c *Clientset) Core() coreinternalversion.CoreInterface {
@@ -117,9 +138,19 @@ func (c *Clientset) Certificates() certificatesinternalversion.CertificatesInter
 	return &fakecertificatesinternalversion.FakeCertificates{Fake: &c.Fake}
 }
 
+// Events retrieves the EventsClient
+func (c *Clientset) Events() eventsinternalversion.EventsInterface {
+	return &fakeeventsinternalversion.FakeEvents{Fake: &c.Fake}
+}
+
 // Extensions retrieves the ExtensionsClient
 func (c *Clientset) Extensions() extensionsinternalversion.ExtensionsInterface {
 	return &fakeextensionsinternalversion.FakeExtensions{Fake: &c.Fake}
+}
+
+// Networking retrieves the NetworkingClient
+func (c *Clientset) Networking() networkinginternalversion.NetworkingInterface {
+	return &fakenetworkinginternalversion.FakeNetworking{Fake: &c.Fake}
 }
 
 // Policy retrieves the PolicyClient
@@ -130,6 +161,11 @@ func (c *Clientset) Policy() policyinternalversion.PolicyInterface {
 // Rbac retrieves the RbacClient
 func (c *Clientset) Rbac() rbacinternalversion.RbacInterface {
 	return &fakerbacinternalversion.FakeRbac{Fake: &c.Fake}
+}
+
+// Scheduling retrieves the SchedulingClient
+func (c *Clientset) Scheduling() schedulinginternalversion.SchedulingInterface {
+	return &fakeschedulinginternalversion.FakeScheduling{Fake: &c.Fake}
 }
 
 // Settings retrieves the SettingsClient

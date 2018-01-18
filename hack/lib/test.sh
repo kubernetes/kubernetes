@@ -250,11 +250,22 @@ kube::test::describe_resource_events_assert() {
     fi
 }
 
+# Compare sort-by resource name output with expected order specify in the last parameter
+kube::test::if_sort_by_has_correct_order() {
+  local array=($(echo "$1" |awk '{if(NR!=1) print $1}'))
+  local var
+  for i in "${array[@]}"; do
+    var+="$i:"
+  done
+
+  kube::test::if_has_string "$var" "${@:$#}"
+}
+
 kube::test::if_has_string() {
   local message=$1
   local match=$2
 
-  if echo "$message" | grep -q "$match"; then
+  if grep -q "${match}" <<< "${message}"; then
     echo "Successful"
     echo "message:$message"
     echo "has:$match"
@@ -272,7 +283,7 @@ kube::test::if_has_not_string() {
   local message=$1
   local match=$2
 
-  if echo "$message" | grep -q "$match"; then
+  if grep -q "${match}" <<< "${message}"; then
     echo "FAIL!"
     echo "message:$message"
     echo "has:$match"
@@ -282,6 +293,18 @@ kube::test::if_has_not_string() {
     echo "Successful"
     echo "message:$message"
     echo "has not:$match"
+    return 0
+  fi
+}
+
+kube::test::if_empty_string() {
+  local match=$1
+  if [ -n "$match" ]; then
+    echo "$match is not empty"
+    caller
+    return 1
+  else
+    echo "Successful"
     return 0
   fi
 }
@@ -315,7 +338,7 @@ kube::test::version::object_to_file() {
 kube::test::version::json_object_to_file() {
   flags=$1
   file=$2
-  kubectl version $flags --output json | sed -e s/'\"'/''/g -e s/'}'/''/g -e s/'{'/''/g -e s/'clientVersion:'/'clientVersion:,'/ -e s/'serverVersion:'/'serverVersion:,'/ | tr , '\n' > "${file}"
+  kubectl version $flags --output json | sed -e s/' '/''/g -e s/'\"'/''/g -e s/'}'/''/g -e s/'{'/''/g -e s/'clientVersion:'/'clientVersion:,'/ -e s/'serverVersion:'/'serverVersion:,'/ | tr , '\n' > "${file}"
 }
 
 kube::test::version::json_client_server_object_to_file() {

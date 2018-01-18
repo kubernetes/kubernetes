@@ -20,7 +20,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
 func TestInfluxDBGetUsagePercentileCPU(t *testing.T) {

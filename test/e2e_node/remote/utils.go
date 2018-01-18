@@ -27,10 +27,11 @@ import (
 // utils.go contains functions used across test suites.
 
 const (
-	cniRelease       = "0799f5732f2a11b329d9e3d51b9c8f2e3759f2ff"
-	cniDirectory     = "cni" // The CNI tarball creates the "bin" directory under "cni".
+	cniVersion       = "v0.6.0"
+	cniArch          = "amd64"
+	cniDirectory     = "cni/bin" // The CNI tarball places binaries under directory under "cni/bin".
 	cniConfDirectory = "cni/net.d"
-	cniURL           = "https://storage.googleapis.com/kubernetes-release/network-plugins/cni-" + cniRelease + ".tar.gz"
+	cniURL           = "https://dl.k8s.io/network-plugins/cni-plugins-" + cniArch + "-" + cniVersion + ".tgz"
 )
 
 const cniConfig = `{

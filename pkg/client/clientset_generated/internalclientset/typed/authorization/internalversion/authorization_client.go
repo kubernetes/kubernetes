@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2018 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,6 +25,7 @@ type AuthorizationInterface interface {
 	RESTClient() rest.Interface
 	LocalSubjectAccessReviewsGetter
 	SelfSubjectAccessReviewsGetter
+	SelfSubjectRulesReviewsGetter
 	SubjectAccessReviewsGetter
 }
 
@@ -39,6 +40,10 @@ func (c *AuthorizationClient) LocalSubjectAccessReviews(namespace string) LocalS
 
 func (c *AuthorizationClient) SelfSubjectAccessReviews() SelfSubjectAccessReviewInterface {
 	return newSelfSubjectAccessReviews(c)
+}
+
+func (c *AuthorizationClient) SelfSubjectRulesReviews() SelfSubjectRulesReviewInterface {
+	return newSelfSubjectRulesReviews(c)
 }
 
 func (c *AuthorizationClient) SubjectAccessReviews() SubjectAccessReviewInterface {

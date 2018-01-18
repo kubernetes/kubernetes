@@ -20,36 +20,58 @@ package e2e_node
 
 import (
 	"fmt"
+	"io/ioutil"
+	"path"
 	"sort"
+	"strconv"
 	"time"
 
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/perftype"
+	nodeperftype "k8s.io/kubernetes/test/e2e_node/perftype"
 
 	. "github.com/onsi/gomega"
 )
 
 const (
-	// TODO(coufon): be consistent with perf_util.go version
-	currentDataVersion = "v1"
-	TimeSeriesTag      = "[Result:TimeSeries]"
-	TimeSeriesEnd      = "[Finish:TimeSeries]"
+	TimeSeriesTag = "[Result:TimeSeries]"
+	TimeSeriesEnd = "[Finish:TimeSeries]"
 )
 
-type NodeTimeSeries struct {
-	// value in OperationData is an array of timestamps
-	OperationData map[string][]int64         `json:"op_series,omitempty"`
-	ResourceData  map[string]*ResourceSeries `json:"resource_series,omitempty"`
-	Labels        map[string]string          `json:"labels"`
-	Version       string                     `json:"version"`
+// dumpDataToFile inserts the current timestamp into the labels and writes the
+// data for the test into the file with the specified prefix.
+func dumpDataToFile(data interface{}, labels map[string]string, prefix string) {
+	testName := labels["test"]
+	fileName := path.Join(framework.TestContext.ReportDir, fmt.Sprintf("%s-%s-%s.json", prefix, framework.TestContext.ReportPrefix, testName))
+	labels["timestamp"] = strconv.FormatInt(time.Now().UTC().Unix(), 10)
+	framework.Logf("Dumping perf data for test %q to %q.", testName, fileName)
+	if err := ioutil.WriteFile(fileName, []byte(framework.PrettyPrintJSON(data)), 0644); err != nil {
+		framework.Logf("Failed to write perf data for test %q to %q: %v", testName, fileName, err)
+	}
 }
 
-// logDensityTimeSeries logs the time series data of operation and resource usage
+// logPerfData writes the perf data to a standalone json file if the
+// framework.TestContext.ReportDir is non-empty, or to the general build log
+// otherwise. The perfType identifies which type of the perf data it is, such
+// as "cpu" and "memory". If an error occurs, no perf data will be logged.
+func logPerfData(p *perftype.PerfData, perfType string) {
+	if framework.TestContext.ReportDir == "" {
+		framework.PrintPerfData(p)
+		return
+	}
+	dumpDataToFile(p, p.Labels, "performance-"+perfType)
+}
+
+// logDensityTimeSeries writes the time series data of operation and resource
+// usage to a standalone json file if the framework.TestContext.ReportDir is
+// non-empty, or to the general build log otherwise. If an error occurs,
+// no perf data will be logged.
 func logDensityTimeSeries(rc *ResourceCollector, create, watch map[string]metav1.Time, testInfo map[string]string) {
-	timeSeries := &NodeTimeSeries{
+	timeSeries := &nodeperftype.NodeTimeSeries{
 		Labels:  testInfo,
-		Version: currentDataVersion,
+		Version: framework.CurrentKubeletPerfMetricsVersion,
 	}
 	// Attach operation time series.
 	timeSeries.OperationData = map[string][]int64{
@@ -58,8 +80,12 @@ func logDensityTimeSeries(rc *ResourceCollector, create, watch map[string]metav1
 	}
 	// Attach resource time series.
 	timeSeries.ResourceData = rc.GetResourceTimeSeries()
-	// Log time series with tags
-	framework.Logf("%s %s\n%s", TimeSeriesTag, framework.PrettyPrintJSON(timeSeries), TimeSeriesEnd)
+
+	if framework.TestContext.ReportDir == "" {
+		framework.Logf("%s %s\n%s", TimeSeriesTag, framework.PrettyPrintJSON(timeSeries), TimeSeriesEnd)
+		return
+	}
+	dumpDataToFile(timeSeries, timeSeries.Labels, "time_series")
 }
 
 type int64arr []int64
@@ -82,7 +108,7 @@ func getCumulatedPodTimeSeries(timePerPod map[string]metav1.Time) []int64 {
 // getLatencyPerfData returns perf data of pod startup latency.
 func getLatencyPerfData(latency framework.LatencyMetric, testInfo map[string]string) *perftype.PerfData {
 	return &perftype.PerfData{
-		Version: currentDataVersion,
+		Version: framework.CurrentKubeletPerfMetricsVersion,
 		DataItems: []perftype.DataItem{
 			{
 				Data: map[string]float64{
@@ -105,7 +131,7 @@ func getLatencyPerfData(latency framework.LatencyMetric, testInfo map[string]str
 // getThroughputPerfData returns perf data of pod creation startup throughput.
 func getThroughputPerfData(batchLag time.Duration, e2eLags []framework.PodLatencyData, podsNr int, testInfo map[string]string) *perftype.PerfData {
 	return &perftype.PerfData{
-		Version: currentDataVersion,
+		Version: framework.CurrentKubeletPerfMetricsVersion,
 		DataItems: []perftype.DataItem{
 			{
 				Data: map[string]float64{
@@ -123,18 +149,20 @@ func getThroughputPerfData(batchLag time.Duration, e2eLags []framework.PodLatenc
 	}
 }
 
-// getTestNodeInfo fetches the capacity of a node from API server and returns a map of labels.
-func getTestNodeInfo(f *framework.Framework, testName string) map[string]string {
+// getTestNodeInfo returns a label map containing the test name and
+// description, the name of the node on which the test will be run, the image
+// name of the node, and the node capacities.
+func getTestNodeInfo(f *framework.Framework, testName, testDesc string) map[string]string {
 	nodeName := framework.TestContext.NodeName
-	node, err := f.ClientSet.Core().Nodes().Get(nodeName, metav1.GetOptions{})
+	node, err := f.ClientSet.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
 	Expect(err).NotTo(HaveOccurred())
 
-	cpu, ok := node.Status.Capacity["cpu"]
+	cpu, ok := node.Status.Capacity[v1.ResourceCPU]
 	if !ok {
 		framework.Failf("Fail to fetch CPU capacity value of test node.")
 	}
 
-	memory, ok := node.Status.Capacity["memory"]
+	memory, ok := node.Status.Capacity[v1.ResourceMemory]
 	if !ok {
 		framework.Failf("Fail to fetch Memory capacity value of test node.")
 	}
@@ -149,10 +177,15 @@ func getTestNodeInfo(f *framework.Framework, testName string) map[string]string 
 		framework.Failf("Fail to fetch Memory capacity value as Int64.")
 	}
 
+	image := node.Status.NodeInfo.OSImage
+	if framework.TestContext.ImageDescription != "" {
+		image = fmt.Sprintf("%s (%s)", image, framework.TestContext.ImageDescription)
+	}
 	return map[string]string{
 		"node":    nodeName,
 		"test":    testName,
-		"image":   node.Status.NodeInfo.OSImage,
+		"image":   image,
 		"machine": fmt.Sprintf("cpu:%dcore,memory:%.1fGB", cpuValue, float32(memoryValue)/(1024*1024*1024)),
+		"desc":    testDesc,
 	}
 }

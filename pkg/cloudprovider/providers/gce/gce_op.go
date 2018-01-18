@@ -17,17 +17,20 @@ limitations under the License.
 package gce
 
 import (
+	"encoding/json"
 	"fmt"
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/wait"
 
 	"github.com/golang/glog"
-	compute "google.golang.org/api/compute/v1"
+	computealpha "google.golang.org/api/compute/v0.alpha"
+	computebeta "google.golang.org/api/compute/v0.beta"
+	computev1 "google.golang.org/api/compute/v1"
 	"google.golang.org/api/googleapi"
 )
 
-func (gce *GCECloud) waitForOp(op *compute.Operation, getOperation func(operationName string) (*compute.Operation, error), mc *metricContext) error {
+func (gce *GCECloud) waitForOp(op *computev1.Operation, getOperation func(operationName string) (*computev1.Operation, error), mc *metricContext) error {
 	if op == nil {
 		return mc.Observe(fmt.Errorf("operation must not be nil"))
 	}
@@ -72,11 +75,11 @@ func (gce *GCECloud) waitForOp(op *compute.Operation, getOperation func(operatio
 	})
 }
 
-func opIsDone(op *compute.Operation) bool {
+func opIsDone(op *computev1.Operation) bool {
 	return op != nil && op.Status == "DONE"
 }
 
-func getErrorFromOp(op *compute.Operation) error {
+func getErrorFromOp(op *computev1.Operation) error {
 	if op != nil && op.Error != nil && len(op.Error.Errors) > 0 {
 		err := &googleapi.Error{
 			Code:    int(op.HttpErrorStatusCode),
@@ -89,20 +92,89 @@ func getErrorFromOp(op *compute.Operation) error {
 	return nil
 }
 
-func (gce *GCECloud) waitForGlobalOp(op *compute.Operation, mc *metricContext) error {
-	return gce.waitForOp(op, func(operationName string) (*compute.Operation, error) {
-		return gce.service.GlobalOperations.Get(gce.projectID, operationName).Do()
-	}, mc)
+func (gce *GCECloud) waitForGlobalOp(op gceObject, mc *metricContext) error {
+	return gce.waitForGlobalOpInProject(op, gce.ProjectID(), mc)
 }
 
-func (gce *GCECloud) waitForRegionOp(op *compute.Operation, region string, mc *metricContext) error {
-	return gce.waitForOp(op, func(operationName string) (*compute.Operation, error) {
-		return gce.service.RegionOperations.Get(gce.projectID, region, operationName).Do()
-	}, mc)
+func (gce *GCECloud) waitForRegionOp(op gceObject, region string, mc *metricContext) error {
+	return gce.waitForRegionOpInProject(op, gce.ProjectID(), region, mc)
 }
 
-func (gce *GCECloud) waitForZoneOp(op *compute.Operation, zone string, mc *metricContext) error {
-	return gce.waitForOp(op, func(operationName string) (*compute.Operation, error) {
-		return gce.service.ZoneOperations.Get(gce.projectID, zone, operationName).Do()
-	}, mc)
+func (gce *GCECloud) waitForZoneOp(op gceObject, zone string, mc *metricContext) error {
+	return gce.waitForZoneOpInProject(op, gce.ProjectID(), zone, mc)
+}
+
+func (gce *GCECloud) waitForGlobalOpInProject(op gceObject, projectID string, mc *metricContext) error {
+	switch v := op.(type) {
+	case *computealpha.Operation:
+		return gce.waitForOp(convertToV1Operation(op), func(operationName string) (*computev1.Operation, error) {
+			op, err := gce.serviceAlpha.GlobalOperations.Get(projectID, operationName).Do()
+			return convertToV1Operation(op), err
+		}, mc)
+	case *computebeta.Operation:
+		return gce.waitForOp(convertToV1Operation(op), func(operationName string) (*computev1.Operation, error) {
+			op, err := gce.serviceBeta.GlobalOperations.Get(projectID, operationName).Do()
+			return convertToV1Operation(op), err
+		}, mc)
+	case *computev1.Operation:
+		return gce.waitForOp(op.(*computev1.Operation), func(operationName string) (*computev1.Operation, error) {
+			return gce.service.GlobalOperations.Get(projectID, operationName).Do()
+		}, mc)
+	default:
+		return fmt.Errorf("unexpected type: %T", v)
+	}
+}
+
+func (gce *GCECloud) waitForRegionOpInProject(op gceObject, projectID, region string, mc *metricContext) error {
+	switch v := op.(type) {
+	case *computealpha.Operation:
+		return gce.waitForOp(convertToV1Operation(op), func(operationName string) (*computev1.Operation, error) {
+			op, err := gce.serviceAlpha.RegionOperations.Get(projectID, region, operationName).Do()
+			return convertToV1Operation(op), err
+		}, mc)
+	case *computebeta.Operation:
+		return gce.waitForOp(convertToV1Operation(op), func(operationName string) (*computev1.Operation, error) {
+			op, err := gce.serviceBeta.RegionOperations.Get(projectID, region, operationName).Do()
+			return convertToV1Operation(op), err
+		}, mc)
+	case *computev1.Operation:
+		return gce.waitForOp(op.(*computev1.Operation), func(operationName string) (*computev1.Operation, error) {
+			return gce.service.RegionOperations.Get(projectID, region, operationName).Do()
+		}, mc)
+	default:
+		return fmt.Errorf("unexpected type: %T", v)
+	}
+}
+
+func (gce *GCECloud) waitForZoneOpInProject(op gceObject, projectID, zone string, mc *metricContext) error {
+	switch v := op.(type) {
+	case *computealpha.Operation:
+		return gce.waitForOp(convertToV1Operation(op), func(operationName string) (*computev1.Operation, error) {
+			op, err := gce.serviceAlpha.ZoneOperations.Get(projectID, zone, operationName).Do()
+			return convertToV1Operation(op), err
+		}, mc)
+	case *computebeta.Operation:
+		return gce.waitForOp(convertToV1Operation(op), func(operationName string) (*computev1.Operation, error) {
+			op, err := gce.serviceBeta.ZoneOperations.Get(projectID, zone, operationName).Do()
+			return convertToV1Operation(op), err
+		}, mc)
+	case *computev1.Operation:
+		return gce.waitForOp(op.(*computev1.Operation), func(operationName string) (*computev1.Operation, error) {
+			return gce.service.ZoneOperations.Get(projectID, zone, operationName).Do()
+		}, mc)
+	default:
+		return fmt.Errorf("unexpected type: %T", v)
+	}
+}
+
+func convertToV1Operation(object gceObject) *computev1.Operation {
+	enc, err := object.MarshalJSON()
+	if err != nil {
+		panic(fmt.Sprintf("Failed to encode to json: %v", err))
+	}
+	var op computev1.Operation
+	if err := json.Unmarshal(enc, &op); err != nil {
+		panic(fmt.Sprintf("Failed to convert GCE apiObject %v to v1 operation: %v", object, err))
+	}
+	return &op
 }

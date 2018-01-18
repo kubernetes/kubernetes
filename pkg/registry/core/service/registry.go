@@ -24,16 +24,16 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
 // Registry is an interface for things that know how to store services.
 type Registry interface {
 	ListServices(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (*api.ServiceList, error)
-	CreateService(ctx genericapirequest.Context, svc *api.Service) (*api.Service, error)
+	CreateService(ctx genericapirequest.Context, svc *api.Service, createValidation rest.ValidateObjectFunc) (*api.Service, error)
 	GetService(ctx genericapirequest.Context, name string, options *metav1.GetOptions) (*api.Service, error)
 	DeleteService(ctx genericapirequest.Context, name string) error
-	UpdateService(ctx genericapirequest.Context, svc *api.Service) (*api.Service, error)
+	UpdateService(ctx genericapirequest.Context, svc *api.Service, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (*api.Service, error)
 	WatchServices(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (watch.Interface, error)
 	ExportService(ctx genericapirequest.Context, name string, options metav1.ExportOptions) (*api.Service, error)
 }
@@ -57,8 +57,8 @@ func (s *storage) ListServices(ctx genericapirequest.Context, options *metainter
 	return obj.(*api.ServiceList), nil
 }
 
-func (s *storage) CreateService(ctx genericapirequest.Context, svc *api.Service) (*api.Service, error) {
-	obj, err := s.Create(ctx, svc)
+func (s *storage) CreateService(ctx genericapirequest.Context, svc *api.Service, createValidation rest.ValidateObjectFunc) (*api.Service, error) {
+	obj, err := s.Create(ctx, svc, createValidation, false)
 	if err != nil {
 		return nil, err
 	}
@@ -78,8 +78,8 @@ func (s *storage) DeleteService(ctx genericapirequest.Context, name string) erro
 	return err
 }
 
-func (s *storage) UpdateService(ctx genericapirequest.Context, svc *api.Service) (*api.Service, error) {
-	obj, _, err := s.Update(ctx, svc.Name, rest.DefaultUpdatedObjectInfo(svc, api.Scheme))
+func (s *storage) UpdateService(ctx genericapirequest.Context, svc *api.Service, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (*api.Service, error) {
+	obj, _, err := s.Update(ctx, svc.Name, rest.DefaultUpdatedObjectInfo(svc), createValidation, updateValidation)
 	if err != nil {
 		return nil, err
 	}

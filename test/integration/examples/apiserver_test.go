@@ -33,12 +33,13 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+	genericapiserver "k8s.io/apiserver/pkg/server"
 	client "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/client-go/util/cert"
-	apiregistrationv1alpha1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1alpha1"
+	apiregistrationv1beta1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1"
 	aggregatorclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset"
 	kubeaggregatorserver "k8s.io/kube-aggregator/pkg/cmd/server"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app"
@@ -101,7 +102,7 @@ func TestAggregatedAPIServer(t *testing.T) {
 			kubeAPIServerOptions.SecureServing.BindPort = kubePort
 			kubeAPIServerOptions.SecureServing.ServerCert.CertDirectory = certDir
 			kubeAPIServerOptions.InsecureServing.BindPort = 0
-			kubeAPIServerOptions.Etcd.StorageConfig.ServerList = []string{framework.GetEtcdURLFromEnv()}
+			kubeAPIServerOptions.Etcd.StorageConfig.ServerList = []string{framework.GetEtcdURL()}
 			kubeAPIServerOptions.ServiceClusterIPRange = *defaultServiceClusterIPRange
 			kubeAPIServerOptions.Authentication.RequestHeader.UsernameHeaders = []string{"X-Remote-User"}
 			kubeAPIServerOptions.Authentication.RequestHeader.GroupHeaders = []string{"X-Remote-Group"}
@@ -111,13 +112,22 @@ func TestAggregatedAPIServer(t *testing.T) {
 			kubeAPIServerOptions.Authentication.ClientCert.ClientCA = clientCACertFile.Name()
 			kubeAPIServerOptions.Authorization.Mode = "RBAC"
 
-			kubeAPIServerConfig, sharedInformers, _, err := app.CreateKubeAPIServerConfig(kubeAPIServerOptions)
+			tunneler, proxyTransport, err := app.CreateNodeDialer(kubeAPIServerOptions)
 			if err != nil {
 				t.Fatal(err)
 			}
-			kubeClientConfigValue.Store(kubeAPIServerConfig.GenericConfig.LoopbackClientConfig)
+			kubeAPIServerConfig, sharedInformers, versionedInformers, _, _, err := app.CreateKubeAPIServerConfig(kubeAPIServerOptions, tunneler, proxyTransport)
+			if err != nil {
+				t.Fatal(err)
+			}
+			// Adjust the loopback config for external use (external server name and CA)
+			kubeAPIServerClientConfig := rest.CopyConfig(kubeAPIServerConfig.GenericConfig.LoopbackClientConfig)
+			kubeAPIServerClientConfig.CAFile = path.Join(certDir, "apiserver.crt")
+			kubeAPIServerClientConfig.CAData = nil
+			kubeAPIServerClientConfig.ServerName = ""
+			kubeClientConfigValue.Store(kubeAPIServerClientConfig)
 
-			kubeAPIServer, err := app.CreateKubeAPIServer(kubeAPIServerConfig, sharedInformers, wait.NeverStop)
+			kubeAPIServer, err := app.CreateKubeAPIServer(kubeAPIServerConfig, genericapiserver.EmptyDelegate, sharedInformers, versionedInformers)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -185,8 +195,9 @@ func TestAggregatedAPIServer(t *testing.T) {
 				"--requestheader-allowed-names=kube-aggregator",
 				"--authentication-kubeconfig", kubeconfigFile.Name(),
 				"--authorization-kubeconfig", kubeconfigFile.Name(),
-				"--etcd-servers", framework.GetEtcdURLFromEnv(),
+				"--etcd-servers", framework.GetEtcdURL(),
 				"--cert-dir", wardleCertDir,
+				"--kubeconfig", kubeconfigFile.Name(),
 			})
 			if err := wardleCmd.Execute(); err != nil {
 				t.Log(err)
@@ -258,10 +269,10 @@ func TestAggregatedAPIServer(t *testing.T) {
 				"--requestheader-username-headers", "",
 				"--proxy-client-cert-file", proxyClientCertFile.Name(),
 				"--proxy-client-key-file", proxyClientKeyFile.Name(),
-				"--core-kubeconfig", kubeconfigFile.Name(),
+				"--kubeconfig", kubeconfigFile.Name(),
 				"--authentication-kubeconfig", kubeconfigFile.Name(),
 				"--authorization-kubeconfig", kubeconfigFile.Name(),
-				"--etcd-servers", framework.GetEtcdURLFromEnv(),
+				"--etcd-servers", framework.GetEtcdURL(),
 				"--cert-dir", aggregatorCertDir,
 			})
 			if err := aggregatorCmd.Execute(); err != nil {
@@ -303,17 +314,18 @@ func TestAggregatedAPIServer(t *testing.T) {
 		t.Fatal(err)
 	}
 	aggregatorClient := aggregatorclient.NewForConfigOrDie(aggregatorClientConfig)
-	_, err = aggregatorClient.ApiregistrationV1alpha1().APIServices().Create(&apiregistrationv1alpha1.APIService{
+	_, err = aggregatorClient.ApiregistrationV1beta1().APIServices().Create(&apiregistrationv1beta1.APIService{
 		ObjectMeta: metav1.ObjectMeta{Name: "v1alpha1.wardle.k8s.io"},
-		Spec: apiregistrationv1alpha1.APIServiceSpec{
-			Service: &apiregistrationv1alpha1.ServiceReference{
+		Spec: apiregistrationv1beta1.APIServiceSpec{
+			Service: &apiregistrationv1beta1.ServiceReference{
 				Namespace: "kube-wardle",
 				Name:      "api",
 			},
-			Group:    "wardle.k8s.io",
-			Version:  "v1alpha1",
-			CABundle: wardleCA,
-			Priority: 200,
+			Group:                "wardle.k8s.io",
+			Version:              "v1alpha1",
+			CABundle:             wardleCA,
+			GroupPriorityMinimum: 200,
+			VersionPriority:      200,
 		},
 	})
 	if err != nil {
@@ -327,14 +339,15 @@ func TestAggregatedAPIServer(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err = aggregatorClient.ApiregistrationV1alpha1().APIServices().Create(&apiregistrationv1alpha1.APIService{
+	_, err = aggregatorClient.ApiregistrationV1beta1().APIServices().Create(&apiregistrationv1beta1.APIService{
 		ObjectMeta: metav1.ObjectMeta{Name: "v1."},
-		Spec: apiregistrationv1alpha1.APIServiceSpec{
+		Spec: apiregistrationv1beta1.APIServiceSpec{
 			// register this as a loca service so it doesn't try to lookup the default kubernetes service
 			// which will have an unroutable IP address since its fake.
-			Group:    "",
-			Version:  "v1",
-			Priority: 100,
+			Group:                "",
+			Version:              "v1",
+			GroupPriorityMinimum: 100,
+			VersionPriority:      100,
 		},
 	})
 	if err != nil {
@@ -378,9 +391,6 @@ func createKubeConfig(clientCfg *rest.Config) *clientcmdapi.Config {
 		cluster.CertificateAuthorityData = clientCfg.CAData
 	}
 	cluster.InsecureSkipTLSVerify = clientCfg.Insecure
-	if clientCfg.GroupVersion != nil {
-		cluster.APIVersion = clientCfg.GroupVersion.String()
-	}
 	config.Clusters[clusterNick] = cluster
 
 	context := clientcmdapi.NewContext()
@@ -444,9 +454,11 @@ func testAPIResourceList(t *testing.T, client rest.Interface) {
 		t.Fatalf("Error in unmarshalling response from server %s: %v", "/apis/wardle.k8s.io/v1alpha1", err)
 	}
 	assert.Equal(t, groupVersion.String(), apiResourceList.GroupVersion)
-	assert.Equal(t, 1, len(apiResourceList.APIResources))
-	assert.Equal(t, "flunders", apiResourceList.APIResources[0].Name)
-	assert.True(t, apiResourceList.APIResources[0].Namespaced)
+	assert.Equal(t, 2, len(apiResourceList.APIResources))
+	assert.Equal(t, "fischers", apiResourceList.APIResources[0].Name)
+	assert.False(t, apiResourceList.APIResources[0].Namespaced)
+	assert.Equal(t, "flunders", apiResourceList.APIResources[1].Name)
+	assert.True(t, apiResourceList.APIResources[1].Namespaced)
 }
 
 const (

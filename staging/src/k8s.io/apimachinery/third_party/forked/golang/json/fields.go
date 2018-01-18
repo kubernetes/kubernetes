@@ -17,16 +17,25 @@ import (
 	"unicode/utf8"
 )
 
+const (
+	patchStrategyTagKey = "patchStrategy"
+	patchMergeKeyTagKey = "patchMergeKey"
+)
+
 // Finds the patchStrategy and patchMergeKey struct tag fields on a given
 // struct field given the struct type and the JSON name of the field.
+// It returns field type, a slice of patch strategies, merge key and error.
 // TODO: fix the returned errors to be introspectable.
-func LookupPatchMetadata(t reflect.Type, jsonField string) (reflect.Type, string, string, error) {
-	if t.Kind() == reflect.Map {
-		return t.Elem(), "", "", nil
+func LookupPatchMetadataForStruct(t reflect.Type, jsonField string) (
+	elemType reflect.Type, patchStrategies []string, patchMergeKey string, e error) {
+	if t.Kind() == reflect.Ptr {
+		t = t.Elem()
 	}
+
 	if t.Kind() != reflect.Struct {
-		return nil, "", "", fmt.Errorf("merging an object in json but data type is not map or struct, instead is: %s",
+		e = fmt.Errorf("merging an object in json but data type is not struct, instead is: %s",
 			t.Kind().String())
+		return
 	}
 	jf := []byte(jsonField)
 	// Find the field that the JSON library would use.
@@ -50,11 +59,14 @@ func LookupPatchMetadata(t reflect.Type, jsonField string) (reflect.Type, string
 		for i := 1; i < len(f.index); i++ {
 			tjf = tjf.Type.Field(f.index[i])
 		}
-		patchStrategy := tjf.Tag.Get("patchStrategy")
-		patchMergeKey := tjf.Tag.Get("patchMergeKey")
-		return tjf.Type, patchStrategy, patchMergeKey, nil
+		patchStrategy := tjf.Tag.Get(patchStrategyTagKey)
+		patchMergeKey = tjf.Tag.Get(patchMergeKeyTagKey)
+		patchStrategies = strings.Split(patchStrategy, ",")
+		elemType = tjf.Type
+		return
 	}
-	return nil, "", "", fmt.Errorf("unable to find api field in struct %s for the json field %q", t.Name(), jsonField)
+	e = fmt.Errorf("unable to find api field in struct %s for the json field %q", t.Name(), jsonField)
+	return
 }
 
 // A field represents a single field found in a struct.

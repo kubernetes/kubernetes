@@ -1,12 +1,12 @@
 {
  "kind": "discovery#restDescription",
- "etag": "\"tbys6C40o18GZwyMen5GMkdK-3s/mLggzdz9EvP0lVEQoxoRvdSJShg\"",
+ "etag": "\"YWOzh2SDasdU84ArJnpYek-OMdg/NOsFjtPY9zRzc3K9F8mQGuDeSj0\"",
  "discoveryVersion": "v1",
  "id": "cloudmonitoring:v2beta2",
  "name": "cloudmonitoring",
  "canonicalName": "Cloud Monitoring",
  "version": "v2beta2",
- "revision": "20161031",
+ "revision": "20170501",
  "title": "Cloud Monitoring API",
  "description": "Accesses Google Cloud Monitoring data.",
  "ownerDomain": "google.com",
@@ -21,7 +21,7 @@
  "basePath": "/cloudmonitoring/v2beta2/projects/",
  "rootUrl": "https://www.googleapis.com/",
  "servicePath": "cloudmonitoring/v2beta2/projects/",
- "batchPath": "batch",
+ "batchPath": "batch/cloudmonitoring/v2beta2",
  "parameters": {
   "alt": {
    "type": "string",

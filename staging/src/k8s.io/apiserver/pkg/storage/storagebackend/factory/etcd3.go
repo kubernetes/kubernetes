@@ -17,13 +17,23 @@ limitations under the License.
 package factory
 
 import (
-	"k8s.io/apiserver/pkg/storage"
-	"k8s.io/apiserver/pkg/storage/etcd3"
-	"k8s.io/apiserver/pkg/storage/storagebackend"
+	"time"
 
 	"github.com/coreos/etcd/clientv3"
 	"github.com/coreos/etcd/pkg/transport"
 	"golang.org/x/net/context"
+
+	"k8s.io/apiserver/pkg/storage"
+	"k8s.io/apiserver/pkg/storage/etcd3"
+	"k8s.io/apiserver/pkg/storage/storagebackend"
+	"k8s.io/apiserver/pkg/storage/value"
+)
+
+// The short keepalive timeout and interval have been chosen to aggressively
+// detect a failed etcd server without introducing much overhead.
+var (
+	keepaliveTime    = 30 * time.Second
+	keepaliveTimeout = 10 * time.Second
 )
 
 func newETCD3Storage(c storagebackend.Config) (storage.Interface, DestroyFunc, error) {
@@ -42,21 +52,27 @@ func newETCD3Storage(c storagebackend.Config) (storage.Interface, DestroyFunc, e
 		tlsConfig = nil
 	}
 	cfg := clientv3.Config{
-		Endpoints: c.ServerList,
-		TLS:       tlsConfig,
+		DialKeepAliveTime:    keepaliveTime,
+		DialKeepAliveTimeout: keepaliveTimeout,
+		Endpoints:            c.ServerList,
+		TLS:                  tlsConfig,
 	}
 	client, err := clientv3.New(cfg)
 	if err != nil {
 		return nil, nil, err
 	}
 	ctx, cancel := context.WithCancel(context.Background())
-	etcd3.StartCompactor(ctx, client)
+	etcd3.StartCompactor(ctx, client, c.CompactionInterval)
 	destroyFunc := func() {
 		cancel()
 		client.Close()
 	}
-	if c.Quorum {
-		return etcd3.New(client, c.Codec, c.Prefix, etcd3.IdentityTransformer), destroyFunc, nil
+	transformer := c.Transformer
+	if transformer == nil {
+		transformer = value.IdentityTransformer
 	}
-	return etcd3.NewWithNoQuorumRead(client, c.Codec, c.Prefix, etcd3.IdentityTransformer), destroyFunc, nil
+	if c.Quorum {
+		return etcd3.New(client, c.Codec, c.Prefix, transformer, c.Paging), destroyFunc, nil
+	}
+	return etcd3.NewWithNoQuorumRead(client, c.Codec, c.Prefix, transformer, c.Paging), destroyFunc, nil
 }

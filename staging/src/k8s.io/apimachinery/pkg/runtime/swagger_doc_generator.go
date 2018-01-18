@@ -71,7 +71,7 @@ func fmtRawDoc(rawDoc string) string {
 			delPrevChar()
 			buffer.WriteString("\n\n")
 		case strings.HasPrefix(leading, "TODO"): // Ignore one line TODOs
-		case strings.HasPrefix(leading, "+"): // Ignore instructions to go2idl
+		case strings.HasPrefix(leading, "+"): // Ignore instructions to the generators
 		default:
 			if strings.HasPrefix(line, " ") || strings.HasPrefix(line, "\t") {
 				delPrevChar()

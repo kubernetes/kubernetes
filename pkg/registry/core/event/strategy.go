@@ -25,10 +25,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
+	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/validation"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/apis/core/validation"
 )
 
 type eventStrategy struct {
@@ -38,7 +40,11 @@ type eventStrategy struct {
 
 // Strategy is the default logic that pplies when creating and updating
 // Event objects via the REST API.
-var Strategy = eventStrategy{api.Scheme, names.SimpleNameGenerator}
+var Strategy = eventStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
+
+func (eventStrategy) DefaultGarbageCollectionPolicy(ctx genericapirequest.Context) rest.GarbageCollectionPolicy {
+	return rest.Unsupported
+}
 
 func (eventStrategy) NamespaceScoped() bool {
 	return true
@@ -73,12 +79,12 @@ func (eventStrategy) AllowUnconditionalUpdate() bool {
 }
 
 // GetAttrs returns labels and fields of a given object for filtering purposes.
-func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
+func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
 	event, ok := obj.(*api.Event)
 	if !ok {
-		return nil, nil, fmt.Errorf("not an event")
+		return nil, nil, false, fmt.Errorf("not an event")
 	}
-	return labels.Set(event.Labels), EventToSelectableFields(event), nil
+	return labels.Set(event.Labels), EventToSelectableFields(event), event.Initializers != nil, nil
 }
 
 func MatchEvent(label labels.Selector, field fields.Selector) storage.SelectionPredicate {

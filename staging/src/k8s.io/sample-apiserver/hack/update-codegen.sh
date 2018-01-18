@@ -18,52 +18,17 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../../../../..
-EXAMPLE_ROOT=$(dirname "${BASH_SOURCE}")/..
-source "${KUBE_ROOT}/hack/lib/init.sh"
+SCRIPT_ROOT=$(dirname ${BASH_SOURCE})/..
+CODEGEN_PKG=${CODEGEN_PKG:-$(cd ${SCRIPT_ROOT}; ls -d -1 ./vendor/k8s.io/code-generator 2>/dev/null || echo ../code-generator)}
 
-# Register function to be called on EXIT to remove generated binary.
-function cleanup {
-  rm -f "${CLIENTGEN:-}"
-  rm -f "${listergen:-}"
-  rm -f "${informergen:-}"
-}
-trap cleanup EXIT
+# generate the code with:
+# --output-base    because this script should also be able to run inside the vendor dir of
+#                  k8s.io/kubernetes. The output-base is needed for the generators to output into the vendor dir
+#                  instead of the $GOPATH directly. For normal projects this can be dropped.
+${CODEGEN_PKG}/generate-internal-groups.sh all \
+  k8s.io/sample-apiserver/pkg/client k8s.io/sample-apiserver/pkg/apis k8s.io/sample-apiserver/pkg/apis \
+  wardle:v1alpha1 \
+  --output-base "$(dirname ${BASH_SOURCE})/../../.."
 
-echo "Building client-gen"
-CLIENTGEN="${PWD}/client-gen-binary"
-go build -o "${CLIENTGEN}" ./cmd/libs/go2idl/client-gen
-
-PREFIX=k8s.io/sample-apiserver/pkg/apis
-INPUT_BASE="--input-base ${PREFIX}"
-INPUT_APIS=(
-wardle/
-wardle/v1alpha1
-)
-INPUT="--input ${INPUT_APIS[@]}"
-CLIENTSET_PATH="--clientset-path k8s.io/sample-apiserver/pkg/client/clientset_generated"
-
-${CLIENTGEN} ${INPUT_BASE} ${INPUT} ${CLIENTSET_PATH} 
-${CLIENTGEN} --clientset-name="clientset" ${INPUT_BASE} --input wardle/v1alpha1 ${CLIENTSET_PATH} 
-
-
-echo "Building lister-gen"
-listergen="${PWD}/lister-gen"
-go build -o "${listergen}" ./cmd/libs/go2idl/lister-gen
-
-LISTER_INPUT="--input-dirs k8s.io/sample-apiserver/pkg/apis/wardle --input-dirs k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1"
-LISTER_PATH="--output-package k8s.io/sample-apiserver/pkg/client/listers"
-${listergen} ${LISTER_INPUT} ${LISTER_PATH}
-
-
-echo "Building informer-gen"
-informergen="${PWD}/informer-gen"
-go build -o "${informergen}" ./cmd/libs/go2idl/informer-gen
-
-${informergen} \
-  --input-dirs k8s.io/sample-apiserver/pkg/apis/wardle --input-dirs k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1 \
-  --versioned-clientset-package k8s.io/sample-apiserver/pkg/client/clientset_generated/clientset \
-  --internal-clientset-package k8s.io/sample-apiserver/pkg/client/clientset_generated/internalclientset \
-  --listers-package k8s.io/sample-apiserver/pkg/client/listers \
-  --output-package k8s.io/sample-apiserver/pkg/client/informers
-  "$@"
+# To use your own boilerplate text append:
+#   --go-header-file ${SCRIPT_ROOT}/hack/custom-boilerplate.go.txt

@@ -13,6 +13,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"golang.org/x/text/internal"
 	"golang.org/x/text/language"
 	"golang.org/x/text/transform"
 	"golang.org/x/text/unicode/norm"
@@ -23,6 +24,11 @@ import (
 // returns whether a checkpoint is possible: whether the pDst bytes written to
 // dst so far won't need changing as we see more source bytes.
 type mapFunc func(*context) bool
+
+// A spanFunc takes a context set to the current rune and returns whether this
+// rune would be altered when written to the output. It may advance the context
+// to the next rune. It returns whether a checkpoint is possible.
+type spanFunc func(*context) bool
 
 // maxIgnorable defines the maximum number of ignorables to consider for
 // lookahead operations.
@@ -36,12 +42,12 @@ func init() {
 	for _, s := range strings.Split(supported, " ") {
 		tags = append(tags, language.MustParse(s))
 	}
-	matcher = language.NewMatcher(tags)
+	matcher = internal.NewInheritanceMatcher(tags)
 	Supported = language.NewCoverage(tags)
 }
 
 var (
-	matcher language.Matcher
+	matcher *internal.InheritanceMatcher
 
 	Supported language.Coverage
 
@@ -50,56 +56,69 @@ var (
 
 	// Some uppercase mappers are stateless, so we can precompute the
 	// Transformers and save a bit on runtime allocations.
-	upperFunc = []mapFunc{
-		nil,              // und
-		nil,              // af
-		aztrUpper(upper), // az
-		elUpper,          // el
-		ltUpper(upper),   // lt
-		nil,              // nl
-		aztrUpper(upper), // tr
+	upperFunc = []struct {
+		upper mapFunc
+		span  spanFunc
+	}{
+		{nil, nil},                  // und
+		{nil, nil},                  // af
+		{aztrUpper(upper), isUpper}, // az
+		{elUpper, noSpan},           // el
+		{ltUpper(upper), noSpan},    // lt
+		{nil, nil},                  // nl
+		{aztrUpper(upper), isUpper}, // tr
 	}
 
-	undUpper transform.Transformer = &undUpperCaser{}
+	undUpper            transform.SpanningTransformer = &undUpperCaser{}
+	undLower            transform.SpanningTransformer = &undLowerCaser{}
+	undLowerIgnoreSigma transform.SpanningTransformer = &undLowerIgnoreSigmaCaser{}
 
 	lowerFunc = []mapFunc{
-		lower,     // und
-		lower,     // af
+		nil,       // und
+		nil,       // af
 		aztrLower, // az
-		lower,     // el
+		nil,       // el
 		ltLower,   // lt
-		lower,     // nl
+		nil,       // nl
 		aztrLower, // tr
 	}
 
 	titleInfos = []struct {
-		title, lower mapFunc
-		rewrite      func(*context)
+		title     mapFunc
+		lower     mapFunc
+		titleSpan spanFunc
+		rewrite   func(*context)
 	}{
-		{title, lower, nil},                // und
-		{title, lower, afnlRewrite},        // af
-		{aztrUpper(title), aztrLower, nil}, // az
-		{title, lower, nil},                // el
-		{ltUpper(title), ltLower, nil},     // lt
-		{nlTitle, lower, afnlRewrite},      // nl
-		{aztrUpper(title), aztrLower, nil}, // tr
+		{title, lower, isTitle, nil},                // und
+		{title, lower, isTitle, afnlRewrite},        // af
+		{aztrUpper(title), aztrLower, isTitle, nil}, // az
+		{title, lower, isTitle, nil},                // el
+		{ltUpper(title), ltLower, noSpan, nil},      // lt
+		{nlTitle, lower, nlTitleSpan, afnlRewrite},  // nl
+		{aztrUpper(title), aztrLower, isTitle, nil}, // tr
 	}
 )
 
-func makeUpper(t language.Tag, o options) transform.Transformer {
+func makeUpper(t language.Tag, o options) transform.SpanningTransformer {
 	_, i, _ := matcher.Match(t)
-	f := upperFunc[i]
+	f := upperFunc[i].upper
 	if f == nil {
 		return undUpper
 	}
-	return &simpleCaser{f: f}
+	return &simpleCaser{f: f, span: upperFunc[i].span}
 }
 
-func makeLower(t language.Tag, o options) transform.Transformer {
+func makeLower(t language.Tag, o options) transform.SpanningTransformer {
 	_, i, _ := matcher.Match(t)
 	f := lowerFunc[i]
-	if o.noFinalSigma {
-		return &simpleCaser{f: f}
+	if f == nil {
+		if o.ignoreFinalSigma {
+			return undLowerIgnoreSigma
+		}
+		return undLower
+	}
+	if o.ignoreFinalSigma {
+		return &simpleCaser{f: f, span: isLower}
 	}
 	return &lowerCaser{
 		first:   f,
@@ -107,20 +126,26 @@ func makeLower(t language.Tag, o options) transform.Transformer {
 	}
 }
 
-func makeTitle(t language.Tag, o options) transform.Transformer {
+func makeTitle(t language.Tag, o options) transform.SpanningTransformer {
 	_, i, _ := matcher.Match(t)
 	x := &titleInfos[i]
 	lower := x.lower
 	if o.noLower {
 		lower = (*context).copy
-	} else if !o.noFinalSigma {
+	} else if !o.ignoreFinalSigma {
 		lower = finalSigma(lower)
 	}
 	return &titleCaser{
-		title:   x.title,
-		lower:   lower,
-		rewrite: x.rewrite,
+		title:     x.title,
+		lower:     lower,
+		titleSpan: x.titleSpan,
+		rewrite:   x.rewrite,
 	}
+}
+
+func noSpan(c *context) bool {
+	c.err = transform.ErrEndOfSpan
+	return false
 }
 
 // TODO: consider a similar special case for the fast majority lower case. This
@@ -132,7 +157,7 @@ type undUpperCaser struct{ transform.NopResetter }
 // undUpperCaser implements the Transformer interface for doing an upper case
 // mapping for the root locale (und). It eliminates the need for an allocation
 // as it prevents escaping by not using function pointers.
-func (t *undUpperCaser) Transform(dst, src []byte, atEOF bool) (nDst, nSrc int, err error) {
+func (t undUpperCaser) Transform(dst, src []byte, atEOF bool) (nDst, nSrc int, err error) {
 	c := context{dst: dst, src: src, atEOF: atEOF}
 	for c.next() {
 		upper(&c)
@@ -141,26 +166,117 @@ func (t *undUpperCaser) Transform(dst, src []byte, atEOF bool) (nDst, nSrc int, 
 	return c.ret()
 }
 
+func (t undUpperCaser) Span(src []byte, atEOF bool) (n int, err error) {
+	c := context{src: src, atEOF: atEOF}
+	for c.next() && isUpper(&c) {
+		c.checkpoint()
+	}
+	return c.retSpan()
+}
+
+// undLowerIgnoreSigmaCaser implements the Transformer interface for doing
+// a lower case mapping for the root locale (und) ignoring final sigma
+// handling. This casing algorithm is used in some performance-critical packages
+// like secure/precis and x/net/http/idna, which warrants its special-casing.
+type undLowerIgnoreSigmaCaser struct{ transform.NopResetter }
+
+func (t undLowerIgnoreSigmaCaser) Transform(dst, src []byte, atEOF bool) (nDst, nSrc int, err error) {
+	c := context{dst: dst, src: src, atEOF: atEOF}
+	for c.next() && lower(&c) {
+		c.checkpoint()
+	}
+	return c.ret()
+
+}
+
+// Span implements a generic lower-casing. This is possible as isLower works
+// for all lowercasing variants. All lowercase variants only vary in how they
+// transform a non-lowercase letter. They will never change an already lowercase
+// letter. In addition, there is no state.
+func (t undLowerIgnoreSigmaCaser) Span(src []byte, atEOF bool) (n int, err error) {
+	c := context{src: src, atEOF: atEOF}
+	for c.next() && isLower(&c) {
+		c.checkpoint()
+	}
+	return c.retSpan()
+}
+
 type simpleCaser struct {
 	context
-	f mapFunc
+	f    mapFunc
+	span spanFunc
 }
 
 // simpleCaser implements the Transformer interface for doing a case operation
 // on a rune-by-rune basis.
 func (t *simpleCaser) Transform(dst, src []byte, atEOF bool) (nDst, nSrc int, err error) {
-	t.context = context{dst: dst, src: src, atEOF: atEOF}
-	c := &t.context
-	for c.next() && t.f(c) {
+	c := context{dst: dst, src: src, atEOF: atEOF}
+	for c.next() && t.f(&c) {
 		c.checkpoint()
 	}
 	return c.ret()
+}
+
+func (t *simpleCaser) Span(src []byte, atEOF bool) (n int, err error) {
+	c := context{src: src, atEOF: atEOF}
+	for c.next() && t.span(&c) {
+		c.checkpoint()
+	}
+	return c.retSpan()
+}
+
+// undLowerCaser implements the Transformer interface for doing a lower case
+// mapping for the root locale (und) ignoring final sigma handling. This casing
+// algorithm is used in some performance-critical packages like secure/precis
+// and x/net/http/idna, which warrants its special-casing.
+type undLowerCaser struct{ transform.NopResetter }
+
+func (t undLowerCaser) Transform(dst, src []byte, atEOF bool) (nDst, nSrc int, err error) {
+	c := context{dst: dst, src: src, atEOF: atEOF}
+
+	for isInterWord := true; c.next(); {
+		if isInterWord {
+			if c.info.isCased() {
+				if !lower(&c) {
+					break
+				}
+				isInterWord = false
+			} else if !c.copy() {
+				break
+			}
+		} else {
+			if c.info.isNotCasedAndNotCaseIgnorable() {
+				if !c.copy() {
+					break
+				}
+				isInterWord = true
+			} else if !c.hasPrefix("Σ") {
+				if !lower(&c) {
+					break
+				}
+			} else if !finalSigmaBody(&c) {
+				break
+			}
+		}
+		c.checkpoint()
+	}
+	return c.ret()
+}
+
+func (t undLowerCaser) Span(src []byte, atEOF bool) (n int, err error) {
+	c := context{src: src, atEOF: atEOF}
+	for c.next() && isLower(&c) {
+		c.checkpoint()
+	}
+	return c.retSpan()
 }
 
 // lowerCaser implements the Transformer interface. The default Unicode lower
 // casing requires different treatment for the first and subsequent characters
 // of a word, most notably to handle the Greek final Sigma.
 type lowerCaser struct {
+	undLowerIgnoreSigmaCaser
+
 	context
 
 	first, midWord mapFunc
@@ -202,7 +318,9 @@ type titleCaser struct {
 	context
 
 	// rune mappings used by the actual casing algorithms.
-	title, lower mapFunc
+	title     mapFunc
+	lower     mapFunc
+	titleSpan spanFunc
 
 	rewrite func(*context)
 }
@@ -228,10 +346,10 @@ func (t *titleCaser) Transform(dst, src []byte, atEOF bool) (nDst, nSrc int, err
 			t.rewrite(c)
 		}
 
-		wasMid := p.isCaseIgnorableAndNonBreakStarter()
+		wasMid := p.isMid()
 		// Break out of this loop on failure to ensure we do not modify the
 		// state incorrectly.
-		if p.isCased() && !p.isCaseIgnorableAndNotCased() {
+		if p.isCased() {
 			if !c.isMidWord {
 				if !t.title(c) {
 					break
@@ -242,26 +360,69 @@ func (t *titleCaser) Transform(dst, src []byte, atEOF bool) (nDst, nSrc int, err
 			}
 		} else if !c.copy() {
 			break
-		}
-
-		// TODO: make this an "else if" if we can prove that no rune that does
-		// not match the first condition of the if statement can be a break.
-		if p.isBreak() {
+		} else if p.isBreak() {
 			c.isMidWord = false
 		}
 
 		// As we save the state of the transformer, it is safe to call
 		// checkpoint after any successful write.
-		c.checkpoint()
+		if !(c.isMidWord && wasMid) {
+			c.checkpoint()
+		}
 
 		if !c.next() {
 			break
 		}
-		if wasMid && c.info.isCaseIgnorableAndNonBreakStarter() {
+		if wasMid && c.info.isMid() {
 			c.isMidWord = false
 		}
 	}
 	return c.ret()
+}
+
+func (t *titleCaser) Span(src []byte, atEOF bool) (n int, err error) {
+	t.context = context{src: src, atEOF: atEOF, isMidWord: t.isMidWord}
+	c := &t.context
+
+	if !c.next() {
+		return c.retSpan()
+	}
+
+	for {
+		p := c.info
+		if t.rewrite != nil {
+			t.rewrite(c)
+		}
+
+		wasMid := p.isMid()
+		// Break out of this loop on failure to ensure we do not modify the
+		// state incorrectly.
+		if p.isCased() {
+			if !c.isMidWord {
+				if !t.titleSpan(c) {
+					break
+				}
+				c.isMidWord = true
+			} else if !isLower(c) {
+				break
+			}
+		} else if p.isBreak() {
+			c.isMidWord = false
+		}
+		// As we save the state of the transformer, it is safe to call
+		// checkpoint after any successful write.
+		if !(c.isMidWord && wasMid) {
+			c.checkpoint()
+		}
+
+		if !c.next() {
+			break
+		}
+		if wasMid && c.info.isMid() {
+			c.isMidWord = false
+		}
+	}
+	return c.retSpan()
 }
 
 // finalSigma adds Greek final Sigma handing to another casing function. It
@@ -269,43 +430,68 @@ func (t *titleCaser) Transform(dst, src []byte, atEOF bool) (nDst, nSrc int, err
 // case-ignorables and a cased letters.
 func finalSigma(f mapFunc) mapFunc {
 	return func(c *context) bool {
-		// ::NFD();
-		// # 03A3; 03C2; 03A3; 03A3; Final_Sigma; # GREEK CAPITAL LETTER SIGMA
-		// Σ } [:case-ignorable:]* [:cased:] → σ;
-		// [:cased:] [:case-ignorable:]* { Σ → ς;
-		// ::Any-Lower;
-		// ::NFC();
-
 		if !c.hasPrefix("Σ") {
 			return f(c)
 		}
-
-		p := c.pDst
-		c.writeString("ς")
-		// We need to do one more iteration after maxIgnorable, as a cased
-		// letter is not an ignorable and may modify the result.
-		for i := 0; i < maxIgnorable+1; i++ {
-			if !c.next() {
-				return false
-			}
-			if !c.info.isCaseIgnorable() {
-				if c.info.isCased() {
-					// p+1 is guaranteed to be in bounds: if writing ς was
-					// successful, p+1 will contain the second byte of ς. If not,
-					// this function will have returned after c.next returned false.
-					c.dst[p+1]++ // ς → σ
-				}
-				c.unreadRune()
-				return true
-			}
-			// A case ignorable may also introduce a word break, so we may need
-			// to continue searching even after detecting a break.
-			c.isMidWord = c.isMidWord && !c.info.isBreak()
-			c.copy()
-		}
-		return true
+		return finalSigmaBody(c)
 	}
 }
+
+func finalSigmaBody(c *context) bool {
+	// Current rune must be ∑.
+
+	// ::NFD();
+	// # 03A3; 03C2; 03A3; 03A3; Final_Sigma; # GREEK CAPITAL LETTER SIGMA
+	// Σ } [:case-ignorable:]* [:cased:] → σ;
+	// [:cased:] [:case-ignorable:]* { Σ → ς;
+	// ::Any-Lower;
+	// ::NFC();
+
+	p := c.pDst
+	c.writeString("ς")
+
+	// TODO: we should do this here, but right now this will never have an
+	// effect as this is called when the prefix is Sigma, whereas Dutch and
+	// Afrikaans only test for an apostrophe.
+	//
+	// if t.rewrite != nil {
+	// 	t.rewrite(c)
+	// }
+
+	// We need to do one more iteration after maxIgnorable, as a cased
+	// letter is not an ignorable and may modify the result.
+	wasMid := false
+	for i := 0; i < maxIgnorable+1; i++ {
+		if !c.next() {
+			return false
+		}
+		if !c.info.isCaseIgnorable() {
+			// All Midword runes are also case ignorable, so we are
+			// guaranteed to have a letter or word break here. As we are
+			// unreading the run, there is no need to unset c.isMidWord;
+			// the title caser will handle this.
+			if c.info.isCased() {
+				// p+1 is guaranteed to be in bounds: if writing ς was
+				// successful, p+1 will contain the second byte of ς. If not,
+				// this function will have returned after c.next returned false.
+				c.dst[p+1]++ // ς → σ
+			}
+			c.unreadRune()
+			return true
+		}
+		// A case ignorable may also introduce a word break, so we may need
+		// to continue searching even after detecting a break.
+		isMid := c.info.isMid()
+		if (wasMid && isMid) || c.info.isBreak() {
+			c.isMidWord = false
+		}
+		wasMid = isMid
+		c.copy()
+	}
+	return true
+}
+
+// finalSigmaSpan would be the same as isLower.
 
 // elUpper implements Greek upper casing, which entails removing a predefined
 // set of non-blocked modifiers. Note that these accents should not be removed
@@ -376,6 +562,8 @@ func elUpper(c *context) bool {
 	return i == maxIgnorable
 }
 
+// TODO: implement elUpperSpan (low-priority: complex and infrequent).
+
 func ltLower(c *context) bool {
 	// From CLDR:
 	// # Introduce an explicit dot above when lowercasing capital I's and J's
@@ -390,10 +578,10 @@ func ltLower(c *context) bool {
 	// ::NFD();
 	// I } [^[:ccc=Not_Reordered:][:ccc=Above:]]* [:ccc=Above:] → i \u0307;
 	// J } [^[:ccc=Not_Reordered:][:ccc=Above:]]* [:ccc=Above:] → j \u0307;
-	// Į } [^[:ccc=Not_Reordered:][:ccc=Above:]]* [:ccc=Above:] → į \u0307;
-	// Ì → i \u0307 \u0300;
-	// Í → i \u0307 \u0301;
-	// Ĩ → i \u0307 \u0303;
+	// I \u0328 (Į) } [^[:ccc=Not_Reordered:][:ccc=Above:]]* [:ccc=Above:] → i \u0328 \u0307;
+	// I \u0300 (Ì) → i \u0307 \u0300;
+	// I \u0301 (Í) → i \u0307 \u0301;
+	// I \u0303 (Ĩ) → i \u0307 \u0303;
 	// ::Any-Lower();
 	// ::NFC();
 
@@ -445,9 +633,16 @@ func ltLower(c *context) bool {
 	return i == maxIgnorable
 }
 
+// ltLowerSpan would be the same as isLower.
+
 func ltUpper(f mapFunc) mapFunc {
 	return func(c *context) bool {
+		// Unicode:
+		// 0307; 0307; ; ; lt After_Soft_Dotted; # COMBINING DOT ABOVE
+		//
 		// From CLDR:
+		// # Remove \u0307 following soft-dotteds (i, j, and the like), with possible
+		// # intervening non-230 marks.
 		// ::NFD();
 		// [:Soft_Dotted:] [^[:ccc=Not_Reordered:][:ccc=Above:]]* { \u0307 → ;
 		// ::Any-Upper();
@@ -511,6 +706,8 @@ func ltUpper(f mapFunc) mapFunc {
 	}
 }
 
+// TODO: implement ltUpperSpan (low priority: complex and infrequent).
+
 func aztrUpper(f mapFunc) mapFunc {
 	return func(c *context) bool {
 		// i→İ;
@@ -571,6 +768,8 @@ Loop:
 	return c.writeString("ı") && c.writeBytes(c.src[start:c.pSrc+c.sz]) && done
 }
 
+// aztrLowerSpan would be the same as isLower.
+
 func nlTitle(c *context) bool {
 	// From CLDR:
 	// # Special titlecasing for Dutch initial "ij".
@@ -588,6 +787,24 @@ func nlTitle(c *context) bool {
 		return c.writeString("J")
 	}
 	c.unreadRune()
+	return true
+}
+
+func nlTitleSpan(c *context) bool {
+	// From CLDR:
+	// # Special titlecasing for Dutch initial "ij".
+	// ::Any-Title();
+	// # Fix up Ij at the beginning of a "word" (per Any-Title, notUAX #29)
+	// [:^WB=ALetter:] [:WB=Extend:]* [[:WB=MidLetter:][:WB=MidNumLet:]]? { Ij } → IJ ;
+	if c.src[c.pSrc] != 'I' {
+		return isTitle(c)
+	}
+	if !c.next() || c.src[c.pSrc] == 'j' {
+		return false
+	}
+	if c.src[c.pSrc] != 'J' {
+		c.unreadRune()
+	}
 	return true
 }
 

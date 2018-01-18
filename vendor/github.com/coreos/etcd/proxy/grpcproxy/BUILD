@@ -1,11 +1,4 @@
-package(default_visibility = ["//visibility:public"])
-
-licenses(["notice"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
@@ -13,32 +6,42 @@ go_library(
         "auth.go",
         "cluster.go",
         "doc.go",
+        "election.go",
         "kv.go",
-        "kv_client_adapter.go",
+        "leader.go",
         "lease.go",
+        "lock.go",
+        "logger.go",
         "maintenance.go",
         "metrics.go",
+        "register.go",
         "watch.go",
         "watch_broadcast.go",
         "watch_broadcasts.go",
-        "watch_client_adapter.go",
         "watch_ranges.go",
         "watcher.go",
     ],
-    tags = ["automanaged"],
+    importpath = "github.com/coreos/etcd/proxy/grpcproxy",
+    visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/coreos/etcd/clientv3:go_default_library",
+        "//vendor/github.com/coreos/etcd/clientv3/concurrency:go_default_library",
+        "//vendor/github.com/coreos/etcd/clientv3/naming:go_default_library",
+        "//vendor/github.com/coreos/etcd/etcdserver/api/v3election/v3electionpb:go_default_library",
+        "//vendor/github.com/coreos/etcd/etcdserver/api/v3lock/v3lockpb:go_default_library",
         "//vendor/github.com/coreos/etcd/etcdserver/api/v3rpc:go_default_library",
         "//vendor/github.com/coreos/etcd/etcdserver/api/v3rpc/rpctypes:go_default_library",
         "//vendor/github.com/coreos/etcd/etcdserver/etcdserverpb:go_default_library",
         "//vendor/github.com/coreos/etcd/mvcc:go_default_library",
         "//vendor/github.com/coreos/etcd/mvcc/mvccpb:go_default_library",
         "//vendor/github.com/coreos/etcd/proxy/grpcproxy/cache:go_default_library",
+        "//vendor/github.com/coreos/pkg/capnslog:go_default_library",
         "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",
         "//vendor/golang.org/x/net/context:go_default_library",
         "//vendor/golang.org/x/time/rate:go_default_library",
         "//vendor/google.golang.org/grpc:go_default_library",
         "//vendor/google.golang.org/grpc/metadata:go_default_library",
+        "//vendor/google.golang.org/grpc/naming:go_default_library",
     ],
 )
 
@@ -53,7 +56,9 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//vendor/github.com/coreos/etcd/proxy/grpcproxy/adapter:all-srcs",
         "//vendor/github.com/coreos/etcd/proxy/grpcproxy/cache:all-srcs",
     ],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

@@ -17,15 +17,21 @@ limitations under the License.
 package azure_file
 
 import (
+	"fmt"
 	"io/ioutil"
 	"os"
 	"path"
+	"reflect"
+	"strings"
 	"testing"
 
+	"github.com/Azure/go-autorest/autorest/to"
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
+	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/azure"
+	fakecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
@@ -38,7 +44,7 @@ func TestCanSupport(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
 
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/azure-file")
 	if err != nil {
@@ -50,7 +56,7 @@ func TestCanSupport(t *testing.T) {
 	if !plug.CanSupport(&volume.Spec{Volume: &v1.Volume{VolumeSource: v1.VolumeSource{AzureFile: &v1.AzureFileVolumeSource{}}}}) {
 		t.Errorf("Expected true")
 	}
-	if !plug.CanSupport(&volume.Spec{PersistentVolume: &v1.PersistentVolume{Spec: v1.PersistentVolumeSpec{PersistentVolumeSource: v1.PersistentVolumeSource{AzureFile: &v1.AzureFileVolumeSource{}}}}}) {
+	if !plug.CanSupport(&volume.Spec{PersistentVolume: &v1.PersistentVolume{Spec: v1.PersistentVolumeSpec{PersistentVolumeSource: v1.PersistentVolumeSource{AzureFile: &v1.AzureFilePersistentVolumeSource{}}}}}) {
 		t.Errorf("Expected true")
 	}
 }
@@ -62,34 +68,64 @@ func TestGetAccessModes(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
 
 	plug, err := plugMgr.FindPersistentPluginByName("kubernetes.io/azure-file")
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
-	if !contains(plug.GetAccessModes(), v1.ReadWriteOnce) || !contains(plug.GetAccessModes(), v1.ReadOnlyMany) || !contains(plug.GetAccessModes(), v1.ReadWriteMany) {
+	if !volumetest.ContainsAccessMode(plug.GetAccessModes(), v1.ReadWriteOnce) || !volumetest.ContainsAccessMode(plug.GetAccessModes(), v1.ReadOnlyMany) || !volumetest.ContainsAccessMode(plug.GetAccessModes(), v1.ReadWriteMany) {
 		t.Errorf("Expected three AccessModeTypes:  %s, %s, and %s", v1.ReadWriteOnce, v1.ReadOnlyMany, v1.ReadWriteMany)
 	}
 }
 
-func contains(modes []v1.PersistentVolumeAccessMode, mode v1.PersistentVolumeAccessMode) bool {
-	for _, m := range modes {
-		if m == mode {
-			return true
-		}
+func getAzureTestCloud(t *testing.T) *azure.Cloud {
+	config := `{
+                "aadClientId": "--aad-client-id--",
+                "aadClientSecret": "--aad-client-secret--"
+        }`
+	configReader := strings.NewReader(config)
+	cloud, err := azure.NewCloud(configReader)
+	if err != nil {
+		t.Error(err)
 	}
-	return false
+	azureCloud, ok := cloud.(*azure.Cloud)
+	if !ok {
+		t.Error("NewCloud returned incorrect type")
+	}
+	return azureCloud
 }
 
-func TestPlugin(t *testing.T) {
+func getTestTempDir(t *testing.T) string {
 	tmpDir, err := ioutil.TempDir(os.TempDir(), "azurefileTest")
 	if err != nil {
 		t.Fatalf("can't make a temp dir: %v", err)
 	}
+	return tmpDir
+}
+
+func TestPluginAzureCloudProvider(t *testing.T) {
+	tmpDir := getTestTempDir(t)
 	defer os.RemoveAll(tmpDir)
+	testPlugin(t, tmpDir, volumetest.NewFakeVolumeHostWithCloudProvider(tmpDir, nil, nil, getAzureTestCloud(t)))
+}
+
+func TestPluginWithoutCloudProvider(t *testing.T) {
+	tmpDir := getTestTempDir(t)
+	defer os.RemoveAll(tmpDir)
+	testPlugin(t, tmpDir, volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
+}
+
+func TestPluginWithOtherCloudProvider(t *testing.T) {
+	tmpDir := getTestTempDir(t)
+	defer os.RemoveAll(tmpDir)
+	cloud := &fakecloud.FakeCloud{}
+	testPlugin(t, tmpDir, volumetest.NewFakeVolumeHostWithCloudProvider(tmpDir, nil, nil, cloud))
+}
+
+func testPlugin(t *testing.T, tmpDir string, volumeHost volume.VolumeHost) {
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumeHost)
 
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/azure-file")
 	if err != nil {
@@ -151,7 +187,7 @@ func TestPlugin(t *testing.T) {
 	if _, err := os.Stat(path); err == nil {
 		t.Errorf("TearDown() failed, volume path still exists: %s", path)
 	} else if !os.IsNotExist(err) {
-		t.Errorf("SetUp() failed: %v", err)
+		t.Errorf("TearDown() failed: %v", err)
 	}
 }
 
@@ -162,7 +198,7 @@ func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 		},
 		Spec: v1.PersistentVolumeSpec{
 			PersistentVolumeSource: v1.PersistentVolumeSource{
-				AzureFile: &v1.AzureFileVolumeSource{},
+				AzureFile: &v1.AzureFilePersistentVolumeSource{},
 			},
 			ClaimRef: &v1.ObjectReference{
 				Name: "claimA",
@@ -186,13 +222,16 @@ func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 	client := fake.NewSimpleClientset(pv, claim)
 
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), volumetest.NewFakeVolumeHost("/tmp/fake", client, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost("/tmp/fake", client, nil))
 	plug, _ := plugMgr.FindPluginByName(azureFilePluginName)
 
 	// readOnly bool is supplied by persistent-claim volume source when its mounter creates other volumes
 	spec := volume.NewSpecFromPersistentVolume(pv, true)
 	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: types.UID("poduid")}}
 	mounter, _ := plug.NewMounter(spec, pod, volume.VolumeOptions{})
+	if mounter == nil {
+		t.Fatalf("Got a nil Mounter")
+	}
 
 	if !mounter.GetAttributes().ReadOnly {
 		t.Errorf("Expected true for mounter.IsReadOnly")
@@ -215,7 +254,7 @@ func TestMounterAndUnmounterTypeAssert(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
 
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/azure-file")
 	if err != nil {
@@ -240,5 +279,143 @@ func TestMounterAndUnmounterTypeAssert(t *testing.T) {
 	unmounter, err := plug.(*azureFilePlugin).newUnmounterInternal("vol1", types.UID("poduid"), &mount.FakeMounter{})
 	if _, ok := unmounter.(volume.Mounter); ok {
 		t.Errorf("Volume Unmounter can be type-assert to Mounter")
+	}
+}
+
+type testcase struct {
+	name      string
+	defaultNs string
+	spec      *volume.Spec
+	// Expected return of the test
+	expectedName  string
+	expectedNs    string
+	expectedError error
+}
+
+func TestGetSecretNameAndNamespaceForPV(t *testing.T) {
+	secretNs := "ns"
+	tests := []testcase{
+		{
+			name:      "persistent volume source",
+			defaultNs: "default",
+			spec: &volume.Spec{
+				PersistentVolume: &v1.PersistentVolume{
+					Spec: v1.PersistentVolumeSpec{
+						PersistentVolumeSource: v1.PersistentVolumeSource{
+							AzureFile: &v1.AzureFilePersistentVolumeSource{
+								ShareName:       "share",
+								SecretName:      "name",
+								SecretNamespace: &secretNs,
+							},
+						},
+					},
+				},
+			},
+			expectedName:  "name",
+			expectedNs:    "ns",
+			expectedError: nil,
+		},
+		{
+			name:      "persistent volume source without namespace",
+			defaultNs: "default",
+			spec: &volume.Spec{
+				PersistentVolume: &v1.PersistentVolume{
+					Spec: v1.PersistentVolumeSpec{
+						PersistentVolumeSource: v1.PersistentVolumeSource{
+							AzureFile: &v1.AzureFilePersistentVolumeSource{
+								ShareName:  "share",
+								SecretName: "name",
+							},
+						},
+					},
+				},
+			},
+			expectedName:  "name",
+			expectedNs:    "default",
+			expectedError: nil,
+		},
+		{
+			name:      "pod volume source",
+			defaultNs: "default",
+			spec: &volume.Spec{
+				Volume: &v1.Volume{
+					VolumeSource: v1.VolumeSource{
+						AzureFile: &v1.AzureFileVolumeSource{
+							ShareName:  "share",
+							SecretName: "name",
+						},
+					},
+				},
+			},
+			expectedName:  "name",
+			expectedNs:    "default",
+			expectedError: nil,
+		},
+	}
+	for _, testcase := range tests {
+		resultName, resultNs, err := getSecretNameAndNamespace(testcase.spec, testcase.defaultNs)
+		if err != testcase.expectedError || resultName != testcase.expectedName || resultNs != testcase.expectedNs {
+			t.Errorf("%s failed: expected err=%v ns=%q name=%q, got %v/%q/%q", testcase.name, testcase.expectedError, testcase.expectedNs, testcase.expectedName,
+				err, resultNs, resultName)
+		}
+	}
+
+}
+
+func TestAppendDefaultMountOptions(t *testing.T) {
+	tests := []struct {
+		options  []string
+		fsGroup  *int64
+		expected []string
+	}{
+		{
+			options: []string{"dir_mode=0777"},
+			fsGroup: nil,
+			expected: []string{"dir_mode=0777",
+				fmt.Sprintf("%s=%s", fileMode, defaultFileMode),
+				fmt.Sprintf("%s=%s", vers, defaultVers)},
+		},
+		{
+			options: []string{"file_mode=0777"},
+			fsGroup: to.Int64Ptr(0),
+			expected: []string{"file_mode=0777",
+				fmt.Sprintf("%s=%s", dirMode, defaultDirMode),
+				fmt.Sprintf("%s=%s", vers, defaultVers),
+				fmt.Sprintf("%s=0", gid)},
+		},
+		{
+			options: []string{"vers=2.1"},
+			fsGroup: to.Int64Ptr(1000),
+			expected: []string{"vers=2.1",
+				fmt.Sprintf("%s=%s", fileMode, defaultFileMode),
+				fmt.Sprintf("%s=%s", dirMode, defaultDirMode),
+				fmt.Sprintf("%s=1000", gid)},
+		},
+		{
+			options: []string{""},
+			expected: []string{"", fmt.Sprintf("%s=%s",
+				fileMode, defaultFileMode),
+				fmt.Sprintf("%s=%s", dirMode, defaultDirMode),
+				fmt.Sprintf("%s=%s", vers, defaultVers)},
+		},
+		{
+			options:  []string{"file_mode=0777", "dir_mode=0777"},
+			expected: []string{"file_mode=0777", "dir_mode=0777", fmt.Sprintf("%s=%s", vers, defaultVers)},
+		},
+		{
+			options: []string{"gid=2000"},
+			fsGroup: to.Int64Ptr(1000),
+			expected: []string{"gid=2000",
+				fmt.Sprintf("%s=%s", fileMode, defaultFileMode),
+				fmt.Sprintf("%s=%s", dirMode, defaultDirMode),
+				"vers=3.0"},
+		},
+	}
+
+	for _, test := range tests {
+		result := appendDefaultMountOptions(test.options, test.fsGroup)
+		if !reflect.DeepEqual(result, test.expected) {
+			t.Errorf("input: %q, appendDefaultMountOptions result: %q, expected: %q", test.options, result, test.expected)
+		}
 	}
 }

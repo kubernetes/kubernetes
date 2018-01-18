@@ -19,16 +19,18 @@ package cmd
 import (
 	"fmt"
 	"io"
+	"os"
 
 	"k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/auth"
 	cmdconfig "k8s.io/kubernetes/pkg/kubectl/cmd/config"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/resource"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/rollout"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/set"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/util/i18n"
+	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
@@ -36,22 +38,22 @@ import (
 
 const (
 	bashCompletionFunc = `# call kubectl get $1,
-__kubectl_override_flag_list=(kubeconfig cluster user context namespace server)
+__kubectl_override_flag_list=(--kubeconfig --cluster --user --context --namespace --server -n -s)
 __kubectl_override_flags()
 {
-    local ${__kubectl_override_flag_list[*]} two_word_of of
+    local ${__kubectl_override_flag_list[*]##*-} two_word_of of var
     for w in "${words[@]}"; do
         if [ -n "${two_word_of}" ]; then
-            eval "${two_word_of}=\"--${two_word_of}=\${w}\""
+            eval "${two_word_of##*-}=\"${two_word_of}=\${w}\""
             two_word_of=
             continue
         fi
         for of in "${__kubectl_override_flag_list[@]}"; do
             case "${w}" in
-                --${of}=*)
-                    eval "${of}=\"${w}\""
+                ${of}=*)
+                    eval "${of##*-}=\"${w}\""
                     ;;
-                --${of})
+                ${of})
                     two_word_of="${of}"
                     ;;
             esac
@@ -60,20 +62,11 @@ __kubectl_override_flags()
             namespace="--all-namespaces"
         fi
     done
-    for of in "${__kubectl_override_flag_list[@]}"; do
-        if eval "test -n \"\$${of}\""; then
-            eval "echo \${${of}}"
+    for var in "${__kubectl_override_flag_list[@]##*-}"; do
+        if eval "test -n \"\$${var}\""; then
+            eval "echo \${${var}}"
         fi
     done
-}
-
-__kubectl_get_namespaces()
-{
-    local template kubectl_out
-    template="{{ range .items  }}{{ .metadata.name }} {{ end }}"
-    if kubectl_out=$(kubectl get -o template --template="${template}" namespace 2>/dev/null); then
-        COMPREPLY=( $( compgen -W "${kubectl_out[*]}" -- "$cur" ) )
-    fi
 }
 
 __kubectl_config_get_contexts()
@@ -92,7 +85,7 @@ __kubectl_config_get_users()
 }
 
 # $1 has to be "contexts", "clusters" or "users"
-__kubectl_config_get()
+__kubectl_parse_config()
 {
     local template kubectl_out
     template="{{ range .$1  }}{{ .name }} {{ end }}"
@@ -119,6 +112,11 @@ __kubectl_get_resource()
     __kubectl_parse_get "${nouns[${#nouns[@]} -1]}"
 }
 
+__kubectl_get_resource_namespace()
+{
+    __kubectl_parse_get "namespace"
+}
+
 __kubectl_get_resource_pod()
 {
     __kubectl_parse_get "pod"
@@ -132,6 +130,11 @@ __kubectl_get_resource_rc()
 __kubectl_get_resource_node()
 {
     __kubectl_parse_get "node"
+}
+
+__kubectl_get_resource_clusterrole()
+{
+    __kubectl_parse_get "clusterrole"
 }
 
 # $1 is the name of the pod we want to get the list of containers inside
@@ -165,7 +168,7 @@ __kubectl_require_pod_and_container()
 
 __custom_func() {
     case ${last_command} in
-        kubectl_get | kubectl_describe | kubectl_delete | kubectl_label | kubectl_stop | kubectl_edit | kubectl_patch |\
+        kubectl_get | kubectl_describe | kubectl_delete | kubectl_label | kubectl_edit | kubectl_patch |\
         kubectl_annotate | kubectl_expose | kubectl_scale | kubectl_autoscale | kubectl_taint | kubectl_rollout_*)
             __kubectl_get_resource
             return
@@ -186,8 +189,12 @@ __custom_func() {
             __kubectl_get_resource_node
             return
             ;;
-        kubectl_config_use-context)
+        kubectl_config_use-context | kubectl_config_rename-context)
             __kubectl_config_get_contexts
+            return
+            ;;
+        kubectl_config_delete-cluster)
+            __kubectl_config_get_clusters
             return
             ;;
         *)
@@ -195,60 +202,20 @@ __custom_func() {
     esac
 }
 `
-
-	// If you add a resource to this list, please also take a look at pkg/kubectl/kubectl.go
-	// and add a short forms entry in expandResourceShortcut() when appropriate.
-	// TODO: This should be populated using the discovery information from apiserver.
-	validResources = `Valid resource types include:
-
-    * all
-    * certificatesigningrequests (aka 'csr')
-    * clusterrolebindings
-    * clusterroles
-    * clusters (valid only for federation apiservers)
-    * componentstatuses (aka 'cs')
-    * configmaps (aka 'cm')
-    * cronjobs
-    * daemonsets (aka 'ds')
-    * deployments (aka 'deploy')
-    * endpoints (aka 'ep')
-    * events (aka 'ev')
-    * horizontalpodautoscalers (aka 'hpa')
-    * ingresses (aka 'ing')
-    * jobs
-    * limitranges (aka 'limits')
-    * namespaces (aka 'ns')
-    * networkpolicies (aka 'netpol')
-    * nodes (aka 'no')
-    * persistentvolumeclaims (aka 'pvc')
-    * persistentvolumes (aka 'pv')
-    * poddisruptionbudgets (aka 'pdb')
-    * podpreset
-    * pods (aka 'po')
-    * podsecuritypolicies (aka 'psp')
-    * podtemplates
-    * replicasets (aka 'rs')
-    * replicationcontrollers (aka 'rc')
-    * resourcequotas (aka 'quota')
-    * rolebindings
-    * roles
-    * secrets
-    * serviceaccounts (aka 'sa')
-    * services (aka 'svc')
-    * statefulsets
-    * storageclasses
-    * thirdpartyresources
-    `
 )
 
 var (
 	bash_completion_flags = map[string]string{
-		"namespace": "__kubectl_get_namespaces",
+		"namespace": "__kubectl_get_resource_namespace",
 		"context":   "__kubectl_config_get_contexts",
 		"cluster":   "__kubectl_config_get_clusters",
 		"user":      "__kubectl_config_get_users",
 	}
 )
+
+func NewDefaultKubectlCommand() *cobra.Command {
+	return NewKubectlCommand(cmdutil.NewFactory(nil), os.Stdin, os.Stdout, os.Stderr)
+}
 
 // NewKubectlCommand creates the `kubectl` command and its nested children.
 func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cobra.Command {
@@ -259,7 +226,8 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 		Long: templates.LongDesc(`
       kubectl controls the Kubernetes cluster manager.
 
-      Find more information at https://github.com/kubernetes/kubernetes.`),
+      Find more information at:
+            https://kubernetes.io/docs/reference/kubectl/overview/`),
 		Run: runHelp,
 		BashCompletionFunction: bashCompletionFunc,
 	}
@@ -284,13 +252,14 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 				NewCmdCreate(f, out, err),
 				NewCmdExposeService(f, out),
 				NewCmdRun(f, in, out, err),
-				set.NewCmdSet(f, out, err),
+				set.NewCmdSet(f, in, out, err),
+				deprecatedAlias("run-container", NewCmdRun(f, in, out, err)),
 			},
 		},
 		{
 			Message: "Basic Commands (Intermediate):",
 			Commands: []*cobra.Command{
-				NewCmdGet(f, out, err),
+				resource.NewCmdGet(f, out, err),
 				NewCmdExplain(f, out, err),
 				NewCmdEdit(f, out, err),
 				NewCmdDelete(f, out, err),
@@ -333,7 +302,7 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 		{
 			Message: "Advanced Commands:",
 			Commands: []*cobra.Command{
-				NewCmdApply(f, out, err),
+				NewCmdApply("kubectl", f, out, err),
 				NewCmdPatch(f, out),
 				NewCmdReplace(f, out),
 				NewCmdConvert(f, out),
@@ -350,10 +319,14 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 	}
 	groups.Add(cmds)
 
-	filters := []string{
-		"options",
-		Deprecated("kubectl", "delete", cmds, NewCmdStop(f, out)),
+	filters := []string{"options"}
+
+	// Hide the "alpha" subcommand if there are no alpha commands in this build.
+	alpha := NewCmdAlpha(f, in, out, err)
+	if !alpha.HasSubCommands() {
+		filters = append(filters, alpha.Name())
 	}
+
 	templates.ActsAsRootCommand(cmds, filters, groups...)
 
 	for name, completion := range bash_completion_flags {
@@ -368,11 +341,12 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 		}
 	}
 
-	cmds.AddCommand(cmdconfig.NewCmdConfig(clientcmd.NewDefaultPathOptions(), out, err))
+	cmds.AddCommand(alpha)
+	cmds.AddCommand(cmdconfig.NewCmdConfig(f, clientcmd.NewDefaultPathOptions(), out, err))
 	cmds.AddCommand(NewCmdPlugin(f, in, out, err))
 	cmds.AddCommand(NewCmdVersion(f, out))
 	cmds.AddCommand(NewCmdApiVersions(f, out))
-	cmds.AddCommand(NewCmdOptions())
+	cmds.AddCommand(NewCmdOptions(out))
 
 	return cmds
 }
@@ -385,9 +359,17 @@ func printDeprecationWarning(command, alias string) {
 	glog.Warningf("%s is DEPRECATED and will be removed in a future version. Use %s instead.", alias, command)
 }
 
-func Deprecated(baseName, to string, parent, cmd *cobra.Command) string {
-	cmd.Long = fmt.Sprintf("Deprecated: This command is deprecated, all its functionalities are covered by \"%s %s\"", baseName, to)
-	cmd.Short = fmt.Sprintf("Deprecated: %s", to)
-	parent.AddCommand(cmd)
-	return cmd.Name()
+// deprecatedAlias is intended to be used to create a "wrapper" command around
+// an existing command. The wrapper works the same but prints a deprecation
+// message before running. This command is identical functionality.
+func deprecatedAlias(deprecatedVersion string, cmd *cobra.Command) *cobra.Command {
+	// Have to be careful here because Cobra automatically extracts the name
+	// of the command from the .Use field.
+	originalName := cmd.Name()
+
+	cmd.Use = deprecatedVersion
+	cmd.Deprecated = fmt.Sprintf("use %q instead", originalName)
+	cmd.Short = fmt.Sprintf("%s. This command is deprecated, use %q instead", cmd.Short, originalName)
+	cmd.Hidden = true
+	return cmd
 }

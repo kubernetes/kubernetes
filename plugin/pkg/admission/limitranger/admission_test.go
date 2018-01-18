@@ -29,7 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/admission"
 	core "k8s.io/client-go/testing"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
@@ -361,10 +361,80 @@ func TestPodLimitFunc(t *testing.T) {
 			pod:        validPod("pod-max-mem-ratio", 3, getResourceRequirements(getComputeResourceList("", "300Mi"), getComputeResourceList("", "450Mi"))),
 			limitRange: createLimitRange(api.LimitTypePod, api.ResourceList{}, getComputeResourceList("", "2Gi"), api.ResourceList{}, api.ResourceList{}, getComputeResourceList("", "1.5")),
 		},
+		{
+			pod:        validPod("ctr-1-min-local-ephemeral-storage-request", 1, getResourceRequirements(getLocalStorageResourceList("60Mi"), getLocalStorageResourceList(""))),
+			limitRange: createLimitRange(api.LimitTypeContainer, getLocalStorageResourceList("50Mi"), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
+		},
+		{
+			pod:        validPod("ctr-1-min-local-ephemeral-storage-request-limit", 1, getResourceRequirements(getLocalStorageResourceList("60Mi"), getLocalStorageResourceList("100Mi"))),
+			limitRange: createLimitRange(api.LimitTypeContainer, getLocalStorageResourceList("50Mi"), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
+		},
+		{
+			pod:        validPod("ctr-1-max-local-ephemeral-storage-request-limit", 1, getResourceRequirements(getLocalStorageResourceList("250Mi"), getLocalStorageResourceList("500Mi"))),
+			limitRange: createLimitRange(api.LimitTypeContainer, api.ResourceList{}, getLocalStorageResourceList("1Gi"), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
+		},
+		{
+			pod:        validPod("ctr-1-max-local-ephemeral-storage-limit", 1, getResourceRequirements(getLocalStorageResourceList(""), getLocalStorageResourceList("500Mi"))),
+			limitRange: createLimitRange(api.LimitTypeContainer, api.ResourceList{}, getLocalStorageResourceList("1Gi"), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
+		},
+		{
+			pod:        validPod("ctr-2-min-local-ephemeral-storage-request", 2, getResourceRequirements(getLocalStorageResourceList("60Mi"), getLocalStorageResourceList(""))),
+			limitRange: createLimitRange(api.LimitTypeContainer, getLocalStorageResourceList("50Mi"), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
+		},
+		{
+			pod:        validPod("ctr-2-min-local-ephemeral-storage-request-limit", 2, getResourceRequirements(getLocalStorageResourceList("60Mi"), getLocalStorageResourceList("100Mi"))),
+			limitRange: createLimitRange(api.LimitTypeContainer, getLocalStorageResourceList("50Mi"), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
+		},
+		{
+			pod:        validPod("ctr-2-max-local-ephemeral-storage-request-limit", 2, getResourceRequirements(getLocalStorageResourceList("250Mi"), getLocalStorageResourceList("500Mi"))),
+			limitRange: createLimitRange(api.LimitTypeContainer, api.ResourceList{}, getLocalStorageResourceList("600Mi"), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
+		},
+		{
+			pod:        validPod("ctr-2-max-local-ephemeral-storage-limit", 2, getResourceRequirements(getLocalStorageResourceList(""), getLocalStorageResourceList("500Mi"))),
+			limitRange: createLimitRange(api.LimitTypeContainer, api.ResourceList{}, getLocalStorageResourceList("600Mi"), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
+		},
+		{
+			pod:        validPod("pod-min-local-ephemeral-storage-request", 2, getResourceRequirements(getLocalStorageResourceList("60Mi"), getLocalStorageResourceList(""))),
+			limitRange: createLimitRange(api.LimitTypePod, getLocalStorageResourceList("100Mi"), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
+		},
+		{
+			pod:        validPod("pod-min-local-ephemeral-storage-request-limit", 2, getResourceRequirements(getLocalStorageResourceList("60Mi"), getLocalStorageResourceList("100Mi"))),
+			limitRange: createLimitRange(api.LimitTypePod, getLocalStorageResourceList("100Mi"), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
+		},
+		{
+			pod: validPodInit(
+				validPod("pod-init-min-local-ephemeral-storage-request", 2, getResourceRequirements(getLocalStorageResourceList("60Mi"), getLocalStorageResourceList(""))),
+				getResourceRequirements(getLocalStorageResourceList("100Mi"), getLocalStorageResourceList("")),
+			),
+			limitRange: createLimitRange(api.LimitTypePod, getLocalStorageResourceList("100Mi"), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
+		},
+		{
+			pod: validPodInit(
+				validPod("pod-init-min-local-ephemeral-storage-request-limit", 2, getResourceRequirements(getLocalStorageResourceList("60Mi"), getLocalStorageResourceList("100Mi"))),
+				getResourceRequirements(getLocalStorageResourceList("80Mi"), getLocalStorageResourceList("100Mi")),
+			),
+			limitRange: createLimitRange(api.LimitTypePod, getLocalStorageResourceList("100Mi"), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
+		},
+		{
+			pod:        validPod("pod-max-local-ephemeral-storage-request-limit", 2, getResourceRequirements(getLocalStorageResourceList("250Mi"), getLocalStorageResourceList("500Mi"))),
+			limitRange: createLimitRange(api.LimitTypePod, api.ResourceList{}, getLocalStorageResourceList("1Gi"), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
+		},
+		{
+			pod:        validPod("pod-max-local-ephemeral-storage-limit", 2, getResourceRequirements(getLocalStorageResourceList(""), getLocalStorageResourceList("500Mi"))),
+			limitRange: createLimitRange(api.LimitTypePod, api.ResourceList{}, getLocalStorageResourceList("1Gi"), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
+		},
+		{
+			pod:        validPod("pod-max-local-ephemeral-storage-ratio", 3, getResourceRequirements(getLocalStorageResourceList("300Mi"), getLocalStorageResourceList("450Mi"))),
+			limitRange: createLimitRange(api.LimitTypePod, api.ResourceList{}, getLocalStorageResourceList("2Gi"), api.ResourceList{}, api.ResourceList{}, getLocalStorageResourceList("1.5")),
+		},
 	}
 	for i := range successCases {
 		test := successCases[i]
-		err := PodLimitFunc(&test.limitRange, &test.pod)
+		err := PodMutateLimitFunc(&test.limitRange, &test.pod)
+		if err != nil {
+			t.Errorf("Unexpected error for pod: %s, %v", test.pod.Name, err)
+		}
+		err = PodValidateLimitFunc(&test.limitRange, &test.pod)
 		if err != nil {
 			t.Errorf("Unexpected error for pod: %s, %v", test.pod.Name, err)
 		}
@@ -466,22 +536,109 @@ func TestPodLimitFunc(t *testing.T) {
 			pod:        validPod("pod-max-mem-ratio", 3, getResourceRequirements(getComputeResourceList("", "250Mi"), getComputeResourceList("", "500Mi"))),
 			limitRange: createLimitRange(api.LimitTypePod, api.ResourceList{}, getComputeResourceList("", "2Gi"), api.ResourceList{}, api.ResourceList{}, getComputeResourceList("", "1.5")),
 		},
+		{
+			pod:        validPod("ctr-1-min-local-ephemeral-storage-request", 1, getResourceRequirements(getLocalStorageResourceList("40Mi"), getLocalStorageResourceList(""))),
+			limitRange: createLimitRange(api.LimitTypeContainer, getLocalStorageResourceList("50Mi"), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
+		},
+		{
+			pod:        validPod("ctr-1-min-local-ephemeral-storage-request-limit", 1, getResourceRequirements(getLocalStorageResourceList("40Mi"), getLocalStorageResourceList("100Mi"))),
+			limitRange: createLimitRange(api.LimitTypeContainer, getLocalStorageResourceList("50Mi"), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
+		},
+		{
+			pod:        validPod("ctr-1-min-local-ephemeral-storage-no-request-limit", 1, getResourceRequirements(getLocalStorageResourceList(""), getLocalStorageResourceList(""))),
+			limitRange: createLimitRange(api.LimitTypeContainer, getLocalStorageResourceList("50Mi"), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
+		},
+		{
+			pod:        validPod("ctr-1-max-local-ephemeral-storage-request-limit", 1, getResourceRequirements(getLocalStorageResourceList("250Mi"), getLocalStorageResourceList("2Gi"))),
+			limitRange: createLimitRange(api.LimitTypeContainer, api.ResourceList{}, getLocalStorageResourceList("1Gi"), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
+		},
+		{
+			pod:        validPod("ctr-1-max-local-ephemeral-storage-limit", 1, getResourceRequirements(getLocalStorageResourceList(""), getLocalStorageResourceList("2Gi"))),
+			limitRange: createLimitRange(api.LimitTypeContainer, api.ResourceList{}, getLocalStorageResourceList("1Gi"), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
+		},
+		{
+			pod:        validPod("ctr-1-max-local-ephemeral-storage-no-request-limit", 1, getResourceRequirements(getLocalStorageResourceList(""), getLocalStorageResourceList(""))),
+			limitRange: createLimitRange(api.LimitTypeContainer, api.ResourceList{}, getLocalStorageResourceList("1Gi"), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
+		},
+		{
+			pod:        validPod("ctr-2-min-local-ephemeral-storage-request", 2, getResourceRequirements(getLocalStorageResourceList("40Mi"), getLocalStorageResourceList(""))),
+			limitRange: createLimitRange(api.LimitTypeContainer, getLocalStorageResourceList("50Mi"), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
+		},
+		{
+			pod:        validPod("ctr-2-min-local-ephemeral-storage-request-limit", 2, getResourceRequirements(getLocalStorageResourceList("40Mi"), getLocalStorageResourceList("100Mi"))),
+			limitRange: createLimitRange(api.LimitTypeContainer, getLocalStorageResourceList("50Mi"), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
+		},
+		{
+			pod:        validPod("ctr-2-min-local-ephemeral-storage-no-request-limit", 2, getResourceRequirements(getLocalStorageResourceList(""), getLocalStorageResourceList(""))),
+			limitRange: createLimitRange(api.LimitTypeContainer, getLocalStorageResourceList("50Mi"), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
+		},
+		{
+			pod:        validPod("ctr-2-max-local-ephemeral-storage-request-limit", 2, getResourceRequirements(getLocalStorageResourceList("250Mi"), getLocalStorageResourceList("2Gi"))),
+			limitRange: createLimitRange(api.LimitTypeContainer, api.ResourceList{}, getLocalStorageResourceList("1Gi"), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
+		},
+		{
+			pod:        validPod("ctr-2-max-local-ephemeral-storage-limit", 2, getResourceRequirements(getLocalStorageResourceList(""), getLocalStorageResourceList("2Gi"))),
+			limitRange: createLimitRange(api.LimitTypeContainer, api.ResourceList{}, getLocalStorageResourceList("1Gi"), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
+		},
+		{
+			pod:        validPod("ctr-2-max-local-ephemeral-storage-no-request-limit", 2, getResourceRequirements(getLocalStorageResourceList(""), getLocalStorageResourceList(""))),
+			limitRange: createLimitRange(api.LimitTypeContainer, api.ResourceList{}, getLocalStorageResourceList("1Gi"), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
+		},
+		{
+			pod:        validPod("pod-min-local-ephemeral-storage-request", 1, getResourceRequirements(getLocalStorageResourceList("60Mi"), getLocalStorageResourceList(""))),
+			limitRange: createLimitRange(api.LimitTypePod, getLocalStorageResourceList("100Mi"), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
+		},
+		{
+			pod:        validPod("pod-min-local-ephemeral-storage-request-limit", 1, getResourceRequirements(getLocalStorageResourceList("60Mi"), getLocalStorageResourceList("100Mi"))),
+			limitRange: createLimitRange(api.LimitTypePod, getLocalStorageResourceList("100Mi"), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
+		},
+		{
+			pod:        validPod("pod-max-local-ephemeral-storage-request-limit", 3, getResourceRequirements(getLocalStorageResourceList("250Mi"), getLocalStorageResourceList("500Mi"))),
+			limitRange: createLimitRange(api.LimitTypePod, api.ResourceList{}, getLocalStorageResourceList("1Gi"), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
+		},
+		{
+			pod:        validPod("pod-max-local-ephemeral-storage-limit", 3, getResourceRequirements(getLocalStorageResourceList(""), getLocalStorageResourceList("500Mi"))),
+			limitRange: createLimitRange(api.LimitTypePod, api.ResourceList{}, getLocalStorageResourceList("1Gi"), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
+		},
+		{
+			pod: validPodInit(
+				validPod("pod-init-max-local-ephemeral-storage-limit", 1, getResourceRequirements(getLocalStorageResourceList(""), getLocalStorageResourceList("500Mi"))),
+				getResourceRequirements(getLocalStorageResourceList(""), getLocalStorageResourceList("1.5Gi")),
+			),
+			limitRange: createLimitRange(api.LimitTypePod, api.ResourceList{}, getLocalStorageResourceList("1Gi"), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
+		},
+		{
+			pod:        validPod("pod-max-local-ephemeral-storage-ratio", 3, getResourceRequirements(getLocalStorageResourceList("250Mi"), getLocalStorageResourceList("500Mi"))),
+			limitRange: createLimitRange(api.LimitTypePod, api.ResourceList{}, getLocalStorageResourceList("2Gi"), api.ResourceList{}, api.ResourceList{}, getLocalStorageResourceList("1.5")),
+		},
 	}
 	for i := range errorCases {
 		test := errorCases[i]
-		err := PodLimitFunc(&test.limitRange, &test.pod)
+		err := PodMutateLimitFunc(&test.limitRange, &test.pod)
+		if err != nil {
+			t.Errorf("Unexpected error for pod: %s, %v", test.pod.Name, err)
+		}
+		err = PodValidateLimitFunc(&test.limitRange, &test.pod)
 		if err == nil {
 			t.Errorf("Expected error for pod: %s", test.pod.Name)
 		}
 	}
 }
 
+func getLocalStorageResourceList(ephemeralStorage string) api.ResourceList {
+	res := api.ResourceList{}
+	if ephemeralStorage != "" {
+		res[api.ResourceEphemeralStorage] = resource.MustParse(ephemeralStorage)
+	}
+	return res
+}
+
 func TestPodLimitFuncApplyDefault(t *testing.T) {
 	limitRange := validLimitRange()
 	testPod := validPodInit(validPod("foo", 1, getResourceRequirements(api.ResourceList{}, api.ResourceList{})), getResourceRequirements(api.ResourceList{}, api.ResourceList{}))
-	err := PodLimitFunc(&limitRange, &testPod)
+	err := PodMutateLimitFunc(&limitRange, &testPod)
 	if err != nil {
-		t.Errorf("Unexpected error for valid pod: %v, %v", testPod.Name, err)
+		t.Errorf("Unexpected error for valid pod: %s, %v", testPod.Name, err)
 	}
 
 	for i := range testPod.Spec.Containers {
@@ -492,16 +649,16 @@ func TestPodLimitFuncApplyDefault(t *testing.T) {
 		requestCpu := container.Resources.Requests.Cpu().String()
 
 		if limitMemory != "10Mi" {
-			t.Errorf("Unexpected memory value %s", limitMemory)
+			t.Errorf("Unexpected limit memory value %s", limitMemory)
 		}
 		if limitCpu != "75m" {
-			t.Errorf("Unexpected cpu value %s", limitCpu)
+			t.Errorf("Unexpected limit cpu value %s", limitCpu)
 		}
 		if requestMemory != "5Mi" {
-			t.Errorf("Unexpected memory value %s", requestMemory)
+			t.Errorf("Unexpected request memory value %s", requestMemory)
 		}
 		if requestCpu != "50m" {
-			t.Errorf("Unexpected cpu value %s", requestCpu)
+			t.Errorf("Unexpected request cpu value %s", requestCpu)
 		}
 	}
 
@@ -513,16 +670,16 @@ func TestPodLimitFuncApplyDefault(t *testing.T) {
 		requestCpu := container.Resources.Requests.Cpu().String()
 
 		if limitMemory != "10Mi" {
-			t.Errorf("Unexpected memory value %s", limitMemory)
+			t.Errorf("Unexpected limit memory value %s", limitMemory)
 		}
 		if limitCpu != "75m" {
-			t.Errorf("Unexpected cpu value %s", limitCpu)
+			t.Errorf("Unexpected limit cpu value %s", limitCpu)
 		}
 		if requestMemory != "5Mi" {
-			t.Errorf("Unexpected memory value %s", requestMemory)
+			t.Errorf("Unexpected request memory value %s", requestMemory)
 		}
 		if requestCpu != "50m" {
-			t.Errorf("Unexpected cpu value %s", requestCpu)
+			t.Errorf("Unexpected request cpu value %s", requestCpu)
 		}
 	}
 }
@@ -538,11 +695,15 @@ func TestLimitRangerIgnoresSubresource(t *testing.T) {
 
 	testPod := validPod("testPod", 1, api.ResourceRequirements{})
 	err = handler.Admit(admission.NewAttributesRecord(&testPod, nil, api.Kind("Pod").WithVersion("version"), limitRange.Namespace, "testPod", api.Resource("pods").WithVersion("version"), "", admission.Update, nil))
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = handler.Validate(admission.NewAttributesRecord(&testPod, nil, api.Kind("Pod").WithVersion("version"), limitRange.Namespace, "testPod", api.Resource("pods").WithVersion("version"), "", admission.Update, nil))
 	if err == nil {
 		t.Errorf("Expected an error since the pod did not specify resource limits in its update call")
 	}
 
-	err = handler.Admit(admission.NewAttributesRecord(&testPod, nil, api.Kind("Pod").WithVersion("version"), limitRange.Namespace, "testPod", api.Resource("pods").WithVersion("version"), "status", admission.Update, nil))
+	err = handler.Validate(admission.NewAttributesRecord(&testPod, nil, api.Kind("Pod").WithVersion("version"), limitRange.Namespace, "testPod", api.Resource("pods").WithVersion("version"), "status", admission.Update, nil))
 	if err != nil {
 		t.Errorf("Should have ignored calls to any subresource of pod %v", err)
 	}
@@ -560,13 +721,26 @@ func TestLimitRangerAdmitPod(t *testing.T) {
 
 	testPod := validPod("testPod", 1, api.ResourceRequirements{})
 	err = handler.Admit(admission.NewAttributesRecord(&testPod, nil, api.Kind("Pod").WithVersion("version"), limitRange.Namespace, "testPod", api.Resource("pods").WithVersion("version"), "", admission.Update, nil))
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = handler.Validate(admission.NewAttributesRecord(&testPod, nil, api.Kind("Pod").WithVersion("version"), limitRange.Namespace, "testPod", api.Resource("pods").WithVersion("version"), "", admission.Update, nil))
 	if err == nil {
 		t.Errorf("Expected an error since the pod did not specify resource limits in its update call")
 	}
 
-	err = handler.Admit(admission.NewAttributesRecord(&testPod, nil, api.Kind("Pod").WithVersion("version"), limitRange.Namespace, "testPod", api.Resource("pods").WithVersion("version"), "status", admission.Update, nil))
+	err = handler.Validate(admission.NewAttributesRecord(&testPod, nil, api.Kind("Pod").WithVersion("version"), limitRange.Namespace, "testPod", api.Resource("pods").WithVersion("version"), "status", admission.Update, nil))
 	if err != nil {
 		t.Errorf("Should have ignored calls to any subresource of pod %v", err)
+	}
+
+	// a pod that is undergoing termination should never be blocked
+	terminatingPod := validPod("terminatingPod", 1, api.ResourceRequirements{})
+	now := metav1.Now()
+	terminatingPod.DeletionTimestamp = &now
+	err = handler.Validate(admission.NewAttributesRecord(&terminatingPod, &terminatingPod, api.Kind("Pod").WithVersion("version"), limitRange.Namespace, "terminatingPod", api.Resource("pods").WithVersion("version"), "", admission.Update, nil))
+	if err != nil {
+		t.Errorf("LimitRange should ignore a pod marked for termination")
 	}
 }
 
@@ -589,7 +763,7 @@ func newMockClientForTest(limitRanges []api.LimitRange) *fake.Clientset {
 }
 
 // newHandlerForTest returns a handler configured for testing.
-func newHandlerForTest(c clientset.Interface) (admission.Interface, informers.SharedInformerFactory, error) {
+func newHandlerForTest(c clientset.Interface) (*LimitRanger, informers.SharedInformerFactory, error) {
 	f := informers.NewSharedInformerFactory(c, 5*time.Minute)
 	handler, err := NewLimitRanger(&DefaultLimitRangerActions{})
 	if err != nil {
@@ -597,7 +771,7 @@ func newHandlerForTest(c clientset.Interface) (admission.Interface, informers.Sh
 	}
 	pluginInitializer := kubeadmission.NewPluginInitializer(c, f, nil, nil, nil)
 	pluginInitializer.Initialize(handler)
-	err = admission.Validate(handler)
+	err = admission.ValidateInitialization(handler)
 	return handler, f, err
 }
 
@@ -637,7 +811,7 @@ func TestPersistentVolumeClaimLimitFunc(t *testing.T) {
 	}
 	for i := range successCases {
 		test := successCases[i]
-		err := PersistentVolumeClaimLimitFunc(&test.limitRange, &test.pvc)
+		err := PersistentVolumeClaimValidateLimitFunc(&test.limitRange, &test.pvc)
 		if err != nil {
 			t.Errorf("Unexpected error for pvc: %s, %v", test.pvc.Name, err)
 		}
@@ -655,7 +829,7 @@ func TestPersistentVolumeClaimLimitFunc(t *testing.T) {
 	}
 	for i := range errorCases {
 		test := errorCases[i]
-		err := PersistentVolumeClaimLimitFunc(&test.limitRange, &test.pvc)
+		err := PersistentVolumeClaimValidateLimitFunc(&test.limitRange, &test.pvc)
 		if err == nil {
 			t.Errorf("Expected error for pvc: %s", test.pvc.Name)
 		}

@@ -21,14 +21,13 @@ import (
 	"crypto/sha256"
 	"encoding/base32"
 	"fmt"
+	"strconv"
 	"strings"
 	"sync"
 
 	"github.com/golang/glog"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	iptablesproxy "k8s.io/kubernetes/pkg/proxy/iptables"
-	utildbus "k8s.io/kubernetes/pkg/util/dbus"
-	utilexec "k8s.io/kubernetes/pkg/util/exec"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 )
 
@@ -51,11 +50,10 @@ type hostportManager struct {
 	mu          sync.Mutex
 }
 
-func NewHostportManager() HostPortManager {
-	iptInterface := utiliptables.New(utilexec.New(), utildbus.New(), utiliptables.ProtocolIpv4)
+func NewHostportManager(iptables utiliptables.Interface) HostPortManager {
 	return &hostportManager{
 		hostPortMap: make(map[hostport]closeable),
-		iptables:    iptInterface,
+		iptables:    iptables,
 		portOpener:  openLocalPort,
 	}
 }
@@ -180,11 +178,6 @@ func (hm *hostportManager) Remove(id string, podPortMapping *PodPortMapping) (er
 	chainsToRemove := []utiliptables.Chain{}
 	for _, pm := range hostportMappings {
 		chainsToRemove = append(chainsToRemove, getHostportChain(id, pm))
-
-		// To preserve backward compatibility for k8s 1.5 or earlier.
-		// Need to remove hostport chains added by hostportSyncer if there is any
-		// TODO: remove this in 1.7
-		chainsToRemove = append(chainsToRemove, hostportChainName(pm, getPodFullName(podPortMapping)))
 	}
 
 	// remove rules that consists of target chains
@@ -255,7 +248,7 @@ func (hm *hostportManager) closeHostports(hostportMappings []*PortMapping) error
 // WARNING: Please do not change this function. Otherwise, HostportManager may not be able to
 // identify existing iptables chains.
 func getHostportChain(id string, pm *PortMapping) utiliptables.Chain {
-	hash := sha256.Sum256([]byte(id + string(pm.HostPort) + string(pm.Protocol)))
+	hash := sha256.Sum256([]byte(id + strconv.Itoa(int(pm.HostPort)) + string(pm.Protocol)))
 	encoded := base32.StdEncoding.EncodeToString(hash[:])
 	return utiliptables.Chain(kubeHostportChainPrefix + encoded[:16])
 }
@@ -275,11 +268,12 @@ func gatherHostportMappings(podPortMapping *PodPortMapping) []*PortMapping {
 // getExistingHostportIPTablesRules retrieves raw data from iptables-save, parse it,
 // return all the hostport related chains and rules
 func getExistingHostportIPTablesRules(iptables utiliptables.Interface) (map[utiliptables.Chain]string, []string, error) {
-	iptablesSaveRaw, err := iptables.Save(utiliptables.TableNAT)
+	iptablesData := bytes.NewBuffer(nil)
+	err := iptables.SaveInto(utiliptables.TableNAT, iptablesData)
 	if err != nil { // if we failed to get any rules
 		return nil, nil, fmt.Errorf("failed to execute iptables-save: %v", err)
 	}
-	existingNATChains := utiliptables.GetChainLines(utiliptables.TableNAT, iptablesSaveRaw)
+	existingNATChains := utiliptables.GetChainLines(utiliptables.TableNAT, iptablesData.Bytes())
 
 	existingHostportChains := make(map[utiliptables.Chain]string)
 	existingHostportRules := []string{}
@@ -290,7 +284,7 @@ func getExistingHostportIPTablesRules(iptables utiliptables.Interface) (map[util
 		}
 	}
 
-	for _, line := range strings.Split(string(iptablesSaveRaw), "\n") {
+	for _, line := range strings.Split(string(iptablesData.Bytes()), "\n") {
 		if strings.HasPrefix(line, fmt.Sprintf("-A %s", kubeHostportChainPrefix)) ||
 			strings.HasPrefix(line, fmt.Sprintf("-A %s", string(kubeHostportsChain))) {
 			existingHostportRules = append(existingHostportRules, line)

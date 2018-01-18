@@ -18,10 +18,10 @@ package pod
 
 import (
 	"github.com/golang/glog"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	clientset "k8s.io/client-go/kubernetes"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
@@ -63,7 +63,7 @@ func (mc *basicMirrorClient) CreateMirrorPod(pod *v1.Pod) error {
 	}
 	hash := getPodHash(pod)
 	copyPod.Annotations[kubetypes.ConfigMirrorAnnotationKey] = hash
-	apiPod, err := mc.apiserverClient.Core().Pods(copyPod.Namespace).Create(&copyPod)
+	apiPod, err := mc.apiserverClient.CoreV1().Pods(copyPod.Namespace).Create(&copyPod)
 	if err != nil && errors.IsAlreadyExists(err) {
 		// Check if the existing pod is the same as the pod we want to create.
 		if h, ok := apiPod.Annotations[kubetypes.ConfigMirrorAnnotationKey]; ok && h == hash {
@@ -84,7 +84,7 @@ func (mc *basicMirrorClient) DeleteMirrorPod(podFullName string) error {
 	}
 	glog.V(2).Infof("Deleting a mirror pod %q", podFullName)
 	// TODO(random-liu): Delete the mirror pod with uid precondition in mirror pod manager
-	if err := mc.apiserverClient.Core().Pods(namespace).Delete(name, metav1.NewDeleteOptions(0)); err != nil && !errors.IsNotFound(err) {
+	if err := mc.apiserverClient.CoreV1().Pods(namespace).Delete(name, metav1.NewDeleteOptions(0)); err != nil && !errors.IsNotFound(err) {
 		glog.Errorf("Failed deleting a mirror pod %q: %v", podFullName, err)
 	}
 	return nil

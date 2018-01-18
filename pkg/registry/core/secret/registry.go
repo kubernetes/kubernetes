@@ -22,7 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
 // Registry is an interface implemented by things that know how to store Secret objects.
@@ -30,8 +30,8 @@ type Registry interface {
 	ListSecrets(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (*api.SecretList, error)
 	WatchSecrets(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (watch.Interface, error)
 	GetSecret(ctx genericapirequest.Context, name string, options *metav1.GetOptions) (*api.Secret, error)
-	CreateSecret(ctx genericapirequest.Context, Secret *api.Secret) (*api.Secret, error)
-	UpdateSecret(ctx genericapirequest.Context, Secret *api.Secret) (*api.Secret, error)
+	CreateSecret(ctx genericapirequest.Context, Secret *api.Secret, createValidation rest.ValidateObjectFunc) (*api.Secret, error)
+	UpdateSecret(ctx genericapirequest.Context, Secret *api.Secret, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (*api.Secret, error)
 	DeleteSecret(ctx genericapirequest.Context, name string) error
 }
 
@@ -66,13 +66,13 @@ func (s *storage) GetSecret(ctx genericapirequest.Context, name string, options 
 	return obj.(*api.Secret), nil
 }
 
-func (s *storage) CreateSecret(ctx genericapirequest.Context, secret *api.Secret) (*api.Secret, error) {
-	obj, err := s.Create(ctx, secret)
+func (s *storage) CreateSecret(ctx genericapirequest.Context, secret *api.Secret, createValidation rest.ValidateObjectFunc) (*api.Secret, error) {
+	obj, err := s.Create(ctx, secret, createValidation, false)
 	return obj.(*api.Secret), err
 }
 
-func (s *storage) UpdateSecret(ctx genericapirequest.Context, secret *api.Secret) (*api.Secret, error) {
-	obj, _, err := s.Update(ctx, secret.Name, rest.DefaultUpdatedObjectInfo(secret, api.Scheme))
+func (s *storage) UpdateSecret(ctx genericapirequest.Context, secret *api.Secret, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (*api.Secret, error) {
+	obj, _, err := s.Update(ctx, secret.Name, rest.DefaultUpdatedObjectInfo(secret), createValidation, updateValidation)
 	return obj.(*api.Secret), err
 }
 

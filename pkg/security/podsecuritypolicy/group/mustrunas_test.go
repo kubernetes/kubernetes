@@ -17,11 +17,9 @@ limitations under the License.
 package group
 
 import (
-	"testing"
-
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	"testing"
 )
 
 func TestMustRunAsOptions(t *testing.T) {
@@ -54,26 +52,26 @@ func TestMustRunAsOptions(t *testing.T) {
 func TestGenerate(t *testing.T) {
 	tests := map[string]struct {
 		ranges   []extensions.GroupIDRange
-		expected []types.UnixGroupID
+		expected []int64
 	}{
 		"multi value": {
 			ranges: []extensions.GroupIDRange{
 				{Min: 1, Max: 2},
 			},
-			expected: []types.UnixGroupID{1},
+			expected: []int64{1},
 		},
 		"single value": {
 			ranges: []extensions.GroupIDRange{
 				{Min: 1, Max: 1},
 			},
-			expected: []types.UnixGroupID{1},
+			expected: []int64{1},
 		},
 		"multi range": {
 			ranges: []extensions.GroupIDRange{
 				{Min: 1, Max: 1},
 				{Min: 2, Max: 500},
 			},
-			expected: []types.UnixGroupID{1},
+			expected: []int64{1},
 		},
 	}
 
@@ -110,67 +108,52 @@ func TestGenerate(t *testing.T) {
 }
 
 func TestValidate(t *testing.T) {
-	validPod := func() *api.Pod {
-		return &api.Pod{
-			Spec: api.PodSpec{
-				SecurityContext: &api.PodSecurityContext{},
-			},
-		}
-	}
-
 	tests := map[string]struct {
 		ranges []extensions.GroupIDRange
 		pod    *api.Pod
-		groups []types.UnixGroupID
+		groups []int64
 		pass   bool
 	}{
 		"nil security context": {
-			pod: &api.Pod{},
 			ranges: []extensions.GroupIDRange{
 				{Min: 1, Max: 3},
 			},
 		},
 		"empty groups": {
-			pod: validPod(),
 			ranges: []extensions.GroupIDRange{
 				{Min: 1, Max: 3},
 			},
 		},
 		"not in range": {
-			pod:    validPod(),
-			groups: []types.UnixGroupID{5},
+			groups: []int64{5},
 			ranges: []extensions.GroupIDRange{
 				{Min: 1, Max: 3},
 				{Min: 4, Max: 4},
 			},
 		},
 		"in range 1": {
-			pod:    validPod(),
-			groups: []types.UnixGroupID{2},
+			groups: []int64{2},
 			ranges: []extensions.GroupIDRange{
 				{Min: 1, Max: 3},
 			},
 			pass: true,
 		},
 		"in range boundry min": {
-			pod:    validPod(),
-			groups: []types.UnixGroupID{1},
+			groups: []int64{1},
 			ranges: []extensions.GroupIDRange{
 				{Min: 1, Max: 3},
 			},
 			pass: true,
 		},
 		"in range boundry max": {
-			pod:    validPod(),
-			groups: []types.UnixGroupID{3},
+			groups: []int64{3},
 			ranges: []extensions.GroupIDRange{
 				{Min: 1, Max: 3},
 			},
 			pass: true,
 		},
 		"singular range": {
-			pod:    validPod(),
-			groups: []types.UnixGroupID{4},
+			groups: []int64{4},
 			ranges: []extensions.GroupIDRange{
 				{Min: 4, Max: 4},
 			},
@@ -183,7 +166,7 @@ func TestValidate(t *testing.T) {
 		if err != nil {
 			t.Errorf("error creating strategy for %s: %v", k, err)
 		}
-		errs := s.Validate(v.pod, v.groups)
+		errs := s.Validate(nil, v.groups)
 		if v.pass && len(errs) > 0 {
 			t.Errorf("unexpected errors for %s: %v", k, errs)
 		}

@@ -22,14 +22,11 @@ import (
 	"sync"
 
 	"github.com/golang/glog"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
-	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	"k8s.io/kubernetes/pkg/api/validation"
+	"k8s.io/kubernetes/pkg/kubelet/checkpoint"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
@@ -65,8 +62,9 @@ type PodConfig struct {
 	updates chan kubetypes.PodUpdate
 
 	// contains the list of all configured sources
-	sourcesLock sync.Mutex
-	sources     sets.String
+	sourcesLock       sync.Mutex
+	sources           sets.String
+	checkpointManager checkpoint.Manager
 }
 
 // NewPodConfig creates an object that can merge many configuration sources into a stream
@@ -110,6 +108,19 @@ func (c *PodConfig) Updates() <-chan kubetypes.PodUpdate {
 // Sync requests the full configuration be delivered to the update channel.
 func (c *PodConfig) Sync() {
 	c.pods.Sync()
+}
+
+// Restore restores pods from the checkpoint path, *once*
+func (c *PodConfig) Restore(path string, updates chan<- interface{}) error {
+	var err error
+	if c.checkpointManager == nil {
+		c.checkpointManager = checkpoint.NewCheckpointManager(path)
+		pods, err := c.checkpointManager.LoadPods()
+		if err == nil {
+			updates <- kubetypes.PodUpdate{Pods: pods, Op: kubetypes.RESTORE, Source: kubetypes.ApiserverSource}
+		}
+	}
+	return err
 }
 
 // podStorage manages the current pod state at any point in time and ensures updates
@@ -156,7 +167,7 @@ func (s *podStorage) Merge(source string, change interface{}) error {
 	defer s.updateLock.Unlock()
 
 	seenBefore := s.sourcesSeen.Has(source)
-	adds, updates, deletes, removes, reconciles := s.merge(source, change)
+	adds, updates, deletes, removes, reconciles, restores := s.merge(source, change)
 	firstSet := !seenBefore && s.sourcesSeen.Has(source)
 
 	// deliver update notifications
@@ -173,6 +184,9 @@ func (s *podStorage) Merge(source string, change interface{}) error {
 		}
 		if len(deletes.Pods) > 0 {
 			s.updates <- *deletes
+		}
+		if len(restores.Pods) > 0 {
+			s.updates <- *restores
 		}
 		if firstSet && len(adds.Pods) == 0 && len(updates.Pods) == 0 && len(deletes.Pods) == 0 {
 			// Send an empty update when first seeing the source and there are
@@ -210,7 +224,7 @@ func (s *podStorage) Merge(source string, change interface{}) error {
 	return nil
 }
 
-func (s *podStorage) merge(source string, change interface{}) (adds, updates, deletes, removes, reconciles *kubetypes.PodUpdate) {
+func (s *podStorage) merge(source string, change interface{}) (adds, updates, deletes, removes, reconciles, restores *kubetypes.PodUpdate) {
 	s.podLock.Lock()
 	defer s.podLock.Unlock()
 
@@ -219,6 +233,7 @@ func (s *podStorage) merge(source string, change interface{}) (adds, updates, de
 	deletePods := []*v1.Pod{}
 	removePods := []*v1.Pod{}
 	reconcilePods := []*v1.Pod{}
+	restorePods := []*v1.Pod{}
 
 	pods := s.pods[source]
 	if pods == nil {
@@ -255,17 +270,6 @@ func (s *podStorage) merge(source string, change interface{}) (adds, updates, de
 	}
 
 	update := change.(kubetypes.PodUpdate)
-	// The InitContainers and InitContainerStatuses fields are lost during
-	// serialization and deserialization. They are conveyed via Annotations.
-	// Setting these fields here so that kubelet doesn't have to check for
-	// annotations.
-	if source == kubetypes.ApiserverSource {
-		for _, pod := range update.Pods {
-			if err := podutil.SetInitContainersAndStatuses(pod); err != nil {
-				glog.Error(err)
-			}
-		}
-	}
 	switch update.Op {
 	case kubetypes.ADD, kubetypes.UPDATE, kubetypes.DELETE:
 		if update.Op == kubetypes.ADD {
@@ -302,6 +306,8 @@ func (s *podStorage) merge(source string, change interface{}) (adds, updates, de
 				removePods = append(removePods, existing)
 			}
 		}
+	case kubetypes.RESTORE:
+		glog.V(4).Infof("Restoring pods for source %s", source)
 
 	default:
 		glog.Warningf("Received invalid update type: %v", update)
@@ -315,8 +321,9 @@ func (s *podStorage) merge(source string, change interface{}) (adds, updates, de
 	deletes = &kubetypes.PodUpdate{Op: kubetypes.DELETE, Pods: copyPods(deletePods), Source: source}
 	removes = &kubetypes.PodUpdate{Op: kubetypes.REMOVE, Pods: copyPods(removePods), Source: source}
 	reconciles = &kubetypes.PodUpdate{Op: kubetypes.RECONCILE, Pods: copyPods(reconcilePods), Source: source}
+	restores = &kubetypes.PodUpdate{Op: kubetypes.RESTORE, Pods: copyPods(restorePods), Source: source}
 
-	return adds, updates, deletes, removes, reconciles
+	return adds, updates, deletes, removes, reconciles, restores
 }
 
 func (s *podStorage) markSourceSet(source string) {
@@ -334,34 +341,17 @@ func (s *podStorage) seenSources(sources ...string) bool {
 func filterInvalidPods(pods []*v1.Pod, source string, recorder record.EventRecorder) (filtered []*v1.Pod) {
 	names := sets.String{}
 	for i, pod := range pods {
-		var errlist field.ErrorList
-		// TODO: remove the conversion when validation is performed on versioned objects.
-		internalPod := &api.Pod{}
-		if err := v1.Convert_v1_Pod_To_api_Pod(pod, internalPod, nil); err != nil {
-			glog.Warningf("Pod[%d] (%s) from %s failed to convert to v1, ignoring: %v", i+1, format.Pod(pod), source, err)
-			recorder.Eventf(pod, v1.EventTypeWarning, "FailedConversion", "Error converting pod %s from %s, ignoring: %v", format.Pod(pod), source, err)
+		// Pods from each source are assumed to have passed validation individually.
+		// This function only checks if there is any naming conflict.
+		name := kubecontainer.GetPodFullName(pod)
+		if names.Has(name) {
+			glog.Warningf("Pod[%d] (%s) from %s failed validation due to duplicate pod name %q, ignoring", i+1, format.Pod(pod), source, pod.Name)
+			recorder.Eventf(pod, v1.EventTypeWarning, events.FailedValidation, "Error validating pod %s from %s due to duplicate pod name %q, ignoring", format.Pod(pod), source, pod.Name)
 			continue
-		}
-		if errs := validation.ValidatePod(internalPod); len(errs) != 0 {
-			errlist = append(errlist, errs...)
-			// If validation fails, don't trust it any further -
-			// even Name could be bad.
 		} else {
-			name := kubecontainer.GetPodFullName(pod)
-			if names.Has(name) {
-				// TODO: when validation becomes versioned, this gets a bit
-				// more complicated.
-				errlist = append(errlist, field.Duplicate(field.NewPath("metadata", "name"), pod.Name))
-			} else {
-				names.Insert(name)
-			}
+			names.Insert(name)
 		}
-		if len(errlist) > 0 {
-			err := errlist.ToAggregate()
-			glog.Warningf("Pod[%d] (%s) from %s failed validation, ignoring: %v", i+1, format.Pod(pod), source, err)
-			recorder.Eventf(pod, v1.EventTypeWarning, events.FailedValidation, "Error validating pod %s from %s, ignoring: %v", format.Pod(pod), source, err)
-			continue
-		}
+
 		filtered = append(filtered, pod)
 	}
 	return
@@ -502,11 +492,7 @@ func (s *podStorage) MergedState() interface{} {
 	pods := make([]*v1.Pod, 0)
 	for _, sourcePods := range s.pods {
 		for _, podRef := range sourcePods {
-			pod, err := api.Scheme.Copy(podRef)
-			if err != nil {
-				glog.Errorf("unable to copy pod: %v", err)
-			}
-			pods = append(pods, pod.(*v1.Pod))
+			pods = append(pods, podRef.DeepCopy())
 		}
 	}
 	return pods
@@ -516,11 +502,7 @@ func copyPods(sourcePods []*v1.Pod) []*v1.Pod {
 	pods := []*v1.Pod{}
 	for _, source := range sourcePods {
 		// Use a deep copy here just in case
-		pod, err := api.Scheme.Copy(source)
-		if err != nil {
-			glog.Errorf("unable to copy pod: %v", err)
-		}
-		pods = append(pods, pod.(*v1.Pod))
+		pods = append(pods, source.DeepCopy())
 	}
 	return pods
 }

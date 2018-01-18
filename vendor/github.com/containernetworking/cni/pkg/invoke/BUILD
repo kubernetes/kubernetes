@@ -1,11 +1,4 @@
-package(default_visibility = ["//visibility:public"])
-
-licenses(["notice"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
@@ -14,10 +7,33 @@ go_library(
         "delegate.go",
         "exec.go",
         "find.go",
-        "os_unix.go",
         "raw_exec.go",
-    ],
-    tags = ["automanaged"],
+    ] + select({
+        "@io_bazel_rules_go//go/platform:darwin": [
+            "os_unix.go",
+        ],
+        "@io_bazel_rules_go//go/platform:dragonfly": [
+            "os_unix.go",
+        ],
+        "@io_bazel_rules_go//go/platform:freebsd": [
+            "os_unix.go",
+        ],
+        "@io_bazel_rules_go//go/platform:linux": [
+            "os_unix.go",
+        ],
+        "@io_bazel_rules_go//go/platform:netbsd": [
+            "os_unix.go",
+        ],
+        "@io_bazel_rules_go//go/platform:solaris": [
+            "os_unix.go",
+        ],
+        "@io_bazel_rules_go//go/platform:windows": [
+            "os_windows.go",
+        ],
+        "//conditions:default": [],
+    }),
+    importpath = "github.com/containernetworking/cni/pkg/invoke",
+    visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/containernetworking/cni/pkg/types:go_default_library",
         "//vendor/github.com/containernetworking/cni/pkg/version:go_default_library",
@@ -35,4 +51,5 @@ filegroup(
     name = "all-srcs",
     srcs = [":package-srcs"],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

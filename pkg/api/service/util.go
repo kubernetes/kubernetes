@@ -18,13 +18,9 @@ package service
 
 import (
 	"fmt"
-	"strconv"
-	"strings"
-
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	netsets "k8s.io/kubernetes/pkg/util/net/sets"
-
-	"github.com/golang/glog"
+	"strings"
 )
 
 const (
@@ -56,7 +52,7 @@ func GetLoadBalancerSourceRanges(service *api.Service) (netsets.IPNet, error) {
 			return nil, fmt.Errorf("service.Spec.LoadBalancerSourceRanges: %v is not valid. Expecting a list of IP ranges. For example, 10.0.0.0/24. Error msg: %v", specs, err)
 		}
 	} else {
-		val := service.Annotations[AnnotationLoadBalancerSourceRangesKey]
+		val := service.Annotations[api.AnnotationLoadBalancerSourceRangesKey]
 		val = strings.TrimSpace(val)
 		if val == "" {
 			val = defaultLoadBalancerSourceRanges
@@ -64,7 +60,7 @@ func GetLoadBalancerSourceRanges(service *api.Service) (netsets.IPNet, error) {
 		specs := strings.Split(val, ",")
 		ipnets, err = netsets.ParseIPNets(specs...)
 		if err != nil {
-			return nil, fmt.Errorf("%s: %s is not valid. Expecting a comma-separated list of source IP ranges. For example, 10.0.0.0/24,192.168.2.0/24", AnnotationLoadBalancerSourceRangesKey, val)
+			return nil, fmt.Errorf("%s: %s is not valid. Expecting a comma-separated list of source IP ranges. For example, 10.0.0.0/24,192.168.2.0/24", api.AnnotationLoadBalancerSourceRangesKey, val)
 		}
 	}
 	return ipnets, nil
@@ -76,48 +72,14 @@ func RequestsOnlyLocalTraffic(service *api.Service) bool {
 		service.Spec.Type != api.ServiceTypeNodePort {
 		return false
 	}
-	// First check the alpha annotation and then the beta. This is so existing
-	// Services continue to work till the user decides to transition to beta.
-	// If they transition to beta, there's no way to go back to alpha without
-	// rolling back the cluster.
-	for _, annotation := range []string{AlphaAnnotationExternalTraffic, BetaAnnotationExternalTraffic} {
-		if l, ok := service.Annotations[annotation]; ok {
-			switch l {
-			case AnnotationValueExternalTrafficLocal:
-				return true
-			case AnnotationValueExternalTrafficGlobal:
-				return false
-			default:
-				glog.Errorf("Invalid value for annotation %v: %v", annotation, l)
-			}
-		}
-	}
-	return false
+
+	return service.Spec.ExternalTrafficPolicy == api.ServiceExternalTrafficPolicyTypeLocal
 }
 
-// NeedsHealthCheck Check if service needs health check.
+// NeedsHealthCheck checks if service needs health check.
 func NeedsHealthCheck(service *api.Service) bool {
 	if service.Spec.Type != api.ServiceTypeLoadBalancer {
 		return false
 	}
 	return RequestsOnlyLocalTraffic(service)
-}
-
-// GetServiceHealthCheckNodePort Return health check node port annotation for service, if one exists
-func GetServiceHealthCheckNodePort(service *api.Service) int32 {
-	// First check the alpha annotation and then the beta. This is so existing
-	// Services continue to work till the user decides to transition to beta.
-	// If they transition to beta, there's no way to go back to alpha without
-	// rolling back the cluster.
-	for _, annotation := range []string{AlphaAnnotationHealthCheckNodePort, BetaAnnotationHealthCheckNodePort} {
-		if l, ok := service.Annotations[annotation]; ok {
-			p, err := strconv.Atoi(l)
-			if err != nil {
-				glog.Errorf("Failed to parse annotation %v: %v", annotation, err)
-				continue
-			}
-			return int32(p)
-		}
-	}
-	return 0
 }

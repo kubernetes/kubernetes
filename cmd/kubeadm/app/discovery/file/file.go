@@ -19,15 +19,15 @@ package file
 import (
 	"fmt"
 
+	"k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/pkg/api/v1"
+	bootstrapapi "k8s.io/client-go/tools/bootstrap/token/api"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
-	bootstrapapi "k8s.io/kubernetes/pkg/bootstrap/api"
 )
 
 // RetrieveValidatedClusterInfo connects to the API Server and makes sure it can talk
@@ -62,7 +62,7 @@ func ValidateClusterInfo(clusterinfo *clientcmdapi.Config) (*clientcmdapi.Cluste
 		defaultCluster.CertificateAuthorityData,
 	)
 
-	client, err := kubeconfigutil.KubeConfigToClientSet(configFromClusterInfo)
+	client, err := kubeconfigutil.ToClientSet(configFromClusterInfo)
 	if err != nil {
 		return nil, err
 	}
@@ -75,14 +75,13 @@ func ValidateClusterInfo(clusterinfo *clientcmdapi.Config) (*clientcmdapi.Cluste
 		clusterinfoCM, err = client.CoreV1().ConfigMaps(metav1.NamespacePublic).Get(bootstrapapi.ConfigMapClusterInfo, metav1.GetOptions{})
 		if err != nil {
 			if apierrors.IsForbidden(err) {
-				// If the request is unauthorized, the cluster admin has not granted access to the cluster info configmap for unauthenicated users
+				// If the request is unauthorized, the cluster admin has not granted access to the cluster info configmap for unauthenticated users
 				// In that case, trust the cluster admin and do not refresh the cluster-info credentials
 				fmt.Printf("[discovery] Could not access the %s ConfigMap for refreshing the cluster-info information, but the TLS cert is valid so proceeding...\n", bootstrapapi.ConfigMapClusterInfo)
 				return true, nil
-			} else {
-				fmt.Printf("[discovery] Failed to validate the API Server's identity, will try again: [%v]\n", err)
-				return false, nil
 			}
+			fmt.Printf("[discovery] Failed to validate the API Server's identity, will try again: [%v]\n", err)
+			return false, nil
 		}
 		return true, nil
 	})

@@ -22,8 +22,8 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
+	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
 func TestValidateScale(t *testing.T) {
@@ -320,32 +320,6 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 				},
 			},
 			msg: "must be greater than or equal to `minReplicas`",
-		},
-		{
-			horizontalPodAutoscaler: autoscaling.HorizontalPodAutoscaler{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "myautoscaler",
-					Namespace: metav1.NamespaceDefault,
-				},
-				Spec: autoscaling.HorizontalPodAutoscalerSpec{
-					ScaleTargetRef: autoscaling.CrossVersionObjectReference{
-						Kind: "ReplicationController",
-						Name: "myrc",
-					},
-					MinReplicas: newInt32(1),
-					MaxReplicas: 5,
-					Metrics: []autoscaling.MetricSpec{
-						{
-							Type: autoscaling.ResourceMetricSourceType,
-							Resource: &autoscaling.ResourceMetricSource{
-								Name: api.ResourceCPU,
-								TargetAverageUtilization: newInt32(-70),
-							},
-						},
-					},
-				},
-			},
-			msg: "must be greater than 0",
 		},
 		{
 			horizontalPodAutoscaler: autoscaling.HorizontalPodAutoscaler{

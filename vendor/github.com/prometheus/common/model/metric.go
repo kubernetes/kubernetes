@@ -15,11 +15,18 @@ package model
 
 import (
 	"fmt"
+	"regexp"
 	"sort"
 	"strings"
 )
 
-var separator = []byte{0}
+var (
+	separator = []byte{0}
+	// MetricNameRE is a regular expression matching valid metric
+	// names. Note that the IsValidMetricName function performs the same
+	// check but faster than a match with this regular expression.
+	MetricNameRE = regexp.MustCompile(`^[a-zA-Z_:][a-zA-Z0-9_:]*$`)
+)
 
 // A Metric is similar to a LabelSet, but the key difference is that a Metric is
 // a singleton and refers to one and only one stream of samples.
@@ -37,7 +44,7 @@ func (m Metric) Before(o Metric) bool {
 
 // Clone returns a copy of the Metric.
 func (m Metric) Clone() Metric {
-	clone := Metric{}
+	clone := make(Metric, len(m))
 	for k, v := range m {
 		clone[k] = v
 	}
@@ -78,4 +85,19 @@ func (m Metric) Fingerprint() Fingerprint {
 // algorithm, which is, however, more susceptible to hash collisions.
 func (m Metric) FastFingerprint() Fingerprint {
 	return LabelSet(m).FastFingerprint()
+}
+
+// IsValidMetricName returns true iff name matches the pattern of MetricNameRE.
+// This function, however, does not use MetricNameRE for the check but a much
+// faster hardcoded implementation.
+func IsValidMetricName(n LabelValue) bool {
+	if len(n) == 0 {
+		return false
+	}
+	for i, b := range n {
+		if !((b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z') || b == '_' || b == ':' || (b >= '0' && b <= '9' && i > 0)) {
+			return false
+		}
+	}
+	return true
 }

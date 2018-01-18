@@ -1,10 +1,10 @@
-// +build !linux,!freebsd,!darwin
+// +build !linux,!freebsd
 
 package system
 
 import "syscall"
 
-// LUtimesNano is not supported on platforms other than linux, freebsd and darwin.
+// LUtimesNano is only supported on linux and freebsd.
 func LUtimesNano(path string, ts []syscall.Timespec) error {
 	return ErrNotSupportedPlatform
 }

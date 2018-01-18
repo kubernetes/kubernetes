@@ -22,22 +22,21 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/apimachinery/pkg/watch"
+	informers "k8s.io/client-go/informers/core/v1"
+	clientset "k8s.io/client-go/kubernetes"
+	listersv1 "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
+	clientretry "k8s.io/client-go/util/retry"
 	"k8s.io/client-go/util/workqueue"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	clientretry "k8s.io/kubernetes/pkg/client/retry"
+	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/registry/core/secret"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 	"k8s.io/kubernetes/pkg/util/metrics"
@@ -71,7 +70,7 @@ type TokensControllerOptions struct {
 }
 
 // NewTokensController returns a new *TokensController.
-func NewTokensController(cl clientset.Interface, options TokensControllerOptions) *TokensController {
+func NewTokensController(serviceAccounts informers.ServiceAccountInformer, secrets informers.SecretInformer, cl clientset.Interface, options TokensControllerOptions) (*TokensController, error) {
 	maxRetries := options.MaxRetries
 	if maxRetries == 0 {
 		maxRetries = 10
@@ -87,51 +86,47 @@ func NewTokensController(cl clientset.Interface, options TokensControllerOptions
 
 		maxRetries: maxRetries,
 	}
-	if cl != nil && cl.Core().RESTClient().GetRateLimiter() != nil {
-		metrics.RegisterMetricAndTrackRateLimiterUsage("serviceaccount_controller", cl.Core().RESTClient().GetRateLimiter())
+	if cl != nil && cl.CoreV1().RESTClient().GetRateLimiter() != nil {
+		if err := metrics.RegisterMetricAndTrackRateLimiterUsage("serviceaccount_tokens_controller", cl.CoreV1().RESTClient().GetRateLimiter()); err != nil {
+			return nil, err
+		}
 	}
 
-	e.serviceAccounts, e.serviceAccountController = cache.NewInformer(
-		&cache.ListWatch{
-			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-				return e.client.Core().ServiceAccounts(metav1.NamespaceAll).List(options)
-			},
-			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-				return e.client.Core().ServiceAccounts(metav1.NamespaceAll).Watch(options)
-			},
-		},
-		&v1.ServiceAccount{},
-		options.ServiceAccountResync,
+	e.serviceAccounts = serviceAccounts.Lister()
+	e.serviceAccountSynced = serviceAccounts.Informer().HasSynced
+	serviceAccounts.Informer().AddEventHandlerWithResyncPeriod(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc:    e.queueServiceAccountSync,
 			UpdateFunc: e.queueServiceAccountUpdateSync,
 			DeleteFunc: e.queueServiceAccountSync,
 		},
+		options.ServiceAccountResync,
 	)
 
-	tokenSelector := fields.SelectorFromSet(map[string]string{api.SecretTypeField: string(v1.SecretTypeServiceAccountToken)})
-	e.secrets, e.secretController = cache.NewIndexerInformer(
-		&cache.ListWatch{
-			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-				options.FieldSelector = tokenSelector.String()
-				return e.client.Core().Secrets(metav1.NamespaceAll).List(options)
+	secretCache := secrets.Informer().GetIndexer()
+	e.updatedSecrets = cache.NewIntegerResourceVersionMutationCache(secretCache, secretCache, 60*time.Second, true)
+	e.secretSynced = secrets.Informer().HasSynced
+	secrets.Informer().AddEventHandlerWithResyncPeriod(
+		cache.FilteringResourceEventHandler{
+			FilterFunc: func(obj interface{}) bool {
+				switch t := obj.(type) {
+				case *v1.Secret:
+					return t.Type == v1.SecretTypeServiceAccountToken
+				default:
+					utilruntime.HandleError(fmt.Errorf("object passed to %T that is not expected: %T", e, obj))
+					return false
+				}
 			},
-			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-				options.FieldSelector = tokenSelector.String()
-				return e.client.Core().Secrets(metav1.NamespaceAll).Watch(options)
+			Handler: cache.ResourceEventHandlerFuncs{
+				AddFunc:    e.queueSecretSync,
+				UpdateFunc: e.queueSecretUpdateSync,
+				DeleteFunc: e.queueSecretSync,
 			},
 		},
-		&v1.Secret{},
 		options.SecretResync,
-		cache.ResourceEventHandlerFuncs{
-			AddFunc:    e.queueSecretSync,
-			UpdateFunc: e.queueSecretUpdateSync,
-			DeleteFunc: e.queueSecretSync,
-		},
-		cache.Indexers{"namespace": cache.MetaNamespaceIndexFunc},
 	)
 
-	return e
+	return e, nil
 }
 
 // TokensController manages ServiceAccountToken secrets for ServiceAccount objects
@@ -141,12 +136,15 @@ type TokensController struct {
 
 	rootCA []byte
 
-	serviceAccounts cache.Store
-	secrets         cache.Indexer
+	serviceAccounts listersv1.ServiceAccountLister
+	// updatedSecrets is a wrapper around the shared cache which allows us to record
+	// and return our local mutations (since we're very likely to act on an updated
+	// secret before the watch reports it).
+	updatedSecrets cache.MutationCache
 
 	// Since we join two objects, we'll watch both of them with controllers.
-	serviceAccountController cache.Controller
-	secretController         cache.Controller
+	serviceAccountSynced cache.InformerSynced
+	secretSynced         cache.InformerSynced
 
 	// syncServiceAccountQueue handles service account events:
 	//   * ensures a referenced token exists for service accounts which still exist
@@ -166,29 +164,22 @@ type TokensController struct {
 
 // Runs controller blocks until stopCh is closed
 func (e *TokensController) Run(workers int, stopCh <-chan struct{}) {
+	// Shut down queues
 	defer utilruntime.HandleCrash()
+	defer e.syncServiceAccountQueue.ShutDown()
+	defer e.syncSecretQueue.ShutDown()
 
-	// Start controllers (to fill stores, call informers, fill work queues)
-	go e.serviceAccountController.Run(stopCh)
-	go e.secretController.Run(stopCh)
-
-	// Wait for stores to fill
-	for !e.serviceAccountController.HasSynced() || !e.secretController.HasSynced() {
-		time.Sleep(100 * time.Millisecond)
+	if !controller.WaitForCacheSync("tokens", stopCh, e.serviceAccountSynced, e.secretSynced) {
+		return
 	}
 
-	// Spawn workers to process work queues
+	glog.V(5).Infof("Starting workers")
 	for i := 0; i < workers; i++ {
 		go wait.Until(e.syncServiceAccount, 0, stopCh)
 		go wait.Until(e.syncSecret, 0, stopCh)
 	}
-
-	// Block until stop channel is closed
 	<-stopCh
-
-	// Shut down queues
-	e.syncServiceAccountQueue.ShutDown()
-	e.syncSecretQueue.ShutDown()
+	glog.V(1).Infof("Shutting down")
 }
 
 func (e *TokensController) queueServiceAccountSync(obj interface{}) {
@@ -355,7 +346,7 @@ func (e *TokensController) deleteToken(ns, name string, uid types.UID) ( /*retry
 	if len(uid) > 0 {
 		opts = &metav1.DeleteOptions{Preconditions: &metav1.Preconditions{UID: &uid}}
 	}
-	err := e.client.Core().Secrets(ns).Delete(name, opts)
+	err := e.client.CoreV1().Secrets(ns).Delete(name, opts)
 	// NotFound doesn't need a retry (it's already been deleted)
 	// Conflict doesn't need a retry (the UID precondition failed)
 	if err == nil || apierrors.IsNotFound(err) || apierrors.IsConflict(err) {
@@ -377,7 +368,7 @@ func (e *TokensController) ensureReferencedToken(serviceAccount *v1.ServiceAccou
 
 	// We don't want to update the cache's copy of the service account
 	// so add the secret to a freshly retrieved copy of the service account
-	serviceAccounts := e.client.Core().ServiceAccounts(serviceAccount.Namespace)
+	serviceAccounts := e.client.CoreV1().ServiceAccounts(serviceAccount.Namespace)
 	liveServiceAccount, err := serviceAccounts.Get(serviceAccount.Name, metav1.GetOptions{})
 	if err != nil {
 		// Retry if we cannot fetch the live service account (for a NotFound error, either the live lookup or our cache are stale)
@@ -416,14 +407,14 @@ func (e *TokensController) ensureReferencedToken(serviceAccount *v1.ServiceAccou
 	}
 
 	// Save the secret
-	createdToken, err := e.client.Core().Secrets(serviceAccount.Namespace).Create(secret)
+	createdToken, err := e.client.CoreV1().Secrets(serviceAccount.Namespace).Create(secret)
 	if err != nil {
 		// retriable error
 		return true, err
 	}
 	// Manually add the new token to the cache store.
 	// This prevents the service account update (below) triggering another token creation, if the referenced token couldn't be found in the store
-	e.secrets.Add(createdToken)
+	e.updatedSecrets.Mutation(createdToken)
 
 	// Try to add a reference to the newly created token to the service account
 	addedReference := false
@@ -466,7 +457,7 @@ func (e *TokensController) ensureReferencedToken(serviceAccount *v1.ServiceAccou
 		// we weren't able to use the token, try to clean it up.
 		glog.V(2).Infof("deleting secret %s/%s because reference couldn't be added (%v)", secret.Namespace, secret.Name, err)
 		deleteOpts := &metav1.DeleteOptions{Preconditions: &metav1.Preconditions{UID: &createdToken.UID}}
-		if deleteErr := e.client.Core().Secrets(createdToken.Namespace).Delete(createdToken.Name, deleteOpts); deleteErr != nil {
+		if deleteErr := e.client.CoreV1().Secrets(createdToken.Namespace).Delete(createdToken.Name, deleteOpts); deleteErr != nil {
 			glog.Error(deleteErr) // if we fail, just log it
 		}
 	}
@@ -524,7 +515,7 @@ func (e *TokensController) generateTokenIfNeeded(serviceAccount *v1.ServiceAccou
 
 	// We don't want to update the cache's copy of the secret
 	// so add the token to a freshly retrieved copy of the secret
-	secrets := e.client.Core().Secrets(cachedSecret.Namespace)
+	secrets := e.client.CoreV1().Secrets(cachedSecret.Namespace)
 	liveSecret, err := secrets.Get(cachedSecret.Name, metav1.GetOptions{})
 	if err != nil {
 		// Retry for any error other than a NotFound
@@ -588,7 +579,7 @@ func (e *TokensController) generateTokenIfNeeded(serviceAccount *v1.ServiceAccou
 func (e *TokensController) removeSecretReference(saNamespace string, saName string, saUID types.UID, secretName string) error {
 	// We don't want to update the cache's copy of the service account
 	// so remove the secret from a freshly retrieved copy of the service account
-	serviceAccounts := e.client.Core().ServiceAccounts(saNamespace)
+	serviceAccounts := e.client.CoreV1().ServiceAccounts(saNamespace)
 	serviceAccount, err := serviceAccounts.Get(saName, metav1.GetOptions{})
 	// Ignore NotFound errors when attempting to remove a reference
 	if apierrors.IsNotFound(err) {
@@ -626,15 +617,11 @@ func (e *TokensController) removeSecretReference(saNamespace string, saName stri
 
 func (e *TokensController) getServiceAccount(ns string, name string, uid types.UID, fetchOnCacheMiss bool) (*v1.ServiceAccount, error) {
 	// Look up in cache
-	obj, exists, err := e.serviceAccounts.GetByKey(makeCacheKey(ns, name))
-	if err != nil {
+	sa, err := e.serviceAccounts.ServiceAccounts(ns).Get(name)
+	if err != nil && !apierrors.IsNotFound(err) {
 		return nil, err
 	}
-	if exists {
-		sa, ok := obj.(*v1.ServiceAccount)
-		if !ok {
-			return nil, fmt.Errorf("expected *v1.ServiceAccount, got %#v", sa)
-		}
+	if sa != nil {
 		// Ensure UID matches if given
 		if len(uid) == 0 || uid == sa.UID {
 			return sa, nil
@@ -646,7 +633,7 @@ func (e *TokensController) getServiceAccount(ns string, name string, uid types.U
 	}
 
 	// Live lookup
-	sa, err := e.client.Core().ServiceAccounts(ns).Get(name, metav1.GetOptions{})
+	sa, err = e.client.CoreV1().ServiceAccounts(ns).Get(name, metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {
 		return nil, nil
 	}
@@ -662,7 +649,7 @@ func (e *TokensController) getServiceAccount(ns string, name string, uid types.U
 
 func (e *TokensController) getSecret(ns string, name string, uid types.UID, fetchOnCacheMiss bool) (*v1.Secret, error) {
 	// Look up in cache
-	obj, exists, err := e.secrets.GetByKey(makeCacheKey(ns, name))
+	obj, exists, err := e.updatedSecrets.GetByKey(makeCacheKey(ns, name))
 	if err != nil {
 		return nil, err
 	}
@@ -682,7 +669,7 @@ func (e *TokensController) getSecret(ns string, name string, uid types.UID, fetc
 	}
 
 	// Live lookup
-	secret, err := e.client.Core().Secrets(ns).Get(name, metav1.GetOptions{})
+	secret, err := e.client.CoreV1().Secrets(ns).Get(name, metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {
 		return nil, nil
 	}
@@ -699,7 +686,7 @@ func (e *TokensController) getSecret(ns string, name string, uid types.UID, fetc
 // listTokenSecrets returns a list of all of the ServiceAccountToken secrets that
 // reference the given service account's name and uid
 func (e *TokensController) listTokenSecrets(serviceAccount *v1.ServiceAccount) ([]*v1.Secret, error) {
-	namespaceSecrets, err := e.secrets.ByIndex("namespace", serviceAccount.Namespace)
+	namespaceSecrets, err := e.updatedSecrets.ByIndex("namespace", serviceAccount.Namespace)
 	if err != nil {
 		return nil, err
 	}

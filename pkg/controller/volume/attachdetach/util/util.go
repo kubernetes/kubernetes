@@ -20,10 +20,9 @@ import (
 	"fmt"
 
 	"github.com/golang/glog"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
-	corelisters "k8s.io/kubernetes/pkg/client/listers/core/v1"
+	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
@@ -80,16 +79,7 @@ func CreateVolumeSpec(podVolume v1.Volume, podNamespace string, pvcLister coreli
 
 	// Do not return the original volume object, since it's from the shared
 	// informer it may be mutated by another consumer.
-	clonedPodVolumeObj, err := api.Scheme.DeepCopy(&podVolume)
-	if err != nil || clonedPodVolumeObj == nil {
-		return nil, fmt.Errorf(
-			"failed to deep copy %q volume object. err=%v", podVolume.Name, err)
-	}
-
-	clonedPodVolume, ok := clonedPodVolumeObj.(*v1.Volume)
-	if !ok {
-		return nil, fmt.Errorf("failed to cast clonedPodVolume %#v to v1.Volume", clonedPodVolumeObj)
-	}
+	clonedPodVolume := podVolume.DeepCopy()
 
 	return volume.NewSpecFromVolume(clonedPodVolume), nil
 }
@@ -146,17 +136,26 @@ func getPVSpecFromCache(name string, pvcReadOnly bool, expectedClaimUID types.UI
 
 	// Do not return the object from the informer, since the store is shared it
 	// may be mutated by another consumer.
-	clonedPVObj, err := api.Scheme.DeepCopy(pv)
-	if err != nil || clonedPVObj == nil {
-		return nil, fmt.Errorf("failed to deep copy %q PV object. err=%v", name, err)
-	}
-
-	clonedPV, ok := clonedPVObj.(*v1.PersistentVolume)
-	if !ok {
-		return nil, fmt.Errorf("failed to cast %q clonedPV %#v to PersistentVolume", name, pv)
-	}
+	clonedPV := pv.DeepCopy()
 
 	return volume.NewSpecFromPersistentVolume(clonedPV, pvcReadOnly), nil
+}
+
+// DetermineVolumeAction returns true if volume and pod needs to be added to dswp
+// and it returns false if volume and pod needs to be removed from dswp
+func DetermineVolumeAction(pod *v1.Pod, desiredStateOfWorld cache.DesiredStateOfWorld, defaultAction bool) bool {
+	if pod == nil || len(pod.Spec.Volumes) <= 0 {
+		return defaultAction
+	}
+	nodeName := types.NodeName(pod.Spec.NodeName)
+	keepTerminatedPodVolume := desiredStateOfWorld.GetKeepTerminatedPodVolumesForNode(nodeName)
+
+	if volumehelper.IsPodTerminated(pod, pod.Status) {
+		// if pod is terminate we let kubelet policy dictate if volume
+		// should be detached or not
+		return keepTerminatedPodVolume
+	}
+	return defaultAction
 }
 
 // ProcessPodVolumes processes the volumes in the given pod and adds them to the
@@ -184,7 +183,7 @@ func ProcessPodVolumes(pod *v1.Pod, addVolumes bool, desiredStateOfWorld cache.D
 		// If the node the pod is scheduled to does not exist in the desired
 		// state of the world data structure, that indicates the node is not
 		// yet managed by the controller. Therefore, ignore the pod.
-		glog.V(10).Infof(
+		glog.V(4).Infof(
 			"Skipping processing of pod %q/%q: it is scheduled to node %q which is not managed by the controller.",
 			pod.Namespace,
 			pod.Name,

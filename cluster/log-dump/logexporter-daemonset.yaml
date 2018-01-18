@@ -1,0 +1,77 @@
+# Template job config for running the log exporter on the cluster as a daemonset.
+# Creates everything within 'logexporter' namespace.
+#
+# Note: Since daemonsets have "AlwaysRestart" policy for pods, we provide a long
+# sleep-duration (24 hr) to the logexporter pods so they don't finish the work and
+# get restarted while some pods are still running. So it is your duty to detect
+# the work has been done (or use some timeout) and delete the daemonset yourself.
+
+apiVersion: v1
+kind: Namespace
+metadata:
+    name: {{.LogexporterNamespace}}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: google-service-account
+  namespace: {{.LogexporterNamespace}}
+type: Opaque
+data:
+  service-account.json: {{.ServiceAccountCredentials}}
+---
+apiVersion: apps/v1beta2
+kind: DaemonSet
+metadata:
+  name: logexporter
+  namespace: {{.LogexporterNamespace}}
+spec:
+  selector:
+    matchLabels:
+      app: logexporter
+  template:
+    metadata:
+      labels:
+        app: logexporter
+    spec:
+      containers:
+      - name: logexporter-test
+        image: gcr.io/google-containers/logexporter:v0.1.1
+        env:
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        command:
+        - logexporter
+        - --node-name=$(NODE_NAME)
+        - --cloud-provider={{.CloudProvider}}
+        - --gcs-path={{.GCSPath}}
+        - --gcloud-auth-file-path=/etc/service-account/service-account.json
+        - --enable-hollow-node-logs={{.EnableHollowNodeLogs}}
+        - --sleep-duration=24h
+        - --alsologtostderr
+        volumeMounts:
+        - mountPath: /etc/service-account
+          name: service
+          readOnly: true
+        - mountPath: /var/log
+          name: varlog
+          readOnly: true
+        - mountPath: /workspace/etc
+          name: hostetc
+          readOnly: true
+        resources:
+          requests:
+            cpu: 10m
+            memory: 10Mi
+      volumes:
+      - name: service
+        secret:
+          secretName: google-service-account
+      - name: varlog
+        hostPath:
+          path: /var/log
+      - name: hostetc
+        hostPath:
+          path: /etc

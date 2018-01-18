@@ -19,10 +19,11 @@ package e2e_node
 import (
 	"time"
 
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -46,7 +47,7 @@ var _ = framework.KubeDescribe("Container Lifecycle Hook", func() {
 				Containers: []v1.Container{
 					{
 						Name:  "pod-handle-http-request",
-						Image: "gcr.io/google_containers/netexec:1.7",
+						Image: imageutils.GetE2EImage(imageutils.Netexec),
 						Ports: []v1.ContainerPort{
 							{
 								ContainerPort: 8080,
@@ -83,7 +84,7 @@ var _ = framework.KubeDescribe("Container Lifecycle Hook", func() {
 				}, preStopWaitTimeout, podCheckInterval).Should(BeNil())
 			}
 		}
-		It("should execute poststart exec hook properly [Conformance]", func() {
+		framework.ConformanceIt("should execute poststart exec hook properly", func() {
 			lifecycle := &v1.Lifecycle{
 				PostStart: &v1.Handler{
 					Exec: &v1.ExecAction{
@@ -91,10 +92,10 @@ var _ = framework.KubeDescribe("Container Lifecycle Hook", func() {
 					},
 				},
 			}
-			podWithHook := getPodWithHook("pod-with-poststart-exec-hook", "gcr.io/google_containers/hostexec:1.2", lifecycle)
+			podWithHook := getPodWithHook("pod-with-poststart-exec-hook", imageutils.GetE2EImage(imageutils.Hostexec), lifecycle)
 			testPodWithHook(podWithHook)
 		})
-		It("should execute prestop exec hook properly [Conformance]", func() {
+		framework.ConformanceIt("should execute prestop exec hook properly", func() {
 			lifecycle := &v1.Lifecycle{
 				PreStop: &v1.Handler{
 					Exec: &v1.ExecAction{
@@ -102,10 +103,10 @@ var _ = framework.KubeDescribe("Container Lifecycle Hook", func() {
 					},
 				},
 			}
-			podWithHook := getPodWithHook("pod-with-prestop-exec-hook", "gcr.io/google_containers/hostexec:1.2", lifecycle)
+			podWithHook := getPodWithHook("pod-with-prestop-exec-hook", imageutils.GetE2EImage(imageutils.Hostexec), lifecycle)
 			testPodWithHook(podWithHook)
 		})
-		It("should execute poststart http hook properly [Conformance]", func() {
+		framework.ConformanceIt("should execute poststart http hook properly", func() {
 			lifecycle := &v1.Lifecycle{
 				PostStart: &v1.Handler{
 					HTTPGet: &v1.HTTPGetAction{
@@ -118,7 +119,7 @@ var _ = framework.KubeDescribe("Container Lifecycle Hook", func() {
 			podWithHook := getPodWithHook("pod-with-poststart-http-hook", framework.GetPauseImageNameForHostArch(), lifecycle)
 			testPodWithHook(podWithHook)
 		})
-		It("should execute prestop http hook properly [Conformance]", func() {
+		framework.ConformanceIt("should execute prestop http hook properly", func() {
 			lifecycle := &v1.Lifecycle{
 				PreStop: &v1.Handler{
 					HTTPGet: &v1.HTTPGetAction{

@@ -21,36 +21,100 @@ limitations under the License.
 package app
 
 import (
+	"fmt"
+	"os"
+
 	"github.com/golang/glog"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	certcontroller "k8s.io/kubernetes/pkg/controller/certificates"
+	cmoptions "k8s.io/kubernetes/cmd/controller-manager/app/options"
+	"k8s.io/kubernetes/pkg/controller/certificates/approver"
+	"k8s.io/kubernetes/pkg/controller/certificates/cleaner"
+	"k8s.io/kubernetes/pkg/controller/certificates/signer"
 )
 
-func startCSRController(ctx ControllerContext) (bool, error) {
+func startCSRSigningController(ctx ControllerContext) (bool, error) {
 	if !ctx.AvailableResources[schema.GroupVersionResource{Group: "certificates.k8s.io", Version: "v1beta1", Resource: "certificatesigningrequests"}] {
 		return false, nil
 	}
+	if ctx.Options.ClusterSigningCertFile == "" || ctx.Options.ClusterSigningKeyFile == "" {
+		return false, nil
+	}
+
+	// Deprecation warning for old defaults.
+	//
+	// * If the signing cert and key are the default paths but the files
+	// exist, warn that the paths need to be specified explicitly in a
+	// later release and the defaults will be removed. We don't expect this
+	// to be the case.
+	//
+	// * If the signing cert and key are default paths but the files don't exist,
+	// bail out of startController without logging.
+	var keyFileExists, keyUsesDefault, certFileExists, certUsesDefault bool
+
+	_, err := os.Stat(ctx.Options.ClusterSigningCertFile)
+	certFileExists = !os.IsNotExist(err)
+
+	certUsesDefault = (ctx.Options.ClusterSigningCertFile == cmoptions.DefaultClusterSigningCertFile)
+
+	_, err = os.Stat(ctx.Options.ClusterSigningKeyFile)
+	keyFileExists = !os.IsNotExist(err)
+
+	keyUsesDefault = (ctx.Options.ClusterSigningKeyFile == cmoptions.DefaultClusterSigningKeyFile)
+
+	switch {
+	case (keyFileExists && keyUsesDefault) || (certFileExists && certUsesDefault):
+		glog.Warningf("You might be using flag defaulting for --cluster-signing-cert-file and" +
+			" --cluster-signing-key-file. These defaults are deprecated and will be removed" +
+			" in a subsequent release. Please pass these options explicitly.")
+	case (!keyFileExists && keyUsesDefault) && (!certFileExists && certUsesDefault):
+		// This is what we expect right now if people aren't
+		// setting up the signing controller. This isn't
+		// actually a problem since the signer is not a
+		// required controller.
+		return false, nil
+	default:
+		// Note that '!filesExist && !usesDefaults' is obviously
+		// operator error. We don't handle this case here and instead
+		// allow it to be handled by NewCSR... below.
+	}
+
 	c := ctx.ClientBuilder.ClientOrDie("certificate-controller")
 
-	signer, err := certcontroller.NewCFSSLSigner(ctx.Options.ClusterSigningCertFile, ctx.Options.ClusterSigningKeyFile)
+	signer, err := signer.NewCSRSigningController(
+		c,
+		ctx.InformerFactory.Certificates().V1beta1().CertificateSigningRequests(),
+		ctx.Options.ClusterSigningCertFile,
+		ctx.Options.ClusterSigningKeyFile,
+		ctx.Options.ClusterSigningDuration.Duration,
+	)
 	if err != nil {
-		glog.Errorf("Failed to start certificate controller: %v", err)
+		return false, fmt.Errorf("failed to start certificate controller: %v", err)
+	}
+	go signer.Run(1, ctx.Stop)
+
+	return true, nil
+}
+
+func startCSRApprovingController(ctx ControllerContext) (bool, error) {
+	if !ctx.AvailableResources[schema.GroupVersionResource{Group: "certificates.k8s.io", Version: "v1beta1", Resource: "certificatesigningrequests"}] {
 		return false, nil
 	}
 
-	certController, err := certcontroller.NewCertificateController(
-		c,
+	approver := approver.NewCSRApprovingController(
+		ctx.ClientBuilder.ClientOrDie("certificate-controller"),
 		ctx.InformerFactory.Certificates().V1beta1().CertificateSigningRequests(),
-		signer,
-		certcontroller.NewGroupApprover(ctx.Options.ApproveAllKubeletCSRsForGroup),
 	)
-	if err != nil {
-		// TODO this is failing consistently in test-cmd and local-up-cluster.sh.  Fix them and make it consistent with all others which
-		// cause a crash loop
-		glog.Errorf("Failed to start certificate controller: %v", err)
-		return false, nil
-	}
-	go certController.Run(1, ctx.Stop)
+	go approver.Run(1, ctx.Stop)
+
+	return true, nil
+}
+
+func startCSRCleanerController(ctx ControllerContext) (bool, error) {
+	cleaner := cleaner.NewCSRCleanerController(
+		ctx.ClientBuilder.ClientOrDie("certificate-controller").CertificatesV1beta1().CertificateSigningRequests(),
+		ctx.InformerFactory.Certificates().V1beta1().CertificateSigningRequests(),
+	)
+	go cleaner.Run(1, ctx.Stop)
 	return true, nil
 }

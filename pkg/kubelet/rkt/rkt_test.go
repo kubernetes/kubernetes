@@ -23,29 +23,31 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"testing"
 	"time"
 
 	appcschema "github.com/appc/spec/schema"
 	appctypes "github.com/appc/spec/schema/types"
+	"github.com/coreos/go-systemd/unit"
 	rktapi "github.com/coreos/rkt/api/v1alpha"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubetypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/errors"
 	utiltesting "k8s.io/client-go/util/testing"
-	"k8s.io/kubernetes/pkg/api/v1"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertesting "k8s.io/kubernetes/pkg/kubelet/container/testing"
-	kubetesting "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	"k8s.io/kubernetes/pkg/kubelet/network/kubenet"
 	nettest "k8s.io/kubernetes/pkg/kubelet/network/testing"
 	"k8s.io/kubernetes/pkg/kubelet/types"
-	utilexec "k8s.io/kubernetes/pkg/util/exec"
+	"k8s.io/utils/exec"
+	fakeexec "k8s.io/utils/exec/testing"
 )
 
 func mustMarshalPodManifest(man *appcschema.PodManifest) []byte {
@@ -583,7 +585,7 @@ func TestGetPodStatus(t *testing.T) {
 	defer ctrl.Finish()
 	fr := newFakeRktInterface()
 	fs := newFakeSystemd()
-	fnet := newFakeNetNs()
+	fug := newfakeUnitGetter()
 	fnp := nettest.NewMockNetworkPlugin(ctrl)
 	fos := &containertesting.FakeOS{}
 	frh := &containertesting.FakeRuntimeHelper{}
@@ -593,7 +595,7 @@ func TestGetPodStatus(t *testing.T) {
 		runtimeHelper: frh,
 		os:            fos,
 		network:       network.NewPluginManager(fnp),
-		netns:         fnet,
+		unitGetter:    fug,
 	}
 
 	ns := func(seconds int64) int64 {
@@ -846,7 +848,7 @@ func TestGetPodStatus(t *testing.T) {
 
 		assert.Equal(t, tt.result, status, testCaseHint)
 		assert.Equal(t, []string{"ListPods"}, fr.called, testCaseHint)
-		fnet.networkNamespace = kubecontainer.ContainerID{}
+		fug.networkNamespace = kubecontainer.ContainerID{}
 		fr.CleanCalls()
 		ctrl.Finish()
 	}
@@ -935,6 +937,7 @@ func baseImageManifest(t *testing.T) *appcschema.ImageManifest {
 func baseAppWithRootUserGroup(t *testing.T) *appctypes.App {
 	app := baseApp(t)
 	app.User, app.Group = "0", "0"
+	app.Isolators = append(app.Isolators)
 	return app
 }
 
@@ -982,10 +985,10 @@ func TestSetApp(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	rootUser := kubetypes.UnixUserID(0)
-	nonRootUser := kubetypes.UnixUserID(42)
+	rootUser := int64(0)
+	nonRootUser := int64(42)
 	runAsNonRootTrue := true
-	fsgid := kubetypes.UnixGroupID(3)
+	fsgid := int64(3)
 
 	tests := []struct {
 		container        *v1.Container
@@ -1069,8 +1072,8 @@ func TestSetApp(t *testing.T) {
 				Command:    []string{"/bin/bar", "$(env-bar)"},
 				WorkingDir: tmpDir,
 				Resources: v1.ResourceRequirements{
-					Limits:   v1.ResourceList{"cpu": resource.MustParse("50m"), "memory": resource.MustParse("50M")},
-					Requests: v1.ResourceList{"cpu": resource.MustParse("5m"), "memory": resource.MustParse("5M")},
+					Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("50m"), v1.ResourceMemory: resource.MustParse("50M")},
+					Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("5m"), v1.ResourceMemory: resource.MustParse("5M")},
 				},
 			},
 			mountPoints: []appctypes.MountPoint{
@@ -1091,9 +1094,9 @@ func TestSetApp(t *testing.T) {
 				RunAsNonRoot: &runAsNonRootTrue,
 			},
 			podCtx: &v1.PodSecurityContext{
-				SupplementalGroups: []kubetypes.UnixGroupID{
-					kubetypes.UnixGroupID(1),
-					kubetypes.UnixGroupID(2),
+				SupplementalGroups: []int64{
+					int64(1),
+					int64(2),
 				},
 				FSGroup: &fsgid,
 			},
@@ -1133,8 +1136,8 @@ func TestSetApp(t *testing.T) {
 				Args:       []string{"hello", "world", "$(env-bar)"},
 				WorkingDir: tmpDir,
 				Resources: v1.ResourceRequirements{
-					Limits:   v1.ResourceList{"cpu": resource.MustParse("50m")},
-					Requests: v1.ResourceList{"memory": resource.MustParse("5M")},
+					Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("50m")},
+					Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("5M")},
 				},
 			},
 			mountPoints: []appctypes.MountPoint{
@@ -1156,9 +1159,9 @@ func TestSetApp(t *testing.T) {
 				RunAsNonRoot: &runAsNonRootTrue,
 			},
 			podCtx: &v1.PodSecurityContext{
-				SupplementalGroups: []kubetypes.UnixGroupID{
-					kubetypes.UnixGroupID(1),
-					kubetypes.UnixGroupID(2),
+				SupplementalGroups: []int64{
+					int64(1),
+					int64(2),
 				},
 				FSGroup: &fsgid,
 			},
@@ -1394,7 +1397,7 @@ func TestGenerateRunCommand(t *testing.T) {
 
 	rkt := &Runtime{
 		nsenterPath: "/usr/bin/nsenter",
-		os:          &kubetesting.FakeOS{HostName: hostName},
+		os:          &containertesting.FakeOS{HostName: hostName},
 		config: &Config{
 			Path:            "/bin/rkt/rkt",
 			Stage1Image:     "/bin/rkt/stage1-coreos.aci",
@@ -1413,8 +1416,8 @@ func TestGenerateRunCommand(t *testing.T) {
 			HostName:    tt.hostName,
 			Err:         tt.err,
 		}
-		rkt.execer = &utilexec.FakeExec{CommandScript: []utilexec.FakeCommandAction{func(cmd string, args ...string) utilexec.Cmd {
-			return utilexec.InitFakeCmd(&utilexec.FakeCmd{}, cmd, args...)
+		rkt.execer = &fakeexec.FakeExec{CommandScript: []fakeexec.FakeCommandAction{func(cmd string, args ...string) exec.Cmd {
+			return fakeexec.InitFakeCmd(&fakeexec.FakeCmd{}, cmd, args...)
 		}}}
 
 		// a command should be created of this form, but the returned command shouldn't be called (asserted by having no expectations on it)
@@ -1631,16 +1634,20 @@ func TestGarbageCollect(t *testing.T) {
 	fr := newFakeRktInterface()
 	fs := newFakeSystemd()
 	cli := newFakeRktCli()
-	fakeOS := kubetesting.NewFakeOS()
-	getter := newFakePodGetter()
+	fakeOS := containertesting.NewFakeOS()
+	deletionProvider := newFakePodDeletionProvider()
+	fug := newfakeUnitGetter()
+	frh := &containertesting.FakeRuntimeHelper{}
 
 	rkt := &Runtime{
 		os:                  fakeOS,
 		cli:                 cli,
 		apisvc:              fr,
-		podGetter:           getter,
+		podDeletionProvider: deletionProvider,
 		systemd:             fs,
 		containerRefManager: kubecontainer.NewRefManager(),
+		unitGetter:          fug,
+		runtimeHelper:       frh,
 	}
 
 	fakeApp := &rktapi.App{Name: "app-foo"}
@@ -1651,7 +1658,7 @@ func TestGarbageCollect(t *testing.T) {
 		pods                 []*rktapi.Pod
 		serviceFilesOnDisk   []string
 		expectedCommands     []string
-		expectedServiceFiles []string
+		expectedDeletedFiles []string
 	}{
 		// All running pods, should not be gc'd.
 		// Dead, new pods should not be gc'd.
@@ -1738,7 +1745,7 @@ func TestGarbageCollect(t *testing.T) {
 			},
 			[]string{"k8s_dead-old.service", "k8s_deleted-foo.service", "k8s_non-existing-bar.service"},
 			[]string{"rkt rm dead-old", "rkt rm deleted-foo"},
-			[]string{"/run/systemd/system/k8s_dead-old.service", "/run/systemd/system/k8s_deleted-foo.service", "/run/systemd/system/k8s_non-existing-bar.service"},
+			[]string{"/poddir/fake/finished-dead-old", "/poddir/fake/finished-deleted-foo", "/poddir/fake/finished-non-existing-bar", "/run/systemd/system/k8s_dead-old.service", "/run/systemd/system/k8s_deleted-foo.service", "/run/systemd/system/k8s_non-existing-bar.service"},
 		},
 		// gcPolicy.MaxContainers should be enforced.
 		// Oldest ones are removed first.
@@ -1795,7 +1802,7 @@ func TestGarbageCollect(t *testing.T) {
 			},
 			[]string{"k8s_dead-0.service", "k8s_dead-1.service", "k8s_dead-2.service"},
 			[]string{"rkt rm dead-0", "rkt rm dead-1"},
-			[]string{"/run/systemd/system/k8s_dead-0.service", "/run/systemd/system/k8s_dead-1.service"},
+			[]string{"/poddir/fake/finished-dead-0", "/poddir/fake/finished-dead-1", "/run/systemd/system/k8s_dead-0.service", "/run/systemd/system/k8s_dead-1.service"},
 		},
 	}
 
@@ -1822,11 +1829,12 @@ func TestGarbageCollect(t *testing.T) {
 
 		fr.pods = tt.pods
 		for _, p := range tt.apiPods {
-			getter.pods[p.UID] = p
+			deletionProvider.pods[p.UID] = struct{}{}
 		}
 
 		allSourcesReady := true
-		err := rkt.GarbageCollect(tt.gcPolicy, allSourcesReady)
+		evictNonDeletedPods := false
+		err := rkt.GarbageCollect(tt.gcPolicy, allSourcesReady, evictNonDeletedPods)
 		assert.NoError(t, err, testCaseHint)
 
 		sort.Sort(sortedStringList(tt.expectedCommands))
@@ -1834,14 +1842,17 @@ func TestGarbageCollect(t *testing.T) {
 
 		assert.Equal(t, tt.expectedCommands, cli.cmds, testCaseHint)
 
-		sort.Sort(sortedStringList(tt.expectedServiceFiles))
+		sort.Sort(sortedStringList(tt.expectedDeletedFiles))
 		sort.Sort(sortedStringList(fakeOS.Removes))
 		sort.Sort(sortedStringList(fs.resetFailedUnits))
 
-		assert.Equal(t, tt.expectedServiceFiles, fakeOS.Removes, testCaseHint)
+		assert.Equal(t, tt.expectedDeletedFiles, fakeOS.Removes, testCaseHint)
 		var expectedService []string
-		for _, f := range tt.expectedServiceFiles {
-			expectedService = append(expectedService, filepath.Base(f))
+		for _, f := range tt.expectedDeletedFiles {
+			unit := filepath.Base(f)
+			if strings.HasSuffix(unit, ".service") && strings.HasPrefix(unit, kubernetesUnitPrefix) {
+				expectedService = append(expectedService, unit)
+			}
 		}
 		assert.Equal(t, expectedService, fs.resetFailedUnits, testCaseHint)
 
@@ -1850,7 +1861,7 @@ func TestGarbageCollect(t *testing.T) {
 		ctrl.Finish()
 		fakeOS.Removes = []string{}
 		fs.resetFailedUnits = []string{}
-		getter.pods = make(map[kubetypes.UID]*v1.Pod)
+		deletionProvider.pods = make(map[kubetypes.UID]struct{})
 	}
 }
 
@@ -2018,7 +2029,7 @@ func TestConstructSyslogIdentifier(t *testing.T) {
 }
 
 func TestGetPodSystemdServiceFiles(t *testing.T) {
-	fs := kubetesting.NewFakeOS()
+	fs := containertesting.NewFakeOS()
 	r := &Runtime{os: fs}
 
 	testCases := []struct {
@@ -2063,6 +2074,56 @@ func TestGetPodSystemdServiceFiles(t *testing.T) {
 		for _, f := range serviceFiles {
 			assert.Contains(t, tt.expected, f.Name(), fmt.Sprintf("Test case #%d", i))
 
+		}
+	}
+}
+
+func TestSetupSystemdCustomFields(t *testing.T) {
+	testCases := []struct {
+		unitOpts       []*unit.UnitOption
+		podAnnotations map[string]string
+		expectedValues []string
+		raiseErr       bool
+	}{
+		// without annotation
+		{
+			[]*unit.UnitOption{
+				{Section: "Service", Name: "ExecStart", Value: "/bin/true"},
+			},
+			map[string]string{},
+			[]string{"/bin/true"},
+			false,
+		},
+		// with valid annotation for LimitNOFile
+		{
+			[]*unit.UnitOption{
+				{Section: "Service", Name: "ExecStart", Value: "/bin/true"},
+			},
+			map[string]string{k8sRktLimitNoFileAnno: "1024"},
+			[]string{"/bin/true", "1024"},
+			false,
+		},
+		// with invalid annotation for LimitNOFile
+		{
+			[]*unit.UnitOption{
+				{Section: "Service", Name: "ExecStart", Value: "/bin/true"},
+			},
+			map[string]string{k8sRktLimitNoFileAnno: "-1"},
+			[]string{"/bin/true"},
+			true,
+		},
+	}
+
+	for i, tt := range testCases {
+		raiseErr := false
+		newUnitsOpts, err := setupSystemdCustomFields(tt.podAnnotations, tt.unitOpts)
+		if err != nil {
+			raiseErr = true
+		}
+		assert.Equal(t, tt.raiseErr, raiseErr, fmt.Sprintf("Test case #%d", i))
+		for _, opt := range newUnitsOpts {
+			assert.Equal(t, "Service", opt.Section, fmt.Sprintf("Test case #%d", i))
+			assert.Contains(t, tt.expectedValues, opt.Value, fmt.Sprintf("Test case #%d", i))
 		}
 	}
 }

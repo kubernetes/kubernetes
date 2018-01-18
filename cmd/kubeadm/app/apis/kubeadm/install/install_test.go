@@ -19,10 +19,10 @@ package install
 import (
 	"testing"
 
-	apitesting "k8s.io/apimachinery/pkg/api/testing"
-	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/fuzzer"
+	"k8s.io/apimachinery/pkg/api/testing/roundtrip"
+	kubeadmfuzzer "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/fuzzer"
 )
 
 func TestRoundTripTypes(t *testing.T) {
-	apitesting.RoundTripTestForAPIGroup(t, Install, fuzzer.KubeadmFuzzerFuncs(t))
+	roundtrip.RoundTripTestForAPIGroup(t, Install, kubeadmfuzzer.Funcs)
 }

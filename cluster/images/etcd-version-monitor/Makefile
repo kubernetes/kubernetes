@@ -15,12 +15,12 @@
 # Build the etcd-version-monitor image
 #
 # Usage:
-# 	[GOLANG_VERSION=1.8.1] [REGISTRY=gcr.io/google-containers] [TAG=test] make (build|push)
+# 	[GOLANG_VERSION=1.8.3] [REGISTRY=gcr.io/google-containers] [TAG=test] make (build|push)
 # TODO(shyamjvs): Support architectures other than amd64 if needed.
 ARCH:=amd64
-GOLANG_VERSION?=1.8.1
+GOLANG_VERSION?=1.8.3
 REGISTRY?=gcr.io/google-containers
-TAG?=0.1.0
+TAG?=0.1.1
 IMAGE:=$(REGISTRY)/etcd-version-monitor:$(TAG)
 CURRENT_DIR:=$(pwd)
 TEMP_DIR:=$(shell mktemp -d)

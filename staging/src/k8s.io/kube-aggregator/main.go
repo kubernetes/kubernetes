@@ -21,7 +21,9 @@ import (
 	"os"
 	"runtime"
 
-	"k8s.io/apimachinery/pkg/util/wait"
+	"github.com/golang/glog"
+
+	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/util/logs"
 	"k8s.io/kube-aggregator/pkg/cmd/server"
 
@@ -30,7 +32,7 @@ import (
 	_ "k8s.io/kube-aggregator/pkg/apis/apiregistration/validation"
 	_ "k8s.io/kube-aggregator/pkg/client/clientset_generated/internalclientset"
 	_ "k8s.io/kube-aggregator/pkg/client/listers/apiregistration/internalversion"
-	_ "k8s.io/kube-aggregator/pkg/client/listers/apiregistration/v1alpha1"
+	_ "k8s.io/kube-aggregator/pkg/client/listers/apiregistration/v1beta1"
 )
 
 func main() {
@@ -41,9 +43,10 @@ func main() {
 		runtime.GOMAXPROCS(runtime.NumCPU())
 	}
 
-	cmd := server.NewCommandStartAggregator(os.Stdout, os.Stderr, wait.NeverStop)
+	stopCh := genericapiserver.SetupSignalHandler()
+	cmd := server.NewCommandStartAggregator(os.Stdout, os.Stderr, stopCh)
 	cmd.Flags().AddGoFlagSet(flag.CommandLine)
 	if err := cmd.Execute(); err != nil {
-		panic(err)
+		glog.Fatal(err)
 	}
 }

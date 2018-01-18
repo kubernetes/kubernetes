@@ -26,7 +26,9 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apimachineryvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -34,13 +36,17 @@ import (
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/validation"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	podutil "k8s.io/kubernetes/pkg/api/pod"
+	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/apis/core/helper/qos"
+	"k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/kubelet/client"
-	"k8s.io/kubernetes/pkg/kubelet/qos"
 )
 
 // podStrategy implements behavior for Pods
@@ -51,7 +57,7 @@ type podStrategy struct {
 
 // Strategy is the default logic that applies when creating and updating Pod
 // objects via the REST API.
-var Strategy = podStrategy{api.Scheme, names.SimpleNameGenerator}
+var Strategy = podStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
 
 // NamespaceScoped is true for pods.
 func (podStrategy) NamespaceScoped() bool {
@@ -63,8 +69,10 @@ func (podStrategy) PrepareForCreate(ctx genericapirequest.Context, obj runtime.O
 	pod := obj.(*api.Pod)
 	pod.Status = api.PodStatus{
 		Phase:    api.PodPending,
-		QOSClass: qos.InternalGetPodQOS(pod),
+		QOSClass: qos.GetPodQOS(pod),
 	}
+
+	podutil.DropDisabledAlphaFields(&pod.Spec)
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
@@ -72,6 +80,9 @@ func (podStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runt
 	newPod := obj.(*api.Pod)
 	oldPod := old.(*api.Pod)
 	newPod.Status = oldPod.Status
+
+	podutil.DropDisabledAlphaFields(&newPod.Spec)
+	podutil.DropDisabledAlphaFields(&oldPod.Spec)
 }
 
 // Validate validates a new pod.
@@ -89,9 +100,31 @@ func (podStrategy) AllowCreateOnUpdate() bool {
 	return false
 }
 
+func isUpdatingUninitializedPod(old runtime.Object) (bool, error) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.Initializers) {
+		return false, nil
+	}
+	oldMeta, err := meta.Accessor(old)
+	if err != nil {
+		return false, err
+	}
+	oldInitializers := oldMeta.GetInitializers()
+	if oldInitializers != nil && len(oldInitializers.Pending) != 0 {
+		return true, nil
+	}
+	return false, nil
+}
+
 // ValidateUpdate is the default update validation for an end user.
 func (podStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
 	errorList := validation.ValidatePod(obj.(*api.Pod))
+	uninitializedUpdate, err := isUpdatingUninitializedPod(old)
+	if err != nil {
+		return append(errorList, field.InternalError(field.NewPath("metadata"), err))
+	}
+	if uninitializedUpdate {
+		return errorList
+	}
 	return append(errorList, validation.ValidatePodUpdate(obj.(*api.Pod), old.(*api.Pod))...)
 }
 
@@ -153,20 +186,32 @@ func (podStatusStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, ol
 	oldPod := old.(*api.Pod)
 	newPod.Spec = oldPod.Spec
 	newPod.DeletionTimestamp = nil
+
+	// don't allow the pods/status endpoint to touch owner references since old kubelets corrupt them in a way
+	// that breaks garbage collection
+	newPod.OwnerReferences = oldPod.OwnerReferences
 }
 
 func (podStatusStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
+	var errorList field.ErrorList
+	uninitializedUpdate, err := isUpdatingUninitializedPod(old)
+	if err != nil {
+		return append(errorList, field.InternalError(field.NewPath("metadata"), err))
+	}
+	if uninitializedUpdate {
+		return append(errorList, field.Forbidden(field.NewPath("status"), apimachineryvalidation.UninitializedStatusUpdateErrorMsg))
+	}
 	// TODO: merge valid fields after update
 	return validation.ValidatePodStatusUpdate(obj.(*api.Pod), old.(*api.Pod))
 }
 
 // GetAttrs returns labels and fields of a given object for filtering purposes.
-func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
+func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
 	pod, ok := obj.(*api.Pod)
 	if !ok {
-		return nil, nil, fmt.Errorf("not a pod")
+		return nil, nil, false, fmt.Errorf("not a pod")
 	}
-	return labels.Set(pod.ObjectMeta.Labels), PodToSelectableFields(pod), nil
+	return labels.Set(pod.ObjectMeta.Labels), PodToSelectableFields(pod), pod.Initializers != nil, nil
 }
 
 // MatchPod returns a generic matcher for a given label and field selector.
@@ -192,10 +237,12 @@ func PodToSelectableFields(pod *api.Pod) fields.Set {
 	// amount of allocations needed to create the fields.Set. If you add any
 	// field here or the number of object-meta related fields changes, this should
 	// be adjusted.
-	podSpecificFieldsSet := make(fields.Set, 5)
+	podSpecificFieldsSet := make(fields.Set, 7)
 	podSpecificFieldsSet["spec.nodeName"] = pod.Spec.NodeName
 	podSpecificFieldsSet["spec.restartPolicy"] = string(pod.Spec.RestartPolicy)
+	podSpecificFieldsSet["spec.schedulerName"] = string(pod.Spec.SchedulerName)
 	podSpecificFieldsSet["status.phase"] = string(pod.Status.Phase)
+	podSpecificFieldsSet["status.podIP"] = string(pod.Status.PodIP)
 	return generic.AddObjectMetaFieldsSet(podSpecificFieldsSet, &pod.ObjectMeta, true)
 }
 

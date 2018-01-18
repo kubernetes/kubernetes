@@ -23,16 +23,14 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/client-go/tools/clientcmd/api/latest"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 	"k8s.io/kubernetes/pkg/printers"
-	"k8s.io/kubernetes/pkg/util/i18n"
 )
 
 type ViewOptions struct {
@@ -57,7 +55,7 @@ var (
 		kubectl config view -o jsonpath='{.users[?(@.name == "e2e")].user.password}'`)
 )
 
-func NewCmdConfigView(out, errOut io.Writer, ConfigAccess clientcmd.ConfigAccess) *cobra.Command {
+func NewCmdConfigView(f cmdutil.Factory, out, errOut io.Writer, ConfigAccess clientcmd.ConfigAccess) *cobra.Command {
 	options := &ViewOptions{ConfigAccess: ConfigAccess}
 	// Default to yaml
 	defaultOutputFormat := "yaml"
@@ -81,7 +79,8 @@ func NewCmdConfigView(out, errOut io.Writer, ConfigAccess clientcmd.ConfigAccess
 				cmd.Flags().Set("output", defaultOutputFormat)
 			}
 
-			printer, _, err := cmdutil.PrinterForCommand(cmd, meta.NewDefaultRESTMapper(nil, nil), latest.Scheme, []runtime.Decoder{latest.Codec})
+			printOpts := cmdutil.ExtractCmdPrintOptions(cmd, false)
+			printer, err := f.PrinterForOptions(printOpts)
 			cmdutil.CheckErr(err)
 			printer = printers.NewVersionedPrinter(printer, latest.Scheme, latest.ExternalVersion)
 
@@ -93,11 +92,11 @@ func NewCmdConfigView(out, errOut io.Writer, ConfigAccess clientcmd.ConfigAccess
 	cmd.Flags().Set("output", defaultOutputFormat)
 
 	options.Merge.Default(true)
-	f := cmd.Flags().VarPF(&options.Merge, "merge", "", "merge the full hierarchy of kubeconfig files")
-	f.NoOptDefVal = "true"
-	cmd.Flags().BoolVar(&options.RawByteData, "raw", false, "display raw byte data")
-	cmd.Flags().BoolVar(&options.Flatten, "flatten", false, "flatten the resulting kubeconfig file into self-contained output (useful for creating portable kubeconfig files)")
-	cmd.Flags().BoolVar(&options.Minify, "minify", false, "remove all information not used by current-context from the output")
+	mergeFlag := cmd.Flags().VarPF(&options.Merge, "merge", "", "Merge the full hierarchy of kubeconfig files")
+	mergeFlag.NoOptDefVal = "true"
+	cmd.Flags().BoolVar(&options.RawByteData, "raw", false, "Display raw byte data")
+	cmd.Flags().BoolVar(&options.Flatten, "flatten", false, "Flatten the resulting kubeconfig file into self-contained output (useful for creating portable kubeconfig files)")
+	cmd.Flags().BoolVar(&options.Minify, "minify", false, "Remove all information not used by current-context from the output")
 	return cmd
 }
 

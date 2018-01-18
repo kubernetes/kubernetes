@@ -20,14 +20,15 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"path/filepath"
 	"strings"
 	"time"
 
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	clientset "k8s.io/client-go/kubernetes"
 )
 
 func EtcdUpgrade(target_storage, target_version string) error {
@@ -42,9 +43,11 @@ func EtcdUpgrade(target_storage, target_version string) error {
 func MasterUpgrade(v string) error {
 	switch TestContext.Provider {
 	case "gce":
-		return masterUpgradeGCE(v)
+		return masterUpgradeGCE(v, false)
 	case "gke":
 		return masterUpgradeGKE(v)
+	case "kubernetes-anywhere":
+		return masterUpgradeKubernetesAnywhere(v)
 	default:
 		return fmt.Errorf("MasterUpgrade() is not implemented for provider %s", TestContext.Provider)
 	}
@@ -55,20 +58,30 @@ func etcdUpgradeGCE(target_storage, target_version string) error {
 		os.Environ(),
 		"TEST_ETCD_VERSION="+target_version,
 		"STORAGE_BACKEND="+target_storage,
-		"TEST_ETCD_IMAGE=3.0.17")
+		"TEST_ETCD_IMAGE=3.1.10")
 
 	_, _, err := RunCmdEnv(env, gceUpgradeScript(), "-l", "-M")
 	return err
 }
 
-func masterUpgradeGCE(rawV string) error {
-	env := os.Environ()
+// TODO(mrhohn): Remove this function when kube-proxy is run as a DaemonSet by default.
+func MasterUpgradeGCEWithKubeProxyDaemonSet(v string, enableKubeProxyDaemonSet bool) error {
+	return masterUpgradeGCE(v, enableKubeProxyDaemonSet)
+}
+
+// TODO(mrhohn): Remove 'enableKubeProxyDaemonSet' when kube-proxy is run as a DaemonSet by default.
+func masterUpgradeGCE(rawV string, enableKubeProxyDaemonSet bool) error {
+	env := append(os.Environ(), fmt.Sprintf("KUBE_PROXY_DAEMONSET=%v", enableKubeProxyDaemonSet))
 	// TODO: Remove these variables when they're no longer needed for downgrades.
 	if TestContext.EtcdUpgradeVersion != "" && TestContext.EtcdUpgradeStorage != "" {
 		env = append(env,
 			"TEST_ETCD_VERSION="+TestContext.EtcdUpgradeVersion,
 			"STORAGE_BACKEND="+TestContext.EtcdUpgradeStorage,
-			"TEST_ETCD_IMAGE=3.0.17")
+			"TEST_ETCD_IMAGE=3.1.10")
+	} else {
+		// In e2e tests, we skip the confirmation prompt about
+		// implicit etcd upgrades to simulate the user entering "y".
+		env = append(env, "TEST_ALLOW_IMPLICIT_ETCD_UPGRADE=true")
 	}
 
 	v := "v" + rawV
@@ -96,12 +109,49 @@ func masterUpgradeGKE(v string) error {
 	return nil
 }
 
+func masterUpgradeKubernetesAnywhere(v string) error {
+	Logf("Upgrading master to %q", v)
+
+	kaPath := TestContext.KubernetesAnywherePath
+	originalConfigPath := filepath.Join(kaPath, ".config")
+	backupConfigPath := filepath.Join(kaPath, ".config.bak")
+	updatedConfigPath := filepath.Join(kaPath, fmt.Sprintf(".config-%s", v))
+
+	// modify config with specified k8s version
+	if _, _, err := RunCmd("sed",
+		"-i.bak", // writes original to .config.bak
+		fmt.Sprintf(`s/kubernetes_version=.*$/kubernetes_version=%q/`, v),
+		originalConfigPath); err != nil {
+		return err
+	}
+
+	defer func() {
+		// revert .config.bak to .config
+		if err := os.Rename(backupConfigPath, originalConfigPath); err != nil {
+			Logf("Could not rename %s back to %s", backupConfigPath, originalConfigPath)
+		}
+	}()
+
+	// invoke ka upgrade
+	if _, _, err := RunCmd("make", "-C", TestContext.KubernetesAnywherePath,
+		"WAIT_FOR_KUBECONFIG=y", "upgrade-master"); err != nil {
+		return err
+	}
+
+	// move .config to .config.<version>
+	if err := os.Rename(originalConfigPath, updatedConfigPath); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func NodeUpgrade(f *Framework, v string, img string) error {
 	// Perform the upgrade.
 	var err error
 	switch TestContext.Provider {
 	case "gce":
-		err = nodeUpgradeGCE(v, img)
+		err = nodeUpgradeGCE(v, img, false)
 	case "gke":
 		err = nodeUpgradeGKE(v, img)
 	default:
@@ -122,14 +172,30 @@ func NodeUpgrade(f *Framework, v string, img string) error {
 	return nil
 }
 
-func nodeUpgradeGCE(rawV, img string) error {
+// TODO(mrhohn): Remove this function when kube-proxy is run as a DaemonSet by default.
+func NodeUpgradeGCEWithKubeProxyDaemonSet(f *Framework, v string, img string, enableKubeProxyDaemonSet bool) error {
+	// Perform the upgrade.
+	if err := nodeUpgradeGCE(v, img, enableKubeProxyDaemonSet); err != nil {
+		return err
+	}
+	// Wait for it to complete and validate nodes are healthy.
+	Logf("Waiting up to %v for all nodes to be ready after the upgrade", RestartNodeReadyAgainTimeout)
+	if _, err := CheckNodesReady(f.ClientSet, RestartNodeReadyAgainTimeout, TestContext.CloudConfig.NumNodes); err != nil {
+		return err
+	}
+	return nil
+}
+
+// TODO(mrhohn): Remove 'enableKubeProxyDaemonSet' when kube-proxy is run as a DaemonSet by default.
+func nodeUpgradeGCE(rawV, img string, enableKubeProxyDaemonSet bool) error {
 	v := "v" + rawV
+	env := append(os.Environ(), fmt.Sprintf("KUBE_PROXY_DAEMONSET=%v", enableKubeProxyDaemonSet))
 	if img != "" {
-		env := append(os.Environ(), "KUBE_NODE_OS_DISTRIBUTION="+img)
+		env = append(env, "KUBE_NODE_OS_DISTRIBUTION="+img)
 		_, _, err := RunCmdEnv(env, gceUpgradeScript(), "-N", "-o", v)
 		return err
 	}
-	_, _, err := RunCmd(gceUpgradeScript(), "-N", v)
+	_, _, err := RunCmdEnv(env, gceUpgradeScript(), "-N", v)
 	return err
 }
 
@@ -171,7 +237,7 @@ func CheckNodesReady(c clientset.Interface, nt time.Duration, expect int) ([]str
 		// A rolling-update (GCE/GKE implementation of restart) can complete before the apiserver
 		// knows about all of the nodes. Thus, we retry the list nodes call
 		// until we get the expected number of nodes.
-		nodeList, errLast = c.Core().Nodes().List(metav1.ListOptions{
+		nodeList, errLast = c.CoreV1().Nodes().List(metav1.ListOptions{
 			FieldSelector: fields.Set{"spec.unschedulable": "false"}.AsSelector().String()})
 		if errLast != nil {
 			return false, nil
@@ -264,7 +330,7 @@ func gceUpgradeScript() string {
 func waitForSSHTunnels() {
 	Logf("Waiting for SSH tunnels to establish")
 	RunKubectl("run", "ssh-tunnel-test",
-		"--image=gcr.io/google_containers/busybox:1.24",
+		"--image=busybox",
 		"--restart=Never",
 		"--command", "--",
 		"echo", "Hello")

@@ -15,12 +15,11 @@ new_file_0660
 new_file_0666
 new_file_0777
 pods_per_node
-pods_per_node
 test_args
-up_to
 up_to
 upgrade_args
 valid_flag
 retry_time
 file_content_in_loop
 break_on_expected_content
+Premium_LRS

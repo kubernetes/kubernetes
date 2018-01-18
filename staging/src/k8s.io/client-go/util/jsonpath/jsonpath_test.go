@@ -27,10 +27,11 @@ import (
 )
 
 type jsonpathTest struct {
-	name     string
-	template string
-	input    interface{}
-	expect   string
+	name        string
+	template    string
+	input       interface{}
+	expect      string
+	expectError bool
 }
 
 func testJSONPath(tests []jsonpathTest, allowMissingKeys bool, t *testing.T) {
@@ -43,7 +44,12 @@ func testJSONPath(tests []jsonpathTest, allowMissingKeys bool, t *testing.T) {
 		}
 		buf := new(bytes.Buffer)
 		err = j.Execute(buf, test.input)
-		if err != nil {
+		if test.expectError {
+			if test.expectError && err == nil {
+				t.Errorf("in %s, expected execute error", test.name)
+			}
+			continue
+		} else if err != nil {
 			t.Errorf("in %s, execute error %v", test.name, err)
 		}
 		out := buf.String()
@@ -151,40 +157,40 @@ func TestStructInput(t *testing.T) {
 	}
 
 	storeTests := []jsonpathTest{
-		{"plain", "hello jsonpath", nil, "hello jsonpath"},
-		{"recursive", "{..}", []int{1, 2, 3}, "[1 2 3]"},
-		{"filter", "{[?(@<5)]}", []int{2, 6, 3, 7}, "2 3"},
-		{"quote", `{"{"}`, nil, "{"},
-		{"union", "{[1,3,4]}", []int{0, 1, 2, 3, 4}, "1 3 4"},
-		{"array", "{[0:2]}", []string{"Monday", "Tudesday"}, "Monday Tudesday"},
-		{"variable", "hello {.Name}", storeData, "hello jsonpath"},
-		{"dict/", "{$.Labels.web/html}", storeData, "15"},
-		{"dict/", "{$.Employees.jason}", storeData, "manager"},
-		{"dict/", "{$.Employees.dan}", storeData, "clerk"},
-		{"dict-", "{.Labels.k8s-app}", storeData, "20"},
-		{"nest", "{.Bicycle[*].Color}", storeData, "red green"},
-		{"allarray", "{.Book[*].Author}", storeData, "Nigel Rees Evelyn Waugh Herman Melville"},
-		{"allfileds", "{.Bicycle.*}", storeData, "{red 19.95 true} {green 20.01 false}"},
-		{"recurfileds", "{..Price}", storeData, "8.95 12.99 8.99 19.95 20.01"},
+		{"plain", "hello jsonpath", nil, "hello jsonpath", false},
+		{"recursive", "{..}", []int{1, 2, 3}, "[1 2 3]", false},
+		{"filter", "{[?(@<5)]}", []int{2, 6, 3, 7}, "2 3", false},
+		{"quote", `{"{"}`, nil, "{", false},
+		{"union", "{[1,3,4]}", []int{0, 1, 2, 3, 4}, "1 3 4", false},
+		{"array", "{[0:2]}", []string{"Monday", "Tudesday"}, "Monday Tudesday", false},
+		{"variable", "hello {.Name}", storeData, "hello jsonpath", false},
+		{"dict/", "{$.Labels.web/html}", storeData, "15", false},
+		{"dict/", "{$.Employees.jason}", storeData, "manager", false},
+		{"dict/", "{$.Employees.dan}", storeData, "clerk", false},
+		{"dict-", "{.Labels.k8s-app}", storeData, "20", false},
+		{"nest", "{.Bicycle[*].Color}", storeData, "red green", false},
+		{"allarray", "{.Book[*].Author}", storeData, "Nigel Rees Evelyn Waugh Herman Melville", false},
+		{"allfileds", "{.Bicycle.*}", storeData, "{red 19.95 true} {green 20.01 false}", false},
+		{"recurfileds", "{..Price}", storeData, "8.95 12.99 8.99 19.95 20.01", false},
 		{"lastarray", "{.Book[-1:]}", storeData,
-			"{Category: fiction, Author: Herman Melville, Title: Moby Dick, Price: 8.99}"},
+			"{Category: fiction, Author: Herman Melville, Title: Moby Dick, Price: 8.99}", false},
 		{"recurarray", "{..Book[2]}", storeData,
-			"{Category: fiction, Author: Herman Melville, Title: Moby Dick, Price: 8.99}"},
-		{"bool", "{.Bicycle[?(@.IsNew==true)]}", storeData, "{red 19.95 true}"},
+			"{Category: fiction, Author: Herman Melville, Title: Moby Dick, Price: 8.99}", false},
+		{"bool", "{.Bicycle[?(@.IsNew==true)]}", storeData, "{red 19.95 true}", false},
 	}
 	testJSONPath(storeTests, false, t)
 
 	missingKeyTests := []jsonpathTest{
-		{"nonexistent field", "{.hello}", storeData, ""},
+		{"nonexistent field", "{.hello}", storeData, "", false},
 	}
 	testJSONPath(missingKeyTests, true, t)
 
 	failStoreTests := []jsonpathTest{
-		{"invalid identifier", "{hello}", storeData, "unrecognized identifier hello"},
-		{"nonexistent field", "{.hello}", storeData, "hello is not found"},
-		{"invalid array", "{.Labels[0]}", storeData, "map[string]int is not array or slice"},
-		{"invalid filter operator", "{.Book[?(@.Price<>10)]}", storeData, "unrecognized filter operator <>"},
-		{"redundent end", "{range .Labels.*}{@}{end}{end}", storeData, "not in range, nothing to end"},
+		{"invalid identifier", "{hello}", storeData, "unrecognized identifier hello", false},
+		{"nonexistent field", "{.hello}", storeData, "hello is not found", false},
+		{"invalid array", "{.Labels[0]}", storeData, "map[string]int is not array or slice", false},
+		{"invalid filter operator", "{.Book[?(@.Price<>10)]}", storeData, "unrecognized filter operator <>", false},
+		{"redundent end", "{range .Labels.*}{@}{end}{end}", storeData, "not in range, nothing to end", false},
 	}
 	testFailJSONPath(failStoreTests, t)
 }
@@ -204,8 +210,8 @@ func TestJSONInput(t *testing.T) {
 		t.Error(err)
 	}
 	pointsTests := []jsonpathTest{
-		{"exists filter", "{[?(@.z)].id}", pointsData, "i2 i5"},
-		{"bracket key", "{[0]['id']}", pointsData, "i1"},
+		{"exists filter", "{[?(@.z)].id}", pointsData, "i2 i5", false},
+		{"bracket key", "{[0]['id']}", pointsData, "i1", false},
 	}
 	testJSONPath(pointsTests, false, t)
 }
@@ -265,26 +271,101 @@ func TestKubernetes(t *testing.T) {
 	}
 
 	nodesTests := []jsonpathTest{
-		{"range item", `{range .items[*]}{.metadata.name}, {end}{.kind}`, nodesData, "127.0.0.1, 127.0.0.2, List"},
-		{"range item with quote", `{range .items[*]}{.metadata.name}{"\t"}{end}`, nodesData, "127.0.0.1\t127.0.0.2\t"},
+		{"range item", `{range .items[*]}{.metadata.name}, {end}{.kind}`, nodesData, "127.0.0.1, 127.0.0.2, List", false},
+		{"range item with quote", `{range .items[*]}{.metadata.name}{"\t"}{end}`, nodesData, "127.0.0.1\t127.0.0.2\t", false},
 		{"range addresss", `{.items[*].status.addresses[*].address}`, nodesData,
-			"127.0.0.1 127.0.0.2 127.0.0.3"},
+			"127.0.0.1 127.0.0.2 127.0.0.3", false},
 		{"double range", `{range .items[*]}{range .status.addresses[*]}{.address}, {end}{end}`, nodesData,
-			"127.0.0.1, 127.0.0.2, 127.0.0.3, "},
-		{"item name", `{.items[*].metadata.name}`, nodesData, "127.0.0.1 127.0.0.2"},
+			"127.0.0.1, 127.0.0.2, 127.0.0.3, ", false},
+		{"item name", `{.items[*].metadata.name}`, nodesData, "127.0.0.1 127.0.0.2", false},
 		{"union nodes capacity", `{.items[*]['metadata.name', 'status.capacity']}`, nodesData,
-			"127.0.0.1 127.0.0.2 map[cpu:4] map[cpu:8]"},
+			"127.0.0.1 127.0.0.2 map[cpu:4] map[cpu:8]", false},
 		{"range nodes capacity", `{range .items[*]}[{.metadata.name}, {.status.capacity}] {end}`, nodesData,
-			"[127.0.0.1, map[cpu:4]] [127.0.0.2, map[cpu:8]] "},
-		{"user password", `{.users[?(@.name=="e2e")].user.password}`, &nodesData, "secret"},
-		{"hostname", `{.items[0].metadata.labels.kubernetes\.io/hostname}`, &nodesData, "127.0.0.1"},
-		{"hostname filter", `{.items[?(@.metadata.labels.kubernetes\.io/hostname=="127.0.0.1")].kind}`, &nodesData, "None"},
-		{"bool item", `{.items[?(@..ready==true)].metadata.name}`, &nodesData, "127.0.0.1"},
+			"[127.0.0.1, map[cpu:4]] [127.0.0.2, map[cpu:8]] ", false},
+		{"user password", `{.users[?(@.name=="e2e")].user.password}`, &nodesData, "secret", false},
+		{"hostname", `{.items[0].metadata.labels.kubernetes\.io/hostname}`, &nodesData, "127.0.0.1", false},
+		{"hostname filter", `{.items[?(@.metadata.labels.kubernetes\.io/hostname=="127.0.0.1")].kind}`, &nodesData, "None", false},
+		{"bool item", `{.items[?(@..ready==true)].metadata.name}`, &nodesData, "127.0.0.1", false},
 	}
 	testJSONPath(nodesTests, false, t)
 
 	randomPrintOrderTests := []jsonpathTest{
-		{"recursive name", "{..name}", nodesData, `127.0.0.1 127.0.0.2 myself e2e`},
+		{"recursive name", "{..name}", nodesData, `127.0.0.1 127.0.0.2 myself e2e`, false},
 	}
 	testJSONPathSortOutput(randomPrintOrderTests, t)
+}
+
+func TestFilterPartialMatchesSometimesMissingAnnotations(t *testing.T) {
+	// for https://issues.k8s.io/45546
+	var input = []byte(`{
+		"kind": "List",
+		"items": [
+			{
+				"kind": "Pod",
+				"metadata": {
+					"name": "pod1",
+					"annotations": {
+						"color": "blue"
+					}
+				}
+			},
+			{
+				"kind": "Pod",
+				"metadata": {
+					"name": "pod2"
+				}
+			},
+			{
+				"kind": "Pod",
+				"metadata": {
+					"name": "pod3",
+					"annotations": {
+						"color": "green"
+					}
+				}
+			},
+			{
+				"kind": "Pod",
+				"metadata": {
+					"name": "pod4",
+					"annotations": {
+						"color": "blue"
+					}
+				}
+			}
+		]
+	}`)
+	var data interface{}
+	err := json.Unmarshal(input, &data)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	testJSONPath(
+		[]jsonpathTest{
+			{
+				"filter, should only match a subset, some items don't have annotations, tolerate missing items",
+				`{.items[?(@.metadata.annotations.color=="blue")].metadata.name}`,
+				data,
+				"pod1 pod4",
+				false, // expect no error
+			},
+		},
+		true, // allow missing keys
+		t,
+	)
+
+	testJSONPath(
+		[]jsonpathTest{
+			{
+				"filter, should only match a subset, some items don't have annotations, error on missing items",
+				`{.items[?(@.metadata.annotations.color=="blue")].metadata.name}`,
+				data,
+				"",
+				true, // expect an error
+			},
+		},
+		false, // don't allow missing keys
+		t,
+	)
 }

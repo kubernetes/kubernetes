@@ -7,21 +7,24 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"syscall"
 
 	"github.com/opencontainers/runc/libcontainer/configs"
 	libseccomp "github.com/seccomp/libseccomp-golang"
+
+	"golang.org/x/sys/unix"
 )
 
 var (
 	actAllow = libseccomp.ActAllow
 	actTrap  = libseccomp.ActTrap
 	actKill  = libseccomp.ActKill
-	actTrace = libseccomp.ActTrace.SetReturnCode(int16(syscall.EPERM))
-	actErrno = libseccomp.ActErrno.SetReturnCode(int16(syscall.EPERM))
+	actTrace = libseccomp.ActTrace.SetReturnCode(int16(unix.EPERM))
+	actErrno = libseccomp.ActErrno.SetReturnCode(int16(unix.EPERM))
+)
 
-	// SeccompModeFilter refers to the syscall argument SECCOMP_MODE_FILTER.
-	SeccompModeFilter = uintptr(2)
+const (
+	// Linux system calls can have at most 6 arguments
+	syscallMaxArguments int = 6
 )
 
 // Filters given syscalls in a container, preventing them from being used
@@ -47,11 +50,11 @@ func InitSeccomp(config *configs.Seccomp) error {
 	for _, arch := range config.Architectures {
 		scmpArch, err := libseccomp.GetArchFromString(arch)
 		if err != nil {
-			return err
+			return fmt.Errorf("error validating Seccomp architecture: %s", err)
 		}
 
 		if err := filter.AddArch(scmpArch); err != nil {
-			return err
+			return fmt.Errorf("error adding architecture to seccomp filter: %s", err)
 		}
 	}
 
@@ -84,9 +87,9 @@ func IsEnabled() bool {
 	s, err := parseStatusFile("/proc/self/status")
 	if err != nil {
 		// Check if Seccomp is supported, via CONFIG_SECCOMP.
-		if _, _, err := syscall.RawSyscall(syscall.SYS_PRCTL, syscall.PR_GET_SECCOMP, 0, 0); err != syscall.EINVAL {
+		if err := unix.Prctl(unix.PR_GET_SECCOMP, 0, 0, 0, 0); err != unix.EINVAL {
 			// Make sure the kernel has CONFIG_SECCOMP_FILTER.
-			if _, _, err := syscall.RawSyscall(syscall.SYS_PRCTL, syscall.PR_SET_SECCOMP, SeccompModeFilter, 0); err != syscall.EINVAL {
+			if err := unix.Prctl(unix.PR_SET_SECCOMP, unix.SECCOMP_MODE_FILTER, 0, 0, 0); err != unix.EINVAL {
 				return true
 			}
 		}
@@ -172,29 +175,55 @@ func matchCall(filter *libseccomp.ScmpFilter, call *configs.Syscall) error {
 	// Convert the call's action to the libseccomp equivalent
 	callAct, err := getAction(call.Action)
 	if err != nil {
-		return err
+		return fmt.Errorf("action in seccomp profile is invalid: %s", err)
 	}
 
 	// Unconditional match - just add the rule
 	if len(call.Args) == 0 {
 		if err = filter.AddRule(callNum, callAct); err != nil {
-			return err
+			return fmt.Errorf("error adding seccomp filter rule for syscall %s: %s", call.Name, err)
 		}
 	} else {
-		// Conditional match - convert the per-arg rules into library format
+		// If two or more arguments have the same condition,
+		// Revert to old behavior, adding each condition as a separate rule
+		argCounts := make([]uint, syscallMaxArguments)
 		conditions := []libseccomp.ScmpCondition{}
 
 		for _, cond := range call.Args {
 			newCond, err := getCondition(cond)
 			if err != nil {
-				return err
+				return fmt.Errorf("error creating seccomp syscall condition for syscall %s: %s", call.Name, err)
 			}
+
+			argCounts[cond.Index] += 1
 
 			conditions = append(conditions, newCond)
 		}
 
-		if err = filter.AddRuleConditional(callNum, callAct, conditions); err != nil {
-			return err
+		hasMultipleArgs := false
+		for _, count := range argCounts {
+			if count > 1 {
+				hasMultipleArgs = true
+				break
+			}
+		}
+
+		if hasMultipleArgs {
+			// Revert to old behavior
+			// Add each condition attached to a separate rule
+			for _, cond := range conditions {
+				condArr := []libseccomp.ScmpCondition{cond}
+
+				if err = filter.AddRuleConditional(callNum, callAct, condArr); err != nil {
+					return fmt.Errorf("error adding seccomp rule for syscall %s: %s", call.Name, err)
+				}
+			}
+		} else {
+			// No conditions share same argument
+			// Use new, proper behavior
+			if err = filter.AddRuleConditional(callNum, callAct, conditions); err != nil {
+				return fmt.Errorf("error adding seccomp rule for syscall %s: %s", call.Name, err)
+			}
 		}
 	}
 
@@ -212,10 +241,6 @@ func parseStatusFile(path string) (map[string]string, error) {
 	status := make(map[string]string)
 
 	for s.Scan() {
-		if err := s.Err(); err != nil {
-			return nil, err
-		}
-
 		text := s.Text()
 		parts := strings.Split(text, ":")
 
@@ -225,5 +250,9 @@ func parseStatusFile(path string) (map[string]string, error) {
 
 		status[parts[0]] = parts[1]
 	}
+	if err := s.Err(); err != nil {
+		return nil, err
+	}
+
 	return status, nil
 }

@@ -23,16 +23,21 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage"
 	storeerr "k8s.io/apiserver/pkg/storage/errors"
-	"k8s.io/kubernetes/pkg/api"
+	appsv1beta1 "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
+	appsv1beta2 "k8s.io/kubernetes/pkg/apis/apps/v1beta2"
+	"k8s.io/kubernetes/pkg/apis/autoscaling"
+	autoscalingv1 "k8s.io/kubernetes/pkg/apis/autoscaling/v1"
+	autoscalingvalidation "k8s.io/kubernetes/pkg/apis/autoscaling/validation"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	extensionsv1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	extvalidation "k8s.io/kubernetes/pkg/apis/extensions/validation"
-	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/registry/extensions/deployment"
 )
 
@@ -58,30 +63,28 @@ func NewStorage(optsGetter generic.RESTOptionsGetter) DeploymentStorage {
 
 type REST struct {
 	*genericregistry.Store
+	categories []string
 }
 
 // NewREST returns a RESTStorage object that will work against deployments.
 func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, *RollbackREST) {
 	store := &genericregistry.Store{
-		Copier:            api.Scheme,
-		NewFunc:           func() runtime.Object { return &extensions.Deployment{} },
-		NewListFunc:       func() runtime.Object { return &extensions.DeploymentList{} },
-		PredicateFunc:     deployment.MatchDeployment,
-		QualifiedResource: extensions.Resource("deployments"),
-		WatchCacheSize:    cachesize.GetWatchCacheSizeByResource("deployments"),
+		NewFunc:                  func() runtime.Object { return &extensions.Deployment{} },
+		NewListFunc:              func() runtime.Object { return &extensions.DeploymentList{} },
+		DefaultQualifiedResource: extensions.Resource("deployments"),
 
 		CreateStrategy: deployment.Strategy,
 		UpdateStrategy: deployment.Strategy,
 		DeleteStrategy: deployment.Strategy,
 	}
-	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: deployment.GetAttrs}
+	options := &generic.StoreOptions{RESTOptions: optsGetter}
 	if err := store.CompleteWithOptions(options); err != nil {
 		panic(err) // TODO: Propagate error up
 	}
 
 	statusStore := *store
 	statusStore.UpdateStrategy = deployment.StatusStrategy
-	return &REST{store}, &StatusREST{store: &statusStore}, &RollbackREST{store: store}
+	return &REST{store, []string{"all"}}, &StatusREST{store: &statusStore}, &RollbackREST{store: store}
 }
 
 // Implement ShortNamesProvider
@@ -90,6 +93,19 @@ var _ rest.ShortNamesProvider = &REST{}
 // ShortNames implements the ShortNamesProvider interface. Returns a list of short names for a resource.
 func (r *REST) ShortNames() []string {
 	return []string{"deploy"}
+}
+
+// Implement CategoriesProvider
+var _ rest.CategoriesProvider = &REST{}
+
+// Categories implements the CategoriesProvider interface. Returns a list of categories a resource is part of.
+func (r *REST) Categories() []string {
+	return r.categories
+}
+
+func (r *REST) WithCategories(categories []string) *REST {
+	r.categories = categories
+	return r
 }
 
 // StatusREST implements the REST endpoint for changing the status of a deployment
@@ -107,8 +123,8 @@ func (r *StatusREST) Get(ctx genericapirequest.Context, name string, options *me
 }
 
 // Update alters the status subset of an object.
-func (r *StatusREST) Update(ctx genericapirequest.Context, name string, objInfo rest.UpdatedObjectInfo) (runtime.Object, bool, error) {
-	return r.store.Update(ctx, name, objInfo)
+func (r *StatusREST) Update(ctx genericapirequest.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (runtime.Object, bool, error) {
+	return r.store.Update(ctx, name, objInfo, createValidation, updateValidation)
 }
 
 // RollbackREST implements the REST endpoint for initiating the rollback of a deployment
@@ -123,7 +139,7 @@ func (r *RollbackREST) New() runtime.Object {
 
 var _ = rest.Creater(&RollbackREST{})
 
-func (r *RollbackREST) Create(ctx genericapirequest.Context, obj runtime.Object) (runtime.Object, error) {
+func (r *RollbackREST) Create(ctx genericapirequest.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, includeUninitialized bool) (runtime.Object, error) {
 	rollback, ok := obj.(*extensions.DeploymentRollback)
 	if !ok {
 		return nil, errors.NewBadRequest(fmt.Sprintf("not a DeploymentRollback: %#v", obj))
@@ -139,6 +155,7 @@ func (r *RollbackREST) Create(ctx genericapirequest.Context, obj runtime.Object)
 		return nil, err
 	}
 	return &metav1.Status{
+		Status:  metav1.StatusSuccess,
 		Message: fmt.Sprintf("rollback request for deployment %q succeeded", rollback.Name),
 		Code:    http.StatusOK,
 	}, nil
@@ -186,10 +203,24 @@ type ScaleREST struct {
 
 // ScaleREST implements Patcher
 var _ = rest.Patcher(&ScaleREST{})
+var _ = rest.GroupVersionKindProvider(&ScaleREST{})
+
+func (r *ScaleREST) GroupVersionKind(containingGV schema.GroupVersion) schema.GroupVersionKind {
+	switch containingGV {
+	case extensionsv1beta1.SchemeGroupVersion:
+		return extensionsv1beta1.SchemeGroupVersion.WithKind("Scale")
+	case appsv1beta1.SchemeGroupVersion:
+		return appsv1beta1.SchemeGroupVersion.WithKind("Scale")
+	case appsv1beta2.SchemeGroupVersion:
+		return appsv1beta2.SchemeGroupVersion.WithKind("Scale")
+	default:
+		return autoscalingv1.SchemeGroupVersion.WithKind("Scale")
+	}
+}
 
 // New creates a new Scale object
 func (r *ScaleREST) New() runtime.Object {
-	return &extensions.Scale{}
+	return &autoscaling.Scale{}
 }
 
 func (r *ScaleREST) Get(ctx genericapirequest.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
@@ -204,7 +235,7 @@ func (r *ScaleREST) Get(ctx genericapirequest.Context, name string, options *met
 	return scale, nil
 }
 
-func (r *ScaleREST) Update(ctx genericapirequest.Context, name string, objInfo rest.UpdatedObjectInfo) (runtime.Object, bool, error) {
+func (r *ScaleREST) Update(ctx genericapirequest.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (runtime.Object, bool, error) {
 	deployment, err := r.registry.GetDeployment(ctx, name, &metav1.GetOptions{})
 	if err != nil {
 		return nil, false, errors.NewNotFound(extensions.Resource("deployments/scale"), name)
@@ -222,18 +253,18 @@ func (r *ScaleREST) Update(ctx genericapirequest.Context, name string, objInfo r
 	if obj == nil {
 		return nil, false, errors.NewBadRequest(fmt.Sprintf("nil update passed to Scale"))
 	}
-	scale, ok := obj.(*extensions.Scale)
+	scale, ok := obj.(*autoscaling.Scale)
 	if !ok {
 		return nil, false, errors.NewBadRequest(fmt.Sprintf("expected input object type to be Scale, but %T", obj))
 	}
 
-	if errs := extvalidation.ValidateScale(scale); len(errs) > 0 {
+	if errs := autoscalingvalidation.ValidateScale(scale); len(errs) > 0 {
 		return nil, false, errors.NewInvalid(extensions.Kind("Scale"), name, errs)
 	}
 
 	deployment.Spec.Replicas = scale.Spec.Replicas
 	deployment.ResourceVersion = scale.ResourceVersion
-	deployment, err = r.registry.UpdateDeployment(ctx, deployment)
+	deployment, err = r.registry.UpdateDeployment(ctx, deployment, createValidation, updateValidation)
 	if err != nil {
 		return nil, false, err
 	}
@@ -245,8 +276,12 @@ func (r *ScaleREST) Update(ctx genericapirequest.Context, name string, objInfo r
 }
 
 // scaleFromDeployment returns a scale subresource for a deployment.
-func scaleFromDeployment(deployment *extensions.Deployment) (*extensions.Scale, error) {
-	return &extensions.Scale{
+func scaleFromDeployment(deployment *extensions.Deployment) (*autoscaling.Scale, error) {
+	selector, err := metav1.LabelSelectorAsSelector(deployment.Spec.Selector)
+	if err != nil {
+		return nil, err
+	}
+	return &autoscaling.Scale{
 		// TODO: Create a variant of ObjectMeta type that only contains the fields below.
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              deployment.Name,
@@ -255,12 +290,12 @@ func scaleFromDeployment(deployment *extensions.Deployment) (*extensions.Scale, 
 			ResourceVersion:   deployment.ResourceVersion,
 			CreationTimestamp: deployment.CreationTimestamp,
 		},
-		Spec: extensions.ScaleSpec{
+		Spec: autoscaling.ScaleSpec{
 			Replicas: deployment.Spec.Replicas,
 		},
-		Status: extensions.ScaleStatus{
+		Status: autoscaling.ScaleStatus{
 			Replicas: deployment.Status.Replicas,
-			Selector: deployment.Spec.Selector,
+			Selector: selector.String(),
 		},
 	}, nil
 }

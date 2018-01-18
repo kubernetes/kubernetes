@@ -18,16 +18,12 @@ package gce
 
 import (
 	"net/http"
-	"time"
 
 	compute "google.golang.org/api/compute/v1"
 )
 
 func newTargetProxyMetricContext(request string) *metricContext {
-	return &metricContext{
-		start:      time.Now(),
-		attributes: []string{"targetproxy_" + request, unusedMetricLabel, unusedMetricLabel},
-	}
+	return newGenericMetricContext("targetproxy", request, unusedMetricLabel, unusedMetricLabel, computeV1Version)
 }
 
 // GetTargetHttpProxy returns the UrlMap by name.
@@ -37,22 +33,14 @@ func (gce *GCECloud) GetTargetHttpProxy(name string) (*compute.TargetHttpProxy, 
 	return v, mc.Observe(err)
 }
 
-// CreateTargetHttpProxy creates and returns a TargetHttpProxy with the given UrlMap.
-func (gce *GCECloud) CreateTargetHttpProxy(urlMap *compute.UrlMap, name string) (*compute.TargetHttpProxy, error) {
-	proxy := &compute.TargetHttpProxy{
-		Name:   name,
-		UrlMap: urlMap.SelfLink,
-	}
-
+// CreateTargetHttpProxy creates a TargetHttpProxy
+func (gce *GCECloud) CreateTargetHttpProxy(proxy *compute.TargetHttpProxy) error {
 	mc := newTargetProxyMetricContext("create")
 	op, err := gce.service.TargetHttpProxies.Insert(gce.projectID, proxy).Do()
 	if err != nil {
-		return nil, mc.Observe(err)
+		return mc.Observe(err)
 	}
-	if err = gce.waitForGlobalOp(op, mc); err != nil {
-		return nil, err
-	}
-	return gce.GetTargetHttpProxy(name)
+	return gce.waitForGlobalOp(op, mc)
 }
 
 // SetUrlMapForTargetHttpProxy sets the given UrlMap for the given TargetHttpProxy.
@@ -96,22 +84,14 @@ func (gce *GCECloud) GetTargetHttpsProxy(name string) (*compute.TargetHttpsProxy
 	return v, mc.Observe(err)
 }
 
-// CreateTargetHttpsProxy creates and returns a TargetHttpsProxy with the given UrlMap and SslCertificate.
-func (gce *GCECloud) CreateTargetHttpsProxy(urlMap *compute.UrlMap, sslCert *compute.SslCertificate, name string) (*compute.TargetHttpsProxy, error) {
+// CreateTargetHttpsProxy creates a TargetHttpsProxy
+func (gce *GCECloud) CreateTargetHttpsProxy(proxy *compute.TargetHttpsProxy) error {
 	mc := newTargetProxyMetricContext("create")
-	proxy := &compute.TargetHttpsProxy{
-		Name:            name,
-		UrlMap:          urlMap.SelfLink,
-		SslCertificates: []string{sslCert.SelfLink},
-	}
 	op, err := gce.service.TargetHttpsProxies.Insert(gce.projectID, proxy).Do()
 	if err != nil {
-		return nil, mc.Observe(err)
+		return mc.Observe(err)
 	}
-	if err = gce.waitForGlobalOp(op, mc); err != nil {
-		return nil, err
-	}
-	return gce.GetTargetHttpsProxy(name)
+	return gce.waitForGlobalOp(op, mc)
 }
 
 // SetUrlMapForTargetHttpsProxy sets the given UrlMap for the given TargetHttpsProxy.

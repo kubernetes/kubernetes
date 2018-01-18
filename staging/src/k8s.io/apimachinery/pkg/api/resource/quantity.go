@@ -27,9 +27,7 @@ import (
 
 	flag "github.com/spf13/pflag"
 
-	"github.com/go-openapi/spec"
 	inf "gopkg.in/inf.v0"
-	"k8s.io/apimachinery/pkg/openapi"
 )
 
 // Quantity is a fixed-point representation of a number.
@@ -93,6 +91,7 @@ import (
 // +protobuf.embed=string
 // +protobuf.options.marshal=false
 // +protobuf.options.(gogoproto.goproto_stringer)=false
+// +k8s:deepcopy-gen=true
 // +k8s:openapi-gen=true
 type Quantity struct {
 	// i is the quantity in int64 scaled form, if d.Dec == nil
@@ -398,24 +397,22 @@ func (q Quantity) DeepCopy() Quantity {
 	return q
 }
 
-// OpenAPIDefinition returns openAPI definition for this type.
-func (_ Quantity) OpenAPIDefinition() openapi.OpenAPIDefinition {
-	return openapi.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Type:   []string{"string"},
-				Format: "",
-			},
-		},
-	}
-}
+// OpenAPISchemaType is used by the kube-openapi generator when constructing
+// the OpenAPI spec of this type.
+//
+// See: https://github.com/kubernetes/kube-openapi/tree/master/pkg/generators
+func (_ Quantity) OpenAPISchemaType() []string { return []string{"string"} }
+
+// OpenAPISchemaFormat is used by the kube-openapi generator when constructing
+// the OpenAPI spec of this type.
+func (_ Quantity) OpenAPISchemaFormat() string { return "" }
 
 // CanonicalizeBytes returns the canonical form of q and its suffix (see comment on Quantity).
 //
 // Note about BinarySI:
 // * If q.Format is set to BinarySI and q.Amount represents a non-zero value between
 //   -1 and +1, it will be emitted as if q.Format were DecimalSI.
-// * Otherwise, if q.Format is set to BinarySI, frational parts of q.Amount will be
+// * Otherwise, if q.Format is set to BinarySI, fractional parts of q.Amount will be
 //   rounded up. (1.1i becomes 2i.)
 func (q *Quantity) CanonicalizeBytes(out []byte) (result, suffix []byte) {
 	if q.IsZero() {

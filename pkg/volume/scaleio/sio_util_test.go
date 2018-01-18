@@ -23,8 +23,9 @@ import (
 	"reflect"
 	"testing"
 
+	api "k8s.io/api/core/v1"
 	utiltesting "k8s.io/client-go/util/testing"
-	api "k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/volume"
 )
 
 var (
@@ -48,7 +49,7 @@ var (
 		confKey.gateway:          "http://sio/",
 		confKey.volSpecName:      testSioVolName,
 		confKey.volumeName:       "sio-vol",
-		confKey.secretRef:        "sio-secret",
+		confKey.secretName:       "sio-secret",
 		confKey.protectionDomain: "defaultPD",
 		confKey.storagePool:      "deraultSP",
 		confKey.fsType:           "xfs",
@@ -60,7 +61,7 @@ var (
 
 func TestUtilMapVolumeSource(t *testing.T) {
 	data := make(map[string]string)
-	mapVolumeSource(data, vol.VolumeSource.ScaleIO)
+	mapVolumeSpec(data, volume.NewSpecFromVolume(vol))
 	if data[confKey.gateway] != "http://test.scaleio:1111" {
 		t.Error("Unexpected gateway value")
 	}
@@ -79,9 +80,6 @@ func TestUtilMapVolumeSource(t *testing.T) {
 	if data[confKey.fsType] != "ext4" {
 		t.Error("Unexpected fstype value")
 	}
-	if data[confKey.secretRef] != "test-secret" {
-		t.Error("Unexpected secret ref value")
-	}
 	if data[confKey.sslEnabled] != "false" {
 		t.Error("Unexpected sslEnabled value")
 	}
@@ -92,8 +90,8 @@ func TestUtilMapVolumeSource(t *testing.T) {
 
 func TestUtilValidateConfigs(t *testing.T) {
 	data := map[string]string{
-		confKey.secretRef: "sio-secret",
-		confKey.system:    "sio",
+		confKey.secretName: "sio-secret",
+		confKey.system:     "sio",
 	}
 	if err := validateConfigs(data); err != gatewayNotProvidedErr {
 		t.Error("Expecting error for missing gateway, but did not get it")
@@ -105,7 +103,7 @@ func TestUtilApplyConfigDefaults(t *testing.T) {
 		confKey.system:     "sio",
 		confKey.gateway:    "http://sio/",
 		confKey.volumeName: "sio-vol",
-		confKey.secretRef:  "test-secret",
+		confKey.secretName: "test-secret",
 	}
 	applyConfigDefaults(data)
 
@@ -115,10 +113,10 @@ func TestUtilApplyConfigDefaults(t *testing.T) {
 	if data[confKey.system] != "sio" {
 		t.Error("Unexpected system value")
 	}
-	if data[confKey.protectionDomain] != "default" {
+	if data[confKey.protectionDomain] != "" {
 		t.Error("Unexpected protection domain value")
 	}
-	if data[confKey.storagePool] != "default" {
+	if data[confKey.storagePool] != "" {
 		t.Error("Unexpected storage pool value")
 	}
 	if data[confKey.volumeName] != "sio-vol" {
@@ -130,7 +128,7 @@ func TestUtilApplyConfigDefaults(t *testing.T) {
 	if data[confKey.storageMode] != "ThinProvisioned" {
 		t.Error("Unexpected storage mode value")
 	}
-	if data[confKey.secretRef] != "test-secret" {
+	if data[confKey.secretName] != "test-secret" {
 		t.Error("Unexpected secret ref value")
 	}
 	if data[confKey.sslEnabled] != "false" {
@@ -157,7 +155,7 @@ func TestUtilSaveConfig(t *testing.T) {
 	config := path.Join(tmpDir, testConfigFile)
 	data := map[string]string{
 		confKey.gateway:    "https://test-gateway/",
-		confKey.secretRef:  "sio-secret",
+		confKey.secretName: "sio-secret",
 		confKey.sslEnabled: "false",
 	}
 	if err := saveConfig(config, data); err != nil {
@@ -167,6 +165,7 @@ func TestUtilSaveConfig(t *testing.T) {
 	if err != nil {
 		t.Fatal("failed to open conf file: ", file)
 	}
+	defer file.Close()
 	dataRcvd := map[string]string{}
 	if err := gob.NewDecoder(file).Decode(&dataRcvd); err != nil {
 		t.Fatal(err)
@@ -177,7 +176,7 @@ func TestUtilSaveConfig(t *testing.T) {
 }
 
 func TestUtilAttachSecret(t *testing.T) {
-	plugMgr, tmpDir := newPluginMgr(t)
+	plugMgr, tmpDir := newPluginMgr(t, makeScaleIOSecret(testSecret, testns))
 	defer os.RemoveAll(tmpDir)
 
 	plug, err := plugMgr.FindPluginByName(sioPluginName)
@@ -211,10 +210,13 @@ func TestUtilLoadConfig(t *testing.T) {
 	configFile := path.Join(tmpDir, sioConfigFileName)
 
 	if err := saveConfig(configFile, config); err != nil {
-		t.Fatal("failed while saving data", err)
+		t.Fatalf("failed to save configFile %s error:%v", configFile, err)
 	}
 
 	dataRcvd, err := loadConfig(configFile)
+	if err != nil {
+		t.Fatalf("failed to load configFile %s error:%v", configFile, err)
+	}
 	if dataRcvd[confKey.gateway] != config[confKey.gateway] ||
 		dataRcvd[confKey.system] != config[confKey.system] {
 		t.Fatal("loaded config data not matching saved config data")

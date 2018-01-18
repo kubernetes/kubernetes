@@ -164,7 +164,34 @@ func (p *Collector) Retrieve(ctx context.Context, objs []types.ManagedObjectRefe
 		return err
 	}
 
+	if d, ok := dst.(*[]types.ObjectContent); ok {
+		*d = res.Returnval
+		return nil
+	}
+
 	return mo.LoadRetrievePropertiesResponse(res, dst)
+}
+
+// RetrieveWithFilter populates dst as Retrieve does, but only for entities matching the given filter.
+func (p *Collector) RetrieveWithFilter(ctx context.Context, objs []types.ManagedObjectReference, ps []string, dst interface{}, filter Filter) error {
+	if len(filter) == 0 {
+		return p.Retrieve(ctx, objs, ps, dst)
+	}
+
+	var content []types.ObjectContent
+
+	err := p.Retrieve(ctx, objs, filter.Keys(), &content)
+	if err != nil {
+		return err
+	}
+
+	objs = filter.MatchObjectContent(content)
+
+	if len(objs) == 0 {
+		return nil
+	}
+
+	return p.Retrieve(ctx, objs, ps, dst)
 }
 
 // RetrieveOne calls Retrieve with a single managed object reference.

@@ -45,7 +45,7 @@ func NewKubeProxy() *Server {
 	// refactored to use cobra throughout.
 	command.Flags().AddGoFlagSet(flag.CommandLine)
 
-	hks.Run = func(_ *Server, args []string) error {
+	hks.Run = func(_ *Server, args []string, stopCh <-chan struct{}) error {
 		command.SetArgs(args)
 		return command.Execute()
 	}

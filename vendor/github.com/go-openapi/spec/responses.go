@@ -51,7 +51,7 @@ func (r Responses) JSONLookup(token string) (interface{}, error) {
 	}
 	if i, err := strconv.Atoi(token); err == nil {
 		if scr, ok := r.StatusCodeResponses[i]; ok {
-			return &scr, nil
+			return scr, nil
 		}
 	}
 	return nil, fmt.Errorf("object has no field %q", token)

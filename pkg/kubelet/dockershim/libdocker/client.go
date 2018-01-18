@@ -20,15 +20,17 @@ import (
 	"strings"
 	"time"
 
-	dockerapi "github.com/docker/engine-api/client"
-	dockertypes "github.com/docker/engine-api/types"
+	dockertypes "github.com/docker/docker/api/types"
+	dockercontainer "github.com/docker/docker/api/types/container"
+	dockerimagetypes "github.com/docker/docker/api/types/image"
+	dockerapi "github.com/docker/docker/client"
 	"github.com/golang/glog"
 )
 
 const (
 	// https://docs.docker.com/engine/reference/api/docker_remote_api/
-	// docker version should be at least 1.10.x
-	MinimumDockerAPIVersion = "1.22.0"
+	// docker version should be at least 1.11.x
+	MinimumDockerAPIVersion = "1.23.0"
 
 	// Status of a container returned by ListContainers.
 	StatusRunningPrefix = "Up"
@@ -38,31 +40,37 @@ const (
 	// This is only used by GetKubeletDockerContainers(), and should be removed
 	// along with the function.
 	containerNamePrefix = "k8s"
+
+	// Fake docker endpoint
+	FakeDockerEndpoint = "fake://"
 )
 
 // Interface is an abstract interface for testability.  It abstracts the interface of docker client.
 type Interface interface {
 	ListContainers(options dockertypes.ContainerListOptions) ([]dockertypes.Container, error)
 	InspectContainer(id string) (*dockertypes.ContainerJSON, error)
-	CreateContainer(dockertypes.ContainerCreateConfig) (*dockertypes.ContainerCreateResponse, error)
+	InspectContainerWithSize(id string) (*dockertypes.ContainerJSON, error)
+	CreateContainer(dockertypes.ContainerCreateConfig) (*dockercontainer.ContainerCreateCreatedBody, error)
 	StartContainer(id string) error
-	StopContainer(id string, timeout int) error
+	StopContainer(id string, timeout time.Duration) error
+	UpdateContainerResources(id string, updateConfig dockercontainer.UpdateConfig) error
 	RemoveContainer(id string, opts dockertypes.ContainerRemoveOptions) error
 	InspectImageByRef(imageRef string) (*dockertypes.ImageInspect, error)
 	InspectImageByID(imageID string) (*dockertypes.ImageInspect, error)
-	ListImages(opts dockertypes.ImageListOptions) ([]dockertypes.Image, error)
+	ListImages(opts dockertypes.ImageListOptions) ([]dockertypes.ImageSummary, error)
 	PullImage(image string, auth dockertypes.AuthConfig, opts dockertypes.ImagePullOptions) error
-	RemoveImage(image string, opts dockertypes.ImageRemoveOptions) ([]dockertypes.ImageDelete, error)
-	ImageHistory(id string) ([]dockertypes.ImageHistory, error)
+	RemoveImage(image string, opts dockertypes.ImageRemoveOptions) ([]dockertypes.ImageDeleteResponseItem, error)
+	ImageHistory(id string) ([]dockerimagetypes.HistoryResponseItem, error)
 	Logs(string, dockertypes.ContainerLogsOptions, StreamOptions) error
 	Version() (*dockertypes.Version, error)
 	Info() (*dockertypes.Info, error)
-	CreateExec(string, dockertypes.ExecConfig) (*dockertypes.ContainerExecCreateResponse, error)
+	CreateExec(string, dockertypes.ExecConfig) (*dockertypes.IDResponse, error)
 	StartExec(string, dockertypes.ExecStartCheck, StreamOptions) error
 	InspectExec(id string) (*dockertypes.ContainerExecInspect, error)
 	AttachToContainer(string, dockertypes.ContainerAttachOptions, StreamOptions) error
-	ResizeContainerTTY(id string, height, width int) error
-	ResizeExecTTY(id string, height, width int) error
+	ResizeContainerTTY(id string, height, width uint) error
+	ResizeExecTTY(id string, height, width uint) error
+	GetContainerStats(id string) (*dockertypes.StatsJSON, error)
 }
 
 // Get a *dockerapi.Client, either using the endpoint passed in, or using
@@ -81,9 +89,18 @@ func getDockerClient(dockerEndpoint string) (*dockerapi.Client, error) {
 // is the timeout for docker requests. If timeout is exceeded, the request
 // will be cancelled and throw out an error. If requestTimeout is 0, a default
 // value will be applied.
-func ConnectToDockerOrDie(dockerEndpoint string, requestTimeout, imagePullProgressDeadline time.Duration) Interface {
-	if dockerEndpoint == "fake://" {
-		return NewFakeDockerClient()
+func ConnectToDockerOrDie(dockerEndpoint string, requestTimeout, imagePullProgressDeadline time.Duration,
+	withTraceDisabled bool, enableSleep bool) Interface {
+	if dockerEndpoint == FakeDockerEndpoint {
+		fakeClient := NewFakeDockerClient()
+		if withTraceDisabled {
+			fakeClient = fakeClient.WithTraceDisabled()
+		}
+
+		if enableSleep {
+			fakeClient.EnableSleep = true
+		}
+		return fakeClient
 	}
 	client, err := getDockerClient(dockerEndpoint)
 	if err != nil {

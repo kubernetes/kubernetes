@@ -47,6 +47,9 @@ func FindInGoSearchPath(pkg string) string {
 // FullGoSearchPath gets the search paths for finding packages
 func FullGoSearchPath() string {
 	allPaths := os.Getenv(GOPATHKey)
+	if allPaths == "" {
+		allPaths = filepath.Join(os.Getenv("HOME"), "go")
+	}
 	if allPaths != "" {
 		allPaths = strings.Join([]string{allPaths, runtime.GOROOT()}, ":")
 	} else {

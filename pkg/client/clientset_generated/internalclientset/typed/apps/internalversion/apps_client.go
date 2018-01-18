@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2018 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -23,12 +23,17 @@ import (
 
 type AppsInterface interface {
 	RESTClient() rest.Interface
+	ControllerRevisionsGetter
 	StatefulSetsGetter
 }
 
 // AppsClient is used to interact with features provided by the apps group.
 type AppsClient struct {
 	restClient rest.Interface
+}
+
+func (c *AppsClient) ControllerRevisions(namespace string) ControllerRevisionInterface {
+	return newControllerRevisions(c, namespace)
 }
 
 func (c *AppsClient) StatefulSets(namespace string) StatefulSetInterface {

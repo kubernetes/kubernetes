@@ -17,22 +17,23 @@ limitations under the License.
 package flexvolume
 
 import (
-	"path"
 	"time"
 
 	"github.com/golang/glog"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
 type flexVolumeAttacher struct {
-	plugin *flexVolumePlugin
+	plugin *flexVolumeAttachablePlugin
 }
 
 var _ volume.Attacher = &flexVolumeAttacher{}
 
 // Attach is part of the volume.Attacher interface
 func (a *flexVolumeAttacher) Attach(spec *volume.Spec, hostName types.NodeName) (string, error) {
+
 	call := a.plugin.NewDriverCall(attachCmd)
 	call.AppendSpec(spec, a.plugin.host, nil)
 	call.Append(string(hostName))
@@ -47,7 +48,7 @@ func (a *flexVolumeAttacher) Attach(spec *volume.Spec, hostName types.NodeName) 
 }
 
 // WaitForAttach is part of the volume.Attacher interface
-func (a *flexVolumeAttacher) WaitForAttach(spec *volume.Spec, devicePath string, timeout time.Duration) (string, error) {
+func (a *flexVolumeAttacher) WaitForAttach(spec *volume.Spec, devicePath string, _ *v1.Pod, timeout time.Duration) (string, error) {
 	call := a.plugin.NewDriverCallWithTimeout(waitForAttachCmd, timeout)
 	call.Append(devicePath)
 	call.AppendSpec(spec, a.plugin.host, nil)
@@ -63,15 +64,13 @@ func (a *flexVolumeAttacher) WaitForAttach(spec *volume.Spec, devicePath string,
 
 // GetDeviceMountPath is part of the volume.Attacher interface
 func (a *flexVolumeAttacher) GetDeviceMountPath(spec *volume.Spec) (string, error) {
-	mountsDir := path.Join(a.plugin.host.GetPluginDir(flexVolumePluginName), a.plugin.driverName, "mounts")
-
-	return (*attacherDefaults)(a).GetDeviceMountPath(spec, mountsDir)
+	return a.plugin.getDeviceMountPath(spec)
 }
 
 // MountDevice is part of the volume.Attacher interface
 func (a *flexVolumeAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string) error {
 	// Mount only once.
-	alreadyMounted, err := prepareForMount(a.plugin.host.GetMounter(), deviceMountPath)
+	alreadyMounted, err := prepareForMount(a.plugin.host.GetMounter(a.plugin.GetPluginName()), deviceMountPath)
 	if err != nil {
 		return err
 	}
@@ -89,7 +88,7 @@ func (a *flexVolumeAttacher) MountDevice(spec *volume.Spec, devicePath string, d
 		// Devicepath is empty if the plugin does not support attach calls. Ignore mountDevice calls if the
 		// plugin does not implement attach interface.
 		if devicePath != "" {
-			return (*attacherDefaults)(a).MountDevice(spec, devicePath, deviceMountPath, a.plugin.host.GetMounter())
+			return (*attacherDefaults)(a).MountDevice(spec, devicePath, deviceMountPath, a.plugin.host.GetMounter(a.plugin.GetPluginName()))
 		} else {
 			return nil
 		}
@@ -114,6 +113,8 @@ func (a *flexVolumeAttacher) VolumesAreAttached(specs []*volume.Spec, nodeName t
 				volumesAttachedCheck[spec] = false
 				glog.V(2).Infof("VolumesAreAttached: check volume (%q) is no longer attached", spec.Name())
 			}
+		} else {
+			return nil, err
 		}
 	}
 	return volumesAttachedCheck, nil

@@ -15,6 +15,11 @@
       "name": "meteor"
     },
     "sessionAffinity": "ClientIP",
+    "sessionAffinityConfig": {
+      "clientIP": {
+        "timeoutSeconds": 90
+      }
+    },
     "type": "LoadBalancer"
   }
 }

@@ -14,6 +14,14 @@ spec:
     rule: RunAsAny
   volumes:
   - '*'
+  allowedCapabilities:
+  - '*'
+  hostPID: true
+  hostIPC: true
+  hostNetwork: true
+  hostPorts:
+  - min: 1
+    max: 65536
 ---
 apiVersion: extensions/v1beta1
 kind: PodSecurityPolicy
@@ -35,4 +43,7 @@ spec:
   - 'downwardAPI'
   - 'configMap'
   - 'persistentVolumeClaim'
-
+  - 'projected'
+  hostPID: false
+  hostIPC: false
+  hostNetwork: false

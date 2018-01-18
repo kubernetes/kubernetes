@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM gcr.io/google_containers/ubuntu-slim:0.6
+FROM gcr.io/google_containers/ubuntu-slim:0.9
 
 ARG BUILD_DATE
 ARG VCS_REF
@@ -42,12 +42,12 @@ ADD files /
 
 RUN set -e && echo 'debconf debconf/frontend select Noninteractive' | debconf-set-selections \
   && apt-get update && apt-get -qq -y --force-yes install --no-install-recommends \
-	openjdk-8-jre-headless \
-	libjemalloc1 \
-	localepurge \
-	wget && \
+    openjdk-8-jre-headless \
+    libjemalloc1 \
+    localepurge \
+    wget && \
   mirror_url=$( wget -q -O - http://www.apache.org/dyn/closer.cgi/cassandra/ \
-        | sed -n 's#.*href="\(http://ftp.[^"]*\)".*#\1#p' \
+        | sed -n 's#.*href="\(http://.*/cassandra\/[^"]*\)".*#\1#p' \
         | head -n 1 \
     ) \
     && wget -q -O - ${mirror_url}/${CASSANDRA_VERSION}/apache-cassandra-${CASSANDRA_VERSION}-bin.tar.gz \
@@ -64,7 +64,7 @@ RUN set -e && echo 'debconf debconf/frontend select Noninteractive' | debconf-se
     && chown cassandra: /ready-probe.sh \
     && if [ -n "$DEV_CONTAINER" ]; then apt-get -y --no-install-recommends install python; else rm -rf  $CASSANDRA_HOME/pylib; fi \
     && apt-get -y purge wget localepurge \
-    && apt-get autoremove \
+    && apt-get -y autoremove \
     && apt-get clean \
     && rm -rf \
         $CASSANDRA_HOME/*.txt \
@@ -73,12 +73,12 @@ RUN set -e && echo 'debconf debconf/frontend select Noninteractive' | debconf-se
         $CASSANDRA_HOME/tools/*.yaml \
         $CASSANDRA_HOME/tools/bin/*.bat \
         $CASSANDRA_HOME/bin/*.bat \
-	doc \
-	man \
-	info \
-	locale \
-	common-licenses \
-	~/.bashrc \
+    doc \
+    man \
+    info \
+    locale \
+    common-licenses \
+    ~/.bashrc \
         /var/lib/apt/lists/* \
         /var/log/* \
         /var/cache/debconf/* \
@@ -116,7 +116,8 @@ RUN set -e && echo 'debconf debconf/frontend select Noninteractive' | debconf-se
         /usr/lib/jvm/java-8-openjdk-amd64/jre/lib/ext/nashorn.jar \
         /usr/lib/jvm/java-8-openjdk-amd64/jre/lib/oblique-fonts \
         /usr/lib/jvm/java-8-openjdk-amd64/jre/lib/plugin.jar \
-	/usr/lib/jvm/java-8-openjdk-amd64/man
+        /usr/lib/jvm/java-8-openjdk-amd64/man
+
 
 VOLUME ["/$CASSANDRA_DATA"]
 

@@ -1,3 +1,5 @@
+syntax = "proto2";
+
 message criu_page_server_info {
 	optional string		address	= 1;
 	optional int32		port	= 2;
@@ -15,6 +17,12 @@ message ext_mount_map {
 	required string		val	= 2;
 };
 
+message join_namespace {
+	required string		ns		= 1;
+	required string		ns_file		= 2;
+	optional string		extra_opt	= 3;
+}
+
 message inherit_fd {
 	required string		key	= 1;
 	required int32		fd	= 2;
@@ -31,7 +39,7 @@ message unix_sk {
 
 enum criu_cg_mode {
 	IGNORE	= 0;
-	NONE	= 1;
+	CG_NONE	= 1;
 	PROPS	= 2;
 	SOFT	= 3;
 	FULL	= 4;
@@ -63,13 +71,13 @@ message criu_opts {
 
 	optional int32			work_dir_fd	= 17;
 	optional bool			link_remap	= 18;
-	repeated criu_veth_pair		veths		= 19;
+	repeated criu_veth_pair		veths		= 19; /* DEPRECATED, use external instead */
 
 	optional uint32			cpu_cap		= 20 [default = 0xffffffff];
 	optional bool			force_irmap	= 21;
 	repeated string			exec_cmd	= 22;
 
-	repeated ext_mount_map		ext_mnt		= 23;
+	repeated ext_mount_map		ext_mnt		= 23; /* DEPRECATED, use external instead */
 	optional bool			manage_cgroups	= 24; /* backward compatibility */
 	repeated cgroup_root		cg_root		= 25;
 
@@ -83,14 +91,26 @@ message criu_opts {
 	repeated string			skip_mnt	= 31;
 	repeated string			enable_fs	= 32;
 
-	repeated unix_sk                unix_sk_ino     = 33;
+	repeated unix_sk                unix_sk_ino     = 33; /* DEPRECATED, use external instead */
 
 	optional criu_cg_mode		manage_cgroups_mode = 34;
 	optional uint32			ghost_limit	= 35 [default = 0x100000];
 	repeated string			irmap_scan_paths = 36;
 	repeated string			external	= 37;
 	optional uint32			empty_ns	= 38;
-	optional bool			no_seccomp	= 39;
+	repeated join_namespace		join_ns		= 39;
+
+	optional string			cgroup_props		= 41;
+	optional string			cgroup_props_file	= 42;
+	repeated string			cgroup_dump_controller	= 43;
+
+	optional string			freeze_cgroup		= 44;
+	optional uint32			timeout			= 45;
+	optional bool			tcp_skip_in_flight	= 46;
+	optional bool			weak_sysctls		= 47;
+	optional bool			lazy_pages		= 48;
+	optional int32			status_fd		= 49;
+	optional bool			orphan_pts_master	= 50;
 }
 
 message criu_dump_resp {
@@ -120,6 +140,8 @@ enum criu_req_type {
 	CPUINFO_CHECK	= 8;
 
 	FEATURE_CHECK	= 9;
+
+	VERSION		= 10;
 }
 
 /*
@@ -128,6 +150,7 @@ enum criu_req_type {
  */
 message criu_features {
 	optional bool			mem_track	= 1;
+	optional bool			lazy_pages	= 2;
 }
 
 /*
@@ -171,4 +194,16 @@ message criu_resp {
 
 	optional int32			cr_errno	= 7;
 	optional criu_features		features	= 8;
+	optional string			cr_errmsg	= 9;
+	optional criu_version		version		= 10;
+}
+
+/* Answer for criu_req_type.VERSION requests */
+message criu_version {
+	required int32			major		= 1;
+	required int32			minor		= 2;
+	optional string			gitid		= 3;
+	optional int32			sublevel	= 4;
+	optional int32			extra		= 5;
+	optional string			name		= 6;
 }

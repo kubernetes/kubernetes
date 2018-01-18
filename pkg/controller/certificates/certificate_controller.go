@@ -14,40 +14,30 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// Package certificates implements an abstract controller that is useful for
+// building controllers that manage CSRs
 package certificates
 
 import (
 	"fmt"
 	"time"
 
+	certificates "k8s.io/api/certificates/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/kubernetes/scheme"
+	certificatesinformers "k8s.io/client-go/informers/certificates/v1beta1"
+	clientset "k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
+	certificateslisters "k8s.io/client-go/listers/certificates/v1beta1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
-	certificates "k8s.io/kubernetes/pkg/apis/certificates/v1beta1"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	certificatesinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions/certificates/v1beta1"
-	certificateslisters "k8s.io/kubernetes/pkg/client/listers/certificates/v1beta1"
 	"k8s.io/kubernetes/pkg/controller"
 
 	"github.com/golang/glog"
+	"github.com/juju/ratelimit"
 )
-
-// err returned from these interfaces should indicate utter failure that
-// should be retried. "Buisness logic" errors should be indicated by adding
-// a condition to the CSRs status, not by returning an error.
-
-type AutoApprover interface {
-	AutoApprove(csr *certificates.CertificateSigningRequest) (*certificates.CertificateSigningRequest, error)
-}
-
-type Signer interface {
-	Sign(csr *certificates.CertificateSigningRequest) (*certificates.CertificateSigningRequest, error)
-}
 
 type CertificateController struct {
 	kubeClient clientset.Interface
@@ -55,25 +45,29 @@ type CertificateController struct {
 	csrLister  certificateslisters.CertificateSigningRequestLister
 	csrsSynced cache.InformerSynced
 
-	syncHandler func(csrKey string) error
-
-	approver AutoApprover
-	signer   Signer
+	handler func(*certificates.CertificateSigningRequest) error
 
 	queue workqueue.RateLimitingInterface
 }
 
-func NewCertificateController(kubeClient clientset.Interface, csrInformer certificatesinformers.CertificateSigningRequestInformer, signer Signer, approver AutoApprover) (*CertificateController, error) {
+func NewCertificateController(
+	kubeClient clientset.Interface,
+	csrInformer certificatesinformers.CertificateSigningRequestInformer,
+	handler func(*certificates.CertificateSigningRequest) error,
+) *CertificateController {
 	// Send events to the apiserver
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
-	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(kubeClient.Core().RESTClient()).Events("")})
+	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(kubeClient.CoreV1().RESTClient()).Events("")})
 
 	cc := &CertificateController{
 		kubeClient: kubeClient,
-		queue:      workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "certificate"),
-		signer:     signer,
-		approver:   approver,
+		queue: workqueue.NewNamedRateLimitingQueue(workqueue.NewMaxOfRateLimiter(
+			workqueue.NewItemExponentialFailureRateLimiter(200*time.Millisecond, 1000*time.Second),
+			// 10 qps, 100 bucket size.  This is only for retry speed and its only the overall factor (not per item)
+			&workqueue.BucketRateLimiter{Bucket: ratelimit.NewBucketWithRate(float64(10), int64(100))},
+		), "certificate"),
+		handler: handler,
 	}
 
 	// Manage the addition/update of certificate requests
@@ -108,8 +102,7 @@ func NewCertificateController(kubeClient clientset.Interface, csrInformer certif
 	})
 	cc.csrLister = csrInformer.Lister()
 	cc.csrsSynced = csrInformer.Informer().HasSynced
-	cc.syncHandler = cc.maybeSignCertificate
-	return cc, nil
+	return cc
 }
 
 // Run the main goroutine responsible for watching and syncing jobs.
@@ -145,15 +138,19 @@ func (cc *CertificateController) processNextWorkItem() bool {
 	}
 	defer cc.queue.Done(cKey)
 
-	err := cc.syncHandler(cKey.(string))
-	if err == nil {
-		cc.queue.Forget(cKey)
+	if err := cc.syncFunc(cKey.(string)); err != nil {
+		cc.queue.AddRateLimited(cKey)
+		if _, ignorable := err.(ignorableError); !ignorable {
+			utilruntime.HandleError(fmt.Errorf("Sync %v failed with : %v", cKey, err))
+		} else {
+			glog.V(4).Infof("Sync %v failed with : %v", cKey, err)
+		}
 		return true
 	}
 
-	cc.queue.AddRateLimited(cKey)
-	utilruntime.HandleError(fmt.Errorf("Sync %v failed with : %v", cKey, err))
+	cc.queue.Forget(cKey)
 	return true
+
 }
 
 func (cc *CertificateController) enqueueCertificateRequest(obj interface{}) {
@@ -169,7 +166,7 @@ func (cc *CertificateController) enqueueCertificateRequest(obj interface{}) {
 // been approved and meets policy expectations, generate an X509 cert using the
 // cluster CA assets. If successful it will update the CSR approve subresource
 // with the signed certificate.
-func (cc *CertificateController) maybeSignCertificate(key string) error {
+func (cc *CertificateController) syncFunc(key string) error {
 	startTime := time.Now()
 	defer func() {
 		glog.V(4).Infof("Finished syncing certificate request %q (%v)", key, time.Now().Sub(startTime))
@@ -189,38 +186,21 @@ func (cc *CertificateController) maybeSignCertificate(key string) error {
 	}
 
 	// need to operate on a copy so we don't mutate the csr in the shared cache
-	copy, err := scheme.Scheme.DeepCopy(csr)
-	if err != nil {
-		return err
-	}
-	csr = copy.(*certificates.CertificateSigningRequest)
+	csr = csr.DeepCopy()
 
-	if cc.approver != nil {
-		csr, err = cc.approver.AutoApprove(csr)
-		if err != nil {
-			return fmt.Errorf("error auto approving csr: %v", err)
-		}
-		_, err = cc.kubeClient.Certificates().CertificateSigningRequests().UpdateApproval(csr)
-		if err != nil {
-			return fmt.Errorf("error updating approval for csr: %v", err)
-		}
-	}
+	return cc.handler(csr)
+}
 
-	// At this point, the controller needs to:
-	// 1. Check the approval conditions
-	// 2. Generate a signed certificate
-	// 3. Update the Status subresource
+// IgnorableError returns an error that we shouldn't handle (i.e. log) because
+// it's spammy and usually user error. Instead we will log these errors at a
+// higher log level. We still need to throw these errors to signal that the
+// sync should be retried.
+func IgnorableError(s string, args ...interface{}) ignorableError {
+	return ignorableError(fmt.Sprintf(s, args...))
+}
 
-	if cc.signer != nil && IsCertificateRequestApproved(csr) {
-		csr, err := cc.signer.Sign(csr)
-		if err != nil {
-			return fmt.Errorf("error auto signing csr: %v", err)
-		}
-		_, err = cc.kubeClient.Certificates().CertificateSigningRequests().UpdateStatus(csr)
-		if err != nil {
-			return fmt.Errorf("error updating signature for csr: %v", err)
-		}
-	}
+type ignorableError string
 
-	return nil
+func (e ignorableError) Error() string {
+	return string(e)
 }

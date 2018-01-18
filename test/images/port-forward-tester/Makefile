@@ -12,19 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-TAG = 1.2
-PREFIX = gcr.io/google_containers
+SRCS=portforwardtester
+ARCH ?= amd64
+TARGET ?= $(CURDIR)
+GOLANG_VERSION ?= latest
+SRC_DIR = $(notdir $(shell pwd))
+export
 
-all: push
+bin:
+	../image-util.sh bin $(SRCS)
 
-portforwardtester: portforwardtester.go
-	CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags '-w' ./portforwardtester.go
-
-image: portforwardtester
-	docker build --pull -t $(PREFIX)/portforwardtester:$(TAG) .
-
-push: image
-	gcloud docker -- push $(PREFIX)/portforwardtester:$(TAG)
-
-clean:
-	rm -f portforwardtester
+.PHONY: bin

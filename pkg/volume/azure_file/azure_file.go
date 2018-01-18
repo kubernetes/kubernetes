@@ -19,19 +19,22 @@ package azure_file
 import (
 	"fmt"
 	"os"
+	"runtime"
 
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/util/mount"
 	kstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/cloudprovider"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/azure"
 	"k8s.io/kubernetes/pkg/volume/util"
 )
 
-// This is the primary entrypoint for volume plugins.
+// ProbeVolumePlugins is the primary endpoint for volume plugins
 func ProbeVolumePlugins() []volume.VolumePlugin {
 	return []volume.VolumePlugin{&azureFilePlugin{nil}}
 }
@@ -61,12 +64,12 @@ func (plugin *azureFilePlugin) GetPluginName() string {
 }
 
 func (plugin *azureFilePlugin) GetVolumeName(spec *volume.Spec) (string, error) {
-	volumeSource, _, err := getVolumeSource(spec)
+	share, _, err := getVolumeSource(spec)
 	if err != nil {
 		return "", err
 	}
 
-	return volumeSource.ShareName, nil
+	return share, nil
 }
 
 func (plugin *azureFilePlugin) CanSupport(spec *volume.Spec) bool {
@@ -96,15 +99,15 @@ func (plugin *azureFilePlugin) GetAccessModes() []v1.PersistentVolumeAccessMode 
 }
 
 func (plugin *azureFilePlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ volume.VolumeOptions) (volume.Mounter, error) {
-	return plugin.newMounterInternal(spec, pod, &azureSvc{}, plugin.host.GetMounter())
+	return plugin.newMounterInternal(spec, pod, &azureSvc{}, plugin.host.GetMounter(plugin.GetPluginName()))
 }
 
 func (plugin *azureFilePlugin) newMounterInternal(spec *volume.Spec, pod *v1.Pod, util azureUtil, mounter mount.Interface) (volume.Mounter, error) {
-	source, readOnly, err := getVolumeSource(spec)
+	share, readOnly, err := getVolumeSource(spec)
 	if err != nil {
 		return nil, err
 	}
-
+	secretName, secretNamespace, err := getSecretNameAndNamespace(spec, pod.Namespace)
 	return &azureFileMounter{
 		azureFile: &azureFile{
 			volName:         spec.Name(),
@@ -113,16 +116,17 @@ func (plugin *azureFilePlugin) newMounterInternal(spec *volume.Spec, pod *v1.Pod
 			plugin:          plugin,
 			MetricsProvider: volume.NewMetricsStatFS(getPath(pod.UID, spec.Name(), plugin.host)),
 		},
-		util:         util,
-		secretName:   source.SecretName,
-		shareName:    source.ShareName,
-		readOnly:     readOnly,
-		mountOptions: volume.MountOptionFromSpec(spec),
+		util:            util,
+		secretNamespace: secretNamespace,
+		secretName:      secretName,
+		shareName:       share,
+		readOnly:        readOnly,
+		mountOptions:    volume.MountOptionFromSpec(spec),
 	}, nil
 }
 
 func (plugin *azureFilePlugin) NewUnmounter(volName string, podUID types.UID) (volume.Unmounter, error) {
-	return plugin.newUnmounterInternal(volName, podUID, plugin.host.GetMounter())
+	return plugin.newUnmounterInternal(volName, podUID, plugin.host.GetMounter(plugin.GetPluginName()))
 }
 
 func (plugin *azureFilePlugin) newUnmounterInternal(volName string, podUID types.UID, mounter mount.Interface) (volume.Unmounter, error) {
@@ -164,11 +168,12 @@ func (azureFileVolume *azureFile) GetPath() string {
 
 type azureFileMounter struct {
 	*azureFile
-	util         azureUtil
-	secretName   string
-	shareName    string
-	readOnly     bool
-	mountOptions []string
+	util            azureUtil
+	secretName      string
+	secretNamespace string
+	shareName       string
+	readOnly        bool
+	mountOptions    []string
 }
 
 var _ volume.Mounter = &azureFileMounter{}
@@ -189,11 +194,11 @@ func (b *azureFileMounter) CanMount() error {
 }
 
 // SetUp attaches the disk and bind mounts to the volume path.
-func (b *azureFileMounter) SetUp(fsGroup *types.UnixGroupID) error {
+func (b *azureFileMounter) SetUp(fsGroup *int64) error {
 	return b.SetUpAt(b.GetPath(), fsGroup)
 }
 
-func (b *azureFileMounter) SetUpAt(dir string, fsGroup *types.UnixGroupID) error {
+func (b *azureFileMounter) SetUpAt(dir string, fsGroup *int64) error {
 	notMnt, err := b.mounter.IsLikelyNotMountPoint(dir)
 	glog.V(4).Infof("AzureFile mount set up: %s %v %v", dir, !notMnt, err)
 	if err != nil && !os.IsNotExist(err) {
@@ -203,17 +208,28 @@ func (b *azureFileMounter) SetUpAt(dir string, fsGroup *types.UnixGroupID) error
 		return nil
 	}
 	var accountKey, accountName string
-	if accountName, accountKey, err = b.util.GetAzureCredentials(b.plugin.host, b.pod.Namespace, b.secretName); err != nil {
+	if accountName, accountKey, err = b.util.GetAzureCredentials(b.plugin.host, b.secretNamespace, b.secretName); err != nil {
 		return err
 	}
-	os.MkdirAll(dir, 0750)
-	source := fmt.Sprintf("//%s.file.core.windows.net/%s", accountName, b.shareName)
-	// parameters suggested by https://azure.microsoft.com/en-us/documentation/articles/storage-how-to-use-files-linux/
-	options := []string{fmt.Sprintf("vers=3.0,username=%s,password=%s,dir_mode=0777,file_mode=0777", accountName, accountKey)}
-	if b.readOnly {
-		options = append(options, "ro")
+
+	mountOptions := []string{}
+	source := ""
+	osSeparator := string(os.PathSeparator)
+	source = fmt.Sprintf("%s%s%s.file.%s%s%s", osSeparator, osSeparator, accountName, getStorageEndpointSuffix(b.plugin.host.GetCloudProvider()), osSeparator, b.shareName)
+
+	if runtime.GOOS == "windows" {
+		mountOptions = []string{fmt.Sprintf("AZURE\\%s", accountName), accountKey}
+	} else {
+		os.MkdirAll(dir, 0700)
+		// parameters suggested by https://azure.microsoft.com/en-us/documentation/articles/storage-how-to-use-files-linux/
+		options := []string{fmt.Sprintf("username=%s,password=%s", accountName, accountKey)}
+		if b.readOnly {
+			options = append(options, "ro")
+		}
+		mountOptions = volume.JoinMountOptions(b.mountOptions, options)
+		mountOptions = appendDefaultMountOptions(mountOptions, fsGroup)
 	}
-	mountOptions := volume.JoinMountOptions(b.mountOptions, options)
+
 	err = b.mounter.Mount(source, dir, "cifs", mountOptions)
 	if err != nil {
 		notMnt, mntErr := b.mounter.IsLikelyNotMountPoint(dir)
@@ -257,14 +273,60 @@ func (c *azureFileUnmounter) TearDownAt(dir string) error {
 	return util.UnmountPath(dir, c.mounter)
 }
 
-func getVolumeSource(
-	spec *volume.Spec) (*v1.AzureFileVolumeSource, bool, error) {
+func getVolumeSource(spec *volume.Spec) (string, bool, error) {
 	if spec.Volume != nil && spec.Volume.AzureFile != nil {
-		return spec.Volume.AzureFile, spec.Volume.AzureFile.ReadOnly, nil
+		share := spec.Volume.AzureFile.ShareName
+		readOnly := spec.Volume.AzureFile.ReadOnly
+		return share, readOnly, nil
 	} else if spec.PersistentVolume != nil &&
 		spec.PersistentVolume.Spec.AzureFile != nil {
-		return spec.PersistentVolume.Spec.AzureFile, spec.ReadOnly, nil
+		share := spec.PersistentVolume.Spec.AzureFile.ShareName
+		readOnly := spec.ReadOnly
+		return share, readOnly, nil
+	}
+	return "", false, fmt.Errorf("Spec does not reference an AzureFile volume type")
+}
+
+func getSecretNameAndNamespace(spec *volume.Spec, defaultNamespace string) (string, string, error) {
+	secretName := ""
+	secretNamespace := ""
+	if spec.Volume != nil && spec.Volume.AzureFile != nil {
+		secretName = spec.Volume.AzureFile.SecretName
+		secretNamespace = defaultNamespace
+
+	} else if spec.PersistentVolume != nil &&
+		spec.PersistentVolume.Spec.AzureFile != nil {
+		secretNamespace = defaultNamespace
+		if spec.PersistentVolume.Spec.AzureFile.SecretNamespace != nil {
+			secretNamespace = *spec.PersistentVolume.Spec.AzureFile.SecretNamespace
+		}
+		secretName = spec.PersistentVolume.Spec.AzureFile.SecretName
+	} else {
+		return "", "", fmt.Errorf("Spec does not reference an AzureFile volume type")
 	}
 
-	return nil, false, fmt.Errorf("Spec does not reference an AzureFile volume type")
+	if len(secretNamespace) == 0 {
+		return "", "", fmt.Errorf("invalid Azure volume: nil namespace")
+	}
+	return secretName, secretNamespace, nil
+
+}
+
+func getAzureCloud(cloudProvider cloudprovider.Interface) (*azure.Cloud, error) {
+	azure, ok := cloudProvider.(*azure.Cloud)
+	if !ok || azure == nil {
+		return nil, fmt.Errorf("Failed to get Azure Cloud Provider. GetCloudProvider returned %v instead", cloudProvider)
+	}
+
+	return azure, nil
+}
+
+func getStorageEndpointSuffix(cloudprovider cloudprovider.Interface) string {
+	const publicCloudStorageEndpointSuffix = "core.windows.net"
+	azure, err := getAzureCloud(cloudprovider)
+	if err != nil {
+		glog.Warningf("No Azure cloud provider found. Using the Azure public cloud endpoint: %s", publicCloudStorageEndpointSuffix)
+		return publicCloudStorageEndpointSuffix
+	}
+	return azure.Environment.StorageEndpointSuffix
 }

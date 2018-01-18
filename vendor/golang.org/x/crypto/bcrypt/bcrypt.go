@@ -12,9 +12,10 @@ import (
 	"crypto/subtle"
 	"errors"
 	"fmt"
-	"golang.org/x/crypto/blowfish"
 	"io"
 	"strconv"
+
+	"golang.org/x/crypto/blowfish"
 )
 
 const (
@@ -205,7 +206,6 @@ func bcrypt(password []byte, cost int, salt []byte) ([]byte, error) {
 }
 
 func expensiveBlowfishSetup(key []byte, cost uint32, salt []byte) (*blowfish.Cipher, error) {
-
 	csalt, err := base64Decode(salt)
 	if err != nil {
 		return nil, err
@@ -213,7 +213,8 @@ func expensiveBlowfishSetup(key []byte, cost uint32, salt []byte) (*blowfish.Cip
 
 	// Bug compatibility with C bcrypt implementations. They use the trailing
 	// NULL in the key string during expansion.
-	ckey := append(key, 0)
+	// We copy the key to prevent changing the underlying array.
+	ckey := append(key[:len(key):len(key)], 0)
 
 	c, err := blowfish.NewSaltedCipher(ckey, csalt)
 	if err != nil {

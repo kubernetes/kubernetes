@@ -52,7 +52,7 @@ type Decoder struct {
 }
 
 // Bytes converts the given encoded bytes to UTF-8. It returns the converted
-// bytes or 0, err if any error occurred.
+// bytes or nil, err if any error occurred.
 func (d *Decoder) Bytes(b []byte) ([]byte, error) {
 	b, _, err := transform.Bytes(d, b)
 	if err != nil {
@@ -62,7 +62,7 @@ func (d *Decoder) Bytes(b []byte) ([]byte, error) {
 }
 
 // String converts the given encoded string to UTF-8. It returns the converted
-// string or 0, err if any error occurred.
+// string or "", err if any error occurred.
 func (d *Decoder) String(s string) (string, error) {
 	s, _, err := transform.String(d, s)
 	if err != nil {
@@ -95,7 +95,7 @@ type Encoder struct {
 	_ struct{}
 }
 
-// Bytes converts bytes from UTF-8. It returns the converted bytes or 0, err if
+// Bytes converts bytes from UTF-8. It returns the converted bytes or nil, err if
 // any error occurred.
 func (e *Encoder) Bytes(b []byte) ([]byte, error) {
 	b, _, err := transform.Bytes(e, b)
@@ -106,7 +106,7 @@ func (e *Encoder) Bytes(b []byte) ([]byte, error) {
 }
 
 // String converts a string from UTF-8. It returns the converted string or
-// 0, err if any error occurred.
+// "", err if any error occurred.
 func (e *Encoder) String(s string) (string, error) {
 	s, _, err := transform.String(e, s)
 	if err != nil {

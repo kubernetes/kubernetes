@@ -22,16 +22,16 @@ import (
 	"sync"
 	"time"
 
+	"k8s.io/api/core/v1"
 	storageetcd "k8s.io/apiserver/pkg/storage/etcd"
-	"k8s.io/kubernetes/pkg/api/v1"
+	clientset "k8s.io/client-go/kubernetes"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/kubelet/util"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/client-go/util/clock"
 )
 
 const (
@@ -64,7 +64,7 @@ func NewSimpleSecretManager(kubeClient clientset.Interface) Manager {
 }
 
 func (s *simpleSecretManager) GetSecret(namespace, name string) (*v1.Secret, error) {
-	return s.kubeClient.Core().Secrets(namespace).Get(name, metav1.GetOptions{})
+	return s.kubeClient.CoreV1().Secrets(namespace).Get(name, metav1.GetOptions{})
 }
 
 func (s *simpleSecretManager) RegisterPod(pod *v1.Pod) {
@@ -216,7 +216,7 @@ func (s *secretStore) Get(namespace, name string) (*v1.Secret, error) {
 			// etcd and apiserver (the cache is eventually consistent).
 			util.FromApiserverCache(&opts)
 		}
-		secret, err := s.kubeClient.Core().Secrets(namespace).Get(name, opts)
+		secret, err := s.kubeClient.CoreV1().Secrets(namespace).Get(name, opts)
 		if err != nil && !apierrors.IsNotFound(err) && data.secret == nil && data.err == nil {
 			// Couldn't fetch the latest secret, but there is no cached data to return.
 			// Return the fetch result instead.
@@ -282,6 +282,11 @@ func (c *cachingSecretManager) RegisterPod(pod *v1.Pod) {
 	c.registeredPods[key] = pod
 	if prev != nil {
 		for name := range getSecretNames(prev) {
+			// On an update, the .Add() call above will have re-incremented the
+			// ref count of any existing secrets, so any secrets that are in both
+			// names and prev need to have their ref counts decremented. Any that
+			// are only in prev need to be completely removed. This unconditional
+			// call takes care of both cases.
 			c.secretStore.Delete(prev.Namespace, name)
 		}
 	}

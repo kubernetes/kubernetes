@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package install installs the certificates API group, making it available as
+// Package install installs the example API group, making it available as
 // an option to all of the API encoding/decoding machinery.
 package install
 
@@ -32,7 +32,6 @@ func Install(groupFactoryRegistry announced.APIGroupFactoryRegistry, registry *r
 		&announced.GroupMetaFactoryArgs{
 			GroupName:                  example.GroupName,
 			VersionPreferenceOrder:     []string{examplev1.SchemeGroupVersion.Version},
-			ImportPrefix:               "k8s.io/apiserver/pkg/apis/example",
 			AddInternalObjectsToScheme: example.AddToScheme,
 		},
 		announced.VersionToSchemeFunc{

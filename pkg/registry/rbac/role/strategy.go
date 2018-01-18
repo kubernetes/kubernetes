@@ -17,17 +17,12 @@ limitations under the License.
 package role
 
 import (
-	"fmt"
-
-	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
-	apistorage "k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/apis/rbac/validation"
 )
@@ -40,7 +35,7 @@ type strategy struct {
 
 // strategy is the default logic that applies when creating and updating
 // Role objects.
-var Strategy = strategy{api.Scheme, names.SimpleNameGenerator}
+var Strategy = strategy{legacyscheme.Scheme, names.SimpleNameGenerator}
 
 // Strategy should implement rest.RESTCreateStrategy
 var _ rest.RESTCreateStrategy = Strategy
@@ -97,31 +92,4 @@ func (strategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.O
 // object.
 func (strategy) AllowUnconditionalUpdate() bool {
 	return true
-}
-
-func (s strategy) Export(ctx genericapirequest.Context, obj runtime.Object, exact bool) error {
-	return nil
-}
-
-// GetAttrs returns labels and fields of a given object for filtering purposes.
-func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
-	role, ok := obj.(*rbac.Role)
-	if !ok {
-		return nil, nil, fmt.Errorf("not a Role")
-	}
-	return labels.Set(role.Labels), SelectableFields(role), nil
-}
-
-// Matcher returns a generic matcher for a given label and field selector.
-func Matcher(label labels.Selector, field fields.Selector) apistorage.SelectionPredicate {
-	return apistorage.SelectionPredicate{
-		Label:    label,
-		Field:    field,
-		GetAttrs: GetAttrs,
-	}
-}
-
-// SelectableFields returns a field set that can be used for filter selection
-func SelectableFields(obj *rbac.Role) fields.Set {
-	return nil
 }

@@ -24,10 +24,10 @@ import (
 	"strings"
 
 	"github.com/golang/glog"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
-	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/kubelet/qos"
+	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 )
 
 const (
@@ -66,7 +66,7 @@ func (m *podContainerManagerImpl) Exists(pod *v1.Pod) bool {
 
 // EnsureExists takes a pod as argument and makes sure that
 // pod cgroup exists if qos cgroup hierarchy flag is enabled.
-// If the pod level container doesen't already exist it is created.
+// If the pod level container doesn't already exist it is created.
 func (m *podContainerManagerImpl) EnsureExists(pod *v1.Pod) error {
 	podContainerName, _ := m.GetPodContainerName(pod)
 	// check if container already exist
@@ -91,9 +91,9 @@ func (m *podContainerManagerImpl) EnsureExists(pod *v1.Pod) error {
 	return nil
 }
 
-// GetPodContainerName returns the CgroupName identifer, and its literal cgroupfs form on the host.
+// GetPodContainerName returns the CgroupName identifier, and its literal cgroupfs form on the host.
 func (m *podContainerManagerImpl) GetPodContainerName(pod *v1.Pod) (CgroupName, string) {
-	podQOS := qos.GetPodQOS(pod)
+	podQOS := v1qos.GetPodQOS(pod)
 	// Get the parent QOS container name
 	var parentContainer string
 	switch podQOS {
@@ -104,7 +104,7 @@ func (m *podContainerManagerImpl) GetPodContainerName(pod *v1.Pod) (CgroupName, 
 	case v1.PodQOSBestEffort:
 		parentContainer = m.qosContainersInfo.BestEffort
 	}
-	podContainer := podCgroupNamePrefix + string(pod.UID)
+	podContainer := GetPodCgroupNameSuffix(pod.UID)
 
 	// Get the absolute path of the cgroup
 	cgroupName := (CgroupName)(path.Join(parentContainer, podContainer))
@@ -175,7 +175,7 @@ func (m *podContainerManagerImpl) ReduceCPULimits(podCgroup CgroupName) error {
 	return m.cgroupManager.ReduceCPULimits(podCgroup)
 }
 
-// GetAllPodsFromCgroups scans through all the subsytems of pod cgroups
+// GetAllPodsFromCgroups scans through all the subsystems of pod cgroups
 // Get list of pods whose cgroup still exist on the cgroup mounts
 func (m *podContainerManagerImpl) GetAllPodsFromCgroups() (map[types.UID]CgroupName, error) {
 	// Map for storing all the found pods on the disk

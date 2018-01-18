@@ -19,13 +19,13 @@ set -o nounset
 set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
-KUBE_REMOTE_RUNTIME_ROOT="${KUBE_ROOT}/pkg/kubelet/api/v1alpha1/runtime"
+KUBE_REMOTE_RUNTIME_ROOT="${KUBE_ROOT}/pkg/kubelet/apis/cri/v1alpha1/runtime/"
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
 kube::golang::setup_env
 
 BINS=(
-	cmd/libs/go2idl/go-to-protobuf/protoc-gen-gogo
+	vendor/k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo
 )
 make -C "${KUBE_ROOT}" WHAT="${BINS[*]}"
 

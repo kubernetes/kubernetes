@@ -18,73 +18,121 @@ package printers
 
 import (
 	"bytes"
-	"regexp"
+	"fmt"
+	"reflect"
 	"testing"
 
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1alpha1 "k8s.io/apimachinery/pkg/apis/meta/v1alpha1"
+	"k8s.io/apimachinery/pkg/runtime"
+	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
-func TestPrintUnstructuredObject(t *testing.T) {
-	tests := []struct {
-		expected string
-		options  PrintOptions
-	}{
-		{
-			expected: "NAME\\s+KIND\\s+DUMMY 1\\s+DUMMY 2\\s+ITEMS\nMyName\\s+Test\\.v1\\.\\s+present\\s+present\\s+1 item\\(s\\)",
-		},
-		{
-			options: PrintOptions{
-				WithNamespace: true,
-			},
-			expected: "NAMESPACE\\s+NAME\\s+KIND\\s+DUMMY 1\\s+DUMMY 2\nMyNamespace\\s+MyName\\s+Test\\.v1\\.\\s+present\\s+present",
-		},
-		{
-			options: PrintOptions{
-				ShowLabels:    true,
-				WithNamespace: true,
-			},
-			expected: "NAMESPACE\\s+NAME\\s+KIND\\s+DUMMY 1\\s+LABELS\nMyNamespace\\s+MyName\\s+Test\\.v1\\.\\s+present\\s+<none>",
-		},
+var testNamespaceColumnDefinitions = []metav1alpha1.TableColumnDefinition{
+	{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
+	{Name: "Status", Type: "string", Description: "The status of the namespace"},
+	{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
+}
+
+func testPrintNamespace(obj *api.Namespace, options PrintOptions) ([]metav1alpha1.TableRow, error) {
+	if options.WithNamespace {
+		return nil, fmt.Errorf("namespace is not namespaced")
 	}
-	out := bytes.NewBuffer([]byte{})
-
-	obj := &unstructured.Unstructured{
-		Object: map[string]interface{}{
-			"apiVersion": "v1",
-			"kind":       "Test",
-			"dummy1":     "present",
-			"dummy2":     "present",
-			"metadata": map[string]interface{}{
-				"name":              "MyName",
-				"namespace":         "MyNamespace",
-				"creationTimestamp": "2017-04-01T00:00:00Z",
-				"resourceVersion":   123,
-				"uid":               "00000000-0000-0000-0000-000000000001",
-				"dummy3":            "present",
-			},
-			"items": []interface{}{
-				map[string]interface{}{
-					"itemBool": true,
-					"itemInt":  42,
-				},
-			},
-			"url":    "http://localhost",
-			"status": "ok",
-		},
+	row := metav1alpha1.TableRow{
+		Object: runtime.RawExtension{Object: obj},
 	}
+	row.Cells = append(row.Cells, obj.Name, obj.Status.Phase, "<unknow>")
+	return []metav1alpha1.TableRow{row}, nil
+}
 
-	for _, test := range tests {
-		printer := &HumanReadablePrinter{
-			options: test.options,
-		}
-		printer.PrintObj(obj, out)
-
-		matches, err := regexp.MatchString(test.expected, out.String())
+func testPrintNamespaceList(list *api.NamespaceList, options PrintOptions) ([]metav1alpha1.TableRow, error) {
+	rows := make([]metav1alpha1.TableRow, 0, len(list.Items))
+	for i := range list.Items {
+		r, err := testPrintNamespace(&list.Items[i], options)
 		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
+			return nil, err
 		}
-		if !matches {
-			t.Errorf("wanted %s, got %s", test.expected, out)
+		rows = append(rows, r...)
+	}
+	return rows, nil
+}
+func TestPrintRowsForHandlerEntry(t *testing.T) {
+	printFunc := reflect.ValueOf(testPrintNamespace)
+
+	testCase := map[string]struct {
+		h             *handlerEntry
+		opt           PrintOptions
+		obj           runtime.Object
+		includeHeader bool
+		expectOut     string
+		expectErr     string
+	}{
+		"no tablecolumndefinition and includeheader flase": {
+			h: &handlerEntry{
+				columnDefinitions: []metav1alpha1.TableColumnDefinition{},
+				printRows:         true,
+				printFunc:         printFunc,
+			},
+			opt: PrintOptions{},
+			obj: &api.Namespace{
+				ObjectMeta: metav1.ObjectMeta{Name: "test"},
+			},
+			includeHeader: false,
+			expectOut:     "test\t\t<unknow>\n",
+		},
+		"no tablecolumndefinition and includeheader true": {
+			h: &handlerEntry{
+				columnDefinitions: []metav1alpha1.TableColumnDefinition{},
+				printRows:         true,
+				printFunc:         printFunc,
+			},
+			opt: PrintOptions{},
+			obj: &api.Namespace{
+				ObjectMeta: metav1.ObjectMeta{Name: "test"},
+			},
+			includeHeader: true,
+			expectOut:     "\ntest\t\t<unknow>\n",
+		},
+		"have tablecolumndefinition and includeheader true": {
+			h: &handlerEntry{
+				columnDefinitions: testNamespaceColumnDefinitions,
+				printRows:         true,
+				printFunc:         printFunc,
+			},
+			opt: PrintOptions{},
+			obj: &api.Namespace{
+				ObjectMeta: metav1.ObjectMeta{Name: "test"},
+			},
+			includeHeader: true,
+			expectOut:     "NAME\tSTATUS\tAGE\ntest\t\t<unknow>\n",
+		},
+		"print namespace and withnamespace true, should not print header": {
+			h: &handlerEntry{
+				columnDefinitions: testNamespaceColumnDefinitions,
+				printRows:         true,
+				printFunc:         printFunc,
+			},
+			opt: PrintOptions{
+				WithNamespace: true,
+			},
+			obj: &api.Namespace{
+				ObjectMeta: metav1.ObjectMeta{Name: "test"},
+			},
+			includeHeader: true,
+			expectOut:     "",
+			expectErr:     "namespace is not namespaced",
+		},
+	}
+	for name, test := range testCase {
+		buffer := &bytes.Buffer{}
+		err := printRowsForHandlerEntry(buffer, test.h, test.obj, test.opt, test.includeHeader)
+		if err != nil {
+			if err.Error() != test.expectErr {
+				t.Errorf("[%s]expect:\n %v\n but got:\n %v\n", name, test.expectErr, err)
+			}
+		}
+		if test.expectOut != buffer.String() {
+			t.Errorf("[%s]expect:\n %v\n but got:\n %v\n", name, test.expectOut, buffer.String())
 		}
 	}
 }

@@ -148,12 +148,13 @@ type VolumeDurabilityInfo struct {
 
 type VolumeCreateRequest struct {
 	// Size in GB
-	Size       int                  `json:"size"`
-	Clusters   []string             `json:"clusters,omitempty"`
-	Name       string               `json:"name"`
-	Durability VolumeDurabilityInfo `json:"durability,omitempty"`
-	Gid        int64                `json:"gid,omitempty"`
-	Snapshot   struct {
+	Size                 int                  `json:"size"`
+	Clusters             []string             `json:"clusters,omitempty"`
+	Name                 string               `json:"name"`
+	Durability           VolumeDurabilityInfo `json:"durability,omitempty"`
+	Gid                  int64                `json:"gid,omitempty"`
+	GlusterVolumeOptions []string             `json:"glustervolumeoptions,omitempty"`
+	Snapshot             struct {
 		Enable bool    `json:"enable"`
 		Factor float32 `json:"factor"`
 	} `json:"snapshot"`

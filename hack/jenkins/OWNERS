@@ -1,4 +1,4 @@
 approvers:
-- test-infra-maintainers
+- sig-testing-approvers
 reviewers:
-- test-infra-maintainers
+- sig-testing-reviewers

@@ -38,6 +38,7 @@ grep ^STABLE_BUILD_GIT_COMMIT bazel-out/stable-status.txt | cut -d' ' -f2 >>$@
 
 pkg_tar(
     name = "kubernetes-src",
+    build_tar = "@io_kubernetes_build//tools/build_tar",
     extension = "tar.gz",
     files = select({
         ":package_src": ["//:all-srcs"],
@@ -65,6 +66,7 @@ filegroup(
 
 pkg_tar(
     name = "_client-bin",
+    build_tar = "@io_kubernetes_build//tools/build_tar",
     files = ["//build:client-targets"],
     mode = "0755",
     package_dir = "client/bin",
@@ -73,6 +75,7 @@ pkg_tar(
 
 pkg_tar(
     name = "kubernetes-client-%s" % PLATFORM_ARCH_STRING,
+    build_tar = "@io_kubernetes_build//tools/build_tar",
     extension = "tar.gz",
     package_dir = "kubernetes",
     deps = [
@@ -82,6 +85,7 @@ pkg_tar(
 
 pkg_tar(
     name = "_node-bin",
+    build_tar = "@io_kubernetes_build//tools/build_tar",
     files = [
         "//build:client-targets",
         "//build:node-targets",
@@ -93,6 +97,7 @@ pkg_tar(
 
 pkg_tar(
     name = "kubernetes-node-%s" % PLATFORM_ARCH_STRING,
+    build_tar = "@io_kubernetes_build//tools/build_tar",
     extension = "tar.gz",
     files = [":license-targets"],
     mode = "0644",
@@ -104,6 +109,7 @@ pkg_tar(
 
 pkg_tar(
     name = "_server-bin",
+    build_tar = "@io_kubernetes_build//tools/build_tar",
     files = [
         "//build:client-targets",
         "//build:docker-artifacts",
@@ -125,6 +131,7 @@ genrule(
 # Some of the startup scripts fail if there isn't an addons/ directory in the server tarball.
 pkg_tar(
     name = "_server-addons",
+    build_tar = "@io_kubernetes_build//tools/build_tar",
     files = [
         ":.dummy",
     ],
@@ -134,6 +141,7 @@ pkg_tar(
 
 pkg_tar(
     name = "kubernetes-server-%s" % PLATFORM_ARCH_STRING,
+    build_tar = "@io_kubernetes_build//tools/build_tar",
     extension = "tar.gz",
     files = [":license-targets"],
     mode = "0644",
@@ -146,6 +154,7 @@ pkg_tar(
 
 pkg_tar(
     name = "_test-bin",
+    build_tar = "@io_kubernetes_build//tools/build_tar",
     files = ["//build:test-targets"],
     mode = "0755",
     package_dir = "platforms/" + PLATFORM_ARCH_STRING.replace("-", "/"),
@@ -155,6 +164,7 @@ pkg_tar(
 
 pkg_tar(
     name = "kubernetes-test",
+    build_tar = "@io_kubernetes_build//tools/build_tar",
     extension = "tar.gz",
     files = ["//build:test-portable-targets"],
     package_dir = "kubernetes",
@@ -167,9 +177,9 @@ pkg_tar(
 
 pkg_tar(
     name = "_full_server",
+    build_tar = "@io_kubernetes_build//tools/build_tar",
     files = [
         ":kubernetes-manifests.tar.gz",
-        ":kubernetes-salt.tar.gz",
     ],
     package_dir = "server",
     visibility = ["//visibility:private"],
@@ -177,11 +187,11 @@ pkg_tar(
 
 pkg_tar(
     name = "kubernetes",
+    build_tar = "@io_kubernetes_build//tools/build_tar",
     extension = "tar.gz",
     files = [
         "//:Godeps/LICENSES",
         "//:README.md",
-        "//:Vagrantfile",
         "//:version",
         "//cluster:all-srcs",
         "//docs:all-srcs",
@@ -193,23 +203,15 @@ pkg_tar(
     strip_prefix = "//",
     deps = [
         ":_full_server",
-        "//federation:release",
     ],
 )
 
 pkg_tar(
     name = "kubernetes-manifests",
+    build_tar = "@io_kubernetes_build//tools/build_tar",
     extension = "tar.gz",
     deps = [
         "//cluster:manifests",
-    ],
-)
-
-pkg_tar(
-    name = "kubernetes-salt",
-    extension = "tar.gz",
-    deps = [
-        "//cluster/saltbase:salt",
     ],
 )
 
@@ -221,7 +223,6 @@ release_filegroup(
         ":kubernetes-node-%s.tar.gz" % PLATFORM_ARCH_STRING,
         ":kubernetes-server-%s.tar.gz" % PLATFORM_ARCH_STRING,
         ":kubernetes-manifests.tar.gz",
-        ":kubernetes-salt.tar.gz",
         ":kubernetes-src.tar.gz",
         ":kubernetes-test.tar.gz",
     ],

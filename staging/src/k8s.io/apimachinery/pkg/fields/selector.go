@@ -40,6 +40,8 @@ type Selector interface {
 
 	// Transform returns a new copy of the selector after TransformFunc has been
 	// applied to the entire selector, or an error if fn returns an error.
+	// If for a given requirement both field and value are transformed to empty
+	// string, the requirement is skipped.
 	Transform(fn TransformFunc) (Selector, error)
 
 	// Requirements converts this interface to Requirements to expose
@@ -48,6 +50,9 @@ type Selector interface {
 
 	// String returns a human readable string that represents this selector.
 	String() string
+
+	// Make a deep copy of the selector.
+	DeepCopySelector() Selector
 }
 
 // Everything returns a selector that matches all fields.
@@ -79,6 +84,9 @@ func (t *hasTerm) Transform(fn TransformFunc) (Selector, error) {
 	if err != nil {
 		return nil, err
 	}
+	if len(field) == 0 && len(value) == 0 {
+		return Everything(), nil
+	}
 	return &hasTerm{field, value}, nil
 }
 
@@ -92,6 +100,15 @@ func (t *hasTerm) Requirements() Requirements {
 
 func (t *hasTerm) String() string {
 	return fmt.Sprintf("%v=%v", t.field, EscapeValue(t.value))
+}
+
+func (t *hasTerm) DeepCopySelector() Selector {
+	if t == nil {
+		return nil
+	}
+	out := new(hasTerm)
+	*out = *t
+	return out
 }
 
 type notHasTerm struct {
@@ -115,6 +132,9 @@ func (t *notHasTerm) Transform(fn TransformFunc) (Selector, error) {
 	if err != nil {
 		return nil, err
 	}
+	if len(field) == 0 && len(value) == 0 {
+		return Everything(), nil
+	}
 	return &notHasTerm{field, value}, nil
 }
 
@@ -128,6 +148,15 @@ func (t *notHasTerm) Requirements() Requirements {
 
 func (t *notHasTerm) String() string {
 	return fmt.Sprintf("%v!=%v", t.field, EscapeValue(t.value))
+}
+
+func (t *notHasTerm) DeepCopySelector() Selector {
+	if t == nil {
+		return nil
+	}
+	out := new(notHasTerm)
+	*out = *t
+	return out
 }
 
 type andTerm []Selector
@@ -169,13 +198,15 @@ func (t andTerm) RequiresExactMatch(field string) (string, bool) {
 }
 
 func (t andTerm) Transform(fn TransformFunc) (Selector, error) {
-	next := make([]Selector, len([]Selector(t)))
-	for i, s := range []Selector(t) {
+	next := make([]Selector, 0, len([]Selector(t)))
+	for _, s := range []Selector(t) {
 		n, err := s.Transform(fn)
 		if err != nil {
 			return nil, err
 		}
-		next[i] = n
+		if !n.Empty() {
+			next = append(next, n)
+		}
 	}
 	return andTerm(next), nil
 }
@@ -195,6 +226,17 @@ func (t andTerm) String() string {
 		terms = append(terms, q.String())
 	}
 	return strings.Join(terms, ",")
+}
+
+func (t andTerm) DeepCopySelector() Selector {
+	if t == nil {
+		return nil
+	}
+	out := make([]Selector, len(t))
+	for i := range t {
+		out[i] = t[i].DeepCopySelector()
+	}
+	return andTerm(out)
 }
 
 // SelectorFromSet returns a Selector which will match exactly the given Set. A
@@ -222,7 +264,7 @@ var valueEscaper = strings.NewReplacer(
 	`=`, `\=`,
 )
 
-// Escapes an arbitrary literal string for use as a fieldSelector value
+// EscapeValue escapes an arbitrary literal string for use as a fieldSelector value
 func EscapeValue(s string) string {
 	return valueEscaper.Replace(s)
 }
@@ -245,7 +287,7 @@ func (i UnescapedRune) Error() string {
 	return fmt.Sprintf("invalid field selector: unescaped character in value: %v", i.r)
 }
 
-// Unescapes a fieldSelector value and returns the original literal value.
+// UnescapeValue unescapes a fieldSelector value and returns the original literal value.
 // May return the original string if it contains no escaped or special characters.
 func UnescapeValue(s string) (string, error) {
 	// if there's no escaping or special characters, just return to avoid allocation
@@ -307,12 +349,12 @@ func ParseSelector(selector string) (Selector, error) {
 		})
 }
 
-// Parses the selector and runs them through the given TransformFunc.
+// ParseAndTransformSelector parses the selector and runs them through the given TransformFunc.
 func ParseAndTransformSelector(selector string, fn TransformFunc) (Selector, error) {
 	return parseSelector(selector, fn)
 }
 
-// Function to transform selectors.
+// TransformFunc transforms selectors.
 type TransformFunc func(field, value string) (newField, newValue string, err error)
 
 // splitTerms returns the comma-separated terms contained in the given fieldSelector.

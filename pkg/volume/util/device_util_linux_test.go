@@ -21,6 +21,7 @@ package util
 import (
 	"errors"
 	"os"
+	"reflect"
 	"testing"
 	"time"
 )
@@ -29,11 +30,14 @@ type mockOsIOHandler struct{}
 
 func (handler *mockOsIOHandler) ReadDir(dirname string) ([]os.FileInfo, error) {
 	switch dirname {
-	case "/sys/block/dm-2/slaves/":
-		f := &fakeFileInfo{
+	case "/sys/block/dm-1/slaves":
+		f1 := &fakeFileInfo{
 			name: "sda",
 		}
-		return []os.FileInfo{f}, nil
+		f2 := &fakeFileInfo{
+			name: "sdb",
+		}
+		return []os.FileInfo{f1, f2}, nil
 	case "/sys/block/":
 		f1 := &fakeFileInfo{
 			name: "sda",
@@ -62,8 +66,10 @@ func (handler *mockOsIOHandler) EvalSymlinks(path string) (string, error) {
 		"/returns/a/dev":                                              "/dev/sde",
 		"/returns/non/dev":                                            "/sys/block",
 		"/dev/disk/by-path/127.0.0.1:3260-eui.02004567A425678D-lun-0": "/dev/sda",
+		"/dev/disk/by-path/127.0.0.3:3260-eui.03004567A425678D-lun-0": "/dev/sdb",
 		"/dev/dm-2": "/dev/dm-2",
 		"/dev/dm-3": "/dev/dm-3",
+		"/dev/sdc":  "/dev/sdc",
 		"/dev/sde":  "/dev/sde",
 	}
 	return links[path], nil
@@ -116,10 +122,16 @@ func TestFindDeviceForPath(t *testing.T) {
 	io := &mockOsIOHandler{}
 
 	disk, err := findDeviceForPath("/dev/sde", io)
+	if err != nil {
+		t.Fatalf("error finding device for path /dev/sde:%v", err)
+	}
 	if disk != "sde" {
 		t.Fatalf("disk [%s] didn't match expected sde", disk)
 	}
 	disk, err = findDeviceForPath("/returns/a/dev", io)
+	if err != nil {
+		t.Fatalf("error finding device for path /returns/a/dev:%v", err)
+	}
 	if disk != "sde" {
 		t.Fatalf("disk [%s] didn't match expected sde", disk)
 	}
@@ -133,4 +145,16 @@ func TestFindDeviceForPath(t *testing.T) {
 		t.Fatalf("path shouldn't exist but still doesn't give an error")
 	}
 
+}
+
+func TestFindSlaveDevicesOnMultipath(t *testing.T) {
+	mockDeviceUtil := NewDeviceHandler(&mockOsIOHandler{})
+	devices := mockDeviceUtil.FindSlaveDevicesOnMultipath("/dev/dm-1")
+	if !reflect.DeepEqual(devices, []string{"/dev/sda", "/dev/sdb"}) {
+		t.Fatalf("failed to find devices managed by mpio device. /dev/sda, /dev/sdb expected got [%s]", devices)
+	}
+	dev := mockDeviceUtil.FindSlaveDevicesOnMultipath("/dev/sdc")
+	if len(dev) != 0 {
+		t.Fatalf("mpio device not found '' expected got [%s]", dev)
+	}
 }

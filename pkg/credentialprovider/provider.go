@@ -22,7 +22,7 @@ import (
 	"sync"
 	"time"
 
-	dockertypes "github.com/docker/engine-api/types"
+	dockertypes "github.com/docker/docker/api/types"
 	"github.com/golang/glog"
 )
 

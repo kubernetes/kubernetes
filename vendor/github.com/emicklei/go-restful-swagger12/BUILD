@@ -1,11 +1,4 @@
-package(default_visibility = ["//visibility:public"])
-
-licenses(["notice"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
@@ -21,7 +14,8 @@ go_library(
         "swagger_builder.go",
         "swagger_webservice.go",
     ],
-    tags = ["automanaged"],
+    importpath = "github.com/emicklei/go-restful-swagger12",
+    visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/emicklei/go-restful:go_default_library",
         "//vendor/github.com/emicklei/go-restful/log:go_default_library",
@@ -37,9 +31,7 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [
-        ":package-srcs",
-        "//vendor/github.com/emicklei/go-restful-swagger12/test_package:all-srcs",
-    ],
+    srcs = [":package-srcs"],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

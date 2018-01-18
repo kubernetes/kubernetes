@@ -40,6 +40,10 @@ func NewFeatureOptions() *FeatureOptions {
 }
 
 func (o *FeatureOptions) AddFlags(fs *pflag.FlagSet) {
+	if o == nil {
+		return
+	}
+
 	fs.BoolVar(&o.EnableProfiling, "profiling", o.EnableProfiling,
 		"Enable profiling via web interface host:port/debug/pprof/")
 	fs.BoolVar(&o.EnableContentionProfiling, "contention-profiling", o.EnableContentionProfiling,
@@ -49,9 +53,22 @@ func (o *FeatureOptions) AddFlags(fs *pflag.FlagSet) {
 }
 
 func (o *FeatureOptions) ApplyTo(c *server.Config) error {
+	if o == nil {
+		return nil
+	}
+
 	c.EnableProfiling = o.EnableProfiling
 	c.EnableContentionProfiling = o.EnableContentionProfiling
 	c.EnableSwaggerUI = o.EnableSwaggerUI
 
 	return nil
+}
+
+func (o *FeatureOptions) Validate() []error {
+	if o == nil {
+		return nil
+	}
+
+	errs := []error{}
+	return errs
 }

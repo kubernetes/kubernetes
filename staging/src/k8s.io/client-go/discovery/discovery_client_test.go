@@ -19,20 +19,20 @@ package discovery_test
 import (
 	"encoding/json"
 	"fmt"
+	"mime"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
 	"testing"
 
-	"github.com/emicklei/go-restful-swagger12"
+	"github.com/gogo/protobuf/proto"
+	"github.com/googleapis/gnostic/OpenAPIv2"
 
-	"github.com/go-openapi/spec"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/version"
 	. "k8s.io/client-go/discovery"
-	"k8s.io/client-go/pkg/api/v1"
 	restclient "k8s.io/client-go/rest"
 )
 
@@ -265,92 +265,44 @@ func TestGetServerResources(t *testing.T) {
 	}
 }
 
-func swaggerSchemaFakeServer() (*httptest.Server, error) {
-	request := 1
-	var sErr error
-
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		var resp interface{}
-		if request == 1 {
-			resp = metav1.APIVersions{Versions: []string{"v1", "v2", "v3"}}
-			request++
-		} else {
-			resp = swagger.ApiDeclaration{}
-		}
-		output, err := json.Marshal(resp)
-		if err != nil {
-			sErr = err
-			return
-		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		w.Write(output)
-	}))
-	return server, sErr
-}
-
-func TestGetSwaggerSchema(t *testing.T) {
-	expect := swagger.ApiDeclaration{}
-
-	server, err := swaggerSchemaFakeServer()
-	if err != nil {
-		t.Errorf("unexpected encoding error: %v", err)
-	}
-	defer server.Close()
-
-	client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
-	got, err := client.SwaggerSchema(v1.SchemeGroupVersion)
-	if err != nil {
-		t.Fatalf("unexpected encoding error: %v", err)
-	}
-	if e, a := expect, *got; !reflect.DeepEqual(e, a) {
-		t.Errorf("expected %v, got %v", e, a)
-	}
-}
-
-func TestGetSwaggerSchemaFail(t *testing.T) {
-	expErr := "API version: api.group/v4 is not supported by the server. Use one of: [v1 v2 v3]"
-
-	server, err := swaggerSchemaFakeServer()
-	if err != nil {
-		t.Errorf("unexpected encoding error: %v", err)
-	}
-	defer server.Close()
-
-	client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
-	got, err := client.SwaggerSchema(schema.GroupVersion{Group: "api.group", Version: "v4"})
-	if got != nil {
-		t.Fatalf("unexpected response: %v", got)
-	}
-	if err.Error() != expErr {
-		t.Errorf("expected an error, got %v", err)
-	}
-}
-
-var returnedOpenAPI = spec.Swagger{
-	SwaggerProps: spec.SwaggerProps{
-		Definitions: spec.Definitions{
-			"fake.type.1": spec.Schema{
-				SchemaProps: spec.SchemaProps{
-					Properties: map[string]spec.Schema{
-						"count": {
-							SchemaProps: spec.SchemaProps{
-								Type: []string{"integer"},
+var returnedOpenAPI = openapi_v2.Document{
+	Definitions: &openapi_v2.Definitions{
+		AdditionalProperties: []*openapi_v2.NamedSchema{
+			{
+				Name: "fake.type.1",
+				Value: &openapi_v2.Schema{
+					Properties: &openapi_v2.Properties{
+						AdditionalProperties: []*openapi_v2.NamedSchema{
+							{
+								Name: "count",
+								Value: &openapi_v2.Schema{
+									Type: &openapi_v2.TypeItem{
+										Value: []string{"integer"},
+									},
+								},
 							},
 						},
 					},
 				},
 			},
-			"fake.type.2": spec.Schema{
-				SchemaProps: spec.SchemaProps{
-					Properties: map[string]spec.Schema{
-						"count": {
-							SchemaProps: spec.SchemaProps{
-								Type: []string{"array"},
-								Items: &spec.SchemaOrArray{
-									Schema: &spec.Schema{
-										SchemaProps: spec.SchemaProps{
-											Type: []string{"string"},
+			{
+				Name: "fake.type.2",
+				Value: &openapi_v2.Schema{
+					Properties: &openapi_v2.Properties{
+						AdditionalProperties: []*openapi_v2.NamedSchema{
+							{
+								Name: "count",
+								Value: &openapi_v2.Schema{
+									Type: &openapi_v2.TypeItem{
+										Value: []string{"array"},
+									},
+									Items: &openapi_v2.ItemsItem{
+										Schema: []*openapi_v2.Schema{
+											{
+												Type: &openapi_v2.TypeItem{
+													Value: []string{"string"},
+												},
+											},
 										},
 									},
 								},
@@ -366,19 +318,20 @@ var returnedOpenAPI = spec.Swagger{
 func openapiSchemaFakeServer() (*httptest.Server, error) {
 	var sErr error
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		if req.URL.Path != "/swagger.json" {
+		if req.URL.Path != "/swagger-2.0.0.pb-v1" {
 			sErr = fmt.Errorf("Unexpected url %v", req.URL)
 		}
 		if req.Method != "GET" {
 			sErr = fmt.Errorf("Unexpected method %v", req.Method)
 		}
 
-		output, err := json.Marshal(returnedOpenAPI)
+		mime.AddExtensionType(".pb-v1", "application/com.github.googleapis.gnostic.OpenAPIv2@68f4ded+protobuf")
+
+		output, err := proto.Marshal(&returnedOpenAPI)
 		if err != nil {
 			sErr = err
 			return
 		}
-		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		w.Write(output)
 	}))

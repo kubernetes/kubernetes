@@ -19,9 +19,12 @@ package admission
 import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apiserver/pkg/admission"
+	webhookconfig "k8s.io/apiserver/pkg/admission/plugin/webhook/config"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
+	"k8s.io/kubernetes/pkg/quota"
 )
 
 // TODO add a `WantsToRun` which takes a stopCh.  Might make it generic.
@@ -29,19 +32,13 @@ import (
 // WantsInternalKubeClientSet defines a function which sets ClientSet for admission plugins that need it
 type WantsInternalKubeClientSet interface {
 	SetInternalKubeClientSet(internalclientset.Interface)
-	admission.Validator
+	admission.InitializationValidator
 }
 
 // WantsInternalKubeInformerFactory defines a function which sets InformerFactory for admission plugins that need it
 type WantsInternalKubeInformerFactory interface {
 	SetInternalKubeInformerFactory(informers.SharedInformerFactory)
-	admission.Validator
-}
-
-// WantsAuthorizer defines a function which sets Authorizer for admission plugins that need it.
-type WantsAuthorizer interface {
-	SetAuthorizer(authorizer.Authorizer)
-	admission.Validator
+	admission.InitializationValidator
 }
 
 // WantsCloudConfig defines a function which sets CloudConfig for admission plugins that need it.
@@ -54,30 +51,49 @@ type WantsRESTMapper interface {
 	SetRESTMapper(meta.RESTMapper)
 }
 
-type pluginInitializer struct {
-	internalClient internalclientset.Interface
-	informers      informers.SharedInformerFactory
-	authorizer     authorizer.Authorizer
-	cloudConfig    []byte
-	restMapper     meta.RESTMapper
+// WantsQuotaConfiguration defines a function which sets quota configuration for admission plugins that need it.
+type WantsQuotaConfiguration interface {
+	SetQuotaConfiguration(quota.Configuration)
+	admission.InitializationValidator
 }
 
-var _ admission.PluginInitializer = pluginInitializer{}
+// PluginInitializer is used for initialization of the Kubernetes specific admission plugins.
+type PluginInitializer struct {
+	internalClient                    internalclientset.Interface
+	externalClient                    clientset.Interface
+	informers                         informers.SharedInformerFactory
+	authorizer                        authorizer.Authorizer
+	cloudConfig                       []byte
+	restMapper                        meta.RESTMapper
+	quotaConfiguration                quota.Configuration
+	serviceResolver                   webhookconfig.ServiceResolver
+	authenticationInfoResolverWrapper webhookconfig.AuthenticationInfoResolverWrapper
+}
+
+var _ admission.PluginInitializer = &PluginInitializer{}
 
 // NewPluginInitializer constructs new instance of PluginInitializer
-func NewPluginInitializer(internalClient internalclientset.Interface, sharedInformers informers.SharedInformerFactory, authz authorizer.Authorizer, cloudConfig []byte, restMapper meta.RESTMapper) admission.PluginInitializer {
-	return pluginInitializer{
-		internalClient: internalClient,
-		informers:      sharedInformers,
-		authorizer:     authz,
-		cloudConfig:    cloudConfig,
-		restMapper:     restMapper,
+// TODO: switch these parameters to use the builder pattern or just make them
+// all public, this construction method is pointless boilerplate.
+func NewPluginInitializer(
+	internalClient internalclientset.Interface,
+	sharedInformers informers.SharedInformerFactory,
+	cloudConfig []byte,
+	restMapper meta.RESTMapper,
+	quotaConfiguration quota.Configuration,
+) *PluginInitializer {
+	return &PluginInitializer{
+		internalClient:     internalClient,
+		informers:          sharedInformers,
+		cloudConfig:        cloudConfig,
+		restMapper:         restMapper,
+		quotaConfiguration: quotaConfiguration,
 	}
 }
 
 // Initialize checks the initialization interfaces implemented by each plugin
 // and provide the appropriate initialization data
-func (i pluginInitializer) Initialize(plugin admission.Interface) {
+func (i *PluginInitializer) Initialize(plugin admission.Interface) {
 	if wants, ok := plugin.(WantsInternalKubeClientSet); ok {
 		wants.SetInternalKubeClientSet(i.internalClient)
 	}
@@ -86,15 +102,15 @@ func (i pluginInitializer) Initialize(plugin admission.Interface) {
 		wants.SetInternalKubeInformerFactory(i.informers)
 	}
 
-	if wants, ok := plugin.(WantsAuthorizer); ok {
-		wants.SetAuthorizer(i.authorizer)
-	}
-
 	if wants, ok := plugin.(WantsCloudConfig); ok {
 		wants.SetCloudConfig(i.cloudConfig)
 	}
 
 	if wants, ok := plugin.(WantsRESTMapper); ok {
 		wants.SetRESTMapper(i.restMapper)
+	}
+
+	if wants, ok := plugin.(WantsQuotaConfiguration); ok {
+		wants.SetQuotaConfiguration(i.quotaConfiguration)
 	}
 }

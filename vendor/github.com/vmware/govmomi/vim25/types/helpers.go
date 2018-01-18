@@ -46,3 +46,7 @@ func (r *ManagedObjectReference) FromString(o string) bool {
 
 	return true
 }
+
+func (c *PerfCounterInfo) Name() string {
+	return c.GroupInfo.GetElementDescription().Key + "." + c.NameInfo.GetElementDescription().Key + "." + string(c.RollupType)
+}

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013 Dave Collins <dave@davec.name>
+ * Copyright (c) 2013-2016 Dave Collins <dave@davec.name>
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -180,7 +180,7 @@ func printComplex(w io.Writer, c complex128, floatPrecision int) {
 	w.Write(closeParenBytes)
 }
 
-// printHexPtr outputs a uintptr formatted as hexidecimal with a leading '0x'
+// printHexPtr outputs a uintptr formatted as hexadecimal with a leading '0x'
 // prefix to Writer w.
 func printHexPtr(w io.Writer, p uintptr) {
 	// Null pointer.

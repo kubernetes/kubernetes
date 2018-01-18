@@ -25,11 +25,11 @@ import (
 	"strings"
 	"testing"
 
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
+	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/empty_dir"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
@@ -505,7 +505,8 @@ func TestCollectDataWithConfigMap(t *testing.T) {
 				sources: source.Sources,
 				podUID:  pod.UID,
 				plugin: &projectedPlugin{
-					host: host,
+					host:         host,
+					getConfigMap: host.GetConfigMapFunc(),
 				},
 			},
 			source: *source,
@@ -543,6 +544,48 @@ func TestCollectDataWithDownwardAPI(t *testing.T) {
 		payload    map[string]util.FileProjection
 		success    bool
 	}{
+		{
+			name: "annotation",
+			volumeFile: []v1.DownwardAPIVolumeFile{
+				{Path: "annotation", FieldRef: &v1.ObjectFieldSelector{
+					FieldPath: "metadata.annotations['a1']"}}},
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      testPodName,
+					Namespace: testNamespace,
+					Annotations: map[string]string{
+						"a1": "value1",
+						"a2": "value2",
+					},
+					UID: testPodUID},
+			},
+			mode: 0644,
+			payload: map[string]util.FileProjection{
+				"annotation": {Data: []byte("value1"), Mode: 0644},
+			},
+			success: true,
+		},
+		{
+			name: "annotation-error",
+			volumeFile: []v1.DownwardAPIVolumeFile{
+				{Path: "annotation", FieldRef: &v1.ObjectFieldSelector{
+					FieldPath: "metadata.annotations['']"}}},
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      testPodName,
+					Namespace: testNamespace,
+					Annotations: map[string]string{
+						"a1": "value1",
+						"a2": "value2",
+					},
+					UID: testPodUID},
+			},
+			mode: 0644,
+			payload: map[string]util.FileProjection{
+				"annotation": {Data: []byte("does-not-matter-because-this-test-case-will-fail-anyway"), Mode: 0644},
+			},
+			success: false,
+		},
 		{
 			name: "labels",
 			volumeFile: []v1.DownwardAPIVolumeFile{
@@ -669,7 +712,7 @@ func TestCanSupport(t *testing.T) {
 	pluginMgr := volume.VolumePluginMgr{}
 	tempDir, host := newTestHost(t, nil)
 	defer os.RemoveAll(tempDir)
-	pluginMgr.InitPlugins(ProbeVolumePlugins(), host)
+	pluginMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, host)
 
 	plugin, err := pluginMgr.FindPluginByName(projectedPluginName)
 	if err != nil {
@@ -700,7 +743,7 @@ func TestPlugin(t *testing.T) {
 		rootDir, host = newTestHost(t, client)
 	)
 	defer os.RemoveAll(rootDir)
-	pluginMgr.InitPlugins(ProbeVolumePlugins(), host)
+	pluginMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, host)
 
 	plugin, err := pluginMgr.FindPluginByName(projectedPluginName)
 	if err != nil {
@@ -764,7 +807,7 @@ func TestPluginReboot(t *testing.T) {
 		rootDir, host = newTestHost(t, client)
 	)
 	defer os.RemoveAll(rootDir)
-	pluginMgr.InitPlugins(ProbeVolumePlugins(), host)
+	pluginMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, host)
 
 	plugin, err := pluginMgr.FindPluginByName(projectedPluginName)
 	if err != nil {
@@ -818,7 +861,7 @@ func TestPluginOptional(t *testing.T) {
 	)
 	volumeSpec.VolumeSource.Projected.Sources[0].Secret.Optional = &trueVal
 	defer os.RemoveAll(rootDir)
-	pluginMgr.InitPlugins(ProbeVolumePlugins(), host)
+	pluginMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, host)
 
 	plugin, err := pluginMgr.FindPluginByName(projectedPluginName)
 	if err != nil {
@@ -895,7 +938,7 @@ func TestPluginOptionalKeys(t *testing.T) {
 	}
 	volumeSpec.VolumeSource.Projected.Sources[0].Secret.Optional = &trueVal
 	defer os.RemoveAll(rootDir)
-	pluginMgr.InitPlugins(ProbeVolumePlugins(), host)
+	pluginMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, host)
 
 	plugin, err := pluginMgr.FindPluginByName(projectedPluginName)
 	if err != nil {
@@ -1041,6 +1084,6 @@ func doTestCleanAndTeardown(plugin volume.VolumePlugin, podUID types.UID, testVo
 	if _, err := os.Stat(volumePath); err == nil {
 		t.Errorf("TearDown() failed, volume path still exists: %s", volumePath)
 	} else if !os.IsNotExist(err) {
-		t.Errorf("SetUp() failed: %v", err)
+		t.Errorf("TearDown() failed: %v", err)
 	}
 }

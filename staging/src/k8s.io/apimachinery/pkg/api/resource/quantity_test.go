@@ -29,8 +29,6 @@ import (
 	inf "gopkg.in/inf.v0"
 )
 
-var useInfDec bool
-
 func amount(i int64, exponent int) infDecAmount {
 	// See the below test-- scale is the negative of an exponent.
 	return infDecAmount{inf.NewDec(i, inf.Scale(-exponent))}
@@ -79,7 +77,7 @@ func TestQuantityParseZero(t *testing.T) {
 	}
 }
 
-// TestQuantityParseNonNumericError ensures that when a non-numeric string is parsed
+// TestQuantityParseNonNumericPanic ensures that when a non-numeric string is parsed
 // it panics
 func TestQuantityParseNonNumericPanic(t *testing.T) {
 	defer func() {
@@ -140,7 +138,7 @@ func TestQuantitySubZeroPreservesSuffix(t *testing.T) {
 	}
 }
 
-// Verifies that you get 0 as canonical value if internal value is 0, and not 0<suffix>
+// TestQuantityCanocicalizeZero verifies that you get 0 as canonical value if internal value is 0, and not 0<suffix>
 func TestQuantityCanocicalizeZero(t *testing.T) {
 	val := MustParse("1000m")
 	val.i.Sub(int64Amount{value: 1})

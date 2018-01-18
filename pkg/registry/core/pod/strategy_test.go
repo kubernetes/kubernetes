@@ -29,9 +29,13 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/kubelet/client"
+
+	// install all api groups for testing
+	_ "k8s.io/kubernetes/pkg/api/testapi"
 )
 
 func TestMatchPod(t *testing.T) {
@@ -70,6 +74,20 @@ func TestMatchPod(t *testing.T) {
 		},
 		{
 			in: &api.Pod{
+				Spec: api.PodSpec{SchedulerName: "scheduler1"},
+			},
+			fieldSelector: fields.ParseSelectorOrDie("spec.schedulerName=scheduler1"),
+			expectMatch:   true,
+		},
+		{
+			in: &api.Pod{
+				Spec: api.PodSpec{SchedulerName: "scheduler1"},
+			},
+			fieldSelector: fields.ParseSelectorOrDie("spec.schedulerName=scheduler2"),
+			expectMatch:   false,
+		},
+		{
+			in: &api.Pod{
 				Status: api.PodStatus{Phase: api.PodRunning},
 			},
 			fieldSelector: fields.ParseSelectorOrDie("status.phase=Running"),
@@ -80,6 +98,20 @@ func TestMatchPod(t *testing.T) {
 				Status: api.PodStatus{Phase: api.PodRunning},
 			},
 			fieldSelector: fields.ParseSelectorOrDie("status.phase=Pending"),
+			expectMatch:   false,
+		},
+		{
+			in: &api.Pod{
+				Status: api.PodStatus{PodIP: "1.2.3.4"},
+			},
+			fieldSelector: fields.ParseSelectorOrDie("status.podIP=1.2.3.4"),
+			expectMatch:   true,
+		},
+		{
+			in: &api.Pod{
+				Status: api.PodStatus{PodIP: "1.2.3.4"},
+			},
+			fieldSelector: fields.ParseSelectorOrDie("status.podIP=4.3.2.1"),
 			expectMatch:   false,
 		},
 	}
@@ -330,7 +362,7 @@ func TestCheckLogLocation(t *testing.T) {
 
 func TestSelectableFieldLabelConversions(t *testing.T) {
 	apitesting.TestSelectableFieldLabelConversionsOfKind(t,
-		api.Registry.GroupOrDie(api.GroupName).GroupVersion.String(),
+		legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion.String(),
 		"Pod",
 		PodToSelectableFields(&api.Pod{}),
 		nil,

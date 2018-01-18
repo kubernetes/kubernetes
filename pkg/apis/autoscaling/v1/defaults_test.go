@@ -20,27 +20,29 @@ import (
 	"reflect"
 	"testing"
 
+	autoscalingv1 "k8s.io/api/autoscaling/v1"
+
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/pkg/api"
-	_ "k8s.io/kubernetes/pkg/api/install"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	_ "k8s.io/kubernetes/pkg/apis/autoscaling/install"
 	. "k8s.io/kubernetes/pkg/apis/autoscaling/v1"
+	_ "k8s.io/kubernetes/pkg/apis/core/install"
 )
 
 func TestSetDefaultHPA(t *testing.T) {
 	tests := []struct {
-		hpa            HorizontalPodAutoscaler
+		hpa            autoscalingv1.HorizontalPodAutoscaler
 		expectReplicas int32
 		test           string
 	}{
 		{
-			hpa:            HorizontalPodAutoscaler{},
+			hpa:            autoscalingv1.HorizontalPodAutoscaler{},
 			expectReplicas: 1,
 			test:           "unspecified min replicas, use the default value",
 		},
 		{
-			hpa: HorizontalPodAutoscaler{
-				Spec: HorizontalPodAutoscalerSpec{
+			hpa: autoscalingv1.HorizontalPodAutoscaler{
+				Spec: autoscalingv1.HorizontalPodAutoscalerSpec{
 					MinReplicas: newInt32(3),
 				},
 			},
@@ -52,7 +54,7 @@ func TestSetDefaultHPA(t *testing.T) {
 	for _, test := range tests {
 		hpa := &test.hpa
 		obj2 := roundTrip(t, runtime.Object(hpa))
-		hpa2, ok := obj2.(*HorizontalPodAutoscaler)
+		hpa2, ok := obj2.(*autoscalingv1.HorizontalPodAutoscaler)
 		if !ok {
 			t.Fatalf("unexpected object: %v", obj2)
 		}
@@ -65,18 +67,18 @@ func TestSetDefaultHPA(t *testing.T) {
 }
 
 func roundTrip(t *testing.T, obj runtime.Object) runtime.Object {
-	data, err := runtime.Encode(api.Codecs.LegacyCodec(SchemeGroupVersion), obj)
+	data, err := runtime.Encode(legacyscheme.Codecs.LegacyCodec(SchemeGroupVersion), obj)
 	if err != nil {
 		t.Errorf("%v\n %#v", err, obj)
 		return nil
 	}
-	obj2, err := runtime.Decode(api.Codecs.UniversalDecoder(), data)
+	obj2, err := runtime.Decode(legacyscheme.Codecs.UniversalDecoder(), data)
 	if err != nil {
 		t.Errorf("%v\nData: %s\nSource: %#v", err, string(data), obj)
 		return nil
 	}
 	obj3 := reflect.New(reflect.TypeOf(obj).Elem()).Interface().(runtime.Object)
-	err = api.Scheme.Convert(obj2, obj3, nil)
+	err = legacyscheme.Scheme.Convert(obj2, obj3, nil)
 	if err != nil {
 		t.Errorf("%v\nSource: %#v", err, obj2)
 		return nil

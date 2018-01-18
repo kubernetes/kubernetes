@@ -48,6 +48,9 @@
 // When using a map, and there is a section with the same section name but
 // without a subsection name, its values are stored with the empty string used
 // as the key.
+// It is possible to provide default values for subsections in the section
+// "default-<sectionname>" (or by setting values in the corresponding struct
+// field "Default_<sectionname>").
 //
 // The functions in this package panic if config is not a pointer to a struct,
 // or when a field is not of a suitable type (either a struct or a map with
@@ -94,6 +97,30 @@
 //
 // The types subpackage for provides helpers for parsing "enum-like" and integer
 // types.
+//
+// Error handling
+//
+// There are 3 types of errors:
+//
+//  - programmer errors / panics:
+//    - invalid configuration structure
+//  - data errors:
+//    - fatal errors:
+//      - invalid configuration syntax
+//    - warnings:
+//      - data that doesn't belong to any part of the config structure
+//
+// Programmer errors trigger panics. These are should be fixed by the programmer
+// before releasing code that uses gcfg.
+//
+// Data errors cause gcfg to return a non-nil error value. This includes the
+// case when there are extra unknown key-value definitions in the configuration
+// data (extra data).
+// However, in some occasions it is desirable to be able to proceed in
+// situations when the only data error is that of extra data.
+// These errors are handled at a different (warning) priority and can be
+// filtered out programmatically. To ignore extra data warnings, wrap the
+// gcfg.Read*Into invocation into a call to gcfg.FatalOnly.
 //
 // TODO
 //

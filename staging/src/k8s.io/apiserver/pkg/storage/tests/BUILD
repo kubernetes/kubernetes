@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -11,8 +9,8 @@ load(
 go_test(
     name = "go_default_test",
     srcs = ["cacher_test.go"],
-    library = ":go_default_library",
-    tags = ["automanaged"],
+    embed = [":go_default_library"],
+    importpath = "k8s.io/apiserver/pkg/storage/tests",
     deps = [
         "//vendor/golang.org/x/net/context:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/equality:go_default_library",
@@ -34,16 +32,26 @@ go_test(
         "//vendor/k8s.io/apiserver/pkg/storage/etcd/etcdtest:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/storage/etcd/testing:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/storage/etcd3:go_default_library",
-        "//vendor/k8s.io/client-go/pkg/api/install:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/storage/value:go_default_library",
     ],
 )
 
 go_library(
     name = "go_default_library",
     srcs = ["utils.go"],
+    importpath = "k8s.io/apiserver/pkg/storage/tests",
+    deps = ["//vendor/k8s.io/apiserver/pkg/apis/example:go_default_library"],
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
     tags = ["automanaged"],
-    deps = [
-        "//vendor/k8s.io/apiserver/pkg/apis/example:go_default_library",
-        "//vendor/k8s.io/client-go/pkg/api/install:go_default_library",
-    ],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [":package-srcs"],
+    tags = ["automanaged"],
 )

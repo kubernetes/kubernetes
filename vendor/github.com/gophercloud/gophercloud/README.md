@@ -74,7 +74,7 @@ import (
 
 // Option 1: Pass in the values yourself
 opts := gophercloud.AuthOptions{
-  IdentityEndpoint: "https://my-openstack.com:5000/v2.0",
+  IdentityEndpoint: "https://openstack.example.com:5000/v2.0",
   Username: "{username}",
   Password: "{password}",
 }
@@ -141,3 +141,19 @@ See the [contributing guide](./.github/CONTRIBUTING.md).
 
 If you're struggling with something or have spotted a potential bug, feel free
 to submit an issue to our [bug tracker](/issues).
+
+## Thank You
+
+We'd like to extend special thanks and appreciation to the following:
+
+### OpenLab
+
+<a href="http://openlabtesting.org/"><img src="assets/openlab.png" width="600px"></a>
+
+OpenLab is providing a full CI environment to test each PR and merge for a variety of OpenStack releases.
+
+### VEXXHOST
+
+<a href="https://vexxhost.com/"><img src="assets/vexxhost.png" width="600px"></a>
+
+VEXXHOST is providing their services to assist with the development and testing of Gophercloud.

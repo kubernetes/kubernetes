@@ -26,9 +26,12 @@ import (
 )
 
 const (
+	// DefaultErrorExitCode defines exit the code for failed action generally
 	DefaultErrorExitCode = 1
-	PreFlightExitCode    = 2
-	ValidationExitCode   = 3
+	// PreFlightExitCode defines exit the code for preflight checks
+	PreFlightExitCode = 2
+	// ValidationExitCode defines the exit code validation checks
+	ValidationExitCode = 3
 )
 
 type debugError interface {
@@ -71,4 +74,13 @@ func checkErr(prefix string, err error, handleErr func(string, int)) {
 	default:
 		handleErr(err.Error(), DefaultErrorExitCode)
 	}
+}
+
+// FormatErrMsg returns a human-readable string describing the slice of errors passed to the function
+func FormatErrMsg(errs []error) string {
+	var errMsg string
+	for _, err := range errs {
+		errMsg = fmt.Sprintf("%s\t- %s\n", errMsg, err.Error())
+	}
+	return errMsg
 }
