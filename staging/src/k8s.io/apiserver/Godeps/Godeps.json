@@ -1763,6 +1763,10 @@
 			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 		},
 		{
+			"ImportPath": "k8s.io/client-go/util/retry",
+			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+		},
+		{
 			"ImportPath": "k8s.io/kube-openapi/pkg/builder",
 			"Rev": "a07b7bbb58e7fdc5144f8d7046331d29fc9ad3b3"
 		},
