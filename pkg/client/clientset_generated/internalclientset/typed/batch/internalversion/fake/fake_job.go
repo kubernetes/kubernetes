@@ -23,6 +23,7 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
+	autoscaling "k8s.io/kubernetes/pkg/apis/autoscaling"
 	batch "k8s.io/kubernetes/pkg/apis/batch"
 )
 
@@ -135,4 +136,26 @@ func (c *FakeJobs) Patch(name string, pt types.PatchType, data []byte, subresour
 		return nil, err
 	}
 	return obj.(*batch.Job), err
+}
+
+// GetScale takes name of the job, and returns the corresponding scale object, and an error if there is any.
+func (c *FakeJobs) GetScale(jobName string, options v1.GetOptions) (result *autoscaling.Scale, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewGetSubresourceAction(jobsResource, c.ns, "scale", jobName), &autoscaling.Scale{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*autoscaling.Scale), err
+}
+
+// UpdateScale takes the representation of a scale and updates it. Returns the server's representation of the scale, and an error, if there is any.
+func (c *FakeJobs) UpdateScale(jobName string, scale *autoscaling.Scale) (result *autoscaling.Scale, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewUpdateSubresourceAction(jobsResource, "scale", c.ns, scale), &autoscaling.Scale{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*autoscaling.Scale), err
 }
