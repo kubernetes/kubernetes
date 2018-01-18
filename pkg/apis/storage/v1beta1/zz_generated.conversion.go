@@ -54,6 +54,8 @@ func autoConvert_v1beta1_StorageClass_To_storage_StorageClass(in *v1beta1.Storag
 	out.MountOptions = *(*[]string)(unsafe.Pointer(&in.MountOptions))
 	out.AllowVolumeExpansion = (*bool)(unsafe.Pointer(in.AllowVolumeExpansion))
 	out.VolumeBindingMode = (*storage.VolumeBindingMode)(unsafe.Pointer(in.VolumeBindingMode))
+	out.CredentialIDs = *(*[]string)(unsafe.Pointer(&in.CredentialIDs))
+	out.SecretRefs = *(*map[string]core.SecretReference)(unsafe.Pointer(&in.SecretRefs))
 	return nil
 }
 
@@ -69,6 +71,8 @@ func autoConvert_storage_StorageClass_To_v1beta1_StorageClass(in *storage.Storag
 	out.ReclaimPolicy = (*v1.PersistentVolumeReclaimPolicy)(unsafe.Pointer(in.ReclaimPolicy))
 	out.MountOptions = *(*[]string)(unsafe.Pointer(&in.MountOptions))
 	out.AllowVolumeExpansion = (*bool)(unsafe.Pointer(in.AllowVolumeExpansion))
+	out.CredentialIDs = *(*[]string)(unsafe.Pointer(&in.CredentialIDs))
+	out.SecretRefs = *(*map[string]v1.SecretReference)(unsafe.Pointer(&in.SecretRefs))
 	out.VolumeBindingMode = (*v1beta1.VolumeBindingMode)(unsafe.Pointer(in.VolumeBindingMode))
 	return nil
 }
@@ -80,7 +84,17 @@ func Convert_storage_StorageClass_To_v1beta1_StorageClass(in *storage.StorageCla
 
 func autoConvert_v1beta1_StorageClassList_To_storage_StorageClassList(in *v1beta1.StorageClassList, out *storage.StorageClassList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]storage.StorageClass)(unsafe.Pointer(&in.Items))
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]storage.StorageClass, len(*in))
+		for i := range *in {
+			if err := Convert_v1beta1_StorageClass_To_storage_StorageClass(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 
@@ -91,7 +105,17 @@ func Convert_v1beta1_StorageClassList_To_storage_StorageClassList(in *v1beta1.St
 
 func autoConvert_storage_StorageClassList_To_v1beta1_StorageClassList(in *storage.StorageClassList, out *v1beta1.StorageClassList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]v1beta1.StorageClass)(unsafe.Pointer(&in.Items))
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]v1beta1.StorageClass, len(*in))
+		for i := range *in {
+			if err := Convert_storage_StorageClass_To_v1beta1_StorageClass(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 

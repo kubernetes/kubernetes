@@ -70,6 +70,18 @@ message StorageClass {
   // the VolumeScheduling feature.
   // +optional
   optional string volumeBindingMode = 7;
+
+  // CredentialID is the string slice of IDs to use for authentication and
+  // authorization against the storage backend. The value of CredentialID is
+  // used as a key SecretRefs map to select the corresponding Secret object.
+  // +optional
+  repeated string credentialIDs = 8;
+
+  // Secrets for authentication and authorization against a storage backend,
+  // which is described by the StorageClass object. CredentialID is the key, to
+  // select corresponding SecretRef
+  // +optional
+  map<string, k8s.io.api.core.v1.SecretReference> secretRefs = 9;
 }
 
 // StorageClassList is a collection of storage classes.

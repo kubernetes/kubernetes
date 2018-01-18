@@ -69,6 +69,18 @@ func (in *StorageClass) DeepCopyInto(out *StorageClass) {
 			**out = **in
 		}
 	}
+	if in.CredentialIDs != nil {
+		in, out := &in.CredentialIDs, &out.CredentialIDs
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
+	if in.SecretRefs != nil {
+		in, out := &in.SecretRefs, &out.SecretRefs
+		*out = make(map[string]core_v1.SecretReference, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
 	return
 }
 

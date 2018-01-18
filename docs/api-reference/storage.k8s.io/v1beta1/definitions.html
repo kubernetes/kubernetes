@@ -965,6 +965,20 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1beta1_volumebindingmode">v1beta1.VolumeBindingMode</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">credentialIDs</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">CredentialID is the string slice of IDs to use for authentication and authorization against the storage backend. The value of CredentialID is used as a key SecretRefs map to select the corresponding Secret object.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string array</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">secretRefs</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Secrets for authentication and authorization against a storage backend, which is described by the StorageClass object. CredentialID is the key, to select corresponding SecretRef</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">object</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
 </tbody>
 </table>
 
