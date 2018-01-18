@@ -81,7 +81,7 @@ spec:
           - --config-dir=/etc/config
           - --cpu=40m
           - --extra-cpu=0.5m
-          - --memory=140Mi
+          - --memory=40Mi
           - --extra-memory=4Mi
           - --threshold=5
           - --deployment=metrics-server-v0.2.1
