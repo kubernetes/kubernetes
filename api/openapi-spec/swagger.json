@@ -77568,7 +77568,7 @@
       "type": "string"
      },
      "qosClass": {
-      "description": "The Quality of Service (QOS) classification assigned to the pod based on resource requirements See PodQOSClass type for available QOS classes More info: https://github.com/kubernetes/kubernetes/blob/master/docs/design/resource-qos.md",
+      "description": "The Quality of Service (QOS) classification assigned to the pod based on resource requirements See PodQOSClass type for available QOS classes More info: https://github.com/kubernetes/community/blob/master/contributors/design-proposals/node/resource-qos.md",
       "type": "string"
      },
      "reason": {
