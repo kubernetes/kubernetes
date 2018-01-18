@@ -168,19 +168,15 @@ func (attacher *awsElasticBlockStoreAttacher) WaitForAttach(spec *volume.Spec, d
 		select {
 		case <-ticker.C:
 			glog.V(5).Infof("Checking AWS Volume %q is attached.", volumeID)
-			if devicePath != "" {
-				devicePaths := getDiskByIdPaths(aws.KubernetesVolumeID(volumeSource.VolumeID), partition, devicePath)
-				path, err := verifyDevicePath(devicePaths)
-				if err != nil {
-					// Log error, if any, and continue checking periodically. See issue #11321
-					glog.Errorf("Error verifying AWS Volume (%q) is attached: %v", volumeID, err)
-				} else if path != "" {
-					// A device path has successfully been created for the PD
-					glog.Infof("Successfully found attached AWS Volume %q.", volumeID)
-					return path, nil
-				}
-			} else {
-				glog.V(5).Infof("AWS Volume (%q) is not attached yet", volumeID)
+			devicePaths := getDiskByIdPaths(aws.KubernetesVolumeID(volumeSource.VolumeID), partition, devicePath)
+			path, err := verifyDevicePath(devicePaths)
+			if err != nil {
+				// Log error, if any, and continue checking periodically. See issue #11321
+				glog.Errorf("Error verifying AWS Volume (%q) is attached: %v", volumeID, err)
+			} else if path != "" {
+				// A device path has successfully been created for the PD
+				glog.Infof("Successfully found attached AWS Volume %q.", volumeID)
+				return path, nil
 			}
 		case <-timer.C:
 			return "", fmt.Errorf("Could not find attached AWS Volume %q. Timeout waiting for mount paths to be created.", volumeID)
