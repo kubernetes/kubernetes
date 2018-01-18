@@ -10,6 +10,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "doc.go",
+        "registry.go",
         "strategy.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/registry/batch/job",
@@ -18,6 +19,7 @@ go_library(
         "//pkg/api/pod:go_default_library",
         "//pkg/apis/batch:go_default_library",
         "//pkg/apis/batch/validation:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/apis/meta/internalversion:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/fields:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/labels:go_default_library",
