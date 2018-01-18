@@ -185,6 +185,12 @@ message CSIPersistentVolumeSource {
   // Defaults to false (read/write).
   // +optional
   optional bool readOnly = 3;
+
+  // Filesystem type to mount.
+  // Must be a filesystem type supported by the host operating system.
+  // Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
+  // +optional
+  optional string fsType = 4;
 }
 
 // Adds and removes POSIX capabilities from running containers.

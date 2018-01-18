@@ -619,6 +619,7 @@ func autoConvert_v1_CSIPersistentVolumeSource_To_core_CSIPersistentVolumeSource(
 	out.Driver = in.Driver
 	out.VolumeHandle = in.VolumeHandle
 	out.ReadOnly = in.ReadOnly
+	out.FSType = in.FSType
 	return nil
 }
 
@@ -631,6 +632,7 @@ func autoConvert_core_CSIPersistentVolumeSource_To_v1_CSIPersistentVolumeSource(
 	out.Driver = in.Driver
 	out.VolumeHandle = in.VolumeHandle
 	out.ReadOnly = in.ReadOnly
+	out.FSType = in.FSType
 	return nil
 }
 
