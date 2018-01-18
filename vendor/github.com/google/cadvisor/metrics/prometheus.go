@@ -317,6 +317,36 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc) *PrometheusCo
 					return values
 				},
 			}, {
+				name:        "container_accelerator_encoder_utilization",
+				help:        "Accelerator encoder utilization",
+				valueType:   prometheus.GaugeValue,
+				extraLabels: []string{"make", "model", "acc_id"},
+				getValues: func(s *info.ContainerStats) metricValues {
+					values := make(metricValues, 0, len(s.Accelerators))
+					for _, value := range s.Accelerators {
+						values = append(values, metricValue{
+							value:  float64(value.EncoderUtilization),
+							labels: []string{value.Make, value.Model, value.ID},
+						})
+					}
+					return values
+				},
+			}, {
+				name:        "container_accelerator_decoder_utilization",
+				help:        "Accelerator decoder utilization",
+				valueType:   prometheus.GaugeValue,
+				extraLabels: []string{"make", "model", "acc_id"},
+				getValues: func(s *info.ContainerStats) metricValues {
+					values := make(metricValues, 0, len(s.Accelerators))
+					for _, value := range s.Accelerators {
+						values = append(values, metricValue{
+							value:  float64(value.DecoderUtilization),
+							labels: []string{value.Make, value.Model, value.ID},
+						})
+					}
+					return values
+				},
+			}, {
 				name:        "container_fs_inodes_free",
 				help:        "Number of available Inodes",
 				valueType:   prometheus.GaugeValue,

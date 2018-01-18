@@ -220,6 +220,14 @@ func (nc *NvidiaCollector) UpdateStats(stats *info.ContainerStats) error {
 		if err != nil {
 			return fmt.Errorf("error while getting gpu memory info: %v", err)
 		}
+		utilizationEncoder, _, err := device.EncoderUtilization()
+		if err != nil {
+			return fmt.Errorf("error while getting gpu encoder info: %v", err)
+		}
+		utilizationDecoder, _, err := device.DecoderUtilization()
+		if err != nil {
+			return fmt.Errorf("error while getting gpu decoder info: %v", err)
+		}
 		//TODO: Use housekeepingInterval
 		utilizationGPU, err := device.AverageGPUUtilization(10 * time.Second)
 		if err != nil {
@@ -227,12 +235,14 @@ func (nc *NvidiaCollector) UpdateStats(stats *info.ContainerStats) error {
 		}
 
 		stats.Accelerators = append(stats.Accelerators, info.AcceleratorStats{
-			Make:        "nvidia",
-			Model:       model,
-			ID:          uuid,
-			MemoryTotal: memoryTotal,
-			MemoryUsed:  memoryUsed,
-			DutyCycle:   uint64(utilizationGPU),
+			Make:               "nvidia",
+			Model:              model,
+			ID:                 uuid,
+			MemoryTotal:        memoryTotal,
+			MemoryUsed:         memoryUsed,
+			DutyCycle:          uint64(utilizationGPU),
+			EncoderUtilization: uint64(utilizationEncoder),
+			DecoderUtilization: uint64(utilizationDecoder),
 		})
 	}
 	return nil

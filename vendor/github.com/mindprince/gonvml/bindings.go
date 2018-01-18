@@ -111,6 +111,22 @@ nvmlReturn_t nvmlDeviceGetPowerUsage(nvmlDevice_t device, unsigned int *power) {
   return nvmlDeviceGetPowerUsageFunc(device, power);
 }
 
+nvmlReturn_t (*nvmlDeviceGetEncoderUtilizationFunc)(nvmlDevice_t device, unsigned int* utilization, unsigned int* samplingPeriodUs);
+nvmlReturn_t nvmlDeviceGetEncoderUtilization(nvmlDevice_t device, unsigned int* utilization, unsigned int* samplingPeriodUs) {
+  if (nvmlDeviceGetEncoderUtilizationFunc == NULL) {
+    return NVML_ERROR_FUNCTION_NOT_FOUND;
+  }
+  return nvmlDeviceGetEncoderUtilizationFunc(device, utilization, samplingPeriodUs);
+}
+
+nvmlReturn_t (*nvmlDeviceGetDecoderUtilizationFunc)(nvmlDevice_t device, unsigned int* utilization, unsigned int* samplingPeriodUs);
+nvmlReturn_t nvmlDeviceGetDecoderUtilization(nvmlDevice_t device, unsigned int* utilization, unsigned int* samplingPeriodUs) {
+  if (nvmlDeviceGetDecoderUtilizationFunc == NULL) {
+    return NVML_ERROR_FUNCTION_NOT_FOUND;
+  }
+  return nvmlDeviceGetDecoderUtilizationFunc(device, utilization, samplingPeriodUs);
+}
+
 nvmlReturn_t (*nvmlDeviceGetSamplesFunc)(nvmlDevice_t device, nvmlSamplingType_t type, unsigned long long lastSeenTimeStamp, nvmlValueType_t *sampleValType, unsigned int *sampleCount, nvmlSample_t *samples);
 
 // Loads the "libnvidia-ml.so.1" shared library.
@@ -173,6 +189,14 @@ nvmlReturn_t nvmlInit_dl(void) {
   if (nvmlDeviceGetSamplesFunc == NULL) {
     return NVML_ERROR_FUNCTION_NOT_FOUND;
   }
+  nvmlDeviceGetEncoderUtilizationFunc = dlsym(nvmlHandle, "nvmlDeviceGetEncoderUtilization");
+  if (nvmlDeviceGetEncoderUtilizationFunc == NULL) {
+    return NVML_ERROR_FUNCTION_NOT_FOUND;
+  }
+  nvmlDeviceGetDecoderUtilizationFunc = dlsym(nvmlHandle, "nvmlDeviceGetDecoderUtilization");
+  if (nvmlDeviceGetDecoderUtilizationFunc == NULL) {
+    return NVML_ERROR_FUNCTION_NOT_FOUND;
+  } 
   nvmlReturn_t result = nvmlInitFunc();
   if (result != NVML_SUCCESS) {
     dlclose(nvmlHandle);
@@ -428,4 +452,24 @@ func (d Device) AverageGPUUtilization(since time.Duration) (uint, error) {
 	var n C.uint
 	r := C.nvmlDeviceGetAverageUsage(d.dev, C.NVML_GPU_UTILIZATION_SAMPLES, lastTs, &n)
 	return uint(n), errorString(r)
+}
+
+func (d Device) EncoderUtilization() (uint, uint, error) {
+	if C.nvmlHandle == nil {
+		return 0, 0, errLibraryNotLoaded
+  }
+  var n C.uint
+  var sp C.uint
+  r := C.nvmlDeviceGetEncoderUtilization(d.dev, &n, &sp)
+  return uint(n), uint(sp), errorString(r) 
+}
+
+func (d Device) DecoderUtilization() (uint, uint, error){
+	if C.nvmlHandle == nil {
+		return 0, 0, errLibraryNotLoaded
+  }
+  var n C.uint
+  var sp C.uint
+  r := C.nvmlDeviceGetDecoderUtilization(d.dev, &n, &sp)
+  return uint(n), uint(sp), errorString(r) 
 }

@@ -547,6 +547,12 @@ type AcceleratorStats struct {
 	// Percent of time over the past sample period during which
 	// the accelerator was actively processing.
 	DutyCycle uint64 `json:"duty_cycle"`
+
+	// Utilization of encoder
+	EncoderUtilization uint64 `json:encoder_utilization`
+
+	// Utilization of decoder
+	DecoderUtilization uint64 `json:decoder_utilization`
 }
 
 type ContainerStats struct {
