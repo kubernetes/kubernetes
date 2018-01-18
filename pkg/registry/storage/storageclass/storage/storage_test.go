@@ -57,10 +57,6 @@ func validNewStorageClass(name string) *storageapi.StorageClass {
 	}
 }
 
-func validChangedStorageClass() *storageapi.StorageClass {
-	return validNewStorageClass("foo")
-}
-
 func TestCreate(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)

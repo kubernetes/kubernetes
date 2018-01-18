@@ -194,7 +194,6 @@ func (f *fakePodDeletionProvider) IsPodDeleted(uid types.UID) bool {
 
 type fakeUnitGetter struct {
 	networkNamespace kubecontainer.ContainerID
-	callServices     []string
 }
 
 func newfakeUnitGetter() *fakeUnitGetter {

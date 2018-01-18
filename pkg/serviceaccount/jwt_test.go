@@ -80,17 +80,6 @@ X024wzbiw1q07jFCyfQmODzURAx1VNT7QVUMdz/N8vy47/H40AZJ
 -----END RSA PRIVATE KEY-----
 `
 
-// openssl ecparam -name prime256v1 -genkey -out ecdsa256params.pem
-const ecdsaPrivateKeyWithParams = `-----BEGIN EC PARAMETERS-----
-BggqhkjOPQMBBw==
------END EC PARAMETERS-----
------BEGIN EC PRIVATE KEY-----
-MHcCAQEEIJ9LWDj3ZWe9CksPV7mZjD2dYXG9icfzxadCRwd3vr1toAoGCCqGSM49
-AwEHoUQDQgAEaLNEpzbaaNTCkKjBVj7sxpfJ1ifJQGNvcck4nrzcwFRuujwVDDJh
-95iIGwKCQeSg+yhdN6Q/p2XaxNIZlYmUhg==
------END EC PRIVATE KEY-----
-`
-
 // openssl ecparam -name prime256v1 -genkey -noout -out ecdsa256.pem
 const ecdsaPrivateKey = `-----BEGIN EC PRIVATE KEY-----
 MHcCAQEEIEZmTmUhuanLjPA2CLquXivuwBDHTt5XYwgIr/kA1LtRoAoGCCqGSM49

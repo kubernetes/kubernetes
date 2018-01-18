@@ -286,9 +286,9 @@ func TestAttach(t *testing.T) {
 func TestAttachWarnings(t *testing.T) {
 	version := legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion.Version
 	tests := []struct {
-		name, container, version, podPath, fetchPodPath, expectedErr, expectedOut string
-		pod                                                                       *api.Pod
-		stdin, tty                                                                bool
+		name, container, version, podPath, fetchPodPath, expectedErr string
+		pod                                                          *api.Pod
+		stdin, tty                                                   bool
 	}{
 		{
 			name:         "fallback tty if not supported",
