@@ -74,9 +74,9 @@ type StorageClass struct {
 
 	// Secrets for authentication and authorization against a storage backend,
 	// which is described by the StorageClass object. CredentialID is the key, to
-	// select corresponding SecretRef
+	// select corresponding Secret.
 	// +optional
-	SecretRefs map[string]api.SecretReference
+	SecretRefs map[string]string
 
 	// VolumeBindingMode indicates how PersistentVolumeClaims should be
 	// provisioned and bound.  When unset, VolumeBindingImmediate is used.
