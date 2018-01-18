@@ -38,7 +38,7 @@ const (
 )
 
 //Tests List of internal tests.
-var Tests = []controlplane.ControlPlaneTests{
+var Tests = []controlplane.Tests{
 	{Name: "Statefulset", F: statefulsetUpgrades},
 }
 
@@ -66,16 +66,16 @@ func statefulsetUpgrades(t *testing.T, controlPlane *controlplane.ControlPlane) 
 	ssSrvInput := framework.CreateStatefulSetService(svcName, labels)
 	ssInput := framework.NewStatefulSet(ssName, TestNamespace, svcName, int32(replica), []v1.VolumeMount{}, []v1.VolumeMount{}, labels)
 
-	_, err := controlPlane.Cli.Core().Services(TestNamespace).Create(ssSrvInput)
+	_, err := controlPlane.Client.Core().Services(TestNamespace).Create(ssSrvInput)
 	controlplane.CheckErrors(t, err, "While Creating headless service")
 
-	_, err = controlPlane.Cli.AppsV1beta1().StatefulSets(TestNamespace).Create(ssInput)
+	_, err = controlPlane.Client.AppsV1beta1().StatefulSets(TestNamespace).Create(ssInput)
 	controlplane.CheckErrors(t, err, "While Creating statefulset")
 
 	t.Run("wait-for-Statefulset", func(t *testing.T) {
 
 		err = wait.Poll(time.Millisecond*10, time.Minute, func() (bool, error) {
-			pods, err := controlPlane.Cli.Core().Pods(TestNamespace).List(v1meta.ListOptions{LabelSelector: "app=test"})
+			pods, err := controlPlane.Client.Core().Pods(TestNamespace).List(v1meta.ListOptions{LabelSelector: "app=test"})
 			controlplane.CheckErrors(t, err, "While trying to list the pods")
 			if len(pods.Items) == replica {
 				return true, nil
@@ -91,12 +91,12 @@ func statefulsetUpgrades(t *testing.T, controlPlane *controlplane.ControlPlane) 
 
 		//Change the image
 		ssInput.Spec.Template.Spec.Containers[0].Image = "new-image:latest"
-		_, err = controlPlane.Cli.AppsV1beta1().StatefulSets(TestNamespace).Update(ssInput)
+		_, err = controlPlane.Client.AppsV1beta1().StatefulSets(TestNamespace).Update(ssInput)
 		controlplane.CheckErrors(t, err, "While trying to update the statefulset image")
 
 		err = wait.Poll(time.Millisecond*10, time.Minute, func() (bool, error) {
 
-			pods, err := controlPlane.Cli.Core().Pods(TestNamespace).List(v1meta.ListOptions{LabelSelector: "app=test"})
+			pods, err := controlPlane.Client.Core().Pods(TestNamespace).List(v1meta.ListOptions{LabelSelector: "app=test"})
 			controlplane.CheckErrors(t, err, "While trying to list the pods")
 			for _, p := range pods.Items {
 				for _, c := range p.Spec.Containers {
@@ -118,7 +118,7 @@ func statefulsetUpgrades(t *testing.T, controlPlane *controlplane.ControlPlane) 
 	t.Run("Default-VerifyOrderinalCreationOrder", func(t *testing.T) {
 
 		podOrdinalMap := make(map[string]time.Time)
-		pods, err := controlPlane.Cli.Core().Pods(TestNamespace).List(v1meta.ListOptions{LabelSelector: "app=test"})
+		pods, err := controlPlane.Client.Core().Pods(TestNamespace).List(v1meta.ListOptions{LabelSelector: "app=test"})
 		controlplane.CheckErrors(t, err, "While trying to list the pods")
 
 		for _, p := range pods.Items {

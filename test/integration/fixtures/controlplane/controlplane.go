@@ -50,8 +50,8 @@ import (
 //KubeConfFileName The filename kubeconfig file is created with
 const KubeConfFileName = "kubeconfig"
 
-//ControlPlaneTests creates a common type for creating and adding tests using this framework
-type ControlPlaneTests struct {
+//Tests creates a common type for creating and adding tests using this framework
+type Tests struct {
 	Name string
 	F    func(t *testing.T, controlPlane *ControlPlane)
 }
@@ -114,7 +114,7 @@ type ControllerManager struct {
 	Port int
 }
 
-//Start Starts a Controlelr Manager
+//Start starts a Controller Manager
 func (cm *ControllerManager) Start(t *testing.T, cli *restclient.Config, KubeConfigFilePath string) error {
 
 	var err error
@@ -143,11 +143,11 @@ func (cm *ControllerManager) Start(t *testing.T, cli *restclient.Config, KubeCon
 		}
 	}(t)
 
-	t.Logf("Waiting for the controlelr manager to come up Port=%d CM.Port=%d", cm.Port, cm.Opt.Port)
+	t.Logf("Waiting for the controller manager to come up Port=%d CM.Port=%d", cm.Port, cm.Opt.Port)
 
 	url := fmt.Sprintf("http://0.0.0.0:%d/healthz", cm.Port)
 
-	//Wait until the controller manafer is up
+	//Wait until the controller manager is up
 	err = wait.Poll(time.Millisecond*100, time.Minute, func() (bool, error) {
 		time.Sleep(time.Millisecond * 100)
 		if Healthz(url) {
@@ -160,7 +160,7 @@ func (cm *ControllerManager) Start(t *testing.T, cli *restclient.Config, KubeCon
 		t.Fatalf("Control Manager failed to start started=%v\n", err)
 	}
 
-	t.Logf("Controlelr manager started...\n")
+	t.Logf("Controller manager started...\n")
 
 	return err
 }
@@ -213,13 +213,13 @@ func (sc *Scheduler) Start(t *testing.T, cli *restclient.Config, KubeConfigFileP
 	return nil
 }
 
-//ControlPlane Identifiles starts a control plane
+//ControlPlane starts a control plane
 type ControlPlane struct {
 	Name              string
 	APIServer         APIServer
 	ControllerManager ControllerManager
 	Scheduler         Scheduler
-	Cli               *kubernetes.Clientset
+	Client            *kubernetes.Clientset
 	Conf              *clientcmdapi.Config
 }
 
@@ -227,7 +227,7 @@ type ControlPlane struct {
 func (cp *ControlPlane) Start(t *testing.T) error {
 
 	cp.APIServer.Start(t)
-	cp.Cli, _ = kubernetes.NewForConfig(cp.APIServer.ClientConfig)
+	cp.Client, _ = kubernetes.NewForConfig(cp.APIServer.ClientConfig)
 
 	certPem, keyPem, err := certutil.GenerateSelfSignedCertKey(server.LoopbackClientServerNameOverride, nil, nil)
 	if err != nil {

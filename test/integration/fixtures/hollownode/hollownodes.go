@@ -54,13 +54,13 @@ const (
 type Config struct {
 
 	//Client information
-	Cli *clientset.Clientset
+	Client *clientset.Clientset
 
 	//Master Related Configs
 	Master string
 
 	//A Common Namespace used mostly for Tests
-	NameSpace string
+	Namespace string
 
 	Nodes *HollowNodes
 
@@ -185,18 +185,19 @@ func createDIR(t *testing.T, dirname string) {
 func (hn *HollowNode) Run() {
 
 	go hn.HollowKubelet.Run()
+	//Give it a second before starting another hollow kubelet
 	time.Sleep(time.Second)
 }
 
 //HollowNodes Map of nodes we might need to lookup in the tests.
 type HollowNodes struct {
-	N map[string]*HollowNode //A Map of hollow nodes
+	Nodes map[string]*HollowNode //A Map of hollow nodes
 
 }
 
 //Add simply adds the hollownode to the lookup map
 func (hns *HollowNodes) Add(hn *HollowNode) {
-	hns.N[hn.Name] = hn
+	hns.Nodes[hn.Name] = hn
 }
 
 // ListContainers ListContainers prints all the containers from the fake Docker client from all the nodes
@@ -206,7 +207,7 @@ func (hns *HollowNodes) ListContainers() []string {
 	var opt dockertypes.ContainerListOptions
 	opt.All = true
 
-	for _, n := range hns.N {
+	for _, n := range hns.Nodes {
 		containers, _ := n.DockerCli.ListContainers(opt)
 		for _, c := range containers {
 			result = append(result, n.Name+":"+c.ID)
@@ -224,9 +225,9 @@ func InitNodes(t *testing.T, serverPath string, insecurePort int) error {
 	// Get the root data
 	Cfg.RootDir = serverPath
 	Cfg.Master = fmt.Sprintf("http://localhost:%d", insecurePort)
-	Cfg.NameSpace = NameSpace
-	Cfg.Nodes = &HollowNodes{N: make(map[string]*HollowNode)}
-	Cfg.Cli = createCli(t)
+	Cfg.Namespace = NameSpace
+	Cfg.Nodes = &HollowNodes{Nodes: make(map[string]*HollowNode)}
+	Cfg.Client = createCli(t)
 	t.Logf("Creating %d Hollow-nodes...\n", NumNodes)
 
 	createDIR(t, Cfg.RootDir+"/nodes")

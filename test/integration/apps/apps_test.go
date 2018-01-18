@@ -29,7 +29,7 @@ import (
 //RunBySuite Below flag will be set to 'True' if run the by the script via go test -ldflags
 var RunBySuite string
 
-var Tests = []controlplane.ControlPlaneTests{
+var Tests = []controlplane.Tests{
 	{Name: upgrades.TestPkgName, F: upgrades.RunTests},
 }
 
@@ -50,7 +50,7 @@ func Setup(t *testing.T) error {
 	ns.Name = "testing"
 	ns.ObjectMeta.Name = "testing"
 
-	_, err := controlPlane.Cli.Core().Namespaces().Create(&ns)
+	_, err := controlPlane.Client.Core().Namespaces().Create(&ns)
 	if err != nil {
 		t.Fatalf("Error creating namespace =%v", err)
 	}
