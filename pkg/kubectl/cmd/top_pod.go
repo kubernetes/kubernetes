@@ -78,7 +78,8 @@ func NewCmdTopPod(f cmdutil.Factory, options *TopPodOptions, out io.Writer) *cob
 	}
 
 	cmd := &cobra.Command{
-		Use:     "pod [NAME | -l label]",
+		Use: "pod [NAME | -l label]",
+		DisableFlagsInUseLine: true,
 		Short:   i18n.T("Display Resource (CPU/Memory/Storage) usage of pods"),
 		Long:    topPodLong,
 		Example: topPodExample,

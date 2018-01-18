@@ -89,7 +89,8 @@ func NewCmdTopNode(f cmdutil.Factory, options *TopNodeOptions, out io.Writer) *c
 	}
 
 	cmd := &cobra.Command{
-		Use:     "node [NAME | -l label]",
+		Use: "node [NAME | -l label]",
+		DisableFlagsInUseLine: true,
 		Short:   i18n.T("Display Resource (CPU/Memory/Storage) usage of nodes"),
 		Long:    topNodeLong,
 		Example: topNodeExample,

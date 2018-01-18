@@ -102,7 +102,8 @@ func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 	var description string
 	var printJoinCommand bool
 	createCmd := &cobra.Command{
-		Use:   "create [token]",
+		Use: "create [token]",
+		DisableFlagsInUseLine: true,
 		Short: "Create bootstrap tokens on the server.",
 		Long: dedent.Dedent(`
 			This command will create a bootstrap token for you.
@@ -156,7 +157,8 @@ func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 	tokenCmd.AddCommand(listCmd)
 
 	deleteCmd := &cobra.Command{
-		Use:   "delete [token-value]",
+		Use: "delete [token-value]",
+		DisableFlagsInUseLine: true,
 		Short: "Delete bootstrap tokens on the server.",
 		Long: dedent.Dedent(`
 			This command will delete a given bootstrap token for you.

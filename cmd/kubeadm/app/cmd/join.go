@@ -111,7 +111,7 @@ func NewCmdJoin(out io.Writer) *cobra.Command {
 	var ignorePreflightErrors []string
 
 	cmd := &cobra.Command{
-		Use:   "join [flags]",
+		Use:   "join",
 		Short: "Run this on any machine you wish to join an existing cluster",
 		Long:  joinLongDescription,
 		Run: func(cmd *cobra.Command, args []string) {
