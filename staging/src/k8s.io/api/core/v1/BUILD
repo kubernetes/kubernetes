@@ -30,6 +30,7 @@ go_library(
         "toleration.go",
         "types.go",
         "types_swagger_doc_generated.go",
+        "utils.go",
         "zz_generated.deepcopy.go",
     ],
     importpath = "k8s.io/api/core/v1",
