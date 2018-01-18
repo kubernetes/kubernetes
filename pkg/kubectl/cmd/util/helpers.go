@@ -114,20 +114,19 @@ var ErrExit = fmt.Errorf("exit")
 // OperationFailedUnchangedExit may be passed to CheckError to instruct it to operation succeed but unchanged
 var OperationFailedUnchangedExit = fmt.Errorf("unchanged error")
 
-var unchanged = true
-
-// IdempotentOperationObjectCheck used for check if two objects equal
-func IdempotentOperationObjectCheck(flag bool, objA, objB runtime.Object) {
+// IdempotentOperationObjectUnchanged used for check if two objects equal
+func IdempotentOperationObjectUnchanged(flag bool, objA, objB runtime.Object) bool {
 	if flag && !reflect.DeepEqual(objA, objB) {
-		unchanged = false
+		return false
 	}
+	return true
 }
 
 // IdempotentOperationErrorReturn first check the `--error-unchanged` flag if command set to true
 // and then if the command operation applied without any changes or use dry-run mode
 // we will return OperationFailedUnchangedExit error, otherwise return nil
-func IdempotentOperationErrorReturn(flag, dryRun bool) error {
-	if flag && (unchanged || dryRun) {
+func IdempotentOperationErrorReturn(flag, dryRun, unchanged bool) error {
+	if !dryRun && flag && unchanged {
 		return OperationFailedUnchangedExit
 	}
 	return nil

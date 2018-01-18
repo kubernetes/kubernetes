@@ -262,6 +262,7 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 
 	visitedUids := sets.NewString()
 	visitedNamespaces := sets.NewString()
+	didNotApply := true
 
 	count := 0
 	err = r.Visit(func(info *resource.Info, err error) error {
@@ -354,7 +355,7 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 				return cmdutil.AddSourceToErr(fmt.Sprintf("applying patch:\n%s\nto:\n%v\nfor:", patchBytes, info), info.Source, err)
 			}
 
-			cmdutil.IdempotentOperationObjectCheck(options.errorUnchanged, info.Object, patchedObject)
+			didNotApply = cmdutil.IdempotentOperationObjectUnchanged(options.errorUnchanged, info.Object, patchedObject)
 
 			info.Refresh(patchedObject, true)
 
@@ -386,7 +387,7 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 	}
 
 	if !options.Prune {
-		return cmdutil.IdempotentOperationErrorReturn(options.errorUnchanged, dryRun)
+		return cmdutil.IdempotentOperationErrorReturn(options.errorUnchanged, didNotApply, dryRun)
 	}
 
 	p := pruner{
@@ -422,7 +423,7 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 		}
 	}
 
-	return cmdutil.IdempotentOperationErrorReturn(options.errorUnchanged, dryRun)
+	return cmdutil.IdempotentOperationErrorReturn(options.errorUnchanged, didNotApply, dryRun)
 }
 
 type pruneResource struct {

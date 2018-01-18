@@ -52,6 +52,8 @@ type PatchOptions struct {
 	DryRun bool
 
 	OutputFormat string
+
+	errorUnchanged bool
 }
 
 var (
@@ -101,6 +103,7 @@ func NewCmdPatch(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd.Flags().StringP("patch", "p", "", "The patch to be applied to the resource JSON file.")
 	cmd.MarkFlagRequired("patch")
 	cmd.Flags().String("type", "strategic", fmt.Sprintf("The type of patch being provided; one of %v", sets.StringKeySet(patchTypes).List()))
+	cmd.Flags().BoolVar(&options.errorUnchanged, "error-unchanged", false, "if set to true the exit code will be 3 on no differences found")
 	cmdutil.AddPrinterFlags(cmd)
 	cmdutil.AddRecordFlag(cmd)
 	cmdutil.AddDryRunFlag(cmd)
@@ -203,12 +206,8 @@ func RunPatch(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []strin
 			}
 			cmdutil.PrintSuccess(options.OutputFormat == "name", out, info.Object, false, patchOperation(didPatch))
 
-			// if object was not successfully patched, exit with error code 1
-			if !didPatch {
-				return cmdutil.ErrExit
-			}
-
-			return nil
+			// if object was not successfully patched and --error-unchanged=true, exit with error code 3
+			return cmdutil.IdempotentOperationErrorReturn(options.errorUnchanged, options.Local, !didPatch)
 		}
 
 		count++
