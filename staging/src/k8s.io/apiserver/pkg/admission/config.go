@@ -96,6 +96,18 @@ func ReadAdmissionConfiguration(pluginNames []string, configFilePath string, con
 	if !(runtime.IsMissingVersion(err) || runtime.IsMissingKind(err) || runtime.IsNotRegisteredError(err)) {
 		return nil, err
 	}
+
+	// Only tolerate load errors if the file appears to be one of the two legacy plugin configs
+	unstructuredData := map[string]interface{}{}
+	if err2 := yaml.Unmarshal(data, &unstructuredData); err2 != nil {
+		return nil, err
+	}
+	_, isLegacyImagePolicy := unstructuredData["imagePolicy"]
+	_, isLegacyPodNodeSelector := unstructuredData["podNodeSelectorPluginConfig"]
+	if !isLegacyImagePolicy && !isLegacyPodNodeSelector {
+		return nil, err
+	}
+
 	// convert the legacy format to the new admission control format
 	// in order to preserve backwards compatibility, we set plugins that
 	// previously read input from a non-versioned file configuration to the
