@@ -824,7 +824,7 @@
       "items": {
        "type": "string"
       },
-      "description": "CredentialID is the string slice of IDs to use for authentication and authorization against the storage backend. The value of CredentialID is used as a key SecretRefs map to select the corresponding Secret object."
+      "description": "CredentialID is the string slice of IDs to use for authentication and authorization against the storage backend. The value of CredentialID is used as a key SecretRefs map to select the corresponding Secret."
      },
      "secretRefs": {
       "type": "object",

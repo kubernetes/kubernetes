@@ -83115,7 +83115,7 @@
       "type": "string"
      },
      "credentialIDs": {
-      "description": "CredentialID is the string slice of IDs to use for authentication and authorization against the storage backend. The value of CredentialID is used as a key SecretRefs map to select the corresponding Secret object.",
+      "description": "CredentialID is the string slice of IDs to use for authentication and authorization against the storage backend. The value of CredentialID is used as a key SecretRefs map to select the corresponding Secret.",
       "type": "array",
       "items": {
        "type": "string"
@@ -83155,7 +83155,7 @@
       "description": "Secrets for authentication and authorization against a storage backend, which is described by the StorageClass object. CredentialID is the key, to select corresponding SecretRef",
       "type": "object",
       "additionalProperties": {
-       "$ref": "#/definitions/io.k8s.api.core.v1.SecretReference"
+       "type": "string"
       }
      },
      "volumeBindingMode": {
@@ -83360,7 +83360,7 @@
       "type": "string"
      },
      "credentialIDs": {
-      "description": "CredentialID is the string slice of IDs to use for authentication and authorization against the storage backend. The value of CredentialID is used as a key SecretRefs map to select the corresponding Secret object.",
+      "description": "CredentialID is the string slice of IDs to use for authentication and authorization against the storage backend. The value of CredentialID is used as a key SecretRefs map to select the corresponding Secret.",
       "type": "array",
       "items": {
        "type": "string"
@@ -83400,7 +83400,7 @@
       "description": "Secrets for authentication and authorization against a storage backend, which is described by the StorageClass object. CredentialID is the key, to select corresponding SecretRef",
       "type": "object",
       "additionalProperties": {
-       "$ref": "#/definitions/io.k8s.api.core.v1.SecretReference"
+       "type": "string"
       }
      },
      "volumeBindingMode": {
