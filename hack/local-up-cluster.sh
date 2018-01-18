@@ -608,6 +608,9 @@ function start_controller_manager {
     cloud_config_arg="--cloud-provider=${CLOUD_PROVIDER} --cloud-config=${CLOUD_CONFIG}"
     if [[ "${EXTERNAL_CLOUD_PROVIDER:-}" == "true" ]]; then
       cloud_config_arg="--cloud-provider=external"
+      cloud_config_arg+=" --external-cloud-volume-plugin=${CLOUD_PROVIDER}"
+      cloud_config_arg+=" --cloud-config=${CLOUD_CONFIG}"
+      cloud_config_arg+=" --provider-id=$(hostname)"
     fi
 
     CTLRMGR_LOG=${LOG_DIR}/kube-controller-manager.log
