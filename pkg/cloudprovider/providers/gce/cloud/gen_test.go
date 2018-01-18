@@ -51,44 +51,44 @@ func TestAddressesGroup(t *testing.T) {
 	_, _, _ = ctx, mock, key
 
 	// Get not found.
-	if _, err := mock.AlphaAddresses().Get(ctx, *key); err == nil {
+	if _, err := mock.AlphaAddresses().Get(ctx, key); err == nil {
 		t.Errorf("AlphaAddresses().Get(%v, %v) = _, nil; want error", ctx, key)
 	}
-	if _, err := mock.BetaAddresses().Get(ctx, *key); err == nil {
+	if _, err := mock.BetaAddresses().Get(ctx, key); err == nil {
 		t.Errorf("BetaAddresses().Get(%v, %v) = _, nil; want error", ctx, key)
 	}
-	if _, err := mock.Addresses().Get(ctx, *key); err == nil {
+	if _, err := mock.Addresses().Get(ctx, key); err == nil {
 		t.Errorf("Addresses().Get(%v, %v) = _, nil; want error", ctx, key)
 	}
 
 	// Insert.
 	{
 		obj := &alpha.Address{}
-		if err := mock.AlphaAddresses().Insert(ctx, *keyAlpha, obj); err != nil {
-			t.Errorf("AlphaAddresses().Insert(%v, %v, %v) = %v; want nil", ctx, key, obj, err)
+		if err := mock.AlphaAddresses().Insert(ctx, keyAlpha, obj); err != nil {
+			t.Errorf("AlphaAddresses().Insert(%v, %v, %v) = %v; want nil", ctx, keyAlpha, obj, err)
 		}
 	}
 	{
 		obj := &beta.Address{}
-		if err := mock.BetaAddresses().Insert(ctx, *keyBeta, obj); err != nil {
-			t.Errorf("BetaAddresses().Insert(%v, %v, %v) = %v; want nil", ctx, key, obj, err)
+		if err := mock.BetaAddresses().Insert(ctx, keyBeta, obj); err != nil {
+			t.Errorf("BetaAddresses().Insert(%v, %v, %v) = %v; want nil", ctx, keyBeta, obj, err)
 		}
 	}
 	{
 		obj := &ga.Address{}
-		if err := mock.Addresses().Insert(ctx, *keyGA, obj); err != nil {
-			t.Errorf("Addresses().Insert(%v, %v, %v) = %v; want nil", ctx, key, obj, err)
+		if err := mock.Addresses().Insert(ctx, keyGA, obj); err != nil {
+			t.Errorf("Addresses().Insert(%v, %v, %v) = %v; want nil", ctx, keyGA, obj, err)
 		}
 	}
 
 	// Get across versions.
-	if obj, err := mock.AlphaAddresses().Get(ctx, *key); err != nil {
+	if obj, err := mock.AlphaAddresses().Get(ctx, key); err != nil {
 		t.Errorf("AlphaAddresses().Get(%v, %v) = %v, %v; want nil", ctx, key, obj, err)
 	}
-	if obj, err := mock.BetaAddresses().Get(ctx, *key); err != nil {
+	if obj, err := mock.BetaAddresses().Get(ctx, key); err != nil {
 		t.Errorf("BetaAddresses().Get(%v, %v) = %v, %v; want nil", ctx, key, obj, err)
 	}
-	if obj, err := mock.Addresses().Get(ctx, *key); err != nil {
+	if obj, err := mock.Addresses().Get(ctx, key); err != nil {
 		t.Errorf("Addresses().Get(%v, %v) = %v, %v; want nil", ctx, key, obj, err)
 	}
 
@@ -146,25 +146,25 @@ func TestAddressesGroup(t *testing.T) {
 	}
 
 	// Delete across versions.
-	if err := mock.AlphaAddresses().Delete(ctx, *keyAlpha); err != nil {
-		t.Errorf("AlphaAddresses().Delete(%v, %v) = %v; want nil", ctx, key, err)
+	if err := mock.AlphaAddresses().Delete(ctx, keyAlpha); err != nil {
+		t.Errorf("AlphaAddresses().Delete(%v, %v) = %v; want nil", ctx, keyAlpha, err)
 	}
-	if err := mock.BetaAddresses().Delete(ctx, *keyBeta); err != nil {
-		t.Errorf("BetaAddresses().Delete(%v, %v) = %v; want nil", ctx, key, err)
+	if err := mock.BetaAddresses().Delete(ctx, keyBeta); err != nil {
+		t.Errorf("BetaAddresses().Delete(%v, %v) = %v; want nil", ctx, keyBeta, err)
 	}
-	if err := mock.Addresses().Delete(ctx, *keyGA); err != nil {
-		t.Errorf("Addresses().Delete(%v, %v) = %v; want nil", ctx, key, err)
+	if err := mock.Addresses().Delete(ctx, keyGA); err != nil {
+		t.Errorf("Addresses().Delete(%v, %v) = %v; want nil", ctx, keyGA, err)
 	}
 
 	// Delete not found.
-	if err := mock.AlphaAddresses().Delete(ctx, *keyAlpha); err == nil {
-		t.Errorf("AlphaAddresses().Delete(%v, %v) = nil; want error", ctx, key)
+	if err := mock.AlphaAddresses().Delete(ctx, keyAlpha); err == nil {
+		t.Errorf("AlphaAddresses().Delete(%v, %v) = nil; want error", ctx, keyAlpha)
 	}
-	if err := mock.BetaAddresses().Delete(ctx, *keyBeta); err == nil {
-		t.Errorf("BetaAddresses().Delete(%v, %v) = nil; want error", ctx, key)
+	if err := mock.BetaAddresses().Delete(ctx, keyBeta); err == nil {
+		t.Errorf("BetaAddresses().Delete(%v, %v) = nil; want error", ctx, keyBeta)
 	}
-	if err := mock.Addresses().Delete(ctx, *keyGA); err == nil {
-		t.Errorf("Addresses().Delete(%v, %v) = nil; want error", ctx, key)
+	if err := mock.Addresses().Delete(ctx, keyGA); err == nil {
+		t.Errorf("Addresses().Delete(%v, %v) = nil; want error", ctx, keyGA)
 	}
 }
 
@@ -183,32 +183,32 @@ func TestBackendServicesGroup(t *testing.T) {
 	_, _, _ = ctx, mock, key
 
 	// Get not found.
-	if _, err := mock.AlphaBackendServices().Get(ctx, *key); err == nil {
+	if _, err := mock.AlphaBackendServices().Get(ctx, key); err == nil {
 		t.Errorf("AlphaBackendServices().Get(%v, %v) = _, nil; want error", ctx, key)
 	}
-	if _, err := mock.BackendServices().Get(ctx, *key); err == nil {
+	if _, err := mock.BackendServices().Get(ctx, key); err == nil {
 		t.Errorf("BackendServices().Get(%v, %v) = _, nil; want error", ctx, key)
 	}
 
 	// Insert.
 	{
 		obj := &alpha.BackendService{}
-		if err := mock.AlphaBackendServices().Insert(ctx, *keyAlpha, obj); err != nil {
-			t.Errorf("AlphaBackendServices().Insert(%v, %v, %v) = %v; want nil", ctx, key, obj, err)
+		if err := mock.AlphaBackendServices().Insert(ctx, keyAlpha, obj); err != nil {
+			t.Errorf("AlphaBackendServices().Insert(%v, %v, %v) = %v; want nil", ctx, keyAlpha, obj, err)
 		}
 	}
 	{
 		obj := &ga.BackendService{}
-		if err := mock.BackendServices().Insert(ctx, *keyGA, obj); err != nil {
-			t.Errorf("BackendServices().Insert(%v, %v, %v) = %v; want nil", ctx, key, obj, err)
+		if err := mock.BackendServices().Insert(ctx, keyGA, obj); err != nil {
+			t.Errorf("BackendServices().Insert(%v, %v, %v) = %v; want nil", ctx, keyGA, obj, err)
 		}
 	}
 
 	// Get across versions.
-	if obj, err := mock.AlphaBackendServices().Get(ctx, *key); err != nil {
+	if obj, err := mock.AlphaBackendServices().Get(ctx, key); err != nil {
 		t.Errorf("AlphaBackendServices().Get(%v, %v) = %v, %v; want nil", ctx, key, obj, err)
 	}
-	if obj, err := mock.BackendServices().Get(ctx, *key); err != nil {
+	if obj, err := mock.BackendServices().Get(ctx, key); err != nil {
 		t.Errorf("BackendServices().Get(%v, %v) = %v, %v; want nil", ctx, key, obj, err)
 	}
 
@@ -250,19 +250,19 @@ func TestBackendServicesGroup(t *testing.T) {
 	}
 
 	// Delete across versions.
-	if err := mock.AlphaBackendServices().Delete(ctx, *keyAlpha); err != nil {
-		t.Errorf("AlphaBackendServices().Delete(%v, %v) = %v; want nil", ctx, key, err)
+	if err := mock.AlphaBackendServices().Delete(ctx, keyAlpha); err != nil {
+		t.Errorf("AlphaBackendServices().Delete(%v, %v) = %v; want nil", ctx, keyAlpha, err)
 	}
-	if err := mock.BackendServices().Delete(ctx, *keyGA); err != nil {
-		t.Errorf("BackendServices().Delete(%v, %v) = %v; want nil", ctx, key, err)
+	if err := mock.BackendServices().Delete(ctx, keyGA); err != nil {
+		t.Errorf("BackendServices().Delete(%v, %v) = %v; want nil", ctx, keyGA, err)
 	}
 
 	// Delete not found.
-	if err := mock.AlphaBackendServices().Delete(ctx, *keyAlpha); err == nil {
-		t.Errorf("AlphaBackendServices().Delete(%v, %v) = nil; want error", ctx, key)
+	if err := mock.AlphaBackendServices().Delete(ctx, keyAlpha); err == nil {
+		t.Errorf("AlphaBackendServices().Delete(%v, %v) = nil; want error", ctx, keyAlpha)
 	}
-	if err := mock.BackendServices().Delete(ctx, *keyGA); err == nil {
-		t.Errorf("BackendServices().Delete(%v, %v) = nil; want error", ctx, key)
+	if err := mock.BackendServices().Delete(ctx, keyGA); err == nil {
+		t.Errorf("BackendServices().Delete(%v, %v) = nil; want error", ctx, keyGA)
 	}
 }
 
@@ -281,32 +281,32 @@ func TestDisksGroup(t *testing.T) {
 	_, _, _ = ctx, mock, key
 
 	// Get not found.
-	if _, err := mock.AlphaDisks().Get(ctx, *key); err == nil {
+	if _, err := mock.AlphaDisks().Get(ctx, key); err == nil {
 		t.Errorf("AlphaDisks().Get(%v, %v) = _, nil; want error", ctx, key)
 	}
-	if _, err := mock.Disks().Get(ctx, *key); err == nil {
+	if _, err := mock.Disks().Get(ctx, key); err == nil {
 		t.Errorf("Disks().Get(%v, %v) = _, nil; want error", ctx, key)
 	}
 
 	// Insert.
 	{
 		obj := &alpha.Disk{}
-		if err := mock.AlphaDisks().Insert(ctx, *keyAlpha, obj); err != nil {
-			t.Errorf("AlphaDisks().Insert(%v, %v, %v) = %v; want nil", ctx, key, obj, err)
+		if err := mock.AlphaDisks().Insert(ctx, keyAlpha, obj); err != nil {
+			t.Errorf("AlphaDisks().Insert(%v, %v, %v) = %v; want nil", ctx, keyAlpha, obj, err)
 		}
 	}
 	{
 		obj := &ga.Disk{}
-		if err := mock.Disks().Insert(ctx, *keyGA, obj); err != nil {
-			t.Errorf("Disks().Insert(%v, %v, %v) = %v; want nil", ctx, key, obj, err)
+		if err := mock.Disks().Insert(ctx, keyGA, obj); err != nil {
+			t.Errorf("Disks().Insert(%v, %v, %v) = %v; want nil", ctx, keyGA, obj, err)
 		}
 	}
 
 	// Get across versions.
-	if obj, err := mock.AlphaDisks().Get(ctx, *key); err != nil {
+	if obj, err := mock.AlphaDisks().Get(ctx, key); err != nil {
 		t.Errorf("AlphaDisks().Get(%v, %v) = %v, %v; want nil", ctx, key, obj, err)
 	}
-	if obj, err := mock.Disks().Get(ctx, *key); err != nil {
+	if obj, err := mock.Disks().Get(ctx, key); err != nil {
 		t.Errorf("Disks().Get(%v, %v) = %v, %v; want nil", ctx, key, obj, err)
 	}
 
@@ -348,19 +348,19 @@ func TestDisksGroup(t *testing.T) {
 	}
 
 	// Delete across versions.
-	if err := mock.AlphaDisks().Delete(ctx, *keyAlpha); err != nil {
-		t.Errorf("AlphaDisks().Delete(%v, %v) = %v; want nil", ctx, key, err)
+	if err := mock.AlphaDisks().Delete(ctx, keyAlpha); err != nil {
+		t.Errorf("AlphaDisks().Delete(%v, %v) = %v; want nil", ctx, keyAlpha, err)
 	}
-	if err := mock.Disks().Delete(ctx, *keyGA); err != nil {
-		t.Errorf("Disks().Delete(%v, %v) = %v; want nil", ctx, key, err)
+	if err := mock.Disks().Delete(ctx, keyGA); err != nil {
+		t.Errorf("Disks().Delete(%v, %v) = %v; want nil", ctx, keyGA, err)
 	}
 
 	// Delete not found.
-	if err := mock.AlphaDisks().Delete(ctx, *keyAlpha); err == nil {
-		t.Errorf("AlphaDisks().Delete(%v, %v) = nil; want error", ctx, key)
+	if err := mock.AlphaDisks().Delete(ctx, keyAlpha); err == nil {
+		t.Errorf("AlphaDisks().Delete(%v, %v) = nil; want error", ctx, keyAlpha)
 	}
-	if err := mock.Disks().Delete(ctx, *keyGA); err == nil {
-		t.Errorf("Disks().Delete(%v, %v) = nil; want error", ctx, key)
+	if err := mock.Disks().Delete(ctx, keyGA); err == nil {
+		t.Errorf("Disks().Delete(%v, %v) = nil; want error", ctx, keyGA)
 	}
 }
 
@@ -377,20 +377,20 @@ func TestFirewallsGroup(t *testing.T) {
 	_, _, _ = ctx, mock, key
 
 	// Get not found.
-	if _, err := mock.Firewalls().Get(ctx, *key); err == nil {
+	if _, err := mock.Firewalls().Get(ctx, key); err == nil {
 		t.Errorf("Firewalls().Get(%v, %v) = _, nil; want error", ctx, key)
 	}
 
 	// Insert.
 	{
 		obj := &ga.Firewall{}
-		if err := mock.Firewalls().Insert(ctx, *keyGA, obj); err != nil {
-			t.Errorf("Firewalls().Insert(%v, %v, %v) = %v; want nil", ctx, key, obj, err)
+		if err := mock.Firewalls().Insert(ctx, keyGA, obj); err != nil {
+			t.Errorf("Firewalls().Insert(%v, %v, %v) = %v; want nil", ctx, keyGA, obj, err)
 		}
 	}
 
 	// Get across versions.
-	if obj, err := mock.Firewalls().Get(ctx, *key); err != nil {
+	if obj, err := mock.Firewalls().Get(ctx, key); err != nil {
 		t.Errorf("Firewalls().Get(%v, %v) = %v, %v; want nil", ctx, key, obj, err)
 	}
 
@@ -416,13 +416,13 @@ func TestFirewallsGroup(t *testing.T) {
 	}
 
 	// Delete across versions.
-	if err := mock.Firewalls().Delete(ctx, *keyGA); err != nil {
-		t.Errorf("Firewalls().Delete(%v, %v) = %v; want nil", ctx, key, err)
+	if err := mock.Firewalls().Delete(ctx, keyGA); err != nil {
+		t.Errorf("Firewalls().Delete(%v, %v) = %v; want nil", ctx, keyGA, err)
 	}
 
 	// Delete not found.
-	if err := mock.Firewalls().Delete(ctx, *keyGA); err == nil {
-		t.Errorf("Firewalls().Delete(%v, %v) = nil; want error", ctx, key)
+	if err := mock.Firewalls().Delete(ctx, keyGA); err == nil {
+		t.Errorf("Firewalls().Delete(%v, %v) = nil; want error", ctx, keyGA)
 	}
 }
 
@@ -441,32 +441,32 @@ func TestForwardingRulesGroup(t *testing.T) {
 	_, _, _ = ctx, mock, key
 
 	// Get not found.
-	if _, err := mock.AlphaForwardingRules().Get(ctx, *key); err == nil {
+	if _, err := mock.AlphaForwardingRules().Get(ctx, key); err == nil {
 		t.Errorf("AlphaForwardingRules().Get(%v, %v) = _, nil; want error", ctx, key)
 	}
-	if _, err := mock.ForwardingRules().Get(ctx, *key); err == nil {
+	if _, err := mock.ForwardingRules().Get(ctx, key); err == nil {
 		t.Errorf("ForwardingRules().Get(%v, %v) = _, nil; want error", ctx, key)
 	}
 
 	// Insert.
 	{
 		obj := &alpha.ForwardingRule{}
-		if err := mock.AlphaForwardingRules().Insert(ctx, *keyAlpha, obj); err != nil {
-			t.Errorf("AlphaForwardingRules().Insert(%v, %v, %v) = %v; want nil", ctx, key, obj, err)
+		if err := mock.AlphaForwardingRules().Insert(ctx, keyAlpha, obj); err != nil {
+			t.Errorf("AlphaForwardingRules().Insert(%v, %v, %v) = %v; want nil", ctx, keyAlpha, obj, err)
 		}
 	}
 	{
 		obj := &ga.ForwardingRule{}
-		if err := mock.ForwardingRules().Insert(ctx, *keyGA, obj); err != nil {
-			t.Errorf("ForwardingRules().Insert(%v, %v, %v) = %v; want nil", ctx, key, obj, err)
+		if err := mock.ForwardingRules().Insert(ctx, keyGA, obj); err != nil {
+			t.Errorf("ForwardingRules().Insert(%v, %v, %v) = %v; want nil", ctx, keyGA, obj, err)
 		}
 	}
 
 	// Get across versions.
-	if obj, err := mock.AlphaForwardingRules().Get(ctx, *key); err != nil {
+	if obj, err := mock.AlphaForwardingRules().Get(ctx, key); err != nil {
 		t.Errorf("AlphaForwardingRules().Get(%v, %v) = %v, %v; want nil", ctx, key, obj, err)
 	}
-	if obj, err := mock.ForwardingRules().Get(ctx, *key); err != nil {
+	if obj, err := mock.ForwardingRules().Get(ctx, key); err != nil {
 		t.Errorf("ForwardingRules().Get(%v, %v) = %v, %v; want nil", ctx, key, obj, err)
 	}
 
@@ -508,19 +508,19 @@ func TestForwardingRulesGroup(t *testing.T) {
 	}
 
 	// Delete across versions.
-	if err := mock.AlphaForwardingRules().Delete(ctx, *keyAlpha); err != nil {
-		t.Errorf("AlphaForwardingRules().Delete(%v, %v) = %v; want nil", ctx, key, err)
+	if err := mock.AlphaForwardingRules().Delete(ctx, keyAlpha); err != nil {
+		t.Errorf("AlphaForwardingRules().Delete(%v, %v) = %v; want nil", ctx, keyAlpha, err)
 	}
-	if err := mock.ForwardingRules().Delete(ctx, *keyGA); err != nil {
-		t.Errorf("ForwardingRules().Delete(%v, %v) = %v; want nil", ctx, key, err)
+	if err := mock.ForwardingRules().Delete(ctx, keyGA); err != nil {
+		t.Errorf("ForwardingRules().Delete(%v, %v) = %v; want nil", ctx, keyGA, err)
 	}
 
 	// Delete not found.
-	if err := mock.AlphaForwardingRules().Delete(ctx, *keyAlpha); err == nil {
-		t.Errorf("AlphaForwardingRules().Delete(%v, %v) = nil; want error", ctx, key)
+	if err := mock.AlphaForwardingRules().Delete(ctx, keyAlpha); err == nil {
+		t.Errorf("AlphaForwardingRules().Delete(%v, %v) = nil; want error", ctx, keyAlpha)
 	}
-	if err := mock.ForwardingRules().Delete(ctx, *keyGA); err == nil {
-		t.Errorf("ForwardingRules().Delete(%v, %v) = nil; want error", ctx, key)
+	if err := mock.ForwardingRules().Delete(ctx, keyGA); err == nil {
+		t.Errorf("ForwardingRules().Delete(%v, %v) = nil; want error", ctx, keyGA)
 	}
 }
 
@@ -537,20 +537,20 @@ func TestGlobalAddressesGroup(t *testing.T) {
 	_, _, _ = ctx, mock, key
 
 	// Get not found.
-	if _, err := mock.GlobalAddresses().Get(ctx, *key); err == nil {
+	if _, err := mock.GlobalAddresses().Get(ctx, key); err == nil {
 		t.Errorf("GlobalAddresses().Get(%v, %v) = _, nil; want error", ctx, key)
 	}
 
 	// Insert.
 	{
 		obj := &ga.Address{}
-		if err := mock.GlobalAddresses().Insert(ctx, *keyGA, obj); err != nil {
-			t.Errorf("GlobalAddresses().Insert(%v, %v, %v) = %v; want nil", ctx, key, obj, err)
+		if err := mock.GlobalAddresses().Insert(ctx, keyGA, obj); err != nil {
+			t.Errorf("GlobalAddresses().Insert(%v, %v, %v) = %v; want nil", ctx, keyGA, obj, err)
 		}
 	}
 
 	// Get across versions.
-	if obj, err := mock.GlobalAddresses().Get(ctx, *key); err != nil {
+	if obj, err := mock.GlobalAddresses().Get(ctx, key); err != nil {
 		t.Errorf("GlobalAddresses().Get(%v, %v) = %v, %v; want nil", ctx, key, obj, err)
 	}
 
@@ -576,13 +576,13 @@ func TestGlobalAddressesGroup(t *testing.T) {
 	}
 
 	// Delete across versions.
-	if err := mock.GlobalAddresses().Delete(ctx, *keyGA); err != nil {
-		t.Errorf("GlobalAddresses().Delete(%v, %v) = %v; want nil", ctx, key, err)
+	if err := mock.GlobalAddresses().Delete(ctx, keyGA); err != nil {
+		t.Errorf("GlobalAddresses().Delete(%v, %v) = %v; want nil", ctx, keyGA, err)
 	}
 
 	// Delete not found.
-	if err := mock.GlobalAddresses().Delete(ctx, *keyGA); err == nil {
-		t.Errorf("GlobalAddresses().Delete(%v, %v) = nil; want error", ctx, key)
+	if err := mock.GlobalAddresses().Delete(ctx, keyGA); err == nil {
+		t.Errorf("GlobalAddresses().Delete(%v, %v) = nil; want error", ctx, keyGA)
 	}
 }
 
@@ -599,20 +599,20 @@ func TestGlobalForwardingRulesGroup(t *testing.T) {
 	_, _, _ = ctx, mock, key
 
 	// Get not found.
-	if _, err := mock.GlobalForwardingRules().Get(ctx, *key); err == nil {
+	if _, err := mock.GlobalForwardingRules().Get(ctx, key); err == nil {
 		t.Errorf("GlobalForwardingRules().Get(%v, %v) = _, nil; want error", ctx, key)
 	}
 
 	// Insert.
 	{
 		obj := &ga.ForwardingRule{}
-		if err := mock.GlobalForwardingRules().Insert(ctx, *keyGA, obj); err != nil {
-			t.Errorf("GlobalForwardingRules().Insert(%v, %v, %v) = %v; want nil", ctx, key, obj, err)
+		if err := mock.GlobalForwardingRules().Insert(ctx, keyGA, obj); err != nil {
+			t.Errorf("GlobalForwardingRules().Insert(%v, %v, %v) = %v; want nil", ctx, keyGA, obj, err)
 		}
 	}
 
 	// Get across versions.
-	if obj, err := mock.GlobalForwardingRules().Get(ctx, *key); err != nil {
+	if obj, err := mock.GlobalForwardingRules().Get(ctx, key); err != nil {
 		t.Errorf("GlobalForwardingRules().Get(%v, %v) = %v, %v; want nil", ctx, key, obj, err)
 	}
 
@@ -638,13 +638,13 @@ func TestGlobalForwardingRulesGroup(t *testing.T) {
 	}
 
 	// Delete across versions.
-	if err := mock.GlobalForwardingRules().Delete(ctx, *keyGA); err != nil {
-		t.Errorf("GlobalForwardingRules().Delete(%v, %v) = %v; want nil", ctx, key, err)
+	if err := mock.GlobalForwardingRules().Delete(ctx, keyGA); err != nil {
+		t.Errorf("GlobalForwardingRules().Delete(%v, %v) = %v; want nil", ctx, keyGA, err)
 	}
 
 	// Delete not found.
-	if err := mock.GlobalForwardingRules().Delete(ctx, *keyGA); err == nil {
-		t.Errorf("GlobalForwardingRules().Delete(%v, %v) = nil; want error", ctx, key)
+	if err := mock.GlobalForwardingRules().Delete(ctx, keyGA); err == nil {
+		t.Errorf("GlobalForwardingRules().Delete(%v, %v) = nil; want error", ctx, keyGA)
 	}
 }
 
@@ -663,32 +663,32 @@ func TestHealthChecksGroup(t *testing.T) {
 	_, _, _ = ctx, mock, key
 
 	// Get not found.
-	if _, err := mock.AlphaHealthChecks().Get(ctx, *key); err == nil {
+	if _, err := mock.AlphaHealthChecks().Get(ctx, key); err == nil {
 		t.Errorf("AlphaHealthChecks().Get(%v, %v) = _, nil; want error", ctx, key)
 	}
-	if _, err := mock.HealthChecks().Get(ctx, *key); err == nil {
+	if _, err := mock.HealthChecks().Get(ctx, key); err == nil {
 		t.Errorf("HealthChecks().Get(%v, %v) = _, nil; want error", ctx, key)
 	}
 
 	// Insert.
 	{
 		obj := &alpha.HealthCheck{}
-		if err := mock.AlphaHealthChecks().Insert(ctx, *keyAlpha, obj); err != nil {
-			t.Errorf("AlphaHealthChecks().Insert(%v, %v, %v) = %v; want nil", ctx, key, obj, err)
+		if err := mock.AlphaHealthChecks().Insert(ctx, keyAlpha, obj); err != nil {
+			t.Errorf("AlphaHealthChecks().Insert(%v, %v, %v) = %v; want nil", ctx, keyAlpha, obj, err)
 		}
 	}
 	{
 		obj := &ga.HealthCheck{}
-		if err := mock.HealthChecks().Insert(ctx, *keyGA, obj); err != nil {
-			t.Errorf("HealthChecks().Insert(%v, %v, %v) = %v; want nil", ctx, key, obj, err)
+		if err := mock.HealthChecks().Insert(ctx, keyGA, obj); err != nil {
+			t.Errorf("HealthChecks().Insert(%v, %v, %v) = %v; want nil", ctx, keyGA, obj, err)
 		}
 	}
 
 	// Get across versions.
-	if obj, err := mock.AlphaHealthChecks().Get(ctx, *key); err != nil {
+	if obj, err := mock.AlphaHealthChecks().Get(ctx, key); err != nil {
 		t.Errorf("AlphaHealthChecks().Get(%v, %v) = %v, %v; want nil", ctx, key, obj, err)
 	}
-	if obj, err := mock.HealthChecks().Get(ctx, *key); err != nil {
+	if obj, err := mock.HealthChecks().Get(ctx, key); err != nil {
 		t.Errorf("HealthChecks().Get(%v, %v) = %v, %v; want nil", ctx, key, obj, err)
 	}
 
@@ -730,19 +730,19 @@ func TestHealthChecksGroup(t *testing.T) {
 	}
 
 	// Delete across versions.
-	if err := mock.AlphaHealthChecks().Delete(ctx, *keyAlpha); err != nil {
-		t.Errorf("AlphaHealthChecks().Delete(%v, %v) = %v; want nil", ctx, key, err)
+	if err := mock.AlphaHealthChecks().Delete(ctx, keyAlpha); err != nil {
+		t.Errorf("AlphaHealthChecks().Delete(%v, %v) = %v; want nil", ctx, keyAlpha, err)
 	}
-	if err := mock.HealthChecks().Delete(ctx, *keyGA); err != nil {
-		t.Errorf("HealthChecks().Delete(%v, %v) = %v; want nil", ctx, key, err)
+	if err := mock.HealthChecks().Delete(ctx, keyGA); err != nil {
+		t.Errorf("HealthChecks().Delete(%v, %v) = %v; want nil", ctx, keyGA, err)
 	}
 
 	// Delete not found.
-	if err := mock.AlphaHealthChecks().Delete(ctx, *keyAlpha); err == nil {
-		t.Errorf("AlphaHealthChecks().Delete(%v, %v) = nil; want error", ctx, key)
+	if err := mock.AlphaHealthChecks().Delete(ctx, keyAlpha); err == nil {
+		t.Errorf("AlphaHealthChecks().Delete(%v, %v) = nil; want error", ctx, keyAlpha)
 	}
-	if err := mock.HealthChecks().Delete(ctx, *keyGA); err == nil {
-		t.Errorf("HealthChecks().Delete(%v, %v) = nil; want error", ctx, key)
+	if err := mock.HealthChecks().Delete(ctx, keyGA); err == nil {
+		t.Errorf("HealthChecks().Delete(%v, %v) = nil; want error", ctx, keyGA)
 	}
 }
 
@@ -759,20 +759,20 @@ func TestHttpHealthChecksGroup(t *testing.T) {
 	_, _, _ = ctx, mock, key
 
 	// Get not found.
-	if _, err := mock.HttpHealthChecks().Get(ctx, *key); err == nil {
+	if _, err := mock.HttpHealthChecks().Get(ctx, key); err == nil {
 		t.Errorf("HttpHealthChecks().Get(%v, %v) = _, nil; want error", ctx, key)
 	}
 
 	// Insert.
 	{
 		obj := &ga.HttpHealthCheck{}
-		if err := mock.HttpHealthChecks().Insert(ctx, *keyGA, obj); err != nil {
-			t.Errorf("HttpHealthChecks().Insert(%v, %v, %v) = %v; want nil", ctx, key, obj, err)
+		if err := mock.HttpHealthChecks().Insert(ctx, keyGA, obj); err != nil {
+			t.Errorf("HttpHealthChecks().Insert(%v, %v, %v) = %v; want nil", ctx, keyGA, obj, err)
 		}
 	}
 
 	// Get across versions.
-	if obj, err := mock.HttpHealthChecks().Get(ctx, *key); err != nil {
+	if obj, err := mock.HttpHealthChecks().Get(ctx, key); err != nil {
 		t.Errorf("HttpHealthChecks().Get(%v, %v) = %v, %v; want nil", ctx, key, obj, err)
 	}
 
@@ -798,13 +798,13 @@ func TestHttpHealthChecksGroup(t *testing.T) {
 	}
 
 	// Delete across versions.
-	if err := mock.HttpHealthChecks().Delete(ctx, *keyGA); err != nil {
-		t.Errorf("HttpHealthChecks().Delete(%v, %v) = %v; want nil", ctx, key, err)
+	if err := mock.HttpHealthChecks().Delete(ctx, keyGA); err != nil {
+		t.Errorf("HttpHealthChecks().Delete(%v, %v) = %v; want nil", ctx, keyGA, err)
 	}
 
 	// Delete not found.
-	if err := mock.HttpHealthChecks().Delete(ctx, *keyGA); err == nil {
-		t.Errorf("HttpHealthChecks().Delete(%v, %v) = nil; want error", ctx, key)
+	if err := mock.HttpHealthChecks().Delete(ctx, keyGA); err == nil {
+		t.Errorf("HttpHealthChecks().Delete(%v, %v) = nil; want error", ctx, keyGA)
 	}
 }
 
@@ -821,20 +821,20 @@ func TestHttpsHealthChecksGroup(t *testing.T) {
 	_, _, _ = ctx, mock, key
 
 	// Get not found.
-	if _, err := mock.HttpsHealthChecks().Get(ctx, *key); err == nil {
+	if _, err := mock.HttpsHealthChecks().Get(ctx, key); err == nil {
 		t.Errorf("HttpsHealthChecks().Get(%v, %v) = _, nil; want error", ctx, key)
 	}
 
 	// Insert.
 	{
 		obj := &ga.HttpsHealthCheck{}
-		if err := mock.HttpsHealthChecks().Insert(ctx, *keyGA, obj); err != nil {
-			t.Errorf("HttpsHealthChecks().Insert(%v, %v, %v) = %v; want nil", ctx, key, obj, err)
+		if err := mock.HttpsHealthChecks().Insert(ctx, keyGA, obj); err != nil {
+			t.Errorf("HttpsHealthChecks().Insert(%v, %v, %v) = %v; want nil", ctx, keyGA, obj, err)
 		}
 	}
 
 	// Get across versions.
-	if obj, err := mock.HttpsHealthChecks().Get(ctx, *key); err != nil {
+	if obj, err := mock.HttpsHealthChecks().Get(ctx, key); err != nil {
 		t.Errorf("HttpsHealthChecks().Get(%v, %v) = %v, %v; want nil", ctx, key, obj, err)
 	}
 
@@ -860,13 +860,13 @@ func TestHttpsHealthChecksGroup(t *testing.T) {
 	}
 
 	// Delete across versions.
-	if err := mock.HttpsHealthChecks().Delete(ctx, *keyGA); err != nil {
-		t.Errorf("HttpsHealthChecks().Delete(%v, %v) = %v; want nil", ctx, key, err)
+	if err := mock.HttpsHealthChecks().Delete(ctx, keyGA); err != nil {
+		t.Errorf("HttpsHealthChecks().Delete(%v, %v) = %v; want nil", ctx, keyGA, err)
 	}
 
 	// Delete not found.
-	if err := mock.HttpsHealthChecks().Delete(ctx, *keyGA); err == nil {
-		t.Errorf("HttpsHealthChecks().Delete(%v, %v) = nil; want error", ctx, key)
+	if err := mock.HttpsHealthChecks().Delete(ctx, keyGA); err == nil {
+		t.Errorf("HttpsHealthChecks().Delete(%v, %v) = nil; want error", ctx, keyGA)
 	}
 }
 
@@ -883,20 +883,20 @@ func TestInstanceGroupsGroup(t *testing.T) {
 	_, _, _ = ctx, mock, key
 
 	// Get not found.
-	if _, err := mock.InstanceGroups().Get(ctx, *key); err == nil {
+	if _, err := mock.InstanceGroups().Get(ctx, key); err == nil {
 		t.Errorf("InstanceGroups().Get(%v, %v) = _, nil; want error", ctx, key)
 	}
 
 	// Insert.
 	{
 		obj := &ga.InstanceGroup{}
-		if err := mock.InstanceGroups().Insert(ctx, *keyGA, obj); err != nil {
-			t.Errorf("InstanceGroups().Insert(%v, %v, %v) = %v; want nil", ctx, key, obj, err)
+		if err := mock.InstanceGroups().Insert(ctx, keyGA, obj); err != nil {
+			t.Errorf("InstanceGroups().Insert(%v, %v, %v) = %v; want nil", ctx, keyGA, obj, err)
 		}
 	}
 
 	// Get across versions.
-	if obj, err := mock.InstanceGroups().Get(ctx, *key); err != nil {
+	if obj, err := mock.InstanceGroups().Get(ctx, key); err != nil {
 		t.Errorf("InstanceGroups().Get(%v, %v) = %v, %v; want nil", ctx, key, obj, err)
 	}
 
@@ -922,13 +922,13 @@ func TestInstanceGroupsGroup(t *testing.T) {
 	}
 
 	// Delete across versions.
-	if err := mock.InstanceGroups().Delete(ctx, *keyGA); err != nil {
-		t.Errorf("InstanceGroups().Delete(%v, %v) = %v; want nil", ctx, key, err)
+	if err := mock.InstanceGroups().Delete(ctx, keyGA); err != nil {
+		t.Errorf("InstanceGroups().Delete(%v, %v) = %v; want nil", ctx, keyGA, err)
 	}
 
 	// Delete not found.
-	if err := mock.InstanceGroups().Delete(ctx, *keyGA); err == nil {
-		t.Errorf("InstanceGroups().Delete(%v, %v) = nil; want error", ctx, key)
+	if err := mock.InstanceGroups().Delete(ctx, keyGA); err == nil {
+		t.Errorf("InstanceGroups().Delete(%v, %v) = nil; want error", ctx, keyGA)
 	}
 }
 
@@ -949,44 +949,44 @@ func TestInstancesGroup(t *testing.T) {
 	_, _, _ = ctx, mock, key
 
 	// Get not found.
-	if _, err := mock.AlphaInstances().Get(ctx, *key); err == nil {
+	if _, err := mock.AlphaInstances().Get(ctx, key); err == nil {
 		t.Errorf("AlphaInstances().Get(%v, %v) = _, nil; want error", ctx, key)
 	}
-	if _, err := mock.BetaInstances().Get(ctx, *key); err == nil {
+	if _, err := mock.BetaInstances().Get(ctx, key); err == nil {
 		t.Errorf("BetaInstances().Get(%v, %v) = _, nil; want error", ctx, key)
 	}
-	if _, err := mock.Instances().Get(ctx, *key); err == nil {
+	if _, err := mock.Instances().Get(ctx, key); err == nil {
 		t.Errorf("Instances().Get(%v, %v) = _, nil; want error", ctx, key)
 	}
 
 	// Insert.
 	{
 		obj := &alpha.Instance{}
-		if err := mock.AlphaInstances().Insert(ctx, *keyAlpha, obj); err != nil {
-			t.Errorf("AlphaInstances().Insert(%v, %v, %v) = %v; want nil", ctx, key, obj, err)
+		if err := mock.AlphaInstances().Insert(ctx, keyAlpha, obj); err != nil {
+			t.Errorf("AlphaInstances().Insert(%v, %v, %v) = %v; want nil", ctx, keyAlpha, obj, err)
 		}
 	}
 	{
 		obj := &beta.Instance{}
-		if err := mock.BetaInstances().Insert(ctx, *keyBeta, obj); err != nil {
-			t.Errorf("BetaInstances().Insert(%v, %v, %v) = %v; want nil", ctx, key, obj, err)
+		if err := mock.BetaInstances().Insert(ctx, keyBeta, obj); err != nil {
+			t.Errorf("BetaInstances().Insert(%v, %v, %v) = %v; want nil", ctx, keyBeta, obj, err)
 		}
 	}
 	{
 		obj := &ga.Instance{}
-		if err := mock.Instances().Insert(ctx, *keyGA, obj); err != nil {
-			t.Errorf("Instances().Insert(%v, %v, %v) = %v; want nil", ctx, key, obj, err)
+		if err := mock.Instances().Insert(ctx, keyGA, obj); err != nil {
+			t.Errorf("Instances().Insert(%v, %v, %v) = %v; want nil", ctx, keyGA, obj, err)
 		}
 	}
 
 	// Get across versions.
-	if obj, err := mock.AlphaInstances().Get(ctx, *key); err != nil {
+	if obj, err := mock.AlphaInstances().Get(ctx, key); err != nil {
 		t.Errorf("AlphaInstances().Get(%v, %v) = %v, %v; want nil", ctx, key, obj, err)
 	}
-	if obj, err := mock.BetaInstances().Get(ctx, *key); err != nil {
+	if obj, err := mock.BetaInstances().Get(ctx, key); err != nil {
 		t.Errorf("BetaInstances().Get(%v, %v) = %v, %v; want nil", ctx, key, obj, err)
 	}
-	if obj, err := mock.Instances().Get(ctx, *key); err != nil {
+	if obj, err := mock.Instances().Get(ctx, key); err != nil {
 		t.Errorf("Instances().Get(%v, %v) = %v, %v; want nil", ctx, key, obj, err)
 	}
 
@@ -1044,25 +1044,25 @@ func TestInstancesGroup(t *testing.T) {
 	}
 
 	// Delete across versions.
-	if err := mock.AlphaInstances().Delete(ctx, *keyAlpha); err != nil {
-		t.Errorf("AlphaInstances().Delete(%v, %v) = %v; want nil", ctx, key, err)
+	if err := mock.AlphaInstances().Delete(ctx, keyAlpha); err != nil {
+		t.Errorf("AlphaInstances().Delete(%v, %v) = %v; want nil", ctx, keyAlpha, err)
 	}
-	if err := mock.BetaInstances().Delete(ctx, *keyBeta); err != nil {
-		t.Errorf("BetaInstances().Delete(%v, %v) = %v; want nil", ctx, key, err)
+	if err := mock.BetaInstances().Delete(ctx, keyBeta); err != nil {
+		t.Errorf("BetaInstances().Delete(%v, %v) = %v; want nil", ctx, keyBeta, err)
 	}
-	if err := mock.Instances().Delete(ctx, *keyGA); err != nil {
-		t.Errorf("Instances().Delete(%v, %v) = %v; want nil", ctx, key, err)
+	if err := mock.Instances().Delete(ctx, keyGA); err != nil {
+		t.Errorf("Instances().Delete(%v, %v) = %v; want nil", ctx, keyGA, err)
 	}
 
 	// Delete not found.
-	if err := mock.AlphaInstances().Delete(ctx, *keyAlpha); err == nil {
-		t.Errorf("AlphaInstances().Delete(%v, %v) = nil; want error", ctx, key)
+	if err := mock.AlphaInstances().Delete(ctx, keyAlpha); err == nil {
+		t.Errorf("AlphaInstances().Delete(%v, %v) = nil; want error", ctx, keyAlpha)
 	}
-	if err := mock.BetaInstances().Delete(ctx, *keyBeta); err == nil {
-		t.Errorf("BetaInstances().Delete(%v, %v) = nil; want error", ctx, key)
+	if err := mock.BetaInstances().Delete(ctx, keyBeta); err == nil {
+		t.Errorf("BetaInstances().Delete(%v, %v) = nil; want error", ctx, keyBeta)
 	}
-	if err := mock.Instances().Delete(ctx, *keyGA); err == nil {
-		t.Errorf("Instances().Delete(%v, %v) = nil; want error", ctx, key)
+	if err := mock.Instances().Delete(ctx, keyGA); err == nil {
+		t.Errorf("Instances().Delete(%v, %v) = nil; want error", ctx, keyGA)
 	}
 }
 
@@ -1079,20 +1079,20 @@ func TestNetworkEndpointGroupsGroup(t *testing.T) {
 	_, _, _ = ctx, mock, key
 
 	// Get not found.
-	if _, err := mock.AlphaNetworkEndpointGroups().Get(ctx, *key); err == nil {
+	if _, err := mock.AlphaNetworkEndpointGroups().Get(ctx, key); err == nil {
 		t.Errorf("AlphaNetworkEndpointGroups().Get(%v, %v) = _, nil; want error", ctx, key)
 	}
 
 	// Insert.
 	{
 		obj := &alpha.NetworkEndpointGroup{}
-		if err := mock.AlphaNetworkEndpointGroups().Insert(ctx, *keyAlpha, obj); err != nil {
-			t.Errorf("AlphaNetworkEndpointGroups().Insert(%v, %v, %v) = %v; want nil", ctx, key, obj, err)
+		if err := mock.AlphaNetworkEndpointGroups().Insert(ctx, keyAlpha, obj); err != nil {
+			t.Errorf("AlphaNetworkEndpointGroups().Insert(%v, %v, %v) = %v; want nil", ctx, keyAlpha, obj, err)
 		}
 	}
 
 	// Get across versions.
-	if obj, err := mock.AlphaNetworkEndpointGroups().Get(ctx, *key); err != nil {
+	if obj, err := mock.AlphaNetworkEndpointGroups().Get(ctx, key); err != nil {
 		t.Errorf("AlphaNetworkEndpointGroups().Get(%v, %v) = %v, %v; want nil", ctx, key, obj, err)
 	}
 
@@ -1118,13 +1118,13 @@ func TestNetworkEndpointGroupsGroup(t *testing.T) {
 	}
 
 	// Delete across versions.
-	if err := mock.AlphaNetworkEndpointGroups().Delete(ctx, *keyAlpha); err != nil {
-		t.Errorf("AlphaNetworkEndpointGroups().Delete(%v, %v) = %v; want nil", ctx, key, err)
+	if err := mock.AlphaNetworkEndpointGroups().Delete(ctx, keyAlpha); err != nil {
+		t.Errorf("AlphaNetworkEndpointGroups().Delete(%v, %v) = %v; want nil", ctx, keyAlpha, err)
 	}
 
 	// Delete not found.
-	if err := mock.AlphaNetworkEndpointGroups().Delete(ctx, *keyAlpha); err == nil {
-		t.Errorf("AlphaNetworkEndpointGroups().Delete(%v, %v) = nil; want error", ctx, key)
+	if err := mock.AlphaNetworkEndpointGroups().Delete(ctx, keyAlpha); err == nil {
+		t.Errorf("AlphaNetworkEndpointGroups().Delete(%v, %v) = nil; want error", ctx, keyAlpha)
 	}
 }
 
@@ -1167,31 +1167,47 @@ func TestRegionBackendServicesGroup(t *testing.T) {
 	var key *meta.Key
 	keyAlpha := meta.RegionalKey("key-alpha", "location")
 	key = keyAlpha
+	keyGA := meta.RegionalKey("key-ga", "location")
+	key = keyGA
 	// Ignore unused variables.
 	_, _, _ = ctx, mock, key
 
 	// Get not found.
-	if _, err := mock.AlphaRegionBackendServices().Get(ctx, *key); err == nil {
+	if _, err := mock.AlphaRegionBackendServices().Get(ctx, key); err == nil {
 		t.Errorf("AlphaRegionBackendServices().Get(%v, %v) = _, nil; want error", ctx, key)
+	}
+	if _, err := mock.RegionBackendServices().Get(ctx, key); err == nil {
+		t.Errorf("RegionBackendServices().Get(%v, %v) = _, nil; want error", ctx, key)
 	}
 
 	// Insert.
 	{
 		obj := &alpha.BackendService{}
-		if err := mock.AlphaRegionBackendServices().Insert(ctx, *keyAlpha, obj); err != nil {
-			t.Errorf("AlphaRegionBackendServices().Insert(%v, %v, %v) = %v; want nil", ctx, key, obj, err)
+		if err := mock.AlphaRegionBackendServices().Insert(ctx, keyAlpha, obj); err != nil {
+			t.Errorf("AlphaRegionBackendServices().Insert(%v, %v, %v) = %v; want nil", ctx, keyAlpha, obj, err)
+		}
+	}
+	{
+		obj := &ga.BackendService{}
+		if err := mock.RegionBackendServices().Insert(ctx, keyGA, obj); err != nil {
+			t.Errorf("RegionBackendServices().Insert(%v, %v, %v) = %v; want nil", ctx, keyGA, obj, err)
 		}
 	}
 
 	// Get across versions.
-	if obj, err := mock.AlphaRegionBackendServices().Get(ctx, *key); err != nil {
+	if obj, err := mock.AlphaRegionBackendServices().Get(ctx, key); err != nil {
 		t.Errorf("AlphaRegionBackendServices().Get(%v, %v) = %v, %v; want nil", ctx, key, obj, err)
+	}
+	if obj, err := mock.RegionBackendServices().Get(ctx, key); err != nil {
+		t.Errorf("RegionBackendServices().Get(%v, %v) = %v, %v; want nil", ctx, key, obj, err)
 	}
 
 	// List.
 	mock.MockAlphaRegionBackendServices.Objects[*keyAlpha] = mock.MockAlphaRegionBackendServices.Obj(&alpha.BackendService{Name: keyAlpha.Name})
+	mock.MockRegionBackendServices.Objects[*keyGA] = mock.MockRegionBackendServices.Obj(&ga.BackendService{Name: keyGA.Name})
 	want := map[string]bool{
 		"key-alpha": true,
+		"key-ga":    true,
 	}
 	_ = want // ignore unused variables.
 	{
@@ -1208,15 +1224,35 @@ func TestRegionBackendServicesGroup(t *testing.T) {
 			}
 		}
 	}
+	{
+		objs, err := mock.RegionBackendServices().List(ctx, location, filter.None)
+		if err != nil {
+			t.Errorf("RegionBackendServices().List(%v, %v, %v) = %v, %v; want _, nil", ctx, location, filter.None, objs, err)
+		} else {
+			got := map[string]bool{}
+			for _, obj := range objs {
+				got[obj.Name] = true
+			}
+			if !reflect.DeepEqual(got, want) {
+				t.Errorf("AlphaRegionBackendServices().List(); got %+v, want %+v", got, want)
+			}
+		}
+	}
 
 	// Delete across versions.
-	if err := mock.AlphaRegionBackendServices().Delete(ctx, *keyAlpha); err != nil {
-		t.Errorf("AlphaRegionBackendServices().Delete(%v, %v) = %v; want nil", ctx, key, err)
+	if err := mock.AlphaRegionBackendServices().Delete(ctx, keyAlpha); err != nil {
+		t.Errorf("AlphaRegionBackendServices().Delete(%v, %v) = %v; want nil", ctx, keyAlpha, err)
+	}
+	if err := mock.RegionBackendServices().Delete(ctx, keyGA); err != nil {
+		t.Errorf("RegionBackendServices().Delete(%v, %v) = %v; want nil", ctx, keyGA, err)
 	}
 
 	// Delete not found.
-	if err := mock.AlphaRegionBackendServices().Delete(ctx, *keyAlpha); err == nil {
-		t.Errorf("AlphaRegionBackendServices().Delete(%v, %v) = nil; want error", ctx, key)
+	if err := mock.AlphaRegionBackendServices().Delete(ctx, keyAlpha); err == nil {
+		t.Errorf("AlphaRegionBackendServices().Delete(%v, %v) = nil; want error", ctx, keyAlpha)
+	}
+	if err := mock.RegionBackendServices().Delete(ctx, keyGA); err == nil {
+		t.Errorf("RegionBackendServices().Delete(%v, %v) = nil; want error", ctx, keyGA)
 	}
 }
 
@@ -1233,20 +1269,20 @@ func TestRegionDisksGroup(t *testing.T) {
 	_, _, _ = ctx, mock, key
 
 	// Get not found.
-	if _, err := mock.AlphaRegionDisks().Get(ctx, *key); err == nil {
+	if _, err := mock.AlphaRegionDisks().Get(ctx, key); err == nil {
 		t.Errorf("AlphaRegionDisks().Get(%v, %v) = _, nil; want error", ctx, key)
 	}
 
 	// Insert.
 	{
 		obj := &alpha.Disk{}
-		if err := mock.AlphaRegionDisks().Insert(ctx, *keyAlpha, obj); err != nil {
-			t.Errorf("AlphaRegionDisks().Insert(%v, %v, %v) = %v; want nil", ctx, key, obj, err)
+		if err := mock.AlphaRegionDisks().Insert(ctx, keyAlpha, obj); err != nil {
+			t.Errorf("AlphaRegionDisks().Insert(%v, %v, %v) = %v; want nil", ctx, keyAlpha, obj, err)
 		}
 	}
 
 	// Get across versions.
-	if obj, err := mock.AlphaRegionDisks().Get(ctx, *key); err != nil {
+	if obj, err := mock.AlphaRegionDisks().Get(ctx, key); err != nil {
 		t.Errorf("AlphaRegionDisks().Get(%v, %v) = %v, %v; want nil", ctx, key, obj, err)
 	}
 
@@ -1272,13 +1308,13 @@ func TestRegionDisksGroup(t *testing.T) {
 	}
 
 	// Delete across versions.
-	if err := mock.AlphaRegionDisks().Delete(ctx, *keyAlpha); err != nil {
-		t.Errorf("AlphaRegionDisks().Delete(%v, %v) = %v; want nil", ctx, key, err)
+	if err := mock.AlphaRegionDisks().Delete(ctx, keyAlpha); err != nil {
+		t.Errorf("AlphaRegionDisks().Delete(%v, %v) = %v; want nil", ctx, keyAlpha, err)
 	}
 
 	// Delete not found.
-	if err := mock.AlphaRegionDisks().Delete(ctx, *keyAlpha); err == nil {
-		t.Errorf("AlphaRegionDisks().Delete(%v, %v) = nil; want error", ctx, key)
+	if err := mock.AlphaRegionDisks().Delete(ctx, keyAlpha); err == nil {
+		t.Errorf("AlphaRegionDisks().Delete(%v, %v) = nil; want error", ctx, keyAlpha)
 	}
 }
 
@@ -1295,7 +1331,7 @@ func TestRegionsGroup(t *testing.T) {
 	_, _, _ = ctx, mock, key
 
 	// Get not found.
-	if _, err := mock.Regions().Get(ctx, *key); err == nil {
+	if _, err := mock.Regions().Get(ctx, key); err == nil {
 		t.Errorf("Regions().Get(%v, %v) = _, nil; want error", ctx, key)
 	}
 
@@ -1342,20 +1378,20 @@ func TestRoutesGroup(t *testing.T) {
 	_, _, _ = ctx, mock, key
 
 	// Get not found.
-	if _, err := mock.Routes().Get(ctx, *key); err == nil {
+	if _, err := mock.Routes().Get(ctx, key); err == nil {
 		t.Errorf("Routes().Get(%v, %v) = _, nil; want error", ctx, key)
 	}
 
 	// Insert.
 	{
 		obj := &ga.Route{}
-		if err := mock.Routes().Insert(ctx, *keyGA, obj); err != nil {
-			t.Errorf("Routes().Insert(%v, %v, %v) = %v; want nil", ctx, key, obj, err)
+		if err := mock.Routes().Insert(ctx, keyGA, obj); err != nil {
+			t.Errorf("Routes().Insert(%v, %v, %v) = %v; want nil", ctx, keyGA, obj, err)
 		}
 	}
 
 	// Get across versions.
-	if obj, err := mock.Routes().Get(ctx, *key); err != nil {
+	if obj, err := mock.Routes().Get(ctx, key); err != nil {
 		t.Errorf("Routes().Get(%v, %v) = %v, %v; want nil", ctx, key, obj, err)
 	}
 
@@ -1381,13 +1417,13 @@ func TestRoutesGroup(t *testing.T) {
 	}
 
 	// Delete across versions.
-	if err := mock.Routes().Delete(ctx, *keyGA); err != nil {
-		t.Errorf("Routes().Delete(%v, %v) = %v; want nil", ctx, key, err)
+	if err := mock.Routes().Delete(ctx, keyGA); err != nil {
+		t.Errorf("Routes().Delete(%v, %v) = %v; want nil", ctx, keyGA, err)
 	}
 
 	// Delete not found.
-	if err := mock.Routes().Delete(ctx, *keyGA); err == nil {
-		t.Errorf("Routes().Delete(%v, %v) = nil; want error", ctx, key)
+	if err := mock.Routes().Delete(ctx, keyGA); err == nil {
+		t.Errorf("Routes().Delete(%v, %v) = nil; want error", ctx, keyGA)
 	}
 }
 
@@ -1404,20 +1440,20 @@ func TestSslCertificatesGroup(t *testing.T) {
 	_, _, _ = ctx, mock, key
 
 	// Get not found.
-	if _, err := mock.SslCertificates().Get(ctx, *key); err == nil {
+	if _, err := mock.SslCertificates().Get(ctx, key); err == nil {
 		t.Errorf("SslCertificates().Get(%v, %v) = _, nil; want error", ctx, key)
 	}
 
 	// Insert.
 	{
 		obj := &ga.SslCertificate{}
-		if err := mock.SslCertificates().Insert(ctx, *keyGA, obj); err != nil {
-			t.Errorf("SslCertificates().Insert(%v, %v, %v) = %v; want nil", ctx, key, obj, err)
+		if err := mock.SslCertificates().Insert(ctx, keyGA, obj); err != nil {
+			t.Errorf("SslCertificates().Insert(%v, %v, %v) = %v; want nil", ctx, keyGA, obj, err)
 		}
 	}
 
 	// Get across versions.
-	if obj, err := mock.SslCertificates().Get(ctx, *key); err != nil {
+	if obj, err := mock.SslCertificates().Get(ctx, key); err != nil {
 		t.Errorf("SslCertificates().Get(%v, %v) = %v, %v; want nil", ctx, key, obj, err)
 	}
 
@@ -1443,13 +1479,13 @@ func TestSslCertificatesGroup(t *testing.T) {
 	}
 
 	// Delete across versions.
-	if err := mock.SslCertificates().Delete(ctx, *keyGA); err != nil {
-		t.Errorf("SslCertificates().Delete(%v, %v) = %v; want nil", ctx, key, err)
+	if err := mock.SslCertificates().Delete(ctx, keyGA); err != nil {
+		t.Errorf("SslCertificates().Delete(%v, %v) = %v; want nil", ctx, keyGA, err)
 	}
 
 	// Delete not found.
-	if err := mock.SslCertificates().Delete(ctx, *keyGA); err == nil {
-		t.Errorf("SslCertificates().Delete(%v, %v) = nil; want error", ctx, key)
+	if err := mock.SslCertificates().Delete(ctx, keyGA); err == nil {
+		t.Errorf("SslCertificates().Delete(%v, %v) = nil; want error", ctx, keyGA)
 	}
 }
 
@@ -1466,20 +1502,20 @@ func TestTargetHttpProxiesGroup(t *testing.T) {
 	_, _, _ = ctx, mock, key
 
 	// Get not found.
-	if _, err := mock.TargetHttpProxies().Get(ctx, *key); err == nil {
+	if _, err := mock.TargetHttpProxies().Get(ctx, key); err == nil {
 		t.Errorf("TargetHttpProxies().Get(%v, %v) = _, nil; want error", ctx, key)
 	}
 
 	// Insert.
 	{
 		obj := &ga.TargetHttpProxy{}
-		if err := mock.TargetHttpProxies().Insert(ctx, *keyGA, obj); err != nil {
-			t.Errorf("TargetHttpProxies().Insert(%v, %v, %v) = %v; want nil", ctx, key, obj, err)
+		if err := mock.TargetHttpProxies().Insert(ctx, keyGA, obj); err != nil {
+			t.Errorf("TargetHttpProxies().Insert(%v, %v, %v) = %v; want nil", ctx, keyGA, obj, err)
 		}
 	}
 
 	// Get across versions.
-	if obj, err := mock.TargetHttpProxies().Get(ctx, *key); err != nil {
+	if obj, err := mock.TargetHttpProxies().Get(ctx, key); err != nil {
 		t.Errorf("TargetHttpProxies().Get(%v, %v) = %v, %v; want nil", ctx, key, obj, err)
 	}
 
@@ -1505,13 +1541,13 @@ func TestTargetHttpProxiesGroup(t *testing.T) {
 	}
 
 	// Delete across versions.
-	if err := mock.TargetHttpProxies().Delete(ctx, *keyGA); err != nil {
-		t.Errorf("TargetHttpProxies().Delete(%v, %v) = %v; want nil", ctx, key, err)
+	if err := mock.TargetHttpProxies().Delete(ctx, keyGA); err != nil {
+		t.Errorf("TargetHttpProxies().Delete(%v, %v) = %v; want nil", ctx, keyGA, err)
 	}
 
 	// Delete not found.
-	if err := mock.TargetHttpProxies().Delete(ctx, *keyGA); err == nil {
-		t.Errorf("TargetHttpProxies().Delete(%v, %v) = nil; want error", ctx, key)
+	if err := mock.TargetHttpProxies().Delete(ctx, keyGA); err == nil {
+		t.Errorf("TargetHttpProxies().Delete(%v, %v) = nil; want error", ctx, keyGA)
 	}
 }
 
@@ -1528,20 +1564,20 @@ func TestTargetHttpsProxiesGroup(t *testing.T) {
 	_, _, _ = ctx, mock, key
 
 	// Get not found.
-	if _, err := mock.TargetHttpsProxies().Get(ctx, *key); err == nil {
+	if _, err := mock.TargetHttpsProxies().Get(ctx, key); err == nil {
 		t.Errorf("TargetHttpsProxies().Get(%v, %v) = _, nil; want error", ctx, key)
 	}
 
 	// Insert.
 	{
 		obj := &ga.TargetHttpsProxy{}
-		if err := mock.TargetHttpsProxies().Insert(ctx, *keyGA, obj); err != nil {
-			t.Errorf("TargetHttpsProxies().Insert(%v, %v, %v) = %v; want nil", ctx, key, obj, err)
+		if err := mock.TargetHttpsProxies().Insert(ctx, keyGA, obj); err != nil {
+			t.Errorf("TargetHttpsProxies().Insert(%v, %v, %v) = %v; want nil", ctx, keyGA, obj, err)
 		}
 	}
 
 	// Get across versions.
-	if obj, err := mock.TargetHttpsProxies().Get(ctx, *key); err != nil {
+	if obj, err := mock.TargetHttpsProxies().Get(ctx, key); err != nil {
 		t.Errorf("TargetHttpsProxies().Get(%v, %v) = %v, %v; want nil", ctx, key, obj, err)
 	}
 
@@ -1567,13 +1603,13 @@ func TestTargetHttpsProxiesGroup(t *testing.T) {
 	}
 
 	// Delete across versions.
-	if err := mock.TargetHttpsProxies().Delete(ctx, *keyGA); err != nil {
-		t.Errorf("TargetHttpsProxies().Delete(%v, %v) = %v; want nil", ctx, key, err)
+	if err := mock.TargetHttpsProxies().Delete(ctx, keyGA); err != nil {
+		t.Errorf("TargetHttpsProxies().Delete(%v, %v) = %v; want nil", ctx, keyGA, err)
 	}
 
 	// Delete not found.
-	if err := mock.TargetHttpsProxies().Delete(ctx, *keyGA); err == nil {
-		t.Errorf("TargetHttpsProxies().Delete(%v, %v) = nil; want error", ctx, key)
+	if err := mock.TargetHttpsProxies().Delete(ctx, keyGA); err == nil {
+		t.Errorf("TargetHttpsProxies().Delete(%v, %v) = nil; want error", ctx, keyGA)
 	}
 }
 
@@ -1590,20 +1626,20 @@ func TestTargetPoolsGroup(t *testing.T) {
 	_, _, _ = ctx, mock, key
 
 	// Get not found.
-	if _, err := mock.TargetPools().Get(ctx, *key); err == nil {
+	if _, err := mock.TargetPools().Get(ctx, key); err == nil {
 		t.Errorf("TargetPools().Get(%v, %v) = _, nil; want error", ctx, key)
 	}
 
 	// Insert.
 	{
 		obj := &ga.TargetPool{}
-		if err := mock.TargetPools().Insert(ctx, *keyGA, obj); err != nil {
-			t.Errorf("TargetPools().Insert(%v, %v, %v) = %v; want nil", ctx, key, obj, err)
+		if err := mock.TargetPools().Insert(ctx, keyGA, obj); err != nil {
+			t.Errorf("TargetPools().Insert(%v, %v, %v) = %v; want nil", ctx, keyGA, obj, err)
 		}
 	}
 
 	// Get across versions.
-	if obj, err := mock.TargetPools().Get(ctx, *key); err != nil {
+	if obj, err := mock.TargetPools().Get(ctx, key); err != nil {
 		t.Errorf("TargetPools().Get(%v, %v) = %v, %v; want nil", ctx, key, obj, err)
 	}
 
@@ -1629,13 +1665,13 @@ func TestTargetPoolsGroup(t *testing.T) {
 	}
 
 	// Delete across versions.
-	if err := mock.TargetPools().Delete(ctx, *keyGA); err != nil {
-		t.Errorf("TargetPools().Delete(%v, %v) = %v; want nil", ctx, key, err)
+	if err := mock.TargetPools().Delete(ctx, keyGA); err != nil {
+		t.Errorf("TargetPools().Delete(%v, %v) = %v; want nil", ctx, keyGA, err)
 	}
 
 	// Delete not found.
-	if err := mock.TargetPools().Delete(ctx, *keyGA); err == nil {
-		t.Errorf("TargetPools().Delete(%v, %v) = nil; want error", ctx, key)
+	if err := mock.TargetPools().Delete(ctx, keyGA); err == nil {
+		t.Errorf("TargetPools().Delete(%v, %v) = nil; want error", ctx, keyGA)
 	}
 }
 
@@ -1652,20 +1688,20 @@ func TestUrlMapsGroup(t *testing.T) {
 	_, _, _ = ctx, mock, key
 
 	// Get not found.
-	if _, err := mock.UrlMaps().Get(ctx, *key); err == nil {
+	if _, err := mock.UrlMaps().Get(ctx, key); err == nil {
 		t.Errorf("UrlMaps().Get(%v, %v) = _, nil; want error", ctx, key)
 	}
 
 	// Insert.
 	{
 		obj := &ga.UrlMap{}
-		if err := mock.UrlMaps().Insert(ctx, *keyGA, obj); err != nil {
-			t.Errorf("UrlMaps().Insert(%v, %v, %v) = %v; want nil", ctx, key, obj, err)
+		if err := mock.UrlMaps().Insert(ctx, keyGA, obj); err != nil {
+			t.Errorf("UrlMaps().Insert(%v, %v, %v) = %v; want nil", ctx, keyGA, obj, err)
 		}
 	}
 
 	// Get across versions.
-	if obj, err := mock.UrlMaps().Get(ctx, *key); err != nil {
+	if obj, err := mock.UrlMaps().Get(ctx, key); err != nil {
 		t.Errorf("UrlMaps().Get(%v, %v) = %v, %v; want nil", ctx, key, obj, err)
 	}
 
@@ -1691,13 +1727,13 @@ func TestUrlMapsGroup(t *testing.T) {
 	}
 
 	// Delete across versions.
-	if err := mock.UrlMaps().Delete(ctx, *keyGA); err != nil {
-		t.Errorf("UrlMaps().Delete(%v, %v) = %v; want nil", ctx, key, err)
+	if err := mock.UrlMaps().Delete(ctx, keyGA); err != nil {
+		t.Errorf("UrlMaps().Delete(%v, %v) = %v; want nil", ctx, keyGA, err)
 	}
 
 	// Delete not found.
-	if err := mock.UrlMaps().Delete(ctx, *keyGA); err == nil {
-		t.Errorf("UrlMaps().Delete(%v, %v) = nil; want error", ctx, key)
+	if err := mock.UrlMaps().Delete(ctx, keyGA); err == nil {
+		t.Errorf("UrlMaps().Delete(%v, %v) = nil; want error", ctx, keyGA)
 	}
 }
 
@@ -1714,7 +1750,7 @@ func TestZonesGroup(t *testing.T) {
 	_, _, _ = ctx, mock, key
 
 	// Get not found.
-	if _, err := mock.Zones().Get(ctx, *key); err == nil {
+	if _, err := mock.Zones().Get(ctx, key); err == nil {
 		t.Errorf("Zones().Get(%v, %v) = _, nil; want error", ctx, key)
 	}
 
