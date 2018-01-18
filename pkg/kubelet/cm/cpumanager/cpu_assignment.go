@@ -86,7 +86,7 @@ func (a *cpuAccumulator) freeCores() []int {
 
 // Returns CPU IDs as a slice sorted by:
 // - socket affinity with result
-// - number of CPUs available on the same sockett
+// - number of CPUs available on the same socket
 // - number of CPUs available on the same core
 // - socket ID.
 // - core ID.
