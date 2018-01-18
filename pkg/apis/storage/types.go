@@ -66,6 +66,18 @@ type StorageClass struct {
 	// +optional
 	AllowVolumeExpansion *bool
 
+	// CredentialID is the string slice of IDs to use for authentication and
+	// authorization against the storage backend. The value of CredentialID is
+	// used as a key SecretRefs map to select the corresponding Secret object.
+	// +optional
+	CredentialIDs []string
+
+	// Secrets for authentication and authorization against a storage backend,
+	// which is described by the StorageClass object. CredentialID is the key, to
+	// select corresponding SecretRef
+	// +optional
+	SecretRefs map[string]api.SecretReference
+
 	// VolumeBindingMode indicates how PersistentVolumeClaims should be
 	// provisioned and bound.  When unset, VolumeBindingImmediate is used.
 	// This field is alpha-level and is only honored by servers that enable
