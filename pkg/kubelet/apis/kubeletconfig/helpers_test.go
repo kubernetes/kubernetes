@@ -175,6 +175,7 @@ var (
 		"HairpinMode",
 		"HealthzBindAddress",
 		"HealthzPort",
+		"TLSCipherSuites[*]",
 		"IPTablesDropBit",
 		"IPTablesMasqueradeBit",
 		"ImageGCHighThresholdPercent",

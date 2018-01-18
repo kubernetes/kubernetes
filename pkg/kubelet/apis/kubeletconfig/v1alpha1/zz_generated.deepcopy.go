@@ -132,6 +132,11 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 			**out = **in
 		}
 	}
+	if in.TLSCipherSuites != nil {
+		in, out := &in.TLSCipherSuites, &out.TLSCipherSuites
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	in.Authentication.DeepCopyInto(&out.Authentication)
 	out.Authorization = in.Authorization
 	if in.RegistryPullQPS != nil {
