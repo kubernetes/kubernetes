@@ -59,6 +59,7 @@ func TestPrintConfiguration(t *testing.T) {
 	  podSubnet: ""
 	  serviceSubnet: ""
 	nodeName: ""
+	privilegedPods: false
 	token: ""
 	unifiedControlPlaneImage: ""
 `),
@@ -92,6 +93,7 @@ func TestPrintConfiguration(t *testing.T) {
 	  podSubnet: ""
 	  serviceSubnet: 10.96.0.1/12
 	nodeName: ""
+	privilegedPods: false
 	token: ""
 	unifiedControlPlaneImage: ""
 `),
@@ -135,6 +137,7 @@ func TestPrintConfiguration(t *testing.T) {
 	  podSubnet: ""
 	  serviceSubnet: ""
 	nodeName: ""
+	privilegedPods: false
 	token: ""
 	unifiedControlPlaneImage: ""
 `),
