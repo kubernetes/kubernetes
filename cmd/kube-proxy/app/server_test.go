@@ -29,7 +29,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/diff"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig"
 	"k8s.io/kubernetes/pkg/util/configz"
 	utilpointer "k8s.io/kubernetes/pkg/util/pointer"
@@ -189,8 +188,6 @@ conntrack:
   min: 1
   tcpCloseWaitTimeout: 10s
   tcpEstablishedTimeout: 20s
-featureGates:
-  SupportIPVSProxyMode: true
 healthzBindAddress: "%s"
 hostnameOverride: "foo"
 iptables:
@@ -307,7 +304,7 @@ nodePortAddresses:
 				TCPCloseWaitTimeout:   &metav1.Duration{Duration: 10 * time.Second},
 				TCPEstablishedTimeout: &metav1.Duration{Duration: 20 * time.Second},
 			},
-			FeatureGates:       map[string]bool{string(features.SupportIPVSProxyMode): true},
+			FeatureGates:       map[string]bool{},
 			HealthzBindAddress: tc.healthzBindAddress,
 			HostnameOverride:   "foo",
 			IPTables: kubeproxyconfig.KubeProxyIPTablesConfiguration{
