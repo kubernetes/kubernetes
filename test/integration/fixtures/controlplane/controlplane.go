@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2018 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,20 +21,19 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
-	"net"
 	"net/http"
-	"sync"
 	"testing"
 	"time"
 
 	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
 
-	ApiTesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
+	apitesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	cmapp "k8s.io/kubernetes/cmd/kube-controller-manager/app"
 	cmopt "k8s.io/kubernetes/cmd/kube-controller-manager/app/options"
 	sched "k8s.io/kubernetes/cmd/kube-scheduler/app"
 
 	hwnodes "k8s.io/kubernetes/test/integration/fixtures/hollownode"
+	"k8s.io/kubernetes/test/integration/framework"
 
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/server"
@@ -51,30 +50,27 @@ import (
 //KubeConfFileName The filename kubeconfig file is created with
 const KubeConfFileName = "kubeconfig"
 
-//Declare Some Global variables
-var (
-	//RegisteredControllPlanes Map of all registred control plances
-	RegisteredControllPlanes map[string]*ControlPlane //Try to maintain a map of controll planes
-	//InitOnce Do.Once for Initializing this map
-	InitOnce sync.Once //Initialize this map only once
-)
+//ControlPlaneTests creates a common type for creating and adding tests using this framework
+type ControlPlaneTests struct {
+	Name string
+	F    func(t *testing.T, controlPlane *ControlPlane)
+}
 
 //APIServer Structure of the API server object
 type APIServer struct {
-	ApiTesting.TestServer
+	apitesting.TestServer
 	InsecurePort int
 	etcdServer   *etcdtesting.EtcdTestServer
 }
 
-//Start Starts the API serer, should be fatal on any errors
-func (AP *APIServer) Start(t *testing.T) error {
+//Start Starts the API server, should be fatal on any errors
+func (ap *APIServer) Start(t *testing.T) {
 
-	var flags []string
 	var err error
 
 	storageServer, storageConfig := etcdtesting.NewUnsecuredEtcd3TestClientServer(t)
 
-	//Supress any futher logs for etcd server
+	//Suppress any further logs for etcd server
 	repo, err := capnslog.GetRepoLogger("github.com/coreos/etcd")
 	if err != nil {
 		t.Fatalf("couldn't configure logging: %v", err)
@@ -82,33 +78,31 @@ func (AP *APIServer) Start(t *testing.T) error {
 	repo.SetRepoLogLevel(capnslog.ERROR)
 
 	//Supply insecure port
-	AP.InsecurePort, err = createListenerOnFreePort()
+	ap.InsecurePort, err = framework.FindFreeLocalPort()
 	if err != nil {
 		t.Errorf("Unable to obtain an insecure port=%v\n", err)
-		return nil
 	}
 
-	flags = append(flags, fmt.Sprintf("--insecure-port=%d", AP.InsecurePort))
-
+	var flags []string
 	//Supply plugins
+	flags = append(flags, fmt.Sprintf("--insecure-port=%d", ap.InsecurePort))
 	flags = append(flags, "--admission-control=Initializers,NamespaceLifecycle,LimitRanger,DefaultStorageClass,ResourceQuota,DefaultTolerationSeconds")
 
-	testAPIServer := ApiTesting.StartTestServerOrDie(t, flags, storageConfig)
+	testAPIServer := apitesting.StartTestServerOrDie(t, flags, storageConfig)
 
-	AP.ClientConfig = testAPIServer.ClientConfig
-	AP.ServerOpts = testAPIServer.ServerOpts
-	AP.TearDownFn = testAPIServer.TearDownFn
-	AP.TmpDir = testAPIServer.TmpDir
-	AP.etcdServer = storageServer
+	ap.ClientConfig = testAPIServer.ClientConfig
+	ap.ServerOpts = testAPIServer.ServerOpts
+	ap.TearDownFn = testAPIServer.TearDownFn
+	ap.TmpDir = testAPIServer.TmpDir
+	ap.etcdServer = storageServer
 
-	return nil
 }
 
 //TearDown Brings down an api-server gracefully.
-func (AP *APIServer) TearDown(t *testing.T) error {
+func (ap *APIServer) TearDown(t *testing.T) error {
 
-	AP.TearDownFn()
-	AP.etcdServer.Terminate(t)
+	ap.TearDownFn()
+	ap.etcdServer.Terminate(t)
 
 	return nil
 
@@ -121,45 +115,49 @@ type ControllerManager struct {
 }
 
 //Start Starts a Controlelr Manager
-func (CM *ControllerManager) Start(t *testing.T, cli *restclient.Config, KubeConfigFilePath string) error {
+func (cm *ControllerManager) Start(t *testing.T, cli *restclient.Config, KubeConfigFilePath string) error {
 
 	var err error
 
-	CM.Opt = cmopt.NewCMServer()
+	cm.Opt = cmopt.NewCMServer()
 
-	CM.Opt.Kubeconfig = KubeConfigFilePath
-	CM.Port, err = createListenerOnFreePort()
+	cm.Opt.Kubeconfig = KubeConfigFilePath
+	cm.Port, err = framework.FindFreeLocalPort()
 	if err != nil {
 		t.Fatalf("Failed to create listerner port for Controlelr Manager err=%v\n", err)
 	}
-	CM.Opt.Port = int32(CM.Port)
-	CM.Opt.Controllers = append(CM.Opt.Controllers, "-nodelifecycle")
-	CM.Opt.Controllers = append(CM.Opt.Controllers, "-serviceaccount")
-	CM.Opt.Controllers = append(CM.Opt.Controllers, "-bootstrapsigner")
-	CM.Opt.Controllers = append(CM.Opt.Controllers, "-tokencleaner")
-	CM.Opt.Controllers = append(CM.Opt.Controllers, cmapp.KnownControllers()...)
+	cm.Opt.Port = int32(cm.Port)
+	cm.Opt.Controllers = append(cm.Opt.Controllers, "-nodelifecycle")
+	cm.Opt.Controllers = append(cm.Opt.Controllers, "-serviceaccount")
+	cm.Opt.Controllers = append(cm.Opt.Controllers, "-bootstrapsigner")
+	cm.Opt.Controllers = append(cm.Opt.Controllers, "-tokencleaner")
+	cm.Opt.Controllers = append(cm.Opt.Controllers, cmapp.KnownControllers()...)
 
-	CM.Opt.UseServiceAccountCredentials = false
+	cm.Opt.UseServiceAccountCredentials = false
 
 	go func(t *testing.T) {
 
-		err = cmapp.Run(CM.Opt)
+		err = cmapp.Run(cm.Opt)
 		if err != nil {
 			t.Fatalf("Error Starting Controller manager error = %v\n", err)
 		}
 	}(t)
 
-	log.Printf("Waiting for the controlelr manager to come up Port=%d CM.Port=%d", CM.Port, CM.Opt.Port)
+	t.Logf("Waiting for the controlelr manager to come up Port=%d CM.Port=%d", cm.Port, cm.Opt.Port)
 
-	url := fmt.Sprintf("http://0.0.0.0:%d/healthz", CM.Port)
+	url := fmt.Sprintf("http://0.0.0.0:%d/healthz", cm.Port)
 
 	//Wait until the controller manafer is up
-	for {
-		log.Printf("Tring to http.Get url=%s", url)
+	err = wait.Poll(time.Millisecond*100, time.Minute, func() (bool, error) {
 		time.Sleep(time.Millisecond * 100)
 		if Healthz(url) {
-			break
+			return true, nil
 		}
+		return false, nil
+	})
+
+	if err != nil {
+		t.Fatalf("Control Manager failed to start started=%v\n", err)
 	}
 
 	t.Logf("Controlelr manager started...\n")
@@ -174,20 +172,20 @@ type Scheduler struct {
 }
 
 //Start starts a scheduler
-func (Sc *Scheduler) Start(t *testing.T, cli *restclient.Config, KubeConfigFilePath string) error {
+func (sc *Scheduler) Start(t *testing.T, cli *restclient.Config, KubeConfigFilePath string) error {
 
 	var err error
 	var flags []string
 
 	command := sched.NewSchedulerCommand()
 
-	Sc.Port, err = createListenerOnFreePort()
+	sc.Port, err = framework.FindFreeLocalPort()
 	if err != nil {
 		t.Errorf("Unable to create Lister port for scheduler=%v\n", err)
 	}
 
 	flags = append(flags, "--kubeconfig="+KubeConfigFilePath)
-	flags = append(flags, fmt.Sprintf("--port=%d", Sc.Port))
+	flags = append(flags, fmt.Sprintf("--port=%d", sc.Port))
 
 	command.SetArgs(flags)
 
@@ -198,14 +196,19 @@ func (Sc *Scheduler) Start(t *testing.T, cli *restclient.Config, KubeConfigFileP
 		}
 	}(t)
 
-	log.Printf("Waiting for the Scheduler to come up Port=%d", Sc.Port)
+	t.Logf("Waiting for the Scheduler to come up Port=%d", sc.Port)
 	//Wait until the scheduler is up
-	for {
-		time.Sleep(time.Millisecond * 100)
-		if Healthz(fmt.Sprintf("http://0.0.0.0:%d/healthz", Sc.Port)) {
-			break
+	err = wait.Poll(time.Millisecond*100, time.Minute, func() (bool, error) {
+		if Healthz(fmt.Sprintf("http://0.0.0.0:%d/healthz", sc.Port)) {
+			return true, nil
 		}
+		return false, nil
+	})
+
+	if err != nil {
+		t.Fatalf("Unable to start Scheduler error=%v", err)
 	}
+
 	t.Logf("Scheduler started...\n")
 	return nil
 }
@@ -221,93 +224,86 @@ type ControlPlane struct {
 }
 
 //Start Starts complete control plane
-func (CP *ControlPlane) Start(t *testing.T) error {
+func (cp *ControlPlane) Start(t *testing.T) error {
 
-	CP.APIServer.Start(t)
-	CP.Cli, _ = kubernetes.NewForConfig(CP.APIServer.ClientConfig)
+	cp.APIServer.Start(t)
+	cp.Cli, _ = kubernetes.NewForConfig(cp.APIServer.ClientConfig)
 
 	certPem, keyPem, err := certutil.GenerateSelfSignedCertKey(server.LoopbackClientServerNameOverride, nil, nil)
 	if err != nil {
 		t.Fatalf("failed to generate self-signed certificate for loopback connection: %v", err)
 	}
 
-	CP.Conf = clientcmdapi.NewConfig()
+	cp.Conf = clientcmdapi.NewConfig()
 	Cluster := clientcmdapi.NewCluster()
 	Context := clientcmdapi.NewContext()
 	AuthInfo := clientcmdapi.NewAuthInfo()
 
 	//API-Server
-	KubeConfigFilePath := fmt.Sprintf("%s/%s", CP.APIServer.TmpDir, KubeConfFileName)
+	KubeConfigFilePath := fmt.Sprintf("%s/%s", cp.APIServer.TmpDir, KubeConfFileName)
 
-	Cluster.Server = CP.APIServer.ClientConfig.Host
+	Cluster.Server = cp.APIServer.ClientConfig.Host
 	Cluster.InsecureSkipTLSVerify = true
 
-	Context.AuthInfo = CP.Name
-	Context.Cluster = CP.Name
+	Context.AuthInfo = cp.Name
+	Context.Cluster = cp.Name
 
-	AuthInfo.Token = CP.APIServer.ClientConfig.BearerToken
+	AuthInfo.Token = cp.APIServer.ClientConfig.BearerToken
 	AuthInfo.ClientKeyData = append(AuthInfo.ClientKeyData, keyPem...)
 	AuthInfo.ClientCertificateData = append(AuthInfo.ClientCertificateData, certPem...)
 
-	CP.Conf.CurrentContext = CP.Name
-	CP.Conf.Clusters[CP.Name] = Cluster
-	CP.Conf.Contexts[CP.Name] = Context
-	CP.Conf.AuthInfos[CP.Name] = AuthInfo
+	cp.Conf.CurrentContext = cp.Name
+	cp.Conf.Clusters[cp.Name] = Cluster
+	cp.Conf.Contexts[cp.Name] = Context
+	cp.Conf.AuthInfos[cp.Name] = AuthInfo
 
-	err = clientcmd.WriteToFile(*CP.Conf, KubeConfigFilePath)
+	err = clientcmd.WriteToFile(*cp.Conf, KubeConfigFilePath)
 	if err != nil {
 		t.Fatalf("Unable to write the config locally")
 	}
 
 	//Create an output file
-	logFile, err := ioutil.TempFile(CP.APIServer.TmpDir, CP.Name)
+	logFile, err := ioutil.TempFile(cp.APIServer.TmpDir, cp.Name)
 	log.SetOutput(logFile)
-	flag.Lookup("log_dir").Value.Set(CP.APIServer.TmpDir)
+	flag.Lookup("log_dir").Value.Set(cp.APIServer.TmpDir)
 
-	CP.ControllerManager.Start(t, CP.APIServer.ClientConfig, KubeConfigFilePath)
+	cp.ControllerManager.Start(t, cp.APIServer.ClientConfig, KubeConfigFilePath)
 	configz.Delete("componentconfig")
-	CP.Scheduler.Start(t, CP.APIServer.ClientConfig, KubeConfigFilePath)
+	cp.Scheduler.Start(t, cp.APIServer.ClientConfig, KubeConfigFilePath)
 
 	//Add nodes to the cluster. Default is ten nodes
-	CP.AddNode(t)
+	cp.AddNode(t)
 
-	RegisterControllPlane(CP.Name, CP)
+	//Start Monitoring the control plane by constantly health checking them
+	go cp.HealthCheck(t)
 
 	return nil
 }
 
 //HealthCheck Api server will healthcheck itself just do it for Controller Manager and Scheduler
-func (CP *ControlPlane) HealthCheck() {
+func (cp *ControlPlane) HealthCheck(t *testing.T) {
 
 	//We need to abort if any of the component is failing health check
 
-	err := wait.Poll(500*time.Millisecond, 30*time.Second, func() (bool, error) {
+	healthFn := func() {
 
-		if !Healthz(fmt.Sprintf("http://0.0.0.0:%d/healthz", CP.ControllerManager.Port)) {
-			log.Fatalf("Controller Manager failed health-check aborting")
+		if !Healthz(fmt.Sprintf("http://0.0.0.0:%d/healthz", cp.ControllerManager.Port)) {
+			t.Fatalf("Controller Manager failed health-check aborting")
 
 		}
 
-		if !Healthz(fmt.Sprintf("http://0.0.0.0:%d/healthz", CP.Scheduler.Port)) {
-			log.Fatalf("Scheduler failed health-check aborting")
+		if !Healthz(fmt.Sprintf("http://0.0.0.0:%d/healthz", cp.Scheduler.Port)) {
+			t.Fatalf("Scheduler failed health-check aborting")
 		}
 
-		log.Printf("Controller Manager 0.0.0.0:%d and Scheduler 0.0.0.0:%d are healthy", CP.ControllerManager.Port, CP.Scheduler.Port)
-
-		return true, nil
-
-	})
-	if err != nil {
-
-		log.Fatalf("Unable to wait for healthcheck\n")
 	}
-
+	wait.Forever(healthFn, time.Second)
 }
 
 //AddNode Addss a number of nodes to the control plane, for now they are hollow nodes
-func (CP *ControlPlane) AddNode(t *testing.T) {
+func (cp *ControlPlane) AddNode(t *testing.T) {
 
-	hwnodes.InitNodes(t, CP.APIServer.TmpDir, CP.APIServer.InsecurePort)
+	hwnodes.InitNodes(t, cp.APIServer.TmpDir, cp.APIServer.InsecurePort)
 }
 
 //Healthz Health checks a given url, just verifies if it is 200 OK.
@@ -320,62 +316,16 @@ func Healthz(url string) bool {
 }
 
 //TearDown bring down a control plane gracefully.
-func (CP *ControlPlane) TearDown(t *testing.T) error {
+func (cp *ControlPlane) TearDown(t *testing.T) error {
 
 	//Teardown API Server
-	CP.APIServer.TearDown(t)
+	cp.APIServer.TearDown(t)
 	return nil
 }
 
 //NewControlPlane creates a new pointer of CP identified by a given name
 func NewControlPlane(name string) *ControlPlane {
 	return &ControlPlane{Name: name}
-}
-
-//createListenerOnFreePort a local function to pick a random port to be used by the component to bind.
-func createListenerOnFreePort() (int, error) {
-
-	ln, err := net.Listen("tcp", ":0")
-	if err != nil {
-		return 0, err
-	}
-
-	//Close this anyways as we will try to bind again.
-	defer ln.Close()
-
-	// get port
-	tcpAddr, ok := ln.Addr().(*net.TCPAddr)
-	if !ok {
-		return 0, fmt.Errorf("invalid listen address: %q", ln.Addr().String())
-	}
-	return tcpAddr.Port, nil
-
-}
-
-//LookupControllPlane a top-level funtion to simply check if a mentioned control plane exisist
-func LookupControllPlane(name string) *ControlPlane {
-
-	if cp, isAvailable := RegisteredControllPlanes[name]; isAvailable {
-		return cp
-	}
-
-	return nil
-}
-
-//RegisterControllPlane Should be automatic as and when a control plance is created it should be registered here.
-func RegisterControllPlane(name string, cp *ControlPlane) {
-
-	RegisteredControllPlanes[name] = cp
-	return
-}
-
-//
-func initializeModule() {
-	RegisteredControllPlanes = make(map[string]*ControlPlane)
-}
-
-func init() {
-	InitOnce.Do(initializeModule)
 }
 
 //CheckErrors a simple utility function that Fatal's out in case of any error.

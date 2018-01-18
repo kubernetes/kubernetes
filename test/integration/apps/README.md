@@ -7,7 +7,7 @@ Lowest layer verifies the core components and the later layers go on and verify 
 |   1    | Core                | pod/ node / scheduler | Basic sanity tests  |  Basic Sanity testing by integrating core components
 |   2    | Configuration       | Affinity / Service  / Volume / Disruption   |  Check if pod works with its closest configurable components
 |   3    | Pod Controller      | RS  /  StatefulSet / Jobs / Daemon          |  Check if RS / SS and jobs manage pods as expected
-|   4    | Higher Controllers  | Deployment / Cornjobs                       |  Check if deployments and Cronjobs create RS and jobs 
+|   4    | Higher Controllers  | Deployment / Cronjobs                       |  Check if deployments and Cronjobs create RS and jobs
 |   5    | Upgrades            | Upgrade tests on all the three controllers  |  Check if upgrade and history management works across all the controlers
 
 ## How to run 

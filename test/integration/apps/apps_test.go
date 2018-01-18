@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2018 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,15 +18,9 @@ package apps
 
 import (
 	"flag"
-	"log"
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/test/integration/apps/core"
-	"k8s.io/kubernetes/test/integration/apps/hrcontrollers"
-	"k8s.io/kubernetes/test/integration/apps/podconfig"
-	"k8s.io/kubernetes/test/integration/apps/podcontrollers"
 	"k8s.io/kubernetes/test/integration/apps/upgrades"
 	controlplane "k8s.io/kubernetes/test/integration/fixtures/controlplane"
 	"k8s.io/kubernetes/test/integration/framework"
@@ -35,15 +29,11 @@ import (
 //RunBySuite Below flag will be set to 'True' if run the by the script via go test -ldflags
 var RunBySuite string
 
-var Tests = []testing.InternalTest{
-	{Name: core.Name, F: core.RunTests},
-	{Name: podconfig.Name, F: podconfig.RunTests},
-	{Name: podcontrollers.Name, F: podcontrollers.RunTests},
-	{Name: hrcontrollers.Name, F: hrcontrollers.RunTests},
-	{Name: upgrades.Name, F: upgrades.RunTests},
+var Tests = []controlplane.ControlPlaneTests{
+	{Name: upgrades.TestPkgName, F: upgrades.RunTests},
 }
 
-var CP *controlplane.ControlPlane
+var controlPlane *controlplane.ControlPlane
 
 func TestMain(m *testing.M) {
 	flag.Parse()
@@ -52,14 +42,25 @@ func TestMain(m *testing.M) {
 
 func Setup(t *testing.T) error {
 	//Wait for kube components
-	CP = controlplane.NewControlPlane("Apps")
-	CP.Start(t)
+	controlPlane = controlplane.NewControlPlane("Apps")
+	controlPlane.Start(t)
+
+	//Setup a testing namespace
+	ns := v1.Namespace{}
+	ns.Name = "testing"
+	ns.ObjectMeta.Name = "testing"
+
+	_, err := controlPlane.Cli.Core().Namespaces().Create(&ns)
+	if err != nil {
+		t.Fatalf("Error creating namespace =%v", err)
+	}
+
 	return nil
 }
 
 func TearDown(t *testing.T) error {
 
-	CP.TearDown(t)
+	controlPlane.TearDown(t)
 	return nil
 }
 
@@ -68,31 +69,9 @@ func TestApps(t *testing.T) {
 	Setup(t)
 	defer TearDown(t)
 
-	NSOpt := meta_v1.ListOptions{}
-	NS := v1.Namespace{}
-	NS.Name = "testing"
-	NS.ObjectMeta.Name = "testing"
-
-	ns, err := CP.Cli.Core().Namespaces().Create(&NS)
-
-	if err != nil {
-		t.Fatalf("Error creating namespace =%v", err)
-	}
-
-	log.Printf("Namespance created is %v", ns)
-
-	nsList, err := CP.Cli.Core().Namespaces().List(NSOpt)
-	if err != nil {
-		t.Fatalf("Error Listing namespace =%v", err)
-	}
-
-	log.Printf("There are %d Namespaces", len(nsList.Items))
-	for _, n := range nsList.Items {
-		log.Printf("%s", n.Name)
-	}
-
 	for _, tst := range Tests {
-		t.Run(tst.Name, tst.F)
+		t.Run(tst.Name, func(t *testing.T) {
+			tst.F(t, controlPlane)
+		})
 	}
-
 }

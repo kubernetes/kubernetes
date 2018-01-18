@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2018 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -24,53 +24,38 @@ import (
 	v1 "k8s.io/api/core/v1"
 	v1meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
 	controlplane "k8s.io/kubernetes/test/integration/fixtures/controlplane"
 )
 
 // Some global variables
-var (
+const (
 	//Name of the package
-	Name = "Upgrades"
+	TestPkgName = "Upgrades"
 	//Namespace the one used for this testing pkg
-	Namespace = "testing"
-	//Try to look up the control plane as its not passed around to sub-tests
-	CP *controlplane.ControlPlane
+	TestNamespace = "testing"
 )
 
 //Tests List of internal tests.
-var Tests = []testing.InternalTest{
+var Tests = []controlplane.ControlPlaneTests{
 	{Name: "Statefulset", F: statefulsetUpgrades},
-	{Name: "Daemon", F: daemonsetUpgrades},
-	{Name: "Deployment", F: deploymentUpgrades},
 }
 
 // RunTests Starting point of tests in this package
-func RunTests(t *testing.T) {
+func RunTests(t *testing.T, controlPlane *controlplane.ControlPlane) {
 
 	setup(t)
 	defer teardown(t)
 
-	//Run one test case after other
 	for _, tst := range Tests {
-		t.Run(tst.Name, tst.F)
+		t.Run(tst.Name, func(t *testing.T) {
+			tst.F(t, controlPlane)
+		})
 	}
-
-	//Tear-down
-
 }
 
-func setup(t *testing.T) {
-	CP = controlplane.LookupControllPlane("Apps")
-	if CP == nil {
-		t.Fatalf("Unable to find the Control Plane")
-	}
-	return
-}
-
-func statefulsetUpgrades(t *testing.T) {
-
-	//var podListopt v1meta.ListOptions
+func statefulsetUpgrades(t *testing.T, controlPlane *controlplane.ControlPlane) {
 
 	labels := make(map[string]string)
 	ssName := "ss-upgrade"
@@ -79,66 +64,61 @@ func statefulsetUpgrades(t *testing.T) {
 	replica := 5
 
 	ssSrvInput := framework.CreateStatefulSetService(svcName, labels)
-	ssInput := framework.NewStatefulSet(ssName, Namespace, svcName, int32(replica), []v1.VolumeMount{}, []v1.VolumeMount{}, labels)
+	ssInput := framework.NewStatefulSet(ssName, TestNamespace, svcName, int32(replica), []v1.VolumeMount{}, []v1.VolumeMount{}, labels)
 
-	_, err := CP.Cli.Core().Services(Namespace).Create(ssSrvInput)
+	_, err := controlPlane.Cli.Core().Services(TestNamespace).Create(ssSrvInput)
 	controlplane.CheckErrors(t, err, "While Creating headless service")
 
-	_, err = CP.Cli.AppsV1beta1().StatefulSets(Namespace).Create(ssInput)
+	_, err = controlPlane.Cli.AppsV1beta1().StatefulSets(TestNamespace).Create(ssInput)
 	controlplane.CheckErrors(t, err, "While Creating statefulset")
 
-	//Wait for a while as it takes some time to for the pods to get created
-	//time.Sleep(time.Second * 10)
+	t.Run("wait-for-Statefulset", func(t *testing.T) {
 
-	for {
-		pods, err := CP.Cli.Core().Pods(Namespace).List(v1meta.ListOptions{LabelSelector: "app=test"})
-		controlplane.CheckErrors(t, err, "While trying to list the pods")
-		if len(pods.Items) == replica {
-			break
+		err = wait.Poll(time.Millisecond*10, time.Minute, func() (bool, error) {
+			pods, err := controlPlane.Cli.Core().Pods(TestNamespace).List(v1meta.ListOptions{LabelSelector: "app=test"})
+			controlplane.CheckErrors(t, err, "While trying to list the pods")
+			if len(pods.Items) == replica {
+				return true, nil
+			}
+			return false, nil
+		})
+		if err != nil {
+			t.Fatalf("Failed to create statefulset err=%v", err)
 		}
-		time.Sleep(time.Millisecond * 10)
-		//fmt.Printf("Not Enough pods yet have=%d, want=%d\n", len(pods.Items), replica)
-	}
-
-	//fmt.Printf("Containers are = %v\n", Cfg.Nodes.ListContainers())
+	})
 
 	t.Run("Default-VerifyImageUpdate", func(t *testing.T) {
 
 		//Change the image
 		ssInput.Spec.Template.Spec.Containers[0].Image = "new-image:latest"
-		_, err = CP.Cli.AppsV1beta1().StatefulSets(Namespace).Update(ssInput)
+		_, err = controlPlane.Cli.AppsV1beta1().StatefulSets(TestNamespace).Update(ssInput)
 		controlplane.CheckErrors(t, err, "While trying to update the statefulset image")
 
-		continueLoop := true
-		retry := 1000
-		for continueLoop && retry > 0 {
+		err = wait.Poll(time.Millisecond*10, time.Minute, func() (bool, error) {
 
-			continueLoop = false
-			time.Sleep(time.Millisecond * 100)
-
-			pods, err := CP.Cli.Core().Pods(Namespace).List(v1meta.ListOptions{LabelSelector: "app=test"})
+			pods, err := controlPlane.Cli.Core().Pods(TestNamespace).List(v1meta.ListOptions{LabelSelector: "app=test"})
 			controlplane.CheckErrors(t, err, "While trying to list the pods")
-
 			for _, p := range pods.Items {
 				for _, c := range p.Spec.Containers {
-					//fmt.Printf("Pod = %s Container =%s Image =%s\n", p.ObjectMeta.Name, c.Name, c.Image)
 					if c.Image != "new-image:latest" {
-						continueLoop = true
+						return false, nil
 					}
 				}
 			}
-			retry--
+			return true, nil
+		})
+
+		if err != nil {
+			t.Fatalf("Pods are not updated with the new image")
+
 		}
-		if continueLoop {
-			//This means there are some pods or all pods still with old image and not update to latest
-			t.Fatalf("Failed to get the new image updated")
-		}
+
 	})
 
 	t.Run("Default-VerifyOrderinalCreationOrder", func(t *testing.T) {
 
 		podOrdinalMap := make(map[string]time.Time)
-		pods, err := CP.Cli.Core().Pods(Namespace).List(v1meta.ListOptions{LabelSelector: "app=test"})
+		pods, err := controlPlane.Cli.Core().Pods(TestNamespace).List(v1meta.ListOptions{LabelSelector: "app=test"})
 		controlplane.CheckErrors(t, err, "While trying to list the pods")
 
 		for _, p := range pods.Items {
@@ -155,17 +135,13 @@ func statefulsetUpgrades(t *testing.T) {
 				t.Errorf("Error: After update %s should have been created after %s", thisPod, nextPod)
 			}
 		}
+
 	})
 }
 
-func deploymentUpgrades(t *testing.T) {
-	//Tests Related Deployment upgrades
-	t.SkipNow()
-}
-
-func daemonsetUpgrades(t *testing.T) {
-	//Tests Related to DaemonSet upgrades
-	t.SkipNow()
+//Setup code like creating a separate namespace for upgrade test etc., should be done here.
+func setup(t *testing.T) {
+	return
 }
 
 func teardown(t *testing.T) {

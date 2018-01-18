@@ -1,8 +1,6 @@
 approvers:
-- janetkuo
-- kargakis
-- erictune
-- kow3ns
-- smarterclayton
+- sig-testing-approvers
+- dhilipkumars
 reviewers:
-- sig-apps-reviewers
+- sig-testing-reviewers
+- dhilipkumars

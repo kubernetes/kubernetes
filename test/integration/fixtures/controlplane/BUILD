@@ -12,6 +12,7 @@ go_library(
         "//cmd/kube-scheduler/app:go_default_library",
         "//pkg/util/configz:go_default_library",
         "//test/integration/fixtures/hollownode:go_default_library",
+        "//test/integration/framework:go_default_library",
         "//vendor/github.com/coreos/pkg/capnslog:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/server:go_default_library",
