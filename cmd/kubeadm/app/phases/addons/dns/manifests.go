@@ -309,13 +309,13 @@ data:
         health
         kubernetes {{ .DNSDomain }} {{ .ServiceCIDR }} {
            pods insecure
-           upstream /etc/resolv.conf
+           upstream {{ .UpstreamNameserver }}
            fallthrough in-addr.arpa ip6.arpa
         }
         prometheus :9153
-        proxy . /etc/resolv.conf
+        proxy . {{ .UpstreamNameserver }}
         cache 30
-    }
+    }{{ .StubDomain }}
 `
 	// CoreDNSClusterRole is the CoreDNS ClusterRole manifest
 	CoreDNSClusterRole = `
@@ -358,4 +358,15 @@ metadata:
   name: coredns
   namespace: kube-system
 `
+	// coreDNSProxyDefaultPort, coreDNSCorefileDefaultData, coreDNSProxyStanzaSuffix is used in the translation of configMap of kube-dns to CoreDNS.
+	coreDNSProxyStanzaPrefix = `
+    `
+	coreDNSProxyDefaultPort    = `:53`
+	coreDNSCorefileDefaultData = ` {
+        errors
+        cache 30
+        proxy . `
+	coreDNSProxyStanzaSuffix = `
+    }
+    `
 )

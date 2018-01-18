@@ -18,7 +18,11 @@ package dns
 
 import (
 	"fmt"
+
 	"runtime"
+	"strings"
+
+	"encoding/json"
 
 	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
@@ -33,12 +37,15 @@ import (
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/util/version"
 )
 
 const (
 	// KubeDNSServiceAccountName describes the name of the ServiceAccount for the kube-dns addon
-	KubeDNSServiceAccountName = "kube-dns"
+	KubeDNSServiceAccountName  = "kube-dns"
+	kubeDNSStubDomain          = "stubDomains"
+	kubeDNSUpstreamNameservers = "upstreamNameservers"
 )
 
 // EnsureDNSAddon creates the kube-dns or CoreDNS addon
@@ -139,11 +146,27 @@ func coreDNSAddon(cfg *kubeadmapi.MasterConfiguration, client clientset.Interfac
 	if err != nil {
 		return fmt.Errorf("error when parsing CoreDNS deployment template: %v", err)
 	}
+	kubeDNSConfigMap, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(kubeadmconstants.KubeDNS, metav1.GetOptions{})
+	if err != nil && !apierrors.IsNotFound(err) {
+		return err
+	}
+
+	stubDomain, err := translateStubDomainOfKubeDNSToProxyCoreDNS(kubeDNSStubDomain, kubeDNSConfigMap)
+	if err != nil {
+		return err
+	}
+
+	upstreamNameserver, err := translateUpstreamNameServerOfKubeDNSToUpstreamProxyCoreDNS(kubeDNSUpstreamNameservers, kubeDNSConfigMap)
+	if err != nil {
+		return err
+	}
 
 	// Get the config file for CoreDNS
-	coreDNSConfigMapBytes, err := kubeadmutil.ParseTemplate(CoreDNSConfigMap, struct{ DNSDomain, ServiceCIDR string }{
-		ServiceCIDR: cfg.Networking.ServiceSubnet,
-		DNSDomain:   cfg.Networking.DNSDomain,
+	coreDNSConfigMapBytes, err := kubeadmutil.ParseTemplate(CoreDNSConfigMap, struct{ DNSDomain, ServiceCIDR, UpstreamNameserver, StubDomain string }{
+		ServiceCIDR:        cfg.Networking.ServiceSubnet,
+		DNSDomain:          cfg.Networking.DNSDomain,
+		UpstreamNameserver: upstreamNameserver,
+		StubDomain:         stubDomain,
 	})
 	if err != nil {
 		return fmt.Errorf("error when parsing CoreDNS configMap template: %v", err)
@@ -243,4 +266,41 @@ func createDNSService(dnsService *v1.Service, serviceBytes []byte, client client
 		}
 	}
 	return nil
+}
+
+// translateStubDomainOfKubeDNSToProxyCoreDNS translates StubDomain Data in kube-dns ConfigMap
+// in the form of Proxy for the CoreDNS Corefile.
+func translateStubDomainOfKubeDNSToProxyCoreDNS(dataField string, kubeDNSConfigMap *v1.ConfigMap) (string, error) {
+	if proxy, ok := kubeDNSConfigMap.Data[dataField]; ok {
+		stubDomainData := make(map[string][]string)
+		proxyStanzaList := coreDNSProxyStanzaPrefix
+
+		err := json.Unmarshal([]byte(proxy), &stubDomainData)
+		if err != nil {
+			return "", fmt.Errorf("failed to parse JSON from 'kube-dns ConfigMap: %v", err)
+		}
+
+		for domain, proxyIP := range stubDomainData {
+			proxyStanzaList = proxyStanzaList + domain + coreDNSProxyDefaultPort + coreDNSCorefileDefaultData + strings.Join(proxyIP, " ") + coreDNSProxyStanzaSuffix
+		}
+		return proxyStanzaList, nil
+	}
+	return "", nil
+}
+
+// translateUpstreamNameServerOfKubeDNSToUpstreamProxyCoreDNS translates UpstreamNameServer Data in kube-dns ConfigMap
+// in the form of Proxy for the CoreDNS Corefile.
+func translateUpstreamNameServerOfKubeDNSToUpstreamProxyCoreDNS(dataField string, kubeDNSConfigMap *v1.ConfigMap) (string, error) {
+	if upstreamValues, ok := kubeDNSConfigMap.Data[dataField]; ok {
+		var upstreamProxyIP []string
+
+		err := json.Unmarshal([]byte(upstreamValues), &upstreamProxyIP)
+		if err != nil {
+			return "", fmt.Errorf("failed to parse JSON from 'kube-dns ConfigMap: %v", err)
+		}
+
+		coreDNSProxyStanzaList := strings.Join(upstreamProxyIP, " ")
+		return coreDNSProxyStanzaList, nil
+	}
+	return kubetypes.ResolvConfDefault, nil
 }

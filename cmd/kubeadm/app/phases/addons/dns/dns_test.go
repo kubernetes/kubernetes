@@ -17,9 +17,12 @@ limitations under the License.
 package dns
 
 import (
+	"strings"
 	"testing"
 
+	"k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
@@ -127,9 +130,11 @@ func TestCompileManifests(t *testing.T) {
 		},
 		{
 			manifest: CoreDNSConfigMap,
-			data: struct{ DNSDomain, ServiceCIDR string }{
-				DNSDomain:   "foo",
-				ServiceCIDR: "foo",
+			data: struct{ DNSDomain, ServiceCIDR, UpstreamNameserver, StubDomain string }{
+				DNSDomain:          "foo",
+				ServiceCIDR:        "foo",
+				UpstreamNameserver: "foo",
+				StubDomain:         "foo",
 			},
 			expected: true,
 		},
@@ -172,6 +177,137 @@ func TestGetDNSIP(t *testing.T) {
 				rt.expectedDNSIP,
 				actualDNSIP,
 			)
+		}
+	}
+}
+
+func TestTranslateStubDomainKubeDNSToCoreDNS(t *testing.T) {
+	testCases := []struct {
+		configMap *v1.ConfigMap
+		expect    string
+	}{
+		{
+			configMap: &v1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "kube-dns",
+					Namespace: "kube-system",
+				},
+				Data: map[string]string{
+					"stubDomains":         `{"foo.com" : ["1.2.3.4:5300","3.3.3.3"], "my.cluster.local" : ["2.3.4.5"]}`,
+					"upstreamNameservers": `["8.8.8.8", "8.8.4.4"]`,
+				},
+			},
+
+			expect: `
+    foo.com:53 {
+        errors
+        cache 30
+        proxy . 1.2.3.4:5300 3.3.3.3
+    }
+    my.cluster.local:53 {
+        errors
+        cache 30
+        proxy . 2.3.4.5
+    }
+    `,
+		},
+		{
+			configMap: &v1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "kubedns",
+					Namespace: "kube-system",
+				},
+			},
+
+			expect: "",
+		},
+		{
+			configMap: &v1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "kube-dns",
+					Namespace: "kube-system",
+				},
+				Data: map[string]string{
+					"stubDomains":         `{"foo.com" : ["1.2.3.4:5300"], "my.cluster.local" : ["2.3.4.5"]}`,
+					"upstreamNameservers": `["8.8.8.8", "8.8.4.4"]`,
+				},
+			},
+
+			expect: `
+    foo.com:53 {
+        errors
+        cache 30
+        proxy . 1.2.3.4:5300
+    }
+    my.cluster.local:53 {
+        errors
+        cache 30
+        proxy . 2.3.4.5
+    }
+    `,
+		},
+	}
+	for _, testCase := range testCases {
+		out, err := translateStubDomainOfKubeDNSToProxyCoreDNS(kubeDNSStubDomain, testCase.configMap)
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		if !strings.Contains(out, testCase.expect) {
+			t.Errorf("expected to find %q in output: %q", testCase.expect, out)
+		}
+	}
+}
+
+func TestTranslateUpstreamKubeDNSToCoreDNS(t *testing.T) {
+	testCases := []struct {
+		configMap *v1.ConfigMap
+		expect    string
+	}{
+		{
+			configMap: &v1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "kube-dns",
+					Namespace: "kube-system",
+				},
+			},
+
+			expect: "/etc/resolv.conf",
+		},
+		{
+			configMap: &v1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "kubedns",
+					Namespace: "kube-system",
+				},
+				Data: map[string]string{
+					"stubDomains":         ` {"foo.com" : ["1.2.3.4:5300"], "my.cluster.local" : ["2.3.4.5"]}`,
+					"upstreamNameservers": `["8.8.8.8", "8.8.4.4", "4.4.4.4"]`,
+				},
+			},
+
+			expect: "8.8.8.8 8.8.4.4 4.4.4.4",
+		},
+		{
+			configMap: &v1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "kubedns",
+					Namespace: "kube-system",
+				},
+				Data: map[string]string{
+					"upstreamNameservers": `["8.8.8.8", "8.8.4.4"]`,
+				},
+			},
+
+			expect: "8.8.8.8 8.8.4.4",
+		},
+	}
+	for _, testCase := range testCases {
+		out, err := translateUpstreamNameServerOfKubeDNSToUpstreamProxyCoreDNS(kubeDNSUpstreamNameservers, testCase.configMap)
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		if !strings.Contains(out, testCase.expect) {
+			t.Errorf("expected to find %q in output: %q", testCase.expect, out)
 		}
 	}
 }
