@@ -126,13 +126,11 @@ if [ "${CLOUD_PROVIDER}" == "openstack" ]; then
     fi
 fi
 
-# set feature gates if using ipvs mode
+# load required kernel modules if proxy mode is set to "ipvs".
 if [ "${KUBE_PROXY_MODE}" == "ipvs" ]; then
     # If required kernel modules are not available, fall back to iptables.
     sudo modprobe -a ip_vs ip_vs_rr ip_vs_wrr ip_vs_sh nf_conntrack_ipv4
-    if [[ $? -eq 0 ]]; then
-      FEATURE_GATES="${FEATURE_GATES},SupportIPVSProxyMode=true"
-    else
+    if [[ $? -ne 0 ]]; then
       echo "Required kernel modules for ipvs not found. Falling back to iptables mode."
       KUBE_PROXY_MODE=iptables
     fi
