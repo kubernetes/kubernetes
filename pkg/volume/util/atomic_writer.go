@@ -47,9 +47,9 @@ const (
 //    by the caller.
 //
 // The visible files in this volume are symlinks to files in the writer's data
-// directory.  Actual files are stored in a hidden timestamped directory which
+// directory. Actual files are stored in a hidden timestamped directory which
 // is symlinked to by the data directory. The timestamped directory and
-// data directory symlink are created in the writer's target dir.  This scheme
+// data directory symlink are created in the writer's target dir. This scheme
 // allows the files to be atomically updated by changing the target of the
 // data directory symlink.
 //
@@ -83,7 +83,7 @@ const (
 )
 
 // Write does an atomic projection of the given payload into the writer's target
-// directory.  Input paths must not begin with '..'.
+// directory. Input paths must not begin with '..'.
 //
 // The Write algorithm is:
 //
@@ -215,7 +215,7 @@ func (w *AtomicWriter) Write(payload map[string]FileProjection) error {
 	return nil
 }
 
-// validatePayload returns an error if any path in the payload  returns a copy of the payload with the paths cleaned.
+// validatePayload returns an error if any path in the payload returns a copy of the payload with the paths cleaned.
 func validatePayload(payload map[string]FileProjection) (map[string]FileProjection, error) {
 	cleanPayload := make(map[string]FileProjection)
 	for k, content := range payload {
@@ -230,7 +230,7 @@ func validatePayload(payload map[string]FileProjection) (map[string]FileProjecti
 }
 
 // validatePath validates a single path, returning an error if the path is
-// invalid.  paths may not:
+// invalid. Paths may not:
 //
 // 1. be absolute
 // 2. contain '..' as an element
@@ -355,7 +355,7 @@ func (w *AtomicWriter) newTimestampDir() (string, error) {
 	}
 
 	// 0755 permissions are needed to allow 'group' and 'other' to recurse the
-	// directory tree.  do a chmod here to ensure that permissions are set correctly
+	// directory tree. Do a chmod here to ensure that permissions are set correctly
 	// regardless of the process' umask.
 	err = os.Chmod(tsDir, 0755)
 	if err != nil {
@@ -366,7 +366,7 @@ func (w *AtomicWriter) newTimestampDir() (string, error) {
 	return tsDir, nil
 }
 
-// writePayloadToDir writes the given payload to the given directory.  The
+// writePayloadToDir writes the given payload to the given directory. The
 // directory must exist.
 func (w *AtomicWriter) writePayloadToDir(payload map[string]FileProjection, dir string) error {
 	for userVisiblePath, fileProjection := range payload {
@@ -418,7 +418,7 @@ func (w *AtomicWriter) createUserVisibleFiles(payload map[string]FileProjection)
 			// If dir is not empty, the projection path contains at least one
 			// subdirectory (example: userVisiblePath := "foo/bar").
 			// Since filepath.Split leaves a trailing path separator, in this
-			// example, dir = "foo/".  In order to calculate the number of
+			// example, dir = "foo/". In order to calculate the number of
 			// subdirectories, we must subtract 1 from the number returned by split.
 			subDirs = len(strings.Split(dir, string(os.PathSeparator))) - 1
 			err := os.MkdirAll(path.Join(w.targetDir, dir), os.ModePerm)
