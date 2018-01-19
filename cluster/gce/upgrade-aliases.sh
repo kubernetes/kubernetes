@@ -144,7 +144,7 @@ if [[ "${k8s_node_routes_count}" -eq 0 ]]; then
   echo "No k8s node routes found and IP alias should already be enabled. Exiting..."
   exit 0
 fi
-echo "Found ${k8s_node_routes_count} k8s node routes. Proceeding to upgrade them to IP aliases based connectivity..."
+echo "Found ${k8s_node_routes_count} K8s node routes. Proceeding to upgrade them to IP aliases based connectivity..."
 
 detect-k8s-subnetwork
 if [ -z ${IP_ALIAS_SUBNETWORK} ]; then
@@ -167,7 +167,7 @@ export ETCD_IMAGE=3.0.17
 export ETCD_VERSION=3.0.17
 
 # Upgrade master with updated kube envs
-${KUBE_ROOT}/cluster/gce/upgrade.sh -M -l
+# ${KUBE_ROOT}/cluster/gce/upgrade.sh -M -l
 
 delete-k8s-node-routes
 set-allow-subnet-cidr-routes-overlap false
