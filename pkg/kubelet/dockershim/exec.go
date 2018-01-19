@@ -19,6 +19,7 @@ package dockershim
 import (
 	"fmt"
 	"io"
+	"os"
 	"time"
 
 	dockertypes "github.com/docker/docker/api/types"
@@ -87,6 +88,28 @@ func (*NativeExecHandler) ExecInContainer(client libdocker.Interface, container 
 		case <-done:
 			// ExecInContainer has returned, so short-circuit
 			return
+		}
+
+		// Kill the process if timeout elapsed
+		if timeout != 0 {
+			time.AfterFunc(timeout, func() {
+				inspect, err := client.InspectExec(execObj.ID)
+				if err != nil {
+					glog.Errorf("Unable to inspect exec session %s in container %s for timeout termination!", execObj.ID, container.ID)
+					return
+				}
+				if inspect.Running {
+					proc, err := os.FindProcess(inspect.Pid)
+					if err != nil {
+						glog.Errorf("Unable to retrieve process information for exec session %s in container %s for timeout termination!", execObj.ID, container.ID)
+						return
+					}
+					if proc.Kill() != nil {
+						glog.Errorf("Unable to kill the timeout process of exec session %s in container %s!", execObj.ID, container.ID)
+					}
+					proc.Release()
+				}
+			})
 		}
 
 		kubecontainer.HandleResizing(resize, func(size remotecommand.TerminalSize) {
