@@ -21,15 +21,15 @@ import (
 	"math"
 
 	"github.com/golang/glog"
+
 	"k8s.io/api/core/v1"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/api/v1/resource"
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
+	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
@@ -64,7 +64,7 @@ func NewCriticalPodAdmissionHandler(getPodsFunc eviction.ActivePodsFunc, killPod
 // HandleAdmissionFailure gracefully handles admission rejection, and, in some cases,
 // to allow admission of the pod despite its previous failure.
 func (c *CriticalPodAdmissionHandler) HandleAdmissionFailure(pod *v1.Pod, failureReasons []algorithm.PredicateFailureReason) (bool, []algorithm.PredicateFailureReason, error) {
-	if !kubetypes.IsCriticalPod(pod) || !utilfeature.DefaultFeatureGate.Enabled(features.ExperimentalCriticalPodAnnotation) {
+	if !kubepod.IsCriticalPod(pod) {
 		return false, failureReasons, nil
 	}
 	// InsufficientResourceError is not a reason to reject a critical pod.

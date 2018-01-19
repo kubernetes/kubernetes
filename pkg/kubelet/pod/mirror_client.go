@@ -21,7 +21,9 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
@@ -88,6 +90,11 @@ func (mc *basicMirrorClient) DeleteMirrorPod(podFullName string) error {
 		glog.Errorf("Failed deleting a mirror pod %q: %v", podFullName, err)
 	}
 	return nil
+}
+
+func IsCriticalPod(pod *v1.Pod) bool {
+	return utilfeature.DefaultFeatureGate.Enabled(features.ExperimentalCriticalPodAnnotation) &&
+		kubetypes.IsCriticalPod(pod)
 }
 
 func IsStaticPod(pod *v1.Pod) bool {
