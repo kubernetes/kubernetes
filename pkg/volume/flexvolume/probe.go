@@ -25,30 +25,23 @@ import (
 	"fmt"
 	"path/filepath"
 	"sync"
-	"time"
 
 	"github.com/fsnotify/fsnotify"
 	"k8s.io/apimachinery/pkg/util/errors"
 	utilfs "k8s.io/kubernetes/pkg/util/filesystem"
+	utilstrings "k8s.io/kubernetes/pkg/util/strings"
+	"strings"
 )
 
 type flexVolumeProber struct {
-	mutex           sync.Mutex
-	pluginDir       string // Flexvolume driver directory
-	watcher         utilfs.FSWatcher
-	probeNeeded     bool      // Must only read and write this through testAndSetProbeNeeded.
-	lastUpdated     time.Time // Last time probeNeeded was updated.
-	watchEventCount int
-	factory         PluginFactory
-	fs              utilfs.Filesystem
+	mutex          sync.Mutex
+	pluginDir      string // Flexvolume driver directory
+	watcher        utilfs.FSWatcher
+	factory        PluginFactory
+	fs             utilfs.Filesystem
+	probeAllNeeded bool
+	eventsMap      map[string]volume.ProbeOperation // the key is the driver directory path, the value is the coresponding operation
 }
-
-const (
-	// TODO (cxing) Tune these params based on test results.
-	// watchEventLimit is the max allowable number of processed watches within watchEventInterval.
-	watchEventInterval = 5 * time.Second
-	watchEventLimit    = 20
-)
 
 func GetDynamicPluginProber(pluginDir string) volume.DynamicPluginProber {
 	return &flexVolumeProber{
@@ -60,8 +53,8 @@ func GetDynamicPluginProber(pluginDir string) volume.DynamicPluginProber {
 }
 
 func (prober *flexVolumeProber) Init() error {
-	prober.testAndSetProbeNeeded(true)
-	prober.lastUpdated = time.Now()
+	prober.testAndSetProbeAllNeeded(true)
+	prober.eventsMap = map[string]volume.ProbeOperation{}
 
 	if err := prober.createPluginDir(); err != nil {
 		return err
@@ -73,26 +66,44 @@ func (prober *flexVolumeProber) Init() error {
 	return nil
 }
 
-// Probes for Flexvolume drivers.
-// If a filesystem update has occurred since the last probe, updated = true
-// and the list of probed plugins is returned.
-// Otherwise, update = false and probedPlugins = nil.
-//
-// If an error occurs, updated and plugins are set arbitrarily.
-func (prober *flexVolumeProber) Probe() (updated bool, plugins []volume.VolumePlugin, err error) {
-	probeNeeded := prober.testAndSetProbeNeeded(false)
-
-	if !probeNeeded {
-		return false, nil, nil
+// If probeAllNeeded is true, probe all pluginDir
+// else probe events in eventsMap
+func (prober *flexVolumeProber) Probe() (events []volume.ProbeEvent, err error) {
+	if prober.probeAllNeeded {
+		prober.testAndSetProbeAllNeeded(false)
+		return prober.probeAll()
 	}
 
+	return prober.probeMap()
+}
+
+func (prober *flexVolumeProber) probeMap() (events []volume.ProbeEvent, err error) {
+	// TODO use a concurrent map to avoid Locking the entire map
+	prober.mutex.Lock()
+	defer prober.mutex.Unlock()
+	probeEvents := []volume.ProbeEvent{}
+	allErrs := []error{}
+	for driverDirPathAbs, op := range prober.eventsMap {
+		driverDirName := filepath.Base(driverDirPathAbs) // e.g. driverDirName = vendor~cifs
+		probeEvent, pluginErr := prober.newProbeEvent(driverDirName, op)
+		if pluginErr != nil {
+			allErrs = append(allErrs, pluginErr)
+			continue
+		}
+		probeEvents = append(probeEvents, probeEvent)
+
+		delete(prober.eventsMap, driverDirPathAbs)
+	}
+	return probeEvents, errors.NewAggregate(allErrs)
+}
+
+func (prober *flexVolumeProber) probeAll() (events []volume.ProbeEvent, err error) {
+	probeEvents := []volume.ProbeEvent{}
+	allErrs := []error{}
 	files, err := prober.fs.ReadDir(prober.pluginDir)
 	if err != nil {
-		return false, nil, fmt.Errorf("Error reading the Flexvolume directory: %s", err)
+		return nil, fmt.Errorf("Error reading the Flexvolume directory: %s", err)
 	}
-
-	plugins = []volume.VolumePlugin{}
-	allErrs := []error{}
 	for _, f := range files {
 		// only directories with names that do not begin with '.' are counted as plugins
 		// and pluginDir/dirname/dirname should be an executable
@@ -100,20 +111,39 @@ func (prober *flexVolumeProber) Probe() (updated bool, plugins []volume.VolumePl
 		// e.g. dirname = vendor~cifs
 		// then, executable will be pluginDir/dirname/cifs
 		if f.IsDir() && filepath.Base(f.Name())[0] != '.' {
-			plugin, pluginErr := prober.factory.NewFlexVolumePlugin(prober.pluginDir, f.Name())
+			probeEvent, pluginErr := prober.newProbeEvent(f.Name(), volume.ProbeAddOrUpdate)
 			if pluginErr != nil {
-				pluginErr = fmt.Errorf(
-					"Error creating Flexvolume plugin from directory %s, skipping. Error: %s",
-					f.Name(), pluginErr)
 				allErrs = append(allErrs, pluginErr)
 				continue
 			}
-
-			plugins = append(plugins, plugin)
+			probeEvents = append(probeEvents, probeEvent)
 		}
 	}
+	return probeEvents, errors.NewAggregate(allErrs)
+}
 
-	return true, plugins, errors.NewAggregate(allErrs)
+func (prober *flexVolumeProber) newProbeEvent(driverDirName string, op volume.ProbeOperation) (volume.ProbeEvent, error) {
+	probeEvent := volume.ProbeEvent{
+		Op: op,
+	}
+	if op == volume.ProbeAddOrUpdate {
+		plugin, pluginErr := prober.factory.NewFlexVolumePlugin(prober.pluginDir, driverDirName)
+		if pluginErr != nil {
+			pluginErr = fmt.Errorf(
+				"Error creating Flexvolume plugin from directory %s, skipping. Error: %s",
+				driverDirName, pluginErr)
+			return probeEvent, pluginErr
+		}
+		probeEvent.Plugin = plugin
+		probeEvent.PluginName = plugin.GetPluginName()
+	} else if op == volume.ProbeRemove {
+		driverName := utilstrings.UnescapePluginName(driverDirName)
+		probeEvent.PluginName = flexVolumePluginNamePrefix + driverName
+
+	} else {
+		return probeEvent, fmt.Errorf("Unknown Operation on directory: %s. ", driverDirName)
+	}
+	return probeEvent, nil
 }
 
 func (prober *flexVolumeProber) handleWatchEvent(event fsnotify.Event) error {
@@ -127,46 +157,67 @@ func (prober *flexVolumeProber) handleWatchEvent(event fsnotify.Event) error {
 	if err != nil {
 		return err
 	}
-
+	parentPathAbs := filepath.Dir(eventPathAbs)
 	pluginDirAbs, err := filepath.Abs(prober.pluginDir)
 	if err != nil {
 		return err
 	}
 
-	// If the Flexvolume plugin directory is removed, need to recreate it
-	// in order to keep it under watch.
-	if eventOpIs(event, fsnotify.Remove) && eventPathAbs == pluginDirAbs {
-		if err := prober.createPluginDir(); err != nil {
-			return err
+	// event of pluginDirAbs
+	if eventPathAbs == pluginDirAbs {
+		// If the Flexvolume plugin directory is removed, need to recreate it
+		// in order to keep it under watch.
+		if eventOpIs(event, fsnotify.Remove) {
+			if err := prober.createPluginDir(); err != nil {
+				return err
+			}
+			if err := prober.addWatchRecursive(pluginDirAbs); err != nil {
+				return err
+			}
 		}
-		if err := prober.addWatchRecursive(pluginDirAbs); err != nil {
-			return err
-		}
-	} else if eventOpIs(event, fsnotify.Create) {
+		return nil
+	}
+
+	// watch newly added subdirectories inside a driver directory
+	if eventOpIs(event, fsnotify.Create) {
 		if err := prober.addWatchRecursive(eventPathAbs); err != nil {
 			return err
 		}
 	}
 
-	prober.updateProbeNeeded()
+	eventRelPathToPluginDir, err := filepath.Rel(pluginDirAbs, eventPathAbs)
+	if err != nil {
+		return err
+	}
+
+	// event inside specific driver dir
+	if len(eventRelPathToPluginDir) > 0 {
+		driverDirName := strings.Split(eventRelPathToPluginDir, string(os.PathSeparator))[0]
+		driverDirAbs := filepath.Join(pluginDirAbs, driverDirName)
+		// executable is removed, will trigger ProbeRemove event
+		if eventOpIs(event, fsnotify.Remove) && (eventRelPathToPluginDir == getExecutablePathRel(driverDirName) || parentPathAbs == pluginDirAbs) {
+			prober.updateEventsMap(driverDirAbs, volume.ProbeRemove)
+		} else {
+			prober.updateEventsMap(driverDirAbs, volume.ProbeAddOrUpdate)
+		}
+	}
 
 	return nil
 }
 
-func (prober *flexVolumeProber) updateProbeNeeded() {
-	// Within 'watchEventInterval' seconds, a max of 'watchEventLimit' watch events is processed.
-	// The watch event will not be registered if the limit is reached.
-	// This prevents increased disk usage from Probe() being triggered too frequently (either
-	// accidentally or maliciously).
-	if time.Since(prober.lastUpdated) > watchEventInterval {
-		// Update, then reset the timer and watch count.
-		prober.testAndSetProbeNeeded(true)
-		prober.lastUpdated = time.Now()
-		prober.watchEventCount = 1
-	} else if prober.watchEventCount < watchEventLimit {
-		prober.testAndSetProbeNeeded(true)
-		prober.watchEventCount++
+// getExecutableName returns the executableName of a flex plugin
+func getExecutablePathRel(driverDirName string) string {
+	parts := strings.Split(driverDirName, "~")
+	return filepath.Join(driverDirName, parts[len(parts)-1])
+}
+
+func (prober *flexVolumeProber) updateEventsMap(eventDirAbs string, op volume.ProbeOperation) {
+	prober.mutex.Lock()
+	defer prober.mutex.Unlock()
+	if prober.probeAllNeeded {
+		return
 	}
+	prober.eventsMap[eventDirAbs] = op
 }
 
 // Recursively adds to watch all directories inside and including the file specified by the given filename.
@@ -222,10 +273,10 @@ func (prober *flexVolumeProber) createPluginDir() error {
 	return nil
 }
 
-func (prober *flexVolumeProber) testAndSetProbeNeeded(newval bool) (oldval bool) {
+func (prober *flexVolumeProber) testAndSetProbeAllNeeded(newval bool) (oldval bool) {
 	prober.mutex.Lock()
 	defer prober.mutex.Unlock()
-	oldval, prober.probeNeeded = prober.probeNeeded, newval
+	oldval, prober.probeAllNeeded = prober.probeAllNeeded, newval
 	return
 }
 
