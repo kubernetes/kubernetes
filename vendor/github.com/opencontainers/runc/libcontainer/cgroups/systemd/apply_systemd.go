@@ -1,4 +1,4 @@
-// +build linux
+// +build linux,!static_build
 
 package systemd
 
@@ -271,6 +271,13 @@ func (m *Manager) Apply(pid int) error {
 	// cpu.cfs_quota_us and cpu.cfs_period_us are controlled by systemd.
 	if c.Resources.CpuQuota != 0 && c.Resources.CpuPeriod != 0 {
 		cpuQuotaPerSecUSec := uint64(c.Resources.CpuQuota*1000000) / c.Resources.CpuPeriod
+		// systemd converts CPUQuotaPerSecUSec (microseconds per CPU second) to CPUQuota
+		// (integer percentage of CPU) internally.  This means that if a fractional percent of
+		// CPU is indicated by Resources.CpuQuota, we need to round up to the nearest
+		// 10ms (1% of a second) such that child cgroups can set the cpu.cfs_quota_us they expect.
+		if cpuQuotaPerSecUSec%10000 != 0 {
+			cpuQuotaPerSecUSec = ((cpuQuotaPerSecUSec / 10000) + 1) * 10000
+		}
 		properties = append(properties,
 			newProp("CPUQuotaPerSecUSec", cpuQuotaPerSecUSec))
 	}
@@ -288,9 +295,12 @@ func (m *Manager) Apply(pid int) error {
 		}
 	}
 
-	if _, err := theConn.StartTransientUnit(unitName, "replace", properties, nil); err != nil && !isUnitExists(err) {
+	statusChan := make(chan string)
+	if _, err := theConn.StartTransientUnit(unitName, "replace", properties, statusChan); err != nil && !isUnitExists(err) {
 		return err
 	}
+
+	<-statusChan
 
 	if err := joinCgroups(c, pid); err != nil {
 		return err

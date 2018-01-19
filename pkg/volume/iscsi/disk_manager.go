@@ -27,15 +27,19 @@ import (
 // Abstract interface to disk operations.
 type diskManager interface {
 	MakeGlobalPDName(disk iscsiDisk) string
+	MakeGlobalVDPDName(disk iscsiDisk) string
 	// Attaches the disk to the kubelet's host machine.
 	AttachDisk(b iscsiDiskMounter) (string, error)
 	// Detaches the disk from the kubelet's host machine.
 	DetachDisk(disk iscsiDiskUnmounter, mntPath string) error
+	// Detaches the block disk from the kubelet's host machine.
+	DetachBlockISCSIDisk(disk iscsiDiskUnmapper, mntPath string) error
 }
 
 // utility to mount a disk based filesystem
+// globalPDPath: global mount path like, /var/lib/kubelet/plugins/kubernetes.io/iscsi/{ifaceName}/{portal-some_iqn-lun-lun_id}
+// volPath: pod volume dir path like, /var/lib/kubelet/pods/{podUID}/volumes/kubernetes.io~iscsi/{volumeName}
 func diskSetUp(manager diskManager, b iscsiDiskMounter, volPath string, mounter mount.Interface, fsGroup *int64) error {
-	// TODO: handle failed mounts here.
 	notMnt, err := mounter.IsLikelyNotMountPoint(volPath)
 	if err != nil && !os.IsNotExist(err) {
 		glog.Errorf("cannot validate mountpoint: %s", volPath)

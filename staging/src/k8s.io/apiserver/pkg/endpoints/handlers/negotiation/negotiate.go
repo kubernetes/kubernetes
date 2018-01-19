@@ -73,31 +73,30 @@ func NegotiateOutputStreamSerializer(req *http.Request, ns runtime.NegotiatedSer
 }
 
 // NegotiateInputSerializer returns the input serializer for the provided request.
-func NegotiateInputSerializer(req *http.Request, ns runtime.NegotiatedSerializer) (runtime.SerializerInfo, error) {
+func NegotiateInputSerializer(req *http.Request, streaming bool, ns runtime.NegotiatedSerializer) (runtime.SerializerInfo, error) {
 	mediaType := req.Header.Get("Content-Type")
-	return NegotiateInputSerializerForMediaType(mediaType, ns)
+	return NegotiateInputSerializerForMediaType(mediaType, streaming, ns)
 }
 
 // NegotiateInputSerializerForMediaType returns the appropriate serializer for the given media type or an error.
-func NegotiateInputSerializerForMediaType(mediaType string, ns runtime.NegotiatedSerializer) (runtime.SerializerInfo, error) {
+func NegotiateInputSerializerForMediaType(mediaType string, streaming bool, ns runtime.NegotiatedSerializer) (runtime.SerializerInfo, error) {
 	mediaTypes := ns.SupportedMediaTypes()
 	if len(mediaType) == 0 {
 		mediaType = mediaTypes[0].MediaType
 	}
-	mediaType, _, err := mime.ParseMediaType(mediaType)
-	if err != nil {
-		_, supported := MediaTypesForSerializer(ns)
-		return runtime.SerializerInfo{}, NewUnsupportedMediaTypeError(supported)
-	}
-
-	for _, info := range mediaTypes {
-		if info.MediaType != mediaType {
-			continue
+	if mediaType, _, err := mime.ParseMediaType(mediaType); err == nil {
+		for _, info := range mediaTypes {
+			if info.MediaType != mediaType {
+				continue
+			}
+			return info, nil
 		}
-		return info, nil
 	}
 
-	_, supported := MediaTypesForSerializer(ns)
+	supported, streamingSupported := MediaTypesForSerializer(ns)
+	if streaming {
+		return runtime.SerializerInfo{}, NewUnsupportedMediaTypeError(streamingSupported)
+	}
 	return runtime.SerializerInfo{}, NewUnsupportedMediaTypeError(supported)
 }
 

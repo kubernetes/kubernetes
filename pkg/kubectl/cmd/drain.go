@@ -105,7 +105,8 @@ func NewCmdCordon(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	options := &DrainOptions{Factory: f, Out: out}
 
 	cmd := &cobra.Command{
-		Use:     "cordon NODE",
+		Use: "cordon NODE",
+		DisableFlagsInUseLine: true,
 		Short:   i18n.T("Mark node as unschedulable"),
 		Long:    cordon_long,
 		Example: cordon_example,
@@ -132,7 +133,8 @@ func NewCmdUncordon(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	options := &DrainOptions{Factory: f, Out: out}
 
 	cmd := &cobra.Command{
-		Use:     "uncordon NODE",
+		Use: "uncordon NODE",
+		DisableFlagsInUseLine: true,
 		Short:   i18n.T("Mark node as schedulable"),
 		Long:    uncordon_long,
 		Example: uncordon_example,
@@ -184,7 +186,8 @@ func NewCmdDrain(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 	options := &DrainOptions{Factory: f, Out: out, ErrOut: errOut, backOff: clockwork.NewRealClock()}
 
 	cmd := &cobra.Command{
-		Use:     "drain NODE",
+		Use: "drain NODE",
+		DisableFlagsInUseLine: true,
 		Short:   i18n.T("Drain node in preparation for maintenance"),
 		Long:    drain_long,
 		Example: drain_example,
@@ -446,7 +449,7 @@ func (o *DrainOptions) getPodsForDeletion(nodeInfo *resource.Info) (pods []corev
 
 	for _, pod := range podList.Items {
 		podOk := true
-		for _, filt := range []podFilter{mirrorPodFilter, o.localStorageFilter, o.unreplicatedFilter, o.daemonsetFilter} {
+		for _, filt := range []podFilter{o.daemonsetFilter, mirrorPodFilter, o.localStorageFilter, o.unreplicatedFilter} {
 			filterOk, w, f := filt(pod)
 
 			podOk = podOk && filterOk
@@ -455,6 +458,13 @@ func (o *DrainOptions) getPodsForDeletion(nodeInfo *resource.Info) (pods []corev
 			}
 			if f != nil {
 				fs[f.string] = append(fs[f.string], pod.Name)
+			}
+
+			// short-circuit as soon as pod not ok
+			// at that point, there is no reason to run pod
+			// through any additional filters
+			if !podOk {
+				break
 			}
 		}
 		if podOk {

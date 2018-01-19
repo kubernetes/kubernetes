@@ -25,7 +25,9 @@ import (
 )
 
 type SummaryProvider interface {
-	Get() (*statsapi.Summary, error)
+	// Get provides a new Summary with the stats from Kubelet,
+	// and will update some stats if updateStats is true
+	Get(updateStats bool) (*statsapi.Summary, error)
 }
 
 // summaryProviderImpl implements the SummaryProvider interface.
@@ -41,8 +43,7 @@ func NewSummaryProvider(statsProvider StatsProvider) SummaryProvider {
 	return &summaryProviderImpl{statsProvider}
 }
 
-// Get provides a new Summary with the stats from Kubelet.
-func (sp *summaryProviderImpl) Get() (*statsapi.Summary, error) {
+func (sp *summaryProviderImpl) Get(updateStats bool) (*statsapi.Summary, error) {
 	// TODO(timstclair): Consider returning a best-effort response if any of
 	// the following errors occur.
 	node, err := sp.provider.GetNode()
@@ -50,7 +51,7 @@ func (sp *summaryProviderImpl) Get() (*statsapi.Summary, error) {
 		return nil, fmt.Errorf("failed to get node info: %v", err)
 	}
 	nodeConfig := sp.provider.GetNodeConfig()
-	rootStats, networkStats, err := sp.provider.GetCgroupStats("/")
+	rootStats, networkStats, err := sp.provider.GetCgroupStats("/", updateStats)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get root cgroup stats: %v", err)
 	}
@@ -87,7 +88,7 @@ func (sp *summaryProviderImpl) Get() (*statsapi.Summary, error) {
 		if name == "" {
 			continue
 		}
-		s, _, err := sp.provider.GetCgroupStats(name)
+		s, _, err := sp.provider.GetCgroupStats(name, false)
 		if err != nil {
 			glog.Errorf("Failed to get system container stats for %q: %v", name, err)
 			continue

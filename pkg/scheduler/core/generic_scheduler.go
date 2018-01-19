@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
+	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/pkg/scheduler/schedulercache"
 	"k8s.io/kubernetes/pkg/scheduler/util"
 
@@ -89,20 +90,20 @@ func (f *FitError) Error() string {
 }
 
 type genericScheduler struct {
-	cache                 schedulercache.Cache
-	equivalenceCache      *EquivalenceCache
-	schedulingQueue       SchedulingQueue
-	predicates            map[string]algorithm.FitPredicate
-	priorityMetaProducer  algorithm.MetadataProducer
-	predicateMetaProducer algorithm.PredicateMetadataProducer
-	prioritizers          []algorithm.PriorityConfig
-	extenders             []algorithm.SchedulerExtender
-	lastNodeIndexLock     sync.Mutex
-	lastNodeIndex         uint64
-
-	cachedNodeInfoMap map[string]*schedulercache.NodeInfo
-	volumeBinder      *volumebinder.VolumeBinder
-	pvcLister         corelisters.PersistentVolumeClaimLister
+	cache                    schedulercache.Cache
+	equivalenceCache         *EquivalenceCache
+	schedulingQueue          SchedulingQueue
+	predicates               map[string]algorithm.FitPredicate
+	priorityMetaProducer     algorithm.PriorityMetadataProducer
+	predicateMetaProducer    algorithm.PredicateMetadataProducer
+	prioritizers             []algorithm.PriorityConfig
+	extenders                []algorithm.SchedulerExtender
+	lastNodeIndexLock        sync.Mutex
+	lastNodeIndex            uint64
+	alwaysCheckAllPredicates bool
+	cachedNodeInfoMap        map[string]*schedulercache.NodeInfo
+	volumeBinder             *volumebinder.VolumeBinder
+	pvcLister                corelisters.PersistentVolumeClaimLister
 }
 
 // Schedule tries to schedule the given pod to one of node in the node list.
@@ -131,7 +132,8 @@ func (g *genericScheduler) Schedule(pod *v1.Pod, nodeLister algorithm.NodeLister
 	}
 
 	trace.Step("Computing predicates")
-	filteredNodes, failedPredicateMap, err := findNodesThatFit(pod, g.cachedNodeInfoMap, nodes, g.predicates, g.extenders, g.predicateMetaProducer, g.equivalenceCache, g.schedulingQueue)
+	startPredicateEvalTime := time.Now()
+	filteredNodes, failedPredicateMap, err := findNodesThatFit(pod, g.cachedNodeInfoMap, nodes, g.predicates, g.extenders, g.predicateMetaProducer, g.equivalenceCache, g.schedulingQueue, g.alwaysCheckAllPredicates)
 	if err != nil {
 		return "", err
 	}
@@ -143,11 +145,13 @@ func (g *genericScheduler) Schedule(pod *v1.Pod, nodeLister algorithm.NodeLister
 			FailedPredicates: failedPredicateMap,
 		}
 	}
+	metrics.SchedulingAlgorithmPredicateEvaluationDuration.Observe(metrics.SinceInMicroseconds(startPredicateEvalTime))
 
 	trace.Step("Prioritizing")
-
+	startPriorityEvalTime := time.Now()
 	// When only one node after predicate, just use it.
 	if len(filteredNodes) == 1 {
+		metrics.SchedulingAlgorithmPriorityEvaluationDuration.Observe(metrics.SinceInMicroseconds(startPriorityEvalTime))
 		return filteredNodes[0].Name, nil
 	}
 
@@ -156,6 +160,7 @@ func (g *genericScheduler) Schedule(pod *v1.Pod, nodeLister algorithm.NodeLister
 	if err != nil {
 		return "", err
 	}
+	metrics.SchedulingAlgorithmPriorityEvaluationDuration.Observe(metrics.SinceInMicroseconds(startPriorityEvalTime))
 
 	trace.Step("Selecting host")
 	return g.selectHost(priorityList)
@@ -290,6 +295,7 @@ func findNodesThatFit(
 	metadataProducer algorithm.PredicateMetadataProducer,
 	ecache *EquivalenceCache,
 	schedulingQueue SchedulingQueue,
+	alwaysCheckAllPredicates bool,
 ) ([]*v1.Node, FailedPredicateMap, error) {
 	var filtered []*v1.Node
 	failedPredicateMap := FailedPredicateMap{}
@@ -308,7 +314,7 @@ func findNodesThatFit(
 		meta := metadataProducer(pod, nodeNameToInfo)
 		checkNode := func(i int) {
 			nodeName := nodes[i].Name
-			fits, failedPredicates, err := podFitsOnNode(pod, meta, nodeNameToInfo[nodeName], predicateFuncs, ecache, schedulingQueue)
+			fits, failedPredicates, err := podFitsOnNode(pod, meta, nodeNameToInfo[nodeName], predicateFuncs, ecache, schedulingQueue, alwaysCheckAllPredicates)
 			if err != nil {
 				predicateResultLock.Lock()
 				errs[err.Error()]++
@@ -397,6 +403,7 @@ func podFitsOnNode(
 	predicateFuncs map[string]algorithm.FitPredicate,
 	ecache *EquivalenceCache,
 	queue SchedulingQueue,
+	alwaysCheckAllPredicates bool,
 ) (bool, []algorithm.PredicateFailureReason, error) {
 	var (
 		equivalenceHash  uint64
@@ -452,8 +459,6 @@ func podFitsOnNode(
 					fit, reasons, invalid = ecache.PredicateWithECache(pod.GetName(), info.Node().GetName(), predicateKey, equivalenceHash)
 				}
 
-				// TODO(bsalamat): When one predicate fails and fit is false, why do we continue
-				// checking other predicates?
 				if !eCacheAvailable || invalid {
 					// we need to execute predicate functions since equivalence cache does not work
 					fit, reasons, err = predicate(pod, metaToUse, nodeInfoToUse)
@@ -474,6 +479,11 @@ func podFitsOnNode(
 				if !fit {
 					// eCache is available and valid, and predicates result is unfit, record the fail reasons
 					failedPredicates = append(failedPredicates, reasons...)
+					// if alwaysCheckAllPredicates is false, short circuit all predicates when one predicate fails.
+					if !alwaysCheckAllPredicates {
+						glog.V(5).Infoln("since alwaysCheckAllPredicates has not been set, the predicate evaluation is short circuited and there are chances of other predicates failing as well.")
+						break
+					}
 				}
 			}
 		}
@@ -912,7 +922,7 @@ func selectVictimsOnNode(
 	// that we should check is if the "pod" is failing to schedule due to pod affinity
 	// failure.
 	// TODO(bsalamat): Consider checking affinity to lower priority pods if feasible with reasonable performance.
-	if fits, _, err := podFitsOnNode(pod, meta, nodeInfoCopy, fitPredicates, nil, queue); !fits {
+	if fits, _, err := podFitsOnNode(pod, meta, nodeInfoCopy, fitPredicates, nil, queue, false); !fits {
 		if err != nil {
 			glog.Warningf("Encountered error while selecting victims on node %v: %v", nodeInfo.Node().Name, err)
 		}
@@ -926,7 +936,7 @@ func selectVictimsOnNode(
 	violatingVictims, nonViolatingVictims := filterPodsWithPDBViolation(potentialVictims.Items, pdbs)
 	reprievePod := func(p *v1.Pod) bool {
 		addPod(p)
-		fits, _, _ := podFitsOnNode(pod, meta, nodeInfoCopy, fitPredicates, nil, queue)
+		fits, _, _ := podFitsOnNode(pod, meta, nodeInfoCopy, fitPredicates, nil, queue, false)
 		if !fits {
 			removePod(p)
 			victims = append(victims, p)
@@ -1037,21 +1047,23 @@ func NewGenericScheduler(
 	predicates map[string]algorithm.FitPredicate,
 	predicateMetaProducer algorithm.PredicateMetadataProducer,
 	prioritizers []algorithm.PriorityConfig,
-	priorityMetaProducer algorithm.MetadataProducer,
+	priorityMetaProducer algorithm.PriorityMetadataProducer,
 	extenders []algorithm.SchedulerExtender,
 	volumeBinder *volumebinder.VolumeBinder,
-	pvcLister corelisters.PersistentVolumeClaimLister) algorithm.ScheduleAlgorithm {
+	pvcLister corelisters.PersistentVolumeClaimLister,
+	alwaysCheckAllPredicates bool) algorithm.ScheduleAlgorithm {
 	return &genericScheduler{
-		cache:                 cache,
-		equivalenceCache:      eCache,
-		schedulingQueue:       podQueue,
-		predicates:            predicates,
-		predicateMetaProducer: predicateMetaProducer,
-		prioritizers:          prioritizers,
-		priorityMetaProducer:  priorityMetaProducer,
-		extenders:             extenders,
-		cachedNodeInfoMap:     make(map[string]*schedulercache.NodeInfo),
-		volumeBinder:          volumeBinder,
-		pvcLister:             pvcLister,
+		cache:                    cache,
+		equivalenceCache:         eCache,
+		schedulingQueue:          podQueue,
+		predicates:               predicates,
+		predicateMetaProducer:    predicateMetaProducer,
+		prioritizers:             prioritizers,
+		priorityMetaProducer:     priorityMetaProducer,
+		extenders:                extenders,
+		cachedNodeInfoMap:        make(map[string]*schedulercache.NodeInfo),
+		volumeBinder:             volumeBinder,
+		pvcLister:                pvcLister,
+		alwaysCheckAllPredicates: alwaysCheckAllPredicates,
 	}
 }

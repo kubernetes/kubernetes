@@ -77,7 +77,9 @@ function config-ip-firewall {
     iptables -w -t nat -A IP-MASQ -m comment --comment "ip-masq: outbound traffic is subject to MASQUERADE (must be last in chain)" -j MASQUERADE
   fi
 
-  if [[ "${ENABLE_METADATA_CONCEALMENT:-}" == "true" ]]; then
+  # If METADATA_CONCEALMENT_NO_FIREWALL is set, don't create a firewall on this
+  # node because we don't expect the daemonset to run on this node.
+  if [[ "${ENABLE_METADATA_CONCEALMENT:-}" == "true" ]] && [[ ! "${METADATA_CONCEALMENT_NO_FIREWALL:-}" == "true" ]]; then
     echo "Add rule for metadata concealment"
     iptables -w -t nat -I PREROUTING -p tcp -d 169.254.169.254 --dport 80 -m comment --comment "metadata-concealment: bridge traffic to metadata server goes to metadata proxy" -j DNAT --to-destination 127.0.0.1:988
   fi
@@ -1334,7 +1336,7 @@ function prepare-kube-proxy-manifest-variables {
 function start-kube-proxy {
   echo "Start kube-proxy static pod"
   prepare-log-file /var/log/kube-proxy.log
-  local -r src_file="${KUBE_HOME}/kube-manifests/kubernetes/kube-proxy.manifest"
+  local -r src_file="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty/kube-proxy.manifest"
   prepare-kube-proxy-manifest-variables "${src_file}"
 
   cp "${src_file}" /etc/kubernetes/manifests
@@ -2077,7 +2079,7 @@ EOF
   sed -i -e "s@{{ *pillar\['dns_server'\] *}}@${DNS_SERVER_IP}@g" "${kubedns_file}"
 
   if [[ "${ENABLE_DNS_HORIZONTAL_AUTOSCALER:-}" == "true" ]]; then
-    setup-addon-manifests "addons" "dns-horizontal-autoscaler"
+    setup-addon-manifests "addons" "dns-horizontal-autoscaler" "gce"
   fi
 }
 
@@ -2225,7 +2227,7 @@ EOF
     setup-addon-manifests "addons" "node-problem-detector/standalone" "node-problem-detector"
   fi
   if echo "${ADMISSION_CONTROL:-}" | grep -q "LimitRanger"; then
-    setup-addon-manifests "admission-controls" "limit-range"
+    setup-addon-manifests "admission-controls" "limit-range" "gce"
   fi
   if [[ "${NETWORK_POLICY_PROVIDER:-}" == "calico" ]]; then
     setup-addon-manifests "addons" "calico-policy-controller"
@@ -2260,7 +2262,7 @@ function start-image-puller {
 # Starts kube-registry proxy
 function start-kube-registry-proxy {
   echo "Start kube-registry-proxy"
-  cp "${KUBE_HOME}/kube-manifests/kubernetes/kube-registry-proxy.yaml" /etc/kubernetes/manifests
+  cp "${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty/kube-registry-proxy.yaml" /etc/kubernetes/manifests
 }
 
 # Starts a l7 loadbalancing controller for ingress.

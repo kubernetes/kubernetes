@@ -22,7 +22,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-source cluster/lib/logging.sh
+source hack/lib/logging.sh
 
 
 if [[ $# -eq 0 || ! $1 =~ ^[Yy]$ ]]; then

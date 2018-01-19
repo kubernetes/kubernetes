@@ -22,7 +22,6 @@ go_test(
         "//cmd/kube-apiserver/app/options:go_default_library",
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/core:go_default_library",
-        "//pkg/kubectl/cmd/util:go_default_library",
         "//pkg/master:go_default_library",
         "//test/integration/framework:go_default_library",
         "//vendor/github.com/coreos/etcd/clientv3:go_default_library",
@@ -40,8 +39,6 @@ go_test(
         "//vendor/k8s.io/apiserver/pkg/storage/storagebackend:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes:go_default_library",
         "//vendor/k8s.io/client-go/rest:go_default_library",
-        "//vendor/k8s.io/client-go/tools/clientcmd:go_default_library",
-        "//vendor/k8s.io/client-go/tools/clientcmd/api:go_default_library",
         "//vendor/k8s.io/client-go/util/flowcontrol:go_default_library",
     ],
 )

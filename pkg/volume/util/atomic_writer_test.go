@@ -235,7 +235,17 @@ func TestPathsToRemove(t *testing.T) {
 			continue
 		}
 
-		actual, err := writer.pathsToRemove(tc.payload2)
+		dataDirPath := path.Join(targetDir, dataDirName)
+		oldTsDir, err := os.Readlink(dataDirPath)
+		if err != nil && os.IsNotExist(err) {
+			t.Errorf("Data symlink does not exist: %v", dataDirPath)
+			continue
+		} else if err != nil {
+			t.Errorf("Unable to read symlink %v: %v", dataDirPath, err)
+			continue
+		}
+
+		actual, err := writer.pathsToRemove(tc.payload2, path.Join(targetDir, oldTsDir))
 		if err != nil {
 			t.Errorf("%v: unexpected error determining paths to remove: %v", tc.name, err)
 			continue
@@ -741,14 +751,15 @@ func TestMultipleUpdates(t *testing.T) {
 }
 
 func checkVolumeContents(targetDir, tcName string, payload map[string]FileProjection, t *testing.T) {
+	dataDirPath := path.Join(targetDir, dataDirName)
 	// use filepath.Walk to reconstruct the payload, then deep equal
 	observedPayload := make(map[string]FileProjection)
 	visitor := func(path string, info os.FileInfo, err error) error {
-		if info.Mode().IsRegular() || info.IsDir() {
+		if info.IsDir() {
 			return nil
 		}
 
-		relativePath := strings.TrimPrefix(path, targetDir)
+		relativePath := strings.TrimPrefix(path, dataDirPath)
 		relativePath = strings.TrimPrefix(relativePath, "/")
 		if strings.HasPrefix(relativePath, "..") {
 			return nil
@@ -769,9 +780,26 @@ func checkVolumeContents(targetDir, tcName string, payload map[string]FileProjec
 		return nil
 	}
 
-	err := filepath.Walk(targetDir, visitor)
+	d, err := ioutil.ReadDir(targetDir)
 	if err != nil {
-		t.Errorf("%v: unexpected error walking directory: %v", tcName, err)
+		t.Errorf("Unable to read dir %v: %v", targetDir, err)
+		return
+	}
+	for _, info := range d {
+		if strings.HasPrefix(info.Name(), "..") {
+			continue
+		}
+		if info.Mode()&os.ModeSymlink != 0 {
+			p := path.Join(targetDir, info.Name())
+			actual, err := os.Readlink(p)
+			if err != nil {
+				t.Errorf("Unable to read symlink %v: %v", p, err)
+				continue
+			}
+			if err := filepath.Walk(path.Join(targetDir, actual), visitor); err != nil {
+				t.Errorf("%v: unexpected error walking directory: %v", tcName, err)
+			}
+		}
 	}
 
 	cleanPathPayload := make(map[string]FileProjection, len(payload))

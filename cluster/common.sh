@@ -25,7 +25,6 @@ KUBE_ROOT=$(cd $(dirname "${BASH_SOURCE}")/.. && pwd)
 DEFAULT_KUBECONFIG="${HOME:-.}/.kube/config"
 
 source "${KUBE_ROOT}/hack/lib/util.sh"
-source "${KUBE_ROOT}/cluster/lib/logging.sh"
 # KUBE_RELEASE_VERSION_REGEX matches things like "v1.2.3" or "v1.2.3-alpha.4"
 #
 # NOTE This must match the version_regex in build/common.sh
@@ -352,8 +351,6 @@ function set_binary_version() {
 #   KUBE_TAR_HASH
 #   SERVER_BINARY_TAR_URL
 #   SERVER_BINARY_TAR_HASH
-#   SALT_TAR_URL
-#   SALT_TAR_HASH
 function tars_from_version() {
   local sha1sum=""
   if which sha1sum >/dev/null 2>&1; then
@@ -367,13 +364,11 @@ function tars_from_version() {
     upload-server-tars
   elif [[ ${KUBE_VERSION} =~ ${KUBE_RELEASE_VERSION_REGEX} ]]; then
     SERVER_BINARY_TAR_URL="https://storage.googleapis.com/kubernetes-release/release/${KUBE_VERSION}/kubernetes-server-linux-amd64.tar.gz"
-    SALT_TAR_URL="https://storage.googleapis.com/kubernetes-release/release/${KUBE_VERSION}/kubernetes-salt.tar.gz"
     # TODO: Clean this up.
     KUBE_MANIFESTS_TAR_URL="${SERVER_BINARY_TAR_URL/server-linux-amd64/manifests}"
     KUBE_MANIFESTS_TAR_HASH=$(curl ${KUBE_MANIFESTS_TAR_URL} --silent --show-error | ${sha1sum} | awk '{print $1}')
   elif [[ ${KUBE_VERSION} =~ ${KUBE_CI_VERSION_REGEX} ]]; then
     SERVER_BINARY_TAR_URL="https://storage.googleapis.com/kubernetes-release-dev/ci/${KUBE_VERSION}/kubernetes-server-linux-amd64.tar.gz"
-    SALT_TAR_URL="https://storage.googleapis.com/kubernetes-release-dev/ci/${KUBE_VERSION}/kubernetes-salt.tar.gz"
     # TODO: Clean this up.
     KUBE_MANIFESTS_TAR_URL="${SERVER_BINARY_TAR_URL/server-linux-amd64/manifests}"
     KUBE_MANIFESTS_TAR_HASH=$(curl ${KUBE_MANIFESTS_TAR_URL} --silent --show-error | ${sha1sum} | awk '{print $1}')
@@ -384,16 +379,9 @@ function tars_from_version() {
   if ! SERVER_BINARY_TAR_HASH=$(curl -Ss --fail "${SERVER_BINARY_TAR_URL}.sha1"); then
     echo "Failure trying to curl release .sha1"
   fi
-  if ! SALT_TAR_HASH=$(curl -Ss --fail "${SALT_TAR_URL}.sha1"); then
-    echo "Failure trying to curl Salt tar .sha1"
-  fi
 
   if ! curl -Ss --head "${SERVER_BINARY_TAR_URL}" >&/dev/null; then
     echo "Can't find release at ${SERVER_BINARY_TAR_URL}" >&2
-    exit 1
-  fi
-  if ! curl -Ss --head "${SALT_TAR_URL}" >&/dev/null; then
-    echo "Can't find Salt tar at ${SALT_TAR_URL}" >&2
     exit 1
   fi
 }
@@ -428,16 +416,14 @@ function find-tar() {
 #   KUBE_ROOT
 # Vars set:
 #   SERVER_BINARY_TAR
-#   SALT_TAR
 #   KUBE_MANIFESTS_TAR
 function find-release-tars() {
   SERVER_BINARY_TAR=$(find-tar kubernetes-server-linux-amd64.tar.gz)
-  SALT_TAR=$(find-tar kubernetes-salt.tar.gz)
 
   # This tarball is used by GCI, Ubuntu Trusty, and Container Linux.
   KUBE_MANIFESTS_TAR=
-  if [[ "${MASTER_OS_DISTRIBUTION:-}" == "trusty" || "${MASTER_OS_DISTRIBUTION:-}" == "gci" || "${MASTER_OS_DISTRIBUTION:-}" == "container-linux" || "${MASTER_OS_DISTRIBUTION:-}" == "ubuntu" ]] || \
-     [[ "${NODE_OS_DISTRIBUTION:-}" == "trusty" || "${NODE_OS_DISTRIBUTION:-}" == "gci" || "${NODE_OS_DISTRIBUTION:-}" == "container-linux" || "${NODE_OS_DISTRIBUTION:-}" == "ubuntu" ]] ; then
+  if [[ "${MASTER_OS_DISTRIBUTION:-}" == "trusty" || "${MASTER_OS_DISTRIBUTION:-}" == "gci" || "${MASTER_OS_DISTRIBUTION:-}" == "ubuntu" ]] || \
+     [[ "${NODE_OS_DISTRIBUTION:-}" == "trusty" || "${NODE_OS_DISTRIBUTION:-}" == "gci" || "${NODE_OS_DISTRIBUTION:-}" == "ubuntu" ]] ; then
     KUBE_MANIFESTS_TAR=$(find-tar kubernetes-manifests.tar.gz)
   fi
 }
@@ -499,7 +485,7 @@ function stage-images() {
   done
 
   kube::util::wait-for-jobs || {
-    kube::log::error "unable to push images. See ${temp_dir}/*.log for more info."
+    echo "!!! unable to push images. See ${temp_dir}/*.log for more info." 1>&2
     return 1
   }
 
@@ -574,15 +560,11 @@ function build-kube-env {
   local file=$2
 
   local server_binary_tar_url=$SERVER_BINARY_TAR_URL
-  local salt_tar_url=$SALT_TAR_URL
   local kube_manifests_tar_url="${KUBE_MANIFESTS_TAR_URL:-}"
-  if [[ "${master}" == "true" && "${MASTER_OS_DISTRIBUTION}" == "container-linux" ]] || \
-     [[ "${master}" == "false" && "${NODE_OS_DISTRIBUTION}" == "container-linux" ]] || \
-     [[ "${master}" == "true" && "${MASTER_OS_DISTRIBUTION}" == "ubuntu" ]] || \
+  if [[ "${master}" == "true" && "${MASTER_OS_DISTRIBUTION}" == "ubuntu" ]] || \
      [[ "${master}" == "false" && "${NODE_OS_DISTRIBUTION}" == "ubuntu" ]] ; then
     # TODO: Support fallback .tar.gz settings on Container Linux
     server_binary_tar_url=$(split_csv "${SERVER_BINARY_TAR_URL}")
-    salt_tar_url=$(split_csv "${SALT_TAR_URL}")
     kube_manifests_tar_url=$(split_csv "${KUBE_MANIFESTS_TAR_URL}")
   fi
 
@@ -603,8 +585,6 @@ SERVER_BINARY_TAR_URL: $(yaml-quote ${server_binary_tar_url})
 SERVER_BINARY_TAR_HASH: $(yaml-quote ${SERVER_BINARY_TAR_HASH})
 PROJECT_ID: $(yaml-quote ${PROJECT})
 NETWORK_PROJECT_ID: $(yaml-quote ${NETWORK_PROJECT})
-SALT_TAR_URL: $(yaml-quote ${salt_tar_url})
-SALT_TAR_HASH: $(yaml-quote ${SALT_TAR_HASH})
 SERVICE_CLUSTER_IP_RANGE: $(yaml-quote ${SERVICE_CLUSTER_IP_RANGE})
 KUBERNETES_MASTER_NAME: $(yaml-quote ${KUBERNETES_MASTER_NAME})
 ALLOCATE_NODE_CIDRS: $(yaml-quote ${ALLOCATE_NODE_CIDRS:-false})
@@ -696,8 +676,8 @@ EOF
 TERMINATED_POD_GC_THRESHOLD: $(yaml-quote ${TERMINATED_POD_GC_THRESHOLD})
 EOF
   fi
-  if [[ "${master}" == "true" && ("${MASTER_OS_DISTRIBUTION}" == "trusty" || "${MASTER_OS_DISTRIBUTION}" == "gci" || "${MASTER_OS_DISTRIBUTION}" == "container-linux") || "${MASTER_OS_DISTRIBUTION}" == "ubuntu" ]] || \
-     [[ "${master}" == "false" && ("${NODE_OS_DISTRIBUTION}" == "trusty" || "${NODE_OS_DISTRIBUTION}" == "gci" || "${NODE_OS_DISTRIBUTION}" == "container-linux") || "${NODE_OS_DISTRIBUTION}" = "ubuntu" ]] ; then
+  if [[ "${master}" == "true" && ("${MASTER_OS_DISTRIBUTION}" == "trusty" || "${MASTER_OS_DISTRIBUTION}" == "gci") || "${MASTER_OS_DISTRIBUTION}" == "ubuntu" ]] || \
+     [[ "${master}" == "false" && ("${NODE_OS_DISTRIBUTION}" == "trusty" || "${NODE_OS_DISTRIBUTION}" == "gci") || "${NODE_OS_DISTRIBUTION}" = "ubuntu" ]] ; then
     cat >>$file <<EOF
 KUBE_MANIFESTS_TAR_URL: $(yaml-quote ${kube_manifests_tar_url})
 KUBE_MANIFESTS_TAR_HASH: $(yaml-quote ${KUBE_MANIFESTS_TAR_HASH})
@@ -942,16 +922,6 @@ EOF
   if [ -n "${EVICTION_HARD:-}" ]; then
       cat >>$file <<EOF
 EVICTION_HARD: $(yaml-quote ${EVICTION_HARD})
-EOF
-  fi
-  if [[ "${master}" == "true" && "${MASTER_OS_DISTRIBUTION}" == "container-linux" ]] || \
-     [[ "${master}" == "false" && "${NODE_OS_DISTRIBUTION}" == "container-linux" ]]; then
-    # Container-Linux-only env vars. TODO(yifan): Make them available on other distros.
-    cat >>$file <<EOF
-KUBERNETES_CONTAINER_RUNTIME: $(yaml-quote ${CONTAINER_RUNTIME:-rkt})
-RKT_VERSION: $(yaml-quote ${RKT_VERSION:-})
-RKT_PATH: $(yaml-quote ${RKT_PATH:-})
-RKT_STAGE1_IMAGE: $(yaml-quote ${RKT_STAGE1_IMAGE:-})
 EOF
   fi
   if [[ "${ENABLE_CLUSTER_AUTOSCALER}" == "true" ]]; then

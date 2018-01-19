@@ -31,8 +31,8 @@ kube::util::go_install_from_commit \
     github.com/kubernetes/repo-infra/kazel \
     ae4e9a3906ace4ba657b7a09242610c6266e832c
 kube::util::go_install_from_commit \
-    github.com/bazelbuild/rules_go/go/tools/gazelle/gazelle \
-    737df20c53499fd84b67f04c6ca9ccdee2e77089
+    github.com/bazelbuild/bazel-gazelle/cmd/gazelle \
+    31ce76e3acc34a22434d1a783bb9b3cae790d108  # 0.8.0
 
 touch "${KUBE_ROOT}/vendor/BUILD"
 

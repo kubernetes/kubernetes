@@ -17,15 +17,11 @@ limitations under the License.
 package e2e_node
 
 import (
-	"os/exec"
-	"regexp"
 	"strconv"
 	"time"
 
 	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
 	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
@@ -89,24 +85,28 @@ var _ = framework.KubeDescribe("NVIDIA GPU Device Plugin [Feature:GPUDevicePlugi
 
 		It("checks that when Kubelet restarts exclusive GPU assignation to pods is kept.", func() {
 			By("Creating one GPU pod on a node with at least two GPUs")
-			p1 := f.PodClient().CreateSync(makeCudaPauseImage())
-			count1, devId1 := getDeviceId(f, p1.Name, p1.Name, 1)
+			podRECMD := "devs=$(ls /dev/ | egrep '^nvidia[0-9]+$') && echo gpu devices: $devs"
+			p1 := f.PodClient().CreateSync(makeBusyboxPod(framework.NVIDIAGPUResourceName, podRECMD))
+
+			deviceIDRE := "gpu devices: (nvidia[0-9]+)"
+			count1, devId1 := parseLogFromNRuns(f, p1.Name, p1.Name, 1, deviceIDRE)
 			p1, err := f.PodClient().Get(p1.Name, metav1.GetOptions{})
 			framework.ExpectNoError(err)
 
 			By("Restarting Kubelet and waiting for the current running pod to restart")
-			restartKubelet(f)
+			restartKubelet()
 
 			By("Confirming that after a kubelet and pod restart, GPU assignement is kept")
-			count1, devIdRestart1 := getDeviceId(f, p1.Name, p1.Name, count1+1)
+			count1, devIdRestart1 := parseLogFromNRuns(f, p1.Name, p1.Name, count1+1, deviceIDRE)
 			Expect(devIdRestart1).To(Equal(devId1))
 
 			By("Restarting Kubelet and creating another pod")
-			restartKubelet(f)
-			p2 := f.PodClient().CreateSync(makeCudaPauseImage())
+			restartKubelet()
+			p2 := f.PodClient().CreateSync(makeBusyboxPod(framework.NVIDIAGPUResourceName, podRECMD))
 
 			By("Checking that pods got a different GPU")
-			count2, devId2 := getDeviceId(f, p2.Name, p2.Name, 1)
+			count2, devId2 := parseLogFromNRuns(f, p2.Name, p2.Name, 1, deviceIDRE)
+
 			Expect(devId1).To(Not(Equal(devId2)))
 
 			By("Deleting device plugin.")
@@ -118,16 +118,16 @@ var _ = framework.KubeDescribe("NVIDIA GPU Device Plugin [Feature:GPUDevicePlugi
 				return framework.NumberOfNVIDIAGPUs(node) <= 0
 			}, 10*time.Minute, framework.Poll).Should(BeTrue())
 			By("Checking that scheduled pods can continue to run even after we delete device plugin.")
-			count1, devIdRestart1 = getDeviceId(f, p1.Name, p1.Name, count1+1)
+			count1, devIdRestart1 = parseLogFromNRuns(f, p1.Name, p1.Name, count1+1, deviceIDRE)
 			Expect(devIdRestart1).To(Equal(devId1))
-			count2, devIdRestart2 := getDeviceId(f, p2.Name, p2.Name, count2+1)
+			count2, devIdRestart2 := parseLogFromNRuns(f, p2.Name, p2.Name, count2+1, deviceIDRE)
 			Expect(devIdRestart2).To(Equal(devId2))
 			By("Restarting Kubelet.")
-			restartKubelet(f)
+			restartKubelet()
 			By("Checking that scheduled pods can continue to run even after we delete device plugin and restart Kubelet.")
-			count1, devIdRestart1 = getDeviceId(f, p1.Name, p1.Name, count1+2)
+			count1, devIdRestart1 = parseLogFromNRuns(f, p1.Name, p1.Name, count1+2, deviceIDRE)
 			Expect(devIdRestart1).To(Equal(devId1))
-			count2, devIdRestart2 = getDeviceId(f, p2.Name, p2.Name, count2+2)
+			count2, devIdRestart2 = parseLogFromNRuns(f, p2.Name, p2.Name, count2+2, deviceIDRE)
 			Expect(devIdRestart2).To(Equal(devId2))
 			logDevicePluginMetrics()
 
@@ -164,69 +164,4 @@ func logDevicePluginMetrics() {
 			}
 		}
 	}
-}
-
-func makeCudaPauseImage() *v1.Pod {
-	podName := testPodNamePrefix + string(uuid.NewUUID())
-
-	return &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{Name: podName},
-		Spec: v1.PodSpec{
-			RestartPolicy: v1.RestartPolicyAlways,
-			Containers: []v1.Container{{
-				Image: busyboxImage,
-				Name:  podName,
-				// Retrieves the gpu devices created in the user pod.
-				// Note the nvidia device plugin implementation doesn't do device id remapping currently.
-				// Will probably need to use nvidia-smi if that changes.
-				Command: []string{"sh", "-c", "devs=$(ls /dev/ | egrep '^nvidia[0-9]+$') && echo gpu devices: $devs"},
-
-				Resources: v1.ResourceRequirements{
-					Limits:   newDecimalResourceList(framework.NVIDIAGPUResourceName, 1),
-					Requests: newDecimalResourceList(framework.NVIDIAGPUResourceName, 1),
-				},
-			}},
-		},
-	}
-}
-
-func newDecimalResourceList(name v1.ResourceName, quantity int64) v1.ResourceList {
-	return v1.ResourceList{name: *resource.NewQuantity(quantity, resource.DecimalSI)}
-}
-
-// TODO: Find a uniform way to deal with systemctl/initctl/service operations. #34494
-func restartKubelet(f *framework.Framework) {
-	stdout, err := exec.Command("sudo", "systemctl", "list-units", "kubelet*", "--state=running").CombinedOutput()
-	framework.ExpectNoError(err)
-	regex := regexp.MustCompile("(kubelet-[0-9]+)")
-	matches := regex.FindStringSubmatch(string(stdout))
-	Expect(len(matches)).NotTo(BeZero())
-	kube := matches[0]
-	framework.Logf("Get running kubelet with systemctl: %v, %v", string(stdout), kube)
-	stdout, err = exec.Command("sudo", "systemctl", "restart", kube).CombinedOutput()
-	framework.ExpectNoError(err, "Failed to restart kubelet with systemctl: %v, %v", err, stdout)
-}
-
-func getDeviceId(f *framework.Framework, podName string, contName string, restartCount int32) (int32, string) {
-	var count int32
-	// Wait till pod has been restarted at least restartCount times.
-	Eventually(func() bool {
-		p, err := f.PodClient().Get(podName, metav1.GetOptions{})
-		if err != nil || len(p.Status.ContainerStatuses) < 1 {
-			return false
-		}
-		count = p.Status.ContainerStatuses[0].RestartCount
-		return count >= restartCount
-	}, 5*time.Minute, framework.Poll).Should(BeTrue())
-	logs, err := framework.GetPodLogs(f.ClientSet, f.Namespace.Name, podName, contName)
-	if err != nil {
-		framework.Failf("GetPodLogs for pod %q failed: %v", podName, err)
-	}
-	framework.Logf("got pod logs: %v", logs)
-	regex := regexp.MustCompile("gpu devices: (nvidia[0-9]+)")
-	matches := regex.FindStringSubmatch(logs)
-	if len(matches) < 2 {
-		return count, ""
-	}
-	return count, matches[1]
 }

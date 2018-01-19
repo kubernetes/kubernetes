@@ -18,7 +18,6 @@ package vsphere
 
 import (
 	"fmt"
-	"os"
 	"strconv"
 	"time"
 
@@ -225,7 +224,7 @@ var _ = utils.SIGDescribe("Volume Placement", func() {
 		volumeOptions = new(vclib.VolumeOptions)
 		volumeOptions.CapacityKB = 2097152
 		volumeOptions.Name = "e2e-vmdk-" + strconv.FormatInt(time.Now().UnixNano(), 10)
-		volumeOptions.Datastore = os.Getenv("VSPHERE_SECOND_SHARED_DATASTORE")
+		volumeOptions.Datastore = GetAndExpectStringEnvVar(SecondSharedDatastore)
 		volumePath, err := createVSphereVolume(vsp, volumeOptions)
 		Expect(err).NotTo(HaveOccurred())
 		volumePaths = append(volumePaths, volumePath)

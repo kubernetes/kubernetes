@@ -357,7 +357,26 @@ func (plugin *rbdPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*vol
 	}
 	s := dstrings.Split(sourceName, "-image-")
 	if len(s) != 2 {
-		return nil, fmt.Errorf("sourceName %s wrong, should be pool+\"-image-\"+imageName", sourceName)
+		// The mountPath parameter is the volume mount path for a specific pod, its format
+		// is /var/lib/kubelet/pods/{podUID}/volumes/{volumePluginName}/{volumeName}.
+		// mounter.GetDeviceNameFromMount will find the device path(such as /dev/rbd0) by
+		// mountPath first, and then try to find the global device mount path from the mounted
+		// path list of this device. sourceName is extracted from this global device mount path.
+		// mounter.GetDeviceNameFromMount expects the global device mount path conforms to canonical
+		// format: /var/lib/kubelet/plugins/kubernetes.io/rbd/mounts/{pool}-image-{image}.
+		// If this assertion failed, it means that the global device mount path is created by
+		// the deprecated format: /var/lib/kubelet/plugins/kubernetes.io/rbd/rbd/{pool}-image-{image}.
+		// So we will try to check whether this old style global device mount path exist or not.
+		// If existed, extract the sourceName from this old style path, otherwise return an error.
+		glog.V(3).Infof("SourceName %s wrong, fallback to old format", sourceName)
+		sourceName, err = plugin.getDeviceNameFromOldMountPath(mounter, mountPath)
+		if err != nil {
+			return nil, err
+		}
+		s = dstrings.Split(sourceName, "-image-")
+		if len(s) != 2 {
+			return nil, fmt.Errorf("sourceName %s wrong, should be pool+\"-image-\"+imageName", sourceName)
+		}
 	}
 	rbdVolume := &v1.Volume{
 		Name: volumeName,
@@ -490,6 +509,22 @@ func (plugin *rbdPlugin) newUnmapperInternal(volName string, podUID types.UID, m
 			mon: make([]string, 0),
 		},
 	}, nil
+}
+
+func (plugin *rbdPlugin) getDeviceNameFromOldMountPath(mounter mount.Interface, mountPath string) (string, error) {
+	refs, err := mount.GetMountRefsByDev(mounter, mountPath)
+	if err != nil {
+		return "", err
+	}
+	// baseMountPath is the prefix of deprecated device global mounted path,
+	// such as: /var/lib/kubelet/plugins/kubernetes.io/rbd/rbd
+	baseMountPath := filepath.Join(plugin.host.GetPluginDir(rbdPluginName), "rbd")
+	for _, ref := range refs {
+		if dstrings.HasPrefix(ref, baseMountPath) {
+			return filepath.Rel(baseMountPath, ref)
+		}
+	}
+	return "", fmt.Errorf("can't find source name from mounted path: %s", mountPath)
 }
 
 func (plugin *rbdPlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, error) {
@@ -886,6 +921,12 @@ func (rbd *rbdDiskUnmapper) TearDownDevice(mapPath, _ string) error {
 	if err != nil {
 		return fmt.Errorf("rbd: failed to get loopback for device: %v, err: %v", device, err)
 	}
+	// Get loopback device which takes fd lock for device beofore detaching a volume from node.
+	// TODO: This is a workaround for issue #54108
+	// Currently local attach plugins such as FC, iSCSI, RBD can't obtain devicePath during
+	// GenerateUnmapDeviceFunc() in operation_generator. As a result, these plugins fail to get
+	// and remove loopback device then it will be remained on kubelet node. To avoid the problem,
+	// local attach plugins needs to remove loopback device during TearDownDevice().
 	blkUtil := volutil.NewBlockVolumePathHandler()
 	loop, err := volutil.BlockVolumePathHandler.GetLoopDevice(blkUtil, device)
 	if err != nil {

@@ -24,13 +24,30 @@ import (
 
 	"os"
 
+	storagev1alpha1 "k8s.io/api/storage/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/auth/nodeidentifier"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac/bootstrappolicy"
 )
+
+var (
+	csiEnabledFeature  = utilfeature.NewFeatureGate()
+	csiDisabledFeature = utilfeature.NewFeatureGate()
+)
+
+func init() {
+	if err := csiEnabledFeature.Add(map[utilfeature.Feature]utilfeature.FeatureSpec{features.CSIPersistentVolume: {Default: true}}); err != nil {
+		panic(err)
+	}
+	if err := csiDisabledFeature.Add(map[utilfeature.Feature]utilfeature.FeatureSpec{features.CSIPersistentVolume: {Default: false}}); err != nil {
+		panic(err)
+	}
+}
 
 func TestAuthorizer(t *testing.T) {
 	g := NewGraph()
@@ -39,6 +56,7 @@ func TestAuthorizer(t *testing.T) {
 		nodes:                  2,
 		namespaces:             2,
 		podsPerNode:            2,
+		attachmentsPerNode:     1,
 		sharedConfigMapsPerPod: 0,
 		uniqueConfigMapsPerPod: 1,
 		sharedSecretsPerPod:    1,
@@ -46,18 +64,19 @@ func TestAuthorizer(t *testing.T) {
 		sharedPVCsPerPod:       0,
 		uniquePVCsPerPod:       1,
 	}
-	pods, pvs := generate(opts)
-	populate(g, pods, pvs)
+	pods, pvs, attachments := generate(opts)
+	populate(g, pods, pvs, attachments)
 
 	identifier := nodeidentifier.NewDefaultNodeIdentifier()
-	authz := NewAuthorizer(g, identifier, bootstrappolicy.NodeRules())
+	authz := NewAuthorizer(g, identifier, bootstrappolicy.NodeRules()).(*NodeAuthorizer)
 
 	node0 := &user.DefaultInfo{Name: "system:node:node0", Groups: []string{"system:nodes"}}
 
 	tests := []struct {
-		name   string
-		attrs  authorizer.AttributesRecord
-		expect authorizer.Decision
+		name     string
+		attrs    authorizer.AttributesRecord
+		expect   authorizer.Decision
+		features utilfeature.FeatureGate
 	}{
 		{
 			name:   "allowed configmap",
@@ -115,10 +134,33 @@ func TestAuthorizer(t *testing.T) {
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "persistentvolumes", Name: "pv0-pod0-node1-ns0", Namespace: ""},
 			expect: authorizer.DecisionNoOpinion,
 		},
+		{
+			name:     "disallowed attachment - no relationship",
+			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "volumeattachments", APIGroup: "storage.k8s.io", Name: "attachment0-node1"},
+			features: csiEnabledFeature,
+			expect:   authorizer.DecisionNoOpinion,
+		},
+		{
+			name:     "disallowed attachment - feature disabled",
+			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "volumeattachments", APIGroup: "storage.k8s.io", Name: "attachment0-node0"},
+			features: csiDisabledFeature,
+			expect:   authorizer.DecisionNoOpinion,
+		},
+		{
+			name:     "allowed attachment - feature enabled",
+			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "volumeattachments", APIGroup: "storage.k8s.io", Name: "attachment0-node0"},
+			features: csiEnabledFeature,
+			expect:   authorizer.DecisionAllow,
+		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
+			if tc.features == nil {
+				authz.features = utilfeature.DefaultFeatureGate
+			} else {
+				authz.features = tc.features
+			}
 			decision, _, _ := authz.Authorize(tc.attrs)
 			if decision != tc.expect {
 				t.Errorf("expected %v, got %v", tc.expect, decision)
@@ -204,6 +246,8 @@ type sampleDataOpts struct {
 
 	podsPerNode int
 
+	attachmentsPerNode int
+
 	sharedConfigMapsPerPod int
 	sharedSecretsPerPod    int
 	sharedPVCsPerPod       int
@@ -218,6 +262,7 @@ func BenchmarkPopulationAllocation(b *testing.B) {
 		nodes:                  500,
 		namespaces:             200,
 		podsPerNode:            200,
+		attachmentsPerNode:     20,
 		sharedConfigMapsPerPod: 0,
 		uniqueConfigMapsPerPod: 1,
 		sharedSecretsPerPod:    1,
@@ -226,12 +271,12 @@ func BenchmarkPopulationAllocation(b *testing.B) {
 		uniquePVCsPerPod:       1,
 	}
 
-	pods, pvs := generate(opts)
+	pods, pvs, attachments := generate(opts)
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
 		g := NewGraph()
-		populate(g, pods, pvs)
+		populate(g, pods, pvs, attachments)
 	}
 }
 
@@ -248,6 +293,7 @@ func BenchmarkPopulationRetention(b *testing.B) {
 		nodes:                  500,
 		namespaces:             200,
 		podsPerNode:            200,
+		attachmentsPerNode:     20,
 		sharedConfigMapsPerPod: 0,
 		uniqueConfigMapsPerPod: 1,
 		sharedSecretsPerPod:    1,
@@ -256,14 +302,14 @@ func BenchmarkPopulationRetention(b *testing.B) {
 		uniquePVCsPerPod:       1,
 	}
 
-	pods, pvs := generate(opts)
+	pods, pvs, attachments := generate(opts)
 	// Garbage collect before the first iteration
 	runtime.GC()
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
 		g := NewGraph()
-		populate(g, pods, pvs)
+		populate(g, pods, pvs, attachments)
 
 		if i == 0 {
 			f, _ := os.Create("BenchmarkPopulationRetention.profile")
@@ -283,6 +329,7 @@ func BenchmarkAuthorization(b *testing.B) {
 		nodes:                  500,
 		namespaces:             200,
 		podsPerNode:            200,
+		attachmentsPerNode:     20,
 		sharedConfigMapsPerPod: 0,
 		uniqueConfigMapsPerPod: 1,
 		sharedSecretsPerPod:    1,
@@ -290,18 +337,19 @@ func BenchmarkAuthorization(b *testing.B) {
 		sharedPVCsPerPod:       0,
 		uniquePVCsPerPod:       1,
 	}
-	pods, pvs := generate(opts)
-	populate(g, pods, pvs)
+	pods, pvs, attachments := generate(opts)
+	populate(g, pods, pvs, attachments)
 
 	identifier := nodeidentifier.NewDefaultNodeIdentifier()
-	authz := NewAuthorizer(g, identifier, bootstrappolicy.NodeRules())
+	authz := NewAuthorizer(g, identifier, bootstrappolicy.NodeRules()).(*NodeAuthorizer)
 
 	node0 := &user.DefaultInfo{Name: "system:node:node0", Groups: []string{"system:nodes"}}
 
 	tests := []struct {
-		name   string
-		attrs  authorizer.AttributesRecord
-		expect authorizer.Decision
+		name     string
+		attrs    authorizer.AttributesRecord
+		expect   authorizer.Decision
+		features utilfeature.FeatureGate
 	}{
 		{
 			name:   "allowed configmap",
@@ -343,10 +391,33 @@ func BenchmarkAuthorization(b *testing.B) {
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "persistentvolumes", Name: "pv0-pod0-node1-ns0", Namespace: ""},
 			expect: authorizer.DecisionNoOpinion,
 		},
+		{
+			name:     "disallowed attachment - no relationship",
+			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "volumeattachments", APIGroup: "storage.k8s.io", Name: "attachment0-node1"},
+			features: csiEnabledFeature,
+			expect:   authorizer.DecisionNoOpinion,
+		},
+		{
+			name:     "disallowed attachment - feature disabled",
+			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "volumeattachments", APIGroup: "storage.k8s.io", Name: "attachment0-node0"},
+			features: csiDisabledFeature,
+			expect:   authorizer.DecisionNoOpinion,
+		},
+		{
+			name:     "allowed attachment - feature enabled",
+			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "volumeattachments", APIGroup: "storage.k8s.io", Name: "attachment0-node0"},
+			features: csiEnabledFeature,
+			expect:   authorizer.DecisionAllow,
+		},
 	}
 
 	b.ResetTimer()
 	for _, tc := range tests {
+		if tc.features == nil {
+			authz.features = utilfeature.DefaultFeatureGate
+		} else {
+			authz.features = tc.features
+		}
 		b.Run(tc.name, func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
 				decision, _, _ := authz.Authorize(tc.attrs)
@@ -358,7 +429,7 @@ func BenchmarkAuthorization(b *testing.B) {
 	}
 }
 
-func populate(graph *Graph, pods []*api.Pod, pvs []*api.PersistentVolume) {
+func populate(graph *Graph, pods []*api.Pod, pvs []*api.PersistentVolume, attachments []*storagev1alpha1.VolumeAttachment) {
 	p := &graphPopulator{}
 	p.graph = graph
 	for _, pod := range pods {
@@ -367,15 +438,19 @@ func populate(graph *Graph, pods []*api.Pod, pvs []*api.PersistentVolume) {
 	for _, pv := range pvs {
 		p.addPV(pv)
 	}
+	for _, attachment := range attachments {
+		p.addVolumeAttachment(attachment)
+	}
 }
 
 // generate creates sample pods and persistent volumes based on the provided options.
 // the secret/configmap/pvc/node references in the pod and pv objects are named to indicate the connections between the objects.
 // for example, secret0-pod0-node0 is a secret referenced by pod0 which is bound to node0.
 // when populated into the graph, the node authorizer should allow node0 to access that secret, but not node1.
-func generate(opts sampleDataOpts) ([]*api.Pod, []*api.PersistentVolume) {
+func generate(opts sampleDataOpts) ([]*api.Pod, []*api.PersistentVolume, []*storagev1alpha1.VolumeAttachment) {
 	pods := make([]*api.Pod, 0, opts.nodes*opts.podsPerNode)
 	pvs := make([]*api.PersistentVolume, 0, (opts.nodes*opts.podsPerNode*opts.uniquePVCsPerPod)+(opts.sharedPVCsPerPod*opts.namespaces))
+	attachments := make([]*storagev1alpha1.VolumeAttachment, 0, opts.nodes*opts.attachmentsPerNode)
 
 	for n := 0; n < opts.nodes; n++ {
 		nodeName := fmt.Sprintf("node%d", n)
@@ -432,6 +507,12 @@ func generate(opts sampleDataOpts) ([]*api.Pod, []*api.PersistentVolume) {
 
 			pods = append(pods, pod)
 		}
+		for a := 0; a < opts.attachmentsPerNode; a++ {
+			attachment := &storagev1alpha1.VolumeAttachment{}
+			attachment.Name = fmt.Sprintf("attachment%d-%s", a, nodeName)
+			attachment.Spec.NodeName = nodeName
+			attachments = append(attachments, attachment)
+		}
 	}
-	return pods, pvs
+	return pods, pvs, attachments
 }

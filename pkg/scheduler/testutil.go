@@ -40,7 +40,7 @@ func (fc *FakeConfigurator) GetPriorityFunctionConfigs(priorityKeys sets.String)
 }
 
 // GetPriorityMetadataProducer is not implemented yet.
-func (fc *FakeConfigurator) GetPriorityMetadataProducer() (algorithm.MetadataProducer, error) {
+func (fc *FakeConfigurator) GetPriorityMetadataProducer() (algorithm.PriorityMetadataProducer, error) {
 	return nil, fmt.Errorf("not implemented")
 }
 

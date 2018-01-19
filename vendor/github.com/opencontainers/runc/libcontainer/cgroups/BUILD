@@ -63,7 +63,6 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//vendor/github.com/opencontainers/runc/libcontainer/cgroups/fs:all-srcs",
-        "//vendor/github.com/opencontainers/runc/libcontainer/cgroups/rootless:all-srcs",
         "//vendor/github.com/opencontainers/runc/libcontainer/cgroups/systemd:all-srcs",
     ],
     tags = ["automanaged"],

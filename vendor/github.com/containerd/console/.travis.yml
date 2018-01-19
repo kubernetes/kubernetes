@@ -1,0 +1,17 @@
+language: go
+go:
+  - 1.9.x
+  - tip
+
+go_import_path: github.com/containerd/console
+
+install:
+  - go get -d
+  - GOOS=windows go get -d
+  - GOOS=solaris go get -d
+
+script:
+  - go test -race
+  - GOOS=windows go test
+  - GOOS=solaris go build
+  - GOOS=solaris go test -c

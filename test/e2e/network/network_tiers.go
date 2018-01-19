@@ -195,7 +195,7 @@ func getGCEForwardingRuleByIP(ip string) (*computealpha.ForwardingRule, error) {
 	if err != nil {
 		return nil, err
 	}
-	for _, rule := range ruleList.Items {
+	for _, rule := range ruleList {
 		if rule.IPAddress == ip {
 			return rule, nil
 		}

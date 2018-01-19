@@ -25,7 +25,7 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
-	bootstrapapi "k8s.io/kubernetes/pkg/bootstrap/api"
+	bootstrapapi "k8s.io/client-go/tools/bootstrap/token/api"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	"k8s.io/kubernetes/pkg/util/version"
 )

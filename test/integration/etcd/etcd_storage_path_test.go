@@ -44,14 +44,11 @@ import (
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/clientcmd"
-	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	kapi "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/test/integration/framework"
 
 	// install all APIs
@@ -798,9 +795,7 @@ func startRealMasterOrDie(t *testing.T, certDir string) (*allClient, clientv3.KV
 		t.Fatal(err)
 	}
 
-	mapper, _ := util.NewFactory(clientcmd.NewDefaultClientConfig(*clientcmdapi.NewConfig(), &clientcmd.ConfigOverrides{})).Object()
-
-	return client, kvClient, mapper
+	return client, kvClient, legacyscheme.Registry.RESTMapper()
 }
 
 func dumpEtcdKVOnFailure(t *testing.T, kvClient clientv3.KV) {

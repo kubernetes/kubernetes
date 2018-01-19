@@ -74,12 +74,16 @@ kube::etcd::start() {
 }
 
 kube::etcd::stop() {
-  kill "${ETCD_PID-}" >/dev/null 2>&1 || :
-  wait "${ETCD_PID-}" >/dev/null 2>&1 || :
+  if [[ -n "${ETCD_PID-}" ]]; then
+    kill "${ETCD_PID}" &>/dev/null || :
+    wait "${ETCD_PID}" &>/dev/null || :
+  fi
 }
 
 kube::etcd::clean_etcd_dir() {
-  rm -rf "${ETCD_DIR-}"
+  if [[ -n "${ETCD_DIR-}" ]]; then
+    rm -rf "${ETCD_DIR}"
+  fi
 }
 
 kube::etcd::cleanup() {

@@ -37,7 +37,6 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
-	"k8s.io/api/extensions/v1beta1"
 	extensions "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -112,7 +111,7 @@ func NewReplicaSetController(rsInformer extensionsinformers.ReplicaSetInformer, 
 	eventBroadcaster.StartLogging(glog.Infof)
 	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(kubeClient.CoreV1().RESTClient()).Events("")})
 	return NewBaseController(rsInformer, podInformer, kubeClient, burstReplicas,
-		v1beta1.SchemeGroupVersion.WithKind("ReplicaSet"),
+		extensions.SchemeGroupVersion.WithKind("ReplicaSet"),
 		"replicaset_controller",
 		"replicaset",
 		controller.RealPodControl{

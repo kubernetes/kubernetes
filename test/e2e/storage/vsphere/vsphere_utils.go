@@ -28,7 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	k8stype "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
@@ -71,7 +70,7 @@ func verifyVSphereDiskAttached(c clientset.Interface, vsp *vsphere.VSphere, volu
 }
 
 // Wait until vsphere volumes are detached from the list of nodes or time out after 5 minutes
-func waitForVSphereDisksToDetach(c clientset.Interface, vsp *vsphere.VSphere, nodeVolumes map[k8stype.NodeName][]string) error {
+func waitForVSphereDisksToDetach(c clientset.Interface, vsp *vsphere.VSphere, nodeVolumes map[types.NodeName][]string) error {
 	var (
 		err            error
 		disksAttached  = true
@@ -425,7 +424,7 @@ func verifyVSphereVolumesAccessible(c clientset.Interface, pod *v1.Pod, persiste
 	namespace := pod.Namespace
 	for index, pv := range persistentvolumes {
 		// Verify disks are attached to the node
-		isAttached, err := verifyVSphereDiskAttached(c, vsp, pv.Spec.VsphereVolume.VolumePath, k8stype.NodeName(nodeName))
+		isAttached, err := verifyVSphereDiskAttached(c, vsp, pv.Spec.VsphereVolume.VolumePath, types.NodeName(nodeName))
 		Expect(err).NotTo(HaveOccurred())
 		Expect(isAttached).To(BeTrue(), fmt.Sprintf("disk %v is not attached with the node", pv.Spec.VsphereVolume.VolumePath))
 		// Verify Volumes are accessible

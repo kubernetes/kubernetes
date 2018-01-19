@@ -32,17 +32,34 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/mergepatch"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/audit"
+	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 )
 
 // PatchResource returns a function that will handle a resource patch
 // TODO: Eventually PatchResource should just use GuaranteedUpdate and this routine should be a bit cleaner
-func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface, converter runtime.ObjectConvertor) http.HandlerFunc {
+func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface, converter runtime.ObjectConvertor, patchTypes []string) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
+		// Do this first, otherwise name extraction can fail for unrecognized content types
+		// TODO: handle this in negotiation
+		contentType := req.Header.Get("Content-Type")
+		// Remove "; charset=" if included in header.
+		if idx := strings.Index(contentType, ";"); idx > 0 {
+			contentType = contentType[:idx]
+		}
+		patchType := types.PatchType(contentType)
+
+		// Ensure the patchType is one we support
+		if !sets.NewString(patchTypes...).Has(contentType) {
+			scope.err(negotiation.NewUnsupportedMediaTypeError(patchTypes), w, req)
+			return
+		}
+
 		// TODO: we either want to remove timeout or document it (if we
 		// document, move timeout out of this function and declare it in
 		// api_installer)
@@ -62,14 +79,6 @@ func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface
 			scope.err(err, w, req)
 			return
 		}
-
-		// TODO: handle this in negotiation
-		contentType := req.Header.Get("Content-Type")
-		// Remove "; charset=" if included in header.
-		if idx := strings.Index(contentType, ";"); idx > 0 {
-			contentType = contentType[:idx]
-		}
-		patchType := types.PatchType(contentType)
 
 		patchJS, err := readBody(req)
 		if err != nil {

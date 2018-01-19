@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	clientset "k8s.io/client-go/kubernetes"
+	scaleclient "k8s.io/client-go/scale"
 	extensionsinternal "k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
@@ -178,8 +179,10 @@ func WatchRecreateDeployment(c clientset.Interface, d *extensions.Deployment) er
 	return err
 }
 
-func ScaleDeployment(clientset clientset.Interface, internalClientset internalclientset.Interface, ns, name string, size uint, wait bool) error {
-	return ScaleResource(clientset, internalClientset, ns, name, size, wait, extensionsinternal.Kind("Deployment"))
+//TODO(p0lyn0mial): remove internalClientset and kind.
+//TODO(p0lyn0mial): update the callers.
+func ScaleDeployment(clientset clientset.Interface, internalClientset internalclientset.Interface, scalesGetter scaleclient.ScalesGetter, ns, name string, size uint, wait bool) error {
+	return ScaleResource(clientset, internalClientset, scalesGetter, ns, name, size, wait, extensionsinternal.Kind("Deployment"), extensionsinternal.Resource("deployments"))
 }
 
 func RunDeployment(config testutils.DeploymentConfig) error {

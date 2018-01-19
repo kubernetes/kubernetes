@@ -12,11 +12,13 @@ go_test(
         "finalization_test.go",
         "registration_test.go",
         "validation_test.go",
+        "yaml_test.go",
     ],
     importpath = "k8s.io/apiextensions-apiserver/test/integration",
     tags = ["integration"],
     deps = [
         "//vendor/github.com/coreos/etcd/clientv3:go_default_library",
+        "//vendor/github.com/ghodss/yaml:go_default_library",
         "//vendor/github.com/stretchr/testify/require:go_default_library",
         "//vendor/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1:go_default_library",
         "//vendor/k8s.io/apiextensions-apiserver/pkg/apiserver:go_default_library",

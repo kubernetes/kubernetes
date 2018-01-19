@@ -202,6 +202,7 @@ func autoConvert_v1alpha1_MasterConfiguration_To_kubeadm_MasterConfiguration(in 
 	out.CloudProvider = in.CloudProvider
 	out.NodeName = in.NodeName
 	out.AuthorizationModes = *(*[]string)(unsafe.Pointer(&in.AuthorizationModes))
+	out.PrivilegedPods = in.PrivilegedPods
 	out.Token = in.Token
 	out.TokenTTL = (*v1.Duration)(unsafe.Pointer(in.TokenTTL))
 	out.APIServerExtraArgs = *(*map[string]string)(unsafe.Pointer(&in.APIServerExtraArgs))
@@ -243,6 +244,7 @@ func autoConvert_kubeadm_MasterConfiguration_To_v1alpha1_MasterConfiguration(in 
 	out.CloudProvider = in.CloudProvider
 	out.NodeName = in.NodeName
 	out.AuthorizationModes = *(*[]string)(unsafe.Pointer(&in.AuthorizationModes))
+	out.PrivilegedPods = in.PrivilegedPods
 	out.Token = in.Token
 	out.TokenTTL = (*v1.Duration)(unsafe.Pointer(in.TokenTTL))
 	out.APIServerExtraArgs = *(*map[string]string)(unsafe.Pointer(&in.APIServerExtraArgs))

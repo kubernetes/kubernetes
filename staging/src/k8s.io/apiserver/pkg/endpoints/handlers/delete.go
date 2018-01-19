@@ -60,7 +60,7 @@ func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope RequestSco
 				return
 			}
 			if len(body) > 0 {
-				s, err := negotiation.NegotiateInputSerializer(req, metainternalversion.Codecs)
+				s, err := negotiation.NegotiateInputSerializer(req, false, metainternalversion.Codecs)
 				if err != nil {
 					scope.err(err, w, req)
 					return
@@ -228,7 +228,7 @@ func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope RequestSco
 				return
 			}
 			if len(body) > 0 {
-				s, err := negotiation.NegotiateInputSerializer(req, scope.Serializer)
+				s, err := negotiation.NegotiateInputSerializer(req, false, scope.Serializer)
 				if err != nil {
 					scope.err(err, w, req)
 					return

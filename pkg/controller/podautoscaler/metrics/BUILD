@@ -37,6 +37,7 @@ go_test(
     srcs = [
         "legacy_metrics_client_test.go",
         "rest_metrics_client_test.go",
+        "utilization_test.go",
     ],
     embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/pkg/controller/podautoscaler/metrics",

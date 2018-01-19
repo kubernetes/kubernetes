@@ -56,7 +56,7 @@ func UpdateResource(r rest.Updater, scope RequestScope, typer runtime.ObjectType
 			return
 		}
 
-		s, err := negotiation.NegotiateInputSerializer(req, scope.Serializer)
+		s, err := negotiation.NegotiateInputSerializer(req, false, scope.Serializer)
 		if err != nil {
 			scope.err(err, w, req)
 			return

@@ -25,7 +25,6 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/util/flowcontrol"
 	serviceapi "k8s.io/kubernetes/pkg/api/v1/service"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/azure/auth"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
@@ -862,7 +861,6 @@ func getTestCloud() (az *Cloud) {
 			MaximumLoadBalancerRuleCount: 250,
 		},
 	}
-	az.operationPollRateLimiter = flowcontrol.NewTokenBucketRateLimiter(100, 100)
 	az.LoadBalancerClient = newFakeAzureLBClient()
 	az.PublicIPAddressesClient = newFakeAzurePIPClient(az.Config.SubscriptionID)
 	az.SubnetsClient = newFakeAzureSubnetsClient()
@@ -1002,23 +1000,6 @@ func getBackendPort(port int32) int32 {
 	return port + 10000
 }
 
-func getTestPublicFipConfigurationProperties() network.FrontendIPConfigurationPropertiesFormat {
-	return network.FrontendIPConfigurationPropertiesFormat{
-		PublicIPAddress: &network.PublicIPAddress{ID: to.StringPtr("/this/is/a/public/ip/address/id")},
-	}
-}
-
-func getTestInternalFipConfigurationProperties(expectedSubnetName *string) network.FrontendIPConfigurationPropertiesFormat {
-	var expectedSubnet *network.Subnet
-	if expectedSubnetName != nil {
-		expectedSubnet = &network.Subnet{Name: expectedSubnetName}
-	}
-	return network.FrontendIPConfigurationPropertiesFormat{
-		PublicIPAddress: &network.PublicIPAddress{ID: to.StringPtr("/this/is/a/public/ip/address/id")},
-		Subnet:          expectedSubnet,
-	}
-}
-
 func getTestService(identifier string, proto v1.Protocol, requestedPorts ...int32) v1.Service {
 	ports := []v1.ServicePort{}
 	for _, port := range requestedPorts {
@@ -1056,39 +1037,6 @@ func setLoadBalancerModeAnnotation(service *v1.Service, lbMode string) {
 
 func setLoadBalancerAutoModeAnnotation(service *v1.Service) {
 	setLoadBalancerModeAnnotation(service, ServiceAnnotationLoadBalancerAutoModeValue)
-}
-
-func getTestLoadBalancer(services ...v1.Service) network.LoadBalancer {
-	rules := []network.LoadBalancingRule{}
-	probes := []network.Probe{}
-
-	for _, service := range services {
-		for _, port := range service.Spec.Ports {
-			ruleName := getLoadBalancerRuleName(&service, port, nil)
-			rules = append(rules, network.LoadBalancingRule{
-				Name: to.StringPtr(ruleName),
-				LoadBalancingRulePropertiesFormat: &network.LoadBalancingRulePropertiesFormat{
-					FrontendPort: to.Int32Ptr(port.Port),
-					BackendPort:  to.Int32Ptr(port.Port),
-				},
-			})
-			probes = append(probes, network.Probe{
-				Name: to.StringPtr(ruleName),
-				ProbePropertiesFormat: &network.ProbePropertiesFormat{
-					Port: to.Int32Ptr(port.NodePort),
-				},
-			})
-		}
-	}
-
-	lb := network.LoadBalancer{
-		LoadBalancerPropertiesFormat: &network.LoadBalancerPropertiesFormat{
-			LoadBalancingRules: &rules,
-			Probes:             &probes,
-		},
-	}
-
-	return lb
 }
 
 func getServiceSourceRanges(service *v1.Service) []string {

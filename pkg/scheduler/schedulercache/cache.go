@@ -131,7 +131,7 @@ func (cache *schedulerCache) AssumePod(pod *v1.Pod) error {
 	cache.mu.Lock()
 	defer cache.mu.Unlock()
 	if _, ok := cache.podStates[key]; ok {
-		return fmt.Errorf("pod %v state wasn't initial but get assumed", key)
+		return fmt.Errorf("pod %v is not in the cache, so can't be assumed", key)
 	}
 
 	cache.addPod(pod)
@@ -178,7 +178,7 @@ func (cache *schedulerCache) ForgetPod(pod *v1.Pod) error {
 
 	currState, ok := cache.podStates[key]
 	if ok && currState.pod.Spec.NodeName != pod.Spec.NodeName {
-		return fmt.Errorf("pod %v state was assumed on a different node", key)
+		return fmt.Errorf("pod %v was assumed on %v but assigned to %v", key, pod.Spec.NodeName, currState.pod.Spec.NodeName)
 	}
 
 	switch {
@@ -191,7 +191,7 @@ func (cache *schedulerCache) ForgetPod(pod *v1.Pod) error {
 		delete(cache.assumedPods, key)
 		delete(cache.podStates, key)
 	default:
-		return fmt.Errorf("pod %v state wasn't assumed but get forgotten", key)
+		return fmt.Errorf("pod %v wasn't assumed so cannot be forgotten", key)
 	}
 	return nil
 }
@@ -241,7 +241,7 @@ func (cache *schedulerCache) AddPod(pod *v1.Pod) error {
 	case ok && cache.assumedPods[key]:
 		if currState.pod.Spec.NodeName != pod.Spec.NodeName {
 			// The pod was added to a different node than it was assumed to.
-			glog.Warningf("Pod %v assumed to a different node than added to.", key)
+			glog.Warningf("Pod %v was assumed to be on %v but got added to %v", key, pod.Spec.NodeName, currState.pod.Spec.NodeName)
 			// Clean this up.
 			cache.removePod(currState.pod)
 			cache.addPod(pod)
@@ -257,7 +257,7 @@ func (cache *schedulerCache) AddPod(pod *v1.Pod) error {
 		}
 		cache.podStates[key] = ps
 	default:
-		return fmt.Errorf("pod was already in added state. Pod key: %v", key)
+		return fmt.Errorf("pod %v was already in added state.", key)
 	}
 	return nil
 }
@@ -284,7 +284,7 @@ func (cache *schedulerCache) UpdatePod(oldPod, newPod *v1.Pod) error {
 			return err
 		}
 	default:
-		return fmt.Errorf("pod %v state wasn't added but get updated", key)
+		return fmt.Errorf("pod %v is not added to scheduler cache, so cannot be updated", key)
 	}
 	return nil
 }
@@ -304,7 +304,7 @@ func (cache *schedulerCache) RemovePod(pod *v1.Pod) error {
 	// before Remove event, in which case the state would change from Assumed to Added.
 	case ok && !cache.assumedPods[key]:
 		if currState.pod.Spec.NodeName != pod.Spec.NodeName {
-			glog.Errorf("Pod %v removed from a different node than previously added to.", key)
+			glog.Errorf("Pod %v was assumed to be on %v but got added to %v", key, pod.Spec.NodeName, currState.pod.Spec.NodeName)
 			glog.Fatalf("Schedulercache is corrupted and can badly affect scheduling decisions")
 		}
 		err := cache.removePod(currState.pod)
@@ -313,7 +313,7 @@ func (cache *schedulerCache) RemovePod(pod *v1.Pod) error {
 		}
 		delete(cache.podStates, key)
 	default:
-		return fmt.Errorf("pod state wasn't added but get removed. Pod key: %v", key)
+		return fmt.Errorf("pod %v is not found in scheduler cache, so cannot be removed from it", key)
 	}
 	return nil
 }
@@ -345,7 +345,7 @@ func (cache *schedulerCache) GetPod(pod *v1.Pod) (*v1.Pod, error) {
 
 	podState, ok := cache.podStates[key]
 	if !ok {
-		return nil, fmt.Errorf("pod %v does not exist", key)
+		return nil, fmt.Errorf("pod %v does not exist in scheduler cache", key)
 	}
 
 	return podState.pod, nil

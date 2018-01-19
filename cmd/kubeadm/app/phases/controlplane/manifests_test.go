@@ -135,6 +135,58 @@ func TestCreateStaticPodFilesAndWrappers(t *testing.T) {
 	}
 }
 
+func TestCreatePrivilegedContainerForOpenStack(t *testing.T) {
+	// Creates a Master Configuration with OpenStack cloud provider
+	var staticPodNames = []string{
+		kubeadmconstants.KubeAPIServer,
+		kubeadmconstants.KubeControllerManager,
+	}
+	var assertions = []struct {
+		cloudProvider     string
+		privilegedPods    bool
+		expectedPrivilege bool
+	}{
+		{
+			cloudProvider:     "",
+			expectedPrivilege: false,
+		},
+		{
+			cloudProvider:     "aws",
+			expectedPrivilege: false,
+		},
+		{
+			cloudProvider:     "openstack",
+			privilegedPods:    true,
+			expectedPrivilege: true,
+		},
+	}
+
+	for _, assertion := range assertions {
+		cfg := &kubeadmapi.MasterConfiguration{
+			KubernetesVersion: "v1.9.0",
+			CloudProvider:     assertion.cloudProvider,
+			PrivilegedPods:    assertion.privilegedPods,
+		}
+
+		k8sVersion, _ := version.ParseSemantic(cfg.KubernetesVersion)
+		specs := GetStaticPodSpecs(cfg, k8sVersion)
+
+		for _, podname := range staticPodNames {
+			spec, _ := specs[podname]
+			sc := spec.Spec.Containers[0].SecurityContext
+			if assertion.expectedPrivilege == true {
+				if sc == nil || sc.Privileged == nil || *sc.Privileged == false {
+					t.Errorf("GetStaticPodSpecs did not enable privileged containers in %s pod for provider %s", podname, assertion.cloudProvider)
+				}
+			} else {
+				if sc != nil && sc.Privileged != nil && *sc.Privileged == true {
+					t.Errorf("GetStaticPodSpecs enabled privileged containers in %s pod for provider %s", podname, assertion.cloudProvider)
+				}
+			}
+		}
+	}
+}
+
 func TestGetAPIServerCommand(t *testing.T) {
 	var tests = []struct {
 		cfg      *kubeadmapi.MasterConfiguration
@@ -150,7 +202,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 			expected: []string{
 				"kube-apiserver",
 				"--insecure-port=0",
-				"--admission-control=Initializers,NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,DefaultTolerationSeconds,NodeRestriction,ResourceQuota",
+				"--admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,DefaultTolerationSeconds,NodeRestriction,ResourceQuota",
 				"--service-cluster-ip-range=bar",
 				"--service-account-key-file=" + testCertsDir + "/sa.pub",
 				"--client-ca-file=" + testCertsDir + "/ca.crt",
@@ -184,7 +236,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 			expected: []string{
 				"kube-apiserver",
 				"--insecure-port=0",
-				"--admission-control=Initializers,NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,DefaultTolerationSeconds,NodeRestriction,ResourceQuota",
+				"--admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,DefaultTolerationSeconds,NodeRestriction,ResourceQuota",
 				"--service-cluster-ip-range=bar",
 				"--service-account-key-file=" + testCertsDir + "/sa.pub",
 				"--client-ca-file=" + testCertsDir + "/ca.crt",
@@ -218,7 +270,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 			expected: []string{
 				"kube-apiserver",
 				"--insecure-port=0",
-				"--admission-control=Initializers,NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,DefaultTolerationSeconds,NodeRestriction,ResourceQuota",
+				"--admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,DefaultTolerationSeconds,NodeRestriction,ResourceQuota",
 				"--service-cluster-ip-range=bar",
 				"--service-account-key-file=" + testCertsDir + "/sa.pub",
 				"--client-ca-file=" + testCertsDir + "/ca.crt",
@@ -253,7 +305,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 			expected: []string{
 				"kube-apiserver",
 				"--insecure-port=0",
-				"--admission-control=Initializers,NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,DefaultTolerationSeconds,NodeRestriction,ResourceQuota",
+				"--admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,DefaultTolerationSeconds,NodeRestriction,ResourceQuota",
 				"--service-cluster-ip-range=bar",
 				"--service-account-key-file=" + testCertsDir + "/sa.pub",
 				"--client-ca-file=" + testCertsDir + "/ca.crt",
@@ -290,7 +342,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 			expected: []string{
 				"kube-apiserver",
 				"--insecure-port=0",
-				"--admission-control=Initializers,NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,DefaultTolerationSeconds,NodeRestriction,ResourceQuota",
+				"--admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,DefaultTolerationSeconds,NodeRestriction,ResourceQuota",
 				"--service-cluster-ip-range=bar",
 				"--service-account-key-file=" + testCertsDir + "/sa.pub",
 				"--client-ca-file=" + testCertsDir + "/ca.crt",
@@ -327,7 +379,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 			expected: []string{
 				"kube-apiserver",
 				"--insecure-port=0",
-				"--admission-control=Initializers,NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,DefaultTolerationSeconds,NodeRestriction,ResourceQuota",
+				"--admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,DefaultTolerationSeconds,NodeRestriction,ResourceQuota",
 				"--service-cluster-ip-range=bar",
 				"--service-account-key-file=" + testCertsDir + "/sa.pub",
 				"--client-ca-file=" + testCertsDir + "/ca.crt",
@@ -364,7 +416,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 			expected: []string{
 				"kube-apiserver",
 				"--insecure-port=0",
-				"--admission-control=Initializers,NamespaceLifecycle,LimitRanger,ServiceAccount,DefaultStorageClass,DefaultTolerationSeconds,NodeRestriction,ResourceQuota",
+				"--admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,DefaultStorageClass,DefaultTolerationSeconds,NodeRestriction,MutatingAdmissionWebhook,ValidatingAdmissionWebhook,ResourceQuota",
 				"--service-cluster-ip-range=bar",
 				"--service-account-key-file=" + testCertsDir + "/sa.pub",
 				"--client-ca-file=" + testCertsDir + "/ca.crt",
@@ -401,7 +453,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 			expected: []string{
 				"kube-apiserver",
 				"--insecure-port=0",
-				"--admission-control=Initializers,NamespaceLifecycle,LimitRanger,ServiceAccount,DefaultStorageClass,DefaultTolerationSeconds,NodeRestriction,ResourceQuota",
+				"--admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,DefaultStorageClass,DefaultTolerationSeconds,NodeRestriction,MutatingAdmissionWebhook,ValidatingAdmissionWebhook,ResourceQuota",
 				"--service-cluster-ip-range=bar",
 				"--service-account-key-file=" + testCertsDir + "/sa.pub",
 				"--client-ca-file=" + testCertsDir + "/ca.crt",
@@ -437,7 +489,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 			expected: []string{
 				"kube-apiserver",
 				"--insecure-port=0",
-				"--admission-control=Initializers,NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,DefaultTolerationSeconds,NodeRestriction,ResourceQuota",
+				"--admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,DefaultTolerationSeconds,NodeRestriction,MutatingAdmissionWebhook,ValidatingAdmissionWebhook,ResourceQuota",
 				"--service-cluster-ip-range=bar",
 				"--service-account-key-file=" + testCertsDir + "/sa.pub",
 				"--client-ca-file=" + testCertsDir + "/ca.crt",
@@ -473,7 +525,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 			expected: []string{
 				"kube-apiserver",
 				"--insecure-port=0",
-				"--admission-control=Initializers,NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,DefaultTolerationSeconds,NodeRestriction,ResourceQuota",
+				"--admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,DefaultTolerationSeconds,NodeRestriction,MutatingAdmissionWebhook,ValidatingAdmissionWebhook,ResourceQuota",
 				"--service-cluster-ip-range=bar",
 				"--service-account-key-file=" + testCertsDir + "/sa.pub",
 				"--client-ca-file=" + testCertsDir + "/ca.crt",

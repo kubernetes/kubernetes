@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	clientset "k8s.io/client-go/kubernetes"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/util/mount"
@@ -262,8 +263,9 @@ func (b *glusterfsMounter) SetUpAt(dir string, fsGroup *int64) error {
 	if !notMnt {
 		return nil
 	}
-
-	os.MkdirAll(dir, 0750)
+	if err := os.MkdirAll(dir, 0750); err != nil {
+		return err
+	}
 	err = b.setUpAtInternal(dir)
 	if err == nil {
 		return nil
@@ -405,17 +407,18 @@ func (plugin *glusterfsPlugin) newProvisionerInternal(options volume.VolumeOptio
 }
 
 type provisionerConfig struct {
-	url             string
-	user            string
-	userKey         string
-	secretNamespace string
-	secretName      string
-	secretValue     string
-	clusterID       string
-	gidMin          int
-	gidMax          int
-	volumeType      gapi.VolumeDurabilityInfo
-	volumeOptions   []string
+	url              string
+	user             string
+	userKey          string
+	secretNamespace  string
+	secretName       string
+	secretValue      string
+	clusterID        string
+	gidMin           int
+	gidMax           int
+	volumeType       gapi.VolumeDurabilityInfo
+	volumeOptions    []string
+	volumeNamePrefix string
 }
 
 type glusterfsVolumeProvisioner struct {
@@ -599,8 +602,13 @@ func (d *glusterfsVolumeDeleter) getGid() (int, bool, error) {
 
 func (d *glusterfsVolumeDeleter) Delete() error {
 	glog.V(2).Infof("delete volume: %s ", d.glusterfsMounter.path)
+
 	volumeName := d.glusterfsMounter.path
-	volumeID := dstrings.TrimPrefix(volumeName, volPrefix)
+	volumeID, err := getVolumeID(d.spec, volumeName)
+	if err != nil {
+		return fmt.Errorf("failed to get volumeID, err: %v", err)
+	}
+
 	class, err := volutil.GetClassForVolume(d.plugin.host.GetKubeClient(), d.spec)
 	if err != nil {
 		return err
@@ -737,6 +745,7 @@ func (p *glusterfsVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
 
 func (p *glusterfsVolumeProvisioner) CreateVolume(gid int) (r *v1.GlusterfsVolumeSource, size int, volID string, err error) {
 	var clusterIDs []string
+	customVolumeName := ""
 	capacity := p.options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
 	// Glusterfs creates volumes in units of GiB, but heketi documentation incorrectly reports GBs
 	sz := int(volume.RoundUpToGiB(capacity))
@@ -754,8 +763,13 @@ func (p *glusterfsVolumeProvisioner) CreateVolume(gid int) (r *v1.GlusterfsVolum
 		clusterIDs = dstrings.Split(p.clusterID, ",")
 		glog.V(4).Infof("provided clusterIDs: %v", clusterIDs)
 	}
+
+	if p.provisionerConfig.volumeNamePrefix != "" {
+		customVolumeName = fmt.Sprintf("%s_%s_%s", p.provisionerConfig.volumeNamePrefix, p.options.PVC.Name, uuid.NewUUID())
+	}
+
 	gid64 := int64(gid)
-	volumeReq := &gapi.VolumeCreateRequest{Size: sz, Clusters: clusterIDs, Gid: gid64, Durability: p.volumeType, GlusterVolumeOptions: p.volumeOptions}
+	volumeReq := &gapi.VolumeCreateRequest{Size: sz, Name: customVolumeName, Clusters: clusterIDs, Gid: gid64, Durability: p.volumeType, GlusterVolumeOptions: p.volumeOptions}
 	volume, err := cli.VolumeCreate(volumeReq)
 	if err != nil {
 		glog.Errorf("error creating volume %v ", err)
@@ -921,6 +935,7 @@ func parseClassParameters(params map[string]string, kubeClient clientset.Interfa
 	authEnabled := true
 	parseVolumeType := ""
 	parseVolumeOptions := ""
+	parseVolumeNamePrefix := ""
 
 	for k, v := range params {
 		switch dstrings.ToLower(k) {
@@ -971,7 +986,10 @@ func parseClassParameters(params map[string]string, kubeClient clientset.Interfa
 			if len(v) != 0 {
 				parseVolumeOptions = v
 			}
-
+		case "volumenameprefix":
+			if len(v) != 0 {
+				parseVolumeNamePrefix = v
+			}
 		default:
 			return nil, fmt.Errorf("invalid option %q for volume plugin %s", k, glusterfsPluginName)
 		}
@@ -1051,16 +1069,45 @@ func parseClassParameters(params map[string]string, kubeClient clientset.Interfa
 		cfg.volumeOptions = volOptions
 
 	}
+
+	if len(parseVolumeNamePrefix) != 0 {
+		if dstrings.Contains(parseVolumeNamePrefix, "_") {
+			return nil, fmt.Errorf("Storageclass parameter 'volumenameprefix' should not contain '_' in its value")
+		}
+		cfg.volumeNamePrefix = parseVolumeNamePrefix
+	}
 	return &cfg, nil
+}
+
+// getVolumeID returns volumeID from the PV or volumename.
+func getVolumeID(pv *v1.PersistentVolume, volumeName string) (string, error) {
+	volumeID := ""
+
+	// Get volID from pvspec if available, else fill it from volumename.
+	if pv != nil {
+		if pv.Annotations["VolID"] != "" {
+			volumeID = pv.Annotations["VolID"]
+		} else {
+			volumeID = dstrings.TrimPrefix(volumeName, volPrefix)
+		}
+	} else {
+		return volumeID, fmt.Errorf("provided PV spec is nil")
+	}
+	if volumeID == "" {
+		return volumeID, fmt.Errorf("volume ID is empty")
+	}
+	return volumeID, nil
 }
 
 func (plugin *glusterfsPlugin) ExpandVolumeDevice(spec *volume.Spec, newSize resource.Quantity, oldSize resource.Quantity) (resource.Quantity, error) {
 	pvSpec := spec.PersistentVolume.Spec
 	glog.V(2).Infof("Request to expand volume: %s ", pvSpec.Glusterfs.Path)
 	volumeName := pvSpec.Glusterfs.Path
+	volumeID, err := getVolumeID(spec.PersistentVolume, volumeName)
 
-	// Fetch the volume for expansion.
-	volumeID := dstrings.TrimPrefix(volumeName, volPrefix)
+	if err != nil {
+		return oldSize, fmt.Errorf("failed to get volumeID, err: %v", err)
+	}
 
 	//Get details of SC.
 	class, err := volutil.GetClassForVolume(plugin.host.GetKubeClient(), spec.PersistentVolume)

@@ -37,7 +37,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/apiserver/pkg/endpoints/request"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -681,7 +680,7 @@ func (e *Store) Get(ctx genericapirequest.Context, name string, options *metav1.
 // qualifiedResourceFromContext attempts to retrieve a GroupResource from the context's request info.
 // If the context has no request info, DefaultQualifiedResource is used.
 func (e *Store) qualifiedResourceFromContext(ctx genericapirequest.Context) schema.GroupResource {
-	if info, ok := request.RequestInfoFrom(ctx); ok {
+	if info, ok := genericapirequest.RequestInfoFrom(ctx); ok {
 		return schema.GroupResource{Group: info.APIGroup, Resource: info.Resource}
 	}
 	// some implementations access storage directly and thus the context has no RequestInfo

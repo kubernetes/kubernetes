@@ -30,9 +30,12 @@ import (
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 )
 
+// PluginName indicates name of admission plugin.
+const PluginName = "OwnerReferencesPermissionEnforcement"
+
 // Register registers a plugin
 func Register(plugins *admission.Plugins) {
-	plugins.Register("OwnerReferencesPermissionEnforcement", func(config io.Reader) (admission.Interface, error) {
+	plugins.Register(PluginName, func(config io.Reader) (admission.Interface, error) {
 		// the pods/status endpoint is ignored by this plugin since old kubelets
 		// corrupt them.  the pod status strategy ensures status updates cannot mutate
 		// ownerRef.

@@ -22,25 +22,25 @@ import (
 
 	"github.com/golang/glog"
 
+	"fmt"
 	"k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/apimachinery/pkg/watch"
+	informers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
+	corelisters "k8s.io/client-go/listers/core/v1"
+	bootstrapapi "k8s.io/client-go/tools/bootstrap/token/api"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	bootstrapapi "k8s.io/kubernetes/pkg/bootstrap/api"
+	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/util/metrics"
 )
 
 // BootstrapSignerOptions contains options for the BootstrapSigner
 type BootstrapSignerOptions struct {
-
 	// ConfigMapNamespace is the namespace of the ConfigMap
 	ConfigMapNamespace string
 
@@ -71,88 +71,101 @@ func DefaultBootstrapSignerOptions() BootstrapSignerOptions {
 
 // BootstrapSigner is a controller that signs a ConfigMap with a set of tokens.
 type BootstrapSigner struct {
-	client          clientset.Interface
-	configMapKey    string
-	secretNamespace string
-
-	configMaps cache.Store
-	secrets    cache.Store
+	client             clientset.Interface
+	configMapKey       string
+	configMapName      string
+	configMapNamespace string
+	secretNamespace    string
 
 	// syncQueue handles synchronizing updates to the ConfigMap.  We'll only ever
 	// have one item (Named <ConfigMapName>) in this queue. We are using it
 	// serializes and collapses updates as they can come from both the ConfigMap
 	// and Secrets controllers.
-	syncQueue workqueue.Interface
+	syncQueue workqueue.RateLimitingInterface
 
-	// Since we join two objects, we'll watch both of them with controllers.
-	configMapsController cache.Controller
-	secretsController    cache.Controller
+	secretLister corelisters.SecretLister
+	secretSynced cache.InformerSynced
+
+	configMapLister corelisters.ConfigMapLister
+	configMapSynced cache.InformerSynced
 }
 
 // NewBootstrapSigner returns a new *BootstrapSigner.
-//
-// TODO: Switch to shared informers
-func NewBootstrapSigner(cl clientset.Interface, options BootstrapSignerOptions) (*BootstrapSigner, error) {
+func NewBootstrapSigner(cl clientset.Interface, secrets informers.SecretInformer, configMaps informers.ConfigMapInformer, options BootstrapSignerOptions) (*BootstrapSigner, error) {
 	e := &BootstrapSigner{
-		client:          cl,
-		configMapKey:    options.ConfigMapNamespace + "/" + options.ConfigMapName,
-		secretNamespace: options.TokenSecretNamespace,
-		syncQueue:       workqueue.NewNamed("bootstrap_signer_queue"),
+		client:             cl,
+		configMapKey:       options.ConfigMapNamespace + "/" + options.ConfigMapName,
+		configMapName:      options.ConfigMapName,
+		configMapNamespace: options.ConfigMapNamespace,
+		secretNamespace:    options.TokenSecretNamespace,
+		secretLister:       secrets.Lister(),
+		secretSynced:       secrets.Informer().HasSynced,
+		configMapLister:    configMaps.Lister(),
+		configMapSynced:    configMaps.Informer().HasSynced,
+		syncQueue:          workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "bootstrap_signer_queue"),
 	}
 	if cl.CoreV1().RESTClient().GetRateLimiter() != nil {
 		if err := metrics.RegisterMetricAndTrackRateLimiterUsage("bootstrap_signer", cl.CoreV1().RESTClient().GetRateLimiter()); err != nil {
 			return nil, err
 		}
 	}
-	configMapSelector := fields.SelectorFromSet(map[string]string{api.ObjectNameField: options.ConfigMapName})
-	e.configMaps, e.configMapsController = cache.NewInformer(
-		&cache.ListWatch{
-			ListFunc: func(lo metav1.ListOptions) (runtime.Object, error) {
-				lo.FieldSelector = configMapSelector.String()
-				return e.client.CoreV1().ConfigMaps(options.ConfigMapNamespace).List(lo)
+
+	configMaps.Informer().AddEventHandlerWithResyncPeriod(
+		cache.FilteringResourceEventHandler{
+			FilterFunc: func(obj interface{}) bool {
+				switch t := obj.(type) {
+				case *v1.ConfigMap:
+					return t.Name == options.ConfigMapName && t.Namespace == options.ConfigMapNamespace
+				default:
+					utilruntime.HandleError(fmt.Errorf("object passed to %T that is not expected: %T", e, obj))
+					return false
+				}
 			},
-			WatchFunc: func(lo metav1.ListOptions) (watch.Interface, error) {
-				lo.FieldSelector = configMapSelector.String()
-				return e.client.CoreV1().ConfigMaps(options.ConfigMapNamespace).Watch(lo)
+			Handler: cache.ResourceEventHandlerFuncs{
+				AddFunc:    func(_ interface{}) { e.pokeConfigMapSync() },
+				UpdateFunc: func(_, _ interface{}) { e.pokeConfigMapSync() },
 			},
 		},
-		&v1.ConfigMap{},
 		options.ConfigMapResync,
-		cache.ResourceEventHandlerFuncs{
-			AddFunc:    func(_ interface{}) { e.pokeConfigMapSync() },
-			UpdateFunc: func(_, _ interface{}) { e.pokeConfigMapSync() },
-		},
 	)
 
-	secretSelector := fields.SelectorFromSet(map[string]string{api.SecretTypeField: string(bootstrapapi.SecretTypeBootstrapToken)})
-	e.secrets, e.secretsController = cache.NewInformer(
-		&cache.ListWatch{
-			ListFunc: func(lo metav1.ListOptions) (runtime.Object, error) {
-				lo.FieldSelector = secretSelector.String()
-				return e.client.CoreV1().Secrets(e.secretNamespace).List(lo)
+	secrets.Informer().AddEventHandlerWithResyncPeriod(
+		cache.FilteringResourceEventHandler{
+			FilterFunc: func(obj interface{}) bool {
+				switch t := obj.(type) {
+				case *v1.Secret:
+					return t.Type == bootstrapapi.SecretTypeBootstrapToken && t.Namespace == e.secretNamespace
+				default:
+					utilruntime.HandleError(fmt.Errorf("object passed to %T that is not expected: %T", e, obj))
+					return false
+				}
 			},
-			WatchFunc: func(lo metav1.ListOptions) (watch.Interface, error) {
-				lo.FieldSelector = secretSelector.String()
-				return e.client.CoreV1().Secrets(e.secretNamespace).Watch(lo)
+			Handler: cache.ResourceEventHandlerFuncs{
+				AddFunc:    func(_ interface{}) { e.pokeConfigMapSync() },
+				UpdateFunc: func(_, _ interface{}) { e.pokeConfigMapSync() },
+				DeleteFunc: func(_ interface{}) { e.pokeConfigMapSync() },
 			},
 		},
-		&v1.Secret{},
 		options.SecretResync,
-		cache.ResourceEventHandlerFuncs{
-			AddFunc:    func(_ interface{}) { e.pokeConfigMapSync() },
-			UpdateFunc: func(_, _ interface{}) { e.pokeConfigMapSync() },
-			DeleteFunc: func(_ interface{}) { e.pokeConfigMapSync() },
-		},
 	)
+
 	return e, nil
 }
 
 // Run runs controller loops and returns when they are done
 func (e *BootstrapSigner) Run(stopCh <-chan struct{}) {
-	go e.configMapsController.Run(stopCh)
-	go e.secretsController.Run(stopCh)
+	// Shut down queues
+	defer utilruntime.HandleCrash()
+	defer e.syncQueue.ShutDown()
+
+	if !controller.WaitForCacheSync("bootstrap_signer", stopCh, e.configMapSynced, e.secretSynced) {
+		return
+	}
+
+	glog.V(5).Infof("Starting workers")
 	go wait.Until(e.serviceConfigMapQueue, 0, stopCh)
 	<-stopCh
+	glog.V(1).Infof("Shutting down")
 }
 
 func (e *BootstrapSigner) pokeConfigMapSync() {
@@ -237,27 +250,32 @@ func (e *BootstrapSigner) updateConfigMap(cm *v1.ConfigMap) {
 
 // getConfigMap gets the ConfigMap we are interested in
 func (e *BootstrapSigner) getConfigMap() *v1.ConfigMap {
-	configMap, exists, err := e.configMaps.GetByKey(e.configMapKey)
+	configMap, err := e.configMapLister.ConfigMaps(e.configMapNamespace).Get(e.configMapName)
 
 	// If we can't get the configmap just return nil. The resync will eventually
 	// sync things up.
+	if err != nil {
+		if !apierrors.IsNotFound(err) {
+			utilruntime.HandleError(err)
+		}
+		return nil
+	}
+
+	return configMap
+}
+
+func (e *BootstrapSigner) listSecrets() []*v1.Secret {
+	secrets, err := e.secretLister.Secrets(e.secretNamespace).List(labels.Everything())
 	if err != nil {
 		utilruntime.HandleError(err)
 		return nil
 	}
 
-	if exists {
-		return configMap.(*v1.ConfigMap)
-	}
-	return nil
-}
-
-func (e *BootstrapSigner) listSecrets() []*v1.Secret {
-	secrets := e.secrets.List()
-
 	items := []*v1.Secret{}
-	for _, obj := range secrets {
-		items = append(items, obj.(*v1.Secret))
+	for _, secret := range secrets {
+		if secret.Type == bootstrapapi.SecretTypeBootstrapToken {
+			items = append(items, secret)
+		}
 	}
 	return items
 }

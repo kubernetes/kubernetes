@@ -20,7 +20,6 @@ import (
 	"fmt"
 
 	"k8s.io/api/core/v1"
-	corev1 "k8s.io/api/core/v1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
@@ -57,7 +56,7 @@ var (
 		Spec: extensionsv1beta1.PodSecurityPolicySpec{
 			Privileged:               false,
 			AllowPrivilegeEscalation: boolPtr(false),
-			RequiredDropCapabilities: []corev1.Capability{
+			RequiredDropCapabilities: []v1.Capability{
 				"AUDIT_WRITE",
 				"CHOWN",
 				"DAC_OVERRIDE",

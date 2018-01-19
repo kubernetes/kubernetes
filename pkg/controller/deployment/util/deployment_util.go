@@ -124,18 +124,6 @@ func GetDeploymentCondition(status extensions.DeploymentStatus, condType extensi
 	return nil
 }
 
-// TODO: remove the duplicate
-// GetDeploymentConditionInternal returns the condition with the provided type.
-func GetDeploymentConditionInternal(status internalextensions.DeploymentStatus, condType internalextensions.DeploymentConditionType) *internalextensions.DeploymentCondition {
-	for i := range status.Conditions {
-		c := status.Conditions[i]
-		if c.Type == condType {
-			return &c
-		}
-	}
-	return nil
-}
-
 // SetDeploymentCondition updates the deployment to include the provided condition. If the condition that
 // we are about to add already exists and has the same status and reason then we are not going to update.
 func SetDeploymentCondition(status *extensions.DeploymentStatus, condition extensions.DeploymentCondition) {

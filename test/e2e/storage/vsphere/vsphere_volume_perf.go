@@ -18,8 +18,6 @@ package vsphere
 
 import (
 	"fmt"
-	"os"
-	"strconv"
 	"time"
 
 	. "github.com/onsi/ginkgo"
@@ -56,39 +54,25 @@ var _ = utils.SIGDescribe("vcp-performance [Feature:vsphere]", func() {
 		client           clientset.Interface
 		namespace        string
 		nodeSelectorList []*NodeSelector
+		policyName       string
+		datastoreName    string
 		volumeCount      int
 		volumesPerPod    int
 		iterations       int
-		policyName       string
-		datastoreName    string
 	)
 
 	BeforeEach(func() {
-		var err error
 		framework.SkipUnlessProviderIs("vsphere")
 		client = f.ClientSet
 		namespace = f.Namespace.Name
 
 		// Read the environment variables
-		volumeCountStr := os.Getenv("VCP_PERF_VOLUME_COUNT")
-		Expect(volumeCountStr).NotTo(BeEmpty(), "ENV VCP_PERF_VOLUME_COUNT is not set")
-		volumeCount, err = strconv.Atoi(volumeCountStr)
-		Expect(err).NotTo(HaveOccurred(), "Error Parsing VCP_PERF_VOLUME_COUNT")
+		volumeCount = GetAndExpectIntEnvVar(VCPPerfVolumeCount)
+		volumesPerPod = GetAndExpectIntEnvVar(VCPPerfVolumesPerPod)
+		iterations = GetAndExpectIntEnvVar(VCPPerfIterations)
 
-		volumesPerPodStr := os.Getenv("VCP_PERF_VOLUME_PER_POD")
-		Expect(volumesPerPodStr).NotTo(BeEmpty(), "ENV VCP_PERF_VOLUME_PER_POD is not set")
-		volumesPerPod, err = strconv.Atoi(volumesPerPodStr)
-		Expect(err).NotTo(HaveOccurred(), "Error Parsing VCP_PERF_VOLUME_PER_POD")
-
-		iterationsStr := os.Getenv("VCP_PERF_ITERATIONS")
-		Expect(iterationsStr).NotTo(BeEmpty(), "ENV VCP_PERF_ITERATIONS is not set")
-		iterations, err = strconv.Atoi(iterationsStr)
-		Expect(err).NotTo(HaveOccurred(), "Error Parsing VCP_PERF_ITERATIONS")
-
-		policyName = os.Getenv("VSPHERE_SPBM_GOLD_POLICY")
-		datastoreName = os.Getenv("VSPHERE_DATASTORE")
-		Expect(policyName).NotTo(BeEmpty(), "ENV VSPHERE_SPBM_GOLD_POLICY is not set")
-		Expect(datastoreName).NotTo(BeEmpty(), "ENV VSPHERE_DATASTORE is not set")
+		policyName = GetAndExpectStringEnvVar(SPBMPolicyName)
+		datastoreName = GetAndExpectStringEnvVar(StorageClassDatastoreName)
 
 		nodes := framework.GetReadySchedulableNodesOrDie(client)
 		Expect(len(nodes.Items)).To(BeNumerically(">=", 1), "Requires at least %d nodes (not %d)", 2, len(nodes.Items))

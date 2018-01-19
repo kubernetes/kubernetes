@@ -43,10 +43,9 @@ type PriorityReduceFunction func(pod *v1.Pod, meta interface{}, nodeNameToInfo m
 // PredicateMetadataProducer is a function that computes predicate metadata for a given pod.
 type PredicateMetadataProducer func(pod *v1.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo) PredicateMetadata
 
-// MetadataProducer is a function that computes metadata for a given pod. This
+// PriorityMetadataProducer is a function that computes metadata for a given pod. This
 // is now used for only for priority functions. For predicates please use PredicateMetadataProducer.
-// TODO: Rename this once we have a specific type for priority metadata producer.
-type MetadataProducer func(pod *v1.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo) interface{}
+type PriorityMetadataProducer func(pod *v1.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo) interface{}
 
 // DEPRECATED
 // Use Map-Reduce pattern for priority functions.
@@ -67,8 +66,8 @@ func EmptyPredicateMetadataProducer(pod *v1.Pod, nodeNameToInfo map[string]*sche
 	return nil
 }
 
-// EmptyMetadataProducer returns a no-op MetadataProducer type.
-func EmptyMetadataProducer(pod *v1.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo) interface{} {
+// EmptyPriorityMetadataProducer returns a no-op PriorityMetadataProducer type.
+func EmptyPriorityMetadataProducer(pod *v1.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo) interface{} {
 	return nil
 }
 

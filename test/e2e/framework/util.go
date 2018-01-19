@@ -74,6 +74,7 @@ import (
 
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
+	scaleclient "k8s.io/client-go/scale"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
@@ -2682,20 +2683,25 @@ func RemoveAvoidPodsOffNode(c clientset.Interface, nodeName string) {
 	ExpectNoError(err)
 }
 
-func getScalerForKind(internalClientset internalclientset.Interface, kind schema.GroupKind) (kubectl.Scaler, error) {
-	return kubectl.ScalerFor(kind, internalClientset)
+//TODO(p0lyn0mial): remove internalClientset and kind
+func getScalerForKind(internalClientset internalclientset.Interface, kind schema.GroupKind, scalesGetter scaleclient.ScalesGetter, gr schema.GroupResource) (kubectl.Scaler, error) {
+	return kubectl.ScalerFor(kind, internalClientset, scalesGetter, gr)
 }
 
+//TODO(p0lyn0mial): remove internalClientset and kind.
+//TODO(p0lyn0mial): update the callers.
 func ScaleResource(
 	clientset clientset.Interface,
 	internalClientset internalclientset.Interface,
+	scalesGetter scaleclient.ScalesGetter,
 	ns, name string,
 	size uint,
 	wait bool,
 	kind schema.GroupKind,
+	gr schema.GroupResource,
 ) error {
 	By(fmt.Sprintf("Scaling %v %s in namespace %s to %d", kind, name, ns, size))
-	scaler, err := getScalerForKind(internalClientset, kind)
+	scaler, err := getScalerForKind(internalClientset, kind, scalesGetter, gr)
 	if err != nil {
 		return err
 	}
@@ -3454,12 +3460,6 @@ func GetSigner(provider string) (ssh.Signer, error) {
 		}
 		// Otherwise revert to home dir
 		keyfile = "kube_aws_rsa"
-	case "vagrant":
-		keyfile = os.Getenv("VAGRANT_SSH_KEY")
-		if len(keyfile) != 0 {
-			return sshutil.MakePrivateKeySignerFromFile(keyfile)
-		}
-		return nil, fmt.Errorf("VAGRANT_SSH_KEY env variable should be provided")
 	case "local", "vsphere":
 		keyfile = os.Getenv("LOCAL_SSH_KEY") // maybe?
 		if len(keyfile) == 0 {
@@ -3900,9 +3900,7 @@ func sshRestartMaster() error {
 	}
 	var command string
 	if ProviderIs("gce") {
-		// `kube-apiserver_kube-apiserver` matches the name of the apiserver
-		// container.
-		command = "sudo docker ps | grep kube-apiserver_kube-apiserver | cut -d ' ' -f 1 | xargs sudo docker kill"
+		command = "pidof kube-apiserver | xargs sudo kill"
 	} else {
 		command = "sudo /etc/init.d/kube-apiserver restart"
 	}
@@ -3933,9 +3931,9 @@ func RestartControllerManager() error {
 	if ProviderIs("gce") && !MasterOSDistroIs("gci") {
 		return fmt.Errorf("unsupported master OS distro: %s", TestContext.MasterOSDistro)
 	}
-	cmd := "sudo docker ps | grep k8s_kube-controller-manager | cut -d ' ' -f 1 | xargs sudo docker kill"
+	cmd := "pidof kube-controller-manager | xargs sudo kill"
 	Logf("Restarting controller-manager via ssh, running: %v", cmd)
-	result, err := SSH(cmd, GetMasterHost()+":22", TestContext.Provider)
+	result, err := SSH(cmd, net.JoinHostPort(GetMasterHost(), sshPort), TestContext.Provider)
 	if err != nil || result.Code != 0 {
 		LogSSHResult(result)
 		return fmt.Errorf("couldn't restart controller-manager: %v", err)
@@ -3946,7 +3944,7 @@ func RestartControllerManager() error {
 func WaitForControllerManagerUp() error {
 	cmd := "curl http://localhost:" + strconv.Itoa(ports.ControllerManagerPort) + "/healthz"
 	for start := time.Now(); time.Since(start) < time.Minute; time.Sleep(5 * time.Second) {
-		result, err := SSH(cmd, GetMasterHost()+":22", TestContext.Provider)
+		result, err := SSH(cmd, net.JoinHostPort(GetMasterHost(), sshPort), TestContext.Provider)
 		if err != nil || result.Code != 0 {
 			LogSSHResult(result)
 		}
@@ -3960,9 +3958,9 @@ func WaitForControllerManagerUp() error {
 // CheckForControllerManagerHealthy checks that the controller manager does not crash within "duration"
 func CheckForControllerManagerHealthy(duration time.Duration) error {
 	var PID string
-	cmd := "sudo docker ps | grep k8s_kube-controller-manager | cut -d ' ' -f 1"
+	cmd := "pidof kube-controller-manager"
 	for start := time.Now(); time.Since(start) < duration; time.Sleep(5 * time.Second) {
-		result, err := SSH(cmd, GetMasterHost()+":22", TestContext.Provider)
+		result, err := SSH(cmd, net.JoinHostPort(GetMasterHost(), sshPort), TestContext.Provider)
 		if err != nil {
 			// We don't necessarily know that it crashed, pipe could just be broken
 			LogSSHResult(result)

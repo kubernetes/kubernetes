@@ -548,6 +548,10 @@ func (kl *Kubelet) setNodeStatusMachineInfo(node *v1.Node) {
 		}
 	}
 
+	var devicePluginAllocatable v1.ResourceList
+	var devicePluginCapacity v1.ResourceList
+	var removedDevicePlugins []string
+
 	// TODO: Post NotReady if we cannot get MachineInfo from cAdvisor. This needs to start
 	// cAdvisor locally, e.g. for test-cmd.sh, and in integration test.
 	info, err := kl.GetCachedMachineInfo()
@@ -592,13 +596,14 @@ func (kl *Kubelet) setNodeStatusMachineInfo(node *v1.Node) {
 			}
 		}
 
-		devicePluginCapacity, removedDevicePlugins := kl.containerManager.GetDevicePluginResourceCapacity()
+		devicePluginCapacity, devicePluginAllocatable, removedDevicePlugins = kl.containerManager.GetDevicePluginResourceCapacity()
 		if devicePluginCapacity != nil {
 			for k, v := range devicePluginCapacity {
 				glog.V(2).Infof("Update capacity for %s to %d", k, v.Value())
 				node.Status.Capacity[k] = v
 			}
 		}
+
 		for _, removedResource := range removedDevicePlugins {
 			glog.V(2).Infof("Remove capacity for %s", removedResource)
 			delete(node.Status.Capacity, v1.ResourceName(removedResource))
@@ -628,6 +633,12 @@ func (kl *Kubelet) setNodeStatusMachineInfo(node *v1.Node) {
 			value.Set(0)
 		}
 		node.Status.Allocatable[k] = value
+	}
+	if devicePluginAllocatable != nil {
+		for k, v := range devicePluginAllocatable {
+			glog.V(2).Infof("Update allocatable for %s to %d", k, v.Value())
+			node.Status.Allocatable[k] = v
+		}
 	}
 	// for every huge page reservation, we need to remove it from allocatable memory
 	for k, v := range node.Status.Capacity {

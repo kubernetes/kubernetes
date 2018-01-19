@@ -50,13 +50,6 @@ func createRemoteRuntimeService(endpoint string, t *testing.T) internalapi.Runti
 	return runtimeService
 }
 
-func createRemoteImageService(endpoint string, t *testing.T) internalapi.ImageManagerService {
-	imageService, err := NewRemoteImageService(endpoint, defaultConnectionTimeout)
-	assert.NoError(t, err)
-
-	return imageService
-}
-
 func TestVersion(t *testing.T) {
 	fakeRuntime, endpoint := createAndStartFakeRemoteRuntime(t)
 	defer fakeRuntime.Stop()

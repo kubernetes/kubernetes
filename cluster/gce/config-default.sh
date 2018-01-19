@@ -54,12 +54,6 @@ CREATE_CUSTOM_NETWORK=${CREATE_CUSTOM_NETWORK:-false}
 
 MASTER_OS_DISTRIBUTION=${KUBE_MASTER_OS_DISTRIBUTION:-${KUBE_OS_DISTRIBUTION:-gci}}
 NODE_OS_DISTRIBUTION=${KUBE_NODE_OS_DISTRIBUTION:-${KUBE_OS_DISTRIBUTION:-gci}}
-if [[ "${MASTER_OS_DISTRIBUTION}" == "coreos" ]]; then
-    MASTER_OS_DISTRIBUTION="container-linux"
-fi
-if [[ "${NODE_OS_DISTRIBUTION}" == "coreos" ]]; then
-    NODE_OS_DISTRIBUTION="container-linux"
-fi
 
 if [[ "${MASTER_OS_DISTRIBUTION}" == "cos" ]]; then
     MASTER_OS_DISTRIBUTION="gci"
@@ -192,7 +186,7 @@ if [[ ${ENABLE_METADATA_CONCEALMENT:-} == "true" ]]; then
   # Put the necessary label on the node so the daemonset gets scheduled.
   NODE_LABELS="${NODE_LABELS},beta.kubernetes.io/metadata-proxy-ready=true"
   # Add to the provider custom variables.
-  PROVIDER_VARS="${PROVIDER_VARS:-} ENABLE_METADATA_CONCEALMENT"
+  PROVIDER_VARS="${PROVIDER_VARS:-} ENABLE_METADATA_CONCEALMENT METADATA_CONCEALMENT_NO_FIREWALL"
 fi
 
 # Optional: Enable node logging.

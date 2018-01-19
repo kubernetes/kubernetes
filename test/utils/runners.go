@@ -38,6 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
+	scaleclient "k8s.io/client-go/scale"
 	"k8s.io/client-go/util/workqueue"
 	batchinternal "k8s.io/kubernetes/pkg/apis/batch"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -105,16 +106,20 @@ type RunObjectConfig interface {
 	GetKind() schema.GroupKind
 	GetClient() clientset.Interface
 	GetInternalClient() internalclientset.Interface
+	GetScalesGetter() scaleclient.ScalesGetter
 	SetClient(clientset.Interface)
 	SetInternalClient(internalclientset.Interface)
+	SetScalesClient(scaleclient.ScalesGetter)
 	GetReplicas() int
 	GetLabelValue(string) (string, bool)
+	GetGroupResource() schema.GroupResource
 }
 
 type RCConfig struct {
 	Affinity          *v1.Affinity
 	Client            clientset.Interface
 	InternalClient    internalclientset.Interface
+	ScalesGetter      scaleclient.ScalesGetter
 	Image             string
 	Command           []string
 	Name              string
@@ -277,6 +282,10 @@ func (config *DeploymentConfig) GetKind() schema.GroupKind {
 	return extensionsinternal.Kind("Deployment")
 }
 
+func (config *DeploymentConfig) GetGroupResource() schema.GroupResource {
+	return extensionsinternal.Resource("deployments")
+}
+
 func (config *DeploymentConfig) create() error {
 	deployment := &extensions.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
@@ -344,6 +353,10 @@ func (config *ReplicaSetConfig) GetKind() schema.GroupKind {
 	return extensionsinternal.Kind("ReplicaSet")
 }
 
+func (config *ReplicaSetConfig) GetGroupResource() schema.GroupResource {
+	return extensionsinternal.Resource("replicasets")
+}
+
 func (config *ReplicaSetConfig) create() error {
 	rs := &extensions.ReplicaSet{
 		ObjectMeta: metav1.ObjectMeta{
@@ -409,6 +422,10 @@ func (config *JobConfig) Run() error {
 
 func (config *JobConfig) GetKind() schema.GroupKind {
 	return batchinternal.Kind("Job")
+}
+
+func (config *JobConfig) GetGroupResource() schema.GroupResource {
+	return batchinternal.Resource("jobs")
 }
 
 func (config *JobConfig) create() error {
@@ -482,6 +499,10 @@ func (config *RCConfig) GetKind() schema.GroupKind {
 	return api.Kind("ReplicationController")
 }
 
+func (config *RCConfig) GetGroupResource() schema.GroupResource {
+	return api.Resource("replicationcontrollers")
+}
+
 func (config *RCConfig) GetClient() clientset.Interface {
 	return config.Client
 }
@@ -490,12 +511,20 @@ func (config *RCConfig) GetInternalClient() internalclientset.Interface {
 	return config.InternalClient
 }
 
+func (config *RCConfig) GetScalesGetter() scaleclient.ScalesGetter {
+	return config.ScalesGetter
+}
+
 func (config *RCConfig) SetClient(c clientset.Interface) {
 	config.Client = c
 }
 
 func (config *RCConfig) SetInternalClient(c internalclientset.Interface) {
 	config.InternalClient = c
+}
+
+func (config *RCConfig) SetScalesClient(getter scaleclient.ScalesGetter) {
+	config.ScalesGetter = getter
 }
 
 func (config *RCConfig) GetReplicas() int {

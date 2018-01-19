@@ -110,12 +110,14 @@ func TestAddFlags(t *testing.T) {
 			RequestTimeout:              time.Duration(2) * time.Minute,
 			MinRequestTimeout:           1800,
 		},
-		Admission: &apiserveroptions.AdmissionOptions{
-			RecommendedPluginOrder: []string{"NamespaceLifecycle", "Initializers", "MutatingAdmissionWebhook", "ValidatingAdmissionWebhook"},
-			DefaultOffPlugins:      []string{"Initializers", "MutatingAdmissionWebhook", "ValidatingAdmissionWebhook"},
-			PluginNames:            []string{"AlwaysDeny"},
-			ConfigFile:             "/admission-control-config",
-			Plugins:                s.Admission.Plugins,
+		Admission: &kubeoptions.AdmissionOptions{
+			PluginNames: []string{"AlwaysDeny"},
+			GenericAdmission: &apiserveroptions.AdmissionOptions{
+				RecommendedPluginOrder: s.Admission.GenericAdmission.RecommendedPluginOrder,
+				DefaultOffPlugins:      s.Admission.GenericAdmission.DefaultOffPlugins,
+				ConfigFile:             "/admission-control-config",
+				Plugins:                s.Admission.GenericAdmission.Plugins,
+			},
 		},
 		Etcd: &apiserveroptions.EtcdOptions{
 			StorageConfig: storagebackend.Config{

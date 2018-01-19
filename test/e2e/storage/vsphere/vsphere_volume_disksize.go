@@ -18,7 +18,6 @@ package vsphere
 
 import (
 	"fmt"
-	"os"
 	"strings"
 	"time"
 
@@ -58,8 +57,7 @@ var _ = utils.SIGDescribe("Volume Disk Size [Feature:vsphere]", func() {
 		client = f.ClientSet
 		namespace = f.Namespace.Name
 		scParameters = make(map[string]string)
-		datastore = os.Getenv("VSPHERE_DATASTORE")
-		Expect(datastore).NotTo(BeEmpty())
+		datastore = GetAndExpectStringEnvVar(StorageClassDatastoreName)
 		nodeList := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
 		if !(len(nodeList.Items) > 0) {
 			framework.Failf("Unable to find ready and schedulable Node")

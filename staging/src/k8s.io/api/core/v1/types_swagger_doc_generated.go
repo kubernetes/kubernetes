@@ -121,6 +121,7 @@ var map_CSIPersistentVolumeSource = map[string]string{
 	"driver":       "Driver is the name of the driver to use for this volume. Required.",
 	"volumeHandle": "VolumeHandle is the unique volume name returned by the CSI volume plugin’s CreateVolume to refer to the volume on all subsequent calls. Required.",
 	"readOnly":     "Optional: The value to pass to ControllerPublishVolumeRequest. Defaults to false (read/write).",
+	"fsType":       "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified.",
 }
 
 func (CSIPersistentVolumeSource) SwaggerDoc() map[string]string {
@@ -1531,7 +1532,7 @@ var map_PodStatus = map[string]string{
 	"startTime":             "RFC 3339 date and time at which the object was acknowledged by the Kubelet. This is before the Kubelet pulled the container image(s) for the pod.",
 	"initContainerStatuses": "The list has one entry per init container in the manifest. The most recent successful init container will have ready = true, the most recently started container will have startTime set. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#pod-and-container-status",
 	"containerStatuses":     "The list has one entry per container in the manifest. Each entry is currently the output of `docker inspect`. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#pod-and-container-status",
-	"qosClass":              "The Quality of Service (QOS) classification assigned to the pod based on resource requirements See PodQOSClass type for available QOS classes More info: https://github.com/kubernetes/kubernetes/blob/master/docs/design/resource-qos.md",
+	"qosClass":              "The Quality of Service (QOS) classification assigned to the pod based on resource requirements See PodQOSClass type for available QOS classes More info: https://git.k8s.io/community/contributors/design-proposals/node/resource-qos.md",
 }
 
 func (PodStatus) SwaggerDoc() map[string]string {
