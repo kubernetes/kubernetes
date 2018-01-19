@@ -2,21 +2,22 @@
 {{var "l"}} := r.ReadMapStart()
 {{var "bh"}} := z.DecBasicHandle()
 if {{var "v"}} == nil {
-	{{var "rl"}}, _ := z.DecInferLen({{var "l"}}, {{var "bh"}}.MaxInitLen, {{ .Size }})
+	{{var "rl"}} := z.DecInferLen({{var "l"}}, {{var "bh"}}.MaxInitLen, {{ .Size }})
 	{{var "v"}} = make(map[{{ .KTyp }}]{{ .Typ }}, {{var "rl"}})
 	*{{ .Varname }} = {{var "v"}}
 }
 var {{var "mk"}} {{ .KTyp }}
 var {{var "mv"}} {{ .Typ }}
-var {{var "mg"}} {{if decElemKindPtr}}, {{var "ms"}}, {{var "mok"}}{{end}} bool
+var {{var "mg"}}, {{var "mdn"}} {{if decElemKindPtr}}, {{var "ms"}}, {{var "mok"}}{{end}} bool
 if {{var "bh"}}.MapValueReset {
 	{{if decElemKindPtr}}{{var "mg"}} = true
 	{{else if decElemKindIntf}}if !{{var "bh"}}.InterfaceReset { {{var "mg"}} = true }
 	{{else if not decElemKindImmutable}}{{var "mg"}} = true
 	{{end}} }
-if {{var "l"}} > 0  {
-for {{var "j"}} := 0; {{var "j"}} < {{var "l"}}; {{var "j"}}++ {
-	z.DecSendContainerState(codecSelfer_containerMapKey{{ .Sfx }})
+if {{var "l"}} != 0 {
+{{var "hl"}} := {{var "l"}} > 0 
+	for {{var "j"}} := 0; ({{var "hl"}} && {{var "j"}} < {{var "l"}}) || !({{var "hl"}} || r.CheckBreak()); {{var "j"}}++ {
+	r.ReadMapElemKey() {{/* z.DecSendContainerState(codecSelfer_containerMapKey{{ .Sfx }}) */}}
 	{{ $x := printf "%vmk%v" .TempVar .Rand }}{{ decLineVarK $x }}
 {{ if eq .KTyp "interface{}" }}{{/* // special case if a byte array. */}}if {{var "bv"}}, {{var "bok"}} := {{var "mk"}}.([]byte); {{var "bok"}} {
 		{{var "mk"}} = string({{var "bv"}})
@@ -28,31 +29,14 @@ for {{var "j"}} := 0; {{var "j"}} < {{var "l"}}; {{var "j"}}++ {
 			{{var "ms"}} = false
 		} {{else}}{{var "mv"}} = {{var "v"}}[{{var "mk"}}] {{end}}
 	} {{if not decElemKindImmutable}}else { {{var "mv"}} = {{decElemZero}} }{{end}}
-	z.DecSendContainerState(codecSelfer_containerMapValue{{ .Sfx }})
-	{{ $x := printf "%vmv%v" .TempVar .Rand }}{{ decLineVar $x }}
-	if {{if decElemKindPtr}} {{var "ms"}} && {{end}} {{var "v"}} != nil {
-		{{var "v"}}[{{var "mk"}}] = {{var "mv"}}
-	}
-}
-} else if {{var "l"}} < 0  {
-for {{var "j"}} := 0; !r.CheckBreak(); {{var "j"}}++ {
-	z.DecSendContainerState(codecSelfer_containerMapKey{{ .Sfx }})
-	{{ $x := printf "%vmk%v" .TempVar .Rand }}{{ decLineVarK $x }}
-{{ if eq .KTyp "interface{}" }}{{/* // special case if a byte array. */}}if {{var "bv"}}, {{var "bok"}} := {{var "mk"}}.([]byte); {{var "bok"}} {
-		{{var "mk"}} = string({{var "bv"}})
-	}{{ end }}{{if decElemKindPtr}}
-	{{var "ms"}} = true {{ end }}
-	if {{var "mg"}} {
-		{{if decElemKindPtr}}{{var "mv"}}, {{var "mok"}} = {{var "v"}}[{{var "mk"}}] 
-		if {{var "mok"}} {
-			{{var "ms"}} = false
-		} {{else}}{{var "mv"}} = {{var "v"}}[{{var "mk"}}] {{end}}
-	} {{if not decElemKindImmutable}}else { {{var "mv"}} = {{decElemZero}} }{{end}}
-	z.DecSendContainerState(codecSelfer_containerMapValue{{ .Sfx }})
-	{{ $x := printf "%vmv%v" .TempVar .Rand }}{{ decLineVar $x }}
-	if {{if decElemKindPtr}} {{var "ms"}} && {{end}} {{var "v"}} != nil {
+	r.ReadMapElemValue() {{/* z.DecSendContainerState(codecSelfer_containerMapValue{{ .Sfx }}) */}}
+	{{var "mdn"}} = false
+	{{ $x := printf "%vmv%v" .TempVar .Rand }}{{ $y := printf "%vmdn%v" .TempVar .Rand }}{{ decLineVar $x $y }}
+	if {{var "mdn"}} {
+		if {{ var "bh" }}.DeleteOnNilMapValue { delete({{var "v"}}, {{var "mk"}}) } else { {{var "v"}}[{{var "mk"}}] = {{decElemZero}} }
+	} else if {{if decElemKindPtr}} {{var "ms"}} && {{end}} {{var "v"}} != nil {
 		{{var "v"}}[{{var "mk"}}] = {{var "mv"}}
 	}
 }
 } // else len==0: TODO: Should we clear map entries?
-z.DecSendContainerState(codecSelfer_containerMapEnd{{ .Sfx }})
+r.ReadMapEnd() {{/* z.DecSendContainerState(codecSelfer_containerMapEnd{{ .Sfx }}) */}}

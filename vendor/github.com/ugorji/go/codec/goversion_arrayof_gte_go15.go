@@ -9,8 +9,6 @@ import "reflect"
 
 const reflectArrayOfSupported = true
 
-func reflectArrayOf(rvn reflect.Value) (rvn2 reflect.Value) {
-	rvn2 = reflect.New(reflect.ArrayOf(rvn.Len(), intfTyp)).Elem()
-	reflect.Copy(rvn2, rvn)
-	return
+func reflectArrayOf(count int, elem reflect.Type) reflect.Type {
+	return reflect.ArrayOf(count, elem)
 }
