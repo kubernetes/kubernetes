@@ -74,6 +74,9 @@ message NonResourceRule {
   // final step in the path.  "*" means all.
   // +optional
   repeated string nonResourceURLs = 2;
+
+  // Denies indicates if a rule allows or denies requests that match the rule's resource and action.
+  optional bool denies = 3;
 }
 
 // ResourceAttributes includes the authorization attributes available for resource requests to the Authorizer interface
@@ -129,6 +132,9 @@ message ResourceRule {
   // ResourceNames is an optional white list of names that the rule applies to.  An empty set means that everything is allowed.  "*" means all.
   // +optional
   repeated string resourceNames = 4;
+
+  // Denies indicates if a rule allows or denies requests that match the rule's resource and action.
+  optional bool denies = 5;
 }
 
 // SelfSubjectAccessReview checks whether or the current user can perform an action.  Not filling in a
@@ -158,12 +164,13 @@ message SelfSubjectAccessReviewSpec {
   optional NonResourceAttributes nonResourceAttributes = 2;
 }
 
-// SelfSubjectRulesReview enumerates the set of actions the current user can perform within a namespace.
-// The returned list of actions may be incomplete depending on the server's authorization mode,
-// and any errors experienced during the evaluation. SelfSubjectRulesReview should be used by UIs to show/hide actions,
-// or to quickly let an end user reason about their permissions. It should NOT Be used by external systems to
-// drive authorization decisions as this raises confused deputy, cache lifetime/revocation, and correctness concerns.
-// SubjectAccessReview, and LocalAccessReview are the correct way to defer authorization decisions to the API server.
+// SelfSubjectRulesReview enumerates the set of actions the current user is allowed or explicitly disallowed
+// from performing within a namespace. Rules review should be used by UIs to show/hide actions, or to quickly
+// let an end user reason about their permissions.
+// 
+// Rules review APIs MUST NOT be used by external systems to drive authorization decisions as this raises
+// confused deputy, cache lifetime/revocation, and correctness concerns. Additionally, the returned list
+// may be incomplete depending on the server's authorization mode or errors encountered during evaluation
 message SelfSubjectRulesReview {
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
@@ -206,7 +213,7 @@ message SubjectAccessReviewSpec {
   optional NonResourceAttributes nonResourceAttributes = 2;
 
   // User is the user you're testing for.
-  // If you specify "User" but not "Group", then is it interpreted as "What if User were not a member of any groups
+  // If you specify "User" but not "Group", then is it interpreted as "What if User were not a member of any groups"
   // +optional
   optional string user = 3;
 
@@ -247,17 +254,51 @@ message SubjectAccessReviewStatus {
   optional string evaluationError = 3;
 }
 
+// SubjectRulesReview is like SelfSubjectRulesReview, but can query any user, not just the current user.
+message SubjectRulesReview {
+  // +optional
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+
+  // Spec holds information about the request being evaluated.
+  optional SubjectRulesReviewSpec spec = 2;
+
+  // Status is filled in by the server and indicates the set of actions a user can perform.
+  optional SubjectRulesReviewStatus status = 3;
+}
+
+// SubjectRulesRevieSpec is a description of the rules review request.
+message SubjectRulesReviewSpec {
+  // Namespace to evaluate rules for. Required.
+  optional string namespace = 1;
+
+  // User is the user you're testing for.
+  // If you specify "User" but not "Group", then is it interpreted as "What if User were not a member of any groups"
+  optional string user = 2;
+
+  // Groups is the groups you're testing for.
+  repeated string groups = 3;
+
+  // Extra corresponds to the user.Info.GetExtra() method from the authenticator.  Since that is input to the authorizer
+  // it needs a reflection here.
+  map<string, ExtraValue> extra = 4;
+
+  // UID information about the requesting user.
+  optional string uid = 5;
+}
+
 // SubjectRulesReviewStatus contains the result of a rules check. This check can be incomplete depending on
 // the set of authorizers the server is configured with and any errors experienced during evaluation.
-// Because authorization rules are additive, if a rule appears in a list it's safe to assume the subject has that permission,
-// even if that list is incomplete.
 message SubjectRulesReviewStatus {
-  // ResourceRules is the list of actions the subject is allowed to perform on resources.
-  // The list ordering isn't significant, may contain duplicates, and possibly be incomplete.
+  // ResourceRules is the list of actions the subject is allowed or disallowed to perform on resources.
+  // 
+  // Order matters when evaluating rules. The first rule that matches a request either allows or denies it.
+  // If no rule matches a request, the action is implicily denied.
   repeated ResourceRule resourceRules = 1;
 
-  // NonResourceRules is the list of actions the subject is allowed to perform on non-resources.
-  // The list ordering isn't significant, may contain duplicates, and possibly be incomplete.
+  // NonResourceRules is the list of actions the subject is allowed or disallowed to perform on non-resource URLs.
+  // 
+  // Order matters when evaluating rules. The first rule that matches a request either allows or denies it.
+  // If no rule matches a request, the action is implicily denied.
   repeated NonResourceRule nonResourceRules = 2;
 
   // Incomplete is true when the rules returned by this call are incomplete. This is most commonly

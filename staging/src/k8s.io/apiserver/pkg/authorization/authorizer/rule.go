@@ -25,6 +25,8 @@ type ResourceRuleInfo interface {
 	GetResources() []string
 	// GetResourceNames return a white list of names that the rule applies to.
 	GetResourceNames() []string
+	// GetDenies returns if this rule allows or denies requests that match the resource.
+	GetDenies() bool
 }
 
 // DefaultResourceRuleInfo holds information that describes a rule for the resource
@@ -33,6 +35,7 @@ type DefaultResourceRuleInfo struct {
 	APIGroups     []string
 	Resources     []string
 	ResourceNames []string
+	Denies        bool
 }
 
 func (i *DefaultResourceRuleInfo) GetVerbs() []string {
@@ -51,17 +54,24 @@ func (i *DefaultResourceRuleInfo) GetResourceNames() []string {
 	return i.ResourceNames
 }
 
+func (i *DefaultResourceRuleInfo) GetDenies() bool {
+	return i.Denies
+}
+
 type NonResourceRuleInfo interface {
 	// GetVerbs returns a list of kubernetes resource API verbs.
 	GetVerbs() []string
 	// GetNonResourceURLs return a set of partial urls that a user should have access to.
 	GetNonResourceURLs() []string
+	// GetDenies returns if this rule allows or denies requests that match the resource.
+	GetDenies() bool
 }
 
 // DefaultNonResourceRuleInfo holds information that describes a rule for the non-resource
 type DefaultNonResourceRuleInfo struct {
 	Verbs           []string
 	NonResourceURLs []string
+	Denies          bool
 }
 
 func (i *DefaultNonResourceRuleInfo) GetVerbs() []string {
@@ -70,4 +80,8 @@ func (i *DefaultNonResourceRuleInfo) GetVerbs() []string {
 
 func (i *DefaultNonResourceRuleInfo) GetNonResourceURLs() []string {
 	return i.NonResourceURLs
+}
+
+func (i *DefaultNonResourceRuleInfo) GetDenies() bool {
+	return i.Denies
 }

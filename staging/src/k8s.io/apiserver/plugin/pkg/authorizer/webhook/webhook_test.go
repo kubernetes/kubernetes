@@ -17,6 +17,7 @@ limitations under the License.
 package webhook
 
 import (
+	"bytes"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
@@ -188,7 +189,7 @@ current-context: default
 			if err != nil {
 				return fmt.Errorf("error building sar client: %v", err)
 			}
-			_, err = newWithBackoff(sarClient, 0, 0, 0)
+			_, err = newWithBackoff(sarClient, nil, 0, 0, 0)
 			return err
 		}()
 		if err != nil && !tt.wantErr {
@@ -206,8 +207,28 @@ type Service interface {
 	HTTPStatusCode() int
 }
 
-// NewTestServer wraps a Service as an httptest.Server.
-func NewTestServer(s Service, cert, key, caCert []byte) (*httptest.Server, error) {
+type RulesReviewService interface {
+	Review(v1beta1.SubjectRulesReviewSpec) v1beta1.SubjectRulesReviewStatus
+	HTTPStatusCode() int
+}
+
+// NewTestServer wraps a Service or a RulesReviewService as an httptest.Server. If a
+// Service is passed, the server expectes SubjectAccessReviews, if a RulesReviewService
+// is passed, the server expects SubjectRulesReviews.
+func NewTestServer(service interface{}, cert, key, caCert []byte) (*httptest.Server, error) {
+	var (
+		authorizerService  Service
+		rulesReviewService RulesReviewService
+	)
+	switch s := service.(type) {
+	case Service:
+		authorizerService = s
+	case RulesReviewService:
+		rulesReviewService = s
+	default:
+		return nil, fmt.Errorf("service must implement Service or RulesReviewService")
+	}
+
 	const webhookPath = "/testserver"
 	var tlsConfig *tls.Config
 	if cert != nil {
@@ -238,35 +259,55 @@ func NewTestServer(s Service, cert, key, caCert []byte) (*httptest.Server, error
 			return
 		}
 
-		var review v1beta1.SubjectAccessReview
 		bodyData, _ := ioutil.ReadAll(r.Body)
-		if err := json.Unmarshal(bodyData, &review); err != nil {
-			http.Error(w, fmt.Sprintf("failed to decode body: %v", err), http.StatusBadRequest)
-			return
-		}
 
-		// ensure we received the serialized review as expected
-		if review.APIVersion != "authorization.k8s.io/v1beta1" {
-			http.Error(w, fmt.Sprintf("wrong api version: %s", string(bodyData)), http.StatusBadRequest)
-			return
-		}
-		// once we have a successful request, always call the review to record that we were called
-		s.Review(&review)
-		if s.HTTPStatusCode() < 200 || s.HTTPStatusCode() >= 300 {
-			http.Error(w, "HTTP Error", s.HTTPStatusCode())
-			return
-		}
-		type status struct {
-			Allowed         bool   `json:"allowed"`
-			Reason          string `json:"reason"`
-			EvaluationError string `json:"evaluationError"`
-		}
-		resp := struct {
-			APIVersion string `json:"apiVersion"`
-			Status     status `json:"status"`
-		}{
-			APIVersion: v1beta1.SchemeGroupVersion.String(),
-			Status:     status{review.Status.Allowed, review.Status.Reason, review.Status.EvaluationError},
+		var resp interface{}
+
+		if authorizerService != nil {
+			var review v1beta1.SubjectAccessReview
+			if err := json.Unmarshal(bodyData, &review); err != nil {
+				http.Error(w, fmt.Sprintf("failed to decode body: %v", err), http.StatusBadRequest)
+				return
+			}
+
+			// ensure we received the serialized review as expected
+			if review.APIVersion != "authorization.k8s.io/v1beta1" {
+				http.Error(w, fmt.Sprintf("wrong api version: %s", string(bodyData)), http.StatusBadRequest)
+				return
+			}
+			// once we have a successful request, always call the review to record that we were called
+			authorizerService.Review(&review)
+			if code := authorizerService.HTTPStatusCode(); code < 200 || code >= 300 {
+				http.Error(w, "HTTP Error", code)
+				return
+			}
+			type status struct {
+				Allowed         bool   `json:"allowed"`
+				Reason          string `json:"reason"`
+				EvaluationError string `json:"evaluationError"`
+			}
+			resp = struct {
+				APIVersion string `json:"apiVersion"`
+				Status     status `json:"status"`
+			}{
+				APIVersion: v1beta1.SchemeGroupVersion.String(),
+				Status:     status{review.Status.Allowed, review.Status.Reason, review.Status.EvaluationError},
+			}
+		} else {
+			var review v1beta1.SubjectRulesReview
+			if err := json.Unmarshal(bodyData, &review); err != nil {
+				http.Error(w, fmt.Sprintf("failed to decode body: %v", err), http.StatusBadRequest)
+				return
+			}
+
+			// ensure we received the serialized review as expected
+			if review.APIVersion != "authorization.k8s.io/v1beta1" {
+				http.Error(w, fmt.Sprintf("wrong api version: %s", string(bodyData)), http.StatusBadRequest)
+				return
+			}
+			// once we have a successful request, always call the review to record that we were called
+			status := rulesReviewService.Review(review.Spec)
+			resp = v1beta1.SubjectRulesReview{Status: status}
 		}
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(resp)
@@ -301,17 +342,41 @@ func (m *mockService) HTTPStatusCode() int { return m.statusCode }
 
 // newAuthorizer creates a temporary kubeconfig file from the provided arguments and attempts to load
 // a new WebhookAuthorizer from it.
-func newAuthorizer(callbackURL string, clientCert, clientKey, ca []byte, cacheTime time.Duration) (*WebhookAuthorizer, error) {
+func newAuthorizer(callbackURL string, clientCert, clientKey, ca []byte, cacheTime time.Duration) (a *WebhookAuthorizer, err error) {
+	err = withKubeconfig(callbackURL, clientCert, clientKey, ca, func(path string) error {
+		sarClient, err := subjectAccessReviewInterfaceFromKubeconfig(path)
+		if err != nil {
+			return fmt.Errorf("error building sar client: %v", err)
+		}
+		a, err = newWithBackoff(sarClient, nil, cacheTime, cacheTime, 0)
+		return err
+	})
+	return a, err
+}
+
+func newRulesReviewer(callbackURL string, clientCert, clientKey, ca []byte) (a *WebhookAuthorizer, err error) {
+	err = withKubeconfig(callbackURL, clientCert, clientKey, ca, func(path string) error {
+		srrClient, err := subjectRulesReviewInterfaceFromKubeconfig(path)
+		if err != nil {
+			return fmt.Errorf("error building sar client: %v", err)
+		}
+		a, err = newWithBackoff(nil, srrClient, 0, 0, 0)
+		return err
+	})
+	return a, err
+}
+
+func withKubeconfig(url string, clientCert, clientKey, ca []byte, f func(filepath string) error) error {
 	tempfile, err := ioutil.TempFile("", "")
 	if err != nil {
-		return nil, err
+		return err
 	}
 	p := tempfile.Name()
 	defer os.Remove(p)
 	config := v1.Config{
 		Clusters: []v1.NamedCluster{
 			{
-				Cluster: v1.Cluster{Server: callbackURL, CertificateAuthorityData: ca},
+				Cluster: v1.Cluster{Server: url, CertificateAuthorityData: ca},
 			},
 		},
 		AuthInfos: []v1.NamedAuthInfo{
@@ -321,13 +386,9 @@ func newAuthorizer(callbackURL string, clientCert, clientKey, ca []byte, cacheTi
 		},
 	}
 	if err := json.NewEncoder(tempfile).Encode(config); err != nil {
-		return nil, err
+		return err
 	}
-	sarClient, err := subjectAccessReviewInterfaceFromKubeconfig(p)
-	if err != nil {
-		return nil, fmt.Errorf("error building sar client: %v", err)
-	}
-	return newWithBackoff(sarClient, cacheTime, cacheTime, 0)
+	return f(p)
 }
 
 func TestTLSConfig(t *testing.T) {
@@ -540,6 +601,258 @@ func TestWebhook(t *testing.T) {
 			t.Errorf("case %d: got != want:\n%s", i, diff.ObjectGoPrintDiff(gotAttr, tt.want))
 		}
 	}
+}
+
+type mockRulesReviewer struct {
+	namespace  string
+	userPerms  map[string]v1beta1.SubjectRulesReviewStatus
+	groupPerms map[string]v1beta1.SubjectRulesReviewStatus
+	extraPerms map[string]map[string]v1beta1.SubjectRulesReviewStatus
+}
+
+func (m *mockRulesReviewer) HTTPStatusCode() int { return 200 }
+
+func (m *mockRulesReviewer) Review(spec v1beta1.SubjectRulesReviewSpec) v1beta1.SubjectRulesReviewStatus {
+	if spec.Namespace != m.namespace {
+		return v1beta1.SubjectRulesReviewStatus{}
+	}
+
+	var status v1beta1.SubjectRulesReviewStatus
+
+	appendStatus := func(s v1beta1.SubjectRulesReviewStatus) {
+		status.ResourceRules = append(status.ResourceRules, s.ResourceRules...)
+		status.NonResourceRules = append(status.NonResourceRules, s.NonResourceRules...)
+	}
+
+	appendStatus(m.userPerms[spec.User])
+	for _, group := range spec.Groups {
+		appendStatus(m.groupPerms[group])
+	}
+	for key, val := range spec.Extra {
+		perms, ok := m.extraPerms[key]
+		if ok {
+			for _, v := range val {
+				appendStatus(perms[string(v)])
+			}
+		}
+	}
+
+	return status
+}
+
+func TestRulesReview(t *testing.T) {
+	s := &mockRulesReviewer{
+		namespace: "my-namespace",
+		userPerms: map[string]v1beta1.SubjectRulesReviewStatus{
+			"jane": {
+				ResourceRules: []v1beta1.ResourceRule{
+					{
+						Verbs:     []string{"get"},
+						APIGroups: []string{""},
+						Resources: []string{"pods", "services"},
+					},
+				},
+			},
+			"admin": {
+				ResourceRules: []v1beta1.ResourceRule{
+					{
+						Verbs:     []string{"*"},
+						APIGroups: []string{"*"},
+						Resources: []string{"*"},
+					},
+				},
+			},
+		},
+		groupPerms: map[string]v1beta1.SubjectRulesReviewStatus{
+			"developers": {
+				ResourceRules: []v1beta1.ResourceRule{
+					{
+						Verbs:     []string{"update", "delete"},
+						APIGroups: []string{""},
+						Resources: []string{"nodes"},
+						Denies:    true,
+					},
+					{
+						Verbs:     []string{"update", "delete"},
+						APIGroups: []string{""},
+						Resources: []string{"pods", "services"},
+					},
+				},
+			},
+			"discovery": {
+				NonResourceRules: []v1beta1.NonResourceRule{
+					{
+						Verbs:           []string{"get"},
+						NonResourceURLs: []string{"/foo", "/foo/bar"},
+					},
+				},
+			},
+		},
+		extraPerms: map[string]map[string]v1beta1.SubjectRulesReviewStatus{
+			"project": {
+				"foo": {
+					ResourceRules: []v1beta1.ResourceRule{
+						{
+							Verbs:         []string{"get", "update"},
+							APIGroups:     []string{""},
+							Resources:     []string{"namespace"},
+							ResourceNames: []string{"foo"},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	server, err := NewTestServer(s, serverCert, serverKey, caCert)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer server.Close()
+
+	wh, err := newRulesReviewer(server.URL, clientCert, clientKey, caCert)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tests := []struct {
+		name string
+
+		namespace string
+		user      string
+		groups    []string
+		extra     map[string][]string
+
+		resourceRules    []authorizer.DefaultResourceRuleInfo
+		nonResourceRules []authorizer.DefaultNonResourceRuleInfo
+	}{
+		{
+			name:      "user",
+			namespace: s.namespace,
+			user:      "jane",
+
+			resourceRules: []authorizer.DefaultResourceRuleInfo{
+				{
+					Verbs:     []string{"get"},
+					APIGroups: []string{""},
+					Resources: []string{"pods", "services"},
+				},
+			},
+		},
+		{
+			name:      "user in different namespace",
+			namespace: "different-namespace",
+			user:      "jane",
+		},
+		{
+			name:      "user with groups",
+			namespace: s.namespace,
+			user:      "jane",
+			groups:    []string{"developers", "discovery"},
+			resourceRules: []authorizer.DefaultResourceRuleInfo{
+				{
+					Verbs:     []string{"get"},
+					APIGroups: []string{""},
+					Resources: []string{"pods", "services"},
+				},
+				// Order matters here. The deny rule should always be first.
+				{
+					Verbs:     []string{"update", "delete"},
+					APIGroups: []string{""},
+					Resources: []string{"nodes"},
+					Denies:    true,
+				},
+				{
+					Verbs:     []string{"update", "delete"},
+					APIGroups: []string{""},
+					Resources: []string{"pods", "services"},
+				},
+			},
+			nonResourceRules: []authorizer.DefaultNonResourceRuleInfo{
+				{
+					Verbs:           []string{"get"},
+					NonResourceURLs: []string{"/foo", "/foo/bar"},
+				},
+			},
+		},
+		{
+			name:      "admin",
+			namespace: s.namespace,
+			user:      "admin",
+			resourceRules: []authorizer.DefaultResourceRuleInfo{
+				{
+					Verbs:     []string{"*"},
+					APIGroups: []string{"*"},
+					Resources: []string{"*"},
+				},
+			},
+		},
+		{
+			name:      "user with extras",
+			namespace: s.namespace,
+			user:      "jane",
+			extra: map[string][]string{
+				"project": {"foo"},
+			},
+
+			resourceRules: []authorizer.DefaultResourceRuleInfo{
+				{
+					Verbs:     []string{"get"},
+					APIGroups: []string{""},
+					Resources: []string{"pods", "services"},
+				},
+				{
+					Verbs:         []string{"get", "update"},
+					APIGroups:     []string{""},
+					Resources:     []string{"namespace"},
+					ResourceNames: []string{"foo"},
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			u := &user.DefaultInfo{
+				Name:   test.user,
+				Groups: test.groups,
+				Extra:  test.extra,
+			}
+
+			resourceRules, nonResourceRules, incomplete, err := wh.RulesFor(u, test.namespace)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if incomplete {
+				t.Fatal("results incomplete")
+			}
+
+			if len(resourceRules) == 0 {
+				resourceRules = nil
+			}
+			if len(nonResourceRules) == 0 {
+				nonResourceRules = nil
+			}
+
+			assertEq(t, resourceRules, test.resourceRules)
+			assertEq(t, nonResourceRules, test.nonResourceRules)
+		})
+	}
+}
+
+func assertEq(t *testing.T, want, got interface{}) {
+	wantBytes, err := json.MarshalIndent(want, "", "  ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	gotBytes, err := json.MarshalIndent(got, "", "  ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Equal(wantBytes, gotBytes) {
+		return
+	}
+	t.Errorf("expected:\n%s\ngot:\n%s", wantBytes, gotBytes)
 }
 
 type webhookCacheTestCase struct {

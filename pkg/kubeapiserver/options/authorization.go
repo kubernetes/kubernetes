@@ -28,11 +28,12 @@ import (
 )
 
 type BuiltInAuthorizationOptions struct {
-	Mode                        string
-	PolicyFile                  string
-	WebhookConfigFile           string
-	WebhookCacheAuthorizedTTL   time.Duration
-	WebhookCacheUnauthorizedTTL time.Duration
+	Mode                         string
+	PolicyFile                   string
+	WebhookConfigFile            string
+	WebhookCacheAuthorizedTTL    time.Duration
+	WebhookCacheUnauthorizedTTL  time.Duration
+	WebhookRulesReviewConfigFile string
 }
 
 func NewBuiltInAuthorizationOptions() *BuiltInAuthorizationOptions {
@@ -68,6 +69,12 @@ func (s *BuiltInAuthorizationOptions) AddFlags(fs *pflag.FlagSet) {
 		"authorization-webhook-cache-unauthorized-ttl", s.WebhookCacheUnauthorizedTTL,
 		"The duration to cache 'unauthorized' responses from the webhook authorizer.")
 
+	fs.StringVar(&s.WebhookRulesReviewConfigFile, "authorization-webhook-rules-review-config-file",
+		s.WebhookRulesReviewConfigFile, ""+
+			"File with webhook configuration in kubeconfig format, used with --authorization-mode=Webhook. "+
+			"The API server will query the remote service to satisfy rules review queries, which return the "+
+			"set of actions a user can perform within a certain namespace. Optional.")
+
 	fs.String("authorization-rbac-super-user", "", ""+
 		"If specified, a username which avoids RBAC authorization checks and role binding "+
 		"privilege escalation checks, to be used with --authorization-mode=RBAC.")
@@ -85,11 +92,12 @@ func (s *BuiltInAuthorizationOptions) Modes() []string {
 
 func (s *BuiltInAuthorizationOptions) ToAuthorizationConfig(informerFactory informers.SharedInformerFactory) authorizer.AuthorizationConfig {
 	return authorizer.AuthorizationConfig{
-		AuthorizationModes:          s.Modes(),
-		PolicyFile:                  s.PolicyFile,
-		WebhookConfigFile:           s.WebhookConfigFile,
-		WebhookCacheAuthorizedTTL:   s.WebhookCacheAuthorizedTTL,
-		WebhookCacheUnauthorizedTTL: s.WebhookCacheUnauthorizedTTL,
-		InformerFactory:             informerFactory,
+		AuthorizationModes:           s.Modes(),
+		PolicyFile:                   s.PolicyFile,
+		WebhookConfigFile:            s.WebhookConfigFile,
+		WebhookCacheAuthorizedTTL:    s.WebhookCacheAuthorizedTTL,
+		WebhookCacheUnauthorizedTTL:  s.WebhookCacheUnauthorizedTTL,
+		WebhookRulesReviewConfigFile: s.WebhookRulesReviewConfigFile,
+		InformerFactory:              informerFactory,
 	}
 }

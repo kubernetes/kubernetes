@@ -51,6 +51,7 @@ var map_NonResourceRule = map[string]string{
 	"":                "NonResourceRule holds information that describes a rule for the non-resource",
 	"verbs":           "Verb is a list of kubernetes non-resource API verbs, like: get, post, put, delete, patch, head, options.  \"*\" means all.",
 	"nonResourceURLs": "NonResourceURLs is a set of partial urls that a user should have access to.  *s are allowed, but only as the full, final step in the path.  \"*\" means all.",
+	"denies":          "Denies indicates if a rule allows or denies requests that match the rule's resource and action.",
 }
 
 func (NonResourceRule) SwaggerDoc() map[string]string {
@@ -78,6 +79,7 @@ var map_ResourceRule = map[string]string{
 	"apiGroups":     "APIGroups is the name of the APIGroup that contains the resources.  If multiple API groups are specified, any action requested against one of the enumerated resources in any API group will be allowed.  \"*\" means all.",
 	"resources":     "Resources is a list of resources this rule applies to.  \"*\" means all in the specified apiGroups.\n \"*/foo\" represents the subresource 'foo' for all resources in the specified apiGroups.",
 	"resourceNames": "ResourceNames is an optional white list of names that the rule applies to.  An empty set means that everything is allowed.  \"*\" means all.",
+	"denies":        "Denies indicates if a rule allows or denies requests that match the rule's resource and action.",
 }
 
 func (ResourceRule) SwaggerDoc() map[string]string {
@@ -105,7 +107,7 @@ func (SelfSubjectAccessReviewSpec) SwaggerDoc() map[string]string {
 }
 
 var map_SelfSubjectRulesReview = map[string]string{
-	"":       "SelfSubjectRulesReview enumerates the set of actions the current user can perform within a namespace. The returned list of actions may be incomplete depending on the server's authorization mode, and any errors experienced during the evaluation. SelfSubjectRulesReview should be used by UIs to show/hide actions, or to quickly let an end user reason about their permissions. It should NOT Be used by external systems to drive authorization decisions as this raises confused deputy, cache lifetime/revocation, and correctness concerns. SubjectAccessReview, and LocalAccessReview are the correct way to defer authorization decisions to the API server.",
+	"":       "SelfSubjectRulesReview enumerates the set of actions the current user is allowed or explicitly disallowed from performing within a namespace. Rules review should be used by UIs to show/hide actions, or to quickly let an end user reason about their permissions.\n\nRules review APIs MUST NOT be used by external systems to drive authorization decisions as this raises confused deputy, cache lifetime/revocation, and correctness concerns. Additionally, the returned list may be incomplete depending on the server's authorization mode or errors encountered during evaluation",
 	"spec":   "Spec holds information about the request being evaluated.",
 	"status": "Status is filled in by the server and indicates the set of actions a user can perform.",
 }
@@ -136,7 +138,7 @@ var map_SubjectAccessReviewSpec = map[string]string{
 	"":                      "SubjectAccessReviewSpec is a description of the access request.  Exactly one of ResourceAuthorizationAttributes and NonResourceAuthorizationAttributes must be set",
 	"resourceAttributes":    "ResourceAuthorizationAttributes describes information for a resource access request",
 	"nonResourceAttributes": "NonResourceAttributes describes information for a non-resource access request",
-	"user":                  "User is the user you're testing for. If you specify \"User\" but not \"Group\", then is it interpreted as \"What if User were not a member of any groups",
+	"user":                  "User is the user you're testing for. If you specify \"User\" but not \"Group\", then is it interpreted as \"What if User were not a member of any groups\"",
 	"group":                 "Groups is the groups you're testing for.",
 	"extra":                 "Extra corresponds to the user.Info.GetExtra() method from the authenticator.  Since that is input to the authorizer it needs a reflection here.",
 	"uid":                   "UID information about the requesting user.",
@@ -158,10 +160,33 @@ func (SubjectAccessReviewStatus) SwaggerDoc() map[string]string {
 	return map_SubjectAccessReviewStatus
 }
 
+var map_SubjectRulesReview = map[string]string{
+	"":       "SubjectRulesReview is like SelfSubjectRulesReview, but can query any user, not just the current user.",
+	"spec":   "Spec holds information about the request being evaluated.",
+	"status": "Status is filled in by the server and indicates the set of actions a user can perform.",
+}
+
+func (SubjectRulesReview) SwaggerDoc() map[string]string {
+	return map_SubjectRulesReview
+}
+
+var map_SubjectRulesReviewSpec = map[string]string{
+	"":          "SubjectRulesRevieSpec is a description of the rules review request.",
+	"namespace": "Namespace to evaluate rules for. Required.",
+	"user":      "User is the user you're testing for. If you specify \"User\" but not \"Group\", then is it interpreted as \"What if User were not a member of any groups\"",
+	"groups":    "Groups is the groups you're testing for.",
+	"extra":     "Extra corresponds to the user.Info.GetExtra() method from the authenticator.  Since that is input to the authorizer it needs a reflection here.",
+	"uid":       "UID information about the requesting user.",
+}
+
+func (SubjectRulesReviewSpec) SwaggerDoc() map[string]string {
+	return map_SubjectRulesReviewSpec
+}
+
 var map_SubjectRulesReviewStatus = map[string]string{
-	"":                 "SubjectRulesReviewStatus contains the result of a rules check. This check can be incomplete depending on the set of authorizers the server is configured with and any errors experienced during evaluation. Because authorization rules are additive, if a rule appears in a list it's safe to assume the subject has that permission, even if that list is incomplete.",
-	"resourceRules":    "ResourceRules is the list of actions the subject is allowed to perform on resources. The list ordering isn't significant, may contain duplicates, and possibly be incomplete.",
-	"nonResourceRules": "NonResourceRules is the list of actions the subject is allowed to perform on non-resources. The list ordering isn't significant, may contain duplicates, and possibly be incomplete.",
+	"":                 "SubjectRulesReviewStatus contains the result of a rules check. This check can be incomplete depending on the set of authorizers the server is configured with and any errors experienced during evaluation.",
+	"resourceRules":    "ResourceRules is the list of actions the subject is allowed or disallowed to perform on resources.\n\nOrder matters when evaluating rules. The first rule that matches a request either allows or denies it. If no rule matches a request, the action is implicily denied.",
+	"nonResourceRules": "NonResourceRules is the list of actions the subject is allowed or disallowed to perform on non-resource URLs.\n\nOrder matters when evaluating rules. The first rule that matches a request either allows or denies it. If no rule matches a request, the action is implicily denied.",
 	"incomplete":       "Incomplete is true when the rules returned by this call are incomplete. This is most commonly encountered when an authorizer, such as an external authorizer, doesn't support rules evaluation.",
 	"evaluationError":  "EvaluationError can appear in combination with Rules. It indicates an error occurred during rule evaluation, such as an authorizer that doesn't support rule evaluation, and that ResourceRules and/or NonResourceRules may be incomplete.",
 }

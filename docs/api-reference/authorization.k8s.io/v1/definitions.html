@@ -1184,7 +1184,7 @@ When an object is created, the system will populate this list with the current s
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">user</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">User is the user you&#8217;re testing for. If you specify "User" but not "Groups", then is it interpreted as "What if User were not a member of any groups</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">User is the user you&#8217;re testing for. If you specify "User" but not "Groups", then is it interpreted as "What if User were not a member of any groups"</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -1217,7 +1217,7 @@ When an object is created, the system will populate this list with the current s
 <div class="sect2">
 <h3 id="_v1_subjectrulesreviewstatus">v1.SubjectRulesReviewStatus</h3>
 <div class="paragraph">
-<p>SubjectRulesReviewStatus contains the result of a rules check. This check can be incomplete depending on the set of authorizers the server is configured with and any errors experienced during evaluation. Because authorization rules are additive, if a rule appears in a list it&#8217;s safe to assume the subject has that permission, even if that list is incomplete.</p>
+<p>SubjectRulesReviewStatus contains the result of a rules check. This check can be incomplete depending on the set of authorizers the server is configured with and any errors experienced during evaluation.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -1239,14 +1239,18 @@ When an object is created, the system will populate this list with the current s
 <tbody>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">resourceRules</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">ResourceRules is the list of actions the subject is allowed to perform on resources. The list ordering isn&#8217;t significant, may contain duplicates, and possibly be incomplete.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">ResourceRules is the list of actions the subject is allowed or disallowed to perform on resources.<br>
+<br>
+Order matters when evaluating rules. The first rule that matches a request either allows or denies it. If no rule matches a request, the action is implicily denied.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_resourcerule">v1.ResourceRule</a> array</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">nonResourceRules</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">NonResourceRules is the list of actions the subject is allowed to perform on non-resources. The list ordering isn&#8217;t significant, may contain duplicates, and possibly be incomplete.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">NonResourceRules is the list of actions the subject is allowed or disallowed to perform on non-resource URLs.<br>
+<br>
+Order matters when evaluating rules. The first rule that matches a request either allows or denies it. If no rule matches a request, the action is implicily denied.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_nonresourcerule">v1.NonResourceRule</a> array</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -1452,6 +1456,13 @@ When an object is created, the system will populate this list with the current s
 <td class="tableblock halign-left valign-top"><p class="tableblock">string array</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">denies</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Denies indicates if a rule allows or denies requests that match the rule&#8217;s resource and action.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">boolean</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+</tr>
 </tbody>
 </table>
 
@@ -1607,6 +1618,13 @@ Examples:<br>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string array</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">denies</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Denies indicates if a rule allows or denies requests that match the rule&#8217;s resource and action.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">boolean</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+</tr>
 </tbody>
 </table>
 
@@ -1738,7 +1756,10 @@ Examples:<br>
 <div class="sect2">
 <h3 id="_v1_selfsubjectrulesreview">v1.SelfSubjectRulesReview</h3>
 <div class="paragraph">
-<p>SelfSubjectRulesReview enumerates the set of actions the current user can perform within a namespace. The returned list of actions may be incomplete depending on the server&#8217;s authorization mode, and any errors experienced during the evaluation. SelfSubjectRulesReview should be used by UIs to show/hide actions, or to quickly let an end user reason about their permissions. It should NOT Be used by external systems to drive authorization decisions as this raises confused deputy, cache lifetime/revocation, and correctness concerns. SubjectAccessReview, and LocalAccessReview are the correct way to defer authorization decisions to the API server.</p>
+<p>SelfSubjectRulesReview enumerates the set of actions the current user is allowed or explicitly disallowed from performing within a namespace. Rules review should be used by UIs to show/hide actions, or to quickly let an end user reason about their permissions.</p>
+</div>
+<div class="paragraph">
+<p>Rules review APIs MUST NOT be used by external systems to drive authorization decisions as this raises confused deputy, cache lifetime/revocation, and correctness concerns. Additionally, the returned list may be incomplete depending on the server&#8217;s authorization mode or errors encountered during evaluation</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>

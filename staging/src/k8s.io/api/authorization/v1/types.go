@@ -132,7 +132,7 @@ type SubjectAccessReviewSpec struct {
 	NonResourceAttributes *NonResourceAttributes `json:"nonResourceAttributes,omitempty" protobuf:"bytes,2,opt,name=nonResourceAttributes"`
 
 	// User is the user you're testing for.
-	// If you specify "User" but not "Groups", then is it interpreted as "What if User were not a member of any groups
+	// If you specify "User" but not "Groups", then is it interpreted as "What if User were not a member of any groups"
 	// +optional
 	User string `json:"user,omitempty" protobuf:"bytes,3,opt,name=user"`
 	// Groups is the groups you're testing for.
@@ -192,12 +192,13 @@ type SubjectAccessReviewStatus struct {
 // +genclient:noVerbs
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// SelfSubjectRulesReview enumerates the set of actions the current user can perform within a namespace.
-// The returned list of actions may be incomplete depending on the server's authorization mode,
-// and any errors experienced during the evaluation. SelfSubjectRulesReview should be used by UIs to show/hide actions,
-// or to quickly let an end user reason about their permissions. It should NOT Be used by external systems to
-// drive authorization decisions as this raises confused deputy, cache lifetime/revocation, and correctness concerns.
-// SubjectAccessReview, and LocalAccessReview are the correct way to defer authorization decisions to the API server.
+// SelfSubjectRulesReview enumerates the set of actions the current user is allowed or explicitly disallowed
+// from performing within a namespace. Rules review should be used by UIs to show/hide actions, or to quickly
+// let an end user reason about their permissions.
+//
+// Rules review APIs MUST NOT be used by external systems to drive authorization decisions as this raises
+// confused deputy, cache lifetime/revocation, and correctness concerns. Additionally, the returned list
+// may be incomplete depending on the server's authorization mode or errors encountered during evaluation
 type SelfSubjectRulesReview struct {
 	metav1.TypeMeta `json:",inline"`
 	// +optional
@@ -216,16 +217,50 @@ type SelfSubjectRulesReviewSpec struct {
 	Namespace string `json:"namespace,omitempty" protobuf:"bytes,1,opt,name=namespace"`
 }
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// SubjectRulesReview is like SelfSubjectRulesReview, but can query any user, not just the current user.
+type SubjectRulesReview struct {
+	metav1.TypeMeta `json:",inline"`
+	// +optional
+	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+
+	// Spec holds information about the request being evaluated.
+	Spec SubjectRulesReviewSpec `json:"spec" protobuf:"bytes,2,opt,name=spec"`
+
+	// Status is filled in by the server and indicates the set of actions a user can perform.
+	Status SubjectRulesReviewStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
+}
+
+// SubjectRulesRevieSpec is a description of the rules review request.
+type SubjectRulesReviewSpec struct {
+	// Namespace to evaluate rules for. Required.
+	Namespace string `json:"namespace" protobuf:"bytes,1,opt,name=namespace"`
+
+	// User is the user you're testing for.
+	// If you specify "User" but not "Group", then is it interpreted as "What if User were not a member of any groups"
+	User string `json:"user" protobuf:"bytes,2,opt,name=user"`
+	// Groups is the groups you're testing for.
+	Groups []string `json:"groups" protobuf:"bytes,3,rep,name=groups"`
+	// Extra corresponds to the user.Info.GetExtra() method from the authenticator.  Since that is input to the authorizer
+	// it needs a reflection here.
+	Extra map[string]ExtraValue `json:"extra" protobuf:"bytes,4,rep,name=extra"`
+	// UID information about the requesting user.
+	UID string `json:"uid" protobuf:"bytes,5,opt,name=uid"`
+}
+
 // SubjectRulesReviewStatus contains the result of a rules check. This check can be incomplete depending on
 // the set of authorizers the server is configured with and any errors experienced during evaluation.
-// Because authorization rules are additive, if a rule appears in a list it's safe to assume the subject has that permission,
-// even if that list is incomplete.
 type SubjectRulesReviewStatus struct {
-	// ResourceRules is the list of actions the subject is allowed to perform on resources.
-	// The list ordering isn't significant, may contain duplicates, and possibly be incomplete.
+	// ResourceRules is the list of actions the subject is allowed or disallowed to perform on resources.
+	//
+	// Order matters when evaluating rules. The first rule that matches a request either allows or denies it.
+	// If no rule matches a request, the action is implicily denied.
 	ResourceRules []ResourceRule `json:"resourceRules" protobuf:"bytes,1,rep,name=resourceRules"`
-	// NonResourceRules is the list of actions the subject is allowed to perform on non-resources.
-	// The list ordering isn't significant, may contain duplicates, and possibly be incomplete.
+	// NonResourceRules is the list of actions the subject is allowed or disallowed to perform on non-resource URLs.
+	//
+	// Order matters when evaluating rules. The first rule that matches a request either allows or denies it.
+	// If no rule matches a request, the action is implicily denied.
 	NonResourceRules []NonResourceRule `json:"nonResourceRules" protobuf:"bytes,2,rep,name=nonResourceRules"`
 	// Incomplete is true when the rules returned by this call are incomplete. This is most commonly
 	// encountered when an authorizer, such as an external authorizer, doesn't support rules evaluation.
@@ -254,6 +289,9 @@ type ResourceRule struct {
 	// ResourceNames is an optional white list of names that the rule applies to.  An empty set means that everything is allowed.  "*" means all.
 	// +optional
 	ResourceNames []string `json:"resourceNames,omitempty" protobuf:"bytes,4,rep,name=resourceNames"`
+
+	// Denies indicates if a rule allows or denies requests that match the rule's resource and action.
+	Denies bool `json:"denies,omitempty" protobuf:"varint,5,rep,name=denies"`
 }
 
 // NonResourceRule holds information that describes a rule for the non-resource
@@ -265,4 +303,7 @@ type NonResourceRule struct {
 	// final step in the path.  "*" means all.
 	// +optional
 	NonResourceURLs []string `json:"nonResourceURLs,omitempty" protobuf:"bytes,2,rep,name=nonResourceURLs"`
+
+	// Denies indicates if a rule allows or denies requests that match the rule's resource and action.
+	Denies bool `json:"denies,omitempty" protobuf:"varint,3,rep,name=denies"`
 }
