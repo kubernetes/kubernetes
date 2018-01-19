@@ -83,9 +83,7 @@ function set-allow-subnet-cidr-routes-overlap() {
     --format='value(fingerprint)')
   local access_token=$(gcloud auth print-access-token)
   local request="{\"allowSubnetCidrRoutesOverlap\":$1, \"fingerprint\":\"${fingerprint}\"}"
-  local subnetwork_url=$(gcloud beta compute networks subnets describe \
-    ${IP_ALIAS_SUBNETWORK} --project=${PROJECT} --region=${REGION} \
-    --format='value(selfLink)')
+  local subnetwork_url="${GCE_API_ENDPOINT}projects/${PROJECT}/regions/${REGION}/subnetworks/${IP_ALIAS_SUBNETWORK}"
   until curl -s --header "Content-Type: application/json" --header "Authorization: Bearer ${access_token}" \
     -X PATCH -d "${request}" "${subnetwork_url}" --output /dev/null; do
     printf "."
@@ -163,8 +161,8 @@ export KUBE_GCE_ENABLE_IP_ALIASES=true
 export SECONDARY_RANGE_NAME="pods-default"
 export STORAGE_BACKEND="etcd3"
 export STORAGE_MEDIA_TYPE="application/vnd.kubernetes.protobuf"
-export ETCD_IMAGE=3.0.17
-export ETCD_VERSION=3.0.17
+export ETCD_IMAGE=3.1.10
+export ETCD_VERSION=3.1.10
 
 # Upgrade master with updated kube envs
 ${KUBE_ROOT}/cluster/gce/upgrade.sh -M -l
