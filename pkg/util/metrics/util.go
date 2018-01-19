@@ -21,7 +21,6 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/flowcontrol"
 
 	"github.com/golang/glog"
@@ -71,11 +70,13 @@ func RegisterMetricAndTrackRateLimiterUsage(ownerName string, rateLimiter flowco
 	if err := registerRateLimiterMetric(ownerName); err != nil {
 		return err
 	}
-	go wait.Until(func() {
-		metricsLock.Lock()
-		defer metricsLock.Unlock()
-		rateLimiterMetrics[ownerName].metric.Set(rateLimiter.Saturation())
-	}, updatePeriod, rateLimiterMetrics[ownerName].stopCh)
+	// TODO: determine how to track rate limiter saturation
+	// See discussion at https://go-review.googlesource.com/c/time/+/29958#message-4caffc11669cadd90e2da4c05122cfec50ea6a22
+	// go wait.Until(func() {
+	//   metricsLock.Lock()
+	//   defer metricsLock.Unlock()
+	//   rateLimiterMetrics[ownerName].metric.Set()
+	// }, updatePeriod, rateLimiterMetrics[ownerName].stopCh)
 	return nil
 }
 
