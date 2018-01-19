@@ -37,7 +37,7 @@ import (
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
-	v1node "k8s.io/kubernetes/pkg/api/v1/node"
+	v1node "k8s.io/kubernetes/pkg/apis/core/v1/helper/node"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/util/metrics"

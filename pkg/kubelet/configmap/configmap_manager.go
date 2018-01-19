@@ -25,7 +25,7 @@ import (
 	"k8s.io/api/core/v1"
 	storageetcd "k8s.io/apiserver/pkg/storage/etcd"
 	clientset "k8s.io/client-go/kubernetes"
-	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	podutil "k8s.io/kubernetes/pkg/apis/core/v1/helper/pod"
 	"k8s.io/kubernetes/pkg/kubelet/util"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"

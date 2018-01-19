@@ -46,7 +46,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
-	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	podutil "k8s.io/kubernetes/pkg/apis/core/v1/helper/pod"
 	"k8s.io/kubernetes/pkg/controller"
 
 	"github.com/golang/glog"

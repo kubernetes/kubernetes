@@ -18,9 +18,7 @@ package pod
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 // Visitor is called with each object name, and returns true if visiting should continue
@@ -226,53 +224,4 @@ func UpdatePodCondition(status *api.PodStatus, condition *api.PodCondition) bool
 	status.Conditions[conditionIndex] = *condition
 	// Return true if one of the fields have changed.
 	return !isEqual
-}
-
-// DropDisabledAlphaFields removes disabled fields from the pod spec.
-// This should be called from PrepareForCreate/PrepareForUpdate for all resources containing a pod spec.
-func DropDisabledAlphaFields(podSpec *api.PodSpec) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.PodPriority) {
-		podSpec.Priority = nil
-		podSpec.PriorityClassName = ""
-	}
-
-	if !utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) {
-		for i := range podSpec.Volumes {
-			if podSpec.Volumes[i].EmptyDir != nil {
-				podSpec.Volumes[i].EmptyDir.SizeLimit = nil
-			}
-		}
-	}
-
-	for i := range podSpec.Containers {
-		DropDisabledVolumeMountsAlphaFields(podSpec.Containers[i].VolumeMounts)
-	}
-	for i := range podSpec.InitContainers {
-		DropDisabledVolumeMountsAlphaFields(podSpec.InitContainers[i].VolumeMounts)
-	}
-
-	DropDisabledVolumeDevicesAlphaFields(podSpec)
-}
-
-// DropDisabledVolumeMountsAlphaFields removes disabled fields from []VolumeMount.
-// This should be called from PrepareForCreate/PrepareForUpdate for all resources containing a VolumeMount
-func DropDisabledVolumeMountsAlphaFields(volumeMounts []api.VolumeMount) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.MountPropagation) {
-		for i := range volumeMounts {
-			volumeMounts[i].MountPropagation = nil
-		}
-	}
-}
-
-// DropDisabledVolumeDevicesAlphaFields removes disabled fields from []VolumeDevice.
-// This should be called from PrepareForCreate/PrepareForUpdate for all resources containing a VolumeDevice
-func DropDisabledVolumeDevicesAlphaFields(podSpec *api.PodSpec) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) {
-		for i := range podSpec.Containers {
-			podSpec.Containers[i].VolumeDevices = nil
-		}
-		for i := range podSpec.InitContainers {
-			podSpec.InitContainers[i].VolumeDevices = nil
-		}
-	}
 }

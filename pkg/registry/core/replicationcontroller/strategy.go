@@ -34,10 +34,10 @@ import (
 	apistorage "k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/api/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
+	kubefeatures "k8s.io/kubernetes/pkg/features"
 )
 
 // rcStrategy implements verification logic for Replication Controllers.
@@ -68,7 +68,7 @@ func (rcStrategy) PrepareForCreate(ctx genericapirequest.Context, obj runtime.Ob
 	controller.Generation = 1
 
 	if controller.Spec.Template != nil {
-		pod.DropDisabledAlphaFields(&controller.Spec.Template.Spec)
+		kubefeatures.DropDisabledPodSpecAlphaFields(&controller.Spec.Template.Spec)
 	}
 }
 
@@ -80,10 +80,10 @@ func (rcStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runti
 	newController.Status = oldController.Status
 
 	if oldController.Spec.Template != nil {
-		pod.DropDisabledAlphaFields(&oldController.Spec.Template.Spec)
+		kubefeatures.DropDisabledPodSpecAlphaFields(&oldController.Spec.Template.Spec)
 	}
 	if newController.Spec.Template != nil {
-		pod.DropDisabledAlphaFields(&newController.Spec.Template.Spec)
+		kubefeatures.DropDisabledPodSpecAlphaFields(&newController.Spec.Template.Spec)
 	}
 
 	// Any changes to the spec increment the generation number, any changes to the

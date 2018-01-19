@@ -9,23 +9,29 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["util.go"],
-    importpath = "k8s.io/kubernetes/pkg/api/endpoints",
+    importpath = "k8s.io/kubernetes/pkg/apis/core/helper/service",
     deps = [
         "//pkg/apis/core:go_default_library",
-        "//pkg/util/hash:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
+        "//pkg/util/net/sets:go_default_library",
     ],
 )
 
 go_test(
     name = "go_default_test",
     srcs = ["util_test.go"],
+<<<<<<< HEAD:pkg/api/service/BUILD
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/api/endpoints",
+    importpath = "k8s.io/kubernetes/pkg/api/service",
+||||||| merged common ancestors
+    importpath = "k8s.io/kubernetes/pkg/api/service",
+    library = ":go_default_library",
+=======
+    importpath = "k8s.io/kubernetes/pkg/apis/core/helper/service",
+    library = ":go_default_library",
+>>>>>>> pkg/api/core: move pkg/api/service:pkg/apis/core/helper/service/BUILD
     deps = [
         "//pkg/apis/core:go_default_library",
-        "//vendor/github.com/davecgh/go-spew/spew:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
+        "//pkg/util/net/sets:go_default_library",
     ],
 )
 

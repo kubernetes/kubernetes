@@ -26,7 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
-	apiservice "k8s.io/kubernetes/pkg/api/v1/service"
+	apiservice "k8s.io/kubernetes/pkg/apis/core/v1/helper/service"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	netsets "k8s.io/kubernetes/pkg/util/net/sets"
 

@@ -6,24 +6,12 @@ load(
     "go_test",
 )
 
-go_test(
-    name = "go_default_test",
-    srcs = ["helpers_test.go"],
-    embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/api/v1/resource",
-    deps = [
-        "//vendor/github.com/stretchr/testify/assert:go_default_library",
-        "//vendor/k8s.io/api/core/v1:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
-    ],
-)
-
 go_library(
     name = "go_default_library",
     srcs = ["helpers.go"],
-    importpath = "k8s.io/kubernetes/pkg/api/v1/resource",
+    importpath = "k8s.io/kubernetes/pkg/apis/core/helper/resource",
     deps = [
-        "//vendor/k8s.io/api/core/v1:go_default_library",
+        "//pkg/apis/core:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
     ],
 )
@@ -39,4 +27,15 @@ filegroup(
     name = "all-srcs",
     srcs = [":package-srcs"],
     tags = ["automanaged"],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = ["helpers_test.go"],
+    embed = [":go_default_library"],
+    importpath = "k8s.io/kubernetes/pkg/apis/core/helper/resource",
+    deps = [
+        "//pkg/apis/core:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
+    ],
 )
