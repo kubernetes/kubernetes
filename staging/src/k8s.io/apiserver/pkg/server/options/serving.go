@@ -256,6 +256,7 @@ func (s *SecureServingOptions) applyServingInfoTo(c *server.Config) error {
 		secureServingInfo.CipherSuites = cipherSuites
 	}
 
+	var err error
 	secureServingInfo.MinTLSVersion, err = utilflag.TLSVersion(s.MinTLSVersion)
 	if err != nil {
 		return err
@@ -273,7 +274,6 @@ func (s *SecureServingOptions) applyServingInfoTo(c *server.Config) error {
 			return fmt.Errorf("failed to load SNI cert and key: %v", err)
 		}
 	}
-	var err error
 	secureServingInfo.SNICerts, err = server.GetNamedCertificateMap(namedTLSCerts)
 	if err != nil {
 		return err
