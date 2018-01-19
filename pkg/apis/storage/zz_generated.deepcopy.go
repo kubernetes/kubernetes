@@ -21,6 +21,7 @@ limitations under the License.
 package storage
 
 import (
+	v1 "k8s.io/api/core/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	core "k8s.io/kubernetes/pkg/apis/core"
 )
@@ -60,14 +61,9 @@ func (in *StorageClass) DeepCopyInto(out *StorageClass) {
 			**out = **in
 		}
 	}
-	if in.CredentialIDs != nil {
-		in, out := &in.CredentialIDs, &out.CredentialIDs
-		*out = make([]string, len(*in))
-		copy(*out, *in)
-	}
 	if in.SecretRefs != nil {
 		in, out := &in.SecretRefs, &out.SecretRefs
-		*out = make(map[string]string, len(*in))
+		*out = make(map[string]v1.SecretReference, len(*in))
 		for key, val := range *in {
 			(*out)[key] = val
 		}

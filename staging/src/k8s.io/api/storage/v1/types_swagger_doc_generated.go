@@ -36,7 +36,6 @@ var map_StorageClass = map[string]string{
 	"mountOptions":         "Dynamically provisioned PersistentVolumes of this storage class are created with these mountOptions, e.g. [\"ro\", \"soft\"]. Not validated - mount of the PVs will simply fail if one is invalid.",
 	"allowVolumeExpansion": "AllowVolumeExpansion shows whether the storage class allow volume expand",
 	"volumeBindingMode":    "VolumeBindingMode indicates how PersistentVolumeClaims should be provisioned and bound.  When unset, VolumeBindingImmediate is used. This field is alpha-level and is only honored by servers that enable the VolumeScheduling feature.",
-	"credentialIDs":        "CredentialID is the string slice of IDs to use for authentication and authorization against the storage backend. The value of CredentialID is used as a key SecretRefs map to select the corresponding Secret.",
 	"secretRefs":           "Secrets for authentication and authorization against a storage backend, which is described by the StorageClass object. CredentialID is the key, to select corresponding SecretRef",
 }
 

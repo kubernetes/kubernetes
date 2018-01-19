@@ -54,8 +54,7 @@ func autoConvert_v1beta1_StorageClass_To_storage_StorageClass(in *v1beta1.Storag
 	out.MountOptions = *(*[]string)(unsafe.Pointer(&in.MountOptions))
 	out.AllowVolumeExpansion = (*bool)(unsafe.Pointer(in.AllowVolumeExpansion))
 	out.VolumeBindingMode = (*storage.VolumeBindingMode)(unsafe.Pointer(in.VolumeBindingMode))
-	out.CredentialIDs = *(*[]string)(unsafe.Pointer(&in.CredentialIDs))
-	out.SecretRefs = *(*map[string]string)(unsafe.Pointer(&in.SecretRefs))
+	out.SecretRefs = *(*map[string]v1.SecretReference)(unsafe.Pointer(&in.SecretRefs))
 	return nil
 }
 
@@ -71,8 +70,7 @@ func autoConvert_storage_StorageClass_To_v1beta1_StorageClass(in *storage.Storag
 	out.ReclaimPolicy = (*v1.PersistentVolumeReclaimPolicy)(unsafe.Pointer(in.ReclaimPolicy))
 	out.MountOptions = *(*[]string)(unsafe.Pointer(&in.MountOptions))
 	out.AllowVolumeExpansion = (*bool)(unsafe.Pointer(in.AllowVolumeExpansion))
-	out.CredentialIDs = *(*[]string)(unsafe.Pointer(&in.CredentialIDs))
-	out.SecretRefs = *(*map[string]string)(unsafe.Pointer(&in.SecretRefs))
+	out.SecretRefs = *(*map[string]v1.SecretReference)(unsafe.Pointer(&in.SecretRefs))
 	out.VolumeBindingMode = (*v1beta1.VolumeBindingMode)(unsafe.Pointer(in.VolumeBindingMode))
 	return nil
 }
