@@ -81,7 +81,7 @@ func (n nodeAuthorizerAttributesGetter) GetRequestAttributes(u user.Info, r *htt
 	requestPath := r.URL.Path
 
 	// Default attributes mirror the API attributes that would allow this access to the kubelet API
-	attrs := authorizer.AttributesRecord{
+	attrs := &authorizer.AttributesRecord{
 		User:            u,
 		Verb:            apiVerb,
 		Namespace:       "",

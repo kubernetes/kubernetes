@@ -54,7 +54,7 @@ func BindingAuthorized(ctx genericapirequest.Context, roleRef rbac.RoleRef, bind
 		return false
 	}
 
-	attrs := authorizer.AttributesRecord{
+	attrs := &authorizer.AttributesRecord{
 		User: user,
 		Verb: "bind",
 		// check against the namespace where the binding is being created (or the empty namespace for clusterrolebindings).

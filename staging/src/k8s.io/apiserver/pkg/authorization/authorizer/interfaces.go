@@ -101,47 +101,47 @@ type AttributesRecord struct {
 	Path            string
 }
 
-func (a AttributesRecord) GetUser() user.Info {
+func (a *AttributesRecord) GetUser() user.Info {
 	return a.User
 }
 
-func (a AttributesRecord) GetVerb() string {
+func (a *AttributesRecord) GetVerb() string {
 	return a.Verb
 }
 
-func (a AttributesRecord) IsReadOnly() bool {
+func (a *AttributesRecord) IsReadOnly() bool {
 	return a.Verb == "get" || a.Verb == "list" || a.Verb == "watch"
 }
 
-func (a AttributesRecord) GetNamespace() string {
+func (a *AttributesRecord) GetNamespace() string {
 	return a.Namespace
 }
 
-func (a AttributesRecord) GetResource() string {
+func (a *AttributesRecord) GetResource() string {
 	return a.Resource
 }
 
-func (a AttributesRecord) GetSubresource() string {
+func (a *AttributesRecord) GetSubresource() string {
 	return a.Subresource
 }
 
-func (a AttributesRecord) GetName() string {
+func (a *AttributesRecord) GetName() string {
 	return a.Name
 }
 
-func (a AttributesRecord) GetAPIGroup() string {
+func (a *AttributesRecord) GetAPIGroup() string {
 	return a.APIGroup
 }
 
-func (a AttributesRecord) GetAPIVersion() string {
+func (a *AttributesRecord) GetAPIVersion() string {
 	return a.APIVersion
 }
 
-func (a AttributesRecord) IsResourceRequest() bool {
+func (a *AttributesRecord) IsResourceRequest() bool {
 	return a.ResourceRequest
 }
 
-func (a AttributesRecord) GetPath() string {
+func (a *AttributesRecord) GetPath() string {
 	return a.Path
 }
 

@@ -260,7 +260,7 @@ func (i *initializer) Admit(a admission.Attributes) (err error) {
 
 func (i *initializer) canInitialize(a admission.Attributes, message string) error {
 	// caller must have the ability to mutate un-initialized resources
-	decision, reason, err := i.authorizer.Authorize(authorizer.AttributesRecord{
+	decision, reason, err := i.authorizer.Authorize(&authorizer.AttributesRecord{
 		Name:            a.GetName(),
 		ResourceRequest: true,
 		User:            a.GetUserInfo(),

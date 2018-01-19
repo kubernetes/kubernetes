@@ -54,7 +54,7 @@ func (r *REST) Create(ctx genericapirequest.Context, obj runtime.Object, createV
 		return nil, apierrors.NewBadRequest("no user present on request")
 	}
 
-	var authorizationAttributes authorizer.AttributesRecord
+	var authorizationAttributes *authorizer.AttributesRecord
 	if selfSAR.Spec.ResourceAttributes != nil {
 		authorizationAttributes = authorizationutil.ResourceAttributesFrom(userToCheck, *selfSAR.Spec.ResourceAttributes)
 	} else {

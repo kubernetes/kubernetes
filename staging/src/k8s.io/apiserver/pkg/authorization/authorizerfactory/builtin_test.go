@@ -40,8 +40,8 @@ func TestNewAlwaysDenyAuthorizer(t *testing.T) {
 func TestPrivilegedGroupAuthorizer(t *testing.T) {
 	auth := NewPrivilegedGroups("allow-01", "allow-01")
 
-	yes := authorizer.AttributesRecord{User: &user.DefaultInfo{Groups: []string{"no", "allow-01"}}}
-	no := authorizer.AttributesRecord{User: &user.DefaultInfo{Groups: []string{"no", "deny-01"}}}
+	yes := &authorizer.AttributesRecord{User: &user.DefaultInfo{Groups: []string{"no", "allow-01"}}}
+	no := &authorizer.AttributesRecord{User: &user.DefaultInfo{Groups: []string{"no", "deny-01"}}}
 
 	if authorized, _, _ := auth.Authorize(yes); authorized != authorizer.DecisionAllow {
 		t.Errorf("failed")

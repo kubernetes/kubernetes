@@ -92,7 +92,7 @@ func (a *gcPermissionsEnforcement) Validate(attributes admission.Attributes) (er
 		return nil
 	}
 
-	deleteAttributes := authorizer.AttributesRecord{
+	deleteAttributes := &authorizer.AttributesRecord{
 		User:            attributes.GetUserInfo(),
 		Verb:            "delete",
 		Namespace:       attributes.GetNamespace(),
@@ -167,8 +167,8 @@ func isChangingOwnerReference(newObj, oldObj runtime.Object) bool {
 // Translates ref to a DeleteAttribute deleting the object referred by the ref.
 // OwnerReference only records the object kind, which might map to multiple
 // resources, so multiple DeleteAttribute might be returned.
-func (a *gcPermissionsEnforcement) ownerRefToDeleteAttributeRecords(ref metav1.OwnerReference, attributes admission.Attributes) ([]authorizer.AttributesRecord, error) {
-	var ret []authorizer.AttributesRecord
+func (a *gcPermissionsEnforcement) ownerRefToDeleteAttributeRecords(ref metav1.OwnerReference, attributes admission.Attributes) ([]*authorizer.AttributesRecord, error) {
+	var ret []*authorizer.AttributesRecord
 	groupVersion, err := schema.ParseGroupVersion(ref.APIVersion)
 	if err != nil {
 		return ret, err
@@ -178,7 +178,7 @@ func (a *gcPermissionsEnforcement) ownerRefToDeleteAttributeRecords(ref metav1.O
 		return ret, err
 	}
 	for _, mapping := range mappings {
-		ret = append(ret, authorizer.AttributesRecord{
+		ret = append(ret, &authorizer.AttributesRecord{
 			User: attributes.GetUserInfo(),
 			Verb: "update",
 			// ownerReference can only refer to an object in the same namespace, so attributes.GetNamespace() equals to the owner's namespace

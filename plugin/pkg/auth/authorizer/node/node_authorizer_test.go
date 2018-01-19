@@ -56,63 +56,63 @@ func TestAuthorizer(t *testing.T) {
 
 	tests := []struct {
 		name   string
-		attrs  authorizer.AttributesRecord
+		attrs  *authorizer.AttributesRecord
 		expect authorizer.Decision
 	}{
 		{
 			name:   "allowed configmap",
-			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "configmaps", Name: "configmap0-pod0-node0", Namespace: "ns0"},
+			attrs:  &authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "configmaps", Name: "configmap0-pod0-node0", Namespace: "ns0"},
 			expect: authorizer.DecisionAllow,
 		},
 		{
 			name:   "allowed secret via pod",
-			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "secrets", Name: "secret0-pod0-node0", Namespace: "ns0"},
+			attrs:  &authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "secrets", Name: "secret0-pod0-node0", Namespace: "ns0"},
 			expect: authorizer.DecisionAllow,
 		},
 		{
 			name:   "allowed shared secret via pod",
-			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "secrets", Name: "secret0-shared", Namespace: "ns0"},
+			attrs:  &authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "secrets", Name: "secret0-shared", Namespace: "ns0"},
 			expect: authorizer.DecisionAllow,
 		},
 		{
 			name:   "allowed shared secret via pvc",
-			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "secrets", Name: "secret-pv0-pod0-node0-ns0", Namespace: "ns0"},
+			attrs:  &authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "secrets", Name: "secret-pv0-pod0-node0-ns0", Namespace: "ns0"},
 			expect: authorizer.DecisionAllow,
 		},
 		{
 			name:   "allowed pvc",
-			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "persistentvolumeclaims", Name: "pvc0-pod0-node0", Namespace: "ns0"},
+			attrs:  &authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "persistentvolumeclaims", Name: "pvc0-pod0-node0", Namespace: "ns0"},
 			expect: authorizer.DecisionAllow,
 		},
 		{
 			name:   "allowed pv",
-			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "persistentvolumes", Name: "pv0-pod0-node0-ns0", Namespace: ""},
+			attrs:  &authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "persistentvolumes", Name: "pv0-pod0-node0-ns0", Namespace: ""},
 			expect: authorizer.DecisionAllow,
 		},
 
 		{
 			name:   "disallowed configmap",
-			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "configmaps", Name: "configmap0-pod0-node1", Namespace: "ns0"},
+			attrs:  &authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "configmaps", Name: "configmap0-pod0-node1", Namespace: "ns0"},
 			expect: authorizer.DecisionNoOpinion,
 		},
 		{
 			name:   "disallowed secret via pod",
-			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "secrets", Name: "secret0-pod0-node1", Namespace: "ns0"},
+			attrs:  &authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "secrets", Name: "secret0-pod0-node1", Namespace: "ns0"},
 			expect: authorizer.DecisionNoOpinion,
 		},
 		{
 			name:   "disallowed shared secret via pvc",
-			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "secrets", Name: "secret-pv0-pod0-node1-ns0", Namespace: "ns0"},
+			attrs:  &authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "secrets", Name: "secret-pv0-pod0-node1-ns0", Namespace: "ns0"},
 			expect: authorizer.DecisionNoOpinion,
 		},
 		{
 			name:   "disallowed pvc",
-			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "persistentvolumeclaims", Name: "pvc0-pod0-node1", Namespace: "ns0"},
+			attrs:  &authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "persistentvolumeclaims", Name: "pvc0-pod0-node1", Namespace: "ns0"},
 			expect: authorizer.DecisionNoOpinion,
 		},
 		{
 			name:   "disallowed pv",
-			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "persistentvolumes", Name: "pv0-pod0-node1-ns0", Namespace: ""},
+			attrs:  &authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "persistentvolumes", Name: "pv0-pod0-node1-ns0", Namespace: ""},
 			expect: authorizer.DecisionNoOpinion,
 		},
 	}
@@ -186,7 +186,7 @@ func TestAuthorizerSharedResources(t *testing.T) {
 	}
 
 	for i, tc := range testcases {
-		decision, _, err := authz.Authorize(authorizer.AttributesRecord{User: tc.User, ResourceRequest: true, Verb: "get", Resource: "secrets", Namespace: "ns1", Name: tc.Secret})
+		decision, _, err := authz.Authorize(&authorizer.AttributesRecord{User: tc.User, ResourceRequest: true, Verb: "get", Resource: "secrets", Namespace: "ns1", Name: tc.Secret})
 		if err != nil {
 			t.Errorf("%d: unexpected error: %v", i, err)
 			continue
@@ -300,47 +300,47 @@ func BenchmarkAuthorization(b *testing.B) {
 
 	tests := []struct {
 		name   string
-		attrs  authorizer.AttributesRecord
+		attrs  *authorizer.AttributesRecord
 		expect authorizer.Decision
 	}{
 		{
 			name:   "allowed configmap",
-			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "configmaps", Name: "configmap0-pod0-node0", Namespace: "ns0"},
+			attrs:  &authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "configmaps", Name: "configmap0-pod0-node0", Namespace: "ns0"},
 			expect: authorizer.DecisionAllow,
 		},
 		{
 			name:   "allowed secret via pod",
-			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "secrets", Name: "secret0-pod0-node0", Namespace: "ns0"},
+			attrs:  &authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "secrets", Name: "secret0-pod0-node0", Namespace: "ns0"},
 			expect: authorizer.DecisionAllow,
 		},
 		{
 			name:   "allowed shared secret via pod",
-			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "secrets", Name: "secret0-shared", Namespace: "ns0"},
+			attrs:  &authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "secrets", Name: "secret0-shared", Namespace: "ns0"},
 			expect: authorizer.DecisionAllow,
 		},
 		{
 			name:   "disallowed configmap",
-			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "configmaps", Name: "configmap0-pod0-node1", Namespace: "ns0"},
+			attrs:  &authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "configmaps", Name: "configmap0-pod0-node1", Namespace: "ns0"},
 			expect: authorizer.DecisionNoOpinion,
 		},
 		{
 			name:   "disallowed secret via pod",
-			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "secrets", Name: "secret0-pod0-node1", Namespace: "ns0"},
+			attrs:  &authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "secrets", Name: "secret0-pod0-node1", Namespace: "ns0"},
 			expect: authorizer.DecisionNoOpinion,
 		},
 		{
 			name:   "disallowed shared secret via pvc",
-			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "secrets", Name: "secret-pv0-pod0-node1-ns0", Namespace: "ns0"},
+			attrs:  &authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "secrets", Name: "secret-pv0-pod0-node1-ns0", Namespace: "ns0"},
 			expect: authorizer.DecisionNoOpinion,
 		},
 		{
 			name:   "disallowed pvc",
-			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "persistentvolumeclaims", Name: "pvc0-pod0-node1", Namespace: "ns0"},
+			attrs:  &authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "persistentvolumeclaims", Name: "pvc0-pod0-node1", Namespace: "ns0"},
 			expect: authorizer.DecisionNoOpinion,
 		},
 		{
 			name:   "disallowed pv",
-			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "persistentvolumes", Name: "pv0-pod0-node1-ns0", Namespace: ""},
+			attrs:  &authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "persistentvolumes", Name: "pv0-pod0-node1-ns0", Namespace: ""},
 			expect: authorizer.DecisionNoOpinion,
 		},
 	}
