@@ -79,16 +79,19 @@ var _ = utils.SIGDescribe("Volume FStype [Feature:vsphere]", func() {
 	})
 
 	It("verify fstype - ext3 formatted volume", func() {
+		framework.Logf("Context string: %s", framework.TestContext.VSphereTestContext.TestString)
 		By("Invoking Test for fstype: ext3")
 		invokeTestForFstype(f, client, namespace, Ext3FSType, Ext3FSType)
 	})
 
 	It("verify fstype - default value should be ext4", func() {
+		framework.Logf("Context string: %s", framework.TestContext.VSphereTestContext.TestString)
 		By("Invoking Test for fstype: Default Value - ext4")
 		invokeTestForFstype(f, client, namespace, "", Ext4FSType)
 	})
 
 	It("verify invalid fstype", func() {
+		framework.Logf("Context string: %s", framework.TestContext.VSphereTestContext.TestString)
 		By("Invoking Test for fstype: invalid Value")
 		invokeTestForInvalidFstype(f, client, namespace, InvalidFSType)
 	})

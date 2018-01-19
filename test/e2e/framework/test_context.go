@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
 	"k8s.io/kubernetes/pkg/kubemark"
+	"k8s.io/kubernetes/test/e2e/storage/vsphere"
 )
 
 const defaultHost = "http://127.0.0.1:8080"
@@ -130,6 +131,8 @@ type TestContextType struct {
 		Scale                    int
 		MilliSecondsBetweenWaves int
 	}
+
+	VSphereTestContext *vsphere.Context
 }
 
 // NodeTestContextType is part of TestContextType, it is shared by all node e2e test.

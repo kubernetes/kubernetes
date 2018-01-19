@@ -43,6 +43,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework/metrics"
 	"k8s.io/kubernetes/test/e2e/manifest"
 	testutils "k8s.io/kubernetes/test/utils"
+	"k8s.io/kubernetes/test/e2e/storage/vsphere"
 )
 
 var (
@@ -145,6 +146,8 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	switch framework.TestContext.Provider {
 	case "gce", "gke":
 		framework.LogClusterImageSources()
+	case "vsphere":
+		vsphere.Bootstrap(&framework.TestContext)
 	}
 
 	c, err := framework.LoadClientset()
