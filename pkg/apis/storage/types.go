@@ -17,7 +17,6 @@ limitations under the License.
 package storage
 
 import (
-	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
@@ -71,7 +70,7 @@ type StorageClass struct {
 	// which is described by the StorageClass object. CredentialID is the key, to
 	// select corresponding Secret.
 	// +optional
-	SecretRefs map[string]v1.SecretReference
+	SecretRefs map[string]api.SecretReference
 
 	// VolumeBindingMode indicates how PersistentVolumeClaims should be
 	// provisioned and bound.  When unset, VolumeBindingImmediate is used.
