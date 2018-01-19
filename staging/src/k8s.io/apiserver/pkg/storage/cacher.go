@@ -340,7 +340,7 @@ func (c *Cacher) Watch(ctx context.Context, key string, resourceVersion string, 
 	c.Lock()
 	defer c.Unlock()
 	forget := forgetWatcher(c, c.watcherIdx, triggerValue, triggerSupported)
-	watcher := newCacheWatcher(c.copier, watchRV, chanSize, initEvents, watchFilterFunction(key, pred), forget)
+	watcher := newCacheWatcher(c.copier, watchRV, chanSize, initEvents, watchFilterFunction(key, pred), forget, c.versioner)
 
 	c.watchers.addWatcher(watcher, c.watcherIdx, triggerValue, triggerSupported)
 	c.watcherIdx++
@@ -756,24 +756,26 @@ func (c *errWatcher) Stop() {
 // cacherWatch implements watch.Interface
 type cacheWatcher struct {
 	sync.Mutex
-	copier  runtime.ObjectCopier
-	input   chan *watchCacheEvent
-	result  chan watch.Event
-	done    chan struct{}
-	filter  watchFilterFunc
-	stopped bool
-	forget  func(bool)
+	copier    runtime.ObjectCopier
+	input     chan *watchCacheEvent
+	result    chan watch.Event
+	done      chan struct{}
+	filter    watchFilterFunc
+	stopped   bool
+	forget    func(bool)
+	versioner Versioner
 }
 
-func newCacheWatcher(copier runtime.ObjectCopier, resourceVersion uint64, chanSize int, initEvents []*watchCacheEvent, filter watchFilterFunc, forget func(bool)) *cacheWatcher {
+func newCacheWatcher(copier runtime.ObjectCopier, resourceVersion uint64, chanSize int, initEvents []*watchCacheEvent, filter watchFilterFunc, forget func(bool), versioner Versioner) *cacheWatcher {
 	watcher := &cacheWatcher{
-		copier:  copier,
-		input:   make(chan *watchCacheEvent, chanSize),
-		result:  make(chan watch.Event, chanSize),
-		done:    make(chan struct{}),
-		filter:  filter,
-		stopped: false,
-		forget:  forget,
+		copier:    copier,
+		input:     make(chan *watchCacheEvent, chanSize),
+		result:    make(chan watch.Event, chanSize),
+		done:      make(chan struct{}),
+		filter:    filter,
+		stopped:   false,
+		forget:    forget,
+		versioner: versioner,
 	}
 	go watcher.process(initEvents, resourceVersion)
 	return watcher
@@ -872,10 +874,14 @@ func (c *cacheWatcher) sendWatchCacheEvent(event *watchCacheEvent) {
 		}
 		watchEvent = watch.Event{Type: watch.Modified, Object: object}
 	case !curObjPasses && oldObjPasses:
+		// return a delete event with the previous object content, but with the event's resource version
 		object, err := c.copier.Copy(event.PrevObject)
 		if err != nil {
 			utilruntime.HandleError(fmt.Errorf("unexpected copy error: %v", err))
 			return
+		}
+		if err := c.versioner.UpdateObject(object, event.ResourceVersion); err != nil {
+			utilruntime.HandleError(fmt.Errorf("failure to version api object (%d) %#v: %v", event.ResourceVersion, object, err))
 		}
 		watchEvent = watch.Event{Type: watch.Deleted, Object: object}
 	}
