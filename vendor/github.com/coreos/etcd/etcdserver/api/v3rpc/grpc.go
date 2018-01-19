@@ -23,9 +23,13 @@ import (
 
 	"github.com/coreos/etcd/etcdserver"
 	pb "github.com/coreos/etcd/etcdserver/etcdserverpb"
+
+	"github.com/grpc-ecosystem/go-grpc-prometheus"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/grpclog"
+	"google.golang.org/grpc/health"
+	healthpb "google.golang.org/grpc/health/grpc_health_v1"
 )
 
 const (
@@ -57,6 +61,16 @@ func Server(s *etcdserver.EtcdServer, tls *tls.Config, gopts ...grpc.ServerOptio
 	pb.RegisterAuthServer(grpcServer, NewAuthServer(s))
 	pb.RegisterMaintenanceServer(grpcServer, NewMaintenanceServer(s))
 
+	// server should register all the services manually
+	// use empty service name for all etcd services' health status,
+	// see https://github.com/grpc/grpc/blob/master/doc/health-checking.md for more
+	hsrv := health.NewServer()
+	hsrv.SetServingStatus("", healthpb.HealthCheckResponse_SERVING)
+	healthpb.RegisterHealthServer(grpcServer, hsrv)
+
+	// set zero values for metrics registered for this grpc server
+	grpc_prometheus.Register(grpcServer)
+
 	grpclogOnce.Do(func() {
 		if s.Cfg.Debug {
 			grpc.EnableTracing = true
@@ -67,5 +81,6 @@ func Server(s *etcdserver.EtcdServer, tls *tls.Config, gopts ...grpc.ServerOptio
 			grpclog.SetLoggerV2(grpclog.NewLoggerV2(ioutil.Discard, os.Stderr, os.Stderr))
 		}
 	})
+
 	return grpcServer
 }

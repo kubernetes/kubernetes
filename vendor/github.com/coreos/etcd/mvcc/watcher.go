@@ -129,16 +129,25 @@ func (ws *watchStream) Chan() <-chan WatchResponse {
 func (ws *watchStream) Cancel(id WatchID) error {
 	ws.mu.Lock()
 	cancel, ok := ws.cancels[id]
+	w := ws.watchers[id]
 	ok = ok && !ws.closed
-	if ok {
-		delete(ws.cancels, id)
-		delete(ws.watchers, id)
-	}
 	ws.mu.Unlock()
+
 	if !ok {
 		return ErrWatcherNotExist
 	}
 	cancel()
+
+	ws.mu.Lock()
+	// The watch isn't removed until cancel so that if Close() is called,
+	// it will wait for the cancel. Otherwise, Close() could close the
+	// watch channel while the store is still posting events.
+	if ww := ws.watchers[id]; ww == w {
+		delete(ws.cancels, id)
+		delete(ws.watchers, id)
+	}
+	ws.mu.Unlock()
+
 	return nil
 }
 

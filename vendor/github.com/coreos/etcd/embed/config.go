@@ -15,11 +15,14 @@
 package embed
 
 import (
+	"crypto/tls"
 	"fmt"
 	"io/ioutil"
 	"net"
 	"net/http"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -30,8 +33,10 @@ import (
 	"github.com/coreos/etcd/pkg/transport"
 	"github.com/coreos/etcd/pkg/types"
 
+	"github.com/coreos/pkg/capnslog"
 	"github.com/ghodss/yaml"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/grpclog"
 )
 
 const (
@@ -41,6 +46,7 @@ const (
 	DefaultName                  = "default"
 	DefaultMaxSnapshots          = 5
 	DefaultMaxWALs               = 5
+	DefaultMaxTxnOps             = uint(128)
 	DefaultMaxRequestBytes       = 1.5 * 1024 * 1024
 	DefaultGRPCKeepAliveMinTime  = 5 * time.Second
 	DefaultGRPCKeepAliveInterval = 2 * time.Hour
@@ -48,6 +54,16 @@ const (
 
 	DefaultListenPeerURLs   = "http://localhost:2380"
 	DefaultListenClientURLs = "http://localhost:2379"
+
+	DefaultLogOutput = "default"
+
+	// DefaultStrictReconfigCheck is the default value for "--strict-reconfig-check" flag.
+	// It's enabled by default.
+	DefaultStrictReconfigCheck = true
+	// DefaultEnableV2 is the default value for "--enable-v2" flag.
+	// v2 is enabled by default.
+	// TODO: disable v2 when deprecated.
+	DefaultEnableV2 = true
 
 	// maxElectionMs specifies the maximum value of election timeout.
 	// More details are listed in ../Documentation/tuning.md#time-parameters.
@@ -82,7 +98,8 @@ type Config struct {
 	MaxWalFiles             uint   `json:"max-wals"`
 	Name                    string `json:"name"`
 	SnapCount               uint64 `json:"snapshot-count"`
-	AutoCompactionRetention int    `json:"auto-compaction-retention"`
+	AutoCompactionRetention string `json:"auto-compaction-retention"`
+	AutoCompactionMode      string `json:"auto-compaction-mode"`
 
 	// TickMs is the number of milliseconds between heartbeat ticks.
 	// TODO: decouple tickMs and heartbeat tick (current heartbeat tick = 1).
@@ -90,6 +107,7 @@ type Config struct {
 	TickMs            uint  `json:"heartbeat-interval"`
 	ElectionMs        uint  `json:"election-timeout"`
 	QuotaBackendBytes int64 `json:"quota-backend-bytes"`
+	MaxTxnOps         uint  `json:"max-txn-ops"`
 	MaxRequestBytes   uint  `json:"max-request-bytes"`
 
 	// gRPC server options
@@ -130,10 +148,13 @@ type Config struct {
 
 	// debug
 
-	Debug        bool   `json:"debug"`
-	LogPkgLevels string `json:"log-package-levels"`
-	EnablePprof  bool   `json:"enable-pprof"`
-	Metrics      string `json:"metrics"`
+	Debug                 bool   `json:"debug"`
+	LogPkgLevels          string `json:"log-package-levels"`
+	LogOutput             string `json:"log-output"`
+	EnablePprof           bool   `json:"enable-pprof"`
+	Metrics               string `json:"metrics"`
+	ListenMetricsUrls     []url.URL
+	ListenMetricsUrlsJSON string `json:"listen-metrics-urls"`
 
 	// ForceNewCluster starts a new cluster even if previously started; unsafe.
 	ForceNewCluster bool `json:"force-new-cluster"`
@@ -155,6 +176,12 @@ type Config struct {
 	// auth
 
 	AuthToken string `json:"auth-token"`
+
+	// Experimental flags
+
+	ExperimentalInitialCorruptCheck bool          `json:"experimental-initial-corrupt-check"`
+	ExperimentalCorruptCheckTime    time.Duration `json:"experimental-corrupt-check-time"`
+	ExperimentalEnableV2V3          string        `json:"experimental-enable-v2v3"`
 }
 
 // configYAML holds the config suitable for yaml parsing
@@ -195,6 +222,7 @@ func NewConfig() *Config {
 		MaxWalFiles:           DefaultMaxWALs,
 		Name:                  DefaultName,
 		SnapCount:             etcdserver.DefaultSnapCount,
+		MaxTxnOps:             DefaultMaxTxnOps,
 		MaxRequestBytes:       DefaultMaxRequestBytes,
 		GRPCKeepAliveMinTime:  DefaultGRPCKeepAliveMinTime,
 		GRPCKeepAliveInterval: DefaultGRPCKeepAliveInterval,
@@ -207,13 +235,67 @@ func NewConfig() *Config {
 		ACUrls:                []url.URL{*acurl},
 		ClusterState:          ClusterStateFlagNew,
 		InitialClusterToken:   "etcd-cluster",
-		StrictReconfigCheck:   true,
+		StrictReconfigCheck:   DefaultStrictReconfigCheck,
+		LogOutput:             DefaultLogOutput,
 		Metrics:               "basic",
-		EnableV2:              true,
+		EnableV2:              DefaultEnableV2,
 		AuthToken:             "simple",
 	}
 	cfg.InitialCluster = cfg.InitialClusterFromName(cfg.Name)
 	return cfg
+}
+
+func logTLSHandshakeFailure(conn *tls.Conn, err error) {
+	state := conn.ConnectionState()
+	remoteAddr := conn.RemoteAddr().String()
+	serverName := state.ServerName
+	if len(state.PeerCertificates) > 0 {
+		cert := state.PeerCertificates[0]
+		ips, dns := cert.IPAddresses, cert.DNSNames
+		plog.Infof("rejected connection from %q (error %q, ServerName %q, IPAddresses %q, DNSNames %q)", remoteAddr, err.Error(), serverName, ips, dns)
+	} else {
+		plog.Infof("rejected connection from %q (error %q, ServerName %q)", remoteAddr, err.Error(), serverName)
+	}
+}
+
+// SetupLogging initializes etcd logging.
+// Must be called after flag parsing.
+func (cfg *Config) SetupLogging() {
+	cfg.ClientTLSInfo.HandshakeFailure = logTLSHandshakeFailure
+	cfg.PeerTLSInfo.HandshakeFailure = logTLSHandshakeFailure
+
+	capnslog.SetGlobalLogLevel(capnslog.INFO)
+	if cfg.Debug {
+		capnslog.SetGlobalLogLevel(capnslog.DEBUG)
+		grpc.EnableTracing = true
+		// enable info, warning, error
+		grpclog.SetLoggerV2(grpclog.NewLoggerV2(os.Stderr, os.Stderr, os.Stderr))
+	} else {
+		// only discard info
+		grpclog.SetLoggerV2(grpclog.NewLoggerV2(ioutil.Discard, os.Stderr, os.Stderr))
+	}
+	if cfg.LogPkgLevels != "" {
+		repoLog := capnslog.MustRepoLogger("github.com/coreos/etcd")
+		settings, err := repoLog.ParseLogLevelConfig(cfg.LogPkgLevels)
+		if err != nil {
+			plog.Warningf("couldn't parse log level string: %s, continuing with default levels", err.Error())
+			return
+		}
+		repoLog.SetLogLevel(settings)
+	}
+
+	// capnslog initially SetFormatter(NewDefaultFormatter(os.Stderr))
+	// where NewDefaultFormatter returns NewJournaldFormatter when syscall.Getppid() == 1
+	// specify 'stdout' or 'stderr' to skip journald logging even when running under systemd
+	switch cfg.LogOutput {
+	case "stdout":
+		capnslog.SetFormatter(capnslog.NewPrettyFormatter(os.Stdout, cfg.Debug))
+	case "stderr":
+		capnslog.SetFormatter(capnslog.NewPrettyFormatter(os.Stderr, cfg.Debug))
+	case DefaultLogOutput:
+	default:
+		plog.Panicf(`unknown log-output %q (only supports %q, "stdout", "stderr")`, cfg.LogOutput, DefaultLogOutput)
+	}
 }
 
 func ConfigFromFile(path string) (*Config, error) {
@@ -275,6 +357,14 @@ func (cfg *configYAML) configFromFile(path string) error {
 		cfg.ACUrls = []url.URL(u)
 	}
 
+	if cfg.ListenMetricsUrlsJSON != "" {
+		u, err := types.NewURLs(strings.Split(cfg.ListenMetricsUrlsJSON, ","))
+		if err != nil {
+			plog.Fatalf("unexpected error setting up listen-metrics-urls: %v", err)
+		}
+		cfg.ListenMetricsUrls = []url.URL(u)
+	}
+
 	// If a discovery flag is set, clear default initial cluster set by InitialClusterFromName
 	if (cfg.Durl != "" || cfg.DNSCluster != "") && cfg.InitialCluster == defaultInitialCluster {
 		cfg.InitialCluster = ""
@@ -305,6 +395,25 @@ func (cfg *Config) Validate() error {
 	if err := checkBindURLs(cfg.LCUrls); err != nil {
 		return err
 	}
+	if err := checkBindURLs(cfg.ListenMetricsUrls); err != nil {
+		return err
+	}
+	if err := checkHostURLs(cfg.APUrls); err != nil {
+		// TODO: return err in v3.4
+		addrs := make([]string, len(cfg.APUrls))
+		for i := range cfg.APUrls {
+			addrs[i] = cfg.APUrls[i].String()
+		}
+		plog.Warningf("advertise-peer-urls %q is deprecated (%v)", strings.Join(addrs, ","), err)
+	}
+	if err := checkHostURLs(cfg.ACUrls); err != nil {
+		// TODO: return err in v3.4
+		addrs := make([]string, len(cfg.ACUrls))
+		for i := range cfg.ACUrls {
+			addrs[i] = cfg.ACUrls[i].String()
+		}
+		plog.Warningf("advertise-client-urls %q is deprecated (%v)", strings.Join(addrs, ","), err)
+	}
 
 	// Check if conflicting flags are passed.
 	nSet := 0
@@ -322,6 +431,12 @@ func (cfg *Config) Validate() error {
 		return ErrConflictBootstrapFlags
 	}
 
+	if cfg.TickMs <= 0 {
+		return fmt.Errorf("--heartbeat-interval must be >0 (set to %dms)", cfg.TickMs)
+	}
+	if cfg.ElectionMs <= 0 {
+		return fmt.Errorf("--election-timeout must be >0 (set to %dms)", cfg.ElectionMs)
+	}
 	if 5*cfg.TickMs > cfg.ElectionMs {
 		return fmt.Errorf("--election-timeout[%vms] should be at least as 5 times as --heartbeat-interval[%vms]", cfg.ElectionMs, cfg.TickMs)
 	}
@@ -400,6 +515,34 @@ func (cfg Config) defaultClientHost() bool {
 	return len(cfg.ACUrls) == 1 && cfg.ACUrls[0].String() == DefaultAdvertiseClientURLs
 }
 
+func (cfg *Config) ClientSelfCert() (err error) {
+	if cfg.ClientAutoTLS && cfg.ClientTLSInfo.Empty() {
+		chosts := make([]string, len(cfg.LCUrls))
+		for i, u := range cfg.LCUrls {
+			chosts[i] = u.Host
+		}
+		cfg.ClientTLSInfo, err = transport.SelfCert(filepath.Join(cfg.Dir, "fixtures", "client"), chosts)
+		return err
+	} else if cfg.ClientAutoTLS {
+		plog.Warningf("ignoring client auto TLS since certs given")
+	}
+	return nil
+}
+
+func (cfg *Config) PeerSelfCert() (err error) {
+	if cfg.PeerAutoTLS && cfg.PeerTLSInfo.Empty() {
+		phosts := make([]string, len(cfg.LPUrls))
+		for i, u := range cfg.LPUrls {
+			phosts[i] = u.Host
+		}
+		cfg.PeerTLSInfo, err = transport.SelfCert(filepath.Join(cfg.Dir, "fixtures", "peer"), phosts)
+		return err
+	} else if cfg.PeerAutoTLS {
+		plog.Warningf("ignoring peer auto TLS since certs given")
+	}
+	return nil
+}
+
 // UpdateDefaultClusterFromName updates cluster advertise URLs with, if available, default host,
 // if advertise URLs are default values(localhost:2379,2380) AND if listen URL is 0.0.0.0.
 // e.g. advertise peer URL localhost:2380 or listen peer URL 0.0.0.0:2380
@@ -441,7 +584,6 @@ func (cfg *Config) UpdateDefaultClusterFromName(defaultInitialCluster string) (s
 }
 
 // checkBindURLs returns an error if any URL uses a domain name.
-// TODO: return error in 3.2.0
 func checkBindURLs(urls []url.URL) error {
 	for _, url := range urls {
 		if url.Scheme == "unix" || url.Scheme == "unixs" {
@@ -458,6 +600,19 @@ func checkBindURLs(urls []url.URL) error {
 		}
 		if net.ParseIP(host) == nil {
 			return fmt.Errorf("expected IP in URL for binding (%s)", url.String())
+		}
+	}
+	return nil
+}
+
+func checkHostURLs(urls []url.URL) error {
+	for _, url := range urls {
+		host, _, err := net.SplitHostPort(url.Host)
+		if err != nil {
+			return err
+		}
+		if host == "" {
+			return fmt.Errorf("unexpected empty host (%s)", url.String())
 		}
 	}
 	return nil

@@ -94,7 +94,7 @@ func RegisterLockHandler(ctx context.Context, mux *runtime.ServeMux, conn *grpc.
 func RegisterLockHandlerClient(ctx context.Context, mux *runtime.ServeMux, client v3lockpb.LockClient) error {
 
 	mux.Handle("POST", pattern_Lock_Lock_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
-		ctx, cancel := context.WithCancel(ctx)
+		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		if cn, ok := w.(http.CloseNotifier); ok {
 			go func(done <-chan struct{}, closed <-chan bool) {
@@ -123,7 +123,7 @@ func RegisterLockHandlerClient(ctx context.Context, mux *runtime.ServeMux, clien
 	})
 
 	mux.Handle("POST", pattern_Lock_Unlock_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
-		ctx, cancel := context.WithCancel(ctx)
+		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		if cn, ok := w.(http.CloseNotifier); ok {
 			go func(done <-chan struct{}, closed <-chan bool) {
@@ -155,9 +155,9 @@ func RegisterLockHandlerClient(ctx context.Context, mux *runtime.ServeMux, clien
 }
 
 var (
-	pattern_Lock_Lock_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 1}, []string{"v3alpha", "lock"}, ""))
+	pattern_Lock_Lock_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 1}, []string{"v3beta", "lock"}, ""))
 
-	pattern_Lock_Unlock_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2}, []string{"v3alpha", "lock", "unlock"}, ""))
+	pattern_Lock_Unlock_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2}, []string{"v3beta", "lock", "unlock"}, ""))
 )
 
 var (

@@ -3,16 +3,15 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = [
-        "buffer.go",
-        "cmux.go",
-        "matchers.go",
-        "patricia.go",
+        "doc.go",
+        "websocket_proxy.go",
     ],
-    importpath = "github.com/cockroachdb/cmux",
+    importpath = "github.com/tmc/grpc-websocket-proxy/wsproxy",
     visibility = ["//visibility:public"],
     deps = [
-        "//vendor/golang.org/x/net/http2:go_default_library",
-        "//vendor/golang.org/x/net/http2/hpack:go_default_library",
+        "//vendor/github.com/gorilla/websocket:go_default_library",
+        "//vendor/github.com/sirupsen/logrus:go_default_library",
+        "//vendor/golang.org/x/net/context:go_default_library",
     ],
 )
 

@@ -15,19 +15,18 @@
 package grpcproxy
 
 import (
+	"context"
 	"io"
 	"sync"
 	"sync/atomic"
 	"time"
 
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/metadata"
-
-	"golang.org/x/net/context"
-
 	"github.com/coreos/etcd/clientv3"
 	"github.com/coreos/etcd/etcdserver/api/v3rpc/rpctypes"
 	pb "github.com/coreos/etcd/etcdserver/etcdserverpb"
+
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/metadata"
 )
 
 type leaseProxy struct {
@@ -73,7 +72,7 @@ func NewLeaseProxy(c *clientv3.Client) (pb.LeaseServer, <-chan struct{}) {
 }
 
 func (lp *leaseProxy) LeaseGrant(ctx context.Context, cr *pb.LeaseGrantRequest) (*pb.LeaseGrantResponse, error) {
-	rp, err := lp.leaseClient.LeaseGrant(ctx, cr)
+	rp, err := lp.leaseClient.LeaseGrant(ctx, cr, grpc.FailFast(false))
 	if err != nil {
 		return nil, err
 	}
@@ -109,6 +108,22 @@ func (lp *leaseProxy) LeaseTimeToLive(ctx context.Context, rr *pb.LeaseTimeToLiv
 		TTL:        r.TTL,
 		GrantedTTL: r.GrantedTTL,
 		Keys:       r.Keys,
+	}
+	return rp, err
+}
+
+func (lp *leaseProxy) LeaseLeases(ctx context.Context, rr *pb.LeaseLeasesRequest) (*pb.LeaseLeasesResponse, error) {
+	r, err := lp.lessor.Leases(ctx)
+	if err != nil {
+		return nil, err
+	}
+	leases := make([]*pb.LeaseStatus, len(r.Leases))
+	for i := range r.Leases {
+		leases[i] = &pb.LeaseStatus{ID: int64(r.Leases[i].ID)}
+	}
+	rp := &pb.LeaseLeasesResponse{
+		Header: r.ResponseHeader,
+		Leases: leases,
 	}
 	return rp, err
 }

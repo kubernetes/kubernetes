@@ -1,17 +1,20 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
-filegroup(
-    name = "go_default_library_protos",
-    srcs = ["descriptor.proto"],
-    visibility = ["//visibility:public"],
-)
-
 go_library(
     name = "go_default_library",
-    srcs = ["descriptor.pb.go"],
-    importpath = "github.com/golang/protobuf/protoc-gen-go/descriptor",
+    srcs = [
+        "buffer.go",
+        "cmux.go",
+        "doc.go",
+        "matchers.go",
+        "patricia.go",
+    ],
+    importpath = "github.com/soheilhy/cmux",
     visibility = ["//visibility:public"],
-    deps = ["//vendor/github.com/golang/protobuf/proto:go_default_library"],
+    deps = [
+        "//vendor/golang.org/x/net/http2:go_default_library",
+        "//vendor/golang.org/x/net/http2/hpack:go_default_library",
+    ],
 )
 
 filegroup(

@@ -246,5 +246,5 @@ func parsePREFSRC(m *syscall.NetlinkMessage) (host string, oif uint32, err error
 	if oif == 0 {
 		err = errNoDefaultRoute
 	}
-	return
+	return host, oif, err
 }

@@ -11,7 +11,10 @@ go_library(
     srcs = ["kv.pb.go"],
     importpath = "github.com/coreos/etcd/mvcc/mvccpb",
     visibility = ["//visibility:public"],
-    deps = ["//vendor/github.com/golang/protobuf/proto:go_default_library"],
+    deps = [
+        "//vendor/github.com/gogo/protobuf/gogoproto:go_default_library",
+        "//vendor/github.com/golang/protobuf/proto:go_default_library",
+    ],
 )
 
 filegroup(

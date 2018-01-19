@@ -29,13 +29,8 @@ const (
 )
 
 // NewPeerHandler generates an http.Handler to handle etcd peer requests.
-func NewPeerHandler(s *etcdserver.EtcdServer) http.Handler {
-	var lh http.Handler
-	l := s.Lessor()
-	if l != nil {
-		lh = leasehttp.NewHandler(l, func() <-chan struct{} { return s.ApplyWait() })
-	}
-	return newPeerHandler(s.Cluster(), s.RaftHandler(), lh)
+func NewPeerHandler(s etcdserver.ServerPeer) http.Handler {
+	return newPeerHandler(s.Cluster(), s.RaftHandler(), s.LeaseHandler())
 }
 
 func newPeerHandler(cluster api.Cluster, raftHandler http.Handler, leaseHandler http.Handler) http.Handler {

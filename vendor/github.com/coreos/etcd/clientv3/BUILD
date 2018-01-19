@@ -30,7 +30,6 @@ go_library(
         "//vendor/github.com/coreos/etcd/etcdserver/api/v3rpc/rpctypes:go_default_library",
         "//vendor/github.com/coreos/etcd/etcdserver/etcdserverpb:go_default_library",
         "//vendor/github.com/coreos/etcd/mvcc/mvccpb:go_default_library",
-        "//vendor/golang.org/x/net/context:go_default_library",
         "//vendor/google.golang.org/grpc:go_default_library",
         "//vendor/google.golang.org/grpc/codes:go_default_library",
         "//vendor/google.golang.org/grpc/credentials:go_default_library",

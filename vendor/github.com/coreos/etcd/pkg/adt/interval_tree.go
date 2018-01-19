@@ -485,6 +485,15 @@ func (ivt *IntervalTree) Stab(iv Interval) (ivs []*IntervalValue) {
 	return ivs
 }
 
+// Union merges a given interval tree into the receiver.
+func (ivt *IntervalTree) Union(inIvt IntervalTree, ivl Interval) {
+	f := func(n *IntervalValue) bool {
+		ivt.Insert(n.Ivl, n.Val)
+		return true
+	}
+	inIvt.Visit(ivl, f)
+}
+
 type StringComparable string
 
 func (s StringComparable) Compare(c Comparable) int {
