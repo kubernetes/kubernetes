@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2017 The Kubernetes Authors.
+# Copyright 2018 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# !!!EXPERIMENTAL!!! Upgrade a k8s cluster from routes to IP aliases for
+# !!!EXPERIMENTAL!!! Upgrade a K8s cluster from routes to IP aliases for
 # node connectivity on GCE. This is only for migration.
 
 set -o errexit
@@ -30,7 +30,7 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 source "${KUBE_ROOT}/hack/lib/util.sh"
 source "${KUBE_ROOT}/cluster/kube-util.sh"
 
-# Print the number of routes used for k8s cluster node connectivity.
+# Print the number of routes used for K8s cluster node connectivity.
 #
 # Assumed vars:
 #   PROJECT
@@ -41,7 +41,7 @@ function get-k8s-node-routes-count() {
   echo -n "${k8s_node_routes_count}"
 }
 
-# Detect the subnetwork where the k8s cluster resides.
+# Detect the subnetwork where the K8s cluster resides.
 #
 # Assumed vars:
 #  KUBE_MASTER
@@ -93,7 +93,7 @@ function set-allow-subnet-cidr-routes-overlap() {
   done
 }
 
-# Add secondary ranges to k8s subnet.
+# Add secondary ranges to K8s subnet.
 #
 # Assumed vars:
 #   IP_ALIAS_SUBNETWORK
@@ -119,7 +119,7 @@ function add-k8s-subnet-secondary-ranges() {
   done
 }
 
-# Delete all k8s node routes.
+# Delete all K8s node routes.
 #
 # Assumed vars:
 #   PROJECT
@@ -156,7 +156,7 @@ echo "k8s cluster sits on subnetwork \"${IP_ALIAS_SUBNETWORK}\""
 set-allow-subnet-cidr-routes-overlap true
 add-k8s-subnet-secondary-ranges
 
-echo "Changing k8s master envs and restarting..."
+echo "Changing K8s master envs and restarting..."
 export KUBE_GCE_IP_ALIAS_SUBNETWORK=${IP_ALIAS_SUBNETWORK}
 export KUBE_GCE_NODE_IPAM_MODE="IPAMFromCluster"
 export KUBE_GCE_ENABLE_IP_ALIASES=true
