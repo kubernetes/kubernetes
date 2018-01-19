@@ -178,7 +178,6 @@ pkg/kubelet/custommetrics
 pkg/kubelet/dockershim
 pkg/kubelet/dockershim/cm
 pkg/kubelet/dockershim/libdocker
-pkg/kubelet/dockershim/remote
 pkg/kubelet/dockershim/testing
 pkg/kubelet/events
 pkg/kubelet/gpu
