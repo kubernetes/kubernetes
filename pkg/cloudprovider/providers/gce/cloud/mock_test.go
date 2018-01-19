@@ -45,42 +45,42 @@ func TestMocks(t *testing.T) {
 	key := keyAlpha
 
 	// Get not found.
-	if _, err := mock.AlphaAddresses().Get(ctx, *key); err == nil {
+	if _, err := mock.AlphaAddresses().Get(ctx, key); err == nil {
 		t.Errorf("AlphaAddresses().Get(%v, %v) = _, nil; want error", ctx, key)
 	}
-	if _, err := mock.BetaAddresses().Get(ctx, *key); err == nil {
+	if _, err := mock.BetaAddresses().Get(ctx, key); err == nil {
 		t.Errorf("BetaAddresses().Get(%v, %v) = _, nil; want error", ctx, key)
 	}
-	if _, err := mock.Addresses().Get(ctx, *key); err == nil {
+	if _, err := mock.Addresses().Get(ctx, key); err == nil {
 		t.Errorf("Addresses().Get(%v, %v) = _, nil; want error", ctx, key)
 	}
 	// Insert.
 	{
 		obj := &alpha.Address{}
-		if err := mock.AlphaAddresses().Insert(ctx, *keyAlpha, obj); err != nil {
+		if err := mock.AlphaAddresses().Insert(ctx, keyAlpha, obj); err != nil {
 			t.Errorf("AlphaAddresses().Insert(%v, %v, %v) = %v; want nil", ctx, key, obj, err)
 		}
 	}
 	{
 		obj := &beta.Address{}
-		if err := mock.BetaAddresses().Insert(ctx, *keyBeta, obj); err != nil {
+		if err := mock.BetaAddresses().Insert(ctx, keyBeta, obj); err != nil {
 			t.Errorf("BetaAddresses().Insert(%v, %v, %v) = %v; want nil", ctx, key, obj, err)
 		}
 	}
 	{
 		obj := &ga.Address{}
-		if err := mock.Addresses().Insert(ctx, *keyGA, &ga.Address{Name: "ga"}); err != nil {
+		if err := mock.Addresses().Insert(ctx, keyGA, &ga.Address{Name: "ga"}); err != nil {
 			t.Errorf("Addresses().Insert(%v, %v, %v) = %v; want nil", ctx, key, obj, err)
 		}
 	}
 	// Get across versions.
-	if obj, err := mock.AlphaAddresses().Get(ctx, *key); err != nil {
+	if obj, err := mock.AlphaAddresses().Get(ctx, key); err != nil {
 		t.Errorf("AlphaAddresses().Get(%v, %v) = %v, %v; want nil", ctx, key, obj, err)
 	}
-	if obj, err := mock.BetaAddresses().Get(ctx, *key); err != nil {
+	if obj, err := mock.BetaAddresses().Get(ctx, key); err != nil {
 		t.Errorf("BetaAddresses().Get(%v, %v) = %v, %v; want nil", ctx, key, obj, err)
 	}
-	if obj, err := mock.Addresses().Get(ctx, *key); err != nil {
+	if obj, err := mock.Addresses().Get(ctx, key); err != nil {
 		t.Errorf("Addresses().Get(%v, %v) = %v, %v; want nil", ctx, key, obj, err)
 	}
 	// List across versions.
@@ -128,23 +128,23 @@ func TestMocks(t *testing.T) {
 		}
 	}
 	// Delete across versions.
-	if err := mock.AlphaAddresses().Delete(ctx, *keyAlpha); err != nil {
+	if err := mock.AlphaAddresses().Delete(ctx, keyAlpha); err != nil {
 		t.Errorf("AlphaAddresses().Delete(%v, %v) = %v; want nil", ctx, key, err)
 	}
-	if err := mock.BetaAddresses().Delete(ctx, *keyBeta); err != nil {
+	if err := mock.BetaAddresses().Delete(ctx, keyBeta); err != nil {
 		t.Errorf("BetaAddresses().Delete(%v, %v) = %v; want nil", ctx, key, err)
 	}
-	if err := mock.Addresses().Delete(ctx, *keyGA); err != nil {
+	if err := mock.Addresses().Delete(ctx, keyGA); err != nil {
 		t.Errorf("Addresses().Delete(%v, %v) = %v; want nil", ctx, key, err)
 	}
 	// Delete not found.
-	if err := mock.AlphaAddresses().Delete(ctx, *keyAlpha); err == nil {
+	if err := mock.AlphaAddresses().Delete(ctx, keyAlpha); err == nil {
 		t.Errorf("AlphaAddresses().Delete(%v, %v) = nil; want error", ctx, key)
 	}
-	if err := mock.BetaAddresses().Delete(ctx, *keyBeta); err == nil {
+	if err := mock.BetaAddresses().Delete(ctx, keyBeta); err == nil {
 		t.Errorf("BetaAddresses().Delete(%v, %v) = nil; want error", ctx, key)
 	}
-	if err := mock.Addresses().Delete(ctx, *keyGA); err == nil {
+	if err := mock.Addresses().Delete(ctx, keyGA); err == nil {
 		t.Errorf("Addresses().Delete(%v, %v) = nil; want error", ctx, key)
 	}
 }
