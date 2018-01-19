@@ -156,7 +156,7 @@ func (options *CertificateOptions) RunCertificateDeny(f cmdutil.Factory, out io.
 		csr.Status.Conditions = append(csr.Status.Conditions, certificates.CertificateSigningRequestCondition{
 			Type:           certificates.CertificateDenied,
 			Reason:         "KubectlDeny",
-			Message:        "This CSR was approved by kubectl certificate deny.",
+			Message:        "This CSR was denied by kubectl certificate deny.",
 			LastUpdateTime: metav1.Now(),
 		})
 		return csr, "denied"
