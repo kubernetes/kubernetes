@@ -54,6 +54,9 @@ type SecureServingOptions struct {
 	// CipherSuites is the list of allowed cipher suites for the server.
 	// Values are from tls package constants (https://golang.org/pkg/crypto/tls/#pkg-constants).
 	CipherSuites []string
+	// MinTLSVersion is the minimum TLS version supported.
+	// Values are from tls package constants (https://golang.org/pkg/crypto/tls/#pkg-constants).
+	MinTLSVersion string
 }
 
 type CertKey struct {
@@ -141,6 +144,10 @@ func (s *SecureServingOptions) AddFlags(fs *pflag.FlagSet) {
 		"Comma-separated list of cipher suites for the server. "+
 			"Values are from tls package constants (https://golang.org/pkg/crypto/tls/#pkg-constants). "+
 			"If omitted, the default Go cipher suites will be used")
+
+	fs.StringVar(&s.MinTLSVersion, "tls-min-version", s.MinTLSVersion,
+		"Minimum TLS version supported. "+
+			"Value must match version names from https://golang.org/pkg/crypto/tls/#pkg-constants.")
 
 	fs.Var(utilflag.NewNamedCertKeyArray(&s.SNICertKeys), "tls-sni-cert-key", ""+
 		"A pair of x509 certificate and private key file paths, optionally suffixed with a list of "+
@@ -247,6 +254,11 @@ func (s *SecureServingOptions) applyServingInfoTo(c *server.Config) error {
 			return err
 		}
 		secureServingInfo.CipherSuites = cipherSuites
+	}
+
+	secureServingInfo.MinTLSVersion, err = utilflag.TLSVersion(s.MinTLSVersion)
+	if err != nil {
+		return err
 	}
 
 	// load SNI certs

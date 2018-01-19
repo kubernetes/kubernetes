@@ -62,3 +62,26 @@ func TLSCipherSuites(cipherNames []string) ([]uint16, error) {
 	}
 	return ciphersIntSlice, nil
 }
+
+var versions = map[string]uint16{
+	"VersionTLS10": tls.VersionTLS10,
+	"VersionTLS11": tls.VersionTLS11,
+	"VersionTLS12": tls.VersionTLS12,
+}
+
+func TLSVersion(versionName string) (uint16, error) {
+	if len(versionName) == 0 {
+		return DefaultTLSVersion(), nil
+	}
+	if version, ok := versions[versionName]; ok {
+		return version, nil
+	}
+	return 0, fmt.Errorf("unknown tls version %q", versionName)
+}
+
+func DefaultTLSVersion() uint16 {
+	// Can't use SSLv3 because of POODLE and BEAST
+	// Can't use TLSv1.0 because of POODLE and BEAST using CBC cipher
+	// Can't use TLSv1.1 because of RC4 cipher usage
+	return tls.VersionTLS12
+}

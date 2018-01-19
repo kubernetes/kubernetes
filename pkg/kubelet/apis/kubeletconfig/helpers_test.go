@@ -176,6 +176,7 @@ var (
 		"HealthzBindAddress",
 		"HealthzPort",
 		"TLSCipherSuites[*]",
+		"TLSMinVersion",
 		"IPTablesDropBit",
 		"IPTablesMasqueradeBit",
 		"ImageGCHighThresholdPercent",
