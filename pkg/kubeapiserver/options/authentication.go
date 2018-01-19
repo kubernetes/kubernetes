@@ -61,6 +61,7 @@ type OIDCAuthenticationOptions struct {
 	UsernamePrefix string
 	GroupsClaim    string
 	GroupsPrefix   string
+	SigningAlgs    []string
 }
 
 type PasswordFileAuthenticationOptions struct {
@@ -208,6 +209,10 @@ func (s *BuiltInAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 			"If provided, all groups will be prefixed with this value to prevent conflicts with "+
 			"other authentication strategies.")
 
+		fs.StringSliceVar(&s.OIDC.SigningAlgs, "oidc-signing-algs", []string{"RS256"}, ""+
+			"Comma-separated list of allowed JOSE asymmetric signing algorithms. JWTs with a "+
+			"'alg' header value not in this list will be rejected. "+
+			"Values are defined by RFC 7518 https://tools.ietf.org/html/rfc7518#section-3.1.")
 	}
 
 	if s.PasswordFile != nil {
@@ -272,6 +277,7 @@ func (s *BuiltInAuthenticationOptions) ToAuthenticationConfig() authenticator.Au
 		ret.OIDCIssuerURL = s.OIDC.IssuerURL
 		ret.OIDCUsernameClaim = s.OIDC.UsernameClaim
 		ret.OIDCUsernamePrefix = s.OIDC.UsernamePrefix
+		ret.OIDCSigningAlgs = s.OIDC.SigningAlgs
 	}
 
 	if s.PasswordFile != nil {
