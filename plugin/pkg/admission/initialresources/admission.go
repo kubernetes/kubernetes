@@ -17,7 +17,6 @@ limitations under the License.
 package initialresources
 
 import (
-	"flag"
 	"fmt"
 	"io"
 	"sort"
@@ -29,12 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apiserver/pkg/admission"
 	api "k8s.io/kubernetes/pkg/apis/core"
-)
-
-var (
-	source     = flag.String("ir-data-source", "influxdb", "Data source used by InitialResources. Supported options: influxdb, gcm.")
-	percentile = flag.Int64("ir-percentile", 90, "Which percentile of samples should InitialResources use when estimating resources. For experiment purposes.")
-	nsOnly     = flag.Bool("ir-namespace-only", false, "Whether the estimation should be made only based on data from the same namespace.")
+	pluginapi "k8s.io/kubernetes/plugin/pkg/admission/initialresources/apis/initialresources"
 )
 
 const (
@@ -48,30 +42,31 @@ const (
 // WARNING: this feature is experimental and will definitely change.
 func Register(plugins *admission.Plugins) {
 	plugins.Register("InitialResources", func(config io.Reader) (admission.Interface, error) {
-		// TODO: remove the usage of flags in favor of reading versioned configuration
-		s, err := newDataSource(*source)
+		pluginConfig, err := loadConfiguration(config)
 		if err != nil {
 			return nil, err
 		}
-		return newInitialResources(s, *percentile, *nsOnly), nil
+		s, err := newDataSource(pluginConfig)
+		if err != nil {
+			return nil, err
+		}
+		return newInitialResources(s, pluginConfig), nil
 	})
 }
 
 type InitialResources struct {
 	*admission.Handler
-	source     dataSource
-	percentile int64
-	nsOnly     bool
+	source       dataSource
+	pluginConfig *pluginapi.Configuration
 }
 
 var _ admission.MutationInterface = &InitialResources{}
 
-func newInitialResources(source dataSource, percentile int64, nsOnly bool) *InitialResources {
+func newInitialResources(source dataSource, pluginConfig *pluginapi.Configuration) *InitialResources {
 	return &InitialResources{
-		Handler:    admission.NewHandler(admission.Create),
-		source:     source,
-		percentile: percentile,
-		nsOnly:     nsOnly,
+		Handler:      admission.NewHandler(admission.Create),
+		source:       source,
+		pluginConfig: pluginConfig,
 	}
 }
 
@@ -162,24 +157,24 @@ func (ir InitialResources) getEstimation(kind api.ResourceName, c *api.Container
 	var err error
 
 	// Historical data from last 7 days for the same image:tag within the same namespace.
-	if usage, samples, err = ir.source.GetUsagePercentile(kind, ir.percentile, c.Image, ns, true, start, end); err != nil {
+	if usage, samples, err = ir.source.GetUsagePercentile(kind, ir.pluginConfig.Percentile, c.Image, ns, true, start, end); err != nil {
 		return nil, err
 	}
 	if samples < samplesThreshold {
 		// Historical data from last 30 days for the same image:tag within the same namespace.
 		start := end.Add(-month)
-		if usage, samples, err = ir.source.GetUsagePercentile(kind, ir.percentile, c.Image, ns, true, start, end); err != nil {
+		if usage, samples, err = ir.source.GetUsagePercentile(kind, ir.pluginConfig.Percentile, c.Image, ns, true, start, end); err != nil {
 			return nil, err
 		}
 	}
 
 	// If we are allowed to estimate only based on data from the same namespace.
-	if ir.nsOnly {
+	if ir.pluginConfig.NamespaceOnly {
 		if samples < samplesThreshold {
 			// Historical data from last 30 days for the same image within the same namespace.
 			start := end.Add(-month)
 			image := strings.Split(c.Image, ":")[0]
-			if usage, samples, err = ir.source.GetUsagePercentile(kind, ir.percentile, image, ns, false, start, end); err != nil {
+			if usage, samples, err = ir.source.GetUsagePercentile(kind, ir.pluginConfig.Percentile, image, ns, false, start, end); err != nil {
 				return nil, err
 			}
 		}
@@ -187,14 +182,14 @@ func (ir InitialResources) getEstimation(kind api.ResourceName, c *api.Container
 		if samples < samplesThreshold {
 			// Historical data from last 7 days for the same image:tag within all namespaces.
 			start := end.Add(-week)
-			if usage, samples, err = ir.source.GetUsagePercentile(kind, ir.percentile, c.Image, "", true, start, end); err != nil {
+			if usage, samples, err = ir.source.GetUsagePercentile(kind, ir.pluginConfig.Percentile, c.Image, "", true, start, end); err != nil {
 				return nil, err
 			}
 		}
 		if samples < samplesThreshold {
 			// Historical data from last 30 days for the same image:tag within all namespaces.
 			start := end.Add(-month)
-			if usage, samples, err = ir.source.GetUsagePercentile(kind, ir.percentile, c.Image, "", true, start, end); err != nil {
+			if usage, samples, err = ir.source.GetUsagePercentile(kind, ir.pluginConfig.Percentile, c.Image, "", true, start, end); err != nil {
 				return nil, err
 			}
 		}
@@ -202,7 +197,7 @@ func (ir InitialResources) getEstimation(kind api.ResourceName, c *api.Container
 			// Historical data from last 30 days for the same image within all namespaces.
 			start := end.Add(-month)
 			image := strings.Split(c.Image, ":")[0]
-			if usage, samples, err = ir.source.GetUsagePercentile(kind, ir.percentile, image, "", false, start, end); err != nil {
+			if usage, samples, err = ir.source.GetUsagePercentile(kind, ir.pluginConfig.Percentile, image, "", false, start, end); err != nil {
 				return nil, err
 			}
 		}

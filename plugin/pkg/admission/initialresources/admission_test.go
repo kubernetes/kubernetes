@@ -171,7 +171,11 @@ func TestEstimateReturnsErrorFromSource(t *testing.T) {
 	f := func(_ api.ResourceName, _ int64, _, ns string, exactMatch bool, start, end time.Time) (int64, int64, error) {
 		return 0, 0, errors.New("Example error")
 	}
-	ir := newInitialResources(&fakeSource{f: f}, 90, false)
+	config, err := GetDefaultConfiConfiguration()
+	if err != nil {
+		t.Errorf("get default confiConfiguration err: %v", err)
+	}
+	ir := newInitialResources(&fakeSource{f: f}, config)
 	admit(t, ir, getPods())
 }
 
@@ -182,7 +186,11 @@ func TestEstimationBasedOnTheSameImageSameNamespace7d(t *testing.T) {
 		}
 		return 200, 120, nil
 	}
-	performTest(t, newInitialResources(&fakeSource{f: f}, 90, false))
+	config, err := GetDefaultConfiConfiguration()
+	if err != nil {
+		t.Errorf("get default confiConfiguration err: %v", err)
+	}
+	performTest(t, newInitialResources(&fakeSource{f: f}, config))
 }
 
 func TestEstimationBasedOnTheSameImageSameNamespace30d(t *testing.T) {
@@ -195,7 +203,11 @@ func TestEstimationBasedOnTheSameImageSameNamespace30d(t *testing.T) {
 		}
 		return 200, 120, nil
 	}
-	performTest(t, newInitialResources(&fakeSource{f: f}, 90, false))
+	config, err := GetDefaultConfiConfiguration()
+	if err != nil {
+		t.Errorf("get default confiConfiguration err: %v", err)
+	}
+	performTest(t, newInitialResources(&fakeSource{f: f}, config))
 }
 
 func TestEstimationBasedOnTheSameImageAllNamespaces7d(t *testing.T) {
@@ -208,7 +220,11 @@ func TestEstimationBasedOnTheSameImageAllNamespaces7d(t *testing.T) {
 		}
 		return 200, 120, nil
 	}
-	performTest(t, newInitialResources(&fakeSource{f: f}, 90, false))
+	config, err := GetDefaultConfiConfiguration()
+	if err != nil {
+		t.Errorf("get default confiConfiguration err: %v", err)
+	}
+	performTest(t, newInitialResources(&fakeSource{f: f}, config))
 }
 
 func TestEstimationBasedOnTheSameImageAllNamespaces30d(t *testing.T) {
@@ -224,7 +240,11 @@ func TestEstimationBasedOnTheSameImageAllNamespaces30d(t *testing.T) {
 		}
 		return 200, 120, nil
 	}
-	performTest(t, newInitialResources(&fakeSource{f: f}, 90, false))
+	config, err := GetDefaultConfiConfiguration()
+	if err != nil {
+		t.Errorf("get default confiConfiguration err: %v", err)
+	}
+	performTest(t, newInitialResources(&fakeSource{f: f}, config))
 }
 
 func TestEstimationBasedOnOtherImages(t *testing.T) {
@@ -234,14 +254,22 @@ func TestEstimationBasedOnOtherImages(t *testing.T) {
 		}
 		return 200, 20, nil
 	}
-	performTest(t, newInitialResources(&fakeSource{f: f}, 90, false))
+	config, err := GetDefaultConfiConfiguration()
+	if err != nil {
+		t.Errorf("get default confiConfiguration err: %v", err)
+	}
+	performTest(t, newInitialResources(&fakeSource{f: f}, config))
 }
 
 func TestNoData(t *testing.T) {
 	f := func(_ api.ResourceName, _ int64, _, ns string, _ bool, _, _ time.Time) (int64, int64, error) {
 		return 200, 0, nil
 	}
-	ir := newInitialResources(&fakeSource{f: f}, 90, false)
+	config, err := GetDefaultConfiConfiguration()
+	if err != nil {
+		t.Errorf("get default confiConfiguration err: %v", err)
+	}
+	ir := newInitialResources(&fakeSource{f: f}, config)
 
 	pods := []*api.Pod{
 		createPod("p0", "image:v0", parseReq("", "")),
@@ -262,7 +290,11 @@ func TestManyContainers(t *testing.T) {
 		}
 		return 200, 30, nil
 	}
-	ir := newInitialResources(&fakeSource{f: f}, 90, false)
+	config, err := GetDefaultConfiConfiguration()
+	if err != nil {
+		t.Errorf("get default confiConfiguration err: %v", err)
+	}
+	ir := newInitialResources(&fakeSource{f: f}, config)
 
 	pod := createPod("p", "image:v0", parseReq("", ""))
 	addContainer(pod, "c1", "image:v1", parseReq("", "300"))
@@ -285,7 +317,12 @@ func TestNamespaceAware(t *testing.T) {
 		}
 		return 200, 120, nil
 	}
-	ir := newInitialResources(&fakeSource{f: f}, 90, true)
+	config, err := GetDefaultConfiConfiguration()
+	if err != nil {
+		t.Errorf("get default confiConfiguration err: %v", err)
+	}
+	config.NamespaceOnly = true
+	ir := newInitialResources(&fakeSource{f: f}, config)
 
 	pods := []*api.Pod{
 		createPod("p0", "image:v0", parseReq("", "")),

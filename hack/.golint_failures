@@ -418,6 +418,8 @@ plugin/pkg/admission/antiaffinity
 plugin/pkg/admission/eventratelimit/apis/eventratelimit
 plugin/pkg/admission/eventratelimit/apis/eventratelimit/v1alpha1
 plugin/pkg/admission/initialresources
+plugin/pkg/admission/initialresources/apis/initialresources
+plugin/pkg/admission/initialresources/apis/initialresources/v1alpha1
 plugin/pkg/admission/limitranger
 plugin/pkg/admission/noderestriction
 plugin/pkg/admission/persistentvolume/label
