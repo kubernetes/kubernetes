@@ -1159,3 +1159,10 @@ func (vs *VSphere) NodeDeleted(obj interface{}) {
 	glog.V(4).Infof("Node deleted: %+v", node)
 	vs.nodeManager.UnRegisterNode(node)
 }
+
+func (vs *VSphere) NodeManager() (nodeManager *NodeManager) {
+	if vs == nil {
+		return nil
+	}
+	return vs.nodeManager
+}

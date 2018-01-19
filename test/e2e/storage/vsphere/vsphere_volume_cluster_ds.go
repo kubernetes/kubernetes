@@ -18,7 +18,6 @@ package vsphere
 
 import (
 	"fmt"
-	"os"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -43,18 +42,19 @@ import (
 var _ = utils.SIGDescribe("Volume Provisioning On Clustered Datastore [Feature:vsphere]", func() {
 	f := framework.NewDefaultFramework("volume-provision")
 
-	var client clientset.Interface
-	var namespace string
-	var scParameters map[string]string
-	var clusterDatastore string
+	var (
+		client           clientset.Interface
+		namespace        string
+		scParameters     map[string]string
+		clusterDatastore string
+	)
+
 	BeforeEach(func() {
 		framework.SkipUnlessProviderIs("vsphere")
 		client = f.ClientSet
 		namespace = f.Namespace.Name
 		scParameters = make(map[string]string)
-
-		clusterDatastore = os.Getenv("CLUSTER_DATASTORE")
-		Expect(clusterDatastore).NotTo(BeEmpty(), "Please set CLUSTER_DATASTORE system environment. eg: export CLUSTER_DATASTORE=<cluster_name>/<datastore_name")
+		clusterDatastore = GetAndExpectStringEnvVar(VCPClusterDatastore)
 	})
 
 	/*
@@ -129,9 +129,8 @@ var _ = utils.SIGDescribe("Volume Provisioning On Clustered Datastore [Feature:v
 		2. invokeValidPolicyTest - util to do e2e dynamic provision test
 	*/
 	It("verify dynamic provision with spbm policy on clustered datastore", func() {
-		storagePolicy := os.Getenv("VSPHERE_SPBM_POLICY_DS_CLUSTER")
-		Expect(storagePolicy).NotTo(BeEmpty(), "Please set VSPHERE_SPBM_POLICY_DS_CLUSTER system environment")
-		scParameters[SpbmStoragePolicy] = storagePolicy
+		policyDatastoreCluster := GetAndExpectStringEnvVar(SPBMPolicyDataStoreCluster)
+		scParameters[SpbmStoragePolicy] = policyDatastoreCluster
 		invokeValidPolicyTest(f, client, namespace, scParameters)
 	})
 })

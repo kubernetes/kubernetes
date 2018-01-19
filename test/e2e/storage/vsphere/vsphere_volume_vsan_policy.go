@@ -19,21 +19,16 @@ package vsphere
 import (
 	"fmt"
 	"hash/fnv"
-	"os"
 	"time"
 
 	"strings"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-
-	"github.com/vmware/govmomi/find"
-	"golang.org/x/net/context"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8stype "k8s.io/apimachinery/pkg/types"
 	clientset "k8s.io/client-go/kubernetes"
-	vsphere "k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
@@ -98,11 +93,15 @@ var _ = utils.SIGDescribe("Storage Policy Based Volume Provisioning [Feature:vsp
 		client       clientset.Interface
 		namespace    string
 		scParameters map[string]string
+		policyName   string
+		tagPolicy    string
 	)
 	BeforeEach(func() {
 		framework.SkipUnlessProviderIs("vsphere")
 		client = f.ClientSet
 		namespace = f.Namespace.Name
+		policyName = GetAndExpectStringEnvVar(SPBMPolicyName)
+		tagPolicy = GetAndExpectStringEnvVar(SPBMTagPolicy)
 		framework.Logf("framework: %+v", f)
 		scParameters = make(map[string]string)
 		nodeList := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
@@ -113,47 +112,47 @@ var _ = utils.SIGDescribe("Storage Policy Based Volume Provisioning [Feature:vsp
 
 	// Valid policy.
 	It("verify VSAN storage capability with valid hostFailuresToTolerate and cacheReservation values is honored for dynamically provisioned pvc using storageclass", func() {
-		By(fmt.Sprintf("Invoking Test for VSAN policy hostFailuresToTolerate: %s, cacheReservation: %s", HostFailuresToTolerateCapabilityVal, CacheReservationCapabilityVal))
+		By(fmt.Sprintf("Invoking test for VSAN policy hostFailuresToTolerate: %s, cacheReservation: %s", HostFailuresToTolerateCapabilityVal, CacheReservationCapabilityVal))
 		scParameters[Policy_HostFailuresToTolerate] = HostFailuresToTolerateCapabilityVal
 		scParameters[Policy_CacheReservation] = CacheReservationCapabilityVal
-		framework.Logf("Invoking Test for VSAN storage capabilities: %+v", scParameters)
+		framework.Logf("Invoking test for VSAN storage capabilities: %+v", scParameters)
 		invokeValidPolicyTest(f, client, namespace, scParameters)
 	})
 
 	// Valid policy.
 	It("verify VSAN storage capability with valid diskStripes and objectSpaceReservation values is honored for dynamically provisioned pvc using storageclass", func() {
-		By(fmt.Sprintf("Invoking Test for VSAN policy diskStripes: %s, objectSpaceReservation: %s", DiskStripesCapabilityVal, ObjectSpaceReservationCapabilityVal))
+		By(fmt.Sprintf("Invoking test for VSAN policy diskStripes: %s, objectSpaceReservation: %s", DiskStripesCapabilityVal, ObjectSpaceReservationCapabilityVal))
 		scParameters[Policy_DiskStripes] = "1"
 		scParameters[Policy_ObjectSpaceReservation] = "30"
-		framework.Logf("Invoking Test for VSAN storage capabilities: %+v", scParameters)
+		framework.Logf("Invoking test for VSAN storage capabilities: %+v", scParameters)
 		invokeValidPolicyTest(f, client, namespace, scParameters)
 	})
 
 	// Valid policy.
 	It("verify VSAN storage capability with valid diskStripes and objectSpaceReservation values and a VSAN datastore is honored for dynamically provisioned pvc using storageclass", func() {
-		By(fmt.Sprintf("Invoking Test for VSAN policy diskStripes: %s, objectSpaceReservation: %s", DiskStripesCapabilityVal, ObjectSpaceReservationCapabilityVal))
+		By(fmt.Sprintf("Invoking test for VSAN policy diskStripes: %s, objectSpaceReservation: %s", DiskStripesCapabilityVal, ObjectSpaceReservationCapabilityVal))
 		scParameters[Policy_DiskStripes] = DiskStripesCapabilityVal
 		scParameters[Policy_ObjectSpaceReservation] = ObjectSpaceReservationCapabilityVal
 		scParameters[Datastore] = VsanDatastore
-		framework.Logf("Invoking Test for VSAN storage capabilities: %+v", scParameters)
+		framework.Logf("Invoking test for VSAN storage capabilities: %+v", scParameters)
 		invokeValidPolicyTest(f, client, namespace, scParameters)
 	})
 
 	// Valid policy.
 	It("verify VSAN storage capability with valid objectSpaceReservation and iopsLimit values is honored for dynamically provisioned pvc using storageclass", func() {
-		By(fmt.Sprintf("Invoking Test for VSAN policy objectSpaceReservation: %s, iopsLimit: %s", ObjectSpaceReservationCapabilityVal, IopsLimitCapabilityVal))
+		By(fmt.Sprintf("Invoking test for VSAN policy objectSpaceReservation: %s, iopsLimit: %s", ObjectSpaceReservationCapabilityVal, IopsLimitCapabilityVal))
 		scParameters[Policy_ObjectSpaceReservation] = ObjectSpaceReservationCapabilityVal
 		scParameters[Policy_IopsLimit] = IopsLimitCapabilityVal
-		framework.Logf("Invoking Test for VSAN storage capabilities: %+v", scParameters)
+		framework.Logf("Invoking test for VSAN storage capabilities: %+v", scParameters)
 		invokeValidPolicyTest(f, client, namespace, scParameters)
 	})
 
 	// Invalid VSAN storage capabilties parameters.
 	It("verify VSAN storage capability with invalid capability name objectSpaceReserve is not honored for dynamically provisioned pvc using storageclass", func() {
-		By(fmt.Sprintf("Invoking Test for VSAN policy objectSpaceReserve: %s, stripeWidth: %s", ObjectSpaceReservationCapabilityVal, StripeWidthCapabilityVal))
+		By(fmt.Sprintf("Invoking test for VSAN policy objectSpaceReserve: %s, stripeWidth: %s", ObjectSpaceReservationCapabilityVal, StripeWidthCapabilityVal))
 		scParameters["objectSpaceReserve"] = ObjectSpaceReservationCapabilityVal
 		scParameters[Policy_DiskStripes] = StripeWidthCapabilityVal
-		framework.Logf("Invoking Test for VSAN storage capabilities: %+v", scParameters)
+		framework.Logf("Invoking test for VSAN storage capabilities: %+v", scParameters)
 		err := invokeInvalidPolicyTestNeg(client, namespace, scParameters)
 		Expect(err).To(HaveOccurred())
 		errorMsg := "invalid option \\\"objectSpaceReserve\\\" for volume plugin kubernetes.io/vsphere-volume"
@@ -165,10 +164,10 @@ var _ = utils.SIGDescribe("Storage Policy Based Volume Provisioning [Feature:vsp
 	// Invalid policy on a VSAN test bed.
 	// diskStripes value has to be between 1 and 12.
 	It("verify VSAN storage capability with invalid diskStripes value is not honored for dynamically provisioned pvc using storageclass", func() {
-		By(fmt.Sprintf("Invoking Test for VSAN policy diskStripes: %s, cacheReservation: %s", DiskStripesCapabilityInvalidVal, CacheReservationCapabilityVal))
+		By(fmt.Sprintf("Invoking test for VSAN policy diskStripes: %s, cacheReservation: %s", DiskStripesCapabilityInvalidVal, CacheReservationCapabilityVal))
 		scParameters[Policy_DiskStripes] = DiskStripesCapabilityInvalidVal
 		scParameters[Policy_CacheReservation] = CacheReservationCapabilityVal
-		framework.Logf("Invoking Test for VSAN storage capabilities: %+v", scParameters)
+		framework.Logf("Invoking test for VSAN storage capabilities: %+v", scParameters)
 		err := invokeInvalidPolicyTestNeg(client, namespace, scParameters)
 		Expect(err).To(HaveOccurred())
 		errorMsg := "Invalid value for " + Policy_DiskStripes + "."
@@ -180,9 +179,9 @@ var _ = utils.SIGDescribe("Storage Policy Based Volume Provisioning [Feature:vsp
 	// Invalid policy on a VSAN test bed.
 	// hostFailuresToTolerate value has to be between 0 and 3 including.
 	It("verify VSAN storage capability with invalid hostFailuresToTolerate value is not honored for dynamically provisioned pvc using storageclass", func() {
-		By(fmt.Sprintf("Invoking Test for VSAN policy hostFailuresToTolerate: %s", HostFailuresToTolerateCapabilityInvalidVal))
+		By(fmt.Sprintf("Invoking test for VSAN policy hostFailuresToTolerate: %s", HostFailuresToTolerateCapabilityInvalidVal))
 		scParameters[Policy_HostFailuresToTolerate] = HostFailuresToTolerateCapabilityInvalidVal
-		framework.Logf("Invoking Test for VSAN storage capabilities: %+v", scParameters)
+		framework.Logf("Invoking test for VSAN storage capabilities: %+v", scParameters)
 		err := invokeInvalidPolicyTestNeg(client, namespace, scParameters)
 		Expect(err).To(HaveOccurred())
 		errorMsg := "Invalid value for " + Policy_HostFailuresToTolerate + "."
@@ -194,11 +193,11 @@ var _ = utils.SIGDescribe("Storage Policy Based Volume Provisioning [Feature:vsp
 	// Specify a valid VSAN policy on a non-VSAN test bed.
 	// The test should fail.
 	It("verify VSAN storage capability with non-vsan datastore is not honored for dynamically provisioned pvc using storageclass", func() {
-		By(fmt.Sprintf("Invoking Test for VSAN policy diskStripes: %s, objectSpaceReservation: %s and a non-VSAN datastore: %s", DiskStripesCapabilityVal, ObjectSpaceReservationCapabilityVal, VmfsDatastore))
+		By(fmt.Sprintf("Invoking test for VSAN policy diskStripes: %s, objectSpaceReservation: %s and a non-VSAN datastore: %s", DiskStripesCapabilityVal, ObjectSpaceReservationCapabilityVal, VmfsDatastore))
 		scParameters[Policy_DiskStripes] = DiskStripesCapabilityVal
 		scParameters[Policy_ObjectSpaceReservation] = ObjectSpaceReservationCapabilityVal
 		scParameters[Datastore] = VmfsDatastore
-		framework.Logf("Invoking Test for VSAN storage capabilities: %+v", scParameters)
+		framework.Logf("Invoking test for VSAN storage capabilities: %+v", scParameters)
 		err := invokeInvalidPolicyTestNeg(client, namespace, scParameters)
 		Expect(err).To(HaveOccurred())
 		errorMsg := "The specified datastore: \\\"" + VmfsDatastore + "\\\" is not a VSAN datastore. " +
@@ -209,12 +208,10 @@ var _ = utils.SIGDescribe("Storage Policy Based Volume Provisioning [Feature:vsp
 	})
 
 	It("verify an existing and compatible SPBM policy is honored for dynamically provisioned pvc using storageclass", func() {
-		By(fmt.Sprintf("Invoking Test for SPBM policy: %s", os.Getenv("VSPHERE_SPBM_GOLD_POLICY")))
-		goldPolicy := os.Getenv("VSPHERE_SPBM_GOLD_POLICY")
-		Expect(goldPolicy).NotTo(BeEmpty())
-		scParameters[SpbmStoragePolicy] = goldPolicy
+		By(fmt.Sprintf("Invoking test for SPBM policy: %s", policyName))
+		scParameters[SpbmStoragePolicy] = policyName
 		scParameters[DiskFormat] = ThinDisk
-		framework.Logf("Invoking Test for SPBM storage policy: %+v", scParameters)
+		framework.Logf("Invoking test for SPBM storage policy: %+v", scParameters)
 		invokeValidPolicyTest(f, client, namespace, scParameters)
 	})
 
@@ -222,33 +219,30 @@ var _ = utils.SIGDescribe("Storage Policy Based Volume Provisioning [Feature:vsp
 		scParameters[Policy_DiskStripes] = DiskStripesCapabilityMaxVal
 		scParameters[Policy_ObjectSpaceReservation] = ObjectSpaceReservationCapabilityVal
 		scParameters[Datastore] = VsanDatastore
-		framework.Logf("Invoking Test for SPBM storage policy: %+v", scParameters)
-		clusterName := os.Getenv("VSPHERE_KUBERNETES_CLUSTER")
-		Expect(clusterName).NotTo(BeEmpty())
-		invokeStaleDummyVMTestWithStoragePolicy(client, namespace, clusterName, scParameters)
+		framework.Logf("Invoking test for SPBM storage policy: %+v", scParameters)
+		kubernetesClusterName := GetAndExpectStringEnvVar(KubernetesClusterName)
+		invokeStaleDummyVMTestWithStoragePolicy(client, namespace, kubernetesClusterName, scParameters)
 	})
 
 	It("verify if a SPBM policy is not honored on a non-compatible datastore for dynamically provisioned pvc using storageclass", func() {
-		By(fmt.Sprintf("Invoking Test for SPBM policy: %s and datastore: %s", os.Getenv("VSPHERE_SPBM_TAG_POLICY"), VsanDatastore))
-		tagPolicy := os.Getenv("VSPHERE_SPBM_TAG_POLICY")
-		Expect(tagPolicy).NotTo(BeEmpty())
+		By(fmt.Sprintf("Invoking test for SPBM policy: %s and datastore: %s", tagPolicy, VsanDatastore))
 		scParameters[SpbmStoragePolicy] = tagPolicy
 		scParameters[Datastore] = VsanDatastore
 		scParameters[DiskFormat] = ThinDisk
-		framework.Logf("Invoking Test for SPBM storage policy on a non-compatible datastore: %+v", scParameters)
+		framework.Logf("Invoking test for SPBM storage policy on a non-compatible datastore: %+v", scParameters)
 		err := invokeInvalidPolicyTestNeg(client, namespace, scParameters)
 		Expect(err).To(HaveOccurred())
-		errorMsg := "User specified datastore is not compatible with the storagePolicy: \\\"" + os.Getenv("VSPHERE_SPBM_TAG_POLICY") + "\\\""
+		errorMsg := "User specified datastore is not compatible with the storagePolicy: \\\"" + tagPolicy + "\\\""
 		if !strings.Contains(err.Error(), errorMsg) {
 			Expect(err).NotTo(HaveOccurred(), errorMsg)
 		}
 	})
 
 	It("verify if a non-existing SPBM policy is not honored for dynamically provisioned pvc using storageclass", func() {
-		By(fmt.Sprintf("Invoking Test for SPBM policy: %s", BronzeStoragePolicy))
+		By(fmt.Sprintf("Invoking test for SPBM policy: %s", BronzeStoragePolicy))
 		scParameters[SpbmStoragePolicy] = BronzeStoragePolicy
 		scParameters[DiskFormat] = ThinDisk
-		framework.Logf("Invoking Test for non-existing SPBM storage policy: %+v", scParameters)
+		framework.Logf("Invoking test for non-existing SPBM storage policy: %+v", scParameters)
 		err := invokeInvalidPolicyTestNeg(client, namespace, scParameters)
 		Expect(err).To(HaveOccurred())
 		errorMsg := "no pbm profile found with name: \\\"" + BronzeStoragePolicy + "\\"
@@ -258,14 +252,12 @@ var _ = utils.SIGDescribe("Storage Policy Based Volume Provisioning [Feature:vsp
 	})
 
 	It("verify an if a SPBM policy and VSAN capabilities cannot be honored for dynamically provisioned pvc using storageclass", func() {
-		By(fmt.Sprintf("Invoking Test for SPBM policy: %s with VSAN storage capabilities", os.Getenv("VSPHERE_SPBM_GOLD_POLICY")))
-		goldPolicy := os.Getenv("VSPHERE_SPBM_GOLD_POLICY")
-		Expect(goldPolicy).NotTo(BeEmpty())
-		scParameters[SpbmStoragePolicy] = goldPolicy
+		By(fmt.Sprintf("Invoking test for SPBM policy: %s with VSAN storage capabilities", policyName))
+		scParameters[SpbmStoragePolicy] = policyName
 		Expect(scParameters[SpbmStoragePolicy]).NotTo(BeEmpty())
 		scParameters[Policy_DiskStripes] = DiskStripesCapabilityVal
 		scParameters[DiskFormat] = ThinDisk
-		framework.Logf("Invoking Test for SPBM storage policy and VSAN capabilities together: %+v", scParameters)
+		framework.Logf("Invoking test for SPBM storage policy and VSAN capabilities together: %+v", scParameters)
 		err := invokeInvalidPolicyTestNeg(client, namespace, scParameters)
 		Expect(err).To(HaveOccurred())
 		errorMsg := "Cannot specify storage policy capabilities along with storage policy name. Please specify only one"
@@ -355,23 +347,7 @@ func invokeStaleDummyVMTestWithStoragePolicy(client clientset.Interface, namespa
 	fnvHash.Write([]byte(vmName))
 	dummyVMFullName := DummyVMPrefixName + "-" + fmt.Sprint(fnvHash.Sum32())
 	errorMsg := "Dummy VM - " + vmName + "is still present. Failing the test.."
-	Expect(isDummyVMPresent(dummyVMFullName)).NotTo(BeTrue(), errorMsg)
-}
-
-func isDummyVMPresent(vmName string) bool {
-	By("Verifing if the dummy VM is deleted by the vSphere Cloud Provider clean up routine")
-	govMoMiClient, err := vsphere.GetgovmomiClient(nil)
+	vsp, err := getVSphere(client)
 	Expect(err).NotTo(HaveOccurred())
-
-	f := find.NewFinder(govMoMiClient.Client, true)
-	ctx, _ := context.WithCancel(context.Background())
-
-	workingDir := os.Getenv("VSPHERE_WORKING_DIR")
-	Expect(workingDir).NotTo(BeEmpty())
-	vmPath := workingDir + vmName
-	_, err = f.VirtualMachine(ctx, vmPath)
-	if err != nil {
-		return false
-	}
-	return true
+	Expect(vsp.IsDummyVMPresent(dummyVMFullName)).NotTo(BeTrue(), errorMsg)
 }
