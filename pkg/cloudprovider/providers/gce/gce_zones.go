@@ -17,13 +17,14 @@ limitations under the License.
 package gce
 
 import (
-	"fmt"
+	"context"
 	"strings"
 
 	compute "google.golang.org/api/compute/v1"
 
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/cloudprovider"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud/filter"
 )
 
 func newZonesMetricContext(request, region string) *metricContext {
@@ -72,12 +73,11 @@ func (gce *GCECloud) GetZoneByNodeName(nodeName types.NodeName) (cloudprovider.Z
 // ListZonesInRegion returns all zones in a GCP region
 func (gce *GCECloud) ListZonesInRegion(region string) ([]*compute.Zone, error) {
 	mc := newZonesMetricContext("list", region)
-	filter := fmt.Sprintf("region eq %v", gce.getRegionLink(region))
-	list, err := gce.service.Zones.List(gce.projectID).Filter(filter).Do()
+	list, err := gce.c.Zones().List(context.Background(), filter.Regexp("region", gce.getRegionLink(region)))
 	if err != nil {
 		return nil, mc.Observe(err)
 	}
-	return list.Items, mc.Observe(err)
+	return list, mc.Observe(err)
 }
 
 func (gce *GCECloud) getRegionLink(region string) string {
