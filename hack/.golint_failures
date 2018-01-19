@@ -604,7 +604,6 @@ staging/src/k8s.io/apiserver/pkg/util/wsstream
 staging/src/k8s.io/apiserver/plugin/pkg/audit/log
 staging/src/k8s.io/apiserver/plugin/pkg/authenticator/password/passwordfile
 staging/src/k8s.io/apiserver/plugin/pkg/authenticator/token/oidc
-staging/src/k8s.io/apiserver/plugin/pkg/authenticator/token/oidc/testing
 staging/src/k8s.io/apiserver/plugin/pkg/authenticator/token/tokentest
 staging/src/k8s.io/apiserver/plugin/pkg/authenticator/token/webhook
 staging/src/k8s.io/apiserver/plugin/pkg/authorizer/webhook
@@ -672,7 +671,6 @@ staging/src/k8s.io/client-go/kubernetes/typed/storage/v1alpha1
 staging/src/k8s.io/client-go/kubernetes/typed/storage/v1alpha1/fake
 staging/src/k8s.io/client-go/kubernetes/typed/storage/v1beta1
 staging/src/k8s.io/client-go/kubernetes/typed/storage/v1beta1/fake
-staging/src/k8s.io/client-go/plugin/pkg/auth/authenticator/token/oidc/testing
 staging/src/k8s.io/client-go/plugin/pkg/client/auth/oidc
 staging/src/k8s.io/client-go/rest
 staging/src/k8s.io/client-go/rest/fake
