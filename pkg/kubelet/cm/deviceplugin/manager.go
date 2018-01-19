@@ -287,7 +287,7 @@ func (m *ManagerImpl) Register(ctx context.Context, r *pluginapi.RegisterRequest
 	glog.Infof("Got registration request from device plugin with resource name %q", r.ResourceName)
 	metrics.DevicePluginRegistrationCount.WithLabelValues(r.ResourceName).Inc()
 	if r.Version != pluginapi.Version {
-		errorString := fmt.Sprintf(errUnsuportedVersion, r.Version, pluginapi.Version)
+		errorString := fmt.Sprintf(errUnsupportedVersion, r.Version, pluginapi.Version)
 		glog.Infof("Bad registration request from device plugin with resource name %q: %v", r.ResourceName, errorString)
 		return &pluginapi.Empty{}, fmt.Errorf(errorString)
 	}
