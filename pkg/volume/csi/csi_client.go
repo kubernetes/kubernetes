@@ -41,6 +41,7 @@ type csiClient interface {
 		accessMode api.PersistentVolumeAccessMode,
 		volumeInfo map[string]string,
 		volumeAttribs map[string]string,
+		userCredentials map[string]string,
 		fsType string,
 	) error
 	NodeUnpublishVolume(ctx grpctx.Context, volID string, targetPath string) error
@@ -151,6 +152,7 @@ func (c *csiDriverClient) NodePublishVolume(
 	accessMode api.PersistentVolumeAccessMode,
 	volumeInfo map[string]string,
 	volumeAttribs map[string]string,
+	userCredentials map[string]string,
 	fsType string,
 ) error {
 	glog.V(4).Info(log("calling NodePublishVolume rpc [volid=%s,target_path=%s]", volID, targetPath))
@@ -172,7 +174,7 @@ func (c *csiDriverClient) NodePublishVolume(
 		Readonly:          readOnly,
 		PublishVolumeInfo: volumeInfo,
 		VolumeAttributes:  volumeAttribs,
-
+		UserCredentials:   userCredentials,
 		VolumeCapability: &csipb.VolumeCapability{
 			AccessMode: &csipb.VolumeCapability_AccessMode{
 				Mode: asCSIAccessMode(accessMode),
