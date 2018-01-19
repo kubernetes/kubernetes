@@ -610,9 +610,6 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 			if err != nil {
 				return nil, err
 			}
-			if err := ds.Start(); err != nil {
-				return nil, err
-			}
 			// For now, the CRI shim redirects the streaming requests to the
 			// kubelet, which handles the requests using DockerService..
 			klet.criHandler = ds
