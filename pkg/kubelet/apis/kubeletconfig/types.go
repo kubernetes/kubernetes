@@ -254,6 +254,10 @@ type KubeletConfiguration struct {
 	FeatureGates map[string]bool
 	// Tells the Kubelet to fail to start if swap is enabled on the node.
 	FailSwapOn bool
+	// CertBeginRotationFraction determines how far into the life of a
+	// certificate the kubelet will wait before it begins attempting to rotate the
+	// certificate. Default value is 0.8. Requires certificate rotation to be enabled.
+	CertBeginRotationFraction float64
 
 	/* following flags are meant for Node Allocatable */
 

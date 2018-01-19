@@ -89,6 +89,12 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration) error 
 	if kc.RegistryPullQPS < 0 {
 		allErrors = append(allErrors, fmt.Errorf("Invalid configuration: RegistryPullQPS (--registry-qps) %v must not be a negative number", kc.RegistryPullQPS))
 	}
+
+	if kc.CertBeginRotationFraction <= 0 || kc.CertBeginRotationFraction >= .95 {
+		allErrors = append(allErrors, fmt.Errorf("configuration: CertBeginRotationFraction (--cert-rotate-after) %v must be between 0 and .95 exclusive", kc.CertBeginRotationFraction))
+	} else {
+	}
+
 	for _, val := range kc.EnforceNodeAllocatable {
 		switch val {
 		case kubetypes.NodeAllocatableEnforcementKey:

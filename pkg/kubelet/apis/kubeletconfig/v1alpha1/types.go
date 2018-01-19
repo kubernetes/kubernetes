@@ -250,6 +250,10 @@ type KubeletConfiguration struct {
 	// Tells the Kubelet to fail to start if swap is enabled on the node.
 	FailSwapOn *bool `json:"failSwapOn,omitempty"`
 
+	// CertBeginRotationFraction determines how far into the life of a
+	// certificate the kubelet will wait before it begins attempting to rotate the
+	// certificate. Default value is 0.8. Requires certificate rotation to be enabled.
+	CertBeginRotationFraction float64
 	/* following flags are meant for Node Allocatable */
 
 	// A set of ResourceName=ResourceQuantity (e.g. cpu=200m,memory=150G) pairs

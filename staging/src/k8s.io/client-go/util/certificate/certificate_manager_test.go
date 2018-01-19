@@ -110,6 +110,8 @@ bDQT1r8Q3Gx+h9LRqQeHgPBQ3F5ylqqBAiBaJ0hkYvrIdWxNlcLqD3065bJpHQ4S
 WQkuZUQN1M/Xvg==
 -----END RSA PRIVATE KEY-----`)
 
+var defaultRotationFraction = .8
+
 type certificateData struct {
 	keyPEM         []byte
 	certificatePEM []byte
@@ -148,39 +150,47 @@ func TestNewManagerNoRotation(t *testing.T) {
 
 func TestShouldRotate(t *testing.T) {
 	now := time.Now()
-	tests := []struct {
-		name         string
-		notBefore    time.Time
-		notAfter     time.Time
-		shouldRotate bool
+	testCases := []struct {
+		name             string
+		notBefore        time.Time
+		notAfter         time.Time
+		shouldRotate     bool
+		rotationFraction float64
 	}{
-		{"just issued, still good", now.Add(-1 * time.Hour), now.Add(99 * time.Hour), false},
-		{"half way expired, still good", now.Add(-24 * time.Hour), now.Add(24 * time.Hour), false},
-		{"mostly expired, still good", now.Add(-69 * time.Hour), now.Add(31 * time.Hour), false},
-		{"just about expired, should rotate", now.Add(-91 * time.Hour), now.Add(9 * time.Hour), true},
-		{"nearly expired, should rotate", now.Add(-99 * time.Hour), now.Add(1 * time.Hour), true},
-		{"already expired, should rotate", now.Add(-10 * time.Hour), now.Add(-1 * time.Hour), true},
+		{"just issued, still good", now.Add(-1 * time.Hour), now.Add(99 * time.Hour), false, defaultRotationFraction},
+		{"half way expired, still good", now.Add(-24 * time.Hour), now.Add(24 * time.Hour), false, defaultRotationFraction},
+		{"mostly expired, still good", now.Add(-69 * time.Hour), now.Add(31 * time.Hour), false, defaultRotationFraction},
+		{"just about expired, should rotate", now.Add(-91 * time.Hour), now.Add(9 * time.Hour), true, defaultRotationFraction},
+		{"nearly expired, should rotate", now.Add(-99 * time.Hour), now.Add(1 * time.Hour), true, defaultRotationFraction},
+		{"already expired, should rotate", now.Add(-10 * time.Hour), now.Add(-1 * time.Hour), true, defaultRotationFraction},
+		{"mostly expired, but rotate early", now.Add(-69 * time.Hour), now.Add(31 * time.Hour), true, .2},
+		{"half way expired, rotate at 25%%", now.Add(-24 * time.Hour), now.Add(24 * time.Hour), true, .25},
+		{"half way expired, rotate at .75%%", now.Add(-24 * time.Hour), now.Add(24 * time.Hour), false, .75},
+		{"80%% expired, rotate at 70%%", now.Add(-80 * time.Hour), now.Add(20 * time.Hour), true, .7},
+		{"80%% expired, rotate at 90%%", now.Add(-80 * time.Hour), now.Add(20 * time.Hour), false, .9},
+		{"2%% expired, rotate at 1%%", now.Add(-2 * time.Hour), now.Add(98 * time.Hour), true, .01},
 	}
 
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
 			m := manager{
 				cert: &tls.Certificate{
 					Leaf: &x509.Certificate{
-						NotBefore: test.notBefore,
-						NotAfter:  test.notAfter,
+						NotBefore: tc.notBefore,
+						NotAfter:  tc.notAfter,
 					},
 				},
 				template: &x509.CertificateRequest{},
 				usages:   []certificates.KeyUsage{},
+				certBeginRotationFraction: tc.rotationFraction,
 			}
 			m.setRotationDeadline()
-			if m.shouldRotate() != test.shouldRotate {
+			if m.shouldRotate() != tc.shouldRotate {
 				t.Errorf("Time %v, a certificate issued for (%v, %v) should rotate should be %t.",
 					now,
 					m.cert.Leaf.NotBefore,
 					m.cert.Leaf.NotAfter,
-					test.shouldRotate)
+					tc.shouldRotate)
 			}
 		})
 	}
@@ -201,19 +211,23 @@ func TestSetRotationDeadline(t *testing.T) {
 
 	now := time.Now()
 	testCases := []struct {
-		name         string
-		notBefore    time.Time
-		notAfter     time.Time
-		shouldRotate bool
+		name             string
+		notBefore        time.Time
+		notAfter         time.Time
+		rotationFraction float64
 	}{
-		{"just issued, still good", now.Add(-1 * time.Hour), now.Add(99 * time.Hour), false},
-		{"half way expired, still good", now.Add(-24 * time.Hour), now.Add(24 * time.Hour), false},
-		{"mostly expired, still good", now.Add(-69 * time.Hour), now.Add(31 * time.Hour), false},
-		{"just about expired, should rotate", now.Add(-91 * time.Hour), now.Add(9 * time.Hour), true},
-		{"nearly expired, should rotate", now.Add(-99 * time.Hour), now.Add(1 * time.Hour), true},
-		{"already expired, should rotate", now.Add(-10 * time.Hour), now.Add(-1 * time.Hour), true},
-		{"long duration", now.Add(-6 * 30 * 24 * time.Hour), now.Add(6 * 30 * 24 * time.Hour), true},
-		{"short duration", now.Add(-30 * time.Second), now.Add(30 * time.Second), true},
+		{"just issued, still good", now.Add(-1 * time.Hour), now.Add(99 * time.Hour), defaultRotationFraction},
+		{"half way expired, still good", now.Add(-24 * time.Hour), now.Add(24 * time.Hour), defaultRotationFraction},
+		{"mostly expired, still good", now.Add(-69 * time.Hour), now.Add(31 * time.Hour), defaultRotationFraction},
+		{"just about expired, should rotate", now.Add(-91 * time.Hour), now.Add(9 * time.Hour), defaultRotationFraction},
+		{"nearly expired, should rotate", now.Add(-99 * time.Hour), now.Add(1 * time.Hour), defaultRotationFraction},
+		{"already expired, should rotate", now.Add(-10 * time.Hour), now.Add(-1 * time.Hour), defaultRotationFraction},
+		{"mostly expired, but rotate early", now.Add(-69 * time.Hour), now.Add(31 * time.Hour), .2},
+		{"half way expired, rotate at 25%%", now.Add(-24 * time.Hour), now.Add(24 * time.Hour), .25},
+		{"half way expired, rotate at .75%%", now.Add(-24 * time.Hour), now.Add(24 * time.Hour), .75},
+		{"80%% expired, rotate at 70%%", now.Add(-80 * time.Hour), now.Add(20 * time.Hour), .7},
+		{"80%% expired, rotate at 90%%", now.Add(-80 * time.Hour), now.Add(20 * time.Hour), .9},
+		{"2%% expired, rotate at 1%%", now.Add(-2 * time.Hour), now.Add(98 * time.Hour), .01},
 	}
 
 	for _, tc := range testCases {
@@ -226,12 +240,15 @@ func TestSetRotationDeadline(t *testing.T) {
 						NotAfter:  tc.notAfter,
 					},
 				},
-				template:              &x509.CertificateRequest{},
-				usages:                []certificates.KeyUsage{},
-				certificateExpiration: &g,
+				template:                  &x509.CertificateRequest{},
+				usages:                    []certificates.KeyUsage{},
+				certificateExpiration:     &g,
+				certBeginRotationFraction: tc.rotationFraction,
 			}
-			jitteryDuration = func(float64) time.Duration { return time.Duration(float64(tc.notAfter.Sub(tc.notBefore)) * 0.7) }
-			lowerBound := tc.notBefore.Add(time.Duration(float64(tc.notAfter.Sub(tc.notBefore)) * 0.7))
+			jitteryDuration = func(float64) time.Duration {
+				return time.Duration(float64(tc.notAfter.Sub(tc.notBefore)) * tc.rotationFraction)
+			}
+			lowerBound := tc.notBefore.Add(time.Duration(float64(tc.notAfter.Sub(tc.notBefore)) * tc.rotationFraction))
 
 			m.setRotationDeadline()
 
@@ -266,6 +283,7 @@ func TestRotateCertCreateCSRError(t *testing.T) {
 		certSigningRequestClient: fakeClient{
 			failureType: createError,
 		},
+		certBeginRotationFraction: defaultRotationFraction,
 	}
 
 	if success, err := m.rotateCerts(); success {
@@ -289,6 +307,7 @@ func TestRotateCertWaitingForResultError(t *testing.T) {
 		certSigningRequestClient: fakeClient{
 			failureType: watchError,
 		},
+		certBeginRotationFraction: defaultRotationFraction,
 	}
 
 	certificateWaitBackoff = wait.Backoff{Steps: 1}
@@ -304,11 +323,12 @@ func TestNewManagerBootstrap(t *testing.T) {
 
 	var cm Manager
 	cm, err := NewManager(&Config{
-		Template:                &x509.CertificateRequest{},
-		Usages:                  []certificates.KeyUsage{},
-		CertificateStore:        store,
-		BootstrapCertificatePEM: bootstrapCertData.certificatePEM,
-		BootstrapKeyPEM:         bootstrapCertData.keyPEM,
+		Template:                  &x509.CertificateRequest{},
+		Usages:                    []certificates.KeyUsage{},
+		CertificateStore:          store,
+		BootstrapCertificatePEM:   bootstrapCertData.certificatePEM,
+		BootstrapKeyPEM:           bootstrapCertData.keyPEM,
+		CertBeginRotationFraction: defaultRotationFraction,
 	})
 	if err != nil {
 		t.Fatalf("Failed to initialize the certificate manager: %v", err)
@@ -341,11 +361,12 @@ func TestNewManagerNoBootstrap(t *testing.T) {
 	}
 
 	cm, err := NewManager(&Config{
-		Template:                &x509.CertificateRequest{},
-		Usages:                  []certificates.KeyUsage{},
-		CertificateStore:        store,
-		BootstrapCertificatePEM: bootstrapCertData.certificatePEM,
-		BootstrapKeyPEM:         bootstrapCertData.keyPEM,
+		Template:                  &x509.CertificateRequest{},
+		Usages:                    []certificates.KeyUsage{},
+		CertificateStore:          store,
+		BootstrapCertificatePEM:   bootstrapCertData.certificatePEM,
+		BootstrapKeyPEM:           bootstrapCertData.keyPEM,
+		CertBeginRotationFraction: defaultRotationFraction,
 	})
 
 	if err != nil {
@@ -494,9 +515,10 @@ func TestInitializeCertificateSigningRequestClient(t *testing.T) {
 					certificates.UsageKeyEncipherment,
 					certificates.UsageClientAuth,
 				},
-				CertificateStore:        certificateStore,
-				BootstrapCertificatePEM: tc.bootstrapCert.certificatePEM,
-				BootstrapKeyPEM:         tc.bootstrapCert.keyPEM,
+				CertificateStore:          certificateStore,
+				BootstrapCertificatePEM:   tc.bootstrapCert.certificatePEM,
+				BootstrapKeyPEM:           tc.bootstrapCert.keyPEM,
+				CertBeginRotationFraction: defaultRotationFraction,
 			})
 			if err != nil {
 				t.Errorf("Got %v, wanted no error.", err)
@@ -601,6 +623,7 @@ func TestInitializeOtherRESTClients(t *testing.T) {
 				CertificateSigningRequestClient: &fakeClient{
 					certificatePEM: tc.apiCert.certificatePEM,
 				},
+				CertBeginRotationFraction: defaultRotationFraction,
 			})
 			if err != nil {
 				t.Errorf("Got %v, wanted no error.", err)
@@ -756,6 +779,7 @@ func TestServerHealth(t *testing.T) {
 					failureType:    tc.failureType,
 					err:            tc.clientErr,
 				},
+				CertBeginRotationFraction: defaultRotationFraction,
 			})
 			if err != nil {
 				t.Errorf("Got %v, wanted no error.", err)

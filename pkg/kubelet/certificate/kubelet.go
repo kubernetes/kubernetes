@@ -96,7 +96,7 @@ func NewKubeletServerCertificateManager(kubeClient clientset.Interface, kubeCfg 
 // client that can be used to sign new certificates (or rotate). It answers with
 // whatever certificate it is initialized with. If a CSR client is set later, it
 // may begin rotating/renewing the client cert
-func NewKubeletClientCertificateManager(certDirectory string, nodeName types.NodeName, certData []byte, keyData []byte, certFile string, keyFile string) (certificate.Manager, error) {
+func NewKubeletClientCertificateManager(certDirectory string, nodeName types.NodeName, certData []byte, keyData []byte, certFile string, keyFile string, certBeginRotationFraction float64) (certificate.Manager, error) {
 	certificateStore, err := certificate.NewFileStore(
 		"kubelet-client",
 		certDirectory,
@@ -138,10 +138,11 @@ func NewKubeletClientCertificateManager(certDirectory string, nodeName types.Nod
 			// authenticate itself to the TLS server.
 			certificates.UsageClientAuth,
 		},
-		CertificateStore:        certificateStore,
-		BootstrapCertificatePEM: certData,
-		BootstrapKeyPEM:         keyData,
-		CertificateExpiration:   certificateExpiration,
+		CertificateStore:          certificateStore,
+		BootstrapCertificatePEM:   certData,
+		BootstrapKeyPEM:           keyData,
+		CertificateExpiration:     certificateExpiration,
+		CertBeginRotationFraction: certBeginRotationFraction,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize client certificate manager: %v", err)

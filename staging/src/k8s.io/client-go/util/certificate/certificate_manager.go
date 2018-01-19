@@ -105,6 +105,11 @@ type Config struct {
 	// CertificateExpiration will record a metric that shows the remaining
 	// lifetime of the certificate.
 	CertificateExpiration Gauge
+
+	// CertBeginRotationFraction determines how far into the life of a
+	// certificate the kubelet will wait before it begins attempting to rotate the
+	// certificate. Default value is 0.8.
+	CertBeginRotationFraction float64
 }
 
 // Store is responsible for getting and updating the current certificate.
@@ -135,16 +140,17 @@ type NoCertKeyError string
 func (e *NoCertKeyError) Error() string { return string(*e) }
 
 type manager struct {
-	certSigningRequestClient certificatesclient.CertificateSigningRequestInterface
-	template                 *x509.CertificateRequest
-	usages                   []certificates.KeyUsage
-	certStore                Store
-	certAccessLock           sync.RWMutex
-	cert                     *tls.Certificate
-	rotationDeadline         time.Time
-	forceRotation            bool
-	certificateExpiration    Gauge
-	serverHealth             bool
+	certSigningRequestClient  certificatesclient.CertificateSigningRequestInterface
+	template                  *x509.CertificateRequest
+	usages                    []certificates.KeyUsage
+	certStore                 Store
+	certAccessLock            sync.RWMutex
+	cert                      *tls.Certificate
+	rotationDeadline          time.Time
+	forceRotation             bool
+	certificateExpiration     Gauge
+	serverHealth              bool
+	certBeginRotationFraction float64
 }
 
 // NewManager returns a new certificate manager. A certificate manager is
@@ -160,15 +166,15 @@ func NewManager(config *Config) (Manager, error) {
 	}
 
 	m := manager{
-		certSigningRequestClient: config.CertificateSigningRequestClient,
-		template:                 config.Template,
-		usages:                   config.Usages,
-		certStore:                config.CertificateStore,
-		cert:                     cert,
-		forceRotation:            forceRotation,
-		certificateExpiration:    config.CertificateExpiration,
+		certSigningRequestClient:  config.CertificateSigningRequestClient,
+		template:                  config.Template,
+		usages:                    config.Usages,
+		certStore:                 config.CertificateStore,
+		cert:                      cert,
+		forceRotation:             forceRotation,
+		certificateExpiration:     config.CertificateExpiration,
+		certBeginRotationFraction: config.CertBeginRotationFraction,
 	}
-
 	return &m, nil
 }
 
@@ -368,23 +374,23 @@ func (m *manager) setRotationDeadline() {
 	notAfter := m.cert.Leaf.NotAfter
 	totalDuration := float64(notAfter.Sub(m.cert.Leaf.NotBefore))
 
-	m.rotationDeadline = m.cert.Leaf.NotBefore.Add(jitteryDuration(totalDuration))
+	m.rotationDeadline = m.cert.Leaf.NotBefore.Add(jitteryDuration(totalDuration * m.certBeginRotationFraction))
 	glog.V(2).Infof("Certificate expiration is %v, rotation deadline is %v", notAfter, m.rotationDeadline)
 	if m.certificateExpiration != nil {
 		m.certificateExpiration.Set(float64(notAfter.Unix()))
 	}
 }
 
-// jitteryDuration uses some jitter to set the rotation threshold so each node
-// will rotate at approximately 70-90% of the total lifetime of the
-// certificate.  With jitter, if a number of nodes are added to a cluster at
+// Returns a random time within totalDuration +- 5%.
+// Jitter is added so that if a number of nodes are added to a cluster at
 // approximately the same time (such as cluster creation time), they won't all
 // try to rotate certificates at the same time for the rest of the life of the
 // cluster.
 //
 // This function is represented as a variable to allow replacement during testing.
 var jitteryDuration = func(totalDuration float64) time.Duration {
-	return wait.Jitter(time.Duration(totalDuration), 0.2) - time.Duration(totalDuration*0.3)
+	const JitterFactor = 0.1
+	return wait.Jitter(time.Duration(totalDuration), JitterFactor) - time.Duration((totalDuration * JitterFactor / 2))
 }
 
 // updateCached sets the most recent retrieved cert. It also sets the server
