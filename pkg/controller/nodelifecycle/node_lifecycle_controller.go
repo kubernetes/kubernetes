@@ -39,14 +39,13 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
-	v1node "k8s.io/kubernetes/pkg/api/v1/node"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/nodelifecycle/scheduler"
-	nodeutil "k8s.io/kubernetes/pkg/controller/util/node"
+	controllernodeutil "k8s.io/kubernetes/pkg/controller/util/node"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/pkg/util/metrics"
-	utilnode "k8s.io/kubernetes/pkg/util/node"
+	nodeutil "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/util/system"
 	taintutils "k8s.io/kubernetes/pkg/util/taints"
 	utilversion "k8s.io/kubernetes/pkg/util/version"
@@ -236,7 +235,7 @@ func NewNodeLifecycleController(podInformer coreinformers.PodInformer,
 		knownNodeSet:  make(map[string]*v1.Node),
 		nodeStatusMap: make(map[string]nodeStatusData),
 		nodeExistsInCloudProvider: func(nodeName types.NodeName) (bool, error) {
-			return nodeutil.ExistsInCloudProvider(cloud, nodeName)
+			return controllernodeutil.ExistsInCloudProvider(cloud, nodeName)
 		},
 		recorder:                    recorder,
 		nodeMonitorPeriod:           nodeMonitorPeriod,
@@ -301,15 +300,15 @@ func NewNodeLifecycleController(podInformer coreinformers.PodInformer,
 	if nc.runTaintManager {
 		nc.taintManager = scheduler.NewNoExecuteTaintManager(kubeClient)
 		nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-			AddFunc: nodeutil.CreateAddNodeHandler(func(node *v1.Node) error {
+			AddFunc: controllernodeutil.CreateAddNodeHandler(func(node *v1.Node) error {
 				nc.taintManager.NodeUpdated(nil, node)
 				return nil
 			}),
-			UpdateFunc: nodeutil.CreateUpdateNodeHandler(func(oldNode, newNode *v1.Node) error {
+			UpdateFunc: controllernodeutil.CreateUpdateNodeHandler(func(oldNode, newNode *v1.Node) error {
 				nc.taintManager.NodeUpdated(oldNode, newNode)
 				return nil
 			}),
-			DeleteFunc: nodeutil.CreateDeleteNodeHandler(func(node *v1.Node) error {
+			DeleteFunc: controllernodeutil.CreateDeleteNodeHandler(func(node *v1.Node) error {
 				nc.taintManager.NodeUpdated(node, nil)
 				return nil
 			}),
@@ -319,10 +318,10 @@ func NewNodeLifecycleController(podInformer coreinformers.PodInformer,
 	if nc.taintNodeByCondition {
 		glog.Infof("Controller will taint node by condition.")
 		nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-			AddFunc: nodeutil.CreateAddNodeHandler(func(node *v1.Node) error {
+			AddFunc: controllernodeutil.CreateAddNodeHandler(func(node *v1.Node) error {
 				return nc.doNoScheduleTaintingPass(node)
 			}),
-			UpdateFunc: nodeutil.CreateUpdateNodeHandler(func(_, newNode *v1.Node) error {
+			UpdateFunc: controllernodeutil.CreateUpdateNodeHandler(func(_, newNode *v1.Node) error {
 				return nc.doNoScheduleTaintingPass(newNode)
 			}),
 		})
@@ -331,10 +330,10 @@ func NewNodeLifecycleController(podInformer coreinformers.PodInformer,
 	// NOTE(resouer): nodeInformer to substitute deprecated taint key (notReady -> not-ready).
 	// Remove this logic when we don't need this backwards compatibility
 	nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: nodeutil.CreateAddNodeHandler(func(node *v1.Node) error {
+		AddFunc: controllernodeutil.CreateAddNodeHandler(func(node *v1.Node) error {
 			return nc.doFixDeprecatedTaintKeyPass(node)
 		}),
-		UpdateFunc: nodeutil.CreateUpdateNodeHandler(func(_, newNode *v1.Node) error {
+		UpdateFunc: controllernodeutil.CreateUpdateNodeHandler(func(_, newNode *v1.Node) error {
 			return nc.doFixDeprecatedTaintKeyPass(newNode)
 		}),
 	})
@@ -416,7 +415,7 @@ func (nc *Controller) doFixDeprecatedTaintKeyPass(node *v1.Node) error {
 	glog.Warningf("Detected deprecated taint keys: %v on node: %v, will substitute them with %v",
 		taintsToDel, node.GetName(), taintsToAdd)
 
-	if !nodeutil.SwapNodeControllerTaint(nc.kubeClient, taintsToAdd, taintsToDel, node) {
+	if !controllernodeutil.SwapNodeControllerTaint(nc.kubeClient, taintsToAdd, taintsToDel, node) {
 		return fmt.Errorf("failed to swap taints of node %+v", node)
 	}
 	return nil
@@ -444,7 +443,7 @@ func (nc *Controller) doNoScheduleTaintingPass(node *v1.Node) error {
 	if len(taintsToAdd) == 0 && len(taintsToDel) == 0 {
 		return nil
 	}
-	if !nodeutil.SwapNodeControllerTaint(nc.kubeClient, taintsToAdd, taintsToDel, node) {
+	if !controllernodeutil.SwapNodeControllerTaint(nc.kubeClient, taintsToAdd, taintsToDel, node) {
 		return fmt.Errorf("failed to swap taints of node %+v", node)
 	}
 	return nil
@@ -465,10 +464,10 @@ func (nc *Controller) doNoExecuteTaintingPass() {
 				// retry in 50 millisecond
 				return false, 50 * time.Millisecond
 			} else {
-				zone := utilnode.GetZoneKey(node)
+				zone := nodeutil.GetZoneKey(node)
 				evictionsNumber.WithLabelValues(zone).Inc()
 			}
-			_, condition := v1node.GetNodeCondition(&node.Status, v1.NodeReady)
+			_, condition := nodeutil.GetNodeCondition(&node.Status, v1.NodeReady)
 			// Because we want to mimic NodeStatus.Condition["Ready"] we make "unreachable" and "not ready" taints mutually exclusive.
 			taintToAdd := v1.Taint{}
 			oppositeTaint := v1.Taint{}
@@ -484,7 +483,7 @@ func (nc *Controller) doNoExecuteTaintingPass() {
 				return true, 0
 			}
 
-			return nodeutil.SwapNodeControllerTaint(nc.kubeClient, []*v1.Taint{&taintToAdd}, []*v1.Taint{&oppositeTaint}, node), 0
+			return controllernodeutil.SwapNodeControllerTaint(nc.kubeClient, []*v1.Taint{&taintToAdd}, []*v1.Taint{&oppositeTaint}, node), 0
 		})
 	}
 }
@@ -501,11 +500,11 @@ func (nc *Controller) doEvictionPass() {
 			} else if err != nil {
 				glog.Warningf("Failed to get Node %v from the nodeLister: %v", value.Value, err)
 			} else {
-				zone := utilnode.GetZoneKey(node)
+				zone := nodeutil.GetZoneKey(node)
 				evictionsNumber.WithLabelValues(zone).Inc()
 			}
 			nodeUID, _ := value.UID.(string)
-			remaining, err := nodeutil.DeletePods(nc.kubeClient, nc.recorder, value.Value, nodeUID, nc.daemonSetStore)
+			remaining, err := controllernodeutil.DeletePods(nc.kubeClient, nc.recorder, value.Value, nodeUID, nc.daemonSetStore)
 			if err != nil {
 				utilruntime.HandleError(fmt.Errorf("unable to evict node %q: %v", value.Value, err))
 				return false, 0
@@ -536,7 +535,7 @@ func (nc *Controller) monitorNodeStatus() error {
 
 	for i := range added {
 		glog.V(1).Infof("Controller observed a new Node: %#v", added[i].Name)
-		nodeutil.RecordNodeEvent(nc.recorder, added[i].Name, string(added[i].UID), v1.EventTypeNormal, "RegisteredNode", fmt.Sprintf("Registered Node %v in Controller", added[i].Name))
+		controllernodeutil.RecordNodeEvent(nc.recorder, added[i].Name, string(added[i].UID), v1.EventTypeNormal, "RegisteredNode", fmt.Sprintf("Registered Node %v in Controller", added[i].Name))
 		nc.knownNodeSet[added[i].Name] = added[i]
 		nc.addPodEvictorForNewZone(added[i])
 		if nc.useTaintBasedEvictions {
@@ -548,7 +547,7 @@ func (nc *Controller) monitorNodeStatus() error {
 
 	for i := range deleted {
 		glog.V(1).Infof("Controller observed a Node deletion: %v", deleted[i].Name)
-		nodeutil.RecordNodeEvent(nc.recorder, deleted[i].Name, string(deleted[i].UID), v1.EventTypeNormal, "RemovingNode", fmt.Sprintf("Removing Node %v from Controller", deleted[i].Name))
+		controllernodeutil.RecordNodeEvent(nc.recorder, deleted[i].Name, string(deleted[i].UID), v1.EventTypeNormal, "RemovingNode", fmt.Sprintf("Removing Node %v from Controller", deleted[i].Name))
 		delete(nc.knownNodeSet, deleted[i].Name)
 	}
 
@@ -578,7 +577,7 @@ func (nc *Controller) monitorNodeStatus() error {
 
 		// We do not treat a master node as a part of the cluster for network disruption checking.
 		if !system.IsMasterNode(node.Name) {
-			zoneToNodeConditions[utilnode.GetZoneKey(node)] = append(zoneToNodeConditions[utilnode.GetZoneKey(node)], currentReadyCondition)
+			zoneToNodeConditions[nodeutil.GetZoneKey(node)] = append(zoneToNodeConditions[nodeutil.GetZoneKey(node)], currentReadyCondition)
 		}
 
 		decisionTimestamp := nc.now()
@@ -589,7 +588,7 @@ func (nc *Controller) monitorNodeStatus() error {
 					// We want to update the taint straight away if Node is already tainted with the UnreachableTaint
 					if taintutils.TaintExists(node.Spec.Taints, UnreachableTaintTemplate) {
 						taintToAdd := *NotReadyTaintTemplate
-						if !nodeutil.SwapNodeControllerTaint(nc.kubeClient, []*v1.Taint{&taintToAdd}, []*v1.Taint{UnreachableTaintTemplate}, node) {
+						if !controllernodeutil.SwapNodeControllerTaint(nc.kubeClient, []*v1.Taint{&taintToAdd}, []*v1.Taint{UnreachableTaintTemplate}, node) {
 							glog.Errorf("Failed to instantly swap UnreachableTaint to NotReadyTaint. Will try again in the next cycle.")
 						}
 					} else if nc.markNodeForTainting(node) {
@@ -616,7 +615,7 @@ func (nc *Controller) monitorNodeStatus() error {
 					// We want to update the taint straight away if Node is already tainted with the UnreachableTaint
 					if taintutils.TaintExists(node.Spec.Taints, NotReadyTaintTemplate) {
 						taintToAdd := *UnreachableTaintTemplate
-						if !nodeutil.SwapNodeControllerTaint(nc.kubeClient, []*v1.Taint{&taintToAdd}, []*v1.Taint{NotReadyTaintTemplate}, node) {
+						if !controllernodeutil.SwapNodeControllerTaint(nc.kubeClient, []*v1.Taint{&taintToAdd}, []*v1.Taint{NotReadyTaintTemplate}, node) {
 							glog.Errorf("Failed to instantly swap UnreachableTaint to NotReadyTaint. Will try again in the next cycle.")
 						}
 					} else if nc.markNodeForTainting(node) {
@@ -656,8 +655,8 @@ func (nc *Controller) monitorNodeStatus() error {
 
 			// Report node event.
 			if currentReadyCondition.Status != v1.ConditionTrue && observedReadyCondition.Status == v1.ConditionTrue {
-				nodeutil.RecordNodeStatusChange(nc.recorder, node, "NodeNotReady")
-				if err = nodeutil.MarkAllPodsNotReady(nc.kubeClient, node); err != nil {
+				controllernodeutil.RecordNodeStatusChange(nc.recorder, node, "NodeNotReady")
+				if err = controllernodeutil.MarkAllPodsNotReady(nc.kubeClient, node); err != nil {
 					utilruntime.HandleError(fmt.Errorf("Unable to mark all pods NotReady on node %v: %v", node.Name, err))
 				}
 			}
@@ -672,13 +671,13 @@ func (nc *Controller) monitorNodeStatus() error {
 				}
 				if !exists {
 					glog.V(2).Infof("Deleting node (no longer present in cloud provider): %s", node.Name)
-					nodeutil.RecordNodeEvent(nc.recorder, node.Name, string(node.UID), v1.EventTypeNormal, "DeletingNode", fmt.Sprintf("Deleting Node %v because it's not present according to cloud provider", node.Name))
+					controllernodeutil.RecordNodeEvent(nc.recorder, node.Name, string(node.UID), v1.EventTypeNormal, "DeletingNode", fmt.Sprintf("Deleting Node %v because it's not present according to cloud provider", node.Name))
 					go func(nodeName string) {
 						defer utilruntime.HandleCrash()
 						// Kubelet is not reporting and Cloud Provider says node
 						// is gone. Delete it without worrying about grace
 						// periods.
-						if err := nodeutil.ForcefullyDeleteNode(nc.kubeClient, nodeName); err != nil {
+						if err := controllernodeutil.ForcefullyDeleteNode(nc.kubeClient, nodeName); err != nil {
 							glog.Errorf("Unable to forcefully delete node %q: %v", nodeName, err)
 						}
 					}(node.Name)
@@ -697,7 +696,7 @@ func (nc *Controller) tryUpdateNodeStatus(node *v1.Node) (time.Duration, v1.Node
 	var err error
 	var gracePeriod time.Duration
 	var observedReadyCondition v1.NodeCondition
-	_, currentReadyCondition := v1node.GetNodeCondition(&node.Status, v1.NodeReady)
+	_, currentReadyCondition := nodeutil.GetNodeCondition(&node.Status, v1.NodeReady)
 	if currentReadyCondition == nil {
 		// If ready condition is nil, then kubelet (or nodecontroller) never posted node status.
 		// A fake ready condition is created, where LastProbeTime and LastTransitionTime is set
@@ -737,9 +736,9 @@ func (nc *Controller) tryUpdateNodeStatus(node *v1.Node) (time.Duration, v1.Node
 	//     if that's the case, but it does not seem necessary.
 	var savedCondition *v1.NodeCondition
 	if found {
-		_, savedCondition = v1node.GetNodeCondition(&savedNodeStatus.status, v1.NodeReady)
+		_, savedCondition = nodeutil.GetNodeCondition(&savedNodeStatus.status, v1.NodeReady)
 	}
-	_, observedCondition := v1node.GetNodeCondition(&node.Status, v1.NodeReady)
+	_, observedCondition := nodeutil.GetNodeCondition(&node.Status, v1.NodeReady)
 	if !found {
 		glog.Warningf("Missing timestamp for Node %s. Assuming now as a timestamp.", node.Name)
 		savedNodeStatus = nodeStatusData{
@@ -821,7 +820,7 @@ func (nc *Controller) tryUpdateNodeStatus(node *v1.Node) (time.Duration, v1.Node
 
 		nowTimestamp := nc.now()
 		for _, nodeConditionType := range remainingNodeConditionTypes {
-			_, currentCondition := v1node.GetNodeCondition(&node.Status, nodeConditionType)
+			_, currentCondition := nodeutil.GetNodeCondition(&node.Status, nodeConditionType)
 			if currentCondition == nil {
 				glog.V(2).Infof("Condition %v of node %v was never updated by kubelet", nodeConditionType, node.Name)
 				node.Status.Conditions = append(node.Status.Conditions, v1.NodeCondition{
@@ -844,7 +843,7 @@ func (nc *Controller) tryUpdateNodeStatus(node *v1.Node) (time.Duration, v1.Node
 			}
 		}
 
-		_, currentCondition := v1node.GetNodeCondition(&node.Status, v1.NodeReady)
+		_, currentCondition := nodeutil.GetNodeCondition(&node.Status, v1.NodeReady)
 		if !apiequality.Semantic.DeepEqual(currentCondition, &observedReadyCondition) {
 			if _, err = nc.kubeClient.CoreV1().Nodes().UpdateStatus(node); err != nil {
 				glog.Errorf("Error updating node %s: %v", node.Name, err)
@@ -997,7 +996,7 @@ func (nc *Controller) classifyNodes(allNodes []*v1.Node) (added, deleted, newZon
 			added = append(added, allNodes[i])
 		} else {
 			// Currently, we only consider new zone as updated.
-			zone := utilnode.GetZoneKey(allNodes[i])
+			zone := nodeutil.GetZoneKey(allNodes[i])
 			if _, found := nc.zoneStates[zone]; !found {
 				newZoneRepresentatives = append(newZoneRepresentatives, allNodes[i])
 			}
@@ -1038,7 +1037,7 @@ func (nc *Controller) ReducedQPSFunc(nodeNum int) float32 {
 
 // addPodEvictorForNewZone checks if new zone appeared, and if so add new evictor.
 func (nc *Controller) addPodEvictorForNewZone(node *v1.Node) {
-	zone := utilnode.GetZoneKey(node)
+	zone := nodeutil.GetZoneKey(node)
 	if _, found := nc.zoneStates[zone]; !found {
 		nc.zoneStates[zone] = stateInitial
 		if !nc.useTaintBasedEvictions {
@@ -1059,7 +1058,7 @@ func (nc *Controller) addPodEvictorForNewZone(node *v1.Node) {
 // cancelPodEviction removes any queued evictions, typically because the node is available again. It
 // returns true if an eviction was queued.
 func (nc *Controller) cancelPodEviction(node *v1.Node) bool {
-	zone := utilnode.GetZoneKey(node)
+	zone := nodeutil.GetZoneKey(node)
 	nc.evictorLock.Lock()
 	defer nc.evictorLock.Unlock()
 	wasDeleting := nc.zonePodEvictor[zone].Remove(node.Name)
@@ -1075,13 +1074,13 @@ func (nc *Controller) cancelPodEviction(node *v1.Node) bool {
 func (nc *Controller) evictPods(node *v1.Node) bool {
 	nc.evictorLock.Lock()
 	defer nc.evictorLock.Unlock()
-	return nc.zonePodEvictor[utilnode.GetZoneKey(node)].Add(node.Name, string(node.UID))
+	return nc.zonePodEvictor[nodeutil.GetZoneKey(node)].Add(node.Name, string(node.UID))
 }
 
 func (nc *Controller) markNodeForTainting(node *v1.Node) bool {
 	nc.evictorLock.Lock()
 	defer nc.evictorLock.Unlock()
-	return nc.zoneNoExecuteTainter[utilnode.GetZoneKey(node)].Add(node.Name, string(node.UID))
+	return nc.zoneNoExecuteTainter[nodeutil.GetZoneKey(node)].Add(node.Name, string(node.UID))
 }
 
 func (nc *Controller) markNodeAsReachable(node *v1.Node) (bool, error) {
@@ -1097,7 +1096,7 @@ func (nc *Controller) markNodeAsReachable(node *v1.Node) (bool, error) {
 		glog.Errorf("Failed to remove taint from node %v: %v", node.Name, err)
 		return false, err
 	}
-	return nc.zoneNoExecuteTainter[utilnode.GetZoneKey(node)].Remove(node.Name), nil
+	return nc.zoneNoExecuteTainter[nodeutil.GetZoneKey(node)].Remove(node.Name), nil
 }
 
 // ComputeZoneState returns a slice of NodeReadyConditions for all Nodes in a given zone.

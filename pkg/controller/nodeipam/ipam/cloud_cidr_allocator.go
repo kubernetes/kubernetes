@@ -36,12 +36,11 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
-	v1node "k8s.io/kubernetes/pkg/api/v1/node"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	"k8s.io/kubernetes/pkg/controller"
-	nodeutil "k8s.io/kubernetes/pkg/controller/util/node"
-	utilnode "k8s.io/kubernetes/pkg/util/node"
+	controllernodeutil "k8s.io/kubernetes/pkg/controller/util/node"
+	nodeutil "k8s.io/kubernetes/pkg/util/node"
 )
 
 // cloudCIDRAllocator allocates node CIDRs according to IP address aliases
@@ -101,20 +100,20 @@ func NewCloudCIDRAllocator(client clientset.Interface, cloud cloudprovider.Inter
 	}
 
 	nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: nodeutil.CreateAddNodeHandler(ca.AllocateOrOccupyCIDR),
-		UpdateFunc: nodeutil.CreateUpdateNodeHandler(func(_, newNode *v1.Node) error {
+		AddFunc: controllernodeutil.CreateAddNodeHandler(ca.AllocateOrOccupyCIDR),
+		UpdateFunc: controllernodeutil.CreateUpdateNodeHandler(func(_, newNode *v1.Node) error {
 			if newNode.Spec.PodCIDR == "" {
 				return ca.AllocateOrOccupyCIDR(newNode)
 			}
 			// Even if PodCIDR is assigned, but NetworkUnavailable condition is
 			// set to true, we need to process the node to set the condition.
-			_, cond := v1node.GetNodeCondition(&newNode.Status, v1.NodeNetworkUnavailable)
+			_, cond := nodeutil.GetNodeCondition(&newNode.Status, v1.NodeNetworkUnavailable)
 			if cond == nil || cond.Status != v1.ConditionFalse {
 				return ca.AllocateOrOccupyCIDR(newNode)
 			}
 			return nil
 		}),
-		DeleteFunc: nodeutil.CreateDeleteNodeHandler(ca.ReleaseCIDR),
+		DeleteFunc: controllernodeutil.CreateDeleteNodeHandler(ca.ReleaseCIDR),
 	})
 
 	glog.V(0).Infof("Using cloud CIDR allocator (provider: %v)", cloud.ProviderName())
@@ -201,11 +200,11 @@ func (ca *cloudCIDRAllocator) updateCIDRAllocation(nodeName string) error {
 
 	cidrs, err := ca.cloud.AliasRanges(types.NodeName(nodeName))
 	if err != nil {
-		nodeutil.RecordNodeStatusChange(ca.recorder, node, "CIDRNotAvailable")
+		controllernodeutil.RecordNodeStatusChange(ca.recorder, node, "CIDRNotAvailable")
 		return fmt.Errorf("failed to allocate cidr: %v", err)
 	}
 	if len(cidrs) == 0 {
-		nodeutil.RecordNodeStatusChange(ca.recorder, node, "CIDRNotAvailable")
+		controllernodeutil.RecordNodeStatusChange(ca.recorder, node, "CIDRNotAvailable")
 		return fmt.Errorf("failed to allocate cidr: Node %v has no CIDRs", node.Name)
 	}
 	_, cidr, err := net.ParseCIDR(cidrs[0])
@@ -227,19 +226,19 @@ func (ca *cloudCIDRAllocator) updateCIDRAllocation(nodeName string) error {
 			// See https://github.com/kubernetes/kubernetes/pull/42147#discussion_r103357248
 		}
 		for i := 0; i < cidrUpdateRetries; i++ {
-			if err = utilnode.PatchNodeCIDR(ca.client, types.NodeName(node.Name), podCIDR); err == nil {
+			if err = nodeutil.PatchNodeCIDR(ca.client, types.NodeName(node.Name), podCIDR); err == nil {
 				glog.Infof("Set node %v PodCIDR to %v", node.Name, podCIDR)
 				break
 			}
 		}
 	}
 	if err != nil {
-		nodeutil.RecordNodeStatusChange(ca.recorder, node, "CIDRAssignmentFailed")
+		controllernodeutil.RecordNodeStatusChange(ca.recorder, node, "CIDRAssignmentFailed")
 		glog.Errorf("Failed to update node %v PodCIDR to %v after multiple attempts: %v", node.Name, podCIDR, err)
 		return err
 	}
 
-	err = utilnode.SetNodeCondition(ca.client, types.NodeName(node.Name), v1.NodeCondition{
+	err = nodeutil.SetNodeCondition(ca.client, types.NodeName(node.Name), v1.NodeCondition{
 		Type:               v1.NodeNetworkUnavailable,
 		Status:             v1.ConditionFalse,
 		Reason:             "RouteCreated",
