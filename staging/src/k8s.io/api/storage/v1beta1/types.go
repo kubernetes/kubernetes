@@ -67,17 +67,11 @@ type StorageClass struct {
 	// +optional
 	VolumeBindingMode *VolumeBindingMode `json:"volumeBindingMode,omitempty" protobuf:"bytes,7,opt,name=volumeBindingMode"`
 
-	// CredentialID is the string slice of IDs to use for authentication and
-	// authorization against the storage backend. The value of CredentialID is
-	// used as a key SecretRefs map to select the corresponding Secret.
-	// +optional
-	CredentialIDs []string `json:"credentialIDs,omitempty" protobuf:"bytes,8,opt,name=credentialIDs"`
-
 	// Secrets for authentication and authorization against a storage backend,
 	// which is described by the StorageClass object. CredentialID is the key, to
 	// select corresponding SecretRef
 	// +optional
-	SecretRefs map[string]string `json:"secretRefs,omitempty" protobuf:"bytes,9,rep,name=secretRefs"`
+	SecretRefs map[string]v1.SecretReference `json:"secretRefs,omitempty" protobuf:"bytes,8,rep,name=secretRefs"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
