@@ -245,6 +245,7 @@ filegroup(
         "//vendor/github.com/google/cadvisor/zfs:all-srcs",
         "//vendor/github.com/google/certificate-transparency/go:all-srcs",
         "//vendor/github.com/google/gofuzz:all-srcs",
+        "//vendor/github.com/google/uuid:all-srcs",
         "//vendor/github.com/googleapis/gnostic/OpenAPIv2:all-srcs",
         "//vendor/github.com/googleapis/gnostic/compiler:all-srcs",
         "//vendor/github.com/googleapis/gnostic/extensions:all-srcs",
