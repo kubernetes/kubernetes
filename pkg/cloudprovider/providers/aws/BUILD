@@ -27,7 +27,7 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/cloudprovider/providers/aws",
     deps = [
-        "//pkg/api/v1/service:go_default_library",
+        "//pkg/apis/core/v1/helper/service:go_default_library",
         "//pkg/cloudprovider:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/credentialprovider/aws:go_default_library",

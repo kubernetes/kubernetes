@@ -15,9 +15,9 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/api/legacyscheme:go_default_library",
-        "//pkg/api/service:go_default_library",
         "//pkg/apis/core:go_default_library",
         "//pkg/apis/core/helper:go_default_library",
+        "//pkg/apis/core/helper/service:go_default_library",
         "//pkg/apis/core/pods:go_default_library",
         "//pkg/apis/core/v1:go_default_library",
         "//pkg/apis/core/v1/helper:go_default_library",

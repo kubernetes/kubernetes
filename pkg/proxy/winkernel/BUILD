@@ -16,9 +16,9 @@ go_library(
         "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:windows": [
-            "//pkg/api/service:go_default_library",
             "//pkg/apis/core:go_default_library",
             "//pkg/apis/core/helper:go_default_library",
+            "//pkg/apis/core/helper/service:go_default_library",
             "//pkg/features:go_default_library",
             "//pkg/proxy:go_default_library",
             "//pkg/proxy/healthcheck:go_default_library",
