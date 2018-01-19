@@ -224,12 +224,6 @@ func verifyFakeContainerList(fakeRuntime *apitest.FakeRuntimeService, expected s
 	return actual, actual.Equal(expected)
 }
 
-type containerRecord struct {
-	container *v1.Container
-	attempt   uint32
-	state     runtimeapi.ContainerState
-}
-
 // Only extract the fields of interests.
 type cRecord struct {
 	name    string

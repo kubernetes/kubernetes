@@ -1260,7 +1260,6 @@ func TestFindSourceController(t *testing.T) {
 	tests := []struct {
 		list               *api.ReplicationControllerList
 		expectedController *api.ReplicationController
-		err                error
 		name               string
 		expectError        bool
 	}{

@@ -31,9 +31,11 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/admission/resourcequota/apis/resourcequota/validation"
 )
 
+const PluginName = "ResourceQuota"
+
 // Register registers a plugin
 func Register(plugins *admission.Plugins) {
-	plugins.Register("ResourceQuota",
+	plugins.Register(PluginName,
 		func(config io.Reader) (admission.Interface, error) {
 			// load the configuration provided (if any)
 			configuration, err := LoadConfiguration(config)

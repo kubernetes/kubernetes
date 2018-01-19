@@ -276,7 +276,7 @@ type {{.WrapType}} interface {
 	{{.WrapTypeOps}}
 {{- end}}
 {{- if .GenerateGet}}
-	Get(ctx context.Context, key meta.Key) (*{{.FQObjectType}}, error)
+	Get(ctx context.Context, key *meta.Key) (*{{.FQObjectType}}, error)
 {{- end -}}
 {{- if .GenerateList}}
 {{- if .KeyIsGlobal}}
@@ -290,10 +290,10 @@ type {{.WrapType}} interface {
 {{- end -}}
 {{- end -}}
 {{- if .GenerateInsert}}
-	Insert(ctx context.Context, key meta.Key, obj *{{.FQObjectType}}) error
+	Insert(ctx context.Context, key *meta.Key, obj *{{.FQObjectType}}) error
 {{- end -}}
 {{- if .GenerateDelete}}
-	Delete(ctx context.Context, key meta.Key) error
+	Delete(ctx context.Context, key *meta.Key) error
 {{- end -}}
 {{- if .AggregatedList}}
 	AggregatedList(ctx context.Context, fl *filter.F) (map[string][]*{{.FQObjectType}}, error)
@@ -352,7 +352,7 @@ type {{.MockWrapType}} struct {
 	// execution flow of the mock. Return (false, nil, nil) to continue with
 	// normal mock behavior/ after the hook function executes.
 	{{- if .GenerateGet}}
-	GetHook    func(m *{{.MockWrapType}}, ctx context.Context, key meta.Key) (bool, *{{.FQObjectType}}, error)
+	GetHook    func(m *{{.MockWrapType}}, ctx context.Context, key *meta.Key) (bool, *{{.FQObjectType}}, error)
 	{{- end -}}
 	{{- if .GenerateList}}
 	{{- if .KeyIsGlobal}}
@@ -366,10 +366,10 @@ type {{.MockWrapType}} struct {
 	{{- end}}
 	{{- end -}}
 	{{- if .GenerateInsert}}
-	InsertHook func(m *{{.MockWrapType}}, ctx context.Context, key meta.Key, obj *{{.FQObjectType}}) (bool, error)
+	InsertHook func(m *{{.MockWrapType}}, ctx context.Context, key *meta.Key, obj *{{.FQObjectType}}) (bool, error)
 	{{- end -}}
 	{{- if .GenerateDelete}}
-	DeleteHook func(m *{{.MockWrapType}}, ctx context.Context, key meta.Key) (bool, error)
+	DeleteHook func(m *{{.MockWrapType}}, ctx context.Context, key *meta.Key) (bool, error)
 	{{- end -}}
 	{{- if .AggregatedList}}
 	AggregatedListHook func(m *{{.MockWrapType}}, ctx context.Context, fl *filter.F) (bool, map[string][]*{{.FQObjectType}}, error)
@@ -388,7 +388,7 @@ type {{.MockWrapType}} struct {
 
 {{- if .GenerateGet}}
 // Get returns the object from the mock.
-func (m *{{.MockWrapType}}) Get(ctx context.Context, key meta.Key) (*{{.FQObjectType}}, error) {
+func (m *{{.MockWrapType}}) Get(ctx context.Context, key *meta.Key) (*{{.FQObjectType}}, error) {
 	if m.GetHook != nil {
 		if intercept, obj, err := m.GetHook(m, ctx, key);  intercept {
 			glog.V(5).Infof("{{.MockWrapType}}.Get(%v, %s) = %+v, %v", ctx, key, obj ,err)
@@ -399,11 +399,11 @@ func (m *{{.MockWrapType}}) Get(ctx context.Context, key meta.Key) (*{{.FQObject
 	m.Lock.Lock()
 	defer m.Lock.Unlock()
 
-	if err, ok := m.GetError[key]; ok {
+	if err, ok := m.GetError[*key]; ok {
 		glog.V(5).Infof("{{.MockWrapType}}.Get(%v, %s) = nil, %v", ctx, key, err)
 		return nil, err
 	}
-	if obj, ok := m.Objects[key]; ok {
+	if obj, ok := m.Objects[*key]; ok {
 		typedObj := obj.To{{.VersionTitle}}()
 		glog.V(5).Infof("{{.MockWrapType}}.Get(%v, %s) = %+v, nil", ctx, key, typedObj)
 		return typedObj, nil
@@ -503,7 +503,7 @@ func (m *{{.MockWrapType}}) List(ctx context.Context, zone string, fl *filter.F)
 
 {{- if .GenerateInsert}}
 // Insert is a mock for inserting/creating a new object.
-func (m *{{.MockWrapType}}) Insert(ctx context.Context, key meta.Key, obj *{{.FQObjectType}}) error {
+func (m *{{.MockWrapType}}) Insert(ctx context.Context, key *meta.Key, obj *{{.FQObjectType}}) error {
 	if m.InsertHook != nil {
 		if intercept, err := m.InsertHook(m, ctx, key, obj);  intercept {
 			glog.V(5).Infof("{{.MockWrapType}}.Insert(%v, %v, %+v) = %v", ctx, key, obj, err)
@@ -514,11 +514,11 @@ func (m *{{.MockWrapType}}) Insert(ctx context.Context, key meta.Key, obj *{{.FQ
 	m.Lock.Lock()
 	defer m.Lock.Unlock()
 
-	if err, ok := m.InsertError[key]; ok {
+	if err, ok := m.InsertError[*key]; ok {
 		glog.V(5).Infof("{{.MockWrapType}}.Insert(%v, %v, %+v) = %v", ctx, key, obj, err)
 		return err
 	}
-	if _, ok := m.Objects[key]; ok {
+	if _, ok := m.Objects[*key]; ok {
 		err := &googleapi.Error{
 			Code: http.StatusConflict,
 			Message: fmt.Sprintf("{{.MockWrapType}} %v exists", key),
@@ -532,7 +532,7 @@ func (m *{{.MockWrapType}}) Insert(ctx context.Context, key meta.Key, obj *{{.FQ
 		obj.SelfLink = SelfLink(meta.Version{{.VersionTitle}}, "mock-project", "{{.Resource}}", key)
 	}
 
-	m.Objects[key] = &Mock{{.Service}}Obj{obj}
+	m.Objects[*key] = &Mock{{.Service}}Obj{obj}
 	glog.V(5).Infof("{{.MockWrapType}}.Insert(%v, %v, %+v) = nil", ctx, key, obj)
 	return nil
 }
@@ -540,7 +540,7 @@ func (m *{{.MockWrapType}}) Insert(ctx context.Context, key meta.Key, obj *{{.FQ
 
 {{- if .GenerateDelete}}
 // Delete is a mock for deleting the object.
-func (m *{{.MockWrapType}}) Delete(ctx context.Context, key meta.Key) error {
+func (m *{{.MockWrapType}}) Delete(ctx context.Context, key *meta.Key) error {
 	if m.DeleteHook != nil {
 		if intercept, err := m.DeleteHook(m, ctx, key);  intercept {
 			glog.V(5).Infof("{{.MockWrapType}}.Delete(%v, %v) = %v", ctx, key, err)
@@ -551,11 +551,11 @@ func (m *{{.MockWrapType}}) Delete(ctx context.Context, key meta.Key) error {
 	m.Lock.Lock()
 	defer m.Lock.Unlock()
 
-	if err, ok := m.DeleteError[key]; ok {
+	if err, ok := m.DeleteError[*key]; ok {
 		glog.V(5).Infof("{{.MockWrapType}}.Delete(%v, %v) = %v", ctx, key, err)
 		return err
 	}
-	if _, ok := m.Objects[key]; !ok {
+	if _, ok := m.Objects[*key]; !ok {
 		err := &googleapi.Error{
 			Code: http.StatusNotFound,
 			Message: fmt.Sprintf("{{.MockWrapType}} %v not found", key),
@@ -564,7 +564,7 @@ func (m *{{.MockWrapType}}) Delete(ctx context.Context, key meta.Key) error {
 		return err
 	}
 
-	delete(m.Objects, key)
+	delete(m.Objects, *key)
 	glog.V(5).Infof("{{.MockWrapType}}.Delete(%v, %v) = nil", ctx, key)
 	return nil
 }
@@ -621,16 +621,21 @@ func (m *{{.MockWrapType}}) Obj(o *{{.FQObjectType}}) *Mock{{.Service}}Obj {
 {{- range .}}
 // {{.Name}} is a mock for the corresponding method.
 func (m *{{.MockWrapType}}) {{.FcnArgs}} {
-{{- if eq .ReturnType "Operation"}}
+{{- if .IsOperation }}
 	if m.{{.MockHookName}} != nil {
 		return m.{{.MockHookName}}(m, ctx, key {{.CallArgs}})
 	}
 	return nil
-{{- else}}
+{{- else if .IsGet}}
 	if m.{{.MockHookName}} != nil {
 		return m.{{.MockHookName}}(m, ctx, key {{.CallArgs}})
 	}
 	return nil, fmt.Errorf("{{.MockHookName}} must be set")
+{{- else if .IsPaged}}
+	if m.{{.MockHookName}} != nil {
+		return m.{{.MockHookName}}(m, ctx, key {{.CallArgs}}, fl)
+	}
+	return nil, nil
 {{- end}}
 }
 {{end -}}
@@ -642,7 +647,7 @@ type {{.GCEWrapType}} struct {
 
 {{- if .GenerateGet}}
 // Get the {{.Object}} named by key.
-func (g *{{.GCEWrapType}}) Get(ctx context.Context, key meta.Key) (*{{.FQObjectType}}, error) {
+func (g *{{.GCEWrapType}}) Get(ctx context.Context, key *meta.Key) (*{{.FQObjectType}}, error) {
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "{{.Version}}", "{{.Service}}")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -714,7 +719,7 @@ rk := &RateLimitKey{
 
 {{- if .GenerateInsert}}
 // Insert {{.Object}} with key of value obj.
-func (g *{{.GCEWrapType}}) Insert(ctx context.Context, key meta.Key, obj *{{.FQObjectType}}) error {
+func (g *{{.GCEWrapType}}) Insert(ctx context.Context, key *meta.Key, obj *{{.FQObjectType}}) error {
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "{{.Version}}", "{{.Service}}")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -747,7 +752,7 @@ func (g *{{.GCEWrapType}}) Insert(ctx context.Context, key meta.Key, obj *{{.FQO
 
 {{- if .GenerateDelete}}
 // Delete the {{.Object}} referenced by key.
-func (g *{{.GCEWrapType}}) Delete(ctx context.Context, key meta.Key) error {
+func (g *{{.GCEWrapType}}) Delete(ctx context.Context, key *meta.Key) error {
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "{{.Version}}", "{{.Service}}")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -823,7 +828,7 @@ func (g *{{.GCEWrapType}}) {{.FcnArgs}} {
 		Service: "{{.Service}}",
 	}
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
-	{{- if eq .ReturnType "Operation"}}
+	{{- if .IsOperation}}
 		return err
 	{{- else}}
 		return nil, err
@@ -838,15 +843,26 @@ func (g *{{.GCEWrapType}}) {{.FcnArgs}} {
 {{- if .KeyIsZonal}}
 	call := g.s.{{.VersionTitle}}.{{.Service}}.{{.Name}}(projectID, key.Zone, key.Name {{.CallArgs}})
 {{- end}}
+{{- if .IsOperation}}
 	call.Context(ctx)
-{{- if eq .ReturnType "Operation"}}
 	op, err := call.Do()
 	if err != nil {
 		return err
 	}
 	return g.s.WaitForCompletion(ctx, op)
-{{- else}}
+{{- else if .IsGet}}
+	call.Context(ctx)
 	return call.Do()
+{{- else if .IsPaged}}
+	var all []*{{.Version}}.{{.ItemType}}
+	f := func(l *{{.Version}}.{{.ReturnType}}) error {
+		all = append(all, l.Items...)
+		return nil
+	}
+	if err := call.Pages(ctx, f); err != nil {
+		return nil, err
+	}
+	return all, nil
 {{- end}}
 }
 {{end -}}
@@ -933,17 +949,17 @@ func Test{{.Service}}Group(t *testing.T) {
 
 	// Get not found.
 {{- if .HasAlpha}}{{- if .Alpha.GenerateGet}}
-	if _, err := mock.Alpha{{.Service}}().Get(ctx, *key); err == nil {
+	if _, err := mock.Alpha{{.Service}}().Get(ctx, key); err == nil {
 		t.Errorf("Alpha{{.Service}}().Get(%v, %v) = _, nil; want error", ctx, key)
 	}
 {{- end}}{{- end}}
 {{- if .HasBeta}}{{- if .Beta.GenerateGet}}
-	if _, err := mock.Beta{{.Service}}().Get(ctx, *key); err == nil {
+	if _, err := mock.Beta{{.Service}}().Get(ctx, key); err == nil {
 		t.Errorf("Beta{{.Service}}().Get(%v, %v) = _, nil; want error", ctx, key)
 	}
 {{- end}}{{- end}}
 {{- if .HasGA}}{{- if .GA.GenerateGet}}
-	if _, err := mock.{{.Service}}().Get(ctx, *key); err == nil {
+	if _, err := mock.{{.Service}}().Get(ctx, key); err == nil {
 		t.Errorf("{{.Service}}().Get(%v, %v) = _, nil; want error", ctx, key)
 	}
 {{- end}}{{- end}}
@@ -952,41 +968,41 @@ func Test{{.Service}}Group(t *testing.T) {
 {{- if .HasAlpha}}{{- if .Alpha.GenerateInsert}}
 	{
 		obj := &alpha.{{.Alpha.Object}}{}
-		if err := mock.Alpha{{.Service}}().Insert(ctx, *keyAlpha, obj); err != nil {
-			t.Errorf("Alpha{{.Service}}().Insert(%v, %v, %v) = %v; want nil", ctx, key, obj, err)
+		if err := mock.Alpha{{.Service}}().Insert(ctx, keyAlpha, obj); err != nil {
+			t.Errorf("Alpha{{.Service}}().Insert(%v, %v, %v) = %v; want nil", ctx, keyAlpha, obj, err)
 		}
 	}
 {{- end}}{{- end}}
 {{- if .HasBeta}}{{- if .Beta.GenerateInsert}}
 	{
 		obj := &beta.{{.Beta.Object}}{}
-		if err := mock.Beta{{.Service}}().Insert(ctx, *keyBeta, obj); err != nil {
-			t.Errorf("Beta{{.Service}}().Insert(%v, %v, %v) = %v; want nil", ctx, key, obj, err)
+		if err := mock.Beta{{.Service}}().Insert(ctx, keyBeta, obj); err != nil {
+			t.Errorf("Beta{{.Service}}().Insert(%v, %v, %v) = %v; want nil", ctx, keyBeta, obj, err)
 		}
 	}
 {{- end}}{{- end}}
 {{- if .HasGA}}{{- if .GA.GenerateInsert}}
 	{
 		obj := &ga.{{.GA.Object}}{}
-		if err := mock.{{.Service}}().Insert(ctx, *keyGA, obj); err != nil {
-			t.Errorf("{{.Service}}().Insert(%v, %v, %v) = %v; want nil", ctx, key, obj, err)
+		if err := mock.{{.Service}}().Insert(ctx, keyGA, obj); err != nil {
+			t.Errorf("{{.Service}}().Insert(%v, %v, %v) = %v; want nil", ctx, keyGA, obj, err)
 		}
 	}
 {{- end}}{{- end}}
 
 	// Get across versions.
 {{- if .HasAlpha}}{{- if .Alpha.GenerateInsert}}
-	if obj, err := mock.Alpha{{.Service}}().Get(ctx, *key); err != nil {
+	if obj, err := mock.Alpha{{.Service}}().Get(ctx, key); err != nil {
 		t.Errorf("Alpha{{.Service}}().Get(%v, %v) = %v, %v; want nil", ctx, key, obj, err)
 	}
 {{- end}}{{- end}}
 {{- if .HasBeta}}{{- if .Beta.GenerateInsert}}
-	if obj, err := mock.Beta{{.Service}}().Get(ctx, *key); err != nil {
+	if obj, err := mock.Beta{{.Service}}().Get(ctx, key); err != nil {
 		t.Errorf("Beta{{.Service}}().Get(%v, %v) = %v, %v; want nil", ctx, key, obj, err)
 	}
 {{- end}}{{- end}}
 {{- if .HasGA}}{{- if .GA.GenerateInsert}}
-	if obj, err := mock.{{.Service}}().Get(ctx, *key); err != nil {
+	if obj, err := mock.{{.Service}}().Get(ctx, key); err != nil {
 		t.Errorf("{{.Service}}().Get(%v, %v) = %v, %v; want nil", ctx, key, obj, err)
 	}
 {{- end}}{{- end}}
@@ -1077,35 +1093,35 @@ func Test{{.Service}}Group(t *testing.T) {
 
 	// Delete across versions.
 {{- if .HasAlpha}}{{- if .Alpha.GenerateDelete}}
-	if err := mock.Alpha{{.Service}}().Delete(ctx, *keyAlpha); err != nil {
-		t.Errorf("Alpha{{.Service}}().Delete(%v, %v) = %v; want nil", ctx, key, err)
+	if err := mock.Alpha{{.Service}}().Delete(ctx, keyAlpha); err != nil {
+		t.Errorf("Alpha{{.Service}}().Delete(%v, %v) = %v; want nil", ctx, keyAlpha, err)
 	}
 {{- end}}{{- end}}
 {{- if .HasBeta}}{{- if .Beta.GenerateDelete}}
-	if err := mock.Beta{{.Service}}().Delete(ctx, *keyBeta); err != nil {
-		t.Errorf("Beta{{.Service}}().Delete(%v, %v) = %v; want nil", ctx, key, err)
+	if err := mock.Beta{{.Service}}().Delete(ctx, keyBeta); err != nil {
+		t.Errorf("Beta{{.Service}}().Delete(%v, %v) = %v; want nil", ctx, keyBeta, err)
 	}
 {{- end}}{{- end}}
 {{- if .HasGA}}{{- if .GA.GenerateDelete}}
-	if err := mock.{{.Service}}().Delete(ctx, *keyGA); err != nil {
-		t.Errorf("{{.Service}}().Delete(%v, %v) = %v; want nil", ctx, key, err)
+	if err := mock.{{.Service}}().Delete(ctx, keyGA); err != nil {
+		t.Errorf("{{.Service}}().Delete(%v, %v) = %v; want nil", ctx, keyGA, err)
 	}
 {{- end}}{{- end}}
 
 	// Delete not found.
 {{- if .HasAlpha}}{{- if .Alpha.GenerateDelete}}
-	if err := mock.Alpha{{.Service}}().Delete(ctx, *keyAlpha); err == nil {
-		t.Errorf("Alpha{{.Service}}().Delete(%v, %v) = nil; want error", ctx, key)
+	if err := mock.Alpha{{.Service}}().Delete(ctx, keyAlpha); err == nil {
+		t.Errorf("Alpha{{.Service}}().Delete(%v, %v) = nil; want error", ctx, keyAlpha)
 	}
 {{- end}}{{- end}}
 {{- if .HasBeta}}{{- if .Beta.GenerateDelete}}
-	if err := mock.Beta{{.Service}}().Delete(ctx, *keyBeta); err == nil {
-		t.Errorf("Beta{{.Service}}().Delete(%v, %v) = nil; want error", ctx, key)
+	if err := mock.Beta{{.Service}}().Delete(ctx, keyBeta); err == nil {
+		t.Errorf("Beta{{.Service}}().Delete(%v, %v) = nil; want error", ctx, keyBeta)
 	}
 {{- end}}{{- end}}
 {{- if .HasGA}}{{- if .GA.GenerateDelete}}
-	if err := mock.{{.Service}}().Delete(ctx, *keyGA); err == nil {
-		t.Errorf("{{.Service}}().Delete(%v, %v) = nil; want error", ctx, key)
+	if err := mock.{{.Service}}().Delete(ctx, keyGA); err == nil {
+		t.Errorf("{{.Service}}().Delete(%v, %v) = nil; want error", ctx, keyGA)
 	}
 {{- end}}{{- end}}
 }

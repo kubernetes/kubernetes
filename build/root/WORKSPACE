@@ -1,15 +1,15 @@
 http_archive(
     name = "io_bazel_rules_go",
-    sha256 = "e8c7f1fda9ee482745a5b35e8314ac3ae744d4ba30f3e6de28148fd166044306",
-    strip_prefix = "rules_go-737df20c53499fd84b67f04c6ca9ccdee2e77089",
-    urls = ["https://github.com/bazelbuild/rules_go/archive/737df20c53499fd84b67f04c6ca9ccdee2e77089.tar.gz"],
+    sha256 = "0efdc3cca8ac1c29e1c837bee260dab537dfd373eb4c43c7d50246a142a7c098",
+    strip_prefix = "rules_go-74d8ad8f9f59a1d9a7cf066d0980f9e394acccd7",
+    urls = ["https://github.com/bazelbuild/rules_go/archive/74d8ad8f9f59a1d9a7cf066d0980f9e394acccd7.tar.gz"],
 )
 
 http_archive(
     name = "io_kubernetes_build",
-    sha256 = "cf138e48871629345548b4aaf23101314b5621c1bdbe45c4e75edb45b08891f0",
-    strip_prefix = "repo-infra-1fb0a3ff0cc5308a6d8e2f3f9c57d1f2f940354e",
-    urls = ["https://github.com/kubernetes/repo-infra/archive/1fb0a3ff0cc5308a6d8e2f3f9c57d1f2f940354e.tar.gz"],
+    sha256 = "f4946917d95c54aaa98d1092757256e491f8f48fd550179134f00f902bc0b4ce",
+    strip_prefix = "repo-infra-c75960142a50de16ac6225b0843b1ff3476ab0b4",
+    urls = ["https://github.com/kubernetes/repo-infra/archive/c75960142a50de16ac6225b0843b1ff3476ab0b4.tar.gz"],
 )
 
 http_archive(
@@ -27,16 +27,6 @@ new_http_archive(
     sha256 = "2d335f298619c6fb02b1124773a56966e448ad9952b26fea52909da4fe80d2be",
     strip_prefix = "etcd-v%s-linux-amd64" % ETCD_VERSION,
     urls = ["https://github.com/coreos/etcd/releases/download/v%s/etcd-v%s-linux-amd64.tar.gz" % (ETCD_VERSION, ETCD_VERSION)],
-)
-
-# This contains a patch to not prepend ./ to tarfiles produced by pkg_tar.
-# When merged upstream, we'll no longer need to use ixdy's fork:
-# https://bazel-review.googlesource.com/#/c/10390/
-http_archive(
-    name = "io_bazel",
-    sha256 = "892a84aa1e7c1f99fb57bb056cb648745c513077252815324579a012d263defb",
-    strip_prefix = "bazel-df2c687c22bdd7c76f3cdcc85f38fefd02f0b844",
-    urls = ["https://github.com/ixdy/bazel/archive/df2c687c22bdd7c76f3cdcc85f38fefd02f0b844.tar.gz"],
 )
 
 http_archive(

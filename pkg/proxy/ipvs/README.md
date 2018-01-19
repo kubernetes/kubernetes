@@ -39,9 +39,11 @@ Then the configuration file is similar to:
 kind: MasterConfiguration
 apiVersion: kubeadm.k8s.io/v1alpha1
 ...
-featureGates:
-  SupportIPVSProxyMode: true
-mode: ipvs
+kubeProxy:
+  config:
+    featureGates: SupportIPVSProxyMode=true
+    mode: ipvs
+...
 ```
 
 ## Debug

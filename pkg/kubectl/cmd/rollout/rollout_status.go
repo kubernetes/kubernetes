@@ -54,7 +54,8 @@ func NewCmdRolloutStatus(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	argAliases := kubectl.ResourceAliases(validArgs)
 
 	cmd := &cobra.Command{
-		Use:     "status (TYPE NAME | TYPE/NAME) [flags]",
+		Use: "status (TYPE NAME | TYPE/NAME) [flags]",
+		DisableFlagsInUseLine: true,
 		Short:   i18n.T("Show the status of the rollout"),
 		Long:    status_long,
 		Example: status_example,

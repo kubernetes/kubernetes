@@ -119,6 +119,18 @@ var AllServices = []*ServiceInfo{
 		Object:      "BackendService",
 		Service:     "RegionBackendServices",
 		Resource:    "backendServices",
+		version:     VersionGA,
+		keyType:     Regional,
+		serviceType: reflect.TypeOf(&ga.RegionBackendServicesService{}),
+		additionalMethods: []string{
+			"GetHealth",
+			"Update",
+		},
+	},
+	{
+		Object:      "BackendService",
+		Service:     "RegionBackendServices",
+		Resource:    "backendServices",
 		version:     VersionAlpha,
 		keyType:     Regional,
 		serviceType: reflect.TypeOf(&alpha.RegionBackendServicesService{}),
@@ -285,6 +297,7 @@ var AllServices = []*ServiceInfo{
 		additionalMethods: []string{
 			"AttachNetworkEndpoints",
 			"DetachNetworkEndpoints",
+			"ListNetworkEndpoints",
 		},
 		options: AggregatedList,
 	},

@@ -100,6 +100,9 @@ type realImageGCManager struct {
 
 	// imageCache is the cache of latest image list.
 	imageCache imageCache
+
+	// sandbox image exempted from GC
+	sandboxImage string
 }
 
 // imageCache caches latest result of ListImages.
@@ -136,7 +139,7 @@ type imageRecord struct {
 	size int64
 }
 
-func NewImageGCManager(runtime container.Runtime, statsProvider StatsProvider, recorder record.EventRecorder, nodeRef *v1.ObjectReference, policy ImageGCPolicy) (ImageGCManager, error) {
+func NewImageGCManager(runtime container.Runtime, statsProvider StatsProvider, recorder record.EventRecorder, nodeRef *v1.ObjectReference, policy ImageGCPolicy, sandboxImage string) (ImageGCManager, error) {
 	// Validate policy.
 	if policy.HighThresholdPercent < 0 || policy.HighThresholdPercent > 100 {
 		return nil, fmt.Errorf("invalid HighThresholdPercent %d, must be in range [0-100]", policy.HighThresholdPercent)
@@ -155,6 +158,7 @@ func NewImageGCManager(runtime container.Runtime, statsProvider StatsProvider, r
 		recorder:      recorder,
 		nodeRef:       nodeRef,
 		initialized:   false,
+		sandboxImage:  sandboxImage,
 	}
 
 	return im, nil
@@ -195,6 +199,12 @@ func (im *realImageGCManager) GetImageList() ([]container.Image, error) {
 
 func (im *realImageGCManager) detectImages(detectTime time.Time) (sets.String, error) {
 	imagesInUse := sets.NewString()
+
+	// Always consider the container runtime pod sandbox image in use
+	imageRef, err := im.runtime.GetImageRef(container.ImageSpec{Image: im.sandboxImage})
+	if err == nil && imageRef != "" {
+		imagesInUse.Insert(imageRef)
+	}
 
 	images, err := im.runtime.ListImages()
 	if err != nil {

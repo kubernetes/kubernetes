@@ -44,6 +44,7 @@ var unstructuredSerializer = dynamic.ContentConfig().NegotiatedSerializer
 
 var fakecmd = &cobra.Command{
 	Use: "delete ([-f FILENAME] | TYPE [(NAME | -l label | --all)])",
+	DisableFlagsInUseLine: true,
 	Run: func(cmd *cobra.Command, args []string) {
 		cmdutil.CheckErr(cmdutil.ValidateOutputArgs(cmd))
 	},

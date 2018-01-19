@@ -12,7 +12,6 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud/meta",
     visibility = ["//visibility:public"],
     deps = [
-        "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/google.golang.org/api/compute/v0.alpha:go_default_library",
         "//vendor/google.golang.org/api/compute/v0.beta:go_default_library",
         "//vendor/google.golang.org/api/compute/v1:go_default_library",

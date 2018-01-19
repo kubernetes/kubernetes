@@ -444,7 +444,7 @@ func (gce *GCECloud) ensureInternalInstanceGroup(name, zone string, nodes []*v1.
 			return "", err
 		}
 
-		for _, ins := range instances.Items {
+		for _, ins := range instances {
 			parts := strings.Split(ins.Instance, "/")
 			gceNodes.Insert(parts[len(parts)-1])
 		}

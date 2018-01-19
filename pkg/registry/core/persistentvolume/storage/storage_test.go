@@ -77,11 +77,6 @@ func validNewPersistentVolume(name string) *api.PersistentVolume {
 	return pv
 }
 
-func validChangedPersistentVolume() *api.PersistentVolume {
-	pv := validNewPersistentVolume("foo")
-	return pv
-}
-
 func TestCreate(t *testing.T) {
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)

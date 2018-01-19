@@ -38,7 +38,6 @@ import (
 func TestCRIListPodStats(t *testing.T) {
 	const (
 		seedRoot       = 0
-		seedRuntime    = 100
 		seedKubelet    = 200
 		seedMisc       = 300
 		seedSandbox0   = 1000

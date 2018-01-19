@@ -138,11 +138,6 @@ func getResourceList(cpu, memory string) api.ResourceList {
 	return res
 }
 
-func addResource(rName, value string, rl api.ResourceList) api.ResourceList {
-	rl[api.ResourceName(rName)] = resource.MustParse(value)
-	return rl
-}
-
 func getResourceRequirements(requests, limits api.ResourceList) api.ResourceRequirements {
 	res := api.ResourceRequirements{}
 	res.Requests = requests

@@ -165,28 +165,28 @@ func TestSelfLink(t *testing.T) {
 		ver      meta.Version
 		project  string
 		resource string
-		key      meta.Key
+		key      *meta.Key
 		want     string
 	}{
 		{
 			meta.VersionAlpha,
 			"proj1",
 			"addresses",
-			*meta.RegionalKey("key1", "us-central1"),
+			meta.RegionalKey("key1", "us-central1"),
 			"https://www.googleapis.com/compute/alpha/projects/proj1/regions/us-central1/addresses/key1",
 		},
 		{
 			meta.VersionBeta,
 			"proj3",
 			"disks",
-			*meta.ZonalKey("key2", "us-central1-b"),
+			meta.ZonalKey("key2", "us-central1-b"),
 			"https://www.googleapis.com/compute/beta/projects/proj3/zones/us-central1-b/disks/key2",
 		},
 		{
 			meta.VersionGA,
 			"proj4",
 			"urlMaps",
-			*meta.GlobalKey("key3"),
+			meta.GlobalKey("key3"),
 			"https://www.googleapis.com/compute/v1/projects/proj4/urlMaps/key3",
 		},
 	} {

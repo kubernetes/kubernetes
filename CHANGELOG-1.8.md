@@ -877,7 +877,7 @@ Consider the following changes, limitations, and guidelines before you upgrade:
 
 * Advanced auditing is the default auditing mechanism at `v1beta1`. The new version introduces the following changes:
 
-  * The `--audit-policy-file` option is required if the `AdvancedAudit` feature is not explicitly turned off (`--feature-gates=AdvancedAudit=false`) on the API server.
+  * The `--audit-policy-file` option is required if the `AdvancedAuditing` feature is not explicitly turned off (`--feature-gates=AdvancedAuditing=false`) on the API server.
   * The audit log file defaults to JSON encoding when using the advanced auditing feature gate.
   * An audit policy file without either an `apiVersion` or a `kind` field may be treated as invalid.
   * The webhook and log file now output the `v1beta1` event format.

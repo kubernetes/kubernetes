@@ -17,12 +17,10 @@ limitations under the License.
 package vsphere
 
 import (
-	"os"
 	"path/filepath"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"github.com/vmware/govmomi/find"
 	"github.com/vmware/govmomi/vim25/types"
 	"golang.org/x/net/context"
 	"k8s.io/api/core/v1"
@@ -30,7 +28,6 @@ import (
 	k8stype "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	clientset "k8s.io/client-go/kubernetes"
-	vsphere "k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
@@ -152,7 +149,7 @@ func invokeTest(f *framework.Framework, client clientset.Interface, namespace st
 
 	By("Waiting for pod to be running")
 	Expect(framework.WaitForPodNameRunningInNamespace(client, pod.Name, namespace)).To(Succeed())
-	Expect(verifyDiskFormat(nodeName, pv.Spec.VsphereVolume.VolumePath, diskFormat)).To(BeTrue(), "DiskFormat Verification Failed")
+	Expect(verifyDiskFormat(client, nodeName, pv.Spec.VsphereVolume.VolumePath, diskFormat)).To(BeTrue(), "DiskFormat Verification Failed")
 
 	var volumePaths []string
 	volumePaths = append(volumePaths, pv.Spec.VsphereVolume.VolumePath)
@@ -162,22 +159,22 @@ func invokeTest(f *framework.Framework, client clientset.Interface, namespace st
 
 }
 
-func verifyDiskFormat(nodeName string, pvVolumePath string, diskFormat string) bool {
+func verifyDiskFormat(client clientset.Interface, nodeName string, pvVolumePath string, diskFormat string) bool {
 	By("Verifing disk format")
 	eagerlyScrub := false
 	thinProvisioned := false
 	diskFound := false
 	pvvmdkfileName := filepath.Base(pvVolumePath) + filepath.Ext(pvVolumePath)
 
-	govMoMiClient, err := vsphere.GetgovmomiClient(nil)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	vsp, err := getVSphere(client)
+	Expect(err).NotTo(HaveOccurred())
+	nodeInfo, err := vsp.NodeManager().GetNodeInfo(k8stype.NodeName(nodeName))
 	Expect(err).NotTo(HaveOccurred())
 
-	f := find.NewFinder(govMoMiClient.Client, true)
-	ctx, _ := context.WithCancel(context.Background())
-	vm, err := f.VirtualMachine(ctx, os.Getenv("VSPHERE_WORKING_DIR")+nodeName)
-	Expect(err).NotTo(HaveOccurred())
-
-	vmDevices, err := vm.Device(ctx)
+	vmDevices, err := nodeInfo.VM().Device(ctx)
 	Expect(err).NotTo(HaveOccurred())
 
 	disks := vmDevices.SelectByType((*types.VirtualDisk)(nil))

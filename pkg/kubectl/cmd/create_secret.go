@@ -76,7 +76,8 @@ var (
 // NewCmdCreateSecretGeneric is a command to create generic secrets from files, directories, or literal values
 func NewCmdCreateSecretGeneric(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "generic NAME [--type=string] [--from-file=[key=]source] [--from-literal=key1=value1] [--dry-run]",
+		Use: "generic NAME [--type=string] [--from-file=[key=]source] [--from-literal=key1=value1] [--dry-run]",
+		DisableFlagsInUseLine: true,
 		Short:   i18n.T("Create a secret from a local file, directory or literal value"),
 		Long:    secretLong,
 		Example: secretExample,
@@ -149,7 +150,8 @@ var (
 // NewCmdCreateSecretDockerRegistry is a macro command for creating secrets to work with Docker registries
 func NewCmdCreateSecretDockerRegistry(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "docker-registry NAME --docker-username=user --docker-password=password --docker-email=email [--docker-server=string] [--from-literal=key1=value1] [--dry-run]",
+		Use: "docker-registry NAME --docker-username=user --docker-password=password --docker-email=email [--docker-server=string] [--from-literal=key1=value1] [--dry-run]",
+		DisableFlagsInUseLine: true,
 		Short:   i18n.T("Create a secret for use with a Docker registry"),
 		Long:    secretForDockerRegistryLong,
 		Example: secretForDockerRegistryExample,
@@ -223,7 +225,8 @@ var (
 // NewCmdCreateSecretTLS is a macro command for creating secrets to work with Docker registries
 func NewCmdCreateSecretTLS(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "tls NAME --cert=path/to/cert/file --key=path/to/key/file [--dry-run]",
+		Use: "tls NAME --cert=path/to/cert/file --key=path/to/key/file [--dry-run]",
+		DisableFlagsInUseLine: true,
 		Short:   i18n.T("Create a TLS secret"),
 		Long:    secretForTLSLong,
 		Example: secretForTLSExample,

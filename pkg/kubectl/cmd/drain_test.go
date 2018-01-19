@@ -44,7 +44,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/rest/fake"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/api/ref"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -881,19 +880,4 @@ func (m *MyReq) isFor(method string, path string) bool {
 		req.URL.Path == strings.Join([]string{"/api/v1", path}, "") ||
 		req.URL.Path == strings.Join([]string{"/apis/extensions/v1beta1", path}, "") ||
 		req.URL.Path == strings.Join([]string{"/apis/batch/v1", path}, ""))
-}
-
-func refJson(t *testing.T, o runtime.Object) string {
-	ref, err := ref.GetReference(legacyscheme.Scheme, o)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	_, _, codec, _ := cmdtesting.NewAPIFactory()
-	json, err := runtime.Encode(codec, &api.SerializedReference{Reference: *ref})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	return string(json)
 }

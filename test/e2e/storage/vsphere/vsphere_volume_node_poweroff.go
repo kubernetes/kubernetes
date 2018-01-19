@@ -18,13 +18,10 @@ package vsphere
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
 	"time"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"github.com/vmware/govmomi/find"
 	"golang.org/x/net/context"
 
 	vimtypes "github.com/vmware/govmomi/vim25/types"
@@ -47,11 +44,10 @@ import (
 var _ = utils.SIGDescribe("Node Poweroff [Feature:vsphere] [Slow] [Disruptive]", func() {
 	f := framework.NewDefaultFramework("node-poweroff")
 	var (
-		client     clientset.Interface
-		namespace  string
-		vsp        *vsphere.VSphere
-		workingDir string
-		err        error
+		client    clientset.Interface
+		namespace string
+		vsp       *vsphere.VSphere
+		err       error
 	)
 
 	BeforeEach(func() {
@@ -64,8 +60,6 @@ var _ = utils.SIGDescribe("Node Poweroff [Feature:vsphere] [Slow] [Disruptive]",
 		Expect(len(nodeList.Items) > 1).To(BeTrue(), "At least 2 nodes are required for this test")
 		vsp, err = getVSphere(client)
 		Expect(err).NotTo(HaveOccurred())
-		workingDir = os.Getenv("VSPHERE_WORKING_DIR")
-		Expect(workingDir).NotTo(BeEmpty())
 	})
 
 	/*
@@ -118,16 +112,10 @@ var _ = utils.SIGDescribe("Node Poweroff [Feature:vsphere] [Slow] [Disruptive]",
 		Expect(isAttached).To(BeTrue(), "Disk is not attached to the node")
 
 		By(fmt.Sprintf("Power off the node: %v", node1))
-		govMoMiClient, err := vsphere.GetgovmomiClient(nil)
+		nodeInfo, err := vsp.NodeManager().GetNodeInfo(node1)
 		Expect(err).NotTo(HaveOccurred())
-
-		f := find.NewFinder(govMoMiClient.Client, true)
+		vm := nodeInfo.VM()
 		ctx, _ := context.WithCancel(context.Background())
-
-		vmPath := filepath.Join(workingDir, string(node1))
-		vm, err := f.VirtualMachine(ctx, vmPath)
-		Expect(err).NotTo(HaveOccurred())
-
 		_, err = vm.PowerOff(ctx)
 		Expect(err).NotTo(HaveOccurred())
 		defer vm.PowerOn(ctx)

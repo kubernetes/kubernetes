@@ -24,7 +24,6 @@ import (
 	_ "k8s.io/kubernetes/pkg/cloudprovider/providers"
 
 	// Admission policies
-	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/kubernetes/plugin/pkg/admission/admit"
 	"k8s.io/kubernetes/plugin/pkg/admission/alwayspullimages"
 	"k8s.io/kubernetes/plugin/pkg/admission/antiaffinity"
@@ -52,15 +51,59 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/admission/securitycontext/scdeny"
 	"k8s.io/kubernetes/plugin/pkg/admission/serviceaccount"
 	"k8s.io/kubernetes/plugin/pkg/admission/storageclass/setdefault"
+
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/admission/plugin/initialization"
+	"k8s.io/apiserver/pkg/admission/plugin/namespace/lifecycle"
+	mutatingwebhook "k8s.io/apiserver/pkg/admission/plugin/webhook/mutating"
+	validatingwebhook "k8s.io/apiserver/pkg/admission/plugin/webhook/validating"
 )
 
-// RegisterAllAdmissionPlugins registers all admission plugins
+// AllOrderedPlugins is the list of all the plugins in order.
+var AllOrderedPlugins = []string{
+	admit.PluginName,                      // AlwaysAdmit
+	autoprovision.PluginName,              // NamespaceAutoProvision
+	lifecycle.PluginName,                  // NamespaceLifecycle
+	exists.PluginName,                     // NamespaceExists
+	scdeny.PluginName,                     // SecurityContextDeny
+	antiaffinity.PluginName,               // LimitPodHardAntiAffinity
+	initialresources.PluginName,           // InitialResources
+	podpreset.PluginName,                  // PodPreset
+	limitranger.PluginName,                // LimitRanger
+	serviceaccount.PluginName,             // ServiceAccount
+	noderestriction.PluginName,            // NodeRestriction
+	alwayspullimages.PluginName,           // AlwaysPullImages
+	imagepolicy.PluginName,                // ImagePolicyWebhook
+	podsecuritypolicy.PluginName,          // PodSecurityPolicy
+	podnodeselector.PluginName,            // PodNodeSelector
+	podpriority.PluginName,                // Priority
+	defaulttolerationseconds.PluginName,   // DefaultTolerationSeconds
+	podtolerationrestriction.PluginName,   // PodTolerationRestriction
+	exec.DenyEscalatingExec,               // DenyEscalatingExec
+	exec.DenyExecOnPrivileged,             // DenyExecOnPrivileged
+	eventratelimit.PluginName,             // EventRateLimit
+	extendedresourcetoleration.PluginName, // ExtendedResourceToleration
+	label.PluginName,                      // PersistentVolumeLabel
+	setdefault.PluginName,                 // DefaultStorageClass
+	pvcprotection.PluginName,              // PVCProtection
+	gc.PluginName,                         // OwnerReferencesPermissionEnforcement
+	resize.PluginName,                     // PersistentVolumeClaimResize
+	mutatingwebhook.PluginName,            // MutatingAdmissionWebhook
+	initialization.PluginName,             // Initializers
+	validatingwebhook.PluginName,          // ValidatingAdmissionWebhook
+	resourcequota.PluginName,              // ResourceQuota
+	deny.PluginName,                       // AlwaysDeny
+}
+
+// RegisterAllAdmissionPlugins registers all admission plugins and
+// sets the recommended plugins order.
 func RegisterAllAdmissionPlugins(plugins *admission.Plugins) {
-	admit.Register(plugins)
+	admit.Register(plugins) // DEPRECATED as no real meaning
 	alwayspullimages.Register(plugins)
 	antiaffinity.Register(plugins)
 	defaulttolerationseconds.Register(plugins)
-	deny.Register(plugins)
+	deny.Register(plugins) // DEPRECATED as no real meaning
 	eventratelimit.Register(plugins)
 	exec.Register(plugins)
 	extendedresourcetoleration.Register(plugins)
@@ -83,4 +126,12 @@ func RegisterAllAdmissionPlugins(plugins *admission.Plugins) {
 	setdefault.Register(plugins)
 	resize.Register(plugins)
 	pvcprotection.Register(plugins)
+}
+
+// DefaultOffAdmissionPlugins get admission plugins off by default for kube-apiserver.
+func DefaultOffAdmissionPlugins() sets.String {
+	defaultOffPlugins := sets.NewString(AllOrderedPlugins...)
+	defaultOffPlugins.Delete(lifecycle.PluginName)
+
+	return defaultOffPlugins
 }

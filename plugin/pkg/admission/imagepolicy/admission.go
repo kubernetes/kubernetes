@@ -43,13 +43,16 @@ import (
 	_ "k8s.io/kubernetes/pkg/apis/imagepolicy/install"
 )
 
+// PluginName indicates name of admission plugin.
+const PluginName = "ImagePolicyWebhook"
+
 var (
 	groupVersions = []schema.GroupVersion{v1alpha1.SchemeGroupVersion}
 )
 
 // Register registers a plugin
 func Register(plugins *admission.Plugins) {
-	plugins.Register("ImagePolicyWebhook", func(config io.Reader) (admission.Interface, error) {
+	plugins.Register(PluginName, func(config io.Reader) (admission.Interface, error) {
 		newImagePolicyWebhook, err := NewImagePolicyWebhook(config)
 		if err != nil {
 			return nil, err

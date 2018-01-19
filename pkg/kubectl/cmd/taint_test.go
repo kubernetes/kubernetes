@@ -84,7 +84,6 @@ func TestTaint(t *testing.T) {
 		args        []string
 		expectFatal bool
 		expectTaint bool
-		selector    bool
 	}{
 		// success cases
 		{

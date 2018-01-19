@@ -31,19 +31,6 @@ import (
 	_ "k8s.io/kubernetes/pkg/api/testapi"
 )
 
-func testEvent(name string) *api.Event {
-	return &api.Event{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: "default",
-		},
-		InvolvedObject: api.ObjectReference{
-			Namespace: "default",
-		},
-		Reason: "forTesting",
-	}
-}
-
 func TestGetAttrs(t *testing.T) {
 	eventA := &api.Event{
 		ObjectMeta: metav1.ObjectMeta{

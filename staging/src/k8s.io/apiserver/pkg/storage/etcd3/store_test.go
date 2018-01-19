@@ -1193,7 +1193,7 @@ func testPropogateStore(ctx context.Context, t *testing.T, store *store, obj *ex
 	key := "/testkey"
 	err := store.unconditionalDelete(ctx, key, &example.Pod{})
 	if err != nil && !storage.IsNotFound(err) {
-		t.Fatal("Cleanup failed: %v", err)
+		t.Fatalf("Cleanup failed: %v", err)
 	}
 	setOutput := &example.Pod{}
 	if err := store.Create(ctx, key, obj, setOutput, 0); err != nil {

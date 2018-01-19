@@ -18,8 +18,6 @@ package vsphere
 
 import (
 	"fmt"
-	"os"
-	"strconv"
 	"sync"
 
 	. "github.com/onsi/ginkgo"
@@ -50,10 +48,10 @@ var _ = utils.SIGDescribe("vsphere cloud provider stress [Feature:vsphere]", fun
 		namespace     string
 		instances     int
 		iterations    int
-		err           error
-		scNames       = []string{storageclass1, storageclass2, storageclass3, storageclass4}
 		policyName    string
 		datastoreName string
+		err           error
+		scNames       = []string{storageclass1, storageclass2, storageclass3, storageclass4}
 	)
 
 	BeforeEach(func() {
@@ -67,23 +65,16 @@ var _ = utils.SIGDescribe("vsphere cloud provider stress [Feature:vsphere]", fun
 		// if VCP_STRESS_INSTANCES = 12 and VCP_STRESS_ITERATIONS is 10. 12 threads will run in parallel for 10 times.
 		// Resulting 120 Volumes and POD Creation. Volumes will be provisioned with each different types of Storage Class,
 		// Each iteration creates PVC, verify PV is provisioned, then creates a pod, verify volume is attached to the node, and then delete the pod and delete pvc.
-		instancesStr := os.Getenv("VCP_STRESS_INSTANCES")
-		Expect(instancesStr).NotTo(BeEmpty(), "ENV VCP_STRESS_INSTANCES is not set")
-		instances, err = strconv.Atoi(instancesStr)
-		Expect(err).NotTo(HaveOccurred(), "Error Parsing VCP-STRESS-INSTANCES")
+		instances = GetAndExpectIntEnvVar(VCPStressInstances)
 		Expect(instances <= volumesPerNode*len(nodeList.Items)).To(BeTrue(), fmt.Sprintf("Number of Instances should be less or equal: %v", volumesPerNode*len(nodeList.Items)))
 		Expect(instances > len(scNames)).To(BeTrue(), "VCP_STRESS_INSTANCES should be greater than 3 to utilize all 4 types of storage classes")
 
-		iterationStr := os.Getenv("VCP_STRESS_ITERATIONS")
-		Expect(instancesStr).NotTo(BeEmpty(), "ENV VCP_STRESS_ITERATIONS is not set")
-		iterations, err = strconv.Atoi(iterationStr)
+		iterations = GetAndExpectIntEnvVar(VCPStressIterations)
 		Expect(err).NotTo(HaveOccurred(), "Error Parsing VCP_STRESS_ITERATIONS")
 		Expect(iterations > 0).To(BeTrue(), "VCP_STRESS_ITERATIONS should be greater than 0")
 
-		policyName = os.Getenv("VSPHERE_SPBM_POLICY_NAME")
-		datastoreName = os.Getenv("VSPHERE_DATASTORE")
-		Expect(policyName).NotTo(BeEmpty(), "ENV VSPHERE_SPBM_POLICY_NAME is not set")
-		Expect(datastoreName).NotTo(BeEmpty(), "ENV VSPHERE_DATASTORE is not set")
+		policyName = GetAndExpectStringEnvVar(SPBMPolicyName)
+		datastoreName = GetAndExpectStringEnvVar(StorageClassDatastoreName)
 	})
 
 	It("vsphere stress tests", func() {

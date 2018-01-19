@@ -29,15 +29,23 @@ import (
 	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 )
 
+const (
+	// DenyEscalatingExec indicates name of admission plugin.
+	DenyEscalatingExec = "DenyEscalatingExec"
+	// DenyExecOnPrivileged indicates name of admission plugin.
+	// Deprecated, should use DenyEscalatingExec instead.
+	DenyExecOnPrivileged = "DenyExecOnPrivileged"
+)
+
 // Register registers a plugin
 func Register(plugins *admission.Plugins) {
-	plugins.Register("DenyEscalatingExec", func(config io.Reader) (admission.Interface, error) {
+	plugins.Register(DenyEscalatingExec, func(config io.Reader) (admission.Interface, error) {
 		return NewDenyEscalatingExec(), nil
 	})
 
 	// This is for legacy support of the DenyExecOnPrivileged admission controller.  Most
 	// of the time DenyEscalatingExec should be preferred.
-	plugins.Register("DenyExecOnPrivileged", func(config io.Reader) (admission.Interface, error) {
+	plugins.Register(DenyExecOnPrivileged, func(config io.Reader) (admission.Interface, error) {
 		return NewDenyExecOnPrivileged(), nil
 	})
 }
