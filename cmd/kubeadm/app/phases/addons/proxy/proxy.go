@@ -17,6 +17,7 @@ limitations under the License.
 package proxy
 
 import (
+	"bytes"
 	"fmt"
 	"runtime"
 
@@ -57,11 +58,13 @@ func EnsureProxyAddon(cfg *kubeadmapi.MasterConfiguration, client clientset.Inte
 		return err
 	}
 
-	proxyBytes, err := kubeadmutil.MarshalToYamlForCodecsWithShift(cfg.KubeProxy.Config, kubeproxyconfigv1alpha1.SchemeGroupVersion,
+	proxyBytes, err := kubeadmutil.MarshalToYamlForCodecs(cfg.KubeProxy.Config, kubeproxyconfigv1alpha1.SchemeGroupVersion,
 		kubeproxyconfigscheme.Codecs)
 	if err != nil {
 		return fmt.Errorf("error when marshaling: %v", err)
 	}
+	var prefixBytes bytes.Buffer
+	apiclient.PrintBytesWithLinePrefix(&prefixBytes, proxyBytes, "    ")
 	var proxyConfigMapBytes, proxyDaemonSetBytes []byte
 	proxyConfigMapBytes, err = kubeadmutil.ParseTemplate(KubeProxyConfigMap19,
 		struct {
@@ -69,7 +72,7 @@ func EnsureProxyAddon(cfg *kubeadmapi.MasterConfiguration, client clientset.Inte
 			ProxyConfig    string
 		}{
 			MasterEndpoint: masterEndpoint,
-			ProxyConfig:    proxyBytes,
+			ProxyConfig:    prefixBytes.String(),
 		})
 	if err != nil {
 		return fmt.Errorf("error when parsing kube-proxy configmap template: %v", err)
