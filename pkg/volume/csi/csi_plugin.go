@@ -32,9 +32,10 @@ import (
 )
 
 const (
-	csiPluginName              = "kubernetes.io/csi"
-	csiVolAttribsAnnotationKey = "csi.volume.kubernetes.io/volume-attributes"
-
+	csiPluginName                   = "kubernetes.io/csi"
+	csiVolAttribsAnnotationKey      = "csi.volume.kubernetes.io/volume-attributes"
+	csiSecretNameAnnotationKey      = "csi.volume.kubernetes.io/user-credential-name"
+	csiSecretNamespaceAnnotationKey = "csi.volume.kubernetes.io/user-credential-namespace"
 	// TODO (vladimirvivien) implement a more dynamic way to discover
 	// the unix domain socket path for each installed csi driver.
 	// TODO (vladimirvivien) would be nice to name socket with a .sock extension

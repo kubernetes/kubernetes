@@ -160,6 +160,15 @@ func (c *csiMountMgr) SetUpAt(dir string, fsGroup *int64) error {
 		return err
 	}
 
+	// get user credentials
+	// TODO: for alpha user credentials are passed via PV.Annotations
+	// Beta will fix that
+	creds, err := getUserCredentialsFromSpec(c.k8s, c.spec)
+	if err != nil {
+		glog.Error(log("mounter.SetUpAt failed to extract user credentials from PV annotations: %v", err))
+		return err
+	}
+
 	// create target_dir before call to NodePublish
 	if err := os.MkdirAll(dir, 0750); err != nil {
 		glog.Error(log("mouter.SetUpAt failed to create dir %#v:  %v", dir, err))
@@ -204,6 +213,7 @@ func (c *csiMountMgr) SetUpAt(dir string, fsGroup *int64) error {
 		accessMode,
 		c.volumeInfo,
 		attribs,
+		creds,
 		fsType,
 	)
 
@@ -316,6 +326,41 @@ func getVolAttribsFromSpec(spec *volume.Spec) (map[string]string, error) {
 		return nil, err
 	}
 	return attribs, nil
+}
+
+// getUserCredentialsFromSpec exracts user credential information from PV.Annotations
+func getUserCredentialsFromSpec(client kubernetes.Interface, spec *volume.Spec) (map[string]string, error) {
+	if spec == nil {
+		return nil, errors.New("missing volume spec")
+	}
+	annotations := spec.PersistentVolume.GetAnnotations()
+	if annotations == nil {
+		return nil, nil // no annotations found
+	}
+
+	secretName, found := annotations[csiSecretNameAnnotationKey]
+	if !found {
+		return nil, nil
+	}
+	if len(secretName) == 0 {
+		return nil, nil
+	}
+	secretNamespace := ""
+	ns, found := annotations[csiSecretNamespaceAnnotationKey]
+	if found {
+		secretNamespace = ns
+	}
+
+	creds := make(map[string]string)
+	secret, err := client.CoreV1().Secrets(secretNamespace).Get(secretName, meta.GetOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("cannot get secret %s/%s, err %v", secretNamespace, secretName, err)
+	}
+	for name, data := range secret.Data {
+		creds[name] = string(data)
+	}
+
+	return creds, nil
 }
 
 // saveVolumeData persists parameter data as json file using the locagion
