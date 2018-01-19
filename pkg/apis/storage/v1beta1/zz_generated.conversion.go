@@ -54,7 +54,7 @@ func autoConvert_v1beta1_StorageClass_To_storage_StorageClass(in *v1beta1.Storag
 	out.MountOptions = *(*[]string)(unsafe.Pointer(&in.MountOptions))
 	out.AllowVolumeExpansion = (*bool)(unsafe.Pointer(in.AllowVolumeExpansion))
 	out.VolumeBindingMode = (*storage.VolumeBindingMode)(unsafe.Pointer(in.VolumeBindingMode))
-	out.SecretRefs = *(*map[string]v1.SecretReference)(unsafe.Pointer(&in.SecretRefs))
+	out.SecretRefs = *(*map[string]core.SecretReference)(unsafe.Pointer(&in.SecretRefs))
 	return nil
 }
 
