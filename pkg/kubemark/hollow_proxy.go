@@ -33,7 +33,7 @@ import (
 	proxyconfig "k8s.io/kubernetes/pkg/proxy/config"
 	"k8s.io/kubernetes/pkg/proxy/iptables"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
-	utilnode "k8s.io/kubernetes/pkg/util/node"
+	nodeutil "k8s.io/kubernetes/pkg/util/node"
 	utilpointer "k8s.io/kubernetes/pkg/util/pointer"
 	utilsysctl "k8s.io/kubernetes/pkg/util/sysctl"
 	utilexec "k8s.io/utils/exec"
@@ -144,7 +144,7 @@ func getNodeIP(client clientset.Interface, hostname string) net.IP {
 		glog.Warningf("Failed to retrieve node info: %v", err)
 		return nil
 	}
-	nodeIP, err = utilnode.InternalGetNodeHostIP(node)
+	nodeIP, err = nodeutil.InternalGetNodeHostIP(node)
 	if err != nil {
 		glog.Warningf("Failed to retrieve node IP: %v", err)
 		return nil

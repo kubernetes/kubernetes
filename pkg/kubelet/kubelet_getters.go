@@ -31,7 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	utilfile "k8s.io/kubernetes/pkg/util/file"
-	utilnode "k8s.io/kubernetes/pkg/util/node"
+	nodeutil "k8s.io/kubernetes/pkg/util/node"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
@@ -217,7 +217,7 @@ func (kl *Kubelet) GetHostIP() (net.IP, error) {
 	if err != nil {
 		return nil, fmt.Errorf("cannot get node: %v", err)
 	}
-	return utilnode.GetNodeHostIP(node)
+	return nodeutil.GetNodeHostIP(node)
 }
 
 // getHostIPAnyway attempts to return the host IP from kubelet's nodeInfo, or
@@ -227,7 +227,7 @@ func (kl *Kubelet) getHostIPAnyWay() (net.IP, error) {
 	if err != nil {
 		return nil, err
 	}
-	return utilnode.GetNodeHostIP(node)
+	return nodeutil.GetNodeHostIP(node)
 }
 
 // GetExtraSupplementalGroupsForPod returns a list of the extra
