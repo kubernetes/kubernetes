@@ -428,7 +428,7 @@ func (kl *Kubelet) recordNodeStatusEvent(eventType, event string) {
 // Set IP and hostname addresses for the node.
 func (kl *Kubelet) setNodeAddress(node *v1.Node) error {
 	if kl.nodeIP != nil {
-		if err := validateNodeIP(kl.nodeIP); err != nil {
+		if err := kl.validateNodeIP(kl.nodeIP); err != nil {
 			return fmt.Errorf("failed to validate nodeIP: %v", err)
 		}
 		glog.V(2).Infof("Using node IP: %q", kl.nodeIP.String())
@@ -505,7 +505,7 @@ func (kl *Kubelet) setNodeAddress(node *v1.Node) error {
 			var addrs []net.IP
 			addrs, _ = net.LookupIP(node.Name)
 			for _, addr := range addrs {
-				if err = validateNodeIP(addr); err == nil {
+				if err = kl.validateNodeIP(addr); err == nil {
 					if addr.To4() != nil {
 						ipAddr = addr
 						break
@@ -1080,7 +1080,10 @@ func (kl *Kubelet) defaultNodeStatusFuncs() []func(*v1.Node) error {
 }
 
 // Validate given node IP belongs to the current host
-func validateNodeIP(nodeIP net.IP) error {
+func (kl *Kubelet) validateNodeIP(nodeIP net.IP) error {
+	if kl.disableNodeIPValidation {
+		return nil
+	}
 	// Honor IP limitations set in setNodeStatus()
 	if nodeIP.To4() == nil && nodeIP.To16() == nil {
 		return fmt.Errorf("nodeIP must be a valid IP address")

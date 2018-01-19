@@ -199,6 +199,7 @@ type Builder func(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	runtimeCgroups string,
 	hostnameOverride string,
 	nodeIP string,
+	disableNodeIPValidation bool,
 	providerID string,
 	cloudProvider string,
 	certDirectory string,
@@ -324,6 +325,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	runtimeCgroups string,
 	hostnameOverride string,
 	nodeIP string,
+	disableNodeIPValidation bool,
 	providerID string,
 	cloudProvider string,
 	certDirectory string,
@@ -512,20 +514,21 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		nodeRef:                   nodeRef,
 		nodeLabels:                nodeLabels,
 		nodeStatusUpdateFrequency: kubeCfg.NodeStatusUpdateFrequency.Duration,
-		os:                   kubeDeps.OSInterface,
-		oomWatcher:           oomWatcher,
-		cgroupsPerQOS:        kubeCfg.CgroupsPerQOS,
-		cgroupRoot:           kubeCfg.CgroupRoot,
-		mounter:              kubeDeps.Mounter,
-		writer:               kubeDeps.Writer,
-		maxPods:              int(kubeCfg.MaxPods),
-		podsPerCore:          int(kubeCfg.PodsPerCore),
-		syncLoopMonitor:      atomic.Value{},
-		daemonEndpoints:      daemonEndpoints,
-		containerManager:     kubeDeps.ContainerManager,
-		containerRuntimeName: containerRuntime,
-		nodeIP:               parsedNodeIP,
-		clock:                clock.RealClock{},
+		os:                      kubeDeps.OSInterface,
+		oomWatcher:              oomWatcher,
+		cgroupsPerQOS:           kubeCfg.CgroupsPerQOS,
+		cgroupRoot:              kubeCfg.CgroupRoot,
+		mounter:                 kubeDeps.Mounter,
+		writer:                  kubeDeps.Writer,
+		maxPods:                 int(kubeCfg.MaxPods),
+		podsPerCore:             int(kubeCfg.PodsPerCore),
+		syncLoopMonitor:         atomic.Value{},
+		daemonEndpoints:         daemonEndpoints,
+		containerManager:        kubeDeps.ContainerManager,
+		containerRuntimeName:    containerRuntime,
+		nodeIP:                  parsedNodeIP,
+		disableNodeIPValidation: disableNodeIPValidation,
+		clock: clock.RealClock{},
 		enableControllerAttachDetach:            kubeCfg.EnableControllerAttachDetach,
 		iptClient:                               utilipt.New(utilexec.New(), utildbus.New(), utilipt.ProtocolIpv4),
 		makeIPTablesUtilChains:                  kubeCfg.MakeIPTablesUtilChains,
@@ -1123,8 +1126,10 @@ type Kubelet struct {
 	// oneTimeInitializer is used to initialize modules that are dependent on the runtime to be up.
 	oneTimeInitializer sync.Once
 
-	// If non-nil, use this IP address for the node
+	// If non-nil, use this IP address for the node.
 	nodeIP net.IP
+	// If set, node IP will not be validated.
+	disableNodeIPValidation bool
 
 	// If non-nil, this is a unique identifier for the node in an external database, eg. cloudprovider
 	providerID string

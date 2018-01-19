@@ -77,6 +77,8 @@ type KubeletFlags struct {
 	// NodeIP is IP address of the node.
 	// If set, kubelet will use this IP address for the node.
 	NodeIP string
+	// Turn off node IP validation.
+	DisableNodeIPValidation bool
 
 	// This flag, if set, sets the unique id of the instance that an external provider (i.e. cloudprovider)
 	// can use to identify a specific node
@@ -350,6 +352,7 @@ func (f *KubeletFlags) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&f.HostnameOverride, "hostname-override", f.HostnameOverride, "If non-empty, will use this string as identification instead of the actual hostname.")
 
 	fs.StringVar(&f.NodeIP, "node-ip", f.NodeIP, "IP address of the node. If set, kubelet will use this IP address for the node")
+	fs.BoolVar(&f.DisableNodeIPValidation, "disable-node-ip-validation", false, "Turn off node IP validation. If set, no checking will be applied to node ip")
 
 	fs.StringVar(&f.ProviderID, "provider-id", f.ProviderID, "Unique identifier for identifying the node in a machine database, i.e cloudprovider")
 
