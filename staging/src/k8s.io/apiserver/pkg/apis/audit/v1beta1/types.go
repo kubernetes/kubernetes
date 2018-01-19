@@ -23,13 +23,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
-// Header keys used by the audit system.
-const (
-	// Header to hold the audit ID as the request is propagated through the serving hierarchy. The
-	// Audit-ID header should be set by the first server to receive the request (e.g. the federation
-	// server or kube-aggregator).
-	HeaderAuditID = "Audit-ID"
-)
 
 // Level defines the amount of information logged during auditing
 type Level string

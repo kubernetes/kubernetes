@@ -23,33 +23,13 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
-// Header keys used by the audit system.
-const (
-	// Header to hold the audit ID as the request is propagated through the serving hierarchy. The
-	// Audit-ID header should be set by the first server to receive the request (e.g. the federation
-	// server or kube-aggregator).
-	//
-	// Audit ID is also returned to client by http response header.
-	// It's not guaranteed Audit-Id http header is sent for all requests. When kube-apiserver didn't
-	// audit the events according to the audit policy, no Audit-ID is returned. Also, for request to
-	// pods/exec, pods/attach, pods/proxy, kube-apiserver works like a proxy and redirect the request
-	// to kubelet node, users will only get http headers sent from kubelet node, so no Audit-ID is
-	// sent when users run command like "kubectl exec" or "kubectl attach".
-	HeaderAuditID = "Audit-ID"
-)
-
 // Level defines the amount of information logged during auditing
 type Level string
 
 // Valid audit levels
 const (
-	// LevelNone disables auditing
-	LevelNone Level = "None"
 	// LevelMetadata provides the basic level of auditing.
 	LevelMetadata Level = "Metadata"
-	// LevelRequest provides Metadata level of auditing, and additionally
-	// logs the request object (does not apply for non-resource requests).
-	LevelRequest Level = "Request"
 	// LevelRequestResponse provides Request level of auditing, and additionally
 	// logs the response object (does not apply for non-resource requests).
 	LevelRequestResponse Level = "RequestResponse"
@@ -58,20 +38,6 @@ const (
 // Stage defines the stages in request handling that audit events may be generated.
 type Stage string
 
-// Valid audit stages.
-const (
-	// The stage for events generated as soon as the audit handler receives the request, and before it
-	// is delegated down the handler chain.
-	StageRequestReceived = "RequestReceived"
-	// The stage for events generated once the response headers are sent, but before the response body
-	// is sent. This stage is only generated for long-running requests (e.g. watch).
-	StageResponseStarted = "ResponseStarted"
-	// The stage for events generated once the response body has been completed, and no more bytes
-	// will be sent.
-	StageResponseComplete = "ResponseComplete"
-	// The stage for events generated when a panic occurred.
-	StagePanic = "Panic"
-)
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
