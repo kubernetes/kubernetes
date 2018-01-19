@@ -190,9 +190,7 @@ func TestUpdateCachedPredicateItem(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		// this case does not need to calculate equivalence hash, just pass an empty function
-		fakeGetEquivalencePodFunc := func(pod *v1.Pod) interface{} { return nil }
-		ecache := NewEquivalenceCache(fakeGetEquivalencePodFunc)
+		ecache := NewEquivalenceCache()
 		if test.expectPredicateMap {
 			ecache.algorithmCache[test.nodeName] = newAlgorithmCache()
 			predicateItem := HostPredicate{
@@ -310,9 +308,7 @@ func TestPredicateWithECache(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		// this case does not need to calculate equivalence hash, just pass an empty function
-		fakeGetEquivalencePodFunc := func(pod *v1.Pod) interface{} { return nil }
-		ecache := NewEquivalenceCache(fakeGetEquivalencePodFunc)
+		ecache := NewEquivalenceCache()
 		// set cached item to equivalence cache
 		ecache.UpdateCachedPredicateItem(
 			test.podName,
@@ -361,27 +357,7 @@ func TestGetHashEquivalencePod(t *testing.T) {
 
 	testNamespace := "test"
 
-	pvcInfo := predicates.FakePersistentVolumeClaimInfo{
-		{
-			ObjectMeta: metav1.ObjectMeta{UID: "someEBSVol1", Name: "someEBSVol1", Namespace: testNamespace},
-			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "someEBSVol1"},
-		},
-		{
-			ObjectMeta: metav1.ObjectMeta{UID: "someEBSVol2", Name: "someEBSVol2", Namespace: testNamespace},
-			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "someNonEBSVol"},
-		},
-		{
-			ObjectMeta: metav1.ObjectMeta{UID: "someEBSVol3-0", Name: "someEBSVol3-0", Namespace: testNamespace},
-			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "pvcWithDeletedPV"},
-		},
-		{
-			ObjectMeta: metav1.ObjectMeta{UID: "someEBSVol3-1", Name: "someEBSVol3-1", Namespace: testNamespace},
-			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "anotherPVCWithDeletedPV"},
-		},
-	}
-
-	// use default equivalence class generator
-	ecache := NewEquivalenceCache(predicates.NewEquivalencePodGenerator(pvcInfo))
+	ecache := NewEquivalenceCache()
 
 	isController := true
 
@@ -607,7 +583,7 @@ func TestGetHashEquivalencePod(t *testing.T) {
 	for _, test := range tests {
 		for i, podInfo := range test.podInfoList {
 			testPod := podInfo.pod
-			hash, isValid := ecache.getHashEquivalencePod(testPod)
+			hash, isValid := ecache.getEquivalenceHash(testPod)
 			if isValid != podInfo.hashIsValid {
 				t.Errorf("Failed: pod %v is expected to have valid hash", testPod)
 			}
@@ -668,9 +644,7 @@ func TestInvalidateCachedPredicateItemOfAllNodes(t *testing.T) {
 			},
 		},
 	}
-	// this case does not need to calculate equivalence hash, just pass an empty function
-	fakeGetEquivalencePodFunc := func(pod *v1.Pod) interface{} { return nil }
-	ecache := NewEquivalenceCache(fakeGetEquivalencePodFunc)
+	ecache := NewEquivalenceCache()
 
 	for _, test := range tests {
 		// set cached item to equivalence cache
@@ -736,9 +710,7 @@ func TestInvalidateAllCachedPredicateItemOfNode(t *testing.T) {
 			},
 		},
 	}
-	// this case does not need to calculate equivalence hash, just pass an empty function
-	fakeGetEquivalencePodFunc := func(pod *v1.Pod) interface{} { return nil }
-	ecache := NewEquivalenceCache(fakeGetEquivalencePodFunc)
+	ecache := NewEquivalenceCache()
 
 	for _, test := range tests {
 		// set cached item to equivalence cache
@@ -763,31 +735,9 @@ func TestInvalidateAllCachedPredicateItemOfNode(t *testing.T) {
 }
 
 func BenchmarkEquivalenceHash(b *testing.B) {
-	testNamespace := "test"
-
-	pvcInfo := predicates.FakePersistentVolumeClaimInfo{
-		{
-			ObjectMeta: metav1.ObjectMeta{UID: "someEBSVol1", Name: "someEBSVol1", Namespace: testNamespace},
-			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "someEBSVol1"},
-		},
-		{
-			ObjectMeta: metav1.ObjectMeta{UID: "someEBSVol2", Name: "someEBSVol2", Namespace: testNamespace},
-			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "someNonEBSVol"},
-		},
-		{
-			ObjectMeta: metav1.ObjectMeta{UID: "someEBSVol3-0", Name: "someEBSVol3-0", Namespace: testNamespace},
-			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "pvcWithDeletedPV"},
-		},
-		{
-			ObjectMeta: metav1.ObjectMeta{UID: "someEBSVol3-1", Name: "someEBSVol3-1", Namespace: testNamespace},
-			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "anotherPVCWithDeletedPV"},
-		},
-	}
-
-	// use default equivalence class generator
-	cache := NewEquivalenceCache(predicates.NewEquivalencePodGenerator(pvcInfo))
+	cache := NewEquivalenceCache()
 	pod := makeBasicPod()
 	for i := 0; i < b.N; i++ {
-		cache.getHashEquivalencePod(pod)
+		cache.getEquivalenceHash(pod)
 	}
 }
