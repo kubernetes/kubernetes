@@ -275,17 +275,34 @@ def update_kubelet_status():
         hookenv.status_set('waiting', msg)
 
 
-@when('certificates.available')
-def send_data(tls):
+def get_ingress_address(relation):
+    try:
+        network_info = hookenv.network_get(relation.relation_name)
+    except NotImplementedError:
+        network_info = []
+
+    if network_info and 'ingress-addresses' in network_info:
+        # just grab the first one for now, maybe be more robust here?
+        return network_info['ingress-addresses'][0]
+    else:
+        # if they don't have ingress-addresses they are running a juju that
+        # doesn't support spaces, so just return the private address
+        return hookenv.unit_get('private-address')
+
+
+@when('certificates.available', 'kube-control.connected')
+def send_data(tls, kube_control):
     '''Send the data that is required to create a server certificate for
     this server.'''
     # Use the public ip of this unit as the Common Name for the certificate.
     common_name = hookenv.unit_public_ip()
 
+    ingress_ip = get_ingress_address(kube_control)
+
     # Create SANs that the tls layer will add to the server cert.
     sans = [
         hookenv.unit_public_ip(),
-        hookenv.unit_private_ip(),
+        ingress_ip,
         gethostname()
     ]
 
@@ -328,6 +345,7 @@ def start_worker(kube_api, kube_control, auth_control, cni):
     # the correct DNS even though the server isn't ready yet.
 
     dns = kube_control.get_dns()
+    ingress_ip = get_ingress_address(kube_control)
     cluster_cidr = cni.get_config()['cidr']
 
     if cluster_cidr is None:
@@ -341,7 +359,7 @@ def start_worker(kube_api, kube_control, auth_control, cni):
     set_privileged()
 
     create_config(random.choice(servers), creds)
-    configure_kubelet(dns)
+    configure_kubelet(dns, ingress_ip)
     configure_kube_proxy(servers, cluster_cidr)
     set_state('kubernetes-worker.config.created')
     restart_unit_services()
@@ -528,7 +546,7 @@ def configure_kubernetes_service(service, base_args, extra_args_key):
     db.set(prev_args_key, args)
 
 
-def configure_kubelet(dns):
+def configure_kubelet(dns, ingress_ip):
     layer_options = layer.options('tls-client')
     ca_cert_path = layer_options.get('ca_certificate_path')
     server_cert_path = layer_options.get('server_certificate_path')
@@ -548,6 +566,7 @@ def configure_kubelet(dns):
     kubelet_opts['tls-private-key-file'] = server_key_path
     kubelet_opts['logtostderr'] = 'true'
     kubelet_opts['fail-swap-on'] = 'false'
+    kubelet_opts['node-ip'] = ingress_ip
 
     if (dns['enable-kube-dns']):
         kubelet_opts['cluster-dns'] = dns['sdn-ip']
