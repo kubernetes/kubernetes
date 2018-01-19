@@ -23,6 +23,7 @@ import (
 	"testing"
 	"time"
 
+	storagev1alpha1 "k8s.io/api/storage/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -31,8 +32,11 @@ import (
 	"k8s.io/apiserver/pkg/authentication/request/bearertoken"
 	"k8s.io/apiserver/pkg/authentication/token/tokenfile"
 	"k8s.io/apiserver/pkg/authentication/user"
+	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
+	versionedinformers "k8s.io/client-go/informers"
+	externalclientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -71,13 +75,18 @@ func TestNodeAuthorizer(t *testing.T) {
 
 	// Build client config, clientset, and informers
 	clientConfig := &restclient.Config{Host: apiServer.URL, ContentConfig: restclient.ContentConfig{NegotiatedSerializer: legacyscheme.Codecs}}
-	superuserClient := clientsetForToken(tokenMaster, clientConfig)
+	superuserClient, superuserClientExternal := clientsetForToken(tokenMaster, clientConfig)
 	informerFactory := informers.NewSharedInformerFactory(superuserClient, time.Minute)
+	versionedInformerFactory := versionedinformers.NewSharedInformerFactory(superuserClientExternal, time.Minute)
+
+	// Enabled CSIPersistentVolume feature at startup so volumeattachments get watched
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIPersistentVolume, true)()
 
 	// Set up Node+RBAC authorizer
 	authorizerConfig := &authorizer.AuthorizationConfig{
-		AuthorizationModes: []string{"Node", "RBAC"},
-		InformerFactory:    informerFactory,
+		AuthorizationModes:       []string{"Node", "RBAC"},
+		InformerFactory:          informerFactory,
+		VersionedInformerFactory: versionedInformerFactory,
 	}
 	nodeRBACAuthorizer, _, err := authorizerConfig.New()
 	if err != nil {
@@ -94,9 +103,12 @@ func TestNodeAuthorizer(t *testing.T) {
 	// Start the server
 	masterConfig := framework.NewIntegrationTestMasterConfig()
 	masterConfig.GenericConfig.Authenticator = authenticator
-
 	masterConfig.GenericConfig.Authorizer = nodeRBACAuthorizer
 	masterConfig.GenericConfig.AdmissionControl = nodeRestrictionAdmission
+
+	// enable testing volume attachments
+	masterConfig.ExtraConfig.APIResourceConfigSource.(*serverstorage.ResourceConfig).EnableVersions(storagev1alpha1.SchemeGroupVersion)
+
 	_, _, closeFn := framework.RunAMasterUsingServer(masterConfig, apiServer, h)
 	defer closeFn()
 
@@ -104,6 +116,7 @@ func TestNodeAuthorizer(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 	informerFactory.Start(stopCh)
+	versionedInformerFactory.Start(stopCh)
 
 	// Wait for a healthy server
 	for {
@@ -124,6 +137,17 @@ func TestNodeAuthorizer(t *testing.T) {
 		t.Fatal(err)
 	}
 	if _, err := superuserClient.Core().ConfigMaps("ns").Create(&api.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "myconfigmap"}}); err != nil {
+		t.Fatal(err)
+	}
+	pvName := "mypv"
+	if _, err := superuserClientExternal.StorageV1alpha1().VolumeAttachments().Create(&storagev1alpha1.VolumeAttachment{
+		ObjectMeta: metav1.ObjectMeta{Name: "myattachment"},
+		Spec: storagev1alpha1.VolumeAttachmentSpec{
+			Attacher: "foo",
+			Source:   storagev1alpha1.VolumeAttachmentSource{PersistentVolumeName: &pvName},
+			NodeName: "node2",
+		},
+	}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := superuserClient.Core().PersistentVolumeClaims("ns").Create(&api.PersistentVolumeClaim{
@@ -175,6 +199,12 @@ func TestNodeAuthorizer(t *testing.T) {
 	getPV := func(client clientset.Interface) func() error {
 		return func() error {
 			_, err := client.Core().PersistentVolumes().Get("mypv", metav1.GetOptions{})
+			return err
+		}
+	}
+	getVolumeAttachment := func(client externalclientset.Interface) func() error {
+		return func() error {
+			_, err := client.StorageV1alpha1().VolumeAttachments().Get("myattachment", metav1.GetOptions{})
 			return err
 		}
 	}
@@ -303,9 +333,9 @@ func TestNodeAuthorizer(t *testing.T) {
 		}
 	}
 
-	nodeanonClient := clientsetForToken(tokenNodeUnknown, clientConfig)
-	node1Client := clientsetForToken(tokenNode1, clientConfig)
-	node2Client := clientsetForToken(tokenNode2, clientConfig)
+	nodeanonClient, _ := clientsetForToken(tokenNodeUnknown, clientConfig)
+	node1Client, node1ClientExternal := clientsetForToken(tokenNode1, clientConfig)
+	node2Client, node2ClientExternal := clientsetForToken(tokenNode2, clientConfig)
 
 	// all node requests from node1 and unknown node fail
 	expectForbidden(t, getSecret(nodeanonClient))
@@ -402,32 +432,40 @@ func TestNodeAuthorizer(t *testing.T) {
 
 	// re-create a pod as an admin to add object references
 	expectAllowed(t, createNode2NormalPod(superuserClient))
-	// With ExpandPersistentVolumes feature disabled
+
+	// ExpandPersistentVolumes feature disabled
 	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExpandPersistentVolumes, false)()
-	// node->pvc relationship not established
 	expectForbidden(t, updatePVCCapacity(node1Client))
-	// node->pvc relationship established but feature is disabled
 	expectForbidden(t, updatePVCCapacity(node2Client))
 
-	//Enabled ExpandPersistentVolumes feature
+	// ExpandPersistentVolumes feature enabled
 	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExpandPersistentVolumes, true)()
-	// Node->pvc relationship not established
 	expectForbidden(t, updatePVCCapacity(node1Client))
-	// node->pvc relationship established and feature is enabled
 	expectAllowed(t, updatePVCCapacity(node2Client))
-	// node->pvc relationship established but updating phase
 	expectForbidden(t, updatePVCPhase(node2Client))
+
+	// Disabled CSIPersistentVolume feature
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIPersistentVolume, false)()
+	expectForbidden(t, getVolumeAttachment(node1ClientExternal))
+	expectForbidden(t, getVolumeAttachment(node2ClientExternal))
+	// Enabled CSIPersistentVolume feature
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIPersistentVolume, true)()
+	expectForbidden(t, getVolumeAttachment(node1ClientExternal))
+	expectAllowed(t, getVolumeAttachment(node2ClientExternal))
 }
 
 // expect executes a function a set number of times until it either returns the
 // expected error or executes too many times. It returns if the retries timed
 // out and the last error returned by the method.
-func expect(f func() error, wantErr func(error) bool) (timeout bool, lastErr error) {
+func expect(t *testing.T, f func() error, wantErr func(error) bool) (timeout bool, lastErr error) {
+	t.Helper()
 	err := wait.PollImmediate(time.Second, 30*time.Second, func() (bool, error) {
+		t.Helper()
 		lastErr = f()
 		if wantErr(lastErr) {
 			return true, nil
 		}
+		t.Logf("unexpected response, will retry: %v", lastErr)
 		return false, nil
 	})
 	return err == nil, lastErr
@@ -435,21 +473,21 @@ func expect(f func() error, wantErr func(error) bool) (timeout bool, lastErr err
 
 func expectForbidden(t *testing.T, f func() error) {
 	t.Helper()
-	if ok, err := expect(f, errors.IsForbidden); !ok {
+	if ok, err := expect(t, f, errors.IsForbidden); !ok {
 		t.Errorf("Expected forbidden error, got %v", err)
 	}
 }
 
 func expectNotFound(t *testing.T, f func() error) {
 	t.Helper()
-	if ok, err := expect(f, errors.IsNotFound); !ok {
+	if ok, err := expect(t, f, errors.IsNotFound); !ok {
 		t.Errorf("Expected notfound error, got %v", err)
 	}
 }
 
 func expectAllowed(t *testing.T, f func() error) {
 	t.Helper()
-	if ok, err := expect(f, func(e error) bool { return e == nil }); !ok {
+	if ok, err := expect(t, f, func(e error) bool { return e == nil }); !ok {
 		t.Errorf("Expected no error, got %v", err)
 	}
 }
