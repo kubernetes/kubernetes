@@ -18,7 +18,6 @@ package stackdriver
 
 import (
 	"fmt"
-	"strings"
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -113,13 +112,12 @@ var _ = instrumentation.SIGDescribe("Cluster level logging implemented by Stackd
 	ginkgo.It("should ingest logs [Feature:StackdriverLogging]", func() {
 		withLogProviderForScope(f, podsScope, func(p *sdLogProvider) {
 			ginkgo.By("Checking that too long lines are trimmed", func() {
-				originalLength := 100001
+				maxLength := 100 * 1024
 				cmd := []string{
 					"/bin/sh",
 					"-c",
-					fmt.Sprintf("while :; do printf '%%*s' %d | tr ' ' 'A'; echo; sleep 60; done", originalLength),
+					fmt.Sprintf("while :; do printf '%%*s' %d | tr ' ' 'A'; echo; sleep 60; done", maxLength+1),
 				}
-				trimPrefix := "[Trimmed]"
 
 				pod, err := utils.StartAndReturnSelf(utils.NewExecLoggingPod("synthlogger-4", cmd), f)
 				framework.ExpectNoError(err, "Failed to start a pod")
@@ -133,11 +131,8 @@ var _ = instrumentation.SIGDescribe("Cluster level logging implemented by Stackd
 					if log.JSONPayload != nil {
 						return false, fmt.Errorf("got json log entry %v, wanted plain text", log.JSONPayload)
 					}
-					if len(log.TextPayload) == originalLength {
-						return false, fmt.Errorf("got non-trimmed entry of length %d", len(log.TextPayload))
-					}
-					if !strings.HasPrefix(log.TextPayload, trimPrefix) {
-						return false, fmt.Errorf("got message without prefix '%s': %s", trimPrefix, log.TextPayload)
+					if len(log.TextPayload) > maxLength {
+						return false, fmt.Errorf("got too long entry of length %d", len(log.TextPayload))
 					}
 					return true, nil
 				}, utils.JustTimeout, pod.Name())
