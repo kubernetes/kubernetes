@@ -167,7 +167,7 @@ export ETCD_IMAGE=3.0.17
 export ETCD_VERSION=3.0.17
 
 # Upgrade master with updated kube envs
-# ${KUBE_ROOT}/cluster/gce/upgrade.sh -M -l
+${KUBE_ROOT}/cluster/gce/upgrade.sh -M -l
 
 delete-k8s-node-routes
 set-allow-subnet-cidr-routes-overlap false
