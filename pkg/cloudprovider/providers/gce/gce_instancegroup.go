@@ -16,7 +16,11 @@ limitations under the License.
 
 package gce
 
-import compute "google.golang.org/api/compute/v1"
+import (
+	"context"
+
+	compute "google.golang.org/api/compute/v1"
+)
 
 func newInstanceGroupMetricContext(request string, zone string) *metricContext {
 	return newGenericMetricContext("instancegroup", request, unusedMetricLabel, zone, computeV1Version)
@@ -48,22 +52,28 @@ func (gce *GCECloud) DeleteInstanceGroup(name string, zone string) error {
 
 // ListInstanceGroups lists all InstanceGroups in the project and
 // zone.
-func (gce *GCECloud) ListInstanceGroups(zone string) (*compute.InstanceGroupList, error) {
+func (gce *GCECloud) ListInstanceGroups(zone string) ([]*compute.InstanceGroup, error) {
 	mc := newInstanceGroupMetricContext("list", zone)
-	// TODO: use PageToken to list all not just the first 500
-	v, err := gce.service.InstanceGroups.List(gce.projectID, zone).Do()
-	return v, mc.Observe(err)
+	instanceGroups := []*compute.InstanceGroup{}
+	err := gce.service.InstanceGroups.List(gce.projectID, zone).Pages(context.Background(), func(res *compute.InstanceGroupList) error {
+		instanceGroups = append(instanceGroups, res.Items...)
+		return nil
+	})
+	return instanceGroups, mc.Observe(err)
 }
 
 // ListInstancesInInstanceGroup lists all the instances in a given
 // instance group and state.
-func (gce *GCECloud) ListInstancesInInstanceGroup(name string, zone string, state string) (*compute.InstanceGroupsListInstances, error) {
+func (gce *GCECloud) ListInstancesInInstanceGroup(name string, zone string, state string) ([]*compute.InstanceWithNamedPorts, error) {
 	mc := newInstanceGroupMetricContext("list_instances", zone)
-	// TODO: use PageToken to list all not just the first 500
-	v, err := gce.service.InstanceGroups.ListInstances(
+	instances := []*compute.InstanceWithNamedPorts{}
+	err := gce.service.InstanceGroups.ListInstances(
 		gce.projectID, zone, name,
-		&compute.InstanceGroupsListInstancesRequest{InstanceState: state}).Do()
-	return v, mc.Observe(err)
+		&compute.InstanceGroupsListInstancesRequest{InstanceState: state}).Pages(context.Background(), func(res *compute.InstanceGroupsListInstances) error {
+		instances = append(instances, res.Items...)
+		return nil
+	})
+	return instances, mc.Observe(err)
 }
 
 // AddInstancesToInstanceGroup adds the given instances to the given

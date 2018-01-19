@@ -17,6 +17,7 @@ limitations under the License.
 package gce
 
 import (
+	"context"
 	"net/http"
 
 	computealpha "google.golang.org/api/compute/v0.alpha"
@@ -104,11 +105,14 @@ func (gce *GCECloud) CreateAlphaGlobalBackendService(bg *computealpha.BackendSer
 }
 
 // ListGlobalBackendServices lists all backend services in the project.
-func (gce *GCECloud) ListGlobalBackendServices() (*compute.BackendServiceList, error) {
+func (gce *GCECloud) ListGlobalBackendServices() ([]*compute.BackendService, error) {
 	mc := newBackendServiceMetricContext("list", "")
-	// TODO: use PageToken to list all not just the first 500
-	v, err := gce.service.BackendServices.List(gce.projectID).Do()
-	return v, mc.Observe(err)
+	backendServices := []*compute.BackendService{}
+	err := gce.service.BackendServices.List(gce.projectID).Pages(context.Background(), func(res *compute.BackendServiceList) error {
+		backendServices = append(backendServices, res.Items...)
+		return nil
+	})
+	return backendServices, mc.Observe(err)
 }
 
 // GetGlobalBackendServiceHealth returns the health of the BackendService identified by the given
@@ -165,11 +169,14 @@ func (gce *GCECloud) CreateRegionBackendService(bg *compute.BackendService, regi
 }
 
 // ListRegionBackendServices lists all backend services in the project.
-func (gce *GCECloud) ListRegionBackendServices(region string) (*compute.BackendServiceList, error) {
+func (gce *GCECloud) ListRegionBackendServices(region string) ([]*compute.BackendService, error) {
 	mc := newBackendServiceMetricContext("list", region)
-	// TODO: use PageToken to list all not just the first 500
-	v, err := gce.service.RegionBackendServices.List(gce.projectID, region).Do()
-	return v, mc.Observe(err)
+	backendServices := []*compute.BackendService{}
+	err := gce.service.RegionBackendServices.List(gce.projectID, region).Pages(context.Background(), func(res *compute.BackendServiceList) error {
+		backendServices = append(backendServices, res.Items...)
+		return nil
+	})
+	return backendServices, mc.Observe(err)
 }
 
 // GetRegionalBackendServiceHealth returns the health of the BackendService identified by the given

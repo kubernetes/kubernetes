@@ -17,6 +17,7 @@ limitations under the License.
 package gce
 
 import (
+	"context"
 	"net/http"
 
 	compute "google.golang.org/api/compute/v1"
@@ -66,9 +67,12 @@ func (gce *GCECloud) DeleteSslCertificate(name string) error {
 }
 
 // ListSslCertificates lists all SslCertificates in the project.
-func (gce *GCECloud) ListSslCertificates() (*compute.SslCertificateList, error) {
+func (gce *GCECloud) ListSslCertificates() ([]*compute.SslCertificate, error) {
 	mc := newCertMetricContext("list")
-	// TODO: use PageToken to list all not just the first 500
-	v, err := gce.service.SslCertificates.List(gce.projectID).Do()
-	return v, mc.Observe(err)
+	sslCertificates := []*compute.SslCertificate{}
+	err := gce.service.SslCertificates.List(gce.projectID).Pages(context.Background(), func(res *compute.SslCertificateList) error {
+		sslCertificates = append(sslCertificates, res.Items...)
+		return nil
+	})
+	return sslCertificates, mc.Observe(err)
 }

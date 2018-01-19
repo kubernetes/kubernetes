@@ -17,6 +17,7 @@ limitations under the License.
 package gce
 
 import (
+	"context"
 	"net/http"
 
 	compute "google.golang.org/api/compute/v1"
@@ -67,9 +68,12 @@ func (gce *GCECloud) DeleteUrlMap(name string) error {
 }
 
 // ListUrlMaps lists all UrlMaps in the project.
-func (gce *GCECloud) ListUrlMaps() (*compute.UrlMapList, error) {
+func (gce *GCECloud) ListUrlMaps() ([]*compute.UrlMap, error) {
 	mc := newUrlMapMetricContext("list")
-	// TODO: use PageToken to list all not just the first 500
-	v, err := gce.service.UrlMaps.List(gce.projectID).Do()
-	return v, mc.Observe(err)
+	urlMaps := []*compute.UrlMap{}
+	err := gce.service.UrlMaps.List(gce.projectID).Pages(context.Background(), func(res *compute.UrlMapList) error {
+		urlMaps = append(urlMaps, res.Items...)
+		return nil
+	})
+	return urlMaps, mc.Observe(err)
 }
