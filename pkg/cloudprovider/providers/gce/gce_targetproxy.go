@@ -17,8 +17,6 @@ limitations under the License.
 package gce
 
 import (
-	"net/http"
-
 	compute "google.golang.org/api/compute/v1"
 )
 
@@ -59,9 +57,6 @@ func (gce *GCECloud) DeleteTargetHttpProxy(name string) error {
 	mc := newTargetProxyMetricContext("delete")
 	op, err := gce.service.TargetHttpProxies.Delete(gce.projectID, name).Do()
 	if err != nil {
-		if isHTTPErrorCode(err, http.StatusNotFound) {
-			return nil
-		}
 		return mc.Observe(err)
 	}
 	return gce.waitForGlobalOp(op, mc)
@@ -121,9 +116,6 @@ func (gce *GCECloud) DeleteTargetHttpsProxy(name string) error {
 	mc := newTargetProxyMetricContext("delete")
 	op, err := gce.service.TargetHttpsProxies.Delete(gce.projectID, name).Do()
 	if err != nil {
-		if isHTTPErrorCode(err, http.StatusNotFound) {
-			return nil
-		}
 		return mc.Observe(err)
 	}
 	return gce.waitForGlobalOp(op, mc)
