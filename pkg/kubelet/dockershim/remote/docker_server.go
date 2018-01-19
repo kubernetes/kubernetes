@@ -33,16 +33,16 @@ type DockerServer struct {
 	// endpoint is the endpoint to serve on.
 	endpoint string
 	// service is the docker service which implements runtime and image services.
-	service DockerService
+	service dockershim.CRIService
 	// server is the grpc server.
 	server *grpc.Server
 }
 
 // NewDockerServer creates the dockershim grpc server.
-func NewDockerServer(endpoint string, s dockershim.DockerService) *DockerServer {
+func NewDockerServer(endpoint string, s dockershim.CRIService) *DockerServer {
 	return &DockerServer{
 		endpoint: endpoint,
-		service:  NewDockerService(s),
+		service:  s,
 	}
 }
 

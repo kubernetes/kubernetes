@@ -28,11 +28,11 @@ import (
 	"github.com/blang/semver"
 	dockertypes "github.com/docker/docker/api/types"
 	"github.com/golang/glog"
+	"golang.org/x/net/context"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubetypes "k8s.io/apimachinery/pkg/types"
-	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
 	kubecm "k8s.io/kubernetes/pkg/kubelet/cm"
@@ -262,11 +262,17 @@ func NewDockerService(config *ClientConfig, podSandboxImage string, streamingCon
 	return ds, nil
 }
 
+// CRIService is the interface implement CRI remote service server.
+type CRIService interface {
+	runtimeapi.RuntimeServiceServer
+	runtimeapi.ImageServiceServer
+}
+
 // DockerService is an interface that embeds the new RuntimeService and
 // ImageService interfaces.
 type DockerService interface {
-	internalapi.RuntimeService
-	internalapi.ImageManagerService
+	CRIService
+
 	Start() error
 	// For serving streaming calls.
 	http.Handler
@@ -309,8 +315,10 @@ type dockerService struct {
 	disableSharedPID bool
 }
 
+// TODO: handle context.
+
 // Version returns the runtime name, runtime version and runtime API version
-func (ds *dockerService) Version(_ string) (*runtimeapi.VersionResponse, error) {
+func (ds *dockerService) Version(_ context.Context, r *runtimeapi.VersionRequest) (*runtimeapi.VersionResponse, error) {
 	v, err := ds.getDockerVersion()
 	if err != nil {
 		return nil, err
@@ -336,17 +344,20 @@ func (ds *dockerService) getDockerVersion() (*dockertypes.Version, error) {
 }
 
 // UpdateRuntimeConfig updates the runtime config. Currently only handles podCIDR updates.
-func (ds *dockerService) UpdateRuntimeConfig(runtimeConfig *runtimeapi.RuntimeConfig) (err error) {
+func (ds *dockerService) UpdateRuntimeConfig(_ context.Context, r *runtimeapi.UpdateRuntimeConfigRequest) (*runtimeapi.UpdateRuntimeConfigResponse, error) {
+	runtimeConfig := r.GetRuntimeConfig()
 	if runtimeConfig == nil {
-		return
+		return &runtimeapi.UpdateRuntimeConfigResponse{}, nil
 	}
+
 	glog.Infof("docker cri received runtime config %+v", runtimeConfig)
 	if ds.network != nil && runtimeConfig.NetworkConfig.PodCidr != "" {
 		event := make(map[string]interface{})
 		event[network.NET_PLUGIN_EVENT_POD_CIDR_CHANGE_DETAIL_CIDR] = runtimeConfig.NetworkConfig.PodCidr
 		ds.network.Event(network.NET_PLUGIN_EVENT_POD_CIDR_CHANGE, event)
 	}
-	return
+
+	return &runtimeapi.UpdateRuntimeConfigResponse{}, nil
 }
 
 // GetNetNS returns the network namespace of the given containerID. The ID
@@ -392,7 +403,7 @@ func (ds *dockerService) Start() error {
 
 // Status returns the status of the runtime.
 // TODO(random-liu): Set network condition accordingly here.
-func (ds *dockerService) Status() (*runtimeapi.RuntimeStatus, error) {
+func (ds *dockerService) Status(_ context.Context, r *runtimeapi.StatusRequest) (*runtimeapi.StatusResponse, error) {
 	runtimeReady := &runtimeapi.RuntimeCondition{
 		Type:   runtimeapi.RuntimeReady,
 		Status: true,
@@ -412,7 +423,8 @@ func (ds *dockerService) Status() (*runtimeapi.RuntimeStatus, error) {
 		networkReady.Reason = "NetworkPluginNotReady"
 		networkReady.Message = fmt.Sprintf("docker: network plugin is not ready: %v", err)
 	}
-	return &runtimeapi.RuntimeStatus{Conditions: conditions}, nil
+	status := &runtimeapi.RuntimeStatus{Conditions: conditions}
+	return &runtimeapi.StatusResponse{Status: status}, nil
 }
 
 func (ds *dockerService) ServeHTTP(w http.ResponseWriter, r *http.Request) {
