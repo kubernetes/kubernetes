@@ -62,6 +62,9 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [":package-srcs"],
+    srcs = [
+        ":package-srcs",
+        "//test/e2e/storage/vsphere/bootstrap:all-srcs",
+    ],
     tags = ["automanaged"],
 )
