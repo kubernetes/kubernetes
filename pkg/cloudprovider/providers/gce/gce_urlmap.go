@@ -18,7 +18,6 @@ package gce
 
 import (
 	"context"
-	"net/http"
 
 	compute "google.golang.org/api/compute/v1"
 
@@ -52,11 +51,7 @@ func (gce *GCECloud) UpdateUrlMap(urlMap *compute.UrlMap) error {
 // DeleteUrlMap deletes a url map by name.
 func (gce *GCECloud) DeleteUrlMap(name string) error {
 	mc := newUrlMapMetricContext("delete")
-	err := gce.c.UrlMaps().Delete(context.Background(), meta.GlobalKey(name))
-	if isHTTPErrorCode(err, http.StatusNotFound) {
-		err = nil
-	}
-	return mc.Observe(err)
+	return mc.Observe(gce.c.UrlMaps().Delete(context.Background(), meta.GlobalKey(name)))
 }
 
 // ListUrlMaps lists all UrlMaps in the project.

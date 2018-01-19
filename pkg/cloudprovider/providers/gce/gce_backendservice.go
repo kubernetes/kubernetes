@@ -18,7 +18,6 @@ package gce
 
 import (
 	"context"
-	"net/http"
 
 	computealpha "google.golang.org/api/compute/v0.alpha"
 	compute "google.golang.org/api/compute/v1"
@@ -66,11 +65,7 @@ func (gce *GCECloud) UpdateAlphaGlobalBackendService(bg *computealpha.BackendSer
 // DeleteGlobalBackendService deletes the given BackendService by name.
 func (gce *GCECloud) DeleteGlobalBackendService(name string) error {
 	mc := newBackendServiceMetricContext("delete", "")
-	err := gce.c.BackendServices().Delete(context.Background(), meta.GlobalKey(name))
-	if isHTTPErrorCode(err, http.StatusNotFound) {
-		return nil
-	}
-	return mc.Observe(err)
+	return mc.Observe(gce.c.BackendServices().Delete(context.Background(), meta.GlobalKey(name)))
 }
 
 // CreateGlobalBackendService creates the given BackendService.
@@ -119,11 +114,7 @@ func (gce *GCECloud) UpdateRegionBackendService(bg *compute.BackendService, regi
 // DeleteRegionBackendService deletes the given BackendService by name.
 func (gce *GCECloud) DeleteRegionBackendService(name, region string) error {
 	mc := newBackendServiceMetricContext("delete", region)
-	err := gce.c.RegionBackendServices().Delete(context.Background(), meta.RegionalKey(name, region))
-	if isHTTPErrorCode(err, http.StatusNotFound) {
-		err = nil
-	}
-	return mc.Observe(err)
+	return mc.Observe(gce.c.RegionBackendServices().Delete(context.Background(), meta.RegionalKey(name, region)))
 }
 
 // CreateRegionBackendService creates the given BackendService.

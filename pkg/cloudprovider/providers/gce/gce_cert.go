@@ -18,7 +18,6 @@ package gce
 
 import (
 	"context"
-	"net/http"
 
 	compute "google.golang.org/api/compute/v1"
 
@@ -50,11 +49,7 @@ func (gce *GCECloud) CreateSslCertificate(sslCerts *compute.SslCertificate) (*co
 // DeleteSslCertificate deletes the SslCertificate by name.
 func (gce *GCECloud) DeleteSslCertificate(name string) error {
 	mc := newCertMetricContext("delete")
-	err := gce.c.SslCertificates().Delete(context.Background(), meta.GlobalKey(name))
-	if isHTTPErrorCode(err, http.StatusNotFound) {
-		err = nil
-	}
-	return mc.Observe(err)
+	return mc.Observe(gce.c.SslCertificates().Delete(context.Background(), meta.GlobalKey(name)))
 }
 
 // ListSslCertificates lists all SslCertificates in the project.

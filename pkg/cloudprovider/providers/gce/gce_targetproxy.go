@@ -18,7 +18,6 @@ package gce
 
 import (
 	"context"
-	"net/http"
 
 	compute "google.golang.org/api/compute/v1"
 
@@ -53,11 +52,7 @@ func (gce *GCECloud) SetUrlMapForTargetHttpProxy(proxy *compute.TargetHttpProxy,
 // DeleteTargetHttpProxy deletes the TargetHttpProxy by name.
 func (gce *GCECloud) DeleteTargetHttpProxy(name string) error {
 	mc := newTargetProxyMetricContext("delete")
-	err := gce.c.TargetHttpProxies().Delete(context.Background(), meta.GlobalKey(name))
-	if isHTTPErrorCode(err, http.StatusNotFound) {
-		err = nil
-	}
-	return mc.Observe(err)
+	return mc.Observe(gce.c.TargetHttpProxies().Delete(context.Background(), meta.GlobalKey(name)))
 }
 
 // ListTargetHttpProxies lists all TargetHttpProxies in the project.
@@ -101,11 +96,7 @@ func (gce *GCECloud) SetSslCertificateForTargetHttpsProxy(proxy *compute.TargetH
 // DeleteTargetHttpsProxy deletes the TargetHttpsProxy by name.
 func (gce *GCECloud) DeleteTargetHttpsProxy(name string) error {
 	mc := newTargetProxyMetricContext("delete")
-	err := gce.c.TargetHttpsProxies().Delete(context.Background(), meta.GlobalKey(name))
-	if isHTTPErrorCode(err, http.StatusNotFound) {
-		err = nil
-	}
-	return mc.Observe(err)
+	return mc.Observe(gce.c.TargetHttpsProxies().Delete(context.Background(), meta.GlobalKey(name)))
 }
 
 // ListTargetHttpsProxies lists all TargetHttpsProxies in the project.
