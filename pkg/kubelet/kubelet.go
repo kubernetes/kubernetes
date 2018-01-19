@@ -630,8 +630,8 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 				return nil, err
 			}
 			if !supported {
-				klet.dockerLegacyService = ds.NewDockerLegacyService()
-				legacyLogProvider = dockershim.NewLegacyLogProvider(klet.dockerLegacyService)
+				klet.dockerLegacyService = ds
+				legacyLogProvider = ds
 			}
 		case kubetypes.RemoteContainerRuntime:
 			// No-op.
