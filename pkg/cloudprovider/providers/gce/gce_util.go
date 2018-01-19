@@ -128,7 +128,7 @@ func lastComponent(s string) string {
 // mapNodeNameToInstanceName maps a k8s NodeName to a GCE Instance Name
 // This is a simple string cast.
 func mapNodeNameToInstanceName(nodeName types.NodeName) string {
-	return string(nodeName)
+	return canonicalizeInstanceName(string(nodeName))
 }
 
 // mapInstanceToNodeName maps a GCE Instance to a k8s NodeName

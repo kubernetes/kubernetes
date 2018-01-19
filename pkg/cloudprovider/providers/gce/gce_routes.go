@@ -21,11 +21,13 @@ import (
 	"net/http"
 	"path"
 
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 
 	"github.com/golang/glog"
 	compute "google.golang.org/api/compute/v1"
+	"k8s.io/api/core/v1"
+	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 func newRoutesMetricContext(request string) *metricContext {
@@ -36,6 +38,16 @@ func (gce *GCECloud) ListRoutes(clusterName string) ([]*cloudprovider.Route, err
 	var routes []*cloudprovider.Route
 	pageToken := ""
 	page := 0
+
+	nodeList, err := gce.client.CoreV1().Nodes().List(meta_v1.ListOptions{})
+	if err != nil {
+		glog.Errorf("Error getting node list %v", err)
+	}
+	nodesIndex := make(map[string]v1.Node)
+	for _, n := range nodeList.Items {
+		nodesIndex[mapNodeNameToInstanceName(types.NodeName(n.GetName()))] = n
+	}
+
 	for ; page == 0 || (pageToken != "" && page < maxPages); page++ {
 		mc := newRoutesMetricContext("list_page")
 		listCall := gce.service.Routes.List(gce.NetworkProjectID())
@@ -57,11 +69,11 @@ func (gce *GCECloud) ListRoutes(clusterName string) ([]*cloudprovider.Route, err
 			return nil, err
 		}
 		pageToken = res.NextPageToken
+
 		for _, r := range res.Items {
-			target := path.Base(r.NextHopInstance)
 			// TODO: Should we lastComponent(target) this?
-			targetNodeName := types.NodeName(target) // NodeName == Instance Name on GCE
-			routes = append(routes, &cloudprovider.Route{Name: r.Name, TargetNode: targetNodeName, DestinationCIDR: r.DestRange})
+			target := nodesIndex[path.Base(r.NextHopInstance)]
+			routes = append(routes, &cloudprovider.Route{Name: r.Name, TargetNode: types.NodeName(target.GetName()), DestinationCIDR: r.DestRange})
 		}
 	}
 	if page >= maxPages {
