@@ -23,7 +23,7 @@ import (
 
 var FakeMetadata = Metadata{
 	Uuid:             "83679162-1378-4288-a2d4-70e13ec132aa",
-	Name:             "test",
+	Hostname:         "test",
 	AvailabilityZone: "nova",
 }
 
@@ -81,8 +81,8 @@ func TestParseMetadata(t *testing.T) {
 		t.Fatalf("Should succeed when provided with valid data: %s", err)
 	}
 
-	if md.Name != "test" {
-		t.Errorf("incorrect name: %s", md.Name)
+	if md.Hostname != "test.novalocal" {
+		t.Errorf("incorrect hostname: %s", md.Hostname)
 	}
 
 	if md.Uuid != "83679162-1378-4288-a2d4-70e13ec132aa" {

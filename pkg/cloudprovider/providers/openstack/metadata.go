@@ -69,7 +69,7 @@ type DeviceMetadata struct {
 // See http://docs.openstack.org/user-guide/cli_config_drive.html
 type Metadata struct {
 	Uuid             string           `json:"uuid"`
-	Name             string           `json:"name"`
+	Hostname         string           `json:"hostname"`
 	AvailabilityZone string           `json:"availability_zone"`
 	Devices          []DeviceMetadata `json:"devices,omitempty"`
 	// .. and other fields we don't care about.  Expand as necessary.
