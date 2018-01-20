@@ -428,8 +428,10 @@ func (kl *Kubelet) recordNodeStatusEvent(eventType, event string) {
 // Set IP and hostname addresses for the node.
 func (kl *Kubelet) setNodeAddress(node *v1.Node) error {
 	if kl.nodeIP != nil {
-		if err := validateNodeIP(kl.nodeIP); err != nil {
-			return fmt.Errorf("failed to validate nodeIP: %v", err)
+		if kl.validateNodeIP {
+			if err := validateNodeIP(kl.nodeIP); err != nil {
+				return fmt.Errorf("failed to validate nodeIP: %v", err)
+			}
 		}
 		glog.V(2).Infof("Using node IP: %q", kl.nodeIP.String())
 	}

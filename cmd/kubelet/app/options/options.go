@@ -71,6 +71,11 @@ type KubeletFlags struct {
 	// If set, kubelet will use this IP address for the node.
 	NodeIP string
 
+	// Whether to run sanity checks on the NodeIP
+	// May be undesired if e.G. the Kubelets address is not assigned to the server
+	// it runs on because its behind a NAT
+	ValidateNodeIP bool
+
 	// This flag, if set, sets the unique id of the instance that an external provider (i.e. cloudprovider)
 	// can use to identify a specific node
 	ProviderID string
@@ -238,6 +243,7 @@ func NewKubeletFlags() *KubeletFlags {
 		HostNetworkSources:  []string{kubetypes.AllSource},
 		HostPIDSources:      []string{kubetypes.AllSource},
 		HostIPCSources:      []string{kubetypes.AllSource},
+		ValidateNodeIP:      true,
 	}
 }
 
@@ -330,6 +336,8 @@ func (f *KubeletFlags) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&f.HostnameOverride, "hostname-override", f.HostnameOverride, "If non-empty, will use this string as identification instead of the actual hostname.")
 
 	fs.StringVar(&f.NodeIP, "node-ip", f.NodeIP, "IP address of the node. If set, kubelet will use this IP address for the node")
+
+	fs.BoolVar(&f.ValidateNodeIP, "validate-node-ip", f.ValidateNodeIP, "Whether to validate if the node ip a valid ip address and assigned to the server")
 
 	fs.StringVar(&f.ProviderID, "provider-id", f.ProviderID, "Unique identifier for identifying the node in a machine database, i.e cloudprovider")
 
