@@ -51,7 +51,7 @@ var (
 
 	serviceClusterIPExample = templates.Examples(i18n.T(`
     # Create a new ClusterIP service named my-cs
-    kubectl create service clusterip my-cs --tcp=5678:8080
+    kubectl create service clusterip my-cs --ports=tcp:5678:8080
 
     # Create a new ClusterIP service named my-cs (in headless mode)
     kubectl create service clusterip my-cs --clusterip="None"`))
@@ -59,12 +59,14 @@ var (
 
 func addPortFlags(cmd *cobra.Command) {
 	cmd.Flags().StringSlice("tcp", []string{}, "Port pairs can be specified as '<port>:<targetPort>'.")
+	cmd.Flags().MarkDeprecated("tcp", "It will be removed in the future, please use --ports instead")
+	cmd.Flags().StringSlice("ports", []string{}, "Protocol and port pairs can be specified as '<protocol>:<port>:<targetPort>'.")
 }
 
 // NewCmdCreateServiceClusterIP is a command to create a ClusterIP service
 func NewCmdCreateServiceClusterIP(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use: "clusterip NAME [--tcp=<port>:<targetPort>] [--dry-run]",
+		Use: "clusterip NAME [--ports=<protocol>:<port>:<targetPort>] [--dry-run]",
 		DisableFlagsInUseLine: true,
 		Short:   i18n.T("Create a ClusterIP service."),
 		Long:    serviceClusterIPLong,
@@ -96,9 +98,13 @@ func CreateServiceClusterIP(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Comm
 	var generator kubectl.StructuredGenerator
 	switch generatorName := cmdutil.GetFlagString(cmd, "generator"); generatorName {
 	case cmdutil.ServiceClusterIPGeneratorV1Name:
+		ports, err := PortsFromCommandArgs(cmd)
+		if err != nil {
+			return err
+		}
 		generator = &kubectl.ServiceCommonGeneratorV1{
 			Name:      name,
-			TCP:       cmdutil.GetFlagStringSlice(cmd, "tcp"),
+			Ports:     ports,
 			Type:      v1.ServiceTypeClusterIP,
 			ClusterIP: cmdutil.GetFlagString(cmd, "clusterip"),
 		}
@@ -119,13 +125,13 @@ var (
 
 	serviceNodePortExample = templates.Examples(i18n.T(`
     # Create a new NodePort service named my-ns
-    kubectl create service nodeport my-ns --tcp=5678:8080`))
+    kubectl create service nodeport my-ns --ports=tcp:5678:8080`))
 )
 
 // NewCmdCreateServiceNodePort is a macro command for creating a NodePort service
 func NewCmdCreateServiceNodePort(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use: "nodeport NAME [--tcp=port:targetPort] [--dry-run]",
+		Use: "nodeport NAME [--ports=protocol:port:targetPort] [--dry-run]",
 		DisableFlagsInUseLine: true,
 		Short:   i18n.T("Create a NodePort service."),
 		Long:    serviceNodePortLong,
@@ -153,9 +159,13 @@ func CreateServiceNodePort(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Comma
 	var generator kubectl.StructuredGenerator
 	switch generatorName := cmdutil.GetFlagString(cmd, "generator"); generatorName {
 	case cmdutil.ServiceNodePortGeneratorV1Name:
+		ports, err := PortsFromCommandArgs(cmd)
+		if err != nil {
+			return err
+		}
 		generator = &kubectl.ServiceCommonGeneratorV1{
 			Name:      name,
-			TCP:       cmdutil.GetFlagStringSlice(cmd, "tcp"),
+			Ports:     ports,
 			Type:      v1.ServiceTypeNodePort,
 			ClusterIP: "",
 			NodePort:  cmdutil.GetFlagInt(cmd, "node-port"),
@@ -177,13 +187,13 @@ var (
 
 	serviceLoadBalancerExample = templates.Examples(i18n.T(`
     # Create a new LoadBalancer service named my-lbs
-    kubectl create service loadbalancer my-lbs --tcp=5678:8080`))
+    kubectl create service loadbalancer my-lbs --ports=tcp:5678:8080`))
 )
 
 // NewCmdCreateServiceLoadBalancer is a macro command for creating a LoadBalancer service
 func NewCmdCreateServiceLoadBalancer(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use: "loadbalancer NAME [--tcp=port:targetPort] [--dry-run]",
+		Use: "loadbalancer NAME [--ports=protocol:port:targetPort] [--dry-run]",
 		DisableFlagsInUseLine: true,
 		Short:   i18n.T("Create a LoadBalancer service."),
 		Long:    serviceLoadBalancerLong,
@@ -210,9 +220,13 @@ func CreateServiceLoadBalancer(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.C
 	var generator kubectl.StructuredGenerator
 	switch generatorName := cmdutil.GetFlagString(cmd, "generator"); generatorName {
 	case cmdutil.ServiceLoadBalancerGeneratorV1Name:
+		ports, err := PortsFromCommandArgs(cmd)
+		if err != nil {
+			return err
+		}
 		generator = &kubectl.ServiceCommonGeneratorV1{
 			Name:      name,
-			TCP:       cmdutil.GetFlagStringSlice(cmd, "tcp"),
+			Ports:     ports,
 			Type:      v1.ServiceTypeLoadBalancer,
 			ClusterIP: "",
 		}

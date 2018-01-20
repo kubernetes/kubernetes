@@ -285,6 +285,28 @@ func NameFromCommandArgs(cmd *cobra.Command, args []string) (string, error) {
 	return args[0], nil
 }
 
+// PortsFromCommandArgs is a function to gather ports config from args. It supports deprecating "--tcp" arg.
+func PortsFromCommandArgs(cmd *cobra.Command) ([]string, error) {
+	var (
+		ports []string
+		err   error
+	)
+	if ports = cmdutil.GetFlagStringSlice(cmd, "ports"); len(ports) == 0 {
+		ports = cmdutil.GetFlagStringSlice(cmd, "tcp")
+		if len(ports) == 0 {
+			err = cmdutil.UsageErrorf(cmd, "PORTS or TCP is required")
+		} else {
+			// Use "tcp:" prefix
+			var temp []string
+			for _, item := range ports {
+				temp = append(temp, "tcp:"+item)
+			}
+			ports = temp
+		}
+	}
+	return ports, err
+}
+
 // CreateSubcommandOptions is an options struct to support create subcommands
 type CreateSubcommandOptions struct {
 	// Name of resource being created
