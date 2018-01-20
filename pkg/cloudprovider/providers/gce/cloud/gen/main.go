@@ -395,7 +395,7 @@ func (m *{{.MockWrapType}}) Get(ctx context.Context, key *meta.Key) (*{{.FQObjec
 			return obj, err
 		}
 	}
-	if ! key.Valid() {
+	if !key.Valid() {
 		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 
@@ -485,7 +485,7 @@ func (m *{{.MockWrapType}}) List(ctx context.Context, zone string, fl *filter.F)
 			continue
 		}
 {{- end}}
-		if ! fl.Match(obj.To{{.VersionTitle}}()) {
+		if !fl.Match(obj.To{{.VersionTitle}}()) {
 			continue
 		}
 		objs = append(objs, obj.To{{.VersionTitle}}())
@@ -513,7 +513,7 @@ func (m *{{.MockWrapType}}) Insert(ctx context.Context, key *meta.Key, obj *{{.F
 			return err
 		}
 	}
-	if ! key.Valid() {
+	if !key.Valid() {
 		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 
@@ -553,7 +553,7 @@ func (m *{{.MockWrapType}}) Delete(ctx context.Context, key *meta.Key) error {
 			return err
 		}
 	}
-	if ! key.Valid() {
+	if !key.Valid() {
 		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 
@@ -611,7 +611,7 @@ func (m *{{.MockWrapType}}) AggregatedList(ctx context.Context, fl *filter.F) (m
 			glog.V(5).Infof("{{.MockWrapType}}.AggregatedList(%v, %v) = nil, %v", ctx, fl, err)
 			return nil, err
 		}
-		if ! fl.Match(obj.To{{.VersionTitle}}()) {
+		if !fl.Match(obj.To{{.VersionTitle}}()) {
 			continue
 		}
 		objs[location] = append(objs[location], obj.To{{.VersionTitle}}())
@@ -659,7 +659,7 @@ type {{.GCEWrapType}} struct {
 func (g *{{.GCEWrapType}}) Get(ctx context.Context, key *meta.Key) (*{{.FQObjectType}}, error) {
 	glog.V(5).Infof("{{.GCEWrapType}}.Get(%v, %v): called", ctx, key)
 
-	if ! key.Valid() {
+	if !key.Valid() {
 		glog.V(2).Infof("{{.GCEWrapType}}.Get(%v, %v): key is invalid (%#v)", ctx, key, key)
 		return nil, fmt.Errorf("invalid GCE key (%#v)", key)
 	}
@@ -759,7 +759,7 @@ func (g *{{.GCEWrapType}}) List(ctx context.Context, zone string, fl *filter.F) 
 // Insert {{.Object}} with key of value obj.
 func (g *{{.GCEWrapType}}) Insert(ctx context.Context, key *meta.Key, obj *{{.FQObjectType}}) error {
 	glog.V(5).Infof("{{.GCEWrapType}}.Insert(%v, %v, %+v): called", ctx, key, obj)
-	if ! key.Valid() {
+	if !key.Valid() {
 		glog.V(2).Infof("{{.GCEWrapType}}.Insert(%v, %v, ...): key is invalid (%#v)", ctx, key, key)
 		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
@@ -803,7 +803,7 @@ func (g *{{.GCEWrapType}}) Insert(ctx context.Context, key *meta.Key, obj *{{.FQ
 // Delete the {{.Object}} referenced by key.
 func (g *{{.GCEWrapType}}) Delete(ctx context.Context, key *meta.Key) error {
 	glog.V(5).Infof("{{.GCEWrapType}}.Delete(%v, %v): called", ctx, key)
-	if ! key.Valid() {
+	if !key.Valid() {
 		glog.V(2).Infof("{{.GCEWrapType}}.Delete(%v, %v): key is invalid (%#v)", ctx, key, key)
 		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
@@ -898,7 +898,7 @@ func (g *{{.GCEWrapType}}) AggregatedList(ctx context.Context, fl *filter.F) (ma
 func (g *{{.GCEWrapType}}) {{.FcnArgs}} {
 	glog.V(5).Infof("{{.GCEWrapType}}.{{.Name}}(%v, %v, ...): called", ctx, key)
 
-	if ! key.Valid() {
+	if !key.Valid() {
 		glog.V(2).Infof("{{.GCEWrapType}}.{{.Name}}(%v, %v, ...): key is invalid (%#v)", ctx, key, key)
 {{- if .IsOperation}}
 		return fmt.Errorf("invalid GCE key (%+v)", key)

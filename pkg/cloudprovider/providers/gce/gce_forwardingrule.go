@@ -46,7 +46,7 @@ func (gce *GCECloud) SetProxyForGlobalForwardingRule(forwardingRuleName, targetP
 	return mc.Observe(gce.c.GlobalForwardingRules().SetTarget(context.Background(), meta.GlobalKey(forwardingRuleName), target))
 }
 
-// DeleteGlobalForwardingRule deletes the GlobalForwakdingRule by name.
+// DeleteGlobalForwardingRule deletes the GlobalForwardingRule by name.
 func (gce *GCECloud) DeleteGlobalForwardingRule(name string) error {
 	mc := newForwardingRuleMetricContext("delete", "")
 	return mc.Observe(gce.c.GlobalForwardingRules().Delete(context.Background(), meta.GlobalKey(name)))
