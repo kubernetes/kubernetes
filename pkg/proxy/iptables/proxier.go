@@ -1165,6 +1165,7 @@ func (proxier *Proxier) syncProxyRules() {
 	// Build rules for each service.
 	var svcNameString string
 	for svcName, svcInfo := range proxier.serviceMap {
+		isIPv6 := utilproxy.IsIPv6(svcInfo.clusterIP)
 		protocol := strings.ToLower(string(svcInfo.protocol))
 		svcNameString = svcInfo.serviceNameString
 
@@ -1377,7 +1378,6 @@ func (proxier *Proxier) syncProxyRules() {
 					// This is very low impact. The NodePort range is intentionally obscure, and unlikely to actually collide with real Services.
 					// This only affects UDP connections, which are not common.
 					// See issue: https://github.com/kubernetes/kubernetes/issues/49881
-					isIPv6 := utilproxy.IsIPv6(svcInfo.clusterIP)
 					err := utilproxy.ClearUDPConntrackForPort(proxier.exec, lp.Port, isIPv6)
 					if err != nil {
 						glog.Errorf("Failed to clear udp conntrack for port %d, error: %v", lp.Port, err)
@@ -1400,6 +1400,13 @@ func (proxier *Proxier) syncProxyRules() {
 			} else {
 				// TODO: Make all nodePorts jump to the firewall chain.
 				// Currently we only create it for loadbalancers (#33586).
+
+				// Fix localhost martian source error
+				loopback := "127.0.0.0/8"
+				if isIPv6 {
+					loopback = "::1/128"
+				}
+				writeLine(proxier.natRules, append(args, "-s", loopback, "-j", string(KubeMarkMasqChain))...)
 				writeLine(proxier.natRules, append(args, "-j", string(svcXlbChain))...)
 			}
 

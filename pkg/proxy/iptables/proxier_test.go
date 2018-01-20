@@ -1017,6 +1017,10 @@ func onlyLocalNodePorts(t *testing.T, fp *Proxier, ipt *iptablestest.FakeIPTable
 		errorf(fmt.Sprintf("Failed to find jump to lb chain %v", lbChain), kubeNodePortRules, t)
 	}
 
+	if !hasJump(kubeNodePortRules, string(KubeMarkMasqChain), "", svcNodePort) {
+		errorf(fmt.Sprintf("Failed to find jump to %s chain for destination IP %d", KubeMarkMasqChain, svcNodePort), kubeNodePortRules, t)
+	}
+
 	svcChain := string(servicePortChainName(svcPortName.String(), proto))
 	lbRules := ipt.GetRules(lbChain)
 	if hasJump(lbRules, nonLocalEpChain, "", 0) {
