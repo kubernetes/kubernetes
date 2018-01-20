@@ -524,7 +524,6 @@ CLUSTER_REGISTRY_DISK_SIZE: $(yaml-quote ${CLUSTER_REGISTRY_DISK_SIZE:-})
 DNS_SERVER_IP: $(yaml-quote ${DNS_SERVER_IP:-})
 DNS_DOMAIN: $(yaml-quote ${DNS_DOMAIN:-})
 ENABLE_DNS_HORIZONTAL_AUTOSCALER: $(yaml-quote ${ENABLE_DNS_HORIZONTAL_AUTOSCALER:-false})
-KUBELET_TOKEN: $(yaml-quote ${KUBELET_TOKEN:-})
 KUBE_PROXY_DAEMONSET: $(yaml-quote ${KUBE_PROXY_DAEMONSET:-false})
 KUBE_PROXY_TOKEN: $(yaml-quote ${KUBE_PROXY_TOKEN:-})
 NODE_PROBLEM_DETECTOR_TOKEN: $(yaml-quote ${NODE_PROBLEM_DETECTOR_TOKEN:-})
@@ -1232,7 +1231,6 @@ function get-env-val() {
 function parse-master-env() {
   # Get required master env vars
   local master_env=$(get-master-env)
-  KUBELET_TOKEN=$(get-env-val "${master_env}" "KUBELET_TOKEN")
   KUBE_PROXY_TOKEN=$(get-env-val "${master_env}" "KUBE_PROXY_TOKEN")
   NODE_PROBLEM_DETECTOR_TOKEN=$(get-env-val "${master_env}" "NODE_PROBLEM_DETECTOR_TOKEN")
   CA_CERT_BASE64=$(get-env-val "${master_env}" "CA_CERT")
