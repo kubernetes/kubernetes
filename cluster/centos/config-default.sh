@@ -79,7 +79,7 @@ function concat-etcd-servers() {
 export ETCD_SERVERS="$(concat-etcd-servers)"
 
 # By default, etcd cluster will use runtime configuration
-#   https://coreos.com/etcd/docs/latest/v2/runtime-configuration.html
+#   https://coreos.com/etcd/docs/latest/docs.html#documentation
 # Get etc initial cluster and store in ETCD_INITIAL_CLUSTER
 function concat-etcd-initial-cluster() {
   local etcd_initial_cluster=""

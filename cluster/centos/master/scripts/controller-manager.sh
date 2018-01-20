@@ -32,6 +32,10 @@ KUBE_CONTROLLER_MANAGER_SERVICE_ACCOUNT_PRIVATE_KEY_FILE="--service-account-priv
 
 # --leader-elect
 KUBE_LEADER_ELECT="--leader-elect"
+
+# --port
+# The port that the controller-manager's http service runs on (default 10252)
+KUBE_CONTROLLER_MANAGER_PORT="--port 10252"
 EOF
 
 KUBE_CONTROLLER_MANAGER_OPTS="  \${KUBE_LOGTOSTDERR} \\
@@ -39,7 +43,8 @@ KUBE_CONTROLLER_MANAGER_OPTS="  \${KUBE_LOGTOSTDERR} \\
                                 \${KUBE_MASTER}      \\
                                 \${KUBE_CONTROLLER_MANAGER_ROOT_CA_FILE} \\
                                 \${KUBE_CONTROLLER_MANAGER_SERVICE_ACCOUNT_PRIVATE_KEY_FILE}\\
-                                \${KUBE_LEADER_ELECT}"
+                                \${KUBE_LEADER_ELECT}\\
+                                \${KUBE_CONTROLLER_MANAGER_PORT}"
 
 cat <<EOF >/usr/lib/systemd/system/kube-controller-manager.service
 [Unit]

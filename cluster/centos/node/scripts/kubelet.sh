@@ -62,7 +62,7 @@ KUBELET__DNS_IP="--cluster-dns=${DNS_SERVER_IP}"
 KUBELET_DNS_DOMAIN="--cluster-domain=${DNS_DOMAIN}"
 
 # Add your own!
-KUBELET_ARGS=""
+KUBELET_ARGS="--fail-swap-on=false"
 EOF
 
 KUBELET_OPTS="      \${KUBE_LOGTOSTDERR}     \\

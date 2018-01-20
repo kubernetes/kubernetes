@@ -211,6 +211,7 @@ echo "[INFO] tear-down-master on $1"
   kube-ssh "${1}" "sudo rm -rf /srv/kubernetes"
   kube-ssh "${1}" "sudo rm -rf ${KUBE_TEMP}"
   kube-ssh "${1}" "sudo rm -rf /var/lib/etcd"
+  kube-ssh "${1}" "sudo systemctl daemon-reload"
 }
 
 # Clean up on node
@@ -229,6 +230,7 @@ echo "[INFO] tear-down-node on $1"
   kube-ssh "$1" "sudo rm -rf /opt/kubernetes"
   kube-ssh "$1" "sudo rm -rf /srv/kubernetes"
   kube-ssh "$1" "sudo rm -rf ${KUBE_TEMP}"
+  kube-ssh "$1" "sudo systemctl daemon-reload"
 }
 
 # Generate the CA certificates for k8s components

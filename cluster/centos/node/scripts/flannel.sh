@@ -34,6 +34,7 @@ cat <<EOF >/usr/lib/systemd/system/flannel.service
 [Unit]
 Description=Flanneld overlay address etcd agent
 After=network.target
+After=etcd.service
 Before=docker.service
 
 [Service]
