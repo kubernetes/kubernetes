@@ -746,11 +746,6 @@ EOF
 APISERVER_TEST_ARGS: $(yaml-quote ${APISERVER_TEST_ARGS})
 EOF
     fi
-    if [ -n "${APISERVER_TEST_LOG_LEVEL:-}" ]; then
-      cat >>$file <<EOF
-APISERVER_TEST_LOG_LEVEL: $(yaml-quote ${APISERVER_TEST_LOG_LEVEL})
-EOF
-    fi
     if [ -n "${CONTROLLER_MANAGER_TEST_ARGS:-}" ]; then
       cat >>$file <<EOF
 CONTROLLER_MANAGER_TEST_ARGS: $(yaml-quote ${CONTROLLER_MANAGER_TEST_ARGS})
@@ -840,12 +835,6 @@ EOF
 ENABLE_CLUSTER_AUTOSCALER: $(yaml-quote ${ENABLE_CLUSTER_AUTOSCALER})
 AUTOSCALER_MIG_CONFIG: $(yaml-quote ${AUTOSCALER_MIG_CONFIG})
 AUTOSCALER_EXPANDER_CONFIG: $(yaml-quote ${AUTOSCALER_EXPANDER_CONFIG})
-EOF
-  fi
-
-  if [ -n "${DNS_ZONE_NAME:-}" ]; then
-    cat >>$file <<EOF
-DNS_ZONE_NAME: $(yaml-quote ${DNS_ZONE_NAME})
 EOF
   fi
   if [ -n "${SCHEDULING_ALGORITHM_PROVIDER:-}" ]; then
