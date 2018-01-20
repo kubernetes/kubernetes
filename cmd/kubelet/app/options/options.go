@@ -48,7 +48,7 @@ import (
 // In general, please try to avoid adding flags or configuration fields,
 // we already have a confusingly large amount of them.
 type KubeletFlags struct {
-	KubeConfig          flag.StringFlag
+	KubeConfig          string
 	BootstrapKubeconfig string
 	RotateCertificates  bool
 
@@ -179,8 +179,6 @@ type KubeletFlags struct {
 	// schedulable. Won't have any effect if register-node is false.
 	// DEPRECATED: use registerWithTaints instead
 	RegisterSchedulable bool
-	// RequireKubeConfig is deprecated! A valid KubeConfig is now required if --kubeconfig is provided.
-	RequireKubeConfig bool
 	// nonMasqueradeCIDR configures masquerading: traffic to IPs outside this range will use IP masquerade.
 	NonMasqueradeCIDR string
 	// This flag, if set, instructs the kubelet to keep volumes from terminated pods mounted to the node.
@@ -213,9 +211,6 @@ func NewKubeletFlags() *KubeletFlags {
 	}
 
 	return &KubeletFlags{
-		// TODO(#41161:v1.10.0): Remove the default kubeconfig path and --require-kubeconfig.
-		RequireKubeConfig:                   false,
-		KubeConfig:                          flag.NewStringFlag("/var/lib/kubelet/kubeconfig"),
 		ContainerRuntimeOptions:             *NewContainerRuntimeOptions(),
 		CertDirectory:                       "/var/lib/kubelet/pki",
 		RootDirectory:                       v1alpha1.DefaultRootDir,
@@ -309,10 +304,7 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 func (f *KubeletFlags) AddFlags(fs *pflag.FlagSet) {
 	f.ContainerRuntimeOptions.AddFlags(fs)
 
-	fs.Var(&f.KubeConfig, "kubeconfig", "Path to a kubeconfig file, specifying how to connect to the API server.")
-	// TODO(#41161:v1.10.0): Remove the default kubeconfig path and --require-kubeconfig.
-	fs.BoolVar(&f.RequireKubeConfig, "require-kubeconfig", f.RequireKubeConfig, "This flag is no longer necessary. It has been deprecated and will be removed in a future version.")
-	fs.MarkDeprecated("require-kubeconfig", "You no longer need to use --require-kubeconfig. This will be removed in a future version. Providing --kubeconfig enables API server mode, omitting --kubeconfig enables standalone mode unless --require-kubeconfig=true is also set. In the latter case, the legacy default kubeconfig path will be used until --require-kubeconfig is removed.")
+	fs.StringVar(&f.KubeConfig, "kubeconfig", f.KubeConfig, "Path to a kubeconfig file, specifying how to connect to the API server. Providing --kubeconfig enables API server mode, omitting --kubeconfig enables standalone mode.")
 
 	fs.MarkDeprecated("experimental-bootstrap-kubeconfig", "Use --bootstrap-kubeconfig")
 	fs.StringVar(&f.BootstrapKubeconfig, "experimental-bootstrap-kubeconfig", f.BootstrapKubeconfig, "deprecated: use --bootstrap-kubeconfig")
