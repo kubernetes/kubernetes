@@ -377,10 +377,6 @@ ENABLE_DEFAULT_STORAGE_CLASS="${ENABLE_DEFAULT_STORAGE_CLASS:-true}"
 # Upgrade test jobs that go from a version < 1.6 to a version >= 1.6 should override this to be true.
 ENABLE_LEGACY_ABAC="${ENABLE_LEGACY_ABAC:-false}" # true, false
 
-# TODO(dawn1107): Remove this once the flag is built into CVM image.
-# Kernel panic upon soft lockup issue
-SOFTLOCKUP_PANIC="${SOFTLOCKUP_PANIC:-true}" # true, false
-
 # Enable a simple "AdvancedAuditing" setup for testing.
 ENABLE_APISERVER_ADVANCED_AUDIT="${ENABLE_APISERVER_ADVANCED_AUDIT:-true}" # true, false
 
