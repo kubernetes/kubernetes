@@ -610,9 +610,6 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 			if err != nil {
 				return nil, err
 			}
-			if err := ds.Start(); err != nil {
-				return nil, err
-			}
 			// For now, the CRI shim redirects the streaming requests to the
 			// kubelet, which handles the requests using DockerService..
 			klet.criHandler = ds
@@ -633,8 +630,8 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 				return nil, err
 			}
 			if !supported {
-				klet.dockerLegacyService = ds.NewDockerLegacyService()
-				legacyLogProvider = dockershim.NewLegacyLogProvider(klet.dockerLegacyService)
+				klet.dockerLegacyService = ds
+				legacyLogProvider = ds
 			}
 		case kubetypes.RemoteContainerRuntime:
 			// No-op.
