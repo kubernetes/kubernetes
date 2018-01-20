@@ -35,6 +35,7 @@ export PATH=${GOPATH}/bin:${PWD}/third_party/etcd:/usr/local/go/bin:${PATH}
 
 retry go get github.com/tools/godep && godep version
 retry go get github.com/jstemmer/go-junit-report
+retry go get github.com/cespare/prettybench
 
 # Disable the Go race detector.
 export KUBE_RACE=" "
@@ -48,4 +49,6 @@ cd /go/src/k8s.io/kubernetes
 
 ./hack/install-etcd.sh
 
-make test-integration WHAT="$*" KUBE_TEST_ARGS="-run='XXX' -bench=. -benchmem"
+# Run the benchmark tests and pretty-print the results into a separate file.
+make test-integration WHAT="$*" KUBE_TEST_ARGS="-run='XXX' -bench=. -benchmem" \
+  | tee >(prettybench -no-passthrough > ${ARTIFACTS_DIR}/BenchmarkResults.txt)
