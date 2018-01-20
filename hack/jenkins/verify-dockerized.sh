@@ -40,9 +40,5 @@ export LOG_LEVEL=4
 
 cd /go/src/k8s.io/kubernetes
 
-# hack/verify-client-go.sh requires all dependencies exist in the GOPATH.
-# the retry helps avoid flakes while keeping total time bounded.
-./hack/godep-restore.sh || ./hack/godep-restore.sh
-
 ./hack/install-etcd.sh
 make verify
