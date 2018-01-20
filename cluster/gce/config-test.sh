@@ -346,11 +346,7 @@ STORAGE_BACKEND=${STORAGE_BACKEND:-}
 # Storage media type: application/json and application/vnd.kubernetes.protobuf are supported.
 STORAGE_MEDIA_TYPE=${STORAGE_MEDIA_TYPE:-}
 
-# OpenContrail networking plugin specific settings
-NETWORK_PROVIDER="${NETWORK_PROVIDER:-kubenet}" # none, opencontrail, kubenet
-OPENCONTRAIL_TAG="${OPENCONTRAIL_TAG:-R2.20}"
-OPENCONTRAIL_KUBERNETES_TAG="${OPENCONTRAIL_KUBERNETES_TAG:-master}"
-OPENCONTRAIL_PUBLIC_SUBNET="${OPENCONTRAIL_PUBLIC_SUBNET:-10.1.0.0/16}"
+NETWORK_PROVIDER="${NETWORK_PROVIDER:-kubenet}" # none, kubenet
 
 # Network Policy plugin specific settings.
 NETWORK_POLICY_PROVIDER="${NETWORK_POLICY_PROVIDER:-none}" # calico
