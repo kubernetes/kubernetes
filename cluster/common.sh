@@ -407,50 +407,6 @@ function find-release-version() {
   fi
 }
 
-function stage-images() {
-  find-release-version
-  find-release-tars
-
-  KUBE_IMAGE_TAG="$(echo """${KUBE_GIT_VERSION}""" | sed 's/+/-/g')"
-
-  local docker_wrapped_binaries=(
-    "kube-apiserver"
-    "kube-controller-manager"
-    "kube-scheduler"
-    "kube-proxy"
-  )
-
-  local docker_cmd=("docker")
-
-  if [[ "${KUBE_DOCKER_REGISTRY}" == "gcr.io/"* ]]; then
-    local docker_push_cmd=("gcloud" "docker")
-  else
-    local docker_push_cmd=("${docker_cmd[@]}")
-  fi
-
-  local temp_dir="$(mktemp -d -t 'kube-server-XXXX')"
-
-  tar xzfv "${SERVER_BINARY_TAR}" -C "${temp_dir}" &> /dev/null
-
-  for binary in "${docker_wrapped_binaries[@]}"; do
-    local docker_tag="$(cat ${temp_dir}/kubernetes/server/bin/${binary}.docker_tag)"
-    (
-      "${docker_cmd[@]}" load -i "${temp_dir}/kubernetes/server/bin/${binary}.tar"
-      "${docker_cmd[@]}" rmi "${KUBE_DOCKER_REGISTRY}/${binary}:${KUBE_IMAGE_TAG}" 2>/dev/null || true
-      "${docker_cmd[@]}" tag "gcr.io/google_containers/${binary}:${docker_tag}" "${KUBE_DOCKER_REGISTRY}/${binary}:${KUBE_IMAGE_TAG}"
-      "${docker_push_cmd[@]}" push "${KUBE_DOCKER_REGISTRY}/${binary}:${KUBE_IMAGE_TAG}"
-    ) &> "${temp_dir}/${binary}-push.log" &
-  done
-
-  kube::util::wait-for-jobs || {
-    echo "!!! unable to push images. See ${temp_dir}/*.log for more info." 1>&2
-    return 1
-  }
-
-  rm -rf "${temp_dir}"
-  return 0
-}
-
 # Quote something appropriate for a yaml string.
 #
 # TODO(zmerlynn): Note that this function doesn't so much "quote" as
@@ -584,7 +540,6 @@ NETWORK_POLICY_PROVIDER: $(yaml-quote ${NETWORK_POLICY_PROVIDER:-})
 PREPULL_E2E_IMAGES: $(yaml-quote ${PREPULL_E2E_IMAGES:-})
 HAIRPIN_MODE: $(yaml-quote ${HAIRPIN_MODE:-})
 E2E_STORAGE_TEST_ENVIRONMENT: $(yaml-quote ${E2E_STORAGE_TEST_ENVIRONMENT:-})
-KUBE_IMAGE_TAG: $(yaml-quote ${KUBE_IMAGE_TAG:-})
 KUBE_DOCKER_REGISTRY: $(yaml-quote ${KUBE_DOCKER_REGISTRY:-})
 KUBE_ADDON_REGISTRY: $(yaml-quote ${KUBE_ADDON_REGISTRY:-})
 MULTIZONE: $(yaml-quote ${MULTIZONE:-})

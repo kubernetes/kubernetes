@@ -64,11 +64,6 @@ verify-prereqs
 echo "... calling verify-kube-binaries" >&2
 verify-kube-binaries
 
-if [[ "${KUBE_STAGE_IMAGES:-}" == "true" ]]; then
-  echo "... staging images" >&2
-  stage-images
-fi
-
 echo "... calling kube-up" >&2
 kube-up
 
