@@ -422,7 +422,7 @@ func (hst HTTPProxyCheck) Check() (warnings, errors []error) {
 		return nil, []error{err}
 	}
 
-	proxy, err := http.DefaultTransport.(*http.Transport).Proxy(req)
+	proxy, err := netutil.SetOldTransportDefaults(&http.Transport{}).Proxy(req)
 	if err != nil {
 		return nil, []error{err}
 	}
@@ -798,15 +798,15 @@ func (evc ExternalEtcdVersionCheck) configCertAndKey(config *tls.Config) (*tls.C
 
 func (evc ExternalEtcdVersionCheck) getHTTPClient(config *tls.Config) *http.Client {
 	if config != nil {
-		transport := &http.Transport{
+		transport := netutil.SetOldTransportDefaults(&http.Transport{
 			TLSClientConfig: config,
-		}
+		})
 		return &http.Client{
 			Transport: transport,
 			Timeout:   externalEtcdRequestTimeout,
 		}
 	}
-	return &http.Client{Timeout: externalEtcdRequestTimeout}
+	return &http.Client{Timeout: externalEtcdRequestTimeout, Transport: netutil.SetOldTransportDefaults(&http.Transport{})}
 }
 
 func getEtcdVersionResponse(client *http.Client, url string, target interface{}) error {
