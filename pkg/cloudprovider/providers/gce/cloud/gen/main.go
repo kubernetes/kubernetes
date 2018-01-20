@@ -395,7 +395,7 @@ func (m *{{.MockWrapType}}) Get(ctx context.Context, key *meta.Key) (*{{.FQObjec
 			return obj, err
 		}
 	}
-	if ! key.Valid() {
+	if !key.Valid() {
 		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 
@@ -485,7 +485,7 @@ func (m *{{.MockWrapType}}) List(ctx context.Context, zone string, fl *filter.F)
 			continue
 		}
 {{- end}}
-		if ! fl.Match(obj.To{{.VersionTitle}}()) {
+		if !fl.Match(obj.To{{.VersionTitle}}()) {
 			continue
 		}
 		objs = append(objs, obj.To{{.VersionTitle}}())
@@ -513,7 +513,7 @@ func (m *{{.MockWrapType}}) Insert(ctx context.Context, key *meta.Key, obj *{{.F
 			return err
 		}
 	}
-	if ! key.Valid() {
+	if !key.Valid() {
 		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 
@@ -553,7 +553,7 @@ func (m *{{.MockWrapType}}) Delete(ctx context.Context, key *meta.Key) error {
 			return err
 		}
 	}
-	if ! key.Valid() {
+	if !key.Valid() {
 		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 
@@ -611,7 +611,7 @@ func (m *{{.MockWrapType}}) AggregatedList(ctx context.Context, fl *filter.F) (m
 			glog.V(5).Infof("{{.MockWrapType}}.AggregatedList(%v, %v) = nil, %v", ctx, fl, err)
 			return nil, err
 		}
-		if ! fl.Match(obj.To{{.VersionTitle}}()) {
+		if !fl.Match(obj.To{{.VersionTitle}}()) {
 			continue
 		}
 		objs[location] = append(objs[location], obj.To{{.VersionTitle}}())
@@ -657,8 +657,11 @@ type {{.GCEWrapType}} struct {
 {{- if .GenerateGet}}
 // Get the {{.Object}} named by key.
 func (g *{{.GCEWrapType}}) Get(ctx context.Context, key *meta.Key) (*{{.FQObjectType}}, error) {
-	if ! key.Valid() {
-		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+	glog.V(5).Infof("{{.GCEWrapType}}.Get(%v, %v): called", ctx, key)
+
+	if !key.Valid() {
+		glog.V(2).Infof("{{.GCEWrapType}}.Get(%v, %v): key is invalid (%#v)", ctx, key, key)
+		return nil, fmt.Errorf("invalid GCE key (%#v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "{{.Version}}", "{{.Service}}")
 	rk := &RateLimitKey{
@@ -667,7 +670,9 @@ func (g *{{.GCEWrapType}}) Get(ctx context.Context, key *meta.Key) (*{{.FQObject
 		Version: meta.Version("{{.Version}}"),
 		Service: "{{.Service}}",
 	}
+	glog.V(5).Infof("{{.GCEWrapType}}.Get(%v, %v): projectID = %v, rk = %+v", ctx, key, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("{{.GCEWrapType}}.Get(%v, %v): RateLimiter error: %v", ctx, key, err)
 		return nil, err
 	}
 {{- if .KeyIsGlobal}}
@@ -680,7 +685,9 @@ func (g *{{.GCEWrapType}}) Get(ctx context.Context, key *meta.Key) (*{{.FQObject
 	call := g.s.{{.VersionTitle}}.{{.Service}}.Get(projectID, key.Zone, key.Name)
 {{- end}}
 	call.Context(ctx)
-	return call.Do()
+	v, err := call.Do()
+	glog.V(4).Infof("{{.GCEWrapType}}.Get(%v, %v) = %+v, %v", ctx, key, v, err)
+	return v, err
 }
 {{- end}}
 
@@ -688,15 +695,18 @@ func (g *{{.GCEWrapType}}) Get(ctx context.Context, key *meta.Key) (*{{.FQObject
 // List all {{.Object}} objects.
 {{- if .KeyIsGlobal}}
 func (g *{{.GCEWrapType}}) List(ctx context.Context, fl *filter.F) ([]*{{.FQObjectType}}, error) {
+	glog.V(5).Infof("{{.GCEWrapType}}.List(%v, %v) called", ctx, fl)
 {{- end -}}
 {{- if .KeyIsRegional}}
 func (g *{{.GCEWrapType}}) List(ctx context.Context, region string, fl *filter.F) ([]*{{.FQObjectType}}, error) {
+	glog.V(5).Infof("{{.GCEWrapType}}.List(%v, %v, %v) called", ctx, region, fl)
 {{- end -}}
 {{- if .KeyIsZonal}}
 func (g *{{.GCEWrapType}}) List(ctx context.Context, zone string, fl *filter.F) ([]*{{.FQObjectType}}, error) {
+	glog.V(5).Infof("{{.GCEWrapType}}.List(%v, %v, %v) called", ctx, zone, fl)
 {{- end}}
-projectID := g.s.ProjectRouter.ProjectID(ctx, "{{.Version}}", "{{.Service}}")
-rk := &RateLimitKey{
+	projectID := g.s.ProjectRouter.ProjectID(ctx, "{{.Version}}", "{{.Service}}")
+	rk := &RateLimitKey{
 		ProjectID: projectID,
 		Operation: "List",
 		Version: meta.Version("{{.Version}}"),
@@ -706,12 +716,15 @@ rk := &RateLimitKey{
 		return nil, err
 	}
 {{- if .KeyIsGlobal}}
+	glog.V(5).Infof("{{.GCEWrapType}}.List(%v, %v): projectID = %v, rk = %+v", ctx, fl, projectID, rk)
 	call := g.s.{{.VersionTitle}}.{{.Service}}.List(projectID)
 {{- end -}}
 {{- if .KeyIsRegional}}
+	glog.V(5).Infof("{{.GCEWrapType}}.List(%v, %v, %v): projectID = %v, rk = %+v", ctx, region, fl, projectID, rk)
 	call := g.s.{{.VersionTitle}}.{{.Service}}.List(projectID, region)
 {{- end -}}
 {{- if .KeyIsZonal}}
+	glog.V(5).Infof("{{.GCEWrapType}}.List(%v, %v, %v): projectID = %v, rk = %+v", ctx, zone, fl, projectID, rk)
 	call := g.s.{{.VersionTitle}}.{{.Service}}.List(projectID, zone)
 {{- end}}
 	if fl != filter.None {
@@ -719,12 +732,25 @@ rk := &RateLimitKey{
 	}
 	var all []*{{.FQObjectType}}
 	f := func(l *{{.ObjectListType}}) error {
+		glog.V(5).Infof("{{.GCEWrapType}}.List(%v, ..., %v): page %+v", ctx, fl, l)
 		all = append(all, l.Items...)
 		return nil
 	}
 	if err := call.Pages(ctx, f); err != nil {
+		glog.V(4).Infof("{{.GCEWrapType}}.List(%v, ..., %v) = %v, %v", ctx, fl, nil, err)
 		return nil, err
 	}
+
+	if glog.V(4) {
+		glog.V(4).Infof("{{.GCEWrapType}}.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
+	} else if glog.V(5) {
+		var asStr []string
+		for _, o := range all {
+			asStr = append(asStr, fmt.Sprintf("%+v", o))
+		}
+		glog.V(5).Infof("{{.GCEWrapType}}.List(%v, ..., %v) = %v, %v", ctx, fl, asStr, nil)
+	}
+
 	return all, nil
 }
 {{- end}}
@@ -732,7 +758,9 @@ rk := &RateLimitKey{
 {{- if .GenerateInsert}}
 // Insert {{.Object}} with key of value obj.
 func (g *{{.GCEWrapType}}) Insert(ctx context.Context, key *meta.Key, obj *{{.FQObjectType}}) error {
-	if ! key.Valid() {
+	glog.V(5).Infof("{{.GCEWrapType}}.Insert(%v, %v, %+v): called", ctx, key, obj)
+	if !key.Valid() {
+		glog.V(2).Infof("{{.GCEWrapType}}.Insert(%v, %v, ...): key is invalid (%#v)", ctx, key, key)
 		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "{{.Version}}", "{{.Service}}")
@@ -742,7 +770,9 @@ func (g *{{.GCEWrapType}}) Insert(ctx context.Context, key *meta.Key, obj *{{.FQ
 		Version: meta.Version("{{.Version}}"),
 		Service: "{{.Service}}",
 	}
+	glog.V(5).Infof("{{.GCEWrapType}}.Insert(%v, %v, ...): projectID = %v, rk = %+v", ctx, key, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("{{.GCEWrapType}}.Insert(%v, %v, ...): RateLimiter error: %v", ctx, key, err)
 		return err
 	}
 	obj.Name = key.Name
@@ -759,16 +789,22 @@ func (g *{{.GCEWrapType}}) Insert(ctx context.Context, key *meta.Key, obj *{{.FQ
 
 	op, err := call.Do()
 	if err != nil {
+		glog.V(4).Infof("{{.GCEWrapType}}.Insert(%v, %v, ...) = %+v", ctx, key, err)
 		return err
 	}
-	return g.s.WaitForCompletion(ctx, op)
+
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("{{.GCEWrapType}}.Insert(%v, %v, %+v) = %+v", ctx, key, obj, err)
+	return err
 }
 {{- end}}
 
 {{- if .GenerateDelete}}
 // Delete the {{.Object}} referenced by key.
 func (g *{{.GCEWrapType}}) Delete(ctx context.Context, key *meta.Key) error {
-	if ! key.Valid() {
+	glog.V(5).Infof("{{.GCEWrapType}}.Delete(%v, %v): called", ctx, key)
+	if !key.Valid() {
+		glog.V(2).Infof("{{.GCEWrapType}}.Delete(%v, %v): key is invalid (%#v)", ctx, key, key)
 		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "{{.Version}}", "{{.Service}}")
@@ -778,7 +814,9 @@ func (g *{{.GCEWrapType}}) Delete(ctx context.Context, key *meta.Key) error {
 		Version: meta.Version("{{.Version}}"),
 		Service: "{{.Service}}",
 	}
+	glog.V(5).Infof("{{.GCEWrapType}}.Delete(%v, %v): projectID = %v, rk = %+v", ctx, key, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("{{.GCEWrapType}}.Delete(%v, %v): RateLimiter error: %v", ctx, key, err)
 		return err
 	}
 {{- if .KeyIsGlobal}}
@@ -794,15 +832,21 @@ func (g *{{.GCEWrapType}}) Delete(ctx context.Context, key *meta.Key) error {
 
 	op, err := call.Do()
 	if err != nil {
+		glog.V(4).Infof("{{.GCEWrapType}}.Delete(%v, %v) = %v", ctx, key, err)
 		return err
 	}
-	return g.s.WaitForCompletion(ctx, op)
+
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("{{.GCEWrapType}}.Delete(%v, %v) = %v", ctx, key, err)
+	return err
 }
 {{end -}}
 
 {{- if .AggregatedList}}
 // AggregatedList lists all resources of the given type across all locations.
 func (g *{{.GCEWrapType}}) AggregatedList(ctx context.Context, fl *filter.F) (map[string][]*{{.FQObjectType}}, error) {
+	glog.V(5).Infof("{{.GCEWrapType}}.AggregatedList(%v, %v) called", ctx, fl)
+
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "{{.Version}}", "{{.Service}}")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -810,7 +854,10 @@ func (g *{{.GCEWrapType}}) AggregatedList(ctx context.Context, fl *filter.F) (ma
 		Version: meta.Version("{{.Version}}"),
 		Service: "{{.Service}}",
 	}
+
+	glog.V(5).Infof("{{.GCEWrapType}}.AggregatedList(%v, %v): projectID = %v, rk = %+v", ctx, fl, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(5).Infof("{{.GCEWrapType}}.AggregatedList(%v, %v): RateLimiter error: %v", ctx, fl, err)
 		return nil, err
 	}
 
@@ -823,12 +870,23 @@ func (g *{{.GCEWrapType}}) AggregatedList(ctx context.Context, fl *filter.F) (ma
 	all := map[string][]*{{.FQObjectType}}{}
 	f := func(l *{{.ObjectAggregatedListType}}) error {
 		for k, v := range l.Items {
+			glog.V(5).Infof("{{.GCEWrapType}}.AggregatedList(%v, %v): page[%v]%+v", ctx, fl, k, v)
 			all[k] = append(all[k], v.{{.AggregatedListField}}...)
 		}
 		return nil
 	}
 	if err := call.Pages(ctx, f); err != nil {
+		glog.V(4).Infof("{{.GCEWrapType}}.AggregatedList(%v, %v) = %v, %v", ctx, fl, nil, err)
 		return nil, err
+	}
+	if glog.V(4) {
+		glog.V(4).Infof("{{.GCEWrapType}}.AggregatedList(%v, %v) = [%v items], %v", ctx, fl, len(all), nil)
+	} else if glog.V(5) {
+		var asStr []string
+		for _, o := range all {
+			asStr = append(asStr, fmt.Sprintf("%+v", o))
+		}
+		glog.V(5).Infof("{{.GCEWrapType}}.AggregatedList(%v, %v) = %v, %v", ctx, fl, asStr, nil)
 	}
 	return all, nil
 }
@@ -838,7 +896,10 @@ func (g *{{.GCEWrapType}}) AggregatedList(ctx context.Context, fl *filter.F) (ma
 {{- range .}}
 // {{.Name}} is a method on {{.GCEWrapType}}.
 func (g *{{.GCEWrapType}}) {{.FcnArgs}} {
-	if ! key.Valid() {
+	glog.V(5).Infof("{{.GCEWrapType}}.{{.Name}}(%v, %v, ...): called", ctx, key)
+
+	if !key.Valid() {
+		glog.V(2).Infof("{{.GCEWrapType}}.{{.Name}}(%v, %v, ...): key is invalid (%#v)", ctx, key, key)
 {{- if .IsOperation}}
 		return fmt.Errorf("invalid GCE key (%+v)", key)
 {{- else if .IsGet}}
@@ -854,7 +915,10 @@ func (g *{{.GCEWrapType}}) {{.FcnArgs}} {
 		Version: meta.Version("{{.Version}}"),
 		Service: "{{.Service}}",
 	}
+	glog.V(5).Infof("{{.GCEWrapType}}.{{.Name}}(%v, %v, ...): projectID = %v, rk = %+v", ctx, key, projectID, rk)
+
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("{{.GCEWrapType}}.{{.Name}}(%v, %v, ...): RateLimiter error: %v", ctx, key, err)
 	{{- if .IsOperation}}
 		return err
 	{{- else}}
@@ -874,20 +938,36 @@ func (g *{{.GCEWrapType}}) {{.FcnArgs}} {
 	call.Context(ctx)
 	op, err := call.Do()
 	if err != nil {
+		glog.V(4).Infof("{{.GCEWrapType}}.{{.Name}}(%v, %v, ...) = %+v", ctx, key, err)
 		return err
 	}
-	return g.s.WaitForCompletion(ctx, op)
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("{{.GCEWrapType}}.{{.Name}}(%v, %v, ...) = %+v", ctx, key, err)
+	return err
 {{- else if .IsGet}}
 	call.Context(ctx)
-	return call.Do()
+	v, err := call.Do()
+	glog.V(4).Infof("{{.GCEWrapType}}.{{.Name}}(%v, %v, ...) = %+v, %v", ctx, key, v, err)
+	return v, err
 {{- else if .IsPaged}}
 	var all []*{{.Version}}.{{.ItemType}}
 	f := func(l *{{.Version}}.{{.ReturnType}}) error {
+		glog.V(5).Infof("{{.GCEWrapType}}.{{.Name}}(%v, %v, ...): page %+v", ctx, key, l)
 		all = append(all, l.Items...)
 		return nil
 	}
 	if err := call.Pages(ctx, f); err != nil {
+		glog.V(4).Infof("{{.GCEWrapType}}.{{.Name}}(%v, %v, ...) = %v, %v", ctx, key, nil, err)
 		return nil, err
+	}
+	if glog.V(4) {
+		glog.V(4).Infof("{{.GCEWrapType}}.{{.Name}}(%v, %v, ...) = [%v items], %v", ctx, key, len(all), nil)
+	} else if glog.V(5) {
+		var asStr []string
+		for _, o := range all {
+			asStr = append(asStr, fmt.Sprintf("%+v", o))
+		}
+		glog.V(5).Infof("{{.GCEWrapType}}.{{.Name}}(%v, %v, ...) = %v, %v", ctx, key, asStr, nil)
 	}
 	return all, nil
 {{- end}}
