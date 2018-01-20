@@ -369,7 +369,6 @@ function kube::release::package_kube_manifests_tarball() {
 
   local dst_dir="${release_stage}/gci-trusty"
   mkdir -p "${dst_dir}"
-  cp "${src_dir}/kube-registry-proxy.yaml" "${dst_dir}/"
   cp "${src_dir}/kube-proxy.manifest" "${dst_dir}/"
   cp "${src_dir}/cluster-autoscaler.manifest" "${dst_dir}/"
   cp "${src_dir}/etcd.manifest" "${dst_dir}"

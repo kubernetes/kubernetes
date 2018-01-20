@@ -2193,18 +2193,6 @@ EOF
       setup-kube-dns-manifest
     fi
   fi
-  if [[ "${ENABLE_CLUSTER_REGISTRY:-}" == "true" ]]; then
-    setup-addon-manifests "addons" "registry"
-    local -r registry_pv_file="${dst_dir}/registry/registry-pv.yaml"
-    local -r registry_pvc_file="${dst_dir}/registry/registry-pvc.yaml"
-    mv "${dst_dir}/registry/registry-pv.yaml.in" "${registry_pv_file}"
-    mv "${dst_dir}/registry/registry-pvc.yaml.in" "${registry_pvc_file}"
-    # Replace the salt configurations with variable values.
-    remove-salt-config-comments "${controller_yaml}"
-    sed -i -e "s@{{ *pillar\['cluster_registry_disk_size'\] *}}@${CLUSTER_REGISTRY_DISK_SIZE}@g" "${registry_pv_file}"
-    sed -i -e "s@{{ *pillar\['cluster_registry_disk_size'\] *}}@${CLUSTER_REGISTRY_DISK_SIZE}@g" "${registry_pvc_file}"
-    sed -i -e "s@{{ *pillar\['cluster_registry_disk_name'\] *}}@${CLUSTER_REGISTRY_DISK}@g" "${registry_pvc_file}"
-  fi
   if [[ "${ENABLE_NODE_LOGGING:-}" == "true" ]] && \
      [[ "${LOGGING_DESTINATION:-}" == "elasticsearch" ]] && \
      [[ "${ENABLE_CLUSTER_LOGGING:-}" == "true" ]]; then
@@ -2260,12 +2248,6 @@ function start-image-puller {
   echo "Start image-puller"
   cp "${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty/e2e-image-puller.manifest" \
     /etc/kubernetes/manifests/
-}
-
-# Starts kube-registry proxy
-function start-kube-registry-proxy {
-  echo "Start kube-registry-proxy"
-  cp "${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty/kube-registry-proxy.yaml" /etc/kubernetes/manifests
 }
 
 # Starts a l7 loadbalancing controller for ingress.
@@ -2450,10 +2432,6 @@ if [[ "${KUBERNETES_MASTER:-}" == "true" ]]; then
 else
   if [[ "${KUBE_PROXY_DAEMONSET:-}" != "true" ]]; then
     start-kube-proxy
-  fi
-  # Kube-registry-proxy.
-  if [[ "${ENABLE_CLUSTER_REGISTRY:-}" == "true" ]]; then
-    start-kube-registry-proxy
   fi
   if [[ "${PREPULL_E2E_IMAGES:-}" == "true" ]]; then
     start-image-puller

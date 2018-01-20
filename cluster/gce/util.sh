@@ -1014,15 +1014,6 @@ function create-master() {
     --type "${MASTER_DISK_TYPE}" \
     --size "${MASTER_DISK_SIZE}"
 
-  # Create disk for cluster registry if enabled
-  if [[ "${ENABLE_CLUSTER_REGISTRY}" == true && -n "${CLUSTER_REGISTRY_DISK}" ]]; then
-    gcloud compute disks create "${CLUSTER_REGISTRY_DISK}" \
-      --project "${PROJECT}" \
-      --zone "${ZONE}" \
-      --type "${CLUSTER_REGISTRY_DISK_TYPE_GCE}" \
-      --size "${CLUSTER_REGISTRY_DISK_SIZE}" &
-  fi
-
   # Create rule for accessing and securing etcd servers.
   if ! gcloud compute firewall-rules --project "${NETWORK_PROJECT}" describe "${MASTER_NAME}-etcd" &>/dev/null; then
     gcloud compute firewall-rules create "${MASTER_NAME}-etcd" \
@@ -1621,17 +1612,6 @@ function kube-down() {
       "${replica_pd}"
   fi
 
-  # Delete disk for cluster registry if enabled
-  if [[ "${ENABLE_CLUSTER_REGISTRY}" == true && -n "${CLUSTER_REGISTRY_DISK}" ]]; then
-    if gcloud compute disks describe "${CLUSTER_REGISTRY_DISK}" --zone "${ZONE}" --project "${PROJECT}" &>/dev/null; then
-      gcloud compute disks delete \
-        --project "${PROJECT}" \
-        --quiet \
-        --zone "${ZONE}" \
-        "${CLUSTER_REGISTRY_DISK}"
-    fi
-  fi
-
   # Check if this are any remaining master replicas.
   local REMAINING_MASTER_COUNT=$(gcloud compute instances list \
     --project "${PROJECT}" \
@@ -1877,11 +1857,6 @@ function check-resources() {
 
   if gcloud compute disks describe --project "${PROJECT}" "${MASTER_NAME}"-pd --zone "${ZONE}" &>/dev/null; then
     KUBE_RESOURCE_FOUND="Persistent disk ${MASTER_NAME}-pd"
-    return 1
-  fi
-
-  if gcloud compute disks describe --project "${PROJECT}" "${CLUSTER_REGISTRY_DISK}" --zone "${ZONE}" &>/dev/null; then
-    KUBE_RESOURCE_FOUND="Persistent disk ${CLUSTER_REGISTRY_DISK}"
     return 1
   fi
 
