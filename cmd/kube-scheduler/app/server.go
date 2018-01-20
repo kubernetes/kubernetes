@@ -194,6 +194,7 @@ func (o *Options) applyDeprecatedHealthzAddressToConfig() {
 func (o *Options) applyDeprecatedHealthzPortToConfig() {
 	if o.healthzPort == -1 {
 		o.config.HealthzBindAddress = ""
+		o.config.MetricsBindAddress = ""
 		return
 	}
 
@@ -374,10 +375,13 @@ func NewSchedulerServer(config *componentconfig.KubeSchedulerConfiguration, mast
 	}
 
 	// Configz registration.
-	if c, err := configz.New("componentconfig"); err == nil {
-		c.Set(config)
-	} else {
-		return nil, fmt.Errorf("unable to register configz: %s", err)
+	// only register if we're actually exposing it somewhere
+	if len(config.MetricsBindAddress) > 0 || len(config.HealthzBindAddress) > 0 {
+		if c, err := configz.New("componentconfig"); err == nil {
+			c.Set(config)
+		} else {
+			return nil, fmt.Errorf("unable to register configz: %s", err)
+		}
 	}
 
 	// Prepare some Kube clients.
@@ -402,7 +406,7 @@ func NewSchedulerServer(config *componentconfig.KubeSchedulerConfiguration, mast
 	// Prepare a healthz server. If the metrics bind address is the same as the
 	// healthz bind address, consolidate the servers into one.
 	var healthzServer *http.Server
-	if len(config.HealthzBindAddress) != 0 {
+	if len(config.HealthzBindAddress) > 0 {
 		healthzServer = makeHealthzServer(config)
 	}
 

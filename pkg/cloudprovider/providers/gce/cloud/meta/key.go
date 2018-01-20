@@ -18,6 +18,7 @@ package meta
 
 import (
 	"fmt"
+	"regexp"
 )
 
 // Key for a GCP resource.
@@ -37,6 +38,11 @@ const (
 	Regional = "regional"
 	// Global key type.
 	Global = "global"
+)
+
+var (
+	// locationRegexp is the format of regions/zone names in GCE.
+	locationRegexp = regexp.MustCompile("^[a-z](?:[-a-z0-9]+)?$")
 )
 
 // ZonalKey returns the key for a zonal resource.
@@ -79,9 +85,15 @@ func (k Key) String() string {
 }
 
 // Valid is true if the key is valid.
-func (k *Key) Valid(typeName string) bool {
+func (k *Key) Valid() bool {
 	if k.Zone != "" && k.Region != "" {
 		return false
+	}
+	switch {
+	case k.Region != "":
+		return locationRegexp.Match([]byte(k.Region))
+	case k.Zone != "":
+		return locationRegexp.Match([]byte(k.Zone))
 	}
 	return true
 }

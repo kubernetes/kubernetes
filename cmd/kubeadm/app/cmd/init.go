@@ -32,6 +32,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilflag "k8s.io/apiserver/pkg/util/flag"
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
@@ -192,6 +193,10 @@ func AddInitConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiext.MasterConfigur
 	)
 	flagSet.StringVar(featureGatesString, "feature-gates", *featureGatesString, "A set of key=value pairs that describe feature gates for various features. "+
 		"Options are:\n"+strings.Join(features.KnownFeatures(&features.InitFeatureGates), "\n"))
+
+	flagSet.Var(utilflag.NewMapStringString(&cfg.APIServerExtraArgs), "apiserver-extra-args", "A set of extra flags to pass to the API Server or override default ones in form of <flagname>=<value>")
+	flagSet.Var(utilflag.NewMapStringString(&cfg.ControllerManagerExtraArgs), "controller-manager-extra-args", "A set of extra flags to pass to the Controller Manager or override default ones in form of <flagname>=<value>")
+	flagSet.Var(utilflag.NewMapStringString(&cfg.SchedulerExtraArgs), "scheduler-extra-args", "A set of extra flags to pass to the Scheduler or override default ones in form of <flagname>=<value>")
 }
 
 // AddInitOtherFlags adds init flags that are not bound to a configuration file to the given flagset

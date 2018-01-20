@@ -93,6 +93,7 @@ func (c *csiDriverClient) assertConnection() error {
 // If version is not supported, the assertion fails with an error.
 // This test should be done early during the storage operation flow to avoid
 // unnecessary calls later.
+// `ver` argument holds the expected supported version.
 func (c *csiDriverClient) AssertSupportedVersion(ctx grpctx.Context, ver *csipb.Version) error {
 	if c.versionAsserted {
 		if !c.versionSupported {
@@ -129,7 +130,10 @@ func (c *csiDriverClient) AssertSupportedVersion(ctx grpctx.Context, ver *csipb.
 	c.versionSupported = supported
 
 	if !supported {
-		return fmt.Errorf("version %s not supported", verToStr(ver))
+		return fmt.Errorf(
+			"CSI Driver does not support version %s. Instead it supports versions %s",
+			verToStr(ver),
+			versToStr(vers))
 	}
 
 	glog.V(4).Info(log("version %s supported", verToStr(ver)))

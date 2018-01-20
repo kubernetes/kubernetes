@@ -2074,12 +2074,7 @@ func describeIngressTLS(w PrefixWriter, ingTLS []extensions.IngressTLS) {
 func describeIngressAnnotations(w PrefixWriter, annotations map[string]string) {
 	w.Write(LEVEL_0, "Annotations:\n")
 	for k, v := range annotations {
-		if !strings.HasPrefix(k, "ingress") {
-			continue
-		}
-		parts := strings.Split(k, "/")
-		name := parts[len(parts)-1]
-		w.Write(LEVEL_1, "%v:\t%s\n", name, v)
+		w.Write(LEVEL_1, "%v:\t%s\n", k, v)
 	}
 	return
 }

@@ -21,11 +21,13 @@ package dockershim
 import (
 	"time"
 
+	"golang.org/x/net/context"
+
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 )
 
 // ImageFsInfo returns information of the filesystem that is used to store images.
-func (ds *dockerService) ImageFsInfo() ([]*runtimeapi.FilesystemUsage, error) {
+func (ds *dockerService) ImageFsInfo(_ context.Context, _ *runtimeapi.ImageFsInfoRequest) (*runtimeapi.ImageFsInfoResponse, error) {
 	// For Windows Stats to work correctly, a file system must be provided. For now, provide a fake filesystem.
 	filesystems := []*runtimeapi.FilesystemUsage{
 		{
@@ -35,5 +37,5 @@ func (ds *dockerService) ImageFsInfo() ([]*runtimeapi.FilesystemUsage, error) {
 		},
 	}
 
-	return filesystems, nil
+	return &runtimeapi.ImageFsInfoResponse{ImageFilesystems: filesystems}, nil
 }

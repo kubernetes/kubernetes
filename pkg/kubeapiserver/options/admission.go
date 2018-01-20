@@ -116,8 +116,13 @@ func (a *AdmissionOptions) ApplyTo(
 
 	if a.PluginNames != nil {
 		// pass PluginNames to generic AdmissionOptions
-		a.GenericAdmission.EnablePlugins = a.PluginNames
+		a.GenericAdmission.EnablePlugins, a.GenericAdmission.DisablePlugins = computePluginNames(a.PluginNames, a.GenericAdmission.RecommendedPluginOrder)
 	}
 
 	return a.GenericAdmission.ApplyTo(c, informers, kubeAPIServerClientConfig, scheme, pluginInitializers...)
+}
+
+// explicitly disable all plugins that are not in the enabled list
+func computePluginNames(explicitlyEnabled []string, all []string) (enabled []string, disabled []string) {
+	return explicitlyEnabled, sets.NewString(all...).Difference(sets.NewString(explicitlyEnabled...)).List()
 }

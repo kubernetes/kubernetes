@@ -17,6 +17,7 @@ limitations under the License.
 package options
 
 import (
+	"reflect"
 	"testing"
 )
 
@@ -49,5 +50,39 @@ func TestValidate(t *testing.T) {
 	options.PluginNames = []string{"ServiceAccount"}
 	if errs := options.Validate(); len(errs) > 0 {
 		t.Errorf("Unexpected err: %v", errs)
+	}
+}
+
+func TestComputeEnabledAdmission(t *testing.T) {
+	tests := []struct {
+		name             string
+		all              []string
+		enabled          []string
+		expectedDisabled []string
+	}{
+		{
+			name:             "matches",
+			all:              []string{"one", "two"},
+			enabled:          []string{"one", "two"},
+			expectedDisabled: []string{},
+		},
+		{
+			name:             "choose one",
+			all:              []string{"one", "two"},
+			enabled:          []string{"one"},
+			expectedDisabled: []string{"two"},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			actualEnabled, actualDisabled := computePluginNames(tc.enabled, tc.all)
+			if e, a := tc.enabled, actualEnabled; !reflect.DeepEqual(e, a) {
+				t.Errorf("expected %v, got %v", e, a)
+			}
+			if e, a := tc.expectedDisabled, actualDisabled; !reflect.DeepEqual(e, a) {
+				t.Errorf("expected %v, got %v", e, a)
+			}
+		})
 	}
 }

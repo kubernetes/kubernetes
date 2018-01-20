@@ -39,6 +39,30 @@ var _ = framework.KubeDescribe("ContainerLogPath", func() {
 	f := framework.NewDefaultFramework("kubelet-container-log-path")
 	Describe("Pod with a container", func() {
 		Context("printed log to stdout", func() {
+			BeforeEach(func() {
+				if framework.TestContext.ContainerRuntime == "docker" {
+					// Container Log Path support requires JSON logging driver.
+					// It does not work when Docker daemon is logging to journald.
+					d, err := getDockerLoggingDriver()
+					framework.ExpectNoError(err)
+					if d != "json-file" {
+						framework.Skipf("Skipping because Docker daemon is using a logging driver other than \"json-file\": %s", d)
+					}
+					// Even if JSON logging is in use, this test fails if SELinux support
+					// is enabled, since the isolation provided by the SELinux policy
+					// prevents processes running inside Docker containers (under SELinux
+					// type svirt_lxc_net_t) from accessing the log files which are owned
+					// by Docker (and labeled with the container_var_lib_t type.)
+					//
+					// Therefore, let's also skip this test when running with SELinux
+					// support enabled.
+					e, err := isDockerSELinuxSupportEnabled()
+					framework.ExpectNoError(err)
+					if e {
+						framework.Skipf("Skipping because Docker daemon is running with SELinux support enabled")
+					}
+				}
+			})
 			It("should print log to correct log path", func() {
 				podClient := f.PodClient()
 				ns := f.Namespace.Name
