@@ -677,61 +677,6 @@ function create-node-template() {
   done
 }
 
-# Robustly try to add metadata on an instance.
-# $1: The name of the instance.
-# $2...$n: The metadata key=value pairs to add.
-function add-instance-metadata() {
-  local -r instance=$1
-  shift 1
-  local -r kvs=( "$@" )
-  detect-project
-  local attempt=0
-  while true; do
-    if ! gcloud compute instances add-metadata "${instance}" \
-      --project "${PROJECT}" \
-      --zone "${ZONE}" \
-      --metadata "${kvs[@]}"; then
-        if (( attempt > 5 )); then
-          echo -e "${color_red}Failed to add instance metadata in ${instance} ${color_norm}" >&2
-          exit 2
-        fi
-        echo -e "${color_yellow}Attempt $(($attempt+1)) failed to add metadata in ${instance}. Retrying.${color_norm}" >&2
-        attempt=$(($attempt+1))
-        sleep $((5 * $attempt))
-    else
-        break
-    fi
-  done
-}
-
-# Robustly try to add metadata on an instance, from a file.
-# $1: The name of the instance.
-# $2...$n: The metadata key=file pairs to add.
-function add-instance-metadata-from-file() {
-  local -r instance=$1
-  shift 1
-  local -r kvs=( "$@" )
-  detect-project
-  local attempt=0
-  while true; do
-    echo "${kvs[@]}"
-    if ! gcloud compute instances add-metadata "${instance}" \
-      --project "${PROJECT}" \
-      --zone "${ZONE}" \
-      --metadata-from-file "$(join_csv ${kvs[@]})"; then
-        if (( attempt > 5 )); then
-          echo -e "${color_red}Failed to add instance metadata in ${instance} ${color_norm}" >&2
-          exit 2
-        fi
-        echo -e "${color_yellow}Attempt $(($attempt+1)) failed to add metadata in ${instance}. Retrying.${color_norm}" >&2
-        attempt=$(($attempt+1))
-        sleep $(($attempt * 5))
-    else
-        break
-    fi
-  done
-}
-
 # Instantiate a kubernetes cluster
 #
 # Assumed vars

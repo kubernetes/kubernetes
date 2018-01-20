@@ -159,15 +159,6 @@ function clear-kubeconfig() {
   echo "Cleared config for ${CONTEXT} from ${KUBECONFIG}"
 }
 
-function tear_down_alive_resources() {
-  local kubectl="${KUBE_ROOT}/cluster/kubectl.sh"
-  "${kubectl}" delete deployments --all || true
-  "${kubectl}" delete rc --all || true
-  "${kubectl}" delete pods --all || true
-  "${kubectl}" delete svc --all || true
-  "${kubectl}" delete pvc --all || true
-}
-
 # Gets username, password for the current-context in kubeconfig, if they exist.
 # Assumed vars:
 #   KUBECONFIG  # if unset, defaults to global
@@ -253,17 +244,6 @@ function gen-kube-bearertoken() {
     KUBE_BEARER_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
 }
 
-# Generate uid
-# This function only works on systems with python. It generates a time based
-# UID instead of a UUID because GCE has a name length limit.
-#
-# Vars set:
-#   KUBE_UID
-function gen-uid {
-    KUBE_UID=$(python -c 'import uuid; print(uuid.uuid1().fields[0])')
-}
-
-
 function load-or-gen-kube-basicauth() {
   if [[ ! -z "${KUBE_CONTEXT:-}" ]]; then
     get-kubeconfig-basicauth
@@ -291,28 +271,6 @@ function load-or-gen-kube-bearertoken() {
   if [[ -z "${KUBE_BEARER_TOKEN:-}" ]]; then
     gen-kube-bearertoken
   fi
-}
-
-# Get the master IP for the current-context in kubeconfig if one exists.
-#
-# Assumed vars:
-#   KUBECONFIG  # if unset, defaults to global
-#   KUBE_CONTEXT  # if unset, defaults to current-context
-#
-# Vars set:
-#   KUBE_MASTER_URL
-#
-# KUBE_MASTER_URL will be empty if no current-context is set, or the
-# current-context user does not exist or contain a server entry.
-function detect-master-from-kubeconfig() {
-  export KUBECONFIG=${KUBECONFIG:-$DEFAULT_KUBECONFIG}
-
-  local cc=$("${KUBE_ROOT}/cluster/kubectl.sh" config view -o jsonpath="{.current-context}")
-  if [[ ! -z "${KUBE_CONTEXT:-}" ]]; then
-    cc="${KUBE_CONTEXT}"
-  fi
-  local cluster=$("${KUBE_ROOT}/cluster/kubectl.sh" config view -o jsonpath="{.contexts[?(@.name == \"${cc}\")].context.cluster}")
-  KUBE_MASTER_URL=$("${KUBE_ROOT}/cluster/kubectl.sh" config view -o jsonpath="{.clusters[?(@.name == \"${cluster}\")].cluster.server}")
 }
 
 # Sets KUBE_VERSION variable to the proper version number (e.g. "v1.0.6",
@@ -569,7 +527,6 @@ function build-kube-env {
   fi
 
   build-runtime-config
-  gen-uid
 
   rm -f ${file}
   cat >$file <<EOF
@@ -633,7 +590,6 @@ KUBE_DOCKER_REGISTRY: $(yaml-quote ${KUBE_DOCKER_REGISTRY:-})
 KUBE_ADDON_REGISTRY: $(yaml-quote ${KUBE_ADDON_REGISTRY:-})
 MULTIZONE: $(yaml-quote ${MULTIZONE:-})
 NON_MASQUERADE_CIDR: $(yaml-quote ${NON_MASQUERADE_CIDR:-})
-KUBE_UID: $(yaml-quote ${KUBE_UID:-})
 ENABLE_DEFAULT_STORAGE_CLASS: $(yaml-quote ${ENABLE_DEFAULT_STORAGE_CLASS:-})
 ENABLE_APISERVER_BASIC_AUDIT: $(yaml-quote ${ENABLE_APISERVER_BASIC_AUDIT:-})
 ENABLE_APISERVER_ADVANCED_AUDIT: $(yaml-quote ${ENABLE_APISERVER_ADVANCED_AUDIT:-})
