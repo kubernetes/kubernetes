@@ -1,11 +1,11 @@
-# Enable TLS for Kube-Registry 
+# Enable TLS for Kube-Registry
 
 This document describes how to enable TLS for kube-registry. Before you start, please check if you have all the prerequisite:
 
 - A domain for kube-registry. Assuming it is ` myregistrydomain.com`.
 - Domain certificate and key. Assuming they are `domain.crt` and `domain.key`
 
-### Pack domain.crt and domain.key into a Secret 
+### Pack domain.crt and domain.key into a Secret
 
 ```console
 $ kubectl --namespace=kube-system create secret generic registry-tls-secret --from-file=domain.crt=domain.crt --from-file=domain.key=domain.key
@@ -13,7 +13,7 @@ $ kubectl --namespace=kube-system create secret generic registry-tls-secret --fr
 
 ### Run Registry
 
-Please be noted that this sample rc is using emptyDir as storage backend for simplicity. 
+Please be noted that this sample rc is using emptyDir as storage backend for simplicity.
 
 <!-- BEGIN MUNGE: EXAMPLE registry-tls-rc.yaml -->
 ```yaml
@@ -40,7 +40,7 @@ spec:
     spec:
       containers:
       - name: registry
-        image: registry:2
+        image: registry:2.6.2
         resources:
           # keep request = limit to keep this container in guaranteed class
           limits:
@@ -78,7 +78,7 @@ spec:
 
 ### Expose External IP for Kube-Registry
 
-Modify the default kube-registry service to `LoadBalancer` type and point the DNS record of `myregistrydomain.com` to the service external ip. 
+Modify the default kube-registry service to `LoadBalancer` type and point the DNS record of `myregistrydomain.com` to the service external ip.
 
 <!-- BEGIN MUNGE: EXAMPLE registry-tls-svc.yaml -->
 ```yaml
@@ -102,9 +102,9 @@ spec:
 ```
 <!-- END MUNGE: EXAMPLE registry-tls-svc.yaml -->
 
-### To Verify 
+### To Verify
 
-Now you should be able to access your kube-registry from another docker host. 
+Now you should be able to access your kube-registry from another docker host.
 ```console
 docker pull busybox
 docker tag busybox myregistrydomain.com:5000/busybox

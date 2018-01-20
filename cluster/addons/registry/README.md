@@ -122,7 +122,7 @@ spec:
     spec:
       containers:
       - name: registry
-        image: registry:2
+        image: registry:2.6.2
         resources:
           limits:
             cpu: 100m
@@ -179,7 +179,7 @@ node by creating following daemonset.
 
 <!-- BEGIN MUNGE: EXAMPLE ../../saltbase/salt/kube-registry-proxy/kube-registry-proxy.yaml -->
 ```yaml
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   name: kube-registry-proxy
