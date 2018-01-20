@@ -1240,6 +1240,9 @@ func (m *MockAddresses) Get(ctx context.Context, key *meta.Key) (*ga.Address, er
 			return obj, err
 		}
 	}
+	if !key.Valid() {
+		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 
 	m.Lock.Lock()
 	defer m.Lock.Unlock()
@@ -1304,6 +1307,9 @@ func (m *MockAddresses) Insert(ctx context.Context, key *meta.Key, obj *ga.Addre
 			return err
 		}
 	}
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 
 	m.Lock.Lock()
 	defer m.Lock.Unlock()
@@ -1339,6 +1345,9 @@ func (m *MockAddresses) Delete(ctx context.Context, key *meta.Key) error {
 			return err
 		}
 	}
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 
 	m.Lock.Lock()
 	defer m.Lock.Unlock()
@@ -1373,6 +1382,9 @@ type GCEAddresses struct {
 
 // Get the Address named by key.
 func (g *GCEAddresses) Get(ctx context.Context, key *meta.Key) (*ga.Address, error) {
+	if !key.Valid() {
+		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "Addresses")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -1417,6 +1429,9 @@ func (g *GCEAddresses) List(ctx context.Context, region string, fl *filter.F) ([
 
 // Insert Address with key of value obj.
 func (g *GCEAddresses) Insert(ctx context.Context, key *meta.Key, obj *ga.Address) error {
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "Addresses")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -1440,6 +1455,9 @@ func (g *GCEAddresses) Insert(ctx context.Context, key *meta.Key, obj *ga.Addres
 
 // Delete the Address referenced by key.
 func (g *GCEAddresses) Delete(ctx context.Context, key *meta.Key) error {
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "Addresses")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -1515,6 +1533,9 @@ func (m *MockAlphaAddresses) Get(ctx context.Context, key *meta.Key) (*alpha.Add
 			return obj, err
 		}
 	}
+	if !key.Valid() {
+		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 
 	m.Lock.Lock()
 	defer m.Lock.Unlock()
@@ -1579,6 +1600,9 @@ func (m *MockAlphaAddresses) Insert(ctx context.Context, key *meta.Key, obj *alp
 			return err
 		}
 	}
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 
 	m.Lock.Lock()
 	defer m.Lock.Unlock()
@@ -1614,6 +1638,9 @@ func (m *MockAlphaAddresses) Delete(ctx context.Context, key *meta.Key) error {
 			return err
 		}
 	}
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 
 	m.Lock.Lock()
 	defer m.Lock.Unlock()
@@ -1648,6 +1675,9 @@ type GCEAlphaAddresses struct {
 
 // Get the Address named by key.
 func (g *GCEAlphaAddresses) Get(ctx context.Context, key *meta.Key) (*alpha.Address, error) {
+	if !key.Valid() {
+		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "alpha", "Addresses")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -1692,6 +1722,9 @@ func (g *GCEAlphaAddresses) List(ctx context.Context, region string, fl *filter.
 
 // Insert Address with key of value obj.
 func (g *GCEAlphaAddresses) Insert(ctx context.Context, key *meta.Key, obj *alpha.Address) error {
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "alpha", "Addresses")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -1715,6 +1748,9 @@ func (g *GCEAlphaAddresses) Insert(ctx context.Context, key *meta.Key, obj *alph
 
 // Delete the Address referenced by key.
 func (g *GCEAlphaAddresses) Delete(ctx context.Context, key *meta.Key) error {
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "alpha", "Addresses")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -1790,6 +1826,9 @@ func (m *MockBetaAddresses) Get(ctx context.Context, key *meta.Key) (*beta.Addre
 			return obj, err
 		}
 	}
+	if !key.Valid() {
+		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 
 	m.Lock.Lock()
 	defer m.Lock.Unlock()
@@ -1854,6 +1893,9 @@ func (m *MockBetaAddresses) Insert(ctx context.Context, key *meta.Key, obj *beta
 			return err
 		}
 	}
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 
 	m.Lock.Lock()
 	defer m.Lock.Unlock()
@@ -1889,6 +1931,9 @@ func (m *MockBetaAddresses) Delete(ctx context.Context, key *meta.Key) error {
 			return err
 		}
 	}
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 
 	m.Lock.Lock()
 	defer m.Lock.Unlock()
@@ -1923,6 +1968,9 @@ type GCEBetaAddresses struct {
 
 // Get the Address named by key.
 func (g *GCEBetaAddresses) Get(ctx context.Context, key *meta.Key) (*beta.Address, error) {
+	if !key.Valid() {
+		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "beta", "Addresses")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -1967,6 +2015,9 @@ func (g *GCEBetaAddresses) List(ctx context.Context, region string, fl *filter.F
 
 // Insert Address with key of value obj.
 func (g *GCEBetaAddresses) Insert(ctx context.Context, key *meta.Key, obj *beta.Address) error {
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "beta", "Addresses")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -1990,6 +2041,9 @@ func (g *GCEBetaAddresses) Insert(ctx context.Context, key *meta.Key, obj *beta.
 
 // Delete the Address referenced by key.
 func (g *GCEBetaAddresses) Delete(ctx context.Context, key *meta.Key) error {
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "beta", "Addresses")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -2065,6 +2119,9 @@ func (m *MockGlobalAddresses) Get(ctx context.Context, key *meta.Key) (*ga.Addre
 			return obj, err
 		}
 	}
+	if !key.Valid() {
+		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 
 	m.Lock.Lock()
 	defer m.Lock.Unlock()
@@ -2126,6 +2183,9 @@ func (m *MockGlobalAddresses) Insert(ctx context.Context, key *meta.Key, obj *ga
 			return err
 		}
 	}
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 
 	m.Lock.Lock()
 	defer m.Lock.Unlock()
@@ -2161,6 +2221,9 @@ func (m *MockGlobalAddresses) Delete(ctx context.Context, key *meta.Key) error {
 			return err
 		}
 	}
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 
 	m.Lock.Lock()
 	defer m.Lock.Unlock()
@@ -2195,6 +2258,9 @@ type GCEGlobalAddresses struct {
 
 // Get the Address named by key.
 func (g *GCEGlobalAddresses) Get(ctx context.Context, key *meta.Key) (*ga.Address, error) {
+	if !key.Valid() {
+		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "GlobalAddresses")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -2239,6 +2305,9 @@ func (g *GCEGlobalAddresses) List(ctx context.Context, fl *filter.F) ([]*ga.Addr
 
 // Insert Address with key of value obj.
 func (g *GCEGlobalAddresses) Insert(ctx context.Context, key *meta.Key, obj *ga.Address) error {
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "GlobalAddresses")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -2262,6 +2331,9 @@ func (g *GCEGlobalAddresses) Insert(ctx context.Context, key *meta.Key, obj *ga.
 
 // Delete the Address referenced by key.
 func (g *GCEGlobalAddresses) Delete(ctx context.Context, key *meta.Key) error {
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "GlobalAddresses")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -2342,6 +2414,9 @@ func (m *MockBackendServices) Get(ctx context.Context, key *meta.Key) (*ga.Backe
 			return obj, err
 		}
 	}
+	if !key.Valid() {
+		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 
 	m.Lock.Lock()
 	defer m.Lock.Unlock()
@@ -2403,6 +2478,9 @@ func (m *MockBackendServices) Insert(ctx context.Context, key *meta.Key, obj *ga
 			return err
 		}
 	}
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 
 	m.Lock.Lock()
 	defer m.Lock.Unlock()
@@ -2437,6 +2515,9 @@ func (m *MockBackendServices) Delete(ctx context.Context, key *meta.Key) error {
 			glog.V(5).Infof("MockBackendServices.Delete(%v, %v) = %v", ctx, key, err)
 			return err
 		}
+	}
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 
 	m.Lock.Lock()
@@ -2488,6 +2569,9 @@ type GCEBackendServices struct {
 
 // Get the BackendService named by key.
 func (g *GCEBackendServices) Get(ctx context.Context, key *meta.Key) (*ga.BackendService, error) {
+	if !key.Valid() {
+		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "BackendServices")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -2532,6 +2616,9 @@ func (g *GCEBackendServices) List(ctx context.Context, fl *filter.F) ([]*ga.Back
 
 // Insert BackendService with key of value obj.
 func (g *GCEBackendServices) Insert(ctx context.Context, key *meta.Key, obj *ga.BackendService) error {
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "BackendServices")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -2555,6 +2642,9 @@ func (g *GCEBackendServices) Insert(ctx context.Context, key *meta.Key, obj *ga.
 
 // Delete the BackendService referenced by key.
 func (g *GCEBackendServices) Delete(ctx context.Context, key *meta.Key) error {
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "BackendServices")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -2578,6 +2668,9 @@ func (g *GCEBackendServices) Delete(ctx context.Context, key *meta.Key) error {
 
 // GetHealth is a method on GCEBackendServices.
 func (g *GCEBackendServices) GetHealth(ctx context.Context, key *meta.Key, arg0 *ga.ResourceGroupReference) (*ga.BackendServiceGroupHealth, error) {
+	if !key.Valid() {
+		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "BackendServices")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -2595,6 +2688,9 @@ func (g *GCEBackendServices) GetHealth(ctx context.Context, key *meta.Key, arg0 
 
 // Update is a method on GCEBackendServices.
 func (g *GCEBackendServices) Update(ctx context.Context, key *meta.Key, arg0 *ga.BackendService) error {
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "BackendServices")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -2671,6 +2767,9 @@ func (m *MockAlphaBackendServices) Get(ctx context.Context, key *meta.Key) (*alp
 			return obj, err
 		}
 	}
+	if !key.Valid() {
+		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 
 	m.Lock.Lock()
 	defer m.Lock.Unlock()
@@ -2732,6 +2831,9 @@ func (m *MockAlphaBackendServices) Insert(ctx context.Context, key *meta.Key, ob
 			return err
 		}
 	}
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 
 	m.Lock.Lock()
 	defer m.Lock.Unlock()
@@ -2766,6 +2868,9 @@ func (m *MockAlphaBackendServices) Delete(ctx context.Context, key *meta.Key) er
 			glog.V(5).Infof("MockAlphaBackendServices.Delete(%v, %v) = %v", ctx, key, err)
 			return err
 		}
+	}
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 
 	m.Lock.Lock()
@@ -2809,6 +2914,9 @@ type GCEAlphaBackendServices struct {
 
 // Get the BackendService named by key.
 func (g *GCEAlphaBackendServices) Get(ctx context.Context, key *meta.Key) (*alpha.BackendService, error) {
+	if !key.Valid() {
+		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "alpha", "BackendServices")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -2853,6 +2961,9 @@ func (g *GCEAlphaBackendServices) List(ctx context.Context, fl *filter.F) ([]*al
 
 // Insert BackendService with key of value obj.
 func (g *GCEAlphaBackendServices) Insert(ctx context.Context, key *meta.Key, obj *alpha.BackendService) error {
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "alpha", "BackendServices")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -2876,6 +2987,9 @@ func (g *GCEAlphaBackendServices) Insert(ctx context.Context, key *meta.Key, obj
 
 // Delete the BackendService referenced by key.
 func (g *GCEAlphaBackendServices) Delete(ctx context.Context, key *meta.Key) error {
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "alpha", "BackendServices")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -2899,6 +3013,9 @@ func (g *GCEAlphaBackendServices) Delete(ctx context.Context, key *meta.Key) err
 
 // Update is a method on GCEAlphaBackendServices.
 func (g *GCEAlphaBackendServices) Update(ctx context.Context, key *meta.Key, arg0 *alpha.BackendService) error {
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "alpha", "BackendServices")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -2977,6 +3094,9 @@ func (m *MockRegionBackendServices) Get(ctx context.Context, key *meta.Key) (*ga
 			return obj, err
 		}
 	}
+	if !key.Valid() {
+		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 
 	m.Lock.Lock()
 	defer m.Lock.Unlock()
@@ -3041,6 +3161,9 @@ func (m *MockRegionBackendServices) Insert(ctx context.Context, key *meta.Key, o
 			return err
 		}
 	}
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 
 	m.Lock.Lock()
 	defer m.Lock.Unlock()
@@ -3075,6 +3198,9 @@ func (m *MockRegionBackendServices) Delete(ctx context.Context, key *meta.Key) e
 			glog.V(5).Infof("MockRegionBackendServices.Delete(%v, %v) = %v", ctx, key, err)
 			return err
 		}
+	}
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 
 	m.Lock.Lock()
@@ -3126,6 +3252,9 @@ type GCERegionBackendServices struct {
 
 // Get the BackendService named by key.
 func (g *GCERegionBackendServices) Get(ctx context.Context, key *meta.Key) (*ga.BackendService, error) {
+	if !key.Valid() {
+		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "RegionBackendServices")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -3170,6 +3299,9 @@ func (g *GCERegionBackendServices) List(ctx context.Context, region string, fl *
 
 // Insert BackendService with key of value obj.
 func (g *GCERegionBackendServices) Insert(ctx context.Context, key *meta.Key, obj *ga.BackendService) error {
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "RegionBackendServices")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -3193,6 +3325,9 @@ func (g *GCERegionBackendServices) Insert(ctx context.Context, key *meta.Key, ob
 
 // Delete the BackendService referenced by key.
 func (g *GCERegionBackendServices) Delete(ctx context.Context, key *meta.Key) error {
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "RegionBackendServices")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -3215,6 +3350,9 @@ func (g *GCERegionBackendServices) Delete(ctx context.Context, key *meta.Key) er
 
 // GetHealth is a method on GCERegionBackendServices.
 func (g *GCERegionBackendServices) GetHealth(ctx context.Context, key *meta.Key, arg0 *ga.ResourceGroupReference) (*ga.BackendServiceGroupHealth, error) {
+	if !key.Valid() {
+		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "RegionBackendServices")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -3232,6 +3370,9 @@ func (g *GCERegionBackendServices) GetHealth(ctx context.Context, key *meta.Key,
 
 // Update is a method on GCERegionBackendServices.
 func (g *GCERegionBackendServices) Update(ctx context.Context, key *meta.Key, arg0 *ga.BackendService) error {
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "RegionBackendServices")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -3310,6 +3451,9 @@ func (m *MockAlphaRegionBackendServices) Get(ctx context.Context, key *meta.Key)
 			return obj, err
 		}
 	}
+	if !key.Valid() {
+		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 
 	m.Lock.Lock()
 	defer m.Lock.Unlock()
@@ -3374,6 +3518,9 @@ func (m *MockAlphaRegionBackendServices) Insert(ctx context.Context, key *meta.K
 			return err
 		}
 	}
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 
 	m.Lock.Lock()
 	defer m.Lock.Unlock()
@@ -3408,6 +3555,9 @@ func (m *MockAlphaRegionBackendServices) Delete(ctx context.Context, key *meta.K
 			glog.V(5).Infof("MockAlphaRegionBackendServices.Delete(%v, %v) = %v", ctx, key, err)
 			return err
 		}
+	}
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 
 	m.Lock.Lock()
@@ -3459,6 +3609,9 @@ type GCEAlphaRegionBackendServices struct {
 
 // Get the BackendService named by key.
 func (g *GCEAlphaRegionBackendServices) Get(ctx context.Context, key *meta.Key) (*alpha.BackendService, error) {
+	if !key.Valid() {
+		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "alpha", "RegionBackendServices")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -3503,6 +3656,9 @@ func (g *GCEAlphaRegionBackendServices) List(ctx context.Context, region string,
 
 // Insert BackendService with key of value obj.
 func (g *GCEAlphaRegionBackendServices) Insert(ctx context.Context, key *meta.Key, obj *alpha.BackendService) error {
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "alpha", "RegionBackendServices")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -3526,6 +3682,9 @@ func (g *GCEAlphaRegionBackendServices) Insert(ctx context.Context, key *meta.Ke
 
 // Delete the BackendService referenced by key.
 func (g *GCEAlphaRegionBackendServices) Delete(ctx context.Context, key *meta.Key) error {
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "alpha", "RegionBackendServices")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -3548,6 +3707,9 @@ func (g *GCEAlphaRegionBackendServices) Delete(ctx context.Context, key *meta.Ke
 
 // GetHealth is a method on GCEAlphaRegionBackendServices.
 func (g *GCEAlphaRegionBackendServices) GetHealth(ctx context.Context, key *meta.Key, arg0 *alpha.ResourceGroupReference) (*alpha.BackendServiceGroupHealth, error) {
+	if !key.Valid() {
+		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "alpha", "RegionBackendServices")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -3565,6 +3727,9 @@ func (g *GCEAlphaRegionBackendServices) GetHealth(ctx context.Context, key *meta
 
 // Update is a method on GCEAlphaRegionBackendServices.
 func (g *GCEAlphaRegionBackendServices) Update(ctx context.Context, key *meta.Key, arg0 *alpha.BackendService) error {
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "alpha", "RegionBackendServices")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -3639,6 +3804,9 @@ func (m *MockDisks) Get(ctx context.Context, key *meta.Key) (*ga.Disk, error) {
 			return obj, err
 		}
 	}
+	if !key.Valid() {
+		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 
 	m.Lock.Lock()
 	defer m.Lock.Unlock()
@@ -3703,6 +3871,9 @@ func (m *MockDisks) Insert(ctx context.Context, key *meta.Key, obj *ga.Disk) err
 			return err
 		}
 	}
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 
 	m.Lock.Lock()
 	defer m.Lock.Unlock()
@@ -3738,6 +3909,9 @@ func (m *MockDisks) Delete(ctx context.Context, key *meta.Key) error {
 			return err
 		}
 	}
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 
 	m.Lock.Lock()
 	defer m.Lock.Unlock()
@@ -3772,6 +3946,9 @@ type GCEDisks struct {
 
 // Get the Disk named by key.
 func (g *GCEDisks) Get(ctx context.Context, key *meta.Key) (*ga.Disk, error) {
+	if !key.Valid() {
+		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "Disks")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -3816,6 +3993,9 @@ func (g *GCEDisks) List(ctx context.Context, zone string, fl *filter.F) ([]*ga.D
 
 // Insert Disk with key of value obj.
 func (g *GCEDisks) Insert(ctx context.Context, key *meta.Key, obj *ga.Disk) error {
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "Disks")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -3839,6 +4019,9 @@ func (g *GCEDisks) Insert(ctx context.Context, key *meta.Key, obj *ga.Disk) erro
 
 // Delete the Disk referenced by key.
 func (g *GCEDisks) Delete(ctx context.Context, key *meta.Key) error {
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "Disks")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -3914,6 +4097,9 @@ func (m *MockAlphaDisks) Get(ctx context.Context, key *meta.Key) (*alpha.Disk, e
 			return obj, err
 		}
 	}
+	if !key.Valid() {
+		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 
 	m.Lock.Lock()
 	defer m.Lock.Unlock()
@@ -3978,6 +4164,9 @@ func (m *MockAlphaDisks) Insert(ctx context.Context, key *meta.Key, obj *alpha.D
 			return err
 		}
 	}
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 
 	m.Lock.Lock()
 	defer m.Lock.Unlock()
@@ -4013,6 +4202,9 @@ func (m *MockAlphaDisks) Delete(ctx context.Context, key *meta.Key) error {
 			return err
 		}
 	}
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 
 	m.Lock.Lock()
 	defer m.Lock.Unlock()
@@ -4047,6 +4239,9 @@ type GCEAlphaDisks struct {
 
 // Get the Disk named by key.
 func (g *GCEAlphaDisks) Get(ctx context.Context, key *meta.Key) (*alpha.Disk, error) {
+	if !key.Valid() {
+		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "alpha", "Disks")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -4091,6 +4286,9 @@ func (g *GCEAlphaDisks) List(ctx context.Context, zone string, fl *filter.F) ([]
 
 // Insert Disk with key of value obj.
 func (g *GCEAlphaDisks) Insert(ctx context.Context, key *meta.Key, obj *alpha.Disk) error {
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "alpha", "Disks")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -4114,6 +4312,9 @@ func (g *GCEAlphaDisks) Insert(ctx context.Context, key *meta.Key, obj *alpha.Di
 
 // Delete the Disk referenced by key.
 func (g *GCEAlphaDisks) Delete(ctx context.Context, key *meta.Key) error {
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "alpha", "Disks")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -4189,6 +4390,9 @@ func (m *MockAlphaRegionDisks) Get(ctx context.Context, key *meta.Key) (*alpha.D
 			return obj, err
 		}
 	}
+	if !key.Valid() {
+		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 
 	m.Lock.Lock()
 	defer m.Lock.Unlock()
@@ -4253,6 +4457,9 @@ func (m *MockAlphaRegionDisks) Insert(ctx context.Context, key *meta.Key, obj *a
 			return err
 		}
 	}
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 
 	m.Lock.Lock()
 	defer m.Lock.Unlock()
@@ -4288,6 +4495,9 @@ func (m *MockAlphaRegionDisks) Delete(ctx context.Context, key *meta.Key) error 
 			return err
 		}
 	}
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 
 	m.Lock.Lock()
 	defer m.Lock.Unlock()
@@ -4322,6 +4532,9 @@ type GCEAlphaRegionDisks struct {
 
 // Get the Disk named by key.
 func (g *GCEAlphaRegionDisks) Get(ctx context.Context, key *meta.Key) (*alpha.Disk, error) {
+	if !key.Valid() {
+		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "alpha", "RegionDisks")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -4366,6 +4579,9 @@ func (g *GCEAlphaRegionDisks) List(ctx context.Context, region string, fl *filte
 
 // Insert Disk with key of value obj.
 func (g *GCEAlphaRegionDisks) Insert(ctx context.Context, key *meta.Key, obj *alpha.Disk) error {
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "alpha", "RegionDisks")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -4389,6 +4605,9 @@ func (g *GCEAlphaRegionDisks) Insert(ctx context.Context, key *meta.Key, obj *al
 
 // Delete the Disk referenced by key.
 func (g *GCEAlphaRegionDisks) Delete(ctx context.Context, key *meta.Key) error {
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "alpha", "RegionDisks")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -4466,6 +4685,9 @@ func (m *MockFirewalls) Get(ctx context.Context, key *meta.Key) (*ga.Firewall, e
 			return obj, err
 		}
 	}
+	if !key.Valid() {
+		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 
 	m.Lock.Lock()
 	defer m.Lock.Unlock()
@@ -4527,6 +4749,9 @@ func (m *MockFirewalls) Insert(ctx context.Context, key *meta.Key, obj *ga.Firew
 			return err
 		}
 	}
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 
 	m.Lock.Lock()
 	defer m.Lock.Unlock()
@@ -4561,6 +4786,9 @@ func (m *MockFirewalls) Delete(ctx context.Context, key *meta.Key) error {
 			glog.V(5).Infof("MockFirewalls.Delete(%v, %v) = %v", ctx, key, err)
 			return err
 		}
+	}
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 
 	m.Lock.Lock()
@@ -4604,6 +4832,9 @@ type GCEFirewalls struct {
 
 // Get the Firewall named by key.
 func (g *GCEFirewalls) Get(ctx context.Context, key *meta.Key) (*ga.Firewall, error) {
+	if !key.Valid() {
+		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "Firewalls")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -4648,6 +4879,9 @@ func (g *GCEFirewalls) List(ctx context.Context, fl *filter.F) ([]*ga.Firewall, 
 
 // Insert Firewall with key of value obj.
 func (g *GCEFirewalls) Insert(ctx context.Context, key *meta.Key, obj *ga.Firewall) error {
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "Firewalls")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -4671,6 +4905,9 @@ func (g *GCEFirewalls) Insert(ctx context.Context, key *meta.Key, obj *ga.Firewa
 
 // Delete the Firewall referenced by key.
 func (g *GCEFirewalls) Delete(ctx context.Context, key *meta.Key) error {
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "Firewalls")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -4694,6 +4931,9 @@ func (g *GCEFirewalls) Delete(ctx context.Context, key *meta.Key) error {
 
 // Update is a method on GCEFirewalls.
 func (g *GCEFirewalls) Update(ctx context.Context, key *meta.Key, arg0 *ga.Firewall) error {
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "Firewalls")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -4768,6 +5008,9 @@ func (m *MockForwardingRules) Get(ctx context.Context, key *meta.Key) (*ga.Forwa
 			return obj, err
 		}
 	}
+	if !key.Valid() {
+		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 
 	m.Lock.Lock()
 	defer m.Lock.Unlock()
@@ -4832,6 +5075,9 @@ func (m *MockForwardingRules) Insert(ctx context.Context, key *meta.Key, obj *ga
 			return err
 		}
 	}
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 
 	m.Lock.Lock()
 	defer m.Lock.Unlock()
@@ -4867,6 +5113,9 @@ func (m *MockForwardingRules) Delete(ctx context.Context, key *meta.Key) error {
 			return err
 		}
 	}
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 
 	m.Lock.Lock()
 	defer m.Lock.Unlock()
@@ -4901,6 +5150,9 @@ type GCEForwardingRules struct {
 
 // Get the ForwardingRule named by key.
 func (g *GCEForwardingRules) Get(ctx context.Context, key *meta.Key) (*ga.ForwardingRule, error) {
+	if !key.Valid() {
+		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "ForwardingRules")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -4945,6 +5197,9 @@ func (g *GCEForwardingRules) List(ctx context.Context, region string, fl *filter
 
 // Insert ForwardingRule with key of value obj.
 func (g *GCEForwardingRules) Insert(ctx context.Context, key *meta.Key, obj *ga.ForwardingRule) error {
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "ForwardingRules")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -4968,6 +5223,9 @@ func (g *GCEForwardingRules) Insert(ctx context.Context, key *meta.Key, obj *ga.
 
 // Delete the ForwardingRule referenced by key.
 func (g *GCEForwardingRules) Delete(ctx context.Context, key *meta.Key) error {
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "ForwardingRules")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -5043,6 +5301,9 @@ func (m *MockAlphaForwardingRules) Get(ctx context.Context, key *meta.Key) (*alp
 			return obj, err
 		}
 	}
+	if !key.Valid() {
+		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 
 	m.Lock.Lock()
 	defer m.Lock.Unlock()
@@ -5107,6 +5368,9 @@ func (m *MockAlphaForwardingRules) Insert(ctx context.Context, key *meta.Key, ob
 			return err
 		}
 	}
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 
 	m.Lock.Lock()
 	defer m.Lock.Unlock()
@@ -5142,6 +5406,9 @@ func (m *MockAlphaForwardingRules) Delete(ctx context.Context, key *meta.Key) er
 			return err
 		}
 	}
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 
 	m.Lock.Lock()
 	defer m.Lock.Unlock()
@@ -5176,6 +5443,9 @@ type GCEAlphaForwardingRules struct {
 
 // Get the ForwardingRule named by key.
 func (g *GCEAlphaForwardingRules) Get(ctx context.Context, key *meta.Key) (*alpha.ForwardingRule, error) {
+	if !key.Valid() {
+		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "alpha", "ForwardingRules")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -5220,6 +5490,9 @@ func (g *GCEAlphaForwardingRules) List(ctx context.Context, region string, fl *f
 
 // Insert ForwardingRule with key of value obj.
 func (g *GCEAlphaForwardingRules) Insert(ctx context.Context, key *meta.Key, obj *alpha.ForwardingRule) error {
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "alpha", "ForwardingRules")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -5243,6 +5516,9 @@ func (g *GCEAlphaForwardingRules) Insert(ctx context.Context, key *meta.Key, obj
 
 // Delete the ForwardingRule referenced by key.
 func (g *GCEAlphaForwardingRules) Delete(ctx context.Context, key *meta.Key) error {
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "alpha", "ForwardingRules")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -5320,6 +5596,9 @@ func (m *MockGlobalForwardingRules) Get(ctx context.Context, key *meta.Key) (*ga
 			return obj, err
 		}
 	}
+	if !key.Valid() {
+		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 
 	m.Lock.Lock()
 	defer m.Lock.Unlock()
@@ -5381,6 +5660,9 @@ func (m *MockGlobalForwardingRules) Insert(ctx context.Context, key *meta.Key, o
 			return err
 		}
 	}
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 
 	m.Lock.Lock()
 	defer m.Lock.Unlock()
@@ -5415,6 +5697,9 @@ func (m *MockGlobalForwardingRules) Delete(ctx context.Context, key *meta.Key) e
 			glog.V(5).Infof("MockGlobalForwardingRules.Delete(%v, %v) = %v", ctx, key, err)
 			return err
 		}
+	}
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 
 	m.Lock.Lock()
@@ -5458,6 +5743,9 @@ type GCEGlobalForwardingRules struct {
 
 // Get the ForwardingRule named by key.
 func (g *GCEGlobalForwardingRules) Get(ctx context.Context, key *meta.Key) (*ga.ForwardingRule, error) {
+	if !key.Valid() {
+		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "GlobalForwardingRules")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -5502,6 +5790,9 @@ func (g *GCEGlobalForwardingRules) List(ctx context.Context, fl *filter.F) ([]*g
 
 // Insert ForwardingRule with key of value obj.
 func (g *GCEGlobalForwardingRules) Insert(ctx context.Context, key *meta.Key, obj *ga.ForwardingRule) error {
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "GlobalForwardingRules")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -5525,6 +5816,9 @@ func (g *GCEGlobalForwardingRules) Insert(ctx context.Context, key *meta.Key, ob
 
 // Delete the ForwardingRule referenced by key.
 func (g *GCEGlobalForwardingRules) Delete(ctx context.Context, key *meta.Key) error {
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "GlobalForwardingRules")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -5548,6 +5842,9 @@ func (g *GCEGlobalForwardingRules) Delete(ctx context.Context, key *meta.Key) er
 
 // SetTarget is a method on GCEGlobalForwardingRules.
 func (g *GCEGlobalForwardingRules) SetTarget(ctx context.Context, key *meta.Key, arg0 *ga.TargetReference) error {
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "GlobalForwardingRules")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -5624,6 +5921,9 @@ func (m *MockHealthChecks) Get(ctx context.Context, key *meta.Key) (*ga.HealthCh
 			return obj, err
 		}
 	}
+	if !key.Valid() {
+		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 
 	m.Lock.Lock()
 	defer m.Lock.Unlock()
@@ -5685,6 +5985,9 @@ func (m *MockHealthChecks) Insert(ctx context.Context, key *meta.Key, obj *ga.He
 			return err
 		}
 	}
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 
 	m.Lock.Lock()
 	defer m.Lock.Unlock()
@@ -5719,6 +6022,9 @@ func (m *MockHealthChecks) Delete(ctx context.Context, key *meta.Key) error {
 			glog.V(5).Infof("MockHealthChecks.Delete(%v, %v) = %v", ctx, key, err)
 			return err
 		}
+	}
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 
 	m.Lock.Lock()
@@ -5762,6 +6068,9 @@ type GCEHealthChecks struct {
 
 // Get the HealthCheck named by key.
 func (g *GCEHealthChecks) Get(ctx context.Context, key *meta.Key) (*ga.HealthCheck, error) {
+	if !key.Valid() {
+		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "HealthChecks")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -5806,6 +6115,9 @@ func (g *GCEHealthChecks) List(ctx context.Context, fl *filter.F) ([]*ga.HealthC
 
 // Insert HealthCheck with key of value obj.
 func (g *GCEHealthChecks) Insert(ctx context.Context, key *meta.Key, obj *ga.HealthCheck) error {
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "HealthChecks")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -5829,6 +6141,9 @@ func (g *GCEHealthChecks) Insert(ctx context.Context, key *meta.Key, obj *ga.Hea
 
 // Delete the HealthCheck referenced by key.
 func (g *GCEHealthChecks) Delete(ctx context.Context, key *meta.Key) error {
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "HealthChecks")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -5852,6 +6167,9 @@ func (g *GCEHealthChecks) Delete(ctx context.Context, key *meta.Key) error {
 
 // Update is a method on GCEHealthChecks.
 func (g *GCEHealthChecks) Update(ctx context.Context, key *meta.Key, arg0 *ga.HealthCheck) error {
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "HealthChecks")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -5928,6 +6246,9 @@ func (m *MockAlphaHealthChecks) Get(ctx context.Context, key *meta.Key) (*alpha.
 			return obj, err
 		}
 	}
+	if !key.Valid() {
+		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 
 	m.Lock.Lock()
 	defer m.Lock.Unlock()
@@ -5989,6 +6310,9 @@ func (m *MockAlphaHealthChecks) Insert(ctx context.Context, key *meta.Key, obj *
 			return err
 		}
 	}
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 
 	m.Lock.Lock()
 	defer m.Lock.Unlock()
@@ -6023,6 +6347,9 @@ func (m *MockAlphaHealthChecks) Delete(ctx context.Context, key *meta.Key) error
 			glog.V(5).Infof("MockAlphaHealthChecks.Delete(%v, %v) = %v", ctx, key, err)
 			return err
 		}
+	}
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 
 	m.Lock.Lock()
@@ -6066,6 +6393,9 @@ type GCEAlphaHealthChecks struct {
 
 // Get the HealthCheck named by key.
 func (g *GCEAlphaHealthChecks) Get(ctx context.Context, key *meta.Key) (*alpha.HealthCheck, error) {
+	if !key.Valid() {
+		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "alpha", "HealthChecks")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -6110,6 +6440,9 @@ func (g *GCEAlphaHealthChecks) List(ctx context.Context, fl *filter.F) ([]*alpha
 
 // Insert HealthCheck with key of value obj.
 func (g *GCEAlphaHealthChecks) Insert(ctx context.Context, key *meta.Key, obj *alpha.HealthCheck) error {
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "alpha", "HealthChecks")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -6133,6 +6466,9 @@ func (g *GCEAlphaHealthChecks) Insert(ctx context.Context, key *meta.Key, obj *a
 
 // Delete the HealthCheck referenced by key.
 func (g *GCEAlphaHealthChecks) Delete(ctx context.Context, key *meta.Key) error {
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "alpha", "HealthChecks")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -6156,6 +6492,9 @@ func (g *GCEAlphaHealthChecks) Delete(ctx context.Context, key *meta.Key) error 
 
 // Update is a method on GCEAlphaHealthChecks.
 func (g *GCEAlphaHealthChecks) Update(ctx context.Context, key *meta.Key, arg0 *alpha.HealthCheck) error {
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "alpha", "HealthChecks")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -6232,6 +6571,9 @@ func (m *MockHttpHealthChecks) Get(ctx context.Context, key *meta.Key) (*ga.Http
 			return obj, err
 		}
 	}
+	if !key.Valid() {
+		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 
 	m.Lock.Lock()
 	defer m.Lock.Unlock()
@@ -6293,6 +6635,9 @@ func (m *MockHttpHealthChecks) Insert(ctx context.Context, key *meta.Key, obj *g
 			return err
 		}
 	}
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 
 	m.Lock.Lock()
 	defer m.Lock.Unlock()
@@ -6327,6 +6672,9 @@ func (m *MockHttpHealthChecks) Delete(ctx context.Context, key *meta.Key) error 
 			glog.V(5).Infof("MockHttpHealthChecks.Delete(%v, %v) = %v", ctx, key, err)
 			return err
 		}
+	}
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 
 	m.Lock.Lock()
@@ -6370,6 +6718,9 @@ type GCEHttpHealthChecks struct {
 
 // Get the HttpHealthCheck named by key.
 func (g *GCEHttpHealthChecks) Get(ctx context.Context, key *meta.Key) (*ga.HttpHealthCheck, error) {
+	if !key.Valid() {
+		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "HttpHealthChecks")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -6414,6 +6765,9 @@ func (g *GCEHttpHealthChecks) List(ctx context.Context, fl *filter.F) ([]*ga.Htt
 
 // Insert HttpHealthCheck with key of value obj.
 func (g *GCEHttpHealthChecks) Insert(ctx context.Context, key *meta.Key, obj *ga.HttpHealthCheck) error {
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "HttpHealthChecks")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -6437,6 +6791,9 @@ func (g *GCEHttpHealthChecks) Insert(ctx context.Context, key *meta.Key, obj *ga
 
 // Delete the HttpHealthCheck referenced by key.
 func (g *GCEHttpHealthChecks) Delete(ctx context.Context, key *meta.Key) error {
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "HttpHealthChecks")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -6460,6 +6817,9 @@ func (g *GCEHttpHealthChecks) Delete(ctx context.Context, key *meta.Key) error {
 
 // Update is a method on GCEHttpHealthChecks.
 func (g *GCEHttpHealthChecks) Update(ctx context.Context, key *meta.Key, arg0 *ga.HttpHealthCheck) error {
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "HttpHealthChecks")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -6536,6 +6896,9 @@ func (m *MockHttpsHealthChecks) Get(ctx context.Context, key *meta.Key) (*ga.Htt
 			return obj, err
 		}
 	}
+	if !key.Valid() {
+		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 
 	m.Lock.Lock()
 	defer m.Lock.Unlock()
@@ -6597,6 +6960,9 @@ func (m *MockHttpsHealthChecks) Insert(ctx context.Context, key *meta.Key, obj *
 			return err
 		}
 	}
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 
 	m.Lock.Lock()
 	defer m.Lock.Unlock()
@@ -6631,6 +6997,9 @@ func (m *MockHttpsHealthChecks) Delete(ctx context.Context, key *meta.Key) error
 			glog.V(5).Infof("MockHttpsHealthChecks.Delete(%v, %v) = %v", ctx, key, err)
 			return err
 		}
+	}
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 
 	m.Lock.Lock()
@@ -6674,6 +7043,9 @@ type GCEHttpsHealthChecks struct {
 
 // Get the HttpsHealthCheck named by key.
 func (g *GCEHttpsHealthChecks) Get(ctx context.Context, key *meta.Key) (*ga.HttpsHealthCheck, error) {
+	if !key.Valid() {
+		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "HttpsHealthChecks")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -6718,6 +7090,9 @@ func (g *GCEHttpsHealthChecks) List(ctx context.Context, fl *filter.F) ([]*ga.Ht
 
 // Insert HttpsHealthCheck with key of value obj.
 func (g *GCEHttpsHealthChecks) Insert(ctx context.Context, key *meta.Key, obj *ga.HttpsHealthCheck) error {
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "HttpsHealthChecks")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -6741,6 +7116,9 @@ func (g *GCEHttpsHealthChecks) Insert(ctx context.Context, key *meta.Key, obj *g
 
 // Delete the HttpsHealthCheck referenced by key.
 func (g *GCEHttpsHealthChecks) Delete(ctx context.Context, key *meta.Key) error {
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "HttpsHealthChecks")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -6764,6 +7142,9 @@ func (g *GCEHttpsHealthChecks) Delete(ctx context.Context, key *meta.Key) error 
 
 // Update is a method on GCEHttpsHealthChecks.
 func (g *GCEHttpsHealthChecks) Update(ctx context.Context, key *meta.Key, arg0 *ga.HttpsHealthCheck) error {
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "HttpsHealthChecks")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -6846,6 +7227,9 @@ func (m *MockInstanceGroups) Get(ctx context.Context, key *meta.Key) (*ga.Instan
 			return obj, err
 		}
 	}
+	if !key.Valid() {
+		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 
 	m.Lock.Lock()
 	defer m.Lock.Unlock()
@@ -6910,6 +7294,9 @@ func (m *MockInstanceGroups) Insert(ctx context.Context, key *meta.Key, obj *ga.
 			return err
 		}
 	}
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 
 	m.Lock.Lock()
 	defer m.Lock.Unlock()
@@ -6944,6 +7331,9 @@ func (m *MockInstanceGroups) Delete(ctx context.Context, key *meta.Key) error {
 			glog.V(5).Infof("MockInstanceGroups.Delete(%v, %v) = %v", ctx, key, err)
 			return err
 		}
+	}
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 
 	m.Lock.Lock()
@@ -7011,6 +7401,9 @@ type GCEInstanceGroups struct {
 
 // Get the InstanceGroup named by key.
 func (g *GCEInstanceGroups) Get(ctx context.Context, key *meta.Key) (*ga.InstanceGroup, error) {
+	if !key.Valid() {
+		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "InstanceGroups")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -7055,6 +7448,9 @@ func (g *GCEInstanceGroups) List(ctx context.Context, zone string, fl *filter.F)
 
 // Insert InstanceGroup with key of value obj.
 func (g *GCEInstanceGroups) Insert(ctx context.Context, key *meta.Key, obj *ga.InstanceGroup) error {
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "InstanceGroups")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -7078,6 +7474,9 @@ func (g *GCEInstanceGroups) Insert(ctx context.Context, key *meta.Key, obj *ga.I
 
 // Delete the InstanceGroup referenced by key.
 func (g *GCEInstanceGroups) Delete(ctx context.Context, key *meta.Key) error {
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "InstanceGroups")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -7100,6 +7499,9 @@ func (g *GCEInstanceGroups) Delete(ctx context.Context, key *meta.Key) error {
 
 // AddInstances is a method on GCEInstanceGroups.
 func (g *GCEInstanceGroups) AddInstances(ctx context.Context, key *meta.Key, arg0 *ga.InstanceGroupsAddInstancesRequest) error {
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "InstanceGroups")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -7121,6 +7523,9 @@ func (g *GCEInstanceGroups) AddInstances(ctx context.Context, key *meta.Key, arg
 
 // ListInstances is a method on GCEInstanceGroups.
 func (g *GCEInstanceGroups) ListInstances(ctx context.Context, key *meta.Key, arg0 *ga.InstanceGroupsListInstancesRequest, fl *filter.F) ([]*ga.InstanceWithNamedPorts, error) {
+	if !key.Valid() {
+		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "InstanceGroups")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -7145,6 +7550,9 @@ func (g *GCEInstanceGroups) ListInstances(ctx context.Context, key *meta.Key, ar
 
 // RemoveInstances is a method on GCEInstanceGroups.
 func (g *GCEInstanceGroups) RemoveInstances(ctx context.Context, key *meta.Key, arg0 *ga.InstanceGroupsRemoveInstancesRequest) error {
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "InstanceGroups")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -7166,6 +7574,9 @@ func (g *GCEInstanceGroups) RemoveInstances(ctx context.Context, key *meta.Key, 
 
 // SetNamedPorts is a method on GCEInstanceGroups.
 func (g *GCEInstanceGroups) SetNamedPorts(ctx context.Context, key *meta.Key, arg0 *ga.InstanceGroupsSetNamedPortsRequest) error {
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "InstanceGroups")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -7244,6 +7655,9 @@ func (m *MockInstances) Get(ctx context.Context, key *meta.Key) (*ga.Instance, e
 			return obj, err
 		}
 	}
+	if !key.Valid() {
+		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 
 	m.Lock.Lock()
 	defer m.Lock.Unlock()
@@ -7308,6 +7722,9 @@ func (m *MockInstances) Insert(ctx context.Context, key *meta.Key, obj *ga.Insta
 			return err
 		}
 	}
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 
 	m.Lock.Lock()
 	defer m.Lock.Unlock()
@@ -7342,6 +7759,9 @@ func (m *MockInstances) Delete(ctx context.Context, key *meta.Key) error {
 			glog.V(5).Infof("MockInstances.Delete(%v, %v) = %v", ctx, key, err)
 			return err
 		}
+	}
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 
 	m.Lock.Lock()
@@ -7393,6 +7813,9 @@ type GCEInstances struct {
 
 // Get the Instance named by key.
 func (g *GCEInstances) Get(ctx context.Context, key *meta.Key) (*ga.Instance, error) {
+	if !key.Valid() {
+		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "Instances")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -7437,6 +7860,9 @@ func (g *GCEInstances) List(ctx context.Context, zone string, fl *filter.F) ([]*
 
 // Insert Instance with key of value obj.
 func (g *GCEInstances) Insert(ctx context.Context, key *meta.Key, obj *ga.Instance) error {
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "Instances")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -7460,6 +7886,9 @@ func (g *GCEInstances) Insert(ctx context.Context, key *meta.Key, obj *ga.Instan
 
 // Delete the Instance referenced by key.
 func (g *GCEInstances) Delete(ctx context.Context, key *meta.Key) error {
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "Instances")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -7482,6 +7911,9 @@ func (g *GCEInstances) Delete(ctx context.Context, key *meta.Key) error {
 
 // AttachDisk is a method on GCEInstances.
 func (g *GCEInstances) AttachDisk(ctx context.Context, key *meta.Key, arg0 *ga.AttachedDisk) error {
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "Instances")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -7503,6 +7935,9 @@ func (g *GCEInstances) AttachDisk(ctx context.Context, key *meta.Key, arg0 *ga.A
 
 // DetachDisk is a method on GCEInstances.
 func (g *GCEInstances) DetachDisk(ctx context.Context, key *meta.Key, arg0 string) error {
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "Instances")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -7581,6 +8016,9 @@ func (m *MockBetaInstances) Get(ctx context.Context, key *meta.Key) (*beta.Insta
 			return obj, err
 		}
 	}
+	if !key.Valid() {
+		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 
 	m.Lock.Lock()
 	defer m.Lock.Unlock()
@@ -7645,6 +8083,9 @@ func (m *MockBetaInstances) Insert(ctx context.Context, key *meta.Key, obj *beta
 			return err
 		}
 	}
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 
 	m.Lock.Lock()
 	defer m.Lock.Unlock()
@@ -7679,6 +8120,9 @@ func (m *MockBetaInstances) Delete(ctx context.Context, key *meta.Key) error {
 			glog.V(5).Infof("MockBetaInstances.Delete(%v, %v) = %v", ctx, key, err)
 			return err
 		}
+	}
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 
 	m.Lock.Lock()
@@ -7730,6 +8174,9 @@ type GCEBetaInstances struct {
 
 // Get the Instance named by key.
 func (g *GCEBetaInstances) Get(ctx context.Context, key *meta.Key) (*beta.Instance, error) {
+	if !key.Valid() {
+		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "beta", "Instances")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -7774,6 +8221,9 @@ func (g *GCEBetaInstances) List(ctx context.Context, zone string, fl *filter.F) 
 
 // Insert Instance with key of value obj.
 func (g *GCEBetaInstances) Insert(ctx context.Context, key *meta.Key, obj *beta.Instance) error {
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "beta", "Instances")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -7797,6 +8247,9 @@ func (g *GCEBetaInstances) Insert(ctx context.Context, key *meta.Key, obj *beta.
 
 // Delete the Instance referenced by key.
 func (g *GCEBetaInstances) Delete(ctx context.Context, key *meta.Key) error {
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "beta", "Instances")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -7819,6 +8272,9 @@ func (g *GCEBetaInstances) Delete(ctx context.Context, key *meta.Key) error {
 
 // AttachDisk is a method on GCEBetaInstances.
 func (g *GCEBetaInstances) AttachDisk(ctx context.Context, key *meta.Key, arg0 *beta.AttachedDisk) error {
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "beta", "Instances")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -7840,6 +8296,9 @@ func (g *GCEBetaInstances) AttachDisk(ctx context.Context, key *meta.Key, arg0 *
 
 // DetachDisk is a method on GCEBetaInstances.
 func (g *GCEBetaInstances) DetachDisk(ctx context.Context, key *meta.Key, arg0 string) error {
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "beta", "Instances")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -7920,6 +8379,9 @@ func (m *MockAlphaInstances) Get(ctx context.Context, key *meta.Key) (*alpha.Ins
 			return obj, err
 		}
 	}
+	if !key.Valid() {
+		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 
 	m.Lock.Lock()
 	defer m.Lock.Unlock()
@@ -7984,6 +8446,9 @@ func (m *MockAlphaInstances) Insert(ctx context.Context, key *meta.Key, obj *alp
 			return err
 		}
 	}
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 
 	m.Lock.Lock()
 	defer m.Lock.Unlock()
@@ -8018,6 +8483,9 @@ func (m *MockAlphaInstances) Delete(ctx context.Context, key *meta.Key) error {
 			glog.V(5).Infof("MockAlphaInstances.Delete(%v, %v) = %v", ctx, key, err)
 			return err
 		}
+	}
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 
 	m.Lock.Lock()
@@ -8077,6 +8545,9 @@ type GCEAlphaInstances struct {
 
 // Get the Instance named by key.
 func (g *GCEAlphaInstances) Get(ctx context.Context, key *meta.Key) (*alpha.Instance, error) {
+	if !key.Valid() {
+		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "alpha", "Instances")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -8121,6 +8592,9 @@ func (g *GCEAlphaInstances) List(ctx context.Context, zone string, fl *filter.F)
 
 // Insert Instance with key of value obj.
 func (g *GCEAlphaInstances) Insert(ctx context.Context, key *meta.Key, obj *alpha.Instance) error {
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "alpha", "Instances")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -8144,6 +8618,9 @@ func (g *GCEAlphaInstances) Insert(ctx context.Context, key *meta.Key, obj *alph
 
 // Delete the Instance referenced by key.
 func (g *GCEAlphaInstances) Delete(ctx context.Context, key *meta.Key) error {
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "alpha", "Instances")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -8166,6 +8643,9 @@ func (g *GCEAlphaInstances) Delete(ctx context.Context, key *meta.Key) error {
 
 // AttachDisk is a method on GCEAlphaInstances.
 func (g *GCEAlphaInstances) AttachDisk(ctx context.Context, key *meta.Key, arg0 *alpha.AttachedDisk) error {
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "alpha", "Instances")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -8187,6 +8667,9 @@ func (g *GCEAlphaInstances) AttachDisk(ctx context.Context, key *meta.Key, arg0 
 
 // DetachDisk is a method on GCEAlphaInstances.
 func (g *GCEAlphaInstances) DetachDisk(ctx context.Context, key *meta.Key, arg0 string) error {
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "alpha", "Instances")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -8208,6 +8691,9 @@ func (g *GCEAlphaInstances) DetachDisk(ctx context.Context, key *meta.Key, arg0 
 
 // UpdateNetworkInterface is a method on GCEAlphaInstances.
 func (g *GCEAlphaInstances) UpdateNetworkInterface(ctx context.Context, key *meta.Key, arg0 string, arg1 *alpha.NetworkInterface) error {
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "alpha", "Instances")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -8291,6 +8777,9 @@ func (m *MockAlphaNetworkEndpointGroups) Get(ctx context.Context, key *meta.Key)
 			return obj, err
 		}
 	}
+	if !key.Valid() {
+		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 
 	m.Lock.Lock()
 	defer m.Lock.Unlock()
@@ -8355,6 +8844,9 @@ func (m *MockAlphaNetworkEndpointGroups) Insert(ctx context.Context, key *meta.K
 			return err
 		}
 	}
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 
 	m.Lock.Lock()
 	defer m.Lock.Unlock()
@@ -8389,6 +8881,9 @@ func (m *MockAlphaNetworkEndpointGroups) Delete(ctx context.Context, key *meta.K
 			glog.V(5).Infof("MockAlphaNetworkEndpointGroups.Delete(%v, %v) = %v", ctx, key, err)
 			return err
 		}
+	}
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 
 	m.Lock.Lock()
@@ -8483,6 +8978,9 @@ type GCEAlphaNetworkEndpointGroups struct {
 
 // Get the NetworkEndpointGroup named by key.
 func (g *GCEAlphaNetworkEndpointGroups) Get(ctx context.Context, key *meta.Key) (*alpha.NetworkEndpointGroup, error) {
+	if !key.Valid() {
+		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "alpha", "NetworkEndpointGroups")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -8527,6 +9025,9 @@ func (g *GCEAlphaNetworkEndpointGroups) List(ctx context.Context, zone string, f
 
 // Insert NetworkEndpointGroup with key of value obj.
 func (g *GCEAlphaNetworkEndpointGroups) Insert(ctx context.Context, key *meta.Key, obj *alpha.NetworkEndpointGroup) error {
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "alpha", "NetworkEndpointGroups")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -8550,6 +9051,9 @@ func (g *GCEAlphaNetworkEndpointGroups) Insert(ctx context.Context, key *meta.Ke
 
 // Delete the NetworkEndpointGroup referenced by key.
 func (g *GCEAlphaNetworkEndpointGroups) Delete(ctx context.Context, key *meta.Key) error {
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "alpha", "NetworkEndpointGroups")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -8604,6 +9108,9 @@ func (g *GCEAlphaNetworkEndpointGroups) AggregatedList(ctx context.Context, fl *
 
 // AttachNetworkEndpoints is a method on GCEAlphaNetworkEndpointGroups.
 func (g *GCEAlphaNetworkEndpointGroups) AttachNetworkEndpoints(ctx context.Context, key *meta.Key, arg0 *alpha.NetworkEndpointGroupsAttachEndpointsRequest) error {
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "alpha", "NetworkEndpointGroups")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -8625,6 +9132,9 @@ func (g *GCEAlphaNetworkEndpointGroups) AttachNetworkEndpoints(ctx context.Conte
 
 // DetachNetworkEndpoints is a method on GCEAlphaNetworkEndpointGroups.
 func (g *GCEAlphaNetworkEndpointGroups) DetachNetworkEndpoints(ctx context.Context, key *meta.Key, arg0 *alpha.NetworkEndpointGroupsDetachEndpointsRequest) error {
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "alpha", "NetworkEndpointGroups")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -8646,6 +9156,9 @@ func (g *GCEAlphaNetworkEndpointGroups) DetachNetworkEndpoints(ctx context.Conte
 
 // ListNetworkEndpoints is a method on GCEAlphaNetworkEndpointGroups.
 func (g *GCEAlphaNetworkEndpointGroups) ListNetworkEndpoints(ctx context.Context, key *meta.Key, arg0 *alpha.NetworkEndpointGroupsListEndpointsRequest, fl *filter.F) ([]*alpha.NetworkEndpointWithHealthStatus, error) {
+	if !key.Valid() {
+		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "alpha", "NetworkEndpointGroups")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -8760,6 +9273,9 @@ func (m *MockRegions) Get(ctx context.Context, key *meta.Key) (*ga.Region, error
 			return obj, err
 		}
 	}
+	if !key.Valid() {
+		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 
 	m.Lock.Lock()
 	defer m.Lock.Unlock()
@@ -8825,6 +9341,9 @@ type GCERegions struct {
 
 // Get the Region named by key.
 func (g *GCERegions) Get(ctx context.Context, key *meta.Key) (*ga.Region, error) {
+	if !key.Valid() {
+		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "Regions")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -8922,6 +9441,9 @@ func (m *MockRoutes) Get(ctx context.Context, key *meta.Key) (*ga.Route, error) 
 			return obj, err
 		}
 	}
+	if !key.Valid() {
+		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 
 	m.Lock.Lock()
 	defer m.Lock.Unlock()
@@ -8983,6 +9505,9 @@ func (m *MockRoutes) Insert(ctx context.Context, key *meta.Key, obj *ga.Route) e
 			return err
 		}
 	}
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 
 	m.Lock.Lock()
 	defer m.Lock.Unlock()
@@ -9018,6 +9543,9 @@ func (m *MockRoutes) Delete(ctx context.Context, key *meta.Key) error {
 			return err
 		}
 	}
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 
 	m.Lock.Lock()
 	defer m.Lock.Unlock()
@@ -9052,6 +9580,9 @@ type GCERoutes struct {
 
 // Get the Route named by key.
 func (g *GCERoutes) Get(ctx context.Context, key *meta.Key) (*ga.Route, error) {
+	if !key.Valid() {
+		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "Routes")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -9096,6 +9627,9 @@ func (g *GCERoutes) List(ctx context.Context, fl *filter.F) ([]*ga.Route, error)
 
 // Insert Route with key of value obj.
 func (g *GCERoutes) Insert(ctx context.Context, key *meta.Key, obj *ga.Route) error {
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "Routes")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -9119,6 +9653,9 @@ func (g *GCERoutes) Insert(ctx context.Context, key *meta.Key, obj *ga.Route) er
 
 // Delete the Route referenced by key.
 func (g *GCERoutes) Delete(ctx context.Context, key *meta.Key) error {
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "Routes")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -9195,6 +9732,9 @@ func (m *MockSslCertificates) Get(ctx context.Context, key *meta.Key) (*ga.SslCe
 			return obj, err
 		}
 	}
+	if !key.Valid() {
+		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 
 	m.Lock.Lock()
 	defer m.Lock.Unlock()
@@ -9256,6 +9796,9 @@ func (m *MockSslCertificates) Insert(ctx context.Context, key *meta.Key, obj *ga
 			return err
 		}
 	}
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 
 	m.Lock.Lock()
 	defer m.Lock.Unlock()
@@ -9291,6 +9834,9 @@ func (m *MockSslCertificates) Delete(ctx context.Context, key *meta.Key) error {
 			return err
 		}
 	}
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 
 	m.Lock.Lock()
 	defer m.Lock.Unlock()
@@ -9325,6 +9871,9 @@ type GCESslCertificates struct {
 
 // Get the SslCertificate named by key.
 func (g *GCESslCertificates) Get(ctx context.Context, key *meta.Key) (*ga.SslCertificate, error) {
+	if !key.Valid() {
+		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "SslCertificates")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -9369,6 +9918,9 @@ func (g *GCESslCertificates) List(ctx context.Context, fl *filter.F) ([]*ga.SslC
 
 // Insert SslCertificate with key of value obj.
 func (g *GCESslCertificates) Insert(ctx context.Context, key *meta.Key, obj *ga.SslCertificate) error {
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "SslCertificates")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -9392,6 +9944,9 @@ func (g *GCESslCertificates) Insert(ctx context.Context, key *meta.Key, obj *ga.
 
 // Delete the SslCertificate referenced by key.
 func (g *GCESslCertificates) Delete(ctx context.Context, key *meta.Key) error {
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "SslCertificates")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -9470,6 +10025,9 @@ func (m *MockTargetHttpProxies) Get(ctx context.Context, key *meta.Key) (*ga.Tar
 			return obj, err
 		}
 	}
+	if !key.Valid() {
+		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 
 	m.Lock.Lock()
 	defer m.Lock.Unlock()
@@ -9531,6 +10089,9 @@ func (m *MockTargetHttpProxies) Insert(ctx context.Context, key *meta.Key, obj *
 			return err
 		}
 	}
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 
 	m.Lock.Lock()
 	defer m.Lock.Unlock()
@@ -9565,6 +10126,9 @@ func (m *MockTargetHttpProxies) Delete(ctx context.Context, key *meta.Key) error
 			glog.V(5).Infof("MockTargetHttpProxies.Delete(%v, %v) = %v", ctx, key, err)
 			return err
 		}
+	}
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 
 	m.Lock.Lock()
@@ -9608,6 +10172,9 @@ type GCETargetHttpProxies struct {
 
 // Get the TargetHttpProxy named by key.
 func (g *GCETargetHttpProxies) Get(ctx context.Context, key *meta.Key) (*ga.TargetHttpProxy, error) {
+	if !key.Valid() {
+		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "TargetHttpProxies")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -9652,6 +10219,9 @@ func (g *GCETargetHttpProxies) List(ctx context.Context, fl *filter.F) ([]*ga.Ta
 
 // Insert TargetHttpProxy with key of value obj.
 func (g *GCETargetHttpProxies) Insert(ctx context.Context, key *meta.Key, obj *ga.TargetHttpProxy) error {
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "TargetHttpProxies")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -9675,6 +10245,9 @@ func (g *GCETargetHttpProxies) Insert(ctx context.Context, key *meta.Key, obj *g
 
 // Delete the TargetHttpProxy referenced by key.
 func (g *GCETargetHttpProxies) Delete(ctx context.Context, key *meta.Key) error {
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "TargetHttpProxies")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -9698,6 +10271,9 @@ func (g *GCETargetHttpProxies) Delete(ctx context.Context, key *meta.Key) error 
 
 // SetUrlMap is a method on GCETargetHttpProxies.
 func (g *GCETargetHttpProxies) SetUrlMap(ctx context.Context, key *meta.Key, arg0 *ga.UrlMapReference) error {
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "TargetHttpProxies")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -9776,6 +10352,9 @@ func (m *MockTargetHttpsProxies) Get(ctx context.Context, key *meta.Key) (*ga.Ta
 			return obj, err
 		}
 	}
+	if !key.Valid() {
+		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 
 	m.Lock.Lock()
 	defer m.Lock.Unlock()
@@ -9837,6 +10416,9 @@ func (m *MockTargetHttpsProxies) Insert(ctx context.Context, key *meta.Key, obj 
 			return err
 		}
 	}
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 
 	m.Lock.Lock()
 	defer m.Lock.Unlock()
@@ -9871,6 +10453,9 @@ func (m *MockTargetHttpsProxies) Delete(ctx context.Context, key *meta.Key) erro
 			glog.V(5).Infof("MockTargetHttpsProxies.Delete(%v, %v) = %v", ctx, key, err)
 			return err
 		}
+	}
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 
 	m.Lock.Lock()
@@ -9922,6 +10507,9 @@ type GCETargetHttpsProxies struct {
 
 // Get the TargetHttpsProxy named by key.
 func (g *GCETargetHttpsProxies) Get(ctx context.Context, key *meta.Key) (*ga.TargetHttpsProxy, error) {
+	if !key.Valid() {
+		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "TargetHttpsProxies")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -9966,6 +10554,9 @@ func (g *GCETargetHttpsProxies) List(ctx context.Context, fl *filter.F) ([]*ga.T
 
 // Insert TargetHttpsProxy with key of value obj.
 func (g *GCETargetHttpsProxies) Insert(ctx context.Context, key *meta.Key, obj *ga.TargetHttpsProxy) error {
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "TargetHttpsProxies")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -9989,6 +10580,9 @@ func (g *GCETargetHttpsProxies) Insert(ctx context.Context, key *meta.Key, obj *
 
 // Delete the TargetHttpsProxy referenced by key.
 func (g *GCETargetHttpsProxies) Delete(ctx context.Context, key *meta.Key) error {
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "TargetHttpsProxies")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -10012,6 +10606,9 @@ func (g *GCETargetHttpsProxies) Delete(ctx context.Context, key *meta.Key) error
 
 // SetSslCertificates is a method on GCETargetHttpsProxies.
 func (g *GCETargetHttpsProxies) SetSslCertificates(ctx context.Context, key *meta.Key, arg0 *ga.TargetHttpsProxiesSetSslCertificatesRequest) error {
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "TargetHttpsProxies")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -10033,6 +10630,9 @@ func (g *GCETargetHttpsProxies) SetSslCertificates(ctx context.Context, key *met
 
 // SetUrlMap is a method on GCETargetHttpsProxies.
 func (g *GCETargetHttpsProxies) SetUrlMap(ctx context.Context, key *meta.Key, arg0 *ga.UrlMapReference) error {
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "TargetHttpsProxies")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -10111,6 +10711,9 @@ func (m *MockTargetPools) Get(ctx context.Context, key *meta.Key) (*ga.TargetPoo
 			return obj, err
 		}
 	}
+	if !key.Valid() {
+		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 
 	m.Lock.Lock()
 	defer m.Lock.Unlock()
@@ -10175,6 +10778,9 @@ func (m *MockTargetPools) Insert(ctx context.Context, key *meta.Key, obj *ga.Tar
 			return err
 		}
 	}
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 
 	m.Lock.Lock()
 	defer m.Lock.Unlock()
@@ -10209,6 +10815,9 @@ func (m *MockTargetPools) Delete(ctx context.Context, key *meta.Key) error {
 			glog.V(5).Infof("MockTargetPools.Delete(%v, %v) = %v", ctx, key, err)
 			return err
 		}
+	}
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 
 	m.Lock.Lock()
@@ -10260,6 +10869,9 @@ type GCETargetPools struct {
 
 // Get the TargetPool named by key.
 func (g *GCETargetPools) Get(ctx context.Context, key *meta.Key) (*ga.TargetPool, error) {
+	if !key.Valid() {
+		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "TargetPools")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -10304,6 +10916,9 @@ func (g *GCETargetPools) List(ctx context.Context, region string, fl *filter.F) 
 
 // Insert TargetPool with key of value obj.
 func (g *GCETargetPools) Insert(ctx context.Context, key *meta.Key, obj *ga.TargetPool) error {
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "TargetPools")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -10327,6 +10942,9 @@ func (g *GCETargetPools) Insert(ctx context.Context, key *meta.Key, obj *ga.Targ
 
 // Delete the TargetPool referenced by key.
 func (g *GCETargetPools) Delete(ctx context.Context, key *meta.Key) error {
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "TargetPools")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -10349,6 +10967,9 @@ func (g *GCETargetPools) Delete(ctx context.Context, key *meta.Key) error {
 
 // AddInstance is a method on GCETargetPools.
 func (g *GCETargetPools) AddInstance(ctx context.Context, key *meta.Key, arg0 *ga.TargetPoolsAddInstanceRequest) error {
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "TargetPools")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -10370,6 +10991,9 @@ func (g *GCETargetPools) AddInstance(ctx context.Context, key *meta.Key, arg0 *g
 
 // RemoveInstance is a method on GCETargetPools.
 func (g *GCETargetPools) RemoveInstance(ctx context.Context, key *meta.Key, arg0 *ga.TargetPoolsRemoveInstanceRequest) error {
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "TargetPools")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -10446,6 +11070,9 @@ func (m *MockUrlMaps) Get(ctx context.Context, key *meta.Key) (*ga.UrlMap, error
 			return obj, err
 		}
 	}
+	if !key.Valid() {
+		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 
 	m.Lock.Lock()
 	defer m.Lock.Unlock()
@@ -10507,6 +11134,9 @@ func (m *MockUrlMaps) Insert(ctx context.Context, key *meta.Key, obj *ga.UrlMap)
 			return err
 		}
 	}
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 
 	m.Lock.Lock()
 	defer m.Lock.Unlock()
@@ -10541,6 +11171,9 @@ func (m *MockUrlMaps) Delete(ctx context.Context, key *meta.Key) error {
 			glog.V(5).Infof("MockUrlMaps.Delete(%v, %v) = %v", ctx, key, err)
 			return err
 		}
+	}
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 
 	m.Lock.Lock()
@@ -10584,6 +11217,9 @@ type GCEUrlMaps struct {
 
 // Get the UrlMap named by key.
 func (g *GCEUrlMaps) Get(ctx context.Context, key *meta.Key) (*ga.UrlMap, error) {
+	if !key.Valid() {
+		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "UrlMaps")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -10628,6 +11264,9 @@ func (g *GCEUrlMaps) List(ctx context.Context, fl *filter.F) ([]*ga.UrlMap, erro
 
 // Insert UrlMap with key of value obj.
 func (g *GCEUrlMaps) Insert(ctx context.Context, key *meta.Key, obj *ga.UrlMap) error {
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "UrlMaps")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -10651,6 +11290,9 @@ func (g *GCEUrlMaps) Insert(ctx context.Context, key *meta.Key, obj *ga.UrlMap) 
 
 // Delete the UrlMap referenced by key.
 func (g *GCEUrlMaps) Delete(ctx context.Context, key *meta.Key) error {
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "UrlMaps")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -10674,6 +11316,9 @@ func (g *GCEUrlMaps) Delete(ctx context.Context, key *meta.Key) error {
 
 // Update is a method on GCEUrlMaps.
 func (g *GCEUrlMaps) Update(ctx context.Context, key *meta.Key, arg0 *ga.UrlMap) error {
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "UrlMaps")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -10740,6 +11385,9 @@ func (m *MockZones) Get(ctx context.Context, key *meta.Key) (*ga.Zone, error) {
 			return obj, err
 		}
 	}
+	if !key.Valid() {
+		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 
 	m.Lock.Lock()
 	defer m.Lock.Unlock()
@@ -10805,6 +11453,9 @@ type GCEZones struct {
 
 // Get the Zone named by key.
 func (g *GCEZones) Get(ctx context.Context, key *meta.Key) (*ga.Zone, error) {
+	if !key.Valid() {
+		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "Zones")
 	rk := &RateLimitKey{
 		ProjectID: projectID,

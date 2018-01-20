@@ -395,6 +395,9 @@ func (m *{{.MockWrapType}}) Get(ctx context.Context, key *meta.Key) (*{{.FQObjec
 			return obj, err
 		}
 	}
+	if ! key.Valid() {
+		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 
 	m.Lock.Lock()
 	defer m.Lock.Unlock()
@@ -510,6 +513,9 @@ func (m *{{.MockWrapType}}) Insert(ctx context.Context, key *meta.Key, obj *{{.F
 			return err
 		}
 	}
+	if ! key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 
 	m.Lock.Lock()
 	defer m.Lock.Unlock()
@@ -546,6 +552,9 @@ func (m *{{.MockWrapType}}) Delete(ctx context.Context, key *meta.Key) error {
 			glog.V(5).Infof("{{.MockWrapType}}.Delete(%v, %v) = %v", ctx, key, err)
 			return err
 		}
+	}
+	if ! key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 
 	m.Lock.Lock()
@@ -648,6 +657,9 @@ type {{.GCEWrapType}} struct {
 {{- if .GenerateGet}}
 // Get the {{.Object}} named by key.
 func (g *{{.GCEWrapType}}) Get(ctx context.Context, key *meta.Key) (*{{.FQObjectType}}, error) {
+	if ! key.Valid() {
+		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "{{.Version}}", "{{.Service}}")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -720,6 +732,9 @@ rk := &RateLimitKey{
 {{- if .GenerateInsert}}
 // Insert {{.Object}} with key of value obj.
 func (g *{{.GCEWrapType}}) Insert(ctx context.Context, key *meta.Key, obj *{{.FQObjectType}}) error {
+	if ! key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "{{.Version}}", "{{.Service}}")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -753,6 +768,9 @@ func (g *{{.GCEWrapType}}) Insert(ctx context.Context, key *meta.Key, obj *{{.FQ
 {{- if .GenerateDelete}}
 // Delete the {{.Object}} referenced by key.
 func (g *{{.GCEWrapType}}) Delete(ctx context.Context, key *meta.Key) error {
+	if ! key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "{{.Version}}", "{{.Service}}")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -820,6 +838,15 @@ func (g *{{.GCEWrapType}}) AggregatedList(ctx context.Context, fl *filter.F) (ma
 {{- range .}}
 // {{.Name}} is a method on {{.GCEWrapType}}.
 func (g *{{.GCEWrapType}}) {{.FcnArgs}} {
+	if ! key.Valid() {
+{{- if .IsOperation}}
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+{{- else if .IsGet}}
+		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+{{- else if .IsPaged}}
+		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+{{- end}}
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "{{.Version}}", "{{.Service}}")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
