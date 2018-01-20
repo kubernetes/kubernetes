@@ -114,7 +114,7 @@ data:
       @id fluentd-containers.log
       @type tail
       path /var/log/containers/*.log
-      pos_file /var/log/fluentd-containers.log.pos
+      pos_file /var/log/es-containers.log.pos
       time_format %Y-%m-%dT%H:%M:%S.%NZ
       tag raw.kubernetes.*
       format json
@@ -153,7 +153,7 @@ data:
       @type tail
       format syslog
       path /var/log/startupscript.log
-      pos_file /var/log/startupscript.log.pos
+      pos_file /var/log/es-startupscript.log.pos
       tag startupscript
     </source>
 
@@ -165,7 +165,7 @@ data:
       @type tail
       format /^time="(?<time>[^)]*)" level=(?<severity>[^ ]*) msg="(?<message>[^"]*)"( err="(?<error>[^"]*)")?( statusCode=($<status_code>\d+))?/
       path /var/log/docker.log
-      pos_file /var/log/docker.log.pos
+      pos_file /var/log/es-docker.log.pos
       tag docker
     </source>
 
@@ -178,7 +178,7 @@ data:
       # parse out of it (like severities).
       format none
       path /var/log/etcd.log
-      pos_file /var/log/etcd.log.pos
+      pos_file /var/log/es-etcd.log.pos
       tag etcd
     </source>
 
@@ -197,7 +197,7 @@ data:
       format1 /^(?<severity>\w)(?<time>\d{4} [^\s]*)\s+(?<pid>\d+)\s+(?<source>[^ \]]+)\] (?<message>.*)/
       time_format %m%d %H:%M:%S.%N
       path /var/log/kubelet.log
-      pos_file /var/log/kubelet.log.pos
+      pos_file /var/log/es-kubelet.log.pos
       tag kubelet
     </source>
 
@@ -212,7 +212,7 @@ data:
       format1 /^(?<severity>\w)(?<time>\d{4} [^\s]*)\s+(?<pid>\d+)\s+(?<source>[^ \]]+)\] (?<message>.*)/
       time_format %m%d %H:%M:%S.%N
       path /var/log/kube-proxy.log
-      pos_file /var/log/kube-proxy.log.pos
+      pos_file /var/log/es-kube-proxy.log.pos
       tag kube-proxy
     </source>
 
@@ -227,7 +227,7 @@ data:
       format1 /^(?<severity>\w)(?<time>\d{4} [^\s]*)\s+(?<pid>\d+)\s+(?<source>[^ \]]+)\] (?<message>.*)/
       time_format %m%d %H:%M:%S.%N
       path /var/log/kube-apiserver.log
-      pos_file /var/log/kube-apiserver.log.pos
+      pos_file /var/log/es-kube-apiserver.log.pos
       tag kube-apiserver
     </source>
 
@@ -242,7 +242,7 @@ data:
       format1 /^(?<severity>\w)(?<time>\d{4} [^\s]*)\s+(?<pid>\d+)\s+(?<source>[^ \]]+)\] (?<message>.*)/
       time_format %m%d %H:%M:%S.%N
       path /var/log/kube-controller-manager.log
-      pos_file /var/log/kube-controller-manager.log.pos
+      pos_file /var/log/es-kube-controller-manager.log.pos
       tag kube-controller-manager
     </source>
 
@@ -257,7 +257,7 @@ data:
       format1 /^(?<severity>\w)(?<time>\d{4} [^\s]*)\s+(?<pid>\d+)\s+(?<source>[^ \]]+)\] (?<message>.*)/
       time_format %m%d %H:%M:%S.%N
       path /var/log/kube-scheduler.log
-      pos_file /var/log/kube-scheduler.log.pos
+      pos_file /var/log/es-kube-scheduler.log.pos
       tag kube-scheduler
     </source>
 
@@ -272,7 +272,7 @@ data:
       format1 /^(?<severity>\w)(?<time>\d{4} [^\s]*)\s+(?<pid>\d+)\s+(?<source>[^ \]]+)\] (?<message>.*)/
       time_format %m%d %H:%M:%S.%N
       path /var/log/rescheduler.log
-      pos_file /var/log/rescheduler.log.pos
+      pos_file /var/log/es-rescheduler.log.pos
       tag rescheduler
     </source>
 
@@ -287,7 +287,7 @@ data:
       format1 /^(?<severity>\w)(?<time>\d{4} [^\s]*)\s+(?<pid>\d+)\s+(?<source>[^ \]]+)\] (?<message>.*)/
       time_format %m%d %H:%M:%S.%N
       path /var/log/glbc.log
-      pos_file /var/log/glbc.log.pos
+      pos_file /var/log/es-glbc.log.pos
       tag glbc
     </source>
 
@@ -302,7 +302,7 @@ data:
       format1 /^(?<severity>\w)(?<time>\d{4} [^\s]*)\s+(?<pid>\d+)\s+(?<source>[^ \]]+)\] (?<message>.*)/
       time_format %m%d %H:%M:%S.%N
       path /var/log/cluster-autoscaler.log
-      pos_file /var/log/cluster-autoscaler.log.pos
+      pos_file /var/log/es-cluster-autoscaler.log.pos
       tag cluster-autoscaler
     </source>
 
@@ -311,7 +311,6 @@ data:
       @id journald-docker
       @type systemd
       filters [{ "_SYSTEMD_UNIT": "docker.service" }]
-      #pos_file /var/log/journald-docker.pos
       <storage>
         @type local
         persistent true
