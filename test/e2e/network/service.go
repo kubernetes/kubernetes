@@ -25,6 +25,8 @@ import (
 	"strings"
 	"time"
 
+	compute "google.golang.org/api/compute/v1"
+
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -572,16 +574,23 @@ var _ = SIGDescribe("Services", func() {
 		if framework.ProviderIs("gce", "gke") {
 			By("creating a static load balancer IP")
 			staticIPName = fmt.Sprintf("e2e-external-lb-test-%s", framework.RunId)
-			requestedIP, err = framework.CreateGCEStaticIP(staticIPName)
+			gceCloud, err := framework.GetGCECloud()
+			Expect(err).NotTo(HaveOccurred())
+
+			err = gceCloud.ReserveRegionAddress(&compute.Address{Name: staticIPName}, gceCloud.Region())
 			defer func() {
 				if staticIPName != "" {
 					// Release GCE static IP - this is not kube-managed and will not be automatically released.
-					if err := framework.DeleteGCEStaticIP(staticIPName); err != nil {
+					if err := gceCloud.DeleteRegionAddress(staticIPName, gceCloud.Region()); err != nil {
 						framework.Logf("failed to release static IP %s: %v", staticIPName, err)
 					}
 				}
 			}()
 			Expect(err).NotTo(HaveOccurred())
+			reservedAddr, err := gceCloud.GetRegionAddress(staticIPName, gceCloud.Region())
+			Expect(err).NotTo(HaveOccurred())
+
+			requestedIP = reservedAddr.Address
 			framework.Logf("Allocated static load balancer IP: %s", requestedIP)
 		}
 
@@ -622,9 +631,11 @@ var _ = SIGDescribe("Services", func() {
 			// coming from, so this is first-aid rather than surgery).
 			By("demoting the static IP to ephemeral")
 			if staticIPName != "" {
+				gceCloud, err := framework.GetGCECloud()
+				Expect(err).NotTo(HaveOccurred())
 				// Deleting it after it is attached "demotes" it to an
 				// ephemeral IP, which can be auto-released.
-				if err := framework.DeleteGCEStaticIP(staticIPName); err != nil {
+				if err := gceCloud.DeleteRegionAddress(staticIPName, gceCloud.Region()); err != nil {
 					framework.Failf("failed to release static IP %s: %v", staticIPName, err)
 				}
 				staticIPName = ""
