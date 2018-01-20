@@ -1382,8 +1382,11 @@ type GCEAddresses struct {
 
 // Get the Address named by key.
 func (g *GCEAddresses) Get(ctx context.Context, key *meta.Key) (*ga.Address, error) {
+	glog.V(5).Infof("GCEAddresses.Get(%v, %v): called", ctx, key)
+
 	if !key.Valid() {
-		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+		glog.V(2).Infof("GCEAddresses.Get(%v, %v): key is invalid (%#v)", ctx, key, key)
+		return nil, fmt.Errorf("invalid GCE key (%#v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "Addresses")
 	rk := &RateLimitKey{
@@ -1392,16 +1395,21 @@ func (g *GCEAddresses) Get(ctx context.Context, key *meta.Key) (*ga.Address, err
 		Version:   meta.Version("ga"),
 		Service:   "Addresses",
 	}
+	glog.V(5).Infof("GCEAddresses.Get(%v, %v): projectID = %v, rk = %+v", ctx, key, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEAddresses.Get(%v, %v): RateLimiter error: %v", ctx, key, err)
 		return nil, err
 	}
 	call := g.s.GA.Addresses.Get(projectID, key.Region, key.Name)
 	call.Context(ctx)
-	return call.Do()
+	v, err := call.Do()
+	glog.V(4).Infof("GCEAddresses.Get(%v, %v) = %+v, %v", ctx, key, v, err)
+	return v, err
 }
 
 // List all Address objects.
 func (g *GCEAddresses) List(ctx context.Context, region string, fl *filter.F) ([]*ga.Address, error) {
+	glog.V(5).Infof("GCEAddresses.List(%v, %v, %v) called", ctx, region, fl)
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "Addresses")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -1412,24 +1420,40 @@ func (g *GCEAddresses) List(ctx context.Context, region string, fl *filter.F) ([
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
 		return nil, err
 	}
+	glog.V(5).Infof("GCEAddresses.List(%v, %v, %v): projectID = %v, rk = %+v", ctx, region, fl, projectID, rk)
 	call := g.s.GA.Addresses.List(projectID, region)
 	if fl != filter.None {
 		call.Filter(fl.String())
 	}
 	var all []*ga.Address
 	f := func(l *ga.AddressList) error {
+		glog.V(5).Infof("GCEAddresses.List(%v, ..., %v): page %+v", ctx, fl, l)
 		all = append(all, l.Items...)
 		return nil
 	}
 	if err := call.Pages(ctx, f); err != nil {
+		glog.V(4).Infof("GCEAddresses.List(%v, ..., %v) = %v, %v", ctx, fl, nil, err)
 		return nil, err
 	}
+
+	if glog.V(4) {
+		glog.V(4).Infof("GCEAddresses.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
+	} else if glog.V(5) {
+		var asStr []string
+		for _, o := range all {
+			asStr = append(asStr, fmt.Sprintf("%+v", o))
+		}
+		glog.V(5).Infof("GCEAddresses.List(%v, ..., %v) = %v, %v", ctx, fl, asStr, nil)
+	}
+
 	return all, nil
 }
 
 // Insert Address with key of value obj.
 func (g *GCEAddresses) Insert(ctx context.Context, key *meta.Key, obj *ga.Address) error {
+	glog.V(5).Infof("GCEAddresses.Insert(%v, %v, %+v): called", ctx, key, obj)
 	if !key.Valid() {
+		glog.V(2).Infof("GCEAddresses.Insert(%v, %v, ...): key is invalid (%#v)", ctx, key, key)
 		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "Addresses")
@@ -1439,7 +1463,9 @@ func (g *GCEAddresses) Insert(ctx context.Context, key *meta.Key, obj *ga.Addres
 		Version:   meta.Version("ga"),
 		Service:   "Addresses",
 	}
+	glog.V(5).Infof("GCEAddresses.Insert(%v, %v, ...): projectID = %v, rk = %+v", ctx, key, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEAddresses.Insert(%v, %v, ...): RateLimiter error: %v", ctx, key, err)
 		return err
 	}
 	obj.Name = key.Name
@@ -1448,14 +1474,20 @@ func (g *GCEAddresses) Insert(ctx context.Context, key *meta.Key, obj *ga.Addres
 
 	op, err := call.Do()
 	if err != nil {
+		glog.V(4).Infof("GCEAddresses.Insert(%v, %v, ...) = %+v", ctx, key, err)
 		return err
 	}
-	return g.s.WaitForCompletion(ctx, op)
+
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCEAddresses.Insert(%v, %v, %+v) = %+v", ctx, key, obj, err)
+	return err
 }
 
 // Delete the Address referenced by key.
 func (g *GCEAddresses) Delete(ctx context.Context, key *meta.Key) error {
+	glog.V(5).Infof("GCEAddresses.Delete(%v, %v): called", ctx, key)
 	if !key.Valid() {
+		glog.V(2).Infof("GCEAddresses.Delete(%v, %v): key is invalid (%#v)", ctx, key, key)
 		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "Addresses")
@@ -1465,7 +1497,9 @@ func (g *GCEAddresses) Delete(ctx context.Context, key *meta.Key) error {
 		Version:   meta.Version("ga"),
 		Service:   "Addresses",
 	}
+	glog.V(5).Infof("GCEAddresses.Delete(%v, %v): projectID = %v, rk = %+v", ctx, key, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEAddresses.Delete(%v, %v): RateLimiter error: %v", ctx, key, err)
 		return err
 	}
 	call := g.s.GA.Addresses.Delete(projectID, key.Region, key.Name)
@@ -1473,9 +1507,13 @@ func (g *GCEAddresses) Delete(ctx context.Context, key *meta.Key) error {
 
 	op, err := call.Do()
 	if err != nil {
+		glog.V(4).Infof("GCEAddresses.Delete(%v, %v) = %v", ctx, key, err)
 		return err
 	}
-	return g.s.WaitForCompletion(ctx, op)
+
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCEAddresses.Delete(%v, %v) = %v", ctx, key, err)
+	return err
 }
 
 // AlphaAddresses is an interface that allows for mocking of Addresses.
@@ -1675,8 +1713,11 @@ type GCEAlphaAddresses struct {
 
 // Get the Address named by key.
 func (g *GCEAlphaAddresses) Get(ctx context.Context, key *meta.Key) (*alpha.Address, error) {
+	glog.V(5).Infof("GCEAlphaAddresses.Get(%v, %v): called", ctx, key)
+
 	if !key.Valid() {
-		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+		glog.V(2).Infof("GCEAlphaAddresses.Get(%v, %v): key is invalid (%#v)", ctx, key, key)
+		return nil, fmt.Errorf("invalid GCE key (%#v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "alpha", "Addresses")
 	rk := &RateLimitKey{
@@ -1685,16 +1726,21 @@ func (g *GCEAlphaAddresses) Get(ctx context.Context, key *meta.Key) (*alpha.Addr
 		Version:   meta.Version("alpha"),
 		Service:   "Addresses",
 	}
+	glog.V(5).Infof("GCEAlphaAddresses.Get(%v, %v): projectID = %v, rk = %+v", ctx, key, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEAlphaAddresses.Get(%v, %v): RateLimiter error: %v", ctx, key, err)
 		return nil, err
 	}
 	call := g.s.Alpha.Addresses.Get(projectID, key.Region, key.Name)
 	call.Context(ctx)
-	return call.Do()
+	v, err := call.Do()
+	glog.V(4).Infof("GCEAlphaAddresses.Get(%v, %v) = %+v, %v", ctx, key, v, err)
+	return v, err
 }
 
 // List all Address objects.
 func (g *GCEAlphaAddresses) List(ctx context.Context, region string, fl *filter.F) ([]*alpha.Address, error) {
+	glog.V(5).Infof("GCEAlphaAddresses.List(%v, %v, %v) called", ctx, region, fl)
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "alpha", "Addresses")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -1705,24 +1751,40 @@ func (g *GCEAlphaAddresses) List(ctx context.Context, region string, fl *filter.
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
 		return nil, err
 	}
+	glog.V(5).Infof("GCEAlphaAddresses.List(%v, %v, %v): projectID = %v, rk = %+v", ctx, region, fl, projectID, rk)
 	call := g.s.Alpha.Addresses.List(projectID, region)
 	if fl != filter.None {
 		call.Filter(fl.String())
 	}
 	var all []*alpha.Address
 	f := func(l *alpha.AddressList) error {
+		glog.V(5).Infof("GCEAlphaAddresses.List(%v, ..., %v): page %+v", ctx, fl, l)
 		all = append(all, l.Items...)
 		return nil
 	}
 	if err := call.Pages(ctx, f); err != nil {
+		glog.V(4).Infof("GCEAlphaAddresses.List(%v, ..., %v) = %v, %v", ctx, fl, nil, err)
 		return nil, err
 	}
+
+	if glog.V(4) {
+		glog.V(4).Infof("GCEAlphaAddresses.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
+	} else if glog.V(5) {
+		var asStr []string
+		for _, o := range all {
+			asStr = append(asStr, fmt.Sprintf("%+v", o))
+		}
+		glog.V(5).Infof("GCEAlphaAddresses.List(%v, ..., %v) = %v, %v", ctx, fl, asStr, nil)
+	}
+
 	return all, nil
 }
 
 // Insert Address with key of value obj.
 func (g *GCEAlphaAddresses) Insert(ctx context.Context, key *meta.Key, obj *alpha.Address) error {
+	glog.V(5).Infof("GCEAlphaAddresses.Insert(%v, %v, %+v): called", ctx, key, obj)
 	if !key.Valid() {
+		glog.V(2).Infof("GCEAlphaAddresses.Insert(%v, %v, ...): key is invalid (%#v)", ctx, key, key)
 		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "alpha", "Addresses")
@@ -1732,7 +1794,9 @@ func (g *GCEAlphaAddresses) Insert(ctx context.Context, key *meta.Key, obj *alph
 		Version:   meta.Version("alpha"),
 		Service:   "Addresses",
 	}
+	glog.V(5).Infof("GCEAlphaAddresses.Insert(%v, %v, ...): projectID = %v, rk = %+v", ctx, key, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEAlphaAddresses.Insert(%v, %v, ...): RateLimiter error: %v", ctx, key, err)
 		return err
 	}
 	obj.Name = key.Name
@@ -1741,14 +1805,20 @@ func (g *GCEAlphaAddresses) Insert(ctx context.Context, key *meta.Key, obj *alph
 
 	op, err := call.Do()
 	if err != nil {
+		glog.V(4).Infof("GCEAlphaAddresses.Insert(%v, %v, ...) = %+v", ctx, key, err)
 		return err
 	}
-	return g.s.WaitForCompletion(ctx, op)
+
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCEAlphaAddresses.Insert(%v, %v, %+v) = %+v", ctx, key, obj, err)
+	return err
 }
 
 // Delete the Address referenced by key.
 func (g *GCEAlphaAddresses) Delete(ctx context.Context, key *meta.Key) error {
+	glog.V(5).Infof("GCEAlphaAddresses.Delete(%v, %v): called", ctx, key)
 	if !key.Valid() {
+		glog.V(2).Infof("GCEAlphaAddresses.Delete(%v, %v): key is invalid (%#v)", ctx, key, key)
 		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "alpha", "Addresses")
@@ -1758,7 +1828,9 @@ func (g *GCEAlphaAddresses) Delete(ctx context.Context, key *meta.Key) error {
 		Version:   meta.Version("alpha"),
 		Service:   "Addresses",
 	}
+	glog.V(5).Infof("GCEAlphaAddresses.Delete(%v, %v): projectID = %v, rk = %+v", ctx, key, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEAlphaAddresses.Delete(%v, %v): RateLimiter error: %v", ctx, key, err)
 		return err
 	}
 	call := g.s.Alpha.Addresses.Delete(projectID, key.Region, key.Name)
@@ -1766,9 +1838,13 @@ func (g *GCEAlphaAddresses) Delete(ctx context.Context, key *meta.Key) error {
 
 	op, err := call.Do()
 	if err != nil {
+		glog.V(4).Infof("GCEAlphaAddresses.Delete(%v, %v) = %v", ctx, key, err)
 		return err
 	}
-	return g.s.WaitForCompletion(ctx, op)
+
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCEAlphaAddresses.Delete(%v, %v) = %v", ctx, key, err)
+	return err
 }
 
 // BetaAddresses is an interface that allows for mocking of Addresses.
@@ -1968,8 +2044,11 @@ type GCEBetaAddresses struct {
 
 // Get the Address named by key.
 func (g *GCEBetaAddresses) Get(ctx context.Context, key *meta.Key) (*beta.Address, error) {
+	glog.V(5).Infof("GCEBetaAddresses.Get(%v, %v): called", ctx, key)
+
 	if !key.Valid() {
-		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+		glog.V(2).Infof("GCEBetaAddresses.Get(%v, %v): key is invalid (%#v)", ctx, key, key)
+		return nil, fmt.Errorf("invalid GCE key (%#v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "beta", "Addresses")
 	rk := &RateLimitKey{
@@ -1978,16 +2057,21 @@ func (g *GCEBetaAddresses) Get(ctx context.Context, key *meta.Key) (*beta.Addres
 		Version:   meta.Version("beta"),
 		Service:   "Addresses",
 	}
+	glog.V(5).Infof("GCEBetaAddresses.Get(%v, %v): projectID = %v, rk = %+v", ctx, key, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEBetaAddresses.Get(%v, %v): RateLimiter error: %v", ctx, key, err)
 		return nil, err
 	}
 	call := g.s.Beta.Addresses.Get(projectID, key.Region, key.Name)
 	call.Context(ctx)
-	return call.Do()
+	v, err := call.Do()
+	glog.V(4).Infof("GCEBetaAddresses.Get(%v, %v) = %+v, %v", ctx, key, v, err)
+	return v, err
 }
 
 // List all Address objects.
 func (g *GCEBetaAddresses) List(ctx context.Context, region string, fl *filter.F) ([]*beta.Address, error) {
+	glog.V(5).Infof("GCEBetaAddresses.List(%v, %v, %v) called", ctx, region, fl)
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "beta", "Addresses")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -1998,24 +2082,40 @@ func (g *GCEBetaAddresses) List(ctx context.Context, region string, fl *filter.F
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
 		return nil, err
 	}
+	glog.V(5).Infof("GCEBetaAddresses.List(%v, %v, %v): projectID = %v, rk = %+v", ctx, region, fl, projectID, rk)
 	call := g.s.Beta.Addresses.List(projectID, region)
 	if fl != filter.None {
 		call.Filter(fl.String())
 	}
 	var all []*beta.Address
 	f := func(l *beta.AddressList) error {
+		glog.V(5).Infof("GCEBetaAddresses.List(%v, ..., %v): page %+v", ctx, fl, l)
 		all = append(all, l.Items...)
 		return nil
 	}
 	if err := call.Pages(ctx, f); err != nil {
+		glog.V(4).Infof("GCEBetaAddresses.List(%v, ..., %v) = %v, %v", ctx, fl, nil, err)
 		return nil, err
 	}
+
+	if glog.V(4) {
+		glog.V(4).Infof("GCEBetaAddresses.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
+	} else if glog.V(5) {
+		var asStr []string
+		for _, o := range all {
+			asStr = append(asStr, fmt.Sprintf("%+v", o))
+		}
+		glog.V(5).Infof("GCEBetaAddresses.List(%v, ..., %v) = %v, %v", ctx, fl, asStr, nil)
+	}
+
 	return all, nil
 }
 
 // Insert Address with key of value obj.
 func (g *GCEBetaAddresses) Insert(ctx context.Context, key *meta.Key, obj *beta.Address) error {
+	glog.V(5).Infof("GCEBetaAddresses.Insert(%v, %v, %+v): called", ctx, key, obj)
 	if !key.Valid() {
+		glog.V(2).Infof("GCEBetaAddresses.Insert(%v, %v, ...): key is invalid (%#v)", ctx, key, key)
 		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "beta", "Addresses")
@@ -2025,7 +2125,9 @@ func (g *GCEBetaAddresses) Insert(ctx context.Context, key *meta.Key, obj *beta.
 		Version:   meta.Version("beta"),
 		Service:   "Addresses",
 	}
+	glog.V(5).Infof("GCEBetaAddresses.Insert(%v, %v, ...): projectID = %v, rk = %+v", ctx, key, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEBetaAddresses.Insert(%v, %v, ...): RateLimiter error: %v", ctx, key, err)
 		return err
 	}
 	obj.Name = key.Name
@@ -2034,14 +2136,20 @@ func (g *GCEBetaAddresses) Insert(ctx context.Context, key *meta.Key, obj *beta.
 
 	op, err := call.Do()
 	if err != nil {
+		glog.V(4).Infof("GCEBetaAddresses.Insert(%v, %v, ...) = %+v", ctx, key, err)
 		return err
 	}
-	return g.s.WaitForCompletion(ctx, op)
+
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCEBetaAddresses.Insert(%v, %v, %+v) = %+v", ctx, key, obj, err)
+	return err
 }
 
 // Delete the Address referenced by key.
 func (g *GCEBetaAddresses) Delete(ctx context.Context, key *meta.Key) error {
+	glog.V(5).Infof("GCEBetaAddresses.Delete(%v, %v): called", ctx, key)
 	if !key.Valid() {
+		glog.V(2).Infof("GCEBetaAddresses.Delete(%v, %v): key is invalid (%#v)", ctx, key, key)
 		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "beta", "Addresses")
@@ -2051,7 +2159,9 @@ func (g *GCEBetaAddresses) Delete(ctx context.Context, key *meta.Key) error {
 		Version:   meta.Version("beta"),
 		Service:   "Addresses",
 	}
+	glog.V(5).Infof("GCEBetaAddresses.Delete(%v, %v): projectID = %v, rk = %+v", ctx, key, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEBetaAddresses.Delete(%v, %v): RateLimiter error: %v", ctx, key, err)
 		return err
 	}
 	call := g.s.Beta.Addresses.Delete(projectID, key.Region, key.Name)
@@ -2059,9 +2169,13 @@ func (g *GCEBetaAddresses) Delete(ctx context.Context, key *meta.Key) error {
 
 	op, err := call.Do()
 	if err != nil {
+		glog.V(4).Infof("GCEBetaAddresses.Delete(%v, %v) = %v", ctx, key, err)
 		return err
 	}
-	return g.s.WaitForCompletion(ctx, op)
+
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCEBetaAddresses.Delete(%v, %v) = %v", ctx, key, err)
+	return err
 }
 
 // GlobalAddresses is an interface that allows for mocking of GlobalAddresses.
@@ -2258,8 +2372,11 @@ type GCEGlobalAddresses struct {
 
 // Get the Address named by key.
 func (g *GCEGlobalAddresses) Get(ctx context.Context, key *meta.Key) (*ga.Address, error) {
+	glog.V(5).Infof("GCEGlobalAddresses.Get(%v, %v): called", ctx, key)
+
 	if !key.Valid() {
-		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+		glog.V(2).Infof("GCEGlobalAddresses.Get(%v, %v): key is invalid (%#v)", ctx, key, key)
+		return nil, fmt.Errorf("invalid GCE key (%#v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "GlobalAddresses")
 	rk := &RateLimitKey{
@@ -2268,16 +2385,21 @@ func (g *GCEGlobalAddresses) Get(ctx context.Context, key *meta.Key) (*ga.Addres
 		Version:   meta.Version("ga"),
 		Service:   "GlobalAddresses",
 	}
+	glog.V(5).Infof("GCEGlobalAddresses.Get(%v, %v): projectID = %v, rk = %+v", ctx, key, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEGlobalAddresses.Get(%v, %v): RateLimiter error: %v", ctx, key, err)
 		return nil, err
 	}
 	call := g.s.GA.GlobalAddresses.Get(projectID, key.Name)
 	call.Context(ctx)
-	return call.Do()
+	v, err := call.Do()
+	glog.V(4).Infof("GCEGlobalAddresses.Get(%v, %v) = %+v, %v", ctx, key, v, err)
+	return v, err
 }
 
 // List all Address objects.
 func (g *GCEGlobalAddresses) List(ctx context.Context, fl *filter.F) ([]*ga.Address, error) {
+	glog.V(5).Infof("GCEGlobalAddresses.List(%v, %v) called", ctx, fl)
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "GlobalAddresses")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -2288,24 +2410,40 @@ func (g *GCEGlobalAddresses) List(ctx context.Context, fl *filter.F) ([]*ga.Addr
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
 		return nil, err
 	}
+	glog.V(5).Infof("GCEGlobalAddresses.List(%v, %v): projectID = %v, rk = %+v", ctx, fl, projectID, rk)
 	call := g.s.GA.GlobalAddresses.List(projectID)
 	if fl != filter.None {
 		call.Filter(fl.String())
 	}
 	var all []*ga.Address
 	f := func(l *ga.AddressList) error {
+		glog.V(5).Infof("GCEGlobalAddresses.List(%v, ..., %v): page %+v", ctx, fl, l)
 		all = append(all, l.Items...)
 		return nil
 	}
 	if err := call.Pages(ctx, f); err != nil {
+		glog.V(4).Infof("GCEGlobalAddresses.List(%v, ..., %v) = %v, %v", ctx, fl, nil, err)
 		return nil, err
 	}
+
+	if glog.V(4) {
+		glog.V(4).Infof("GCEGlobalAddresses.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
+	} else if glog.V(5) {
+		var asStr []string
+		for _, o := range all {
+			asStr = append(asStr, fmt.Sprintf("%+v", o))
+		}
+		glog.V(5).Infof("GCEGlobalAddresses.List(%v, ..., %v) = %v, %v", ctx, fl, asStr, nil)
+	}
+
 	return all, nil
 }
 
 // Insert Address with key of value obj.
 func (g *GCEGlobalAddresses) Insert(ctx context.Context, key *meta.Key, obj *ga.Address) error {
+	glog.V(5).Infof("GCEGlobalAddresses.Insert(%v, %v, %+v): called", ctx, key, obj)
 	if !key.Valid() {
+		glog.V(2).Infof("GCEGlobalAddresses.Insert(%v, %v, ...): key is invalid (%#v)", ctx, key, key)
 		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "GlobalAddresses")
@@ -2315,7 +2453,9 @@ func (g *GCEGlobalAddresses) Insert(ctx context.Context, key *meta.Key, obj *ga.
 		Version:   meta.Version("ga"),
 		Service:   "GlobalAddresses",
 	}
+	glog.V(5).Infof("GCEGlobalAddresses.Insert(%v, %v, ...): projectID = %v, rk = %+v", ctx, key, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEGlobalAddresses.Insert(%v, %v, ...): RateLimiter error: %v", ctx, key, err)
 		return err
 	}
 	obj.Name = key.Name
@@ -2324,14 +2464,20 @@ func (g *GCEGlobalAddresses) Insert(ctx context.Context, key *meta.Key, obj *ga.
 
 	op, err := call.Do()
 	if err != nil {
+		glog.V(4).Infof("GCEGlobalAddresses.Insert(%v, %v, ...) = %+v", ctx, key, err)
 		return err
 	}
-	return g.s.WaitForCompletion(ctx, op)
+
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCEGlobalAddresses.Insert(%v, %v, %+v) = %+v", ctx, key, obj, err)
+	return err
 }
 
 // Delete the Address referenced by key.
 func (g *GCEGlobalAddresses) Delete(ctx context.Context, key *meta.Key) error {
+	glog.V(5).Infof("GCEGlobalAddresses.Delete(%v, %v): called", ctx, key)
 	if !key.Valid() {
+		glog.V(2).Infof("GCEGlobalAddresses.Delete(%v, %v): key is invalid (%#v)", ctx, key, key)
 		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "GlobalAddresses")
@@ -2341,7 +2487,9 @@ func (g *GCEGlobalAddresses) Delete(ctx context.Context, key *meta.Key) error {
 		Version:   meta.Version("ga"),
 		Service:   "GlobalAddresses",
 	}
+	glog.V(5).Infof("GCEGlobalAddresses.Delete(%v, %v): projectID = %v, rk = %+v", ctx, key, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEGlobalAddresses.Delete(%v, %v): RateLimiter error: %v", ctx, key, err)
 		return err
 	}
 	call := g.s.GA.GlobalAddresses.Delete(projectID, key.Name)
@@ -2350,9 +2498,13 @@ func (g *GCEGlobalAddresses) Delete(ctx context.Context, key *meta.Key) error {
 
 	op, err := call.Do()
 	if err != nil {
+		glog.V(4).Infof("GCEGlobalAddresses.Delete(%v, %v) = %v", ctx, key, err)
 		return err
 	}
-	return g.s.WaitForCompletion(ctx, op)
+
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCEGlobalAddresses.Delete(%v, %v) = %v", ctx, key, err)
+	return err
 }
 
 // BackendServices is an interface that allows for mocking of BackendServices.
@@ -2569,8 +2721,11 @@ type GCEBackendServices struct {
 
 // Get the BackendService named by key.
 func (g *GCEBackendServices) Get(ctx context.Context, key *meta.Key) (*ga.BackendService, error) {
+	glog.V(5).Infof("GCEBackendServices.Get(%v, %v): called", ctx, key)
+
 	if !key.Valid() {
-		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+		glog.V(2).Infof("GCEBackendServices.Get(%v, %v): key is invalid (%#v)", ctx, key, key)
+		return nil, fmt.Errorf("invalid GCE key (%#v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "BackendServices")
 	rk := &RateLimitKey{
@@ -2579,16 +2734,21 @@ func (g *GCEBackendServices) Get(ctx context.Context, key *meta.Key) (*ga.Backen
 		Version:   meta.Version("ga"),
 		Service:   "BackendServices",
 	}
+	glog.V(5).Infof("GCEBackendServices.Get(%v, %v): projectID = %v, rk = %+v", ctx, key, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEBackendServices.Get(%v, %v): RateLimiter error: %v", ctx, key, err)
 		return nil, err
 	}
 	call := g.s.GA.BackendServices.Get(projectID, key.Name)
 	call.Context(ctx)
-	return call.Do()
+	v, err := call.Do()
+	glog.V(4).Infof("GCEBackendServices.Get(%v, %v) = %+v, %v", ctx, key, v, err)
+	return v, err
 }
 
 // List all BackendService objects.
 func (g *GCEBackendServices) List(ctx context.Context, fl *filter.F) ([]*ga.BackendService, error) {
+	glog.V(5).Infof("GCEBackendServices.List(%v, %v) called", ctx, fl)
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "BackendServices")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -2599,24 +2759,40 @@ func (g *GCEBackendServices) List(ctx context.Context, fl *filter.F) ([]*ga.Back
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
 		return nil, err
 	}
+	glog.V(5).Infof("GCEBackendServices.List(%v, %v): projectID = %v, rk = %+v", ctx, fl, projectID, rk)
 	call := g.s.GA.BackendServices.List(projectID)
 	if fl != filter.None {
 		call.Filter(fl.String())
 	}
 	var all []*ga.BackendService
 	f := func(l *ga.BackendServiceList) error {
+		glog.V(5).Infof("GCEBackendServices.List(%v, ..., %v): page %+v", ctx, fl, l)
 		all = append(all, l.Items...)
 		return nil
 	}
 	if err := call.Pages(ctx, f); err != nil {
+		glog.V(4).Infof("GCEBackendServices.List(%v, ..., %v) = %v, %v", ctx, fl, nil, err)
 		return nil, err
 	}
+
+	if glog.V(4) {
+		glog.V(4).Infof("GCEBackendServices.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
+	} else if glog.V(5) {
+		var asStr []string
+		for _, o := range all {
+			asStr = append(asStr, fmt.Sprintf("%+v", o))
+		}
+		glog.V(5).Infof("GCEBackendServices.List(%v, ..., %v) = %v, %v", ctx, fl, asStr, nil)
+	}
+
 	return all, nil
 }
 
 // Insert BackendService with key of value obj.
 func (g *GCEBackendServices) Insert(ctx context.Context, key *meta.Key, obj *ga.BackendService) error {
+	glog.V(5).Infof("GCEBackendServices.Insert(%v, %v, %+v): called", ctx, key, obj)
 	if !key.Valid() {
+		glog.V(2).Infof("GCEBackendServices.Insert(%v, %v, ...): key is invalid (%#v)", ctx, key, key)
 		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "BackendServices")
@@ -2626,7 +2802,9 @@ func (g *GCEBackendServices) Insert(ctx context.Context, key *meta.Key, obj *ga.
 		Version:   meta.Version("ga"),
 		Service:   "BackendServices",
 	}
+	glog.V(5).Infof("GCEBackendServices.Insert(%v, %v, ...): projectID = %v, rk = %+v", ctx, key, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEBackendServices.Insert(%v, %v, ...): RateLimiter error: %v", ctx, key, err)
 		return err
 	}
 	obj.Name = key.Name
@@ -2635,14 +2813,20 @@ func (g *GCEBackendServices) Insert(ctx context.Context, key *meta.Key, obj *ga.
 
 	op, err := call.Do()
 	if err != nil {
+		glog.V(4).Infof("GCEBackendServices.Insert(%v, %v, ...) = %+v", ctx, key, err)
 		return err
 	}
-	return g.s.WaitForCompletion(ctx, op)
+
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCEBackendServices.Insert(%v, %v, %+v) = %+v", ctx, key, obj, err)
+	return err
 }
 
 // Delete the BackendService referenced by key.
 func (g *GCEBackendServices) Delete(ctx context.Context, key *meta.Key) error {
+	glog.V(5).Infof("GCEBackendServices.Delete(%v, %v): called", ctx, key)
 	if !key.Valid() {
+		glog.V(2).Infof("GCEBackendServices.Delete(%v, %v): key is invalid (%#v)", ctx, key, key)
 		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "BackendServices")
@@ -2652,7 +2836,9 @@ func (g *GCEBackendServices) Delete(ctx context.Context, key *meta.Key) error {
 		Version:   meta.Version("ga"),
 		Service:   "BackendServices",
 	}
+	glog.V(5).Infof("GCEBackendServices.Delete(%v, %v): projectID = %v, rk = %+v", ctx, key, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEBackendServices.Delete(%v, %v): RateLimiter error: %v", ctx, key, err)
 		return err
 	}
 	call := g.s.GA.BackendServices.Delete(projectID, key.Name)
@@ -2661,14 +2847,21 @@ func (g *GCEBackendServices) Delete(ctx context.Context, key *meta.Key) error {
 
 	op, err := call.Do()
 	if err != nil {
+		glog.V(4).Infof("GCEBackendServices.Delete(%v, %v) = %v", ctx, key, err)
 		return err
 	}
-	return g.s.WaitForCompletion(ctx, op)
+
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCEBackendServices.Delete(%v, %v) = %v", ctx, key, err)
+	return err
 }
 
 // GetHealth is a method on GCEBackendServices.
 func (g *GCEBackendServices) GetHealth(ctx context.Context, key *meta.Key, arg0 *ga.ResourceGroupReference) (*ga.BackendServiceGroupHealth, error) {
+	glog.V(5).Infof("GCEBackendServices.GetHealth(%v, %v, ...): called", ctx, key)
+
 	if !key.Valid() {
+		glog.V(2).Infof("GCEBackendServices.GetHealth(%v, %v, ...): key is invalid (%#v)", ctx, key, key)
 		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "BackendServices")
@@ -2678,17 +2871,25 @@ func (g *GCEBackendServices) GetHealth(ctx context.Context, key *meta.Key, arg0 
 		Version:   meta.Version("ga"),
 		Service:   "BackendServices",
 	}
+	glog.V(5).Infof("GCEBackendServices.GetHealth(%v, %v, ...): projectID = %v, rk = %+v", ctx, key, projectID, rk)
+
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEBackendServices.GetHealth(%v, %v, ...): RateLimiter error: %v", ctx, key, err)
 		return nil, err
 	}
 	call := g.s.GA.BackendServices.GetHealth(projectID, key.Name, arg0)
 	call.Context(ctx)
-	return call.Do()
+	v, err := call.Do()
+	glog.V(4).Infof("GCEBackendServices.GetHealth(%v, %v, ...) = %+v, %v", ctx, key, v, err)
+	return v, err
 }
 
 // Update is a method on GCEBackendServices.
 func (g *GCEBackendServices) Update(ctx context.Context, key *meta.Key, arg0 *ga.BackendService) error {
+	glog.V(5).Infof("GCEBackendServices.Update(%v, %v, ...): called", ctx, key)
+
 	if !key.Valid() {
+		glog.V(2).Infof("GCEBackendServices.Update(%v, %v, ...): key is invalid (%#v)", ctx, key, key)
 		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "BackendServices")
@@ -2698,16 +2899,22 @@ func (g *GCEBackendServices) Update(ctx context.Context, key *meta.Key, arg0 *ga
 		Version:   meta.Version("ga"),
 		Service:   "BackendServices",
 	}
+	glog.V(5).Infof("GCEBackendServices.Update(%v, %v, ...): projectID = %v, rk = %+v", ctx, key, projectID, rk)
+
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEBackendServices.Update(%v, %v, ...): RateLimiter error: %v", ctx, key, err)
 		return err
 	}
 	call := g.s.GA.BackendServices.Update(projectID, key.Name, arg0)
 	call.Context(ctx)
 	op, err := call.Do()
 	if err != nil {
+		glog.V(4).Infof("GCEBackendServices.Update(%v, %v, ...) = %+v", ctx, key, err)
 		return err
 	}
-	return g.s.WaitForCompletion(ctx, op)
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCEBackendServices.Update(%v, %v, ...) = %+v", ctx, key, err)
+	return err
 }
 
 // AlphaBackendServices is an interface that allows for mocking of BackendServices.
@@ -2914,8 +3121,11 @@ type GCEAlphaBackendServices struct {
 
 // Get the BackendService named by key.
 func (g *GCEAlphaBackendServices) Get(ctx context.Context, key *meta.Key) (*alpha.BackendService, error) {
+	glog.V(5).Infof("GCEAlphaBackendServices.Get(%v, %v): called", ctx, key)
+
 	if !key.Valid() {
-		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+		glog.V(2).Infof("GCEAlphaBackendServices.Get(%v, %v): key is invalid (%#v)", ctx, key, key)
+		return nil, fmt.Errorf("invalid GCE key (%#v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "alpha", "BackendServices")
 	rk := &RateLimitKey{
@@ -2924,16 +3134,21 @@ func (g *GCEAlphaBackendServices) Get(ctx context.Context, key *meta.Key) (*alph
 		Version:   meta.Version("alpha"),
 		Service:   "BackendServices",
 	}
+	glog.V(5).Infof("GCEAlphaBackendServices.Get(%v, %v): projectID = %v, rk = %+v", ctx, key, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEAlphaBackendServices.Get(%v, %v): RateLimiter error: %v", ctx, key, err)
 		return nil, err
 	}
 	call := g.s.Alpha.BackendServices.Get(projectID, key.Name)
 	call.Context(ctx)
-	return call.Do()
+	v, err := call.Do()
+	glog.V(4).Infof("GCEAlphaBackendServices.Get(%v, %v) = %+v, %v", ctx, key, v, err)
+	return v, err
 }
 
 // List all BackendService objects.
 func (g *GCEAlphaBackendServices) List(ctx context.Context, fl *filter.F) ([]*alpha.BackendService, error) {
+	glog.V(5).Infof("GCEAlphaBackendServices.List(%v, %v) called", ctx, fl)
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "alpha", "BackendServices")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -2944,24 +3159,40 @@ func (g *GCEAlphaBackendServices) List(ctx context.Context, fl *filter.F) ([]*al
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
 		return nil, err
 	}
+	glog.V(5).Infof("GCEAlphaBackendServices.List(%v, %v): projectID = %v, rk = %+v", ctx, fl, projectID, rk)
 	call := g.s.Alpha.BackendServices.List(projectID)
 	if fl != filter.None {
 		call.Filter(fl.String())
 	}
 	var all []*alpha.BackendService
 	f := func(l *alpha.BackendServiceList) error {
+		glog.V(5).Infof("GCEAlphaBackendServices.List(%v, ..., %v): page %+v", ctx, fl, l)
 		all = append(all, l.Items...)
 		return nil
 	}
 	if err := call.Pages(ctx, f); err != nil {
+		glog.V(4).Infof("GCEAlphaBackendServices.List(%v, ..., %v) = %v, %v", ctx, fl, nil, err)
 		return nil, err
 	}
+
+	if glog.V(4) {
+		glog.V(4).Infof("GCEAlphaBackendServices.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
+	} else if glog.V(5) {
+		var asStr []string
+		for _, o := range all {
+			asStr = append(asStr, fmt.Sprintf("%+v", o))
+		}
+		glog.V(5).Infof("GCEAlphaBackendServices.List(%v, ..., %v) = %v, %v", ctx, fl, asStr, nil)
+	}
+
 	return all, nil
 }
 
 // Insert BackendService with key of value obj.
 func (g *GCEAlphaBackendServices) Insert(ctx context.Context, key *meta.Key, obj *alpha.BackendService) error {
+	glog.V(5).Infof("GCEAlphaBackendServices.Insert(%v, %v, %+v): called", ctx, key, obj)
 	if !key.Valid() {
+		glog.V(2).Infof("GCEAlphaBackendServices.Insert(%v, %v, ...): key is invalid (%#v)", ctx, key, key)
 		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "alpha", "BackendServices")
@@ -2971,7 +3202,9 @@ func (g *GCEAlphaBackendServices) Insert(ctx context.Context, key *meta.Key, obj
 		Version:   meta.Version("alpha"),
 		Service:   "BackendServices",
 	}
+	glog.V(5).Infof("GCEAlphaBackendServices.Insert(%v, %v, ...): projectID = %v, rk = %+v", ctx, key, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEAlphaBackendServices.Insert(%v, %v, ...): RateLimiter error: %v", ctx, key, err)
 		return err
 	}
 	obj.Name = key.Name
@@ -2980,14 +3213,20 @@ func (g *GCEAlphaBackendServices) Insert(ctx context.Context, key *meta.Key, obj
 
 	op, err := call.Do()
 	if err != nil {
+		glog.V(4).Infof("GCEAlphaBackendServices.Insert(%v, %v, ...) = %+v", ctx, key, err)
 		return err
 	}
-	return g.s.WaitForCompletion(ctx, op)
+
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCEAlphaBackendServices.Insert(%v, %v, %+v) = %+v", ctx, key, obj, err)
+	return err
 }
 
 // Delete the BackendService referenced by key.
 func (g *GCEAlphaBackendServices) Delete(ctx context.Context, key *meta.Key) error {
+	glog.V(5).Infof("GCEAlphaBackendServices.Delete(%v, %v): called", ctx, key)
 	if !key.Valid() {
+		glog.V(2).Infof("GCEAlphaBackendServices.Delete(%v, %v): key is invalid (%#v)", ctx, key, key)
 		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "alpha", "BackendServices")
@@ -2997,7 +3236,9 @@ func (g *GCEAlphaBackendServices) Delete(ctx context.Context, key *meta.Key) err
 		Version:   meta.Version("alpha"),
 		Service:   "BackendServices",
 	}
+	glog.V(5).Infof("GCEAlphaBackendServices.Delete(%v, %v): projectID = %v, rk = %+v", ctx, key, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEAlphaBackendServices.Delete(%v, %v): RateLimiter error: %v", ctx, key, err)
 		return err
 	}
 	call := g.s.Alpha.BackendServices.Delete(projectID, key.Name)
@@ -3006,14 +3247,21 @@ func (g *GCEAlphaBackendServices) Delete(ctx context.Context, key *meta.Key) err
 
 	op, err := call.Do()
 	if err != nil {
+		glog.V(4).Infof("GCEAlphaBackendServices.Delete(%v, %v) = %v", ctx, key, err)
 		return err
 	}
-	return g.s.WaitForCompletion(ctx, op)
+
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCEAlphaBackendServices.Delete(%v, %v) = %v", ctx, key, err)
+	return err
 }
 
 // Update is a method on GCEAlphaBackendServices.
 func (g *GCEAlphaBackendServices) Update(ctx context.Context, key *meta.Key, arg0 *alpha.BackendService) error {
+	glog.V(5).Infof("GCEAlphaBackendServices.Update(%v, %v, ...): called", ctx, key)
+
 	if !key.Valid() {
+		glog.V(2).Infof("GCEAlphaBackendServices.Update(%v, %v, ...): key is invalid (%#v)", ctx, key, key)
 		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "alpha", "BackendServices")
@@ -3023,16 +3271,22 @@ func (g *GCEAlphaBackendServices) Update(ctx context.Context, key *meta.Key, arg
 		Version:   meta.Version("alpha"),
 		Service:   "BackendServices",
 	}
+	glog.V(5).Infof("GCEAlphaBackendServices.Update(%v, %v, ...): projectID = %v, rk = %+v", ctx, key, projectID, rk)
+
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEAlphaBackendServices.Update(%v, %v, ...): RateLimiter error: %v", ctx, key, err)
 		return err
 	}
 	call := g.s.Alpha.BackendServices.Update(projectID, key.Name, arg0)
 	call.Context(ctx)
 	op, err := call.Do()
 	if err != nil {
+		glog.V(4).Infof("GCEAlphaBackendServices.Update(%v, %v, ...) = %+v", ctx, key, err)
 		return err
 	}
-	return g.s.WaitForCompletion(ctx, op)
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCEAlphaBackendServices.Update(%v, %v, ...) = %+v", ctx, key, err)
+	return err
 }
 
 // RegionBackendServices is an interface that allows for mocking of RegionBackendServices.
@@ -3252,8 +3506,11 @@ type GCERegionBackendServices struct {
 
 // Get the BackendService named by key.
 func (g *GCERegionBackendServices) Get(ctx context.Context, key *meta.Key) (*ga.BackendService, error) {
+	glog.V(5).Infof("GCERegionBackendServices.Get(%v, %v): called", ctx, key)
+
 	if !key.Valid() {
-		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+		glog.V(2).Infof("GCERegionBackendServices.Get(%v, %v): key is invalid (%#v)", ctx, key, key)
+		return nil, fmt.Errorf("invalid GCE key (%#v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "RegionBackendServices")
 	rk := &RateLimitKey{
@@ -3262,16 +3519,21 @@ func (g *GCERegionBackendServices) Get(ctx context.Context, key *meta.Key) (*ga.
 		Version:   meta.Version("ga"),
 		Service:   "RegionBackendServices",
 	}
+	glog.V(5).Infof("GCERegionBackendServices.Get(%v, %v): projectID = %v, rk = %+v", ctx, key, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCERegionBackendServices.Get(%v, %v): RateLimiter error: %v", ctx, key, err)
 		return nil, err
 	}
 	call := g.s.GA.RegionBackendServices.Get(projectID, key.Region, key.Name)
 	call.Context(ctx)
-	return call.Do()
+	v, err := call.Do()
+	glog.V(4).Infof("GCERegionBackendServices.Get(%v, %v) = %+v, %v", ctx, key, v, err)
+	return v, err
 }
 
 // List all BackendService objects.
 func (g *GCERegionBackendServices) List(ctx context.Context, region string, fl *filter.F) ([]*ga.BackendService, error) {
+	glog.V(5).Infof("GCERegionBackendServices.List(%v, %v, %v) called", ctx, region, fl)
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "RegionBackendServices")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -3282,24 +3544,40 @@ func (g *GCERegionBackendServices) List(ctx context.Context, region string, fl *
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
 		return nil, err
 	}
+	glog.V(5).Infof("GCERegionBackendServices.List(%v, %v, %v): projectID = %v, rk = %+v", ctx, region, fl, projectID, rk)
 	call := g.s.GA.RegionBackendServices.List(projectID, region)
 	if fl != filter.None {
 		call.Filter(fl.String())
 	}
 	var all []*ga.BackendService
 	f := func(l *ga.BackendServiceList) error {
+		glog.V(5).Infof("GCERegionBackendServices.List(%v, ..., %v): page %+v", ctx, fl, l)
 		all = append(all, l.Items...)
 		return nil
 	}
 	if err := call.Pages(ctx, f); err != nil {
+		glog.V(4).Infof("GCERegionBackendServices.List(%v, ..., %v) = %v, %v", ctx, fl, nil, err)
 		return nil, err
 	}
+
+	if glog.V(4) {
+		glog.V(4).Infof("GCERegionBackendServices.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
+	} else if glog.V(5) {
+		var asStr []string
+		for _, o := range all {
+			asStr = append(asStr, fmt.Sprintf("%+v", o))
+		}
+		glog.V(5).Infof("GCERegionBackendServices.List(%v, ..., %v) = %v, %v", ctx, fl, asStr, nil)
+	}
+
 	return all, nil
 }
 
 // Insert BackendService with key of value obj.
 func (g *GCERegionBackendServices) Insert(ctx context.Context, key *meta.Key, obj *ga.BackendService) error {
+	glog.V(5).Infof("GCERegionBackendServices.Insert(%v, %v, %+v): called", ctx, key, obj)
 	if !key.Valid() {
+		glog.V(2).Infof("GCERegionBackendServices.Insert(%v, %v, ...): key is invalid (%#v)", ctx, key, key)
 		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "RegionBackendServices")
@@ -3309,7 +3587,9 @@ func (g *GCERegionBackendServices) Insert(ctx context.Context, key *meta.Key, ob
 		Version:   meta.Version("ga"),
 		Service:   "RegionBackendServices",
 	}
+	glog.V(5).Infof("GCERegionBackendServices.Insert(%v, %v, ...): projectID = %v, rk = %+v", ctx, key, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCERegionBackendServices.Insert(%v, %v, ...): RateLimiter error: %v", ctx, key, err)
 		return err
 	}
 	obj.Name = key.Name
@@ -3318,14 +3598,20 @@ func (g *GCERegionBackendServices) Insert(ctx context.Context, key *meta.Key, ob
 
 	op, err := call.Do()
 	if err != nil {
+		glog.V(4).Infof("GCERegionBackendServices.Insert(%v, %v, ...) = %+v", ctx, key, err)
 		return err
 	}
-	return g.s.WaitForCompletion(ctx, op)
+
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCERegionBackendServices.Insert(%v, %v, %+v) = %+v", ctx, key, obj, err)
+	return err
 }
 
 // Delete the BackendService referenced by key.
 func (g *GCERegionBackendServices) Delete(ctx context.Context, key *meta.Key) error {
+	glog.V(5).Infof("GCERegionBackendServices.Delete(%v, %v): called", ctx, key)
 	if !key.Valid() {
+		glog.V(2).Infof("GCERegionBackendServices.Delete(%v, %v): key is invalid (%#v)", ctx, key, key)
 		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "RegionBackendServices")
@@ -3335,7 +3621,9 @@ func (g *GCERegionBackendServices) Delete(ctx context.Context, key *meta.Key) er
 		Version:   meta.Version("ga"),
 		Service:   "RegionBackendServices",
 	}
+	glog.V(5).Infof("GCERegionBackendServices.Delete(%v, %v): projectID = %v, rk = %+v", ctx, key, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCERegionBackendServices.Delete(%v, %v): RateLimiter error: %v", ctx, key, err)
 		return err
 	}
 	call := g.s.GA.RegionBackendServices.Delete(projectID, key.Region, key.Name)
@@ -3343,14 +3631,21 @@ func (g *GCERegionBackendServices) Delete(ctx context.Context, key *meta.Key) er
 
 	op, err := call.Do()
 	if err != nil {
+		glog.V(4).Infof("GCERegionBackendServices.Delete(%v, %v) = %v", ctx, key, err)
 		return err
 	}
-	return g.s.WaitForCompletion(ctx, op)
+
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCERegionBackendServices.Delete(%v, %v) = %v", ctx, key, err)
+	return err
 }
 
 // GetHealth is a method on GCERegionBackendServices.
 func (g *GCERegionBackendServices) GetHealth(ctx context.Context, key *meta.Key, arg0 *ga.ResourceGroupReference) (*ga.BackendServiceGroupHealth, error) {
+	glog.V(5).Infof("GCERegionBackendServices.GetHealth(%v, %v, ...): called", ctx, key)
+
 	if !key.Valid() {
+		glog.V(2).Infof("GCERegionBackendServices.GetHealth(%v, %v, ...): key is invalid (%#v)", ctx, key, key)
 		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "RegionBackendServices")
@@ -3360,17 +3655,25 @@ func (g *GCERegionBackendServices) GetHealth(ctx context.Context, key *meta.Key,
 		Version:   meta.Version("ga"),
 		Service:   "RegionBackendServices",
 	}
+	glog.V(5).Infof("GCERegionBackendServices.GetHealth(%v, %v, ...): projectID = %v, rk = %+v", ctx, key, projectID, rk)
+
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCERegionBackendServices.GetHealth(%v, %v, ...): RateLimiter error: %v", ctx, key, err)
 		return nil, err
 	}
 	call := g.s.GA.RegionBackendServices.GetHealth(projectID, key.Region, key.Name, arg0)
 	call.Context(ctx)
-	return call.Do()
+	v, err := call.Do()
+	glog.V(4).Infof("GCERegionBackendServices.GetHealth(%v, %v, ...) = %+v, %v", ctx, key, v, err)
+	return v, err
 }
 
 // Update is a method on GCERegionBackendServices.
 func (g *GCERegionBackendServices) Update(ctx context.Context, key *meta.Key, arg0 *ga.BackendService) error {
+	glog.V(5).Infof("GCERegionBackendServices.Update(%v, %v, ...): called", ctx, key)
+
 	if !key.Valid() {
+		glog.V(2).Infof("GCERegionBackendServices.Update(%v, %v, ...): key is invalid (%#v)", ctx, key, key)
 		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "RegionBackendServices")
@@ -3380,16 +3683,22 @@ func (g *GCERegionBackendServices) Update(ctx context.Context, key *meta.Key, ar
 		Version:   meta.Version("ga"),
 		Service:   "RegionBackendServices",
 	}
+	glog.V(5).Infof("GCERegionBackendServices.Update(%v, %v, ...): projectID = %v, rk = %+v", ctx, key, projectID, rk)
+
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCERegionBackendServices.Update(%v, %v, ...): RateLimiter error: %v", ctx, key, err)
 		return err
 	}
 	call := g.s.GA.RegionBackendServices.Update(projectID, key.Region, key.Name, arg0)
 	call.Context(ctx)
 	op, err := call.Do()
 	if err != nil {
+		glog.V(4).Infof("GCERegionBackendServices.Update(%v, %v, ...) = %+v", ctx, key, err)
 		return err
 	}
-	return g.s.WaitForCompletion(ctx, op)
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCERegionBackendServices.Update(%v, %v, ...) = %+v", ctx, key, err)
+	return err
 }
 
 // AlphaRegionBackendServices is an interface that allows for mocking of RegionBackendServices.
@@ -3609,8 +3918,11 @@ type GCEAlphaRegionBackendServices struct {
 
 // Get the BackendService named by key.
 func (g *GCEAlphaRegionBackendServices) Get(ctx context.Context, key *meta.Key) (*alpha.BackendService, error) {
+	glog.V(5).Infof("GCEAlphaRegionBackendServices.Get(%v, %v): called", ctx, key)
+
 	if !key.Valid() {
-		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+		glog.V(2).Infof("GCEAlphaRegionBackendServices.Get(%v, %v): key is invalid (%#v)", ctx, key, key)
+		return nil, fmt.Errorf("invalid GCE key (%#v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "alpha", "RegionBackendServices")
 	rk := &RateLimitKey{
@@ -3619,16 +3931,21 @@ func (g *GCEAlphaRegionBackendServices) Get(ctx context.Context, key *meta.Key) 
 		Version:   meta.Version("alpha"),
 		Service:   "RegionBackendServices",
 	}
+	glog.V(5).Infof("GCEAlphaRegionBackendServices.Get(%v, %v): projectID = %v, rk = %+v", ctx, key, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEAlphaRegionBackendServices.Get(%v, %v): RateLimiter error: %v", ctx, key, err)
 		return nil, err
 	}
 	call := g.s.Alpha.RegionBackendServices.Get(projectID, key.Region, key.Name)
 	call.Context(ctx)
-	return call.Do()
+	v, err := call.Do()
+	glog.V(4).Infof("GCEAlphaRegionBackendServices.Get(%v, %v) = %+v, %v", ctx, key, v, err)
+	return v, err
 }
 
 // List all BackendService objects.
 func (g *GCEAlphaRegionBackendServices) List(ctx context.Context, region string, fl *filter.F) ([]*alpha.BackendService, error) {
+	glog.V(5).Infof("GCEAlphaRegionBackendServices.List(%v, %v, %v) called", ctx, region, fl)
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "alpha", "RegionBackendServices")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -3639,24 +3956,40 @@ func (g *GCEAlphaRegionBackendServices) List(ctx context.Context, region string,
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
 		return nil, err
 	}
+	glog.V(5).Infof("GCEAlphaRegionBackendServices.List(%v, %v, %v): projectID = %v, rk = %+v", ctx, region, fl, projectID, rk)
 	call := g.s.Alpha.RegionBackendServices.List(projectID, region)
 	if fl != filter.None {
 		call.Filter(fl.String())
 	}
 	var all []*alpha.BackendService
 	f := func(l *alpha.BackendServiceList) error {
+		glog.V(5).Infof("GCEAlphaRegionBackendServices.List(%v, ..., %v): page %+v", ctx, fl, l)
 		all = append(all, l.Items...)
 		return nil
 	}
 	if err := call.Pages(ctx, f); err != nil {
+		glog.V(4).Infof("GCEAlphaRegionBackendServices.List(%v, ..., %v) = %v, %v", ctx, fl, nil, err)
 		return nil, err
 	}
+
+	if glog.V(4) {
+		glog.V(4).Infof("GCEAlphaRegionBackendServices.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
+	} else if glog.V(5) {
+		var asStr []string
+		for _, o := range all {
+			asStr = append(asStr, fmt.Sprintf("%+v", o))
+		}
+		glog.V(5).Infof("GCEAlphaRegionBackendServices.List(%v, ..., %v) = %v, %v", ctx, fl, asStr, nil)
+	}
+
 	return all, nil
 }
 
 // Insert BackendService with key of value obj.
 func (g *GCEAlphaRegionBackendServices) Insert(ctx context.Context, key *meta.Key, obj *alpha.BackendService) error {
+	glog.V(5).Infof("GCEAlphaRegionBackendServices.Insert(%v, %v, %+v): called", ctx, key, obj)
 	if !key.Valid() {
+		glog.V(2).Infof("GCEAlphaRegionBackendServices.Insert(%v, %v, ...): key is invalid (%#v)", ctx, key, key)
 		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "alpha", "RegionBackendServices")
@@ -3666,7 +3999,9 @@ func (g *GCEAlphaRegionBackendServices) Insert(ctx context.Context, key *meta.Ke
 		Version:   meta.Version("alpha"),
 		Service:   "RegionBackendServices",
 	}
+	glog.V(5).Infof("GCEAlphaRegionBackendServices.Insert(%v, %v, ...): projectID = %v, rk = %+v", ctx, key, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEAlphaRegionBackendServices.Insert(%v, %v, ...): RateLimiter error: %v", ctx, key, err)
 		return err
 	}
 	obj.Name = key.Name
@@ -3675,14 +4010,20 @@ func (g *GCEAlphaRegionBackendServices) Insert(ctx context.Context, key *meta.Ke
 
 	op, err := call.Do()
 	if err != nil {
+		glog.V(4).Infof("GCEAlphaRegionBackendServices.Insert(%v, %v, ...) = %+v", ctx, key, err)
 		return err
 	}
-	return g.s.WaitForCompletion(ctx, op)
+
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCEAlphaRegionBackendServices.Insert(%v, %v, %+v) = %+v", ctx, key, obj, err)
+	return err
 }
 
 // Delete the BackendService referenced by key.
 func (g *GCEAlphaRegionBackendServices) Delete(ctx context.Context, key *meta.Key) error {
+	glog.V(5).Infof("GCEAlphaRegionBackendServices.Delete(%v, %v): called", ctx, key)
 	if !key.Valid() {
+		glog.V(2).Infof("GCEAlphaRegionBackendServices.Delete(%v, %v): key is invalid (%#v)", ctx, key, key)
 		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "alpha", "RegionBackendServices")
@@ -3692,7 +4033,9 @@ func (g *GCEAlphaRegionBackendServices) Delete(ctx context.Context, key *meta.Ke
 		Version:   meta.Version("alpha"),
 		Service:   "RegionBackendServices",
 	}
+	glog.V(5).Infof("GCEAlphaRegionBackendServices.Delete(%v, %v): projectID = %v, rk = %+v", ctx, key, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEAlphaRegionBackendServices.Delete(%v, %v): RateLimiter error: %v", ctx, key, err)
 		return err
 	}
 	call := g.s.Alpha.RegionBackendServices.Delete(projectID, key.Region, key.Name)
@@ -3700,14 +4043,21 @@ func (g *GCEAlphaRegionBackendServices) Delete(ctx context.Context, key *meta.Ke
 
 	op, err := call.Do()
 	if err != nil {
+		glog.V(4).Infof("GCEAlphaRegionBackendServices.Delete(%v, %v) = %v", ctx, key, err)
 		return err
 	}
-	return g.s.WaitForCompletion(ctx, op)
+
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCEAlphaRegionBackendServices.Delete(%v, %v) = %v", ctx, key, err)
+	return err
 }
 
 // GetHealth is a method on GCEAlphaRegionBackendServices.
 func (g *GCEAlphaRegionBackendServices) GetHealth(ctx context.Context, key *meta.Key, arg0 *alpha.ResourceGroupReference) (*alpha.BackendServiceGroupHealth, error) {
+	glog.V(5).Infof("GCEAlphaRegionBackendServices.GetHealth(%v, %v, ...): called", ctx, key)
+
 	if !key.Valid() {
+		glog.V(2).Infof("GCEAlphaRegionBackendServices.GetHealth(%v, %v, ...): key is invalid (%#v)", ctx, key, key)
 		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "alpha", "RegionBackendServices")
@@ -3717,17 +4067,25 @@ func (g *GCEAlphaRegionBackendServices) GetHealth(ctx context.Context, key *meta
 		Version:   meta.Version("alpha"),
 		Service:   "RegionBackendServices",
 	}
+	glog.V(5).Infof("GCEAlphaRegionBackendServices.GetHealth(%v, %v, ...): projectID = %v, rk = %+v", ctx, key, projectID, rk)
+
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEAlphaRegionBackendServices.GetHealth(%v, %v, ...): RateLimiter error: %v", ctx, key, err)
 		return nil, err
 	}
 	call := g.s.Alpha.RegionBackendServices.GetHealth(projectID, key.Region, key.Name, arg0)
 	call.Context(ctx)
-	return call.Do()
+	v, err := call.Do()
+	glog.V(4).Infof("GCEAlphaRegionBackendServices.GetHealth(%v, %v, ...) = %+v, %v", ctx, key, v, err)
+	return v, err
 }
 
 // Update is a method on GCEAlphaRegionBackendServices.
 func (g *GCEAlphaRegionBackendServices) Update(ctx context.Context, key *meta.Key, arg0 *alpha.BackendService) error {
+	glog.V(5).Infof("GCEAlphaRegionBackendServices.Update(%v, %v, ...): called", ctx, key)
+
 	if !key.Valid() {
+		glog.V(2).Infof("GCEAlphaRegionBackendServices.Update(%v, %v, ...): key is invalid (%#v)", ctx, key, key)
 		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "alpha", "RegionBackendServices")
@@ -3737,16 +4095,22 @@ func (g *GCEAlphaRegionBackendServices) Update(ctx context.Context, key *meta.Ke
 		Version:   meta.Version("alpha"),
 		Service:   "RegionBackendServices",
 	}
+	glog.V(5).Infof("GCEAlphaRegionBackendServices.Update(%v, %v, ...): projectID = %v, rk = %+v", ctx, key, projectID, rk)
+
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEAlphaRegionBackendServices.Update(%v, %v, ...): RateLimiter error: %v", ctx, key, err)
 		return err
 	}
 	call := g.s.Alpha.RegionBackendServices.Update(projectID, key.Region, key.Name, arg0)
 	call.Context(ctx)
 	op, err := call.Do()
 	if err != nil {
+		glog.V(4).Infof("GCEAlphaRegionBackendServices.Update(%v, %v, ...) = %+v", ctx, key, err)
 		return err
 	}
-	return g.s.WaitForCompletion(ctx, op)
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCEAlphaRegionBackendServices.Update(%v, %v, ...) = %+v", ctx, key, err)
+	return err
 }
 
 // Disks is an interface that allows for mocking of Disks.
@@ -3946,8 +4310,11 @@ type GCEDisks struct {
 
 // Get the Disk named by key.
 func (g *GCEDisks) Get(ctx context.Context, key *meta.Key) (*ga.Disk, error) {
+	glog.V(5).Infof("GCEDisks.Get(%v, %v): called", ctx, key)
+
 	if !key.Valid() {
-		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+		glog.V(2).Infof("GCEDisks.Get(%v, %v): key is invalid (%#v)", ctx, key, key)
+		return nil, fmt.Errorf("invalid GCE key (%#v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "Disks")
 	rk := &RateLimitKey{
@@ -3956,16 +4323,21 @@ func (g *GCEDisks) Get(ctx context.Context, key *meta.Key) (*ga.Disk, error) {
 		Version:   meta.Version("ga"),
 		Service:   "Disks",
 	}
+	glog.V(5).Infof("GCEDisks.Get(%v, %v): projectID = %v, rk = %+v", ctx, key, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEDisks.Get(%v, %v): RateLimiter error: %v", ctx, key, err)
 		return nil, err
 	}
 	call := g.s.GA.Disks.Get(projectID, key.Zone, key.Name)
 	call.Context(ctx)
-	return call.Do()
+	v, err := call.Do()
+	glog.V(4).Infof("GCEDisks.Get(%v, %v) = %+v, %v", ctx, key, v, err)
+	return v, err
 }
 
 // List all Disk objects.
 func (g *GCEDisks) List(ctx context.Context, zone string, fl *filter.F) ([]*ga.Disk, error) {
+	glog.V(5).Infof("GCEDisks.List(%v, %v, %v) called", ctx, zone, fl)
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "Disks")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -3976,24 +4348,40 @@ func (g *GCEDisks) List(ctx context.Context, zone string, fl *filter.F) ([]*ga.D
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
 		return nil, err
 	}
+	glog.V(5).Infof("GCEDisks.List(%v, %v, %v): projectID = %v, rk = %+v", ctx, zone, fl, projectID, rk)
 	call := g.s.GA.Disks.List(projectID, zone)
 	if fl != filter.None {
 		call.Filter(fl.String())
 	}
 	var all []*ga.Disk
 	f := func(l *ga.DiskList) error {
+		glog.V(5).Infof("GCEDisks.List(%v, ..., %v): page %+v", ctx, fl, l)
 		all = append(all, l.Items...)
 		return nil
 	}
 	if err := call.Pages(ctx, f); err != nil {
+		glog.V(4).Infof("GCEDisks.List(%v, ..., %v) = %v, %v", ctx, fl, nil, err)
 		return nil, err
 	}
+
+	if glog.V(4) {
+		glog.V(4).Infof("GCEDisks.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
+	} else if glog.V(5) {
+		var asStr []string
+		for _, o := range all {
+			asStr = append(asStr, fmt.Sprintf("%+v", o))
+		}
+		glog.V(5).Infof("GCEDisks.List(%v, ..., %v) = %v, %v", ctx, fl, asStr, nil)
+	}
+
 	return all, nil
 }
 
 // Insert Disk with key of value obj.
 func (g *GCEDisks) Insert(ctx context.Context, key *meta.Key, obj *ga.Disk) error {
+	glog.V(5).Infof("GCEDisks.Insert(%v, %v, %+v): called", ctx, key, obj)
 	if !key.Valid() {
+		glog.V(2).Infof("GCEDisks.Insert(%v, %v, ...): key is invalid (%#v)", ctx, key, key)
 		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "Disks")
@@ -4003,7 +4391,9 @@ func (g *GCEDisks) Insert(ctx context.Context, key *meta.Key, obj *ga.Disk) erro
 		Version:   meta.Version("ga"),
 		Service:   "Disks",
 	}
+	glog.V(5).Infof("GCEDisks.Insert(%v, %v, ...): projectID = %v, rk = %+v", ctx, key, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEDisks.Insert(%v, %v, ...): RateLimiter error: %v", ctx, key, err)
 		return err
 	}
 	obj.Name = key.Name
@@ -4012,14 +4402,20 @@ func (g *GCEDisks) Insert(ctx context.Context, key *meta.Key, obj *ga.Disk) erro
 
 	op, err := call.Do()
 	if err != nil {
+		glog.V(4).Infof("GCEDisks.Insert(%v, %v, ...) = %+v", ctx, key, err)
 		return err
 	}
-	return g.s.WaitForCompletion(ctx, op)
+
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCEDisks.Insert(%v, %v, %+v) = %+v", ctx, key, obj, err)
+	return err
 }
 
 // Delete the Disk referenced by key.
 func (g *GCEDisks) Delete(ctx context.Context, key *meta.Key) error {
+	glog.V(5).Infof("GCEDisks.Delete(%v, %v): called", ctx, key)
 	if !key.Valid() {
+		glog.V(2).Infof("GCEDisks.Delete(%v, %v): key is invalid (%#v)", ctx, key, key)
 		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "Disks")
@@ -4029,7 +4425,9 @@ func (g *GCEDisks) Delete(ctx context.Context, key *meta.Key) error {
 		Version:   meta.Version("ga"),
 		Service:   "Disks",
 	}
+	glog.V(5).Infof("GCEDisks.Delete(%v, %v): projectID = %v, rk = %+v", ctx, key, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEDisks.Delete(%v, %v): RateLimiter error: %v", ctx, key, err)
 		return err
 	}
 	call := g.s.GA.Disks.Delete(projectID, key.Zone, key.Name)
@@ -4037,9 +4435,13 @@ func (g *GCEDisks) Delete(ctx context.Context, key *meta.Key) error {
 
 	op, err := call.Do()
 	if err != nil {
+		glog.V(4).Infof("GCEDisks.Delete(%v, %v) = %v", ctx, key, err)
 		return err
 	}
-	return g.s.WaitForCompletion(ctx, op)
+
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCEDisks.Delete(%v, %v) = %v", ctx, key, err)
+	return err
 }
 
 // AlphaDisks is an interface that allows for mocking of Disks.
@@ -4239,8 +4641,11 @@ type GCEAlphaDisks struct {
 
 // Get the Disk named by key.
 func (g *GCEAlphaDisks) Get(ctx context.Context, key *meta.Key) (*alpha.Disk, error) {
+	glog.V(5).Infof("GCEAlphaDisks.Get(%v, %v): called", ctx, key)
+
 	if !key.Valid() {
-		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+		glog.V(2).Infof("GCEAlphaDisks.Get(%v, %v): key is invalid (%#v)", ctx, key, key)
+		return nil, fmt.Errorf("invalid GCE key (%#v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "alpha", "Disks")
 	rk := &RateLimitKey{
@@ -4249,16 +4654,21 @@ func (g *GCEAlphaDisks) Get(ctx context.Context, key *meta.Key) (*alpha.Disk, er
 		Version:   meta.Version("alpha"),
 		Service:   "Disks",
 	}
+	glog.V(5).Infof("GCEAlphaDisks.Get(%v, %v): projectID = %v, rk = %+v", ctx, key, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEAlphaDisks.Get(%v, %v): RateLimiter error: %v", ctx, key, err)
 		return nil, err
 	}
 	call := g.s.Alpha.Disks.Get(projectID, key.Zone, key.Name)
 	call.Context(ctx)
-	return call.Do()
+	v, err := call.Do()
+	glog.V(4).Infof("GCEAlphaDisks.Get(%v, %v) = %+v, %v", ctx, key, v, err)
+	return v, err
 }
 
 // List all Disk objects.
 func (g *GCEAlphaDisks) List(ctx context.Context, zone string, fl *filter.F) ([]*alpha.Disk, error) {
+	glog.V(5).Infof("GCEAlphaDisks.List(%v, %v, %v) called", ctx, zone, fl)
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "alpha", "Disks")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -4269,24 +4679,40 @@ func (g *GCEAlphaDisks) List(ctx context.Context, zone string, fl *filter.F) ([]
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
 		return nil, err
 	}
+	glog.V(5).Infof("GCEAlphaDisks.List(%v, %v, %v): projectID = %v, rk = %+v", ctx, zone, fl, projectID, rk)
 	call := g.s.Alpha.Disks.List(projectID, zone)
 	if fl != filter.None {
 		call.Filter(fl.String())
 	}
 	var all []*alpha.Disk
 	f := func(l *alpha.DiskList) error {
+		glog.V(5).Infof("GCEAlphaDisks.List(%v, ..., %v): page %+v", ctx, fl, l)
 		all = append(all, l.Items...)
 		return nil
 	}
 	if err := call.Pages(ctx, f); err != nil {
+		glog.V(4).Infof("GCEAlphaDisks.List(%v, ..., %v) = %v, %v", ctx, fl, nil, err)
 		return nil, err
 	}
+
+	if glog.V(4) {
+		glog.V(4).Infof("GCEAlphaDisks.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
+	} else if glog.V(5) {
+		var asStr []string
+		for _, o := range all {
+			asStr = append(asStr, fmt.Sprintf("%+v", o))
+		}
+		glog.V(5).Infof("GCEAlphaDisks.List(%v, ..., %v) = %v, %v", ctx, fl, asStr, nil)
+	}
+
 	return all, nil
 }
 
 // Insert Disk with key of value obj.
 func (g *GCEAlphaDisks) Insert(ctx context.Context, key *meta.Key, obj *alpha.Disk) error {
+	glog.V(5).Infof("GCEAlphaDisks.Insert(%v, %v, %+v): called", ctx, key, obj)
 	if !key.Valid() {
+		glog.V(2).Infof("GCEAlphaDisks.Insert(%v, %v, ...): key is invalid (%#v)", ctx, key, key)
 		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "alpha", "Disks")
@@ -4296,7 +4722,9 @@ func (g *GCEAlphaDisks) Insert(ctx context.Context, key *meta.Key, obj *alpha.Di
 		Version:   meta.Version("alpha"),
 		Service:   "Disks",
 	}
+	glog.V(5).Infof("GCEAlphaDisks.Insert(%v, %v, ...): projectID = %v, rk = %+v", ctx, key, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEAlphaDisks.Insert(%v, %v, ...): RateLimiter error: %v", ctx, key, err)
 		return err
 	}
 	obj.Name = key.Name
@@ -4305,14 +4733,20 @@ func (g *GCEAlphaDisks) Insert(ctx context.Context, key *meta.Key, obj *alpha.Di
 
 	op, err := call.Do()
 	if err != nil {
+		glog.V(4).Infof("GCEAlphaDisks.Insert(%v, %v, ...) = %+v", ctx, key, err)
 		return err
 	}
-	return g.s.WaitForCompletion(ctx, op)
+
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCEAlphaDisks.Insert(%v, %v, %+v) = %+v", ctx, key, obj, err)
+	return err
 }
 
 // Delete the Disk referenced by key.
 func (g *GCEAlphaDisks) Delete(ctx context.Context, key *meta.Key) error {
+	glog.V(5).Infof("GCEAlphaDisks.Delete(%v, %v): called", ctx, key)
 	if !key.Valid() {
+		glog.V(2).Infof("GCEAlphaDisks.Delete(%v, %v): key is invalid (%#v)", ctx, key, key)
 		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "alpha", "Disks")
@@ -4322,7 +4756,9 @@ func (g *GCEAlphaDisks) Delete(ctx context.Context, key *meta.Key) error {
 		Version:   meta.Version("alpha"),
 		Service:   "Disks",
 	}
+	glog.V(5).Infof("GCEAlphaDisks.Delete(%v, %v): projectID = %v, rk = %+v", ctx, key, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEAlphaDisks.Delete(%v, %v): RateLimiter error: %v", ctx, key, err)
 		return err
 	}
 	call := g.s.Alpha.Disks.Delete(projectID, key.Zone, key.Name)
@@ -4330,9 +4766,13 @@ func (g *GCEAlphaDisks) Delete(ctx context.Context, key *meta.Key) error {
 
 	op, err := call.Do()
 	if err != nil {
+		glog.V(4).Infof("GCEAlphaDisks.Delete(%v, %v) = %v", ctx, key, err)
 		return err
 	}
-	return g.s.WaitForCompletion(ctx, op)
+
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCEAlphaDisks.Delete(%v, %v) = %v", ctx, key, err)
+	return err
 }
 
 // AlphaRegionDisks is an interface that allows for mocking of RegionDisks.
@@ -4532,8 +4972,11 @@ type GCEAlphaRegionDisks struct {
 
 // Get the Disk named by key.
 func (g *GCEAlphaRegionDisks) Get(ctx context.Context, key *meta.Key) (*alpha.Disk, error) {
+	glog.V(5).Infof("GCEAlphaRegionDisks.Get(%v, %v): called", ctx, key)
+
 	if !key.Valid() {
-		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+		glog.V(2).Infof("GCEAlphaRegionDisks.Get(%v, %v): key is invalid (%#v)", ctx, key, key)
+		return nil, fmt.Errorf("invalid GCE key (%#v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "alpha", "RegionDisks")
 	rk := &RateLimitKey{
@@ -4542,16 +4985,21 @@ func (g *GCEAlphaRegionDisks) Get(ctx context.Context, key *meta.Key) (*alpha.Di
 		Version:   meta.Version("alpha"),
 		Service:   "RegionDisks",
 	}
+	glog.V(5).Infof("GCEAlphaRegionDisks.Get(%v, %v): projectID = %v, rk = %+v", ctx, key, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEAlphaRegionDisks.Get(%v, %v): RateLimiter error: %v", ctx, key, err)
 		return nil, err
 	}
 	call := g.s.Alpha.RegionDisks.Get(projectID, key.Region, key.Name)
 	call.Context(ctx)
-	return call.Do()
+	v, err := call.Do()
+	glog.V(4).Infof("GCEAlphaRegionDisks.Get(%v, %v) = %+v, %v", ctx, key, v, err)
+	return v, err
 }
 
 // List all Disk objects.
 func (g *GCEAlphaRegionDisks) List(ctx context.Context, region string, fl *filter.F) ([]*alpha.Disk, error) {
+	glog.V(5).Infof("GCEAlphaRegionDisks.List(%v, %v, %v) called", ctx, region, fl)
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "alpha", "RegionDisks")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -4562,24 +5010,40 @@ func (g *GCEAlphaRegionDisks) List(ctx context.Context, region string, fl *filte
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
 		return nil, err
 	}
+	glog.V(5).Infof("GCEAlphaRegionDisks.List(%v, %v, %v): projectID = %v, rk = %+v", ctx, region, fl, projectID, rk)
 	call := g.s.Alpha.RegionDisks.List(projectID, region)
 	if fl != filter.None {
 		call.Filter(fl.String())
 	}
 	var all []*alpha.Disk
 	f := func(l *alpha.DiskList) error {
+		glog.V(5).Infof("GCEAlphaRegionDisks.List(%v, ..., %v): page %+v", ctx, fl, l)
 		all = append(all, l.Items...)
 		return nil
 	}
 	if err := call.Pages(ctx, f); err != nil {
+		glog.V(4).Infof("GCEAlphaRegionDisks.List(%v, ..., %v) = %v, %v", ctx, fl, nil, err)
 		return nil, err
 	}
+
+	if glog.V(4) {
+		glog.V(4).Infof("GCEAlphaRegionDisks.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
+	} else if glog.V(5) {
+		var asStr []string
+		for _, o := range all {
+			asStr = append(asStr, fmt.Sprintf("%+v", o))
+		}
+		glog.V(5).Infof("GCEAlphaRegionDisks.List(%v, ..., %v) = %v, %v", ctx, fl, asStr, nil)
+	}
+
 	return all, nil
 }
 
 // Insert Disk with key of value obj.
 func (g *GCEAlphaRegionDisks) Insert(ctx context.Context, key *meta.Key, obj *alpha.Disk) error {
+	glog.V(5).Infof("GCEAlphaRegionDisks.Insert(%v, %v, %+v): called", ctx, key, obj)
 	if !key.Valid() {
+		glog.V(2).Infof("GCEAlphaRegionDisks.Insert(%v, %v, ...): key is invalid (%#v)", ctx, key, key)
 		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "alpha", "RegionDisks")
@@ -4589,7 +5053,9 @@ func (g *GCEAlphaRegionDisks) Insert(ctx context.Context, key *meta.Key, obj *al
 		Version:   meta.Version("alpha"),
 		Service:   "RegionDisks",
 	}
+	glog.V(5).Infof("GCEAlphaRegionDisks.Insert(%v, %v, ...): projectID = %v, rk = %+v", ctx, key, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEAlphaRegionDisks.Insert(%v, %v, ...): RateLimiter error: %v", ctx, key, err)
 		return err
 	}
 	obj.Name = key.Name
@@ -4598,14 +5064,20 @@ func (g *GCEAlphaRegionDisks) Insert(ctx context.Context, key *meta.Key, obj *al
 
 	op, err := call.Do()
 	if err != nil {
+		glog.V(4).Infof("GCEAlphaRegionDisks.Insert(%v, %v, ...) = %+v", ctx, key, err)
 		return err
 	}
-	return g.s.WaitForCompletion(ctx, op)
+
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCEAlphaRegionDisks.Insert(%v, %v, %+v) = %+v", ctx, key, obj, err)
+	return err
 }
 
 // Delete the Disk referenced by key.
 func (g *GCEAlphaRegionDisks) Delete(ctx context.Context, key *meta.Key) error {
+	glog.V(5).Infof("GCEAlphaRegionDisks.Delete(%v, %v): called", ctx, key)
 	if !key.Valid() {
+		glog.V(2).Infof("GCEAlphaRegionDisks.Delete(%v, %v): key is invalid (%#v)", ctx, key, key)
 		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "alpha", "RegionDisks")
@@ -4615,7 +5087,9 @@ func (g *GCEAlphaRegionDisks) Delete(ctx context.Context, key *meta.Key) error {
 		Version:   meta.Version("alpha"),
 		Service:   "RegionDisks",
 	}
+	glog.V(5).Infof("GCEAlphaRegionDisks.Delete(%v, %v): projectID = %v, rk = %+v", ctx, key, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEAlphaRegionDisks.Delete(%v, %v): RateLimiter error: %v", ctx, key, err)
 		return err
 	}
 	call := g.s.Alpha.RegionDisks.Delete(projectID, key.Region, key.Name)
@@ -4623,9 +5097,13 @@ func (g *GCEAlphaRegionDisks) Delete(ctx context.Context, key *meta.Key) error {
 
 	op, err := call.Do()
 	if err != nil {
+		glog.V(4).Infof("GCEAlphaRegionDisks.Delete(%v, %v) = %v", ctx, key, err)
 		return err
 	}
-	return g.s.WaitForCompletion(ctx, op)
+
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCEAlphaRegionDisks.Delete(%v, %v) = %v", ctx, key, err)
+	return err
 }
 
 // Firewalls is an interface that allows for mocking of Firewalls.
@@ -4832,8 +5310,11 @@ type GCEFirewalls struct {
 
 // Get the Firewall named by key.
 func (g *GCEFirewalls) Get(ctx context.Context, key *meta.Key) (*ga.Firewall, error) {
+	glog.V(5).Infof("GCEFirewalls.Get(%v, %v): called", ctx, key)
+
 	if !key.Valid() {
-		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+		glog.V(2).Infof("GCEFirewalls.Get(%v, %v): key is invalid (%#v)", ctx, key, key)
+		return nil, fmt.Errorf("invalid GCE key (%#v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "Firewalls")
 	rk := &RateLimitKey{
@@ -4842,16 +5323,21 @@ func (g *GCEFirewalls) Get(ctx context.Context, key *meta.Key) (*ga.Firewall, er
 		Version:   meta.Version("ga"),
 		Service:   "Firewalls",
 	}
+	glog.V(5).Infof("GCEFirewalls.Get(%v, %v): projectID = %v, rk = %+v", ctx, key, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEFirewalls.Get(%v, %v): RateLimiter error: %v", ctx, key, err)
 		return nil, err
 	}
 	call := g.s.GA.Firewalls.Get(projectID, key.Name)
 	call.Context(ctx)
-	return call.Do()
+	v, err := call.Do()
+	glog.V(4).Infof("GCEFirewalls.Get(%v, %v) = %+v, %v", ctx, key, v, err)
+	return v, err
 }
 
 // List all Firewall objects.
 func (g *GCEFirewalls) List(ctx context.Context, fl *filter.F) ([]*ga.Firewall, error) {
+	glog.V(5).Infof("GCEFirewalls.List(%v, %v) called", ctx, fl)
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "Firewalls")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -4862,24 +5348,40 @@ func (g *GCEFirewalls) List(ctx context.Context, fl *filter.F) ([]*ga.Firewall, 
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
 		return nil, err
 	}
+	glog.V(5).Infof("GCEFirewalls.List(%v, %v): projectID = %v, rk = %+v", ctx, fl, projectID, rk)
 	call := g.s.GA.Firewalls.List(projectID)
 	if fl != filter.None {
 		call.Filter(fl.String())
 	}
 	var all []*ga.Firewall
 	f := func(l *ga.FirewallList) error {
+		glog.V(5).Infof("GCEFirewalls.List(%v, ..., %v): page %+v", ctx, fl, l)
 		all = append(all, l.Items...)
 		return nil
 	}
 	if err := call.Pages(ctx, f); err != nil {
+		glog.V(4).Infof("GCEFirewalls.List(%v, ..., %v) = %v, %v", ctx, fl, nil, err)
 		return nil, err
 	}
+
+	if glog.V(4) {
+		glog.V(4).Infof("GCEFirewalls.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
+	} else if glog.V(5) {
+		var asStr []string
+		for _, o := range all {
+			asStr = append(asStr, fmt.Sprintf("%+v", o))
+		}
+		glog.V(5).Infof("GCEFirewalls.List(%v, ..., %v) = %v, %v", ctx, fl, asStr, nil)
+	}
+
 	return all, nil
 }
 
 // Insert Firewall with key of value obj.
 func (g *GCEFirewalls) Insert(ctx context.Context, key *meta.Key, obj *ga.Firewall) error {
+	glog.V(5).Infof("GCEFirewalls.Insert(%v, %v, %+v): called", ctx, key, obj)
 	if !key.Valid() {
+		glog.V(2).Infof("GCEFirewalls.Insert(%v, %v, ...): key is invalid (%#v)", ctx, key, key)
 		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "Firewalls")
@@ -4889,7 +5391,9 @@ func (g *GCEFirewalls) Insert(ctx context.Context, key *meta.Key, obj *ga.Firewa
 		Version:   meta.Version("ga"),
 		Service:   "Firewalls",
 	}
+	glog.V(5).Infof("GCEFirewalls.Insert(%v, %v, ...): projectID = %v, rk = %+v", ctx, key, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEFirewalls.Insert(%v, %v, ...): RateLimiter error: %v", ctx, key, err)
 		return err
 	}
 	obj.Name = key.Name
@@ -4898,14 +5402,20 @@ func (g *GCEFirewalls) Insert(ctx context.Context, key *meta.Key, obj *ga.Firewa
 
 	op, err := call.Do()
 	if err != nil {
+		glog.V(4).Infof("GCEFirewalls.Insert(%v, %v, ...) = %+v", ctx, key, err)
 		return err
 	}
-	return g.s.WaitForCompletion(ctx, op)
+
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCEFirewalls.Insert(%v, %v, %+v) = %+v", ctx, key, obj, err)
+	return err
 }
 
 // Delete the Firewall referenced by key.
 func (g *GCEFirewalls) Delete(ctx context.Context, key *meta.Key) error {
+	glog.V(5).Infof("GCEFirewalls.Delete(%v, %v): called", ctx, key)
 	if !key.Valid() {
+		glog.V(2).Infof("GCEFirewalls.Delete(%v, %v): key is invalid (%#v)", ctx, key, key)
 		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "Firewalls")
@@ -4915,7 +5425,9 @@ func (g *GCEFirewalls) Delete(ctx context.Context, key *meta.Key) error {
 		Version:   meta.Version("ga"),
 		Service:   "Firewalls",
 	}
+	glog.V(5).Infof("GCEFirewalls.Delete(%v, %v): projectID = %v, rk = %+v", ctx, key, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEFirewalls.Delete(%v, %v): RateLimiter error: %v", ctx, key, err)
 		return err
 	}
 	call := g.s.GA.Firewalls.Delete(projectID, key.Name)
@@ -4924,14 +5436,21 @@ func (g *GCEFirewalls) Delete(ctx context.Context, key *meta.Key) error {
 
 	op, err := call.Do()
 	if err != nil {
+		glog.V(4).Infof("GCEFirewalls.Delete(%v, %v) = %v", ctx, key, err)
 		return err
 	}
-	return g.s.WaitForCompletion(ctx, op)
+
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCEFirewalls.Delete(%v, %v) = %v", ctx, key, err)
+	return err
 }
 
 // Update is a method on GCEFirewalls.
 func (g *GCEFirewalls) Update(ctx context.Context, key *meta.Key, arg0 *ga.Firewall) error {
+	glog.V(5).Infof("GCEFirewalls.Update(%v, %v, ...): called", ctx, key)
+
 	if !key.Valid() {
+		glog.V(2).Infof("GCEFirewalls.Update(%v, %v, ...): key is invalid (%#v)", ctx, key, key)
 		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "Firewalls")
@@ -4941,16 +5460,22 @@ func (g *GCEFirewalls) Update(ctx context.Context, key *meta.Key, arg0 *ga.Firew
 		Version:   meta.Version("ga"),
 		Service:   "Firewalls",
 	}
+	glog.V(5).Infof("GCEFirewalls.Update(%v, %v, ...): projectID = %v, rk = %+v", ctx, key, projectID, rk)
+
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEFirewalls.Update(%v, %v, ...): RateLimiter error: %v", ctx, key, err)
 		return err
 	}
 	call := g.s.GA.Firewalls.Update(projectID, key.Name, arg0)
 	call.Context(ctx)
 	op, err := call.Do()
 	if err != nil {
+		glog.V(4).Infof("GCEFirewalls.Update(%v, %v, ...) = %+v", ctx, key, err)
 		return err
 	}
-	return g.s.WaitForCompletion(ctx, op)
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCEFirewalls.Update(%v, %v, ...) = %+v", ctx, key, err)
+	return err
 }
 
 // ForwardingRules is an interface that allows for mocking of ForwardingRules.
@@ -5150,8 +5675,11 @@ type GCEForwardingRules struct {
 
 // Get the ForwardingRule named by key.
 func (g *GCEForwardingRules) Get(ctx context.Context, key *meta.Key) (*ga.ForwardingRule, error) {
+	glog.V(5).Infof("GCEForwardingRules.Get(%v, %v): called", ctx, key)
+
 	if !key.Valid() {
-		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+		glog.V(2).Infof("GCEForwardingRules.Get(%v, %v): key is invalid (%#v)", ctx, key, key)
+		return nil, fmt.Errorf("invalid GCE key (%#v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "ForwardingRules")
 	rk := &RateLimitKey{
@@ -5160,16 +5688,21 @@ func (g *GCEForwardingRules) Get(ctx context.Context, key *meta.Key) (*ga.Forwar
 		Version:   meta.Version("ga"),
 		Service:   "ForwardingRules",
 	}
+	glog.V(5).Infof("GCEForwardingRules.Get(%v, %v): projectID = %v, rk = %+v", ctx, key, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEForwardingRules.Get(%v, %v): RateLimiter error: %v", ctx, key, err)
 		return nil, err
 	}
 	call := g.s.GA.ForwardingRules.Get(projectID, key.Region, key.Name)
 	call.Context(ctx)
-	return call.Do()
+	v, err := call.Do()
+	glog.V(4).Infof("GCEForwardingRules.Get(%v, %v) = %+v, %v", ctx, key, v, err)
+	return v, err
 }
 
 // List all ForwardingRule objects.
 func (g *GCEForwardingRules) List(ctx context.Context, region string, fl *filter.F) ([]*ga.ForwardingRule, error) {
+	glog.V(5).Infof("GCEForwardingRules.List(%v, %v, %v) called", ctx, region, fl)
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "ForwardingRules")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -5180,24 +5713,40 @@ func (g *GCEForwardingRules) List(ctx context.Context, region string, fl *filter
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
 		return nil, err
 	}
+	glog.V(5).Infof("GCEForwardingRules.List(%v, %v, %v): projectID = %v, rk = %+v", ctx, region, fl, projectID, rk)
 	call := g.s.GA.ForwardingRules.List(projectID, region)
 	if fl != filter.None {
 		call.Filter(fl.String())
 	}
 	var all []*ga.ForwardingRule
 	f := func(l *ga.ForwardingRuleList) error {
+		glog.V(5).Infof("GCEForwardingRules.List(%v, ..., %v): page %+v", ctx, fl, l)
 		all = append(all, l.Items...)
 		return nil
 	}
 	if err := call.Pages(ctx, f); err != nil {
+		glog.V(4).Infof("GCEForwardingRules.List(%v, ..., %v) = %v, %v", ctx, fl, nil, err)
 		return nil, err
 	}
+
+	if glog.V(4) {
+		glog.V(4).Infof("GCEForwardingRules.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
+	} else if glog.V(5) {
+		var asStr []string
+		for _, o := range all {
+			asStr = append(asStr, fmt.Sprintf("%+v", o))
+		}
+		glog.V(5).Infof("GCEForwardingRules.List(%v, ..., %v) = %v, %v", ctx, fl, asStr, nil)
+	}
+
 	return all, nil
 }
 
 // Insert ForwardingRule with key of value obj.
 func (g *GCEForwardingRules) Insert(ctx context.Context, key *meta.Key, obj *ga.ForwardingRule) error {
+	glog.V(5).Infof("GCEForwardingRules.Insert(%v, %v, %+v): called", ctx, key, obj)
 	if !key.Valid() {
+		glog.V(2).Infof("GCEForwardingRules.Insert(%v, %v, ...): key is invalid (%#v)", ctx, key, key)
 		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "ForwardingRules")
@@ -5207,7 +5756,9 @@ func (g *GCEForwardingRules) Insert(ctx context.Context, key *meta.Key, obj *ga.
 		Version:   meta.Version("ga"),
 		Service:   "ForwardingRules",
 	}
+	glog.V(5).Infof("GCEForwardingRules.Insert(%v, %v, ...): projectID = %v, rk = %+v", ctx, key, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEForwardingRules.Insert(%v, %v, ...): RateLimiter error: %v", ctx, key, err)
 		return err
 	}
 	obj.Name = key.Name
@@ -5216,14 +5767,20 @@ func (g *GCEForwardingRules) Insert(ctx context.Context, key *meta.Key, obj *ga.
 
 	op, err := call.Do()
 	if err != nil {
+		glog.V(4).Infof("GCEForwardingRules.Insert(%v, %v, ...) = %+v", ctx, key, err)
 		return err
 	}
-	return g.s.WaitForCompletion(ctx, op)
+
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCEForwardingRules.Insert(%v, %v, %+v) = %+v", ctx, key, obj, err)
+	return err
 }
 
 // Delete the ForwardingRule referenced by key.
 func (g *GCEForwardingRules) Delete(ctx context.Context, key *meta.Key) error {
+	glog.V(5).Infof("GCEForwardingRules.Delete(%v, %v): called", ctx, key)
 	if !key.Valid() {
+		glog.V(2).Infof("GCEForwardingRules.Delete(%v, %v): key is invalid (%#v)", ctx, key, key)
 		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "ForwardingRules")
@@ -5233,7 +5790,9 @@ func (g *GCEForwardingRules) Delete(ctx context.Context, key *meta.Key) error {
 		Version:   meta.Version("ga"),
 		Service:   "ForwardingRules",
 	}
+	glog.V(5).Infof("GCEForwardingRules.Delete(%v, %v): projectID = %v, rk = %+v", ctx, key, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEForwardingRules.Delete(%v, %v): RateLimiter error: %v", ctx, key, err)
 		return err
 	}
 	call := g.s.GA.ForwardingRules.Delete(projectID, key.Region, key.Name)
@@ -5241,9 +5800,13 @@ func (g *GCEForwardingRules) Delete(ctx context.Context, key *meta.Key) error {
 
 	op, err := call.Do()
 	if err != nil {
+		glog.V(4).Infof("GCEForwardingRules.Delete(%v, %v) = %v", ctx, key, err)
 		return err
 	}
-	return g.s.WaitForCompletion(ctx, op)
+
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCEForwardingRules.Delete(%v, %v) = %v", ctx, key, err)
+	return err
 }
 
 // AlphaForwardingRules is an interface that allows for mocking of ForwardingRules.
@@ -5443,8 +6006,11 @@ type GCEAlphaForwardingRules struct {
 
 // Get the ForwardingRule named by key.
 func (g *GCEAlphaForwardingRules) Get(ctx context.Context, key *meta.Key) (*alpha.ForwardingRule, error) {
+	glog.V(5).Infof("GCEAlphaForwardingRules.Get(%v, %v): called", ctx, key)
+
 	if !key.Valid() {
-		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+		glog.V(2).Infof("GCEAlphaForwardingRules.Get(%v, %v): key is invalid (%#v)", ctx, key, key)
+		return nil, fmt.Errorf("invalid GCE key (%#v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "alpha", "ForwardingRules")
 	rk := &RateLimitKey{
@@ -5453,16 +6019,21 @@ func (g *GCEAlphaForwardingRules) Get(ctx context.Context, key *meta.Key) (*alph
 		Version:   meta.Version("alpha"),
 		Service:   "ForwardingRules",
 	}
+	glog.V(5).Infof("GCEAlphaForwardingRules.Get(%v, %v): projectID = %v, rk = %+v", ctx, key, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEAlphaForwardingRules.Get(%v, %v): RateLimiter error: %v", ctx, key, err)
 		return nil, err
 	}
 	call := g.s.Alpha.ForwardingRules.Get(projectID, key.Region, key.Name)
 	call.Context(ctx)
-	return call.Do()
+	v, err := call.Do()
+	glog.V(4).Infof("GCEAlphaForwardingRules.Get(%v, %v) = %+v, %v", ctx, key, v, err)
+	return v, err
 }
 
 // List all ForwardingRule objects.
 func (g *GCEAlphaForwardingRules) List(ctx context.Context, region string, fl *filter.F) ([]*alpha.ForwardingRule, error) {
+	glog.V(5).Infof("GCEAlphaForwardingRules.List(%v, %v, %v) called", ctx, region, fl)
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "alpha", "ForwardingRules")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -5473,24 +6044,40 @@ func (g *GCEAlphaForwardingRules) List(ctx context.Context, region string, fl *f
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
 		return nil, err
 	}
+	glog.V(5).Infof("GCEAlphaForwardingRules.List(%v, %v, %v): projectID = %v, rk = %+v", ctx, region, fl, projectID, rk)
 	call := g.s.Alpha.ForwardingRules.List(projectID, region)
 	if fl != filter.None {
 		call.Filter(fl.String())
 	}
 	var all []*alpha.ForwardingRule
 	f := func(l *alpha.ForwardingRuleList) error {
+		glog.V(5).Infof("GCEAlphaForwardingRules.List(%v, ..., %v): page %+v", ctx, fl, l)
 		all = append(all, l.Items...)
 		return nil
 	}
 	if err := call.Pages(ctx, f); err != nil {
+		glog.V(4).Infof("GCEAlphaForwardingRules.List(%v, ..., %v) = %v, %v", ctx, fl, nil, err)
 		return nil, err
 	}
+
+	if glog.V(4) {
+		glog.V(4).Infof("GCEAlphaForwardingRules.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
+	} else if glog.V(5) {
+		var asStr []string
+		for _, o := range all {
+			asStr = append(asStr, fmt.Sprintf("%+v", o))
+		}
+		glog.V(5).Infof("GCEAlphaForwardingRules.List(%v, ..., %v) = %v, %v", ctx, fl, asStr, nil)
+	}
+
 	return all, nil
 }
 
 // Insert ForwardingRule with key of value obj.
 func (g *GCEAlphaForwardingRules) Insert(ctx context.Context, key *meta.Key, obj *alpha.ForwardingRule) error {
+	glog.V(5).Infof("GCEAlphaForwardingRules.Insert(%v, %v, %+v): called", ctx, key, obj)
 	if !key.Valid() {
+		glog.V(2).Infof("GCEAlphaForwardingRules.Insert(%v, %v, ...): key is invalid (%#v)", ctx, key, key)
 		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "alpha", "ForwardingRules")
@@ -5500,7 +6087,9 @@ func (g *GCEAlphaForwardingRules) Insert(ctx context.Context, key *meta.Key, obj
 		Version:   meta.Version("alpha"),
 		Service:   "ForwardingRules",
 	}
+	glog.V(5).Infof("GCEAlphaForwardingRules.Insert(%v, %v, ...): projectID = %v, rk = %+v", ctx, key, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEAlphaForwardingRules.Insert(%v, %v, ...): RateLimiter error: %v", ctx, key, err)
 		return err
 	}
 	obj.Name = key.Name
@@ -5509,14 +6098,20 @@ func (g *GCEAlphaForwardingRules) Insert(ctx context.Context, key *meta.Key, obj
 
 	op, err := call.Do()
 	if err != nil {
+		glog.V(4).Infof("GCEAlphaForwardingRules.Insert(%v, %v, ...) = %+v", ctx, key, err)
 		return err
 	}
-	return g.s.WaitForCompletion(ctx, op)
+
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCEAlphaForwardingRules.Insert(%v, %v, %+v) = %+v", ctx, key, obj, err)
+	return err
 }
 
 // Delete the ForwardingRule referenced by key.
 func (g *GCEAlphaForwardingRules) Delete(ctx context.Context, key *meta.Key) error {
+	glog.V(5).Infof("GCEAlphaForwardingRules.Delete(%v, %v): called", ctx, key)
 	if !key.Valid() {
+		glog.V(2).Infof("GCEAlphaForwardingRules.Delete(%v, %v): key is invalid (%#v)", ctx, key, key)
 		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "alpha", "ForwardingRules")
@@ -5526,7 +6121,9 @@ func (g *GCEAlphaForwardingRules) Delete(ctx context.Context, key *meta.Key) err
 		Version:   meta.Version("alpha"),
 		Service:   "ForwardingRules",
 	}
+	glog.V(5).Infof("GCEAlphaForwardingRules.Delete(%v, %v): projectID = %v, rk = %+v", ctx, key, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEAlphaForwardingRules.Delete(%v, %v): RateLimiter error: %v", ctx, key, err)
 		return err
 	}
 	call := g.s.Alpha.ForwardingRules.Delete(projectID, key.Region, key.Name)
@@ -5534,9 +6131,13 @@ func (g *GCEAlphaForwardingRules) Delete(ctx context.Context, key *meta.Key) err
 
 	op, err := call.Do()
 	if err != nil {
+		glog.V(4).Infof("GCEAlphaForwardingRules.Delete(%v, %v) = %v", ctx, key, err)
 		return err
 	}
-	return g.s.WaitForCompletion(ctx, op)
+
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCEAlphaForwardingRules.Delete(%v, %v) = %v", ctx, key, err)
+	return err
 }
 
 // GlobalForwardingRules is an interface that allows for mocking of GlobalForwardingRules.
@@ -5743,8 +6344,11 @@ type GCEGlobalForwardingRules struct {
 
 // Get the ForwardingRule named by key.
 func (g *GCEGlobalForwardingRules) Get(ctx context.Context, key *meta.Key) (*ga.ForwardingRule, error) {
+	glog.V(5).Infof("GCEGlobalForwardingRules.Get(%v, %v): called", ctx, key)
+
 	if !key.Valid() {
-		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+		glog.V(2).Infof("GCEGlobalForwardingRules.Get(%v, %v): key is invalid (%#v)", ctx, key, key)
+		return nil, fmt.Errorf("invalid GCE key (%#v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "GlobalForwardingRules")
 	rk := &RateLimitKey{
@@ -5753,16 +6357,21 @@ func (g *GCEGlobalForwardingRules) Get(ctx context.Context, key *meta.Key) (*ga.
 		Version:   meta.Version("ga"),
 		Service:   "GlobalForwardingRules",
 	}
+	glog.V(5).Infof("GCEGlobalForwardingRules.Get(%v, %v): projectID = %v, rk = %+v", ctx, key, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEGlobalForwardingRules.Get(%v, %v): RateLimiter error: %v", ctx, key, err)
 		return nil, err
 	}
 	call := g.s.GA.GlobalForwardingRules.Get(projectID, key.Name)
 	call.Context(ctx)
-	return call.Do()
+	v, err := call.Do()
+	glog.V(4).Infof("GCEGlobalForwardingRules.Get(%v, %v) = %+v, %v", ctx, key, v, err)
+	return v, err
 }
 
 // List all ForwardingRule objects.
 func (g *GCEGlobalForwardingRules) List(ctx context.Context, fl *filter.F) ([]*ga.ForwardingRule, error) {
+	glog.V(5).Infof("GCEGlobalForwardingRules.List(%v, %v) called", ctx, fl)
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "GlobalForwardingRules")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -5773,24 +6382,40 @@ func (g *GCEGlobalForwardingRules) List(ctx context.Context, fl *filter.F) ([]*g
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
 		return nil, err
 	}
+	glog.V(5).Infof("GCEGlobalForwardingRules.List(%v, %v): projectID = %v, rk = %+v", ctx, fl, projectID, rk)
 	call := g.s.GA.GlobalForwardingRules.List(projectID)
 	if fl != filter.None {
 		call.Filter(fl.String())
 	}
 	var all []*ga.ForwardingRule
 	f := func(l *ga.ForwardingRuleList) error {
+		glog.V(5).Infof("GCEGlobalForwardingRules.List(%v, ..., %v): page %+v", ctx, fl, l)
 		all = append(all, l.Items...)
 		return nil
 	}
 	if err := call.Pages(ctx, f); err != nil {
+		glog.V(4).Infof("GCEGlobalForwardingRules.List(%v, ..., %v) = %v, %v", ctx, fl, nil, err)
 		return nil, err
 	}
+
+	if glog.V(4) {
+		glog.V(4).Infof("GCEGlobalForwardingRules.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
+	} else if glog.V(5) {
+		var asStr []string
+		for _, o := range all {
+			asStr = append(asStr, fmt.Sprintf("%+v", o))
+		}
+		glog.V(5).Infof("GCEGlobalForwardingRules.List(%v, ..., %v) = %v, %v", ctx, fl, asStr, nil)
+	}
+
 	return all, nil
 }
 
 // Insert ForwardingRule with key of value obj.
 func (g *GCEGlobalForwardingRules) Insert(ctx context.Context, key *meta.Key, obj *ga.ForwardingRule) error {
+	glog.V(5).Infof("GCEGlobalForwardingRules.Insert(%v, %v, %+v): called", ctx, key, obj)
 	if !key.Valid() {
+		glog.V(2).Infof("GCEGlobalForwardingRules.Insert(%v, %v, ...): key is invalid (%#v)", ctx, key, key)
 		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "GlobalForwardingRules")
@@ -5800,7 +6425,9 @@ func (g *GCEGlobalForwardingRules) Insert(ctx context.Context, key *meta.Key, ob
 		Version:   meta.Version("ga"),
 		Service:   "GlobalForwardingRules",
 	}
+	glog.V(5).Infof("GCEGlobalForwardingRules.Insert(%v, %v, ...): projectID = %v, rk = %+v", ctx, key, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEGlobalForwardingRules.Insert(%v, %v, ...): RateLimiter error: %v", ctx, key, err)
 		return err
 	}
 	obj.Name = key.Name
@@ -5809,14 +6436,20 @@ func (g *GCEGlobalForwardingRules) Insert(ctx context.Context, key *meta.Key, ob
 
 	op, err := call.Do()
 	if err != nil {
+		glog.V(4).Infof("GCEGlobalForwardingRules.Insert(%v, %v, ...) = %+v", ctx, key, err)
 		return err
 	}
-	return g.s.WaitForCompletion(ctx, op)
+
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCEGlobalForwardingRules.Insert(%v, %v, %+v) = %+v", ctx, key, obj, err)
+	return err
 }
 
 // Delete the ForwardingRule referenced by key.
 func (g *GCEGlobalForwardingRules) Delete(ctx context.Context, key *meta.Key) error {
+	glog.V(5).Infof("GCEGlobalForwardingRules.Delete(%v, %v): called", ctx, key)
 	if !key.Valid() {
+		glog.V(2).Infof("GCEGlobalForwardingRules.Delete(%v, %v): key is invalid (%#v)", ctx, key, key)
 		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "GlobalForwardingRules")
@@ -5826,7 +6459,9 @@ func (g *GCEGlobalForwardingRules) Delete(ctx context.Context, key *meta.Key) er
 		Version:   meta.Version("ga"),
 		Service:   "GlobalForwardingRules",
 	}
+	glog.V(5).Infof("GCEGlobalForwardingRules.Delete(%v, %v): projectID = %v, rk = %+v", ctx, key, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEGlobalForwardingRules.Delete(%v, %v): RateLimiter error: %v", ctx, key, err)
 		return err
 	}
 	call := g.s.GA.GlobalForwardingRules.Delete(projectID, key.Name)
@@ -5835,14 +6470,21 @@ func (g *GCEGlobalForwardingRules) Delete(ctx context.Context, key *meta.Key) er
 
 	op, err := call.Do()
 	if err != nil {
+		glog.V(4).Infof("GCEGlobalForwardingRules.Delete(%v, %v) = %v", ctx, key, err)
 		return err
 	}
-	return g.s.WaitForCompletion(ctx, op)
+
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCEGlobalForwardingRules.Delete(%v, %v) = %v", ctx, key, err)
+	return err
 }
 
 // SetTarget is a method on GCEGlobalForwardingRules.
 func (g *GCEGlobalForwardingRules) SetTarget(ctx context.Context, key *meta.Key, arg0 *ga.TargetReference) error {
+	glog.V(5).Infof("GCEGlobalForwardingRules.SetTarget(%v, %v, ...): called", ctx, key)
+
 	if !key.Valid() {
+		glog.V(2).Infof("GCEGlobalForwardingRules.SetTarget(%v, %v, ...): key is invalid (%#v)", ctx, key, key)
 		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "GlobalForwardingRules")
@@ -5852,16 +6494,22 @@ func (g *GCEGlobalForwardingRules) SetTarget(ctx context.Context, key *meta.Key,
 		Version:   meta.Version("ga"),
 		Service:   "GlobalForwardingRules",
 	}
+	glog.V(5).Infof("GCEGlobalForwardingRules.SetTarget(%v, %v, ...): projectID = %v, rk = %+v", ctx, key, projectID, rk)
+
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEGlobalForwardingRules.SetTarget(%v, %v, ...): RateLimiter error: %v", ctx, key, err)
 		return err
 	}
 	call := g.s.GA.GlobalForwardingRules.SetTarget(projectID, key.Name, arg0)
 	call.Context(ctx)
 	op, err := call.Do()
 	if err != nil {
+		glog.V(4).Infof("GCEGlobalForwardingRules.SetTarget(%v, %v, ...) = %+v", ctx, key, err)
 		return err
 	}
-	return g.s.WaitForCompletion(ctx, op)
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCEGlobalForwardingRules.SetTarget(%v, %v, ...) = %+v", ctx, key, err)
+	return err
 }
 
 // HealthChecks is an interface that allows for mocking of HealthChecks.
@@ -6068,8 +6716,11 @@ type GCEHealthChecks struct {
 
 // Get the HealthCheck named by key.
 func (g *GCEHealthChecks) Get(ctx context.Context, key *meta.Key) (*ga.HealthCheck, error) {
+	glog.V(5).Infof("GCEHealthChecks.Get(%v, %v): called", ctx, key)
+
 	if !key.Valid() {
-		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+		glog.V(2).Infof("GCEHealthChecks.Get(%v, %v): key is invalid (%#v)", ctx, key, key)
+		return nil, fmt.Errorf("invalid GCE key (%#v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "HealthChecks")
 	rk := &RateLimitKey{
@@ -6078,16 +6729,21 @@ func (g *GCEHealthChecks) Get(ctx context.Context, key *meta.Key) (*ga.HealthChe
 		Version:   meta.Version("ga"),
 		Service:   "HealthChecks",
 	}
+	glog.V(5).Infof("GCEHealthChecks.Get(%v, %v): projectID = %v, rk = %+v", ctx, key, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEHealthChecks.Get(%v, %v): RateLimiter error: %v", ctx, key, err)
 		return nil, err
 	}
 	call := g.s.GA.HealthChecks.Get(projectID, key.Name)
 	call.Context(ctx)
-	return call.Do()
+	v, err := call.Do()
+	glog.V(4).Infof("GCEHealthChecks.Get(%v, %v) = %+v, %v", ctx, key, v, err)
+	return v, err
 }
 
 // List all HealthCheck objects.
 func (g *GCEHealthChecks) List(ctx context.Context, fl *filter.F) ([]*ga.HealthCheck, error) {
+	glog.V(5).Infof("GCEHealthChecks.List(%v, %v) called", ctx, fl)
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "HealthChecks")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -6098,24 +6754,40 @@ func (g *GCEHealthChecks) List(ctx context.Context, fl *filter.F) ([]*ga.HealthC
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
 		return nil, err
 	}
+	glog.V(5).Infof("GCEHealthChecks.List(%v, %v): projectID = %v, rk = %+v", ctx, fl, projectID, rk)
 	call := g.s.GA.HealthChecks.List(projectID)
 	if fl != filter.None {
 		call.Filter(fl.String())
 	}
 	var all []*ga.HealthCheck
 	f := func(l *ga.HealthCheckList) error {
+		glog.V(5).Infof("GCEHealthChecks.List(%v, ..., %v): page %+v", ctx, fl, l)
 		all = append(all, l.Items...)
 		return nil
 	}
 	if err := call.Pages(ctx, f); err != nil {
+		glog.V(4).Infof("GCEHealthChecks.List(%v, ..., %v) = %v, %v", ctx, fl, nil, err)
 		return nil, err
 	}
+
+	if glog.V(4) {
+		glog.V(4).Infof("GCEHealthChecks.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
+	} else if glog.V(5) {
+		var asStr []string
+		for _, o := range all {
+			asStr = append(asStr, fmt.Sprintf("%+v", o))
+		}
+		glog.V(5).Infof("GCEHealthChecks.List(%v, ..., %v) = %v, %v", ctx, fl, asStr, nil)
+	}
+
 	return all, nil
 }
 
 // Insert HealthCheck with key of value obj.
 func (g *GCEHealthChecks) Insert(ctx context.Context, key *meta.Key, obj *ga.HealthCheck) error {
+	glog.V(5).Infof("GCEHealthChecks.Insert(%v, %v, %+v): called", ctx, key, obj)
 	if !key.Valid() {
+		glog.V(2).Infof("GCEHealthChecks.Insert(%v, %v, ...): key is invalid (%#v)", ctx, key, key)
 		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "HealthChecks")
@@ -6125,7 +6797,9 @@ func (g *GCEHealthChecks) Insert(ctx context.Context, key *meta.Key, obj *ga.Hea
 		Version:   meta.Version("ga"),
 		Service:   "HealthChecks",
 	}
+	glog.V(5).Infof("GCEHealthChecks.Insert(%v, %v, ...): projectID = %v, rk = %+v", ctx, key, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEHealthChecks.Insert(%v, %v, ...): RateLimiter error: %v", ctx, key, err)
 		return err
 	}
 	obj.Name = key.Name
@@ -6134,14 +6808,20 @@ func (g *GCEHealthChecks) Insert(ctx context.Context, key *meta.Key, obj *ga.Hea
 
 	op, err := call.Do()
 	if err != nil {
+		glog.V(4).Infof("GCEHealthChecks.Insert(%v, %v, ...) = %+v", ctx, key, err)
 		return err
 	}
-	return g.s.WaitForCompletion(ctx, op)
+
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCEHealthChecks.Insert(%v, %v, %+v) = %+v", ctx, key, obj, err)
+	return err
 }
 
 // Delete the HealthCheck referenced by key.
 func (g *GCEHealthChecks) Delete(ctx context.Context, key *meta.Key) error {
+	glog.V(5).Infof("GCEHealthChecks.Delete(%v, %v): called", ctx, key)
 	if !key.Valid() {
+		glog.V(2).Infof("GCEHealthChecks.Delete(%v, %v): key is invalid (%#v)", ctx, key, key)
 		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "HealthChecks")
@@ -6151,7 +6831,9 @@ func (g *GCEHealthChecks) Delete(ctx context.Context, key *meta.Key) error {
 		Version:   meta.Version("ga"),
 		Service:   "HealthChecks",
 	}
+	glog.V(5).Infof("GCEHealthChecks.Delete(%v, %v): projectID = %v, rk = %+v", ctx, key, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEHealthChecks.Delete(%v, %v): RateLimiter error: %v", ctx, key, err)
 		return err
 	}
 	call := g.s.GA.HealthChecks.Delete(projectID, key.Name)
@@ -6160,14 +6842,21 @@ func (g *GCEHealthChecks) Delete(ctx context.Context, key *meta.Key) error {
 
 	op, err := call.Do()
 	if err != nil {
+		glog.V(4).Infof("GCEHealthChecks.Delete(%v, %v) = %v", ctx, key, err)
 		return err
 	}
-	return g.s.WaitForCompletion(ctx, op)
+
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCEHealthChecks.Delete(%v, %v) = %v", ctx, key, err)
+	return err
 }
 
 // Update is a method on GCEHealthChecks.
 func (g *GCEHealthChecks) Update(ctx context.Context, key *meta.Key, arg0 *ga.HealthCheck) error {
+	glog.V(5).Infof("GCEHealthChecks.Update(%v, %v, ...): called", ctx, key)
+
 	if !key.Valid() {
+		glog.V(2).Infof("GCEHealthChecks.Update(%v, %v, ...): key is invalid (%#v)", ctx, key, key)
 		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "HealthChecks")
@@ -6177,16 +6866,22 @@ func (g *GCEHealthChecks) Update(ctx context.Context, key *meta.Key, arg0 *ga.He
 		Version:   meta.Version("ga"),
 		Service:   "HealthChecks",
 	}
+	glog.V(5).Infof("GCEHealthChecks.Update(%v, %v, ...): projectID = %v, rk = %+v", ctx, key, projectID, rk)
+
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEHealthChecks.Update(%v, %v, ...): RateLimiter error: %v", ctx, key, err)
 		return err
 	}
 	call := g.s.GA.HealthChecks.Update(projectID, key.Name, arg0)
 	call.Context(ctx)
 	op, err := call.Do()
 	if err != nil {
+		glog.V(4).Infof("GCEHealthChecks.Update(%v, %v, ...) = %+v", ctx, key, err)
 		return err
 	}
-	return g.s.WaitForCompletion(ctx, op)
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCEHealthChecks.Update(%v, %v, ...) = %+v", ctx, key, err)
+	return err
 }
 
 // AlphaHealthChecks is an interface that allows for mocking of HealthChecks.
@@ -6393,8 +7088,11 @@ type GCEAlphaHealthChecks struct {
 
 // Get the HealthCheck named by key.
 func (g *GCEAlphaHealthChecks) Get(ctx context.Context, key *meta.Key) (*alpha.HealthCheck, error) {
+	glog.V(5).Infof("GCEAlphaHealthChecks.Get(%v, %v): called", ctx, key)
+
 	if !key.Valid() {
-		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+		glog.V(2).Infof("GCEAlphaHealthChecks.Get(%v, %v): key is invalid (%#v)", ctx, key, key)
+		return nil, fmt.Errorf("invalid GCE key (%#v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "alpha", "HealthChecks")
 	rk := &RateLimitKey{
@@ -6403,16 +7101,21 @@ func (g *GCEAlphaHealthChecks) Get(ctx context.Context, key *meta.Key) (*alpha.H
 		Version:   meta.Version("alpha"),
 		Service:   "HealthChecks",
 	}
+	glog.V(5).Infof("GCEAlphaHealthChecks.Get(%v, %v): projectID = %v, rk = %+v", ctx, key, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEAlphaHealthChecks.Get(%v, %v): RateLimiter error: %v", ctx, key, err)
 		return nil, err
 	}
 	call := g.s.Alpha.HealthChecks.Get(projectID, key.Name)
 	call.Context(ctx)
-	return call.Do()
+	v, err := call.Do()
+	glog.V(4).Infof("GCEAlphaHealthChecks.Get(%v, %v) = %+v, %v", ctx, key, v, err)
+	return v, err
 }
 
 // List all HealthCheck objects.
 func (g *GCEAlphaHealthChecks) List(ctx context.Context, fl *filter.F) ([]*alpha.HealthCheck, error) {
+	glog.V(5).Infof("GCEAlphaHealthChecks.List(%v, %v) called", ctx, fl)
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "alpha", "HealthChecks")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -6423,24 +7126,40 @@ func (g *GCEAlphaHealthChecks) List(ctx context.Context, fl *filter.F) ([]*alpha
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
 		return nil, err
 	}
+	glog.V(5).Infof("GCEAlphaHealthChecks.List(%v, %v): projectID = %v, rk = %+v", ctx, fl, projectID, rk)
 	call := g.s.Alpha.HealthChecks.List(projectID)
 	if fl != filter.None {
 		call.Filter(fl.String())
 	}
 	var all []*alpha.HealthCheck
 	f := func(l *alpha.HealthCheckList) error {
+		glog.V(5).Infof("GCEAlphaHealthChecks.List(%v, ..., %v): page %+v", ctx, fl, l)
 		all = append(all, l.Items...)
 		return nil
 	}
 	if err := call.Pages(ctx, f); err != nil {
+		glog.V(4).Infof("GCEAlphaHealthChecks.List(%v, ..., %v) = %v, %v", ctx, fl, nil, err)
 		return nil, err
 	}
+
+	if glog.V(4) {
+		glog.V(4).Infof("GCEAlphaHealthChecks.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
+	} else if glog.V(5) {
+		var asStr []string
+		for _, o := range all {
+			asStr = append(asStr, fmt.Sprintf("%+v", o))
+		}
+		glog.V(5).Infof("GCEAlphaHealthChecks.List(%v, ..., %v) = %v, %v", ctx, fl, asStr, nil)
+	}
+
 	return all, nil
 }
 
 // Insert HealthCheck with key of value obj.
 func (g *GCEAlphaHealthChecks) Insert(ctx context.Context, key *meta.Key, obj *alpha.HealthCheck) error {
+	glog.V(5).Infof("GCEAlphaHealthChecks.Insert(%v, %v, %+v): called", ctx, key, obj)
 	if !key.Valid() {
+		glog.V(2).Infof("GCEAlphaHealthChecks.Insert(%v, %v, ...): key is invalid (%#v)", ctx, key, key)
 		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "alpha", "HealthChecks")
@@ -6450,7 +7169,9 @@ func (g *GCEAlphaHealthChecks) Insert(ctx context.Context, key *meta.Key, obj *a
 		Version:   meta.Version("alpha"),
 		Service:   "HealthChecks",
 	}
+	glog.V(5).Infof("GCEAlphaHealthChecks.Insert(%v, %v, ...): projectID = %v, rk = %+v", ctx, key, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEAlphaHealthChecks.Insert(%v, %v, ...): RateLimiter error: %v", ctx, key, err)
 		return err
 	}
 	obj.Name = key.Name
@@ -6459,14 +7180,20 @@ func (g *GCEAlphaHealthChecks) Insert(ctx context.Context, key *meta.Key, obj *a
 
 	op, err := call.Do()
 	if err != nil {
+		glog.V(4).Infof("GCEAlphaHealthChecks.Insert(%v, %v, ...) = %+v", ctx, key, err)
 		return err
 	}
-	return g.s.WaitForCompletion(ctx, op)
+
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCEAlphaHealthChecks.Insert(%v, %v, %+v) = %+v", ctx, key, obj, err)
+	return err
 }
 
 // Delete the HealthCheck referenced by key.
 func (g *GCEAlphaHealthChecks) Delete(ctx context.Context, key *meta.Key) error {
+	glog.V(5).Infof("GCEAlphaHealthChecks.Delete(%v, %v): called", ctx, key)
 	if !key.Valid() {
+		glog.V(2).Infof("GCEAlphaHealthChecks.Delete(%v, %v): key is invalid (%#v)", ctx, key, key)
 		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "alpha", "HealthChecks")
@@ -6476,7 +7203,9 @@ func (g *GCEAlphaHealthChecks) Delete(ctx context.Context, key *meta.Key) error 
 		Version:   meta.Version("alpha"),
 		Service:   "HealthChecks",
 	}
+	glog.V(5).Infof("GCEAlphaHealthChecks.Delete(%v, %v): projectID = %v, rk = %+v", ctx, key, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEAlphaHealthChecks.Delete(%v, %v): RateLimiter error: %v", ctx, key, err)
 		return err
 	}
 	call := g.s.Alpha.HealthChecks.Delete(projectID, key.Name)
@@ -6485,14 +7214,21 @@ func (g *GCEAlphaHealthChecks) Delete(ctx context.Context, key *meta.Key) error 
 
 	op, err := call.Do()
 	if err != nil {
+		glog.V(4).Infof("GCEAlphaHealthChecks.Delete(%v, %v) = %v", ctx, key, err)
 		return err
 	}
-	return g.s.WaitForCompletion(ctx, op)
+
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCEAlphaHealthChecks.Delete(%v, %v) = %v", ctx, key, err)
+	return err
 }
 
 // Update is a method on GCEAlphaHealthChecks.
 func (g *GCEAlphaHealthChecks) Update(ctx context.Context, key *meta.Key, arg0 *alpha.HealthCheck) error {
+	glog.V(5).Infof("GCEAlphaHealthChecks.Update(%v, %v, ...): called", ctx, key)
+
 	if !key.Valid() {
+		glog.V(2).Infof("GCEAlphaHealthChecks.Update(%v, %v, ...): key is invalid (%#v)", ctx, key, key)
 		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "alpha", "HealthChecks")
@@ -6502,16 +7238,22 @@ func (g *GCEAlphaHealthChecks) Update(ctx context.Context, key *meta.Key, arg0 *
 		Version:   meta.Version("alpha"),
 		Service:   "HealthChecks",
 	}
+	glog.V(5).Infof("GCEAlphaHealthChecks.Update(%v, %v, ...): projectID = %v, rk = %+v", ctx, key, projectID, rk)
+
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEAlphaHealthChecks.Update(%v, %v, ...): RateLimiter error: %v", ctx, key, err)
 		return err
 	}
 	call := g.s.Alpha.HealthChecks.Update(projectID, key.Name, arg0)
 	call.Context(ctx)
 	op, err := call.Do()
 	if err != nil {
+		glog.V(4).Infof("GCEAlphaHealthChecks.Update(%v, %v, ...) = %+v", ctx, key, err)
 		return err
 	}
-	return g.s.WaitForCompletion(ctx, op)
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCEAlphaHealthChecks.Update(%v, %v, ...) = %+v", ctx, key, err)
+	return err
 }
 
 // HttpHealthChecks is an interface that allows for mocking of HttpHealthChecks.
@@ -6718,8 +7460,11 @@ type GCEHttpHealthChecks struct {
 
 // Get the HttpHealthCheck named by key.
 func (g *GCEHttpHealthChecks) Get(ctx context.Context, key *meta.Key) (*ga.HttpHealthCheck, error) {
+	glog.V(5).Infof("GCEHttpHealthChecks.Get(%v, %v): called", ctx, key)
+
 	if !key.Valid() {
-		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+		glog.V(2).Infof("GCEHttpHealthChecks.Get(%v, %v): key is invalid (%#v)", ctx, key, key)
+		return nil, fmt.Errorf("invalid GCE key (%#v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "HttpHealthChecks")
 	rk := &RateLimitKey{
@@ -6728,16 +7473,21 @@ func (g *GCEHttpHealthChecks) Get(ctx context.Context, key *meta.Key) (*ga.HttpH
 		Version:   meta.Version("ga"),
 		Service:   "HttpHealthChecks",
 	}
+	glog.V(5).Infof("GCEHttpHealthChecks.Get(%v, %v): projectID = %v, rk = %+v", ctx, key, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEHttpHealthChecks.Get(%v, %v): RateLimiter error: %v", ctx, key, err)
 		return nil, err
 	}
 	call := g.s.GA.HttpHealthChecks.Get(projectID, key.Name)
 	call.Context(ctx)
-	return call.Do()
+	v, err := call.Do()
+	glog.V(4).Infof("GCEHttpHealthChecks.Get(%v, %v) = %+v, %v", ctx, key, v, err)
+	return v, err
 }
 
 // List all HttpHealthCheck objects.
 func (g *GCEHttpHealthChecks) List(ctx context.Context, fl *filter.F) ([]*ga.HttpHealthCheck, error) {
+	glog.V(5).Infof("GCEHttpHealthChecks.List(%v, %v) called", ctx, fl)
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "HttpHealthChecks")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -6748,24 +7498,40 @@ func (g *GCEHttpHealthChecks) List(ctx context.Context, fl *filter.F) ([]*ga.Htt
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
 		return nil, err
 	}
+	glog.V(5).Infof("GCEHttpHealthChecks.List(%v, %v): projectID = %v, rk = %+v", ctx, fl, projectID, rk)
 	call := g.s.GA.HttpHealthChecks.List(projectID)
 	if fl != filter.None {
 		call.Filter(fl.String())
 	}
 	var all []*ga.HttpHealthCheck
 	f := func(l *ga.HttpHealthCheckList) error {
+		glog.V(5).Infof("GCEHttpHealthChecks.List(%v, ..., %v): page %+v", ctx, fl, l)
 		all = append(all, l.Items...)
 		return nil
 	}
 	if err := call.Pages(ctx, f); err != nil {
+		glog.V(4).Infof("GCEHttpHealthChecks.List(%v, ..., %v) = %v, %v", ctx, fl, nil, err)
 		return nil, err
 	}
+
+	if glog.V(4) {
+		glog.V(4).Infof("GCEHttpHealthChecks.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
+	} else if glog.V(5) {
+		var asStr []string
+		for _, o := range all {
+			asStr = append(asStr, fmt.Sprintf("%+v", o))
+		}
+		glog.V(5).Infof("GCEHttpHealthChecks.List(%v, ..., %v) = %v, %v", ctx, fl, asStr, nil)
+	}
+
 	return all, nil
 }
 
 // Insert HttpHealthCheck with key of value obj.
 func (g *GCEHttpHealthChecks) Insert(ctx context.Context, key *meta.Key, obj *ga.HttpHealthCheck) error {
+	glog.V(5).Infof("GCEHttpHealthChecks.Insert(%v, %v, %+v): called", ctx, key, obj)
 	if !key.Valid() {
+		glog.V(2).Infof("GCEHttpHealthChecks.Insert(%v, %v, ...): key is invalid (%#v)", ctx, key, key)
 		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "HttpHealthChecks")
@@ -6775,7 +7541,9 @@ func (g *GCEHttpHealthChecks) Insert(ctx context.Context, key *meta.Key, obj *ga
 		Version:   meta.Version("ga"),
 		Service:   "HttpHealthChecks",
 	}
+	glog.V(5).Infof("GCEHttpHealthChecks.Insert(%v, %v, ...): projectID = %v, rk = %+v", ctx, key, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEHttpHealthChecks.Insert(%v, %v, ...): RateLimiter error: %v", ctx, key, err)
 		return err
 	}
 	obj.Name = key.Name
@@ -6784,14 +7552,20 @@ func (g *GCEHttpHealthChecks) Insert(ctx context.Context, key *meta.Key, obj *ga
 
 	op, err := call.Do()
 	if err != nil {
+		glog.V(4).Infof("GCEHttpHealthChecks.Insert(%v, %v, ...) = %+v", ctx, key, err)
 		return err
 	}
-	return g.s.WaitForCompletion(ctx, op)
+
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCEHttpHealthChecks.Insert(%v, %v, %+v) = %+v", ctx, key, obj, err)
+	return err
 }
 
 // Delete the HttpHealthCheck referenced by key.
 func (g *GCEHttpHealthChecks) Delete(ctx context.Context, key *meta.Key) error {
+	glog.V(5).Infof("GCEHttpHealthChecks.Delete(%v, %v): called", ctx, key)
 	if !key.Valid() {
+		glog.V(2).Infof("GCEHttpHealthChecks.Delete(%v, %v): key is invalid (%#v)", ctx, key, key)
 		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "HttpHealthChecks")
@@ -6801,7 +7575,9 @@ func (g *GCEHttpHealthChecks) Delete(ctx context.Context, key *meta.Key) error {
 		Version:   meta.Version("ga"),
 		Service:   "HttpHealthChecks",
 	}
+	glog.V(5).Infof("GCEHttpHealthChecks.Delete(%v, %v): projectID = %v, rk = %+v", ctx, key, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEHttpHealthChecks.Delete(%v, %v): RateLimiter error: %v", ctx, key, err)
 		return err
 	}
 	call := g.s.GA.HttpHealthChecks.Delete(projectID, key.Name)
@@ -6810,14 +7586,21 @@ func (g *GCEHttpHealthChecks) Delete(ctx context.Context, key *meta.Key) error {
 
 	op, err := call.Do()
 	if err != nil {
+		glog.V(4).Infof("GCEHttpHealthChecks.Delete(%v, %v) = %v", ctx, key, err)
 		return err
 	}
-	return g.s.WaitForCompletion(ctx, op)
+
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCEHttpHealthChecks.Delete(%v, %v) = %v", ctx, key, err)
+	return err
 }
 
 // Update is a method on GCEHttpHealthChecks.
 func (g *GCEHttpHealthChecks) Update(ctx context.Context, key *meta.Key, arg0 *ga.HttpHealthCheck) error {
+	glog.V(5).Infof("GCEHttpHealthChecks.Update(%v, %v, ...): called", ctx, key)
+
 	if !key.Valid() {
+		glog.V(2).Infof("GCEHttpHealthChecks.Update(%v, %v, ...): key is invalid (%#v)", ctx, key, key)
 		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "HttpHealthChecks")
@@ -6827,16 +7610,22 @@ func (g *GCEHttpHealthChecks) Update(ctx context.Context, key *meta.Key, arg0 *g
 		Version:   meta.Version("ga"),
 		Service:   "HttpHealthChecks",
 	}
+	glog.V(5).Infof("GCEHttpHealthChecks.Update(%v, %v, ...): projectID = %v, rk = %+v", ctx, key, projectID, rk)
+
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEHttpHealthChecks.Update(%v, %v, ...): RateLimiter error: %v", ctx, key, err)
 		return err
 	}
 	call := g.s.GA.HttpHealthChecks.Update(projectID, key.Name, arg0)
 	call.Context(ctx)
 	op, err := call.Do()
 	if err != nil {
+		glog.V(4).Infof("GCEHttpHealthChecks.Update(%v, %v, ...) = %+v", ctx, key, err)
 		return err
 	}
-	return g.s.WaitForCompletion(ctx, op)
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCEHttpHealthChecks.Update(%v, %v, ...) = %+v", ctx, key, err)
+	return err
 }
 
 // HttpsHealthChecks is an interface that allows for mocking of HttpsHealthChecks.
@@ -7043,8 +7832,11 @@ type GCEHttpsHealthChecks struct {
 
 // Get the HttpsHealthCheck named by key.
 func (g *GCEHttpsHealthChecks) Get(ctx context.Context, key *meta.Key) (*ga.HttpsHealthCheck, error) {
+	glog.V(5).Infof("GCEHttpsHealthChecks.Get(%v, %v): called", ctx, key)
+
 	if !key.Valid() {
-		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+		glog.V(2).Infof("GCEHttpsHealthChecks.Get(%v, %v): key is invalid (%#v)", ctx, key, key)
+		return nil, fmt.Errorf("invalid GCE key (%#v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "HttpsHealthChecks")
 	rk := &RateLimitKey{
@@ -7053,16 +7845,21 @@ func (g *GCEHttpsHealthChecks) Get(ctx context.Context, key *meta.Key) (*ga.Http
 		Version:   meta.Version("ga"),
 		Service:   "HttpsHealthChecks",
 	}
+	glog.V(5).Infof("GCEHttpsHealthChecks.Get(%v, %v): projectID = %v, rk = %+v", ctx, key, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEHttpsHealthChecks.Get(%v, %v): RateLimiter error: %v", ctx, key, err)
 		return nil, err
 	}
 	call := g.s.GA.HttpsHealthChecks.Get(projectID, key.Name)
 	call.Context(ctx)
-	return call.Do()
+	v, err := call.Do()
+	glog.V(4).Infof("GCEHttpsHealthChecks.Get(%v, %v) = %+v, %v", ctx, key, v, err)
+	return v, err
 }
 
 // List all HttpsHealthCheck objects.
 func (g *GCEHttpsHealthChecks) List(ctx context.Context, fl *filter.F) ([]*ga.HttpsHealthCheck, error) {
+	glog.V(5).Infof("GCEHttpsHealthChecks.List(%v, %v) called", ctx, fl)
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "HttpsHealthChecks")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -7073,24 +7870,40 @@ func (g *GCEHttpsHealthChecks) List(ctx context.Context, fl *filter.F) ([]*ga.Ht
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
 		return nil, err
 	}
+	glog.V(5).Infof("GCEHttpsHealthChecks.List(%v, %v): projectID = %v, rk = %+v", ctx, fl, projectID, rk)
 	call := g.s.GA.HttpsHealthChecks.List(projectID)
 	if fl != filter.None {
 		call.Filter(fl.String())
 	}
 	var all []*ga.HttpsHealthCheck
 	f := func(l *ga.HttpsHealthCheckList) error {
+		glog.V(5).Infof("GCEHttpsHealthChecks.List(%v, ..., %v): page %+v", ctx, fl, l)
 		all = append(all, l.Items...)
 		return nil
 	}
 	if err := call.Pages(ctx, f); err != nil {
+		glog.V(4).Infof("GCEHttpsHealthChecks.List(%v, ..., %v) = %v, %v", ctx, fl, nil, err)
 		return nil, err
 	}
+
+	if glog.V(4) {
+		glog.V(4).Infof("GCEHttpsHealthChecks.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
+	} else if glog.V(5) {
+		var asStr []string
+		for _, o := range all {
+			asStr = append(asStr, fmt.Sprintf("%+v", o))
+		}
+		glog.V(5).Infof("GCEHttpsHealthChecks.List(%v, ..., %v) = %v, %v", ctx, fl, asStr, nil)
+	}
+
 	return all, nil
 }
 
 // Insert HttpsHealthCheck with key of value obj.
 func (g *GCEHttpsHealthChecks) Insert(ctx context.Context, key *meta.Key, obj *ga.HttpsHealthCheck) error {
+	glog.V(5).Infof("GCEHttpsHealthChecks.Insert(%v, %v, %+v): called", ctx, key, obj)
 	if !key.Valid() {
+		glog.V(2).Infof("GCEHttpsHealthChecks.Insert(%v, %v, ...): key is invalid (%#v)", ctx, key, key)
 		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "HttpsHealthChecks")
@@ -7100,7 +7913,9 @@ func (g *GCEHttpsHealthChecks) Insert(ctx context.Context, key *meta.Key, obj *g
 		Version:   meta.Version("ga"),
 		Service:   "HttpsHealthChecks",
 	}
+	glog.V(5).Infof("GCEHttpsHealthChecks.Insert(%v, %v, ...): projectID = %v, rk = %+v", ctx, key, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEHttpsHealthChecks.Insert(%v, %v, ...): RateLimiter error: %v", ctx, key, err)
 		return err
 	}
 	obj.Name = key.Name
@@ -7109,14 +7924,20 @@ func (g *GCEHttpsHealthChecks) Insert(ctx context.Context, key *meta.Key, obj *g
 
 	op, err := call.Do()
 	if err != nil {
+		glog.V(4).Infof("GCEHttpsHealthChecks.Insert(%v, %v, ...) = %+v", ctx, key, err)
 		return err
 	}
-	return g.s.WaitForCompletion(ctx, op)
+
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCEHttpsHealthChecks.Insert(%v, %v, %+v) = %+v", ctx, key, obj, err)
+	return err
 }
 
 // Delete the HttpsHealthCheck referenced by key.
 func (g *GCEHttpsHealthChecks) Delete(ctx context.Context, key *meta.Key) error {
+	glog.V(5).Infof("GCEHttpsHealthChecks.Delete(%v, %v): called", ctx, key)
 	if !key.Valid() {
+		glog.V(2).Infof("GCEHttpsHealthChecks.Delete(%v, %v): key is invalid (%#v)", ctx, key, key)
 		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "HttpsHealthChecks")
@@ -7126,7 +7947,9 @@ func (g *GCEHttpsHealthChecks) Delete(ctx context.Context, key *meta.Key) error 
 		Version:   meta.Version("ga"),
 		Service:   "HttpsHealthChecks",
 	}
+	glog.V(5).Infof("GCEHttpsHealthChecks.Delete(%v, %v): projectID = %v, rk = %+v", ctx, key, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEHttpsHealthChecks.Delete(%v, %v): RateLimiter error: %v", ctx, key, err)
 		return err
 	}
 	call := g.s.GA.HttpsHealthChecks.Delete(projectID, key.Name)
@@ -7135,14 +7958,21 @@ func (g *GCEHttpsHealthChecks) Delete(ctx context.Context, key *meta.Key) error 
 
 	op, err := call.Do()
 	if err != nil {
+		glog.V(4).Infof("GCEHttpsHealthChecks.Delete(%v, %v) = %v", ctx, key, err)
 		return err
 	}
-	return g.s.WaitForCompletion(ctx, op)
+
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCEHttpsHealthChecks.Delete(%v, %v) = %v", ctx, key, err)
+	return err
 }
 
 // Update is a method on GCEHttpsHealthChecks.
 func (g *GCEHttpsHealthChecks) Update(ctx context.Context, key *meta.Key, arg0 *ga.HttpsHealthCheck) error {
+	glog.V(5).Infof("GCEHttpsHealthChecks.Update(%v, %v, ...): called", ctx, key)
+
 	if !key.Valid() {
+		glog.V(2).Infof("GCEHttpsHealthChecks.Update(%v, %v, ...): key is invalid (%#v)", ctx, key, key)
 		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "HttpsHealthChecks")
@@ -7152,16 +7982,22 @@ func (g *GCEHttpsHealthChecks) Update(ctx context.Context, key *meta.Key, arg0 *
 		Version:   meta.Version("ga"),
 		Service:   "HttpsHealthChecks",
 	}
+	glog.V(5).Infof("GCEHttpsHealthChecks.Update(%v, %v, ...): projectID = %v, rk = %+v", ctx, key, projectID, rk)
+
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEHttpsHealthChecks.Update(%v, %v, ...): RateLimiter error: %v", ctx, key, err)
 		return err
 	}
 	call := g.s.GA.HttpsHealthChecks.Update(projectID, key.Name, arg0)
 	call.Context(ctx)
 	op, err := call.Do()
 	if err != nil {
+		glog.V(4).Infof("GCEHttpsHealthChecks.Update(%v, %v, ...) = %+v", ctx, key, err)
 		return err
 	}
-	return g.s.WaitForCompletion(ctx, op)
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCEHttpsHealthChecks.Update(%v, %v, ...) = %+v", ctx, key, err)
+	return err
 }
 
 // InstanceGroups is an interface that allows for mocking of InstanceGroups.
@@ -7401,8 +8237,11 @@ type GCEInstanceGroups struct {
 
 // Get the InstanceGroup named by key.
 func (g *GCEInstanceGroups) Get(ctx context.Context, key *meta.Key) (*ga.InstanceGroup, error) {
+	glog.V(5).Infof("GCEInstanceGroups.Get(%v, %v): called", ctx, key)
+
 	if !key.Valid() {
-		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+		glog.V(2).Infof("GCEInstanceGroups.Get(%v, %v): key is invalid (%#v)", ctx, key, key)
+		return nil, fmt.Errorf("invalid GCE key (%#v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "InstanceGroups")
 	rk := &RateLimitKey{
@@ -7411,16 +8250,21 @@ func (g *GCEInstanceGroups) Get(ctx context.Context, key *meta.Key) (*ga.Instanc
 		Version:   meta.Version("ga"),
 		Service:   "InstanceGroups",
 	}
+	glog.V(5).Infof("GCEInstanceGroups.Get(%v, %v): projectID = %v, rk = %+v", ctx, key, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEInstanceGroups.Get(%v, %v): RateLimiter error: %v", ctx, key, err)
 		return nil, err
 	}
 	call := g.s.GA.InstanceGroups.Get(projectID, key.Zone, key.Name)
 	call.Context(ctx)
-	return call.Do()
+	v, err := call.Do()
+	glog.V(4).Infof("GCEInstanceGroups.Get(%v, %v) = %+v, %v", ctx, key, v, err)
+	return v, err
 }
 
 // List all InstanceGroup objects.
 func (g *GCEInstanceGroups) List(ctx context.Context, zone string, fl *filter.F) ([]*ga.InstanceGroup, error) {
+	glog.V(5).Infof("GCEInstanceGroups.List(%v, %v, %v) called", ctx, zone, fl)
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "InstanceGroups")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -7431,24 +8275,40 @@ func (g *GCEInstanceGroups) List(ctx context.Context, zone string, fl *filter.F)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
 		return nil, err
 	}
+	glog.V(5).Infof("GCEInstanceGroups.List(%v, %v, %v): projectID = %v, rk = %+v", ctx, zone, fl, projectID, rk)
 	call := g.s.GA.InstanceGroups.List(projectID, zone)
 	if fl != filter.None {
 		call.Filter(fl.String())
 	}
 	var all []*ga.InstanceGroup
 	f := func(l *ga.InstanceGroupList) error {
+		glog.V(5).Infof("GCEInstanceGroups.List(%v, ..., %v): page %+v", ctx, fl, l)
 		all = append(all, l.Items...)
 		return nil
 	}
 	if err := call.Pages(ctx, f); err != nil {
+		glog.V(4).Infof("GCEInstanceGroups.List(%v, ..., %v) = %v, %v", ctx, fl, nil, err)
 		return nil, err
 	}
+
+	if glog.V(4) {
+		glog.V(4).Infof("GCEInstanceGroups.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
+	} else if glog.V(5) {
+		var asStr []string
+		for _, o := range all {
+			asStr = append(asStr, fmt.Sprintf("%+v", o))
+		}
+		glog.V(5).Infof("GCEInstanceGroups.List(%v, ..., %v) = %v, %v", ctx, fl, asStr, nil)
+	}
+
 	return all, nil
 }
 
 // Insert InstanceGroup with key of value obj.
 func (g *GCEInstanceGroups) Insert(ctx context.Context, key *meta.Key, obj *ga.InstanceGroup) error {
+	glog.V(5).Infof("GCEInstanceGroups.Insert(%v, %v, %+v): called", ctx, key, obj)
 	if !key.Valid() {
+		glog.V(2).Infof("GCEInstanceGroups.Insert(%v, %v, ...): key is invalid (%#v)", ctx, key, key)
 		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "InstanceGroups")
@@ -7458,7 +8318,9 @@ func (g *GCEInstanceGroups) Insert(ctx context.Context, key *meta.Key, obj *ga.I
 		Version:   meta.Version("ga"),
 		Service:   "InstanceGroups",
 	}
+	glog.V(5).Infof("GCEInstanceGroups.Insert(%v, %v, ...): projectID = %v, rk = %+v", ctx, key, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEInstanceGroups.Insert(%v, %v, ...): RateLimiter error: %v", ctx, key, err)
 		return err
 	}
 	obj.Name = key.Name
@@ -7467,14 +8329,20 @@ func (g *GCEInstanceGroups) Insert(ctx context.Context, key *meta.Key, obj *ga.I
 
 	op, err := call.Do()
 	if err != nil {
+		glog.V(4).Infof("GCEInstanceGroups.Insert(%v, %v, ...) = %+v", ctx, key, err)
 		return err
 	}
-	return g.s.WaitForCompletion(ctx, op)
+
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCEInstanceGroups.Insert(%v, %v, %+v) = %+v", ctx, key, obj, err)
+	return err
 }
 
 // Delete the InstanceGroup referenced by key.
 func (g *GCEInstanceGroups) Delete(ctx context.Context, key *meta.Key) error {
+	glog.V(5).Infof("GCEInstanceGroups.Delete(%v, %v): called", ctx, key)
 	if !key.Valid() {
+		glog.V(2).Infof("GCEInstanceGroups.Delete(%v, %v): key is invalid (%#v)", ctx, key, key)
 		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "InstanceGroups")
@@ -7484,7 +8352,9 @@ func (g *GCEInstanceGroups) Delete(ctx context.Context, key *meta.Key) error {
 		Version:   meta.Version("ga"),
 		Service:   "InstanceGroups",
 	}
+	glog.V(5).Infof("GCEInstanceGroups.Delete(%v, %v): projectID = %v, rk = %+v", ctx, key, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEInstanceGroups.Delete(%v, %v): RateLimiter error: %v", ctx, key, err)
 		return err
 	}
 	call := g.s.GA.InstanceGroups.Delete(projectID, key.Zone, key.Name)
@@ -7492,14 +8362,21 @@ func (g *GCEInstanceGroups) Delete(ctx context.Context, key *meta.Key) error {
 
 	op, err := call.Do()
 	if err != nil {
+		glog.V(4).Infof("GCEInstanceGroups.Delete(%v, %v) = %v", ctx, key, err)
 		return err
 	}
-	return g.s.WaitForCompletion(ctx, op)
+
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCEInstanceGroups.Delete(%v, %v) = %v", ctx, key, err)
+	return err
 }
 
 // AddInstances is a method on GCEInstanceGroups.
 func (g *GCEInstanceGroups) AddInstances(ctx context.Context, key *meta.Key, arg0 *ga.InstanceGroupsAddInstancesRequest) error {
+	glog.V(5).Infof("GCEInstanceGroups.AddInstances(%v, %v, ...): called", ctx, key)
+
 	if !key.Valid() {
+		glog.V(2).Infof("GCEInstanceGroups.AddInstances(%v, %v, ...): key is invalid (%#v)", ctx, key, key)
 		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "InstanceGroups")
@@ -7509,21 +8386,30 @@ func (g *GCEInstanceGroups) AddInstances(ctx context.Context, key *meta.Key, arg
 		Version:   meta.Version("ga"),
 		Service:   "InstanceGroups",
 	}
+	glog.V(5).Infof("GCEInstanceGroups.AddInstances(%v, %v, ...): projectID = %v, rk = %+v", ctx, key, projectID, rk)
+
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEInstanceGroups.AddInstances(%v, %v, ...): RateLimiter error: %v", ctx, key, err)
 		return err
 	}
 	call := g.s.GA.InstanceGroups.AddInstances(projectID, key.Zone, key.Name, arg0)
 	call.Context(ctx)
 	op, err := call.Do()
 	if err != nil {
+		glog.V(4).Infof("GCEInstanceGroups.AddInstances(%v, %v, ...) = %+v", ctx, key, err)
 		return err
 	}
-	return g.s.WaitForCompletion(ctx, op)
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCEInstanceGroups.AddInstances(%v, %v, ...) = %+v", ctx, key, err)
+	return err
 }
 
 // ListInstances is a method on GCEInstanceGroups.
 func (g *GCEInstanceGroups) ListInstances(ctx context.Context, key *meta.Key, arg0 *ga.InstanceGroupsListInstancesRequest, fl *filter.F) ([]*ga.InstanceWithNamedPorts, error) {
+	glog.V(5).Infof("GCEInstanceGroups.ListInstances(%v, %v, ...): called", ctx, key)
+
 	if !key.Valid() {
+		glog.V(2).Infof("GCEInstanceGroups.ListInstances(%v, %v, ...): key is invalid (%#v)", ctx, key, key)
 		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "InstanceGroups")
@@ -7533,24 +8419,41 @@ func (g *GCEInstanceGroups) ListInstances(ctx context.Context, key *meta.Key, ar
 		Version:   meta.Version("ga"),
 		Service:   "InstanceGroups",
 	}
+	glog.V(5).Infof("GCEInstanceGroups.ListInstances(%v, %v, ...): projectID = %v, rk = %+v", ctx, key, projectID, rk)
+
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEInstanceGroups.ListInstances(%v, %v, ...): RateLimiter error: %v", ctx, key, err)
 		return nil, err
 	}
 	call := g.s.GA.InstanceGroups.ListInstances(projectID, key.Zone, key.Name, arg0)
 	var all []*ga.InstanceWithNamedPorts
 	f := func(l *ga.InstanceGroupsListInstances) error {
+		glog.V(5).Infof("GCEInstanceGroups.ListInstances(%v, %v, ...): page %+v", ctx, key, l)
 		all = append(all, l.Items...)
 		return nil
 	}
 	if err := call.Pages(ctx, f); err != nil {
+		glog.V(4).Infof("GCEInstanceGroups.ListInstances(%v, %v, ...) = %v, %v", ctx, key, nil, err)
 		return nil, err
+	}
+	if glog.V(4) {
+		glog.V(4).Infof("GCEInstanceGroups.ListInstances(%v, %v, ...) = [%v items], %v", ctx, key, len(all), nil)
+	} else if glog.V(5) {
+		var asStr []string
+		for _, o := range all {
+			asStr = append(asStr, fmt.Sprintf("%+v", o))
+		}
+		glog.V(5).Infof("GCEInstanceGroups.ListInstances(%v, %v, ...) = %v, %v", ctx, key, asStr, nil)
 	}
 	return all, nil
 }
 
 // RemoveInstances is a method on GCEInstanceGroups.
 func (g *GCEInstanceGroups) RemoveInstances(ctx context.Context, key *meta.Key, arg0 *ga.InstanceGroupsRemoveInstancesRequest) error {
+	glog.V(5).Infof("GCEInstanceGroups.RemoveInstances(%v, %v, ...): called", ctx, key)
+
 	if !key.Valid() {
+		glog.V(2).Infof("GCEInstanceGroups.RemoveInstances(%v, %v, ...): key is invalid (%#v)", ctx, key, key)
 		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "InstanceGroups")
@@ -7560,21 +8463,30 @@ func (g *GCEInstanceGroups) RemoveInstances(ctx context.Context, key *meta.Key, 
 		Version:   meta.Version("ga"),
 		Service:   "InstanceGroups",
 	}
+	glog.V(5).Infof("GCEInstanceGroups.RemoveInstances(%v, %v, ...): projectID = %v, rk = %+v", ctx, key, projectID, rk)
+
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEInstanceGroups.RemoveInstances(%v, %v, ...): RateLimiter error: %v", ctx, key, err)
 		return err
 	}
 	call := g.s.GA.InstanceGroups.RemoveInstances(projectID, key.Zone, key.Name, arg0)
 	call.Context(ctx)
 	op, err := call.Do()
 	if err != nil {
+		glog.V(4).Infof("GCEInstanceGroups.RemoveInstances(%v, %v, ...) = %+v", ctx, key, err)
 		return err
 	}
-	return g.s.WaitForCompletion(ctx, op)
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCEInstanceGroups.RemoveInstances(%v, %v, ...) = %+v", ctx, key, err)
+	return err
 }
 
 // SetNamedPorts is a method on GCEInstanceGroups.
 func (g *GCEInstanceGroups) SetNamedPorts(ctx context.Context, key *meta.Key, arg0 *ga.InstanceGroupsSetNamedPortsRequest) error {
+	glog.V(5).Infof("GCEInstanceGroups.SetNamedPorts(%v, %v, ...): called", ctx, key)
+
 	if !key.Valid() {
+		glog.V(2).Infof("GCEInstanceGroups.SetNamedPorts(%v, %v, ...): key is invalid (%#v)", ctx, key, key)
 		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "InstanceGroups")
@@ -7584,16 +8496,22 @@ func (g *GCEInstanceGroups) SetNamedPorts(ctx context.Context, key *meta.Key, ar
 		Version:   meta.Version("ga"),
 		Service:   "InstanceGroups",
 	}
+	glog.V(5).Infof("GCEInstanceGroups.SetNamedPorts(%v, %v, ...): projectID = %v, rk = %+v", ctx, key, projectID, rk)
+
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEInstanceGroups.SetNamedPorts(%v, %v, ...): RateLimiter error: %v", ctx, key, err)
 		return err
 	}
 	call := g.s.GA.InstanceGroups.SetNamedPorts(projectID, key.Zone, key.Name, arg0)
 	call.Context(ctx)
 	op, err := call.Do()
 	if err != nil {
+		glog.V(4).Infof("GCEInstanceGroups.SetNamedPorts(%v, %v, ...) = %+v", ctx, key, err)
 		return err
 	}
-	return g.s.WaitForCompletion(ctx, op)
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCEInstanceGroups.SetNamedPorts(%v, %v, ...) = %+v", ctx, key, err)
+	return err
 }
 
 // Instances is an interface that allows for mocking of Instances.
@@ -7813,8 +8731,11 @@ type GCEInstances struct {
 
 // Get the Instance named by key.
 func (g *GCEInstances) Get(ctx context.Context, key *meta.Key) (*ga.Instance, error) {
+	glog.V(5).Infof("GCEInstances.Get(%v, %v): called", ctx, key)
+
 	if !key.Valid() {
-		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+		glog.V(2).Infof("GCEInstances.Get(%v, %v): key is invalid (%#v)", ctx, key, key)
+		return nil, fmt.Errorf("invalid GCE key (%#v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "Instances")
 	rk := &RateLimitKey{
@@ -7823,16 +8744,21 @@ func (g *GCEInstances) Get(ctx context.Context, key *meta.Key) (*ga.Instance, er
 		Version:   meta.Version("ga"),
 		Service:   "Instances",
 	}
+	glog.V(5).Infof("GCEInstances.Get(%v, %v): projectID = %v, rk = %+v", ctx, key, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEInstances.Get(%v, %v): RateLimiter error: %v", ctx, key, err)
 		return nil, err
 	}
 	call := g.s.GA.Instances.Get(projectID, key.Zone, key.Name)
 	call.Context(ctx)
-	return call.Do()
+	v, err := call.Do()
+	glog.V(4).Infof("GCEInstances.Get(%v, %v) = %+v, %v", ctx, key, v, err)
+	return v, err
 }
 
 // List all Instance objects.
 func (g *GCEInstances) List(ctx context.Context, zone string, fl *filter.F) ([]*ga.Instance, error) {
+	glog.V(5).Infof("GCEInstances.List(%v, %v, %v) called", ctx, zone, fl)
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "Instances")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -7843,24 +8769,40 @@ func (g *GCEInstances) List(ctx context.Context, zone string, fl *filter.F) ([]*
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
 		return nil, err
 	}
+	glog.V(5).Infof("GCEInstances.List(%v, %v, %v): projectID = %v, rk = %+v", ctx, zone, fl, projectID, rk)
 	call := g.s.GA.Instances.List(projectID, zone)
 	if fl != filter.None {
 		call.Filter(fl.String())
 	}
 	var all []*ga.Instance
 	f := func(l *ga.InstanceList) error {
+		glog.V(5).Infof("GCEInstances.List(%v, ..., %v): page %+v", ctx, fl, l)
 		all = append(all, l.Items...)
 		return nil
 	}
 	if err := call.Pages(ctx, f); err != nil {
+		glog.V(4).Infof("GCEInstances.List(%v, ..., %v) = %v, %v", ctx, fl, nil, err)
 		return nil, err
 	}
+
+	if glog.V(4) {
+		glog.V(4).Infof("GCEInstances.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
+	} else if glog.V(5) {
+		var asStr []string
+		for _, o := range all {
+			asStr = append(asStr, fmt.Sprintf("%+v", o))
+		}
+		glog.V(5).Infof("GCEInstances.List(%v, ..., %v) = %v, %v", ctx, fl, asStr, nil)
+	}
+
 	return all, nil
 }
 
 // Insert Instance with key of value obj.
 func (g *GCEInstances) Insert(ctx context.Context, key *meta.Key, obj *ga.Instance) error {
+	glog.V(5).Infof("GCEInstances.Insert(%v, %v, %+v): called", ctx, key, obj)
 	if !key.Valid() {
+		glog.V(2).Infof("GCEInstances.Insert(%v, %v, ...): key is invalid (%#v)", ctx, key, key)
 		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "Instances")
@@ -7870,7 +8812,9 @@ func (g *GCEInstances) Insert(ctx context.Context, key *meta.Key, obj *ga.Instan
 		Version:   meta.Version("ga"),
 		Service:   "Instances",
 	}
+	glog.V(5).Infof("GCEInstances.Insert(%v, %v, ...): projectID = %v, rk = %+v", ctx, key, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEInstances.Insert(%v, %v, ...): RateLimiter error: %v", ctx, key, err)
 		return err
 	}
 	obj.Name = key.Name
@@ -7879,14 +8823,20 @@ func (g *GCEInstances) Insert(ctx context.Context, key *meta.Key, obj *ga.Instan
 
 	op, err := call.Do()
 	if err != nil {
+		glog.V(4).Infof("GCEInstances.Insert(%v, %v, ...) = %+v", ctx, key, err)
 		return err
 	}
-	return g.s.WaitForCompletion(ctx, op)
+
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCEInstances.Insert(%v, %v, %+v) = %+v", ctx, key, obj, err)
+	return err
 }
 
 // Delete the Instance referenced by key.
 func (g *GCEInstances) Delete(ctx context.Context, key *meta.Key) error {
+	glog.V(5).Infof("GCEInstances.Delete(%v, %v): called", ctx, key)
 	if !key.Valid() {
+		glog.V(2).Infof("GCEInstances.Delete(%v, %v): key is invalid (%#v)", ctx, key, key)
 		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "Instances")
@@ -7896,7 +8846,9 @@ func (g *GCEInstances) Delete(ctx context.Context, key *meta.Key) error {
 		Version:   meta.Version("ga"),
 		Service:   "Instances",
 	}
+	glog.V(5).Infof("GCEInstances.Delete(%v, %v): projectID = %v, rk = %+v", ctx, key, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEInstances.Delete(%v, %v): RateLimiter error: %v", ctx, key, err)
 		return err
 	}
 	call := g.s.GA.Instances.Delete(projectID, key.Zone, key.Name)
@@ -7904,14 +8856,21 @@ func (g *GCEInstances) Delete(ctx context.Context, key *meta.Key) error {
 
 	op, err := call.Do()
 	if err != nil {
+		glog.V(4).Infof("GCEInstances.Delete(%v, %v) = %v", ctx, key, err)
 		return err
 	}
-	return g.s.WaitForCompletion(ctx, op)
+
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCEInstances.Delete(%v, %v) = %v", ctx, key, err)
+	return err
 }
 
 // AttachDisk is a method on GCEInstances.
 func (g *GCEInstances) AttachDisk(ctx context.Context, key *meta.Key, arg0 *ga.AttachedDisk) error {
+	glog.V(5).Infof("GCEInstances.AttachDisk(%v, %v, ...): called", ctx, key)
+
 	if !key.Valid() {
+		glog.V(2).Infof("GCEInstances.AttachDisk(%v, %v, ...): key is invalid (%#v)", ctx, key, key)
 		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "Instances")
@@ -7921,21 +8880,30 @@ func (g *GCEInstances) AttachDisk(ctx context.Context, key *meta.Key, arg0 *ga.A
 		Version:   meta.Version("ga"),
 		Service:   "Instances",
 	}
+	glog.V(5).Infof("GCEInstances.AttachDisk(%v, %v, ...): projectID = %v, rk = %+v", ctx, key, projectID, rk)
+
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEInstances.AttachDisk(%v, %v, ...): RateLimiter error: %v", ctx, key, err)
 		return err
 	}
 	call := g.s.GA.Instances.AttachDisk(projectID, key.Zone, key.Name, arg0)
 	call.Context(ctx)
 	op, err := call.Do()
 	if err != nil {
+		glog.V(4).Infof("GCEInstances.AttachDisk(%v, %v, ...) = %+v", ctx, key, err)
 		return err
 	}
-	return g.s.WaitForCompletion(ctx, op)
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCEInstances.AttachDisk(%v, %v, ...) = %+v", ctx, key, err)
+	return err
 }
 
 // DetachDisk is a method on GCEInstances.
 func (g *GCEInstances) DetachDisk(ctx context.Context, key *meta.Key, arg0 string) error {
+	glog.V(5).Infof("GCEInstances.DetachDisk(%v, %v, ...): called", ctx, key)
+
 	if !key.Valid() {
+		glog.V(2).Infof("GCEInstances.DetachDisk(%v, %v, ...): key is invalid (%#v)", ctx, key, key)
 		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "Instances")
@@ -7945,16 +8913,22 @@ func (g *GCEInstances) DetachDisk(ctx context.Context, key *meta.Key, arg0 strin
 		Version:   meta.Version("ga"),
 		Service:   "Instances",
 	}
+	glog.V(5).Infof("GCEInstances.DetachDisk(%v, %v, ...): projectID = %v, rk = %+v", ctx, key, projectID, rk)
+
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEInstances.DetachDisk(%v, %v, ...): RateLimiter error: %v", ctx, key, err)
 		return err
 	}
 	call := g.s.GA.Instances.DetachDisk(projectID, key.Zone, key.Name, arg0)
 	call.Context(ctx)
 	op, err := call.Do()
 	if err != nil {
+		glog.V(4).Infof("GCEInstances.DetachDisk(%v, %v, ...) = %+v", ctx, key, err)
 		return err
 	}
-	return g.s.WaitForCompletion(ctx, op)
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCEInstances.DetachDisk(%v, %v, ...) = %+v", ctx, key, err)
+	return err
 }
 
 // BetaInstances is an interface that allows for mocking of Instances.
@@ -8174,8 +9148,11 @@ type GCEBetaInstances struct {
 
 // Get the Instance named by key.
 func (g *GCEBetaInstances) Get(ctx context.Context, key *meta.Key) (*beta.Instance, error) {
+	glog.V(5).Infof("GCEBetaInstances.Get(%v, %v): called", ctx, key)
+
 	if !key.Valid() {
-		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+		glog.V(2).Infof("GCEBetaInstances.Get(%v, %v): key is invalid (%#v)", ctx, key, key)
+		return nil, fmt.Errorf("invalid GCE key (%#v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "beta", "Instances")
 	rk := &RateLimitKey{
@@ -8184,16 +9161,21 @@ func (g *GCEBetaInstances) Get(ctx context.Context, key *meta.Key) (*beta.Instan
 		Version:   meta.Version("beta"),
 		Service:   "Instances",
 	}
+	glog.V(5).Infof("GCEBetaInstances.Get(%v, %v): projectID = %v, rk = %+v", ctx, key, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEBetaInstances.Get(%v, %v): RateLimiter error: %v", ctx, key, err)
 		return nil, err
 	}
 	call := g.s.Beta.Instances.Get(projectID, key.Zone, key.Name)
 	call.Context(ctx)
-	return call.Do()
+	v, err := call.Do()
+	glog.V(4).Infof("GCEBetaInstances.Get(%v, %v) = %+v, %v", ctx, key, v, err)
+	return v, err
 }
 
 // List all Instance objects.
 func (g *GCEBetaInstances) List(ctx context.Context, zone string, fl *filter.F) ([]*beta.Instance, error) {
+	glog.V(5).Infof("GCEBetaInstances.List(%v, %v, %v) called", ctx, zone, fl)
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "beta", "Instances")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -8204,24 +9186,40 @@ func (g *GCEBetaInstances) List(ctx context.Context, zone string, fl *filter.F) 
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
 		return nil, err
 	}
+	glog.V(5).Infof("GCEBetaInstances.List(%v, %v, %v): projectID = %v, rk = %+v", ctx, zone, fl, projectID, rk)
 	call := g.s.Beta.Instances.List(projectID, zone)
 	if fl != filter.None {
 		call.Filter(fl.String())
 	}
 	var all []*beta.Instance
 	f := func(l *beta.InstanceList) error {
+		glog.V(5).Infof("GCEBetaInstances.List(%v, ..., %v): page %+v", ctx, fl, l)
 		all = append(all, l.Items...)
 		return nil
 	}
 	if err := call.Pages(ctx, f); err != nil {
+		glog.V(4).Infof("GCEBetaInstances.List(%v, ..., %v) = %v, %v", ctx, fl, nil, err)
 		return nil, err
 	}
+
+	if glog.V(4) {
+		glog.V(4).Infof("GCEBetaInstances.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
+	} else if glog.V(5) {
+		var asStr []string
+		for _, o := range all {
+			asStr = append(asStr, fmt.Sprintf("%+v", o))
+		}
+		glog.V(5).Infof("GCEBetaInstances.List(%v, ..., %v) = %v, %v", ctx, fl, asStr, nil)
+	}
+
 	return all, nil
 }
 
 // Insert Instance with key of value obj.
 func (g *GCEBetaInstances) Insert(ctx context.Context, key *meta.Key, obj *beta.Instance) error {
+	glog.V(5).Infof("GCEBetaInstances.Insert(%v, %v, %+v): called", ctx, key, obj)
 	if !key.Valid() {
+		glog.V(2).Infof("GCEBetaInstances.Insert(%v, %v, ...): key is invalid (%#v)", ctx, key, key)
 		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "beta", "Instances")
@@ -8231,7 +9229,9 @@ func (g *GCEBetaInstances) Insert(ctx context.Context, key *meta.Key, obj *beta.
 		Version:   meta.Version("beta"),
 		Service:   "Instances",
 	}
+	glog.V(5).Infof("GCEBetaInstances.Insert(%v, %v, ...): projectID = %v, rk = %+v", ctx, key, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEBetaInstances.Insert(%v, %v, ...): RateLimiter error: %v", ctx, key, err)
 		return err
 	}
 	obj.Name = key.Name
@@ -8240,14 +9240,20 @@ func (g *GCEBetaInstances) Insert(ctx context.Context, key *meta.Key, obj *beta.
 
 	op, err := call.Do()
 	if err != nil {
+		glog.V(4).Infof("GCEBetaInstances.Insert(%v, %v, ...) = %+v", ctx, key, err)
 		return err
 	}
-	return g.s.WaitForCompletion(ctx, op)
+
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCEBetaInstances.Insert(%v, %v, %+v) = %+v", ctx, key, obj, err)
+	return err
 }
 
 // Delete the Instance referenced by key.
 func (g *GCEBetaInstances) Delete(ctx context.Context, key *meta.Key) error {
+	glog.V(5).Infof("GCEBetaInstances.Delete(%v, %v): called", ctx, key)
 	if !key.Valid() {
+		glog.V(2).Infof("GCEBetaInstances.Delete(%v, %v): key is invalid (%#v)", ctx, key, key)
 		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "beta", "Instances")
@@ -8257,7 +9263,9 @@ func (g *GCEBetaInstances) Delete(ctx context.Context, key *meta.Key) error {
 		Version:   meta.Version("beta"),
 		Service:   "Instances",
 	}
+	glog.V(5).Infof("GCEBetaInstances.Delete(%v, %v): projectID = %v, rk = %+v", ctx, key, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEBetaInstances.Delete(%v, %v): RateLimiter error: %v", ctx, key, err)
 		return err
 	}
 	call := g.s.Beta.Instances.Delete(projectID, key.Zone, key.Name)
@@ -8265,14 +9273,21 @@ func (g *GCEBetaInstances) Delete(ctx context.Context, key *meta.Key) error {
 
 	op, err := call.Do()
 	if err != nil {
+		glog.V(4).Infof("GCEBetaInstances.Delete(%v, %v) = %v", ctx, key, err)
 		return err
 	}
-	return g.s.WaitForCompletion(ctx, op)
+
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCEBetaInstances.Delete(%v, %v) = %v", ctx, key, err)
+	return err
 }
 
 // AttachDisk is a method on GCEBetaInstances.
 func (g *GCEBetaInstances) AttachDisk(ctx context.Context, key *meta.Key, arg0 *beta.AttachedDisk) error {
+	glog.V(5).Infof("GCEBetaInstances.AttachDisk(%v, %v, ...): called", ctx, key)
+
 	if !key.Valid() {
+		glog.V(2).Infof("GCEBetaInstances.AttachDisk(%v, %v, ...): key is invalid (%#v)", ctx, key, key)
 		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "beta", "Instances")
@@ -8282,21 +9297,30 @@ func (g *GCEBetaInstances) AttachDisk(ctx context.Context, key *meta.Key, arg0 *
 		Version:   meta.Version("beta"),
 		Service:   "Instances",
 	}
+	glog.V(5).Infof("GCEBetaInstances.AttachDisk(%v, %v, ...): projectID = %v, rk = %+v", ctx, key, projectID, rk)
+
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEBetaInstances.AttachDisk(%v, %v, ...): RateLimiter error: %v", ctx, key, err)
 		return err
 	}
 	call := g.s.Beta.Instances.AttachDisk(projectID, key.Zone, key.Name, arg0)
 	call.Context(ctx)
 	op, err := call.Do()
 	if err != nil {
+		glog.V(4).Infof("GCEBetaInstances.AttachDisk(%v, %v, ...) = %+v", ctx, key, err)
 		return err
 	}
-	return g.s.WaitForCompletion(ctx, op)
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCEBetaInstances.AttachDisk(%v, %v, ...) = %+v", ctx, key, err)
+	return err
 }
 
 // DetachDisk is a method on GCEBetaInstances.
 func (g *GCEBetaInstances) DetachDisk(ctx context.Context, key *meta.Key, arg0 string) error {
+	glog.V(5).Infof("GCEBetaInstances.DetachDisk(%v, %v, ...): called", ctx, key)
+
 	if !key.Valid() {
+		glog.V(2).Infof("GCEBetaInstances.DetachDisk(%v, %v, ...): key is invalid (%#v)", ctx, key, key)
 		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "beta", "Instances")
@@ -8306,16 +9330,22 @@ func (g *GCEBetaInstances) DetachDisk(ctx context.Context, key *meta.Key, arg0 s
 		Version:   meta.Version("beta"),
 		Service:   "Instances",
 	}
+	glog.V(5).Infof("GCEBetaInstances.DetachDisk(%v, %v, ...): projectID = %v, rk = %+v", ctx, key, projectID, rk)
+
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEBetaInstances.DetachDisk(%v, %v, ...): RateLimiter error: %v", ctx, key, err)
 		return err
 	}
 	call := g.s.Beta.Instances.DetachDisk(projectID, key.Zone, key.Name, arg0)
 	call.Context(ctx)
 	op, err := call.Do()
 	if err != nil {
+		glog.V(4).Infof("GCEBetaInstances.DetachDisk(%v, %v, ...) = %+v", ctx, key, err)
 		return err
 	}
-	return g.s.WaitForCompletion(ctx, op)
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCEBetaInstances.DetachDisk(%v, %v, ...) = %+v", ctx, key, err)
+	return err
 }
 
 // AlphaInstances is an interface that allows for mocking of Instances.
@@ -8545,8 +9575,11 @@ type GCEAlphaInstances struct {
 
 // Get the Instance named by key.
 func (g *GCEAlphaInstances) Get(ctx context.Context, key *meta.Key) (*alpha.Instance, error) {
+	glog.V(5).Infof("GCEAlphaInstances.Get(%v, %v): called", ctx, key)
+
 	if !key.Valid() {
-		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+		glog.V(2).Infof("GCEAlphaInstances.Get(%v, %v): key is invalid (%#v)", ctx, key, key)
+		return nil, fmt.Errorf("invalid GCE key (%#v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "alpha", "Instances")
 	rk := &RateLimitKey{
@@ -8555,16 +9588,21 @@ func (g *GCEAlphaInstances) Get(ctx context.Context, key *meta.Key) (*alpha.Inst
 		Version:   meta.Version("alpha"),
 		Service:   "Instances",
 	}
+	glog.V(5).Infof("GCEAlphaInstances.Get(%v, %v): projectID = %v, rk = %+v", ctx, key, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEAlphaInstances.Get(%v, %v): RateLimiter error: %v", ctx, key, err)
 		return nil, err
 	}
 	call := g.s.Alpha.Instances.Get(projectID, key.Zone, key.Name)
 	call.Context(ctx)
-	return call.Do()
+	v, err := call.Do()
+	glog.V(4).Infof("GCEAlphaInstances.Get(%v, %v) = %+v, %v", ctx, key, v, err)
+	return v, err
 }
 
 // List all Instance objects.
 func (g *GCEAlphaInstances) List(ctx context.Context, zone string, fl *filter.F) ([]*alpha.Instance, error) {
+	glog.V(5).Infof("GCEAlphaInstances.List(%v, %v, %v) called", ctx, zone, fl)
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "alpha", "Instances")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -8575,24 +9613,40 @@ func (g *GCEAlphaInstances) List(ctx context.Context, zone string, fl *filter.F)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
 		return nil, err
 	}
+	glog.V(5).Infof("GCEAlphaInstances.List(%v, %v, %v): projectID = %v, rk = %+v", ctx, zone, fl, projectID, rk)
 	call := g.s.Alpha.Instances.List(projectID, zone)
 	if fl != filter.None {
 		call.Filter(fl.String())
 	}
 	var all []*alpha.Instance
 	f := func(l *alpha.InstanceList) error {
+		glog.V(5).Infof("GCEAlphaInstances.List(%v, ..., %v): page %+v", ctx, fl, l)
 		all = append(all, l.Items...)
 		return nil
 	}
 	if err := call.Pages(ctx, f); err != nil {
+		glog.V(4).Infof("GCEAlphaInstances.List(%v, ..., %v) = %v, %v", ctx, fl, nil, err)
 		return nil, err
 	}
+
+	if glog.V(4) {
+		glog.V(4).Infof("GCEAlphaInstances.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
+	} else if glog.V(5) {
+		var asStr []string
+		for _, o := range all {
+			asStr = append(asStr, fmt.Sprintf("%+v", o))
+		}
+		glog.V(5).Infof("GCEAlphaInstances.List(%v, ..., %v) = %v, %v", ctx, fl, asStr, nil)
+	}
+
 	return all, nil
 }
 
 // Insert Instance with key of value obj.
 func (g *GCEAlphaInstances) Insert(ctx context.Context, key *meta.Key, obj *alpha.Instance) error {
+	glog.V(5).Infof("GCEAlphaInstances.Insert(%v, %v, %+v): called", ctx, key, obj)
 	if !key.Valid() {
+		glog.V(2).Infof("GCEAlphaInstances.Insert(%v, %v, ...): key is invalid (%#v)", ctx, key, key)
 		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "alpha", "Instances")
@@ -8602,7 +9656,9 @@ func (g *GCEAlphaInstances) Insert(ctx context.Context, key *meta.Key, obj *alph
 		Version:   meta.Version("alpha"),
 		Service:   "Instances",
 	}
+	glog.V(5).Infof("GCEAlphaInstances.Insert(%v, %v, ...): projectID = %v, rk = %+v", ctx, key, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEAlphaInstances.Insert(%v, %v, ...): RateLimiter error: %v", ctx, key, err)
 		return err
 	}
 	obj.Name = key.Name
@@ -8611,14 +9667,20 @@ func (g *GCEAlphaInstances) Insert(ctx context.Context, key *meta.Key, obj *alph
 
 	op, err := call.Do()
 	if err != nil {
+		glog.V(4).Infof("GCEAlphaInstances.Insert(%v, %v, ...) = %+v", ctx, key, err)
 		return err
 	}
-	return g.s.WaitForCompletion(ctx, op)
+
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCEAlphaInstances.Insert(%v, %v, %+v) = %+v", ctx, key, obj, err)
+	return err
 }
 
 // Delete the Instance referenced by key.
 func (g *GCEAlphaInstances) Delete(ctx context.Context, key *meta.Key) error {
+	glog.V(5).Infof("GCEAlphaInstances.Delete(%v, %v): called", ctx, key)
 	if !key.Valid() {
+		glog.V(2).Infof("GCEAlphaInstances.Delete(%v, %v): key is invalid (%#v)", ctx, key, key)
 		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "alpha", "Instances")
@@ -8628,7 +9690,9 @@ func (g *GCEAlphaInstances) Delete(ctx context.Context, key *meta.Key) error {
 		Version:   meta.Version("alpha"),
 		Service:   "Instances",
 	}
+	glog.V(5).Infof("GCEAlphaInstances.Delete(%v, %v): projectID = %v, rk = %+v", ctx, key, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEAlphaInstances.Delete(%v, %v): RateLimiter error: %v", ctx, key, err)
 		return err
 	}
 	call := g.s.Alpha.Instances.Delete(projectID, key.Zone, key.Name)
@@ -8636,14 +9700,21 @@ func (g *GCEAlphaInstances) Delete(ctx context.Context, key *meta.Key) error {
 
 	op, err := call.Do()
 	if err != nil {
+		glog.V(4).Infof("GCEAlphaInstances.Delete(%v, %v) = %v", ctx, key, err)
 		return err
 	}
-	return g.s.WaitForCompletion(ctx, op)
+
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCEAlphaInstances.Delete(%v, %v) = %v", ctx, key, err)
+	return err
 }
 
 // AttachDisk is a method on GCEAlphaInstances.
 func (g *GCEAlphaInstances) AttachDisk(ctx context.Context, key *meta.Key, arg0 *alpha.AttachedDisk) error {
+	glog.V(5).Infof("GCEAlphaInstances.AttachDisk(%v, %v, ...): called", ctx, key)
+
 	if !key.Valid() {
+		glog.V(2).Infof("GCEAlphaInstances.AttachDisk(%v, %v, ...): key is invalid (%#v)", ctx, key, key)
 		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "alpha", "Instances")
@@ -8653,21 +9724,30 @@ func (g *GCEAlphaInstances) AttachDisk(ctx context.Context, key *meta.Key, arg0 
 		Version:   meta.Version("alpha"),
 		Service:   "Instances",
 	}
+	glog.V(5).Infof("GCEAlphaInstances.AttachDisk(%v, %v, ...): projectID = %v, rk = %+v", ctx, key, projectID, rk)
+
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEAlphaInstances.AttachDisk(%v, %v, ...): RateLimiter error: %v", ctx, key, err)
 		return err
 	}
 	call := g.s.Alpha.Instances.AttachDisk(projectID, key.Zone, key.Name, arg0)
 	call.Context(ctx)
 	op, err := call.Do()
 	if err != nil {
+		glog.V(4).Infof("GCEAlphaInstances.AttachDisk(%v, %v, ...) = %+v", ctx, key, err)
 		return err
 	}
-	return g.s.WaitForCompletion(ctx, op)
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCEAlphaInstances.AttachDisk(%v, %v, ...) = %+v", ctx, key, err)
+	return err
 }
 
 // DetachDisk is a method on GCEAlphaInstances.
 func (g *GCEAlphaInstances) DetachDisk(ctx context.Context, key *meta.Key, arg0 string) error {
+	glog.V(5).Infof("GCEAlphaInstances.DetachDisk(%v, %v, ...): called", ctx, key)
+
 	if !key.Valid() {
+		glog.V(2).Infof("GCEAlphaInstances.DetachDisk(%v, %v, ...): key is invalid (%#v)", ctx, key, key)
 		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "alpha", "Instances")
@@ -8677,21 +9757,30 @@ func (g *GCEAlphaInstances) DetachDisk(ctx context.Context, key *meta.Key, arg0 
 		Version:   meta.Version("alpha"),
 		Service:   "Instances",
 	}
+	glog.V(5).Infof("GCEAlphaInstances.DetachDisk(%v, %v, ...): projectID = %v, rk = %+v", ctx, key, projectID, rk)
+
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEAlphaInstances.DetachDisk(%v, %v, ...): RateLimiter error: %v", ctx, key, err)
 		return err
 	}
 	call := g.s.Alpha.Instances.DetachDisk(projectID, key.Zone, key.Name, arg0)
 	call.Context(ctx)
 	op, err := call.Do()
 	if err != nil {
+		glog.V(4).Infof("GCEAlphaInstances.DetachDisk(%v, %v, ...) = %+v", ctx, key, err)
 		return err
 	}
-	return g.s.WaitForCompletion(ctx, op)
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCEAlphaInstances.DetachDisk(%v, %v, ...) = %+v", ctx, key, err)
+	return err
 }
 
 // UpdateNetworkInterface is a method on GCEAlphaInstances.
 func (g *GCEAlphaInstances) UpdateNetworkInterface(ctx context.Context, key *meta.Key, arg0 string, arg1 *alpha.NetworkInterface) error {
+	glog.V(5).Infof("GCEAlphaInstances.UpdateNetworkInterface(%v, %v, ...): called", ctx, key)
+
 	if !key.Valid() {
+		glog.V(2).Infof("GCEAlphaInstances.UpdateNetworkInterface(%v, %v, ...): key is invalid (%#v)", ctx, key, key)
 		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "alpha", "Instances")
@@ -8701,16 +9790,22 @@ func (g *GCEAlphaInstances) UpdateNetworkInterface(ctx context.Context, key *met
 		Version:   meta.Version("alpha"),
 		Service:   "Instances",
 	}
+	glog.V(5).Infof("GCEAlphaInstances.UpdateNetworkInterface(%v, %v, ...): projectID = %v, rk = %+v", ctx, key, projectID, rk)
+
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEAlphaInstances.UpdateNetworkInterface(%v, %v, ...): RateLimiter error: %v", ctx, key, err)
 		return err
 	}
 	call := g.s.Alpha.Instances.UpdateNetworkInterface(projectID, key.Zone, key.Name, arg0, arg1)
 	call.Context(ctx)
 	op, err := call.Do()
 	if err != nil {
+		glog.V(4).Infof("GCEAlphaInstances.UpdateNetworkInterface(%v, %v, ...) = %+v", ctx, key, err)
 		return err
 	}
-	return g.s.WaitForCompletion(ctx, op)
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCEAlphaInstances.UpdateNetworkInterface(%v, %v, ...) = %+v", ctx, key, err)
+	return err
 }
 
 // AlphaNetworkEndpointGroups is an interface that allows for mocking of NetworkEndpointGroups.
@@ -8978,8 +10073,11 @@ type GCEAlphaNetworkEndpointGroups struct {
 
 // Get the NetworkEndpointGroup named by key.
 func (g *GCEAlphaNetworkEndpointGroups) Get(ctx context.Context, key *meta.Key) (*alpha.NetworkEndpointGroup, error) {
+	glog.V(5).Infof("GCEAlphaNetworkEndpointGroups.Get(%v, %v): called", ctx, key)
+
 	if !key.Valid() {
-		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+		glog.V(2).Infof("GCEAlphaNetworkEndpointGroups.Get(%v, %v): key is invalid (%#v)", ctx, key, key)
+		return nil, fmt.Errorf("invalid GCE key (%#v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "alpha", "NetworkEndpointGroups")
 	rk := &RateLimitKey{
@@ -8988,16 +10086,21 @@ func (g *GCEAlphaNetworkEndpointGroups) Get(ctx context.Context, key *meta.Key) 
 		Version:   meta.Version("alpha"),
 		Service:   "NetworkEndpointGroups",
 	}
+	glog.V(5).Infof("GCEAlphaNetworkEndpointGroups.Get(%v, %v): projectID = %v, rk = %+v", ctx, key, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEAlphaNetworkEndpointGroups.Get(%v, %v): RateLimiter error: %v", ctx, key, err)
 		return nil, err
 	}
 	call := g.s.Alpha.NetworkEndpointGroups.Get(projectID, key.Zone, key.Name)
 	call.Context(ctx)
-	return call.Do()
+	v, err := call.Do()
+	glog.V(4).Infof("GCEAlphaNetworkEndpointGroups.Get(%v, %v) = %+v, %v", ctx, key, v, err)
+	return v, err
 }
 
 // List all NetworkEndpointGroup objects.
 func (g *GCEAlphaNetworkEndpointGroups) List(ctx context.Context, zone string, fl *filter.F) ([]*alpha.NetworkEndpointGroup, error) {
+	glog.V(5).Infof("GCEAlphaNetworkEndpointGroups.List(%v, %v, %v) called", ctx, zone, fl)
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "alpha", "NetworkEndpointGroups")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -9008,24 +10111,40 @@ func (g *GCEAlphaNetworkEndpointGroups) List(ctx context.Context, zone string, f
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
 		return nil, err
 	}
+	glog.V(5).Infof("GCEAlphaNetworkEndpointGroups.List(%v, %v, %v): projectID = %v, rk = %+v", ctx, zone, fl, projectID, rk)
 	call := g.s.Alpha.NetworkEndpointGroups.List(projectID, zone)
 	if fl != filter.None {
 		call.Filter(fl.String())
 	}
 	var all []*alpha.NetworkEndpointGroup
 	f := func(l *alpha.NetworkEndpointGroupList) error {
+		glog.V(5).Infof("GCEAlphaNetworkEndpointGroups.List(%v, ..., %v): page %+v", ctx, fl, l)
 		all = append(all, l.Items...)
 		return nil
 	}
 	if err := call.Pages(ctx, f); err != nil {
+		glog.V(4).Infof("GCEAlphaNetworkEndpointGroups.List(%v, ..., %v) = %v, %v", ctx, fl, nil, err)
 		return nil, err
 	}
+
+	if glog.V(4) {
+		glog.V(4).Infof("GCEAlphaNetworkEndpointGroups.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
+	} else if glog.V(5) {
+		var asStr []string
+		for _, o := range all {
+			asStr = append(asStr, fmt.Sprintf("%+v", o))
+		}
+		glog.V(5).Infof("GCEAlphaNetworkEndpointGroups.List(%v, ..., %v) = %v, %v", ctx, fl, asStr, nil)
+	}
+
 	return all, nil
 }
 
 // Insert NetworkEndpointGroup with key of value obj.
 func (g *GCEAlphaNetworkEndpointGroups) Insert(ctx context.Context, key *meta.Key, obj *alpha.NetworkEndpointGroup) error {
+	glog.V(5).Infof("GCEAlphaNetworkEndpointGroups.Insert(%v, %v, %+v): called", ctx, key, obj)
 	if !key.Valid() {
+		glog.V(2).Infof("GCEAlphaNetworkEndpointGroups.Insert(%v, %v, ...): key is invalid (%#v)", ctx, key, key)
 		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "alpha", "NetworkEndpointGroups")
@@ -9035,7 +10154,9 @@ func (g *GCEAlphaNetworkEndpointGroups) Insert(ctx context.Context, key *meta.Ke
 		Version:   meta.Version("alpha"),
 		Service:   "NetworkEndpointGroups",
 	}
+	glog.V(5).Infof("GCEAlphaNetworkEndpointGroups.Insert(%v, %v, ...): projectID = %v, rk = %+v", ctx, key, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEAlphaNetworkEndpointGroups.Insert(%v, %v, ...): RateLimiter error: %v", ctx, key, err)
 		return err
 	}
 	obj.Name = key.Name
@@ -9044,14 +10165,20 @@ func (g *GCEAlphaNetworkEndpointGroups) Insert(ctx context.Context, key *meta.Ke
 
 	op, err := call.Do()
 	if err != nil {
+		glog.V(4).Infof("GCEAlphaNetworkEndpointGroups.Insert(%v, %v, ...) = %+v", ctx, key, err)
 		return err
 	}
-	return g.s.WaitForCompletion(ctx, op)
+
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCEAlphaNetworkEndpointGroups.Insert(%v, %v, %+v) = %+v", ctx, key, obj, err)
+	return err
 }
 
 // Delete the NetworkEndpointGroup referenced by key.
 func (g *GCEAlphaNetworkEndpointGroups) Delete(ctx context.Context, key *meta.Key) error {
+	glog.V(5).Infof("GCEAlphaNetworkEndpointGroups.Delete(%v, %v): called", ctx, key)
 	if !key.Valid() {
+		glog.V(2).Infof("GCEAlphaNetworkEndpointGroups.Delete(%v, %v): key is invalid (%#v)", ctx, key, key)
 		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "alpha", "NetworkEndpointGroups")
@@ -9061,7 +10188,9 @@ func (g *GCEAlphaNetworkEndpointGroups) Delete(ctx context.Context, key *meta.Ke
 		Version:   meta.Version("alpha"),
 		Service:   "NetworkEndpointGroups",
 	}
+	glog.V(5).Infof("GCEAlphaNetworkEndpointGroups.Delete(%v, %v): projectID = %v, rk = %+v", ctx, key, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEAlphaNetworkEndpointGroups.Delete(%v, %v): RateLimiter error: %v", ctx, key, err)
 		return err
 	}
 	call := g.s.Alpha.NetworkEndpointGroups.Delete(projectID, key.Zone, key.Name)
@@ -9069,13 +10198,19 @@ func (g *GCEAlphaNetworkEndpointGroups) Delete(ctx context.Context, key *meta.Ke
 
 	op, err := call.Do()
 	if err != nil {
+		glog.V(4).Infof("GCEAlphaNetworkEndpointGroups.Delete(%v, %v) = %v", ctx, key, err)
 		return err
 	}
-	return g.s.WaitForCompletion(ctx, op)
+
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCEAlphaNetworkEndpointGroups.Delete(%v, %v) = %v", ctx, key, err)
+	return err
 }
 
 // AggregatedList lists all resources of the given type across all locations.
 func (g *GCEAlphaNetworkEndpointGroups) AggregatedList(ctx context.Context, fl *filter.F) (map[string][]*alpha.NetworkEndpointGroup, error) {
+	glog.V(5).Infof("GCEAlphaNetworkEndpointGroups.AggregatedList(%v, %v) called", ctx, fl)
+
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "alpha", "NetworkEndpointGroups")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -9083,7 +10218,10 @@ func (g *GCEAlphaNetworkEndpointGroups) AggregatedList(ctx context.Context, fl *
 		Version:   meta.Version("alpha"),
 		Service:   "NetworkEndpointGroups",
 	}
+
+	glog.V(5).Infof("GCEAlphaNetworkEndpointGroups.AggregatedList(%v, %v): projectID = %v, rk = %+v", ctx, fl, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(5).Infof("GCEAlphaNetworkEndpointGroups.AggregatedList(%v, %v): RateLimiter error: %v", ctx, fl, err)
 		return nil, err
 	}
 
@@ -9096,19 +10234,33 @@ func (g *GCEAlphaNetworkEndpointGroups) AggregatedList(ctx context.Context, fl *
 	all := map[string][]*alpha.NetworkEndpointGroup{}
 	f := func(l *alpha.NetworkEndpointGroupAggregatedList) error {
 		for k, v := range l.Items {
+			glog.V(5).Infof("GCEAlphaNetworkEndpointGroups.AggregatedList(%v, %v): page[%v]%+v", ctx, fl, k, v)
 			all[k] = append(all[k], v.NetworkEndpointGroups...)
 		}
 		return nil
 	}
 	if err := call.Pages(ctx, f); err != nil {
+		glog.V(4).Infof("GCEAlphaNetworkEndpointGroups.AggregatedList(%v, %v) = %v, %v", ctx, fl, nil, err)
 		return nil, err
+	}
+	if glog.V(4) {
+		glog.V(4).Infof("GCEAlphaNetworkEndpointGroups.AggregatedList(%v, %v) = [%v items], %v", ctx, fl, len(all), nil)
+	} else if glog.V(5) {
+		var asStr []string
+		for _, o := range all {
+			asStr = append(asStr, fmt.Sprintf("%+v", o))
+		}
+		glog.V(5).Infof("GCEAlphaNetworkEndpointGroups.AggregatedList(%v, %v) = %v, %v", ctx, fl, asStr, nil)
 	}
 	return all, nil
 }
 
 // AttachNetworkEndpoints is a method on GCEAlphaNetworkEndpointGroups.
 func (g *GCEAlphaNetworkEndpointGroups) AttachNetworkEndpoints(ctx context.Context, key *meta.Key, arg0 *alpha.NetworkEndpointGroupsAttachEndpointsRequest) error {
+	glog.V(5).Infof("GCEAlphaNetworkEndpointGroups.AttachNetworkEndpoints(%v, %v, ...): called", ctx, key)
+
 	if !key.Valid() {
+		glog.V(2).Infof("GCEAlphaNetworkEndpointGroups.AttachNetworkEndpoints(%v, %v, ...): key is invalid (%#v)", ctx, key, key)
 		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "alpha", "NetworkEndpointGroups")
@@ -9118,21 +10270,30 @@ func (g *GCEAlphaNetworkEndpointGroups) AttachNetworkEndpoints(ctx context.Conte
 		Version:   meta.Version("alpha"),
 		Service:   "NetworkEndpointGroups",
 	}
+	glog.V(5).Infof("GCEAlphaNetworkEndpointGroups.AttachNetworkEndpoints(%v, %v, ...): projectID = %v, rk = %+v", ctx, key, projectID, rk)
+
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEAlphaNetworkEndpointGroups.AttachNetworkEndpoints(%v, %v, ...): RateLimiter error: %v", ctx, key, err)
 		return err
 	}
 	call := g.s.Alpha.NetworkEndpointGroups.AttachNetworkEndpoints(projectID, key.Zone, key.Name, arg0)
 	call.Context(ctx)
 	op, err := call.Do()
 	if err != nil {
+		glog.V(4).Infof("GCEAlphaNetworkEndpointGroups.AttachNetworkEndpoints(%v, %v, ...) = %+v", ctx, key, err)
 		return err
 	}
-	return g.s.WaitForCompletion(ctx, op)
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCEAlphaNetworkEndpointGroups.AttachNetworkEndpoints(%v, %v, ...) = %+v", ctx, key, err)
+	return err
 }
 
 // DetachNetworkEndpoints is a method on GCEAlphaNetworkEndpointGroups.
 func (g *GCEAlphaNetworkEndpointGroups) DetachNetworkEndpoints(ctx context.Context, key *meta.Key, arg0 *alpha.NetworkEndpointGroupsDetachEndpointsRequest) error {
+	glog.V(5).Infof("GCEAlphaNetworkEndpointGroups.DetachNetworkEndpoints(%v, %v, ...): called", ctx, key)
+
 	if !key.Valid() {
+		glog.V(2).Infof("GCEAlphaNetworkEndpointGroups.DetachNetworkEndpoints(%v, %v, ...): key is invalid (%#v)", ctx, key, key)
 		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "alpha", "NetworkEndpointGroups")
@@ -9142,21 +10303,30 @@ func (g *GCEAlphaNetworkEndpointGroups) DetachNetworkEndpoints(ctx context.Conte
 		Version:   meta.Version("alpha"),
 		Service:   "NetworkEndpointGroups",
 	}
+	glog.V(5).Infof("GCEAlphaNetworkEndpointGroups.DetachNetworkEndpoints(%v, %v, ...): projectID = %v, rk = %+v", ctx, key, projectID, rk)
+
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEAlphaNetworkEndpointGroups.DetachNetworkEndpoints(%v, %v, ...): RateLimiter error: %v", ctx, key, err)
 		return err
 	}
 	call := g.s.Alpha.NetworkEndpointGroups.DetachNetworkEndpoints(projectID, key.Zone, key.Name, arg0)
 	call.Context(ctx)
 	op, err := call.Do()
 	if err != nil {
+		glog.V(4).Infof("GCEAlphaNetworkEndpointGroups.DetachNetworkEndpoints(%v, %v, ...) = %+v", ctx, key, err)
 		return err
 	}
-	return g.s.WaitForCompletion(ctx, op)
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCEAlphaNetworkEndpointGroups.DetachNetworkEndpoints(%v, %v, ...) = %+v", ctx, key, err)
+	return err
 }
 
 // ListNetworkEndpoints is a method on GCEAlphaNetworkEndpointGroups.
 func (g *GCEAlphaNetworkEndpointGroups) ListNetworkEndpoints(ctx context.Context, key *meta.Key, arg0 *alpha.NetworkEndpointGroupsListEndpointsRequest, fl *filter.F) ([]*alpha.NetworkEndpointWithHealthStatus, error) {
+	glog.V(5).Infof("GCEAlphaNetworkEndpointGroups.ListNetworkEndpoints(%v, %v, ...): called", ctx, key)
+
 	if !key.Valid() {
+		glog.V(2).Infof("GCEAlphaNetworkEndpointGroups.ListNetworkEndpoints(%v, %v, ...): key is invalid (%#v)", ctx, key, key)
 		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "alpha", "NetworkEndpointGroups")
@@ -9166,17 +10336,31 @@ func (g *GCEAlphaNetworkEndpointGroups) ListNetworkEndpoints(ctx context.Context
 		Version:   meta.Version("alpha"),
 		Service:   "NetworkEndpointGroups",
 	}
+	glog.V(5).Infof("GCEAlphaNetworkEndpointGroups.ListNetworkEndpoints(%v, %v, ...): projectID = %v, rk = %+v", ctx, key, projectID, rk)
+
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEAlphaNetworkEndpointGroups.ListNetworkEndpoints(%v, %v, ...): RateLimiter error: %v", ctx, key, err)
 		return nil, err
 	}
 	call := g.s.Alpha.NetworkEndpointGroups.ListNetworkEndpoints(projectID, key.Zone, key.Name, arg0)
 	var all []*alpha.NetworkEndpointWithHealthStatus
 	f := func(l *alpha.NetworkEndpointGroupsListNetworkEndpoints) error {
+		glog.V(5).Infof("GCEAlphaNetworkEndpointGroups.ListNetworkEndpoints(%v, %v, ...): page %+v", ctx, key, l)
 		all = append(all, l.Items...)
 		return nil
 	}
 	if err := call.Pages(ctx, f); err != nil {
+		glog.V(4).Infof("GCEAlphaNetworkEndpointGroups.ListNetworkEndpoints(%v, %v, ...) = %v, %v", ctx, key, nil, err)
 		return nil, err
+	}
+	if glog.V(4) {
+		glog.V(4).Infof("GCEAlphaNetworkEndpointGroups.ListNetworkEndpoints(%v, %v, ...) = [%v items], %v", ctx, key, len(all), nil)
+	} else if glog.V(5) {
+		var asStr []string
+		for _, o := range all {
+			asStr = append(asStr, fmt.Sprintf("%+v", o))
+		}
+		glog.V(5).Infof("GCEAlphaNetworkEndpointGroups.ListNetworkEndpoints(%v, %v, ...) = %v, %v", ctx, key, asStr, nil)
 	}
 	return all, nil
 }
@@ -9341,8 +10525,11 @@ type GCERegions struct {
 
 // Get the Region named by key.
 func (g *GCERegions) Get(ctx context.Context, key *meta.Key) (*ga.Region, error) {
+	glog.V(5).Infof("GCERegions.Get(%v, %v): called", ctx, key)
+
 	if !key.Valid() {
-		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+		glog.V(2).Infof("GCERegions.Get(%v, %v): key is invalid (%#v)", ctx, key, key)
+		return nil, fmt.Errorf("invalid GCE key (%#v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "Regions")
 	rk := &RateLimitKey{
@@ -9351,16 +10538,21 @@ func (g *GCERegions) Get(ctx context.Context, key *meta.Key) (*ga.Region, error)
 		Version:   meta.Version("ga"),
 		Service:   "Regions",
 	}
+	glog.V(5).Infof("GCERegions.Get(%v, %v): projectID = %v, rk = %+v", ctx, key, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCERegions.Get(%v, %v): RateLimiter error: %v", ctx, key, err)
 		return nil, err
 	}
 	call := g.s.GA.Regions.Get(projectID, key.Name)
 	call.Context(ctx)
-	return call.Do()
+	v, err := call.Do()
+	glog.V(4).Infof("GCERegions.Get(%v, %v) = %+v, %v", ctx, key, v, err)
+	return v, err
 }
 
 // List all Region objects.
 func (g *GCERegions) List(ctx context.Context, fl *filter.F) ([]*ga.Region, error) {
+	glog.V(5).Infof("GCERegions.List(%v, %v) called", ctx, fl)
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "Regions")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -9371,18 +10563,32 @@ func (g *GCERegions) List(ctx context.Context, fl *filter.F) ([]*ga.Region, erro
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
 		return nil, err
 	}
+	glog.V(5).Infof("GCERegions.List(%v, %v): projectID = %v, rk = %+v", ctx, fl, projectID, rk)
 	call := g.s.GA.Regions.List(projectID)
 	if fl != filter.None {
 		call.Filter(fl.String())
 	}
 	var all []*ga.Region
 	f := func(l *ga.RegionList) error {
+		glog.V(5).Infof("GCERegions.List(%v, ..., %v): page %+v", ctx, fl, l)
 		all = append(all, l.Items...)
 		return nil
 	}
 	if err := call.Pages(ctx, f); err != nil {
+		glog.V(4).Infof("GCERegions.List(%v, ..., %v) = %v, %v", ctx, fl, nil, err)
 		return nil, err
 	}
+
+	if glog.V(4) {
+		glog.V(4).Infof("GCERegions.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
+	} else if glog.V(5) {
+		var asStr []string
+		for _, o := range all {
+			asStr = append(asStr, fmt.Sprintf("%+v", o))
+		}
+		glog.V(5).Infof("GCERegions.List(%v, ..., %v) = %v, %v", ctx, fl, asStr, nil)
+	}
+
 	return all, nil
 }
 
@@ -9580,8 +10786,11 @@ type GCERoutes struct {
 
 // Get the Route named by key.
 func (g *GCERoutes) Get(ctx context.Context, key *meta.Key) (*ga.Route, error) {
+	glog.V(5).Infof("GCERoutes.Get(%v, %v): called", ctx, key)
+
 	if !key.Valid() {
-		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+		glog.V(2).Infof("GCERoutes.Get(%v, %v): key is invalid (%#v)", ctx, key, key)
+		return nil, fmt.Errorf("invalid GCE key (%#v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "Routes")
 	rk := &RateLimitKey{
@@ -9590,16 +10799,21 @@ func (g *GCERoutes) Get(ctx context.Context, key *meta.Key) (*ga.Route, error) {
 		Version:   meta.Version("ga"),
 		Service:   "Routes",
 	}
+	glog.V(5).Infof("GCERoutes.Get(%v, %v): projectID = %v, rk = %+v", ctx, key, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCERoutes.Get(%v, %v): RateLimiter error: %v", ctx, key, err)
 		return nil, err
 	}
 	call := g.s.GA.Routes.Get(projectID, key.Name)
 	call.Context(ctx)
-	return call.Do()
+	v, err := call.Do()
+	glog.V(4).Infof("GCERoutes.Get(%v, %v) = %+v, %v", ctx, key, v, err)
+	return v, err
 }
 
 // List all Route objects.
 func (g *GCERoutes) List(ctx context.Context, fl *filter.F) ([]*ga.Route, error) {
+	glog.V(5).Infof("GCERoutes.List(%v, %v) called", ctx, fl)
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "Routes")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -9610,24 +10824,40 @@ func (g *GCERoutes) List(ctx context.Context, fl *filter.F) ([]*ga.Route, error)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
 		return nil, err
 	}
+	glog.V(5).Infof("GCERoutes.List(%v, %v): projectID = %v, rk = %+v", ctx, fl, projectID, rk)
 	call := g.s.GA.Routes.List(projectID)
 	if fl != filter.None {
 		call.Filter(fl.String())
 	}
 	var all []*ga.Route
 	f := func(l *ga.RouteList) error {
+		glog.V(5).Infof("GCERoutes.List(%v, ..., %v): page %+v", ctx, fl, l)
 		all = append(all, l.Items...)
 		return nil
 	}
 	if err := call.Pages(ctx, f); err != nil {
+		glog.V(4).Infof("GCERoutes.List(%v, ..., %v) = %v, %v", ctx, fl, nil, err)
 		return nil, err
 	}
+
+	if glog.V(4) {
+		glog.V(4).Infof("GCERoutes.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
+	} else if glog.V(5) {
+		var asStr []string
+		for _, o := range all {
+			asStr = append(asStr, fmt.Sprintf("%+v", o))
+		}
+		glog.V(5).Infof("GCERoutes.List(%v, ..., %v) = %v, %v", ctx, fl, asStr, nil)
+	}
+
 	return all, nil
 }
 
 // Insert Route with key of value obj.
 func (g *GCERoutes) Insert(ctx context.Context, key *meta.Key, obj *ga.Route) error {
+	glog.V(5).Infof("GCERoutes.Insert(%v, %v, %+v): called", ctx, key, obj)
 	if !key.Valid() {
+		glog.V(2).Infof("GCERoutes.Insert(%v, %v, ...): key is invalid (%#v)", ctx, key, key)
 		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "Routes")
@@ -9637,7 +10867,9 @@ func (g *GCERoutes) Insert(ctx context.Context, key *meta.Key, obj *ga.Route) er
 		Version:   meta.Version("ga"),
 		Service:   "Routes",
 	}
+	glog.V(5).Infof("GCERoutes.Insert(%v, %v, ...): projectID = %v, rk = %+v", ctx, key, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCERoutes.Insert(%v, %v, ...): RateLimiter error: %v", ctx, key, err)
 		return err
 	}
 	obj.Name = key.Name
@@ -9646,14 +10878,20 @@ func (g *GCERoutes) Insert(ctx context.Context, key *meta.Key, obj *ga.Route) er
 
 	op, err := call.Do()
 	if err != nil {
+		glog.V(4).Infof("GCERoutes.Insert(%v, %v, ...) = %+v", ctx, key, err)
 		return err
 	}
-	return g.s.WaitForCompletion(ctx, op)
+
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCERoutes.Insert(%v, %v, %+v) = %+v", ctx, key, obj, err)
+	return err
 }
 
 // Delete the Route referenced by key.
 func (g *GCERoutes) Delete(ctx context.Context, key *meta.Key) error {
+	glog.V(5).Infof("GCERoutes.Delete(%v, %v): called", ctx, key)
 	if !key.Valid() {
+		glog.V(2).Infof("GCERoutes.Delete(%v, %v): key is invalid (%#v)", ctx, key, key)
 		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "Routes")
@@ -9663,7 +10901,9 @@ func (g *GCERoutes) Delete(ctx context.Context, key *meta.Key) error {
 		Version:   meta.Version("ga"),
 		Service:   "Routes",
 	}
+	glog.V(5).Infof("GCERoutes.Delete(%v, %v): projectID = %v, rk = %+v", ctx, key, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCERoutes.Delete(%v, %v): RateLimiter error: %v", ctx, key, err)
 		return err
 	}
 	call := g.s.GA.Routes.Delete(projectID, key.Name)
@@ -9672,9 +10912,13 @@ func (g *GCERoutes) Delete(ctx context.Context, key *meta.Key) error {
 
 	op, err := call.Do()
 	if err != nil {
+		glog.V(4).Infof("GCERoutes.Delete(%v, %v) = %v", ctx, key, err)
 		return err
 	}
-	return g.s.WaitForCompletion(ctx, op)
+
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCERoutes.Delete(%v, %v) = %v", ctx, key, err)
+	return err
 }
 
 // SslCertificates is an interface that allows for mocking of SslCertificates.
@@ -9871,8 +11115,11 @@ type GCESslCertificates struct {
 
 // Get the SslCertificate named by key.
 func (g *GCESslCertificates) Get(ctx context.Context, key *meta.Key) (*ga.SslCertificate, error) {
+	glog.V(5).Infof("GCESslCertificates.Get(%v, %v): called", ctx, key)
+
 	if !key.Valid() {
-		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+		glog.V(2).Infof("GCESslCertificates.Get(%v, %v): key is invalid (%#v)", ctx, key, key)
+		return nil, fmt.Errorf("invalid GCE key (%#v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "SslCertificates")
 	rk := &RateLimitKey{
@@ -9881,16 +11128,21 @@ func (g *GCESslCertificates) Get(ctx context.Context, key *meta.Key) (*ga.SslCer
 		Version:   meta.Version("ga"),
 		Service:   "SslCertificates",
 	}
+	glog.V(5).Infof("GCESslCertificates.Get(%v, %v): projectID = %v, rk = %+v", ctx, key, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCESslCertificates.Get(%v, %v): RateLimiter error: %v", ctx, key, err)
 		return nil, err
 	}
 	call := g.s.GA.SslCertificates.Get(projectID, key.Name)
 	call.Context(ctx)
-	return call.Do()
+	v, err := call.Do()
+	glog.V(4).Infof("GCESslCertificates.Get(%v, %v) = %+v, %v", ctx, key, v, err)
+	return v, err
 }
 
 // List all SslCertificate objects.
 func (g *GCESslCertificates) List(ctx context.Context, fl *filter.F) ([]*ga.SslCertificate, error) {
+	glog.V(5).Infof("GCESslCertificates.List(%v, %v) called", ctx, fl)
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "SslCertificates")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -9901,24 +11153,40 @@ func (g *GCESslCertificates) List(ctx context.Context, fl *filter.F) ([]*ga.SslC
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
 		return nil, err
 	}
+	glog.V(5).Infof("GCESslCertificates.List(%v, %v): projectID = %v, rk = %+v", ctx, fl, projectID, rk)
 	call := g.s.GA.SslCertificates.List(projectID)
 	if fl != filter.None {
 		call.Filter(fl.String())
 	}
 	var all []*ga.SslCertificate
 	f := func(l *ga.SslCertificateList) error {
+		glog.V(5).Infof("GCESslCertificates.List(%v, ..., %v): page %+v", ctx, fl, l)
 		all = append(all, l.Items...)
 		return nil
 	}
 	if err := call.Pages(ctx, f); err != nil {
+		glog.V(4).Infof("GCESslCertificates.List(%v, ..., %v) = %v, %v", ctx, fl, nil, err)
 		return nil, err
 	}
+
+	if glog.V(4) {
+		glog.V(4).Infof("GCESslCertificates.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
+	} else if glog.V(5) {
+		var asStr []string
+		for _, o := range all {
+			asStr = append(asStr, fmt.Sprintf("%+v", o))
+		}
+		glog.V(5).Infof("GCESslCertificates.List(%v, ..., %v) = %v, %v", ctx, fl, asStr, nil)
+	}
+
 	return all, nil
 }
 
 // Insert SslCertificate with key of value obj.
 func (g *GCESslCertificates) Insert(ctx context.Context, key *meta.Key, obj *ga.SslCertificate) error {
+	glog.V(5).Infof("GCESslCertificates.Insert(%v, %v, %+v): called", ctx, key, obj)
 	if !key.Valid() {
+		glog.V(2).Infof("GCESslCertificates.Insert(%v, %v, ...): key is invalid (%#v)", ctx, key, key)
 		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "SslCertificates")
@@ -9928,7 +11196,9 @@ func (g *GCESslCertificates) Insert(ctx context.Context, key *meta.Key, obj *ga.
 		Version:   meta.Version("ga"),
 		Service:   "SslCertificates",
 	}
+	glog.V(5).Infof("GCESslCertificates.Insert(%v, %v, ...): projectID = %v, rk = %+v", ctx, key, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCESslCertificates.Insert(%v, %v, ...): RateLimiter error: %v", ctx, key, err)
 		return err
 	}
 	obj.Name = key.Name
@@ -9937,14 +11207,20 @@ func (g *GCESslCertificates) Insert(ctx context.Context, key *meta.Key, obj *ga.
 
 	op, err := call.Do()
 	if err != nil {
+		glog.V(4).Infof("GCESslCertificates.Insert(%v, %v, ...) = %+v", ctx, key, err)
 		return err
 	}
-	return g.s.WaitForCompletion(ctx, op)
+
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCESslCertificates.Insert(%v, %v, %+v) = %+v", ctx, key, obj, err)
+	return err
 }
 
 // Delete the SslCertificate referenced by key.
 func (g *GCESslCertificates) Delete(ctx context.Context, key *meta.Key) error {
+	glog.V(5).Infof("GCESslCertificates.Delete(%v, %v): called", ctx, key)
 	if !key.Valid() {
+		glog.V(2).Infof("GCESslCertificates.Delete(%v, %v): key is invalid (%#v)", ctx, key, key)
 		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "SslCertificates")
@@ -9954,7 +11230,9 @@ func (g *GCESslCertificates) Delete(ctx context.Context, key *meta.Key) error {
 		Version:   meta.Version("ga"),
 		Service:   "SslCertificates",
 	}
+	glog.V(5).Infof("GCESslCertificates.Delete(%v, %v): projectID = %v, rk = %+v", ctx, key, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCESslCertificates.Delete(%v, %v): RateLimiter error: %v", ctx, key, err)
 		return err
 	}
 	call := g.s.GA.SslCertificates.Delete(projectID, key.Name)
@@ -9963,9 +11241,13 @@ func (g *GCESslCertificates) Delete(ctx context.Context, key *meta.Key) error {
 
 	op, err := call.Do()
 	if err != nil {
+		glog.V(4).Infof("GCESslCertificates.Delete(%v, %v) = %v", ctx, key, err)
 		return err
 	}
-	return g.s.WaitForCompletion(ctx, op)
+
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCESslCertificates.Delete(%v, %v) = %v", ctx, key, err)
+	return err
 }
 
 // TargetHttpProxies is an interface that allows for mocking of TargetHttpProxies.
@@ -10172,8 +11454,11 @@ type GCETargetHttpProxies struct {
 
 // Get the TargetHttpProxy named by key.
 func (g *GCETargetHttpProxies) Get(ctx context.Context, key *meta.Key) (*ga.TargetHttpProxy, error) {
+	glog.V(5).Infof("GCETargetHttpProxies.Get(%v, %v): called", ctx, key)
+
 	if !key.Valid() {
-		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+		glog.V(2).Infof("GCETargetHttpProxies.Get(%v, %v): key is invalid (%#v)", ctx, key, key)
+		return nil, fmt.Errorf("invalid GCE key (%#v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "TargetHttpProxies")
 	rk := &RateLimitKey{
@@ -10182,16 +11467,21 @@ func (g *GCETargetHttpProxies) Get(ctx context.Context, key *meta.Key) (*ga.Targ
 		Version:   meta.Version("ga"),
 		Service:   "TargetHttpProxies",
 	}
+	glog.V(5).Infof("GCETargetHttpProxies.Get(%v, %v): projectID = %v, rk = %+v", ctx, key, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCETargetHttpProxies.Get(%v, %v): RateLimiter error: %v", ctx, key, err)
 		return nil, err
 	}
 	call := g.s.GA.TargetHttpProxies.Get(projectID, key.Name)
 	call.Context(ctx)
-	return call.Do()
+	v, err := call.Do()
+	glog.V(4).Infof("GCETargetHttpProxies.Get(%v, %v) = %+v, %v", ctx, key, v, err)
+	return v, err
 }
 
 // List all TargetHttpProxy objects.
 func (g *GCETargetHttpProxies) List(ctx context.Context, fl *filter.F) ([]*ga.TargetHttpProxy, error) {
+	glog.V(5).Infof("GCETargetHttpProxies.List(%v, %v) called", ctx, fl)
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "TargetHttpProxies")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -10202,24 +11492,40 @@ func (g *GCETargetHttpProxies) List(ctx context.Context, fl *filter.F) ([]*ga.Ta
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
 		return nil, err
 	}
+	glog.V(5).Infof("GCETargetHttpProxies.List(%v, %v): projectID = %v, rk = %+v", ctx, fl, projectID, rk)
 	call := g.s.GA.TargetHttpProxies.List(projectID)
 	if fl != filter.None {
 		call.Filter(fl.String())
 	}
 	var all []*ga.TargetHttpProxy
 	f := func(l *ga.TargetHttpProxyList) error {
+		glog.V(5).Infof("GCETargetHttpProxies.List(%v, ..., %v): page %+v", ctx, fl, l)
 		all = append(all, l.Items...)
 		return nil
 	}
 	if err := call.Pages(ctx, f); err != nil {
+		glog.V(4).Infof("GCETargetHttpProxies.List(%v, ..., %v) = %v, %v", ctx, fl, nil, err)
 		return nil, err
 	}
+
+	if glog.V(4) {
+		glog.V(4).Infof("GCETargetHttpProxies.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
+	} else if glog.V(5) {
+		var asStr []string
+		for _, o := range all {
+			asStr = append(asStr, fmt.Sprintf("%+v", o))
+		}
+		glog.V(5).Infof("GCETargetHttpProxies.List(%v, ..., %v) = %v, %v", ctx, fl, asStr, nil)
+	}
+
 	return all, nil
 }
 
 // Insert TargetHttpProxy with key of value obj.
 func (g *GCETargetHttpProxies) Insert(ctx context.Context, key *meta.Key, obj *ga.TargetHttpProxy) error {
+	glog.V(5).Infof("GCETargetHttpProxies.Insert(%v, %v, %+v): called", ctx, key, obj)
 	if !key.Valid() {
+		glog.V(2).Infof("GCETargetHttpProxies.Insert(%v, %v, ...): key is invalid (%#v)", ctx, key, key)
 		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "TargetHttpProxies")
@@ -10229,7 +11535,9 @@ func (g *GCETargetHttpProxies) Insert(ctx context.Context, key *meta.Key, obj *g
 		Version:   meta.Version("ga"),
 		Service:   "TargetHttpProxies",
 	}
+	glog.V(5).Infof("GCETargetHttpProxies.Insert(%v, %v, ...): projectID = %v, rk = %+v", ctx, key, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCETargetHttpProxies.Insert(%v, %v, ...): RateLimiter error: %v", ctx, key, err)
 		return err
 	}
 	obj.Name = key.Name
@@ -10238,14 +11546,20 @@ func (g *GCETargetHttpProxies) Insert(ctx context.Context, key *meta.Key, obj *g
 
 	op, err := call.Do()
 	if err != nil {
+		glog.V(4).Infof("GCETargetHttpProxies.Insert(%v, %v, ...) = %+v", ctx, key, err)
 		return err
 	}
-	return g.s.WaitForCompletion(ctx, op)
+
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCETargetHttpProxies.Insert(%v, %v, %+v) = %+v", ctx, key, obj, err)
+	return err
 }
 
 // Delete the TargetHttpProxy referenced by key.
 func (g *GCETargetHttpProxies) Delete(ctx context.Context, key *meta.Key) error {
+	glog.V(5).Infof("GCETargetHttpProxies.Delete(%v, %v): called", ctx, key)
 	if !key.Valid() {
+		glog.V(2).Infof("GCETargetHttpProxies.Delete(%v, %v): key is invalid (%#v)", ctx, key, key)
 		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "TargetHttpProxies")
@@ -10255,7 +11569,9 @@ func (g *GCETargetHttpProxies) Delete(ctx context.Context, key *meta.Key) error 
 		Version:   meta.Version("ga"),
 		Service:   "TargetHttpProxies",
 	}
+	glog.V(5).Infof("GCETargetHttpProxies.Delete(%v, %v): projectID = %v, rk = %+v", ctx, key, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCETargetHttpProxies.Delete(%v, %v): RateLimiter error: %v", ctx, key, err)
 		return err
 	}
 	call := g.s.GA.TargetHttpProxies.Delete(projectID, key.Name)
@@ -10264,14 +11580,21 @@ func (g *GCETargetHttpProxies) Delete(ctx context.Context, key *meta.Key) error 
 
 	op, err := call.Do()
 	if err != nil {
+		glog.V(4).Infof("GCETargetHttpProxies.Delete(%v, %v) = %v", ctx, key, err)
 		return err
 	}
-	return g.s.WaitForCompletion(ctx, op)
+
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCETargetHttpProxies.Delete(%v, %v) = %v", ctx, key, err)
+	return err
 }
 
 // SetUrlMap is a method on GCETargetHttpProxies.
 func (g *GCETargetHttpProxies) SetUrlMap(ctx context.Context, key *meta.Key, arg0 *ga.UrlMapReference) error {
+	glog.V(5).Infof("GCETargetHttpProxies.SetUrlMap(%v, %v, ...): called", ctx, key)
+
 	if !key.Valid() {
+		glog.V(2).Infof("GCETargetHttpProxies.SetUrlMap(%v, %v, ...): key is invalid (%#v)", ctx, key, key)
 		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "TargetHttpProxies")
@@ -10281,16 +11604,22 @@ func (g *GCETargetHttpProxies) SetUrlMap(ctx context.Context, key *meta.Key, arg
 		Version:   meta.Version("ga"),
 		Service:   "TargetHttpProxies",
 	}
+	glog.V(5).Infof("GCETargetHttpProxies.SetUrlMap(%v, %v, ...): projectID = %v, rk = %+v", ctx, key, projectID, rk)
+
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCETargetHttpProxies.SetUrlMap(%v, %v, ...): RateLimiter error: %v", ctx, key, err)
 		return err
 	}
 	call := g.s.GA.TargetHttpProxies.SetUrlMap(projectID, key.Name, arg0)
 	call.Context(ctx)
 	op, err := call.Do()
 	if err != nil {
+		glog.V(4).Infof("GCETargetHttpProxies.SetUrlMap(%v, %v, ...) = %+v", ctx, key, err)
 		return err
 	}
-	return g.s.WaitForCompletion(ctx, op)
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCETargetHttpProxies.SetUrlMap(%v, %v, ...) = %+v", ctx, key, err)
+	return err
 }
 
 // TargetHttpsProxies is an interface that allows for mocking of TargetHttpsProxies.
@@ -10507,8 +11836,11 @@ type GCETargetHttpsProxies struct {
 
 // Get the TargetHttpsProxy named by key.
 func (g *GCETargetHttpsProxies) Get(ctx context.Context, key *meta.Key) (*ga.TargetHttpsProxy, error) {
+	glog.V(5).Infof("GCETargetHttpsProxies.Get(%v, %v): called", ctx, key)
+
 	if !key.Valid() {
-		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+		glog.V(2).Infof("GCETargetHttpsProxies.Get(%v, %v): key is invalid (%#v)", ctx, key, key)
+		return nil, fmt.Errorf("invalid GCE key (%#v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "TargetHttpsProxies")
 	rk := &RateLimitKey{
@@ -10517,16 +11849,21 @@ func (g *GCETargetHttpsProxies) Get(ctx context.Context, key *meta.Key) (*ga.Tar
 		Version:   meta.Version("ga"),
 		Service:   "TargetHttpsProxies",
 	}
+	glog.V(5).Infof("GCETargetHttpsProxies.Get(%v, %v): projectID = %v, rk = %+v", ctx, key, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCETargetHttpsProxies.Get(%v, %v): RateLimiter error: %v", ctx, key, err)
 		return nil, err
 	}
 	call := g.s.GA.TargetHttpsProxies.Get(projectID, key.Name)
 	call.Context(ctx)
-	return call.Do()
+	v, err := call.Do()
+	glog.V(4).Infof("GCETargetHttpsProxies.Get(%v, %v) = %+v, %v", ctx, key, v, err)
+	return v, err
 }
 
 // List all TargetHttpsProxy objects.
 func (g *GCETargetHttpsProxies) List(ctx context.Context, fl *filter.F) ([]*ga.TargetHttpsProxy, error) {
+	glog.V(5).Infof("GCETargetHttpsProxies.List(%v, %v) called", ctx, fl)
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "TargetHttpsProxies")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -10537,24 +11874,40 @@ func (g *GCETargetHttpsProxies) List(ctx context.Context, fl *filter.F) ([]*ga.T
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
 		return nil, err
 	}
+	glog.V(5).Infof("GCETargetHttpsProxies.List(%v, %v): projectID = %v, rk = %+v", ctx, fl, projectID, rk)
 	call := g.s.GA.TargetHttpsProxies.List(projectID)
 	if fl != filter.None {
 		call.Filter(fl.String())
 	}
 	var all []*ga.TargetHttpsProxy
 	f := func(l *ga.TargetHttpsProxyList) error {
+		glog.V(5).Infof("GCETargetHttpsProxies.List(%v, ..., %v): page %+v", ctx, fl, l)
 		all = append(all, l.Items...)
 		return nil
 	}
 	if err := call.Pages(ctx, f); err != nil {
+		glog.V(4).Infof("GCETargetHttpsProxies.List(%v, ..., %v) = %v, %v", ctx, fl, nil, err)
 		return nil, err
 	}
+
+	if glog.V(4) {
+		glog.V(4).Infof("GCETargetHttpsProxies.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
+	} else if glog.V(5) {
+		var asStr []string
+		for _, o := range all {
+			asStr = append(asStr, fmt.Sprintf("%+v", o))
+		}
+		glog.V(5).Infof("GCETargetHttpsProxies.List(%v, ..., %v) = %v, %v", ctx, fl, asStr, nil)
+	}
+
 	return all, nil
 }
 
 // Insert TargetHttpsProxy with key of value obj.
 func (g *GCETargetHttpsProxies) Insert(ctx context.Context, key *meta.Key, obj *ga.TargetHttpsProxy) error {
+	glog.V(5).Infof("GCETargetHttpsProxies.Insert(%v, %v, %+v): called", ctx, key, obj)
 	if !key.Valid() {
+		glog.V(2).Infof("GCETargetHttpsProxies.Insert(%v, %v, ...): key is invalid (%#v)", ctx, key, key)
 		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "TargetHttpsProxies")
@@ -10564,7 +11917,9 @@ func (g *GCETargetHttpsProxies) Insert(ctx context.Context, key *meta.Key, obj *
 		Version:   meta.Version("ga"),
 		Service:   "TargetHttpsProxies",
 	}
+	glog.V(5).Infof("GCETargetHttpsProxies.Insert(%v, %v, ...): projectID = %v, rk = %+v", ctx, key, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCETargetHttpsProxies.Insert(%v, %v, ...): RateLimiter error: %v", ctx, key, err)
 		return err
 	}
 	obj.Name = key.Name
@@ -10573,14 +11928,20 @@ func (g *GCETargetHttpsProxies) Insert(ctx context.Context, key *meta.Key, obj *
 
 	op, err := call.Do()
 	if err != nil {
+		glog.V(4).Infof("GCETargetHttpsProxies.Insert(%v, %v, ...) = %+v", ctx, key, err)
 		return err
 	}
-	return g.s.WaitForCompletion(ctx, op)
+
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCETargetHttpsProxies.Insert(%v, %v, %+v) = %+v", ctx, key, obj, err)
+	return err
 }
 
 // Delete the TargetHttpsProxy referenced by key.
 func (g *GCETargetHttpsProxies) Delete(ctx context.Context, key *meta.Key) error {
+	glog.V(5).Infof("GCETargetHttpsProxies.Delete(%v, %v): called", ctx, key)
 	if !key.Valid() {
+		glog.V(2).Infof("GCETargetHttpsProxies.Delete(%v, %v): key is invalid (%#v)", ctx, key, key)
 		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "TargetHttpsProxies")
@@ -10590,7 +11951,9 @@ func (g *GCETargetHttpsProxies) Delete(ctx context.Context, key *meta.Key) error
 		Version:   meta.Version("ga"),
 		Service:   "TargetHttpsProxies",
 	}
+	glog.V(5).Infof("GCETargetHttpsProxies.Delete(%v, %v): projectID = %v, rk = %+v", ctx, key, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCETargetHttpsProxies.Delete(%v, %v): RateLimiter error: %v", ctx, key, err)
 		return err
 	}
 	call := g.s.GA.TargetHttpsProxies.Delete(projectID, key.Name)
@@ -10599,14 +11962,21 @@ func (g *GCETargetHttpsProxies) Delete(ctx context.Context, key *meta.Key) error
 
 	op, err := call.Do()
 	if err != nil {
+		glog.V(4).Infof("GCETargetHttpsProxies.Delete(%v, %v) = %v", ctx, key, err)
 		return err
 	}
-	return g.s.WaitForCompletion(ctx, op)
+
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCETargetHttpsProxies.Delete(%v, %v) = %v", ctx, key, err)
+	return err
 }
 
 // SetSslCertificates is a method on GCETargetHttpsProxies.
 func (g *GCETargetHttpsProxies) SetSslCertificates(ctx context.Context, key *meta.Key, arg0 *ga.TargetHttpsProxiesSetSslCertificatesRequest) error {
+	glog.V(5).Infof("GCETargetHttpsProxies.SetSslCertificates(%v, %v, ...): called", ctx, key)
+
 	if !key.Valid() {
+		glog.V(2).Infof("GCETargetHttpsProxies.SetSslCertificates(%v, %v, ...): key is invalid (%#v)", ctx, key, key)
 		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "TargetHttpsProxies")
@@ -10616,21 +11986,30 @@ func (g *GCETargetHttpsProxies) SetSslCertificates(ctx context.Context, key *met
 		Version:   meta.Version("ga"),
 		Service:   "TargetHttpsProxies",
 	}
+	glog.V(5).Infof("GCETargetHttpsProxies.SetSslCertificates(%v, %v, ...): projectID = %v, rk = %+v", ctx, key, projectID, rk)
+
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCETargetHttpsProxies.SetSslCertificates(%v, %v, ...): RateLimiter error: %v", ctx, key, err)
 		return err
 	}
 	call := g.s.GA.TargetHttpsProxies.SetSslCertificates(projectID, key.Name, arg0)
 	call.Context(ctx)
 	op, err := call.Do()
 	if err != nil {
+		glog.V(4).Infof("GCETargetHttpsProxies.SetSslCertificates(%v, %v, ...) = %+v", ctx, key, err)
 		return err
 	}
-	return g.s.WaitForCompletion(ctx, op)
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCETargetHttpsProxies.SetSslCertificates(%v, %v, ...) = %+v", ctx, key, err)
+	return err
 }
 
 // SetUrlMap is a method on GCETargetHttpsProxies.
 func (g *GCETargetHttpsProxies) SetUrlMap(ctx context.Context, key *meta.Key, arg0 *ga.UrlMapReference) error {
+	glog.V(5).Infof("GCETargetHttpsProxies.SetUrlMap(%v, %v, ...): called", ctx, key)
+
 	if !key.Valid() {
+		glog.V(2).Infof("GCETargetHttpsProxies.SetUrlMap(%v, %v, ...): key is invalid (%#v)", ctx, key, key)
 		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "TargetHttpsProxies")
@@ -10640,16 +12019,22 @@ func (g *GCETargetHttpsProxies) SetUrlMap(ctx context.Context, key *meta.Key, ar
 		Version:   meta.Version("ga"),
 		Service:   "TargetHttpsProxies",
 	}
+	glog.V(5).Infof("GCETargetHttpsProxies.SetUrlMap(%v, %v, ...): projectID = %v, rk = %+v", ctx, key, projectID, rk)
+
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCETargetHttpsProxies.SetUrlMap(%v, %v, ...): RateLimiter error: %v", ctx, key, err)
 		return err
 	}
 	call := g.s.GA.TargetHttpsProxies.SetUrlMap(projectID, key.Name, arg0)
 	call.Context(ctx)
 	op, err := call.Do()
 	if err != nil {
+		glog.V(4).Infof("GCETargetHttpsProxies.SetUrlMap(%v, %v, ...) = %+v", ctx, key, err)
 		return err
 	}
-	return g.s.WaitForCompletion(ctx, op)
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCETargetHttpsProxies.SetUrlMap(%v, %v, ...) = %+v", ctx, key, err)
+	return err
 }
 
 // TargetPools is an interface that allows for mocking of TargetPools.
@@ -10869,8 +12254,11 @@ type GCETargetPools struct {
 
 // Get the TargetPool named by key.
 func (g *GCETargetPools) Get(ctx context.Context, key *meta.Key) (*ga.TargetPool, error) {
+	glog.V(5).Infof("GCETargetPools.Get(%v, %v): called", ctx, key)
+
 	if !key.Valid() {
-		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+		glog.V(2).Infof("GCETargetPools.Get(%v, %v): key is invalid (%#v)", ctx, key, key)
+		return nil, fmt.Errorf("invalid GCE key (%#v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "TargetPools")
 	rk := &RateLimitKey{
@@ -10879,16 +12267,21 @@ func (g *GCETargetPools) Get(ctx context.Context, key *meta.Key) (*ga.TargetPool
 		Version:   meta.Version("ga"),
 		Service:   "TargetPools",
 	}
+	glog.V(5).Infof("GCETargetPools.Get(%v, %v): projectID = %v, rk = %+v", ctx, key, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCETargetPools.Get(%v, %v): RateLimiter error: %v", ctx, key, err)
 		return nil, err
 	}
 	call := g.s.GA.TargetPools.Get(projectID, key.Region, key.Name)
 	call.Context(ctx)
-	return call.Do()
+	v, err := call.Do()
+	glog.V(4).Infof("GCETargetPools.Get(%v, %v) = %+v, %v", ctx, key, v, err)
+	return v, err
 }
 
 // List all TargetPool objects.
 func (g *GCETargetPools) List(ctx context.Context, region string, fl *filter.F) ([]*ga.TargetPool, error) {
+	glog.V(5).Infof("GCETargetPools.List(%v, %v, %v) called", ctx, region, fl)
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "TargetPools")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -10899,24 +12292,40 @@ func (g *GCETargetPools) List(ctx context.Context, region string, fl *filter.F) 
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
 		return nil, err
 	}
+	glog.V(5).Infof("GCETargetPools.List(%v, %v, %v): projectID = %v, rk = %+v", ctx, region, fl, projectID, rk)
 	call := g.s.GA.TargetPools.List(projectID, region)
 	if fl != filter.None {
 		call.Filter(fl.String())
 	}
 	var all []*ga.TargetPool
 	f := func(l *ga.TargetPoolList) error {
+		glog.V(5).Infof("GCETargetPools.List(%v, ..., %v): page %+v", ctx, fl, l)
 		all = append(all, l.Items...)
 		return nil
 	}
 	if err := call.Pages(ctx, f); err != nil {
+		glog.V(4).Infof("GCETargetPools.List(%v, ..., %v) = %v, %v", ctx, fl, nil, err)
 		return nil, err
 	}
+
+	if glog.V(4) {
+		glog.V(4).Infof("GCETargetPools.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
+	} else if glog.V(5) {
+		var asStr []string
+		for _, o := range all {
+			asStr = append(asStr, fmt.Sprintf("%+v", o))
+		}
+		glog.V(5).Infof("GCETargetPools.List(%v, ..., %v) = %v, %v", ctx, fl, asStr, nil)
+	}
+
 	return all, nil
 }
 
 // Insert TargetPool with key of value obj.
 func (g *GCETargetPools) Insert(ctx context.Context, key *meta.Key, obj *ga.TargetPool) error {
+	glog.V(5).Infof("GCETargetPools.Insert(%v, %v, %+v): called", ctx, key, obj)
 	if !key.Valid() {
+		glog.V(2).Infof("GCETargetPools.Insert(%v, %v, ...): key is invalid (%#v)", ctx, key, key)
 		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "TargetPools")
@@ -10926,7 +12335,9 @@ func (g *GCETargetPools) Insert(ctx context.Context, key *meta.Key, obj *ga.Targ
 		Version:   meta.Version("ga"),
 		Service:   "TargetPools",
 	}
+	glog.V(5).Infof("GCETargetPools.Insert(%v, %v, ...): projectID = %v, rk = %+v", ctx, key, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCETargetPools.Insert(%v, %v, ...): RateLimiter error: %v", ctx, key, err)
 		return err
 	}
 	obj.Name = key.Name
@@ -10935,14 +12346,20 @@ func (g *GCETargetPools) Insert(ctx context.Context, key *meta.Key, obj *ga.Targ
 
 	op, err := call.Do()
 	if err != nil {
+		glog.V(4).Infof("GCETargetPools.Insert(%v, %v, ...) = %+v", ctx, key, err)
 		return err
 	}
-	return g.s.WaitForCompletion(ctx, op)
+
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCETargetPools.Insert(%v, %v, %+v) = %+v", ctx, key, obj, err)
+	return err
 }
 
 // Delete the TargetPool referenced by key.
 func (g *GCETargetPools) Delete(ctx context.Context, key *meta.Key) error {
+	glog.V(5).Infof("GCETargetPools.Delete(%v, %v): called", ctx, key)
 	if !key.Valid() {
+		glog.V(2).Infof("GCETargetPools.Delete(%v, %v): key is invalid (%#v)", ctx, key, key)
 		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "TargetPools")
@@ -10952,7 +12369,9 @@ func (g *GCETargetPools) Delete(ctx context.Context, key *meta.Key) error {
 		Version:   meta.Version("ga"),
 		Service:   "TargetPools",
 	}
+	glog.V(5).Infof("GCETargetPools.Delete(%v, %v): projectID = %v, rk = %+v", ctx, key, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCETargetPools.Delete(%v, %v): RateLimiter error: %v", ctx, key, err)
 		return err
 	}
 	call := g.s.GA.TargetPools.Delete(projectID, key.Region, key.Name)
@@ -10960,14 +12379,21 @@ func (g *GCETargetPools) Delete(ctx context.Context, key *meta.Key) error {
 
 	op, err := call.Do()
 	if err != nil {
+		glog.V(4).Infof("GCETargetPools.Delete(%v, %v) = %v", ctx, key, err)
 		return err
 	}
-	return g.s.WaitForCompletion(ctx, op)
+
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCETargetPools.Delete(%v, %v) = %v", ctx, key, err)
+	return err
 }
 
 // AddInstance is a method on GCETargetPools.
 func (g *GCETargetPools) AddInstance(ctx context.Context, key *meta.Key, arg0 *ga.TargetPoolsAddInstanceRequest) error {
+	glog.V(5).Infof("GCETargetPools.AddInstance(%v, %v, ...): called", ctx, key)
+
 	if !key.Valid() {
+		glog.V(2).Infof("GCETargetPools.AddInstance(%v, %v, ...): key is invalid (%#v)", ctx, key, key)
 		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "TargetPools")
@@ -10977,21 +12403,30 @@ func (g *GCETargetPools) AddInstance(ctx context.Context, key *meta.Key, arg0 *g
 		Version:   meta.Version("ga"),
 		Service:   "TargetPools",
 	}
+	glog.V(5).Infof("GCETargetPools.AddInstance(%v, %v, ...): projectID = %v, rk = %+v", ctx, key, projectID, rk)
+
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCETargetPools.AddInstance(%v, %v, ...): RateLimiter error: %v", ctx, key, err)
 		return err
 	}
 	call := g.s.GA.TargetPools.AddInstance(projectID, key.Region, key.Name, arg0)
 	call.Context(ctx)
 	op, err := call.Do()
 	if err != nil {
+		glog.V(4).Infof("GCETargetPools.AddInstance(%v, %v, ...) = %+v", ctx, key, err)
 		return err
 	}
-	return g.s.WaitForCompletion(ctx, op)
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCETargetPools.AddInstance(%v, %v, ...) = %+v", ctx, key, err)
+	return err
 }
 
 // RemoveInstance is a method on GCETargetPools.
 func (g *GCETargetPools) RemoveInstance(ctx context.Context, key *meta.Key, arg0 *ga.TargetPoolsRemoveInstanceRequest) error {
+	glog.V(5).Infof("GCETargetPools.RemoveInstance(%v, %v, ...): called", ctx, key)
+
 	if !key.Valid() {
+		glog.V(2).Infof("GCETargetPools.RemoveInstance(%v, %v, ...): key is invalid (%#v)", ctx, key, key)
 		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "TargetPools")
@@ -11001,16 +12436,22 @@ func (g *GCETargetPools) RemoveInstance(ctx context.Context, key *meta.Key, arg0
 		Version:   meta.Version("ga"),
 		Service:   "TargetPools",
 	}
+	glog.V(5).Infof("GCETargetPools.RemoveInstance(%v, %v, ...): projectID = %v, rk = %+v", ctx, key, projectID, rk)
+
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCETargetPools.RemoveInstance(%v, %v, ...): RateLimiter error: %v", ctx, key, err)
 		return err
 	}
 	call := g.s.GA.TargetPools.RemoveInstance(projectID, key.Region, key.Name, arg0)
 	call.Context(ctx)
 	op, err := call.Do()
 	if err != nil {
+		glog.V(4).Infof("GCETargetPools.RemoveInstance(%v, %v, ...) = %+v", ctx, key, err)
 		return err
 	}
-	return g.s.WaitForCompletion(ctx, op)
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCETargetPools.RemoveInstance(%v, %v, ...) = %+v", ctx, key, err)
+	return err
 }
 
 // UrlMaps is an interface that allows for mocking of UrlMaps.
@@ -11217,8 +12658,11 @@ type GCEUrlMaps struct {
 
 // Get the UrlMap named by key.
 func (g *GCEUrlMaps) Get(ctx context.Context, key *meta.Key) (*ga.UrlMap, error) {
+	glog.V(5).Infof("GCEUrlMaps.Get(%v, %v): called", ctx, key)
+
 	if !key.Valid() {
-		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+		glog.V(2).Infof("GCEUrlMaps.Get(%v, %v): key is invalid (%#v)", ctx, key, key)
+		return nil, fmt.Errorf("invalid GCE key (%#v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "UrlMaps")
 	rk := &RateLimitKey{
@@ -11227,16 +12671,21 @@ func (g *GCEUrlMaps) Get(ctx context.Context, key *meta.Key) (*ga.UrlMap, error)
 		Version:   meta.Version("ga"),
 		Service:   "UrlMaps",
 	}
+	glog.V(5).Infof("GCEUrlMaps.Get(%v, %v): projectID = %v, rk = %+v", ctx, key, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEUrlMaps.Get(%v, %v): RateLimiter error: %v", ctx, key, err)
 		return nil, err
 	}
 	call := g.s.GA.UrlMaps.Get(projectID, key.Name)
 	call.Context(ctx)
-	return call.Do()
+	v, err := call.Do()
+	glog.V(4).Infof("GCEUrlMaps.Get(%v, %v) = %+v, %v", ctx, key, v, err)
+	return v, err
 }
 
 // List all UrlMap objects.
 func (g *GCEUrlMaps) List(ctx context.Context, fl *filter.F) ([]*ga.UrlMap, error) {
+	glog.V(5).Infof("GCEUrlMaps.List(%v, %v) called", ctx, fl)
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "UrlMaps")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -11247,24 +12696,40 @@ func (g *GCEUrlMaps) List(ctx context.Context, fl *filter.F) ([]*ga.UrlMap, erro
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
 		return nil, err
 	}
+	glog.V(5).Infof("GCEUrlMaps.List(%v, %v): projectID = %v, rk = %+v", ctx, fl, projectID, rk)
 	call := g.s.GA.UrlMaps.List(projectID)
 	if fl != filter.None {
 		call.Filter(fl.String())
 	}
 	var all []*ga.UrlMap
 	f := func(l *ga.UrlMapList) error {
+		glog.V(5).Infof("GCEUrlMaps.List(%v, ..., %v): page %+v", ctx, fl, l)
 		all = append(all, l.Items...)
 		return nil
 	}
 	if err := call.Pages(ctx, f); err != nil {
+		glog.V(4).Infof("GCEUrlMaps.List(%v, ..., %v) = %v, %v", ctx, fl, nil, err)
 		return nil, err
 	}
+
+	if glog.V(4) {
+		glog.V(4).Infof("GCEUrlMaps.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
+	} else if glog.V(5) {
+		var asStr []string
+		for _, o := range all {
+			asStr = append(asStr, fmt.Sprintf("%+v", o))
+		}
+		glog.V(5).Infof("GCEUrlMaps.List(%v, ..., %v) = %v, %v", ctx, fl, asStr, nil)
+	}
+
 	return all, nil
 }
 
 // Insert UrlMap with key of value obj.
 func (g *GCEUrlMaps) Insert(ctx context.Context, key *meta.Key, obj *ga.UrlMap) error {
+	glog.V(5).Infof("GCEUrlMaps.Insert(%v, %v, %+v): called", ctx, key, obj)
 	if !key.Valid() {
+		glog.V(2).Infof("GCEUrlMaps.Insert(%v, %v, ...): key is invalid (%#v)", ctx, key, key)
 		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "UrlMaps")
@@ -11274,7 +12739,9 @@ func (g *GCEUrlMaps) Insert(ctx context.Context, key *meta.Key, obj *ga.UrlMap) 
 		Version:   meta.Version("ga"),
 		Service:   "UrlMaps",
 	}
+	glog.V(5).Infof("GCEUrlMaps.Insert(%v, %v, ...): projectID = %v, rk = %+v", ctx, key, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEUrlMaps.Insert(%v, %v, ...): RateLimiter error: %v", ctx, key, err)
 		return err
 	}
 	obj.Name = key.Name
@@ -11283,14 +12750,20 @@ func (g *GCEUrlMaps) Insert(ctx context.Context, key *meta.Key, obj *ga.UrlMap) 
 
 	op, err := call.Do()
 	if err != nil {
+		glog.V(4).Infof("GCEUrlMaps.Insert(%v, %v, ...) = %+v", ctx, key, err)
 		return err
 	}
-	return g.s.WaitForCompletion(ctx, op)
+
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCEUrlMaps.Insert(%v, %v, %+v) = %+v", ctx, key, obj, err)
+	return err
 }
 
 // Delete the UrlMap referenced by key.
 func (g *GCEUrlMaps) Delete(ctx context.Context, key *meta.Key) error {
+	glog.V(5).Infof("GCEUrlMaps.Delete(%v, %v): called", ctx, key)
 	if !key.Valid() {
+		glog.V(2).Infof("GCEUrlMaps.Delete(%v, %v): key is invalid (%#v)", ctx, key, key)
 		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "UrlMaps")
@@ -11300,7 +12773,9 @@ func (g *GCEUrlMaps) Delete(ctx context.Context, key *meta.Key) error {
 		Version:   meta.Version("ga"),
 		Service:   "UrlMaps",
 	}
+	glog.V(5).Infof("GCEUrlMaps.Delete(%v, %v): projectID = %v, rk = %+v", ctx, key, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEUrlMaps.Delete(%v, %v): RateLimiter error: %v", ctx, key, err)
 		return err
 	}
 	call := g.s.GA.UrlMaps.Delete(projectID, key.Name)
@@ -11309,14 +12784,21 @@ func (g *GCEUrlMaps) Delete(ctx context.Context, key *meta.Key) error {
 
 	op, err := call.Do()
 	if err != nil {
+		glog.V(4).Infof("GCEUrlMaps.Delete(%v, %v) = %v", ctx, key, err)
 		return err
 	}
-	return g.s.WaitForCompletion(ctx, op)
+
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCEUrlMaps.Delete(%v, %v) = %v", ctx, key, err)
+	return err
 }
 
 // Update is a method on GCEUrlMaps.
 func (g *GCEUrlMaps) Update(ctx context.Context, key *meta.Key, arg0 *ga.UrlMap) error {
+	glog.V(5).Infof("GCEUrlMaps.Update(%v, %v, ...): called", ctx, key)
+
 	if !key.Valid() {
+		glog.V(2).Infof("GCEUrlMaps.Update(%v, %v, ...): key is invalid (%#v)", ctx, key, key)
 		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "UrlMaps")
@@ -11326,16 +12808,22 @@ func (g *GCEUrlMaps) Update(ctx context.Context, key *meta.Key, arg0 *ga.UrlMap)
 		Version:   meta.Version("ga"),
 		Service:   "UrlMaps",
 	}
+	glog.V(5).Infof("GCEUrlMaps.Update(%v, %v, ...): projectID = %v, rk = %+v", ctx, key, projectID, rk)
+
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEUrlMaps.Update(%v, %v, ...): RateLimiter error: %v", ctx, key, err)
 		return err
 	}
 	call := g.s.GA.UrlMaps.Update(projectID, key.Name, arg0)
 	call.Context(ctx)
 	op, err := call.Do()
 	if err != nil {
+		glog.V(4).Infof("GCEUrlMaps.Update(%v, %v, ...) = %+v", ctx, key, err)
 		return err
 	}
-	return g.s.WaitForCompletion(ctx, op)
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCEUrlMaps.Update(%v, %v, ...) = %+v", ctx, key, err)
+	return err
 }
 
 // Zones is an interface that allows for mocking of Zones.
@@ -11453,8 +12941,11 @@ type GCEZones struct {
 
 // Get the Zone named by key.
 func (g *GCEZones) Get(ctx context.Context, key *meta.Key) (*ga.Zone, error) {
+	glog.V(5).Infof("GCEZones.Get(%v, %v): called", ctx, key)
+
 	if !key.Valid() {
-		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+		glog.V(2).Infof("GCEZones.Get(%v, %v): key is invalid (%#v)", ctx, key, key)
+		return nil, fmt.Errorf("invalid GCE key (%#v)", key)
 	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "Zones")
 	rk := &RateLimitKey{
@@ -11463,16 +12954,21 @@ func (g *GCEZones) Get(ctx context.Context, key *meta.Key) (*ga.Zone, error) {
 		Version:   meta.Version("ga"),
 		Service:   "Zones",
 	}
+	glog.V(5).Infof("GCEZones.Get(%v, %v): projectID = %v, rk = %+v", ctx, key, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEZones.Get(%v, %v): RateLimiter error: %v", ctx, key, err)
 		return nil, err
 	}
 	call := g.s.GA.Zones.Get(projectID, key.Name)
 	call.Context(ctx)
-	return call.Do()
+	v, err := call.Do()
+	glog.V(4).Infof("GCEZones.Get(%v, %v) = %+v, %v", ctx, key, v, err)
+	return v, err
 }
 
 // List all Zone objects.
 func (g *GCEZones) List(ctx context.Context, fl *filter.F) ([]*ga.Zone, error) {
+	glog.V(5).Infof("GCEZones.List(%v, %v) called", ctx, fl)
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "Zones")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -11483,17 +12979,31 @@ func (g *GCEZones) List(ctx context.Context, fl *filter.F) ([]*ga.Zone, error) {
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
 		return nil, err
 	}
+	glog.V(5).Infof("GCEZones.List(%v, %v): projectID = %v, rk = %+v", ctx, fl, projectID, rk)
 	call := g.s.GA.Zones.List(projectID)
 	if fl != filter.None {
 		call.Filter(fl.String())
 	}
 	var all []*ga.Zone
 	f := func(l *ga.ZoneList) error {
+		glog.V(5).Infof("GCEZones.List(%v, ..., %v): page %+v", ctx, fl, l)
 		all = append(all, l.Items...)
 		return nil
 	}
 	if err := call.Pages(ctx, f); err != nil {
+		glog.V(4).Infof("GCEZones.List(%v, ..., %v) = %v, %v", ctx, fl, nil, err)
 		return nil, err
 	}
+
+	if glog.V(4) {
+		glog.V(4).Infof("GCEZones.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
+	} else if glog.V(5) {
+		var asStr []string
+		for _, o := range all {
+			asStr = append(asStr, fmt.Sprintf("%+v", o))
+		}
+		glog.V(5).Infof("GCEZones.List(%v, ..., %v) = %v, %v", ctx, fl, asStr, nil)
+	}
+
 	return all, nil
 }
