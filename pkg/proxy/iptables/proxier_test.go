@@ -36,7 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/proxy"
-	utilproxy "k8s.io/kubernetes/pkg/proxy/util"
+	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	"k8s.io/kubernetes/pkg/util/async"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	iptablestest "k8s.io/kubernetes/pkg/util/iptables/testing"
@@ -225,7 +225,7 @@ func TestDeleteEndpointConnections(t *testing.T) {
 			svcPort:      80,
 			protocol:     UDP,
 			endpoint:     "10.240.0.3:80",
-			simulatedErr: utilproxy.NoConnectionToDelete,
+			simulatedErr: proxyutil.NoConnectionToDelete,
 		}, {
 			description:  "V4 UDP, unexpected error, should be glogged",
 			svcName:      "v4-udp-simulated-error",
@@ -311,7 +311,7 @@ func TestDeleteEndpointConnections(t *testing.T) {
 				}
 				return false
 			}
-			endpointIP := utilproxy.IPPart(tc.endpoint)
+			endpointIP := proxyutil.IPPart(tc.endpoint)
 			expectCommand := fmt.Sprintf("conntrack -D --orig-dst %s --dst-nat %s -p udp", tc.svcIP, endpointIP)
 			if isIPv6(endpointIP) {
 				expectCommand += " -f ipv6"
@@ -331,7 +331,7 @@ func TestDeleteEndpointConnections(t *testing.T) {
 
 		// Check the number of new glog errors
 		var expGlogErrs int64
-		if tc.simulatedErr != "" && tc.simulatedErr != utilproxy.NoConnectionToDelete {
+		if tc.simulatedErr != "" && tc.simulatedErr != proxyutil.NoConnectionToDelete {
 			expGlogErrs = 1
 		}
 		glogErrs := glog.Stats.Error.Lines() - priorGlogErrs
@@ -352,12 +352,12 @@ func (c *fakeClosable) Close() error {
 
 // fakePortOpener implements portOpener.
 type fakePortOpener struct {
-	openPorts []*utilproxy.LocalPort
+	openPorts []*proxyutil.LocalPort
 }
 
 // OpenLocalPort fakes out the listen() and bind() used by syncProxyRules
 // to lock a local port.
-func (f *fakePortOpener) OpenLocalPort(lp *utilproxy.LocalPort) (utilproxy.Closeable, error) {
+func (f *fakePortOpener) OpenLocalPort(lp *proxyutil.LocalPort) (proxyutil.Closeable, error) {
 	f.openPorts = append(f.openPorts, lp)
 	return nil, nil
 }
@@ -398,8 +398,8 @@ func NewFakeProxier(ipt utiliptables.Interface) *Proxier {
 		iptables:                 ipt,
 		clusterCIDR:              "10.0.0.0/24",
 		hostname:                 testHostname,
-		portsMap:                 make(map[utilproxy.LocalPort]utilproxy.Closeable),
-		portMapper:               &fakePortOpener{[]*utilproxy.LocalPort{}},
+		portsMap:                 make(map[proxyutil.LocalPort]proxyutil.Closeable),
+		portMapper:               &fakePortOpener{[]*proxyutil.LocalPort{}},
 		healthChecker:            newFakeHealthChecker(),
 		precomputedProbabilities: make([]string, 0, 1001),
 		iptablesData:             bytes.NewBuffer(nil),
