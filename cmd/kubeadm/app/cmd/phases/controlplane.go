@@ -22,6 +22,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	utilflag "k8s.io/apiserver/pkg/util/flag"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
@@ -147,10 +148,16 @@ func getControlPlaneSubCommands(outDir, defaultKubernetesVersion string) []*cobr
 			cmd.Flags().StringVar(&cfg.Networking.ServiceSubnet, "service-cidr", cfg.Networking.ServiceSubnet, "The range of IP address used for service VIPs")
 			cmd.Flags().StringVar(&featureGatesString, "feature-gates", featureGatesString, "A set of key=value pairs that describe feature gates for various features. "+
 				"Options are:\n"+strings.Join(features.KnownFeatures(&features.InitFeatureGates), "\n"))
+			cmd.Flags().Var(utilflag.NewMapStringString(&cfg.APIServerExtraArgs), "apiserver-extra-args", "A set of extra flags to pass to the API Server or override default ones in form of <flagname>=<value>")
 		}
 
 		if properties.use == "all" || properties.use == "controller-manager" {
 			cmd.Flags().StringVar(&cfg.Networking.PodSubnet, "pod-network-cidr", cfg.Networking.PodSubnet, "The range of IP addresses used for the Pod network")
+			cmd.Flags().Var(utilflag.NewMapStringString(&cfg.ControllerManagerExtraArgs), "controller-manager-extra-args", "A set of extra flags to pass to the Controller Manager or override default ones in form of <flagname>=<value>")
+		}
+
+		if properties.use == "all" || properties.use == "scheduler" {
+			cmd.Flags().Var(utilflag.NewMapStringString(&cfg.SchedulerExtraArgs), "scheduler-extra-args", "A set of extra flags to pass to the Scheduler or override default ones in form of <flagname>=<value>")
 		}
 
 		cmd.Flags().StringVar(&cfgPath, "config", cfgPath, "Path to kubeadm config file (WARNING: Usage of a configuration file is experimental)")
