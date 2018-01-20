@@ -47,6 +47,7 @@ go_library(
         "//test/utils/image:go_default_library",
         "//vendor/github.com/blang/semver:go_default_library",
         "//vendor/github.com/coreos/go-systemd/util:go_default_library",
+        "//vendor/github.com/docker/docker/api/types:go_default_library",
         "//vendor/github.com/docker/docker/client:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",
