@@ -532,7 +532,7 @@ func TestAttacherMountDevice(t *testing.T) {
 		}()
 
 		// Run
-		err = csiAttacher.MountDevice(spec, tc.devicePath, tc.deviceMountPath)
+		tc.devicePath, tc.deviceMountPath, err = csiAttacher.MountDevice(spec, tc.devicePath, nil)
 
 		// Verify
 		if err != nil {
@@ -544,6 +544,8 @@ func TestAttacherMountDevice(t *testing.T) {
 		if err == nil && tc.shouldFail {
 			t.Errorf("test should fail, but no error occurred")
 		}
+
+		plug.host.GetMounter(plug.GetPluginName()).Unmount(tc.deviceMountPath)
 
 		// Verify call goes through all the way
 		numStaged := 1

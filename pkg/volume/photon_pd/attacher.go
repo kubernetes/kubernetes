@@ -55,6 +55,11 @@ func (plugin *photonPersistentDiskPlugin) NewAttacher() (volume.Attacher, error)
 	}, nil
 }
 
+// NewDeviceMounter initializes a DeviceMounter. For photon pd, this is an Attacher.
+func (plugin *photonPersistentDiskPlugin) NewDeviceMounter() (volume.DeviceMounter, error) {
+	return plugin.NewAttacher()
+}
+
 // Attaches the volume specified by the given spec to the given host.
 // On success, returns the device path where the device was attached on the
 // node.
@@ -186,25 +191,30 @@ func (plugin *photonPersistentDiskPlugin) GetDeviceMountRefs(deviceMountPath str
 }
 
 // MountDevice mounts device to global mount point.
-func (attacher *photonPersistentDiskAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string) error {
+func (attacher *photonPersistentDiskAttacher) MountDevice(spec *volume.Spec, devicePath string, _ *v1.Pod) (string, string, error) {
+	deviceMountPath, err := attacher.GetDeviceMountPath(spec)
+	if err != nil {
+		return devicePath, deviceMountPath, err
+	}
+
 	mounter := attacher.host.GetMounter(photonPersistentDiskPluginName)
 	notMnt, err := mounter.IsLikelyNotMountPoint(deviceMountPath)
 	if err != nil {
 		if os.IsNotExist(err) {
 			if err := os.MkdirAll(deviceMountPath, 0750); err != nil {
 				glog.Errorf("Failed to create directory at %#v. err: %s", deviceMountPath, err)
-				return err
+				return devicePath, deviceMountPath, err
 			}
 			notMnt = true
 		} else {
-			return err
+			return devicePath, deviceMountPath, err
 		}
 	}
 
 	volumeSource, _, err := getVolumeSource(spec)
 	if err != nil {
 		glog.Errorf("Photon Controller attacher: MountDevice failed to get volume source. err: %s", err)
-		return err
+		return devicePath, deviceMountPath, err
 	}
 
 	options := []string{}
@@ -215,11 +225,11 @@ func (attacher *photonPersistentDiskAttacher) MountDevice(spec *volume.Spec, dev
 		err = diskMounter.FormatAndMount(devicePath, deviceMountPath, volumeSource.FSType, mountOptions)
 		if err != nil {
 			os.Remove(deviceMountPath)
-			return err
+			return devicePath, deviceMountPath, err
 		}
 		glog.V(4).Infof("formatting spec %v devicePath %v deviceMountPath %v fs %v with options %+v", spec.Name(), devicePath, deviceMountPath, volumeSource.FSType, options)
 	}
-	return nil
+	return devicePath, deviceMountPath, nil
 }
 
 type photonPersistentDiskDetacher struct {
@@ -240,6 +250,11 @@ func (plugin *photonPersistentDiskPlugin) NewDetacher() (volume.Detacher, error)
 		mounter:     plugin.host.GetMounter(plugin.GetPluginName()),
 		photonDisks: photonCloud,
 	}, nil
+}
+
+// NewDeviceUmounter initializes a DeviceUmounter. For phonon pd, this is a Detacher.
+func (plugin *photonPersistentDiskPlugin) NewDeviceUmounter() (volume.DeviceUmounter, error) {
+	return plugin.NewDetacher()
 }
 
 // Detach the given device from the given host.

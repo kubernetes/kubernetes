@@ -34,6 +34,11 @@ func (plugin *rbdPlugin) NewAttacher() (volume.Attacher, error) {
 	return plugin.newAttacherInternal(&RBDUtil{})
 }
 
+// NewDeviceMounter initializes a DeviceMounter.
+func (plugin *rbdPlugin) NewDeviceMounter() (volume.DeviceMounter, error) {
+	return plugin.NewAttacher()
+}
+
 func (plugin *rbdPlugin) newAttacherInternal(manager diskManager) (volume.Attacher, error) {
 	return &rbdAttacher{
 		plugin:  plugin,
@@ -45,6 +50,11 @@ func (plugin *rbdPlugin) newAttacherInternal(manager diskManager) (volume.Attach
 // NewDetacher implements AttachableVolumePlugin.NewDetacher.
 func (plugin *rbdPlugin) NewDetacher() (volume.Detacher, error) {
 	return plugin.newDetacherInternal(&RBDUtil{})
+}
+
+// NewDeviceUmounter initializes a DeviceUmounter.
+func (plugin *rbdPlugin) NewDeviceUmounter() (volume.DeviceUmounter, error) {
+	return plugin.NewDetacher()
 }
 
 func (plugin *rbdPlugin) newDetacherInternal(manager diskManager) (volume.Detacher, error) {
@@ -125,29 +135,34 @@ func (attacher *rbdAttacher) GetDeviceMountPath(spec *volume.Spec) (string, erro
 // MountDevice implements Attacher.MountDevice. It is called by the kubelet to
 // mount device at the given mount path.
 // This method is idempotent, callers are responsible for retrying on failure.
-func (attacher *rbdAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string) error {
+func (attacher *rbdAttacher) MountDevice(spec *volume.Spec, devicePath string, _ *v1.Pod) (string, string, error) {
+	deviceMountPath, err := attacher.GetDeviceMountPath(spec)
+	if err != nil {
+		return devicePath, deviceMountPath, err
+	}
+
 	glog.V(4).Infof("rbd: mouting device %s to %s", devicePath, deviceMountPath)
 	notMnt, err := attacher.mounter.IsLikelyNotMountPoint(deviceMountPath)
 	if err != nil {
 		if os.IsNotExist(err) {
 			if err := os.MkdirAll(deviceMountPath, 0750); err != nil {
-				return err
+				return devicePath, deviceMountPath, err
 			}
 			notMnt = true
 		} else {
-			return err
+			return devicePath, deviceMountPath, err
 		}
 	}
 	if !notMnt {
-		return nil
+		return devicePath, deviceMountPath, nil
 	}
 	fstype, err := getVolumeSourceFSType(spec)
 	if err != nil {
-		return err
+		return devicePath, deviceMountPath, err
 	}
 	ro, err := getVolumeSourceReadOnly(spec)
 	if err != nil {
-		return err
+		return devicePath, deviceMountPath, err
 	}
 	options := []string{}
 	if ro {
@@ -157,10 +172,10 @@ func (attacher *rbdAttacher) MountDevice(spec *volume.Spec, devicePath string, d
 	err = attacher.mounter.FormatAndMount(devicePath, deviceMountPath, fstype, mountOptions)
 	if err != nil {
 		os.Remove(deviceMountPath)
-		return fmt.Errorf("rbd: failed to mount device %s at %s (fstype: %s), error %v", devicePath, deviceMountPath, fstype, err)
+		return devicePath, deviceMountPath, fmt.Errorf("rbd: failed to mount device %s at %s (fstype: %s), error %v", devicePath, deviceMountPath, fstype, err)
 	}
 	glog.V(3).Infof("rbd: successfully mount device %s at %s (fstype: %s)", devicePath, deviceMountPath, fstype)
-	return nil
+	return devicePath, deviceMountPath, nil
 }
 
 // rbdDetacher implements volume.Detacher interface.

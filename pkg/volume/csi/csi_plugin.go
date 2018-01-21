@@ -194,6 +194,11 @@ func (p *csiPlugin) NewAttacher() (volume.Attacher, error) {
 	}, nil
 }
 
+// NewDeviceMounter initializes a DeviceMounter. For CSI, this is an Attacher.
+func (p *csiPlugin) NewDeviceMounter() (volume.DeviceMounter, error) {
+	return p.NewAttacher()
+}
+
 func (p *csiPlugin) NewDetacher() (volume.Detacher, error) {
 	k8s := p.host.GetKubeClient()
 	if k8s == nil {
@@ -206,6 +211,11 @@ func (p *csiPlugin) NewDetacher() (volume.Detacher, error) {
 		k8s:           k8s,
 		waitSleepTime: 1 * time.Second,
 	}, nil
+}
+
+// NewDeviceUmounter initializes a DeviceUmounter. For CSI, this is a Detacher.
+func (p *csiPlugin) NewDeviceUmounter() (volume.DeviceUmounter, error) {
+	return p.NewDetacher()
 }
 
 func (p *csiPlugin) GetDeviceMountRefs(deviceMountPath string) ([]string, error) {

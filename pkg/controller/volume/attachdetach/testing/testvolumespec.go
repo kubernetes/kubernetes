@@ -295,12 +295,20 @@ func (plugin *TestPlugin) NewAttacher() (volume.Attacher, error) {
 	return &attacher, nil
 }
 
+func (plugin *TestPlugin) NewDeviceMounter() (volume.DeviceMounter, error) {
+	return plugin.NewAttacher()
+}
+
 func (plugin *TestPlugin) NewDetacher() (volume.Detacher, error) {
 	detacher := testPluginDetacher{
 		detachedVolumeMap: plugin.detachedVolumeMap,
 		pluginLock:        plugin.pluginLock,
 	}
 	return &detacher, nil
+}
+
+func (plugin *TestPlugin) NewDeviceUmounter() (volume.DeviceUmounter, error) {
+	return plugin.NewDetacher()
 }
 
 func (plugin *TestPlugin) GetDeviceMountRefs(deviceMountPath string) ([]string, error) {
@@ -400,15 +408,15 @@ func (attacher *testPluginAttacher) GetDeviceMountPath(spec *volume.Spec) (strin
 	return "", nil
 }
 
-func (attacher *testPluginAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string) error {
+func (attacher *testPluginAttacher) MountDevice(spec *volume.Spec, devicePath string, pod *v1.Pod) (string, string, error) {
 	attacher.pluginLock.Lock()
 	defer attacher.pluginLock.Unlock()
 	if spec == nil {
 		*attacher.ErrorEncountered = true
 		glog.Errorf("MountDevice called with nil volume spec")
-		return fmt.Errorf("MountDevice called with nil volume spec")
+		return "", "", fmt.Errorf("MountDevice called with nil volume spec")
 	}
-	return nil
+	return "", "", nil
 }
 
 // Detacher

@@ -68,14 +68,19 @@ func (a *flexVolumeAttacher) GetDeviceMountPath(spec *volume.Spec) (string, erro
 }
 
 // MountDevice is part of the volume.Attacher interface
-func (a *flexVolumeAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string) error {
+func (a *flexVolumeAttacher) MountDevice(spec *volume.Spec, devicePath string, _ *v1.Pod) (string, string, error) {
+	deviceMountPath, err := a.GetDeviceMountPath(spec)
+	if err != nil {
+		return devicePath, deviceMountPath, err
+	}
+
 	// Mount only once.
 	alreadyMounted, err := prepareForMount(a.plugin.host.GetMounter(a.plugin.GetPluginName()), deviceMountPath)
 	if err != nil {
-		return err
+		return devicePath, deviceMountPath, err
 	}
 	if alreadyMounted {
-		return nil
+		return devicePath, deviceMountPath, nil
 	}
 
 	call := a.plugin.NewDriverCall(mountDeviceCmd)
@@ -88,12 +93,12 @@ func (a *flexVolumeAttacher) MountDevice(spec *volume.Spec, devicePath string, d
 		// Devicepath is empty if the plugin does not support attach calls. Ignore mountDevice calls if the
 		// plugin does not implement attach interface.
 		if devicePath != "" {
-			return (*attacherDefaults)(a).MountDevice(spec, devicePath, deviceMountPath, a.plugin.host.GetMounter(a.plugin.GetPluginName()))
+			return devicePath, deviceMountPath, (*attacherDefaults)(a).MountDevice(spec, devicePath, deviceMountPath, a.plugin.host.GetMounter(a.plugin.GetPluginName()))
 		} else {
-			return nil
+			return devicePath, deviceMountPath, nil
 		}
 	}
-	return err
+	return devicePath, deviceMountPath, err
 }
 
 func (a *flexVolumeAttacher) VolumesAreAttached(specs []*volume.Spec, nodeName types.NodeName) (map[*volume.Spec]bool, error) {

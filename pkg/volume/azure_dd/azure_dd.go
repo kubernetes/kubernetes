@@ -126,6 +126,11 @@ func (plugin *azureDataDiskPlugin) NewAttacher() (volume.Attacher, error) {
 	}, nil
 }
 
+// NewDeviceMounter initializes a DeviceMounter. For azure disk, this is an Attacher.
+func (plugin *azureDataDiskPlugin) NewDeviceMounter() (volume.DeviceMounter, error) {
+	return plugin.NewAttacher()
+}
+
 func (plugin *azureDataDiskPlugin) NewDetacher() (volume.Detacher, error) {
 	azure, err := getCloud(plugin.host)
 	if err != nil {
@@ -137,6 +142,11 @@ func (plugin *azureDataDiskPlugin) NewDetacher() (volume.Detacher, error) {
 		plugin: plugin,
 		cloud:  azure,
 	}, nil
+}
+
+// NewDeviceUmounter initializes a DeviceUmounter. For azure disk, this is a Detacher.
+func (plugin *azureDataDiskPlugin) NewDeviceUmounter() (volume.DeviceUmounter, error) {
+	return plugin.NewDetacher()
 }
 
 func (plugin *azureDataDiskPlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, error) {

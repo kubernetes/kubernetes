@@ -251,33 +251,38 @@ func (c *csiAttacher) GetDeviceMountPath(spec *volume.Spec) (string, error) {
 	return deviceMountPath, nil
 }
 
-func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string) error {
-	glog.V(4).Infof(log("attacher.MountDevice(%s, %s)", devicePath, deviceMountPath))
+func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, _ *v1.Pod) (string, string, error) {
+	glog.V(4).Infof(log("attacher.MountDevice(%s)", devicePath))
+
+	deviceMountPath, err := c.GetDeviceMountPath(spec)
+	if err != nil {
+		return devicePath, deviceMountPath, err
+	}
 
 	mounted, err := isDirMounted(c.plugin, deviceMountPath)
 	if err != nil {
 		glog.Error(log("attacher.MountDevice failed while checking mount status for dir [%s]", deviceMountPath))
-		return err
+		return devicePath, deviceMountPath, err
 	}
 
 	if mounted {
 		glog.V(4).Info(log("attacher.MountDevice skipping mount, dir already mounted [%s]", deviceMountPath))
-		return nil
+		return devicePath, deviceMountPath, nil
 	}
 
 	// Setup
 	if spec == nil {
-		return fmt.Errorf("attacher.MountDevice failed, spec is nil")
+		return devicePath, deviceMountPath, fmt.Errorf("attacher.MountDevice failed, spec is nil")
 	}
 	csiSource, err := getCSISourceFromSpec(spec)
 	if err != nil {
 		glog.Error(log("attacher.MountDevice failed to get CSI persistent source: %v", err))
-		return err
+		return devicePath, deviceMountPath, err
 	}
 
 	if c.csiClient == nil {
 		if csiSource.Driver == "" {
-			return fmt.Errorf("attacher.MountDevice failed, driver name is empty")
+			return devicePath, deviceMountPath, fmt.Errorf("attacher.MountDevice failed, driver name is empty")
 		}
 		addr := fmt.Sprintf(csiAddrTemplate, csiSource.Driver)
 		c.csiClient = newCsiDriverClient("unix", addr)
@@ -290,16 +295,16 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 	stageUnstageSet, err := hasStageUnstageCapability(ctx, csi)
 	if err != nil {
 		glog.Error(log("attacher.MountDevice failed to check STAGE_UNSTAGE_VOLUME: %v", err))
-		return err
+		return devicePath, deviceMountPath, err
 	}
 	if !stageUnstageSet {
 		glog.Infof(log("attacher.MountDevice STAGE_UNSTAGE_VOLUME capability not set. Skipping MountDevice..."))
-		return nil
+		return devicePath, deviceMountPath, nil
 	}
 
 	// Start MountDevice
 	if deviceMountPath == "" {
-		return fmt.Errorf("attacher.MountDevice failed, deviceMountPath is empty")
+		return devicePath, deviceMountPath, fmt.Errorf("attacher.MountDevice failed, deviceMountPath is empty")
 	}
 
 	nodeName := string(c.plugin.host.GetNodeName())
@@ -309,12 +314,12 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 	attachment, err := c.k8s.StorageV1beta1().VolumeAttachments().Get(attachID, meta.GetOptions{})
 	if err != nil {
 		glog.Error(log("attacher.MountDevice failed while getting volume attachment [id=%v]: %v", attachID, err))
-		return err
+		return devicePath, deviceMountPath, err
 	}
 
 	if attachment == nil {
 		glog.Error(log("unable to find VolumeAttachment [id=%s]", attachID))
-		return errors.New("no existing VolumeAttachment found")
+		return devicePath, deviceMountPath, errors.New("no existing VolumeAttachment found")
 	}
 	publishVolumeInfo := attachment.Status.AttachmentMetadata
 
@@ -322,7 +327,7 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 	if csiSource.NodeStageSecretRef != nil {
 		nodeStageSecrets, err = getCredentialsFromSecret(c.k8s, csiSource.NodeStageSecretRef)
 		if err != nil {
-			return fmt.Errorf("fetching NodeStageSecretRef %s/%s failed: %v",
+			return devicePath, deviceMountPath, fmt.Errorf("fetching NodeStageSecretRef %s/%s failed: %v",
 				csiSource.NodeStageSecretRef.Namespace, csiSource.NodeStageSecretRef.Name, err)
 		}
 	}
@@ -330,7 +335,7 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 	// create target_dir before call to NodeStageVolume
 	if err := os.MkdirAll(deviceMountPath, 0750); err != nil {
 		glog.Error(log("attacher.MountDevice failed to create dir %#v:  %v", deviceMountPath, err))
-		return err
+		return devicePath, deviceMountPath, err
 	}
 	glog.V(4).Info(log("created target path successfully [%s]", deviceMountPath))
 
@@ -359,11 +364,11 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 		if removeMountDirErr := removeMountDir(c.plugin, deviceMountPath); removeMountDirErr != nil {
 			glog.Error(log("attacher.MountDevice failed to remove mount dir after a NodeStageVolume() error [%s]: %v", deviceMountPath, removeMountDirErr))
 		}
-		return err
+		return devicePath, deviceMountPath, err
 	}
 
 	glog.V(4).Infof(log("attacher.MountDevice successfully requested NodeStageVolume [%s]", deviceMountPath))
-	return nil
+	return devicePath, deviceMountPath, nil
 }
 
 var _ volume.Detacher = &csiAttacher{}
