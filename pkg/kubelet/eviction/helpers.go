@@ -590,7 +590,7 @@ func memory(stats statsFunc) cmpFunc {
 }
 
 // podRequest returns the total resource request of a pod which is the
-// max(sum of init container requests, sum of container requests)
+// max(max of init container requests, sum of container requests)
 func podRequest(pod *v1.Pod, resourceName v1.ResourceName) resource.Quantity {
 	containerValue := resource.Quantity{Format: resource.BinarySI}
 	if resourceName == resourceDisk && !utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) {
@@ -609,9 +609,13 @@ func podRequest(pod *v1.Pod, resourceName v1.ResourceName) resource.Quantity {
 	for i := range pod.Spec.InitContainers {
 		switch resourceName {
 		case v1.ResourceMemory:
-			containerValue.Add(*pod.Spec.Containers[i].Resources.Requests.Memory())
+			if initValue.Cmp(*pod.Spec.InitContainers[i].Resources.Requests.Memory()) < 0 {
+				initValue = *pod.Spec.InitContainers[i].Resources.Requests.Memory()
+			}
 		case resourceDisk:
-			containerValue.Add(*pod.Spec.Containers[i].Resources.Requests.StorageEphemeral())
+			if initValue.Cmp(*pod.Spec.InitContainers[i].Resources.Requests.StorageEphemeral()) < 0 {
+				initValue = *pod.Spec.InitContainers[i].Resources.Requests.StorageEphemeral()
+			}
 		}
 	}
 	if containerValue.Cmp(initValue) > 0 {
