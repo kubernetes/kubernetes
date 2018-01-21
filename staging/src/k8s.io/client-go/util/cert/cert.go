@@ -44,6 +44,10 @@ type Config struct {
 	Organization []string
 	AltNames     AltNames
 	Usages       []x509.ExtKeyUsage
+
+	// Validity bounds.
+	NotBefore *time.Time
+	NotAfter  *time.Time
 }
 
 // AltNames contains the domain names and IP addresses that will be added
@@ -59,21 +63,43 @@ func NewPrivateKey() (*rsa.PrivateKey, error) {
 	return rsa.GenerateKey(cryptorand.Reader, rsaKeySize)
 }
 
+// setCertificateExpiration sets default expiration for the certificate if
+// not specified in the Config object.
+func setCertificateExpiration(cfg *Config, tmpl *x509.Certificate) {
+	now := time.Now()
+	if cfg != nil && cfg.NotBefore != nil {
+		tmpl.NotBefore = *cfg.NotBefore
+	} else {
+		// Certificate is not valid before the current date/time
+		tmpl.NotBefore = now.UTC()
+	}
+	if cfg != nil && cfg.NotAfter != nil {
+		tmpl.NotAfter = *cfg.NotAfter
+	} else {
+		// Certificate is valid for one year from the current date/time
+		tmpl.NotAfter = now.Add(duration365d).UTC()
+	}
+}
+
 // NewSelfSignedCACert creates a CA certificate
 func NewSelfSignedCACert(cfg Config, key *rsa.PrivateKey) (*x509.Certificate, error) {
-	now := time.Now()
 	tmpl := x509.Certificate{
 		SerialNumber: new(big.Int).SetInt64(0),
 		Subject: pkix.Name{
 			CommonName:   cfg.CommonName,
 			Organization: cfg.Organization,
 		},
-		NotBefore:             now.UTC(),
-		NotAfter:              now.Add(duration365d * 10).UTC(),
 		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
 		BasicConstraintsValid: true,
 		IsCA: true,
 	}
+
+	if cfg.NotAfter == nil {
+		// CA certs default to one year expiration
+		expiryDate := time.Now().Add(duration365d * 10).UTC()
+		cfg.NotAfter = &expiryDate
+	}
+	setCertificateExpiration(&cfg, &tmpl)
 
 	certDERBytes, err := x509.CreateCertificate(cryptorand.Reader, &tmpl, &tmpl, key.Public(), key)
 	if err != nil {
@@ -103,11 +129,18 @@ func NewSignedCert(cfg Config, key *rsa.PrivateKey, caCert *x509.Certificate, ca
 		DNSNames:     cfg.AltNames.DNSNames,
 		IPAddresses:  cfg.AltNames.IPs,
 		SerialNumber: serial,
-		NotBefore:    caCert.NotBefore,
-		NotAfter:     time.Now().Add(duration365d).UTC(),
 		KeyUsage:     x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
 		ExtKeyUsage:  cfg.Usages,
 	}
+
+	// If the caller has not specified, just use the value from
+	// the caCert for backwards compatibility
+	if cfg.NotBefore != nil {
+		t := caCert.NotBefore
+		cfg.NotBefore = &t
+	}
+	setCertificateExpiration(&cfg, &certTmpl)
+
 	certDERBytes, err := x509.CreateCertificate(cryptorand.Reader, &certTmpl, caCert, key.Public(), caKey)
 	if err != nil {
 		return nil, err
@@ -148,14 +181,13 @@ func GenerateSelfSignedCertKey(host string, alternateIPs []net.IP, alternateDNS 
 		Subject: pkix.Name{
 			CommonName: fmt.Sprintf("%s@%d", host, time.Now().Unix()),
 		},
-		NotBefore: time.Now(),
-		NotAfter:  time.Now().Add(time.Hour * 24 * 365),
-
 		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
 		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
 		BasicConstraintsValid: true,
 		IsCA: true,
 	}
+
+	setCertificateExpiration(nil, &template)
 
 	if ip := net.ParseIP(host); ip != nil {
 		template.IPAddresses = append(template.IPAddresses, ip)
