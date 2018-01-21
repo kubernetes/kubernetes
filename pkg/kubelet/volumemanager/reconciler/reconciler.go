@@ -351,7 +351,6 @@ type reconstructedVolume struct {
 	pluginIsAttachable  bool
 	volumeGidValue      string
 	devicePath          string
-	reportedInUse       bool
 	mounter             volumepkg.Mounter
 	blockVolumeMapper   volumepkg.BlockVolumeMapper
 }
