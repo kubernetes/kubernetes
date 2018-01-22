@@ -190,7 +190,7 @@ func ValidateCustomResourceDefinitionValidation(customResourceValidation *apiext
 	// if validation passed otherwise, make sure we can actually construct a schema validator from this custom resource validation.
 	if len(allErrs) == 0 {
 		if _, err := apiservervalidation.NewSchemaValidator(customResourceValidation); err != nil {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("customResourceValidation"), "", fmt.Sprintf("error building validator: %v", err)))
+			allErrs = append(allErrs, field.Invalid(fldPath, "", fmt.Sprintf("error building validator: %v", err)))
 		}
 	}
 	return allErrs
@@ -313,7 +313,7 @@ func (v *specStandardValidatorV3) validate(schema *apiextensions.JSONSchemaProps
 	}
 
 	if schema.Ref != nil {
-		allErrs = append(allErrs, field.Forbidden(fldPath.Child("ref"), "ref is not supported"))
+		allErrs = append(allErrs, field.Forbidden(fldPath.Child("$ref"), "$ref is not supported"))
 	}
 
 	if schema.Type == "null" {

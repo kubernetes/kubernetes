@@ -157,7 +157,7 @@ func (c *CRDFinalizer) deleteInstances(crd *apiextensions.CustomResourceDefiniti
 	// directly to the storage instead. Since we control the storage, we know that delete collection works.
 	crClient, err := c.crClientGetter.GetCustomResourceListerCollectionDeleter(crd)
 	if err != nil {
-		err = fmt.Errorf("unable to find a custom resource client for %s.%s due to %v", crd.Status.AcceptedNames.Plural, crd.Spec.Group, err)
+		err = fmt.Errorf("unable to find a custom resource client for %s.%s: %v", crd.Status.AcceptedNames.Plural, crd.Spec.Group, err)
 		return apiextensions.CustomResourceDefinitionCondition{
 			Type:    apiextensions.Terminating,
 			Status:  apiextensions.ConditionTrue,
