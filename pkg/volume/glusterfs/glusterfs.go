@@ -1132,6 +1132,21 @@ func (plugin *glusterfsPlugin) ExpandVolumeDevice(spec *volume.Spec, newSize res
 	expansionSize := (newSize.Value() - oldSize.Value())
 	expansionSizeGiB := int(volume.RoundUpSize(expansionSize, volume.GIB))
 
+	// Find out requested Size
+
+	requestGiB := volume.RoundUpToGiB(newSize)
+
+	//Check the existing volume size
+	currentVolumeInfo, err := cli.VolumeInfo(volumeID)
+	if err != nil {
+		glog.Errorf("error when fetching details of volume :%v", err)
+		return oldSize, err
+	}
+
+	if int64(currentVolumeInfo.Size) >= requestGiB {
+		return newSize, nil
+	}
+
 	// Make volume expansion request
 	volumeExpandReq := &gapi.VolumeExpandRequest{Size: expansionSizeGiB}
 
