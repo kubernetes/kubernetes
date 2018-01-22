@@ -520,7 +520,7 @@
 		},
 		{
 			"ImportPath": "github.com/gorilla/websocket",
-			"Rev": "6eb6ad425a89d9da7a5549bc6da8f79ba5c17844"
+			"Rev": "4201258b820c74ac8e6922fc9e6b52f71fe46f8d"
 		},
 		{
 			"ImportPath": "github.com/grpc-ecosystem/go-grpc-prometheus",
