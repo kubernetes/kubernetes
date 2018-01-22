@@ -47,6 +47,7 @@ func TestReadAdmissionConfiguration(t *testing.T) {
 	testCases := map[string]struct {
 		ConfigBody              string
 		ExpectedAdmissionConfig *apiserver.AdmissionConfiguration
+		ExpectErr               bool
 		PluginNames             []string
 	}{
 		"v1alpha1 configuration - path fixup": {
@@ -89,6 +90,7 @@ func TestReadAdmissionConfiguration(t *testing.T) {
 					},
 				},
 			},
+			ExpectErr:   false,
 			PluginNames: []string{},
 		},
 		"legacy configuration with using legacy plugins": {
@@ -116,6 +118,64 @@ func TestReadAdmissionConfiguration(t *testing.T) {
 					},
 				},
 			},
+			ExpectErr:   false,
+			PluginNames: []string{"ImagePolicyWebhook", "PodNodeSelector"},
+		},
+		"invalid legacy configuration keys with using legacy plugin": {
+			ConfigBody: `{
+"invalid-imagePolicy": {
+  "kubeConfigFile": "/home/user/.kube/config",
+  "allowTTL": 30,
+  "denyTTL": 30,
+  "retryBackoff": 500,
+  "defaultAllow": true
+},
+"invalid podNodeSelectorPluginConfig": {
+  "clusterDefaultNodeSelector": ""
+}
+}`,
+			ExpectedAdmissionConfig: &apiserver.AdmissionConfiguration{
+				Plugins: []apiserver.AdmissionPluginConfiguration{
+					{
+						Name: "ImagePolicyWebhook",
+						Path: configFileName,
+					},
+					{
+						Name: "PodNodeSelector",
+						Path: configFileName,
+					},
+				},
+			},
+			ExpectErr:   true,
+			PluginNames: []string{"ImagePolicyWebhook", "PodNodeSelector"},
+		},
+		"legacy and unknown configuration with using legacy plugin": {
+			ConfigBody: `{
+"imagePolicy": {
+  "kubeConfigFile": "/home/user/.kube/config",
+  "allowTTL": 30,
+  "denyTTL": 30,
+  "retryBackoff": 500,
+  "defaultAllow": true
+},
+"podNodeSelectorPluginConfig": {
+  "clusterDefaultNodeSelector": ""
+},
+"other unknown plugins": {}
+}`,
+			ExpectedAdmissionConfig: &apiserver.AdmissionConfiguration{
+				Plugins: []apiserver.AdmissionPluginConfiguration{
+					{
+						Name: "ImagePolicyWebhook",
+						Path: configFileName,
+					},
+					{
+						Name: "PodNodeSelector",
+						Path: configFileName,
+					},
+				},
+			},
+			ExpectErr:   false,
 			PluginNames: []string{"ImagePolicyWebhook", "PodNodeSelector"},
 		},
 		"legacy configuration not using legacy plugins": {
@@ -131,6 +191,7 @@ func TestReadAdmissionConfiguration(t *testing.T) {
   "clusterDefaultNodeSelector": ""
 }  
 }`,
+			ExpectErr:               false,
 			ExpectedAdmissionConfig: &apiserver.AdmissionConfiguration{},
 			PluginNames:             []string{"NamespaceLifecycle", "InitialResources"},
 		},
@@ -145,11 +206,16 @@ func TestReadAdmissionConfiguration(t *testing.T) {
 			t.Fatalf("unexpected err writing temp file: %v", err)
 		}
 		config, err := ReadAdmissionConfiguration(testCase.PluginNames, configFileName, scheme)
-		if err != nil {
-			t.Fatalf("unexpected err: %v", err)
+		if testCase.ExpectErr && err == nil {
+			t.Fatalf("expect err but got none")
 		}
-		if !reflect.DeepEqual(config.(configProvider).config, testCase.ExpectedAdmissionConfig) {
-			t.Errorf("%s: Expected:\n\t%#v\nGot:\n\t%#v", testName, testCase.ExpectedAdmissionConfig, config.(configProvider).config)
+		if !testCase.ExpectErr {
+			if err != nil {
+				t.Fatalf("unexpected err: %v", err)
+			}
+			if !reflect.DeepEqual(config.(configProvider).config, testCase.ExpectedAdmissionConfig) {
+				t.Errorf("%s: Expected:\n\t%#v\nGot:\n\t%#v", testName, testCase.ExpectedAdmissionConfig, config.(configProvider).config)
+			}
 		}
 	}
 }
