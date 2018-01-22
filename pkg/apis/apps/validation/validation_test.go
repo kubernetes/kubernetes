@@ -21,6 +21,7 @@ import (
 	"strings"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -28,7 +29,15 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
+func testVolumeClaim(name string, spec api.PersistentVolumeClaimSpec) api.PersistentVolumeClaim {
+	return api.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{Name: name},
+		Spec:       spec,
+	}
+}
+
 func TestValidateStatefulSet(t *testing.T) {
+	validClassName := "valid"
 	validLabels := map[string]string{"a": "b"}
 	validPodTemplate := api.PodTemplate{
 		Template: api.PodTemplateSpec{
@@ -43,6 +52,28 @@ func TestValidateStatefulSet(t *testing.T) {
 		},
 	}
 
+	validPersistentVolumeClaimSpec := api.PersistentVolumeClaimSpec{
+		Selector: &metav1.LabelSelector{
+			MatchExpressions: []metav1.LabelSelectorRequirement{
+				{
+					Key:      "key2",
+					Operator: "Exists",
+				},
+			},
+		},
+		AccessModes: []api.PersistentVolumeAccessMode{
+			api.ReadWriteOnce,
+			api.ReadOnlyMany,
+		},
+		Resources: api.ResourceRequirements{
+			Requests: api.ResourceList{
+				api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
+			},
+		},
+		StorageClassName: &validClassName,
+	}
+
+	invalidClassName := "-invalid-"
 	invalidLabels := map[string]string{"NoUppercaseOrSpecialCharsLike=Equals": "b"}
 	invalidPodTemplate := api.PodTemplate{
 		Template: api.PodTemplateSpec{
@@ -68,6 +99,27 @@ func TestValidateStatefulSet(t *testing.T) {
 				ActiveDeadlineSeconds: &invalidTime,
 			},
 		},
+	}
+
+	invalidPersistentVolumeClaimSpec := api.PersistentVolumeClaimSpec{
+		Selector: &metav1.LabelSelector{
+			MatchExpressions: []metav1.LabelSelectorRequirement{
+				{
+					Key:      "key2",
+					Operator: "Exists",
+				},
+			},
+		},
+		AccessModes: []api.PersistentVolumeAccessMode{
+			api.ReadWriteOnce,
+			api.ReadOnlyMany,
+		},
+		Resources: api.ResourceRequirements{
+			Requests: api.ResourceList{
+				api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
+			},
+		},
+		StorageClassName: &invalidClassName,
 	}
 
 	successCases := []apps.StatefulSet{
@@ -119,6 +171,16 @@ func TestValidateStatefulSet(t *testing.T) {
 					RollingUpdate: func() *apps.RollingUpdateStatefulSetStrategy {
 						return &apps.RollingUpdateStatefulSetStrategy{Partition: 2}
 					}()},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "abc-123", Namespace: metav1.NamespaceDefault},
+			Spec: apps.StatefulSetSpec{
+				PodManagementPolicy:  apps.ParallelPodManagement,
+				Selector:             &metav1.LabelSelector{MatchLabels: validLabels},
+				Template:             validPodTemplate.Template,
+				UpdateStrategy:       apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
+				VolumeClaimTemplates: []api.PersistentVolumeClaim{testVolumeClaim("foo", validPersistentVolumeClaimSpec)},
 			},
 		},
 	}
@@ -346,6 +408,16 @@ func TestValidateStatefulSet(t *testing.T) {
 				UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
 			},
 		},
+		"invalid pvc": {
+			ObjectMeta: metav1.ObjectMeta{Name: "abc-123", Namespace: metav1.NamespaceDefault},
+			Spec: apps.StatefulSetSpec{
+				PodManagementPolicy:  apps.ParallelPodManagement,
+				Selector:             &metav1.LabelSelector{MatchLabels: validLabels},
+				Template:             validPodTemplate.Template,
+				UpdateStrategy:       apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
+				VolumeClaimTemplates: []api.PersistentVolumeClaim{testVolumeClaim("foo", invalidPersistentVolumeClaimSpec)},
+			},
+		},
 	}
 
 	for k, v := range errorCases {
@@ -371,6 +443,7 @@ func TestValidateStatefulSet(t *testing.T) {
 					field != "spec.updateStrategy" &&
 					field != "spec.updateStrategy.rollingUpdate" &&
 					field != "spec.updateStrategy.rollingUpdate.partition" &&
+					field != "spec.volumeClaimTemplates[0].spec.storageClassName" &&
 					field != "spec.podManagementPolicy" &&
 					field != "spec.template.spec.activeDeadlineSeconds" {
 					t.Errorf("%s: missing prefix for: %v", k, errs[i])
