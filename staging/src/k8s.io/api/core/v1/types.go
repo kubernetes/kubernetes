@@ -530,6 +530,11 @@ type PersistentVolumeSpec struct {
 	// This is an alpha feature and may change in the future.
 	// +optional
 	VolumeMode *PersistentVolumeMode `json:"volumeMode,omitempty" protobuf:"bytes,8,opt,name=volumeMode,casttype=PersistentVolumeMode"`
+	// UserID is a user defined at the storage backend, this user ID will be used for
+	// all PV related operations along with the authentication key stored in the corresponding
+	// Secret object.
+	// +optional
+	UserID string `json:"userID,omitempty" protobuf:"bytes,9,opt,name=userID"`
 }
 
 // PersistentVolumeReclaimPolicy describes a policy for end-of-life maintenance of persistent volumes.
@@ -649,6 +654,11 @@ type PersistentVolumeClaimSpec struct {
 	// This is an alpha feature and may change in the future.
 	// +optional
 	VolumeMode *PersistentVolumeMode `json:"volumeMode,omitempty" protobuf:"bytes,6,opt,name=volumeMode,casttype=PersistentVolumeMode"`
+	// UserID is a user defined at the storage backend, this user ID will be used for
+	// all PV related operations along with the authentication key stored in the corresponding
+	// Secret object.
+	// +optional
+	UserID string `json:"userID,omitempty" protobuf:"bytes,7,opt,name=userID"`
 }
 
 // PersistentVolumeClaimConditionType is a valid value of PersistentVolumeClaimCondition.Type

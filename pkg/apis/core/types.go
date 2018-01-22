@@ -467,6 +467,11 @@ type PersistentVolumeSpec struct {
 	// This is an alpha feature and may change in the future.
 	// +optional
 	VolumeMode *PersistentVolumeMode
+	// UserID is a user defined at the storage backend, this user ID will be used for
+	// all PV related operations along with the authentication key stored in the corresponding
+	// Secret object.
+	// +optional
+	UserID string
 }
 
 // PersistentVolumeReclaimPolicy describes a policy for end-of-life maintenance of persistent volumes
@@ -568,6 +573,11 @@ type PersistentVolumeClaimSpec struct {
 	// This is an alpha feature and may change in the future.
 	// +optional
 	VolumeMode *PersistentVolumeMode
+	// UserID is a user defined at the storage backend, this user ID will be used for
+	// all PV related operations along with the authentication key stored in the corresponding
+	// Secret object.
+	// +optional
+	UserID string
 }
 
 type PersistentVolumeClaimConditionType string
