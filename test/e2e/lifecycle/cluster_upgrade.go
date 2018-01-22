@@ -72,7 +72,7 @@ var kubeProxyDowngradeTests = []upgrades.Test{
 	&upgrades.IngressUpgradeTest{},
 }
 
-// Upgrade ingress with custom image.
+// Forcefully swap ingress image.
 var ingressUpgradeTests = []upgrades.Test{
 	&upgrades.IngressUpgradeTest{},
 }
@@ -224,7 +224,32 @@ var _ = SIGDescribe("ingress Upgrade [Feature:IngressUpgrade]", func() {
 			upgradeFunc := func() {
 				start := time.Now()
 				defer finalizeUpgradeTest(start, ingressTest)
-				framework.ExpectNoError(framework.IngressUpgrade())
+				framework.ExpectNoError(framework.IngressUpgrade(true))
+			}
+			runUpgradeSuite(f, ingressUpgradeTests, testFrameworks, testSuite, upgCtx, upgrades.IngressUpgrade, upgradeFunc)
+		})
+	})
+})
+
+var _ = SIGDescribe("ingress Downgrade [Feature:IngressDowngrade]", func() {
+	f := framework.NewDefaultFramework("ingress-downgrade")
+
+	// Create the frameworks here because we can only create them
+	// in a "Describe".
+	testFrameworks := createUpgradeFrameworks(ingressUpgradeTests)
+	Describe("ingress downgrade", func() {
+		It("should maintain a functioning ingress", func() {
+			upgCtx, err := getUpgradeContext(f.ClientSet.Discovery(), "")
+			framework.ExpectNoError(err)
+
+			testSuite := &junit.TestSuite{Name: "ingress downgrade"}
+			ingressTest := &junit.TestCase{Name: "[sig-networking] ingress-downgrade", Classname: "upgrade_tests"}
+			testSuite.TestCases = append(testSuite.TestCases, ingressTest)
+
+			upgradeFunc := func() {
+				start := time.Now()
+				defer finalizeUpgradeTest(start, ingressTest)
+				framework.ExpectNoError(framework.IngressUpgrade(false))
 			}
 			runUpgradeSuite(f, ingressUpgradeTests, testFrameworks, testSuite, upgCtx, upgrades.IngressUpgrade, upgradeFunc)
 		})
