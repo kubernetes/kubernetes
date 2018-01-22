@@ -11,6 +11,7 @@ go_test(
     srcs = [
         "admission_test.go",
         "cache_test.go",
+        "config_test.go",
     ],
     embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/plugin/pkg/admission/eventratelimit",
