@@ -21,10 +21,12 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"github.com/prometheus/client_golang/prometheus"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 )
@@ -142,6 +144,13 @@ func (w *worker) stop() {
 func (w *worker) doProbe() (keepGoing bool) {
 	defer func() { recover() }() // Actually eat panics (HandleCrash takes care of logging)
 	defer runtime.HandleCrash(func(_ interface{}) { keepGoing = true })
+	proberResultsMetricLabels := prometheus.Labels{
+		"probe_type":     w.probeType.String(),
+		"container_name": w.container.Name,
+		"pod_name":       w.pod.Name,
+		"namespace":      w.pod.Namespace,
+		"pod_uid":        string(w.pod.UID),
+	}
 
 	status, ok := w.probeManager.statusManager.GetPodStatus(w.pod.UID)
 	if !ok {
@@ -167,6 +176,7 @@ func (w *worker) doProbe() (keepGoing bool) {
 
 	if w.containerID.String() != c.ContainerID {
 		if !w.containerID.IsEmpty() {
+			metrics.ProberResults.Delete(proberResultsMetricLabels)
 			w.resultsManager.Remove(w.containerID)
 		}
 		w.containerID = kubecontainer.ParseContainerID(c.ContainerID)
@@ -218,6 +228,7 @@ func (w *worker) doProbe() (keepGoing bool) {
 	}
 
 	w.resultsManager.Set(w.containerID, result, w.pod)
+	metrics.ProberResults.With(proberResultsMetricLabels).Set(result.ToPrometheusType())
 
 	if w.probeType == liveness && result == results.Failure {
 		// The container fails a liveness check, it will need to be restarted.

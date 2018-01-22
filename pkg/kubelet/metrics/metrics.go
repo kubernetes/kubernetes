@@ -101,6 +101,14 @@ var (
 			Help:      "Interval in microseconds between relisting in PLEG.",
 		},
 	)
+	ProberResults = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Subsystem: KubeletSubsystem,
+			Name:      "probe_result",
+			Help:      "The result of a liveness or readiness probe for a container.",
+		},
+		[]string{"probe_type", "container_name", "pod_name", "namespace", "pod_uid"},
+	)
 	// Metrics of remote runtime operations.
 	RuntimeOperations = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
@@ -214,6 +222,7 @@ func Register(containerCache kubecontainer.RuntimeCache) {
 		prometheus.MustRegister(newPodAndContainerCollector(containerCache))
 		prometheus.MustRegister(PLEGRelistLatency)
 		prometheus.MustRegister(PLEGRelistInterval)
+		prometheus.MustRegister(ProberResults)
 		prometheus.MustRegister(RuntimeOperations)
 		prometheus.MustRegister(RuntimeOperationsLatency)
 		prometheus.MustRegister(RuntimeOperationsErrors)
