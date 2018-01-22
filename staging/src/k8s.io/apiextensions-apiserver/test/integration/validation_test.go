@@ -411,7 +411,7 @@ func TestForbiddenFieldsInSchema(t *testing.T) {
 
 	_, err = testserver.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, clientPool)
 	if err == nil {
-		t.Fatal("unexpected non-error: ref cannot be non-empty string")
+		t.Fatal("unexpected non-error: $ref cannot be non-empty string")
 	}
 
 	noxuDefinition.Spec.Validation.OpenAPIV3Schema.Ref = nil
