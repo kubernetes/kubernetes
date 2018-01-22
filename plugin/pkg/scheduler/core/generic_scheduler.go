@@ -83,7 +83,7 @@ type genericScheduler struct {
 	cachedNodeInfoMap map[string]*schedulercache.NodeInfo
 }
 
-// Schedule tries to schedule the given pod to one of node in the node list.
+// Schedule tries to schedule the given pod to one of nodes in the node list.
 // If it succeeds, it will return the name of the node.
 // If it fails, it will return a Fiterror error with reasons.
 func (g *genericScheduler) Schedule(pod *v1.Pod, nodeLister algorithm.NodeLister) (string, error) {
@@ -129,7 +129,7 @@ func (g *genericScheduler) Schedule(pod *v1.Pod, nodeLister algorithm.NodeLister
 }
 
 // Prioritizers returns a slice containing all the scheduler's priority
-// functions and their config. It is exposed for testing only.
+// functions and their configs. It is exposed for testing only.
 func (g *genericScheduler) Prioritizers() []algorithm.PriorityConfig {
 	return g.prioritizers
 }
@@ -250,7 +250,7 @@ func podFitsOnNode(pod *v1.Pod, meta interface{}, info *schedulercache.NodeInfo,
 	for predicateKey, predicate := range predicateFuncs {
 		// If equivalenceCache is available
 		if eCacheAvailable {
-			// PredicateWithECache will returns it's cached predicate results
+			// PredicateWithECache will return its cached predicate results
 			fit, reasons, invalid = ecache.PredicateWithECache(pod.GetName(), info.Node().GetName(), predicateKey, equivalenceHash)
 		}
 
