@@ -630,16 +630,18 @@ def launch_default_ingress_controller():
     ''' Launch the Kubernetes ingress controller & default backend (404) '''
     config = hookenv.config()
 
-    # need to test this in case we get in here from a config change to the image
+    # need to test this in case we get in
+    # here from a config change to the image
     if not config.get('ingress'):
         return
-    
+
     context = {}
     context['arch'] = arch()
     addon_path = '/root/cdk/addons/{}'
 
     context['defaultbackend_image'] = config.get('default-backend-image')
-    if context['defaultbackend_image'] == "" or context['defaultbackend_image'] == "auto":
+    if (context['defaultbackend_image'] == "" or
+       context['defaultbackend_image'] == "auto"):
         if context['arch'] == 's390x':
             context['defaultbackend_image'] = \
                 "gcr.io/google_containers/defaultbackend-s390x:1.4"
@@ -668,7 +670,7 @@ def launch_default_ingress_controller():
                 "docker.io/cdkbot/nginx-ingress-controller-s390x:0.9.0-beta.13"
         else:
             context['ingress_image'] = \
-                "gcr.io/google_containers/nginx-ingress-controller:0.9.0-beta.15"
+                "gcr.io/google_containers/nginx-ingress-controller:0.9.0-beta.15" # noqa
     context['juju_application'] = hookenv.service_name()
     manifest = addon_path.format('ingress-daemon-set.yaml')
     render('ingress-daemon-set.yaml', manifest, context)
