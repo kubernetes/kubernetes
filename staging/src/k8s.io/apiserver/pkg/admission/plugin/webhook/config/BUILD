@@ -30,6 +30,7 @@ go_test(
     name = "go_default_test",
     srcs = [
         "authentication_test.go",
+        "kubeconfig_test.go",
         "serviceresolver_test.go",
     ],
     embed = [":go_default_library"],
