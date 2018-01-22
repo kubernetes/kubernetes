@@ -641,6 +641,13 @@ func (as *availabilitySet) ensureHostInPool(serviceName string, nodeName types.N
 		resp := <-respChan
 		err := <-errChan
 		glog.V(10).Infof("InterfacesClient.CreateOrUpdate(%q): end", *nic.Name)
+		if err != nil && vmSetName == "" {
+			if strings.Contains(err.Error(), errNetworkInterfaceAndLoadBalancerAreInDifferentAvailabilitySets) ||
+				strings.Contains(err.Error(), errNetworkInterfaceUsesMultipleLoadBalancersOfSameType) {
+				glog.V(3).Infof("warning: node %s has already been binded to another availability set, omit it in backendPool %s", vmName, backendPoolID)
+				return nil
+			}
+		}
 		if as.CloudProviderBackoff && shouldRetryAPIRequest(resp.Response, err) {
 			glog.V(2).Infof("nicupdate(%s) backing off: nic(%s) - updating, err=%v", serviceName, nicName, err)
 			retryErr := as.CreateOrUpdateInterfaceWithRetry(nic)
