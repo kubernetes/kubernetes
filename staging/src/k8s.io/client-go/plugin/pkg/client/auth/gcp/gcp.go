@@ -42,8 +42,18 @@ func init() {
 	}
 }
 
-// Stubbable for testing
-var execCommand = exec.Command
+var (
+	// Stubbable for testing
+	execCommand = exec.Command
+
+	// defaultScopes:
+	// - cloud-platform is the base scope to authenticate to GCP.
+	// - userinfo.email is used to authenticate to GKE APIs with gserviceaccount
+	//   email instead of numeric uniqueID.
+	defaultScopes = []string{
+		"https://www.googleapis.com/auth/cloud-platform",
+		"https://www.googleapis.com/auth/userinfo.email"}
+)
 
 // gcpAuthProvider is an auth provider plugin that uses GCP credentials to provide
 // tokens for kubectl to authenticate itself to the apiserver. A sample json config
@@ -104,9 +114,26 @@ type gcpAuthProvider struct {
 }
 
 func newGCPAuthProvider(_ string, gcpConfig map[string]string, persister restclient.AuthProviderConfigPersister) (restclient.AuthProvider, error) {
-	var ts oauth2.TokenSource
-	var err error
-	if cmd, useCmd := gcpConfig["cmd-path"]; useCmd {
+	ts, err := tokenSource(isCmdTokenSource(gcpConfig), gcpConfig)
+	if err != nil {
+		return nil, err
+	}
+	cts, err := newCachedTokenSource(gcpConfig["access-token"], gcpConfig["expiry"], persister, ts, gcpConfig)
+	if err != nil {
+		return nil, err
+	}
+	return &gcpAuthProvider{cts, persister}, nil
+}
+
+func isCmdTokenSource(gcpConfig map[string]string) bool {
+	_, ok := gcpConfig["cmd-path"]
+	return ok
+}
+
+func tokenSource(isCmd bool, gcpConfig map[string]string) (oauth2.TokenSource, error) {
+	// Command-based token source
+	if isCmd {
+		cmd := gcpConfig["cmd-path"]
 		if len(cmd) == 0 {
 			return nil, fmt.Errorf("missing access token cmd")
 		}
@@ -121,28 +148,29 @@ func newGCPAuthProvider(_ string, gcpConfig map[string]string, persister restcli
 			cmd = fields[0]
 			args = fields[1:]
 		}
-		ts = newCmdTokenSource(cmd, args, gcpConfig["token-key"], gcpConfig["expiry-key"], gcpConfig["time-fmt"])
-	} else {
-		var scopes []string
-		if gcpConfig["scopes"] != "" {
-			scopes = strings.Split(gcpConfig["scopes"], ",")
-		} else {
-			// default scopes: userinfo.email is used to authenticate to
-			// GKE APIs with gserviceaccount email instead of numeric uniqueID.
-			scopes = []string{
-				"https://www.googleapis.com/auth/cloud-platform",
-				"https://www.googleapis.com/auth/userinfo.email"}
-		}
-		ts, err = google.DefaultTokenSource(context.Background(), scopes...)
+		return newCmdTokenSource(cmd, args, gcpConfig["token-key"], gcpConfig["expiry-key"], gcpConfig["time-fmt"]), nil
 	}
+
+	// Google Application Credentials-based token source
+	scopes := parseScopes(gcpConfig)
+	ts, err := google.DefaultTokenSource(context.Background(), scopes...)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("cannot construct google default token source: %v", err)
 	}
-	cts, err := newCachedTokenSource(gcpConfig["access-token"], gcpConfig["expiry"], persister, ts, gcpConfig)
-	if err != nil {
-		return nil, err
+	return ts, nil
+}
+
+// parseScopes constructs a list of scopes that should be included in token source
+// from the config map.
+func parseScopes(gcpConfig map[string]string) []string {
+	scopes, ok := gcpConfig["scopes"]
+	if !ok {
+		return defaultScopes
 	}
-	return &gcpAuthProvider{cts, persister}, nil
+	if scopes == "" {
+		return []string{}
+	}
+	return strings.Split(gcpConfig["scopes"], ",")
 }
 
 func (g *gcpAuthProvider) WrapTransport(rt http.RoundTripper) http.RoundTripper {
