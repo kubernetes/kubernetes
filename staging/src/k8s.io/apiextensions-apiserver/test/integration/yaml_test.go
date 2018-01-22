@@ -232,7 +232,7 @@ values:
 			Param("watch", "true").
 			DoRaw()
 		if !errors.IsNotAcceptable(err) {
-			t.Fatal("expected not acceptable error, got %v (%s)", err, string(result))
+			t.Fatalf("expected not acceptable error, got %v (%s)", err, string(result))
 		}
 		obj, err := decodeYAML(result)
 		if err != nil {
@@ -294,7 +294,7 @@ values:
 			t.Fatal(v, ok, err, string(result))
 		}
 		if obj.GetUID() != uid {
-			t.Fatal("uid changed: %v vs %v", uid, obj.GetUID())
+			t.Fatalf("uid changed: %v vs %v", uid, obj.GetUID())
 		}
 	}
 
@@ -302,7 +302,7 @@ values:
 	{
 		yamlBody := []byte(fmt.Sprintf(`
 values:
-  numVal: 3`, apiVersion, kind, uid, resourceVersion))
+  numVal: 3`))
 		result, err := rest.Patch(types.MergePatchType).
 			SetHeader("Accept", "application/yaml").
 			SetHeader("Content-Type", "application/yaml").
