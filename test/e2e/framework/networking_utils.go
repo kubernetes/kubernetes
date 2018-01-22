@@ -650,11 +650,20 @@ func TestReachableHTTP(ip string, port int, request string, expect string) (bool
 	return TestReachableHTTPWithContent(ip, port, request, expect, nil)
 }
 
+func TestReachableHTTPWithRetriableErrorCodes(ip string, port int, request string, expect string, retriableErrCodes []int) (bool, error) {
+	return TestReachableHTTPWithContentTimeoutWithRetriableErrorCodes(ip, port, request, expect, nil, retriableErrCodes, time.Second*5)
+}
+
 func TestReachableHTTPWithContent(ip string, port int, request string, expect string, content *bytes.Buffer) (bool, error) {
 	return TestReachableHTTPWithContentTimeout(ip, port, request, expect, content, 5*time.Second)
 }
 
 func TestReachableHTTPWithContentTimeout(ip string, port int, request string, expect string, content *bytes.Buffer, timeout time.Duration) (bool, error) {
+	return TestReachableHTTPWithContentTimeoutWithRetriableErrorCodes(ip, port, request, expect, content, []int{}, timeout)
+}
+
+func TestReachableHTTPWithContentTimeoutWithRetriableErrorCodes(ip string, port int, request string, expect string, content *bytes.Buffer, retriableErrCodes []int, timeout time.Duration) (bool, error) {
+
 	url := fmt.Sprintf("http://%s:%d%s", ip, port, request)
 	if ip == "" {
 		Failf("Got empty IP for reachability check (%s)", url)
@@ -679,6 +688,11 @@ func TestReachableHTTPWithContentTimeout(ip string, port int, request string, ex
 		return false, nil
 	}
 	if resp.StatusCode != 200 {
+		for _, code := range retriableErrCodes {
+			if resp.StatusCode == code {
+				return false, nil
+			}
+		}
 		return false, fmt.Errorf("received non-success return status %q trying to access %s; got body: %s",
 			resp.Status, url, string(body))
 	}

@@ -41,7 +41,12 @@ const (
 )
 
 // EnsureDNSAddon creates the kube-dns addon
-func EnsureDNSAddon(cfg *kubeadmapi.MasterConfiguration, client clientset.Interface, k8sVersion *version.Version) error {
+func EnsureDNSAddon(cfg *kubeadmapi.MasterConfiguration, client clientset.Interface) error {
+	k8sVersion, err := version.ParseSemantic(cfg.KubernetesVersion)
+	if err != nil {
+		return fmt.Errorf("couldn't parse kubernetes version %q: %v", cfg.KubernetesVersion, err)
+	}
+
 	if err := CreateServiceAccount(client); err != nil {
 		return err
 	}

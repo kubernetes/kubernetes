@@ -31,6 +31,7 @@ func NewCmdPhase(out io.Writer) *cobra.Command {
 		RunE:  cmdutil.SubCmdRunE("phase"),
 	}
 
+	cmd.AddCommand(NewCmdAddon())
 	cmd.AddCommand(NewCmdBootstrapToken())
 	cmd.AddCommand(NewCmdCerts())
 	cmd.AddCommand(NewCmdControlplane())
