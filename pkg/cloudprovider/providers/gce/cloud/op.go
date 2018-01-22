@@ -41,7 +41,6 @@ type operation interface {
 
 type gaOperation struct {
 	s         *Service
-	op        *ga.Operation
 	projectID string
 	key       *meta.Key
 }
@@ -58,14 +57,14 @@ func (o *gaOperation) isDone(ctx context.Context) (bool, error) {
 
 	switch o.key.Type() {
 	case meta.Regional:
-		op, err = o.s.GA.RegionOperations.Get(o.projectID, o.key.Region, o.op.Name).Context(ctx).Do()
-		glog.V(5).Infof("GA.RegionOperations.Get(%v, %v, %v) = %+v, %v; ctx = %v", o.projectID, o.key.Region, o.op.Name, op, err, ctx)
+		op, err = o.s.GA.RegionOperations.Get(o.projectID, o.key.Region, o.key.Name).Context(ctx).Do()
+		glog.V(5).Infof("GA.RegionOperations.Get(%v, %v, %v) = %+v, %v; ctx = %v", o.projectID, o.key.Region, o.key.Name, op, err, ctx)
 	case meta.Zonal:
-		op, err = o.s.GA.ZoneOperations.Get(o.projectID, o.key.Zone, o.op.Name).Context(ctx).Do()
-		glog.V(5).Infof("GA.ZoneOperations.Get(%v, %v, %v) = %+v, %v; ctx = %v", o.projectID, o.key.Zone, o.op.Name, op, err, ctx)
+		op, err = o.s.GA.ZoneOperations.Get(o.projectID, o.key.Zone, o.key.Name).Context(ctx).Do()
+		glog.V(5).Infof("GA.ZoneOperations.Get(%v, %v, %v) = %+v, %v; ctx = %v", o.projectID, o.key.Zone, o.key.Name, op, err, ctx)
 	case meta.Global:
-		op, err = o.s.GA.GlobalOperations.Get(o.projectID, o.op.Name).Context(ctx).Do()
-		glog.V(5).Infof("GA.GlobalOperations.Get(%v, %v) = %+v, %v; ctx = %v", o.projectID, o.op.Name, op, err, ctx)
+		op, err = o.s.GA.GlobalOperations.Get(o.projectID, o.key.Name).Context(ctx).Do()
+		glog.V(5).Infof("GA.GlobalOperations.Get(%v, %v) = %+v, %v; ctx = %v", o.projectID, o.key.Name, op, err, ctx)
 	default:
 		return false, fmt.Errorf("invalid key type: %#v", o.key)
 	}
@@ -86,7 +85,6 @@ func (o *gaOperation) rateLimitKey() *RateLimitKey {
 
 type alphaOperation struct {
 	s         *Service
-	op        *alpha.Operation
 	projectID string
 	key       *meta.Key
 }
@@ -103,14 +101,14 @@ func (o *alphaOperation) isDone(ctx context.Context) (bool, error) {
 
 	switch o.key.Type() {
 	case meta.Regional:
-		op, err = o.s.Alpha.RegionOperations.Get(o.projectID, o.key.Region, o.op.Name).Context(ctx).Do()
-		glog.V(5).Infof("Alpha.RegionOperations.Get(%v, %v, %v) = %+v, %v; ctx = %v", o.projectID, o.key.Region, o.op.Name, op, err, ctx)
+		op, err = o.s.Alpha.RegionOperations.Get(o.projectID, o.key.Region, o.key.Name).Context(ctx).Do()
+		glog.V(5).Infof("Alpha.RegionOperations.Get(%v, %v, %v) = %+v, %v; ctx = %v", o.projectID, o.key.Region, o.key.Name, op, err, ctx)
 	case meta.Zonal:
-		op, err = o.s.Alpha.ZoneOperations.Get(o.projectID, o.key.Zone, o.op.Name).Context(ctx).Do()
-		glog.V(5).Infof("Alpha.ZoneOperations.Get(%v, %v, %v) = %+v, %v; ctx = %v", o.projectID, o.key.Zone, o.op.Name, op, err, ctx)
+		op, err = o.s.Alpha.ZoneOperations.Get(o.projectID, o.key.Zone, o.key.Name).Context(ctx).Do()
+		glog.V(5).Infof("Alpha.ZoneOperations.Get(%v, %v, %v) = %+v, %v; ctx = %v", o.projectID, o.key.Zone, o.key.Name, op, err, ctx)
 	case meta.Global:
-		op, err = o.s.Alpha.GlobalOperations.Get(o.projectID, o.op.Name).Context(ctx).Do()
-		glog.V(5).Infof("Alpha.GlobalOperations.Get(%v, %v) = %+v, %v; ctx = %v", o.projectID, o.op.Name, op, err, ctx)
+		op, err = o.s.Alpha.GlobalOperations.Get(o.projectID, o.key.Name).Context(ctx).Do()
+		glog.V(5).Infof("Alpha.GlobalOperations.Get(%v, %v) = %+v, %v; ctx = %v", o.projectID, o.key.Name, op, err, ctx)
 	default:
 		return false, fmt.Errorf("invalid key type: %#v", o.key)
 	}
@@ -131,7 +129,6 @@ func (o *alphaOperation) rateLimitKey() *RateLimitKey {
 
 type betaOperation struct {
 	s         *Service
-	op        *beta.Operation
 	projectID string
 	key       *meta.Key
 }
@@ -148,14 +145,14 @@ func (o *betaOperation) isDone(ctx context.Context) (bool, error) {
 
 	switch o.key.Type() {
 	case meta.Regional:
-		op, err = o.s.Beta.RegionOperations.Get(o.projectID, o.key.Region, o.op.Name).Context(ctx).Do()
-		glog.V(5).Infof("Beta.RegionOperations.Get(%v, %v, %v) = %+v, %v; ctx = %v", o.projectID, o.key.Region, o.op.Name, op, err, ctx)
+		op, err = o.s.Beta.RegionOperations.Get(o.projectID, o.key.Region, o.key.Name).Context(ctx).Do()
+		glog.V(5).Infof("Beta.RegionOperations.Get(%v, %v, %v) = %+v, %v; ctx = %v", o.projectID, o.key.Region, o.key.Name, op, err, ctx)
 	case meta.Zonal:
-		op, err = o.s.Beta.ZoneOperations.Get(o.projectID, o.key.Zone, o.op.Name).Context(ctx).Do()
-		glog.V(5).Infof("Beta.ZoneOperations.Get(%v, %v, %v) = %+v, %v; ctx = %v", o.projectID, o.key.Zone, o.op.Name, op, err, ctx)
+		op, err = o.s.Beta.ZoneOperations.Get(o.projectID, o.key.Zone, o.key.Name).Context(ctx).Do()
+		glog.V(5).Infof("Beta.ZoneOperations.Get(%v, %v, %v) = %+v, %v; ctx = %v", o.projectID, o.key.Zone, o.key.Name, op, err, ctx)
 	case meta.Global:
-		op, err = o.s.Beta.GlobalOperations.Get(o.projectID, o.op.Name).Context(ctx).Do()
-		glog.V(5).Infof("Beta.GlobalOperations.Get(%v, %v) = %+v, %v; ctx = %v", o.projectID, o.op.Name, op, err, ctx)
+		op, err = o.s.Beta.GlobalOperations.Get(o.projectID, o.key.Name).Context(ctx).Do()
+		glog.V(5).Infof("Beta.GlobalOperations.Get(%v, %v) = %+v, %v; ctx = %v", o.projectID, o.key.Name, op, err, ctx)
 	default:
 		return false, fmt.Errorf("invalid key type: %#v", o.key)
 	}
