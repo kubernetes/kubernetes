@@ -195,7 +195,7 @@ func (ca *cloudCIDRAllocator) updateCIDRAllocation(nodeName string) error {
 
 	node, err := ca.nodeLister.Get(nodeName)
 	if err != nil {
-		glog.Errorf("Failed while getting node %v for updating Node.Spec.PodCIDR: %v", nodeName, err)
+		glog.Errorf("Failed to get node %v: %v", nodeName, err)
 		return err
 	}
 
