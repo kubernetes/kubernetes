@@ -149,11 +149,11 @@ define UPDATE_HELP_INFO
 endef
 .PHONY: update
 ifeq ($(PRINT_HELP),y)
-update:
+update: generated_files
 	@echo "$$UPDATE_HELP_INFO"
 else
 update:
-	hack/update-all.sh
+	CALLED_FROM_MAIN_MAKEFILE=1 hack/make-rules/update.sh
 endif
 
 define CHECK_TEST_HELP_INFO
