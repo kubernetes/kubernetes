@@ -80,12 +80,6 @@ func (c *APIServiceRegistrationController) sync(key string) error {
 		return err
 	}
 
-	// remove registration handling for APIServices which are not available
-	if !apiregistration.IsAPIServiceConditionTrue(apiService, apiregistration.Available) {
-		c.apiHandlerManager.RemoveAPIService(key)
-		return nil
-	}
-
 	return c.apiHandlerManager.AddAPIService(apiService)
 }
 
