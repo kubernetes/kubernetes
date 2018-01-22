@@ -21,7 +21,7 @@ import (
 	"math/rand"
 	"os"
 	"time"
-
+	"fmt"
 	"github.com/spf13/pflag"
 
 	utilflag "k8s.io/apiserver/pkg/util/flag"
@@ -45,5 +45,6 @@ func main() {
 
 	if err := command.Execute(); err != nil {
 		os.Exit(1)
+		fmt.Println("test_pr")
 	}
 }
