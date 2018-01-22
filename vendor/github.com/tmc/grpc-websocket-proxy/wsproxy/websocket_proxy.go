@@ -31,7 +31,6 @@ type Proxy struct {
 	methodOverrideParam string
 	tokenCookieName     string
 	requestMutator      RequestMutatorFunc
-	headerForwarder     func(header string) bool
 }
 
 // Logger collects log messages.
@@ -72,29 +71,11 @@ func WithRequestMutator(fn RequestMutatorFunc) Option {
 	}
 }
 
-// WithForwardedHeaders allows controlling which headers are forwarded.
-func WithForwardedHeaders(fn func(header string) bool) Option {
-	return func(p *Proxy) {
-		p.headerForwarder = fn
-	}
-}
-
 // WithLogger allows a custom FieldLogger to be supplied
 func WithLogger(logger Logger) Option {
 	return func(p *Proxy) {
 		p.logger = logger
 	}
-}
-
-var defaultHeadersToForward = map[string]bool{
-	"Origin":  true,
-	"origin":  true,
-	"Referer": true,
-	"referer": true,
-}
-
-func defaultHeaderForwarder(header string) bool {
-	return defaultHeadersToForward[header]
 }
 
 // WebsocketProxy attempts to expose the underlying handler as a bidi websocket stream with newline-delimited
@@ -115,7 +96,6 @@ func WebsocketProxy(h http.Handler, opts ...Option) http.Handler {
 		logger:              logrus.New(),
 		methodOverrideParam: MethodOverrideParam,
 		tokenCookieName:     TokenCookieName,
-		headerForwarder:     defaultHeaderForwarder,
 	}
 	for _, o := range opts {
 		o(p)
@@ -165,11 +145,6 @@ func (p *Proxy) proxy(w http.ResponseWriter, r *http.Request) {
 	}
 	if swsp := r.Header.Get("Sec-WebSocket-Protocol"); swsp != "" {
 		request.Header.Set("Authorization", strings.Replace(swsp, "Bearer, ", "Bearer ", 1))
-	}
-	for header := range r.Header {
-		if p.headerForwarder(header) {
-			request.Header.Set(header, r.Header.Get(header))
-		}
 	}
 	// If token cookie is present, populate Authorization header from the cookie instead.
 	if cookie, err := r.Cookie(p.tokenCookieName); err == nil {
