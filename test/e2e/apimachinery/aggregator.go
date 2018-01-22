@@ -314,7 +314,6 @@ func TestSampleAPIServer(f *framework.Framework, image string) {
 	// is setting up a new namespace, we are just using that.
 	err = framework.WaitForDeploymentComplete(client, deployment)
 
-	// We seem to need to do additional waiting until the extension api service is actually up.
 	err = wait.Poll(100*time.Millisecond, 30*time.Second, func() (bool, error) {
 		request := restClient.Get().AbsPath("/apis/wardle.k8s.io/v1alpha1/namespaces/default/flunders")
 		request.SetHeader("Accept", "application/json")
@@ -323,6 +322,9 @@ func TestSampleAPIServer(f *framework.Framework, image string) {
 			status, ok := err.(*apierrs.StatusError)
 			if !ok {
 				return false, err
+			}
+			if status.Status().Code == 503 {
+				return false, nil
 			}
 			if status.Status().Code == 404 && strings.HasPrefix(err.Error(), "the server could not find the requested resource") {
 				return false, nil
