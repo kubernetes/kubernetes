@@ -77716,6 +77716,10 @@
       "description": "Name of the StorageClass required by the claim. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#class-1",
       "type": "string"
      },
+     "userID": {
+      "description": "UserID is a user defined at the storage backend, this user ID will be used for all PV related operations along with the authentication key stored in the corresponding Secret object.",
+      "type": "string"
+     },
      "volumeMode": {
       "description": "volumeMode defines what type of volume is required by the claim. Value of Filesystem is implied when not included in claim spec. This is an alpha feature and may change in the future.",
       "type": "string"
@@ -77927,6 +77931,10 @@
      "storageos": {
       "description": "StorageOS represents a StorageOS volume that is attached to the kubelet's host machine and mounted into the pod More info: https://releases.k8s.io/HEAD/examples/volumes/storageos/README.md",
       "$ref": "#/definitions/io.k8s.api.core.v1.StorageOSPersistentVolumeSource"
+     },
+     "userID": {
+      "description": "UserID is a user defined at the storage backend, this user ID will be used for all PV related operations along with the authentication key stored in the corresponding Secret object.",
+      "type": "string"
      },
      "volumeMode": {
       "description": "volumeMode defines if a volume is intended to be used with a formatted filesystem or to remain in raw block state. Value of Filesystem is implied when not included in spec. This is an alpha feature and may change in the future.",

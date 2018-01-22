@@ -6073,6 +6073,10 @@ func (m *PersistentVolumeClaimSpec) MarshalTo(dAtA []byte) (int, error) {
 		i = encodeVarintGenerated(dAtA, i, uint64(len(*m.VolumeMode)))
 		i += copy(dAtA[i:], *m.VolumeMode)
 	}
+	dAtA[i] = 0x3a
+	i++
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.UserID)))
+	i += copy(dAtA[i:], m.UserID)
 	return i, nil
 }
 
@@ -6584,6 +6588,10 @@ func (m *PersistentVolumeSpec) MarshalTo(dAtA []byte) (int, error) {
 		i = encodeVarintGenerated(dAtA, i, uint64(len(*m.VolumeMode)))
 		i += copy(dAtA[i:], *m.VolumeMode)
 	}
+	dAtA[i] = 0x4a
+	i++
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.UserID)))
+	i += copy(dAtA[i:], m.UserID)
 	return i, nil
 }
 
@@ -12356,6 +12364,8 @@ func (m *PersistentVolumeClaimSpec) Size() (n int) {
 		l = len(*m.VolumeMode)
 		n += 1 + l + sovGenerated(uint64(l))
 	}
+	l = len(m.UserID)
+	n += 1 + l + sovGenerated(uint64(l))
 	return n
 }
 
@@ -12543,6 +12553,8 @@ func (m *PersistentVolumeSpec) Size() (n int) {
 		l = len(*m.VolumeMode)
 		n += 1 + l + sovGenerated(uint64(l))
 	}
+	l = len(m.UserID)
+	n += 1 + l + sovGenerated(uint64(l))
 	return n
 }
 
@@ -15445,6 +15457,7 @@ func (this *PersistentVolumeClaimSpec) String() string {
 		`Selector:` + strings.Replace(fmt.Sprintf("%v", this.Selector), "LabelSelector", "k8s_io_apimachinery_pkg_apis_meta_v1.LabelSelector", 1) + `,`,
 		`StorageClassName:` + valueToStringGenerated(this.StorageClassName) + `,`,
 		`VolumeMode:` + valueToStringGenerated(this.VolumeMode) + `,`,
+		`UserID:` + fmt.Sprintf("%v", this.UserID) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -15548,6 +15561,7 @@ func (this *PersistentVolumeSpec) String() string {
 		`StorageClassName:` + fmt.Sprintf("%v", this.StorageClassName) + `,`,
 		`MountOptions:` + fmt.Sprintf("%v", this.MountOptions) + `,`,
 		`VolumeMode:` + valueToStringGenerated(this.VolumeMode) + `,`,
+		`UserID:` + fmt.Sprintf("%v", this.UserID) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -33907,6 +33921,35 @@ func (m *PersistentVolumeClaimSpec) Unmarshal(dAtA []byte) error {
 			s := PersistentVolumeMode(dAtA[iNdEx:postIndex])
 			m.VolumeMode = &s
 			iNdEx = postIndex
+		case 7:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field UserID", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.UserID = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(dAtA[iNdEx:])
@@ -35532,6 +35575,35 @@ func (m *PersistentVolumeSpec) Unmarshal(dAtA []byte) error {
 			}
 			s := PersistentVolumeMode(dAtA[iNdEx:postIndex])
 			m.VolumeMode = &s
+			iNdEx = postIndex
+		case 9:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field UserID", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.UserID = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
