@@ -648,7 +648,7 @@
 		},
 		{
 			"ImportPath": "github.com/tmc/grpc-websocket-proxy/wsproxy",
-			"Rev": "830351dc03c6f07d625727d5f993a463babb20e1"
+			"Rev": "89b8d40f7ca833297db804fcb3be53a76d01c238"
 		},
 		{
 			"ImportPath": "github.com/ugorji/go/codec",
