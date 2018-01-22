@@ -51,7 +51,10 @@ go_library(
 
 go_test(
     name = "go_default_test",
-    srcs = ["admission_test.go"],
+    srcs = [
+        "admission_test.go",
+        "config_test.go",
+    ],
     embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/plugin/pkg/admission/resourcequota",
     deps = [
