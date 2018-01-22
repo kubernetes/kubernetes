@@ -67,7 +67,7 @@ var AllOrderedPlugins = []string{
 	lifecycle.PluginName,                  // NamespaceLifecycle
 	exists.PluginName,                     // NamespaceExists
 	scdeny.PluginName,                     // SecurityContextDeny
-	antiaffinity.PluginName,               // LimitPodHardAntiAffinity
+	antiaffinity.PluginName,               // LimitPodHardAntiAffinityTopology
 	initialresources.PluginName,           // InitialResources
 	podpreset.PluginName,                  // PodPreset
 	limitranger.PluginName,                // LimitRanger

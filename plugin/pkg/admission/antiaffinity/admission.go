@@ -26,7 +26,7 @@ import (
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 )
 
-const PluginName = "LimitPodHardAntiAffinity"
+const PluginName = "LimitPodHardAntiAffinityTopology"
 
 // Register registers a plugin
 func Register(plugins *admission.Plugins) {
