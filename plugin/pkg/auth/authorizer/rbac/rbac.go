@@ -62,7 +62,7 @@ type authorizingVisitor struct {
 func (v *authorizingVisitor) visit(source fmt.Stringer, rule *rbac.PolicyRule, err error) bool {
 	if rule != nil && RuleAllows(v.requestAttributes, rule) {
 		v.allowed = true
-		v.reason = fmt.Sprintf("allowed by %s", source.String())
+		v.reason = fmt.Sprintf("RBAC: allowed by %s", source.String())
 		return false
 	}
 	if err != nil {
@@ -120,7 +120,7 @@ func (r *RBACAuthorizer) Authorize(requestAttributes authorizer.Attributes) (aut
 
 	reason := ""
 	if len(ruleCheckingVisitor.errors) > 0 {
-		reason = fmt.Sprintf("%v", utilerrors.NewAggregate(ruleCheckingVisitor.errors))
+		reason = fmt.Sprintf("RBAC: %v", utilerrors.NewAggregate(ruleCheckingVisitor.errors))
 	}
 	return authorizer.DecisionNoOpinion, reason, nil
 }

@@ -23,9 +23,21 @@ import (
 	"github.com/golang/glog"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 	"k8s.io/apiserver/pkg/endpoints/request"
+)
+
+const (
+	// Annotation key names set in advanced audit
+	decisionAnnotationKey = "authorization.k8s.io/decision"
+	reasonAnnotationKey   = "authorization.k8s.io/reason"
+
+	// Annotation values set in advanced audit
+	decisionAllow  = "allow"
+	decisionForbid = "forbid"
+	reasonError    = "internal error"
 )
 
 // WithAuthorizationCheck passes all authorized requests on to handler, and returns a forbidden error otherwise.
@@ -40,6 +52,7 @@ func WithAuthorization(handler http.Handler, requestContextMapper request.Reques
 			responsewriters.InternalError(w, req, errors.New("no context found for request"))
 			return
 		}
+		ae := request.AuditEventFrom(ctx)
 
 		attributes, err := GetAuthorizerAttributes(ctx)
 		if err != nil {
@@ -49,15 +62,20 @@ func WithAuthorization(handler http.Handler, requestContextMapper request.Reques
 		authorized, reason, err := a.Authorize(attributes)
 		// an authorizer like RBAC could encounter evaluation errors and still allow the request, so authorizer decision is checked before error here.
 		if authorized == authorizer.DecisionAllow {
+			audit.LogAnnotation(ae, decisionAnnotationKey, decisionAllow)
+			audit.LogAnnotation(ae, reasonAnnotationKey, reason)
 			handler.ServeHTTP(w, req)
 			return
 		}
 		if err != nil {
+			audit.LogAnnotation(ae, reasonAnnotationKey, reasonError)
 			responsewriters.InternalError(w, req, err)
 			return
 		}
 
 		glog.V(4).Infof("Forbidden: %#v, Reason: %q", req.RequestURI, reason)
+		audit.LogAnnotation(ae, decisionAnnotationKey, decisionForbid)
+		audit.LogAnnotation(ae, reasonAnnotationKey, reason)
 		responsewriters.Forbidden(ctx, attributes, w, req, reason, s)
 	})
 }
