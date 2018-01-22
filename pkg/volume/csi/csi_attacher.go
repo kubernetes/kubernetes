@@ -26,7 +26,7 @@ import (
 	"github.com/golang/glog"
 
 	"k8s.io/api/core/v1"
-	storage "k8s.io/api/storage/v1alpha1"
+	storage "k8s.io/api/storage/v1beta1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -73,7 +73,7 @@ func (c *csiAttacher) Attach(spec *volume.Spec, nodeName types.NodeName) (string
 		Status: storage.VolumeAttachmentStatus{Attached: false},
 	}
 
-	_, err = c.k8s.StorageV1alpha1().VolumeAttachments().Create(attachment)
+	_, err = c.k8s.StorageV1beta1().VolumeAttachments().Create(attachment)
 	alreadyExist := false
 	if err != nil {
 		if !apierrs.IsAlreadyExists(err) {
@@ -128,7 +128,7 @@ func (c *csiAttacher) waitForVolumeAttachment(volumeHandle, attachID string, tim
 		select {
 		case <-ticker.C:
 			glog.V(4).Info(log("probing VolumeAttachment [id=%v]", attachID))
-			attach, err := c.k8s.StorageV1alpha1().VolumeAttachments().Get(attachID, meta.GetOptions{})
+			attach, err := c.k8s.StorageV1beta1().VolumeAttachments().Get(attachID, meta.GetOptions{})
 			if err != nil {
 				glog.Error(log("attacher.WaitForAttach failed (will continue to try): %v", err))
 				continue
@@ -173,7 +173,7 @@ func (c *csiAttacher) VolumesAreAttached(specs []*volume.Spec, nodeName types.No
 
 		attachID := getAttachmentName(source.VolumeHandle, source.Driver, string(nodeName))
 		glog.V(4).Info(log("probing attachment status for VolumeAttachment %v", attachID))
-		attach, err := c.k8s.StorageV1alpha1().VolumeAttachments().Get(attachID, meta.GetOptions{})
+		attach, err := c.k8s.StorageV1beta1().VolumeAttachments().Get(attachID, meta.GetOptions{})
 		if err != nil {
 			glog.Error(log("attacher.VolumesAreAttached failed for attach.ID=%v: %v", attachID, err))
 			continue
@@ -212,7 +212,7 @@ func (c *csiAttacher) Detach(volumeName string, nodeName types.NodeName) error {
 	driverName := parts[0]
 	volID := parts[1]
 	attachID := getAttachmentName(volID, driverName, string(nodeName))
-	if err := c.k8s.StorageV1alpha1().VolumeAttachments().Delete(attachID, nil); err != nil {
+	if err := c.k8s.StorageV1beta1().VolumeAttachments().Delete(attachID, nil); err != nil {
 		glog.Error(log("detacher.Detach failed to delete VolumeAttachment [%s]: %v", attachID, err))
 		return err
 	}
@@ -236,7 +236,7 @@ func (c *csiAttacher) waitForVolumeDetachment(volumeHandle, attachID string) err
 		select {
 		case <-ticker.C:
 			glog.V(4).Info(log("probing VolumeAttachment [id=%v]", attachID))
-			attach, err := c.k8s.StorageV1alpha1().VolumeAttachments().Get(attachID, meta.GetOptions{})
+			attach, err := c.k8s.StorageV1beta1().VolumeAttachments().Get(attachID, meta.GetOptions{})
 			if err != nil {
 				if apierrs.IsNotFound(err) {
 					//object deleted or never existed, done
