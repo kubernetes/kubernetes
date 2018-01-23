@@ -1395,6 +1395,14 @@ func (c *PodAffinityChecker) satisfiesPodsAffinityAntiAffinity(pod *v1.Pod, node
 
 // PodToleratesNodeTaints checks if a pod tolerations can tolerate the node taints
 func PodToleratesNodeTaints(pod *v1.Pod, meta algorithm.PredicateMetadata, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
+	if nodeInfo == nil || nodeInfo.Node() == nil {
+		return false, []algorithm.PredicateFailureReason{ErrNodeUnknownCondition}, nil
+	}
+
+	if nodeInfo.Node().Spec.Unschedulable {
+		return false, []algorithm.PredicateFailureReason{ErrNodeUnschedulable}, nil
+	}
+
 	return podToleratesNodeTaints(pod, nodeInfo, func(t *v1.Taint) bool {
 		// PodToleratesNodeTaints is only interested in NoSchedule and NoExecute taints.
 		return t.Effect == v1.TaintEffectNoSchedule || t.Effect == v1.TaintEffectNoExecute
