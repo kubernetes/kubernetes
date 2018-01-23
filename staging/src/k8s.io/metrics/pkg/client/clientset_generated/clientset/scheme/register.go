@@ -51,5 +51,4 @@ func init() {
 func AddToScheme(scheme *runtime.Scheme) {
 	metricsv1alpha1.AddToScheme(scheme)
 	metricsv1beta1.AddToScheme(scheme)
-
 }

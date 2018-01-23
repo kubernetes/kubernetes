@@ -51,5 +51,4 @@ func init() {
 func AddToScheme(scheme *runtime.Scheme) {
 	examplev1.AddToScheme(scheme)
 	secondexamplev1.AddToScheme(scheme)
-
 }

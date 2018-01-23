@@ -45,5 +45,4 @@ func init() {
 func Install(groupFactoryRegistry announced.APIGroupFactoryRegistry, registry *registered.APIRegistrationManager, scheme *runtime.Scheme) {
 	example.Install(groupFactoryRegistry, registry, scheme)
 	secondexample.Install(groupFactoryRegistry, registry, scheme)
-
 }

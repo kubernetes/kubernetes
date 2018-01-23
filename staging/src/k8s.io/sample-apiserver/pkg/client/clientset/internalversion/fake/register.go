@@ -49,5 +49,4 @@ func init() {
 // correctly.
 func AddToScheme(scheme *runtime.Scheme) {
 	wardleinternalversion.AddToScheme(scheme)
-
 }
