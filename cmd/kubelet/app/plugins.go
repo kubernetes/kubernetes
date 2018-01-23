@@ -118,7 +118,7 @@ func ProbeNetworkPlugins(cniConfDir, cniBinDir string) []network.NetworkPlugin {
 	allPlugins := []network.NetworkPlugin{}
 
 	// for each existing plugin, add to the list
-	allPlugins = append(allPlugins, cni.ProbeNetworkPlugins(cniConfDir, cniBinDir)...)
+	allPlugins = append(allPlugins, cni.ProbeNetworkPlugins(cniConfDir, []string{cniBinDir})...)
 	allPlugins = append(allPlugins, kubenet.NewPlugin(cniBinDir))
 
 	return allPlugins

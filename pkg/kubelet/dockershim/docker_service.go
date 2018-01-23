@@ -229,7 +229,7 @@ func NewDockerService(config *ClientConfig, podSandboxImage string, streamingCon
 		}
 	}
 	// dockershim currently only supports CNI plugins.
-	cniPlugins := cni.ProbeNetworkPlugins(pluginSettings.PluginConfDir, pluginSettings.PluginBinDir)
+	cniPlugins := cni.ProbeNetworkPlugins(pluginSettings.PluginConfDir, []string{pluginSettings.PluginBinDir})
 	cniPlugins = append(cniPlugins, kubenet.NewPlugin(pluginSettings.PluginBinDir))
 	netHost := &dockerNetworkHost{
 		pluginSettings.LegacyRuntimeHost,
