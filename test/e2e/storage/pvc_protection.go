@@ -76,7 +76,7 @@ var _ = utils.SIGDescribe("PVC Protection [Feature:PVCProtection]", func() {
 		By("Deleting the PVC")
 		err = client.CoreV1().PersistentVolumeClaims(pvc.Namespace).Delete(pvc.Name, metav1.NewDeleteOptions(0))
 		Expect(err).NotTo(HaveOccurred(), "Error deleting PVC")
-		framework.WaitForPersistentVolumeClaimBeRemoved(client, pvc.Namespace, pvc.Name, framework.Poll, framework.ClaimProvisionTimeout)
+		framework.WaitForPersistentVolumeClaimDeleted(client, pvc.Namespace, pvc.Name, framework.Poll, framework.ClaimProvisionTimeout)
 		pvcCreatedAndNotDeleted = false
 	})
 
@@ -100,7 +100,44 @@ var _ = utils.SIGDescribe("PVC Protection [Feature:PVCProtection]", func() {
 		Expect(err).NotTo(HaveOccurred(), "Error terminating and deleting pod")
 
 		By("Checking that the PVC is automatically removed from the system because it's no longer in active use by a pod")
-		framework.WaitForPersistentVolumeClaimBeRemoved(client, pvc.Namespace, pvc.Name, framework.Poll, framework.ClaimProvisionTimeout)
+		framework.WaitForPersistentVolumeClaimDeleted(client, pvc.Namespace, pvc.Name, framework.Poll, framework.ClaimProvisionTimeout)
+		pvcCreatedAndNotDeleted = false
+	})
+
+	It("Verify that scheduling of a pod that uses PVC that is being deleted fails and the pod becomes Unschedulable", func() {
+		By("Creating first Pod that becomes Running and therefore is actively using the PVC")
+		pvcClaims := []*v1.PersistentVolumeClaim{pvc}
+		firstPod, err := framework.CreatePod(client, nameSpace, nil, pvcClaims, false, "")
+		Expect(err).NotTo(HaveOccurred(), "While creating pod that uses the PVC or waiting for the Pod to become Running")
+
+		By("Deleting the PVC, however, the PVC must not be removed from the system as it's in active use by a pod")
+		err = client.CoreV1().PersistentVolumeClaims(pvc.Namespace).Delete(pvc.Name, metav1.NewDeleteOptions(0))
+		Expect(err).NotTo(HaveOccurred(), "Error deleting PVC")
+
+		By("Checking that the PVC status is Terminating")
+		pvc, err = client.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(pvc.Name, metav1.GetOptions{})
+		Expect(err).NotTo(HaveOccurred(), "While checking PVC status")
+		Expect(pvc.ObjectMeta.DeletionTimestamp).NotTo(Equal(nil))
+
+		By("Creating second Pod whose scheduling fails because it uses a PVC that is being deleted")
+		secondPod, err2 := framework.CreateUnschedulablePod(client, nameSpace, nil, pvcClaims, false, "")
+		Expect(err2).NotTo(HaveOccurred(), "While creating second pod that uses a PVC that is being deleted and that is Unschedulable")
+
+		By("Deleting the second pod that uses the PVC that is being deleted")
+		err = framework.DeletePodWithWait(f, client, secondPod)
+		Expect(err).NotTo(HaveOccurred(), "Error terminating and deleting pod")
+
+		By("Checking again that the PVC status is Terminating")
+		pvc, err = client.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(pvc.Name, metav1.GetOptions{})
+		Expect(err).NotTo(HaveOccurred(), "While checking PVC status")
+		Expect(pvc.ObjectMeta.DeletionTimestamp).NotTo(Equal(nil))
+
+		By("Deleting the first pod that uses the PVC")
+		err = framework.DeletePodWithWait(f, client, firstPod)
+		Expect(err).NotTo(HaveOccurred(), "Error terminating and deleting pod")
+
+		By("Checking that the PVC is automatically removed from the system because it's no longer in active use by a pod")
+		framework.WaitForPersistentVolumeClaimDeleted(client, pvc.Namespace, pvc.Name, framework.Poll, framework.ClaimProvisionTimeout)
 		pvcCreatedAndNotDeleted = false
 	})
 })
