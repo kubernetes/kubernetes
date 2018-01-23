@@ -123,7 +123,7 @@ func (cm *ClientManager) HookClient(h *v1beta1.Webhook) (*rest.RESTClient, error
 
 	if svc := h.ClientConfig.Service; svc != nil {
 		serverName := svc.Name + "." + svc.Namespace + ".svc"
-		restConfig, err := cm.authInfoResolver.ClientConfigFor(serverName)
+		restConfig, err := cm.authInfoResolver.ClientConfigFor(serverName, false)
 		if err != nil {
 			return nil, err
 		}
@@ -162,7 +162,7 @@ func (cm *ClientManager) HookClient(h *v1beta1.Webhook) (*rest.RESTClient, error
 		return nil, &webhookerrors.ErrCallingWebhook{WebhookName: h.Name, Reason: fmt.Errorf("Unparsable URL: %v", err)}
 	}
 
-	restConfig, err := cm.authInfoResolver.ClientConfigFor(u.Host)
+	restConfig, err := cm.authInfoResolver.ClientConfigFor(u.Host, true)
 	if err != nil {
 		return nil, err
 	}
