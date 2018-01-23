@@ -79,7 +79,7 @@ func NewAdmissionOptions() *AdmissionOptions {
 		// after all the mutating ones, so their relative order in this list
 		// doesn't matter.
 		RecommendedPluginOrder: []string{lifecycle.PluginName, initialization.PluginName, mutatingwebhook.PluginName, validatingwebhook.PluginName},
-		DefaultOffPlugins:      sets.NewString(initialization.PluginName, mutatingwebhook.PluginName, validatingwebhook.PluginName),
+		DefaultOffPlugins:      sets.NewString(initialization.PluginName),
 	}
 	server.RegisterAllAdmissionPlugins(options.Plugins)
 	return options
