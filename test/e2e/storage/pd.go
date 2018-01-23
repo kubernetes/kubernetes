@@ -390,8 +390,8 @@ var _ = utils.SIGDescribe("Pod Disks", func() {
 					Expect(true, strings.Contains(string(output), string(host0Name)))
 
 					By("deleting host0")
-					resp, err := gceCloud.DeleteInstance(framework.TestContext.CloudConfig.ProjectID, framework.TestContext.CloudConfig.Zone, string(host0Name))
-					framework.ExpectNoError(err, fmt.Sprintf("Failed to delete host0Pod: err=%v response=%#v", err, resp))
+					err = gceCloud.DeleteInstance(framework.TestContext.CloudConfig.ProjectID, framework.TestContext.CloudConfig.Zone, string(host0Name))
+					framework.ExpectNoError(err, fmt.Sprintf("Failed to delete host0Pod: err=%v", err))
 					By("expecting host0 node to be re-created")
 					numNodes := countReadyNodes(cs, host0Name)
 					Expect(numNodes).To(Equal(origNodeCnt), fmt.Sprintf("Requires current node count (%d) to return to original node count (%d)", numNodes, origNodeCnt))
