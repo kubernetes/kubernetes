@@ -589,7 +589,7 @@ function kube::build::run_build_command_ex() {
     --env "GOGCFLAGS=${GOGCFLAGS:-}"
   )
 
-  if [ ! -z "${DOCKER_CGROUP_PARENT:-}" ]; then
+  if [[ -n "${DOCKER_CGROUP_PARENT:-}" ]]; then
     kube::log::status "Using ${DOCKER_CGROUP_PARENT} as container cgroup parent"
     docker_run_opts+=(--cgroup-parent "${DOCKER_CGROUP_PARENT}")
   fi
