@@ -341,8 +341,8 @@ func processRetryResponse(resp autorest.Response, err error) (bool, error) {
 		// suppress the error object so that backoff process continues
 		return false, nil
 	}
-	// Fall-through: stop periodic backoff, return error object from most recent request
-	return true, err
+	// Fall-through: stop periodic backoff
+	return true, nil
 }
 
 // shouldRetryAPIRequest determines if the response from an HTTP request suggests periodic retry behavior
