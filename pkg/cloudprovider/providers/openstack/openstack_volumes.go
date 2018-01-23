@@ -222,6 +222,7 @@ func (volumes *VolumesV3) getVolume(volumeID string) (Volume, error) {
 		ID:     volumeV3.ID,
 		Name:   volumeV3.Name,
 		Status: volumeV3.Status,
+		Size:   volumeV3.Size,
 	}
 
 	if len(volumeV3.Attachments) > 0 {
