@@ -556,8 +556,23 @@ def push_service_data(kube_api):
     kube_api.configure(port=6443)
 
 
-@when('certificates.available')
-def send_data(tls):
+def get_ingress_address(relation):
+    try:
+        network_info = hookenv.network_get(relation.relation_name)
+    except NotImplementedError:
+        network_info = []
+
+    if network_info and 'ingress-addresses' in network_info:
+        # just grab the first one for now, maybe be more robust here?
+        return network_info['ingress-addresses'][0]
+    else:
+        # if they don't have ingress-addresses they are running a juju that
+        # doesn't support spaces, so just return the private address
+        return hookenv.unit_get('private-address')
+
+
+@when('certificates.available', 'kube-api-endpoint.available')
+def send_data(tls, kube_api_endpoint):
     '''Send the data that is required to create a server certificate for
     this server.'''
     # Use the public ip of this unit as the Common Name for the certificate.
@@ -566,11 +581,14 @@ def send_data(tls):
     # Get the SDN gateway based on the cidr address.
     kubernetes_service_ip = get_kubernetes_service_ip()
 
+    # Get ingress address
+    ingress_ip = get_ingress_address(kube_api_endpoint)
+
     domain = hookenv.config('dns_domain')
     # Create SANs that the tls layer will add to the server cert.
     sans = [
         hookenv.unit_public_ip(),
-        hookenv.unit_private_ip(),
+        ingress_ip,
         socket.gethostname(),
         kubernetes_service_ip,
         'kubernetes',
@@ -1100,6 +1118,8 @@ def configure_apiserver(etcd_connection_string, leader_etcd_version):
     api_opts['basic-auth-file'] = '/root/cdk/basic_auth.csv'
     api_opts['token-auth-file'] = '/root/cdk/known_tokens.csv'
     api_opts['service-account-key-file'] = '/root/cdk/serviceaccount.key'
+    api_opts['kubelet-preferred-address-types'] = \
+        '[InternalIP,Hostname,InternalDNS,ExternalDNS,ExternalIP]'
 
     etcd_dir = '/root/cdk/etcd'
     etcd_ca = os.path.join(etcd_dir, 'client-ca.pem')
