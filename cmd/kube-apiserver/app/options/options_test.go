@@ -27,7 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/diff"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
-	utilconfig "k8s.io/apiserver/pkg/util/flag"
+	utilflag "k8s.io/apiserver/pkg/util/flag"
 	auditwebhook "k8s.io/apiserver/plugin/pkg/audit/webhook"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -235,8 +235,8 @@ func TestAddFlags(t *testing.T) {
 			StorageVersions:        legacyscheme.Registry.AllPreferredGroupVersions(),
 			DefaultStorageVersions: legacyscheme.Registry.AllPreferredGroupVersions(),
 		},
-		APIEnablement: &kubeoptions.APIEnablementOptions{
-			RuntimeConfig: utilconfig.ConfigurationMap{},
+		APIEnablement: &apiserveroptions.APIEnablementOptions{
+			RuntimeConfig: utilflag.ConfigurationMap{},
 		},
 		EnableLogsHandler:       false,
 		EnableAggregatorRouting: true,

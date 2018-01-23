@@ -61,6 +61,14 @@ func createAggregatorConfig(kubeAPIServerConfig genericapiserver.Config, command
 	etcdOptions.StorageConfig.Codec = aggregatorapiserver.Codecs.LegacyCodec(v1beta1.SchemeGroupVersion)
 	genericConfig.RESTOptionsGetter = &genericoptions.SimpleRestOptionsFactory{Options: etcdOptions}
 
+	// override MergedResourceConfig with aggregator defaults and registry
+	if err := commandOptions.APIEnablement.ApplyTo(
+		&genericConfig,
+		aggregatorapiserver.DefaultAPIResourceConfigSource(),
+		aggregatorapiserver.Registry); err != nil {
+		return nil, err
+	}
+
 	var err error
 	var certBytes, keyBytes []byte
 	if len(commandOptions.ProxyClientCertFile) > 0 && len(commandOptions.ProxyClientKeyFile) > 0 {
