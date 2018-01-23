@@ -238,7 +238,7 @@ type equivalencePod struct {
 
 // getEquivalencePod returns the equivalencePod for a Pod.
 func getEquivalencePod(pod *v1.Pod) *equivalencePod {
-	return &equivalencePod{
+	ep := &equivalencePod{
 		Namespace:      &pod.Namespace,
 		Labels:         pod.Labels,
 		Affinity:       pod.Spec.Affinity,
@@ -249,4 +249,26 @@ func getEquivalencePod(pod *v1.Pod) *equivalencePod {
 		Tolerations:    pod.Spec.Tolerations,
 		Volumes:        pod.Spec.Volumes,
 	}
+	// DeepHashObject considers nil and empy slices to be different. Normalize them.
+	if len(ep.Containers) == 0 {
+		ep.Containers = nil
+	}
+	if len(ep.InitContainers) == 0 {
+		ep.InitContainers = nil
+	}
+	if len(ep.Tolerations) == 0 {
+		ep.Tolerations = nil
+	}
+	if len(ep.Volumes) == 0 {
+		ep.Volumes = nil
+	}
+	// Normalize empty maps also.
+	if len(ep.Labels) == 0 {
+		ep.Labels = nil
+	}
+	if len(ep.NodeSelector) == 0 {
+		ep.NodeSelector = nil
+	}
+	// TODO: Also normalize nested maps and slices.
+	return ep
 }
