@@ -49,6 +49,8 @@ import (
 
 var serverAggregatorVersion = utilversion.MustParseSemantic("v1.7.0")
 
+const wardleAPIServiceName = "v1alpha1.wardle.k8s.io"
+
 var _ = SIGDescribe("Aggregator", func() {
 	var ns string
 	var c clientset.Interface
@@ -85,7 +87,7 @@ var _ = SIGDescribe("Aggregator", func() {
 
 func cleanTest(client clientset.Interface, aggrclient *aggregatorclient.Clientset, namespace string) {
 	// delete the APIService first to avoid causing discovery errors
-	_ = aggrclient.ApiregistrationV1beta1().APIServices().Delete("v1alpha1.wardle.k8s.io", nil)
+	_ = aggrclient.ApiregistrationV1beta1().APIServices().Delete(wardleAPIServiceName, nil)
 
 	_ = client.ExtensionsV1beta1().Deployments(namespace).Delete("sample-apiserver", nil)
 	_ = client.CoreV1().Secrets(namespace).Delete("sample-apiserver-secret", nil)
@@ -293,7 +295,7 @@ func TestSampleAPIServer(f *framework.Framework, image string) {
 
 	// kubectl create -f apiservice.yaml
 	_, err = aggrclient.ApiregistrationV1beta1().APIServices().Create(&apiregistrationv1beta1.APIService{
-		ObjectMeta: metav1.ObjectMeta{Name: "v1alpha1.wardle.k8s.io"},
+		ObjectMeta: metav1.ObjectMeta{Name: wardleAPIServiceName},
 		Spec: apiregistrationv1beta1.APIServiceSpec{
 			Service: &apiregistrationv1beta1.ServiceReference{
 				Namespace: namespace,
@@ -306,7 +308,7 @@ func TestSampleAPIServer(f *framework.Framework, image string) {
 			VersionPriority:      200,
 		},
 	})
-	framework.ExpectNoError(err, "creating apiservice %s with namespace %s", "v1alpha1.wardle.k8s.io", namespace)
+	framework.ExpectNoError(err, "creating apiservice %s with namespace %s", wardleAPIServiceName, namespace)
 
 	// Wait for the extension apiserver to be up and healthy
 	// kubectl get deployments -n <aggregated-api-namespace> && status == Running

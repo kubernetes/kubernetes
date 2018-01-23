@@ -103,6 +103,8 @@ func (m *PathRecorderMux) ListedPaths() []string {
 }
 
 func (m *PathRecorderMux) trackCallers(path string) {
+	glog.Infof("PathRecorderMux register %s", path)
+
 	if existingStack, ok := m.pathStacks[path]; ok {
 		utilruntime.HandleError(fmt.Errorf("registered %q from %v", path, existingStack))
 	}
@@ -151,6 +153,8 @@ func (m *PathRecorderMux) NotFoundHandler(notFoundHandler http.Handler) {
 func (m *PathRecorderMux) Unregister(path string) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
+
+	glog.Infof("PathRecorderMux.Unregister %s", path)
 
 	delete(m.pathToHandler, path)
 	delete(m.prefixToHandler, path)
