@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2018 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,11 +19,12 @@ package files
 import (
 	"fmt"
 	"io/ioutil"
-	utilfs "k8s.io/kubernetes/pkg/util/filesystem"
 	"os"
 	"path/filepath"
 	"reflect"
 	"testing"
+
+	utilfs "k8s.io/kubernetes/pkg/util/filesystem"
 )
 
 func TestFileExists(t *testing.T) {
@@ -50,7 +51,7 @@ func TestFileExists(t *testing.T) {
 			create:       true,
 			isFile:       false,
 			expectedBool: false,
-			expectedErr:  fmt.Errorf(""), // should have error, but the error info can only be fulfilled after creating the dir
+			expectedErr:  fmt.Errorf("expected regular file at %q, but mode is %q", prePath + "/ExistsAsDir", "drwxr-xr-x"), // should have error, but the error info can only be fulfilled after creating the dir
 		},
 		"exists as file": {
 			path:         prePath + "/ExistsAsFile",
@@ -62,29 +63,15 @@ func TestFileExists(t *testing.T) {
 	}
 
 	for tesetcaseName, testcase := range testcases {
-		var result bool
-		var err error
 		t.Run(tesetcaseName, func(t *testing.T) {
 			if testcase.create {
-				if testcase.isFile {
-					// create as file
-					if err = createFile(fs, testcase.path); err != nil {
-						t.Fatalf("unexpected error in creating file %s, err: %v", testcase.path, err)
-					}
-				} else {
-					// create as dir
-					if err = createDir(fs, testcase.path); err != nil {
-						t.Fatalf("unexpected error in creating dir %s, err: %v", testcase.path, err)
-					}
+				if err := createFileOrDir(testcase.isFile, fs, testcase.path); err != nil {
+					t.Fatalf("unexpected error in creating %s, error: %v", testcase.path, err)
 				}
 			}
 
-			// not nil indicates that we should specify the error
-			if testcase.expectedErr != nil {
-				testcase.expectedErr = fmt.Errorf("expected regular file at %q, but mode is %q", testcase.path, getFileMode(fs, testcase.path))
-			}
-
-			if result, err = FileExists(fs, testcase.path); !reflect.DeepEqual(testcase.expectedErr, err) {
+			result, err := FileExists(fs, testcase.path)
+			if !reflect.DeepEqual(testcase.expectedErr, err) {
 				t.Errorf("unexpected error in checking file exists, expected: %v, actual: %v", testcase.expectedErr, err)
 			}
 			if testcase.expectedBool != result {
@@ -118,16 +105,15 @@ func TestEnsureFile(t *testing.T) {
 	}
 
 	for testcaseName, testcase := range testcases {
-		var err error
 		t.Run(testcaseName, func(t *testing.T) {
 			if testcase.create {
 				// should create the file before running the test
-				if err = createFile(fs, testcase.path); err != nil {
+				if err := createFile(fs, testcase.path); err != nil {
 					t.Fatalf("unexpeted error: %v", err)
 				}
 			}
 
-			if err = EnsureFile(fs, testcase.path); err != nil {
+			if err := EnsureFile(fs, testcase.path); err != nil {
 				t.Fatalf("unexpeted error in ensuring file: %v", err)
 			}
 			// verify if the file has been created
@@ -149,12 +135,8 @@ func TestWriteTmpFile(t *testing.T) {
 	fileContent := "a test case of WriteTmpFile"
 	defer cleanup(t, fs, prePath)
 
-	if err := createDir(fs, prePath); err != nil {
-		t.Fatalf("error in creating dir %q, error: %v", prePath, err)
-	}
 	// write content into file
 	filePath, err := WriteTmpFile(fs, filePath, []byte(fileContent))
-
 	if err != nil {
 		t.Errorf("unexpected error in WriteTmpFile: %v", err)
 	} else {
@@ -176,15 +158,12 @@ func TestReplaceFile(t *testing.T) {
 	fs := utilfs.DefaultFs{}
 	defer cleanup(t, fs, prePath)
 
-	if err := createDir(fs, prePath); err != nil {
-		t.Fatalf("error in creating dir %q, error: %v", prePath, err)
-	}
 	if _, err := WriteTmpFile(fs, filePath, []byte(fileContent)); err != nil {
 		t.Fatalf("error in writing file: %s, error: %v", filePath, err)
 	} else {
 		// replace the file with new content, and verify if new content written
 		fileContent = "new test to replace file"
-		if err = ReplaceFile(fs, filePath, []byte(fileContent)); err != nil {
+		if err := ReplaceFile(fs, filePath, []byte(fileContent)); err != nil {
 			t.Errorf("error in ReplaceFile: %s, error: %v", filePath, err)
 		} else {
 			// read the content out and verify if matches the new one
@@ -223,7 +202,7 @@ func TestDirExists(t *testing.T) {
 			isFile:       true,
 			create:       true,
 			expectedBool: false,
-			expectedErr:  fmt.Errorf(""), // should have error, but the error info can only be fulfilled after creating the file
+			expectedErr:  fmt.Errorf("expected dir at %q, but mode is %q", prePath + "/ExistsAsFile/file", "-rw-r--r--"), // should have error, but the error info can only be fulfilled after creating the file
 		},
 		"exists as dir": {
 			path:         prePath + "/ExistsAsDir",
@@ -235,33 +214,21 @@ func TestDirExists(t *testing.T) {
 	}
 
 	for testcaseName, testcase := range testcases {
-		var err error
 		t.Run(testcaseName, func(t *testing.T) {
 			if testcase.create {
-				if testcase.isFile {
-					err = createFile(fs, testcase.path)
-				} else {
-					err = createDir(fs, testcase.path)
+				if err := createFileOrDir(testcase.isFile, fs, testcase.path); err != nil {
+					t.Fatalf("unexpected error in creating %s, error: %v", testcase.path, err)
 				}
 			}
 
-			// not nil indicates that we should specify the error
-			if testcase.expectedErr != nil {
-				testcase.expectedErr = fmt.Errorf("expected dir at %q, but mode is %q", testcase.path, getFileMode(fs, testcase.path))
-			}
-
-			if err != nil {
-				t.Errorf("unexpected error in creating %q, err: %v", testcase.path, err)
+			if result, err := DirExists(fs, testcase.path); err != nil {
+				// if the path is file, should get error
+				if !reflect.DeepEqual(testcase.expectedErr, err) {
+					t.Errorf("unexpected error in creating dir, expected: %v, actual: %v", testcase.expectedErr, err)
+				}
 			} else {
-				if result, err := DirExists(fs, testcase.path); err != nil {
-					// if the path is file, should get error
-					if !reflect.DeepEqual(testcase.expectedErr, err) {
-						t.Errorf("unexpected error in creating dir, expected: %v, actual: %v", testcase.expectedErr, err)
-					}
-				} else {
-					if testcase.expectedBool != result {
-						t.Errorf("unexpected result, expected: %v, actual: %v", testcase.expectedBool, result)
-					}
+				if testcase.expectedBool != result {
+					t.Errorf("unexpected result, expected: %v, actual: %v", testcase.expectedBool, result)
 				}
 			}
 		})
@@ -284,7 +251,7 @@ func TestEnsureDir(t *testing.T) {
 			path:        prePath + "/ExistsAsFile",
 			isFile:      true,
 			create:      true,
-			expectedErr: fmt.Errorf(""), // should have error, but the error info can only be fulfilled after creating the file
+			expectedErr: fmt.Errorf("expected dir at %q, but mode is %q", prePath + "/ExistsAsFile", "-rw-r--r--"), // should have error, but the error info can only be fulfilled after creating the file
 		},
 		"exists as dir": {
 			path:        prePath + "/NotExists",
@@ -301,42 +268,38 @@ func TestEnsureDir(t *testing.T) {
 	}
 
 	for testcaseName, testcase := range testcases {
-		var err error
 		t.Run(testcaseName, func(t *testing.T) {
 			if testcase.create {
-				if testcase.isFile {
-					err = createFile(fs, testcase.path)
-				} else {
-					err = createDir(fs, testcase.path)
+				if err := createFileOrDir(testcase.isFile, fs, testcase.path); err != nil {
+					t.Fatalf("unexpected error in creating %s, error: %v", testcase.path, err)
 				}
 			}
 
-			// not nil indicates we should specify the error
-			if testcase.expectedErr != nil {
-				testcase.expectedErr = fmt.Errorf("expected dir at %q, but mode is %q", testcase.path, getFileMode(fs, testcase.path))
-			}
-
-			if err != nil {
-				t.Errorf("unexpected error in creating dir: %s, error: %v", testcase.path, err)
+			// ensure dir exists
+			if err := EnsureDir(fs, testcase.path); err != nil {
+				// if the path is file, should get error
+				if !reflect.DeepEqual(testcase.expectedErr, err) {
+					t.Errorf("unexpected error in creating dir, expected: %v, actual: %v", testcase.expectedErr, err)
+				}
 			} else {
-				// ensure dir exists
-				if err = EnsureDir(fs, testcase.path); err != nil {
-					// if the path is file, should get error
-					if !reflect.DeepEqual(testcase.expectedErr, err) {
-						t.Errorf("unexpected error in creating dir, expected: %v, actual: %v", testcase.expectedErr, err)
-					}
-				} else {
-					// check if dir created
-					info, err := fs.Stat(testcase.path)
-					if err != nil {
-						t.Errorf("unexpected error in verifying dir: %s, error: %v", testcase.path, err)
-					}
-					if !info.IsDir() {
-						t.Errorf("expected dir in path: %q, but got: %v", testcase.path, info.Mode())
-					}
+				// check if dir created
+				info, err := fs.Stat(testcase.path)
+				if err != nil {
+					t.Errorf("unexpected error in verifying dir: %s, error: %v", testcase.path, err)
+				}
+				if !info.IsDir() {
+					t.Errorf("expected dir in path: %q, but got: %v", testcase.path, info.Mode())
 				}
 			}
 		})
+	}
+}
+
+func createFileOrDir(isFile bool, fs utilfs.Filesystem, path string) error {
+	if isFile {
+		return createFile(fs, path)
+	} else {
+		return createDir(fs, path)
 	}
 }
 
@@ -346,13 +309,6 @@ func getTempDir(t *testing.T, subPath string) string {
 		t.Fatalf("error in getting temp dir via ioutil, error: %v", err)
 	}
 	return dir
-}
-
-func getFileMode(fs utilfs.Filesystem, path string) string {
-	if info, err := fs.Stat(path); err == nil {
-		return info.Mode().String()
-	}
-	return ""
 }
 
 func createFile(fs utilfs.Filesystem, path string) error {
@@ -369,7 +325,7 @@ func createFile(fs utilfs.Filesystem, path string) error {
 }
 
 func createDir(fs utilfs.Filesystem, path string) error {
-	if err := fs.MkdirAll(path, 0755); err != nil && !os.IsExist(err) {
+	if err := fs.MkdirAll(path, defaultPerm); err != nil && !os.IsExist(err) {
 		return err
 	}
 
