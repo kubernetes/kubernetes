@@ -218,13 +218,13 @@ func TestDirExists(t *testing.T) {
 			expectedBool: false,
 			expectedErr:  nil,
 		},
-		//"exists as file": {
-		//	path:         prePath + "/ExistsAsFile/file",
-		//	isFile:       true,
-		//	create:       true,
-		//	expectedBool: false,
-		//	expectedErr:  fmt.Errorf(""), // should have error, but the error info can only be fulfilled after creating the file
-		//},
+		"exists as file": {
+			path:         prePath + "/ExistsAsFile/file",
+			isFile:       true,
+			create:       true,
+			expectedBool: false,
+			expectedErr:  fmt.Errorf(""), // should have error, but the error info can only be fulfilled after creating the file
+		},
 		"exists as dir": {
 			path:         prePath + "/ExistsAsDir",
 			isFile:       false,
@@ -292,12 +292,12 @@ func TestEnsureDir(t *testing.T) {
 			create:      true,
 			expectedErr: nil,
 		},
-		//"not exists in sub dir": {
-		//	path:        prePath + "/SubDir1/SubDir2/Exists",
-		//	isFile:      false,
-		//	create:      false,
-		//	expectedErr: nil,
-		//},
+		"not exists in sub dir": {
+			path:        prePath + "/SubDir1/SubDir2/Exists",
+			isFile:      false,
+			create:      false,
+			expectedErr: nil,
+		},
 	}
 
 	for testcaseName, testcase := range testcases {
@@ -369,7 +369,7 @@ func createFile(fs utilfs.Filesystem, path string) error {
 }
 
 func createDir(fs utilfs.Filesystem, path string) error {
-	if err := fs.MkdirAll(path, defaultPerm); err != nil && !os.IsExist(err) {
+	if err := fs.MkdirAll(path, 0755); err != nil && !os.IsExist(err) {
 		return err
 	}
 
