@@ -17,12 +17,17 @@ limitations under the License.
 package upgrades
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"path/filepath"
+	"reflect"
 
+	"github.com/davecgh/go-spew/spew"
 	. "github.com/onsi/ginkgo"
 
+	compute "google.golang.org/api/compute/v1"
+	extensions "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
@@ -30,16 +35,34 @@ import (
 // IngressUpgradeTest adapts the Ingress e2e for upgrade testing
 type IngressUpgradeTest struct {
 	gceController *framework.GCEIngressController
+	// holds GCP resources pre-upgrade
+	resourceStore *GCPResourceStore
 	jig           *framework.IngressTestJig
 	httpClient    *http.Client
 	ip            string
 	ipName        string
 }
 
+// GCPResourceStore keeps track of the GCP resources spun up by an ingress.
+// Note: Fields are exported so that we can utilize reflection.
+type GCPResourceStore struct {
+	Fw      *compute.Firewall
+	FwdList []*compute.ForwardingRule
+	UmList  []*compute.UrlMap
+	TpList  []*compute.TargetHttpProxy
+	TpsList []*compute.TargetHttpsProxy
+	SslList []*compute.SslCertificate
+	BeList  []*compute.BackendService
+	Ip      *compute.Address
+	IgList  []*compute.InstanceGroup
+}
+
 func (IngressUpgradeTest) Name() string { return "ingress-upgrade" }
 
 // Setup creates a GLBC, allocates an ip, and an ingress resource,
 // then waits for a successful connectivity check to the ip.
+// Also keeps track of all load balancer resources for cross-checking
+// during an IngressUpgrade.
 func (t *IngressUpgradeTest) Setup(f *framework.Framework) {
 	framework.SkipUnlessProviderIs("gce", "gke")
 
@@ -66,13 +89,18 @@ func (t *IngressUpgradeTest) Setup(f *framework.Framework) {
 
 	// Create a working basic Ingress
 	By(fmt.Sprintf("allocated static ip %v: %v through the GCE cloud provider", t.ipName, t.ip))
-	jig.CreateIngress(filepath.Join(framework.IngressManifestPath, "static-ip"), ns.Name, map[string]string{
+	jig.CreateIngress(filepath.Join(framework.IngressManifestPath, "static-ip-2"), ns.Name, map[string]string{
 		"kubernetes.io/ingress.global-static-ip-name": t.ipName,
 		"kubernetes.io/ingress.allow-http":            "false",
 	}, map[string]string{})
+	jig.AddHTTPS("tls-secret", "ingress.test.com")
 
 	By("waiting for Ingress to come up with ip: " + t.ip)
 	framework.ExpectNoError(framework.PollURL(fmt.Sprintf("https://%v/", t.ip), "", framework.LoadBalancerPollTimeout, jig.PollInterval, t.httpClient, false))
+
+	By("keeping track of GCP resources created by Ingress")
+	t.resourceStore = &GCPResourceStore{}
+	t.populateGCPResourceStore(t.resourceStore)
 }
 
 // Test waits for the upgrade to complete, and then verifies
@@ -84,6 +112,8 @@ func (t *IngressUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, 
 		// Ingress. Restarting the ingress controller and deleting ingresses
 		// while it's down will leak cloud resources, because the ingress
 		// controller doesn't checkpoint to disk.
+		t.verify(f, done, true)
+	case IngressUpgrade:
 		t.verify(f, done, true)
 	default:
 		// Currently ingress gets disrupted across node upgrade, because endpoints
@@ -99,6 +129,7 @@ func (t *IngressUpgradeTest) Teardown(f *framework.Framework) {
 	if CurrentGinkgoTestDescription().Failed {
 		framework.DescribeIng(t.gceController.Ns)
 	}
+
 	if t.jig.Ingress != nil {
 		By("Deleting ingress")
 		t.jig.TryDeleteIngress()
@@ -122,4 +153,80 @@ func (t *IngressUpgradeTest) verify(f *framework.Framework, done <-chan struct{}
 	}
 	By("hitting the Ingress IP " + t.ip)
 	framework.ExpectNoError(framework.PollURL(fmt.Sprintf("https://%v/", t.ip), "", framework.LoadBalancerPollTimeout, t.jig.PollInterval, t.httpClient, false))
+
+	// We want to manually trigger a sync because then we can easily verify
+	// a correct sync completed after update.
+	By("updating ingress spec to manually trigger a sync")
+	t.jig.Update(func(ing *extensions.Ingress) {
+		ing.Spec.TLS[0].Hosts = append(ing.Spec.TLS[0].Hosts, "ingress.test.com")
+		ing.Spec.Rules = append(
+			ing.Spec.Rules,
+			extensions.IngressRule{
+				Host: "ingress.test.com",
+				IngressRuleValue: extensions.IngressRuleValue{
+					HTTP: &extensions.HTTPIngressRuleValue{
+						Paths: []extensions.HTTPIngressPath{
+							{
+								Path: "/test",
+								// Note: Dependant on using "static-ip-2" manifest.
+								Backend: *(ing.Spec.Backend),
+							},
+						},
+					},
+				},
+			})
+	})
+	// WaitForIngress() tests that all paths are pinged, which is how we know
+	// everything is synced with the cloud.
+	t.jig.WaitForIngress(false)
+	By("comparing GCP resources post-upgrade")
+	postUpgradeResourceStore := &GCPResourceStore{}
+	t.populateGCPResourceStore(postUpgradeResourceStore)
+	framework.ExpectNoError(compareGCPResourceStores(t.resourceStore, postUpgradeResourceStore, func(v1 reflect.Value, v2 reflect.Value) error {
+		i1 := v1.Interface()
+		i2 := v2.Interface()
+		// Skip verifying the UrlMap since we did that via WaitForIngress()
+		if !reflect.DeepEqual(i1, i2) && (v1.Type() != reflect.TypeOf([]*compute.UrlMap{})) {
+			return spew.Errorf("resources after ingress upgrade were different:\n Pre-Upgrade: %#v\n Post-Upgrade: %#v", i1, i2)
+		}
+		return nil
+	}))
+}
+
+func (t *IngressUpgradeTest) populateGCPResourceStore(resourceStore *GCPResourceStore) {
+	cont := t.gceController
+	resourceStore.Fw = cont.GetFirewallRule()
+	resourceStore.FwdList = cont.ListGlobalForwardingRules()
+	resourceStore.UmList = cont.ListUrlMaps()
+	resourceStore.TpList = cont.ListTargetHttpProxies()
+	resourceStore.TpsList = cont.ListTargetHttpsProxies()
+	resourceStore.SslList = cont.ListSslCertificates()
+	resourceStore.BeList = cont.ListGlobalBackendServices()
+	resourceStore.Ip = cont.GetGlobalAddress(t.ipName)
+	resourceStore.IgList = cont.ListInstanceGroups()
+}
+
+func compareGCPResourceStores(rs1 *GCPResourceStore, rs2 *GCPResourceStore, compare func(v1 reflect.Value, v2 reflect.Value) error) error {
+	// Before we do a comparison, remove the ServerResponse field from the
+	// Compute API structs. This is needed because two objects could be the same
+	// but their ServerResponse will be different if they were populated through
+	// separate API calls.
+	rs1Json, _ := json.Marshal(rs1)
+	rs2Json, _ := json.Marshal(rs2)
+	rs1New := &GCPResourceStore{}
+	rs2New := &GCPResourceStore{}
+	json.Unmarshal(rs1Json, rs1New)
+	json.Unmarshal(rs2Json, rs2New)
+
+	// Iterate through struct fields and perform equality checks on the fields.
+	// We do this rather than performing a deep equal on the struct itself because
+	// it is easier to log which field, if any, is not the same.
+	rs1V := reflect.ValueOf(*rs1New)
+	rs2V := reflect.ValueOf(*rs2New)
+	for i := 0; i < rs1V.NumField(); i++ {
+		if err := compare(rs1V.Field(i), rs2V.Field(i)); err != nil {
+			return err
+		}
+	}
+	return nil
 }

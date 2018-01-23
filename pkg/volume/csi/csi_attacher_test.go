@@ -110,13 +110,13 @@ func TestAttacherAttach(t *testing.T) {
 
 	// attacher loop
 	for i, tc := range testCases {
-		t.Log("test case: ", tc.name)
+		t.Logf("test case: %s", tc.name)
 		spec := volume.NewSpecFromPersistentVolume(makeTestPV(fmt.Sprintf("test-pv%d", i), 10, tc.driverName, tc.volumeName), false)
 
 		go func(id, nodename string, fail bool) {
 			attachID, err := csiAttacher.Attach(spec, types.NodeName(nodename))
 			if !fail && err != nil {
-				t.Error("was not expecting failure, but got err: ", err)
+				t.Errorf("expecting no failure, but got err: %v", err)
 			}
 			if attachID != id && !fail {
 				t.Errorf("expecting attachID %v, got %v", id, attachID)
@@ -178,7 +178,7 @@ func TestAttacherWaitForVolumeAttachment(t *testing.T) {
 	}
 
 	for i, tc := range testCases {
-		t.Logf("running test: %v", tc.name)
+		t.Logf("running test: %s", tc.name)
 		pvName := fmt.Sprintf("test-pv-%d", i)
 		volID := fmt.Sprintf("test-vol-%d", i)
 		attachID := getAttachmentName(volID, testDriver, nodeName)

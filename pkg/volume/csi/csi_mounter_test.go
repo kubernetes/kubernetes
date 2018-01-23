@@ -64,7 +64,7 @@ func TestMounterGetPath(t *testing.T) {
 		},
 	}
 	for _, tc := range testCases {
-		t.Log("test case:", tc.name)
+		t.Logf("test case: %s", tc.name)
 		pv := makeTestPV(tc.specVolumeName, 10, testDriver, testVol)
 		spec := volume.NewSpecFromPersistentVolume(pv, pv.Spec.PersistentVolumeSource.CSI.ReadOnly)
 		mounter, err := plug.NewMounter(
@@ -78,7 +78,7 @@ func TestMounterGetPath(t *testing.T) {
 		csiMounter := mounter.(*csiMountMgr)
 
 		path := csiMounter.GetPath()
-		t.Log("*** GetPath: ", path)
+		t.Logf("*** GetPath: %s", path)
 
 		if tc.path != path {
 			t.Errorf("expecting path %s, got %s", tc.path, path)
@@ -186,7 +186,7 @@ func TestUnmounterTeardown(t *testing.T) {
 		"test-pv",
 		map[string]string{volDataKey.specVolID: "test-pv", volDataKey.driverName: "driver", volDataKey.volHandle: "vol-handle"},
 	); err != nil {
-		t.Fatal("failed to save volume data:", err)
+		t.Fatalf("failed to save volume data: %v", err)
 	}
 
 	err = csiUnmounter.TearDownAt(dir)
@@ -231,11 +231,11 @@ func TestGetVolAttribsFromSpec(t *testing.T) {
 	}
 	spec := volume.NewSpecFromPersistentVolume(makeTestPV("test-pv", 10, testDriver, testVol), false)
 	for _, tc := range testCases {
-		t.Log("test case:", tc.name)
+		t.Logf("test case: %s", tc.name)
 		spec.PersistentVolume.Annotations = tc.annotations
 		attribs, err := getVolAttribsFromSpec(spec)
 		if !tc.shouldFail && err != nil {
-			t.Error("test case should not fail, but err != nil", err)
+			t.Errorf("test case should not fail, but err != nil: %v", err)
 		}
 		eq := true
 		for k, v := range attribs {
@@ -262,7 +262,7 @@ func TestSaveVolumeData(t *testing.T) {
 	}
 
 	for i, tc := range testCases {
-		t.Log("test case:", tc.name)
+		t.Logf("test case: %s", tc.name)
 		specVolID := fmt.Sprintf("spec-volid-%d", i)
 		mountDir := path.Join(getTargetPath(testPodUID, specVolID, plug.host), "/mount")
 		if err := os.MkdirAll(mountDir, 0755); err != nil && !os.IsNotExist(err) {
@@ -272,24 +272,24 @@ func TestSaveVolumeData(t *testing.T) {
 		err := saveVolumeData(plug, testPodUID, specVolID, tc.data)
 
 		if !tc.shouldFail && err != nil {
-			t.Error("unexpected failure: ", err)
+			t.Errorf("unexpected failure: %v", err)
 		}
 		// did file get created
 		dataDir := getTargetPath(testPodUID, specVolID, plug.host)
 		file := path.Join(dataDir, volDataFileName)
 		if _, err := os.Stat(file); err != nil {
-			t.Error("failed to create data dir:", err)
+			t.Errorf("failed to create data dir: %v", err)
 		}
 
 		// validate content
 		data, err := ioutil.ReadFile(file)
 		if !tc.shouldFail && err != nil {
-			t.Error("failed to read data file:", err)
+			t.Errorf("failed to read data file: %v", err)
 		}
 
 		jsonData := new(bytes.Buffer)
 		if err := json.NewEncoder(jsonData).Encode(tc.data); err != nil {
-			t.Error("failed to encode json:", err)
+			t.Errorf("failed to encode json: %v", err)
 		}
 		if string(data) != jsonData.String() {
 			t.Errorf("expecting encoded data %v, got %v", string(data), jsonData)

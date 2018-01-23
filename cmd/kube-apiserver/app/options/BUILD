@@ -14,6 +14,7 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/cmd/kube-apiserver/app/options",
     deps = [
+        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/core:go_default_library",
         "//pkg/apis/core/validation:go_default_library",
         "//pkg/features:go_default_library",
@@ -22,9 +23,11 @@ go_library(
         "//pkg/master/ports:go_default_library",
         "//pkg/master/reconcilers:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",
+        "//vendor/k8s.io/apiextensions-apiserver/pkg/apiserver:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/net:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/server/options:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/storage/storagebackend:go_default_library",
+        "//vendor/k8s.io/kube-aggregator/pkg/apiserver:go_default_library",
     ],
 )
 

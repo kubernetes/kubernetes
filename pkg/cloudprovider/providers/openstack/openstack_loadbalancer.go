@@ -959,14 +959,6 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *v1.Serv
 			_ = lbaas.EnsureLoadBalancerDeleted(clusterName, apiService)
 			return status, err
 		}
-
-		// delete the old Security Group for the service
-		// Related to #53764
-		// TODO(FengyunPan): Remove it at V1.10
-		err = lbaas.EnsureOldSecurityGroupDeleted(clusterName, apiService)
-		if err != nil {
-			return status, fmt.Errorf("Failed to delete the Security Group for loadbalancer service %s/%s: %v", apiService.Namespace, apiService.Name, err)
-		}
 	}
 
 	return status, nil
@@ -1492,14 +1484,6 @@ func (lbaas *LbaasV2) EnsureLoadBalancerDeleted(clusterName string, service *v1.
 		if err != nil {
 			return fmt.Errorf("Failed to delete Security Group for loadbalancer service %s/%s: %v", service.Namespace, service.Name, err)
 		}
-
-		// delete the old Security Group for the service
-		// Related to #53764
-		// TODO(FengyunPan): Remove it at V1.10
-		err = lbaas.EnsureOldSecurityGroupDeleted(clusterName, service)
-		if err != nil {
-			return fmt.Errorf("Failed to delete the Security Group for loadbalancer service %s/%s: %v", service.Namespace, service.Name, err)
-		}
 	}
 
 	return nil
@@ -1509,69 +1493,6 @@ func (lbaas *LbaasV2) EnsureLoadBalancerDeleted(clusterName string, service *v1.
 func (lbaas *LbaasV2) EnsureSecurityGroupDeleted(clusterName string, service *v1.Service) error {
 	// Generate Name
 	lbSecGroupName := getSecurityGroupName(service)
-	lbSecGroupID, err := groups.IDFromName(lbaas.network, lbSecGroupName)
-	if err != nil {
-		// check whether security group does not exist
-		_, ok := err.(*gophercloud.ErrResourceNotFound)
-		if ok {
-			// It is OK when the security group has been deleted by others.
-			return nil
-		} else {
-			return fmt.Errorf("Error occurred finding security group: %s: %v", lbSecGroupName, err)
-		}
-	}
-
-	lbSecGroup := groups.Delete(lbaas.network, lbSecGroupID)
-	if lbSecGroup.Err != nil && !isNotFound(lbSecGroup.Err) {
-		return lbSecGroup.Err
-	}
-
-	if len(lbaas.opts.NodeSecurityGroupIDs) == 0 {
-		// Just happen when nodes have not Security Group, or should not happen
-		// UpdateLoadBalancer and EnsureLoadBalancer can set lbaas.opts.NodeSecurityGroupIDs when it is empty
-		// And service controller call UpdateLoadBalancer to set lbaas.opts.NodeSecurityGroupIDs when controller manager service is restarted.
-		glog.Warningf("Can not find node-security-group from all the nodes of this cluster when delete loadbalancer service %s/%s",
-			service.Namespace, service.Name)
-	} else {
-		// Delete the rules in the Node Security Group
-		for _, nodeSecurityGroupID := range lbaas.opts.NodeSecurityGroupIDs {
-			opts := rules.ListOpts{
-				SecGroupID:    nodeSecurityGroupID,
-				RemoteGroupID: lbSecGroupID,
-			}
-			secGroupRules, err := getSecurityGroupRules(lbaas.network, opts)
-
-			if err != nil && !isNotFound(err) {
-				msg := fmt.Sprintf("Error finding rules for remote group id %s in security group id %s: %v", lbSecGroupID, nodeSecurityGroupID, err)
-				return fmt.Errorf(msg)
-			}
-
-			for _, rule := range secGroupRules {
-				res := rules.Delete(lbaas.network, rule.ID)
-				if res.Err != nil && !isNotFound(res.Err) {
-					return fmt.Errorf("Error occurred deleting security group rule: %s: %v", rule.ID, res.Err)
-				}
-			}
-		}
-	}
-
-	return nil
-}
-
-// getOldSecurityGroupName is used to get the old security group name
-// Related to #53764
-// TODO(FengyunPan): Remove it at V1.10
-func getOldSecurityGroupName(clusterName string, service *v1.Service) string {
-	return fmt.Sprintf("lb-sg-%s-%v", clusterName, service.Name)
-}
-
-// EnsureOldSecurityGroupDeleted deleting old security group for specific loadbalancer service.
-// Related to #53764
-// TODO(FengyunPan): Remove it at V1.10
-func (lbaas *LbaasV2) EnsureOldSecurityGroupDeleted(clusterName string, service *v1.Service) error {
-	glog.V(4).Infof("EnsureOldSecurityGroupDeleted(%v, %v)", clusterName, service)
-	// Generate Name
-	lbSecGroupName := getOldSecurityGroupName(clusterName, service)
 	lbSecGroupID, err := groups.IDFromName(lbaas.network, lbSecGroupName)
 	if err != nil {
 		// check whether security group does not exist

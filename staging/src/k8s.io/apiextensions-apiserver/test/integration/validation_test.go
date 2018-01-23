@@ -403,16 +403,23 @@ func TestForbiddenFieldsInSchema(t *testing.T) {
 		t.Fatalf("unexpected non-error: uniqueItems cannot be set to true")
 	}
 
+	noxuDefinition.Spec.Validation.OpenAPIV3Schema.Ref = strPtr("#/definition/zeta")
 	noxuDefinition.Spec.Validation.OpenAPIV3Schema.Properties["zeta"] = apiextensionsv1beta1.JSONSchemaProps{
 		Type:        "array",
 		UniqueItems: false,
 	}
 
 	_, err = testserver.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, clientPool)
+	if err == nil {
+		t.Fatal("unexpected non-error: $ref cannot be non-empty string")
+	}
+
+	noxuDefinition.Spec.Validation.OpenAPIV3Schema.Ref = nil
+
+	_, err = testserver.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, clientPool)
 	if err != nil {
 		t.Fatal(err)
 	}
-
 }
 
 func float64Ptr(f float64) *float64 {
@@ -421,4 +428,8 @@ func float64Ptr(f float64) *float64 {
 
 func int64Ptr(f int64) *int64 {
 	return &f
+}
+
+func strPtr(str string) *string {
+	return &str
 }

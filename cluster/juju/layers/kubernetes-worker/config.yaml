@@ -58,3 +58,15 @@ options:
 
       The value for this config must be a JSON array of credential objects, like this:
         [{"server": "my.registry", "username": "myUser", "password": "myPass"}]
+  nginx-image:
+    type: string
+    default: "auto"
+    description: |
+      Docker image to use for the nginx ingress controller. Auto will select an image
+      based on architecture.
+  default-backend-image:
+    type: string
+    default: "auto"
+    description: |
+      Docker image to use for the default backend. Auto will select an image
+      based on architecture.

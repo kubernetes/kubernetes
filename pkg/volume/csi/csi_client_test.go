@@ -52,12 +52,12 @@ func TestClientAssertSupportedVersion(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		t.Log("case: ", tc.testName)
+		t.Logf("test case: %s", tc.testName)
 		client := setupClient(t)
 		client.idClient.(*fake.IdentityClient).SetNextError(tc.err)
 		err := client.AssertSupportedVersion(grpctx.Background(), tc.ver)
 		if tc.mustFail && err == nil {
-			t.Error("must fail, but err = nil")
+			t.Error("test must fail, but err = nil")
 		}
 	}
 }
@@ -74,12 +74,12 @@ func TestClientNodeProbe(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		t.Log("case: ", tc.testName)
+		t.Logf("test case: %s", tc.testName)
 		client := setupClient(t)
 		client.nodeClient.(*fake.NodeClient).SetNextError(tc.err)
 		err := client.NodeProbe(grpctx.Background(), tc.ver)
 		if tc.mustFail && err == nil {
-			t.Error("must fail, but err = nil")
+			t.Error("test must fail, but err = nil")
 		}
 	}
 }
@@ -103,7 +103,7 @@ func TestClientNodePublishVolume(t *testing.T) {
 	client := setupClient(t)
 
 	for _, tc := range testCases {
-		t.Log("case: ", tc.name)
+		t.Logf("test case: %s", tc.name)
 		client.nodeClient.(*fake.NodeClient).SetNextError(tc.err)
 		err := client.NodePublishVolume(
 			grpctx.Background(),
@@ -117,7 +117,7 @@ func TestClientNodePublishVolume(t *testing.T) {
 		)
 
 		if tc.mustFail && err == nil {
-			t.Error("must fail, but err is nil: ", err)
+			t.Error("test must fail, but err is nil")
 		}
 	}
 }
@@ -139,11 +139,11 @@ func TestClientNodeUnpublishVolume(t *testing.T) {
 	client := setupClient(t)
 
 	for _, tc := range testCases {
-		t.Log("case: ", tc.name)
+		t.Logf("test case: %s", tc.name)
 		client.nodeClient.(*fake.NodeClient).SetNextError(tc.err)
 		err := client.NodeUnpublishVolume(grpctx.Background(), tc.volID, tc.targetPath)
 		if tc.mustFail && err == nil {
-			t.Error("must fail, but err is nil: ", err)
+			t.Error("test must fail, but err is nil")
 		}
 	}
 }

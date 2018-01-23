@@ -58,7 +58,7 @@ func (i *Instances) CurrentNodeName(hostname string) (types.NodeName, error) {
 	if err != nil {
 		return "", err
 	}
-	return types.NodeName(md.Name), nil
+	return types.NodeName(md.Hostname), nil
 }
 
 func (i *Instances) AddSSHKeyToAllInstances(user string, keyData []byte) error {

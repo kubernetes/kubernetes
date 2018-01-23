@@ -379,11 +379,8 @@ func untarAll(reader io.Reader, destFile, prefix string) error {
 }
 
 func getPrefix(file string) string {
-	if file[0] == '/' {
-		// tar strips the leading '/' if it's there, so we will too
-		return file[1:]
-	}
-	return file
+	// tar strips the leading '/' if it's there, so we will too
+	return strings.TrimLeft(file, "/")
 }
 
 func execute(f cmdutil.Factory, cmd *cobra.Command, options *ExecOptions) error {

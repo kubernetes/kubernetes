@@ -26,6 +26,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/buffer"
+	"k8s.io/client-go/util/retry"
 
 	"github.com/golang/glog"
 )
@@ -540,20 +541,35 @@ func (p *processorListener) pop() {
 }
 
 func (p *processorListener) run() {
-	defer utilruntime.HandleCrash()
+	// this call blocks until the channel is closed.  When a panic happens during the notification
+	// we will catch it, **the offending item will be skipped!**, and after a short delay (one second)
+	// the next notification will be attempted.  This is usually better than the alternative of never
+	// delivering again.
+	stopCh := make(chan struct{})
+	wait.Until(func() {
+		// this gives us a few quick retries before a long pause and then a few more quick retries
+		err := wait.ExponentialBackoff(retry.DefaultRetry, func() (bool, error) {
+			for next := range p.nextCh {
+				switch notification := next.(type) {
+				case updateNotification:
+					p.handler.OnUpdate(notification.oldObj, notification.newObj)
+				case addNotification:
+					p.handler.OnAdd(notification.newObj)
+				case deleteNotification:
+					p.handler.OnDelete(notification.oldObj)
+				default:
+					utilruntime.HandleError(fmt.Errorf("unrecognized notification: %#v", next))
+				}
+			}
+			// the only way to get here is if the p.nextCh is empty and closed
+			return true, nil
+		})
 
-	for next := range p.nextCh {
-		switch notification := next.(type) {
-		case updateNotification:
-			p.handler.OnUpdate(notification.oldObj, notification.newObj)
-		case addNotification:
-			p.handler.OnAdd(notification.newObj)
-		case deleteNotification:
-			p.handler.OnDelete(notification.oldObj)
-		default:
-			utilruntime.HandleError(fmt.Errorf("unrecognized notification: %#v", next))
+		// the only way to get here is if the p.nextCh is empty and closed
+		if err == nil {
+			close(stopCh)
 		}
-	}
+	}, 1*time.Minute, stopCh)
 }
 
 // shouldResync deterimines if the listener needs a resync. If the listener's resyncPeriod is 0,

@@ -275,17 +275,34 @@ def update_kubelet_status():
         hookenv.status_set('waiting', msg)
 
 
-@when('certificates.available')
-def send_data(tls):
+def get_ingress_address(relation):
+    try:
+        network_info = hookenv.network_get(relation.relation_name)
+    except NotImplementedError:
+        network_info = []
+
+    if network_info and 'ingress-addresses' in network_info:
+        # just grab the first one for now, maybe be more robust here?
+        return network_info['ingress-addresses'][0]
+    else:
+        # if they don't have ingress-addresses they are running a juju that
+        # doesn't support spaces, so just return the private address
+        return hookenv.unit_get('private-address')
+
+
+@when('certificates.available', 'kube-control.connected')
+def send_data(tls, kube_control):
     '''Send the data that is required to create a server certificate for
     this server.'''
     # Use the public ip of this unit as the Common Name for the certificate.
     common_name = hookenv.unit_public_ip()
 
+    ingress_ip = get_ingress_address(kube_control)
+
     # Create SANs that the tls layer will add to the server cert.
     sans = [
         hookenv.unit_public_ip(),
-        hookenv.unit_private_ip(),
+        ingress_ip,
         gethostname()
     ]
 
@@ -328,6 +345,7 @@ def start_worker(kube_api, kube_control, auth_control, cni):
     # the correct DNS even though the server isn't ready yet.
 
     dns = kube_control.get_dns()
+    ingress_ip = get_ingress_address(kube_control)
     cluster_cidr = cni.get_config()['cidr']
 
     if cluster_cidr is None:
@@ -341,7 +359,7 @@ def start_worker(kube_api, kube_control, auth_control, cni):
     set_privileged()
 
     create_config(random.choice(servers), creds)
-    configure_kubelet(dns)
+    configure_kubelet(dns, ingress_ip)
     configure_kube_proxy(servers, cluster_cidr)
     set_state('kubernetes-worker.config.created')
     restart_unit_services()
@@ -528,7 +546,7 @@ def configure_kubernetes_service(service, base_args, extra_args_key):
     db.set(prev_args_key, args)
 
 
-def configure_kubelet(dns):
+def configure_kubelet(dns, ingress_ip):
     layer_options = layer.options('tls-client')
     ca_cert_path = layer_options.get('ca_certificate_path')
     server_cert_path = layer_options.get('server_certificate_path')
@@ -548,6 +566,7 @@ def configure_kubelet(dns):
     kubelet_opts['tls-private-key-file'] = server_key_path
     kubelet_opts['logtostderr'] = 'true'
     kubelet_opts['fail-swap-on'] = 'false'
+    kubelet_opts['node-ip'] = ingress_ip
 
     if (dns['enable-kube-dns']):
         kubelet_opts['cluster-dns'] = dns['sdn-ip']
@@ -624,17 +643,30 @@ def create_kubeconfig(kubeconfig, server, ca, key=None, certificate=None,
     check_call(split(cmd.format(kubeconfig, context)))
 
 
+@when_any('config.changed.default-backend-image',
+          'config.changed.nginx-image')
 def launch_default_ingress_controller():
     ''' Launch the Kubernetes ingress controller & default backend (404) '''
+    config = hookenv.config()
+
+    # need to test this in case we get in
+    # here from a config change to the image
+    if not config.get('ingress'):
+        return
+
     context = {}
     context['arch'] = arch()
     addon_path = '/root/cdk/addons/{}'
 
-    context['defaultbackend_image'] = \
-        "gcr.io/google_containers/defaultbackend:1.4"
-    if arch() == 's390x':
-        context['defaultbackend_image'] = \
-            "gcr.io/google_containers/defaultbackend-s390x:1.4"
+    context['defaultbackend_image'] = config.get('default-backend-image')
+    if (context['defaultbackend_image'] == "" or
+       context['defaultbackend_image'] == "auto"):
+        if context['arch'] == 's390x':
+            context['defaultbackend_image'] = \
+                "gcr.io/google_containers/defaultbackend-s390x:1.4"
+        else:
+            context['defaultbackend_image'] = \
+                "gcr.io/google_containers/defaultbackend:1.4"
 
     # Render the default http backend (404) replicationcontroller manifest
     manifest = addon_path.format('default-http-backend.yaml')
@@ -650,11 +682,14 @@ def launch_default_ingress_controller():
         return
 
     # Render the ingress daemon set controller manifest
-    context['ingress_image'] = \
-        "gcr.io/google_containers/nginx-ingress-controller:0.9.0-beta.13"
-    if arch() == 's390x':
-        context['ingress_image'] = \
-            "docker.io/cdkbot/nginx-ingress-controller-s390x:0.9.0-beta.13"
+    context['ingress_image'] = config.get('nginx-image')
+    if context['ingress_image'] == "" or context['ingress_image'] == "auto":
+        if context['arch'] == 's390x':
+            context['ingress_image'] = \
+                "docker.io/cdkbot/nginx-ingress-controller-s390x:0.9.0-beta.13"
+        else:
+            context['ingress_image'] = \
+                "gcr.io/google_containers/nginx-ingress-controller:0.9.0-beta.15" # noqa
     context['juju_application'] = hookenv.service_name()
     manifest = addon_path.format('ingress-daemon-set.yaml')
     render('ingress-daemon-set.yaml', manifest, context)
