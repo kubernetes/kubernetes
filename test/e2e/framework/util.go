@@ -1200,6 +1200,10 @@ func hasRemainingContent(c clientset.Interface, clientPool dynamic.ClientPool, n
 			if apierrs.IsMethodNotSupported(err) || apierrs.IsNotFound(err) || apierrs.IsForbidden(err) {
 				continue
 			}
+			// skip unavailable servers
+			if apierrs.IsServiceUnavailable(err) {
+				continue
+			}
 			return false, err
 		}
 		unstructuredList, ok := obj.(*unstructured.UnstructuredList)
