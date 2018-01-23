@@ -34,8 +34,8 @@ import (
 
 const (
 	CNIPluginName        = "cni"
-	DefaultNetDir        = "/etc/cni/net.d"
-	DefaultCNIDir        = "/opt/cni/bin"
+	DefaultConfDir       = "/etc/cni/net.d"
+	DefaultBinDir        = "/opt/cni/bin"
 	VendorCNIDirTemplate = "%s/opt/%s/bin"
 )
 
@@ -50,7 +50,7 @@ type cniNetworkPlugin struct {
 	host               network.Host
 	execer             utilexec.Interface
 	nsenterPath        string
-	pluginDir          string
+	confDir            string
 	binDir             string
 	vendorCNIDirPrefix string
 }
@@ -70,15 +70,15 @@ type cniPortMapping struct {
 	HostIP        string `json:"hostIP"`
 }
 
-func probeNetworkPluginsWithVendorCNIDirPrefix(pluginDir, binDir, vendorCNIDirPrefix string) []network.NetworkPlugin {
+func probeNetworkPluginsWithVendorCNIDirPrefix(confDir, binDir, vendorCNIDirPrefix string) []network.NetworkPlugin {
 	if binDir == "" {
-		binDir = DefaultCNIDir
+		binDir = DefaultBinDir
 	}
 	plugin := &cniNetworkPlugin{
 		defaultNetwork:     nil,
 		loNetwork:          getLoNetwork(binDir, vendorCNIDirPrefix),
 		execer:             utilexec.New(),
-		pluginDir:          pluginDir,
+		confDir:            confDir,
 		binDir:             binDir,
 		vendorCNIDirPrefix: vendorCNIDirPrefix,
 	}
@@ -88,20 +88,20 @@ func probeNetworkPluginsWithVendorCNIDirPrefix(pluginDir, binDir, vendorCNIDirPr
 	return []network.NetworkPlugin{plugin}
 }
 
-func ProbeNetworkPlugins(pluginDir, binDir string) []network.NetworkPlugin {
-	return probeNetworkPluginsWithVendorCNIDirPrefix(pluginDir, binDir, "")
+func ProbeNetworkPlugins(confDir, binDir string) []network.NetworkPlugin {
+	return probeNetworkPluginsWithVendorCNIDirPrefix(confDir, binDir, "")
 }
 
-func getDefaultCNINetwork(pluginDir, binDir, vendorCNIDirPrefix string) (*cniNetwork, error) {
-	if pluginDir == "" {
-		pluginDir = DefaultNetDir
+func getDefaultCNINetwork(confDir, binDir, vendorCNIDirPrefix string) (*cniNetwork, error) {
+	if confDir == "" {
+		confDir = DefaultConfDir
 	}
-	files, err := libcni.ConfFiles(pluginDir, []string{".conf", ".conflist", ".json"})
+	files, err := libcni.ConfFiles(confDir, []string{".conf", ".conflist", ".json"})
 	switch {
 	case err != nil:
 		return nil, err
 	case len(files) == 0:
-		return nil, fmt.Errorf("No networks found in %s", pluginDir)
+		return nil, fmt.Errorf("No networks found in %s", confDir)
 	}
 
 	sort.Strings(files)
@@ -146,7 +146,7 @@ func getDefaultCNINetwork(pluginDir, binDir, vendorCNIDirPrefix string) (*cniNet
 		network := &cniNetwork{name: confList.Name, NetworkConfig: confList, CNIConfig: cninet}
 		return network, nil
 	}
-	return nil, fmt.Errorf("No valid networks found in %s", pluginDir)
+	return nil, fmt.Errorf("No valid networks found in %s", confDir)
 }
 
 func vendorCNIDir(prefix, pluginType string) string {
@@ -166,7 +166,7 @@ func (plugin *cniNetworkPlugin) Init(host network.Host, hairpinMode kubeletconfi
 }
 
 func (plugin *cniNetworkPlugin) syncNetworkConfig() {
-	network, err := getDefaultCNINetwork(plugin.pluginDir, plugin.binDir, plugin.vendorCNIDirPrefix)
+	network, err := getDefaultCNINetwork(plugin.confDir, plugin.binDir, plugin.vendorCNIDirPrefix)
 	if err != nil {
 		glog.Warningf("Unable to update cni config: %s", err)
 		return
@@ -198,7 +198,7 @@ func (plugin *cniNetworkPlugin) Name() string {
 }
 
 func (plugin *cniNetworkPlugin) Status() error {
-	// sync network config from pluginDir periodically to detect network config updates
+	// sync network config from confDir periodically to detect network config updates
 	plugin.syncNetworkConfig()
 
 	// Can't set up pods if we don't have any CNI network configs yet
