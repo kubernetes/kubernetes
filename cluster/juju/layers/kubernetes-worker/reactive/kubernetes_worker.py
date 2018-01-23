@@ -624,17 +624,30 @@ def create_kubeconfig(kubeconfig, server, ca, key=None, certificate=None,
     check_call(split(cmd.format(kubeconfig, context)))
 
 
+@when_any('config.changed.default-backend-image',
+          'config.changed.nginx-image')
 def launch_default_ingress_controller():
     ''' Launch the Kubernetes ingress controller & default backend (404) '''
+    config = hookenv.config()
+
+    # need to test this in case we get in
+    # here from a config change to the image
+    if not config.get('ingress'):
+        return
+
     context = {}
     context['arch'] = arch()
     addon_path = '/root/cdk/addons/{}'
 
-    context['defaultbackend_image'] = \
-        "gcr.io/google_containers/defaultbackend:1.4"
-    if arch() == 's390x':
-        context['defaultbackend_image'] = \
-            "gcr.io/google_containers/defaultbackend-s390x:1.4"
+    context['defaultbackend_image'] = config.get('default-backend-image')
+    if (context['defaultbackend_image'] == "" or
+       context['defaultbackend_image'] == "auto"):
+        if context['arch'] == 's390x':
+            context['defaultbackend_image'] = \
+                "gcr.io/google_containers/defaultbackend-s390x:1.4"
+        else:
+            context['defaultbackend_image'] = \
+                "gcr.io/google_containers/defaultbackend:1.4"
 
     # Render the default http backend (404) replicationcontroller manifest
     manifest = addon_path.format('default-http-backend.yaml')
@@ -650,11 +663,14 @@ def launch_default_ingress_controller():
         return
 
     # Render the ingress daemon set controller manifest
-    context['ingress_image'] = \
-        "gcr.io/google_containers/nginx-ingress-controller:0.9.0-beta.13"
-    if arch() == 's390x':
-        context['ingress_image'] = \
-            "docker.io/cdkbot/nginx-ingress-controller-s390x:0.9.0-beta.13"
+    context['ingress_image'] = config.get('nginx-image')
+    if context['ingress_image'] == "" or context['ingress_image'] == "auto":
+        if context['arch'] == 's390x':
+            context['ingress_image'] = \
+                "docker.io/cdkbot/nginx-ingress-controller-s390x:0.9.0-beta.13"
+        else:
+            context['ingress_image'] = \
+                "gcr.io/google_containers/nginx-ingress-controller:0.9.0-beta.15" # noqa
     context['juju_application'] = hookenv.service_name()
     manifest = addon_path.format('ingress-daemon-set.yaml')
     render('ingress-daemon-set.yaml', manifest, context)
