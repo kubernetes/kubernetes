@@ -49,6 +49,12 @@ type Attributes interface {
 	GetKind() schema.GroupVersionKind
 	// GetUserInfo is information about the requesting user
 	GetUserInfo() user.Info
+	// GetAnnotations returns annotation map for the admission chain.
+	GetAnnotations() map[string]string
+	// SetAnnotations sets annotation key-value pairs in a structed format:
+	// "<plugin_name>/<key>"="value"
+	// Both ValidationInterface and MutationInterface are allowed to set Annotations.
+	SetAnnotations(plugin_name, key, value string) bool
 }
 
 // Interface is an abstract, pluggable interface for Admission Control decisions.

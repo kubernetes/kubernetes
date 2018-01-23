@@ -116,7 +116,7 @@ func admit(t *testing.T, ir admission.MutationInterface, pods []*api.Pod) {
 
 		podKind := api.Kind("Pod").WithVersion("version")
 		podRes := api.Resource("pods").WithVersion("version")
-		attrs := admission.NewAttributesRecord(p, nil, podKind, "test", p.ObjectMeta.Name, podRes, "", admission.Create, nil)
+		attrs := admission.NewAttributesRecord(p, nil, podKind, "test", p.ObjectMeta.Name, podRes, "", admission.Create, nil, nil)
 		if err := ir.Admit(attrs); err != nil {
 			t.Error(err)
 		}
@@ -132,11 +132,11 @@ func testAdminScenarios(t *testing.T, ir admission.MutationInterface, p *api.Pod
 		expectError bool
 	}{
 		{
-			admission.NewAttributesRecord(p, nil, podKind, "test", p.ObjectMeta.Name, podRes, "foo", admission.Create, nil),
+			admission.NewAttributesRecord(p, nil, podKind, "test", p.ObjectMeta.Name, podRes, "foo", admission.Create, nil, nil),
 			false,
 		},
 		{
-			admission.NewAttributesRecord(&api.ReplicationController{}, nil, podKind, "test", "", podRes, "", admission.Create, nil),
+			admission.NewAttributesRecord(&api.ReplicationController{}, nil, podKind, "test", "", podRes, "", admission.Create, nil, nil),
 			true,
 		},
 	}

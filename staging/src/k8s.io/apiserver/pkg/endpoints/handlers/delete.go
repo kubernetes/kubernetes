@@ -96,7 +96,7 @@ func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope RequestSco
 		trace.Step("About to check admission control")
 		if admit != nil && admit.Handles(admission.Delete) {
 			userInfo, _ := request.UserFrom(ctx)
-			attrs := admission.NewAttributesRecord(nil, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Delete, userInfo)
+			attrs := admission.NewAttributesRecord(nil, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Delete, userInfo, nil)
 			if mutatingAdmission, ok := admit.(admission.MutationInterface); ok {
 				if err := mutatingAdmission.Admit(attrs); err != nil {
 					scope.err(err, w, req)
@@ -182,7 +182,7 @@ func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope RequestSco
 		if mutatingAdmission, ok := admit.(admission.MutationInterface); ok && mutatingAdmission.Handles(admission.Delete) {
 			userInfo, _ := request.UserFrom(ctx)
 
-			err = mutatingAdmission.Admit(admission.NewAttributesRecord(nil, nil, scope.Kind, namespace, "", scope.Resource, scope.Subresource, admission.Delete, userInfo))
+			err = mutatingAdmission.Admit(admission.NewAttributesRecord(nil, nil, scope.Kind, namespace, "", scope.Resource, scope.Subresource, admission.Delete, userInfo, nil))
 			if err != nil {
 				scope.err(err, w, req)
 				return
@@ -192,7 +192,7 @@ func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope RequestSco
 		if validatingAdmission, ok := admit.(admission.ValidationInterface); ok && validatingAdmission.Handles(admission.Delete) {
 			userInfo, _ := request.UserFrom(ctx)
 
-			err = validatingAdmission.Validate(admission.NewAttributesRecord(nil, nil, scope.Kind, namespace, "", scope.Resource, scope.Subresource, admission.Delete, userInfo))
+			err = validatingAdmission.Validate(admission.NewAttributesRecord(nil, nil, scope.Kind, namespace, "", scope.Resource, scope.Subresource, admission.Delete, userInfo, nil))
 			if err != nil {
 				scope.err(err, w, req)
 				return

@@ -146,6 +146,7 @@ func TestPriorityClassAdmission(t *testing.T) {
 			"",
 			admission.Create,
 			nil,
+			nil,
 		)
 		err := ctrl.Validate(attrs)
 		glog.Infof("Got %v", err)
@@ -185,7 +186,7 @@ func TestDefaultPriority(t *testing.T) {
 			name:                  "add a default class",
 			classesBefore:         []*scheduling.PriorityClass{nondefaultClass1},
 			classesAfter:          []*scheduling.PriorityClass{nondefaultClass1, defaultClass1},
-			attributes:            admission.NewAttributesRecord(defaultClass1, nil, pcKind, "", defaultClass1.Name, pcResource, "", admission.Create, nil),
+			attributes:            admission.NewAttributesRecord(defaultClass1, nil, pcKind, "", defaultClass1.Name, pcResource, "", admission.Create, nil, nil),
 			expectedDefaultBefore: scheduling.DefaultPriorityWhenNoDefaultClassExists,
 			expectedDefaultAfter:  defaultClass1.Value,
 		},
@@ -193,7 +194,7 @@ func TestDefaultPriority(t *testing.T) {
 			name:                  "delete default priority class",
 			classesBefore:         []*scheduling.PriorityClass{defaultClass1},
 			classesAfter:          []*scheduling.PriorityClass{},
-			attributes:            admission.NewAttributesRecord(nil, nil, pcKind, "", defaultClass1.Name, pcResource, "", admission.Delete, nil),
+			attributes:            admission.NewAttributesRecord(nil, nil, pcKind, "", defaultClass1.Name, pcResource, "", admission.Delete, nil, nil),
 			expectedDefaultBefore: defaultClass1.Value,
 			expectedDefaultAfter:  scheduling.DefaultPriorityWhenNoDefaultClassExists,
 		},
@@ -201,7 +202,7 @@ func TestDefaultPriority(t *testing.T) {
 			name:                  "update default class and remove its global default",
 			classesBefore:         []*scheduling.PriorityClass{defaultClass1},
 			classesAfter:          []*scheduling.PriorityClass{&updatedDefaultClass1},
-			attributes:            admission.NewAttributesRecord(&updatedDefaultClass1, defaultClass1, pcKind, "", defaultClass1.Name, pcResource, "", admission.Update, nil),
+			attributes:            admission.NewAttributesRecord(&updatedDefaultClass1, defaultClass1, pcKind, "", defaultClass1.Name, pcResource, "", admission.Update, nil, nil),
 			expectedDefaultBefore: defaultClass1.Value,
 			expectedDefaultAfter:  scheduling.DefaultPriorityWhenNoDefaultClassExists,
 		},
@@ -444,6 +445,7 @@ func TestPodAdmission(t *testing.T) {
 			api.Resource("pods").WithVersion("version"),
 			"",
 			admission.Create,
+			nil,
 			nil,
 		)
 		err := ctrl.Admit(attrs)

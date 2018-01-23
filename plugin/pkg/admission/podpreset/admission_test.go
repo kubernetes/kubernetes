@@ -819,6 +819,7 @@ func admitPod(pod *api.Pod, pip *settings.PodPreset) error {
 		"",
 		kadmission.Create,
 		&user.DefaultInfo{},
+		nil,
 	)
 
 	err := plugin.Admit(attrs)
