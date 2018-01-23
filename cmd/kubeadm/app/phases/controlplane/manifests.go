@@ -82,7 +82,7 @@ func GetStaticPodSpecs(cfg *kubeadmapi.MasterConfiguration, k8sVersion *version.
 			VolumeMounts:  staticpodutil.VolumeMountMapToSlice(mounts.GetVolumeMounts(kubeadmconstants.KubeAPIServer)),
 			LivenessProbe: staticpodutil.ComponentProbe(cfg, kubeadmconstants.KubeAPIServer, int(cfg.API.BindPort), "/healthz", v1.URISchemeHTTPS),
 			Resources:     staticpodutil.ComponentResources("250m"),
-			Env:           getProxyEnvVars(),
+			Env:           getProxyEnvVars(cfg),
 		}, mounts.GetVolumes(kubeadmconstants.KubeAPIServer)),
 		kubeadmconstants.KubeControllerManager: staticpodutil.ComponentPod(v1.Container{
 			Name:          kubeadmconstants.KubeControllerManager,
@@ -91,7 +91,7 @@ func GetStaticPodSpecs(cfg *kubeadmapi.MasterConfiguration, k8sVersion *version.
 			VolumeMounts:  staticpodutil.VolumeMountMapToSlice(mounts.GetVolumeMounts(kubeadmconstants.KubeControllerManager)),
 			LivenessProbe: staticpodutil.ComponentProbe(cfg, kubeadmconstants.KubeControllerManager, 10252, "/healthz", v1.URISchemeHTTP),
 			Resources:     staticpodutil.ComponentResources("200m"),
-			Env:           getProxyEnvVars(),
+			Env:           getProxyEnvVars(cfg),
 		}, mounts.GetVolumes(kubeadmconstants.KubeControllerManager)),
 		kubeadmconstants.KubeScheduler: staticpodutil.ComponentPod(v1.Container{
 			Name:          kubeadmconstants.KubeScheduler,
@@ -100,7 +100,7 @@ func GetStaticPodSpecs(cfg *kubeadmapi.MasterConfiguration, k8sVersion *version.
 			VolumeMounts:  staticpodutil.VolumeMountMapToSlice(mounts.GetVolumeMounts(kubeadmconstants.KubeScheduler)),
 			LivenessProbe: staticpodutil.ComponentProbe(cfg, kubeadmconstants.KubeScheduler, 10251, "/healthz", v1.URISchemeHTTP),
 			Resources:     staticpodutil.ComponentResources("100m"),
-			Env:           getProxyEnvVars(),
+			Env:           getProxyEnvVars(cfg),
 		}, mounts.GetVolumes(kubeadmconstants.KubeScheduler)),
 	}
 
@@ -277,7 +277,13 @@ func getSchedulerCommand(cfg *kubeadmapi.MasterConfiguration) []string {
 }
 
 // getProxyEnvVars builds a list of environment variables to use in the control plane containers in order to use the right proxy
-func getProxyEnvVars() []v1.EnvVar {
+func getProxyEnvVars(cfg *kubeadmapi.MasterConfiguration) []v1.EnvVar {
+	noProxyIPs := []string{"localhost", "127.0.0.1", "::1",
+		cfg.API.AdvertiseAddress,
+		cfg.Networking.PodSubnet,
+		cfg.Networking.ServiceSubnet,
+		cfg.Networking.DNSDomain,
+	}
 	envs := []v1.EnvVar{}
 	for _, env := range os.Environ() {
 		pos := strings.Index(env, "=")
@@ -285,13 +291,23 @@ func getProxyEnvVars() []v1.EnvVar {
 			// malformed environment variable, skip it.
 			continue
 		}
-		name := env[:pos]
+		name := strings.ToLower(env[:pos])
 		value := env[pos+1:]
-		if strings.HasSuffix(strings.ToLower(name), "_proxy") && value != "" {
+
+		if strings.HasSuffix(name, "_proxy") && value != "" {
+			if name == "no_proxy" {
+				noProxyIPs = append(noProxyIPs, value)
+				continue
+			}
 			envVar := v1.EnvVar{Name: name, Value: value}
 			envs = append(envs, envVar)
 		}
 	}
+
+	// set no_proxy
+	envVar := v1.EnvVar{Name: "no_proxy", Value: strings.Join(noProxyIPs, ",")}
+	envs = append(envs, envVar)
+
 	return envs
 }
 
