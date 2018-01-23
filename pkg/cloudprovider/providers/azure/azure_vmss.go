@@ -785,11 +785,11 @@ func (ss *scaleSet) EnsureHostsInPool(serviceName string, nodes []*v1.Node, back
 	for _, curNode := range nodes {
 		curScaleSetName, err := extractScaleSetNameByVMID(curNode.Spec.ExternalID)
 		if err != nil {
-			glog.V(2).Infof("Node %q is not belonging to any scale sets, omitting it", curNode.Name)
+			glog.V(4).Infof("Node %q is not belonging to any scale sets, omitting it", curNode.Name)
 			continue
 		}
 		if curScaleSetName != vmSetName {
-			glog.V(2).Infof("Node %q is not belonging to scale set %q, omitting it", curNode.Name, vmSetName)
+			glog.V(4).Infof("Node %q is not belonging to scale set %q, omitting it", curNode.Name, vmSetName)
 			continue
 		}
 
