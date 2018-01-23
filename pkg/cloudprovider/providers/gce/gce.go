@@ -229,6 +229,11 @@ func (g *GCECloud) ComputeServices() *Services {
 	return &Services{g.service, g.serviceAlpha, g.serviceBeta}
 }
 
+// Compute returns the generated stubs for the compute API.
+func (g *GCECloud) Compute() cloud.Cloud {
+	return g.c
+}
+
 // newGCECloud creates a new instance of GCECloud.
 func newGCECloud(config io.Reader) (gceCloud *GCECloud, err error) {
 	var cloudConfig *CloudConfig
