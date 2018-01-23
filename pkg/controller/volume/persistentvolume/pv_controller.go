@@ -235,22 +235,22 @@ func checkVolumeSatisfyClaim(volume *v1.PersistentVolume, claim *v1.PersistentVo
 	requestedSize := requestedQty.Value()
 	isMisMatch, err := checkVolumeModeMisMatches(&claim.Spec, &volume.Spec)
 	if err != nil {
-		return fmt.Errorf("error checking if volumeMode was a mismatch: %v", err)
+		return fmt.Errorf("error checking volumeMode: %v", err)
 	}
 
 	volumeQty := volume.Spec.Capacity[v1.ResourceStorage]
 	volumeSize := volumeQty.Value()
 	if volumeSize < requestedSize {
-		return fmt.Errorf("Storage capacity of volume[%s] requested by claim[%v] is not enough", volume.Name, claimToClaimKey(claim))
+		return fmt.Errorf("requested PV is too small")
 	}
 
 	requestedClass := v1helper.GetPersistentVolumeClaimClass(claim)
 	if v1helper.GetPersistentVolumeClass(volume) != requestedClass {
-		return fmt.Errorf("Class of volume[%s] is not the same as claim[%v]", volume.Name, claimToClaimKey(claim))
+		return fmt.Errorf("storageClasseName does not match")
 	}
 
 	if isMisMatch {
-		return fmt.Errorf("VolumeMode[%v] of volume[%s] is incompatible with VolumeMode[%v] of claim[%v]", volume.Spec.VolumeMode, volume.Name, claim.Spec.VolumeMode, claim.Name)
+		return fmt.Errorf("incompatible volumeMode")
 	}
 
 	return nil
@@ -363,7 +363,8 @@ func (ctrl *PersistentVolumeController) syncUnboundClaim(claim *v1.PersistentVol
 				if err = checkVolumeSatisfyClaim(volume, claim); err != nil {
 					glog.V(4).Infof("Can't bind the claim to volume %q: %v", volume.Name, err)
 					//send a event
-					ctrl.eventRecorder.Event(claim, v1.EventTypeWarning, events.VolumeMismatch, "Volume's size is smaller than requested or volume's class does not match with claim")
+					msg := fmt.Sprintf("Cannot bind to requested volume %q: %s", volume.Name, err)
+					ctrl.eventRecorder.Event(claim, v1.EventTypeWarning, events.VolumeMismatch, msg)
 					//volume does not satisfy the requirements of the claim
 					if _, err = ctrl.updateClaimStatus(claim, v1.ClaimPending, nil); err != nil {
 						return err
