@@ -119,7 +119,7 @@ func ProbeNetworkPlugins(cniConfDir, cniBinDir string) []network.NetworkPlugin {
 
 	// for each existing plugin, add to the list
 	allPlugins = append(allPlugins, cni.ProbeNetworkPlugins(cniConfDir, []string{cniBinDir})...)
-	allPlugins = append(allPlugins, kubenet.NewPlugin(cniBinDir))
+	allPlugins = append(allPlugins, kubenet.NewPlugin([]string{cniBinDir}))
 
 	return allPlugins
 }
