@@ -24,9 +24,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	openapispec "github.com/go-openapi/spec"
-	"github.com/go-openapi/strfmt"
-	"github.com/go-openapi/validate"
 	"github.com/golang/glog"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -313,13 +310,13 @@ func (r *crdHandler) removeDeadStorage() {
 }
 
 // GetCustomResourceListerCollectionDeleter returns the ListerCollectionDeleter for
-// the given uid, or nil if one does not exist.
-func (r *crdHandler) GetCustomResourceListerCollectionDeleter(crd *apiextensions.CustomResourceDefinition) finalizer.ListerCollectionDeleter {
+// the given uid, or nil if an error occurs.
+func (r *crdHandler) GetCustomResourceListerCollectionDeleter(crd *apiextensions.CustomResourceDefinition) (finalizer.ListerCollectionDeleter, error) {
 	info, err := r.getOrCreateServingInfoFor(crd)
 	if err != nil {
-		utilruntime.HandleError(err)
+		return nil, err
 	}
-	return info.storage
+	return info.storage, nil
 }
 
 func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResourceDefinition) (*crdInfo, error) {
@@ -354,15 +351,10 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResource
 	}
 	creator := unstructuredCreator{}
 
-	// convert CRD schema to openapi schema
-	openapiSchema := &openapispec.Schema{}
-	if err := apiservervalidation.ConvertToOpenAPITypes(crd, openapiSchema); err != nil {
+	validator, err := apiservervalidation.NewSchemaValidator(crd.Spec.Validation)
+	if err != nil {
 		return nil, err
 	}
-	if err := openapispec.ExpandSchema(openapiSchema, nil, nil); err != nil {
-		return nil, err
-	}
-	validator := validate.NewSchemaValidator(openapiSchema, nil, "", strfmt.Default)
 
 	storage := customresource.NewREST(
 		schema.GroupResource{Group: crd.Spec.Group, Resource: crd.Status.AcceptedNames.Plural},
