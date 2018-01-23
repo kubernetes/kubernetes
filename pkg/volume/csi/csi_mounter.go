@@ -87,8 +87,12 @@ func getTargetPath(uid types.UID, specVolumeID string, host volume.VolumeHost) s
 var _ volume.Mounter = &csiMountMgr{}
 
 func (c *csiMountMgr) CanMount() error {
-	//TODO (vladimirvivien) use this method to probe controller using CSI.NodeProbe() call
-	// to ensure Node service is ready in the CSI plugin
+	ctx, cancel := grpctx.WithTimeout(grpctx.Background(), csiTimeout)
+	defer cancel()
+	if err := c.csiClient.NodeProbe(ctx, csiVersion); err != nil {
+		glog.Error(log("mounter.CanMount failed to probe driver: %v", err))
+		return err
+	}
 	return nil
 }
 
@@ -126,13 +130,6 @@ func (c *csiMountMgr) SetUpAt(dir string, fsGroup *int64) error {
 	// ensure version is supported
 	if err := csi.AssertSupportedVersion(ctx, csiVersion); err != nil {
 		glog.Error(log("mounter.SetUpAt failed to assert version: %v", err))
-		return err
-	}
-
-	// probe driver
-	// TODO (vladimirvivien) move probe call where it is done only when it is needed.
-	if err := csi.NodeProbe(ctx, csiVersion); err != nil {
-		glog.Error(log("mounter.SetUpAt failed to probe driver: %v", err))
 		return err
 	}
 
