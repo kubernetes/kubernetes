@@ -18,30 +18,6 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-# As of go 1.6, the vendor experiment is enabled by default.
-export GO15VENDOREXPERIMENT=1
-
-#### HACK ####
-# Sometimes godep just can't handle things. This lets use manually put
-# some deps in place first, so godep won't fall over.
-preload-dep() {
-  org="$1"
-  project="$2"
-  sha="$3"
-  # project_dir ($4) is optional, if unset we will generate it
-  if [[ -z ${4:-} ]]; then
-    project_dir="${GOPATH}/src/${org}/${project}.git"
-  else
-    project_dir="${4}"
-  fi
-
-  echo "**HACK** preloading dep for ${org} ${project} at ${sha} into ${project_dir}"
-  git clone "https://${org}/${project}" "${project_dir}" > /dev/null 2>&1
-  pushd "${project_dir}" > /dev/null
-    git checkout "${sha}"
-  popd > /dev/null
-}
-
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
@@ -64,16 +40,15 @@ fi
 if [[ -z ${KEEP_TMP:-} ]]; then
     KEEP_TMP=false
 fi
-function cleanup {
+function verify_gopath_cleanup {
   if [ "${KEEP_TMP}" == "true" ]; then
     echo "Leaving ${_tmpdir} for you to examine or copy. Please delete it manually when finished. (rm -rf ${_tmpdir})"
   else
     echo "Removing ${_tmpdir}"
     rm -rf "${_tmpdir}"
   fi
-  export GODEP=""
 }
-trap cleanup EXIT
+kube::util::trap_add verify_gopath_cleanup EXIT
 
 # Copy the contents of the kube directory into the nice clean place
 _kubetmp="${_tmpdir}/src/k8s.io"
@@ -82,8 +57,13 @@ mkdir -p "${_kubetmp}"
 git archive --format=tar --prefix=kubernetes/ $(git write-tree) | (cd "${_kubetmp}" && tar xf -)
 _kubetmp="${_kubetmp}/kubernetes"
 
-# Do all our work in the new GOPATH
-export GOPATH="${_tmpdir}"
+# If there is a preloaded set of deps, use that. If not just do all our work in
+# the new GOPATH.
+if [[ -d "${KUBE_ROOT}/_gopath" ]]; then
+  GOPATH="${KUBE_ROOT}/_gopath:${_tmpdir}"
+else
+  GOPATH="${_tmpdir}"
+fi
 
 pushd "${_kubetmp}" 2>&1 > /dev/null
   # Restore the Godeps into our temp directory

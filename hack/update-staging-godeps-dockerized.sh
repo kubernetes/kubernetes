@@ -53,13 +53,17 @@ done
 # Confirm this is running inside a docker container, as this will modify the git tree (unsafe to run outside of container)
 kube::util::ensure_dockerized
 kube::golang::setup_env
-# Ensure we have a simple gopath so that we can modify it, and that no staging repos have made their way in
-kube::util::ensure_single_dir_gopath
+# Ensure that no staging repos have made their way into the GOPATH
 kube::util::ensure_no_staging_repos_in_gopath
 # Confirm we have the right godep version installed
 kube::util::ensure_godep_version
 # Create a fake git repo the root of the repo to prevent godeps from complaining
 kube::util::create-fake-git-tree "${KUBE_ROOT}"
+
+# If there is a preloaded set of deps, use that.
+if [[ -d "${KUBE_GOPATH}/src/k8s.io/kubernetes/_gopath" ]]; then
+  GOPATH="${GOPATH}:${KUBE_GOPATH}/src/k8s.io/kubernetes/_gopath"
+fi
 
 "${KUBE_ROOT}/hack/godep-restore.sh"
 
@@ -70,13 +74,16 @@ function updateGodepManifest() {
   pushd "${TMP_GOPATH}/src/k8s.io/${repo}" >/dev/null
     kube::log::status "Updating godeps for k8s.io/${repo}"
     rm -rf Godeps # remove the current Godeps.json so we always rebuild it
-    GOPATH="${TMP_GOPATH}:${GOPATH}:${GOPATH}/src/k8s.io/kubernetes/staging" godep save ${GODEP_OPTS} ./... 2>&1 | sed 's/^/  /'
+    GOPATH="${TMP_GOPATH}:${GOPATH}:${KUBE_GOPATH}/src/k8s.io/kubernetes/staging" godep save ${GODEP_OPTS} ./... 2>&1 | sed 's/^/  /'
 
     # Rewriting Godeps.json to cross-out commits that don't really exist because we haven't pushed the prereqs yet
     local repo
     for repo in $(ls -1 ${KUBE_ROOT}/staging/src/k8s.io); do
       # remove staging prefix
       jq '.Deps |= map(.ImportPath |= ltrimstr("k8s.io/kubernetes/staging/src/"))' Godeps/Godeps.json |
+
+        # remove cached godeps prefix
+        jq '.Deps |= map(.ImportPath |= ltrimstr("k8s.io/kubernetes/_gopath/src/"))' |
 
         # x-out staging repo revisions. They will only be known when the publisher bot has created the final export.
         # We keep the staging dependencies in here though to give the publisher bot a way to detect when the staging
