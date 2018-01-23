@@ -297,6 +297,10 @@ func (a *MutatingWebhook) callAttrMutatingHook(ctx context.Context, h *v1beta1.W
 		return &webhookerrors.ErrCallingWebhook{WebhookName: h.Name, Reason: err}
 	}
 
+	for k, v := range response.Response.Annotations {
+		attr.SetAnnotations(h.Name, k, v)
+	}
+
 	if !response.Response.Allowed {
 		return webhookerrors.ToStatusErr(h.Name, response.Response.Result)
 	}

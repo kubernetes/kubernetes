@@ -94,6 +94,10 @@ type AdmissionResponse struct {
 	// The type of Patch. Currently we only allow "JSONPatch".
 	// +optional
 	PatchType *PatchType `json:"patchType,omitempty" protobuf:"bytes,5,opt,name=patchType"`
+
+	// Annotations set by remote admission controller.
+	// +optional
+	Annotations map[string]string `json:"annotations,omitempty" rotobuf:"bytes,6,rep,name=annotations" protobuf:"bytes,6,rep,name=annotations"`
 }
 
 // PatchType is the type of patch being used to represent the mutated object

@@ -234,13 +234,14 @@ func (a *ValidatingAdmissionWebhook) Validate(attr admission.Attributes) error {
 
 	wg := sync.WaitGroup{}
 	errCh := make(chan error, len(relevantHooks))
+	annotationLock := sync.Mutex{}
 	wg.Add(len(relevantHooks))
 	for i := range relevantHooks {
 		go func(hook *v1beta1.Webhook) {
 			defer wg.Done()
 
 			t := time.Now()
-			err := a.callHook(ctx, hook, versionedAttr)
+			err := a.callHook(ctx, hook, versionedAttr, annotationLock)
 			admissionmetrics.Metrics.ObserveWebhook(time.Since(t), err != nil, attr, "validating", hook.Name)
 			if err == nil {
 				return
@@ -299,7 +300,7 @@ func (a *ValidatingAdmissionWebhook) shouldCallHook(h *v1beta1.Webhook, attr adm
 	return a.namespaceMatcher.MatchNamespaceSelector(h, attr)
 }
 
-func (a *ValidatingAdmissionWebhook) callHook(ctx context.Context, h *v1beta1.Webhook, attr admission.Attributes) error {
+func (a *ValidatingAdmissionWebhook) callHook(ctx context.Context, h *v1beta1.Webhook, attr admission.Attributes, annotationLock sync.Mutex) error {
 	// Make the webhook request
 	request := request.CreateAdmissionReview(attr)
 	client, err := a.clientManager.HookClient(h)
@@ -309,6 +310,14 @@ func (a *ValidatingAdmissionWebhook) callHook(ctx context.Context, h *v1beta1.We
 	response := &admissionv1beta1.AdmissionReview{}
 	if err := client.Post().Context(ctx).Body(&request).Do().Into(response); err != nil {
 		return &webhookerrors.ErrCallingWebhook{WebhookName: h.Name, Reason: err}
+	}
+
+	if len(response.Response.Annotations) != 0 {
+		annotationLock.Lock()
+		for k, v := range response.Response.Annotations {
+			attr.SetAnnotations(h.Name, k, v)
+		}
+		annotationLock.Unlock()
 	}
 
 	if response.Response == nil {

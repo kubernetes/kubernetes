@@ -97,6 +97,10 @@ message AdmissionResponse {
   // The type of Patch. Currently we only allow "JSONPatch".
   // +optional
   optional string patchType = 5;
+
+  // Annotations set by remote admission controller.
+  // +optional
+  map<string, string> annotations = 6;
 }
 
 // AdmissionReview describes an admission review request/response.
