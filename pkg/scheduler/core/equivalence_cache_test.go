@@ -21,11 +21,131 @@ import (
 	"testing"
 
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 )
+
+// makeBasicPod returns a Pod object with many of the fields populated.
+func makeBasicPod() *v1.Pod {
+	isController := true
+	return &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-pod",
+			Namespace: "test-ns",
+			Labels:    map[string]string{"app": "web", "env": "prod"},
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion: "v1",
+					Kind:       "ReplicationController",
+					Name:       "rc",
+					UID:        "123",
+					Controller: &isController,
+				},
+			},
+		},
+		Spec: v1.PodSpec{
+			Affinity: &v1.Affinity{
+				NodeAffinity: &v1.NodeAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+						NodeSelectorTerms: []v1.NodeSelectorTerm{
+							{
+								MatchExpressions: []v1.NodeSelectorRequirement{
+									{
+										Key:      "failure-domain.beta.kubernetes.io/zone",
+										Operator: "Exists",
+									},
+								},
+							},
+						},
+					},
+				},
+				PodAffinity: &v1.PodAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
+						{
+							LabelSelector: &metav1.LabelSelector{
+								MatchLabels: map[string]string{"app": "db"}},
+							TopologyKey: "kubernetes.io/hostname",
+						},
+					},
+				},
+				PodAntiAffinity: &v1.PodAntiAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
+						{
+							LabelSelector: &metav1.LabelSelector{
+								MatchLabels: map[string]string{"app": "web"}},
+							TopologyKey: "kubernetes.io/hostname",
+						},
+					},
+				},
+			},
+			InitContainers: []v1.Container{
+				{
+					Name:  "init-pause",
+					Image: "gcr.io/google_containers/pause",
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							"cpu": resource.MustParse("1"),
+							"mem": resource.MustParse("100Mi"),
+						},
+					},
+				},
+			},
+			Containers: []v1.Container{
+				{
+					Name:  "pause",
+					Image: "gcr.io/google_containers/pause",
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							"cpu": resource.MustParse("1"),
+							"mem": resource.MustParse("100Mi"),
+						},
+					},
+					VolumeMounts: []v1.VolumeMount{
+						{
+							Name:      "nfs",
+							MountPath: "/srv/data",
+						},
+					},
+				},
+			},
+			NodeSelector: map[string]string{"node-type": "awesome"},
+			Tolerations: []v1.Toleration{
+				{
+					Effect:   "NoSchedule",
+					Key:      "experimental",
+					Operator: "Exists",
+				},
+			},
+			Volumes: []v1.Volume{
+				{
+					VolumeSource: v1.VolumeSource{
+						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+							ClaimName: "someEBSVol1",
+						},
+					},
+				},
+				{
+					VolumeSource: v1.VolumeSource{
+						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+							ClaimName: "someEBSVol2",
+						},
+					},
+				},
+				{
+					Name: "nfs",
+					VolumeSource: v1.VolumeSource{
+						NFS: &v1.NFSVolumeSource{
+							Server: "nfs.corp.example.com",
+						},
+					},
+				},
+			},
+		},
+	}
+}
 
 type predicateItemType struct {
 	fit     bool
@@ -639,5 +759,35 @@ func TestInvalidateAllCachedPredicateItemOfNode(t *testing.T) {
 			t.Errorf("Failed: cached item for node: %v should be invalidated", test.nodeName)
 			break
 		}
+	}
+}
+
+func BenchmarkEquivalenceHash(b *testing.B) {
+	testNamespace := "test"
+
+	pvcInfo := predicates.FakePersistentVolumeClaimInfo{
+		{
+			ObjectMeta: metav1.ObjectMeta{UID: "someEBSVol1", Name: "someEBSVol1", Namespace: testNamespace},
+			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "someEBSVol1"},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{UID: "someEBSVol2", Name: "someEBSVol2", Namespace: testNamespace},
+			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "someNonEBSVol"},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{UID: "someEBSVol3-0", Name: "someEBSVol3-0", Namespace: testNamespace},
+			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "pvcWithDeletedPV"},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{UID: "someEBSVol3-1", Name: "someEBSVol3-1", Namespace: testNamespace},
+			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "anotherPVCWithDeletedPV"},
+		},
+	}
+
+	// use default equivalence class generator
+	cache := NewEquivalenceCache(predicates.NewEquivalencePodGenerator(pvcInfo))
+	pod := makeBasicPod()
+	for i := 0; i < b.N; i++ {
+		cache.getHashEquivalencePod(pod)
 	}
 }
