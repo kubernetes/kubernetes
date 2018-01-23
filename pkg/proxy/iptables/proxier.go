@@ -754,8 +754,7 @@ func (proxier *Proxier) OnEndpointsSynced() {
 // <changes> map is cleared after applying them.
 func updateEndpointsMap(
 	endpointsMap proxyEndpointsMap,
-	changes *endpointsChangeMap,
-	hostname string) (result updateEndpointMapResult) {
+	changes *endpointsChangeMap) (result updateEndpointMapResult) {
 	result.staleEndpoints = make(map[endpointServicePair]bool)
 	result.staleServiceNames = make(map[proxy.ServicePortName]bool)
 
@@ -984,7 +983,7 @@ func (proxier *Proxier) syncProxyRules() {
 	serviceUpdateResult := updateServiceMap(
 		proxier.serviceMap, &proxier.serviceChanges)
 	endpointUpdateResult := updateEndpointsMap(
-		proxier.endpointsMap, &proxier.endpointsChanges, proxier.hostname)
+		proxier.endpointsMap, &proxier.endpointsChanges)
 
 	staleServices := serviceUpdateResult.staleServices
 	// merge stale services gathered from updateEndpointsMap
