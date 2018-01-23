@@ -93,6 +93,7 @@ go_library(
         "//pkg/util/sysctl:go_default_library",
         "//pkg/util/version:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/golang.org/x/sys/unix:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
@@ -102,7 +103,6 @@ go_library(
     ] + select({
         "@io_bazel_rules_go//go/platform:linux": [
             "//vendor/github.com/vishvananda/netlink:go_default_library",
-            "//vendor/golang.org/x/sys/unix:go_default_library",
         ],
         "//conditions:default": [],
     }),
