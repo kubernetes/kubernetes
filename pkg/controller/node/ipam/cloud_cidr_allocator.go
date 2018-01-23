@@ -191,9 +191,13 @@ func (ca *cloudCIDRAllocator) AllocateOrOccupyCIDR(node *v1.Node) error {
 
 // updateCIDRAllocation assigns CIDR to Node and sends an update to the API server.
 func (ca *cloudCIDRAllocator) updateCIDRAllocation(nodeName string) error {
-	var err error
-	var node *v1.Node
 	defer ca.removeNodeFromProcessing(nodeName)
+
+	node, err := ca.nodeLister.Get(nodeName)
+	if err != nil {
+		glog.Errorf("Failed to get node %v: %v", nodeName, err)
+		return err
+	}
 
 	cidrs, err := ca.cloud.AliasRanges(types.NodeName(nodeName))
 	if err != nil {
