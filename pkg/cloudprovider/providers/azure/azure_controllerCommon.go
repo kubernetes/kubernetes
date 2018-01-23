@@ -44,6 +44,9 @@ const (
 	errLeaseIDMissing    = "LeaseIdMissing"
 	errContainerNotFound = "ContainerNotFound"
 	errDiskBlobNotFound  = "DiskBlobNotFound"
+
+	errNetworkInterfaceAndLoadBalancerAreInDifferentAvailabilitySets = "NetworkInterfaceAndLoadBalancerAreInDifferentAvailabilitySets"
+	errNetworkInterfaceUsesMultipleLoadBalancersOfSameType           = "NetworkInterfaceUsesMultipleLoadBalancersOfSameType"
 )
 
 var defaultBackOff = kwait.Backoff{
