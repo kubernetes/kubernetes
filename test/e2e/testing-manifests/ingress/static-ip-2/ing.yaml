@@ -6,10 +6,6 @@ metadata:
   # annotations:
   #  kubernetes.io/ingress.global-static-ip-name: "staticip"
 spec:
-  tls:
-  # This assumes tls-secret exists.
-  # To generate it run the make in this directory.
-  - secretName: tls-secret
   backend:
     serviceName: echoheaders-https
     servicePort: 80
