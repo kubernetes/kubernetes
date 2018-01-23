@@ -765,7 +765,7 @@ func (p *glusterfsVolumeProvisioner) CreateVolume(gid int) (r *v1.GlusterfsVolum
 	}
 
 	if p.provisionerConfig.volumeNamePrefix != "" {
-		customVolumeName = fmt.Sprintf("%s_%s_%s", p.provisionerConfig.volumeNamePrefix, p.options.PVC.Name, uuid.NewUUID())
+		customVolumeName = fmt.Sprintf("%s_%s_%s_%s", p.provisionerConfig.volumeNamePrefix, p.options.PVC.Namespace, p.options.PVC.Name, uuid.NewUUID())
 	}
 
 	gid64 := int64(gid)
