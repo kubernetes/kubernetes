@@ -50,6 +50,7 @@ import (
 // described in https://github.com/kubernetes/community/pull/128
 var cloudproviders = []string{
 	"aws",
+	"alicloud",
 	"azure",
 	"cloudstack",
 	"gce",
