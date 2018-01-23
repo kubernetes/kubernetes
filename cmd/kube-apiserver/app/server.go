@@ -460,15 +460,17 @@ func BuildGenericConfig(s *options.ServerRunOptions, proxyTransport *http.Transp
 	}
 
 	webhookAuthResolver := func(delegate webhookconfig.AuthenticationInfoResolver) webhookconfig.AuthenticationInfoResolver {
-		return webhookconfig.AuthenticationInfoResolverFunc(func(server string) (*rest.Config, error) {
+		return webhookconfig.AuthenticationInfoResolverFunc(func(server string, directRouting bool) (*rest.Config, error) {
 			if server == "kubernetes.default.svc" {
 				return genericConfig.LoopbackClientConfig, nil
 			}
-			ret, err := delegate.ClientConfigFor(server)
+			ret, err := delegate.ClientConfigFor(server, directRouting)
 			if err != nil {
 				return nil, err
 			}
-			if proxyTransport != nil && proxyTransport.Dial != nil {
+			if !directRouting && proxyTransport != nil && proxyTransport.Dial != nil {
+				// Use the SSH tunnels iff the webhook server is not directly
+				// routable from apiserver's network environment.
 				ret.Dial = proxyTransport.Dial
 			}
 			return ret, err
