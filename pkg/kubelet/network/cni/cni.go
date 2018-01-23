@@ -68,6 +68,11 @@ type cniPortMapping struct {
 	HostIP        string `json:"hostIP"`
 }
 
+func SplitDirs(dirs string) []string {
+	// Use comma rather than colon to work better with Windows too
+	return strings.Split(dirs, ",")
+}
+
 func ProbeNetworkPlugins(confDir string, binDirs []string) []network.NetworkPlugin {
 	old := binDirs
 	binDirs = make([]string, len(binDirs))

@@ -563,7 +563,7 @@ func (plugin *kubenetNetworkPlugin) Status() error {
 	}
 
 	if !plugin.checkRequiredCNIPlugins() {
-		return fmt.Errorf("could not locate kubenet required CNI plugins %v at %q or %q", requiredCNIPlugins, plugin.binDirs)
+		return fmt.Errorf("could not locate kubenet required CNI plugins %v at %q", requiredCNIPlugins, plugin.binDirs)
 	}
 	return nil
 }
