@@ -90,17 +90,6 @@ data:
     </match>
   system.input.conf: |-
     # Example:
-    # 2015-12-21 23:17:22,066 [salt.state       ][INFO    ] Completed state [net.ipv4.ip_forward] at time 23:17:22.066081
-    <source>
-      type tail
-      format /^(?<time>[^ ]* [^ ,]*)[^\[]*\[[^\]]*\]\[(?<severity>[^ \]]*) *\] (?<message>.*)$/
-      time_format %Y-%m-%d %H:%M:%S
-      path /var/log/salt/minion
-      pos_file /var/log/gcp-salt.pos
-      tag salt
-    </source>
-
-    # Example:
     # Dec 21 23:17:22 gke-foo-1-1-4b5cbd14-node-4eoj startupscript: Finished running startup script /var/run/google.startup.script
     <source>
       type tail
