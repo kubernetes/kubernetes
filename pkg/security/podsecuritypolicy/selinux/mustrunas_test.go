@@ -76,9 +76,15 @@ func TestMustRunAsValidate(t *testing.T) {
 		return &api.SELinuxOptions{
 			User:  "user",
 			Role:  "role",
-			Level: "level",
+			Level: "s0:c0,c6",
 			Type:  "type",
 		}
+	}
+
+	newValidOptsWithLevel := func(level string) *api.SELinuxOptions {
+		opts := newValidOpts()
+		opts.Level = level
+		return opts
 	}
 
 	role := newValidOpts()
@@ -115,6 +121,10 @@ func TestMustRunAsValidate(t *testing.T) {
 		},
 		"valid": {
 			seLinux:     newValidOpts(),
+			expectedMsg: "",
+		},
+		"valid with different order of categories": {
+			seLinux:     newValidOptsWithLevel("s0:c6,c0"),
 			expectedMsg: "",
 		},
 	}
