@@ -28,6 +28,7 @@ import (
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/status"
+	"k8s.io/kubernetes/pkg/kubelet/util/pluginwatcher"
 	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
 
 	"fmt"
@@ -94,6 +95,7 @@ type ContainerManager interface {
 
 	// GetPodCgroupRoot returns the cgroup which contains all pods.
 	GetPodCgroupRoot() string
+	GetPluginRegistrationHandlerCallback() pluginwatcher.RegisterCallbackFn
 }
 
 type NodeConfig struct {

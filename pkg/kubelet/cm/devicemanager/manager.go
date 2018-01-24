@@ -39,6 +39,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
+	watcher "k8s.io/kubernetes/pkg/kubelet/util/pluginwatcher"
 	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
 )
 
@@ -239,6 +240,43 @@ func (m *ManagerImpl) Start(activePods ActivePodsFunc, sourcesReady config.Sourc
 	return nil
 }
 
+// GetWatcherCallback returns callback function to be registered with plugin watcher
+func (m *ManagerImpl) GetWatcherCallback() watcher.RegisterCallbackFn {
+	if f, err := os.Create(m.socketdir + "DEPRECATION"); err != nil {
+		glog.Errorf("Failed to create deprecation file at %s", m.socketdir)
+	} else {
+		f.Close()
+		glog.V(4).Infof("created deprecation file %s", f.Name())
+	}
+
+	return func(name string, endpoint string, versions []string, sockPath string) (chan bool, error) {
+		if !m.isVersionCompatibleWithPlugin(versions) {
+			return nil, fmt.Errorf("manager version, %s, is not among plugin supported versions %v", pluginapi.Version, versions)
+		}
+
+		if !v1helper.IsExtendedResourceName(v1.ResourceName(name)) {
+			return nil, fmt.Errorf("invalid name of device plugin socket: %v", fmt.Sprintf(errInvalidResourceName, name))
+		}
+
+		return m.addEndpointProbeMode(name, sockPath)
+	}
+}
+
+func (m *ManagerImpl) isVersionCompatibleWithPlugin(versions []string) bool {
+	// TODO(vikasc): Currently this is fine as we only have a single supported version. When we do need to support
+	// multiple versions in the future, we may need to extend this function to return a supported version.
+	// E.g., say kubelet supports v1beta1 and v1beta2, and we get v1alpha1 and v1beta1 from a device plugin,
+	// this function should return v1beta1
+	for _, version := range versions {
+		for _, supportedVersion := range pluginapi.SupportedVersions {
+			if version == supportedVersion {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // Devices is the map of devices that are known by the Device
 // Plugin manager with the kind of the devices as key
 func (m *ManagerImpl) Devices() map[string][]pluginapi.Device {
@@ -335,10 +373,41 @@ func (m *ManagerImpl) Stop() error {
 	return nil
 }
 
-func (m *ManagerImpl) addEndpoint(r *pluginapi.RegisterRequest) {
-	existingDevs := make(map[string]pluginapi.Device)
+func (m *ManagerImpl) addEndpointProbeMode(resourceName string, socketPath string) (chan bool, error) {
+	chanForAckOfNotification := make(chan bool)
+
+	new, err := newEndpointImpl(socketPath, resourceName, make(map[string]pluginapi.Device), m.callback)
+	if err != nil {
+		glog.Errorf("Failed to dial device plugin with socketPath %s: %v", socketPath, err)
+		return nil, fmt.Errorf("Failed to dial device plugin with socketPath %s: %v", socketPath, err)
+	}
+
+	options, err := new.client.GetDevicePluginOptions(context.Background(), &pluginapi.Empty{})
+	if err != nil {
+		glog.Errorf("Failed to get device plugin options: %v", err)
+		return nil, fmt.Errorf("Failed to get device plugin options: %v", err)
+	}
+	m.registerEndpoint(resourceName, options, new)
+
+	go func() {
+		select {
+		case <-chanForAckOfNotification:
+			close(chanForAckOfNotification)
+			m.runEndpoint(resourceName, new)
+		case <-time.After(time.Second):
+			glog.Errorf("Timed out while waiting for notification ack from plugin")
+		}
+	}()
+	return chanForAckOfNotification, nil
+}
+
+func (m *ManagerImpl) registerEndpoint(resourceName string, options *pluginapi.DevicePluginOptions, e *endpointImpl) {
 	m.mutex.Lock()
-	old, ok := m.endpoints[r.ResourceName]
+	defer m.mutex.Unlock()
+	if options != nil {
+		m.pluginOpts[resourceName] = options
+	}
+	old, ok := m.endpoints[resourceName]
 	if ok && old != nil {
 		// Pass devices of previous endpoint into re-registered one,
 		// to avoid potential orphaned devices upon re-registration
@@ -347,49 +416,40 @@ func (m *ManagerImpl) addEndpoint(r *pluginapi.RegisterRequest) {
 			device.Health = pluginapi.Unhealthy
 			devices[device.ID] = device
 		}
-		existingDevs = devices
-	}
-	m.mutex.Unlock()
-
-	socketPath := filepath.Join(m.socketdir, r.Endpoint)
-	e, err := newEndpointImpl(socketPath, r.ResourceName, existingDevs, m.callback)
-	if err != nil {
-		glog.Errorf("Failed to dial device plugin with request %v: %v", r, err)
-		return
-	}
-	m.mutex.Lock()
-	if r.Options != nil {
-		m.pluginOpts[r.ResourceName] = r.Options
-	}
-	// Check for potential re-registration during the initialization of new endpoint,
-	// and skip updating if re-registration happens.
-	// TODO: simplify the part once we have a better way to handle registered devices
-	ext := m.endpoints[r.ResourceName]
-	if ext != old {
-		glog.Warningf("Some other endpoint %v is added while endpoint %v is initialized", ext, e)
-		m.mutex.Unlock()
-		e.stop()
-		return
+		e.devices = devices
 	}
 	// Associates the newly created endpoint with the corresponding resource name.
 	// Stops existing endpoint if there is any.
-	m.endpoints[r.ResourceName] = e
+	m.endpoints[resourceName] = e
 	glog.V(2).Infof("Registered endpoint %v", e)
-	m.mutex.Unlock()
 
 	if old != nil {
 		old.stop()
 	}
+	return
+}
+
+func (m *ManagerImpl) runEndpoint(resourceName string, e *endpointImpl) {
+	e.run()
+	e.stop()
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	if old, ok := m.endpoints[resourceName]; ok && old == e {
+		m.markResourceUnhealthy(resourceName)
+	}
+	glog.V(2).Infof("Unregistered endpoint %v", e)
+}
+
+func (m *ManagerImpl) addEndpoint(r *pluginapi.RegisterRequest) {
+	new, err := newEndpointImpl(filepath.Join(m.socketdir, r.Endpoint), r.ResourceName, make(map[string]pluginapi.Device), m.callback)
+	if err != nil {
+		glog.Errorf("Failed to dial device plugin with request %v: %v", r, err)
+		return
+	}
+	m.registerEndpoint(r.ResourceName, r.Options, new)
 
 	go func() {
-		e.run()
-		e.stop()
-		m.mutex.Lock()
-		if old, ok := m.endpoints[r.ResourceName]; ok && old == e {
-			m.markResourceUnhealthy(r.ResourceName)
-		}
-		glog.V(2).Infof("Unregistered endpoint %v", e)
-		m.mutex.Unlock()
+		m.runEndpoint(r.ResourceName, new)
 	}()
 }
 
