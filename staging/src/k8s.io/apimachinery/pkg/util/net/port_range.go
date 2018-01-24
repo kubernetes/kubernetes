@@ -43,14 +43,20 @@ func (pr PortRange) String() string {
 	return fmt.Sprintf("%d-%d", pr.Base, pr.Base+pr.Size-1)
 }
 
+const (
+	SinglePortNotation = iota
+	HyphenNotation     = 1 << iota
+	PlusNotation
+)
+
 // Set parses a string of the form "min-max", inclusive at both ends, and
 // sets the PortRange from it.  This is part of the flag.Value and pflag.Value
 // interfaces.
 func (pr *PortRange) Set(value string) error {
-	value = strings.TrimSpace(value)
 
-	// TODO: Accept "80" syntax
-	// TODO: Accept "80+8" syntax
+	value = strings.TrimSpace(value)
+	hyphenIndex := strings.Index(value, "-")
+	plusIndex := strings.Index(value, "+")
 
 	if value == "" {
 		pr.Base = 0
@@ -58,20 +64,48 @@ func (pr *PortRange) Set(value string) error {
 		return nil
 	}
 
-	hyphenIndex := strings.Index(value, "-")
-	if hyphenIndex == -1 {
-		return fmt.Errorf("expected hyphen in port range")
+	var err error
+	var notation int
+	var low, high int
+
+	if hyphenIndex >= 0 {
+		notation |= HyphenNotation
+	}
+	if plusIndex != -1 {
+		notation |= PlusNotation
 	}
 
-	var err error
-	var low int
-	var high int
-	low, err = strconv.Atoi(value[:hyphenIndex])
-	if err == nil {
+	switch notation {
+	case SinglePortNotation:
+		var port int
+		port, err = strconv.Atoi(value)
+		if err != nil {
+			return err
+		}
+		low = port
+		high = port
+	case HyphenNotation:
+		low, err = strconv.Atoi(value[:hyphenIndex])
+		if err != nil {
+			return err
+		}
 		high, err = strconv.Atoi(value[hyphenIndex+1:])
-	}
-	if err != nil {
-		return fmt.Errorf("unable to parse port range: %s: %v", value, err)
+		if err != nil {
+			return err
+		}
+	case PlusNotation:
+		var offset int
+		low, err = strconv.Atoi(value[:plusIndex])
+		if err != nil {
+			return err
+		}
+		offset, err = strconv.Atoi(value[plusIndex+1:])
+		if err != nil {
+			return err
+		}
+		high = low + offset
+	default:
+		return fmt.Errorf("unable to parse port range: %s", value)
 	}
 
 	if low > 65535 || high > 65535 {
