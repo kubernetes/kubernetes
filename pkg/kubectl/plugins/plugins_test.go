@@ -16,7 +16,10 @@ limitations under the License.
 
 package plugins
 
-import "testing"
+import (
+	"strconv"
+	"testing"
+)
 
 func TestPlugin(t *testing.T) {
 	tests := []struct {
@@ -128,9 +131,66 @@ func TestPlugin(t *testing.T) {
 					Command:   "echo 1",
 					Flags: []Flag{
 						{
+							Name: "aflag",
+							Desc: "Invalid flag type",
+							Type: "stringArray",
+						},
+					},
+				},
+			},
+			expectedErr: ErrInvalidFlagType,
+		},
+		{
+			plugin: &Plugin{
+				Description: Description{
+					Name:      "test",
+					ShortDesc: "The test",
+					Command:   "echo 1",
+					Flags: []Flag{
+						{
+							Name:     "aflag",
+							Desc:     "boolean flag with a default value",
+							Type:     BoolFlagType,
+							DefValue: "true",
+						},
+					},
+				},
+			},
+		},
+		{
+			plugin: &Plugin{
+				Description: Description{
+					Name:      "test",
+					ShortDesc: "The test",
+					Command:   "echo 1",
+					Flags: []Flag{
+						{
+							Name:     "aflag",
+							Desc:     "Invalid flag default value",
+							Type:     BoolFlagType,
+							DefValue: "yes",
+						},
+					},
+				},
+			},
+			expectedErr: ErrInvalidFlagDefaultValue,
+		},
+		{
+			plugin: &Plugin{
+				Description: Description{
+					Name:      "test",
+					ShortDesc: "The test",
+					Command:   "echo 1",
+					Flags: []Flag{
+						{
 							Name:      "aflag",
 							Desc:      "A flag",
 							Shorthand: "a",
+						},
+						{
+							Name: "boolflag",
+							Desc: "A bool flag",
+							Type: BoolFlagType,
 						},
 					},
 					Tree: Plugins{
@@ -165,5 +225,44 @@ func TestPlugin(t *testing.T) {
 		if err != test.expectedErr {
 			t.Errorf("%s: expected error %v, got %v", test.plugin.Name, test.expectedErr, err)
 		}
+	}
+}
+
+func TestPluginFlagTypeDefaultsToString(t *testing.T) {
+	f := Flag{
+		Name: "aflag",
+		Desc: "a flag with an unspecified type",
+		Type: "",
+	}
+
+	err := f.Validate()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if f.Type != StringFlagType {
+		t.Fatalf("expected flag type to default to %v, got %v", StringFlagType, f.Type)
+	}
+}
+
+func TestPluginBoolFlagDefaultsToFalse(t *testing.T) {
+	f := Flag{
+		Name:     "aflag",
+		Desc:     "a bool flag with an unspecified default value",
+		Type:     BoolFlagType,
+		DefValue: "",
+	}
+
+	err := f.Validate()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	defVal, err := strconv.ParseBool(f.DefValue)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if defVal != false {
+		t.Fatalf("expected bool flag to default to %v, got %v", false, defVal)
 	}
 }
