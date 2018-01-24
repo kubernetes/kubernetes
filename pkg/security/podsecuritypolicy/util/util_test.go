@@ -194,3 +194,38 @@ func TestAllowsHostVolumePath(t *testing.T) {
 		}
 	}
 }
+
+func TestEqualStringSlices(t *testing.T) {
+	tests := map[string]struct {
+		arg1           []string
+		arg2           []string
+		expectedResult bool
+	}{
+		"nil equals to nil": {
+			arg1:           nil,
+			arg2:           nil,
+			expectedResult: true,
+		},
+		"equal by size": {
+			arg1:           []string{"1", "1"},
+			arg2:           []string{"1", "1"},
+			expectedResult: true,
+		},
+		"not equal by size": {
+			arg1:           []string{"1"},
+			arg2:           []string{"1", "1"},
+			expectedResult: false,
+		},
+		"not equal by elements": {
+			arg1:           []string{"1", "1"},
+			arg2:           []string{"1", "2"},
+			expectedResult: false,
+		},
+	}
+
+	for k, v := range tests {
+		if result := EqualStringSlices(v.arg1, v.arg2); result != v.expectedResult {
+			t.Errorf("%s expected to return %t but got %t", k, v.expectedResult, result)
+		}
+	}
+}
