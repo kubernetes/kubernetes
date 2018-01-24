@@ -601,6 +601,11 @@ function kube::build::run_build_command_ex() {
     --env "GOGCFLAGS=${GOGCFLAGS:-}"
   )
 
+  if [[ -n "${DOCKER_CGROUP_PARENT:-}" ]]; then
+    kube::log::status "Using ${DOCKER_CGROUP_PARENT} as container cgroup parent"
+    docker_run_opts+=(--cgroup-parent "${DOCKER_CGROUP_PARENT}")
+  fi
+
   # If we have stdin we can run interactive.  This allows things like 'shell.sh'
   # to work.  However, if we run this way and don't have stdin, then it ends up
   # running in a daemon-ish mode.  So if we don't have a stdin, we explicitly
