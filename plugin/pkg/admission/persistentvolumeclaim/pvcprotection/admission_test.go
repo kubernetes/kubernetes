@@ -77,7 +77,7 @@ func TestAdmit(t *testing.T) {
 	ctrl.SetInternalKubeInformerFactory(informerFactory)
 
 	for _, test := range tests {
-		feature.DefaultFeatureGate.Set(fmt.Sprintf("PVCProtection=%v", test.featureEnabled))
+		feature.DefaultFeatureGate.Set(fmt.Sprintf("StorageProtection=%v", test.featureEnabled))
 		obj := test.object.DeepCopyObject()
 		attrs := admission.NewAttributesRecord(
 			obj,                  // new object
@@ -102,5 +102,5 @@ func TestAdmit(t *testing.T) {
 
 	// Disable the feature for rest of the tests.
 	// TODO: remove after alpha
-	feature.DefaultFeatureGate.Set("PVCProtection=false")
+	feature.DefaultFeatureGate.Set("StorageProtection=false")
 }

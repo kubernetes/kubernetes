@@ -80,7 +80,7 @@ func (c *pvcProtectionPlugin) ValidateInitialization() error {
 //
 // This prevents users from deleting a PVC that's used by a running pod.
 func (c *pvcProtectionPlugin) Admit(a admission.Attributes) error {
-	if !feature.DefaultFeatureGate.Enabled(features.PVCProtection) {
+	if !feature.DefaultFeatureGate.Enabled(features.StorageProtection) {
 		return nil
 	}
 

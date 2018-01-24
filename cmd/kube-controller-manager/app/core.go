@@ -393,7 +393,7 @@ func startGarbageCollectorController(ctx ControllerContext) (bool, error) {
 }
 
 func startPVCProtectionController(ctx ControllerContext) (bool, error) {
-	if utilfeature.DefaultFeatureGate.Enabled(features.PVCProtection) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.StorageProtection) {
 		go pvcprotection.NewPVCProtectionController(
 			ctx.InformerFactory.Core().V1().PersistentVolumeClaims(),
 			ctx.InformerFactory.Core().V1().Pods(),

@@ -434,7 +434,7 @@ func (dswp *desiredStateOfWorldPopulator) getPVCExtractPV(
 			err)
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.PVCProtection) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.StorageProtection) {
 		// Pods that uses a PVC that is being deleted must not be started.
 		//
 		// In case an old kubelet is running without this check or some kubelets
