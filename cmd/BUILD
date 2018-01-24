@@ -31,6 +31,7 @@ filegroup(
         "//cmd/kubelet:all-srcs",
         "//cmd/kubemark:all-srcs",
         "//cmd/linkcheck:all-srcs",
+        "//cmd/staginghub:all-srcs",
     ],
     tags = ["automanaged"],
 )
