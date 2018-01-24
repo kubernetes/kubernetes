@@ -120,6 +120,7 @@ type Cloud struct {
 	VirtualMachinesClient   VirtualMachinesClient
 	StorageAccountClient    StorageAccountClient
 	DisksClient             DisksClient
+	FileClient              FileClient
 	resourceRequestBackoff  wait.Backoff
 	vmSet                   VMSet
 
@@ -193,6 +194,7 @@ func NewCloud(configReader io.Reader) (cloudprovider.Interface, error) {
 		PublicIPAddressesClient:         newAzPublicIPAddressesClient(azClientConfig),
 		VirtualMachineScaleSetsClient:   newAzVirtualMachineScaleSetsClient(azClientConfig),
 		VirtualMachineScaleSetVMsClient: newAzVirtualMachineScaleSetVMsClient(azClientConfig),
+		FileClient:                      &azureFileClient{env: *env},
 	}
 
 	// Conditionally configure resource request backoff

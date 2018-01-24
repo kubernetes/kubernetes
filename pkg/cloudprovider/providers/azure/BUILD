@@ -69,6 +69,7 @@ go_test(
         "azure_loadbalancer_test.go",
         "azure_metrics_test.go",
         "azure_standard_test.go",
+        "azure_storage_test.go",
         "azure_storageaccount_test.go",
         "azure_test.go",
         "azure_vmss_test.go",

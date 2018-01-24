@@ -24,51 +24,48 @@ import (
 
 // CreateFileShare creates a file share, using a matching storage account
 func (az *Cloud) CreateFileShare(name, storageAccount, storageType, location string, requestGB int) (string, string, error) {
-	var err error
+	var errResult error
 	accounts := []accountWithLocation{}
 	if len(storageAccount) > 0 {
 		accounts = append(accounts, accountWithLocation{Name: storageAccount})
 	} else {
 		// find a storage account
-		accounts, err = az.getStorageAccounts()
-		if err != nil {
+		accounts, errResult = az.getStorageAccounts()
+		if errResult != nil {
 			// TODO: create a storage account and container
-			return "", "", err
+			return "", "", errResult
 		}
 	}
 	for _, account := range accounts {
 		glog.V(4).Infof("account %s type %s location %s", account.Name, account.StorageType, account.Location)
 		if ((storageType == "" || account.StorageType == storageType) && (location == "" || account.Location == location)) || len(storageAccount) > 0 {
 			// find the access key with this account
-			key, err := az.getStorageAccesskey(account.Name)
-			if err != nil {
-				err = fmt.Errorf("could not get storage key for storage account %s: %v", account.Name, err)
+			key, innerErr := az.getStorageAccesskey(account.Name)
+			if innerErr != nil {
+				errResult = fmt.Errorf("could not get storage key for storage account %s: %v", account.Name, innerErr)
 				continue
 			}
 
-			err = az.createFileShare(account.Name, key, name, requestGB)
-			if err != nil {
-				err = fmt.Errorf("failed to create share %s in account %s: %v", name, account.Name, err)
+			if innerErr = az.createFileShare(account.Name, key, name, requestGB); innerErr != nil {
+				errResult = fmt.Errorf("failed to create share %s in account %s: %v", name, account.Name, innerErr)
 				continue
 			}
 			glog.V(4).Infof("created share %s in account %s", name, account.Name)
-			return account.Name, key, err
+			return account.Name, key, nil
 		}
 	}
 
-	if err == nil {
-		err = fmt.Errorf("failed to find a matching storage account")
+	if errResult == nil {
+		errResult = fmt.Errorf("failed to find a matching storage account")
 	}
-	return "", "", err
+	return "", "", errResult
 }
 
 // DeleteFileShare deletes a file share using storage account name and key
 func (az *Cloud) DeleteFileShare(accountName, key, name string) error {
-	err := az.deleteFileShare(accountName, key, name)
-	if err != nil {
+	if err := az.deleteFileShare(accountName, key, name); err != nil {
 		return err
 	}
 	glog.V(4).Infof("share %s deleted", name)
 	return nil
-
 }
