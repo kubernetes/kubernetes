@@ -88,7 +88,7 @@ func NewEtcd(dataDir string) *EtcdServer {
 // Start starts the etcd server and listening for client connections
 func (e *EtcdServer) Start() error {
 	var err error
-	e.EtcdServer, err = etcdserver.NewServer(e.config)
+	e.EtcdServer, err = etcdserver.NewServer(*e.config)
 	if err != nil {
 		return err
 	}

@@ -9,12 +9,14 @@ import (
 	"io"
 )
 
-// WriteJSON is deprecated, use c.WriteJSON instead.
+// WriteJSON writes the JSON encoding of v as a message.
+//
+// Deprecated: Use c.WriteJSON instead.
 func WriteJSON(c *Conn, v interface{}) error {
 	return c.WriteJSON(v)
 }
 
-// WriteJSON writes the JSON encoding of v to the connection.
+// WriteJSON writes the JSON encoding of v as a message.
 //
 // See the documentation for encoding/json Marshal for details about the
 // conversion of Go values to JSON.
@@ -31,7 +33,10 @@ func (c *Conn) WriteJSON(v interface{}) error {
 	return err2
 }
 
-// ReadJSON is deprecated, use c.ReadJSON instead.
+// ReadJSON reads the next JSON-encoded message from the connection and stores
+// it in the value pointed to by v.
+//
+// Deprecated: Use c.ReadJSON instead.
 func ReadJSON(c *Conn, v interface{}) error {
 	return c.ReadJSON(v)
 }
@@ -48,9 +53,7 @@ func (c *Conn) ReadJSON(v interface{}) error {
 	}
 	err = json.NewDecoder(r).Decode(v)
 	if err == io.EOF {
-		// Decode returns io.EOF when the message is empty or all whitespace.
-		// Convert to io.ErrUnexpectedEOF so that application can distinguish
-		// between an error reading the JSON value and the connection closing.
+		// One value is expected in the message.
 		err = io.ErrUnexpectedEOF
 	}
 	return err

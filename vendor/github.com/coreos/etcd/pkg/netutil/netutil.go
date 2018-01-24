@@ -92,15 +92,19 @@ func resolveTCPAddrs(ctx context.Context, urls [][]url.URL) ([][]url.URL, error)
 }
 
 func resolveURL(ctx context.Context, u url.URL) (string, error) {
+	if u.Scheme == "unix" || u.Scheme == "unixs" {
+		// unix sockets don't resolve over TCP
+		return "", nil
+	}
+	host, _, err := net.SplitHostPort(u.Host)
+	if err != nil {
+		plog.Errorf("could not parse url %s during tcp resolving", u.Host)
+		return "", err
+	}
+	if host == "localhost" || net.ParseIP(host) != nil {
+		return "", nil
+	}
 	for ctx.Err() == nil {
-		host, _, err := net.SplitHostPort(u.Host)
-		if err != nil {
-			plog.Errorf("could not parse url %s during tcp resolving", u.Host)
-			return "", err
-		}
-		if host == "localhost" || net.ParseIP(host) != nil {
-			return "", nil
-		}
 		tcpAddr, err := resolveTCPAddr(ctx, u.Host)
 		if err == nil {
 			plog.Infof("resolving %s to %s", u.Host, tcpAddr.String())

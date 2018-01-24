@@ -74,7 +74,9 @@ func RegisterMetricAndTrackRateLimiterUsage(ownerName string, rateLimiter flowco
 	go wait.Until(func() {
 		metricsLock.Lock()
 		defer metricsLock.Unlock()
-		rateLimiterMetrics[ownerName].metric.Set(rateLimiter.Saturation())
+		if rateMetric, ok := rateLimiterMetrics[ownerName]; ok && rateMetric.metric != nil {
+			rateMetric.metric.Set(rateLimiter.Saturation())
+		}
 	}, updatePeriod, rateLimiterMetrics[ownerName].stopCh)
 	return nil
 }

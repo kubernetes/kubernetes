@@ -15,17 +15,11 @@ To install:
 
     go get github.com/ugorji/go/codec
 
-This package understands the `unsafe` tag, to allow using unsafe semantics:
-
-  - When decoding into a struct, you need to read the field name as a string 
-    so you can find the struct field it is mapped to.
-    Using `unsafe` will bypass the allocation and copying overhead of `[]byte->string` conversion.
-
-To use it, you must pass the `unsafe` tag during install:
-
-```
-go install -tags=unsafe github.com/ugorji/go/codec 
-```
+This package will carefully use 'unsafe' for performance reasons in specific places.
+You can build without unsafe use by passing the safe or appengine tag
+i.e. 'go install -tags=safe ...'. Note that unsafe is only supported for the last 3
+go sdk versions e.g. current go release is go 1.9, so we support unsafe use only from
+go 1.7+ . This is because supporting unsafe requires knowledge of implementation details.
 
 Online documentation: http://godoc.org/github.com/ugorji/go/codec  
 Detailed Usage/How-to Primer: http://ugorji.net/blog/go-codec-primer
@@ -36,8 +30,13 @@ the standard library (ie json, xml, gob, etc).
 Rich Feature Set includes:
 
   - Simple but extremely powerful and feature-rich API
+  - Support for go1.4 and above, while selectively using newer APIs for later releases
+  - Good code coverage ( > 70% )
   - Very High Performance.
     Our extensive benchmarks show us outperforming Gob, Json, Bson, etc by 2-4X.
+  - Careful selected use of 'unsafe' for targeted performance gains.
+    100% mode exists where 'unsafe' is not used at all.
+  - Lock-free (sans mutex) concurrency for scaling to 100's of cores
   - Multiple conversions:
     Package coerces types where appropriate 
     e.g. decode an int in the stream into a float, etc.
@@ -145,4 +144,23 @@ Typical usage model:
     rpcCodec := codec.GoRpc.ClientCodec(conn, h)
     //OR rpcCodec := codec.MsgpackSpecRpc.ClientCodec(conn, h)
     client := rpc.NewClientWithCodec(rpcCodec)
+
+## Running Tests
+
+To run tests, use the following:
+
+    go test
+
+To run the full suite of tests, use the following:
+
+    go test -tags alltests -run Suite
+
+You can run the tag 'safe' to run tests or build in safe mode. e.g.
+
+    go test -tags safe -run Json
+    go test -tags "alltests safe" -run Suite
+
+## Running Benchmarks
+
+Please see http://github.com/ugorji/go-codec-bench .
 

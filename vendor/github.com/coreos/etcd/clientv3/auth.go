@@ -15,13 +15,13 @@
 package clientv3
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
 	"github.com/coreos/etcd/auth/authpb"
 	pb "github.com/coreos/etcd/etcdserver/etcdserverpb"
 
-	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 )
 
