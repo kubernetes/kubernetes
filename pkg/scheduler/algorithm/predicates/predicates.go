@@ -41,6 +41,7 @@ import (
 	priorityutil "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities/util"
 	"k8s.io/kubernetes/pkg/scheduler/schedulercache"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
+	"k8s.io/kubernetes/pkg/util/taints"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 
 	"github.com/golang/glog"
@@ -1489,7 +1490,7 @@ func CheckNodeConditionPredicate(pod *v1.Pod, meta algorithm.PredicateMetadata, 
 		}
 	}
 
-	if node.Spec.Unschedulable {
+	if node.Spec.Unschedulable || taints.TaintExistsWithEffect(node.Spec.Taints) {
 		reasons = append(reasons, ErrNodeUnschedulable)
 	}
 

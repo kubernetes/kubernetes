@@ -3621,6 +3621,14 @@ func TestNodeConditionPredicate(t *testing.T) {
 			node:        &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node11"}},
 			schedulable: true,
 		},
+		{
+			node:        &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node12"}, Spec: v1.NodeSpec{Taints: []v1.Taint{{Key: algorithm.TaintNodeNotReady, Effect: v1.TaintEffectNoExecute}}}},
+			schedulable: false,
+		},
+		{
+			node:        &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node13"}, Spec: v1.NodeSpec{Taints: []v1.Taint{{Effect: v1.TaintEffectNoSchedule}}}},
+			schedulable: false,
+		},
 	}
 
 	for _, test := range tests {
