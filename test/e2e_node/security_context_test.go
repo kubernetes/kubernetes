@@ -373,6 +373,18 @@ var _ = framework.KubeDescribe("Security Context", func() {
 				if !isSupported {
 					framework.Skipf("Skipping because no_new_privs is not supported in this docker")
 				}
+				// It turns out SELinux policy in RHEL 7 does not play well with
+				// the "NoNewPrivileges" flag. So let's skip this test when running
+				// with SELinux support enabled.
+				//
+				// TODO(filbranden): Remove this after the fix for
+				// https://github.com/projectatomic/container-selinux/issues/45
+				// has been backported to RHEL 7 (expected on RHEL 7.5)
+				selinuxEnabled, err := isDockerSELinuxSupportEnabled()
+				framework.ExpectNoError(err)
+				if selinuxEnabled {
+					framework.Skipf("Skipping because Docker daemon is running with SELinux support enabled")
+				}
 			}
 		})
 
