@@ -930,6 +930,8 @@ func (fRTC *fakeRouteTablesClient) Get(resourceGroupName string, routeTableName 
 type fakeStorageAccountClient struct {
 	mutex     *sync.Mutex
 	FakeStore map[string]map[string]storage.Account
+	Keys      storage.AccountListKeysResult
+	Err       error
 }
 
 func newFakeStorageAccountClient() *fakeStorageAccountClient {
@@ -999,7 +1001,7 @@ func (fSAC *fakeStorageAccountClient) Delete(resourceGroupName string, accountNa
 }
 
 func (fSAC *fakeStorageAccountClient) ListKeys(resourceGroupName string, accountName string) (result storage.AccountListKeysResult, err error) {
-	return storage.AccountListKeysResult{}, nil
+	return fSAC.Keys, fSAC.Err
 }
 
 func (fSAC *fakeStorageAccountClient) ListByResourceGroup(resourceGroupName string) (result storage.AccountListResult, err error) {
