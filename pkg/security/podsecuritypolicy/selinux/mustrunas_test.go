@@ -93,9 +93,6 @@ func TestMustRunAsValidate(t *testing.T) {
 	user := newValidOpts()
 	user.User = "invalid"
 
-	level := newValidOpts()
-	level.Level = "invalid"
-
 	seType := newValidOpts()
 	seType.Type = "invalid"
 
@@ -116,15 +113,20 @@ func TestMustRunAsValidate(t *testing.T) {
 			pspSeLinux:  validOpts,
 			expectedMsg: "user: Invalid value",
 		},
-		"invalid level": {
-			podSeLinux:  level,
-			pspSeLinux:  validOpts,
+		"levels are not equal": {
+			podSeLinux:  newValidOptsWithLevel("s0"),
+			pspSeLinux:  newValidOptsWithLevel("s0:c1,c2"),
 			expectedMsg: "level: Invalid value",
 		},
-		"invalid type": {
-			podSeLinux:  seType,
-			pspSeLinux:  validOpts,
-			expectedMsg: "type: Invalid value",
+		"levels differ by sensitivity": {
+			podSeLinux:  newValidOptsWithLevel("s0:c6"),
+			pspSeLinux:  newValidOptsWithLevel("s1:c6"),
+			expectedMsg: "level: Invalid value",
+		},
+		"levels differ by categories": {
+			podSeLinux:  newValidOptsWithLevel("s0:c0,c8"),
+			pspSeLinux:  newValidOptsWithLevel("s0:c1,c7"),
+			expectedMsg: "level: Invalid value",
 		},
 		"valid": {
 			podSeLinux:  validOpts,
