@@ -100,31 +100,31 @@ func TestMustRunAsValidate(t *testing.T) {
 	seType.Type = "invalid"
 
 	tests := map[string]struct {
-		seLinux     *api.SELinuxOptions
+		podSeLinux  *api.SELinuxOptions
 		expectedMsg string
 	}{
 		"invalid role": {
-			seLinux:     role,
+			podSeLinux:  role,
 			expectedMsg: "role: Invalid value",
 		},
 		"invalid user": {
-			seLinux:     user,
+			podSeLinux:  user,
 			expectedMsg: "user: Invalid value",
 		},
 		"invalid level": {
-			seLinux:     level,
+			podSeLinux:  level,
 			expectedMsg: "level: Invalid value",
 		},
 		"invalid type": {
-			seLinux:     seType,
+			podSeLinux:  seType,
 			expectedMsg: "type: Invalid value",
 		},
 		"valid": {
-			seLinux:     newValidOpts(),
+			podSeLinux:  newValidOpts(),
 			expectedMsg: "",
 		},
 		"valid with different order of categories": {
-			seLinux:     newValidOptsWithLevel("s0:c6,c0"),
+			podSeLinux:  newValidOptsWithLevel("s0:c6,c0"),
 			expectedMsg: "",
 		},
 	}
@@ -140,7 +140,7 @@ func TestMustRunAsValidate(t *testing.T) {
 			continue
 		}
 
-		errs := mustRunAs.Validate(nil, nil, nil, tc.seLinux)
+		errs := mustRunAs.Validate(nil, nil, nil, tc.podSeLinux)
 		//should've passed but didn't
 		if len(tc.expectedMsg) == 0 && len(errs) > 0 {
 			t.Errorf("%s expected no errors but received %v", name, errs)
