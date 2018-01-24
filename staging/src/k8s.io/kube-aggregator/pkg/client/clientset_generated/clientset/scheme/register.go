@@ -51,5 +51,4 @@ func init() {
 func AddToScheme(scheme *runtime.Scheme) {
 	apiregistrationv1beta1.AddToScheme(scheme)
 	apiregistrationv1.AddToScheme(scheme)
-
 }

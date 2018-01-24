@@ -49,5 +49,4 @@ func init() {
 // correctly.
 func AddToScheme(scheme *runtime.Scheme) {
 	samplecontrollerv1alpha1.AddToScheme(scheme)
-
 }
