@@ -26,6 +26,7 @@ go_library(
         "nodes_util.go",
         "perf_util.go",
         "pods.go",
+        "profile_gatherer.go",
         "psp_util.go",
         "pv_util.go",
         "rc_util.go",
