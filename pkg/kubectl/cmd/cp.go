@@ -214,6 +214,8 @@ func copyFromPod(f cmdutil.Factory, cmd *cobra.Command, cmderr io.Writer, src, d
 	}
 
 	reader, outStream := io.Pipe()
+	prefix := getPrefix(src.File)
+	prefix = path.Clean(prefix)
 	options := &ExecOptions{
 		StreamOptions: StreamOptions{
 			In:  nil,
@@ -225,7 +227,7 @@ func copyFromPod(f cmdutil.Factory, cmd *cobra.Command, cmderr io.Writer, src, d
 		},
 
 		// TODO: Improve error messages by first testing if 'tar' is present in the container?
-		Command:  []string{"tar", "cf", "-", src.File},
+		Command:  []string{"tar", "cf", "-", prefix},
 		Executor: &DefaultRemoteExecutor{},
 	}
 
@@ -233,8 +235,6 @@ func copyFromPod(f cmdutil.Factory, cmd *cobra.Command, cmderr io.Writer, src, d
 		defer outStream.Close()
 		execute(f, cmd, options)
 	}()
-	prefix := getPrefix(src.File)
-	prefix = path.Clean(prefix)
 	return untarAll(reader, dest.File, prefix)
 }
 
