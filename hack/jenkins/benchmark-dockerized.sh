@@ -45,11 +45,11 @@ export KUBE_COVER="n"
 export KUBE_JUNIT_REPORT_DIR=${WORKSPACE}/artifacts
 export ARTIFACTS_DIR=${WORKSPACE}/artifacts
 
+mkdir -p "${ARTIFACTS_DIR}"
 cd /go/src/k8s.io/kubernetes
 
 ./hack/install-etcd.sh
 
 # Run the benchmark tests and pretty-print the results into a separate file.
-touch ${ARTIFACTS_DIR}/BenchmarkResults.txt
 make test-integration WHAT="$*" KUBE_TEST_ARGS="-run='XXX' -bench=. -benchmem" \
   | tee >(prettybench -no-passthrough > ${ARTIFACTS_DIR}/BenchmarkResults.txt)
