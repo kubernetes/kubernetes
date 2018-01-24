@@ -41,7 +41,6 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/admission/noderestriction"
 	"k8s.io/kubernetes/plugin/pkg/admission/persistentvolume/label"
 	"k8s.io/kubernetes/plugin/pkg/admission/persistentvolume/resize"
-	"k8s.io/kubernetes/plugin/pkg/admission/persistentvolumeclaim/pvcprotection"
 	"k8s.io/kubernetes/plugin/pkg/admission/podnodeselector"
 	"k8s.io/kubernetes/plugin/pkg/admission/podpreset"
 	"k8s.io/kubernetes/plugin/pkg/admission/podtolerationrestriction"
@@ -50,6 +49,7 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/admission/security/podsecuritypolicy"
 	"k8s.io/kubernetes/plugin/pkg/admission/securitycontext/scdeny"
 	"k8s.io/kubernetes/plugin/pkg/admission/serviceaccount"
+	"k8s.io/kubernetes/plugin/pkg/admission/storage/storageprotection"
 	"k8s.io/kubernetes/plugin/pkg/admission/storageclass/setdefault"
 
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -86,7 +86,7 @@ var AllOrderedPlugins = []string{
 	extendedresourcetoleration.PluginName, // ExtendedResourceToleration
 	label.PluginName,                      // PersistentVolumeLabel
 	setdefault.PluginName,                 // DefaultStorageClass
-	pvcprotection.PluginName,              // PVCProtection
+	storageprotection.PluginName,          // StorageProtection
 	gc.PluginName,                         // OwnerReferencesPermissionEnforcement
 	resize.PluginName,                     // PersistentVolumeClaimResize
 	mutatingwebhook.PluginName,            // MutatingAdmissionWebhook
@@ -125,7 +125,7 @@ func RegisterAllAdmissionPlugins(plugins *admission.Plugins) {
 	serviceaccount.Register(plugins)
 	setdefault.Register(plugins)
 	resize.Register(plugins)
-	pvcprotection.Register(plugins)
+	storageprotection.Register(plugins)
 }
 
 // DefaultOffAdmissionPlugins get admission plugins off by default for kube-apiserver.
