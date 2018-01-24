@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package multicluster
+package scheduling
 
 import (
 	"fmt"
@@ -32,7 +32,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
-var _ = Describe("[sig-storage] Multi-AZ Clusters", func() {
+var _ = SIGDescribe("Multi-AZ Cluster Volumes", func() {
 	f := framework.NewDefaultFramework("multi-az")
 	var zoneCount int
 	var err error
