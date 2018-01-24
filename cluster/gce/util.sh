@@ -1868,7 +1868,7 @@ function get-master-replicas-count() {
 # Prints regexp for full master machine name. In a cluster with replicated master,
 # VM names may either be MASTER_NAME or MASTER_NAME with a suffix for a replica.
 function get-replica-name-regexp() {
-  echo "${MASTER_NAME}(-...)?"
+  echo "^${MASTER_NAME}(-...)?"
 }
 
 # Sets REPLICA_NAME to a unique name for a master replica that will match
