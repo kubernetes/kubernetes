@@ -97,6 +97,28 @@ func TestSandboxGC(t *testing.T) {
 			evictTerminatedPods: false,
 		},
 		{
+			description: "older exited sandboxes without containers for existing pods should be garbage collected if there are more than one exited sandboxes.",
+			sandboxes: []sandboxTemplate{
+				makeGCSandbox(pods[0], 1, runtimeapi.PodSandboxState_SANDBOX_NOTREADY, true, 1),
+				makeGCSandbox(pods[0], 0, runtimeapi.PodSandboxState_SANDBOX_NOTREADY, true, 0),
+			},
+			containers:          []containerTemplate{},
+			remain:              []int{0},
+			evictTerminatedPods: false,
+		},
+		{
+			description: "older exited sandboxes with containers for existing pods should not be garbage collected even if there are more than one exited sandboxes.",
+			sandboxes: []sandboxTemplate{
+				makeGCSandbox(pods[0], 1, runtimeapi.PodSandboxState_SANDBOX_NOTREADY, true, 1),
+				makeGCSandbox(pods[0], 0, runtimeapi.PodSandboxState_SANDBOX_NOTREADY, true, 0),
+			},
+			containers: []containerTemplate{
+				{pod: pods[0], container: &pods[0].Spec.Containers[0], sandboxAttempt: 0, state: runtimeapi.ContainerState_CONTAINER_EXITED},
+			},
+			remain:              []int{0, 1},
+			evictTerminatedPods: false,
+		},
+		{
 			description: "non-running sandboxes for existing pods should be garbage collected if evictTerminatedPods is set.",
 			sandboxes: []sandboxTemplate{
 				makeGCSandbox(pods[0], 0, runtimeapi.PodSandboxState_SANDBOX_READY, true, 0),
@@ -187,6 +209,7 @@ func TestContainerGC(t *testing.T) {
 		policy              *kubecontainer.ContainerGCPolicy // container gc policy
 		remain              []int                            // template indexes of remaining containers
 		evictTerminatedPods bool
+		allSourcesReady     bool
 	}{
 		{
 			description: "all containers should be removed when max container limit is 0",
@@ -196,6 +219,7 @@ func TestContainerGC(t *testing.T) {
 			policy:              &kubecontainer.ContainerGCPolicy{MinAge: time.Minute, MaxPerPodContainer: 1, MaxContainers: 0},
 			remain:              []int{},
 			evictTerminatedPods: false,
+			allSourcesReady:     true,
 		},
 		{
 			description: "max containers should be complied when no max per pod container limit is set",
@@ -209,6 +233,7 @@ func TestContainerGC(t *testing.T) {
 			policy:              &kubecontainer.ContainerGCPolicy{MinAge: time.Minute, MaxPerPodContainer: -1, MaxContainers: 4},
 			remain:              []int{0, 1, 2, 3},
 			evictTerminatedPods: false,
+			allSourcesReady:     true,
 		},
 		{
 			description: "no containers should be removed if both max container and per pod container limits are not set",
@@ -220,6 +245,7 @@ func TestContainerGC(t *testing.T) {
 			policy:              &kubecontainer.ContainerGCPolicy{MinAge: time.Minute, MaxPerPodContainer: -1, MaxContainers: -1},
 			remain:              []int{0, 1, 2},
 			evictTerminatedPods: false,
+			allSourcesReady:     true,
 		},
 		{
 			description: "recently started containers should not be removed",
@@ -230,6 +256,7 @@ func TestContainerGC(t *testing.T) {
 			},
 			remain:              []int{0, 1, 2},
 			evictTerminatedPods: false,
+			allSourcesReady:     true,
 		},
 		{
 			description: "oldest containers should be removed when per pod container limit exceeded",
@@ -240,6 +267,7 @@ func TestContainerGC(t *testing.T) {
 			},
 			remain:              []int{0, 1},
 			evictTerminatedPods: false,
+			allSourcesReady:     true,
 		},
 		{
 			description: "running containers should not be removed",
@@ -250,6 +278,7 @@ func TestContainerGC(t *testing.T) {
 			},
 			remain:              []int{0, 1, 2},
 			evictTerminatedPods: false,
+			allSourcesReady:     true,
 		},
 		{
 			description: "no containers should be removed when limits are not exceeded",
@@ -259,6 +288,7 @@ func TestContainerGC(t *testing.T) {
 			},
 			remain:              []int{0, 1},
 			evictTerminatedPods: false,
+			allSourcesReady:     true,
 		},
 		{
 			description: "max container count should apply per (UID, container) pair",
@@ -275,6 +305,7 @@ func TestContainerGC(t *testing.T) {
 			},
 			remain:              []int{0, 1, 3, 4, 6, 7},
 			evictTerminatedPods: false,
+			allSourcesReady:     true,
 		},
 		{
 			description: "max limit should apply and try to keep from every pod",
@@ -292,6 +323,7 @@ func TestContainerGC(t *testing.T) {
 			},
 			remain:              []int{0, 2, 4, 6, 8},
 			evictTerminatedPods: false,
+			allSourcesReady:     true,
 		},
 		{
 			description: "oldest pods should be removed if limit exceeded",
@@ -309,6 +341,7 @@ func TestContainerGC(t *testing.T) {
 			},
 			remain:              []int{0, 2, 4, 6, 8, 9},
 			evictTerminatedPods: false,
+			allSourcesReady:     true,
 		},
 		{
 			description: "all non-running containers should be removed when evictTerminatedPods is set",
@@ -322,6 +355,7 @@ func TestContainerGC(t *testing.T) {
 			},
 			remain:              []int{4, 5},
 			evictTerminatedPods: true,
+			allSourcesReady:     true,
 		},
 		{
 			description: "containers for deleted pods should be removed",
@@ -335,6 +369,16 @@ func TestContainerGC(t *testing.T) {
 			},
 			remain:              []int{0, 1, 2},
 			evictTerminatedPods: false,
+			allSourcesReady:     true,
+		},
+		{
+			description: "containers for deleted pods may not be removed if allSourcesReady is set false ",
+			containers: []containerTemplate{
+				makeGCContainer("deleted", "bar1", 0, 0, runtimeapi.ContainerState_CONTAINER_EXITED),
+			},
+			remain:              []int{0},
+			evictTerminatedPods: true,
+			allSourcesReady:     false,
 		},
 	} {
 		t.Logf("TestCase #%d: %+v", c, test)
@@ -344,7 +388,7 @@ func TestContainerGC(t *testing.T) {
 		if test.policy == nil {
 			test.policy = &defaultGCPolicy
 		}
-		err := m.containerGC.evictContainers(*test.policy, true, test.evictTerminatedPods)
+		err := m.containerGC.evictContainers(*test.policy, test.allSourcesReady, test.evictTerminatedPods)
 		assert.NoError(t, err)
 		realRemain, err := fakeRuntime.ListContainers(nil)
 		assert.NoError(t, err)
