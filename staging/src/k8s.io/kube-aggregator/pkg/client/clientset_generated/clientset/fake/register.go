@@ -21,6 +21,7 @@ import (
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
+	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	apiregistrationv1beta1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1"
 )
 
@@ -49,5 +50,6 @@ func init() {
 // correctly.
 func AddToScheme(scheme *runtime.Scheme) {
 	apiregistrationv1beta1.AddToScheme(scheme)
+	apiregistrationv1.AddToScheme(scheme)
 
 }

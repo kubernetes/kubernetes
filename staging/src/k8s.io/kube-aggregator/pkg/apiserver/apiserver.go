@@ -35,6 +35,7 @@ import (
 
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration"
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration/install"
+	"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1"
 	"k8s.io/kube-aggregator/pkg/client/clientset_generated/internalclientset"
 	informers "k8s.io/kube-aggregator/pkg/client/informers/internalversion"
@@ -188,12 +189,23 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 		apiGroupInfo.GroupMeta.GroupVersion = v1beta1.SchemeGroupVersion
 		storage := map[string]rest.Storage{}
 		version := v1beta1.SchemeGroupVersion
-		if apiResourceConfig.ResourceEnabled(version.WithResource("customresourcedefinitions")) {
+		if apiResourceConfig.ResourceEnabled(version.WithResource("apiservices")) {
 			apiServiceREST := apiservicestorage.NewREST(Scheme, c.GenericConfig.RESTOptionsGetter)
 			storage["apiservices"] = apiServiceREST
 			storage["apiservices/status"] = apiservicestorage.NewStatusREST(Scheme, apiServiceREST)
 		}
 		apiGroupInfo.VersionedResourcesStorageMap["v1beta1"] = storage
+	}
+	if apiResourceConfig.AnyResourcesForVersionEnabled(v1beta1.SchemeGroupVersion) {
+		apiGroupInfo.GroupMeta.GroupVersion = v1.SchemeGroupVersion
+		storage := map[string]rest.Storage{}
+		version := v1.SchemeGroupVersion
+		if apiResourceConfig.ResourceEnabled(version.WithResource("apiservices")) {
+			apiServiceREST := apiservicestorage.NewREST(Scheme, c.GenericConfig.RESTOptionsGetter)
+			storage["apiservices"] = apiServiceREST
+			storage["apiservices/status"] = apiservicestorage.NewStatusREST(Scheme, apiServiceREST)
+		}
+		apiGroupInfo.VersionedResourcesStorageMap["v1"] = storage
 	}
 
 	if err := s.GenericAPIServer.InstallAPIGroup(&apiGroupInfo); err != nil {
@@ -342,6 +354,7 @@ func DefaultAPIResourceConfigSource() *serverstorage.ResourceConfig {
 	ret := serverstorage.NewResourceConfig()
 	// NOTE: GroupVersions listed here will be enabled by default. Don't put alpha versions in the list.
 	ret.EnableVersions(
+		v1.SchemeGroupVersion,
 		v1beta1.SchemeGroupVersion,
 	)
 

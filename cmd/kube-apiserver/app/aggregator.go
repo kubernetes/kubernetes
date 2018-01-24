@@ -38,6 +38,7 @@ import (
 	kubeexternalinformers "k8s.io/client-go/informers"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration"
+	"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1"
 	aggregatorapiserver "k8s.io/kube-aggregator/pkg/apiserver"
 	apiregistrationclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/internalclientset/typed/apiregistration/internalversion"
@@ -58,7 +59,7 @@ func createAggregatorConfig(kubeAPIServerConfig genericapiserver.Config, command
 
 	// copy the etcd options so we don't mutate originals.
 	etcdOptions := *commandOptions.Etcd
-	etcdOptions.StorageConfig.Codec = aggregatorapiserver.Codecs.LegacyCodec(v1beta1.SchemeGroupVersion)
+	etcdOptions.StorageConfig.Codec = aggregatorapiserver.Codecs.LegacyCodec(v1beta1.SchemeGroupVersion, v1.SchemeGroupVersion)
 	genericConfig.RESTOptionsGetter = &genericoptions.SimpleRestOptionsFactory{Options: etcdOptions}
 
 	// override MergedResourceConfig with aggregator defaults and registry
@@ -238,6 +239,7 @@ var apiVersionPriorities = map[schema.GroupVersion]priority{
 	{Group: "storage.k8s.io", Version: "v1beta1"}:                {group: 16800, version: 9},
 	{Group: "storage.k8s.io", Version: "v1alpha1"}:               {group: 16800, version: 1},
 	{Group: "apiextensions.k8s.io", Version: "v1beta1"}:          {group: 16700, version: 9},
+	{Group: "admissionregistration.k8s.io", Version: "v1"}:       {group: 16700, version: 15},
 	{Group: "admissionregistration.k8s.io", Version: "v1beta1"}:  {group: 16700, version: 12},
 	{Group: "admissionregistration.k8s.io", Version: "v1alpha1"}: {group: 16700, version: 9},
 	{Group: "scheduling.k8s.io", Version: "v1alpha1"}:            {group: 16600, version: 9},
