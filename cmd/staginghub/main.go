@@ -23,9 +23,10 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/euforia/go-git-server"
+	"github.com/golang/glog"
 
-	"k8s.io/kubernetes/cmd/staginghub/store"
+	"k8s.io/kubernetes/cmd/staginghub/override"
+	"k8s.io/kubernetes/third_party/go-git-http"
 )
 
 func init() {
@@ -35,23 +36,18 @@ func init() {
 func main() {
 	port := flag.Int("p", 12345, "The TCP port to listen on.")
 	addr := flag.String("l", "localhost", "The IP or hostname to listen on.")
+
+	flag.Set("logtostderr", "true")
 	flag.Parse()
 
-	repostore, err := store.NewSubdirRepoStore()
+	subdirOverride, err := override.NewSubDirOverride()
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	objstores, err := store.NewPwdObjectStorage()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	gh := gitserver.NewGitHTTPService(repostore, objstores)
-	rh := WithEmptyGoMetadata(fmt.Sprintf("%s:%d", *addr, *port), gitserver.NewRepoHTTPService(repostore))
-
-	router := gitserver.NewRouter(gh, rh, nil)
-	if err := router.Serve(fmt.Sprintf("%s:%d", *addr, *port)); err != nil {
+	gitHandler := githttp.New(".", subdirOverride)
+	handler := WithLog(WithEmptyGoMetadata(fmt.Sprintf("%s:%d", *addr, *port), gitHandler))
+	if err := http.ListenAndServe(fmt.Sprintf("%s:%d", *addr, *port), handler); err != nil {
 		log.Println(err)
 	}
 }
@@ -75,5 +71,12 @@ func WithEmptyGoMetadata(host string, delegate http.Handler) http.Handler {
 		}
 
 		delegate.ServeHTTP(w, req)
+	})
+}
+
+func WithLog(handler http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		glog.Infof("%s %s %s", r.RemoteAddr, r.Method, r.URL)
+		handler.ServeHTTP(w, r)
 	})
 }

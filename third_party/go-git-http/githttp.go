@@ -1,6 +1,7 @@
 package githttp
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"net/http"
@@ -9,6 +10,11 @@ import (
 	"path"
 	"strings"
 )
+
+type Override interface {
+	Refs(repo string) (map[string]string, error) // maps from refs/heads/<branch> to hashes
+	GitDir(repoPath string) string               // the directory where the .git dir can be found
+}
 
 type GitHttp struct {
 	// Root directory to serve repos from
@@ -23,6 +29,8 @@ type GitHttp struct {
 
 	// Event handling functions
 	EventHandler func(ev Event)
+
+	Override Override
 }
 
 // Implement the http.Handler interface
@@ -32,12 +40,13 @@ func (g *GitHttp) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 // Shorthand constructor for most common scenario
-func New(root string) *GitHttp {
+func New(root string, o Override) *GitHttp {
 	return &GitHttp{
 		ProjectRoot: root,
 		GitBinPath:  "/usr/bin/git",
 		UploadPack:  true,
 		ReceivePack: true,
+		Override:    o,
 	}
 }
 
@@ -156,10 +165,25 @@ func (g *GitHttp) getInfoRefs(hr HandlerReq) error {
 		return sendFile("text/plain; charset=utf-8", hr)
 	}
 
-	args := []string{service_name, "--stateless-rpc", "--advertise-refs", "."}
-	refs, err := g.gitCommand(dir, args...)
-	if err != nil {
-		return err
+	var refs []byte
+	if g.Override != nil {
+		buf := bytes.Buffer{}
+		rs, err := g.Override.Refs(hr.Repo)
+		if err != nil {
+			return err
+		}
+		for ref, sha := range rs {
+			s := fmt.Sprintf("%s %s", sha, ref)
+			buf.Write([]byte(fmt.Sprintf("%04x%s\n", len(s)+5, s)))
+		}
+		buf.Write(packetFlush())
+		refs = buf.Bytes()
+	} else {
+		args := []string{service_name, "--stateless-rpc", "--advertise-refs", "."}
+		refs, err = g.gitCommand(dir, args...)
+		if err != nil {
+			return err
+		}
 	}
 
 	hdrNocache(w)

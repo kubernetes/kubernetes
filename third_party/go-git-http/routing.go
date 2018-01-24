@@ -19,6 +19,7 @@ type HandlerReq struct {
 	Rpc  string
 	Dir  string
 	File string
+	Repo string
 }
 
 // Routing regexes
@@ -90,16 +91,21 @@ func (g *GitHttp) requestHandler(w http.ResponseWriter, r *http.Request) {
 	file := strings.Replace(r.URL.Path, repo+"/", "", 1)
 
 	// Resolve directory
-	dir, err := g.getGitDir(repo)
-
-	// Repo not found on disk
-	if err != nil {
-		renderNotFound(w)
-		return
+	var dir string
+	if g.Override != nil {
+		dir = g.Override.GitDir(repo)
+	} else {
+		var err error
+		dir, err = g.getGitDir(repo)
+		// Repo not found on disk
+		if err != nil {
+			renderNotFound(w)
+			return
+		}
 	}
 
 	// Build request info for handler
-	hr := HandlerReq{w, r, rpc, dir, file}
+	hr := HandlerReq{w, r, rpc, dir, file, repo}
 
 	// Call handler
 	if err := service.Handler(hr); err != nil {
