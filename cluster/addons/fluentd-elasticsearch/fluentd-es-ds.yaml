@@ -48,24 +48,24 @@ roleRef:
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
-  name: fluentd-es-v2.0.3
+  name: fluentd-es-v2.0.4
   namespace: kube-system
   labels:
     k8s-app: fluentd-es
-    version: v2.0.3
+    version: v2.0.4
     kubernetes.io/cluster-service: "true"
     addonmanager.kubernetes.io/mode: Reconcile
 spec:
   selector:
     matchLabels:
       k8s-app: fluentd-es
-      version: v2.0.3
+      version: v2.0.4
   template:
     metadata:
       labels:
         k8s-app: fluentd-es
         kubernetes.io/cluster-service: "true"
-        version: v2.0.3
+        version: v2.0.4
       # This annotation ensures that fluentd does not get evicted if the node
       # supports critical pod annotation based priority scheme.
       # Note that this does not guarantee admission on the nodes (#40573).
@@ -75,7 +75,7 @@ spec:
       serviceAccountName: fluentd-es
       containers:
       - name: fluentd-es
-        image: gcr.io/google-containers/fluentd-elasticsearch:v2.0.3
+        image: gcr.io/google-containers/fluentd-elasticsearch:v2.0.4
         env:
         - name: FLUENTD_ARGS
           value: --no-supervisor -q
@@ -112,4 +112,4 @@ spec:
           path: /usr/lib64
       - name: config-volume
         configMap:
-          name: fluentd-es-config-v0.1.2
+          name: fluentd-es-config-v0.1.3

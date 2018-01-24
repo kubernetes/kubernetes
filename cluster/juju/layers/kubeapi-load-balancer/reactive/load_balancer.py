@@ -56,8 +56,23 @@ apilb_nginx = """/var/log/nginx.*.log {
 }"""
 
 
-@when('certificates.available')
-def request_server_certificates(tls):
+def get_ingress_address(relation):
+    try:
+        network_info = hookenv.network_get(relation.relation_name)
+    except NotImplementedError:
+        network_info = []
+
+    if network_info and 'ingress-addresses' in network_info:
+        # just grab the first one for now, maybe be more robust here?
+        return network_info['ingress-addresses'][0]
+    else:
+        # if they don't have ingress-addresses they are running a juju that
+        # doesn't support spaces, so just return the private address
+        return hookenv.unit_get('private-address')
+
+
+@when('certificates.available', 'website.available')
+def request_server_certificates(tls, website):
     '''Send the data that is required to create a server certificate for
     this server.'''
     # Use the public ip of this unit as the Common Name for the certificate.
@@ -65,7 +80,7 @@ def request_server_certificates(tls):
     # Create SANs that the tls layer will add to the server cert.
     sans = [
         hookenv.unit_public_ip(),
-        hookenv.unit_private_ip(),
+        get_ingress_address(website),
         socket.gethostname(),
     ]
     # maybe they have extra names they want as SANs

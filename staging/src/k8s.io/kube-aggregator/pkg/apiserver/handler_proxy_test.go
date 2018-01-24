@@ -18,6 +18,7 @@ package apiserver
 
 import (
 	"crypto/tls"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
@@ -84,13 +85,11 @@ func (*fakeRequestContextMapper) Update(req *http.Request, context genericapireq
 
 type mockedRouter struct {
 	destinationHost string
+	err             error
 }
 
 func (r *mockedRouter) ResolveEndpoint(namespace, name string) (*url.URL, error) {
-	return &url.URL{
-		Scheme: "https",
-		Host:   r.destinationHost,
-	}, nil
+	return &url.URL{Scheme: "https", Host: r.destinationHost}, r.err
 }
 
 func TestProxyHandler(t *testing.T) {
@@ -108,6 +107,8 @@ func TestProxyHandler(t *testing.T) {
 		user       user.Info
 		path       string
 		apiService *apiregistration.APIService
+
+		serviceResolver ServiceResolver
 
 		expectedStatusCode int
 		expectedBody       string
@@ -220,6 +221,29 @@ func TestProxyHandler(t *testing.T) {
 			},
 			expectedStatusCode: http.StatusServiceUnavailable,
 		},
+		"service unresolveable": {
+			user: &user.DefaultInfo{
+				Name:   "username",
+				Groups: []string{"one", "two"},
+			},
+			path:            "/request/path",
+			serviceResolver: &mockedRouter{err: fmt.Errorf("unresolveable")},
+			apiService: &apiregistration.APIService{
+				ObjectMeta: metav1.ObjectMeta{Name: "v1.foo"},
+				Spec: apiregistration.APIServiceSpec{
+					Service:  &apiregistration.ServiceReference{Name: "bad-service", Namespace: "test-ns"},
+					Group:    "foo",
+					Version:  "v1",
+					CABundle: testCACrt,
+				},
+				Status: apiregistration.APIServiceStatus{
+					Conditions: []apiregistration.APIServiceCondition{
+						{Type: apiregistration.Available, Status: apiregistration.ConditionTrue},
+					},
+				},
+			},
+			expectedStatusCode: http.StatusServiceUnavailable,
+		},
 		"fail on bad serving cert": {
 			user: &user.DefaultInfo{
 				Name:   "username",
@@ -247,9 +271,13 @@ func TestProxyHandler(t *testing.T) {
 		target.Reset()
 
 		func() {
+			serviceResolver := tc.serviceResolver
+			if serviceResolver == nil {
+				serviceResolver = &mockedRouter{destinationHost: targetServer.Listener.Addr().String()}
+			}
 			handler := &proxyHandler{
 				localDelegate:   http.NewServeMux(),
-				serviceResolver: &mockedRouter{destinationHost: targetServer.Listener.Addr().String()},
+				serviceResolver: serviceResolver,
 				proxyTransport:  &http.Transport{},
 			}
 			handler.contextMapper = &fakeRequestContextMapper{user: tc.user}
