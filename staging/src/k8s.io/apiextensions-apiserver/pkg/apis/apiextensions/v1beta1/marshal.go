@@ -30,7 +30,7 @@ func (s JSONSchemaPropsOrBool) MarshalJSON() ([]byte, error) {
 		return json.Marshal(s.Schema)
 	}
 
-	if s.Schema == nil && !s.Allows {
+	if !s.Allows {
 		return jsFalse, nil
 	}
 	return jsTrue, nil

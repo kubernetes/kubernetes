@@ -206,13 +206,13 @@ func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSch
 
 	allErrs = append(allErrs, ssv.validate(schema, fldPath)...)
 
-	if schema.UniqueItems == true {
+	if schema.UniqueItems {
 		allErrs = append(allErrs, field.Forbidden(fldPath.Child("uniqueItems"), "uniqueItems cannot be set to true since the runtime complexity becomes quadratic"))
 	}
 
 	// additionalProperties contradicts Kubernetes API convention to ignore unknown fields
 	if schema.AdditionalProperties != nil {
-		if schema.AdditionalProperties.Allows == false {
+		if !schema.AdditionalProperties.Allows && schema.AdditionalProperties.Schema == nil {
 			allErrs = append(allErrs, field.Forbidden(fldPath.Child("additionalProperties"), "additionalProperties cannot be set to false"))
 		}
 		allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(schema.AdditionalProperties.Schema, fldPath.Child("additionalProperties"), ssv)...)
