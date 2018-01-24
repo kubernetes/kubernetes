@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"github.com/vmware/govmomi"
+	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/simulator"
 )
 
@@ -39,7 +40,7 @@ func TestDatacenter(t *testing.T) {
 	s := model.Service.NewServer()
 	defer s.Close()
 
-	avm := simulator.Map.Any("VirtualMachine").(*simulator.VirtualMachine)
+	avm := simulator.Map.Any(VirtualMachineType).(*simulator.VirtualMachine)
 
 	c, err := govmomi.NewClient(ctx, s.URL, true)
 	if err != nil {
@@ -48,17 +49,17 @@ func TestDatacenter(t *testing.T) {
 
 	vc := &VSphereConnection{GoVmomiClient: c}
 
-	_, err = GetDatacenter(ctx, vc, "enoent")
+	_, err = GetDatacenter(ctx, vc, testNameNotFound)
 	if err == nil {
 		t.Error("expected error")
 	}
 
-	dc, err := GetDatacenter(ctx, vc, "DC0")
+	dc, err := GetDatacenter(ctx, vc, testDefaultDatacenter)
 	if err != nil {
 		t.Error(err)
 	}
 
-	_, err = dc.GetVMByUUID(ctx, "enoent")
+	_, err = dc.GetVMByUUID(ctx, testNameNotFound)
 	if err == nil {
 		t.Error("expected error")
 	}
@@ -68,22 +69,26 @@ func TestDatacenter(t *testing.T) {
 		t.Error(err)
 	}
 
-	_, err = dc.GetVMByPath(ctx, "enoent")
+	_, err = dc.GetVMByPath(ctx, testNameNotFound)
 	if err == nil {
 		t.Error("expected error")
 	}
 
-	vm, err := dc.GetVMByPath(ctx, "/DC0/vm/"+avm.Name)
+	vm, err := dc.GetVMByPath(ctx, testDefaultDatacenter+"/vm/"+avm.Name)
 	if err != nil {
 		t.Error(err)
 	}
 
-	_, err = dc.GetDatastoreByPath(ctx, "enoent") // invalid format
+	_, err = dc.GetDatastoreByPath(ctx, testNameNotFound) // invalid format
 	if err == nil {
 		t.Error("expected error")
 	}
 
-	_, err = dc.GetDatastoreByPath(ctx, "[enoent] no/no.vmx")
+	invalidPath := object.DatastorePath{
+		Datastore: testNameNotFound,
+		Path:      testNameNotFound,
+	}
+	_, err = dc.GetDatastoreByPath(ctx, invalidPath.String())
 	if err == nil {
 		t.Error("expected error")
 	}
@@ -93,22 +98,22 @@ func TestDatacenter(t *testing.T) {
 		t.Error(err)
 	}
 
-	_, err = dc.GetDatastoreByName(ctx, "enoent")
+	_, err = dc.GetDatastoreByName(ctx, testNameNotFound)
 	if err == nil {
 		t.Error("expected error")
 	}
 
-	ds, err := dc.GetDatastoreByName(ctx, "LocalDS_0")
+	ds, err := dc.GetDatastoreByName(ctx, testDefaultDatastore)
 	if err != nil {
 		t.Error(err)
 	}
 
-	_, err = dc.GetFolderByPath(ctx, "enoent")
+	_, err = dc.GetFolderByPath(ctx, testNameNotFound)
 	if err == nil {
 		t.Error("expected error")
 	}
 
-	_, err = dc.GetFolderByPath(ctx, "/DC0/vm")
+	_, err = dc.GetFolderByPath(ctx, testDefaultDatacenter+"/vm")
 	if err != nil {
 		t.Error(err)
 	}
@@ -118,7 +123,7 @@ func TestDatacenter(t *testing.T) {
 		t.Error("expected error")
 	}
 
-	_, err = dc.GetVMMoList(ctx, []*VirtualMachine{vm}, []string{"enoent"}) // invalid property
+	_, err = dc.GetVMMoList(ctx, []*VirtualMachine{vm}, []string{testNameNotFound}) // invalid property
 	if err == nil {
 		t.Error("expected error")
 	}
@@ -128,14 +133,14 @@ func TestDatacenter(t *testing.T) {
 		t.Error(err)
 	}
 
-	vmdk := ds.Path(avm.Name + "/disk1.vmdk")
+	diskPath := ds.Path(avm.Name + "/disk1.vmdk")
 
-	_, err = dc.GetVirtualDiskPage83Data(ctx, vmdk+"-enoent")
+	_, err = dc.GetVirtualDiskPage83Data(ctx, diskPath+testNameNotFound)
 	if err == nil {
 		t.Error("expected error")
 	}
 
-	_, err = dc.GetVirtualDiskPage83Data(ctx, vmdk)
+	_, err = dc.GetVirtualDiskPage83Data(ctx, diskPath)
 	if err != nil {
 		t.Error(err)
 	}
@@ -145,7 +150,7 @@ func TestDatacenter(t *testing.T) {
 		t.Error("expected error")
 	}
 
-	_, err = dc.GetDatastoreMoList(ctx, []*Datastore{ds}, []string{"enoent"}) // invalid property
+	_, err = dc.GetDatastoreMoList(ctx, []*Datastore{ds}, []string{testNameNotFound}) // invalid property
 	if err == nil {
 		t.Error("expected error")
 	}
@@ -156,7 +161,7 @@ func TestDatacenter(t *testing.T) {
 	}
 
 	nodeVolumes := map[string][]string{
-		avm.Name: {"enoent", vmdk},
+		avm.Name: {testNameNotFound, diskPath},
 	}
 
 	attached, err := dc.CheckDisksAttached(ctx, nodeVolumes)
@@ -164,11 +169,11 @@ func TestDatacenter(t *testing.T) {
 		t.Error(err)
 	}
 
-	if attached[avm.Name]["enoent"] {
+	if attached[avm.Name][testNameNotFound] {
 		t.Error("should not be attached")
 	}
 
-	if !attached[avm.Name][vmdk] {
-		t.Errorf("%s should be attached", vmdk)
+	if !attached[avm.Name][diskPath] {
+		t.Errorf("%s should be attached", diskPath)
 	}
 }

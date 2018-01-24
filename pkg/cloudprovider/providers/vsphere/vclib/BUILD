@@ -59,11 +59,17 @@ filegroup(
 
 go_test(
     name = "go_default_test",
-    srcs = ["datacenter_test.go"],
+    srcs = [
+        "datacenter_test.go",
+        "datastore_test.go",
+        "folder_test.go",
+        "virtualmachine_test.go",
+    ],
     embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere/vclib",
     deps = [
         "//vendor/github.com/vmware/govmomi:go_default_library",
+        "//vendor/github.com/vmware/govmomi/object:go_default_library",
         "//vendor/github.com/vmware/govmomi/simulator:go_default_library",
     ],
 )
