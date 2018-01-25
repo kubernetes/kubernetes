@@ -781,10 +781,12 @@ func (c *configFactory) invalidateCachedPredicatesOnNodeUpdate(newNode *v1.Node,
 			}
 			if oldConditions[v1.NodeReady] != newConditions[v1.NodeReady] ||
 				oldConditions[v1.NodeOutOfDisk] != newConditions[v1.NodeOutOfDisk] ||
-				oldConditions[v1.NodeNetworkUnavailable] != newConditions[v1.NodeNetworkUnavailable] ||
-				newNode.Spec.Unschedulable != oldNode.Spec.Unschedulable {
+				oldConditions[v1.NodeNetworkUnavailable] != newConditions[v1.NodeNetworkUnavailable] {
 				invalidPredicates.Insert("CheckNodeCondition")
 			}
+		}
+		if newNode.Spec.Unschedulable != oldNode.Spec.Unschedulable {
+			invalidPredicates.Insert("CheckNodeCondition")
 		}
 		c.equivalencePodCache.InvalidateCachedPredicateItem(newNode.GetName(), invalidPredicates)
 	}
