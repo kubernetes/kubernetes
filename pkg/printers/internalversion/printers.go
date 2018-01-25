@@ -609,6 +609,9 @@ func printPod(pod *api.Pod, options printers.PrintOptions) ([]metav1alpha1.Table
 			nodeName = "<none>"
 		}
 		row.Cells = append(row.Cells, podIP, nodeName)
+		if len(pod.Status.NominatedNodeName) > 0 {
+			row.Cells = append(row.Cells, pod.Status.NominatedNodeName)
+		}
 	}
 
 	return []metav1alpha1.TableRow{row}, nil

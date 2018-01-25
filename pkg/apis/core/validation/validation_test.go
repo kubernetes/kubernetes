@@ -7756,6 +7756,129 @@ func TestValidatePodUpdate(t *testing.T) {
 	}
 }
 
+func TestValidatePodStatusUpdate(t *testing.T) {
+	tests := []struct {
+		new  core.Pod
+		old  core.Pod
+		err  string
+		test string
+	}{
+		{
+			core.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: core.PodSpec{
+					NodeName: "node1",
+				},
+				Status: core.PodStatus{
+					NominatedNodeName: "node1",
+				},
+			},
+			core.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: core.PodSpec{
+					NodeName: "node1",
+				},
+				Status: core.PodStatus{},
+			},
+			"",
+			"removed nominatedNodeName",
+		},
+		{
+			core.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: core.PodSpec{
+					NodeName: "node1",
+				},
+			},
+			core.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: core.PodSpec{
+					NodeName: "node1",
+				},
+				Status: core.PodStatus{
+					NominatedNodeName: "node1",
+				},
+			},
+			"",
+			"add valid nominatedNodeName",
+		},
+		{
+			core.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: core.PodSpec{
+					NodeName: "node1",
+				},
+				Status: core.PodStatus{
+					NominatedNodeName: "Node1",
+				},
+			},
+			core.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: core.PodSpec{
+					NodeName: "node1",
+				},
+			},
+			"nominatedNodeName",
+			"Add invalid nominatedNodeName",
+		},
+		{
+			core.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: core.PodSpec{
+					NodeName: "node1",
+				},
+				Status: core.PodStatus{
+					NominatedNodeName: "node1",
+				},
+			},
+			core.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: core.PodSpec{
+					NodeName: "node1",
+				},
+				Status: core.PodStatus{
+					NominatedNodeName: "node2",
+				},
+			},
+			"",
+			"Update nominatedNodeName",
+		},
+	}
+
+	for _, test := range tests {
+		test.new.ObjectMeta.ResourceVersion = "1"
+		test.old.ObjectMeta.ResourceVersion = "1"
+		errs := ValidatePodStatusUpdate(&test.new, &test.old)
+		if test.err == "" {
+			if len(errs) != 0 {
+				t.Errorf("unexpected invalid: %s (%+v)\nA: %+v\nB: %+v", test.test, errs, test.new, test.old)
+			}
+		} else {
+			if len(errs) == 0 {
+				t.Errorf("unexpected valid: %s\nA: %+v\nB: %+v", test.test, test.new, test.old)
+			} else if actualErr := errs.ToAggregate().Error(); !strings.Contains(actualErr, test.err) {
+				t.Errorf("unexpected error message: %s\nExpected error: %s\nActual error: %s", test.test, test.err, actualErr)
+			}
+		}
+	}
+}
+
 func makeValidService() core.Service {
 	return core.Service{
 		ObjectMeta: metav1.ObjectMeta{
