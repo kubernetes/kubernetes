@@ -1,30 +1,3 @@
-{% set etcd_protocol = 'http' -%}
-{% set etcd_creds = '' -%}
-{% if pillar.get('etcd_over_ssl', '').lower() == 'true' -%}
-  {% set etcd_protocol = 'https' -%}
-  {% set etcd_creds = '--peer-trusted-ca-file /srv/kubernetes/etcd-ca.crt --peer-cert-file /srv/kubernetes/etcd-peer.crt --peer-key-file /srv/kubernetes/etcd-peer.key -peer-client-cert-auth' -%}
-{% endif -%}
-{% set hostname = pillar.get('hostname', '') -%}
-{% set cluster_state = (pillar.get('initial_etcd_cluster_state') or 'new') -%}
-{% set etcd_cluster_array = (pillar.get('initial_etcd_cluster') or hostname).split(',') -%}
-{% set etcd_cluster = '' -%}
-{# We use vars dictionary to pass variables set inside the for loop, because jinja defines new variables inside the for loop that hide variables from the outside. #}
-{% set vars = {'etcd_cluster': ''} -%}
-{% for host in etcd_cluster_array -%}
-  {% if etcd_cluster != '' -%}
-    {% set etcd_cluster = etcd_cluster ~ ',' -%}
-  {% endif -%}
-  {% set etcd_cluster = etcd_cluster ~ 'etcd-' ~ host ~ '=' ~ etcd_protocol ~'://' ~ host ~ ':' ~ server_port -%}
-  {% do vars.update({'etcd_cluster': etcd_cluster}) -%}
-{% endfor -%}
-{% set etcd_cluster = vars.etcd_cluster -%}
-{% set quota_bytes = '' -%}
-{% if pillar.get('storage_backend', 'etcd3') == 'etcd3' -%}
-  {% set quota_bytes = '--quota-backend-bytes=4294967296' -%}
-{% endif -%}
-{% set liveness_probe_initial_delay = pillar.get('etcd_liveness_probe_initial_delay', 15) -%}
-{% set srv_kube_path = "/srv/kubernetes" -%}
-
 {
 "apiVersion": "v1",
 "kind": "Pod",

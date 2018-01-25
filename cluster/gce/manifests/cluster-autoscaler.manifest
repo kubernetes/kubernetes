@@ -1,14 +1,3 @@
-{% if pillar.get('enable_cluster_autoscaler', '').lower() == 'true' %}
-{% set cloud_config = "" -%}
-{% set cloud_config_mount = "" -%}
-{% set cloud_config_volume = "" -%}
-{% if grains.cloud == 'gce' and grains.cloud_config is defined -%}
-  {% set cloud_config = "--cloud-config=" + grains.cloud_config -%}
-  {% set cloud_config_mount = "{\"name\": \"cloudconfigmount\",\"mountPath\": \"" + grains.cloud_config + "\", \"readOnly\": true}," -%}
-  {% set cloud_config_volume = "{\"name\": \"cloudconfigmount\",\"hostPath\": {\"path\": \"" + grains.cloud_config + "\", \"type\": \"FileOrCreate\"}}," -%}
-{% endif -%}
-{% set params = pillar['autoscaler_mig_config'] + " " + cloud_config + " " + pillar.get('autoscaler_expander_config', '') -%}
-
 {
     "kind": "Pod",
     "apiVersion": "v1",
@@ -103,4 +92,3 @@
         "restartPolicy": "Always"
     }
 }
-{% endif %}
