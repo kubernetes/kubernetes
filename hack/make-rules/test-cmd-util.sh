@@ -4120,6 +4120,8 @@ run_kubectl_explain_tests() {
   # shortcuts work
   kubectl explain po
   kubectl explain po.status.message
+  # cronjob work
+  kubectl explain cronjob
 
   set +o nounset
   set +o errexit
