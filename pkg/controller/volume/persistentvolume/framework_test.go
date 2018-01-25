@@ -802,6 +802,13 @@ func claimWithAnnotation(name, value string, claims []*v1.PersistentVolumeClaim)
 	return claims
 }
 
+// claimWithAccessMode saves given access into given claims.
+// Meant to be used to compose claims specified inline in a test.
+func claimWithAccessMode(modes []v1.PersistentVolumeAccessMode, claims []*v1.PersistentVolumeClaim) []*v1.PersistentVolumeClaim {
+	claims[0].Spec.AccessModes = modes
+	return claims
+}
+
 func testSyncClaim(ctrl *PersistentVolumeController, reactor *volumeReactor, test controllerTest) error {
 	return ctrl.syncClaim(test.initialClaims[0])
 }
