@@ -1003,9 +1003,6 @@ func TestUnstructuredApply(t *testing.T) {
 			if errBuf.String() != "" {
 				t.Fatalf("unexpected error output: %s", errBuf.String())
 			}
-			if !verifiedPatch {
-				t.Fatal("No server-side patch call detected")
-			}
 		})
 	}
 }
@@ -1020,8 +1017,6 @@ func TestUnstructuredIdempotentApply(t *testing.T) {
 		t.Fatal(err)
 	}
 	path := "/namespaces/test/widgets/widget"
-
-	verifiedPatch := false
 
 	for _, fn := range testingOpenAPISchemaFns {
 		t.Run("test repeated apply operations on an unstructured object", func(t *testing.T) {
@@ -1039,41 +1034,15 @@ func TestUnstructuredIdempotentApply(t *testing.T) {
 							Header:     defaultHeader(),
 							Body:       body}, nil
 					case p == path && m == "PATCH":
-						// In idempotent updates, kubectl sends a logically empty
-						// request body with the PATCH request.
-						// Should look like this:
-						// Request Body: {"metadata":{"annotations":{}}}
+						// In idempotent updates, kubectl will resolve to an empty patch and not send anything to the server
+						// Thus, if we reach this branch, kubectl is unnecessarily sending a patch.
 
 						patch, err := ioutil.ReadAll(req.Body)
 						if err != nil {
 							t.Fatal(err)
 						}
-
-						contentType := req.Header.Get("Content-Type")
-						if contentType != "application/merge-patch+json" {
-							t.Fatalf("Unexpected Content-Type: %s", contentType)
-						}
-
-						patchMap := map[string]interface{}{}
-						if err := json.Unmarshal(patch, &patchMap); err != nil {
-							t.Fatal(err)
-						}
-						if len(patchMap) != 1 {
-							t.Fatalf("Unexpected Patch. Has more than 1 entry. path: %s", patch)
-						}
-
-						annotationsMap := walkMapPath(t, patchMap, []string{"metadata", "annotations"})
-						if len(annotationsMap) != 0 {
-							t.Fatalf("Unexpected Patch. Found unexpected annotation: %s", patch)
-						}
-
-						verifiedPatch = true
-
-						body := ioutil.NopCloser(bytes.NewReader(serversideData))
-						return &http.Response{
-							StatusCode: 200,
-							Header:     defaultHeader(),
-							Body:       body}, nil
+						t.Fatalf("Unexpected Patch: %s", patch)
+						return nil, nil
 					default:
 						t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 						return nil, nil
