@@ -78,9 +78,6 @@ type PredicateFailureReason interface {
 	GetReason() string
 }
 
-// GetEquivalencePodFunc is a function that gets a EquivalencePod from a pod.
-type GetEquivalencePodFunc func(pod *v1.Pod) interface{}
-
 // NodeLister interface represents anything that can list nodes for a scheduler.
 type NodeLister interface {
 	// We explicitly return []*v1.Node, instead of v1.NodeList, to avoid
