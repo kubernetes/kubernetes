@@ -502,6 +502,10 @@ func TestPodContainerDeviceAllocation(t *testing.T) {
 		resourceQuantity: *resource.NewQuantity(int64(1), resource.DecimalSI),
 		devs:             []string{"dev3", "dev4"},
 	}
+	nonDeviceRes := TestResource{
+		resourceName:     "domain3.com/resource3",
+		resourceQuantity: *resource.NewQuantity(int64(1), resource.DecimalSI),
+	}
 	testResources := make([]TestResource, 2)
 	testResources = append(testResources, res1)
 	testResources = append(testResources, res2)
@@ -517,9 +521,10 @@ func TestPodContainerDeviceAllocation(t *testing.T) {
 
 	testPods := []*v1.Pod{
 		makePod(v1.ResourceList{
-			v1.ResourceName(res1.resourceName): res1.resourceQuantity,
-			v1.ResourceName("cpu"):             res1.resourceQuantity,
-			v1.ResourceName(res2.resourceName): res2.resourceQuantity}),
+			v1.ResourceName(res1.resourceName):         res1.resourceQuantity,
+			v1.ResourceName("cpu"):                     res1.resourceQuantity,
+			v1.ResourceName(res2.resourceName):         res2.resourceQuantity,
+			v1.ResourceName(nonDeviceRes.resourceName): nonDeviceRes.resourceQuantity}),
 		makePod(v1.ResourceList{
 			v1.ResourceName(res1.resourceName): res2.resourceQuantity}),
 		makePod(v1.ResourceList{
@@ -534,7 +539,7 @@ func TestPodContainerDeviceAllocation(t *testing.T) {
 		expErr                    error
 	}{
 		{
-			description:               "Successfull allocation of two Res1 resources and one Res2 resource",
+			description:               "Successfull allocation of two Res1 resources, one Res2 resource, and a non device resource",
 			testPod:                   testPods[0],
 			expectedContainerOptsLen:  []int{3, 2, 2},
 			expectedAllocatedResName1: 2,
