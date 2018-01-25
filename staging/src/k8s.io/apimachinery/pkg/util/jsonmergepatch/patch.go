@@ -116,10 +116,26 @@ func keepOrDeleteNullInObj(m map[string]interface{}, keepNull bool) (map[string]
 		case val != nil:
 			switch typedVal := val.(type) {
 			case map[string]interface{}:
-				filteredMap[key], err = keepOrDeleteNullInObj(typedVal, keepNull)
+				// Explicitly-set empty maps are treated as values instead of empty patches
+				if len(typedVal) == 0 {
+					if !keepNull {
+						filteredMap[key] = typedVal
+					}
+					continue
+				}
+
+				var filteredSubMap map[string]interface{}
+				filteredSubMap, err = keepOrDeleteNullInObj(typedVal, keepNull)
 				if err != nil {
 					return nil, err
 				}
+
+				// If the returned filtered submap was empty, this is an empty patch for the entire subdict, so the key
+				// should not be set
+				if len(filteredSubMap) != 0 {
+					filteredMap[key] = filteredSubMap
+				}
+
 			case []interface{}, string, float64, bool, int, int64, nil:
 				// Lists are always replaced in Json, no need to check each entry in the list.
 				if !keepNull {
