@@ -44,6 +44,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/util/sliceutils"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
+	"k8s.io/kubernetes/pkg/util/taints"
 	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
 )
@@ -948,7 +949,7 @@ var oldNodeUnschedulable bool
 // record if node schedulable change.
 func (kl *Kubelet) recordNodeSchedulableEvent(node *v1.Node) {
 	if oldNodeUnschedulable != node.Spec.Unschedulable {
-		if node.Spec.Unschedulable {
+		if node.Spec.Unschedulable || taints.TaintExistsWithEffect(node.Spec.Taints) {
 			kl.recordNodeStatusEvent(v1.EventTypeNormal, events.NodeNotSchedulable)
 		} else {
 			kl.recordNodeStatusEvent(v1.EventTypeNormal, events.NodeSchedulable)

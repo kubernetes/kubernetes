@@ -685,3 +685,41 @@ func TestParseTaints(t *testing.T) {
 		}
 	}
 }
+
+func TestTaintExistsWithEffect(t *testing.T) {
+	firstSetOfTaints := []v1.Taint{
+		{
+			Key:    "foo_1",
+			Value:  "bar_1",
+			Effect: v1.TaintEffectNoExecute,
+		},
+		{
+			Key:    "foo_2",
+			Value:  "bar_2",
+			Effect: v1.TaintEffectNoSchedule,
+		},
+		{
+			Key:    "foo_3",
+			Value:  "bar_3",
+			Effect: v1.TaintEffectPreferNoSchedule,
+		},
+	}
+
+	result := TaintExistsWithEffect(firstSetOfTaints)
+	if result != true {
+		t.Errorf("[%s] unexpected results: %v", "Taint should exist", result)
+	}
+
+	secondSetOfTaints := []v1.Taint{
+		{
+			Key:    "foo_3",
+			Value:  "bar_3",
+			Effect: v1.TaintEffectPreferNoSchedule,
+		},
+	}
+
+	result = TaintExistsWithEffect(secondSetOfTaints)
+	if result != false {
+		t.Errorf("[%s] unexpected results: %v", "Taint should not exist", result)
+	}
+}
