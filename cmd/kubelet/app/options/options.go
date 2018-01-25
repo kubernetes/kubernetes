@@ -487,13 +487,16 @@ func AddKubeletConfigFlags(mainfs *pflag.FlagSet, c *kubeletconfig.KubeletConfig
 		"If --tls-cert-file and --tls-private-key-file are not provided, a self-signed certificate and key "+
 		"are generated for the public address and saved to the directory passed to --cert-dir.")
 	fs.StringVar(&c.TLSPrivateKeyFile, "tls-private-key-file", c.TLSPrivateKeyFile, "File containing x509 private key matching --tls-cert-file.")
+
+	tlsCipherPossibleValues := flag.TLSCipherPossibleValues()
 	fs.StringSliceVar(&c.TLSCipherSuites, "tls-cipher-suites", c.TLSCipherSuites,
 		"Comma-separated list of cipher suites for the server. "+
-			"Values are from tls package constants (https://golang.org/pkg/crypto/tls/#pkg-constants). "+
-			"If omitted, the default Go cipher suites will be used")
+			"If omitted, the default Go cipher suites will be used. "+
+			"Possible values: "+strings.Join(tlsCipherPossibleValues, ","))
+	tlsPossibleVersions := flag.TLSPossibleVersions()
 	fs.StringVar(&c.TLSMinVersion, "tls-min-version", c.TLSMinVersion,
 		"Minimum TLS version supported. "+
-			"Value must match version names from https://golang.org/pkg/crypto/tls/#pkg-constants.")
+			"Possible values: "+strings.Join(tlsPossibleVersions, ", "))
 	fs.BoolVar(&c.RotateCertificates, "rotate-certificates", c.RotateCertificates, "<Warning: Beta feature> Auto rotate the kubelet client certificates by requesting new certificates from the kube-apiserver when the certificate expiration approaches.")
 
 	fs.Int32Var(&c.RegistryPullQPS, "registry-qps", c.RegistryPullQPS, "If > 0, limit registry pull QPS to this value.  If 0, unlimited.")
