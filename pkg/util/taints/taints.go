@@ -311,6 +311,23 @@ func TaintExists(taints []v1.Taint, taintToFind *v1.Taint) bool {
 	return false
 }
 
+func TaintExistsWithEffect(taints []v1.Taint) bool {
+	noExecuteTaintTemplate := &v1.Taint{
+		Effect: v1.TaintEffectNoExecute,
+	}
+
+	notScheduleTaintTemplate := &v1.Taint{
+		Effect: v1.TaintEffectNoSchedule,
+	}
+
+	for _, taint := range taints {
+		if taint.Effect == noExecuteTaintTemplate.Effect || taint.Effect == notScheduleTaintTemplate.Effect {
+			return true
+		}
+	}
+	return false
+}
+
 func TaintSetDiff(t1, t2 []v1.Taint) (taintsToAdd []*v1.Taint, taintsToRemove []*v1.Taint) {
 	for _, taint := range t1 {
 		if !TaintExists(t2, &taint) {
