@@ -37,8 +37,7 @@ const maxCacheEntries = 100
 // 2. function to get equivalence pod
 type EquivalenceCache struct {
 	sync.RWMutex
-	getEquivalencePod algorithm.GetEquivalencePodFunc
-	algorithmCache    map[string]AlgorithmCache
+	algorithmCache map[string]AlgorithmCache
 }
 
 // The AlgorithmCache stores PredicateMap with predicate name as key
@@ -62,10 +61,9 @@ func newAlgorithmCache() AlgorithmCache {
 	}
 }
 
-func NewEquivalenceCache(getEquivalencePodFunc algorithm.GetEquivalencePodFunc) *EquivalenceCache {
+func NewEquivalenceCache() *EquivalenceCache {
 	return &EquivalenceCache{
-		getEquivalencePod: getEquivalencePodFunc,
-		algorithmCache:    make(map[string]AlgorithmCache),
+		algorithmCache: make(map[string]AlgorithmCache),
 	}
 }
 
@@ -208,15 +206,69 @@ func (ec *EquivalenceCache) InvalidateCachedPredicateItemForPodAdd(pod *v1.Pod, 
 	ec.InvalidateCachedPredicateItem(nodeName, invalidPredicates)
 }
 
-// getHashEquivalencePod returns the hash of equivalence pod.
-// 1. equivalenceHash
-// 2. if equivalence hash is valid
-func (ec *EquivalenceCache) getHashEquivalencePod(pod *v1.Pod) (uint64, bool) {
-	equivalencePod := ec.getEquivalencePod(pod)
-	if equivalencePod != nil {
-		hash := fnv.New32a()
-		hashutil.DeepHashObject(hash, equivalencePod)
-		return uint64(hash.Sum32()), true
+// getEquivalenceHash computes a hash of the given pod.
+// The hashing function returns the same value for any two pods that are
+// equivalent from the perspective of scheduling.
+func (ec *EquivalenceCache) getEquivalenceHash(pod *v1.Pod) (uint64, bool) {
+	equivalencePod := getEquivalencePod(pod)
+	hash := fnv.New32a()
+	hashutil.DeepHashObject(hash, equivalencePod)
+	return uint64(hash.Sum32()), true
+}
+
+// equivalencePod is the set of pod attributes which must match for two pods to
+// be considered equivalent for scheduling purposes. For correctness, this must
+// include any Pod field which is used by a FitPredicate.
+//
+// NOTE: For equivalence hash to be formally correct, lists and maps in the
+// equivalencePod should be normalized. (e.g. by sorting them) However, the
+// vast majority of equivalent pod classes are expected to be created from a
+// single pod template, so they will all have the same ordering.
+type equivalencePod struct {
+	Namespace      *string
+	Labels         map[string]string
+	Affinity       *v1.Affinity
+	Containers     []v1.Container // See note about ordering
+	InitContainers []v1.Container // See note about ordering
+	NodeName       *string
+	NodeSelector   map[string]string
+	Tolerations    []v1.Toleration
+	Volumes        []v1.Volume // See note about ordering
+}
+
+// getEquivalencePod returns the equivalencePod for a Pod.
+func getEquivalencePod(pod *v1.Pod) *equivalencePod {
+	ep := &equivalencePod{
+		Namespace:      &pod.Namespace,
+		Labels:         pod.Labels,
+		Affinity:       pod.Spec.Affinity,
+		Containers:     pod.Spec.Containers,
+		InitContainers: pod.Spec.InitContainers,
+		NodeName:       &pod.Spec.NodeName,
+		NodeSelector:   pod.Spec.NodeSelector,
+		Tolerations:    pod.Spec.Tolerations,
+		Volumes:        pod.Spec.Volumes,
 	}
-	return 0, false
+	// DeepHashObject considers nil and empy slices to be different. Normalize them.
+	if len(ep.Containers) == 0 {
+		ep.Containers = nil
+	}
+	if len(ep.InitContainers) == 0 {
+		ep.InitContainers = nil
+	}
+	if len(ep.Tolerations) == 0 {
+		ep.Tolerations = nil
+	}
+	if len(ep.Volumes) == 0 {
+		ep.Volumes = nil
+	}
+	// Normalize empty maps also.
+	if len(ep.Labels) == 0 {
+		ep.Labels = nil
+	}
+	if len(ep.NodeSelector) == 0 {
+		ep.NodeSelector = nil
+	}
+	// TODO: Also normalize nested maps and slices.
+	return ep
 }

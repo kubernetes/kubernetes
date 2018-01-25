@@ -135,6 +135,8 @@ type configFactory struct {
 	alwaysCheckAllPredicates bool
 }
 
+var _ scheduler.Configurator = &configFactory{}
+
 // NewConfigFactory initializes the default implementation of a Configurator To encourage eventual privatization of the struct type, we only
 // return the interface.
 func NewConfigFactory(
@@ -967,14 +969,8 @@ func (f *configFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, 
 	}
 
 	// Init equivalence class cache
-	if f.enableEquivalenceClassCache && getEquivalencePodFuncFactory != nil {
-		pluginArgs, err := f.getPluginArgs()
-		if err != nil {
-			return nil, err
-		}
-		f.equivalencePodCache = core.NewEquivalenceCache(
-			getEquivalencePodFuncFactory(*pluginArgs),
-		)
+	if f.enableEquivalenceClassCache {
+		f.equivalencePodCache = core.NewEquivalenceCache()
 		glog.Info("Created equivalence class cache")
 	}
 

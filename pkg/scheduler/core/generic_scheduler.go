@@ -418,7 +418,7 @@ func podFitsOnNode(
 
 	if ecache != nil {
 		// getHashEquivalencePod will return immediately if no equivalence pod found
-		equivalenceHash, eCacheAvailable = ecache.getHashEquivalencePod(pod)
+		equivalenceHash, eCacheAvailable = ecache.getEquivalenceHash(pod)
 	}
 	podsAdded := false
 	// We run predicates twice in some cases. If the node has greater or equal priority
