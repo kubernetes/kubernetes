@@ -21,8 +21,11 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rsa"
+	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 
 	"k8s.io/api/core/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -35,7 +38,7 @@ import (
 	"gopkg.in/square/go-jose.v2/jwt"
 )
 
-const Issuer = "kubernetes/serviceaccount"
+const LegacyIssuer = "kubernetes/serviceaccount"
 
 type privateClaims struct {
 	ServiceAccountName string `json:"kubernetes.io/serviceaccount/service-account.name"`
@@ -59,11 +62,15 @@ type TokenGenerator interface {
 // JWTTokenGenerator returns a TokenGenerator that generates signed JWT tokens, using the given privateKey.
 // privateKey is a PEM-encoded byte array of a private RSA key.
 // JWTTokenAuthenticator()
-func JWTTokenGenerator(privateKey interface{}) TokenGenerator {
-	return &jwtTokenGenerator{privateKey}
+func JWTTokenGenerator(iss string, privateKey interface{}) TokenGenerator {
+	return &jwtTokenGenerator{
+		iss:        iss,
+		privateKey: privateKey,
+	}
 }
 
 type jwtTokenGenerator struct {
+	iss        string
 	privateKey interface{}
 }
 
@@ -100,7 +107,7 @@ func (j *jwtTokenGenerator) GenerateToken(serviceAccount v1.ServiceAccount, secr
 
 	return jwt.Signed(signer).
 		Claims(&jwt.Claims{
-			Issuer:  Issuer,
+			Issuer:  j.iss,
 			Subject: apiserverserviceaccount.MakeUsername(serviceAccount.Namespace, serviceAccount.Name),
 		}).
 		Claims(&privateClaims{
@@ -114,11 +121,17 @@ func (j *jwtTokenGenerator) GenerateToken(serviceAccount v1.ServiceAccount, secr
 // JWTTokenAuthenticator authenticates tokens as JWT tokens produced by JWTTokenGenerator
 // Token signatures are verified using each of the given public keys until one works (allowing key rotation)
 // If lookup is true, the service account and secret referenced as claims inside the token are retrieved and verified with the provided ServiceAccountTokenGetter
-func JWTTokenAuthenticator(keys []interface{}, lookup bool, getter ServiceAccountTokenGetter) authenticator.Token {
-	return &jwtTokenAuthenticator{keys, lookup, getter}
+func JWTTokenAuthenticator(iss string, keys []interface{}, lookup bool, getter ServiceAccountTokenGetter) authenticator.Token {
+	return &jwtTokenAuthenticator{
+		iss:    iss,
+		keys:   keys,
+		lookup: lookup,
+		getter: getter,
+	}
 }
 
 type jwtTokenAuthenticator struct {
+	iss    string
 	keys   []interface{}
 	lookup bool
 	getter ServiceAccountTokenGetter
@@ -127,6 +140,10 @@ type jwtTokenAuthenticator struct {
 var errMismatchedSigningMethod = errors.New("invalid signing method")
 
 func (j *jwtTokenAuthenticator) AuthenticateToken(tokenData string) (user.Info, bool, error) {
+	if !j.hasCorrectIssuer(tokenData) {
+		return nil, false, nil
+	}
+
 	tok, err := jwt.ParseSigned(tokenData)
 	if err != nil {
 		return nil, false, nil
@@ -152,18 +169,42 @@ func (j *jwtTokenAuthenticator) AuthenticateToken(tokenData string) (user.Info, 
 		return nil, false, utilerrors.NewAggregate(errlist)
 	}
 
-	// If we get here, we have a token with a recognized signature
-
-	// Make sure we issued the token
-	if public.Issuer != Issuer {
-		return nil, false, nil
-	}
-
+	// If we get here, we have a token with a recognized signature and
+	// issuer string.
 	if err := j.Validate(tokenData, public, private); err != nil {
 		return nil, false, err
 	}
 
 	return UserInfo(private.Namespace, private.ServiceAccountName, private.ServiceAccountUID), true, nil
+
+}
+
+// hasCorrectIssuer returns true if tokenData is a valid JWT in compact
+// serialization format and the "iss" claim matches the iss field of this token
+// authenticator, and otherwise returns false.
+//
+// Note: go-jose currently does not allow access to unverified JWS payloads.
+// See https://github.com/square/go-jose/issues/169
+func (j *jwtTokenAuthenticator) hasCorrectIssuer(tokenData string) bool {
+	parts := strings.Split(tokenData, ".")
+	if len(parts) != 3 {
+		return false
+	}
+	payload, err := base64.RawURLEncoding.DecodeString(parts[1])
+	if err != nil {
+		return false
+	}
+	claims := struct {
+		// WARNING: this JWT is not verified. Do not trust these claims.
+		Issuer string `json:"iss"`
+	}{}
+	if err := json.Unmarshal(payload, &claims); err != nil {
+		return false
+	}
+	if claims.Issuer != j.iss {
+		return false
+	}
+	return true
 
 }
 
