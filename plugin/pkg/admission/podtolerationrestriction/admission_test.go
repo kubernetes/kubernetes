@@ -232,7 +232,7 @@ func TestPodAdmission(t *testing.T) {
 	// TODO: remove for loop when support for deprecated alpha annotations removed
 	defaultTolerationsAnnotations := []string{algorithm.AnnotationDefaultTolerations, algorithm.DeprecatedAnnotationDefaultTolerations}
 	tolerationWhitelistAnnotations := []string{algorithm.AnnotationTolerationsWhitelist, algorithm.DeprecatedAnnotationTolerationsWhitelist}
-	
+
 	for i := 0; i < len(defaultTolerationsAnnotations); i++ {
 		defaultTolerationAnnotation := defaultTolerationsAnnotations[i]
 		tolerationWhitelistAnnotation := tolerationWhitelistAnnotations[i]

@@ -244,7 +244,7 @@ func (p *podTolerationsPlugin) getNamespaceDefaultTolerations(nsName string) ([]
 		return nil, err
 	}
 	if defaultTolerations == nil {
-		defaultTolerations, err = extractNSTolerations(ns, algorithm.DeprecatedAnnotationDefaultTolerations)	
+		defaultTolerations, err = extractNSTolerations(ns, algorithm.DeprecatedAnnotationDefaultTolerations)
 	}
 	if err != nil {
 		return nil, err
