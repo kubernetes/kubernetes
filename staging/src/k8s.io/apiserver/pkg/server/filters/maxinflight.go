@@ -48,15 +48,15 @@ func WithMaxInFlightLimit(
 	requestContextMapper apirequest.RequestContextMapper,
 	longRunningRequestCheck apirequest.LongRunningRequestCheck,
 ) http.Handler {
-	if nonMutatingLimit == 0 && mutatingLimit == 0 {
+	if nonMutatingLimit <= 0 && mutatingLimit <= 0 {
 		return handler
 	}
 	var nonMutatingChan chan bool
 	var mutatingChan chan bool
-	if nonMutatingLimit != 0 {
+	if nonMutatingLimit > 0 {
 		nonMutatingChan = make(chan bool, nonMutatingLimit)
 	}
-	if mutatingLimit != 0 {
+	if mutatingLimit > 0 {
 		mutatingChan = make(chan bool, mutatingLimit)
 	}
 
