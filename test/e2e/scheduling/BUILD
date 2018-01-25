@@ -25,6 +25,7 @@ go_library(
         "//pkg/kubelet/apis:go_default_library",
         "//pkg/quota/evaluator/core:go_default_library",
         "//pkg/scheduler/algorithm/priorities/util:go_default_library",
+        "//pkg/scheduler/api:go_default_library",
         "//pkg/util/version:go_default_library",
         "//test/e2e/common:go_default_library",
         "//test/e2e/framework:go_default_library",
