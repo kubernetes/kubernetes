@@ -27,10 +27,10 @@ Auto-scaler.
 ## Add-on naming
 
 The suggested naming for most of the resources is `<basename>` (with no version number).
-Though resources like `Pod`, `ReplicationController` and `DaemonSet` are exceptional.
+Though resources like `Pod` and `ReplicationController` are exceptional.
 It would be hard to update `Pod` because many fields in `Pod` are immutable. For
-`ReplicationController` and `DaemonSet`, in-place update may not trigger the underlying
-pods to be re-created. You probably need to change their names during update to trigger
-a complete deletion and creation.
+`ReplicationController`, in-place update may not trigger the underlying pods to be
+re-created. You probably need to change their names during update to trigger a complete
+deletion and creation.
 
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/cluster/addons/README.md?pixel)]()
