@@ -492,6 +492,19 @@ func (mounter *SafeFormatAndMount) formatAndMount(source string, target string, 
 		}
 	}
 
+	// Run e2fsck and resize2fs to extends ext2/ext3/ext4 disk size
+	glog.Infof("Extending disk size run cmd e2fsck on disk: %s", source)
+	args = []string{"-f", "-y", source}
+	out, err = mounter.Exec.Run("e2fsck", args...)
+	if err != nil {
+		glog.Infof("`e2fsck` error %s", string(out))
+	}
+	args = []string{source}
+	out, err = mounter.Exec.Run("resize2fs", args...)
+	if err != nil {
+		glog.Infof("`resize2fs` error %s", string(out))
+	}
+
 	// Try to mount the disk
 	glog.V(4).Infof("Attempting to mount disk: %s %s %s", fstype, source, target)
 	mountErr := mounter.Interface.Mount(source, target, fstype, options)
