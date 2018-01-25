@@ -272,12 +272,12 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 					_, err = f.ClientSet.ExtensionsV1beta1().Deployments(ns).UpdateScale(name, scale)
 					Expect(err).NotTo(HaveOccurred())
 				}
-				wait.Poll(5*time.Second, NEGUpdateTimeout, func() (bool, error) {
+				wait.Poll(10*time.Second, NEGUpdateTimeout, func() (bool, error) {
 					res, err := jig.GetDistinctResponseFromIngress()
 					if err != nil {
-						return false, err
+						return false, nil
 					}
-					return res.Len() == num, err
+					return res.Len() == num, nil
 				})
 			}
 
@@ -319,12 +319,12 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			scale.Spec.Replicas = int32(replicas)
 			_, err = f.ClientSet.ExtensionsV1beta1().Deployments(ns).UpdateScale(name, scale)
 			Expect(err).NotTo(HaveOccurred())
-			wait.Poll(5*time.Second, framework.LoadBalancerPollTimeout, func() (bool, error) {
+			wait.Poll(10*time.Second, framework.LoadBalancerPollTimeout, func() (bool, error) {
 				res, err := jig.GetDistinctResponseFromIngress()
 				if err != nil {
-					return false, err
+					return false, nil
 				}
-				return res.Len() == replicas, err
+				return res.Len() == replicas, nil
 			})
 
 			By("Trigger rolling update and observe service disruption")
@@ -335,7 +335,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			deploy.Spec.Template.Spec.TerminationGracePeriodSeconds = &gracePeriod
 			_, err = f.ClientSet.ExtensionsV1beta1().Deployments(ns).Update(deploy)
 			Expect(err).NotTo(HaveOccurred())
-			wait.Poll(30*time.Second, framework.LoadBalancerPollTimeout, func() (bool, error) {
+			wait.Poll(10*time.Second, framework.LoadBalancerPollTimeout, func() (bool, error) {
 				res, err := jig.GetDistinctResponseFromIngress()
 				Expect(err).NotTo(HaveOccurred())
 				deploy, err := f.ClientSet.ExtensionsV1beta1().Deployments(ns).Get(name, metav1.GetOptions{})

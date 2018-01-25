@@ -168,6 +168,13 @@ const (
 	// Enable nodes to exclude themselves from service load balancers
 	ServiceNodeExclusion utilfeature.Feature = "ServiceNodeExclusion"
 
+	// owner @brendandburns
+	// stable: v1.10
+	//
+	// Enable the service proxy to contact external IP addresses. Note this feature is present
+	// only for backward compatability, it will be removed in the 1.11 release.
+	ServiceProxyAllowExternalIPs utilfeature.Feature = "ServiceProxyAllowExternalIPs"
+
 	// owner: @jsafrane
 	// alpha: v1.9
 	//
@@ -268,4 +275,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	// inherited features from apiextensions-apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:
 	apiextensionsfeatures.CustomResourceValidation: {Default: true, PreRelease: utilfeature.Beta},
+
+	// backward compatability features that enable backwards compatability but should be removed soon.
+	ServiceProxyAllowExternalIPs: {Default: false, PreRelease: utilfeature.Beta},
 }

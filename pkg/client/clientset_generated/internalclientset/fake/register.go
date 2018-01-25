@@ -79,5 +79,4 @@ func AddToScheme(scheme *runtime.Scheme) {
 	schedulinginternalversion.AddToScheme(scheme)
 	settingsinternalversion.AddToScheme(scheme)
 	storageinternalversion.AddToScheme(scheme)
-
 }

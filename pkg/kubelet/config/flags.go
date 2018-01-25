@@ -103,8 +103,9 @@ func (s *ContainerRuntimeOptions) AddFlags(fs *pflag.FlagSet) {
 
 	// Rkt-specific settings.
 	fs.StringVar(&s.RktPath, "rkt-path", s.RktPath, "Path of rkt binary. Leave empty to use the first rkt in $PATH.  Only used if --container-runtime='rkt'.")
+	fs.MarkDeprecated("rkt-path", "will be removed in a future version. Rktnetes has been deprecated in favor of rktlet (https://github.com/kubernetes-incubator/rktlet).")
 	fs.StringVar(&s.RktAPIEndpoint, "rkt-api-endpoint", s.RktAPIEndpoint, "The endpoint of the rkt API service to communicate with. Only used if --container-runtime='rkt'.")
+	fs.MarkDeprecated("rkt-api-endpoint", "will be removed in a future version. Rktnetes has been deprecated in favor of rktlet (https://github.com/kubernetes-incubator/rktlet).")
 	fs.StringVar(&s.RktStage1Image, "rkt-stage1-image", s.RktStage1Image, "image to use as stage1. Local paths and http/https URLs are supported. If empty, the 'stage1.aci' in the same directory as '--rkt-path' will be used.")
-	fs.MarkDeprecated("rkt-stage1-image", "Will be removed in a future version. The default stage1 image will be specified by the rkt configurations, see https://github.com/coreos/rkt/blob/master/Documentation/configuration.md for more details.")
-
+	fs.MarkDeprecated("rkt-stage1-image", "will be removed in a future version. Rktnetes has been deprecated in favor of rktlet (https://github.com/kubernetes-incubator/rktlet).")
 }

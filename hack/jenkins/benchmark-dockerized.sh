@@ -45,6 +45,7 @@ export KUBE_COVER="n"
 export KUBE_JUNIT_REPORT_DIR=${WORKSPACE}/artifacts
 export ARTIFACTS_DIR=${WORKSPACE}/artifacts
 
+mkdir -p "${ARTIFACTS_DIR}"
 cd /go/src/k8s.io/kubernetes
 
 ./hack/install-etcd.sh

@@ -76,9 +76,15 @@ func TestMustRunAsValidate(t *testing.T) {
 		return &api.SELinuxOptions{
 			User:  "user",
 			Role:  "role",
-			Level: "level",
+			Level: "s0:c0,c6",
 			Type:  "type",
 		}
+	}
+
+	newValidOptsWithLevel := func(level string) *api.SELinuxOptions {
+		opts := newValidOpts()
+		opts.Level = level
+		return opts
 	}
 
 	role := newValidOpts()
@@ -87,50 +93,64 @@ func TestMustRunAsValidate(t *testing.T) {
 	user := newValidOpts()
 	user.User = "invalid"
 
-	level := newValidOpts()
-	level.Level = "invalid"
-
 	seType := newValidOpts()
 	seType.Type = "invalid"
 
+	validOpts := newValidOpts()
+
 	tests := map[string]struct {
-		seLinux     *api.SELinuxOptions
+		podSeLinux  *api.SELinuxOptions
+		pspSeLinux  *api.SELinuxOptions
 		expectedMsg string
 	}{
 		"invalid role": {
-			seLinux:     role,
+			podSeLinux:  role,
+			pspSeLinux:  validOpts,
 			expectedMsg: "role: Invalid value",
 		},
 		"invalid user": {
-			seLinux:     user,
+			podSeLinux:  user,
+			pspSeLinux:  validOpts,
 			expectedMsg: "user: Invalid value",
 		},
-		"invalid level": {
-			seLinux:     level,
+		"levels are not equal": {
+			podSeLinux:  newValidOptsWithLevel("s0"),
+			pspSeLinux:  newValidOptsWithLevel("s0:c1,c2"),
 			expectedMsg: "level: Invalid value",
 		},
-		"invalid type": {
-			seLinux:     seType,
-			expectedMsg: "type: Invalid value",
+		"levels differ by sensitivity": {
+			podSeLinux:  newValidOptsWithLevel("s0:c6"),
+			pspSeLinux:  newValidOptsWithLevel("s1:c6"),
+			expectedMsg: "level: Invalid value",
+		},
+		"levels differ by categories": {
+			podSeLinux:  newValidOptsWithLevel("s0:c0,c8"),
+			pspSeLinux:  newValidOptsWithLevel("s0:c1,c7"),
+			expectedMsg: "level: Invalid value",
 		},
 		"valid": {
-			seLinux:     newValidOpts(),
+			podSeLinux:  validOpts,
+			pspSeLinux:  validOpts,
+			expectedMsg: "",
+		},
+		"valid with different order of categories": {
+			podSeLinux:  newValidOptsWithLevel("s0:c6,c0"),
+			pspSeLinux:  validOpts,
 			expectedMsg: "",
 		},
 	}
 
-	opts := &extensions.SELinuxStrategyOptions{
-		SELinuxOptions: newValidOpts(),
-	}
-
 	for name, tc := range tests {
+		opts := &extensions.SELinuxStrategyOptions{
+			SELinuxOptions: tc.pspSeLinux,
+		}
 		mustRunAs, err := NewMustRunAs(opts)
 		if err != nil {
 			t.Errorf("unexpected error initializing NewMustRunAs for testcase %s: %#v", name, err)
 			continue
 		}
 
-		errs := mustRunAs.Validate(nil, nil, nil, tc.seLinux)
+		errs := mustRunAs.Validate(nil, nil, nil, tc.podSeLinux)
 		//should've passed but didn't
 		if len(tc.expectedMsg) == 0 && len(errs) > 0 {
 			t.Errorf("%s expected no errors but received %v", name, errs)

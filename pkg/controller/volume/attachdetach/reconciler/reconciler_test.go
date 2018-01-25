@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/statusupdater"
 	controllervolumetesting "k8s.io/kubernetes/pkg/controller/volume/attachdetach/testing"
+	stringutil "k8s.io/kubernetes/pkg/util/strings"
 	volumetesting "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
 	"k8s.io/kubernetes/pkg/volume/util/types"
@@ -529,6 +530,115 @@ func Test_Run_OneVolumeAttachAndDetachMultipleNodesWithReadWriteOnce(t *testing.
 	waitForNewAttacherCallCount(t, 2 /* expectedCallCount */, fakePlugin)
 	verifyNewAttacherCallCount(t, false /* expectZeroNewAttacherCallCount */, fakePlugin)
 	waitForTotalAttachCallCount(t, 2 /* expectedAttachCallCount */, fakePlugin)
+}
+
+func Test_ReportMultiAttachError(t *testing.T) {
+	type nodeWithPods struct {
+		name     k8stypes.NodeName
+		podNames []string
+	}
+	tests := []struct {
+		name           string
+		nodes          []nodeWithPods
+		expectedEvents []string
+	}{
+		{
+			"no pods use the volume",
+			[]nodeWithPods{
+				{"node1", []string{"ns1/pod1"}},
+			},
+			[]string{"Warning FailedAttachVolume Multi-Attach error for volume \"volume-name\" Volume is already exclusively attached to one node and can't be attached to another"},
+		},
+		{
+			"pods in the same namespace use the volume",
+			[]nodeWithPods{
+				{"node1", []string{"ns1/pod1"}},
+				{"node2", []string{"ns1/pod2"}},
+			},
+			[]string{"Warning FailedAttachVolume Multi-Attach error for volume \"volume-name\" Volume is already used by pod(s) pod2"},
+		},
+		{
+			"pods in anotother namespace use the volume",
+			[]nodeWithPods{
+				{"node1", []string{"ns1/pod1"}},
+				{"node2", []string{"ns2/pod2"}},
+			},
+			[]string{"Warning FailedAttachVolume Multi-Attach error for volume \"volume-name\" Volume is already used by 1 pod(s) in different namespaces"},
+		},
+		{
+			"pods both in the same and anotother namespace use the volume",
+			[]nodeWithPods{
+				{"node1", []string{"ns1/pod1"}},
+				{"node2", []string{"ns2/pod2"}},
+				{"node3", []string{"ns1/pod3"}},
+			},
+			[]string{"Warning FailedAttachVolume Multi-Attach error for volume \"volume-name\" Volume is already used by pod(s) pod3 and 1 pod(s) in different namespaces"},
+		},
+	}
+
+	for _, test := range tests {
+		// Arrange
+		t.Logf("Test %q starting", test.name)
+		volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
+		dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
+		asw := cache.NewActualStateOfWorld(volumePluginMgr)
+		fakeKubeClient := controllervolumetesting.CreateTestClient()
+		fakeRecorder := record.NewFakeRecorder(100)
+		fakeHandler := volumetesting.NewBlockVolumePathHandler()
+		ad := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
+			fakeKubeClient,
+			volumePluginMgr,
+			fakeRecorder,
+			false, /* checkNodeCapabilitiesBeforeMount */
+			fakeHandler))
+		nsu := statusupdater.NewFakeNodeStatusUpdater(false /* returnError */)
+		rc := NewReconciler(
+			reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, dsw, asw, ad, nsu, fakeRecorder)
+
+		nodes := []k8stypes.NodeName{}
+		for _, n := range test.nodes {
+			dsw.AddNode(n.name, false /*keepTerminatedPodVolumes*/)
+			nodes = append(nodes, n.name)
+			for _, podName := range n.podNames {
+				volumeName := v1.UniqueVolumeName("volume-name")
+				volumeSpec := controllervolumetesting.GetTestVolumeSpec(string(volumeName), volumeName)
+				volumeSpec.PersistentVolume.Spec.AccessModes = []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}
+				uid := string(n.name) + "-" + podName // unique UID
+				namespace, name := stringutil.SplitQualifiedName(podName)
+				pod := controllervolumetesting.NewPod(uid, name)
+				pod.Namespace = namespace
+				_, err := dsw.AddPod(types.UniquePodName(uid), pod, volumeSpec, n.name)
+				if err != nil {
+					t.Fatalf("Error adding pod %s to DSW: %s", podName, err)
+				}
+			}
+		}
+		// Act
+		volumes := dsw.GetVolumesToAttach()
+		for _, vol := range volumes {
+			if vol.NodeName == "node1" {
+				rc.(*reconciler).reportMultiAttachError(vol, nodes)
+			}
+		}
+
+		// Assert
+		close(fakeRecorder.Events)
+		index := 0
+		for event := range fakeRecorder.Events {
+			if len(test.expectedEvents) < index {
+				t.Errorf("Test %q: unexpected event received: %s", test.name, event)
+			} else {
+				expectedEvent := test.expectedEvents[index]
+				if expectedEvent != event {
+					t.Errorf("Test %q: event %d: expected %q, got %q", test.name, index, expectedEvent, event)
+				}
+			}
+			index++
+		}
+		for i := index; i < len(test.expectedEvents); i++ {
+			t.Errorf("Test %q: event %d: expected %q, got none", test.name, i, test.expectedEvents[i])
+		}
+	}
 }
 
 func waitForMultiAttachErrorOnNode(

@@ -645,6 +645,7 @@ def create_kubeconfig(kubeconfig, server, ca, key=None, certificate=None,
 
 @when_any('config.changed.default-backend-image',
           'config.changed.nginx-image')
+@when('kubernetes-worker.config.created')
 def launch_default_ingress_controller():
     ''' Launch the Kubernetes ingress controller & default backend (404) '''
     config = hookenv.config()

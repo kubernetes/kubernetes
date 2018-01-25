@@ -149,9 +149,12 @@ func init() {
 
 // Install registers the API group and adds types to a scheme
 func Install(groupFactoryRegistry $.announcedAPIGroupFactoryRegistry|raw$, registry *$.registeredAPIRegistrationManager|raw$, scheme *$.runtimeScheme|raw$) {
-	$range .allInstallGroups$ $.InstallPackageAlias$.Install(groupFactoryRegistry, registry, scheme)
-	$end$
-	$if .customRegister$ExtraInstall(groupFactoryRegistry, registry, scheme)$end$
+	$- range .allInstallGroups$
+	$.InstallPackageAlias$.Install(groupFactoryRegistry, registry, scheme)
+	$- end$
+	$if .customRegister$
+	ExtraInstall(groupFactoryRegistry, registry, scheme)
+	$end -$
 }
 `
 
@@ -178,8 +181,11 @@ func init() {
 // After this, RawExtensions in Kubernetes types will serialize kube-aggregator types
 // correctly.
 func AddToScheme(scheme *$.runtimeScheme|raw$) {
-	$range .allGroupVersions$ $.PackageAlias$.AddToScheme(scheme)
-	$end$
-	$if .customRegister$ExtraAddToScheme(scheme)$end$
+	$- range .allGroupVersions$
+	$.PackageAlias$.AddToScheme(scheme)
+	$- end$
+	$if .customRegister$
+	ExtraAddToScheme(scheme)
+	$end -$
 }
 `

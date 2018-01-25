@@ -43,5 +43,4 @@ func init() {
 // Install registers the API group and adds types to a scheme
 func Install(groupFactoryRegistry announced.APIGroupFactoryRegistry, registry *registered.APIRegistrationManager, scheme *runtime.Scheme) {
 	apiregistration.Install(groupFactoryRegistry, registry, scheme)
-
 }

@@ -51,5 +51,4 @@ func init() {
 func AddToScheme(scheme *runtime.Scheme) {
 	exampleinternalversion.AddToScheme(scheme)
 	secondexampleinternalversion.AddToScheme(scheme)
-
 }
