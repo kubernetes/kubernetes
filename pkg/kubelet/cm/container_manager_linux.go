@@ -46,6 +46,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/deviceplugin"
+	"k8s.io/kubernetes/pkg/kubelet/cm/util"
 	cmutil "k8s.io/kubernetes/pkg/kubelet/cm/util"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -242,7 +243,7 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 		glog.Infof("container manager verified user specified cgroup-root exists: %v", cgroupRoot)
 		// Include the top level cgroup for enforcing node allocatable into cgroup-root.
 		// This way, all sub modules can avoid having to understand the concept of node allocatable.
-		cgroupRoot = path.Join(cgroupRoot, defaultNodeAllocatableCgroupName)
+		cgroupRoot = util.GetCgroupRootUnderCgroupsPerQOS(cgroupRoot)
 	}
 	glog.Infof("Creating Container Manager object based on Node Config: %+v", nodeConfig)
 

@@ -7,7 +7,9 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = select({
+    srcs = [
+        "util.go",
+    ] + select({
         "@io_bazel_rules_go//go/platform:android": [
             "cgroups_unsupported.go",
         ],

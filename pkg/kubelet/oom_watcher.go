@@ -25,6 +25,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
+	"k8s.io/kubernetes/pkg/kubelet/cm"
+	"k8s.io/kubernetes/pkg/kubelet/cm/util"
 )
 
 // OOMWatcher defines the interface of OOM watchers.
@@ -35,13 +37,15 @@ type OOMWatcher interface {
 type realOOMWatcher struct {
 	cadvisor cadvisor.Interface
 	recorder record.EventRecorder
+	cm       cm.ContainerManager
 }
 
 // NewOOMWatcher creates and initializes a OOMWatcher based on parameters.
-func NewOOMWatcher(cadvisor cadvisor.Interface, recorder record.EventRecorder) OOMWatcher {
+func NewOOMWatcher(cadvisor cadvisor.Interface, recorder record.EventRecorder, cm cm.ContainerManager) OOMWatcher {
 	return &realOOMWatcher{
 		cadvisor: cadvisor,
 		recorder: recorder,
+		cm:       cm,
 	}
 }
 
@@ -49,12 +53,22 @@ const systemOOMEvent = "SystemOOM"
 
 // Watches cadvisor for system oom's and records an event for every system oom encountered.
 func (ow *realOOMWatcher) Start(ref *v1.ObjectReference) error {
+	nodeConfig := ow.cm.GetNodeConfig()
+	containerName := nodeConfig.CgroupRoot
+	includeSubcontainers := false
+	// when CgroupPerQOS is enabled, cgroups hierarchy is narrowed down to a limited scope only related to Kubernetes pods.
+	// It should be ok to watch subcontainers oom events.
+	if nodeConfig.CgroupsPerQOS {
+		containerName = util.GetCgroupRootUnderCgroupsPerQOS(nodeConfig.CgroupRoot)
+		includeSubcontainers = true
+	}
+
 	request := events.Request{
 		EventType: map[cadvisorapi.EventType]bool{
 			cadvisorapi.EventOom: true,
 		},
-		ContainerName:        "/",
-		IncludeSubcontainers: false,
+		ContainerName:        containerName,
+		IncludeSubcontainers: includeSubcontainers,
 	}
 	eventChannel, err := ow.cadvisor.WatchEvents(&request)
 	if err != nil {

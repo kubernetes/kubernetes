@@ -35,10 +35,6 @@ import (
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
-const (
-	defaultNodeAllocatableCgroupName = "kubepods"
-)
-
 func (cm *containerManagerImpl) createNodeAllocatableCgroups() error {
 	cgroupConfig := &CgroupConfig{
 		Name: CgroupName(cm.cgroupRoot),
