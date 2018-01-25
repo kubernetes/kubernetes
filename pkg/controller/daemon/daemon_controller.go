@@ -667,6 +667,12 @@ func (dsc *DaemonSetsController) deletePod(obj interface{}) {
 	glog.V(4).Infof("Pod %s deleted.", pod.Name)
 	dsc.expectations.DeletionObserved(dsKey)
 	dsc.enqueueDaemonSet(ds)
+
+	// delete or update ds
+	if ds.Status.NumberMisscheduled > 0 && len(pod.Spec.NodeName) != 0 {
+		// If scheduled pods were deleted, requeue suspended daemon pods.
+		dsc.requeueSuspendedDaemonPods(pod.Spec.NodeName)
+	}
 }
 
 func (dsc *DaemonSetsController) addNode(obj interface{}) {

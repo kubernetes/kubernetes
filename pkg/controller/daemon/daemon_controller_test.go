@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apiserver/pkg/storage/names"
@@ -2193,6 +2194,212 @@ func TestDeleteNoDaemonPod(t *testing.T) {
 				syncAndValidateDaemonSets(t, manager, c.ds, podControl, 0, 0, 2)
 			case apps.RollingUpdateDaemonSetStrategyType:
 				syncAndValidateDaemonSets(t, manager, c.ds, podControl, 0, 0, 3)
+			default:
+				t.Fatalf("unexpected UpdateStrategy %+v", strategy)
+			}
+
+			manager.enqueueDaemonSetRateLimited = func(ds *apps.DaemonSet) {
+				if ds.Name == "ds" {
+					enqueued = true
+				}
+			}
+
+			enqueued = false
+			manager.deletePod(c.deletedPod)
+			if enqueued != c.shouldEnqueue {
+				t.Errorf("Test case: '%s', expected: %t, got: %t", c.test, c.shouldEnqueue, enqueued)
+			}
+		}
+	}
+}
+
+// TestDeleteDaemonSetPod should be resynced when daemonset pods was deleted.
+func TestDeleteDaemonSetPod(t *testing.T) {
+	var enqueued bool
+	var dsUid types.UID = uuid.NewUUID()
+
+	cases := []struct {
+		test          string
+		node          *v1.Node
+		existPods     []*v1.Pod
+		deletedPod    *v1.Pod
+		suspendDs     *apps.DaemonSet
+		runningDs     *apps.DaemonSet
+		shouldEnqueue bool
+	}{
+		{
+			test: "Deleted daemonset pods (ref daemonset has been deleted)to release resources",
+			node: func() *v1.Node {
+				node := newNode("node1", nil)
+				node.Status.Conditions = []v1.NodeCondition{
+					{Type: v1.NodeReady, Status: v1.ConditionTrue},
+				}
+				node.Status.Allocatable = allocatableResources("200M", "200m")
+				return node
+			}(),
+			existPods: func() []*v1.Pod {
+				pods := []*v1.Pod{}
+				for i := 0; i < 4; i++ {
+					podSpec := resourcePodSpec("node1", "50M", "50m")
+					pods = append(pods, &v1.Pod{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: fmt.Sprintf("pod_%d", i),
+							OwnerReferences: []metav1.OwnerReference{
+								{
+									Controller: func() *bool { res := true; return &res }(),
+									Kind:       controllerKind.Kind,
+									UID:        dsUid,
+									Name:       fmt.Sprintf("pod_%d_ds", i),
+								},
+							},
+						},
+						Spec: podSpec,
+					})
+				}
+				return pods
+			}(),
+			deletedPod: func() *v1.Pod {
+				podSpec := resourcePodSpec("node1", "50M", "50m")
+				return &v1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "pod_0",
+						Namespace: metav1.NamespaceDefault,
+						OwnerReferences: []metav1.OwnerReference{
+							{
+								Controller: func() *bool { res := true; return &res }(),
+								Kind:       controllerKind.Kind,
+								UID:        dsUid,
+								Name:       "pod_0_ds",
+							},
+						},
+					},
+					Spec: podSpec,
+				}
+			}(),
+			suspendDs: func() *apps.DaemonSet {
+				ds := newDaemonSet("ds")
+				ds.Spec.Template.Spec = resourcePodSpec("", "50M", "50m")
+				ds.Status = apps.DaemonSetStatus{
+					ObservedGeneration:     0,
+					UpdatedNumberScheduled: 0,
+					DesiredNumberScheduled: 1,
+					NumberAvailable:        0,
+					NumberMisscheduled:     0,
+				}
+				return ds
+			}(),
+			runningDs: func() *apps.DaemonSet {
+				ds := newDaemonSet("pod_0_ds")
+				ds.Spec.Template.Spec = resourcePodSpec("", "50M", "50m")
+				ds.UID = dsUid
+				ds.Status = apps.DaemonSetStatus{
+					ObservedGeneration:     1,
+					UpdatedNumberScheduled: 0,
+					DesiredNumberScheduled: 1,
+					NumberAvailable:        0,
+					NumberMisscheduled:     1,
+				}
+				return ds
+			}(),
+			shouldEnqueue: true,
+		}, {
+			test: "Deleted daemonset pods (ref daemonset has not been deleted)to release resources",
+			node: func() *v1.Node {
+				node := newNode("node1", nil)
+				node.Status.Conditions = []v1.NodeCondition{
+					{Type: v1.NodeReady, Status: v1.ConditionTrue},
+				}
+				node.Status.Allocatable = allocatableResources("200M", "200m")
+				return node
+			}(),
+			existPods: func() []*v1.Pod {
+				pods := []*v1.Pod{}
+				for i := 0; i < 4; i++ {
+					podSpec := resourcePodSpec("node1", "50M", "50m")
+					pods = append(pods, &v1.Pod{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: fmt.Sprintf("pod_%d", i),
+							OwnerReferences: []metav1.OwnerReference{
+								{
+									Controller: func() *bool { res := true; return &res }(),
+									Kind:       controllerKind.Kind,
+									UID:        dsUid,
+									Name:       fmt.Sprintf("pod_%d_ds", i),
+								},
+							},
+						},
+						Spec: podSpec,
+					})
+				}
+				return pods
+			}(),
+			deletedPod: func() *v1.Pod {
+				podSpec := resourcePodSpec("node1", "50M", "50m")
+				return &v1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "pod_0",
+						Namespace: metav1.NamespaceDefault,
+						OwnerReferences: []metav1.OwnerReference{
+							{
+								Controller: func() *bool { res := true; return &res }(),
+								Kind:       controllerKind.Kind,
+								UID:        dsUid,
+								Name:       "pod_0_ds",
+							},
+						},
+					},
+					Spec: podSpec,
+				}
+			}(),
+			suspendDs: func() *apps.DaemonSet {
+				ds := newDaemonSet("ds")
+				ds.Spec.Template.Spec = resourcePodSpec("", "50M", "50m")
+				ds.Status = apps.DaemonSetStatus{
+					ObservedGeneration:     0,
+					UpdatedNumberScheduled: 0,
+					DesiredNumberScheduled: 1,
+					NumberAvailable:        0,
+					NumberMisscheduled:     0,
+				}
+				return ds
+			}(),
+			runningDs: func() *apps.DaemonSet {
+				ds := newDaemonSet("pod_0_ds")
+				ds.Spec.Template.Spec = resourcePodSpec("", "50M", "50m")
+				ds.UID = dsUid
+				ds.Status = apps.DaemonSetStatus{
+					ObservedGeneration:     0,
+					UpdatedNumberScheduled: 0,
+					DesiredNumberScheduled: 1,
+					NumberAvailable:        0,
+					NumberMisscheduled:     0,
+				}
+				return ds
+			}(),
+			shouldEnqueue: false,
+		},
+	}
+
+	for _, c := range cases {
+		for _, strategy := range updateStrategies() {
+			manager, podControl, _, err := newTestController()
+			if err != nil {
+				t.Fatalf("error creating DaemonSets controller: %v", err)
+			}
+			manager.nodeStore.Add(c.node)
+			c.suspendDs.Spec.UpdateStrategy = *strategy
+			manager.dsStore.Add(c.suspendDs)
+			if c.runningDs != nil {
+				manager.dsStore.Add(c.runningDs)
+			}
+			for _, pod := range c.existPods {
+				manager.podStore.Add(pod)
+			}
+			switch strategy.Type {
+			case apps.OnDeleteDaemonSetStrategyType:
+				syncAndValidateDaemonSets(t, manager, c.suspendDs, podControl, 0, 0, 2)
+			case apps.RollingUpdateDaemonSetStrategyType:
+				syncAndValidateDaemonSets(t, manager, c.suspendDs, podControl, 0, 0, 3)
 			default:
 				t.Fatalf("unexpected UpdateStrategy %+v", strategy)
 			}
