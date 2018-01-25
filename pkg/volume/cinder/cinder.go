@@ -59,6 +59,7 @@ type CinderProvider interface {
 	DiskIsAttachedByName(nodeName types.NodeName, volumeID string) (bool, string, error)
 	DisksAreAttachedByName(nodeName types.NodeName, volumeIDs []string) (map[string]bool, error)
 	ShouldTrustDevicePath() bool
+	SafeToDetachNode(nodeName types.NodeName) (bool, error) 
 	Instances() (cloudprovider.Instances, bool)
 	ExpandVolume(volumeID string, oldSize resource.Quantity, newSize resource.Quantity) (resource.Quantity, error)
 }

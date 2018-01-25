@@ -223,3 +223,9 @@ func (detacher *rbdDetacher) UnmountDevice(deviceMountPath string) error {
 func (detacher *rbdDetacher) Detach(volumeName string, nodeName types.NodeName) error {
 	return nil
 }
+
+// SafeToDetachFromNode returns true if it is safe to detach drive from node immediately
+func (detacher *rbdDetacher) SafeToDetachFromNode(nodeName types.NodeName) (bool, error) {
+	return false, nil
+}
+

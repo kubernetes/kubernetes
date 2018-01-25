@@ -603,6 +603,32 @@ func (os *OpenStack) DiskIsAttached(instanceID, volumeID string) (bool, error) {
 	return instanceID == volume.AttachedServerId, nil
 }
 
+
+// SafeToDetachNode queries if a node is safe to detach volume
+func (os *OpenStack) SafeToDetachNode(nodeName types.NodeName) (bool, error) {
+	cClient, err := os.NewComputeV2()
+	if err != nil {
+		return false, err
+	}
+	srv, err := getServerByName(cClient, nodeName, false)
+	if err != nil {
+		if err == ErrNotFound {
+			// instance not found anymore in cloudprovider, assume that cinder is safe to detach
+			return true, nil
+		} else {
+			return false, err
+		}
+	}
+	glog.V(4).Infof("Node %s status %s", nodeName, srv.Status)
+	// all states listed here where it is safe to detach drive without problems
+	if srv.Status == "SHUTOFF" {
+		return true, nil
+	} else {
+		return false, nil
+	}
+}
+
+
 // DiskIsAttachedByName queries if a volume is attached to a compute instance by name
 func (os *OpenStack) DiskIsAttachedByName(nodeName types.NodeName, volumeID string) (bool, string, error) {
 	cClient, err := os.NewComputeV2()

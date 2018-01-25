@@ -105,6 +105,9 @@ type DesiredStateOfWorld interface {
 	// Mark multiattach error as reported to prevent spamming multiple
 	// events for same error
 	SetMultiAttachError(v1.UniqueVolumeName, k8stypes.NodeName)
+
+	// is node in state where it is safe to detach volumes
+	SafeToDetach(nodeName k8stypes.NodeName) bool
 }
 
 // VolumeToAttach represents a volume that should be attached to a node.
@@ -158,6 +161,9 @@ type nodeManaged struct {
 	// keepTerminatedPodVolumes determines if for terminated pods(on this node) - volumes
 	// should be kept mounted and attached.
 	keepTerminatedPodVolumes bool
+
+	// safeToDetach determines if it is safe to detach volume - for instance if node is going to deleted from cluster
+	safeToDetach bool
 }
 
 // The volumeToAttach object represents a volume that should be attached to a node.
@@ -200,6 +206,7 @@ func (dsw *desiredStateOfWorld) AddNode(nodeName k8stypes.NodeName, keepTerminat
 			nodeName:                 nodeName,
 			volumesToAttach:          make(map[v1.UniqueVolumeName]volumeToAttach),
 			keepTerminatedPodVolumes: keepTerminatedPodVolumes,
+			safeToDetach:             false,
 		}
 	}
 }
@@ -267,10 +274,36 @@ func (dsw *desiredStateOfWorld) DeleteNode(nodeName k8stypes.NodeName) error {
 	}
 
 	if len(nodeObj.volumesToAttach) > 0 {
+		// query real status of node
+		// if node is in safe mode mark as safeToDetach
+		safeToDetach := true
+		for _, volumeObj := range nodeObj.volumesToAttach {
+			volumePlugin, err := dsw.volumePluginMgr.FindAttachablePluginBySpec(volumeObj.spec)
+			if err != nil || volumePlugin == nil {
+				return fmt.Errorf(
+					"failed to get volumePlugin from volumeSpec for volume %q err=%v",
+					volumeObj.spec.Name(),
+					err)
+			}
+			volumeDetacher, err := volumePlugin.NewDetacher()
+			if err != nil {
+				return fmt.Errorf("failed to init NewDetacher err=%v", err)
+			}
+			safe, err := volumeDetacher.SafeToDetachFromNode(nodeName)
+			if err != nil {
+				return fmt.Errorf("failed to get SafeToDetachFromNode err=%v", err)
+			}
+			if !safe {
+				safeToDetach = false
+			}
+		}
+		nodeObj.safeToDetach = safeToDetach
+		dsw.nodesManaged[nodeName] = nodeObj
 		return fmt.Errorf(
-			"failed to delete node %q from list of nodes managed by attach/detach controller--the node still contains %v volumes in its list of volumes to attach",
+			"failed to delete node %q from list of nodes managed by attach/detach controller--the node still contains %v volumes in its list of volumes to attach. SafeToDetach: %t",
 			nodeName,
-			len(nodeObj.volumesToAttach))
+			len(nodeObj.volumesToAttach),
+			safeToDetach)
 	}
 
 	delete(
@@ -316,6 +349,18 @@ func (dsw *desiredStateOfWorld) NodeExists(nodeName k8stypes.NodeName) bool {
 
 	_, nodeExists := dsw.nodesManaged[nodeName]
 	return nodeExists
+}
+
+func (dsw *desiredStateOfWorld) SafeToDetach(nodeName k8stypes.NodeName) bool {
+
+	// do we need lock here?
+	//dsw.RLock()
+	//defer dsw.RUnlock()
+	nodeObj, nodeExists := dsw.nodesManaged[nodeName]
+	if nodeExists {
+		return nodeObj.safeToDetach
+	}
+	return false
 }
 
 func (dsw *desiredStateOfWorld) VolumeExists(

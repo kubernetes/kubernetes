@@ -268,6 +268,11 @@ func (detacher *photonPersistentDiskDetacher) Detach(volumeName string, nodeName
 	return nil
 }
 
+// SafeToDetachFromNode returns true if it is safe to detach drive from node immediately
+func (detacher *photonPersistentDiskDetacher) SafeToDetachFromNode(nodeName types.NodeName) (bool, error) {
+	return false, nil
+}
+
 func (detacher *photonPersistentDiskDetacher) WaitForDetach(devicePath string, timeout time.Duration) error {
 	ticker := time.NewTicker(checkSleepDuration)
 	defer ticker.Stop()

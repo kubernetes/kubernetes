@@ -245,6 +245,10 @@ type Detacher interface {
 	// should only be called once all bind mounts have been
 	// unmounted.
 	UnmountDevice(deviceMountPath string) error
+
+	// SafeToDetachFromNode shows is the node in safe mode to detach volume
+	// for instance if node is shutdowned in cloud provider it is safe to detach without waiting
+	SafeToDetachFromNode(nodeName types.NodeName) (bool, error)
 }
 
 // NewDeletedVolumeInUseError returns a new instance of DeletedVolumeInUseError

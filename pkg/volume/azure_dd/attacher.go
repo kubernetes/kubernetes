@@ -295,6 +295,12 @@ func (d *azureDiskDetacher) Detach(diskURI string, nodeName types.NodeName) erro
 	return err
 }
 
+
+// SafeToDetachFromNode returns true if it is safe to detach drive from node immediately
+func (d *azureDiskDetacher) SafeToDetachFromNode(nodeName types.NodeName) (bool, error) {
+	return false, nil
+}
+
 // UnmountDevice unmounts the volume on the node
 func (detacher *azureDiskDetacher) UnmountDevice(deviceMountPath string) error {
 	err := volumeutil.UnmountPath(deviceMountPath, detacher.plugin.host.GetMounter(detacher.plugin.GetPluginName()))
