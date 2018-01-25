@@ -61,4 +61,29 @@ const (
 	// from the cloud-controller-manager intitializes this node, and then removes
 	// the taint
 	TaintExternalCloudProvider = "node.cloudprovider.kubernetes.io/uninitialized"
+
+	// AnnotationDefaultTolerations is an annotation key, used on Namespace objects.
+	// Its value defines a list of default tolerations for pods in that namespace
+	// that do not define their tolerations.
+	AnnotationDefaultTolerations = "scheduler.kubernetes.io/default-tolerations"
+
+	// DeprecatedAnnotationDefaultTolerations is the deprecated version
+	// of AnnotationDefaultTolerations. (It is deprecated since 1.10.)
+	DeprecatedAnnotationDefaultTolerations = "scheduler.alpha.kubernetes.io/defaultTolerations"
+
+	// AnnotationTolerationsWhitelist is an annotation key, used on Namespace objects.
+	// Its value defines a whitelist for pods in that namespace.
+	AnnotationTolerationsWhitelist = "scheduler.kubernetes.io/tolerations-whitelist"
+
+	// DeprecatedAnnotationTolerationsWhitelist is the deprecated version
+	// of AnnotationTolerationsWhitelist. (It is deprecated since 1.10.)
+	DeprecatedAnnotationTolerationsWhitelist = "scheduler.alpha.kubernetes.io/tolerationsWhitelist"
+
+	// AnnotationNamespaceNodeSelector is an annotation key used for assigning
+	// node selectors labels to namespaces
+	AnnotationNamespaceNodeSelector = "scheduler.kubernetes.io/node-selector"
+
+	// DeprecatedAnnotationNamespaceNodeSelector is the deprecated version of AnnotationNamespaceNodeSelector.
+	// It is deprecated since 1.10
+	DeprecatedAnnotationNamespaceNodeSelector = "scheduler.alpha.kubernetes.io/node-selector"
 )

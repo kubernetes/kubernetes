@@ -158,7 +158,7 @@ func TestPodAdmission(t *testing.T) {
 	}
 	for _, test := range tests {
 		if !test.ignoreTestNamespaceNodeSelector {
-			namespace.ObjectMeta.Annotations = map[string]string{"scheduler.alpha.kubernetes.io/node-selector": test.namespaceNodeSelector}
+			namespace.ObjectMeta.Annotations = map[string]string{"scheduler.kubernetes.io/node-selector": test.namespaceNodeSelector}
 			informerFactory.Core().InternalVersion().Namespaces().Informer().GetStore().Update(namespace)
 		}
 		handler.clusterNodeSelectors = make(map[string]string)
@@ -234,7 +234,7 @@ func TestIgnoreUpdatingInitializedPod(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        "testNamespace",
 			Namespace:   "",
-			Annotations: map[string]string{"scheduler.alpha.kubernetes.io/node-selector": namespaceNodeSelector},
+			Annotations: map[string]string{"scheduler.kubernetes.io/node-selector": namespaceNodeSelector},
 		},
 	}
 	err = informerFactory.Core().InternalVersion().Namespaces().Informer().GetStore().Update(namespace)

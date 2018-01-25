@@ -235,7 +235,7 @@ func TestPodAdmission(t *testing.T) {
 			if err != nil {
 				t.Errorf("error in marshalling namespace tolerations %v", test.namespaceTolerations)
 			}
-			namespace.Annotations = map[string]string{NSDefaultTolerations: string(tolerationStr)}
+			namespace.Annotations = map[string]string{algorithm.AnnotationDefaultTolerations: string(tolerationStr)}
 		}
 
 		if test.whitelist != nil {
@@ -243,7 +243,7 @@ func TestPodAdmission(t *testing.T) {
 			if err != nil {
 				t.Errorf("error in marshalling namespace whitelist %v", test.whitelist)
 			}
-			namespace.Annotations[NSWLTolerations] = string(tolerationStr)
+			namespace.Annotations[algorithm.AnnotationTolerationsWhitelist] = string(tolerationStr)
 		}
 
 		informerFactory.Core().InternalVersion().Namespaces().Informer().GetStore().Update(namespace)
@@ -339,7 +339,7 @@ func TestIgnoreUpdatingInitializedPod(t *testing.T) {
 			Namespace: "",
 		},
 	}
-	namespace.Annotations = map[string]string{NSDefaultTolerations: string(tolerationsStr)}
+	namespace.Annotations = map[string]string{algorithm.AnnotationDefaultTolerations: string(tolerationsStr)}
 	err = informerFactory.Core().InternalVersion().Namespaces().Informer().GetStore().Update(namespace)
 	if err != nil {
 		t.Fatal(err)
