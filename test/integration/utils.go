@@ -23,8 +23,12 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/storage/storagebackend"
 	clientset "k8s.io/client-go/kubernetes"
 	coreclient "k8s.io/client-go/kubernetes/typed/core/v1"
+
+	"github.com/coreos/etcd/clientv3"
+	"github.com/coreos/etcd/pkg/transport"
 )
 
 func DeletePodOrErrorf(t *testing.T, c clientset.Interface, ns, name string) {
@@ -61,4 +65,29 @@ func WaitForPodToDisappear(podClient coreclient.PodInterface, podName string, in
 			}
 		}
 	})
+}
+
+func GetEtcdKVClient(config storagebackend.Config) (clientv3.KV, error) {
+	tlsInfo := transport.TLSInfo{
+		CertFile: config.CertFile,
+		KeyFile:  config.KeyFile,
+		CAFile:   config.CAFile,
+	}
+
+	tlsConfig, err := tlsInfo.ClientConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	cfg := clientv3.Config{
+		Endpoints: config.ServerList,
+		TLS:       tlsConfig,
+	}
+
+	c, err := clientv3.New(cfg)
+	if err != nil {
+		return nil, err
+	}
+
+	return clientv3.NewKV(c), nil
 }

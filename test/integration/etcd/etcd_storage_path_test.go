@@ -49,13 +49,13 @@ import (
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	kapi "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/test/integration"
 	"k8s.io/kubernetes/test/integration/framework"
 
 	// install all APIs
 	_ "k8s.io/kubernetes/pkg/master" // TODO what else is needed
 
 	"github.com/coreos/etcd/clientv3"
-	"github.com/coreos/etcd/pkg/transport"
 )
 
 // Etcd data for all persisted objects.
@@ -790,7 +790,7 @@ func startRealMasterOrDie(t *testing.T, certDir string) (*allClient, clientv3.KV
 		t.Fatal(err)
 	}
 
-	kvClient, err := getEtcdKVClient(storageConfig)
+	kvClient, err := integration.GetEtcdKVClient(storageConfig)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1105,31 +1105,6 @@ func diffMapKeys(a, b interface{}, stringer func(interface{}) string) []string {
 	}
 
 	return ret
-}
-
-func getEtcdKVClient(config storagebackend.Config) (clientv3.KV, error) {
-	tlsInfo := transport.TLSInfo{
-		CertFile: config.CertFile,
-		KeyFile:  config.KeyFile,
-		CAFile:   config.CAFile,
-	}
-
-	tlsConfig, err := tlsInfo.ClientConfig()
-	if err != nil {
-		return nil, err
-	}
-
-	cfg := clientv3.Config{
-		Endpoints: config.ServerList,
-		TLS:       tlsConfig,
-	}
-
-	c, err := clientv3.New(cfg)
-	if err != nil {
-		return nil, err
-	}
-
-	return clientv3.NewKV(c), nil
 }
 
 type allResourceSource struct{}
