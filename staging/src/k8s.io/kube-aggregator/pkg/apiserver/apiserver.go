@@ -34,7 +34,6 @@ import (
 
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration"
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration/install"
-	"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1"
 	"k8s.io/kube-aggregator/pkg/client/clientset_generated/internalclientset"
 	informers "k8s.io/kube-aggregator/pkg/client/informers/internalversion"
