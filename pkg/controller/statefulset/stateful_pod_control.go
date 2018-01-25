@@ -80,7 +80,7 @@ func (spc *realStatefulPodControl) CreateStatefulPod(set *apps.StatefulSet, pod 
 	_, err := spc.client.CoreV1().Pods(set.Namespace).Create(pod)
 	// sink already exists errors
 	if apierrors.IsAlreadyExists(err) {
-		return err
+		return nil
 	}
 	spc.recordPodEvent("create", set, pod, err)
 	return err
