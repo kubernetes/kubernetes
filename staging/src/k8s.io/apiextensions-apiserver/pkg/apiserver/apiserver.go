@@ -35,7 +35,6 @@ import (
 	genericregistry "k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
-	serverstorage "k8s.io/apiserver/pkg/server/storage"
 
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/install"
@@ -54,7 +53,7 @@ import (
 
 var (
 	groupFactoryRegistry = make(announced.APIGroupFactoryRegistry)
-	Registry             = registered.NewOrDie("")
+	registry             = registered.NewOrDie("")
 	Scheme               = runtime.NewScheme()
 	Codecs               = serializer.NewCodecFactory(Scheme)
 
@@ -71,7 +70,7 @@ var (
 )
 
 func init() {
-	install.Install(groupFactoryRegistry, Registry, Scheme)
+	install.Install(groupFactoryRegistry, registry, Scheme)
 
 	// we need to add the options to empty v1
 	metav1.AddToGroupVersion(Scheme, schema.GroupVersion{Group: "", Version: "v1"})
@@ -132,19 +131,13 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		GenericAPIServer: genericServer,
 	}
 
-	apiResourceConfig := c.GenericConfig.MergedResourceConfig
-	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(apiextensions.GroupName, Registry, Scheme, metav1.ParameterCodec, Codecs)
-	if apiResourceConfig.AnyResourcesForVersionEnabled(v1beta1.SchemeGroupVersion) {
-		apiGroupInfo.GroupMeta.GroupVersion = v1beta1.SchemeGroupVersion
-		storage := map[string]rest.Storage{}
-		version := v1beta1.SchemeGroupVersion
-		if apiResourceConfig.ResourceEnabled(version.WithResource("customresourcedefinitions")) {
-			customResourceDefintionStorage := customresourcedefinition.NewREST(Scheme, c.GenericConfig.RESTOptionsGetter)
-			storage["customresourcedefinitions"] = customResourceDefintionStorage
-			storage["customresourcedefinitions/status"] = customresourcedefinition.NewStatusREST(Scheme, customResourceDefintionStorage)
-		}
-		apiGroupInfo.VersionedResourcesStorageMap["v1beta1"] = storage
-	}
+	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(apiextensions.GroupName, registry, Scheme, metav1.ParameterCodec, Codecs)
+	apiGroupInfo.GroupMeta.GroupVersion = v1beta1.SchemeGroupVersion
+	customResourceDefintionStorage := customresourcedefinition.NewREST(Scheme, c.GenericConfig.RESTOptionsGetter)
+	v1beta1storage := map[string]rest.Storage{}
+	v1beta1storage["customresourcedefinitions"] = customResourceDefintionStorage
+	v1beta1storage["customresourcedefinitions/status"] = customresourcedefinition.NewStatusREST(Scheme, customResourceDefintionStorage)
+	apiGroupInfo.VersionedResourcesStorageMap["v1beta1"] = v1beta1storage
 
 	if err := s.GenericAPIServer.InstallAPIGroup(&apiGroupInfo); err != nil {
 		return nil, err
@@ -217,14 +210,4 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 	})
 
 	return s, nil
-}
-
-func DefaultAPIResourceConfigSource() *serverstorage.ResourceConfig {
-	ret := serverstorage.NewResourceConfig()
-	// NOTE: GroupVersions listed here will be enabled by default. Don't put alpha versions in the list.
-	ret.EnableVersions(
-		v1beta1.SchemeGroupVersion,
-	)
-
-	return ret
 }
