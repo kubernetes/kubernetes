@@ -36,7 +36,6 @@ const defaultEtcdPathPrefix = "/registry/apiextensions.kubernetes.io"
 
 type CustomResourceDefinitionsServerOptions struct {
 	RecommendedOptions *genericoptions.RecommendedOptions
-	APIEnablement      *genericoptions.APIEnablementOptions
 
 	StdOut io.Writer
 	StdErr io.Writer
@@ -45,7 +44,6 @@ type CustomResourceDefinitionsServerOptions struct {
 func NewCustomResourceDefinitionsServerOptions(out, errOut io.Writer) *CustomResourceDefinitionsServerOptions {
 	o := &CustomResourceDefinitionsServerOptions{
 		RecommendedOptions: genericoptions.NewRecommendedOptions(defaultEtcdPathPrefix, apiserver.Codecs.LegacyCodec(v1beta1.SchemeGroupVersion)),
-		APIEnablement:      genericoptions.NewAPIEnablementOptions(),
 
 		StdOut: out,
 		StdErr: errOut,
@@ -79,14 +77,13 @@ func NewCommandStartCustomResourceDefinitionsServer(out, errOut io.Writer, stopC
 
 	flags := cmd.Flags()
 	o.RecommendedOptions.AddFlags(flags)
-	o.APIEnablement.AddFlags(flags)
+
 	return cmd
 }
 
 func (o CustomResourceDefinitionsServerOptions) Validate(args []string) error {
 	errors := []error{}
 	errors = append(errors, o.RecommendedOptions.Validate()...)
-	errors = append(errors, o.APIEnablement.Validate(apiserver.Registry)...)
 	return utilerrors.NewAggregate(errors)
 }
 
@@ -102,9 +99,6 @@ func (o CustomResourceDefinitionsServerOptions) Config() (*apiserver.Config, err
 
 	serverConfig := genericapiserver.NewRecommendedConfig(apiserver.Codecs)
 	if err := o.RecommendedOptions.ApplyTo(serverConfig, apiserver.Scheme); err != nil {
-		return nil, err
-	}
-	if err := o.APIEnablement.ApplyTo(&serverConfig.Config, apiserver.DefaultAPIResourceConfigSource(), apiserver.Registry); err != nil {
 		return nil, err
 	}
 

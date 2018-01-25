@@ -151,14 +151,7 @@ var _ StorageFactory = &DefaultStorageFactory{}
 
 const AllResources = "*"
 
-func NewDefaultStorageFactory(
-	config storagebackend.Config,
-	defaultMediaType string,
-	defaultSerializer runtime.StorageSerializer,
-	resourceEncodingConfig ResourceEncodingConfig,
-	resourceConfig APIResourceConfigSource,
-	specialDefaultResourcePrefixes map[schema.GroupResource]string,
-) *DefaultStorageFactory {
+func NewDefaultStorageFactory(config storagebackend.Config, defaultMediaType string, defaultSerializer runtime.StorageSerializer, resourceEncodingConfig ResourceEncodingConfig, resourceConfig APIResourceConfigSource, specialDefaultResourcePrefixes map[schema.GroupResource]string) *DefaultStorageFactory {
 	config.Paging = utilfeature.DefaultFeatureGate.Enabled(features.APIListChunking)
 	if len(defaultMediaType) == 0 {
 		defaultMediaType = runtime.ContentTypeJSON
