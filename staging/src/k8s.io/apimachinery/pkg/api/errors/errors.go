@@ -366,6 +366,9 @@ func NewGenericServerResponse(code int, verb string, qualifiedResource schema.Gr
 	case http.StatusUnprocessableEntity:
 		reason = metav1.StatusReasonInvalid
 		message = "the server rejected our request due to an error in our request"
+	case http.StatusServiceUnavailable:
+		reason = metav1.StatusReasonServiceUnavailable
+		message = "the server is currently unable to handle the request"
 	case http.StatusGatewayTimeout:
 		reason = metav1.StatusReasonTimeout
 		message = "the server was unable to return a response in the time allotted, but may still be processing the request"
