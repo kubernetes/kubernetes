@@ -181,6 +181,9 @@ type KubeControllerManagerConfiguration struct {
 	CloudProvider string
 	// cloudConfigFile is the path to the cloud provider configuration file.
 	CloudConfigFile string
+	// externalCloudVolumePlugin specifies the plugin to use when cloudProvider is "external".
+	// It is currently used by the in repo cloud providers to handle node and volume control in the KCM.
+	ExternalCloudVolumePlugin string
 	// run with untagged cloud instances
 	AllowUntaggedCloud bool
 	// concurrentEndpointSyncs is the number of endpoint syncing operations

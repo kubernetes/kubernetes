@@ -36,8 +36,8 @@ go_test(
         "//examples:config",
         "//test/fixtures",
     ],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/pkg/kubectl/cmd/resource",
-    library = ":go_default_library",
     deps = [
         "//pkg/api/testapi:go_default_library",
         "//pkg/api/testing:go_default_library",

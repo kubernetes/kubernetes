@@ -143,7 +143,7 @@ func TestBuildKubeConfigFromSpecWithClientAuth(t *testing.T) {
 	// Creates a CA
 	caCert, caKey := certstestutil.SetupCertificateAuthorithy(t)
 
-	// Executes buildKubeConfigFromSpec passing a KubeConfigSpec wiht a ClientAuth
+	// Executes buildKubeConfigFromSpec passing a KubeConfigSpec with a ClientAuth
 	config := setupdKubeConfigWithClientAuth(t, caCert, caKey, "https://1.2.3.4:1234", "myClientName", "myOrg1", "myOrg2")
 
 	// Asserts spec data are propagated to the kubeconfig
@@ -155,7 +155,7 @@ func TestBuildKubeConfigFromSpecWithTokenAuth(t *testing.T) {
 	// Creates a CA
 	caCert, _ := certstestutil.SetupCertificateAuthorithy(t)
 
-	// Executes buildKubeConfigFromSpec passing a KubeConfigSpec wiht a Token
+	// Executes buildKubeConfigFromSpec passing a KubeConfigSpec with a Token
 	config := setupdKubeConfigWithTokenAuth(t, caCert, "https://1.2.3.4:1234", "myClientName", "123456")
 
 	// Asserts spec data are propagated to the kubeconfig
@@ -219,7 +219,7 @@ func TestCreateKubeConfigFileIfNotExists(t *testing.T) {
 			t.Errorf("createKubeConfigFileIfNotExists failed")
 		}
 
-		// Assert creted files is there
+		// Assert that the created file is there
 		testutil.AssertFileExists(t, tmpdir, "test.conf")
 	}
 }
@@ -338,10 +338,10 @@ func TestWriteKubeConfig(t *testing.T) {
 	// Adds a pki folder with a ca cert to the temp folder
 	pkidir := testutil.SetupPkiDirWithCertificateAuthorithy(t, tmpdir)
 
-	// Retrives ca cert for assertions
+	// Retrieves ca cert for assertions
 	caCert, _, err := pkiutil.TryLoadCertAndKeyFromDisk(pkidir, kubeadmconstants.CACertAndKeyBaseName)
 	if err != nil {
-		t.Fatalf("couldn't retrive ca cert: %v", err)
+		t.Fatalf("couldn't retrieve ca cert: %v", err)
 	}
 
 	// Creates a Master Configuration pointing to the pkidir folder

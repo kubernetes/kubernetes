@@ -338,7 +338,7 @@ func (c *Cacher) Watch(ctx context.Context, key string, resourceVersion string, 
 	c.Lock()
 	defer c.Unlock()
 	forget := forgetWatcher(c, c.watcherIdx, triggerValue, triggerSupported)
-	watcher := newCacheWatcher(watchRV, chanSize, initEvents, watchFilterFunction(key, pred), forget)
+	watcher := newCacheWatcher(watchRV, chanSize, initEvents, watchFilterFunction(key, pred), forget, c.versioner)
 
 	c.watchers.addWatcher(watcher, c.watcherIdx, triggerValue, triggerSupported)
 	c.watcherIdx++
@@ -655,7 +655,7 @@ func (c *Cacher) Stop() {
 	}
 	c.stopLock.Lock()
 	if c.stopped {
-		// avoid that it was locked meanwhile as isStopped only read-locks
+		c.stopLock.Unlock()
 		return
 	}
 	c.stopped = true
@@ -676,18 +676,22 @@ func forgetWatcher(c *Cacher, index int, triggerValue string, triggerSupported b
 			glog.V(1).Infof("Forcing watcher close due to unresponsiveness: %v", c.objectType.String())
 		}
 		// It's possible that the watcher is already not in the structure (e.g. in case of
-		// simulaneous Stop() and terminateAllWatchers(), but it doesn't break anything.
+		// simultaneous Stop() and terminateAllWatchers(), but it doesn't break anything.
 		c.watchers.deleteWatcher(index, triggerValue, triggerSupported)
 	}
 }
 
 func filterFunction(key string, p SelectionPredicate) func(string, runtime.Object) bool {
-	f := SimpleFilter(p)
 	filterFunc := func(objKey string, obj runtime.Object) bool {
 		if !hasPathPrefix(objKey, key) {
 			return false
 		}
-		return f(obj)
+		matches, err := p.Matches(obj)
+		if err != nil {
+			glog.Errorf("invalid object for matching. Obj: %v. Err: %v", obj, err)
+			return false
+		}
+		return matches
 	}
 	return filterFunc
 }
@@ -743,7 +747,7 @@ func (lw *cacherListerWatcher) Watch(options metav1.ListOptions) (watch.Interfac
 	return lw.storage.WatchList(context.TODO(), lw.resourcePrefix, options.ResourceVersion, Everything)
 }
 
-// cacherWatch implements watch.Interface to return a single error
+// errWatcher implements watch.Interface to return a single error
 type errWatcher struct {
 	result chan watch.Event
 }
@@ -783,25 +787,27 @@ func (c *errWatcher) Stop() {
 	// no-op
 }
 
-// cacherWatch implements watch.Interface
+// cachWatcher implements watch.Interface
 type cacheWatcher struct {
 	sync.Mutex
-	input   chan *watchCacheEvent
-	result  chan watch.Event
-	done    chan struct{}
-	filter  watchFilterFunc
-	stopped bool
-	forget  func(bool)
+	input     chan *watchCacheEvent
+	result    chan watch.Event
+	done      chan struct{}
+	filter    watchFilterFunc
+	stopped   bool
+	forget    func(bool)
+	versioner Versioner
 }
 
-func newCacheWatcher(resourceVersion uint64, chanSize int, initEvents []*watchCacheEvent, filter watchFilterFunc, forget func(bool)) *cacheWatcher {
+func newCacheWatcher(resourceVersion uint64, chanSize int, initEvents []*watchCacheEvent, filter watchFilterFunc, forget func(bool), versioner Versioner) *cacheWatcher {
 	watcher := &cacheWatcher{
-		input:   make(chan *watchCacheEvent, chanSize),
-		result:  make(chan watch.Event, chanSize),
-		done:    make(chan struct{}),
-		filter:  filter,
-		stopped: false,
-		forget:  forget,
+		input:     make(chan *watchCacheEvent, chanSize),
+		result:    make(chan watch.Event, chanSize),
+		done:      make(chan struct{}),
+		filter:    filter,
+		stopped:   false,
+		forget:    forget,
+		versioner: versioner,
 	}
 	go watcher.process(initEvents, resourceVersion)
 	return watcher
@@ -890,7 +896,12 @@ func (c *cacheWatcher) sendWatchCacheEvent(event *watchCacheEvent) {
 	case curObjPasses && oldObjPasses:
 		watchEvent = watch.Event{Type: watch.Modified, Object: event.Object.DeepCopyObject()}
 	case !curObjPasses && oldObjPasses:
-		watchEvent = watch.Event{Type: watch.Deleted, Object: event.PrevObject.DeepCopyObject()}
+		// return a delete event with the previous object content, but with the event's resource version
+		oldObj := event.PrevObject.DeepCopyObject()
+		if err := c.versioner.UpdateObject(oldObj, event.ResourceVersion); err != nil {
+			utilruntime.HandleError(fmt.Errorf("failure to version api object (%d) %#v: %v", event.ResourceVersion, oldObj, err))
+		}
+		watchEvent = watch.Event{Type: watch.Deleted, Object: oldObj}
 	}
 
 	// We need to ensure that if we put event X to the c.result, all

@@ -546,11 +546,6 @@ func (pc *PCCloud) Routes() (cloudprovider.Routes, bool) {
 	return nil, false
 }
 
-// ScrubDNS filters DNS settings for pods.
-func (pc *PCCloud) ScrubDNS(nameservers, searches []string) (nsOut, srchOut []string) {
-	return nameservers, searches
-}
-
 // HasClusterID returns true if the cluster has a clusterID
 func (pc *PCCloud) HasClusterID() bool {
 	return true

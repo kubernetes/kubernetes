@@ -100,12 +100,10 @@ The main output is a tar file: `kubernetes.tar.gz`.  This includes:
 * Examples
 * Cluster deployment scripts for various clouds
 * Tar file containing all server binaries
-* Tar file containing salt deployment tree shared across multiple cloud deployments.
 
 In addition, there are some other tar files that are created:
 * `kubernetes-client-*.tar.gz` Client binaries for a specific platform.
 * `kubernetes-server-*.tar.gz` Server binaries for a specific platform.
-* `kubernetes-salt.tar.gz` The salt script/tree shared across multiple deployment scripts.
 
 When building final release tars, they are first staged into `_output/release-stage` before being tar'd up and put into `_output/release-tars`.
 

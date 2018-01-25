@@ -53,7 +53,7 @@ func (r *Routes) ListRoutes(clusterName string) ([]*cloudprovider.Route, error) 
 	glog.V(4).Infof("ListRoutes(%v)", clusterName)
 
 	nodeNamesByAddr := make(map[string]types.NodeName)
-	err := foreachServer(r.compute, servers.ListOpts{Status: "ACTIVE"}, func(srv *servers.Server) (bool, error) {
+	err := foreachServer(r.compute, servers.ListOpts{}, func(srv *servers.Server) (bool, error) {
 		addrs, err := nodeAddresses(srv)
 		if err != nil {
 			return false, err
@@ -77,15 +77,11 @@ func (r *Routes) ListRoutes(clusterName string) ([]*cloudprovider.Route, error) 
 
 	var routes []*cloudprovider.Route
 	for _, item := range router.Routes {
-		nodeName, ok := nodeNamesByAddr[item.NextHop]
-		if !ok {
-			// Not one of our routes?
-			glog.V(4).Infof("Skipping route with unknown nexthop %v", item.NextHop)
-			continue
-		}
+		nodeName, foundNode := nodeNamesByAddr[item.NextHop]
 		route := cloudprovider.Route{
 			Name:            item.DestinationCIDR,
-			TargetNode:      nodeName,
+			TargetNode:      nodeName, //empty if NextHop is unknown
+			Blackhole:       !foundNode,
 			DestinationCIDR: item.DestinationCIDR,
 		}
 		routes = append(routes, &route)
@@ -288,7 +284,7 @@ func (r *Routes) DeleteRoute(clusterName string, route *cloudprovider.Route) err
 }
 
 func getPortIDByIP(compute *gophercloud.ServiceClient, targetNode types.NodeName, ipAddress string) (string, error) {
-	srv, err := getServerByName(compute, targetNode)
+	srv, err := getServerByName(compute, targetNode, true)
 	if err != nil {
 		return "", err
 	}

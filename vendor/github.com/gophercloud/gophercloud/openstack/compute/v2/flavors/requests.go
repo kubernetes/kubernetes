@@ -162,6 +162,75 @@ func ListAccesses(client *gophercloud.ServiceClient, id string) pagination.Pager
 	})
 }
 
+// AddAccessOptsBuilder allows extensions to add additional parameters to the
+// AddAccess requests.
+type AddAccessOptsBuilder interface {
+	ToAddAccessMap() (map[string]interface{}, error)
+}
+
+// AddAccessOpts represents options for adding access to a flavor.
+type AddAccessOpts struct {
+	// Tenant is the project/tenant ID to grant access.
+	Tenant string `json:"tenant"`
+}
+
+// ToAddAccessMap constructs a request body from AddAccessOpts.
+func (opts AddAccessOpts) ToAddAccessMap() (map[string]interface{}, error) {
+	return gophercloud.BuildRequestBody(opts, "addTenantAccess")
+}
+
+// AddAccess grants a tenant/project access to a flavor.
+func AddAccess(client *gophercloud.ServiceClient, id string, opts AddAccessOptsBuilder) (r AddAccessResult) {
+	b, err := opts.ToAddAccessMap()
+	if err != nil {
+		r.Err = err
+		return
+	}
+	_, r.Err = client.Post(accessActionURL(client, id), b, &r.Body, &gophercloud.RequestOpts{
+		OkCodes: []int{200},
+	})
+	return
+}
+
+// ExtraSpecs requests all the extra-specs for the given flavor ID.
+func ListExtraSpecs(client *gophercloud.ServiceClient, flavorID string) (r ListExtraSpecsResult) {
+	_, r.Err = client.Get(extraSpecsListURL(client, flavorID), &r.Body, nil)
+	return
+}
+
+func GetExtraSpec(client *gophercloud.ServiceClient, flavorID string, key string) (r GetExtraSpecResult) {
+	_, r.Err = client.Get(extraSpecsGetURL(client, flavorID, key), &r.Body, nil)
+	return
+}
+
+// CreateExtraSpecsOptsBuilder allows extensions to add additional parameters to the
+// CreateExtraSpecs requests.
+type CreateExtraSpecsOptsBuilder interface {
+	ToExtraSpecsCreateMap() (map[string]interface{}, error)
+}
+
+// ExtraSpecsOpts is a map that contains key-value pairs.
+type ExtraSpecsOpts map[string]string
+
+// ToExtraSpecsCreateMap assembles a body for a Create request based on the
+// contents of a ExtraSpecsOpts
+func (opts ExtraSpecsOpts) ToExtraSpecsCreateMap() (map[string]interface{}, error) {
+	return map[string]interface{}{"extra_specs": opts}, nil
+}
+
+// CreateExtraSpecs will create or update the extra-specs key-value pairs for the specified Flavor
+func CreateExtraSpecs(client *gophercloud.ServiceClient, flavorID string, opts CreateExtraSpecsOptsBuilder) (r CreateExtraSpecsResult) {
+	b, err := opts.ToExtraSpecsCreateMap()
+	if err != nil {
+		r.Err = err
+		return
+	}
+	_, r.Err = client.Post(extraSpecsCreateURL(client, flavorID), b, &r.Body, &gophercloud.RequestOpts{
+		OkCodes: []int{200},
+	})
+	return
+}
+
 // IDFromName is a convienience function that returns a flavor's ID given its
 // name.
 func IDFromName(client *gophercloud.ServiceClient, name string) (string, error) {

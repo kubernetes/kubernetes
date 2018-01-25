@@ -38,7 +38,7 @@ DOCKERIZED_BINARIES = {
     },
     "kube-scheduler": {
         "base": "@official_busybox//image",
-        "target": "//plugin/cmd/kube-scheduler:kube-scheduler",
+        "target": "//cmd/kube-scheduler:kube-scheduler",
     },
     "kube-proxy": {
         "base": "@debian-iptables-amd64//image",
@@ -127,7 +127,7 @@ release_filegroup(
         "//cmd/hyperkube",
         "//cmd/kube-apiserver",
         "//cmd/kube-controller-manager",
-        "//plugin/cmd/kube-scheduler",
+        "//cmd/kube-scheduler",
         "//vendor/k8s.io/kube-aggregator",
     ],
 )

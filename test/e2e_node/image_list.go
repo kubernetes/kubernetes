@@ -17,7 +17,6 @@ limitations under the License.
 package e2e_node
 
 import (
-	"errors"
 	"fmt"
 	"os/exec"
 	"os/user"
@@ -28,7 +27,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
-	"k8s.io/kubernetes/pkg/kubelet/remote"
 	commontest "k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -39,8 +37,6 @@ const (
 	maxImagePullRetries = 5
 	// Sleep duration between image pull retry attempts.
 	imagePullRetryDelay = time.Second
-	// connection timeout for gRPC image service connection
-	imageServiceConnectionTimeout = 15 * time.Minute
 )
 
 // NodeImageWhiteList is a list of images used in node e2e test. These images will be prepulled
@@ -107,17 +103,7 @@ func getPuller() (puller, error) {
 	case "docker":
 		return &dockerPuller{}, nil
 	case "remote":
-		endpoint := framework.TestContext.ContainerRuntimeEndpoint
-		if framework.TestContext.ImageServiceEndpoint != "" {
-			//ImageServiceEndpoint is the same as ContainerRuntimeEndpoint if not
-			//explicitly specified
-			//https://github.com/kubernetes/kubernetes/blob/master/pkg/kubelet/kubelet.go#L517
-			endpoint = framework.TestContext.ImageServiceEndpoint
-		}
-		if endpoint == "" {
-			return nil, errors.New("can't prepull images, no remote endpoint provided")
-		}
-		is, err := remote.NewRemoteImageService(endpoint, imageServiceConnectionTimeout)
+		_, is, err := getCRIClient()
 		if err != nil {
 			return nil, err
 		}

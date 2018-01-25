@@ -47,10 +47,10 @@ func testPortForward(t *testing.T, flags map[string]string, args []string) {
 	version := "v1"
 
 	tests := []struct {
-		name                       string
-		podPath, pfPath, container string
-		pod                        *api.Pod
-		pfErr                      bool
+		name            string
+		podPath, pfPath string
+		pod             *api.Pod
+		pfErr           bool
 	}{
 		{
 			name:    "pod portforward",

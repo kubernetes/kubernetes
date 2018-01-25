@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library", "go_test")
 
 go_library(
     name = "go_default_library",
@@ -9,8 +9,8 @@ go_library(
 
 go_binary(
     name = "conformance",
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/test/conformance",
-    library = ":go_default_library",
     visibility = ["//visibility:public"],
 )
 
@@ -47,4 +47,12 @@ sh_test(
         "testdata/conformance.txt",
         ":list_conformance_tests",
     ],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = ["walk_test.go"],
+    data = glob(["testdata/**"]),
+    embed = [":go_default_library"],
+    importpath = "k8s.io/kubernetes/test/conformance",
 )

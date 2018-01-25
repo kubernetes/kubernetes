@@ -22,7 +22,7 @@ options:
       switch to privileged mode if gpu hardware is detected.
   channel:
     type: string
-    default: "1.8/stable"
+    default: "1.9/stable"
     description: |
       Snap channel to install Kubernetes worker services from
   require-manual-upgrade:
@@ -49,3 +49,24 @@ options:
         runtime-config=batch/v2alpha1=true profiling=true
       will result in kube-apiserver being run with the following options:
         --runtime-config=batch/v2alpha1=true --profiling=true
+  docker-logins:
+    type: string
+    default: "[]"
+    description: |
+      Docker login credentials. Setting this config allows Kubelet to pull images from
+      registries where auth is required.
+
+      The value for this config must be a JSON array of credential objects, like this:
+        [{"server": "my.registry", "username": "myUser", "password": "myPass"}]
+  nginx-image:
+    type: string
+    default: "auto"
+    description: |
+      Docker image to use for the nginx ingress controller. Auto will select an image
+      based on architecture.
+  default-backend-image:
+    type: string
+    default: "auto"
+    description: |
+      Docker image to use for the default backend. Auto will select an image
+      based on architecture.

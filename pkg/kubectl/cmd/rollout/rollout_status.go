@@ -54,7 +54,8 @@ func NewCmdRolloutStatus(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	argAliases := kubectl.ResourceAliases(validArgs)
 
 	cmd := &cobra.Command{
-		Use:     "status (TYPE NAME | TYPE/NAME) [flags]",
+		Use: "status (TYPE NAME | TYPE/NAME) [flags]",
+		DisableFlagsInUseLine: true,
 		Short:   i18n.T("Show the status of the rollout"),
 		Long:    status_long,
 		Example: status_example,
@@ -125,7 +126,7 @@ func RunStatus(f cmdutil.Factory, cmd *cobra.Command, out io.Writer, args []stri
 	}
 
 	// check if deployment's has finished the rollout
-	status, done, err := statusViewer.Status(cmdNamespace, info.Name, revision)
+	status, done, err := statusViewer.Status(info.Namespace, info.Name, revision)
 	if err != nil {
 		return err
 	}
@@ -150,7 +151,7 @@ func RunStatus(f cmdutil.Factory, cmd *cobra.Command, out io.Writer, args []stri
 	return intr.Run(func() error {
 		_, err := watch.Until(0, w, func(e watch.Event) (bool, error) {
 			// print deployment's status
-			status, done, err := statusViewer.Status(cmdNamespace, info.Name, revision)
+			status, done, err := statusViewer.Status(info.Namespace, info.Name, revision)
 			if err != nil {
 				return false, err
 			}

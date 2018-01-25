@@ -163,9 +163,9 @@ func TestPodAndContainer(t *testing.T) {
 func TestExec(t *testing.T) {
 	version := "v1"
 	tests := []struct {
-		name, podPath, execPath, container string
-		pod                                *api.Pod
-		execErr                            bool
+		name, podPath, execPath string
+		pod                     *api.Pod
+		execErr                 bool
 	}{
 		{
 			name:     "pod exec",

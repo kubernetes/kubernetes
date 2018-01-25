@@ -8,6 +8,7 @@ go_library(
     deps = [
         "//pkg/controller:go_default_library",
         "//pkg/util/metrics:go_default_library",
+        "//pkg/util/slice:go_default_library",
         "//pkg/volume/util:go_default_library",
         "//pkg/volume/util/volumehelper:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
@@ -27,8 +28,8 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["pvc_protection_controller_test.go"],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/pkg/controller/volume/pvcprotection",
-    library = ":go_default_library",
     deps = [
         "//pkg/controller:go_default_library",
         "//pkg/volume/util:go_default_library",

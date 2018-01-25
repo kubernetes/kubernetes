@@ -451,8 +451,8 @@ function kube::build::build_image() {
 
   cp /etc/localtime "${LOCAL_OUTPUT_BUILD_CONTEXT}/"
 
-  cp build/build-image/Dockerfile "${LOCAL_OUTPUT_BUILD_CONTEXT}/Dockerfile"
-  cp build/build-image/rsyncd.sh "${LOCAL_OUTPUT_BUILD_CONTEXT}/"
+  cp ${KUBE_ROOT}/build/build-image/Dockerfile "${LOCAL_OUTPUT_BUILD_CONTEXT}/Dockerfile"
+  cp ${KUBE_ROOT}/build/build-image/rsyncd.sh "${LOCAL_OUTPUT_BUILD_CONTEXT}/"
   dd if=/dev/urandom bs=512 count=1 2>/dev/null | LC_ALL=C tr -dc 'A-Za-z0-9' | dd bs=32 count=1 2>/dev/null > "${LOCAL_OUTPUT_BUILD_CONTEXT}/rsyncd.password"
   chmod go= "${LOCAL_OUTPUT_BUILD_CONTEXT}/rsyncd.password"
 
@@ -600,6 +600,11 @@ function kube::build::run_build_command_ex() {
     --env "GOLDFLAGS=${GOLDFLAGS:-}"
     --env "GOGCFLAGS=${GOGCFLAGS:-}"
   )
+
+  if [[ -n "${DOCKER_CGROUP_PARENT:-}" ]]; then
+    kube::log::status "Using ${DOCKER_CGROUP_PARENT} as container cgroup parent"
+    docker_run_opts+=(--cgroup-parent "${DOCKER_CGROUP_PARENT}")
+  fi
 
   # If we have stdin we can run interactive.  This allows things like 'shell.sh'
   # to work.  However, if we run this way and don't have stdin, then it ends up

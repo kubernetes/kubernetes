@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2018 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -185,6 +185,12 @@ message CSIPersistentVolumeSource {
   // Defaults to false (read/write).
   // +optional
   optional bool readOnly = 3;
+
+  // Filesystem type to mount.
+  // Must be a filesystem type supported by the host operating system.
+  // Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
+  // +optional
+  optional string fsType = 4;
 }
 
 // Adds and removes POSIX capabilities from running containers.
@@ -1169,8 +1175,38 @@ message FCVolumeSource {
   repeated string wwids = 5;
 }
 
+// FlexPersistentVolumeSource represents a generic persistent volume resource that is
+// provisioned/attached using an exec based plugin.
+message FlexPersistentVolumeSource {
+  // Driver is the name of the driver to use for this volume.
+  optional string driver = 1;
+
+  // Filesystem type to mount.
+  // Must be a filesystem type supported by the host operating system.
+  // Ex. "ext4", "xfs", "ntfs". The default filesystem depends on FlexVolume script.
+  // +optional
+  optional string fsType = 2;
+
+  // Optional: SecretRef is reference to the secret object containing
+  // sensitive information to pass to the plugin scripts. This may be
+  // empty if no secret object is specified. If the secret object
+  // contains more than one secret, all secrets are passed to the plugin
+  // scripts.
+  // +optional
+  optional SecretReference secretRef = 3;
+
+  // Optional: Defaults to false (read/write). ReadOnly here will force
+  // the ReadOnly setting in VolumeMounts.
+  // +optional
+  optional bool readOnly = 4;
+
+  // Optional: Extra command options if any.
+  // +optional
+  map<string, string> options = 5;
+}
+
 // FlexVolume represents a generic volume resource that is
-// provisioned/attached using an exec based plugin. This is an alpha feature and may change in future.
+// provisioned/attached using an exec based plugin.
 message FlexVolumeSource {
   // Driver is the name of the driver to use for this volume.
   optional string driver = 1;
@@ -2439,10 +2475,9 @@ message PersistentVolumeSource {
   optional FlockerVolumeSource flocker = 11;
 
   // FlexVolume represents a generic volume resource that is
-  // provisioned/attached using an exec based plugin. This is an
-  // alpha feature and may change in future.
+  // provisioned/attached using an exec based plugin.
   // +optional
-  optional FlexVolumeSource flexVolume = 12;
+  optional FlexPersistentVolumeSource flexVolume = 12;
 
   // AzureFile represents an Azure File Service mount on the host and bind mount to the pod.
   // +optional
@@ -2620,6 +2655,7 @@ message PodAffinityTerm {
 
   // namespaces specifies which namespaces the labelSelector applies to (matches against);
   // null or empty list means "this pod's namespace"
+  // +optional
   repeated string namespaces = 2;
 
   // This pod should be co-located (affinity) or not co-located (anti-affinity) with the pods matching
@@ -3149,7 +3185,7 @@ message PodStatus {
 
   // The Quality of Service (QOS) classification assigned to the pod based on resource requirements
   // See PodQOSClass type for available QOS classes
-  // More info: https://github.com/kubernetes/kubernetes/blob/master/docs/design/resource-qos.md
+  // More info: https://git.k8s.io/community/contributors/design-proposals/node/resource-qos.md
   // +optional
   optional string qosClass = 9;
 }
@@ -4477,8 +4513,7 @@ message VolumeSource {
   optional RBDVolumeSource rbd = 11;
 
   // FlexVolume represents a generic volume resource that is
-  // provisioned/attached using an exec based plugin. This is an
-  // alpha feature and may change in future.
+  // provisioned/attached using an exec based plugin.
   // +optional
   optional FlexVolumeSource flexVolume = 12;
 

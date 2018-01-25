@@ -13,8 +13,8 @@ go_test(
         "deployment_test.go",
         "main_test.go",
     ],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/test/integration/deployment",
-    library = ":go_default_library",
     tags = ["integration"],
     deps = [
         "//pkg/controller/deployment/util:go_default_library",

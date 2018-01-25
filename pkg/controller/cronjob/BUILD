@@ -46,8 +46,8 @@ go_test(
         "cronjob_controller_test.go",
         "utils_test.go",
     ],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/pkg/controller/cronjob",
-    library = ":go_default_library",
     deps = [
         "//pkg/apis/batch/install:go_default_library",
         "//pkg/apis/core/install:go_default_library",

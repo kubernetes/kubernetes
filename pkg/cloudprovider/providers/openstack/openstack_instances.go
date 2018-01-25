@@ -43,7 +43,7 @@ func (os *OpenStack) Instances() (cloudprovider.Instances, bool) {
 		return nil, false
 	}
 
-	glog.V(1).Info("Claiming to support Instances")
+	glog.V(4).Info("Claiming to support Instances")
 
 	return &Instances{
 		compute: compute,
@@ -58,7 +58,7 @@ func (i *Instances) CurrentNodeName(hostname string) (types.NodeName, error) {
 	if err != nil {
 		return "", err
 	}
-	return types.NodeName(md.Name), nil
+	return types.NodeName(md.Hostname), nil
 }
 
 func (i *Instances) AddSSHKeyToAllInstances(user string, keyData []byte) error {
@@ -103,7 +103,7 @@ func (i *Instances) NodeAddressesByProviderID(providerID string) ([]v1.NodeAddre
 
 // ExternalID returns the cloud provider ID of the specified instance (deprecated).
 func (i *Instances) ExternalID(name types.NodeName) (string, error) {
-	srv, err := getServerByName(i.compute, name)
+	srv, err := getServerByName(i.compute, name, true)
 	if err != nil {
 		if err == ErrNotFound {
 			return "", cloudprovider.InstanceNotFound
@@ -151,7 +151,7 @@ func (os *OpenStack) InstanceID() (string, error) {
 
 // InstanceID returns the cloud provider ID of the specified instance.
 func (i *Instances) InstanceID(name types.NodeName) (string, error) {
-	srv, err := getServerByName(i.compute, name)
+	srv, err := getServerByName(i.compute, name, true)
 	if err != nil {
 		if err == ErrNotFound {
 			return "", cloudprovider.InstanceNotFound
@@ -184,7 +184,7 @@ func (i *Instances) InstanceTypeByProviderID(providerID string) (string, error) 
 
 // InstanceType returns the type of the specified instance.
 func (i *Instances) InstanceType(name types.NodeName) (string, error) {
-	srv, err := getServerByName(i.compute, name)
+	srv, err := getServerByName(i.compute, name, true)
 
 	if err != nil {
 		return "", err

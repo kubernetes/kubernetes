@@ -61,7 +61,7 @@ func createHandler(r rest.NamedCreater, scope RequestScope, typer runtime.Object
 		ctx = request.WithNamespace(ctx, namespace)
 
 		gv := scope.Kind.GroupVersion()
-		s, err := negotiation.NegotiateInputSerializer(req, scope.Serializer)
+		s, err := negotiation.NegotiateInputSerializer(req, false, scope.Serializer)
 		if err != nil {
 			scope.err(err, w, req)
 			return

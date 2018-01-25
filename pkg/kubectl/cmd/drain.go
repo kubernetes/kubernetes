@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/json"
@@ -61,6 +62,7 @@ type DrainOptions struct {
 	backOff            clockwork.Clock
 	DeleteLocalData    bool
 	Selector           string
+	PodSelector        string
 	mapper             meta.RESTMapper
 	nodeInfos          []*resource.Info
 	Out                io.Writer
@@ -103,7 +105,8 @@ func NewCmdCordon(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	options := &DrainOptions{Factory: f, Out: out}
 
 	cmd := &cobra.Command{
-		Use:     "cordon NODE",
+		Use: "cordon NODE",
+		DisableFlagsInUseLine: true,
 		Short:   i18n.T("Mark node as unschedulable"),
 		Long:    cordon_long,
 		Example: cordon_example,
@@ -130,7 +133,8 @@ func NewCmdUncordon(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	options := &DrainOptions{Factory: f, Out: out}
 
 	cmd := &cobra.Command{
-		Use:     "uncordon NODE",
+		Use: "uncordon NODE",
+		DisableFlagsInUseLine: true,
 		Short:   i18n.T("Mark node as schedulable"),
 		Long:    uncordon_long,
 		Example: uncordon_example,
@@ -182,7 +186,8 @@ func NewCmdDrain(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 	options := &DrainOptions{Factory: f, Out: out, ErrOut: errOut, backOff: clockwork.NewRealClock()}
 
 	cmd := &cobra.Command{
-		Use:     "drain NODE",
+		Use: "drain NODE",
+		DisableFlagsInUseLine: true,
 		Short:   i18n.T("Drain node in preparation for maintenance"),
 		Long:    drain_long,
 		Example: drain_example,
@@ -197,6 +202,8 @@ func NewCmdDrain(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 	cmd.Flags().IntVar(&options.GracePeriodSeconds, "grace-period", -1, "Period of time in seconds given to each pod to terminate gracefully. If negative, the default value specified in the pod will be used.")
 	cmd.Flags().DurationVar(&options.Timeout, "timeout", 0, "The length of time to wait before giving up, zero means infinite")
 	cmd.Flags().StringVarP(&options.Selector, "selector", "l", options.Selector, "Selector (label query) to filter on")
+	cmd.Flags().StringVarP(&options.PodSelector, "pod-selector", "", options.PodSelector, "Label selector to filter pods on the node")
+
 	cmdutil.AddDryRunFlag(cmd)
 	return cmd
 }
@@ -221,6 +228,12 @@ func (o *DrainOptions) SetupDrain(cmd *cobra.Command, args []string) error {
 
 	if o.client, err = o.Factory.KubernetesClientSet(); err != nil {
 		return err
+	}
+
+	if len(o.PodSelector) > 0 {
+		if _, err := labels.Parse(o.PodSelector); err != nil {
+			return errors.New("--pod-selector=<pod_selector> must be a valid label selector")
+		}
 	}
 
 	o.restClient, err = o.Factory.RESTClient()
@@ -328,38 +341,8 @@ func (o *DrainOptions) deleteOrEvictPodsSimple(nodeInfo *resource.Info) error {
 	return err
 }
 
-func (o *DrainOptions) getController(namespace string, controllerRef *metav1.OwnerReference) (interface{}, error) {
-	switch controllerRef.Kind {
-	case "ReplicationController":
-		return o.client.Core().ReplicationControllers(namespace).Get(controllerRef.Name, metav1.GetOptions{})
-	case "DaemonSet":
-		return o.client.Extensions().DaemonSets(namespace).Get(controllerRef.Name, metav1.GetOptions{})
-	case "Job":
-		return o.client.Batch().Jobs(namespace).Get(controllerRef.Name, metav1.GetOptions{})
-	case "ReplicaSet":
-		return o.client.Extensions().ReplicaSets(namespace).Get(controllerRef.Name, metav1.GetOptions{})
-	case "StatefulSet":
-		return o.client.AppsV1beta1().StatefulSets(namespace).Get(controllerRef.Name, metav1.GetOptions{})
-	}
-	return nil, fmt.Errorf("Unknown controller kind %q", controllerRef.Kind)
-}
-
-func (o *DrainOptions) getPodController(pod corev1.Pod) (*metav1.OwnerReference, error) {
-	controllerRef := metav1.GetControllerOf(&pod)
-	if controllerRef == nil {
-		return nil, nil
-	}
-
-	// We assume the only reason for an error is because the controller is
-	// gone/missing, not for any other cause.
-	// TODO(mml): something more sophisticated than this
-	// TODO(juntee): determine if it's safe to remove getController(),
-	// so that drain can work for controller types that we don't know about
-	_, err := o.getController(pod.Namespace, controllerRef)
-	if err != nil {
-		return nil, err
-	}
-	return controllerRef, nil
+func (o *DrainOptions) getPodController(pod corev1.Pod) *metav1.OwnerReference {
+	return metav1.GetControllerOf(&pod)
 }
 
 func (o *DrainOptions) unreplicatedFilter(pod corev1.Pod) (bool, *warning, *fatal) {
@@ -368,21 +351,15 @@ func (o *DrainOptions) unreplicatedFilter(pod corev1.Pod) (bool, *warning, *fata
 		return true, nil, nil
 	}
 
-	controllerRef, err := o.getPodController(pod)
-	if err != nil {
-		// if we're forcing, remove orphaned pods with a warning
-		if apierrors.IsNotFound(err) && o.Force {
-			return true, &warning{err.Error()}, nil
-		}
-		return false, nil, &fatal{err.Error()}
-	}
+	controllerRef := o.getPodController(pod)
 	if controllerRef != nil {
 		return true, nil, nil
 	}
-	if !o.Force {
-		return false, nil, &fatal{kUnmanagedFatal}
+	if o.Force {
+		return true, &warning{kUnmanagedWarning}, nil
 	}
-	return true, &warning{kUnmanagedWarning}, nil
+
+	return false, nil, &fatal{kUnmanagedFatal}
 }
 
 func (o *DrainOptions) daemonsetFilter(pod corev1.Pod) (bool, *warning, *fatal) {
@@ -393,23 +370,23 @@ func (o *DrainOptions) daemonsetFilter(pod corev1.Pod) (bool, *warning, *fatal) 
 	// The exception is for pods that are orphaned (the referencing
 	// management resource - including DaemonSet - is not found).
 	// Such pods will be deleted if --force is used.
-	controllerRef, err := o.getPodController(pod)
-	if err != nil {
-		// if we're forcing, remove orphaned pods with a warning
+	controllerRef := o.getPodController(pod)
+	if controllerRef == nil || controllerRef.Kind != "DaemonSet" {
+		return true, nil, nil
+	}
+
+	if _, err := o.client.ExtensionsV1beta1().DaemonSets(pod.Namespace).Get(controllerRef.Name, metav1.GetOptions{}); err != nil {
+		// remove orphaned pods with a warning if --force is used
 		if apierrors.IsNotFound(err) && o.Force {
 			return true, &warning{err.Error()}, nil
 		}
 		return false, nil, &fatal{err.Error()}
 	}
-	if controllerRef == nil || controllerRef.Kind != "DaemonSet" {
-		return true, nil, nil
-	}
-	if _, err := o.client.Extensions().DaemonSets(pod.Namespace).Get(controllerRef.Name, metav1.GetOptions{}); err != nil {
-		return false, nil, &fatal{err.Error()}
-	}
+
 	if !o.IgnoreDaemonsets {
 		return false, nil, &fatal{kDaemonsetFatal}
 	}
+
 	return false, &warning{kDaemonsetWarning}, nil
 }
 
@@ -455,7 +432,13 @@ func (ps podStatuses) Message() string {
 // getPodsForDeletion receives resource info for a node, and returns all the pods from the given node that we
 // are planning on deleting. If there are any pods preventing us from deleting, we return that list in an error.
 func (o *DrainOptions) getPodsForDeletion(nodeInfo *resource.Info) (pods []corev1.Pod, err error) {
-	podList, err := o.client.Core().Pods(metav1.NamespaceAll).List(metav1.ListOptions{
+	labelSelector, err := labels.Parse(o.PodSelector)
+	if err != nil {
+		return pods, err
+	}
+
+	podList, err := o.client.CoreV1().Pods(metav1.NamespaceAll).List(metav1.ListOptions{
+		LabelSelector: labelSelector.String(),
 		FieldSelector: fields.SelectorFromSet(fields.Set{"spec.nodeName": nodeInfo.Name}).String()})
 	if err != nil {
 		return pods, err
@@ -466,7 +449,7 @@ func (o *DrainOptions) getPodsForDeletion(nodeInfo *resource.Info) (pods []corev
 
 	for _, pod := range podList.Items {
 		podOk := true
-		for _, filt := range []podFilter{mirrorPodFilter, o.localStorageFilter, o.unreplicatedFilter, o.daemonsetFilter} {
+		for _, filt := range []podFilter{o.daemonsetFilter, mirrorPodFilter, o.localStorageFilter, o.unreplicatedFilter} {
 			filterOk, w, f := filt(pod)
 
 			podOk = podOk && filterOk
@@ -475,6 +458,13 @@ func (o *DrainOptions) getPodsForDeletion(nodeInfo *resource.Info) (pods []corev
 			}
 			if f != nil {
 				fs[f.string] = append(fs[f.string], pod.Name)
+			}
+
+			// short-circuit as soon as pod not ok
+			// at that point, there is no reason to run pod
+			// through any additional filters
+			if !podOk {
+				break
 			}
 		}
 		if podOk {
@@ -497,7 +487,7 @@ func (o *DrainOptions) deletePod(pod corev1.Pod) error {
 		gracePeriodSeconds := int64(o.GracePeriodSeconds)
 		deleteOptions.GracePeriodSeconds = &gracePeriodSeconds
 	}
-	return o.client.Core().Pods(pod.Namespace).Delete(pod.Name, deleteOptions)
+	return o.client.CoreV1().Pods(pod.Namespace).Delete(pod.Name, deleteOptions)
 }
 
 func (o *DrainOptions) evictPod(pod corev1.Pod, policyGroupVersion string) error {
@@ -518,7 +508,7 @@ func (o *DrainOptions) evictPod(pod corev1.Pod, policyGroupVersion string) error
 		DeleteOptions: deleteOptions,
 	}
 	// Remember to change change the URL manipulation func when Evction's version change
-	return o.client.Policy().Evictions(eviction.Namespace).Evict(eviction)
+	return o.client.PolicyV1beta1().Evictions(eviction.Namespace).Evict(eviction)
 }
 
 // deleteOrEvictPods deletes or evicts the pods on the api server
@@ -533,7 +523,7 @@ func (o *DrainOptions) deleteOrEvictPods(pods []corev1.Pod) error {
 	}
 
 	getPodFn := func(namespace, name string) (*corev1.Pod, error) {
-		return o.client.Core().Pods(namespace).Get(name, metav1.GetOptions{})
+		return o.client.CoreV1().Pods(namespace).Get(name, metav1.GetOptions{})
 	}
 
 	if len(policyGroupVersion) > 0 {

@@ -39,7 +39,6 @@ const (
 	mountDeviceCmd   = "mountdevice"
 
 	detachCmd        = "detach"
-	waitForDetachCmd = "waitfordetach"
 	unmountDeviceCmd = "unmountdevice"
 
 	mountCmd   = "mount"
@@ -162,10 +161,25 @@ func (dc *DriverCall) Run() (*DriverStatus, error) {
 type OptionsForDriver map[string]string
 
 func NewOptionsForDriver(spec *volume.Spec, host volume.VolumeHost, extraOptions map[string]string) (OptionsForDriver, error) {
-	volSource, readOnly := getVolumeSource(spec)
+
+	volSourceFSType, err := getFSType(spec)
+	if err != nil {
+		return nil, err
+	}
+
+	readOnly, err := getReadOnly(spec)
+	if err != nil {
+		return nil, err
+	}
+
+	volSourceOptions, err := getOptions(spec)
+	if err != nil {
+		return nil, err
+	}
+
 	options := map[string]string{}
 
-	options[optionFSType] = volSource.FSType
+	options[optionFSType] = volSourceFSType
 
 	if readOnly {
 		options[optionReadWrite] = "ro"
@@ -179,7 +193,7 @@ func NewOptionsForDriver(spec *volume.Spec, host volume.VolumeHost, extraOptions
 		options[key] = value
 	}
 
-	for key, value := range volSource.Options {
+	for key, value := range volSourceOptions {
 		options[key] = value
 	}
 

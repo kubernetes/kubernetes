@@ -1,4 +1,4 @@
-//+build !jsoniter-sloppy
+//+build !jsoniter_sloppy
 
 package jsoniter
 
@@ -64,7 +64,7 @@ func (iter *Iterator) trySkipString() bool {
 		} else if c == '\\' {
 			return false
 		} else if c < ' ' {
-			iter.ReportError("ReadString",
+			iter.ReportError("trySkipString",
 				fmt.Sprintf(`invalid control character found: %d`, c))
 			return true // already failed
 		}

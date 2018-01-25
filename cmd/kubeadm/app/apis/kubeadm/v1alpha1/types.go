@@ -39,6 +39,11 @@ type MasterConfiguration struct {
 	NodeName             string               `json:"nodeName"`
 	AuthorizationModes   []string             `json:"authorizationModes,omitempty"`
 
+	// Mark the controller and api server pods as privileged as some cloud
+	// controllers like openstack need escalated privileges under some conditions
+	// example - loading a config drive to fetch node information
+	PrivilegedPods bool `json:"privilegedPods"`
+
 	Token    string           `json:"token"`
 	TokenTTL *metav1.Duration `json:"tokenTTL,omitempty"`
 
@@ -147,7 +152,7 @@ type NodeConfiguration struct {
 
 // KubeletConfiguration contains elements describing initial remote configuration of kubelet
 type KubeletConfiguration struct {
-	BaseConfig *kubeletconfigv1alpha1.KubeletConfiguration `json:"baseConfig"`
+	BaseConfig *kubeletconfigv1alpha1.KubeletConfiguration `json:"baseConfig,omitempty"`
 }
 
 // HostPathMount contains elements describing volumes that are mounted from the

@@ -78,16 +78,32 @@ var (
 		},
 		[]string{"verb", "resource", "subresource", "scope"},
 	)
+	// DroppedRequests is a number of requests dropped with 'Try again later' reponse"
+	DroppedRequests = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "apiserver_dropped_requests",
+			Help: "Number of requests dropped with 'Try again later' reponse",
+		},
+		[]string{"requestKind"},
+	)
 	kubectlExeRegexp = regexp.MustCompile(`^.*((?i:kubectl\.exe))`)
 )
 
-// Register all metrics.
-func Register() {
+const (
+	// ReadOnlyKind is a string identifying read only request kind
+	ReadOnlyKind = "readOnly"
+	// MutatingKind is a string identifying mutating request kind
+	MutatingKind = "mutating"
+)
+
+func init() {
+	// Register all metrics.
 	prometheus.MustRegister(requestCounter)
 	prometheus.MustRegister(longRunningRequestGauge)
 	prometheus.MustRegister(requestLatencies)
 	prometheus.MustRegister(requestLatenciesSummary)
 	prometheus.MustRegister(responseSizes)
+	prometheus.MustRegister(DroppedRequests)
 }
 
 // Record records a single request to the standard metrics endpoints. For use by handlers that perform their own

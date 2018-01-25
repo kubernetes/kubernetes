@@ -21,7 +21,7 @@ func encoderOfSlice(cfg *frozenConfig, typ reflect.Type) (ValEncoder, error) {
 		return nil, err
 	}
 	if typ.Elem().Kind() == reflect.Map {
-		encoder = &optionalEncoder{encoder}
+		encoder = &OptionalEncoder{encoder}
 	}
 	return &sliceEncoder{typ, typ.Elem(), encoder}, nil
 }
@@ -127,12 +127,10 @@ func growOne(slice *sliceHeader, sliceType reflect.Type, elementType reflect.Typ
 	newVal := reflect.MakeSlice(sliceType, newLen, newCap)
 	dst := unsafe.Pointer(newVal.Pointer())
 	// copy old array into new array
-	originalBytesCount := uintptr(slice.Len) * elementType.Size()
-	srcPtr := (*[1 << 30]byte)(slice.Data)
-	dstPtr := (*[1 << 30]byte)(dst)
-	for i := uintptr(0); i < originalBytesCount; i++ {
-		dstPtr[i] = srcPtr[i]
-	}
+	originalBytesCount := slice.Len * int(elementType.Size())
+	srcSliceHeader := (unsafe.Pointer)(&sliceHeader{slice.Data, originalBytesCount, originalBytesCount})
+	dstSliceHeader := (unsafe.Pointer)(&sliceHeader{dst, originalBytesCount, originalBytesCount})
+	copy(*(*[]byte)(dstSliceHeader), *(*[]byte)(srcSliceHeader))
 	slice.Data = dst
 	slice.Len = newLen
 	slice.Cap = newCap

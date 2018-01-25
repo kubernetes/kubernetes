@@ -77,8 +77,6 @@ func (az *Cloud) CreateRoute(clusterName string, nameHint string, kubeRoute *clo
 		}
 
 		glog.V(3).Infof("create: creating routetable. routeTableName=%q", az.RouteTableName)
-		az.operationPollRateLimiter.Accept()
-		glog.V(10).Infof("RouteTablesClient.CreateOrUpdate(%q): start", az.RouteTableName)
 		respChan, errChan := az.RouteTablesClient.CreateOrUpdate(az.ResourceGroup, az.RouteTableName, routeTable, nil)
 		resp := <-respChan
 		err := <-errChan
@@ -119,8 +117,6 @@ func (az *Cloud) CreateRoute(clusterName string, nameHint string, kubeRoute *clo
 	}
 
 	glog.V(3).Infof("create: creating route: instance=%q cidr=%q", kubeRoute.TargetNode, kubeRoute.DestinationCIDR)
-	az.operationPollRateLimiter.Accept()
-	glog.V(10).Infof("RoutesClient.CreateOrUpdate(%q): start", az.RouteTableName)
 	respChan, errChan := az.RoutesClient.CreateOrUpdate(az.ResourceGroup, az.RouteTableName, *route.Name, route, nil)
 	resp := <-respChan
 	err = <-errChan
@@ -147,8 +143,6 @@ func (az *Cloud) DeleteRoute(clusterName string, kubeRoute *cloudprovider.Route)
 	glog.V(2).Infof("delete: deleting route. clusterName=%q instance=%q cidr=%q", clusterName, kubeRoute.TargetNode, kubeRoute.DestinationCIDR)
 
 	routeName := mapNodeNameToRouteName(kubeRoute.TargetNode)
-	az.operationPollRateLimiter.Accept()
-	glog.V(10).Infof("RoutesClient.Delete(%q): start", az.RouteTableName)
 	respChan, errChan := az.RoutesClient.Delete(az.ResourceGroup, az.RouteTableName, routeName, nil)
 	resp := <-respChan
 	err := <-errChan

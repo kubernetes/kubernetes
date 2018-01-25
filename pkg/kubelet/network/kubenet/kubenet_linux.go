@@ -334,19 +334,17 @@ func (plugin *kubenetNetworkPlugin) setup(namespace string, name string, id kube
 
 	// Put the container bridge into promiscuous mode to force it to accept hairpin packets.
 	// TODO: Remove this once the kernel bug (#20096) is fixed.
-	// TODO: check and set promiscuous mode with netlink once vishvananda/netlink supports it
 	if plugin.hairpinMode == kubeletconfig.PromiscuousBridge {
-		output, err := plugin.execer.Command("ip", "link", "show", "dev", BridgeName).CombinedOutput()
-		if err != nil || strings.Index(string(output), "PROMISC") < 0 {
-			_, err := plugin.execer.Command("ip", "link", "set", BridgeName, "promisc", "on").CombinedOutput()
-			if err != nil {
-				return fmt.Errorf("Error setting promiscuous mode on %s: %v", BridgeName, err)
-			}
-		}
-
 		link, err := netlink.LinkByName(BridgeName)
 		if err != nil {
 			return fmt.Errorf("failed to lookup %q: %v", BridgeName, err)
+		}
+		if link.Attrs().Promisc != 1 {
+			// promiscuous mode is not on, then turn it on.
+			err := netlink.SetPromiscOn(link)
+			if err != nil {
+				return fmt.Errorf("Error setting promiscuous mode on %s: %v", BridgeName, err)
+			}
 		}
 
 		// configure the ebtables rules to eliminate duplicate packets by best effort
@@ -767,7 +765,10 @@ func (plugin *kubenetNetworkPlugin) delContainerFromNetwork(config *libcni.Netwo
 	}
 
 	glog.V(3).Infof("Removing %s/%s from '%s' with CNI '%s' plugin and runtime: %+v", namespace, name, config.Network.Name, config.Network.Type, rt)
-	if err := plugin.cniConfig.DelNetwork(config, rt); err != nil {
+	err = plugin.cniConfig.DelNetwork(config, rt)
+	// The pod may not get deleted successfully at the first time.
+	// Ignore "no such file or directory" error in case the network has already been deleted in previous attempts.
+	if err != nil && !strings.Contains(err.Error(), "no such file or directory") {
 		return fmt.Errorf("Error removing container from network: %v", err)
 	}
 	return nil

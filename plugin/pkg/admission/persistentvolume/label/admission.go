@@ -33,9 +33,11 @@ import (
 	vol "k8s.io/kubernetes/pkg/volume"
 )
 
+const PluginName = "PersistentVolumeLabel"
+
 // Register registers a plugin
 func Register(plugins *admission.Plugins) {
-	plugins.Register("PersistentVolumeLabel", func(config io.Reader) (admission.Interface, error) {
+	plugins.Register(PluginName, func(config io.Reader) (admission.Interface, error) {
 		persistentVolumeLabelAdmission := NewPersistentVolumeLabel()
 		return persistentVolumeLabelAdmission, nil
 	})

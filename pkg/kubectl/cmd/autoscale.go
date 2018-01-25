@@ -52,7 +52,8 @@ func NewCmdAutoscale(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	argAliases := kubectl.ResourceAliases(validArgs)
 
 	cmd := &cobra.Command{
-		Use:     "autoscale (-f FILENAME | TYPE NAME | TYPE/NAME) [--min=MINPODS] --max=MAXPODS [--cpu-percent=CPU] [flags]",
+		Use: "autoscale (-f FILENAME | TYPE NAME | TYPE/NAME) [--min=MINPODS] --max=MAXPODS [--cpu-percent=CPU]",
+		DisableFlagsInUseLine: true,
 		Short:   i18n.T("Auto-scale a Deployment, ReplicaSet, or ReplicationController"),
 		Long:    autoscaleLong,
 		Example: autoscaleExample,
@@ -64,11 +65,11 @@ func NewCmdAutoscale(f cmdutil.Factory, out io.Writer) *cobra.Command {
 		ArgAliases: argAliases,
 	}
 	cmdutil.AddPrinterFlags(cmd)
-	cmd.Flags().String("generator", "horizontalpodautoscaler/v1", i18n.T("The name of the API generator to use. Currently there is only 1 generator."))
-	cmd.Flags().Int("min", -1, "The lower limit for the number of pods that can be set by the autoscaler. If it's not specified or negative, the server will apply a default value.")
-	cmd.Flags().Int("max", -1, "The upper limit for the number of pods that can be set by the autoscaler. Required.")
+	cmd.Flags().String("generator", cmdutil.HorizontalPodAutoscalerV1GeneratorName, i18n.T("The name of the API generator to use. Currently there is only 1 generator."))
+	cmd.Flags().Int32("min", -1, "The lower limit for the number of pods that can be set by the autoscaler. If it's not specified or negative, the server will apply a default value.")
+	cmd.Flags().Int32("max", -1, "The upper limit for the number of pods that can be set by the autoscaler. Required.")
 	cmd.MarkFlagRequired("max")
-	cmd.Flags().Int("cpu-percent", -1, fmt.Sprintf("The target average CPU utilization (represented as a percent of requested CPU) over all the pods. If it's not specified or negative, a default autoscaling policy will be used."))
+	cmd.Flags().Int32("cpu-percent", -1, fmt.Sprintf("The target average CPU utilization (represented as a percent of requested CPU) over all the pods. If it's not specified or negative, a default autoscaling policy will be used."))
 	cmd.Flags().String("name", "", i18n.T("The name for the newly created object. If not specified, the name of the input resource will be used."))
 	cmdutil.AddDryRunFlag(cmd)
 	usage := "identifying the resource to autoscale."
@@ -103,15 +104,6 @@ func RunAutoscale(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []s
 		return err
 	}
 
-	// Get the generator, setup and validate all required parameters
-	generatorName := cmdutil.GetFlagString(cmd, "generator")
-	generators := f.Generators("autoscale")
-	generator, found := generators[generatorName]
-	if !found {
-		return cmdutil.UsageErrorf(cmd, "generator %q not found.", generatorName)
-	}
-	names := generator.ParamNames()
-
 	count := 0
 	err = r.Visit(func(info *resource.Info, err error) error {
 		if err != nil {
@@ -123,24 +115,25 @@ func RunAutoscale(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []s
 			return err
 		}
 
-		name := info.Name
-		params := kubectl.MakeParams(cmd, names)
-		params["default-name"] = name
-
-		params["scaleRef-kind"] = mapping.GroupVersionKind.Kind
-		params["scaleRef-name"] = name
-		params["scaleRef-apiVersion"] = mapping.GroupVersionKind.GroupVersion().String()
-
-		if err = kubectl.ValidateParams(names, params); err != nil {
-			return err
-		}
-		// Check for invalid flags used against the present generator.
-		if err := kubectl.EnsureFlagsValid(cmd, generators, generatorName); err != nil {
-			return err
+		// get the generator
+		var generator kubectl.StructuredGenerator
+		switch generatorName := cmdutil.GetFlagString(cmd, "generator"); generatorName {
+		case cmdutil.HorizontalPodAutoscalerV1GeneratorName:
+			generator = &kubectl.HorizontalPodAutoscalerGeneratorV1{
+				Name:               info.Name,
+				MinReplicas:        cmdutil.GetFlagInt32(cmd, "min"),
+				MaxReplicas:        cmdutil.GetFlagInt32(cmd, "max"),
+				CPUPercent:         cmdutil.GetFlagInt32(cmd, "cpu-percent"),
+				ScaleRefName:       info.Name,
+				ScaleRefKind:       mapping.GroupVersionKind.Kind,
+				ScaleRefApiVersion: mapping.GroupVersionKind.GroupVersion().String(),
+			}
+		default:
+			return errUnsupportedGenerator(cmd, generatorName)
 		}
 
 		// Generate new object
-		object, err := generator.Generate(params)
+		object, err := generator.StructuredGenerate()
 		if err != nil {
 			return err
 		}
@@ -194,7 +187,7 @@ func RunAutoscale(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []s
 
 func validateFlags(cmd *cobra.Command) error {
 	errs := []error{}
-	max, min := cmdutil.GetFlagInt(cmd, "max"), cmdutil.GetFlagInt(cmd, "min")
+	max, min := cmdutil.GetFlagInt32(cmd, "max"), cmdutil.GetFlagInt32(cmd, "min")
 	if max < 1 {
 		errs = append(errs, fmt.Errorf("--max=MAXPODS is required and must be at least 1, max: %d", max))
 	}

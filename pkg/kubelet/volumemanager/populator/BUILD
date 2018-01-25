@@ -19,7 +19,6 @@ go_library(
         "//pkg/kubelet/util/format:go_default_library",
         "//pkg/kubelet/volumemanager/cache:go_default_library",
         "//pkg/volume:go_default_library",
-        "//pkg/volume/util:go_default_library",
         "//pkg/volume/util/types:go_default_library",
         "//pkg/volume/util/volumehelper:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
@@ -48,8 +47,8 @@ filegroup(
 go_test(
     name = "go_default_test",
     srcs = ["desired_state_of_world_populator_test.go"],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/pkg/kubelet/volumemanager/populator",
-    library = ":go_default_library",
     deps = [
         "//pkg/kubelet/configmap:go_default_library",
         "//pkg/kubelet/container/testing:go_default_library",

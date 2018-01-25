@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2018 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,7 +17,6 @@ limitations under the License.
 package storage
 
 import (
-	"encoding/json"
 	"fmt"
 	"math/rand"
 	"path"
@@ -26,12 +25,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ghodss/yaml"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
-	batchv1 "k8s.io/api/batch/v1"
 	"k8s.io/api/core/v1"
+	extv1beta1 "k8s.io/api/extensions/v1beta1"
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -44,6 +44,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/storage/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
@@ -111,19 +112,21 @@ const (
 	// Following are constants used for provisioner e2e tests.
 	//
 	// testServiceAccount is the service account for bootstrapper
-	testServiceAccount = "local-storage-bootstrapper"
-	// testRoleBinding is the cluster-admin rolebinding for bootstrapper
-	testRoleBinding = "local-storage:bootstrapper"
+	testServiceAccount = "local-storage-admin"
 	// volumeConfigName is the configmap passed to bootstrapper and provisioner
 	volumeConfigName = "local-volume-config"
-	// bootstrapper and provisioner images used for e2e tests
-	bootstrapperImageName = "quay.io/external_storage/local-volume-provisioner-bootstrap:v1.0.1"
-	provisionerImageName  = "quay.io/external_storage/local-volume-provisioner:v1.0.1"
-	// provisioner daemonSetName name, must match the one defined in bootstrapper
+	// provisioner image used for e2e tests
+	provisionerImageName = "quay.io/external_storage/local-volume-provisioner:v2.0.0"
+	// provisioner daemonSetName name
 	daemonSetName = "local-volume-provisioner"
-	// provisioner node/pv cluster role binding, must match the one defined in bootstrapper
-	nodeBindingName = "local-storage:provisioner-node-binding"
-	pvBindingName   = "local-storage:provisioner-pv-binding"
+	// provisioner default mount point folder
+	provisionerDefaultMountRoot = "/mnt/local-storage"
+	// provisioner node/pv cluster role binding
+	nodeBindingName         = "local-storage:provisioner-node-binding"
+	pvBindingName           = "local-storage:provisioner-pv-binding"
+	systemRoleNode          = "system:node"
+	systemRolePVProvisioner = "system:persistent-volume-provisioner"
+
 	// A sample request size
 	testRequestSize = "10Mi"
 )
@@ -138,7 +141,7 @@ var (
 		Level: "s0:c0,c1"}
 )
 
-var _ = SIGDescribe("PersistentVolumes-local [Feature:LocalPersistentVolumes] [Serial]", func() {
+var _ = utils.SIGDescribe("PersistentVolumes-local [Feature:LocalPersistentVolumes] [Serial]", func() {
 	f := framework.NewDefaultFramework("persistent-local-volumes-test")
 
 	var (
@@ -314,7 +317,7 @@ var _ = SIGDescribe("PersistentVolumes-local [Feature:LocalPersistentVolumes] [S
 					reason:  "FailedMount",
 					pattern: make([]string, 2)}
 				ep.pattern = append(ep.pattern, "NodeSelectorTerm")
-				ep.pattern = append(ep.pattern, "Storage node affinity check failed")
+				ep.pattern = append(ep.pattern, "MountVolume.NodeAffinity check failed")
 
 				It("should not be able to mount due to different NodeName", func() {
 					testPodWithNodeName(config, testVolType, ep, config.nodes[1].Name, makeLocalPodWithNodeName, testMode)
@@ -331,24 +334,21 @@ var _ = SIGDescribe("PersistentVolumes-local [Feature:LocalPersistentVolumes] [S
 			setupLocalVolumeProvisioner(config)
 			volumePath = path.Join(
 				hostBase, discoveryDir, fmt.Sprintf("vol-%v", string(uuid.NewUUID())))
+			setupLocalVolumeProvisionerMountPoint(config, volumePath)
 		})
 
 		AfterEach(func() {
+			cleanupLocalVolumeProvisionerMountPoint(config, volumePath)
 			cleanupLocalVolumeProvisioner(config, volumePath)
 			cleanupStorageClass(config)
 		})
 
 		It("should create and recreate local persistent volume", func() {
-			By("Creating bootstrapper pod to start provisioner daemonset")
-			createBootstrapperJob(config)
+			By("Starting a provisioner daemonset")
+			createProvisionerDaemonset(config)
 			kind := schema.GroupKind{Group: "extensions", Kind: "DaemonSet"}
 			framework.WaitForControlledPodsRunning(config.client, config.ns, daemonSetName, kind)
 
-			By("Creating a directory under discovery path")
-			framework.Logf("creating local volume under path %q", volumePath)
-			mkdirCmd := fmt.Sprintf("mkdir %v -m 777", volumePath)
-			err := framework.IssueSSHCommand(mkdirCmd, framework.TestContext.Provider, config.node0)
-			Expect(err).NotTo(HaveOccurred())
 			By("Waiting for a PersitentVolume to be created")
 			oldPV, err := waitForLocalPersistentVolume(config.client, volumePath)
 			Expect(err).NotTo(HaveOccurred())
@@ -838,7 +838,7 @@ func createFileDoesntExistCmd(testFileDir string, testFile string) string {
 // Execute a read or write command in a pod.
 // Fail on error
 func podRWCmdExec(pod *v1.Pod, cmd string) string {
-	out, err := podExec(pod, cmd)
+	out, err := utils.PodExec(pod, cmd)
 	Expect(err).NotTo(HaveOccurred())
 	return out
 }
@@ -864,11 +864,11 @@ func setupLocalVolumesPVCsPVs(
 func setupLocalVolumeProvisioner(config *localTestConfig) {
 	By("Bootstrapping local volume provisioner")
 	createServiceAccount(config)
-	createClusterRoleBinding(config)
+	createProvisionerClusterRoleBinding(config)
 	createVolumeConfigMap(config)
 
 	By("Initializing local volume discovery base path")
-	mkdirCmd := fmt.Sprintf("mkdir %v -m 777", path.Join(hostBase, discoveryDir))
+	mkdirCmd := fmt.Sprintf("mkdir -p %v -m 777", path.Join(hostBase, discoveryDir))
 	err := framework.IssueSSHCommand(mkdirCmd, framework.TestContext.Provider, config.node0)
 	Expect(err).NotTo(HaveOccurred())
 }
@@ -877,7 +877,7 @@ func cleanupLocalVolumeProvisioner(config *localTestConfig, volumePath string) {
 	By("Cleaning up cluster role binding")
 	deleteClusterRoleBinding(config)
 
-	By("Removing the test directory")
+	By("Removing the test discovery directory")
 	removeCmd := fmt.Sprintf("rm -r %s", path.Join(hostBase, discoveryDir))
 	err := framework.IssueSSHCommand(removeCmd, framework.TestContext.Provider, config.node0)
 	Expect(err).NotTo(HaveOccurred())
@@ -889,6 +889,30 @@ func cleanupLocalVolumeProvisioner(config *localTestConfig, volumePath string) {
 	Expect(err).NotTo(HaveOccurred())
 }
 
+func setupLocalVolumeProvisionerMountPoint(config *localTestConfig, volumePath string) {
+	By(fmt.Sprintf("Creating local directory at path %q", volumePath))
+	mkdirCmd := fmt.Sprintf("mkdir %v -m 777", volumePath)
+	err := framework.IssueSSHCommand(mkdirCmd, framework.TestContext.Provider, config.node0)
+	Expect(err).NotTo(HaveOccurred())
+
+	By(fmt.Sprintf("Mounting local directory at path %q", volumePath))
+	mntCmd := fmt.Sprintf("sudo mount --bind %v %v", volumePath, volumePath)
+	err = framework.IssueSSHCommand(mntCmd, framework.TestContext.Provider, config.node0)
+	Expect(err).NotTo(HaveOccurred())
+}
+
+func cleanupLocalVolumeProvisionerMountPoint(config *localTestConfig, volumePath string) {
+	By(fmt.Sprintf("Unmounting the test mount point from %q", volumePath))
+	umountCmd := fmt.Sprintf("sudo umount %v", volumePath)
+	err := framework.IssueSSHCommand(umountCmd, framework.TestContext.Provider, config.node0)
+	Expect(err).NotTo(HaveOccurred())
+
+	By("Removing the test mount point")
+	removeCmd := fmt.Sprintf("rm -r %s", volumePath)
+	err = framework.IssueSSHCommand(removeCmd, framework.TestContext.Provider, config.node0)
+
+}
+
 func createServiceAccount(config *localTestConfig) {
 	serviceAccount := v1.ServiceAccount{
 		TypeMeta:   metav1.TypeMeta{APIVersion: "v1", Kind: "ServiceAccount"},
@@ -898,7 +922,10 @@ func createServiceAccount(config *localTestConfig) {
 	Expect(err).NotTo(HaveOccurred())
 }
 
-func createClusterRoleBinding(config *localTestConfig) {
+// createProvisionerClusterRoleBinding creates two cluster role bindings for local volume provisioner's
+// service account: systemRoleNode and systemRolePVProvisioner. These are required for
+// provisioner to get node information and create persistent volumes.
+func createProvisionerClusterRoleBinding(config *localTestConfig) {
 	subjects := []rbacv1beta1.Subject{
 		{
 			Kind:      rbacv1beta1.ServiceAccountKind,
@@ -907,29 +934,44 @@ func createClusterRoleBinding(config *localTestConfig) {
 		},
 	}
 
-	binding := rbacv1beta1.ClusterRoleBinding{
+	pvBinding := rbacv1beta1.ClusterRoleBinding{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "rbac.authorization.k8s.io/v1beta1",
 			Kind:       "ClusterRoleBinding",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name: testRoleBinding,
+			Name: pvBindingName,
 		},
 		RoleRef: rbacv1beta1.RoleRef{
 			APIGroup: "rbac.authorization.k8s.io",
 			Kind:     "ClusterRole",
-			Name:     "cluster-admin",
+			Name:     systemRolePVProvisioner,
+		},
+		Subjects: subjects,
+	}
+	nodeBinding := rbacv1beta1.ClusterRoleBinding{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "rbac.authorization.k8s.io/v1beta1",
+			Kind:       "ClusterRoleBinding",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: nodeBindingName,
+		},
+		RoleRef: rbacv1beta1.RoleRef{
+			APIGroup: "rbac.authorization.k8s.io",
+			Kind:     "ClusterRole",
+			Name:     systemRoleNode,
 		},
 		Subjects: subjects,
 	}
 
-	_, err := config.client.RbacV1beta1().ClusterRoleBindings().Create(&binding)
+	_, err := config.client.RbacV1beta1().ClusterRoleBindings().Create(&pvBinding)
+	Expect(err).NotTo(HaveOccurred())
+	_, err = config.client.RbacV1beta1().ClusterRoleBindings().Create(&nodeBinding)
 	Expect(err).NotTo(HaveOccurred())
 }
 
 func deleteClusterRoleBinding(config *localTestConfig) {
-	err := config.client.RbacV1beta1().ClusterRoleBindings().Delete(testRoleBinding, metav1.NewDeleteOptions(0))
-	Expect(err).NotTo(HaveOccurred())
 	// These role bindings are created in provisioner; we just ensure it's
 	// deleted and do not panic on error.
 	config.client.RbacV1beta1().ClusterRoleBindings().Delete(nodeBindingName, metav1.NewDeleteOptions(0))
@@ -937,12 +979,26 @@ func deleteClusterRoleBinding(config *localTestConfig) {
 }
 
 func createVolumeConfigMap(config *localTestConfig) {
-	mountConfig := struct {
-		HostDir string `json:"hostDir"`
-	}{
-		HostDir: path.Join(hostBase, discoveryDir),
+	// MountConfig and ProvisionerConfiguration from
+	// https://github.com/kubernetes-incubator/external-storage/blob/master/local-volume/provisioner/pkg/common/common.go
+	type MountConfig struct {
+		// The hostpath directory
+		HostDir  string `json:"hostDir" yaml:"hostDir"`
+		MountDir string `json:"mountDir" yaml:"mountDir"`
 	}
-	data, err := json.Marshal(&mountConfig)
+	type ProvisionerConfiguration struct {
+		// StorageClassConfig defines configuration of Provisioner's storage classes
+		StorageClassConfig map[string]MountConfig `json:"storageClassMap" yaml:"storageClassMap"`
+	}
+	var provisionerConfig ProvisionerConfiguration
+	provisionerConfig.StorageClassConfig = map[string]MountConfig{
+		config.scName: {
+			HostDir:  path.Join(hostBase, discoveryDir),
+			MountDir: provisionerDefaultMountRoot,
+		},
+	}
+
+	data, err := yaml.Marshal(&provisionerConfig.StorageClassConfig)
 	Expect(err).NotTo(HaveOccurred())
 
 	configMap := v1.ConfigMap{
@@ -955,32 +1011,50 @@ func createVolumeConfigMap(config *localTestConfig) {
 			Namespace: config.ns,
 		},
 		Data: map[string]string{
-			config.scName: string(data),
+			"storageClassMap": string(data),
 		},
 	}
 	_, err = config.client.CoreV1().ConfigMaps(config.ns).Create(&configMap)
 	Expect(err).NotTo(HaveOccurred())
 }
 
-func createBootstrapperJob(config *localTestConfig) {
-	bootJob := &batchv1.Job{
+func createProvisionerDaemonset(config *localTestConfig) {
+	provisionerPrivileged := true
+	provisioner := &extv1beta1.DaemonSet{
 		TypeMeta: metav1.TypeMeta{
-			Kind:       "Job",
-			APIVersion: "batch/v1",
+			Kind:       "DaemonSet",
+			APIVersion: "extensions/v1beta1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: "local-volume-tester-",
+			Name: daemonSetName,
 		},
-		Spec: batchv1.JobSpec{
+		Spec: extv1beta1.DaemonSetSpec{
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{"app": "local-volume-provisioner"},
+			},
 			Template: v1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{"app": "local-volume-provisioner"},
+				},
 				Spec: v1.PodSpec{
-					RestartPolicy:      v1.RestartPolicyNever,
 					ServiceAccountName: testServiceAccount,
 					Containers: []v1.Container{
 						{
-							Name:  "volume-tester",
-							Image: bootstrapperImageName,
+							Name:            "provisioner",
+							Image:           provisionerImageName,
+							ImagePullPolicy: "Always",
+							SecurityContext: &v1.SecurityContext{
+								Privileged: &provisionerPrivileged,
+							},
 							Env: []v1.EnvVar{
+								{
+									Name: "MY_NODE_NAME",
+									ValueFrom: &v1.EnvVarSource{
+										FieldRef: &v1.ObjectFieldSelector{
+											FieldPath: "spec.nodeName",
+										},
+									},
+								},
 								{
 									Name: "MY_NAMESPACE",
 									ValueFrom: &v1.EnvVarSource{
@@ -990,9 +1064,35 @@ func createBootstrapperJob(config *localTestConfig) {
 									},
 								},
 							},
-							Args: []string{
-								fmt.Sprintf("--image=%v", provisionerImageName),
-								fmt.Sprintf("--volume-config=%v", volumeConfigName),
+							VolumeMounts: []v1.VolumeMount{
+								{
+									Name:      volumeConfigName,
+									MountPath: "/etc/provisioner/config/",
+								},
+								{
+									Name:      "local-disks",
+									MountPath: provisionerDefaultMountRoot,
+								},
+							},
+						},
+					},
+					Volumes: []v1.Volume{
+						{
+							Name: volumeConfigName,
+							VolumeSource: v1.VolumeSource{
+								ConfigMap: &v1.ConfigMapVolumeSource{
+									LocalObjectReference: v1.LocalObjectReference{
+										Name: volumeConfigName,
+									},
+								},
+							},
+						},
+						{
+							Name: "local-disks",
+							VolumeSource: v1.VolumeSource{
+								HostPath: &v1.HostPathVolumeSource{
+									Path: path.Join(hostBase, discoveryDir),
+								},
 							},
 						},
 					},
@@ -1000,9 +1100,7 @@ func createBootstrapperJob(config *localTestConfig) {
 			},
 		},
 	}
-	job, err := config.client.Batch().Jobs(config.ns).Create(bootJob)
-	Expect(err).NotTo(HaveOccurred())
-	err = framework.WaitForJobFinish(config.client, config.ns, job.Name, 1)
+	_, err := config.client.ExtensionsV1beta1().DaemonSets(config.ns).Create(provisioner)
 	Expect(err).NotTo(HaveOccurred())
 }
 

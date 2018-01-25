@@ -62,12 +62,12 @@ func (p RESTStorageProvider) v1beta1Storage(apiResourceConfigSource serverstorag
 
 	if apiResourceConfigSource.ResourceEnabled(version.WithResource("daemonsets")) {
 		daemonSetStorage, daemonSetStatusStorage := daemonstore.NewREST(restOptionsGetter)
-		storage["daemonsets"] = daemonSetStorage
+		storage["daemonsets"] = daemonSetStorage.WithCategories(nil)
 		storage["daemonsets/status"] = daemonSetStatusStorage
 	}
 	if apiResourceConfigSource.ResourceEnabled(version.WithResource("deployments")) {
 		deploymentStorage := deploymentstore.NewStorage(restOptionsGetter)
-		storage["deployments"] = deploymentStorage.Deployment
+		storage["deployments"] = deploymentStorage.Deployment.WithCategories(nil)
 		storage["deployments/status"] = deploymentStorage.Status
 		storage["deployments/rollback"] = deploymentStorage.Rollback
 		storage["deployments/scale"] = deploymentStorage.Scale
@@ -83,7 +83,7 @@ func (p RESTStorageProvider) v1beta1Storage(apiResourceConfigSource serverstorag
 	}
 	if apiResourceConfigSource.ResourceEnabled(version.WithResource("replicasets")) {
 		replicaSetStorage := replicasetstore.NewStorage(restOptionsGetter)
-		storage["replicasets"] = replicaSetStorage.ReplicaSet
+		storage["replicasets"] = replicaSetStorage.ReplicaSet.WithCategories(nil)
 		storage["replicasets/status"] = replicaSetStorage.Status
 		storage["replicasets/scale"] = replicaSetStorage.Scale
 	}

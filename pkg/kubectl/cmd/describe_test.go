@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"fmt"
 	"net/http"
+	"strings"
 	"testing"
 
 	"k8s.io/client-go/rest/fake"
@@ -166,5 +167,32 @@ func TestDescribeObjectSkipEvents(t *testing.T) {
 	cmd.Run(cmd, []string{"pods"})
 	if d.Settings.ShowEvents != false {
 		t.Errorf("ShowEvents = false expected, got ShowEvents = %v", d.Settings.ShowEvents)
+	}
+}
+
+func TestDescribeHelpMessage(t *testing.T) {
+	f, _, _, _ := cmdtesting.NewAPIFactory()
+
+	buf := bytes.NewBuffer([]byte{})
+	buferr := bytes.NewBuffer([]byte{})
+	cmd := NewCmdDescribe(f, buf, buferr)
+	cmd.SetArgs([]string{"-h"})
+	cmd.SetOutput(buf)
+	_, err := cmd.ExecuteC()
+
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	got := buf.String()
+
+	expected := `describe (-f FILENAME | TYPE [NAME_PREFIX | -l label] | TYPE/NAME)`
+	if !strings.Contains(got, expected) {
+		t.Errorf("Expected to contain: \n %v\nGot:\n %v\n", expected, got)
+	}
+
+	unexpected := `describe (-f FILENAME | TYPE [NAME_PREFIX | -l label] | TYPE/NAME) [flags]`
+	if strings.Contains(got, unexpected) {
+		t.Errorf("Expected not to contain: \n %v\nGot:\n %v\n", unexpected, got)
 	}
 }

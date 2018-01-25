@@ -1,8 +1,8 @@
 package(default_visibility = ["//visibility:public"])
 
-load("@bazel_tools//tools/build_defs/pkg:pkg.bzl", "pkg_tar")
 load("@io_kubernetes_build//defs:deb.bzl", "k8s_deb", "deb_data")
 load("@io_kubernetes_build//defs:build.bzl", "release_filegroup")
+load("@io_kubernetes_build//defs:pkg.bzl", "pkg_tar")
 
 # We do not include kube-scheduler, kube-controller-manager,
 # kube-apiserver, and kube-proxy in this list even though we
@@ -41,7 +41,7 @@ deb_data(
     name = "kube-scheduler",
     data = [
         {
-            "files": ["//plugin/cmd/kube-scheduler"],
+            "files": ["//cmd/kube-scheduler"],
             "mode": "0755",
             "dir": "/usr/bin",
         },

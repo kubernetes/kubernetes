@@ -34,7 +34,6 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -87,6 +86,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/oom"
 	"k8s.io/kubernetes/pkg/util/rlimit"
 	"k8s.io/kubernetes/pkg/version"
+	"k8s.io/kubernetes/pkg/version/verflag"
 )
 
 const (
@@ -96,9 +96,13 @@ const (
 
 // NewKubeletCommand creates a *cobra.Command object with default parameters
 func NewKubeletCommand() *cobra.Command {
-	// ignore the error, as this is just for generating docs and the like
-	s, _ := options.NewKubeletServer()
-	s.AddFlags(pflag.CommandLine)
+	kubeletFlags := options.NewKubeletFlags()
+	kubeletConfiguration, err := options.NewKubeletConfiguration()
+	// programmer error
+	if err != nil {
+		glog.Fatal(err)
+	}
+
 	cmd := &cobra.Command{
 		Use: componentKubelet,
 		Long: `The kubelet is the primary "node agent" that runs on each
@@ -121,8 +125,58 @@ is checked every 20 seconds (also configurable with a flag).
 HTTP server: The kubelet can also listen for HTTP and respond to a simple API
 (underspec'd currently) to submit a new manifest.`,
 		Run: func(cmd *cobra.Command, args []string) {
+			// short-circuit on verflag
+			verflag.PrintAndExitIfRequested()
+
+			// TODO(mtaufen): won't need this this once dynamic config is GA
+			// set feature gates so we can check if dynamic config is enabled
+			if err := utilfeature.DefaultFeatureGate.SetFromMap(kubeletConfiguration.FeatureGates); err != nil {
+				glog.Fatal(err)
+			}
+			// validate the initial KubeletFlags, to make sure the dynamic-config-related flags aren't used unless the feature gate is on
+			if err := options.ValidateKubeletFlags(kubeletFlags); err != nil {
+				glog.Fatal(err)
+			}
+			// bootstrap the kubelet config controller, app.BootstrapKubeletConfigController will check
+			// feature gates and only turn on relevant parts of the controller
+			kubeletConfig, kubeletConfigController, err := BootstrapKubeletConfigController(
+				kubeletConfiguration, kubeletFlags.KubeletConfigFile, kubeletFlags.DynamicConfigDir)
+			if err != nil {
+				glog.Fatal(err)
+			}
+
+			// construct a KubeletServer from kubeletFlags and kubeletConfig
+			kubeletServer := &options.KubeletServer{
+				KubeletFlags:         *kubeletFlags,
+				KubeletConfiguration: *kubeletConfig,
+			}
+
+			// use kubeletServer to construct the default KubeletDeps
+			kubeletDeps, err := UnsecuredDependencies(kubeletServer)
+			if err != nil {
+				glog.Fatal(err)
+			}
+
+			// add the kubelet config controller to kubeletDeps
+			kubeletDeps.KubeletConfigController = kubeletConfigController
+
+			// start the experimental docker shim, if enabled
+			if kubeletServer.KubeletFlags.ExperimentalDockershim {
+				if err := RunDockershim(&kubeletServer.KubeletFlags, kubeletConfig); err != nil {
+					glog.Fatal(err)
+				}
+			}
+
+			// run the kubelet
+			if err := Run(kubeletServer, kubeletDeps); err != nil {
+				glog.Fatal(err)
+			}
 		},
 	}
+
+	kubeletFlags.AddFlags(cmd.Flags())
+	options.AddKubeletConfigFlags(cmd.Flags(), kubeletConfiguration)
+	options.AddGlobalFlags(cmd.Flags())
 
 	return cmd
 }
@@ -139,7 +193,7 @@ func UnsecuredDependencies(s *options.KubeletServer) (*kubelet.Dependencies, err
 	mounter := mount.New(s.ExperimentalMounterPath)
 	var writer kubeio.Writer = &kubeio.StdWriter{}
 	if s.Containerized {
-		glog.V(2).Info("Running kubelet in containerized mode (experimental)")
+		glog.V(2).Info("Running kubelet in containerized mode")
 		mounter = mount.NewNsenterMounter()
 		writer = &kubeio.NsenterWriter{}
 	}
@@ -289,12 +343,8 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies) (err error) {
 		}
 	}
 
-	if s.CloudProvider == kubeletconfigv1alpha1.AutoDetectCloudProvider {
-		glog.Warning("--cloud-provider=auto-detect is deprecated. The desired cloud provider should be set explicitly")
-	}
-
 	if kubeDeps.Cloud == nil {
-		if !cloudprovider.IsExternal(s.CloudProvider) && s.CloudProvider != kubeletconfigv1alpha1.AutoDetectCloudProvider {
+		if !cloudprovider.IsExternal(s.CloudProvider) {
 			cloud, err := cloudprovider.InitCloudProvider(s.CloudProvider, s.CloudConfigFile)
 			if err != nil {
 				return err
@@ -333,7 +383,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies) (err error) {
 		var heartbeatClient v1core.CoreV1Interface
 		var externalKubeClient clientset.Interface
 
-		clientConfig, err := CreateAPIServerClientConfig(s)
+		clientConfig, err := createAPIServerClientConfig(s)
 
 		var clientCertificateManager certificate.Manager
 		if err == nil {
@@ -401,7 +451,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies) (err error) {
 	// Alpha Dynamic Configuration Implementation;
 	// if the kubelet config controller is available, inject the latest to start the config and status sync loops
 	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicKubeletConfig) && kubeDeps.KubeletConfigController != nil && !standaloneMode && !s.RunOnce {
-		kubeDeps.KubeletConfigController.StartSync(kubeDeps.KubeClient, string(nodeName))
+		kubeDeps.KubeletConfigController.StartSync(kubeDeps.KubeClient, kubeDeps.EventClient, string(nodeName))
 	}
 
 	if kubeDeps.Auth == nil {
@@ -571,12 +621,21 @@ func InitializeTLS(kf *options.KubeletFlags, kc *kubeletconfiginternal.KubeletCo
 			glog.V(4).Infof("Using self-signed cert (%s, %s)", kc.TLSCertFile, kc.TLSPrivateKeyFile)
 		}
 	}
+
+	tlsCipherSuites, err := flag.TLSCipherSuites(kc.TLSCipherSuites)
+	if err != nil {
+		return nil, err
+	}
+
+	minTLSVersion, err := flag.TLSVersion(kc.TLSMinVersion)
+	if err != nil {
+		return nil, err
+	}
+
 	tlsOptions := &server.TLSOptions{
 		Config: &tls.Config{
-			// Can't use SSLv3 because of POODLE and BEAST
-			// Can't use TLSv1.0 because of POODLE and BEAST using CBC cipher
-			// Can't use TLSv1.1 because of RC4 cipher usage
-			MinVersion: tls.VersionTLS12,
+			MinVersion:   minTLSVersion,
+			CipherSuites: tlsCipherSuites,
 		},
 		CertFile: kc.TLSCertFile,
 		KeyFile:  kc.TLSPrivateKeyFile,
@@ -617,10 +676,9 @@ func createClientConfig(s *options.KubeletServer) (*restclient.Config, error) {
 	}
 }
 
-// CreateAPIServerClientConfig generates a client.Config from command line flags
+// createAPIServerClientConfig generates a client.Config from command line flags
 // via createClientConfig and then injects chaos into the configuration via addChaosToClientConfig.
-// This func is exported to support integration with third party kubelet extensions (e.g. kubernetes-mesos).
-func CreateAPIServerClientConfig(s *options.KubeletServer) (*restclient.Config, error) {
+func createAPIServerClientConfig(s *options.KubeletServer) (*restclient.Config, error) {
 	clientConfig, err := createClientConfig(s)
 	if err != nil {
 		return nil, err
@@ -667,17 +725,17 @@ func RunKubelet(kubeFlags *options.KubeletFlags, kubeCfg *kubeletconfiginternal.
 	//                prefer this to be done as part of an independent validation step on the
 	//                KubeletConfiguration. But as far as I can tell, we don't have an explicit
 	//                place for validation of the KubeletConfiguration yet.
-	hostNetworkSources, err := kubetypes.GetValidatedSources(kubeCfg.HostNetworkSources)
+	hostNetworkSources, err := kubetypes.GetValidatedSources(kubeFlags.HostNetworkSources)
 	if err != nil {
 		return err
 	}
 
-	hostPIDSources, err := kubetypes.GetValidatedSources(kubeCfg.HostPIDSources)
+	hostPIDSources, err := kubetypes.GetValidatedSources(kubeFlags.HostPIDSources)
 	if err != nil {
 		return err
 	}
 
-	hostIPCSources, err := kubetypes.GetValidatedSources(kubeCfg.HostIPCSources)
+	hostIPCSources, err := kubetypes.GetValidatedSources(kubeFlags.HostIPCSources)
 	if err != nil {
 		return err
 	}
@@ -687,20 +745,16 @@ func RunKubelet(kubeFlags *options.KubeletFlags, kubeCfg *kubeletconfiginternal.
 		HostPIDSources:     hostPIDSources,
 		HostIPCSources:     hostIPCSources,
 	}
-	capabilities.Setup(kubeCfg.AllowPrivileged, privilegedSources, 0)
+	capabilities.Setup(kubeFlags.AllowPrivileged, privilegedSources, 0)
 
 	credentialprovider.SetPreferredDockercfgPath(kubeFlags.RootDirectory)
 	glog.V(2).Infof("Using root directory: %v", kubeFlags.RootDirectory)
 
-	builder := kubeDeps.Builder
-	if builder == nil {
-		builder = CreateAndInitKubelet
-	}
 	if kubeDeps.OSInterface == nil {
 		kubeDeps.OSInterface = kubecontainer.RealOS{}
 	}
 
-	k, err := builder(kubeCfg,
+	k, err := CreateAndInitKubelet(kubeCfg,
 		kubeDeps,
 		&kubeFlags.ContainerRuntimeOptions,
 		kubeFlags.ContainerRuntime,
@@ -714,7 +768,6 @@ func RunKubelet(kubeFlags *options.KubeletFlags, kubeCfg *kubeletconfiginternal.
 		kubeFlags.RegisterNode,
 		kubeFlags.RegisterWithTaints,
 		kubeFlags.AllowedUnsafeSysctls,
-		kubeFlags.Containerized,
 		kubeFlags.RemoteRuntimeEndpoint,
 		kubeFlags.RemoteImageEndpoint,
 		kubeFlags.ExperimentalMounterPath,
@@ -788,7 +841,6 @@ func CreateAndInitKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	registerNode bool,
 	registerWithTaints []api.Taint,
 	allowedUnsafeSysctls []string,
-	containerized bool,
 	remoteRuntimeEndpoint string,
 	remoteImageEndpoint string,
 	experimentalMounterPath string,
@@ -822,7 +874,6 @@ func CreateAndInitKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		registerNode,
 		registerWithTaints,
 		allowedUnsafeSysctls,
-		containerized,
 		remoteRuntimeEndpoint,
 		remoteImageEndpoint,
 		experimentalMounterPath,
@@ -878,16 +929,16 @@ func parseResourceList(m map[string]string) (v1.ResourceList, error) {
 
 // BootstrapKubeletConfigController constructs and bootstrap a configuration controller
 func BootstrapKubeletConfigController(defaultConfig *kubeletconfiginternal.KubeletConfiguration,
-	initConfigDirFlag flag.StringFlag,
+	kubeletConfigFileFlag flag.StringFlag,
 	dynamicConfigDirFlag flag.StringFlag) (*kubeletconfiginternal.KubeletConfiguration, *kubeletconfig.Controller, error) {
 	var err error
 	// Alpha Dynamic Configuration Implementation; this section only loads config from disk, it does not contact the API server
 	// compute absolute paths based on current working dir
-	initConfigDir := ""
-	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletConfigFile) && initConfigDirFlag.Provided() {
-		initConfigDir, err = filepath.Abs(initConfigDirFlag.Value())
+	kubeletConfigFile := ""
+	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletConfigFile) && kubeletConfigFileFlag.Provided() {
+		kubeletConfigFile, err = filepath.Abs(kubeletConfigFileFlag.Value())
 		if err != nil {
-			return nil, nil, fmt.Errorf("failed to get absolute path for --init-config-dir")
+			return nil, nil, fmt.Errorf("failed to get absolute path for --config")
 		}
 	}
 	dynamicConfigDir := ""
@@ -898,8 +949,8 @@ func BootstrapKubeletConfigController(defaultConfig *kubeletconfiginternal.Kubel
 		}
 	}
 
-	// get the latest KubeletConfiguration checkpoint from disk, or load the init or default config if no valid checkpoints exist
-	kubeletConfigController, err := kubeletconfig.NewController(defaultConfig, initConfigDir, dynamicConfigDir)
+	// get the latest KubeletConfiguration checkpoint from disk, or load the kubelet config file or default config if no valid checkpoints exist
+	kubeletConfigController, err := kubeletconfig.NewController(defaultConfig, kubeletConfigFile, dynamicConfigDir)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to construct controller, error: %v", err)
 	}
@@ -949,10 +1000,6 @@ func RunDockershim(f *options.KubeletFlags, c *kubeletconfiginternal.KubeletConf
 	if err != nil {
 		return err
 	}
-	if err := ds.Start(); err != nil {
-		return err
-	}
-
 	glog.V(2).Infof("Starting the GRPC server for the docker CRI shim.")
 	server := dockerremote.NewDockerServer(f.RemoteRuntimeEndpoint, ds)
 	if err := server.Start(); err != nil {

@@ -17,7 +17,6 @@ aliases:
     - adohe
     - brendandburns
     - deads2k
-    - fabianofranz
     - janetkuo
     - liggitt
     - pwittrock
@@ -30,7 +29,6 @@ aliases:
     - dshulyak
     - eparis
     - ericchiang
-    - fabianofranz
     - ghodss
     - mengqiy
     - rootfs
@@ -101,6 +99,12 @@ aliases:
   sig-apps-api-approvers:
     - erictune
     - smarterclayton
+  sig-autoscaling-maintainers:
+    - aleksandra-malinowska
+    - bskiba
+    - DirectXMan12
+    - MaciekPytel
+    - mwielgus
   milestone-maintainers:
     - lavalamp
     - deads2k
@@ -121,7 +125,6 @@ aliases:
     - slack
     - colemickens
     - foxish
-    - fabianofranz
     - pwittrock
     - AdoHe
     - lukemarsden

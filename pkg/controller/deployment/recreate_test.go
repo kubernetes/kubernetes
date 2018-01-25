@@ -115,9 +115,11 @@ func TestOldPodsRunning(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		if expected, got := test.expected, oldPodsRunning(test.newRS, test.oldRSs, test.podMap); expected != got {
-			t.Errorf("%s: expected %t, got %t", test.name, expected, got)
-		}
+		t.Run(test.name, func(t *testing.T) {
+			if expected, got := test.expected, oldPodsRunning(test.newRS, test.oldRSs, test.podMap); expected != got {
+				t.Errorf("%s: expected %t, got %t", test.name, expected, got)
+			}
+		})
 	}
 }
 

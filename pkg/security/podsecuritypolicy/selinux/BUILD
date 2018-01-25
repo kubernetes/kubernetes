@@ -18,6 +18,7 @@ go_library(
     deps = [
         "//pkg/apis/core:go_default_library",
         "//pkg/apis/extensions:go_default_library",
+        "//pkg/security/podsecuritypolicy/util:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/validation/field:go_default_library",
     ],
 )
@@ -28,8 +29,8 @@ go_test(
         "mustrunas_test.go",
         "runasany_test.go",
     ],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/pkg/security/podsecuritypolicy/selinux",
-    library = ":go_default_library",
     deps = [
         "//pkg/apis/core:go_default_library",
         "//pkg/apis/extensions:go_default_library",

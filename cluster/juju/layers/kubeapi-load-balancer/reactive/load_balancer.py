@@ -21,6 +21,7 @@ import subprocess
 from charms import layer
 from charms.reactive import when, when_any, when_not
 from charms.reactive import set_state, remove_state
+from charms.reactive import hook
 from charmhelpers.core import hookenv
 from charmhelpers.core import host
 from charmhelpers.contrib.charmsupport import nrpe
@@ -35,8 +36,43 @@ from subprocess import STDOUT
 from subprocess import CalledProcessError
 
 
-@when('certificates.available')
-def request_server_certificates(tls):
+apilb_nginx = """/var/log/nginx.*.log {
+    daily
+    missingok
+    rotate 14
+    compress
+    delaycompress
+    notifempty
+    create 0640 www-data adm
+    sharedscripts
+    prerotate
+        if [ -d /etc/logrotate.d/httpd-prerotate ]; then \\
+            run-parts /etc/logrotate.d/httpd-prerotate; \\
+        fi \\
+    endscript
+    postrotate
+        invoke-rc.d nginx rotate >/dev/null 2>&1
+    endscript
+}"""
+
+
+def get_ingress_address(relation):
+    try:
+        network_info = hookenv.network_get(relation.relation_name)
+    except NotImplementedError:
+        network_info = []
+
+    if network_info and 'ingress-addresses' in network_info:
+        # just grab the first one for now, maybe be more robust here?
+        return network_info['ingress-addresses'][0]
+    else:
+        # if they don't have ingress-addresses they are running a juju that
+        # doesn't support spaces, so just return the private address
+        return hookenv.unit_get('private-address')
+
+
+@when('certificates.available', 'website.available')
+def request_server_certificates(tls, website):
     '''Send the data that is required to create a server certificate for
     this server.'''
     # Use the public ip of this unit as the Common Name for the certificate.
@@ -44,7 +80,7 @@ def request_server_certificates(tls):
     # Create SANs that the tls layer will add to the server cert.
     sans = [
         hookenv.unit_public_ip(),
-        hookenv.unit_private_ip(),
+        get_ingress_address(website),
         socket.gethostname(),
     ]
     # maybe they have extra names they want as SANs
@@ -89,6 +125,14 @@ def close_old_port():
         hookenv.log('Port %d already closed, skipping.' % old_port)
 
 
+def maybe_write_apilb_logrotate_config():
+    filename = '/etc/logrotate.d/apilb_nginx'
+    if not os.path.exists(filename):
+        # Set log rotation for apilb log file
+        with open(filename, 'w+') as fp:
+            fp.write(apilb_nginx)
+
+
 @when('nginx.available', 'apiserver.available',
       'certificates.server.cert.available')
 def install_load_balancer(apiserver, tls):
@@ -122,8 +166,16 @@ def install_load_balancer(apiserver, tls):
                 port=port,
                 server_certificate=server_cert_path,
                 server_key=server_key_path,
+                proxy_read_timeout=hookenv.config('proxy_read_timeout')
         )
+
+        maybe_write_apilb_logrotate_config()
         hookenv.status_set('active', 'Loadbalancer ready.')
+
+
+@hook('upgrade-charm')
+def upgrade_charm():
+    maybe_write_apilb_logrotate_config()
 
 
 @when('nginx.available')

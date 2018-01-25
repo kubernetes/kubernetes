@@ -194,15 +194,15 @@ func (nfsMounter *nfsMounter) CanMount() error {
 	exec := nfsMounter.plugin.host.GetExec(nfsMounter.plugin.GetPluginName())
 	switch runtime.GOOS {
 	case "linux":
-		if _, err := exec.Run("/bin/ls", "/sbin/mount.nfs"); err != nil {
+		if _, err := exec.Run("test", "-x", "/sbin/mount.nfs"); err != nil {
 			return fmt.Errorf("Required binary /sbin/mount.nfs is missing")
 		}
-		if _, err := exec.Run("/bin/ls", "/sbin/mount.nfs4"); err != nil {
+		if _, err := exec.Run("test", "-x", "/sbin/mount.nfs4"); err != nil {
 			return fmt.Errorf("Required binary /sbin/mount.nfs4 is missing")
 		}
 		return nil
 	case "darwin":
-		if _, err := exec.Run("/bin/ls", "/sbin/mount_nfs"); err != nil {
+		if _, err := exec.Run("test", "-x", "/sbin/mount_nfs"); err != nil {
 			return fmt.Errorf("Required binary /sbin/mount_nfs is missing")
 		}
 	}
@@ -233,7 +233,7 @@ func (b *nfsMounter) SetUp(fsGroup *int64) error {
 }
 
 func (b *nfsMounter) SetUpAt(dir string, fsGroup *int64) error {
-	notMnt, err := b.mounter.IsLikelyNotMountPoint(dir)
+	notMnt, err := b.mounter.IsNotMountPoint(dir)
 	glog.V(4).Infof("NFS mount set up: %s %v %v", dir, !notMnt, err)
 	if err != nil && !os.IsNotExist(err) {
 		return err
@@ -252,7 +252,7 @@ func (b *nfsMounter) SetUpAt(dir string, fsGroup *int64) error {
 	mountOptions := volume.JoinMountOptions(b.mountOptions, options)
 	err = b.mounter.Mount(source, dir, "nfs", mountOptions)
 	if err != nil {
-		notMnt, mntErr := b.mounter.IsLikelyNotMountPoint(dir)
+		notMnt, mntErr := b.mounter.IsNotMountPoint(dir)
 		if mntErr != nil {
 			glog.Errorf("IsLikelyNotMountPoint check failed: %v", mntErr)
 			return err
@@ -262,7 +262,7 @@ func (b *nfsMounter) SetUpAt(dir string, fsGroup *int64) error {
 				glog.Errorf("Failed to unmount: %v", mntErr)
 				return err
 			}
-			notMnt, mntErr := b.mounter.IsLikelyNotMountPoint(dir)
+			notMnt, mntErr := b.mounter.IsNotMountPoint(dir)
 			if mntErr != nil {
 				glog.Errorf("IsLikelyNotMountPoint check failed: %v", mntErr)
 				return err
@@ -290,7 +290,10 @@ func (c *nfsUnmounter) TearDown() error {
 }
 
 func (c *nfsUnmounter) TearDownAt(dir string) error {
-	return util.UnmountPath(dir, c.mounter)
+	// Use extensiveMountPointCheck to consult /proc/mounts. We can't use faster
+	// IsLikelyNotMountPoint (lstat()), since there may be root_squash on the
+	// NFS server and kubelet may not be able to do lstat/stat() there.
+	return util.UnmountMountPoint(dir, c.mounter, true /* extensiveMountPointCheck */)
 }
 
 func getVolumeSource(spec *volume.Spec) (*v1.NFSVolumeSource, bool, error) {

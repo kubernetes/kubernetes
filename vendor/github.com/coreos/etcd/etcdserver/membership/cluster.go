@@ -178,7 +178,7 @@ func (c *RaftCluster) String() string {
 	fmt.Fprintf(b, "Members:[%s] ", strings.Join(ms, " "))
 	var ids []string
 	for id := range c.removed {
-		ids = append(ids, fmt.Sprintf("%s", id))
+		ids = append(ids, id.String())
 	}
 	fmt.Fprintf(b, "RemovedMemberIDs:[%s]}", strings.Join(ids, " "))
 	return b.String()

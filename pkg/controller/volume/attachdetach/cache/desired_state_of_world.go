@@ -152,7 +152,7 @@ type nodeManaged struct {
 
 	// volumesToAttach is a map containing the set of volumes that should be
 	// attached to this node. The key in the map is the name of the volume and
-	// the value is a pod object containing more information about the volume.
+	// the value is a volumeToAttach object containing more information about the volume.
 	volumesToAttach map[v1.UniqueVolumeName]volumeToAttach
 
 	// keepTerminatedPodVolumes determines if for terminated pods(on this node) - volumes
@@ -160,7 +160,7 @@ type nodeManaged struct {
 	keepTerminatedPodVolumes bool
 }
 
-// The volume object represents a volume that should be attached to a node.
+// The volumeToAttach object represents a volume that should be attached to a node.
 type volumeToAttach struct {
 	// multiAttachErrorReported indicates whether the multi-attach error has been reported for the given volume.
 	// It is used to to prevent reporting the error from being reported more than once for a given volume.

@@ -38,19 +38,28 @@ spec:
       dnsPolicy: Default
       containers:
       - name: metadata-proxy
-        image: gcr.io/google_containers/metadata-proxy:v0.1.4
+        image: gcr.io/google_containers/metadata-proxy:v0.1.9
         securityContext:
           privileged: true
+        # Request and limit resources to get guaranteed QoS.
         resources:
           requests:
-            memory: "32Mi"
+            memory: "25Mi"
             cpu: "30m"
           limits:
-            memory: "32Mi"
+            memory: "25Mi"
             cpu: "30m"
       # BEGIN_PROMETHEUS_TO_SD
       - name: prometheus-to-sd-exporter
         image: gcr.io/google_containers/prometheus-to-sd:v0.2.2
+        # Request and limit resources to get guaranteed QoS.
+        resources:
+          requests:
+            memory: "20Mi"
+            cpu: "2m"
+          limits:
+            memory: "20Mi"
+            cpu: "2m"
         command:
           - /monitor
           - --stackdriver-prefix={{ prometheus_to_sd_prefix }}/addons

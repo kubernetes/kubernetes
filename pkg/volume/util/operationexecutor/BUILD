@@ -39,8 +39,8 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["operation_executor_test.go"],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/pkg/volume/util/operationexecutor",
-    library = ":go_default_library",
     deps = [
         "//pkg/controller/volume/expand/cache:go_default_library",
         "//pkg/util/mount:go_default_library",

@@ -71,6 +71,10 @@ func timeRfc1123Formatted(t time.Time) string {
 	return t.Format(http.TimeFormat)
 }
 
+func timeRFC3339Formatted(t time.Time) string {
+	return t.Format("2006-01-02T15:04:05.0000000Z")
+}
+
 func mergeParams(v1, v2 url.Values) url.Values {
 	out := url.Values{}
 	for k, v := range v1 {
@@ -172,7 +176,7 @@ func addTimeout(params url.Values, timeout uint) url.Values {
 
 func addSnapshot(params url.Values, snapshot *time.Time) url.Values {
 	if snapshot != nil {
-		params.Add("snapshot", snapshot.Format("2006-01-02T15:04:05.0000000Z"))
+		params.Add("snapshot", timeRFC3339Formatted(*snapshot))
 	}
 	return params
 }

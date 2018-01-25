@@ -377,8 +377,7 @@ func newContainerData(containerName string, memoryCache *memory.InMemoryCache, h
 		// Create cpu load reader.
 		loadReader, err := cpuload.New()
 		if err != nil {
-			// TODO(rjnagal): Promote to warning once we support cpu load inside namespaces.
-			glog.Infof("Could not initialize cpu load reader for %q: %s", ref.Name, err)
+			glog.Warningf("Could not initialize cpu load reader for %q: %s", ref.Name, err)
 		} else {
 			cont.loadReader = loadReader
 		}
@@ -467,7 +466,7 @@ func (c *containerData) housekeeping() {
 			stats, err := c.memoryCache.RecentStats(c.info.Name, empty, empty, numSamples)
 			if err != nil {
 				if c.allowErrorLogging() {
-					glog.Infof("[%s] Failed to get recent stats for logging usage: %v", c.info.Name, err)
+					glog.Warningf("[%s] Failed to get recent stats for logging usage: %v", c.info.Name, err)
 				}
 			} else if len(stats) < numSamples {
 				// Ignore, not enough stats yet.
@@ -483,6 +482,7 @@ func (c *containerData) housekeeping() {
 				instantUsageInCores := float64(stats[numSamples-1].Cpu.Usage.Total-stats[numSamples-2].Cpu.Usage.Total) / float64(stats[numSamples-1].Timestamp.Sub(stats[numSamples-2].Timestamp).Nanoseconds())
 				usageInCores := float64(usageCpuNs) / float64(stats[numSamples-1].Timestamp.Sub(stats[0].Timestamp).Nanoseconds())
 				usageInHuman := units.HumanSize(float64(usageMemory))
+				// Don't set verbosity since this is already protected by the logUsage flag.
 				glog.Infof("[%s] %.3f cores (average: %.3f cores), %s of memory", c.info.Name, instantUsageInCores, usageInCores, usageInHuman)
 			}
 		}
@@ -504,7 +504,7 @@ func (c *containerData) housekeepingTick(timer <-chan time.Time, longHousekeepin
 	err := c.updateStats()
 	if err != nil {
 		if c.allowErrorLogging() {
-			glog.Infof("Failed to update stats for container \"%s\": %s", c.info.Name, err)
+			glog.Warning("Failed to update stats for container \"%s\": %s", c.info.Name, err)
 		}
 	}
 	// Log if housekeeping took too long.

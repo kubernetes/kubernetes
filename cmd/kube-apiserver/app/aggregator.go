@@ -38,6 +38,7 @@ import (
 	kubeexternalinformers "k8s.io/client-go/informers"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration"
+	"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1"
 	aggregatorapiserver "k8s.io/kube-aggregator/pkg/apiserver"
 	apiregistrationclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/internalclientset/typed/apiregistration/internalversion"
@@ -58,8 +59,16 @@ func createAggregatorConfig(kubeAPIServerConfig genericapiserver.Config, command
 
 	// copy the etcd options so we don't mutate originals.
 	etcdOptions := *commandOptions.Etcd
-	etcdOptions.StorageConfig.Codec = aggregatorapiserver.Codecs.LegacyCodec(v1beta1.SchemeGroupVersion)
+	etcdOptions.StorageConfig.Codec = aggregatorapiserver.Codecs.LegacyCodec(v1beta1.SchemeGroupVersion, v1.SchemeGroupVersion)
 	genericConfig.RESTOptionsGetter = &genericoptions.SimpleRestOptionsFactory{Options: etcdOptions}
+
+	// override MergedResourceConfig with aggregator defaults and registry
+	if err := commandOptions.APIEnablement.ApplyTo(
+		&genericConfig,
+		aggregatorapiserver.DefaultAPIResourceConfigSource(),
+		aggregatorapiserver.Registry); err != nil {
+		return nil, err
+	}
 
 	var err error
 	var certBytes, keyBytes []byte
@@ -187,8 +196,12 @@ func makeAPIServiceAvailableHealthzCheck(name string, apiServices []*apiregistra
 	})
 }
 
+// priority defines group priority that is used in discovery. This controls
+// group position in the kubectl output.
 type priority struct {
-	group   int32
+	// group indicates the order of the group relative to other groups.
+	group int32
+	// version indicates the relative order of the version inside of its group.
 	version int32
 }
 
@@ -226,9 +239,13 @@ var apiVersionPriorities = map[schema.GroupVersion]priority{
 	{Group: "storage.k8s.io", Version: "v1beta1"}:                {group: 16800, version: 9},
 	{Group: "storage.k8s.io", Version: "v1alpha1"}:               {group: 16800, version: 1},
 	{Group: "apiextensions.k8s.io", Version: "v1beta1"}:          {group: 16700, version: 9},
+	{Group: "admissionregistration.k8s.io", Version: "v1"}:       {group: 16700, version: 15},
 	{Group: "admissionregistration.k8s.io", Version: "v1beta1"}:  {group: 16700, version: 12},
 	{Group: "admissionregistration.k8s.io", Version: "v1alpha1"}: {group: 16700, version: 9},
 	{Group: "scheduling.k8s.io", Version: "v1alpha1"}:            {group: 16600, version: 9},
+	// Append a new group to the end of the list if unsure.
+	// You can use min(existing group)-100 as the initial value for a group.
+	// Version can be set to 9 (to have space around) for a new group.
 }
 
 func apiServicesToRegister(delegateAPIServer genericapiserver.DelegationTarget, registration autoregister.AutoAPIServiceRegistration) []*apiregistration.APIService {

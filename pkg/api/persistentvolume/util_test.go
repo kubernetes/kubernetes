@@ -61,8 +61,15 @@ func TestPVSecrets(t *testing.T) {
 		{Spec: api.PersistentVolumeSpec{
 			ClaimRef: &api.ObjectReference{Namespace: "claimrefns", Name: "claimrefname"},
 			PersistentVolumeSource: api.PersistentVolumeSource{
-				FlexVolume: &api.FlexVolumeSource{
-					SecretRef: &api.LocalObjectReference{
+				FlexVolume: &api.FlexPersistentVolumeSource{
+					SecretRef: &api.SecretReference{
+						Name:      "Spec.PersistentVolumeSource.FlexVolume.SecretRef",
+						Namespace: "flexns"}}}}},
+		{Spec: api.PersistentVolumeSpec{
+			ClaimRef: &api.ObjectReference{Namespace: "claimrefns", Name: "claimrefname"},
+			PersistentVolumeSource: api.PersistentVolumeSource{
+				FlexVolume: &api.FlexPersistentVolumeSource{
+					SecretRef: &api.SecretReference{
 						Name: "Spec.PersistentVolumeSource.FlexVolume.SecretRef"}}}}},
 		{Spec: api.PersistentVolumeSpec{
 			ClaimRef: &api.ObjectReference{Namespace: "claimrefns", Name: "claimrefname"},
@@ -160,15 +167,22 @@ func TestPVSecrets(t *testing.T) {
 	expectedNamespacedNames := sets.NewString(
 		"claimrefns/Spec.PersistentVolumeSource.AzureFile.SecretName",
 		"Spec.PersistentVolumeSource.AzureFile.SecretNamespace/Spec.PersistentVolumeSource.AzureFile.SecretName",
+
 		"claimrefns/Spec.PersistentVolumeSource.CephFS.SecretRef",
 		"cephfs/Spec.PersistentVolumeSource.CephFS.SecretRef",
+
 		"claimrefns/Spec.PersistentVolumeSource.FlexVolume.SecretRef",
+		"flexns/Spec.PersistentVolumeSource.FlexVolume.SecretRef",
+
 		"claimrefns/Spec.PersistentVolumeSource.RBD.SecretRef",
 		"rbdns/Spec.PersistentVolumeSource.RBD.SecretRef",
+
 		"claimrefns/Spec.PersistentVolumeSource.ScaleIO.SecretRef",
 		"scaleions/Spec.PersistentVolumeSource.ScaleIO.SecretRef",
+
 		"claimrefns/Spec.PersistentVolumeSource.ISCSI.SecretRef",
 		"iscsi/Spec.PersistentVolumeSource.ISCSI.SecretRef",
+
 		"storageosns/Spec.PersistentVolumeSource.StorageOS.SecretRef",
 	)
 	if missingNames := expectedNamespacedNames.Difference(extractedNamesWithNamespace); len(missingNames) > 0 {

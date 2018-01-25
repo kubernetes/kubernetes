@@ -48,6 +48,7 @@ const (
 	storageGroup        = "storage.k8s.io"
 	resMetricsGroup     = "metrics.k8s.io"
 	customMetricsGroup  = "custom.metrics.k8s.io"
+	networkingGroup     = "networking.k8s.io"
 )
 
 func addDefaultMetadata(obj runtime.Object) {
@@ -143,6 +144,12 @@ func NodeRules() []rbac.PolicyRule {
 		pvcStatusPolicyRule := rbac.NewRule("get", "update", "patch").Groups(legacyGroup).Resources("persistentvolumeclaims/status").RuleOrDie()
 		nodePolicyRules = append(nodePolicyRules, pvcStatusPolicyRule)
 	}
+
+	// CSI
+	if utilfeature.DefaultFeatureGate.Enabled(features.CSIPersistentVolume) {
+		volAttachRule := rbac.NewRule("get").Groups(storageGroup).Resources("volumeattachments").RuleOrDie()
+		nodePolicyRules = append(nodePolicyRules, volAttachRule)
+	}
 	return nodePolicyRules
 }
 
@@ -162,7 +169,7 @@ func ClusterRoles() []rbac.ClusterRole {
 			ObjectMeta: metav1.ObjectMeta{Name: "system:discovery"},
 			Rules: []rbac.PolicyRule{
 				rbac.NewRule("get").URLs(
-					"/healthz", "/version",
+					"/healthz", "/version", "/version/",
 					// remove once swagger 1.2 support is removed
 					"/swaggerapi", "/swaggerapi/*",
 					// do not expand this pattern for openapi discovery docs
@@ -231,9 +238,12 @@ func ClusterRoles() []rbac.ClusterRole {
 
 				rbac.NewRule(ReadWrite...).Groups(extensionsGroup).Resources("daemonsets",
 					"deployments", "deployments/scale", "deployments/rollback", "ingresses",
-					"replicasets", "replicasets/scale", "replicationcontrollers/scale").RuleOrDie(),
+					"replicasets", "replicasets/scale", "replicationcontrollers/scale",
+					"networkpolicies").RuleOrDie(),
 
 				rbac.NewRule(ReadWrite...).Groups(policyGroup).Resources("poddisruptionbudgets").RuleOrDie(),
+
+				rbac.NewRule(ReadWrite...).Groups(networkingGroup).Resources("networkpolicies").RuleOrDie(),
 
 				// additional admin powers
 				rbac.NewRule("create").Groups(authorizationGroup).Resources("localsubjectaccessreviews").RuleOrDie(),
@@ -267,9 +277,12 @@ func ClusterRoles() []rbac.ClusterRole {
 
 				rbac.NewRule(ReadWrite...).Groups(extensionsGroup).Resources("daemonsets",
 					"deployments", "deployments/scale", "deployments/rollback", "ingresses",
-					"replicasets", "replicasets/scale", "replicationcontrollers/scale").RuleOrDie(),
+					"replicasets", "replicasets/scale", "replicationcontrollers/scale",
+					"networkpolicies").RuleOrDie(),
 
 				rbac.NewRule(ReadWrite...).Groups(policyGroup).Resources("poddisruptionbudgets").RuleOrDie(),
+
+				rbac.NewRule(ReadWrite...).Groups(networkingGroup).Resources("networkpolicies").RuleOrDie(),
 			},
 		},
 		{
@@ -295,9 +308,12 @@ func ClusterRoles() []rbac.ClusterRole {
 				rbac.NewRule(Read...).Groups(batchGroup).Resources("jobs", "cronjobs").RuleOrDie(),
 
 				rbac.NewRule(Read...).Groups(extensionsGroup).Resources("daemonsets", "deployments", "deployments/scale",
-					"ingresses", "replicasets", "replicasets/scale", "replicationcontrollers/scale").RuleOrDie(),
+					"ingresses", "replicasets", "replicasets/scale", "replicationcontrollers/scale",
+					"networkpolicies").RuleOrDie(),
 
 				rbac.NewRule(Read...).Groups(policyGroup).Resources("poddisruptionbudgets").RuleOrDie(),
+
+				rbac.NewRule(Read...).Groups(networkingGroup).Resources("networkpolicies").RuleOrDie(),
 			},
 		},
 		{
@@ -332,6 +348,17 @@ func ClusterRoles() []rbac.ClusterRole {
 				rbac.NewRule("get").Groups(legacyGroup).Resources("nodes").RuleOrDie(),
 
 				eventsRule(),
+			},
+		},
+		{
+			// a role to use for full access to the kubelet API
+			ObjectMeta: metav1.ObjectMeta{Name: "system:kubelet-api-admin"},
+			Rules: []rbac.PolicyRule{
+				// Allow read-only access to the Node API objects
+				rbac.NewRule("get", "list", "watch").Groups(legacyGroup).Resources("nodes").RuleOrDie(),
+				// Allow all API calls to the nodes
+				rbac.NewRule("proxy").Groups(legacyGroup).Resources("nodes").RuleOrDie(),
+				rbac.NewRule("*").Groups(legacyGroup).Resources("nodes/proxy", "nodes/metrics", "nodes/spec", "nodes/stats", "nodes/log").RuleOrDie(),
 			},
 		},
 		{
@@ -423,6 +450,13 @@ func ClusterRoles() []rbac.ClusterRole {
 			},
 		},
 		{
+			ObjectMeta: metav1.ObjectMeta{Name: "system:aws-cloud-provider"},
+			Rules: []rbac.PolicyRule{
+				rbac.NewRule("get", "patch").Groups(legacyGroup).Resources("nodes").RuleOrDie(),
+				eventsRule(),
+			},
+		},
+		{
 			// a role making the csrapprover controller approve a node client CSR
 			ObjectMeta: metav1.ObjectMeta{Name: "system:certificates.k8s.io:certificatesigningrequests:nodeclient"},
 			Rules: []rbac.PolicyRule{
@@ -476,6 +510,7 @@ func ClusterRoleBindings() []rbac.ClusterRoleBinding {
 		rbac.NewClusterBinding("system:kube-controller-manager").Users(user.KubeControllerManager).BindingOrDie(),
 		rbac.NewClusterBinding("system:kube-dns").SAs("kube-system", "kube-dns").BindingOrDie(),
 		rbac.NewClusterBinding("system:kube-scheduler").Users(user.KubeScheduler).BindingOrDie(),
+		rbac.NewClusterBinding("system:aws-cloud-provider").SAs("kube-system", "aws-cloud-provider").BindingOrDie(),
 
 		// This default binding of the system:node role to the system:nodes group is deprecated in 1.7 with the availability of the Node authorizer.
 		// This leaves the binding, but with an empty set of subjects, so that tightening reconciliation can remove the subject.

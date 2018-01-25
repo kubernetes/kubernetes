@@ -1,19 +1,20 @@
 language: go
 
 go:
-  - 1.6.3
-  - 1.7
-  - 1.8
+  - 1.7.x
+  - 1.8.x
+  - 1.9.x
+
+matrix:
+  include:
+  - go: 1.9.x
+    env: ARCH=386
 
 go_import_path: google.golang.org/grpc
 
 before_install:
-  - go get github.com/golang/lint/golint
-  - go get -u golang.org/x/tools/cmd/goimports github.com/axw/gocov/gocov github.com/mattn/goveralls golang.org/x/tools/cmd/cover
+  - if [[ "$TRAVIS_GO_VERSION" = 1.9* && "$ARCH" != "386" ]]; then ./vet.sh -install || exit 1; fi
 
 script:
-  - '! gofmt -s -d -l . 2>&1 | read'
-  - '! goimports -l . | read'
-  - '! golint ./... | grep -vE "(_mock|_string|\.pb)\.go:"'
-  - '! go tool vet -all . 2>&1 | grep -vE "constant [0-9]+ not a string in call to Errorf" | grep -vF .pb.go:' # https://github.com/golang/protobuf/issues/214
+  - if [[ "$TRAVIS_GO_VERSION" = 1.9* && "$ARCH" != "386" ]]; then ./vet.sh || exit 1; fi
   - make test testrace

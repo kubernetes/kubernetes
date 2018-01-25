@@ -39,7 +39,7 @@ const (
 	// DefaultClusterDNSIP defines default DNS IP
 	DefaultClusterDNSIP = "10.96.0.10"
 	// DefaultKubernetesVersion defines default kubernetes version
-	DefaultKubernetesVersion = "stable-1.8"
+	DefaultKubernetesVersion = "stable-1.9"
 	// DefaultAPIBindPort defines default API port
 	DefaultAPIBindPort = 6443
 	// DefaultAuthorizationModes defines default authorization modes
@@ -65,7 +65,7 @@ const (
 	DefaultProxyBindAddressv4 = "0.0.0.0"
 	// DefaultProxyBindAddressv6 is the default bind address when the advertise address is v6
 	DefaultProxyBindAddressv6 = "::"
-	// KubeproxyKubeConfigFileName efines the file name for the kube-proxy's KubeConfig file
+	// KubeproxyKubeConfigFileName defines the file name for the kube-proxy's KubeConfig file
 	KubeproxyKubeConfigFileName = "/var/lib/kube-proxy/kubeconfig.conf"
 )
 
@@ -156,26 +156,24 @@ func SetDefaults_NodeConfiguration(obj *NodeConfiguration) {
 	}
 }
 
-// SetDefaultsEtcdSelfHosted sets defaults for self-hosted etcd
+// SetDefaultsEtcdSelfHosted sets defaults for self-hosted etcd if used
 func SetDefaultsEtcdSelfHosted(obj *MasterConfiguration) {
-	if obj.Etcd.SelfHosted == nil {
-		obj.Etcd.SelfHosted = &SelfHostedEtcd{}
-	}
+	if obj.Etcd.SelfHosted != nil {
+		if obj.Etcd.SelfHosted.ClusterServiceName == "" {
+			obj.Etcd.SelfHosted.ClusterServiceName = DefaultEtcdClusterServiceName
+		}
 
-	if obj.Etcd.SelfHosted.ClusterServiceName == "" {
-		obj.Etcd.SelfHosted.ClusterServiceName = DefaultEtcdClusterServiceName
-	}
+		if obj.Etcd.SelfHosted.EtcdVersion == "" {
+			obj.Etcd.SelfHosted.EtcdVersion = constants.DefaultEtcdVersion
+		}
 
-	if obj.Etcd.SelfHosted.EtcdVersion == "" {
-		obj.Etcd.SelfHosted.EtcdVersion = constants.DefaultEtcdVersion
-	}
+		if obj.Etcd.SelfHosted.OperatorVersion == "" {
+			obj.Etcd.SelfHosted.OperatorVersion = DefaultEtcdOperatorVersion
+		}
 
-	if obj.Etcd.SelfHosted.OperatorVersion == "" {
-		obj.Etcd.SelfHosted.OperatorVersion = DefaultEtcdOperatorVersion
-	}
-
-	if obj.Etcd.SelfHosted.CertificatesDir == "" {
-		obj.Etcd.SelfHosted.CertificatesDir = DefaultEtcdCertDir
+		if obj.Etcd.SelfHosted.CertificatesDir == "" {
+			obj.Etcd.SelfHosted.CertificatesDir = DefaultEtcdCertDir
+		}
 	}
 }
 
@@ -186,9 +184,6 @@ func SetDefaults_KubeletConfiguration(obj *MasterConfiguration) {
 	}
 	if obj.KubeletConfiguration.BaseConfig.PodManifestPath == "" {
 		obj.KubeletConfiguration.BaseConfig.PodManifestPath = DefaultManifestsDir
-	}
-	if obj.KubeletConfiguration.BaseConfig.AllowPrivileged == nil {
-		obj.KubeletConfiguration.BaseConfig.AllowPrivileged = utilpointer.BoolPtr(true)
 	}
 	if obj.KubeletConfiguration.BaseConfig.ClusterDNS == nil {
 		dnsIP, err := constants.GetDNSIP(obj.Networking.ServiceSubnet)

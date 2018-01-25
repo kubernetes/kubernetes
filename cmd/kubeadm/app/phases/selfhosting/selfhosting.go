@@ -21,7 +21,7 @@ import (
 	"os"
 	"time"
 
-	apps "k8s.io/api/apps/v1beta2"
+	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -52,7 +52,7 @@ const (
 // 8. In order to avoid race conditions, we have to make sure that static pod is deleted correctly before we continue
 //      Otherwise, there is a race condition when we proceed without kubelet having restarted the API server correctly and the next .Create call flakes
 // 9. Do that for the kube-apiserver, kube-controller-manager and kube-scheduler in a loop
-func CreateSelfHostedControlPlane(manifestsDir, kubeConfigDir string, cfg *kubeadmapi.MasterConfiguration, client clientset.Interface, waiter apiclient.Waiter) error {
+func CreateSelfHostedControlPlane(manifestsDir, kubeConfigDir string, cfg *kubeadmapi.MasterConfiguration, client clientset.Interface, waiter apiclient.Waiter, dryRun bool) error {
 
 	// Adjust the timeout slightly to something self-hosting specific
 	waiter.SetTimeout(selfHostingWaitTimeout)
@@ -104,13 +104,15 @@ func CreateSelfHostedControlPlane(manifestsDir, kubeConfigDir string, cfg *kubea
 			return err
 		}
 
-		// Remove the old Static Pod manifest
-		if err := os.RemoveAll(manifestPath); err != nil {
-			return fmt.Errorf("unable to delete static pod manifest for %s [%v]", componentName, err)
+		// Remove the old Static Pod manifest if not dryrunning
+		if !dryRun {
+			if err := os.RemoveAll(manifestPath); err != nil {
+				return fmt.Errorf("unable to delete static pod manifest for %s [%v]", componentName, err)
+			}
 		}
 
 		// Wait for the mirror Pod hash to be removed; otherwise we'll run into race conditions here when the kubelet hasn't had time to
-		// remove the Static Pod (or the mirror Pod respectively). This implicitely also tests that the API server endpoint is healthy,
+		// remove the Static Pod (or the mirror Pod respectively). This implicitly also tests that the API server endpoint is healthy,
 		// because this blocks until the API server returns a 404 Not Found when getting the Static Pod
 		staticPodName := fmt.Sprintf("%s-%s", componentName, cfg.NodeName)
 		if err := waiter.WaitForPodToDisappear(staticPodName); err != nil {
@@ -127,7 +129,7 @@ func CreateSelfHostedControlPlane(manifestsDir, kubeConfigDir string, cfg *kubea
 	return nil
 }
 
-// BuildDaemonSet is responsible for mutating the PodSpec and return a DaemonSet which is suitable for the self-hosting purporse
+// BuildDaemonSet is responsible for mutating the PodSpec and returns a DaemonSet which is suitable for self-hosting
 func BuildDaemonSet(name string, podSpec *v1.PodSpec, mutators map[string][]PodSpecMutatorFunc) *apps.DaemonSet {
 
 	// Mutate the PodSpec so it's suitable for self-hosting

@@ -52,14 +52,14 @@ func TestPrintConfiguration(t *testing.T) {
 	  keyFile: ""
 	imageRepository: ""
 	kubeProxy: {}
-	kubeletConfiguration:
-	  baseConfig: null
+	kubeletConfiguration: {}
 	kubernetesVersion: v1.7.1
 	networking:
 	  dnsDomain: ""
 	  podSubnet: ""
 	  serviceSubnet: ""
 	nodeName: ""
+	privilegedPods: false
 	token: ""
 	unifiedControlPlaneImage: ""
 `),
@@ -86,14 +86,14 @@ func TestPrintConfiguration(t *testing.T) {
 	  keyFile: ""
 	imageRepository: ""
 	kubeProxy: {}
-	kubeletConfiguration:
-	  baseConfig: null
+	kubeletConfiguration: {}
 	kubernetesVersion: v1.7.1
 	networking:
 	  dnsDomain: ""
 	  podSubnet: ""
 	  serviceSubnet: 10.96.0.1/12
 	nodeName: ""
+	privilegedPods: false
 	token: ""
 	unifiedControlPlaneImage: ""
 `),
@@ -130,14 +130,14 @@ func TestPrintConfiguration(t *testing.T) {
 	    operatorVersion: v0.1.0
 	imageRepository: ""
 	kubeProxy: {}
-	kubeletConfiguration:
-	  baseConfig: null
+	kubeletConfiguration: {}
 	kubernetesVersion: v1.7.1
 	networking:
 	  dnsDomain: ""
 	  podSubnet: ""
 	  serviceSubnet: ""
 	nodeName: ""
+	privilegedPods: false
 	token: ""
 	unifiedControlPlaneImage: ""
 `),

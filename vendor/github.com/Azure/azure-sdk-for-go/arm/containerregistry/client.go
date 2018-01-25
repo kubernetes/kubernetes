@@ -1,6 +1,6 @@
 // Package containerregistry implements the Azure ARM Containerregistry service API version 2017-10-01.
 //
-//
+// Deprecated: Please instead use github.com/Azure/azure-sdk-for-go/services/containerregistry/mgmt/2017-10-01/containerregistry
 package containerregistry
 
 // Copyright (c) Microsoft and contributors.  All rights reserved.

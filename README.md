@@ -55,7 +55,7 @@ $ cd kubernetes
 $ make quick-release
 ```
 
-If you are less impatient, head over to the [developer's documentation].
+For the full story, head over to the [developer's documentation].
 
 ## Support
 
@@ -71,7 +71,7 @@ That said, if you have questions, reach out to us
 [communication]: https://github.com/kubernetes/community/blob/master/communication.md
 [community repository]: https://github.com/kubernetes/community
 [containerized applications]: https://kubernetes.io/docs/concepts/overview/what-is-kubernetes/
-[developer's documentation]: https://github.com/kubernetes/community/tree/master/contributors/devel
+[developer's documentation]: https://github.com/kubernetes/community/tree/master/contributors/devel#readme
 [Docker environment]: https://docs.docker.com/engine
 [Go environment]: https://golang.org/doc/install
 [GoDoc]: https://godoc.org/k8s.io/kubernetes
@@ -81,6 +81,6 @@ That said, if you have questions, reach out to us
 [Scalable Microservices with Kubernetes]: https://www.udacity.com/course/scalable-microservices-with-kubernetes--ud615
 [Submit Queue]: http://submit-queue.k8s.io/#/ci
 [Submit Queue Widget]: http://submit-queue.k8s.io/health.svg?v=1
-[troubleshooting guide]: https://kubernetes.io/docs/tasks/debug-application-cluster/troubleshooting/ 
+[troubleshooting guide]: https://kubernetes.io/docs/tasks/debug-application-cluster/troubleshooting/
 
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/README.md?pixel)]()

@@ -57,9 +57,11 @@ data:
   Corefile: |
     .:53 {
         errors
-        log stdout
+        log
         health
-        kubernetes $DNS_DOMAIN $SERVICE_CLUSTER_IP_RANGE
+        kubernetes $DNS_DOMAIN $SERVICE_CLUSTER_IP_RANGE {
+            pods insecure
+        }
         prometheus
         proxy . /etc/resolv.conf
         cache 30
@@ -93,7 +95,7 @@ spec:
           operator: "Exists"
       containers:
       - name: coredns
-        image: coredns/coredns:0.9.10
+        image: coredns/coredns:1.0.1
         imagePullPolicy: IfNotPresent
         resources:
           limits:

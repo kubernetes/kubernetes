@@ -162,9 +162,17 @@ func (expc *expandController) Run(stopCh <-chan struct{}) {
 
 func (expc *expandController) deletePVC(obj interface{}) {
 	pvc, ok := obj.(*v1.PersistentVolumeClaim)
-
-	if pvc == nil || !ok {
-		return
+	if !ok {
+		tombstone, ok := obj.(kcache.DeletedFinalStateUnknown)
+		if !ok {
+			runtime.HandleError(fmt.Errorf("couldn't get object from tombstone %+v", obj))
+			return
+		}
+		pvc, ok = tombstone.Obj.(*v1.PersistentVolumeClaim)
+		if !ok {
+			runtime.HandleError(fmt.Errorf("tombstone contained object that is not a pvc %#v", obj))
+			return
+		}
 	}
 
 	expc.resizeMap.DeletePVC(pvc)
@@ -276,4 +284,8 @@ func (expc *expandController) GetConfigMapFunc() func(namespace, name string) (*
 
 func (expc *expandController) GetNodeLabels() (map[string]string, error) {
 	return nil, fmt.Errorf("GetNodeLabels unsupported in expandController")
+}
+
+func (expc *expandController) GetNodeName() types.NodeName {
+	return ""
 }

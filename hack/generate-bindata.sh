@@ -22,7 +22,7 @@ if [[ -z "${KUBE_ROOT:-}" ]]; then
 	KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 fi
 
-source "${KUBE_ROOT}/cluster/lib/logging.sh"
+source "${KUBE_ROOT}/hack/lib/logging.sh"
 
 if [[ ! -d "${KUBE_ROOT}/examples" ]]; then
 	echo "${KUBE_ROOT}/examples not detected.  This script should be run from a location where the source dirs are available."
@@ -39,7 +39,7 @@ if ! which go-bindata &>/dev/null ; then
 fi
 
 # run the generation from the root directory for stable output
-pushd "${KUBE_ROOT}"
+pushd "${KUBE_ROOT}" >/dev/null
 
 # These are files for e2e tests.
 BINDATA_OUTPUT="test/e2e/generated/bindata.go"
@@ -84,4 +84,4 @@ fi
 
 rm -f "${BINDATA_OUTPUT}.tmp"
 
-popd
+popd >/dev/null

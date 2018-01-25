@@ -303,7 +303,7 @@ func (c *BlobDiskController) DeleteBlobDisk(diskURI string) error {
 func (c *BlobDiskController) setUniqueStrings() {
 	uniqueString := c.common.resourceGroup + c.common.location + c.common.subscriptionID
 	hash := MakeCRC32(uniqueString)
-	//used to generate a unqie container name used by this cluster PVC
+	//used to generate a unique container name used by this cluster PVC
 	defaultContainerName = hash
 
 	storageAccountNamePrefix = fmt.Sprintf(storageAccountNameTemplate, hash)
@@ -359,13 +359,13 @@ func (c *BlobDiskController) ensureDefaultContainer(storageAccountName string) e
 	var err error
 	var blobSvc azstorage.BlobStorageClient
 
-	// short circut the check via local cache
+	// short circuit the check via local cache
 	// we are forgiving the fact that account may not be in cache yet
 	if v, ok := c.accounts[storageAccountName]; ok && v.defaultContainerCreated {
 		return nil
 	}
 
-	// not cached, check existance and readiness
+	// not cached, check existence and readiness
 	bExist, provisionState, _ := c.getStorageAccountState(storageAccountName)
 
 	// account does not exist
@@ -392,7 +392,7 @@ func (c *BlobDiskController) ensureDefaultContainer(storageAccountName string) e
 			c.accounts[storageAccountName].isValidating = 0
 		}()
 
-		// short circut the check again.
+		// short circuit the check again.
 		if v, ok := c.accounts[storageAccountName]; ok && v.defaultContainerCreated {
 			return nil
 		}
@@ -471,7 +471,7 @@ func (c *BlobDiskController) getDiskCount(SAName string) (int, error) {
 }
 
 func (c *BlobDiskController) getAllStorageAccounts() (map[string]*storageAccountState, error) {
-	accountListResult, err := c.common.cloud.StorageAccountClient.List()
+	accountListResult, err := c.common.cloud.StorageAccountClient.ListByResourceGroup(c.common.resourceGroup)
 	if err != nil {
 		return nil, err
 	}
@@ -519,7 +519,7 @@ func (c *BlobDiskController) createStorageAccount(storageAccountName string, sto
 			return fmt.Errorf("azureDisk - can not create new storage account, current storage accounts count:%v Max is:%v", len(c.accounts), maxStorageAccounts)
 		}
 
-		glog.V(2).Infof("azureDisk - Creating storage account %s type %s \n", storageAccountName, string(storageAccountType))
+		glog.V(2).Infof("azureDisk - Creating storage account %s type %s", storageAccountName, string(storageAccountType))
 
 		cp := storage.AccountCreateParameters{
 			Sku:      &storage.Sku{Name: storageAccountType},
@@ -542,14 +542,6 @@ func (c *BlobDiskController) createStorageAccount(storageAccountName string, sto
 		c.addAccountState(storageAccountName, newAccountState)
 	}
 
-	if !bExist {
-		// SA Accounts takes time to be provisioned
-		// so if this account was just created allow it sometime
-		// before polling
-		glog.V(2).Infof("azureDisk - storage account %s was just created, allowing time before polling status", storageAccountName)
-		time.Sleep(25 * time.Second) // as observed 25 is the average time for SA to be provisioned
-	}
-
 	// finally, make sure that we default container is created
 	// before handing it back over
 	return c.ensureDefaultContainer(storageAccountName)
@@ -567,9 +559,9 @@ func (c *BlobDiskController) findSANameForDisk(storageAccountType storage.SkuNam
 			continue
 		}
 
-		// note: we compute avge stratified by type.
-		// this to enable user to grow per SA type to avoid low
-		//avg utilization on one account type skewing all data.
+		// note: we compute avg stratified by type.
+		// this is to enable user to grow per SA type to avoid low
+		// avg utilization on one account type skewing all data.
 
 		if v.saType == storageAccountType {
 			// compute average
@@ -582,7 +574,7 @@ func (c *BlobDiskController) findSANameForDisk(storageAccountType storage.SkuNam
 			// empty account
 			if dCount == 0 {
 				glog.V(2).Infof("azureDisk - account %s identified for a new disk  is because it has 0 allocated disks", v.name)
-				return v.name, nil // shortcircut, avg is good and no need to adjust
+				return v.name, nil // short circuit, avg is good and no need to adjust
 			}
 			// if this account is less allocated
 			if dCount < maxDiskCount {
@@ -608,7 +600,7 @@ func (c *BlobDiskController) findSANameForDisk(storageAccountType storage.SkuNam
 	avgUtilization := float64(disksAfter) / float64(countAccounts*maxDisksPerStorageAccounts)
 	aboveAvg := (avgUtilization > storageAccountUtilizationBeforeGrowing)
 
-	// avg are not create and we should craete more accounts if we can
+	// avg are not create and we should create more accounts if we can
 	if aboveAvg && countAccounts < maxStorageAccounts {
 		glog.V(2).Infof("azureDisk - shared storageAccounts utilzation(%v) >  grow-at-avg-utilization (%v). New storage account will be created", avgUtilization, storageAccountUtilizationBeforeGrowing)
 		SAName = getAccountNameForNum(c.getNextAccountNum())
@@ -619,7 +611,7 @@ func (c *BlobDiskController) findSANameForDisk(storageAccountType storage.SkuNam
 		return SAName, nil
 	}
 
-	// avergates are not ok and we are at capacity(max storage accounts allowed)
+	// averages are not ok and we are at capacity (max storage accounts allowed)
 	if aboveAvg && countAccounts == maxStorageAccounts {
 		glog.Infof("azureDisk - shared storageAccounts utilzation(%v) > grow-at-avg-utilization (%v). But k8s maxed on SAs for PVC(%v). k8s will now exceed grow-at-avg-utilization without adding accounts",
 			avgUtilization, storageAccountUtilizationBeforeGrowing, maxStorageAccounts)

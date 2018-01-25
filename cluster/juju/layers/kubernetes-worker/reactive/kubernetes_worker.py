@@ -14,6 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import json
 import os
 import random
 import shutil
@@ -61,6 +62,10 @@ def upgrade_charm():
 
     cleanup_pre_snap_services()
     check_resources_for_upgrade_needed()
+
+    # Remove the RC for nginx ingress if it exists
+    if hookenv.config().get('ingress'):
+        kubectl_success('delete', 'rc', 'nginx-ingress-controller')
 
     # Remove gpu.enabled state so we can reconfigure gpu-related kubelet flags,
     # since they can differ between k8s versions
@@ -157,7 +162,7 @@ def shutdown():
     '''
     try:
         if os.path.isfile(kubeconfig_path):
-            kubectl('delete', 'node', gethostname())
+            kubectl('delete', 'node', gethostname().lower())
     except CalledProcessError:
         hookenv.log('Failed to unregister node.')
     service_stop('snap.kubelet.daemon')
@@ -270,17 +275,34 @@ def update_kubelet_status():
         hookenv.status_set('waiting', msg)
 
 
-@when('certificates.available')
-def send_data(tls):
+def get_ingress_address(relation):
+    try:
+        network_info = hookenv.network_get(relation.relation_name)
+    except NotImplementedError:
+        network_info = []
+
+    if network_info and 'ingress-addresses' in network_info:
+        # just grab the first one for now, maybe be more robust here?
+        return network_info['ingress-addresses'][0]
+    else:
+        # if they don't have ingress-addresses they are running a juju that
+        # doesn't support spaces, so just return the private address
+        return hookenv.unit_get('private-address')
+
+
+@when('certificates.available', 'kube-control.connected')
+def send_data(tls, kube_control):
     '''Send the data that is required to create a server certificate for
     this server.'''
     # Use the public ip of this unit as the Common Name for the certificate.
     common_name = hookenv.unit_public_ip()
 
+    ingress_ip = get_ingress_address(kube_control)
+
     # Create SANs that the tls layer will add to the server cert.
     sans = [
         hookenv.unit_public_ip(),
-        hookenv.unit_private_ip(),
+        ingress_ip,
         gethostname()
     ]
 
@@ -323,6 +345,7 @@ def start_worker(kube_api, kube_control, auth_control, cni):
     # the correct DNS even though the server isn't ready yet.
 
     dns = kube_control.get_dns()
+    ingress_ip = get_ingress_address(kube_control)
     cluster_cidr = cni.get_config()['cidr']
 
     if cluster_cidr is None:
@@ -336,7 +359,7 @@ def start_worker(kube_api, kube_control, auth_control, cni):
     set_privileged()
 
     create_config(random.choice(servers), creds)
-    configure_kubelet(dns)
+    configure_kubelet(dns, ingress_ip)
     configure_kube_proxy(servers, cluster_cidr)
     set_state('kubernetes-worker.config.created')
     restart_unit_services()
@@ -372,7 +395,7 @@ def sdn_changed():
 @when('kubernetes-worker.config.created')
 @when_not('kubernetes-worker.ingress.available')
 def render_and_launch_ingress():
-    ''' If configuration has ingress RC enabled, launch the ingress load
+    ''' If configuration has ingress daemon set enabled, launch the ingress load
     balancer and default http backend. Otherwise attempt deletion. '''
     config = hookenv.config()
     # If ingress is enabled, launch the ingress controller
@@ -383,21 +406,9 @@ def render_and_launch_ingress():
         kubectl_manifest('delete',
                          '/root/cdk/addons/default-http-backend.yaml')
         kubectl_manifest('delete',
-                         '/root/cdk/addons/ingress-replication-controller.yaml')  # noqa
+                         '/root/cdk/addons/ingress-daemon-set.yaml')  # noqa
         hookenv.close_port(80)
         hookenv.close_port(443)
-
-
-@when('kubernetes-worker.ingress.available')
-def scale_ingress_controller():
-    ''' Scale the number of ingress controller replicas to match the number of
-    nodes. '''
-    try:
-        output = kubectl('get', 'nodes', '-o', 'name')
-        count = len(output.splitlines())
-        kubectl('scale', '--replicas=%d' % count, 'rc/nginx-ingress-controller')  # noqa
-    except CalledProcessError:
-        hookenv.log('Failed to scale ingress controllers. Will attempt again next update.')  # noqa
 
 
 @when('config.changed.labels', 'kubernetes-worker.config.created')
@@ -428,10 +439,40 @@ def apply_node_labels():
     for label in user_labels:
         _apply_node_label(label, overwrite=True)
 
+    # Set label for application name
+    _apply_node_label('juju-application={}'.format(hookenv.service_name()),
+                      overwrite=True)
+
 
 @when_any('config.changed.kubelet-extra-args',
           'config.changed.proxy-extra-args')
 def extra_args_changed():
+    set_state('kubernetes-worker.restart-needed')
+
+
+@when('config.changed.docker-logins')
+def docker_logins_changed():
+    config = hookenv.config()
+    previous_logins = config.previous('docker-logins')
+    logins = config['docker-logins']
+    logins = json.loads(logins)
+
+    if previous_logins:
+        previous_logins = json.loads(previous_logins)
+        next_servers = {login['server'] for login in logins}
+        previous_servers = {login['server'] for login in previous_logins}
+        servers_to_logout = previous_servers - next_servers
+        for server in servers_to_logout:
+            cmd = ['docker', 'logout', server]
+            subprocess.check_call(cmd)
+
+    for login in logins:
+        server = login['server']
+        username = login['username']
+        password = login['password']
+        cmd = ['docker', 'login', server, '-u', username, '-p', password]
+        subprocess.check_call(cmd)
+
     set_state('kubernetes-worker.restart-needed')
 
 
@@ -505,7 +546,7 @@ def configure_kubernetes_service(service, base_args, extra_args_key):
     db.set(prev_args_key, args)
 
 
-def configure_kubelet(dns):
+def configure_kubelet(dns, ingress_ip):
     layer_options = layer.options('tls-client')
     ca_cert_path = layer_options.get('ca_certificate_path')
     server_cert_path = layer_options.get('server_certificate_path')
@@ -518,7 +559,6 @@ def configure_kubelet(dns):
     kubelet_opts['v'] = '0'
     kubelet_opts['address'] = '0.0.0.0'
     kubelet_opts['port'] = '10250'
-    kubelet_opts['cluster-dns'] = dns['sdn-ip']
     kubelet_opts['cluster-domain'] = dns['domain']
     kubelet_opts['anonymous-auth'] = 'false'
     kubelet_opts['client-ca-file'] = ca_cert_path
@@ -526,6 +566,10 @@ def configure_kubelet(dns):
     kubelet_opts['tls-private-key-file'] = server_key_path
     kubelet_opts['logtostderr'] = 'true'
     kubelet_opts['fail-swap-on'] = 'false'
+    kubelet_opts['node-ip'] = ingress_ip
+
+    if (dns['enable-kube-dns']):
+        kubelet_opts['cluster-dns'] = dns['sdn-ip']
 
     privileged = is_state('kubernetes-worker.privileged')
     kubelet_opts['allow-privileged'] = 'true' if privileged else 'false'
@@ -599,11 +643,31 @@ def create_kubeconfig(kubeconfig, server, ca, key=None, certificate=None,
     check_call(split(cmd.format(kubeconfig, context)))
 
 
+@when_any('config.changed.default-backend-image',
+          'config.changed.nginx-image')
+@when('kubernetes-worker.config.created')
 def launch_default_ingress_controller():
     ''' Launch the Kubernetes ingress controller & default backend (404) '''
+    config = hookenv.config()
+
+    # need to test this in case we get in
+    # here from a config change to the image
+    if not config.get('ingress'):
+        return
+
     context = {}
     context['arch'] = arch()
     addon_path = '/root/cdk/addons/{}'
+
+    context['defaultbackend_image'] = config.get('default-backend-image')
+    if (context['defaultbackend_image'] == "" or
+       context['defaultbackend_image'] == "auto"):
+        if context['arch'] == 's390x':
+            context['defaultbackend_image'] = \
+                "gcr.io/google_containers/defaultbackend-s390x:1.4"
+        else:
+            context['defaultbackend_image'] = \
+                "gcr.io/google_containers/defaultbackend:1.4"
 
     # Render the default http backend (404) replicationcontroller manifest
     manifest = addon_path.format('default-http-backend.yaml')
@@ -618,15 +682,19 @@ def launch_default_ingress_controller():
         hookenv.close_port(443)
         return
 
-    # Render the ingress replication controller manifest
-    context['ingress_image'] = \
-        "gcr.io/google_containers/nginx-ingress-controller:0.9.0-beta.13"
-    if arch() == 's390x':
-        context['ingress_image'] = \
-            "docker.io/cdkbot/nginx-ingress-controller-s390x:0.9.0-beta.13"
-    manifest = addon_path.format('ingress-replication-controller.yaml')
-    render('ingress-replication-controller.yaml', manifest, context)
-    hookenv.log('Creating the ingress replication controller.')
+    # Render the ingress daemon set controller manifest
+    context['ingress_image'] = config.get('nginx-image')
+    if context['ingress_image'] == "" or context['ingress_image'] == "auto":
+        if context['arch'] == 's390x':
+            context['ingress_image'] = \
+                "docker.io/cdkbot/nginx-ingress-controller-s390x:0.9.0-beta.13"
+        else:
+            context['ingress_image'] = \
+                "gcr.io/google_containers/nginx-ingress-controller:0.9.0-beta.15" # noqa
+    context['juju_application'] = hookenv.service_name()
+    manifest = addon_path.format('ingress-daemon-set.yaml')
+    render('ingress-daemon-set.yaml', manifest, context)
+    hookenv.log('Creating the ingress daemon set.')
     try:
         kubectl('apply', '-f', manifest)
     except CalledProcessError as e:
@@ -844,14 +912,14 @@ def request_kubelet_and_proxy_credentials(kube_control):
     # The kube-cotrol interface is created to support RBAC.
     # At this point we might as well do the right thing and return the hostname
     # even if it will only be used when we enable RBAC
-    nodeuser = 'system:node:{}'.format(gethostname())
+    nodeuser = 'system:node:{}'.format(gethostname().lower())
     kube_control.set_auth_request(nodeuser)
 
 
 @when('kube-control.connected')
 def catch_change_in_creds(kube_control):
     """Request a service restart in case credential updates were detected."""
-    nodeuser = 'system:node:{}'.format(gethostname())
+    nodeuser = 'system:node:{}'.format(gethostname().lower())
     creds = kube_control.get_auth_credentials(nodeuser)
     if creds \
             and data_changed('kube-control.creds', creds) \
@@ -899,23 +967,64 @@ def _systemctl_is_active(application):
         return False
 
 
+class GetNodeNameFailed(Exception):
+    pass
+
+
+def get_node_name():
+    # Get all the nodes in the cluster
+    cmd = 'kubectl --kubeconfig={} get no -o=json'.format(kubeconfig_path)
+    cmd = cmd.split()
+    deadline = time.time() + 60
+    while time.time() < deadline:
+        try:
+            raw = check_output(cmd)
+            break
+        except CalledProcessError:
+            hookenv.log('Failed to get node name for node %s.'
+                        ' Will retry.' % (gethostname()))
+            time.sleep(1)
+    else:
+        msg = 'Failed to get node name for node %s' % gethostname()
+        raise GetNodeNameFailed(msg)
+
+    result = json.loads(raw.decode('utf-8'))
+    if 'items' in result:
+        for node in result['items']:
+            if 'status' not in node:
+                continue
+            if 'addresses' not in node['status']:
+                continue
+
+            # find the hostname
+            for address in node['status']['addresses']:
+                if address['type'] == 'Hostname':
+                    if address['address'] == gethostname():
+                        return node['metadata']['name']
+
+                    # if we didn't match, just bail to the next node
+                    break
+    msg = 'Failed to get node name for node %s' % gethostname()
+    raise GetNodeNameFailed(msg)
+
+
 class ApplyNodeLabelFailed(Exception):
     pass
 
 
 def _apply_node_label(label, delete=False, overwrite=False):
     ''' Invoke kubectl to apply node label changes '''
+    nodename = get_node_name()
 
-    hostname = gethostname()
     # TODO: Make this part of the kubectl calls instead of a special string
     cmd_base = 'kubectl --kubeconfig={0} label node {1} {2}'
 
     if delete is True:
         label_key = label.split('=')[0]
-        cmd = cmd_base.format(kubeconfig_path, hostname, label_key)
+        cmd = cmd_base.format(kubeconfig_path, nodename, label_key)
         cmd = cmd + '-'
     else:
-        cmd = cmd_base.format(kubeconfig_path, hostname, label)
+        cmd = cmd_base.format(kubeconfig_path, nodename, label)
         if overwrite:
             cmd = '{} --overwrite'.format(cmd)
     cmd = cmd.split()

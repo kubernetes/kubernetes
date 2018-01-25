@@ -111,7 +111,7 @@ func NewCmdJoin(out io.Writer) *cobra.Command {
 	var ignorePreflightErrors []string
 
 	cmd := &cobra.Command{
-		Use:   "join [flags]",
+		Use:   "join",
 		Short: "Run this on any machine you wish to join an existing cluster",
 		Long:  joinLongDescription,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -199,7 +199,6 @@ type Join struct {
 
 // NewJoin instantiates Join struct with given arguments
 func NewJoin(cfgPath string, args []string, cfg *kubeadmapi.NodeConfiguration, ignorePreflightErrors sets.String, criSocket string) (*Join, error) {
-	fmt.Println("[kubeadm] WARNING: kubeadm is currently in beta")
 
 	if cfg.NodeName == "" {
 		cfg.NodeName = nodeutil.GetHostname("")

@@ -579,7 +579,7 @@ func TestReplicaCalcMissingMetrics(t *testing.T) {
 func TestReplicaCalcEmptyMetrics(t *testing.T) {
 	tc := replicaCalcTestCase{
 		currentReplicas: 4,
-		expectedError:   fmt.Errorf("unable to get metrics for resource cpu: no metrics returned from heapster"),
+		expectedError:   fmt.Errorf("unable to get metrics for resource cpu: no metrics returned from resource metrics API"),
 		resource: &resourceInfo{
 			name:     v1.ResourceCPU,
 			requests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},

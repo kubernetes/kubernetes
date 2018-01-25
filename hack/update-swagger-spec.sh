@@ -37,14 +37,17 @@ make -C "${KUBE_ROOT}" WHAT=cmd/kube-apiserver
 
 function cleanup()
 {
-    [[ -n ${APISERVER_PID-} ]] && kill ${APISERVER_PID} 1>&2 2>/dev/null
+    if [[ -n "${APISERVER_PID-}" ]]; then
+      kill "${APISERVER_PID}" &>/dev/null || :
+      wait "${APISERVER_PID}" &>/dev/null || :
+    fi
 
     kube::etcd::cleanup
 
     kube::log::status "Clean up complete"
 }
 
-trap cleanup EXIT SIGINT
+kube::util::trap_add cleanup EXIT
 
 kube::golang::setup_env
 
@@ -55,6 +58,7 @@ ETCD_HOST=${ETCD_HOST:-127.0.0.1}
 ETCD_PORT=${ETCD_PORT:-2379}
 API_PORT=${API_PORT:-8050}
 API_HOST=${API_HOST:-127.0.0.1}
+API_LOGFILE=/tmp/swagger-api-server.log
 
 kube::etcd::start
 
@@ -70,10 +74,16 @@ kube::log::status "Starting kube-apiserver"
   --advertise-address="10.10.10.10" \
   --cert-dir="${TMP_DIR}/certs" \
   --runtime-config=$(echo "${KUBE_AVAILABLE_GROUP_VERSIONS}" | sed -E 's|[[:blank:]]+|,|g') \
-  --service-cluster-ip-range="10.0.0.0/24" >/tmp/swagger-api-server.log 2>&1 &
+  --service-cluster-ip-range="10.0.0.0/24" >"${API_LOGFILE}" 2>&1 &
 APISERVER_PID=$!
 
-kube::util::wait_for_url "${API_HOST}:${API_PORT}/healthz" "apiserver: "
+if ! kube::util::wait_for_url "${API_HOST}:${API_PORT}/healthz" "apiserver: "; then
+  kube::log::error "Here are the last 10 lines from kube-apiserver (${API_LOGFILE})"
+  kube::log::error "=== BEGIN OF LOG ==="
+  tail -10 "${API_LOGFILE}" || :
+  kube::log::error "=== END OF LOG ==="
+  exit 1
+fi
 
 SWAGGER_API_PATH="${API_HOST}:${API_PORT}/swaggerapi/"
 

@@ -30,7 +30,7 @@ import (
 // Collector models the PropertyCollector managed object.
 //
 // For more information, see:
-// http://pubs.vmware.com/vsphere-55/index.jsp#com.vmware.wssdk.apiref.doc/vmodl.query.PropertyCollector.html
+// http://pubs.vmware.com/vsphere-60/index.jsp?topic=%2Fcom.vmware.wssdk.apiref.doc%2Fvmodl.query.PropertyCollector.html
 //
 type Collector struct {
 	roundTripper soap.RoundTripper

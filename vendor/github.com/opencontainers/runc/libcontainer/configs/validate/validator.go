@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/opencontainers/runc/libcontainer/configs"
+	"github.com/opencontainers/runc/libcontainer/intelrdt"
 	selinux "github.com/opencontainers/selinux/go-selinux"
 )
 
@@ -38,6 +39,9 @@ func (v *ConfigValidator) Validate(config *configs.Config) error {
 		return err
 	}
 	if err := v.sysctl(config); err != nil {
+		return err
+	}
+	if err := v.intelrdt(config); err != nil {
 		return err
 	}
 	if config.Rootless {
@@ -148,6 +152,19 @@ func (v *ConfigValidator) sysctl(config *configs.Config) error {
 			}
 		}
 		return fmt.Errorf("sysctl %q is not in a separate kernel namespace", s)
+	}
+
+	return nil
+}
+
+func (v *ConfigValidator) intelrdt(config *configs.Config) error {
+	if config.IntelRdt != nil {
+		if !intelrdt.IsEnabled() {
+			return fmt.Errorf("intelRdt is specified in config, but Intel RDT feature is not supported or enabled")
+		}
+		if config.IntelRdt.L3CacheSchema == "" {
+			return fmt.Errorf("intelRdt is specified in config, but intelRdt.l3CacheSchema is empty")
+		}
 	}
 
 	return nil

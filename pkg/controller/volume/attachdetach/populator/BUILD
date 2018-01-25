@@ -41,8 +41,8 @@ filegroup(
 go_test(
     name = "go_default_test",
     srcs = ["desired_state_of_world_populator_test.go"],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/pkg/controller/volume/attachdetach/populator",
-    library = ":go_default_library",
     deps = [
         "//pkg/controller:go_default_library",
         "//pkg/controller/volume/attachdetach/cache:go_default_library",

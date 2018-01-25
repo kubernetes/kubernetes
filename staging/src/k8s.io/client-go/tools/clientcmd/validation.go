@@ -253,6 +253,10 @@ func validateAuthInfo(authInfoName string, authInfo clientcmdapi.AuthInfo) []err
 func validateContext(contextName string, context clientcmdapi.Context, config clientcmdapi.Config) []error {
 	validationErrors := make([]error, 0)
 
+	if len(contextName) == 0 {
+		validationErrors = append(validationErrors, fmt.Errorf("empty context name for %#v is not allowed", context))
+	}
+
 	if len(context.AuthInfo) == 0 {
 		validationErrors = append(validationErrors, fmt.Errorf("user was not specified for context %q", contextName))
 	} else if _, exists := config.AuthInfos[context.AuthInfo]; !exists {

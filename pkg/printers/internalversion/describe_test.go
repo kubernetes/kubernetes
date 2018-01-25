@@ -783,8 +783,8 @@ func TestDefaultDescribers(t *testing.T) {
 
 func TestGetPodsTotalRequests(t *testing.T) {
 	testCases := []struct {
-		pods                         *api.PodList
-		expectedReqs, expectedLimits map[api.ResourceName]resource.Quantity
+		pods         *api.PodList
+		expectedReqs map[api.ResourceName]resource.Quantity
 	}{
 		{
 			pods: &api.PodList{
@@ -848,10 +848,7 @@ func TestGetPodsTotalRequests(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		reqs, _, err := getPodsTotalRequestsAndLimits(testCase.pods)
-		if err != nil {
-			t.Errorf("Unexpected error %v", err)
-		}
+		reqs, _ := getPodsTotalRequestsAndLimits(testCase.pods)
 		if !apiequality.Semantic.DeepEqual(reqs, testCase.expectedReqs) {
 			t.Errorf("Expected %v, got %v", testCase.expectedReqs, reqs)
 		}

@@ -1958,11 +1958,11 @@ func TestGetTable(t *testing.T) {
 				}
 				obj, _, err := extractBodyObject(resp, unstructured.UnstructuredJSONScheme)
 				if err != nil {
-					t.Fatalf("%d: unexpected body read error: %v", err)
+					t.Fatalf("%d: unexpected body read error: %v", i, err)
 				}
 				gvk := schema.GroupVersionKind{Version: "v1", Kind: "Status"}
 				if obj.GetObjectKind().GroupVersionKind() != gvk {
-					t.Fatalf("%d: unexpected error body: %#v", obj)
+					t.Fatalf("%d: unexpected error body: %#v", i, obj)
 				}
 				return
 			}
@@ -2027,9 +2027,27 @@ func TestGetPartialObjectMetadata(t *testing.T) {
 			statusCode: http.StatusNotAcceptable,
 		},
 		{
+			accept:     runtime.ContentTypeJSON + ";as=PartialObjectMetadata;v=v1;g=meta.k8s.io, application/json",
+			expectKind: schema.GroupVersionKind{Kind: "Simple", Group: testGroupVersion.Group, Version: testGroupVersion.Version},
+		},
+		{
+			accept:     runtime.ContentTypeJSON + ";as=PartialObjectMetadata;v=v1alpha1;g=meta.k8s.io, application/json",
+			expectKind: schema.GroupVersionKind{Kind: "PartialObjectMetadata", Group: "meta.k8s.io", Version: "v1alpha1"},
+		},
+		{
 			list:       true,
 			accept:     runtime.ContentTypeJSON + ";as=PartialObjectMetadata;v=v1alpha1;g=meta.k8s.io",
 			statusCode: http.StatusNotAcceptable,
+		},
+		{
+			list:       true,
+			accept:     runtime.ContentTypeJSON + ";as=PartialObjectMetadata;v=v1;g=meta.k8s.io, application/json",
+			expectKind: schema.GroupVersionKind{Kind: "SimpleList", Group: testGroupVersion.Group, Version: testGroupVersion.Version},
+		},
+		{
+			list:       true,
+			accept:     runtime.ContentTypeJSON + ";as=PartialObjectMetadataList;v=v1alpha1;g=meta.k8s.io, application/json",
+			expectKind: schema.GroupVersionKind{Kind: "PartialObjectMetadataList", Group: "meta.k8s.io", Version: "v1alpha1"},
 		},
 		{
 			accept:     runtime.ContentTypeJSON + ";as=PartialObjectMetadataList;v=v1alpha1;g=meta.k8s.io",
@@ -2083,12 +2101,12 @@ func TestGetPartialObjectMetadata(t *testing.T) {
 			}
 			obj, _, err := extractBodyObject(resp, unstructured.UnstructuredJSONScheme)
 			if err != nil {
-				t.Errorf("%d: unexpected body read error: %v", err)
+				t.Errorf("%d: unexpected body read error: %v", i, err)
 				continue
 			}
 			gvk := schema.GroupVersionKind{Version: "v1", Kind: "Status"}
 			if obj.GetObjectKind().GroupVersionKind() != gvk {
-				t.Errorf("%d: unexpected error body: %#v", obj)
+				t.Errorf("%d: unexpected error body: %#v", i, obj)
 			}
 			continue
 		}
@@ -2096,12 +2114,22 @@ func TestGetPartialObjectMetadata(t *testing.T) {
 			t.Errorf("%d: invalid status: %#v\n%s", i, resp, bodyOrDie(resp))
 			continue
 		}
-		itemOut, body, err := extractBodyObject(resp, metainternalversion.Codecs.LegacyCodec(metav1alpha1.SchemeGroupVersion))
-		if err != nil {
-			t.Fatal(err)
-		}
-		if !reflect.DeepEqual(test.expected, itemOut) {
-			t.Errorf("%d: did not match: %s", i, diff.ObjectReflectDiff(test.expected, itemOut))
+		body := ""
+		if test.expected != nil {
+			itemOut, d, err := extractBodyObject(resp, metainternalversion.Codecs.LegacyCodec(metav1alpha1.SchemeGroupVersion))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !reflect.DeepEqual(test.expected, itemOut) {
+				t.Errorf("%d: did not match: %s", i, diff.ObjectReflectDiff(test.expected, itemOut))
+			}
+			body = d
+		} else {
+			d, err := ioutil.ReadAll(resp.Body)
+			if err != nil {
+				t.Fatal(err)
+			}
+			body = string(d)
 		}
 		obj := &unstructured.Unstructured{}
 		if err := json.Unmarshal([]byte(body), obj); err != nil {

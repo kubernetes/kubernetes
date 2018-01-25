@@ -29,15 +29,23 @@ import (
 	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 )
 
+const (
+	// DenyEscalatingExec indicates name of admission plugin.
+	DenyEscalatingExec = "DenyEscalatingExec"
+	// DenyExecOnPrivileged indicates name of admission plugin.
+	// Deprecated, should use DenyEscalatingExec instead.
+	DenyExecOnPrivileged = "DenyExecOnPrivileged"
+)
+
 // Register registers a plugin
 func Register(plugins *admission.Plugins) {
-	plugins.Register("DenyEscalatingExec", func(config io.Reader) (admission.Interface, error) {
+	plugins.Register(DenyEscalatingExec, func(config io.Reader) (admission.Interface, error) {
 		return NewDenyEscalatingExec(), nil
 	})
 
 	// This is for legacy support of the DenyExecOnPrivileged admission controller.  Most
 	// of the time DenyEscalatingExec should be preferred.
-	plugins.Register("DenyExecOnPrivileged", func(config io.Reader) (admission.Interface, error) {
+	plugins.Register(DenyExecOnPrivileged, func(config io.Reader) (admission.Interface, error) {
 		return NewDenyExecOnPrivileged(), nil
 	})
 }
@@ -49,9 +57,10 @@ type DenyExec struct {
 	client internalclientset.Interface
 
 	// these flags control which items will be checked to deny exec/attach
-	hostIPC    bool
-	hostPID    bool
-	privileged bool
+	hostNetwork bool
+	hostIPC     bool
+	hostPID     bool
+	privileged  bool
 }
 
 var _ admission.ValidationInterface = &DenyExec{}
@@ -62,22 +71,24 @@ var _ = kubeapiserveradmission.WantsInternalKubeClientSet(&DenyExec{})
 // using host based configurations.
 func NewDenyEscalatingExec() *DenyExec {
 	return &DenyExec{
-		Handler:    admission.NewHandler(admission.Connect),
-		hostIPC:    true,
-		hostPID:    true,
-		privileged: true,
+		Handler:     admission.NewHandler(admission.Connect),
+		hostNetwork: true,
+		hostIPC:     true,
+		hostPID:     true,
+		privileged:  true,
 	}
 }
 
 // NewDenyExecOnPrivileged creates a new admission controller that is only checking the privileged
-// option.  This is for legacy support of the DenyExecOnPrivileged admission controller.  Most
-// of the time NewDenyEscalatingExec should be preferred.
+// option. This is for legacy support of the DenyExecOnPrivileged admission controller.
+// Most of the time NewDenyEscalatingExec should be preferred.
 func NewDenyExecOnPrivileged() *DenyExec {
 	return &DenyExec{
-		Handler:    admission.NewHandler(admission.Connect),
-		hostIPC:    false,
-		hostPID:    false,
-		privileged: true,
+		Handler:     admission.NewHandler(admission.Connect),
+		hostNetwork: false,
+		hostIPC:     false,
+		hostPID:     false,
+		privileged:  true,
 	}
 }
 
@@ -96,12 +107,19 @@ func (d *DenyExec) Validate(a admission.Attributes) (err error) {
 		return admission.NewForbidden(a, err)
 	}
 
-	if d.hostPID && pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.HostPID {
-		return admission.NewForbidden(a, fmt.Errorf("cannot exec into or attach to a container using host pid"))
-	}
+	if pod.Spec.SecurityContext != nil {
+		securityContext := pod.Spec.SecurityContext
+		if d.hostNetwork && securityContext.HostNetwork {
+			return admission.NewForbidden(a, fmt.Errorf("cannot exec into or attach to a container using host network"))
+		}
 
-	if d.hostIPC && pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.HostIPC {
-		return admission.NewForbidden(a, fmt.Errorf("cannot exec into or attach to a container using host ipc"))
+		if d.hostPID && securityContext.HostPID {
+			return admission.NewForbidden(a, fmt.Errorf("cannot exec into or attach to a container using host pid"))
+		}
+
+		if d.hostIPC && securityContext.HostIPC {
+			return admission.NewForbidden(a, fmt.Errorf("cannot exec into or attach to a container using host ipc"))
+		}
 	}
 
 	if d.privileged && isPrivileged(pod) {

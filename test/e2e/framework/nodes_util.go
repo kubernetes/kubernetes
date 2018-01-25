@@ -40,6 +40,15 @@ func EtcdUpgrade(target_storage, target_version string) error {
 	}
 }
 
+func IngressUpgrade() error {
+	switch TestContext.Provider {
+	case "gce":
+		return ingressUpgradeGCE()
+	default:
+		return fmt.Errorf("IngressUpgrade() is not implemented for provider %s", TestContext.Provider)
+	}
+}
+
 func MasterUpgrade(v string) error {
 	switch TestContext.Provider {
 	case "gce":
@@ -64,6 +73,15 @@ func etcdUpgradeGCE(target_storage, target_version string) error {
 	return err
 }
 
+func ingressUpgradeGCE() error {
+	// Flip glbc image from latest release image to HEAD to simulate an upgrade.
+	// Kubelet should restart glbc automatically.
+	sshResult, err := NodeExec(GetMasterHost(), "sudo sed -i -re 's/(image:)(.*)/\\1 gcr.io\\/e2e-ingress-gce\\/ingress-gce-e2e-glbc-amd64:latest/' /etc/kubernetes/manifests/glbc.manifest")
+	// TODO(rramkumar): Ensure glbc pod is in "Running" state before proceeding.
+	LogSSHResult(sshResult)
+	return err
+}
+
 // TODO(mrhohn): Remove this function when kube-proxy is run as a DaemonSet by default.
 func MasterUpgradeGCEWithKubeProxyDaemonSet(v string, enableKubeProxyDaemonSet bool) error {
 	return masterUpgradeGCE(v, enableKubeProxyDaemonSet)
@@ -78,6 +96,10 @@ func masterUpgradeGCE(rawV string, enableKubeProxyDaemonSet bool) error {
 			"TEST_ETCD_VERSION="+TestContext.EtcdUpgradeVersion,
 			"STORAGE_BACKEND="+TestContext.EtcdUpgradeStorage,
 			"TEST_ETCD_IMAGE=3.1.10")
+	} else {
+		// In e2e tests, we skip the confirmation prompt about
+		// implicit etcd upgrades to simulate the user entering "y".
+		env = append(env, "TEST_ALLOW_IMPLICIT_ETCD_UPGRADE=true")
 	}
 
 	v := "v" + rawV

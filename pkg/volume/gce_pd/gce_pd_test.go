@@ -183,7 +183,7 @@ func TestPlugin(t *testing.T) {
 	}
 	cap := persistentSpec.Spec.Capacity[v1.ResourceStorage]
 	size := cap.Value()
-	if size != 100*1024*1024*1024 {
+	if size != 100*volume.GB {
 		t.Errorf("Provision() returned unexpected volume size: %v", size)
 	}
 

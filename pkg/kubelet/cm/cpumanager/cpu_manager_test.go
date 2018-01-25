@@ -28,7 +28,6 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state"
@@ -118,28 +117,6 @@ func (psp mockPodStatusProvider) GetPodStatus(uid types.UID) (v1.PodStatus, bool
 	return psp.podStatus, psp.found
 }
 
-type mockPodKiller struct {
-	killedPods []*v1.Pod
-}
-
-func (f *mockPodKiller) killPodNow(pod *v1.Pod, status v1.PodStatus, gracePeriodOverride *int64) error {
-	f.killedPods = append(f.killedPods, pod)
-	return nil
-}
-
-type mockPodProvider struct {
-	pods []*v1.Pod
-}
-
-func (f *mockPodProvider) getPods() []*v1.Pod {
-	return f.pods
-}
-
-type mockRecorder struct{}
-
-func (r *mockRecorder) Eventf(object runtime.Object, eventtype, reason, messageFmt string, args ...interface{}) {
-}
-
 func makePod(cpuRequest, cpuLimit string) *v1.Pod {
 	return &v1.Pod{
 		Spec: v1.PodSpec{
@@ -159,20 +136,6 @@ func makePod(cpuRequest, cpuLimit string) *v1.Pod {
 			},
 		},
 	}
-}
-
-// CpuAllocatable must be <= CpuCapacity
-func prepareCPUNodeStatus(CPUCapacity, CPUAllocatable string) v1.NodeStatus {
-	nodestatus := v1.NodeStatus{
-		Capacity:    make(v1.ResourceList, 1),
-		Allocatable: make(v1.ResourceList, 1),
-	}
-	cpucap, _ := resource.ParseQuantity(CPUCapacity)
-	cpuall, _ := resource.ParseQuantity(CPUAllocatable)
-
-	nodestatus.Capacity[v1.ResourceCPU] = cpucap
-	nodestatus.Allocatable[v1.ResourceCPU] = cpuall
-	return nodestatus
 }
 
 func TestCPUManagerAdd(t *testing.T) {
@@ -234,7 +197,6 @@ func TestCPUManagerGenerate(t *testing.T) {
 		cpuPolicyName              string
 		nodeAllocatableReservation v1.ResourceList
 		isTopologyBroken           bool
-		panicMsg                   string
 		expectedPolicy             string
 		expectedError              error
 		skipIfPermissionsError     bool
@@ -270,14 +232,14 @@ func TestCPUManagerGenerate(t *testing.T) {
 			description:                "static policy - broken reservation",
 			cpuPolicyName:              "static",
 			nodeAllocatableReservation: v1.ResourceList{},
-			panicMsg:                   "unable to determine reserved CPU resources for static policy",
+			expectedError:              fmt.Errorf("unable to determine reserved CPU resources for static policy"),
 			skipIfPermissionsError:     true,
 		},
 		{
 			description:                "static policy - no CPU resources",
 			cpuPolicyName:              "static",
 			nodeAllocatableReservation: v1.ResourceList{v1.ResourceCPU: *resource.NewQuantity(0, resource.DecimalSI)},
-			panicMsg:                   "the static policy requires systemreserved.cpu + kubereserved.cpu to be greater than zero",
+			expectedError:              fmt.Errorf("the static policy requires systemreserved.cpu + kubereserved.cpu to be greater than zero"),
 			skipIfPermissionsError:     true,
 		},
 	}
@@ -319,19 +281,6 @@ func TestCPUManagerGenerate(t *testing.T) {
 				t.Errorf("cannot create state file: %s", err.Error())
 			}
 			defer os.RemoveAll(sDir)
-			defer func() {
-				if err := recover(); err != nil {
-					if testCase.panicMsg != "" {
-						if !strings.Contains(err.(string), testCase.panicMsg) {
-							t.Errorf("Unexpected panic message. Have: %q wants %q", err, testCase.panicMsg)
-						}
-					} else {
-						t.Errorf("Unexpected panic: %q", err)
-					}
-				} else if testCase.panicMsg != "" {
-					t.Error("Expected panic hasn't been raised")
-				}
-			}()
 
 			mgr, err := NewManager(testCase.cpuPolicyName, 5*time.Second, machineInfo, testCase.nodeAllocatableReservation, sDir)
 			if testCase.expectedError != nil {

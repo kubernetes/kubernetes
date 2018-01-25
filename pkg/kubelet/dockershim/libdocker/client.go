@@ -29,8 +29,8 @@ import (
 
 const (
 	// https://docs.docker.com/engine/reference/api/docker_remote_api/
-	// docker version should be at least 1.10.x
-	MinimumDockerAPIVersion = "1.22.0"
+	// docker version should be at least 1.11.x
+	MinimumDockerAPIVersion = "1.23.0"
 
 	// Status of a container returned by ListContainers.
 	StatusRunningPrefix = "Up"

@@ -53,7 +53,8 @@ var (
 // NewCmdExplain returns a cobra command for swagger docs
 func NewCmdExplain(f cmdutil.Factory, out, cmdErr io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "explain RESOURCE",
+		Use: "explain RESOURCE",
+		DisableFlagsInUseLine: true,
 		Short:   i18n.T("Documentation of resources"),
 		Long:    explainLong + "\n\n" + cmdutil.ValidResourceTypeList(f),
 		Example: explainExamples,
@@ -129,5 +130,5 @@ func RunExplain(f cmdutil.Factory, out, cmdErr io.Writer, cmd *cobra.Command, ar
 		return fmt.Errorf("Couldn't find resource for %q", gvk)
 	}
 
-	return explain.PrintModelDescription(fieldsPath, out, schema, recursive)
+	return explain.PrintModelDescription(fieldsPath, out, schema, gvk, recursive)
 }

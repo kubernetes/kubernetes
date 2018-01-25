@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
+	scaleclient "k8s.io/client-go/scale"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
@@ -84,7 +85,9 @@ func RcByNameContainer(name string, replicas int32, image string, labels map[str
 
 // ScaleRCByLabels scales an RC via ns/label lookup. If replicas == 0 it waits till
 // none are running, otherwise it does what a synchronous scale operation would do.
-func ScaleRCByLabels(clientset clientset.Interface, internalClientset internalclientset.Interface, ns string, l map[string]string, replicas uint) error {
+//TODO(p0lyn0mial): remove internalClientset.
+//TODO(p0lyn0mial): update the callers.
+func ScaleRCByLabels(clientset clientset.Interface, internalClientset internalclientset.Interface, scalesGetter scaleclient.ScalesGetter, ns string, l map[string]string, replicas uint) error {
 	listOpts := metav1.ListOptions{LabelSelector: labels.SelectorFromSet(labels.Set(l)).String()}
 	rcs, err := clientset.CoreV1().ReplicationControllers(ns).List(listOpts)
 	if err != nil {
@@ -96,7 +99,7 @@ func ScaleRCByLabels(clientset clientset.Interface, internalClientset internalcl
 	Logf("Scaling %v RCs with labels %v in ns %v to %v replicas.", len(rcs.Items), l, ns, replicas)
 	for _, labelRC := range rcs.Items {
 		name := labelRC.Name
-		if err := ScaleRC(clientset, internalClientset, ns, name, replicas, false); err != nil {
+		if err := ScaleRC(clientset, internalClientset, scalesGetter, ns, name, replicas, false); err != nil {
 			return err
 		}
 		rc, err := clientset.CoreV1().ReplicationControllers(ns).Get(name, metav1.GetOptions{})
@@ -156,8 +159,10 @@ func DeleteRCAndPods(clientset clientset.Interface, internalClientset internalcl
 	return DeleteResourceAndPods(clientset, internalClientset, api.Kind("ReplicationController"), ns, name)
 }
 
-func ScaleRC(clientset clientset.Interface, internalClientset internalclientset.Interface, ns, name string, size uint, wait bool) error {
-	return ScaleResource(clientset, internalClientset, ns, name, size, wait, api.Kind("ReplicationController"))
+//TODO(p0lyn0mial): remove internalClientset.
+//TODO(p0lyn0mial): update the callers.
+func ScaleRC(clientset clientset.Interface, internalClientset internalclientset.Interface, scalesGetter scaleclient.ScalesGetter, ns, name string, size uint, wait bool) error {
+	return ScaleResource(clientset, internalClientset, scalesGetter, ns, name, size, wait, api.Kind("ReplicationController"), api.Resource("replicationcontrollers"))
 }
 
 func RunRC(config testutils.RCConfig) error {

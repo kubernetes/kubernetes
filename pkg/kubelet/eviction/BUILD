@@ -12,13 +12,12 @@ go_test(
         "eviction_manager_test.go",
         "helpers_test.go",
     ],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/pkg/kubelet/eviction",
-    library = ":go_default_library",
     deps = [
         "//pkg/apis/core:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/kubelet/apis/stats/v1alpha1:go_default_library",
-        "//pkg/kubelet/cm:go_default_library",
         "//pkg/kubelet/eviction/api:go_default_library",
         "//pkg/kubelet/lifecycle:go_default_library",
         "//pkg/kubelet/types:go_default_library",
@@ -39,11 +38,40 @@ go_library(
         "doc.go",
         "eviction_manager.go",
         "helpers.go",
-        "threshold_notifier_unsupported.go",
         "types.go",
     ] + select({
-        "@io_bazel_rules_go//go/platform:linux_amd64": [
+        "@io_bazel_rules_go//go/platform:android": [
+            "threshold_notifier_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:darwin": [
+            "threshold_notifier_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:dragonfly": [
+            "threshold_notifier_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:freebsd": [
+            "threshold_notifier_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:linux": [
             "threshold_notifier_linux.go",
+        ],
+        "@io_bazel_rules_go//go/platform:nacl": [
+            "threshold_notifier_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:netbsd": [
+            "threshold_notifier_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:openbsd": [
+            "threshold_notifier_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:plan9": [
+            "threshold_notifier_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:solaris": [
+            "threshold_notifier_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:windows": [
+            "threshold_notifier_unsupported.go",
         ],
         "//conditions:default": [],
     }),
@@ -61,7 +89,7 @@ go_library(
         "//pkg/kubelet/server/stats:go_default_library",
         "//pkg/kubelet/types:go_default_library",
         "//pkg/kubelet/util/format:go_default_library",
-        "//plugin/pkg/scheduler/util:go_default_library",
+        "//pkg/scheduler/util:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
@@ -71,7 +99,7 @@ go_library(
         "//vendor/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//vendor/k8s.io/client-go/tools/record:go_default_library",
     ] + select({
-        "@io_bazel_rules_go//go/platform:linux_amd64": [
+        "@io_bazel_rules_go//go/platform:linux": [
             "//vendor/golang.org/x/sys/unix:go_default_library",
         ],
         "//conditions:default": [],

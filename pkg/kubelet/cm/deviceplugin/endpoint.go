@@ -164,7 +164,11 @@ func (e *endpointImpl) run() {
 		}
 
 		e.mutex.Lock()
-		e.devices = devices
+		// NOTE: Return a copy of 'devices' instead of returning a direct reference to local 'devices'
+		e.devices = make(map[string]pluginapi.Device)
+		for _, d := range devices {
+			e.devices[d.ID] = d
+		}
 		e.mutex.Unlock()
 
 		e.callback(e.resourceName, added, updated, deleted)
@@ -182,9 +186,10 @@ func (e *endpointImpl) stop() {
 	e.clientConn.Close()
 }
 
-// dial establishes the gRPC communication with the registered device plugin.
+// dial establishes the gRPC communication with the registered device plugin. https://godoc.org/google.golang.org/grpc#Dial
 func dial(unixSocketPath string) (pluginapi.DevicePluginClient, *grpc.ClientConn, error) {
-	c, err := grpc.Dial(unixSocketPath, grpc.WithInsecure(),
+	c, err := grpc.Dial(unixSocketPath, grpc.WithInsecure(), grpc.WithBlock(),
+		grpc.WithTimeout(10*time.Second),
 		grpc.WithDialer(func(addr string, timeout time.Duration) (net.Conn, error) {
 			return net.DialTimeout("unix", addr, timeout)
 		}),

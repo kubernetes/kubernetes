@@ -42,8 +42,8 @@ import (
 	expvalidation "k8s.io/kubernetes/pkg/apis/extensions/validation"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/registry/batch/job"
-	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
-	schedulerapilatest "k8s.io/kubernetes/plugin/pkg/scheduler/api/latest"
+	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
+	schedulerapilatest "k8s.io/kubernetes/pkg/scheduler/api/latest"
 )
 
 func validateObject(obj runtime.Object) (errors field.ErrorList) {

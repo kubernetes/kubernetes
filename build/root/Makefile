@@ -149,11 +149,11 @@ define UPDATE_HELP_INFO
 endef
 .PHONY: update
 ifeq ($(PRINT_HELP),y)
-update:
+update: generated_files
 	@echo "$$UPDATE_HELP_INFO"
 else
 update:
-	hack/update-all.sh
+	CALLED_FROM_MAIN_MAKEFILE=1 hack/make-rules/update.sh
 endif
 
 define CHECK_TEST_HELP_INFO
@@ -389,7 +389,7 @@ define RELEASE_SKIP_TESTS_HELP_INFO
 #
 # Args:
 #   KUBE_RELEASE_RUN_TESTS: Whether to run tests. Set to 'y' to run tests anyways.
-#   KUBE_FASTBUILD: Whether to cross-compile for other architectures. Set to 'true' to do so.
+#   KUBE_FASTBUILD: Whether to cross-compile for other architectures. Set to 'false' to do so.
 #
 # Example:
 #   make release-skip-tests
@@ -464,21 +464,6 @@ $(filter-out %$(EXCLUDE_TARGET),$(notdir $(abspath $(wildcard cmd/*/)))):
 else
 $(filter-out %$(EXCLUDE_TARGET),$(notdir $(abspath $(wildcard cmd/*/)))): generated_files
 	hack/make-rules/build.sh cmd/$@
-endif
-
-define PLUGIN_CMD_HELP_INFO
-# Add rules for all directories in plugin/cmd/
-#
-# Example:
-#   make kube-scheduler
-endef
-.PHONY: $(notdir $(abspath $(wildcard plugin/cmd/*/)))
-ifeq ($(PRINT_HELP),y)
-$(notdir $(abspath $(wildcard plugin/cmd/*/))):
-	@echo "$$PLUGIN_CMD_HELP_INFO"
-else
-$(notdir $(abspath $(wildcard plugin/cmd/*/))): generated_files
-	hack/make-rules/build.sh plugin/cmd/$@
 endif
 
 define GENERATED_FILES_HELP_INFO

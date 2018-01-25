@@ -45,6 +45,7 @@ PACKAGES=(
   k8s.io/apiserver/pkg/apis/example/v1
   k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1
   k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1
+  k8s.io/kube-aggregator/pkg/apis/apiregistration/v1
   k8s.io/api/core/v1
   k8s.io/api/policy/v1beta1
   k8s.io/api/extensions/v1beta1

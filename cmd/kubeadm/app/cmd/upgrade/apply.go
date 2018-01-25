@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/controlplane"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/upgrade"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
@@ -68,7 +69,8 @@ func NewCmdApply(parentFlags *cmdUpgradeFlags) *cobra.Command {
 	}
 
 	cmd := &cobra.Command{
-		Use:   "apply [version]",
+		Use: "apply [version]",
+		DisableFlagsInUseLine: true,
 		Short: "Upgrade your Kubernetes cluster to the specified version.",
 		Run: func(cmd *cobra.Command, args []string) {
 			var err error
@@ -79,11 +81,26 @@ func NewCmdApply(parentFlags *cmdUpgradeFlags) *cobra.Command {
 			err = runPreflightChecks(flags.parent.ignorePreflightErrorsSet)
 			kubeadmutil.CheckErr(err)
 
-			err = cmdutil.ValidateExactArgNumber(args, []string{"version"})
-			kubeadmutil.CheckErr(err)
+			// If the version is specified in config file, pick up that value.
+			if flags.parent.cfgPath != "" {
+				cfg, err := upgrade.FetchConfigurationFromFile(flags.parent.cfgPath)
+				kubeadmutil.CheckErr(err)
 
-			// It's safe to use args[0] here as the slice has been validated above
-			flags.newK8sVersionStr = args[0]
+				if cfg.KubernetesVersion != "" {
+					flags.newK8sVersionStr = cfg.KubernetesVersion
+				}
+			}
+
+			// If the new version is already specified in config file, version arg is optional.
+			if flags.newK8sVersionStr == "" {
+				err = cmdutil.ValidateExactArgNumber(args, []string{"version"})
+				kubeadmutil.CheckErr(err)
+			}
+
+			// If option was specified in both args and config file, args will overwrite the config file.
+			if len(args) == 1 {
+				flags.newK8sVersionStr = args[0]
+			}
 
 			// Default the flags dynamically, based on each others' value
 			err = SetImplicitFlags(flags)
@@ -119,13 +136,10 @@ func NewCmdApply(parentFlags *cmdUpgradeFlags) *cobra.Command {
 func RunApply(flags *applyFlags) error {
 
 	// Start with the basics, verify that the cluster is healthy and get the configuration from the cluster (using the ConfigMap)
-	upgradeVars, err := enforceRequirements(flags.parent.featureGatesString, flags.parent.kubeConfigPath, flags.parent.cfgPath, flags.parent.printConfig, flags.dryRun, flags.parent.ignorePreflightErrorsSet)
+	upgradeVars, err := enforceRequirements(flags.parent, flags.dryRun, flags.newK8sVersionStr)
 	if err != nil {
 		return err
 	}
-
-	// Set the upgraded version on the external config object now
-	upgradeVars.cfg.KubernetesVersion = flags.newK8sVersionStr
 
 	// Grab the external, versioned configuration and convert it to the internal type for usage here later
 	internalcfg := &kubeadmapi.MasterConfiguration{}
@@ -143,6 +157,10 @@ func RunApply(flags *applyFlags) error {
 		return fmt.Errorf("unable to parse normalized version %q as a semantic version", flags.newK8sVersionStr)
 	}
 	flags.newK8sVersion = k8sVer
+
+	if err := features.ValidateVersion(features.InitFeatureGates, internalcfg.FeatureGates, internalcfg.KubernetesVersion); err != nil {
+		return err
+	}
 
 	// Enforce the version skew policies
 	if err := EnforceVersionPolicies(flags, upgradeVars.versionGetter); err != nil {
@@ -167,7 +185,7 @@ func RunApply(flags *applyFlags) error {
 	}
 
 	// Upgrade RBAC rules and addons.
-	if err := upgrade.PerformPostUpgradeTasks(upgradeVars.client, internalcfg, flags.newK8sVersion); err != nil {
+	if err := upgrade.PerformPostUpgradeTasks(upgradeVars.client, internalcfg, flags.newK8sVersion, flags.dryRun); err != nil {
 		return fmt.Errorf("[upgrade/postupgrade] FATAL post-upgrade error: %v", err)
 	}
 
@@ -201,7 +219,7 @@ func SetImplicitFlags(flags *applyFlags) error {
 // EnforceVersionPolicies makes sure that the version the user specified is valid to upgrade to
 // There are both fatal and skippable (with --force) errors
 func EnforceVersionPolicies(flags *applyFlags, versionGetter upgrade.VersionGetter) error {
-	fmt.Printf("[upgrade/version] You have chosen to upgrade to version %q\n", flags.newK8sVersionStr)
+	fmt.Printf("[upgrade/version] You have chosen to change the cluster version to %q\n", flags.newK8sVersionStr)
 
 	versionSkewErrs := upgrade.EnforceVersionPolicies(versionGetter, flags.newK8sVersionStr, flags.newK8sVersion, flags.parent.allowExperimentalUpgrades, flags.parent.allowRCUpgrades)
 	if versionSkewErrs != nil {

@@ -27,7 +27,6 @@ import (
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"k8s.io/apimachinery/pkg/types"
-	kubetypes "k8s.io/apimachinery/pkg/types"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
@@ -195,7 +194,6 @@ func (f *fakePodDeletionProvider) IsPodDeleted(uid types.UID) bool {
 
 type fakeUnitGetter struct {
 	networkNamespace kubecontainer.ContainerID
-	callServices     []string
 }
 
 func newfakeUnitGetter() *fakeUnitGetter {
@@ -204,7 +202,7 @@ func newfakeUnitGetter() *fakeUnitGetter {
 	}
 }
 
-func (f *fakeUnitGetter) getNetworkNamespace(uid kubetypes.UID, latestPod *rktapi.Pod) (kubecontainer.ContainerID, error) {
+func (f *fakeUnitGetter) getNetworkNamespace(uid types.UID, latestPod *rktapi.Pod) (kubecontainer.ContainerID, error) {
 	return kubecontainer.ContainerID{ID: "42"}, nil
 }
 

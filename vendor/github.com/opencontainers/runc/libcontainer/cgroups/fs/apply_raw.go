@@ -145,8 +145,17 @@ func (m *Manager) Apply(pid int) (err error) {
 		m.Paths[sys.Name()] = p
 
 		if err := sys.Apply(d); err != nil {
+			if os.IsPermission(err) && m.Cgroups.Path == "" {
+				// If we didn't set a cgroup path, then let's defer the error here
+				// until we know whether we have set limits or not.
+				// If we hadn't set limits, then it's ok that we couldn't join this cgroup, because
+				// it will have the same limits as its parent.
+				delete(m.Paths, sys.Name())
+				continue
+			}
 			return err
 		}
+
 	}
 	return nil
 }
@@ -198,6 +207,10 @@ func (m *Manager) Set(container *configs.Config) error {
 	for _, sys := range subsystems {
 		path := paths[sys.Name()]
 		if err := sys.Set(path, container.Cgroups); err != nil {
+			if path == "" {
+				// cgroup never applied
+				return fmt.Errorf("cannot set limits on the %s cgroup, as the container has not joined it", sys.Name())
+			}
 			return err
 		}
 	}

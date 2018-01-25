@@ -50,8 +50,8 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["garbagecollector_test.go"],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/pkg/controller/garbagecollector",
-    library = ":go_default_library",
     deps = [
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/core/install:go_default_library",

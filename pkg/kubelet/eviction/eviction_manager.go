@@ -59,7 +59,7 @@ type managerImpl struct {
 	killPodFunc KillPodFunc
 	// the interface that knows how to do image gc
 	imageGC ImageGC
-	// the interface that knows how to do image gc
+	// the interface that knows how to do container gc
 	containerGC ContainerGC
 	// protects access to internal state
 	sync.RWMutex
@@ -251,7 +251,7 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 			m.synchronize(diskInfoProvider, podFunc, capacityProvider)
 		})
 		if err != nil {
-			glog.Warningf("eviction manager: failed to create hard memory threshold notifier: %v", err)
+			glog.Warningf("eviction manager: failed to create soft memory threshold notifier: %v", err)
 		}
 		// start hard memory notification
 		err = startMemoryThresholdNotifier(m.config.Thresholds, observations, true, func(desc string) {
@@ -259,7 +259,7 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 			m.synchronize(diskInfoProvider, podFunc, capacityProvider)
 		})
 		if err != nil {
-			glog.Warningf("eviction manager: failed to create soft memory threshold notifier: %v", err)
+			glog.Warningf("eviction manager: failed to create hard memory threshold notifier: %v", err)
 		}
 	}
 
@@ -312,7 +312,7 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 	m.Unlock()
 
 	// evict pods if there is a resource usage violation from local volume temporary storage
-	// If eviction happens in localVolumeEviction function, skip the rest of eviction action
+	// If eviction happens in localStorageEviction function, skip the rest of eviction action
 	if utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) {
 		if evictedPods := m.localStorageEviction(activePods); len(evictedPods) > 0 {
 			return evictedPods
@@ -455,7 +455,9 @@ func (m *managerImpl) reclaimNodeLevelResources(resourceToReclaim v1.ResourceNam
 // localStorageEviction checks the EmptyDir volume usage for each pod and determine whether it exceeds the specified limit and needs
 // to be evicted. It also checks every container in the pod, if the container overlay usage exceeds the limit, the pod will be evicted too.
 func (m *managerImpl) localStorageEviction(pods []*v1.Pod) []*v1.Pod {
-	summary, err := m.summaryProvider.Get()
+	// do not update node-level stats as local storage evictions do not utilize them.
+	forceStatsUpdate := false
+	summary, err := m.summaryProvider.Get(forceStatsUpdate)
 	if err != nil {
 		glog.Errorf("Could not get summary provider")
 		return nil

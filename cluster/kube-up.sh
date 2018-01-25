@@ -34,13 +34,7 @@ source "${KUBE_ROOT}/cluster/kube-util.sh"
 
 DEPRECATED_PROVIDERS=(
   "centos"
-  "libvert-coreos"
   "local"
-  "openstack-heat"
-  "photon-controller"
-  "vagrant"
-  "vsphere"
-  "windows"
 )
 
 for provider in "${DEPRECATED_PROVIDERS[@]}"; do

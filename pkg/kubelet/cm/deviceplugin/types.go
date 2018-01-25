@@ -22,7 +22,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
-	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
+	"k8s.io/kubernetes/pkg/scheduler/schedulercache"
 )
 
 // Manager manages all the Device Plugins running on a node.
@@ -53,9 +53,9 @@ type Manager interface {
 	// for the found one. An empty struct is returned in case no cached state is found.
 	GetDeviceRunContainerOptions(pod *v1.Pod, container *v1.Container) *DeviceRunContainerOptions
 
-	// GetCapacity returns the amount of available device plugin resource capacity
+	// GetCapacity returns the amount of available device plugin resource capacity, resource allocatable
 	// and inactive device plugin resources previously registered on the node.
-	GetCapacity() (v1.ResourceList, []string)
+	GetCapacity() (v1.ResourceList, v1.ResourceList, []string)
 }
 
 // DeviceRunContainerOptions contains the combined container runtime settings to consume its allocated devices.
@@ -73,9 +73,9 @@ const (
 	// errFailedToDialDevicePlugin is the error raised when the device plugin could not be
 	// reached on the registered socket
 	errFailedToDialDevicePlugin = "failed to dial device plugin:"
-	// errUnsuportedVersion is the error raised when the device plugin uses an API version not
+	// errUnsupportedVersion is the error raised when the device plugin uses an API version not
 	// supported by the Kubelet registry
-	errUnsuportedVersion = "requested API version %q is not supported by kubelet. Supported version is %q"
+	errUnsupportedVersion = "requested API version %q is not supported by kubelet. Supported version is %q"
 	// errDevicePluginAlreadyExists is the error raised when a device plugin with the
 	// same Resource Name tries to register itself
 	errDevicePluginAlreadyExists = "another device plugin already registered this Resource Name"

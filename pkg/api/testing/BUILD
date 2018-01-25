@@ -16,7 +16,6 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/api/testing",
     deps = [
-        "//cmd/kubeadm/app/apis/kubeadm/fuzzer:go_default_library",
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/admissionregistration/fuzzer:go_default_library",
         "//pkg/apis/apps/fuzzer:go_default_library",
@@ -72,8 +71,8 @@ go_test(
         "serialization_test.go",
         "unstructured_test.go",
     ],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/pkg/api/testing",
-    library = ":go_default_library",
     deps = [
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/api/testapi:go_default_library",
@@ -85,7 +84,6 @@ go_test(
         "//pkg/apis/extensions:go_default_library",
         "//pkg/apis/extensions/v1beta1:go_default_library",
         "//vendor/github.com/gogo/protobuf/proto:go_default_library",
-        "//vendor/github.com/golang/protobuf/proto:go_default_library",
         "//vendor/github.com/google/gofuzz:go_default_library",
         "//vendor/github.com/json-iterator/go:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",

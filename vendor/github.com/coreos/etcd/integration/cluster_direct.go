@@ -18,6 +18,8 @@ package integration
 
 import (
 	"github.com/coreos/etcd/clientv3"
+	"github.com/coreos/etcd/etcdserver/api/v3election/v3electionpb"
+	"github.com/coreos/etcd/etcdserver/api/v3lock/v3lockpb"
 	pb "github.com/coreos/etcd/etcdserver/etcdserverpb"
 )
 
@@ -29,6 +31,8 @@ func toGRPC(c *clientv3.Client) grpcAPI {
 		pb.NewWatchClient(c.ActiveConnection()),
 		pb.NewMaintenanceClient(c.ActiveConnection()),
 		pb.NewAuthClient(c.ActiveConnection()),
+		v3lockpb.NewLockClient(c.ActiveConnection()),
+		v3electionpb.NewElectionClient(c.ActiveConnection()),
 	}
 }
 

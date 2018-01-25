@@ -263,7 +263,7 @@ func CalculateUsage(namespaceName string, scopes []api.ResourceQuotaScope, hardL
 	for _, evaluator := range evaluators {
 		potentialResources = append(potentialResources, evaluator.MatchingResources(hardResources)...)
 	}
-	// NOTE: the intersection just removes duplicates since the evaluator match intersects wtih hard
+	// NOTE: the intersection just removes duplicates since the evaluator match intersects with hard
 	matchedResources := Intersection(hardResources, potentialResources)
 
 	// sum the observed usage from each evaluator

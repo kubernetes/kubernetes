@@ -113,10 +113,7 @@ func TestBanflunderAdmissionPlugin(t *testing.T) {
 				t.Fatalf("scenario %d: failed to create banflunder admission plugin due to = %v", index, err)
 			}
 
-			targetInitializer, err := wardleinitializer.New(informersFactory)
-			if err != nil {
-				t.Fatalf("scenario %d: failed to crate wardle plugin initializer due to = %v", index, err)
-			}
+			targetInitializer := wardleinitializer.New(informersFactory)
 			targetInitializer.Initialize(target)
 
 			err = admission.ValidateInitialization(target)

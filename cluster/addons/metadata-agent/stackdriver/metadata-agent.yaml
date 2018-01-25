@@ -22,7 +22,7 @@ spec:
         name: metadata-agent
         ports:
         - containerPort: 8000
-          hostPort: 8000
+          hostPort: 8799
           protocol: TCP
         resources:
           requests:

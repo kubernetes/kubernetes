@@ -40,6 +40,7 @@ import (
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
 const (
@@ -52,7 +53,7 @@ const (
 	minNodes            = 2
 )
 
-var _ = SIGDescribe("Pod Disks", func() {
+var _ = utils.SIGDescribe("Pod Disks", func() {
 	var (
 		ns         string
 		cs         clientset.Interface
@@ -389,8 +390,8 @@ var _ = SIGDescribe("Pod Disks", func() {
 					Expect(true, strings.Contains(string(output), string(host0Name)))
 
 					By("deleting host0")
-					resp, err := gceCloud.DeleteInstance(framework.TestContext.CloudConfig.ProjectID, framework.TestContext.CloudConfig.Zone, string(host0Name))
-					framework.ExpectNoError(err, fmt.Sprintf("Failed to delete host0Pod: err=%v response=%#v", err, resp))
+					err = gceCloud.DeleteInstance(framework.TestContext.CloudConfig.ProjectID, framework.TestContext.CloudConfig.Zone, string(host0Name))
+					framework.ExpectNoError(err, fmt.Sprintf("Failed to delete host0Pod: err=%v", err))
 					By("expecting host0 node to be re-created")
 					numNodes := countReadyNodes(cs, host0Name)
 					Expect(numNodes).To(Equal(origNodeCnt), fmt.Sprintf("Requires current node count (%d) to return to original node count (%d)", numNodes, origNodeCnt))

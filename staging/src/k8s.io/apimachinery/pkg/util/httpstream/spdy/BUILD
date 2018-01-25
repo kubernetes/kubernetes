@@ -13,8 +13,8 @@ go_test(
         "roundtripper_test.go",
         "upgrade_test.go",
     ],
+    embed = [":go_default_library"],
     importpath = "k8s.io/apimachinery/pkg/util/httpstream/spdy",
-    library = ":go_default_library",
     deps = [
         "//vendor/github.com/elazarl/goproxy:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/httpstream:go_default_library",

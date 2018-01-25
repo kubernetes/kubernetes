@@ -5,12 +5,41 @@ go_library(
     srcs = [
         "config.go",
         "devicetoken.go",
-        "msi.go",
         "persist.go",
         "sender.go",
         "token.go",
     ] + select({
-        "@io_bazel_rules_go//go/platform:windows_amd64": [
+        "@io_bazel_rules_go//go/platform:android": [
+            "msi.go",
+        ],
+        "@io_bazel_rules_go//go/platform:darwin": [
+            "msi.go",
+        ],
+        "@io_bazel_rules_go//go/platform:dragonfly": [
+            "msi.go",
+        ],
+        "@io_bazel_rules_go//go/platform:freebsd": [
+            "msi.go",
+        ],
+        "@io_bazel_rules_go//go/platform:linux": [
+            "msi.go",
+        ],
+        "@io_bazel_rules_go//go/platform:nacl": [
+            "msi.go",
+        ],
+        "@io_bazel_rules_go//go/platform:netbsd": [
+            "msi.go",
+        ],
+        "@io_bazel_rules_go//go/platform:openbsd": [
+            "msi.go",
+        ],
+        "@io_bazel_rules_go//go/platform:plan9": [
+            "msi.go",
+        ],
+        "@io_bazel_rules_go//go/platform:solaris": [
+            "msi.go",
+        ],
+        "@io_bazel_rules_go//go/platform:windows": [
             "msi_windows.go",
         ],
         "//conditions:default": [],

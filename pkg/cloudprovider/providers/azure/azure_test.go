@@ -17,20 +17,16 @@ limitations under the License.
 package azure
 
 import (
-	"encoding/json"
 	"fmt"
 	"math"
-	"net/http"
-	"net/http/httptest"
-	"reflect"
 	"strings"
 	"testing"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/util/flowcontrol"
 	serviceapi "k8s.io/kubernetes/pkg/api/v1/service"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/azure/auth"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 
 	"github.com/Azure/azure-sdk-for-go/arm/compute"
@@ -850,8 +846,10 @@ func TestReconcilePublicIPWithExternalAndInternalSwitch(t *testing.T) {
 func getTestCloud() (az *Cloud) {
 	az = &Cloud{
 		Config: Config{
-			TenantID:                     "tenant",
-			SubscriptionID:               "subscription",
+			AzureAuthConfig: auth.AzureAuthConfig{
+				TenantID:       "tenant",
+				SubscriptionID: "subscription",
+			},
 			ResourceGroup:                "rg",
 			VnetResourceGroup:            "rg",
 			Location:                     "westus",
@@ -863,13 +861,15 @@ func getTestCloud() (az *Cloud) {
 			MaximumLoadBalancerRuleCount: 250,
 		},
 	}
-	az.operationPollRateLimiter = flowcontrol.NewTokenBucketRateLimiter(100, 100)
 	az.LoadBalancerClient = newFakeAzureLBClient()
 	az.PublicIPAddressesClient = newFakeAzurePIPClient(az.Config.SubscriptionID)
 	az.SubnetsClient = newFakeAzureSubnetsClient()
 	az.SecurityGroupsClient = newFakeAzureNSGClient()
 	az.VirtualMachinesClient = newFakeAzureVirtualMachinesClient()
 	az.InterfacesClient = newFakeAzureInterfacesClient()
+	az.VirtualMachineScaleSetsClient = newFakeVirtualMachineScaleSetsClient()
+	az.VirtualMachineScaleSetVMsClient = newFakeVirtualMachineScaleSetVMsClient()
+	az.vmSet = newAvailabilitySet(az)
 
 	return az
 }
@@ -1000,23 +1000,6 @@ func getBackendPort(port int32) int32 {
 	return port + 10000
 }
 
-func getTestPublicFipConfigurationProperties() network.FrontendIPConfigurationPropertiesFormat {
-	return network.FrontendIPConfigurationPropertiesFormat{
-		PublicIPAddress: &network.PublicIPAddress{ID: to.StringPtr("/this/is/a/public/ip/address/id")},
-	}
-}
-
-func getTestInternalFipConfigurationProperties(expectedSubnetName *string) network.FrontendIPConfigurationPropertiesFormat {
-	var expectedSubnet *network.Subnet
-	if expectedSubnetName != nil {
-		expectedSubnet = &network.Subnet{Name: expectedSubnetName}
-	}
-	return network.FrontendIPConfigurationPropertiesFormat{
-		PublicIPAddress: &network.PublicIPAddress{ID: to.StringPtr("/this/is/a/public/ip/address/id")},
-		Subnet:          expectedSubnet,
-	}
-}
-
 func getTestService(identifier string, proto v1.Protocol, requestedPorts ...int32) v1.Service {
 	ports := []v1.ServicePort{}
 	for _, port := range requestedPorts {
@@ -1054,39 +1037,6 @@ func setLoadBalancerModeAnnotation(service *v1.Service, lbMode string) {
 
 func setLoadBalancerAutoModeAnnotation(service *v1.Service) {
 	setLoadBalancerModeAnnotation(service, ServiceAnnotationLoadBalancerAutoModeValue)
-}
-
-func getTestLoadBalancer(services ...v1.Service) network.LoadBalancer {
-	rules := []network.LoadBalancingRule{}
-	probes := []network.Probe{}
-
-	for _, service := range services {
-		for _, port := range service.Spec.Ports {
-			ruleName := getLoadBalancerRuleName(&service, port, nil)
-			rules = append(rules, network.LoadBalancingRule{
-				Name: to.StringPtr(ruleName),
-				LoadBalancingRulePropertiesFormat: &network.LoadBalancingRulePropertiesFormat{
-					FrontendPort: to.Int32Ptr(port.Port),
-					BackendPort:  to.Int32Ptr(port.Port),
-				},
-			})
-			probes = append(probes, network.Probe{
-				Name: to.StringPtr(ruleName),
-				ProbePropertiesFormat: &network.ProbePropertiesFormat{
-					Port: to.Int32Ptr(port.NodePort),
-				},
-			})
-		}
-	}
-
-	lb := network.LoadBalancer{
-		LoadBalancerPropertiesFormat: &network.LoadBalancerPropertiesFormat{
-			LoadBalancingRules: &rules,
-			Probes:             &probes,
-		},
-	}
-
-	return lb
 }
 
 func getServiceSourceRanges(service *v1.Service) []string {
@@ -1631,7 +1581,8 @@ func TestDecodeInstanceInfo(t *testing.T) {
 	}
 }
 
-func TestSplitProviderID(t *testing.T) {
+func TestGetNodeNameByProviderID(t *testing.T) {
+	az := getTestCloud()
 	providers := []struct {
 		providerID string
 		name       types.NodeName
@@ -1666,7 +1617,7 @@ func TestSplitProviderID(t *testing.T) {
 	}
 
 	for _, test := range providers {
-		name, err := splitProviderID(test.providerID)
+		name, err := az.vmSet.GetNodeNameByProviderID(test.providerID)
 		if (err != nil) != test.fail {
 			t.Errorf("Expected to failt=%t, with pattern %v", test.fail, test)
 		}
@@ -1679,73 +1630,6 @@ func TestSplitProviderID(t *testing.T) {
 			t.Errorf("Expected %v, but got %v", test.name, name)
 		}
 
-	}
-}
-
-func TestMetadataURLGeneration(t *testing.T) {
-	metadata := NewInstanceMetadata()
-	fullPath := metadata.makeMetadataURL("some/path")
-	if fullPath != "http://169.254.169.254/metadata/some/path" {
-		t.Errorf("Expected http://169.254.169.254/metadata/some/path saw %s", fullPath)
-	}
-}
-
-func TestMetadataParsing(t *testing.T) {
-	data := `
-{
-    "interface": [
-      {
-        "ipv4": {
-          "ipAddress": [
-            {
-              "privateIpAddress": "10.0.1.4",
-              "publicIpAddress": "X.X.X.X"
-            }
-          ],
-          "subnet": [
-            {
-              "address": "10.0.1.0",
-              "prefix": "24"
-            }
-          ]
-        },
-        "ipv6": {
-          "ipAddress": [
-
-          ]
-        },
-        "macAddress": "002248020E1E"
-      }
-    ]
-}	
-`
-
-	network := NetworkMetadata{}
-	if err := json.Unmarshal([]byte(data), &network); err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
-
-	ip := network.Interface[0].IPV4.IPAddress[0].PrivateIP
-	if ip != "10.0.1.4" {
-		t.Errorf("Unexpected value: %s, expected 10.0.1.4", ip)
-	}
-
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintln(w, data)
-	}))
-	defer server.Close()
-
-	metadata := &InstanceMetadata{
-		baseURL: server.URL,
-	}
-
-	networkJSON := NetworkMetadata{}
-	if err := metadata.Object("/some/path", &networkJSON); err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
-
-	if !reflect.DeepEqual(network, networkJSON) {
-		t.Errorf("Unexpected inequality:\n%#v\nvs\n%#v", network, networkJSON)
 	}
 }
 

@@ -63,7 +63,7 @@ import (
 	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
+	"k8s.io/kubernetes/pkg/version/verflag"
 )
 
 const (
@@ -71,10 +71,16 @@ const (
 	ControllerStartJitter = 1.0
 )
 
+type ControllerLoopMode int
+
+const (
+	IncludeCloudLoops ControllerLoopMode = iota
+	ExternalLoops
+)
+
 // NewControllerManagerCommand creates a *cobra.Command object with default parameters
 func NewControllerManagerCommand() *cobra.Command {
 	s := options.NewCMServer()
-	s.AddFlags(pflag.CommandLine, KnownControllers(), ControllersDisabledByDefault.List())
 	cmd := &cobra.Command{
 		Use: "kube-controller-manager",
 		Long: `The Kubernetes controller manager is a daemon that embeds
@@ -86,8 +92,11 @@ current state towards the desired state. Examples of controllers that ship with
 Kubernetes today are the replication controller, endpoints controller, namespace
 controller, and serviceaccounts controller.`,
 		Run: func(cmd *cobra.Command, args []string) {
+			verflag.PrintAndExitIfRequested()
+			Run(s)
 		},
 	}
+	s.AddFlags(cmd.Flags(), KnownControllers(), ControllersDisabledByDefault.List())
 
 	return cmd
 }
@@ -121,7 +130,9 @@ func Run(s *options.CMServer) error {
 		return err
 	}
 
-	go startHTTP(s)
+	if s.Port >= 0 {
+		go startHTTP(s)
+	}
 
 	recorder := createRecorder(kubeClient)
 
@@ -139,7 +150,7 @@ func Run(s *options.CMServer) error {
 			clientBuilder = controller.SAControllerClientBuilder{
 				ClientConfig:         restclient.AnonymousClientConfig(kubeconfig),
 				CoreClient:           kubeClient.CoreV1(),
-				AuthenticationClient: kubeClient.Authentication(),
+				AuthenticationClient: kubeClient.AuthenticationV1(),
 				Namespace:            "kube-system",
 			}
 		} else {
@@ -151,7 +162,7 @@ func Run(s *options.CMServer) error {
 		}
 		saTokenControllerInitFunc := serviceAccountTokenControllerStarter{rootClientBuilder: rootClientBuilder}.startServiceAccountTokenController
 
-		if err := StartControllers(ctx, saTokenControllerInitFunc, NewControllerInitializers()); err != nil {
+		if err := StartControllers(ctx, saTokenControllerInitFunc, NewControllerInitializers(ctx.LoopMode)); err != nil {
 			glog.Fatalf("error starting controllers: %v", err)
 		}
 
@@ -162,7 +173,7 @@ func Run(s *options.CMServer) error {
 	}
 
 	if !s.LeaderElection.LeaderElect {
-		run(nil)
+		run(wait.NeverStop)
 		panic("unreachable")
 	}
 
@@ -262,6 +273,11 @@ type ControllerContext struct {
 	// It must be initialized and ready to use.
 	Cloud cloudprovider.Interface
 
+	// Control for which control loops to be run
+	// IncludeCloudLoops is for a kube-controller-manager running all loops
+	// ExternalLoops is for a kube-controller-manager running with a cloud-controller-manager
+	LoopMode ControllerLoopMode
+
 	// Stop is the stop channel
 	Stop <-chan struct{}
 
@@ -305,7 +321,7 @@ func IsControllerEnabled(name string, disabledByDefaultControllers sets.String, 
 type InitFunc func(ctx ControllerContext) (bool, error)
 
 func KnownControllers() []string {
-	ret := sets.StringKeySet(NewControllerInitializers())
+	ret := sets.StringKeySet(NewControllerInitializers(IncludeCloudLoops))
 
 	// add "special" controllers that aren't initialized normally.  These controllers cannot be initialized
 	// using a normal function.  The only known special case is the SA token controller which *must* be started
@@ -329,7 +345,7 @@ const (
 
 // NewControllerInitializers is a public map of named controller groups (you can start more than one in an init func)
 // paired to their InitFunc.  This allows for structured downstream composition and subdivision.
-func NewControllerInitializers() map[string]InitFunc {
+func NewControllerInitializers(loopMode ControllerLoopMode) map[string]InitFunc {
 	controllers := map[string]InitFunc{}
 	controllers["endpoint"] = startEndpointController
 	controllers["replicationcontroller"] = startReplicationController
@@ -352,9 +368,14 @@ func NewControllerInitializers() map[string]InitFunc {
 	controllers["ttl"] = startTTLController
 	controllers["bootstrapsigner"] = startBootstrapSignerController
 	controllers["tokencleaner"] = startTokenCleanerController
-	controllers["service"] = startServiceController
-	controllers["node"] = startNodeController
-	controllers["route"] = startRouteController
+	if loopMode == IncludeCloudLoops {
+		controllers["service"] = startServiceController
+		controllers["nodeipam"] = startNodeIpamController
+		controllers["route"] = startRouteController
+		// TODO: volume controller into the IncludeCloudLoops only set.
+		// TODO: Separate cluster in cloud check from node lifecycle controller.
+	}
+	controllers["nodelifecycle"] = startNodeLifecycleController
 	controllers["persistentvolume-binder"] = startPersistentVolumeBinderController
 	controllers["attachdetach"] = startAttachDetachController
 	controllers["persistentvolume-expander"] = startVolumeExpandController
@@ -430,7 +451,17 @@ func CreateControllerContext(s *options.CMServer, rootClientBuilder, clientBuild
 		return ControllerContext{}, err
 	}
 
-	cloud, err := cloudprovider.InitCloudProvider(s.CloudProvider, s.CloudConfigFile)
+	var cloud cloudprovider.Interface
+	var loopMode ControllerLoopMode
+	if cloudprovider.IsExternal(s.CloudProvider) {
+		loopMode = ExternalLoops
+		if s.ExternalCloudVolumePlugin != "" {
+			cloud, err = cloudprovider.InitCloudProvider(s.ExternalCloudVolumePlugin, s.CloudConfigFile)
+		}
+	} else {
+		loopMode = IncludeCloudLoops
+		cloud, err = cloudprovider.InitCloudProvider(s.CloudProvider, s.CloudConfigFile)
+	}
 	if err != nil {
 		return ControllerContext{}, fmt.Errorf("cloud provider could not be initialized: %v", err)
 	}
@@ -453,6 +484,7 @@ func CreateControllerContext(s *options.CMServer, rootClientBuilder, clientBuild
 		Options:            *s,
 		AvailableResources: availableResources,
 		Cloud:              cloud,
+		LoopMode:           loopMode,
 		Stop:               stop,
 		InformersStarted:   make(chan struct{}),
 	}

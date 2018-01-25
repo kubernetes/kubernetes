@@ -372,6 +372,19 @@ func CleanupGCEIngressController(gceController *GCEIngressController) {
 	}
 }
 
+func (cont *GCEIngressController) ListGlobalForwardingRules() []*compute.ForwardingRule {
+	gceCloud := cont.Cloud.Provider.(*gcecloud.GCECloud)
+	fwdList := []*compute.ForwardingRule{}
+	l, err := gceCloud.ListGlobalForwardingRules()
+	Expect(err).NotTo(HaveOccurred())
+	for _, fwd := range l {
+		if cont.isOwned(fwd.Name) {
+			fwdList = append(fwdList, fwd)
+		}
+	}
+	return fwdList
+}
+
 func (cont *GCEIngressController) deleteForwardingRule(del bool) string {
 	msg := ""
 	fwList := []compute.ForwardingRule{}
@@ -394,6 +407,13 @@ func (cont *GCEIngressController) deleteForwardingRule(del bool) string {
 	return msg
 }
 
+func (cont *GCEIngressController) GetGlobalAddress(ipName string) *compute.Address {
+	gceCloud := cont.Cloud.Provider.(*gcecloud.GCECloud)
+	ip, err := gceCloud.GetGlobalAddress(ipName)
+	Expect(err).NotTo(HaveOccurred())
+	return ip
+}
+
 func (cont *GCEIngressController) deleteAddresses(del bool) string {
 	msg := ""
 	ipList := []compute.Address{}
@@ -412,6 +432,32 @@ func (cont *GCEIngressController) deleteAddresses(del bool) string {
 		}
 	}
 	return msg
+}
+
+func (cont *GCEIngressController) ListTargetHttpProxies() []*compute.TargetHttpProxy {
+	gceCloud := cont.Cloud.Provider.(*gcecloud.GCECloud)
+	tpList := []*compute.TargetHttpProxy{}
+	l, err := gceCloud.ListTargetHttpProxies()
+	Expect(err).NotTo(HaveOccurred())
+	for _, tp := range l {
+		if cont.isOwned(tp.Name) {
+			tpList = append(tpList, tp)
+		}
+	}
+	return tpList
+}
+
+func (cont *GCEIngressController) ListTargetHttpsProxies() []*compute.TargetHttpsProxy {
+	gceCloud := cont.Cloud.Provider.(*gcecloud.GCECloud)
+	tpsList := []*compute.TargetHttpsProxy{}
+	l, err := gceCloud.ListTargetHttpsProxies()
+	Expect(err).NotTo(HaveOccurred())
+	for _, tps := range l {
+		if cont.isOwned(tps.Name) {
+			tpsList = append(tpsList, tps)
+		}
+	}
+	return tpsList
 }
 
 func (cont *GCEIngressController) deleteTargetProxy(del bool) string {
@@ -449,6 +495,19 @@ func (cont *GCEIngressController) deleteTargetProxy(del bool) string {
 	return msg
 }
 
+func (cont *GCEIngressController) ListUrlMaps() []*compute.UrlMap {
+	gceCloud := cont.Cloud.Provider.(*gcecloud.GCECloud)
+	umList := []*compute.UrlMap{}
+	l, err := gceCloud.ListUrlMaps()
+	Expect(err).NotTo(HaveOccurred())
+	for _, um := range l {
+		if cont.isOwned(um.Name) {
+			umList = append(umList, um)
+		}
+	}
+	return umList
+}
+
 func (cont *GCEIngressController) deleteURLMap(del bool) (msg string) {
 	gceCloud := cont.Cloud.Provider.(*gcecloud.GCECloud)
 	umList, err := gceCloud.ListUrlMaps()
@@ -458,10 +517,10 @@ func (cont *GCEIngressController) deleteURLMap(del bool) (msg string) {
 		}
 		return fmt.Sprintf("Failed to list url maps: %v", err)
 	}
-	if len(umList.Items) == 0 {
+	if len(umList) == 0 {
 		return msg
 	}
-	for _, um := range umList.Items {
+	for _, um := range umList {
 		if !cont.canDelete(um.Name, um.CreationTimestamp, del) {
 			continue
 		}
@@ -478,6 +537,19 @@ func (cont *GCEIngressController) deleteURLMap(del bool) (msg string) {
 	return msg
 }
 
+func (cont *GCEIngressController) ListGlobalBackendServices() []*compute.BackendService {
+	gceCloud := cont.Cloud.Provider.(*gcecloud.GCECloud)
+	beList := []*compute.BackendService{}
+	l, err := gceCloud.ListGlobalBackendServices()
+	Expect(err).NotTo(HaveOccurred())
+	for _, be := range l {
+		if cont.isOwned(be.Name) {
+			beList = append(beList, be)
+		}
+	}
+	return beList
+}
+
 func (cont *GCEIngressController) deleteBackendService(del bool) (msg string) {
 	gceCloud := cont.Cloud.Provider.(*gcecloud.GCECloud)
 	beList, err := gceCloud.ListGlobalBackendServices()
@@ -487,11 +559,11 @@ func (cont *GCEIngressController) deleteBackendService(del bool) (msg string) {
 		}
 		return fmt.Sprintf("Failed to list backend services: %v", err)
 	}
-	if len(beList.Items) == 0 {
+	if len(beList) == 0 {
 		Logf("No backend services found")
 		return msg
 	}
-	for _, be := range beList.Items {
+	for _, be := range beList {
 		if !cont.canDelete(be.Name, be.CreationTimestamp, del) {
 			continue
 		}
@@ -517,10 +589,10 @@ func (cont *GCEIngressController) deleteHTTPHealthCheck(del bool) (msg string) {
 		}
 		return fmt.Sprintf("Failed to list HTTP health checks: %v", err)
 	}
-	if len(hcList.Items) == 0 {
+	if len(hcList) == 0 {
 		return msg
 	}
-	for _, hc := range hcList.Items {
+	for _, hc := range hcList {
 		if !cont.canDelete(hc.Name, hc.CreationTimestamp, del) {
 			continue
 		}
@@ -537,6 +609,19 @@ func (cont *GCEIngressController) deleteHTTPHealthCheck(del bool) (msg string) {
 	return msg
 }
 
+func (cont *GCEIngressController) ListSslCertificates() []*compute.SslCertificate {
+	gceCloud := cont.Cloud.Provider.(*gcecloud.GCECloud)
+	sslList := []*compute.SslCertificate{}
+	l, err := gceCloud.ListSslCertificates()
+	Expect(err).NotTo(HaveOccurred())
+	for _, ssl := range l {
+		if cont.isOwned(ssl.Name) {
+			sslList = append(sslList, ssl)
+		}
+	}
+	return sslList
+}
+
 func (cont *GCEIngressController) deleteSSLCertificate(del bool) (msg string) {
 	gceCloud := cont.Cloud.Provider.(*gcecloud.GCECloud)
 	sslList, err := gceCloud.ListSslCertificates()
@@ -546,8 +631,8 @@ func (cont *GCEIngressController) deleteSSLCertificate(del bool) (msg string) {
 		}
 		return fmt.Sprintf("Failed to list ssl certificates: %v", err)
 	}
-	if len(sslList.Items) != 0 {
-		for _, s := range sslList.Items {
+	if len(sslList) != 0 {
+		for _, s := range sslList {
 			if !cont.canDelete(s.Name, s.CreationTimestamp, del) {
 				continue
 			}
@@ -565,6 +650,19 @@ func (cont *GCEIngressController) deleteSSLCertificate(del bool) (msg string) {
 	return msg
 }
 
+func (cont *GCEIngressController) ListInstanceGroups() []*compute.InstanceGroup {
+	gceCloud := cont.Cloud.Provider.(*gcecloud.GCECloud)
+	igList := []*compute.InstanceGroup{}
+	l, err := gceCloud.ListInstanceGroups(cont.Cloud.Zone)
+	Expect(err).NotTo(HaveOccurred())
+	for _, ig := range l {
+		if cont.isOwned(ig.Name) {
+			igList = append(igList, ig)
+		}
+	}
+	return igList
+}
+
 func (cont *GCEIngressController) deleteInstanceGroup(del bool) (msg string) {
 	gceCloud := cont.Cloud.Provider.(*gcecloud.GCECloud)
 	// TODO: E2E cloudprovider has only 1 zone, but the cluster can have many.
@@ -576,10 +674,10 @@ func (cont *GCEIngressController) deleteInstanceGroup(del bool) (msg string) {
 		}
 		return fmt.Sprintf("Failed to list instance groups: %v", err)
 	}
-	if len(igList.Items) == 0 {
+	if len(igList) == 0 {
 		return msg
 	}
-	for _, ig := range igList.Items {
+	for _, ig := range igList {
 		if !cont.canDelete(ig.Name, ig.CreationTimestamp, del) {
 			continue
 		}
@@ -656,6 +754,12 @@ func (cont *GCEIngressController) canDelete(resourceName, creationTimestamp stri
 		return false
 	}
 	return canDeleteWithTimestamp(resourceName, creationTimestamp)
+}
+
+// isOwned returns true if the resourceName ends in a suffix matching this
+// controller UID.
+func (cont *GCEIngressController) isOwned(resourceName string) bool {
+	return cont.canDelete(resourceName, "", false)
 }
 
 // canDeleteNEG returns true if either the name contains this controller's UID,
@@ -745,7 +849,7 @@ func (cont *GCEIngressController) backendMode(nodeports []string, keyword string
 	}
 
 	matchingBackendService := 0
-	for _, bs := range beList.Items {
+	for _, bs := range beList {
 		match := false
 		for _, np := range nodeports {
 			// Warning: This assumes backend service naming convention includes nodeport in the name

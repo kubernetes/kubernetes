@@ -61,9 +61,9 @@ var CommonImageWhiteList = sets.NewString(
 	imageutils.GetE2EImage(imageutils.ServeHostname),
 	imageutils.GetE2EImage(imageutils.TestWebserver),
 	imageutils.GetE2EImage(imageutils.Hostexec),
-	"gcr.io/google_containers/volume-nfs:0.8",
-	"gcr.io/google_containers/volume-gluster:0.2",
-	"gcr.io/google_containers/e2e-net-amd64:1.0",
+	imageutils.GetE2EImage(imageutils.VolumeNFSServer),
+	imageutils.GetE2EImage(imageutils.VolumeGlusterServer),
+	imageutils.GetE2EImage(imageutils.E2ENet),
 )
 
 func svcByName(name string, port int) *v1.Service {

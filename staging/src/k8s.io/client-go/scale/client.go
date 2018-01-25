@@ -21,6 +21,7 @@ import (
 
 	autoscaling "k8s.io/api/autoscaling/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/client-go/dynamic"
@@ -129,21 +130,29 @@ func (c *namespacedScaleClient) Get(resource schema.GroupResource, name string) 
 		return nil, fmt.Errorf("unable to get client for %s: %v", resource.String(), err)
 	}
 
-	rawObj, err := c.client.clientBase.Get().
+	result := c.client.clientBase.Get().
 		AbsPath(path).
 		Namespace(c.namespace).
 		Resource(gvr.Resource).
 		Name(name).
 		SubResource("scale").
-		Do().
-		Get()
+		Do()
+	if err := result.Error(); err != nil {
+		return nil, fmt.Errorf("could not fetch the scale for %s %s: %v", resource.String(), name, err)
+	}
 
+	scaleBytes, err := result.Raw()
+	if err != nil {
+		return nil, err
+	}
+	decoder := scaleConverter.codecs.UniversalDecoder(scaleConverter.ScaleVersions()...)
+	rawScaleObj, err := runtime.Decode(decoder, scaleBytes)
 	if err != nil {
 		return nil, err
 	}
 
 	// convert whatever this is to autoscaling/v1.Scale
-	scaleObj, err := scaleConverter.ConvertToVersion(rawObj, autoscaling.SchemeGroupVersion)
+	scaleObj, err := scaleConverter.ConvertToVersion(rawScaleObj, autoscaling.SchemeGroupVersion)
 	if err != nil {
 		return nil, fmt.Errorf("received an object from a /scale endpoint which was not convertible to autoscaling Scale: %v", err)
 	}
@@ -158,7 +167,7 @@ func (c *namespacedScaleClient) Update(resource schema.GroupResource, scale *aut
 	}
 
 	// Currently, a /scale endpoint can receive and return different scale types.
-	// Until we hvae support for the alternative API representations proposal,
+	// Until we have support for the alternative API representations proposal,
 	// we need to deal with sending and accepting differnet API versions.
 
 	// figure out what scale we actually need here
@@ -170,25 +179,38 @@ func (c *namespacedScaleClient) Update(resource schema.GroupResource, scale *aut
 	// convert this to whatever this endpoint wants
 	scaleUpdate, err := scaleConverter.ConvertToVersion(scale, desiredGVK.GroupVersion())
 	if err != nil {
-		return nil, fmt.Errorf("could not convert scale update to internal Scale: %v", err)
+		return nil, fmt.Errorf("could not convert scale update to external Scale: %v", err)
+	}
+	encoder := scaleConverter.codecs.LegacyCodec(desiredGVK.GroupVersion())
+	scaleUpdateBytes, err := runtime.Encode(encoder, scaleUpdate)
+	if err != nil {
+		return nil, fmt.Errorf("could not encode scale update to external Scale: %v", err)
 	}
 
-	rawObj, err := c.client.clientBase.Put().
+	result := c.client.clientBase.Put().
 		AbsPath(path).
 		Namespace(c.namespace).
 		Resource(gvr.Resource).
 		Name(scale.Name).
 		SubResource("scale").
-		Body(scaleUpdate).
-		Do().
-		Get()
+		Body(scaleUpdateBytes).
+		Do()
+	if err := result.Error(); err != nil {
+		return nil, fmt.Errorf("could not update the scale for %s %s: %v", resource.String(), scale.Name, err)
+	}
 
+	scaleBytes, err := result.Raw()
 	if err != nil {
-		return nil, fmt.Errorf("could not fetch the scale for %s %s: %v", resource.String(), scale.Name, err)
+		return nil, err
+	}
+	decoder := scaleConverter.codecs.UniversalDecoder(scaleConverter.ScaleVersions()...)
+	rawScaleObj, err := runtime.Decode(decoder, scaleBytes)
+	if err != nil {
+		return nil, err
 	}
 
 	// convert whatever this is back to autoscaling/v1.Scale
-	scaleObj, err := scaleConverter.ConvertToVersion(rawObj, autoscaling.SchemeGroupVersion)
+	scaleObj, err := scaleConverter.ConvertToVersion(rawScaleObj, autoscaling.SchemeGroupVersion)
 	if err != nil {
 		return nil, fmt.Errorf("received an object from a /scale endpoint which was not convertible to autoscaling Scale: %v", err)
 	}

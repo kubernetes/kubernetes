@@ -84,7 +84,8 @@ var (
 func NewCmdApplySetLastApplied(f cmdutil.Factory, out, err io.Writer) *cobra.Command {
 	options := &SetLastAppliedOptions{Out: out, ErrOut: err}
 	cmd := &cobra.Command{
-		Use:     "set-last-applied -f FILENAME",
+		Use: "set-last-applied -f FILENAME",
+		DisableFlagsInUseLine: true,
 		Short:   i18n.T("Set the last-applied-configuration annotation on a live object to match the contents of a file."),
 		Long:    applySetLastAppliedLong,
 		Example: applySetLastAppliedExample,

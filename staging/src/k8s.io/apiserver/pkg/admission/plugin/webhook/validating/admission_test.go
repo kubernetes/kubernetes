@@ -32,7 +32,6 @@ import (
 	registrationv1beta1 "k8s.io/api/admissionregistration/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -403,7 +402,7 @@ func TestValidate(t *testing.T) {
 					t.Errorf(" expected an error saying %q, but got %v", tt.errorContains, err)
 				}
 			}
-			if _, isStatusErr := err.(*apierrors.StatusError); err != nil && !isStatusErr {
+			if _, isStatusErr := err.(*errors.StatusError); err != nil && !isStatusErr {
 				t.Errorf("%s: expected a StatusError, got %T", name, err)
 			}
 		})

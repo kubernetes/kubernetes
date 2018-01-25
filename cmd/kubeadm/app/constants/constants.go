@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
+	bootstrapapi "k8s.io/client-go/tools/bootstrap/token/api"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	"k8s.io/kubernetes/pkg/util/version"
 )
@@ -220,25 +221,23 @@ var (
 	AuthorizationWebhookConfigPath = filepath.Join(KubernetesDir, "webhook_authz.conf")
 
 	// DefaultTokenUsages specifies the default functions a token will get
-	DefaultTokenUsages = []string{"signing", "authentication"}
+	DefaultTokenUsages = bootstrapapi.KnownTokenUsages
 
 	// MasterComponents defines the master component names
 	MasterComponents = []string{KubeAPIServer, KubeControllerManager, KubeScheduler}
 
 	// MinimumControlPlaneVersion specifies the minimum control plane version kubeadm can deploy
-	MinimumControlPlaneVersion = version.MustParseSemantic("v1.8.0")
+	MinimumControlPlaneVersion = version.MustParseSemantic("v1.9.0")
 
 	// MinimumKubeletVersion specifies the minimum version of kubelet which kubeadm supports
-	MinimumKubeletVersion = version.MustParseSemantic("v1.8.0")
-
-	// MinimumKubeProxyComponentConfigVersion specifies the minimum version for the kubeProxyComponent
-	MinimumKubeProxyComponentConfigVersion = version.MustParseSemantic("v1.9.0-alpha.3")
+	MinimumKubeletVersion = version.MustParseSemantic("v1.9.0")
 
 	// SupportedEtcdVersion lists officially supported etcd versions with corresponding kubernetes releases
 	SupportedEtcdVersion = map[uint8]string{
 		8:  "3.0.17",
 		9:  "3.1.10",
 		10: "3.1.10",
+		11: "3.1.10",
 	}
 )
 

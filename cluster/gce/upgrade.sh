@@ -537,6 +537,39 @@ if [[ -z "${STORAGE_MEDIA_TYPE:-}" ]] && [[ "${STORAGE_BACKEND:-}" != "etcd2" ]]
   fi
 fi
 
+# Prompt if etcd image/version is unspecified when doing master upgrade.
+# In e2e tests, we use TEST_ALLOW_IMPLICIT_ETCD_UPGRADE=true to skip this
+# prompt, simulating the behavior when the user confirms interactively.
+# All other automated use of this script should explicitly specify a version.
+if [[ "${master_upgrade}" == "true" ]]; then
+  if [[ -z "${ETCD_IMAGE:-}" && -z "${TEST_ETCD_IMAGE:-}" ]] || [[ -z "${ETCD_VERSION:-}" && -z "${TEST_ETCD_VERSION:-}" ]]; then
+    echo
+    echo "***WARNING***"
+    echo "Upgrading Kubernetes with this script might result in an upgrade to a new etcd version."
+    echo "Some etcd version upgrades, such as 3.0.x to 3.1.x, DO NOT offer a downgrade path."
+    echo "To pin the etcd version to your current one (e.g. v3.0.17), set the following variables"
+    echo "before running this script:"
+    echo
+    echo "# example: pin to etcd v3.0.17"
+    echo "export ETCD_IMAGE=3.0.17"
+    echo "export ETCD_VERSION=3.0.17"
+    echo
+    echo "Alternatively, if you choose to allow an etcd upgrade that doesn't support downgrade,"
+    echo "you might still be able to downgrade Kubernetes by pinning to the newer etcd version."
+    echo "In all cases, it is strongly recommended to have an etcd backup before upgrading."
+    echo
+    if [ -t 0 ] && [ -t 1 ]; then
+      read -p "Continue with default etcd version, which might upgrade etcd? [y/N] " confirm
+      if [[ "${confirm}" != "y" ]]; then
+        exit 1
+      fi
+    elif [[ "${TEST_ALLOW_IMPLICIT_ETCD_UPGRADE:-}" != "true" ]]; then
+      echo "ETCD_IMAGE and ETCD_VERSION must be specified when run non-interactively." >&2
+      exit 1
+    fi
+  fi
+fi
+
 print-node-version-info "Pre-Upgrade"
 
 if [[ "${local_binaries}" == "false" ]]; then
