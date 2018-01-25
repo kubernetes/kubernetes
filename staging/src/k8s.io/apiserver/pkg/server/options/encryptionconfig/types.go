@@ -82,7 +82,9 @@ type KMSConfig struct {
 	// +optional
 	CacheSize int `json:"cachesize,omitempty"`
 	// configfile is the path to the configuration file for the named KMS provider.
-	ConfigFile string `json:"configfile"`
+	// +optional
+	ConfigFile string `json:"configfile,omitempty"`
 	// the gRPC server listening address, for example "unix:///var/run/kms-provider.sock".
-	Endpoint string `json:"endpoint"`
+	// +optional
+	Endpoint string `json:"endpoint,omitempty"`
 }

@@ -49,7 +49,7 @@ type gRPCService struct {
 
 // NewGRPCService returns an envelope.Service which use gRPC to communicate the remote KMS provider.
 func NewGRPCService(endpoint string) (Service, error) {
-	glog.Infof("Configure KMS provider with endpoint: %s", endpoint)
+	glog.V(4).Infof("Configure KMS provider with endpoint: %s", endpoint)
 
 	protocol, addr, err := parseEndpoint(endpoint)
 	if err != nil {
@@ -106,7 +106,7 @@ func checkAPIVersion(kmsClient kmsapi.KMSServiceClient) error {
 			response.Version, kmsapiVersion)
 	}
 
-	glog.Infof("KMS provider %s initialized, version: %s", response.RuntimeName, response.RuntimeVersion)
+	glog.V(4).Infof("KMS provider %s initialized, version: %s", response.RuntimeName, response.RuntimeVersion)
 	return nil
 }
 
