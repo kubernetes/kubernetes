@@ -92,7 +92,7 @@ function juLog() {
   # calculate command to eval
   [ -z "$1" ] && return
   cmd="$1"; shift
-  while [ -n "$1" ]
+  while [ -n "${1:-}" ]
   do
      cmd="$cmd \"$1\""
      shift
@@ -118,7 +118,7 @@ function juLog() {
   # set the appropriate error, based in the exit code and the regex
   [ $evErr != 0 ] && err=1 || err=0
   out=`cat $outf | ${SED} -e 's/^\([^+]\)/| \1/g'`
-  if [ $err = 0 -a -n "$ereg" ]; then
+  if [ $err = 0 -a -n "${ereg:-}" ]; then
       H=`echo "$out" | egrep $icase "$ereg"`
       [ -n "$H" ] && err=1
   fi
