@@ -112,15 +112,18 @@ func (t *IngressUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, 
 		// Ingress. Restarting the ingress controller and deleting ingresses
 		// while it's down will leak cloud resources, because the ingress
 		// controller doesn't checkpoint to disk.
-		t.verify(f, done, true)
+		t.verify(f, done, true, false)
 	case IngressUpgrade:
-		t.verify(f, done, true)
+		t.verify(f, done, true, false)
 	default:
 		// Currently ingress gets disrupted across node upgrade, because endpoints
 		// get killed and we don't have any guarantees that 2 nodes don't overlap
 		// their upgrades (even on cloud platforms like GCE, because VM level
 		// rolling upgrades are not Kubernetes aware).
-		t.verify(f, done, false)
+		// Also, nodes might be removed and re-added to the instance group by
+		// ingress controller during node upgrade. We specifically wait for the
+		// GCP resources to be reconciled.
+		t.verify(f, done, false, true)
 	}
 }
 
@@ -141,7 +144,7 @@ func (t *IngressUpgradeTest) Teardown(f *framework.Framework) {
 	framework.CleanupGCEIngressController(t.gceController)
 }
 
-func (t *IngressUpgradeTest) verify(f *framework.Framework, done <-chan struct{}, testDuringDisruption bool) {
+func (t *IngressUpgradeTest) verify(f *framework.Framework, done <-chan struct{}, testDuringDisruption, pollForGCPResources bool) {
 	if testDuringDisruption {
 		By("continuously hitting the Ingress IP")
 		wait.Until(func() {
@@ -180,17 +183,32 @@ func (t *IngressUpgradeTest) verify(f *framework.Framework, done <-chan struct{}
 	// everything is synced with the cloud.
 	t.jig.WaitForIngress(false)
 	By("comparing GCP resources post-upgrade")
-	postUpgradeResourceStore := &GCPResourceStore{}
-	t.populateGCPResourceStore(postUpgradeResourceStore)
-	framework.ExpectNoError(compareGCPResourceStores(t.resourceStore, postUpgradeResourceStore, func(v1 reflect.Value, v2 reflect.Value) error {
-		i1 := v1.Interface()
-		i2 := v2.Interface()
-		// Skip verifying the UrlMap since we did that via WaitForIngress()
-		if !reflect.DeepEqual(i1, i2) && (v1.Type() != reflect.TypeOf([]*compute.UrlMap{})) {
-			return spew.Errorf("resources after ingress upgrade were different:\n Pre-Upgrade: %#v\n Post-Upgrade: %#v", i1, i2)
-		}
-		return nil
-	}))
+	compareFunc := func() error {
+		postUpgradeResourceStore := &GCPResourceStore{}
+		t.populateGCPResourceStore(postUpgradeResourceStore)
+		return compareGCPResourceStores(t.resourceStore, postUpgradeResourceStore, func(v1 reflect.Value, v2 reflect.Value) error {
+			i1 := v1.Interface()
+			i2 := v2.Interface()
+			// Skip verifying the UrlMap since we did that via WaitForIngress()
+			if !reflect.DeepEqual(i1, i2) && (v1.Type() != reflect.TypeOf([]*compute.UrlMap{})) {
+				return spew.Errorf("resources after ingress upgrade were different:\n Pre-Upgrade: %#v\n Post-Upgrade: %#v", i1, i2)
+			}
+			return nil
+		})
+	}
+	var err error
+	if pollForGCPResources {
+		err = wait.Poll(framework.LoadBalancerPollInterval, framework.LoadBalancerPollTimeout, func() (bool, error) {
+			if err := compareFunc(); err != nil {
+				framework.Logf("%v", err)
+				return false, nil
+			}
+			return true, nil
+		})
+	} else {
+		err = compareFunc()
+	}
+	framework.ExpectNoError(err)
 }
 
 func (t *IngressUpgradeTest) populateGCPResourceStore(resourceStore *GCPResourceStore) {
