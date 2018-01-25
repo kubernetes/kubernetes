@@ -31,6 +31,8 @@ retry() {
 
 export PATH=${GOPATH}/bin:${PWD}/third_party/etcd:/usr/local/go/bin:${PATH}
 
+# Produce a JUnit-style XML test report
+export KUBE_JUNIT_REPORT_DIR=${WORKSPACE}/artifacts
 # Set artifacts directory
 export ARTIFACTS_DIR=${WORKSPACE}/artifacts
 
