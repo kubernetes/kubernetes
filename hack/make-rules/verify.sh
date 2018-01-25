@@ -129,30 +129,15 @@ function run-checks {
   done
 }
 
-SILENT=true
-QUICK=false
-
-while getopts ":vQ" opt; do
-  case ${opt} in
-    v)
-      SILENT=false
-      ;;
-    Q)
-      QUICK=true
-      ;;
-    \?)
-      echo "Invalid flag: -${OPTARG}" >&2
-      exit 1
-      ;;
-  esac
-done
+SILENT=${SILENT:-false}
+QUICK=${QUICK:-false}
 
 if ${SILENT} ; then
-  echo "Running in silent mode, run with -v if you want to see script logs."
+  echo "Running in silent mode, run with SILENT=false if you want to see script logs."
 fi
 
 if ${QUICK} ; then
-  echo "Running in quick mode (-Q flag). Only fast checks will run."
+  echo "Running in quick mode (QUICK=true). Only fast checks will run."
 fi
 
 ret=0
