@@ -71,8 +71,10 @@ func NewAPIServiceRegistrationController(apiServiceInformer informers.APIService
 }
 
 func (c *APIServiceRegistrationController) sync(key string) error {
+	glog.Infof("APIServiceRegistrationController sync %s", key)
 	apiService, err := c.apiServiceLister.Get(key)
 	if apierrors.IsNotFound(err) {
+		glog.Infof("APIServiceRegistrationController sync remove %s", key)
 		c.apiHandlerManager.RemoveAPIService(key)
 		return nil
 	}
@@ -80,6 +82,7 @@ func (c *APIServiceRegistrationController) sync(key string) error {
 		return err
 	}
 
+	glog.Infof("APIServiceRegistrationController sync add %s", key)
 	return c.apiHandlerManager.AddAPIService(apiService)
 }
 
@@ -149,6 +152,7 @@ func (c *APIServiceRegistrationController) updateAPIService(obj, _ interface{}) 
 }
 
 func (c *APIServiceRegistrationController) deleteAPIService(obj interface{}) {
+	glog.Infof("APIServiceRegistrationController deleteAPIService %#v", obj)
 	castObj, ok := obj.(*apiregistration.APIService)
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
