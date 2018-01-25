@@ -585,3 +585,37 @@ func TestInstanceIDFromProviderID(t *testing.T) {
 		}
 	}
 }
+
+func TestToAuth3Options(t *testing.T) {
+	cfg := Config{}
+	cfg.Global.Username = "user"
+	cfg.Global.Password = "pass"
+	cfg.Global.DomainId = "2a73b8f597c04551a0fdc8e95544be8a"
+	cfg.Global.DomainName = "local"
+	cfg.Global.AuthUrl = "http://auth.url"
+	cfg.Global.UserId = "user"
+
+	ao := cfg.toAuth3Options()
+
+	if !ao.AllowReauth {
+		t.Errorf("Will need to be able to reauthenticate")
+	}
+	if ao.Username != cfg.Global.Username {
+		t.Errorf("Username %s != %s", ao.Username, cfg.Global.Username)
+	}
+	if ao.Password != cfg.Global.Password {
+		t.Errorf("Password %s != %s", ao.Password, cfg.Global.Password)
+	}
+	if ao.DomainID != cfg.Global.DomainId {
+		t.Errorf("DomainID %s != %s", ao.DomainID, cfg.Global.DomainId)
+	}
+	if ao.IdentityEndpoint != cfg.Global.AuthUrl {
+		t.Errorf("IdentityEndpoint %s != %s", ao.IdentityEndpoint, cfg.Global.AuthUrl)
+	}
+	if ao.UserID != cfg.Global.UserId {
+		t.Errorf("UserID %s != %s", ao.UserID, cfg.Global.UserId)
+	}
+	if ao.DomainName != cfg.Global.DomainName {
+		t.Errorf("DomainName %s != %s", ao.DomainName, cfg.Global.DomainName)
+	}
+}
