@@ -637,18 +637,6 @@ func (c *BlobDiskController) getNextAccountNum() int {
 	return max + 1
 }
 
-func (c *BlobDiskController) deleteStorageAccount(storageAccountName string) error {
-	resp, err := c.common.cloud.StorageAccountClient.Delete(c.common.resourceGroup, storageAccountName)
-	if err != nil {
-		return fmt.Errorf("azureDisk - Delete of storage account '%s' failed with status %s...%v", storageAccountName, resp.Status, err)
-	}
-
-	c.removeAccountState(storageAccountName)
-
-	glog.Infof("azureDisk - Storage Account %s was deleted", storageAccountName)
-	return nil
-}
-
 //Gets storage account exist, provisionStatus, Error if any
 func (c *BlobDiskController) getStorageAccountState(storageAccountName string) (bool, storage.ProvisioningState, error) {
 	account, err := c.common.cloud.StorageAccountClient.GetProperties(c.common.resourceGroup, storageAccountName)
@@ -665,12 +653,6 @@ func (c *BlobDiskController) addAccountState(key string, state *storageAccountSt
 	if _, ok := c.accounts[key]; !ok {
 		c.accounts[key] = state
 	}
-}
-
-func (c *BlobDiskController) removeAccountState(key string) {
-	accountsLock.Lock()
-	defer accountsLock.Unlock()
-	delete(c.accounts, key)
 }
 
 // pads account num with zeros as needed

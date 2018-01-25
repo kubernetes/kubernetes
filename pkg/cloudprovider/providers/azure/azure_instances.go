@@ -119,9 +119,3 @@ func (az *Cloud) CurrentNodeName(hostname string) (types.NodeName, error) {
 func mapNodeNameToVMName(nodeName types.NodeName) string {
 	return string(nodeName)
 }
-
-// mapVMNameToNodeName maps an Azure VM Name to a k8s NodeName
-// This is a simple string cast.
-func mapVMNameToNodeName(vmName string) types.NodeName {
-	return types.NodeName(vmName)
-}

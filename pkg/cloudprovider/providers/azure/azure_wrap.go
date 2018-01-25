@@ -131,54 +131,6 @@ func (az *Cloud) getRouteTable() (routeTable network.RouteTable, exists bool, er
 	return routeTable, exists, err
 }
 
-func (az *Cloud) getSecurityGroup() (sg network.SecurityGroup, exists bool, err error) {
-	var realErr error
-
-	sg, err = az.SecurityGroupsClient.Get(az.ResourceGroup, az.SecurityGroupName, "")
-	exists, realErr = checkResourceExistsFromError(err)
-	if realErr != nil {
-		return sg, false, realErr
-	}
-
-	if !exists {
-		return sg, false, nil
-	}
-
-	return sg, exists, err
-}
-
-func (az *Cloud) getAzureLoadBalancer(name string) (lb network.LoadBalancer, exists bool, err error) {
-	var realErr error
-
-	lb, err = az.LoadBalancerClient.Get(az.ResourceGroup, name, "")
-	exists, realErr = checkResourceExistsFromError(err)
-	if realErr != nil {
-		return lb, false, realErr
-	}
-
-	if !exists {
-		return lb, false, nil
-	}
-
-	return lb, exists, err
-}
-
-func (az *Cloud) listLoadBalancers() (lbListResult network.LoadBalancerListResult, exists bool, err error) {
-	var realErr error
-
-	lbListResult, err = az.LoadBalancerClient.List(az.ResourceGroup)
-	exists, realErr = checkResourceExistsFromError(err)
-	if realErr != nil {
-		return lbListResult, false, realErr
-	}
-
-	if !exists {
-		return lbListResult, false, nil
-	}
-
-	return lbListResult, exists, err
-}
-
 func (az *Cloud) getPublicIPAddress(pipResourceGroup string, pipName string) (pip network.PublicIPAddress, exists bool, err error) {
 	resourceGroup := az.ResourceGroup
 	if pipResourceGroup != "" {

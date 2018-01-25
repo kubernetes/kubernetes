@@ -861,14 +861,17 @@ func getTestCloud() (az *Cloud) {
 			MaximumLoadBalancerRuleCount: 250,
 		},
 	}
+	az.DisksClient = newFakeDisksClient()
+	az.InterfacesClient = newFakeAzureInterfacesClient()
 	az.LoadBalancerClient = newFakeAzureLBClient()
 	az.PublicIPAddressesClient = newFakeAzurePIPClient(az.Config.SubscriptionID)
-	az.SubnetsClient = newFakeAzureSubnetsClient()
+	az.RoutesClient = newFakeRoutesClient()
+	az.RouteTablesClient = newFakeRouteTablesClient()
 	az.SecurityGroupsClient = newFakeAzureNSGClient()
-	az.VirtualMachinesClient = newFakeAzureVirtualMachinesClient()
-	az.InterfacesClient = newFakeAzureInterfacesClient()
+	az.SubnetsClient = newFakeAzureSubnetsClient()
 	az.VirtualMachineScaleSetsClient = newFakeVirtualMachineScaleSetsClient()
 	az.VirtualMachineScaleSetVMsClient = newFakeVirtualMachineScaleSetVMsClient()
+	az.VirtualMachinesClient = newFakeAzureVirtualMachinesClient()
 	az.vmSet = newAvailabilitySet(az)
 
 	return az
