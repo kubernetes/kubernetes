@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 	kubeadmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
+	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 )
 
 // TestPodAdmission verifies various scenarios involving pod/namespace/global node label selectors
@@ -156,47 +157,54 @@ func TestPodAdmission(t *testing.T) {
 			testName:                        "Default node selector conflict with the whitelist",
 		},
 	}
-	for _, test := range tests {
-		if !test.ignoreTestNamespaceNodeSelector {
-			namespace.ObjectMeta.Annotations = map[string]string{"scheduler.kubernetes.io/node-selector": test.namespaceNodeSelector}
-			informerFactory.Core().InternalVersion().Namespaces().Informer().GetStore().Update(namespace)
-		}
-		handler.clusterNodeSelectors = make(map[string]string)
-		handler.clusterNodeSelectors["clusterDefaultNodeSelector"] = test.defaultNodeSelector
-		handler.clusterNodeSelectors[namespace.Name] = test.whitelist
-		pod.Spec = api.PodSpec{NodeSelector: test.podNodeSelector}
 
-		err := handler.Admit(admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), "testNamespace", namespace.ObjectMeta.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, nil))
-		if test.admit && err != nil {
-			t.Errorf("Test: %s, expected no error but got: %s", test.testName, err)
-		} else if !test.admit && err == nil {
-			t.Errorf("Test: %s, expected an error", test.testName)
-		}
-		if test.admit && !labels.Equals(test.mergedNodeSelector, labels.Set(pod.Spec.NodeSelector)) {
-			t.Errorf("Test: %s, expected: %s but got: %s", test.testName, test.mergedNodeSelector, pod.Spec.NodeSelector)
-		}
-		err = handler.Validate(admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), "testNamespace", namespace.ObjectMeta.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, nil))
-		if test.admit && err != nil {
-			t.Errorf("Test: %s, expected no error but got: %s", test.testName, err)
-		} else if !test.admit && err == nil {
-			t.Errorf("Test: %s, expected an error", test.testName)
-		}
+	podNodeSelectorAnnotations := []string{algorithm.AnnotationNamespaceNodeSelector, algorithm.DeprecatedAnnotationNamespaceNodeSelector}
+	for i := 0; i < len(podNodeSelectorAnnotations); i++ {
+		podNodeSelectorAnnotation := podNodeSelectorAnnotations[i]
 
-		// handles update of uninitialized pod like it's newly created.
-		err = handler.Admit(admission.NewAttributesRecord(pod, &oldPod, api.Kind("Pod").WithVersion("version"), "testNamespace", namespace.ObjectMeta.Name, api.Resource("pods").WithVersion("version"), "", admission.Update, nil))
-		if test.admit && err != nil {
-			t.Errorf("Test: %s, expected no error but got: %s", test.testName, err)
-		} else if !test.admit && err == nil {
-			t.Errorf("Test: %s, expected an error", test.testName)
-		}
-		if test.admit && !labels.Equals(test.mergedNodeSelector, labels.Set(pod.Spec.NodeSelector)) {
-			t.Errorf("Test: %s, expected: %s but got: %s", test.testName, test.mergedNodeSelector, pod.Spec.NodeSelector)
-		}
-		err = handler.Validate(admission.NewAttributesRecord(pod, &oldPod, api.Kind("Pod").WithVersion("version"), "testNamespace", namespace.ObjectMeta.Name, api.Resource("pods").WithVersion("version"), "", admission.Update, nil))
-		if test.admit && err != nil {
-			t.Errorf("Test: %s, expected no error but got: %s", test.testName, err)
-		} else if !test.admit && err == nil {
-			t.Errorf("Test: %s, expected an error", test.testName)
+		for _, test := range tests {
+			namespace.ObjectMeta.Annotations = map[string]string{} // reset since we run twice for stable+deprecated annotation
+			if !test.ignoreTestNamespaceNodeSelector {
+				namespace.ObjectMeta.Annotations = map[string]string{podNodeSelectorAnnotation: test.namespaceNodeSelector}
+				informerFactory.Core().InternalVersion().Namespaces().Informer().GetStore().Update(namespace)
+			}
+			handler.clusterNodeSelectors = make(map[string]string)
+			handler.clusterNodeSelectors["clusterDefaultNodeSelector"] = test.defaultNodeSelector
+			handler.clusterNodeSelectors[namespace.Name] = test.whitelist
+			pod.Spec = api.PodSpec{NodeSelector: test.podNodeSelector}
+
+			err := handler.Admit(admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), "testNamespace", namespace.ObjectMeta.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, nil))
+			if test.admit && err != nil {
+				t.Errorf("Test: %s, expected no error but got: %s", test.testName, err)
+			} else if !test.admit && err == nil {
+				t.Errorf("Test: %s, expected an error", test.testName)
+			}
+			if test.admit && !labels.Equals(test.mergedNodeSelector, labels.Set(pod.Spec.NodeSelector)) {
+				t.Errorf("Test: %s, expected: %s but got: %s", test.testName, test.mergedNodeSelector, pod.Spec.NodeSelector)
+			}
+			err = handler.Validate(admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), "testNamespace", namespace.ObjectMeta.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, nil))
+			if test.admit && err != nil {
+				t.Errorf("Test: %s, expected no error but got: %s", test.testName, err)
+			} else if !test.admit && err == nil {
+				t.Errorf("Test: %s, expected an error", test.testName)
+			}
+
+			// handles update of uninitialized pod like it's newly created.
+			err = handler.Admit(admission.NewAttributesRecord(pod, &oldPod, api.Kind("Pod").WithVersion("version"), "testNamespace", namespace.ObjectMeta.Name, api.Resource("pods").WithVersion("version"), "", admission.Update, nil))
+			if test.admit && err != nil {
+				t.Errorf("Test: %s, expected no error but got: %s", test.testName, err)
+			} else if !test.admit && err == nil {
+				t.Errorf("Test: %s, expected an error", test.testName)
+			}
+			if test.admit && !labels.Equals(test.mergedNodeSelector, labels.Set(pod.Spec.NodeSelector)) {
+				t.Errorf("Test: %s, expected: %s but got: %s", test.testName, test.mergedNodeSelector, pod.Spec.NodeSelector)
+			}
+			err = handler.Validate(admission.NewAttributesRecord(pod, &oldPod, api.Kind("Pod").WithVersion("version"), "testNamespace", namespace.ObjectMeta.Name, api.Resource("pods").WithVersion("version"), "", admission.Update, nil))
+			if test.admit && err != nil {
+				t.Errorf("Test: %s, expected no error but got: %s", test.testName, err)
+			} else if !test.admit && err == nil {
+				t.Errorf("Test: %s, expected an error", test.testName)
+			}
 		}
 	}
 }
