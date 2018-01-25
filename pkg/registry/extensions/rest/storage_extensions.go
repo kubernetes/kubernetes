@@ -24,12 +24,12 @@ import (
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	daemonstore "k8s.io/kubernetes/pkg/registry/apps/daemonset/storage"
+	deploymentstore "k8s.io/kubernetes/pkg/registry/apps/deployment/storage"
+	replicasetstore "k8s.io/kubernetes/pkg/registry/apps/replicaset/storage"
 	expcontrollerstore "k8s.io/kubernetes/pkg/registry/extensions/controller/storage"
-	daemonstore "k8s.io/kubernetes/pkg/registry/extensions/daemonset/storage"
-	deploymentstore "k8s.io/kubernetes/pkg/registry/extensions/deployment/storage"
 	ingressstore "k8s.io/kubernetes/pkg/registry/extensions/ingress/storage"
 	pspstore "k8s.io/kubernetes/pkg/registry/extensions/podsecuritypolicy/storage"
-	replicasetstore "k8s.io/kubernetes/pkg/registry/extensions/replicaset/storage"
 	networkpolicystore "k8s.io/kubernetes/pkg/registry/networking/networkpolicy/storage"
 )
 
