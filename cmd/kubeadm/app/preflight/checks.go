@@ -99,7 +99,12 @@ func (CRICheck) Name() string {
 
 // Check validates the container runtime through the CRI.
 func (criCheck CRICheck) Check() (warnings, errors []error) {
-	if err := criCheck.exec.Command("sh", "-c", fmt.Sprintf("crictl -r %s info", criCheck.socket)).Run(); err != nil {
+	crictlPath, err := criCheck.exec.LookPath("crictl")
+	if err != nil {
+		errors = append(errors, fmt.Errorf("unable to find command crictl: %s", err))
+		return warnings, errors
+	}
+	if err := criCheck.exec.Command(fmt.Sprintf("%s -r %s info", crictlPath, criCheck.socket)).Run(); err != nil {
 		errors = append(errors, fmt.Errorf("unable to check if the container runtime at %q is running: %s", criCheck.socket, err))
 		return warnings, errors
 	}
@@ -859,8 +864,6 @@ func RunInitMasterChecks(execer utilsexec.Interface, cfg *kubeadmapi.MasterConfi
 		exec:       execer,
 		suggestion: fmt.Sprintf("go get %v", kubeadmconstants.CRICtlPackage),
 	}
-	warns, _ := criCtlChecker.Check()
-	useCRI := len(warns) == 0
 
 	manifestsDir := filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.ManifestsSubDirName)
 
@@ -871,6 +874,7 @@ func RunInitMasterChecks(execer utilsexec.Interface, cfg *kubeadmapi.MasterConfi
 		HostnameCheck{nodeName: cfg.NodeName},
 		KubeletVersionCheck{KubernetesVersion: cfg.KubernetesVersion},
 		ServiceCheck{Service: "kubelet", CheckIfActive: false},
+		ServiceCheck{Service: "docker", CheckIfActive: true}, // assume docker
 		FirewalldCheck{ports: []int{int(cfg.API.BindPort), 10250}},
 		PortOpenCheck{port: int(cfg.API.BindPort)},
 		PortOpenCheck{port: 10250},
@@ -900,13 +904,6 @@ func RunInitMasterChecks(execer utilsexec.Interface, cfg *kubeadmapi.MasterConfi
 		HTTPProxyCheck{Proto: "https", Host: cfg.API.AdvertiseAddress, Port: int(cfg.API.BindPort)},
 		HTTPProxyCIDRCheck{Proto: "https", CIDR: cfg.Networking.ServiceSubnet},
 		HTTPProxyCIDRCheck{Proto: "https", CIDR: cfg.Networking.PodSubnet},
-	}
-
-	if useCRI {
-		checks = append(checks, CRICheck{socket: criSocket, exec: execer})
-	} else {
-		// assume docker
-		checks = append(checks, ServiceCheck{Service: "docker", CheckIfActive: true})
 	}
 
 	if len(cfg.Etcd.Endpoints) == 0 {
