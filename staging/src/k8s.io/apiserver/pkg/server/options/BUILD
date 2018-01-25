@@ -4,7 +4,6 @@ go_library(
     name = "go_default_library",
     srcs = [
         "admission.go",
-        "api_enablement.go",
         "audit.go",
         "authentication.go",
         "authorization.go",
@@ -48,7 +47,6 @@ go_library(
         "//vendor/k8s.io/apiserver/pkg/registry/generic/registry:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/server:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/server/healthz:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/server/resourceconfig:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/server/storage:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/storage/etcd3/preflight:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/storage/storagebackend:go_default_library",
