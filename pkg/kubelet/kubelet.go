@@ -19,6 +19,7 @@ package kubelet
 import (
 	"crypto/tls"
 	"fmt"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"net/url"
@@ -161,6 +162,9 @@ const (
 
 	// Minimum number of dead containers to keep in a pod
 	minDeadContainerInPod = 1
+
+	// The root directory for configuring hugetlb cgroup
+	hugepagesDirectory = "/sys/fs/cgroup/hugetlb/"
 )
 
 // SyncHandler is an interface implemented by Kubelet, for testability
@@ -884,6 +888,15 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 			glog.Errorf("Accelerators feature is supported with docker runtime only. Disabling this feature internally.")
 		}
 	}
+
+	// fail fast if huge pages support is not present
+	if utilfeature.DefaultFeatureGate.Enabled(features.HugePages) {
+		if _, err := ioutil.ReadDir(hugepagesDirectory); err != nil {
+			glog.Warningln("HugePages feature is not available, please disable the feature.")
+			return nil, err
+		}
+	}
+
 	// Set GPU manager to a stub implementation if it is not enabled or cannot be supported.
 	if klet.gpuManager == nil {
 		klet.gpuManager = gpu.NewGPUManagerStub()
