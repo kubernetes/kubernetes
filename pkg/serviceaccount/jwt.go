@@ -123,18 +123,23 @@ func (j *jwtTokenGenerator) GenerateToken(serviceAccount v1.ServiceAccount, secr
 // If lookup is true, the service account and secret referenced as claims inside the token are retrieved and verified with the provided ServiceAccountTokenGetter
 func JWTTokenAuthenticator(iss string, keys []interface{}, lookup bool, getter ServiceAccountTokenGetter) authenticator.Token {
 	return &jwtTokenAuthenticator{
-		iss:    iss,
-		keys:   keys,
-		lookup: lookup,
-		getter: getter,
+		iss:  iss,
+		keys: keys,
+		validator: &legacyValidator{
+			lookup: lookup,
+			getter: getter,
+		},
 	}
 }
 
 type jwtTokenAuthenticator struct {
-	iss    string
-	keys   []interface{}
-	lookup bool
-	getter ServiceAccountTokenGetter
+	iss       string
+	keys      []interface{}
+	validator Validator
+}
+
+type Validator interface {
+	Validate(tokenData string, public *jwt.Claims, private *privateClaims) error
 }
 
 var errMismatchedSigningMethod = errors.New("invalid signing method")
@@ -171,7 +176,7 @@ func (j *jwtTokenAuthenticator) AuthenticateToken(tokenData string) (user.Info, 
 
 	// If we get here, we have a token with a recognized signature and
 	// issuer string.
-	if err := j.Validate(tokenData, public, private); err != nil {
+	if err := j.validator.Validate(tokenData, public, private); err != nil {
 		return nil, false, err
 	}
 
@@ -208,7 +213,12 @@ func (j *jwtTokenAuthenticator) hasCorrectIssuer(tokenData string) bool {
 
 }
 
-func (j *jwtTokenAuthenticator) Validate(tokenData string, public *jwt.Claims, private *privateClaims) error {
+type legacyValidator struct {
+	lookup bool
+	getter ServiceAccountTokenGetter
+}
+
+func (v *legacyValidator) Validate(tokenData string, public *jwt.Claims, private *privateClaims) error {
 
 	// Make sure the claims we need exist
 	if len(public.Subject) == 0 {
@@ -236,9 +246,9 @@ func (j *jwtTokenAuthenticator) Validate(tokenData string, public *jwt.Claims, p
 		return errors.New("sub claim is invalid")
 	}
 
-	if j.lookup {
+	if v.lookup {
 		// Make sure token hasn't been invalidated by deletion of the secret
-		secret, err := j.getter.GetSecret(namespace, secretName)
+		secret, err := v.getter.GetSecret(namespace, secretName)
 		if err != nil {
 			glog.V(4).Infof("Could not retrieve token %s/%s for service account %s/%s: %v", namespace, secretName, namespace, serviceAccountName, err)
 			return errors.New("Token has been invalidated")
@@ -253,7 +263,7 @@ func (j *jwtTokenAuthenticator) Validate(tokenData string, public *jwt.Claims, p
 		}
 
 		// Make sure service account still exists (name and UID)
-		serviceAccount, err := j.getter.GetServiceAccount(namespace, serviceAccountName)
+		serviceAccount, err := v.getter.GetServiceAccount(namespace, serviceAccountName)
 		if err != nil {
 			glog.V(4).Infof("Could not retrieve service account %s/%s: %v", namespace, serviceAccountName, err)
 			return err
