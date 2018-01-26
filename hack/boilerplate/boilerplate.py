@@ -133,6 +133,10 @@ skipped_dirs = ['Godeps', 'third_party', '_gopath', '_output', '.git', 'cluster/
                 "vendor", "test/e2e/generated/bindata.go", "hack/boilerplate/test",
                 "pkg/generated/bindata.go"]
 
+# list all the files that are ungenerated
+skipped_ungenerated_files = ['hack/build-ui.sh', 'hack/lib/swagger.sh',
+                             'hack/boilerplate/boilerplate.py']
+
 def normalize_files(files):
     newfiles = []
     for pathname in files:
@@ -181,7 +185,80 @@ def get_regexs():
     regexs["go_build_constraints"] = re.compile(r"^(// \+build.*\n)+\n", re.MULTILINE)
     # strip #!.* from shell scripts
     regexs["shebang"] = re.compile(r"^(#!.*\n)\n*", re.MULTILINE)
+    # Search for generated files
+    regexs["generated"] = re.compile( 'DO NOT EDIT' )
     return regexs
+
+
+def is_generated_files(filename, regexs):
+    for d in skipped_ungenerated_files:
+ 	if d in filename:
+            return False
+    
+    try:
+        f = open(filename, 'r')
+    except Exception as exc:
+        print("Unable to open %s: %s" % (filename, exc), file=verbose_out)
+        return False
+
+    data = f.read()
+    f.close()
+
+    p = regexs["generated"]
+    found = p.search(data)
+
+    if found:
+        return True
+    else:
+        return False
+
+
+def generated_file_passes(filename, refs, regexs):
+    try:
+        f = open(filename, 'r')
+    except Exception as exc:
+        print("Unable to open %s: %s" % (filename, exc), file=verbose_out)
+        return False
+
+    data = f.read()
+    f.close()
+
+    extension = "generatego"
+    ref = refs[extension]
+
+    # remove build tags from the top of Go files
+    p = regexs["go_build_constraints"]
+    (data, found) = p.subn("", data, 1)
+
+    data = data.splitlines()
+
+    # if our test file is smaller than the reference it surely fails!
+    if len(ref) > len(data):
+        print('File %s smaller than reference (%d < %d)' %
+              (filename, len(data), len(ref)),
+              file=verbose_out)
+        return False
+
+    # trim our file to the same number of lines as the reference file
+    data = data[:len(ref)]
+
+    p = regexs["year"]
+    for d in data:
+        if p.search(d):
+            print('File %s is missing the year' % filename, file=verbose_out)
+            return False
+
+    # if we don't match the reference at this point, fail
+    if ref != data:
+        print("Header in %s does not match reference, diff:" % filename, file=verbose_out)
+        if args.verbose:
+            print(file=verbose_out)
+            for line in difflib.unified_diff(ref, data, 'reference', filename, lineterm=''):
+                print(line, file=verbose_out)
+            print(file=verbose_out)
+        return False
+
+    return True
 
 def main():
     regexs = get_regexs()
@@ -189,8 +266,14 @@ def main():
     filenames = get_files(refs.keys())
 
     for filename in filenames:
-        if not file_passes(filename, refs, regexs):
-            print(filename, file=sys.stdout)
+        # if the file is automatically generated, then don't
+        # check the YEAR field.
+        if is_generated_files(filename, regexs):
+            if not generated_file_passes(filename, refs, regexs):
+                print(filename, file=sys.stdout)
+        else:
+            if not file_passes(filename, refs, regexs):
+                print(filename, file=sys.stdout)
 
     return 0
 
