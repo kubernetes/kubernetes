@@ -32,7 +32,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
-var _ = SIGDescribe("Multi-AZ Cluster Volumes", func() {
+var _ = SIGDescribe("Multi-AZ Cluster Volumes [sig-storage]", func() {
 	f := framework.NewDefaultFramework("multi-az")
 	var zoneCount int
 	var err error
