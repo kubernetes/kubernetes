@@ -1795,7 +1795,8 @@ func testPSPAdmitAdvanced(testCaseName string, op kadmission.Operation, psps []*
 	originalPod := pod.DeepCopy()
 	plugin := NewTestAdmission(psps, authz)
 
-	attrs := kadmission.NewAttributesRecord(pod, oldPod, kapi.Kind("Pod").WithVersion("version"), pod.Namespace, "", kapi.Resource("pods").WithVersion("version"), "", op, userInfo, nil)
+	annotations := make(map[string]string)
+	attrs := kadmission.NewAttributesRecord(pod, oldPod, kapi.Kind("Pod").WithVersion("version"), pod.Namespace, "", kapi.Resource("pods").WithVersion("version"), "", op, userInfo, annotations)
 	err := plugin.Admit(attrs)
 
 	if shouldPassAdmit && err != nil {
@@ -1825,10 +1826,26 @@ func testPSPAdmitAdvanced(testCaseName string, op kadmission.Operation, psps []*
 	}
 
 	err = plugin.Validate(attrs)
+	if shouldPassAdmit && op == kadmission.Create {
+		validateAuditAnnotation(testCaseName, annotations, "podsecuritypolicy.admission.k8s.io/admit-policy", expectedPSP, t)
+	} else {
+		validateAuditAnnotation(testCaseName, annotations, "podsecuritypolicy.admission.k8s.io/admit-policy", "", t)
+	}
 	if shouldPassValidate && err != nil {
 		t.Errorf("%s: expected no errors on Validate but received %v", testCaseName, err)
 	} else if !shouldPassValidate && err == nil {
 		t.Errorf("%s: expected errors on Validate but received none", testCaseName)
+	}
+	if shouldPassValidate {
+		validateAuditAnnotation(testCaseName, annotations, "podsecuritypolicy.admission.k8s.io/validate-policy", expectedPSP, t)
+	} else {
+		validateAuditAnnotation(testCaseName, annotations, "podsecuritypolicy.admission.k8s.io/validate-policy", "", t)
+	}
+}
+
+func validateAuditAnnotation(testCaseName string, annotations map[string]string, key, value string, t *testing.T) {
+	if annotations[key] != value {
+		t.Errorf("%s: expected to have annotations[%s] set to %q, got %q", testCaseName, key, value, annotations[key])
 	}
 }
 

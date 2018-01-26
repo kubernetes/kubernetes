@@ -94,10 +94,12 @@ func createHandler(r rest.NamedCreater, scope RequestScope, typer runtime.Object
 		audit.LogRequestObject(ae, obj, scope.Resource, scope.Subresource, scope.Serializer)
 
 		userInfo, _ := request.UserFrom(ctx)
-		admissionAttributes := admission.NewAttributesRecord(obj, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Create, userInfo, nil)
+		annotations := make(map[string]string)
+		admissionAttributes := admission.NewAttributesRecord(obj, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Create, userInfo, annotations)
 		if mutatingAdmission, ok := admit.(admission.MutationInterface); ok && mutatingAdmission.Handles(admission.Create) {
 			err = mutatingAdmission.Admit(admissionAttributes)
 			if err != nil {
+				audit.LogAnnotations(ae, annotations)
 				scope.err(err, w, req)
 				return
 			}
@@ -116,6 +118,7 @@ func createHandler(r rest.NamedCreater, scope RequestScope, typer runtime.Object
 				includeUninitialized,
 			)
 		})
+		audit.LogAnnotations(ae, annotations)
 		if err != nil {
 			scope.err(err, w, req)
 			return

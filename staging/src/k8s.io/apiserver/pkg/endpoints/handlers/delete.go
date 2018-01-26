@@ -51,6 +51,7 @@ func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope RequestSco
 		}
 		ctx := scope.ContextFunc(req)
 		ctx = request.WithNamespace(ctx, namespace)
+		ae := request.AuditEventFrom(ctx)
 
 		options := &metav1.DeleteOptions{}
 		if allowsOptions {
@@ -79,7 +80,6 @@ func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope RequestSco
 				}
 				trace.Step("Decoded delete options")
 
-				ae := request.AuditEventFrom(ctx)
 				audit.LogRequestObject(ae, obj, scope.Resource, scope.Subresource, scope.Serializer)
 				trace.Step("Recorded the audit event")
 			} else {
@@ -94,22 +94,26 @@ func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope RequestSco
 		}
 
 		trace.Step("About to check admission control")
+		annotations := make(map[string]string)
 		if admit != nil && admit.Handles(admission.Delete) {
 			userInfo, _ := request.UserFrom(ctx)
-			attrs := admission.NewAttributesRecord(nil, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Delete, userInfo, nil)
+			attrs := admission.NewAttributesRecord(nil, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Delete, userInfo, annotations)
 			if mutatingAdmission, ok := admit.(admission.MutationInterface); ok {
 				if err := mutatingAdmission.Admit(attrs); err != nil {
+					audit.LogAnnotations(ae, annotations)
 					scope.err(err, w, req)
 					return
 				}
 			}
 			if validatingAdmission, ok := admit.(admission.ValidationInterface); ok {
 				if err := validatingAdmission.Validate(attrs); err != nil {
+					audit.LogAnnotations(ae, annotations)
 					scope.err(err, w, req)
 					return
 				}
 			}
 		}
+		audit.LogAnnotations(ae, annotations)
 
 		trace.Step("About to delete object from database")
 		wasDeleted := true
@@ -178,12 +182,15 @@ func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope RequestSco
 
 		ctx := scope.ContextFunc(req)
 		ctx = request.WithNamespace(ctx, namespace)
+		ae := request.AuditEventFrom(ctx)
 
+		annotations := make(map[string]string)
 		if mutatingAdmission, ok := admit.(admission.MutationInterface); ok && mutatingAdmission.Handles(admission.Delete) {
 			userInfo, _ := request.UserFrom(ctx)
 
-			err = mutatingAdmission.Admit(admission.NewAttributesRecord(nil, nil, scope.Kind, namespace, "", scope.Resource, scope.Subresource, admission.Delete, userInfo, nil))
+			err = mutatingAdmission.Admit(admission.NewAttributesRecord(nil, nil, scope.Kind, namespace, "", scope.Resource, scope.Subresource, admission.Delete, userInfo, annotations))
 			if err != nil {
+				audit.LogAnnotations(ae, annotations)
 				scope.err(err, w, req)
 				return
 			}
@@ -192,12 +199,15 @@ func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope RequestSco
 		if validatingAdmission, ok := admit.(admission.ValidationInterface); ok && validatingAdmission.Handles(admission.Delete) {
 			userInfo, _ := request.UserFrom(ctx)
 
-			err = validatingAdmission.Validate(admission.NewAttributesRecord(nil, nil, scope.Kind, namespace, "", scope.Resource, scope.Subresource, admission.Delete, userInfo, nil))
+			err = validatingAdmission.Validate(admission.NewAttributesRecord(nil, nil, scope.Kind, namespace, "", scope.Resource, scope.Subresource, admission.Delete, userInfo, annotations))
 			if err != nil {
+				audit.LogAnnotations(ae, annotations)
 				scope.err(err, w, req)
 				return
 			}
 		}
+
+		audit.LogAnnotations(ae, annotations)
 
 		listOptions := metainternalversion.ListOptions{}
 		if err := metainternalversion.ParameterCodec.DecodeParameters(req.URL.Query(), scope.MetaGroupVersion, &listOptions); err != nil {
@@ -244,7 +254,6 @@ func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope RequestSco
 					return
 				}
 
-				ae := request.AuditEventFrom(ctx)
 				audit.LogRequestObject(ae, obj, scope.Resource, scope.Subresource, scope.Serializer)
 			}
 		}
