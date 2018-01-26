@@ -24,7 +24,6 @@ import (
 	"fmt"
 	"path"
 	"reflect"
-	"strconv"
 	"strings"
 	"time"
 
@@ -524,14 +523,14 @@ func (s *store) List(ctx context.Context, key, resourceVersion string, pred stor
 
 	case s.pagingEnabled && pred.Limit > 0:
 		if len(resourceVersion) > 0 {
-			fromRV, err := strconv.ParseInt(resourceVersion, 10, 64)
+			fromRV, err := s.versioner.ParseListResourceVersion(resourceVersion)
 			if err != nil {
 				return apierrors.NewBadRequest(fmt.Sprintf("invalid resource version: %v", err))
 			}
 			if fromRV > 0 {
-				options = append(options, clientv3.WithRev(fromRV))
+				options = append(options, clientv3.WithRev(int64(fromRV)))
 			}
-			returnedRV = fromRV
+			returnedRV = int64(fromRV)
 		}
 
 		rangeEnd := clientv3.GetPrefixRangeEnd(keyPrefix)
@@ -539,14 +538,14 @@ func (s *store) List(ctx context.Context, key, resourceVersion string, pred stor
 
 	default:
 		if len(resourceVersion) > 0 {
-			fromRV, err := strconv.ParseInt(resourceVersion, 10, 64)
+			fromRV, err := s.versioner.ParseListResourceVersion(resourceVersion)
 			if err != nil {
 				return apierrors.NewBadRequest(fmt.Sprintf("invalid resource version: %v", err))
 			}
 			if fromRV > 0 {
-				options = append(options, clientv3.WithRev(fromRV))
+				options = append(options, clientv3.WithRev(int64(fromRV)))
 			}
-			returnedRV = fromRV
+			returnedRV = int64(fromRV)
 		}
 
 		options = append(options, clientv3.WithPrefix())
@@ -666,7 +665,7 @@ func (s *store) WatchList(ctx context.Context, key string, resourceVersion strin
 }
 
 func (s *store) watch(ctx context.Context, key string, rv string, pred storage.SelectionPredicate, recursive bool) (watch.Interface, error) {
-	rev, err := storage.ParseWatchResourceVersion(rv)
+	rev, err := s.versioner.ParseWatchResourceVersion(rv)
 	if err != nil {
 		return nil, err
 	}
