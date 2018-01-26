@@ -24,10 +24,12 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utiltesting "k8s.io/client-go/util/testing"
 	// util.go uses api.Codecs.LegacyCodec so import this package to do some
 	// resource initialization.
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	"k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	"k8s.io/kubernetes/pkg/util/mount"
 )
 
 var nodeLabels map[string]string = map[string]string{
@@ -260,6 +262,45 @@ func TestZonesToSet(t *testing.T) {
 	for _, tt := range tests {
 		if got, err := ZonesToSet(tt.zones); err != nil || !got.Equal(tt.want) {
 			t.Errorf("%v(%v) returned (%v), want (%v)", functionUnderTest, tt.zones, got, tt.want)
+		}
+	}
+}
+
+func TestDoUnmountMountPoint(t *testing.T) {
+
+	tmpDir1, err1 := utiltesting.MkTmpdir("umount_test1")
+	if err1 != nil {
+		t.Fatalf("error creating temp dir: %v", err1)
+	}
+	defer os.RemoveAll(tmpDir1)
+
+	tmpDir2, err2 := utiltesting.MkTmpdir("umount_test2")
+	if err2 != nil {
+		t.Fatalf("error creating temp dir: %v", err2)
+	}
+	defer os.RemoveAll(tmpDir2)
+
+	// Second part: want no error
+	tests := []struct {
+		mountPath    string
+		corruptedMnt bool
+	}{
+		{
+			mountPath:    tmpDir1,
+			corruptedMnt: true,
+		},
+		{
+			mountPath:    tmpDir2,
+			corruptedMnt: false,
+		},
+	}
+
+	fake := &mount.FakeMounter{}
+
+	for _, tt := range tests {
+		err := doUnmountMountPoint(tt.mountPath, fake, false, tt.corruptedMnt)
+		if err != nil {
+			t.Errorf("err Expected nil, but got: %v", err)
 		}
 	}
 }
