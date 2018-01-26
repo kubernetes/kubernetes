@@ -26,6 +26,7 @@ import (
 	"github.com/coreos/pkg/capnslog"
 
 	appsv1beta2 "k8s.io/api/apps/v1beta2"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -77,6 +78,8 @@ func TestScaleSubresources(t *testing.T) {
 		makeGVR("apps", "v1", "deployments/scale"):  makeGVK("autoscaling", "v1", "Scale"),
 		makeGVR("apps", "v1", "replicasets/scale"):  makeGVK("autoscaling", "v1", "Scale"),
 		makeGVR("apps", "v1", "statefulsets/scale"): makeGVK("autoscaling", "v1", "Scale"),
+
+		makeGVR("batch", "v1", "jobs/scale"): makeGVK("autoscaling", "v1", "Scale"),
 	}
 
 	autoscalingGVK := schema.GroupVersionKind{Group: "autoscaling", Version: "v1", Kind: "Scale"}
@@ -145,6 +148,9 @@ func TestScaleSubresources(t *testing.T) {
 	if _, err := clientSet.AppsV1beta2().StatefulSets("default").Create(ssStub); err != nil {
 		t.Fatal(err)
 	}
+	if _, err := clientSet.BatchV1().Jobs("default").Create(jobStub); err != nil {
+		t.Fatal(err)
+	}
 
 	// Ensure scale subresources return and accept expected kinds
 	for gvr, gvk := range discoveredScaleSubresources {
@@ -211,6 +217,14 @@ var (
 	ssStub = &appsv1beta2.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{Name: "test"},
 		Spec:       appsv1beta2.StatefulSetSpec{Selector: &metav1.LabelSelector{MatchLabels: podStub.Labels}, Replicas: &replicas, Template: podStub},
+	}
+
+	jobStub = &batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{Name: "test"},
+		Spec: batchv1.JobSpec{Template: corev1.PodTemplateSpec{
+			ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"foo": "bar"}},
+			Spec:       corev1.PodSpec{Containers: []corev1.Container{{Name: "test", Image: "busybox"}}, RestartPolicy: corev1.RestartPolicyNever},
+		}},
 	}
 )
 

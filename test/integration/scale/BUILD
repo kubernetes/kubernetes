@@ -17,6 +17,7 @@ go_test(
         "//vendor/github.com/coreos/etcd/etcdserver/api/v3rpc:go_default_library",
         "//vendor/github.com/coreos/pkg/capnslog:go_default_library",
         "//vendor/k8s.io/api/apps/v1beta2:go_default_library",
+        "//vendor/k8s.io/api/batch/v1:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1/unstructured:go_default_library",

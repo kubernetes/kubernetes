@@ -10,6 +10,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "doc.go",
+        "registry.go",
         "strategy.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/registry/batch/job",
