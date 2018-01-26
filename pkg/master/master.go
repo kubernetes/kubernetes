@@ -487,15 +487,5 @@ func DefaultAPIResourceConfigSource() *serverstorage.ResourceConfig {
 		admissionregistrationv1beta1.SchemeGroupVersion,
 	)
 
-	// all extensions resources except these are disabled by default
-	ret.EnableResources(
-		extensionsapiv1beta1.SchemeGroupVersion.WithResource("daemonsets"),
-		extensionsapiv1beta1.SchemeGroupVersion.WithResource("deployments"),
-		extensionsapiv1beta1.SchemeGroupVersion.WithResource("ingresses"),
-		extensionsapiv1beta1.SchemeGroupVersion.WithResource("networkpolicies"),
-		extensionsapiv1beta1.SchemeGroupVersion.WithResource("replicasets"),
-		extensionsapiv1beta1.SchemeGroupVersion.WithResource("podsecuritypolicies"),
-	)
-
 	return ret
 }

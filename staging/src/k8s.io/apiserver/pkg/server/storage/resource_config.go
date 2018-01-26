@@ -25,7 +25,6 @@ import (
 type APIResourceConfigSource interface {
 	AnyVersionOfResourceEnabled(resource schema.GroupResource) bool
 	ResourceEnabled(resource schema.GroupVersionResource) bool
-	AllResourcesForVersionEnabled(version schema.GroupVersion) bool
 	AnyResourcesForVersionEnabled(version schema.GroupVersion) bool
 	AnyResourcesForGroupEnabled(group string) bool
 }
@@ -85,31 +84,6 @@ func (o *ResourceConfig) EnableVersions(versions ...schema.GroupVersion) {
 	}
 }
 
-func (o *ResourceConfig) DisableResources(resources ...schema.GroupVersionResource) {
-	for _, resource := range resources {
-		version := resource.GroupVersion()
-		_, versionExists := o.GroupVersionResourceConfigs[version]
-		if !versionExists {
-			o.GroupVersionResourceConfigs[version] = NewGroupVersionResourceConfig()
-		}
-
-		o.GroupVersionResourceConfigs[version].DisabledResources.Insert(resource.Resource)
-	}
-}
-
-func (o *ResourceConfig) EnableResources(resources ...schema.GroupVersionResource) {
-	for _, resource := range resources {
-		version := resource.GroupVersion()
-		_, versionExists := o.GroupVersionResourceConfigs[version]
-		if !versionExists {
-			o.GroupVersionResourceConfigs[version] = NewGroupVersionResourceConfig()
-		}
-
-		o.GroupVersionResourceConfigs[version].EnabledResources.Insert(resource.Resource)
-		o.GroupVersionResourceConfigs[version].DisabledResources.Delete(resource.Resource)
-	}
-}
-
 // AnyResourcesForVersionEnabled only considers matches based on exactly group/resource lexical matching.  This means that
 // resource renames across versions are NOT considered to be the same resource by this method. You'll need to manually check
 // using the ResourceEnabled function.
@@ -145,22 +119,6 @@ func (o *ResourceConfig) ResourceEnabled(resource schema.GroupVersionResource) b
 	}
 
 	return true
-}
-
-func (o *ResourceConfig) AllResourcesForVersionEnabled(version schema.GroupVersion) bool {
-	versionOverride, versionExists := o.GroupVersionResourceConfigs[version]
-	if !versionExists {
-		return false
-	}
-	if !versionOverride.Enable {
-		return false
-	}
-
-	if len(versionOverride.EnabledResources) == 0 && len(versionOverride.DisabledResources) == 0 {
-		return true
-	}
-
-	return false
 }
 
 func (o *ResourceConfig) AnyResourcesForVersionEnabled(version schema.GroupVersion) bool {
