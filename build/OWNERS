@@ -1,11 +1,14 @@
 reviewers:
+  - sig-testing-reviewers
   - cblecker
   - ixdy
   - jbeda
   - lavalamp
   - zmerlynn
   - spxtr
+  - Q-Lee
 approvers:
+  - sig-testing-approvers
   - cblecker
   - ixdy
   - jbeda
@@ -13,3 +16,4 @@ approvers:
   - zmerlynn
   - mikedanese
   - spxtr
+  - Q-Lee
