@@ -157,9 +157,11 @@ type serviceInfo struct {
 	serviceLBChainName       utiliptables.Chain
 }
 
+type endpointString string
+
 // internal struct for endpoints information
 type endpointsInfo struct {
-	endpoint string // TODO: should be an endpointString type
+	endpoint endpointString
 	isLocal  bool
 	// The following fields we lazily compute and store here for performance
 	// reasons. If the protocol is the same as you expect it to be, then the
@@ -170,7 +172,7 @@ type endpointsInfo struct {
 
 // IPPart returns just the IP part of the endpoint.
 func (e *endpointsInfo) IPPart() string {
-	return utilproxy.IPPart(e.endpoint)
+	return utilproxy.IPPart(string(e.endpoint))
 }
 
 // Returns the endpoint chain name for a given endpointsInfo.
@@ -858,13 +860,13 @@ func endpointsToEndpointsMap(endpoints *api.Endpoints, hostname string) proxyEnd
 					continue
 				}
 				epInfo := &endpointsInfo{
-					endpoint: net.JoinHostPort(addr.IP, strconv.Itoa(int(port.Port))),
+					endpoint: joinEndpointHostPort(addr.IP, strconv.Itoa(int(port.Port))),
 					isLocal:  addr.NodeName != nil && *addr.NodeName == hostname,
 				}
 				endpointsMap[svcPortName] = append(endpointsMap[svcPortName], epInfo)
 			}
 			if glog.V(3) {
-				newEPList := []string{}
+				newEPList := []endpointString{}
 				for _, ep := range endpointsMap[svcPortName] {
 					newEPList = append(newEPList, ep.endpoint)
 				}
@@ -873,6 +875,10 @@ func endpointsToEndpointsMap(endpoints *api.Endpoints, hostname string) proxyEnd
 		}
 	}
 	return endpointsMap
+}
+
+func joinEndpointHostPort(host, port string) endpointString {
+	return endpointString(net.JoinHostPort(host, port))
 }
 
 // Translates single Service object to proxyServiceMap.
@@ -930,19 +936,19 @@ func serviceLBChainName(servicePortName string, protocol string) utiliptables.Ch
 }
 
 // This is the same as servicePortChainName but with the endpoint included.
-func servicePortEndpointChainName(servicePortName string, protocol string, endpoint string) utiliptables.Chain {
-	hash := sha256.Sum256([]byte(servicePortName + protocol + endpoint))
+func servicePortEndpointChainName(servicePortName string, protocol string, endpoint endpointString) utiliptables.Chain {
+	hash := sha256.Sum256([]byte(servicePortName + protocol + string(endpoint)))
 	encoded := base32.StdEncoding.EncodeToString(hash[:])
 	return utiliptables.Chain("KUBE-SEP-" + encoded[:16])
 }
 
 type endpointServicePair struct {
-	endpoint        string
+	endpoint        endpointString
 	servicePortName proxy.ServicePortName
 }
 
 func (esp *endpointServicePair) IPPart() string {
-	return utilproxy.IPPart(esp.endpoint)
+	return utilproxy.IPPart(string(esp.endpoint))
 }
 
 // After a UDP endpoint has been removed, we must flush any pending conntrack entries to it, or else we
@@ -951,7 +957,7 @@ func (esp *endpointServicePair) IPPart() string {
 func (proxier *Proxier) deleteEndpointConnections(connectionMap map[endpointServicePair]bool) {
 	for epSvcPair := range connectionMap {
 		if svcInfo, ok := proxier.serviceMap[epSvcPair.servicePortName]; ok && svcInfo.protocol == api.ProtocolUDP {
-			endpointIP := utilproxy.IPPart(epSvcPair.endpoint)
+			endpointIP := utilproxy.IPPart(string(epSvcPair.endpoint))
 			err := utilproxy.ClearUDPConntrackForPeers(proxier.exec, svcInfo.clusterIP.String(), endpointIP)
 			if err != nil {
 				glog.Errorf("Failed to delete %s endpoint connections, error: %v", epSvcPair.servicePortName.String(), err)
@@ -1511,7 +1517,7 @@ func (proxier *Proxier) syncProxyRules() {
 				args = append(args, "-m", "recent", "--name", string(endpointChain), "--set")
 			}
 			// DNAT to final destination.
-			args = append(args, "-m", protocol, "-p", protocol, "-j", "DNAT", "--to-destination", endpoints[i].endpoint)
+			args = append(args, "-m", protocol, "-p", protocol, "-j", "DNAT", "--to-destination", string(endpoints[i].endpoint))
 			writeLine(proxier.natRules, args...)
 		}
 

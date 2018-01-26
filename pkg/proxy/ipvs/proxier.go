@@ -522,9 +522,11 @@ func serviceToServiceMap(service *api.Service) proxyServiceMap {
 	return serviceMap
 }
 
+type endpointString string
+
 // internal struct for endpoints information
 type endpointsInfo struct {
-	endpoint string // TODO: should be an endpointString type
+	endpoint endpointString
 	isLocal  bool
 }
 
@@ -534,16 +536,16 @@ func (e *endpointsInfo) String() string {
 
 // IPPart returns just the IP part of the endpoint.
 func (e *endpointsInfo) IPPart() string {
-	return utilproxy.IPPart(e.endpoint)
+	return utilproxy.IPPart(string(e.endpoint))
 }
 
 // PortPart returns just the Port part of the endpoint.
 func (e *endpointsInfo) PortPart() (int, error) {
-	return utilproxy.PortPart(e.endpoint)
+	return utilproxy.PortPart(string(e.endpoint))
 }
 
 type endpointServicePair struct {
-	endpoint        string
+	endpoint        endpointString
 	servicePortName proxy.ServicePortName
 }
 
@@ -648,13 +650,13 @@ func endpointsToEndpointsMap(endpoints *api.Endpoints, hostname string) proxyEnd
 					continue
 				}
 				epInfo := &endpointsInfo{
-					endpoint: net.JoinHostPort(addr.IP, strconv.Itoa(int(port.Port))),
+					endpoint: joinEndpointHostPort(addr.IP, strconv.Itoa(int(port.Port))),
 					isLocal:  addr.NodeName != nil && *addr.NodeName == hostname,
 				}
 				endpointsMap[svcPort] = append(endpointsMap[svcPort], epInfo)
 			}
 			if glog.V(3) {
-				newEPList := []string{}
+				newEPList := []endpointString{}
 				for _, ep := range endpointsMap[svcPort] {
 					newEPList = append(newEPList, ep.endpoint)
 				}
@@ -663,6 +665,10 @@ func endpointsToEndpointsMap(endpoints *api.Endpoints, hostname string) proxyEnd
 		}
 	}
 	return endpointsMap
+}
+
+func joinEndpointHostPort(host, port string) endpointString {
+	return endpointString(net.JoinHostPort(host, port))
 }
 
 func newEndpointsChangeMap(hostname string) endpointsChangeMap {
@@ -1566,7 +1572,7 @@ func (proxier *Proxier) syncProxyRules() {
 func (proxier *Proxier) deleteEndpointConnections(connectionMap map[endpointServicePair]bool) {
 	for epSvcPair := range connectionMap {
 		if svcInfo, ok := proxier.serviceMap[epSvcPair.servicePortName]; ok && svcInfo.protocol == api.ProtocolUDP {
-			endpointIP := utilproxy.IPPart(epSvcPair.endpoint)
+			endpointIP := utilproxy.IPPart(string(epSvcPair.endpoint))
 			err := utilproxy.ClearUDPConntrackForPeers(proxier.exec, svcInfo.clusterIP.String(), endpointIP)
 			if err != nil {
 				glog.Errorf("Failed to delete %s endpoint connections, error: %v", epSvcPair.servicePortName.String(), err)
@@ -1631,7 +1637,7 @@ func (proxier *Proxier) syncEndpoint(svcPortName proxy.ServicePortName, onlyNode
 
 	for _, eps := range proxier.endpointsMap[svcPortName] {
 		if !onlyNodeLocalEndpoints || onlyNodeLocalEndpoints && eps.isLocal {
-			newEndpoints.Insert(eps.endpoint)
+			newEndpoints.Insert(string(eps.endpoint))
 		}
 	}
 
