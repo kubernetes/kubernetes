@@ -196,7 +196,7 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 		}
 		apiGroupInfo.VersionedResourcesStorageMap["v1beta1"] = storage
 	}
-	if apiResourceConfig.AnyResourcesForVersionEnabled(v1beta1.SchemeGroupVersion) {
+	if apiResourceConfig.AnyResourcesForVersionEnabled(v1.SchemeGroupVersion) {
 		apiGroupInfo.GroupMeta.GroupVersion = v1.SchemeGroupVersion
 		storage := map[string]rest.Storage{}
 		version := v1.SchemeGroupVersion
