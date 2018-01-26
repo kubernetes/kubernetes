@@ -291,6 +291,66 @@ func makeEventRecorder(kubeDeps *kubelet.Dependencies, nodeName types.NodeName) 
 	}
 }
 
+func makeContainerManager(s *options.KubeletServer, kubeDeps *kubelet.Dependencies) error {
+	if s.CgroupsPerQOS && s.CgroupRoot == "" {
+		glog.Infof("--cgroups-per-qos enabled, but --cgroup-root was not specified.  defaulting to /")
+		s.CgroupRoot = "/"
+	}
+	kubeReserved, err := parseResourceList(s.KubeReserved)
+	if err != nil {
+		return err
+	}
+	systemReserved, err := parseResourceList(s.SystemReserved)
+	if err != nil {
+		return err
+	}
+	var hardEvictionThresholds []evictionapi.Threshold
+	// If the user requested to ignore eviction thresholds, then do not set valid values for hardEvictionThresholds here.
+	if !s.ExperimentalNodeAllocatableIgnoreEvictionThreshold {
+		hardEvictionThresholds, err = eviction.ParseThresholdConfig([]string{}, s.EvictionHard, nil, nil, nil)
+		if err != nil {
+			return err
+		}
+	}
+	experimentalQOSReserved, err := cm.ParseQOSReserved(s.ExperimentalQOSReserved)
+	if err != nil {
+		return err
+	}
+
+	devicePluginEnabled := utilfeature.DefaultFeatureGate.Enabled(features.DevicePlugins)
+
+	kubeDeps.ContainerManager, err = cm.NewContainerManager(
+		kubeDeps.Mounter,
+		kubeDeps.CAdvisorInterface,
+		cm.NodeConfig{
+			RuntimeCgroupsName:    s.RuntimeCgroups,
+			SystemCgroupsName:     s.SystemCgroups,
+			KubeletCgroupsName:    s.KubeletCgroups,
+			ContainerRuntime:      s.ContainerRuntime,
+			CgroupsPerQOS:         s.CgroupsPerQOS,
+			CgroupRoot:            s.CgroupRoot,
+			CgroupDriver:          s.CgroupDriver,
+			KubeletRootDir:        s.RootDirectory,
+			ProtectKernelDefaults: s.ProtectKernelDefaults,
+			NodeAllocatableConfig: cm.NodeAllocatableConfig{
+				KubeReservedCgroupName:   s.KubeReservedCgroup,
+				SystemReservedCgroupName: s.SystemReservedCgroup,
+				EnforceNodeAllocatable:   sets.NewString(s.EnforceNodeAllocatable...),
+				KubeReserved:             kubeReserved,
+				SystemReserved:           systemReserved,
+				HardEvictionThresholds:   hardEvictionThresholds,
+			},
+			ExperimentalQOSReserved:               *experimentalQOSReserved,
+			ExperimentalCPUManagerPolicy:          s.CPUManagerPolicy,
+			ExperimentalCPUManagerReconcilePeriod: s.CPUManagerReconcilePeriod.Duration,
+		},
+		s.FailSwapOn,
+		devicePluginEnabled,
+		kubeDeps.Recorder)
+
+	return err
+}
+
 func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies) (err error) {
 	// Set global feature gates based on the value on the initial KubeletServer
 	err = utilfeature.DefaultFeatureGate.SetFromMap(s.KubeletConfiguration.FeatureGates)
@@ -474,63 +534,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies) (err error) {
 	makeEventRecorder(kubeDeps, nodeName)
 
 	if kubeDeps.ContainerManager == nil {
-		if s.CgroupsPerQOS && s.CgroupRoot == "" {
-			glog.Infof("--cgroups-per-qos enabled, but --cgroup-root was not specified.  defaulting to /")
-			s.CgroupRoot = "/"
-		}
-		kubeReserved, err := parseResourceList(s.KubeReserved)
-		if err != nil {
-			return err
-		}
-		systemReserved, err := parseResourceList(s.SystemReserved)
-		if err != nil {
-			return err
-		}
-		var hardEvictionThresholds []evictionapi.Threshold
-		// If the user requested to ignore eviction thresholds, then do not set valid values for hardEvictionThresholds here.
-		if !s.ExperimentalNodeAllocatableIgnoreEvictionThreshold {
-			hardEvictionThresholds, err = eviction.ParseThresholdConfig([]string{}, s.EvictionHard, nil, nil, nil)
-			if err != nil {
-				return err
-			}
-		}
-		experimentalQOSReserved, err := cm.ParseQOSReserved(s.ExperimentalQOSReserved)
-		if err != nil {
-			return err
-		}
-
-		devicePluginEnabled := utilfeature.DefaultFeatureGate.Enabled(features.DevicePlugins)
-
-		kubeDeps.ContainerManager, err = cm.NewContainerManager(
-			kubeDeps.Mounter,
-			kubeDeps.CAdvisorInterface,
-			cm.NodeConfig{
-				RuntimeCgroupsName:    s.RuntimeCgroups,
-				SystemCgroupsName:     s.SystemCgroups,
-				KubeletCgroupsName:    s.KubeletCgroups,
-				ContainerRuntime:      s.ContainerRuntime,
-				CgroupsPerQOS:         s.CgroupsPerQOS,
-				CgroupRoot:            s.CgroupRoot,
-				CgroupDriver:          s.CgroupDriver,
-				KubeletRootDir:        s.RootDirectory,
-				ProtectKernelDefaults: s.ProtectKernelDefaults,
-				NodeAllocatableConfig: cm.NodeAllocatableConfig{
-					KubeReservedCgroupName:   s.KubeReservedCgroup,
-					SystemReservedCgroupName: s.SystemReservedCgroup,
-					EnforceNodeAllocatable:   sets.NewString(s.EnforceNodeAllocatable...),
-					KubeReserved:             kubeReserved,
-					SystemReserved:           systemReserved,
-					HardEvictionThresholds:   hardEvictionThresholds,
-				},
-				ExperimentalQOSReserved:               *experimentalQOSReserved,
-				ExperimentalCPUManagerPolicy:          s.CPUManagerPolicy,
-				ExperimentalCPUManagerReconcilePeriod: s.CPUManagerReconcilePeriod.Duration,
-			},
-			s.FailSwapOn,
-			devicePluginEnabled,
-			kubeDeps.Recorder)
-
-		if err != nil {
+		if err = makeContainerManager(s, kubeDeps); err != nil {
 			return err
 		}
 	}
