@@ -29,7 +29,7 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
-	appsv1beta1 "k8s.io/api/apps/v1beta1"
+	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
 	extv1beta1 "k8s.io/api/extensions/v1beta1"
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
@@ -1193,7 +1193,7 @@ func findLocalPersistentVolume(c clientset.Interface, volumePath string) (*v1.Pe
 	return nil, fmt.Errorf("Unable to find local persistent volume with path %v", volumePath)
 }
 
-func createStatefulSet(config *localTestConfig, ssReplicas int32, volumeCount int) *appsv1beta1.StatefulSet {
+func createStatefulSet(config *localTestConfig, ssReplicas int32, volumeCount int) *appsv1.StatefulSet {
 	mounts := []v1.VolumeMount{}
 	claims := []v1.PersistentVolumeClaim{}
 	for i := 0; i < volumeCount; i++ {
@@ -1223,12 +1223,12 @@ func createStatefulSet(config *localTestConfig, ssReplicas int32, volumeCount in
 	}
 
 	labels := map[string]string{"app": "local-volume-test"}
-	spec := &appsv1beta1.StatefulSet{
+	spec := &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "local-volume-statefulset",
 			Namespace: config.ns,
 		},
-		Spec: appsv1beta1.StatefulSetSpec{
+		Spec: appsv1.StatefulSetSpec{
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{"app": "local-volume-test"},
 			},
@@ -1253,14 +1253,14 @@ func createStatefulSet(config *localTestConfig, ssReplicas int32, volumeCount in
 		},
 	}
 
-	ss, err := config.client.AppsV1beta1().StatefulSets(config.ns).Create(spec)
+	ss, err := config.client.AppsV1().StatefulSets(config.ns).Create(spec)
 	Expect(err).NotTo(HaveOccurred())
 
 	config.ssTester.WaitForRunningAndReady(ssReplicas, ss)
 	return ss
 }
 
-func validateStatefulSet(config *localTestConfig, ss *appsv1beta1.StatefulSet) {
+func validateStatefulSet(config *localTestConfig, ss *appsv1.StatefulSet) {
 	pods := config.ssTester.GetPodList(ss)
 
 	// Verify that each pod is on a different node

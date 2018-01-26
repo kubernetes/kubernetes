@@ -21,19 +21,19 @@ import (
 	"reflect"
 	"time"
 
-	apps "k8s.io/api/apps/v1beta1"
+	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
-	appsinformers "k8s.io/client-go/informers/apps/v1beta1"
+	appsinformers "k8s.io/client-go/informers/apps/v1"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
-	appslisters "k8s.io/client-go/listers/apps/v1beta1"
+	appslisters "k8s.io/client-go/listers/apps/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
@@ -298,7 +298,7 @@ func (ssc *StatefulSetController) getPodsForStatefulSet(set *apps.StatefulSet, s
 	// If any adoptions are attempted, we should first recheck for deletion with
 	// an uncached quorum read sometime after listing Pods (see #42639).
 	canAdoptFunc := controller.RecheckDeletionTimestamp(func() (metav1.Object, error) {
-		fresh, err := ssc.kubeClient.AppsV1beta1().StatefulSets(set.Namespace).Get(set.Name, metav1.GetOptions{})
+		fresh, err := ssc.kubeClient.AppsV1().StatefulSets(set.Namespace).Get(set.Name, metav1.GetOptions{})
 		if err != nil {
 			return nil, err
 		}
@@ -326,7 +326,7 @@ func (ssc *StatefulSetController) adoptOrphanRevisions(set *apps.StatefulSet) er
 		}
 	}
 	if hasOrphans {
-		fresh, err := ssc.kubeClient.AppsV1beta1().StatefulSets(set.Namespace).Get(set.Name, metav1.GetOptions{})
+		fresh, err := ssc.kubeClient.AppsV1().StatefulSets(set.Namespace).Get(set.Name, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
