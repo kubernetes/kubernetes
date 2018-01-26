@@ -459,29 +459,35 @@ func BuildGenericConfig(s *options.ServerRunOptions, proxyTransport *http.Transp
 		genericConfig.DisabledPostStartHooks.Insert(rbacrest.PostStartHookName)
 	}
 
-	webhookAuthResolver := func(delegate webhookconfig.AuthenticationInfoResolver) webhookconfig.AuthenticationInfoResolver {
-		return webhookconfig.AuthenticationInfoResolverFunc(func(server string, directRouting bool) (*rest.Config, error) {
-			if server == "kubernetes.default.svc" {
-				return genericConfig.LoopbackClientConfig, nil
-			}
-			ret, err := delegate.ClientConfigFor(server, directRouting)
-			if err != nil {
-				return nil, err
-			}
-			if !directRouting && proxyTransport != nil && proxyTransport.Dial != nil {
-				// Use the SSH tunnels iff the webhook server is not directly
-				// routable from apiserver's network environment.
-				ret.Dial = proxyTransport.Dial
-			}
-			return ret, err
-		})
+	webhookAuthResolverWrapper := func(delegate webhookconfig.AuthenticationInfoResolver) webhookconfig.AuthenticationInfoResolver {
+		return &webhookconfig.AuthenticationInfoResolverDelegator{
+			ClientConfigForFunc: func(server string) (*rest.Config, error) {
+				if server == "kubernetes.default.svc" {
+					return genericConfig.LoopbackClientConfig, nil
+				}
+				return delegate.ClientConfigFor(server)
+			},
+			ClientConfigForServiceFunc: func(serviceName, serviceNamespace string) (*rest.Config, error) {
+				if serviceName == "kubernetes" && serviceNamespace == "default" {
+					return genericConfig.LoopbackClientConfig, nil
+				}
+				ret, err := delegate.ClientConfigForService(serviceName, serviceNamespace)
+				if err != nil {
+					return nil, err
+				}
+				if proxyTransport != nil && proxyTransport.Dial != nil {
+					ret.Dial = proxyTransport.Dial
+				}
+				return ret, err
+			},
+		}
 	}
 	pluginInitializers, err := BuildAdmissionPluginInitializers(
 		s,
 		client,
 		sharedInformers,
 		serviceResolver,
-		webhookAuthResolver,
+		webhookAuthResolverWrapper,
 	)
 	if err != nil {
 		return nil, nil, nil, nil, nil, fmt.Errorf("failed to create admission plugin initializer: %v", err)

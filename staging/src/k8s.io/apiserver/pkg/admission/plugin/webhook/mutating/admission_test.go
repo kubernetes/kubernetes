@@ -631,7 +631,12 @@ type fakeAuthenticationInfoResolver struct {
 	cachedCount *int32
 }
 
-func (c *fakeAuthenticationInfoResolver) ClientConfigFor(server string, directRouting bool) (*rest.Config, error) {
+func (c *fakeAuthenticationInfoResolver) ClientConfigFor(server string) (*rest.Config, error) {
+	atomic.AddInt32(c.cachedCount, 1)
+	return c.restConfig, nil
+}
+
+func (c *fakeAuthenticationInfoResolver) ClientConfigForService(serviceName, serviceNamespace string) (*rest.Config, error) {
 	atomic.AddInt32(c.cachedCount, 1)
 	return c.restConfig, nil
 }
