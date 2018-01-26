@@ -32,6 +32,15 @@ juDIR=`pwd`/results
 # The name of the suite is calculated based in your script name
 suite=""
 
+if LANG=C sed --help 2>&1 | grep -q GNU; then
+  SED="sed"
+elif which gsed &>/dev/null; then
+  SED="gsed"
+else
+  echo "Failed to find GNU sed as sed or gsed. If you are on Mac: brew install gnu-sed." >&2
+  exit 1
+fi
+
 # A wrapper for the eval method witch allows catching seg-faults and use tee
 errfile=/tmp/evErr.$$.log
 function eVal() {
@@ -57,11 +66,11 @@ function juLog() {
   ya=""; icase=""
   while [ -z "$ya" ]; do
     case "$1" in
-  	  -name=*)   name=`echo "$1" | sed -e 's/-name=//'`;   shift;;
-  	  -class=*)  class=`echo "$1" | sed -e 's/-class=//'`;   shift;;
-      -ierror=*) ereg=`echo "$1" | sed -e 's/-ierror=//'`; icase="-i"; shift;;
-      -error=*)  ereg=`echo "$1" | sed -e 's/-error=//'`;  shift;;
-      -output=*) juDIR=`echo "$1" | sed -e 's/-output=//'`;  shift;;
+  	  -name=*)   name=`echo "$1" | ${SED} -e 's/-name=//'`;   shift;;
+  	  -class=*)  class=`echo "$1" | ${SED} -e 's/-class=//'`;   shift;;
+      -ierror=*) ereg=`echo "$1" | ${SED} -e 's/-ierror=//'`; icase="-i"; shift;;
+      -error=*)  ereg=`echo "$1" | ${SED} -e 's/-error=//'`;  shift;;
+      -output=*) juDIR=`echo "$1" | ${SED} -e 's/-output=//'`;  shift;;
       *)         ya=1;;
     esac
   done
@@ -83,7 +92,7 @@ function juLog() {
   # calculate command to eval
   [ -z "$1" ] && return
   cmd="$1"; shift
-  while [ -n "$1" ]
+  while [ -n "${1:-}" ]
   do
      cmd="$cmd \"$1\""
      shift
@@ -108,8 +117,8 @@ function juLog() {
 
   # set the appropriate error, based in the exit code and the regex
   [ $evErr != 0 ] && err=1 || err=0
-  out=`cat $outf | sed -e 's/^\([^+]\)/| \1/g'`
-  if [ $err = 0 -a -n "$ereg" ]; then
+  out=`cat $outf | ${SED} -e 's/^\([^+]\)/| \1/g'`
+  if [ $err = 0 -a -n "${ereg:-}" ]; then
       H=`echo "$out" | egrep $icase "$ereg"`
       [ -n "$H" ] && err=1
   fi
@@ -148,14 +157,14 @@ $errMsg
 
   if [[ -e "$juDIR/junit_$suite.xml" ]]; then
     # file exists. first update the failures count
-    failCount=`sed -n "s/.*testsuite.*failures=\"\([0-9]*\)\".*/\1/p" "$juDIR/junit_$suite.xml"`
+    failCount=`${SED} -n "s/.*testsuite.*failures=\"\([0-9]*\)\".*/\1/p" "$juDIR/junit_$suite.xml"`
     errors=$(($failCount+$errors))
-    sed -i "0,/failures=\"$failCount\"/ s/failures=\"$failCount\"/failures=\"$errors\"/" "$juDIR/junit_$suite.xml"
-    sed -i "0,/errors=\"$failCount\"/ s/errors=\"$failCount\"/errors=\"$errors\"/" "$juDIR/junit_$suite.xml"
+    ${SED} -i "0,/failures=\"$failCount\"/ s/failures=\"$failCount\"/failures=\"$errors\"/" "$juDIR/junit_$suite.xml"
+    ${SED} -i "0,/errors=\"$failCount\"/ s/errors=\"$failCount\"/errors=\"$errors\"/" "$juDIR/junit_$suite.xml"
 
     # file exists. Need to append to it. If we remove the testsuite end tag, we can just add it in after.
-    sed -i "s^</testsuite>^^g" $juDIR/junit_$suite.xml ## remove testSuite so we can add it later
-    sed -i "s^</testsuites>^^g" $juDIR/junit_$suite.xml
+    ${SED} -i "s^</testsuite>^^g" $juDIR/junit_$suite.xml ## remove testSuite so we can add it later
+    ${SED} -i "s^</testsuites>^^g" $juDIR/junit_$suite.xml
     cat <<EOF >> "$juDIR/junit_$suite.xml"
      $content
     </testsuite>
