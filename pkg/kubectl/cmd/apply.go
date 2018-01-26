@@ -274,6 +274,9 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 			return cmdutil.AddSourceToErr(fmt.Sprintf("retrieving modified configuration from:\n%v\nfor:", info), info.Source, err)
 		}
 
+		// Print object only if output format other than "name" is specified
+		printObject := len(output) > 0 && !shortOutput
+
 		if err := info.Get(); err != nil {
 			if !errors.IsNotFound(err) {
 				return cmdutil.AddSourceToErr(fmt.Sprintf("retrieving current configuration of:\n%v\nfrom server for:", info), info.Source, err)
@@ -297,7 +300,7 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 			}
 
 			count++
-			if len(output) > 0 && !shortOutput {
+			if printObject {
 				return cmdutil.PrintObject(cmd, info.Object, out)
 			}
 			cmdutil.PrintSuccess(shortOutput, out, info.Object, dryRun, "created")
@@ -343,14 +346,14 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 				visitedUids.Insert(string(uid))
 			}
 
-			if string(patchBytes) == "{}" {
+			if string(patchBytes) == "{}" && !printObject {
 				count++
 				cmdutil.PrintSuccess(shortOutput, out, info.Object, false, "unchanged")
 				return nil
 			}
 		}
 		count++
-		if len(output) > 0 && !shortOutput {
+		if printObject {
 			return cmdutil.PrintObject(cmd, info.Object, out)
 		}
 		cmdutil.PrintSuccess(shortOutput, out, info.Object, dryRun, "configured")
