@@ -93,6 +93,36 @@ func TestReplaceAliases(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:     "resource-match-preferred",
+			arg:      "pods",
+			expected: schema.GroupVersionResource{Resource: "pods", Group: ""},
+			srvRes: []*metav1.APIResourceList{
+				{
+					GroupVersion: "v1",
+					APIResources: []metav1.APIResource{{Name: "pods", SingularName: "pod"}},
+				},
+				{
+					GroupVersion: "acme.com/v1",
+					APIResources: []metav1.APIResource{{Name: "poddlers", ShortNames: []string{"pods", "pod"}}},
+				},
+			},
+		},
+		{
+			name:     "resource-match-singular-preferred",
+			arg:      "pod",
+			expected: schema.GroupVersionResource{Resource: "pod", Group: ""},
+			srvRes: []*metav1.APIResourceList{
+				{
+					GroupVersion: "v1",
+					APIResources: []metav1.APIResource{{Name: "pods", SingularName: "pod"}},
+				},
+				{
+					GroupVersion: "acme.com/v1",
+					APIResources: []metav1.APIResource{{Name: "poddlers", ShortNames: []string{"pods", "pod"}}},
+				},
+			},
+		},
 	}
 
 	ds := &fakeDiscoveryClient{}
