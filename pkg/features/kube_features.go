@@ -223,6 +223,12 @@ const (
 	//
 	// Implement IPVS-based in-cluster service load balancing
 	SupportIPVSProxyMode utilfeature.Feature = "SupportIPVSProxyMode"
+
+	// owner: @dims
+	// alpha: v1.10
+	//
+	// Implement support for limiting pids in pods
+	SupportPodPidsLimit utilfeature.Feature = "SupportPodPidsLimit"
 )
 
 func init() {
@@ -263,6 +269,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	PVCProtection:                               {Default: false, PreRelease: utilfeature.Alpha},
 	ResourceLimitsPriorityFunction:              {Default: false, PreRelease: utilfeature.Alpha},
 	SupportIPVSProxyMode:                        {Default: false, PreRelease: utilfeature.Beta},
+	SupportPodPidsLimit:                         {Default: false, PreRelease: utilfeature.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:
