@@ -20,7 +20,7 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
-	apps "k8s.io/api/apps/v1beta1"
+	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/util/version"
 
@@ -71,7 +71,7 @@ func (t *StatefulSetUpgradeTest) Setup(f *framework.Framework) {
 
 	By("Creating statefulset " + ssName + " in namespace " + ns)
 	*(t.set.Spec.Replicas) = 3
-	_, err = f.ClientSet.AppsV1beta1().StatefulSets(ns).Create(t.set)
+	_, err = f.ClientSet.AppsV1().StatefulSets(ns).Create(t.set)
 	Expect(err).NotTo(HaveOccurred())
 
 	By("Saturating stateful set " + t.set.Name)

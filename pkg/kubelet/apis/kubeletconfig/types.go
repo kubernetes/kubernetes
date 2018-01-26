@@ -193,6 +193,8 @@ type KubeletConfiguration struct {
 	// The CIDR to use for pod IP addresses, only used in standalone mode.
 	// In cluster mode, this is obtained from the master.
 	PodCIDR string
+	// PodPidsLimit is the maximum number of pids in any pod.
+	PodPidsLimit *int64
 	// ResolverConfig is the resolver configuration file used as the basis
 	// for the container DNS resolution configuration.
 	ResolverConfig string

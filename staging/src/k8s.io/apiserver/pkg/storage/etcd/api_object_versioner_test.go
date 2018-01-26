@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apiserver/pkg/storage"
 	storagetesting "k8s.io/apiserver/pkg/storage/testing"
 )
 
@@ -37,6 +38,43 @@ func TestObjectVersioner(t *testing.T) {
 	}
 	if obj.ResourceVersion != "5" || obj.DeletionTimestamp != nil {
 		t.Errorf("unexpected resource version: %#v", obj)
+	}
+}
+
+func TestEtcdParseResourceVersion(t *testing.T) {
+	testCases := []struct {
+		Version       string
+		ExpectVersion uint64
+		Err           bool
+	}{
+		{Version: "", ExpectVersion: 0},
+		{Version: "a", Err: true},
+		{Version: " ", Err: true},
+		{Version: "1", ExpectVersion: 1},
+		{Version: "10", ExpectVersion: 10},
+	}
+
+	v := APIObjectVersioner{}
+	testFuncs := []func(string) (uint64, error){
+		v.ParseListResourceVersion,
+		v.ParseWatchResourceVersion,
+	}
+
+	for _, testCase := range testCases {
+		for i, f := range testFuncs {
+			version, err := f(testCase.Version)
+			switch {
+			case testCase.Err && err == nil:
+				t.Errorf("%s[%v]: unexpected non-error", testCase.Version, i)
+			case testCase.Err && !storage.IsInvalidError(err):
+				t.Errorf("%s[%v]: unexpected error: %v", testCase.Version, i, err)
+			case !testCase.Err && err != nil:
+				t.Errorf("%s[%v]: unexpected error: %v", testCase.Version, i, err)
+			}
+			if version != testCase.ExpectVersion {
+				t.Errorf("%s[%v]: expected version %d but was %d", testCase.Version, i, testCase.ExpectVersion, version)
+			}
+		}
 	}
 }
 

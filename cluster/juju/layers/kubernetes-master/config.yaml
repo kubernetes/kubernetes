@@ -80,3 +80,9 @@ options:
     description: |
       When true, master nodes will not be upgraded until the user triggers
       it manually by running the upgrade action.
+  storage-backend:
+    type: string
+    default: "auto"
+    description: |
+      The storage backend for kube-apiserver persistence. Can be "etcd2", "etcd3", or
+      "auto". Auto mode will select etcd3 on new installations, or etcd2 on upgrades.

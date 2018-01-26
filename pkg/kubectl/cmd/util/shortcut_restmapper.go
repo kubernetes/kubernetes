@@ -115,6 +115,7 @@ func (e shortcutExpander) expandResourceShortcut(resource schema.GroupVersionRes
 			}
 			if resource.Resource == item.ShortForm.Resource {
 				resource.Resource = item.LongForm.Resource
+				resource.Group = item.LongForm.Group
 				return resource
 			}
 		}

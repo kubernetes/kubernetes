@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2018 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,10 +14,31 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package multicluster
+package bootstrap
 
-import "github.com/onsi/ginkgo"
+import (
+	"sync"
+)
 
-func SIGDescribe(text string, body func()) bool {
-	return ginkgo.Describe("[sig-multicluster] "+text, body)
+var once sync.Once
+var waiting = make(chan bool)
+
+// Bootstrap takes care of initializing necessary test context for vSphere tests
+func Bootstrap() {
+	done := make(chan bool)
+	go func() {
+		once.Do(bootstrapOnce)
+		<-waiting
+		done <- true
+	}()
+	<-done
+}
+
+func bootstrapOnce() {
+	// TBD
+	// 1. Read vSphere conf and get VSphere instances
+	// 2. Get Node to VSphere mapping
+	// 3. Set NodeMapper in vSphere context
+	TestContext = Context{}
+	close(waiting)
 }

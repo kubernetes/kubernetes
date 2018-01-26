@@ -840,6 +840,7 @@ func Convert_core_ComponentStatusList_To_v1_ComponentStatusList(in *core.Compone
 func autoConvert_v1_ConfigMap_To_core_ConfigMap(in *v1.ConfigMap, out *core.ConfigMap, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	out.Data = *(*map[string]string)(unsafe.Pointer(&in.Data))
+	out.BinaryData = *(*map[string][]byte)(unsafe.Pointer(&in.BinaryData))
 	return nil
 }
 
@@ -851,6 +852,7 @@ func Convert_v1_ConfigMap_To_core_ConfigMap(in *v1.ConfigMap, out *core.ConfigMa
 func autoConvert_core_ConfigMap_To_v1_ConfigMap(in *core.ConfigMap, out *v1.ConfigMap, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	out.Data = *(*map[string]string)(unsafe.Pointer(&in.Data))
+	out.BinaryData = *(*map[string][]byte)(unsafe.Pointer(&in.BinaryData))
 	return nil
 }
 

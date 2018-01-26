@@ -17,6 +17,7 @@ limitations under the License.
 package scheduling
 
 import (
+	"os"
 	"strings"
 	"time"
 
@@ -163,7 +164,12 @@ func testNvidiaGPUsOnCOS(f *framework.Framework) {
 	framework.Logf("Cluster is running on COS. Proceeding with test")
 
 	if f.BaseName == "device-plugin-gpus" {
-		dsYamlUrl = "https://raw.githubusercontent.com/GoogleCloudPlatform/container-engine-accelerators/master/daemonset.yaml"
+		dsYamlUrlFromEnv := os.Getenv("NVIDIA_DRIVER_INSTALLER_DAEMONSET")
+		if dsYamlUrlFromEnv != "" {
+			dsYamlUrl = dsYamlUrlFromEnv
+		} else {
+			dsYamlUrl = "https://raw.githubusercontent.com/GoogleCloudPlatform/container-engine-accelerators/master/daemonset.yaml"
+		}
 		gpuResourceName = framework.NVIDIAGPUResourceName
 		podCreationFunc = makeCudaAdditionDevicePluginTestPod
 	} else {
@@ -172,6 +178,7 @@ func testNvidiaGPUsOnCOS(f *framework.Framework) {
 		podCreationFunc = makeCudaAdditionTestPod
 	}
 
+	framework.Logf("Using %v", dsYamlUrl)
 	// Creates the DaemonSet that installs Nvidia Drivers.
 	// The DaemonSet also runs nvidia device plugin for device plugin test.
 	ds, err := framework.DsFromManifest(dsYamlUrl)

@@ -128,7 +128,7 @@ func TestTokenGenerateAndValidate(t *testing.T) {
 	}
 
 	// Generate the RSA token
-	rsaGenerator := serviceaccount.JWTTokenGenerator(getPrivateKey(rsaPrivateKey))
+	rsaGenerator := serviceaccount.JWTTokenGenerator(serviceaccount.LegacyIssuer, getPrivateKey(rsaPrivateKey))
 	rsaToken, err := rsaGenerator.GenerateToken(*serviceAccount, *rsaSecret)
 	if err != nil {
 		t.Fatalf("error generating token: %v", err)
@@ -141,7 +141,7 @@ func TestTokenGenerateAndValidate(t *testing.T) {
 	}
 
 	// Generate the ECDSA token
-	ecdsaGenerator := serviceaccount.JWTTokenGenerator(getPrivateKey(ecdsaPrivateKey))
+	ecdsaGenerator := serviceaccount.JWTTokenGenerator(serviceaccount.LegacyIssuer, getPrivateKey(ecdsaPrivateKey))
 	ecdsaToken, err := ecdsaGenerator.GenerateToken(*serviceAccount, *ecdsaSecret)
 	if err != nil {
 		t.Fatalf("error generating token: %v", err)
@@ -151,6 +151,13 @@ func TestTokenGenerateAndValidate(t *testing.T) {
 	}
 	ecdsaSecret.Data = map[string][]byte{
 		"token": []byte(ecdsaToken),
+	}
+
+	// Generate signer with same keys as RSA signer but different issuer
+	badIssuerGenerator := serviceaccount.JWTTokenGenerator("foo", getPrivateKey(rsaPrivateKey))
+	badIssuerToken, err := badIssuerGenerator.GenerateToken(*serviceAccount, *rsaSecret)
+	if err != nil {
+		t.Fatalf("error generating token: %v", err)
 	}
 
 	testCases := map[string]struct {
@@ -194,6 +201,13 @@ func TestTokenGenerateAndValidate(t *testing.T) {
 			ExpectedUserName: expectedUserName,
 			ExpectedUserUID:  expectedUserUID,
 			ExpectedGroups:   []string{"system:serviceaccounts", "system:serviceaccounts:test"},
+		},
+		"valid key, invalid issuer (rsa)": {
+			Token:       badIssuerToken,
+			Client:      nil,
+			Keys:        []interface{}{getPublicKey(rsaPublicKey)},
+			ExpectedErr: false,
+			ExpectedOK:  false,
 		},
 		"valid key (ecdsa)": {
 			Token:            ecdsaToken,
@@ -253,7 +267,7 @@ func TestTokenGenerateAndValidate(t *testing.T) {
 
 	for k, tc := range testCases {
 		getter := serviceaccountcontroller.NewGetterFromClient(tc.Client)
-		authenticator := serviceaccount.JWTTokenAuthenticator(tc.Keys, tc.Client != nil, getter)
+		authenticator := serviceaccount.JWTTokenAuthenticator(serviceaccount.LegacyIssuer, tc.Keys, tc.Client != nil, getter)
 
 		// An invalid, non-JWT token should always fail
 		if _, ok, err := authenticator.AuthenticateToken("invalid token"); err != nil || ok {

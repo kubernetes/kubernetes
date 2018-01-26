@@ -1085,8 +1085,8 @@ func getVolumeID(pv *v1.PersistentVolume, volumeName string) (string, error) {
 
 	// Get volID from pvspec if available, else fill it from volumename.
 	if pv != nil {
-		if pv.Annotations["VolID"] != "" {
-			volumeID = pv.Annotations["VolID"]
+		if pv.Annotations[heketiVolIDAnn] != "" {
+			volumeID = pv.Annotations[heketiVolIDAnn]
 		} else {
 			volumeID = dstrings.TrimPrefix(volumeName, volPrefix)
 		}

@@ -75567,8 +75567,16 @@
       "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources",
       "type": "string"
      },
+     "binaryData": {
+      "description": "BinaryData contains the binary data. Each key must consist of alphanumeric characters, '-', '_' or '.'. BinaryData can contain byte sequences that are not in the UTF-8 range. The keys stored in BinaryData must not overlap with the ones in the Data field, this is enforced during validation process. Using this field will require 1.10+ apiserver and kubelet.",
+      "type": "object",
+      "additionalProperties": {
+       "type": "string",
+       "format": "byte"
+      }
+     },
      "data": {
-      "description": "Data contains the configuration data. Each key must consist of alphanumeric characters, '-', '_' or '.'.",
+      "description": "Data contains the configuration data. Each key must consist of alphanumeric characters, '-', '_' or '.'. Values with non-UTF-8 byte sequences must use the BinaryData field. The keys stored in Data must not overlap with the keys in the BinaryData field, this is enforced during validation process.",
       "type": "object",
       "additionalProperties": {
        "type": "string"
