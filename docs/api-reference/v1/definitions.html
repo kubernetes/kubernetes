@@ -1107,7 +1107,14 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">data</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Data contains the configuration data. Each key must consist of alphanumeric characters, <em>-</em>, <em>_</em> or <em>.</em>.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Data contains the configuration data. Each key must consist of alphanumeric characters, <em>-</em>, <em>_</em> or <em>.</em>. Values with non-UTF-8 byte sequences must use the BinaryData field. The keys stored in Data must not overlap with the keys in the BinaryData field, this is enforced during validation process.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">object</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">binaryData</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">BinaryData contains the binary data. Each key must consist of alphanumeric characters, <em>-</em>, <em>_</em> or <em>.</em>. BinaryData can contain byte sequences that are not in the UTF-8 range. The keys stored in BinaryData must not overlap with the ones in the Data field, this is enforced during validation process. Using this field will require 1.10+ apiserver and kubelet.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">object</p></td>
 <td class="tableblock halign-left valign-top"></td>
