@@ -52,6 +52,9 @@ type ContainerManager interface {
 	Exec(*runtimeapi.ExecRequest) (*runtimeapi.ExecResponse, error)
 	// Attach prepares a streaming endpoint to attach to a running container, and returns the address.
 	Attach(req *runtimeapi.AttachRequest) (*runtimeapi.AttachResponse, error)
+	// ReopenContainerLog asks runtime to reopen the stdout/stderr log file
+	// for the container.
+	ReopenContainerLog(ContainerID string) error
 }
 
 // PodSandboxManager contains methods for operating on PodSandboxes. The methods

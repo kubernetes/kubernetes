@@ -459,3 +459,11 @@ func (r *FakeRuntimeService) ListContainerStats(filter *runtimeapi.ContainerStat
 
 	return result, nil
 }
+
+func (r *FakeRuntimeService) ReopenContainerLog(containerID string) error {
+	r.Lock()
+	defer r.Unlock()
+
+	r.Called = append(r.Called, "ReopenContainerLog")
+	return nil
+}

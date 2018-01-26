@@ -283,3 +283,13 @@ func (f *RemoteRuntime) UpdateContainerResources(ctx context.Context, req *kubea
 
 	return &kubeapi.UpdateContainerResourcesResponse{}, nil
 }
+
+// ReopenContainerLog reopens the container log file.
+func (f *RemoteRuntime) ReopenContainerLog(ctx context.Context, req *kubeapi.ReopenContainerLogRequest) (*kubeapi.ReopenContainerLogResponse, error) {
+	err := f.RuntimeService.ReopenContainerLog(req.ContainerId)
+	if err != nil {
+		return nil, err
+	}
+
+	return &kubeapi.ReopenContainerLogResponse{}, nil
+}

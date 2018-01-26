@@ -476,3 +476,15 @@ func (r *RemoteRuntimeService) ListContainerStats(filter *runtimeapi.ContainerSt
 
 	return resp.GetStats(), nil
 }
+
+func (r *RemoteRuntimeService) ReopenContainerLog(containerID string) error {
+	ctx, cancel := getContextWithTimeout(r.timeout)
+	defer cancel()
+
+	_, err := r.runtimeClient.ReopenContainerLog(ctx, &runtimeapi.ReopenContainerLogRequest{ContainerId: containerID})
+	if err != nil {
+		glog.Errorf("ReopenContainerLog %q from runtime service failed: %v", containerID, err)
+		return err
+	}
+	return nil
+}
