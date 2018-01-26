@@ -181,10 +181,10 @@ readonly KUBE_TEST_SERVER_TARGETS=($(kube::golang::server_test_targets))
 readonly KUBE_TEST_SERVER_BINARIES=("${KUBE_TEST_SERVER_TARGETS[@]##*/}")
 readonly KUBE_TEST_SERVER_PLATFORMS=("${KUBE_SERVER_PLATFORMS[@]}")
 
-# Gigabytes desired for parallel platform builds. 11 is fairly
-# arbitrary, but is a reasonable splitting point for 2015
-# laptops-versus-not.
-readonly KUBE_PARALLEL_BUILD_MEMORY=11
+# Gigabytes necessary for parallel platform builds.
+# As of January 2018, RAM usage is exceeding 30G
+# Setting to 40 to provide some headroom
+readonly KUBE_PARALLEL_BUILD_MEMORY=40
 
 # TODO(pipejakob) gke-certificates-controller is included here to exercise its
 # compilation, but it doesn't need to be distributed in any of our tars. Its
