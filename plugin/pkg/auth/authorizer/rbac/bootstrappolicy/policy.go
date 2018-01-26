@@ -426,6 +426,7 @@ func ClusterRoles() []rbac.ClusterRole {
 				// things that pods use or applies to them
 				rbac.NewRule(Read...).Groups(policyGroup).Resources("poddisruptionbudgets").RuleOrDie(),
 				rbac.NewRule(Read...).Groups(legacyGroup).Resources("persistentvolumeclaims", "persistentvolumes").RuleOrDie(),
+				rbac.NewRule(Read...).Groups(legacyGroup).Resources("namespaces").RuleOrDie(),
 			},
 		},
 		{

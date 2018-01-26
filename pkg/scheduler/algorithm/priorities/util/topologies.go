@@ -17,22 +17,56 @@ limitations under the License.
 package util
 
 import (
+	"sync"
+
 	"k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
-// GetNamespacesFromPodAffinityTerm returns a set of names
-// according to the namespaces indicated in podAffinityTerm.
-// If namespaces is empty it considers the given pod's namespace.
+// NamespaceLister helps list Namespaces.
+type namespaceLister interface {
+	// List lists all Namespaces in the indexer.
+	List(selector labels.Selector) (ret []*v1.Namespace, err error)
+}
+
+var (
+	once     sync.Once
+	nsLister namespaceLister
+)
+
+// InitNamespaceLister initialize the namespace lister
+func InitNamespaceLister(namespaceListerLister namespaceLister) {
+	once.Do(func() {
+		nsLister = namespaceListerLister
+	})
+}
+
+// GetNamespacesFromPodAffinityTerm return the namespaces from the pod affinity item
 func GetNamespacesFromPodAffinityTerm(pod *v1.Pod, podAffinityTerm *v1.PodAffinityTerm) sets.String {
-	names := sets.String{}
-	if len(podAffinityTerm.Namespaces) == 0 {
-		names.Insert(pod.Namespace)
+	namespaces := sets.String{}
+	if podAffinityTerm.NamespaceSelector != nil {
+		namespaceSelector, err := metav1.LabelSelectorAsSelector(podAffinityTerm.NamespaceSelector)
+		if err != nil {
+			return namespaces
+		}
+		namespaceList, err := nsLister.List(namespaceSelector)
+		if err != nil {
+			return namespaces
+		}
+
+		for _, ns := range namespaceList {
+			namespaces.Insert(ns.Name)
+		}
 	} else {
-		names.Insert(podAffinityTerm.Namespaces...)
+		if len(podAffinityTerm.Namespaces) == 0 {
+			namespaces.Insert(pod.Namespace)
+		} else {
+			namespaces.Insert(podAffinityTerm.Namespaces...)
+		}
 	}
-	return names
+	return namespaces
 }
 
 // PodMatchesTermsNamespaceAndSelector returns true if the given <pod>

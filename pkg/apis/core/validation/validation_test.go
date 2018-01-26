@@ -6305,6 +6305,116 @@ func TestValidatePod(t *testing.T) {
 				},
 			}),
 		},
+		{ // Pod affinity with namespace selector
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "123",
+				Namespace: "ns",
+			},
+			Spec: validPodSpec(&core.Affinity{
+				PodAffinity: &core.PodAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: []core.PodAffinityTerm{
+						{
+							LabelSelector: &metav1.LabelSelector{
+								MatchExpressions: []metav1.LabelSelectorRequirement{
+									{
+										Key:      "key2",
+										Operator: metav1.LabelSelectorOpIn,
+										Values:   []string{"value1", "value2"},
+									},
+								},
+							},
+							TopologyKey: "zone",
+							NamespaceSelector: &metav1.LabelSelector{
+								MatchExpressions: []metav1.LabelSelectorRequirement{
+									{
+										Key:      "key2",
+										Operator: metav1.LabelSelectorOpIn,
+										Values:   []string{"value1", "value2"},
+									},
+								},
+							},
+						},
+					},
+					PreferredDuringSchedulingIgnoredDuringExecution: []core.WeightedPodAffinityTerm{
+						{
+							Weight: 10,
+							PodAffinityTerm: core.PodAffinityTerm{
+								LabelSelector: &metav1.LabelSelector{
+									MatchExpressions: []metav1.LabelSelectorRequirement{
+										{
+											Key:      "key2",
+											Operator: metav1.LabelSelectorOpNotIn,
+											Values:   []string{"value1", "value2"},
+										},
+									},
+								},
+								TopologyKey: "region",
+								NamespaceSelector: &metav1.LabelSelector{
+									MatchExpressions: []metav1.LabelSelectorRequirement{
+										{
+											Key:      "key2",
+											Operator: metav1.LabelSelectorOpIn,
+											Values:   []string{"value1", "value2"},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			}),
+		},
+		{ // Pod affinity with namespace selector and namespaces in different podAffinityTerm
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "123",
+				Namespace: "ns",
+			},
+			Spec: validPodSpec(&core.Affinity{
+				PodAffinity: &core.PodAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: []core.PodAffinityTerm{
+						{
+							LabelSelector: &metav1.LabelSelector{
+								MatchExpressions: []metav1.LabelSelectorRequirement{
+									{
+										Key:      "key2",
+										Operator: metav1.LabelSelectorOpIn,
+										Values:   []string{"value1", "value2"},
+									},
+								},
+							},
+							TopologyKey: "zone",
+							NamespaceSelector: &metav1.LabelSelector{
+								MatchExpressions: []metav1.LabelSelectorRequirement{
+									{
+										Key:      "key2",
+										Operator: metav1.LabelSelectorOpIn,
+										Values:   []string{"value1", "value2"},
+									},
+								},
+							},
+						},
+					},
+					PreferredDuringSchedulingIgnoredDuringExecution: []core.WeightedPodAffinityTerm{
+						{
+							Weight: 10,
+							PodAffinityTerm: core.PodAffinityTerm{
+								LabelSelector: &metav1.LabelSelector{
+									MatchExpressions: []metav1.LabelSelectorRequirement{
+										{
+											Key:      "key2",
+											Operator: metav1.LabelSelectorOpNotIn,
+											Values:   []string{"value1", "value2"},
+										},
+									},
+								},
+								Namespaces:  []string{"ns"},
+								TopologyKey: "region",
+							},
+						},
+					},
+				},
+			}),
+		},
 		{ // populate forgiveness tolerations with exists operator in annotations.
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "123",
@@ -6862,6 +6972,46 @@ func TestValidatePod(t *testing.T) {
 										},
 									},
 									Namespaces: []string{"ns"},
+								},
+							},
+						},
+					},
+				}),
+			},
+		},
+		"invalid pod affinity, namespaces and namespaceSelector cannot coexist": {
+			expectedError: "namespace and namespaceSelector cannot coexist",
+			spec: core.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "123",
+					Namespace: "ns",
+				},
+				Spec: validPodSpec(&core.Affinity{
+					PodAffinity: &core.PodAffinity{
+						PreferredDuringSchedulingIgnoredDuringExecution: []core.WeightedPodAffinityTerm{
+							{
+								Weight: 10,
+								PodAffinityTerm: core.PodAffinityTerm{
+									LabelSelector: &metav1.LabelSelector{
+										MatchExpressions: []metav1.LabelSelectorRequirement{
+											{
+												Key:      "key2",
+												Operator: metav1.LabelSelectorOpNotIn,
+												Values:   []string{"value1", "value2"},
+											},
+										},
+									},
+									Namespaces: []string{"ns"},
+									NamespaceSelector: &metav1.LabelSelector{
+										MatchExpressions: []metav1.LabelSelectorRequirement{
+											{
+												Key:      "key2",
+												Operator: metav1.LabelSelectorOpNotIn,
+												Values:   []string{"value1", "value2"},
+											},
+										},
+									},
+									TopologyKey: "region",
 								},
 							},
 						},
