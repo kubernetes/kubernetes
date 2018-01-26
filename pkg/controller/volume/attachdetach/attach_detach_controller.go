@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package volume implements a controller to manage volume attach and detach
+// Package attachdetach implements a controller to manage volume attach and detach
 // operations.
 package attachdetach
 
