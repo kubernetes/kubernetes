@@ -200,6 +200,9 @@ const (
 	CoreDNS = "coredns"
 	// KubeDNS defines a variable used internally when referring to the kube-dns addon for a cluster
 	KubeDNS = "kube-dns"
+
+	// CRICtlPackage defines the go package that installs crictl
+	CRICtlPackage = "github.com/kubernetes-incubator/cri-tools/cmd/crictl"
 )
 
 var (
