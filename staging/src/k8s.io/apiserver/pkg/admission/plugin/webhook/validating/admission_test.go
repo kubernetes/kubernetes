@@ -661,6 +661,11 @@ func (c *fakeAuthenticationInfoResolver) ClientConfigFor(server string) (*rest.C
 	return c.restConfig, nil
 }
 
+func (c *fakeAuthenticationInfoResolver) ClientConfigForService(serviceName, serviceNamespace string) (*rest.Config, error) {
+	atomic.AddInt32(c.cachedCount, 1)
+	return c.restConfig, nil
+}
+
 func newMatchEverythingRules() []registrationv1beta1.RuleWithOperations {
 	return []registrationv1beta1.RuleWithOperations{{
 		Operations: []registrationv1beta1.OperationType{registrationv1beta1.OperationAll},
