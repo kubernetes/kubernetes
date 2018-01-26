@@ -112,7 +112,12 @@ def check_for_upgrade_needed():
         # we take no risk and forcibly upgrade the snaps.
         # Forcibly means we do not prompt the user to call the upgrade action.
         set_upgrade_needed(forced=True)
-    upgrade_for_etcd()
+
+    # Set the auto storage backend to etcd2.
+    auto_storage_backend = leader_get('auto_storage_backend')
+    is_leader = is_state('leadership.is_leader')
+    if not auto_storage_backend and is_leader:
+        leader_set(auto_storage_backend='etcd2')
 
 
 def snap_resources_changed():
@@ -136,14 +141,6 @@ def snap_resources_changed():
         db.set('snap.resources.fingerprint.initialised', True)
         any_file_changed(paths)
         return 'unknown'
-
-
-def upgrade_for_etcd():
-    # we are upgrading the charm.
-    # If this is an old deployment etcd_version is not set
-    # so if we are the leader we need to set it to v2
-    if not leader_get('etcd_version') and is_state('leadership.is_leader'):
-        leader_set(etcd_version='etcd2')
 
 
 def add_rbac_roles():
@@ -277,6 +274,11 @@ def password_changed():
     set_state('reconfigure.authentication.setup')
     remove_state('authentication.setup')
     set_state('client.password.initialised')
+
+
+@when('config.changed.storage-backend')
+def storage_backend_changed():
+    remove_state('kubernetes-master.components.started')
 
 
 @when('cni.connected')
@@ -432,7 +434,7 @@ def master_services_down():
 
 @when('etcd.available', 'tls_client.server.certificate.saved',
       'authentication.setup')
-@when('leadership.set.etcd_version')
+@when('leadership.set.auto_storage_backend')
 @when_not('kubernetes-master.components.started')
 def start_master(etcd):
     '''Run the Kubernetes master components.'''
@@ -450,8 +452,7 @@ def start_master(etcd):
     handle_etcd_relation(etcd)
 
     # Add CLI options to all components
-    leader_etcd_version = leader_get('etcd_version')
-    configure_apiserver(etcd.get_connection_string(), leader_etcd_version)
+    configure_apiserver(etcd.get_connection_string(), getStorageBackend())
     configure_controller_manager()
     configure_scheduler()
     set_state('kubernetes-master.components.started')
@@ -473,13 +474,15 @@ def etcd_data_change(etcd):
     if data_changed('etcd-connect', connection_string):
         remove_state('kubernetes-master.components.started')
 
-    # We are the leader and the etcd_version is not set meaning
+    # We are the leader and the auto_storage_backend is not set meaning
     # this is the first time we connect to etcd.
-    if is_state('leadership.is_leader') and not leader_get('etcd_version'):
+    auto_storage_backend = leader_get('auto_storage_backend')
+    is_leader = is_state('leadership.is_leader')
+    if is_leader and not auto_storage_backend:
         if etcd.get_version().startswith('3.'):
-            leader_set(etcd_version='etcd3')
+            leader_set(auto_storage_backend='etcd3')
         else:
-            leader_set(etcd_version='etcd2')
+            leader_set(auto_storage_backend='etcd2')
 
 
 @when('kube-control.connected')
@@ -765,7 +768,7 @@ def ceph_storage(ceph_admin):
         cmd = ['kubectl', 'apply', '-f', '/tmp/ceph-secret.yaml']
         check_call(cmd)
         os.remove('/tmp/ceph-secret.yaml')
-    except: # NOQA
+    except:  # NOQA
         # the enlistment in kubernetes failed, return and prepare for re-exec
         return
 
@@ -853,11 +856,11 @@ def on_config_allow_privileged_change():
 
 @when('config.changed.api-extra-args')
 @when('kubernetes-master.components.started')
-@when('leadership.set.etcd_version')
+@when('leadership.set.auto_storage_backend')
 @when('etcd.available')
 def on_config_api_extra_args_change(etcd):
     configure_apiserver(etcd.get_connection_string(),
-                        leader_get('etcd_version'))
+                        getStorageBackend())
 
 
 @when('config.changed.controller-manager-extra-args')
@@ -1300,3 +1303,10 @@ def touch(fname):
         os.utime(fname, None)
     except OSError:
         open(fname, 'a').close()
+
+
+def getStorageBackend():
+    storage_backend = hookenv.config('storage-backend')
+    if storage_backend == 'auto':
+        storage_backend = leader_get('auto_storage_backend')
+    return storage_backend
