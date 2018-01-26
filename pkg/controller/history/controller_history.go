@@ -23,10 +23,10 @@ import (
 	"sort"
 	"strconv"
 
-	apps "k8s.io/api/apps/v1beta1"
-	appsinformers "k8s.io/client-go/informers/apps/v1beta1"
+	apps "k8s.io/api/apps/v1beta2"
+	appsinformers "k8s.io/client-go/informers/apps/v1beta2"
 	clientset "k8s.io/client-go/kubernetes"
-	appslisters "k8s.io/client-go/listers/apps/v1beta1"
+	appslisters "k8s.io/client-go/listers/apps/v1beta2"
 	hashutil "k8s.io/kubernetes/pkg/util/hash"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -60,12 +60,8 @@ func ControllerRevisionName(prefix string, hash uint32) string {
 // has a Revision equal to revision. The collisionCount is used when creating the name of the ControllerRevision
 // so the name is likely unique. If the returned error is nil, the returned ControllerRevision is valid. If the
 // returned error is not nil, the returned ControllerRevision is invalid for use.
-func NewControllerRevision(parent metav1.Object,
-	parentKind schema.GroupVersionKind,
-	selector labels.Selector,
-	data runtime.RawExtension,
-	revision int64,
-	collisionCount *int32) (*apps.ControllerRevision, error) {
+func NewControllerRevision(parent metav1.Object, parentKind schema.GroupVersionKind, selector labels.Selector,
+	data runtime.RawExtension, revision int64, collisionCount *int32) (*apps.ControllerRevision, error) {
 	labelMap, err := labels.ConvertSelectorToLabelsMap(selector.String())
 	if err != nil {
 		return nil, err
@@ -251,7 +247,7 @@ func (rh *realHistory) CreateControllerRevision(parent metav1.Object, revision *
 		hash := HashControllerRevision(revision, collisionCount)
 		// Update the revisions name and labels
 		clone.Name = ControllerRevisionName(parent.GetName(), hash)
-		created, err := rh.client.AppsV1beta1().ControllerRevisions(parent.GetNamespace()).Create(clone)
+		created, err := rh.client.AppsV1beta2().ControllerRevisions(parent.GetNamespace()).Create(clone)
 		if errors.IsAlreadyExists(err) {
 			*collisionCount++
 			continue
@@ -267,7 +263,7 @@ func (rh *realHistory) UpdateControllerRevision(revision *apps.ControllerRevisio
 			return nil
 		}
 		clone.Revision = newRevision
-		updated, updateErr := rh.client.AppsV1beta1().ControllerRevisions(clone.Namespace).Update(clone)
+		updated, updateErr := rh.client.AppsV1beta2().ControllerRevisions(clone.Namespace).Update(clone)
 		if updateErr == nil {
 			return nil
 		}
@@ -284,7 +280,7 @@ func (rh *realHistory) UpdateControllerRevision(revision *apps.ControllerRevisio
 }
 
 func (rh *realHistory) DeleteControllerRevision(revision *apps.ControllerRevision) error {
-	return rh.client.AppsV1beta1().ControllerRevisions(revision.Namespace).Delete(revision.Name, nil)
+	return rh.client.AppsV1beta2().ControllerRevisions(revision.Namespace).Delete(revision.Name, nil)
 }
 
 func (rh *realHistory) AdoptControllerRevision(parent metav1.Object, parentKind schema.GroupVersionKind, revision *apps.ControllerRevision) (*apps.ControllerRevision, error) {
@@ -293,7 +289,7 @@ func (rh *realHistory) AdoptControllerRevision(parent metav1.Object, parentKind 
 		return nil, fmt.Errorf("attempt to adopt revision owned by %v", owner)
 	}
 	// Use strategic merge patch to add an owner reference indicating a controller ref
-	return rh.client.AppsV1beta1().ControllerRevisions(parent.GetNamespace()).Patch(revision.GetName(),
+	return rh.client.AppsV1beta2().ControllerRevisions(parent.GetNamespace()).Patch(revision.GetName(),
 		types.StrategicMergePatchType, []byte(fmt.Sprintf(
 			`{"metadata":{"ownerReferences":[{"apiVersion":"%s","kind":"%s","name":"%s","uid":"%s","controller":true,"blockOwnerDeletion":true}],"uid":"%s"}}`,
 			parentKind.GroupVersion().String(), parentKind.Kind,
@@ -302,7 +298,7 @@ func (rh *realHistory) AdoptControllerRevision(parent metav1.Object, parentKind 
 
 func (rh *realHistory) ReleaseControllerRevision(parent metav1.Object, revision *apps.ControllerRevision) (*apps.ControllerRevision, error) {
 	// Use strategic merge patch to add an owner reference indicating a controller ref
-	released, err := rh.client.AppsV1beta1().ControllerRevisions(revision.GetNamespace()).Patch(revision.GetName(),
+	released, err := rh.client.AppsV1beta2().ControllerRevisions(revision.GetNamespace()).Patch(revision.GetName(),
 		types.StrategicMergePatchType,
 		[]byte(fmt.Sprintf(`{"metadata":{"ownerReferences":[{"$patch":"delete","uid":"%s"}],"uid":"%s"}}`, parent.GetUID(), revision.UID)))
 

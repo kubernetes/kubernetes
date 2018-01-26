@@ -23,8 +23,7 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	apps "k8s.io/api/apps/v1beta1"
-	appsv1beta2 "k8s.io/api/apps/v1beta2"
+	apps "k8s.io/api/apps/v1beta2"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	klabels "k8s.io/apimachinery/pkg/labels"
@@ -95,7 +94,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			sst := framework.NewStatefulSetTester(c)
 			sst.PauseNewPods(ss)
 
-			_, err := c.AppsV1beta1().StatefulSets(ns).Create(ss)
+			_, err := c.AppsV1beta2().StatefulSets(ns).Create(ss)
 			Expect(err).NotTo(HaveOccurred())
 
 			By("Saturating stateful set " + ss.Name)
@@ -135,7 +134,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			// Replace ss with the one returned from Create() so it has the UID.
 			// Save Kind since it won't be populated in the returned ss.
 			kind := ss.Kind
-			ss, err := c.AppsV1beta1().StatefulSets(ns).Create(ss)
+			ss, err := c.AppsV1beta2().StatefulSets(ns).Create(ss)
 			Expect(err).NotTo(HaveOccurred())
 			ss.Kind = kind
 
@@ -215,7 +214,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			sst := framework.NewStatefulSetTester(c)
 			sst.PauseNewPods(ss)
 
-			_, err := c.AppsV1beta1().StatefulSets(ns).Create(ss)
+			_, err := c.AppsV1beta2().StatefulSets(ns).Create(ss)
 			Expect(err).NotTo(HaveOccurred())
 
 			sst.WaitForRunning(1, 0, ss)
@@ -248,7 +247,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			ss := framework.NewStatefulSet("ss2", ns, headlessSvcName, 3, nil, nil, labels)
 			sst := framework.NewStatefulSetTester(c)
 			sst.SetHttpProbe(ss)
-			ss, err := c.AppsV1beta1().StatefulSets(ns).Create(ss)
+			ss, err := c.AppsV1beta2().StatefulSets(ns).Create(ss)
 			Expect(err).NotTo(HaveOccurred())
 			sst.WaitForRunningAndReady(*ss.Spec.Replicas, ss)
 			ss = sst.WaitForStatus(ss)
@@ -373,7 +372,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 						}()}
 				}(),
 			}
-			ss, err := c.AppsV1beta1().StatefulSets(ns).Create(ss)
+			ss, err := c.AppsV1beta2().StatefulSets(ns).Create(ss)
 			Expect(err).NotTo(HaveOccurred())
 			sst.WaitForRunningAndReady(*ss.Spec.Replicas, ss)
 			ss = sst.WaitForStatus(ss)
@@ -575,7 +574,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			ss.Spec.UpdateStrategy = apps.StatefulSetUpdateStrategy{
 				Type: apps.OnDeleteStatefulSetStrategyType,
 			}
-			ss, err := c.AppsV1beta1().StatefulSets(ns).Create(ss)
+			ss, err := c.AppsV1beta2().StatefulSets(ns).Create(ss)
 			Expect(err).NotTo(HaveOccurred())
 			sst.WaitForRunningAndReady(*ss.Spec.Replicas, ss)
 			ss = sst.WaitForStatus(ss)
@@ -659,7 +658,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			ss := framework.NewStatefulSet(ssName, ns, headlessSvcName, 1, nil, nil, psLabels)
 			sst := framework.NewStatefulSetTester(c)
 			sst.SetHttpProbe(ss)
-			ss, err = c.AppsV1beta1().StatefulSets(ns).Create(ss)
+			ss, err = c.AppsV1beta2().StatefulSets(ns).Create(ss)
 			Expect(err).NotTo(HaveOccurred())
 
 			By("Waiting until all stateful set " + ssName + " replicas will be running in namespace " + ns)
@@ -731,7 +730,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			ss.Spec.PodManagementPolicy = apps.ParallelPodManagement
 			sst := framework.NewStatefulSetTester(c)
 			sst.SetHttpProbe(ss)
-			ss, err := c.AppsV1beta1().StatefulSets(ns).Create(ss)
+			ss, err := c.AppsV1beta2().StatefulSets(ns).Create(ss)
 			Expect(err).NotTo(HaveOccurred())
 
 			By("Waiting until all stateful set " + ssName + " replicas will be running in namespace " + ns)
@@ -793,7 +792,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			statefulPodContainer := &ss.Spec.Template.Spec.Containers[0]
 			statefulPodContainer.Ports = append(statefulPodContainer.Ports, conflictingPort)
 			ss.Spec.Template.Spec.NodeName = node.Name
-			_, err = f.ClientSet.AppsV1beta1().StatefulSets(f.Namespace.Name).Create(ss)
+			_, err = f.ClientSet.AppsV1beta2().StatefulSets(f.Namespace.Name).Create(ss)
 			framework.ExpectNoError(err)
 
 			By("Waiting until pod " + podName + " will start running in namespace " + f.Namespace.Name)
@@ -850,14 +849,14 @@ var _ = SIGDescribe("StatefulSet", func() {
 			ss := framework.NewStatefulSet(ssName, ns, headlessSvcName, 1, nil, nil, labels)
 			sst := framework.NewStatefulSetTester(c)
 			sst.SetHttpProbe(ss)
-			ss, err := c.AppsV1beta1().StatefulSets(ns).Create(ss)
+			ss, err := c.AppsV1beta2().StatefulSets(ns).Create(ss)
 			Expect(err).NotTo(HaveOccurred())
 			sst.WaitForRunningAndReady(*ss.Spec.Replicas, ss)
 			ss = sst.WaitForStatus(ss)
 
 			By("getting scale subresource")
 			scale := framework.NewStatefulSetScale(ss)
-			scaleResult := &appsv1beta2.Scale{}
+			scaleResult := &apps.Scale{}
 			err = c.AppsV1beta2().RESTClient().Get().AbsPath("/apis/apps/v1beta2").Namespace(ns).Resource("statefulsets").Name(ssName).SubResource("scale").Do().Into(scale)
 			if err != nil {
 				framework.Failf("Failed to get scale subresource: %v", err)
@@ -875,7 +874,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			Expect(scaleResult.Spec.Replicas).To(Equal(int32(2)))
 
 			By("verifying the statefulset Spec.Replicas was modified")
-			ss, err = c.AppsV1beta1().StatefulSets(ns).Get(ssName, metav1.GetOptions{})
+			ss, err = c.AppsV1beta2().StatefulSets(ns).Get(ssName, metav1.GetOptions{})
 			if err != nil {
 				framework.Failf("Failed to get statefulset resource: %v", err)
 			}

@@ -25,6 +25,7 @@ import (
 	"syscall"
 
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
+	appsv1beta2 "k8s.io/api/apps/v1beta2"
 	"k8s.io/api/core/v1"
 	extv1beta1 "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -307,7 +308,7 @@ func (r *StatefulSetRollbacker) Rollback(obj runtime.Object, updatedAnnotations 
 	if err != nil {
 		return "", fmt.Errorf("failed to create accessor for kind %v: %s", obj.GetObjectKind(), err.Error())
 	}
-	sts, history, err := statefulSetHistory(r.c.AppsV1beta1(), accessor.GetNamespace(), accessor.GetName())
+	sts, history, err := statefulSetHistory(r.c.AppsV1beta2(), accessor.GetNamespace(), accessor.GetName())
 	if err != nil {
 		return "", err
 	}
@@ -315,7 +316,7 @@ func (r *StatefulSetRollbacker) Rollback(obj runtime.Object, updatedAnnotations 
 		return "", fmt.Errorf("no last revision to roll back to")
 	}
 
-	toHistory := findHistory(toRevision, history)
+	toHistory := findHistoryV1beta2(toRevision, history)
 	if toHistory == nil {
 		return "", revisionNotFoundErr(toRevision)
 	}
@@ -345,6 +346,35 @@ func (r *StatefulSetRollbacker) Rollback(obj runtime.Object, updatedAnnotations 
 	return rollbackSuccess, nil
 }
 
+// findHistoryV1beta2 returns a controllerrevision of a specific revision from the given controllerrevisions.
+// It returns nil if no such controllerrevision exists.
+// If toRevision is 0, the last previously used history is returned.
+// TODO(dixudx): rename me when all controllers have been bumped to v1beta2
+func findHistoryV1beta2(toRevision int64, allHistory []*appsv1beta2.ControllerRevision) *appsv1beta2.ControllerRevision {
+	if toRevision == 0 && len(allHistory) <= 1 {
+		return nil
+	}
+
+	// Find the history to rollback to
+	var toHistory *appsv1beta2.ControllerRevision
+	if toRevision == 0 {
+		// If toRevision == 0, find the latest revision (2nd max)
+		sort.Slice(allHistory, func(i, j int) bool {
+			return allHistory[i].Revision < allHistory[j].Revision
+		})
+		toHistory = allHistory[len(allHistory)-2]
+	} else {
+		for _, h := range allHistory {
+			if h.Revision == toRevision {
+				// If toRevision != 0, find the history with matching revision
+				return h
+			}
+		}
+	}
+
+	return toHistory
+}
+
 // findHistory returns a controllerrevision of a specific revision from the given controllerrevisions.
 // It returns nil if no such controllerrevision exists.
 // If toRevision is 0, the last previously used history is returned.
@@ -357,7 +387,9 @@ func findHistory(toRevision int64, allHistory []*appsv1beta1.ControllerRevision)
 	var toHistory *appsv1beta1.ControllerRevision
 	if toRevision == 0 {
 		// If toRevision == 0, find the latest revision (2nd max)
-		sort.Sort(historiesByRevision(allHistory))
+		sort.Slice(allHistory, func(i, j int) bool {
+			return allHistory[i].Revision < allHistory[j].Revision
+		})
 		toHistory = allHistory[len(allHistory)-2]
 	} else {
 		for _, h := range allHistory {
@@ -385,13 +417,4 @@ func printPodTemplate(specTemplate *v1.PodTemplateSpec) (string, error) {
 
 func revisionNotFoundErr(r int64) error {
 	return fmt.Errorf("unable to find specified revision %v in history", r)
-}
-
-// TODO: copied from daemon controller, should extract to a library
-type historiesByRevision []*appsv1beta1.ControllerRevision
-
-func (h historiesByRevision) Len() int      { return len(h) }
-func (h historiesByRevision) Swap(i, j int) { h[i], h[j] = h[j], h[i] }
-func (h historiesByRevision) Less(i, j int) bool {
-	return h[i].Revision < h[j].Revision
 }
