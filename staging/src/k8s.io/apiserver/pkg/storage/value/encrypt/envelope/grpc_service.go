@@ -38,6 +38,9 @@ const (
 
 	// Current version for the protocal interface definition.
 	kmsapiVersion = "v1beta1"
+
+	// The timeout that communicate with KMS server.
+	timeout = 30 * time.Second
 )
 
 // The gRPC implementation for envelope.Service.
@@ -51,16 +54,12 @@ type gRPCService struct {
 func NewGRPCService(endpoint string) (Service, error) {
 	glog.V(4).Infof("Configure KMS provider with endpoint: %s", endpoint)
 
-	protocol, addr, err := parseEndpoint(endpoint)
+	addr, err := parseEndpoint(endpoint)
 	if err != nil {
 		return nil, err
 	}
 
-	dialer := func(addr string, timeout time.Duration) (net.Conn, error) {
-		return net.DialTimeout(protocol, addr, timeout)
-	}
-
-	connection, err := grpc.Dial(addr, grpc.WithInsecure(), grpc.WithDialer(dialer))
+	connection, err := grpc.Dial(addr, grpc.WithInsecure(), grpc.WithTimeout(timeout), grpc.WithDialer(unixDial))
 	if err != nil {
 		return nil, fmt.Errorf("connect remote KMS provider %q failed, error: %v", addr, err)
 	}
@@ -76,28 +75,36 @@ func NewGRPCService(endpoint string) (Service, error) {
 	return &gRPCService{kmsClient: kmsClient, connection: connection}, nil
 }
 
+// This dialer explicitly ask gRPC to use unix socket as network.
+func unixDial(addr string, timeout time.Duration) (net.Conn, error) {
+	return net.DialTimeout(unixProtocol, addr, timeout)
+}
+
 // Parse the endpoint to extract schema, host or path.
-func parseEndpoint(endpoint string) (string, string, error) {
+func parseEndpoint(endpoint string) (string, error) {
 	if len(endpoint) == 0 {
-		return "", "", fmt.Errorf("remote KMS provider can't use empty string as endpoint")
+		return "", fmt.Errorf("remote KMS provider can't use empty string as endpoint")
 	}
 
 	u, err := url.Parse(endpoint)
 	if err != nil {
-		return "", "", fmt.Errorf("invalid endpoint %q for remote KMS provider, error: %v", endpoint, err)
+		return "", fmt.Errorf("invalid endpoint %q for remote KMS provider, error: %v", endpoint, err)
 	}
 
 	if u.Scheme != unixProtocol {
-		return "", "", fmt.Errorf("unsupported scheme %q for remote KMS provider", u.Scheme)
+		return "", fmt.Errorf("unsupported scheme %q for remote KMS provider", u.Scheme)
 	}
-	return unixProtocol, u.Path, nil
+	return u.Path, nil
 }
 
 // Check the KMS provider API version.
-// Only matching kubeRuntimeAPIVersion is supported now.
+// Only matching kmsapiVersion is supported now.
 func checkAPIVersion(kmsClient kmsapi.KMSServiceClient) error {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
 	request := &kmsapi.VersionRequest{Version: kmsapiVersion}
-	response, err := kmsClient.Version(context.Background(), request)
+	response, err := kmsClient.Version(ctx, request)
 	if err != nil {
 		return fmt.Errorf("failed get version from remote KMS provider: %v", err)
 	}
@@ -112,8 +119,11 @@ func checkAPIVersion(kmsClient kmsapi.KMSServiceClient) error {
 
 // Decrypt a given data string to obtain the original byte data.
 func (g *gRPCService) Decrypt(cipher []byte) ([]byte, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
 	request := &kmsapi.DecryptRequest{Cipher: cipher, Version: kmsapiVersion}
-	response, err := g.kmsClient.Decrypt(context.Background(), request)
+	response, err := g.kmsClient.Decrypt(ctx, request)
 	if err != nil {
 		return nil, err
 	}
@@ -122,8 +132,11 @@ func (g *gRPCService) Decrypt(cipher []byte) ([]byte, error) {
 
 // Encrypt bytes to a string ciphertext.
 func (g *gRPCService) Encrypt(plain []byte) ([]byte, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
 	request := &kmsapi.EncryptRequest{Plain: plain, Version: kmsapiVersion}
-	response, err := g.kmsClient.Encrypt(context.Background(), request)
+	response, err := g.kmsClient.Encrypt(ctx, request)
 	if err != nil {
 		return nil, err
 	}

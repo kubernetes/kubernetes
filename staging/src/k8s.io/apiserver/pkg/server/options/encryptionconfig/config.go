@@ -102,6 +102,9 @@ func ParseEncryptionConfiguration(f io.Reader) (map[schema.GroupResource]value.T
 	return result, nil
 }
 
+// The factory to create kms service. This is to make writing test easier.
+var envelopeServiceFactory = envelope.NewGRPCService
+
 // GetPrefixTransformers constructs and returns the appropriate prefix transformers for the passed resource using its configuration
 func GetPrefixTransformers(config *ResourceConfig) ([]value.PrefixTransformer, error) {
 	var result []value.PrefixTransformer
@@ -151,28 +154,15 @@ func GetPrefixTransformers(config *ResourceConfig) ([]value.PrefixTransformer, e
 				return nil, fmt.Errorf("more than one provider specified in a single element, should split into different list elements")
 			}
 
-			var envelopeService envelope.Service
-			if len(provider.KMS.ConfigFile) > 0 {
-				// There should be no KMS provider plugins on API server side in future.
-				f, err := os.Open(provider.KMS.ConfigFile)
-				if err != nil {
-					return nil, fmt.Errorf("error opening KMS provider configuration file %q: %v", provider.KMS.ConfigFile, err)
-				}
-				defer f.Close()
-				pluginFound := false
-				envelopeService, pluginFound, err = KMSPluginRegistry.getPlugin(provider.KMS.Name, f)
-				if err != nil {
-					return nil, fmt.Errorf("could not configure KMS plugin %q, %v", provider.KMS.Name, err)
-				}
-				if pluginFound == false {
-					return nil, fmt.Errorf("KMS plugin %q not found", provider.KMS.Name)
-				}
-			} else {
-				// Get gRPC client service with endpoint.
-				envelopeService, err = envelope.NewGRPCService(provider.KMS.Endpoint)
-				if err != nil {
-					return nil, fmt.Errorf("could not configure KMS plugin %q, error: %v", provider.KMS.Name, err)
-				}
+			// Ensure the endpoint is provided.
+			if len(provider.KMS.Endpoint) == 0 {
+				return nil, fmt.Errorf("remote KMS provider can't use empty string as endpoint")
+			}
+
+			// Get gRPC client service with endpoint.
+			envelopeService, err := envelopeServiceFactory(provider.KMS.Endpoint)
+			if err != nil {
+				return nil, fmt.Errorf("could not configure KMS plugin %q, error: %v", provider.KMS.Name, err)
 			}
 
 			transformer, err = getEnvelopePrefixTransformer(provider.KMS, envelopeService, kmsTransformerPrefixV1)
