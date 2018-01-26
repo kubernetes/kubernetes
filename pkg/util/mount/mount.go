@@ -125,12 +125,6 @@ type SafeFormatAndMount struct {
 // disk is already formatted or it is being mounted as read-only, it
 // will be mounted without formatting.
 func (mounter *SafeFormatAndMount) FormatAndMount(source string, target string, fstype string, options []string) error {
-	// Don't attempt to format if mounting as readonly. Go straight to mounting.
-	for _, option := range options {
-		if option == "ro" {
-			return mounter.Interface.Mount(source, target, fstype, options)
-		}
-	}
 	return mounter.formatAndMount(source, target, fstype, options)
 }
 
