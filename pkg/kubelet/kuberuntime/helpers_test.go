@@ -305,3 +305,45 @@ func TestGetSeccompProfileFromAnnotations(t *testing.T) {
 		assert.Equal(t, test.expectedProfile, seccompProfile, "TestCase[%d]", i)
 	}
 }
+
+func TestNamespacesForPod(t *testing.T) {
+	for desc, test := range map[string]struct {
+		input    *v1.Pod
+		expected *runtimeapi.NamespaceOption
+	}{
+		"nil pod -> default v1 namespaces": {
+			nil,
+			&runtimeapi.NamespaceOption{
+				Ipc:     runtimeapi.NamespaceMode_POD,
+				Network: runtimeapi.NamespaceMode_POD,
+				Pid:     runtimeapi.NamespaceMode_CONTAINER,
+			},
+		},
+		"v1.Pod default namespaces": {
+			&v1.Pod{},
+			&runtimeapi.NamespaceOption{
+				Ipc:     runtimeapi.NamespaceMode_POD,
+				Network: runtimeapi.NamespaceMode_POD,
+				Pid:     runtimeapi.NamespaceMode_CONTAINER,
+			},
+		},
+		"Host Namespaces": {
+			&v1.Pod{
+				Spec: v1.PodSpec{
+					HostIPC:     true,
+					HostNetwork: true,
+					HostPID:     true,
+				},
+			},
+			&runtimeapi.NamespaceOption{
+				Ipc:     runtimeapi.NamespaceMode_NODE,
+				Network: runtimeapi.NamespaceMode_NODE,
+				Pid:     runtimeapi.NamespaceMode_NODE,
+			},
+		},
+	} {
+		t.Logf("TestCase: %s", desc)
+		actual := namespacesForPod(test.input)
+		assert.Equal(t, test.expected, actual)
+	}
+}

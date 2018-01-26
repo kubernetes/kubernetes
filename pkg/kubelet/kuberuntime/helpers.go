@@ -278,3 +278,35 @@ func (m *kubeGenericRuntimeManager) getSeccompProfileFromAnnotations(annotations
 
 	return profile
 }
+
+func ipcNamespaceForPod(pod *v1.Pod) runtimeapi.NamespaceMode {
+	if pod != nil && pod.Spec.HostIPC {
+		return runtimeapi.NamespaceMode_NODE
+	}
+	return runtimeapi.NamespaceMode_POD
+}
+
+func networkNamespaceForPod(pod *v1.Pod) runtimeapi.NamespaceMode {
+	if pod != nil && pod.Spec.HostNetwork {
+		return runtimeapi.NamespaceMode_NODE
+	}
+	return runtimeapi.NamespaceMode_POD
+}
+
+func pidNamespaceForPod(pod *v1.Pod) runtimeapi.NamespaceMode {
+	if pod != nil && pod.Spec.HostPID {
+		return runtimeapi.NamespaceMode_NODE
+	}
+	// Note that PID does not default to the zero value
+	return runtimeapi.NamespaceMode_CONTAINER
+}
+
+// namespacesForPod returns the runtimeapi.NamespaceOption for a given pod.
+// An empty or nil pod can be used to get the namespace defaults for v1.Pod.
+func namespacesForPod(pod *v1.Pod) *runtimeapi.NamespaceOption {
+	return &runtimeapi.NamespaceOption{
+		Ipc:     ipcNamespaceForPod(pod),
+		Network: networkNamespaceForPod(pod),
+		Pid:     pidNamespaceForPod(pod),
+	}
+}

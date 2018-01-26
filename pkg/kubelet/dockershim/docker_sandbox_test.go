@@ -103,13 +103,18 @@ func TestSandboxStatus(t *testing.T) {
 
 	state := runtimeapi.PodSandboxState_SANDBOX_READY
 	ct := int64(0)
-	hostNetwork := false
 	expected := &runtimeapi.PodSandboxStatus{
-		State:       state,
-		CreatedAt:   ct,
-		Metadata:    config.Metadata,
-		Network:     &runtimeapi.PodSandboxNetworkStatus{Ip: fakeIP},
-		Linux:       &runtimeapi.LinuxPodSandboxStatus{Namespaces: &runtimeapi.Namespace{Options: &runtimeapi.NamespaceOption{HostNetwork: hostNetwork}}},
+		State:     state,
+		CreatedAt: ct,
+		Metadata:  config.Metadata,
+		Network:   &runtimeapi.PodSandboxNetworkStatus{Ip: fakeIP},
+		Linux: &runtimeapi.LinuxPodSandboxStatus{
+			Namespaces: &runtimeapi.Namespace{
+				Options: &runtimeapi.NamespaceOption{
+					Pid: runtimeapi.NamespaceMode_CONTAINER,
+				},
+			},
+		},
 		Labels:      labels,
 		Annotations: annotations,
 	}
@@ -162,13 +167,18 @@ func TestSandboxStatusAfterRestart(t *testing.T) {
 
 	state := runtimeapi.PodSandboxState_SANDBOX_READY
 	ct := int64(0)
-	hostNetwork := false
 	expected := &runtimeapi.PodSandboxStatus{
-		State:       state,
-		CreatedAt:   ct,
-		Metadata:    config.Metadata,
-		Network:     &runtimeapi.PodSandboxNetworkStatus{Ip: fakeIP},
-		Linux:       &runtimeapi.LinuxPodSandboxStatus{Namespaces: &runtimeapi.Namespace{Options: &runtimeapi.NamespaceOption{HostNetwork: hostNetwork}}},
+		State:     state,
+		CreatedAt: ct,
+		Metadata:  config.Metadata,
+		Network:   &runtimeapi.PodSandboxNetworkStatus{Ip: fakeIP},
+		Linux: &runtimeapi.LinuxPodSandboxStatus{
+			Namespaces: &runtimeapi.Namespace{
+				Options: &runtimeapi.NamespaceOption{
+					Pid: runtimeapi.NamespaceMode_CONTAINER,
+				},
+			},
+		},
 		Labels:      map[string]string{},
 		Annotations: map[string]string{},
 	}
@@ -238,11 +248,10 @@ func TestHostNetworkPluginInvocation(t *testing.T) {
 		map[string]string{"label": name},
 		map[string]string{"annotation": ns},
 	)
-	hostNetwork := true
 	c.Linux = &runtimeapi.LinuxPodSandboxConfig{
 		SecurityContext: &runtimeapi.LinuxSandboxSecurityContext{
 			NamespaceOptions: &runtimeapi.NamespaceOption{
-				HostNetwork: hostNetwork,
+				Network: runtimeapi.NamespaceMode_NODE,
 			},
 		},
 	}
