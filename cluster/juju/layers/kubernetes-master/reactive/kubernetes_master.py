@@ -612,12 +612,13 @@ def send_data(tls, kube_api_endpoint):
     tls.request_server_cert(common_name, sans, certificate_name)
 
 
-@when('config.changed.extra_sans', 'certificates.available')
-def update_certificate(tls):
+@when('config.changed.extra_sans', 'certificates.available',
+      'kube-api-endpoint.available')
+def update_certificate(tls, kube_api_endpoint):
     # Using the config.changed.extra_sans flag to catch changes.
     # IP changes will take ~5 minutes or so to propagate, but
     # it will update.
-    send_data(tls)
+    send_data(tls, kube_api_endpoint)
 
 
 @when('certificates.server.cert.available',
