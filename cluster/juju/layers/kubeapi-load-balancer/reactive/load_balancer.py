@@ -93,12 +93,13 @@ def request_server_certificates(tls, website):
     tls.request_server_cert(common_name, sans, certificate_name)
 
 
-@when('config.changed.extra_sans', 'certificates.available')
-def update_certificate(tls):
+@when('config.changed.extra_sans', 'certificates.available',
+      'website.available')
+def update_certificate(tls, website):
     # Using the config.changed.extra_sans flag to catch changes.
     # IP changes will take ~5 minutes or so to propagate, but
     # it will update.
-    request_server_certificates(tls)
+    request_server_certificates(tls, website)
 
 
 @when('certificates.server.cert.available',
