@@ -46,7 +46,7 @@ errfile=/tmp/evErr.$$.log
 function eVal() {
   (eval "$1")
   # stdout and stderr may currently be inverted (see below) so echo may write to stderr
-  echo $? 2>&1 | tr -d "\n" > ${errfile}
+  echo "$?" 2>&1 | tr -d "\n" > "${errfile}"
 }
 
 # Method to clean old tests
@@ -64,7 +64,7 @@ function juLog() {
 
   # parse arguments
   ya=""; icase=""
-  while [ -z "$ya" ]; do
+  while [[ -z "$ya" ]]; do
     case "$1" in
   	  -name=*)   name=`echo "$1" | ${SED} -e 's/-name=//'`;   shift;;
   	  -class=*)  class=`echo "$1" | ${SED} -e 's/-class=//'`;   shift;;
@@ -78,7 +78,7 @@ function juLog() {
   # create output directory
   mkdir -p "${juDIR}" || exit
   # use first arg as name if it was not given
-  if [ -z "${name}" ]; then
+  if [[ -z "${name}" ]]; then
     name="${asserts}-$1"
     shift
   fi
@@ -90,9 +90,9 @@ function juLog() {
   suite=${class}
 
   # calculate command to eval
-  [ -z "$1" ] && return
+  [[ -z "$1" ]] && return
   cmd="$1"; shift
-  while [ -n "${1:-}" ]
+  while [[ -n "${1:-}" ]]
   do
      cmd="${cmd} \"$1\""
      shift
@@ -116,13 +116,13 @@ function juLog() {
   echo "+++ exit code: ${evErr}"        | tee -a ${outf}
 
   # set the appropriate error, based in the exit code and the regex
-  [ ${evErr} != 0 ] && err=1 || err=0
+  [[ ${evErr} != 0 ]] && err=1 || err=0
   out=`cat $outf | ${SED} -e 's/^\([^+]\)/| \1/g'`
   if [ ${err} = 0 -a -n "${ereg:-}" ]; then
       H=`echo "${out}" | egrep ${icase} "${ereg}"`
-      [ -n "${H}" ] && err=1
+      [[ -n "${H}" ]] && err=1
   fi
-  [ ${err} != 0 ] && echo "+++ error: ${err}"         | tee -a ${outf}
+  [[ ${err} != 0 ]] && echo "+++ error: ${err}"         | tee -a ${outf}
   rm -f ${outf}
 
   errMsg=`cat ${errf}`
@@ -135,7 +135,7 @@ function juLog() {
 
   # write the junit xml report
   ## failure tag
-  [ ${err} = 0 ] && failure="" || failure="
+  [[ ${err} = 0 ]] && failure="" || failure="
       <failure type=\"ScriptError\" message=\"Script Error\">
       <![CDATA[
       ${errMsg}
@@ -183,5 +183,5 @@ EOF
 EOF
   fi
 
-  return $err
+  return ${err}
 }
