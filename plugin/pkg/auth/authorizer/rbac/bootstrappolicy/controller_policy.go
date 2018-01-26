@@ -334,6 +334,15 @@ func buildControllerRoles() ([]rbac.ClusterRole, []rbac.ClusterRoleBinding) {
 			},
 		})
 	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.StorageProtection) {
+		addControllerRole(&controllerRoles, &controllerRoleBindings, rbac.ClusterRole{
+			ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "pv-protection-controller"},
+			Rules: []rbac.PolicyRule{
+				rbac.NewRule("get", "list", "watch", "update").Groups(legacyGroup).Resources("persistentvolumes").RuleOrDie(),
+				eventsRule(),
+			},
+		})
+	}
 
 	return controllerRoles, controllerRoleBindings
 }
