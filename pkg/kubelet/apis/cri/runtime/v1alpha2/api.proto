@@ -489,6 +489,12 @@ message KeyValue {
     string value = 2;
 }
 
+// Soft and Hard ulimit(s)
+message LimitValue {
+    int64 hard = 1;
+    int64 soft = 2;
+}
+
 // LinuxContainerResources specifies Linux specific configuration for
 // resources.
 // TODO: Consider using Resources from opencontainers/runtime-spec/specs-go
@@ -508,6 +514,8 @@ message LinuxContainerResources {
     string cpuset_cpus = 6;
     // CpusetMems constrains the allowed set of memory nodes. Default: "" (not specified).
     string cpuset_mems = 7;
+    // ulimits holds linux ulimit(s) config for the container.
+    map<string, LimitValue> ulimits = 8;
 }
 
 // SELinuxOption are the labels to be applied to the container.

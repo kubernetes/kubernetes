@@ -35,6 +35,7 @@ import (
 	corelisters "k8s.io/client-go/listers/core/v1"
 	storagelisters "k8s.io/client-go/listers/storage/v1"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/kubernetes/pkg/apis/core/helper"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	"k8s.io/kubernetes/pkg/features"
@@ -747,6 +748,9 @@ func PodFitsResources(pod *v1.Pod, meta algorithm.PredicateMetadata, nodeInfo *s
 	}
 
 	for rName, rQuant := range podRequest.ScalarResources {
+		if helper.IsUlimitResourceName(string(rName)) {
+			continue
+		}
 		if v1helper.IsExtendedResourceName(rName) {
 			// If this resource is one of the extended resources that should be
 			// ignored, we will skip checking it.

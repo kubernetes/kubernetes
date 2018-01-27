@@ -17,6 +17,7 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/scheduler/algorithm/predicates",
     deps = [
+        "//pkg/apis/core/helper:go_default_library",
         "//pkg/apis/core/v1/helper:go_default_library",
         "//pkg/apis/core/v1/helper/qos:go_default_library",
         "//pkg/features:go_default_library",

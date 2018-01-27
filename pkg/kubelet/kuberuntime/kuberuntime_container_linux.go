@@ -19,7 +19,11 @@ limitations under the License.
 package kuberuntime
 
 import (
+	"strings"
+
 	"k8s.io/api/core/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 )
@@ -35,6 +39,34 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerConfig(container *v1.C
 	lc := &runtimeapi.LinuxContainerConfig{
 		Resources:       &runtimeapi.LinuxContainerResources{},
 		SecurityContext: m.determineEffectiveSecurityContext(pod, container, uid, username),
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.SupportUlimits) {
+		lc.Resources.Ulimits = make(map[string]*runtimeapi.LimitValue)
+		for key, value := range container.Resources.Requests {
+			if strings.HasPrefix(string(key), "ulimit-") {
+				limit := strings.Split(string(key), "-")[1]
+				if _, ok := lc.Resources.Ulimits[limit]; ok {
+					lc.Resources.Ulimits[limit].Soft = value.Value()
+				} else {
+					lc.Resources.Ulimits[limit] = &runtimeapi.LimitValue{
+						Soft: value.Value(),
+					}
+				}
+			}
+		}
+		for key, value := range container.Resources.Limits {
+			if strings.HasPrefix(string(key), "ulimit-") {
+				limit := strings.Split(string(key), "-")[1]
+				if _, ok := lc.Resources.Ulimits[limit]; ok {
+					lc.Resources.Ulimits[limit].Hard = value.Value()
+				} else {
+					lc.Resources.Ulimits[limit] = &runtimeapi.LimitValue{
+						Hard: value.Value(),
+					}
+				}
+			}
+		}
 	}
 
 	// set linux container resources
