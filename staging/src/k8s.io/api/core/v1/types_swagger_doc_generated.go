@@ -1528,6 +1528,7 @@ var map_PodStatus = map[string]string{
 	"conditions":            "Current service state of pod. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#pod-conditions",
 	"message":               "A human readable message indicating details about why the pod is in this condition.",
 	"reason":                "A brief CamelCase message indicating details about why the pod is in this state. e.g. 'Evicted'",
+	"nominatedNodeName":     "nominatedNodeName is set only when this pod preempts other pods on the node, but it cannot be scheduled right away as preemption victims receive their graceful termination periods. This field does not guarantee that the pod will be scheduled on this node. Scheduler may decide to place the pod elsewhere if other nodes become available sooner. Scheduler may also decide to give the resources on this node to a higher priority pod that is created after preemption. As a result, this field may be different than PodSpec.nodeName when the pod is scheduled.",
 	"hostIP":                "IP address of the host to which the pod is assigned. Empty if not yet scheduled.",
 	"podIP":                 "IP address allocated to the pod. Routable at least within the cluster. Empty if not yet allocated.",
 	"startTime":             "RFC 3339 date and time at which the object was acknowledged by the Kubelet. This is before the Kubelet pulled the container image(s) for the pod.",

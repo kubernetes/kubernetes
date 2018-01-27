@@ -3942,6 +3942,7 @@ func autoConvert_v1_PodStatus_To_core_PodStatus(in *v1.PodStatus, out *core.PodS
 	out.Conditions = *(*[]core.PodCondition)(unsafe.Pointer(&in.Conditions))
 	out.Message = in.Message
 	out.Reason = in.Reason
+	out.NominatedNodeName = in.NominatedNodeName
 	out.HostIP = in.HostIP
 	out.PodIP = in.PodIP
 	out.StartTime = (*meta_v1.Time)(unsafe.Pointer(in.StartTime))
@@ -3961,6 +3962,7 @@ func autoConvert_core_PodStatus_To_v1_PodStatus(in *core.PodStatus, out *v1.PodS
 	out.Conditions = *(*[]v1.PodCondition)(unsafe.Pointer(&in.Conditions))
 	out.Message = in.Message
 	out.Reason = in.Reason
+	out.NominatedNodeName = in.NominatedNodeName
 	out.HostIP = in.HostIP
 	out.PodIP = in.PodIP
 	out.StartTime = (*meta_v1.Time)(unsafe.Pointer(in.StartTime))
