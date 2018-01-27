@@ -204,7 +204,6 @@ pkg/kubelet/prober/testing
 pkg/kubelet/qos
 pkg/kubelet/remote
 pkg/kubelet/rkt
-pkg/kubelet/rktshim
 pkg/kubelet/secret
 pkg/kubelet/server
 pkg/kubelet/server/portforward

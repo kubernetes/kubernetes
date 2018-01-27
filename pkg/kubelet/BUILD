@@ -278,7 +278,6 @@ filegroup(
         "//pkg/kubelet/qos:all-srcs",
         "//pkg/kubelet/remote:all-srcs",
         "//pkg/kubelet/rkt:all-srcs",
-        "//pkg/kubelet/rktshim:all-srcs",
         "//pkg/kubelet/secret:all-srcs",
         "//pkg/kubelet/server:all-srcs",
         "//pkg/kubelet/stats:all-srcs",
