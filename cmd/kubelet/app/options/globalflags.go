@@ -53,8 +53,9 @@ func normalize(s string) string {
 // register adds a flag to local that targets the Value associated with the Flag named globalName in global
 func register(global *flag.FlagSet, local *pflag.FlagSet, globalName string) {
 	if f := global.Lookup(globalName); f != nil {
-		f.Name = normalize(f.Name)
-		local.AddFlag(pflag.PFlagFromGoFlag(f))
+		pflagFlag := pflag.PFlagFromGoFlag(f)
+		pflagFlag.Name = normalize(pflagFlag.Name)
+		local.AddFlag(pflagFlag)
 	} else {
 		panic(fmt.Sprintf("failed to find flag in global flagset (flag): %s", globalName))
 	}

@@ -20,6 +20,7 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -347,6 +348,7 @@ type InPathCheck struct {
 	mandatory  bool
 	exec       utilsexec.Interface
 	label      string
+	suggestion string
 }
 
 // Name returns label for individual InPathCheck. If not known, will return based on path.
@@ -358,7 +360,7 @@ func (ipc InPathCheck) Name() string {
 }
 
 // Check validates if the given executable is present in the path.
-func (ipc InPathCheck) Check() (warnings, errors []error) {
+func (ipc InPathCheck) Check() (warnings, errs []error) {
 	_, err := ipc.exec.LookPath(ipc.executable)
 	if err != nil {
 		if ipc.mandatory {
@@ -366,7 +368,11 @@ func (ipc InPathCheck) Check() (warnings, errors []error) {
 			return nil, []error{fmt.Errorf("%s not found in system path", ipc.executable)}
 		}
 		// Return as a warning:
-		return []error{fmt.Errorf("%s not found in system path", ipc.executable)}, nil
+		warningMessage := fmt.Sprintf("%s not found in system path", ipc.executable)
+		if ipc.suggestion != "" {
+			warningMessage += fmt.Sprintf("\nSuggestion: %s", ipc.suggestion)
+		}
+		return []error{errors.New(warningMessage)}, nil
 	}
 	return nil, nil
 }
@@ -847,7 +853,12 @@ func RunInitMasterChecks(execer utilsexec.Interface, cfg *kubeadmapi.MasterConfi
 	}
 
 	// check if we can use crictl to perform checks via the CRI
-	criCtlChecker := InPathCheck{executable: "crictl", mandatory: false, exec: execer}
+	criCtlChecker := InPathCheck{
+		executable: "crictl",
+		mandatory:  false,
+		exec:       execer,
+		suggestion: fmt.Sprintf("go get %v", kubeadmconstants.CRICtlPackage),
+	}
 	warns, _ := criCtlChecker.Check()
 	useCRI := len(warns) == 0
 
@@ -948,7 +959,12 @@ func RunJoinNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.NodeConfigura
 	}
 
 	// check if we can use crictl to perform checks via the CRI
-	criCtlChecker := InPathCheck{executable: "crictl", mandatory: false, exec: execer}
+	criCtlChecker := InPathCheck{
+		executable: "crictl",
+		mandatory:  false,
+		exec:       execer,
+		suggestion: fmt.Sprintf("go get %v", kubeadmconstants.CRICtlPackage),
+	}
 	warns, _ := criCtlChecker.Check()
 	useCRI := len(warns) == 0
 

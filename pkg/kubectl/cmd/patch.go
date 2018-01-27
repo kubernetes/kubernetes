@@ -40,7 +40,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
-	"k8s.io/kubernetes/pkg/printers"
 )
 
 var patchTypes = map[string]types.PatchType{"json": types.JSONPatchType, "merge": types.MergePatchType, "strategic": types.StrategicMergePatchType}
@@ -82,17 +81,7 @@ var (
 
 func NewCmdPatch(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	options := &PatchOptions{}
-
-	// retrieve a list of handled resources from printer as valid args
-	validArgs, argAliases := []string{}, []string{}
-	p, err := f.Printer(nil, printers.PrintOptions{
-		ColumnLabels: []string{},
-	})
-	cmdutil.CheckErr(err)
-	if p != nil {
-		validArgs = p.HandledResources()
-		argAliases = kubectl.ResourceAliases(validArgs)
-	}
+	validArgs := cmdutil.ValidArgList(f)
 
 	cmd := &cobra.Command{
 		Use: "patch (-f FILENAME | TYPE NAME) -p PATCH",
@@ -106,7 +95,7 @@ func NewCmdPatch(f cmdutil.Factory, out io.Writer) *cobra.Command {
 			cmdutil.CheckErr(err)
 		},
 		ValidArgs:  validArgs,
-		ArgAliases: argAliases,
+		ArgAliases: kubectl.ResourceAliases(validArgs),
 	}
 	cmd.Flags().StringP("patch", "p", "", "The patch to be applied to the resource JSON file.")
 	cmd.MarkFlagRequired("patch")

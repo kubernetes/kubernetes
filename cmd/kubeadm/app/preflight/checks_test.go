@@ -299,6 +299,7 @@ func TestRunChecks(t *testing.T) {
 		{[]Checker{ExtraArgsCheck{
 			APIServerExtraArgs: map[string]string{"invalid-argument": "foo"},
 		}}, true, "\t[WARNING ExtraArgs]: kube-apiserver: failed to parse extra argument --invalid-argument=foo\n"},
+		{[]Checker{InPathCheck{executable: "foobar", mandatory: false, exec: exec.New(), suggestion: "install foobar"}}, true, "\t[WARNING FileExisting-foobar]: foobar not found in system path\nSuggestion: install foobar\n"},
 	}
 	for _, rt := range tokenTest {
 		buf := new(bytes.Buffer)

@@ -28,6 +28,8 @@ import (
 
 	"github.com/spf13/pflag"
 
+	"fmt"
+
 	utilflag "k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/apiserver/pkg/util/logs"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app"
@@ -52,6 +54,7 @@ func main() {
 	defer logs.FlushLogs()
 
 	if err := command.Execute(); err != nil {
+		fmt.Fprintf(os.Stderr, "%v\n", err)
 		os.Exit(1)
 	}
 }

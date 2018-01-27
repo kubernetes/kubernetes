@@ -930,14 +930,13 @@ func parseResourceList(m map[string]string) (v1.ResourceList, error) {
 
 // BootstrapKubeletConfigController constructs and bootstrap a configuration controller
 func BootstrapKubeletConfigController(defaultConfig *kubeletconfiginternal.KubeletConfiguration,
-	kubeletConfigFileFlag flag.StringFlag,
+	kubeletConfigFile string,
 	dynamicConfigDirFlag flag.StringFlag) (*kubeletconfiginternal.KubeletConfiguration, *kubeletconfig.Controller, error) {
 	var err error
 	// Alpha Dynamic Configuration Implementation; this section only loads config from disk, it does not contact the API server
 	// compute absolute paths based on current working dir
-	kubeletConfigFile := ""
-	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletConfigFile) && kubeletConfigFileFlag.Provided() {
-		kubeletConfigFile, err = filepath.Abs(kubeletConfigFileFlag.Value())
+	if len(kubeletConfigFile) > 0 {
+		kubeletConfigFile, err = filepath.Abs(kubeletConfigFile)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to get absolute path for --config")
 		}

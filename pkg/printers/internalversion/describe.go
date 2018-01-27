@@ -3387,6 +3387,7 @@ func describePodSecurityPolicy(psp *extensions.PodSecurityPolicy) (string, error
 		w.Write(LEVEL_0, "\nSettings:\n")
 
 		w.Write(LEVEL_1, "Allow Privileged:\t%t\n", psp.Spec.Privileged)
+		w.Write(LEVEL_1, "Allow Privilege Escalation:\t%v\n", psp.Spec.AllowPrivilegeEscalation)
 		w.Write(LEVEL_1, "Default Add Capabilities:\t%v\n", capsToString(psp.Spec.DefaultAddCapabilities))
 		w.Write(LEVEL_1, "Required Drop Capabilities:\t%s\n", capsToString(psp.Spec.RequiredDropCapabilities))
 		w.Write(LEVEL_1, "Allowed Capabilities:\t%s\n", capsToString(psp.Spec.AllowedCapabilities))

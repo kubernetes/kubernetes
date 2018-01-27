@@ -123,7 +123,7 @@ verify:
 	@echo "$$VERIFY_HELP_INFO"
 else
 verify: verify_generated_files
-	KUBE_VERIFY_GIT_BRANCH=$(BRANCH) hack/make-rules/verify.sh -v
+	KUBE_VERIFY_GIT_BRANCH=$(BRANCH) hack/make-rules/verify.sh
 endif
 
 define QUICK_VERIFY_HELP_INFO
@@ -138,7 +138,7 @@ quick-verify:
 	@echo "$$QUICK_VERIFY_HELP_INFO"
 else
 quick-verify: verify_generated_files
-	hack/make-rules/verify.sh -v -Q
+	QUICK=true SILENT=false hack/make-rules/verify.sh
 endif
 
 define UPDATE_HELP_INFO

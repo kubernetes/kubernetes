@@ -622,11 +622,17 @@ func (b *Builder) resourceMappings() ([]*meta.RESTMapping, error) {
 		return nil, fmt.Errorf("you may only specify a single resource type")
 	}
 	mappings := []*meta.RESTMapping{}
+	seen := map[schema.GroupVersionKind]bool{}
 	for _, r := range b.resources {
 		mapping, err := b.mappingFor(r)
 		if err != nil {
 			return nil, err
 		}
+		// This ensures the mappings for resources(shortcuts, plural) unique
+		if seen[mapping.GroupVersionKind] {
+			continue
+		}
+		seen[mapping.GroupVersionKind] = true
 
 		mappings = append(mappings, mapping)
 	}
