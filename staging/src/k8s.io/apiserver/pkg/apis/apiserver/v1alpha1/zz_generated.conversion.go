@@ -24,6 +24,7 @@ import (
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	apiserver "k8s.io/apiserver/pkg/apis/apiserver"
+	unsafe "unsafe"
 )
 
 func init() {
@@ -42,17 +43,7 @@ func RegisterConversions(scheme *runtime.Scheme) error {
 }
 
 func autoConvert_v1alpha1_AdmissionConfiguration_To_apiserver_AdmissionConfiguration(in *AdmissionConfiguration, out *apiserver.AdmissionConfiguration, s conversion.Scope) error {
-	if in.Plugins != nil {
-		in, out := &in.Plugins, &out.Plugins
-		*out = make([]apiserver.AdmissionPluginConfiguration, len(*in))
-		for i := range *in {
-			if err := Convert_v1alpha1_AdmissionPluginConfiguration_To_apiserver_AdmissionPluginConfiguration(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Plugins = nil
-	}
+	out.Plugins = *(*[]apiserver.AdmissionPluginConfiguration)(unsafe.Pointer(&in.Plugins))
 	return nil
 }
 
@@ -62,17 +53,7 @@ func Convert_v1alpha1_AdmissionConfiguration_To_apiserver_AdmissionConfiguration
 }
 
 func autoConvert_apiserver_AdmissionConfiguration_To_v1alpha1_AdmissionConfiguration(in *apiserver.AdmissionConfiguration, out *AdmissionConfiguration, s conversion.Scope) error {
-	if in.Plugins != nil {
-		in, out := &in.Plugins, &out.Plugins
-		*out = make([]AdmissionPluginConfiguration, len(*in))
-		for i := range *in {
-			if err := Convert_apiserver_AdmissionPluginConfiguration_To_v1alpha1_AdmissionPluginConfiguration(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Plugins = nil
-	}
+	out.Plugins = *(*[]AdmissionPluginConfiguration)(unsafe.Pointer(&in.Plugins))
 	return nil
 }
 
@@ -84,9 +65,7 @@ func Convert_apiserver_AdmissionConfiguration_To_v1alpha1_AdmissionConfiguration
 func autoConvert_v1alpha1_AdmissionPluginConfiguration_To_apiserver_AdmissionPluginConfiguration(in *AdmissionPluginConfiguration, out *apiserver.AdmissionPluginConfiguration, s conversion.Scope) error {
 	out.Name = in.Name
 	out.Path = in.Path
-	if err := runtime.Convert_runtime_RawExtension_To_runtime_Object(&in.Configuration, &out.Configuration, s); err != nil {
-		return err
-	}
+	out.Configuration = (*runtime.Unknown)(unsafe.Pointer(in.Configuration))
 	return nil
 }
 
@@ -98,9 +77,7 @@ func Convert_v1alpha1_AdmissionPluginConfiguration_To_apiserver_AdmissionPluginC
 func autoConvert_apiserver_AdmissionPluginConfiguration_To_v1alpha1_AdmissionPluginConfiguration(in *apiserver.AdmissionPluginConfiguration, out *AdmissionPluginConfiguration, s conversion.Scope) error {
 	out.Name = in.Name
 	out.Path = in.Path
-	if err := runtime.Convert_runtime_Object_To_runtime_RawExtension(&in.Configuration, &out.Configuration, s); err != nil {
-		return err
-	}
+	out.Configuration = (*runtime.Unknown)(unsafe.Pointer(in.Configuration))
 	return nil
 }
 

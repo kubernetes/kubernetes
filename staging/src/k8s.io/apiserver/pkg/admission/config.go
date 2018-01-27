@@ -96,6 +96,18 @@ func ReadAdmissionConfiguration(pluginNames []string, configFilePath string, con
 	if !(runtime.IsMissingVersion(err) || runtime.IsMissingKind(err) || runtime.IsNotRegisteredError(err)) {
 		return nil, err
 	}
+
+	// Only tolerate load errors if the file appears to be one of the two legacy plugin configs
+	unstructuredData := map[string]interface{}{}
+	if err2 := yaml.Unmarshal(data, &unstructuredData); err2 != nil {
+		return nil, err
+	}
+	_, isLegacyImagePolicy := unstructuredData["imagePolicy"]
+	_, isLegacyPodNodeSelector := unstructuredData["podNodeSelectorPluginConfig"]
+	if !isLegacyImagePolicy && !isLegacyPodNodeSelector {
+		return nil, err
+	}
+
 	// convert the legacy format to the new admission control format
 	// in order to preserve backwards compatibility, we set plugins that
 	// previously read input from a non-versioned file configuration to the
@@ -127,16 +139,10 @@ type configProvider struct {
 }
 
 // GetAdmissionPluginConfigurationFor returns a reader that holds the admission plugin configuration.
-func GetAdmissionPluginConfigurationFor(pluginCfg apiserver.AdmissionPluginConfiguration, scheme *runtime.Scheme) (io.Reader, error) {
-	// if there is nothing nested in the object, we return the named location
-	obj := pluginCfg.Configuration
-	if obj != nil {
-		// serialize the configuration and build a reader for it
-		content, err := writeYAML(obj, scheme)
-		if err != nil {
-			return nil, err
-		}
-		return bytes.NewBuffer(content), nil
+func GetAdmissionPluginConfigurationFor(pluginCfg apiserver.AdmissionPluginConfiguration) (io.Reader, error) {
+	// if there is a nest object, return it directly
+	if pluginCfg.Configuration != nil {
+		return bytes.NewBuffer(pluginCfg.Configuration.Raw), nil
 	}
 	// there is nothing nested, so we delegate to path
 	if pluginCfg.Path != "" {
@@ -163,7 +169,7 @@ func (p configProvider) ConfigFor(pluginName string) (io.Reader, error) {
 		if pluginName != pluginCfg.Name {
 			continue
 		}
-		pluginConfig, err := GetAdmissionPluginConfigurationFor(pluginCfg, p.scheme)
+		pluginConfig, err := GetAdmissionPluginConfigurationFor(pluginCfg)
 		if err != nil {
 			return nil, err
 		}
