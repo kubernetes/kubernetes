@@ -223,3 +223,19 @@ func ValidResourceTypeList(f ClientAccessFactory) string {
 	
 	`)
 }
+
+// Retrieve a list of handled resources from printer as valid args
+// TODO: This function implementation should be replaced with a real implementation from the
+//   discovery service.
+func ValidArgList(f ClientAccessFactory) []string {
+	validArgs := []string{}
+	p, err := f.Printer(nil, printers.PrintOptions{
+		ColumnLabels: []string{},
+	})
+	CheckErr(err)
+	if p != nil {
+		validArgs = p.HandledResources()
+	}
+
+	return validArgs
+}

@@ -32,7 +32,6 @@ import (
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
-	"k8s.io/kubernetes/pkg/printers"
 )
 
 var (
@@ -114,17 +113,7 @@ type DeleteOptions struct {
 
 func NewCmdDelete(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 	options := &DeleteOptions{}
-
-	// retrieve a list of handled resources from printer as valid args
-	validArgs, argAliases := []string{}, []string{}
-	p, err := f.Printer(nil, printers.PrintOptions{
-		ColumnLabels: []string{},
-	})
-	cmdutil.CheckErr(err)
-	if p != nil {
-		validArgs = p.HandledResources()
-		argAliases = kubectl.ResourceAliases(validArgs)
-	}
+	validArgs := cmdutil.ValidArgList(f)
 
 	cmd := &cobra.Command{
 		Use: "delete ([-f FILENAME] | TYPE [(NAME | -l label | --all)])",
@@ -146,7 +135,7 @@ func NewCmdDelete(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 		},
 		SuggestFor: []string{"rm"},
 		ValidArgs:  validArgs,
-		ArgAliases: argAliases,
+		ArgAliases: kubectl.ResourceAliases(validArgs),
 	}
 	usage := "containing the resource to delete."
 	cmdutil.AddFilenameOptionFlags(cmd, &options.FilenameOptions, usage)
