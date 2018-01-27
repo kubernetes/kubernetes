@@ -83,7 +83,7 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	extensionsinternal "k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	"k8s.io/kubernetes/pkg/client/conditions"
+	conditions "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/azure"
 	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	"k8s.io/kubernetes/pkg/controller"
