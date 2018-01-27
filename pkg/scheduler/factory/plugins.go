@@ -75,6 +75,9 @@ type PriorityConfigFactory struct {
 	Weight            int
 }
 
+// EquivalencePodFuncFactory produces a function to get equivalence class for given pod.
+type EquivalencePodFuncFactory func(PluginFactoryArgs) algorithm.GetEquivalencePodFunc
+
 var (
 	schedulerFactoryMutex sync.Mutex
 
@@ -87,6 +90,9 @@ var (
 	// Registered metadata producers
 	priorityMetadataProducer  PriorityMetadataProducerFactory
 	predicateMetadataProducer PredicateMetadataProducerFactory
+
+	// get equivalence pod function
+	getEquivalencePodFuncFactory EquivalencePodFuncFactory
 )
 
 const (
@@ -333,6 +339,11 @@ func RegisterCustomPriorityFunction(policy schedulerapi.PriorityPolicy) string {
 	}
 
 	return RegisterPriorityConfigFactory(policy.Name, *pcf)
+}
+
+// RegisterGetEquivalencePodFunction registers equivalenceFuncFactory to produce equivalence class for given pod.
+func RegisterGetEquivalencePodFunction(equivalenceFuncFactory EquivalencePodFuncFactory) {
+	getEquivalencePodFuncFactory = equivalenceFuncFactory
 }
 
 // IsPriorityFunctionRegistered is useful for testing providers.
