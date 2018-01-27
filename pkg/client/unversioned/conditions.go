@@ -19,6 +19,7 @@ package unversioned
 import (
 	"fmt"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -275,7 +276,7 @@ func ServiceAccountHasSecrets(event watch.Event) (bool, error) {
 		return false, errors.NewNotFound(schema.GroupResource{Resource: "serviceaccounts"}, "")
 	}
 	switch t := event.Object.(type) {
-	case *api.ServiceAccount:
+	case *v1.ServiceAccount:
 		return len(t.Secrets) > 0, nil
 	}
 	return false, nil
