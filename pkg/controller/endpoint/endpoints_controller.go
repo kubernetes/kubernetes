@@ -74,7 +74,7 @@ var (
 
 // NewEndpointController returns a new *EndpointController.
 func NewEndpointController(podInformer coreinformers.PodInformer, serviceInformer coreinformers.ServiceInformer,
-	endpointsInformer coreinformers.EndpointsInformer, client clientset.Interface) *EndpointController {
+	endpointsInformer coreinformers.EndpointsInformer, nodeInformer coreinformers.NodeInformer, client clientset.Interface) *EndpointController {
 	if client != nil && client.CoreV1().RESTClient().GetRateLimiter() != nil {
 		metrics.RegisterMetricAndTrackRateLimiterUsage("endpoint_controller", client.CoreV1().RESTClient().GetRateLimiter())
 	}
@@ -105,6 +105,16 @@ func NewEndpointController(podInformer coreinformers.PodInformer, serviceInforme
 	e.endpointsLister = endpointsInformer.Lister()
 	e.endpointsSynced = endpointsInformer.Informer().HasSynced
 
+	nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc:    e.addNode,
+		UpdateFunc: e.updateNode,
+		DeleteFunc: e.deleteNode,
+	})
+	e.nodeLister = nodeInformer.Lister()
+	e.nodesSynced = nodeInformer.Informer().HasSynced
+
+	e.nodePodsCache = NewNodePodsCache()
+
 	return e
 }
 
@@ -133,6 +143,13 @@ type EndpointController struct {
 	// Added as a member to the struct to allow injection for testing.
 	endpointsSynced cache.InformerSynced
 
+	// nodeLister is able to list/get node and is populated by the shared informer passed to
+	// NewEndpointController.
+	nodeLister corelisters.NodeLister
+	// nodesSynced returns true if the node shared informer has been synced at least once.
+	// Added as a member to the struct to allow injection for testing.
+	nodesSynced cache.InformerSynced
+
 	// Services that need to be updated. A channel is inappropriate here,
 	// because it allows services with lots of pods to be serviced much
 	// more often than services with few pods; it also would cause a
@@ -142,6 +159,11 @@ type EndpointController struct {
 
 	// workerLoopPeriod is the time between worker runs. The workers process the queue of service and pod changes.
 	workerLoopPeriod time.Duration
+
+	// nodePodsCache is an node name to its pods running on the node map cache.
+	// It's used to index the relationship between node and its corresponding pods since
+	// we may need to update endpoint address when node changes.
+	nodePodsCache Cache
 }
 
 // Run will not return until stopCh is closed. workers determines how many
@@ -153,7 +175,7 @@ func (e *EndpointController) Run(workers int, stopCh <-chan struct{}) {
 	glog.Infof("Starting endpoint controller")
 	defer glog.Infof("Shutting down endpoint controller")
 
-	if !controller.WaitForCacheSync("endpoint", stopCh, e.podsSynced, e.servicesSynced, e.endpointsSynced) {
+	if !controller.WaitForCacheSync("endpoint", stopCh, e.podsSynced, e.servicesSynced, e.endpointsSynced, e.nodesSynced) {
 		return
 	}
 
@@ -187,9 +209,22 @@ func (e *EndpointController) getPodServiceMemberships(pod *v1.Pod) (sets.String,
 	return set, nil
 }
 
+// When a pod is added, will do the following two things:
+//   * figure out what services it will be a member of and enqueue them.
+//   * update nodePodsCache
+// obj must have *v1.Pod type.
+func (e *EndpointController) addPod(obj interface{}) {
+	e.enqueueServicesByPod(obj)
+	pod := obj.(*v1.Pod)
+
+	if err := e.nodePodsCache.AddPod(pod); err != nil {
+		utilruntime.HandleError(fmt.Errorf("Unable to add pod %v/%v to nodePodsCache: %v", pod.Namespace, pod.Name, err))
+	}
+}
+
 // When a pod is added, figure out what services it will be a member of and
 // enqueue them. obj must have *v1.Pod type.
-func (e *EndpointController) addPod(obj interface{}) {
+func (e *EndpointController) enqueueServicesByPod(obj interface{}) {
 	pod := obj.(*v1.Pod)
 	services, err := e.getPodServiceMemberships(pod)
 	if err != nil {
@@ -199,6 +234,62 @@ func (e *EndpointController) addPod(obj interface{}) {
 	for key := range services {
 		e.queue.Add(key)
 	}
+}
+
+func (e *EndpointController) addNode(obj interface{}) {
+	node := obj.(*v1.Node)
+	if err := e.nodePodsCache.AddNode(node); err != nil {
+		utilruntime.HandleError(fmt.Errorf("Unable to add node %v to nodePodsCache: %v", node.Name, err))
+	}
+}
+
+func (e *EndpointController) deleteNode(obj interface{}) {
+	if node, ok := obj.(*v1.Node); ok {
+		if err := e.nodePodsCache.RemoveNode(node); err != nil {
+			utilruntime.HandleError(fmt.Errorf("Unable to remove node %v from nodePodsCache: %v", node.Name, err))
+		}
+	}
+
+	// If we reached here it means the node was deleted but its final state is unrecorded.
+	tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
+	if !ok {
+		utilruntime.HandleError(fmt.Errorf("Couldn't get object from tombstone %#v", obj))
+		return
+	}
+	node, ok := tombstone.Obj.(*v1.Node)
+	if !ok {
+		utilruntime.HandleError(fmt.Errorf("Tombstone contained object that is not a Node: %#v", obj))
+		return
+	}
+	if err := e.nodePodsCache.RemoveNode(node); err != nil {
+		utilruntime.HandleError(fmt.Errorf("Unable to remove node %v from nodePodsCache: %v", node.Name, err))
+	}
+}
+
+func (e *EndpointController) updateNode(old, cur interface{}) {
+	// We only need to update endpoint address when node labels changed.
+	oldNode := old.(*v1.Node)
+	curNode := cur.(*v1.Node)
+	if apiequality.Semantic.DeepEqual(oldNode.Labels, curNode.Labels) {
+		return
+	}
+	pods, err := e.nodePodsCache.ListPodsOnNode(curNode.Name)
+	if err != nil {
+		utilruntime.HandleError(fmt.Errorf("Unable to list pods on node %v from nodePodsCache: %v", curNode.Name, err))
+	}
+	// fetch services by pod, enqueue services
+	for _, pod := range pods {
+		services, err := e.getPodServiceMemberships(pod)
+		if err != nil {
+			utilruntime.HandleError(fmt.Errorf("Unable to get pod %v/%v's service memberships: %v", pod.Namespace, pod.Name, err))
+			return
+		}
+		for key := range services {
+			e.queue.Add(key)
+		}
+	}
+	// No need to update nodePodsCache because node name will never be changed thus its corresponding pod will
+	// not be changed as well.
 }
 
 func podToEndpointAddress(pod *v1.Pod) *v1.EndpointAddress {
@@ -255,8 +346,9 @@ func determineNeededServiceUpdates(oldServices, services sets.String, podChanged
 	return services
 }
 
-// When a pod is updated, figure out what services it used to be a member of
-// and what services it will be a member of, and enqueue the union of these.
+// When a pod is updated
+//   * figure out what services it used to be a member of and what services it will be a member of, and enqueue the union of these.
+//   * update nodePodsCache
 // old and cur must be *v1.Pod types.
 func (e *EndpointController) updatePod(old, cur interface{}) {
 	newPod := cur.(*v1.Pod)
@@ -267,9 +359,13 @@ func (e *EndpointController) updatePod(old, cur interface{}) {
 		return
 	}
 
+	if err := e.nodePodsCache.UpdatePod(oldPod, newPod); err != nil {
+		utilruntime.HandleError(fmt.Errorf("Unable to update pod %v/%v to %v/%v in nodePodsCache: %v", oldPod.Namespace, oldPod.Name, newPod.Namespace, newPod.Name, err))
+	}
+
 	podChangedFlag := podChanged(oldPod, newPod)
 
-	// Check if the pod labels have changed, indicating a possibe
+	// Check if the pod labels have changed, indicating a possible
 	// change in the service membership
 	labelsChanged := false
 	if !reflect.DeepEqual(newPod.Labels, oldPod.Labels) ||
@@ -310,11 +406,14 @@ func hostNameAndDomainAreEqual(pod1, pod2 *v1.Pod) bool {
 // When a pod is deleted, enqueue the services the pod used to be a member of.
 // obj could be an *v1.Pod, or a DeletionFinalStateUnknown marker item.
 func (e *EndpointController) deletePod(obj interface{}) {
-	if _, ok := obj.(*v1.Pod); ok {
+	if pod, ok := obj.(*v1.Pod); ok {
 		// Enqueue all the services that the pod used to be a member
 		// of. This happens to be exactly the same thing we do when a
 		// pod is added.
-		e.addPod(obj)
+		e.enqueueServicesByPod(obj)
+		if err := e.nodePodsCache.RemovePod(pod); err != nil {
+			utilruntime.HandleError(fmt.Errorf("Unable to remove pod %v/%v from nodePodsCache: %v", pod.Namespace, pod.Name, err))
+		}
 		return
 	}
 	// If we reached here it means the pod was deleted but its final state is unrecorded.
@@ -329,7 +428,10 @@ func (e *EndpointController) deletePod(obj interface{}) {
 		return
 	}
 	glog.V(4).Infof("Enqueuing services of deleted pod %s/%s having final state unrecorded", pod.Namespace, pod.Name)
-	e.addPod(pod)
+	e.enqueueServicesByPod(pod)
+	if err := e.nodePodsCache.RemovePod(pod); err != nil {
+		utilruntime.HandleError(fmt.Errorf("Unable to remove pod %v/%v from nodePodsCache: %v", pod.Namespace, pod.Name, err))
+	}
 }
 
 // obj could be an *v1.Service, or a DeletionFinalStateUnknown marker item.
@@ -445,6 +547,18 @@ func (e *EndpointController) syncService(key string) error {
 		}
 
 		epa := *podToEndpointAddress(pod)
+
+		if service.Spec.Topology != nil && service.Spec.Topology.Mode != v1.TopologyModeIgnored {
+			epa.Topology = make(map[string]string)
+			topologyKey := service.Spec.Topology.Key
+			node, err := e.nodeLister.Get(pod.Spec.NodeName)
+			if err != nil {
+				// node is deleted, unset epa's topology information
+				delete(epa.Topology, topologyKey)
+			} else {
+				epa.Topology[topologyKey] = node.Labels[topologyKey]
+			}
+		}
 
 		hostname := pod.Spec.Hostname
 		if len(hostname) > 0 && pod.Spec.Subdomain == service.Name && service.Namespace == pod.Namespace {

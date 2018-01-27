@@ -135,21 +135,24 @@ type endpointController struct {
 	podStore       cache.Store
 	serviceStore   cache.Store
 	endpointsStore cache.Store
+	nodeStore      cache.Store
 }
 
 func newController(url string) *endpointController {
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: url, ContentConfig: restclient.ContentConfig{GroupVersion: &legacyscheme.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
 	informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
 	endpoints := NewEndpointController(informerFactory.Core().V1().Pods(), informerFactory.Core().V1().Services(),
-		informerFactory.Core().V1().Endpoints(), client)
+		informerFactory.Core().V1().Endpoints(), informerFactory.Core().V1().Nodes(), client)
 	endpoints.podsSynced = alwaysReady
 	endpoints.servicesSynced = alwaysReady
 	endpoints.endpointsSynced = alwaysReady
+	endpoints.nodesSynced = alwaysReady
 	return &endpointController{
 		endpoints,
 		informerFactory.Core().V1().Pods().Informer().GetStore(),
 		informerFactory.Core().V1().Services().Informer().GetStore(),
 		informerFactory.Core().V1().Endpoints().Informer().GetStore(),
+		informerFactory.Core().V1().Nodes().Informer().GetStore(),
 	}
 }
 
@@ -670,12 +673,14 @@ func TestWaitsForAllInformersToBeSynced2(t *testing.T) {
 		podsSynced            func() bool
 		servicesSynced        func() bool
 		endpointsSynced       func() bool
+		nodesSynced           func() bool
 		shouldUpdateEndpoints bool
 	}{
-		{neverReady, alwaysReady, alwaysReady, false},
-		{alwaysReady, neverReady, alwaysReady, false},
-		{alwaysReady, alwaysReady, neverReady, false},
-		{alwaysReady, alwaysReady, alwaysReady, true},
+		{neverReady, alwaysReady, alwaysReady, alwaysReady, false},
+		{alwaysReady, neverReady, alwaysReady, alwaysReady, false},
+		{alwaysReady, alwaysReady, neverReady, alwaysReady, false},
+		{alwaysReady, alwaysReady, alwaysReady, neverReady, false},
+		{alwaysReady, alwaysReady, alwaysReady, alwaysReady, true},
 	}
 
 	for _, test := range tests {
@@ -697,6 +702,7 @@ func TestWaitsForAllInformersToBeSynced2(t *testing.T) {
 			endpoints.podsSynced = test.podsSynced
 			endpoints.servicesSynced = test.servicesSynced
 			endpoints.endpointsSynced = test.endpointsSynced
+			endpoints.nodesSynced = test.nodesSynced
 			endpoints.workerLoopPeriod = 10 * time.Millisecond
 			stopCh := make(chan struct{})
 			defer close(stopCh)
