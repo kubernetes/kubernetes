@@ -8652,6 +8652,102 @@ func TestValidateService(t *testing.T) {
 			},
 			numErrs: 1,
 		},
+		{
+			name: "topology field can be empty",
+			tweakSvc: func(s *core.Service) {
+				s.Spec.Topology = nil
+			},
+			numErrs: 0,
+		},
+		{
+			name: "topology field must be empty when externalTrafficPolicy is Local",
+			tweakSvc: func(s *core.Service) {
+				s.Spec.Topology = &core.Topology{
+					Key:  "foo",
+					Mode: core.TopologyModeIgnored,
+				}
+				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeLocal
+			},
+			numErrs: 1,
+		},
+		{
+			name: "topology field can be specified when externalTrafficPolicy is Cluster",
+			tweakSvc: func(s *core.Service) {
+				s.Spec.Topology = &core.Topology{
+					Key:  "k8s.io/hostname",
+					Mode: core.TopologyModeRequired,
+				}
+				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
+			},
+			numErrs: 0,
+		},
+		{
+			name: "can't specify topology without key and mode",
+			tweakSvc: func(s *core.Service) {
+				s.Spec.Topology = &core.Topology{}
+			},
+			numErrs: 2,
+		},
+		{
+			name: "mode should be valid value when topology field is not empty",
+			tweakSvc: func(s *core.Service) {
+				s.Spec.Topology = &core.Topology{
+					Key:  "abc",
+					Mode: "foo",
+				}
+			},
+			numErrs: 1,
+		},
+		{
+			name: "key can't be empty when topology field is not empty",
+			tweakSvc: func(s *core.Service) {
+				s.Spec.Topology = &core.Topology{
+					Key:  "",
+					Mode: core.TopologyModeIgnored,
+				}
+			},
+			numErrs: 1,
+		},
+		{
+			name: "key can't be empty and mode should be valid value when topology field is not empty",
+			tweakSvc: func(s *core.Service) {
+				s.Spec.Topology = &core.Topology{
+					Key:  "",
+					Mode: "foo",
+				}
+			},
+			numErrs: 2,
+		},
+		{
+			name: "ignored is a valid mode",
+			tweakSvc: func(s *core.Service) {
+				s.Spec.Topology = &core.Topology{
+					Key:  "k8s.io/hostname",
+					Mode: core.TopologyModeIgnored,
+				}
+			},
+			numErrs: 0,
+		},
+		{
+			name: "preferred is a valid mode",
+			tweakSvc: func(s *core.Service) {
+				s.Spec.Topology = &core.Topology{
+					Key:  "k8s.io/rack",
+					Mode: core.TopologyModePreferred,
+				}
+			},
+			numErrs: 0,
+		},
+		{
+			name: "required is a valid mode",
+			tweakSvc: func(s *core.Service) {
+				s.Spec.Topology = &core.Topology{
+					Key:  "k8s.io/region",
+					Mode: core.TopologyModeRequired,
+				}
+			},
+			numErrs: 0,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -12297,6 +12393,76 @@ func newNodeNameEndpoint(nodeName string) *core.Endpoints {
 						Hostname: "zookeeper1",
 						NodeName: &nodeName}}}}}
 	return ep
+}
+
+func newTopologyEndpoint(topology map[string]string) *core.Endpoints {
+	ep := &core.Endpoints{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "foo",
+			Namespace:       "bar",
+			ResourceVersion: "1",
+		},
+		Subsets: []core.EndpointSubset{
+			{
+				NotReadyAddresses: []core.EndpointAddress{},
+				Ports:             []core.EndpointPort{{Name: "http", Port: 8080, Protocol: "TCP"}},
+				Addresses: []core.EndpointAddress{
+					{
+						IP:       "1.2.3.4",
+						Hostname: "etcd-1",
+						Topology: topology,
+					},
+				},
+			},
+		},
+	}
+	return ep
+}
+
+func TestEndpointAddressTopology(t *testing.T) {
+	TestCases := []struct {
+		topology  map[string]string
+		expectErr bool
+	}{
+		{ // case 0
+			topology: map[string]string{
+				"foo": "bar",
+			},
+			expectErr: false,
+		},
+		{ // case 1
+			topology: map[string]string{
+				"AAA":                 "BBB",
+				"a-b-c":               "c-d-e",
+				"k8s.io/failure-zone": "zone-A",
+			},
+			expectErr: false,
+		},
+		{ // case 2
+			topology: map[string]string{
+				"k8s.io/hostname": "host1",
+				"far":             "",
+			},
+			expectErr: false,
+		},
+		{ // case 3
+			topology: map[string]string{
+				"":            "baz",
+				"k8s.io/rack": "rackB",
+			},
+			expectErr: true,
+		},
+	}
+	for i := range TestCases {
+		endpoint := newTopologyEndpoint(TestCases[i].topology)
+		errList := ValidateEndpoints(endpoint)
+		if len(errList) != 0 && !TestCases[i].expectErr {
+			t.Errorf("Case [%d], unexpected error: %v", i, errList)
+		}
+		if len(errList) == 0 && TestCases[i].expectErr {
+			t.Errorf("Case [%d], expected error, got nil", i)
+		}
+	}
 }
 
 func TestEndpointAddressNodeNameUpdateRestrictions(t *testing.T) {

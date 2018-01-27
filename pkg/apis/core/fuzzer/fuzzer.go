@@ -476,6 +476,9 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 			case core.ServiceAffinityNone:
 				ss.SessionAffinityConfig = nil
 			}
+			ss.Topology = &core.Topology{
+				Mode: core.TopologyModeIgnored,
+			}
 		},
 		func(n *core.Node, c fuzz.Continue) {
 			c.FuzzNoCustom(n)

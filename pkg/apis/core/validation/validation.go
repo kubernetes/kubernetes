@@ -3434,6 +3434,8 @@ func ValidatePodTemplateUpdate(newPod, oldPod *core.PodTemplate) field.ErrorList
 var supportedSessionAffinityType = sets.NewString(string(core.ServiceAffinityClientIP), string(core.ServiceAffinityNone))
 var supportedServiceType = sets.NewString(string(core.ServiceTypeClusterIP), string(core.ServiceTypeNodePort),
 	string(core.ServiceTypeLoadBalancer), string(core.ServiceTypeExternalName))
+var supportedTopologyMode = sets.NewString(string(core.TopologyModeIgnored), string(core.TopologyModePreferred),
+	string(core.TopologyModeRequired))
 
 // ValidateService tests if required fields/annotations of a Service are valid.
 func ValidateService(service *core.Service) field.ErrorList {
@@ -3604,6 +3606,10 @@ func ValidateService(service *core.Service) field.ErrorList {
 
 	allErrs = append(allErrs, validateServiceExternalTrafficFieldsValue(service)...)
 
+	if service.Spec.Topology != nil {
+		allErrs = append(allErrs, validateServiceTopology(service)...)
+	}
+
 	return allErrs
 }
 
@@ -3683,6 +3689,25 @@ func ValidateServiceExternalTrafficFieldsCombination(service *core.Service) fiel
 		service.Spec.HealthCheckNodePort != 0 {
 		allErrs = append(allErrs, field.Invalid(field.NewPath("spec", "healthCheckNodePort"), service.Spec.HealthCheckNodePort,
 			"HealthCheckNodePort can only be set on LoadBalancer service with ExternalTrafficPolicy=Local"))
+	}
+
+	return allErrs
+}
+
+// validateServiceTopology validates service topology related fields
+// have legal value.
+func validateServiceTopology(service *core.Service) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if service.Spec.ExternalTrafficPolicy == core.ServiceExternalTrafficPolicyTypeLocal {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("spec", "topology"), service.Spec.Topology,
+			fmt.Sprintf("can not specify topology when externalTrafficPolicy is %s", core.ServiceExternalTrafficPolicyTypeLocal)))
+	}
+	if service.Spec.Topology.Key == "" {
+		allErrs = append(allErrs, field.Required(field.NewPath("spec", "topolgoy", "key"), "can not be empty"))
+	}
+	if !supportedTopologyMode.Has(string(service.Spec.Topology.Mode)) {
+		allErrs = append(allErrs, field.NotSupported(field.NewPath("spec", "topology", "mode"), service.Spec.Topology.Mode, supportedTopologyMode.List()))
 	}
 
 	return allErrs
@@ -4770,6 +4795,11 @@ func validateEndpointAddress(address *core.EndpointAddress, fldPath *field.Path,
 		return allErrs
 	}
 	allErrs = append(allErrs, validateNonSpecialIP(address.IP, fldPath.Child("ip"))...)
+
+	if address.Topology != nil {
+		allErrs = append(allErrs, unversionedvalidation.ValidateLabels(address.Topology, fldPath.Child("topology"))...)
+	}
+
 	return allErrs
 }
 

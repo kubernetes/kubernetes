@@ -3161,6 +3161,13 @@ type ServiceSpec struct {
 	// field.
 	// +optional
 	PublishNotReadyAddresses bool
+
+	// topology is used to achieve "local" service in a given topology level.
+	// User can control what ever topology level they want.
+	// If the topology requirements specified by this field are not met, the LB, such as kube-proxy
+	// will not pick endpoints for the service.
+	// +optional
+	Topology *Topology
 }
 
 type ServicePort struct {
@@ -3188,6 +3195,32 @@ type ServicePort struct {
 	// Default is to auto-allocate a port if the ServiceType of this Service requires one.
 	NodePort int32
 }
+
+// Defines a topology information.
+type Topology struct {
+	// Valid values for mode are "ignored", "required", "preferred".
+	// "ignored" is the default value and the associated topology key will have no effect.
+	// "required" is the "hard" requirement for topology key and an example would be "only visit service backends in the same zone".
+	// "preferred" is the "soft" requirement for topology key and an example would be "prefer to visit service backends in the same rack, but OK to other racks if none match"
+	// +optional
+	Mode TopologyMode
+	// key is the key for the node label that the system uses to denote such a topology domain.
+	// There are some built-in topology keys, e.g. kubernetes.io/hostname, failure-domain.beta.kubernetes.io/zone and failure-domain.beta.kubernetes.io/region etc.
+	// The built-in topology keys can be good examples and we recommend users switch to a similar mode for portability, but it's NOT enforced.
+	// Users can define whatever topology key they like since topology is arbitrary.
+	Key string
+}
+
+type TopologyMode string
+
+const (
+	// TopologyModeIgnored specifies "ignore" the topology key.
+	TopologyModeIgnored TopologyMode = "Ignored"
+	// TopologyModePreferred specifies "prefer" the topology key - it's "soft" requirement.
+	TopologyModePreferred TopologyMode = "Preferred"
+	// TopologyModeRequired specifies "require" the topology key, it's "hard" requirement.
+	TopologyModeRequired TopologyMode = "Required"
+)
 
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -3303,6 +3336,9 @@ type EndpointAddress struct {
 	NodeName *string
 	// Optional: The kubernetes object related to the entry point.
 	TargetRef *ObjectReference
+	// Topology information that this endpoint carries.
+	// +optional
+	Topology map[string]string
 }
 
 // EndpointPort is a tuple that describes a single port.

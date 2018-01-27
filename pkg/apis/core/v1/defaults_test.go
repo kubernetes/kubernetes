@@ -668,6 +668,9 @@ func TestSetDefaultService(t *testing.T) {
 	if svc2.Spec.Type != v1.ServiceTypeClusterIP {
 		t.Errorf("Expected default type:%s, got: %s", v1.ServiceTypeClusterIP, svc2.Spec.Type)
 	}
+	if svc2.Spec.Topology != nil {
+		t.Errorf("Expected empty topology, got: %v", svc2.Spec.Topology)
+	}
 }
 
 func TestSetDefaultServiceSessionAffinityConfig(t *testing.T) {
@@ -705,6 +708,33 @@ func TestSetDefaultServiceSessionAffinityConfig(t *testing.T) {
 		}
 		if *svc2.Spec.SessionAffinityConfig.ClientIP.TimeoutSeconds != v1.DefaultClientIPServiceAffinitySeconds {
 			t.Errorf("Case: %s, default TimeoutSeconds should be %d when session affinity type: %s, got: %d", name, v1.DefaultClientIPServiceAffinitySeconds, v1.ServiceAffinityClientIP, *svc2.Spec.SessionAffinityConfig.ClientIP.TimeoutSeconds)
+		}
+	}
+}
+
+func TestSetDefaultServiceTopology(t *testing.T) {
+	testCases := map[string]v1.Service{
+		"Mode is empty and Key is not empty": {
+			Spec: v1.ServiceSpec{
+				Topology: &v1.Topology{
+					Key: "foo-key",
+				},
+			},
+		},
+		"Both Mode and Key are empty": {
+			Spec: v1.ServiceSpec{
+				Topology: &v1.Topology{},
+			},
+		},
+	}
+	for name, test := range testCases {
+		obj2 := roundTrip(t, runtime.Object(&test))
+		svc2 := obj2.(*v1.Service)
+		if svc2.Spec.Topology == nil {
+			t.Fatalf("Case: %s, unexpected empty Topology", name)
+		}
+		if svc2.Spec.Topology.Mode != v1.TopologyModeIgnored {
+			t.Errorf("Case: %s, default topology mode: %s should be set, got: %s", name, v1.TopologyModeIgnored, svc2.Spec.Topology.Mode)
 		}
 	}
 }

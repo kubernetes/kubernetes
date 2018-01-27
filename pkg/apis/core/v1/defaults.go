@@ -127,6 +127,10 @@ func SetDefaults_Service(obj *v1.Service) {
 		obj.Spec.ExternalTrafficPolicy == "" {
 		obj.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeCluster
 	}
+
+	if obj.Spec.Topology != nil && obj.Spec.Topology.Mode == "" {
+		obj.Spec.Topology.Mode = v1.TopologyModeIgnored
+	}
 }
 func SetDefaults_Pod(obj *v1.Pod) {
 	// If limits are specified, but requests are not, default requests to limits
