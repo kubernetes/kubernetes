@@ -316,7 +316,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 	}
 
 	// install legacy rest storage
-	if c.ExtraConfig.APIResourceConfigSource.AnyResourcesForVersionEnabled(apiv1.SchemeGroupVersion) {
+	if c.ExtraConfig.APIResourceConfigSource.VersionEnabled(apiv1.SchemeGroupVersion) {
 		legacyRESTStorageProvider := corerest.LegacyRESTStorageProvider{
 			StorageFactory:       c.ExtraConfig.StorageFactory,
 			ProxyTransport:       c.ExtraConfig.ProxyTransport,
@@ -406,7 +406,7 @@ func (m *Master) InstallAPIs(apiResourceConfigSource serverstorage.APIResourceCo
 
 	for _, restStorageBuilder := range restStorageProviders {
 		groupName := restStorageBuilder.GroupName()
-		if !apiResourceConfigSource.AnyResourcesForGroupEnabled(groupName) {
+		if !apiResourceConfigSource.AnyVersionForGroupEnabled(groupName) {
 			glog.V(1).Infof("Skipping disabled API group %q.", groupName)
 			continue
 		}

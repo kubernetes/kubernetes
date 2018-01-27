@@ -32,7 +32,7 @@ type RESTStorageProvider struct{}
 func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool) {
 	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(scheduling.GroupName, legacyscheme.Registry, legacyscheme.Scheme, legacyscheme.ParameterCodec, legacyscheme.Codecs)
 
-	if apiResourceConfigSource.AnyResourcesForVersionEnabled(schedulingapiv1alpha1.SchemeGroupVersion) {
+	if apiResourceConfigSource.VersionEnabled(schedulingapiv1alpha1.SchemeGroupVersion) {
 		apiGroupInfo.VersionedResourcesStorageMap[schedulingapiv1alpha1.SchemeGroupVersion.Version] = p.v1alpha1Storage(apiResourceConfigSource, restOptionsGetter)
 		apiGroupInfo.GroupMeta.GroupVersion = schedulingapiv1alpha1.SchemeGroupVersion
 	}
@@ -41,13 +41,11 @@ func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorag
 }
 
 func (p RESTStorageProvider) v1alpha1Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) map[string]rest.Storage {
-	version := schedulingapiv1alpha1.SchemeGroupVersion
-
 	storage := map[string]rest.Storage{}
-	if apiResourceConfigSource.ResourceEnabled(version.WithResource("priorityclasses")) {
-		priorityClassStorage := priorityclassstore.NewREST(restOptionsGetter)
-		storage["priorityclasses"] = priorityClassStorage
-	}
+	// priorityclasses
+	priorityClassStorage := priorityclassstore.NewREST(restOptionsGetter)
+	storage["priorityclasses"] = priorityClassStorage
+
 	return storage
 }
 

@@ -32,18 +32,18 @@ func TestDisabledVersion(t *testing.T) {
 	config.DisableVersions(g1v1)
 	config.EnableVersions(g1v2, g2v1)
 
-	if config.AnyResourcesForVersionEnabled(g1v1) {
+	if config.VersionEnabled(g1v1) {
 		t.Errorf("expected disabled for %v, from %v", g1v1, config)
 	}
-	if !config.AnyResourcesForVersionEnabled(g1v2) {
+	if !config.VersionEnabled(g1v2) {
 		t.Errorf("expected enabled for %v, from %v", g1v1, config)
 	}
-	if !config.AnyResourcesForVersionEnabled(g2v1) {
+	if !config.VersionEnabled(g2v1) {
 		t.Errorf("expected enabled for %v, from %v", g1v1, config)
 	}
 }
 
-func TestAnyResourcesForGroupEnabled(t *testing.T) {
+func TestAnyVersionForGroupEnabled(t *testing.T) {
 	tests := []struct {
 		name      string
 		creator   func() APIResourceConfigSource
@@ -86,7 +86,7 @@ func TestAnyResourcesForGroupEnabled(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		if e, a := tc.expectedResult, tc.creator().AnyResourcesForGroupEnabled(tc.testGroup); e != a {
+		if e, a := tc.expectedResult, tc.creator().AnyVersionForGroupEnabled(tc.testGroup); e != a {
 			t.Errorf("%s: expected %v, got %v", tc.name, e, a)
 		}
 	}
