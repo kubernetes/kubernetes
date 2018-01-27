@@ -234,10 +234,10 @@ func testPrivilegedPods(f *framework.Framework, tester func(pod *v1.Pod)) {
 		tester(unconfined)
 	})
 
-	By("Running a CAP_SYS_ADMIN pod", func() {
+	By("Running a SYS_ADMIN pod", func() {
 		sysadmin := restrictedPod(f, "sysadmin")
 		sysadmin.Spec.Containers[0].SecurityContext.Capabilities = &v1.Capabilities{
-			Add: []v1.Capability{"CAP_SYS_ADMIN"},
+			Add: []v1.Capability{"SYS_ADMIN"},
 		}
 		sysadmin.Spec.Containers[0].SecurityContext.AllowPrivilegeEscalation = nil
 		tester(sysadmin)
