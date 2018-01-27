@@ -170,7 +170,7 @@ const (
 	ServiceNodeExclusion utilfeature.Feature = "ServiceNodeExclusion"
 
 	// owner @brendandburns
-	// stable: v1.10
+	// deprecated: v1.10
 	//
 	// Enable the service proxy to contact external IP addresses. Note this feature is present
 	// only for backward compatability, it will be removed in the 1.11 release.
@@ -284,6 +284,6 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	// unintentionally on either side:
 	apiextensionsfeatures.CustomResourceValidation: {Default: true, PreRelease: utilfeature.Beta},
 
-	// backward compatability features that enable backwards compatability but should be removed soon.
-	ServiceProxyAllowExternalIPs: {Default: false, PreRelease: utilfeature.Beta},
+	// features that enable backwards compatability but are scheduled to be removed
+	ServiceProxyAllowExternalIPs: {Default: false, PreRelease: utilfeature.Deprecated},
 }
