@@ -162,7 +162,7 @@ func Run(s *options.CMServer) error {
 	}
 
 	if !s.LeaderElection.LeaderElect {
-		run(nil)
+		run(wait.NeverStop)
 		panic("unreachable")
 	}
 
