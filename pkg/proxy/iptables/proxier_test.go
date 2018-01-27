@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/proxy"
 	utilproxy "k8s.io/kubernetes/pkg/proxy/util"
@@ -1038,6 +1039,64 @@ func onlyLocalNodePorts(t *testing.T, fp *Proxier, ipt *iptablestest.FakeIPTable
 	}
 }
 
+func TestSameTopology(t *testing.T) {
+	utilfeature.DefaultFeatureGate.Set("TopologyAwareServiceRouting=true")
+	ipt := iptablestest.NewFake()
+	fp := NewFakeProxier(ipt)
+	fp.nodeLabels = map[string]string{"foo": "bar"}
+	svcIP := "10.20.30.41"
+	svcPort := 80
+	svcNodePort := 3001
+	svcPortName := proxy.ServicePortName{
+		NamespacedName: makeNSN("ns1", "svc1"),
+		Port:           "p80",
+	}
+
+	makeServiceMap(fp,
+		makeTestService(svcPortName.Namespace, svcPortName.Name, func(svc *api.Service) {
+			svc.Spec.ClusterIP = svcIP
+			svc.Spec.Ports = []api.ServicePort{{
+				Name:     svcPortName.Port,
+				Port:     int32(svcPort),
+				Protocol: api.ProtocolTCP,
+				NodePort: int32(svcNodePort),
+			}}
+			svc.Spec.Topology = &api.Topology{
+				Mode: api.TopologyModeRequired,
+				Key:  "foo",
+			}
+		}),
+	)
+
+	epIP1 := "10.180.0.1"
+	epIP2 := "10.180.2.1"
+	makeEndpointsMap(fp,
+		makeTestEndpoints(svcPortName.Namespace, svcPortName.Name, func(ept *api.Endpoints) {
+			ept.Subsets = []api.EndpointSubset{{
+				Addresses: []api.EndpointAddress{{
+					IP: epIP1,
+				}, {
+					IP:       epIP2,
+					Topology: map[string]string{"foo": "bar"},
+				}},
+				Ports: []api.EndpointPort{{
+					Name: svcPortName.Port,
+					Port: int32(svcPort),
+				}},
+			}}
+		}),
+	)
+
+	fp.syncProxyRules()
+
+	kubeServicesRules := ipt.GetRules(string(kubeServicesChain))
+	proto := strings.ToLower(string(api.ProtocolTCP))
+	lbChain := string(serviceLBChainName(svcPortName.String(), proto))
+	if !hasJump(kubeServicesRules, lbChain, svcIP, svcPort) {
+		errorf(fmt.Sprintf("Failed to find jump to lb chain %v", lbChain), kubeServicesRules, t)
+	}
+}
+
 func makeTestService(namespace, name string, svcFunc func(*api.Service)) *api.Service {
 	svc := &api.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -1568,7 +1627,7 @@ func Test_endpointsToEndpointsMap(t *testing.T) {
 				t.Errorf("[%d] expected %d endpoints for %v, got %d", tci, len(tc.expected[x]), x, len(newEndpoints[x]))
 			} else {
 				for i := range newEndpoints[x] {
-					if *(newEndpoints[x][i]) != *(tc.expected[x][i]) {
+					if !reflect.DeepEqual(newEndpoints[x][i], tc.expected[x][i]) {
 						t.Errorf("[%d] expected new[%v][%d] to be %v, got %v", tci, x, i, tc.expected[x][i], *(newEndpoints[x][i]))
 					}
 				}
@@ -1628,7 +1687,7 @@ func compareEndpointsMaps(t *testing.T, tci int, newMap, expected map[proxy.Serv
 			t.Errorf("[%d] expected %d endpoints for %v, got %d", tci, len(expected[x]), x, len(newMap[x]))
 		} else {
 			for i := range expected[x] {
-				if *(newMap[x][i]) != *(expected[x][i]) {
+				if !reflect.DeepEqual(newMap[x][i], expected[x][i]) {
 					t.Errorf("[%d] expected new[%v][%d] to be %v, got %v", tci, x, i, expected[x][i], newMap[x][i])
 				}
 			}

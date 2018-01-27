@@ -134,6 +134,7 @@ func newProxyServer(
 	var proxier proxy.ProxyProvider
 	var serviceEventHandler proxyconfig.ServiceHandler
 	var endpointsEventHandler proxyconfig.EndpointsHandler
+	var nodeEventHandler proxyconfig.NodeHandler
 
 	proxyMode := getProxyMode(string(config.Mode), iptInterface, kernelHandler, ipsetInterface, iptables.LinuxKernelCompatTester{})
 	if proxyMode == proxyModeIPTables {
@@ -169,6 +170,7 @@ func newProxyServer(
 		proxier = proxierIPTables
 		serviceEventHandler = proxierIPTables
 		endpointsEventHandler = proxierIPTables
+		nodeEventHandler = proxierIPTables
 		// No turning back. Remove artifacts that might still exist from the userspace Proxier.
 		glog.V(0).Info("Tearing down inactive rules.")
 		// TODO this has side effects that should only happen when Run() is invoked.
@@ -267,6 +269,7 @@ func newProxyServer(
 		ConfigSyncPeriod:       config.ConfigSyncPeriod.Duration,
 		ServiceEventHandler:    serviceEventHandler,
 		EndpointsEventHandler:  endpointsEventHandler,
+		NodeEventHandler:       nodeEventHandler,
 		HealthzServer:          healthzServer,
 	}, nil
 }

@@ -378,6 +378,7 @@ type ProxyServer struct {
 	ConfigSyncPeriod       time.Duration
 	ServiceEventHandler    config.ServiceHandler
 	EndpointsEventHandler  config.EndpointsHandler
+	NodeEventHandler       config.NodeHandler
 	HealthzServer          *healthcheck.HealthzServer
 }
 
@@ -538,6 +539,10 @@ func (s *ProxyServer) Run() error {
 	endpointsConfig := config.NewEndpointsConfig(informerFactory.Core().InternalVersion().Endpoints(), s.ConfigSyncPeriod)
 	endpointsConfig.RegisterEventHandler(s.EndpointsEventHandler)
 	go endpointsConfig.Run(wait.NeverStop)
+
+	nodeConfig := config.NewNodeConfig(s.Client, s.NodeRef.Name, s.ConfigSyncPeriod)
+	nodeConfig.RegisterEventHandler(s.NodeEventHandler)
+	go nodeConfig.Run(wait.NeverStop)
 
 	// This has to start after the calls to NewServiceConfig and NewEndpointsConfig because those
 	// functions must configure their shared informer event handlers first.

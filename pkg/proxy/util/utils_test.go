@@ -109,3 +109,96 @@ func TestShouldSkipService(t *testing.T) {
 		}
 	}
 }
+
+func strToStrPtr(str string) *string {
+	tmp := str
+	return &tmp
+}
+
+func TestSameTopologyDomain(t *testing.T) {
+	testCases := []struct {
+		topologyKey  string
+		topologyMode string
+		labels1      map[string]string
+		labels2      map[string]string
+		expectSame   bool
+	}{
+		{ // case 0
+			topologyMode: string(api.TopologyModeIgnored),
+			topologyKey:  "WHAT-EVER",
+			labels1:      map[string]string{"a": "b"},
+			labels2:      map[string]string{"x": "y"},
+			expectSame:   false,
+		},
+		{ // case 1
+			topologyMode: string(api.TopologyModeIgnored),
+			expectSame:   false,
+		},
+		{ // case 2
+			topologyMode: string(api.TopologyModePreferred),
+			topologyKey:  "k8s.io/hostname",
+			labels1:      map[string]string{"k8s.io/hostname": "hostA"},
+			labels2:      map[string]string{"k8s.io/hostname": "hostA"},
+			expectSame:   true,
+		},
+		{ // case 3
+			topologyMode: string(api.TopologyModePreferred),
+			topologyKey:  "k8s.io/hostname",
+			labels1:      map[string]string{"k8s.io/hostname": "hostA"},
+			labels2:      map[string]string{"k8s.io/hostname": "hostB"},
+			expectSame:   false,
+		},
+		{ // case 4
+			topologyMode: string(api.TopologyModePreferred),
+			topologyKey:  "k8s.io/hostname",
+			labels1:      map[string]string{"k8s.io/hostname": "hostA"},
+			expectSame:   false,
+		},
+		{ // case 5
+			topologyMode: string(api.TopologyModeRequired),
+			topologyKey:  "k8s.io/region",
+			labels1:      map[string]string{"k8s.io/region": "region-1"},
+			labels2:      map[string]string{"k8s.io/region": "region-1"},
+			expectSame:   true,
+		},
+		{ // case 6
+			topologyMode: string(api.TopologyModeRequired),
+			topologyKey:  "k8s.io/region",
+			labels1:      map[string]string{"k8s.io/region": "region-1"},
+			labels2:      map[string]string{"k8s.io/region": "region-2"},
+			expectSame:   false,
+		},
+		{ // case 7
+			topologyMode: string(api.TopologyModeRequired),
+			topologyKey:  "k8s.io/region",
+			labels2:      map[string]string{"k8s.io/region": "region-2"},
+			expectSame:   false,
+		},
+		{ // case 8
+			topologyMode: string(api.TopologyModeRequired),
+			topologyKey:  "k8s.io/region",
+			labels1:      map[string]string{"k8s.io/hostname": "hostA"},
+			labels2:      map[string]string{"k8s.io/region": "region-2"},
+			expectSame:   false,
+		},
+		{ // case 9
+			topologyMode: string(api.TopologyModePreferred),
+			topologyKey:  "k8s.io/region",
+			labels1:      map[string]string{"k8s.io/hostname": "hostA"},
+			labels2:      map[string]string{"k8s.io/hostname": "hostA"},
+			expectSame:   false,
+		},
+		{ // case 10
+			topologyMode: string(api.TopologyModeRequired),
+			topologyKey:  "k8s.io/region",
+			expectSame:   false,
+		},
+	}
+
+	for i := range testCases {
+		same := SameTopologyDomain(testCases[i].labels1, testCases[i].labels2, testCases[i].topologyKey, testCases[i].topologyMode)
+		if same != testCases[i].expectSame {
+			t.Errorf("case %d: expect %v, got %v", i, testCases[i].expectSame, same)
+		}
+	}
+}

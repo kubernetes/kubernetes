@@ -39,10 +39,12 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
 	apiservice "k8s.io/kubernetes/pkg/api/service"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	"k8s.io/kubernetes/pkg/proxy/metrics"
@@ -139,17 +141,20 @@ const sysctlBridgeCallIPTables = "net/bridge/bridge-nf-call-iptables"
 
 // internal struct for string service information
 type serviceInfo struct {
-	clusterIP                net.IP
-	port                     int
-	protocol                 api.Protocol
-	nodePort                 int
-	loadBalancerStatus       api.LoadBalancerStatus
-	sessionAffinityType      api.ServiceAffinity
-	stickyMaxAgeSeconds      int
-	externalIPs              []string
-	loadBalancerSourceRanges []string
-	onlyNodeLocalEndpoints   bool
-	healthCheckNodePort      int
+	clusterIP                 net.IP
+	port                      int
+	protocol                  api.Protocol
+	nodePort                  int
+	loadBalancerStatus        api.LoadBalancerStatus
+	sessionAffinityType       api.ServiceAffinity
+	stickyMaxAgeSeconds       int
+	externalIPs               []string
+	loadBalancerSourceRanges  []string
+	onlyNodeLocalEndpoints    bool
+	onlySameTopologyEndpoints bool
+	topologyKey               string
+	topologyMode              string
+	healthCheckNodePort       int
 	// The following fields are computed and stored for performance reasons.
 	serviceNameString        string
 	servicePortChainName     utiliptables.Chain
@@ -159,8 +164,9 @@ type serviceInfo struct {
 
 // internal struct for endpoints information
 type endpointsInfo struct {
-	endpoint string // TODO: should be an endpointString type
-	isLocal  bool
+	endpoint       string // TODO: should be an endpointString type
+	isLocal        bool
+	topologyLabels map[string]string
 	// The following fields we lazily compute and store here for performance
 	// reasons. If the protocol is the same as you expect it to be, then the
 	// chainName can be reused, otherwise it should be recomputed.
@@ -192,6 +198,10 @@ func newServiceInfo(svcPortName proxy.ServicePortName, port *api.ServicePort, se
 	if apiservice.RequestsOnlyLocalTraffic(service) {
 		onlyNodeLocalEndpoints = true
 	}
+	onlySameTopologyEndpoints := false
+	if utilfeature.DefaultFeatureGate.Enabled(features.TopologyAwareServiceRouting) && apiservice.RequestsOnlySameTopologyTraffic(service) {
+		onlySameTopologyEndpoints = true
+	}
 	var stickyMaxAgeSeconds int
 	if service.Spec.SessionAffinity == api.ServiceAffinityClientIP {
 		// Kube-apiserver side guarantees SessionAffinityConfig won't be nil when session affinity type is ClientIP
@@ -203,12 +213,18 @@ func newServiceInfo(svcPortName proxy.ServicePortName, port *api.ServicePort, se
 		protocol:  port.Protocol,
 		nodePort:  int(port.NodePort),
 		// Deep-copy in case the service instance changes
-		loadBalancerStatus:       *helper.LoadBalancerStatusDeepCopy(&service.Status.LoadBalancer),
-		sessionAffinityType:      service.Spec.SessionAffinity,
-		stickyMaxAgeSeconds:      stickyMaxAgeSeconds,
-		externalIPs:              make([]string, len(service.Spec.ExternalIPs)),
-		loadBalancerSourceRanges: make([]string, len(service.Spec.LoadBalancerSourceRanges)),
-		onlyNodeLocalEndpoints:   onlyNodeLocalEndpoints,
+		loadBalancerStatus:        *helper.LoadBalancerStatusDeepCopy(&service.Status.LoadBalancer),
+		sessionAffinityType:       service.Spec.SessionAffinity,
+		stickyMaxAgeSeconds:       stickyMaxAgeSeconds,
+		externalIPs:               make([]string, len(service.Spec.ExternalIPs)),
+		loadBalancerSourceRanges:  make([]string, len(service.Spec.LoadBalancerSourceRanges)),
+		onlyNodeLocalEndpoints:    onlyNodeLocalEndpoints,
+		onlySameTopologyEndpoints: onlySameTopologyEndpoints,
+	}
+
+	if service.Spec.Topology != nil {
+		info.topologyMode = string(service.Spec.Topology.Mode)
+		info.topologyKey = string(service.Spec.Topology.Key)
 	}
 
 	copy(info.loadBalancerSourceRanges, service.Spec.LoadBalancerSourceRanges)
@@ -381,8 +397,10 @@ type Proxier struct {
 	// with some partial data after kube-proxy restart.
 	endpointsSynced bool
 	servicesSynced  bool
+	nodesSynced     bool
 	initialized     int32
 	syncRunner      *async.BoundedFrequencyRunner // governs calls to syncProxyRules
+	nodeLabels      map[string]string
 
 	// These are effectively const and do not need the mutex to be held.
 	iptables       utiliptables.Interface
@@ -396,6 +414,7 @@ type Proxier struct {
 	recorder       record.EventRecorder
 	healthChecker  healthcheck.Server
 	healthzServer  healthcheck.HealthzUpdater
+	// nodeLabelsGetter proxyconfig.DynamicNodeLabelsGetter
 
 	// Since converting probabilities (floats) to strings is expensive
 	// and we are using only probabilities in the format of 1/n, we are
@@ -683,7 +702,7 @@ func (proxier *Proxier) OnServiceDelete(service *api.Service) {
 func (proxier *Proxier) OnServiceSynced() {
 	proxier.mu.Lock()
 	proxier.servicesSynced = true
-	proxier.setInitialized(proxier.servicesSynced && proxier.endpointsSynced)
+	proxier.setInitialized(proxier.servicesSynced && proxier.endpointsSynced && proxier.nodesSynced)
 	proxier.mu.Unlock()
 
 	// Sync unconditionally - this is called once per lifetime.
@@ -743,7 +762,7 @@ func (proxier *Proxier) OnEndpointsDelete(endpoints *api.Endpoints) {
 func (proxier *Proxier) OnEndpointsSynced() {
 	proxier.mu.Lock()
 	proxier.endpointsSynced = true
-	proxier.setInitialized(proxier.servicesSynced && proxier.endpointsSynced)
+	proxier.setInitialized(proxier.servicesSynced && proxier.endpointsSynced && proxier.nodesSynced)
 	proxier.mu.Unlock()
 
 	// Sync unconditionally - this is called once per lifetime.
@@ -781,13 +800,44 @@ func updateEndpointsMap(
 	return result
 }
 
+func (proxier *Proxier) OnNodeAdd(node *api.Node) {
+	proxier.mu.Lock()
+	proxier.nodeLabels = node.Labels
+	proxier.mu.Unlock()
+
+	if proxier.isInitialized() {
+		proxier.syncRunner.Run()
+	}
+}
+
+func (proxier *Proxier) OnNodeUpdate(oldNode, node *api.Node) {
+	proxier.OnNodeAdd(node)
+}
+
+func (proxier *Proxier) OnNodeDelete(node *api.Node) {
+	proxier.nodeLabels = nil
+	if proxier.isInitialized() {
+		proxier.syncRunner.Run()
+	}
+}
+
+func (proxier *Proxier) OnNodeSynced() {
+	proxier.mu.Lock()
+	proxier.nodesSynced = true
+	proxier.setInitialized(proxier.servicesSynced && proxier.endpointsSynced && proxier.nodesSynced)
+	proxier.mu.Unlock()
+
+	// Sync unconditionally - this is called once per lifetime.
+	proxier.syncProxyRules()
+}
+
 // <staleEndpoints> and <staleServices> are modified by this function with detected stale connections.
 func detectStaleConnections(oldEndpointsMap, newEndpointsMap proxyEndpointsMap, staleEndpoints map[endpointServicePair]bool, staleServiceNames map[proxy.ServicePortName]bool) {
 	for svcPortName, epList := range oldEndpointsMap {
 		for _, ep := range epList {
 			stale := true
 			for i := range newEndpointsMap[svcPortName] {
-				if *newEndpointsMap[svcPortName][i] == *ep {
+				if reflect.DeepEqual(newEndpointsMap[svcPortName][i], ep) {
 					stale = false
 					break
 				}
@@ -858,8 +908,9 @@ func endpointsToEndpointsMap(endpoints *api.Endpoints, hostname string) proxyEnd
 					continue
 				}
 				epInfo := &endpointsInfo{
-					endpoint: net.JoinHostPort(addr.IP, strconv.Itoa(int(port.Port))),
-					isLocal:  addr.NodeName != nil && *addr.NodeName == hostname,
+					endpoint:       net.JoinHostPort(addr.IP, strconv.Itoa(int(port.Port))),
+					isLocal:        addr.NodeName != nil && *addr.NodeName == hostname,
+					topologyLabels: addr.Topology,
 				}
 				endpointsMap[svcPortName] = append(endpointsMap[svcPortName], epInfo)
 			}
@@ -1168,19 +1219,23 @@ func (proxier *Proxier) syncProxyRules() {
 		isIPv6 := utilproxy.IsIPv6(svcInfo.clusterIP)
 		protocol := strings.ToLower(string(svcInfo.protocol))
 		svcNameString = svcInfo.serviceNameString
-
-		// Create the per-service chain, retaining counters if possible.
 		svcChain := svcInfo.servicePortChainName
-		if chain, ok := existingNATChains[svcChain]; ok {
-			writeLine(proxier.natChains, chain)
-		} else {
-			writeLine(proxier.natChains, utiliptables.MakeChainLine(svcChain))
-		}
-		activeNATChains[svcChain] = true
-
 		svcXlbChain := svcInfo.serviceLBChainName
-		if svcInfo.onlyNodeLocalEndpoints {
-			// Only for services request OnlyLocal traffic
+
+		if !svcInfo.onlyNodeLocalEndpoints && !svcInfo.onlySameTopologyEndpoints {
+			// Create the per-service chain, retaining counters if possible.
+			if chain, ok := existingNATChains[svcChain]; ok {
+				writeLine(proxier.natChains, chain)
+			} else {
+				writeLine(proxier.natChains, utiliptables.MakeChainLine(svcChain))
+			}
+			activeNATChains[svcChain] = true
+			if activeNATChains[svcXlbChain] {
+				// Cleanup the previously created XLB chain for this service
+				delete(activeNATChains, svcXlbChain)
+			}
+		} else {
+			// Only for services request OnlyLocal or OnlySameTopology traffic
 			// create the per-service LB chain, retaining counters if possible.
 			if lbChain, ok := existingNATChains[svcXlbChain]; ok {
 				writeLine(proxier.natChains, lbChain)
@@ -1188,9 +1243,6 @@ func (proxier *Proxier) syncProxyRules() {
 				writeLine(proxier.natChains, utiliptables.MakeChainLine(svcXlbChain))
 			}
 			activeNATChains[svcXlbChain] = true
-		} else if activeNATChains[svcXlbChain] {
-			// Cleanup the previously created XLB chain for this service
-			delete(activeNATChains, svcXlbChain)
 		}
 
 		// Capture the clusterIP.
@@ -1211,7 +1263,11 @@ func (proxier *Proxier) syncProxyRules() {
 			// If/when we support "Local" policy for VIPs, we should update this.
 			writeLine(proxier.natRules, append(args, "! -s", proxier.clusterCIDR, "-j", string(KubeMarkMasqChain))...)
 		}
-		writeLine(proxier.natRules, append(args, "-j", string(svcChain))...)
+		if svcInfo.onlySameTopologyEndpoints {
+			writeLine(proxier.natRules, append(args, "-j", string(svcXlbChain))...)
+		} else {
+			writeLine(proxier.natRules, append(args, "-j", string(svcChain))...)
+		}
 
 		// Capture externalIPs.
 		for _, externalIP := range svcInfo.externalIPs {
@@ -1265,11 +1321,19 @@ func (proxier *Proxier) syncProxyRules() {
 			externalTrafficOnlyArgs := append(args,
 				"-m", "physdev", "!", "--physdev-is-in",
 				"-m", "addrtype", "!", "--src-type", "LOCAL")
-			writeLine(proxier.natRules, append(externalTrafficOnlyArgs, "-j", string(svcChain))...)
+			if svcInfo.onlySameTopologyEndpoints {
+				writeLine(proxier.natRules, append(externalTrafficOnlyArgs, "-j", string(svcXlbChain))...)
+			} else {
+				writeLine(proxier.natRules, append(externalTrafficOnlyArgs, "-j", string(svcChain))...)
+			}
 			dstLocalOnlyArgs := append(args, "-m", "addrtype", "--dst-type", "LOCAL")
 			// Allow traffic bound for external IPs that happen to be recognized as local IPs to stay local.
 			// This covers cases like GCE load-balancers which get added to the local routing table.
-			writeLine(proxier.natRules, append(dstLocalOnlyArgs, "-j", string(svcChain))...)
+			if svcInfo.onlySameTopologyEndpoints {
+				writeLine(proxier.natRules, append(dstLocalOnlyArgs, "-j", string(svcXlbChain))...)
+			} else {
+				writeLine(proxier.natRules, append(dstLocalOnlyArgs, "-j", string(svcChain))...)
+			}
 
 			// If the service has no endpoints then reject packets coming via externalIP
 			// Install ICMP Reject rule in filter table for destination=externalIP and dport=svcport
@@ -1317,11 +1381,13 @@ func (proxier *Proxier) syncProxyRules() {
 
 				// Each source match rule in the FW chain may jump to either the SVC or the XLB chain
 				chosenChain := svcXlbChain
+				if !svcInfo.onlyNodeLocalEndpoints && !svcInfo.onlySameTopologyEndpoints {
+					chosenChain = svcChain
+				}
 				// If we are proxying globally, we need to masquerade in case we cross nodes.
 				// If we are proxying only locally, we can retain the source IP.
 				if !svcInfo.onlyNodeLocalEndpoints {
 					writeLine(proxier.natRules, append(args, "-j", string(KubeMarkMasqChain))...)
-					chosenChain = svcChain
 				}
 
 				if len(svcInfo.loadBalancerSourceRanges) == 0 {
@@ -1392,11 +1458,15 @@ func (proxier *Proxier) syncProxyRules() {
 				"-m", protocol, "-p", protocol,
 				"--dport", strconv.Itoa(svcInfo.nodePort),
 			)
+			chosenChain := svcXlbChain
+			if !svcInfo.onlyNodeLocalEndpoints && !svcInfo.onlySameTopologyEndpoints {
+				chosenChain = svcChain
+			}
 			if !svcInfo.onlyNodeLocalEndpoints {
 				// Nodeports need SNAT, unless they're local.
 				writeLine(proxier.natRules, append(args, "-j", string(KubeMarkMasqChain))...)
 				// Jump to the service chain.
-				writeLine(proxier.natRules, append(args, "-j", string(svcChain))...)
+				writeLine(proxier.natRules, append(args, "-j", string(chosenChain))...)
 			} else {
 				// TODO: Make all nodePorts jump to the firewall chain.
 				// Currently we only create it for loadbalancers (#33586).
@@ -1407,7 +1477,7 @@ func (proxier *Proxier) syncProxyRules() {
 					loopback = "::1/128"
 				}
 				writeLine(proxier.natRules, append(args, "-s", loopback, "-j", string(KubeMarkMasqChain))...)
-				writeLine(proxier.natRules, append(args, "-j", string(svcXlbChain))...)
+				writeLine(proxier.natRules, append(args, "-j", string(chosenChain))...)
 			}
 
 			// If the service has no endpoints then reject packets.  The filter
@@ -1481,21 +1551,23 @@ func (proxier *Proxier) syncProxyRules() {
 				// Error parsing this endpoint has been logged. Skip to next endpoint.
 				continue
 			}
-			// Balancing rules in the per-service chain.
-			args = append(args[:0], []string{
-				"-A", string(svcChain),
-				"-m", "comment", "--comment", svcNameString,
-			}...)
-			if i < (n - 1) {
-				// Each rule is a probabilistic match.
-				args = append(args,
-					"-m", "statistic",
-					"--mode", "random",
-					"--probability", proxier.probability(n-i))
+			if !svcInfo.onlySameTopologyEndpoints {
+				// Balancing rules in the per-service chain.
+				args = append(args[:0], []string{
+					"-A", string(svcChain),
+					"-m", "comment", "--comment", svcNameString,
+				}...)
+				if i < (n - 1) {
+					// Each rule is a probabilistic match.
+					args = append(args,
+						"-m", "statistic",
+						"--mode", "random",
+						"--probability", proxier.probability(n-i))
+				}
+				// The final (or only if n == 1) rule is a guaranteed match.
+				args = append(args, "-j", string(endpointChain))
+				writeLine(proxier.natRules, args...)
 			}
-			// The final (or only if n == 1) rule is a guaranteed match.
-			args = append(args, "-j", string(endpointChain))
-			writeLine(proxier.natRules, args...)
 
 			// Rules in the per-endpoint chain.
 			args = append(args[:0],
@@ -1515,22 +1587,32 @@ func (proxier *Proxier) syncProxyRules() {
 			writeLine(proxier.natRules, args...)
 		}
 
-		// The logic below this applies only if this service is marked as OnlyLocal
-		if !svcInfo.onlyNodeLocalEndpoints {
+		// The logic below this applies only if this service is marked as OnlyLocal or only same topology domain.
+		if !svcInfo.onlyNodeLocalEndpoints && !svcInfo.onlySameTopologyEndpoints {
 			continue
 		}
 
-		// Now write ingress loadbalancing & DNAT rules only for services that request OnlyLocal traffic.
+		// Now write ingress loadbalancing & DNAT rules only for services that request OnlyLocal or same topology doamin traffic.
 		// TODO - This logic may be combinable with the block above that creates the svc balancer chain
 		localEndpoints := make([]*endpointsInfo, 0)
 		localEndpointChains := make([]utiliptables.Chain, 0)
 		for i := range endpointChains {
-			if endpoints[i].isLocal {
+			if endpoints[i].isLocal && svcInfo.onlyNodeLocalEndpoints {
+				// These slices parallel each other; must be kept in sync
+				localEndpoints = append(localEndpoints, endpoints[i])
+				localEndpointChains = append(localEndpointChains, endpointChains[i])
+			} else if svcInfo.onlySameTopologyEndpoints && utilproxy.SameTopologyDomain(endpoints[i].topologyLabels, proxier.nodeLabels, svcInfo.topologyKey, svcInfo.topologyMode) {
 				// These slices parallel each other; must be kept in sync
 				localEndpoints = append(localEndpoints, endpoints[i])
 				localEndpointChains = append(localEndpointChains, endpointChains[i])
 			}
 		}
+		// If no match endpoints found for "preferred" service topology requirement, use global endpoints instead
+		if len(localEndpoints) == 0 && svcInfo.onlySameTopologyEndpoints && svcInfo.topologyMode == string(api.TopologyModePreferred) {
+			localEndpoints = append(localEndpoints, endpoints...)
+			localEndpointChains = append(localEndpointChains, endpointChains...)
+		}
+
 		// First rule in the chain redirects all pod -> external VIP traffic to the
 		// Service's ClusterIP instead. This happens whether or not we have local
 		// endpoints; only if clusterCIDR is specified

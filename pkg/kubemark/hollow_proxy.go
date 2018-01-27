@@ -59,6 +59,10 @@ func (*FakeProxier) OnEndpointsAdd(endpoints *api.Endpoints)                  {}
 func (*FakeProxier) OnEndpointsUpdate(oldEndpoints, endpoints *api.Endpoints) {}
 func (*FakeProxier) OnEndpointsDelete(endpoints *api.Endpoints)               {}
 func (*FakeProxier) OnEndpointsSynced()                                       {}
+func (*FakeProxier) OnNodeAdd(node *api.Node)                                 {}
+func (*FakeProxier) OnNodeUpdate(oldNode, node *api.Node)                     {}
+func (*FakeProxier) OnNodeDelete(node *api.Node)                              {}
+func (*FakeProxier) OnNodeSynced()                                            {}
 
 func NewHollowProxyOrDie(
 	nodeName string,
@@ -75,10 +79,10 @@ func NewHollowProxyOrDie(
 	var proxier proxy.ProxyProvider
 	var serviceHandler proxyconfig.ServiceHandler
 	var endpointsHandler proxyconfig.EndpointsHandler
+	var nodeHandler proxyconfig.NodeHandler
 
 	if useRealProxier {
 		// Real proxier with fake iptables, sysctl, etc underneath it.
-		//var err error
 		proxierIPTables, err := iptables.NewProxier(
 			iptInterface,
 			sysctl,
@@ -99,10 +103,12 @@ func NewHollowProxyOrDie(
 		proxier = proxierIPTables
 		serviceHandler = proxierIPTables
 		endpointsHandler = proxierIPTables
+		nodeHandler = proxierIPTables
 	} else {
 		proxier = &FakeProxier{}
 		serviceHandler = &FakeProxier{}
 		endpointsHandler = &FakeProxier{}
+		nodeHandler = &FakeProxier{}
 	}
 
 	// Create a Hollow Proxy instance.
@@ -127,6 +133,7 @@ func NewHollowProxyOrDie(
 			ConfigSyncPeriod:      30 * time.Second,
 			ServiceEventHandler:   serviceHandler,
 			EndpointsEventHandler: endpointsHandler,
+			NodeEventHandler:      nodeHandler,
 		},
 	}, nil
 }

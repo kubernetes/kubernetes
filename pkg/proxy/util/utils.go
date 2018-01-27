@@ -56,3 +56,26 @@ func ShouldSkipService(svcName types.NamespacedName, service *api.Service) bool 
 	}
 	return false
 }
+
+// SameTopologyLevel tells if two given labels have the same topology value.
+func SameTopologyDomain(labels1, labels2 map[string]string, topologyKey, topologyMode string) bool {
+	// return false directly if topology mode is "ignored".
+	if topologyMode == string(api.TopologyModeIgnored) {
+		return false
+	}
+	if topologyKey == "" {
+		return false
+	}
+	if labels1 == nil || labels2 == nil {
+		return false
+	}
+	value1, ok1 := labels1[topologyKey]
+	value2, ok2 := labels2[topologyKey]
+	if !ok1 || !ok2 {
+		return false
+	}
+	if value1 != value2 {
+		return false
+	}
+	return true
+}

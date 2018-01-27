@@ -76,6 +76,11 @@ func RequestsOnlyLocalTraffic(service *api.Service) bool {
 	return service.Spec.ExternalTrafficPolicy == api.ServiceExternalTrafficPolicyTypeLocal
 }
 
+// RequestsOnlySameTopologyTraffic checks if service requests only same topology traffic.
+func RequestsOnlySameTopologyTraffic(service *api.Service) bool {
+	return service.Spec.Topology != nil && service.Spec.Topology.Mode != api.TopologyModeIgnored
+}
+
 // NeedsHealthCheck checks if service needs health check.
 func NeedsHealthCheck(service *api.Service) bool {
 	if service.Spec.Type != api.ServiceTypeLoadBalancer {

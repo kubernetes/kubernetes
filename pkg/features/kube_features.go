@@ -238,6 +238,12 @@ const (
 	// Mount secret, configMap, downwardAPI and projected volumes ReadOnly. Note: this feature
 	// gate is present only for backward compatability, it will be removed in the 1.11 release.
 	ReadOnlyAPIDataVolumes utilfeature.Feature = "ReadOnlyAPIDataVolumes"
+
+	// owner: @m1093782566
+	// alpha: v1.10
+	//
+	// Enable topology-aware service routing
+	TopologyAwareServiceRouting utilfeature.Feature = "TopologyAwareServiceRouting"
 )
 
 func init() {
@@ -279,6 +285,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	SupportIPVSProxyMode:                        {Default: false, PreRelease: utilfeature.Beta},
 	SupportPodPidsLimit:                         {Default: false, PreRelease: utilfeature.Alpha},
 	HyperVContainer:                             {Default: false, PreRelease: utilfeature.Alpha},
+	TopologyAwareServiceRouting:                 {Default: false, PreRelease: utilfeature.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:
