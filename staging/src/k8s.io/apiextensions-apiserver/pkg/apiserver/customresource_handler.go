@@ -371,7 +371,7 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResource
 	selfLinkPrefix := ""
 	switch crd.Spec.Scope {
 	case apiextensions.ClusterScoped:
-		selfLinkPrefix = "/" + path.Join("apis", crd.Spec.Group, crd.Spec.Version) + "/"
+		selfLinkPrefix = "/" + path.Join("apis", crd.Spec.Group, crd.Spec.Version) + "/" + crd.Status.AcceptedNames.Plural + "/"
 	case apiextensions.NamespaceScoped:
 		selfLinkPrefix = "/" + path.Join("apis", crd.Spec.Group, crd.Spec.Version, "namespaces") + "/"
 	}

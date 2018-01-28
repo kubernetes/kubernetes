@@ -497,7 +497,7 @@ func TestSelfLink(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if e, a := "/apis/mygroup.example.com/v1beta1/foo", createdCurletInstance.GetSelfLink(); e != a {
+	if e, a := "/apis/mygroup.example.com/v1beta1/curlets/foo", createdCurletInstance.GetSelfLink(); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 }
