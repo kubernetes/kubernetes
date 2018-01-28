@@ -20,12 +20,6 @@ Please enable the admission webhook feature
 make build
 ```
 
-## Deploy the code
-
-```bash
-make deploy-only 
-```
-
 The Makefile assumes your cluster is created by the
 [hack/local-up-cluster.sh](https://github.com/kubernetes/kubernetes/blob/master/hack/local-up-cluster.sh).
 Please modify the Makefile accordingly if your cluster is created differently.
