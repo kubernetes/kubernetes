@@ -41,6 +41,7 @@ var _ admission.ValidationInterface = alwaysAdmit{}
 
 // Admit makes an admission decision based on the request attributes
 func (alwaysAdmit) Admit(a admission.Attributes) (err error) {
+	a.SetAnnotations("alwaysadmit", "aaaa", "bbb")
 	return nil
 }
 

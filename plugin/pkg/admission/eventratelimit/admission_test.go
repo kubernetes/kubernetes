@@ -46,7 +46,7 @@ func attributesForRequest(rq request) admission.Attributes {
 		api.Resource("resource").WithVersion("version"),
 		"",
 		admission.Create,
-		&user.DefaultInfo{Name: rq.username})
+		&user.DefaultInfo{Name: rq.username}, nil)
 }
 
 type request struct {

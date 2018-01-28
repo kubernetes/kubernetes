@@ -46,12 +46,13 @@ func (AdmissionRequest) SwaggerDoc() map[string]string {
 }
 
 var map_AdmissionResponse = map[string]string{
-	"":          "AdmissionResponse describes an admission response.",
-	"uid":       "UID is an identifier for the individual request/response. This should be copied over from the corresponding AdmissionRequest.",
-	"allowed":   "Allowed indicates whether or not the admission request was permitted.",
-	"status":    "Result contains extra details into why an admission request was denied. This field IS NOT consulted in any way if \"Allowed\" is \"true\".",
-	"patch":     "The patch body. Currently we only support \"JSONPatch\" which implements RFC 6902.",
-	"patchType": "The type of Patch. Currently we only allow \"JSONPatch\".",
+	"":            "AdmissionResponse describes an admission response.",
+	"uid":         "UID is an identifier for the individual request/response. This should be copied over from the corresponding AdmissionRequest.",
+	"allowed":     "Allowed indicates whether or not the admission request was permitted.",
+	"status":      "Result contains extra details into why an admission request was denied. This field IS NOT consulted in any way if \"Allowed\" is \"true\".",
+	"patch":       "The patch body. Currently we only support \"JSONPatch\" which implements RFC 6902.",
+	"patchType":   "The type of Patch. Currently we only allow \"JSONPatch\".",
+	"annotations": "Annotations set by remote admission controller.",
 }
 
 func (AdmissionResponse) SwaggerDoc() map[string]string {

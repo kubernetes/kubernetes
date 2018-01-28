@@ -108,6 +108,8 @@ func admitPods(ar v1beta1.AdmissionReview) *v1beta1.AdmissionResponse {
 	if !reviewResponse.Allowed {
 		reviewResponse.Result = &metav1.Status{Message: strings.TrimSpace(msg)}
 	}
+	reviewResponse.Annotations = make(map[string]string)
+	reviewResponse.Annotations["aaaaaaaaaaaaaaaaaaaaaaaaaaaa"] = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 	return &reviewResponse
 }
 
@@ -133,6 +135,8 @@ func mutatePods(ar v1beta1.AdmissionReview) *v1beta1.AdmissionResponse {
 		pt := v1beta1.PatchTypeJSONPatch
 		reviewResponse.PatchType = &pt
 	}
+	reviewResponse.Annotations = make(map[string]string)
+	reviewResponse.Annotations["bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"] = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 	return &reviewResponse
 }
 
@@ -162,6 +166,8 @@ func admitConfigMaps(ar v1beta1.AdmissionReview) *v1beta1.AdmissionResponse {
 			}
 		}
 	}
+	reviewResponse.Annotations = make(map[string]string)
+	reviewResponse.Annotations["cccccccccccccccccccccccccccccccccccccc"] = "ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
 	return &reviewResponse
 }
 
@@ -192,6 +198,8 @@ func mutateConfigmaps(ar v1beta1.AdmissionReview) *v1beta1.AdmissionResponse {
 	pt := v1beta1.PatchTypeJSONPatch
 	reviewResponse.PatchType = &pt
 
+	reviewResponse.Annotations = make(map[string]string)
+	reviewResponse.Annotations["dddddddddddddddddddddddddddddddd"] = "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
 	return &reviewResponse
 }
 
@@ -220,6 +228,8 @@ func mutateCRD(ar v1beta1.AdmissionReview) *v1beta1.AdmissionResponse {
 	}
 	pt := v1beta1.PatchTypeJSONPatch
 	reviewResponse.PatchType = &pt
+	reviewResponse.Annotations = make(map[string]string)
+	reviewResponse.Annotations["eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"] = "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
 	return &reviewResponse
 }
 
@@ -247,6 +257,8 @@ func admitCRD(ar v1beta1.AdmissionReview) *v1beta1.AdmissionResponse {
 			}
 		}
 	}
+	reviewResponse.Annotations = make(map[string]string)
+	reviewResponse.Annotations["ffffffffffffffffffffffffffffffffffffff"] = "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
 	return &reviewResponse
 }
 

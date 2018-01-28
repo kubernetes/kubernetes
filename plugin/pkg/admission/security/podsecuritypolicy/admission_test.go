@@ -466,7 +466,7 @@ func TestAdmitPreferNonmutating(t *testing.T) {
 func TestFailClosedOnInvalidPod(t *testing.T) {
 	plugin := NewTestAdmission(nil, nil)
 	pod := &v1.Pod{}
-	attrs := kadmission.NewAttributesRecord(pod, nil, kapi.Kind("Pod").WithVersion("version"), pod.Namespace, pod.Name, kapi.Resource("pods").WithVersion("version"), "", kadmission.Create, &user.DefaultInfo{})
+	attrs := kadmission.NewAttributesRecord(pod, nil, kapi.Kind("Pod").WithVersion("version"), pod.Namespace, pod.Name, kapi.Resource("pods").WithVersion("version"), "", kadmission.Create, &user.DefaultInfo{}, nil)
 
 	err := plugin.Admit(attrs)
 	if err == nil {
@@ -1795,7 +1795,8 @@ func testPSPAdmitAdvanced(testCaseName string, op kadmission.Operation, psps []*
 	originalPod := pod.DeepCopy()
 	plugin := NewTestAdmission(psps, authz)
 
-	attrs := kadmission.NewAttributesRecord(pod, oldPod, kapi.Kind("Pod").WithVersion("version"), pod.Namespace, "", kapi.Resource("pods").WithVersion("version"), "", op, userInfo)
+	annotations := make(map[string]string)
+	attrs := kadmission.NewAttributesRecord(pod, oldPod, kapi.Kind("Pod").WithVersion("version"), pod.Namespace, "", kapi.Resource("pods").WithVersion("version"), "", op, userInfo, annotations)
 	err := plugin.Admit(attrs)
 
 	if shouldPassAdmit && err != nil {
@@ -1825,10 +1826,26 @@ func testPSPAdmitAdvanced(testCaseName string, op kadmission.Operation, psps []*
 	}
 
 	err = plugin.Validate(attrs)
+	if shouldPassAdmit && op == kadmission.Create {
+		validateAuditAnnotation(testCaseName, annotations, "podsecuritypolicy.admission.k8s.io/admit-policy", expectedPSP, t)
+	} else {
+		validateAuditAnnotation(testCaseName, annotations, "podsecuritypolicy.admission.k8s.io/admit-policy", "", t)
+	}
 	if shouldPassValidate && err != nil {
 		t.Errorf("%s: expected no errors on Validate but received %v", testCaseName, err)
 	} else if !shouldPassValidate && err == nil {
 		t.Errorf("%s: expected errors on Validate but received none", testCaseName)
+	}
+	if shouldPassValidate {
+		validateAuditAnnotation(testCaseName, annotations, "podsecuritypolicy.admission.k8s.io/validate-policy", expectedPSP, t)
+	} else {
+		validateAuditAnnotation(testCaseName, annotations, "podsecuritypolicy.admission.k8s.io/validate-policy", "", t)
+	}
+}
+
+func validateAuditAnnotation(testCaseName string, annotations map[string]string, key, value string, t *testing.T) {
+	if annotations[key] != value {
+		t.Errorf("%s: expected to have annotations[%s] set to %q, got %q", testCaseName, key, value, annotations[key])
 	}
 }
 
@@ -2211,7 +2228,7 @@ func TestPolicyAuthorizationErrors(t *testing.T) {
 			pod.Spec.Containers[0].SecurityContext.Privileged = &privileged
 
 			plugin := NewTestAdmission(tc.inPolicies, authz)
-			attrs := kadmission.NewAttributesRecord(pod, nil, kapi.Kind("Pod").WithVersion("version"), ns, "", kapi.Resource("pods").WithVersion("version"), "", kadmission.Create, &user.DefaultInfo{Name: userName})
+			attrs := kadmission.NewAttributesRecord(pod, nil, kapi.Kind("Pod").WithVersion("version"), ns, "", kapi.Resource("pods").WithVersion("version"), "", kadmission.Create, &user.DefaultInfo{Name: userName}, nil)
 
 			allowedPod, _, validationErrs, err := plugin.computeSecurityContext(attrs, pod, true, "")
 			assert.Nil(t, allowedPod)
@@ -2304,7 +2321,7 @@ func TestPreferValidatedPSP(t *testing.T) {
 			pod.Spec.Containers[0].SecurityContext.AllowPrivilegeEscalation = &allowPrivilegeEscalation
 
 			plugin := NewTestAdmission(tc.inPolicies, authz)
-			attrs := kadmission.NewAttributesRecord(pod, nil, kapi.Kind("Pod").WithVersion("version"), "ns", "", kapi.Resource("pods").WithVersion("version"), "", kadmission.Update, &user.DefaultInfo{Name: "test"})
+			attrs := kadmission.NewAttributesRecord(pod, nil, kapi.Kind("Pod").WithVersion("version"), "ns", "", kapi.Resource("pods").WithVersion("version"), "", kadmission.Update, &user.DefaultInfo{Name: "test"}, nil)
 
 			_, pspName, validationErrs, err := plugin.computeSecurityContext(attrs, pod, false, tc.validatedPSPHint)
 			assert.NoError(t, err)

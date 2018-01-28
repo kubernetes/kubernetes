@@ -370,7 +370,7 @@ func TestAdmit(t *testing.T) {
 		}
 		t.Run(name, func(t *testing.T) {
 			wh.hookSource = &tt.hookSource
-			err = wh.Admit(admission.NewAttributesRecord(&object, &oldObject, kind, namespace, name, resource, subResource, operation, &userInfo))
+			err = wh.Admit(admission.NewAttributesRecord(&object, &oldObject, kind, namespace, name, resource, subResource, operation, &userInfo, nil))
 			if tt.expectAllow != (err == nil) {
 				t.Errorf("expected allowed=%v, but got err=%v", tt.expectAllow, err)
 			}
@@ -537,7 +537,7 @@ func TestAdmitCachedClient(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			err = wh.Admit(admission.NewAttributesRecord(&object, &oldObject, kind, namespace, testcase.name, resource, subResource, operation, &userInfo))
+			err = wh.Admit(admission.NewAttributesRecord(&object, &oldObject, kind, namespace, testcase.name, resource, subResource, operation, &userInfo, nil))
 			if testcase.expectAllow != (err == nil) {
 				t.Errorf("expected allowed=%v, but got err=%v", testcase.expectAllow, err)
 			}

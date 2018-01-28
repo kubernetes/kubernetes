@@ -87,11 +87,12 @@ func UpdateResource(r rest.Updater, scope RequestScope, typer runtime.ObjectType
 		}
 
 		userInfo, _ := request.UserFrom(ctx)
-		staticAdmissionAttributes := admission.NewAttributesRecord(nil, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Update, userInfo)
+		annotations := make(map[string]string)
+		staticAdmissionAttributes := admission.NewAttributesRecord(nil, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Update, userInfo, annotations)
 		var transformers []rest.TransformFunc
 		if mutatingAdmission, ok := admit.(admission.MutationInterface); ok && mutatingAdmission.Handles(admission.Update) {
 			transformers = append(transformers, func(ctx request.Context, newObj, oldObj runtime.Object) (runtime.Object, error) {
-				return newObj, mutatingAdmission.Admit(admission.NewAttributesRecord(newObj, oldObj, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Update, userInfo))
+				return newObj, mutatingAdmission.Admit(admission.NewAttributesRecord(newObj, oldObj, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Update, userInfo, annotations))
 			})
 		}
 
@@ -108,6 +109,7 @@ func UpdateResource(r rest.Updater, scope RequestScope, typer runtime.ObjectType
 			wasCreated = created
 			return obj, err
 		})
+		audit.LogAnnotations(ae, annotations)
 		if err != nil {
 			scope.err(err, w, req)
 			return

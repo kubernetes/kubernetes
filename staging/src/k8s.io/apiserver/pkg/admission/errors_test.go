@@ -36,6 +36,7 @@ func TestNewForbidden(t *testing.T) {
 		schema.GroupVersionResource{Group: "foo", Version: "bar", Resource: "baz"},
 		"",
 		Create,
+		nil,
 		nil)
 	err := errors.New("some error")
 	expectedErr := `baz.foo "Unknown/errorGettingName" is forbidden: some error`

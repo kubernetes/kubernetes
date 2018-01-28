@@ -17,6 +17,8 @@ limitations under the License.
 package admission
 
 import (
+	"github.com/golang/glog"
+
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/authentication/user"
@@ -32,9 +34,10 @@ type attributesRecord struct {
 	object      runtime.Object
 	oldObject   runtime.Object
 	userInfo    user.Info
+	annotations map[string]string
 }
 
-func NewAttributesRecord(object runtime.Object, oldObject runtime.Object, kind schema.GroupVersionKind, namespace, name string, resource schema.GroupVersionResource, subresource string, operation Operation, userInfo user.Info) Attributes {
+func NewAttributesRecord(object runtime.Object, oldObject runtime.Object, kind schema.GroupVersionKind, namespace, name string, resource schema.GroupVersionResource, subresource string, operation Operation, userInfo user.Info, annotations map[string]string) Attributes {
 	return &attributesRecord{
 		kind:        kind,
 		namespace:   namespace,
@@ -45,6 +48,7 @@ func NewAttributesRecord(object runtime.Object, oldObject runtime.Object, kind s
 		object:      object,
 		oldObject:   oldObject,
 		userInfo:    userInfo,
+		annotations: annotations,
 	}
 }
 
@@ -82,4 +86,20 @@ func (record *attributesRecord) GetOldObject() runtime.Object {
 
 func (record *attributesRecord) GetUserInfo() user.Info {
 	return record.userInfo
+}
+
+func (record *attributesRecord) GetAnnotations() map[string]string {
+	return record.annotations
+}
+
+func (record *attributesRecord) SetAnnotations(plugin_name, key, value string) bool {
+	if record.annotations == nil {
+		return false
+	}
+	key = plugin_name + "/" + key
+	if v, ok := record.annotations[key]; ok && v != value {
+		glog.V(5).Infof("admission annotation overwrite, key:%q, old value: %q, new value:%q", key, record.annotations[key], value)
+	}
+	record.annotations[key] = value
+	return true
 }

@@ -209,6 +209,7 @@ func TestAdmission(t *testing.T) {
 			"", // subresource
 			admission.Create,
 			nil, // userInfo
+			nil,
 		)
 		err := ctrl.Admit(attrs)
 		glog.Infof("Got %v", err)

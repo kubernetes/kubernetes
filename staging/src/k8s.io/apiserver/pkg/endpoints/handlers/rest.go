@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 	"k8s.io/apiserver/pkg/endpoints/metrics"
 	"k8s.io/apiserver/pkg/endpoints/request"
@@ -117,21 +118,26 @@ func ConnectResource(connecter rest.Connecter, scope RequestScope, admit admissi
 				ResourcePath: restPath,
 			}
 			userInfo, _ := request.UserFrom(ctx)
+			ae := request.AuditEventFrom(ctx)
+			annotations := make(map[string]string)
 			// TODO: remove the mutating admission here as soon as we have ported all plugin that handle CONNECT
 			if mutatingAdmit, ok := admit.(admission.MutationInterface); ok {
-				err = mutatingAdmit.Admit(admission.NewAttributesRecord(connectRequest, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Connect, userInfo))
+				err = mutatingAdmit.Admit(admission.NewAttributesRecord(connectRequest, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Connect, userInfo, annotations))
 				if err != nil {
+					audit.LogAnnotations(ae, annotations)
 					scope.err(err, w, req)
 					return
 				}
 			}
 			if mutatingAdmit, ok := admit.(admission.ValidationInterface); ok {
-				err = mutatingAdmit.Validate(admission.NewAttributesRecord(connectRequest, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Connect, userInfo))
+				err = mutatingAdmit.Validate(admission.NewAttributesRecord(connectRequest, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Connect, userInfo, annotations))
 				if err != nil {
+					audit.LogAnnotations(ae, annotations)
 					scope.err(err, w, req)
 					return
 				}
 			}
+			audit.LogAnnotations(ae, annotations)
 		}
 		requestInfo, _ := request.RequestInfoFrom(ctx)
 		metrics.RecordLongRunning(req, requestInfo, func() {

@@ -92,6 +92,9 @@ type AdmissionResponse struct {
 	// PatchType indicates the form the Patch will take. Currently we only support "JSONPatch".
 	// +optional
 	PatchType *PatchType
+	// Annotations set by remote admission controller.
+	// +optional
+	Annotations map[string]string
 }
 
 // PatchType is the type of patch being used to represent the mutated object

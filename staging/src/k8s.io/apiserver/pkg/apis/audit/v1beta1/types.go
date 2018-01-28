@@ -128,6 +128,14 @@ type Event struct {
 	// Time the request reached current audit stage.
 	// +optional
 	StageTimestamp metav1.MicroTime `json:"stageTimestamp" protobuf:"bytes,16,opt,name=stageTimestamp"`
+
+	// Annotations is an unstructured key value map stored with an audit event that may be set by
+	// plugins invoked in the request serving chain, including authentication, authorization and
+	// admission plugins. Keys should uniquely identify the informing component to avoid name
+	// collisions (e.g. podsecuritypolicy.admission.k8s.io/policy). Values should be short. Annotations
+	// are included in the Metadata level.
+	// +optional
+	Annotations map[string]string `json:"annotations,omitempty" protobuf:"bytes,17,rep,name=annotations"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
