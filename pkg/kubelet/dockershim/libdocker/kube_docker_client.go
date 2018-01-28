@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"os"
 	"regexp"
 	"sync"
 	"time"
@@ -459,7 +460,7 @@ func (d *kubeDockerClient) CreateExec(id string, opts dockertypes.ExecConfig) (*
 	return &resp, nil
 }
 
-func (d *kubeDockerClient) StartExec(startExec string, opts dockertypes.ExecStartCheck, sopts StreamOptions) error {
+func (d *kubeDockerClient) StartExec(startExec string, opts dockertypes.ExecStartCheck, sopts StreamOptions, timeout time.Duration) error {
 	ctx, cancel := d.getCancelableContext()
 	defer cancel()
 	if opts.Detach {
@@ -489,7 +490,28 @@ func (d *kubeDockerClient) StartExec(startExec string, opts dockertypes.ExecStar
 		sopts.ExecStarted <- struct{}{}
 	}
 
-	return d.holdHijackedConnection(sopts.RawTerminal || opts.Tty, sopts.InputStream, sopts.OutputStream, sopts.ErrorStream, resp)
+	err = d.holdHijackedConnection(sopts.RawTerminal || opts.Tty, sopts.InputStream, sopts.OutputStream, sopts.ErrorStream, resp, timeout)
+	// Kill the process if timeout elapsed
+	if _, ok := err.(operationTimeout); ok {
+		inspect, inspErr := d.InspectExec(startExec)
+		if inspErr != nil {
+			glog.Errorf("Failed to inspect exec session after timeout: session %s, error: %v", startExec, inspErr)
+			return err
+		}
+		if inspect.Running {
+			proc, procErr := os.FindProcess(inspect.Pid)
+			if procErr != nil {
+				glog.Errorf("Failed to retrieve exec process after timeout: session: %s, container: %s, process: %d, error: %v", startExec, inspect.ContainerID, inspect.Pid, procErr)
+				return err
+			}
+			procErr = proc.Kill()
+			proc.Release()
+			if procErr != nil {
+				glog.Errorf("Failed to kill exec process after timeout: session: %s, container: %s, process: %d, error: %v", startExec, inspect.ContainerID, inspect.Pid, procErr)
+			}
+		}
+	}
+	return err
 }
 
 func (d *kubeDockerClient) InspectExec(id string) (*dockertypes.ContainerExecInspect, error) {
@@ -516,7 +538,7 @@ func (d *kubeDockerClient) AttachToContainer(id string, opts dockertypes.Contain
 		return err
 	}
 	defer resp.Close()
-	return d.holdHijackedConnection(sopts.RawTerminal, sopts.InputStream, sopts.OutputStream, sopts.ErrorStream, resp)
+	return d.holdHijackedConnection(sopts.RawTerminal, sopts.InputStream, sopts.OutputStream, sopts.ErrorStream, resp, 0)
 }
 
 func (d *kubeDockerClient) ResizeExecTTY(id string, height, width uint) error {
@@ -578,7 +600,7 @@ func (d *kubeDockerClient) redirectResponseToOutputStream(tty bool, outputStream
 
 // holdHijackedConnection hold the HijackedResponse, redirect the inputStream to the connection, and redirect the response
 // stream to stdout and stderr. NOTE: If needed, we could also add context in this function.
-func (d *kubeDockerClient) holdHijackedConnection(tty bool, inputStream io.Reader, outputStream, errorStream io.Writer, resp dockertypes.HijackedResponse) error {
+func (d *kubeDockerClient) holdHijackedConnection(tty bool, inputStream io.Reader, outputStream, errorStream io.Writer, resp dockertypes.HijackedResponse, timeout time.Duration) error {
 	receiveStdout := make(chan error)
 	if outputStream != nil || errorStream != nil {
 		go func() {
@@ -595,6 +617,13 @@ func (d *kubeDockerClient) holdHijackedConnection(tty bool, inputStream io.Reade
 		close(stdinDone)
 	}()
 
+	timeoutPassed := make(chan struct{})
+	if timeout > 0 {
+		timer := time.AfterFunc(timeout, func() { close(timeoutPassed) })
+		// Stop the timer on function exit
+		defer timer.Stop()
+	}
+
 	select {
 	case err := <-receiveStdout:
 		return err
@@ -602,6 +631,8 @@ func (d *kubeDockerClient) holdHijackedConnection(tty bool, inputStream io.Reade
 		if outputStream != nil || errorStream != nil {
 			return <-receiveStdout
 		}
+	case <-timeoutPassed:
+		return operationTimeout{err: fmt.Errorf("the exec process did not return within %v", timeout)}
 	}
 	return nil
 }

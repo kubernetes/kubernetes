@@ -102,7 +102,7 @@ func (*NativeExecHandler) ExecInContainer(client libdocker.Interface, container 
 		RawTerminal:  tty,
 		ExecStarted:  execStarted,
 	}
-	err = client.StartExec(execObj.ID, startOpts, streamOpts)
+	err = client.StartExec(execObj.ID, startOpts, streamOpts, timeout)
 	if err != nil {
 		return err
 	}

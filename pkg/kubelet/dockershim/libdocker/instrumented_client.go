@@ -208,11 +208,11 @@ func (in instrumentedInterface) CreateExec(id string, opts dockertypes.ExecConfi
 	return out, err
 }
 
-func (in instrumentedInterface) StartExec(startExec string, opts dockertypes.ExecStartCheck, sopts StreamOptions) error {
+func (in instrumentedInterface) StartExec(startExec string, opts dockertypes.ExecStartCheck, sopts StreamOptions, timeout time.Duration) error {
 	const operation = "start_exec"
 	defer recordOperation(operation, time.Now())
 
-	err := in.client.StartExec(startExec, opts, sopts)
+	err := in.client.StartExec(startExec, opts, sopts, timeout)
 	recordError(operation, err)
 	return err
 }

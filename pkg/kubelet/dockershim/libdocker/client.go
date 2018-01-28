@@ -65,7 +65,7 @@ type Interface interface {
 	Version() (*dockertypes.Version, error)
 	Info() (*dockertypes.Info, error)
 	CreateExec(string, dockertypes.ExecConfig) (*dockertypes.IDResponse, error)
-	StartExec(string, dockertypes.ExecStartCheck, StreamOptions) error
+	StartExec(string, dockertypes.ExecStartCheck, StreamOptions, time.Duration) error
 	InspectExec(id string) (*dockertypes.ContainerExecInspect, error)
 	AttachToContainer(string, dockertypes.ContainerAttachOptions, StreamOptions) error
 	ResizeContainerTTY(id string, height, width uint) error
