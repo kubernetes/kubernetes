@@ -1134,8 +1134,5 @@ func getEtcdKVClient(config storagebackend.Config) (clientv3.KV, error) {
 
 type allResourceSource struct{}
 
-func (*allResourceSource) AnyVersionOfResourceEnabled(resource schema.GroupResource) bool { return true }
-func (*allResourceSource) AllResourcesForVersionEnabled(version schema.GroupVersion) bool { return true }
-func (*allResourceSource) AnyResourcesForGroupEnabled(group string) bool                  { return true }
-func (*allResourceSource) ResourceEnabled(resource schema.GroupVersionResource) bool      { return true }
-func (*allResourceSource) AnyResourcesForVersionEnabled(version schema.GroupVersion) bool { return true }
+func (*allResourceSource) AnyVersionForGroupEnabled(group string) bool     { return true }
+func (*allResourceSource) VersionEnabled(version schema.GroupVersion) bool { return true }
