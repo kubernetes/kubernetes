@@ -58,9 +58,10 @@ func (p RESTStorageProvider) v1Storage(apiResourceConfigSource serverstorage.API
 
 	storage := map[string]rest.Storage{}
 	if apiResourceConfigSource.ResourceEnabled(version.WithResource("jobs")) {
-		jobsStorage, jobsStatusStorage := jobstore.NewREST(restOptionsGetter)
-		storage["jobs"] = jobsStorage
-		storage["jobs/status"] = jobsStatusStorage
+		jobsStorage := jobstore.NewStorage(restOptionsGetter)
+		storage["jobs"] = jobsStorage.Job
+		storage["jobs/status"] = jobsStorage.Status
+		storage["jobs/scale"] = jobsStorage.Scale
 	}
 	return storage
 }

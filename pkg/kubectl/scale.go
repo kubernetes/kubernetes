@@ -34,7 +34,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 
 	scaleclient "k8s.io/client-go/scale"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	appsclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/apps/internalversion"
 	batchclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/batch/internalversion"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
@@ -51,24 +50,6 @@ type Scaler interface {
 	// ScaleSimple does a simple one-shot attempt at scaling - not useful on its own, but
 	// a necessary building block for Scale
 	ScaleSimple(namespace, name string, preconditions *ScalePrecondition, newSize uint) (updatedResourceVersion string, err error)
-}
-
-// ScalerFor gets a scaler for a given resource
-// TODO(p0lyn0mial): remove kind and internalclientset
-// TODO(p0lyn0mial): once we have only one scaler, there is  no need to return an error anymore.
-func ScalerFor(kind schema.GroupKind, c internalclientset.Interface, scalesGetter scaleclient.ScalesGetter, gr schema.GroupResource) (Scaler, error) {
-	switch kind {
-	case api.Kind("ReplicationController"):
-		return &ReplicationControllerScaler{c.Core()}, nil
-	case extensions.Kind("ReplicaSet"), apps.Kind("ReplicaSet"):
-		return &ReplicaSetScaler{c.Extensions()}, nil
-	case batch.Kind("Job"):
-		return &JobScaler{c.Batch()}, nil // Either kind of job can be scaled with Batch interface.
-	case apps.Kind("StatefulSet"):
-		return &StatefulSetScaler{c.Apps()}, nil
-	default:
-		return &GenericScaler{scalesGetter, gr}, nil
-	}
 }
 
 // ScalePrecondition describes a condition that must be true for the scale to take place
@@ -167,6 +148,7 @@ func (precondition *ScalePrecondition) ValidateReplicationController(controller 
 	return nil
 }
 
+// TODO(p0lyn0mial): remove ReplicationControllerScaler
 type ReplicationControllerScaler struct {
 	c coreclient.ReplicationControllersGetter
 }
@@ -265,6 +247,7 @@ func (precondition *ScalePrecondition) ValidateReplicaSet(replicaSet *extensions
 	return nil
 }
 
+// TODO(polyn0mial): remove ReplicaSetScaler
 type ReplicaSetScaler struct {
 	c extensionsclient.ReplicaSetsGetter
 }
@@ -339,6 +322,7 @@ func (precondition *ScalePrecondition) ValidateJob(job *batch.Job) error {
 	return nil
 }
 
+// TODO(p0lyn0mial): remove StatefulSetScaler
 type StatefulSetScaler struct {
 	c appsclient.StatefulSetsGetter
 }
@@ -395,6 +379,7 @@ func (scaler *StatefulSetScaler) Scale(namespace, name string, newSize uint, pre
 	return nil
 }
 
+// TODO(p0lyn0mial): remove JobScaler
 type JobScaler struct {
 	c batchclient.JobsGetter
 }
@@ -463,6 +448,7 @@ func (precondition *ScalePrecondition) ValidateDeployment(deployment *extensions
 	return nil
 }
 
+// TODO(p0lyn0mial): remove DeploymentScaler
 type DeploymentScaler struct {
 	c extensionsclient.DeploymentsGetter
 }
@@ -535,19 +521,16 @@ func (precondition *ScalePrecondition) validateGeneric(scale *autoscalingapi.Sca
 }
 
 // GenericScaler can update scales for resources in a particular namespace
-// TODO(po0lyn0mial): when the work on GenericScaler is done, don't
-// export the GenericScaler. Instead use ScalerFor method for getting the Scaler
-// also update the UTs
 type GenericScaler struct {
-	scaleNamespacer scaleclient.ScalesGetter
-	targetGR        schema.GroupResource
+	ScaleNamespacer scaleclient.ScalesGetter
+	TargetGR        schema.GroupResource
 }
 
 var _ Scaler = &GenericScaler{}
 
 // ScaleSimple updates a scale of a given resource. It returns the resourceVersion of the scale if the update was successful.
 func (s *GenericScaler) ScaleSimple(namespace, name string, preconditions *ScalePrecondition, newSize uint) (updatedResourceVersion string, err error) {
-	scale, err := s.scaleNamespacer.Scales(namespace).Get(s.targetGR, name)
+	scale, err := s.ScaleNamespacer.Scales(namespace).Get(s.TargetGR, name)
 	if err != nil {
 		return "", ScaleError{ScaleGetFailure, "", err}
 	}
@@ -558,7 +541,7 @@ func (s *GenericScaler) ScaleSimple(namespace, name string, preconditions *Scale
 	}
 
 	scale.Spec.Replicas = int32(newSize)
-	updatedScale, err := s.scaleNamespacer.Scales(namespace).Update(s.targetGR, scale)
+	updatedScale, err := s.ScaleNamespacer.Scales(namespace).Update(s.TargetGR, scale)
 	if err != nil {
 		if errors.IsConflict(err) {
 			return "", ScaleError{ScaleUpdateConflictFailure, scale.ResourceVersion, err}
@@ -586,7 +569,7 @@ func (s *GenericScaler) Scale(namespace, resourceName string, newSize uint, prec
 		err := wait.PollImmediate(
 			waitForReplicas.Interval,
 			waitForReplicas.Timeout,
-			scaleHasDesiredReplicas(s.scaleNamespacer, s.targetGR, resourceName, namespace, int32(newSize)))
+			scaleHasDesiredReplicas(s.ScaleNamespacer, s.TargetGR, resourceName, namespace, int32(newSize)))
 		if err == wait.ErrWaitTimeout {
 			return fmt.Errorf("timed out waiting for %q to be synced", resourceName)
 		}
