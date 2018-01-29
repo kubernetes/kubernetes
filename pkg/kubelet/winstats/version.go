@@ -69,20 +69,39 @@ func getVersionRevision() (uint16, error) {
 
 // getKernelVersion gets the version of windows kernel.
 func getKernelVersion() (string, error) {
-	ver, err := windows.GetVersion()
+	// Get CurrentBuildNumber.
+	buildNumber, err := getCurrentVersionVal("CurrentBuildNumber")
 	if err != nil {
 		return "", err
 	}
 
+	// Get CurrentMajorVersionNumber.
+	majorVersionNumberString, err := getCurrentVersionVal("CurrentMajorVersionNumber")
+	if err != nil {
+		return "", err
+	}
+	majorVersionNumber, err := windows.UTF16FromString(majorVersionNumberString)
+	if err != nil {
+		return "", err
+	}
+
+	// Get CurrentMinorVersionNumber.
+	minorVersionNumberString, err := getCurrentVersionVal("CurrentMinorVersionNumber")
+	if err != nil {
+		return "", err
+	}
+	minorVersionNumber, err := windows.UTF16FromString(minorVersionNumberString)
+	if err != nil {
+		return "", err
+	}
+
+	// Get UBR.
 	revision, err := getVersionRevision()
 	if err != nil {
 		return "", err
 	}
 
-	major := ver & 0xFF
-	minor := (ver >> 8) & 0xFF
-	build := (ver >> 16) & 0xFFFF
-	return fmt.Sprintf("%d.%d.%05d.%d\n", major, minor, build, revision), nil
+	return fmt.Sprintf("%d.%d.%s.%d\n", majorVersionNumber[0], minorVersionNumber[0], buildNumber, revision), nil
 }
 
 // getOSImageVersion gets the osImage name and version.
