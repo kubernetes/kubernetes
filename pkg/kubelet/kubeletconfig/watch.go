@@ -21,13 +21,13 @@ import (
 	"time"
 
 	apiv1 "k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	kuberuntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
-	utilequal "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/equal"
 	utillog "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/log"
 )
 
@@ -94,7 +94,7 @@ func (cc *Controller) onUpdateNodeEvent(oldObj interface{}, newObj interface{}) 
 		utillog.Errorf("failed to cast old object to Node, couldn't handle event")
 		return
 	}
-	if !utilequal.ConfigSourceEq(oldNode.Spec.ConfigSource, newNode.Spec.ConfigSource) {
+	if !apiequality.Semantic.DeepEqual(oldNode.Spec.ConfigSource, newNode.Spec.ConfigSource) {
 		cc.pokeConfigSourceWorker()
 	}
 }

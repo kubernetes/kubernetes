@@ -3640,12 +3640,49 @@ type NodeSpec struct {
 	DoNotUse_ExternalID string `json:"externalID,omitempty" protobuf:"bytes,2,opt,name=externalID"`
 }
 
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
 // NodeConfigSource specifies a source of node configuration. Exactly one subfield (excluding metadata) must be non-nil.
 type NodeConfigSource struct {
-	metav1.TypeMeta `json:",inline"`
-	ConfigMapRef    *ObjectReference `json:"configMapRef,omitempty" protobuf:"bytes,1,opt,name=configMapRef"`
+	// For historical context, regarding the below kind, apiVersion, and configMapRef deprecation tags:
+	// 1. kind/apiVersion were used by the kubelet to persist this struct to disk (they had no protobuf tags)
+	// 2. configMapRef and proto tag 1 were used by the API to refer to a configmap,
+	//    but used a generic ObjectReference type that didn't really have the fields we needed
+	// All uses/persistence of the NodeConfigSource struct prior to 1.11 were gated by alpha feature flags,
+	// so there was no persisted data for these fields that needed to be migrated/handled.
+
+	// +k8s:deprecated=kind
+	// +k8s:deprecated=apiVersion
+	// +k8s:deprecated=configMapRef,protobuf=1
+
+	// ConfigMap is a reference to a Node's ConfigMap
+	ConfigMap *ConfigMapNodeConfigSource `json:"configMap,omitempty" protobuf:"bytes,2,opt,name=configMap"`
+}
+
+// ConfigMapNodeConfigSource contains the information to reference a ConfigMap as a config source for the Node.
+type ConfigMapNodeConfigSource struct {
+	// Namespace is the metadata.namespace of the referenced ConfigMap.
+	// This field is required in all cases.
+	Namespace string `json:"namespace" protobuf:"bytes,1,opt,name=namespace"`
+
+	// Name is the metadata.name of the referenced ConfigMap.
+	// This field is required in all cases.
+	Name string `json:"name" protobuf:"bytes,2,opt,name=name"`
+
+	// UID is the metadata.UID of the referenced ConfigMap.
+	// This field is currently reqired in Node.Spec.
+	// TODO(#61643): This field will be forbidden in Node.Spec when #61643 is resolved.
+	// TODO(#56896): This field will be required in Node.Status when #56896 is resolved.
+	// +optional
+	UID types.UID `json:"uid,omitempty" protobuf:"bytes,3,opt,name=uid"`
+
+	// ResourceVersion is the metadata.ResourceVersion of the referenced ConfigMap.
+	// This field is forbidden in Node.Spec.
+	// TODO(#56896): This field will be required in Node.Status when #56896 is resolved.
+	// +optional
+	ResourceVersion string `json:"resourceVersion,omitempty" protobuf:"bytes,4,opt,name=resourceVersion"`
+
+	// KubeletConfigKey declares which key of the referenced ConfigMap corresponds to the KubeletConfiguration structure
+	// This field is required in all cases.
+	KubeletConfigKey string `json:"kubeletConfigKey" protobuf:"bytes,5,opt,name=kubeletConfigKey"`
 }
 
 // DaemonEndpoint contains information about a single Daemon endpoint.
