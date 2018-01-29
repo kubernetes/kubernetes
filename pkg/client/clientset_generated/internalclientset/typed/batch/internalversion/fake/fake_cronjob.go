@@ -17,6 +17,7 @@ limitations under the License.
 package fake
 
 import (
+	v1beta1 "k8s.io/api/batch/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
@@ -135,4 +136,15 @@ func (c *FakeCronJobs) Patch(name string, pt types.PatchType, data []byte, subre
 		return nil, err
 	}
 	return obj.(*batch.CronJob), err
+}
+
+// Instantiate takes the representation of a CronJobManualRequest and creates it.  Returns the server's representation of the CronJobManualRequest, and an error, if there is any.
+func (c *FakeCronJobs) Instantiate(cronJobName string, CronJobManualRequest *v1beta1.CronJobManualRequest) (result *v1beta1.CronJobManualRequest, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewCreateSubresourceAction(cronjobsResource, cronJobName, "instantiate", c.ns, CronJobManualRequest), &v1beta1.CronJobManualRequest{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1beta1.CronJobManualRequest), err
 }

@@ -48,6 +48,16 @@ func (CronJobList) SwaggerDoc() map[string]string {
 	return map_CronJobList
 }
 
+var map_CronJobManualRequest = map[string]string{
+	"":         "CronJobManualRequest represents a manual triggering of a CronJob.",
+	"metadata": "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata",
+	"job":      "CreatedJob is the Job created in the instantiation request.",
+}
+
+func (CronJobManualRequest) SwaggerDoc() map[string]string {
+	return map_CronJobManualRequest
+}
+
 var map_CronJobSpec = map[string]string{
 	"":                           "CronJobSpec describes how the job execution will look like and when it will actually run.",
 	"schedule":                   "The schedule in Cron format, see https://en.wikipedia.org/wiki/Cron.",

@@ -17,15 +17,19 @@ limitations under the License.
 package storage
 
 import (
+	"reflect"
 	"testing"
 
+	"k8s.io/api/apps/v1beta1"
 	"k8s.io/api/batch/v2alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
+	"k8s.io/apiserver/pkg/registry/rest"
 	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/apis/batch"
@@ -34,11 +38,11 @@ import (
 )
 
 // TODO: allow for global factory override
-func newStorage(t *testing.T) (*REST, *StatusREST, *etcdtesting.EtcdTestServer) {
+func newStorage(t *testing.T) (*CronJobStorage, *etcdtesting.EtcdTestServer) {
 	etcdStorage, server := registrytest.NewEtcdStorage(t, batch.GroupName)
 	restOptions := generic.RESTOptions{StorageConfig: etcdStorage, Decorator: generic.UndecoratedStorage, DeleteCollectionWorkers: 1}
-	storage, statusStorage := NewREST(restOptions)
-	return storage, statusStorage, server
+	cronJobStorage := NewREST(restOptions)
+	return &cronJobStorage, server
 }
 
 func validNewCronJob() *batch.CronJob {
@@ -71,10 +75,10 @@ func TestCreate(t *testing.T) {
 		return
 	}
 
-	storage, _, server := newStorage(t)
+	storage, server := newStorage(t)
 	defer server.Terminate(t)
-	defer storage.Store.DestroyFunc()
-	test := genericregistrytest.New(t, storage.Store)
+	defer storage.CronJob.Store.DestroyFunc()
+	test := genericregistrytest.New(t, storage.CronJob.Store)
 	validCronJob := validNewCronJob()
 	validCronJob.ObjectMeta = metav1.ObjectMeta{}
 	test.TestCreate(
@@ -93,10 +97,10 @@ func TestUpdate(t *testing.T) {
 		return
 	}
 
-	storage, _, server := newStorage(t)
+	storage, server := newStorage(t)
 	defer server.Terminate(t)
-	defer storage.Store.DestroyFunc()
-	test := genericregistrytest.New(t, storage.Store)
+	defer storage.CronJob.Store.DestroyFunc()
+	test := genericregistrytest.New(t, storage.CronJob.Store)
 	schedule := "1 1 1 1 ?"
 	test.TestUpdate(
 		// valid
@@ -122,10 +126,10 @@ func TestDelete(t *testing.T) {
 		return
 	}
 
-	storage, _, server := newStorage(t)
+	storage, server := newStorage(t)
 	defer server.Terminate(t)
-	defer storage.Store.DestroyFunc()
-	test := genericregistrytest.New(t, storage.Store)
+	defer storage.CronJob.Store.DestroyFunc()
+	test := genericregistrytest.New(t, storage.CronJob.Store)
 	test.TestDelete(validNewCronJob())
 }
 
@@ -135,10 +139,10 @@ func TestGet(t *testing.T) {
 		return
 	}
 
-	storage, _, server := newStorage(t)
+	storage, server := newStorage(t)
 	defer server.Terminate(t)
-	defer storage.Store.DestroyFunc()
-	test := genericregistrytest.New(t, storage.Store)
+	defer storage.CronJob.Store.DestroyFunc()
+	test := genericregistrytest.New(t, storage.CronJob.Store)
 	test.TestGet(validNewCronJob())
 }
 
@@ -148,10 +152,10 @@ func TestList(t *testing.T) {
 		return
 	}
 
-	storage, _, server := newStorage(t)
+	storage, server := newStorage(t)
 	defer server.Terminate(t)
-	defer storage.Store.DestroyFunc()
-	test := genericregistrytest.New(t, storage.Store)
+	defer storage.CronJob.Store.DestroyFunc()
+	test := genericregistrytest.New(t, storage.CronJob.Store)
 	test.TestList(validNewCronJob())
 }
 
@@ -161,10 +165,10 @@ func TestWatch(t *testing.T) {
 		return
 	}
 
-	storage, _, server := newStorage(t)
+	storage, server := newStorage(t)
 	defer server.Terminate(t)
-	defer storage.Store.DestroyFunc()
-	test := genericregistrytest.New(t, storage.Store)
+	defer storage.CronJob.Store.DestroyFunc()
+	test := genericregistrytest.New(t, storage.CronJob.Store)
 	test.TestWatch(
 		validNewCronJob(),
 		// matching labels
@@ -181,6 +185,38 @@ func TestWatch(t *testing.T) {
 			{"name": "foo"},
 		},
 	)
+}
+
+func TestInstantiate(t *testing.T) {
+	// scheduled jobs should be tested only when batch/v1beta1 is enabled
+	if *testapi.Batch.GroupVersion() != v1beta1.SchemeGroupVersion {
+		return
+	}
+
+	storage, server := newStorage(t)
+	defer server.Terminate(t)
+	defer storage.CronJob.Store.DestroyFunc()
+	validCronJob := validNewCronJob()
+	validCronJob.ObjectMeta = metav1.ObjectMeta{}
+
+	// duplicate some of the resttest environment here rather than littering resttest with test methods for
+	// this subresource that doesn't exist anywhere else (also the name Instantiate could be quite misleading)
+	testContext := genericapirequest.WithNamespace(genericapirequest.NewContext(), metav1.NamespaceDefault)
+	createdObj, err := storage.Instantiate.Create(testContext, validCronJob.Name, validCronJob, rest.ValidateAllObjectFunc, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	createdJob := createdObj.(*batch.Job)
+	fetchedJobObj, err := storage.Instantiate.jobStore.Get(testContext, createdJob.Name, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	fetchedJob := fetchedJobObj.(*batch.Job)
+	areEqual := reflect.DeepEqual(createdJob, fetchedJob)
+	if !areEqual {
+		t.Fatalf("Expected %#v, got %#v", createdJob, fetchedJob)
+	}
 }
 
 // TODO: test update /status

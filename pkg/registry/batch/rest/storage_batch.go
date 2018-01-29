@@ -69,10 +69,12 @@ func (p RESTStorageProvider) v1beta1Storage(apiResourceConfigSource serverstorag
 	version := batchapiv1beta1.SchemeGroupVersion
 
 	storage := map[string]rest.Storage{}
+
 	if apiResourceConfigSource.ResourceEnabled(version.WithResource("cronjobs")) {
-		cronJobsStorage, cronJobsStatusStorage := cronjobstore.NewREST(restOptionsGetter)
-		storage["cronjobs"] = cronJobsStorage
-		storage["cronjobs/status"] = cronJobsStatusStorage
+		cronJobStorage := cronjobstore.NewREST(restOptionsGetter)
+		storage["cronjobs"] = cronJobStorage.CronJob
+		storage["cronjobs/status"] = cronJobStorage.Status
+		storage["cronjobs/instantiate"] = cronJobStorage.Instantiate
 	}
 	return storage
 }
@@ -82,9 +84,10 @@ func (p RESTStorageProvider) v2alpha1Storage(apiResourceConfigSource serverstora
 
 	storage := map[string]rest.Storage{}
 	if apiResourceConfigSource.ResourceEnabled(version.WithResource("cronjobs")) {
-		cronJobsStorage, cronJobsStatusStorage := cronjobstore.NewREST(restOptionsGetter)
-		storage["cronjobs"] = cronJobsStorage
-		storage["cronjobs/status"] = cronJobsStatusStorage
+		cronJobStorage := cronjobstore.NewREST(restOptionsGetter)
+		storage["cronjobs"] = cronJobStorage.CronJob
+		storage["cronjobs/status"] = cronJobStorage.Status
+		storage["cronjobs/instantiate"] = cronJobStorage.Instantiate
 	}
 	return storage
 }
