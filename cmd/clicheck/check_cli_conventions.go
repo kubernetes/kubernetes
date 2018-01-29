@@ -27,14 +27,14 @@ import (
 )
 
 var (
-	skip = []string{}
+	skipCmd = []string{}
 )
 
 func main() {
 	var errorCount int
 
 	kubectl := cmd.NewKubectlCommand(cmdutil.NewFactory(nil), os.Stdin, ioutil.Discard, ioutil.Discard)
-	errors := cmdsanity.RunCmdChecks(kubectl, cmdsanity.AllCmdChecks, []string{})
+	errors := cmdsanity.RunCmdChecks(kubectl, cmdsanity.AllCmdChecks, skipCmd)
 	for _, err := range errors {
 		errorCount++
 		fmt.Fprintf(os.Stderr, "     %d. %s\n", errorCount, err)
