@@ -32,6 +32,7 @@ go_library(
         "map_string_bool.go",
         "map_string_string.go",
         "namedcertkey_flag.go",
+        "noop.go",
         "omitempty.go",
         "string_flag.go",
         "tristate.go",

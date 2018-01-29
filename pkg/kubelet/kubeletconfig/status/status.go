@@ -34,11 +34,6 @@ import (
 
 // TODO(mtaufen): s/current/assigned, as this is more accurate e.g. if you are using lkg, you aren't currently using "current" :)
 const (
-	// NotDynamicLocalMessage indicates that the Kubelet is using its local config - we send this when dynamic Kubelet config is disabled by omitting the --dynamic-config-dir flag
-	NotDynamicLocalMessage = "using local config"
-	// NotDynamicLocalReason indicates that the Kubelet is using its local config - we send this when dynamic Kubelet config is disabled by omitting the --dynamic-config-dir flag
-	NotDynamicLocalReason = "dynamic config is currently disabled by omission of --dynamic-config-dir Kubelet flag"
-
 	// CurLocalMessage indicates that the Kubelet is using its local config, which consists of defaults, flags, and/or local files
 	CurLocalMessage = "using current: local"
 	// LkgLocalMessage indicates that the Kubelet is using its local config, which consists of defaults, flags, and/or local files

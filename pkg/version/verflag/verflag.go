@@ -91,6 +91,8 @@ var (
 	versionFlag = Version(versionFlagName, VersionFalse, "Print version information and quit")
 )
 
+// AddFlags registers this package's flags on arbitrary FlagSets, such that they point to the
+// same value as the global flags.
 func AddFlags(fs *flag.FlagSet) {
 	fs.AddFlag(flag.Lookup(versionFlagName))
 }
