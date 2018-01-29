@@ -346,7 +346,7 @@ func (g *Graph) DeleteVolumeAttachment(name string) {
 	g.deleteVertex_locked(vaVertexType, "", name)
 }
 
-// SetNodeConfigMap sets up edges for the Node.Spec.ConfigSource.ConfigMapRef relationship:
+// SetNodeConfigMap sets up edges for the Node.Spec.ConfigSource.ConfigMap relationship:
 //
 // configmap -> node
 func (g *Graph) SetNodeConfigMap(nodeName, configMapName, configMapNamespace string) {

@@ -693,10 +693,11 @@ func generate(opts sampleDataOpts) ([]*api.Node, []*api.Pod, []*api.PersistentVo
 			ObjectMeta: metav1.ObjectMeta{Name: nodeName},
 			Spec: api.NodeSpec{
 				ConfigSource: &api.NodeConfigSource{
-					ConfigMapRef: &api.ObjectReference{
-						Name:      name,
-						Namespace: "ns0",
-						UID:       types.UID(fmt.Sprintf("ns0-%s", name)),
+					ConfigMap: &api.ConfigMapNodeConfigSource{
+						Name:             name,
+						Namespace:        "ns0",
+						UID:              types.UID(fmt.Sprintf("ns0-%s", name)),
+						KubeletConfigKey: "kubelet",
 					},
 				},
 			},
