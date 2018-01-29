@@ -302,7 +302,7 @@ func GetContainerSpec(pod *v1.Pod, containerName string) *v1.Container {
 
 // HasPrivilegedContainer returns true if any of the containers in the pod are privileged.
 func HasPrivilegedContainer(pod *v1.Pod) bool {
-	for _, c := range pod.Spec.Containers {
+	for _, c := range append(pod.Spec.Containers, pod.Spec.InitContainers...) {
 		if c.SecurityContext != nil &&
 			c.SecurityContext.Privileged != nil &&
 			*c.SecurityContext.Privileged {
