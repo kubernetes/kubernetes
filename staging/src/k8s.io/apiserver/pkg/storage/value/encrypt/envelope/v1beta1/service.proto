@@ -1,3 +1,4 @@
+// To regenerate service.pb.go run hack/update-generated-kms.sh
 syntax = "proto3";
 
 package v1beta1;
