@@ -281,13 +281,13 @@ func TestValidateReplicationController(t *testing.T) {
 	}
 }
 
-type ErrorJobs struct {
+type errorJobs struct {
 	batchclient.JobInterface
 	conflict bool
 	invalid  bool
 }
 
-func (c *ErrorJobs) Update(job *batch.Job) (*batch.Job, error) {
+func (c *errorJobs) Update(job *batch.Job) (*batch.Job, error) {
 	switch {
 	case c.invalid:
 		return nil, kerrors.NewInvalid(api.Kind(job.Kind), job.Name, nil)
@@ -297,7 +297,7 @@ func (c *ErrorJobs) Update(job *batch.Job) (*batch.Job, error) {
 	return nil, errors.New("Job update failure")
 }
 
-func (c *ErrorJobs) Get(name string, options metav1.GetOptions) (*batch.Job, error) {
+func (c *errorJobs) Get(name string, options metav1.GetOptions) (*batch.Job, error) {
 	zero := int32(0)
 	return &batch.Job{
 		Spec: batch.JobSpec{
@@ -306,14 +306,14 @@ func (c *ErrorJobs) Get(name string, options metav1.GetOptions) (*batch.Job, err
 	}, nil
 }
 
-type ErrorJobClient struct {
+type errorJobClient struct {
 	batchclient.JobsGetter
 	conflict bool
 	invalid  bool
 }
 
-func (c *ErrorJobClient) Jobs(namespace string) batchclient.JobInterface {
-	return &ErrorJobs{
+func (c *errorJobClient) Jobs(namespace string) batchclient.JobInterface {
+	return &errorJobs{
 		JobInterface: c.JobsGetter.Jobs(namespace),
 		conflict:     c.conflict,
 		invalid:      c.invalid,
@@ -321,14 +321,14 @@ func (c *ErrorJobClient) Jobs(namespace string) batchclient.JobInterface {
 }
 
 func TestJobScaleRetry(t *testing.T) {
-	fake := &ErrorJobClient{JobsGetter: fake.NewSimpleClientset().Batch(), conflict: true}
-	scaler := JobScaler{fake}
+	fake := &errorJobClient{JobsGetter: fake.NewSimpleClientset().Batch(), conflict: true}
+	scaler := ScalerFor(schema.GroupKind{Group: batch.GroupName, Kind: "Job"}, fake, nil, schema.GroupResource{})
 	preconditions := ScalePrecondition{-1, ""}
 	count := uint(3)
 	name := "foo"
 	namespace := "default"
 
-	scaleFunc := ScaleCondition(&scaler, &preconditions, namespace, name, count, nil)
+	scaleFunc := ScaleCondition(scaler, &preconditions, namespace, name, count, nil)
 	pass, err := scaleFunc()
 	if pass != false {
 		t.Errorf("Expected an update failure to return pass = false, got pass = %v", pass)
@@ -337,7 +337,7 @@ func TestJobScaleRetry(t *testing.T) {
 		t.Errorf("Did not expect an error on update failure, got %v", err)
 	}
 	preconditions = ScalePrecondition{3, ""}
-	scaleFunc = ScaleCondition(&scaler, &preconditions, namespace, name, count, nil)
+	scaleFunc = ScaleCondition(scaler, &preconditions, namespace, name, count, nil)
 	pass, err = scaleFunc()
 	if err == nil {
 		t.Error("Expected error on precondition failure")
@@ -355,7 +355,7 @@ func job() *batch.Job {
 
 func TestJobScale(t *testing.T) {
 	fakeClientset := fake.NewSimpleClientset(job())
-	scaler := JobScaler{fakeClientset.Batch()}
+	scaler := ScalerFor(schema.GroupKind{Group: batch.GroupName, Kind: "Job"}, fakeClientset.Batch(), nil, schema.GroupResource{})
 	preconditions := ScalePrecondition{-1, ""}
 	count := uint(3)
 	name := "foo"
@@ -374,14 +374,14 @@ func TestJobScale(t *testing.T) {
 }
 
 func TestJobScaleInvalid(t *testing.T) {
-	fake := &ErrorJobClient{JobsGetter: fake.NewSimpleClientset().Batch(), invalid: true}
-	scaler := JobScaler{fake}
+	fake := &errorJobClient{JobsGetter: fake.NewSimpleClientset().Batch(), invalid: true}
+	scaler := ScalerFor(schema.GroupKind{Group: batch.GroupName, Kind: "Job"}, fake, nil, schema.GroupResource{})
 	preconditions := ScalePrecondition{-1, ""}
 	count := uint(3)
 	name := "foo"
 	namespace := "default"
 
-	scaleFunc := ScaleCondition(&scaler, &preconditions, namespace, name, count, nil)
+	scaleFunc := ScaleCondition(scaler, &preconditions, namespace, name, count, nil)
 	pass, err := scaleFunc()
 	if pass {
 		t.Errorf("Expected an update failure to return pass = false, got pass = %v", pass)
@@ -403,7 +403,7 @@ func TestJobScaleFailsPreconditions(t *testing.T) {
 			Parallelism: &ten,
 		},
 	})
-	scaler := JobScaler{fake.Batch()}
+	scaler := ScalerFor(schema.GroupKind{Group: batch.GroupName, Kind: "Job"}, fake.Batch(), nil, schema.GroupResource{})
 	preconditions := ScalePrecondition{2, ""}
 	count := uint(3)
 	name := "foo"
@@ -1425,7 +1425,7 @@ func TestGenericScaleSimple(t *testing.T) {
 	// act
 	for index, scenario := range scenarios {
 		t.Run(fmt.Sprintf("running scenario %d: %s", index+1, scenario.name), func(t *testing.T) {
-			target := GenericScaler{scenario.scaleGetter, scenario.targetGR}
+			target := ScalerFor(schema.GroupKind{}, nil, scenario.scaleGetter, scenario.targetGR)
 
 			resVersion, err := target.ScaleSimple("default", scenario.resName, &scenario.precondition, uint(scenario.newSize))
 
@@ -1522,7 +1522,7 @@ func TestGenericScale(t *testing.T) {
 	// act
 	for index, scenario := range scenarios {
 		t.Run(fmt.Sprintf("running scenario %d: %s", index+1, scenario.name), func(t *testing.T) {
-			target := GenericScaler{scenario.scaleGetter, scenario.targetGR}
+			target := ScalerFor(schema.GroupKind{}, nil, scenario.scaleGetter, scenario.targetGR)
 
 			err := target.Scale("default", scenario.resName, uint(scenario.newSize), &scenario.precondition, nil, scenario.waitForReplicas)
 

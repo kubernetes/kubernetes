@@ -179,8 +179,6 @@ func WatchRecreateDeployment(c clientset.Interface, d *extensions.Deployment) er
 	return err
 }
 
-//TODO(p0lyn0mial): remove internalClientset and kind.
-//TODO(p0lyn0mial): update the callers.
 func ScaleDeployment(clientset clientset.Interface, internalClientset internalclientset.Interface, scalesGetter scaleclient.ScalesGetter, ns, name string, size uint, wait bool) error {
 	return ScaleResource(clientset, internalClientset, scalesGetter, ns, name, size, wait, extensionsinternal.Kind("Deployment"), extensionsinternal.Resource("deployments"))
 }
