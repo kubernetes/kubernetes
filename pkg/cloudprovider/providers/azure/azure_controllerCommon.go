@@ -30,14 +30,12 @@ import (
 )
 
 const (
-	defaultDataDiskCount       int = 16 // which will allow you to work with most medium size VMs (if not found in map)
-	storageAccountNameTemplate     = "pvc%s"
+	storageAccountNameTemplate = "pvc%s"
 
 	// for limits check https://docs.microsoft.com/en-us/azure/azure-subscription-service-limits#storage-limits
 	maxStorageAccounts                     = 100 // max # is 200 (250 with special request). this allows 100 for everything else including stand alone disks
 	maxDisksPerStorageAccounts             = 60
 	storageAccountUtilizationBeforeGrowing = 0.5
-	storageAccountsCountInit               = 2 // When the plug-in is init-ed, 2 storage accounts will be created to allow fast pvc create/attach/mount
 
 	maxLUN               = 64 // max number of LUNs per VM
 	errLeaseFailed       = "AcquireDiskLeaseFailed"
@@ -58,13 +56,6 @@ type controllerCommon struct {
 	location              string
 	storageEndpointSuffix string
 	resourceGroup         string
-	clientID              string
-	clientSecret          string
-	managementEndpoint    string
-	tokenEndPoint         string
-	aadResourceEndPoint   string
-	aadToken              string
-	expiresOn             time.Time
 	cloud                 *Cloud
 }
 
