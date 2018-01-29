@@ -485,7 +485,7 @@ func (c *BlobDiskController) getAllStorageAccounts() (map[string]*storageAccount
 			continue
 		}
 		if v.Name == nil || v.Sku == nil {
-			glog.Infof("azureDisk - accountListResult Name or Sku is nil")
+			glog.Info("azureDisk - accountListResult Name or Sku is nil")
 			continue
 		}
 		glog.Infof("azureDisk - identified account %s as part of shared PVC accounts", *v.Name)
