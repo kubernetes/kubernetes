@@ -219,6 +219,9 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 	if obj.EnforceNodeAllocatable == nil {
 		obj.EnforceNodeAllocatable = DefaultNodeAllocatableEnforcement
 	}
+	if obj.CertBeginRotationFraction == 0 {
+		obj.CertBeginRotationFraction = 0.8
+	}
 }
 
 func boolVar(b bool) *bool {
