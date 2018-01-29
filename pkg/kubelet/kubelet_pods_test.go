@@ -717,7 +717,7 @@ fe00::2	ip6-allrouters
 }
 
 func TestRunInContainerNoSuchPod(t *testing.T) {
-	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	testKubelet := newTestKubelet(t, false) // controllerAttachDetachEnabled
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
 	fakeRuntime := testKubelet.fakeRuntime
@@ -737,7 +737,7 @@ func TestRunInContainerNoSuchPod(t *testing.T) {
 
 func TestRunInContainer(t *testing.T) {
 	for _, testError := range []error{nil, errors.New("bar")} {
-		testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+		testKubelet := newTestKubelet(t, false) // controllerAttachDetachEnabled
 		defer testKubelet.Cleanup()
 		kubelet := testKubelet.kubelet
 		fakeRuntime := testKubelet.fakeRuntime
@@ -1627,7 +1627,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 
 	for _, tc := range testCases {
 		fakeRecorder := record.NewFakeRecorder(1)
-		testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+		testKubelet := newTestKubelet(t, false) // controllerAttachDetachEnabled
 		testKubelet.kubelet.recorder = fakeRecorder
 		defer testKubelet.Cleanup()
 		kl := testKubelet.kubelet
@@ -2115,7 +2115,7 @@ func TestExec(t *testing.T) {
 	}}
 
 	for _, tc := range testcases {
-		testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+		testKubelet := newTestKubelet(t, false) // controllerAttachDetachEnabled
 		defer testKubelet.Cleanup()
 		kubelet := testKubelet.kubelet
 		testKubelet.fakeRuntime.PodList = []*containertest.FakePod{
@@ -2181,6 +2181,94 @@ func TestExec(t *testing.T) {
 	}
 }
 
+func TestAttach(t *testing.T) {
+	const (
+		podName                = "podFoo"
+		podNamespace           = "nsFoo"
+		podUID       types.UID = "12345678"
+		containerID            = "containerFoo"
+		tty                    = true
+	)
+	var (
+		podFullName = kubecontainer.GetPodFullName(podWithUIDNameNs(podUID, podName, podNamespace))
+		stdin       = &bytes.Buffer{}
+		stdout      = &fakeReadWriteCloser{}
+		stderr      = &fakeReadWriteCloser{}
+	)
+
+	testcases := []struct {
+		description string
+		podFullName string
+		container   string
+		expectError bool
+	}{{
+		description: "success case",
+		podFullName: podFullName,
+		container:   containerID,
+	}, {
+		description: "no such pod",
+		podFullName: "bar" + podFullName,
+		container:   containerID,
+		expectError: true,
+	}, {
+		description: "no such container",
+		podFullName: podFullName,
+		container:   "containerBar",
+		expectError: true,
+	}}
+
+	for _, tc := range testcases {
+		testKubelet := newTestKubelet(t, false) // controllerAttachDetachEnabled
+		defer testKubelet.Cleanup()
+		kubelet := testKubelet.kubelet
+		testKubelet.fakeRuntime.PodList = []*containertest.FakePod{
+			{Pod: &kubecontainer.Pod{
+				ID:        podUID,
+				Name:      podName,
+				Namespace: podNamespace,
+				Containers: []*kubecontainer.Container{
+					{Name: containerID,
+						ID: kubecontainer.ContainerID{Type: "test", ID: containerID},
+					},
+				},
+			}},
+		}
+
+		{ // No streaming case
+			description := "no streaming - " + tc.description
+			redirect, err := kubelet.GetAttach(tc.podFullName, podUID, tc.container, remotecommand.Options{})
+			assert.Error(t, err, description)
+			assert.Nil(t, redirect, description)
+
+			err = kubelet.AttachContainer(tc.podFullName, podUID, tc.container, stdin, stdout, stderr, tty, nil)
+			assert.Error(t, err, description)
+		}
+
+		{ // Direct streaming case
+			description := "direct streaming - " + tc.description
+			fakeRuntime := &containertest.FakeDirectStreamingRuntime{FakeRuntime: testKubelet.fakeRuntime}
+			kubelet.containerRuntime = fakeRuntime
+
+			redirect, err := kubelet.GetAttach(tc.podFullName, podUID, tc.container, remotecommand.Options{})
+			assert.NoError(t, err, description)
+			assert.Nil(t, redirect, description)
+
+			err = kubelet.AttachContainer(tc.podFullName, podUID, tc.container, stdin, stdout, stderr, tty, nil)
+			if tc.expectError {
+				assert.Error(t, err, description)
+			} else {
+				assert.NoError(t, err, description)
+				assert.Equal(t, fakeRuntime.Args.ContainerID.ID, containerID, description+": ID")
+				assert.Equal(t, fakeRuntime.Args.Stdin, stdin, description+": Stdin")
+				assert.Equal(t, fakeRuntime.Args.Stdout, stdout, description+": Stdout")
+				assert.Equal(t, fakeRuntime.Args.Stderr, stderr, description+": Stderr")
+				assert.Equal(t, fakeRuntime.Args.TTY, tty, description+": TTY")
+			}
+		}
+		// TODO: Add a test for Indirect streaming case
+	}
+}
+
 func TestPortForward(t *testing.T) {
 	const (
 		podName                = "podFoo"
@@ -2206,7 +2294,7 @@ func TestPortForward(t *testing.T) {
 	}}
 
 	for _, tc := range testcases {
-		testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+		testKubelet := newTestKubelet(t, false) // controllerAttachDetachEnabled
 		defer testKubelet.Cleanup()
 		kubelet := testKubelet.kubelet
 		testKubelet.fakeRuntime.PodList = []*containertest.FakePod{
