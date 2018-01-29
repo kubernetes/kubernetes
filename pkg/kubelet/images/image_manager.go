@@ -154,11 +154,12 @@ func applyDefaultImageTag(image string) (string, error) {
 	_, isTagged := named.(dockerref.Tagged)
 	_, isDigested := named.(dockerref.Digested)
 	if !isTagged && !isDigested {
-		named, err := dockerref.WithTag(named, parsers.DefaultImageTag)
-		if err != nil {
-			return "", fmt.Errorf("failed to apply default image tag %q: %v", image, err)
-		}
-		image = named.String()
+		// we just concatenate the image name with the default tag here instead
+		// of using dockerref.WithTag(named, ...) because that would cause the
+		// image to be fully qualified as docker.io/$name if it's a short name
+		// (e.g. just busybox). We don't want that to happen to keep the CRI
+		// agnostic wrt image names and default hostnames.
+		image = image + ":" + parsers.DefaultImageTag
 	}
 	return image, nil
 }
