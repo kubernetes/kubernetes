@@ -55,6 +55,18 @@ func TestParseResourceURL(t *testing.T) {
 			&ResourceID{"some-gce-project", "instances", meta.ZonalKey("instance-1", "us-central1-c")},
 		},
 		{
+			"http://localhost:3990/compute/beta/projects/some-gce-project/global/operations/operation-1513289952196-56054460af5a0-b1dae0c3-9bbf9dbf",
+			&ResourceID{"some-gce-project", "operations", meta.GlobalKey("operation-1513289952196-56054460af5a0-b1dae0c3-9bbf9dbf")},
+		},
+		{
+			"http://localhost:3990/compute/alpha/projects/some-gce-project/regions/dev-central1/addresses/my-address",
+			&ResourceID{"some-gce-project", "addresses", meta.RegionalKey("my-address", "dev-central1")},
+		},
+		{
+			"http://localhost:3990/compute/v1/projects/some-gce-project/zones/dev-central1-std/instances/instance-1",
+			&ResourceID{"some-gce-project", "instances", meta.ZonalKey("instance-1", "dev-central1-std")},
+		},
+		{
 			"projects/some-gce-project",
 			&ResourceID{"some-gce-project", "projects", nil},
 		},
@@ -103,7 +115,6 @@ func TestParseResourceURL(t *testing.T) {
 		"projects/some-gce-project/global/foo/bar/baz",
 		"projects/some-gce-project/zones/us-central1-c/res",
 		"projects/some-gce-project/zones/us-central1-c/res/name/extra",
-		"https://www.googleapis.com/compute/gamma/projects/some-gce-project/global/addresses/name",
 	} {
 		r, err := ParseResourceURL(tc)
 		if err == nil {
