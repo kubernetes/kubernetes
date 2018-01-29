@@ -328,11 +328,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies) (err error) {
 
 	// About to get clients and such, detect standaloneMode
 	standaloneMode := true
-	switch {
-	case s.RequireKubeConfig == true:
-		standaloneMode = false
-		glog.Warningf("--require-kubeconfig is deprecated. Set --kubeconfig without using --require-kubeconfig.")
-	case s.KubeConfig.Provided():
+	if len(s.KubeConfig) > 0 {
 		standaloneMode = false
 	}
 
@@ -364,7 +360,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies) (err error) {
 	}
 
 	if s.BootstrapKubeconfig != "" {
-		if err := bootstrap.LoadClientCert(s.KubeConfig.Value(), s.BootstrapKubeconfig, s.CertDirectory, nodeName); err != nil {
+		if err := bootstrap.LoadClientCert(s.KubeConfig, s.BootstrapKubeconfig, s.CertDirectory, nodeName); err != nil {
 			return err
 		}
 	}
@@ -384,58 +380,52 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies) (err error) {
 		var externalKubeClient clientset.Interface
 
 		clientConfig, err := createAPIServerClientConfig(s)
+		if err != nil {
+			return fmt.Errorf("invalid kubeconfig: %v", err)
+		}
 
 		var clientCertificateManager certificate.Manager
-		if err == nil {
-			if s.RotateCertificates && utilfeature.DefaultFeatureGate.Enabled(features.RotateKubeletClientCertificate) {
-				clientCertificateManager, err = kubeletcertificate.NewKubeletClientCertificateManager(s.CertDirectory, nodeName, clientConfig.CertData, clientConfig.KeyData, clientConfig.CertFile, clientConfig.KeyFile)
-				if err != nil {
-					return err
-				}
-				// we set exitIfExpired to true because we use this client configuration to request new certs - if we are unable
-				// to request new certs, we will be unable to continue normal operation
-				if err := kubeletcertificate.UpdateTransport(wait.NeverStop, clientConfig, clientCertificateManager, true); err != nil {
-					return err
-				}
+		if s.RotateCertificates && utilfeature.DefaultFeatureGate.Enabled(features.RotateKubeletClientCertificate) {
+			clientCertificateManager, err = kubeletcertificate.NewKubeletClientCertificateManager(s.CertDirectory, nodeName, clientConfig.CertData, clientConfig.KeyData, clientConfig.CertFile, clientConfig.KeyFile)
+			if err != nil {
+				return err
 			}
+			// we set exitIfExpired to true because we use this client configuration to request new certs - if we are unable
+			// to request new certs, we will be unable to continue normal operation
+			if err := kubeletcertificate.UpdateTransport(wait.NeverStop, clientConfig, clientCertificateManager, true); err != nil {
+				return err
+			}
+		}
 
-			kubeClient, err = clientset.NewForConfig(clientConfig)
-			if err != nil {
-				glog.Warningf("New kubeClient from clientConfig error: %v", err)
-			} else if kubeClient.CertificatesV1beta1() != nil && clientCertificateManager != nil {
-				glog.V(2).Info("Starting client certificate rotation.")
-				clientCertificateManager.SetCertificateSigningRequestClient(kubeClient.CertificatesV1beta1().CertificateSigningRequests())
-				clientCertificateManager.Start()
-			}
-			externalKubeClient, err = clientset.NewForConfig(clientConfig)
-			if err != nil {
-				glog.Warningf("New kubeClient from clientConfig error: %v", err)
-			}
+		kubeClient, err = clientset.NewForConfig(clientConfig)
+		if err != nil {
+			glog.Warningf("New kubeClient from clientConfig error: %v", err)
+		} else if kubeClient.CertificatesV1beta1() != nil && clientCertificateManager != nil {
+			glog.V(2).Info("Starting client certificate rotation.")
+			clientCertificateManager.SetCertificateSigningRequestClient(kubeClient.CertificatesV1beta1().CertificateSigningRequests())
+			clientCertificateManager.Start()
+		}
+		externalKubeClient, err = clientset.NewForConfig(clientConfig)
+		if err != nil {
+			glog.Warningf("New kubeClient from clientConfig error: %v", err)
+		}
 
-			// make a separate client for events
-			eventClientConfig := *clientConfig
-			eventClientConfig.QPS = float32(s.EventRecordQPS)
-			eventClientConfig.Burst = int(s.EventBurst)
-			eventClient, err = v1core.NewForConfig(&eventClientConfig)
-			if err != nil {
-				glog.Warningf("Failed to create API Server client for Events: %v", err)
-			}
+		// make a separate client for events
+		eventClientConfig := *clientConfig
+		eventClientConfig.QPS = float32(s.EventRecordQPS)
+		eventClientConfig.Burst = int(s.EventBurst)
+		eventClient, err = v1core.NewForConfig(&eventClientConfig)
+		if err != nil {
+			glog.Warningf("Failed to create API Server client for Events: %v", err)
+		}
 
-			// make a separate client for heartbeat with throttling disabled and a timeout attached
-			heartbeatClientConfig := *clientConfig
-			heartbeatClientConfig.Timeout = s.KubeletConfiguration.NodeStatusUpdateFrequency.Duration
-			heartbeatClientConfig.QPS = float32(-1)
-			heartbeatClient, err = v1core.NewForConfig(&heartbeatClientConfig)
-			if err != nil {
-				glog.Warningf("Failed to create API Server client for heartbeat: %v", err)
-			}
-		} else {
-			switch {
-			case s.RequireKubeConfig:
-				return fmt.Errorf("invalid kubeconfig: %v", err)
-			case s.KubeConfig.Provided():
-				glog.Warningf("invalid kubeconfig: %v", err)
-			}
+		// make a separate client for heartbeat with throttling disabled and a timeout attached
+		heartbeatClientConfig := *clientConfig
+		heartbeatClientConfig.Timeout = s.KubeletConfiguration.NodeStatusUpdateFrequency.Duration
+		heartbeatClientConfig.QPS = float32(-1)
+		heartbeatClient, err = v1core.NewForConfig(&heartbeatClientConfig)
+		if err != nil {
+			glog.Warningf("Failed to create API Server client for heartbeat: %v", err)
 		}
 
 		kubeDeps.KubeClient = kubeClient
@@ -658,19 +648,15 @@ func InitializeTLS(kf *options.KubeletFlags, kc *kubeletconfiginternal.KubeletCo
 
 func kubeconfigClientConfig(s *options.KubeletServer) (*restclient.Config, error) {
 	return clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
-		&clientcmd.ClientConfigLoadingRules{ExplicitPath: s.KubeConfig.Value()},
+		&clientcmd.ClientConfigLoadingRules{ExplicitPath: s.KubeConfig},
 		&clientcmd.ConfigOverrides{},
 	).ClientConfig()
 }
 
 // createClientConfig creates a client configuration from the command line arguments.
-// If --kubeconfig is explicitly set, it will be used. If it is not set but
-// --require-kubeconfig=true, we attempt to load the default kubeconfig file.
+// If --kubeconfig is explicitly set, it will be used.
 func createClientConfig(s *options.KubeletServer) (*restclient.Config, error) {
-	// If --kubeconfig was not provided, it will have a default path set in cmd/kubelet/app/options/options.go.
-	// We only use that default path when --require-kubeconfig=true. The default path is temporary until --require-kubeconfig is removed.
-	// TODO(#41161:v1.10.0): Remove the default kubeconfig path and --require-kubeconfig.
-	if s.BootstrapKubeconfig != "" || s.KubeConfig.Provided() || s.RequireKubeConfig == true {
+	if s.BootstrapKubeconfig != "" || len(s.KubeConfig) > 0 {
 		return kubeconfigClientConfig(s)
 	} else {
 		return nil, fmt.Errorf("createClientConfig called in standalone mode")
