@@ -18,9 +18,7 @@ package options
 
 import (
 	"crypto/tls"
-	"encoding/pem"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"path"
 	"strconv"
@@ -69,8 +67,6 @@ type CertKey struct {
 type GeneratableKeyCert struct {
 	CertKey CertKey
 
-	// CACertFile is an optional file containing the certificate chain for CertKey.CertFile
-	CACertFile string
 	// CertDirectory is a directory that will contain the certificates.  If the cert and key aren't specifically set
 	// this will be used to derive a match with the "pair-name"
 	CertDirectory string
@@ -135,11 +131,6 @@ func (s *SecureServingOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.ServerCert.CertKey.KeyFile, "tls-private-key-file", s.ServerCert.CertKey.KeyFile,
 		"File containing the default x509 private key matching --tls-cert-file.")
 
-	fs.StringVar(&s.ServerCert.CACertFile, "tls-ca-file", s.ServerCert.CACertFile, "If set, this "+
-		"certificate authority will used for secure access from Admission "+
-		"Controllers. This must be a valid PEM-encoded CA bundle. Altneratively, the certificate authority "+
-		"can be appended to the certificate provided by --tls-cert-file.")
-
 	fs.StringSliceVar(&s.CipherSuites, "tls-cipher-suites", s.CipherSuites,
 		"Comma-separated list of cipher suites for the server. "+
 			"Values are from tls package constants (https://golang.org/pkg/crypto/tls/#pkg-constants). "+
@@ -157,6 +148,11 @@ func (s *SecureServingOptions) AddFlags(fs *pflag.FlagSet) {
 		"trump over extracted names. For multiple key/certificate pairs, use the "+
 		"--tls-sni-cert-key multiple times. "+
 		"Examples: \"example.crt,example.key\" or \"foo.crt,foo.key:*.foo.com,foo.com\".")
+
+	// TODO remove this flag in 1.11.  The flag had no effect before this will prevent scripts from immediately failing on upgrade.
+	fs.String("tls-ca-file", "", "This flag has no effect.")
+	fs.MarkDeprecated("tls-ca-file", "This flag has no effect.")
+
 }
 
 func (s *SecureServingOptions) AddDeprecatedFlags(fs *pflag.FlagSet) {
@@ -228,24 +224,6 @@ func (s *SecureServingOptions) applyServingInfoTo(c *server.Config) error {
 			return fmt.Errorf("unable to load server certificate: %v", err)
 		}
 		secureServingInfo.Cert = &tlsCert
-	}
-
-	// optionally load CA cert
-	if len(s.ServerCert.CACertFile) != 0 {
-		pemData, err := ioutil.ReadFile(s.ServerCert.CACertFile)
-		if err != nil {
-			return fmt.Errorf("failed to read certificate authority from %q: %v", s.ServerCert.CACertFile, err)
-		}
-		block, pemData := pem.Decode(pemData)
-		if block == nil {
-			return fmt.Errorf("no certificate found in certificate authority file %q", s.ServerCert.CACertFile)
-		}
-		if block.Type != "CERTIFICATE" {
-			return fmt.Errorf("expected CERTIFICATE block in certiticate authority file %q, found: %s", s.ServerCert.CACertFile, block.Type)
-		}
-		secureServingInfo.CACert = &tls.Certificate{
-			Certificate: [][]byte{block.Bytes},
-		}
 	}
 
 	if len(s.CipherSuites) != 0 {
