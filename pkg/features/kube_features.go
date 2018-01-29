@@ -37,11 +37,6 @@ const (
 	// alpha: v1.4
 	DynamicKubeletConfig utilfeature.Feature = "DynamicKubeletConfig"
 
-	// owner: @mtaufen
-	// alpha: v1.8
-	// This gate is now a no-op. It will be removed shortly.
-	KubeletConfigFile utilfeature.Feature = "KubeletConfigFile"
-
 	// owner: @pweil-
 	// alpha: v1.5
 	//
@@ -242,7 +237,6 @@ func init() {
 var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureSpec{
 	AppArmor:                                    {Default: true, PreRelease: utilfeature.Beta},
 	DynamicKubeletConfig:                        {Default: false, PreRelease: utilfeature.Alpha},
-	KubeletConfigFile:                           {Default: false, PreRelease: utilfeature.Alpha}, // KubeletConfigFile is now a no-op gate on the path to removal.
 	ExperimentalHostUserNamespaceDefaultingGate: {Default: false, PreRelease: utilfeature.Beta},
 	ExperimentalCriticalPodAnnotation:           {Default: false, PreRelease: utilfeature.Alpha},
 	Accelerators:                                {Default: false, PreRelease: utilfeature.Alpha},
