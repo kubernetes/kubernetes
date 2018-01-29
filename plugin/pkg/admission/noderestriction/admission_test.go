@@ -91,9 +91,19 @@ func Test_nodePlugin_Admit(t *testing.T) {
 		mynodeObjMeta    = metav1.ObjectMeta{Name: "mynode"}
 		mynodeObj        = &api.Node{ObjectMeta: mynodeObjMeta}
 		mynodeObjConfigA = &api.Node{ObjectMeta: mynodeObjMeta, Spec: api.NodeSpec{ConfigSource: &api.NodeConfigSource{
-			ConfigMapRef: &api.ObjectReference{Name: "foo", Namespace: "bar", UID: "fooUID"}}}}
+			ConfigMap: &api.ConfigMapNodeConfigSource{
+				Name:             "foo",
+				Namespace:        "bar",
+				UID:              "fooUID",
+				KubeletConfigKey: "kubelet",
+			}}}}
 		mynodeObjConfigB = &api.Node{ObjectMeta: mynodeObjMeta, Spec: api.NodeSpec{ConfigSource: &api.NodeConfigSource{
-			ConfigMapRef: &api.ObjectReference{Name: "qux", Namespace: "bar", UID: "quxUID"}}}}
+			ConfigMap: &api.ConfigMapNodeConfigSource{
+				Name:             "qux",
+				Namespace:        "bar",
+				UID:              "quxUID",
+				KubeletConfigKey: "kubelet",
+			}}}}
 		othernodeObj = &api.Node{ObjectMeta: metav1.ObjectMeta{Name: "othernode"}}
 
 		mymirrorpod      = makeTestPod("ns", "mymirrorpod", "mynode", true)

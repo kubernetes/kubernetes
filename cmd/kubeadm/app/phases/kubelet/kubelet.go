@@ -116,10 +116,11 @@ func updateNodeWithConfigMap(client clientset.Interface, nodeName string) error 
 		}
 
 		node.Spec.ConfigSource = &v1.NodeConfigSource{
-			ConfigMapRef: &v1.ObjectReference{
-				Name:      kubeadmconstants.KubeletBaseConfigurationConfigMap,
-				Namespace: metav1.NamespaceSystem,
-				UID:       kubeletCfg.UID,
+			ConfigMap: &v1.ConfigMapNodeConfigSource{
+				Name:             kubeadmconstants.KubeletBaseConfigurationConfigMap,
+				Namespace:        metav1.NamespaceSystem,
+				UID:              kubeletCfg.UID,
+				KubeletConfigKey: kubeadmconstants.KubeletBaseConfigurationConfigMapKey,
 			},
 		}
 

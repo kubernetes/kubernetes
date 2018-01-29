@@ -35,7 +35,6 @@ const (
 	lastKnownGoodFile = "last-known-good"
 
 	checkpointsDir = "checkpoints"
-	kubeletKey     = "kubelet" // TODO(mtaufen): eventually the API will have a way to parameterize the kubelet file name, and then we can remove this
 )
 
 // fsStore is for tracking checkpoints in the local filesystem, implements Store
@@ -101,7 +100,7 @@ func (s *fsStore) Load(source checkpoint.RemoteConfigSource) (*kubeletconfig.Kub
 	}
 	// load the kubelet config file
 	utillog.Infof("loading kubelet configuration checkpoint for source %s", sourceFmt)
-	loader, err := configfiles.NewFsLoader(s.fs, filepath.Join(s.checkpointPath(source.UID()), kubeletKey))
+	loader, err := configfiles.NewFsLoader(s.fs, filepath.Join(s.checkpointPath(source.UID()), source.KubeletFilename()))
 	if err != nil {
 		return nil, err
 	}

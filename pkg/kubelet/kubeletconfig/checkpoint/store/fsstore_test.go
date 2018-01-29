@@ -125,7 +125,12 @@ func TestFsStoreExists(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.desc, func(t *testing.T) {
 			source, _, err := checkpoint.NewRemoteConfigSource(&apiv1.NodeConfigSource{
-				ConfigMapRef: &apiv1.ObjectReference{Name: "name", Namespace: "namespace", UID: c.uid}})
+				ConfigMap: &apiv1.ConfigMapNodeConfigSource{
+					Name:             "name",
+					Namespace:        "namespace",
+					UID:              c.uid,
+					KubeletConfigKey: "kubelet",
+				}})
 			if err != nil {
 				t.Fatalf("error constructing remote config source: %v", err)
 			}
@@ -214,7 +219,10 @@ func TestFsStoreLoad(t *testing.T) {
 		t.Fatalf("error encoding KubeletConfiguration: %v", err)
 	}
 	// construct a payload that contains the kubeletconfig
-	const uid = "uid"
+	const (
+		uid        = "uid"
+		kubeletKey = "kubelet"
+	)
 	p, err := checkpoint.NewConfigMapPayload(&apiv1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{UID: types.UID(uid)},
 		Data: map[string]string{
@@ -241,7 +249,12 @@ func TestFsStoreLoad(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.desc, func(t *testing.T) {
 			source, _, err := checkpoint.NewRemoteConfigSource(&apiv1.NodeConfigSource{
-				ConfigMapRef: &apiv1.ObjectReference{Name: "name", Namespace: "namespace", UID: c.uid}})
+				ConfigMap: &apiv1.ConfigMapNodeConfigSource{
+					Name:             "name",
+					Namespace:        "namespace",
+					UID:              c.uid,
+					KubeletConfigKey: kubeletKey,
+				}})
 			if err != nil {
 				t.Fatalf("error constructing remote config source: %v", err)
 			}
@@ -291,7 +304,12 @@ func TestFsStoreCurrent(t *testing.T) {
 	}
 
 	source, _, err := checkpoint.NewRemoteConfigSource(&apiv1.NodeConfigSource{
-		ConfigMapRef: &apiv1.ObjectReference{Name: "name", Namespace: "namespace", UID: "uid"}})
+		ConfigMap: &apiv1.ConfigMapNodeConfigSource{
+			Name:             "name",
+			Namespace:        "namespace",
+			UID:              "uid",
+			KubeletConfigKey: "kubelet",
+		}})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -329,7 +347,12 @@ func TestFsStoreLastKnownGood(t *testing.T) {
 	}
 
 	source, _, err := checkpoint.NewRemoteConfigSource(&apiv1.NodeConfigSource{
-		ConfigMapRef: &apiv1.ObjectReference{Name: "name", Namespace: "namespace", UID: "uid"}})
+		ConfigMap: &apiv1.ConfigMapNodeConfigSource{
+			Name:             "name",
+			Namespace:        "namespace",
+			UID:              "uid",
+			KubeletConfigKey: "kubelet",
+		}})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -367,15 +390,21 @@ func TestFsStoreSetCurrent(t *testing.T) {
 	}
 
 	const uid = "uid"
-	expect := fmt.Sprintf(`apiVersion: v1
-configMapRef:
-  name: name
-  namespace: namespace
-  uid: %s
-kind: NodeConfigSource
+	expect := fmt.Sprintf(`apiVersion: kubelet.config.k8s.io/v1beta1
+kind: SerializedNodeConfigSource
+source:
+  configMap:
+    kubeletConfigKey: kubelet
+    name: name
+    namespace: namespace
+    uid: %s
 `, uid)
-	source, _, err := checkpoint.NewRemoteConfigSource(&apiv1.NodeConfigSource{ConfigMapRef: &apiv1.ObjectReference{
-		Name: "name", Namespace: "namespace", UID: types.UID(uid)}})
+	source, _, err := checkpoint.NewRemoteConfigSource(&apiv1.NodeConfigSource{ConfigMap: &apiv1.ConfigMapNodeConfigSource{
+		Name:             "name",
+		Namespace:        "namespace",
+		UID:              types.UID(uid),
+		KubeletConfigKey: "kubelet",
+	}})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -399,15 +428,21 @@ func TestFsStoreSetLastKnownGood(t *testing.T) {
 	}
 
 	const uid = "uid"
-	expect := fmt.Sprintf(`apiVersion: v1
-configMapRef:
-  name: name
-  namespace: namespace
-  uid: %s
-kind: NodeConfigSource
+	expect := fmt.Sprintf(`apiVersion: kubelet.config.k8s.io/v1beta1
+kind: SerializedNodeConfigSource
+source:
+  configMap:
+    kubeletConfigKey: kubelet
+    name: name
+    namespace: namespace
+    uid: %s
 `, uid)
-	source, _, err := checkpoint.NewRemoteConfigSource(&apiv1.NodeConfigSource{ConfigMapRef: &apiv1.ObjectReference{
-		Name: "name", Namespace: "namespace", UID: types.UID(uid)}})
+	source, _, err := checkpoint.NewRemoteConfigSource(&apiv1.NodeConfigSource{ConfigMap: &apiv1.ConfigMapNodeConfigSource{
+		Name:             "name",
+		Namespace:        "namespace",
+		UID:              types.UID(uid),
+		KubeletConfigKey: "kubelet",
+	}})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -430,11 +465,21 @@ func TestFsStoreReset(t *testing.T) {
 		t.Fatalf("error constructing store: %v", err)
 	}
 
-	source, _, err := checkpoint.NewRemoteConfigSource(&apiv1.NodeConfigSource{ConfigMapRef: &apiv1.ObjectReference{Name: "name", Namespace: "namespace", UID: "uid"}})
+	source, _, err := checkpoint.NewRemoteConfigSource(&apiv1.NodeConfigSource{ConfigMap: &apiv1.ConfigMapNodeConfigSource{
+		Name:             "name",
+		Namespace:        "namespace",
+		UID:              "uid",
+		KubeletConfigKey: "kubelet",
+	}})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	otherSource, _, err := checkpoint.NewRemoteConfigSource(&apiv1.NodeConfigSource{ConfigMapRef: &apiv1.ObjectReference{Name: "other-name", Namespace: "namespace", UID: "other-uid"}})
+	otherSource, _, err := checkpoint.NewRemoteConfigSource(&apiv1.NodeConfigSource{ConfigMap: &apiv1.ConfigMapNodeConfigSource{
+		Name:             "other-name",
+		Namespace:        "namespace",
+		UID:              "other-uid",
+		KubeletConfigKey: "kubelet",
+	}})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -498,7 +543,12 @@ func TestFsStoreReadRemoteConfigSource(t *testing.T) {
 	}
 
 	source, _, err := checkpoint.NewRemoteConfigSource(&apiv1.NodeConfigSource{
-		ConfigMapRef: &apiv1.ObjectReference{Name: "name", Namespace: "namespace", UID: "uid"}})
+		ConfigMap: &apiv1.ConfigMapNodeConfigSource{
+			Name:             "name",
+			Namespace:        "namespace",
+			UID:              "uid",
+			KubeletConfigKey: "kubelet",
+		}})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -534,7 +584,12 @@ func TestFsStoreWriteRemoteConfigSource(t *testing.T) {
 		t.Fatalf("error constructing store: %v", err)
 	}
 
-	source, _, err := checkpoint.NewRemoteConfigSource(&apiv1.NodeConfigSource{ConfigMapRef: &apiv1.ObjectReference{Name: "name", Namespace: "namespace", UID: "uid"}})
+	source, _, err := checkpoint.NewRemoteConfigSource(&apiv1.NodeConfigSource{ConfigMap: &apiv1.ConfigMapNodeConfigSource{
+		Name:             "name",
+		Namespace:        "namespace",
+		UID:              "uid",
+		KubeletConfigKey: "kubelet",
+	}})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

@@ -286,12 +286,13 @@ func TestNodeAuthorizer(t *testing.T) {
 				return err
 			}
 			node2.Spec.ConfigSource = &api.NodeConfigSource{
-				ConfigMapRef: &api.ObjectReference{
+				ConfigMap: &api.ConfigMapNodeConfigSource{
 					Namespace: "ns",
 					Name:      "myconfigmapconfigsource",
 					// validation just requires UID to be non-empty and it isn't necessary for GET,
 					// so we just use a bogus one for the test
-					UID: "uid",
+					UID:              "uid",
+					KubeletConfigKey: "kubelet",
 				},
 			}
 			_, err = client.Core().Nodes().Update(node2)

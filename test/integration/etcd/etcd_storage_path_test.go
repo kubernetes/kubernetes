@@ -437,7 +437,6 @@ var ephemeralWhiteList = createEphemeralWhiteList(
 	gvk("", "v1", "RangeAllocation"),     // stored in various places in etcd but cannot be directly created
 	gvk("", "v1", "ComponentStatus"),     // status info not stored in etcd
 	gvk("", "v1", "SerializedReference"), // used for serilization, not stored in etcd
-	gvk("", "v1", "NodeConfigSource"),    // subfield of node.spec, but shouldn't be directly created
 	gvk("", "v1", "PodStatusResult"),     // wrapper object not stored in etcd
 	// --
 
