@@ -159,6 +159,9 @@ func ModifyConfig(configAccess ConfigAccess, newConfig clientcmdapi.Config, rela
 	// to avoid deadlock (note: this can fail w/ symlinks, but... come on).
 	sort.Strings(possibleSources)
 	for _, filename := range possibleSources {
+		if _, err := os.Stat(lockName(filename)); err == nil {
+			continue
+		}
 		if err := lockFile(filename); err != nil {
 			return err
 		}
