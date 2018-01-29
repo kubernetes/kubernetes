@@ -21,7 +21,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"path"
-	"strconv"
 	"time"
 
 	"github.com/go-openapi/spec"
@@ -326,28 +325,6 @@ func RunAMaster(masterConfig *master.Config) (*master.Master, *httptest.Server, 
 
 func RunAMasterUsingServer(masterConfig *master.Config, s *httptest.Server, masterReceiver MasterReceiver) (*master.Master, *httptest.Server, CloseFunc) {
 	return startMasterOrDie(masterConfig, s, masterReceiver)
-}
-
-// FindFreeLocalPort returns the number of an available port number on
-// the loopback interface.  Useful for determining the port to launch
-// a server on.  Error handling required - there is a non-zero chance
-// that the returned port number will be bound by another process
-// after this function returns.
-func FindFreeLocalPort() (int, error) {
-	l, err := net.Listen("tcp", ":0")
-	if err != nil {
-		return 0, err
-	}
-	defer l.Close()
-	_, portStr, err := net.SplitHostPort(l.Addr().String())
-	if err != nil {
-		return 0, err
-	}
-	port, err := strconv.Atoi(portStr)
-	if err != nil {
-		return 0, err
-	}
-	return port, nil
 }
 
 // SharedEtcd creates a storage config for a shared etcd instance, with a unique prefix.
