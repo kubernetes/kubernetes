@@ -216,10 +216,6 @@ type SecureServingInfo struct {
 	// allowed to be in SNICerts.
 	Cert *tls.Certificate
 
-	// CACert is an optional certificate authority used for the loopback connection of the Admission controllers.
-	// If this is nil, the certificate authority is extracted from Cert or a matching SNI certificate.
-	CACert *tls.Certificate
-
 	// SNICerts are the TLS certificates by name used for SNI.
 	SNICerts map[string]*tls.Certificate
 
