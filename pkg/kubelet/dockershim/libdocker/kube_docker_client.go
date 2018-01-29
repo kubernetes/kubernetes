@@ -261,6 +261,23 @@ func (d *kubeDockerClient) ListImages(opts dockertypes.ImageListOptions) ([]dock
 	return images, nil
 }
 
+func (d *kubeDockerClient) WaitForContainer(id string) error {
+	ctx, cancel := d.getTimeoutContext()
+	defer cancel()
+	waitCh, errCh := d.client.ContainerWait(ctx, id, dockercontainer.WaitConditionNextExit)
+	if ctxErr := contextError(ctx); ctxErr != nil {
+		return ctxErr
+	}
+	//Wait either for the container to finish its execution.
+	select {
+	case <-waitCh:
+		break
+	case err := <-errCh:
+		return err
+	}
+	return nil
+}
+
 func base64EncodeAuth(auth dockertypes.AuthConfig) (string, error) {
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(auth); err != nil {

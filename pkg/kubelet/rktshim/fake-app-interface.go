@@ -148,6 +148,27 @@ func (r *FakeRuntime) StartContainer(id string) error {
 	return nil
 }
 
+func (r *FakeRuntime) WaitForContainer(id string) error {
+	c, ok := r.Containers[id]
+	if !ok {
+		return ErrContainerNotFound
+	}
+	switch c.State {
+	case runtimeapi.ContainerState_CONTAINER_EXITED:
+		fallthrough
+	case runtimeapi.ContainerState_CONTAINER_CREATED:
+		c.Start()
+	case runtimeapi.ContainerState_CONTAINER_UNKNOWN:
+		// TODO(tmrts): add timeout to Start API or generalize timeout somehow
+		//<-time.After(time.Duration(timeout) * time.Second)
+		fallthrough
+	default:
+		return ErrInvalidContainerStateTransition
+	}
+
+	return nil
+}
+
 func (r *FakeRuntime) StopContainer(id string, timeout int64) error {
 	c, ok := r.Containers[id]
 	if !ok {

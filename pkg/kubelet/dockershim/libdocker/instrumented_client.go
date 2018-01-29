@@ -101,6 +101,15 @@ func (in instrumentedInterface) StartContainer(id string) error {
 	return err
 }
 
+func (in instrumentedInterface) WaitForContainer(id string) error {
+	const operation = "waitFor_container"
+	defer recordOperation(operation, time.Now())
+
+	err := in.client.WaitForContainer(id)
+	recordError(operation, err)
+	return err
+}
+
 func (in instrumentedInterface) StopContainer(id string, timeout time.Duration) error {
 	const operation = "stop_container"
 	defer recordOperation(operation, time.Now())

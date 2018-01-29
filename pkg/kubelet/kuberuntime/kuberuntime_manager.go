@@ -376,6 +376,8 @@ type podActions struct {
 	// the key is the container ID of the container, while
 	// the value contains necessary information to kill a container.
 	ContainersToKill map[kubecontainer.ContainerID]containerToKillInfo
+	// Images of DeferContainers that will need to be pre-populated, this will be a map of im
+	DeferContainerImagesToPrePull map[string]string
 }
 
 // podSandboxChanged checks whether the spec of the pod is changed and returns
@@ -449,6 +451,7 @@ func (m *kubeGenericRuntimeManager) computePodActions(pod *v1.Pod, podStatus *ku
 		Attempt:           attempt,
 		ContainersToStart: []int{},
 		ContainersToKill:  make(map[kubecontainer.ContainerID]containerToKillInfo),
+		DeferContainerImagesToPrePull: make(map[string]string),
 	}
 
 	// If we need to (re-)create the pod sandbox, everything will need to be
@@ -554,6 +557,17 @@ func (m *kubeGenericRuntimeManager) computePodActions(pod *v1.Pod, podStatus *ku
 		changes.KillPod = true
 	}
 
+	// Check if we can pull deferContianers images (if its not available) while the POD is running
+	if pod.Spec.DeferContainers != nil {
+		for _, container := range pod.Spec.DeferContainers {
+			if _, ok := changes.DeferContainerImagesToPrePull[container.Image]; !ok {
+				//This seems to be a new image and is part of defer containers and needs to be pulled.
+				changes.DeferContainerImagesToPrePull[container.Image], _ = m.GetImageRef(kubecontainer.ImageSpec{Image: container.Image})
+			}
+
+		}
+	}
+
 	return changes
 }
 
@@ -565,6 +579,7 @@ func (m *kubeGenericRuntimeManager) computePodActions(pod *v1.Pod, podStatus *ku
 //  4. Create sandbox if necessary.
 //  5. Create init containers.
 //  6. Create normal containers.
+//  7. Pull DeferContainers
 func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, _ v1.PodStatus, podStatus *kubecontainer.PodStatus, pullSecrets []v1.Secret, backOff *flowcontrol.Backoff) (result kubecontainer.PodSyncResult) {
 	// Step 1: Compute sandbox and container changes.
 	podContainerChanges := m.computePodActions(pod, podStatus)
@@ -589,7 +604,7 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, _ v1.PodStatus, podStat
 			glog.V(4).Infof("Stopping PodSandbox for %q, will start new one", format.Pod(pod))
 		}
 
-		killResult := m.killPodWithSyncResult(pod, kubecontainer.ConvertPodStatusToRunningPod(m.runtimeName, podStatus), nil)
+		killResult := m.killPodWithSyncResult(pod, kubecontainer.ConvertPodStatusToRunningPod(m.runtimeName, podStatus), nil, pullSecrets)
 		result.AddPodSyncResult(killResult)
 		if killResult.Error() != nil {
 			glog.Errorf("killPodWithSyncResult failed: %v", killResult.Error())
@@ -737,6 +752,24 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, _ v1.PodStatus, podStat
 		}
 	}
 
+	//Step 7: If the Pods is in running phase pre-populate deferContainer images
+	if pod.Status.Phase == v1.PodRunning && len(podContainerChanges.DeferContainerImagesToPrePull) > 0 {
+		for idx, container := range pod.Spec.DeferContainers {
+			if imageRef, ok := podContainerChanges.DeferContainerImagesToPrePull[container.Image]; ok && imageRef == "" {
+				//This is a valid entry but image is not pulled yet.
+				ref, referr := kubecontainer.GenerateContainerRef(pod, &pod.Spec.DeferContainers[idx])
+				if referr == nil {
+					m.recorder.Eventf(ref, v1.EventTypeNormal, events.PullingImage, "Defer-Container image is being pre-pulled")
+				}
+				imageRef, message, err := m.imagePuller.EnsureImageExists(pod, &pod.Spec.DeferContainers[idx], pullSecrets)
+				if err != nil {
+					glog.V(4).Infof("Unable to pull the image err=%v messege=%v deferContainers(%+v) pod(%v)", err, message, container, format.Pod(pod))
+					continue
+				}
+				podContainerChanges.DeferContainerImagesToPrePull[container.Image] = imageRef
+			}
+		}
+	}
 	return
 }
 
@@ -777,15 +810,15 @@ func (m *kubeGenericRuntimeManager) doBackOff(pod *v1.Pod, container *v1.Contain
 // gracePeriodOverride if specified allows the caller to override the pod default grace period.
 // only hard kill paths are allowed to specify a gracePeriodOverride in the kubelet in order to not corrupt user data.
 // it is useful when doing SIGKILL for hard eviction scenarios, or max grace period during soft eviction scenarios.
-func (m *kubeGenericRuntimeManager) KillPod(pod *v1.Pod, runningPod kubecontainer.Pod, gracePeriodOverride *int64) error {
-	err := m.killPodWithSyncResult(pod, runningPod, gracePeriodOverride)
+func (m *kubeGenericRuntimeManager) KillPod(pod *v1.Pod, runningPod kubecontainer.Pod, gracePeriodOverride *int64, pullSecrets []v1.Secret) error {
+	err := m.killPodWithSyncResult(pod, runningPod, gracePeriodOverride, pullSecrets)
 	return err.Error()
 }
 
 // killPodWithSyncResult kills a runningPod and returns SyncResult.
 // Note: The pod passed in could be *nil* when kubelet restarted.
-func (m *kubeGenericRuntimeManager) killPodWithSyncResult(pod *v1.Pod, runningPod kubecontainer.Pod, gracePeriodOverride *int64) (result kubecontainer.PodSyncResult) {
-	killContainerResults := m.killContainersWithSyncResult(pod, runningPod, gracePeriodOverride)
+func (m *kubeGenericRuntimeManager) killPodWithSyncResult(pod *v1.Pod, runningPod kubecontainer.Pod, gracePeriodOverride *int64, pullSecrets []v1.Secret) (result kubecontainer.PodSyncResult) {
+	killContainerResults := m.killContainersWithSyncResult(pod, runningPod, gracePeriodOverride, pullSecrets)
 	for _, containerResult := range killContainerResults {
 		result.AddSyncResult(containerResult)
 	}

@@ -45,6 +45,11 @@ func (*Runtime) StartContainer(string) error {
 	panic("not implemented")
 }
 
+// WaitForContainer starts a created app.
+func (*Runtime) WaitForContainer(string) error {
+	panic("not implemented")
+}
+
 // StopContainer stops a running app with a grace period (i.e. timeout).
 func (*Runtime) StopContainer(string, int64) error {
 	panic("not implemented")
