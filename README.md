@@ -7,7 +7,7 @@
 ----
 
 Kubernetes is an open source system for managing [containerized applications]
-across multiple hosts, providing basic mechanisms for deployment, maintenance,
+across multiple hosts; providing basic mechanisms for deployment, maintenance,
 and scaling of applications.
 
 Kubernetes builds upon a decade and a half of experience at Google running
@@ -59,7 +59,7 @@ For the full story, head over to the [developer's documentation].
 
 ## Support
 
-If you need support, start with the [troubleshooting guide]
+If you need support, start with the [troubleshooting guide],
 and work your way through the process that we've outlined.
 
 That said, if you have questions, reach out to us
