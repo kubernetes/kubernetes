@@ -194,6 +194,7 @@ package_group(
     name = "pkg_kubectl_cmd_testing_CONSUMERS",
     packages = [
         "//pkg/kubectl/cmd",
+        "//pkg/kubectl/cmd/apply/prune",
         "//pkg/kubectl/cmd/auth",
         "//pkg/kubectl/cmd/resource",
         "//pkg/kubectl/cmd/set",
@@ -293,6 +294,7 @@ package_group(
         "//cmd/kubectl/app",
         "//pkg/kubectl",
         "//pkg/kubectl/cmd",
+        "//pkg/kubectl/cmd/apply/prune",
         "//pkg/kubectl/cmd/auth",
         "//pkg/kubectl/cmd/config",
         "//pkg/kubectl/cmd/resource",
