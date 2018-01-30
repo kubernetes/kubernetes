@@ -89,6 +89,8 @@ RKT_STAGE1_IMAGE=${KUBE_RKT_STAGE1_IMAGE:-coreos.com/rkt/stage1-coreos}
 MASTER_EXTRA_METADATA=${KUBE_MASTER_EXTRA_METADATA:-${KUBE_EXTRA_METADATA:-}}
 # MASTER_EXTRA_METADATA is the extra instance metadata on node instance separated by commas.
 NODE_EXTRA_METADATA=${KUBE_NODE_EXTRA_METADATA:-${KUBE_EXTRA_METADATA:-}}
+# KUBELET_TEST_ARGS are extra arguments passed to kubelet.
+KUBELET_TEST_ARGS=${KUBE_KUBELET_EXTRA_ARGS:-}
 
 NETWORK=${KUBE_GCE_NETWORK:-default}
 # Enable network deletion by default (for kube-down), unless we're using 'default' network.
