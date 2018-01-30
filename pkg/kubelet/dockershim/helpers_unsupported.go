@@ -53,3 +53,7 @@ func (ds *dockerService) determinePodIPBySandboxID(uid string) string {
 func getNetworkNamespace(c *dockertypes.ContainerJSON) (string, error) {
 	return "", fmt.Errorf("unsupported platform")
 }
+
+// applyExperimentalCreateConfig applys experimental configures from sandbox annotations.
+func applyExperimentalCreateConfig(createConfig *dockertypes.ContainerCreateConfig, annotations map[string]string) {
+}

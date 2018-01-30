@@ -29,6 +29,13 @@ import (
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 )
 
+const (
+	hypervIsolationAnnotationKey = "experimental.windows.kubernetes.io/isolation-type"
+
+	// Refer https://aka.ms/hyperv-container.
+	hypervIsolation = "hyperv"
+)
+
 func DefaultMemorySwap() int64 {
 	return 0
 }
@@ -40,6 +47,22 @@ func (ds *dockerService) getSecurityOpts(seccompProfile string, separator rune) 
 	return nil, nil
 }
 
+func shouldIsolatedByHyperV(annotations map[string]string) bool {
+	v, ok := annotations[hypervIsolationAnnotationKey]
+	return ok && v == hypervIsolation
+}
+
+// applyExperimentalCreateConfig applys experimental configures from sandbox annotations.
+func applyExperimentalCreateConfig(createConfig *dockertypes.ContainerCreateConfig, annotations map[string]string) {
+	if shouldIsolatedByHyperV(annotations) {
+		createConfig.HostConfig.Isolation = hypervIsolation
+
+		if networkMode := os.Getenv("CONTAINER_NETWORK"); networkMode == "" {
+			createConfig.HostConfig.NetworkMode = dockercontainer.NetworkMode("none")
+		}
+	}
+}
+
 func (ds *dockerService) updateCreateConfig(
 	createConfig *dockertypes.ContainerCreateConfig,
 	config *runtimeapi.ContainerConfig,
@@ -47,10 +70,12 @@ func (ds *dockerService) updateCreateConfig(
 	podSandboxID string, securityOptSep rune, apiVersion *semver.Version) error {
 	if networkMode := os.Getenv("CONTAINER_NETWORK"); networkMode != "" {
 		createConfig.HostConfig.NetworkMode = dockercontainer.NetworkMode(networkMode)
-	} else {
+	} else if !shouldIsolatedByHyperV(sandboxConfig.Annotations) {
 		// Todo: Refactor this call in future for calling methods directly in security_context.go
 		modifyHostNetworkOptionForContainer(false, podSandboxID, createConfig.HostConfig)
 	}
+
+	applyExperimentalCreateConfig(createConfig, sandboxConfig.Annotations)
 
 	return nil
 }
@@ -87,8 +112,17 @@ func (ds *dockerService) determinePodIPBySandboxID(sandboxID string) string {
 		// Todo: Add a kernel version check for more validation
 
 		if networkMode := os.Getenv("CONTAINER_NETWORK"); networkMode == "" {
-			// Do not return any IP, so that we would continue and get the IP of the Sandbox
-			ds.getIP(sandboxID, r)
+			if r.HostConfig.Isolation == hypervIsolation {
+				// Hyper-V only supports one container per Pod yet and the container will have a different
+				// IP address from sandbox. Return the first non-sandbox container IP as POD IP.
+				// TODO(feiskyer): remove this workaround after Hyper-V supports multiple containers per Pod.
+				if containerIP := ds.getIP(c.ID, r); containerIP != "" {
+					return containerIP
+				}
+			} else {
+				// Do not return any IP, so that we would continue and get the IP of the Sandbox
+				ds.getIP(sandboxID, r)
+			}
 		} else {
 			// On Windows, every container that is created in a Sandbox, needs to invoke CNI plugin again for adding the Network,
 			// with the shared container name as NetNS info,
