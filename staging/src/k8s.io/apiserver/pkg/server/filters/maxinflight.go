@@ -19,8 +19,11 @@ package filters
 import (
 	"fmt"
 	"net/http"
+	"sync"
+	"time"
 
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/endpoints/metrics"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
@@ -28,9 +31,16 @@ import (
 	"github.com/golang/glog"
 )
 
-// Constant for the retry-after interval on rate limiting.
-// TODO: maybe make this dynamic? or user-adjustable?
-const retryAfter = "1"
+const (
+	// Constant for the retry-after interval on rate limiting.
+	// TODO: maybe make this dynamic? or user-adjustable?
+	retryAfter = "1"
+
+	// How often inflight usage metric should be updated. Because
+	// the metrics tracks maximal value over period making this
+	// longer will increase the metric value.
+	inflightUsageMetricUpdatePeriod = time.Second
+)
 
 var nonMutatingRequestVerbs = sets.NewString("get", "list", "watch")
 
@@ -40,6 +50,49 @@ func handleError(w http.ResponseWriter, r *http.Request, err error) {
 	glog.Errorf(err.Error())
 }
 
+// requestWatermark is used to trak maximal usage of inflight requests.
+type requestWatermark struct {
+	lock                                 sync.Mutex
+	readOnlyWatermark, mutatingWatermark int
+}
+
+func (w *requestWatermark) recordMutating(mutatingVal int) {
+	w.lock.Lock()
+	defer w.lock.Unlock()
+
+	if w.mutatingWatermark < mutatingVal {
+		w.mutatingWatermark = mutatingVal
+	}
+}
+
+func (w *requestWatermark) recordReadOnly(readOnlyVal int) {
+	w.lock.Lock()
+	defer w.lock.Unlock()
+
+	if w.readOnlyWatermark < readOnlyVal {
+		w.readOnlyWatermark = readOnlyVal
+	}
+}
+
+var watermark = &requestWatermark{}
+
+func startRecordingUsage() {
+	go func() {
+		wait.Forever(func() {
+			watermark.lock.Lock()
+			readOnlyWatermark := watermark.readOnlyWatermark
+			mutatingWatermark := watermark.mutatingWatermark
+			watermark.readOnlyWatermark = 0
+			watermark.mutatingWatermark = 0
+			watermark.lock.Unlock()
+
+			metrics.UpdateInflightRequestMetrics(readOnlyWatermark, mutatingWatermark)
+		}, inflightUsageMetricUpdatePeriod)
+	}()
+}
+
+var startOnce sync.Once
+
 // WithMaxInFlightLimit limits the number of in-flight requests to buffer size of the passed in channel.
 func WithMaxInFlightLimit(
 	handler http.Handler,
@@ -48,6 +101,7 @@ func WithMaxInFlightLimit(
 	requestContextMapper apirequest.RequestContextMapper,
 	longRunningRequestCheck apirequest.LongRunningRequestCheck,
 ) http.Handler {
+	startOnce.Do(startRecordingUsage)
 	if nonMutatingLimit == 0 && mutatingLimit == 0 {
 		return handler
 	}
@@ -79,7 +133,8 @@ func WithMaxInFlightLimit(
 		}
 
 		var c chan bool
-		if !nonMutatingRequestVerbs.Has(requestInfo.Verb) {
+		isMutatingRequest := !nonMutatingRequestVerbs.Has(requestInfo.Verb)
+		if isMutatingRequest {
 			c = mutatingChan
 		} else {
 			c = nonMutatingChan
@@ -91,10 +146,31 @@ func WithMaxInFlightLimit(
 
 			select {
 			case c <- true:
-				defer func() { <-c }()
+				var mutatingLen, readOnlyLen int
+				if isMutatingRequest {
+					mutatingLen = len(mutatingChan)
+				} else {
+					readOnlyLen = len(nonMutatingChan)
+				}
+
+				defer func() {
+					<-c
+					if isMutatingRequest {
+						watermark.recordMutating(mutatingLen)
+					} else {
+						watermark.recordReadOnly(readOnlyLen)
+					}
+
+				}()
 				handler.ServeHTTP(w, r)
 
 			default:
+				// We need to split this data between buckets used for throttling.
+				if isMutatingRequest {
+					metrics.DroppedRequests.WithLabelValues(metrics.MutatingKind).Inc()
+				} else {
+					metrics.DroppedRequests.WithLabelValues(metrics.ReadOnlyKind).Inc()
+				}
 				// at this point we're about to return a 429, BUT not all actors should be rate limited.  A system:master is so powerful
 				// that he should always get an answer.  It's a super-admin or a loopback connection.
 				if currUser, ok := apirequest.UserFrom(ctx); ok {
