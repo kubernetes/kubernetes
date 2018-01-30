@@ -183,7 +183,7 @@ func (o *CreateOptions) RunCreate(f cmdutil.Factory, cmd *cobra.Command) error {
 		return err
 	}
 
-	dryRun := cmdutil.GetFlagBool(cmd, "dry-run")
+	dryRun := cmdutil.GetDryRunFlag(cmd)
 	output := cmdutil.GetFlagString(cmd, "output")
 	mapper := r.Mapper().RESTMapper
 
