@@ -654,7 +654,7 @@ func (pm *VolumePluginMgr) FindCreatablePluginBySpec(spec *Spec) (ProvisionableV
 	return nil, fmt.Errorf("no creatable volume plugin matched")
 }
 
-// FindAttachablePluginBySpec fetches a persistent volume plugin by name.
+// FindAttachablePluginBySpec fetches a persistent volume plugin by spec.
 // Unlike the other "FindPlugin" methods, this does not return error if no
 // plugin is found.  All volumes require a mounter and unmounter, but not
 // every volume will have an attacher/detacher.

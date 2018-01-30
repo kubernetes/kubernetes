@@ -40,10 +40,10 @@ func EtcdUpgrade(target_storage, target_version string) error {
 	}
 }
 
-func IngressUpgrade() error {
+func IngressUpgrade(isUpgrade bool) error {
 	switch TestContext.Provider {
 	case "gce":
-		return ingressUpgradeGCE()
+		return ingressUpgradeGCE(isUpgrade)
 	default:
 		return fmt.Errorf("IngressUpgrade() is not implemented for provider %s", TestContext.Provider)
 	}
@@ -73,10 +73,19 @@ func etcdUpgradeGCE(target_storage, target_version string) error {
 	return err
 }
 
-func ingressUpgradeGCE() error {
+func ingressUpgradeGCE(isUpgrade bool) error {
 	// Flip glbc image from latest release image to HEAD to simulate an upgrade.
+	// Flip from HEAD to latest release image to simulate a downgrade.
 	// Kubelet should restart glbc automatically.
-	sshResult, err := NodeExec(GetMasterHost(), "sudo sed -i -re 's/(image:)(.*)/\\1 gcr.io\\/e2e-ingress-gce\\/ingress-gce-e2e-glbc-amd64:latest/' /etc/kubernetes/manifests/glbc.manifest")
+	var command string
+	if isUpgrade {
+		// Upgrade
+		command = "sudo sed -i -re 's/(image:)(.*)/\\1 gcr.io\\/k8s-ingress-image-push\\/ingress-gce-e2e-glbc-amd64:latest/' /etc/kubernetes/manifests/glbc.manifest"
+	} else {
+		// Downgrade
+		command = "sudo sed -i -re 's/(image:)(.*)/\\1 gcr.io\\/google_containers\\/glbc:0.9.7/' /etc/kubernetes/manifests/glbc.manifest"
+	}
+	sshResult, err := NodeExec(GetMasterHost(), command)
 	// TODO(rramkumar): Ensure glbc pod is in "Running" state before proceeding.
 	LogSSHResult(sshResult)
 	return err

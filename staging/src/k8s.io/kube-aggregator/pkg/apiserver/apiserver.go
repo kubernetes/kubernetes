@@ -185,26 +185,23 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 
 	apiResourceConfig := c.GenericConfig.MergedResourceConfig
 	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(apiregistration.GroupName, Registry, Scheme, metav1.ParameterCodec, Codecs)
-	if apiResourceConfig.AnyResourcesForVersionEnabled(v1beta1.SchemeGroupVersion) {
+	if apiResourceConfig.VersionEnabled(v1beta1.SchemeGroupVersion) {
 		apiGroupInfo.GroupMeta.GroupVersion = v1beta1.SchemeGroupVersion
 		storage := map[string]rest.Storage{}
-		version := v1beta1.SchemeGroupVersion
-		if apiResourceConfig.ResourceEnabled(version.WithResource("apiservices")) {
-			apiServiceREST := apiservicestorage.NewREST(Scheme, c.GenericConfig.RESTOptionsGetter)
-			storage["apiservices"] = apiServiceREST
-			storage["apiservices/status"] = apiservicestorage.NewStatusREST(Scheme, apiServiceREST)
-		}
+		// apiservices
+		apiServiceREST := apiservicestorage.NewREST(Scheme, c.GenericConfig.RESTOptionsGetter)
+		storage["apiservices"] = apiServiceREST
+		storage["apiservices/status"] = apiservicestorage.NewStatusREST(Scheme, apiServiceREST)
 		apiGroupInfo.VersionedResourcesStorageMap["v1beta1"] = storage
 	}
-	if apiResourceConfig.AnyResourcesForVersionEnabled(v1.SchemeGroupVersion) {
+	if apiResourceConfig.VersionEnabled(v1.SchemeGroupVersion) {
 		apiGroupInfo.GroupMeta.GroupVersion = v1.SchemeGroupVersion
 		storage := map[string]rest.Storage{}
-		version := v1.SchemeGroupVersion
-		if apiResourceConfig.ResourceEnabled(version.WithResource("apiservices")) {
-			apiServiceREST := apiservicestorage.NewREST(Scheme, c.GenericConfig.RESTOptionsGetter)
-			storage["apiservices"] = apiServiceREST
-			storage["apiservices/status"] = apiservicestorage.NewStatusREST(Scheme, apiServiceREST)
-		}
+		// apiservices
+		apiServiceREST := apiservicestorage.NewREST(Scheme, c.GenericConfig.RESTOptionsGetter)
+		storage["apiservices"] = apiServiceREST
+		storage["apiservices/status"] = apiservicestorage.NewStatusREST(Scheme, apiServiceREST)
+
 		apiGroupInfo.VersionedResourcesStorageMap["v1"] = storage
 	}
 

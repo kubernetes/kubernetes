@@ -234,7 +234,7 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 		}
 	}
 
-	dryRun := cmdutil.GetFlagBool(cmd, "dry-run")
+	dryRun := cmdutil.GetDryRunFlag(cmd)
 	output := cmdutil.GetFlagString(cmd, "output")
 	shortOutput := output == "name"
 

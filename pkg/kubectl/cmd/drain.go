@@ -224,7 +224,7 @@ func (o *DrainOptions) SetupDrain(cmd *cobra.Command, args []string) error {
 		return cmdutil.UsageErrorf(cmd, fmt.Sprintf("USAGE: %s [flags]", cmd.Use))
 	}
 
-	o.DryRun = cmdutil.GetFlagBool(cmd, "dry-run")
+	o.DryRun = cmdutil.GetDryRunFlag(cmd)
 
 	if o.client, err = o.Factory.KubernetesClientSet(); err != nil {
 		return err

@@ -50,11 +50,9 @@ import (
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericfilters "k8s.io/apiserver/pkg/server/filters"
-	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	restclient "k8s.io/client-go/rest"
-	openapi "k8s.io/kube-openapi/pkg/common"
 )
 
 const (
@@ -82,14 +80,8 @@ func init() {
 	examplev1.AddToScheme(scheme)
 }
 
-func testGetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.OpenAPIDefinition {
-	return map[string]openapi.OpenAPIDefinition{}
-}
-
 // setUp is a convience function for setting up for (most) tests.
-func setUp(t *testing.T) (*etcdtesting.EtcdTestServer, Config, *assert.Assertions) {
-	etcdServer, _ := etcdtesting.NewUnsecuredEtcd3TestClientServer(t)
-
+func setUp(t *testing.T) (Config, *assert.Assertions) {
 	config := NewConfig(codecs)
 	config.PublicAddress = net.ParseIP("192.168.10.4")
 	config.RequestContextMapper = apirequest.NewRequestContextMapper()
@@ -113,24 +105,23 @@ func setUp(t *testing.T) (*etcdtesting.EtcdTestServer, Config, *assert.Assertion
 	sharedInformers := informers.NewSharedInformerFactory(clientset, config.LoopbackClientConfig.Timeout)
 	config.Complete(sharedInformers)
 
-	return etcdServer, *config, assert.New(t)
+	return *config, assert.New(t)
 }
 
-func newMaster(t *testing.T) (*GenericAPIServer, *etcdtesting.EtcdTestServer, Config, *assert.Assertions) {
-	etcdserver, config, assert := setUp(t)
+func newMaster(t *testing.T) (*GenericAPIServer, Config, *assert.Assertions) {
+	config, assert := setUp(t)
 
 	s, err := config.Complete(nil).New("test", EmptyDelegate)
 	if err != nil {
 		t.Fatalf("Error in bringing up the server: %v", err)
 	}
-	return s, etcdserver, config, assert
+	return s, config, assert
 }
 
 // TestNew verifies that the New function returns a GenericAPIServer
 // using the configuration properly.
 func TestNew(t *testing.T) {
-	s, etcdserver, config, assert := newMaster(t)
-	defer etcdserver.Terminate(t)
+	s, config, assert := newMaster(t)
 
 	// Verify many of the variables match their config counterparts
 	assert.Equal(s.legacyAPIGroupPrefixes, config.LegacyAPIGroupPrefixes)
@@ -145,8 +136,7 @@ func TestNew(t *testing.T) {
 
 // Verifies that AddGroupVersions works as expected.
 func TestInstallAPIGroups(t *testing.T) {
-	etcdserver, config, assert := setUp(t)
-	defer etcdserver.Terminate(t)
+	config, assert := setUp(t)
 
 	config.LegacyAPIGroupPrefixes = sets.NewString("/apiPrefix")
 	config.DiscoveryAddresses = discovery.DefaultAddresses{DefaultAddress: "ExternalAddress"}
@@ -312,8 +302,7 @@ func TestInstallAPIGroups(t *testing.T) {
 }
 
 func TestPrepareRun(t *testing.T) {
-	s, etcdserver, config, assert := newMaster(t)
-	defer etcdserver.Terminate(t)
+	s, config, assert := newMaster(t)
 
 	assert.NotNil(config.SwaggerConfig)
 
@@ -340,8 +329,7 @@ func TestPrepareRun(t *testing.T) {
 
 // TestCustomHandlerChain verifies the handler chain with custom handler chain builder functions.
 func TestCustomHandlerChain(t *testing.T) {
-	etcdserver, config, _ := setUp(t)
-	defer etcdserver.Terminate(t)
+	config, _ := setUp(t)
 
 	var protected, called bool
 
@@ -394,8 +382,7 @@ func TestCustomHandlerChain(t *testing.T) {
 
 // TestNotRestRoutesHaveAuth checks that special non-routes are behind authz/authn.
 func TestNotRestRoutesHaveAuth(t *testing.T) {
-	etcdserver, config, _ := setUp(t)
-	defer etcdserver.Terminate(t)
+	config, _ := setUp(t)
 
 	authz := mockAuthorizer{}
 
@@ -516,8 +503,7 @@ func fakeVersion() version.Info {
 
 // TestGracefulShutdown verifies server shutdown after request handler finish.
 func TestGracefulShutdown(t *testing.T) {
-	etcdserver, config, _ := setUp(t)
-	defer etcdserver.Terminate(t)
+	config, _ := setUp(t)
 
 	var graceShutdown bool
 	wg := sync.WaitGroup{}

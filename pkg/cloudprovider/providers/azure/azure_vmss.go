@@ -654,7 +654,7 @@ func (ss *scaleSet) getScaleSetWithRetry(name string) (compute.VirtualMachineSca
 			glog.Errorf("backoff: failure, will retry,err=%v", retryErr)
 			return false, nil
 		}
-		glog.V(2).Infof("backoff: success")
+		glog.V(2).Info("backoff: success")
 		return true, nil
 	})
 

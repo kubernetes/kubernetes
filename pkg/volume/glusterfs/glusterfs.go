@@ -669,7 +669,7 @@ func (d *glusterfsVolumeDeleter) Delete() error {
 	if err != nil {
 		glog.Errorf("error when deleting endpoint/service :%v", err)
 	} else {
-		glog.V(1).Infof("endpoint: %v and service: %v deleted successfully ", dynamicNamespace, dynamicEndpoint)
+		glog.V(1).Infof("endpoint: [%v/%v] is deleted successfully ", dynamicNamespace, dynamicEndpoint)
 	}
 	return nil
 }

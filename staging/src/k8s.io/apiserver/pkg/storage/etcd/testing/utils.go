@@ -285,32 +285,6 @@ func NewEtcdTestClientServer(t *testing.T) *EtcdTestServer {
 	return server
 }
 
-// NewUnsecuredEtcdTestClientServer DEPRECATED creates a new client and server for testing
-func NewUnsecuredEtcdTestClientServer(t *testing.T) *EtcdTestServer {
-	server := configureTestCluster(t, "foo", false)
-	err := server.launch(t)
-	if err != nil {
-		t.Fatalf("Failed to start etcd server error=%v", err)
-		return nil
-	}
-	cfg := etcd.Config{
-		Endpoints: server.ClientURLs.StringSlice(),
-		Transport: newHttpTransport(t, server.CertFile, server.KeyFile, server.CAFile),
-	}
-	server.Client, err = etcd.New(cfg)
-	if err != nil {
-		t.Errorf("Unexpected error in NewUnsecuredEtcdTestClientServer (%v)", err)
-		server.Terminate(t)
-		return nil
-	}
-	if err := server.waitUntilUp(); err != nil {
-		t.Errorf("Unexpected error in waitUntilUp (%v)", err)
-		server.Terminate(t)
-		return nil
-	}
-	return server
-}
-
 // NewEtcd3TestClientServer creates a new client and server for testing
 func NewUnsecuredEtcd3TestClientServer(t *testing.T) (*EtcdTestServer, *storagebackend.Config) {
 	server := &EtcdTestServer{

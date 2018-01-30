@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2018 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,7 +14,28 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package rktshim is the package that contains the shim code for rkt to be used
-// as the kubelet container runtime implementation that is integrated using the
-// Container Runtime Interface.
-package rktshim
+package flag
+
+import (
+	goflag "flag"
+	"github.com/spf13/pflag"
+)
+
+// NoOp implements goflag.Value and plfag.Value,
+// but has a noop Set implementation
+type NoOp struct{}
+
+var _ goflag.Value = NoOp{}
+var _ pflag.Value = NoOp{}
+
+func (NoOp) String() string {
+	return ""
+}
+
+func (NoOp) Set(val string) error {
+	return nil
+}
+
+func (NoOp) Type() string {
+	return "NoOp"
+}

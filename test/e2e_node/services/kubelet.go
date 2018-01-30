@@ -77,7 +77,7 @@ func init() {
 	flag.Var(&kubeletArgs, "kubelet-flags", "Kubelet flags passed to kubelet, this will override default kubelet flags in the test. Flags specified in multiple kubelet-flags will be concatenate.")
 	flag.BoolVar(&kubeletContainerized, "kubelet-containerized", false, "Run kubelet in a docker container")
 	flag.StringVar(&hyperkubeImage, "hyperkube-image", "", "Docker image with containerized kubelet")
-	flag.BoolVar(&genKubeletConfigFile, "generate-kubelet-config-file", false, "The test runner will generate a Kubelet config file containing test defaults instead of passing default flags to the Kubelet.")
+	flag.BoolVar(&genKubeletConfigFile, "generate-kubelet-config-file", true, "The test runner will generate a Kubelet config file containing test defaults instead of passing default flags to the Kubelet.")
 }
 
 // RunKubelet starts kubelet and waits for termination signal. Once receives the

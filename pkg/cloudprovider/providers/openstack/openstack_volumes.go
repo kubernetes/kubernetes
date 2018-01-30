@@ -25,8 +25,11 @@ import (
 	"strings"
 	"time"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/kubernetes/pkg/cloudprovider"
+	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	k8s_volume "k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 
@@ -71,6 +74,8 @@ type Volume struct {
 	AttachedServerId string
 	// Device file path
 	AttachedDevice string
+	// AvailabilityZone is which availability zone the volume is in
+	AvailabilityZone string
 	// Unique identifier for the volume.
 	ID string
 	// Human-readable display name for the volume.
@@ -88,6 +93,9 @@ type VolumeCreateOpts struct {
 	VolumeType   string
 	Metadata     map[string]string
 }
+
+// implements PVLabeler.
+var _ cloudprovider.PVLabeler = (*OpenStack)(nil)
 
 const (
 	VolumeAvailableStatus = "available"
@@ -171,10 +179,11 @@ func (volumes *VolumesV1) getVolume(volumeID string) (Volume, error) {
 	}
 
 	volume := Volume{
-		ID:     volumeV1.ID,
-		Name:   volumeV1.Name,
-		Status: volumeV1.Status,
-		Size:   volumeV1.Size,
+		AvailabilityZone: volumeV1.AvailabilityZone,
+		ID:               volumeV1.ID,
+		Name:             volumeV1.Name,
+		Status:           volumeV1.Status,
+		Size:             volumeV1.Size,
 	}
 
 	if len(volumeV1.Attachments) > 0 && volumeV1.Attachments[0]["server_id"] != nil {
@@ -195,10 +204,11 @@ func (volumes *VolumesV2) getVolume(volumeID string) (Volume, error) {
 	}
 
 	volume := Volume{
-		ID:     volumeV2.ID,
-		Name:   volumeV2.Name,
-		Status: volumeV2.Status,
-		Size:   volumeV2.Size,
+		AvailabilityZone: volumeV2.AvailabilityZone,
+		ID:               volumeV2.ID,
+		Name:             volumeV2.Name,
+		Status:           volumeV2.Status,
+		Size:             volumeV2.Size,
 	}
 
 	if len(volumeV2.Attachments) > 0 {
@@ -219,10 +229,10 @@ func (volumes *VolumesV3) getVolume(volumeID string) (Volume, error) {
 	}
 
 	volume := Volume{
-		ID:     volumeV3.ID,
-		Name:   volumeV3.Name,
-		Status: volumeV3.Status,
-		Size:   volumeV3.Size,
+		AvailabilityZone: volumeV3.AvailabilityZone,
+		ID:               volumeV3.ID,
+		Name:             volumeV3.Name,
+		Status:           volumeV3.Status,
 	}
 
 	if len(volumeV3.Attachments) > 0 {
@@ -678,6 +688,28 @@ func (os *OpenStack) diskIsUsed(volumeID string) (bool, error) {
 // ShouldTrustDevicePath queries if we should trust the cinder provide deviceName, See issue #33128
 func (os *OpenStack) ShouldTrustDevicePath() bool {
 	return os.bsOpts.TrustDevicePath
+}
+
+// GetLabelsForVolume implements PVLabeler.GetLabelsForVolume
+func (os *OpenStack) GetLabelsForVolume(pv *v1.PersistentVolume) (map[string]string, error) {
+	// Ignore any volumes that are being provisioned
+	if pv.Spec.Cinder.VolumeID == k8s_volume.ProvisionedVolumeName {
+		return nil, nil
+	}
+
+	// Get Volume
+	volume, err := os.getVolume(pv.Spec.Cinder.VolumeID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Contruct Volume Labels
+	labels := make(map[string]string)
+	labels[kubeletapis.LabelZoneFailureDomain] = volume.AvailabilityZone
+	labels[kubeletapis.LabelZoneRegion] = os.region
+	glog.V(4).Infof("The Volume %s has labels %v", pv.Spec.Cinder.VolumeID, labels)
+
+	return labels, nil
 }
 
 // recordOpenstackOperationMetric records openstack operation metrics

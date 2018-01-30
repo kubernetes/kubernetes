@@ -140,6 +140,15 @@ func (in instrumentedRuntimeService) UpdateContainerResources(containerID string
 	return err
 }
 
+func (in instrumentedRuntimeService) ReopenContainerLog(containerID string) error {
+	const operation = "reopen_container_log"
+	defer recordOperation(operation, time.Now())
+
+	err := in.service.ReopenContainerLog(containerID)
+	recordError(operation, err)
+	return err
+}
+
 func (in instrumentedRuntimeService) ExecSync(containerID string, cmd []string, timeout time.Duration) ([]byte, []byte, error) {
 	const operation = "exec_sync"
 	defer recordOperation(operation, time.Now())

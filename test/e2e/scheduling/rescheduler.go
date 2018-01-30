@@ -42,7 +42,7 @@ var _ = SIGDescribe("Rescheduler [Serial]", func() {
 	var totalMillicores int
 
 	BeforeEach(func() {
-		framework.SkipUnlessProviderIs("gce", "gke")
+		framework.Skipf("Rescheduler is being deprecated soon in Kubernetes 1.10")
 		ns = f.Namespace.Name
 		nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
 		nodeCount := len(nodes.Items)

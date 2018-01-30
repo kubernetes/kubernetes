@@ -36,7 +36,6 @@ func newKubeletServerOrDie() *KubeletServer {
 }
 
 func cleanFlags(s *KubeletServer) {
-	s.KubeConfig = utilflag.NewStringFlag(s.KubeConfig.Value())
 	s.DynamicConfigDir = utilflag.NewStringFlag(s.DynamicConfigDir.Value())
 }
 

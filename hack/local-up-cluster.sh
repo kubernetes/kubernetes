@@ -496,10 +496,10 @@ function start_apiserver {
     # is set to 127.0.0.1
     advertise_address=""
     if [[ "${API_HOST_IP}" != "127.0.0.1" ]]; then
-        advertise_address="--advertise_address=${API_HOST_IP}"
+        advertise_address="--advertise-address=${API_HOST_IP}"
     fi
     if [[ "${ADVERTISE_ADDRESS}" != "" ]] ; then
-        advertise_address="--advertise_address=${ADVERTISE_ADDRESS}"
+        advertise_address="--advertise-address=${ADVERTISE_ADDRESS}"
     fi
 
     # Create CA signers
@@ -554,7 +554,6 @@ function start_apiserver {
       --secure-port="${API_SECURE_PORT}" \
       --tls-cert-file="${CERT_DIR}/serving-kube-apiserver.crt" \
       --tls-private-key-file="${CERT_DIR}/serving-kube-apiserver.key" \
-      --tls-ca-file="${CERT_DIR}/server-ca.crt" \
       --insecure-bind-address="${API_HOST_IP}" \
       --insecure-port="${API_PORT}" \
       --storage-backend=${STORAGE_BACKEND} \

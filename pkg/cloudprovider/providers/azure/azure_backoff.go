@@ -51,7 +51,7 @@ func (az *Cloud) GetVirtualMachineWithRetry(name types.NodeName) (compute.Virtua
 			glog.Errorf("backoff: failure, will retry,err=%v", retryErr)
 			return false, nil
 		}
-		glog.V(2).Infof("backoff: success")
+		glog.V(2).Info("backoff: success")
 		return true, nil
 	})
 	if err == wait.ErrWaitTimeout {
@@ -118,7 +118,7 @@ func (az *Cloud) GetIPForMachineWithRetry(name types.NodeName) (string, error) {
 			glog.Errorf("backoff: failure, will retry,err=%v", retryErr)
 			return false, nil
 		}
-		glog.V(2).Infof("backoff: success")
+		glog.V(2).Info("backoff: success")
 		return true, nil
 	})
 	return ip, err

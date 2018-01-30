@@ -159,8 +159,6 @@ func DeleteRCAndPods(clientset clientset.Interface, internalClientset internalcl
 	return DeleteResourceAndPods(clientset, internalClientset, api.Kind("ReplicationController"), ns, name)
 }
 
-//TODO(p0lyn0mial): remove internalClientset.
-//TODO(p0lyn0mial): update the callers.
 func ScaleRC(clientset clientset.Interface, internalClientset internalclientset.Interface, scalesGetter scaleclient.ScalesGetter, ns, name string, size uint, wait bool) error {
 	return ScaleResource(clientset, internalClientset, scalesGetter, ns, name, size, wait, api.Kind("ReplicationController"), api.Resource("replicationcontrollers"))
 }

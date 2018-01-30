@@ -125,7 +125,6 @@ func (s *ServerRunOptions) AddFlags(fs *pflag.FlagSet) {
 	s.GenericServerRunOptions.AddUniversalFlags(fs)
 	s.Etcd.AddFlags(fs)
 	s.SecureServing.AddFlags(fs)
-	s.SecureServing.AddDeprecatedFlags(fs)
 	s.InsecureServing.AddFlags(fs)
 	s.InsecureServing.AddDeprecatedFlags(fs)
 	s.Audit.AddFlags(fs)

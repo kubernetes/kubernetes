@@ -30,10 +30,6 @@ const (
 	betaPrefix  = "https://www.googleapis.com/compute/beta/"
 )
 
-var (
-	allPrefixes = []string{gaPrefix, alphaPrefix, betaPrefix}
-)
-
 // ResourceID identifies a GCE resource as parsed from compute resource URL.
 type ResourceID struct {
 	ProjectID string
@@ -66,15 +62,10 @@ func (r *ResourceID) Equal(other *ResourceID) bool {
 func ParseResourceURL(url string) (*ResourceID, error) {
 	errNotValid := fmt.Errorf("%q is not a valid resource URL", url)
 
-	// Remove the "https://..." prefix if present
-	for _, prefix := range allPrefixes {
-		if strings.HasPrefix(url, prefix) {
-			if len(url) < len(prefix) {
-				return nil, errNotValid
-			}
-			url = url[len(prefix):]
-			break
-		}
+	// Remove the prefix up to ...projects/
+	projectsIndex := strings.Index(url, "/projects/")
+	if projectsIndex >= 0 {
+		url = url[projectsIndex+1:]
 	}
 
 	parts := strings.Split(url, "/")

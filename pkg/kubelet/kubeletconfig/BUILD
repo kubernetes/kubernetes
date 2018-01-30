@@ -18,7 +18,6 @@ go_library(
         "//pkg/kubelet/apis/kubeletconfig/validation:go_default_library",
         "//pkg/kubelet/kubeletconfig/checkpoint:go_default_library",
         "//pkg/kubelet/kubeletconfig/checkpoint/store:go_default_library",
-        "//pkg/kubelet/kubeletconfig/configfiles:go_default_library",
         "//pkg/kubelet/kubeletconfig/status:go_default_library",
         "//pkg/kubelet/kubeletconfig/util/equal:go_default_library",
         "//pkg/kubelet/kubeletconfig/util/log:go_default_library",

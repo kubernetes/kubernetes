@@ -31,7 +31,6 @@ import (
 
 	"k8s.io/kubernetes/pkg/kubelet/kubeletconfig/checkpoint"
 	"k8s.io/kubernetes/pkg/kubelet/kubeletconfig/checkpoint/store"
-	"k8s.io/kubernetes/pkg/kubelet/kubeletconfig/configfiles"
 	"k8s.io/kubernetes/pkg/kubelet/kubeletconfig/status"
 	utillog "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/log"
 	utilpanic "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/panic"
@@ -42,22 +41,11 @@ const (
 	checkpointsDir = "checkpoints"
 )
 
-// Controller is the controller which, among other things:
-// - loads configuration from disk
-// - checkpoints configuration to disk
-// - downloads new configuration from the API server
-// - validates configuration
-// - tracks the last-known-good configuration, and rolls-back to last-known-good when necessary
+// Controller manages syncing dynamic Kubelet configurations
 // For more information, see the proposal: https://github.com/kubernetes/community/blob/master/contributors/design-proposals/node/dynamic-kubelet-configuration.md
 type Controller struct {
-	// dynamicConfig, if true, indicates that we should sync config from the API server
-	dynamicConfig bool
-
 	// defaultConfig is the configuration to use if no initConfig is provided
 	defaultConfig *kubeletconfig.KubeletConfiguration
-
-	// fileLoader is for loading the Kubelet's local config files from disk
-	fileLoader configfiles.Loader
 
 	// pendingConfigSource; write to this channel to indicate that the config source needs to be synced from the API server
 	pendingConfigSource chan bool
@@ -73,37 +61,14 @@ type Controller struct {
 }
 
 // NewController constructs a new Controller object and returns it. Directory paths must be absolute.
-// If the `kubeletConfigFile` is an empty string, skips trying to load the kubelet config file.
-// If the `dynamicConfigDir` is an empty string, skips trying to load checkpoints or download new config,
-// but will still sync the ConfigOK condition if you call StartSync with a non-nil client.
-func NewController(defaultConfig *kubeletconfig.KubeletConfiguration,
-	kubeletConfigFile string,
-	dynamicConfigDir string) (*Controller, error) {
-	var err error
-
-	fs := utilfs.DefaultFs{}
-
-	var fileLoader configfiles.Loader
-	if len(kubeletConfigFile) > 0 {
-		fileLoader, err = configfiles.NewFsLoader(fs, kubeletConfigFile)
-		if err != nil {
-			return nil, err
-		}
-	}
-	dynamicConfig := false
-	if len(dynamicConfigDir) > 0 {
-		dynamicConfig = true
-	}
-
+func NewController(defaultConfig *kubeletconfig.KubeletConfiguration, dynamicConfigDir string) *Controller {
 	return &Controller{
-		dynamicConfig: dynamicConfig,
 		defaultConfig: defaultConfig,
 		// channels must have capacity at least 1, since we signal with non-blocking writes
 		pendingConfigSource: make(chan bool, 1),
 		configOK:            status.NewConfigOKCondition(),
-		checkpointStore:     store.NewFsStore(fs, filepath.Join(dynamicConfigDir, checkpointsDir)),
-		fileLoader:          fileLoader,
-	}, nil
+		checkpointStore:     store.NewFsStore(utilfs.DefaultFs{}, filepath.Join(dynamicConfigDir, checkpointsDir)),
+	}
 }
 
 // Bootstrap attempts to return a valid KubeletConfiguration based on the configuration of the Controller,
@@ -111,28 +76,19 @@ func NewController(defaultConfig *kubeletconfig.KubeletConfiguration,
 func (cc *Controller) Bootstrap() (*kubeletconfig.KubeletConfiguration, error) {
 	utillog.Infof("starting controller")
 
-	// Load and validate the local config (defaults + flags, file)
-	local, err := cc.loadLocalConfig()
-	if err != nil {
-		return nil, err
-	} // Assert: the default and file configs are both valid
-
-	// if dynamic config is disabled, we just stop here
-	if !cc.dynamicConfig {
-		// NOTE(mtaufen): We still need to update the status.
-		// We expect to be able to disable dynamic config but still get a status update about the config.
-		// This is because the feature gate covers dynamic config AND config status reporting, while the
-		// --dynamic-config-dir flag just covers dynamic config.
-		cc.configOK.Set(status.NotDynamicLocalMessage, status.NotDynamicLocalReason, apiv1.ConditionTrue)
-		return local, nil
-	} // Assert: dynamic config is enabled
+	// ALWAYS validate the local config. This makes incorrectly provisioned nodes an error.
+	// It must be valid because it is the default last-known-good config.
+	utillog.Infof("validating local config")
+	if err := validation.ValidateKubeletConfiguration(cc.defaultConfig); err != nil {
+		return nil, fmt.Errorf("local config failed validation, error: %v", err)
+	}
 
 	// ensure the filesystem is initialized
 	if err := cc.initializeDynamicConfigDir(); err != nil {
 		return nil, err
 	}
 
-	assigned, curSource, reason, err := cc.loadAssignedConfig(local)
+	assigned, curSource, reason, err := cc.loadAssignedConfig(cc.defaultConfig)
 	if err == nil {
 		// set the status to indicate we will use the assigned config
 		if curSource != nil {
@@ -159,7 +115,7 @@ func (cc *Controller) Bootstrap() (*kubeletconfig.KubeletConfiguration, error) {
 	utillog.Errorf(fmt.Sprintf("%s, error: %v", reason, err))
 
 	// load the last-known-good config
-	lkg, lkgSource, err := cc.loadLastKnownGoodConfig(local)
+	lkg, lkgSource, err := cc.loadLastKnownGoodConfig(cc.defaultConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -195,57 +151,26 @@ func (cc *Controller) StartSync(client clientset.Interface, eventClient v1core.E
 		}, 10*time.Second, 0.2, true, wait.NeverStop)
 	})()
 
-	// only sync to new, remotely provided configurations if dynamic config was enabled
-	if cc.dynamicConfig {
-		cc.informer = newSharedNodeInformer(client, nodeName,
-			cc.onAddNodeEvent, cc.onUpdateNodeEvent, cc.onDeleteNodeEvent)
-		// start the informer loop
-		// Rather than use utilruntime.HandleCrash, which doesn't actually crash in the Kubelet,
-		// we use HandlePanic to manually call the panic handlers and then crash.
-		// We have a better chance of recovering normal operation if we just restart the Kubelet in the event
-		// of a Go runtime error.
-		go utilpanic.HandlePanic(func() {
-			utillog.Infof("starting Node informer sync loop")
-			cc.informer.Run(wait.NeverStop)
-		})()
+	cc.informer = newSharedNodeInformer(client, nodeName,
+		cc.onAddNodeEvent, cc.onUpdateNodeEvent, cc.onDeleteNodeEvent)
+	// start the informer loop
+	// Rather than use utilruntime.HandleCrash, which doesn't actually crash in the Kubelet,
+	// we use HandlePanic to manually call the panic handlers and then crash.
+	// We have a better chance of recovering normal operation if we just restart the Kubelet in the event
+	// of a Go runtime error.
+	go utilpanic.HandlePanic(func() {
+		utillog.Infof("starting Node informer sync loop")
+		cc.informer.Run(wait.NeverStop)
+	})()
 
-		// start the config source sync loop
-		go utilpanic.HandlePanic(func() {
-			utillog.Infof("starting config source sync loop")
-			wait.JitterUntil(func() {
-				cc.syncConfigSource(client, eventClient, nodeName)
-			}, 10*time.Second, 0.2, true, wait.NeverStop)
-		})()
-	} else {
-		utillog.Infof("dynamic config not enabled, will not sync to remote config")
-	}
-}
+	// start the config source sync loop
+	go utilpanic.HandlePanic(func() {
+		utillog.Infof("starting config source sync loop")
+		wait.JitterUntil(func() {
+			cc.syncConfigSource(client, eventClient, nodeName)
+		}, 10*time.Second, 0.2, true, wait.NeverStop)
+	})()
 
-// loadLocalConfig returns the local config: either the defaults provided to the controller or
-// a local config file, if the Kubelet is configured to use the local file
-func (cc *Controller) loadLocalConfig() (*kubeletconfig.KubeletConfiguration, error) {
-	// ALWAYS validate the local configs. This makes incorrectly provisioned nodes an error.
-	// These must be valid because they are the default last-known-good configs.
-	utillog.Infof("validating combination of defaults and flags")
-	if err := validation.ValidateKubeletConfiguration(cc.defaultConfig); err != nil {
-		return nil, fmt.Errorf("combination of defaults and flags failed validation, error: %v", err)
-	}
-	// only attempt to load and validate the Kubelet config file if the user provided a path
-	if cc.fileLoader != nil {
-		utillog.Infof("loading Kubelet config file")
-		kc, err := cc.fileLoader.Load()
-		if err != nil {
-			return nil, err
-		}
-		// validate the Kubelet config file config
-		utillog.Infof("validating Kubelet config file")
-		if err := validation.ValidateKubeletConfiguration(kc); err != nil {
-			return nil, fmt.Errorf("failed to validate the Kubelet config file, error: %v", err)
-		}
-		return kc, nil
-	}
-	// if no Kubelet config file config, just return the default
-	return cc.defaultConfig, nil
 }
 
 // loadAssignedConfig loads the Kubelet's currently assigned config,

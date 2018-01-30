@@ -1,4 +1,4 @@
-# Copyright 2017 The Kubernetes Authors.
+# Copyright 2018 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,29 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-REGISTRY ?= gcr.io/kubernetes-e2e-test-images
-GOARM=7
-QEMUVERSION=v2.9.1
-GOLANG_VERSION=1.9.3
-export
+.PHONY: manifest-tool 
 
-ifndef WHAT
-$(error WHAT is a required variable, ex: make all WHAT=net)
-endif
+MANIFEST_TOOL_DIR := $(shell mktemp -d)
+export PATH := $(MANIFEST_TOOL_DIR):$(PATH)
 
-# Build code.
-#
-# Args:
-#   WHAT: Directory names to build.
-#
-# Example:
-#   make all WHAT=clusterapi-tester
-all: all-container
+MANIFEST_TOOL_VERSION := v0.7.0
 
-all-container:
-	./image-util.sh build $(WHAT)
+space :=
+space +=
+comma := ,
+prefix_linux = $(addprefix linux/,$(strip $1))
+join_platforms = $(subst $(space),$(comma),$(call prefix_linux,$(strip $1)))
 
-all-push: all-container
-	./image-util.sh push $(WHAT)
-
-.PHONY: all all-push all-container
+manifest-tool:
+	curl -sSL https://github.com/estesp/manifest-tool/releases/download/$(MANIFEST_TOOL_VERSION)/manifest-tool-linux-amd64 > $(MANIFEST_TOOL_DIR)/manifest-tool
+	chmod +x $(MANIFEST_TOOL_DIR)/manifest-tool

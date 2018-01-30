@@ -346,8 +346,8 @@ func TestAPIVersionOfDiscoveryEndpoints(t *testing.T) {
 
 func TestNoAlphaVersionsEnabledByDefault(t *testing.T) {
 	config := DefaultAPIResourceConfigSource()
-	for gv, gvConfig := range config.GroupVersionResourceConfigs {
-		if gvConfig.Enable && strings.Contains(gv.Version, "alpha") {
+	for gv, enable := range config.GroupVersionConfigs {
+		if enable && strings.Contains(gv.Version, "alpha") {
 			t.Errorf("Alpha API version %s enabled by default", gv.String())
 		}
 	}

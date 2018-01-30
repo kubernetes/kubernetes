@@ -15,6 +15,7 @@ go_library(
         "docker_container.go",
         "docker_image.go",
         "docker_legacy_service.go",
+        "docker_logs.go",
         "docker_sandbox.go",
         "docker_service.go",
         "docker_streaming.go",
