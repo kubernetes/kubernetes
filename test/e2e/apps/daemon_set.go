@@ -225,30 +225,6 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 			NotTo(HaveOccurred(), "error waiting for daemon pod to not be running on nodes")
 	})
 
-	It("should retry creating failed daemon pods", func() {
-		label := map[string]string{daemonsetNameLabel: dsName}
-
-		By(fmt.Sprintf("Creating a simple DaemonSet %q", dsName))
-		ds, err := c.ExtensionsV1beta1().DaemonSets(ns).Create(newDaemonSet(dsName, image, label))
-		Expect(err).NotTo(HaveOccurred())
-
-		By("Check that daemon pods launch on every node of the cluster.")
-		err = wait.PollImmediate(dsRetryPeriod, dsRetryTimeout, checkRunningOnAllNodes(f, ds))
-		Expect(err).NotTo(HaveOccurred(), "error waiting for daemon pod to start")
-		err = checkDaemonStatus(f, dsName)
-		Expect(err).NotTo(HaveOccurred())
-
-		By("Set a daemon pod's phase to 'Failed', check that the daemon pod is revived.")
-		podList := listDaemonPods(c, ns, label)
-		pod := podList.Items[0]
-		pod.ResourceVersion = ""
-		pod.Status.Phase = v1.PodFailed
-		_, err = c.CoreV1().Pods(ns).UpdateStatus(&pod)
-		Expect(err).NotTo(HaveOccurred(), "error failing a daemon pod")
-		err = wait.PollImmediate(dsRetryPeriod, dsRetryTimeout, checkRunningOnAllNodes(f, ds))
-		Expect(err).NotTo(HaveOccurred(), "error waiting for daemon pod to revive")
-	})
-
 	It("Should not update pod when spec was updated and update strategy is OnDelete", func() {
 		label := map[string]string{daemonsetNameLabel: dsName}
 
