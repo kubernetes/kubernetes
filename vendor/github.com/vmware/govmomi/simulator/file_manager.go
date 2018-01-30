@@ -160,6 +160,7 @@ func (f *FileManager) MakeDirectory(req *types.MakeDirectory) soap.HasFault {
 		return body
 	}
 
+	body.Res = new(types.MakeDirectoryResponse)
 	return body
 }
 

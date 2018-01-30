@@ -57,3 +57,42 @@ func (m *OptionManager) QueryOptions(req *types.QueryOptions) soap.HasFault {
 
 	return body
 }
+
+func (m *OptionManager) find(key string) *types.OptionValue {
+	for _, opt := range m.Setting {
+		setting := opt.GetOptionValue()
+		if setting.Key == key {
+			return setting
+		}
+	}
+	return nil
+}
+
+func (m *OptionManager) UpdateOptions(req *types.UpdateOptions) soap.HasFault {
+	body := new(methods.UpdateOptionsBody)
+
+	for _, change := range req.ChangedValue {
+		setting := change.GetOptionValue()
+
+		// We don't currently include the entire list of default settings for ESX and vCenter,
+		// this prefix is currently used to test the failure path.
+		// Real vCenter seems to only allow new options if Key has a "config." prefix.
+		// TODO: consider behaving the same, which would require including 2 long lists of options in vpx.Setting and esx.Setting
+		if strings.HasPrefix(setting.Key, "ENOENT.") {
+			body.Fault_ = Fault("", &types.InvalidName{Name: setting.Key})
+			return body
+		}
+
+		opt := m.find(setting.Key)
+		if opt != nil {
+			// This is an existing option.
+			opt.Value = setting.Value
+			continue
+		}
+
+		m.Setting = append(m.Setting, change)
+	}
+
+	body.Res = new(types.UpdateOptionsResponse)
+	return body
+}
