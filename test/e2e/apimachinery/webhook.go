@@ -27,8 +27,6 @@ import (
 	extensions "k8s.io/api/extensions/v1beta1"
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
-	crdclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
-	"k8s.io/apiextensions-apiserver/test/integration/testserver"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -67,10 +65,6 @@ const (
 	hangingPodName          = "hanging-pod"
 	disallowedConfigMapName = "disallowed-configmap"
 	allowedConfigMapName    = "allowed-configmap"
-	crdName                 = "e2e-test-webhook-crd"
-	crdKind                 = "E2e-test-webhook-crd"
-	crdAPIGroup             = "webhook-crd-test.k8s.io"
-	crdAPIVersion           = "v1"
 	failNamespaceLabelKey   = "fail-closed-webhook"
 	failNamespaceLabelValue = "yes"
 	failNamespaceName       = "fail-closed-namesapce"
@@ -107,6 +101,7 @@ var _ = SIGDescribe("AdmissionWebhook", func() {
 		// the development 1.9 cycle.
 		deployWebhookAndService(f, imageutils.GetE2EImage(imageutils.AdmissionWebhook), context)
 	})
+
 	AfterEach(func() {
 		cleanWebhookTest(client, namespaceName)
 	})
@@ -118,11 +113,14 @@ var _ = SIGDescribe("AdmissionWebhook", func() {
 	})
 
 	It("Should be able to deny custom resource creation", func() {
-		crdCleanup, dynamicClient := createCRD(f)
-		defer crdCleanup()
-		webhookCleanup := registerWebhookForCRD(f, context)
+		testcrd, err := framework.CreateTestCRD(f)
+		if err != nil {
+			return
+		}
+		defer testcrd.CleanUp()
+		webhookCleanup := registerWebhookForCRD(f, context, testcrd)
 		defer webhookCleanup()
-		testCRDWebhook(f, dynamicClient)
+		testCRDWebhook(f, testcrd.Crd, testcrd.DynamicClient)
 	})
 
 	It("Should unconditionally reject operations on fail closed webhook", func() {
@@ -144,11 +142,14 @@ var _ = SIGDescribe("AdmissionWebhook", func() {
 	})
 
 	It("Should mutate crd", func() {
-		crdCleanup, dynamicClient := createCRD(f)
-		defer crdCleanup()
-		webhookCleanup := registerMutatingWebhookForCRD(f, context)
+		testcrd, err := framework.CreateTestCRD(f)
+		if err != nil {
+			return
+		}
+		defer testcrd.CleanUp()
+		webhookCleanup := registerMutatingWebhookForCRD(f, context, testcrd)
 		defer webhookCleanup()
-		testMutatingCRDWebhook(f, dynamicClient)
+		testMutatingCRDWebhook(f, testcrd.Crd, testcrd.DynamicClient)
 	})
 
 	// TODO: add more e2e tests for mutating webhooks
@@ -814,57 +815,7 @@ func cleanWebhookTest(client clientset.Interface, namespaceName string) {
 	_ = client.RbacV1beta1().RoleBindings("kube-system").Delete(roleBindingName, nil)
 }
 
-// newCRDForAdmissionWebhookTest generates a CRD
-func newCRDForAdmissionWebhookTest() *apiextensionsv1beta1.CustomResourceDefinition {
-	return &apiextensionsv1beta1.CustomResourceDefinition{
-		ObjectMeta: metav1.ObjectMeta{Name: crdName + "s." + crdAPIGroup},
-		Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
-			Group:   crdAPIGroup,
-			Version: crdAPIVersion,
-			Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
-				Plural:   crdName + "s",
-				Singular: crdName,
-				Kind:     crdKind,
-				ListKind: crdName + "List",
-			},
-			Scope: apiextensionsv1beta1.NamespaceScoped,
-		},
-	}
-}
-
-func createCRD(f *framework.Framework) (func(), dynamic.ResourceInterface) {
-	config, err := framework.LoadConfig()
-	if err != nil {
-		framework.Failf("failed to load config: %v", err)
-	}
-
-	apiExtensionClient, err := crdclientset.NewForConfig(config)
-	if err != nil {
-		framework.Failf("failed to initialize apiExtensionClient: %v", err)
-	}
-
-	crd := newCRDForAdmissionWebhookTest()
-
-	//create CRD and waits for the resource to be recognized and available.
-	dynamicClient, err := testserver.CreateNewCustomResourceDefinitionWatchUnsafe(crd, apiExtensionClient, f.ClientPool)
-	if err != nil {
-		framework.Failf("failed to create CustomResourceDefinition: %v", err)
-	}
-
-	resourceClient := dynamicClient.Resource(&metav1.APIResource{
-		Name:       crd.Spec.Names.Plural,
-		Namespaced: true,
-	}, f.Namespace.Name)
-
-	return func() {
-		err = testserver.DeleteCustomResourceDefinition(crd, apiExtensionClient)
-		if err != nil {
-			framework.Failf("failed to delete CustomResourceDefinition: %v", err)
-		}
-	}, resourceClient
-}
-
-func registerWebhookForCRD(f *framework.Framework, context *certContext) func() {
+func registerWebhookForCRD(f *framework.Framework, context *certContext, testcrd *framework.TestCrd) func() {
 	client := f.ClientSet
 	By("Registering the crd webhook via the AdmissionRegistration API")
 
@@ -880,9 +831,9 @@ func registerWebhookForCRD(f *framework.Framework, context *certContext) func() 
 				Rules: []v1beta1.RuleWithOperations{{
 					Operations: []v1beta1.OperationType{v1beta1.Create},
 					Rule: v1beta1.Rule{
-						APIGroups:   []string{crdAPIGroup},
-						APIVersions: []string{crdAPIVersion},
-						Resources:   []string{crdName + "s"},
+						APIGroups:   []string{testcrd.ApiGroup},
+						APIVersions: []string{testcrd.ApiVersion},
+						Resources:   []string{testcrd.GetPluralName()},
 					},
 				}},
 				ClientConfig: v1beta1.WebhookClientConfig{
@@ -905,7 +856,7 @@ func registerWebhookForCRD(f *framework.Framework, context *certContext) func() 
 	}
 }
 
-func registerMutatingWebhookForCRD(f *framework.Framework, context *certContext) func() {
+func registerMutatingWebhookForCRD(f *framework.Framework, context *certContext, testcrd *framework.TestCrd) func() {
 	client := f.ClientSet
 	By("Registering the mutating webhook for crd via the AdmissionRegistration API")
 
@@ -921,9 +872,9 @@ func registerMutatingWebhookForCRD(f *framework.Framework, context *certContext)
 				Rules: []v1beta1.RuleWithOperations{{
 					Operations: []v1beta1.OperationType{v1beta1.Create},
 					Rule: v1beta1.Rule{
-						APIGroups:   []string{crdAPIGroup},
-						APIVersions: []string{crdAPIVersion},
-						Resources:   []string{crdName + "s"},
+						APIGroups:   []string{testcrd.ApiGroup},
+						APIVersions: []string{testcrd.ApiVersion},
+						Resources:   []string{testcrd.GetPluralName()},
 					},
 				}},
 				ClientConfig: v1beta1.WebhookClientConfig{
@@ -940,9 +891,9 @@ func registerMutatingWebhookForCRD(f *framework.Framework, context *certContext)
 				Rules: []v1beta1.RuleWithOperations{{
 					Operations: []v1beta1.OperationType{v1beta1.Create},
 					Rule: v1beta1.Rule{
-						APIGroups:   []string{crdAPIGroup},
-						APIVersions: []string{crdAPIVersion},
-						Resources:   []string{crdName + "s"},
+						APIGroups:   []string{testcrd.ApiGroup},
+						APIVersions: []string{testcrd.ApiVersion},
+						Resources:   []string{testcrd.GetPluralName()},
 					},
 				}},
 				ClientConfig: v1beta1.WebhookClientConfig{
@@ -964,9 +915,8 @@ func registerMutatingWebhookForCRD(f *framework.Framework, context *certContext)
 	return func() { client.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Delete(configName, nil) }
 }
 
-func testCRDWebhook(f *framework.Framework, crdClient dynamic.ResourceInterface) {
+func testCRDWebhook(f *framework.Framework, crd *apiextensionsv1beta1.CustomResourceDefinition, crdClient dynamic.ResourceInterface) {
 	By("Creating a custom resource that should be denied by the webhook")
-	crd := newCRDForAdmissionWebhookTest()
 	crInstance := &unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"kind":       crd.Spec.Names.Kind,
@@ -988,9 +938,8 @@ func testCRDWebhook(f *framework.Framework, crdClient dynamic.ResourceInterface)
 	}
 }
 
-func testMutatingCRDWebhook(f *framework.Framework, crdClient dynamic.ResourceInterface) {
+func testMutatingCRDWebhook(f *framework.Framework, crd *apiextensionsv1beta1.CustomResourceDefinition, crdClient dynamic.ResourceInterface) {
 	By("Creating a custom resource that should be mutated by the webhook")
-	crd := newCRDForAdmissionWebhookTest()
 	cr := &unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"kind":       crd.Spec.Names.Kind,
