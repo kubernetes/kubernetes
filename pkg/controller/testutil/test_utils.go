@@ -40,7 +40,7 @@ import (
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	utilnode "k8s.io/kubernetes/pkg/util/node"
+	nodeutil "k8s.io/kubernetes/pkg/util/node"
 
 	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/golang/glog"
@@ -470,7 +470,7 @@ func GetZones(nodeHandler *FakeNodeHandler) []string {
 	nodes, _ := nodeHandler.List(metav1.ListOptions{})
 	zones := sets.NewString()
 	for _, node := range nodes.Items {
-		zones.Insert(utilnode.GetZoneKey(&node))
+		zones.Insert(nodeutil.GetZoneKey(&node))
 	}
 	return zones.List()
 }

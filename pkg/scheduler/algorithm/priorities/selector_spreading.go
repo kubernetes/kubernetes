@@ -24,7 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	"k8s.io/kubernetes/pkg/scheduler/schedulercache"
-	utilnode "k8s.io/kubernetes/pkg/util/node"
+	nodeutil "k8s.io/kubernetes/pkg/util/node"
 
 	"github.com/golang/glog"
 )
@@ -125,7 +125,7 @@ func (s *SelectorSpread) CalculateSpreadPriorityReduce(pod *v1.Pod, meta interfa
 		if result[i].Score > maxCountByNodeName {
 			maxCountByNodeName = result[i].Score
 		}
-		zoneId := utilnode.GetZoneKey(nodeNameToInfo[result[i].Host].Node())
+		zoneId := nodeutil.GetZoneKey(nodeNameToInfo[result[i].Host].Node())
 		if zoneId == "" {
 			continue
 		}
@@ -152,7 +152,7 @@ func (s *SelectorSpread) CalculateSpreadPriorityReduce(pod *v1.Pod, meta interfa
 		}
 		// If there is zone information present, incorporate it
 		if haveZones {
-			zoneId := utilnode.GetZoneKey(nodeNameToInfo[result[i].Host].Node())
+			zoneId := nodeutil.GetZoneKey(nodeNameToInfo[result[i].Host].Node())
 			if zoneId != "" {
 				zoneScore := MaxPriorityFloat64
 				if maxCountByZone > 0 {
