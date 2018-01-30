@@ -294,7 +294,7 @@ func (az *Cloud) selectLoadBalancer(clusterName string, service *v1.Service, exi
 
 func (az *Cloud) getServiceLoadBalancerStatus(service *v1.Service, lb *network.LoadBalancer) (status *v1.LoadBalancerStatus, err error) {
 	if lb == nil {
-		glog.V(10).Infof("getServiceLoadBalancerStatus lb is nil")
+		glog.V(10).Info("getServiceLoadBalancerStatus lb is nil")
 		return nil, nil
 	}
 	if lb.FrontendIPConfigurations == nil || *lb.FrontendIPConfigurations == nil {
