@@ -26,13 +26,25 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
 )
 
-// IsExtendedResourceName returns true if the resource name is not in the
-// default namespace.
+// IsExtendedResourceName returns true if:
+// 1. the resource name is not in the default namespace;
+// 2. resource name does not have "requests." prefix,
+// to avoid confusion with the convention in quota
+// 3. it satisfies the rules in IsQualifiedName() after converted into quota resource name
 func IsExtendedResourceName(name v1.ResourceName) bool {
-	return !IsDefaultNamespaceResource(name)
+	if IsDefaultNamespaceResource(name) || strings.HasPrefix(string(name), v1.DefaultResourceRequestsPrefix) {
+		return false
+	}
+	// Ensure it satisfies the rules in IsQualifiedName() after converted into quota resource name
+	nameForQuota := fmt.Sprintf("%s%s", v1.DefaultResourceRequestsPrefix, string(name))
+	if errs := validation.IsQualifiedName(string(nameForQuota)); len(errs) != 0 {
+		return false
+	}
+	return true
 }
 
 // IsDefaultNamespaceResource returns true if the resource name is in the
