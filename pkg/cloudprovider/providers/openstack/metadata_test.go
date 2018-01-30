@@ -108,4 +108,8 @@ func TestParseMetadata(t *testing.T) {
 	if md.Devices[0].Type != "disk" {
 		t.Errorf("incorrect device type: %s", md.Devices[0].Type)
 	}
+
+	if md.Devices[0].Serial != "6df1888b-f373-41cf-b960-3786e60a28ef" {
+		t.Errorf("incorrect device serial: %s", md.Devices[0].Serial)
+	}
 }
