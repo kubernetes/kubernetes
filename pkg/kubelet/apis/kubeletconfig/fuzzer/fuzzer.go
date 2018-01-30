@@ -36,7 +36,6 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 		// provide non-empty values for fields with defaults, so the defaulter doesn't change values during round-trip
 		func(obj *kubeletconfig.KubeletConfiguration, c fuzz.Continue) {
 			c.FuzzNoCustom(obj)
-			obj.ConfigTrialDuration = &metav1.Duration{Duration: 10 * time.Minute}
 			obj.Authentication.Anonymous.Enabled = true
 			obj.Authentication.Webhook.Enabled = false
 			obj.Authentication.Webhook.CacheTTL = metav1.Duration{Duration: 2 * time.Minute}
@@ -62,8 +61,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			obj.ImageGCLowThresholdPercent = 80
 			obj.MaxOpenFiles = 1000000
 			obj.MaxPods = 110
-			temp := int64(-1)
-			obj.PodPidsLimit = &temp
+			obj.PodPidsLimit = -1
 			obj.NodeStatusUpdateFrequency = metav1.Duration{Duration: 10 * time.Second}
 			obj.CPUManagerPolicy = "none"
 			obj.CPUManagerReconcilePeriod = obj.NodeStatusUpdateFrequency

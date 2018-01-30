@@ -141,7 +141,9 @@ func Convert_kubeletconfig_KubeletAuthorization_To_v1alpha1_KubeletAuthorization
 }
 
 func autoConvert_v1alpha1_KubeletConfiguration_To_kubeletconfig_KubeletConfiguration(in *KubeletConfiguration, out *kubeletconfig.KubeletConfiguration, s conversion.Scope) error {
-	out.ConfigTrialDuration = (*v1.Duration)(unsafe.Pointer(in.ConfigTrialDuration))
+	if err := v1.Convert_Pointer_v1_Duration_To_v1_Duration(&in.ConfigTrialDuration, &out.ConfigTrialDuration, s); err != nil {
+		return err
+	}
 	out.PodManifestPath = in.PodManifestPath
 	out.SyncFrequency = in.SyncFrequency
 	out.FileCheckFrequency = in.FileCheckFrequency
@@ -213,7 +215,9 @@ func autoConvert_v1alpha1_KubeletConfiguration_To_kubeletconfig_KubeletConfigura
 	out.HairpinMode = in.HairpinMode
 	out.MaxPods = in.MaxPods
 	out.PodCIDR = in.PodCIDR
-	out.PodPidsLimit = (*int64)(unsafe.Pointer(in.PodPidsLimit))
+	if err := v1.Convert_Pointer_int64_To_int64(&in.PodPidsLimit, &out.PodPidsLimit, s); err != nil {
+		return err
+	}
 	out.ResolverConfig = in.ResolverConfig
 	if err := v1.Convert_Pointer_bool_To_bool(&in.CPUCFSQuota, &out.CPUCFSQuota, s); err != nil {
 		return err
@@ -265,7 +269,9 @@ func Convert_v1alpha1_KubeletConfiguration_To_kubeletconfig_KubeletConfiguration
 }
 
 func autoConvert_kubeletconfig_KubeletConfiguration_To_v1alpha1_KubeletConfiguration(in *kubeletconfig.KubeletConfiguration, out *KubeletConfiguration, s conversion.Scope) error {
-	out.ConfigTrialDuration = (*v1.Duration)(unsafe.Pointer(in.ConfigTrialDuration))
+	if err := v1.Convert_v1_Duration_To_Pointer_v1_Duration(&in.ConfigTrialDuration, &out.ConfigTrialDuration, s); err != nil {
+		return err
+	}
 	out.PodManifestPath = in.PodManifestPath
 	out.SyncFrequency = in.SyncFrequency
 	out.FileCheckFrequency = in.FileCheckFrequency
@@ -337,7 +343,9 @@ func autoConvert_kubeletconfig_KubeletConfiguration_To_v1alpha1_KubeletConfigura
 	out.HairpinMode = in.HairpinMode
 	out.MaxPods = in.MaxPods
 	out.PodCIDR = in.PodCIDR
-	out.PodPidsLimit = (*int64)(unsafe.Pointer(in.PodPidsLimit))
+	if err := v1.Convert_int64_To_Pointer_int64(&in.PodPidsLimit, &out.PodPidsLimit, s); err != nil {
+		return err
+	}
 	out.ResolverConfig = in.ResolverConfig
 	if err := v1.Convert_bool_To_Pointer_bool(&in.CPUCFSQuota, &out.CPUCFSQuota, s); err != nil {
 		return err

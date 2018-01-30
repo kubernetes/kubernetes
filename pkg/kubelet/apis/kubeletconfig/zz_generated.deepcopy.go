@@ -21,7 +21,6 @@ limitations under the License.
 package kubeletconfig
 
 import (
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -81,15 +80,7 @@ func (in *KubeletAuthorization) DeepCopy() *KubeletAuthorization {
 func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	if in.ConfigTrialDuration != nil {
-		in, out := &in.ConfigTrialDuration, &out.ConfigTrialDuration
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(v1.Duration)
-			**out = **in
-		}
-	}
+	out.ConfigTrialDuration = in.ConfigTrialDuration
 	out.SyncFrequency = in.SyncFrequency
 	out.FileCheckFrequency = in.FileCheckFrequency
 	out.HTTPCheckFrequency = in.HTTPCheckFrequency
@@ -123,15 +114,6 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 	out.VolumeStatsAggPeriod = in.VolumeStatsAggPeriod
 	out.CPUManagerReconcilePeriod = in.CPUManagerReconcilePeriod
 	out.RuntimeRequestTimeout = in.RuntimeRequestTimeout
-	if in.PodPidsLimit != nil {
-		in, out := &in.PodPidsLimit, &out.PodPidsLimit
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(int64)
-			**out = **in
-		}
-	}
 	if in.EvictionHard != nil {
 		in, out := &in.EvictionHard, &out.EvictionHard
 		*out = make(map[string]string, len(*in))

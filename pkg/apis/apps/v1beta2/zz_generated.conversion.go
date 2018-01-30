@@ -962,7 +962,9 @@ func autoConvert_apps_StatefulSetSpec_To_v1beta2_StatefulSetSpec(in *apps.Statef
 }
 
 func autoConvert_v1beta2_StatefulSetStatus_To_apps_StatefulSetStatus(in *v1beta2.StatefulSetStatus, out *apps.StatefulSetStatus, s conversion.Scope) error {
-	// WARNING: in.ObservedGeneration requires manual conversion: inconvertible types (int64 vs *int64)
+	if err := meta_v1.Convert_int64_To_Pointer_int64(&in.ObservedGeneration, &out.ObservedGeneration, s); err != nil {
+		return err
+	}
 	out.Replicas = in.Replicas
 	out.ReadyReplicas = in.ReadyReplicas
 	out.CurrentReplicas = in.CurrentReplicas
@@ -975,7 +977,9 @@ func autoConvert_v1beta2_StatefulSetStatus_To_apps_StatefulSetStatus(in *v1beta2
 }
 
 func autoConvert_apps_StatefulSetStatus_To_v1beta2_StatefulSetStatus(in *apps.StatefulSetStatus, out *v1beta2.StatefulSetStatus, s conversion.Scope) error {
-	// WARNING: in.ObservedGeneration requires manual conversion: inconvertible types (*int64 vs int64)
+	if err := meta_v1.Convert_Pointer_int64_To_int64(&in.ObservedGeneration, &out.ObservedGeneration, s); err != nil {
+		return err
+	}
 	out.Replicas = in.Replicas
 	out.ReadyReplicas = in.ReadyReplicas
 	out.CurrentReplicas = in.CurrentReplicas
