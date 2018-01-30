@@ -405,14 +405,23 @@ func (kl *Kubelet) tryUpdateNodeStatus(tryNumber int) error {
 	kl.updatePodCIDR(node.Spec.PodCIDR)
 
 	kl.setNodeStatus(node)
+
+	// Patch the current Spec on the API server
+	_, err = nodeutil.PatchNodeSpec(kl.kubeClient, types.NodeName(kl.nodeName), originalNode, node)
+	if err != nil {
+		return err
+	}
+
 	// Patch the current status on the API server
 	updatedNode, _, err := nodeutil.PatchNodeStatus(kl.heartbeatClient, types.NodeName(kl.nodeName), originalNode, node)
 	if err != nil {
 		return err
 	}
+
 	// If update finishes successfully, mark the volumeInUse as reportedInUse to indicate
 	// those volumes are already updated in the node's status
 	kl.volumeManager.MarkVolumesAsReportedInUse(updatedNode.Status.VolumesInUse)
+
 	return nil
 }
 
@@ -735,8 +744,21 @@ func (kl *Kubelet) setNodeReadyCondition(node *v1.Node) {
 	// ref: https://github.com/kubernetes/kubernetes/issues/16961
 	currentTime := metav1.NewTime(kl.clock.Now())
 	var newNodeReadyCondition v1.NodeCondition
-	rs := append(kl.runtimeState.runtimeErrors(), kl.runtimeState.networkErrors()...)
-	if len(rs) == 0 {
+
+	runtimeErrors := kl.runtimeState.runtimeErrors()
+	networkErrors := kl.runtimeState.networkErrors()
+
+	var rs []string
+	for _, val := range runtimeErrors {
+		rs = append(rs, val)
+	}
+	for _, val := range networkErrors {
+		rs = append(rs, val)
+	}
+
+	_, plegError := runtimeErrors[plegErrType]
+
+	if len(rs) == 0 || (len(runtimeErrors) == 1 && plegError) {
 		newNodeReadyCondition = v1.NodeCondition{
 			Type:              v1.NodeReady,
 			Status:            v1.ConditionTrue,
@@ -744,7 +766,7 @@ func (kl *Kubelet) setNodeReadyCondition(node *v1.Node) {
 			Message:           "kubelet is posting ready status",
 			LastHeartbeatTime: currentTime,
 		}
-	} else {
+	} else if !(len(runtimeErrors) == 1 && plegError) {
 		newNodeReadyCondition = v1.NodeCondition{
 			Type:              v1.NodeReady,
 			Status:            v1.ConditionFalse,
@@ -945,8 +967,15 @@ func (kl *Kubelet) setNodeOODCondition(node *v1.Node) {
 // TODO: why is this a package var?
 var oldNodeUnschedulable bool
 
-// record if node schedulable change.
-func (kl *Kubelet) recordNodeSchedulableEvent(node *v1.Node) {
+// setNodeSchedulable for the node.
+func (kl *Kubelet) setNodeSchedulable(node *v1.Node) {
+	runtimeErrors := kl.runtimeState.runtimeErrors()
+	_, plegError := runtimeErrors[plegErrType]
+
+	if len(runtimeErrors) == 1 && plegError {
+		node.Spec.Unschedulable = true
+	}
+
 	if oldNodeUnschedulable != node.Spec.Unschedulable {
 		if node.Spec.Unschedulable {
 			kl.recordNodeStatusEvent(v1.EventTypeNormal, events.NodeNotSchedulable)
@@ -996,7 +1025,7 @@ func (kl *Kubelet) defaultNodeStatusFuncs() []func(*v1.Node) error {
 		withoutError(kl.setNodeDiskPressureCondition),
 		withoutError(kl.setNodeReadyCondition),
 		withoutError(kl.setNodeVolumesInUseStatus),
-		withoutError(kl.recordNodeSchedulableEvent),
+		withoutError(kl.setNodeSchedulable),
 	}
 }
 
