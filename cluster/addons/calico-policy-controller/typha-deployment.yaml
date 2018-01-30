@@ -22,7 +22,7 @@ spec:
       hostNetwork: true
       serviceAccountName: calico
       containers:
-      - image: calico/typha:v0.4.1
+      - image: gcr.io/projectcalico-org/typha:v0.5.5
         name: calico-typha
         ports:
         - containerPort: 5473
