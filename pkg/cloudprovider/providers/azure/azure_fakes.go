@@ -927,10 +927,22 @@ func (fRTC *fakeRouteTablesClient) Get(resourceGroupName string, routeTableName 
 	}
 }
 
+type fakeFileClient struct {
+}
+
+func (fFC *fakeFileClient) createFileShare(accountName, accountKey, name string, sizeGB int) error {
+	return nil
+}
+
+func (fFC *fakeFileClient) deleteFileShare(accountName, accountKey, name string) error {
+	return nil
+}
+
 type fakeStorageAccountClient struct {
 	mutex     *sync.Mutex
 	FakeStore map[string]map[string]storage.Account
 	Keys      storage.AccountListKeysResult
+	Accounts  storage.AccountListResult
 	Err       error
 }
 
@@ -1005,7 +1017,7 @@ func (fSAC *fakeStorageAccountClient) ListKeys(resourceGroupName string, account
 }
 
 func (fSAC *fakeStorageAccountClient) ListByResourceGroup(resourceGroupName string) (result storage.AccountListResult, err error) {
-	return storage.AccountListResult{}, nil
+	return fSAC.Accounts, fSAC.Err
 }
 
 func (fSAC *fakeStorageAccountClient) GetProperties(resourceGroupName string, accountName string) (result storage.Account, err error) {

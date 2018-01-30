@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	azs "github.com/Azure/azure-sdk-for-go/storage"
+	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/golang/glog"
 )
 
@@ -27,9 +28,28 @@ const (
 	useHTTPS = true
 )
 
+// FileClient is the interface for creating file shares, interface for test
+// injection.
+type FileClient interface {
+	createFileShare(accountName, accountKey, name string, sizeGB int) error
+	deleteFileShare(accountName, accountKey, name string) error
+}
+
 // create file share
 func (az *Cloud) createFileShare(accountName, accountKey, name string, sizeGB int) error {
-	fileClient, err := az.getFileSvcClient(accountName, accountKey)
+	return az.FileClient.createFileShare(accountName, accountKey, name, sizeGB)
+}
+
+func (az *Cloud) deleteFileShare(accountName, accountKey, name string) error {
+	return az.FileClient.deleteFileShare(accountName, accountKey, name)
+}
+
+type azureFileClient struct {
+	env azure.Environment
+}
+
+func (f *azureFileClient) createFileShare(accountName, accountKey, name string, sizeGB int) error {
+	fileClient, err := f.getFileSvcClient(accountName, accountKey)
 	if err != nil {
 		return err
 	}
@@ -53,20 +73,19 @@ func (az *Cloud) createFileShare(accountName, accountKey, name string, sizeGB in
 }
 
 // delete a file share
-func (az *Cloud) deleteFileShare(accountName, accountKey, name string) error {
-	fileClient, err := az.getFileSvcClient(accountName, accountKey)
-	if err == nil {
-		share := fileClient.GetShareReference(name)
-		return share.Delete(nil)
+func (f *azureFileClient) deleteFileShare(accountName, accountKey, name string) error {
+	fileClient, err := f.getFileSvcClient(accountName, accountKey)
+	if err != nil {
+		return err
 	}
-	return nil
+	return fileClient.GetShareReference(name).Delete(nil)
 }
 
-func (az *Cloud) getFileSvcClient(accountName, accountKey string) (*azs.FileServiceClient, error) {
-	client, err := azs.NewClient(accountName, accountKey, az.Environment.StorageEndpointSuffix, azs.DefaultAPIVersion, useHTTPS)
+func (f *azureFileClient) getFileSvcClient(accountName, accountKey string) (*azs.FileServiceClient, error) {
+	fileClient, err := azs.NewClient(accountName, accountKey, f.env.StorageEndpointSuffix, azs.DefaultAPIVersion, useHTTPS)
 	if err != nil {
 		return nil, fmt.Errorf("error creating azure client: %v", err)
 	}
-	f := client.GetFileService()
-	return &f, nil
+	fc := fileClient.GetFileService()
+	return &fc, nil
 }
