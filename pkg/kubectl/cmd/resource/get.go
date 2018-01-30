@@ -348,6 +348,10 @@ func (options *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []str
 				}
 				continue
 			}
+			// Don't need wrap sortingPrinter in printing each object
+			if sortingPrinter, found := printer.(*kubectl.SortingPrinter); found {
+				printer = sortingPrinter.Delegate
+			}
 
 			// TODO: this doesn't belong here
 			// add linebreak between resource groups (if there is more than one)
