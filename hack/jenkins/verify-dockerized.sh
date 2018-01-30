@@ -36,8 +36,6 @@ export KUBE_JUNIT_REPORT_DIR=${WORKSPACE}/artifacts
 # Set artifacts directory
 export ARTIFACTS_DIR=${WORKSPACE}/artifacts
 
-retry go get github.com/tools/godep && godep version
-
 export LOG_LEVEL=4
 
 cd /go/src/k8s.io/kubernetes

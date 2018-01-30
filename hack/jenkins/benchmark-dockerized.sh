@@ -33,7 +33,6 @@ retry() {
 
 export PATH=${GOPATH}/bin:${PWD}/third_party/etcd:/usr/local/go/bin:${PATH}
 
-retry go get github.com/tools/godep && godep version
 retry go get github.com/jstemmer/go-junit-report
 retry go get github.com/cespare/prettybench
 
