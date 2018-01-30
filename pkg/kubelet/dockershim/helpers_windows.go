@@ -26,6 +26,9 @@ import (
 	dockercontainer "github.com/docker/docker/api/types/container"
 	dockerfilters "github.com/docker/docker/api/types/filters"
 	"github.com/golang/glog"
+
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 )
 
@@ -48,6 +51,10 @@ func (ds *dockerService) getSecurityOpts(seccompProfile string, separator rune) 
 }
 
 func shouldIsolatedByHyperV(annotations map[string]string) bool {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.HyperVContainer) {
+		return false
+	}
+
 	v, ok := annotations[hypervIsolationAnnotationKey]
 	return ok && v == hypervIsolation
 }
