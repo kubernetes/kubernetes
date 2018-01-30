@@ -63,6 +63,10 @@ service RuntimeService {
     rpc ContainerStatus(ContainerStatusRequest) returns (ContainerStatusResponse) {}
     // UpdateContainerResources updates ContainerConfig of the container.
     rpc UpdateContainerResources(UpdateContainerResourcesRequest) returns (UpdateContainerResourcesResponse) {}
+    // ReopenContainerLog asks runtime to reopen the stdout/stderr log file
+    // for the container. This is often called after the log file has been
+    // rotated.
+    rpc ReopenContainerLog(ReopenContainerLogRequest) returns (ReopenContainerLogResponse) {}
 
     // ExecSync runs a command in a container synchronously.
     rpc ExecSync(ExecSyncRequest) returns (ExecSyncResponse) {}
@@ -1152,4 +1156,12 @@ message MemoryUsage {
     int64 timestamp = 1;
     // The amount of working set memory in bytes.
     UInt64Value working_set_bytes = 2;
+}
+
+message ReopenContainerLogRequest {
+    // ID of the container for which to reopen the log.
+    string container_id = 1;
+}
+
+message ReopenContainerLogResponse{
 }
