@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"time"
 
+	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
 	"k8s.io/kubernetes/pkg/kubelet/kubeletconfig/checkpoint"
 )
 
@@ -29,19 +30,21 @@ type fakeStore struct {
 	lastKnownGood checkpoint.RemoteConfigSource
 }
 
+var _ Store = (*fakeStore)(nil)
+
 func (s *fakeStore) Initialize() error {
 	return fmt.Errorf("Initialize method not supported")
 }
 
-func (s *fakeStore) Exists(uid string) (bool, error) {
+func (s *fakeStore) Exists(source checkpoint.RemoteConfigSource) (bool, error) {
 	return false, fmt.Errorf("Exists method not supported")
 }
 
-func (s *fakeStore) Save(c checkpoint.Checkpoint) error {
+func (s *fakeStore) Save(c checkpoint.Payload) error {
 	return fmt.Errorf("Save method not supported")
 }
 
-func (s *fakeStore) Load(uid string) (checkpoint.Checkpoint, error) {
+func (s *fakeStore) Load(source checkpoint.RemoteConfigSource) (*kubeletconfig.KubeletConfiguration, error) {
 	return nil, fmt.Errorf("Load method not supported")
 }
 
@@ -60,10 +63,6 @@ func (s *fakeStore) LastKnownGood() (checkpoint.RemoteConfigSource, error) {
 func (s *fakeStore) SetCurrent(source checkpoint.RemoteConfigSource) error {
 	s.current = source
 	return nil
-}
-
-func (s *fakeStore) SetCurrentUpdated(source checkpoint.RemoteConfigSource) (bool, error) {
-	return setCurrentUpdated(s, source)
 }
 
 func (s *fakeStore) SetLastKnownGood(source checkpoint.RemoteConfigSource) error {
