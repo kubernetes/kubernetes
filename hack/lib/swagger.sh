@@ -34,7 +34,7 @@ kube::swagger::gen_types_swagger_doc() {
 
   echo "Generating swagger type docs for ${group_version} at ${gv_dir}"
 
-  sed 's/YEAR/2016/' hack/boilerplate/boilerplate.go.txt > "$TMPFILE"
+  echo -e "$(cat hack/boilerplate/boilerplate.generatego.txt)\n" > "$TMPFILE"
   echo "package ${group_version##*/}" >> "$TMPFILE"
   cat >> "$TMPFILE" <<EOF
 
