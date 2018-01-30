@@ -74,7 +74,7 @@ func (h ClientCARegistrationHook) PostStartHook(hookContext genericapiserver.Pos
 // tryToWriteClientCAs is here for unit testing with a fake client.  This is a wait.ConditionFunc so the bool
 // indicates if the condition was met.  True when its finished, false when it should retry.
 func (h ClientCARegistrationHook) tryToWriteClientCAs(client coreclient.CoreInterface) (bool, error) {
-	if _, err := client.Namespaces().Create(&api.Namespace{ObjectMeta: metav1.ObjectMeta{Name: metav1.NamespaceSystem}}); err != nil && !apierrors.IsAlreadyExists(err) {
+	if err := createNamespaceIfNeeded(client, metav1.NamespaceSystem); err != nil {
 		utilruntime.HandleError(err)
 		return false, nil
 	}
