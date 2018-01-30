@@ -410,7 +410,6 @@ func (hc HostnameCheck) Check() (warnings, errors []error) {
 type HTTPProxyCheck struct {
 	Proto string
 	Host  string
-	Port  int
 }
 
 // Name returns HTTPProxy as name for HTTPProxyCheck
@@ -421,7 +420,7 @@ func (hst HTTPProxyCheck) Name() string {
 // Check validates http connectivity type, direct or via proxy.
 func (hst HTTPProxyCheck) Check() (warnings, errors []error) {
 
-	url := fmt.Sprintf("%s://%s:%d", hst.Proto, hst.Host, hst.Port)
+	url := fmt.Sprintf("%s://%s", hst.Proto, hst.Host)
 
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
@@ -897,7 +896,7 @@ func RunInitMasterChecks(execer utilsexec.Interface, cfg *kubeadmapi.MasterConfi
 			ControllerManagerExtraArgs: cfg.ControllerManagerExtraArgs,
 			SchedulerExtraArgs:         cfg.SchedulerExtraArgs,
 		},
-		HTTPProxyCheck{Proto: "https", Host: cfg.API.AdvertiseAddress, Port: int(cfg.API.BindPort)},
+		HTTPProxyCheck{Proto: "https", Host: cfg.API.AdvertiseAddress},
 		HTTPProxyCIDRCheck{Proto: "https", CIDR: cfg.Networking.ServiceSubnet},
 		HTTPProxyCIDRCheck{Proto: "https", CIDR: cfg.Networking.PodSubnet},
 	}
