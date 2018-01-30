@@ -35,7 +35,7 @@ go_library(
     importpath = "k8s.io/apimachinery/pkg/apis/meta/internalversion",
     deps = [
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1alpha1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1beta1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/conversion:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/fields:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/labels:go_default_library",

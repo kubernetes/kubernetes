@@ -29,7 +29,7 @@ import (
 	apitesting "k8s.io/apimachinery/pkg/api/testing"
 	"k8s.io/apimachinery/pkg/api/testing/fuzzer"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	metav1alpha1 "k8s.io/apimachinery/pkg/apis/meta/v1alpha1"
+	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/types"
@@ -252,7 +252,7 @@ func v1FuzzerFuncs(codecs runtimeserializer.CodecFactory) []interface{} {
 
 func v1alpha1FuzzerFuncs(codecs runtimeserializer.CodecFactory) []interface{} {
 	return []interface{}{
-		func(r *metav1alpha1.TableRow, c fuzz.Continue) {
+		func(r *metav1beta1.TableRow, c fuzz.Continue) {
 			c.Fuzz(&r.Object)
 			c.Fuzz(&r.Conditions)
 			if len(r.Conditions) == 0 {

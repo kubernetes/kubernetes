@@ -19,7 +19,7 @@ limitations under the License.
 
 syntax = 'proto2';
 
-package k8s.io.apimachinery.pkg.apis.meta.v1alpha1;
+package k8s.io.apimachinery.pkg.apis.meta.v1beta1;
 
 import "k8s.io/apimachinery/pkg/apis/meta/v1/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/generated.proto";
@@ -27,7 +27,7 @@ import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 import "k8s.io/apimachinery/pkg/util/intstr/generated.proto";
 
 // Package-wide variables from generator "generated".
-option go_package = "v1alpha1";
+option go_package = "v1beta1";
 
 // PartialObjectMetadata is a generic representation of any object with ObjectMeta. It allows clients
 // to get access to a particular ObjectMeta schema without knowing the details of the version.
@@ -52,7 +52,7 @@ message TableOptions {
   // includeObject decides whether to include each object along with its columnar information.
   // Specifying "None" will return no object, specifying "Object" will return the full object contents, and
   // specifying "Metadata" (the default) will return the object's metadata in the PartialObjectMetadata kind
-  // in version v1alpha1 of the meta.k8s.io API group.
+  // in version v1beta1 of the meta.k8s.io API group.
   optional string includeObject = 1;
 }
 

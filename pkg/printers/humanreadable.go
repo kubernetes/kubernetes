@@ -26,7 +26,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	metav1alpha1 "k8s.io/apimachinery/pkg/apis/meta/v1alpha1"
+	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -34,19 +34,19 @@ import (
 )
 
 type TablePrinter interface {
-	PrintTable(obj runtime.Object, options PrintOptions) (*metav1alpha1.Table, error)
+	PrintTable(obj runtime.Object, options PrintOptions) (*metav1beta1.Table, error)
 }
 
 type PrintHandler interface {
 	Handler(columns, columnsWithWide []string, printFunc interface{}) error
-	TableHandler(columns []metav1alpha1.TableColumnDefinition, printFunc interface{}) error
-	DefaultTableHandler(columns []metav1alpha1.TableColumnDefinition, printFunc interface{}) error
+	TableHandler(columns []metav1beta1.TableColumnDefinition, printFunc interface{}) error
+	DefaultTableHandler(columns []metav1beta1.TableColumnDefinition, printFunc interface{}) error
 }
 
 var withNamespacePrefixColumns = []string{"NAMESPACE"} // TODO(erictune): print cluster name too.
 
 type handlerEntry struct {
-	columnDefinitions []metav1alpha1.TableColumnDefinition
+	columnDefinitions []metav1beta1.TableColumnDefinition
 	printRows         bool
 	printFunc         reflect.Value
 	args              []reflect.Value
@@ -126,15 +126,15 @@ func (h *HumanReadablePrinter) EnsurePrintHeaders() {
 // Handler adds a print handler with a given set of columns to HumanReadablePrinter instance.
 // See ValidatePrintHandlerFunc for required method signature.
 func (h *HumanReadablePrinter) Handler(columns, columnsWithWide []string, printFunc interface{}) error {
-	var columnDefinitions []metav1alpha1.TableColumnDefinition
+	var columnDefinitions []metav1beta1.TableColumnDefinition
 	for _, column := range columns {
-		columnDefinitions = append(columnDefinitions, metav1alpha1.TableColumnDefinition{
+		columnDefinitions = append(columnDefinitions, metav1beta1.TableColumnDefinition{
 			Name: column,
 			Type: "string",
 		})
 	}
 	for _, column := range columnsWithWide {
-		columnDefinitions = append(columnDefinitions, metav1alpha1.TableColumnDefinition{
+		columnDefinitions = append(columnDefinitions, metav1beta1.TableColumnDefinition{
 			Name:     column,
 			Type:     "string",
 			Priority: 1,
@@ -164,7 +164,7 @@ func (h *HumanReadablePrinter) Handler(columns, columnsWithWide []string, printF
 
 // TableHandler adds a print handler with a given set of columns to HumanReadablePrinter instance.
 // See ValidateRowPrintHandlerFunc for required method signature.
-func (h *HumanReadablePrinter) TableHandler(columnDefinitions []metav1alpha1.TableColumnDefinition, printFunc interface{}) error {
+func (h *HumanReadablePrinter) TableHandler(columnDefinitions []metav1beta1.TableColumnDefinition, printFunc interface{}) error {
 	printFuncValue := reflect.ValueOf(printFunc)
 	if err := ValidateRowPrintHandlerFunc(printFuncValue); err != nil {
 		utilruntime.HandleError(fmt.Errorf("unable to register print function: %v", err))
@@ -189,7 +189,7 @@ func (h *HumanReadablePrinter) TableHandler(columnDefinitions []metav1alpha1.Tab
 // DefaultTableHandler registers a set of columns and a print func that is given a chance to process
 // any object without an explicit handler. Only the most recently set print handler is used.
 // See ValidateRowPrintHandlerFunc for required method signature.
-func (h *HumanReadablePrinter) DefaultTableHandler(columnDefinitions []metav1alpha1.TableColumnDefinition, printFunc interface{}) error {
+func (h *HumanReadablePrinter) DefaultTableHandler(columnDefinitions []metav1beta1.TableColumnDefinition, printFunc interface{}) error {
 	printFuncValue := reflect.ValueOf(printFunc)
 	if err := ValidateRowPrintHandlerFunc(printFuncValue); err != nil {
 		utilruntime.HandleError(fmt.Errorf("unable to register print function: %v", err))
@@ -208,7 +208,7 @@ func (h *HumanReadablePrinter) DefaultTableHandler(columnDefinitions []metav1alp
 // ValidateRowPrintHandlerFunc validates print handler signature.
 // printFunc is the function that will be called to print an object.
 // It must be of the following type:
-//  func printFunc(object ObjectType, options PrintOptions) ([]metav1alpha1.TableRow, error)
+//  func printFunc(object ObjectType, options PrintOptions) ([]metav1beta1.TableRow, error)
 // where ObjectType is the type of the object that will be printed, and the first
 // return value is an array of rows, with each row containing a number of cells that
 // match the number of columns defined for that printer function.
@@ -222,10 +222,10 @@ func ValidateRowPrintHandlerFunc(printFunc reflect.Value) error {
 			"Must accept 2 parameters and return 2 value.")
 	}
 	if funcType.In(1) != reflect.TypeOf((*PrintOptions)(nil)).Elem() ||
-		funcType.Out(0) != reflect.TypeOf((*[]metav1alpha1.TableRow)(nil)).Elem() ||
+		funcType.Out(0) != reflect.TypeOf((*[]metav1beta1.TableRow)(nil)).Elem() ||
 		funcType.Out(1) != reflect.TypeOf((*error)(nil)).Elem() {
 		return fmt.Errorf("invalid print handler. The expected signature is: "+
-			"func handler(obj %v, options PrintOptions) ([]metav1alpha1.TableRow, error)", funcType.In(0))
+			"func handler(obj %v, options PrintOptions) ([]metav1beta1.TableRow, error)", funcType.In(0))
 	}
 	return nil
 }
@@ -303,7 +303,7 @@ func (h *HumanReadablePrinter) PrintObj(obj runtime.Object, output io.Writer) er
 	}
 
 	// display tables following the rules of options
-	if table, ok := obj.(*metav1alpha1.Table); ok {
+	if table, ok := obj.(*metav1beta1.Table); ok {
 		if err := DecorateTable(table, h.options); err != nil {
 			return err
 		}
@@ -341,10 +341,10 @@ func (h *HumanReadablePrinter) PrintObj(obj runtime.Object, output io.Writer) er
 	return fmt.Errorf("error: unknown type %#v", obj)
 }
 
-func hasCondition(conditions []metav1alpha1.TableRowCondition, t metav1alpha1.RowConditionType) bool {
+func hasCondition(conditions []metav1beta1.TableRowCondition, t metav1beta1.RowConditionType) bool {
 	for _, condition := range conditions {
 		if condition.Type == t {
-			return condition.Status == metav1alpha1.ConditionTrue
+			return condition.Status == metav1beta1.ConditionTrue
 		}
 	}
 	return false
@@ -353,7 +353,7 @@ func hasCondition(conditions []metav1alpha1.TableRowCondition, t metav1alpha1.Ro
 // PrintTable prints a table to the provided output respecting the filtering rules for options
 // for wide columns and filetred rows. It filters out rows that are Completed. You should call
 // DecorateTable if you receive a table from a remote server before calling PrintTable.
-func PrintTable(table *metav1alpha1.Table, output io.Writer, options PrintOptions) error {
+func PrintTable(table *metav1beta1.Table, output io.Writer, options PrintOptions) error {
 	if !options.NoHeaders {
 		first := true
 		for _, column := range table.ColumnDefinitions {
@@ -370,7 +370,7 @@ func PrintTable(table *metav1alpha1.Table, output io.Writer, options PrintOption
 		fmt.Fprintln(output)
 	}
 	for _, row := range table.Rows {
-		if !options.ShowAll && hasCondition(row.Conditions, metav1alpha1.RowCompleted) {
+		if !options.ShowAll && hasCondition(row.Conditions, metav1beta1.RowCompleted) {
 			continue
 		}
 		first := true
@@ -397,7 +397,7 @@ func PrintTable(table *metav1alpha1.Table, output io.Writer, options PrintOption
 // namespace column. It will fill empty columns with nil (if the object
 // does not expose metadata). It returns an error if the table cannot
 // be decorated.
-func DecorateTable(table *metav1alpha1.Table, options PrintOptions) error {
+func DecorateTable(table *metav1beta1.Table, options PrintOptions) error {
 	width := len(table.ColumnDefinitions) + len(options.ColumnLabels)
 	if options.WithNamespace {
 		width++
@@ -420,22 +420,22 @@ func DecorateTable(table *metav1alpha1.Table, options PrintOptions) error {
 	}
 
 	if width != len(table.ColumnDefinitions) {
-		columns = make([]metav1alpha1.TableColumnDefinition, 0, width)
+		columns = make([]metav1beta1.TableColumnDefinition, 0, width)
 		if options.WithNamespace {
-			columns = append(columns, metav1alpha1.TableColumnDefinition{
+			columns = append(columns, metav1beta1.TableColumnDefinition{
 				Name: "Namespace",
 				Type: "string",
 			})
 		}
 		columns = append(columns, table.ColumnDefinitions...)
 		for _, label := range formatLabelHeaders(options.ColumnLabels) {
-			columns = append(columns, metav1alpha1.TableColumnDefinition{
+			columns = append(columns, metav1beta1.TableColumnDefinition{
 				Name: label,
 				Type: "string",
 			})
 		}
 		if options.ShowLabels {
-			columns = append(columns, metav1alpha1.TableColumnDefinition{
+			columns = append(columns, metav1beta1.TableColumnDefinition{
 				Name: "Labels",
 				Type: "string",
 			})
@@ -492,7 +492,7 @@ func DecorateTable(table *metav1alpha1.Table, options PrintOptions) error {
 // PrintTable returns a table for the provided object, using the printer registered for that type. It returns
 // a table that includes all of the information requested by options, but will not remove rows or columns. The
 // caller is responsible for applying rules related to filtering rows or columns.
-func (h *HumanReadablePrinter) PrintTable(obj runtime.Object, options PrintOptions) (*metav1alpha1.Table, error) {
+func (h *HumanReadablePrinter) PrintTable(obj runtime.Object, options PrintOptions) (*metav1beta1.Table, error) {
 	t := reflect.TypeOf(obj)
 	handler, ok := h.handlerMap[t]
 	if !ok {
@@ -510,7 +510,7 @@ func (h *HumanReadablePrinter) PrintTable(obj runtime.Object, options PrintOptio
 
 	columns := handler.columnDefinitions
 	if !options.Wide {
-		columns = make([]metav1alpha1.TableColumnDefinition, 0, len(handler.columnDefinitions))
+		columns = make([]metav1beta1.TableColumnDefinition, 0, len(handler.columnDefinitions))
 		for i := range handler.columnDefinitions {
 			if handler.columnDefinitions[i].Priority != 0 {
 				continue
@@ -518,12 +518,12 @@ func (h *HumanReadablePrinter) PrintTable(obj runtime.Object, options PrintOptio
 			columns = append(columns, handler.columnDefinitions[i])
 		}
 	}
-	table := &metav1alpha1.Table{
+	table := &metav1beta1.Table{
 		ListMeta: metav1.ListMeta{
 			ResourceVersion: "",
 		},
 		ColumnDefinitions: columns,
-		Rows:              results[0].Interface().([]metav1alpha1.TableRow),
+		Rows:              results[0].Interface().([]metav1beta1.TableRow),
 	}
 	if m, err := meta.ListAccessor(obj); err == nil {
 		table.ResourceVersion = m.GetResourceVersion()
@@ -582,7 +582,7 @@ func printRowsForHandlerEntry(output io.Writer, handler *handlerEntry, obj runti
 	}
 
 	if results[1].IsNil() {
-		rows := results[0].Interface().([]metav1alpha1.TableRow)
+		rows := results[0].Interface().([]metav1beta1.TableRow)
 		printRows(output, rows, options)
 		return nil
 	}
@@ -590,7 +590,7 @@ func printRowsForHandlerEntry(output io.Writer, handler *handlerEntry, obj runti
 }
 
 // printRows writes the provided rows to output.
-func printRows(output io.Writer, rows []metav1alpha1.TableRow, options PrintOptions) {
+func printRows(output io.Writer, rows []metav1beta1.TableRow, options PrintOptions) {
 	for _, row := range rows {
 		if options.WithNamespace {
 			if obj := row.Object.Object; obj != nil {
@@ -630,9 +630,9 @@ func printRows(output io.Writer, rows []metav1alpha1.TableRow, options PrintOpti
 
 // legacyPrinterToTable uses the old printFunc with tabbed writer to generate a table.
 // TODO: remove when all legacy printers are removed.
-func (h *HumanReadablePrinter) legacyPrinterToTable(obj runtime.Object, handler *handlerEntry) (*metav1alpha1.Table, error) {
+func (h *HumanReadablePrinter) legacyPrinterToTable(obj runtime.Object, handler *handlerEntry) (*metav1beta1.Table, error) {
 	printFunc := handler.printFunc
-	table := &metav1alpha1.Table{
+	table := &metav1beta1.Table{
 		ColumnDefinitions: handler.columnDefinitions,
 	}
 
@@ -659,7 +659,7 @@ func (h *HumanReadablePrinter) legacyPrinterToTable(obj runtime.Object, handler 
 		}
 		for len(data) > 0 {
 			cells, remainder := tabbedLineToCells(data, len(table.ColumnDefinitions))
-			table.Rows = append(table.Rows, metav1alpha1.TableRow{
+			table.Rows = append(table.Rows, metav1beta1.TableRow{
 				Cells:  cells,
 				Object: runtime.RawExtension{Object: items[i]},
 			})
@@ -674,7 +674,7 @@ func (h *HumanReadablePrinter) legacyPrinterToTable(obj runtime.Object, handler 
 		}
 		data := buf.Bytes()
 		cells, _ := tabbedLineToCells(data, len(table.ColumnDefinitions))
-		table.Rows = append(table.Rows, metav1alpha1.TableRow{
+		table.Rows = append(table.Rows, metav1beta1.TableRow{
 			Cells:  cells,
 			Object: runtime.RawExtension{Object: obj},
 		})

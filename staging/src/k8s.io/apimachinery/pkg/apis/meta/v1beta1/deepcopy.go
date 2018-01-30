@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1alpha1
+package v1beta1
 
 func (in *TableRow) DeepCopy() *TableRow {
 	if in == nil {
