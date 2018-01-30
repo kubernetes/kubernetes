@@ -1320,8 +1320,7 @@ func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
 
 	if err := kl.initializeModules(); err != nil {
 		kl.recorder.Eventf(kl.nodeRef, v1.EventTypeWarning, events.KubeletSetupFailed, err.Error())
-		glog.Error(err)
-		kl.runtimeState.setInitError(err)
+		glog.Fatal(err)
 	}
 
 	// Start volume manager
