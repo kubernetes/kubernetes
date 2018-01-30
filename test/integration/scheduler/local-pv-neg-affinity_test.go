@@ -95,8 +95,8 @@ func TestLocalPVNegativeAffinity(t *testing.T) {
 		if strings.Compare(p.Status.Conditions[0].Reason, "Unschedulable") != 0 {
 			t.Fatalf("Failed as Pod %s reason was: %s but expected: Unschedulable", podName, p.Status.Conditions[0].Reason)
 		}
-		if !strings.Contains(p.Status.Conditions[0].Message, "MatchNodeSelector") || !strings.Contains(p.Status.Conditions[0].Message, "VolumeNodeAffinityConflict") {
-			t.Fatalf("Failed as Pod's %s failure message does not contain expected keywords: MatchNodeSelector, VolumeNodeAffinityConflict", podName)
+		if !strings.Contains(p.Status.Conditions[0].Message, "node(s) didn't match node selector") || !strings.Contains(p.Status.Conditions[0].Message, "node(s) had volume node affinity conflict") {
+			t.Fatalf("Failed as Pod's %s failure message does not contain expected message: node(s) didn't match node selector, node(s) had volume node affinity conflict", podName)
 		}
 		if err := config.client.CoreV1().Pods(config.ns).Delete(podName, &metav1.DeleteOptions{}); err != nil {
 			t.Fatalf("Failed to delete Pod %s: %v", podName, err)
