@@ -77,10 +77,6 @@ func (cu *cadvisorUnsupported) WatchEvents(request *events.Request) (*events.Eve
 	return nil, unsupportedErr
 }
 
-func (cu *cadvisorUnsupported) HasDedicatedImageFs() (bool, error) {
-	return false, unsupportedErr
-}
-
 func (c *cadvisorUnsupported) GetFsInfoByFsUUID(uuid string) (cadvisorapiv2.FsInfo, error) {
 	return cadvisorapiv2.FsInfo{}, nil
 }

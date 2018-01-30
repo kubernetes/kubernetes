@@ -42,9 +42,6 @@ type Interface interface {
 	// Get events streamed through passedChannel that fit the request.
 	WatchEvents(request *events.Request) (*events.EventChannel, error)
 
-	// HasDedicatedImageFs returns true iff a dedicated image filesystem exists for storing images.
-	HasDedicatedImageFs() (bool, error)
-
 	// GetFsInfoByFsUUID returns the stats of the filesystem with the specified
 	// uuid.
 	GetFsInfoByFsUUID(uuid string) (cadvisorapiv2.FsInfo, error)
