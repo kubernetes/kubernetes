@@ -70,8 +70,7 @@ func NewCmdPreFlightMaster() *cobra.Command {
 		Example: masterPreflightExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cfg := &kubeadmapi.MasterConfiguration{}
-			criSocket := ""
-			err := preflight.RunInitMasterChecks(utilsexec.New(), cfg, criSocket, sets.NewString())
+			err := preflight.RunInitMasterChecks(utilsexec.New(), cfg, sets.NewString())
 			kubeadmutil.CheckErr(err)
 		},
 	}

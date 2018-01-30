@@ -50,6 +50,8 @@ const (
 	DefaultImageRepository = "gcr.io/google_containers"
 	// DefaultManifestsDir defines default manifests directory
 	DefaultManifestsDir = "/etc/kubernetes/manifests"
+	// DefaultCRISocket defines the default cri socket
+	DefaultCRISocket = "/var/run/dockershim.sock"
 
 	// DefaultEtcdDataDir defines default location of etcd where static pods will save data to
 	DefaultEtcdDataDir = "/var/lib/etcd"
@@ -103,6 +105,10 @@ func SetDefaults_MasterConfiguration(obj *MasterConfiguration) {
 		obj.TokenTTL = &metav1.Duration{
 			Duration: constants.DefaultTokenDuration,
 		}
+	}
+
+	if obj.CRISocket == "" {
+		obj.CRISocket = DefaultCRISocket
 	}
 
 	if obj.ImageRepository == "" {
