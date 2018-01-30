@@ -18,7 +18,7 @@ install:
 	go install -v github.com/vmware/govmomi/vcsim
 
 go-test:
-	go test -v $(TEST_OPTS) ./...
+	go test -race -v $(TEST_OPTS) ./...
 
 govc-test: install
 	(cd govc/test && ./vendor/github.com/sstephenson/bats/libexec/bats -t .)

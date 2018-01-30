@@ -32,13 +32,14 @@ func (v *VirtualMachineSnapshot) RemoveSnapshotTask(req *types.RemoveSnapshot_Ta
 		Map.Remove(req.This)
 
 		vm := Map.Get(v.Vm).(*VirtualMachine)
+		Map.WithLock(vm, func() {
+			if vm.Snapshot.CurrentSnapshot != nil && *vm.Snapshot.CurrentSnapshot == req.This {
+				parent := findParentSnapshotInTree(vm.Snapshot.RootSnapshotList, req.This)
+				vm.Snapshot.CurrentSnapshot = parent
+			}
 
-		if vm.Snapshot.CurrentSnapshot != nil && *vm.Snapshot.CurrentSnapshot == req.This {
-			parent := findParentSnapshotInTree(vm.Snapshot.RootSnapshotList, req.This)
-			vm.Snapshot.CurrentSnapshot = parent
-		}
-
-		vm.Snapshot.RootSnapshotList = removeSnapshotInTree(vm.Snapshot.RootSnapshotList, req.This, req.RemoveChildren)
+			vm.Snapshot.RootSnapshotList = removeSnapshotInTree(vm.Snapshot.RootSnapshotList, req.This, req.RemoveChildren)
+		})
 
 		return nil, nil
 	})
@@ -54,8 +55,7 @@ func (v *VirtualMachineSnapshot) RevertToSnapshotTask(req *types.RevertToSnapsho
 	task := CreateTask(v, "revertToSnapshot", func(t *Task) (types.AnyType, types.BaseMethodFault) {
 		vm := Map.Get(v.Vm).(*VirtualMachine)
 
-		ref := v.Reference()
-		vm.Snapshot.CurrentSnapshot = &ref
+		Map.WithLock(vm, func() { vm.Snapshot.CurrentSnapshot = &v.Self })
 
 		return nil, nil
 	})
