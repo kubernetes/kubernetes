@@ -530,6 +530,16 @@ type PersistentVolumeSpec struct {
 	// This is an alpha feature and may change in the future.
 	// +optional
 	VolumeMode *PersistentVolumeMode `json:"volumeMode,omitempty" protobuf:"bytes,8,opt,name=volumeMode,casttype=PersistentVolumeMode"`
+	// NodeAffinity defines constraints that limit what nodes this volume can be accessed from.
+	// This field influences the scheduling of pods that use this volume.
+	// +optional
+	NodeAffinity *VolumeNodeAffinity `json:"nodeAffinity,omitempty" protobuf:"bytes,9,opt,name=nodeAffinity"`
+}
+
+// VolumeNodeAffinity defines constraints that limit what nodes this volume can be accessed from.
+type VolumeNodeAffinity struct {
+	// Required specifies hard node constraints that must be met.
+	Required *NodeSelector `json:"required,omitempty" protobuf:"bytes,1,opt,name=required"`
 }
 
 // PersistentVolumeReclaimPolicy describes a policy for end-of-life maintenance of persistent volumes.

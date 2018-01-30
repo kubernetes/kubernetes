@@ -20,8 +20,6 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/golang/glog"
-
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -29,7 +27,6 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	ref "k8s.io/client-go/tools/reference"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -680,9 +677,8 @@ func createTestVolumes() []*v1.PersistentVolume {
 		},
 		{
 			ObjectMeta: metav1.ObjectMeta{
-				UID:         "affinity-pv",
-				Name:        "affinity001",
-				Annotations: getAnnotationWithNodeAffinity("key1", "value1"),
+				UID:  "affinity-pv",
+				Name: "affinity001",
 			},
 			Spec: v1.PersistentVolumeSpec{
 				Capacity: v1.ResourceList{
@@ -696,13 +692,13 @@ func createTestVolumes() []*v1.PersistentVolume {
 					v1.ReadOnlyMany,
 				},
 				StorageClassName: classWait,
+				NodeAffinity:     getVolumeNodeAffinity("key1", "value1"),
 			},
 		},
 		{
 			ObjectMeta: metav1.ObjectMeta{
-				UID:         "affinity-pv2",
-				Name:        "affinity002",
-				Annotations: getAnnotationWithNodeAffinity("key1", "value1"),
+				UID:  "affinity-pv2",
+				Name: "affinity002",
 			},
 			Spec: v1.PersistentVolumeSpec{
 				Capacity: v1.ResourceList{
@@ -716,13 +712,13 @@ func createTestVolumes() []*v1.PersistentVolume {
 					v1.ReadOnlyMany,
 				},
 				StorageClassName: classWait,
+				NodeAffinity:     getVolumeNodeAffinity("key1", "value1"),
 			},
 		},
 		{
 			ObjectMeta: metav1.ObjectMeta{
-				UID:         "affinity-prebound",
-				Name:        "affinity003",
-				Annotations: getAnnotationWithNodeAffinity("key1", "value1"),
+				UID:  "affinity-prebound",
+				Name: "affinity003",
 			},
 			Spec: v1.PersistentVolumeSpec{
 				Capacity: v1.ResourceList{
@@ -737,13 +733,13 @@ func createTestVolumes() []*v1.PersistentVolume {
 				},
 				StorageClassName: classWait,
 				ClaimRef:         &v1.ObjectReference{Name: "claim02", Namespace: "myns"},
+				NodeAffinity:     getVolumeNodeAffinity("key1", "value1"),
 			},
 		},
 		{
 			ObjectMeta: metav1.ObjectMeta{
-				UID:         "affinity-pv3",
-				Name:        "affinity003",
-				Annotations: getAnnotationWithNodeAffinity("key1", "value3"),
+				UID:  "affinity-pv3",
+				Name: "affinity003",
 			},
 			Spec: v1.PersistentVolumeSpec{
 				Capacity: v1.ResourceList{
@@ -757,6 +753,7 @@ func createTestVolumes() []*v1.PersistentVolume {
 					v1.ReadOnlyMany,
 				},
 				StorageClassName: classWait,
+				NodeAffinity:     getVolumeNodeAffinity("key1", "value3"),
 			},
 		},
 	}
@@ -776,9 +773,9 @@ func testVolume(name, size string) *v1.PersistentVolume {
 	}
 }
 
-func getAnnotationWithNodeAffinity(key string, value string) map[string]string {
-	affinity := &v1.NodeAffinity{
-		RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+func getVolumeNodeAffinity(key string, value string) *v1.VolumeNodeAffinity {
+	return &v1.VolumeNodeAffinity{
+		Required: &v1.NodeSelector{
 			NodeSelectorTerms: []v1.NodeSelectorTerm{
 				{
 					MatchExpressions: []v1.NodeSelectorRequirement{
@@ -792,14 +789,6 @@ func getAnnotationWithNodeAffinity(key string, value string) map[string]string {
 			},
 		},
 	}
-
-	annotations := map[string]string{}
-	err := helper.StorageNodeAffinityToAlphaAnnotation(annotations, affinity)
-	if err != nil {
-		glog.Fatalf("Failed to get node affinity annotation: %v", err)
-	}
-
-	return annotations
 }
 
 func createVolumeModeBlockTestVolume() *v1.PersistentVolume {

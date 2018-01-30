@@ -1383,6 +1383,9 @@ func validateLocalVolumeSource(ls *core.LocalVolumeSource, fldPath *field.Path) 
 		return allErrs
 	}
 
+	if !path.IsAbs(ls.Path) {
+		allErrs = append(allErrs, field.Invalid(fldPath, ls.Path, "must be an absolute path"))
+	}
 	allErrs = append(allErrs, validatePathNoBacksteps(ls.Path, fldPath.Child("path"))...)
 	return allErrs
 }
@@ -1495,6 +1498,10 @@ func ValidatePersistentVolume(pv *core.PersistentVolume) field.ErrorList {
 	}
 
 	nodeAffinitySpecified, errs := validateStorageNodeAffinityAnnotation(pv.ObjectMeta.Annotations, metaPath.Child("annotations"))
+	allErrs = append(allErrs, errs...)
+
+	volumeNodeAffinitySpecified, errs := validateVolumeNodeAffinity(pv.Spec.NodeAffinity, specPath.Child("nodeAffinity"))
+	nodeAffinitySpecified = nodeAffinitySpecified || volumeNodeAffinitySpecified
 	allErrs = append(allErrs, errs...)
 
 	numVolumes := 0
@@ -1723,6 +1730,10 @@ func ValidatePersistentVolumeUpdate(newPv, oldPv *core.PersistentVolume) field.E
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) {
 		allErrs = append(allErrs, ValidateImmutableField(newPv.Spec.VolumeMode, oldPv.Spec.VolumeMode, field.NewPath("volumeMode"))...)
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) {
+		allErrs = append(allErrs, ValidateImmutableField(newPv.Spec.NodeAffinity, oldPv.Spec.NodeAffinity, field.NewPath("nodeAffinity"))...)
 	}
 
 	return allErrs
@@ -4936,7 +4947,7 @@ func validateStorageNodeAffinityAnnotation(annotations map[string]string, fldPat
 		return false, allErrs
 	}
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.PersistentLocalVolumes) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) {
 		allErrs = append(allErrs, field.Forbidden(fldPath, "Storage node affinity is disabled by feature-gate"))
 	}
 
@@ -4950,6 +4961,27 @@ func validateStorageNodeAffinityAnnotation(annotations map[string]string, fldPat
 		allErrs = append(allErrs, field.Forbidden(fldPath.Child("preferredDuringSchedulingIgnoredDuringExection"), "Storage node affinity does not support preferredDuringSchedulingIgnoredDuringExecution"))
 	}
 	return policySpecified, allErrs
+}
+
+// validateVolumeNodeAffinity tests that the PersistentVolume.NodeAffinity has valid data
+func validateVolumeNodeAffinity(nodeAffinity *core.VolumeNodeAffinity, fldPath *field.Path) (bool, field.ErrorList) {
+	allErrs := field.ErrorList{}
+
+	if nodeAffinity == nil {
+		return false, allErrs
+	}
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) {
+		allErrs = append(allErrs, field.Forbidden(fldPath, "Volume node affinity is disabled by feature-gate"))
+	}
+
+	if nodeAffinity.Required != nil {
+		allErrs = append(allErrs, ValidateNodeSelector(nodeAffinity.Required, fldPath.Child("required"))...)
+	} else {
+		allErrs = append(allErrs, field.Required(fldPath.Child("required"), "must specify required node constraints"))
+	}
+
+	return true, allErrs
 }
 
 // ValidateCIDR validates whether a CIDR matches the conventions expected by net.ParseCIDR
