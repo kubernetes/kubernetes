@@ -74,6 +74,7 @@ def upgrade_charm():
     remove_state('kubernetes-worker.cni-plugins.installed')
     remove_state('kubernetes-worker.config.created')
     remove_state('kubernetes-worker.ingress.available')
+    remove_state('worker.auth.bootstrapped')
     set_state('kubernetes-worker.restart-needed')
 
 
