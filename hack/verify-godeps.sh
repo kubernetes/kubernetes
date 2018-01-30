@@ -29,6 +29,9 @@ if ! [[ ${KUBE_FORCE_VERIFY_CHECKS:-} =~ ^[yY]$ ]] && \
   exit 0
 fi
 
+# Ensure we have the right godep version available
+kube::util::ensure_godep_version
+
 if [[ -z ${TMP_GOPATH:-} ]]; then
   # Create a nice clean place to put our new godeps
   _tmpdir="$(mktemp -d -t gopath.XXXXXX)"
