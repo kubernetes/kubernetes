@@ -197,6 +197,31 @@ func TestToKubeContainerStatus(t *testing.T) {
 				StartedAt: time.Unix(0, startedAt),
 			},
 		},
+		"container with annotations and labels": {
+			input: &runtimeapi.ContainerStatus{
+				Id:        cid.ID,
+				Metadata:  meta,
+				Image:     imageSpec,
+				State:     runtimeapi.ContainerState_CONTAINER_RUNNING,
+				CreatedAt: createdAt,
+				StartedAt: startedAt,
+				Annotations: map[string]string{
+					"io.kubernetes.container.restartCount": "3",
+					"io.kubernetes.container.hash":         "666",
+				},
+				Labels: map[string]string{"io.kubernetes.container.name": "cname"},
+			},
+			expected: &kubecontainer.ContainerStatus{
+				Name:         "cname",
+				ID:           *cid,
+				Image:        imageSpec.Image,
+				RestartCount: 3,
+				Hash:         0x666,
+				State:        kubecontainer.ContainerStateRunning,
+				CreatedAt:    time.Unix(0, createdAt),
+				StartedAt:    time.Unix(0, startedAt),
+			},
+		},
 	} {
 		actual := toKubeContainerStatus(test.input, cid.Type)
 		assert.Equal(t, test.expected, actual, desc)
