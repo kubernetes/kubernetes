@@ -361,9 +361,10 @@ func (util *FCUtil) DetachBlockFCDisk(c fcDiskUnmapper, mapPath, devicePath stri
 	}
 	loop, err := volumeutil.BlockVolumePathHandler.GetLoopDevice(blkUtil, dstPath)
 	if err != nil {
-		glog.Warningf("fc: failed to get loopback for device: %v, err: %v", dstPath, err)
-	} else {
-		glog.V(4).Infof("fc: found loopback: %v", loop)
+		if err.Error() != volumeutil.ErrDeviceNotFound {
+			return fmt.Errorf("fc: failed to get loopback for destination path: %v, err: %v", dstPath, err)
+		}
+		glog.Warning("fc: loopback for destination path: %s not found", dstPath)
 	}
 
 	// Detach volume from kubelet node
@@ -386,11 +387,12 @@ func (util *FCUtil) DetachBlockFCDisk(c fcDiskUnmapper, mapPath, devicePath stri
 		glog.Errorf("fc: last error occurred during detach disk:\n%v", lastErr)
 		return lastErr
 	}
-
-	// The volume was successfully detached from node. We can safely remove the loopback.
-	err = volumeutil.BlockVolumePathHandler.RemoveLoopDevice(blkUtil, loop)
-	if err != nil {
-		return fmt.Errorf("fc: failed to remove loopback :%v, err: %v", loop, err)
+	if len(loop) != 0 {
+		// The volume was successfully detached from node. We can safely remove the loopback.
+		err = volumeutil.BlockVolumePathHandler.RemoveLoopDevice(blkUtil, loop)
+		if err != nil {
+			return fmt.Errorf("fc: failed to remove loopback :%v, err: %v", loop, err)
+		}
 	}
 	return nil
 }
