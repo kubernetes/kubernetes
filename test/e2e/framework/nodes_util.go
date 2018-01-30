@@ -86,7 +86,6 @@ func ingressUpgradeGCE(isUpgrade bool) error {
 		command = "sudo sed -i -re 's/(image:)(.*)/\\1 gcr.io\\/google_containers\\/glbc:0.9.7/' /etc/kubernetes/manifests/glbc.manifest"
 	}
 	sshResult, err := NodeExec(GetMasterHost(), command)
-	// TODO(rramkumar): Ensure glbc pod is in "Running" state before proceeding.
 	LogSSHResult(sshResult)
 	return err
 }
