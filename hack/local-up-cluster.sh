@@ -380,10 +380,12 @@ cleanup()
   # Check if the proxy is still running
   [[ -n "${PROXY_PID-}" ]] && PROXY_PIDS=$(pgrep -P ${PROXY_PID} ; ps -o pid= -p ${PROXY_PID})
   [[ -n "${PROXY_PIDS-}" ]] && sudo kill ${PROXY_PIDS}
+  rm -f /tmp/kube-proxy.yaml || :
 
   # Check if the scheduler is still running
   [[ -n "${SCHEDULER_PID-}" ]] && SCHEDULER_PIDS=$(pgrep -P ${SCHEDULER_PID} ; ps -o pid= -p ${SCHEDULER_PID})
   [[ -n "${SCHEDULER_PIDS-}" ]] && sudo kill ${SCHEDULER_PIDS}
+  rm -f /tmp/kube-scheduler.yaml || :
 
   # Check if the etcd is still running
   [[ -n "${ETCD_PID-}" ]] && kube::etcd::stop
@@ -433,7 +435,7 @@ function start_apiserver {
       fi
       RUNTIME_CONFIG+="scheduling.k8s.io/v1alpha1=true"
     fi
-    
+
 
     # Admission Controllers to invoke prior to persisting objects in cluster
     #
@@ -823,12 +825,17 @@ EOF
       --v=${LOG_LEVEL} 2>&1 &
     PROXY_PID=$!
 
+    cat <<EOF > /tmp/kube-scheduler.yaml
+apiVersion: componentconfig/v1alpha1
+kind: KubeSchedulerConfiguration
+clientConnection:
+  kubeconfig: ${CERT_DIR}/scheduler.kubeconfig
+featureGates: ${FEATURE_GATES}
+EOF
     SCHEDULER_LOG=${LOG_DIR}/kube-scheduler.log
     ${CONTROLPLANE_SUDO} "${GO_OUT}/hyperkube" scheduler \
       --v=${LOG_LEVEL} \
-      --kubeconfig "$CERT_DIR"/scheduler.kubeconfig \
-      --feature-gates="${FEATURE_GATES}" \
-      --master="https://${API_HOST}:${API_SECURE_PORT}" >"${SCHEDULER_LOG}" 2>&1 &
+      --config=/tmp/kube-scheduler.yaml > "${SCHEDULER_LOG}" 2>&1 &
     SCHEDULER_PID=$!
 }
 
