@@ -98,7 +98,7 @@ func (s *SecureServingOptions) Validate() []error {
 	errors := []error{}
 
 	if s.BindPort < 0 || s.BindPort > 65535 {
-		errors = append(errors, fmt.Errorf("--secure-port %v must be between 0 and 65535, inclusive. 0 for turning off secure port.", s.BindPort))
+		errors = append(errors, fmt.Errorf("--secure-port %v must be between 0 and 65535, inclusive. 0 for turning off secure port", s.BindPort))
 	}
 
 	return errors
@@ -153,12 +153,6 @@ func (s *SecureServingOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.String("tls-ca-file", "", "This flag has no effect.")
 	fs.MarkDeprecated("tls-ca-file", "This flag has no effect.")
 
-}
-
-func (s *SecureServingOptions) AddDeprecatedFlags(fs *pflag.FlagSet) {
-	fs.IPVar(&s.BindAddress, "public-address-override", s.BindAddress,
-		"DEPRECATED: see --bind-address instead.")
-	fs.MarkDeprecated("public-address-override", "see --bind-address instead.")
 }
 
 // ApplyTo fills up serving information in the server configuration.
