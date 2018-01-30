@@ -220,6 +220,16 @@ func (p *cadvisorStatsProvider) ImageFsStats() (*statsapi.FsStats, error) {
 	}, nil
 }
 
+// ImageFsDevice returns name of the device where the image filesystem locates,
+// e.g. /dev/sda1.
+func (p *cadvisorStatsProvider) ImageFsDevice() (string, error) {
+	imageFsInfo, err := p.cadvisor.ImagesFsInfo()
+	if err != nil {
+		return "", err
+	}
+	return imageFsInfo.Device, nil
+}
+
 // buildPodRef returns a PodReference that identifies the Pod managing cinfo
 func buildPodRef(containerLabels map[string]string) statsapi.PodReference {
 	podName := kubetypes.GetPodName(containerLabels)

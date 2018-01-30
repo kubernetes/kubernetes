@@ -84,6 +84,7 @@ type StatsProvider struct {
 type containerStatsProvider interface {
 	ListPodStats() ([]statsapi.PodStats, error)
 	ImageFsStats() (*statsapi.FsStats, error)
+	ImageFsDevice() (string, error)
 }
 
 // GetCgroupStats returns the stats of the cgroup with the cgroupName. Note that
@@ -166,4 +167,17 @@ func (p *StatsProvider) GetRawContainerInfo(containerName string, req *cadvisora
 	return map[string]*cadvisorapiv1.ContainerInfo{
 		containerInfo.Name: containerInfo,
 	}, nil
+}
+
+// HasDedicatedImageFs returns true if a dedicated image filesystem exists for storing images.
+func (p *StatsProvider) HasDedicatedImageFs() (bool, error) {
+	device, err := p.containerStatsProvider.ImageFsDevice()
+	if err != nil {
+		return false, err
+	}
+	rootFsInfo, err := p.cadvisor.RootFsInfo()
+	if err != nil {
+		return false, err
+	}
+	return device != rootFsInfo.Device, nil
 }

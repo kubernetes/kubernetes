@@ -17,6 +17,7 @@ limitations under the License.
 package stats
 
 import (
+	"errors"
 	"fmt"
 	"path"
 	"sort"
@@ -200,6 +201,22 @@ func (p *criStatsProvider) ImageFsStats() (*statsapi.FsStats, error) {
 	}
 
 	return nil, fmt.Errorf("imageFs information is unavailable")
+}
+
+// ImageFsDevice returns name of the device where the image filesystem locates,
+// e.g. /dev/sda1.
+func (p *criStatsProvider) ImageFsDevice() (string, error) {
+	resp, err := p.imageService.ImageFsInfo()
+	if err != nil {
+		return "", err
+	}
+	for _, fs := range resp {
+		fsInfo := p.getFsInfo(fs.GetStorageId())
+		if fsInfo != nil {
+			return fsInfo.Device, nil
+		}
+	}
+	return "", errors.New("imagefs device is not found")
 }
 
 // getFsInfo returns the information of the filesystem with the specified
