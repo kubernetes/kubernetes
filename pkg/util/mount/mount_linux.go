@@ -536,11 +536,11 @@ func (mounter *SafeFormatAndMount) formatAndMount(source string, target string, 
 	return mountErr
 }
 
-// GetDiskFormat uses 'lsblk' to see if the given disk is unformated
+// GetDiskFormat uses 'blkid' to see if the given disk is unformated
 func (mounter *SafeFormatAndMount) GetDiskFormat(disk string) (string, error) {
-	args := []string{"-n", "-o", "FSTYPE", disk}
-	glog.V(4).Infof("Attempting to determine if disk %q is formatted using lsblk with args: (%v)", disk, args)
-	dataOut, err := mounter.Exec.Run("lsblk", args...)
+	args := []string{"-p", "-s", "TYPE", "-o", "value", disk}
+	glog.V(4).Infof("Attempting to determine if disk %q is formatted using blkid with args: (%v)", disk, args)
+	dataOut, err := mounter.Exec.Run("blkid", args...)
 	output := string(dataOut)
 	glog.V(4).Infof("Output: %q", output)
 
@@ -549,23 +549,12 @@ func (mounter *SafeFormatAndMount) GetDiskFormat(disk string) (string, error) {
 		return "", err
 	}
 
-	// Split lsblk output into lines. Unformatted devices should contain only
-	// "\n". Beware of "\n\n", that's a device with one empty partition.
-	output = strings.TrimSuffix(output, "\n") // Avoid last empty line
-	lines := strings.Split(output, "\n")
-	if lines[0] != "" {
-		// The device is formatted
-		return lines[0], nil
-	}
-
-	if len(lines) == 1 {
-		// The device is unformatted and has no dependent devices
+	if len(output) <= 0 {
+		// no fs type
 		return "", nil
 	}
 
-	// The device has dependent devices, most probably partitions (LVM, LUKS
-	// and MD RAID are reported as FSTYPE and caught above).
-	return "unknown data, probably partitions", nil
+	return strings.TrimSpace(output), nil
 }
 
 // isShared returns true, if given path is on a mount point that has shared
