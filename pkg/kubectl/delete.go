@@ -347,7 +347,7 @@ func (reaper *StatefulSetReaper) Stop(namespace, name string, timeout time.Durat
 func (reaper *JobReaper) Stop(namespace, name string, timeout time.Duration, gracePeriod *metav1.DeleteOptions) error {
 	jobs := reaper.client.Jobs(namespace)
 	pods := reaper.podClient.Pods(namespace)
-	scaler := ScalerFor(schema.GroupKind{Group: batch.GroupName, Kind: "Job"}, reaper.client, nil, schema.GroupResource{})
+	scaler := &JobScaler{reaper.client}
 	job, err := jobs.Get(name, metav1.GetOptions{})
 	if err != nil {
 		return err
