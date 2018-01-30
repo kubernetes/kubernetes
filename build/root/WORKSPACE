@@ -46,7 +46,7 @@ load("@io_bazel_rules_docker//docker:docker.bzl", "docker_repositories", "docker
 go_rules_dependencies()
 
 go_register_toolchains(
-    go_version = "1.9.2",
+    go_version = "1.9.3",
 )
 
 docker_repositories()
