@@ -72,21 +72,5 @@ func (az *Cloud) DeleteFileShare(accountName, key, name string) error {
 
 // ResizeFileShare resizes a file share
 func (az *Cloud) ResizeFileShare(accountName, accountKey, name string, sizeGiB int) error {
-	fileClient, err := az.getFileSvcClient(accountName, accountKey)
-	if err != nil {
-		return err
-	}
-
-	share := fileClient.GetShareReference(name)
-	if share.Properties.Quota >= sizeGiB {
-		glog.Warningf("file share size(%dGi) is already greater or equal than requested size(%dGi), accountName: %s, shareName: %s",
-			share.Properties.Quota, sizeGiB, accountName, name)
-		return nil
-	}
-	share.Properties.Quota = sizeGiB
-	if err = share.SetProperties(nil); err != nil {
-		return fmt.Errorf("failed to set quota on file share %s, err: %v", name, err)
-	}
-	glog.V(4).Infof("resize file share completed, accountName: %s, shareName: %s, sizeGiB: %d", accountName, name, sizeGiB)
-	return nil
+	return az.resizeFileShare(accountName, accountKey, name, sizeGiB)
 }

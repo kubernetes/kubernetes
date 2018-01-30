@@ -33,6 +33,7 @@ const (
 type FileClient interface {
 	createFileShare(accountName, accountKey, name string, sizeGiB int) error
 	deleteFileShare(accountName, accountKey, name string) error
+	resizeFileShare(accountName, accountKey, name string, sizeGiB int) error
 }
 
 // create file share
@@ -42,6 +43,10 @@ func (az *Cloud) createFileShare(accountName, accountKey, name string, sizeGiB i
 
 func (az *Cloud) deleteFileShare(accountName, accountKey, name string) error {
 	return az.FileClient.deleteFileShare(accountName, accountKey, name)
+}
+
+func (az *Cloud) resizeFileShare(accountName, accountKey, name string, sizeGiB int) error {
+	return az.FileClient.resizeFileShare(accountName, accountKey, name, sizeGiB)
 }
 
 type azureFileClient struct {
@@ -79,6 +84,25 @@ func (f *azureFileClient) deleteFileShare(accountName, accountKey, name string) 
 		return err
 	}
 	return fileClient.GetShareReference(name).Delete(nil)
+}
+
+func (f *azureFileClient) resizeFileShare(accountName, accountKey, name string, sizeGiB int) error {
+	fileClient, err := f.getFileSvcClient(accountName, accountKey)
+	if err != nil {
+		return err
+	}
+	share := fileClient.GetShareReference(name)
+	if share.Properties.Quota >= sizeGiB {
+		glog.Warningf("file share size(%dGi) is already greater or equal than requested size(%dGi), accountName: %s, shareName: %s",
+			share.Properties.Quota, sizeGiB, accountName, name)
+		return nil
+	}
+	share.Properties.Quota = sizeGiB
+	if err = share.SetProperties(nil); err != nil {
+		return fmt.Errorf("failed to set quota on file share %s, err: %v", name, err)
+	}
+	glog.V(4).Infof("resize file share completed, accountName: %s, shareName: %s, sizeGiB: %d", accountName, name, sizeGiB)
+	return nil
 }
 
 func (f *azureFileClient) getFileSvcClient(accountName, accountKey string) (*azs.FileServiceClient, error) {
