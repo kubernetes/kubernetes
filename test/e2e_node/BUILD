@@ -96,7 +96,6 @@ go_test(
         "kubelet_test.go",
         "lifecycle_hook_test.go",
         "log_path_test.go",
-        "memory_eviction_test.go",
         "mirror_pod_test.go",
         "pods_container_manager_test.go",
         "runtime_conformance_test.go",
