@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
 	stats "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	kubemetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -189,22 +190,28 @@ var _ = framework.KubeDescribe("Density [Serial] [Slow]", func() {
 
 		for _, testArg := range dTests {
 			itArg := testArg
-			desc := fmt.Sprintf("latency/resource should be within limit when create %d pods with %v interval (QPS %d) [Benchmark]", itArg.podsNr, itArg.interval, itArg.APIQPSLimit)
-			It(desc, func() {
-				itArg.createMethod = "batch"
-				testInfo := getTestNodeInfo(f, itArg.getTestName(), desc)
+			Context("", func() {
+				desc := fmt.Sprintf("latency/resource should be within limit when create %d pods with %v interval (QPS %d) [Benchmark]", itArg.podsNr, itArg.interval, itArg.APIQPSLimit)
 				// The latency caused by API QPS limit takes a large portion (up to ~33%) of e2e latency.
 				// It makes the pod startup latency of Kubelet (creation throughput as well) under-estimated.
 				// Here we set API QPS limit from default 5 to 60 in order to test real Kubelet performance.
 				// Note that it will cause higher resource usage.
-				setKubeletAPIQPSLimit(f, int32(itArg.APIQPSLimit))
-				batchLag, e2eLags := runDensityBatchTest(f, rc, itArg, testInfo, true)
+				tempSetCurrentKubeletConfig(f, func(cfg *kubeletconfig.KubeletConfiguration) {
+					framework.Logf("Old QPS limit is: %d\n", cfg.KubeAPIQPS)
+					// Set new API QPS limit
+					cfg.KubeAPIQPS = int32(itArg.APIQPSLimit)
+				})
+				It(desc, func() {
+					itArg.createMethod = "batch"
+					testInfo := getTestNodeInfo(f, itArg.getTestName(), desc)
+					batchLag, e2eLags := runDensityBatchTest(f, rc, itArg, testInfo, true)
 
-				By("Verifying latency")
-				logAndVerifyLatency(batchLag, e2eLags, itArg.podStartupLimits, itArg.podBatchStartupLimit, testInfo, false)
+					By("Verifying latency")
+					logAndVerifyLatency(batchLag, e2eLags, itArg.podStartupLimits, itArg.podBatchStartupLimit, testInfo, false)
 
-				By("Verifying resource")
-				logAndVerifyResource(f, rc, itArg.cpuLimits, itArg.memLimits, testInfo, false)
+					By("Verifying resource")
+					logAndVerifyResource(f, rc, itArg.cpuLimits, itArg.memLimits, testInfo, false)
+				})
 			})
 		}
 	})
@@ -568,35 +575,4 @@ func logAndVerifyLatency(batchLag time.Duration, e2eLags []framework.PodLatencyD
 // logThroughput calculates and logs pod creation throughput.
 func logPodCreateThroughput(batchLag time.Duration, e2eLags []framework.PodLatencyData, podsNr int, testInfo map[string]string) {
 	logPerfData(getThroughputPerfData(batchLag, e2eLags, podsNr, testInfo), "throughput")
-}
-
-// setKubeletAPIQPSLimit sets Kubelet API QPS via ConfigMap. Kubelet will restart with the new QPS.
-func setKubeletAPIQPSLimit(f *framework.Framework, newAPIQPS int32) {
-	const restartGap = 40 * time.Second
-
-	resp := pollConfigz(2*time.Minute, 5*time.Second)
-	kubeCfg, err := decodeConfigz(resp)
-	framework.ExpectNoError(err)
-	framework.Logf("Old QPS limit is: %d\n", kubeCfg.KubeAPIQPS)
-
-	// Set new API QPS limit
-	kubeCfg.KubeAPIQPS = newAPIQPS
-	// TODO(coufon): createConfigMap should firstly check whether configmap already exists, if so, use updateConfigMap.
-	// Calling createConfigMap twice will result in error. It is fine for benchmark test because we only run one test on a new node.
-	_, err = createConfigMap(f, kubeCfg)
-	framework.ExpectNoError(err)
-
-	// Wait for Kubelet to restart
-	time.Sleep(restartGap)
-
-	// Check new QPS has been set
-	resp = pollConfigz(2*time.Minute, 5*time.Second)
-	kubeCfg, err = decodeConfigz(resp)
-	framework.ExpectNoError(err)
-	framework.Logf("New QPS limit is: %d\n", kubeCfg.KubeAPIQPS)
-
-	// TODO(coufon): check test result to see if we need to retry here
-	if kubeCfg.KubeAPIQPS != newAPIQPS {
-		framework.Failf("Fail to set new kubelet API QPS limit.")
-	}
 }
