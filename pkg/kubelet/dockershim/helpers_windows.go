@@ -49,7 +49,7 @@ func (ds *dockerService) updateCreateConfig(
 		createConfig.HostConfig.NetworkMode = dockercontainer.NetworkMode(networkMode)
 	} else {
 		// Todo: Refactor this call in future for calling methods directly in security_context.go
-		modifyHostNetworkOptionForContainer(false, podSandboxID, createConfig.HostConfig)
+		modifyHostOptionsForContainer(false, podSandboxID, createConfig.HostConfig)
 	}
 
 	return nil
