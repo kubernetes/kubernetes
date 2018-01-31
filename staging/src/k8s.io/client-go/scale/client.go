@@ -168,7 +168,7 @@ func (c *namespacedScaleClient) Update(resource schema.GroupResource, scale *aut
 
 	// Currently, a /scale endpoint can receive and return different scale types.
 	// Until we have support for the alternative API representations proposal,
-	// we need to deal with sending and accepting differnet API versions.
+	// we need to deal with sending and accepting different API versions.
 
 	// figure out what scale we actually need here
 	desiredGVK, err := c.client.scaleKindResolver.ScaleForResource(gvr)

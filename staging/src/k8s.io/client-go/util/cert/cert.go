@@ -38,7 +38,7 @@ const (
 	duration365d = time.Hour * 24 * 365
 )
 
-// Config containes the basic fields required for creating a certificate
+// Config contains the basic fields required for creating a certificate
 type Config struct {
 	CommonName   string
 	Organization []string
