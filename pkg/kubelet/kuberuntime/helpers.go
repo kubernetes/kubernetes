@@ -294,10 +294,13 @@ func networkNamespaceForPod(pod *v1.Pod) runtimeapi.NamespaceMode {
 }
 
 func pidNamespaceForPod(pod *v1.Pod) runtimeapi.NamespaceMode {
-	if pod != nil && pod.Spec.HostPID {
-		return runtimeapi.NamespaceMode_NODE
+	if pod != nil {
+		if pod.Spec.HostPID {
+			return runtimeapi.NamespaceMode_NODE
+		}
+		// TODO(verb): set NamespaceMode_POD based on ShareProcessNamespace after #58716 is merged
 	}
-	// Note that PID does not default to the zero value
+	// Note that PID does not default to the zero value for v1.Pod
 	return runtimeapi.NamespaceMode_CONTAINER
 }
 
