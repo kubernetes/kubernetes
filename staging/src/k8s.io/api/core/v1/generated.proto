@@ -170,7 +170,7 @@ message Binding {
   optional ObjectReference target = 2;
 }
 
-// Represents storage that is managed by an external CSI volume driver
+// Represents storage that is managed by an external CSI volume driver (Beta feature)
 message CSIPersistentVolumeSource {
   // Driver is the name of the driver to use for this volume.
   // Required.
@@ -2528,7 +2528,7 @@ message PersistentVolumeSource {
   // +optional
   optional StorageOSPersistentVolumeSource storageos = 21;
 
-  // CSI represents storage that handled by an external CSI driver
+  // CSI represents storage that handled by an external CSI driver (Beta feature).
   // +optional
   optional CSIPersistentVolumeSource csi = 22;
 }
