@@ -34,7 +34,7 @@ func TestIsMasterNode(t *testing.T) {
 			},
 		},
 	}) {
-		t.Errorf("Node labelled 'workerk' should not be master!")
+		t.Errorf("Node labelled 'worker' should not be master!")
 	}
 	if !isMasterNode(&v1.Node{
 		ObjectMeta: meta.ObjectMeta{

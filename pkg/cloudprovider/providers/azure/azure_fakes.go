@@ -66,7 +66,7 @@ func (fLBC *fakeAzureLBClient) CreateOrUpdate(resourceGroupName string, loadBala
 		for idx, config := range *parameters.FrontendIPConfigurations {
 			if config.PrivateIPAllocationMethod == network.Dynamic {
 				// Here we randomly assign an ip as private ip
-				// It dosen't smart enough to know whether it is in the subnet's range
+				// It doesn't smart enough to know whether it is in the subnet's range
 				(*parameters.FrontendIPConfigurations)[idx].PrivateIPAddress = getRandomIPPtr()
 			}
 		}

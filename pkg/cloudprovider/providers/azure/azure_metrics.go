@@ -42,10 +42,10 @@ type metricContext struct {
 	attributes []string
 }
 
-func newMetricContext(prefix, request, resouceGroup, subscriptionID string) *metricContext {
+func newMetricContext(prefix, request, resourceGroup, subscriptionID string) *metricContext {
 	return &metricContext{
 		start:      time.Now(),
-		attributes: []string{prefix + "_" + request, resouceGroup, subscriptionID},
+		attributes: []string{prefix + "_" + request, resourceGroup, subscriptionID},
 	}
 }
 
