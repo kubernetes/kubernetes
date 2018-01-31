@@ -649,3 +649,246 @@ func TestInvalidateAllCachedPredicateItemOfNode(t *testing.T) {
 		}
 	}
 }
+
+func TestInvalidateCachedPredicateItem(t *testing.T) {
+	testPredicate := "GeneralPredicates"
+	// tests is used to initialize all nodes
+	tests := []struct {
+		podName                           string
+		nodeName                          string
+		predicateKey                      string
+		equivalenceHashForUpdatePredicate uint64
+		cachedItem                        predicateItemType
+	}{
+		{
+			podName:  "testPod",
+			nodeName: "node1",
+			equivalenceHashForUpdatePredicate: 123,
+			cachedItem: predicateItemType{
+				fit: false,
+				reasons: []algorithm.PredicateFailureReason{
+					predicates.ErrPodNotFitsHostPorts,
+				},
+			},
+		},
+		{
+			podName:  "testPod",
+			nodeName: "node2",
+			equivalenceHashForUpdatePredicate: 456,
+			cachedItem: predicateItemType{
+				fit: false,
+				reasons: []algorithm.PredicateFailureReason{
+					predicates.ErrPodNotFitsHostPorts,
+				},
+			},
+		},
+		{
+			podName:  "testPod",
+			nodeName: "node3",
+			equivalenceHashForUpdatePredicate: 123,
+			cachedItem: predicateItemType{
+				fit: true,
+			},
+		},
+	}
+	// this case does not need to calculate equivalence hash, just pass an empty function
+	fakeGetEquivalencePodFunc := func(pod *v1.Pod) interface{} { return nil }
+	ecache := NewEquivalenceCache(fakeGetEquivalencePodFunc)
+
+	for _, test := range tests {
+		// set cached item to equivalence cache
+		ecache.UpdateCachedPredicateItem(
+			test.podName,
+			test.nodeName,
+			testPredicate,
+			test.cachedItem.fit,
+			test.cachedItem.reasons,
+			test.equivalenceHashForUpdatePredicate,
+			true,
+		)
+		_, ok := ecache.algorithmCache[test.nodeName].predicatesCache.Get(testPredicate)
+		if !ok {
+			t.Errorf("Failed: %s, can't find expected cache item: %v", test.podName, test.cachedItem)
+		}
+
+		// invalidate cached predicate for a given node
+		ecache.InvalidateCachedPredicateItem(test.nodeName, sets.NewString(testPredicate))
+		if algorithmCache, exist := ecache.algorithmCache[test.nodeName]; exist {
+			if _, exist := algorithmCache.predicatesCache.Get(testPredicate); exist {
+				t.Errorf("Failed: cached item for predicate key: %v on node: %v should be invalidated",
+					testPredicate, test.nodeName)
+				break
+			}
+		}
+	}
+}
+
+func TestInvalidateCachedPredicateItemForPodAdd(t *testing.T) {
+	nodeName := "node"
+	// cachedItems is used to initialize cached predicate items
+	items := []struct {
+		podName                           string
+		predicateKey                      string
+		equivalenceHashForUpdatePredicate uint64
+		cachedItem                        predicateItemType
+	}{
+		{
+			podName:                           "pod1",
+			predicateKey:                      "GeneralPredicates",
+			equivalenceHashForUpdatePredicate: 100,
+			cachedItem: predicateItemType{
+				fit: true,
+			},
+		},
+		{
+			podName:                           "pod2",
+			predicateKey:                      "MaxEBSVolumeCount",
+			equivalenceHashForUpdatePredicate: 200,
+			cachedItem: predicateItemType{
+				fit: true,
+			},
+		},
+		{
+			podName:                           "pod3",
+			predicateKey:                      "MaxGCEPDVolumeCount",
+			equivalenceHashForUpdatePredicate: 300,
+			cachedItem: predicateItemType{
+				fit: true,
+			},
+		},
+		{
+			podName:                           "pod4",
+			predicateKey:                      "MaxAzureDiskVolumeCount",
+			equivalenceHashForUpdatePredicate: 400,
+			cachedItem: predicateItemType{
+				fit: true,
+			},
+		},
+	}
+
+	tests := []struct {
+		pod                       *v1.Pod
+		expectedInvalidPredicates sets.String
+	}{
+		{
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "invalid1",
+				},
+				Spec: v1.PodSpec{
+					Volumes: []v1.Volume{
+						{
+							VolumeSource: v1.VolumeSource{
+								PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{},
+							},
+						},
+					},
+				},
+			},
+			expectedInvalidPredicates: map[string]sets.Empty{
+				"MaxEBSVolumeCount":       {},
+				"MaxGCEPDVolumeCount":     {},
+				"MaxAzureDiskVolumeCount": {},
+			},
+		},
+		{
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "invalid2",
+				},
+				Spec: v1.PodSpec{
+					Volumes: []v1.Volume{
+						{
+							VolumeSource: v1.VolumeSource{
+								AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{},
+							},
+						},
+					},
+				},
+			},
+			expectedInvalidPredicates: map[string]sets.Empty{
+				"MaxEBSVolumeCount": {},
+			},
+		},
+		{
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "invalid3",
+				},
+				Spec: v1.PodSpec{
+					Volumes: []v1.Volume{
+						{
+							VolumeSource: v1.VolumeSource{
+								GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{},
+							},
+						},
+					},
+				},
+			},
+			expectedInvalidPredicates: map[string]sets.Empty{
+				"MaxGCEPDVolumeCount": {},
+			},
+		},
+		{
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "invalid4",
+				},
+				Spec: v1.PodSpec{
+					Volumes: []v1.Volume{
+						{
+							VolumeSource: v1.VolumeSource{
+								AzureDisk: &v1.AzureDiskVolumeSource{},
+							},
+						},
+					},
+				},
+			},
+			expectedInvalidPredicates: map[string]sets.Empty{
+				"MaxAzureDiskVolumeCount": {},
+			},
+		},
+		{
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "valid1",
+				},
+			},
+			expectedInvalidPredicates: map[string]sets.Empty{},
+		},
+	}
+
+	for _, test := range tests {
+		// this case does not need to calculate equivalence hash, just pass an empty function
+		fakeGetEquivalencePodFunc := func(pod *v1.Pod) interface{} { return nil }
+		ecache := NewEquivalenceCache(fakeGetEquivalencePodFunc)
+		// initialize cached predicate items
+		for _, item := range items {
+			// set cached item to equivalence cache
+			ecache.UpdateCachedPredicateItem(
+				item.podName,
+				nodeName,
+				item.predicateKey,
+				item.cachedItem.fit,
+				item.cachedItem.reasons,
+				item.equivalenceHashForUpdatePredicate,
+				true,
+			)
+			_, ok := ecache.algorithmCache[nodeName].predicatesCache.Get(item.predicateKey)
+			if !ok {
+				t.Errorf("Failed: %s, can't find expected cache key: %v", item.podName, item.predicateKey)
+			}
+		}
+
+		// invalidate cached predicate on pod added if necessary
+		ecache.InvalidateCachedPredicateItemForPodAdd(test.pod, nodeName)
+		if algorithmCache, exist := ecache.algorithmCache[nodeName]; exist {
+			for predicate := range test.expectedInvalidPredicates {
+				if _, exist := algorithmCache.predicatesCache.Get(predicate); exist {
+					t.Errorf("Failed: cached item for predicate key: %v should be invalidated when pod: %v is added", predicate, test.pod.Name)
+					break
+				}
+			}
+		}
+	}
+}
