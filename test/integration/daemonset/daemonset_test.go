@@ -26,18 +26,29 @@ import (
 	"k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	corev1typed "k8s.io/client-go/kubernetes/typed/core/v1"
+	typedv1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	extensionsv1beta1typed "k8s.io/client-go/kubernetes/typed/extensions/v1beta1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/util/retry"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller/daemon"
 	"k8s.io/kubernetes/pkg/util/metrics"
 	"k8s.io/kubernetes/test/integration/framework"
+)
+
+const (
+	pollInterval = 100 * time.Millisecond
+	pollTimeout  = 60 * time.Second
+
+	fakeContainerName  = "fake-container-name"
+	fakeContainerImage = "fake-container-image"
 )
 
 func setup(t *testing.T) (*httptest.Server, framework.CloseFunc, *daemon.DaemonSetsController, informers.SharedInformerFactory, clientset.Interface) {
@@ -92,7 +103,7 @@ func newDaemonSet(name, namespace string) *v1beta1.DaemonSet {
 					Labels: testLabels(),
 				},
 				Spec: v1.PodSpec{
-					Containers: []v1.Container{{Name: "foo", Image: "bar"}},
+					Containers: []v1.Container{{Name: fakeContainerName, Image: fakeContainerImage}},
 				},
 			},
 		},
@@ -130,8 +141,8 @@ func resourcePodSpec(nodeName, memory, cpu string) v1.PodSpec {
 		NodeName: nodeName,
 		Containers: []v1.Container{
 			{
-				Name:  "foo",
-				Image: "bar",
+				Name:  fakeContainerName,
+				Image: fakeContainerImage,
 				Resources: v1.ResourceRequirements{
 					Requests: v1.ResourceList{
 						v1.ResourceMemory: resource.MustParse(memory),
@@ -175,7 +186,7 @@ func validateDaemonSetPodsAndMarkReady(
 	podInformer cache.SharedIndexInformer,
 	numberPods int,
 	t *testing.T) {
-	if err := wait.Poll(10*time.Second, 60*time.Second, func() (bool, error) {
+	if err := wait.Poll(pollInterval, pollTimeout, func() (bool, error) {
 		objects := podInformer.GetIndexer().List()
 		if len(objects) != numberPods {
 			return false, nil
@@ -224,7 +235,7 @@ func validateDaemonSetStatus(
 	dsNamespace string,
 	expectedNumberReady int32,
 	t *testing.T) {
-	if err := wait.Poll(5*time.Second, 60*time.Second, func() (bool, error) {
+	if err := wait.Poll(pollInterval, pollTimeout, func() (bool, error) {
 		ds, err := dsClient.Get(dsName, metav1.GetOptions{})
 		if err != nil {
 			return false, err
@@ -236,7 +247,7 @@ func validateDaemonSetStatus(
 }
 
 func validateFailedPlacementEvent(eventClient corev1typed.EventInterface, t *testing.T) {
-	if err := wait.Poll(5*time.Second, 60*time.Second, func() (bool, error) {
+	if err := wait.Poll(pollInterval, pollTimeout, func() (bool, error) {
 		eventList, err := eventClient.List(metav1.ListOptions{})
 		if err != nil {
 			return false, err
@@ -391,5 +402,94 @@ func TestInsufficientCapacityNodeDaemonDoesNotLaunchPod(t *testing.T) {
 		validateFailedPlacementEvent(eventClient, t)
 
 		close(stopCh)
+	}
+}
+
+func getPods(t *testing.T, podClient corev1typed.PodInterface, labelMap map[string]string) *v1.PodList {
+	podSelector := labels.Set(labelMap).AsSelector()
+	options := metav1.ListOptions{LabelSelector: podSelector.String()}
+	pods, err := podClient.List(options)
+	if err != nil {
+		t.Fatalf("failed obtaining a list of pods that match the pod labels %v: %v", labelMap, err)
+	}
+	return pods
+}
+
+func updatePodStatus(t *testing.T, podClient typedv1.PodInterface, podName string, updateStatusFunc func(*v1.Pod)) *v1.Pod {
+	var pod *v1.Pod
+	if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		newPod, err := podClient.Get(podName, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		updateStatusFunc(newPod)
+		pod, err = podClient.UpdateStatus(newPod)
+		return err
+	}); err != nil {
+		t.Fatalf("failed to update status of pod %q: %v", pod.Name, err)
+	}
+	return pod
+}
+
+// waitForAllPodsPending waits for all pods to be in pending phase
+func waitForAllPodsPending(podClient corev1typed.PodInterface, t *testing.T) {
+	if err := wait.Poll(pollInterval, pollTimeout, func() (bool, error) {
+		pods := getPods(t, podClient, testLabels())
+		for _, pod := range pods.Items {
+			if pod.Status.Phase != v1.PodPending {
+				return false, nil
+			}
+		}
+		return true, nil
+	}); err != nil {
+		t.Fatalf("failed waiting for all pods to be in pending phase: %v", err)
+	}
+}
+
+// A DaemonSet should retry creating failed daemon pods
+func TestRetryCreatingFailedPod(t *testing.T) {
+	for _, strategy := range updateStrategies() {
+		server, closeFn, dc, informers, clientset := setup(t)
+		defer closeFn()
+		ns := framework.CreateTestingNamespace("retry-creating-failed-pod-test", server, t)
+		defer framework.DeleteTestingNamespace(ns, server, t)
+
+		dsClient := clientset.ExtensionsV1beta1().DaemonSets(ns.Name)
+		podClient := clientset.CoreV1().Pods(ns.Name)
+		nodeClient := clientset.CoreV1().Nodes()
+		podInformer := informers.Core().V1().Pods().Informer()
+		stopCh := make(chan struct{})
+		defer close(stopCh)
+		informers.Start(stopCh)
+		go dc.Run(5, stopCh)
+
+		dsName := "daemonset"
+		ds := newDaemonSet(dsName, ns.Name)
+		ds.Spec.UpdateStrategy = *strategy
+		ds, err := dsClient.Create(ds)
+		if err != nil {
+			t.Fatalf("failed to create daemonset %q: %v", dsName, err)
+		}
+
+		nodeName := "single-node"
+		node := newNode(nodeName, nil)
+		_, err = nodeClient.Create(node)
+		if err != nil {
+			t.Fatalf("failed to create node %q: %v", nodeName, err)
+		}
+
+		// Validate everything works correctly, include marking pods
+		// as ready and ensure they launch on every node
+		validateDaemonSetPodsAndMarkReady(podClient, podInformer, 1, t)
+		validateDaemonSetStatus(dsClient, ds.Name, ds.Namespace, 1, t)
+
+		// Set the pod's phase to "Failed"
+		pods := getPods(t, podClient, testLabels())
+		updatePodStatus(t, podClient, pods.Items[0].Name, func(pod *v1.Pod) {
+			pod.Status.Phase = v1.PodFailed
+		})
+
+		// Wait for the failed pod to be created again and in pending phase
+		waitForAllPodsPending(podClient, t)
 	}
 }
