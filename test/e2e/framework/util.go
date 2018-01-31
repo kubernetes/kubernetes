@@ -229,6 +229,12 @@ func GetPauseImageName(c clientset.Interface) string {
 	return imageutils.GetE2EImageWithArch(imageutils.Pause, GetServerArchitecture(c))
 }
 
+// GetPauseImageNameForHostArch fetches the pause image name for the same architecture the test is running on.
+// TODO: move this function to the test/utils
+func GetPauseImageNameForHostArch() string {
+	return imageutils.GetE2EImage(imageutils.Pause)
+}
+
 func GetServicesProxyRequest(c clientset.Interface, request *restclient.Request) (*restclient.Request, error) {
 	return request.Resource("services").SubResource("proxy"), nil
 }
@@ -4941,6 +4947,7 @@ func PollURL(route, host string, timeout time.Duration, interval time.Duration, 
 			Logf("host %v path %v: %v unreachable", host, route, err)
 			return expectUnreachable, nil
 		}
+		Logf("host %v path %v: reached", host, route)
 		return !expectUnreachable, nil
 	})
 	if pollErr != nil {

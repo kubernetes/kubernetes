@@ -20,7 +20,6 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
-	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	. "github.com/onsi/ginkgo"
 )
@@ -43,7 +42,7 @@ var _ = framework.KubeDescribe("SimpleMount", func() {
 				Containers: []v1.Container{
 					{
 						Name:  "simple-mount-container",
-						Image: imageutils.GetPauseImageNameForHostArch(),
+						Image: framework.GetPauseImageNameForHostArch(),
 						VolumeMounts: []v1.VolumeMount{
 							{
 								Name:      "simply-mounted-volume",

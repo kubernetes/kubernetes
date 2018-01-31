@@ -65,6 +65,7 @@ var (
 	GBRedisSlave             = ImageConfig{sampleRegistry, "gb-redisslave", "v2", true}
 	Goproxy                  = ImageConfig{e2eRegistry, "goproxy", "1.0", true}
 	Hostexec                 = ImageConfig{e2eRegistry, "hostexec", "1.0", true}
+	IpcUtils                 = ImageConfig{e2eRegistry, "ipc-utils", "1.0", true}
 	Iperf                    = ImageConfig{e2eRegistry, "iperf", "1.0", true}
 	JessieDnsutils           = ImageConfig{e2eRegistry, "jessie-dnsutils", "1.0", true}
 	Kitten                   = ImageConfig{e2eRegistry, "kitten", "1.0", true}
@@ -110,9 +111,4 @@ func GetE2EImageWithArch(image ImageConfig, arch string) string {
 		return fmt.Sprintf("%s/%s:%s", image.registry, image.name, image.version)
 
 	}
-}
-
-// GetPauseImageNameForHostArch fetches the pause image name for the same architecture the test is running on.
-func GetPauseImageNameForHostArch() string {
-        return GetE2EImage(Pause)
 }

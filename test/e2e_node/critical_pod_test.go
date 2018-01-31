@@ -27,7 +27,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
 	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/test/e2e/framework"
-	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -131,7 +130,7 @@ func getTestPod(critical bool, name string, resources v1.ResourceRequirements) *
 			Containers: []v1.Container{
 				{
 					Name:      "container",
-					Image:     imageutils.GetPauseImageNameForHostArch(),
+					Image:     framework.GetPauseImageNameForHostArch(),
 					Resources: resources,
 				},
 			},
