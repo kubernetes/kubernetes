@@ -387,7 +387,7 @@ func TestNotRestRoutesHaveAuth(t *testing.T) {
 	authz := mockAuthorizer{}
 
 	config.LegacyAPIGroupPrefixes = sets.NewString("/apiPrefix")
-	config.Authorizer = &authz
+	config.Authorization.Authorizer = &authz
 
 	config.EnableSwaggerUI = true
 	config.EnableIndex = true
