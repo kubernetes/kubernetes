@@ -59,7 +59,7 @@ import (
 // IANA_SVC_NAME: This is a string, no more than 15 characters long, that
 //      conforms to the definition of IANA service name in RFC 6335.
 //      It must contains at least one letter [a-z] and it must contains only [a-z0-9-].
-//      Hypens ('-') cannot be leading or trailing character of the string
+//      Hyphens ('-') cannot be leading or trailing character of the string
 //      and cannot be adjacent to other hyphens.
 
 // ObjectMeta is metadata that all persisted resources must have, which includes all objects
@@ -1899,7 +1899,7 @@ type SecretKeySelector struct {
 
 // EnvFromSource represents the source of a set of ConfigMaps
 type EnvFromSource struct {
-	// An optional identifer to prepend to each key in the ConfigMap. Must be a C_IDENTIFIER.
+	// An optional identifier to prepend to each key in the ConfigMap. Must be a C_IDENTIFIER.
 	// +optional
 	Prefix string `json:"prefix,omitempty" protobuf:"bytes,1,opt,name=prefix"`
 	// The ConfigMap to select from
@@ -4571,11 +4571,11 @@ type Event struct {
 }
 
 // EventSeries contain information on series of events, i.e. thing that was/is happening
-// continously for some time.
+// continuously for some time.
 type EventSeries struct {
 	// Number of occurrences in this series up to the last heartbeat time
 	Count int32 `json:"count,omitempty" protobuf:"varint,1,name=count"`
-	// Time of the last occurence observed
+	// Time of the last occurrence observed
 	LastObservedTime metav1.MicroTime `json:"lastObservedTime,omitempty" protobuf:"bytes,2,name=lastObservedTime"`
 	// State of this Series: Ongoing or Finished
 	State EventSeriesState `json:"state,omitempty" protobuf:"bytes,3,name=state"`

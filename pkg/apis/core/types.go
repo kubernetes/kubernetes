@@ -52,7 +52,7 @@ import (
 // IANA_SVC_NAME: This is a string, no more than 15 characters long, that
 //      conforms to the definition of IANA service name in RFC 6335.
 //      It must contains at least one letter [a-z] and it must contains only [a-z0-9-].
-//      Hypens ('-') cannot be leading or trailing character of the string
+//      Hyphens ('-') cannot be leading or trailing character of the string
 //      and cannot be adjacent to other hyphens.
 
 // ObjectMeta is metadata that all persisted resources must have, which includes all objects
@@ -4054,7 +4054,7 @@ type Event struct {
 type EventSeries struct {
 	// Number of occurrences in this series up to the last heartbeat time
 	Count int32
-	// Time of the last occurence observed
+	// Time of the last occurrence observed
 	LastObservedTime metav1.MicroTime
 	// State of this Series: Ongoing or Finished
 	State EventSeriesState

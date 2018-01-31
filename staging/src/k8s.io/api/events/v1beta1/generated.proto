@@ -108,7 +108,7 @@ message EventList {
 }
 
 // EventSeries contain information on series of events, i.e. thing that was/is happening
-// continously for some time.
+// continuously for some time.
 message EventSeries {
   // Number of occurrences in this series up to the last heartbeat time
   optional int32 count = 1;

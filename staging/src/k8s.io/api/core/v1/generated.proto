@@ -992,7 +992,7 @@ message EndpointsList {
 
 // EnvFromSource represents the source of a set of ConfigMaps
 message EnvFromSource {
-  // An optional identifer to prepend to each key in the ConfigMap. Must be a C_IDENTIFIER.
+  // An optional identifier to prepend to each key in the ConfigMap. Must be a C_IDENTIFIER.
   // +optional
   optional string prefix = 1;
 
@@ -1124,12 +1124,12 @@ message EventList {
 }
 
 // EventSeries contain information on series of events, i.e. thing that was/is happening
-// continously for some time.
+// continuously for some time.
 message EventSeries {
   // Number of occurrences in this series up to the last heartbeat time
   optional int32 count = 1;
 
-  // Time of the last occurence observed
+  // Time of the last occurrence observed
   optional k8s.io.apimachinery.pkg.apis.meta.v1.MicroTime lastObservedTime = 2;
 
   // State of this Series: Ongoing or Finished
