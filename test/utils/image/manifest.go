@@ -112,3 +112,8 @@ func GetE2EImageWithArch(image ImageConfig, arch string) string {
 
 	}
 }
+
+// GetPauseImageNameForHostArch fetches the pause image name for the same architecture the test is running on.
+func GetPauseImageNameForHostArch() string {
+	return GetE2EImage(Pause)
+}
