@@ -84,6 +84,7 @@ type Config struct {
 
 	// LoopbackClientConfig is a config for a privileged loopback connection to the API server
 	// This is required for proper functioning of the PostStartHooks on a GenericAPIServer
+	// TODO: move into SecureServingInfo(WithLoopback) as soon as insecure serving is gone
 	LoopbackClientConfig *restclient.Config
 	// Authenticator determines which subject is making the request
 	Authenticator authenticator.Request
