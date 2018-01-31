@@ -41,6 +41,7 @@ func TestPrintConfiguration(t *testing.T) {
 	api:
 	  advertiseAddress: ""
 	  bindPort: 0
+	  controlPlaneEndpoint: ""
 	auditPolicy:
 	  logDir: ""
 	  path: ""
@@ -78,6 +79,7 @@ func TestPrintConfiguration(t *testing.T) {
 	api:
 	  advertiseAddress: ""
 	  bindPort: 0
+	  controlPlaneEndpoint: ""
 	auditPolicy:
 	  logDir: ""
 	  path: ""
@@ -120,6 +122,7 @@ func TestPrintConfiguration(t *testing.T) {
 	api:
 	  advertiseAddress: ""
 	  bindPort: 0
+	  controlPlaneEndpoint: ""
 	auditPolicy:
 	  logDir: ""
 	  path: ""

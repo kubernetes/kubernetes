@@ -351,7 +351,7 @@ func ValidateAPIEndpoint(c *kubeadm.MasterConfiguration, fldPath *field.Path) fi
 
 	endpoint, err := kubeadmutil.GetMasterEndpoint(c)
 	if err != nil {
-		allErrs = append(allErrs, field.Invalid(fldPath, endpoint, "Invalid API Endpoint"))
+		allErrs = append(allErrs, field.Invalid(fldPath, endpoint, err.Error()))
 	}
 	return allErrs
 }
