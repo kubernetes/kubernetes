@@ -410,6 +410,7 @@ plugin/pkg/admission/podnodeselector
 plugin/pkg/admission/podpreset
 plugin/pkg/admission/podtolerationrestriction
 plugin/pkg/admission/podtolerationrestriction/apis/podtolerationrestriction
+plugin/pkg/admission/podtolerationrestriction/apis/podtolerationrestriction/v1
 plugin/pkg/admission/podtolerationrestriction/apis/podtolerationrestriction/v1alpha1
 plugin/pkg/admission/resourcequota
 plugin/pkg/admission/resourcequota/apis/resourcequota

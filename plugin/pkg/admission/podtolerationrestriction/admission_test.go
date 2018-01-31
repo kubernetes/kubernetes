@@ -337,9 +337,9 @@ func TestPodAdmission(t *testing.T) {
 
 			err = handler.Admit(admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), "testNamespace", namespace.ObjectMeta.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, nil))
 			if test.admit && err != nil {
-				t.Errorf("expected no error but got", err)
+				t.Error("expected no error but got", err)
 			} else if !test.admit && err == nil {
-				t.Errorf("expected an error")
+				t.Error("expected an error")
 			}
 
 			updatedPodTolerations := pod.Spec.Tolerations
@@ -350,9 +350,9 @@ func TestPodAdmission(t *testing.T) {
 			// handles update of uninitialized pod like it's newly created.
 			err = handler.Admit(admission.NewAttributesRecord(pod, &oldPod, api.Kind("Pod").WithVersion("version"), "testNamespace", namespace.ObjectMeta.Name, api.Resource("pods").WithVersion("version"), "", admission.Update, nil))
 			if test.admit && err != nil {
-				t.Errorf("expected no error but got", err)
+				t.Error("expected no error but got", err)
 			} else if !test.admit && err == nil {
-				t.Errorf("expected an error")
+				t.Error("expected an error")
 			}
 
 			updatedPodTolerations = pod.Spec.Tolerations

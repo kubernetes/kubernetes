@@ -23,7 +23,8 @@ import (
 	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	"k8s.io/apimachinery/pkg/runtime"
 	internalapi "k8s.io/kubernetes/plugin/pkg/admission/podtolerationrestriction/apis/podtolerationrestriction"
-	versionedapi "k8s.io/kubernetes/plugin/pkg/admission/podtolerationrestriction/apis/podtolerationrestriction/v1alpha1"
+	v1 "k8s.io/kubernetes/plugin/pkg/admission/podtolerationrestriction/apis/podtolerationrestriction/v1"
+	v1alpha1 "k8s.io/kubernetes/plugin/pkg/admission/podtolerationrestriction/apis/podtolerationrestriction/v1alpha1"
 )
 
 // Install registers the API group and adds types to a scheme
@@ -31,11 +32,12 @@ func Install(groupFactoryRegistry announced.APIGroupFactoryRegistry, registry *r
 	if err := announced.NewGroupMetaFactory(
 		&announced.GroupMetaFactoryArgs{
 			GroupName:                  internalapi.GroupName,
-			VersionPreferenceOrder:     []string{versionedapi.SchemeGroupVersion.Version},
+			VersionPreferenceOrder:     []string{v1.SchemeGroupVersion.Version, v1alpha1.SchemeGroupVersion.Version},
 			AddInternalObjectsToScheme: internalapi.AddToScheme,
 		},
 		announced.VersionToSchemeFunc{
-			versionedapi.SchemeGroupVersion.Version: versionedapi.AddToScheme,
+			v1.SchemeGroupVersion.Version:       v1.AddToScheme,
+			v1alpha1.SchemeGroupVersion.Version: v1alpha1.AddToScheme,
 		},
 	).Announce(groupFactoryRegistry).RegisterAndEnable(registry, scheme); err != nil {
 		panic(err)
