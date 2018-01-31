@@ -33,16 +33,15 @@ import (
 const (
 	caCertsVolumeName       = "ca-certs"
 	caCertsVolumePath       = "/etc/ssl/certs"
-	caCertsPkiVolumeName    = "ca-certs-etc-pki"
 	flexvolumeDirVolumeName = "flexvolume-dir"
 	cloudConfigVolumeName   = "cloud-config"
 	flexvolumeDirVolumePath = "/usr/libexec/kubernetes/kubelet-plugins/volume/exec"
 )
 
-// caCertsPkiVolumePath specifies the path that can be conditionally mounted into the apiserver and controller-manager containers
-// as /etc/ssl/certs might be a symlink to it. It's a variable since it may be changed in unit testing. This var MUST NOT be changed
-// in normal codepaths during runtime.
-var caCertsPkiVolumePath = "/etc/pki"
+// caCertsExtraVolumePaths specifies the paths that can be conditionally mounted into the apiserver and controller-manager containers
+// as /etc/ssl/certs might be or contain a symlink to them. It's a variable since it may be changed in unit testing. This var MUST
+// NOT be changed in normal codepaths during runtime.
+var caCertsExtraVolumePaths = []string{"/etc/pki", "/usr/share/ca-certificates", "/usr/local/share/ca-certificates", "/etc/ca-certificates"}
 
 // getHostPathVolumesForTheControlPlane gets the required hostPath volumes and mounts for the control plane
 func getHostPathVolumesForTheControlPlane(cfg *kubeadmapi.MasterConfiguration) controlPlaneHostPathMounts {
@@ -96,11 +95,14 @@ func getHostPathVolumesForTheControlPlane(cfg *kubeadmapi.MasterConfiguration) c
 	schedulerKubeConfigFile := filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.SchedulerKubeConfigFileName)
 	mounts.NewHostPathMount(kubeadmconstants.KubeScheduler, kubeadmconstants.KubeConfigVolumeName, schedulerKubeConfigFile, schedulerKubeConfigFile, true, &hostPathFileOrCreate)
 
-	// On some systems were we host-mount /etc/ssl/certs, it is also required to mount /etc/pki. This is needed
-	// due to symlinks pointing from files in /etc/ssl/certs into /etc/pki/
-	if isPkiVolumeMountNeeded() {
-		mounts.NewHostPathMount(kubeadmconstants.KubeAPIServer, caCertsPkiVolumeName, caCertsPkiVolumePath, caCertsPkiVolumePath, true, &hostPathDirectoryOrCreate)
-		mounts.NewHostPathMount(kubeadmconstants.KubeControllerManager, caCertsPkiVolumeName, caCertsPkiVolumePath, caCertsPkiVolumePath, true, &hostPathDirectoryOrCreate)
+	// On some systems were we host-mount /etc/ssl/certs, it is also required to mount additional directories.
+	// This is needed due to symlinks pointing from files in /etc/ssl/certs to these directories.
+	for _, caCertsExtraVolumePath := range caCertsExtraVolumePaths {
+		if isExtraVolumeMountNeeded(caCertsExtraVolumePath) {
+			caCertsExtraVolumeName := strings.Replace(caCertsExtraVolumePath, "/", "-", -1)[1:]
+			mounts.NewHostPathMount(kubeadmconstants.KubeAPIServer, caCertsExtraVolumeName, caCertsExtraVolumePath, caCertsExtraVolumePath, true, &hostPathDirectoryOrCreate)
+			mounts.NewHostPathMount(kubeadmconstants.KubeControllerManager, caCertsExtraVolumeName, caCertsExtraVolumePath, caCertsExtraVolumePath, true, &hostPathDirectoryOrCreate)
+		}
 	}
 
 	// Merge user defined mounts and ensure unique volume and volume mount
@@ -191,7 +193,14 @@ func getEtcdCertVolumes(etcdCfg kubeadmapi.Etcd, k8sCertificatesDir string) ([]v
 		// Ignore ".", which is the result of passing an empty path.
 		// Also ignore the cert directories that already may be mounted; /etc/ssl/certs, /etc/pki or Kubernetes CertificatesDir
 		// If the etcd certs are in there, it's okay, we don't have to do anything
-		if certDir == "." || strings.HasPrefix(certDir, caCertsVolumePath) || strings.HasPrefix(certDir, caCertsPkiVolumePath) || strings.HasPrefix(certDir, k8sCertificatesDir) {
+		extraVolumePath := false
+		for _, caCertsExtraVolumePath := range caCertsExtraVolumePaths {
+			if strings.HasPrefix(certDir, caCertsExtraVolumePath) {
+				extraVolumePath = true
+				break
+			}
+		}
+		if certDir == "." || extraVolumePath || strings.HasPrefix(certDir, caCertsVolumePath) || strings.HasPrefix(certDir, k8sCertificatesDir) {
 			continue
 		}
 		// Filter out any existing hostpath mounts in the list that contains a subset of the path
@@ -222,11 +231,11 @@ func getEtcdCertVolumes(etcdCfg kubeadmapi.Etcd, k8sCertificatesDir string) ([]v
 	return volumes, volumeMounts
 }
 
-// isPkiVolumeMountNeeded specifies whether /etc/pki should be host-mounted into the containers
+// isExtraVolumeMountNeeded specifies whether /etc/pki should be host-mounted into the containers
 // On some systems were we host-mount /etc/ssl/certs, it is also required to mount /etc/pki. This is needed
 // due to symlinks pointing from files in /etc/ssl/certs into /etc/pki/
-func isPkiVolumeMountNeeded() bool {
-	if _, err := os.Stat(caCertsPkiVolumePath); err == nil {
+func isExtraVolumeMountNeeded(caCertsExtraVolumePath string) bool {
+	if _, err := os.Stat(caCertsExtraVolumePath); err == nil {
 		return true
 	}
 	return false

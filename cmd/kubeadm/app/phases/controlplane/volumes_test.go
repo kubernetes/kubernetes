@@ -542,9 +542,9 @@ func TestGetHostPathVolumesForTheControlPlane(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpdir)
 
-	// set up tmp caCertsPkiVolumePath for testing
-	caCertsPkiVolumePath = fmt.Sprintf("%s/etc/pki", tmpdir)
-	defer func() { caCertsPkiVolumePath = "/etc/pki" }()
+	// set up tmp caCertsExtraVolumePaths for testing
+	caCertsExtraVolumePaths = []string{fmt.Sprintf("%s/etc/pki", tmpdir), fmt.Sprintf("%s/usr/share/ca-certificates", tmpdir)}
+	defer func() { caCertsExtraVolumePaths = []string{"/etc/pki", "/usr/share/ca-certificates"} }()
 
 	for _, rt := range tests {
 		mounts := getHostPathVolumesForTheControlPlane(rt.cfg)
