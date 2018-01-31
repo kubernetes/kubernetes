@@ -23,8 +23,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	computealpha "google.golang.org/api/compute/v0.alpha"
+	compute "google.golang.org/api/compute/v1"
 
 	"k8s.io/api/core/v1"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud"
+	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestEnsureStaticIP(t *testing.T) {
@@ -236,4 +240,87 @@ func TestDeleteAddressWithWrongTier(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestEnsureExternalLoadBalancer(t *testing.T) {
+	gceProjectId := "test-project"
+	gceRegion := "test-region"
+	zone := "zone1"
+	nodeName := "test-node-1"
+
+	client, clientErr := newOauthClient(nil)
+	require.NoError(t, clientErr)
+
+	service, serviceErr := compute.New(client)
+	require.NoError(t, serviceErr)
+
+	fakeManager := newFakeManager(gceProjectId, gceRegion)
+
+	alphaFeatureGate, featureGateErr := NewAlphaFeatureGate([]string{})
+	require.NoError(t, featureGateErr)
+
+	cloud := cloud.NewMockGCE()
+	zonesWithNodes := createNodeZones([]string{zone})
+
+	gce := GCECloud{
+		service:						service,
+		manager:            fakeManager,
+		managedZones:       []string{zone},
+		projectID:          gceProjectId,
+		AlphaFeatureGate:   alphaFeatureGate,
+		nodeZones:          zonesWithNodes,
+		nodeInformerSynced: func() bool { return true },
+		c:									cloud,
+	}
+
+	gce.InsertInstance(
+		gceProjectId,
+		zone,
+		&compute.Instance{
+			Name: nodeName,
+			Tags: &compute.Tags{
+				Items: []string{nodeName},
+			},
+		},
+	)
+
+	clusterName := "Test Cluster Name"
+	clusterID := "test-cluster-id"
+
+	apiService := &v1.Service{
+		Spec: v1.ServiceSpec{
+			SessionAffinity: v1.ServiceAffinityClientIP,
+			Type: v1.ServiceTypeClusterIP,
+			Ports: []v1.ServicePort{{Protocol: v1.ProtocolTCP, Port: int32(123)}},
+		},
+	}
+
+	existingFwdRule := &compute.ForwardingRule{}
+
+	nodes := []*v1.Node{
+		&v1.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: nodeName,
+				Labels: map[string]string{
+					kubeletapis.LabelHostname: nodeName,
+				},
+			},
+			Status: v1.NodeStatus{
+				NodeInfo: v1.NodeSystemInfo{
+					KubeProxyVersion: "v1.7.2",
+				},
+			},
+		},
+	}
+
+	status, err := gce.ensureExternalLoadBalancer(
+		clusterName,
+		clusterID,
+		apiService,
+		existingFwdRule,
+		nodes,
+	)
+
+	assert.NotNil(t, status)
+	assert.NoError(t, err)
 }
