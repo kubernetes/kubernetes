@@ -1,13 +1,13 @@
 apiVersion: extensions/v1beta1
 kind: DaemonSet
 metadata:
-  name: fluentd-gcp-v2.0.16
+  name: fluentd-gcp-v3.0.0
   namespace: kube-system
   labels:
     k8s-app: fluentd-gcp
     kubernetes.io/cluster-service: "true"
     addonmanager.kubernetes.io/mode: Reconcile
-    version: v2.0.16
+    version: v3.0.0
 spec:
   updateStrategy:
     type: RollingUpdate
@@ -16,7 +16,7 @@ spec:
       labels:
         k8s-app: fluentd-gcp
         kubernetes.io/cluster-service: "true"
-        version: v2.0.16
+        version: v3.0.0
       # This annotation ensures that fluentd does not get evicted if the node
       # supports critical pod annotation based priority scheme.
       # Note that this does not guarantee admission on the nodes (#40573).
@@ -28,10 +28,7 @@ spec:
       dnsPolicy: Default
       containers:
       - name: fluentd-gcp
-        image: k8s.gcr.io/fluentd-gcp:2.0.16
-        env:
-        - name: FLUENTD_ARGS
-          value: --no-supervisor -q
+        image: gcr.io/stackdriver-agents/stackdriver-logging-agent:{{ fluentd_gcp_version }}
         volumeMounts:
         - name: varlog
           mountPath: /var/log
@@ -42,7 +39,7 @@ spec:
           mountPath: /host/lib
           readOnly: true
         - name: config-volume
-          mountPath: /etc/fluent/config.d
+          mountPath: /etc/google-fluentd/config.d
         # Liveness probe is aimed to help in situarions where fluentd
         # silently hangs for no apparent reasons until manual restart.
         # The idea of this probe is that if fluentd is not queueing or
@@ -82,7 +79,7 @@ spec:
           - /monitor
           - --stackdriver-prefix={{ prometheus_to_sd_prefix }}/addons
           - --api-override={{ prometheus_to_sd_endpoint }}
-          - --source=fluentd:http://localhost:31337?whitelisted=stackdriver_successful_requests_count,stackdriver_failed_requests_count,stackdriver_ingested_entries_count,stackdriver_dropped_entries_count
+          - --source=fluentd:http://localhost:24231?whitelisted=stackdriver_successful_requests_count,stackdriver_failed_requests_count,stackdriver_ingested_entries_count,stackdriver_dropped_entries_count
           - --pod-id=$(POD_NAME)
           - --namespace-id=$(POD_NAMESPACE)
         env:
