@@ -53,6 +53,7 @@ var CurrentSuite Suite
 var CommonImageWhiteList = sets.NewString(
 	"busybox",
 	imageutils.GetE2EImage(imageutils.EntrypointTester),
+	imageutils.GetE2EImage(imageutils.IpcUtils),
 	imageutils.GetE2EImage(imageutils.Liveness),
 	imageutils.GetE2EImage(imageutils.Mounttest),
 	imageutils.GetE2EImage(imageutils.MounttestUser),
