@@ -104,12 +104,14 @@ var _ = SIGDescribe("Services [Feature:GCEAlphaFeature][Slow]", func() {
 		// Test 3: create a standard-tierd LB with a user-requested IP.
 		By("reserving a static IP for the load balancer")
 		requestedAddrName := fmt.Sprintf("e2e-ext-lb-net-tier-%s", framework.RunId)
-		requestedIP, err := reserveAlphaRegionalAddress(requestedAddrName, gcecloud.NetworkTierStandard)
+		gceCloud, err := framework.GetGCECloud()
+		Expect(err).NotTo(HaveOccurred())
+		requestedIP, err := reserveAlphaRegionalAddress(gceCloud, requestedAddrName, gcecloud.NetworkTierStandard)
 		Expect(err).NotTo(HaveOccurred(), "failed to reserve a STANDARD tiered address")
 		defer func() {
 			if requestedAddrName != "" {
 				// Release GCE static address - this is not kube-managed and will not be automatically released.
-				if err := framework.DeleteGCEStaticIP(requestedAddrName); err != nil {
+				if err := gceCloud.DeleteRegionAddress(requestedAddrName, gceCloud.Region()); err != nil {
 					framework.Logf("failed to release static IP address %q: %v", requestedAddrName, err)
 				}
 			}
@@ -221,8 +223,7 @@ func clearNetworkTier(svc *v1.Service) {
 
 // TODO: add retries if this turns out to be flaky.
 // TODO(#51665): remove this helper function once Network Tiers becomes beta.
-func reserveAlphaRegionalAddress(name string, netTier gcecloud.NetworkTier) (string, error) {
-	cloud, err := framework.GetGCECloud()
+func reserveAlphaRegionalAddress(cloud *gcecloud.GCECloud, name string, netTier gcecloud.NetworkTier) (string, error) {
 	alphaAddr := &computealpha.Address{
 		Name:        name,
 		NetworkTier: netTier.ToGCEValue(),
