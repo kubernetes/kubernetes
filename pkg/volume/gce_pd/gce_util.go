@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
+	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/utils/exec"
@@ -356,4 +357,14 @@ func udevadmChangeToDrive(drivePath string) error {
 		return fmt.Errorf("udevadmChangeToDrive: udevadm trigger failed for drive %q with %v.", drive, err)
 	}
 	return nil
+}
+
+// Checks whether the given GCE PD volume spec is associated with a regional PD.
+func isRegionalPD(spec *volume.Spec) bool {
+	if spec.PersistentVolume != nil {
+		zonesLabel := spec.PersistentVolume.Labels[kubeletapis.LabelZoneFailureDomain]
+		zones := strings.Split(zonesLabel, kubeletapis.LabelMultiZoneDelimiter)
+		return len(zones) > 1
+	}
+	return false
 }
