@@ -606,7 +606,12 @@ func UpdateObjectNamespace(info *Info, err error) error {
 		return err
 	}
 	if info.Object != nil {
-		return info.Mapping.MetadataAccessor.SetNamespace(info.Object, info.Namespace)
+		metadata, err := meta.Accessor(info.Object)
+		if err != nil {
+			return fmt.Errorf("unable to retrieve metadata: %v", err)
+		}
+		metadata.SetNamespace(info.Namespace)
+		return nil
 	}
 	return nil
 }
