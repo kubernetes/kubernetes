@@ -636,7 +636,7 @@ func BuildStorageFactory(s *options.ServerRunOptions, apiResourceConfig *servers
 
 func defaultOptions(s *options.ServerRunOptions) error {
 	// set defaults
-	if err := s.GenericServerRunOptions.DefaultAdvertiseAddress(s.SecureServing); err != nil {
+	if err := s.GenericServerRunOptions.DefaultAdvertiseAddress(s.SecureServing.SecureServingOptions); err != nil {
 		return err
 	}
 	if err := kubeoptions.DefaultAdvertiseAddress(s.GenericServerRunOptions, s.InsecureServing); err != nil {
