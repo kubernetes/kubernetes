@@ -55,28 +55,34 @@ func (m *Mapper) InfoForData(data []byte, source string) (*Info, error) {
 		return nil, fmt.Errorf("unable to decode %q: %v", source, err)
 	}
 
-	mapping, err := m.RESTMapping(gvk.GroupKind(), gvk.Version)
-	if err != nil {
-		return nil, fmt.Errorf("unable to recognize %q: %v", source, err)
+	var client RESTClient
+	var mapping *meta.RESTMapping
+	// if we have a disabled clientmapper, we don't have a RESTMapping since that logically requires discovery
+	if _, ok := m.ClientMapper.(DisabledClientForMapping); !ok {
+		mapping, err = m.RESTMapping(gvk.GroupKind(), gvk.Version)
+		if err != nil {
+			return nil, fmt.Errorf("unable to recognize %q: %v", source, err)
+		}
+
+		client, err = m.ClientForMapping(mapping)
+		if err != nil {
+			return nil, fmt.Errorf("unable to connect to a server to handle %q: %v", mapping.Resource, err)
+		}
 	}
 
-	client, err := m.ClientForMapping(mapping)
+	metadata, err := meta.Accessor(obj)
 	if err != nil {
-		return nil, fmt.Errorf("unable to connect to a server to handle %q: %v", mapping.Resource, err)
+		return nil, fmt.Errorf("unable to retrieve metadata: %v", err)
 	}
-
-	name, _ := mapping.MetadataAccessor.Name(obj)
-	namespace, _ := mapping.MetadataAccessor.Namespace(obj)
-	resourceVersion, _ := mapping.MetadataAccessor.ResourceVersion(obj)
 
 	return &Info{
 		Client:  client,
 		Mapping: mapping,
 
 		Source:          source,
-		Namespace:       namespace,
-		Name:            name,
-		ResourceVersion: resourceVersion,
+		Namespace:       metadata.GetNamespace(),
+		Name:            metadata.GetName(),
+		ResourceVersion: metadata.GetResourceVersion(),
 
 		Object: obj,
 	}, nil
@@ -96,25 +102,33 @@ func (m *Mapper) InfoForObject(obj runtime.Object, preferredGVKs []schema.GroupV
 		groupVersionKind = preferredObjectKind(groupVersionKinds, preferredGVKs)
 	}
 
-	mapping, err := m.RESTMapping(groupVersionKind.GroupKind(), groupVersionKind.Version)
-	if err != nil {
-		return nil, fmt.Errorf("unable to recognize %v: %v", groupVersionKind, err)
+	var client RESTClient
+	var mapping *meta.RESTMapping
+	// if we have a disabled clientmapper, we don't have a RESTMapping since that logically requires discovery
+	if _, ok := m.ClientMapper.(DisabledClientForMapping); !ok {
+		mapping, err = m.RESTMapping(groupVersionKind.GroupKind(), groupVersionKind.Version)
+		if err != nil {
+			return nil, fmt.Errorf("unable to recognize %v: %v", groupVersionKind, err)
+		}
+
+		client, err = m.ClientForMapping(mapping)
+		if err != nil {
+			return nil, fmt.Errorf("unable to retrieve metadata: %v", err)
+		}
 	}
 
-	client, err := m.ClientForMapping(mapping)
+	metadata, err := meta.Accessor(obj)
 	if err != nil {
 		return nil, fmt.Errorf("unable to connect to a server to handle %q: %v", mapping.Resource, err)
 	}
-	name, _ := mapping.MetadataAccessor.Name(obj)
-	namespace, _ := mapping.MetadataAccessor.Namespace(obj)
-	resourceVersion, _ := mapping.MetadataAccessor.ResourceVersion(obj)
+
 	return &Info{
 		Client:  client,
 		Mapping: mapping,
 
-		Namespace:       namespace,
-		Name:            name,
-		ResourceVersion: resourceVersion,
+		Namespace:       metadata.GetNamespace(),
+		Name:            metadata.GetName(),
+		ResourceVersion: metadata.GetResourceVersion(),
 
 		Object: obj,
 	}, nil
