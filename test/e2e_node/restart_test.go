@@ -23,6 +23,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"fmt"
 	"os/exec"
@@ -80,7 +81,7 @@ var _ = framework.KubeDescribe("Restart [Serial] [Slow] [Disruptive]", func() {
 		Context("Network", func() {
 			It("should recover from ip leak", func() {
 
-				pods := newTestPods(podCount, false, framework.GetPauseImageNameForHostArch(), "restart-container-runtime-test")
+				pods := newTestPods(podCount, false, imageutils.GetPauseImageNameForHostArch(), "restart-container-runtime-test")
 				By(fmt.Sprintf("Trying to create %d pods on node", len(pods)))
 				createBatchPodWithRateControl(f, pods, podCreationInterval)
 				defer deletePodsSync(f, pods)

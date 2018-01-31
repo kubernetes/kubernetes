@@ -116,7 +116,7 @@ var _ = framework.KubeDescribe("Container Lifecycle Hook", func() {
 					},
 				},
 			}
-			podWithHook := getPodWithHook("pod-with-poststart-http-hook", framework.GetPauseImageNameForHostArch(), lifecycle)
+			podWithHook := getPodWithHook("pod-with-poststart-http-hook", imageutils.GetPauseImageNameForHostArch(), lifecycle)
 			testPodWithHook(podWithHook)
 		})
 		framework.ConformanceIt("should execute prestop http hook properly", func() {
@@ -129,7 +129,7 @@ var _ = framework.KubeDescribe("Container Lifecycle Hook", func() {
 					},
 				},
 			}
-			podWithHook := getPodWithHook("pod-with-prestop-http-hook", framework.GetPauseImageNameForHostArch(), lifecycle)
+			podWithHook := getPodWithHook("pod-with-prestop-http-hook", imageutils.GetPauseImageNameForHostArch(), lifecycle)
 			testPodWithHook(podWithHook)
 		})
 	})
