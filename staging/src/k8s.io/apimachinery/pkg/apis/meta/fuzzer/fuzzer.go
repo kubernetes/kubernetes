@@ -221,7 +221,7 @@ func v1FuzzerFuncs(codecs runtimeserializer.CodecFactory) []interface{} {
 
 			if j.MatchExpressions != nil {
 				// NB: the label selector parser code sorts match expressions by key, and sorts the values,
-				// so we need to make sure ours are sorted as well here to preserve round-trip comparision.
+				// so we need to make sure ours are sorted as well here to preserve round-trip comparison.
 				// In practice, not sorting doesn't hurt anything...
 
 				for i := range j.MatchExpressions {
