@@ -65,7 +65,7 @@ func getEtcdSubCommands(outDir, defaultKubernetesVersion string) []*cobra.Comman
 
 	// This is used for unit testing only...
 	// If we wouldn't set this to something, the code would dynamically look up the version from the internet
-	// By setting this explicitely for tests workarounds that
+	// By setting this explicitly for tests workarounds that
 	if defaultKubernetesVersion != "" {
 		cfg.KubernetesVersion = defaultKubernetesVersion
 	}

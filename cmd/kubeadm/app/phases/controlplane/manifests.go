@@ -69,7 +69,7 @@ func CreateSchedulerStaticPodManifestFile(manifestDir string, cfg *kubeadmapi.Ma
 }
 
 // GetStaticPodSpecs returns all staticPodSpecs actualized to the context of the current MasterConfiguration
-// NB. this methods holds the information about how kubeadm creates static pod mainfests.
+// NB. this methods holds the information about how kubeadm creates static pod manifests.
 func GetStaticPodSpecs(cfg *kubeadmapi.MasterConfiguration, k8sVersion *version.Version) map[string]v1.Pod {
 	// Get the required hostpath mounts
 	mounts := getHostPathVolumesForTheControlPlane(cfg)

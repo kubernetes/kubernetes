@@ -268,28 +268,28 @@ func NewFrontProxyClientCertAndKey(frontProxyCACert *x509.Certificate, frontProx
 	return frontProxyClientCert, frontProxyClientKey, nil
 }
 
-// loadCertificateAuthorithy loads certificate authorithy
+// loadCertificateAuthorithy loads certificate authority
 func loadCertificateAuthorithy(pkiDir string, baseName string) (*x509.Certificate, *rsa.PrivateKey, error) {
-	// Checks if certificate authorithy exists in the PKI directory
+	// Checks if certificate authority exists in the PKI directory
 	if !pkiutil.CertOrKeyExist(pkiDir, baseName) {
-		return nil, nil, fmt.Errorf("couldn't load %s certificate authorithy from %s", baseName, pkiDir)
+		return nil, nil, fmt.Errorf("couldn't load %s certificate authority from %s", baseName, pkiDir)
 	}
 
-	// Try to load certificate authorithy .crt and .key from the PKI directory
+	// Try to load certificate authority .crt and .key from the PKI directory
 	caCert, caKey, err := pkiutil.TryLoadCertAndKeyFromDisk(pkiDir, baseName)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failure loading %s certificate authorithy: %v", baseName, err)
+		return nil, nil, fmt.Errorf("failure loading %s certificate authority: %v", baseName, err)
 	}
 
 	// Make sure the loaded CA cert actually is a CA
 	if !caCert.IsCA {
-		return nil, nil, fmt.Errorf("%s certificate is not a certificate authorithy", baseName)
+		return nil, nil, fmt.Errorf("%s certificate is not a certificate authority", baseName)
 	}
 
 	return caCert, caKey, nil
 }
 
-// writeCertificateAuthorithyFilesIfNotExist write a new certificate Authorithy to the given path.
+// writeCertificateAuthorithyFilesIfNotExist write a new certificate Authority to the given path.
 // If there already is a certificate file at the given path; kubeadm tries to load it and check if the values in the
 // existing and the expected certificate equals. If they do; kubeadm will just skip writing the file as it's up-to-date,
 // otherwise this function returns an error.
@@ -309,7 +309,7 @@ func writeCertificateAuthorithyFilesIfNotExist(pkiDir string, baseName string, c
 			return fmt.Errorf("certificate %s is not a CA", baseName)
 		}
 
-		// kubeadm doesn't validate the existing certificate Authorithy more than this;
+		// kubeadm doesn't validate the existing certificate Authority more than this;
 		// Basically, if we find a certificate file with the same path; and it is a CA
 		// kubeadm thinks those files are equal and doesn't bother writing a new file
 		fmt.Printf("[certificates] Using the existing %s certificate and key.\n", baseName)
@@ -346,7 +346,7 @@ func writeCertificateFilesIfNotExist(pkiDir string, baseName string, signingCert
 
 		// kubeadm doesn't validate the existing certificate more than this;
 		// Basically, if we find a certificate file with the same path; and it is signed by
-		// the expected certificate authorithy, kubeadm thinks those files are equal and
+		// the expected certificate authority, kubeadm thinks those files are equal and
 		// doesn't bother writing a new file
 		fmt.Printf("[certificates] Using the existing %s certificate and key.\n", baseName)
 	} else {
@@ -478,7 +478,7 @@ func validateSignedCert(l certKeyLocation) error {
 	// Try to load CA
 	caCert, err := pkiutil.TryLoadCertFromDisk(l.pkiDir, l.caBaseName)
 	if err != nil {
-		return fmt.Errorf("failure loading certificate authorithy for %s: %v", l.uxName, err)
+		return fmt.Errorf("failure loading certificate authority for %s: %v", l.uxName, err)
 	}
 
 	// Try to load key and signed certificate

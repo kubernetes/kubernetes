@@ -125,7 +125,7 @@ func WritePublicKey(pkiPath, name string, key *rsa.PublicKey) error {
 	return nil
 }
 
-// CertOrKeyExist retuns a boolean whether the cert or the key exists
+// CertOrKeyExist returns a boolean whether the cert or the key exists
 func CertOrKeyExist(pkiPath, name string) bool {
 	certificatePath, privateKeyPath := pathsForCertAndKey(pkiPath, name)
 
