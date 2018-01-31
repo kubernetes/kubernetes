@@ -25,6 +25,9 @@ import (
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
+	"k8s.io/kubernetes/pkg/features"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	runtimetesting "k8s.io/kubernetes/pkg/kubelet/apis/cri/testing"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -307,6 +310,8 @@ func TestGetSeccompProfileFromAnnotations(t *testing.T) {
 }
 
 func TestNamespacesForPod(t *testing.T) {
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodShareProcessNamespace, true)()
+
 	for desc, test := range map[string]struct {
 		input    *v1.Pod
 		expected *runtimeapi.NamespaceOption
@@ -341,6 +346,7 @@ func TestNamespacesForPod(t *testing.T) {
 				Pid:     runtimeapi.NamespaceMode_NODE,
 			},
 		},
+		// TODO(verb): add test cases for ShareProcessNamespace true (after #58716 is merged)
 	} {
 		t.Logf("TestCase: %s", desc)
 		actual := namespacesForPod(test.input)
