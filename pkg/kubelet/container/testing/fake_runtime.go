@@ -67,6 +67,7 @@ type FakeDirectStreamingRuntime struct {
 		// Attach / Exec args
 		ContainerID ContainerID
 		Cmd         []string
+		User        string
 		Stdin       io.Reader
 		Stdout      io.WriteCloser
 		Stderr      io.WriteCloser
@@ -311,13 +312,14 @@ func (f *FakeRuntime) GetPodStatus(uid types.UID, name, namespace string) (*PodS
 	return &status, f.Err
 }
 
-func (f *FakeDirectStreamingRuntime) ExecInContainer(containerID ContainerID, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize, timeout time.Duration) error {
+func (f *FakeDirectStreamingRuntime) ExecInContainer(containerID ContainerID, cmd []string, user string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize, timeout time.Duration) error {
 	f.Lock()
 	defer f.Unlock()
 
 	f.CalledFunctions = append(f.CalledFunctions, "ExecInContainer")
 	f.Args.ContainerID = containerID
 	f.Args.Cmd = cmd
+	f.Args.User = user
 	f.Args.Stdin = stdin
 	f.Args.Stdout = stdout
 	f.Args.Stderr = stderr
@@ -455,7 +457,7 @@ func (f *FakeRuntime) ImageStats() (*ImageStats, error) {
 	return nil, f.Err
 }
 
-func (f *FakeIndirectStreamingRuntime) GetExec(id ContainerID, cmd []string, stdin, stdout, stderr, tty bool) (*url.URL, error) {
+func (f *FakeIndirectStreamingRuntime) GetExec(id ContainerID, cmd []string, user string, stdin, stdout, stderr, tty bool) (*url.URL, error) {
 	f.Lock()
 	defer f.Unlock()
 

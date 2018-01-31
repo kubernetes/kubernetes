@@ -46,17 +46,17 @@ type streamingRuntime struct {
 
 var _ streaming.Runtime = &streamingRuntime{}
 
-func (r *streamingRuntime) Exec(containerID string, cmd []string, in io.Reader, out, err io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize) error {
-	return r.exec(containerID, cmd, in, out, err, tty, resize, 0)
+func (r *streamingRuntime) Exec(containerID string, cmd []string, user string, in io.Reader, out, err io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize) error {
+	return r.exec(containerID, cmd, user, in, out, err, tty, resize, 0)
 }
 
 // Internal version of Exec adds a timeout.
-func (r *streamingRuntime) exec(containerID string, cmd []string, in io.Reader, out, errw io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize, timeout time.Duration) error {
+func (r *streamingRuntime) exec(containerID string, cmd []string, user string, in io.Reader, out, errw io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize, timeout time.Duration) error {
 	container, err := checkContainerStatus(r.client, containerID)
 	if err != nil {
 		return err
 	}
-	return r.execHandler.ExecInContainer(r.client, container, cmd, in, out, errw, tty, resize, timeout)
+	return r.execHandler.ExecInContainer(r.client, container, cmd, user, in, out, errw, tty, resize, timeout)
 }
 
 func (r *streamingRuntime) Attach(containerID string, in io.Reader, out, errw io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize) error {
@@ -80,7 +80,7 @@ func (r *streamingRuntime) PortForward(podSandboxID string, port int32, stream i
 func (ds *dockerService) ExecSync(_ context.Context, req *runtimeapi.ExecSyncRequest) (*runtimeapi.ExecSyncResponse, error) {
 	timeout := time.Duration(req.Timeout) * time.Second
 	var stdoutBuffer, stderrBuffer bytes.Buffer
-	err := ds.streamingRuntime.exec(req.ContainerId, req.Cmd,
+	err := ds.streamingRuntime.exec(req.ContainerId, req.Cmd, "",
 		nil, // in
 		ioutils.WriteCloserWrapper(&stdoutBuffer),
 		ioutils.WriteCloserWrapper(&stderrBuffer),

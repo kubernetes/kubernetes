@@ -1586,7 +1586,7 @@ func (kl *Kubelet) RunInContainer(podFullName string, podUID types.UID, containe
 
 // ExecInContainer executes a command in a container, connecting the supplied
 // stdin/stdout/stderr to the command's IO streams.
-func (kl *Kubelet) ExecInContainer(podFullName string, podUID types.UID, containerName string, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize, timeout time.Duration) error {
+func (kl *Kubelet) ExecInContainer(podFullName string, podUID types.UID, containerName string, cmd []string, user string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize, timeout time.Duration) error {
 	streamingRuntime, ok := kl.containerRuntime.(kubecontainer.DirectStreamingRuntime)
 	if !ok {
 		return fmt.Errorf("streaming methods not supported by runtime")
@@ -1599,7 +1599,7 @@ func (kl *Kubelet) ExecInContainer(podFullName string, podUID types.UID, contain
 	if container == nil {
 		return fmt.Errorf("container not found (%q)", containerName)
 	}
-	return streamingRuntime.ExecInContainer(container.ID, cmd, stdin, stdout, stderr, tty, resize, timeout)
+	return streamingRuntime.ExecInContainer(container.ID, cmd, user, stdin, stdout, stderr, tty, resize, timeout)
 }
 
 // AttachContainer uses the container runtime to attach the given streams to
@@ -1643,7 +1643,7 @@ func (kl *Kubelet) PortForward(podFullName string, podUID types.UID, port int32,
 }
 
 // GetExec gets the URL the exec will be served from, or nil if the Kubelet will serve it.
-func (kl *Kubelet) GetExec(podFullName string, podUID types.UID, containerName string, cmd []string, streamOpts remotecommandserver.Options) (*url.URL, error) {
+func (kl *Kubelet) GetExec(podFullName string, podUID types.UID, containerName string, cmd []string, user string, streamOpts remotecommandserver.Options) (*url.URL, error) {
 	switch streamingRuntime := kl.containerRuntime.(type) {
 	case kubecontainer.DirectStreamingRuntime:
 		// Kubelet will serve the exec directly.
@@ -1656,7 +1656,7 @@ func (kl *Kubelet) GetExec(podFullName string, podUID types.UID, containerName s
 		if container == nil {
 			return nil, fmt.Errorf("container not found (%q)", containerName)
 		}
-		return streamingRuntime.GetExec(container.ID, cmd, streamOpts.Stdin, streamOpts.Stdout, streamOpts.Stderr, streamOpts.TTY)
+		return streamingRuntime.GetExec(container.ID, cmd, user, streamOpts.Stdin, streamOpts.Stdout, streamOpts.Stderr, streamOpts.TTY)
 	default:
 		return nil, fmt.Errorf("container runtime does not support exec")
 	}

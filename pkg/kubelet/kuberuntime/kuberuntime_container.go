@@ -767,7 +767,7 @@ func (m *kubeGenericRuntimeManager) GetContainerLogs(pod *v1.Pod, containerID ku
 }
 
 // GetExec gets the endpoint the runtime will serve the exec request from.
-func (m *kubeGenericRuntimeManager) GetExec(id kubecontainer.ContainerID, cmd []string, stdin, stdout, stderr, tty bool) (*url.URL, error) {
+func (m *kubeGenericRuntimeManager) GetExec(id kubecontainer.ContainerID, cmd []string, user string, stdin, stdout, stderr, tty bool) (*url.URL, error) {
 	req := &runtimeapi.ExecRequest{
 		ContainerId: id.ID,
 		Cmd:         cmd,
@@ -775,6 +775,7 @@ func (m *kubeGenericRuntimeManager) GetExec(id kubecontainer.ContainerID, cmd []
 		Stdin:       stdin,
 		Stdout:      stdout,
 		Stderr:      stderr,
+		User:        user,
 	}
 	resp, err := m.runtimeService.Exec(req)
 	if err != nil {

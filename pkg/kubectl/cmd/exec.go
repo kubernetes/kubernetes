@@ -90,6 +90,7 @@ func NewCmdExec(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer) *c
 	cmd.Flags().StringVarP(&options.ContainerName, "container", "c", "", "Container name. If omitted, the first container in the pod will be chosen")
 	cmd.Flags().BoolVarP(&options.Stdin, "stdin", "i", false, "Pass stdin to the container")
 	cmd.Flags().BoolVarP(&options.TTY, "tty", "t", false, "Stdin is a TTY")
+	cmd.Flags().StringVarP(&options.User, "user", "u", "", "User name or UID (format: <name|uid>[:<group|gid>]). If omitted, the container's default user will be used")
 	return cmd
 }
 
@@ -139,6 +140,7 @@ type ExecOptions struct {
 	StreamOptions
 
 	Command []string
+	User    string
 
 	FullCmdName       string
 	SuggestedCmdUsage string
@@ -318,6 +320,7 @@ func (p *ExecOptions) Run() error {
 		req.VersionedParams(&api.PodExecOptions{
 			Container: containerName,
 			Command:   p.Command,
+			User:      p.User,
 			Stdin:     p.Stdin,
 			Stdout:    p.Out != nil,
 			Stderr:    p.Err != nil,

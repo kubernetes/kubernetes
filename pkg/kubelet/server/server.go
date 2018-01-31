@@ -172,7 +172,7 @@ type HostInterface interface {
 	GetCachedMachineInfo() (*cadvisorapi.MachineInfo, error)
 	GetRunningPods() ([]*v1.Pod, error)
 	RunInContainer(name string, uid types.UID, container string, cmd []string) ([]byte, error)
-	ExecInContainer(name string, uid types.UID, container string, cmd []string, in io.Reader, out, err io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize, timeout time.Duration) error
+	ExecInContainer(name string, uid types.UID, container string, cmd []string, user string, in io.Reader, out, err io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize, timeout time.Duration) error
 	AttachContainer(name string, uid types.UID, container string, in io.Reader, out, err io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize) error
 	GetKubeletContainerLogs(podFullName, containerName string, logOptions *v1.PodLogOptions, stdout, stderr io.Writer) error
 	ServeLogs(w http.ResponseWriter, req *http.Request)
@@ -181,7 +181,7 @@ type HostInterface interface {
 	ResyncInterval() time.Duration
 	GetHostname() string
 	LatestLoopEntryTime() time.Time
-	GetExec(podFullName string, podUID types.UID, containerName string, cmd []string, streamOpts remotecommandserver.Options) (*url.URL, error)
+	GetExec(podFullName string, podUID types.UID, containerName string, cmd []string, user string, streamOpts remotecommandserver.Options) (*url.URL, error)
 	GetAttach(podFullName string, podUID types.UID, containerName string, streamOpts remotecommandserver.Options) (*url.URL, error)
 	GetPortForward(podName, podNamespace string, podUID types.UID, portForwardOpts portforward.V4Options) (*url.URL, error)
 }
@@ -601,6 +601,7 @@ type execRequestParams struct {
 	podUID        types.UID
 	containerName string
 	cmd           []string
+	user          string
 }
 
 func getExecRequestParams(req *restful.Request) execRequestParams {
@@ -610,6 +611,7 @@ func getExecRequestParams(req *restful.Request) execRequestParams {
 		podUID:        types.UID(req.PathParameter("uid")),
 		containerName: req.PathParameter("containerName"),
 		cmd:           req.Request.URL.Query()[api.ExecCommandParam],
+		user:          req.Request.URL.Query().Get(api.ExecUserParam),
 	}
 }
 
@@ -681,7 +683,7 @@ func (s *Server) getExec(request *restful.Request, response *restful.Response) {
 	}
 
 	podFullName := kubecontainer.GetPodFullName(pod)
-	redirect, err := s.host.GetExec(podFullName, params.podUID, params.containerName, params.cmd, *streamOpts)
+	redirect, err := s.host.GetExec(podFullName, params.podUID, params.containerName, params.cmd, params.user, *streamOpts)
 	if err != nil {
 		streaming.WriteError(err, response.ResponseWriter)
 		return
@@ -698,6 +700,7 @@ func (s *Server) getExec(request *restful.Request, response *restful.Response) {
 		params.podUID,
 		params.containerName,
 		params.cmd,
+		params.user,
 		streamOpts,
 		s.host.StreamingConnectionIdleTimeout(),
 		remotecommandconsts.DefaultStreamCreationTimeout,

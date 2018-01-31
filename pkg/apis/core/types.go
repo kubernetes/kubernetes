@@ -3874,6 +3874,9 @@ type PodExecOptions struct {
 
 	// Command is the remote command to execute; argv array; not executed within a shell.
 	Command []string
+
+	// User name or ID for the remote command to execute.
+	User string
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -4436,6 +4439,8 @@ const (
 	ExecTTYParam = "tty"
 	// Command to run for remote command execution
 	ExecCommandParam = "command"
+	// User for remote command execution
+	ExecUserParam = "user"
 
 	// Name of header that specifies stream type
 	StreamType = "streamType"

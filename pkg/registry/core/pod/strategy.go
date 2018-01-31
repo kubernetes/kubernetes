@@ -414,6 +414,9 @@ func streamParams(params url.Values, opts runtime.Object) error {
 		if opts.TTY {
 			params.Add(api.ExecTTYParam, "1")
 		}
+		if opts.User != "" {
+			params.Add(api.ExecUserParam, opts.User)
+		}
 		for _, c := range opts.Command {
 			params.Add("command", c)
 		}
