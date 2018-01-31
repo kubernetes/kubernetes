@@ -18,6 +18,7 @@ go_library(
     deps = [
         "//pkg/cloudprovider:go_default_library",
         "//pkg/cloudprovider/providers/gce:go_default_library",
+        "//pkg/kubelet/apis:go_default_library",
         "//pkg/util/mount:go_default_library",
         "//pkg/util/strings:go_default_library",
         "//pkg/volume:go_default_library",
@@ -42,6 +43,7 @@ go_test(
     importpath = "k8s.io/kubernetes/pkg/volume/gce_pd",
     library = ":go_default_library",
     deps = [
+        "//pkg/kubelet/apis:go_default_library",
         "//pkg/util/mount:go_default_library",
         "//pkg/volume:go_default_library",
         "//pkg/volume/testing:go_default_library",
