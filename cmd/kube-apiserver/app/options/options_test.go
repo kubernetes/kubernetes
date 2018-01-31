@@ -43,7 +43,7 @@ func TestAddFlags(t *testing.T) {
 	s.AddFlags(f)
 
 	args := []string{
-		"--admission-control=AlwaysDeny",
+		"--enable-admission-plugins=AlwaysDeny",
 		"--admission-control-config-file=/admission-control-config",
 		"--advertise-address=192.168.10.10",
 		"--allow-privileged=false",
@@ -111,10 +111,10 @@ func TestAddFlags(t *testing.T) {
 			MinRequestTimeout:           1800,
 		},
 		Admission: &kubeoptions.AdmissionOptions{
-			PluginNames: []string{"AlwaysDeny"},
 			GenericAdmission: &apiserveroptions.AdmissionOptions{
 				RecommendedPluginOrder: s.Admission.GenericAdmission.RecommendedPluginOrder,
 				DefaultOffPlugins:      s.Admission.GenericAdmission.DefaultOffPlugins,
+				EnablePlugins:          []string{"AlwaysDeny"},
 				ConfigFile:             "/admission-control-config",
 				Plugins:                s.Admission.GenericAdmission.Plugins,
 			},

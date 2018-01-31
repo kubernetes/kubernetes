@@ -4947,6 +4947,7 @@ func PollURL(route, host string, timeout time.Duration, interval time.Duration, 
 			Logf("host %v path %v: %v unreachable", host, route, err)
 			return expectUnreachable, nil
 		}
+		Logf("host %v path %v: reached", host, route)
 		return !expectUnreachable, nil
 	})
 	if pollErr != nil {

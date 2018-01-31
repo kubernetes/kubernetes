@@ -123,11 +123,13 @@ func modifyHostConfig(sc *runtimeapi.LinuxContainerSecurityContext, hostConfig *
 // modifySandboxNamespaceOptions apply namespace options for sandbox
 func modifySandboxNamespaceOptions(nsOpts *runtimeapi.NamespaceOption, hostConfig *dockercontainer.HostConfig, network *knetwork.PluginManager) {
 	hostNetwork := false
+	hostIpc := false
 	if nsOpts != nil {
 		hostNetwork = nsOpts.HostNetwork
+		hostIpc = nsOpts.HostIpc
 	}
 	modifyCommonNamespaceOptions(nsOpts, hostConfig)
-	modifyHostNetworkOptionForSandbox(hostNetwork, network, hostConfig)
+	modifyHostOptionsForSandbox(hostNetwork, hostIpc, network, hostConfig)
 }
 
 // modifyContainerNamespaceOptions apply namespace options for container
@@ -138,23 +140,22 @@ func modifyContainerNamespaceOptions(nsOpts *runtimeapi.NamespaceOption, podSand
 	}
 	hostConfig.PidMode = dockercontainer.PidMode(fmt.Sprintf("container:%v", podSandboxID))
 	modifyCommonNamespaceOptions(nsOpts, hostConfig)
-	modifyHostNetworkOptionForContainer(hostNetwork, podSandboxID, hostConfig)
+	modifyHostOptionsForContainer(hostNetwork, podSandboxID, hostConfig)
 }
 
 // modifyCommonNamespaceOptions apply common namespace options for sandbox and container
 func modifyCommonNamespaceOptions(nsOpts *runtimeapi.NamespaceOption, hostConfig *dockercontainer.HostConfig) {
-	if nsOpts != nil {
-		if nsOpts.HostPid {
-			hostConfig.PidMode = namespaceModeHost
-		}
-		if nsOpts.HostIpc {
-			hostConfig.IpcMode = namespaceModeHost
-		}
+	if nsOpts != nil && nsOpts.HostPid {
+		hostConfig.PidMode = namespaceModeHost
 	}
 }
 
-// modifyHostNetworkOptionForSandbox applies NetworkMode/UTSMode to sandbox's dockercontainer.HostConfig.
-func modifyHostNetworkOptionForSandbox(hostNetwork bool, network *knetwork.PluginManager, hc *dockercontainer.HostConfig) {
+// modifyHostOptionsForSandbox applies NetworkMode/UTSMode to sandbox's dockercontainer.HostConfig.
+func modifyHostOptionsForSandbox(hostNetwork bool, hostIpc bool, network *knetwork.PluginManager, hc *dockercontainer.HostConfig) {
+	if hostIpc {
+		hc.IpcMode = namespaceModeHost
+	}
+
 	if hostNetwork {
 		hc.NetworkMode = namespaceModeHost
 		return
@@ -175,8 +176,8 @@ func modifyHostNetworkOptionForSandbox(hostNetwork bool, network *knetwork.Plugi
 	}
 }
 
-// modifyHostNetworkOptionForContainer applies NetworkMode/UTSMode to container's dockercontainer.HostConfig.
-func modifyHostNetworkOptionForContainer(hostNetwork bool, podSandboxID string, hc *dockercontainer.HostConfig) {
+// modifyHostOptionsForContainer applies NetworkMode/UTSMode to container's dockercontainer.HostConfig.
+func modifyHostOptionsForContainer(hostNetwork bool, podSandboxID string, hc *dockercontainer.HostConfig) {
 	sandboxNSMode := fmt.Sprintf("container:%v", podSandboxID)
 	hc.NetworkMode = dockercontainer.NetworkMode(sandboxNSMode)
 	hc.IpcMode = dockercontainer.IpcMode(sandboxNSMode)

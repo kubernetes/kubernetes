@@ -76,7 +76,7 @@ type Config struct {
 	// the cloudprovider will try to add all nodes to a single backend pool which is forbidden.
 	// In other words, if you use multiple agent pools (availability sets), you MUST set this field.
 	PrimaryAvailabilitySetName string `json:"primaryAvailabilitySetName" yaml:"primaryAvailabilitySetName"`
-	// The type of azure nodes. Candidate valudes are: vmss and standard.
+	// The type of azure nodes. Candidate values are: vmss and standard.
 	// If not set, it will be default to standard.
 	VMType string `json:"vmType" yaml:"vmType"`
 	// The name of the scale set that should be used as the load balancer backend.

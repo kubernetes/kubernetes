@@ -172,7 +172,7 @@ func WriteStaticPodToDisk(componentName, manifestDir string, pod v1.Pod) error {
 
 	filename := kubeadmconstants.GetStaticPodFilepath(componentName, manifestDir)
 
-	if err := ioutil.WriteFile(filename, serialized, 0700); err != nil {
+	if err := ioutil.WriteFile(filename, serialized, 0600); err != nil {
 		return fmt.Errorf("failed to write static pod manifest file for %q (%q): %v", componentName, filename, err)
 	}
 

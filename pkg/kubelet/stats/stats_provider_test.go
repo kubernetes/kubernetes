@@ -362,6 +362,41 @@ func TestGetRawContainerInfoSubcontainers(t *testing.T) {
 	mockCadvisor.AssertExpectations(t)
 }
 
+func TestHasDedicatedImageFs(t *testing.T) {
+	for desc, test := range map[string]struct {
+		rootfsDevice  string
+		imagefsDevice string
+		dedicated     bool
+	}{
+		"dedicated device for image filesystem": {
+			rootfsDevice:  "root/device",
+			imagefsDevice: "image/device",
+			dedicated:     true,
+		},
+		"shared device for image filesystem": {
+			rootfsDevice:  "share/device",
+			imagefsDevice: "share/device",
+			dedicated:     false,
+		},
+	} {
+		t.Logf("TestCase %q", desc)
+		var (
+			mockCadvisor     = new(cadvisortest.Mock)
+			mockPodManager   = new(kubepodtest.MockManager)
+			mockRuntimeCache = new(kubecontainertest.MockRuntimeCache)
+		)
+		mockCadvisor.On("RootFsInfo").Return(cadvisorapiv2.FsInfo{Device: test.rootfsDevice}, nil)
+
+		provider := newStatsProvider(mockCadvisor, mockPodManager, mockRuntimeCache, fakeContainerStatsProvider{
+			device: test.imagefsDevice,
+		})
+		dedicated, err := provider.HasDedicatedImageFs()
+		assert.NoError(t, err)
+		assert.Equal(t, test.dedicated, dedicated)
+		mockCadvisor.AssertExpectations(t)
+	}
+}
+
 func getTerminatedContainerInfo(seed int, podName string, podNamespace string, containerName string) cadvisorapiv2.ContainerInfo {
 	cinfo := getTestContainerInfo(seed, podName, podNamespace, containerName)
 	cinfo.Stats[0].Memory.RSS = 0
@@ -606,6 +641,7 @@ func (o *fakeResourceAnalyzer) GetPodVolumeStats(uid types.UID) (serverstats.Pod
 }
 
 type fakeContainerStatsProvider struct {
+	device string
 }
 
 func (p fakeContainerStatsProvider) ListPodStats() ([]statsapi.PodStats, error) {
@@ -613,4 +649,8 @@ func (p fakeContainerStatsProvider) ListPodStats() ([]statsapi.PodStats, error) 
 }
 func (p fakeContainerStatsProvider) ImageFsStats() (*statsapi.FsStats, error) {
 	return nil, fmt.Errorf("not implemented")
+}
+
+func (p fakeContainerStatsProvider) ImageFsDevice() (string, error) {
+	return p.device, nil
 }
