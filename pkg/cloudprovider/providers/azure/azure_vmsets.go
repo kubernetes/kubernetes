@@ -24,7 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider"
 )
 
-// VMSet defines functions all vmsets (including scale set and availabitlity
+// VMSet defines functions all vmsets (including scale set and availability
 // set) should be implemented.
 type VMSet interface {
 	// GetInstanceIDByNodeName gets the cloud provider ID by node name.
@@ -48,7 +48,7 @@ type VMSet interface {
 	GetPrimaryVMSetName() string
 	// GetVMSetNames selects all possible availability sets or scale sets
 	// (depending vmType configured) for service load balancer, if the service has
-	// no loadbalancer mode annotaion returns the primary VMSet. If service annotation
+	// no loadbalancer mode annotation returns the primary VMSet. If service annotation
 	// for loadbalancer exists then return the eligible VMSet.
 	GetVMSetNames(service *v1.Service, nodes []*v1.Node) (availabilitySetNames *[]string, err error)
 	// EnsureHostsInPool ensures the given Node's primary IP configurations are

@@ -73,7 +73,7 @@ func (c *ManagedDiskController) CreateManagedDisk(diskName string, storageAccoun
 	diskID := ""
 
 	err = kwait.ExponentialBackoff(defaultBackOff, func() (bool, error) {
-		provisonState, id, err := c.getDisk(diskName)
+		provisionState, id, err := c.getDisk(diskName)
 		diskID = id
 		// We are waiting for provisioningState==Succeeded
 		// We don't want to hand-off managed disks to k8s while they are
@@ -81,7 +81,7 @@ func (c *ManagedDiskController) CreateManagedDisk(diskName string, storageAccoun
 		if err != nil {
 			return false, err
 		}
-		if strings.ToLower(provisonState) == "succeeded" {
+		if strings.ToLower(provisionState) == "succeeded" {
 			return true, nil
 		}
 		return false, nil
