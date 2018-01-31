@@ -182,7 +182,7 @@ func DeletePVCandValidatePV(c clientset.Interface, ns string, pvc *v1.Persistent
 
 	// Wait for the PV's phase to return to be `expectPVPhase`
 	Logf("Waiting for reclaim process to complete.")
-	err = WaitForPersistentVolumePhase(expectPVPhase, c, pv.Name, 1*time.Second, 300*time.Second)
+	err = WaitForPersistentVolumePhase(expectPVPhase, c, pv.Name, Poll, PVReclaimingTimeout)
 	if err != nil {
 		return fmt.Errorf("pv %q phase did not become %v: %v", pv.Name, expectPVPhase, err)
 	}
@@ -392,14 +392,14 @@ func CreatePVsPVCs(numpvs, numpvcs int, c clientset.Interface, ns string, pvConf
 func WaitOnPVandPVC(c clientset.Interface, ns string, pv *v1.PersistentVolume, pvc *v1.PersistentVolumeClaim) error {
 	// Wait for newly created PVC to bind to the PV
 	Logf("Waiting for PV %v to bind to PVC %v", pv.Name, pvc.Name)
-	err := WaitForPersistentVolumeClaimPhase(v1.ClaimBound, c, ns, pvc.Name, 3*time.Second, 300*time.Second)
+	err := WaitForPersistentVolumeClaimPhase(v1.ClaimBound, c, ns, pvc.Name, Poll, ClaimBindingTimeout)
 	if err != nil {
 		return fmt.Errorf("PVC %q did not become Bound: %v", pvc.Name, err)
 	}
 
 	// Wait for PersistentVolume.Status.Phase to be Bound, which it should be
 	// since the PVC is already bound.
-	err = WaitForPersistentVolumePhase(v1.VolumeBound, c, pv.Name, 3*time.Second, 300*time.Second)
+	err = WaitForPersistentVolumePhase(v1.VolumeBound, c, pv.Name, Poll, PVBindingTimeout)
 	if err != nil {
 		return fmt.Errorf("PV %q did not become Bound: %v", pv.Name, err)
 	}
@@ -445,7 +445,7 @@ func WaitAndVerifyBinds(c clientset.Interface, ns string, pvols PVMap, claims PV
 	}
 
 	for pvName := range pvols {
-		err := WaitForPersistentVolumePhase(v1.VolumeBound, c, pvName, 3*time.Second, 180*time.Second)
+		err := WaitForPersistentVolumePhase(v1.VolumeBound, c, pvName, Poll, PVBindingTimeout)
 		if err != nil && len(pvols) > len(claims) {
 			Logf("WARN: pv %v is not bound after max wait", pvName)
 			Logf("      This may be ok since there are more pvs than pvcs")
@@ -468,7 +468,7 @@ func WaitAndVerifyBinds(c clientset.Interface, ns string, pvols PVMap, claims PV
 				return fmt.Errorf("internal: claims map is missing pvc %q", pvcKey)
 			}
 
-			err := WaitForPersistentVolumeClaimPhase(v1.ClaimBound, c, ns, cr.Name, 3*time.Second, 180*time.Second)
+			err := WaitForPersistentVolumeClaimPhase(v1.ClaimBound, c, ns, cr.Name, Poll, ClaimBindingTimeout)
 			if err != nil {
 				return fmt.Errorf("PVC %q did not become Bound: %v", cr.Name, err)
 			}
