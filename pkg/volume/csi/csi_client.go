@@ -118,9 +118,15 @@ func (c *csiDriverClient) AssertSupportedVersion(ctx grpctx.Context, ver *csipb.
 	vers := rsp.GetSupportedVersions()
 	glog.V(4).Info(log("driver reports %d versions supported: %s", len(vers), versToStr(vers)))
 
+	// If our supported version is still at 0.X.X, then check
+	// also the minor number. If our supported version is >= 1.X.X
+	// then check only the major number.
 	for _, v := range vers {
-		//TODO (vladimirvivien) use more lenient/heuristic for exact or match of ranges etc
-		if verToStr(v) == verToStr(ver) {
+		if ver.GetMajor() == uint32(0) &&
+			(ver.GetMajor() == v.GetMajor() && ver.GetMinor() == v.GetMinor()) {
+			supported = true
+			break
+		} else if ver.GetMajor() != uint32(0) && ver.GetMajor() == v.GetMajor() {
 			supported = true
 			break
 		}

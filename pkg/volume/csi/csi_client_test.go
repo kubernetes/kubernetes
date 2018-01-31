@@ -46,8 +46,13 @@ func TestClientAssertSupportedVersion(t *testing.T) {
 		mustFail bool
 		err      error
 	}{
+		{testName: "supported version", ver: &csipb.Version{Major: 0, Minor: 0, Patch: 0}},
 		{testName: "supported version", ver: &csipb.Version{Major: 0, Minor: 1, Patch: 0}},
-		{testName: "unsupported version", ver: &csipb.Version{Major: 0, Minor: 0, Patch: 0}, mustFail: true},
+		{testName: "supported version", ver: &csipb.Version{Major: 0, Minor: 1, Patch: 10}},
+		{testName: "supported version", ver: &csipb.Version{Major: 1, Minor: 1, Patch: 0}},
+		{testName: "supported version", ver: &csipb.Version{Major: 1, Minor: 0, Patch: 10}},
+		{testName: "unsupported version", ver: &csipb.Version{Major: 10, Minor: 0, Patch: 0}, mustFail: true},
+		{testName: "unsupported version", ver: &csipb.Version{Major: 0, Minor: 10, Patch: 0}, mustFail: true},
 		{testName: "grpc error", ver: &csipb.Version{Major: 0, Minor: 1, Patch: 0}, mustFail: true, err: errors.New("grpc error")},
 	}
 
