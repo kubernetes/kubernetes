@@ -473,6 +473,11 @@ EOF
 kube_apiserver_liveness_probe_initial_delay: '$(echo "$KUBE_APISERVER_LIVENESS_PROBE_INITIAL_DELAY_SEC" | sed -e "s/'/''/g")'
 EOF
     fi
+    if [ -n "${ETCD_COMPACTION_INTERVAL_SEC:-}" ]; then
+      cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
+etcd_compaction_interval_sec: '$(echo "$ETCD_COMPACTION_INTERVAL_SEC" | sed -e "s/'/''/g")'
+EOF
+    fi
     if [ -n "${ADMISSION_CONTROL:-}" ] && [ ${ADMISSION_CONTROL} == *"ImagePolicyWebhook"* ]; then
       cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
 admission-control-config-file: /etc/admission_controller.config
