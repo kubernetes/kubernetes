@@ -86,7 +86,7 @@ func main() {
 		serviceName = "elasticsearch-logging"
 	}
 
-	// Look for endpoints associated with the Elasticsearch loggging service.
+	// Look for endpoints associated with the Elasticsearch logging service.
 	// First wait for the service to become available.
 	for t := time.Now(); time.Since(t) < 5*time.Minute; time.Sleep(10 * time.Second) {
 		elasticsearch, err = client.Core().Services(namespace).Get(serviceName, metav1.GetOptions{})

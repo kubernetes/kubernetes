@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Common utilites for kube-up/kube-down
+# Common utilities for kube-up/kube-down
 
 set -o errexit
 set -o nounset

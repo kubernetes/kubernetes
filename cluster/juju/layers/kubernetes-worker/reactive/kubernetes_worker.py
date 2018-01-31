@@ -739,7 +739,7 @@ def kubectl(*args):
 
 
 def kubectl_success(*args):
-    ''' Runs kubectl with the given args. Returns True if succesful, False if
+    ''' Runs kubectl with the given args. Returns True if successful, False if
     not. '''
     try:
         kubectl(*args)
