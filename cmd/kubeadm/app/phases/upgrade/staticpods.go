@@ -219,7 +219,7 @@ func performEtcdStaticPodUpgrade(waiter apiclient.Waiter, pathMgr StaticPodPathM
 	}
 
 	// Write the updated etcd static Pod manifest into the temporary directory, at this point no etcd change
-	// has occured in any aspects.
+	// has occurred in any aspects.
 	if err := etcdphase.CreateLocalEtcdStaticPodManifestFile(pathMgr.TempManifestDir(), cfg); err != nil {
 		return true, fmt.Errorf("error creating local etcd static pod manifest file: %v", err)
 	}
@@ -324,7 +324,7 @@ func StaticPodControlPlane(waiter apiclient.Waiter, pathMgr StaticPodPathManager
 func rollbackOldManifests(oldManifests map[string]string, origErr error, pathMgr StaticPodPathManager, restoreEtcd bool) error {
 	errs := []error{origErr}
 	for component, backupPath := range oldManifests {
-		// Will restore etcd manifest only if it was explicitely requested by setting restoreEtcd to True
+		// Will restore etcd manifest only if it was explicitly requested by setting restoreEtcd to True
 		if component == constants.Etcd && !restoreEtcd {
 			continue
 		}

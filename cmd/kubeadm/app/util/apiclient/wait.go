@@ -195,7 +195,7 @@ func (w *KubeWaiter) WaitForStaticPodSingleHash(nodeName string, component strin
 }
 
 // WaitForStaticPodControlPlaneHashChange blocks until it timeouts or notices that the Mirror Pod (for the Static Pod, respectively) has changed
-// This implicitely means this function blocks until the kubelet has restarted the Static Pod in question
+// This implicitly means this function blocks until the kubelet has restarted the Static Pod in question
 func (w *KubeWaiter) WaitForStaticPodControlPlaneHashChange(nodeName, component, previousHash string) error {
 	return wait.PollImmediate(constants.APICallRetryInterval, w.timeout, func() (bool, error) {
 
