@@ -1186,7 +1186,7 @@ func testSetup(t *testing.T) (context.Context, *store, *integration.ClusterV3) {
 	return ctx, store, cluster
 }
 
-// testPropogateStore helps propogates store with objects, automates key generation, and returns
+// testPropogateStore helps propagates store with objects, automates key generation, and returns
 // keys and stored objects.
 func testPropogateStore(ctx context.Context, t *testing.T, store *store, obj *example.Pod) (string, *example.Pod) {
 	// Setup store with a key and grab the output for returning.

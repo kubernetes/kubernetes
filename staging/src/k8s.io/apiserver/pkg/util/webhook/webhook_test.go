@@ -230,7 +230,7 @@ func TestKubeConfigFile(t *testing.T) {
 			errRegex: "tls: found a certificate rather than a key in the PEM for the private key",
 		},
 		{
-			test:     "valid configuration (certificate data embeded in config)",
+			test:     "valid configuration (certificate data embedded in config)",
 			cluster:  &defaultCluster,
 			user:     &defaultUser,
 			errRegex: "",

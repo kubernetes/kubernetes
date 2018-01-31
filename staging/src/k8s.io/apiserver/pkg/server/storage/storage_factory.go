@@ -189,7 +189,7 @@ func (s *DefaultStorageFactory) SetEtcdPrefix(groupResource schema.GroupResource
 }
 
 // SetDisableAPIListChunking allows a specific resource to disable paging at the storage layer, to prevent
-// exposure of key names in continuations. This may be overriden by feature gates.
+// exposure of key names in continuations. This may be overridden by feature gates.
 func (s *DefaultStorageFactory) SetDisableAPIListChunking(groupResource schema.GroupResource) {
 	overrides := s.Overrides[groupResource]
 	overrides.disablePaging = true

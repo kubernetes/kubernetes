@@ -42,7 +42,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd/api/v1"
 )
 
-// newWebhookHandler returns a handler which recieves webhook events and decodes the
+// newWebhookHandler returns a handler which receives webhook events and decodes the
 // request body. The caller passes a callback which is called on each webhook POST.
 // The object passed to cb is of the same type as list.
 func newWebhookHandler(t *testing.T, list runtime.Object, cb func(events runtime.Object)) http.Handler {

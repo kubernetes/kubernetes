@@ -78,11 +78,11 @@ var (
 		},
 		[]string{"verb", "resource", "subresource", "scope"},
 	)
-	// DroppedRequests is a number of requests dropped with 'Try again later' reponse"
+	// DroppedRequests is a number of requests dropped with 'Try again later' response"
 	DroppedRequests = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "apiserver_dropped_requests",
-			Help: "Number of requests dropped with 'Try again later' reponse",
+			Help: "Number of requests dropped with 'Try again later' response",
 		},
 		[]string{"requestKind"},
 	)
