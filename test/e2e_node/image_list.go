@@ -51,7 +51,7 @@ var NodeImageWhiteList = sets.NewString(
 	imageutils.GetE2EImage(imageutils.ServeHostname),
 	imageutils.GetE2EImage(imageutils.Netexec),
 	imageutils.GetE2EImage(imageutils.Nonewprivs),
-	framework.GetPauseImageNameForHostArch(),
+	imageutils.GetPauseImageNameForHostArch(),
 	framework.GetGPUDevicePluginImage(),
 )
 
