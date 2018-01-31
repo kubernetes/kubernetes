@@ -810,7 +810,7 @@ def set_privileged():
     """Update the allow-privileged flag for kubelet.
 
     """
-    privileged = hookenv.config('allow-privileged')
+    privileged = hookenv.config('allow-privileged').lower()
     if privileged == 'auto':
         gpu_enabled = is_state('kubernetes-worker.gpu.enabled')
         privileged = 'true' if gpu_enabled else 'false'
