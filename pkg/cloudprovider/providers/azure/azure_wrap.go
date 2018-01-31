@@ -173,3 +173,19 @@ func (az *Cloud) getSubnet(virtualNetworkName string, subnetName string) (subnet
 
 	return subnet, exists, err
 }
+
+func (az *Cloud) getAzureLoadBalancer(name string) (lb network.LoadBalancer, exists bool, err error) {
+	var realErr error
+
+	lb, err = az.LoadBalancerClient.Get(az.ResourceGroup, name, "")
+	exists, realErr = checkResourceExistsFromError(err)
+	if realErr != nil {
+		return lb, false, realErr
+	}
+
+	if !exists {
+		return lb, false, nil
+	}
+
+	return lb, exists, err
+}

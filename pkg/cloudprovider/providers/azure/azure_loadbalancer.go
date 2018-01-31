@@ -772,6 +772,19 @@ func (az *Cloud) reconcileLoadBalancer(clusterName string, service *v1.Service, 
 				glog.V(2).Infof("ensure(%s) abort backoff: lb(%s) - updating", serviceName, lbName)
 				return nil, err
 			}
+
+			if isInternal {
+				// Refresh updated lb which will be used later in other places.
+				newLB, exist, err := az.getAzureLoadBalancer(lbName)
+				if err != nil {
+					glog.V(2).Infof("getAzureLoadBalancer(%s) failed: %v", lbName, err)
+					return nil, err
+				}
+				if !exist {
+					return nil, fmt.Errorf("load balancer %q not found", lbName)
+				}
+				lb = &newLB
+			}
 		}
 	}
 
