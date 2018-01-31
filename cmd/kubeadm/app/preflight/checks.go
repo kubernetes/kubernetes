@@ -1002,12 +1002,16 @@ func RunJoinNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.NodeConfigura
 			criCtlChecker)
 	}
 
-	if len(cfg.DiscoveryTokenAPIServers) > 0 {
-		if ip := net.ParseIP(cfg.DiscoveryTokenAPIServers[0]); ip != nil {
-			if ip.To4() == nil && ip.To16() != nil {
-				checks = append(checks,
-					FileContentCheck{Path: bridgenf6, Content: []byte{'1'}},
-				)
+	for _, server := range cfg.DiscoveryTokenAPIServers {
+		ipstr, _, err := net.SplitHostPort(server)
+		if err == nil {
+			if ip := net.ParseIP(ipstr); ip != nil {
+				if ip.To4() == nil && ip.To16() != nil {
+					checks = append(checks,
+						FileContentCheck{Path: bridgenf6, Content: []byte{'1'}},
+					)
+					break // Ensure that check is added only once
+				}
 			}
 		}
 	}
