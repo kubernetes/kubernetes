@@ -25,8 +25,9 @@ import (
 )
 
 func TestObjectVersioner(t *testing.T) {
-	v := APIObjectVersioner{}
-	if ver, err := v.ObjectResourceVersion(&storagetesting.TestResource{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "5"}}); err != nil || ver != 5 {
+	v := NewAPIObjectVersioner()
+	obfuscatedVersionFive := v.etcdRVToDisplayRV(5)
+	if ver, err := v.ObjectResourceVersion(&storagetesting.TestResource{ObjectMeta: metav1.ObjectMeta{ResourceVersion: obfuscatedVersionFive}}); err != nil || ver != 5 {
 		t.Errorf("unexpected version: %d %v", ver, err)
 	}
 	if ver, err := v.ObjectResourceVersion(&storagetesting.TestResource{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "a"}}); err == nil || ver != 0 {
@@ -36,25 +37,29 @@ func TestObjectVersioner(t *testing.T) {
 	if err := v.UpdateObject(obj, 5); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if obj.ResourceVersion != "5" || obj.DeletionTimestamp != nil {
+	if obj.ResourceVersion != obfuscatedVersionFive || obj.DeletionTimestamp != nil {
 		t.Errorf("unexpected resource version: %#v", obj)
 	}
 }
 
 func TestEtcdParseResourceVersion(t *testing.T) {
+	v := NewAPIObjectVersioner()
+	obfuscatedVersionZero := v.etcdRVToDisplayRV(0)
+	obfuscatedVersionOne := v.etcdRVToDisplayRV(1)
+	obfuscatedVersionTen := v.etcdRVToDisplayRV(10)
 	testCases := []struct {
 		Version       string
 		ExpectVersion uint64
 		Err           bool
 	}{
 		{Version: "", ExpectVersion: 0},
-		{Version: "a", Err: true},
+		{Version: "v", Err: true},
 		{Version: " ", Err: true},
-		{Version: "1", ExpectVersion: 1},
-		{Version: "10", ExpectVersion: 10},
+		{Version: obfuscatedVersionZero, ExpectVersion: 0},
+		{Version: obfuscatedVersionOne, ExpectVersion: 1},
+		{Version: obfuscatedVersionTen, ExpectVersion: 10},
 	}
 
-	v := APIObjectVersioner{}
 	testFuncs := []func(string) (uint64, error){
 		v.ParseListResourceVersion,
 		v.ParseWatchResourceVersion,
@@ -79,10 +84,12 @@ func TestEtcdParseResourceVersion(t *testing.T) {
 }
 
 func TestCompareResourceVersion(t *testing.T) {
-	five := &storagetesting.TestResource{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "5"}}
-	six := &storagetesting.TestResource{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "6"}}
+	versioner := NewAPIObjectVersioner()
+	obfuscatedVersionFive := versioner.etcdRVToDisplayRV(5)
+	obfuscatedVersionSix := versioner.etcdRVToDisplayRV(6)
 
-	versioner := APIObjectVersioner{}
+	five := &storagetesting.TestResource{ObjectMeta: metav1.ObjectMeta{ResourceVersion: obfuscatedVersionFive}}
+	six := &storagetesting.TestResource{ObjectMeta: metav1.ObjectMeta{ResourceVersion: obfuscatedVersionSix}}
 
 	if e, a := -1, versioner.CompareResourceVersion(five, six); e != a {
 		t.Errorf("expected %v got %v", e, a)

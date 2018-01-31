@@ -63,6 +63,13 @@ const (
 	// Allow API clients to retrieve resource lists in chunks rather than
 	// all at once.
 	APIListChunking utilfeature.Feature = "APIListChunking"
+
+	// owner: @jennybuckley
+	// alpha: v1.10
+	//
+	// Stop apiserver from exposing storage backend resource versions of objects
+	// by obfuscating the value used by clients.
+	ResourceVersionObfuscation utilfeature.Feature = "ResourceVersionObfuscation"
 )
 
 func init() {
@@ -73,9 +80,10 @@ func init() {
 // To add a new feature, define a key for it above and add it here. The features will be
 // available throughout Kubernetes binaries.
 var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureSpec{
-	StreamingProxyRedirects: {Default: true, PreRelease: utilfeature.Beta},
-	AdvancedAuditing:        {Default: true, PreRelease: utilfeature.Beta},
-	APIResponseCompression:  {Default: false, PreRelease: utilfeature.Alpha},
-	Initializers:            {Default: false, PreRelease: utilfeature.Alpha},
-	APIListChunking:         {Default: true, PreRelease: utilfeature.Beta},
+	StreamingProxyRedirects:    {Default: true, PreRelease: utilfeature.Beta},
+	AdvancedAuditing:           {Default: true, PreRelease: utilfeature.Beta},
+	APIResponseCompression:     {Default: false, PreRelease: utilfeature.Alpha},
+	Initializers:               {Default: false, PreRelease: utilfeature.Alpha},
+	APIListChunking:            {Default: true, PreRelease: utilfeature.Beta},
+	ResourceVersionObfuscation: {Default: false, PreRelease: utilfeature.Alpha},
 }

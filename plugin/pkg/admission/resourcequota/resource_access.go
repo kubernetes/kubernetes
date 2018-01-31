@@ -88,7 +88,7 @@ func (e *quotaAccessor) UpdateQuotaStatus(newQuota *api.ResourceQuota) error {
 	return nil
 }
 
-var etcdVersioner = etcd.APIObjectVersioner{}
+var etcdVersioner = etcd.NewAPIObjectVersioner()
 
 // checkCache compares the passed quota against the value in the look-aside cache and returns the newer
 // if the cache is out of date, it deletes the stale entry.  This only works because of etcd resourceVersions
