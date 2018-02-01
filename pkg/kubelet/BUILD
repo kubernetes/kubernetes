@@ -65,6 +65,7 @@ go_library(
         "//pkg/kubelet/kuberuntime:go_default_library",
         "//pkg/kubelet/lifecycle:go_default_library",
         "//pkg/kubelet/metrics:go_default_library",
+        "//pkg/kubelet/metrics/collectors:go_default_library",
         "//pkg/kubelet/network:go_default_library",
         "//pkg/kubelet/pleg:go_default_library",
         "//pkg/kubelet/pod:go_default_library",
