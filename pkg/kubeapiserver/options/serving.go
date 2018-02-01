@@ -97,7 +97,7 @@ func (s *InsecureServingOptions) DefaultExternalAddress() (net.IP, error) {
 
 func (s *InsecureServingOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.IPVar(&s.BindAddress, "insecure-bind-address", s.BindAddress, ""+
-		"The IP address on which to serve the --insecure-port (set to 0.0.0.0 for all interfaces).")
+		"The IP address on which to serve the --insecure-port (set to 0.0.0.0 for all IPv4 interfaces and :: for all IPv6 interfaces).")
 	fs.MarkDeprecated("insecure-bind-address", "This flag will be removed in a future version.")
 
 	fs.IntVar(&s.BindPort, "insecure-port", s.BindPort, ""+
