@@ -926,6 +926,26 @@ func CreateClientPod(c clientset.Interface, ns string, pvc *v1.PersistentVolumeC
 	return CreatePod(c, ns, nil, []*v1.PersistentVolumeClaim{pvc}, true, "")
 }
 
+// CreateUnschedulablePod with given claims based on node selector
+func CreateUnschedulablePod(client clientset.Interface, namespace string, nodeSelector map[string]string, pvclaims []*v1.PersistentVolumeClaim, isPrivileged bool, command string) (*v1.Pod, error) {
+	pod := MakePod(namespace, nodeSelector, pvclaims, isPrivileged, command)
+	pod, err := client.CoreV1().Pods(namespace).Create(pod)
+	if err != nil {
+		return nil, fmt.Errorf("pod Create API error: %v", err)
+	}
+	// Waiting for pod to become Unschedulable
+	err = WaitForPodNameUnschedulableInNamespace(client, pod.Name, namespace)
+	if err != nil {
+		return pod, fmt.Errorf("pod %q is not Unschedulable: %v", pod.Name, err)
+	}
+	// get fresh pod info
+	pod, err = client.CoreV1().Pods(namespace).Get(pod.Name, metav1.GetOptions{})
+	if err != nil {
+		return pod, fmt.Errorf("pod Get API error: %v", err)
+	}
+	return pod, nil
+}
+
 // wait until all pvcs phase set to bound
 func WaitForPVClaimBoundPhase(client clientset.Interface, pvclaims []*v1.PersistentVolumeClaim, timeout time.Duration) ([]*v1.PersistentVolume, error) {
 	persistentvolumes := make([]*v1.PersistentVolume, len(pvclaims))

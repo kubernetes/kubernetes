@@ -1551,6 +1551,28 @@ func WaitForPodToDisappear(c clientset.Interface, ns, podName string, label labe
 	})
 }
 
+// WaitForPodNameUnschedulableInNamespace returns an error if it takes too long for the pod to become Pending
+// and have condition Status equal to Unschedulable,
+// if the pod Get api returns an error (IsNotFound or other), or if the pod failed with an unexpected reason.
+// Typically called to test that the passed-in pod is Pending and Unschedulable.
+func WaitForPodNameUnschedulableInNamespace(c clientset.Interface, podName, namespace string) error {
+	return WaitForPodCondition(c, namespace, podName, "Unschedulable", PodStartTimeout, func(pod *v1.Pod) (bool, error) {
+		// Only consider Failed pods. Successful pods will be deleted and detected in
+		// waitForPodCondition's Get call returning `IsNotFound`
+		if pod.Status.Phase == v1.PodPending {
+			for _, cond := range pod.Status.Conditions {
+				if cond.Type == v1.PodScheduled && cond.Status == v1.ConditionFalse && cond.Reason == "Unschedulable" {
+					return true, nil
+				}
+			}
+		}
+		if pod.Status.Phase == v1.PodRunning || pod.Status.Phase == v1.PodSucceeded || pod.Status.Phase == v1.PodFailed {
+			return true, fmt.Errorf("Expected pod %q in namespace %q to be in phase Pending, but got phase: %v", podName, namespace, pod.Status.Phase)
+		}
+		return false, nil
+	})
+}
+
 // WaitForService waits until the service appears (exist == true), or disappears (exist == false)
 func WaitForService(c clientset.Interface, namespace, name string, exist bool, interval, timeout time.Duration) error {
 	err := wait.PollImmediate(interval, timeout, func() (bool, error) {
@@ -5092,4 +5114,20 @@ func waitForServerPreferredNamespacedResources(d discovery.DiscoveryInterface, t
 		return nil, err
 	}
 	return resources, nil
+}
+
+// WaitForPersistentVolumeClaimDeleted waits for a PersistentVolumeClaim to be removed from the system until timeout occurs, whichever comes first.
+func WaitForPersistentVolumeClaimDeleted(c clientset.Interface, ns string, pvcName string, Poll, timeout time.Duration) error {
+	Logf("Waiting up to %v for PersistentVolumeClaim %s to be removed", timeout, pvcName)
+	for start := time.Now(); time.Since(start) < timeout; time.Sleep(Poll) {
+		_, err := c.CoreV1().PersistentVolumeClaims(ns).Get(pvcName, metav1.GetOptions{})
+		if err != nil {
+			if apierrs.IsNotFound(err) {
+				Logf("Claim %q in namespace %q doesn't exist in the system", pvcName, ns)
+				return nil
+			}
+			Logf("Failed to get claim %q in namespace %q, retrying in %v. Error: %v", pvcName, ns, Poll, err)
+		}
+	}
+	return fmt.Errorf("PersistentVolumeClaim %s is not removed from the system within %v", pvcName, timeout)
 }
