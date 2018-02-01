@@ -42,7 +42,7 @@ func WithWaitGroup(handler http.Handler, requestContextMapper apirequest.Request
 
 		if !longRunning(req, requestInfo) {
 			if err := wg.Add(1); err != nil {
-				http.Error(w, "Apisever is shutting down.", http.StatusInternalServerError)
+				http.Error(w, "apiserver is shutting down.", http.StatusInternalServerError)
 				return
 			}
 			defer wg.Done()
