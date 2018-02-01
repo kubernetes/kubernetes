@@ -137,9 +137,10 @@ func NewManager(cpuPolicyName string, reconcilePeriod time.Duration, machineInfo
 		policy = NewNonePolicy()
 	}
 
-	stateImpl := state.NewFileState(
-		path.Join(stateFileDirecory, CPUManagerStateFileName),
-		policy.Name())
+	stateImpl, err := state.NewCheckpointState(stateFileDirecory, policy.Name())
+	if err != nil {
+		return nil, fmt.Errorf("could not initialize checkpoint manager: %v", err)
+	}
 
 	manager := &manager{
 		policy:                     policy,
