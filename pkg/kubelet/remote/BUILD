@@ -53,5 +53,6 @@ go_test(
         "//pkg/kubelet/apis/cri/testing:go_default_library",
         "//pkg/kubelet/remote/fake:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
+        "//vendor/github.com/stretchr/testify/require:go_default_library",
     ],
 )
