@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
-	"path/filepath"
 	"strings"
 	"testing"
 
@@ -32,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/utils/exec"
+	fakeexec "k8s.io/utils/exec/testing"
 )
 
 var (
@@ -566,14 +566,12 @@ func restoreEnv(e map[string]string) {
 }
 
 func TestKubeletVersionCheck(t *testing.T) {
-	type T struct {
+	cases := []struct {
 		kubeletVersion string
 		k8sVersion     string
 		expectErrors   bool
 		expectWarnings bool
-	}
-
-	cases := []T{
+	}{
 		{"v1.10.2", "", false, false},              // check minimally supported version when there is no information about control plane
 		{"v1.7.3", "v1.7.8", true, false},          // too old kubelet (older than kubeadmconstants.MinimumKubeletVersion), should fail.
 		{"v1.9.0", "v1.9.5", false, false},         // kubelet within same major.minor as control plane
@@ -583,27 +581,19 @@ func TestKubeletVersionCheck(t *testing.T) {
 		{"v1.10.0", "v1.9.5", true, false},         // kubelet is newer (release) than control plane, should fail.
 	}
 
-	dir, err := ioutil.TempDir("", "test-kubelet-version-check")
-	if err != nil {
-		t.Errorf("Failed to create directory for testing GetKubeletVersion: %v", err)
-	}
-	defer os.RemoveAll(dir)
-
-	// We don't want to call real kubelet or something else in $PATH
-	oldPATH := os.Getenv("PATH")
-	defer os.Setenv("PATH", oldPATH)
-
-	os.Setenv("PATH", dir)
-
-	kubeletFn := filepath.Join(dir, "kubelet")
 	for _, tc := range cases {
-
-		content := []byte(fmt.Sprintf("#!/bin/sh\necho 'Kubernetes %s'", tc.kubeletVersion))
-		if err := ioutil.WriteFile(kubeletFn, content, 0755); err != nil {
-			t.Errorf("Error creating test stub file %s: %v", kubeletFn, err)
+		fcmd := fakeexec.FakeCmd{
+			CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
+				func() ([]byte, error) { return []byte("Kubernetes " + tc.kubeletVersion), nil },
+			},
+		}
+		fexec := &fakeexec.FakeExec{
+			CommandScript: []fakeexec.FakeCommandAction{
+				func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
+			},
 		}
 
-		check := KubeletVersionCheck{KubernetesVersion: tc.k8sVersion}
+		check := KubeletVersionCheck{KubernetesVersion: tc.k8sVersion, exec: fexec}
 		warnings, errors := check.Check()
 
 		switch {
