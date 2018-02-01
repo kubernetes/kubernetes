@@ -40,6 +40,7 @@ import (
 func AddGlobalFlags(fs *pflag.FlagSet) {
 	addGlogFlags(fs)
 	addCadvisorFlags(fs)
+	addCredentialProviderFlags(fs)
 	verflag.AddFlags(fs)
 	logs.AddFlags(fs)
 }
