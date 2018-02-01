@@ -79,7 +79,7 @@ func (ds *dockerService) updateCreateConfig(
 		createConfig.HostConfig.NetworkMode = dockercontainer.NetworkMode(networkMode)
 	} else if !shouldIsolatedByHyperV(sandboxConfig.Annotations) {
 		// Todo: Refactor this call in future for calling methods directly in security_context.go
-		modifyHostNetworkOptionForContainer(false, podSandboxID, createConfig.HostConfig)
+		modifyHostOptionsForContainer(false, podSandboxID, createConfig.HostConfig)
 	}
 
 	applyExperimentalCreateConfig(createConfig, sandboxConfig.Annotations)
