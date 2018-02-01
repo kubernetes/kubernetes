@@ -54,7 +54,7 @@ type Controller struct {
 	storageObjectInUseProtectionEnabled bool
 }
 
-// NewPVCProtectionController returns a new *{VCProtectionController.
+// NewPVCProtectionController returns a new instance of PVCProtectionController.
 func NewPVCProtectionController(pvcInformer coreinformers.PersistentVolumeClaimInformer, podInformer coreinformers.PodInformer, cl clientset.Interface, storageObjectInUseProtectionFeatureEnabled bool) *Controller {
 	e := &Controller{
 		client: cl,
