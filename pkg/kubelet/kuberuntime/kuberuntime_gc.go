@@ -336,11 +336,39 @@ func (cgc *containerGC) evictPodLogsDirectories(allSourcesReady bool) error {
 	// Remove dead container log symlinks.
 	// TODO(random-liu): Remove this after cluster logging supports CRI container log path.
 	logSymlinks, _ := osInterface.Glob(filepath.Join(legacyContainerLogsDir, fmt.Sprintf("*.%s", legacyLogSuffix)))
-	for _, logSymlink := range logSymlinks {
-		if _, err := osInterface.Stat(logSymlink); os.IsNotExist(err) {
-			err := osInterface.Remove(logSymlink)
-			if err != nil {
-				glog.Errorf("Failed to remove container log dead symlink %q: %v", logSymlink, err)
+	if cgc.manager.runtimeName == "docker" {
+		for _, logSymlink := range logSymlinks {
+			if _, err := osInterface.Stat(logSymlink); os.IsNotExist(err) {
+				firstLinkDstPath, err := os.Readlink(logSymlink)
+				if err != nil {
+					glog.Errorf("Failed to resolve legacy container log symlink %q: %v", logSymlink, err)
+					continue
+				}
+				secondLinkDstPath, err := os.Readlink(firstLinkDstPath)
+				if err != nil {
+					glog.Errorf("Failed to resolve container log symlink %q: %v", firstLinkDstPath, err)
+					continue
+				}
+				dir := filepath.Dir(secondLinkDstPath)
+				if _, err := osInterface.Stat(dir); os.IsNotExist(err) {
+					err1 := osInterface.Remove(logSymlink)
+					if err1 != nil {
+						glog.Errorf("Failed to remove legacy container log symlink %q: %v", logSymlink, err1)
+					}
+					err2 := osInterface.Remove(firstLinkDstPath)
+					if err2 != nil {
+						glog.Errorf("Failed to remove container log symlink %q: %v", firstLinkDstPath, err2)
+					}
+				}
+			}
+		}
+	} else {
+		for _, logSymlink := range logSymlinks {
+			if _, err := osInterface.Stat(logSymlink); os.IsNotExist(err) {
+				err := osInterface.Remove(logSymlink)
+				if err != nil {
+					glog.Errorf("Failed to remove container log dead symlink %q: %v", logSymlink, err)
+				}
 			}
 		}
 	}
