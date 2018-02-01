@@ -52,7 +52,7 @@ func TestCreatePdb(t *testing.T) {
 	cmd.Flags().Set("dry-run", "true")
 	cmd.Flags().Set("output", "name")
 	CreatePodDisruptionBudget(f, buf, cmd, []string{pdbName})
-	expectedOutput := "poddisruptionbudget/" + pdbName + "\n"
+	expectedOutput := "poddisruptionbudgets/" + pdbName + "\n"
 	if buf.String() != expectedOutput {
 		t.Errorf("expected output: %s, but got: %s", expectedOutput, buf.String())
 	}

@@ -165,7 +165,6 @@ func (options *CertificateOptions) RunCertificateDeny(f cmdutil.Factory, out io.
 
 func (options *CertificateOptions) modifyCertificateCondition(f cmdutil.Factory, out io.Writer, modify func(csr *certificates.CertificateSigningRequest) (*certificates.CertificateSigningRequest, string)) error {
 	var found int
-	mapper, _ := f.Object()
 	c, err := f.ClientSet()
 	if err != nil {
 		return err
@@ -192,7 +191,7 @@ func (options *CertificateOptions) modifyCertificateCondition(f cmdutil.Factory,
 			return err
 		}
 		found++
-		f.PrintSuccess(mapper, options.outputStyle == "name", out, info.Mapping.Resource, info.Name, false, verb)
+		f.PrintSuccess(options.outputStyle == "name", out, info.Mapping.Resource, info.Name, false, verb)
 		return nil
 	})
 	if found == 0 {

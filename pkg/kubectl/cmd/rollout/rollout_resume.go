@@ -45,7 +45,7 @@ type ResumeConfig struct {
 	Encoder runtime.Encoder
 	Infos   []*resource.Info
 
-	PrintSuccess func(mapper meta.RESTMapper, shortOutput bool, out io.Writer, resource, name string, dryRun bool, operation string)
+	PrintSuccess func(shortOutput bool, out io.Writer, resource, name string, dryRun bool, operation string)
 	Out          io.Writer
 }
 
@@ -150,7 +150,7 @@ func (o ResumeConfig) RunResume() error {
 		}
 
 		if string(patch.Patch) == "{}" || len(patch.Patch) == 0 {
-			o.PrintSuccess(o.Mapper, false, o.Out, info.Mapping.Resource, info.Name, false, "already resumed")
+			o.PrintSuccess(false, o.Out, info.Mapping.Resource, info.Name, false, "already resumed")
 			continue
 		}
 
@@ -161,7 +161,7 @@ func (o ResumeConfig) RunResume() error {
 		}
 
 		info.Refresh(obj, true)
-		o.PrintSuccess(o.Mapper, false, o.Out, info.Mapping.Resource, info.Name, false, "resumed")
+		o.PrintSuccess(false, o.Out, info.Mapping.Resource, info.Name, false, "resumed")
 	}
 
 	return utilerrors.NewAggregate(allErrs)

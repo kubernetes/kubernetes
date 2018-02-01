@@ -50,7 +50,7 @@ func TestCreateServiceAccount(t *testing.T) {
 	cmd := NewCmdCreateServiceAccount(f, buf)
 	cmd.Flags().Set("output", "name")
 	cmd.Run(cmd, []string{serviceAccountObject.Name})
-	expectedOutput := "serviceaccount/" + serviceAccountObject.Name + "\n"
+	expectedOutput := "serviceaccounts/" + serviceAccountObject.Name + "\n"
 	if buf.String() != expectedOutput {
 		t.Errorf("expected output: %s, but got: %s", expectedOutput, buf.String())
 	}

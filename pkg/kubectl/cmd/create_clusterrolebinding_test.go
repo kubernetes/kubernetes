@@ -107,7 +107,7 @@ func TestCreateClusterRoleBinding(t *testing.T) {
 		},
 	}
 
-	expectedOutput := "clusterrolebinding/" + expectBinding.Name + "\n"
+	expectedOutput := "clusterrolebindings/" + expectBinding.Name + "\n"
 	buf := bytes.NewBuffer([]byte{})
 	cmd := NewCmdCreateClusterRoleBinding(f, buf)
 	cmd.Flags().Set("clusterrole", "fake-clusterrole")

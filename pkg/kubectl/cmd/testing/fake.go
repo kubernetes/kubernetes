@@ -376,8 +376,7 @@ func (f *FakeFactory) PrintResourceInfoForCommand(cmd *cobra.Command, info *reso
 	return printer.PrintObj(info.Object, out)
 }
 
-func (f *FakeFactory) PrintSuccess(mapper meta.RESTMapper, shortOutput bool, out io.Writer, resource, name string, dryRun bool, operation string) {
-	resource, _ = mapper.ResourceSingularizer(resource)
+func (f *FakeFactory) PrintSuccess(shortOutput bool, out io.Writer, resource, name string, dryRun bool, operation string) {
 	dryRunMsg := ""
 	if dryRun {
 		dryRunMsg = " (dry run)"
@@ -772,8 +771,7 @@ func (f *fakeAPIFactory) PrintResourceInfoForCommand(cmd *cobra.Command, info *r
 	return printer.PrintObj(info.Object, out)
 }
 
-func (f *fakeAPIFactory) PrintSuccess(mapper meta.RESTMapper, shortOutput bool, out io.Writer, resource, name string, dryRun bool, operation string) {
-	resource, _ = mapper.ResourceSingularizer(resource)
+func (f *fakeAPIFactory) PrintSuccess(shortOutput bool, out io.Writer, resource, name string, dryRun bool, operation string) {
 	dryRunMsg := ""
 	if dryRun {
 		dryRunMsg = " (dry run)"

@@ -173,7 +173,7 @@ func RunAutoscale(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []s
 			return f.PrintObject(cmd, false, mapper, object, out)
 		}
 
-		f.PrintSuccess(mapper, false, out, info.Mapping.Resource, info.Name, cmdutil.GetDryRunFlag(cmd), "autoscaled")
+		f.PrintSuccess(false, out, info.Mapping.Resource, info.Name, cmdutil.GetDryRunFlag(cmd), "autoscaled")
 		return nil
 	})
 	if err != nil {

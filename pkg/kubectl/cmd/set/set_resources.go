@@ -80,7 +80,7 @@ type ResourcesOptions struct {
 	Requests             string
 	ResourceRequirements v1.ResourceRequirements
 
-	PrintSuccess           func(mapper meta.RESTMapper, shortOutput bool, out io.Writer, resource, name string, dryRun bool, operation string)
+	PrintSuccess           func(shortOutput bool, out io.Writer, resource, name string, dryRun bool, operation string)
 	PrintObject            func(cmd *cobra.Command, isLocal bool, mapper meta.RESTMapper, obj runtime.Object, out io.Writer) error
 	UpdatePodSpecForObject func(obj runtime.Object, fn func(*v1.PodSpec) error) (bool, error)
 	Resources              []string
@@ -269,7 +269,7 @@ func (o *ResourcesOptions) Run() error {
 			}
 			continue
 		}
-		o.PrintSuccess(o.Mapper, shortOutput, o.Out, info.Mapping.Resource, info.Name, false, "resource requirements updated")
+		o.PrintSuccess(shortOutput, o.Out, info.Mapping.Resource, info.Name, false, "resource requirements updated")
 	}
 	return utilerrors.NewAggregate(allErrs)
 }

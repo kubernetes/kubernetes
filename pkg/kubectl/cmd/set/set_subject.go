@@ -257,7 +257,7 @@ func (o *SubjectOptions) Run(f cmdutil.Factory, fn updateSubjects) error {
 		if len(o.Output) > 0 && !shortOutput {
 			return o.PrintObject(o.Mapper, info.AsVersioned(), o.Out)
 		}
-		f.PrintSuccess(o.Mapper, shortOutput, o.Out, info.Mapping.Resource, info.Name, false, "subjects updated")
+		f.PrintSuccess(shortOutput, o.Out, info.Mapping.Resource, info.Name, false, "subjects updated")
 	}
 	return utilerrors.NewAggregate(allErrs)
 }

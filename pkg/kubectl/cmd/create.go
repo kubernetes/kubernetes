@@ -185,7 +185,6 @@ func (o *CreateOptions) RunCreate(f cmdutil.Factory, cmd *cobra.Command) error {
 
 	dryRun := cmdutil.GetDryRunFlag(cmd)
 	output := cmdutil.GetFlagString(cmd, "output")
-	mapper := r.Mapper().RESTMapper
 
 	count := 0
 	err = r.Visit(func(info *resource.Info, err error) error {
@@ -218,7 +217,7 @@ func (o *CreateOptions) RunCreate(f cmdutil.Factory, cmd *cobra.Command) error {
 			f.PrintObjectSpecificMessage(info.Object, o.Out)
 		}
 
-		f.PrintSuccess(mapper, shortOutput, o.Out, info.Mapping.Resource, info.Name, dryRun, "created")
+		f.PrintSuccess(shortOutput, o.Out, info.Mapping.Resource, info.Name, dryRun, "created")
 		return nil
 	})
 	if err != nil {
@@ -357,7 +356,7 @@ func RunCreateSubcommand(f cmdutil.Factory, cmd *cobra.Command, out io.Writer, o
 	}
 
 	if useShortOutput := options.OutputFormat == "name"; useShortOutput || len(options.OutputFormat) == 0 {
-		f.PrintSuccess(mapper, useShortOutput, out, mapping.Resource, info.Name, options.DryRun, "created")
+		f.PrintSuccess(useShortOutput, out, mapping.Resource, info.Name, options.DryRun, "created")
 		return nil
 	}
 

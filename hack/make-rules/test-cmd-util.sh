@@ -3732,7 +3732,7 @@ run_cmd_with_img_tests() {
 
   # Test that a valid image reference value is provided as the value of --image in `kubectl run <name> --image`
   output_message=$(kubectl run test1 --image=validname)
-  kube::test::if_has_string "${output_message}" 'deployment "test1" created'
+  kube::test::if_has_string "${output_message}" 'deployments "test1" created'
   kubectl delete deployments test1
   # test invalid image name
   output_message=$(! kubectl run test2 --image=InvalidImageName 2>&1)
@@ -4410,7 +4410,7 @@ __EOF__
   kube::test::if_has_string "${response}" 'must provide one or more resources'
   # test=label matches our node
   response=$(kubectl cordon --selector test=label)
-  kube::test::if_has_string "${response}" 'node "127.0.0.1" cordoned'
+  kube::test::if_has_string "${response}" 'nodes "127.0.0.1" cordoned'
   # invalid=label does not match any nodes
   response=$(kubectl cordon --selector invalid=label)
   kube::test::if_has_not_string "${response}" 'cordoned'

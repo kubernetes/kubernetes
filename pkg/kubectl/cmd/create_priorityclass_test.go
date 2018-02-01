@@ -52,7 +52,7 @@ func TestCreatePriorityClass(t *testing.T) {
 	cmd.Flags().Set("dry-run", "true")
 	cmd.Flags().Set("output", "name")
 	CreatePriorityClass(f, buf, cmd, []string{pcName})
-	expectedOutput := "priorityclass/" + pcName + "\n"
+	expectedOutput := "priorityclasses/" + pcName + "\n"
 	if buf.String() != expectedOutput {
 		t.Errorf("expected output: %s, but got: %s", expectedOutput, buf.String())
 	}
