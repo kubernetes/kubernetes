@@ -32,10 +32,10 @@ type Balancer struct {
 
 // UpdateLoadBalancer updates hosts under the specified load balancer.
 func (r *Balancer) UpdateLoadBalancer(clusterName string, service *api.Service, nodes []*api.Node) error {
-	glog.Errorf("UpdateLoadBalancer(%v, %v, %v)", clusterName, service.Namespace, service.Name)
+	glog.V(4).Infof("UpdateLoadBalancer(%v, %v, %v)", clusterName, service.Namespace, service.Name)
 
 	var finalState, err = r.updateNode(clusterName, service, nodes)
-	glog.Errorf("%v: Final state: ", service.Name, finalState)
+	glog.Infof("%v: Final state: ", service.Name, finalState)
 
 	return err
 }
@@ -59,7 +59,7 @@ func (r *Balancer) getLoadBalancerNode(clusterName string, service *api.Service)
 	}
 	if len(instances.Items) > 0 {
 		node := instances.Items[0]
-		glog.Errorf("Found '%v' for '%v'", node.ID, name)
+		glog.Infof("Found '%v' for '%v'", node.ID, name)
 		return &node
 	}
 	return nil
@@ -94,7 +94,7 @@ func (r *Balancer) nodeToState(nodeInstance *cloudify.NodeInstance) (status *api
 
 		ingress = append(ingress, ingressNode)
 
-		glog.Errorf("Status %v for return: %+v", nodeInstance.ID, ingress)
+		glog.Infof("Status %v for return: %+v", nodeInstance.ID, ingress)
 		return &api.LoadBalancerStatus{ingress}
 	}
 	return nil
@@ -102,7 +102,7 @@ func (r *Balancer) nodeToState(nodeInstance *cloudify.NodeInstance) (status *api
 
 // GetLoadBalancer returns whether the specified load balancer exists, and if so, what its status is.
 func (r *Balancer) GetLoadBalancer(clusterName string, service *api.Service) (status *api.LoadBalancerStatus, exists bool, retErr error) {
-	glog.Errorf("GetLoadBalancer(%v, %v, %v)", clusterName, service.Namespace, service.Name)
+	glog.V(4).Infof("GetLoadBalancer(%v, %v, %v)", clusterName, service.Namespace, service.Name)
 
 	nodeInstance := r.getLoadBalancerNode(clusterName, service)
 	if nodeInstance != nil {
@@ -112,7 +112,7 @@ func (r *Balancer) GetLoadBalancer(clusterName string, service *api.Service) (st
 		}
 	}
 
-	glog.Errorf("No such loadbalancer: (%v, %v, %v)", clusterName, service.Namespace, service.Name)
+	glog.Infof("No such loadbalancer: (%v, %v, %v)", clusterName, service.Namespace, service.Name)
 
 	return nil, false, nil
 }
@@ -120,11 +120,11 @@ func (r *Balancer) GetLoadBalancer(clusterName string, service *api.Service) (st
 // EnsureLoadBalancerDeleted deletes the specified load balancer if it exists, returning
 // nil if the load balancer specified either didn't exist or was successfully deleted.
 func (r *Balancer) EnsureLoadBalancerDeleted(clusterName string, service *api.Service) error {
-	glog.Errorf("EnsureLoadBalancerDeleted(%v, %v, %v)", clusterName, service.Namespace, service.Name)
+	glog.V(4).Infof("EnsureLoadBalancerDeleted(%v, %v, %v)", clusterName, service.Namespace, service.Name)
 
 	nodeInstance := r.getLoadBalancerNode(clusterName, service)
 
-	glog.Errorf("Delete for node %+v", nodeInstance.ID)
+	glog.Infof("Delete for node %+v", nodeInstance.ID)
 	if nodeInstance != nil {
 		err := r.client.WaitBeforeRunExecution(r.deployment)
 		if err != nil {
@@ -146,7 +146,7 @@ func (r *Balancer) EnsureLoadBalancerDeleted(clusterName string, service *api.Se
 			return err
 		}
 
-		glog.Errorf("%v: Final status for delete(%v), last status: %v", service.Name, execution.ID, execution.Status)
+		glog.Infof("%v: Final status for delete(%v), last status: %v", service.Name, execution.ID, execution.Status)
 
 		if execution.Status == "failed" {
 			return fmt.Errorf(execution.ErrorMessage)
@@ -154,7 +154,7 @@ func (r *Balancer) EnsureLoadBalancerDeleted(clusterName string, service *api.Se
 		return nil
 	}
 
-	glog.Errorf("No such loadbalancer: (%v, %v, %v)", clusterName, service.Namespace, service.Name)
+	glog.Infof("No such loadbalancer: (%v, %v, %v)", clusterName, service.Namespace, service.Name)
 	return nil
 }
 
@@ -165,14 +165,14 @@ func (r *Balancer) createOrGetLoadBalancer(clusterName string, service *api.Serv
 	if nodeInstance != nil {
 		return nodeInstance, nil
 	}
-	glog.Errorf("No precreated nodes for %s", service.Name)
+	glog.Infof("No precreated nodes for '%s'", service.Name)
 
 	// No such loadbalancers
 	nodeInstance = r.getLoadBalancerNode("", nil)
 	if nodeInstance != nil {
 		return nodeInstance, nil
 	}
-	glog.Errorf("No empty nodes for %s", service.Name)
+	glog.Infof("No empty nodes for %s", service.Name)
 
 	var exec cloudify.ExecutionPost
 	exec.WorkflowID = "scale"
@@ -184,7 +184,7 @@ func (r *Balancer) createOrGetLoadBalancer(clusterName string, service *api.Serv
 		return nil, err
 	}
 
-	glog.Errorf("%v: Final status for scale(%v), last status: %v", service.Name, execution.ID, execution.Status)
+	glog.Infof("%v: Final status for scale(%v), last status: %v", service.Name, execution.ID, execution.Status)
 	if execution.Status == "failed" {
 		return nil, fmt.Errorf(execution.ErrorMessage)
 	}
@@ -266,7 +266,7 @@ func (r *Balancer) updateNode(clusterName string, service *api.Service, nodes []
 			return nil, err
 		}
 
-		glog.Errorf("%v: Final status for init(%v), last status: %v", service.Name, execution.ID, execution.Status)
+		glog.Infof("%v: Final status for init(%v), last status: %v", service.Name, execution.ID, execution.Status)
 		if execution.Status == "failed" {
 			return nil, fmt.Errorf(execution.ErrorMessage)
 		}
@@ -283,7 +283,7 @@ func (r *Balancer) updateNode(clusterName string, service *api.Service, nodes []
 
 // EnsureLoadBalancer creates a new load balancer, or updates the existing one. Returns the status of the balancer.
 func (r *Balancer) EnsureLoadBalancer(clusterName string, service *api.Service, nodes []*api.Node) (*api.LoadBalancerStatus, error) {
-	glog.Errorf("EnsureLoadBalancer(%v, %v, %v)", clusterName, service.Namespace, service.Name)
+	glog.V(4).Infof("EnsureLoadBalancer(%v, %v, %v)", clusterName, service.Namespace, service.Name)
 
 	return r.updateNode(clusterName, service, nodes)
 }

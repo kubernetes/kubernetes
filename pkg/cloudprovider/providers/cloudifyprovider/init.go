@@ -107,13 +107,13 @@ func (r *CloudProvider) Routes() (cloudprovider.Routes, bool) {
 
 // HasClusterID returns true if a ClusterID is required and set
 func (r *CloudProvider) HasClusterID() bool {
-	return false
+	// required by kubernetes-1.9
+	return true
 }
 
 // ScrubDNS provides an opportunity for cloud-provider-specific code to process DNS settings for pods.
 func (r *CloudProvider) ScrubDNS(nameservers, searches []string) (nsOut, srchOut []string) {
-	glog.Errorf("?ScrubDNS: Name Servers: %+v ", nameservers)
-	glog.Errorf("?ScrubDNS: Searches: %+v ", searches)
+	glog.Errorf("?ScrubDNS: Name Servers: %+v, Searches: %+v", nameservers, searches)
 	return nameservers, searches
 }
 
