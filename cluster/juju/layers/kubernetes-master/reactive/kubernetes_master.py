@@ -838,7 +838,7 @@ def is_privileged():
     """Return boolean indicating whether or not to set allow-privileged=true.
 
     """
-    privileged = hookenv.config('allow-privileged')
+    privileged = hookenv.config('allow-privileged').lower()
     if privileged == 'auto':
         return is_state('kubernetes-master.gpu.enabled')
     else:
@@ -886,7 +886,7 @@ def on_gpu_available(kube_control):
 
     """
     config = hookenv.config()
-    if config['allow-privileged'] == "false":
+    if config['allow-privileged'].lower() == "false":
         hookenv.status_set(
             'active',
             'GPUs available. Set allow-privileged="auto" to enable.'
