@@ -18,6 +18,8 @@ package app
 
 import (
 	"fmt"
+	"io/ioutil"
+	"os"
 	"reflect"
 	"runtime"
 	"strings"
@@ -408,5 +410,137 @@ func TestProcessHostnameOverrideFlag(t *testing.T) {
 				t.Fatalf("expected hostname: %s, but got: %s", tc.expectedHostname, options.config.HostnameOverride)
 			}
 		})
+	}
+}
+
+func TestConfigChange(t *testing.T) {
+	setUp := func() (*os.File, string, error) {
+		tempDir := os.TempDir()
+		file, err := ioutil.TempFile(tempDir, "kube-proxy-config-")
+		if err != nil {
+			return nil, "", fmt.Errorf("unexpected error when creating temp file: %v", err)
+		}
+
+		_, err = file.WriteString(`apiVersion: kubeproxy.config.k8s.io/v1alpha1
+bindAddress: 0.0.0.0
+clientConnection:
+  acceptContentTypes: ""
+  burst: 10
+  contentType: application/vnd.kubernetes.protobuf
+  kubeconfig: /var/lib/kube-proxy/kubeconfig.conf
+  qps: 5
+clusterCIDR: 10.244.0.0/16
+configSyncPeriod: 15m0s
+conntrack:
+  max: null
+  maxPerCore: 32768
+  min: 131072
+  tcpCloseWaitTimeout: 1h0m0s
+  tcpEstablishedTimeout: 24h0m0s
+enableProfiling: false
+healthzBindAddress: 0.0.0.0:10256
+hostnameOverride: ""
+iptables:
+  masqueradeAll: false
+  masqueradeBit: 14
+  minSyncPeriod: 0s
+  syncPeriod: 30s
+ipvs:
+  excludeCIDRs: null
+  minSyncPeriod: 0s
+  scheduler: ""
+  syncPeriod: 30s
+kind: KubeProxyConfiguration
+metricsBindAddress: 127.0.0.1:10249
+mode: ""
+nodePortAddresses: null
+oomScoreAdj: -999
+portRange: ""
+resourceContainer: /kube-proxy
+udpIdleTimeout: 250ms`)
+		if err != nil {
+			return nil, "", fmt.Errorf("unexpected error when writing content to temp kube-proxy config file: %v", err)
+		}
+
+		return file, tempDir, nil
+	}
+
+	tearDown := func(file *os.File, tempDir string) {
+		file.Close()
+		os.RemoveAll(tempDir)
+	}
+
+	testCases := []struct {
+		name        string
+		proxyServer proxyRun
+		append      bool
+		expectedErr string
+	}{
+		{
+			name:        "update config file",
+			proxyServer: new(fakeProxyServerLongRun),
+			append:      true,
+			expectedErr: "content of the proxy server's configuration file was updated",
+		},
+		{
+			name:        "fake error",
+			proxyServer: new(fakeProxyServerError),
+			expectedErr: "mocking error from ProxyServer.Run()",
+		},
+	}
+
+	for _, tc := range testCases {
+		file, tempDir, err := setUp()
+		if err != nil {
+			t.Fatalf("unexpected error when setting up environment: %v", err)
+		}
+
+		opt := NewOptions()
+		opt.ConfigFile = file.Name()
+		err = opt.Complete()
+		if err != nil {
+			t.Fatal(err)
+		}
+		opt.proxyServer = tc.proxyServer
+
+		errCh := make(chan error)
+		go func() {
+			errCh <- opt.runLoop()
+		}()
+
+		if tc.append {
+			file.WriteString("append fake content")
+		}
+
+		select {
+		case err := <-errCh:
+			if err != nil {
+				if !strings.Contains(err.Error(), tc.expectedErr) {
+					t.Errorf("[%s] Expected error containing %v, got %v", tc.name, tc.expectedErr, err)
+				}
+			}
+		case <-time.After(10 * time.Second):
+			t.Errorf("[%s] Timeout: unable to get any events or internal timeout.", tc.name)
+		}
+		tearDown(file, tempDir)
+	}
+}
+
+type fakeProxyServerLongRun struct{}
+
+// Run runs the specified ProxyServer.
+func (s *fakeProxyServerLongRun) Run() error {
+	for {
+		time.Sleep(2 * time.Second)
+	}
+}
+
+type fakeProxyServerError struct{}
+
+// Run runs the specified ProxyServer.
+func (s *fakeProxyServerError) Run() error {
+	for {
+		time.Sleep(2 * time.Second)
+		return fmt.Errorf("mocking error from ProxyServer.Run()")
 	}
 }
