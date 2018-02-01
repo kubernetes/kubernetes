@@ -647,7 +647,7 @@ function start_cloud_controller_manager {
     fi
 
     CLOUD_CTLRMGR_LOG=${LOG_DIR}/cloud-controller-manager.log
-    ${CONTROLPLANE_SUDO} "${GO_OUT}/hyperkube" alpha cloud-controller-manager \
+    ${CONTROLPLANE_SUDO} "${GO_OUT}/hyperkube" cloud-controller-manager \
       --v=${LOG_LEVEL} \
       --vmodule="${LOG_SPEC}" \
       ${node_cidr_args} \
