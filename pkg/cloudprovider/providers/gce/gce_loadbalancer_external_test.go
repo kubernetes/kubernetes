@@ -26,9 +26,10 @@ import (
 	compute "google.golang.org/api/compute/v1"
 
 	"k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestEnsureStaticIP(t *testing.T) {
@@ -242,6 +243,9 @@ func TestDeleteAddressWithWrongTier(t *testing.T) {
 	}
 }
 
+const gceProjectId = "test-project"
+const gceRegion = "test-region"
+const zone = "zone1"
 const nodeName = "test-node-1"
 const clusterName = "Test Cluster Name"
 const clusterID = "test-cluster-id"
@@ -249,8 +253,8 @@ const clusterID = "test-cluster-id"
 var apiService = &v1.Service{
 	Spec: v1.ServiceSpec{
 		SessionAffinity: v1.ServiceAffinityClientIP,
-		Type: v1.ServiceTypeClusterIP,
-		Ports: []v1.ServicePort{{Protocol: v1.ProtocolTCP, Port: int32(123)}},
+		Type:            v1.ServiceTypeClusterIP,
+		Ports:           []v1.ServicePort{{Protocol: v1.ProtocolTCP, Port: int32(123)}},
 	},
 }
 
@@ -271,10 +275,6 @@ var nodes = []*v1.Node{
 }
 
 func fakeGCECloud() (*GCECloud, error) {
-	gceProjectId := "test-project"
-	gceRegion := "test-region"
-	zone := "zone1"
-
 	client, err := newOauthClient(nil)
 	if err != nil {
 		return nil, err
@@ -296,15 +296,15 @@ func fakeGCECloud() (*GCECloud, error) {
 	zonesWithNodes := createNodeZones([]string{zone})
 
 	gce := GCECloud{
-		region:							gceRegion,
-		service:						service,
+		region:             gceRegion,
+		service:            service,
 		manager:            fakeManager,
 		managedZones:       []string{zone},
 		projectID:          gceProjectId,
 		AlphaFeatureGate:   alphaFeatureGate,
 		nodeZones:          zonesWithNodes,
 		nodeInformerSynced: func() bool { return true },
-		c:									cloud,
+		c:                  cloud,
 	}
 
 	gce.InsertInstance(
@@ -322,13 +322,11 @@ func fakeGCECloud() (*GCECloud, error) {
 }
 
 func createExternalLoadBalancer(gce *GCECloud) (*v1.LoadBalancerStatus, error) {
-	existingFwdRule := &compute.ForwardingRule{}
-
 	status, err := gce.ensureExternalLoadBalancer(
 		clusterName,
 		clusterID,
 		apiService,
-		existingFwdRule,
+		nil,
 		nodes,
 	)
 
@@ -337,11 +335,33 @@ func createExternalLoadBalancer(gce *GCECloud) (*v1.LoadBalancerStatus, error) {
 
 func TestEnsureExternalLoadBalancer(t *testing.T) {
 	gce, err := fakeGCECloud()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	status, err := createExternalLoadBalancer(gce)
-	assert.NotNil(t, status)
 	assert.NoError(t, err)
+	assert.NotEmpty(t, status.Ingress)
+
+	lbName := cloudprovider.GetLoadBalancerName(apiService)
+
+	// Check that Firewall is created
+	firewall, err := gce.GetFirewall(MakeFirewallName(lbName))
+	require.NoError(t, err)
+	assert.Equal(t, []string{nodeName}, firewall.TargetTags)
+	assert.Equal(t, []string{"0.0.0.0/0"}, firewall.SourceRanges)
+
+	// Check that TargetPool is Created
+	pool, err := gce.GetTargetPool(lbName, gceRegion)
+	require.NoError(t, err)
+	assert.Equal(t, lbName, pool.Name)
+	assert.NotEmpty(t, pool.HealthChecks)
+	assert.NotEmpty(t, pool.Instances)
+
+	// Check that ForwardingRule is created
+	fwdRule, err := gce.GetRegionForwardingRule(lbName, gceRegion)
+	require.NoError(t, err)
+	assert.Equal(t, lbName, fwdRule.Name)
+	assert.Equal(t, "TCP", fwdRule.IPProtocol)
+	assert.Equal(t, "123-123", fwdRule.PortRange)
 }
 
 func TestUpdateExternalLoadBalancer(t *testing.T) {
@@ -351,8 +371,6 @@ func TestUpdateExternalLoadBalancer(t *testing.T) {
 
 	err = gce.updateExternalLoadBalancer(clusterName, apiService, nodes)
 	assert.NoError(t, err)
-
-	// Assert pool is modified
 }
 
 func TestEnsureExternalLoadBalancerDeleted(t *testing.T) {
@@ -362,4 +380,21 @@ func TestEnsureExternalLoadBalancerDeleted(t *testing.T) {
 
 	err = gce.ensureExternalLoadBalancerDeleted(clusterName, clusterID, apiService)
 	assert.NoError(t, err)
+
+	lbName := cloudprovider.GetLoadBalancerName(apiService)
+
+	// Check that Firewall is deleted
+	firewall, err := gce.GetFirewall(MakeFirewallName(lbName))
+	require.Error(t, err)
+	assert.Nil(t, firewall)
+
+	// Check that TargetPool is deleted
+	pool, err := gce.GetTargetPool(lbName, gceRegion)
+	require.Error(t, err)
+	assert.Nil(t, pool)
+
+	// Check forwarding rule is deleted
+	fwdRule, err := gce.GetRegionForwardingRule(lbName, gceRegion)
+	require.Error(t, err)
+	assert.Nil(t, fwdRule)
 }
