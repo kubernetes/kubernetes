@@ -21,6 +21,7 @@ package util
 import (
 	"errors"
 	"fmt"
+	"net"
 	"os"
 	"reflect"
 	"sort"
@@ -96,6 +97,9 @@ func (f *ring1Factory) objectLoader() (meta.RESTMapper, runtime.ObjectTyper, err
 	// anything.  This mirrors old behavior that used to fallback to a hardcoded list of API types compiled
 	// into kubernetes.
 	if err != nil {
+		if _, ok := err.(net.Error); ok {
+			return nil, nil, err
+		}
 		glog.V(1).Infof("Unable to retrieve all API resources, continuing with partial results: %v", err)
 	}
 
