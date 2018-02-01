@@ -134,54 +134,6 @@ var (
 		},
 		[]string{"eviction_signal"},
 	)
-	VolumeStatsCapacityBytes = prometheus.NewGaugeVec(
-		prometheus.GaugeOpts{
-			Subsystem: KubeletSubsystem,
-			Name:      VolumeStatsCapacityBytesKey,
-			Help:      "Capacity in bytes of the volume",
-		},
-		[]string{"namespace", "persistentvolumeclaim"},
-	)
-	VolumeStatsAvailableBytes = prometheus.NewGaugeVec(
-		prometheus.GaugeOpts{
-			Subsystem: KubeletSubsystem,
-			Name:      VolumeStatsAvailableBytesKey,
-			Help:      "Number of available bytes in the volume",
-		},
-		[]string{"namespace", "persistentvolumeclaim"},
-	)
-	VolumeStatsUsedBytes = prometheus.NewGaugeVec(
-		prometheus.GaugeOpts{
-			Subsystem: KubeletSubsystem,
-			Name:      VolumeStatsUsedBytesKey,
-			Help:      "Number of used bytes in the volume",
-		},
-		[]string{"namespace", "persistentvolumeclaim"},
-	)
-	VolumeStatsInodes = prometheus.NewGaugeVec(
-		prometheus.GaugeOpts{
-			Subsystem: KubeletSubsystem,
-			Name:      VolumeStatsInodesKey,
-			Help:      "Maximum number of inodes in the volume",
-		},
-		[]string{"namespace", "persistentvolumeclaim"},
-	)
-	VolumeStatsInodesFree = prometheus.NewGaugeVec(
-		prometheus.GaugeOpts{
-			Subsystem: KubeletSubsystem,
-			Name:      VolumeStatsInodesFreeKey,
-			Help:      "Number of free inodes in the volume",
-		},
-		[]string{"namespace", "persistentvolumeclaim"},
-	)
-	VolumeStatsInodesUsed = prometheus.NewGaugeVec(
-		prometheus.GaugeOpts{
-			Subsystem: KubeletSubsystem,
-			Name:      VolumeStatsInodesUsedKey,
-			Help:      "Number of used inodes in the volume",
-		},
-		[]string{"namespace", "persistentvolumeclaim"},
-	)
 	DevicePluginRegistrationCount = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Subsystem: KubeletSubsystem,
@@ -203,7 +155,7 @@ var (
 var registerMetrics sync.Once
 
 // Register all metrics.
-func Register(containerCache kubecontainer.RuntimeCache) {
+func Register(containerCache kubecontainer.RuntimeCache, collectors ...prometheus.Collector) {
 	// Register the metrics.
 	registerMetrics.Do(func() {
 		prometheus.MustRegister(PodWorkerLatency)
@@ -218,14 +170,11 @@ func Register(containerCache kubecontainer.RuntimeCache) {
 		prometheus.MustRegister(RuntimeOperationsLatency)
 		prometheus.MustRegister(RuntimeOperationsErrors)
 		prometheus.MustRegister(EvictionStatsAge)
-		prometheus.MustRegister(VolumeStatsCapacityBytes)
-		prometheus.MustRegister(VolumeStatsAvailableBytes)
-		prometheus.MustRegister(VolumeStatsUsedBytes)
-		prometheus.MustRegister(VolumeStatsInodes)
-		prometheus.MustRegister(VolumeStatsInodesFree)
-		prometheus.MustRegister(VolumeStatsInodesUsed)
 		prometheus.MustRegister(DevicePluginRegistrationCount)
 		prometheus.MustRegister(DevicePluginAllocationLatency)
+		for _, collector := range collectors {
+			prometheus.MustRegister(collector)
+		}
 	})
 }
 
