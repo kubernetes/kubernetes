@@ -1,23 +1,115 @@
 <!-- BEGIN MUNGE: GENERATED_TOC -->
-- [v1.10.0-alpha.2](#v1100-alpha2)
-  - [Downloads for v1.10.0-alpha.2](#downloads-for-v1100-alpha2)
+- [v1.10.0-alpha.3](#v1100-alpha3)
+  - [Downloads for v1.10.0-alpha.3](#downloads-for-v1100-alpha3)
     - [Client Binaries](#client-binaries)
     - [Server Binaries](#server-binaries)
     - [Node Binaries](#node-binaries)
-  - [Changelog since v1.10.0-alpha.1](#changelog-since-v1100-alpha1)
-    - [Action Required](#action-required)
+  - [Changelog since v1.10.0-alpha.2](#changelog-since-v1100-alpha2)
     - [Other notable changes](#other-notable-changes)
-- [v1.10.0-alpha.1](#v1100-alpha1)
-  - [Downloads for v1.10.0-alpha.1](#downloads-for-v1100-alpha1)
+- [v1.10.0-alpha.2](#v1100-alpha2)
+  - [Downloads for v1.10.0-alpha.2](#downloads-for-v1100-alpha2)
     - [Client Binaries](#client-binaries-1)
     - [Server Binaries](#server-binaries-1)
     - [Node Binaries](#node-binaries-1)
+  - [Changelog since v1.10.0-alpha.1](#changelog-since-v1100-alpha1)
+    - [Action Required](#action-required)
+    - [Other notable changes](#other-notable-changes-1)
+- [v1.10.0-alpha.1](#v1100-alpha1)
+  - [Downloads for v1.10.0-alpha.1](#downloads-for-v1100-alpha1)
+    - [Client Binaries](#client-binaries-2)
+    - [Server Binaries](#server-binaries-2)
+    - [Node Binaries](#node-binaries-2)
   - [Changelog since v1.9.0](#changelog-since-v190)
     - [Action Required](#action-required-1)
-    - [Other notable changes](#other-notable-changes-1)
+    - [Other notable changes](#other-notable-changes-2)
 <!-- END MUNGE: GENERATED_TOC -->
 
 <!-- NEW RELEASE NOTES ENTRY -->
+
+
+# v1.10.0-alpha.3
+
+[Documentation](https://docs.k8s.io) & [Examples](https://releases.k8s.io/master/examples)
+
+## Downloads for v1.10.0-alpha.3
+
+
+filename | sha256 hash
+-------- | -----------
+[kubernetes.tar.gz](https://dl.k8s.io/v1.10.0-alpha.3/kubernetes.tar.gz) | `246f0373ccb25a243a387527b32354b69fc2211c422e71479d22bfb3a829c8fb`
+[kubernetes-src.tar.gz](https://dl.k8s.io/v1.10.0-alpha.3/kubernetes-src.tar.gz) | `f9c60bb37fb7b363c9f66d8efd8aa5a36ea2093c61317c950719b3ddc86c5e10`
+
+### Client Binaries
+
+filename | sha256 hash
+-------- | -----------
+[kubernetes-client-darwin-386.tar.gz](https://dl.k8s.io/v1.10.0-alpha.3/kubernetes-client-darwin-386.tar.gz) | `ca8dfd7fbd34478e7ba9bba3779fcca08f7efd4f218b0c8a7f52bbeea0f42cd7`
+[kubernetes-client-darwin-amd64.tar.gz](https://dl.k8s.io/v1.10.0-alpha.3/kubernetes-client-darwin-amd64.tar.gz) | `713c35d99f44bd19d225d2c9f2d7c4f3976b5dd76e9a817b2aaf68ee0cb5a939`
+[kubernetes-client-linux-386.tar.gz](https://dl.k8s.io/v1.10.0-alpha.3/kubernetes-client-linux-386.tar.gz) | `7601e55e3bb0f0fc11611c68c4bc000c3cbbb7a09652c386e482a1671be7e2d6`
+[kubernetes-client-linux-amd64.tar.gz](https://dl.k8s.io/v1.10.0-alpha.3/kubernetes-client-linux-amd64.tar.gz) | `8a6c498531c1832176e22d622008a98bac6043f05dec96747649651531ed3fd7`
+[kubernetes-client-linux-arm64.tar.gz](https://dl.k8s.io/v1.10.0-alpha.3/kubernetes-client-linux-arm64.tar.gz) | `81561820fb5a000152e9d8d94882e0ed6228025ea7973ee98173b5fc89d62a42`
+[kubernetes-client-linux-arm.tar.gz](https://dl.k8s.io/v1.10.0-alpha.3/kubernetes-client-linux-arm.tar.gz) | `6ce8c3ed253a10d78e62e000419653a29c411cd64910325b21ff3370cb0a89eb`
+[kubernetes-client-linux-ppc64le.tar.gz](https://dl.k8s.io/v1.10.0-alpha.3/kubernetes-client-linux-ppc64le.tar.gz) | `a46b42c94040767f6bbf2ce10aef36d8dbe94c0069f866a848d69b2274f8f0bc`
+[kubernetes-client-linux-s390x.tar.gz](https://dl.k8s.io/v1.10.0-alpha.3/kubernetes-client-linux-s390x.tar.gz) | `fa3e656b612277fc4c303aef95c60b58ed887e36431db23d26b536f226a23cf6`
+[kubernetes-client-windows-386.tar.gz](https://dl.k8s.io/v1.10.0-alpha.3/kubernetes-client-windows-386.tar.gz) | `832e12266495ac55cb54a999bc5ae41d42d160387b487d8b4ead577d96686b62`
+[kubernetes-client-windows-amd64.tar.gz](https://dl.k8s.io/v1.10.0-alpha.3/kubernetes-client-windows-amd64.tar.gz) | `7056a3eb5a8f9e8fa0326aa6e0bf97fc5b260447315f8ec7340be5747a16f5fd`
+
+### Server Binaries
+
+filename | sha256 hash
+-------- | -----------
+[kubernetes-server-linux-amd64.tar.gz](https://dl.k8s.io/v1.10.0-alpha.3/kubernetes-server-linux-amd64.tar.gz) | `dc8e2be2fcb6477249621fb5c813c853371a3bf8732c5cb3a6d6cab667cfa324`
+[kubernetes-server-linux-arm64.tar.gz](https://dl.k8s.io/v1.10.0-alpha.3/kubernetes-server-linux-arm64.tar.gz) | `399071ad9042a72bccd6e1aa322405c02b4a807c0b4f987d608c4c9c369979d6`
+[kubernetes-server-linux-arm.tar.gz](https://dl.k8s.io/v1.10.0-alpha.3/kubernetes-server-linux-arm.tar.gz) | `7457ad16665e331fa9224a3d61690206723721197ad9760c3b488de9602293f5`
+[kubernetes-server-linux-ppc64le.tar.gz](https://dl.k8s.io/v1.10.0-alpha.3/kubernetes-server-linux-ppc64le.tar.gz) | `ffcb728d879c0347bd751c9bccac3520bb057d203ba1acd55f8c727295282049`
+[kubernetes-server-linux-s390x.tar.gz](https://dl.k8s.io/v1.10.0-alpha.3/kubernetes-server-linux-s390x.tar.gz) | `f942f6e15886a1fb0d91d04adf47677068c56070dff060f38c371c3ee3e99648`
+
+### Node Binaries
+
+filename | sha256 hash
+-------- | -----------
+[kubernetes-node-linux-amd64.tar.gz](https://dl.k8s.io/v1.10.0-alpha.3/kubernetes-node-linux-amd64.tar.gz) | `81b22beb30be9d270016c7b35b86ea585f29c0c5f09128da9341f9f67c8865f9`
+[kubernetes-node-linux-arm64.tar.gz](https://dl.k8s.io/v1.10.0-alpha.3/kubernetes-node-linux-arm64.tar.gz) | `d9020b99c145f44c519b1a95b55ed24e69d9c679a02352c7e05e86042daca9d1`
+[kubernetes-node-linux-arm.tar.gz](https://dl.k8s.io/v1.10.0-alpha.3/kubernetes-node-linux-arm.tar.gz) | `1d10bee4ed62d70b318f5703b2cd8295a08e199f810d6b361f367907e3f01fb6`
+[kubernetes-node-linux-ppc64le.tar.gz](https://dl.k8s.io/v1.10.0-alpha.3/kubernetes-node-linux-ppc64le.tar.gz) | `67cd4dde212abda37e6f9e6dee1bb59db96e0727100ef0aa561c15562df0f3e1`
+[kubernetes-node-linux-s390x.tar.gz](https://dl.k8s.io/v1.10.0-alpha.3/kubernetes-node-linux-s390x.tar.gz) | `362b030e011ea6222b1f2dec62311d3971bcce4dba94997963e2a091efbf967b`
+[kubernetes-node-windows-amd64.tar.gz](https://dl.k8s.io/v1.10.0-alpha.3/kubernetes-node-windows-amd64.tar.gz) | `e609a2b0410acbb64d3ee6d7f134d98723d82d05bdbead1eaafd3584d3e45c39`
+
+## Changelog since v1.10.0-alpha.2
+
+### Other notable changes
+
+* Fixed issue with kubernetes-worker option allow-privileged not properly handling the value True with a capital T. ([#59116](https://github.com/kubernetes/kubernetes/pull/59116), [@hyperbolic2346](https://github.com/hyperbolic2346))
+* Added anti-affinity to kube-dns pods ([#57683](https://github.com/kubernetes/kubernetes/pull/57683), [@vainu-arto](https://github.com/vainu-arto))
+* cloudprovider/openstack: fix bug the tries to use octavia client to query flip ([#59075](https://github.com/kubernetes/kubernetes/pull/59075), [@jrperritt](https://github.com/jrperritt))
+* Windows containers now support experimental Hyper-V isolation by setting annotation `experimental.windows.kubernetes.io/isolation-type=hyperv` and feature gates HyperVContainer. Only one container per pod is supported yet. ([#58751](https://github.com/kubernetes/kubernetes/pull/58751), [@feiskyer](https://github.com/feiskyer))
+* `crds` is added as a shortname for CustomResourceDefinition i.e. `kubectl get crds` can now be used. ([#59061](https://github.com/kubernetes/kubernetes/pull/59061), [@nikhita](https://github.com/nikhita))
+* Fix an issue where port forwarding doesn't forward local TCP6 ports to the pod ([#57457](https://github.com/kubernetes/kubernetes/pull/57457), [@vfreex](https://github.com/vfreex))
+* YAMLDecoder Read now tracks rest of buffer on io.ErrShortBuffer ([#58817](https://github.com/kubernetes/kubernetes/pull/58817), [@karlhungus](https://github.com/karlhungus))
+* Prevent kubelet from getting wedged if initialization of modules returns an error. ([#59020](https://github.com/kubernetes/kubernetes/pull/59020), [@brendandburns](https://github.com/brendandburns))
+* Fixed a race condition inside kubernetes-worker that would result in a temporary error situation. ([#59005](https://github.com/kubernetes/kubernetes/pull/59005), [@hyperbolic2346](https://github.com/hyperbolic2346))
+* [GCE] Apiserver uses `InternalIP` as the most preferred kubelet address type by default. ([#59019](https://github.com/kubernetes/kubernetes/pull/59019), [@MrHohn](https://github.com/MrHohn))
+* Deprecate insecure flags `--insecure-bind-address`, `--insecure-port` and remove  `--public-address-override`. ([#59018](https://github.com/kubernetes/kubernetes/pull/59018), [@hzxuzhonghu](https://github.com/hzxuzhonghu))
+* Support GetLabelsForVolume in OpenStack Provider ([#58871](https://github.com/kubernetes/kubernetes/pull/58871), [@edisonxiang](https://github.com/edisonxiang))
+* Build using go1.9.3. ([#59012](https://github.com/kubernetes/kubernetes/pull/59012), [@ixdy](https://github.com/ixdy))
+* CRI: Add a call to reopen log file for a container.  ([#58899](https://github.com/kubernetes/kubernetes/pull/58899), [@yujuhong](https://github.com/yujuhong))
+* The alpha KubeletConfigFile feature gate has been removed, because it was redundant with the Kubelet's --config flag. It is no longer necessary to set this gate to use the flag. The --config flag is still considered alpha. ([#58978](https://github.com/kubernetes/kubernetes/pull/58978), [@mtaufen](https://github.com/mtaufen))
+* `kubectl scale` can now scale any resource (kube, CRD, aggregate) conforming to the standard scale endpoint ([#58298](https://github.com/kubernetes/kubernetes/pull/58298), [@p0lyn0mial](https://github.com/p0lyn0mial))
+* kube-apiserver flag --tls-ca-file has had no effect for some time.  It is now deprecated and slated for removal in 1.11.  If you are specifying this flag, you must remove it from your launch config before ugprading to 1.11. ([#58968](https://github.com/kubernetes/kubernetes/pull/58968), [@deads2k](https://github.com/deads2k))
+* Fix regression in the CRI: do not add a default hostname on short image names ([#58955](https://github.com/kubernetes/kubernetes/pull/58955), [@runcom](https://github.com/runcom))
+* Get windows kernel version directly from registry ([#58498](https://github.com/kubernetes/kubernetes/pull/58498), [@feiskyer](https://github.com/feiskyer))
+* Remove deprecated --require-kubeconfig flag, remove default --kubeconfig value ([#58367](https://github.com/kubernetes/kubernetes/pull/58367), [@zhangxiaoyu-zidif](https://github.com/zhangxiaoyu-zidif))
+* Google Cloud Service Account email addresses can now be used in RBAC ([#58141](https://github.com/kubernetes/kubernetes/pull/58141), [@ahmetb](https://github.com/ahmetb))
+    * Role bindings since the default scopes now include the "userinfo.email"
+    * scope. This is a breaking change if the numeric uniqueIDs of the Google
+    * service accounts were being used in RBAC role bindings. The behavior
+    * can be overridden by explicitly specifying the scope values as
+    * comma-separated string in the "users[*].config.scopes" field in the
+    * KUBECONFIG file.
+* kube-apiserver is changed to use SSH tunnels for webhook iff the webhook is not directly routable from apiserver's network environment. ([#58644](https://github.com/kubernetes/kubernetes/pull/58644), [@yguo0905](https://github.com/yguo0905))
+* Updated priority of mirror pod according to PriorityClassName. ([#58485](https://github.com/kubernetes/kubernetes/pull/58485), [@k82cn](https://github.com/k82cn))
+* Fixes a bug where kubelet crashes trying to free memory under memory pressure ([#58574](https://github.com/kubernetes/kubernetes/pull/58574), [@yastij](https://github.com/yastij))
+
 
 
 # v1.10.0-alpha.2
