@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package util
+package conntrack
 
 import (
 	"fmt"
@@ -22,20 +22,28 @@ import (
 	"strconv"
 	"strings"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/utils/exec"
 )
 
 // Utilities for dealing with conntrack
 
+// NoConnectionToDelete is the error string returned by conntrack when no matching connections are found
 const NoConnectionToDelete = "0 flow entries have been deleted"
 
+// IsIPv6 returns true if the given ip address is a valid ipv6 address
 func IsIPv6(netIP net.IP) bool {
 	return netIP != nil && netIP.To4() == nil
 }
 
+// IsIPv6String returns true if the given string is a valid ipv6 address
 func IsIPv6String(ip string) bool {
 	netIP := net.ParseIP(ip)
 	return IsIPv6(netIP)
+}
+
+func protoStr(proto v1.Protocol) string {
+	return strings.ToLower(string(proto))
 }
 
 func parametersWithFamily(isIPv6 bool, parameters ...string) []string {
@@ -45,11 +53,11 @@ func parametersWithFamily(isIPv6 bool, parameters ...string) []string {
 	return parameters
 }
 
-// ClearUDPConntrackForIP uses the conntrack tool to delete the conntrack entries
+// ClearEntriesForIP uses the conntrack tool to delete the conntrack entries
 // for the UDP connections specified by the given service IP
-func ClearUDPConntrackForIP(execer exec.Interface, ip string) error {
-	parameters := parametersWithFamily(IsIPv6String(ip), "-D", "--orig-dst", ip, "-p", "udp")
-	err := ExecConntrackTool(execer, parameters...)
+func ClearEntriesForIP(execer exec.Interface, ip string, protocol v1.Protocol) error {
+	parameters := parametersWithFamily(IsIPv6String(ip), "-D", "--orig-dst", ip, "-p", protoStr(protocol))
+	err := Exec(execer, parameters...)
 	if err != nil && !strings.Contains(err.Error(), NoConnectionToDelete) {
 		// TODO: Better handling for deletion failure. When failure occur, stale udp connection may not get flushed.
 		// These stale udp connection will keep black hole traffic. Making this a best effort operation for now, since it
@@ -59,8 +67,8 @@ func ClearUDPConntrackForIP(execer exec.Interface, ip string) error {
 	return nil
 }
 
-// ExecConntrackTool executes the conntrack tool using the given parameters
-func ExecConntrackTool(execer exec.Interface, parameters ...string) error {
+// Exec executes the conntrack tool using the given parameters
+func Exec(execer exec.Interface, parameters ...string) error {
 	conntrackPath, err := execer.LookPath("conntrack")
 	if err != nil {
 		return fmt.Errorf("error looking for path of conntrack: %v", err)
@@ -72,29 +80,36 @@ func ExecConntrackTool(execer exec.Interface, parameters ...string) error {
 	return nil
 }
 
-// ClearUDPConntrackForPort uses the conntrack tool to delete the conntrack entries
-// for the UDP connections specified by the port.
+// Exists returns true if conntrack binary is installed.
+func Exists(execer exec.Interface) bool {
+	_, err := execer.LookPath("conntrack")
+	return err == nil
+}
+
+// ClearEntriesForPort uses the conntrack tool to delete the conntrack entries
+// for connections specified by the port.
 // When a packet arrives, it will not go through NAT table again, because it is not "the first" packet.
 // The solution is clearing the conntrack. Known issues:
 // https://github.com/docker/docker/issues/8795
 // https://github.com/kubernetes/kubernetes/issues/31983
-func ClearUDPConntrackForPort(execer exec.Interface, port int, isIPv6 bool) error {
+func ClearEntriesForPort(execer exec.Interface, port int, isIPv6 bool, protocol v1.Protocol) error {
 	if port <= 0 {
 		return fmt.Errorf("Wrong port number. The port number must be greater than zero")
 	}
-	parameters := parametersWithFamily(isIPv6, "-D", "-p", "udp", "--dport", strconv.Itoa(port))
-	err := ExecConntrackTool(execer, parameters...)
+	parameters := parametersWithFamily(isIPv6, "-D", "-p", protoStr(protocol), "--dport", strconv.Itoa(port))
+	err := Exec(execer, parameters...)
 	if err != nil && !strings.Contains(err.Error(), NoConnectionToDelete) {
 		return fmt.Errorf("error deleting conntrack entries for UDP port: %d, error: %v", port, err)
 	}
 	return nil
 }
 
-// ClearUDPConntrackForPeers uses the conntrack tool to delete the conntrack entries
-// for the UDP connections specified by the {origin, dest} IP pair.
-func ClearUDPConntrackForPeers(execer exec.Interface, origin, dest string) error {
-	parameters := parametersWithFamily(IsIPv6String(origin), "-D", "--orig-dst", origin, "--dst-nat", dest, "-p", "udp")
-	err := ExecConntrackTool(execer, parameters...)
+// ClearEntriesForNAT uses the conntrack tool to delete the conntrack entries
+// for connections specified by the {origin, dest} IP pair.
+func ClearEntriesForNAT(execer exec.Interface, origin, dest string, protocol v1.Protocol) error {
+	parameters := parametersWithFamily(IsIPv6String(origin), "-D", "--orig-dst", origin, "--dst-nat", dest,
+		"-p", protoStr(protocol))
+	err := Exec(execer, parameters...)
 	if err != nil && !strings.Contains(err.Error(), NoConnectionToDelete) {
 		// TODO: Better handling for deletion failure. When failure occur, stale udp connection may not get flushed.
 		// These stale udp connection will keep black hole traffic. Making this a best effort operation for now, since it
