@@ -278,9 +278,11 @@ func makePodSourceConfig(kubeCfg *kubeletconfiginternal.KubeletConfiguration, ku
 	// Restore from the checkpoint path
 	// NOTE: This MUST happen before creating the apiserver source
 	// below, or the checkpoint would override the source of truth.
-	updatechannel := cfg.Channel(kubetypes.ApiserverSource)
+
+	var updatechannel chan<- interface{}
 	if bootstrapCheckpointPath != "" {
 		glog.Infof("Adding checkpoint path: %v", bootstrapCheckpointPath)
+		updatechannel = cfg.Channel(kubetypes.ApiserverSource)
 		err := cfg.Restore(bootstrapCheckpointPath, updatechannel)
 		if err != nil {
 			return nil, err
@@ -289,6 +291,9 @@ func makePodSourceConfig(kubeCfg *kubeletconfiginternal.KubeletConfiguration, ku
 
 	if kubeDeps.KubeClient != nil {
 		glog.Infof("Watching apiserver")
+		if updatechannel == nil {
+			updatechannel = cfg.Channel(kubetypes.ApiserverSource)
+		}
 		config.NewSourceApiserver(kubeDeps.KubeClient, nodeName, updatechannel)
 	}
 	return cfg, nil
