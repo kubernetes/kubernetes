@@ -3158,6 +3158,7 @@ func autoConvert_v1_PersistentVolumeClaimSpec_To_core_PersistentVolumeClaimSpec(
 	out.VolumeName = in.VolumeName
 	out.StorageClassName = (*string)(unsafe.Pointer(in.StorageClassName))
 	out.VolumeMode = (*core.PersistentVolumeMode)(unsafe.Pointer(in.VolumeMode))
+	out.UserID = in.UserID
 	return nil
 }
 
@@ -3175,6 +3176,7 @@ func autoConvert_core_PersistentVolumeClaimSpec_To_v1_PersistentVolumeClaimSpec(
 	out.VolumeName = in.VolumeName
 	out.StorageClassName = (*string)(unsafe.Pointer(in.StorageClassName))
 	out.VolumeMode = (*v1.PersistentVolumeMode)(unsafe.Pointer(in.VolumeMode))
+	out.UserID = in.UserID
 	return nil
 }
 
@@ -3346,6 +3348,7 @@ func autoConvert_v1_PersistentVolumeSpec_To_core_PersistentVolumeSpec(in *v1.Per
 	out.StorageClassName = in.StorageClassName
 	out.MountOptions = *(*[]string)(unsafe.Pointer(&in.MountOptions))
 	out.VolumeMode = (*core.PersistentVolumeMode)(unsafe.Pointer(in.VolumeMode))
+	out.UserID = in.UserID
 	return nil
 }
 
@@ -3365,6 +3368,7 @@ func autoConvert_core_PersistentVolumeSpec_To_v1_PersistentVolumeSpec(in *core.P
 	out.StorageClassName = in.StorageClassName
 	out.MountOptions = *(*[]string)(unsafe.Pointer(&in.MountOptions))
 	out.VolumeMode = (*v1.PersistentVolumeMode)(unsafe.Pointer(in.VolumeMode))
+	out.UserID = in.UserID
 	return nil
 }
 

@@ -697,6 +697,13 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_persistentvolumemode">v1.PersistentVolumeMode</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">userID</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">UserID is a user defined at the storage backend, this user ID will be used for all PV related operations along with the authentication key stored in the corresponding Secret object.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
 </tbody>
 </table>
 
@@ -4209,6 +4216,13 @@ Examples:<br>
 <td class="tableblock halign-left valign-top"><p class="tableblock">volumeMode defines if a volume is intended to be used with a formatted filesystem or to remain in raw block state. Value of Filesystem is implied when not included in spec. This is an alpha feature and may change in the future.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_persistentvolumemode">v1.PersistentVolumeMode</a></p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">userID</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">UserID is a user defined at the storage backend, this user ID will be used for all PV related operations along with the authentication key stored in the corresponding Secret object.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 </tbody>

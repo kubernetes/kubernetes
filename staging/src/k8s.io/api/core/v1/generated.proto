@@ -2374,6 +2374,12 @@ message PersistentVolumeClaimSpec {
   // This is an alpha feature and may change in the future.
   // +optional
   optional string volumeMode = 6;
+
+  // UserID is a user defined at the storage backend, this user ID will be used for
+  // all PV related operations along with the authentication key stored in the corresponding
+  // Secret object.
+  // +optional
+  optional string userID = 7;
 }
 
 // PersistentVolumeClaimStatus is the current status of a persistent volume claim.
@@ -2578,6 +2584,12 @@ message PersistentVolumeSpec {
   // This is an alpha feature and may change in the future.
   // +optional
   optional string volumeMode = 8;
+
+  // UserID is a user defined at the storage backend, this user ID will be used for
+  // all PV related operations along with the authentication key stored in the corresponding
+  // Secret object.
+  // +optional
+  optional string userID = 9;
 }
 
 // PersistentVolumeStatus is the current status of a persistent volume.

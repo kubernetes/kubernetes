@@ -54,6 +54,7 @@ func autoConvert_v1_StorageClass_To_storage_StorageClass(in *v1.StorageClass, ou
 	out.MountOptions = *(*[]string)(unsafe.Pointer(&in.MountOptions))
 	out.AllowVolumeExpansion = (*bool)(unsafe.Pointer(in.AllowVolumeExpansion))
 	out.VolumeBindingMode = (*storage.VolumeBindingMode)(unsafe.Pointer(in.VolumeBindingMode))
+	out.SecretRefs = *(*map[string]core.SecretReference)(unsafe.Pointer(&in.SecretRefs))
 	return nil
 }
 
@@ -69,6 +70,7 @@ func autoConvert_storage_StorageClass_To_v1_StorageClass(in *storage.StorageClas
 	out.ReclaimPolicy = (*core_v1.PersistentVolumeReclaimPolicy)(unsafe.Pointer(in.ReclaimPolicy))
 	out.MountOptions = *(*[]string)(unsafe.Pointer(&in.MountOptions))
 	out.AllowVolumeExpansion = (*bool)(unsafe.Pointer(in.AllowVolumeExpansion))
+	out.SecretRefs = *(*map[string]core_v1.SecretReference)(unsafe.Pointer(&in.SecretRefs))
 	out.VolumeBindingMode = (*v1.VolumeBindingMode)(unsafe.Pointer(in.VolumeBindingMode))
 	return nil
 }
@@ -80,7 +82,17 @@ func Convert_storage_StorageClass_To_v1_StorageClass(in *storage.StorageClass, o
 
 func autoConvert_v1_StorageClassList_To_storage_StorageClassList(in *v1.StorageClassList, out *storage.StorageClassList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]storage.StorageClass)(unsafe.Pointer(&in.Items))
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]storage.StorageClass, len(*in))
+		for i := range *in {
+			if err := Convert_v1_StorageClass_To_storage_StorageClass(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 
@@ -91,7 +103,17 @@ func Convert_v1_StorageClassList_To_storage_StorageClassList(in *v1.StorageClass
 
 func autoConvert_storage_StorageClassList_To_v1_StorageClassList(in *storage.StorageClassList, out *v1.StorageClassList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]v1.StorageClass)(unsafe.Pointer(&in.Items))
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]v1.StorageClass, len(*in))
+		for i := range *in {
+			if err := Convert_storage_StorageClass_To_v1_StorageClass(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 

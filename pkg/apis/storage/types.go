@@ -66,6 +66,12 @@ type StorageClass struct {
 	// +optional
 	AllowVolumeExpansion *bool
 
+	// Secrets for authentication and authorization against a storage backend,
+	// which is described by the StorageClass object. CredentialID is the key, to
+	// select corresponding Secret.
+	// +optional
+	SecretRefs map[string]api.SecretReference
+
 	// VolumeBindingMode indicates how PersistentVolumeClaims should be
 	// provisioned and bound.  When unset, VolumeBindingImmediate is used.
 	// This field is alpha-level and is only honored by servers that enable

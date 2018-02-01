@@ -21,6 +21,7 @@ syntax = 'proto2';
 
 package k8s.io.api.storage.v1;
 
+import "k8s.io/api/core/v1/generated.proto";
 import "k8s.io/api/storage/v1beta1/generated.proto";
 import "k8s.io/apimachinery/pkg/apis/meta/v1/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/generated.proto";
@@ -70,6 +71,12 @@ message StorageClass {
   // the VolumeScheduling feature.
   // +optional
   optional string volumeBindingMode = 7;
+
+  // Secrets for authentication and authorization against a storage backend,
+  // which is described by the StorageClass object. CredentialID is the key, to
+  // select corresponding SecretRef
+  // +optional
+  map<string, k8s.io.api.core.v1.SecretReference> secretRefs = 8;
 }
 
 // StorageClassList is a collection of storage classes.

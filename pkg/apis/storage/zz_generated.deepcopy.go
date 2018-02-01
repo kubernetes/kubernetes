@@ -60,6 +60,13 @@ func (in *StorageClass) DeepCopyInto(out *StorageClass) {
 			**out = **in
 		}
 	}
+	if in.SecretRefs != nil {
+		in, out := &in.SecretRefs, &out.SecretRefs
+		*out = make(map[string]core.SecretReference, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
 	if in.VolumeBindingMode != nil {
 		in, out := &in.VolumeBindingMode, &out.VolumeBindingMode
 		if *in == nil {

@@ -9341,6 +9341,10 @@
      "volumeMode": {
       "$ref": "v1.PersistentVolumeMode",
       "description": "volumeMode defines what type of volume is required by the claim. Value of Filesystem is implied when not included in claim spec. This is an alpha feature and may change in the future."
+     },
+     "userID": {
+      "type": "string",
+      "description": "UserID is a user defined at the storage backend, this user ID will be used for all PV related operations along with the authentication key stored in the corresponding Secret object."
      }
     }
    },

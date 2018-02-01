@@ -66,6 +66,12 @@ type StorageClass struct {
 	// the VolumeScheduling feature.
 	// +optional
 	VolumeBindingMode *VolumeBindingMode `json:"volumeBindingMode,omitempty" protobuf:"bytes,7,opt,name=volumeBindingMode"`
+
+	// Secrets for authentication and authorization against a storage backend,
+	// which is described by the StorageClass object. CredentialID is the key, to
+	// select corresponding SecretRef
+	// +optional
+	SecretRefs map[string]v1.SecretReference `json:"secretRefs,omitempty" protobuf:"bytes,8,rep,name=secretRefs"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

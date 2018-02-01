@@ -69,6 +69,13 @@ func (in *StorageClass) DeepCopyInto(out *StorageClass) {
 			**out = **in
 		}
 	}
+	if in.SecretRefs != nil {
+		in, out := &in.SecretRefs, &out.SecretRefs
+		*out = make(map[string]v1.SecretReference, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
 	return
 }
 
