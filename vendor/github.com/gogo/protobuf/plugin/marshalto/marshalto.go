@@ -122,7 +122,7 @@ This is followed by calling the MarshalTo method which requires a preallocated b
 The MarshalTo method allows a user to rather preallocated a reusable buffer.
 
 The Size method is generated using the size plugin and the gogoproto.sizer, gogoproto.sizer_all extensions.
-The user can also using the generated Size method to check that his reusable buffer is still big enough.
+The user can also using the generated Size method to check that their reusable buffer is still big enough.
 
 The generated tests and benchmarks will keep you safe and show that this is really a significant speed improvement.
 

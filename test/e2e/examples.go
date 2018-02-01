@@ -470,7 +470,7 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 	})
 
 	framework.KubeDescribe("Downward API", func() {
-		It("should create a pod that prints his name and namespace", func() {
+		It("should create a pod that prints it's name and namespace", func() {
 			mkpath := func(file string) string {
 				path := filepath.Join("test/fixtures/doc-yaml/user-guide/downward-api", file)
 				framework.ExpectNoError(createFileForGoBinData(path, path))

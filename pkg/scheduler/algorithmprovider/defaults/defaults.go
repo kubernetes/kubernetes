@@ -56,7 +56,7 @@ func init() {
 	// For example:
 	// https://github.com/kubernetes/kubernetes/blob/36a218e/plugin/pkg/scheduler/factory/factory.go#L422
 
-	// Registers predicates and priorities that are not enabled by default, but user can pick when creating his
+	// Registers predicates and priorities that are not enabled by default, but user can pick when creating their
 	// own set of priorities/predicates.
 
 	// PodFitsPorts has been replaced by PodFitsHostPorts for better user understanding.
