@@ -18,7 +18,6 @@ Requires: ebtables
 The node agent of Kubernetes, the container cluster manager.
 
 %install
-
 install -m 755 -d %{buildroot}%{_bindir}
 install -m 755 -d %{buildroot}%{_sysconfdir}/systemd/system/
 install -m 755 -d %{buildroot}%{_sysconfdir}/kubernetes/manifests/
