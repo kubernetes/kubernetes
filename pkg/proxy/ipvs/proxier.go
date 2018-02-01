@@ -51,6 +51,8 @@ import (
 	utilipvs "k8s.io/kubernetes/pkg/util/ipvs"
 	utilsysctl "k8s.io/kubernetes/pkg/util/sysctl"
 	utilexec "k8s.io/utils/exec"
+
+	"golang.org/x/sys/unix"
 )
 
 const (
@@ -1702,8 +1704,9 @@ func (proxier *Proxier) cleanLegacyService(atciveServices map[string]bool, curre
 
 	for _, addr := range unbindIPAddr.UnsortedList() {
 		err := proxier.netlinkHandle.UnbindAddress(addr, DefaultDummyDevice)
-		if err != nil {
-			glog.Errorf("Failed to unbind service from dummy interface, error: %v", err)
+		// Ignore no such address error when try to unbind address
+		if err != nil && err != unix.ENXIO {
+			glog.Errorf("Failed to unbind service addr %s from dummy interface %s: %v", addr, DefaultDummyDevice, err)
 		}
 	}
 }
