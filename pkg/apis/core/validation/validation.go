@@ -202,10 +202,6 @@ func ValidateEndpointsSpecificAnnotations(annotations map[string]string, fldPath
 	return allErrs
 }
 
-func ValidateOwnerReferences(ownerReferences []metav1.OwnerReference, fldPath *field.Path) field.ErrorList {
-	return apimachineryvalidation.ValidateOwnerReferences(ownerReferences, fldPath)
-}
-
 // ValidateNameFunc validates that the provided name is valid for a given resource type.
 // Not all resources have the same validation rules for names. Prefix is true
 // if the name will have a value appended to it.  If the name is not valid,
@@ -283,11 +279,6 @@ func NameIsDNSSubdomain(name string, prefix bool) []string {
 	return apimachineryvalidation.NameIsDNSSubdomain(name, prefix)
 }
 
-// NameIsDNSLabel is a ValidateNameFunc for names that must be a DNS 1123 label.
-func NameIsDNSLabel(name string, prefix bool) []string {
-	return apimachineryvalidation.NameIsDNSLabel(name, prefix)
-}
-
 // NameIsDNS1035Label is a ValidateNameFunc for names that must be a DNS 952 label.
 func NameIsDNS1035Label(name string, prefix bool) []string {
 	return apimachineryvalidation.NameIsDNS1035Label(name, prefix)
@@ -351,10 +342,6 @@ func ValidateObjectMetaUpdate(newMeta, oldMeta *metav1.ObjectMeta, fldPath *fiel
 	}
 
 	return allErrs
-}
-
-func ValidateNoNewFinalizers(newFinalizers []string, oldFinalizers []string, fldPath *field.Path) field.ErrorList {
-	return apimachineryvalidation.ValidateNoNewFinalizers(newFinalizers, oldFinalizers, fldPath)
 }
 
 func ValidateVolumes(volumes []core.Volume, fldPath *field.Path) (map[string]core.VolumeSource, field.ErrorList) {
