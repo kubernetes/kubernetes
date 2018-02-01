@@ -52,6 +52,9 @@ import (
 
 var _ = utils.SIGDescribe("Volume Disk Format [Feature:vsphere]", func() {
 	f := framework.NewDefaultFramework("volume-disk-format")
+	const (
+		NodeLabelKey = "vsphere_e2e_label_volume_diskformat"
+	)
 	var (
 		client            clientset.Interface
 		namespace         string
@@ -73,15 +76,15 @@ var _ = utils.SIGDescribe("Volume Disk Format [Feature:vsphere]", func() {
 		if !isNodeLabeled {
 			nodeLabelValue = "vsphere_e2e_" + string(uuid.NewUUID())
 			nodeKeyValueLabel = make(map[string]string)
-			nodeKeyValueLabel["vsphere_e2e_label"] = nodeLabelValue
-			framework.AddOrUpdateLabelOnNode(client, nodeName, "vsphere_e2e_label", nodeLabelValue)
+			nodeKeyValueLabel[NodeLabelKey] = nodeLabelValue
+			framework.AddOrUpdateLabelOnNode(client, nodeName, NodeLabelKey, nodeLabelValue)
 			isNodeLabeled = true
 		}
 	})
 	framework.AddCleanupAction(func() {
 		// Cleanup actions will be called even when the tests are skipped and leaves namespace unset.
 		if len(namespace) > 0 && len(nodeLabelValue) > 0 {
-			framework.RemoveLabelOffNode(client, nodeName, "vsphere_e2e_label")
+			framework.RemoveLabelOffNode(client, nodeName, NodeLabelKey)
 		}
 	})
 
