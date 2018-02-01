@@ -234,6 +234,8 @@ func TestCheckOpenStackOpts(t *testing.T) {
 					FloatingNetworkId:    "38b8b5f9-64dc-4424-bf86-679595714786",
 					LBMethod:             "ROUND_ROBIN",
 					CreateMonitor:        true,
+					MonitorTimeout:       timeout,
+					MonitorMaxRetries:    uint(3),
 					ManageSecurityGroups: true,
 				},
 				metadataOpts: MetadataOpts{
@@ -272,6 +274,46 @@ func TestCheckOpenStackOpts(t *testing.T) {
 			},
 			expectedError: fmt.Errorf("invalid element %q found in section [Metadata] with key `search-order`."+
 				"Supported elements include %q and %q", "value1", configDriveID, metadataID),
+		},
+		{
+			name: "test7",
+			openstackOpts: &OpenStack{
+				provider: nil,
+				lbOpts: LoadBalancerOpts{
+					LBVersion:            "v2",
+					SubnetId:             "6261548e-ffde-4bc7-bd22-59c83578c5ef",
+					FloatingNetworkId:    "38b8b5f9-64dc-4424-bf86-679595714786",
+					LBMethod:             "ROUND_ROBIN",
+					CreateMonitor:        true,
+					MonitorDelay:         delay,
+					MonitorTimeout:       timeout,
+					ManageSecurityGroups: true,
+				},
+				metadataOpts: MetadataOpts{
+					SearchOrder: configDriveID,
+				},
+			},
+			expectedError: fmt.Errorf("monitor-max-retries not set in cloud provider config"),
+		},
+		{
+			name: "test8",
+			openstackOpts: &OpenStack{
+				provider: nil,
+				lbOpts: LoadBalancerOpts{
+					LBVersion:            "v2",
+					SubnetId:             "6261548e-ffde-4bc7-bd22-59c83578c5ef",
+					FloatingNetworkId:    "38b8b5f9-64dc-4424-bf86-679595714786",
+					LBMethod:             "ROUND_ROBIN",
+					CreateMonitor:        true,
+					MonitorDelay:         delay,
+					MonitorMaxRetries:    uint(3),
+					ManageSecurityGroups: true,
+				},
+				metadataOpts: MetadataOpts{
+					SearchOrder: configDriveID,
+				},
+			},
+			expectedError: fmt.Errorf("monitor-timeout not set in cloud provider config"),
 		},
 	}
 
