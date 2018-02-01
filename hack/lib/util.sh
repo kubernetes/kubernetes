@@ -437,21 +437,35 @@ kube::util::ensure_clean_working_dir() {
 
 # Ensure that the given godep version is installed and in the path.  Almost
 # nobody should use any version but the default.
+#
+# Sets:
+#  KUBE_GODEP: The path to the godep binary
+#
 kube::util::ensure_godep_version() {
-  GODEP_VERSION=${1:-"v79"} # this version is known to work
+  local godep_target_version=${1:-"v79"} # this version is known to work
 
-  if [[ "$(godep version 2>/dev/null)" == *"godep ${GODEP_VERSION}"* ]]; then
+  # If KUBE_GODEP is already set, and it's the right version, then use it.
+  if [[ -n "${KUBE_GODEP:-}" && "$(${KUBE_GODEP:?} version 2>/dev/null)" == *"godep ${godep_target_version}"* ]]; then
+    kube::log::status "Using ${KUBE_GODEP}"
     return
   fi
 
-  kube::log::status "Installing godep version ${GODEP_VERSION}"
-  go install ./vendor/github.com/tools/godep/
-  GP="$(echo $GOPATH | cut -f1 -d:)"
-  hash -r # force bash to clear PATH cache
-  PATH="${GP}/bin:${PATH}"
+  # If GODEP is in the path, then use it.
+  if [[ "$(godep version 2>/dev/null)" == *"godep ${godep_target_version}"* ]]; then
+    export KUBE_GODEP="$(which godep)"
+    kube::log::status "Using ${KUBE_GODEP}"
+    return
+  fi
 
-  if [[ "$(godep version 2>/dev/null)" != *"godep ${GODEP_VERSION}"* ]]; then
-    kube::log::error "Expected godep ${GODEP_VERSION}, got $(godep version)"
+  kube::log::status "Installing godep version ${godep_target_version}"
+  # Run in hermetic GOPATH
+  kube::golang::setup_env
+  go install ./vendor/github.com/tools/godep/
+  export KUBE_GODEP="${KUBE_GOPATH}/bin/godep"
+  kube::log::status "Installed ${KUBE_GODEP}"
+
+  if [[ "$(${KUBE_GODEP:?} version 2>/dev/null)" != *"godep ${godep_target_version}"* ]]; then
+    kube::log::error "Expected godep ${godep_target_version} from ${KUBE_GODEP}, got $(${KUBE_GODEP:?} version)"
     return 1
   fi
 }
