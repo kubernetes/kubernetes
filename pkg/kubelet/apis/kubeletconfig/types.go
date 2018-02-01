@@ -49,7 +49,7 @@ type KubeletConfiguration struct {
 
 	// Only used for dynamic configuration.
 	// The length of the trial period for this configuration. This configuration will become the last-known-good after this duration.
-	ConfigTrialDuration *metav1.Duration
+	ConfigTrialDuration metav1.Duration
 	// podManifestPath is the path to the directory containing pod manifests to
 	// run, or the path to a single manifest file
 	PodManifestPath string
@@ -194,7 +194,7 @@ type KubeletConfiguration struct {
 	// In cluster mode, this is obtained from the master.
 	PodCIDR string
 	// PodPidsLimit is the maximum number of pids in any pod.
-	PodPidsLimit *int64
+	PodPidsLimit int64
 	// ResolverConfig is the resolver configuration file used as the basis
 	// for the container DNS resolution configuration.
 	ResolverConfig string

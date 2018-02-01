@@ -98,7 +98,7 @@ var _ = framework.KubeDescribe("DynamicKubeletConfiguration [Feature:DynamicKube
 				// we base the "correct" configmap off of the current configuration,
 				// but we also set the trial duration very high to prevent changing the last-known-good
 				correctKC := originalKC.DeepCopy()
-				correctKC.ConfigTrialDuration = &metav1.Duration{Duration: time.Hour}
+				correctKC.ConfigTrialDuration = metav1.Duration{Duration: time.Hour}
 				correctConfigMap := newKubeletConfigMap("dynamic-kubelet-config-test-correct", correctKC)
 				correctConfigMap, err = f.ClientSet.CoreV1().ConfigMaps("kube-system").Create(correctConfigMap)
 				framework.ExpectNoError(err)
@@ -221,7 +221,7 @@ var _ = framework.KubeDescribe("DynamicKubeletConfiguration [Feature:DynamicKube
 				// we base the "lkg" configmap off of the current configuration, but set the trial
 				// duration very low so that it quickly becomes the last-known-good
 				lkgKC := originalKC.DeepCopy()
-				lkgKC.ConfigTrialDuration = &metav1.Duration{Duration: time.Nanosecond}
+				lkgKC.ConfigTrialDuration = metav1.Duration{Duration: time.Nanosecond}
 				lkgConfigMap := newKubeletConfigMap("dynamic-kubelet-config-test-intended-lkg", lkgKC)
 				lkgConfigMap, err = f.ClientSet.CoreV1().ConfigMaps("kube-system").Create(lkgConfigMap)
 				framework.ExpectNoError(err)
