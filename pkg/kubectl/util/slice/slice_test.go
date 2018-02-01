@@ -26,6 +26,6 @@ func TestSortInts64(t *testing.T) {
 	expected := []int64{1, 2, 3, 4, 5, 6, 10}
 	SortInts64(src)
 	if !reflect.DeepEqual(src, expected) {
-		t.Errorf("func Ints64 didnt sort correctly, %v !- %v", src, expected)
+		t.Errorf("func Ints64 didn't sort correctly, %v !- %v", src, expected)
 	}
 }

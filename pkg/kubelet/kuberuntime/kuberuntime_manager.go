@@ -613,7 +613,7 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, _ v1.PodStatus, podStat
 	}
 
 	// Keep terminated init containers fairly aggressively controlled
-	// This is an optmization because container removals are typically handled
+	// This is an optimization because container removals are typically handled
 	// by container garbage collector.
 	m.pruneInitContainersBeforeStart(pod, podStatus)
 

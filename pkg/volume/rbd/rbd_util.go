@@ -302,7 +302,7 @@ func (util *RBDUtil) DetachDisk(plugin *rbdPlugin, deviceMountPath string, devic
 	glog.V(3).Infof("rbd: successfully unmap device %s", device)
 
 	// Currently, we don't persist rbd info on the disk, but for backward
-	// compatbility, we need to clean it if found.
+	// compatibility, we need to clean it if found.
 	rbdFile := path.Join(deviceMountPath, "rbd.json")
 	exists, err := fileutil.FileExists(rbdFile)
 	if err != nil {

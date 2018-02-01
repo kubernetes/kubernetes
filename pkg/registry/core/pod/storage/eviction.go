@@ -125,7 +125,7 @@ func (r *EvictionREST) Create(ctx genericapirequest.Context, obj runtime.Object,
 		return rtStatus, nil
 	}
 
-	// At this point there was either no PDB or we succeded in decrementing
+	// At this point there was either no PDB or we succeeded in decrementing
 
 	// Try the delete
 	_, _, err = r.store.Delete(ctx, eviction.Name, eviction.DeleteOptions)

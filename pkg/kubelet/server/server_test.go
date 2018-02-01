@@ -276,7 +276,7 @@ func TestContainerInfo(t *testing.T) {
 
 	resp, err := http.Get(fw.testHTTPServer.URL + fmt.Sprintf("/stats/%v/%v", podID, expectedContainerName))
 	if err != nil {
-		t.Fatalf("Got error GETing: %v", err)
+		t.Fatalf("Got error Getting: %v", err)
 	}
 	defer resp.Body.Close()
 	var receivedInfo cadvisorapi.ContainerInfo
@@ -306,7 +306,7 @@ func TestContainerInfoWithUidNamespace(t *testing.T) {
 
 	resp, err := http.Get(fw.testHTTPServer.URL + fmt.Sprintf("/stats/%v/%v/%v/%v", expectedNamespace, podID, testUID, expectedContainerName))
 	if err != nil {
-		t.Fatalf("Got error GETing: %v", err)
+		t.Fatalf("Got error Getting: %v", err)
 	}
 	defer resp.Body.Close()
 	var receivedInfo cadvisorapi.ContainerInfo
@@ -330,7 +330,7 @@ func TestContainerNotFound(t *testing.T) {
 	}
 	resp, err := http.Get(fw.testHTTPServer.URL + fmt.Sprintf("/stats/%v/%v/%v/%v", expectedNamespace, podID, testUID, expectedContainerName))
 	if err != nil {
-		t.Fatalf("Got error GETing: %v", err)
+		t.Fatalf("Got error Getting: %v", err)
 	}
 	if resp.StatusCode != http.StatusNotFound {
 		t.Fatalf("Received status %d expecting %d", resp.StatusCode, http.StatusNotFound)
@@ -354,7 +354,7 @@ func TestRootInfo(t *testing.T) {
 
 	resp, err := http.Get(fw.testHTTPServer.URL + "/stats")
 	if err != nil {
-		t.Fatalf("Got error GETing: %v", err)
+		t.Fatalf("Got error Getting: %v", err)
 	}
 	defer resp.Body.Close()
 	var receivedInfo cadvisorapi.ContainerInfo
@@ -391,7 +391,7 @@ func TestSubcontainerContainerInfo(t *testing.T) {
 	request := fmt.Sprintf("{\"containerName\":%q, \"subcontainers\": true}", kubeletContainer)
 	resp, err := http.Post(fw.testHTTPServer.URL+"/stats/container", "application/json", bytes.NewBuffer([]byte(request)))
 	if err != nil {
-		t.Fatalf("Got error GETing: %v", err)
+		t.Fatalf("Got error Getting: %v", err)
 	}
 	defer resp.Body.Close()
 	var receivedInfo map[string]*cadvisorapi.ContainerInfo
@@ -426,7 +426,7 @@ func TestMachineInfo(t *testing.T) {
 
 	resp, err := http.Get(fw.testHTTPServer.URL + "/spec")
 	if err != nil {
-		t.Fatalf("Got error GETing: %v", err)
+		t.Fatalf("Got error Getting: %v", err)
 	}
 	defer resp.Body.Close()
 	var receivedInfo cadvisorapi.MachineInfo
@@ -453,7 +453,7 @@ func TestServeLogs(t *testing.T) {
 
 	resp, err := http.Get(fw.testHTTPServer.URL + "/logs/")
 	if err != nil {
-		t.Fatalf("Got error GETing: %v", err)
+		t.Fatalf("Got error Getting: %v", err)
 	}
 	defer resp.Body.Close()
 
@@ -573,7 +573,7 @@ func TestHealthCheck(t *testing.T) {
 func assertHealthFails(t *testing.T, httpURL string, expectedErrorCode int) {
 	resp, err := http.Get(httpURL)
 	if err != nil {
-		t.Fatalf("Got error GETing: %v", err)
+		t.Fatalf("Got error Getting: %v", err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != expectedErrorCode {
@@ -862,7 +862,7 @@ func TestSyncLoopCheck(t *testing.T) {
 func assertHealthIsOk(t *testing.T, httpURL string) {
 	resp, err := http.Get(httpURL)
 	if err != nil {
-		t.Fatalf("Got error GETing: %v", err)
+		t.Fatalf("Got error Getting: %v", err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
@@ -927,7 +927,7 @@ func TestContainerLogs(t *testing.T) {
 	setGetContainerLogsFunc(fw, t, expectedPodName, expectedContainerName, &v1.PodLogOptions{}, output)
 	resp, err := http.Get(fw.testHTTPServer.URL + "/containerLogs/" + podNamespace + "/" + podName + "/" + expectedContainerName)
 	if err != nil {
-		t.Errorf("Got error GETing: %v", err)
+		t.Errorf("Got error Getting: %v", err)
 	}
 	defer resp.Body.Close()
 
@@ -954,7 +954,7 @@ func TestContainerLogsWithLimitBytes(t *testing.T) {
 	setGetContainerLogsFunc(fw, t, expectedPodName, expectedContainerName, &v1.PodLogOptions{LimitBytes: &bytes}, output)
 	resp, err := http.Get(fw.testHTTPServer.URL + "/containerLogs/" + podNamespace + "/" + podName + "/" + expectedContainerName + "?limitBytes=3")
 	if err != nil {
-		t.Errorf("Got error GETing: %v", err)
+		t.Errorf("Got error Getting: %v", err)
 	}
 	defer resp.Body.Close()
 
@@ -981,7 +981,7 @@ func TestContainerLogsWithTail(t *testing.T) {
 	setGetContainerLogsFunc(fw, t, expectedPodName, expectedContainerName, &v1.PodLogOptions{TailLines: &expectedTail}, output)
 	resp, err := http.Get(fw.testHTTPServer.URL + "/containerLogs/" + podNamespace + "/" + podName + "/" + expectedContainerName + "?tailLines=5")
 	if err != nil {
-		t.Errorf("Got error GETing: %v", err)
+		t.Errorf("Got error Getting: %v", err)
 	}
 	defer resp.Body.Close()
 
@@ -1008,7 +1008,7 @@ func TestContainerLogsWithLegacyTail(t *testing.T) {
 	setGetContainerLogsFunc(fw, t, expectedPodName, expectedContainerName, &v1.PodLogOptions{TailLines: &expectedTail}, output)
 	resp, err := http.Get(fw.testHTTPServer.URL + "/containerLogs/" + podNamespace + "/" + podName + "/" + expectedContainerName + "?tail=5")
 	if err != nil {
-		t.Errorf("Got error GETing: %v", err)
+		t.Errorf("Got error Getting: %v", err)
 	}
 	defer resp.Body.Close()
 
@@ -1034,7 +1034,7 @@ func TestContainerLogsWithTailAll(t *testing.T) {
 	setGetContainerLogsFunc(fw, t, expectedPodName, expectedContainerName, &v1.PodLogOptions{}, output)
 	resp, err := http.Get(fw.testHTTPServer.URL + "/containerLogs/" + podNamespace + "/" + podName + "/" + expectedContainerName + "?tail=all")
 	if err != nil {
-		t.Errorf("Got error GETing: %v", err)
+		t.Errorf("Got error Getting: %v", err)
 	}
 	defer resp.Body.Close()
 
@@ -1060,7 +1060,7 @@ func TestContainerLogsWithInvalidTail(t *testing.T) {
 	setGetContainerLogsFunc(fw, t, expectedPodName, expectedContainerName, &v1.PodLogOptions{}, output)
 	resp, err := http.Get(fw.testHTTPServer.URL + "/containerLogs/" + podNamespace + "/" + podName + "/" + expectedContainerName + "?tail=-1")
 	if err != nil {
-		t.Errorf("Got error GETing: %v", err)
+		t.Errorf("Got error Getting: %v", err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusUnprocessableEntity {
@@ -1080,7 +1080,7 @@ func TestContainerLogsWithFollow(t *testing.T) {
 	setGetContainerLogsFunc(fw, t, expectedPodName, expectedContainerName, &v1.PodLogOptions{Follow: true}, output)
 	resp, err := http.Get(fw.testHTTPServer.URL + "/containerLogs/" + podNamespace + "/" + podName + "/" + expectedContainerName + "?follow=1")
 	if err != nil {
-		t.Errorf("Got error GETing: %v", err)
+		t.Errorf("Got error Getting: %v", err)
 	}
 	defer resp.Body.Close()
 

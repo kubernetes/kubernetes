@@ -55,8 +55,8 @@ func getFinder(dc *Datacenter) *find.Finder {
 // Example UUID input is 42375390-71f9-43a3-a770-56803bcd7baa and output after format is 4237539071f943a3a77056803bcd7baa
 func formatVirtualDiskUUID(uuid string) string {
 	uuidwithNoSpace := strings.Replace(uuid, " ", "", -1)
-	uuidWithNoHypens := strings.Replace(uuidwithNoSpace, "-", "", -1)
-	return strings.ToLower(uuidWithNoHypens)
+	uuidWithNoHyphens := strings.Replace(uuidwithNoSpace, "-", "", -1)
+	return strings.ToLower(uuidWithNoHyphens)
 }
 
 // getSCSIControllersOfType filters specific type of Controller device from given list of Virtual Machine Devices

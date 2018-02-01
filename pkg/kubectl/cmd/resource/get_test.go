@@ -299,7 +299,7 @@ func TestGetObjectsWithOpenAPIOutputFormatPresent(t *testing.T) {
 
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
-	// overide the openAPISchema function to return custom output
+	// override the openAPISchema function to return custom output
 	// for Pod type.
 	tf.OpenAPISchemaFunc = testOpenAPISchemaData
 	tf.UnstructuredClient = &fake.RESTClient{

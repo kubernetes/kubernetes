@@ -226,7 +226,7 @@ func TestSyncRolloutStatus(t *testing.T) {
 			lastTransition:  testTime,
 		},
 		{
-			name:            "DeploymentProgressing: dont update lastTransitionTime if deployment already has Progressing=True",
+			name:            "DeploymentProgressing: don't update lastTransitionTime if deployment already has Progressing=True",
 			d:               currentDeployment(&pds, 3, 2, 2, 2, []extensions.DeploymentCondition{replicaSetUpdated}),
 			allRSs:          []*extensions.ReplicaSet{newRSWithAvailable("bar", 0, 1, 1)},
 			newRS:           newRSWithAvailable("foo", 3, 2, 2),
@@ -254,7 +254,7 @@ func TestSyncRolloutStatus(t *testing.T) {
 			conditionReason: util.ReplicaSetUpdatedReason,
 		},
 		{
-			name:            "DeploymentComplete: dont update lastTransitionTime if deployment already has Progressing=True",
+			name:            "DeploymentComplete: don't update lastTransitionTime if deployment already has Progressing=True",
 			d:               currentDeployment(&pds, 3, 3, 3, 3, []extensions.DeploymentCondition{replicaSetUpdated}),
 			allRSs:          []*extensions.ReplicaSet{},
 			newRS:           newRSWithAvailable("foo", 3, 3, 3),

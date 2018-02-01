@@ -54,7 +54,7 @@ type Scaler interface {
 
 // ScalerFor gets a scaler for a given resource
 func ScalerFor(kind schema.GroupKind, jobsClient batchclient.JobsGetter, scalesGetter scaleclient.ScalesGetter, gr schema.GroupResource) Scaler {
-	// it seems like jobs dont't follow "normal" scale semantics.
+	// it seems like jobs don't follow "normal" scale semantics.
 	// For example it is not clear whether HPA could make use of it or not.
 	// For more details see: https://github.com/kubernetes/kubernetes/pull/58468
 	switch kind {

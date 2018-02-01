@@ -87,7 +87,7 @@ type PrefixWriter interface {
 	Write(level int, format string, a ...interface{})
 	// WriteLine writes an entire line with no indentation level.
 	WriteLine(a ...interface{})
-	// Flush forces indendation to be reset.
+	// Flush forces indentation to be reset.
 	Flush()
 }
 

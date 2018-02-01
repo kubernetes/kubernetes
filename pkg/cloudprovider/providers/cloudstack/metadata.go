@@ -196,7 +196,7 @@ func findDHCPServer() (string, error) {
 
 				offerPacket, err := client.GetOffer(&discoverPacket)
 				if err != nil {
-					return "", fmt.Errorf("error recieving DHCP offer package: %v", err)
+					return "", fmt.Errorf("error receiving DHCP offer package: %v", err)
 				}
 
 				offerPacketOptions := offerPacket.ParseOptions()

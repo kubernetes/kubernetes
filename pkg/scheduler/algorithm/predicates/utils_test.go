@@ -37,8 +37,8 @@ func ExampleFindLabelsInSet() {
 				Name:      "pod1",
 				Namespace: "ns1",
 				Labels: map[string]string{
-					"label1": "wontSeeThis",
-					"label2": "wontSeeThis",
+					"label1": "won'tSeeThis",
+					"label2": "won'tSeeThis",
 					"label3": "will_see_this",
 				},
 			},

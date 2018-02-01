@@ -51,7 +51,7 @@ const (
 	MAC_OUI_ESX  = "00:0c:29"
 )
 
-// overrideIP indicates if the hostname is overriden by IP address, such as when
+// overrideIP indicates if the hostname is overridden by IP address, such as when
 // running multi-node kubernetes using docker. In this case the user should set
 // overrideIP = true in cloud config file. Default value is false.
 var overrideIP bool = false

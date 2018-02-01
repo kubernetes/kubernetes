@@ -1128,7 +1128,7 @@ func TestSetApp(t *testing.T) {
 			},
 		},
 
-		// app should be changed. (env, mounts, ports, are overrided).
+		// app should be changed. (env, mounts, ports, are overridden).
 		{
 			container: &v1.Container{
 				Name:       "hello-world",

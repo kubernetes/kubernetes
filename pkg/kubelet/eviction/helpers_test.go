@@ -1017,7 +1017,7 @@ func TestMakeSignalObservations(t *testing.T) {
 	}
 	allocatableMemQuantity, found := actualObservations[evictionapi.SignalAllocatableMemoryAvailable]
 	if !found {
-		t.Errorf("Expected allocatable memory observation, but didnt find one")
+		t.Errorf("Expected allocatable memory observation, but didn't find one")
 	}
 	if allocatableMemQuantity.available.Value() != 2*containerWorkingSetBytes {
 		t.Errorf("Expected %v, actual: %v", containerWorkingSetBytes, allocatableMemQuantity.available.Value())

@@ -38,7 +38,7 @@ func newService(name string, uid types.UID, serviceType v1.ServiceType) *v1.Serv
 	return &v1.Service{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "default", UID: uid, SelfLink: testapi.Default.SelfLink("services", name)}, Spec: v1.ServiceSpec{Type: serviceType}}
 }
 
-//Wrap newService so that you dont have to call default argumetns again and again.
+//Wrap newService so that you don't have to call default argumetns again and again.
 func defaultExternalService() *v1.Service {
 
 	return newService("external-balancer", types.UID("123"), v1.ServiceTypeLoadBalancer)
@@ -319,7 +319,7 @@ func TestProcessServiceUpdate(t *testing.T) {
 		key        string
 		updateFn   func(*v1.Service) *v1.Service //Manipulate the structure
 		svc        *v1.Service
-		expectedFn func(*v1.Service, error) error //Error comparision function
+		expectedFn func(*v1.Service, error) error //Error comparison function
 	}{
 		{
 			testName: "If updating a valid service",
@@ -415,7 +415,7 @@ func TestSyncService(t *testing.T) {
 			},
 			expectedFn: func(e error) error {
 				//TODO: Expected error is of the format fmt.Errorf("unexpected key format: %q", "invalid/key/string"),
-				//TODO: should find a way to test for dependent package errors in such a way that it wont break
+				//TODO: should find a way to test for dependent package errors in such a way that it won't break
 				//TODO:	our tests, currently we only test if there is an error.
 				//Error should be non-nil
 				if e == nil {

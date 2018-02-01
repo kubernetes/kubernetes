@@ -383,7 +383,7 @@ func (c *BlobDiskController) ensureDefaultContainer(storageAccountName string) e
 			counter = counter + 1
 			// check if we passed the max sleep
 			if counter >= 20 {
-				return fmt.Errorf("azureDisk - timeout waiting to aquire lock to validate account:%s readiness", storageAccountName)
+				return fmt.Errorf("azureDisk - timeout waiting to acquire lock to validate account:%s readiness", storageAccountName)
 			}
 		}
 

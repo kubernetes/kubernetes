@@ -103,7 +103,7 @@ func (attacher *gcePersistentDiskAttacher) VolumesAreAttached(specs []*volume.Sp
 	pdNameList := []string{}
 	for _, spec := range specs {
 		volumeSource, _, err := getVolumeSource(spec)
-		// If error is occured, skip this volume and move to the next one
+		// If error is occurred, skip this volume and move to the next one
 		if err != nil {
 			glog.Errorf("Error getting volume (%q) source : %v", spec.Name(), err)
 			continue

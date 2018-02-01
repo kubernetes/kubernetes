@@ -153,11 +153,11 @@ type ClientAccessFactory interface {
 	// Returns a Printer for formatting objects of the given type or an error.
 	Printer(mapping *meta.RESTMapping, options printers.PrintOptions) (printers.ResourcePrinter, error)
 	// Pauser marks the object in the info as paused. Currently supported only for Deployments.
-	// Returns the patched object in bytes and any error that occured during the encoding or
+	// Returns the patched object in bytes and any error that occurred during the encoding or
 	// in case the object is already paused.
 	Pauser(info *resource.Info) ([]byte, error)
 	// Resumer resumes a paused object inside the info. Currently supported only for Deployments.
-	// Returns the patched object in bytes and any error that occured during the encoding or
+	// Returns the patched object in bytes and any error that occurred during the encoding or
 	// in case the object is already resumed.
 	Resumer(info *resource.Info) ([]byte, error)
 

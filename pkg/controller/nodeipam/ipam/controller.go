@@ -96,7 +96,7 @@ func NewController(
 }
 
 // Start initializes the Controller with the existing list of nodes and
-// registers the informers for node chnages. This will start synchronization
+// registers the informers for node changes. This will start synchronization
 // of the node and cloud CIDR range allocations.
 func (c *Controller) Start(nodeInformer informers.NodeInformer) error {
 	glog.V(0).Infof("Starting IPAM controller (config=%+v)", c.config)

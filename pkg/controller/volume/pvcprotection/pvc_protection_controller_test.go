@@ -152,13 +152,13 @@ func TestPVCProtectionController(t *testing.T) {
 		// Optional client reactors.
 		reactors []reaction
 		// PVC event to simulate. This PVC will be automatically added to
-		// initalObjects.
+		// initialObjects.
 		updatedPVC *v1.PersistentVolumeClaim
 		// Pod event to simulate. This Pod will be automatically added to
-		// initalObjects.
+		// initialObjects.
 		updatedPod *v1.Pod
 		// Pod event to similate. This Pod is *not* added to
-		// initalObjects.
+		// initialObjects.
 		deletedPod *v1.Pod
 		// List of expected kubeclient actions that should happen during the
 		// test.
@@ -320,7 +320,7 @@ func TestPVCProtectionController(t *testing.T) {
 			case *v1.Pod:
 				podInformer.Informer().GetStore().Add(obj)
 			default:
-				t.Fatalf("Unknown initalObject type: %+v", obj)
+				t.Fatalf("Unknown initialObject type: %+v", obj)
 			}
 		}
 

@@ -42,7 +42,7 @@ type DockerLegacyService interface {
 	GetContainerLogs(*v1.Pod, kubecontainer.ContainerID, *v1.PodLogOptions, io.Writer, io.Writer) error
 
 	// IsCRISupportedLogDriver checks whether the logging driver used by docker is
-	// suppoted by native CRI integration.
+	// supported by native CRI integration.
 	// TODO(resouer): remove this when deprecating unsupported log driver
 	IsCRISupportedLogDriver() (bool, error)
 
@@ -108,7 +108,7 @@ func (d *dockerService) GetContainerLogTail(uid kubetypes.UID, name, namespace s
 var criSupportedLogDrivers = []string{"json-file"}
 
 // IsCRISupportedLogDriver checks whether the logging driver used by docker is
-// suppoted by native CRI integration.
+// supported by native CRI integration.
 func (d *dockerService) IsCRISupportedLogDriver() (bool, error) {
 	info, err := d.client.Info()
 	if err != nil {

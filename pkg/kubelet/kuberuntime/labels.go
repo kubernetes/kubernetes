@@ -132,7 +132,7 @@ func newContainerAnnotations(container *v1.Container, pod *v1.Pod, restartCount 
 	}
 
 	if container.Lifecycle != nil && container.Lifecycle.PreStop != nil {
-		// Using json enconding so that the PreStop handler object is readable after writing as a label
+		// Using json encoding so that the PreStop handler object is readable after writing as a label
 		rawPreStop, err := json.Marshal(container.Lifecycle.PreStop)
 		if err != nil {
 			glog.Errorf("Unable to marshal lifecycle PreStop handler for container %q of pod %q: %v", container.Name, format.Pod(pod), err)
