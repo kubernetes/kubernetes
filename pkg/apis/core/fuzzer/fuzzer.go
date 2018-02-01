@@ -34,7 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/core"
 )
 
-// Funcs returns the fuzzer functions for the core core group.
+// Funcs returns the fuzzer functions for the core group.
 var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 	return []interface{}{
 		func(q *resource.Quantity, c fuzz.Continue) {
