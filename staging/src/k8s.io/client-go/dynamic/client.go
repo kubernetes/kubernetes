@@ -47,7 +47,7 @@ type Interface interface {
 	GetRateLimiter() flowcontrol.RateLimiter
 	// Resource returns an API interface to the specified resource for this client's
 	// group and version.  If resource is not a namespaced resource, then namespace
-	// is ignored.  The ResourceInterface inherits the paramater codec of this client.
+	// is ignored.  The ResourceInterface inherits the parameter codec of this client.
 	Resource(resource *metav1.APIResource, namespace string) ResourceInterface
 	// ParameterCodec returns a client with the provided parameter codec.
 	ParameterCodec(parameterCodec runtime.ParameterCodec) Interface
