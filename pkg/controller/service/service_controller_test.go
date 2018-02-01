@@ -279,7 +279,7 @@ func TestGetNodeTaintPredicate(t *testing.T) {
 					},
 				},
 			},
-			expectAccept: false,
+			expectAccept: true,
 			name:         "basic",
 		},
 		{
@@ -290,8 +290,19 @@ func TestGetNodeTaintPredicate(t *testing.T) {
 					},
 				},
 			},
+			expectAccept: true,
+			name:         "UnreachableNoSchedule",
+		},
+		{
+			node: v1.Node{
+				Spec: v1.NodeSpec{
+					Taints: []v1.Taint{
+						{Key: algorithm.TaintNodeUnreachable, Effect: v1.TaintEffectNoExecute},
+					},
+				},
+			},
 			expectAccept: false,
-			name:         "NoSchedule",
+			name:         "UnreachableNoExecute",
 		},
 		{
 			node: v1.Node{

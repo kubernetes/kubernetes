@@ -311,16 +311,6 @@ func TaintExists(taints []v1.Taint, taintToFind *v1.Taint) bool {
 	return false
 }
 
-// TaintExistsWithKey only check if a Taint exist regarding the Effect
-func TaintExistsWithEffect(taints []v1.Taint, taintKeyToFind v1.TaintEffect) bool {
-	for _, taint := range taints {
-		if taint.Effect == taintKeyToFind {
-			return true
-		}
-	}
-	return false
-}
-
 func TaintSetDiff(t1, t2 []v1.Taint) (taintsToAdd []*v1.Taint, taintsToRemove []*v1.Taint) {
 	for _, taint := range t1 {
 		if !TaintExists(t2, &taint) {

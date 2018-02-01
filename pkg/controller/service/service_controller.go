@@ -42,7 +42,7 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
-	algorithm "k8s.io/kubernetes/pkg/scheduler/algorithm"
+	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/pkg/util/metrics"
 	"k8s.io/kubernetes/pkg/util/taints"
 )
@@ -69,6 +69,14 @@ const (
 	// LabelNodeRoleExcludeBalancer specifies that the node should be
 	// exclude from load balancers created by a cloud provider.
 	LabelNodeRoleExcludeBalancer = "alpha.service-controller.kubernetes.io/exclude-balancer"
+)
+
+var (
+	// UnreachableTaintTemplate is the taint for when a node becomes unreachable.
+	UnreachableTaintTemplate = &v1.Taint{
+		Key:    algorithm.TaintNodeUnreachable,
+		Effect: v1.TaintEffectNoExecute,
+	}
 )
 
 type cachedService struct {
@@ -601,27 +609,18 @@ func getNodeTaintPredicate() corelisters.NodePredicate {
 		if len(node.Spec.Taints) == 0 {
 			return true
 		}
-		// As of 1.6, we will taint the master, but not necessarily mark it unschedulable.
-		// Recognize nodes labeled as master, and filter them also, as we were doing previously.
-		if _, hasMasterRoleLabel := node.Labels[LabelNodeRoleMaster]; hasMasterRoleLabel {
-			return false
-		}
 
 		if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.ServiceNodeExclusion) {
 			if _, hasExcludeBalancerLabel := node.Labels[LabelNodeRoleExcludeBalancer]; hasExcludeBalancerLabel {
 				return false
 			}
 		}
-		// Not Ready, no execute taint
-		notReadyTaintTemplate := &v1.Taint{
-			Key:    algorithm.TaintNodeNotReady,
-			Effect: v1.TaintEffectNoExecute,
-		}
 
-		// We consider the node for load balancing only when taint with Effect NoSchedule
-		// or with a specific Taint NotReady, NoExecute
-		if taints.TaintExists(node.Spec.Taints, notReadyTaintTemplate) || taints.TaintExistsWithEffect(node.Spec.Taints, v1.TaintEffectNoSchedule) {
-			glog.V(4).Infof("Ignoring node %v with %v key, effect %v", node.Name, notReadyTaintTemplate.Key, notReadyTaintTemplate.Effect)
+		// Considering Pod toleration any nodes with any taints can be loadbalanced
+		// We only check for taint Unreachable to be sure node exists
+		// Pods can however tolerate Unreachable taint
+		if taints.TaintExists(node.Spec.Taints, UnreachableTaintTemplate) {
+			glog.V(4).Infof("Ignoring node %v with %v key, effect %v", node.Name, UnreachableTaintTemplate.Key, UnreachableTaintTemplate.Effect)
 			return false
 		}
 		return true
