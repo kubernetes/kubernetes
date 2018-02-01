@@ -242,27 +242,61 @@ func TestDeleteAddressWithWrongTier(t *testing.T) {
 	}
 }
 
-func TestEnsureExternalLoadBalancer(t *testing.T) {
+const nodeName = "test-node-1"
+const clusterName = "Test Cluster Name"
+const clusterID = "test-cluster-id"
+
+var apiService = &v1.Service{
+	Spec: v1.ServiceSpec{
+		SessionAffinity: v1.ServiceAffinityClientIP,
+		Type: v1.ServiceTypeClusterIP,
+		Ports: []v1.ServicePort{{Protocol: v1.ProtocolTCP, Port: int32(123)}},
+	},
+}
+
+var nodes = []*v1.Node{
+	&v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: nodeName,
+			Labels: map[string]string{
+				kubeletapis.LabelHostname: nodeName,
+			},
+		},
+		Status: v1.NodeStatus{
+			NodeInfo: v1.NodeSystemInfo{
+				KubeProxyVersion: "v1.7.2",
+			},
+		},
+	},
+}
+
+func fakeGCECloud() (*GCECloud, error) {
 	gceProjectId := "test-project"
 	gceRegion := "test-region"
 	zone := "zone1"
-	nodeName := "test-node-1"
 
-	client, clientErr := newOauthClient(nil)
-	require.NoError(t, clientErr)
+	client, err := newOauthClient(nil)
+	if err != nil {
+		return nil, err
+	}
 
-	service, serviceErr := compute.New(client)
-	require.NoError(t, serviceErr)
+	service, err := compute.New(client)
+	if err != nil {
+		return nil, err
+	}
 
 	fakeManager := newFakeManager(gceProjectId, gceRegion)
 
-	alphaFeatureGate, featureGateErr := NewAlphaFeatureGate([]string{})
-	require.NoError(t, featureGateErr)
+	alphaFeatureGate, err := NewAlphaFeatureGate([]string{})
+	if err != nil {
+		return nil, err
+	}
 
 	cloud := cloud.NewMockGCE()
 	zonesWithNodes := createNodeZones([]string{zone})
 
 	gce := GCECloud{
+		region:							gceRegion,
 		service:						service,
 		manager:            fakeManager,
 		managedZones:       []string{zone},
@@ -284,34 +318,11 @@ func TestEnsureExternalLoadBalancer(t *testing.T) {
 		},
 	)
 
-	clusterName := "Test Cluster Name"
-	clusterID := "test-cluster-id"
+	return &gce, nil
+}
 
-	apiService := &v1.Service{
-		Spec: v1.ServiceSpec{
-			SessionAffinity: v1.ServiceAffinityClientIP,
-			Type: v1.ServiceTypeClusterIP,
-			Ports: []v1.ServicePort{{Protocol: v1.ProtocolTCP, Port: int32(123)}},
-		},
-	}
-
+func createExternalLoadBalancer(gce *GCECloud) (*v1.LoadBalancerStatus, error) {
 	existingFwdRule := &compute.ForwardingRule{}
-
-	nodes := []*v1.Node{
-		&v1.Node{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: nodeName,
-				Labels: map[string]string{
-					kubeletapis.LabelHostname: nodeName,
-				},
-			},
-			Status: v1.NodeStatus{
-				NodeInfo: v1.NodeSystemInfo{
-					KubeProxyVersion: "v1.7.2",
-				},
-			},
-		},
-	}
 
 	status, err := gce.ensureExternalLoadBalancer(
 		clusterName,
@@ -321,6 +332,34 @@ func TestEnsureExternalLoadBalancer(t *testing.T) {
 		nodes,
 	)
 
+	return status, err
+}
+
+func TestEnsureExternalLoadBalancer(t *testing.T) {
+	gce, err := fakeGCECloud()
+	assert.NoError(t, err)
+
+	status, err := createExternalLoadBalancer(gce)
 	assert.NotNil(t, status)
+	assert.NoError(t, err)
+}
+
+func TestUpdateExternalLoadBalancer(t *testing.T) {
+	gce, err := fakeGCECloud()
+	require.NoError(t, err)
+	createExternalLoadBalancer(gce)
+
+	err = gce.updateExternalLoadBalancer(clusterName, apiService, nodes)
+	assert.NoError(t, err)
+
+	// Assert pool is modified
+}
+
+func TestEnsureExternalLoadBalancerDeleted(t *testing.T) {
+	gce, err := fakeGCECloud()
+	require.NoError(t, err)
+	createExternalLoadBalancer(gce)
+
+	err = gce.ensureExternalLoadBalancerDeleted(clusterName, clusterID, apiService)
 	assert.NoError(t, err)
 }
