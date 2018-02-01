@@ -774,7 +774,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		kubeDeps.TLSOptions.Config.GetCertificate = func(*tls.ClientHelloInfo) (*tls.Certificate, error) {
 			cert := klet.serverCertificateManager.Current()
 			if cert == nil {
-				return nil, fmt.Errorf("no certificate available")
+				return nil, fmt.Errorf("no serving certificate available for the kubelet")
 			}
 			return cert, nil
 		}
