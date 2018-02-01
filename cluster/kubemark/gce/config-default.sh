@@ -60,6 +60,7 @@ CLUSTER_IP_RANGE="${CLUSTER_IP_RANGE:-$(get-cluster-ip-range)}"
 RUNTIME_CONFIG="${KUBE_RUNTIME_CONFIG:-}"
 TERMINATED_POD_GC_THRESHOLD=${TERMINATED_POD_GC_THRESHOLD:-100}
 KUBE_APISERVER_REQUEST_TIMEOUT=300
+ETCD_COMPACTION_INTERVAL_SEC="${KUBEMARK_ETCD_COMPACTION_INTERVAL_SEC:-}"
 
 # Set etcd image (e.g. gcr.io/google_containers/etcd) and version (e.g. 3.1.10) if you need
 # non-default version.
