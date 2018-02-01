@@ -4140,42 +4140,6 @@ func OpenWebSocketForURL(url *url.URL, config *restclient.Config, protocols []st
 	return websocket.DialConfig(cfg)
 }
 
-// getIngressAddress returns the ips/hostnames associated with the Ingress.
-func getIngressAddress(client clientset.Interface, ns, name string) ([]string, error) {
-	ing, err := client.ExtensionsV1beta1().Ingresses(ns).Get(name, metav1.GetOptions{})
-	if err != nil {
-		return nil, err
-	}
-	addresses := []string{}
-	for _, a := range ing.Status.LoadBalancer.Ingress {
-		if a.IP != "" {
-			addresses = append(addresses, a.IP)
-		}
-		if a.Hostname != "" {
-			addresses = append(addresses, a.Hostname)
-		}
-	}
-	return addresses, nil
-}
-
-// WaitForIngressAddress waits for the Ingress to acquire an address.
-func WaitForIngressAddress(c clientset.Interface, ns, ingName string, timeout time.Duration) (string, error) {
-	var address string
-	err := wait.PollImmediate(10*time.Second, timeout, func() (bool, error) {
-		ipOrNameList, err := getIngressAddress(c, ns, ingName)
-		if err != nil || len(ipOrNameList) == 0 {
-			Logf("Waiting for Ingress %v to acquire IP, error %v", ingName, err)
-			if IsRetryableAPIError(err) {
-				return false, nil
-			}
-			return false, err
-		}
-		address = ipOrNameList[0]
-		return true, nil
-	})
-	return address, err
-}
-
 // Looks for the given string in the log of a specific pod container
 func LookForStringInLog(ns, podName, container, expectedString string, timeout time.Duration) (result string, err error) {
 	return LookForString(expectedString, timeout, func() string {
@@ -4795,6 +4759,22 @@ func (p *E2ETestNodePreparer) CleanupNodes() error {
 		}
 	}
 	return encounteredError
+}
+
+func GetClusterID(c clientset.Interface) (string, error) {
+	cm, err := c.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(gcecloud.UIDConfigMapName, metav1.GetOptions{})
+	if err != nil || cm == nil {
+		return "", fmt.Errorf("error getting cluster ID: %v", err)
+	}
+	clusterID, clusterIDExists := cm.Data[gcecloud.UIDCluster]
+	providerID, providerIDExists := cm.Data[gcecloud.UIDProvider]
+	if !clusterIDExists {
+		return "", fmt.Errorf("cluster ID not set")
+	}
+	if providerIDExists {
+		return providerID, nil
+	}
+	return clusterID, nil
 }
 
 // CleanupGCEResources cleans up GCE Service Type=LoadBalancer resources with
