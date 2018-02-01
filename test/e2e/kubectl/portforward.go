@@ -203,7 +203,7 @@ func doTestConnectSendDisconnect(bindAddress string, f *framework.Framework) {
 		framework.Failf("Pod did not start running: %v", err)
 	}
 	defer func() {
-		logs, err := framework.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, "portforwardtester")
+		logs, err := f.GetPodLogs(pod.Name, "portforwardtester")
 		if err != nil {
 			framework.Logf("Error getting pod log: %v", err)
 		} else {
@@ -241,7 +241,7 @@ func doTestConnectSendDisconnect(bindAddress string, f *framework.Framework) {
 	}
 
 	By("Verifying logs")
-	logOutput, err := framework.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, "portforwardtester")
+	logOutput, err := f.GetPodLogs(pod.Name, "portforwardtester")
 	if err != nil {
 		framework.Failf("Error retrieving pod logs: %v", err)
 	}
@@ -259,7 +259,7 @@ func doTestMustConnectSendNothing(bindAddress string, f *framework.Framework) {
 		framework.Failf("Pod did not start running: %v", err)
 	}
 	defer func() {
-		logs, err := framework.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, "portforwardtester")
+		logs, err := f.GetPodLogs(pod.Name, "portforwardtester")
 		if err != nil {
 			framework.Logf("Error getting pod log: %v", err)
 		} else {
@@ -286,7 +286,7 @@ func doTestMustConnectSendNothing(bindAddress string, f *framework.Framework) {
 	}
 
 	By("Verifying logs")
-	logOutput, err := framework.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, "portforwardtester")
+	logOutput, err := f.GetPodLogs(pod.Name, "portforwardtester")
 	if err != nil {
 		framework.Failf("Error retrieving pod logs: %v", err)
 	}
@@ -304,7 +304,7 @@ func doTestMustConnectSendDisconnect(bindAddress string, f *framework.Framework)
 		framework.Failf("Pod did not start running: %v", err)
 	}
 	defer func() {
-		logs, err := framework.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, "portforwardtester")
+		logs, err := f.GetPodLogs(pod.Name, "portforwardtester")
 		if err != nil {
 			framework.Logf("Error getting pod log: %v", err)
 		} else {
@@ -352,7 +352,7 @@ func doTestMustConnectSendDisconnect(bindAddress string, f *framework.Framework)
 	}
 
 	By("Verifying logs")
-	logOutput, err := framework.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, "portforwardtester")
+	logOutput, err := f.GetPodLogs(pod.Name, "portforwardtester")
 	if err != nil {
 		framework.Failf("Error retrieving pod logs: %v", err)
 	}
@@ -374,7 +374,7 @@ func doTestOverWebSockets(bindAddress string, f *framework.Framework) {
 		framework.Failf("Pod did not start running: %v", err)
 	}
 	defer func() {
-		logs, err := framework.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, "portforwardtester")
+		logs, err := f.GetPodLogs(pod.Name, "portforwardtester")
 		if err != nil {
 			framework.Logf("Error getting pod log: %v", err)
 		} else {
@@ -449,7 +449,7 @@ func doTestOverWebSockets(bindAddress string, f *framework.Framework) {
 	}, time.Minute, 10*time.Second).Should(BeNil())
 
 	By("Verifying logs")
-	logOutput, err := framework.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, "portforwardtester")
+	logOutput, err := f.GetPodLogs(pod.Name, "portforwardtester")
 	if err != nil {
 		framework.Failf("Error retrieving pod logs: %v", err)
 	}

@@ -27,7 +27,6 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
-	clientset "k8s.io/client-go/kubernetes"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/test/e2e/framework"
 	testutils "k8s.io/kubernetes/test/utils"
@@ -92,25 +91,25 @@ var _ = SIGDescribe("Reboot [Disruptive] [Feature:Reboot]", func() {
 	It("each node by ordering clean reboot and ensure they function upon restart", func() {
 		// clean shutdown and restart
 		// We sleep 10 seconds to give some time for ssh command to cleanly finish before the node is rebooted.
-		testReboot(f.ClientSet, "nohup sh -c 'sleep 10 && sudo reboot' >/dev/null 2>&1 &", nil)
+		testReboot(f, "nohup sh -c 'sleep 10 && sudo reboot' >/dev/null 2>&1 &", nil)
 	})
 
 	It("each node by ordering unclean reboot and ensure they function upon restart", func() {
 		// unclean shutdown and restart
 		// We sleep 10 seconds to give some time for ssh command to cleanly finish before the node is shutdown.
-		testReboot(f.ClientSet, "nohup sh -c 'sleep 10 && echo b | sudo tee /proc/sysrq-trigger' >/dev/null 2>&1 &", nil)
+		testReboot(f, "nohup sh -c 'sleep 10 && echo b | sudo tee /proc/sysrq-trigger' >/dev/null 2>&1 &", nil)
 	})
 
 	It("each node by triggering kernel panic and ensure they function upon restart", func() {
 		// kernel panic
 		// We sleep 10 seconds to give some time for ssh command to cleanly finish before kernel panic is triggered.
-		testReboot(f.ClientSet, "nohup sh -c 'sleep 10 && echo c | sudo tee /proc/sysrq-trigger' >/dev/null 2>&1 &", nil)
+		testReboot(f, "nohup sh -c 'sleep 10 && echo c | sudo tee /proc/sysrq-trigger' >/dev/null 2>&1 &", nil)
 	})
 
 	It("each node by switching off the network interface and ensure they function upon switch on", func() {
 		// switch the network interface off for a while to simulate a network outage
 		// We sleep 10 seconds to give some time for ssh command to cleanly finish before network is down.
-		testReboot(f.ClientSet, "nohup sh -c 'sleep 10 && sudo ip link set eth0 down && sleep 120 && sudo ip link set eth0 up && (sudo dhclient || true)' >/dev/null 2>&1 &", nil)
+		testReboot(f, "nohup sh -c 'sleep 10 && sudo ip link set eth0 down && sleep 120 && sudo ip link set eth0 up && (sudo dhclient || true)' >/dev/null 2>&1 &", nil)
 	})
 
 	It("each node by dropping all inbound packets for a while and ensure they function afterwards", func() {
@@ -118,7 +117,7 @@ var _ = SIGDescribe("Reboot [Disruptive] [Feature:Reboot]", func() {
 		// We sleep 10 seconds to give some time for ssh command to cleanly finish before starting dropping inbound packets.
 		// We still accept packages send from localhost to prevent monit from restarting kubelet.
 		tmpLogPath := "/tmp/drop-inbound.log"
-		testReboot(f.ClientSet, dropPacketsScript("INPUT", tmpLogPath), catLogHook(tmpLogPath))
+		testReboot(f, dropPacketsScript("INPUT", tmpLogPath), catLogHook(tmpLogPath))
 	})
 
 	It("each node by dropping all outbound packets for a while and ensure they function afterwards", func() {
@@ -126,13 +125,13 @@ var _ = SIGDescribe("Reboot [Disruptive] [Feature:Reboot]", func() {
 		// We sleep 10 seconds to give some time for ssh command to cleanly finish before starting dropping outbound packets.
 		// We still accept packages send to localhost to prevent monit from restarting kubelet.
 		tmpLogPath := "/tmp/drop-outbound.log"
-		testReboot(f.ClientSet, dropPacketsScript("OUTPUT", tmpLogPath), catLogHook(tmpLogPath))
+		testReboot(f, dropPacketsScript("OUTPUT", tmpLogPath), catLogHook(tmpLogPath))
 	})
 })
 
-func testReboot(c clientset.Interface, rebootCmd string, hook terminationHook) {
+func testReboot(f *framework.Framework, rebootCmd string, hook terminationHook) {
 	// Get all nodes, and kick off the test on each.
-	nodelist := framework.GetReadySchedulableNodesOrDie(c)
+	nodelist := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
 	if hook != nil {
 		defer func() {
 			framework.Logf("Executing termination hook on nodes")
@@ -148,7 +147,7 @@ func testReboot(c clientset.Interface, rebootCmd string, hook terminationHook) {
 		go func(ix int) {
 			defer wg.Done()
 			n := nodelist.Items[ix]
-			result[ix] = rebootNode(c, framework.TestContext.Provider, n.ObjectMeta.Name, rebootCmd)
+			result[ix] = rebootNode(f, framework.TestContext.Provider, n.ObjectMeta.Name, rebootCmd)
 			if !result[ix] {
 				failed = true
 			}
@@ -169,7 +168,7 @@ func testReboot(c clientset.Interface, rebootCmd string, hook terminationHook) {
 	}
 }
 
-func printStatusAndLogsForNotReadyPods(c clientset.Interface, ns string, podNames []string, pods []*v1.Pod) {
+func printStatusAndLogsForNotReadyPods(f *framework.Framework, podNames []string, pods []*v1.Pod) {
 	printFn := func(id, log string, err error, previous bool) {
 		prefix := "Retrieving log for container"
 		if previous {
@@ -183,7 +182,7 @@ func printStatusAndLogsForNotReadyPods(c clientset.Interface, ns string, podName
 	}
 	podNameSet := sets.NewString(podNames...)
 	for _, p := range pods {
-		if p.Namespace != ns {
+		if p.Namespace != f.Namespace.Name {
 			continue
 		}
 		if !podNameSet.Has(p.Name) {
@@ -196,7 +195,7 @@ func printStatusAndLogsForNotReadyPods(c clientset.Interface, ns string, podName
 		// Print the log of the containers if pod is not running and ready.
 		for _, container := range p.Status.ContainerStatuses {
 			cIdentifer := fmt.Sprintf("%s/%s/%s", p.Namespace, p.Name, container.Name)
-			log, err := framework.GetPodLogs(c, p.Namespace, p.Name, container.Name)
+			log, err := f.GetPodLogs(p.Name, container.Name)
 			printFn(cIdentifer, log, err, false)
 			// Get log from the previous container.
 			if container.RestartCount > 0 {
@@ -216,22 +215,22 @@ func printStatusAndLogsForNotReadyPods(c clientset.Interface, ns string, podName
 //
 // It returns true through result only if all of the steps pass; at the first
 // failed step, it will return false through result and not run the rest.
-func rebootNode(c clientset.Interface, provider, name, rebootCmd string) bool {
+func rebootNode(f *framework.Framework, provider, name, rebootCmd string) bool {
 	// Setup
 	ns := metav1.NamespaceSystem
-	ps := testutils.NewPodStore(c, ns, labels.Everything(), fields.OneTermEqualSelector(api.PodHostField, name))
+	ps := testutils.NewPodStore(f.ClientSet, ns, labels.Everything(), fields.OneTermEqualSelector(api.PodHostField, name))
 	defer ps.Stop()
 
 	// Get the node initially.
 	framework.Logf("Getting %s", name)
-	node, err := c.CoreV1().Nodes().Get(name, metav1.GetOptions{})
+	node, err := f.ClientSet.CoreV1().Nodes().Get(name, metav1.GetOptions{})
 	if err != nil {
 		framework.Logf("Couldn't get node %s", name)
 		return false
 	}
 
 	// Node sanity check: ensure it is "ready".
-	if !framework.WaitForNodeToBeReady(c, name, framework.NodeReadyInitialTimeout) {
+	if !framework.WaitForNodeToBeReady(f.ClientSet, name, framework.NodeReadyInitialTimeout) {
 		return false
 	}
 
@@ -255,8 +254,8 @@ func rebootNode(c clientset.Interface, provider, name, rebootCmd string) bool {
 
 	// For each pod, we do a sanity check to ensure it's running / healthy
 	// or succeeded now, as that's what we'll be checking later.
-	if !framework.CheckPodsRunningReadyOrSucceeded(c, ns, podNames, framework.PodReadyBeforeTimeout) {
-		printStatusAndLogsForNotReadyPods(c, ns, podNames, pods)
+	if !framework.CheckPodsRunningReadyOrSucceeded(f.ClientSet, ns, podNames, framework.PodReadyBeforeTimeout) {
+		printStatusAndLogsForNotReadyPods(f, podNames, pods)
 		return false
 	}
 
@@ -267,20 +266,20 @@ func rebootNode(c clientset.Interface, provider, name, rebootCmd string) bool {
 	}
 
 	// Wait for some kind of "not ready" status.
-	if !framework.WaitForNodeToBeNotReady(c, name, rebootNodeNotReadyTimeout) {
+	if !framework.WaitForNodeToBeNotReady(f.ClientSet, name, rebootNodeNotReadyTimeout) {
 		return false
 	}
 
 	// Wait for some kind of "ready" status.
-	if !framework.WaitForNodeToBeReady(c, name, rebootNodeReadyAgainTimeout) {
+	if !framework.WaitForNodeToBeReady(f.ClientSet, name, rebootNodeReadyAgainTimeout) {
 		return false
 	}
 
 	// Ensure all of the pods that we found on this node before the reboot are
 	// running / healthy, or succeeded.
-	if !framework.CheckPodsRunningReadyOrSucceeded(c, ns, podNames, rebootPodReadyAgainTimeout) {
+	if !framework.CheckPodsRunningReadyOrSucceeded(f.ClientSet, ns, podNames, rebootPodReadyAgainTimeout) {
 		newPods := ps.List()
-		printStatusAndLogsForNotReadyPods(c, ns, podNames, newPods)
+		printStatusAndLogsForNotReadyPods(f, podNames, newPods)
 		return false
 	}
 

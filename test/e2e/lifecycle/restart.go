@@ -86,7 +86,7 @@ var _ = SIGDescribe("Restart [Disruptive]", func() {
 			originalPodNames[i] = p.ObjectMeta.Name
 		}
 		if !framework.CheckPodsRunningReadyOrSucceeded(f.ClientSet, systemNamespace, originalPodNames, framework.PodReadyBeforeTimeout) {
-			printStatusAndLogsForNotReadyPods(f.ClientSet, systemNamespace, originalPodNames, pods)
+			printStatusAndLogsForNotReadyPods(f, originalPodNames, pods)
 			framework.Failf("At least one pod wasn't running and ready or succeeded at test start.")
 		}
 	})
@@ -125,7 +125,7 @@ var _ = SIGDescribe("Restart [Disruptive]", func() {
 		remaining := framework.RestartPodReadyAgainTimeout - time.Since(podCheckStart)
 		if !framework.CheckPodsRunningReadyOrSucceeded(f.ClientSet, systemNamespace, podNamesAfter, remaining) {
 			pods := ps.List()
-			printStatusAndLogsForNotReadyPods(f.ClientSet, systemNamespace, podNamesAfter, pods)
+			printStatusAndLogsForNotReadyPods(f, podNamesAfter, pods)
 			framework.Failf("At least one pod wasn't running and ready after the restart.")
 		}
 	})

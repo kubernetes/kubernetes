@@ -373,7 +373,7 @@ func testCanConnect(f *framework.Framework, ns *v1.Namespace, podName string, se
 	err = framework.WaitForPodSuccessInNamespace(f.ClientSet, podClient.Name, ns.Name)
 	if err != nil {
 		// Collect pod logs when we see a failure.
-		logs, logErr := framework.GetPodLogs(f.ClientSet, f.Namespace.Name, podName, fmt.Sprintf("%s-container", podName))
+		logs, logErr := f.GetPodLogs(podName, fmt.Sprintf("%s-container", podName))
 		if logErr != nil {
 			framework.Failf("Error getting container logs: %s", logErr)
 		}
@@ -419,7 +419,7 @@ func testCannotConnect(f *framework.Framework, ns *v1.Namespace, podName string,
 	// Dump debug information if the error was nil.
 	if err == nil {
 		// Collect pod logs when we see a failure.
-		logs, logErr := framework.GetPodLogs(f.ClientSet, f.Namespace.Name, podName, fmt.Sprintf("%s-container", podName))
+		logs, logErr := f.GetPodLogs(podName, fmt.Sprintf("%s-container", podName))
 		if logErr != nil {
 			framework.Failf("Error getting container logs: %s", logErr)
 		}
