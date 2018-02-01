@@ -685,7 +685,7 @@ func updatePrintOptionsForOpenAPI(f cmdutil.Factory, mapping *meta.RESTMapping, 
 	return outputOptsFromStr(columns, printOpts)
 }
 
-// outputOptsFromStr parses the print-column metadata and generates printer.OutputOptions object.
+// outputOptsFromStr parses the print-column metadata and generates printers.PrintOptions object.
 func outputOptsFromStr(columnStr string, printOpts *printers.PrintOptions) bool {
 	if columnStr == "" {
 		return false
