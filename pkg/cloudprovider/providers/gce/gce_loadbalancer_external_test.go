@@ -356,6 +356,12 @@ func TestEnsureExternalLoadBalancer(t *testing.T) {
 	assert.NotEmpty(t, pool.HealthChecks)
 	assert.NotEmpty(t, pool.Instances)
 
+	// Check that HealthCheck is created
+	hcName := MakeNodesHealthCheckName(clusterID)
+	healthcheck, err := gce.GetHttpHealthCheck(hcName)
+	require.NoError(t, err)
+	assert.Equal(t, hcName, healthcheck.Name)
+
 	// Check that ForwardingRule is created
 	fwdRule, err := gce.GetRegionForwardingRule(lbName, gceRegion)
 	require.NoError(t, err)
@@ -392,6 +398,12 @@ func TestEnsureExternalLoadBalancerDeleted(t *testing.T) {
 	pool, err := gce.GetTargetPool(lbName, gceRegion)
 	require.Error(t, err)
 	assert.Nil(t, pool)
+
+	// Check that HealthCheck is deleted
+	hcName := MakeNodesHealthCheckName(clusterID)
+	healthcheck, err := gce.GetHttpHealthCheck(hcName)
+	require.Error(t, err)
+	assert.Nil(t, healthcheck)
 
 	// Check forwarding rule is deleted
 	fwdRule, err := gce.GetRegionForwardingRule(lbName, gceRegion)
