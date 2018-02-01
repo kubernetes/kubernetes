@@ -190,7 +190,7 @@ func (scaler *ReplicationControllerScaler) ScaleSimple(namespace, name string, p
 }
 
 // Scale updates a ReplicationController to a new size, with optional precondition check (if preconditions is not nil),
-// optional retries (if retry is not nil), and then optionally waits for it's replica count to reach the new value
+// optional retries (if retry is not nil), and then optionally waits for its replica count to reach the new value
 // (if wait is not nil).
 func (scaler *ReplicationControllerScaler) Scale(namespace, name string, newSize uint, preconditions *ScalePrecondition, retry, waitForReplicas *RetryParams) error {
 	if preconditions == nil {
