@@ -31,6 +31,7 @@ import (
 	genericoptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1"
 	"k8s.io/kube-aggregator/pkg/apiserver"
+	aggregatorscheme "k8s.io/kube-aggregator/pkg/apiserver/scheme"
 )
 
 const defaultEtcdPathPrefix = "/registry/kube-aggregator.kubernetes.io/"
@@ -84,7 +85,7 @@ func (o *AggregatorOptions) AddFlags(fs *pflag.FlagSet) {
 // NewDefaultOptions builds a "normal" set of options.  You wouldn't normally expose this, but hyperkube isn't cobra compatible
 func NewDefaultOptions(out, err io.Writer) *AggregatorOptions {
 	o := &AggregatorOptions{
-		RecommendedOptions: genericoptions.NewRecommendedOptions(defaultEtcdPathPrefix, apiserver.Codecs.LegacyCodec(v1beta1.SchemeGroupVersion)),
+		RecommendedOptions: genericoptions.NewRecommendedOptions(defaultEtcdPathPrefix, aggregatorscheme.Codecs.LegacyCodec(v1beta1.SchemeGroupVersion)),
 		APIEnablement:      genericoptions.NewAPIEnablementOptions(),
 
 		StdOut: out,
@@ -97,7 +98,7 @@ func NewDefaultOptions(out, err io.Writer) *AggregatorOptions {
 func (o AggregatorOptions) Validate(args []string) error {
 	errors := []error{}
 	errors = append(errors, o.RecommendedOptions.Validate()...)
-	errors = append(errors, o.APIEnablement.Validate(apiserver.Registry)...)
+	errors = append(errors, o.APIEnablement.Validate(aggregatorscheme.Registry)...)
 	return utilerrors.NewAggregate(errors)
 }
 
@@ -111,12 +112,12 @@ func (o AggregatorOptions) RunAggregator(stopCh <-chan struct{}) error {
 		return fmt.Errorf("error creating self-signed certificates: %v", err)
 	}
 
-	serverConfig := genericapiserver.NewRecommendedConfig(apiserver.Codecs)
+	serverConfig := genericapiserver.NewRecommendedConfig(aggregatorscheme.Codecs)
 
-	if err := o.RecommendedOptions.ApplyTo(serverConfig, apiserver.Scheme); err != nil {
+	if err := o.RecommendedOptions.ApplyTo(serverConfig, aggregatorscheme.Scheme); err != nil {
 		return err
 	}
-	if err := o.APIEnablement.ApplyTo(&serverConfig.Config, apiserver.DefaultAPIResourceConfigSource(), apiserver.Registry); err != nil {
+	if err := o.APIEnablement.ApplyTo(&serverConfig.Config, apiserver.DefaultAPIResourceConfigSource(), aggregatorscheme.Registry); err != nil {
 		return err
 	}
 	serverConfig.LongRunningFunc = filters.BasicLongRunningRequestCheck(
