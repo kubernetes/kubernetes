@@ -178,6 +178,8 @@ func main() {
 	switch *testSuite {
 	case "conformance":
 		suite = remote.InitConformanceRemote()
+	case "cadvisor":
+		suite = remote.InitCAdvisorE2ERemote()
 	// TODO: Add subcommand for node soaking, node conformance, cri validation.
 	case "default":
 		// Use node e2e suite by default if no subcommand is specified.

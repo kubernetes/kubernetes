@@ -139,21 +139,20 @@ func getTestArtifacts(host, testDir string) error {
 		return fmt.Errorf("failed to create log directory %q: %v", logPath, err)
 	}
 	// Copy logs to artifacts/hostname
-	_, err := runSSHCommand("scp", "-r", fmt.Sprintf("%s:%s/results/*.log", GetHostnameOrIp(host), testDir), logPath)
-	if err != nil {
+	if _, err := runSSHCommand("scp", "-r", fmt.Sprintf("%s:%s/results/*.log", GetHostnameOrIp(host), testDir), logPath); err != nil {
 		return err
 	}
 	// Copy json files (if any) to artifacts.
-	if _, err = SSH(host, "ls", fmt.Sprintf("%s/results/*.json", testDir)); err == nil {
-		_, err = runSSHCommand("scp", "-r", fmt.Sprintf("%s:%s/results/*.json", GetHostnameOrIp(host), testDir), *resultsDir)
-		if err != nil {
+	if _, err := SSH(host, "ls", fmt.Sprintf("%s/results/*.json", testDir)); err == nil {
+		if _, err = runSSHCommand("scp", "-r", fmt.Sprintf("%s:%s/results/*.json", GetHostnameOrIp(host), testDir), *resultsDir); err != nil {
 			return err
 		}
 	}
-	// Copy junit to the top of artifacts
-	_, err = runSSHCommand("scp", fmt.Sprintf("%s:%s/results/junit*", GetHostnameOrIp(host), testDir), *resultsDir)
-	if err != nil {
-		return err
+	if _, err := SSH(host, "ls", fmt.Sprintf("%s/results/junit*", testDir)); err == nil {
+		// Copy junit (if any) to the top of artifacts
+		if _, err = runSSHCommand("scp", fmt.Sprintf("%s:%s/results/junit*", GetHostnameOrIp(host), testDir), *resultsDir); err != nil {
+			return err
+		}
 	}
 	return nil
 }
