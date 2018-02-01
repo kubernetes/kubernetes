@@ -225,6 +225,12 @@ const (
 	//
 	// Implement support for limiting pids in pods
 	SupportPodPidsLimit utilfeature.Feature = "SupportPodPidsLimit"
+
+	// owner: @feiskyer
+	// alpha: v1.10
+	//
+	// Enable Hyper-V containers on Windows
+	HyperVContainer utilfeature.Feature = "HyperVContainer"
 )
 
 func init() {
@@ -265,6 +271,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	ResourceLimitsPriorityFunction:              {Default: false, PreRelease: utilfeature.Alpha},
 	SupportIPVSProxyMode:                        {Default: false, PreRelease: utilfeature.Beta},
 	SupportPodPidsLimit:                         {Default: false, PreRelease: utilfeature.Alpha},
+	HyperVContainer:                             {Default: false, PreRelease: utilfeature.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:
