@@ -1663,6 +1663,74 @@ func TestValidateCSIVolumeSource(t *testing.T) {
 			errtype:  field.ErrorTypeRequired,
 			errfield: "volumeHandle",
 		},
+		{
+			name: "driver name: ok no punctuations",
+			csi:  &core.CSIPersistentVolumeSource{Driver: "comgooglestoragecsigcepd", VolumeHandle: "test-123"},
+		},
+		{
+			name: "driver name: ok dot only",
+			csi:  &core.CSIPersistentVolumeSource{Driver: "io.kubernetes.storage.csi.flex", VolumeHandle: "test-123"},
+		},
+		{
+			name: "driver name: ok dash only",
+			csi:  &core.CSIPersistentVolumeSource{Driver: "io-kubernetes-storage-csi-flex", VolumeHandle: "test-123"},
+		},
+		{
+			name: "driver name: ok underscore only",
+			csi:  &core.CSIPersistentVolumeSource{Driver: "io_kubernetes_storage_csi_flex", VolumeHandle: "test-123"},
+		},
+		{
+			name: "driver name: ok dot underscores",
+			csi:  &core.CSIPersistentVolumeSource{Driver: "io.kubernetes.storage_csi.flex", VolumeHandle: "test-123"},
+		},
+		{
+			name: "driver name: ok beginnin with number",
+			csi:  &core.CSIPersistentVolumeSource{Driver: "2io.kubernetes.storage_csi.flex", VolumeHandle: "test-123"},
+		},
+		{
+			name: "driver name: ok ending with number",
+			csi:  &core.CSIPersistentVolumeSource{Driver: "io.kubernetes.storage_csi.flex2", VolumeHandle: "test-123"},
+		},
+		{
+			name: "driver name: ok dot dash underscores",
+			csi:  &core.CSIPersistentVolumeSource{Driver: "io.kubernetes-storage.csi_flex", VolumeHandle: "test-123"},
+		},
+		{
+			name:     "driver name: invalid length 0",
+			csi:      &core.CSIPersistentVolumeSource{Driver: "", VolumeHandle: "test-123"},
+			errtype:  field.ErrorTypeRequired,
+			errfield: "driver",
+		},
+		{
+			name:     "driver name: invalid length 1",
+			csi:      &core.CSIPersistentVolumeSource{Driver: "a", VolumeHandle: "test-123"},
+			errtype:  field.ErrorTypeInvalid,
+			errfield: "driver",
+		},
+		{
+			name:     "driver name: invalid length > 63",
+			csi:      &core.CSIPersistentVolumeSource{Driver: "comgooglestoragecsigcepdcomgooglestoragecsigcepdcomgooglestoragecsigcepdcomgooglestoragecsigcepd", VolumeHandle: "test-123"},
+			errtype:  field.ErrorTypeTooLong,
+			errfield: "driver",
+		},
+		{
+			name:     "driver name: invalid start char",
+			csi:      &core.CSIPersistentVolumeSource{Driver: "_comgooglestoragecsigcepd", VolumeHandle: "test-123"},
+			errtype:  field.ErrorTypeInvalid,
+			errfield: "driver",
+		},
+		{
+			name:     "driver name: invalid end char",
+			csi:      &core.CSIPersistentVolumeSource{Driver: "comgooglestoragecsigcepd/", VolumeHandle: "test-123"},
+			errtype:  field.ErrorTypeInvalid,
+			errfield: "driver",
+		},
+		{
+			name:     "driver name: invalid separators",
+			csi:      &core.CSIPersistentVolumeSource{Driver: "com/google/storage/csi~gcepd", VolumeHandle: "test-123"},
+			errtype:  field.ErrorTypeInvalid,
+			errfield: "driver",
+		},
 	}
 
 	err := utilfeature.DefaultFeatureGate.Set("CSIPersistentVolume=true")
