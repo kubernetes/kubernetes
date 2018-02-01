@@ -922,7 +922,7 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *v1.Serv
 	}
 
 	portID := loadbalancer.VipPortID
-	floatIP, err := getFloatingIPByPortID(lbaas.lb, portID)
+	floatIP, err := getFloatingIPByPortID(lbaas.network, portID)
 	if err != nil && err != ErrNotFound {
 		return nil, fmt.Errorf("error getting floating ip for port %s: %v", portID, err)
 	}
