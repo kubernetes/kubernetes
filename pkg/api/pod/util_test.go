@@ -314,7 +314,7 @@ func TestDropAlphaVolumeDevices(t *testing.T) {
 			t.Error("VolumeDevices in Container should not have been dropped based on feature-gate")
 		}
 		if testPod.Spec.InitContainers[0].VolumeDevices == nil {
-			t.Error("VolumeDevices in Container should not have been dropped based on feature-gate")
+			t.Error("VolumeDevices in InitContainers should not have been dropped based on feature-gate")
 		}
 	}
 
