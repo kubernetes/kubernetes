@@ -1406,7 +1406,7 @@ type ScaleIOVolumeSource struct {
 }
 
 // ScaleIOPersistentVolumeSource represents a persistent ScaleIO volume that can be defined
-// by a an admin via a storage class, for instance.
+// by an admin via a storage class, for instance.
 type ScaleIOPersistentVolumeSource struct {
 	// The host address of the ScaleIO API Gateway.
 	Gateway string
