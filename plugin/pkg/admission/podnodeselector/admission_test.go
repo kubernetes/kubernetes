@@ -29,6 +29,7 @@ import (
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 	kubeadmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
+	internalapi "k8s.io/kubernetes/plugin/pkg/admission/podnodeselector/apis/podnodeselector"
 )
 
 // TestPodAdmission verifies various scenarios involving pod/namespace/global node label selectors
@@ -158,23 +159,23 @@ func TestPodAdmission(t *testing.T) {
 			testName:                        "Default node selector conflict with the whitelist",
 		},
 		{
-			defaultNodeSelector:   "infra=cloud",
-			namespaceNodeSelector: "infra=false, env=dev",
+			defaultNodeSelector:             "infra=cloud",
+			namespaceNodeSelector:           "infra=false, env=dev",
 			deprecatedNamespaceNodeSelector: "infra=false",
-			whitelist:             "env=dev, infra=false, color=blue",
-			podNodeSelector:       map[string]string{"env": "dev", "color": "blue"},
-			mergedNodeSelector:    labels.Set{"infra": "false", "env": "dev", "color": "blue"},
-			admit:                 true,
-			testName:              "(deprecated annotation) Merge with duplicate entry succeeds",
+			whitelist:                       "env=dev, infra=false, color=blue",
+			podNodeSelector:                 map[string]string{"env": "dev", "color": "blue"},
+			mergedNodeSelector:              labels.Set{"infra": "false", "env": "dev", "color": "blue"},
+			admit:                           true,
+			testName:                        "(deprecated annotation) Merge with duplicate entry succeeds",
 		},
 		{
-			defaultNodeSelector:   "",
-			namespaceNodeSelector: "infra=false, env=dev",
+			defaultNodeSelector:             "",
+			namespaceNodeSelector:           "infra=false, env=dev",
 			deprecatedNamespaceNodeSelector: "infra=true",
-			whitelist:             "env=dev, infra=true, color=blue",
-			podNodeSelector:       map[string]string{"env": "prod", "color": "blue"},
-			admit:                 false,
-			testName:              "(deprecated annotation) Merge with conflicting entry fails",
+			whitelist:                       "env=dev, infra=true, color=blue",
+			podNodeSelector:                 map[string]string{"env": "prod", "color": "blue"},
+			admit:                           false,
+			testName:                        "(deprecated annotation) Merge with conflicting entry fails",
 		},
 	}
 
@@ -188,12 +189,19 @@ func TestPodAdmission(t *testing.T) {
 				}
 				informerFactory.Core().InternalVersion().Namespaces().Informer().GetStore().Update(namespace)
 			}
-			handler.clusterNodeSelectors = make(map[string]string)
-			handler.clusterNodeSelectors["clusterDefaultNodeSelector"] = test.defaultNodeSelector
-			handler.clusterNodeSelectors[namespace.Name] = test.whitelist
-			pod.Spec = api.PodSpec{ NodeSelector: test.podNodeSelector }
 
-			err := handler.Admit(admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), "testNamespace", namespace.ObjectMeta.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, nil))
+			handler.clusterDefaultNodeSelectors, err = labels.ConvertSelectorToLabelsMap(test.defaultNodeSelector)
+			if err != nil {
+				t.Errorf("unexpected error when handling clusterDefaultNodeSelectors")
+			}
+			nsWhitelist, err := labels.ConvertSelectorToLabelsMap(test.whitelist)
+			if err != nil {
+				t.Errorf("unexpected error when handling namespaceSelectorsWhitelists")
+			}
+			handler.namespaceSelectorsWhitelists = map[string]labels.Set{namespace.Name: nsWhitelist}
+			pod.Spec = api.PodSpec{NodeSelector: test.podNodeSelector}
+
+			err = handler.Admit(admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), "testNamespace", namespace.ObjectMeta.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, nil))
 			if test.admit && err != nil {
 				t.Errorf("expected no error but got: %s", err)
 			} else if !test.admit && err == nil {
@@ -236,7 +244,11 @@ func TestHandles(t *testing.T) {
 		admission.Connect: false,
 		admission.Delete:  false,
 	} {
-		nodeEnvionment := NewPodNodeSelector(nil)
+		nodeEnvionment, err := NewPodNodeSelector(&internalapi.Configuration{})
+		if err != nil {
+			t.Fatalf("failed to create PodNodeSelector admission controller")
+		}
+
 		if e, a := shouldHandle, nodeEnvionment.Handles(op); e != a {
 			t.Errorf("%v: shouldHandle=%t, handles=%t", op, e, a)
 		}
@@ -280,9 +292,12 @@ func TestIgnoreUpdatingInitializedPod(t *testing.T) {
 // newHandlerForTest returns the admission controller configured for testing.
 func newHandlerForTest(c clientset.Interface) (*podNodeSelector, informers.SharedInformerFactory, error) {
 	f := informers.NewSharedInformerFactory(c, 5*time.Minute)
-	handler := NewPodNodeSelector(nil)
+	handler, err := NewPodNodeSelector(&internalapi.Configuration{})
+	if err != nil {
+		return nil, nil, err
+	}
 	pluginInitializer := kubeadmission.NewPluginInitializer(c, f, nil, nil, nil)
 	pluginInitializer.Initialize(handler)
-	err := admission.ValidateInitialization(handler)
+	err = admission.ValidateInitialization(handler)
 	return handler, f, err
 }

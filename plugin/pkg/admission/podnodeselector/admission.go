@@ -19,14 +19,12 @@ package podnodeselector
 import (
 	"fmt"
 	"io"
-	"reflect"
 
 	"github.com/golang/glog"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/apiserver/pkg/admission"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
@@ -35,6 +33,7 @@ import (
 	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 	"k8s.io/kubernetes/pkg/kubeapiserver/admission/util"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
+	internalapi "k8s.io/kubernetes/plugin/pkg/admission/podnodeselector/apis/podnodeselector"
 )
 
 // NamespaceNodeSelectors is the list of Namespace annotation keys from which to read
@@ -47,10 +46,11 @@ const PluginName = "PodNodeSelector"
 // Register registers a plugin
 func Register(plugins *admission.Plugins) {
 	plugins.Register(PluginName, func(config io.Reader) (admission.Interface, error) {
-		// TODO move this to a versioned configuration file format.
-		pluginConfig := readConfig(config)
-		plugin := NewPodNodeSelector(pluginConfig.PodNodeSelectorPluginConfig)
-		return plugin, nil
+		pluginConfig, err := loadConfiguration(config)
+		if err != nil {
+			return nil, err
+		}
+		return NewPodNodeSelector(pluginConfig)
 	})
 }
 
@@ -59,43 +59,15 @@ type podNodeSelector struct {
 	*admission.Handler
 	client          internalclientset.Interface
 	namespaceLister corelisters.NamespaceLister
-	// global default node selector and namespace whitelists in a cluster.
-	clusterNodeSelectors map[string]string
+
+	clusterDefaultNodeSelectors  labels.Set
+	namespaceSelectorsWhitelists map[string]labels.Set
 }
 
 var _ admission.MutationInterface = &podNodeSelector{}
 var _ admission.ValidationInterface = &podNodeSelector{}
 var _ = kubeapiserveradmission.WantsInternalKubeClientSet(&podNodeSelector{})
 var _ = kubeapiserveradmission.WantsInternalKubeInformerFactory(&podNodeSelector{})
-
-type pluginConfig struct {
-	PodNodeSelectorPluginConfig map[string]string
-}
-
-// readConfig reads default value of clusterDefaultNodeSelector
-// from the file provided with --admission-control-config-file
-// If the file is not supplied, it defaults to ""
-// The format in a file:
-// podNodeSelectorPluginConfig:
-//  clusterDefaultNodeSelector: <node-selectors-labels>
-//  namespace1: <node-selectors-labels>
-//  namespace2: <node-selectors-labels>
-func readConfig(config io.Reader) *pluginConfig {
-	defaultConfig := &pluginConfig{}
-	if config == nil || reflect.ValueOf(config).IsNil() {
-		return defaultConfig
-	}
-	d := yaml.NewYAMLOrJSONDecoder(config, 4096)
-	for {
-		if err := d.Decode(defaultConfig); err != nil {
-			if err != io.EOF {
-				continue
-			}
-		}
-		break
-	}
-	return defaultConfig
-}
 
 // Admit enforces that pod and its namespace node label selectors matches at least a node in the cluster.
 func (p *podNodeSelector) Admit(a admission.Attributes) error {
@@ -153,10 +125,7 @@ func (p *podNodeSelector) Validate(a admission.Attributes) error {
 	}
 
 	// whitelist verification
-	whitelist, err := labels.ConvertSelectorToLabelsMap(p.clusterNodeSelectors[a.GetNamespace()])
-	if err != nil {
-		return err
-	}
+	whitelist := p.namespaceSelectorsWhitelists[a.GetNamespace()]
 	if !labels.AreLabelsInWhiteList(pod.Spec.NodeSelector, whitelist) {
 		return errors.NewForbidden(resource, pod.Name, fmt.Errorf("pod node label selector labels conflict with its namespace whitelist"))
 	}
@@ -200,11 +169,31 @@ func shouldIgnore(a admission.Attributes) bool {
 	return false
 }
 
-func NewPodNodeSelector(clusterNodeSelectors map[string]string) *podNodeSelector {
-	return &podNodeSelector{
-		Handler:              admission.NewHandler(admission.Create, admission.Update),
-		clusterNodeSelectors: clusterNodeSelectors,
+func NewPodNodeSelector(pluginConfig *internalapi.Configuration) (*podNodeSelector, error) {
+	var err error
+	var clusterDefaultNodeSelectors labels.Set
+	if len(pluginConfig.ClusterDefaultNodeSelectors) > 0 {
+		clusterDefaultNodeSelectors, err = labels.ConvertSelectorToLabelsMap(pluginConfig.ClusterDefaultNodeSelectors)
+		if err != nil {
+			return nil, err
+		}
 	}
+	namespaceSelectorsWhitelists := make(map[string]labels.Set)
+	if len(pluginConfig.NamespaceSelectorsWhitelists) > 0 {
+		for k, v := range pluginConfig.NamespaceSelectorsWhitelists {
+			labelMap, err := labels.ConvertSelectorToLabelsMap(v)
+			if err != nil {
+				return nil, err
+			}
+			namespaceSelectorsWhitelists[k] = labelMap
+		}
+	}
+
+	return &podNodeSelector{
+		Handler:                      admission.NewHandler(admission.Create, admission.Update),
+		clusterDefaultNodeSelectors:  clusterDefaultNodeSelectors,
+		namespaceSelectorsWhitelists: namespaceSelectorsWhitelists,
+	}, nil
 }
 
 func (a *podNodeSelector) SetInternalKubeClientSet(client internalclientset.Interface) {
@@ -258,9 +247,8 @@ func (p *podNodeSelector) getNodeSelectorMap(namespace *api.Namespace) (labels.S
 		}
 	}
 	if !found {
-		selector, err = labels.ConvertSelectorToLabelsMap(p.clusterNodeSelectors["clusterDefaultNodeSelector"])
-		if err != nil {
-			return labels.Set{}, err
+		if p.clusterDefaultNodeSelectors != nil {
+			return p.clusterDefaultNodeSelectors, nil
 		}
 	}
 	return selector, nil
