@@ -100,7 +100,7 @@ func newWithBackoff(subjectAccessReview authorizationclient.SubjectAccessReviewI
 
 // Authorize makes a REST request to the remote service describing the attempted action as a JSON
 // serialized api.authorization.v1beta1.SubjectAccessReview object. An example request body is
-// provided bellow.
+// provided below.
 //
 //     {
 //       "apiVersion": "authorization.k8s.io/v1beta1",

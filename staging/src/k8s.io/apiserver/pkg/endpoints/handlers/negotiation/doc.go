@@ -14,5 +14,5 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package negotation contains media type negotiation logic.
+// Package negotiation contains media type negotiation logic.
 package negotiation // import "k8s.io/apiserver/pkg/endpoints/handlers/negotiation"

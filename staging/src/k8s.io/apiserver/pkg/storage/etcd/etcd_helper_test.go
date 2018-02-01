@@ -348,7 +348,7 @@ func TestGetNotFoundErr(t *testing.T) {
 	var got example.Pod
 	err := helper.Get(context.TODO(), boguskey, "", &got, false)
 	if !storage.IsNotFound(err) {
-		t.Errorf("Unexpected reponse on key=%v, err=%v", boguskey, err)
+		t.Errorf("Unexpected response on key=%v, err=%v", boguskey, err)
 	}
 }
 

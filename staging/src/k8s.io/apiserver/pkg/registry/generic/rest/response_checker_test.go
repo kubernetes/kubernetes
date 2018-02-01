@@ -90,6 +90,6 @@ func TestGenericHttpResponseCheckerLimitReader(t *testing.T) {
 		t.Error("unexpected non-error")
 	}
 	if len(err.Error()) != maxReadLength {
-		t.Errorf("expected lenth of error message: %d, saw: %d", maxReadLength, len(err.Error()))
+		t.Errorf("expected length of error message: %d, saw: %d", maxReadLength, len(err.Error()))
 	}
 }

@@ -76,7 +76,7 @@ type etcdWatcher struct {
 	valueTransformer ValueTransformer
 
 	list    bool // If we're doing a recursive watch, should be true.
-	quorum  bool // If we enable quorum, shoule be true
+	quorum  bool // If we enable quorum, should be true
 	include includeFunc
 	pred    storage.SelectionPredicate
 

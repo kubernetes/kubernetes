@@ -357,7 +357,7 @@ func (b *batchBackend) sendBatchEvents(events []auditinternal.Event) {
 	b.reqMutex.RLock()
 	go func() {
 		// Execute the webhook POST in a goroutine to keep it from blocking.
-		// This lets the webhook continue to drain the queue immediatly.
+		// This lets the webhook continue to drain the queue immediately.
 
 		defer b.reqMutex.RUnlock()
 		defer runtime.HandleCrash()
