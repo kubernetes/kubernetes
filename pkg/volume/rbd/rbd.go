@@ -437,7 +437,6 @@ func (plugin *rbdPlugin) NewBlockVolumeMapper(spec *volume.Spec, pod *v1.Pod, _ 
 		uid = pod.UID
 	}
 	secret := ""
-	// var err error
 	if pod != nil {
 		secretName, secretNs, err := getSecretNameAndNamespace(spec, pod.Namespace)
 		if err != nil {
@@ -854,7 +853,6 @@ func (rbd *rbdDiskMapper) SetUpDevice() (string, error) {
 }
 
 func (rbd *rbd) rbdGlobalMapPath(spec *volume.Spec) (string, error) {
-	var err error
 	mon, err := getVolumeSourceMonitors(spec)
 	if err != nil {
 		return "", err
