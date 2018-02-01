@@ -156,9 +156,7 @@ func (p *PriorityPlugin) admitPod(a admission.Attributes) error {
 	if !ok {
 		return errors.NewBadRequest("resource was marked with kind Pod but was unable to be converted")
 	}
-	if _, isMirrorPod := pod.Annotations[api.MirrorPodAnnotationKey]; isMirrorPod {
-		return nil
-	}
+
 	// Make sure that the client has not set `priority` at the time of pod creation.
 	if operation == admission.Create && pod.Spec.Priority != nil {
 		return admission.NewForbidden(a, fmt.Errorf("the integer value of priority must not be provided in pod spec. Priority admission controller populates the value from the given PriorityClass name"))
