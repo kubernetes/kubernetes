@@ -31,6 +31,7 @@ import (
 	"net/http"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -1127,8 +1128,37 @@ func (j *IngressTestJig) CreateIngress(manifestPath, ns string, ingAnnotations m
 		j.Ingress.Annotations[k] = v
 	}
 	j.Logger.Infof(fmt.Sprintf("creating" + j.Ingress.Name + " ingress"))
-	j.Ingress, err = j.Client.ExtensionsV1beta1().Ingresses(ns).Create(j.Ingress)
+	j.Ingress, err = j.RunCreate(j.Ingress)
 	ExpectNoError(err)
+}
+
+// RunCreate runs the required command to create the given ingress.
+func (j *IngressTestJig) RunCreate(ing *extensions.Ingress) (*extensions.Ingress, error) {
+	if j.Class != MulticlusterIngressClassValue {
+		return j.Client.ExtensionsV1beta1().Ingresses(ing.Namespace).Create(ing)
+	}
+	// Use kubemci to create a multicluster ingress.
+	filePath := TestContext.OutputDir + "/mci.yaml"
+	if err := manifest.IngressToManifest(ing, filePath); err != nil {
+		return nil, err
+	}
+	_, err := RunKubemciCmd("create", ing.Name, fmt.Sprintf("--ingress=%s", filePath))
+	return ing, err
+}
+
+// RunUpdate runs the required command to update the given ingress.
+func (j *IngressTestJig) RunUpdate(ing *extensions.Ingress) (*extensions.Ingress, error) {
+	if j.Class != MulticlusterIngressClassValue {
+		return j.Client.ExtensionsV1beta1().Ingresses(ing.Namespace).Update(ing)
+	}
+	// Use kubemci to update a multicluster ingress.
+	// kubemci does not have an update command. We use "create --force" to update an existing ingress.
+	filePath := TestContext.OutputDir + "/mci.yaml"
+	if err := manifest.IngressToManifest(ing, filePath); err != nil {
+		return nil, err
+	}
+	_, err := RunKubemciCmd("create", ing.Name, fmt.Sprintf("--ingress=%s", filePath), "--force")
+	return ing, err
 }
 
 // Update retrieves the ingress, performs the passed function, and then updates it.
@@ -1141,7 +1171,7 @@ func (j *IngressTestJig) Update(update func(ing *extensions.Ingress)) {
 			Failf("failed to get ingress %q: %v", name, err)
 		}
 		update(j.Ingress)
-		j.Ingress, err = j.Client.ExtensionsV1beta1().Ingresses(ns).Update(j.Ingress)
+		j.Ingress, err = j.RunUpdate(j.Ingress)
 		if err == nil {
 			DescribeIng(j.Ingress.Namespace)
 			return
@@ -1193,9 +1223,8 @@ func (j *IngressTestJig) TryDeleteIngress() {
 }
 
 func (j *IngressTestJig) TryDeleteGivenIngress(ing *extensions.Ingress) {
-	err := j.Client.ExtensionsV1beta1().Ingresses(ing.Namespace).Delete(ing.Name, nil)
-	if err != nil {
-		j.Logger.Infof("Error while deleting the ingress %v/%v: %v", ing.Namespace, ing.Name, err)
+	if err := j.RunDelete(ing, j.Class); err != nil {
+		j.Logger.Infof("Error while deleting the ingress %v/%v with class %s: %v", ing.Namespace, ing.Name, j.Class, err)
 	}
 }
 
@@ -1206,8 +1235,45 @@ func (j *IngressTestJig) TryDeleteGivenService(svc *v1.Service) {
 	}
 }
 
+// RunDelete runs the required command to delete the given ingress.
+func (j *IngressTestJig) RunDelete(ing *extensions.Ingress, class string) error {
+	if j.Class != MulticlusterIngressClassValue {
+		return j.Client.ExtensionsV1beta1().Ingresses(ing.Namespace).Delete(ing.Name, nil)
+	}
+	// Use kubemci to delete a multicluster ingress.
+	filePath := TestContext.OutputDir + "/mci.yaml"
+	if err := manifest.IngressToManifest(ing, filePath); err != nil {
+		return err
+	}
+	_, err := RunKubemciCmd("delete", ing.Name, fmt.Sprintf("--ingress=%s", filePath))
+	return err
+}
+
+// getIngressAddressFromKubemci returns the IP address of the given multicluster ingress using kubemci.
+// TODO(nikhiljindal): Update this to be able to return hostname as well.
+func getIngressAddressFromKubemci(name string) ([]string, error) {
+	out, err := RunKubemciCmd("get-status", name)
+	if err != nil {
+		return []string{}, err
+	}
+	ip := findIPv4(out)
+	return []string{ip}, err
+}
+
+// findIPv4 returns the first IPv4 address found in the given string.
+func findIPv4(input string) string {
+	numBlock := "(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])"
+	regexPattern := numBlock + "\\." + numBlock + "\\." + numBlock + "\\." + numBlock
+
+	regEx := regexp.MustCompile(regexPattern)
+	return regEx.FindString(input)
+}
+
 // getIngressAddress returns the ips/hostnames associated with the Ingress.
-func getIngressAddress(client clientset.Interface, ns, name string) ([]string, error) {
+func getIngressAddress(client clientset.Interface, ns, name, class string) ([]string, error) {
+	if class == MulticlusterIngressClassValue {
+		return getIngressAddressFromKubemci(name)
+	}
 	ing, err := client.ExtensionsV1beta1().Ingresses(ns).Get(name, metav1.GetOptions{})
 	if err != nil {
 		return nil, err
@@ -1228,7 +1294,7 @@ func getIngressAddress(client clientset.Interface, ns, name string) ([]string, e
 func (j *IngressTestJig) WaitForIngressAddress(c clientset.Interface, ns, ingName string, timeout time.Duration) (string, error) {
 	var address string
 	err := wait.PollImmediate(10*time.Second, timeout, func() (bool, error) {
-		ipOrNameList, err := getIngressAddress(c, ns, ingName)
+		ipOrNameList, err := getIngressAddress(c, ns, ingName, j.Class)
 		if err != nil || len(ipOrNameList) == 0 {
 			j.Logger.Errorf("Waiting for Ingress %v to acquire IP, error %v", ingName, err)
 			if IsRetryableAPIError(err) {

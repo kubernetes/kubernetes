@@ -2177,6 +2177,21 @@ func RunKubectlOrDieInput(data string, args ...string) string {
 	return NewKubectlCommand(args...).WithStdinData(data).ExecOrDie()
 }
 
+// RunKubemciCmd is a convenience wrapper over kubectlBuilder to run kubemci.
+// It assumes that kubemci exists in PATH.
+func RunKubemciCmd(args ...string) (string, error) {
+	// kubemci is assumed to be in PATH.
+	kubemci := "kubemci"
+	b := new(kubectlBuilder)
+	if TestContext.KubeConfig != "" {
+		args = append(args, "--"+clientcmd.RecommendedConfigPathFlag+"="+TestContext.KubeConfig)
+	}
+	args = append(args, "--gcp-project="+TestContext.CloudConfig.ProjectID)
+
+	b.cmd = exec.Command(kubemci, args...)
+	return b.Exec()
+}
+
 func StartCmdAndStreamOutput(cmd *exec.Cmd) (stdout, stderr io.ReadCloser, err error) {
 	stdout, err = cmd.StdoutPipe()
 	if err != nil {

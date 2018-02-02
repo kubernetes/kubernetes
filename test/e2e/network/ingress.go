@@ -566,6 +566,38 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 		})
 	})
 
+	Describe("GCE [Slow] [Feature:kubemci]", func() {
+		// Platform specific setup
+		BeforeEach(func() {
+			framework.SkipUnlessProviderIs("gce", "gke")
+			jig.Class = framework.MulticlusterIngressClassValue
+		})
+
+		// Platform specific cleanup
+		AfterEach(func() {
+			if CurrentGinkgoTestDescription().Failed {
+				framework.DescribeIng(ns)
+			}
+			if jig.Ingress == nil {
+				By("No ingress created, no cleanup necessary")
+				return
+			}
+			By("Deleting ingress")
+			jig.TryDeleteIngress()
+		})
+
+		It("should conform to Ingress spec", func() {
+			jig.PollInterval = 5 * time.Second
+			conformanceTests = framework.CreateIngressComformanceTests(jig, ns, map[string]string{})
+			for _, t := range conformanceTests {
+				By(t.EntryLog)
+				t.Execute()
+				By(t.ExitLog)
+				jig.WaitForIngress(true /*waitForNodePort*/)
+			}
+		})
+	})
+
 	// Time: borderline 5m, slow by design
 	Describe("[Slow] Nginx", func() {
 		var nginxController *framework.NginxIngressController
