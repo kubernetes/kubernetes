@@ -61,11 +61,6 @@ var ErrNoNodesAvailable = fmt.Errorf("no nodes available to schedule pods")
 
 const (
 	NoNodeAvailableMsg = "0/%v nodes are available"
-	// NominatedNodeAnnotationKey is used to annotate a pod that has preempted other pods.
-	// The scheduler uses the annotation to find that the pod shouldn't preempt more pods
-	// when it gets to the head of scheduling queue again.
-	// See podEligibleToPreemptOthers() for more information.
-	NominatedNodeAnnotationKey = "scheduler.kubernetes.io/nominated-node-name"
 )
 
 // Error returns detailed information of why the pod failed to fit on each node
@@ -1001,8 +996,9 @@ func nodesWherePreemptionMightHelp(pod *v1.Pod, nodes []*v1.Node, failedPredicat
 // We look at the node that is nominated for this pod and as long as there are
 // terminating pods on the node, we don't consider this for preempting more pods.
 func podEligibleToPreemptOthers(pod *v1.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo) bool {
-	if nodeName, found := pod.Annotations[NominatedNodeAnnotationKey]; found {
-		if nodeInfo, found := nodeNameToInfo[nodeName]; found {
+	nomNodeName := pod.Status.NominatedNodeName
+	if len(nomNodeName) > 0 {
+		if nodeInfo, found := nodeNameToInfo[nomNodeName]; found {
 			for _, p := range nodeInfo.Pods() {
 				if p.DeletionTimestamp != nil && util.GetPodPriority(p) < util.GetPodPriority(pod) {
 					// There is a terminating pod on the nominated node.
