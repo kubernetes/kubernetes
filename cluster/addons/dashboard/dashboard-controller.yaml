@@ -56,8 +56,7 @@ spec:
           timeoutSeconds: 30
       volumes:
       - name: kubernetes-dashboard-certs
-        secret:
-          secretName: kubernetes-dashboard-certs
+        emptyDir: {}
       - name: tmp-volume
         emptyDir: {}
       serviceAccountName: kubernetes-dashboard
