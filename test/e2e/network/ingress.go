@@ -258,29 +258,27 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			// Get cluster UID.
 			clusterID, err := framework.GetClusterID(f.ClientSet)
 			Expect(err).NotTo(HaveOccurred())
-			// Get default backend nodeport.
-			defaultBackendNodePort, err := jig.GetDefaultBackendNodePort()
-			Expect(err).NotTo(HaveOccurred())
+			// Get the related nodeports.
+			nodePorts := jig.GetIngressNodePorts(false)
+			Expect(len(nodePorts)).ToNot(Equal(0))
 
 			// Filter health check using cluster UID as the suffix.
 			By("Retrieving relevant health check resources from GCE.")
 			gceCloud := gceController.Cloud.Provider.(*gcecloud.GCECloud)
 			hcs, err := gceCloud.ListHealthChecks()
 			Expect(err).NotTo(HaveOccurred())
-			ingressHCs := []*compute.HealthCheck{}
+			var hcToChange *compute.HealthCheck
 			for _, hc := range hcs {
 				if strings.HasSuffix(hc.Name, clusterID) {
-					Expect(hc.HttpHealthCheck).ToNot(Equal(nil))
-					// Skip the default backend healthcheck as that shouldn't be customized.
-					if hc.HttpHealthCheck.Port == int64(defaultBackendNodePort) {
-						continue
+					Expect(hc.HttpHealthCheck).NotTo(BeNil())
+					if fmt.Sprintf("%d", hc.HttpHealthCheck.Port) == nodePorts[0] {
+						hcToChange = hc
+						break
 					}
-					ingressHCs = append(ingressHCs, hc)
 				}
 			}
+			Expect(hcToChange).NotTo(BeNil())
 
-			Expect(len(ingressHCs)).ToNot(Equal(0))
-			hcToChange := ingressHCs[0]
 			By(fmt.Sprintf("Modifying health check %v without involving ingress.", hcToChange.Name))
 			// Change timeout from 60s to 25s.
 			hcToChange.TimeoutSec = 25
