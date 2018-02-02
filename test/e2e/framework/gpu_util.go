@@ -21,6 +21,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 
+	"fmt"
 	. "github.com/onsi/gomega"
 )
 
@@ -67,10 +68,16 @@ func NVIDIADevicePlugin(ns string) *v1.Pod {
 	return p
 }
 
-func GetGPUDevicePluginImage() string {
+func GetGPUDevicePluginImage() (string, error) {
 	ds, err := DsFromManifest(GPUDevicePluginDSYAML)
-	if err != nil || ds == nil || len(ds.Spec.Template.Spec.Containers) < 1 {
-		return ""
+	if err != nil {
+		return "", err
 	}
-	return ds.Spec.Template.Spec.Containers[0].Image
+	if ds == nil {
+		return "", fmt.Errorf("empty DaemonSet from DSYAML")
+	}
+	if len(ds.Spec.Template.Spec.Containers) < 1 {
+		return "", fmt.Errorf("no container specified in the DSYAML")
+	}
+	return ds.Spec.Template.Spec.Containers[0].Image, nil
 }

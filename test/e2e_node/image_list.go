@@ -52,12 +52,18 @@ var NodeImageWhiteList = sets.NewString(
 	imageutils.GetE2EImage(imageutils.Netexec),
 	imageutils.GetE2EImage(imageutils.Nonewprivs),
 	imageutils.GetPauseImageNameForHostArch(),
-	framework.GetGPUDevicePluginImage(),
 )
 
 func init() {
 	// Union NodeImageWhiteList and CommonImageWhiteList into the framework image white list.
 	framework.ImageWhiteList = NodeImageWhiteList.Union(commontest.CommonImageWhiteList)
+
+	// parse the device plugin image from url
+	if image, err := framework.GetGPUDevicePluginImage(); err != nil {
+		glog.Errorf("Failed to parse the device plugin image: %v", err)
+	} else {
+		framework.ImageWhiteList.Insert(image)
+	}
 }
 
 // puller represents a generic image puller
