@@ -431,6 +431,7 @@ func (s *Scheme) Convert(in, out interface{}, context interface{}) error {
 				return err
 			}
 			unstructuredOut.SetUnstructuredContent(content)
+			unstructuredOut.GetObjectKind().SetGroupVersionKind(gvk)
 			return nil
 		}
 
