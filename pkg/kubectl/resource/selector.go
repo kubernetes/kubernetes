@@ -58,13 +58,13 @@ func (r *Selector) Visit(fn VisitorFunc) error {
 		list, err := NewHelper(r.Client, r.Mapping).List(
 			r.Namespace,
 			r.ResourceMapping().GroupVersionKind.GroupVersion().String(),
-			r.Export,
 			&metav1.ListOptions{
 				LabelSelector:        r.LabelSelector,
 				FieldSelector:        r.FieldSelector,
 				IncludeUninitialized: r.IncludeUninitialized,
 				Limit:                r.LimitChunks,
 				Continue:             continueToken,
+				Export:               r.Export,
 			},
 		)
 		if err != nil {

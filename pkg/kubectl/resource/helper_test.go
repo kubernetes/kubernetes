@@ -294,8 +294,7 @@ func TestHelperGet(t *testing.T) {
 			RESTClient:      client,
 			NamespaceScoped: true,
 		}
-		obj, err := modifier.Get("bar", "foo", false)
-
+		obj, err := modifier.Get("bar", "foo", &metav1.GetOptions{Export: false})
 		if (err != nil) != test.Err {
 			t.Errorf("unexpected error: %d %t %v", i, test.Err, err)
 		}
@@ -369,7 +368,7 @@ func TestHelperList(t *testing.T) {
 			RESTClient:      client,
 			NamespaceScoped: true,
 		}
-		obj, err := modifier.List("bar", corev1GV.String(), false, &metav1.ListOptions{LabelSelector: "foo=baz"})
+		obj, err := modifier.List("bar", corev1GV.String(), &metav1.ListOptions{LabelSelector: "foo=baz", Export: false})
 		if (err != nil) != test.Err {
 			t.Errorf("unexpected error: %t %v", test.Err, err)
 		}
@@ -438,7 +437,6 @@ func TestHelperListSelectorCombination(t *testing.T) {
 	for _, test := range tests {
 		_, err := modifier.List("bar",
 			corev1GV.String(),
-			false,
 			&metav1.ListOptions{LabelSelector: test.LabelSelector, FieldSelector: test.FieldSelector})
 		if test.Err {
 			if err == nil {

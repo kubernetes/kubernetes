@@ -476,11 +476,11 @@ func (p *pruner) prune(f cmdutil.Factory, namespace string, mapping *meta.RESTMa
 	objList, err := resource.NewHelper(c, mapping).List(
 		namespace,
 		mapping.GroupVersionKind.Version,
-		false,
 		&metav1.ListOptions{
 			LabelSelector:        p.labelSelector,
 			FieldSelector:        p.fieldSelector,
 			IncludeUninitialized: includeUninitialized,
+			Export:               false,
 		},
 	)
 	if err != nil {
@@ -669,7 +669,7 @@ func (p *patcher) patch(current runtime.Object, modified []byte, source, namespa
 		if i > triesBeforeBackOff {
 			p.backOff.Sleep(backOffPeriod)
 		}
-		current, getErr = p.helper.Get(namespace, name, false)
+		current, getErr = p.helper.Get(namespace, name, &metav1.GetOptions{Export: false})
 		if getErr != nil {
 			return nil, nil, getErr
 		}
@@ -687,7 +687,7 @@ func (p *patcher) deleteAndCreate(modified []byte, namespace, name string) ([]by
 		return modified, nil, err
 	}
 	err = wait.PollImmediate(kubectl.Interval, p.timeout, func() (bool, error) {
-		if _, err := p.helper.Get(namespace, name, false); !errors.IsNotFound(err) {
+		if _, err := p.helper.Get(namespace, name, &metav1.GetOptions{Export: false}); !errors.IsNotFound(err) {
 			return false, err
 		}
 		return true, nil
