@@ -26,7 +26,6 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
-	"io"
 	"math/big"
 	"net"
 	"net/http"
@@ -64,10 +63,19 @@ const (
 	// Ingress class annotation defined in ingress repository.
 	// TODO: All these annotations should be reused from
 	// ingress-gce/pkg/annotations instead of duplicating them here.
-	IngressClass = "kubernetes.io/ingress.class"
+	IngressClassKey = "kubernetes.io/ingress.class"
 
 	// Ingress class annotation value for multi cluster ingress.
 	MulticlusterIngressClassValue = "gce-multi-cluster"
+
+	// Static IP annotation defined in ingress repository.
+	IngressStaticIPKey = "kubernetes.io/ingress.global-static-ip-name"
+
+	// Allow HTTP annotation defined in ingress repository.
+	IngressAllowHTTPKey = "kubernetes.io/ingress.allow-http"
+
+	// Pre-shared-cert annotation defined in ingress repository.
+	IngressPreSharedCertKey = "ingress.gcp.kubernetes.io/pre-shared-cert"
 
 	// all cloud resources created by the ingress controller start with this
 	// prefix.
@@ -210,15 +218,15 @@ func CreateIngressComformanceTests(jig *IngressTestJig, ns string, annotations m
 	}
 }
 
-// generateRSACerts generates a basic self signed certificate using a key length
+// GenerateRSACerts generates a basic self signed certificate using a key length
 // of rsaBits, valid for validFor time.
-func generateRSACerts(host string, isCA bool, keyOut, certOut io.Writer) error {
+func GenerateRSACerts(host string, isCA bool) ([]byte, []byte, error) {
 	if len(host) == 0 {
-		return fmt.Errorf("Require a non-empty host for client hello")
+		return nil, nil, fmt.Errorf("Require a non-empty host for client hello")
 	}
 	priv, err := rsa.GenerateKey(rand.Reader, rsaBits)
 	if err != nil {
-		return fmt.Errorf("Failed to generate key: %v", err)
+		return nil, nil, fmt.Errorf("Failed to generate key: %v", err)
 	}
 	notBefore := time.Now()
 	notAfter := notBefore.Add(validFor)
@@ -227,7 +235,7 @@ func generateRSACerts(host string, isCA bool, keyOut, certOut io.Writer) error {
 	serialNumber, err := rand.Int(rand.Reader, serialNumberLimit)
 
 	if err != nil {
-		return fmt.Errorf("failed to generate serial number: %s", err)
+		return nil, nil, fmt.Errorf("failed to generate serial number: %s", err)
 	}
 	template := x509.Certificate{
 		SerialNumber: serialNumber,
@@ -257,17 +265,18 @@ func generateRSACerts(host string, isCA bool, keyOut, certOut io.Writer) error {
 		template.KeyUsage |= x509.KeyUsageCertSign
 	}
 
+	var keyOut, certOut bytes.Buffer
 	derBytes, err := x509.CreateCertificate(rand.Reader, &template, &template, &priv.PublicKey, priv)
 	if err != nil {
-		return fmt.Errorf("Failed to create certificate: %s", err)
+		return nil, nil, fmt.Errorf("Failed to create certificate: %s", err)
 	}
-	if err := pem.Encode(certOut, &pem.Block{Type: "CERTIFICATE", Bytes: derBytes}); err != nil {
-		return fmt.Errorf("Failed creating cert: %v", err)
+	if err := pem.Encode(&certOut, &pem.Block{Type: "CERTIFICATE", Bytes: derBytes}); err != nil {
+		return nil, nil, fmt.Errorf("Failed creating cert: %v", err)
 	}
-	if err := pem.Encode(keyOut, &pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(priv)}); err != nil {
-		return fmt.Errorf("Failed creating keay: %v", err)
+	if err := pem.Encode(&keyOut, &pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(priv)}); err != nil {
+		return nil, nil, fmt.Errorf("Failed creating keay: %v", err)
 	}
-	return nil
+	return certOut.Bytes(), keyOut.Bytes(), nil
 }
 
 // buildTransportWithCA creates a transport for use in executing HTTPS requests with
@@ -297,16 +306,13 @@ func BuildInsecureClient(timeout time.Duration) *http.Client {
 // If a secret with the same name already pathExists in the namespace of the
 // Ingress, it's updated.
 func createIngressTLSSecret(kubeClient clientset.Interface, ing *extensions.Ingress) (host string, rootCA, privKey []byte, err error) {
-	var k, c bytes.Buffer
 	tls := ing.Spec.TLS[0]
 	host = strings.Join(tls.Hosts, ",")
 	Logf("Generating RSA cert for host %v", host)
-
-	if err = generateRSACerts(host, true, &k, &c); err != nil {
+	cert, key, err := GenerateRSACerts(host, true)
+	if err != nil {
 		return
 	}
-	cert := c.Bytes()
-	key := k.Bytes()
 	secret := &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: tls.SecretName,
@@ -1046,7 +1052,7 @@ func (j *IngressTestJig) CreateIngress(manifestPath, ns string, ingAnnotations m
 	j.Ingress, err = manifest.IngressFromManifest(filepath.Join(manifestPath, "ing.yaml"))
 	ExpectNoError(err)
 	j.Ingress.Namespace = ns
-	j.Ingress.Annotations = map[string]string{IngressClass: j.Class}
+	j.Ingress.Annotations = map[string]string{IngressClassKey: j.Class}
 	for k, v := range ingAnnotations {
 		j.Ingress.Annotations[k] = v
 	}
@@ -1145,6 +1151,31 @@ func WaitForIngressAddress(c clientset.Interface, ns, ingName string, timeout ti
 	return address, err
 }
 
+func (j *IngressTestJig) PollIngressWithCert(waitForNodePort bool, knownHosts []string, cert []byte) {
+	// Check that all rules respond to a simple GET.
+	knownHostsSet := sets.NewString(knownHosts...)
+	for _, rules := range j.Ingress.Spec.Rules {
+		timeoutClient := &http.Client{Timeout: IngressReqTimeout}
+		proto := "http"
+		if knownHostsSet.Has(rules.Host) {
+			var err error
+			// Create transport with cert to verify if the server uses the correct one.
+			timeoutClient.Transport, err = buildTransportWithCA(rules.Host, cert)
+			ExpectNoError(err)
+			proto = "https"
+		}
+		for _, p := range rules.IngressRuleValue.HTTP.Paths {
+			if waitForNodePort {
+				j.pollServiceNodePort(j.Ingress.Namespace, p.Backend.ServiceName, int(p.Backend.ServicePort.IntVal))
+			}
+			route := fmt.Sprintf("%v://%v%v", proto, j.Address, p.Path)
+			Logf("Testing route %v host %v with simple GET", route, rules.Host)
+			ExpectNoError(PollURL(route, rules.Host, LoadBalancerPollTimeout, j.PollInterval, timeoutClient, false))
+		}
+	}
+	Logf("Finished polling on all rules on ingress %q", j.Ingress.Name)
+}
+
 // WaitForIngress waits till the ingress acquires an IP, then waits for its
 // hosts/urls to respond to a protocol check (either http or https). If
 // waitForNodePort is true, the NodePort of the Service is verified before
@@ -1158,28 +1189,31 @@ func (j *IngressTestJig) WaitForIngress(waitForNodePort bool) {
 	}
 	j.Address = address
 	Logf("Found address %v for ingress %v", j.Address, j.Ingress.Name)
-	timeoutClient := &http.Client{Timeout: IngressReqTimeout}
 
-	// Check that all rules respond to a simple GET.
-	for _, rules := range j.Ingress.Spec.Rules {
-		proto := "http"
-		if len(j.Ingress.Spec.TLS) > 0 {
-			knownHosts := sets.NewString(j.Ingress.Spec.TLS[0].Hosts...)
-			if knownHosts.Has(rules.Host) {
-				timeoutClient.Transport, err = buildTransportWithCA(rules.Host, j.GetRootCA(j.Ingress.Spec.TLS[0].SecretName))
-				ExpectNoError(err)
-				proto = "https"
-			}
-		}
-		for _, p := range rules.IngressRuleValue.HTTP.Paths {
-			if waitForNodePort {
-				j.pollServiceNodePort(j.Ingress.Namespace, p.Backend.ServiceName, int(p.Backend.ServicePort.IntVal))
-			}
-			route := fmt.Sprintf("%v://%v%v", proto, address, p.Path)
-			Logf("Testing route %v host %v with simple GET", route, rules.Host)
-			ExpectNoError(PollURL(route, rules.Host, LoadBalancerPollTimeout, j.PollInterval, timeoutClient, false))
-		}
+	var knownHosts []string
+	var cert []byte
+	if len(j.Ingress.Spec.TLS) > 0 {
+		knownHosts = j.Ingress.Spec.TLS[0].Hosts
+		cert = j.GetRootCA(j.Ingress.Spec.TLS[0].SecretName)
 	}
+	j.PollIngressWithCert(waitForNodePort, knownHosts, cert)
+}
+
+// WaitForIngress waits till the ingress acquires an IP, then waits for its
+// hosts/urls to respond to a protocol check (either http or https). If
+// waitForNodePort is true, the NodePort of the Service is verified before
+// verifying the Ingress. NodePort is currently a requirement for cloudprovider
+// Ingress. Hostnames and certificate need to be explicitly passed in.
+func (j *IngressTestJig) WaitForIngressWithCert(waitForNodePort bool, knownHosts []string, cert []byte) {
+	// Wait for the loadbalancer IP.
+	address, err := WaitForIngressAddress(j.Client, j.Ingress.Namespace, j.Ingress.Name, LoadBalancerPollTimeout)
+	if err != nil {
+		Failf("Ingress failed to acquire an IP address within %v", LoadBalancerPollTimeout)
+	}
+	j.Address = address
+	Logf("Found address %v for ingress %v", j.Address, j.Ingress.Name)
+
+	j.PollIngressWithCert(waitForNodePort, knownHosts, cert)
 }
 
 // VerifyURL polls for the given iterations, in intervals, and fails if the
