@@ -88,8 +88,7 @@ func NewCmdPreFlightNode() *cobra.Command {
 		Example: nodePreflightExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cfg := &kubeadmapi.NodeConfiguration{}
-			criSocket := ""
-			err := preflight.RunJoinNodeChecks(utilsexec.New(), cfg, criSocket, sets.NewString())
+			err := preflight.RunJoinNodeChecks(utilsexec.New(), cfg, sets.NewString())
 			kubeadmutil.CheckErr(err)
 		},
 	}

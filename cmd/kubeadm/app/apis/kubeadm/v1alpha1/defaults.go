@@ -50,6 +50,8 @@ const (
 	DefaultImageRepository = "gcr.io/google_containers"
 	// DefaultManifestsDir defines default manifests directory
 	DefaultManifestsDir = "/etc/kubernetes/manifests"
+	// DefaultCRISocket defines the default cri socket
+	DefaultCRISocket = "/var/run/dockershim.sock"
 
 	// DefaultEtcdDataDir defines default location of etcd where static pods will save data to
 	DefaultEtcdDataDir = "/var/lib/etcd"
@@ -146,6 +148,9 @@ func SetDefaults_NodeConfiguration(obj *NodeConfiguration) {
 	}
 	if len(obj.DiscoveryToken) == 0 && len(obj.DiscoveryFile) == 0 {
 		obj.DiscoveryToken = obj.Token
+	}
+	if obj.CRISocket == "" {
+		obj.CRISocket = DefaultCRISocket
 	}
 	// Make sure file URLs become paths
 	if len(obj.DiscoveryFile) != 0 {
