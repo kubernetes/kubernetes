@@ -875,6 +875,7 @@ func getTestCloud() (az *Cloud) {
 	az.vmSet = newAvailabilitySet(az)
 
 	az.vmCache = az.newVMCache()
+	az.lbCache = az.newLBCache()
 
 	return az
 }

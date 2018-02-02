@@ -179,3 +179,45 @@ func (az *Cloud) newVMCache() *timedCache {
 
 	return newTimedcache(vmCacheTTL, getter, lister)
 }
+
+func (az *Cloud) newLBCache() *timedCache {
+	getter := func(key string) (interface{}, error) {
+		lb, err := az.LoadBalancerClient.Get(az.ResourceGroup, key, "")
+		exists, realErr := checkResourceExistsFromError(err)
+		if realErr != nil {
+			return nil, realErr
+		}
+
+		if !exists {
+			return nil, nil
+		}
+
+		return &lb, nil
+	}
+
+	lister := func() (map[string]interface{}, error) {
+		allLBs := map[string]interface{}{}
+
+		result, err := az.LoadBalancerClient.List(az.ResourceGroup)
+		if err != nil {
+			return nil, err
+		}
+		moreResults := (result.Value != nil && len(*result.Value) > 0)
+		if moreResults {
+			for idx := range *result.Value {
+				lb := (*result.Value)[idx]
+				allLBs[*lb.Name] = &lb
+			}
+			moreResults = false
+			result, err = az.LoadBalancerClient.ListNextResults(az.ResourceGroup, result)
+			if err != nil {
+				return nil, err
+			}
+			moreResults = (result.Value != nil && len(*result.Value) > 0)
+		}
+
+		return allLBs, nil
+	}
+
+	return newTimedcache(vmCacheTTL, getter, lister)
+}

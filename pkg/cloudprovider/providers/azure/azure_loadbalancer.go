@@ -181,7 +181,7 @@ func (az *Cloud) getServiceLoadBalancer(service *v1.Service, clusterName string,
 	primaryVMSetName := az.vmSet.GetPrimaryVMSetName()
 	defaultLBName := az.getLoadBalancerName(clusterName, primaryVMSetName, isInternal)
 
-	existingLBs, err := az.ListLBWithRetry()
+	existingLBs, err := az.ListLoadBalancers()
 	if err != nil {
 		return nil, nil, false, err
 	}
