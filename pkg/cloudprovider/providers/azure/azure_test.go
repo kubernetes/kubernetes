@@ -874,6 +874,8 @@ func getTestCloud() (az *Cloud) {
 	az.VirtualMachinesClient = newFakeAzureVirtualMachinesClient()
 	az.vmSet = newAvailabilitySet(az)
 
+	az.vmCache = az.newVMCache()
+
 	return az
 }
 

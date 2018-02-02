@@ -41,68 +41,17 @@ func (az *Cloud) requestBackoff() (resourceRequestBackoff wait.Backoff) {
 	return resourceRequestBackoff
 }
 
-// GetVirtualMachineWithRetry invokes az.getVirtualMachine with exponential backoff retry
-func (az *Cloud) GetVirtualMachineWithRetry(name types.NodeName) (compute.VirtualMachine, error) {
-	var machine compute.VirtualMachine
-	var retryErr error
-	err := wait.ExponentialBackoff(az.requestBackoff(), func() (bool, error) {
-		machine, retryErr = az.getVirtualMachine(name)
-		if retryErr != nil {
-			glog.Errorf("backoff: failure, will retry,err=%v", retryErr)
-			return false, nil
-		}
-		glog.V(2).Info("backoff: success")
-		return true, nil
-	})
-	if err == wait.ErrWaitTimeout {
-		err = retryErr
-	}
-
-	return machine, err
-}
-
-// VirtualMachineClientListWithRetry invokes az.VirtualMachinesClient.List with exponential backoff retry
-func (az *Cloud) VirtualMachineClientListWithRetry() ([]compute.VirtualMachine, error) {
-	allNodes := []compute.VirtualMachine{}
-	var result compute.VirtualMachineListResult
-	err := wait.ExponentialBackoff(az.requestBackoff(), func() (bool, error) {
-		var retryErr error
-		result, retryErr = az.VirtualMachinesClient.List(az.ResourceGroup)
-		if retryErr != nil {
-			glog.Errorf("VirtualMachinesClient.List(%v) - backoff: failure, will retry,err=%v",
-				az.ResourceGroup,
-				retryErr)
-			return false, retryErr
-		}
-		glog.V(2).Infof("VirtualMachinesClient.List(%v) - backoff: success", az.ResourceGroup)
-		return true, nil
-	})
+// listVirtualMachines get a list of virtual machines.
+func (az *Cloud) listVirtualMachines() ([]compute.VirtualMachine, error) {
+	vms, err := az.vmCache.List()
 	if err != nil {
 		return nil, err
 	}
 
-	appendResults := (result.Value != nil && len(*result.Value) > 0)
-	for appendResults {
-		allNodes = append(allNodes, *result.Value...)
-		appendResults = false
-		// follow the next link to get all the vms for resource group
-		if result.NextLink != nil {
-			err := wait.ExponentialBackoff(az.requestBackoff(), func() (bool, error) {
-				var retryErr error
-				result, retryErr = az.VirtualMachinesClient.ListNextResults(az.ResourceGroup, result)
-				if retryErr != nil {
-					glog.Errorf("VirtualMachinesClient.ListNextResults(%v) - backoff: failure, will retry,err=%v",
-						az.ResourceGroup, retryErr)
-					return false, retryErr
-				}
-				glog.V(2).Infof("VirtualMachinesClient.ListNextResults(%v): success", az.ResourceGroup)
-				return true, nil
-			})
-			if err != nil {
-				return allNodes, err
-			}
-			appendResults = (result.Value != nil && len(*result.Value) > 0)
-		}
+	allNodes := make([]compute.VirtualMachine, len(vms))
+	for idx := range vms {
+		vm := vms[idx].(*compute.VirtualMachine)
+		allNodes[idx] = *vm
 	}
 
 	return allNodes, err
@@ -326,7 +275,12 @@ func (az *Cloud) CreateOrUpdateVMWithRetry(vmName string, newVM compute.VirtualM
 		resp := <-respChan
 		err := <-errChan
 		glog.V(10).Infof("VirtualMachinesClient.CreateOrUpdate(%s): end", vmName)
-		return processRetryResponse(resp.Response, err)
+		done, err := processRetryResponse(resp.Response, err)
+		if done && err == nil {
+			// Update the cache right after updating.
+			az.vmCache.AddOrUpdate(vmName, nil)
+		}
+		return done, err
 	})
 }
 
