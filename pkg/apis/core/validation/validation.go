@@ -4939,3 +4939,13 @@ func ValidateCIDR(cidr string) (*net.IPNet, error) {
 	}
 	return net, nil
 }
+
+func IsDecremented(update, old *int32) bool {
+	if update == nil && old != nil {
+		return true
+	}
+	if update == nil || old == nil {
+		return false
+	}
+	return *update < *old
+}
