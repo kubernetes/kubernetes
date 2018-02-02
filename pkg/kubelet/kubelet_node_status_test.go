@@ -120,12 +120,12 @@ func applyNodeStatusPatch(originalNode *v1.Node, patch []byte) (*v1.Node, error)
 
 type localCM struct {
 	cm.ContainerManager
-	allocatable v1.ResourceList
-	capacity    v1.ResourceList
+	allocatableReservation v1.ResourceList
+	capacity               v1.ResourceList
 }
 
 func (lcm *localCM) GetNodeAllocatableReservation() v1.ResourceList {
-	return lcm.allocatable
+	return lcm.allocatableReservation
 }
 
 func (lcm *localCM) GetCapacity() v1.ResourceList {
@@ -222,13 +222,15 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 	kubelet.kubeClient = nil // ensure only the heartbeat client is used
 	kubelet.containerManager = &localCM{
 		ContainerManager: cm.NewStubContainerManager(),
-		allocatable: v1.ResourceList{
-			v1.ResourceCPU:    *resource.NewMilliQuantity(200, resource.DecimalSI),
-			v1.ResourceMemory: *resource.NewQuantity(100E6, resource.BinarySI),
+		allocatableReservation: v1.ResourceList{
+			v1.ResourceCPU:              *resource.NewMilliQuantity(200, resource.DecimalSI),
+			v1.ResourceMemory:           *resource.NewQuantity(100E6, resource.BinarySI),
+			v1.ResourceEphemeralStorage: *resource.NewQuantity(2000, resource.BinarySI),
 		},
 		capacity: v1.ResourceList{
-			v1.ResourceCPU:    *resource.NewMilliQuantity(2000, resource.DecimalSI),
-			v1.ResourceMemory: *resource.NewQuantity(10E9, resource.BinarySI),
+			v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
+			v1.ResourceMemory:           *resource.NewQuantity(10E9, resource.BinarySI),
+			v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
 		},
 	}
 	kubeClient := testKubelet.fakeKubeClient
@@ -248,10 +250,21 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 		KernelVersion:      "3.16.0-0.bpo.4-amd64",
 		ContainerOsVersion: "Debian GNU/Linux 7 (wheezy)",
 	}
+	mockCadvisor.On("ImagesFsInfo").Return(cadvisorapiv2.FsInfo{
+		Usage:     400,
+		Capacity:  5000,
+		Available: 600,
+	}, nil)
+	mockCadvisor.On("RootFsInfo").Return(cadvisorapiv2.FsInfo{
+		Usage:     400,
+		Capacity:  5000,
+		Available: 600,
+	}, nil)
 	mockCadvisor.On("VersionInfo").Return(versionInfo, nil)
 	maxAge := 0 * time.Second
 	options := cadvisorapiv2.RequestOptions{IdType: cadvisorapiv2.TypeName, Count: 2, Recursive: false, MaxAge: &maxAge}
 	mockCadvisor.On("ContainerInfoV2", "/", options).Return(map[string]cadvisorapiv2.ContainerInfo{}, nil)
+	kubelet.machineInfo = machineInfo
 
 	expectedNode := &v1.Node{
 		ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname},
@@ -312,14 +325,16 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 				KubeProxyVersion:        version.Get().String(),
 			},
 			Capacity: v1.ResourceList{
-				v1.ResourceCPU:    *resource.NewMilliQuantity(2000, resource.DecimalSI),
-				v1.ResourceMemory: *resource.NewQuantity(10E9, resource.BinarySI),
-				v1.ResourcePods:   *resource.NewQuantity(0, resource.DecimalSI),
+				v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
+				v1.ResourceMemory:           *resource.NewQuantity(10E9, resource.BinarySI),
+				v1.ResourcePods:             *resource.NewQuantity(0, resource.DecimalSI),
+				v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
 			},
 			Allocatable: v1.ResourceList{
-				v1.ResourceCPU:    *resource.NewMilliQuantity(1800, resource.DecimalSI),
-				v1.ResourceMemory: *resource.NewQuantity(9900E6, resource.BinarySI),
-				v1.ResourcePods:   *resource.NewQuantity(0, resource.DecimalSI),
+				v1.ResourceCPU:              *resource.NewMilliQuantity(1800, resource.DecimalSI),
+				v1.ResourceMemory:           *resource.NewQuantity(9900E6, resource.BinarySI),
+				v1.ResourcePods:             *resource.NewQuantity(0, resource.DecimalSI),
+				v1.ResourceEphemeralStorage: *resource.NewQuantity(3000, resource.BinarySI),
 			},
 			Addresses: []v1.NodeAddress{
 				{Type: v1.NodeInternalIP, Address: "127.0.0.1"},
@@ -359,13 +374,14 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 	kubelet.kubeClient = nil // ensure only the heartbeat client is used
 	kubelet.containerManager = &localCM{
 		ContainerManager: cm.NewStubContainerManager(),
-		allocatable: v1.ResourceList{
+		allocatableReservation: v1.ResourceList{
 			v1.ResourceCPU:    *resource.NewMilliQuantity(200, resource.DecimalSI),
 			v1.ResourceMemory: *resource.NewQuantity(100E6, resource.BinarySI),
 		},
 		capacity: v1.ResourceList{
-			v1.ResourceCPU:    *resource.NewMilliQuantity(2000, resource.DecimalSI),
-			v1.ResourceMemory: *resource.NewQuantity(20E9, resource.BinarySI),
+			v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
+			v1.ResourceMemory:           *resource.NewQuantity(20E9, resource.BinarySI),
+			v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
 		},
 	}
 
@@ -443,10 +459,21 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 		KernelVersion:      "3.16.0-0.bpo.4-amd64",
 		ContainerOsVersion: "Debian GNU/Linux 7 (wheezy)",
 	}
+	mockCadvisor.On("ImagesFsInfo").Return(cadvisorapiv2.FsInfo{
+		Usage:     400,
+		Capacity:  5000,
+		Available: 600,
+	}, nil)
+	mockCadvisor.On("RootFsInfo").Return(cadvisorapiv2.FsInfo{
+		Usage:     400,
+		Capacity:  5000,
+		Available: 600,
+	}, nil)
 	mockCadvisor.On("VersionInfo").Return(versionInfo, nil)
 	maxAge := 0 * time.Second
 	options := cadvisorapiv2.RequestOptions{IdType: cadvisorapiv2.TypeName, Count: 2, Recursive: false, MaxAge: &maxAge}
 	mockCadvisor.On("ContainerInfoV2", "/", options).Return(map[string]cadvisorapiv2.ContainerInfo{}, nil)
+	kubelet.machineInfo = machineInfo
 
 	expectedNode := &v1.Node{
 		ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname},
@@ -507,14 +534,16 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 				KubeProxyVersion:        version.Get().String(),
 			},
 			Capacity: v1.ResourceList{
-				v1.ResourceCPU:    *resource.NewMilliQuantity(2000, resource.DecimalSI),
-				v1.ResourceMemory: *resource.NewQuantity(20E9, resource.BinarySI),
-				v1.ResourcePods:   *resource.NewQuantity(0, resource.DecimalSI),
+				v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
+				v1.ResourceMemory:           *resource.NewQuantity(20E9, resource.BinarySI),
+				v1.ResourcePods:             *resource.NewQuantity(0, resource.DecimalSI),
+				v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
 			},
 			Allocatable: v1.ResourceList{
-				v1.ResourceCPU:    *resource.NewMilliQuantity(1800, resource.DecimalSI),
-				v1.ResourceMemory: *resource.NewQuantity(19900E6, resource.BinarySI),
-				v1.ResourcePods:   *resource.NewQuantity(0, resource.DecimalSI),
+				v1.ResourceCPU:              *resource.NewMilliQuantity(1800, resource.DecimalSI),
+				v1.ResourceMemory:           *resource.NewQuantity(19900E6, resource.BinarySI),
+				v1.ResourcePods:             *resource.NewQuantity(0, resource.DecimalSI),
+				v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
 			},
 			Addresses: []v1.NodeAddress{
 				{Type: v1.NodeInternalIP, Address: "127.0.0.1"},
@@ -523,12 +552,12 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 			// images will be sorted from max to min in node status.
 			Images: []v1.ContainerImage{
 				{
-					Names:     []string{"k8s.gcr.io:v3", "k8s.gcr.io:v4"},
-					SizeBytes: 456,
-				},
-				{
 					Names:     []string{"k8s.gcr.io:v1", "k8s.gcr.io:v2"},
 					SizeBytes: 123,
+				},
+				{
+					Names:     []string{"k8s.gcr.io:v3", "k8s.gcr.io:v4"},
+					SizeBytes: 456,
 				},
 			},
 		},
@@ -596,7 +625,7 @@ func TestUpdateExistingNodeStatusTimeout(t *testing.T) {
 	kubelet.heartbeatClient, err = v1core.NewForConfig(config)
 	kubelet.containerManager = &localCM{
 		ContainerManager: cm.NewStubContainerManager(),
-		allocatable: v1.ResourceList{
+		allocatableReservation: v1.ResourceList{
 			v1.ResourceCPU:    *resource.NewMilliQuantity(200, resource.DecimalSI),
 			v1.ResourceMemory: *resource.NewQuantity(100E6, resource.BinarySI),
 		},
@@ -622,13 +651,15 @@ func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
 	kubelet.kubeClient = nil // ensure only the heartbeat client is used
 	kubelet.containerManager = &localCM{
 		ContainerManager: cm.NewStubContainerManager(),
-		allocatable: v1.ResourceList{
-			v1.ResourceCPU:    *resource.NewMilliQuantity(200, resource.DecimalSI),
-			v1.ResourceMemory: *resource.NewQuantity(100E6, resource.BinarySI),
+		allocatableReservation: v1.ResourceList{
+			v1.ResourceCPU:              *resource.NewMilliQuantity(200, resource.DecimalSI),
+			v1.ResourceMemory:           *resource.NewQuantity(100E6, resource.BinarySI),
+			v1.ResourceEphemeralStorage: *resource.NewQuantity(10E9, resource.BinarySI),
 		},
 		capacity: v1.ResourceList{
-			v1.ResourceCPU:    *resource.NewMilliQuantity(2000, resource.DecimalSI),
-			v1.ResourceMemory: *resource.NewQuantity(10E9, resource.BinarySI),
+			v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
+			v1.ResourceMemory:           *resource.NewQuantity(10E9, resource.BinarySI),
+			v1.ResourceEphemeralStorage: *resource.NewQuantity(20E9, resource.BinarySI),
 		},
 	}
 
@@ -650,10 +681,21 @@ func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
 		KernelVersion:      "3.16.0-0.bpo.4-amd64",
 		ContainerOsVersion: "Debian GNU/Linux 7 (wheezy)",
 	}
+
 	mockCadvisor.On("VersionInfo").Return(versionInfo, nil)
 	maxAge := 0 * time.Second
 	options := cadvisorapiv2.RequestOptions{IdType: cadvisorapiv2.TypeName, Count: 2, Recursive: false, MaxAge: &maxAge}
 	mockCadvisor.On("ContainerInfoV2", "/", options).Return(map[string]cadvisorapiv2.ContainerInfo{}, nil)
+	mockCadvisor.On("ImagesFsInfo").Return(cadvisorapiv2.FsInfo{
+		Usage:    400,
+		Capacity: 10E9,
+	}, nil)
+	mockCadvisor.On("RootFsInfo").Return(cadvisorapiv2.FsInfo{
+		Usage:    400,
+		Capacity: 20E9,
+	}, nil)
+
+	kubelet.machineInfo = machineInfo
 
 	expectedNode := &v1.Node{
 		ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname},
@@ -707,14 +749,16 @@ func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
 				KubeProxyVersion:        version.Get().String(),
 			},
 			Capacity: v1.ResourceList{
-				v1.ResourceCPU:    *resource.NewMilliQuantity(2000, resource.DecimalSI),
-				v1.ResourceMemory: *resource.NewQuantity(10E9, resource.BinarySI),
-				v1.ResourcePods:   *resource.NewQuantity(0, resource.DecimalSI),
+				v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
+				v1.ResourceMemory:           *resource.NewQuantity(10E9, resource.BinarySI),
+				v1.ResourcePods:             *resource.NewQuantity(0, resource.DecimalSI),
+				v1.ResourceEphemeralStorage: *resource.NewQuantity(20E9, resource.BinarySI),
 			},
 			Allocatable: v1.ResourceList{
-				v1.ResourceCPU:    *resource.NewMilliQuantity(1800, resource.DecimalSI),
-				v1.ResourceMemory: *resource.NewQuantity(9900E6, resource.BinarySI),
-				v1.ResourcePods:   *resource.NewQuantity(0, resource.DecimalSI),
+				v1.ResourceCPU:              *resource.NewMilliQuantity(1800, resource.DecimalSI),
+				v1.ResourceMemory:           *resource.NewQuantity(9900E6, resource.BinarySI),
+				v1.ResourcePods:             *resource.NewQuantity(0, resource.DecimalSI),
+				v1.ResourceEphemeralStorage: *resource.NewQuantity(10E9, resource.BinarySI),
 			},
 			Addresses: []v1.NodeAddress{
 				{Type: v1.NodeInternalIP, Address: "127.0.0.1"},
@@ -722,12 +766,12 @@ func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
 			},
 			Images: []v1.ContainerImage{
 				{
-					Names:     []string{"k8s.gcr.io:v3", "k8s.gcr.io:v4"},
-					SizeBytes: 456,
-				},
-				{
 					Names:     []string{"k8s.gcr.io:v1", "k8s.gcr.io:v2"},
 					SizeBytes: 123,
+				},
+				{
+					Names:     []string{"k8s.gcr.io:v3", "k8s.gcr.io:v4"},
+					SizeBytes: 456,
 				},
 			},
 		},
@@ -898,6 +942,7 @@ func TestRegisterWithApiServer(t *testing.T) {
 		Usage:    9,
 		Capacity: 10,
 	}, nil)
+	kubelet.machineInfo = machineInfo
 
 	done := make(chan struct{})
 	go func() {
@@ -1105,12 +1150,14 @@ func TestUpdateNewNodeStatusTooLargeReservation(t *testing.T) {
 	kubelet.kubeClient = nil // ensure only the heartbeat client is used
 	kubelet.containerManager = &localCM{
 		ContainerManager: cm.NewStubContainerManager(),
-		allocatable: v1.ResourceList{
-			v1.ResourceCPU: *resource.NewMilliQuantity(40000, resource.DecimalSI),
+		allocatableReservation: v1.ResourceList{
+			v1.ResourceCPU:              *resource.NewMilliQuantity(40000, resource.DecimalSI),
+			v1.ResourceEphemeralStorage: *resource.NewQuantity(1000, resource.BinarySI),
 		},
 		capacity: v1.ResourceList{
-			v1.ResourceCPU:    *resource.NewMilliQuantity(2000, resource.DecimalSI),
-			v1.ResourceMemory: *resource.NewQuantity(10E9, resource.BinarySI),
+			v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
+			v1.ResourceMemory:           *resource.NewQuantity(10E9, resource.BinarySI),
+			v1.ResourceEphemeralStorage: *resource.NewQuantity(3000, resource.BinarySI),
 		},
 	}
 	kubeClient := testKubelet.fakeKubeClient
@@ -1134,20 +1181,33 @@ func TestUpdateNewNodeStatusTooLargeReservation(t *testing.T) {
 	maxAge := 0 * time.Second
 	options := cadvisorapiv2.RequestOptions{IdType: cadvisorapiv2.TypeName, Count: 2, Recursive: false, MaxAge: &maxAge}
 	mockCadvisor.On("ContainerInfoV2", "/", options).Return(map[string]cadvisorapiv2.ContainerInfo{}, nil)
+	mockCadvisor.On("ImagesFsInfo").Return(cadvisorapiv2.FsInfo{
+		Usage:     400,
+		Capacity:  3000,
+		Available: 600,
+	}, nil)
+	mockCadvisor.On("RootFsInfo").Return(cadvisorapiv2.FsInfo{
+		Usage:     400,
+		Capacity:  3000,
+		Available: 600,
+	}, nil)
+	kubelet.machineInfo = machineInfo
 
 	expectedNode := &v1.Node{
 		ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname},
 		Spec:       v1.NodeSpec{},
 		Status: v1.NodeStatus{
 			Capacity: v1.ResourceList{
-				v1.ResourceCPU:    *resource.NewMilliQuantity(2000, resource.DecimalSI),
-				v1.ResourceMemory: *resource.NewQuantity(10E9, resource.BinarySI),
-				v1.ResourcePods:   *resource.NewQuantity(0, resource.DecimalSI),
+				v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
+				v1.ResourceMemory:           *resource.NewQuantity(10E9, resource.BinarySI),
+				v1.ResourcePods:             *resource.NewQuantity(0, resource.DecimalSI),
+				v1.ResourceEphemeralStorage: *resource.NewQuantity(3000, resource.BinarySI),
 			},
 			Allocatable: v1.ResourceList{
-				v1.ResourceCPU:    *resource.NewMilliQuantity(0, resource.DecimalSI),
-				v1.ResourceMemory: *resource.NewQuantity(10E9, resource.BinarySI),
-				v1.ResourcePods:   *resource.NewQuantity(0, resource.DecimalSI),
+				v1.ResourceCPU:              *resource.NewMilliQuantity(0, resource.DecimalSI),
+				v1.ResourceMemory:           *resource.NewQuantity(10E9, resource.BinarySI),
+				v1.ResourcePods:             *resource.NewQuantity(0, resource.DecimalSI),
+				v1.ResourceEphemeralStorage: *resource.NewQuantity(2000, resource.BinarySI),
 			},
 		},
 	}
