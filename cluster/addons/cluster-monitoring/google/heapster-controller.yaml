@@ -61,9 +61,6 @@ spec:
   selector:
     matchLabels:
       k8s-app: heapster
-  selector:
-    matchLabels:
-      k8s-app: heapster
       version: v1.5.0
   template:
     metadata:
