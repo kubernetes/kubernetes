@@ -9,6 +9,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "expansion_generated.go",
+        "ingress.go",
         "networkpolicy.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/client/listers/networking/internalversion",
