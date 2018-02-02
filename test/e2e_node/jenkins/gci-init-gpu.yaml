@@ -1,6 +1,11 @@
 #cloud-config
 
 runcmd:
+  - cp /usr/lib/systemd/system/docker.service /etc/systemd/system/
+  - sed -i -e 's/-s overlay/-s overlay2/g' /etc/systemd/system/docker.service
+  - systemctl daemon-reload
+  - echo '{"live-restore":true}' > /etc/docker/daemon.json
+  - systemctl restart docker
   - modprobe configs
   - docker run -v /dev:/dev -v /home/kubernetes/bin/nvidia:/rootfs/nvidia -v /etc/os-release:/rootfs/etc/os-release -v /proc/sysrq-trigger:/sysrq -e BASE_DIR=/rootfs/nvidia --privileged gcr.io/google_containers/cos-nvidia-driver-install@sha256:cb55c7971c337fece62f2bfe858662522a01e43ac9984a2dd1dd5c71487d225c
   - mount /tmp /tmp -o remount,exec,suid
