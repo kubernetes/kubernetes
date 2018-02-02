@@ -513,7 +513,7 @@ func GetNetlinkSocketAt(newNs, curNs netns.NsHandle, protocol int) (*NetlinkSock
 //      defer d()
 //      < code which needs to be executed in specific netns>
 //  }
-// TODO: This function probably belongs to netns pkg.
+// TODO: his function probably belongs to netns pkg.
 func executeInNetns(newNs, curNs netns.NsHandle) (func(), error) {
 	var (
 		err       error
