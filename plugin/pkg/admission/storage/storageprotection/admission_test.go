@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package pvcprotection
+package storageprotection
 
 import (
 	"fmt"
@@ -25,6 +25,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/util/feature"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -43,32 +44,76 @@ func TestAdmit(t *testing.T) {
 			Namespace: "ns",
 		},
 	}
+
+	pv := &api.PersistentVolume{
+		TypeMeta: metav1.TypeMeta{
+			Kind: "PersistentVolume",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "pv",
+		},
+	}
 	claimWithFinalizer := claim.DeepCopy()
 	claimWithFinalizer.Finalizers = []string{volumeutil.PVCProtectionFinalizer}
 
+	pvWithFinalizer := pv.DeepCopy()
+	pvWithFinalizer.Finalizers = []string{volumeutil.PVProtectionFinalizer}
+
 	tests := []struct {
 		name           string
+		resource       schema.GroupVersionResource
 		object         runtime.Object
 		expectedObject runtime.Object
 		featureEnabled bool
+		namespace      string
 	}{
 		{
 			"create -> add finalizer",
+			api.SchemeGroupVersion.WithResource("persistentvolumeclaims"),
 			claim,
 			claimWithFinalizer,
 			true,
+			claim.Namespace,
 		},
 		{
 			"finalizer already exists -> no new finalizer",
+			api.SchemeGroupVersion.WithResource("persistentvolumeclaims"),
 			claimWithFinalizer,
 			claimWithFinalizer,
 			true,
+			claimWithFinalizer.Namespace,
 		},
 		{
 			"disabled feature -> no finalizer",
+			api.SchemeGroupVersion.WithResource("persistentvolumeclaims"),
 			claim,
 			claim,
 			false,
+			claim.Namespace,
+		},
+		{
+			"create -> add finalizer",
+			api.SchemeGroupVersion.WithResource("persistentvolumes"),
+			pv,
+			pvWithFinalizer,
+			true,
+			pv.Namespace,
+		},
+		{
+			"finalizer already exists -> no new finalizer",
+			api.SchemeGroupVersion.WithResource("persistentvolumes"),
+			pvWithFinalizer,
+			pvWithFinalizer,
+			true,
+			pvWithFinalizer.Namespace,
+		},
+		{
+			"disabled feature -> no finalizer",
+			api.SchemeGroupVersion.WithResource("persistentvolumes"),
+			pv,
+			pv,
+			false,
+			pv.Namespace,
 		},
 	}
 
@@ -77,15 +122,15 @@ func TestAdmit(t *testing.T) {
 	ctrl.SetInternalKubeInformerFactory(informerFactory)
 
 	for _, test := range tests {
-		feature.DefaultFeatureGate.Set(fmt.Sprintf("PVCProtection=%v", test.featureEnabled))
+		feature.DefaultFeatureGate.Set(fmt.Sprintf("StorageProtection=%v", test.featureEnabled))
 		obj := test.object.DeepCopyObject()
 		attrs := admission.NewAttributesRecord(
 			obj,                  // new object
 			obj.DeepCopyObject(), // old object, copy to be sure it's not modified
-			api.Kind("PersistentVolumeClaim").WithVersion("version"),
-			claim.Namespace,
-			claim.Name,
-			api.Resource("persistentvolumeclaims").WithVersion("version"),
+			schema.GroupVersionKind{},
+			test.namespace,
+			"foo",
+			test.resource,
 			"", // subresource
 			admission.Create,
 			nil, // userInfo
@@ -102,5 +147,5 @@ func TestAdmit(t *testing.T) {
 
 	// Disable the feature for rest of the tests.
 	// TODO: remove after alpha
-	feature.DefaultFeatureGate.Set("PVCProtection=false")
+	feature.DefaultFeatureGate.Set("StorageProtection=false")
 }

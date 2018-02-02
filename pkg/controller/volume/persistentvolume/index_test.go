@@ -854,18 +854,22 @@ func createTestVolOrderedIndex(pv *v1.PersistentVolume) persistentVolumeOrderedI
 	return volFile
 }
 
-func toggleBlockVolumeFeature(toggleFlag bool, t *testing.T) {
+func toggleFeature(toggleFlag bool, featureName string, t *testing.T) {
+	var valueStr string
 	if toggleFlag {
-		// Enable alpha feature BlockVolume
-		err := utilfeature.DefaultFeatureGate.Set("BlockVolume=true")
+		// Enable feature
+		valueStr = featureName + "=true"
+		err := utilfeature.DefaultFeatureGate.Set(valueStr)
 		if err != nil {
-			t.Errorf("Failed to enable feature gate for BlockVolume: %v", err)
+			t.Errorf("Failed to enable feature gate for %s: %v", featureName, err)
 			return
 		}
 	} else {
-		err := utilfeature.DefaultFeatureGate.Set("BlockVolume=false")
+		// Disable feature
+		valueStr = featureName + "=false"
+		err := utilfeature.DefaultFeatureGate.Set(valueStr)
 		if err != nil {
-			t.Errorf("Failed to disable feature gate for BlockVolume: %v", err)
+			t.Errorf("Failed to disable feature gate for %s: %v", featureName, err)
 			return
 		}
 	}
@@ -935,7 +939,7 @@ func TestAlphaVolumeModeCheck(t *testing.T) {
 	}
 
 	for name, scenario := range scenarios {
-		toggleBlockVolumeFeature(scenario.enableBlock, t)
+		toggleFeature(scenario.enableBlock, "BlockVolume", t)
 		expectedMisMatch, err := checkVolumeModeMisMatches(&scenario.pvc.Spec, &scenario.vol.Spec)
 		if err != nil {
 			t.Errorf("Unexpected failure for checkVolumeModeMisMatches: %v", err)
@@ -950,7 +954,7 @@ func TestAlphaVolumeModeCheck(t *testing.T) {
 	}
 
 	// make sure feature gate is turned off
-	toggleBlockVolumeFeature(false, t)
+	toggleFeature(false, "BlockVolume", t)
 }
 
 func TestAlphaFilteringVolumeModes(t *testing.T) {
@@ -1028,7 +1032,7 @@ func TestAlphaFilteringVolumeModes(t *testing.T) {
 	}
 
 	for name, scenario := range scenarios {
-		toggleBlockVolumeFeature(scenario.enableBlock, t)
+		toggleFeature(scenario.enableBlock, "BlockVolume", t)
 		pvmatch, err := scenario.vol.findBestMatchForClaim(scenario.pvc, false)
 		// expected to match but either got an error or no returned pvmatch
 		if pvmatch == nil && scenario.isExpectedMatch {
@@ -1047,7 +1051,135 @@ func TestAlphaFilteringVolumeModes(t *testing.T) {
 	}
 
 	// make sure feature gate is turned off
-	toggleBlockVolumeFeature(false, t)
+	toggleFeature(false, "BlockVolume", t)
+}
+
+func TestAlphaStorageProtectionFiltering(t *testing.T) {
+	pv := &v1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        "pv1",
+			Annotations: map[string]string{},
+		},
+		Spec: v1.PersistentVolumeSpec{
+			Capacity:               v1.ResourceList{v1.ResourceName(v1.ResourceStorage): resource.MustParse("1G")},
+			PersistentVolumeSource: v1.PersistentVolumeSource{HostPath: &v1.HostPathVolumeSource{}},
+			AccessModes:            []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
+		},
+	}
+
+	pvToDelete := pv.DeepCopy()
+	now := metav1.Now()
+	pvToDelete.ObjectMeta.DeletionTimestamp = &now
+
+	pvc := &v1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "pvc1",
+			Namespace: "myns",
+		},
+		Spec: v1.PersistentVolumeClaimSpec{
+			AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
+			Resources:   v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceName(v1.ResourceStorage): resource.MustParse("1G")}},
+		},
+	}
+
+	satisfyingTestCases := map[string]struct {
+		isExpectedMatch         bool
+		vol                     *v1.PersistentVolume
+		pvc                     *v1.PersistentVolumeClaim
+		enableStorageProtection bool
+	}{
+		"feature enabled - pv deletionTimeStamp not set": {
+			isExpectedMatch: true,
+			vol:             pv,
+			pvc:             pvc,
+			enableStorageProtection: true,
+		},
+		"feature enabled - pv deletionTimeStamp set": {
+			isExpectedMatch: false,
+			vol:             pvToDelete,
+			pvc:             pvc,
+			enableStorageProtection: true,
+		},
+		"feature disabled - pv deletionTimeStamp not set": {
+			isExpectedMatch: true,
+			vol:             pv,
+			pvc:             pvc,
+			enableStorageProtection: false,
+		},
+		"feature disabled - pv deletionTimeStamp set": {
+			isExpectedMatch: true,
+			vol:             pvToDelete,
+			pvc:             pvc,
+			enableStorageProtection: false,
+		},
+	}
+
+	for name, testCase := range satisfyingTestCases {
+		toggleFeature(testCase.enableStorageProtection, "StorageProtection", t)
+		err := checkVolumeSatisfyClaim(testCase.vol, testCase.pvc)
+		// expected to match but got an error
+		if err != nil && testCase.isExpectedMatch {
+			t.Errorf("%s: expected to match but got an error: %v", name, err)
+		}
+		// not expected to match but did
+		if err == nil && !testCase.isExpectedMatch {
+			t.Errorf("%s: not expected to match but did", name)
+		}
+
+	}
+
+	filteringTestCases := map[string]struct {
+		isExpectedMatch         bool
+		vol                     persistentVolumeOrderedIndex
+		pvc                     *v1.PersistentVolumeClaim
+		enableStorageProtection bool
+	}{
+		"feature enabled - pv deletionTimeStamp not set": {
+			isExpectedMatch: true,
+			vol:             createTestVolOrderedIndex(pv),
+			pvc:             pvc,
+			enableStorageProtection: true,
+		},
+		"feature enabled - pv deletionTimeStamp set": {
+			isExpectedMatch: false,
+			vol:             createTestVolOrderedIndex(pvToDelete),
+			pvc:             pvc,
+			enableStorageProtection: true,
+		},
+		"feature disabled - pv deletionTimeStamp not set": {
+			isExpectedMatch: true,
+			vol:             createTestVolOrderedIndex(pv),
+			pvc:             pvc,
+			enableStorageProtection: false,
+		},
+		"feature disabled - pv deletionTimeStamp set": {
+			isExpectedMatch: true,
+			vol:             createTestVolOrderedIndex(pvToDelete),
+			pvc:             pvc,
+			enableStorageProtection: false,
+		},
+	}
+	for name, testCase := range filteringTestCases {
+		toggleFeature(testCase.enableStorageProtection, "StorageProtection", t)
+		pvmatch, err := testCase.vol.findBestMatchForClaim(testCase.pvc, false)
+		// expected to match but either got an error or no returned pvmatch
+		if pvmatch == nil && testCase.isExpectedMatch {
+			t.Errorf("Unexpected failure for testcase, no matching volume: %s", name)
+		}
+		if err != nil && testCase.isExpectedMatch {
+			t.Errorf("Unexpected failure for testcase: %s - %+v", name, err)
+		}
+		// expected to not match but either got an error or a returned pvmatch
+		if pvmatch != nil && !testCase.isExpectedMatch {
+			t.Errorf("Unexpected failure for testcase, expected no matching volume: %s", name)
+		}
+		if err != nil && !testCase.isExpectedMatch {
+			t.Errorf("Unexpected failure for testcase: %s - %+v", name, err)
+		}
+	}
+
+	// make sure feature gate is turned off
+	toggleFeature(false, "StorageProtection", t)
 }
 
 func TestFindingPreboundVolumes(t *testing.T) {
