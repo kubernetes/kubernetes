@@ -191,7 +191,10 @@ metadata:
 spec:
   selector:
     matchLabels:
-      k8s-app: mkube-registry-proxy
+      k8s-app: kube-registry-proxy
+      kubernetes.io/name: "kube-registry-proxy"
+      kubernetes.io/cluster-service: "true"
+      version: v0.4
   template:
     metadata:
       labels:
