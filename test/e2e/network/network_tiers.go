@@ -26,7 +26,6 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud"
@@ -40,14 +39,12 @@ var _ = SIGDescribe("Services [Feature:GCEAlphaFeature][Slow]", func() {
 	f := framework.NewDefaultFramework("services")
 
 	var cs clientset.Interface
-	var internalClientset internalclientset.Interface
 	serviceLBNames := []string{}
 
 	BeforeEach(func() {
 		// This test suite requires the GCE environment.
 		framework.SkipUnlessProviderIs("gce")
 		cs = f.ClientSet
-		internalClientset = f.InternalClientset
 	})
 
 	AfterEach(func() {
