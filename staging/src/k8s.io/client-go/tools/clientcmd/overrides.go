@@ -17,6 +17,7 @@ limitations under the License.
 package clientcmd
 
 import (
+	"os"
 	"strconv"
 	"strings"
 
@@ -165,7 +166,7 @@ func RecommendedConfigOverrideFlags(prefix string) ConfigOverrideFlags {
 		ClusterOverrideFlags: RecommendedClusterOverrideFlags(prefix),
 		ContextOverrideFlags: RecommendedContextOverrideFlags(prefix),
 
-		CurrentContext: FlagInfo{prefix + FlagContext, "", "", "The name of the kubeconfig context to use"},
+		CurrentContext: FlagInfo{prefix + FlagContext, "", os.Getenv("KUBECTL_CONTEXT"), "The name of the kubeconfig context to use"},
 		Timeout:        FlagInfo{prefix + FlagTimeout, "", "0", "The length of time to wait before giving up on a single server request. Non-zero values should contain a corresponding time unit (e.g. 1s, 2m, 3h). A value of zero means don't timeout requests."},
 	}
 }
@@ -197,7 +198,7 @@ func RecommendedContextOverrideFlags(prefix string) ContextOverrideFlags {
 	return ContextOverrideFlags{
 		ClusterName:  FlagInfo{prefix + FlagClusterName, "", "", "The name of the kubeconfig cluster to use"},
 		AuthInfoName: FlagInfo{prefix + FlagAuthInfoName, "", "", "The name of the kubeconfig user to use"},
-		Namespace:    FlagInfo{prefix + FlagNamespace, "n", "", "If present, the namespace scope for this CLI request"},
+		Namespace:    FlagInfo{prefix + FlagNamespace, "n", os.Getenv("KUBECTL_NAMESPACE"), "If present, the namespace scope for this CLI request"},
 	}
 }
 
