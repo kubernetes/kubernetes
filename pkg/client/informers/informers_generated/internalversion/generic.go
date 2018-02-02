@@ -139,6 +139,8 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Extensions().InternalVersion().ReplicaSets().Informer()}, nil
 
 		// Group=networking.k8s.io, Version=internalVersion
+	case networking.SchemeGroupVersion.WithResource("ingresses"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Networking().InternalVersion().Ingresses().Informer()}, nil
 	case networking.SchemeGroupVersion.WithResource("networkpolicies"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Networking().InternalVersion().NetworkPolicies().Informer()}, nil
 

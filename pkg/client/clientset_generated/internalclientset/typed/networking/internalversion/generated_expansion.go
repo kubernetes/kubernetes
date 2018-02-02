@@ -16,4 +16,6 @@ limitations under the License.
 
 package internalversion
 
+type IngressExpansion interface{}
+
 type NetworkPolicyExpansion interface{}
