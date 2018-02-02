@@ -217,6 +217,8 @@ type NodeConfiguration struct {
 	TLSBootstrapToken string
 	// Token is used for both discovery and TLS bootstrapping.
 	Token string
+	// CRISocket is used to retrieve container runtime info.
+	CRISocket string
 
 	// DiscoveryTokenCACertHashes specifies a set of public key pins to verify
 	// when token-based discovery is used. The root CA found during discovery

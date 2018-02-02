@@ -124,6 +124,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			obj.DiscoveryTokenAPIServers = []string{"foo"}
 			obj.TLSBootstrapToken = "foo"
 			obj.Token = "foo"
+			obj.CRISocket = "foo"
 		},
 	}
 }
