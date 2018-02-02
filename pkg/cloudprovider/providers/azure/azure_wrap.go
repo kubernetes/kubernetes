@@ -17,6 +17,7 @@ limitations under the License.
 package azure
 
 import (
+	"fmt"
 	"net/http"
 	"time"
 
@@ -30,6 +31,7 @@ import (
 
 var (
 	vmCacheTTL = 30 * time.Second
+	lbCacheTTL = 2 * time.Minute
 )
 
 // checkExistsFromError inspects an error and returns a true if err is nil,
@@ -138,6 +140,19 @@ func (az *Cloud) getSubnet(virtualNetworkName string, subnetName string) (subnet
 	return subnet, exists, err
 }
 
+func (az *Cloud) getSecurityGroup() (nsg network.SecurityGroup, err error) {
+	securityGroup, err := az.nsgCache.Get(az.Config.SecurityGroupName)
+	if err != nil {
+		return nsg, err
+	}
+
+	if securityGroup == nil {
+		return nsg, fmt.Errorf("nsg %q not found", az.SecurityGroupName)
+	}
+
+	return *(securityGroup.(*network.SecurityGroup)), nil
+}
+
 func (az *Cloud) newVMCache() *timedCache {
 	getter := func(key string) (interface{}, error) {
 		vm, err := az.VirtualMachinesClient.Get(az.ResourceGroup, key, compute.InstanceView)
@@ -220,4 +235,32 @@ func (az *Cloud) newLBCache() *timedCache {
 	}
 
 	return newTimedcache(vmCacheTTL, getter, lister)
+}
+
+func (az *Cloud) newNSGCache() *timedCache {
+	getter := func(key string) (interface{}, error) {
+		lb, err := az.SecurityGroupsClient.Get(az.ResourceGroup, key, "")
+		exists, realErr := checkResourceExistsFromError(err)
+		if realErr != nil {
+			return nil, realErr
+		}
+
+		if !exists {
+			return nil, nil
+		}
+
+		return &lb, nil
+	}
+
+	lister := func() (map[string]interface{}, error) {
+		// Only one security group is used.
+		lb, err := getter(az.SecurityGroupName)
+		if err != nil {
+			return nil, err
+		}
+
+		return map[string]interface{}{az.SecurityGroupName: lb}, nil
+	}
+
+	return newTimedcache(lbCacheTTL, getter, lister)
 }

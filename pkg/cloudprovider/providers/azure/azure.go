@@ -128,8 +128,9 @@ type Cloud struct {
 	VirtualMachineScaleSetsClient   VirtualMachineScaleSetsClient
 	VirtualMachineScaleSetVMsClient VirtualMachineScaleSetVMsClient
 
-	vmCache *timedCache
-	lbCache *timedCache
+	vmCache  *timedCache
+	lbCache  *timedCache
+	nsgCache *timedCache
 
 	*BlobDiskController
 	*ManagedDiskController
@@ -240,6 +241,7 @@ func NewCloud(configReader io.Reader) (cloudprovider.Interface, error) {
 
 	az.vmCache = az.newVMCache()
 	az.lbCache = az.newLBCache()
+	az.nsgCache = az.newNSGCache()
 
 	if err := initDiskControllers(&az); err != nil {
 		return nil, err

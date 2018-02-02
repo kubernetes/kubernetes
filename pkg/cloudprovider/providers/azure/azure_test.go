@@ -876,6 +876,7 @@ func getTestCloud() (az *Cloud) {
 
 	az.vmCache = az.newVMCache()
 	az.lbCache = az.newLBCache()
+	az.nsgCache = az.newNSGCache()
 
 	return az
 }
