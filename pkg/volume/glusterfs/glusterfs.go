@@ -143,7 +143,11 @@ func (plugin *glusterfsPlugin) GetAccessModes() []v1.PersistentVolumeAccessMode 
 }
 
 func (plugin *glusterfsPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ volume.VolumeOptions) (volume.Mounter, error) {
-	source, _ := plugin.getGlusterVolumeSource(spec)
+	source, _, err := getVolumeSource(spec)
+	if err != nil {
+		glog.Errorf("failed to get gluster volumesource: %v", err)
+		return nil, err
+	}
 	epName := source.EndpointsName
 	// PVC/POD is in same ns.
 	podNs := pod.Namespace
@@ -160,17 +164,8 @@ func (plugin *glusterfsPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ volu
 	return plugin.newMounterInternal(spec, ep, pod, plugin.host.GetMounter(plugin.GetPluginName()))
 }
 
-func (plugin *glusterfsPlugin) getGlusterVolumeSource(spec *volume.Spec) (*v1.GlusterfsVolumeSource, bool) {
-	// Glusterfs volumes used directly in a pod have a ReadOnly flag set by the pod author.
-	// Glusterfs volumes used as a PersistentVolume gets the ReadOnly flag indirectly through the persistent-claim volume used to mount the PV
-	if spec.Volume != nil && spec.Volume.Glusterfs != nil {
-		return spec.Volume.Glusterfs, spec.Volume.Glusterfs.ReadOnly
-	}
-	return spec.PersistentVolume.Spec.Glusterfs, spec.ReadOnly
-}
-
 func (plugin *glusterfsPlugin) newMounterInternal(spec *volume.Spec, ep *v1.Endpoints, pod *v1.Pod, mounter mount.Interface) (volume.Mounter, error) {
-	source, readOnly := plugin.getGlusterVolumeSource(spec)
+	source, readOnly, _ := getVolumeSource(spec)
 	return &glusterfsMounter{
 		glusterfs: &glusterfs{
 			volName:         spec.Name(),
@@ -379,8 +374,7 @@ func (b *glusterfsMounter) setUpAtInternal(dir string) error {
 
 }
 
-func getVolumeSource(
-	spec *volume.Spec) (*v1.GlusterfsVolumeSource, bool, error) {
+func getVolumeSource(spec *volume.Spec) (*v1.GlusterfsVolumeSource, bool, error) {
 	if spec.Volume != nil && spec.Volume.Glusterfs != nil {
 		return spec.Volume.Glusterfs, spec.Volume.Glusterfs.ReadOnly, nil
 	} else if spec.PersistentVolume != nil &&
