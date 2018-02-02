@@ -33,6 +33,7 @@ type NodeInfo struct {
 	dataCenter *vclib.Datacenter
 	vm         *vclib.VirtualMachine
 	vcServer   string
+	vmUUID     string
 }
 
 type NodeManager struct {
@@ -53,6 +54,7 @@ type NodeManager struct {
 type NodeDetails struct {
 	NodeName string
 	vm       *vclib.VirtualMachine
+	VMUUID   string
 }
 
 // TODO: Make it configurable in vsphere.conf
@@ -74,7 +76,10 @@ func (nm *NodeManager) DiscoverNode(node *v1.Node) error {
 	var globalErr *error
 
 	queueChannel = make(chan *VmSearch, QUEUE_SIZE)
-	nodeUUID := node.Status.NodeInfo.SystemUUID
+	nodeUUID := GetUUIDFromProviderID(node.Spec.ProviderID)
+
+	glog.V(4).Infof("Discovering node %s with uuid %s", node.ObjectMeta.Name, nodeUUID)
+
 	vmFound := false
 	globalErr = nil
 
@@ -178,7 +183,7 @@ func (nm *NodeManager) DiscoverNode(node *v1.Node) error {
 					glog.V(4).Infof("Found node %s as vm=%+v in vc=%s and datacenter=%s",
 						node.Name, vm, res.vc, res.datacenter.Name())
 
-					nodeInfo := &NodeInfo{dataCenter: res.datacenter, vm: vm, vcServer: res.vc}
+					nodeInfo := &NodeInfo{dataCenter: res.datacenter, vm: vm, vcServer: res.vc, vmUUID: nodeUUID}
 					nm.addNodeInfo(node.ObjectMeta.Name, nodeInfo)
 					for range queueChannel {
 					}
@@ -311,7 +316,7 @@ func (nm *NodeManager) GetNodeDetails() ([]NodeDetails, error) {
 		}
 		nm.nodeInfoMap[nodeName] = n
 		glog.V(4).Infof("Updated NodeInfo %q for node %q.", nodeInfo, nodeName)
-		nodeDetails = append(nodeDetails, NodeDetails{nodeName, n.vm})
+		nodeDetails = append(nodeDetails, NodeDetails{nodeName, n.vm, n.vmUUID})
 	}
 	return nodeDetails, nil
 }
