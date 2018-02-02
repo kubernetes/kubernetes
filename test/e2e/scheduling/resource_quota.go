@@ -821,7 +821,7 @@ func newTestResourceQuotaWithScope(name string, scope v1.ResourceQuotaScope) *v1
 	}
 }
 
-// newTestResourceQuotaForEphemeralStorage returns a quota that enforces default constraints for testing alpha feature LocalStorageCapacityIsolation
+// newTestResourceQuotaForEphemeralStorage returns a quota that enforces default constraints for testing feature LocalStorageCapacityIsolation
 func newTestResourceQuotaForEphemeralStorage(name string) *v1.ResourceQuota {
 	hard := v1.ResourceList{}
 	hard[v1.ResourceEphemeralStorage] = resource.MustParse("500Mi")

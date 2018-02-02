@@ -250,7 +250,7 @@ var _ = framework.KubeDescribe("LimitRange", func() {
 		}
 
 		By("Creating a Pod with request")
-		pod = f.NewTestPod("pod-partial-resources", getEphemeralStorageResourceList("150m"), v1.ResourceList{})
+		pod = f.NewTestPod("pod-partial-resources", getEphemeralStorageResourceList("150Mi"), v1.ResourceList{})
 		pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
 		Expect(err).NotTo(HaveOccurred())
 
@@ -275,7 +275,7 @@ var _ = framework.KubeDescribe("LimitRange", func() {
 		}
 
 		By("Creating a Pod with limit")
-		pod = f.NewTestPod("pod-partial-resources", v1.ResourceList{}, getEphemeralStorageResourceList("300m"))
+		pod = f.NewTestPod("pod-partial-resources", v1.ResourceList{}, getEphemeralStorageResourceList("300Mi"))
 		pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
 		Expect(err).NotTo(HaveOccurred())
 
