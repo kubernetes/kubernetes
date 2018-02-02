@@ -17,7 +17,6 @@ limitations under the License.
 package services
 
 import (
-	"flag"
 	"fmt"
 	"net/http"
 	"os"
@@ -33,8 +32,6 @@ import (
 
 	"k8s.io/kubernetes/test/e2e/framework"
 )
-
-var serverStartTimeout = flag.Duration("server-start-timeout", time.Second*120, "Time to wait for each server to become healthy.")
 
 // A server manages a separate server process started and killed with
 // commands.
@@ -92,51 +89,6 @@ func commandToString(c *exec.Cmd) string {
 func (s *server) String() string {
 	return fmt.Sprintf("server %q start-command: `%s`, kill-command: `%s`, restart-command: `%s`, health-check: %v, output-file: %q", s.name,
 		commandToString(s.startCommand), commandToString(s.killCommand), commandToString(s.restartCommand), s.healthCheckUrls, s.outFilename)
-}
-
-// readinessCheck checks whether services are ready via the supplied health
-// check URLs. Once there is an error in errCh, the function will stop waiting
-// and return the error.
-// TODO(random-liu): Move this to util
-func readinessCheck(name string, urls []string, errCh <-chan error) error {
-	glog.Infof("Running readiness check for service %q", name)
-	endTime := time.Now().Add(*serverStartTimeout)
-	blockCh := make(chan error)
-	defer close(blockCh)
-	for endTime.After(time.Now()) {
-		select {
-		// We *always* want to run the health check if there is no error on the channel.
-		// With systemd, reads from errCh report nil because cmd.Run() waits
-		// on systemd-run, rather than the service process. systemd-run quickly
-		// exits with status 0, causing the channel to be closed with no error. In
-		// this case, you want to wait for the health check to complete, rather
-		// than returning from readinessCheck as soon as the channel is closed.
-		case err, ok := <-errCh:
-			if ok { // The channel is not closed, this is a real error
-				if err != nil { // If there is an error, return it
-					return err
-				}
-				// If not, keep checking readiness.
-			} else { // The channel is closed, this is only a zero value.
-				// Replace the errCh with blockCh to avoid busy loop,
-				// and keep checking readiness.
-				errCh = blockCh
-			}
-		case <-time.After(time.Second):
-			ready := true
-			for _, url := range urls {
-				resp, err := http.Head(url)
-				if err != nil || resp.StatusCode != http.StatusOK {
-					ready = false
-					break
-				}
-			}
-			if ready {
-				return nil
-			}
-		}
-	}
-	return fmt.Errorf("e2e service %q readiness check timeout %v", name, *serverStartTimeout)
 }
 
 // start starts the server by running its commands, monitors it with a health
@@ -216,7 +168,7 @@ func (s *server) start() error {
 			for {
 				glog.Infof("Running health check for service %q", s.name)
 				// Wait for an initial health check to pass, so that we are sure the server started.
-				err := readinessCheck(s.name, s.healthCheckUrls, nil)
+				err := framework.ReadinessCheck(s.name, s.healthCheckUrls, nil)
 				if err != nil {
 					if usedStartCmd {
 						glog.Infof("Waiting for server %q start command to complete after initial health check failed", s.name)
@@ -295,7 +247,7 @@ func (s *server) start() error {
 		}
 	}()
 
-	return readinessCheck(s.name, s.healthCheckUrls, errCh)
+	return framework.ReadinessCheck(s.name, s.healthCheckUrls, errCh)
 }
 
 // kill runs the server's kill command.

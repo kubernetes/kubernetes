@@ -21,6 +21,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"flag"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -200,6 +201,7 @@ var (
 
 	// Serve hostname image name
 	ServeHostnameImage = imageutils.GetE2EImage(imageutils.ServeHostname)
+	serverStartTimeout = flag.Duration("server-start-timeout", time.Second*120, "Time to wait for each server to become healthy.")
 )
 
 type Address struct {
@@ -1597,6 +1599,50 @@ func WaitForService(c clientset.Interface, namespace, name string, exist bool, i
 		return fmt.Errorf("error waiting for service %s/%s %s: %v", namespace, name, stateMsg[exist], err)
 	}
 	return nil
+}
+
+// ReadinessCheck checks whether services are ready via the supplied health
+// check URLs. Once there is an error in errCh, the function will stop waiting
+// and return the error.
+func ReadinessCheck(name string, urls []string, errCh <-chan error) error {
+	glog.Infof("Running readiness check for service %q", name)
+	endTime := time.Now().Add(*serverStartTimeout)
+	blockCh := make(chan error)
+	defer close(blockCh)
+	for endTime.After(time.Now()) {
+		select {
+		// We *always* want to run the health check if there is no error on the channel.
+		// With systemd, reads from errCh report nil because cmd.Run() waits
+		// on systemd-run, rather than the service process. systemd-run quickly
+		// exits with status 0, causing the channel to be closed with no error. In
+		// this case, you want to wait for the health check to complete, rather
+		// than returning from readinessCheck as soon as the channel is closed.
+		case err, ok := <-errCh:
+			if ok { // The channel is not closed, this is a real error
+				if err != nil { // If there is an error, return it
+					return err
+				}
+				// If not, keep checking readiness.
+			} else { // The channel is closed, this is only a zero value.
+				// Replace the errCh with blockCh to avoid busy loop,
+				// and keep checking readiness.
+				errCh = blockCh
+			}
+		case <-time.After(time.Second):
+			ready := true
+			for _, url := range urls {
+				resp, err := http.Head(url)
+				if err != nil || resp.StatusCode != http.StatusOK {
+					ready = false
+					break
+				}
+			}
+			if ready {
+				return nil
+			}
+		}
+	}
+	return fmt.Errorf("e2e service %q readiness check timeout %v", name, *serverStartTimeout)
 }
 
 // WaitForServiceWithSelector waits until any service with given selector appears (exist == true), or disappears (exist == false)

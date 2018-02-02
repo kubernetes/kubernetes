@@ -22,6 +22,7 @@ import (
 
 	apiserver "k8s.io/kubernetes/cmd/kube-apiserver/app"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
+	"k8s.io/kubernetes/test/e2e/framework"
 )
 
 const (
@@ -63,7 +64,7 @@ func (a *APIServer) Start() error {
 		}
 	}()
 
-	err = readinessCheck("apiserver", []string{apiserverHealthCheckURL}, errCh)
+	err = framework.ReadinessCheck("apiserver", []string{apiserverHealthCheckURL}, errCh)
 	if err != nil {
 		return err
 	}
