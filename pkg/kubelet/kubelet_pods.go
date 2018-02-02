@@ -1214,7 +1214,7 @@ func (kl *Kubelet) GetKubeletContainerLogs(podFullName, containerName string, lo
 }
 
 // getPhase returns the phase of a pod given its container info.
-func getPhase(spec *v1.PodSpec, info []v1.ContainerStatus) v1.PodPhase {
+func getPhase(spec *v1.PodSpec, info []v1.ContainerStatus, previousPhase v1.PodPhase) v1.PodPhase {
 	initialized := 0
 	pendingInitialization := 0
 	failedInitialization := 0
@@ -1319,7 +1319,7 @@ func getPhase(spec *v1.PodSpec, info []v1.ContainerStatus) v1.PodPhase {
 		return v1.PodRunning
 	default:
 		glog.V(5).Infof("pod default case, pending")
-		return v1.PodPending
+		return previousPhase
 	}
 }
 
@@ -1342,12 +1342,9 @@ func (kl *Kubelet) generateAPIPodStatus(pod *v1.Pod, podStatus *kubecontainer.Po
 	s := kl.convertStatusToAPIStatus(pod, podStatus)
 
 	// Assume info is ready to process
-	spec := &pod.Spec
-	allStatus := append(append([]v1.ContainerStatus{}, s.ContainerStatuses...), s.InitContainerStatuses...)
-	s.Phase = getPhase(spec, allStatus)
 	kl.probeManager.UpdatePodStatus(pod.UID, s)
-	s.Conditions = append(s.Conditions, status.GeneratePodInitializedCondition(spec, s.InitContainerStatuses, s.Phase))
-	s.Conditions = append(s.Conditions, status.GeneratePodReadyCondition(spec, s.ContainerStatuses, s.Phase))
+	s.Conditions = append(s.Conditions, status.GeneratePodInitializedCondition(&pod.Spec, s.InitContainerStatuses, s.Phase))
+	s.Conditions = append(s.Conditions, status.GeneratePodReadyCondition(&pod.Spec, s.ContainerStatuses, s.Phase))
 	// s (the PodStatus we are creating) will not have a PodScheduled condition yet, because converStatusToAPIStatus()
 	// does not create one. If the existing PodStatus has a PodScheduled condition, then copy it into s and make sure
 	// it is set to true. If the existing PodStatus does not have a PodScheduled condition, then create one that is set to true.
@@ -1402,6 +1399,9 @@ func (kl *Kubelet) convertStatusToAPIStatus(pod *v1.Pod, podStatus *kubecontaine
 		len(pod.Spec.InitContainers) > 0,
 		true,
 	)
+
+	allStatus := append(append([]v1.ContainerStatus{}, apiPodStatus.ContainerStatuses...), apiPodStatus.InitContainerStatuses...)
+	apiPodStatus.Phase = getPhase(&pod.Spec, allStatus, oldPodStatus.Phase)
 
 	return &apiPodStatus
 }

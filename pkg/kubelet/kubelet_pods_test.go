@@ -1765,7 +1765,8 @@ func TestPodPhaseWithRestartAlways(t *testing.T) {
 		status v1.PodPhase
 		test   string
 	}{
-		{&v1.Pod{Spec: desiredState, Status: v1.PodStatus{}}, v1.PodPending, "waiting"},
+		{&v1.Pod{Spec: desiredState, Status: v1.PodStatus{Phase: v1.PodPending}}, v1.PodPending, "waiting"},
+		{&v1.Pod{Spec: desiredState, Status: v1.PodStatus{Phase: v1.PodFailed}}, v1.PodFailed, "containers removed after deletion"},
 		{
 			&v1.Pod{
 				Spec: desiredState,
@@ -1774,6 +1775,7 @@ func TestPodPhaseWithRestartAlways(t *testing.T) {
 						runningState("containerA"),
 						runningState("containerB"),
 					},
+					Phase: v1.PodPending,
 				},
 			},
 			v1.PodRunning,
@@ -1787,6 +1789,7 @@ func TestPodPhaseWithRestartAlways(t *testing.T) {
 						stoppedState("containerA"),
 						stoppedState("containerB"),
 					},
+					Phase: v1.PodPending,
 				},
 			},
 			v1.PodRunning,
@@ -1800,6 +1803,7 @@ func TestPodPhaseWithRestartAlways(t *testing.T) {
 						runningState("containerA"),
 						stoppedState("containerB"),
 					},
+					Phase: v1.PodPending,
 				},
 			},
 			v1.PodRunning,
@@ -1812,10 +1816,24 @@ func TestPodPhaseWithRestartAlways(t *testing.T) {
 					ContainerStatuses: []v1.ContainerStatus{
 						runningState("containerA"),
 					},
+					Phase: v1.PodPending,
 				},
 			},
 			v1.PodPending,
-			"mixed state #2 with restart always",
+			"mixed state #2 with restart always while pod is pending",
+		},
+		{
+			&v1.Pod{
+				Spec: desiredState,
+				Status: v1.PodStatus{
+					ContainerStatuses: []v1.ContainerStatus{
+						runningState("containerA"),
+					},
+					Phase: v1.PodFailed,
+				},
+			},
+			v1.PodFailed,
+			"mixed state #2 with restart always after pod has failed, and one container has been removed",
 		},
 		{
 			&v1.Pod{
@@ -1825,6 +1843,7 @@ func TestPodPhaseWithRestartAlways(t *testing.T) {
 						runningState("containerA"),
 						waitingState("containerB"),
 					},
+					Phase: v1.PodPending,
 				},
 			},
 			v1.PodPending,
@@ -1838,6 +1857,7 @@ func TestPodPhaseWithRestartAlways(t *testing.T) {
 						runningState("containerA"),
 						waitingStateWithLastTermination("containerB"),
 					},
+					Phase: v1.PodPending,
 				},
 			},
 			v1.PodRunning,
@@ -1845,7 +1865,7 @@ func TestPodPhaseWithRestartAlways(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		status := getPhase(&test.pod.Spec, test.pod.Status.ContainerStatuses)
+		status := getPhase(&test.pod.Spec, test.pod.Status.ContainerStatuses, test.pod.Status.Phase)
 		assert.Equal(t, test.status, status, "[test %s]", test.test)
 	}
 }
@@ -1865,7 +1885,8 @@ func TestPodPhaseWithRestartNever(t *testing.T) {
 		status v1.PodPhase
 		test   string
 	}{
-		{&v1.Pod{Spec: desiredState, Status: v1.PodStatus{}}, v1.PodPending, "waiting"},
+		{&v1.Pod{Spec: desiredState, Status: v1.PodStatus{Phase: v1.PodPending}}, v1.PodPending, "waiting"},
+		{&v1.Pod{Spec: desiredState, Status: v1.PodStatus{Phase: v1.PodFailed}}, v1.PodFailed, "containers removed after deletion"},
 		{
 			&v1.Pod{
 				Spec: desiredState,
@@ -1874,6 +1895,7 @@ func TestPodPhaseWithRestartNever(t *testing.T) {
 						runningState("containerA"),
 						runningState("containerB"),
 					},
+					Phase: v1.PodPending,
 				},
 			},
 			v1.PodRunning,
@@ -1887,6 +1909,7 @@ func TestPodPhaseWithRestartNever(t *testing.T) {
 						succeededState("containerA"),
 						succeededState("containerB"),
 					},
+					Phase: v1.PodPending,
 				},
 			},
 			v1.PodSucceeded,
@@ -1900,6 +1923,7 @@ func TestPodPhaseWithRestartNever(t *testing.T) {
 						failedState("containerA"),
 						failedState("containerB"),
 					},
+					Phase: v1.PodPending,
 				},
 			},
 			v1.PodFailed,
@@ -1913,6 +1937,7 @@ func TestPodPhaseWithRestartNever(t *testing.T) {
 						runningState("containerA"),
 						succeededState("containerB"),
 					},
+					Phase: v1.PodPending,
 				},
 			},
 			v1.PodRunning,
@@ -1925,6 +1950,20 @@ func TestPodPhaseWithRestartNever(t *testing.T) {
 					ContainerStatuses: []v1.ContainerStatus{
 						runningState("containerA"),
 					},
+					Phase: v1.PodFailed,
+				},
+			},
+			v1.PodFailed,
+			"mixed state #2 with restart never after pod has failed, and one container has been removed",
+		},
+		{
+			&v1.Pod{
+				Spec: desiredState,
+				Status: v1.PodStatus{
+					ContainerStatuses: []v1.ContainerStatus{
+						runningState("containerA"),
+					},
+					Phase: v1.PodPending,
 				},
 			},
 			v1.PodPending,
@@ -1938,6 +1977,7 @@ func TestPodPhaseWithRestartNever(t *testing.T) {
 						runningState("containerA"),
 						waitingState("containerB"),
 					},
+					Phase: v1.PodPending,
 				},
 			},
 			v1.PodPending,
@@ -1945,7 +1985,7 @@ func TestPodPhaseWithRestartNever(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		status := getPhase(&test.pod.Spec, test.pod.Status.ContainerStatuses)
+		status := getPhase(&test.pod.Spec, test.pod.Status.ContainerStatuses, test.pod.Status.Phase)
 		assert.Equal(t, test.status, status, "[test %s]", test.test)
 	}
 }
@@ -1965,7 +2005,8 @@ func TestPodPhaseWithRestartOnFailure(t *testing.T) {
 		status v1.PodPhase
 		test   string
 	}{
-		{&v1.Pod{Spec: desiredState, Status: v1.PodStatus{}}, v1.PodPending, "waiting"},
+		{&v1.Pod{Spec: desiredState, Status: v1.PodStatus{Phase: v1.PodPending}}, v1.PodPending, "waiting"},
+		{&v1.Pod{Spec: desiredState, Status: v1.PodStatus{Phase: v1.PodFailed}}, v1.PodFailed, "containers removed after deletion"},
 		{
 			&v1.Pod{
 				Spec: desiredState,
@@ -1974,6 +2015,7 @@ func TestPodPhaseWithRestartOnFailure(t *testing.T) {
 						runningState("containerA"),
 						runningState("containerB"),
 					},
+					Phase: v1.PodPending,
 				},
 			},
 			v1.PodRunning,
@@ -1987,6 +2029,7 @@ func TestPodPhaseWithRestartOnFailure(t *testing.T) {
 						succeededState("containerA"),
 						succeededState("containerB"),
 					},
+					Phase: v1.PodPending,
 				},
 			},
 			v1.PodSucceeded,
@@ -2000,6 +2043,7 @@ func TestPodPhaseWithRestartOnFailure(t *testing.T) {
 						failedState("containerA"),
 						failedState("containerB"),
 					},
+					Phase: v1.PodPending,
 				},
 			},
 			v1.PodRunning,
@@ -2013,6 +2057,7 @@ func TestPodPhaseWithRestartOnFailure(t *testing.T) {
 						runningState("containerA"),
 						succeededState("containerB"),
 					},
+					Phase: v1.PodPending,
 				},
 			},
 			v1.PodRunning,
@@ -2025,6 +2070,7 @@ func TestPodPhaseWithRestartOnFailure(t *testing.T) {
 					ContainerStatuses: []v1.ContainerStatus{
 						runningState("containerA"),
 					},
+					Phase: v1.PodPending,
 				},
 			},
 			v1.PodPending,
@@ -2036,8 +2082,22 @@ func TestPodPhaseWithRestartOnFailure(t *testing.T) {
 				Status: v1.PodStatus{
 					ContainerStatuses: []v1.ContainerStatus{
 						runningState("containerA"),
+					},
+					Phase: v1.PodFailed,
+				},
+			},
+			v1.PodFailed,
+			"mixed state #2 with restart onfailure after pod has failed, and one container has been removed",
+		},
+		{
+			&v1.Pod{
+				Spec: desiredState,
+				Status: v1.PodStatus{
+					ContainerStatuses: []v1.ContainerStatus{
+						runningState("containerA"),
 						waitingState("containerB"),
 					},
+					Phase: v1.PodPending,
 				},
 			},
 			v1.PodPending,
@@ -2051,6 +2111,7 @@ func TestPodPhaseWithRestartOnFailure(t *testing.T) {
 						runningState("containerA"),
 						waitingStateWithLastTermination("containerB"),
 					},
+					Phase: v1.PodPending,
 				},
 			},
 			v1.PodRunning,
@@ -2058,7 +2119,7 @@ func TestPodPhaseWithRestartOnFailure(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		status := getPhase(&test.pod.Spec, test.pod.Status.ContainerStatuses)
+		status := getPhase(&test.pod.Spec, test.pod.Status.ContainerStatuses, test.pod.Status.Phase)
 		assert.Equal(t, test.status, status, "[test %s]", test.test)
 	}
 }
