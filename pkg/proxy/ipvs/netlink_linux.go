@@ -57,7 +57,7 @@ func (h *netlinkHandle) EnsureAddressBind(address, devName string) (exist bool, 
 	return false, nil
 }
 
-// UnbindAddress unbind address from the interface
+// UnbindAddress makes sure IP address is unbound from the network interface.
 func (h *netlinkHandle) UnbindAddress(address, devName string) error {
 	dev, err := h.LinkByName(devName)
 	if err != nil {
@@ -68,7 +68,9 @@ func (h *netlinkHandle) UnbindAddress(address, devName string) error {
 		return fmt.Errorf("error parse ip address: %s", address)
 	}
 	if err := h.AddrDel(dev, &netlink.Addr{IPNet: netlink.NewIPNet(addr)}); err != nil {
-		return fmt.Errorf("error unbind address: %s from interface: %s, err: %v", address, devName, err)
+		if err != unix.ENXIO {
+			return fmt.Errorf("error unbind address: %s from interface: %s, err: %v", address, devName, err)
+		}
 	}
 	return nil
 }
