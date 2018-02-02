@@ -364,17 +364,9 @@ func (as *availabilitySet) GetInstanceIDByNodeName(name string) (string, error) 
 
 	machine, err = as.getVirtualMachine(types.NodeName(name))
 	if err != nil {
-		if as.CloudProviderBackoff {
-			glog.V(2).Infof("InstanceID(%s) backing off", name)
-			machine, err = as.GetVirtualMachineWithRetry(types.NodeName(name))
-			if err != nil {
-				glog.V(2).Infof("InstanceID(%s) abort backoff", name)
-				return "", err
-			}
-		} else {
-			return "", err
-		}
+		return "", err
 	}
+
 	return *machine.ID, nil
 }
 
@@ -441,9 +433,9 @@ func (as *availabilitySet) GetIPByNodeName(name, vmSetName string) (string, erro
 // getAgentPoolAvailabiliySets lists the virtual machines for for the resource group and then builds
 // a list of availability sets that match the nodes available to k8s.
 func (as *availabilitySet) getAgentPoolAvailabiliySets(nodes []*v1.Node) (agentPoolAvailabilitySets *[]string, err error) {
-	vms, err := as.VirtualMachineClientListWithRetry()
+	vms, err := as.listVirtualMachines()
 	if err != nil {
-		glog.Errorf("as.getNodeAvailabilitySet - VirtualMachineClientListWithRetry failed, err=%v", err)
+		glog.Errorf("as.getNodeAvailabilitySet - listVirtualMachines failed, err=%v", err)
 		return nil, err
 	}
 	vmNameToAvailabilitySetID := make(map[string]string, len(vms))
@@ -535,7 +527,7 @@ func (as *availabilitySet) GetVMSetNames(service *v1.Service, nodes []*v1.Node) 
 func (as *availabilitySet) GetPrimaryInterface(nodeName, vmSetName string) (network.Interface, error) {
 	var machine compute.VirtualMachine
 
-	machine, err := as.GetVirtualMachineWithRetry(types.NodeName(nodeName))
+	machine, err := as.getVirtualMachine(types.NodeName(nodeName))
 	if err != nil {
 		glog.V(2).Infof("GetPrimaryInterface(%s, %s) abort backoff", nodeName, vmSetName)
 		return network.Interface{}, err
