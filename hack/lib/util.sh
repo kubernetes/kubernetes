@@ -438,12 +438,19 @@ kube::util::ensure_godep_version() {
 
   kube::log::status "Installing godep version ${GODEP_VERSION}"
   go install ./vendor/github.com/tools/godep/
-  GP="$(echo $GOPATH | cut -f1 -d:)"
-  hash -r # force bash to clear PATH cache
-  PATH="${GP}/bin:${PATH}"
+  if ! which godep >/dev/null 2>&1; then
+    kube::log::error "Can't find godep - is your GOPATH 'bin' in your PATH?"
+    kube::log::error "  GOPATH: ${GOPATH}"
+    kube::log::error "  PATH:   ${PATH}"
+    return 1
+  fi
 
   if [[ "$(godep version 2>/dev/null)" != *"godep ${GODEP_VERSION}"* ]]; then
-    kube::log::error "Expected godep ${GODEP_VERSION}, got $(godep version)"
+    kube::log::error "Wrong godep version - is your GOPATH 'bin' in your PATH?"
+    kube::log::error "  expected: godep ${GODEP_VERSION}"
+    kube::log::error "  got:      $(godep version)"
+    kube::log::error "  GOPATH: ${GOPATH}"
+    kube::log::error "  PATH:   ${PATH}"
     return 1
   fi
 }
