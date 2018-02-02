@@ -18,6 +18,8 @@ package main
 
 import (
 	"crypto/tls"
+	"crypto/x509"
+	"io/ioutil"
 
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -39,13 +41,36 @@ func getClient() *kubernetes.Clientset {
 }
 
 func configTLS(config Config, clientset *kubernetes.Clientset) *tls.Config {
+	if config.ClientCAFile != "" {
+		return configMutualTLS(config, clientset)
+	}
+	return configSingleTLS(config, clientset)
+}
+
+func configSingleTLS(config Config, clientset *kubernetes.Clientset) *tls.Config {
 	sCert, err := tls.LoadX509KeyPair(config.CertFile, config.KeyFile)
 	if err != nil {
 		glog.Fatal(err)
 	}
 	return &tls.Config{
 		Certificates: []tls.Certificate{sCert},
-		// TODO: uses mutual tls after we agree on what cert the apiserver should use.
-		// ClientAuth:   tls.RequireAndVerifyClientCert,
+	}
+}
+
+func configMutualTLS(config Config, clientset *kubernetes.Clientset) *tls.Config {
+	clientCA, err := ioutil.ReadFile(config.ClientCAFile)
+	if err != nil {
+		glog.Fatal(err)
+	}
+	clientCAPool := x509.NewCertPool()
+	clientCAPool.AppendCertsFromPEM(clientCA)
+	sCert, err := tls.LoadX509KeyPair(config.CertFile, config.KeyFile)
+	if err != nil {
+		glog.Fatal(err)
+	}
+	return &tls.Config{
+		Certificates: []tls.Certificate{sCert},
+		ClientCAs:    clientCAPool,
+		ClientAuth:   tls.RequireAndVerifyClientCert,
 	}
 }

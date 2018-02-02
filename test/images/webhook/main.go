@@ -45,10 +45,16 @@ const (
 	]`
 )
 
-// Config contains the server (the webhook) cert and key.
+// Config contains the values of the flags passed to this webhook
 type Config struct {
+	// cert presented by the server (the webhook) to prove
+	// its identity to the client (the apiserver)
 	CertFile string
 	KeyFile  string
+
+	// CA to trust when verifying the identity of the client (the apiserver)
+	// If left blank then the client's identitiy will not be verified
+	ClientCAFile string
 }
 
 func (c *Config) addFlags() {
@@ -57,6 +63,10 @@ func (c *Config) addFlags() {
 		"after server cert).")
 	flag.StringVar(&c.KeyFile, "tls-private-key-file", c.KeyFile, ""+
 		"File containing the default x509 private key matching --tls-cert-file.")
+	flag.StringVar(&c.ClientCAFile, "client-ca-file", c.ClientCAFile, ""+
+		"If set, any request presenting a client certificate signed by one of "+
+		"the authorities in the client-ca-file is authenticated with an identity "+
+		"corresponding to the CommonName of the client certificate.")
 }
 
 func toAdmissionResponse(err error) *v1beta1.AdmissionResponse {

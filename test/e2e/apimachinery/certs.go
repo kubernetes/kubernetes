@@ -18,9 +18,11 @@ package apimachinery
 
 import (
 	"crypto/x509"
+	"fmt"
 	"io/ioutil"
 	"os"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/util/cert"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
@@ -87,4 +89,21 @@ func setupServerCert(namespaceName, serviceName string) *certContext {
 		key:         cert.EncodePrivateKeyPEM(key),
 		signingCert: cert.EncodeCertPEM(signingCert),
 	}
+}
+
+// Get the client CA which was provided to the apiserver as --client-ca-file
+func getClientCA(f *framework.Framework) []byte {
+	clientset := f.ClientSet
+
+	c, err := clientset.CoreV1().ConfigMaps("kube-system").Get("extension-apiserver-authentication", metav1.GetOptions{})
+	if err != nil {
+		framework.Failf("Failed to get extension-apiserver-authentication %v", err)
+	}
+
+	pem, ok := c.Data["client-ca-file"]
+	if !ok {
+		framework.Failf(fmt.Sprintf("cannot find the ca.crt in the configmap, configMap.Data is %#v", c.Data))
+	}
+	framework.Logf("Client CA found: %q", pem)
+	return []byte(pem)
 }
