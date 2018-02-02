@@ -679,7 +679,7 @@ func TestSchedulerWithVolumeBinding(t *testing.T) {
 				FindBoundSatsified:   false,
 			},
 			eventReason: "FailedScheduling",
-			expectError: makePredicateError("1 VolumeNodeAffinityConflict"),
+			expectError: makePredicateError("1 node(s) had volume node affinity conflict"),
 		},
 		"unbound,no-matches": {
 			volumeBinderConfig: &persistentvolume.FakeVolumeBinderConfig{
@@ -687,7 +687,7 @@ func TestSchedulerWithVolumeBinding(t *testing.T) {
 				FindBoundSatsified:   true,
 			},
 			eventReason: "FailedScheduling",
-			expectError: makePredicateError("1 VolumeBindingNoMatch"),
+			expectError: makePredicateError("1 node(s) didn't find available persistent volumes to bind"),
 		},
 		"bound-and-unbound-unsatisfied": {
 			volumeBinderConfig: &persistentvolume.FakeVolumeBinderConfig{
@@ -695,7 +695,7 @@ func TestSchedulerWithVolumeBinding(t *testing.T) {
 				FindBoundSatsified:   false,
 			},
 			eventReason: "FailedScheduling",
-			expectError: makePredicateError("1 VolumeBindingNoMatch, 1 VolumeNodeAffinityConflict"),
+			expectError: makePredicateError("1 node(s) didn't find available persistent volumes to bind, 1 node(s) had volume node affinity conflict"),
 		},
 		"unbound,found-matches": {
 			volumeBinderConfig: &persistentvolume.FakeVolumeBinderConfig{
