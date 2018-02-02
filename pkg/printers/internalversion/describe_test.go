@@ -80,7 +80,8 @@ func TestDescribePodNode(t *testing.T) {
 			NodeName: "all-in-one",
 		},
 		Status: api.PodStatus{
-			HostIP: "127.0.0.1",
+			HostIP:            "127.0.0.1",
+			NominatedNodeName: "nodeA",
 		},
 	})
 	c := &describeClient{T: t, Namespace: "foo", Interface: fake}
@@ -90,6 +91,9 @@ func TestDescribePodNode(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 	if !strings.Contains(out, "all-in-one/127.0.0.1") {
+		t.Errorf("unexpected out: %s", out)
+	}
+	if !strings.Contains(out, "nodeA") {
 		t.Errorf("unexpected out: %s", out)
 	}
 }

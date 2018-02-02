@@ -1704,9 +1704,10 @@ func TestPrintPodwide(t *testing.T) {
 						{Ready: true, RestartCount: 3, State: api.ContainerState{Running: &api.ContainerStateRunning{}}},
 						{RestartCount: 3},
 					},
+					NominatedNodeName: "node1",
 				},
 			},
-			[]metav1alpha1.TableRow{{Cells: []interface{}{"test1", "1/2", "podPhase", 6, "<unknown>", "1.1.1.1", "test1"}}},
+			[]metav1alpha1.TableRow{{Cells: []interface{}{"test1", "1/2", "podPhase", 6, "<unknown>", "1.1.1.1", "test1", "node1"}}},
 		},
 		{
 			// Test when the NodeName and PodIP are none

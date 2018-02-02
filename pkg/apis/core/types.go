@@ -2724,6 +2724,13 @@ type PodStatus struct {
 	// A brief CamelCase message indicating details about why the pod is in this state. e.g. 'Evicted'
 	// +optional
 	Reason string
+	// nominatedNodeName is set when this pod preempts other pods on the node, but it cannot be
+	// scheduled right away as preemption victims receive their graceful termination periods.
+	// This field does not guarantee that the pod will be scheduled on this node. Scheduler may decide
+	// to place the pod elsewhere if other nodes become available sooner. Scheduler may also decide to
+	// give the resources on this node to a higher priority pod that is created after preemption.
+	// +optional
+	NominatedNodeName string
 
 	// +optional
 	HostIP string

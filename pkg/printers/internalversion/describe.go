@@ -651,6 +651,9 @@ func describePod(pod *api.Pod, events *api.EventList) (string, error) {
 		if controlledBy := printController(pod); len(controlledBy) > 0 {
 			w.Write(LEVEL_0, "Controlled By:\t%s\n", controlledBy)
 		}
+		if len(pod.Status.NominatedNodeName) > 0 {
+			w.Write(LEVEL_0, "NominatedNodeName:\t%s\n", pod.Status.NominatedNodeName)
+		}
 
 		if len(pod.Spec.InitContainers) > 0 {
 			describeContainers("Init Containers", pod.Spec.InitContainers, pod.Status.InitContainerStatuses, EnvValueRetriever(pod), w, "")

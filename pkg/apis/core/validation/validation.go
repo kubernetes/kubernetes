@@ -3361,6 +3361,12 @@ func ValidatePodStatusUpdate(newPod, oldPod *core.Pod) field.ErrorList {
 		allErrs = append(allErrs, field.Forbidden(fldPath.Child("nodeName"), "may not be changed directly"))
 	}
 
+	if newPod.Status.NominatedNodeName != oldPod.Status.NominatedNodeName && len(newPod.Status.NominatedNodeName) > 0 {
+		for _, msg := range ValidateNodeName(newPod.Status.NominatedNodeName, false) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("nominatedNodeName"), newPod.Status.NominatedNodeName, msg))
+		}
+	}
+
 	// If pod should not restart, make sure the status update does not transition
 	// any terminated containers to a non-terminated state.
 	allErrs = append(allErrs, ValidateContainerStateTransition(newPod.Status.ContainerStatuses, oldPod.Status.ContainerStatuses, fldPath.Child("containerStatuses"), oldPod.Spec.RestartPolicy)...)
