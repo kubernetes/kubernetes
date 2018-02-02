@@ -278,10 +278,10 @@ func TestResetWithCrictl(t *testing.T) {
 	if fcmd.RunCalls != 3 {
 		t.Errorf("expected 3 calls to Run, got %d", fcmd.RunCalls)
 	}
-	if !strings.Contains(fcmd.RunLog[1][2], "crictl") {
+	if !strings.Contains(fcmd.RunLog[1][0], "crictl") {
 		t.Errorf("expected a call to crictl, got %v", fcmd.RunLog[0])
 	}
-	if !strings.Contains(fcmd.RunLog[2][2], "crictl") {
+	if !strings.Contains(fcmd.RunLog[2][0], "crictl") {
 		t.Errorf("expected a call to crictl, got %v", fcmd.RunLog[0])
 	}
 
@@ -330,7 +330,7 @@ func TestReset(t *testing.T) {
 	if fcmd.RunCalls != 2 {
 		t.Errorf("expected 2 call to Run, got %d", fcmd.RunCalls)
 	}
-	if !strings.Contains(fcmd.RunLog[0][2], "crictl") {
+	if !strings.Contains(fcmd.RunLog[0][0], "crictl") {
 		t.Errorf("expected a call to crictl, got %v", fcmd.RunLog[0])
 	}
 
