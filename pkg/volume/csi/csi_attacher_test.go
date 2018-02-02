@@ -22,7 +22,7 @@ import (
 	"testing"
 	"time"
 
-	storage "k8s.io/api/storage/v1alpha1"
+	storage "k8s.io/api/storage/v1beta1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -129,7 +129,7 @@ func TestAttacherAttach(t *testing.T) {
 		// wait for attachment to be saved
 		var attach *storage.VolumeAttachment
 		for i := 0; i < 100; i++ {
-			attach, err = csiAttacher.k8s.StorageV1alpha1().VolumeAttachments().Get(tc.attachID, meta.GetOptions{})
+			attach, err = csiAttacher.k8s.StorageV1beta1().VolumeAttachments().Get(tc.attachID, meta.GetOptions{})
 			if err != nil {
 				if apierrs.IsNotFound(err) {
 					<-ticker.C
@@ -146,7 +146,7 @@ func TestAttacherAttach(t *testing.T) {
 			t.Error("attachment not found")
 		}
 		attach.Status.Attached = true
-		_, err = csiAttacher.k8s.StorageV1alpha1().VolumeAttachments().Update(attach)
+		_, err = csiAttacher.k8s.StorageV1beta1().VolumeAttachments().Update(attach)
 		if err != nil {
 			t.Error(err)
 		}
@@ -188,7 +188,7 @@ func TestAttacherWaitForVolumeAttachment(t *testing.T) {
 		csiAttacher.waitSleepTime = tc.sleepTime
 
 		go func() {
-			_, err := csiAttacher.k8s.StorageV1alpha1().VolumeAttachments().Create(attachment)
+			_, err := csiAttacher.k8s.StorageV1beta1().VolumeAttachments().Create(attachment)
 			if err != nil {
 				t.Fatalf("failed to attach: %v", err)
 			}
@@ -239,7 +239,7 @@ func TestAttacherVolumesAreAttached(t *testing.T) {
 			attachID := getAttachmentName(volName, testDriver, nodeName)
 			attachment := makeTestAttachment(attachID, nodeName, pv.GetName())
 			attachment.Status.Attached = stat
-			_, err := csiAttacher.k8s.StorageV1alpha1().VolumeAttachments().Create(attachment)
+			_, err := csiAttacher.k8s.StorageV1beta1().VolumeAttachments().Create(attachment)
 			if err != nil {
 				t.Fatalf("failed to attach: %v", err)
 			}
@@ -292,7 +292,7 @@ func TestAttacherDetach(t *testing.T) {
 		pv := makeTestPV("test-pv", 10, testDriver, tc.volID)
 		spec := volume.NewSpecFromPersistentVolume(pv, pv.Spec.PersistentVolumeSource.CSI.ReadOnly)
 		attachment := makeTestAttachment(tc.attachID, nodeName, "test-pv")
-		_, err := csiAttacher.k8s.StorageV1alpha1().VolumeAttachments().Create(attachment)
+		_, err := csiAttacher.k8s.StorageV1beta1().VolumeAttachments().Create(attachment)
 		if err != nil {
 			t.Fatalf("failed to attach: %v", err)
 		}
@@ -307,7 +307,7 @@ func TestAttacherDetach(t *testing.T) {
 		if !tc.shouldFail && err != nil {
 			t.Fatalf("unexpected err: %v", err)
 		}
-		attach, err := csiAttacher.k8s.StorageV1alpha1().VolumeAttachments().Get(tc.attachID, meta.GetOptions{})
+		attach, err := csiAttacher.k8s.StorageV1beta1().VolumeAttachments().Get(tc.attachID, meta.GetOptions{})
 		if err != nil {
 			if !apierrs.IsNotFound(err) {
 				t.Fatalf("unexpected err: %v", err)

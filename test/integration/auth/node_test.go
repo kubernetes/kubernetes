@@ -23,7 +23,7 @@ import (
 	"testing"
 	"time"
 
-	storagev1alpha1 "k8s.io/api/storage/v1alpha1"
+	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -32,7 +32,6 @@ import (
 	"k8s.io/apiserver/pkg/authentication/request/bearertoken"
 	"k8s.io/apiserver/pkg/authentication/token/tokenfile"
 	"k8s.io/apiserver/pkg/authentication/user"
-	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	versionedinformers "k8s.io/client-go/informers"
@@ -106,9 +105,6 @@ func TestNodeAuthorizer(t *testing.T) {
 	masterConfig.GenericConfig.Authorizer = nodeRBACAuthorizer
 	masterConfig.GenericConfig.AdmissionControl = nodeRestrictionAdmission
 
-	// enable testing volume attachments
-	masterConfig.ExtraConfig.APIResourceConfigSource.(*serverstorage.ResourceConfig).EnableVersions(storagev1alpha1.SchemeGroupVersion)
-
 	_, _, closeFn := framework.RunAMasterUsingServer(masterConfig, apiServer, h)
 	defer closeFn()
 
@@ -140,11 +136,11 @@ func TestNodeAuthorizer(t *testing.T) {
 		t.Fatal(err)
 	}
 	pvName := "mypv"
-	if _, err := superuserClientExternal.StorageV1alpha1().VolumeAttachments().Create(&storagev1alpha1.VolumeAttachment{
+	if _, err := superuserClientExternal.StorageV1beta1().VolumeAttachments().Create(&storagev1beta1.VolumeAttachment{
 		ObjectMeta: metav1.ObjectMeta{Name: "myattachment"},
-		Spec: storagev1alpha1.VolumeAttachmentSpec{
+		Spec: storagev1beta1.VolumeAttachmentSpec{
 			Attacher: "foo",
-			Source:   storagev1alpha1.VolumeAttachmentSource{PersistentVolumeName: &pvName},
+			Source:   storagev1beta1.VolumeAttachmentSource{PersistentVolumeName: &pvName},
 			NodeName: "node2",
 		},
 	}); err != nil {
@@ -204,7 +200,7 @@ func TestNodeAuthorizer(t *testing.T) {
 	}
 	getVolumeAttachment := func(client externalclientset.Interface) func() error {
 		return func() error {
-			_, err := client.StorageV1alpha1().VolumeAttachments().Get("myattachment", metav1.GetOptions{})
+			_, err := client.StorageV1beta1().VolumeAttachments().Get("myattachment", metav1.GetOptions{})
 			return err
 		}
 	}

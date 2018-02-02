@@ -24,7 +24,7 @@ import (
 
 	"os"
 
-	storagev1alpha1 "k8s.io/api/storage/v1alpha1"
+	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
@@ -429,7 +429,7 @@ func BenchmarkAuthorization(b *testing.B) {
 	}
 }
 
-func populate(graph *Graph, pods []*api.Pod, pvs []*api.PersistentVolume, attachments []*storagev1alpha1.VolumeAttachment) {
+func populate(graph *Graph, pods []*api.Pod, pvs []*api.PersistentVolume, attachments []*storagev1beta1.VolumeAttachment) {
 	p := &graphPopulator{}
 	p.graph = graph
 	for _, pod := range pods {
@@ -447,10 +447,10 @@ func populate(graph *Graph, pods []*api.Pod, pvs []*api.PersistentVolume, attach
 // the secret/configmap/pvc/node references in the pod and pv objects are named to indicate the connections between the objects.
 // for example, secret0-pod0-node0 is a secret referenced by pod0 which is bound to node0.
 // when populated into the graph, the node authorizer should allow node0 to access that secret, but not node1.
-func generate(opts sampleDataOpts) ([]*api.Pod, []*api.PersistentVolume, []*storagev1alpha1.VolumeAttachment) {
+func generate(opts sampleDataOpts) ([]*api.Pod, []*api.PersistentVolume, []*storagev1beta1.VolumeAttachment) {
 	pods := make([]*api.Pod, 0, opts.nodes*opts.podsPerNode)
 	pvs := make([]*api.PersistentVolume, 0, (opts.nodes*opts.podsPerNode*opts.uniquePVCsPerPod)+(opts.sharedPVCsPerPod*opts.namespaces))
-	attachments := make([]*storagev1alpha1.VolumeAttachment, 0, opts.nodes*opts.attachmentsPerNode)
+	attachments := make([]*storagev1beta1.VolumeAttachment, 0, opts.nodes*opts.attachmentsPerNode)
 
 	for n := 0; n < opts.nodes; n++ {
 		nodeName := fmt.Sprintf("node%d", n)
@@ -508,7 +508,7 @@ func generate(opts sampleDataOpts) ([]*api.Pod, []*api.PersistentVolume, []*stor
 			pods = append(pods, pod)
 		}
 		for a := 0; a < opts.attachmentsPerNode; a++ {
-			attachment := &storagev1alpha1.VolumeAttachment{}
+			attachment := &storagev1beta1.VolumeAttachment{}
 			attachment.Name = fmt.Sprintf("attachment%d-%s", a, nodeName)
 			attachment.Spec.NodeName = nodeName
 			attachments = append(attachments, attachment)
