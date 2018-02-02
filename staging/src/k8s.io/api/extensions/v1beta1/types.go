@@ -561,6 +561,7 @@ type DaemonSetList struct {
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// DEPRECATED 1.10 - This group version of Ingress is deprecated by networking/v1/Ingress.
 // Ingress is a collection of rules that allow inbound connections to reach the
 // endpoints defined by a backend. An Ingress can be configured to give services
 // externally-reachable urls, load balance traffic, terminate SSL, offer name
@@ -585,6 +586,7 @@ type Ingress struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// DEPRECATED 1.10 - This group version of IngressList is deprecated by networking/v1/IngressList.
 // IngressList is a collection of Ingress.
 type IngressList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -597,6 +599,7 @@ type IngressList struct {
 	Items []Ingress `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
+// DEPRECATED 1.10 - This group version of IngressSpec is deprecated by networking/v1/IngressSpec.
 // IngressSpec describes the Ingress the user wishes to exist.
 type IngressSpec struct {
 	// A default backend capable of servicing requests that don't match any
@@ -621,6 +624,7 @@ type IngressSpec struct {
 	// TODO: Add the ability to specify load-balancer IP through claims
 }
 
+// DEPRECATED 1.10 - This group version of IngressTLS is deprecated by networking/v1/IngressTLS.
 // IngressTLS describes the transport layer security associated with an Ingress.
 type IngressTLS struct {
 	// Hosts are a list of hosts included in the TLS certificate. The values in
@@ -639,6 +643,7 @@ type IngressTLS struct {
 	// TODO: Consider specifying different modes of termination, protocols etc.
 }
 
+// DEPRECATED 1.10 - This group version of IngressStatus is deprecated by networking/v1/IngressStatus.
 // IngressStatus describe the current state of the Ingress.
 type IngressStatus struct {
 	// LoadBalancer contains the current status of the load-balancer.
@@ -646,6 +651,7 @@ type IngressStatus struct {
 	LoadBalancer v1.LoadBalancerStatus `json:"loadBalancer,omitempty" protobuf:"bytes,1,opt,name=loadBalancer"`
 }
 
+// DEPRECATED 1.10 - This group version of IngressRule is deprecated by networking/v1/IngressRule.
 // IngressRule represents the rules mapping the paths under a specified host to
 // the related backend services. Incoming requests are first evaluated for a host
 // match, then routed to the backend associated with the matching IngressRuleValue.
@@ -673,6 +679,7 @@ type IngressRule struct {
 	IngressRuleValue `json:",inline,omitempty" protobuf:"bytes,2,opt,name=ingressRuleValue"`
 }
 
+// DEPRECATED 1.10 - This group version of IngressRuleValue is deprecated by networking/v1/IngressRuleValue.
 // IngressRuleValue represents a rule to apply against incoming requests. If the
 // rule is satisfied, the request is routed to the specified backend. Currently
 // mixing different types of rules in a single Ingress is disallowed, so exactly
@@ -688,6 +695,7 @@ type IngressRuleValue struct {
 	HTTP *HTTPIngressRuleValue `json:"http,omitempty" protobuf:"bytes,1,opt,name=http"`
 }
 
+// DEPRECATED 1.10 - This group version of HTTPIngressRuleValue is deprecated by networking/v1/HTTPIngressRuleValue.
 // HTTPIngressRuleValue is a list of http selectors pointing to backends.
 // In the example: http://<host>/<path>?<searchpart> -> backend where
 // where parts of the url correspond to RFC 3986, this resource will be used
@@ -700,6 +708,7 @@ type HTTPIngressRuleValue struct {
 	// options usable by a loadbalancer, like http keep-alive.
 }
 
+// DEPRECATED 1.10 - This group version of HTTPIngressPath is deprecated by networking/v1/HTTPIngressPath.
 // HTTPIngressPath associates a path regex with a backend. Incoming urls matching
 // the path are forwarded to the backend.
 type HTTPIngressPath struct {
@@ -718,6 +727,7 @@ type HTTPIngressPath struct {
 	Backend IngressBackend `json:"backend" protobuf:"bytes,2,opt,name=backend"`
 }
 
+// DEPRECATED 1.10 - This group version of IngressBackend is deprecated by networking/v1/IngressBackend.
 // IngressBackend describes all endpoints for a given service and port.
 type IngressBackend struct {
 	// Specifies the name of the referenced service.
