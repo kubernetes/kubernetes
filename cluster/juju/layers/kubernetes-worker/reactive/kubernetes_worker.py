@@ -976,7 +976,7 @@ def get_node_name():
     # Get all the nodes in the cluster
     cmd = 'kubectl --kubeconfig={} get no -o=json'.format(kubeconfig_path)
     cmd = cmd.split()
-    deadline = time.time() + 60
+    deadline = time.time() + 180
     while time.time() < deadline:
         try:
             raw = check_output(cmd)
@@ -1029,7 +1029,7 @@ def _apply_node_label(label, delete=False, overwrite=False):
             cmd = '{} --overwrite'.format(cmd)
     cmd = cmd.split()
 
-    deadline = time.time() + 60
+    deadline = time.time() + 180
     while time.time() < deadline:
         code = subprocess.call(cmd)
         if code == 0:
