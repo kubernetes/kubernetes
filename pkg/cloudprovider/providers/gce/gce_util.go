@@ -22,6 +22,7 @@ import (
 	"net"
 	"net/http"
 	"regexp"
+	"sort"
 	"strings"
 
 	"k8s.io/api/core/v1"
@@ -98,8 +99,13 @@ func firewallToGcloudArgs(fw *compute.Firewall, projectID string) string {
 			allPorts = append(allPorts, fmt.Sprintf("%v:%v", a.IPProtocol, p))
 		}
 	}
+
+	// Sort all slices to prevent the event from being duped
+	sort.Strings(allPorts)
 	allow := strings.Join(allPorts, ",")
+	sort.Strings(fw.SourceRanges)
 	srcRngs := strings.Join(fw.SourceRanges, ",")
+	sort.Strings(fw.TargetTags)
 	targets := strings.Join(fw.TargetTags, ",")
 	return fmt.Sprintf("--description %q --allow %v --source-ranges %v --target-tags %v --project %v", fw.Description, allow, srcRngs, targets, projectID)
 }
