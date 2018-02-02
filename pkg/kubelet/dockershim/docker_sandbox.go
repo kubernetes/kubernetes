@@ -119,12 +119,7 @@ func (ds *dockerService) RunPodSandbox(ctx context.Context, r *runtimeapi.RunPod
 		}
 	}(&err)
 
-	// Step 3: Create Sandbox Checkpoint.
-	if err = ds.checkpointManager.CreateCheckpoint(createResp.ID, constructPodSandboxCheckpoint(config)); err != nil {
-		return nil, err
-	}
-
-	// Step 4: Start the sandbox container.
+	// Step 3: Start the sandbox container.
 	// Assume kubelet's garbage collector would remove the sandbox later, if
 	// startContainer failed.
 	err = ds.client.StartContainer(createResp.ID)
@@ -154,7 +149,7 @@ func (ds *dockerService) RunPodSandbox(ctx context.Context, r *runtimeapi.RunPod
 		return resp, nil
 	}
 
-	// Step 5: Setup networking for the sandbox.
+	// Step 4: Setup networking for the sandbox.
 	// All pod networking is setup by a CNI plugin discovered at startup time.
 	// This plugin assigns the pod ip, sets up routes inside the sandbox,
 	// creates interfaces etc. In theory, its jurisdiction ends with pod
@@ -162,7 +157,7 @@ func (ds *dockerService) RunPodSandbox(ctx context.Context, r *runtimeapi.RunPod
 	// on the host as well, to satisfy parts of the pod spec that aren't
 	// recognized by the CNI standard yet.
 	cID := kubecontainer.BuildContainerID(runtimeName, createResp.ID)
-	_, err = ds.network.SetUpPod(config.GetMetadata().Namespace, config.GetMetadata().Name, cID, config.Annotations)
+	sandboxIP, err := ds.network.SetUpPod(config.GetMetadata().Namespace, config.GetMetadata().Name, cID, config.Annotations)
 	if err != nil {
 		errList := []error{fmt.Errorf("failed to set up sandbox container %q network for pod %q: %v", createResp.ID, config.Metadata.Name, err)}
 
@@ -179,6 +174,11 @@ func (ds *dockerService) RunPodSandbox(ctx context.Context, r *runtimeapi.RunPod
 		}
 
 		return resp, utilerrors.NewAggregate(errList)
+	}
+
+	// Step 5: Create Sandbox Checkpoint.
+	if err = ds.checkpointManager.CreateCheckpoint(createResp.ID, constructPodSandboxCheckpoint(config, sandboxIP)); err != nil {
+		return nil, err
 	}
 
 	return resp, nil
@@ -349,6 +349,20 @@ func (ds *dockerService) getIP(podSandboxID string, sandbox *dockertypes.Contain
 		return ""
 	}
 
+	// Get pod IP from checkpoint first.
+	checkpoint := &PodSandboxCheckpoint{Version: schemaVersion, Data: &CheckpointData{}}
+	checkpointErr := ds.checkpointManager.GetCheckpoint(podSandboxID, checkpoint)
+	if checkpointErr == nil {
+		return checkpoint.Data.PodIP
+	}
+	glog.Warningf("Failed to retrieve pod IP from checkpoint for sandbox %q: %v", podSandboxID, checkpointErr)
+	if checkpointErr == errors.ErrCorruptCheckpoint {
+		checkpointErr = ds.checkpointManager.RemoveCheckpoint(podSandboxID)
+		if checkpointErr != nil {
+			glog.Errorf("Failed to delete corrupt checkpoint for sandbox %q: %v", podSandboxID, checkpointErr)
+		}
+	}
+
 	ip, err := ds.getIPFromPlugin(sandbox)
 	if err == nil {
 		return ip
@@ -369,7 +383,7 @@ func (ds *dockerService) getIP(podSandboxID string, sandbox *dockertypes.Contain
 	// If all else fails, warn but don't return an error, as pod status
 	// should generally not return anything except fatal errors
 	// FIXME: handle network errors by restarting the pod somehow?
-	glog.Warningf("failed to read pod IP from plugin/docker: %v", err)
+	glog.Warningf("Failed to read pod IP from plugin/docker: %v", err)
 	return ""
 }
 
@@ -635,7 +649,7 @@ func ipcNamespaceMode(container *dockertypes.ContainerJSON) runtimeapi.Namespace
 	return runtimeapi.NamespaceMode_POD
 }
 
-func constructPodSandboxCheckpoint(config *runtimeapi.PodSandboxConfig) checkpointmanager.Checkpoint {
+func constructPodSandboxCheckpoint(config *runtimeapi.PodSandboxConfig, sandboxIP string) checkpointmanager.Checkpoint {
 	data := CheckpointData{}
 	for _, pm := range config.GetPortMappings() {
 		proto := toCheckpointProtocol(pm.Protocol)
@@ -645,6 +659,7 @@ func constructPodSandboxCheckpoint(config *runtimeapi.PodSandboxConfig) checkpoi
 			Protocol:      &proto,
 		})
 	}
+	data.PodIP = sandboxIP
 	if config.GetLinux().GetSecurityContext().GetNamespaceOptions().GetNetwork() == runtimeapi.NamespaceMode_NODE {
 		data.HostNetwork = true
 	}

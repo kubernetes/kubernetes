@@ -52,6 +52,8 @@ type PortMapping struct {
 type CheckpointData struct {
 	PortMappings []*PortMapping `json:"port_mappings,omitempty"`
 	HostNetwork  bool           `json:"host_network,omitempty"`
+	// PodIP  is the IP of the sandbox.
+	PodIP    string             `json:"pod_ip"`
 }
 
 // PodSandboxCheckpoint is the checkpoint structure for a sandbox
