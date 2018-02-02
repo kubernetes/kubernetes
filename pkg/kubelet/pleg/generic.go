@@ -238,7 +238,7 @@ func (g *GenericPLEG) relist() {
 			// serially may take a while. We should be aware of this and
 			// parallelize if needed.
 			if err := g.updateCache(pod, pid); err != nil {
-				glog.Errorf("PLEG: Ignoring events for pod %s/%s: %v", pod.Name, pod.Namespace, err)
+				glog.Errorf("PLEG: Ignoring events for pod %s/%s: %v", pod.Namespace, pod.Name, err)
 
 				// make sure we try to reinspect the pod during the next relisting
 				needsReinspection[pid] = pod
