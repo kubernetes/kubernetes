@@ -368,6 +368,10 @@ func (d *deploymentTester) updateReplicaSet(name string, applyUpdate testutil.Up
 	return testutil.UpdateReplicaSetWithRetries(d.c, d.deployment.Namespace, name, applyUpdate, d.t.Logf, pollInterval, pollTimeout)
 }
 
+func (d *deploymentTester) updateReplicaSetStatus(name string, applyStatusUpdate testutil.UpdateReplicaSetFunc) (*v1beta1.ReplicaSet, error) {
+	return testutil.UpdateReplicaSetStatusWithRetries(d.c, d.deployment.Namespace, name, applyStatusUpdate, d.t.Logf, pollInterval, pollTimeout)
+}
+
 // waitForDeploymentRollbackCleared waits for deployment either started rolling back or doesn't need to rollback.
 func (d *deploymentTester) waitForDeploymentRollbackCleared() error {
 	return testutil.WaitForDeploymentRollbackCleared(d.c, d.deployment.Namespace, d.deployment.Name, pollInterval, pollTimeout)
@@ -378,8 +382,8 @@ func (d *deploymentTester) checkDeploymentRevisionAndImage(revision, image strin
 	return testutil.CheckDeploymentRevisionAndImage(d.c, d.deployment.Namespace, d.deployment.Name, revision, image)
 }
 
-func (d *deploymentTester) waitForDeploymentUpdatedReplicasLTE(minUpdatedReplicas int32) error {
-	return testutil.WaitForDeploymentUpdatedReplicasLTE(d.c, d.deployment.Namespace, d.deployment.Name, minUpdatedReplicas, d.deployment.Generation, pollInterval, pollTimeout)
+func (d *deploymentTester) waitForDeploymentUpdatedReplicasGTE(minUpdatedReplicas int32) error {
+	return testutil.WaitForDeploymentUpdatedReplicasGTE(d.c, d.deployment.Namespace, d.deployment.Name, minUpdatedReplicas, d.deployment.Generation, pollInterval, pollTimeout)
 }
 
 func (d *deploymentTester) waitForDeploymentWithCondition(reason string, condType v1beta1.DeploymentConditionType) error {
@@ -415,4 +419,90 @@ func (d *deploymentTester) listUpdatedPods() ([]v1.Pod, error) {
 
 func (d *deploymentTester) waitRSStable(replicaset *v1beta1.ReplicaSet) error {
 	return testutil.WaitRSStable(d.t, d.c, replicaset, pollInterval, pollTimeout)
+}
+
+func (d *deploymentTester) scaleDeployment(newReplicas int32) error {
+	var err error
+	d.deployment, err = d.updateDeployment(func(update *v1beta1.Deployment) {
+		update.Spec.Replicas = &newReplicas
+	})
+	if err != nil {
+		return fmt.Errorf("failed updating deployment %q: %v", d.deployment.Name, err)
+	}
+
+	if err := d.waitForDeploymentCompleteAndMarkPodsReady(); err != nil {
+		return err
+	}
+
+	rs, err := d.expectNewReplicaSet()
+	if err != nil {
+		return err
+	}
+	if *rs.Spec.Replicas != newReplicas {
+		return fmt.Errorf("expected new replicaset replicas = %d, got %d", newReplicas, *rs.Spec.Replicas)
+	}
+	return nil
+}
+
+// waitForReadyReplicas waits for number of ready replicas to equal number of replicas.
+func (d *deploymentTester) waitForReadyReplicas() error {
+	if err := wait.PollImmediate(pollInterval, pollTimeout, func() (bool, error) {
+		deployment, err := d.c.ExtensionsV1beta1().Deployments(d.deployment.Namespace).Get(d.deployment.Name, metav1.GetOptions{})
+		if err != nil {
+			return false, fmt.Errorf("failed to get deployment %q: %v", d.deployment.Name, err)
+		}
+		return deployment.Status.ReadyReplicas == *deployment.Spec.Replicas, nil
+	}); err != nil {
+		return fmt.Errorf("failed to wait for .readyReplicas to equal .replicas: %v", err)
+	}
+	return nil
+}
+
+// markUpdatedPodsReadyWithoutComplete marks updated Deployment pods as ready without waiting for deployment to complete.
+func (d *deploymentTester) markUpdatedPodsReadyWithoutComplete() error {
+	if err := wait.PollImmediate(pollInterval, pollTimeout, func() (bool, error) {
+		pods, err := d.listUpdatedPods()
+		if err != nil {
+			return false, err
+		}
+		for i := range pods {
+			pod := pods[i]
+			if podutil.IsPodReady(&pod) {
+				continue
+			}
+			if err = markPodReady(d.c, d.deployment.Namespace, &pod); err != nil {
+				d.t.Logf("failed to update Deployment pod %q, will retry later: %v", pod.Name, err)
+				return false, nil
+			}
+		}
+		return true, nil
+	}); err != nil {
+		return fmt.Errorf("failed to mark all updated pods as ready: %v", err)
+	}
+	return nil
+}
+
+// Verify all replicas fields of DeploymentStatus have desired count.
+// Immediately return an error when found a non-matching replicas field.
+func (d *deploymentTester) checkDeploymentStatusReplicasFields(replicas, updatedReplicas, readyReplicas, availableReplicas, unavailableReplicas int32) error {
+	deployment, err := d.c.ExtensionsV1beta1().Deployments(d.deployment.Namespace).Get(d.deployment.Name, metav1.GetOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to get deployment %q: %v", d.deployment.Name, err)
+	}
+	if deployment.Status.Replicas != replicas {
+		return fmt.Errorf("unexpected .replicas: expect %d, got %d", replicas, deployment.Status.Replicas)
+	}
+	if deployment.Status.UpdatedReplicas != updatedReplicas {
+		return fmt.Errorf("unexpected .updatedReplicas: expect %d, got %d", updatedReplicas, deployment.Status.UpdatedReplicas)
+	}
+	if deployment.Status.ReadyReplicas != readyReplicas {
+		return fmt.Errorf("unexpected .readyReplicas: expect %d, got %d", readyReplicas, deployment.Status.ReadyReplicas)
+	}
+	if deployment.Status.AvailableReplicas != availableReplicas {
+		return fmt.Errorf("unexpected .replicas: expect %d, got %d", availableReplicas, deployment.Status.AvailableReplicas)
+	}
+	if deployment.Status.UnavailableReplicas != unavailableReplicas {
+		return fmt.Errorf("unexpected .replicas: expect %d, got %d", unavailableReplicas, deployment.Status.UnavailableReplicas)
+	}
+	return nil
 }
