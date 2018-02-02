@@ -16,4 +16,4 @@ FROM BASEIMAGE
 
 EXPOSE 2379 2380 4001 7001
 COPY etcd* etcdctl* /usr/local/bin/
-COPY migrate-if-needed.sh attachlease rollback /usr/local/bin/
+COPY migrate-if-needed.sh start-stop-etcd.sh attachlease rollback /usr/local/bin/

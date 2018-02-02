@@ -7,6 +7,14 @@ For other architectures, `etcd` is cross-compiled from source. Arch-specific `bu
 
 #### How to release
 
+First, run the migration and rollback tests.
+
+```console
+$ make build test
+```
+
+Next, build and push the docker images for all supported architectures.
+
 ```console
 # Build for linux/amd64 (default)
 $ make push ARCH=amd64
