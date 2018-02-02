@@ -26,7 +26,12 @@ import (
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/watch"
+	fakeclient "k8s.io/client-go/kubernetes/fake"
+	core "k8s.io/client-go/testing"
+	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/kubernetes/pkg/volume"
+	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 )
 
 func makeTestAttachment(attachID, nodeName, pvName string) *storage.VolumeAttachment {
@@ -50,15 +55,6 @@ func makeTestAttachment(attachID, nodeName, pvName string) *storage.VolumeAttach
 }
 
 func TestAttacherAttach(t *testing.T) {
-	plug, tmpDir := newTestPlugin(t)
-	defer os.RemoveAll(tmpDir)
-
-	attacher, err := plug.NewAttacher()
-	if err != nil {
-		t.Fatalf("failed to create new attacher: %v", err)
-	}
-
-	csiAttacher := attacher.(*csiAttacher)
 
 	testCases := []struct {
 		name       string
@@ -111,6 +107,17 @@ func TestAttacherAttach(t *testing.T) {
 	// attacher loop
 	for i, tc := range testCases {
 		t.Logf("test case: %s", tc.name)
+
+		plug, fakeWatcher, tmpDir := newTestWatchPlugin(t)
+		defer os.RemoveAll(tmpDir)
+
+		attacher, err := plug.NewAttacher()
+		if err != nil {
+			t.Fatalf("failed to create new attacher: %v", err)
+		}
+
+		csiAttacher := attacher.(*csiAttacher)
+
 		spec := volume.NewSpecFromPersistentVolume(makeTestPV(fmt.Sprintf("test-pv%d", i), 10, tc.driverName, tc.volumeName), false)
 
 		go func(id, nodename string, fail bool) {
@@ -143,18 +150,21 @@ func TestAttacherAttach(t *testing.T) {
 		}
 
 		if attach == nil {
-			t.Error("attachment not found")
-		}
-		attach.Status.Attached = true
-		_, err = csiAttacher.k8s.StorageV1beta1().VolumeAttachments().Update(attach)
-		if err != nil {
-			t.Error(err)
+			t.Logf("attachment not found for id:%v", tc.attachID)
+		} else {
+			attach.Status.Attached = true
+			_, err = csiAttacher.k8s.StorageV1beta1().VolumeAttachments().Update(attach)
+			if err != nil {
+				t.Error(err)
+			}
+			fakeWatcher.Modify(attach)
 		}
 	}
 }
 
 func TestAttacherWaitForVolumeAttachment(t *testing.T) {
-	plug, tmpDir := newTestPlugin(t)
+
+	plug, fakeWatcher, tmpDir := newTestWatchPlugin(t)
 	defer os.RemoveAll(tmpDir)
 
 	attacher, err := plug.NewAttacher()
@@ -165,42 +175,92 @@ func TestAttacherWaitForVolumeAttachment(t *testing.T) {
 	nodeName := "test-node"
 
 	testCases := []struct {
-		name       string
-		attached   bool
-		attachErr  *storage.VolumeError
-		sleepTime  time.Duration
-		timeout    time.Duration
-		shouldFail bool
+		name                 string
+		initAttached         bool
+		finalAttached        bool
+		trigerWatchEventTime time.Duration
+		initAttachErr        *storage.VolumeError
+		finalAttachErr       *storage.VolumeError
+		sleepTime            time.Duration
+		timeout              time.Duration
+		shouldFail           bool
 	}{
-		{name: "attach ok", attached: true, sleepTime: 10 * time.Millisecond, timeout: 50 * time.Millisecond},
-		{name: "attachment error", attachErr: &storage.VolumeError{Message: "missing volume"}, sleepTime: 10 * time.Millisecond, timeout: 30 * time.Millisecond},
-		{name: "time ran out", attached: false, sleepTime: 5 * time.Millisecond},
+		{
+			name:         "attach success at get",
+			initAttached: true,
+			sleepTime:    10 * time.Millisecond,
+			timeout:      50 * time.Millisecond,
+			shouldFail:   false,
+		},
+		{
+			name:          "attachment error ant get",
+			initAttachErr: &storage.VolumeError{Message: "missing volume"},
+			sleepTime:     10 * time.Millisecond,
+			timeout:       30 * time.Millisecond,
+			shouldFail:    true,
+		},
+		{
+			name:                 "attach success at watch",
+			initAttached:         false,
+			finalAttached:        true,
+			trigerWatchEventTime: 5 * time.Millisecond,
+			timeout:              50 * time.Millisecond,
+			sleepTime:            5 * time.Millisecond,
+			shouldFail:           false,
+		},
+		{
+			name:                 "attachment error ant watch",
+			initAttached:         false,
+			finalAttached:        false,
+			finalAttachErr:       &storage.VolumeError{Message: "missing volume"},
+			trigerWatchEventTime: 5 * time.Millisecond,
+			sleepTime:            10 * time.Millisecond,
+			timeout:              30 * time.Millisecond,
+			shouldFail:           true,
+		},
+		{
+			name:                 "time ran out",
+			initAttached:         false,
+			finalAttached:        true,
+			trigerWatchEventTime: 100 * time.Millisecond,
+			timeout:              50 * time.Millisecond,
+			sleepTime:            5 * time.Millisecond,
+			shouldFail:           true,
+		},
 	}
 
 	for i, tc := range testCases {
-		t.Logf("running test: %s", tc.name)
+		fakeWatcher.Reset()
+		t.Logf("running test: %v", tc.name)
 		pvName := fmt.Sprintf("test-pv-%d", i)
 		volID := fmt.Sprintf("test-vol-%d", i)
 		attachID := getAttachmentName(volID, testDriver, nodeName)
 		attachment := makeTestAttachment(attachID, nodeName, pvName)
-		attachment.Status.Attached = tc.attached
-		attachment.Status.AttachError = tc.attachErr
+		attachment.Status.Attached = tc.initAttached
+		attachment.Status.AttachError = tc.initAttachErr
 		csiAttacher.waitSleepTime = tc.sleepTime
+		_, err := csiAttacher.k8s.StorageV1beta1().VolumeAttachments().Create(attachment)
+		if err != nil {
+			t.Fatalf("failed to attach: %v", err)
+		}
 
-		go func() {
-			_, err := csiAttacher.k8s.StorageV1beta1().VolumeAttachments().Create(attachment)
-			if err != nil {
-				t.Fatalf("failed to attach: %v", err)
-			}
-		}()
+		// after timeout, fakeWatcher will be closed by csiAttacher.waitForVolumeAttachment
+		if tc.trigerWatchEventTime > 0 && tc.trigerWatchEventTime < tc.timeout {
+			go func() {
+				time.Sleep(tc.trigerWatchEventTime)
+				attachment.Status.Attached = tc.finalAttached
+				attachment.Status.AttachError = tc.finalAttachErr
+				fakeWatcher.Modify(attachment)
+			}()
+		}
 
 		retID, err := csiAttacher.waitForVolumeAttachment(volID, attachID, tc.timeout)
 		if tc.shouldFail && err == nil {
 			t.Error("expecting failure, but err is nil")
 		}
-		if tc.attachErr != nil {
-			if tc.attachErr.Message != err.Error() {
-				t.Errorf("expecting error [%v], got [%v]", tc.attachErr.Message, err.Error())
+		if tc.initAttachErr != nil {
+			if tc.initAttachErr.Message != err.Error() {
+				t.Errorf("expecting error [%v], got [%v]", tc.initAttachErr.Message, err.Error())
 			}
 		}
 		if err == nil && retID != attachID {
@@ -268,14 +328,7 @@ func TestAttacherVolumesAreAttached(t *testing.T) {
 }
 
 func TestAttacherDetach(t *testing.T) {
-	plug, tmpDir := newTestPlugin(t)
-	defer os.RemoveAll(tmpDir)
 
-	attacher, err := plug.NewAttacher()
-	if err != nil {
-		t.Fatalf("failed to create new attacher: %v", err)
-	}
-	csiAttacher := attacher.(*csiAttacher)
 	nodeName := "test-node"
 	testCases := []struct {
 		name       string
@@ -289,6 +342,16 @@ func TestAttacherDetach(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
+		t.Logf("running test: %v", tc.name)
+		plug, fakeWatcher, tmpDir := newTestWatchPlugin(t)
+		defer os.RemoveAll(tmpDir)
+
+		attacher, err0 := plug.NewAttacher()
+		if err0 != nil {
+			t.Fatalf("failed to create new attacher: %v", err0)
+		}
+		csiAttacher := attacher.(*csiAttacher)
+
 		pv := makeTestPV("test-pv", 10, testDriver, tc.volID)
 		spec := volume.NewSpecFromPersistentVolume(pv, pv.Spec.PersistentVolumeSource.CSI.ReadOnly)
 		attachment := makeTestAttachment(tc.attachID, nodeName, "test-pv")
@@ -300,6 +363,9 @@ func TestAttacherDetach(t *testing.T) {
 		if err != nil {
 			t.Errorf("test case %s failed: %v", tc.name, err)
 		}
+		go func() {
+			fakeWatcher.Delete(attachment)
+		}()
 		err = csiAttacher.Detach(volumeName, types.NodeName(nodeName))
 		if tc.shouldFail && err == nil {
 			t.Fatal("expecting failure, but err = nil")
@@ -318,4 +384,36 @@ func TestAttacherDetach(t *testing.T) {
 			}
 		}
 	}
+}
+
+// create a plugin mgr to load plugins and setup a fake client
+func newTestWatchPlugin(t *testing.T) (*csiPlugin, *watch.FakeWatcher, string) {
+	tmpDir, err := utiltesting.MkTmpdir("csi-test")
+	if err != nil {
+		t.Fatalf("can't create temp dir: %v", err)
+	}
+
+	fakeClient := fakeclient.NewSimpleClientset()
+	fakeWatcher := watch.NewFake()
+	fakeClient.Fake.PrependWatchReactor("*", core.DefaultWatchReactor(fakeWatcher, nil))
+	fakeClient.Fake.WatchReactionChain = fakeClient.Fake.WatchReactionChain[:1]
+	host := volumetest.NewFakeVolumeHost(
+		tmpDir,
+		fakeClient,
+		nil,
+	)
+	plugMgr := &volume.VolumePluginMgr{}
+	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, host)
+
+	plug, err := plugMgr.FindPluginByName(csiPluginName)
+	if err != nil {
+		t.Fatalf("can't find plugin %v", csiPluginName)
+	}
+
+	csiPlug, ok := plug.(*csiPlugin)
+	if !ok {
+		t.Fatalf("cannot assert plugin to be type csiPlugin")
+	}
+
+	return csiPlug, fakeWatcher, tmpDir
 }

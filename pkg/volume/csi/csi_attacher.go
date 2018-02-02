@@ -30,6 +30,7 @@ import (
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/volume"
 )
@@ -117,37 +118,79 @@ func (c *csiAttacher) WaitForAttach(spec *volume.Spec, attachID string, pod *v1.
 func (c *csiAttacher) waitForVolumeAttachment(volumeHandle, attachID string, timeout time.Duration) (string, error) {
 	glog.V(4).Info(log("probing for updates from CSI driver for [attachment.ID=%v]", attachID))
 
-	ticker := time.NewTicker(c.waitSleepTime)
-	defer ticker.Stop()
-
 	timer := time.NewTimer(timeout) // TODO (vladimirvivien) investigate making this configurable
 	defer timer.Stop()
 
-	//TODO (vladimirvivien) instead of polling api-server, change to a api-server watch
+	return c.waitForVolumeAttachmentInternal(volumeHandle, attachID, timer, timeout)
+}
+
+func (c *csiAttacher) waitForVolumeAttachmentInternal(volumeHandle, attachID string, timer *time.Timer, timeout time.Duration) (string, error) {
+	glog.V(4).Info(log("probing VolumeAttachment [id=%v]", attachID))
+	attach, err := c.k8s.StorageV1beta1().VolumeAttachments().Get(attachID, meta.GetOptions{})
+	if err != nil {
+		glog.Error(log("attacher.WaitForAttach failed for volume [%s] (will continue to try): %v", volumeHandle, err))
+		return "", err
+	}
+	// if being deleted, fail fast
+	if attach.GetDeletionTimestamp() != nil {
+		glog.Error(log("VolumeAttachment [%s] has deletion timestamp, will not continue to wait for attachment", attachID))
+		return "", errors.New("volume attachment is being deleted")
+	}
+	// attachment OK
+	if attach.Status.Attached {
+		return attachID, nil
+	}
+	// driver reports attach error
+	attachErr := attach.Status.AttachError
+	if attachErr != nil {
+		glog.Error(log("attachment for %v failed: %v", volumeHandle, attachErr.Message))
+		return "", errors.New(attachErr.Message)
+	}
+
+	watcher, err := c.k8s.StorageV1beta1().VolumeAttachments().Watch(meta.SingleObject(meta.ObjectMeta{Name: attachID, ResourceVersion: attach.ResourceVersion}))
+	if err != nil {
+		return "", fmt.Errorf("watch error:%v for volume %v", err, volumeHandle)
+	}
+
+	ch := watcher.ResultChan()
+	defer watcher.Stop()
+
 	for {
 		select {
-		case <-ticker.C:
-			glog.V(4).Info(log("probing VolumeAttachment [id=%v]", attachID))
-			attach, err := c.k8s.StorageV1beta1().VolumeAttachments().Get(attachID, meta.GetOptions{})
-			if err != nil {
-				glog.Error(log("attacher.WaitForAttach failed (will continue to try): %v", err))
-				continue
+		case event, ok := <-ch:
+			if !ok {
+				glog.Errorf("[attachment.ID=%v] watch channel had been closed", attachID)
+				return "", errors.New("volume attachment watch channel had been closed")
 			}
-			// if being deleted, fail fast
-			if attach.GetDeletionTimestamp() != nil {
-				glog.Error(log("VolumeAttachment [%s] has deletion timestamp, will not continue to wait for attachment", attachID))
-				return "", errors.New("volume attachment is being deleted")
+
+			switch event.Type {
+			case watch.Added, watch.Modified:
+				attach, _ := event.Object.(*storage.VolumeAttachment)
+				// if being deleted, fail fast
+				if attach.GetDeletionTimestamp() != nil {
+					glog.Error(log("VolumeAttachment [%s] has deletion timestamp, will not continue to wait for attachment", attachID))
+					return "", errors.New("volume attachment is being deleted")
+				}
+				// attachment OK
+				if attach.Status.Attached {
+					return attachID, nil
+				}
+				// driver reports attach error
+				attachErr := attach.Status.AttachError
+				if attachErr != nil {
+					glog.Error(log("attachment for %v failed: %v", volumeHandle, attachErr.Message))
+					return "", errors.New(attachErr.Message)
+				}
+			case watch.Deleted:
+				// if deleted, fail fast
+				glog.Error(log("VolumeAttachment [%s] has been deleted, will not continue to wait for attachment", attachID))
+				return "", errors.New("volume attachment has been deleted")
+
+			case watch.Error:
+				// start another cycle
+				c.waitForVolumeAttachmentInternal(volumeHandle, attachID, timer, timeout)
 			}
-			// attachment OK
-			if attach.Status.Attached {
-				return attachID, nil
-			}
-			// driver reports attach error
-			attachErr := attach.Status.AttachError
-			if attachErr != nil {
-				glog.Error(log("attachment for %v failed: %v", volumeHandle, attachErr.Message))
-				return "", errors.New(attachErr.Message)
-			}
+
 		case <-timer.C:
 			glog.Error(log("attacher.WaitForAttach timeout after %v [volume=%v; attachment.ID=%v]", timeout, volumeHandle, attachID))
 			return "", fmt.Errorf("attachment timeout for volume %v", volumeHandle)
@@ -224,38 +267,69 @@ func (c *csiAttacher) Detach(volumeName string, nodeName types.NodeName) error {
 func (c *csiAttacher) waitForVolumeDetachment(volumeHandle, attachID string) error {
 	glog.V(4).Info(log("probing for updates from CSI driver for [attachment.ID=%v]", attachID))
 
-	ticker := time.NewTicker(c.waitSleepTime)
-	defer ticker.Stop()
-
 	timeout := c.waitSleepTime * 10
 	timer := time.NewTimer(timeout) // TODO (vladimirvivien) investigate making this configurable
 	defer timer.Stop()
 
-	//TODO (vladimirvivien) instead of polling api-server, change to a api-server watch
+	return c.waitForVolumeDetachmentInternal(volumeHandle, attachID, timer, timeout)
+}
+
+func (c *csiAttacher) waitForVolumeDetachmentInternal(volumeHandle, attachID string, timer *time.Timer, timeout time.Duration) error {
+	glog.V(4).Info(log("probing VolumeAttachment [id=%v]", attachID))
+	attach, err := c.k8s.StorageV1beta1().VolumeAttachments().Get(attachID, meta.GetOptions{})
+	if err != nil {
+		if apierrs.IsNotFound(err) {
+			//object deleted or never existed, done
+			glog.V(4).Info(log("VolumeAttachment object [%v] for volume [%v] not found, object deleted", attachID, volumeHandle))
+			return nil
+		}
+		glog.Error(log("detacher.WaitForDetach failed for volume [%s] (will continue to try): %v", volumeHandle, err))
+		return err
+	}
+	// driver reports attach error
+	detachErr := attach.Status.DetachError
+	if detachErr != nil {
+		glog.Error(log("detachment for VolumeAttachment [%v] for volume [%s] failed: %v", attachID, volumeHandle, detachErr.Message))
+		return errors.New(detachErr.Message)
+	}
+
+	watcher, err := c.k8s.StorageV1beta1().VolumeAttachments().Watch(meta.SingleObject(meta.ObjectMeta{Name: attachID, ResourceVersion: attach.ResourceVersion}))
+	if err != nil {
+		return fmt.Errorf("watch error:%v for volume %v", err, volumeHandle)
+	}
+	ch := watcher.ResultChan()
+	defer watcher.Stop()
+
 	for {
 		select {
-		case <-ticker.C:
-			glog.V(4).Info(log("probing VolumeAttachment [id=%v]", attachID))
-			attach, err := c.k8s.StorageV1beta1().VolumeAttachments().Get(attachID, meta.GetOptions{})
-			if err != nil {
-				if apierrs.IsNotFound(err) {
-					//object deleted or never existed, done
-					glog.V(4).Info(log("VolumeAttachment object [%v] for volume [%v] not found, object deleted", attachID, volumeHandle))
-					return nil
-				}
-				glog.Error(log("detacher.WaitForDetach failed for volume [%s] (will continue to try): %v", volumeHandle, err))
-				continue
+		case event, ok := <-ch:
+			if !ok {
+				glog.Errorf("[attachment.ID=%v] watch channel had been closed", attachID)
+				return errors.New("volume attachment watch channel had been closed")
 			}
 
-			// driver reports attach error
-			detachErr := attach.Status.DetachError
-			if detachErr != nil {
-				glog.Error(log("detachment for VolumeAttachment [%v] for volume [%s] failed: %v", attachID, volumeHandle, detachErr.Message))
-				return errors.New(detachErr.Message)
+			switch event.Type {
+			case watch.Added, watch.Modified:
+				attach, _ := event.Object.(*storage.VolumeAttachment)
+				// driver reports attach error
+				detachErr := attach.Status.DetachError
+				if detachErr != nil {
+					glog.Error(log("detachment for VolumeAttachment [%v] for volume [%s] failed: %v", attachID, volumeHandle, detachErr.Message))
+					return errors.New(detachErr.Message)
+				}
+			case watch.Deleted:
+				//object deleted
+				glog.V(4).Info(log("VolumeAttachment object [%v] for volume [%v] has been deleted", attachID, volumeHandle))
+				return nil
+
+			case watch.Error:
+				// start another cycle
+				c.waitForVolumeDetachmentInternal(volumeHandle, attachID, timer, timeout)
 			}
+
 		case <-timer.C:
 			glog.Error(log("detacher.WaitForDetach timeout after %v [volume=%v; attachment.ID=%v]", timeout, volumeHandle, attachID))
-			return fmt.Errorf("detachment timed out for volume %v", volumeHandle)
+			return fmt.Errorf("detachment timeout for volume %v", volumeHandle)
 		}
 	}
 }
