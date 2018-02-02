@@ -17,6 +17,7 @@ limitations under the License.
 package openstack
 
 import (
+	"context"
 	"errors"
 
 	"github.com/gophercloud/gophercloud"
@@ -52,7 +53,7 @@ func NewRoutes(compute *gophercloud.ServiceClient, network *gophercloud.ServiceC
 }
 
 // ListRoutes lists all managed routes that belong to the specified clusterName
-func (r *Routes) ListRoutes(clusterName string) ([]*cloudprovider.Route, error) {
+func (r *Routes) ListRoutes(ctx context.Context, clusterName string) ([]*cloudprovider.Route, error) {
 	glog.V(4).Infof("ListRoutes(%v)", clusterName)
 
 	nodeNamesByAddr := make(map[string]types.NodeName)
@@ -140,7 +141,7 @@ func updateAllowedAddressPairs(network *gophercloud.ServiceClient, port *neutron
 }
 
 // CreateRoute creates the described managed route
-func (r *Routes) CreateRoute(clusterName string, nameHint string, route *cloudprovider.Route) error {
+func (r *Routes) CreateRoute(ctx context.Context, clusterName string, nameHint string, route *cloudprovider.Route) error {
 	glog.V(4).Infof("CreateRoute(%v, %v, %v)", clusterName, nameHint, route)
 
 	onFailure := newCaller()
@@ -213,7 +214,7 @@ func (r *Routes) CreateRoute(clusterName string, nameHint string, route *cloudpr
 }
 
 // DeleteRoute deletes the specified managed route
-func (r *Routes) DeleteRoute(clusterName string, route *cloudprovider.Route) error {
+func (r *Routes) DeleteRoute(ctx context.Context, clusterName string, route *cloudprovider.Route) error {
 	glog.V(4).Infof("DeleteRoute(%v, %v)", clusterName, route)
 
 	onFailure := newCaller()

@@ -16,11 +16,13 @@ limitations under the License.
 
 package gce
 
+import "context"
+
 func newClustersMetricContext(request, zone string) *metricContext {
 	return newGenericMetricContext("clusters", request, unusedMetricLabel, zone, computeV1Version)
 }
 
-func (gce *GCECloud) ListClusters() ([]string, error) {
+func (gce *GCECloud) ListClusters(ctx context.Context) ([]string, error) {
 	allClusters := []string{}
 
 	for _, zone := range gce.managedZones {
@@ -35,7 +37,7 @@ func (gce *GCECloud) ListClusters() ([]string, error) {
 	return allClusters, nil
 }
 
-func (gce *GCECloud) Master(clusterName string) (string, error) {
+func (gce *GCECloud) Master(ctx context.Context, clusterName string) (string, error) {
 	return "k8s-" + clusterName + "-master.internal", nil
 }
 

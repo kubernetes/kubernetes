@@ -17,6 +17,7 @@ limitations under the License.
 package azure
 
 import (
+	"context"
 	"fmt"
 
 	"k8s.io/kubernetes/pkg/cloudprovider"
@@ -28,7 +29,7 @@ import (
 )
 
 // ListRoutes lists all managed routes that belong to the specified clusterName
-func (az *Cloud) ListRoutes(clusterName string) ([]*cloudprovider.Route, error) {
+func (az *Cloud) ListRoutes(ctx context.Context, clusterName string) ([]*cloudprovider.Route, error) {
 	glog.V(10).Infof("list: START clusterName=%q", clusterName)
 	routeTable, existsRouteTable, err := az.getRouteTable()
 	return processRoutes(routeTable, existsRouteTable, err)
@@ -106,7 +107,7 @@ func (az *Cloud) createRouteTable() error {
 // CreateRoute creates the described managed route
 // route.Name will be ignored, although the cloud-provider may use nameHint
 // to create a more user-meaningful name.
-func (az *Cloud) CreateRoute(clusterName string, nameHint string, kubeRoute *cloudprovider.Route) error {
+func (az *Cloud) CreateRoute(ctx context.Context, clusterName string, nameHint string, kubeRoute *cloudprovider.Route) error {
 	glog.V(2).Infof("create: creating route. clusterName=%q instance=%q cidr=%q", clusterName, kubeRoute.TargetNode, kubeRoute.DestinationCIDR)
 	if err := az.createRouteTableIfNotExists(clusterName, kubeRoute); err != nil {
 		return err
@@ -149,7 +150,7 @@ func (az *Cloud) CreateRoute(clusterName string, nameHint string, kubeRoute *clo
 
 // DeleteRoute deletes the specified managed route
 // Route should be as returned by ListRoutes
-func (az *Cloud) DeleteRoute(clusterName string, kubeRoute *cloudprovider.Route) error {
+func (az *Cloud) DeleteRoute(ctx context.Context, clusterName string, kubeRoute *cloudprovider.Route) error {
 	glog.V(2).Infof("delete: deleting route. clusterName=%q instance=%q cidr=%q", clusterName, kubeRoute.TargetNode, kubeRoute.DestinationCIDR)
 
 	routeName := mapNodeNameToRouteName(kubeRoute.TargetNode)
