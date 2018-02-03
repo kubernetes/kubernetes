@@ -79,6 +79,15 @@ const (
 	DefaultDummyDevice = "kube-ipvs0"
 )
 
+// tableChainsWithJumpService is the iptables chains ipvs proxy mode used.
+var tableChainsWithJumpService = []struct {
+	table utiliptables.Table
+	chain utiliptables.Chain
+}{
+	{utiliptables.TableNAT, utiliptables.ChainOutput},
+	{utiliptables.TableNAT, utiliptables.ChainPrerouting},
+}
+
 var ipvsModules = []string{
 	"ip_vs",
 	"ip_vs_rr",
@@ -768,7 +777,6 @@ func CanUseIPVSProxier(handle KernelHandler, ipsetver IPSetVersioner) (bool, err
 	return true, nil
 }
 
-// TODO: make it simpler.
 // CleanupIptablesLeftovers removes all iptables rules and chains created by the Proxier
 // It returns true if an error was encountered. Errors are logged.
 func cleanupIptablesLeftovers(ipt utiliptables.Interface) (encounteredError bool) {
@@ -777,14 +785,7 @@ func cleanupIptablesLeftovers(ipt utiliptables.Interface) (encounteredError bool
 		"-m", "comment", "--comment", "kubernetes service portals",
 		"-j", string(kubeServicesChain),
 	}
-	tableChainsWithJumpServices := []struct {
-		table utiliptables.Table
-		chain utiliptables.Chain
-	}{
-		{utiliptables.TableNAT, utiliptables.ChainOutput},
-		{utiliptables.TableNAT, utiliptables.ChainPrerouting},
-	}
-	for _, tc := range tableChainsWithJumpServices {
+	for _, tc := range tableChainsWithJumpService {
 		if err := ipt.DeleteRule(tc.table, tc.chain, args...); err != nil {
 			if !utiliptables.IsNotFoundError(err) {
 				glog.Errorf("Error removing pure-iptables proxy rule: %v", err)
@@ -806,30 +807,18 @@ func cleanupIptablesLeftovers(ipt utiliptables.Interface) (encounteredError bool
 	}
 
 	// Flush and remove all of our chains.
-	iptablesData := bytes.NewBuffer(nil)
-	if err := ipt.SaveInto(utiliptables.TableNAT, iptablesData); err != nil {
-		glog.Errorf("Failed to execute iptables-save for %s: %v", utiliptables.TableNAT, err)
-		encounteredError = true
-	} else {
-		existingNATChains := utiliptables.GetChainLines(utiliptables.TableNAT, iptablesData.Bytes())
-		natChains := bytes.NewBuffer(nil)
-		natRules := bytes.NewBuffer(nil)
-		writeLine(natChains, "*nat")
-		// Start with chains we know we need to remove.
-		for _, chain := range []utiliptables.Chain{kubeServicesChain, kubePostroutingChain, KubeMarkMasqChain, KubeServiceIPSetsChain} {
-			if _, found := existingNATChains[chain]; found {
-				chainString := string(chain)
-				writeLine(natChains, existingNATChains[chain]) // flush
-				writeLine(natRules, "-X", chainString)         // delete
+	for _, chain := range []utiliptables.Chain{kubeServicesChain, kubePostroutingChain} {
+		if err := ipt.FlushChain(utiliptables.TableNAT, chain); err != nil {
+			if !utiliptables.IsNotFoundError(err) {
+				glog.Errorf("Error removing ipvs Proxier iptables rule: %v", err)
+				encounteredError = true
 			}
 		}
-		writeLine(natRules, "COMMIT")
-		natLines := append(natChains.Bytes(), natRules.Bytes()...)
-		// Write it.
-		err = ipt.Restore(utiliptables.TableNAT, natLines, utiliptables.NoFlushTables, utiliptables.RestoreCounters)
-		if err != nil {
-			glog.Errorf("Failed to execute iptables-restore for %s: %v", utiliptables.TableNAT, err)
-			encounteredError = true
+		if err := ipt.DeleteChain(utiliptables.TableNAT, chain); err != nil {
+			if !utiliptables.IsNotFoundError(err) {
+				glog.Errorf("Error removing ipvs Proxier iptables rule: %v", err)
+				encounteredError = true
+			}
 		}
 	}
 	return encounteredError
@@ -1724,16 +1713,9 @@ func (proxier *Proxier) linkKubeServiceChain(existingNATChains map[utiliptables.
 	if _, err := proxier.iptables.EnsureChain(utiliptables.TableNAT, kubeServicesChain); err != nil {
 		return fmt.Errorf("Failed to ensure that %s chain %s exists: %v", utiliptables.TableNAT, kubeServicesChain, err)
 	}
-	tableChainsNeedJumpServices := []struct {
-		table utiliptables.Table
-		chain utiliptables.Chain
-	}{
-		{utiliptables.TableNAT, utiliptables.ChainOutput},
-		{utiliptables.TableNAT, utiliptables.ChainPrerouting},
-	}
 	comment := "kubernetes service portals"
 	args := []string{"-m", "comment", "--comment", comment, "-j", string(kubeServicesChain)}
-	for _, tc := range tableChainsNeedJumpServices {
+	for _, tc := range tableChainsWithJumpService {
 		if _, err := proxier.iptables.EnsureRule(utiliptables.Prepend, tc.table, tc.chain, args...); err != nil {
 			return fmt.Errorf("Failed to ensure that %s chain %s jumps to %s: %v", tc.table, tc.chain, kubeServicesChain, err)
 		}
