@@ -23,7 +23,7 @@ go_library(
         "//pkg/volume/util:go_default_library",
         "//pkg/volume/util/nestedpendingoperations:go_default_library",
         "//pkg/volume/util/types:go_default_library",
-        "//pkg/volume/util/volumehelper:go_default_library",
+        "//pkg/volume/util/volumepathhandler:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
