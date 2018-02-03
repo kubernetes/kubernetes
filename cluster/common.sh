@@ -159,15 +159,6 @@ function clear-kubeconfig() {
   echo "Cleared config for ${CONTEXT} from ${KUBECONFIG}"
 }
 
-function tear_down_alive_resources() {
-  local kubectl="${KUBE_ROOT}/cluster/kubectl.sh"
-  "${kubectl}" delete deployments --all || true
-  "${kubectl}" delete rc --all || true
-  "${kubectl}" delete pods --all || true
-  "${kubectl}" delete svc --all || true
-  "${kubectl}" delete pvc --all || true
-}
-
 # Gets username, password for the current-context in kubeconfig, if they exist.
 # Assumed vars:
 #   KUBECONFIG  # if unset, defaults to global
@@ -253,17 +244,6 @@ function gen-kube-bearertoken() {
     KUBE_BEARER_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
 }
 
-# Generate uid
-# This function only works on systems with python. It generates a time based
-# UID instead of a UUID because GCE has a name length limit.
-#
-# Vars set:
-#   KUBE_UID
-function gen-uid {
-    KUBE_UID=$(python -c 'import uuid; print(uuid.uuid1().fields[0])')
-}
-
-
 function load-or-gen-kube-basicauth() {
   if [[ ! -z "${KUBE_CONTEXT:-}" ]]; then
     get-kubeconfig-basicauth
@@ -291,28 +271,6 @@ function load-or-gen-kube-bearertoken() {
   if [[ -z "${KUBE_BEARER_TOKEN:-}" ]]; then
     gen-kube-bearertoken
   fi
-}
-
-# Get the master IP for the current-context in kubeconfig if one exists.
-#
-# Assumed vars:
-#   KUBECONFIG  # if unset, defaults to global
-#   KUBE_CONTEXT  # if unset, defaults to current-context
-#
-# Vars set:
-#   KUBE_MASTER_URL
-#
-# KUBE_MASTER_URL will be empty if no current-context is set, or the
-# current-context user does not exist or contain a server entry.
-function detect-master-from-kubeconfig() {
-  export KUBECONFIG=${KUBECONFIG:-$DEFAULT_KUBECONFIG}
-
-  local cc=$("${KUBE_ROOT}/cluster/kubectl.sh" config view -o jsonpath="{.current-context}")
-  if [[ ! -z "${KUBE_CONTEXT:-}" ]]; then
-    cc="${KUBE_CONTEXT}"
-  fi
-  local cluster=$("${KUBE_ROOT}/cluster/kubectl.sh" config view -o jsonpath="{.contexts[?(@.name == \"${cc}\")].context.cluster}")
-  KUBE_MASTER_URL=$("${KUBE_ROOT}/cluster/kubectl.sh" config view -o jsonpath="{.clusters[?(@.name == \"${cluster}\")].cluster.server}")
 }
 
 # Sets KUBE_VERSION variable to the proper version number (e.g. "v1.0.6",
@@ -449,50 +407,6 @@ function find-release-version() {
   fi
 }
 
-function stage-images() {
-  find-release-version
-  find-release-tars
-
-  KUBE_IMAGE_TAG="$(echo """${KUBE_GIT_VERSION}""" | sed 's/+/-/g')"
-
-  local docker_wrapped_binaries=(
-    "kube-apiserver"
-    "kube-controller-manager"
-    "kube-scheduler"
-    "kube-proxy"
-  )
-
-  local docker_cmd=("docker")
-
-  if [[ "${KUBE_DOCKER_REGISTRY}" == "gcr.io/"* ]]; then
-    local docker_push_cmd=("gcloud" "docker")
-  else
-    local docker_push_cmd=("${docker_cmd[@]}")
-  fi
-
-  local temp_dir="$(mktemp -d -t 'kube-server-XXXX')"
-
-  tar xzfv "${SERVER_BINARY_TAR}" -C "${temp_dir}" &> /dev/null
-
-  for binary in "${docker_wrapped_binaries[@]}"; do
-    local docker_tag="$(cat ${temp_dir}/kubernetes/server/bin/${binary}.docker_tag)"
-    (
-      "${docker_cmd[@]}" load -i "${temp_dir}/kubernetes/server/bin/${binary}.tar"
-      "${docker_cmd[@]}" rmi "${KUBE_DOCKER_REGISTRY}/${binary}:${KUBE_IMAGE_TAG}" 2>/dev/null || true
-      "${docker_cmd[@]}" tag "gcr.io/google_containers/${binary}:${docker_tag}" "${KUBE_DOCKER_REGISTRY}/${binary}:${KUBE_IMAGE_TAG}"
-      "${docker_push_cmd[@]}" push "${KUBE_DOCKER_REGISTRY}/${binary}:${KUBE_IMAGE_TAG}"
-    ) &> "${temp_dir}/${binary}-push.log" &
-  done
-
-  kube::util::wait-for-jobs || {
-    echo "!!! unable to push images. See ${temp_dir}/*.log for more info." 1>&2
-    return 1
-  }
-
-  rm -rf "${temp_dir}"
-  return 0
-}
-
 # Quote something appropriate for a yaml string.
 #
 # TODO(zmerlynn): Note that this function doesn't so much "quote" as
@@ -569,7 +483,6 @@ function build-kube-env {
   fi
 
   build-runtime-config
-  gen-uid
 
   rm -f ${file}
   cat >$file <<EOF
@@ -605,13 +518,9 @@ LOGGING_DESTINATION: $(yaml-quote ${LOGGING_DESTINATION:-})
 ELASTICSEARCH_LOGGING_REPLICAS: $(yaml-quote ${ELASTICSEARCH_LOGGING_REPLICAS:-})
 ENABLE_CLUSTER_DNS: $(yaml-quote ${ENABLE_CLUSTER_DNS:-false})
 CLUSTER_DNS_CORE_DNS: $(yaml-quote ${CLUSTER_DNS_CORE_DNS:-false})
-ENABLE_CLUSTER_REGISTRY: $(yaml-quote ${ENABLE_CLUSTER_REGISTRY:-false})
-CLUSTER_REGISTRY_DISK: $(yaml-quote ${CLUSTER_REGISTRY_DISK:-})
-CLUSTER_REGISTRY_DISK_SIZE: $(yaml-quote ${CLUSTER_REGISTRY_DISK_SIZE:-})
 DNS_SERVER_IP: $(yaml-quote ${DNS_SERVER_IP:-})
 DNS_DOMAIN: $(yaml-quote ${DNS_DOMAIN:-})
 ENABLE_DNS_HORIZONTAL_AUTOSCALER: $(yaml-quote ${ENABLE_DNS_HORIZONTAL_AUTOSCALER:-false})
-KUBELET_TOKEN: $(yaml-quote ${KUBELET_TOKEN:-})
 KUBE_PROXY_DAEMONSET: $(yaml-quote ${KUBE_PROXY_DAEMONSET:-false})
 KUBE_PROXY_TOKEN: $(yaml-quote ${KUBE_PROXY_TOKEN:-})
 NODE_PROBLEM_DETECTOR_TOKEN: $(yaml-quote ${NODE_PROBLEM_DETECTOR_TOKEN:-})
@@ -626,17 +535,11 @@ NETWORK_PROVIDER: $(yaml-quote ${NETWORK_PROVIDER:-})
 NETWORK_POLICY_PROVIDER: $(yaml-quote ${NETWORK_POLICY_PROVIDER:-})
 PREPULL_E2E_IMAGES: $(yaml-quote ${PREPULL_E2E_IMAGES:-})
 HAIRPIN_MODE: $(yaml-quote ${HAIRPIN_MODE:-})
-SOFTLOCKUP_PANIC: $(yaml-quote ${SOFTLOCKUP_PANIC:-})
-OPENCONTRAIL_TAG: $(yaml-quote ${OPENCONTRAIL_TAG:-})
-OPENCONTRAIL_KUBERNETES_TAG: $(yaml-quote ${OPENCONTRAIL_KUBERNETES_TAG:-})
-OPENCONTRAIL_PUBLIC_SUBNET: $(yaml-quote ${OPENCONTRAIL_PUBLIC_SUBNET:-})
 E2E_STORAGE_TEST_ENVIRONMENT: $(yaml-quote ${E2E_STORAGE_TEST_ENVIRONMENT:-})
-KUBE_IMAGE_TAG: $(yaml-quote ${KUBE_IMAGE_TAG:-})
 KUBE_DOCKER_REGISTRY: $(yaml-quote ${KUBE_DOCKER_REGISTRY:-})
 KUBE_ADDON_REGISTRY: $(yaml-quote ${KUBE_ADDON_REGISTRY:-})
 MULTIZONE: $(yaml-quote ${MULTIZONE:-})
 NON_MASQUERADE_CIDR: $(yaml-quote ${NON_MASQUERADE_CIDR:-})
-KUBE_UID: $(yaml-quote ${KUBE_UID:-})
 ENABLE_DEFAULT_STORAGE_CLASS: $(yaml-quote ${ENABLE_DEFAULT_STORAGE_CLASS:-})
 ENABLE_APISERVER_BASIC_AUDIT: $(yaml-quote ${ENABLE_APISERVER_BASIC_AUDIT:-})
 ENABLE_APISERVER_ADVANCED_AUDIT: $(yaml-quote ${ENABLE_APISERVER_ADVANCED_AUDIT:-})
@@ -840,11 +743,6 @@ EOF
 APISERVER_TEST_ARGS: $(yaml-quote ${APISERVER_TEST_ARGS})
 EOF
     fi
-    if [ -n "${APISERVER_TEST_LOG_LEVEL:-}" ]; then
-      cat >>$file <<EOF
-APISERVER_TEST_LOG_LEVEL: $(yaml-quote ${APISERVER_TEST_LOG_LEVEL})
-EOF
-    fi
     if [ -n "${CONTROLLER_MANAGER_TEST_ARGS:-}" ]; then
       cat >>$file <<EOF
 CONTROLLER_MANAGER_TEST_ARGS: $(yaml-quote ${CONTROLLER_MANAGER_TEST_ARGS})
@@ -934,12 +832,6 @@ EOF
 ENABLE_CLUSTER_AUTOSCALER: $(yaml-quote ${ENABLE_CLUSTER_AUTOSCALER})
 AUTOSCALER_MIG_CONFIG: $(yaml-quote ${AUTOSCALER_MIG_CONFIG})
 AUTOSCALER_EXPANDER_CONFIG: $(yaml-quote ${AUTOSCALER_EXPANDER_CONFIG})
-EOF
-  fi
-
-  if [ -n "${DNS_ZONE_NAME:-}" ]; then
-    cat >>$file <<EOF
-DNS_ZONE_NAME: $(yaml-quote ${DNS_ZONE_NAME})
 EOF
   fi
   if [ -n "${SCHEDULING_ALGORITHM_PROVIDER:-}" ]; then
@@ -1325,7 +1217,6 @@ function get-env-val() {
 function parse-master-env() {
   # Get required master env vars
   local master_env=$(get-master-env)
-  KUBELET_TOKEN=$(get-env-val "${master_env}" "KUBELET_TOKEN")
   KUBE_PROXY_TOKEN=$(get-env-val "${master_env}" "KUBE_PROXY_TOKEN")
   NODE_PROBLEM_DETECTOR_TOKEN=$(get-env-val "${master_env}" "NODE_PROBLEM_DETECTOR_TOKEN")
   CA_CERT_BASE64=$(get-env-val "${master_env}" "CA_CERT")
