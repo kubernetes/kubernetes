@@ -758,7 +758,8 @@ func findNextInitContainerToRun(pod *v1.Pod, podStatus *kubecontainer.PodStatus)
 func (m *kubeGenericRuntimeManager) GetContainerLogs(pod *v1.Pod, containerID kubecontainer.ContainerID, logOptions *v1.PodLogOptions, stdout, stderr io.Writer) (err error) {
 	status, err := m.runtimeService.ContainerStatus(containerID.ID)
 	if err != nil {
-		return fmt.Errorf("failed to get container status %q: %v", containerID, err)
+		glog.V(4).Infof("failed to get container status for %v: %v", containerID.String(), err)
+		return fmt.Errorf("Unable to retrieve container logs for %v", containerID.String())
 	}
 	labeledInfo := getContainerInfoFromLabels(status.Labels)
 	annotatedInfo := getContainerInfoFromAnnotations(status.Annotations)
