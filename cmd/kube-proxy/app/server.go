@@ -99,12 +99,6 @@ type Options struct {
 	CleanupIPVS bool
 	// config is the proxy server's configuration object.
 	config *kubeproxyconfig.KubeProxyConfiguration
-
-	// The fields below here are placeholders for flags that can't be directly mapped into
-	// kubeproxyconfig.KubeProxyConfiguration.
-	//
-	// TODO remove these fields once the deprecated flags are removed.
-
 	// master is used to override the kubeconfig's URL to the apiserver.
 	master string
 	// healthzPort is the port to be used by the healthz server.
