@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider"
 )
 
+// Instances encapsulates an implementation of Instances for OpenStack.
 type Instances struct {
 	compute *gophercloud.ServiceClient
 	opts    MetadataOpts
@@ -51,7 +52,7 @@ func (os *OpenStack) Instances() (cloudprovider.Instances, bool) {
 	}, true
 }
 
-// Implementation of Instances.CurrentNodeName
+// CurrentNodeName implements Instances.CurrentNodeName
 // Note this is *not* necessarily the same as hostname.
 func (i *Instances) CurrentNodeName(hostname string) (types.NodeName, error) {
 	md, err := getMetadata(i.opts.SearchOrder)
@@ -61,10 +62,12 @@ func (i *Instances) CurrentNodeName(hostname string) (types.NodeName, error) {
 	return types.NodeName(md.Hostname), nil
 }
 
+// AddSSHKeyToAllInstances is not implemented for OpenStack
 func (i *Instances) AddSSHKeyToAllInstances(user string, keyData []byte) error {
 	return cloudprovider.NotImplemented
 }
 
+// NodeAddresses implements Instances.NodeAddresses
 func (i *Instances) NodeAddresses(name types.NodeName) ([]v1.NodeAddress, error) {
 	glog.V(4).Infof("NodeAddresses(%v) called", name)
 
@@ -212,9 +215,9 @@ func srvInstanceType(srv *servers.Server) (string, error) {
 // See cloudprovider.GetInstanceProviderID and Instances.InstanceID.
 func instanceIDFromProviderID(providerID string) (instanceID string, err error) {
 	// If Instances.InstanceID or cloudprovider.GetInstanceProviderID is changed, the regexp should be changed too.
-	var providerIdRegexp = regexp.MustCompile(`^` + ProviderName + `:///([^/]+)$`)
+	var providerIDRegexp = regexp.MustCompile(`^` + ProviderName + `:///([^/]+)$`)
 
-	matches := providerIdRegexp.FindStringSubmatch(providerID)
+	matches := providerIDRegexp.FindStringSubmatch(providerID)
 	if len(matches) != 2 {
 		return "", fmt.Errorf("ProviderID \"%s\" didn't match expected format \"openstack:///InstanceID\"", providerID)
 	}

@@ -35,11 +35,12 @@ import (
 	"k8s.io/utils/exec"
 )
 
-type CinderDiskUtil struct{}
+// DiskUtil has utility/helper methods
+type DiskUtil struct{}
 
-// Attaches a disk specified by a volume.CinderPersistenDisk to the current kubelet.
+// AttachDisk attaches a disk specified by a volume.CinderPersistenDisk to the current kubelet.
 // Mounts the disk to its global path.
-func (util *CinderDiskUtil) AttachDisk(b *cinderVolumeMounter, globalPDPath string) error {
+func (util *DiskUtil) AttachDisk(b *cinderVolumeMounter, globalPDPath string) error {
 	options := []string{}
 	if b.readOnly {
 		options = append(options, "ro")
@@ -98,8 +99,8 @@ func (util *CinderDiskUtil) AttachDisk(b *cinderVolumeMounter, globalPDPath stri
 	return nil
 }
 
-// Unmounts the device and detaches the disk from the kubelet's host machine.
-func (util *CinderDiskUtil) DetachDisk(cd *cinderVolumeUnmounter) error {
+// DetachDisk unmounts the device and detaches the disk from the kubelet's host machine.
+func (util *DiskUtil) DetachDisk(cd *cinderVolumeUnmounter) error {
 	globalPDPath := makeGlobalPDName(cd.plugin.host, cd.pdName)
 	if err := cd.mounter.Unmount(globalPDPath); err != nil {
 		return err
@@ -124,7 +125,8 @@ func (util *CinderDiskUtil) DetachDisk(cd *cinderVolumeUnmounter) error {
 	return nil
 }
 
-func (util *CinderDiskUtil) DeleteVolume(cd *cinderVolumeDeleter) error {
+// DeleteVolume uses the cloud entrypoint to delete specified volume
+func (util *DiskUtil) DeleteVolume(cd *cinderVolumeDeleter) error {
 	cloud, err := cd.plugin.getCloudProvider()
 	if err != nil {
 		return err
@@ -158,7 +160,8 @@ func getZonesFromNodes(kubeClient clientset.Interface) (sets.String, error) {
 	return zones, nil
 }
 
-func (util *CinderDiskUtil) CreateVolume(c *cinderVolumeProvisioner) (volumeID string, volumeSizeGB int, volumeLabels map[string]string, fstype string, err error) {
+// CreateVolume uses the cloud provider entrypoint for creating a volume
+func (util *DiskUtil) CreateVolume(c *cinderVolumeProvisioner) (volumeID string, volumeSizeGB int, volumeLabels map[string]string, fstype string, err error) {
 	cloud, err := c.plugin.getCloudProvider()
 	if err != nil {
 		return "", 0, nil, "", err
@@ -247,10 +250,10 @@ func probeAttachedVolume() error {
 }
 
 func scsiHostRescan() {
-	scsi_path := "/sys/class/scsi_host/"
-	if dirs, err := ioutil.ReadDir(scsi_path); err == nil {
+	scsiPath := "/sys/class/scsi_host/"
+	if dirs, err := ioutil.ReadDir(scsiPath); err == nil {
 		for _, f := range dirs {
-			name := scsi_path + f.Name() + "/scan"
+			name := scsiPath + f.Name() + "/scan"
 			data := []byte("- - -")
 			ioutil.WriteFile(name, data, 0666)
 		}

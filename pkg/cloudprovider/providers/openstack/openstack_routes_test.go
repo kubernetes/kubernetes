@@ -40,7 +40,7 @@ func TestRoutes(t *testing.T) {
 	}
 
 	// Pick the first router and server to try a test with
-	os.routeOpts.RouterId = getRouters(os)[0].ID
+	os.routeOpts.RouterID = getRouters(os)[0].ID
 	servername := getServers(os)[0].Name
 
 	r, ok := os.Routes()

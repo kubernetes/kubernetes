@@ -68,7 +68,7 @@ const (
 	activeStatus = "ACTIVE"
 	errorStatus  = "ERROR"
 
-	ServiceAnnotationLoadBalancerFloatingNetworkId = "loadbalancer.openstack.org/floating-network-id"
+	ServiceAnnotationLoadBalancerFloatingNetworkID = "loadbalancer.openstack.org/floating-network-id"
 
 	// ServiceAnnotationLoadBalancerInternal is the annotation used on the service
 	// to indicate that we want an internal loadbalancer service.
@@ -76,7 +76,7 @@ const (
 	ServiceAnnotationLoadBalancerInternal = "service.beta.kubernetes.io/openstack-internal-load-balancer"
 )
 
-// LoadBalancer implementation for LBaaS v2
+// LbaasV2 is a LoadBalancer implementation for Neutron LBaaS v2 API
 type LbaasV2 struct {
 	LoadBalancer
 }
@@ -368,12 +368,10 @@ func waitLoadbalancerDeleted(client *gophercloud.ServiceClient, loadbalancerID s
 		if err != nil {
 			if err == ErrNotFound {
 				return true, nil
-			} else {
-				return false, err
 			}
-		} else {
-			return false, nil
+			return false, err
 		}
+		return false, nil
 	})
 
 	if err == wait.ErrWaitTimeout {
@@ -442,7 +440,7 @@ func (lbaas *LbaasV2) createLoadBalancer(service *v1.Service, name string, inter
 	createOpts := loadbalancers.CreateOpts{
 		Name:        name,
 		Description: fmt.Sprintf("Kubernetes external service %s", name),
-		VipSubnetID: lbaas.opts.SubnetId,
+		VipSubnetID: lbaas.opts.SubnetID,
 		Provider:    lbaas.opts.LBProvider,
 	}
 
@@ -458,6 +456,7 @@ func (lbaas *LbaasV2) createLoadBalancer(service *v1.Service, name string, inter
 	return loadbalancer, nil
 }
 
+// GetLoadBalancer returns whether the specified load balancer exists and its status
 func (lbaas *LbaasV2) GetLoadBalancer(clusterName string, service *v1.Service) (*v1.LoadBalancerStatus, bool, error) {
 	loadBalancerName := cloudprovider.GetLoadBalancerName(service)
 	loadbalancer, err := getLoadbalancerByName(lbaas.lb, loadBalancerName)
@@ -485,7 +484,7 @@ func (lbaas *LbaasV2) GetLoadBalancer(clusterName string, service *v1.Service) (
 }
 
 // The LB needs to be configured with instance addresses on the same
-// subnet as the LB (aka opts.SubnetId).  Currently we're just
+// subnet as the LB (aka opts.SubnetID).  Currently we're just
 // guessing that the node's InternalIP is the right address - and that
 // should be sufficient for all "normal" cases.
 func nodeAddressForLB(node *v1.Node) (string, error) {
@@ -584,8 +583,8 @@ func isSecurityGroupNotFound(err error) bool {
 	return false
 }
 
-// getFloatingNetworkIdForLB returns a floating-network-id for cluster.
-func getFloatingNetworkIdForLB(client *gophercloud.ServiceClient) (string, error) {
+// getFloatingNetworkIDForLB returns a floating-network-id for cluster.
+func getFloatingNetworkIDForLB(client *gophercloud.ServiceClient) (string, error) {
 	var floatingNetworkIds []string
 
 	type NetworkWithExternalExt struct {
@@ -635,6 +634,7 @@ func getFloatingNetworkIdForLB(client *gophercloud.ServiceClient) (string, error
 // a list of regions (from config) and query/create loadbalancers in
 // each region.
 
+// EnsureLoadBalancer creates a new load balancer 'name', or updates the existing one.
 func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *v1.Service, nodes []*v1.Node) (*v1.LoadBalancerStatus, error) {
 	glog.V(4).Infof("EnsureLoadBalancer(%v, %v, %v, %v, %v, %v, %v)", clusterName, apiService.Namespace, apiService.Name, apiService.Spec.LoadBalancerIP, apiService.Spec.Ports, nodes, apiService.Annotations)
 
@@ -642,16 +642,16 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *v1.Serv
 		return nil, fmt.Errorf("there are no available nodes for LoadBalancer service %s/%s", apiService.Namespace, apiService.Name)
 	}
 
-	if len(lbaas.opts.SubnetId) == 0 {
-		// Get SubnetId automatically.
-		// The LB needs to be configured with instance addresses on the same subnet, so get SubnetId by one node.
+	if len(lbaas.opts.SubnetID) == 0 {
+		// Get SubnetID automatically.
+		// The LB needs to be configured with instance addresses on the same subnet, so get SubnetID by one node.
 		subnetID, err := getSubnetIDForLB(lbaas.compute, *nodes[0])
 		if err != nil {
 			glog.Warningf("Failed to find subnet-id for loadbalancer service %s/%s: %v", apiService.Namespace, apiService.Name, err)
 			return nil, fmt.Errorf("no subnet-id for service %s/%s : subnet-id not set in cloud provider config, "+
 				"and failed to find subnet-id from OpenStack: %v", apiService.Namespace, apiService.Name, err)
 		}
-		lbaas.opts.SubnetId = subnetID
+		lbaas.opts.SubnetID = subnetID
 	}
 
 	ports := apiService.Spec.Ports
@@ -659,10 +659,10 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *v1.Serv
 		return nil, fmt.Errorf("no ports provided to openstack load balancer")
 	}
 
-	floatingPool := getStringFromServiceAnnotation(apiService, ServiceAnnotationLoadBalancerFloatingNetworkId, lbaas.opts.FloatingNetworkId)
+	floatingPool := getStringFromServiceAnnotation(apiService, ServiceAnnotationLoadBalancerFloatingNetworkID, lbaas.opts.FloatingNetworkID)
 	if len(floatingPool) == 0 {
 		var err error
-		floatingPool, err = getFloatingNetworkIdForLB(lbaas.network)
+		floatingPool, err = getFloatingNetworkIDForLB(lbaas.network)
 		if err != nil {
 			glog.Warningf("Failed to find floating-network-id for loadbalancer service %s/%s: %v", apiService.Namespace, apiService.Name, err)
 		}
@@ -816,7 +816,7 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *v1.Serv
 				_, err := v2pools.CreateMember(lbaas.lb, pool.ID, v2pools.CreateMemberOpts{
 					ProtocolPort: int(port.NodePort),
 					Address:      addr,
-					SubnetID:     lbaas.opts.SubnetId,
+					SubnetID:     lbaas.opts.SubnetID,
 				}).Extract()
 				if err != nil {
 					return nil, fmt.Errorf("error creating LB pool member for node: %s, %v", node.Name, err)
@@ -1111,8 +1111,8 @@ func (lbaas *LbaasV2) ensureSecurityGroup(clusterName string, apiService *v1.Ser
 		// update loadbalancer vip port
 		if !found {
 			port.SecurityGroups = append(port.SecurityGroups, lbSecGroup.ID)
-			update_opts := neutronports.UpdateOpts{SecurityGroups: &port.SecurityGroups}
-			res := neutronports.Update(lbaas.network, portID, update_opts)
+			updateOpts := neutronports.UpdateOpts{SecurityGroups: &port.SecurityGroups}
+			res := neutronports.Update(lbaas.network, portID, updateOpts)
 			if res.Err != nil {
 				msg := fmt.Sprintf("Error occured updating port %s for loadbalancer service %s/%s: %v", portID, apiService.Namespace, apiService.Name, res.Err)
 				return fmt.Errorf(msg)
@@ -1152,20 +1152,21 @@ func (lbaas *LbaasV2) ensureSecurityGroup(clusterName string, apiService *v1.Ser
 	return nil
 }
 
+// UpdateLoadBalancer updates hosts under the specified load balancer.
 func (lbaas *LbaasV2) UpdateLoadBalancer(clusterName string, service *v1.Service, nodes []*v1.Node) error {
 	loadBalancerName := cloudprovider.GetLoadBalancerName(service)
 	glog.V(4).Infof("UpdateLoadBalancer(%v, %v, %v)", clusterName, loadBalancerName, nodes)
 
-	if len(lbaas.opts.SubnetId) == 0 && len(nodes) > 0 {
-		// Get SubnetId automatically.
-		// The LB needs to be configured with instance addresses on the same subnet, so get SubnetId by one node.
+	if len(lbaas.opts.SubnetID) == 0 && len(nodes) > 0 {
+		// Get SubnetID automatically.
+		// The LB needs to be configured with instance addresses on the same subnet, so get SubnetID by one node.
 		subnetID, err := getSubnetIDForLB(lbaas.compute, *nodes[0])
 		if err != nil {
 			glog.Warningf("Failed to find subnet-id for loadbalancer service %s/%s: %v", service.Namespace, service.Name, err)
 			return fmt.Errorf("no subnet-id for service %s/%s : subnet-id not set in cloud provider config, "+
 				"and failed to find subnet-id from OpenStack: %v", service.Namespace, service.Name, err)
 		}
-		lbaas.opts.SubnetId = subnetID
+		lbaas.opts.SubnetID = subnetID
 	}
 
 	ports := service.Spec.Ports
@@ -1254,7 +1255,7 @@ func (lbaas *LbaasV2) UpdateLoadBalancer(clusterName string, service *v1.Service
 			_, err := v2pools.CreateMember(lbaas.lb, pool.ID, v2pools.CreateMemberOpts{
 				Address:      addr,
 				ProtocolPort: int(port.NodePort),
-				SubnetID:     lbaas.opts.SubnetId,
+				SubnetID:     lbaas.opts.SubnetID,
 			}).Extract()
 			if err != nil {
 				return err
@@ -1372,6 +1373,7 @@ func (lbaas *LbaasV2) updateSecurityGroup(clusterName string, apiService *v1.Ser
 	return nil
 }
 
+// EnsureLoadBalancerDeleted deletes the specified load balancer
 func (lbaas *LbaasV2) EnsureLoadBalancerDeleted(clusterName string, service *v1.Service) error {
 	loadBalancerName := cloudprovider.GetLoadBalancerName(service)
 	glog.V(4).Infof("EnsureLoadBalancerDeleted(%v, %v)", clusterName, loadBalancerName)
@@ -1512,9 +1514,8 @@ func (lbaas *LbaasV2) EnsureSecurityGroupDeleted(clusterName string, service *v1
 		if isSecurityGroupNotFound(err) {
 			// It is OK when the security group has been deleted by others.
 			return nil
-		} else {
-			return fmt.Errorf("Error occurred finding security group: %s: %v", lbSecGroupName, err)
 		}
+		return fmt.Errorf("Error occurred finding security group: %s: %v", lbSecGroupName, err)
 	}
 
 	lbSecGroup := groups.Delete(lbaas.network, lbSecGroupID)

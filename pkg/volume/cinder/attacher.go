@@ -35,7 +35,7 @@ import (
 
 type cinderDiskAttacher struct {
 	host           volume.VolumeHost
-	cinderProvider CinderProvider
+	cinderProvider BlockStorageProvider
 }
 
 var _ volume.Attacher = &cinderDiskAttacher{}
@@ -215,7 +215,7 @@ func (attacher *cinderDiskAttacher) WaitForAttach(spec *volume.Spec, devicePath 
 	volumeID := volumeSource.VolumeID
 
 	if devicePath == "" {
-		return "", fmt.Errorf("WaitForAttach failed for Cinder disk %q: devicePath is empty.", volumeID)
+		return "", fmt.Errorf("WaitForAttach failed for Cinder disk %q: devicePath is empty", volumeID)
 	}
 
 	ticker := time.NewTicker(probeVolumeInitDelay)
@@ -237,16 +237,15 @@ func (attacher *cinderDiskAttacher) WaitForAttach(spec *volume.Spec, devicePath 
 			if exists && err == nil {
 				glog.Infof("Successfully found attached Cinder disk %q at %v.", volumeID, devicePath)
 				return devicePath, nil
-			} else {
-				// Log an error, and continue checking periodically
-				glog.Errorf("Error: could not find attached Cinder disk %q (path: %q): %v", volumeID, devicePath, err)
-				// Using exponential backoff instead of linear
-				ticker.Stop()
-				duration = time.Duration(float64(duration) * probeVolumeFactor)
-				ticker = time.NewTicker(duration)
 			}
+			// Log an error, and continue checking periodically
+			glog.Errorf("Error: could not find attached Cinder disk %q (path: %q): %v", volumeID, devicePath, err)
+			// Using exponential backoff instead of linear
+			ticker.Stop()
+			duration = time.Duration(float64(duration) * probeVolumeFactor)
+			ticker = time.NewTicker(duration)
 		case <-timer.C:
-			return "", fmt.Errorf("Could not find attached Cinder disk %q. Timeout waiting for mount paths to be created.", volumeID)
+			return "", fmt.Errorf("could not find attached Cinder disk %q. Timeout waiting for mount paths to be created", volumeID)
 		}
 	}
 }
@@ -299,7 +298,7 @@ func (attacher *cinderDiskAttacher) MountDevice(spec *volume.Spec, devicePath st
 
 type cinderDiskDetacher struct {
 	mounter        mount.Interface
-	cinderProvider CinderProvider
+	cinderProvider BlockStorageProvider
 }
 
 var _ volume.Detacher = &cinderDiskDetacher{}

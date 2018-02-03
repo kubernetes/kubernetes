@@ -38,15 +38,17 @@ import (
 )
 
 const (
+	// DefaultCloudConfigPath is the default path for cloud configuration
 	DefaultCloudConfigPath = "/etc/kubernetes/cloud-config"
 )
 
-// This is the primary entrypoint for volume plugins.
+// ProbeVolumePlugins is the primary entrypoint for volume plugins.
 func ProbeVolumePlugins() []volume.VolumePlugin {
 	return []volume.VolumePlugin{&cinderPlugin{}}
 }
 
-type CinderProvider interface {
+// BlockStorageProvider is the interface for accessing cinder functionality.
+type BlockStorageProvider interface {
 	AttachDisk(instanceID, volumeID string) (string, error)
 	DetachDisk(instanceID, volumeID string) error
 	DeleteVolume(volumeID string) error
@@ -120,7 +122,7 @@ func (plugin *cinderPlugin) GetAccessModes() []v1.PersistentVolumeAccessMode {
 }
 
 func (plugin *cinderPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ volume.VolumeOptions) (volume.Mounter, error) {
-	return plugin.newMounterInternal(spec, pod.UID, &CinderDiskUtil{}, plugin.host.GetMounter(plugin.GetPluginName()))
+	return plugin.newMounterInternal(spec, pod.UID, &DiskUtil{}, plugin.host.GetMounter(plugin.GetPluginName()))
 }
 
 func (plugin *cinderPlugin) newMounterInternal(spec *volume.Spec, podUID types.UID, manager cdManager, mounter mount.Interface) (volume.Mounter, error) {
@@ -147,7 +149,7 @@ func (plugin *cinderPlugin) newMounterInternal(spec *volume.Spec, podUID types.U
 }
 
 func (plugin *cinderPlugin) NewUnmounter(volName string, podUID types.UID) (volume.Unmounter, error) {
-	return plugin.newUnmounterInternal(volName, podUID, &CinderDiskUtil{}, plugin.host.GetMounter(plugin.GetPluginName()))
+	return plugin.newUnmounterInternal(volName, podUID, &DiskUtil{}, plugin.host.GetMounter(plugin.GetPluginName()))
 }
 
 func (plugin *cinderPlugin) newUnmounterInternal(volName string, podUID types.UID, manager cdManager, mounter mount.Interface) (volume.Unmounter, error) {
@@ -162,7 +164,7 @@ func (plugin *cinderPlugin) newUnmounterInternal(volName string, podUID types.UI
 }
 
 func (plugin *cinderPlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, error) {
-	return plugin.newDeleterInternal(spec, &CinderDiskUtil{})
+	return plugin.newDeleterInternal(spec, &DiskUtil{})
 }
 
 func (plugin *cinderPlugin) newDeleterInternal(spec *volume.Spec, manager cdManager) (volume.Deleter, error) {
@@ -179,7 +181,7 @@ func (plugin *cinderPlugin) newDeleterInternal(spec *volume.Spec, manager cdMana
 }
 
 func (plugin *cinderPlugin) NewProvisioner(options volume.VolumeOptions) (volume.Provisioner, error) {
-	return plugin.newProvisionerInternal(options, &CinderDiskUtil{})
+	return plugin.newProvisionerInternal(options, &DiskUtil{})
 }
 
 func (plugin *cinderPlugin) newProvisionerInternal(options volume.VolumeOptions, manager cdManager) (volume.Provisioner, error) {
@@ -192,23 +194,22 @@ func (plugin *cinderPlugin) newProvisionerInternal(options volume.VolumeOptions,
 	}, nil
 }
 
-func (plugin *cinderPlugin) getCloudProvider() (CinderProvider, error) {
+func (plugin *cinderPlugin) getCloudProvider() (BlockStorageProvider, error) {
 	cloud := plugin.host.GetCloudProvider()
 	if cloud == nil {
 		if _, err := os.Stat(DefaultCloudConfigPath); err == nil {
 			var config *os.File
 			config, err = os.Open(DefaultCloudConfigPath)
 			if err != nil {
-				return nil, errors.New(fmt.Sprintf("unable to load OpenStack configuration from default path : %v", err))
-			} else {
-				defer config.Close()
-				cloud, err = cloudprovider.GetCloudProvider(openstack.ProviderName, config)
-				if err != nil {
-					return nil, errors.New(fmt.Sprintf("unable to create OpenStack cloud provider from default path : %v", err))
-				}
+				return nil, fmt.Errorf("unable to load OpenStack configuration from default path : %v", err)
+			}
+			defer config.Close()
+			cloud, err = cloudprovider.GetCloudProvider(openstack.ProviderName, config)
+			if err != nil {
+				return nil, fmt.Errorf("unable to create OpenStack cloud provider from default path : %v", err)
 			}
 		} else {
-			return nil, errors.New(fmt.Sprintf("OpenStack cloud provider was not initialized properly : %v", err))
+			return nil, fmt.Errorf("OpenStack cloud provider was not initialized properly : %v", err)
 		}
 	}
 
