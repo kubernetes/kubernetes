@@ -636,7 +636,7 @@ func describePod(pod *api.Pod, events *api.EventList) (string, error) {
 		printLabelsMultiline(w, "Labels", pod.Labels)
 		printAnnotationsMultiline(w, "Annotations", pod.Annotations)
 		if pod.DeletionTimestamp != nil {
-			w.Write(LEVEL_0, "Status:\tTerminating (expires %s)\n", pod.DeletionTimestamp.Time.Format(time.RFC1123Z))
+			w.Write(LEVEL_0, "Status:\tTerminating (lasts %s)\n", translateTimestamp(*pod.DeletionTimestamp))
 			w.Write(LEVEL_0, "Termination Grace Period:\t%ds\n", *pod.DeletionGracePeriodSeconds)
 		} else {
 			w.Write(LEVEL_0, "Status:\t%s\n", string(pod.Status.Phase))
@@ -1140,8 +1140,13 @@ func describePersistentVolume(pv *api.PersistentVolume, events *api.EventList) (
 		w.Write(LEVEL_0, "Name:\t%s\n", pv.Name)
 		printLabelsMultiline(w, "Labels", pv.Labels)
 		printAnnotationsMultiline(w, "Annotations", pv.Annotations)
+		w.Write(LEVEL_0, "Finalizers:\t%v\n", pv.ObjectMeta.Finalizers)
 		w.Write(LEVEL_0, "StorageClass:\t%s\n", helper.GetPersistentVolumeClass(pv))
-		w.Write(LEVEL_0, "Status:\t%s\n", pv.Status.Phase)
+		if pv.ObjectMeta.DeletionTimestamp != nil {
+			w.Write(LEVEL_0, "Status:\tTerminating (lasts %s)\n", translateTimestamp(*pv.ObjectMeta.DeletionTimestamp))
+		} else {
+			w.Write(LEVEL_0, "Status:\t%v\n", pv.Status.Phase)
+		}
 		if pv.Spec.ClaimRef != nil {
 			w.Write(LEVEL_0, "Claim:\t%s\n", pv.Spec.ClaimRef.Namespace+"/"+pv.Spec.ClaimRef.Name)
 		} else {
@@ -1238,7 +1243,7 @@ func describePersistentVolumeClaim(pvc *api.PersistentVolumeClaim, events *api.E
 		w.Write(LEVEL_0, "Namespace:\t%s\n", pvc.Namespace)
 		w.Write(LEVEL_0, "StorageClass:\t%s\n", helper.GetPersistentVolumeClaimClass(pvc))
 		if pvc.ObjectMeta.DeletionTimestamp != nil {
-			w.Write(LEVEL_0, "Status:\tTerminating (since %s)\n", pvc.ObjectMeta.DeletionTimestamp.Time.Format(time.RFC1123Z))
+			w.Write(LEVEL_0, "Status:\tTerminating (lasts %s)\n", translateTimestamp(*pvc.ObjectMeta.DeletionTimestamp))
 		} else {
 			w.Write(LEVEL_0, "Status:\t%v\n", pvc.Status.Phase)
 		}
