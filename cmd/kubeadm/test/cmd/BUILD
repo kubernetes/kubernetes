@@ -22,10 +22,11 @@ go_test(
         "token_test.go",
         "version_test.go",
     ],
-    args = ["--kubeadm-path=../../kubeadm"],
+    args = ["--kubeadm-path=$(location //cmd/kubeadm:kubeadm)"],
     data = ["//cmd/kubeadm"],
     embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/cmd/kubeadm/test/cmd",
+    rundir = ".",
     tags = [
         "integration",
         "skip",
