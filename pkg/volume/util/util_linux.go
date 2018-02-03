@@ -51,7 +51,7 @@ func (v VolumePathHandler) AttachFileDevice(path string) (string, error) {
 func (v VolumePathHandler) GetLoopDevice(path string) (string, error) {
 	_, err := os.Stat(path)
 	if os.IsNotExist(err) {
-		return "", errors.New(ErrNotAvailable)
+		return "", errors.New(ErrDeviceNotFound)
 	}
 	if err != nil {
 		return "", fmt.Errorf("not attachable: %v", err)
@@ -84,9 +84,11 @@ func (v VolumePathHandler) RemoveLoopDevice(device string) error {
 	cmd := exec.Command(losetupPath, args...)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		if !strings.Contains(string(out), "No such device or address") {
-			return err
+		if _, err := os.Stat(device); os.IsNotExist(err) {
+			return nil
 		}
+		glog.V(2).Infof("Failed to remove loopback device: %s: %v %s", device, err, out)
+		return err
 	}
 	return nil
 }

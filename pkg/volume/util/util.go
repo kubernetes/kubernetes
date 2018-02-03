@@ -46,7 +46,6 @@ const (
 
 	ErrDeviceNotFound     = "device not found"
 	ErrDeviceNotSupported = "device not supported"
-	ErrNotAvailable       = "not available"
 )
 
 // IsReady checks for the existence of a regular file

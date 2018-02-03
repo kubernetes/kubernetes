@@ -521,17 +521,22 @@ func (util *ISCSIUtil) DetachBlockISCSIDisk(c iscsiDiskUnmapper, mapPath string)
 	blkUtil := volumeutil.NewBlockVolumePathHandler()
 	loop, err := volumeutil.BlockVolumePathHandler.GetLoopDevice(blkUtil, devicePath)
 	if err != nil {
-		return fmt.Errorf("failed to get loopback for device: %v, err: %v", devicePath, err)
+		if err.Error() != volumeutil.ErrDeviceNotFound {
+			return fmt.Errorf("failed to get loopback for device: %v, err: %v", devicePath, err)
+		}
+		glog.Warning("iscsi: loopback for device: %s not found", device)
 	}
 	// Detach a volume from kubelet node
 	err = util.detachISCSIDisk(c.exec, portals, iqn, iface, volName, initiatorName, found)
 	if err != nil {
 		return fmt.Errorf("failed to finish detachISCSIDisk, err: %v", err)
 	}
-	// The volume was successfully detached from node. We can safely remove the loopback.
-	err = volumeutil.BlockVolumePathHandler.RemoveLoopDevice(blkUtil, loop)
-	if err != nil {
-		return fmt.Errorf("failed to remove loopback :%v, err: %v", loop, err)
+	if len(loop) != 0 {
+		// The volume was successfully detached from node. We can safely remove the loopback.
+		err = volumeutil.BlockVolumePathHandler.RemoveLoopDevice(blkUtil, loop)
+		if err != nil {
+			return fmt.Errorf("failed to remove loopback :%v, err: %v", loop, err)
+		}
 	}
 	return nil
 }
