@@ -738,6 +738,11 @@ EOF
 ETCD_COMPACTION_INTERVAL_SEC: $(yaml-quote ${ETCD_COMPACTION_INTERVAL_SEC})
 EOF
     fi
+    if [ -n "${ETCD_QUOTA_BACKEND_BYTES:-}" ]; then
+      cat >>$file <<EOF
+ETCD_QUOTA_BACKEND_BYTES: $(yaml-quote ${ETCD_QUOTA_BACKEND_BYTES})
+EOF
+    fi
     if [ -n "${APISERVER_TEST_ARGS:-}" ]; then
       cat >>$file <<EOF
 APISERVER_TEST_ARGS: $(yaml-quote ${APISERVER_TEST_ARGS})
