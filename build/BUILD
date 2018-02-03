@@ -31,8 +31,11 @@ docker_build(
         "/usr/bin/busybox": "/bin/busybox",
         "/usr/sbin/busybox": "/bin/busybox",
         "/sbin/busybox": "/bin/busybox",
-        # tee is used to send logs to /var/log and stdout, e.g. by kops
+        # tee & mkfifo are used to send logs to /var/log and stdout, e.g. by kops
         "/bin/tee": "/bin/busybox",
+        "/bin/mkfifo": "/bin/busybox",
+        # Force creation of /tmp
+        "/tmp/hostname": "/etc/hostname",
     },
 )
 
