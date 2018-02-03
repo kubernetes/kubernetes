@@ -25,6 +25,10 @@ import (
 	"sync"
 	"time"
 
+	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/kubernetes/pkg/cloudprovider"
+
 	"github.com/Azure/azure-sdk-for-go/arm/compute"
 	"github.com/Azure/azure-sdk-for-go/arm/disk"
 	"github.com/Azure/azure-sdk-for-go/arm/network"
@@ -846,6 +850,7 @@ func (fRC *fakeRoutesClient) Delete(resourceGroupName string, routeTableName str
 type fakeRouteTablesClient struct {
 	mutex     *sync.Mutex
 	FakeStore map[string]map[string]network.RouteTable
+	Calls     []string
 }
 
 func newFakeRouteTablesClient() *fakeRouteTablesClient {
@@ -858,6 +863,8 @@ func newFakeRouteTablesClient() *fakeRouteTablesClient {
 func (fRTC *fakeRouteTablesClient) CreateOrUpdate(resourceGroupName string, routeTableName string, parameters network.RouteTable, cancel <-chan struct{}) (<-chan network.RouteTable, <-chan error) {
 	fRTC.mutex.Lock()
 	defer fRTC.mutex.Unlock()
+
+	fRTC.Calls = append(fRTC.Calls, "CreateOrUpdate")
 
 	resultChan := make(chan network.RouteTable, 1)
 	errChan := make(chan error, 1)
@@ -885,6 +892,9 @@ func (fRTC *fakeRouteTablesClient) CreateOrUpdate(resourceGroupName string, rout
 func (fRTC *fakeRouteTablesClient) Get(resourceGroupName string, routeTableName string, expand string) (result network.RouteTable, err error) {
 	fRTC.mutex.Lock()
 	defer fRTC.mutex.Unlock()
+
+	fRTC.Calls = append(fRTC.Calls, "Get")
+
 	if _, ok := fRTC.FakeStore[resourceGroupName]; ok {
 		if entity, ok := fRTC.FakeStore[resourceGroupName][routeTableName]; ok {
 			return entity, nil
@@ -1101,4 +1111,77 @@ func (fDC *fakeDisksClient) Get(resourceGroupName string, diskName string) (resu
 		StatusCode: http.StatusNotFound,
 		Message:    "Not such Disk",
 	}
+}
+
+type fakeVMSet struct {
+	NodeToIP map[string]map[string]string
+	Err      error
+}
+
+func (f *fakeVMSet) GetInstanceIDByNodeName(name string) (string, error) {
+	return "", fmt.Errorf("unimplemented")
+}
+
+func (f *fakeVMSet) GetInstanceTypeByNodeName(name string) (string, error) {
+	return "", fmt.Errorf("unimplemented")
+}
+
+func (f *fakeVMSet) GetIPByNodeName(name, vmSetName string) (string, error) {
+	nodes, found := f.NodeToIP[vmSetName]
+	if !found {
+		return "", fmt.Errorf("not found")
+	}
+	ip, found := nodes[name]
+	if !found {
+		return "", fmt.Errorf("not found")
+	}
+	return ip, nil
+}
+
+func (f *fakeVMSet) GetPrimaryInterface(nodeName, vmSetName string) (network.Interface, error) {
+	return network.Interface{}, fmt.Errorf("unimplemented")
+}
+
+func (f *fakeVMSet) GetNodeNameByProviderID(providerID string) (types.NodeName, error) {
+	return types.NodeName(""), fmt.Errorf("unimplemented")
+}
+
+func (f *fakeVMSet) GetZoneByNodeName(name string) (cloudprovider.Zone, error) {
+	return cloudprovider.Zone{}, fmt.Errorf("unimplemented")
+}
+
+func (f *fakeVMSet) GetPrimaryVMSetName() string {
+	return ""
+}
+
+func (f *fakeVMSet) GetVMSetNames(service *v1.Service, nodes []*v1.Node) (availabilitySetNames *[]string, err error) {
+	return nil, fmt.Errorf("unimplemented")
+}
+
+func (f *fakeVMSet) EnsureHostsInPool(serviceName string, nodes []*v1.Node, backendPoolID string, vmSetName string) error {
+	return fmt.Errorf("unimplemented")
+}
+
+func (f *fakeVMSet) EnsureBackendPoolDeleted(poolID, vmSetName string) error {
+	return fmt.Errorf("unimplemented")
+}
+
+func (f *fakeVMSet) AttachDisk(isManagedDisk bool, diskName, diskURI string, nodeName types.NodeName, lun int32, cachingMode compute.CachingTypes) error {
+	return fmt.Errorf("unimplemented")
+}
+
+func (f *fakeVMSet) DetachDiskByName(diskName, diskURI string, nodeName types.NodeName) error {
+	return fmt.Errorf("unimplemented")
+}
+
+func (f *fakeVMSet) GetDiskLun(diskName, diskURI string, nodeName types.NodeName) (int32, error) {
+	return -1, fmt.Errorf("unimplemented")
+}
+
+func (f *fakeVMSet) GetNextDiskLun(nodeName types.NodeName) (int32, error) {
+	return -1, fmt.Errorf("unimplemented")
+}
+
+func (f *fakeVMSet) DisksAreAttached(diskNames []string, nodeName types.NodeName) (map[string]bool, error) {
+	return nil, fmt.Errorf("unimplemented")
 }
