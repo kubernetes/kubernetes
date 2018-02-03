@@ -54,3 +54,14 @@ filegroup(
     srcs = [":package-srcs"],
     tags = ["automanaged"],
 )
+
+go_test(
+    name = "go_default_test",
+    srcs = ["util_test.go"],
+    embed = [":go_default_library"],
+    importpath = "k8s.io/kubernetes/pkg/serviceaccount",
+    deps = [
+        "//vendor/k8s.io/api/core/v1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+    ],
+)
