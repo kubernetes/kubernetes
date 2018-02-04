@@ -59,7 +59,7 @@ type Queue interface {
 	// has since been added.
 	AddIfNotPresent(interface{}) error
 
-	// Return true if the first batch of items has been popped
+	// HasSynced returns true if the first batch of items has been popped
 	HasSynced() bool
 
 	// Close queue
