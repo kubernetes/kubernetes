@@ -36,7 +36,7 @@ const (
 	// metadataUrlTemplate allows building an OpenStack Metadata service URL.
 	// It's a hardcoded IPv4 link-local address as documented in "OpenStack Cloud
 	// Administrator Guide", chapter Compute - Networking with nova-network.
-	// https://docs.openstack.org/admin-guide/compute-networking-nova.html#metadata-service
+	//https://docs.openstack.org/nova/latest/admin/networking-nova.html#metadata-service
 	defaultMetadataVersion = "2012-08-10"
 	metadataUrlTemplate    = "http://169.254.169.254/openstack/%s/meta_data.json"
 
@@ -45,7 +45,7 @@ const (
 
 	// Config drive is defined as an iso9660 or vfat (deprecated) drive
 	// with the "config-2" label.
-	// http://docs.openstack.org/user-guide/cli-config-drive.html
+	//https://docs.openstack.org/nova/latest/user/config-drive.html
 	configDriveLabel        = "config-2"
 	configDrivePathTemplate = "openstack/%s/meta_data.json"
 
@@ -66,7 +66,7 @@ type DeviceMetadata struct {
 }
 
 // Assumes the "2012-08-10" meta_data.json format.
-// See http://docs.openstack.org/user-guide/cli_config_drive.html
+//https://docs.openstack.org/nova/latest/user/config-drive.html
 type Metadata struct {
 	Uuid             string           `json:"uuid"`
 	Hostname         string           `json:"hostname"`
