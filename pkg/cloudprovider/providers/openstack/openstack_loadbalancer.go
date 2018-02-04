@@ -19,6 +19,7 @@ package openstack
 import (
 	"fmt"
 	"net"
+	"reflect"
 	"strings"
 	"time"
 
@@ -568,6 +569,21 @@ func getNodeSecurityGroupIDForLB(compute *gophercloud.ServiceClient, nodes []*v1
 	return nodeSecurityGroupIDs.List(), nil
 }
 
+// isSecurityGroupNotFound return true while 'err' is object of gophercloud.ErrResourceNotFound
+func isSecurityGroupNotFound(err error) bool {
+	errType := reflect.TypeOf(err).String()
+	errTypeSlice := strings.Split(errType, ".")
+	errTypeValue := ""
+	if len(errTypeSlice) != 0 {
+		errTypeValue = errTypeSlice[len(errTypeSlice)-1]
+	}
+	if errTypeValue == "ErrResourceNotFound" {
+		return true
+	}
+
+	return false
+}
+
 // getFloatingNetworkIdForLB returns a floating-network-id for cluster.
 func getFloatingNetworkIdForLB(client *gophercloud.ServiceClient) (string, error) {
 	var floatingNetworkIds []string
@@ -993,10 +1009,8 @@ func (lbaas *LbaasV2) ensureSecurityGroup(clusterName string, apiService *v1.Ser
 	lbSecGroupName := getSecurityGroupName(apiService)
 	lbSecGroupID, err := groups.IDFromName(lbaas.network, lbSecGroupName)
 	if err != nil {
-		// check whether security group does not exist
-		_, ok := err.(*gophercloud.ErrResourceNotFound)
-		if ok {
-			// create it later
+		// If the security group of LB not exist, create it later
+		if isSecurityGroupNotFound(err) {
 			lbSecGroupID = ""
 		} else {
 			return fmt.Errorf("error occurred finding security group: %s: %v", lbSecGroupName, err)
@@ -1495,9 +1509,7 @@ func (lbaas *LbaasV2) EnsureSecurityGroupDeleted(clusterName string, service *v1
 	lbSecGroupName := getSecurityGroupName(service)
 	lbSecGroupID, err := groups.IDFromName(lbaas.network, lbSecGroupName)
 	if err != nil {
-		// check whether security group does not exist
-		_, ok := err.(*gophercloud.ErrResourceNotFound)
-		if ok {
+		if isSecurityGroupNotFound(err) {
 			// It is OK when the security group has been deleted by others.
 			return nil
 		} else {
