@@ -119,6 +119,11 @@ func (m *metadata) InstanceExistsByProviderID(ctx context.Context, providerID st
 	return false, errors.New("InstanceExistsByProviderID not implemented")
 }
 
+// InstanceShutdownByProviderID returns if the instance is shutdown.
+func (m *metadata) InstanceShutdownByProviderID(ctx context.Context, providerID string) (bool, error) {
+	return false, cloudprovider.NotImplemented
+}
+
 // GetZone returns the Zone containing the region that the program is running in.
 func (m *metadata) GetZone(ctx context.Context) (cloudprovider.Zone, error) {
 	zone := cloudprovider.Zone{}
