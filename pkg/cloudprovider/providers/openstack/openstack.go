@@ -188,6 +188,8 @@ func configFromEnv() (cfg Config, ok bool) {
 	cfg.Global.Username = os.Getenv("OS_USERNAME")
 	cfg.Global.Password = os.Getenv("OS_PASSWORD")
 	cfg.Global.Region = os.Getenv("OS_REGION_NAME")
+	cfg.Global.UserId = os.Getenv("OS_USER_ID")
+	cfg.Global.TrustId = os.Getenv("OS_TRUST_ID")
 
 	cfg.Global.TenantId = os.Getenv("OS_TENANT_ID")
 	if cfg.Global.TenantId == "" {
@@ -211,7 +213,7 @@ func configFromEnv() (cfg Config, ok bool) {
 		cfg.Global.Username != "" &&
 		cfg.Global.Password != "" &&
 		(cfg.Global.TenantId != "" || cfg.Global.TenantName != "" ||
-			cfg.Global.DomainId != "" || cfg.Global.DomainName != "")
+			cfg.Global.DomainId != "" || cfg.Global.DomainName != "" || cfg.Global.Region != "" || cfg.Global.UserId != "" || cfg.Global.TrustId != "")
 
 	cfg.Metadata.SearchOrder = fmt.Sprintf("%s,%s", configDriveID, metadataID)
 	cfg.BlockStorage.BSVersion = "auto"
@@ -671,7 +673,7 @@ func (os *OpenStack) Routes() (cloudprovider.Routes, bool) {
 	}
 
 	if !netExts["extraroute"] {
-		glog.V(3).Infof("Neutron extraroute extension not found, required for Routes support")
+		glog.V(3).Info("Neutron extraroute extension not found, required for Routes support")
 		return nil, false
 	}
 
@@ -704,21 +706,21 @@ func (os *OpenStack) volumeService(forceVersion string) (volumeService, error) {
 		if err != nil {
 			return nil, err
 		}
-		glog.V(3).Infof("Using Blockstorage API V1")
+		glog.V(3).Info("Using Blockstorage API V1")
 		return &VolumesV1{sClient, os.bsOpts}, nil
 	case "v2":
 		sClient, err := os.NewBlockStorageV2()
 		if err != nil {
 			return nil, err
 		}
-		glog.V(3).Infof("Using Blockstorage API V2")
+		glog.V(3).Info("Using Blockstorage API V2")
 		return &VolumesV2{sClient, os.bsOpts}, nil
 	case "v3":
 		sClient, err := os.NewBlockStorageV3()
 		if err != nil {
 			return nil, err
 		}
-		glog.V(3).Infof("Using Blockstorage API V3")
+		glog.V(3).Info("Using Blockstorage API V3")
 		return &VolumesV3{sClient, os.bsOpts}, nil
 	case "auto":
 		// Currently kubernetes support Cinder v1 / Cinder v2 / Cinder v3.
@@ -726,17 +728,17 @@ func (os *OpenStack) volumeService(forceVersion string) (volumeService, error) {
 		// If kubernetes can't initialize cinder v2 client, try to initialize cinder v1 client.
 		// Return appropriate message when kubernetes can't initialize them.
 		if sClient, err := os.NewBlockStorageV3(); err == nil {
-			glog.V(3).Infof("Using Blockstorage API V3")
+			glog.V(3).Info("Using Blockstorage API V3")
 			return &VolumesV3{sClient, os.bsOpts}, nil
 		}
 
 		if sClient, err := os.NewBlockStorageV2(); err == nil {
-			glog.V(3).Infof("Using Blockstorage API V2")
+			glog.V(3).Info("Using Blockstorage API V2")
 			return &VolumesV2{sClient, os.bsOpts}, nil
 		}
 
 		if sClient, err := os.NewBlockStorageV1(); err == nil {
-			glog.V(3).Infof("Using Blockstorage API V1")
+			glog.V(3).Info("Using Blockstorage API V1")
 			return &VolumesV1{sClient, os.bsOpts}, nil
 		}
 

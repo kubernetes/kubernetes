@@ -162,7 +162,11 @@ func TestReadConfig(t *testing.T) {
 func TestToAuthOptions(t *testing.T) {
 	cfg := Config{}
 	cfg.Global.Username = "user"
-	// etc.
+	cfg.Global.Password = "pass"
+	cfg.Global.DomainId = "2a73b8f597c04551a0fdc8e95544be8a"
+	cfg.Global.DomainName = "local"
+	cfg.Global.AuthUrl = "http://auth.url"
+	cfg.Global.UserId = "user"
 
 	ao := cfg.toAuthOptions()
 
@@ -171,6 +175,24 @@ func TestToAuthOptions(t *testing.T) {
 	}
 	if ao.Username != cfg.Global.Username {
 		t.Errorf("Username %s != %s", ao.Username, cfg.Global.Username)
+	}
+	if ao.Password != cfg.Global.Password {
+		t.Errorf("Password %s != %s", ao.Password, cfg.Global.Password)
+	}
+	if ao.DomainID != cfg.Global.DomainId {
+		t.Errorf("DomainID %s != %s", ao.DomainID, cfg.Global.DomainId)
+	}
+	if ao.IdentityEndpoint != cfg.Global.AuthUrl {
+		t.Errorf("IdentityEndpoint %s != %s", ao.IdentityEndpoint, cfg.Global.AuthUrl)
+	}
+	if ao.UserID != cfg.Global.UserId {
+		t.Errorf("UserID %s != %s", ao.UserID, cfg.Global.UserId)
+	}
+	if ao.DomainName != cfg.Global.DomainName {
+		t.Errorf("DomainName %s != %s", ao.DomainName, cfg.Global.DomainName)
+	}
+	if ao.TenantID != cfg.Global.TenantId {
+		t.Errorf("TenantID %s != %s", ao.TenantID, cfg.Global.TenantId)
 	}
 }
 
@@ -442,7 +464,7 @@ func TestNodeAddresses(t *testing.T) {
 func TestNewOpenStack(t *testing.T) {
 	cfg, ok := configFromEnv()
 	if !ok {
-		t.Skipf("No config found in environment")
+		t.Skip("No config found in environment")
 	}
 
 	_, err := newOpenStack(cfg)
@@ -454,7 +476,7 @@ func TestNewOpenStack(t *testing.T) {
 func TestLoadBalancer(t *testing.T) {
 	cfg, ok := configFromEnv()
 	if !ok {
-		t.Skipf("No config found in environment")
+		t.Skip("No config found in environment")
 	}
 
 	versions := []string{"v2", ""}
@@ -518,7 +540,7 @@ var diskPathRegexp = regexp.MustCompile("/dev/disk/(?:by-id|by-path)/")
 func TestVolumes(t *testing.T) {
 	cfg, ok := configFromEnv()
 	if !ok {
-		t.Skipf("No config found in environment")
+		t.Skip("No config found in environment")
 	}
 
 	os, err := newOpenStack(cfg)
