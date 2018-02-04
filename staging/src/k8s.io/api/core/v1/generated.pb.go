@@ -7604,6 +7604,18 @@ func (m *PodSpec) MarshalTo(dAtA []byte) (int, error) {
 		}
 		i += n147
 	}
+	if m.ShareProcessNamespace != nil {
+		dAtA[i] = 0xd8
+		i++
+		dAtA[i] = 0x1
+		i++
+		if *m.ShareProcessNamespace {
+			dAtA[i] = 1
+		} else {
+			dAtA[i] = 0
+		}
+		i++
+	}
 	return i, nil
 }
 
@@ -13037,6 +13049,9 @@ func (m *PodSpec) Size() (n int) {
 		l = m.DNSConfig.Size()
 		n += 2 + l + sovGenerated(uint64(l))
 	}
+	if m.ShareProcessNamespace != nil {
+		n += 3
+	}
 	return n
 }
 
@@ -15972,6 +15987,7 @@ func (this *PodSpec) String() string {
 		`PriorityClassName:` + fmt.Sprintf("%v", this.PriorityClassName) + `,`,
 		`Priority:` + valueToStringGenerated(this.Priority) + `,`,
 		`DNSConfig:` + strings.Replace(fmt.Sprintf("%v", this.DNSConfig), "PodDNSConfig", "PodDNSConfig", 1) + `,`,
+		`ShareProcessNamespace:` + valueToStringGenerated(this.ShareProcessNamespace) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -39075,6 +39091,27 @@ func (m *PodSpec) Unmarshal(dAtA []byte) error {
 				return err
 			}
 			iNdEx = postIndex
+		case 27:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ShareProcessNamespace", wireType)
+			}
+			var v int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				v |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			b := bool(v != 0)
+			m.ShareProcessNamespace = &b
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(dAtA[iNdEx:])
