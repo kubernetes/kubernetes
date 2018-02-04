@@ -420,7 +420,7 @@ func WriteToFile(config clientcmdapi.Config, filename string) error {
 
 func lockFile(filename string) error {
 	// TODO: find a way to do this with actual file locks. Will
-	// probably need seperate solution for windows and linux.
+	// probably need separate solution for windows and Linux.
 
 	// Make sure the dir exists before we try to create a lock file.
 	dir := filepath.Dir(filename)
