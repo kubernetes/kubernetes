@@ -36,6 +36,7 @@ import (
 	kubemetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/metrics"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -331,7 +332,7 @@ func runDensityBatchTest(f *framework.Framework, rc *ResourceCollector, testArg 
 	)
 
 	// create test pod data structure
-	pods := newTestPods(testArg.podsNr, true, framework.GetPauseImageNameForHostArch(), podType)
+	pods := newTestPods(testArg.podsNr, true, imageutils.GetPauseImageNameForHostArch(), podType)
 
 	// the controller watches the change of pod status
 	controller := newInformerWatchPod(f, mutex, watchTimes, podType)
@@ -412,8 +413,8 @@ func runDensitySeqTest(f *framework.Framework, rc *ResourceCollector, testArg de
 		podType               = "density_test_pod"
 		sleepBeforeCreatePods = 30 * time.Second
 	)
-	bgPods := newTestPods(testArg.bgPodsNr, true, framework.GetPauseImageNameForHostArch(), "background_pod")
-	testPods := newTestPods(testArg.podsNr, true, framework.GetPauseImageNameForHostArch(), podType)
+	bgPods := newTestPods(testArg.bgPodsNr, true, imageutils.GetPauseImageNameForHostArch(), "background_pod")
+	testPods := newTestPods(testArg.podsNr, true, imageutils.GetPauseImageNameForHostArch(), podType)
 
 	By("Creating a batch of background pods")
 
