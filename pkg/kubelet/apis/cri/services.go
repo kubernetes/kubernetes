@@ -77,7 +77,7 @@ type PodSandboxManager interface {
 	PortForward(*runtimeapi.PortForwardRequest) (*runtimeapi.PortForwardResponse, error)
 }
 
-// ContainerStatsManager contains methods for retriving the container
+// ContainerStatsManager contains methods for retrieving the container
 // statistics.
 type ContainerStatsManager interface {
 	// ContainerStats returns stats of the container. If the container does not

@@ -30,7 +30,7 @@ func ConfigSourceEq(a, b *apiv1.NodeConfigSource) bool {
 	if a.ConfigMapRef != b.ConfigMapRef {
 		return ObjectRefEq(a.ConfigMapRef, b.ConfigMapRef)
 	}
-	// all internal subfields of the config soruce are equal
+	// all internal subfields of the config source are equal
 	return true
 }
 
