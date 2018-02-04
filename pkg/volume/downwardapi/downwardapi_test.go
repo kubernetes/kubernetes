@@ -17,6 +17,7 @@ limitations under the License.
 package downwardapi
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -72,6 +73,8 @@ func TestCanSupport(t *testing.T) {
 }
 
 func TestDownwardAPI(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	labels1 := map[string]string{
 		"key1": "value1",
 		"key2": "value2",
@@ -181,12 +184,12 @@ func TestDownwardAPI(t *testing.T) {
 		},
 	}
 	for _, testCase := range testCases {
-		test := newDownwardAPITest(t, testCase.name, testCase.files, testCase.podLabels, testCase.podAnnotations, testCase.modes)
+		test := newDownwardAPITest(ctx, t, testCase.name, testCase.files, testCase.podLabels, testCase.podAnnotations, testCase.modes)
 		for _, step := range testCase.steps {
 			test.t.Logf("Test case: %q Step: %q", testCase.name, step.getName())
-			step.run(test)
+			step.run(ctx, test)
 		}
-		test.tearDown()
+		test.tearDown(ctx)
 	}
 }
 
@@ -200,7 +203,7 @@ type downwardAPITest struct {
 	rootDir    string
 }
 
-func newDownwardAPITest(t *testing.T, name string, volumeFiles, podLabels, podAnnotations map[string]string, modes map[string]int32) *downwardAPITest {
+func newDownwardAPITest(ctx context.Context, t *testing.T, name string, volumeFiles, podLabels, podAnnotations map[string]string, modes map[string]int32) *downwardAPITest {
 	defaultMode := int32(0644)
 	var files []v1.DownwardAPIVolumeFile
 	for path, fieldPath := range volumeFiles {
@@ -252,7 +255,7 @@ func newDownwardAPITest(t *testing.T, name string, volumeFiles, podLabels, podAn
 
 	volumePath := mounter.GetPath()
 
-	err = mounter.SetUp(nil)
+	err = mounter.SetUp(ctx, nil)
 	if err != nil {
 		t.Errorf("Failed to setup volume: %v", err)
 	}
@@ -278,7 +281,7 @@ func newDownwardAPITest(t *testing.T, name string, volumeFiles, podLabels, podAn
 	}
 }
 
-func (test *downwardAPITest) tearDown() {
+func (test *downwardAPITest) tearDown(ctx context.Context) {
 	unmounter, err := test.plugin.NewUnmounter(test.name, testPodUID)
 	if err != nil {
 		test.t.Errorf("Failed to make a new Unmounter: %v", err)
@@ -287,7 +290,7 @@ func (test *downwardAPITest) tearDown() {
 		test.t.Fatalf("Got a nil Unmounter")
 	}
 
-	if err := unmounter.TearDown(); err != nil {
+	if err := unmounter.TearDown(ctx); err != nil {
 		test.t.Errorf("Expected success, got: %v", err)
 	}
 	if _, err := os.Stat(test.volumePath); err == nil {
@@ -303,7 +306,7 @@ func (test *downwardAPITest) tearDown() {
 // as the name of the file that's used by the step.
 type testStep interface {
 	getName() string
-	run(*downwardAPITest)
+	run(context.Context, *downwardAPITest)
 }
 
 type stepName struct {
@@ -330,7 +333,7 @@ type verifyLinesInFile struct {
 	expected string
 }
 
-func (step verifyLinesInFile) run(test *downwardAPITest) {
+func (step verifyLinesInFile) run(ctx context.Context, test *downwardAPITest) {
 	doVerifyLinesInFile(test.t, test.volumePath, step.name, step.expected)
 }
 
@@ -339,7 +342,7 @@ type verifyMapInFile struct {
 	expected map[string]string
 }
 
-func (step verifyMapInFile) run(test *downwardAPITest) {
+func (step verifyMapInFile) run(ctx context.Context, test *downwardAPITest) {
 	doVerifyLinesInFile(test.t, test.volumePath, step.name, fieldpath.FormatMap(step.expected))
 }
 
@@ -348,7 +351,7 @@ type verifyMode struct {
 	expectedMode int32
 }
 
-func (step verifyMode) run(test *downwardAPITest) {
+func (step verifyMode) run(ctx context.Context, test *downwardAPITest) {
 	fileInfo, err := os.Stat(path.Join(test.volumePath, step.name))
 	if err != nil {
 		test.t.Errorf(err.Error())
@@ -368,7 +371,7 @@ type reSetUp struct {
 	newLabels        map[string]string
 }
 
-func (step reSetUp) run(test *downwardAPITest) {
+func (step reSetUp) run(ctx context.Context, test *downwardAPITest) {
 	if step.newLabels != nil {
 		test.pod.ObjectMeta.Labels = step.newLabels
 	}
@@ -379,7 +382,7 @@ func (step reSetUp) run(test *downwardAPITest) {
 	}
 
 	// now re-run Setup
-	if err = test.mounter.SetUp(nil); err != nil {
+	if err = test.mounter.SetUp(ctx, nil); err != nil {
 		test.t.Errorf("Failed to re-setup volume: %v", err)
 	}
 

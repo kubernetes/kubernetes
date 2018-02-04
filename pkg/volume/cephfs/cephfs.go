@@ -17,6 +17,7 @@ limitations under the License.
 package cephfs
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -218,12 +219,12 @@ func (cephfsMounter *cephfsMounter) CanMount() error {
 }
 
 // SetUp attaches the disk and bind mounts to the volume path.
-func (cephfsVolume *cephfsMounter) SetUp(fsGroup *int64) error {
-	return cephfsVolume.SetUpAt(cephfsVolume.GetPath(), fsGroup)
+func (cephfsVolume *cephfsMounter) SetUp(ctx context.Context, fsGroup *int64) error {
+	return cephfsVolume.SetUpAt(ctx, cephfsVolume.GetPath(), fsGroup)
 }
 
 // SetUpAt attaches the disk and bind mounts to the volume path.
-func (cephfsVolume *cephfsMounter) SetUpAt(dir string, fsGroup *int64) error {
+func (cephfsVolume *cephfsMounter) SetUpAt(ctx context.Context, dir string, fsGroup *int64) error {
 	notMnt, err := cephfsVolume.mounter.IsLikelyNotMountPoint(dir)
 	glog.V(4).Infof("CephFS mount set up: %s %v %v", dir, !notMnt, err)
 	if err != nil && !os.IsNotExist(err) {
@@ -273,12 +274,12 @@ type cephfsUnmounter struct {
 var _ volume.Unmounter = &cephfsUnmounter{}
 
 // TearDown unmounts the bind mount
-func (cephfsVolume *cephfsUnmounter) TearDown() error {
-	return cephfsVolume.TearDownAt(cephfsVolume.GetPath())
+func (cephfsVolume *cephfsUnmounter) TearDown(ctx context.Context) error {
+	return cephfsVolume.TearDownAt(ctx, cephfsVolume.GetPath())
 }
 
 // TearDownAt unmounts the bind mount
-func (cephfsVolume *cephfsUnmounter) TearDownAt(dir string) error {
+func (cephfsVolume *cephfsUnmounter) TearDownAt(ctx context.Context, dir string) error {
 	return util.UnmountPath(dir, cephfsVolume.mounter)
 }
 

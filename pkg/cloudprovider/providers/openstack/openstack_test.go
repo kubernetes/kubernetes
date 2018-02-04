@@ -17,6 +17,7 @@ limitations under the License.
 package openstack
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"reflect"
@@ -478,6 +479,8 @@ func TestLoadBalancer(t *testing.T) {
 	if !ok {
 		t.Skip("No config found in environment")
 	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	versions := []string{"v2", ""}
 
@@ -495,7 +498,7 @@ func TestLoadBalancer(t *testing.T) {
 			t.Fatalf("LoadBalancer() returned false - perhaps your stack doesn't support Neutron?")
 		}
 
-		_, exists, err := lb.GetLoadBalancer(testClusterName, &v1.Service{ObjectMeta: metav1.ObjectMeta{Name: "noexist"}})
+		_, exists, err := lb.GetLoadBalancer(ctx, testClusterName, &v1.Service{ObjectMeta: metav1.ObjectMeta{Name: "noexist"}})
 		if err != nil {
 			t.Fatalf("GetLoadBalancer(\"noexist\") returned error: %s", err)
 		}
@@ -508,6 +511,8 @@ func TestLoadBalancer(t *testing.T) {
 func TestZones(t *testing.T) {
 	SetMetadataFixture(&FakeMetadata)
 	defer ClearMetadata()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	os := OpenStack{
 		provider: &gophercloud.ProviderClient{
@@ -521,7 +526,7 @@ func TestZones(t *testing.T) {
 		t.Fatalf("Zones() returned false")
 	}
 
-	zone, err := z.GetZone()
+	zone, err := z.GetZone(ctx)
 	if err != nil {
 		t.Fatalf("GetZone() returned error: %s", err)
 	}

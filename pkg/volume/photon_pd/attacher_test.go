@@ -17,6 +17,7 @@ limitations under the License.
 package photon_pd
 
 import (
+	"context"
 	"errors"
 	"testing"
 
@@ -80,6 +81,8 @@ func TestAttachDetach(t *testing.T) {
 	spec := createVolSpec(diskName, readOnly)
 	detachError := errors.New("Fake detach error")
 	diskCheckError := errors.New("Fake DiskIsAttached error")
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	tests := []testcase{
 		// Successful Attach call
 		{
@@ -88,7 +91,7 @@ func TestAttachDetach(t *testing.T) {
 			attach:         attachCall{diskName, nodeName, nil},
 			test: func(testcase *testcase) (string, error) {
 				attacher := newAttacher(testcase)
-				return attacher.Attach(spec, nodeName)
+				return attacher.Attach(ctx, spec, nodeName)
 			},
 			expectedDevice: "/dev/disk/by-id/wwn-0x000000000",
 		},
@@ -100,7 +103,7 @@ func TestAttachDetach(t *testing.T) {
 			attach:         attachCall{diskName, nodeName, nil},
 			test: func(testcase *testcase) (string, error) {
 				attacher := newAttacher(testcase)
-				return attacher.Attach(spec, nodeName)
+				return attacher.Attach(ctx, spec, nodeName)
 			},
 			expectedDevice: "/dev/disk/by-id/wwn-0x000000000",
 		},
@@ -112,7 +115,7 @@ func TestAttachDetach(t *testing.T) {
 			detach:         detachCall{diskName, nodeName, nil},
 			test: func(testcase *testcase) (string, error) {
 				detacher := newDetacher(testcase)
-				return "", detacher.Detach(diskName, nodeName)
+				return "", detacher.Detach(ctx, diskName, nodeName)
 			},
 		},
 
@@ -122,7 +125,7 @@ func TestAttachDetach(t *testing.T) {
 			diskIsAttached: diskIsAttachedCall{diskName, nodeName, false, nil},
 			test: func(testcase *testcase) (string, error) {
 				detacher := newDetacher(testcase)
-				return "", detacher.Detach(diskName, nodeName)
+				return "", detacher.Detach(ctx, diskName, nodeName)
 			},
 		},
 
@@ -133,7 +136,7 @@ func TestAttachDetach(t *testing.T) {
 			detach:         detachCall{diskName, nodeName, nil},
 			test: func(testcase *testcase) (string, error) {
 				detacher := newDetacher(testcase)
-				return "", detacher.Detach(diskName, nodeName)
+				return "", detacher.Detach(ctx, diskName, nodeName)
 			},
 		},
 
@@ -144,7 +147,7 @@ func TestAttachDetach(t *testing.T) {
 			detach:         detachCall{diskName, nodeName, detachError},
 			test: func(testcase *testcase) (string, error) {
 				detacher := newDetacher(testcase)
-				return "", detacher.Detach(diskName, nodeName)
+				return "", detacher.Detach(ctx, diskName, nodeName)
 			},
 			expectedError: detachError,
 		},
@@ -233,7 +236,7 @@ type diskIsAttachedCall struct {
 	ret        error
 }
 
-func (testcase *testcase) AttachDisk(diskName string, nodeName types.NodeName) error {
+func (testcase *testcase) AttachDisk(ctx context.Context, diskName string, nodeName types.NodeName) error {
 	expected := &testcase.attach
 
 	if expected.diskName == "" && expected.nodeName == "" {
@@ -258,7 +261,7 @@ func (testcase *testcase) AttachDisk(diskName string, nodeName types.NodeName) e
 	return expected.ret
 }
 
-func (testcase *testcase) DetachDisk(diskName string, nodeName types.NodeName) error {
+func (testcase *testcase) DetachDisk(ctx context.Context, diskName string, nodeName types.NodeName) error {
 	expected := &testcase.detach
 
 	if expected.diskName == "" && expected.nodeName == "" {
@@ -283,7 +286,7 @@ func (testcase *testcase) DetachDisk(diskName string, nodeName types.NodeName) e
 	return expected.ret
 }
 
-func (testcase *testcase) DiskIsAttached(diskName string, nodeName types.NodeName) (bool, error) {
+func (testcase *testcase) DiskIsAttached(ctx context.Context, diskName string, nodeName types.NodeName) (bool, error) {
 	expected := &testcase.diskIsAttached
 
 	if expected.diskName == "" && expected.nodeName == "" {
@@ -308,7 +311,7 @@ func (testcase *testcase) DiskIsAttached(diskName string, nodeName types.NodeNam
 	return expected.isAttached, expected.ret
 }
 
-func (testcase *testcase) DisksAreAttached(diskNames []string, nodeName types.NodeName) (map[string]bool, error) {
+func (testcase *testcase) DisksAreAttached(ctx context.Context, diskNames []string, nodeName types.NodeName) (map[string]bool, error) {
 	return nil, errors.New("Not implemented")
 }
 

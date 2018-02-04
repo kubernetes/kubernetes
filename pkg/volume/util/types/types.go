@@ -17,7 +17,10 @@ limitations under the License.
 // Package types defines types used only by volume components
 package types
 
-import "k8s.io/apimachinery/pkg/types"
+import (
+	"context"
+	"k8s.io/apimachinery/pkg/types"
+)
 
 // UniquePodName defines the type to key pods off of
 type UniquePodName types.UID
@@ -28,7 +31,7 @@ type UniquePVCName types.UID
 // GeneratedOperations contains the operation that is created as well as
 // supporting functions required for the operation executor
 type GeneratedOperations struct {
-	OperationFunc     func() (eventErr error, detailedErr error)
+	OperationFunc     func(ctx context.Context) (eventErr error, detailedErr error)
 	EventRecorderFunc func(*error)
 	CompleteFunc      func(*error)
 }

@@ -23,6 +23,7 @@ import (
 	"net"
 	"time"
 
+	"context"
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -562,7 +563,7 @@ func (adc *attachDetachController) GetHostName() string {
 	return ""
 }
 
-func (adc *attachDetachController) GetHostIP() (net.IP, error) {
+func (adc *attachDetachController) GetHostIP(ctx context.Context) (net.IP, error) {
 	return nil, fmt.Errorf("GetHostIP() not supported by Attach/Detach controller's VolumeHost implementation")
 }
 
@@ -570,14 +571,14 @@ func (adc *attachDetachController) GetNodeAllocatable() (v1.ResourceList, error)
 	return v1.ResourceList{}, nil
 }
 
-func (adc *attachDetachController) GetSecretFunc() func(namespace, name string) (*v1.Secret, error) {
-	return func(_, _ string) (*v1.Secret, error) {
+func (adc *attachDetachController) GetSecretFunc() func(ctx context.Context, namespace, name string) (*v1.Secret, error) {
+	return func(_ context.Context, _, _ string) (*v1.Secret, error) {
 		return nil, fmt.Errorf("GetSecret unsupported in attachDetachController")
 	}
 }
 
-func (adc *attachDetachController) GetConfigMapFunc() func(namespace, name string) (*v1.ConfigMap, error) {
-	return func(_, _ string) (*v1.ConfigMap, error) {
+func (adc *attachDetachController) GetConfigMapFunc() func(ctx context.Context, namespace, name string) (*v1.ConfigMap, error) {
+	return func(_ context.Context, _, _ string) (*v1.ConfigMap, error) {
 		return nil, fmt.Errorf("GetConfigMap unsupported in attachDetachController")
 	}
 }
@@ -600,7 +601,7 @@ func (adc *attachDetachController) addNodeToDswp(node *v1.Node, nodeName types.N
 	}
 }
 
-func (adc *attachDetachController) GetNodeLabels() (map[string]string, error) {
+func (adc *attachDetachController) GetNodeLabels(ctx context.Context) (map[string]string, error) {
 	return nil, fmt.Errorf("GetNodeLabels() unsupported in Attach/Detach controller")
 }
 

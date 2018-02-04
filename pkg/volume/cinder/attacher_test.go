@@ -17,21 +17,21 @@ limitations under the License.
 package cinder
 
 import (
+	"context"
 	"errors"
+	"fmt"
 	"reflect"
+	"sort"
 	"testing"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 
-	"fmt"
-	"sort"
-
 	"github.com/golang/glog"
-	"k8s.io/apimachinery/pkg/types"
 )
 
 const (
@@ -126,6 +126,8 @@ func TestAttachDetach(t *testing.T) {
 	diskPathError := errors.New("Fake GetAttachmentDiskPath error")
 	disksCheckError := errors.New("Fake DisksAreAttached error")
 	operationFinishTimeout := errors.New("Fake waitOperationFinished error")
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	tests := []testcase{
 		// Successful Attach call
 		{
@@ -137,7 +139,7 @@ func TestAttachDetach(t *testing.T) {
 			diskPath:         diskPathCall{instanceID, volumeID, "/dev/sda", nil},
 			test: func(testcase *testcase) (string, error) {
 				attacher := newAttacher(testcase)
-				return attacher.Attach(spec, nodeName)
+				return attacher.Attach(ctx, spec, nodeName)
 			},
 			expectedResult: "/dev/sda",
 		},
@@ -151,7 +153,7 @@ func TestAttachDetach(t *testing.T) {
 			diskPath:         diskPathCall{instanceID, volumeID, "/dev/sda", nil},
 			test: func(testcase *testcase) (string, error) {
 				attacher := newAttacher(testcase)
-				return attacher.Attach(spec, nodeName)
+				return attacher.Attach(ctx, spec, nodeName)
 			},
 			expectedResult: "/dev/sda",
 		},
@@ -163,7 +165,7 @@ func TestAttachDetach(t *testing.T) {
 			operationPending: operationPendingCall{volumeID, true, pending, operationFinishTimeout},
 			test: func(testcase *testcase) (string, error) {
 				attacher := newAttacher(testcase)
-				return attacher.Attach(spec, nodeName)
+				return attacher.Attach(ctx, spec, nodeName)
 			},
 			expectedError: operationFinishTimeout,
 		},
@@ -177,7 +179,7 @@ func TestAttachDetach(t *testing.T) {
 			attach:           attachCall{instanceID, volumeID, "/dev/sda", attachError},
 			test: func(testcase *testcase) (string, error) {
 				attacher := newAttacher(testcase)
-				return attacher.Attach(spec, nodeName)
+				return attacher.Attach(ctx, spec, nodeName)
 			},
 			expectedError: attachError,
 		},
@@ -192,7 +194,7 @@ func TestAttachDetach(t *testing.T) {
 			diskPath:         diskPathCall{instanceID, volumeID, "", diskPathError},
 			test: func(testcase *testcase) (string, error) {
 				attacher := newAttacher(testcase)
-				return attacher.Attach(spec, nodeName)
+				return attacher.Attach(ctx, spec, nodeName)
 			},
 			expectedError: diskPathError,
 		},
@@ -204,7 +206,7 @@ func TestAttachDetach(t *testing.T) {
 			disksAreAttached: disksAreAttachedCall{instanceID, nodeName, []string{volumeID}, map[string]bool{volumeID: true}, nil},
 			test: func(testcase *testcase) (string, error) {
 				attacher := newAttacher(testcase)
-				attachments, err := attacher.VolumesAreAttached([]*volume.Spec{spec}, nodeName)
+				attachments, err := attacher.VolumesAreAttached(ctx, []*volume.Spec{spec}, nodeName)
 				return serializeAttachments(attachments), err
 			},
 			expectedResult: serializeAttachments(map[*volume.Spec]bool{spec: true}),
@@ -217,7 +219,7 @@ func TestAttachDetach(t *testing.T) {
 			disksAreAttached: disksAreAttachedCall{instanceID, nodeName, []string{volumeID}, map[string]bool{volumeID: false}, nil},
 			test: func(testcase *testcase) (string, error) {
 				attacher := newAttacher(testcase)
-				attachments, err := attacher.VolumesAreAttached([]*volume.Spec{spec}, nodeName)
+				attachments, err := attacher.VolumesAreAttached(ctx, []*volume.Spec{spec}, nodeName)
 				return serializeAttachments(attachments), err
 			},
 			expectedResult: serializeAttachments(map[*volume.Spec]bool{spec: false}),
@@ -230,7 +232,7 @@ func TestAttachDetach(t *testing.T) {
 			disksAreAttached: disksAreAttachedCall{instanceID, nodeName, []string{volumeID}, nil, disksCheckError},
 			test: func(testcase *testcase) (string, error) {
 				attacher := newAttacher(testcase)
-				attachments, err := attacher.VolumesAreAttached([]*volume.Spec{spec}, nodeName)
+				attachments, err := attacher.VolumesAreAttached(ctx, []*volume.Spec{spec}, nodeName)
 				return serializeAttachments(attachments), err
 			},
 			expectedResult: serializeAttachments(map[*volume.Spec]bool{spec: true}),
@@ -246,7 +248,7 @@ func TestAttachDetach(t *testing.T) {
 			detach:           detachCall{instanceID, volumeID, nil},
 			test: func(testcase *testcase) (string, error) {
 				detacher := newDetacher(testcase)
-				return "", detacher.Detach(volumeID, nodeName)
+				return "", detacher.Detach(ctx, volumeID, nodeName)
 			},
 		},
 
@@ -258,7 +260,7 @@ func TestAttachDetach(t *testing.T) {
 			diskIsAttached:   diskIsAttachedCall{instanceID, nodeName, volumeID, false, nil},
 			test: func(testcase *testcase) (string, error) {
 				detacher := newDetacher(testcase)
-				return "", detacher.Detach(volumeID, nodeName)
+				return "", detacher.Detach(ctx, volumeID, nodeName)
 			},
 		},
 
@@ -271,7 +273,7 @@ func TestAttachDetach(t *testing.T) {
 			detach:           detachCall{instanceID, volumeID, nil},
 			test: func(testcase *testcase) (string, error) {
 				detacher := newDetacher(testcase)
-				return "", detacher.Detach(volumeID, nodeName)
+				return "", detacher.Detach(ctx, volumeID, nodeName)
 			},
 		},
 
@@ -284,7 +286,7 @@ func TestAttachDetach(t *testing.T) {
 			detach:           detachCall{instanceID, volumeID, detachError},
 			test: func(testcase *testcase) (string, error) {
 				detacher := newDetacher(testcase)
-				return "", detacher.Detach(volumeID, nodeName)
+				return "", detacher.Detach(ctx, volumeID, nodeName)
 			},
 			expectedError: detachError,
 		},
@@ -296,7 +298,7 @@ func TestAttachDetach(t *testing.T) {
 			operationPending: operationPendingCall{volumeID, true, pending, operationFinishTimeout},
 			test: func(testcase *testcase) (string, error) {
 				detacher := newDetacher(testcase)
-				return "", detacher.Detach(volumeID, nodeName)
+				return "", detacher.Detach(ctx, volumeID, nodeName)
 			},
 			expectedError: operationFinishTimeout,
 		},
@@ -703,31 +705,31 @@ type instances struct {
 	instanceID string
 }
 
-func (instances *instances) NodeAddresses(name types.NodeName) ([]v1.NodeAddress, error) {
+func (instances *instances) NodeAddresses(ctx context.Context, name types.NodeName) ([]v1.NodeAddress, error) {
 	return []v1.NodeAddress{}, errors.New("Not implemented")
 }
 
-func (instances *instances) NodeAddressesByProviderID(providerID string) ([]v1.NodeAddress, error) {
+func (instances *instances) NodeAddressesByProviderID(ctx context.Context, providerID string) ([]v1.NodeAddress, error) {
 	return []v1.NodeAddress{}, errors.New("Not implemented")
 }
 
-func (instances *instances) ExternalID(name types.NodeName) (string, error) {
+func (instances *instances) ExternalID(ctx context.Context, name types.NodeName) (string, error) {
 	return "", errors.New("Not implemented")
 }
 
-func (instances *instances) InstanceID(name types.NodeName) (string, error) {
+func (instances *instances) InstanceID(ctx context.Context, name types.NodeName) (string, error) {
 	return instances.instanceID, nil
 }
 
-func (instances *instances) InstanceType(name types.NodeName) (string, error) {
+func (instances *instances) InstanceType(ctx context.Context, name types.NodeName) (string, error) {
 	return "", errors.New("Not implemented")
 }
 
-func (instances *instances) InstanceTypeByProviderID(providerID string) (string, error) {
+func (instances *instances) InstanceTypeByProviderID(ctx context.Context, providerID string) (string, error) {
 	return "", errors.New("Not implemented")
 }
 
-func (instances *instances) InstanceExistsByProviderID(providerID string) (bool, error) {
+func (instances *instances) InstanceExistsByProviderID(ctx context.Context, providerID string) (bool, error) {
 	return false, errors.New("unimplemented")
 }
 
@@ -735,10 +737,10 @@ func (instances *instances) List(filter string) ([]types.NodeName, error) {
 	return []types.NodeName{}, errors.New("Not implemented")
 }
 
-func (instances *instances) AddSSHKeyToAllInstances(user string, keyData []byte) error {
+func (instances *instances) AddSSHKeyToAllInstances(ctx context.Context, user string, keyData []byte) error {
 	return errors.New("Not implemented")
 }
 
-func (instances *instances) CurrentNodeName(hostname string) (types.NodeName, error) {
+func (instances *instances) CurrentNodeName(ctx context.Context, hostname string) (types.NodeName, error) {
 	return "", errors.New("Not implemented")
 }

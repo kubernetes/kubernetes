@@ -17,6 +17,7 @@ limitations under the License.
 package testing
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"time"
@@ -361,7 +362,7 @@ type testPluginAttacher struct {
 	pluginLock        *sync.RWMutex
 }
 
-func (attacher *testPluginAttacher) Attach(spec *volume.Spec, nodeName types.NodeName) (string, error) {
+func (attacher *testPluginAttacher) Attach(ctx context.Context, spec *volume.Spec, nodeName types.NodeName) (string, error) {
 	attacher.pluginLock.Lock()
 	defer attacher.pluginLock.Unlock()
 	if spec == nil {
@@ -373,7 +374,7 @@ func (attacher *testPluginAttacher) Attach(spec *volume.Spec, nodeName types.Nod
 	return spec.Name(), nil
 }
 
-func (attacher *testPluginAttacher) VolumesAreAttached(specs []*volume.Spec, nodeName types.NodeName) (map[*volume.Spec]bool, error) {
+func (attacher *testPluginAttacher) VolumesAreAttached(ctx context.Context, specs []*volume.Spec, nodeName types.NodeName) (map[*volume.Spec]bool, error) {
 	return nil, nil
 }
 
@@ -417,7 +418,7 @@ type testPluginDetacher struct {
 	pluginLock        *sync.RWMutex
 }
 
-func (detacher *testPluginDetacher) Detach(volumeName string, nodeName types.NodeName) error {
+func (detacher *testPluginDetacher) Detach(ctx context.Context, volumeName string, nodeName types.NodeName) error {
 	detacher.pluginLock.Lock()
 	defer detacher.pluginLock.Unlock()
 	detacher.detachedVolumeMap[string(nodeName)] = append(detacher.detachedVolumeMap[string(nodeName)], volumeName)

@@ -17,6 +17,7 @@ limitations under the License.
 package openstack
 
 import (
+	"context"
 	"errors"
 
 	"github.com/gophercloud/gophercloud"
@@ -49,7 +50,7 @@ func NewRoutes(compute *gophercloud.ServiceClient, network *gophercloud.ServiceC
 	}, nil
 }
 
-func (r *Routes) ListRoutes(clusterName string) ([]*cloudprovider.Route, error) {
+func (r *Routes) ListRoutes(ctx context.Context, clusterName string) ([]*cloudprovider.Route, error) {
 	glog.V(4).Infof("ListRoutes(%v)", clusterName)
 
 	nodeNamesByAddr := make(map[string]types.NodeName)
@@ -136,7 +137,7 @@ func updateAllowedAddressPairs(network *gophercloud.ServiceClient, port *neutron
 	return unwinder, nil
 }
 
-func (r *Routes) CreateRoute(clusterName string, nameHint string, route *cloudprovider.Route) error {
+func (r *Routes) CreateRoute(ctx context.Context, clusterName string, nameHint string, route *cloudprovider.Route) error {
 	glog.V(4).Infof("CreateRoute(%v, %v, %v)", clusterName, nameHint, route)
 
 	onFailure := NewCaller()
@@ -208,7 +209,7 @@ func (r *Routes) CreateRoute(clusterName string, nameHint string, route *cloudpr
 	return nil
 }
 
-func (r *Routes) DeleteRoute(clusterName string, route *cloudprovider.Route) error {
+func (r *Routes) DeleteRoute(ctx context.Context, clusterName string, route *cloudprovider.Route) error {
 	glog.V(4).Infof("DeleteRoute(%v, %v)", clusterName, route)
 
 	onFailure := NewCaller()

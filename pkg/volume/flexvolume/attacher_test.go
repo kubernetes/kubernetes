@@ -17,6 +17,7 @@ limitations under the License.
 package flexvolume
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -25,6 +26,8 @@ import (
 )
 
 func TestAttach(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	spec := fakeVolumeSpec()
 
 	plugin, _ := testPlugin()
@@ -34,7 +37,7 @@ func TestAttach(t *testing.T) {
 	)
 
 	a, _ := plugin.NewAttacher()
-	a.Attach(spec, "localhost")
+	a.Attach(ctx, spec, "localhost")
 }
 
 func TestWaitForAttach(t *testing.T) {
@@ -64,6 +67,8 @@ func TestMountDevice(t *testing.T) {
 }
 
 func TestIsVolumeAttached(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	spec := fakeVolumeSpec()
 
 	plugin, _ := testPlugin()
@@ -72,5 +77,5 @@ func TestIsVolumeAttached(t *testing.T) {
 	)
 	a, _ := plugin.NewAttacher()
 	specs := []*volume.Spec{spec}
-	a.VolumesAreAttached(specs, "localhost")
+	a.VolumesAreAttached(ctx, specs, "localhost")
 }

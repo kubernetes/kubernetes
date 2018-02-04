@@ -22,6 +22,7 @@ import (
 	"path"
 	"strings"
 
+	"context"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/util/mount"
@@ -173,12 +174,12 @@ func (b *gitRepoVolumeMounter) CanMount() error {
 }
 
 // SetUp creates new directory and clones a git repo.
-func (b *gitRepoVolumeMounter) SetUp(fsGroup *int64) error {
-	return b.SetUpAt(b.GetPath(), fsGroup)
+func (b *gitRepoVolumeMounter) SetUp(ctx context.Context, fsGroup *int64) error {
+	return b.SetUpAt(ctx, b.GetPath(), fsGroup)
 }
 
 // SetUpAt creates new directory and clones a git repo.
-func (b *gitRepoVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
+func (b *gitRepoVolumeMounter) SetUpAt(ctx context.Context, dir string, fsGroup *int64) error {
 	if volumeutil.IsReady(b.getMetaDir()) {
 		return nil
 	}
@@ -188,7 +189,7 @@ func (b *gitRepoVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 	if err != nil {
 		return err
 	}
-	if err := wrapped.SetUpAt(dir, fsGroup); err != nil {
+	if err := wrapped.SetUpAt(ctx, dir, fsGroup); err != nil {
 		return err
 	}
 
@@ -258,13 +259,13 @@ type gitRepoVolumeUnmounter struct {
 var _ volume.Unmounter = &gitRepoVolumeUnmounter{}
 
 // TearDown simply deletes everything in the directory.
-func (c *gitRepoVolumeUnmounter) TearDown() error {
-	return c.TearDownAt(c.GetPath())
+func (c *gitRepoVolumeUnmounter) TearDown(ctx context.Context) error {
+	return c.TearDownAt(ctx, c.GetPath())
 }
 
 // TearDownAt simply deletes everything in the directory.
-func (c *gitRepoVolumeUnmounter) TearDownAt(dir string) error {
-	return volume.UnmountViaEmptyDir(dir, c.plugin.host, c.volName, wrappedVolumeSpec(), c.podUID)
+func (c *gitRepoVolumeUnmounter) TearDownAt(ctx context.Context, dir string) error {
+	return volume.UnmountViaEmptyDir(ctx, dir, c.plugin.host, c.volName, wrappedVolumeSpec(), c.podUID)
 }
 
 func getVolumeSource(spec *volume.Spec) (*v1.GitRepoVolumeSource, bool) {

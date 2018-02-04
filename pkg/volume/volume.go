@@ -17,6 +17,7 @@ limitations under the License.
 package volume
 
 import (
+	"context"
 	"time"
 
 	"k8s.io/api/core/v1"
@@ -122,14 +123,14 @@ type Mounter interface {
 	// content should be owned by 'fsGroup' so that it can be
 	// accessed by the pod. This may be called more than once, so
 	// implementations must be idempotent.
-	SetUp(fsGroup *int64) error
+	SetUp(ctx context.Context, fsGroup *int64) error
 	// SetUpAt prepares and mounts/unpacks the volume to the
 	// specified directory path, which may or may not exist yet.
 	// The mount point and its content should be owned by
 	// 'fsGroup' so that it can be accessed by the pod. This may
 	// be called more than once, so implementations must be
 	// idempotent.
-	SetUpAt(dir string, fsGroup *int64) error
+	SetUpAt(ctx context.Context, dir string, fsGroup *int64) error
 	// GetAttributes returns the attributes of the mounter.
 	GetAttributes() Attributes
 }
@@ -139,10 +140,10 @@ type Unmounter interface {
 	Volume
 	// TearDown unmounts the volume from a self-determined directory and
 	// removes traces of the SetUp procedure.
-	TearDown() error
+	TearDown(ctx context.Context) error
 	// TearDown unmounts the volume from the specified directory and
 	// removes traces of the SetUp procedure.
-	TearDownAt(dir string) error
+	TearDownAt(ctx context.Context, dir string) error
 }
 
 // BlockVolumeMapper interface provides methods to set up/map the volume.
@@ -203,12 +204,12 @@ type Attacher interface {
 	// Attaches the volume specified by the given spec to the node with the given Name.
 	// On success, returns the device path where the device was attached on the
 	// node.
-	Attach(spec *Spec, nodeName types.NodeName) (string, error)
+	Attach(ctx context.Context, spec *Spec, nodeName types.NodeName) (string, error)
 
 	// VolumesAreAttached checks whether the list of volumes still attached to the specified
 	// node. It returns a map which maps from the volume spec to the checking result.
 	// If an error is occurred during checking, the error will be returned
-	VolumesAreAttached(specs []*Spec, nodeName types.NodeName) (map[*Spec]bool, error)
+	VolumesAreAttached(ctx context.Context, specs []*Spec, nodeName types.NodeName) (map[*Spec]bool, error)
 
 	// WaitForAttach blocks until the device is attached to this
 	// node. If it successfully attaches, the path to the device
@@ -239,7 +240,7 @@ type Detacher interface {
 	// Detach the given volume from the node with the given Name.
 	// volumeName is name of the volume as returned from plugin's
 	// GetVolumeName().
-	Detach(volumeName string, nodeName types.NodeName) error
+	Detach(ctx context.Context, volumeName string, nodeName types.NodeName) error
 
 	// UnmountDevice unmounts the global mount of the disk. This
 	// should only be called once all bind mounts have been

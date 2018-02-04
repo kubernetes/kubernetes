@@ -17,6 +17,7 @@ limitations under the License.
 package azure_dd
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path"
@@ -57,14 +58,14 @@ var _ volume.Detacher = &azureDiskDetacher{}
 var getLunMutex = keymutex.NewKeyMutex()
 
 // Attach attaches a volume.Spec to an Azure VM referenced by NodeName, returning the disk's LUN
-func (a *azureDiskAttacher) Attach(spec *volume.Spec, nodeName types.NodeName) (string, error) {
+func (a *azureDiskAttacher) Attach(ctx context.Context, spec *volume.Spec, nodeName types.NodeName) (string, error) {
 	volumeSource, err := getVolumeSource(spec)
 	if err != nil {
 		glog.Warningf("failed to get azure disk spec (%v)", err)
 		return "", err
 	}
 
-	instanceid, err := a.cloud.InstanceID(nodeName)
+	instanceid, err := a.cloud.InstanceID(ctx, nodeName)
 	if err != nil {
 		glog.Warningf("failed to get azure instance id (%v)", err)
 		return "", fmt.Errorf("failed to get azure instance id for node %q (%v)", nodeName, err)
@@ -113,7 +114,7 @@ func (a *azureDiskAttacher) Attach(spec *volume.Spec, nodeName types.NodeName) (
 	return strconv.Itoa(int(lun)), err
 }
 
-func (a *azureDiskAttacher) VolumesAreAttached(specs []*volume.Spec, nodeName types.NodeName) (map[*volume.Spec]bool, error) {
+func (a *azureDiskAttacher) VolumesAreAttached(ctx context.Context, specs []*volume.Spec, nodeName types.NodeName) (map[*volume.Spec]bool, error) {
 	volumesAttachedCheck := make(map[*volume.Spec]bool)
 	volumeSpecMap := make(map[string]*volume.Spec)
 	volumeIDList := []string{}
@@ -266,12 +267,12 @@ func (attacher *azureDiskAttacher) MountDevice(spec *volume.Spec, devicePath str
 }
 
 // Detach detaches disk from Azure VM.
-func (d *azureDiskDetacher) Detach(diskURI string, nodeName types.NodeName) error {
+func (d *azureDiskDetacher) Detach(ctx context.Context, diskURI string, nodeName types.NodeName) error {
 	if diskURI == "" {
 		return fmt.Errorf("invalid disk to detach: %q", diskURI)
 	}
 
-	instanceid, err := d.cloud.InstanceID(nodeName)
+	instanceid, err := d.cloud.InstanceID(ctx, nodeName)
 	if err != nil {
 		glog.Warningf("no instance id for node %q, skip detaching (%v)", nodeName, err)
 		return nil

@@ -18,6 +18,7 @@ package kubelet
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -803,6 +804,8 @@ func buildService(name, namespace, clusterIP, protocol string, port int) *v1.Ser
 
 func TestMakeEnvironmentVariables(t *testing.T) {
 	trueVal := true
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	services := []*v1.Service{
 		buildService("kubernetes", metav1.NamespaceDefault, "1.2.3.1", "TCP", 8081),
 		buildService("test", "test1", "1.2.3.3", "TCP", 8083),
@@ -1673,7 +1676,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 		}
 		podIP := "1.2.3.4"
 
-		result, err := kl.makeEnvironmentVariables(testPod, tc.container, podIP)
+		result, err := kl.makeEnvironmentVariables(ctx, testPod, tc.container, podIP)
 		select {
 		case e := <-fakeRecorder.Events:
 			assert.Equal(t, tc.expectedEvent, e)

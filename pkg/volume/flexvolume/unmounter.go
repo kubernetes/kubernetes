@@ -17,6 +17,7 @@ limitations under the License.
 package flexvolume
 
 import (
+	"context"
 	"fmt"
 	"os"
 
@@ -37,12 +38,12 @@ type flexVolumeUnmounter struct {
 var _ volume.Unmounter = &flexVolumeUnmounter{}
 
 // Unmounter interface
-func (f *flexVolumeUnmounter) TearDown() error {
+func (f *flexVolumeUnmounter) TearDown(ctx context.Context) error {
 	path := f.GetPath()
-	return f.TearDownAt(path)
+	return f.TearDownAt(ctx, path)
 }
 
-func (f *flexVolumeUnmounter) TearDownAt(dir string) error {
+func (f *flexVolumeUnmounter) TearDownAt(ctx context.Context, dir string) error {
 
 	if pathExists, pathErr := util.PathExists(dir); pathErr != nil {
 		return fmt.Errorf("Error checking if path exists: %v", pathErr)

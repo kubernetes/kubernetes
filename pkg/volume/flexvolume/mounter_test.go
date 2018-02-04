@@ -17,6 +17,7 @@ limitations under the License.
 package flexvolume
 
 import (
+	"context"
 	"testing"
 
 	"k8s.io/api/core/v1"
@@ -26,6 +27,8 @@ import (
 )
 
 func TestSetUpAt(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	spec := fakeVolumeSpec()
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -65,8 +68,8 @@ func TestSetUpAt(t *testing.T) {
 	)
 
 	m, _ := plugin.newMounterInternal(spec, pod, mounter, plugin.runner)
-	m.SetUpAt(rootDir+"/mount-dir", nil)
+	m.SetUpAt(ctx, rootDir+"/mount-dir", nil)
 
 	fsGroup := int64(42)
-	m.SetUpAt(rootDir+"/mount-dir", &fsGroup)
+	m.SetUpAt(ctx, rootDir+"/mount-dir", &fsGroup)
 }

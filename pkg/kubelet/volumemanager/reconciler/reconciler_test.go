@@ -17,6 +17,7 @@ limitations under the License.
 package reconciler
 
 import (
+	"context"
 	"fmt"
 	"testing"
 	"time"
@@ -818,6 +819,8 @@ func Test_Run_Positive_VolumeUnmapControllerAttachEnabled(t *testing.T) {
 }
 
 func Test_GenerateMapVolumeFunc_Plugin_Not_Found(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	testCases := map[string]struct {
 		volumePlugins  []volume.VolumePlugin
 		expectErr      bool
@@ -855,7 +858,7 @@ func Test_GenerateMapVolumeFunc_Plugin_Not_Found(t *testing.T) {
 				Spec: v1.PodSpec{},
 			}
 			volumeToMount := operationexecutor.VolumeToMount{Pod: pod, VolumeSpec: &volume.Spec{}}
-			err := oex.MapVolume(waitForAttachTimeout, volumeToMount, asw)
+			err := oex.MapVolume(ctx, waitForAttachTimeout, volumeToMount, asw)
 			// Assert
 			if assert.Error(t, err) {
 				assert.Contains(t, err.Error(), tc.expectedErrMsg)

@@ -17,6 +17,7 @@ limitations under the License.
 package node
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strings"
@@ -172,12 +173,12 @@ func MarkAllPodsNotReady(kubeClient clientset.Interface, node *v1.Node) error {
 
 // ExistsInCloudProvider returns true if the node exists in the
 // cloud provider.
-func ExistsInCloudProvider(cloud cloudprovider.Interface, nodeName types.NodeName) (bool, error) {
+func ExistsInCloudProvider(ctx context.Context, cloud cloudprovider.Interface, nodeName types.NodeName) (bool, error) {
 	instances, ok := cloud.Instances()
 	if !ok {
 		return false, fmt.Errorf("%v", ErrCloudInstance)
 	}
-	if _, err := instances.ExternalID(nodeName); err != nil {
+	if _, err := instances.ExternalID(ctx, nodeName); err != nil {
 		if err == cloudprovider.InstanceNotFound {
 			return false, nil
 		}

@@ -17,6 +17,7 @@ limitations under the License.
 package route
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"sync"
@@ -112,7 +113,9 @@ func (rc *RouteController) Run(stopCh <-chan struct{}, syncPeriod time.Duration)
 	// We should have a watch on node and if we observe a new node (with CIDR?)
 	// trigger reconciliation for that node.
 	go wait.NonSlidingUntil(func() {
-		if err := rc.reconcileNodeRoutes(); err != nil {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		if err := rc.reconcileNodeRoutes(ctx); err != nil {
 			glog.Errorf("Couldn't reconcile node routes: %v", err)
 		}
 	}, syncPeriod, stopCh)
@@ -120,8 +123,8 @@ func (rc *RouteController) Run(stopCh <-chan struct{}, syncPeriod time.Duration)
 	<-stopCh
 }
 
-func (rc *RouteController) reconcileNodeRoutes() error {
-	routeList, err := rc.routes.ListRoutes(rc.clusterName)
+func (rc *RouteController) reconcileNodeRoutes(ctx context.Context) error {
+	routeList, err := rc.routes.ListRoutes(ctx, rc.clusterName)
 	if err != nil {
 		return fmt.Errorf("error listing routes: %v", err)
 	}
@@ -129,10 +132,10 @@ func (rc *RouteController) reconcileNodeRoutes() error {
 	if err != nil {
 		return fmt.Errorf("error listing nodes: %v", err)
 	}
-	return rc.reconcile(nodes, routeList)
+	return rc.reconcile(ctx, nodes, routeList)
 }
 
-func (rc *RouteController) reconcile(nodes []*v1.Node, routes []*cloudprovider.Route) error {
+func (rc *RouteController) reconcile(ctx context.Context, nodes []*v1.Node, routes []*cloudprovider.Route) error {
 	// nodeCIDRs maps nodeName->nodeCIDR
 	nodeCIDRs := make(map[types.NodeName]string)
 	// routeMap maps routeTargetNode->route
@@ -162,7 +165,7 @@ func (rc *RouteController) reconcile(nodes []*v1.Node, routes []*cloudprovider.R
 			}
 			nameHint := string(node.UID)
 			wg.Add(1)
-			go func(nodeName types.NodeName, nameHint string, route *cloudprovider.Route) {
+			go func(ctx context.Context, nodeName types.NodeName, nameHint string, route *cloudprovider.Route) {
 				defer wg.Done()
 				for i := 0; i < maxRetries; i++ {
 					startTime := time.Now()
@@ -170,7 +173,7 @@ func (rc *RouteController) reconcile(nodes []*v1.Node, routes []*cloudprovider.R
 					// CreateRoute calls in flight.
 					rateLimiter <- struct{}{}
 					glog.Infof("Creating route for node %s %s with hint %s, throttled %v", nodeName, route.DestinationCIDR, nameHint, time.Now().Sub(startTime))
-					err := rc.routes.CreateRoute(rc.clusterName, nameHint, route)
+					err := rc.routes.CreateRoute(ctx, rc.clusterName, nameHint, route)
 					<-rateLimiter
 
 					rc.updateNetworkingCondition(nodeName, err == nil)
@@ -192,7 +195,7 @@ func (rc *RouteController) reconcile(nodes []*v1.Node, routes []*cloudprovider.R
 						return
 					}
 				}
-			}(nodeName, nameHint, route)
+			}(ctx, nodeName, nameHint, route)
 		} else {
 			// Update condition only if it doesn't reflect the current state.
 			_, condition := v1node.GetNodeCondition(&node.Status, v1.NodeNetworkUnavailable)
@@ -208,16 +211,16 @@ func (rc *RouteController) reconcile(nodes []*v1.Node, routes []*cloudprovider.R
 			if route.Blackhole || (nodeCIDRs[route.TargetNode] != route.DestinationCIDR) {
 				wg.Add(1)
 				// Delete the route.
-				go func(route *cloudprovider.Route, startTime time.Time) {
+				go func(ctx context.Context, route *cloudprovider.Route, startTime time.Time) {
 					glog.Infof("Deleting route %s %s", route.Name, route.DestinationCIDR)
-					if err := rc.routes.DeleteRoute(rc.clusterName, route); err != nil {
+					if err := rc.routes.DeleteRoute(ctx, rc.clusterName, route); err != nil {
 						glog.Errorf("Could not delete route %s %s after %v: %v", route.Name, route.DestinationCIDR, time.Now().Sub(startTime), err)
 					} else {
 						glog.Infof("Deleted route %s %s after %v", route.Name, route.DestinationCIDR, time.Now().Sub(startTime))
 					}
 					wg.Done()
 
-				}(route, time.Now())
+				}(ctx, route, time.Now())
 			}
 		}
 	}

@@ -17,6 +17,7 @@ limitations under the License.
 package azure_file
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -124,6 +125,8 @@ func TestPluginWithOtherCloudProvider(t *testing.T) {
 }
 
 func testPlugin(t *testing.T, tmpDir string, volumeHost volume.VolumeHost) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumeHost)
 
@@ -155,7 +158,7 @@ func testPlugin(t *testing.T, tmpDir string, volumeHost volume.VolumeHost) {
 		t.Errorf("Got unexpected path: %s", path)
 	}
 
-	if err := mounter.SetUp(nil); err != nil {
+	if err := mounter.SetUp(ctx, nil); err != nil {
 		t.Errorf("Expected success, got: %v", err)
 	}
 	if _, err := os.Stat(path); err != nil {
@@ -181,7 +184,7 @@ func testPlugin(t *testing.T, tmpDir string, volumeHost volume.VolumeHost) {
 		t.Errorf("Got a nil Unmounter")
 	}
 
-	if err := unmounter.TearDown(); err != nil {
+	if err := unmounter.TearDown(ctx); err != nil {
 		t.Errorf("Expected success, got: %v", err)
 	}
 	if _, err := os.Stat(path); err == nil {

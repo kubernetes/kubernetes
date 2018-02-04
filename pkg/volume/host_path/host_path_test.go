@@ -17,6 +17,7 @@ limitations under the License.
 package host_path
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"testing"
@@ -200,6 +201,8 @@ func TestProvisioner(t *testing.T) {
 }
 
 func TestInvalidHostPath(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(volume.VolumeConfig{}), nil /* prober */, volumetest.NewFakeVolumeHost("fake", nil, nil))
 
@@ -217,7 +220,7 @@ func TestInvalidHostPath(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = mounter.SetUp(nil)
+	err = mounter.SetUp(ctx, nil)
 	expectedMsg := "invalid HostPath `/no/backsteps/allowed/..`: must not contain '..'"
 	if err.Error() != expectedMsg {
 		t.Fatalf("expected error `%s` but got `%s`", expectedMsg, err)
@@ -225,6 +228,8 @@ func TestInvalidHostPath(t *testing.T) {
 }
 
 func TestPlugin(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(volume.VolumeConfig{}), nil /* prober */, volumetest.NewFakeVolumeHost("fake", nil, nil))
 
@@ -253,7 +258,7 @@ func TestPlugin(t *testing.T) {
 		t.Errorf("Got unexpected path: %s", path)
 	}
 
-	if err := mounter.SetUp(nil); err != nil {
+	if err := mounter.SetUp(ctx, nil); err != nil {
 		t.Errorf("Expected success, got: %v", err)
 	}
 
@@ -265,7 +270,7 @@ func TestPlugin(t *testing.T) {
 		t.Fatalf("Got a nil Unmounter")
 	}
 
-	if err := unmounter.TearDown(); err != nil {
+	if err := unmounter.TearDown(ctx); err != nil {
 		t.Errorf("Expected success, got: %v", err)
 	}
 }

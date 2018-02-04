@@ -17,6 +17,7 @@ limitations under the License.
 package rbd
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -175,6 +176,8 @@ func checkMounterLog(t *testing.T, fakeMounter *mount.FakeMounter, expected int,
 }
 
 func doTestPlugin(t *testing.T, c *testcase) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	fakeVolumeHost := volumetest.NewFakeVolumeHost(c.root, nil, nil)
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, fakeVolumeHost)
@@ -191,7 +194,7 @@ func doTestPlugin(t *testing.T, c *testcase) {
 	if err != nil {
 		t.Errorf("Failed to make a new Attacher: %v", err)
 	}
-	deviceAttachPath, err := attacher.Attach(c.spec, fakeNodeName)
+	deviceAttachPath, err := attacher.Attach(ctx, c.spec, fakeNodeName)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -235,7 +238,7 @@ func doTestPlugin(t *testing.T, c *testcase) {
 		t.Errorf("Unexpected path, expected %q, got: %q", c.expectedPodMountPath, path)
 	}
 
-	if err := mounter.SetUp(nil); err != nil {
+	if err := mounter.SetUp(ctx, nil); err != nil {
 		t.Errorf("Expected success, got: %v", err)
 	}
 	if _, err := os.Stat(path); err != nil {
@@ -256,7 +259,7 @@ func doTestPlugin(t *testing.T, c *testcase) {
 		t.Error("Got a nil Unmounter")
 	}
 
-	if err := unmounter.TearDown(); err != nil {
+	if err := unmounter.TearDown(ctx); err != nil {
 		t.Errorf("Expected success, got: %v", err)
 	}
 	if _, err := os.Stat(path); err == nil {
@@ -276,7 +279,7 @@ func doTestPlugin(t *testing.T, c *testcase) {
 		t.Fatalf("Detacher.UnmountDevice failed to unmount %s", deviceMountPath)
 	}
 	checkMounterLog(t, fakeMounter, 4, mount.FakeAction{Action: "unmount", Target: c.expectedDeviceMountPath, Source: "", FSType: ""})
-	err = detacher.Detach(deviceMountPath, fakeNodeName)
+	err = detacher.Detach(ctx, deviceMountPath, fakeNodeName)
 	if err != nil {
 		t.Fatalf("Detacher.Detach failed to detach %s from %s", deviceMountPath, fakeNodeName)
 	}

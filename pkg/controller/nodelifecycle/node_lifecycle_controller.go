@@ -22,6 +22,12 @@ limitations under the License.
 package nodelifecycle
 
 import (
+	"context"
+	"fmt"
+	"github.com/golang/glog"
+	"sync"
+	"time"
+
 	"k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -50,11 +56,6 @@ import (
 	"k8s.io/kubernetes/pkg/util/system"
 	taintutils "k8s.io/kubernetes/pkg/util/taints"
 	utilversion "k8s.io/kubernetes/pkg/util/version"
-
-	"fmt"
-	"github.com/golang/glog"
-	"sync"
-	"time"
 )
 
 func init() {
@@ -236,7 +237,9 @@ func NewNodeLifecycleController(podInformer coreinformers.PodInformer,
 		knownNodeSet:  make(map[string]*v1.Node),
 		nodeStatusMap: make(map[string]nodeStatusData),
 		nodeExistsInCloudProvider: func(nodeName types.NodeName) (bool, error) {
-			return nodeutil.ExistsInCloudProvider(cloud, nodeName)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			return nodeutil.ExistsInCloudProvider(ctx, cloud, nodeName)
 		},
 		recorder:                    recorder,
 		nodeMonitorPeriod:           nodeMonitorPeriod,

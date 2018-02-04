@@ -17,6 +17,7 @@ limitations under the License.
 package vsphere_volume
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path"
@@ -62,7 +63,7 @@ func (plugin *vsphereVolumePlugin) NewAttacher() (volume.Attacher, error) {
 // Callers are responsible for retryinging on failure.
 // Callers are responsible for thread safety between concurrent attach and
 // detach operations.
-func (attacher *vsphereVMDKAttacher) Attach(spec *volume.Spec, nodeName types.NodeName) (string, error) {
+func (attacher *vsphereVMDKAttacher) Attach(ctx context.Context, spec *volume.Spec, nodeName types.NodeName) (string, error) {
 	volumeSource, _, err := getVolumeSource(spec)
 	if err != nil {
 		return "", err
@@ -85,7 +86,7 @@ func (attacher *vsphereVMDKAttacher) Attach(spec *volume.Spec, nodeName types.No
 	return path.Join(diskByIDPath, diskSCSIPrefix+diskUUID), nil
 }
 
-func (attacher *vsphereVMDKAttacher) VolumesAreAttached(specs []*volume.Spec, nodeName types.NodeName) (map[*volume.Spec]bool, error) {
+func (attacher *vsphereVMDKAttacher) VolumesAreAttached(ctx context.Context, specs []*volume.Spec, nodeName types.NodeName) (map[*volume.Spec]bool, error) {
 	glog.Warningf("Attacher.VolumesAreAttached called for node %q - Please use BulkVerifyVolumes for vSphere", nodeName)
 	volumeNodeMap := map[types.NodeName][]*volume.Spec{
 		nodeName: specs,
@@ -251,7 +252,7 @@ func (plugin *vsphereVolumePlugin) NewDetacher() (volume.Detacher, error) {
 }
 
 // Detach the given device from the given node.
-func (detacher *vsphereVMDKDetacher) Detach(volumeName string, nodeName types.NodeName) error {
+func (detacher *vsphereVMDKDetacher) Detach(ctx context.Context, volumeName string, nodeName types.NodeName) error {
 
 	volPath := getVolPathfromVolumeName(volumeName)
 	attached, err := detacher.vsphereVolumes.DiskIsAttached(volPath, nodeName)

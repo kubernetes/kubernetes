@@ -19,6 +19,7 @@ package secret
 import (
 	"fmt"
 
+	"context"
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -43,7 +44,7 @@ const (
 // secretPlugin implements the VolumePlugin interface.
 type secretPlugin struct {
 	host      volume.VolumeHost
-	getSecret func(namespace, name string) (*v1.Secret, error)
+	getSecret func(ctx context.Context, namespace, name string) (*v1.Secret, error)
 }
 
 var _ volume.VolumePlugin = &secretPlugin{}
@@ -158,7 +159,7 @@ type secretVolumeMounter struct {
 	source    v1.SecretVolumeSource
 	pod       v1.Pod
 	opts      *volume.VolumeOptions
-	getSecret func(namespace, name string) (*v1.Secret, error)
+	getSecret func(ctx context.Context, namespace, name string) (*v1.Secret, error)
 }
 
 var _ volume.Mounter = &secretVolumeMounter{}
@@ -178,11 +179,11 @@ func (b *secretVolumeMounter) CanMount() error {
 	return nil
 }
 
-func (b *secretVolumeMounter) SetUp(fsGroup *int64) error {
-	return b.SetUpAt(b.GetPath(), fsGroup)
+func (b *secretVolumeMounter) SetUp(ctx context.Context, fsGroup *int64) error {
+	return b.SetUpAt(ctx, b.GetPath(), fsGroup)
 }
 
-func (b *secretVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
+func (b *secretVolumeMounter) SetUpAt(ctx context.Context, dir string, fsGroup *int64) error {
 	glog.V(3).Infof("Setting up volume %v for pod %v at %v", b.volName, b.pod.UID, dir)
 
 	// Wrap EmptyDir, let it do the setup.
@@ -190,12 +191,12 @@ func (b *secretVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 	if err != nil {
 		return err
 	}
-	if err := wrapped.SetUpAt(dir, fsGroup); err != nil {
+	if err := wrapped.SetUpAt(ctx, dir, fsGroup); err != nil {
 		return err
 	}
 
 	optional := b.source.Optional != nil && *b.source.Optional
-	secret, err := b.getSecret(b.pod.Namespace, b.source.SecretName)
+	secret, err := b.getSecret(ctx, b.pod.Namespace, b.source.SecretName)
 	if err != nil {
 		if !(errors.IsNotFound(err) && optional) {
 			glog.Errorf("Couldn't get secret %v/%v: %v", b.pod.Namespace, b.source.SecretName, err)
@@ -298,12 +299,12 @@ type secretVolumeUnmounter struct {
 
 var _ volume.Unmounter = &secretVolumeUnmounter{}
 
-func (c *secretVolumeUnmounter) TearDown() error {
-	return c.TearDownAt(c.GetPath())
+func (c *secretVolumeUnmounter) TearDown(ctx context.Context) error {
+	return c.TearDownAt(ctx, c.GetPath())
 }
 
-func (c *secretVolumeUnmounter) TearDownAt(dir string) error {
-	return volume.UnmountViaEmptyDir(dir, c.plugin.host, c.volName, wrappedVolumeSpec(), c.podUID)
+func (c *secretVolumeUnmounter) TearDownAt(ctx context.Context, dir string) error {
+	return volume.UnmountViaEmptyDir(ctx, dir, c.plugin.host, c.volName, wrappedVolumeSpec(), c.podUID)
 }
 
 func getVolumeSource(spec *volume.Spec) (*v1.SecretVolumeSource, bool) {

@@ -17,6 +17,7 @@ limitations under the License.
 package rbd
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"time"
@@ -76,7 +77,7 @@ var _ volume.Attacher = &rbdAttacher{}
 // access external `rbd` utility. And there is no need since AttachDetach
 // controller will not try to attach RWO volumes which are already attached to
 // other nodes.
-func (attacher *rbdAttacher) Attach(spec *volume.Spec, nodeName types.NodeName) (string, error) {
+func (attacher *rbdAttacher) Attach(ctx context.Context, spec *volume.Spec, nodeName types.NodeName) (string, error) {
 	return "", nil
 }
 
@@ -84,7 +85,7 @@ func (attacher *rbdAttacher) Attach(spec *volume.Spec, nodeName types.NodeName) 
 // There is no way to confirm whether the volume is attached or not from
 // outside of the kubelet node. This method needs to return true always, like
 // iSCSI, FC plugin.
-func (attacher *rbdAttacher) VolumesAreAttached(specs []*volume.Spec, nodeName types.NodeName) (map[*volume.Spec]bool, error) {
+func (attacher *rbdAttacher) VolumesAreAttached(ctx context.Context, specs []*volume.Spec, nodeName types.NodeName) (map[*volume.Spec]bool, error) {
 	volumesAttachedCheck := make(map[*volume.Spec]bool)
 	for _, spec := range specs {
 		volumesAttachedCheck[spec] = true
@@ -220,6 +221,6 @@ func (detacher *rbdDetacher) UnmountDevice(deviceMountPath string) error {
 }
 
 // Detach implements Detacher.Detach.
-func (detacher *rbdDetacher) Detach(volumeName string, nodeName types.NodeName) error {
+func (detacher *rbdDetacher) Detach(ctx context.Context, volumeName string, nodeName types.NodeName) error {
 	return nil
 }

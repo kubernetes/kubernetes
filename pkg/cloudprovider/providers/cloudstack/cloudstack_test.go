@@ -17,6 +17,7 @@ limitations under the License.
 package cloudstack
 
 import (
+	"context"
 	"os"
 	"strconv"
 	"strings"
@@ -92,6 +93,8 @@ func TestNewCSCloud(t *testing.T) {
 }
 
 func TestLoadBalancer(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	cfg, ok := configFromEnv()
 	if !ok {
 		t.Skipf("No config found in environment")
@@ -107,7 +110,7 @@ func TestLoadBalancer(t *testing.T) {
 		t.Fatalf("LoadBalancer() returned false")
 	}
 
-	_, exists, err := lb.GetLoadBalancer(testClusterName, &v1.Service{ObjectMeta: metav1.ObjectMeta{Name: "noexist"}})
+	_, exists, err := lb.GetLoadBalancer(ctx, testClusterName, &v1.Service{ObjectMeta: metav1.ObjectMeta{Name: "noexist"}})
 	if err != nil {
 		t.Fatalf("GetLoadBalancer(\"noexist\") returned error: %s", err)
 	}

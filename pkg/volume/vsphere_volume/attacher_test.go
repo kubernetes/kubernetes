@@ -17,6 +17,7 @@ limitations under the License.
 package vsphere_volume
 
 import (
+	"context"
 	"errors"
 	"testing"
 
@@ -81,6 +82,8 @@ func TestAttachDetach(t *testing.T) {
 	attachError := errors.New("Fake attach error")
 	detachError := errors.New("Fake detach error")
 	diskCheckError := errors.New("Fake DiskIsAttached error")
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	tests := []testcase{
 		// Successful Attach call
 		{
@@ -88,7 +91,7 @@ func TestAttachDetach(t *testing.T) {
 			attach: attachCall{diskName, nodeName, uuid, nil},
 			test: func(testcase *testcase) (string, error) {
 				attacher := newAttacher(testcase)
-				return attacher.Attach(spec, nodeName)
+				return attacher.Attach(ctx, spec, nodeName)
 			},
 			expectedDevice: "/dev/disk/by-id/wwn-0x" + uuid,
 		},
@@ -99,7 +102,7 @@ func TestAttachDetach(t *testing.T) {
 			attach: attachCall{diskName, nodeName, "", attachError},
 			test: func(testcase *testcase) (string, error) {
 				attacher := newAttacher(testcase)
-				return attacher.Attach(spec, nodeName)
+				return attacher.Attach(ctx, spec, nodeName)
 			},
 			expectedError: attachError,
 		},
@@ -111,7 +114,7 @@ func TestAttachDetach(t *testing.T) {
 			detach:         detachCall{diskName, nodeName, nil},
 			test: func(testcase *testcase) (string, error) {
 				detacher := newDetacher(testcase)
-				return "", detacher.Detach(diskName, nodeName)
+				return "", detacher.Detach(ctx, diskName, nodeName)
 			},
 		},
 
@@ -121,7 +124,7 @@ func TestAttachDetach(t *testing.T) {
 			diskIsAttached: diskIsAttachedCall{diskName, nodeName, false, nil},
 			test: func(testcase *testcase) (string, error) {
 				detacher := newDetacher(testcase)
-				return "", detacher.Detach(diskName, nodeName)
+				return "", detacher.Detach(ctx, diskName, nodeName)
 			},
 		},
 
@@ -132,7 +135,7 @@ func TestAttachDetach(t *testing.T) {
 			detach:         detachCall{diskName, nodeName, nil},
 			test: func(testcase *testcase) (string, error) {
 				detacher := newDetacher(testcase)
-				return "", detacher.Detach(diskName, nodeName)
+				return "", detacher.Detach(ctx, diskName, nodeName)
 			},
 		},
 
@@ -143,7 +146,7 @@ func TestAttachDetach(t *testing.T) {
 			detach:         detachCall{diskName, nodeName, detachError},
 			test: func(testcase *testcase) (string, error) {
 				detacher := newDetacher(testcase)
-				return "", detacher.Detach(diskName, nodeName)
+				return "", detacher.Detach(ctx, diskName, nodeName)
 			},
 			expectedError: detachError,
 		},

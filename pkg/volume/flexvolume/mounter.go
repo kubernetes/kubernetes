@@ -20,6 +20,7 @@ import (
 	"os"
 	"strconv"
 
+	"context"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/utils/exec"
 )
@@ -40,12 +41,12 @@ var _ volume.Mounter = &flexVolumeMounter{}
 // Mounter interface
 
 // SetUp creates new directory.
-func (f *flexVolumeMounter) SetUp(fsGroup *int64) error {
-	return f.SetUpAt(f.GetPath(), fsGroup)
+func (f *flexVolumeMounter) SetUp(ctx context.Context, fsGroup *int64) error {
+	return f.SetUpAt(ctx, f.GetPath(), fsGroup)
 }
 
 // SetUpAt creates new directory.
-func (f *flexVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
+func (f *flexVolumeMounter) SetUpAt(ctx context.Context, dir string, fsGroup *int64) error {
 	// Mount only once.
 	alreadyMounted, err := prepareForMount(f.mounter, dir)
 	if err != nil {
@@ -84,7 +85,7 @@ func (f *flexVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 
 	_, err = call.Run()
 	if isCmdNotSupportedErr(err) {
-		err = (*mounterDefaults)(f).SetUpAt(dir, fsGroup)
+		err = (*mounterDefaults)(f).SetUpAt(ctx, dir, fsGroup)
 	}
 
 	if err != nil {

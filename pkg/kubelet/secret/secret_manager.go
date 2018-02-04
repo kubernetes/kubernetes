@@ -17,6 +17,7 @@ limitations under the License.
 package secret
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"sync"
@@ -40,7 +41,7 @@ const (
 
 type Manager interface {
 	// Get secret by secret namespace and name.
-	GetSecret(namespace, name string) (*v1.Secret, error)
+	GetSecret(ctx context.Context, namespace, name string) (*v1.Secret, error)
 
 	// WARNING: Register/UnregisterPod functions should be efficient,
 	// i.e. should not block on network operations.
@@ -63,7 +64,7 @@ func NewSimpleSecretManager(kubeClient clientset.Interface) Manager {
 	return &simpleSecretManager{kubeClient: kubeClient}
 }
 
-func (s *simpleSecretManager) GetSecret(namespace, name string) (*v1.Secret, error) {
+func (s *simpleSecretManager) GetSecret(ctx context.Context, namespace, name string) (*v1.Secret, error) {
 	return s.kubeClient.CoreV1().Secrets(namespace).Get(name, metav1.GetOptions{})
 }
 
@@ -73,7 +74,7 @@ func (s *simpleSecretManager) RegisterPod(pod *v1.Pod) {
 func (s *simpleSecretManager) UnregisterPod(pod *v1.Pod) {
 }
 
-type GetObjectTTLFunc func() (time.Duration, bool)
+type GetObjectTTLFunc func(ctx context.Context) (time.Duration, bool)
 
 type objectKey struct {
 	namespace string
@@ -160,9 +161,9 @@ func (s *secretStore) Delete(namespace, name string) {
 	}
 }
 
-func GetObjectTTLFromNodeFunc(getNode func() (*v1.Node, error)) GetObjectTTLFunc {
-	return func() (time.Duration, bool) {
-		node, err := getNode()
+func GetObjectTTLFromNodeFunc(getNode func(ctx context.Context) (*v1.Node, error)) GetObjectTTLFunc {
+	return func(ctx context.Context) (time.Duration, bool) {
+		node, err := getNode(ctx)
 		if err != nil {
 			return time.Duration(0), false
 		}
@@ -177,15 +178,15 @@ func GetObjectTTLFromNodeFunc(getNode func() (*v1.Node, error)) GetObjectTTLFunc
 	}
 }
 
-func (s *secretStore) isSecretFresh(data *secretData) bool {
+func (s *secretStore) isSecretFresh(ctx context.Context, data *secretData) bool {
 	secretTTL := s.defaultTTL
-	if ttl, ok := s.getTTL(); ok {
+	if ttl, ok := s.getTTL(ctx); ok {
 		secretTTL = ttl
 	}
 	return s.clock.Now().Before(data.lastUpdateTime.Add(secretTTL))
 }
 
-func (s *secretStore) Get(namespace, name string) (*v1.Secret, error) {
+func (s *secretStore) Get(ctx context.Context, namespace, name string) (*v1.Secret, error) {
 	key := objectKey{namespace: namespace, name: name}
 
 	data := func() *secretData {
@@ -208,7 +209,7 @@ func (s *secretStore) Get(namespace, name string) (*v1.Secret, error) {
 	// needed and return data.
 	data.Lock()
 	defer data.Unlock()
-	if data.err != nil || !s.isSecretFresh(data) {
+	if data.err != nil || !s.isSecretFresh(ctx, data) {
 		opts := metav1.GetOptions{}
 		if data.secret != nil && data.err == nil {
 			// This is just a periodic refresh of a secret we successfully fetched previously.
@@ -256,8 +257,8 @@ func NewCachingSecretManager(kubeClient clientset.Interface, getTTL GetObjectTTL
 	return csm
 }
 
-func (c *cachingSecretManager) GetSecret(namespace, name string) (*v1.Secret, error) {
-	return c.secretStore.Get(namespace, name)
+func (c *cachingSecretManager) GetSecret(ctx context.Context, namespace, name string) (*v1.Secret, error) {
+	return c.secretStore.Get(ctx, namespace, name)
 }
 
 func getSecretNames(pod *v1.Pod) sets.String {

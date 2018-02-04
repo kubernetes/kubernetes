@@ -17,6 +17,7 @@ limitations under the License.
 package iscsi
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"time"
@@ -53,11 +54,11 @@ func (plugin *iscsiPlugin) GetDeviceMountRefs(deviceMountPath string) ([]string,
 	return mount.GetMountRefs(mounter, deviceMountPath)
 }
 
-func (attacher *iscsiAttacher) Attach(spec *volume.Spec, nodeName types.NodeName) (string, error) {
+func (attacher *iscsiAttacher) Attach(ctx context.Context, spec *volume.Spec, nodeName types.NodeName) (string, error) {
 	return "", nil
 }
 
-func (attacher *iscsiAttacher) VolumesAreAttached(specs []*volume.Spec, nodeName types.NodeName) (map[*volume.Spec]bool, error) {
+func (attacher *iscsiAttacher) VolumesAreAttached(ctx context.Context, specs []*volume.Spec, nodeName types.NodeName) (map[*volume.Spec]bool, error) {
 	volumesAttachedCheck := make(map[*volume.Spec]bool)
 	for _, spec := range specs {
 		volumesAttachedCheck[spec] = true
@@ -139,7 +140,7 @@ func (plugin *iscsiPlugin) NewDetacher() (volume.Detacher, error) {
 	}, nil
 }
 
-func (detacher *iscsiDetacher) Detach(volumeName string, nodeName types.NodeName) error {
+func (detacher *iscsiDetacher) Detach(ctx context.Context, volumeName string, nodeName types.NodeName) error {
 	return nil
 }
 

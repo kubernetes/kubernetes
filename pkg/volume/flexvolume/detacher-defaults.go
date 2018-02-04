@@ -17,6 +17,7 @@ limitations under the License.
 package flexvolume
 
 import (
+	"context"
 	"time"
 
 	"github.com/golang/glog"
@@ -27,7 +28,7 @@ import (
 type detacherDefaults flexVolumeDetacher
 
 // Detach is part of the volume.Detacher interface.
-func (d *detacherDefaults) Detach(volumeName string, hostName types.NodeName) error {
+func (d *detacherDefaults) Detach(ctx context.Context, volumeName string, hostName types.NodeName) error {
 	glog.Warning(logPrefix(d.plugin.flexVolumePlugin), "using default Detach for volume ", volumeName, ", host ", hostName)
 	return nil
 }

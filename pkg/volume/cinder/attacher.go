@@ -17,6 +17,7 @@ limitations under the License.
 package cinder
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path"
@@ -119,7 +120,7 @@ func (attacher *cinderDiskAttacher) waitDiskAttached(instanceID, volumeID string
 	return err
 }
 
-func (attacher *cinderDiskAttacher) Attach(spec *volume.Spec, nodeName types.NodeName) (string, error) {
+func (attacher *cinderDiskAttacher) Attach(ctx context.Context, spec *volume.Spec, nodeName types.NodeName) (string, error) {
 	volumeSource, _, err := getVolumeSource(spec)
 	if err != nil {
 		return "", err
@@ -127,7 +128,7 @@ func (attacher *cinderDiskAttacher) Attach(spec *volume.Spec, nodeName types.Nod
 
 	volumeID := volumeSource.VolumeID
 
-	instanceID, err := attacher.nodeInstanceID(nodeName)
+	instanceID, err := attacher.nodeInstanceID(ctx, nodeName)
 	if err != nil {
 		return "", err
 	}
@@ -170,7 +171,7 @@ func (attacher *cinderDiskAttacher) Attach(spec *volume.Spec, nodeName types.Nod
 	return devicePath, nil
 }
 
-func (attacher *cinderDiskAttacher) VolumesAreAttached(specs []*volume.Spec, nodeName types.NodeName) (map[*volume.Spec]bool, error) {
+func (attacher *cinderDiskAttacher) VolumesAreAttached(ctx context.Context, specs []*volume.Spec, nodeName types.NodeName) (map[*volume.Spec]bool, error) {
 	volumesAttachedCheck := make(map[*volume.Spec]bool)
 	volumeSpecMap := make(map[string]*volume.Spec)
 	volumeIDList := []string{}
@@ -362,7 +363,7 @@ func (detacher *cinderDiskDetacher) waitDiskDetached(instanceID, volumeID string
 	return err
 }
 
-func (detacher *cinderDiskDetacher) Detach(volumeName string, nodeName types.NodeName) error {
+func (detacher *cinderDiskDetacher) Detach(ctx context.Context, volumeName string, nodeName types.NodeName) error {
 	volumeID := path.Base(volumeName)
 	if err := detacher.waitOperationFinished(volumeID); err != nil {
 		return err
@@ -397,12 +398,12 @@ func (detacher *cinderDiskDetacher) UnmountDevice(deviceMountPath string) error 
 	return volumeutil.UnmountPath(deviceMountPath, detacher.mounter)
 }
 
-func (attacher *cinderDiskAttacher) nodeInstanceID(nodeName types.NodeName) (string, error) {
+func (attacher *cinderDiskAttacher) nodeInstanceID(ctx context.Context, nodeName types.NodeName) (string, error) {
 	instances, res := attacher.cinderProvider.Instances()
 	if !res {
 		return "", fmt.Errorf("failed to list openstack instances")
 	}
-	instanceID, err := instances.InstanceID(nodeName)
+	instanceID, err := instances.InstanceID(ctx, nodeName)
 	if err != nil {
 		return "", err
 	}

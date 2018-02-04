@@ -17,6 +17,7 @@ limitations under the License.
 package flexvolume
 
 import (
+	"context"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/types"
@@ -25,6 +26,8 @@ import (
 
 func TestTearDownAt(t *testing.T) {
 	mounter := &mount.FakeMounter{}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	plugin, rootDir := testPlugin()
 	plugin.runner = fakeRunner(
@@ -33,5 +36,5 @@ func TestTearDownAt(t *testing.T) {
 	)
 
 	u, _ := plugin.newUnmounterInternal("volName", types.UID("poduid"), mounter, plugin.runner)
-	u.TearDownAt(rootDir + "/mount-dir")
+	u.TearDownAt(ctx, rootDir+"/mount-dir")
 }

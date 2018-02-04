@@ -17,6 +17,7 @@ limitations under the License.
 package gce_pd
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"testing"
@@ -82,6 +83,8 @@ func TestAttachDetach(t *testing.T) {
 	attachError := errors.New("Fake attach error")
 	detachError := errors.New("Fake detach error")
 	diskCheckError := errors.New("Fake DiskIsAttached error")
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	tests := []testcase{
 		// Successful Attach call
 		{
@@ -90,7 +93,7 @@ func TestAttachDetach(t *testing.T) {
 			attach:         attachCall{diskName, nodeName, readOnly, nil},
 			test: func(testcase *testcase) error {
 				attacher := newAttacher(testcase)
-				devicePath, err := attacher.Attach(spec, nodeName)
+				devicePath, err := attacher.Attach(ctx, spec, nodeName)
 				if devicePath != "/dev/disk/by-id/google-disk" {
 					return fmt.Errorf("devicePath incorrect. Expected<\"/dev/disk/by-id/google-disk\"> Actual: <%q>", devicePath)
 				}
@@ -104,7 +107,7 @@ func TestAttachDetach(t *testing.T) {
 			diskIsAttached: diskIsAttachedCall{diskName, nodeName, true, nil},
 			test: func(testcase *testcase) error {
 				attacher := newAttacher(testcase)
-				devicePath, err := attacher.Attach(spec, nodeName)
+				devicePath, err := attacher.Attach(ctx, spec, nodeName)
 				if devicePath != "/dev/disk/by-id/google-disk" {
 					return fmt.Errorf("devicePath incorrect. Expected<\"/dev/disk/by-id/google-disk\"> Actual: <%q>", devicePath)
 				}
@@ -119,7 +122,7 @@ func TestAttachDetach(t *testing.T) {
 			attach:         attachCall{diskName, nodeName, readOnly, nil},
 			test: func(testcase *testcase) error {
 				attacher := newAttacher(testcase)
-				devicePath, err := attacher.Attach(spec, nodeName)
+				devicePath, err := attacher.Attach(ctx, spec, nodeName)
 				if devicePath != "/dev/disk/by-id/google-disk" {
 					return fmt.Errorf("devicePath incorrect. Expected<\"/dev/disk/by-id/google-disk\"> Actual: <%q>", devicePath)
 				}
@@ -134,7 +137,7 @@ func TestAttachDetach(t *testing.T) {
 			attach:         attachCall{diskName, nodeName, readOnly, attachError},
 			test: func(testcase *testcase) error {
 				attacher := newAttacher(testcase)
-				devicePath, err := attacher.Attach(spec, nodeName)
+				devicePath, err := attacher.Attach(ctx, spec, nodeName)
 				if devicePath != "" {
 					return fmt.Errorf("devicePath incorrect. Expected<\"\"> Actual: <%q>", devicePath)
 				}
@@ -150,7 +153,7 @@ func TestAttachDetach(t *testing.T) {
 			detach:         detachCall{diskName, nodeName, nil},
 			test: func(testcase *testcase) error {
 				detacher := newDetacher(testcase)
-				return detacher.Detach(diskName, nodeName)
+				return detacher.Detach(ctx, diskName, nodeName)
 			},
 		},
 
@@ -160,7 +163,7 @@ func TestAttachDetach(t *testing.T) {
 			diskIsAttached: diskIsAttachedCall{diskName, nodeName, false, nil},
 			test: func(testcase *testcase) error {
 				detacher := newDetacher(testcase)
-				return detacher.Detach(diskName, nodeName)
+				return detacher.Detach(ctx, diskName, nodeName)
 			},
 		},
 
@@ -171,7 +174,7 @@ func TestAttachDetach(t *testing.T) {
 			detach:         detachCall{diskName, nodeName, nil},
 			test: func(testcase *testcase) error {
 				detacher := newDetacher(testcase)
-				return detacher.Detach(diskName, nodeName)
+				return detacher.Detach(ctx, diskName, nodeName)
 			},
 		},
 
@@ -182,7 +185,7 @@ func TestAttachDetach(t *testing.T) {
 			detach:         detachCall{diskName, nodeName, detachError},
 			test: func(testcase *testcase) error {
 				detacher := newDetacher(testcase)
-				return detacher.Detach(diskName, nodeName)
+				return detacher.Detach(ctx, diskName, nodeName)
 			},
 			expectedReturn: detachError,
 		},

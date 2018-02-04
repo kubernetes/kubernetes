@@ -17,6 +17,7 @@ limitations under the License.
 package cloud
 
 import (
+	"context"
 	"encoding/json"
 	"testing"
 	"time"
@@ -158,6 +159,8 @@ func TestAddLabelsToVolume(t *testing.T) {
 		},
 	}
 
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	for d, tc := range testCases {
 		labeledCh := make(chan bool, 1)
 		client := fake.NewSimpleClientset()
@@ -177,7 +180,7 @@ func TestAddLabelsToVolume(t *testing.T) {
 		}
 		pvlController := &PersistentVolumeLabelController{kubeClient: client, cloud: fakeCloud}
 		tc.vol.ObjectMeta.Initializers = tc.initializers
-		pvlController.addLabelsToVolume(&tc.vol)
+		pvlController.addLabelsToVolume(ctx, &tc.vol)
 
 		select {
 		case l := <-labeledCh:

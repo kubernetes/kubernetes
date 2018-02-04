@@ -17,6 +17,7 @@ limitations under the License.
 package quobyte
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path"
@@ -234,12 +235,12 @@ func (mounter *quobyteMounter) CanMount() error {
 }
 
 // SetUp attaches the disk and bind mounts to the volume path.
-func (mounter *quobyteMounter) SetUp(fsGroup *int64) error {
+func (mounter *quobyteMounter) SetUp(ctx context.Context, fsGroup *int64) error {
 	pluginDir := mounter.plugin.host.GetPluginDir(strings.EscapeQualifiedNameForDisk(quobytePluginName))
-	return mounter.SetUpAt(pluginDir, fsGroup)
+	return mounter.SetUpAt(ctx, pluginDir, fsGroup)
 }
 
-func (mounter *quobyteMounter) SetUpAt(dir string, fsGroup *int64) error {
+func (mounter *quobyteMounter) SetUpAt(ctx context.Context, dir string, fsGroup *int64) error {
 	// Check if Quobyte is already mounted on the host in the Plugin Dir
 	// if so we can use this mountpoint instead of creating a new one
 	// IsLikelyNotMountPoint wouldn't check the mount type
@@ -291,12 +292,12 @@ type quobyteUnmounter struct {
 
 var _ volume.Unmounter = &quobyteUnmounter{}
 
-func (unmounter *quobyteUnmounter) TearDown() error {
-	return unmounter.TearDownAt(unmounter.GetPath())
+func (unmounter *quobyteUnmounter) TearDown(ctx context.Context) error {
+	return unmounter.TearDownAt(ctx, unmounter.GetPath())
 }
 
 // We don't need to unmount on the host because only one mount exists
-func (unmounter *quobyteUnmounter) TearDownAt(dir string) error {
+func (unmounter *quobyteUnmounter) TearDownAt(ctx context.Context, dir string) error {
 	return nil
 }
 

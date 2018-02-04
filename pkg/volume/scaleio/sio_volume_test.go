@@ -17,6 +17,7 @@ limitations under the License.
 package scaleio
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path"
@@ -138,6 +139,8 @@ func containsMode(modes []api.PersistentVolumeAccessMode, mode api.PersistentVol
 func TestVolumeMounterUnmounter(t *testing.T) {
 	plugMgr, tmpDir := newPluginMgr(t, makeScaleIOSecret(testSecret, testns))
 	defer os.RemoveAll(tmpDir)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	plug, err := plugMgr.FindPluginByName(sioPluginName)
 	if err != nil {
@@ -179,7 +182,7 @@ func TestVolumeMounterUnmounter(t *testing.T) {
 
 	sio := newFakeSio()
 	sioVol := sioMounter.(*sioVolume)
-	if err := sioVol.setSioMgr(); err != nil {
+	if err := sioVol.setSioMgr(ctx); err != nil {
 		t.Fatalf("failed to create sio mgr: %v", err)
 	}
 	sioVol.sioMgr.client = sio
@@ -191,7 +194,7 @@ func TestVolumeMounterUnmounter(t *testing.T) {
 		t.Errorf("Got unexpected path: %s", path)
 	}
 
-	if err := sioMounter.SetUp(nil); err != nil {
+	if err := sioMounter.SetUp(ctx, nil); err != nil {
 		t.Errorf("Expected success, got: %v", err)
 	}
 	if _, err := os.Stat(path); err != nil {
@@ -229,12 +232,12 @@ func TestVolumeMounterUnmounter(t *testing.T) {
 		t.Fatal("Got a nil Unmounter")
 	}
 	sioVol = sioUnmounter.(*sioVolume)
-	if err := sioVol.resetSioMgr(); err != nil {
+	if err := sioVol.resetSioMgr(ctx); err != nil {
 		t.Fatalf("failed to reset sio mgr: %v", err)
 	}
 	sioVol.sioMgr.client = sio
 
-	if err := sioUnmounter.TearDown(); err != nil {
+	if err := sioUnmounter.TearDown(ctx); err != nil {
 		t.Errorf("Expected success, got: %v", err)
 	}
 	// is mount point gone ?
@@ -252,6 +255,8 @@ func TestVolumeMounterUnmounter(t *testing.T) {
 func TestVolumeProvisioner(t *testing.T) {
 	plugMgr, tmpDir := newPluginMgr(t, makeScaleIOSecret(testSecret, testns))
 	defer os.RemoveAll(tmpDir)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	plug, err := plugMgr.FindPluginByName(sioPluginName)
 	if err != nil {
@@ -341,11 +346,11 @@ func TestVolumeProvisioner(t *testing.T) {
 		t.Fatalf("Failed to make a new Mounter: %v", err)
 	}
 	sioVol = sioMounter.(*sioVolume)
-	if err := sioVol.setSioMgr(); err != nil {
+	if err := sioVol.setSioMgr(ctx); err != nil {
 		t.Fatalf("failed to create sio mgr: %v", err)
 	}
 	sioVol.sioMgr.client = sio
-	if err := sioMounter.SetUp(nil); err != nil {
+	if err := sioMounter.SetUp(ctx, nil); err != nil {
 		t.Fatalf("Expected success, got: %v", err)
 	}
 
@@ -365,11 +370,11 @@ func TestVolumeProvisioner(t *testing.T) {
 		t.Fatalf("Failed to make a new Unmounter: %v", err)
 	}
 	sioVol = sioUnmounter.(*sioVolume)
-	if err := sioVol.resetSioMgr(); err != nil {
+	if err := sioVol.resetSioMgr(ctx); err != nil {
 		t.Fatalf("failed to reset sio mgr: %v", err)
 	}
 	sioVol.sioMgr.client = sio
-	if err := sioUnmounter.TearDown(); err != nil {
+	if err := sioUnmounter.TearDown(ctx); err != nil {
 		t.Errorf("Expected success, got: %v", err)
 	}
 

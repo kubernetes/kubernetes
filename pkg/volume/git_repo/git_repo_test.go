@@ -17,6 +17,7 @@ limitations under the License.
 package git_repo
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -78,6 +79,8 @@ type testScenario struct {
 }
 
 func TestPlugin(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	scenarios := []testScenario{
 		{
 			name: "target-dir",
@@ -175,7 +178,7 @@ func TestPlugin(t *testing.T) {
 	}
 
 	for _, scenario := range scenarios {
-		allErrs := doTestPlugin(scenario, t)
+		allErrs := doTestPlugin(ctx, scenario, t)
 		if len(allErrs) == 0 && scenario.isExpectedFailure {
 			t.Errorf("Unexpected success for scenario: %s", scenario.name)
 		}
@@ -186,7 +189,7 @@ func TestPlugin(t *testing.T) {
 
 }
 
-func doTestPlugin(scenario testScenario, t *testing.T) []error {
+func doTestPlugin(ctx context.Context, scenario testScenario, t *testing.T) []error {
 	allErrs := []error{}
 
 	plugMgr := volume.VolumePluginMgr{}
@@ -223,7 +226,7 @@ func doTestPlugin(scenario testScenario, t *testing.T) []error {
 	}
 
 	// Test setUp()
-	setUpErrs := doTestSetUp(scenario, mounter)
+	setUpErrs := doTestSetUp(ctx, scenario, mounter)
 	allErrs = append(allErrs, setUpErrs...)
 
 	if _, err := os.Stat(path); err != nil {
@@ -263,7 +266,7 @@ func doTestPlugin(scenario testScenario, t *testing.T) []error {
 		return allErrs
 	}
 
-	if err := unmounter.TearDown(); err != nil {
+	if err := unmounter.TearDown(ctx); err != nil {
 		allErrs = append(allErrs,
 			fmt.Errorf("Expected success, got: %v", err))
 		return allErrs
@@ -278,7 +281,7 @@ func doTestPlugin(scenario testScenario, t *testing.T) []error {
 	return allErrs
 }
 
-func doTestSetUp(scenario testScenario, mounter volume.Mounter) []error {
+func doTestSetUp(ctx context.Context, scenario testScenario, mounter volume.Mounter) []error {
 	expecteds := scenario.expecteds
 	allErrs := []error{}
 
@@ -309,7 +312,7 @@ func doTestSetUp(scenario testScenario, mounter volume.Mounter) []error {
 	g.mounter = &mount.FakeMounter{}
 	g.exec = mount.NewFakeExec(execCallback)
 
-	g.SetUp(nil)
+	g.SetUp(ctx, nil)
 
 	if !reflect.DeepEqual(expecteds, commandLog) {
 		allErrs = append(allErrs,

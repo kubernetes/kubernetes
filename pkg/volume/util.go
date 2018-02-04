@@ -17,6 +17,7 @@ limitations under the License.
 package volume
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 
@@ -437,7 +438,7 @@ func getPVCNameHashAndIndexOffset(pvcName string) (hash uint32, index uint32) {
 
 // UnmountViaEmptyDir delegates the tear down operation for secret, configmap, git_repo and downwardapi
 // to empty_dir
-func UnmountViaEmptyDir(dir string, host VolumeHost, volName string, volSpec Spec, podUID types.UID) error {
+func UnmountViaEmptyDir(ctx context.Context, dir string, host VolumeHost, volName string, volSpec Spec, podUID types.UID) error {
 	glog.V(3).Infof("Tearing down volume %v for pod %v at %v", volName, podUID, dir)
 
 	// Wrap EmptyDir, let it do the teardown.
@@ -445,7 +446,7 @@ func UnmountViaEmptyDir(dir string, host VolumeHost, volName string, volSpec Spe
 	if err != nil {
 		return err
 	}
-	return wrapped.TearDownAt(dir)
+	return wrapped.TearDownAt(ctx, dir)
 }
 
 // MountOptionFromSpec extracts and joins mount options from volume spec with supplied options

@@ -18,6 +18,7 @@ limitations under the License.
 package app
 
 import (
+	"context"
 	"crypto/tls"
 	"errors"
 	"fmt"
@@ -430,6 +431,9 @@ func makeEventRecorder(kubeDeps *kubelet.Dependencies, nodeName types.NodeName) 
 }
 
 func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies) (err error) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	// Set global feature gates based on the value on the initial KubeletServer
 	err = utilfeature.DefaultFeatureGate.SetFromMap(s.KubeletConfiguration.FeatureGates)
 	if err != nil {
@@ -492,7 +496,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies) (err error) {
 		}
 	}
 
-	nodeName, err := getNodeName(kubeDeps.Cloud, nodeutil.GetHostname(s.HostnameOverride))
+	nodeName, err := getNodeName(kubeDeps.Cloud, ctx, nodeutil.GetHostname(s.HostnameOverride))
 	if err != nil {
 		return err
 	}
@@ -702,7 +706,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies) (err error) {
 
 // getNodeName returns the node name according to the cloud provider
 // if cloud provider is specified. Otherwise, returns the hostname of the node.
-func getNodeName(cloud cloudprovider.Interface, hostname string) (types.NodeName, error) {
+func getNodeName(cloud cloudprovider.Interface, ctx context.Context, hostname string) (types.NodeName, error) {
 	if cloud == nil {
 		return types.NodeName(hostname), nil
 	}
@@ -712,7 +716,7 @@ func getNodeName(cloud cloudprovider.Interface, hostname string) (types.NodeName
 		return "", fmt.Errorf("failed to get instances from cloud provider")
 	}
 
-	nodeName, err := instances.CurrentNodeName(hostname)
+	nodeName, err := instances.CurrentNodeName(ctx, hostname)
 	if err != nil {
 		return "", fmt.Errorf("error fetching current node name from cloud provider: %v", err)
 	}
@@ -836,9 +840,11 @@ func addChaosToClientConfig(s *options.KubeletServer, config *restclient.Config)
 //   3 Standalone 'kubernetes' binary
 // Eventually, #2 will be replaced with instances of #3
 func RunKubelet(kubeFlags *options.KubeletFlags, kubeCfg *kubeletconfiginternal.KubeletConfiguration, kubeDeps *kubelet.Dependencies, runOnce bool) error {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	hostname := nodeutil.GetHostname(kubeFlags.HostnameOverride)
 	// Query the cloud provider for our node name, default to hostname if kubeDeps.Cloud == nil
-	nodeName, err := getNodeName(kubeDeps.Cloud, hostname)
+	nodeName, err := getNodeName(kubeDeps.Cloud, ctx, hostname)
 	if err != nil {
 		return err
 	}

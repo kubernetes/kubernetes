@@ -17,6 +17,7 @@ limitations under the License.
 package azure_file
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"runtime"
@@ -194,11 +195,11 @@ func (b *azureFileMounter) CanMount() error {
 }
 
 // SetUp attaches the disk and bind mounts to the volume path.
-func (b *azureFileMounter) SetUp(fsGroup *int64) error {
-	return b.SetUpAt(b.GetPath(), fsGroup)
+func (b *azureFileMounter) SetUp(ctx context.Context, fsGroup *int64) error {
+	return b.SetUpAt(ctx, b.GetPath(), fsGroup)
 }
 
-func (b *azureFileMounter) SetUpAt(dir string, fsGroup *int64) error {
+func (b *azureFileMounter) SetUpAt(ctx context.Context, dir string, fsGroup *int64) error {
 	notMnt, err := b.mounter.IsLikelyNotMountPoint(dir)
 	glog.V(4).Infof("AzureFile mount set up: %s %v %v", dir, !notMnt, err)
 	if err != nil && !os.IsNotExist(err) {
@@ -265,11 +266,11 @@ type azureFileUnmounter struct {
 	*azureFile
 }
 
-func (c *azureFileUnmounter) TearDown() error {
-	return c.TearDownAt(c.GetPath())
+func (c *azureFileUnmounter) TearDown(ctx context.Context) error {
+	return c.TearDownAt(ctx, c.GetPath())
 }
 
-func (c *azureFileUnmounter) TearDownAt(dir string) error {
+func (c *azureFileUnmounter) TearDownAt(ctx context.Context, dir string) error {
 	return util.UnmountPath(dir, c.mounter)
 }
 

@@ -17,6 +17,7 @@ limitations under the License.
 package fc
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strconv"
@@ -131,12 +132,14 @@ func (fake *fakeDiskManager) DetachBlockFCDisk(c fcDiskUnmapper, mapPath, device
 	return nil
 }
 
-func doTestPlugin(t *testing.T, spec *volume.Spec) {
+func doTestPlugin(t *testing.T, ctx context.Context, spec *volume.Spec) {
 	tmpDir, err := utiltesting.MkTmpdir("fc_test")
 	if err != nil {
 		t.Fatalf("error creating temp dir: %v", err)
 	}
 	defer os.RemoveAll(tmpDir)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
@@ -163,7 +166,7 @@ func doTestPlugin(t *testing.T, spec *volume.Spec) {
 		t.Errorf("Unexpected path, expected %q, got: %q", expectedPath, path)
 	}
 
-	if err := mounter.SetUp(nil); err != nil {
+	if err := mounter.SetUp(ctx, nil); err != nil {
 		t.Errorf("Expected success, got: %v", err)
 	}
 	if _, err := os.Stat(path); err != nil {
@@ -191,7 +194,7 @@ func doTestPlugin(t *testing.T, spec *volume.Spec) {
 		t.Errorf("Got a nil Unmounter: %v", err)
 	}
 
-	if err := unmounter.TearDown(); err != nil {
+	if err := unmounter.TearDown(ctx); err != nil {
 		t.Errorf("Expected success, got: %v", err)
 	}
 	if _, err := os.Stat(path); err == nil {
@@ -229,6 +232,8 @@ func doTestPluginNilMounter(t *testing.T, spec *volume.Spec) {
 }
 
 func TestPluginVolume(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	lun := int32(0)
 	vol := &v1.Volume{
 		Name: "vol1",
@@ -240,10 +245,12 @@ func TestPluginVolume(t *testing.T) {
 			},
 		},
 	}
-	doTestPlugin(t, volume.NewSpecFromVolume(vol))
+	doTestPlugin(t, ctx, volume.NewSpecFromVolume(vol))
 }
 
 func TestPluginPersistentVolume(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	lun := int32(0)
 	vol := &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
@@ -259,10 +266,12 @@ func TestPluginPersistentVolume(t *testing.T) {
 			},
 		},
 	}
-	doTestPlugin(t, volume.NewSpecFromPersistentVolume(vol, false))
+	doTestPlugin(t, ctx, volume.NewSpecFromPersistentVolume(vol, false))
 }
 
 func TestPluginVolumeWWIDs(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	vol := &v1.Volume{
 		Name: "vol1",
 		VolumeSource: v1.VolumeSource{
@@ -272,10 +281,12 @@ func TestPluginVolumeWWIDs(t *testing.T) {
 			},
 		},
 	}
-	doTestPlugin(t, volume.NewSpecFromVolume(vol))
+	doTestPlugin(t, ctx, volume.NewSpecFromVolume(vol))
 }
 
 func TestPluginPersistentVolumeWWIDs(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	vol := &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "vol1",
@@ -289,7 +300,7 @@ func TestPluginPersistentVolumeWWIDs(t *testing.T) {
 			},
 		},
 	}
-	doTestPlugin(t, volume.NewSpecFromPersistentVolume(vol, false))
+	doTestPlugin(t, ctx, volume.NewSpecFromPersistentVolume(vol, false))
 }
 
 func TestPluginVolumeNoDiskInfo(t *testing.T) {

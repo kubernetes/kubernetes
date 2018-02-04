@@ -23,6 +23,7 @@ import (
 	"strconv"
 	"strings"
 
+	"context"
 	"github.com/golang/glog"
 	api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -77,17 +78,17 @@ func (v *sioVolume) CanMount() error {
 	return nil
 }
 
-func (v *sioVolume) SetUp(fsGroup *int64) error {
-	return v.SetUpAt(v.GetPath(), fsGroup)
+func (v *sioVolume) SetUp(ctx context.Context, fsGroup *int64) error {
+	return v.SetUpAt(ctx, v.GetPath(), fsGroup)
 }
 
 // SetUp bind mounts the disk global mount to the volume path.
-func (v *sioVolume) SetUpAt(dir string, fsGroup *int64) error {
+func (v *sioVolume) SetUpAt(ctx context.Context, dir string, fsGroup *int64) error {
 	v.plugin.volumeMtx.LockKey(v.volSpecName)
 	defer v.plugin.volumeMtx.UnlockKey(v.volSpecName)
 
 	glog.V(4).Info(log("setting up volume for PV.spec %s", v.volSpecName))
-	if err := v.setSioMgr(); err != nil {
+	if err := v.setSioMgr(ctx); err != nil {
 		glog.Error(log("setup failed to create scalio manager: %v", err))
 		return err
 	}
@@ -177,12 +178,12 @@ func (v *sioVolume) GetAttributes() volume.Attributes {
 var _ volume.Unmounter = &sioVolume{}
 
 // TearDownAt unmounts the bind mount
-func (v *sioVolume) TearDown() error {
-	return v.TearDownAt(v.GetPath())
+func (v *sioVolume) TearDown(ctx context.Context) error {
+	return v.TearDownAt(ctx, v.GetPath())
 }
 
 // TearDown unmounts  and remove the volume
-func (v *sioVolume) TearDownAt(dir string) error {
+func (v *sioVolume) TearDownAt(ctx context.Context, dir string) error {
 	v.plugin.volumeMtx.LockKey(v.volSpecName)
 	defer v.plugin.volumeMtx.UnlockKey(v.volSpecName)
 
@@ -212,7 +213,7 @@ func (v *sioVolume) TearDownAt(dir string) error {
 	// only allow volume to detach when it is not busy (not being used by other pods)
 	if !deviceBusy {
 		glog.V(4).Info(log("teardown is attempting to detach/unmap volume for PV %s", v.volSpecName))
-		if err := v.resetSioMgr(); err != nil {
+		if err := v.resetSioMgr(ctx); err != nil {
 			glog.Error(log("teardown failed, unable to reset scalio mgr: %v", err))
 		}
 		volName := v.volName
@@ -351,7 +352,7 @@ func (v *sioVolume) Provision() (*api.PersistentVolume, error) {
 
 // setSioMgr creates scaleio mgr from cached config data if found
 // otherwise, setups new config data and create mgr
-func (v *sioVolume) setSioMgr() error {
+func (v *sioVolume) setSioMgr(ctx context.Context) error {
 	glog.V(4).Info(log("setting up sio mgr for spec  %s", v.volSpecName))
 	podDir := v.plugin.host.GetPodPluginDir(v.podUID, sioPluginName)
 	configName := path.Join(podDir, sioConfigFileName)
@@ -390,7 +391,7 @@ func (v *sioVolume) setSioMgr() error {
 		}
 
 		// merge in Sdc Guid label value
-		if err := attachSdcGuid(v.plugin, configData); err != nil {
+		if err := attachSdcGuid(v.plugin, ctx, configData); err != nil {
 			glog.Error(log("failed to retrieve sdc guid: %v", err))
 			return err
 		}
@@ -407,7 +408,7 @@ func (v *sioVolume) setSioMgr() error {
 }
 
 // resetSioMgr creates scaleio manager from existing (cached) config data
-func (v *sioVolume) resetSioMgr() error {
+func (v *sioVolume) resetSioMgr(ctx context.Context) error {
 	podDir := v.plugin.host.GetPodPluginDir(v.podUID, sioPluginName)
 	configName := path.Join(podDir, sioConfigFileName)
 	if v.sioMgr == nil {
@@ -429,7 +430,7 @@ func (v *sioVolume) resetSioMgr() error {
 		}
 
 		// merge in Sdc Guid label value
-		if err := attachSdcGuid(v.plugin, configData); err != nil {
+		if err := attachSdcGuid(v.plugin, ctx, configData); err != nil {
 			glog.Error(log("failed to retrieve sdc guid: %v", err))
 			return err
 		}

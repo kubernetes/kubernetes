@@ -17,6 +17,7 @@ limitations under the License.
 package configmap
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -336,6 +337,8 @@ func TestPlugin(t *testing.T) {
 	)
 
 	defer os.RemoveAll(tempDir)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	pluginMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, host)
 
 	plugin, err := pluginMgr.FindPluginByName(configMapPluginName)
@@ -366,7 +369,7 @@ func TestPlugin(t *testing.T) {
 	}
 
 	fsGroup := int64(1001)
-	err = mounter.SetUp(&fsGroup)
+	err = mounter.SetUp(ctx, &fsGroup)
 	if err != nil {
 		t.Errorf("Failed to setup volume: %v", err)
 	}
@@ -379,7 +382,7 @@ func TestPlugin(t *testing.T) {
 	}
 
 	doTestConfigMapDataInVolume(volumePath, configMap, t)
-	doTestCleanAndTeardown(plugin, testPodUID, testVolumeName, volumePath, t)
+	doTestCleanAndTeardown(ctx, plugin, testPodUID, testVolumeName, volumePath, t)
 }
 
 // Test the case where the plugin's ready file exists, but the volume dir is not a
@@ -400,6 +403,8 @@ func TestPluginReboot(t *testing.T) {
 	)
 
 	defer os.RemoveAll(rootDir)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	pluginMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, host)
 
 	plugin, err := pluginMgr.FindPluginByName(configMapPluginName)
@@ -424,7 +429,7 @@ func TestPluginReboot(t *testing.T) {
 	}
 
 	fsGroup := int64(1001)
-	err = mounter.SetUp(&fsGroup)
+	err = mounter.SetUp(ctx, &fsGroup)
 	if err != nil {
 		t.Errorf("Failed to setup volume: %v", err)
 	}
@@ -437,7 +442,7 @@ func TestPluginReboot(t *testing.T) {
 	}
 
 	doTestConfigMapDataInVolume(volumePath, configMap, t)
-	doTestCleanAndTeardown(plugin, testPodUID, testVolumeName, volumePath, t)
+	doTestCleanAndTeardown(ctx, plugin, testPodUID, testVolumeName, volumePath, t)
 }
 
 func TestPluginOptional(t *testing.T) {
@@ -456,6 +461,8 @@ func TestPluginOptional(t *testing.T) {
 	volumeSpec.VolumeSource.ConfigMap.Optional = &trueVal
 
 	defer os.RemoveAll(tempDir)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	pluginMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, host)
 
 	plugin, err := pluginMgr.FindPluginByName(configMapPluginName)
@@ -486,7 +493,7 @@ func TestPluginOptional(t *testing.T) {
 	}
 
 	fsGroup := int64(1001)
-	err = mounter.SetUp(&fsGroup)
+	err = mounter.SetUp(ctx, &fsGroup)
 	if err != nil {
 		t.Errorf("Failed to setup volume: %v", err)
 	}
@@ -527,7 +534,7 @@ func TestPluginOptional(t *testing.T) {
 		t.Errorf("empty data directory, %s, is not empty. Contains: %s", datadirSymlink, infos[0].Name())
 	}
 
-	doTestCleanAndTeardown(plugin, testPodUID, testVolumeName, volumePath, t)
+	doTestCleanAndTeardown(ctx, plugin, testPodUID, testVolumeName, volumePath, t)
 }
 
 func TestPluginKeysOptional(t *testing.T) {
@@ -553,6 +560,8 @@ func TestPluginKeysOptional(t *testing.T) {
 	volumeSpec.VolumeSource.ConfigMap.Optional = &trueVal
 
 	defer os.RemoveAll(tempDir)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	pluginMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, host)
 
 	plugin, err := pluginMgr.FindPluginByName(configMapPluginName)
@@ -583,7 +592,7 @@ func TestPluginKeysOptional(t *testing.T) {
 	}
 
 	fsGroup := int64(1001)
-	err = mounter.SetUp(&fsGroup)
+	err = mounter.SetUp(ctx, &fsGroup)
 	if err != nil {
 		t.Errorf("Failed to setup volume: %v", err)
 	}
@@ -596,7 +605,7 @@ func TestPluginKeysOptional(t *testing.T) {
 	}
 
 	doTestConfigMapDataInVolume(volumePath, configMap, t)
-	doTestCleanAndTeardown(plugin, testPodUID, testVolumeName, volumePath, t)
+	doTestCleanAndTeardown(ctx, plugin, testPodUID, testVolumeName, volumePath, t)
 }
 
 func volumeSpec(volumeName, configMapName string, defaultMode int32) *v1.Volume {
@@ -645,7 +654,7 @@ func doTestConfigMapDataInVolume(volumePath string, configMap v1.ConfigMap, t *t
 	}
 }
 
-func doTestCleanAndTeardown(plugin volume.VolumePlugin, podUID types.UID, testVolumeName, volumePath string, t *testing.T) {
+func doTestCleanAndTeardown(ctx context.Context, plugin volume.VolumePlugin, podUID types.UID, testVolumeName, volumePath string, t *testing.T) {
 	unmounter, err := plugin.NewUnmounter(testVolumeName, podUID)
 	if err != nil {
 		t.Errorf("Failed to make a new Unmounter: %v", err)
@@ -654,7 +663,7 @@ func doTestCleanAndTeardown(plugin volume.VolumePlugin, podUID types.UID, testVo
 		t.Fatalf("Got a nil Unmounter")
 	}
 
-	if err := unmounter.TearDown(); err != nil {
+	if err := unmounter.TearDown(ctx); err != nil {
 		t.Errorf("Expected success, got: %v", err)
 	}
 	if _, err := os.Stat(volumePath); err == nil {

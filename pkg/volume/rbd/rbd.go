@@ -22,6 +22,7 @@ import (
 	"path/filepath"
 	dstrings "strings"
 
+	"context"
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -776,11 +777,11 @@ func (b *rbdMounter) CanMount() error {
 	return nil
 }
 
-func (b *rbdMounter) SetUp(fsGroup *int64) error {
-	return b.SetUpAt(b.GetPath(), fsGroup)
+func (b *rbdMounter) SetUp(ctx context.Context, fsGroup *int64) error {
+	return b.SetUpAt(ctx, b.GetPath(), fsGroup)
 }
 
-func (b *rbdMounter) SetUpAt(dir string, fsGroup *int64) error {
+func (b *rbdMounter) SetUpAt(ctx context.Context, dir string, fsGroup *int64) error {
 	// diskSetUp checks mountpoints and prevent repeated calls
 	glog.V(4).Infof("rbd: attempting to setup at %s", dir)
 	err := diskSetUp(b.manager, *b, dir, b.mounter, fsGroup)
@@ -800,11 +801,11 @@ var _ volume.Unmounter = &rbdUnmounter{}
 
 // Unmounts the bind mount, and detaches the disk only if the disk
 // resource was the last reference to that disk on the kubelet.
-func (c *rbdUnmounter) TearDown() error {
-	return c.TearDownAt(c.GetPath())
+func (c *rbdUnmounter) TearDown(ctx context.Context) error {
+	return c.TearDownAt(ctx, c.GetPath())
 }
 
-func (c *rbdUnmounter) TearDownAt(dir string) error {
+func (c *rbdUnmounter) TearDownAt(ctx context.Context, dir string) error {
 	glog.V(4).Infof("rbd: attempting to teardown at %s", dir)
 	if pathExists, pathErr := volutil.PathExists(dir); pathErr != nil {
 		return fmt.Errorf("Error checking if path exists: %v", pathErr)

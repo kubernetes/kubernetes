@@ -17,6 +17,7 @@ limitations under the License.
 package nfs
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"runtime"
@@ -228,11 +229,11 @@ func (b *nfsMounter) GetAttributes() volume.Attributes {
 }
 
 // SetUp attaches the disk and bind mounts to the volume path.
-func (b *nfsMounter) SetUp(fsGroup *int64) error {
-	return b.SetUpAt(b.GetPath(), fsGroup)
+func (b *nfsMounter) SetUp(ctx context.Context, fsGroup *int64) error {
+	return b.SetUpAt(ctx, b.GetPath(), fsGroup)
 }
 
-func (b *nfsMounter) SetUpAt(dir string, fsGroup *int64) error {
+func (b *nfsMounter) SetUpAt(ctx context.Context, dir string, fsGroup *int64) error {
 	notMnt, err := b.mounter.IsNotMountPoint(dir)
 	glog.V(4).Infof("NFS mount set up: %s %v %v", dir, !notMnt, err)
 	if err != nil && !os.IsNotExist(err) {
@@ -285,11 +286,11 @@ type nfsUnmounter struct {
 	*nfs
 }
 
-func (c *nfsUnmounter) TearDown() error {
-	return c.TearDownAt(c.GetPath())
+func (c *nfsUnmounter) TearDown(ctx context.Context) error {
+	return c.TearDownAt(ctx, c.GetPath())
 }
 
-func (c *nfsUnmounter) TearDownAt(dir string) error {
+func (c *nfsUnmounter) TearDownAt(ctx context.Context, dir string) error {
 	// Use extensiveMountPointCheck to consult /proc/mounts. We can't use faster
 	// IsLikelyNotMountPoint (lstat()), since there may be root_squash on the
 	// NFS server and kubelet may not be able to do lstat/stat() there.

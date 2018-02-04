@@ -17,6 +17,7 @@ limitations under the License.
 package kubelet
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -185,7 +186,7 @@ func (kl *Kubelet) getRuntime() kubecontainer.Runtime {
 }
 
 // GetNode returns the node info for the configured node name of this Kubelet.
-func (kl *Kubelet) GetNode() (*v1.Node, error) {
+func (kl *Kubelet) GetNode(ctx context.Context) (*v1.Node, error) {
 	if kl.kubeClient == nil {
 		return kl.initialNode()
 	}
@@ -212,8 +213,8 @@ func (kl *Kubelet) GetNodeConfig() cm.NodeConfig {
 }
 
 // GetHostIP returns host IP or nil in case of error.
-func (kl *Kubelet) GetHostIP() (net.IP, error) {
-	node, err := kl.GetNode()
+func (kl *Kubelet) GetHostIP(ctx context.Context) (net.IP, error) {
+	node, err := kl.GetNode(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("cannot get node: %v", err)
 	}
