@@ -73,6 +73,7 @@ items:
     resources:
     - certificatesigningrequests
     verbs:
+    - delete
     - get
     - list
     - watch
