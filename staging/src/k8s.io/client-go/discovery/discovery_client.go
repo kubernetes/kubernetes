@@ -145,9 +145,9 @@ func (d *DiscoveryClient) ServerGroups() (apiGroupList *metav1.APIGroupList, err
 		apiGroupList = &metav1.APIGroupList{}
 	}
 
-	// append the group retrieved from /api to the list if not empty
+	// prepend the group retrieved from /api to the list if not empty
 	if len(v.Versions) != 0 {
-		apiGroupList.Groups = append(apiGroupList.Groups, apiGroup)
+		apiGroupList.Groups = append([]metav1.APIGroup{apiGroup}, apiGroupList.Groups...)
 	}
 	return apiGroupList, nil
 }
