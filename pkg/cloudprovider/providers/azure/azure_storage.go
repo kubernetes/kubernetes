@@ -23,7 +23,7 @@ import (
 )
 
 // CreateFileShare creates a file share, using a matching storage account
-func (az *Cloud) CreateFileShare(name, storageAccount, storageType, location string, requestGB int) (string, string, error) {
+func (az *Cloud) CreateFileShare(name, storageAccount, storageType, location string, requestGiB int) (string, string, error) {
 	var errResult error
 	accounts := []accountWithLocation{}
 	if len(storageAccount) > 0 {
@@ -46,7 +46,7 @@ func (az *Cloud) CreateFileShare(name, storageAccount, storageType, location str
 				continue
 			}
 
-			if innerErr = az.createFileShare(account.Name, key, name, requestGB); innerErr != nil {
+			if innerErr = az.createFileShare(account.Name, key, name, requestGiB); innerErr != nil {
 				errResult = fmt.Errorf("failed to create share %s in account %s: %v", name, account.Name, innerErr)
 				continue
 			}
@@ -68,4 +68,9 @@ func (az *Cloud) DeleteFileShare(accountName, key, name string) error {
 	}
 	glog.V(4).Infof("share %s deleted", name)
 	return nil
+}
+
+// ResizeFileShare resizes a file share
+func (az *Cloud) ResizeFileShare(accountName, accountKey, name string, sizeGiB int) error {
+	return az.resizeFileShare(accountName, accountKey, name, sizeGiB)
 }

@@ -930,11 +930,15 @@ func (fRTC *fakeRouteTablesClient) Get(resourceGroupName string, routeTableName 
 type fakeFileClient struct {
 }
 
-func (fFC *fakeFileClient) createFileShare(accountName, accountKey, name string, sizeGB int) error {
+func (fFC *fakeFileClient) createFileShare(accountName, accountKey, name string, sizeGiB int) error {
 	return nil
 }
 
 func (fFC *fakeFileClient) deleteFileShare(accountName, accountKey, name string) error {
+	return nil
+}
+
+func (fFC *fakeFileClient) resizeFileShare(accountName, accountKey, name string, sizeGiB int) error {
 	return nil
 }
 
