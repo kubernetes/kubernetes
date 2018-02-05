@@ -114,7 +114,7 @@ func Run(s *options.CloudControllerManagerServer) error {
 	}
 
 	if c, err := configz.New("componentconfig"); err == nil {
-		c.Set(s.ControllerManagerOptions)
+		c.Set(s.ControllerManagerOptions.LegacyOptions)
 	} else {
 		glog.Errorf("unable to register configz: %s", err)
 	}
