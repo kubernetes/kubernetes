@@ -892,15 +892,33 @@ func (f *configFactory) CreateFromConfig(policy schedulerapi.Policy) (*scheduler
 	}
 
 	predicateKeys := sets.NewString()
-	for _, predicate := range policy.Predicates {
-		glog.V(2).Infof("Registering predicate: %s", predicate.Name)
-		predicateKeys.Insert(RegisterCustomFitPredicate(predicate))
+	if policy.Predicates == nil {
+		glog.V(2).Infof("Using predicates from algorithm provider '%v'", DefaultProvider)
+		provider, err := GetAlgorithmProvider(DefaultProvider)
+		if err != nil {
+			return nil, err
+		}
+		predicateKeys = provider.FitPredicateKeys
+	} else {
+		for _, predicate := range policy.Predicates {
+			glog.V(2).Infof("Registering predicate: %s", predicate.Name)
+			predicateKeys.Insert(RegisterCustomFitPredicate(predicate))
+		}
 	}
 
 	priorityKeys := sets.NewString()
-	for _, priority := range policy.Priorities {
-		glog.V(2).Infof("Registering priority: %s", priority.Name)
-		priorityKeys.Insert(RegisterCustomPriorityFunction(priority))
+	if policy.Priorities == nil {
+		glog.V(2).Infof("Using priorities from algorithm provider '%v'", DefaultProvider)
+		provider, err := GetAlgorithmProvider(DefaultProvider)
+		if err != nil {
+			return nil, err
+		}
+		priorityKeys = provider.PriorityFunctionKeys
+	} else {
+		for _, priority := range policy.Priorities {
+			glog.V(2).Infof("Registering priority: %s", priority.Name)
+			priorityKeys.Insert(RegisterCustomPriorityFunction(priority))
+		}
 	}
 
 	extenders := make([]algorithm.SchedulerExtender, 0)
