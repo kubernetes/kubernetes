@@ -25,6 +25,8 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"path"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -46,6 +48,8 @@ import (
 const (
 	testNamespace = "secret-encryption-test"
 	testSecret    = "test-secret"
+
+	encryptionConfigFileName = "encryption.conf"
 
 	aesGCMPrefix = "k8s:enc:aesgcm:v1:key1:"
 	aesCBCPrefix = "k8s:enc:aescbc:v1:key1:"
@@ -79,11 +83,129 @@ resources:
         - name: key1
           secret: c2VjcmV0IGlzIHNlY3VyZQ==
 `
+
+	identityConfigYAML = `
+kind: EncryptionConfig
+apiVersion: v1
+resources:
+  - resources:
+    - secrets
+    providers:
+    - identity: {}
+`
 )
 
 type unSealSecret func(cipherText []byte, ctx value.Context, config encryptionconfig.ProviderConfig) ([]byte, error)
 
-// TestSecretsShouldBeEnveloped is an integration test between KubeAPI and ECTD that checks:
+type envelopTest struct {
+	logger            kubeapiservertesting.Logger
+	storageConfig     *storagebackend.Config
+	configDir         string
+	transformerConfig string
+	kubeAPIServer     kubeapiservertesting.TestServer
+	restClient        *kubernetes.Clientset
+	ns                *corev1.Namespace
+	secret            *corev1.Secret
+}
+
+func newEnvelopeTest(l kubeapiservertesting.Logger, transformerConfigYAML string) (*envelopTest, error) {
+	e := envelopTest{
+		logger:            l,
+		transformerConfig: transformerConfigYAML,
+		storageConfig:     framework.SharedEtcd(),
+	}
+
+	var err error
+	if transformerConfigYAML != "" {
+		if e.configDir, err = createKubeAPIServerEncryptionConfig(transformerConfigYAML); err != nil {
+			return nil, fmt.Errorf("error while creating KubeAPIServer encryption config: %v", err)
+		}
+	}
+
+	if e.kubeAPIServer, err = kubeapiservertesting.StartTestServer(l, e.getKubeAPIServerEncryptionOptions(), e.storageConfig); err != nil {
+		return nil, fmt.Errorf("failed to start KubeAPI server: %v", err)
+	}
+
+	if e.restClient, err = kubernetes.NewForConfig(e.kubeAPIServer.ClientConfig); err != nil {
+		return nil, fmt.Errorf("error while creating rest client: %v", err)
+	}
+
+	if e.ns, err = createTestNamespace(e.restClient, testNamespace); err != nil {
+		return nil, err
+	}
+
+	if e.secret, err = createTestSecret(e.restClient, testSecret, e.ns.Name); err != nil {
+		return nil, err
+	}
+
+	return &e, nil
+}
+
+func (e *envelopTest) cleanUp() {
+	os.RemoveAll(e.configDir)
+	e.restClient.CoreV1().Namespaces().Delete(e.ns.Name, metav1.NewDeleteOptions(0))
+	e.kubeAPIServer.TearDownFn()
+}
+
+func (e *envelopTest) run(unSealSecretFunc unSealSecret, expectedEnvelopePrefix string) {
+	response, err := readRawRecordFromETCD(&e.kubeAPIServer, e.getETCDPath())
+	if err != nil {
+		e.logger.Errorf("failed to read from etcd: %v", err)
+		return
+	}
+
+	if !bytes.HasPrefix(response.Kvs[0].Value, []byte(expectedEnvelopePrefix)) {
+		e.logger.Errorf("expected secret to be enveloped by %s, but got %s",
+			expectedEnvelopePrefix, response.Kvs[0].Value)
+		return
+	}
+
+	// etcd path of the key is used as the authenticated context - need to pass it to decrypt
+	ctx := value.DefaultContext([]byte(e.getETCDPath()))
+	// Envelope header precedes the payload
+	sealedData := response.Kvs[0].Value[len(expectedEnvelopePrefix):]
+	transformerConfig, err := parseTransformerConfig(e.transformerConfig)
+	if err != nil {
+		e.logger.Errorf("failed to parse transformer config: %v", err)
+	}
+	v, err := unSealSecretFunc(sealedData, ctx, *transformerConfig)
+	if err != nil {
+		e.logger.Errorf("failed to unseal secret: %v", err)
+		return
+	}
+	if !strings.Contains(string(v), secretVal) {
+		e.logger.Errorf("expected %q after decryption, but got %q", secretVal, string(v))
+	}
+
+	// Secrets should be un-enveloped on direct reads from Kube API Server.
+	s, err := e.restClient.CoreV1().Secrets(testNamespace).Get(testSecret, metav1.GetOptions{})
+	if secretVal != string(s.Data[secretKey]) {
+		e.logger.Errorf("expected %s from KubeAPI, but got %s", secretVal, string(s.Data[secretKey]))
+	}
+}
+
+func (e *envelopTest) benchmark(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		_, err := createTestSecret(e.restClient, e.secret.Name+strconv.Itoa(i), e.ns.Name)
+		if err != nil {
+			b.Fatalf("failed to create a secret: %v", err)
+		}
+	}
+}
+
+func (e *envelopTest) getETCDPath() string {
+	return fmt.Sprintf("/%s/secrets/%s/%s", e.storageConfig.Prefix, e.ns.Name, e.secret.Name)
+}
+
+func (e *envelopTest) getKubeAPIServerEncryptionOptions() []string {
+	if e.transformerConfig != "" {
+		return []string{"--experimental-encryption-provider-config", path.Join(e.configDir, encryptionConfigFileName)}
+	}
+
+	return nil
+}
+
+// TestSecretsShouldBeEnveloped is an integration test between KubeAPI and etcd that checks:
 // 1. Secrets are encrypted on write
 // 2. Secrets are decrypted on read
 // when EncryptionConfig is passed to KubeAPI server.
@@ -98,98 +220,62 @@ func TestSecretsShouldBeEnveloped(t *testing.T) {
 		// TODO: add secretbox
 	}
 	for _, tt := range testCases {
-		runEnvelopeTest(t, tt.unSealFunc, tt.transformerConfigContent, tt.transformerPrefix)
+		test, err := newEnvelopeTest(t, tt.transformerConfigContent)
+		if err != nil {
+			test.cleanUp()
+			t.Errorf("failed to setup test for envelop %s, error was %v", tt.transformerPrefix, err)
+			continue
+		}
+		test.run(tt.unSealFunc, tt.transformerPrefix)
+		test.cleanUp()
 	}
 }
 
-func runEnvelopeTest(t *testing.T, unSealSecretFunc unSealSecret, transformerConfigYAML, expectedEnvelopePrefix string) {
-	transformerConfig := parseTransformerConfigOrDie(t, transformerConfigYAML)
-
-	storageConfig := framework.SharedEtcd()
-	kubeAPIServer, err := startKubeApiWithEncryption(t, storageConfig, transformerConfigYAML)
-	if err != nil {
-		t.Error(err)
-		return
-	}
-	defer kubeAPIServer.TearDownFn()
-
-	client, err := kubernetes.NewForConfig(kubeAPIServer.ClientConfig)
-	if err != nil {
-		t.Fatalf("error while creating client: %v", err)
-	}
-
-	ns, err := createTestNamespace(client, testNamespace)
-	if err != nil {
-		t.Error(err)
-		return
-	}
-	defer func() {
-		client.CoreV1().Namespaces().Delete(ns.Name, metav1.NewDeleteOptions(0))
-	}()
-
-	_, err = createTestSecret(client, testSecret, ns.Name)
-	if err != nil {
-		t.Error(err)
-		return
-	}
-
-	etcdPath := getETCDPath(storageConfig.Prefix)
-	response, err := readRawRecordFromETCD(kubeAPIServer, etcdPath)
-	if err != nil {
-		t.Error(err)
-		return
-	}
-
-	if !bytes.HasPrefix(response.Kvs[0].Value, []byte(expectedEnvelopePrefix)) {
-		t.Errorf("expected secret to be enveloped by %s, but got %s",
-			expectedEnvelopePrefix, response.Kvs[0].Value)
-		return
-	}
-
-	// etcd path of the key is used as authenticated context - need to pass it to decrypt
-	ctx := value.DefaultContext([]byte(etcdPath))
-	// Envelope header precedes the payload
-	sealedData := response.Kvs[0].Value[len(expectedEnvelopePrefix):]
-	v, err := unSealSecretFunc(sealedData, ctx, transformerConfig)
-	if err != nil {
-		t.Error(err)
-		return
-	}
-	if !strings.Contains(string(v), secretVal) {
-		t.Errorf("expected %q after decryption, but got %q", secretVal, string(v))
-	}
-
-	// Secrets should be un-enveloped on direct reads from Kube API Server.
-	s, err := client.CoreV1().Secrets(testNamespace).Get(testSecret, metav1.GetOptions{})
-	if secretVal != string(s.Data[secretKey]) {
-		t.Errorf("expected %s from KubeAPI, but got %s", secretVal, string(s.Data[secretKey]))
-	}
+// Baseline (no enveloping) - use to contrast with enveloping benchmarks.
+func BenchmarkBase(b *testing.B) {
+	runBenchmark(b, "")
 }
 
-func startKubeApiWithEncryption(t *testing.T, storageConfig *storagebackend.Config,
-	transformerConfig string) (*kubeapiservertesting.TestServer, error) {
+// Identity transformer is a NOOP (crypto-wise) - use to contrast with AESGCM and AESCBC benchmark results.
+func BenchmarkIdentityWrite(b *testing.B) {
+	runBenchmark(b, identityConfigYAML)
+}
+
+func BenchmarkAESGCMEnvelopeWrite(b *testing.B) {
+	runBenchmark(b, aesGCMConfigYAML)
+}
+
+func BenchmarkAESCBCEnvelopeWrite(b *testing.B) {
+	runBenchmark(b, aesCBCConfigYAML)
+}
+
+func runBenchmark(b *testing.B, transformerConfig string) {
+	b.StopTimer()
+	test, err := newEnvelopeTest(b, transformerConfig)
+	defer test.cleanUp()
+	if err != nil {
+		b.Fatalf("failed to setup benchmark for config %s, error was %v", transformerConfig, err)
+	}
+
+	b.StartTimer()
+	test.benchmark(b)
+	b.StopTimer()
+}
+
+func createKubeAPIServerEncryptionConfig(transformerConfig string) (string, error) {
 	tempDir, err := ioutil.TempDir("", "secrets-encryption-test")
 	if err != nil {
-		return nil, fmt.Errorf("failed to create temp directory: %v", err)
-	}
-	defer os.RemoveAll(tempDir)
-
-	encryptionConfig, err := ioutil.TempFile(tempDir, "encryption-config")
-	if err != nil {
-		return nil, fmt.Errorf("error while creating temp file for encryption config %v", err)
+		return "", fmt.Errorf("failed to create temp directory: %v", err)
 	}
 
-	if _, err := encryptionConfig.Write([]byte(transformerConfig)); err != nil {
-		return nil, fmt.Errorf("error while writing encryption config: %v", err)
+	encryptionConfig := path.Join(tempDir, encryptionConfigFileName)
+
+	if err := ioutil.WriteFile(encryptionConfig, []byte(transformerConfig), 0644); err != nil {
+		os.RemoveAll(tempDir)
+		return "", fmt.Errorf("error while writing encryption config: %v", err)
 	}
 
-	kubeAPIOptions := []string{"--experimental-encryption-provider-config", encryptionConfig.Name()}
-	server, err := kubeapiservertesting.StartTestServer(t, kubeAPIOptions, storageConfig)
-	if err != nil {
-		return nil, fmt.Errorf("failed to start KubeAPI Server %v", err)
-	}
-
-	return &server, nil
+	return tempDir, nil
 }
 
 func createTestNamespace(client *kubernetes.Clientset, name string) (*corev1.Namespace, error) {
@@ -224,7 +310,6 @@ func createTestSecret(client *kubernetes.Clientset, name, namespace string) (*co
 }
 
 func readRawRecordFromETCD(kubeAPIServer *kubeapiservertesting.TestServer, path string) (*clientv3.GetResponse, error) {
-	// Reading secret directly from etcd - expect data to be enveloped and the payload encrypted.
 	etcdClient, err := integration.GetEtcdKVClient(kubeAPIServer.ServerOpts.Etcd.StorageConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create etcd client: %v", err)
@@ -237,18 +322,14 @@ func readRawRecordFromETCD(kubeAPIServer *kubeapiservertesting.TestServer, path 
 	return response, nil
 }
 
-func getETCDPath(prefix string) string {
-	return fmt.Sprintf("/%s/secrets/%s/%s", prefix, testNamespace, testSecret)
-}
-
-func parseTransformerConfigOrDie(t *testing.T, configContent string) encryptionconfig.ProviderConfig {
+func parseTransformerConfig(configContent string) (*encryptionconfig.ProviderConfig, error) {
 	var config encryptionconfig.EncryptionConfig
 	err := yaml.Unmarshal([]byte(configContent), &config)
 	if err != nil {
-		t.Errorf("failed to extract transformer key: %v", err)
+		return nil, fmt.Errorf("failed to extract transformer key: %v", err)
 	}
 
-	return config.Resources[0].Providers[0]
+	return &config.Resources[0].Providers[0], nil
 }
 
 func unSealWithGCMTransformer(cipherText []byte, ctx value.Context,
