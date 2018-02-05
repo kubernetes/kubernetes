@@ -17,6 +17,8 @@ limitations under the License.
 package validation
 
 import (
+	"time"
+
 	"github.com/robfig/cron"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -205,6 +207,12 @@ func ValidateCronJobSpec(spec *batch.CronJobSpec, fldPath *field.Path) field.Err
 	if spec.FailedJobsHistoryLimit != nil {
 		// zero is a valid SuccessfulJobsHistoryLimit
 		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*spec.FailedJobsHistoryLimit), fldPath.Child("failedJobsHistoryLimit"))...)
+	}
+
+	if spec.TimeZone != "" {
+		if _, err := time.LoadLocation(spec.TimeZone); err != nil {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("timeZone"), spec.TimeZone, "not a valid time zone"))
+		}
 	}
 
 	return allErrs

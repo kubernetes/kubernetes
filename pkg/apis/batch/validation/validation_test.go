@@ -342,6 +342,23 @@ func TestValidateCronJob(t *testing.T) {
 				},
 			},
 		},
+		"with time zone": {
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "mycronjob",
+				Namespace: metav1.NamespaceDefault,
+				UID:       types.UID("1a2b3c"),
+			},
+			Spec: batch.CronJobSpec{
+				Schedule:          "@hourly",
+				TimeZone:          "America/Chicago",
+				ConcurrencyPolicy: batch.AllowConcurrent,
+				JobTemplate: batch.JobTemplateSpec{
+					Spec: batch.JobSpec{
+						Template: validPodTemplateSpec,
+					},
+				},
+			},
+		},
 	}
 	for k, v := range successCases {
 		if errs := ValidateCronJob(&v); len(errs) != 0 {
@@ -579,6 +596,23 @@ func TestValidateCronJob(t *testing.T) {
 								Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: api.TerminationMessageReadFile}},
 							},
 						},
+					},
+				},
+			},
+		},
+		"spec.timeZone: Invalid value: \"Mars/Olympus_Mons\": not a valid timezone": {
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "mycronjob",
+				Namespace: metav1.NamespaceDefault,
+				UID:       types.UID("1a2b3c"),
+			},
+			Spec: batch.CronJobSpec{
+				Schedule:          "* * * * ?",
+				ConcurrencyPolicy: batch.AllowConcurrent,
+				TimeZone:          "Mars/Olympus_Mons",
+				JobTemplate: batch.JobTemplateSpec{
+					Spec: batch.JobSpec{
+						Template: validPodTemplateSpec,
 					},
 				},
 			},

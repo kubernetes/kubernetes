@@ -1490,12 +1490,17 @@
     "description": "CronJobSpec describes how the job execution will look like and when it will actually run.",
     "required": [
      "schedule",
+     "timeZone",
      "jobTemplate"
     ],
     "properties": {
      "schedule": {
       "type": "string",
       "description": "The schedule in Cron format, see https://en.wikipedia.org/wiki/Cron."
+     },
+     "timeZone": {
+      "type": "string",
+      "description": "The time zone to be used when scheduling the job given the schedule specified above. Valid options include anything in the IANA Time Zone database."
      },
      "startingDeadlineSeconds": {
       "type": "integer",
