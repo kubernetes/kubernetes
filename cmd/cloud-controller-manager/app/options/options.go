@@ -29,6 +29,7 @@ import (
 	_ "k8s.io/kubernetes/pkg/features"
 
 	"github.com/spf13/pflag"
+	kubecmoptions "k8s.io/kubernetes/cmd/controller-manager/app/options"
 )
 
 // CloudControllerManagerServer is the main context object for the controller manager.
@@ -45,25 +46,27 @@ func NewCloudControllerManagerServer() *CloudControllerManagerServer {
 		// The common/default are kept in 'cmd/kube-controller-manager/app/options/util.go'.
 		// Please make common changes there and put anything cloud specific here.
 		ControllerManagerServer: cmoptions.ControllerManagerServer{
-			KubeControllerManagerConfiguration: cmoptions.GetDefaultControllerOptions(ports.CloudControllerManagerPort),
+			ControllerManagerOptions: kubecmoptions.ControllerManagerOptions{
+				LegacyOptions: cmoptions.GetDefaultControllerOptions(ports.CloudControllerManagerPort),
+			},
 		},
 		NodeStatusUpdateFrequency: metav1.Duration{Duration: 5 * time.Minute},
 	}
-	s.LeaderElection.LeaderElect = true
+	s.LegacyOptions.LeaderElection.LeaderElect = true
 	return &s
 }
 
 // AddFlags adds flags for a specific ExternalCMServer to the specified FlagSet
 func (s *CloudControllerManagerServer) AddFlags(fs *pflag.FlagSet) {
 	cmoptions.AddDefaultControllerFlags(&s.ControllerManagerServer, fs)
-	fs.StringVar(&s.CloudProvider, "cloud-provider", s.CloudProvider, "The provider of cloud services. Cannot be empty.")
+	fs.StringVar(&s.LegacyOptions.CloudProvider, "cloud-provider", s.LegacyOptions.CloudProvider, "The provider of cloud services. Cannot be empty.")
 	fs.DurationVar(&s.NodeStatusUpdateFrequency.Duration, "node-status-update-frequency", s.NodeStatusUpdateFrequency.Duration, "Specifies how often the controller updates nodes' status.")
 	// TODO: remove --service-account-private-key-file 6 months after 1.8 is released (~1.10)
-	fs.StringVar(&s.ServiceAccountKeyFile, "service-account-private-key-file", s.ServiceAccountKeyFile, "Filename containing a PEM-encoded private RSA or ECDSA key used to sign service account tokens.")
+	fs.StringVar(&s.LegacyOptions.ServiceAccountKeyFile, "service-account-private-key-file", s.LegacyOptions.ServiceAccountKeyFile, "Filename containing a PEM-encoded private RSA or ECDSA key used to sign service account tokens.")
 	fs.MarkDeprecated("service-account-private-key-file", "This flag is currently no-op and will be deleted.")
-	fs.Int32Var(&s.ConcurrentServiceSyncs, "concurrent-service-syncs", s.ConcurrentServiceSyncs, "The number of services that are allowed to sync concurrently. Larger number = more responsive service management, but more CPU (and network) load")
+	fs.Int32Var(&s.LegacyOptions.ConcurrentServiceSyncs, "concurrent-service-syncs", s.LegacyOptions.ConcurrentServiceSyncs, "The number of services that are allowed to sync concurrently. Larger number = more responsive service management, but more CPU (and network) load")
 
-	leaderelectionconfig.BindFlags(&s.LeaderElection, fs)
+	leaderelectionconfig.BindFlags(&s.LegacyOptions.LeaderElection, fs)
 
 	utilfeature.DefaultFeatureGate.AddFlag(fs)
 }
