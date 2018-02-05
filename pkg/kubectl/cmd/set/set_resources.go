@@ -234,7 +234,9 @@ func (o *ResourcesOptions) Run() error {
 
 		//no changes
 		if string(patch.Patch) == "{}" || len(patch.Patch) == 0 {
-			allErrs = append(allErrs, fmt.Errorf("info: %s %q was not changed\n", info.Mapping.Resource, info.Name))
+			if _, err := fmt.Fprintf(o.Err, "error: %s %q was not changed\n", info.Mapping.Resource, info.Name); err != nil {
+				return err
+			}
 			continue
 		}
 
