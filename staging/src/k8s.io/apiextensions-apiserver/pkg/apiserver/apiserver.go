@@ -27,7 +27,6 @@ import (
 	"k8s.io/apimachinery/pkg/apimachinery/announced"
 	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/version"
@@ -40,6 +39,7 @@ import (
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/install"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	"k8s.io/apiextensions-apiserver/pkg/apiserver/scheme"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/internalclientset"
 	internalinformers "k8s.io/apiextensions-apiserver/pkg/client/informers/internalversion"
 	"k8s.io/apiextensions-apiserver/pkg/controller/finalizer"
@@ -55,28 +55,17 @@ import (
 var (
 	groupFactoryRegistry = make(announced.APIGroupFactoryRegistry)
 	Registry             = registered.NewOrDie("")
-	Scheme               = runtime.NewScheme()
-	Codecs               = serializer.NewCodecFactory(Scheme)
-
-	// if you modify this, make sure you update the crEncoder
-	unversionedVersion = schema.GroupVersion{Group: "", Version: "v1"}
-	unversionedTypes   = []runtime.Object{
-		&metav1.Status{},
-		&metav1.WatchEvent{},
-		&metav1.APIVersions{},
-		&metav1.APIGroupList{},
-		&metav1.APIGroup{},
-		&metav1.APIResourceList{},
-	}
+	Scheme               = scheme.Scheme
+	Codecs               = serializer.NewCodecFactory(scheme.Scheme)
 )
 
 func init() {
-	install.Install(groupFactoryRegistry, Registry, Scheme)
+	install.Install(groupFactoryRegistry, Registry, scheme.Scheme)
 
 	// we need to add the options to empty v1
-	metav1.AddToGroupVersion(Scheme, schema.GroupVersion{Group: "", Version: "v1"})
+	metav1.AddToGroupVersion(scheme.Scheme, schema.GroupVersion{Group: "", Version: "v1"})
 
-	Scheme.AddUnversionedTypes(unversionedVersion, unversionedTypes...)
+	Scheme.AddUnversionedTypes(scheme.UnversionedVersion, scheme.UnversionedTypes...)
 }
 
 type ExtraConfig struct {
