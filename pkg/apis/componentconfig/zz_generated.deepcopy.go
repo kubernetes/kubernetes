@@ -90,7 +90,6 @@ func (in *KubeControllerManagerConfiguration) DeepCopyInto(out *KubeControllerMa
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
-	out.ServiceSyncPeriod = in.ServiceSyncPeriod
 	out.NodeSyncPeriod = in.NodeSyncPeriod
 	out.RouteReconciliationPeriod = in.RouteReconciliationPeriod
 	out.ResourceQuotaSyncPeriod = in.ResourceQuotaSyncPeriod

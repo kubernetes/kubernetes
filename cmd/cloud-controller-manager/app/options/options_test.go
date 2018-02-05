@@ -85,7 +85,6 @@ func TestAddFlags(t *testing.T) {
 				ConcurrentRCSyncs:                               5,
 				MinResyncPeriod:                                 metav1.Duration{Duration: 100 * time.Minute},
 				NodeMonitorPeriod:                               metav1.Duration{Duration: 5 * time.Second},
-				ServiceSyncPeriod:                               metav1.Duration{Duration: 5 * time.Minute},
 				ResourceQuotaSyncPeriod:                         metav1.Duration{Duration: 5 * time.Minute},
 				NamespaceSyncPeriod:                             metav1.Duration{Duration: 5 * time.Minute},
 				PVClaimBinderSyncPeriod:                         metav1.Duration{Duration: 15 * time.Second},
