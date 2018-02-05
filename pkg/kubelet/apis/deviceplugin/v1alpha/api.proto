@@ -69,6 +69,8 @@ message Device {
 	string ID = 1;
 	// Health of the device, can be healthy or unhealthy, see constants.go
 	string health = 2;
+        // Attributes of the device. eg: {"version": "1.0"}
+        map<string, string> attributes = 3;
 }
 
 // - Allocate is expected to be called during pod creation since allocation
