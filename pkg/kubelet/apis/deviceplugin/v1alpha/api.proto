@@ -96,6 +96,8 @@ message AllocateResponse {
 	repeated Mount mounts = 2;
 	// Devices for the container.
 	repeated DeviceSpec devices = 3;
+	// Container annotations to pass to the container runtime
+	map<string, string> annotations = 4;
 }
 
 // Mount specifies a host volume to mount into a container.
