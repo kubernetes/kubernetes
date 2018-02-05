@@ -30,6 +30,7 @@ import (
 	extensions "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/network"
 )
 
 // Dependent on "static-ip-2" manifests
@@ -38,10 +39,10 @@ const host = "ingress.test.com"
 
 // IngressUpgradeTest adapts the Ingress e2e for upgrade testing
 type IngressUpgradeTest struct {
-	gceController *framework.GCEIngressController
+	gceController *network.GCEIngressController
 	// holds GCP resources pre-upgrade
 	resourceStore *GCPResourceStore
-	jig           *framework.IngressTestJig
+	jig           *network.IngressTestJig
 	httpClient    *http.Client
 	ip            string
 	ipName        string
@@ -71,12 +72,12 @@ func (t *IngressUpgradeTest) Setup(f *framework.Framework) {
 	framework.SkipUnlessProviderIs("gce", "gke")
 
 	// jig handles all Kubernetes testing logic
-	jig := framework.NewIngressTestJig(f.ClientSet)
+	jig := network.NewIngressTestJig(f.ClientSet)
 
 	ns := f.Namespace
 
 	// gceController handles all cloud testing logic
-	gceController := &framework.GCEIngressController{
+	gceController := &network.GCEIngressController{
 		Ns:     ns.Name,
 		Client: jig.Client,
 		Cloud:  framework.TestContext.CloudConfig,
@@ -85,7 +86,7 @@ func (t *IngressUpgradeTest) Setup(f *framework.Framework) {
 
 	t.gceController = gceController
 	t.jig = jig
-	t.httpClient = framework.BuildInsecureClient(framework.IngressReqTimeout)
+	t.httpClient = network.BuildInsecureClient(network.IngressReqTimeout)
 
 	// Allocate a static-ip for the Ingress, this IP is cleaned up via CleanupGCEIngressController
 	t.ipName = fmt.Sprintf("%s-static-ip", ns.Name)
@@ -93,9 +94,9 @@ func (t *IngressUpgradeTest) Setup(f *framework.Framework) {
 
 	// Create a working basic Ingress
 	By(fmt.Sprintf("allocated static ip %v: %v through the GCE cloud provider", t.ipName, t.ip))
-	jig.CreateIngress(filepath.Join(framework.IngressManifestPath, "static-ip-2"), ns.Name, map[string]string{
-		framework.IngressStaticIPKey:  t.ipName,
-		framework.IngressAllowHTTPKey: "false",
+	jig.CreateIngress(filepath.Join(network.IngressManifestPath, "static-ip-2"), ns.Name, map[string]string{
+		network.IngressStaticIPKey:  t.ipName,
+		network.IngressAllowHTTPKey: "false",
 	}, map[string]string{})
 	t.jig.AddHTTPS("tls-secret", "ingress.test.com")
 
@@ -142,7 +143,7 @@ func (t *IngressUpgradeTest) Teardown(f *framework.Framework) {
 	}
 
 	By("Cleaning up cloud resources")
-	framework.CleanupGCEIngressController(t.gceController)
+	network.CleanupGCEIngressController(t.gceController)
 }
 
 func (t *IngressUpgradeTest) verify(f *framework.Framework, done <-chan struct{}, testDuringDisruption bool) {

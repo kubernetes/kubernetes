@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package framework
+package network
 
 import (
 	"bytes"
@@ -48,6 +48,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	utilfile "k8s.io/kubernetes/pkg/util/file"
+	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/manifest"
 	testutils "k8s.io/kubernetes/test/utils"
 	utilexec "k8s.io/utils/exec"
@@ -113,6 +114,12 @@ const (
 	// a single character of padding.
 	nameLenLimit = 62
 )
+
+func DescribeIng(ns string) {
+	framework.Logf("\nOutput of kubectl describe ing:\n")
+	desc := framework.RunKubectlOrDie("describe", "ing", fmt.Sprintf("--namespace=%v", ns))
+	framework.Logf(desc)
+}
 
 // IngressTestJig holds the relevant state and parameters of the ingress test.
 type IngressTestJig struct {
@@ -211,7 +218,7 @@ func CreateIngressComformanceTests(jig *IngressTestJig, ns string, annotations m
 				})
 				By("Checking that " + pathToFail + " is not exposed by polling for failure")
 				route := fmt.Sprintf("http://%v%v", jig.Address, pathToFail)
-				ExpectNoError(PollURL(route, updateURLMapHost, LoadBalancerCleanupTimeout, jig.PollInterval, &http.Client{Timeout: IngressReqTimeout}, true))
+				framework.ExpectNoError(framework.PollURL(route, updateURLMapHost, framework.LoadBalancerCleanupTimeout, jig.PollInterval, &http.Client{Timeout: IngressReqTimeout}, true))
 			},
 			fmt.Sprintf("Waiting for path updates to reflect in L7"),
 		},
@@ -308,7 +315,7 @@ func BuildInsecureClient(timeout time.Duration) *http.Client {
 func createIngressTLSSecret(kubeClient clientset.Interface, ing *extensions.Ingress) (host string, rootCA, privKey []byte, err error) {
 	tls := ing.Spec.TLS[0]
 	host = strings.Join(tls.Hosts, ",")
-	Logf("Generating RSA cert for host %v", host)
+	framework.Logf("Generating RSA cert for host %v", host)
 	cert, key, err := GenerateRSACerts(host, true)
 	if err != nil {
 		return
@@ -325,11 +332,11 @@ func createIngressTLSSecret(kubeClient clientset.Interface, ing *extensions.Ingr
 	var s *v1.Secret
 	if s, err = kubeClient.CoreV1().Secrets(ing.Namespace).Get(tls.SecretName, metav1.GetOptions{}); err == nil {
 		// TODO: Retry the update. We don't really expect anything to conflict though.
-		Logf("Updating secret %v in ns %v with hosts %v for ingress %v", secret.Name, secret.Namespace, host, ing.Name)
+		framework.Logf("Updating secret %v in ns %v with hosts %v for ingress %v", secret.Name, secret.Namespace, host, ing.Name)
 		s.Data = secret.Data
 		_, err = kubeClient.CoreV1().Secrets(ing.Namespace).Update(s)
 	} else {
-		Logf("Creating secret %v in ns %v with hosts %v for ingress %v", secret.Name, secret.Namespace, host, ing.Name)
+		framework.Logf("Creating secret %v in ns %v with hosts %v for ingress %v", secret.Name, secret.Namespace, host, ing.Name)
 		_, err = kubeClient.CoreV1().Secrets(ing.Namespace).Create(secret)
 	}
 	return host, cert, key, err
@@ -338,9 +345,9 @@ func createIngressTLSSecret(kubeClient clientset.Interface, ing *extensions.Ingr
 // CleanupGCEIngressController calls the GCEIngressController.Cleanup(false)
 // followed with deleting the static ip, and then a final GCEIngressController.Cleanup(true)
 func CleanupGCEIngressController(gceController *GCEIngressController) {
-	pollErr := wait.Poll(5*time.Second, LoadBalancerCleanupTimeout, func() (bool, error) {
+	pollErr := wait.Poll(5*time.Second, framework.LoadBalancerCleanupTimeout, func() (bool, error) {
 		if err := gceController.Cleanup(false); err != nil {
-			Logf("Monitoring glbc's cleanup of gce resources:\n%v", err)
+			framework.Logf("Monitoring glbc's cleanup of gce resources:\n%v", err)
 			return false, nil
 		}
 		return true, nil
@@ -361,7 +368,7 @@ func CleanupGCEIngressController(gceController *GCEIngressController) {
 	// throw out confusing events.
 	if ipErr := wait.Poll(5*time.Second, 1*time.Minute, func() (bool, error) {
 		if err := gceController.deleteStaticIPs(); err != nil {
-			Logf("Failed to delete static-ip: %v\n", err)
+			framework.Logf("Failed to delete static-ip: %v\n", err)
 			return false, nil
 		}
 		return true, nil
@@ -374,7 +381,7 @@ func CleanupGCEIngressController(gceController *GCEIngressController) {
 	// Logging that the GLBC failed to cleanup GCE resources on ingress deletion
 	// See kubernetes/ingress#431
 	if pollErr != nil {
-		Logf("error: L7 controller failed to delete all cloud resources on time. %v", pollErr)
+		framework.Logf("error: L7 controller failed to delete all cloud resources on time. %v", pollErr)
 	}
 }
 
@@ -531,7 +538,7 @@ func (cont *GCEIngressController) deleteURLMap(del bool) (msg string) {
 			continue
 		}
 		if del {
-			Logf("Deleting url-map: %s", um.Name)
+			framework.Logf("Deleting url-map: %s", um.Name)
 			if err := gceCloud.DeleteUrlMap(um.Name); err != nil &&
 				!cont.isHTTPErrorCode(err, http.StatusNotFound) {
 				msg += fmt.Sprintf("Failed to delete url map %v\n", um.Name)
@@ -566,7 +573,7 @@ func (cont *GCEIngressController) deleteBackendService(del bool) (msg string) {
 		return fmt.Sprintf("Failed to list backend services: %v", err)
 	}
 	if len(beList) == 0 {
-		Logf("No backend services found")
+		framework.Logf("No backend services found")
 		return msg
 	}
 	for _, be := range beList {
@@ -574,7 +581,7 @@ func (cont *GCEIngressController) deleteBackendService(del bool) (msg string) {
 			continue
 		}
 		if del {
-			Logf("Deleting backed-service: %s", be.Name)
+			framework.Logf("Deleting backed-service: %s", be.Name)
 			if err := gceCloud.DeleteGlobalBackendService(be.Name); err != nil &&
 				!cont.isHTTPErrorCode(err, http.StatusNotFound) {
 				msg += fmt.Sprintf("Failed to delete backend service %v: %v\n", be.Name, err)
@@ -603,7 +610,7 @@ func (cont *GCEIngressController) deleteHTTPHealthCheck(del bool) (msg string) {
 			continue
 		}
 		if del {
-			Logf("Deleting http-health-check: %s", hc.Name)
+			framework.Logf("Deleting http-health-check: %s", hc.Name)
 			if err := gceCloud.DeleteHttpHealthCheck(hc.Name); err != nil &&
 				!cont.isHTTPErrorCode(err, http.StatusNotFound) {
 				msg += fmt.Sprintf("Failed to delete HTTP health check %v\n", hc.Name)
@@ -643,7 +650,7 @@ func (cont *GCEIngressController) deleteSSLCertificate(del bool) (msg string) {
 				continue
 			}
 			if del {
-				Logf("Deleting ssl-certificate: %s", s.Name)
+				framework.Logf("Deleting ssl-certificate: %s", s.Name)
 				if err := gceCloud.DeleteSslCertificate(s.Name); err != nil &&
 					!cont.isHTTPErrorCode(err, http.StatusNotFound) {
 					msg += fmt.Sprintf("Failed to delete ssl certificates: %v\n", s.Name)
@@ -688,7 +695,7 @@ func (cont *GCEIngressController) deleteInstanceGroup(del bool) (msg string) {
 			continue
 		}
 		if del {
-			Logf("Deleting instance-group: %s", ig.Name)
+			framework.Logf("Deleting instance-group: %s", ig.Name)
 			if err := gceCloud.DeleteInstanceGroup(ig.Name, cont.Cloud.Zone); err != nil &&
 				!cont.isHTTPErrorCode(err, http.StatusNotFound) {
 				msg += fmt.Sprintf("Failed to delete instance group %v\n", ig.Name)
@@ -710,7 +717,7 @@ func (cont *GCEIngressController) deleteNetworkEndpointGroup(del bool) (msg stri
 			return msg
 		}
 		// Do not return error as NEG is still alpha.
-		Logf("Failed to list network endpoint group: %v", err)
+		framework.Logf("Failed to list network endpoint group: %v", err)
 		return msg
 	}
 	if len(negList) == 0 {
@@ -721,7 +728,7 @@ func (cont *GCEIngressController) deleteNetworkEndpointGroup(del bool) (msg stri
 			continue
 		}
 		if del {
-			Logf("Deleting network-endpoint-group: %s", neg.Name)
+			framework.Logf("Deleting network-endpoint-group: %s", neg.Name)
 			if err := gceCloud.DeleteNetworkEndpointGroup(neg.Name, cont.Cloud.Zone); err != nil &&
 				!cont.isHTTPErrorCode(err, http.StatusNotFound) {
 				msg += fmt.Sprintf("Failed to delete network endpoint group %v\n", neg.Name)
@@ -789,11 +796,11 @@ func (cont *GCEIngressController) canDeleteNEG(resourceName, creationTimestamp s
 func canDeleteWithTimestamp(resourceName, creationTimestamp string) bool {
 	createdTime, err := time.Parse(time.RFC3339, creationTimestamp)
 	if err != nil {
-		Logf("WARNING: Failed to parse creation timestamp %v for %v: %v", creationTimestamp, resourceName, err)
+		framework.Logf("WARNING: Failed to parse creation timestamp %v for %v: %v", creationTimestamp, resourceName, err)
 		return false
 	}
 	if time.Since(createdTime) > maxAge {
-		Logf("%v created on %v IS too old", resourceName, creationTimestamp)
+		framework.Logf("%v created on %v IS too old", resourceName, creationTimestamp)
 		return true
 	}
 	return false
@@ -912,9 +919,9 @@ func (cont *GCEIngressController) Init() {
 	// There's a name limit imposed by GCE. The controller will truncate.
 	testName := fmt.Sprintf("k8s-fw-foo-app-X-%v--%v", cont.Ns, cont.UID)
 	if len(testName) > nameLenLimit {
-		Logf("WARNING: test name including cluster UID: %v is over the GCE limit of %v", testName, nameLenLimit)
+		framework.Logf("WARNING: test name including cluster UID: %v is over the GCE limit of %v", testName, nameLenLimit)
 	} else {
-		Logf("Detected cluster UID %v", cont.UID)
+		framework.Logf("Detected cluster UID %v", cont.UID)
 	}
 }
 
@@ -927,21 +934,21 @@ func (cont *GCEIngressController) CreateStaticIP(name string) string {
 	if err := gceCloud.ReserveGlobalAddress(addr); err != nil {
 		if delErr := gceCloud.DeleteGlobalAddress(name); delErr != nil {
 			if cont.isHTTPErrorCode(delErr, http.StatusNotFound) {
-				Logf("Static ip with name %v was not allocated, nothing to delete", name)
+				framework.Logf("Static ip with name %v was not allocated, nothing to delete", name)
 			} else {
-				Logf("Failed to delete static ip %v: %v", name, delErr)
+				framework.Logf("Failed to delete static ip %v: %v", name, delErr)
 			}
 		}
-		Failf("Failed to allocate static ip %v: %v", name, err)
+		framework.Failf("Failed to allocate static ip %v: %v", name, err)
 	}
 
 	ip, err := gceCloud.GetGlobalAddress(name)
 	if err != nil {
-		Failf("Failed to get newly created static ip %v: %v", name, err)
+		framework.Failf("Failed to get newly created static ip %v: %v", name, err)
 	}
 
 	cont.staticIPName = ip.Name
-	Logf("Reserved static ip %v: %v", cont.staticIPName, ip.Address)
+	framework.Logf("Reserved static ip %v: %v", cont.staticIPName, ip.Address)
 	return ip.Address
 }
 
@@ -961,7 +968,7 @@ func (cont *GCEIngressController) deleteStaticIPs() error {
 		for _, ip := range e2eIPs {
 			ips = append(ips, ip.Name)
 		}
-		Logf("None of the remaining %d static-ips were created by this e2e: %v", len(ips), strings.Join(ips, ", "))
+		framework.Logf("None of the remaining %d static-ips were created by this e2e: %v", len(ips), strings.Join(ips, ", "))
 	}
 	return nil
 }
@@ -987,32 +994,32 @@ func gcloudComputeResourceList(resource, regex, project string, out interface{})
 				errMsg = fmt.Sprintf("%v, stderr %v", errMsg, string(osExitErr.Stderr))
 			}
 		}
-		Logf("Error running gcloud command 'gcloud %s': err: %v, output: %v, status: %d, msg: %v", strings.Join(command, " "), err, string(output), errCode, errMsg)
+		framework.Logf("Error running gcloud command 'gcloud %s': err: %v, output: %v, status: %d, msg: %v", strings.Join(command, " "), err, string(output), errCode, errMsg)
 	}
 	if err := json.Unmarshal([]byte(output), out); err != nil {
-		Logf("Error unmarshalling gcloud output for %v: %v, output: %v", resource, err, string(output))
+		framework.Logf("Error unmarshalling gcloud output for %v: %v, output: %v", resource, err, string(output))
 	}
 }
 
 // GcloudComputeResourceDelete deletes the specified compute resource by name and project.
 func GcloudComputeResourceDelete(resource, name, project string, args ...string) error {
-	Logf("Deleting %v: %v", resource, name)
+	framework.Logf("Deleting %v: %v", resource, name)
 	argList := append([]string{"compute", resource, "delete", name, fmt.Sprintf("--project=%v", project), "-q"}, args...)
 	output, err := exec.Command("gcloud", argList...).CombinedOutput()
 	if err != nil {
-		Logf("Error deleting %v, output: %v\nerror: %+v", resource, string(output), err)
+		framework.Logf("Error deleting %v, output: %v\nerror: %+v", resource, string(output), err)
 	}
 	return err
 }
 
 // GcloudComputeResourceCreate creates a compute resource with a name and arguments.
 func GcloudComputeResourceCreate(resource, name, project string, args ...string) error {
-	Logf("Creating %v in project %v: %v", resource, project, name)
+	framework.Logf("Creating %v in project %v: %v", resource, project, name)
 	argsList := append([]string{"compute", resource, "create", name, fmt.Sprintf("--project=%v", project)}, args...)
-	Logf("Running command: gcloud %+v", strings.Join(argsList, " "))
+	framework.Logf("Running command: gcloud %+v", strings.Join(argsList, " "))
 	output, err := exec.Command("gcloud", argsList...).CombinedOutput()
 	if err != nil {
-		Logf("Error creating %v, output: %v\nerror: %+v", resource, string(output), err)
+		framework.Logf("Error creating %v, output: %v\nerror: %+v", resource, string(output), err)
 	}
 	return err
 }
@@ -1025,40 +1032,40 @@ func GcloudComputeResourceCreate(resource, name, project string, args ...string)
 func (j *IngressTestJig) CreateIngress(manifestPath, ns string, ingAnnotations map[string]string, svcAnnotations map[string]string) {
 	var err error
 	mkpath := func(file string) string {
-		return filepath.Join(TestContext.RepoRoot, manifestPath, file)
+		return filepath.Join(framework.TestContext.RepoRoot, manifestPath, file)
 	}
 
-	Logf("creating replication controller")
-	RunKubectlOrDie("create", "-f", mkpath("rc.yaml"), fmt.Sprintf("--namespace=%v", ns))
+	framework.Logf("creating replication controller")
+	framework.RunKubectlOrDie("create", "-f", mkpath("rc.yaml"), fmt.Sprintf("--namespace=%v", ns))
 
-	Logf("creating service")
-	RunKubectlOrDie("create", "-f", mkpath("svc.yaml"), fmt.Sprintf("--namespace=%v", ns))
+	framework.Logf("creating service")
+	framework.RunKubectlOrDie("create", "-f", mkpath("svc.yaml"), fmt.Sprintf("--namespace=%v", ns))
 	if len(svcAnnotations) > 0 {
 		svcList, err := j.Client.CoreV1().Services(ns).List(metav1.ListOptions{})
-		ExpectNoError(err)
+		framework.ExpectNoError(err)
 		for _, svc := range svcList.Items {
 			svc.Annotations = svcAnnotations
 			_, err = j.Client.CoreV1().Services(ns).Update(&svc)
-			ExpectNoError(err)
+			framework.ExpectNoError(err)
 		}
 	}
 
 	if exists, _ := utilfile.FileExists(mkpath("secret.yaml")); exists {
-		Logf("creating secret")
-		RunKubectlOrDie("create", "-f", mkpath("secret.yaml"), fmt.Sprintf("--namespace=%v", ns))
+		framework.Logf("creating secret")
+		framework.RunKubectlOrDie("create", "-f", mkpath("secret.yaml"), fmt.Sprintf("--namespace=%v", ns))
 	}
-	Logf("Parsing ingress from %v", filepath.Join(manifestPath, "ing.yaml"))
+	framework.Logf("Parsing ingress from %v", filepath.Join(manifestPath, "ing.yaml"))
 
 	j.Ingress, err = manifest.IngressFromManifest(filepath.Join(manifestPath, "ing.yaml"))
-	ExpectNoError(err)
+	framework.ExpectNoError(err)
 	j.Ingress.Namespace = ns
 	j.Ingress.Annotations = map[string]string{IngressClassKey: j.Class}
 	for k, v := range ingAnnotations {
 		j.Ingress.Annotations[k] = v
 	}
-	Logf(fmt.Sprintf("creating" + j.Ingress.Name + " ingress"))
+	framework.Logf(fmt.Sprintf("creating" + j.Ingress.Name + " ingress"))
 	j.Ingress, err = j.Client.ExtensionsV1beta1().Ingresses(ns).Create(j.Ingress)
-	ExpectNoError(err)
+	framework.ExpectNoError(err)
 }
 
 // Update retrieves the ingress, performs the passed function, and then updates it.
@@ -1068,7 +1075,7 @@ func (j *IngressTestJig) Update(update func(ing *extensions.Ingress)) {
 	for i := 0; i < 3; i++ {
 		j.Ingress, err = j.Client.ExtensionsV1beta1().Ingresses(ns).Get(name, metav1.GetOptions{})
 		if err != nil {
-			Failf("failed to get ingress %q: %v", name, err)
+			framework.Failf("failed to get ingress %q: %v", name, err)
 		}
 		update(j.Ingress)
 		j.Ingress, err = j.Client.ExtensionsV1beta1().Ingresses(ns).Update(j.Ingress)
@@ -1077,10 +1084,10 @@ func (j *IngressTestJig) Update(update func(ing *extensions.Ingress)) {
 			return
 		}
 		if !apierrs.IsConflict(err) && !apierrs.IsServerTimeout(err) {
-			Failf("failed to update ingress %q: %v", name, err)
+			framework.Failf("failed to update ingress %q: %v", name, err)
 		}
 	}
-	Failf("too many retries updating ingress %q", name)
+	framework.Failf("too many retries updating ingress %q", name)
 }
 
 // AddHTTPS updates the ingress to use this secret for these hosts.
@@ -1089,8 +1096,8 @@ func (j *IngressTestJig) AddHTTPS(secretName string, hosts ...string) {
 	// TODO: Just create the secret in GetRootCAs once we're watching secrets in
 	// the ingress controller.
 	_, cert, _, err := createIngressTLSSecret(j.Client, j.Ingress)
-	ExpectNoError(err)
-	Logf("Updating ingress %v to use secret %v for TLS termination", j.Ingress.Name, secretName)
+	framework.ExpectNoError(err)
+	framework.Logf("Updating ingress %v to use secret %v for TLS termination", j.Ingress.Name, secretName)
 	j.Update(func(ing *extensions.Ingress) {
 		ing.Spec.TLS = []extensions.IngressTLS{{Hosts: hosts, SecretName: secretName}}
 	})
@@ -1102,7 +1109,7 @@ func (j *IngressTestJig) GetRootCA(secretName string) (rootCA []byte) {
 	var ok bool
 	rootCA, ok = j.RootCAs[secretName]
 	if !ok {
-		Failf("Failed to retrieve rootCAs, no recorded secret by name %v", secretName)
+		framework.Failf("Failed to retrieve rootCAs, no recorded secret by name %v", secretName)
 	}
 	return
 }
@@ -1111,7 +1118,7 @@ func (j *IngressTestJig) GetRootCA(secretName string) (rootCA []byte) {
 func (j *IngressTestJig) TryDeleteIngress() {
 	err := j.Client.ExtensionsV1beta1().Ingresses(j.Ingress.Namespace).Delete(j.Ingress.Name, nil)
 	if err != nil {
-		Logf("Error while deleting the ingress %v/%v: %v", j.Ingress.Namespace, j.Ingress.Name, err)
+		framework.Logf("Error while deleting the ingress %v/%v: %v", j.Ingress.Namespace, j.Ingress.Name, err)
 	}
 }
 
@@ -1139,8 +1146,8 @@ func WaitForIngressAddress(c clientset.Interface, ns, ingName string, timeout ti
 	err := wait.PollImmediate(10*time.Second, timeout, func() (bool, error) {
 		ipOrNameList, err := getIngressAddress(c, ns, ingName)
 		if err != nil || len(ipOrNameList) == 0 {
-			Logf("Waiting for Ingress %v to acquire IP, error %v", ingName, err)
-			if IsRetryableAPIError(err) {
+			framework.Logf("Waiting for Ingress %v to acquire IP, error %v", ingName, err)
+			if framework.IsRetryableAPIError(err) {
 				return false, nil
 			}
 			return false, err
@@ -1161,7 +1168,7 @@ func (j *IngressTestJig) PollIngressWithCert(waitForNodePort bool, knownHosts []
 			var err error
 			// Create transport with cert to verify if the server uses the correct one.
 			timeoutClient.Transport, err = buildTransportWithCA(rules.Host, cert)
-			ExpectNoError(err)
+			framework.ExpectNoError(err)
 			proto = "https"
 		}
 		for _, p := range rules.IngressRuleValue.HTTP.Paths {
@@ -1169,11 +1176,11 @@ func (j *IngressTestJig) PollIngressWithCert(waitForNodePort bool, knownHosts []
 				j.pollServiceNodePort(j.Ingress.Namespace, p.Backend.ServiceName, int(p.Backend.ServicePort.IntVal))
 			}
 			route := fmt.Sprintf("%v://%v%v", proto, j.Address, p.Path)
-			Logf("Testing route %v host %v with simple GET", route, rules.Host)
-			ExpectNoError(PollURL(route, rules.Host, LoadBalancerPollTimeout, j.PollInterval, timeoutClient, false))
+			framework.Logf("Testing route %v host %v with simple GET", route, rules.Host)
+			framework.ExpectNoError(framework.PollURL(route, rules.Host, framework.LoadBalancerPollTimeout, j.PollInterval, timeoutClient, false))
 		}
 	}
-	Logf("Finished polling on all rules on ingress %q", j.Ingress.Name)
+	framework.Logf("Finished polling on all rules on ingress %q", j.Ingress.Name)
 }
 
 // WaitForIngress waits till the ingress acquires an IP, then waits for its
@@ -1183,12 +1190,12 @@ func (j *IngressTestJig) PollIngressWithCert(waitForNodePort bool, knownHosts []
 // Ingress.
 func (j *IngressTestJig) WaitForIngress(waitForNodePort bool) {
 	// Wait for the loadbalancer IP.
-	address, err := WaitForIngressAddress(j.Client, j.Ingress.Namespace, j.Ingress.Name, LoadBalancerPollTimeout)
+	address, err := WaitForIngressAddress(j.Client, j.Ingress.Namespace, j.Ingress.Name, framework.LoadBalancerPollTimeout)
 	if err != nil {
-		Failf("Ingress failed to acquire an IP address within %v", LoadBalancerPollTimeout)
+		framework.Failf("Ingress failed to acquire an IP address within %v", framework.LoadBalancerPollTimeout)
 	}
 	j.Address = address
-	Logf("Found address %v for ingress %v", j.Address, j.Ingress.Name)
+	framework.Logf("Found address %v for ingress %v", j.Address, j.Ingress.Name)
 
 	var knownHosts []string
 	var cert []byte
@@ -1206,12 +1213,12 @@ func (j *IngressTestJig) WaitForIngress(waitForNodePort bool) {
 // Ingress. Hostnames and certificate need to be explicitly passed in.
 func (j *IngressTestJig) WaitForIngressWithCert(waitForNodePort bool, knownHosts []string, cert []byte) {
 	// Wait for the loadbalancer IP.
-	address, err := WaitForIngressAddress(j.Client, j.Ingress.Namespace, j.Ingress.Name, LoadBalancerPollTimeout)
+	address, err := WaitForIngressAddress(j.Client, j.Ingress.Namespace, j.Ingress.Name, framework.LoadBalancerPollTimeout)
 	if err != nil {
-		Failf("Ingress failed to acquire an IP address within %v", LoadBalancerPollTimeout)
+		framework.Failf("Ingress failed to acquire an IP address within %v", framework.LoadBalancerPollTimeout)
 	}
 	j.Address = address
-	Logf("Found address %v for ingress %v", j.Address, j.Ingress.Name)
+	framework.Logf("Found address %v for ingress %v", j.Address, j.Ingress.Name)
 
 	j.PollIngressWithCert(waitForNodePort, knownHosts, cert)
 }
@@ -1220,12 +1227,12 @@ func (j *IngressTestJig) WaitForIngressWithCert(waitForNodePort bool, knownHosts
 // given url returns a non-healthy http code even once.
 func (j *IngressTestJig) VerifyURL(route, host string, iterations int, interval time.Duration, httpClient *http.Client) error {
 	for i := 0; i < iterations; i++ {
-		b, err := SimpleGET(httpClient, route, host)
+		b, err := framework.SimpleGET(httpClient, route, host)
 		if err != nil {
-			Logf(b)
+			framework.Logf(b)
 			return err
 		}
-		Logf("Verfied %v with host %v %d times, sleeping for %v", route, host, i, interval)
+		framework.Logf("Verfied %v with host %v %d times, sleeping for %v", route, host, i, interval)
 		time.Sleep(interval)
 	}
 	return nil
@@ -1233,9 +1240,9 @@ func (j *IngressTestJig) VerifyURL(route, host string, iterations int, interval 
 
 func (j *IngressTestJig) pollServiceNodePort(ns, name string, port int) {
 	// TODO: Curl all nodes?
-	u, err := GetNodePortURL(j.Client, ns, name, port)
-	ExpectNoError(err)
-	ExpectNoError(PollURL(u, "", 30*time.Second, j.PollInterval, &http.Client{Timeout: IngressReqTimeout}, false))
+	u, err := framework.GetNodePortURL(j.Client, ns, name, port)
+	framework.ExpectNoError(err)
+	framework.ExpectNoError(framework.PollURL(u, "", 30*time.Second, j.PollInterval, &http.Client{Timeout: IngressReqTimeout}, false))
 }
 
 func (j *IngressTestJig) GetDefaultBackendNodePort() (int32, error) {
@@ -1294,18 +1301,18 @@ func (j *IngressTestJig) ConstructFirewallForIngress(gceController *GCEIngressCo
 // GetDistinctResponseFromIngress tries GET call to the ingress VIP and return all distinct responses.
 func (j *IngressTestJig) GetDistinctResponseFromIngress() (sets.String, error) {
 	// Wait for the loadbalancer IP.
-	address, err := WaitForIngressAddress(j.Client, j.Ingress.Namespace, j.Ingress.Name, LoadBalancerPollTimeout)
+	address, err := WaitForIngressAddress(j.Client, j.Ingress.Namespace, j.Ingress.Name, framework.LoadBalancerPollTimeout)
 	if err != nil {
-		Failf("Ingress failed to acquire an IP address within %v", LoadBalancerPollTimeout)
+		framework.Failf("Ingress failed to acquire an IP address within %v", framework.LoadBalancerPollTimeout)
 	}
 	responses := sets.NewString()
 	timeoutClient := &http.Client{Timeout: IngressReqTimeout}
 
 	for i := 0; i < 100; i++ {
 		url := fmt.Sprintf("http://%v", address)
-		res, err := SimpleGET(timeoutClient, url, "")
+		res, err := framework.SimpleGET(timeoutClient, url, "")
 		if err != nil {
-			Logf("Failed to GET %q. Got responses: %q: %v", url, res, err)
+			framework.Logf("Failed to GET %q. Got responses: %q: %v", url, res, err)
 			return responses, err
 		}
 		responses.Insert(res)
@@ -1314,7 +1321,7 @@ func (j *IngressTestJig) GetDistinctResponseFromIngress() (sets.String, error) {
 }
 
 func (cont *GCEIngressController) getL7AddonUID() (string, error) {
-	Logf("Retrieving UID from config map: %v/%v", metav1.NamespaceSystem, uidConfigMap)
+	framework.Logf("Retrieving UID from config map: %v/%v", metav1.NamespaceSystem, uidConfigMap)
 	cm, err := cont.Client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(uidConfigMap, metav1.GetOptions{})
 	if err != nil {
 		return "", err
@@ -1334,12 +1341,12 @@ type GCEIngressController struct {
 	rc           *v1.ReplicationController
 	svc          *v1.Service
 	Client       clientset.Interface
-	Cloud        CloudConfig
+	Cloud        framework.CloudConfig
 }
 
 // NewIngressTestJig instantiates struct with client
 func NewIngressTestJig(c clientset.Interface) *IngressTestJig {
-	return &IngressTestJig{Client: c, RootCAs: map[string][]byte{}, PollInterval: LoadBalancerPollInterval}
+	return &IngressTestJig{Client: c, RootCAs: map[string][]byte{}, PollInterval: framework.LoadBalancerPollInterval}
 }
 
 // NginxIngressController manages implementation details of Ingress on Nginx.
@@ -1354,25 +1361,25 @@ type NginxIngressController struct {
 // Init initializes the NginxIngressController
 func (cont *NginxIngressController) Init() {
 	mkpath := func(file string) string {
-		return filepath.Join(TestContext.RepoRoot, IngressManifestPath, "nginx", file)
+		return filepath.Join(framework.TestContext.RepoRoot, IngressManifestPath, "nginx", file)
 	}
-	Logf("initializing nginx ingress controller")
-	RunKubectlOrDie("create", "-f", mkpath("rc.yaml"), fmt.Sprintf("--namespace=%v", cont.Ns))
+	framework.Logf("initializing nginx ingress controller")
+	framework.RunKubectlOrDie("create", "-f", mkpath("rc.yaml"), fmt.Sprintf("--namespace=%v", cont.Ns))
 
 	rc, err := cont.Client.CoreV1().ReplicationControllers(cont.Ns).Get("nginx-ingress-controller", metav1.GetOptions{})
-	ExpectNoError(err)
+	framework.ExpectNoError(err)
 	cont.rc = rc
 
-	Logf("waiting for pods with label %v", rc.Spec.Selector)
+	framework.Logf("waiting for pods with label %v", rc.Spec.Selector)
 	sel := labels.SelectorFromSet(labels.Set(rc.Spec.Selector))
-	ExpectNoError(testutils.WaitForPodsWithLabelRunning(cont.Client, cont.Ns, sel))
+	framework.ExpectNoError(testutils.WaitForPodsWithLabelRunning(cont.Client, cont.Ns, sel))
 	pods, err := cont.Client.CoreV1().Pods(cont.Ns).List(metav1.ListOptions{LabelSelector: sel.String()})
-	ExpectNoError(err)
+	framework.ExpectNoError(err)
 	if len(pods.Items) == 0 {
-		Failf("Failed to find nginx ingress controller pods with selector %v", sel)
+		framework.Failf("Failed to find nginx ingress controller pods with selector %v", sel)
 	}
 	cont.pod = &pods.Items[0]
-	cont.externalIP, err = GetHostExternalAddress(cont.Client, cont.pod)
-	ExpectNoError(err)
-	Logf("ingress controller running in pod %v on ip %v", cont.pod.Name, cont.externalIP)
+	cont.externalIP, err = framework.GetHostExternalAddress(cont.Client, cont.pod)
+	framework.ExpectNoError(err)
+	framework.Logf("ingress controller running in pod %v on ip %v", cont.pod.Name, cont.externalIP)
 }
