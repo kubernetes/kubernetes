@@ -22,6 +22,7 @@ import (
 	"sort"
 	"strings"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/mergepatch"
@@ -849,6 +850,10 @@ func handleUnmarshal(j []byte) (map[string]interface{}, error) {
 	return m, nil
 }
 
+type MetaOnly struct {
+	MetaData metav1.ObjectMeta `json:"metadata"`
+}
+
 // StrategicMergeMapPatch applies a strategic merge patch. The original and patch documents
 // must be JSONMap. A patch can be created from an original and modified document by
 // calling CreateTwoWayMergeMapPatch.
@@ -866,7 +871,13 @@ func StrategicMergeMapPatch(original, patch JSONMap, dataStruct interface{}) (JS
 	// each field in a strategic merge patch, we can't find the go struct tags. Hence, we can't easily  do a strategic merge
 	// for custom resources. So we should fail fast and return an error.
 	if _, ok := dataStruct.(*unstructured.Unstructured); ok {
-		return nil, mergepatch.ErrUnsupportedStrategicMergePatchFormat
+		if _, ok := patch["metadata"]; !ok || len(patch) != 1 {
+			return nil, mergepatch.ErrOnlySupportMetadataStrategicMergePatch
+		}
+		schema, err = NewPatchMetaFromStruct(MetaOnly{})
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return StrategicMergeMapPatchUsingLookupPatchMeta(original, patch, schema)
