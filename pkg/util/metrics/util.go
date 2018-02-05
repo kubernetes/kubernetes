@@ -74,7 +74,14 @@ func RegisterMetricAndTrackRateLimiterUsage(ownerName string, rateLimiter flowco
 	go wait.Until(func() {
 		metricsLock.Lock()
 		defer metricsLock.Unlock()
-		rateLimiterMetrics[ownerName].metric.Set(rateLimiter.Saturation())
+
+		// Avoid race between stop channel & metricsLock
+		rlm, ok := rateLimiterMetrics[ownerName]
+		if !ok {
+			glog.Warningf("Rate Limiter Metric for %v not registered", ownerName)
+			return
+		}
+		rlm.metric.Set(rateLimiter.Saturation())
 	}, updatePeriod, rateLimiterMetrics[ownerName].stopCh)
 	return nil
 }
