@@ -32,7 +32,7 @@ import (
 
 // ProxyREST implements the proxy subresource for a Service
 type ProxyREST struct {
-	ServiceRest    *REST
+	Redirector     rest.Redirector
 	ProxyTransport http.RoundTripper
 }
 
@@ -62,7 +62,7 @@ func (r *ProxyREST) Connect(ctx genericapirequest.Context, id string, opts runti
 	if !ok {
 		return nil, fmt.Errorf("Invalid options object: %#v", opts)
 	}
-	location, transport, err := r.ServiceRest.ResourceLocation(ctx, id)
+	location, transport, err := r.Redirector.ResourceLocation(ctx, id)
 	if err != nil {
 		return nil, err
 	}

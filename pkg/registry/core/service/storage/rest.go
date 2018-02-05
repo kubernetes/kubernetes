@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package service
+package storage
 
 import (
 	"fmt"
@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -36,31 +37,25 @@ import (
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+
 	apiservice "k8s.io/kubernetes/pkg/api/service"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/pkg/registry/core/endpoint"
-	podstore "k8s.io/kubernetes/pkg/registry/core/pod/storage"
+	registry "k8s.io/kubernetes/pkg/registry/core/service"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	"k8s.io/kubernetes/pkg/registry/core/service/portallocator"
 )
 
-// ServiceRest includes storage for services and all sub resources
-type ServiceRest struct {
-	Service *REST
-	Proxy   *ProxyREST
-}
-
 // REST adapts a service registry into apiserver's RESTStorage model.
 type REST struct {
-	registry         Registry
-	endpoints        endpoint.Registry
+	services         ServiceStorage
+	endpoints        EndpointsStorage
 	serviceIPs       ipallocator.Interface
 	serviceNodePorts portallocator.Interface
 	proxyTransport   http.RoundTripper
-	pods             *podstore.REST
+	pods             rest.Getter
 }
 
 // ServiceNodePort includes protocol and port number of a service NodePort.
@@ -73,22 +68,49 @@ type ServiceNodePort struct {
 	NodePort int32
 }
 
-// NewStorage returns a new REST.
-func NewStorage(registry Registry, endpoints endpoint.Registry, pods *podstore.REST, serviceIPs ipallocator.Interface,
-	serviceNodePorts portallocator.Interface, proxyTransport http.RoundTripper) *ServiceRest {
+type ServiceStorage interface {
+	rest.Getter
+	rest.Lister
+	rest.CreaterUpdater
+	rest.GracefulDeleter
+	rest.Watcher
+	rest.TableConvertor
+	rest.Exporter
+}
+
+type EndpointsStorage interface {
+	rest.Getter
+	rest.GracefulDeleter
+}
+
+// NewREST returns a wrapper around the underlying generic storage and performs
+// allocations and deallocations of various service related resources like ports.
+// TODO: all transactional behavior should be supported from within generic storage
+//   or the strategy.
+func NewREST(
+	services ServiceStorage,
+	endpoints EndpointsStorage,
+	pods rest.Getter,
+	serviceIPs ipallocator.Interface,
+	serviceNodePorts portallocator.Interface,
+	proxyTransport http.RoundTripper,
+) (*REST, *registry.ProxyREST) {
 	rest := &REST{
-		registry:         registry,
+		services:         services,
 		endpoints:        endpoints,
 		serviceIPs:       serviceIPs,
 		serviceNodePorts: serviceNodePorts,
 		proxyTransport:   proxyTransport,
 		pods:             pods,
 	}
-	return &ServiceRest{
-		Service: rest,
-		Proxy:   &ProxyREST{ServiceRest: rest, ProxyTransport: proxyTransport},
-	}
+	return rest, &registry.ProxyREST{Redirector: rest, ProxyTransport: proxyTransport}
 }
+
+var (
+	_ ServiceStorage          = &REST{}
+	_ rest.CategoriesProvider = &REST{}
+	_ rest.ShortNamesProvider = &REST{}
+)
 
 // ShortNames implements the ShortNamesProvider interface. Returns a list of short names for a resource.
 func (rs *REST) ShortNames() []string {
@@ -100,11 +122,34 @@ func (rs *REST) Categories() []string {
 	return []string{"all"}
 }
 
-// TODO: implement includeUninitialized by refactoring this to move to store
+func (rs *REST) New() runtime.Object {
+	return rs.services.New()
+}
+
+func (rs *REST) NewList() runtime.Object {
+	return rs.services.NewList()
+}
+
+func (rs *REST) Get(ctx genericapirequest.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
+	return rs.services.Get(ctx, name, options)
+}
+
+func (rs *REST) List(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (runtime.Object, error) {
+	return rs.services.List(ctx, options)
+}
+
+func (rs *REST) Watch(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (watch.Interface, error) {
+	return rs.services.Watch(ctx, options)
+}
+
+func (rs *REST) Export(ctx genericapirequest.Context, name string, opts metav1.ExportOptions) (runtime.Object, error) {
+	return rs.services.Export(ctx, name, opts)
+}
+
 func (rs *REST) Create(ctx genericapirequest.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, includeUninitialized bool) (runtime.Object, error) {
 	service := obj.(*api.Service)
 
-	if err := rest.BeforeCreate(Strategy, ctx, obj); err != nil {
+	if err := rest.BeforeCreate(registry.Strategy, ctx, obj); err != nil {
 		return nil, err
 	}
 
@@ -120,7 +165,7 @@ func (rs *REST) Create(ctx genericapirequest.Context, obj runtime.Object, create
 
 	var err error
 	if service.Spec.Type != api.ServiceTypeExternalName {
-		if releaseServiceIP, err = rs.initClusterIP(service); err != nil {
+		if releaseServiceIP, err = initClusterIP(service, rs.serviceIPs); err != nil {
 			return nil, err
 		}
 	}
@@ -129,14 +174,14 @@ func (rs *REST) Create(ctx genericapirequest.Context, obj runtime.Object, create
 	defer nodePortOp.Finish()
 
 	if service.Spec.Type == api.ServiceTypeNodePort || service.Spec.Type == api.ServiceTypeLoadBalancer {
-		if err := rs.initNodePorts(service, nodePortOp); err != nil {
+		if err := initNodePorts(service, nodePortOp); err != nil {
 			return nil, err
 		}
 	}
 
 	// Handle ExternalTraffic related fields during service creation.
 	if apiservice.NeedsHealthCheck(service) {
-		if err := rs.allocateHealthCheckNodePort(service, nodePortOp); err != nil {
+		if err := allocateHealthCheckNodePort(service, nodePortOp); err != nil {
 			return nil, errors.NewInternalError(err)
 		}
 	}
@@ -144,16 +189,16 @@ func (rs *REST) Create(ctx genericapirequest.Context, obj runtime.Object, create
 		return nil, errors.NewInvalid(api.Kind("Service"), service.Name, errs)
 	}
 
-	out, err := rs.registry.CreateService(ctx, service, createValidation)
+	out, err := rs.services.Create(ctx, service, createValidation, includeUninitialized)
 	if err != nil {
-		err = rest.CheckGeneratedNameError(Strategy, err, service)
+		err = rest.CheckGeneratedNameError(registry.Strategy, err, service)
 	}
 
 	if err == nil {
 		el := nodePortOp.Commit()
 		if el != nil {
 			// these should be caught by an eventual reconciliation / restart
-			glog.Errorf("error(s) committing service node-ports changes: %v", el)
+			utilruntime.HandleError(fmt.Errorf("error(s) committing service node-ports changes: %v", el))
 		}
 
 		releaseServiceIP = false
@@ -162,75 +207,56 @@ func (rs *REST) Create(ctx genericapirequest.Context, obj runtime.Object, create
 	return out, err
 }
 
-func (rs *REST) Delete(ctx genericapirequest.Context, id string) (runtime.Object, error) {
-	service, err := rs.registry.GetService(ctx, id, &metav1.GetOptions{})
+func (rs *REST) Delete(ctx genericapirequest.Context, id string, options *metav1.DeleteOptions) (runtime.Object, bool, error) {
+	// TODO: handle graceful
+	obj, _, err := rs.services.Delete(ctx, id, options)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 
-	err = rs.registry.DeleteService(ctx, id)
-	if err != nil {
-		return nil, err
-	}
+	svc := obj.(*api.Service)
 
 	// TODO: can leave dangling endpoints, and potentially return incorrect
 	// endpoints if a new service is created with the same name
-	err = rs.endpoints.DeleteEndpoints(ctx, id)
+	_, _, err = rs.endpoints.Delete(ctx, id, &metav1.DeleteOptions{})
 	if err != nil && !errors.IsNotFound(err) {
-		return nil, err
+		return nil, false, err
 	}
 
-	if helper.IsServiceIPSet(service) {
-		rs.serviceIPs.Release(net.ParseIP(service.Spec.ClusterIP))
+	if helper.IsServiceIPSet(svc) {
+		rs.serviceIPs.Release(net.ParseIP(svc.Spec.ClusterIP))
 	}
 
-	for _, nodePort := range CollectServiceNodePorts(service) {
+	for _, nodePort := range collectServiceNodePorts(svc) {
 		err := rs.serviceNodePorts.Release(nodePort)
 		if err != nil {
 			// these should be caught by an eventual reconciliation / restart
-			glog.Errorf("Error releasing service %s node port %d: %v", service.Name, nodePort, err)
+			utilruntime.HandleError(fmt.Errorf("Error releasing service %s node port %d: %v", svc.Name, nodePort, err))
 		}
 	}
 
-	if apiservice.NeedsHealthCheck(service) {
-		nodePort := service.Spec.HealthCheckNodePort
+	if apiservice.NeedsHealthCheck(svc) {
+		nodePort := svc.Spec.HealthCheckNodePort
 		if nodePort > 0 {
 			err := rs.serviceNodePorts.Release(int(nodePort))
 			if err != nil {
 				// these should be caught by an eventual reconciliation / restart
-				utilruntime.HandleError(fmt.Errorf("Error releasing service %s health check node port %d: %v", service.Name, nodePort, err))
+				utilruntime.HandleError(fmt.Errorf("Error releasing service %s health check node port %d: %v", svc.Name, nodePort, err))
 			}
 		}
 	}
-	return &metav1.Status{Status: metav1.StatusSuccess}, nil
-}
 
-func (rs *REST) Get(ctx genericapirequest.Context, id string, options *metav1.GetOptions) (runtime.Object, error) {
-	return rs.registry.GetService(ctx, id, options)
-}
-
-func (rs *REST) List(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (runtime.Object, error) {
-	return rs.registry.ListServices(ctx, options)
-}
-
-// Watch returns Services events via a watch.Interface.
-// It implements rest.Watcher.
-func (rs *REST) Watch(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (watch.Interface, error) {
-	return rs.registry.WatchServices(ctx, options)
-}
-
-// Export returns Service stripped of cluster-specific information.
-// It implements rest.Exporter.
-func (rs *REST) Export(ctx genericapirequest.Context, name string, opts metav1.ExportOptions) (runtime.Object, error) {
-	return rs.registry.ExportService(ctx, name, opts)
-}
-
-func (*REST) New() runtime.Object {
-	return &api.Service{}
-}
-
-func (*REST) NewList() runtime.Object {
-	return &api.ServiceList{}
+	// TODO: this is duplicated from the generic storage, when this wrapper is fully removed we can drop this
+	details := &metav1.StatusDetails{
+		Name: svc.Name,
+		UID:  svc.UID,
+	}
+	if info, ok := genericapirequest.RequestInfoFrom(ctx); ok {
+		details.Group = info.APIGroup
+		details.Kind = info.Resource // legacy behavior
+	}
+	status := &metav1.Status{Status: metav1.StatusSuccess, Details: details}
+	return status, true, nil
 }
 
 // externalTrafficPolicyUpdate adjusts ExternalTrafficPolicy during service update if needed.
@@ -267,7 +293,7 @@ func (rs *REST) healthCheckNodePortUpdate(oldService, service *api.Service, node
 	// Insert health check node port into the service's HealthCheckNodePort field if needed.
 	case !neededHealthCheckNodePort && needsHealthCheckNodePort:
 		glog.Infof("Transition to LoadBalancer type service with ExternalTrafficPolicy=Local")
-		if err := rs.allocateHealthCheckNodePort(service, nodePortOp); err != nil {
+		if err := allocateHealthCheckNodePort(service, nodePortOp); err != nil {
 			return false, errors.NewInternalError(err)
 		}
 
@@ -295,10 +321,11 @@ func (rs *REST) healthCheckNodePortUpdate(oldService, service *api.Service, node
 }
 
 func (rs *REST) Update(ctx genericapirequest.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (runtime.Object, bool, error) {
-	oldService, err := rs.registry.GetService(ctx, name, &metav1.GetOptions{})
+	oldObj, err := rs.services.Get(ctx, name, &metav1.GetOptions{})
 	if err != nil {
 		return nil, false, err
 	}
+	oldService := oldObj.(*api.Service)
 
 	obj, err := objInfo.UpdatedObject(ctx, oldService)
 	if err != nil {
@@ -331,7 +358,7 @@ func (rs *REST) Update(ctx genericapirequest.Context, name string, objInfo rest.
 
 	// Update service from ExternalName to non-ExternalName, should initialize ClusterIP.
 	if oldService.Spec.Type == api.ServiceTypeExternalName && service.Spec.Type != api.ServiceTypeExternalName {
-		if releaseServiceIP, err = rs.initClusterIP(service); err != nil {
+		if releaseServiceIP, err = initClusterIP(service, rs.serviceIPs); err != nil {
 			return nil, false, err
 		}
 	}
@@ -344,11 +371,11 @@ func (rs *REST) Update(ctx genericapirequest.Context, name string, objInfo rest.
 	// Update service from NodePort or LoadBalancer to ExternalName or ClusterIP, should release NodePort if exists.
 	if (oldService.Spec.Type == api.ServiceTypeNodePort || oldService.Spec.Type == api.ServiceTypeLoadBalancer) &&
 		(service.Spec.Type == api.ServiceTypeExternalName || service.Spec.Type == api.ServiceTypeClusterIP) {
-		rs.releaseNodePorts(oldService, nodePortOp)
+		releaseNodePorts(oldService, nodePortOp)
 	}
 	// Update service from any type to NodePort or LoadBalancer, should update NodePort.
 	if service.Spec.Type == api.ServiceTypeNodePort || service.Spec.Type == api.ServiceTypeLoadBalancer {
-		if err := rs.updateNodePorts(oldService, service, nodePortOp); err != nil {
+		if err := updateNodePorts(oldService, service, nodePortOp); err != nil {
 			return nil, false, err
 		}
 	}
@@ -368,18 +395,18 @@ func (rs *REST) Update(ctx genericapirequest.Context, name string, objInfo rest.
 		return nil, false, errors.NewInvalid(api.Kind("Service"), service.Name, errs)
 	}
 
-	out, err := rs.registry.UpdateService(ctx, service, createValidation, updateValidation)
+	out, created, err := rs.services.Update(ctx, service.Name, rest.DefaultUpdatedObjectInfo(service), createValidation, updateValidation)
 	if err == nil {
 		el := nodePortOp.Commit()
 		if el != nil {
 			// problems should be fixed by an eventual reconciliation / restart
-			glog.Errorf("error(s) committing NodePorts changes: %v", el)
+			utilruntime.HandleError(fmt.Errorf("error(s) committing NodePorts changes: %v", el))
 		}
 
 		releaseServiceIP = false
 	}
 
-	return out, false, err
+	return out, created, err
 }
 
 // Implement Redirector.
@@ -395,10 +422,11 @@ func (rs *REST) ResourceLocation(ctx genericapirequest.Context, id string) (*url
 
 	// If a port *number* was specified, find the corresponding service port name
 	if portNum, err := strconv.ParseInt(portStr, 10, 64); err == nil {
-		svc, err := rs.registry.GetService(ctx, svcName, &metav1.GetOptions{})
+		obj, err := rs.services.Get(ctx, svcName, &metav1.GetOptions{})
 		if err != nil {
 			return nil, nil, err
 		}
+		svc := obj.(*api.Service)
 		found := false
 		for _, svcPort := range svc.Spec.Ports {
 			if int64(svcPort.Port) == portNum {
@@ -413,10 +441,11 @@ func (rs *REST) ResourceLocation(ctx genericapirequest.Context, id string) (*url
 		}
 	}
 
-	eps, err := rs.endpoints.GetEndpoints(ctx, svcName, &metav1.GetOptions{})
+	obj, err := rs.endpoints.Get(ctx, svcName, &metav1.GetOptions{})
 	if err != nil {
 		return nil, nil, err
 	}
+	eps := obj.(*api.Endpoints)
 	if len(eps.Subsets) == 0 {
 		return nil, nil, errors.NewServiceUnavailable(fmt.Sprintf("no endpoints available for service %q", svcName))
 	}
@@ -439,7 +468,7 @@ func (rs *REST) ResourceLocation(ctx genericapirequest.Context, id string) (*url
 					addr := ss.Addresses[(addrSeed+try)%len(ss.Addresses)]
 					if !utilfeature.DefaultFeatureGate.Enabled(features.ServiceProxyAllowExternalIPs) {
 						if err := isValidAddress(ctx, &addr, rs.pods); err != nil {
-							glog.Errorf("Address %v isn't valid (%v)", addr, err)
+							utilruntime.HandleError(fmt.Errorf("Address %v isn't valid (%v)", addr, err))
 							continue
 						}
 					}
@@ -450,14 +479,18 @@ func (rs *REST) ResourceLocation(ctx genericapirequest.Context, id string) (*url
 						Host:   net.JoinHostPort(ip, strconv.Itoa(port)),
 					}, rs.proxyTransport, nil
 				}
-				glog.Errorf("Failed to find a valid address, skipping subset: %v", ss)
+				utilruntime.HandleError(fmt.Errorf("Failed to find a valid address, skipping subset: %v", ss))
 			}
 		}
 	}
 	return nil, nil, errors.NewServiceUnavailable(fmt.Sprintf("no endpoints available for service %q", id))
 }
 
-func isValidAddress(ctx genericapirequest.Context, addr *api.EndpointAddress, pods *podstore.REST) error {
+func (r *REST) ConvertToTable(ctx genericapirequest.Context, object runtime.Object, tableOptions runtime.Object) (*metav1beta1.Table, error) {
+	return r.services.ConvertToTable(ctx, object, tableOptions)
+}
+
+func isValidAddress(ctx genericapirequest.Context, addr *api.EndpointAddress, pods rest.Getter) error {
 	if addr.TargetRef == nil {
 		return fmt.Errorf("Address has no target ref, skipping: %v", addr)
 	}
@@ -503,17 +536,6 @@ func containsNodePort(serviceNodePorts []ServiceNodePort, serviceNodePort Servic
 	return false
 }
 
-func CollectServiceNodePorts(service *api.Service) []int {
-	servicePorts := []int{}
-	for i := range service.Spec.Ports {
-		servicePort := &service.Spec.Ports[i]
-		if servicePort.NodePort != 0 {
-			servicePorts = append(servicePorts, int(servicePort.NodePort))
-		}
-	}
-	return servicePorts
-}
-
 // Loop through the service ports list, find one with the same port number and
 // NodePort specified, return this NodePort otherwise return 0.
 func findRequestedNodePort(port int, servicePorts []api.ServicePort) int {
@@ -527,7 +549,7 @@ func findRequestedNodePort(port int, servicePorts []api.ServicePort) int {
 }
 
 // allocateHealthCheckNodePort allocates health check node port to service.
-func (rs *REST) allocateHealthCheckNodePort(service *api.Service, nodePortOp *portallocator.PortAllocationOperation) error {
+func allocateHealthCheckNodePort(service *api.Service, nodePortOp *portallocator.PortAllocationOperation) error {
 	healthCheckNodePort := service.Spec.HealthCheckNodePort
 	if healthCheckNodePort != 0 {
 		// If the request has a health check nodePort in mind, attempt to reserve it.
@@ -550,11 +572,11 @@ func (rs *REST) allocateHealthCheckNodePort(service *api.Service, nodePortOp *po
 }
 
 // The return bool value indicates if a cluster IP is allocated successfully.
-func (rs *REST) initClusterIP(service *api.Service) (bool, error) {
+func initClusterIP(service *api.Service, serviceIPs ipallocator.Interface) (bool, error) {
 	switch {
 	case service.Spec.ClusterIP == "":
 		// Allocate next available.
-		ip, err := rs.serviceIPs.AllocateNext()
+		ip, err := serviceIPs.AllocateNext()
 		if err != nil {
 			// TODO: what error should be returned here?  It's not a
 			// field-level validation failure (the field is valid), and it's
@@ -565,7 +587,7 @@ func (rs *REST) initClusterIP(service *api.Service) (bool, error) {
 		return true, nil
 	case service.Spec.ClusterIP != api.ClusterIPNone && service.Spec.ClusterIP != "":
 		// Try to respect the requested IP.
-		if err := rs.serviceIPs.Allocate(net.ParseIP(service.Spec.ClusterIP)); err != nil {
+		if err := serviceIPs.Allocate(net.ParseIP(service.Spec.ClusterIP)); err != nil {
 			// TODO: when validation becomes versioned, this gets more complicated.
 			el := field.ErrorList{field.Invalid(field.NewPath("spec", "clusterIP"), service.Spec.ClusterIP, err.Error())}
 			return false, errors.NewInvalid(api.Kind("Service"), service.Name, el)
@@ -576,7 +598,7 @@ func (rs *REST) initClusterIP(service *api.Service) (bool, error) {
 	return false, nil
 }
 
-func (rs *REST) initNodePorts(service *api.Service, nodePortOp *portallocator.PortAllocationOperation) error {
+func initNodePorts(service *api.Service, nodePortOp *portallocator.PortAllocationOperation) error {
 	svcPortToNodePort := map[int]int{}
 	for i := range service.Spec.Ports {
 		servicePort := &service.Spec.Ports[i]
@@ -625,8 +647,8 @@ func (rs *REST) initNodePorts(service *api.Service, nodePortOp *portallocator.Po
 	return nil
 }
 
-func (rs *REST) updateNodePorts(oldService, newService *api.Service, nodePortOp *portallocator.PortAllocationOperation) error {
-	oldNodePortsNumbers := CollectServiceNodePorts(oldService)
+func updateNodePorts(oldService, newService *api.Service, nodePortOp *portallocator.PortAllocationOperation) error {
+	oldNodePortsNumbers := collectServiceNodePorts(oldService)
 	newNodePorts := []ServiceNodePort{}
 	portAllocated := map[int]bool{}
 
@@ -659,7 +681,7 @@ func (rs *REST) updateNodePorts(oldService, newService *api.Service, nodePortOp 
 		newNodePorts = append(newNodePorts, nodePort)
 	}
 
-	newNodePortsNumbers := CollectServiceNodePorts(newService)
+	newNodePortsNumbers := collectServiceNodePorts(newService)
 
 	// The comparison loops are O(N^2), but we don't expect N to be huge
 	// (there's a hard-limit at 2^16, because they're ports; and even 4 ports would be a lot)
@@ -673,10 +695,21 @@ func (rs *REST) updateNodePorts(oldService, newService *api.Service, nodePortOp 
 	return nil
 }
 
-func (rs *REST) releaseNodePorts(service *api.Service, nodePortOp *portallocator.PortAllocationOperation) {
-	nodePorts := CollectServiceNodePorts(service)
+func releaseNodePorts(service *api.Service, nodePortOp *portallocator.PortAllocationOperation) {
+	nodePorts := collectServiceNodePorts(service)
 
 	for _, nodePort := range nodePorts {
 		nodePortOp.ReleaseDeferred(nodePort)
 	}
+}
+
+func collectServiceNodePorts(service *api.Service) []int {
+	servicePorts := []int{}
+	for i := range service.Spec.Ports {
+		servicePort := &service.Spec.Ports[i]
+		if servicePort.NodePort != 0 {
+			servicePorts = append(servicePorts, int(servicePort.NodePort))
+		}
+	}
+	return servicePorts
 }
