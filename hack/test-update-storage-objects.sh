@@ -130,7 +130,7 @@ for test in ${tests[@]}; do
   source_file=${test_data[0]}
 
   kube::log::status "Creating ${source_file}"
-  ${KUBECTL} create -f "${source_file}"
+  ${KUBECTL} create -f "${KUBE_ROOT}/${source_file}"
 
   # Verify that the storage version is the old version
   resource=${test_data[1]}
