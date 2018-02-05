@@ -63,7 +63,6 @@ func GetDefaultControllerOptions(port int32) componentconfig.KubeControllerManag
 		ConcurrentDeploymentSyncs:                       5,
 		ConcurrentNamespaceSyncs:                        10,
 		ConcurrentSATokenSyncs:                          5,
-		ServiceSyncPeriod:                               metav1.Duration{Duration: 5 * time.Minute},
 		RouteReconciliationPeriod:                       metav1.Duration{Duration: 10 * time.Second},
 		ResourceQuotaSyncPeriod:                         metav1.Duration{Duration: 5 * time.Minute},
 		NamespaceSyncPeriod:                             metav1.Duration{Duration: 5 * time.Minute},
