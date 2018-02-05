@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/watch"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
@@ -277,13 +278,14 @@ func RunRun(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *c
 
 	params["env"] = cmdutil.GetFlagStringArray(cmd, "env")
 
+	allErrs := []error{}
 	var runObjectMap = map[string]*RunObject{}
 	runObject, err := createGeneratedObject(f, cmd, generator, names, params, cmdutil.GetFlagString(cmd, "overrides"), namespace)
 	if err != nil {
-		return err
+		allErrs = append(allErrs, err)
+	} else {
+		runObjectMap[generatorName] = runObject
 	}
-	runObjectMap[generatorName] = runObject
-
 	if cmdutil.GetFlagBool(cmd, "expose") {
 		serviceGenerator := cmdutil.GetFlagString(cmd, "service-generator")
 		if len(serviceGenerator) == 0 {
@@ -291,9 +293,10 @@ func RunRun(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *c
 		}
 		serviceRunObject, err := generateService(f, cmd, args, serviceGenerator, params, namespace, cmdOut)
 		if err != nil {
-			return err
+			allErrs = append(allErrs, err)
+		} else {
+			runObjectMap[generatorName] = serviceRunObject
 		}
-		runObjectMap[generatorName] = serviceRunObject
 	}
 
 	if attach {
@@ -401,13 +404,15 @@ func RunRun(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *c
 		}
 
 	}
-
-	outputFormat := cmdutil.GetFlagString(cmd, "output")
-	if outputFormat != "" || cmdutil.GetDryRunFlag(cmd) {
-		return f.PrintObject(cmd, false, runObject.Mapper, runObject.Object, cmdOut)
+	if runObject != nil {
+		outputFormat := cmdutil.GetFlagString(cmd, "output")
+		if outputFormat != "" || cmdutil.GetDryRunFlag(cmd) {
+			return f.PrintObject(cmd, false, runObject.Mapper, runObject.Object, cmdOut)
+		}
+		f.PrintSuccess(false, cmdOut, runObject.Mapping.Resource, args[0], cmdutil.GetDryRunFlag(cmd), "created")
 	}
-	f.PrintSuccess(false, cmdOut, runObject.Mapping.Resource, args[0], cmdutil.GetDryRunFlag(cmd), "created")
-	return nil
+
+	return utilerrors.NewAggregate(allErrs)
 }
 
 // waitForPod watches the given pod until the exitCondition is true
