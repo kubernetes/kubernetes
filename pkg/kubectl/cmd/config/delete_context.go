@@ -28,7 +28,7 @@ import (
 )
 
 var (
-	delete_context_example = templates.Examples(`
+	deleteContextExample = templates.Examples(`
 		# Delete the context for the minikube cluster
 		kubectl config delete-context minikube`)
 )
@@ -39,50 +39,45 @@ func NewCmdConfigDeleteContext(out, errOut io.Writer, configAccess clientcmd.Con
 		DisableFlagsInUseLine: true,
 		Short:   i18n.T("Delete the specified context from the kubeconfig"),
 		Long:    "Delete the specified context from the kubeconfig",
-		Example: delete_context_example,
+		Example: deleteContextExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			err := runDeleteContext(out, errOut, configAccess, cmd)
-			cmdutil.CheckErr(err)
+			cmdutil.CheckErr(runDeleteContext(out, errOut, configAccess, args))
 		},
 	}
 
 	return cmd
 }
 
-func runDeleteContext(out, errOut io.Writer, configAccess clientcmd.ConfigAccess, cmd *cobra.Command) error {
+func runDeleteContext(out, errOut io.Writer, configAccess clientcmd.ConfigAccess, args []string) error {
 	config, err := configAccess.GetStartingConfig()
 	if err != nil {
 		return err
-	}
-
-	args := cmd.Flags().Args()
-	if len(args) != 1 {
-		cmd.Help()
-		return nil
 	}
 
 	configFile := configAccess.GetDefaultFilename()
 	if configAccess.IsExplicitFile() {
 		configFile = configAccess.GetExplicitFile()
 	}
+	for _, arg := range args {
+		_, ok := config.Contexts[arg]
+		if !ok {
+			return fmt.Errorf("cannot delete context %s, not in %s", arg, configFile)
+		}
 
-	name := args[0]
-	_, ok := config.Contexts[name]
-	if !ok {
-		return fmt.Errorf("cannot delete context %s, not in %s", name, configFile)
+		if config.CurrentContext == arg {
+			fmt.Fprint(errOut, "warning: this removed your active context, use \"kubectl config use-context\" to select a different one\n")
+		}
+
+		delete(config.Contexts, arg)
+
+		if err := clientcmd.ModifyConfig(configAccess, *config, true); err != nil {
+			return err
+		}
+
+		_, err := fmt.Fprintf(out, "deleted context %s from %s\n", arg, configFile)
+		if err != nil {
+			return err
+		}
 	}
-
-	if config.CurrentContext == name {
-		fmt.Fprint(errOut, "warning: this removed your active context, use \"kubectl config use-context\" to select a different one\n")
-	}
-
-	delete(config.Contexts, name)
-
-	if err := clientcmd.ModifyConfig(configAccess, *config, true); err != nil {
-		return err
-	}
-
-	fmt.Fprintf(out, "deleted context %s from %s\n", name, configFile)
-
 	return nil
 }

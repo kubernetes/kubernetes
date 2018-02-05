@@ -30,7 +30,7 @@ import (
 
 type deleteClusterTest struct {
 	config           clientcmdapi.Config
-	clusterToDelete  string
+	clusterToDelete  []string
 	expectedClusters []string
 	expectedOut      string
 }
@@ -44,9 +44,26 @@ func TestDeleteCluster(t *testing.T) {
 	}
 	test := deleteClusterTest{
 		config:           conf,
-		clusterToDelete:  "minikube",
+		clusterToDelete:  []string{"minikube"},
 		expectedClusters: []string{"otherkube"},
 		expectedOut:      "deleted cluster minikube from %s\n",
+	}
+
+	test.run(t)
+}
+
+func TestDeleteMultiCluster(t *testing.T) {
+	conf := clientcmdapi.Config{
+		Clusters: map[string]*clientcmdapi.Cluster{
+			"minikube":  {Server: "https://192.168.0.99"},
+			"otherkube": {Server: "https://192.168.0.100"},
+		},
+	}
+	test := deleteClusterTest{
+		config:           conf,
+		clusterToDelete:  []string{"minikube", "otherkube"},
+		expectedClusters: []string{},
+		expectedOut:      "deleted cluster minikube from %s\ndeleted cluster otherkube from %s\n",
 	}
 
 	test.run(t)
@@ -69,12 +86,12 @@ func (test deleteClusterTest) run(t *testing.T) {
 
 	buf := bytes.NewBuffer([]byte{})
 	cmd := NewCmdConfigDeleteCluster(buf, pathOptions)
-	cmd.SetArgs([]string{test.clusterToDelete})
-	if err := cmd.Execute(); err != nil {
-		t.Fatalf("unexpected error executing command: %v", err)
+	cmd.Run(cmd, test.clusterToDelete)
+	name := []interface{}{}
+	for range test.clusterToDelete {
+		name = append(name, fakeKubeFile.Name())
 	}
-
-	expectedOutWithFile := fmt.Sprintf(test.expectedOut, fakeKubeFile.Name())
+	expectedOutWithFile := fmt.Sprintf(test.expectedOut, name...)
 	if expectedOutWithFile != buf.String() {
 		t.Errorf("expected output %s, but got %s", expectedOutWithFile, buf.String())
 		return
@@ -92,6 +109,6 @@ func (test deleteClusterTest) run(t *testing.T) {
 	}
 
 	if !reflect.DeepEqual(test.expectedClusters, clusters) {
-		t.Errorf("expected clusters %v, but found %v in kubeconfig", test.expectedClusters, clusters)
+		t.Errorf("expected clusters:\n %v,\n but found %v in kubeconfig", test.expectedClusters, clusters)
 	}
 }

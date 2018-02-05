@@ -28,7 +28,7 @@ import (
 )
 
 var (
-	delete_cluster_example = templates.Examples(`
+	deleteClusterExample = templates.Examples(`
 		# Delete the minikube cluster
 		kubectl config delete-cluster minikube`)
 )
@@ -39,46 +39,41 @@ func NewCmdConfigDeleteCluster(out io.Writer, configAccess clientcmd.ConfigAcces
 		DisableFlagsInUseLine: true,
 		Short:   i18n.T("Delete the specified cluster from the kubeconfig"),
 		Long:    "Delete the specified cluster from the kubeconfig",
-		Example: delete_cluster_example,
+		Example: deleteClusterExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			err := runDeleteCluster(out, configAccess, cmd)
-			cmdutil.CheckErr(err)
+			cmdutil.CheckErr(runDeleteCluster(out, configAccess, args))
 		},
 	}
 
 	return cmd
 }
 
-func runDeleteCluster(out io.Writer, configAccess clientcmd.ConfigAccess, cmd *cobra.Command) error {
+func runDeleteCluster(out io.Writer, configAccess clientcmd.ConfigAccess, args []string) error {
 	config, err := configAccess.GetStartingConfig()
 	if err != nil {
 		return err
-	}
-
-	args := cmd.Flags().Args()
-	if len(args) != 1 {
-		cmd.Help()
-		return nil
 	}
 
 	configFile := configAccess.GetDefaultFilename()
 	if configAccess.IsExplicitFile() {
 		configFile = configAccess.GetExplicitFile()
 	}
+	for _, arg := range args {
+		_, ok := config.Clusters[arg]
+		if !ok {
+			return fmt.Errorf("cannot delete cluster %s, not in %s", arg, configFile)
+		}
 
-	name := args[0]
-	_, ok := config.Clusters[name]
-	if !ok {
-		return fmt.Errorf("cannot delete cluster %s, not in %s", name, configFile)
+		delete(config.Clusters, arg)
+
+		if err := clientcmd.ModifyConfig(configAccess, *config, true); err != nil {
+			return err
+		}
+
+		_, err := fmt.Fprintf(out, "deleted cluster %s from %s\n", arg, configFile)
+		if err != nil {
+			return err
+		}
 	}
-
-	delete(config.Clusters, name)
-
-	if err := clientcmd.ModifyConfig(configAccess, *config, true); err != nil {
-		return err
-	}
-
-	fmt.Fprintf(out, "deleted cluster %s from %s\n", name, configFile)
-
 	return nil
 }
