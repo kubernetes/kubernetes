@@ -453,18 +453,18 @@ func (testcase *testcase) AttachDisk(instanceID, volumeID string) (string, error
 	if expected.volumeID == "" && expected.instanceID == "" {
 		// testcase.attach looks uninitialized, test did not expect to call
 		// AttachDisk
-		testcase.t.Errorf("Unexpected AttachDisk call!")
-		return "", errors.New("Unexpected AttachDisk call!")
+		testcase.t.Errorf("unexpected AttachDisk call")
+		return "", errors.New("unexpected AttachDisk call")
 	}
 
 	if expected.volumeID != volumeID {
-		testcase.t.Errorf("Unexpected AttachDisk call: expected volumeID %s, got %s", expected.volumeID, volumeID)
-		return "", errors.New("Unexpected AttachDisk call: wrong volumeID")
+		testcase.t.Errorf("unexpected AttachDisk call: expected volumeID %s, got %s", expected.volumeID, volumeID)
+		return "", errors.New("unexpected AttachDisk call: wrong volumeID")
 	}
 
 	if expected.instanceID != instanceID {
-		testcase.t.Errorf("Unexpected AttachDisk call: expected instanceID %s, got %s", expected.instanceID, instanceID)
-		return "", errors.New("Unexpected AttachDisk call: wrong instanceID")
+		testcase.t.Errorf("unexpected AttachDisk call: expected instanceID %s, got %s", expected.instanceID, instanceID)
+		return "", errors.New("unexpected AttachDisk call: wrong instanceID")
 	}
 
 	glog.V(4).Infof("AttachDisk call: %s, %s, returning %q, %v", volumeID, instanceID, expected.retDeviceName, expected.ret)
@@ -479,18 +479,18 @@ func (testcase *testcase) DetachDisk(instanceID, volumeID string) error {
 	if expected.devicePath == "" && expected.instanceID == "" {
 		// testcase.detach looks uninitialized, test did not expect to call
 		// DetachDisk
-		testcase.t.Errorf("Unexpected DetachDisk call!")
-		return errors.New("Unexpected DetachDisk call!")
+		testcase.t.Errorf("unexpected DetachDisk call")
+		return errors.New("unexpected DetachDisk call")
 	}
 
 	if expected.devicePath != volumeID {
-		testcase.t.Errorf("Unexpected DetachDisk call: expected volumeID %s, got %s", expected.devicePath, volumeID)
-		return errors.New("Unexpected DetachDisk call: wrong volumeID")
+		testcase.t.Errorf("unexpected DetachDisk call: expected volumeID %s, got %s", expected.devicePath, volumeID)
+		return errors.New("unexpected DetachDisk call: wrong volumeID")
 	}
 
 	if expected.instanceID != instanceID {
-		testcase.t.Errorf("Unexpected DetachDisk call: expected instanceID %s, got %s", expected.instanceID, instanceID)
-		return errors.New("Unexpected DetachDisk call: wrong instanceID")
+		testcase.t.Errorf("unexpected DetachDisk call: expected instanceID %s, got %s", expected.instanceID, instanceID)
+		return errors.New("unexpected DetachDisk call: wrong instanceID")
 	}
 
 	glog.V(4).Infof("DetachDisk call: %s, %s, returning %v", volumeID, instanceID, expected.ret)
@@ -527,18 +527,18 @@ func (testcase *testcase) DiskIsAttached(instanceID, volumeID string) (bool, err
 	if expected.volumeID == "" && expected.instanceID == "" {
 		// testcase.diskIsAttached looks uninitialized, test did not expect to
 		// call DiskIsAttached
-		testcase.t.Errorf("Unexpected DiskIsAttached call!")
-		return false, errors.New("Unexpected DiskIsAttached call!")
+		testcase.t.Errorf("unexpected DiskIsAttached call")
+		return false, errors.New("unexpected DiskIsAttached call")
 	}
 
 	if expected.volumeID != volumeID {
-		testcase.t.Errorf("Unexpected DiskIsAttached call: expected volumeID %s, got %s", expected.volumeID, volumeID)
-		return false, errors.New("Unexpected DiskIsAttached call: wrong volumeID")
+		testcase.t.Errorf("unexpected DiskIsAttached call: expected volumeID %s, got %s", expected.volumeID, volumeID)
+		return false, errors.New("unexpected DiskIsAttached call: wrong volumeID")
 	}
 
 	if expected.instanceID != instanceID {
-		testcase.t.Errorf("Unexpected DiskIsAttached call: expected instanceID %s, got %s", expected.instanceID, instanceID)
-		return false, errors.New("Unexpected DiskIsAttached call: wrong instanceID")
+		testcase.t.Errorf("unexpected DiskIsAttached call: expected instanceID %s, got %s", expected.instanceID, instanceID)
+		return false, errors.New("unexpected DiskIsAttached call: wrong instanceID")
 	}
 
 	glog.V(4).Infof("DiskIsAttached call: %s, %s, returning %v, %v", volumeID, instanceID, expected.isAttached, expected.ret)
@@ -551,18 +551,18 @@ func (testcase *testcase) GetAttachmentDiskPath(instanceID, volumeID string) (st
 	if expected.volumeID == "" && expected.instanceID == "" {
 		// testcase.diskPath looks uninitialized, test did not expect to
 		// call GetAttachmentDiskPath
-		testcase.t.Errorf("Unexpected GetAttachmentDiskPath call!")
-		return "", errors.New("Unexpected GetAttachmentDiskPath call!")
+		testcase.t.Errorf("unexpected GetAttachmentDiskPath call")
+		return "", errors.New("unexpected GetAttachmentDiskPath call")
 	}
 
 	if expected.volumeID != volumeID {
-		testcase.t.Errorf("Unexpected GetAttachmentDiskPath call: expected volumeID %s, got %s", expected.volumeID, volumeID)
-		return "", errors.New("Unexpected GetAttachmentDiskPath call: wrong volumeID")
+		testcase.t.Errorf("unexpected GetAttachmentDiskPath call: expected volumeID %s, got %s", expected.volumeID, volumeID)
+		return "", errors.New("unexpected GetAttachmentDiskPath call: wrong volumeID")
 	}
 
 	if expected.instanceID != instanceID {
-		testcase.t.Errorf("Unexpected GetAttachmentDiskPath call: expected instanceID %s, got %s", expected.instanceID, instanceID)
-		return "", errors.New("Unexpected GetAttachmentDiskPath call: wrong instanceID")
+		testcase.t.Errorf("unexpected GetAttachmentDiskPath call: expected instanceID %s, got %s", expected.instanceID, instanceID)
+		return "", errors.New("unexpected GetAttachmentDiskPath call: wrong instanceID")
 	}
 
 	glog.V(4).Infof("GetAttachmentDiskPath call: %s, %s, returning %v, %v", volumeID, instanceID, expected.retPath, expected.ret)
@@ -588,25 +588,25 @@ func (testcase *testcase) DiskIsAttachedByName(nodeName types.NodeName, volumeID
 	}
 
 	if expected.nodeName != nodeName {
-		testcase.t.Errorf("Unexpected DiskIsAttachedByName call: expected nodename %s, got %s", expected.nodeName, nodeName)
-		return false, instanceID, errors.New("Unexpected DiskIsAttachedByName call: wrong nodename")
+		testcase.t.Errorf("unexpected DiskIsAttachedByName call: expected nodename %s, got %s", expected.nodeName, nodeName)
+		return false, instanceID, errors.New("unexpected DiskIsAttachedByName call: wrong nodename")
 	}
 
 	if expected.volumeID == "" && expected.instanceID == "" {
 		// testcase.diskIsAttached looks uninitialized, test did not expect to
 		// call DiskIsAttached
-		testcase.t.Errorf("Unexpected DiskIsAttachedByName call!")
-		return false, instanceID, errors.New("Unexpected DiskIsAttachedByName call!")
+		testcase.t.Errorf("unexpected DiskIsAttachedByName call")
+		return false, instanceID, errors.New("unexpected DiskIsAttachedByName call")
 	}
 
 	if expected.volumeID != volumeID {
-		testcase.t.Errorf("Unexpected DiskIsAttachedByName call: expected volumeID %s, got %s", expected.volumeID, volumeID)
-		return false, instanceID, errors.New("Unexpected DiskIsAttachedByName call: wrong volumeID")
+		testcase.t.Errorf("unexpected DiskIsAttachedByName call: expected volumeID %s, got %s", expected.volumeID, volumeID)
+		return false, instanceID, errors.New("unexpected DiskIsAttachedByName call: wrong volumeID")
 	}
 
 	if expected.instanceID != instanceID {
-		testcase.t.Errorf("Unexpected DiskIsAttachedByName call: expected instanceID %s, got %s", expected.instanceID, instanceID)
-		return false, instanceID, errors.New("Unexpected DiskIsAttachedByName call: wrong instanceID")
+		testcase.t.Errorf("unexpected DiskIsAttachedByName call: expected instanceID %s, got %s", expected.instanceID, instanceID)
+		return false, instanceID, errors.New("unexpected DiskIsAttachedByName call: wrong instanceID")
 	}
 
 	glog.V(4).Infof("DiskIsAttachedByName call: %s, %s, returning %v, %v", volumeID, nodeName, expected.isAttached, expected.instanceID, expected.ret)
