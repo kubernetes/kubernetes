@@ -34,20 +34,20 @@ func stringFlagFor(s string) flag.StringFlag {
 	return f
 }
 
-func TestCreateAuthInfoOptions(t *testing.T) {
+func TestSetAuthInfoOptions(t *testing.T) {
 	tests := []struct {
 		flags           []string
 		wantParseErr    bool
 		wantCompleteErr bool
 		wantValidateErr bool
 
-		wantOptions *createAuthInfoOptions
+		wantOptions *setAuthInfoOptions
 	}{
 		{
 			flags: []string{
 				"me",
 			},
-			wantOptions: &createAuthInfoOptions{
+			wantOptions: &setAuthInfoOptions{
 				name: "me",
 			},
 		},
@@ -56,7 +56,7 @@ func TestCreateAuthInfoOptions(t *testing.T) {
 				"me",
 				"--token=foo",
 			},
-			wantOptions: &createAuthInfoOptions{
+			wantOptions: &setAuthInfoOptions{
 				name:  "me",
 				token: stringFlagFor("foo"),
 			},
@@ -67,7 +67,7 @@ func TestCreateAuthInfoOptions(t *testing.T) {
 				"--username=jane",
 				"--password=bar",
 			},
-			wantOptions: &createAuthInfoOptions{
+			wantOptions: &setAuthInfoOptions{
 				name:     "me",
 				username: stringFlagFor("jane"),
 				password: stringFlagFor("bar"),
@@ -90,7 +90,7 @@ func TestCreateAuthInfoOptions(t *testing.T) {
 				"--auth-provider-arg=client-secret=bar",
 				"me",
 			},
-			wantOptions: &createAuthInfoOptions{
+			wantOptions: &setAuthInfoOptions{
 				name:         "me",
 				authProvider: stringFlagFor("oidc"),
 				authProviderArgs: map[string]string{
@@ -107,7 +107,7 @@ func TestCreateAuthInfoOptions(t *testing.T) {
 				"--auth-provider-arg=client-secret-",
 				"me",
 			},
-			wantOptions: &createAuthInfoOptions{
+			wantOptions: &setAuthInfoOptions{
 				name:             "me",
 				authProvider:     stringFlagFor("oidc"),
 				authProviderArgs: map[string]string{},
@@ -123,7 +123,7 @@ func TestCreateAuthInfoOptions(t *testing.T) {
 				"--auth-provider-arg=client-secret-",
 				"me",
 			},
-			wantOptions: &createAuthInfoOptions{
+			wantOptions: &setAuthInfoOptions{
 				name:             "me",
 				authProviderArgs: map[string]string{},
 				authProviderArgsToRemove: []string{
@@ -151,7 +151,7 @@ func TestCreateAuthInfoOptions(t *testing.T) {
 	for i, test := range tests {
 		buff := new(bytes.Buffer)
 
-		opts := new(createAuthInfoOptions)
+		opts := new(setAuthInfoOptions)
 		cmd := newCmdConfigSetAuthInfo(buff, opts)
 		if err := cmd.ParseFlags(test.flags); err != nil {
 			if !test.wantParseErr {
@@ -193,7 +193,7 @@ func TestCreateAuthInfoOptions(t *testing.T) {
 	}
 }
 
-type createAuthInfoTest struct {
+type setAuthInfoTest struct {
 	description    string
 	config         clientcmdapi.Config
 	args           []string
@@ -202,10 +202,10 @@ type createAuthInfoTest struct {
 	expectedConfig clientcmdapi.Config
 }
 
-func TestCreateAuthInfo(t *testing.T) {
+func TestSetAuthInfo(t *testing.T) {
 	conf := clientcmdapi.Config{}
-	test := createAuthInfoTest{
-		description: "Testing for create aythinfo",
+	test := setAuthInfoTest{
+		description: "Testing for set aythinfo",
 		config:      conf,
 		args:        []string{"cluster-admin"},
 		flags: []string{
@@ -220,7 +220,7 @@ func TestCreateAuthInfo(t *testing.T) {
 	}
 	test.run(t)
 }
-func (test createAuthInfoTest) run(t *testing.T) {
+func (test setAuthInfoTest) run(t *testing.T) {
 	fakeKubeFile, err := ioutil.TempFile(os.TempDir(), "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)

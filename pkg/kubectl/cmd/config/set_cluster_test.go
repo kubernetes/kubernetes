@@ -26,7 +26,7 @@ import (
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
 
-type createClusterTest struct {
+type setClusterTest struct {
 	description    string
 	config         clientcmdapi.Config
 	args           []string
@@ -35,9 +35,9 @@ type createClusterTest struct {
 	expectedConfig clientcmdapi.Config
 }
 
-func TestCreateCluster(t *testing.T) {
+func TestSetCluster(t *testing.T) {
 	conf := clientcmdapi.Config{}
-	test := createClusterTest{
+	test := setClusterTest{
 		description: "Testing 'kubectl config set-cluster' with a new cluster",
 		config:      conf,
 		args:        []string{"my-cluster"},
@@ -60,7 +60,7 @@ func TestModifyCluster(t *testing.T) {
 			"my-cluster": {Server: "https://192.168.0.1"},
 		},
 	}
-	test := createClusterTest{
+	test := setClusterTest{
 		description: "Testing 'kubectl config set-cluster' with an existing cluster",
 		config:      conf,
 		args:        []string{"my-cluster"},
@@ -77,7 +77,7 @@ func TestModifyCluster(t *testing.T) {
 	test.run(t)
 }
 
-func (test createClusterTest) run(t *testing.T) {
+func (test setClusterTest) run(t *testing.T) {
 	fakeKubeFile, err := ioutil.TempFile(os.TempDir(), "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
