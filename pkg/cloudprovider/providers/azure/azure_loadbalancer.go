@@ -375,10 +375,12 @@ func (az *Cloud) findServiceIPAddress(clusterName string, service *v1.Service, i
 		return "", err
 	}
 	if !existsLb {
-		return "", fmt.Errorf("Expected to find an IP address for service %s but did not", service.Name)
+		glog.V(2).Infof("Expected to find an IP address for service %s but did not. Assuming it has been removed", service.Name)
+		return "", nil
 	}
 	if len(lbStatus.Ingress) < 1 {
-		return "", fmt.Errorf("Expected to find an IP address for service %s but it had no ingresses", service.Name)
+		glog.V(2).Infof("Expected to find an IP address for service %s but it had no ingresses. Assuming it has been removed", service.Name)
+		return "", nil
 	}
 
 	return lbStatus.Ingress[0].IP, nil
