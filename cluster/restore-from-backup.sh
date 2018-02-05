@@ -23,7 +23,7 @@
 #   b) in case of etcd3
 #      $ etcdctl --endpoints=<address> snapshot save
 #      produced .db file
-# - version.txt file is in the current directy (if it isn't it will be
+# - version.txt file is in the current directory (if it isn't it will be
 #     defaulted to "2.2.1/etcd2"). Based on this file, the script will
 #     decide to which version we are restoring (procedures are different
 #     for etcd2 and etcd3).

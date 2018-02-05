@@ -40,7 +40,7 @@ function usage() {
   echo "  -N:  Upgrade nodes only"
   echo "  -P:  Node upgrade prerequisites only (create a new instance template)"
   echo "  -c:  Upgrade NODE_UPGRADE_PARALLELISM nodes in parallel (default=1) within a single instance group. The MIGs themselves are dealt serially."
-  echo "  -o:  Use os distro sepcified in KUBE_NODE_OS_DISTRIBUTION for new nodes. Options include 'debian' or 'gci'"
+  echo "  -o:  Use os distro specified in KUBE_NODE_OS_DISTRIBUTION for new nodes. Options include 'debian' or 'gci'"
   echo "  -l:  Use local(dev) binaries. This is only supported for master upgrades."
   echo ""
   echo '  Version number or publication is either a proper version number'
