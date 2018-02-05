@@ -24,6 +24,7 @@ import (
 	"path"
 	"strings"
 	"sync"
+	"time"
 )
 
 const (
@@ -140,6 +141,9 @@ func GatherApiserverCPUProfileForNSeconds(wg *sync.WaitGroup, profileBaseName st
 	if wg != nil {
 		defer wg.Done()
 	}
+	if profileBaseName == "" {
+		profileBaseName = time.Now().Format(time.RFC3339)
+	}
 	if err := gatherProfileOfKind(profileBaseName, fmt.Sprintf("profile?seconds=%v", n)); err != nil {
 		Logf("Failed to gather apiserver CPU profile: %v", err)
 	}
@@ -149,7 +153,28 @@ func GatherApiserverMemoryProfile(wg *sync.WaitGroup, profileBaseName string) {
 	if wg != nil {
 		defer wg.Done()
 	}
+	if profileBaseName == "" {
+		profileBaseName = time.Now().Format(time.RFC3339)
+	}
 	if err := gatherProfileOfKind(profileBaseName, "heap"); err != nil {
 		Logf("Failed to gather apiserver memory profile: %v", err)
 	}
+}
+
+// StartApiserverCPUProfileGatherer is a polling-based gatherer of the apiserver's
+// CPU profile. It takes the delay b/w consecutive gatherings as an argument and
+// starts the gathering goroutine. To stop the gatherer, close the returned channel.
+func StartApiserverCPUProfileGatherer(delay time.Duration) chan struct{} {
+	stopCh := make(chan struct{})
+	go func() {
+		for {
+			select {
+			case <-time.After(delay):
+				GatherApiserverCPUProfile(nil, "")
+			case <-stopCh:
+				return
+			}
+		}
+	}()
+	return stopCh
 }
