@@ -8939,6 +8939,7 @@ type BetaInstances interface {
 	Delete(ctx context.Context, key *meta.Key) error
 	AttachDisk(context.Context, *meta.Key, *beta.AttachedDisk) error
 	DetachDisk(context.Context, *meta.Key, string) error
+	UpdateNetworkInterface(context.Context, *meta.Key, string, *beta.NetworkInterface) error
 }
 
 // NewMockBetaInstances returns a new mock for Instances.
@@ -8970,12 +8971,13 @@ type MockBetaInstances struct {
 	// order to add your own logic. Return (true, _, _) to prevent the normal
 	// execution flow of the mock. Return (false, nil, nil) to continue with
 	// normal mock behavior/ after the hook function executes.
-	GetHook        func(m *MockBetaInstances, ctx context.Context, key *meta.Key) (bool, *beta.Instance, error)
-	ListHook       func(m *MockBetaInstances, ctx context.Context, zone string, fl *filter.F) (bool, []*beta.Instance, error)
-	InsertHook     func(m *MockBetaInstances, ctx context.Context, key *meta.Key, obj *beta.Instance) (bool, error)
-	DeleteHook     func(m *MockBetaInstances, ctx context.Context, key *meta.Key) (bool, error)
-	AttachDiskHook func(*MockBetaInstances, context.Context, *meta.Key, *beta.AttachedDisk) error
-	DetachDiskHook func(*MockBetaInstances, context.Context, *meta.Key, string) error
+	GetHook                    func(m *MockBetaInstances, ctx context.Context, key *meta.Key) (bool, *beta.Instance, error)
+	ListHook                   func(m *MockBetaInstances, ctx context.Context, zone string, fl *filter.F) (bool, []*beta.Instance, error)
+	InsertHook                 func(m *MockBetaInstances, ctx context.Context, key *meta.Key, obj *beta.Instance) (bool, error)
+	DeleteHook                 func(m *MockBetaInstances, ctx context.Context, key *meta.Key) (bool, error)
+	AttachDiskHook             func(*MockBetaInstances, context.Context, *meta.Key, *beta.AttachedDisk) error
+	DetachDiskHook             func(*MockBetaInstances, context.Context, *meta.Key, string) error
+	UpdateNetworkInterfaceHook func(*MockBetaInstances, context.Context, *meta.Key, string, *beta.NetworkInterface) error
 
 	// X is extra state that can be used as part of the mock. Generated code
 	// will not use this field.
@@ -9137,6 +9139,14 @@ func (m *MockBetaInstances) AttachDisk(ctx context.Context, key *meta.Key, arg0 
 func (m *MockBetaInstances) DetachDisk(ctx context.Context, key *meta.Key, arg0 string) error {
 	if m.DetachDiskHook != nil {
 		return m.DetachDiskHook(m, ctx, key, arg0)
+	}
+	return nil
+}
+
+// UpdateNetworkInterface is a mock for the corresponding method.
+func (m *MockBetaInstances) UpdateNetworkInterface(ctx context.Context, key *meta.Key, arg0 string, arg1 *beta.NetworkInterface) error {
+	if m.UpdateNetworkInterfaceHook != nil {
+		return m.UpdateNetworkInterfaceHook(m, ctx, key, arg0, arg1)
 	}
 	return nil
 }
@@ -9345,6 +9355,39 @@ func (g *GCEBetaInstances) DetachDisk(ctx context.Context, key *meta.Key, arg0 s
 	}
 	err = g.s.WaitForCompletion(ctx, op)
 	glog.V(4).Infof("GCEBetaInstances.DetachDisk(%v, %v, ...) = %+v", ctx, key, err)
+	return err
+}
+
+// UpdateNetworkInterface is a method on GCEBetaInstances.
+func (g *GCEBetaInstances) UpdateNetworkInterface(ctx context.Context, key *meta.Key, arg0 string, arg1 *beta.NetworkInterface) error {
+	glog.V(5).Infof("GCEBetaInstances.UpdateNetworkInterface(%v, %v, ...): called", ctx, key)
+
+	if !key.Valid() {
+		glog.V(2).Infof("GCEBetaInstances.UpdateNetworkInterface(%v, %v, ...): key is invalid (%#v)", ctx, key, key)
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
+	projectID := g.s.ProjectRouter.ProjectID(ctx, "beta", "Instances")
+	rk := &RateLimitKey{
+		ProjectID: projectID,
+		Operation: "UpdateNetworkInterface",
+		Version:   meta.Version("beta"),
+		Service:   "Instances",
+	}
+	glog.V(5).Infof("GCEBetaInstances.UpdateNetworkInterface(%v, %v, ...): projectID = %v, rk = %+v", ctx, key, projectID, rk)
+
+	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEBetaInstances.UpdateNetworkInterface(%v, %v, ...): RateLimiter error: %v", ctx, key, err)
+		return err
+	}
+	call := g.s.Beta.Instances.UpdateNetworkInterface(projectID, key.Zone, key.Name, arg0, arg1)
+	call.Context(ctx)
+	op, err := call.Do()
+	if err != nil {
+		glog.V(4).Infof("GCEBetaInstances.UpdateNetworkInterface(%v, %v, ...) = %+v", ctx, key, err)
+		return err
+	}
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCEBetaInstances.UpdateNetworkInterface(%v, %v, ...) = %+v", ctx, key, err)
 	return err
 }
 
