@@ -383,10 +383,9 @@ func main() {
 	http.HandleFunc("/custom-resource", serveCustomResource)
 	http.HandleFunc("/mutating-custom-resource", serveMutateCustomResource)
 	http.HandleFunc("/crd", serveCRD)
-	clientset := getClient()
 	server := &http.Server{
 		Addr:      ":443",
-		TLSConfig: configTLS(config, clientset),
+		TLSConfig: configTLS(config),
 	}
 	server.ListenAndServeTLS("", "")
 }
