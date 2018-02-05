@@ -34,10 +34,22 @@ type jsonpathTest struct {
 	expectError bool
 }
 
+func lengthJSONPathFunc(input []reflect.Value) []reflect.Value {
+	results := []reflect.Value{}
+	for _, value := range input {
+		results = append(results, reflect.ValueOf(len(value.String())))
+	}
+	return results
+}
+
 func testJSONPath(tests []jsonpathTest, allowMissingKeys bool, t *testing.T) {
 	for _, test := range tests {
+		jsonpathFunctions := map[string]JSONPathFunction{
+			"length": lengthJSONPathFunc,
+		}
 		j := New(test.name)
 		j.AllowMissingKeys(allowMissingKeys)
+		j.RegisterJSONPathFunctions(jsonpathFunctions)
 		err := j.Parse(test.template)
 		if err != nil {
 			t.Errorf("in %s, parse %s error %v", test.name, test.template, err)
@@ -177,6 +189,8 @@ func TestStructInput(t *testing.T) {
 		{"recurarray", "{..Book[2]}", storeData,
 			"{Category: fiction, Author: Herman Melville, Title: Moby Dick, Price: 8.99}", false},
 		{"bool", "{.Bicycle[?(@.IsNew==true)]}", storeData, "{red 19.95 true}", false},
+		{"function", "{.Name.length()}", storeData, "8", false},
+		{"functionMulti", "{.Book[*].Author.length()}", storeData, "10 12 15", false},
 	}
 	testJSONPath(storeTests, false, t)
 

@@ -38,7 +38,10 @@ go_library(
 
 go_test(
     name = "go_default_xtest",
-    srcs = ["customcolumn_test.go"],
+    srcs = [
+        "common_test.go",
+        "customcolumn_test.go",
+    ],
     importpath = "k8s.io/kubernetes/pkg/printers_test",
     deps = [
         ":go_default_library",
