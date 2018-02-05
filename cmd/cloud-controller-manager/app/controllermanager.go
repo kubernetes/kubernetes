@@ -86,17 +86,17 @@ the cloud specific control loops shipped with Kubernetes.`,
 func resyncPeriod(s *options.CloudControllerManagerServer) func() time.Duration {
 	return func() time.Duration {
 		factor := rand.Float64() + 1
-		return time.Duration(float64(s.MinResyncPeriod.Nanoseconds()) * factor)
+		return time.Duration(float64(s.ControllerManagerOptions.LegacyOptions.MinResyncPeriod.Nanoseconds()) * factor)
 	}
 }
 
 // Run runs the ExternalCMServer.  This should never exit.
 func Run(s *options.CloudControllerManagerServer) error {
-	if s.CloudProvider == "" {
+	if s.ControllerManagerOptions.LegacyOptions.CloudProvider == "" {
 		glog.Fatalf("--cloud-provider cannot be empty")
 	}
 
-	cloud, err := cloudprovider.InitCloudProvider(s.CloudProvider, s.CloudConfigFile)
+	cloud, err := cloudprovider.InitCloudProvider(s.ControllerManagerOptions.LegacyOptions.CloudProvider, s.ControllerManagerOptions.LegacyOptions.CloudConfigFile)
 	if err != nil {
 		glog.Fatalf("Cloud provider could not be initialized: %v", err)
 	}
@@ -106,7 +106,7 @@ func Run(s *options.CloudControllerManagerServer) error {
 	}
 
 	if cloud.HasClusterID() == false {
-		if s.AllowUntaggedCloud == true {
+		if s.ControllerManagerOptions.LegacyOptions.AllowUntaggedCloud == true {
 			glog.Warning("detected a cluster without a ClusterID.  A ClusterID will be required in the future.  Please tag your cluster to avoid any future issues")
 		} else {
 			glog.Fatalf("no ClusterID found.  A ClusterID is required for the cloud provider to function properly.  This check can be bypassed by setting the allow-untagged-cloud option")
@@ -114,7 +114,7 @@ func Run(s *options.CloudControllerManagerServer) error {
 	}
 
 	if c, err := configz.New("componentconfig"); err == nil {
-		c.Set(s.KubeControllerManagerConfiguration)
+		c.Set(s.ControllerManagerOptions)
 	} else {
 		glog.Errorf("unable to register configz: %s", err)
 	}
@@ -124,10 +124,10 @@ func Run(s *options.CloudControllerManagerServer) error {
 	}
 
 	// Set the ContentType of the requests from kube client
-	kubeconfig.ContentConfig.ContentType = s.ContentType
+	kubeconfig.ContentConfig.ContentType = s.ControllerManagerOptions.LegacyOptions.ContentType
 	// Override kubeconfig qps/burst settings from flags
-	kubeconfig.QPS = s.KubeAPIQPS
-	kubeconfig.Burst = int(s.KubeAPIBurst)
+	kubeconfig.QPS = s.ControllerManagerOptions.LegacyOptions.KubeAPIQPS
+	kubeconfig.Burst = int(s.ControllerManagerOptions.LegacyOptions.KubeAPIBurst)
 	kubeClient, err := kubernetes.NewForConfig(restclient.AddUserAgent(kubeconfig, "cloud-controller-manager"))
 	if err != nil {
 		glog.Fatalf("Invalid API configuration: %v", err)
@@ -144,7 +144,7 @@ func Run(s *options.CloudControllerManagerServer) error {
 			ClientConfig: kubeconfig,
 		}
 		var clientBuilder controller.ControllerClientBuilder
-		if s.UseServiceAccountCredentials {
+		if s.ControllerManagerOptions.LegacyOptions.UseServiceAccountCredentials {
 			clientBuilder = controller.SAControllerClientBuilder{
 				ClientConfig:         restclient.AnonymousClientConfig(kubeconfig),
 				CoreClient:           kubeClient.CoreV1(),
@@ -160,7 +160,7 @@ func Run(s *options.CloudControllerManagerServer) error {
 		}
 	}
 
-	if !s.LeaderElection.LeaderElect {
+	if !s.ControllerManagerOptions.LegacyOptions.LeaderElection.LeaderElect {
 		run(nil)
 		panic("unreachable")
 	}
@@ -174,7 +174,7 @@ func Run(s *options.CloudControllerManagerServer) error {
 	id = id + "_" + string(uuid.NewUUID())
 
 	// Lock required for leader election
-	rl, err := resourcelock.New(s.LeaderElection.ResourceLock,
+	rl, err := resourcelock.New(s.ControllerManagerOptions.LegacyOptions.LeaderElection.ResourceLock,
 		"kube-system",
 		"cloud-controller-manager",
 		leaderElectionClient.CoreV1(),
@@ -189,9 +189,9 @@ func Run(s *options.CloudControllerManagerServer) error {
 	// Try and become the leader and start cloud controller manager loops
 	leaderelection.RunOrDie(leaderelection.LeaderElectionConfig{
 		Lock:          rl,
-		LeaseDuration: s.LeaderElection.LeaseDuration.Duration,
-		RenewDeadline: s.LeaderElection.RenewDeadline.Duration,
-		RetryPeriod:   s.LeaderElection.RetryPeriod.Duration,
+		LeaseDuration: s.ControllerManagerOptions.LegacyOptions.LeaderElection.LeaseDuration.Duration,
+		RenewDeadline: s.ControllerManagerOptions.LegacyOptions.LeaderElection.RenewDeadline.Duration,
+		RetryPeriod:   s.ControllerManagerOptions.LegacyOptions.LeaderElection.RetryPeriod.Duration,
 		Callbacks: leaderelection.LeaderCallbacks{
 			OnStartedLeading: run,
 			OnStoppedLeading: func() {
@@ -221,17 +221,17 @@ func StartControllers(s *options.CloudControllerManagerServer, kubeconfig *restc
 	nodeController := cloudcontrollers.NewCloudNodeController(
 		sharedInformers.Core().V1().Nodes(),
 		client("cloud-node-controller"), cloud,
-		s.NodeMonitorPeriod.Duration,
+		s.ControllerManagerOptions.LegacyOptions.NodeMonitorPeriod.Duration,
 		s.NodeStatusUpdateFrequency.Duration)
 
 	nodeController.Run()
-	time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
+	time.Sleep(wait.Jitter(s.ControllerManagerOptions.LegacyOptions.ControllerStartInterval.Duration, ControllerStartJitter))
 
 	// Start the PersistentVolumeLabelController
 	pvlController := cloudcontrollers.NewPersistentVolumeLabelController(client("pvl-controller"), cloud)
 	threads := 5
 	go pvlController.Run(threads, stop)
-	time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
+	time.Sleep(wait.Jitter(s.ControllerManagerOptions.LegacyOptions.ControllerStartInterval.Duration, ControllerStartJitter))
 
 	// Start the service controller
 	serviceController, err := servicecontroller.New(
@@ -239,34 +239,34 @@ func StartControllers(s *options.CloudControllerManagerServer, kubeconfig *restc
 		client("service-controller"),
 		sharedInformers.Core().V1().Services(),
 		sharedInformers.Core().V1().Nodes(),
-		s.ClusterName,
+		s.ControllerManagerOptions.LegacyOptions.ClusterName,
 	)
 	if err != nil {
 		glog.Errorf("Failed to start service controller: %v", err)
 	} else {
-		go serviceController.Run(stop, int(s.ConcurrentServiceSyncs))
-		time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
+		go serviceController.Run(stop, int(s.ControllerManagerOptions.LegacyOptions.ConcurrentServiceSyncs))
+		time.Sleep(wait.Jitter(s.ControllerManagerOptions.LegacyOptions.ControllerStartInterval.Duration, ControllerStartJitter))
 	}
 
 	// If CIDRs should be allocated for pods and set on the CloudProvider, then start the route controller
-	if s.AllocateNodeCIDRs && s.ConfigureCloudRoutes {
+	if s.ControllerManagerOptions.LegacyOptions.AllocateNodeCIDRs && s.ControllerManagerOptions.LegacyOptions.ConfigureCloudRoutes {
 		if routes, ok := cloud.Routes(); !ok {
 			glog.Warning("configure-cloud-routes is set, but cloud provider does not support routes. Will not configure cloud provider routes.")
 		} else {
 			var clusterCIDR *net.IPNet
-			if len(strings.TrimSpace(s.ClusterCIDR)) != 0 {
-				_, clusterCIDR, err = net.ParseCIDR(s.ClusterCIDR)
+			if len(strings.TrimSpace(s.ControllerManagerOptions.LegacyOptions.ClusterCIDR)) != 0 {
+				_, clusterCIDR, err = net.ParseCIDR(s.ControllerManagerOptions.LegacyOptions.ClusterCIDR)
 				if err != nil {
-					glog.Warningf("Unsuccessful parsing of cluster CIDR %v: %v", s.ClusterCIDR, err)
+					glog.Warningf("Unsuccessful parsing of cluster CIDR %v: %v", s.ControllerManagerOptions.LegacyOptions.ClusterCIDR, err)
 				}
 			}
 
-			routeController := routecontroller.New(routes, client("route-controller"), sharedInformers.Core().V1().Nodes(), s.ClusterName, clusterCIDR)
-			go routeController.Run(stop, s.RouteReconciliationPeriod.Duration)
-			time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
+			routeController := routecontroller.New(routes, client("route-controller"), sharedInformers.Core().V1().Nodes(), s.ControllerManagerOptions.LegacyOptions.ClusterName, clusterCIDR)
+			go routeController.Run(stop, s.ControllerManagerOptions.LegacyOptions.RouteReconciliationPeriod.Duration)
+			time.Sleep(wait.Jitter(s.ControllerManagerOptions.LegacyOptions.ControllerStartInterval.Duration, ControllerStartJitter))
 		}
 	} else {
-		glog.Infof("Will not configure cloud provider routes for allocate-node-cidrs: %v, configure-cloud-routes: %v.", s.AllocateNodeCIDRs, s.ConfigureCloudRoutes)
+		glog.Infof("Will not configure cloud provider routes for allocate-node-cidrs: %v, configure-cloud-routes: %v.", s.ControllerManagerOptions.LegacyOptions.AllocateNodeCIDRs, s.ControllerManagerOptions.LegacyOptions.ConfigureCloudRoutes)
 	}
 
 	// If apiserver is not running we should wait for some time and fail only then. This is particularly
@@ -290,12 +290,12 @@ func StartControllers(s *options.CloudControllerManagerServer, kubeconfig *restc
 func startHTTP(s *options.CloudControllerManagerServer) {
 	mux := http.NewServeMux()
 	healthz.InstallHandler(mux)
-	if s.EnableProfiling {
+	if s.ControllerManagerOptions.LegacyOptions.EnableProfiling {
 		mux.HandleFunc("/debug/pprof/", pprof.Index)
 		mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
 		mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
 		mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
-		if s.EnableContentionProfiling {
+		if s.ControllerManagerOptions.LegacyOptions.EnableContentionProfiling {
 			goruntime.SetBlockProfileRate(1)
 		}
 	}
@@ -303,7 +303,7 @@ func startHTTP(s *options.CloudControllerManagerServer) {
 	mux.Handle("/metrics", prometheus.Handler())
 
 	server := &http.Server{
-		Addr:    net.JoinHostPort(s.Address, strconv.Itoa(int(s.Port))),
+		Addr:    net.JoinHostPort(s.ControllerManagerOptions.LegacyOptions.Address, strconv.Itoa(int(s.ControllerManagerOptions.LegacyOptions.Port))),
 		Handler: mux,
 	}
 	glog.Fatal(server.ListenAndServe())

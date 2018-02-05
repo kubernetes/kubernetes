@@ -42,7 +42,7 @@ import (
 type ServerRunOptions struct {
 	GenericServerRunOptions *genericoptions.ServerRunOptions
 	Etcd                    *genericoptions.EtcdOptions
-	SecureServing           *genericoptions.SecureServingOptions
+	SecureServing           *genericoptions.SecureServingOptionsWithLoopback
 	InsecureServing         *kubeoptions.InsecureServingOptions
 	Audit                   *genericoptions.AuditOptions
 	Features                *genericoptions.FeatureOptions
