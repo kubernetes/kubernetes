@@ -17,6 +17,7 @@ limitations under the License.
 package options
 
 import (
+	"net"
 	"reflect"
 	"testing"
 	"time"
@@ -31,7 +32,7 @@ import (
 
 func TestAddFlags(t *testing.T) {
 	f := pflag.NewFlagSet("addflagstest", pflag.ContinueOnError)
-	s := NewCloudControllerManagerServer()
+	s := NewCloudControllerManagerOptions()
 	s.AddFlags(f)
 
 	args := []string{
@@ -65,13 +66,13 @@ func TestAddFlags(t *testing.T) {
 	}
 	f.Parse(args)
 
-	expected := &CloudControllerManagerServer{
-		ControllerManagerServer: cmoptions.ControllerManagerServer{
-			KubeControllerManagerConfiguration: componentconfig.KubeControllerManagerConfiguration{
+	expected := &CloudControllerManagerOptions{
+		Generic: cmoptions.GenericControllerManagerOptions{
+			ComponentConfig: componentconfig.KubeControllerManagerConfiguration{
 				CloudProvider:                                   "gce",
 				CloudConfigFile:                                 "/cloud-config",
-				Port:                                            10000,
-				Address:                                         "192.168.4.10",
+				Port:                                            10253,     // Note: InsecureServingOptions.ApplyTo will write the flag value back into the component config
+				Address:                                         "0.0.0.0", // Note: InsecureServingOptions.ApplyTo will write the flag value back into the component config
 				ConcurrentEndpointSyncs:                         5,
 				ConcurrentRSSyncs:                               5,
 				ConcurrentResourceQuotaSyncs:                    5,
@@ -137,6 +138,11 @@ func TestAddFlags(t *testing.T) {
 				NodeCIDRMaskSize:          24,
 				CIDRAllocatorType:         "RangeAllocator",
 				Controllers:               []string{"*"},
+			},
+			InsecureServing: &cmoptions.InsecureServingOptions{
+				BindAddress: net.ParseIP("192.168.4.10"),
+				BindPort:    int(10000),
+				BindNetwork: "tcp",
 			},
 			Kubeconfig: "/kubeconfig",
 			Master:     "192.168.4.20",

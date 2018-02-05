@@ -3967,7 +3967,7 @@ func RestartControllerManager() error {
 }
 
 func WaitForControllerManagerUp() error {
-	cmd := "curl http://localhost:" + strconv.Itoa(ports.ControllerManagerPort) + "/healthz"
+	cmd := "curl http://localhost:" + strconv.Itoa(ports.InsecureKubeControllerManagerPort) + "/healthz"
 	for start := time.Now(); time.Since(start) < time.Minute; time.Sleep(5 * time.Second) {
 		result, err := SSH(cmd, net.JoinHostPort(GetMasterHost(), sshPort), TestContext.Provider)
 		if err != nil || result.Code != 0 {
