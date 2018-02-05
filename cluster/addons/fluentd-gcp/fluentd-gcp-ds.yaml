@@ -31,12 +31,6 @@ spec:
         env:
         - name: FLUENTD_ARGS
           value: --no-supervisor -q
-        resources:
-          limits:
-            memory: 300Mi
-          requests:
-            cpu: 100m
-            memory: 200Mi
         volumeMounts:
         - name: varlog
           mountPath: /var/log
