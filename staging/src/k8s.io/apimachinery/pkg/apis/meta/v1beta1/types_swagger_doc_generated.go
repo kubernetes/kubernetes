@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1alpha1
+package v1beta1
 
 // This file contains a collection of methods that can be used from go-restful to
 // generate Swagger API documentation for its models. Please read this PR for more
@@ -71,7 +71,7 @@ func (TableColumnDefinition) SwaggerDoc() map[string]string {
 
 var map_TableOptions = map[string]string{
 	"":              "TableOptions are used when a Table is requested by the caller.",
-	"includeObject": "includeObject decides whether to include each object along with its columnar information. Specifying \"None\" will return no object, specifying \"Object\" will return the full object contents, and specifying \"Metadata\" (the default) will return the object's metadata in the PartialObjectMetadata kind in version v1alpha1 of the meta.k8s.io API group.",
+	"includeObject": "includeObject decides whether to include each object along with its columnar information. Specifying \"None\" will return no object, specifying \"Object\" will return the full object contents, and specifying \"Metadata\" (the default) will return the object's metadata in the PartialObjectMetadata kind in version v1beta1 of the meta.k8s.io API group.",
 }
 
 func (TableOptions) SwaggerDoc() map[string]string {

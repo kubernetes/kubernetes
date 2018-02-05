@@ -23,7 +23,7 @@ import (
 
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	metav1alpha1 "k8s.io/apimachinery/pkg/apis/meta/v1alpha1"
+	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/watch"
@@ -134,7 +134,7 @@ type GetterWithOptions interface {
 }
 
 type TableConvertor interface {
-	ConvertToTable(ctx genericapirequest.Context, object runtime.Object, tableOptions runtime.Object) (*metav1alpha1.Table, error)
+	ConvertToTable(ctx genericapirequest.Context, object runtime.Object, tableOptions runtime.Object) (*metav1beta1.Table, error)
 }
 
 // Deleter is an object that can delete a named RESTful resource.

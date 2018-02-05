@@ -14,8 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// package v1alpha1 is alpha objects from meta that will be introduced.
-package v1alpha1
+// package v1beta1 is alpha objects from meta that will be introduced.
+package v1beta1
 
 import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -136,7 +136,7 @@ type TableOptions struct {
 	// includeObject decides whether to include each object along with its columnar information.
 	// Specifying "None" will return no object, specifying "Object" will return the full object contents, and
 	// specifying "Metadata" (the default) will return the object's metadata in the PartialObjectMetadata kind
-	// in version v1alpha1 of the meta.k8s.io API group.
+	// in version v1beta1 of the meta.k8s.io API group.
 	IncludeObject IncludeObjectPolicy `json:"includeObject,omitempty" protobuf:"bytes,1,opt,name=includeObject,casttype=IncludeObjectPolicy"`
 }
 

@@ -359,7 +359,7 @@ func startGarbageCollectorController(ctx ControllerContext) (bool, error) {
 	// TODO: Make NewMetadataCodecFactory support arbitrary (non-compiled)
 	// resource types. Otherwise we'll be storing full Unstructured data in our
 	// caches for custom resources. Consider porting it to work with
-	// metav1alpha1.PartialObjectMetadata.
+	// metav1beta1.PartialObjectMetadata.
 	metaOnlyClientPool := dynamic.NewClientPool(config, restMapper, dynamic.LegacyAPIPathResolverFunc)
 	clientPool := dynamic.NewClientPool(config, restMapper, dynamic.LegacyAPIPathResolverFunc)
 

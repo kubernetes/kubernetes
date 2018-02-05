@@ -45,7 +45,7 @@ import (
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	metav1alpha1 "k8s.io/apimachinery/pkg/apis/meta/v1alpha1"
+	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -434,7 +434,7 @@ func (storage *SimpleRESTStorage) Export(ctx request.Context, name string, opts 
 	return obj, storage.errors["export"]
 }
 
-func (storage *SimpleRESTStorage) ConvertToTable(ctx request.Context, obj runtime.Object, tableOptions runtime.Object) (*metav1alpha1.Table, error) {
+func (storage *SimpleRESTStorage) ConvertToTable(ctx request.Context, obj runtime.Object, tableOptions runtime.Object) (*metav1beta1.Table, error) {
 	return rest.NewDefaultTableConvertor(schema.GroupResource{Resource: "simple"}).ConvertToTable(ctx, obj, tableOptions)
 }
 
@@ -1846,8 +1846,8 @@ func TestGetTable(t *testing.T) {
 		t.Fatal(err)
 	}
 	partial := meta.AsPartialObjectMetadata(m)
-	partial.GetObjectKind().SetGroupVersionKind(metav1alpha1.SchemeGroupVersion.WithKind("PartialObjectMetadata"))
-	encodedBody, err := runtime.Encode(metainternalversion.Codecs.LegacyCodec(metav1alpha1.SchemeGroupVersion), partial)
+	partial.GetObjectKind().SetGroupVersionKind(metav1beta1.SchemeGroupVersion.WithKind("PartialObjectMetadata"))
+	encodedBody, err := runtime.Encode(metainternalversion.Codecs.LegacyCodec(metav1beta1.SchemeGroupVersion), partial)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1860,7 +1860,7 @@ func TestGetTable(t *testing.T) {
 		accept     string
 		params     url.Values
 		pretty     bool
-		expected   *metav1alpha1.Table
+		expected   *metav1beta1.Table
 		statusCode int
 		item       bool
 	}{
@@ -1870,46 +1870,46 @@ func TestGetTable(t *testing.T) {
 		},
 		{
 			item:   true,
-			accept: runtime.ContentTypeJSON + ";as=Table;v=v1alpha1;g=meta.k8s.io",
-			expected: &metav1alpha1.Table{
-				TypeMeta: metav1.TypeMeta{Kind: "Table", APIVersion: "meta.k8s.io/v1alpha1"},
+			accept: runtime.ContentTypeJSON + ";as=Table;v=v1beta1;g=meta.k8s.io",
+			expected: &metav1beta1.Table{
+				TypeMeta: metav1.TypeMeta{Kind: "Table", APIVersion: "meta.k8s.io/v1beta1"},
 				ListMeta: metav1.ListMeta{ResourceVersion: "10", SelfLink: "/blah"},
-				ColumnDefinitions: []metav1alpha1.TableColumnDefinition{
+				ColumnDefinitions: []metav1beta1.TableColumnDefinition{
 					{Name: "Name", Type: "string", Format: "name", Description: metaDoc["name"]},
 					{Name: "Created At", Type: "date", Description: metaDoc["creationTimestamp"]},
 				},
-				Rows: []metav1alpha1.TableRow{
+				Rows: []metav1beta1.TableRow{
 					{Cells: []interface{}{"foo1", now.Time.UTC().Format(time.RFC3339)}, Object: runtime.RawExtension{Raw: encodedBody}},
 				},
 			},
 		},
 		{
 			item:   true,
-			accept: runtime.ContentTypeJSON + ";as=Table;v=v1alpha1;g=meta.k8s.io",
+			accept: runtime.ContentTypeJSON + ";as=Table;v=v1beta1;g=meta.k8s.io",
 			params: url.Values{"includeObject": []string{"Metadata"}},
-			expected: &metav1alpha1.Table{
-				TypeMeta: metav1.TypeMeta{Kind: "Table", APIVersion: "meta.k8s.io/v1alpha1"},
+			expected: &metav1beta1.Table{
+				TypeMeta: metav1.TypeMeta{Kind: "Table", APIVersion: "meta.k8s.io/v1beta1"},
 				ListMeta: metav1.ListMeta{ResourceVersion: "10", SelfLink: "/blah"},
-				ColumnDefinitions: []metav1alpha1.TableColumnDefinition{
+				ColumnDefinitions: []metav1beta1.TableColumnDefinition{
 					{Name: "Name", Type: "string", Format: "name", Description: metaDoc["name"]},
 					{Name: "Created At", Type: "date", Description: metaDoc["creationTimestamp"]},
 				},
-				Rows: []metav1alpha1.TableRow{
+				Rows: []metav1beta1.TableRow{
 					{Cells: []interface{}{"foo1", now.Time.UTC().Format(time.RFC3339)}, Object: runtime.RawExtension{Raw: encodedBody}},
 				},
 			},
 		},
 		{
-			accept: runtime.ContentTypeJSON + ";as=Table;v=v1alpha1;g=meta.k8s.io",
+			accept: runtime.ContentTypeJSON + ";as=Table;v=v1beta1;g=meta.k8s.io",
 			params: url.Values{"includeObject": []string{"Metadata"}},
-			expected: &metav1alpha1.Table{
-				TypeMeta: metav1.TypeMeta{Kind: "Table", APIVersion: "meta.k8s.io/v1alpha1"},
+			expected: &metav1beta1.Table{
+				TypeMeta: metav1.TypeMeta{Kind: "Table", APIVersion: "meta.k8s.io/v1beta1"},
 				ListMeta: metav1.ListMeta{ResourceVersion: "10", SelfLink: "/test/link"},
-				ColumnDefinitions: []metav1alpha1.TableColumnDefinition{
+				ColumnDefinitions: []metav1beta1.TableColumnDefinition{
 					{Name: "Name", Type: "string", Format: "name", Description: metaDoc["name"]},
 					{Name: "Created At", Type: "date", Description: metaDoc["creationTimestamp"]},
 				},
-				Rows: []metav1alpha1.TableRow{
+				Rows: []metav1beta1.TableRow{
 					{Cells: []interface{}{"foo1", now.Time.UTC().Format(time.RFC3339)}, Object: runtime.RawExtension{Raw: encodedBody}},
 				},
 			},
@@ -1969,7 +1969,7 @@ func TestGetTable(t *testing.T) {
 			if resp.StatusCode != http.StatusOK {
 				t.Errorf("%d: unexpected response: %#v", i, resp)
 			}
-			var itemOut metav1alpha1.Table
+			var itemOut metav1beta1.Table
 			body, err := extractBody(resp, &itemOut)
 			if err != nil {
 				t.Fatal(err)
@@ -2031,12 +2031,12 @@ func TestGetPartialObjectMetadata(t *testing.T) {
 			expectKind: schema.GroupVersionKind{Kind: "Simple", Group: testGroupVersion.Group, Version: testGroupVersion.Version},
 		},
 		{
-			accept:     runtime.ContentTypeJSON + ";as=PartialObjectMetadata;v=v1alpha1;g=meta.k8s.io, application/json",
-			expectKind: schema.GroupVersionKind{Kind: "PartialObjectMetadata", Group: "meta.k8s.io", Version: "v1alpha1"},
+			accept:     runtime.ContentTypeJSON + ";as=PartialObjectMetadata;v=v1beta1;g=meta.k8s.io, application/json",
+			expectKind: schema.GroupVersionKind{Kind: "PartialObjectMetadata", Group: "meta.k8s.io", Version: "v1beta1"},
 		},
 		{
 			list:       true,
-			accept:     runtime.ContentTypeJSON + ";as=PartialObjectMetadata;v=v1alpha1;g=meta.k8s.io",
+			accept:     runtime.ContentTypeJSON + ";as=PartialObjectMetadata;v=v1beta1;g=meta.k8s.io",
 			statusCode: http.StatusNotAcceptable,
 		},
 		{
@@ -2046,36 +2046,36 @@ func TestGetPartialObjectMetadata(t *testing.T) {
 		},
 		{
 			list:       true,
-			accept:     runtime.ContentTypeJSON + ";as=PartialObjectMetadataList;v=v1alpha1;g=meta.k8s.io, application/json",
-			expectKind: schema.GroupVersionKind{Kind: "PartialObjectMetadataList", Group: "meta.k8s.io", Version: "v1alpha1"},
+			accept:     runtime.ContentTypeJSON + ";as=PartialObjectMetadataList;v=v1beta1;g=meta.k8s.io, application/json",
+			expectKind: schema.GroupVersionKind{Kind: "PartialObjectMetadataList", Group: "meta.k8s.io", Version: "v1beta1"},
 		},
 		{
-			accept:     runtime.ContentTypeJSON + ";as=PartialObjectMetadataList;v=v1alpha1;g=meta.k8s.io",
+			accept:     runtime.ContentTypeJSON + ";as=PartialObjectMetadataList;v=v1beta1;g=meta.k8s.io",
 			statusCode: http.StatusNotAcceptable,
 		},
 		{
-			accept: runtime.ContentTypeJSON + ";as=PartialObjectMetadata;v=v1alpha1;g=meta.k8s.io",
-			expected: &metav1alpha1.PartialObjectMetadata{
+			accept: runtime.ContentTypeJSON + ";as=PartialObjectMetadata;v=v1beta1;g=meta.k8s.io",
+			expected: &metav1beta1.PartialObjectMetadata{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo1", Namespace: "ns1", CreationTimestamp: now, UID: types.UID("abcdef0123")},
 			},
-			expectKind: schema.GroupVersionKind{Kind: "PartialObjectMetadata", Group: "meta.k8s.io", Version: "v1alpha1"},
+			expectKind: schema.GroupVersionKind{Kind: "PartialObjectMetadata", Group: "meta.k8s.io", Version: "v1beta1"},
 		},
 		{
 			list:   true,
-			accept: runtime.ContentTypeJSON + ";as=PartialObjectMetadataList;v=v1alpha1;g=meta.k8s.io",
-			expected: &metav1alpha1.PartialObjectMetadataList{
-				Items: []*metav1alpha1.PartialObjectMetadata{
+			accept: runtime.ContentTypeJSON + ";as=PartialObjectMetadataList;v=v1beta1;g=meta.k8s.io",
+			expected: &metav1beta1.PartialObjectMetadataList{
+				Items: []*metav1beta1.PartialObjectMetadata{
 					{
-						TypeMeta:   metav1.TypeMeta{APIVersion: "meta.k8s.io/v1alpha1", Kind: "PartialObjectMetadata"},
+						TypeMeta:   metav1.TypeMeta{APIVersion: "meta.k8s.io/v1beta1", Kind: "PartialObjectMetadata"},
 						ObjectMeta: metav1.ObjectMeta{Name: "foo1", Namespace: "ns1", CreationTimestamp: now, UID: types.UID("newer")},
 					},
 					{
-						TypeMeta:   metav1.TypeMeta{APIVersion: "meta.k8s.io/v1alpha1", Kind: "PartialObjectMetadata"},
+						TypeMeta:   metav1.TypeMeta{APIVersion: "meta.k8s.io/v1beta1", Kind: "PartialObjectMetadata"},
 						ObjectMeta: metav1.ObjectMeta{Name: "foo2", Namespace: "ns2", CreationTimestamp: now, UID: types.UID("older")},
 					},
 				},
 			},
-			expectKind: schema.GroupVersionKind{Kind: "PartialObjectMetadataList", Group: "meta.k8s.io", Version: "v1alpha1"},
+			expectKind: schema.GroupVersionKind{Kind: "PartialObjectMetadataList", Group: "meta.k8s.io", Version: "v1beta1"},
 		},
 	}
 	for i, test := range tests {
@@ -2116,7 +2116,7 @@ func TestGetPartialObjectMetadata(t *testing.T) {
 		}
 		body := ""
 		if test.expected != nil {
-			itemOut, d, err := extractBodyObject(resp, metainternalversion.Codecs.LegacyCodec(metav1alpha1.SchemeGroupVersion))
+			itemOut, d, err := extractBodyObject(resp, metainternalversion.Codecs.LegacyCodec(metav1beta1.SchemeGroupVersion))
 			if err != nil {
 				t.Fatal(err)
 			}

@@ -28,7 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	metav1alpha1 "k8s.io/apimachinery/pkg/apis/meta/v1alpha1"
+	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -69,7 +69,7 @@ func (scope *RequestScope) err(err error, w http.ResponseWriter, req *http.Reque
 
 func (scope *RequestScope) AllowsConversion(gvk schema.GroupVersionKind) bool {
 	// TODO: this is temporary, replace with an abstraction calculated at endpoint installation time
-	if gvk.GroupVersion() == metav1alpha1.SchemeGroupVersion {
+	if gvk.GroupVersion() == metav1beta1.SchemeGroupVersion {
 		switch gvk.Kind {
 		case "Table":
 			return scope.TableConvertor != nil

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1alpha1
+package v1beta1
 
 import (
 	"k8s.io/apimachinery/pkg/runtime"
@@ -25,17 +25,17 @@ import (
 const GroupName = "meta.k8s.io"
 
 // SchemeGroupVersion is group version used to register these objects
-var SchemeGroupVersion = schema.GroupVersion{Group: GroupName, Version: "v1alpha1"}
+var SchemeGroupVersion = schema.GroupVersion{Group: GroupName, Version: "v1beta1"}
 
 // Kind takes an unqualified kind and returns a Group qualified GroupKind
 func Kind(kind string) schema.GroupKind {
 	return SchemeGroupVersion.WithKind(kind).GroupKind()
 }
 
-// scheme is the registry for the common types that adhere to the meta v1alpha1 API spec.
+// scheme is the registry for the common types that adhere to the meta v1beta1 API spec.
 var scheme = runtime.NewScheme()
 
-// ParameterCodec knows about query parameters used with the meta v1alpha1 API spec.
+// ParameterCodec knows about query parameters used with the meta v1beta1 API spec.
 var ParameterCodec = runtime.NewParameterCodec(scheme)
 
 func init() {
@@ -47,7 +47,7 @@ func init() {
 	)
 
 	if err := scheme.AddConversionFuncs(
-		Convert_Slice_string_To_v1alpha1_IncludeObjectPolicy,
+		Convert_Slice_string_To_v1beta1_IncludeObjectPolicy,
 	); err != nil {
 		panic(err)
 	}
