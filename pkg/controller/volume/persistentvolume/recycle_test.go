@@ -161,7 +161,7 @@ func TestRecycleSync(t *testing.T) {
 			[]string{"Warning VolumeUnknownReclaimPolicy"}, noerrors, testSyncVolume,
 		},
 	}
-	runSyncTests(t, tests, []*storage.StorageClass{})
+	runSyncTests(t, tests, []*storage.StorageClass{}, []*v1.Pod{})
 }
 
 // Test multiple calls to syncClaim/syncVolume and periodic sync of all

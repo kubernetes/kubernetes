@@ -161,6 +161,8 @@ type PersistentVolumeController struct {
 	claimListerSynced  cache.InformerSynced
 	classLister        storagelisters.StorageClassLister
 	classListerSynced  cache.InformerSynced
+	podLister          corelisters.PodLister
+	podListerSynced    cache.InformerSynced
 
 	kubeClient                clientset.Interface
 	eventRecorder             record.EventRecorder
