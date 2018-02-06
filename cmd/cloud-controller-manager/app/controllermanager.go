@@ -24,7 +24,6 @@ import (
 	"net/http/pprof"
 	"os"
 	goruntime "runtime"
-	"strconv"
 	"strings"
 	"time"
 
@@ -137,7 +136,8 @@ func (c *completedConfig) Run() error {
 	leaderElectionClient := kubernetes.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "leader-election"))
 
 	// Start the external controller manager server
-	go startHTTP(c)
+	stopCh := make(chan struct{})
+	go c.serve(stopCh)
 
 	recorder := createRecorder(kubeClient)
 
@@ -288,26 +288,22 @@ func (c *completedConfig) startControllers(kubeconfig *restclient.Config, rootCl
 	select {}
 }
 
-func startHTTP(s *options.CloudControllerManagerOptions) {
+func (c *completedConfig) serve(stopCh <-chan struct{}) {
 	mux := http.NewServeMux()
 	healthz.InstallHandler(mux)
-	if s.Generic.ComponentConfig.EnableProfiling {
+	if c.Generic.ComponentConfig.EnableProfiling {
 		mux.HandleFunc("/debug/pprof/", pprof.Index)
 		mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
 		mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
 		mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
-		if s.Generic.ComponentConfig.EnableContentionProfiling {
+		if c.Generic.ComponentConfig.EnableContentionProfiling {
 			goruntime.SetBlockProfileRate(1)
 		}
 	}
 	configz.InstallHandler(mux)
 	mux.Handle("/metrics", prometheus.Handler())
 
-	server := &http.Server{
-		Addr:    net.JoinHostPort(s.Generic.ComponentConfig.Address, strconv.Itoa(int(s.Generic.ComponentConfig.Port))),
-		Handler: mux,
-	}
-	glog.Fatal(server.ListenAndServe())
+	glog.Fatal(c.Generic.SecureServingInfo.Serve(mux, 0, stopCh))
 }
 
 func createRecorder(kubeClient *kubernetes.Clientset) record.EventRecorder {
