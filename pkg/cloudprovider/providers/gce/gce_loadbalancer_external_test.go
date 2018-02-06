@@ -29,6 +29,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud/mock"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 )
 
@@ -258,22 +259,6 @@ var apiService = &v1.Service{
 	},
 }
 
-var nodes = []*v1.Node{
-	&v1.Node{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: nodeName,
-			Labels: map[string]string{
-				kubeletapis.LabelHostname: nodeName,
-			},
-		},
-		Status: v1.NodeStatus{
-			NodeInfo: v1.NodeSystemInfo{
-				KubeProxyVersion: "v1.7.2",
-			},
-		},
-	},
-}
-
 func fakeGCECloud() (*GCECloud, error) {
 	client, err := newOauthClient(nil)
 	if err != nil {
@@ -293,6 +278,7 @@ func fakeGCECloud() (*GCECloud, error) {
 	}
 
 	cloud := cloud.NewMockGCE()
+	cloud.MockTargetPools.AddInstanceHook = mock.AddInstanceHook
 	zonesWithNodes := createNodeZones([]string{zone})
 
 	gce := GCECloud{
@@ -307,7 +293,11 @@ func fakeGCECloud() (*GCECloud, error) {
 		c:                  cloud,
 	}
 
-	gce.InsertInstance(
+	return &gce, nil
+}
+
+func createExternalLoadBalancer(gce *GCECloud) (*v1.LoadBalancerStatus, error) {
+	err := gce.InsertInstance(
 		gceProjectId,
 		zone,
 		&compute.Instance{
@@ -318,10 +308,26 @@ func fakeGCECloud() (*GCECloud, error) {
 		},
 	)
 
-	return &gce, nil
-}
+	if err != nil {
+		return nil, err
+	}
 
-func createExternalLoadBalancer(gce *GCECloud) (*v1.LoadBalancerStatus, error) {
+	nodes := []*v1.Node{
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: nodeName,
+				Labels: map[string]string{
+					kubeletapis.LabelHostname: nodeName,
+				},
+			},
+			Status: v1.NodeStatus{
+				NodeInfo: v1.NodeSystemInfo{
+					KubeProxyVersion: "v1.7.2",
+				},
+			},
+		},
+	}
+
 	status, err := gce.ensureExternalLoadBalancer(
 		clusterName,
 		clusterID,
@@ -354,7 +360,7 @@ func TestEnsureExternalLoadBalancer(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, lbName, pool.Name)
 	assert.NotEmpty(t, pool.HealthChecks)
-	assert.NotEmpty(t, pool.Instances)
+	assert.Equal(t, 1, len(pool.Instances))
 
 	// Check that HealthCheck is created
 	hcName := MakeNodesHealthCheckName(clusterID)
@@ -375,8 +381,64 @@ func TestUpdateExternalLoadBalancer(t *testing.T) {
 	require.NoError(t, err)
 	createExternalLoadBalancer(gce)
 
-	err = gce.updateExternalLoadBalancer(clusterName, apiService, nodes)
+	newNodeName := "test-node-2"
+	gce.InsertInstance(
+		gceProjectId,
+		zone,
+		&compute.Instance{
+			Name: newNodeName,
+			Tags: &compute.Tags{
+				Items: []string{newNodeName},
+			},
+		},
+	)
+
+	newNodes := []*v1.Node{
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: nodeName,
+				Labels: map[string]string{
+					kubeletapis.LabelHostname: nodeName,
+				},
+			},
+			Status: v1.NodeStatus{
+				NodeInfo: v1.NodeSystemInfo{
+					KubeProxyVersion: "v1.7.2",
+				},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: newNodeName,
+				Labels: map[string]string{
+					kubeletapis.LabelHostname: newNodeName,
+				},
+			},
+			Status: v1.NodeStatus{
+				NodeInfo: v1.NodeSystemInfo{
+					KubeProxyVersion: "v1.7.2",
+				},
+			},
+		},
+	}
+
+	err = gce.updateExternalLoadBalancer(clusterName, apiService, newNodes)
 	assert.NoError(t, err)
+
+	lbName := cloudprovider.GetLoadBalancerName(apiService)
+
+	// Check that TargetPool is updated with the new node
+	pool, err := gce.GetTargetPool(lbName, gceRegion)
+	require.NoError(t, err)
+
+	assert.Equal(
+		t,
+		[]string{
+			fmt.Sprintf("/zones/%s/instances/%s", zone, nodeName),
+			fmt.Sprintf("/zones/%s/instances/%s", zone, newNodeName),
+		},
+		pool.Instances,
+	)
 }
 
 func TestEnsureExternalLoadBalancerDeleted(t *testing.T) {
