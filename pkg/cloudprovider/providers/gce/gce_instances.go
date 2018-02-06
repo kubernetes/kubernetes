@@ -67,6 +67,11 @@ func getZone(n *v1.Node) string {
 	return zone
 }
 
+func makeHostURL(projectsApiEndpoint, projectID, zone, host string) string {
+	host = canonicalizeInstanceName(host)
+	return projectsApiEndpoint + strings.Join([]string{projectID, "zones", zone, "instances", host}, "/")
+}
+
 // ToInstanceReferences returns instance references by links
 func (gce *GCECloud) ToInstanceReferences(zone string, instanceNames []string) (refs []*compute.InstanceReference) {
 	for _, ins := range instanceNames {

@@ -535,7 +535,7 @@ func (gce *GCECloud) createTargetPoolAndHealthCheck(svc *v1.Service, name, servi
 
 	var instances []string
 	for _, host := range hosts {
-		instances = append(instances, makeHostURL(gce.service.BasePath, gce.projectID, host.Zone, host.Name))
+		instances = append(instances, host.makeComparableHostPath())
 	}
 	glog.Infof("Creating targetpool %v with %d healthchecks", name, len(hcLinks))
 	pool := &compute.TargetPool{
@@ -730,11 +730,6 @@ func nodeNames(nodes []*v1.Node) []string {
 		ret[i] = node.Name
 	}
 	return ret
-}
-
-func makeHostURL(projectsApiEndpoint, projectID, zone, host string) string {
-	host = canonicalizeInstanceName(host)
-	return projectsApiEndpoint + strings.Join([]string{projectID, "zones", zone, "instances", host}, "/")
 }
 
 func hostURLToComparablePath(hostURL string) string {
