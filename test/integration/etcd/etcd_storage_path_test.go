@@ -288,6 +288,11 @@ var etcdStorageData = map[schema.GroupVersionResource]struct {
 		stub:             `{"metadata": {"name": "np2"}, "spec": {"podSelector": {"matchLabels": {"e": "f"}}}}`,
 		expectedEtcdPath: "/registry/networkpolicies/etcdstoragepathtestnamespace/np2",
 	},
+	gvr("networking.k8s.io", "v1", "ingresses"): {
+		stub:             `{"metadata": {"name": "ingress2"}, "spec": {"backend": {"serviceName": "service", "servicePort": 5000}}}`,
+		expectedEtcdPath: "/registry/ingress/etcdstoragepathtestnamespace/ingress2",
+		expectedGVK:      gvkP("extensions", "v1beta1", "Ingress"),
+	},
 	// --
 
 	// k8s.io/kubernetes/pkg/apis/policy/v1beta1
