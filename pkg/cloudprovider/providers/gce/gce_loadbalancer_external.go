@@ -732,11 +732,6 @@ func nodeNames(nodes []*v1.Node) []string {
 	return ret
 }
 
-func makeHostURL(projectsApiEndpoint, projectID, zone, host string) string {
-	host = canonicalizeInstanceName(host)
-	return projectsApiEndpoint + strings.Join([]string{projectID, "zones", zone, "instances", host}, "/")
-}
-
 func hostURLToComparablePath(hostURL string) string {
 	idx := strings.Index(hostURL, "/zones/")
 	if idx < 0 {
