@@ -78602,6 +78602,10 @@
       "description": "NFS represents an NFS mount on the host. Provisioned by an admin. More info: https://kubernetes.io/docs/concepts/storage/volumes#nfs",
       "$ref": "#/definitions/io.k8s.api.core.v1.NFSVolumeSource"
      },
+     "nodeAffinity": {
+      "description": "NodeAffinity defines constraints that limit what nodes this volume can be accessed from. This field influences the scheduling of pods that use this volume.",
+      "$ref": "#/definitions/io.k8s.api.core.v1.VolumeNodeAffinity"
+     },
      "persistentVolumeReclaimPolicy": {
       "description": "What happens to a persistent volume when released from its claim. Valid options are Retain (default) and Recycle. Recycling must be supported by the volume plugin underlying this persistent volume. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#reclaiming",
       "type": "string"
@@ -80577,6 +80581,15 @@
      "subPath": {
       "description": "Path within the volume from which the container's volume should be mounted. Defaults to \"\" (volume's root).",
       "type": "string"
+     }
+    }
+   },
+   "io.k8s.api.core.v1.VolumeNodeAffinity": {
+    "description": "VolumeNodeAffinity defines constraints that limit what nodes this volume can be accessed from.",
+    "properties": {
+     "required": {
+      "description": "Required specifies hard node constraints that must be met.",
+      "$ref": "#/definitions/io.k8s.api.core.v1.NodeSelector"
      }
     }
    },

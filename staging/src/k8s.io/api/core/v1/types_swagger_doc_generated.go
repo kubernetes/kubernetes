@@ -1292,6 +1292,7 @@ var map_PersistentVolumeSpec = map[string]string{
 	"storageClassName":              "Name of StorageClass to which this persistent volume belongs. Empty value means that this volume does not belong to any StorageClass.",
 	"mountOptions":                  "A list of mount options, e.g. [\"ro\", \"soft\"]. Not validated - mount will simply fail if one is invalid. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#mount-options",
 	"volumeMode":                    "volumeMode defines if a volume is intended to be used with a formatted filesystem or to remain in raw block state. Value of Filesystem is implied when not included in spec. This is an alpha feature and may change in the future.",
+	"nodeAffinity":                  "NodeAffinity defines constraints that limit what nodes this volume can be accessed from. This field influences the scheduling of pods that use this volume.",
 }
 
 func (PersistentVolumeSpec) SwaggerDoc() map[string]string {
@@ -2174,6 +2175,15 @@ var map_VolumeMount = map[string]string{
 
 func (VolumeMount) SwaggerDoc() map[string]string {
 	return map_VolumeMount
+}
+
+var map_VolumeNodeAffinity = map[string]string{
+	"":         "VolumeNodeAffinity defines constraints that limit what nodes this volume can be accessed from.",
+	"required": "Required specifies hard node constraints that must be met.",
+}
+
+func (VolumeNodeAffinity) SwaggerDoc() map[string]string {
+	return map_VolumeNodeAffinity
 }
 
 var map_VolumeProjection = map[string]string{
