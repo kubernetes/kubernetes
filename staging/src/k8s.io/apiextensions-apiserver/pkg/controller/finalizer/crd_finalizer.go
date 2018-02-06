@@ -65,7 +65,7 @@ type ListerCollectionDeleter interface {
 type CRClientGetter interface {
 	// GetCustomResourceListerCollectionDeleter gets the ListerCollectionDeleter for the given CRD
 	// UID.
-	GetCustomResourceListerCollectionDeleter(crd *apiextensions.CustomResourceDefinition) ListerCollectionDeleter
+	GetCustomResourceListerCollectionDeleter(crd *apiextensions.CustomResourceDefinition) (ListerCollectionDeleter, error)
 }
 
 // NewCRDFinalizer creates a new CRDFinalizer.
@@ -155,9 +155,9 @@ func (c *CRDFinalizer) deleteInstances(crd *apiextensions.CustomResourceDefiniti
 	// Now we can start deleting items. While it would be ideal to use a REST API client, doing so
 	// could incorrectly delete a ThirdPartyResource with the same URL as the CustomResource, so we go
 	// directly to the storage instead. Since we control the storage, we know that delete collection works.
-	crClient := c.crClientGetter.GetCustomResourceListerCollectionDeleter(crd)
-	if crClient == nil {
-		err := fmt.Errorf("unable to find a custom resource client for %s.%s", crd.Status.AcceptedNames.Plural, crd.Spec.Group)
+	crClient, err := c.crClientGetter.GetCustomResourceListerCollectionDeleter(crd)
+	if err != nil {
+		err = fmt.Errorf("unable to find a custom resource client for %s.%s: %v", crd.Status.AcceptedNames.Plural, crd.Spec.Group, err)
 		return apiextensions.CustomResourceDefinitionCondition{
 			Type:    apiextensions.Terminating,
 			Status:  apiextensions.ConditionTrue,
