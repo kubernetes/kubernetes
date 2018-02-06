@@ -14,24 +14,18 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1
+package fake
 
-type ComponentStatusExpansion interface{}
+import (
+	authenticationv1 "k8s.io/api/authentication/v1"
+	core "k8s.io/client-go/testing"
+)
 
-type ConfigMapExpansion interface{}
+func (c *FakeServiceAccounts) CreateToken(name string, tr *authenticationv1.TokenRequest) (*authenticationv1.TokenRequest, error) {
+	obj, err := c.Fake.Invokes(core.NewCreateSubresourceAction(serviceaccountsResource, name, "token", c.ns, tr), &authenticationv1.TokenRequest{})
 
-type EndpointsExpansion interface{}
-
-type LimitRangeExpansion interface{}
-
-type PersistentVolumeExpansion interface{}
-
-type PersistentVolumeClaimExpansion interface{}
-
-type PodTemplateExpansion interface{}
-
-type ReplicationControllerExpansion interface{}
-
-type ResourceQuotaExpansion interface{}
-
-type SecretExpansion interface{}
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*authenticationv1.TokenRequest), err
+}

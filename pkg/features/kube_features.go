@@ -244,6 +244,12 @@ const (
 	//
 	// Schedule DaemonSet Pods by default scheduler instead of DaemonSet controller
 	NoDaemonSetScheduler utilfeature.Feature = "NoDaemonSetScheduler"
+
+	// owner: @mikedanese
+	// alpha: v1.10
+	//
+	// Implement TokenRequest endpoint on service account resources.
+	TokenRequest utilfeature.Feature = "TokenRequest"
 )
 
 func init() {
@@ -286,6 +292,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	SupportPodPidsLimit:                         {Default: false, PreRelease: utilfeature.Alpha},
 	HyperVContainer:                             {Default: false, PreRelease: utilfeature.Alpha},
 	NoDaemonSetScheduler:                        {Default: false, PreRelease: utilfeature.Alpha},
+	TokenRequest:                                {Default: false, PreRelease: utilfeature.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:

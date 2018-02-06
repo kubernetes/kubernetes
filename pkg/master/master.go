@@ -65,6 +65,7 @@ import (
 	"k8s.io/kubernetes/pkg/registry/core/endpoint"
 	endpointsstorage "k8s.io/kubernetes/pkg/registry/core/endpoint/storage"
 	"k8s.io/kubernetes/pkg/routes"
+	"k8s.io/kubernetes/pkg/serviceaccount"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
 
 	"github.com/golang/glog"
@@ -155,6 +156,8 @@ type ExtraConfig struct {
 
 	// Selects which reconciler to use
 	EndpointReconcilerType reconcilers.Type
+
+	ServiceAccountIssuer serviceaccount.TokenGenerator
 }
 
 type Config struct {
@@ -318,6 +321,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 			ServiceIPRange:       c.ExtraConfig.ServiceIPRange,
 			ServiceNodePortRange: c.ExtraConfig.ServiceNodePortRange,
 			LoopbackClientConfig: c.GenericConfig.LoopbackClientConfig,
+			ServiceAccountIssuer: c.ExtraConfig.ServiceAccountIssuer,
 		}
 		m.InstallLegacyAPI(&c, c.GenericConfig.RESTOptionsGetter, legacyRESTStorageProvider)
 	}

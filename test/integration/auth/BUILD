@@ -15,6 +15,7 @@ go_test(
         "main_test.go",
         "node_test.go",
         "rbac_test.go",
+        "svcaccttoken_test.go",
     ],
     tags = ["integration"],
     deps = [
@@ -41,6 +42,7 @@ go_test(
         "//pkg/registry/rbac/role/storage:go_default_library",
         "//pkg/registry/rbac/rolebinding:go_default_library",
         "//pkg/registry/rbac/rolebinding/storage:go_default_library",
+        "//pkg/serviceaccount:go_default_library",
         "//plugin/pkg/admission/admit:go_default_library",
         "//plugin/pkg/admission/noderestriction:go_default_library",
         "//plugin/pkg/auth/authenticator/token/bootstrap:go_default_library",
@@ -49,7 +51,9 @@ go_test(
         "//test/integration:go_default_library",
         "//test/integration/framework:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/k8s.io/api/authentication/v1:go_default_library",
         "//vendor/k8s.io/api/authentication/v1beta1:go_default_library",
+        "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/api/storage/v1beta1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
@@ -78,6 +82,7 @@ go_test(
         "//vendor/k8s.io/client-go/tools/bootstrap/token/api:go_default_library",
         "//vendor/k8s.io/client-go/tools/clientcmd/api/v1:go_default_library",
         "//vendor/k8s.io/client-go/transport:go_default_library",
+        "//vendor/k8s.io/client-go/util/cert:go_default_library",
     ],
 )
 
