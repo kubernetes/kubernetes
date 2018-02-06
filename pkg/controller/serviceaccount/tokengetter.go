@@ -95,7 +95,7 @@ func NewGetterFromStorageInterface(
 	saOpts := generic.RESTOptions{StorageConfig: saConfig, Decorator: generic.UndecoratedStorage, ResourcePrefix: saPrefix}
 	secretOpts := generic.RESTOptions{StorageConfig: secretConfig, Decorator: generic.UndecoratedStorage, ResourcePrefix: secretPrefix}
 	return NewGetterFromRegistries(
-		serviceaccountregistry.NewRegistry(serviceaccountstore.NewREST(saOpts)),
+		serviceaccountregistry.NewRegistry(serviceaccountstore.NewREST(saOpts, nil, nil, nil)),
 		secret.NewRegistry(secretstore.NewREST(secretOpts)),
 	)
 }

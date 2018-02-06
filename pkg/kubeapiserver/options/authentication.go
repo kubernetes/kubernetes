@@ -18,6 +18,7 @@ package options
 
 import (
 	"fmt"
+	"net/url"
 	"strings"
 	"time"
 
@@ -71,6 +72,7 @@ type PasswordFileAuthenticationOptions struct {
 type ServiceAccountAuthenticationOptions struct {
 	KeyFiles []string
 	Lookup   bool
+	Issuer   string
 }
 
 type TokenFileAuthenticationOptions struct {
@@ -157,6 +159,12 @@ func (s *BuiltInAuthenticationOptions) Validate() []error {
 		allErrors = append(allErrors, fmt.Errorf("oidc-issuer-url and oidc-client-id should be specified together"))
 	}
 
+	if s.ServiceAccounts != nil && len(s.ServiceAccounts.Issuer) > 0 && strings.Contains(s.ServiceAccounts.Issuer, ":") {
+		if _, err := url.Parse(s.ServiceAccounts.Issuer); err != nil {
+			allErrors = append(allErrors, fmt.Errorf("service-account-issuer contained a ':' but was not a valid URL: %v", err))
+		}
+	}
+
 	return allErrors
 }
 
@@ -233,6 +241,10 @@ func (s *BuiltInAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 
 		fs.BoolVar(&s.ServiceAccounts.Lookup, "service-account-lookup", s.ServiceAccounts.Lookup,
 			"If true, validate ServiceAccount tokens exist in etcd as part of authentication.")
+
+		fs.StringVar(&s.ServiceAccounts.Issuer, "service-account-issuer", s.ServiceAccounts.Issuer, ""+
+			"Identifier of the service account token issuer. The issuer will assert this identifier "+
+			"in \"iss\" claim of issued tokens. This value is a string or URI.")
 	}
 
 	if s.TokenFile != nil {
