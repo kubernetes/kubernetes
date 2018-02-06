@@ -43,7 +43,6 @@ import (
 const (
 	DefaultCloudConfigPath = "/etc/kubernetes/cloud-config"
 
-	defaultV18AdmissionControl    = "NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,DefaultTolerationSeconds,NodeRestriction,ResourceQuota"
 	deprecatedV19AdmissionControl = "NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,DefaultTolerationSeconds,NodeRestriction,MutatingAdmissionWebhook,ValidatingAdmissionWebhook,ResourceQuota"
 	defaultV19AdmissionControl    = "NamespaceLifecycle,LimitRanger,ServiceAccount,DefaultStorageClass,DefaultTolerationSeconds,NodeRestriction,MutatingAdmissionWebhook,ValidatingAdmissionWebhook,ResourceQuota"
 )
@@ -179,10 +178,6 @@ func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration, k8sVersion *versio
 	}
 
 	command := []string{"kube-apiserver"}
-
-	if k8sVersion.Minor() == 8 {
-		defaultArguments["admission-control"] = defaultV18AdmissionControl
-	}
 
 	if cfg.CloudProvider == "aws" || cfg.CloudProvider == "gce" {
 		defaultArguments["admission-control"] = deprecatedV19AdmissionControl

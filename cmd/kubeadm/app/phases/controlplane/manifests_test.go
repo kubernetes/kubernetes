@@ -43,7 +43,7 @@ func TestGetStaticPodSpecs(t *testing.T) {
 
 	// Creates a Master Configuration
 	cfg := &kubeadmapi.MasterConfiguration{
-		KubernetesVersion: "v1.8.0",
+		KubernetesVersion: "v1.9.0",
 	}
 
 	// Executes GetStaticPodSpecs
@@ -115,7 +115,7 @@ func TestCreateStaticPodFilesAndWrappers(t *testing.T) {
 
 		// Creates a Master Configuration
 		cfg := &kubeadmapi.MasterConfiguration{
-			KubernetesVersion: "v1.8.0",
+			KubernetesVersion: "v1.9.0",
 		}
 
 		// Execute createStaticPodFunction
@@ -197,12 +197,12 @@ func TestGetAPIServerCommand(t *testing.T) {
 				API:               kubeadmapi.API{BindPort: 123, AdvertiseAddress: "1.2.3.4"},
 				Networking:        kubeadmapi.Networking{ServiceSubnet: "bar"},
 				CertificatesDir:   testCertsDir,
-				KubernetesVersion: "v1.8.0",
+				KubernetesVersion: "v1.9.0",
 			},
 			expected: []string{
 				"kube-apiserver",
 				"--insecure-port=0",
-				"--admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,DefaultTolerationSeconds,NodeRestriction,ResourceQuota",
+				"--admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,DefaultStorageClass,DefaultTolerationSeconds,NodeRestriction,MutatingAdmissionWebhook,ValidatingAdmissionWebhook,ResourceQuota",
 				"--service-cluster-ip-range=bar",
 				"--service-account-key-file=" + testCertsDir + "/sa.pub",
 				"--client-ca-file=" + testCertsDir + "/ca.crt",
@@ -231,12 +231,12 @@ func TestGetAPIServerCommand(t *testing.T) {
 				API:               kubeadmapi.API{BindPort: 123, AdvertiseAddress: "1.2.3.4"},
 				Networking:        kubeadmapi.Networking{ServiceSubnet: "bar"},
 				CertificatesDir:   testCertsDir,
-				KubernetesVersion: "v1.8.0-beta.0",
+				KubernetesVersion: "v1.9.0-beta.0",
 			},
 			expected: []string{
 				"kube-apiserver",
 				"--insecure-port=0",
-				"--admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,DefaultTolerationSeconds,NodeRestriction,ResourceQuota",
+				"--admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,DefaultStorageClass,DefaultTolerationSeconds,NodeRestriction,MutatingAdmissionWebhook,ValidatingAdmissionWebhook,ResourceQuota",
 				"--service-cluster-ip-range=bar",
 				"--service-account-key-file=" + testCertsDir + "/sa.pub",
 				"--client-ca-file=" + testCertsDir + "/ca.crt",
@@ -265,12 +265,12 @@ func TestGetAPIServerCommand(t *testing.T) {
 				API:               kubeadmapi.API{BindPort: 123, AdvertiseAddress: "4.3.2.1"},
 				Networking:        kubeadmapi.Networking{ServiceSubnet: "bar"},
 				CertificatesDir:   testCertsDir,
-				KubernetesVersion: "v1.8.1",
+				KubernetesVersion: "v1.9.1",
 			},
 			expected: []string{
 				"kube-apiserver",
 				"--insecure-port=0",
-				"--admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,DefaultTolerationSeconds,NodeRestriction,ResourceQuota",
+				"--admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,DefaultStorageClass,DefaultTolerationSeconds,NodeRestriction,MutatingAdmissionWebhook,ValidatingAdmissionWebhook,ResourceQuota",
 				"--service-cluster-ip-range=bar",
 				"--service-account-key-file=" + testCertsDir + "/sa.pub",
 				"--client-ca-file=" + testCertsDir + "/ca.crt",
@@ -300,12 +300,12 @@ func TestGetAPIServerCommand(t *testing.T) {
 				Networking:        kubeadmapi.Networking{ServiceSubnet: "bar"},
 				Etcd:              kubeadmapi.Etcd{CertFile: "fiz", KeyFile: "faz"},
 				CertificatesDir:   testCertsDir,
-				KubernetesVersion: "v1.8.0",
+				KubernetesVersion: "v1.9.0",
 			},
 			expected: []string{
 				"kube-apiserver",
 				"--insecure-port=0",
-				"--admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,DefaultTolerationSeconds,NodeRestriction,ResourceQuota",
+				"--admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,DefaultStorageClass,DefaultTolerationSeconds,NodeRestriction,MutatingAdmissionWebhook,ValidatingAdmissionWebhook,ResourceQuota",
 				"--service-cluster-ip-range=bar",
 				"--service-account-key-file=" + testCertsDir + "/sa.pub",
 				"--client-ca-file=" + testCertsDir + "/ca.crt",
@@ -337,12 +337,12 @@ func TestGetAPIServerCommand(t *testing.T) {
 				Networking:        kubeadmapi.Networking{ServiceSubnet: "bar"},
 				Etcd:              kubeadmapi.Etcd{CertFile: "fiz", KeyFile: "faz"},
 				CertificatesDir:   testCertsDir,
-				KubernetesVersion: "v1.8.3",
+				KubernetesVersion: "v1.9.3",
 			},
 			expected: []string{
 				"kube-apiserver",
 				"--insecure-port=0",
-				"--admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,DefaultTolerationSeconds,NodeRestriction,ResourceQuota",
+				"--admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,DefaultStorageClass,DefaultTolerationSeconds,NodeRestriction,MutatingAdmissionWebhook,ValidatingAdmissionWebhook,ResourceQuota",
 				"--service-cluster-ip-range=bar",
 				"--service-account-key-file=" + testCertsDir + "/sa.pub",
 				"--client-ca-file=" + testCertsDir + "/ca.crt",
@@ -374,12 +374,12 @@ func TestGetAPIServerCommand(t *testing.T) {
 				Networking:        kubeadmapi.Networking{ServiceSubnet: "bar"},
 				Etcd:              kubeadmapi.Etcd{CertFile: "fiz", KeyFile: "faz"},
 				CertificatesDir:   testCertsDir,
-				KubernetesVersion: "v1.8.0",
+				KubernetesVersion: "v1.9.0",
 			},
 			expected: []string{
 				"kube-apiserver",
 				"--insecure-port=0",
-				"--admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,DefaultTolerationSeconds,NodeRestriction,ResourceQuota",
+				"--admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,DefaultStorageClass,DefaultTolerationSeconds,NodeRestriction,MutatingAdmissionWebhook,ValidatingAdmissionWebhook,ResourceQuota",
 				"--service-cluster-ip-range=bar",
 				"--service-account-key-file=" + testCertsDir + "/sa.pub",
 				"--client-ca-file=" + testCertsDir + "/ca.crt",
