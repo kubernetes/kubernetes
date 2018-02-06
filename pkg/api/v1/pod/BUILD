@@ -23,6 +23,7 @@ go_test(
     embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/pkg/api/v1/pod",
     deps = [
+        "//vendor/github.com/stretchr/testify/assert:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/intstr:go_default_library",
