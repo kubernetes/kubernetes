@@ -417,9 +417,9 @@ func TestLabelLocal(t *testing.T) {
 
 	buf := bytes.NewBuffer([]byte{})
 	cmd := NewCmdLabel(f, buf)
-	cmd.Flags().Set("local", "true")
 	opts := LabelOptions{FilenameOptions: resource.FilenameOptions{
-		Filenames: []string{"../../../examples/storage/cassandra/cassandra-controller.yaml"}}}
+		Filenames: []string{"../../../examples/storage/cassandra/cassandra-controller.yaml"}},
+		local: true}
 	err := opts.Complete(buf, cmd, []string{"a=b"})
 	if err == nil {
 		err = opts.Validate()
@@ -471,9 +471,7 @@ func TestLabelMultipleObjects(t *testing.T) {
 
 	buf := bytes.NewBuffer([]byte{})
 	cmd := NewCmdLabel(f, buf)
-	cmd.Flags().Set("all", "true")
-
-	opts := LabelOptions{}
+	opts := LabelOptions{all: true}
 	err := opts.Complete(buf, cmd, []string{"pods", "a=b"})
 	if err == nil {
 		err = opts.Validate()
