@@ -172,13 +172,6 @@ func TestPlugin(t *testing.T) {
 			t.Errorf("SetUp() failed: %v", err)
 		}
 	}
-	if _, err := os.Stat(path); err != nil {
-		if os.IsNotExist(err) {
-			t.Errorf("SetUp() failed, volume path not created: %s", path)
-		} else {
-			t.Errorf("SetUp() failed: %v", err)
-		}
-	}
 
 	unmounter, err := plug.(*cinderPlugin).newUnmounterInternal("vol1", types.UID("poduid"), &fakePDManager{0}, &mount.FakeMounter{})
 	if err != nil {
