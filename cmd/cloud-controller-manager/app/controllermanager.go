@@ -70,7 +70,18 @@ the cloud specific control loops shipped with Kubernetes.`,
 		Run: func(cmd *cobra.Command, args []string) {
 			verflag.PrintAndExitIfRequested()
 
-			if err := Run(s); err != nil {
+			if err := s.Validate(); err != nil {
+				fmt.Fprintf(os.Stderr, "%v\n", err)
+				os.Exit(1)
+			}
+
+			c := &Config{}
+			if err := s.ApplyTo(c); err != nil {
+				fmt.Fprintf(os.Stderr, "%v\n", err)
+				os.Exit(1)
+			}
+
+			if err := c.Complete().Run(); err != nil {
 				fmt.Fprintf(os.Stderr, "%v\n", err)
 				os.Exit(1)
 			}
@@ -91,16 +102,11 @@ func resyncPeriod(s *options.CloudControllerManagerOptions) func() time.Duration
 }
 
 // Run runs the ExternalCMServer.  This should never exit.
-func Run(s *CloudControllerManagerConfig) error {
-	if s.Generic.ComponentConfig.CloudProvider == "" {
-		glog.Fatalf("--cloud-provider cannot be empty")
-	}
-
+func (s *completedConfig) Run() error {
 	cloud, err := cloudprovider.InitCloudProvider(s.Generic.ComponentConfig.CloudProvider, s.Generic.ComponentConfig.CloudConfigFile)
 	if err != nil {
 		glog.Fatalf("Cloud provider could not be initialized: %v", err)
 	}
-
 	if cloud == nil {
 		glog.Fatalf("cloud provider is nil")
 	}
@@ -113,12 +119,13 @@ func Run(s *CloudControllerManagerConfig) error {
 		}
 	}
 
+	// setup /configz endpoint
 	if c, err := configz.New("componentconfig"); err == nil {
-		c.Set(s.ControllerManagerOptions.LegacyOptions)
+		c.Set(s.Generic.ComponentConfig)
 	} else {
 		glog.Errorf("unable to register configz: %s", err)
 	}
-	kubeconfig, err := clientcmd.BuildConfigFromFlags(s.Generic.Master, s.Generic.Kubeconfig)
+	kubeconfig, err := clientcmd.BuildConfigFromFlags(s.Generic.Extra.Master, s.Generic.Extra.Kubeconfig)
 	if err != nil {
 		return err
 	}

@@ -17,15 +17,40 @@ limitations under the License.
 package app
 
 import (
-	"k8s.io/apiserver/pkg/server"
+	apiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 )
 
-// GenericControllerManagerConfig is the main context object for the controller manager.
-type GenericControllerManagerConfig struct {
-	ComponentConfig   componentconfig.KubeControllerManagerConfiguration
-	SecureServingInfo server.SecureServingInfo
-
+type ExtraConfig struct {
 	Master     string
 	Kubeconfig string
+}
+
+// Config is the main context object for the controller manager.
+type Config struct {
+	ComponentConfig   componentconfig.KubeControllerManagerConfiguration
+	SecureServingInfo apiserver.SecureServingInfo
+	Extra             ExtraConfig
+}
+
+type completedConfig struct {
+	ComponentConfig   componentconfig.KubeControllerManagerConfiguration
+	SecureServingInfo apiserver.SecureServingInfo
+	Extra             *ExtraConfig
+}
+
+type CompletedConfig struct {
+	// Embed a private pointer that cannot be instantiated outside of this package.
+	*completedConfig
+}
+
+// Complete fills in any fields not set that are required to have valid data. It's mutating the receiver.
+func (c *Config) Complete() CompletedConfig {
+	cc := completedConfig{
+		c.ComponentConfig,
+		c.SecureServingInfo,
+		&c.Extra,
+	}
+
+	return CompletedConfig{&cc}
 }

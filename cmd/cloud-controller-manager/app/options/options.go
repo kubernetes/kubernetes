@@ -17,10 +17,13 @@ limitations under the License.
 package options
 
 import (
+	"fmt"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	cloudcontroller "k8s.io/kubernetes/cmd/cloud-controller-manager/app"
 	cmoptions "k8s.io/kubernetes/cmd/controller-manager/app/options"
 	"k8s.io/kubernetes/pkg/client/leaderelectionconfig"
 	"k8s.io/kubernetes/pkg/master/ports"
@@ -68,4 +71,23 @@ func (o *CloudControllerManagerOptions) AddFlags(fs *pflag.FlagSet) {
 	leaderelectionconfig.BindFlags(&o.Generic.ComponentConfig.LeaderElection, fs)
 
 	utilfeature.DefaultFeatureGate.AddFlag(fs)
+}
+
+func (o *CloudControllerManagerOptions) ApplyTo(c *cloudcontroller.Config) error {
+	if err := o.Generic.ApplyTo(c.Generic); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (o *CloudControllerManagerOptions) Validate() error {
+	errors := []error{}
+	errors = append(errors, o.Generic.Validate()...)
+
+	if len(o.Generic.ComponentConfig.CloudProvider) == 0 {
+		errors = append(errors, fmt.Errorf("--cloud-provider cannot be empty")
+	}
+
+	return utilerrors.NewAggregate(errors)
 }

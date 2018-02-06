@@ -24,6 +24,7 @@ import (
 	"github.com/spf13/pflag"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
+	genericcontrollermanager "k8s.io/kubernetes/cmd/controller-manager/app"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	"k8s.io/kubernetes/pkg/client/leaderelectionconfig"
 )
@@ -146,4 +147,18 @@ func (o *GenericControllerManagerOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.Float32Var(&o.ComponentConfig.KubeAPIQPS, "kube-api-qps", o.ComponentConfig.KubeAPIQPS, "QPS to use while talking with kubernetes apiserver.")
 	fs.Int32Var(&o.ComponentConfig.KubeAPIBurst, "kube-api-burst", o.ComponentConfig.KubeAPIBurst, "Burst to use while talking with kubernetes apiserver.")
 	fs.DurationVar(&o.ComponentConfig.ControllerStartInterval.Duration, "controller-start-interval", o.ComponentConfig.ControllerStartInterval.Duration, "Interval between starting controller managers.")
+}
+
+func (o *GenericControllerManagerOptions) ApplyTo(c *genericcontrollermanager.Config) error {
+	c.ComponentConfig = o.ComponentConfig
+
+	return nil
+}
+
+func (o *GenericControllerManagerOptions) Validate() []error {
+	errors := []error{}
+
+	// TODO: validate component config, master and kubeconfig
+
+	return errors
 }

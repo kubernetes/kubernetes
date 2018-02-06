@@ -17,10 +17,34 @@ limitations under the License.
 package app
 
 import (
-	"k8s.io/kubernetes/cmd/controller-manager/app"
+	genericcontrollermanager "k8s.io/kubernetes/cmd/controller-manager/app"
 )
 
-// CloudControllerManagerConfig is the main context object for the controller manager.
-type CloudControllerManagerConfig struct {
-	Generic app.GenericControllerManagerConfig
+type ExtraConfig struct {
+}
+
+// Config is the main context object for the controller manager.
+type Config struct {
+	Generic *genericcontrollermanager.Config
+	Extra   ExtraConfig
+}
+
+type completedConfig struct {
+	Generic genericcontrollermanager.CompletedConfig
+	Extra   *ExtraConfig
+}
+
+type CompletedConfig struct {
+	// Embed a private pointer that cannot be instantiated outside of this package.
+	*completedConfig
+}
+
+// Complete fills in any fields not set that are required to have valid data. It's mutating the receiver.
+func (c *Config) Complete() CompletedConfig {
+	cc := completedConfig{
+		c.Generic.Complete(),
+		&c.Extra,
+	}
+
+	return CompletedConfig{&cc}
 }
