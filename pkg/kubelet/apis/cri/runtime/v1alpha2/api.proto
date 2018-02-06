@@ -1,7 +1,8 @@
 // To regenerate api.pb.go run hack/update-generated-runtime.sh
 syntax = 'proto3';
 
-package runtime;
+package runtime.v1alpha2;
+option go_package = "v1alpha2";
 
 import "github.com/gogo/protobuf/gogoproto/gogo.proto";
 

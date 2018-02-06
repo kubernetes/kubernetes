@@ -52,8 +52,8 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/kubelet/remote/fake",
     tags = ["automanaged"],
     deps = [
+        "//pkg/kubelet/apis/cri/runtime/v1alpha2:go_default_library",
         "//pkg/kubelet/apis/cri/testing:go_default_library",
-        "//pkg/kubelet/apis/cri/v1alpha1/runtime:go_default_library",
         "//pkg/kubelet/util:go_default_library",
         "//vendor/golang.org/x/net/context:go_default_library",
         "//vendor/google.golang.org/grpc:go_default_library",
