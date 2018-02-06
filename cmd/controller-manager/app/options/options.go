@@ -152,11 +152,16 @@ func (o *GenericControllerManagerOptions) AddFlags(fs *pflag.FlagSet) {
 func (o *GenericControllerManagerOptions) ApplyTo(c *genericcontrollermanager.Config) error {
 	c.ComponentConfig = o.ComponentConfig
 
+	if err := o.SecureServing.ApplyTo(&c.SecureServingInfo); err != nil {
+		return err
+	}
+
 	return nil
 }
 
 func (o *GenericControllerManagerOptions) Validate() []error {
 	errors := []error{}
+	errors = append(errors, o.SecureServing.Validate()...)
 
 	// TODO: validate component config, master and kubeconfig
 

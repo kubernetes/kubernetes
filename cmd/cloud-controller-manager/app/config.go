@@ -17,10 +17,13 @@ limitations under the License.
 package app
 
 import (
+	"time"
+
 	genericcontrollermanager "k8s.io/kubernetes/cmd/controller-manager/app"
 )
 
 type ExtraConfig struct {
+	NodeStatusUpdateFrequency time.Duration
 }
 
 // Config is the main context object for the controller manager.

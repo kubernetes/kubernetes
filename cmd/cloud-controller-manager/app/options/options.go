@@ -78,6 +78,8 @@ func (o *CloudControllerManagerOptions) ApplyTo(c *cloudcontroller.Config) error
 		return err
 	}
 
+	c.Extra.NodeStatusUpdateFrequency = o.NodeStatusUpdateFrequency.Duration
+
 	return nil
 }
 
