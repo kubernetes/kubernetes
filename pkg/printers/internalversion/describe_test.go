@@ -2108,6 +2108,32 @@ Events:              <none>` + "\n"
 
 }
 
+func TestDescribeNode(t *testing.T) {
+	fake := fake.NewSimpleClientset(&api.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "bar",
+			Namespace: "foo",
+		},
+		Spec: api.NodeSpec{
+			Unschedulable: true,
+		},
+	})
+	c := &describeClient{T: t, Namespace: "foo", Interface: fake}
+	d := NodeDescriber{c}
+	out, err := d.Describe("foo", "bar", printers.DescriberSettings{ShowEvents: true})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	expectedOut := []string{"Unschedulable", "true"}
+	for _, expected := range expectedOut {
+		if !strings.Contains(out, expected) {
+			t.Errorf("expected to find %q in output: %q", expected, out)
+		}
+	}
+
+}
+
 // boolPtr returns a pointer to a bool
 func boolPtr(b bool) *bool {
 	o := b

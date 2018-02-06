@@ -2588,8 +2588,9 @@ func describeNode(node *api.Node, nodeNonTerminatedPodsList *api.PodList, events
 		}
 		printLabelsMultiline(w, "Labels", node.Labels)
 		printAnnotationsMultiline(w, "Annotations", node.Annotations)
-		printNodeTaintsMultiline(w, "Taints", node.Spec.Taints)
 		w.Write(LEVEL_0, "CreationTimestamp:\t%s\n", node.CreationTimestamp.Time.Format(time.RFC1123Z))
+		printNodeTaintsMultiline(w, "Taints", node.Spec.Taints)
+		w.Write(LEVEL_0, "Unschedulable:\t%v\n", node.Spec.Unschedulable)
 		if len(node.Status.Conditions) > 0 {
 			w.Write(LEVEL_0, "Conditions:\n  Type\tStatus\tLastHeartbeatTime\tLastTransitionTime\tReason\tMessage\n")
 			w.Write(LEVEL_1, "----\t------\t-----------------\t------------------\t------\t-------\n")
