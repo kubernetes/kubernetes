@@ -56,6 +56,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
+	auditutil "k8s.io/kubernetes/cmd/kubeadm/app/util/audit"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	dryrunutil "k8s.io/kubernetes/cmd/kubeadm/app/util/dryrun"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
@@ -317,6 +318,21 @@ func (i *Init) Run(out io.Writer) error {
 
 	} else {
 		fmt.Println("[externalca] The file 'ca.key' was not found, yet all other certificates are present. Using external CA mode - certificates or kubeconfig will not be generated.")
+	}
+
+	if features.Enabled(i.cfg.FeatureGates, features.Auditing) {
+		// Setup the AuditPolicy (either it was passed in and exists or it wasn't passed in and generate a default policy)
+		if i.cfg.AuditPolicyConfiguration.Path != "" {
+			// TODO(chuckha) ensure passed in audit policy is valid so users don't have to find the error in the api server log.
+			if _, err := os.Stat(i.cfg.AuditPolicyConfiguration.Path); err != nil {
+				return fmt.Errorf("error getting file info for audit policy file %q [%v]", i.cfg.AuditPolicyConfiguration.Path, err)
+			}
+		} else {
+			i.cfg.AuditPolicyConfiguration.Path = filepath.Join(kubeConfigDir, kubeadmconstants.AuditPolicyDir, kubeadmconstants.AuditPolicyFile)
+			if err := auditutil.CreateDefaultAuditLogPolicy(i.cfg.AuditPolicyConfiguration.Path); err != nil {
+				return fmt.Errorf("error creating default audit policy %q [%v]", i.cfg.AuditPolicyConfiguration.Path, err)
+			}
+		}
 	}
 
 	// Temporarily set cfg.CertificatesDir to the "real value" when writing controlplane manifests

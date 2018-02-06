@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/version"
 
 	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
+	utilpointer "k8s.io/kubernetes/pkg/util/pointer"
 )
 
 const (
@@ -338,6 +339,11 @@ func TestGetAPIServerCommand(t *testing.T) {
 				Etcd:              kubeadmapi.Etcd{CertFile: "fiz", KeyFile: "faz"},
 				CertificatesDir:   testCertsDir,
 				KubernetesVersion: "v1.9.3",
+				AuditPolicyConfiguration: kubeadmapi.AuditPolicyConfiguration{
+					Path:      "/foo/bar",
+					LogDir:    "/foo/baz",
+					LogMaxAge: utilpointer.Int32Ptr(10),
+				}, // ignored without the feature gate
 			},
 			expected: []string{
 				"kube-apiserver",
@@ -446,9 +452,12 @@ func TestGetAPIServerCommand(t *testing.T) {
 			cfg: &kubeadmapi.MasterConfiguration{
 				API:               kubeadmapi.API{BindPort: 123, AdvertiseAddress: "2001:db8::1"},
 				Networking:        kubeadmapi.Networking{ServiceSubnet: "bar"},
-				FeatureGates:      map[string]bool{features.HighAvailability: true},
+				FeatureGates:      map[string]bool{features.HighAvailability: true, features.Auditing: true},
 				CertificatesDir:   testCertsDir,
 				KubernetesVersion: "v1.9.0-beta.0",
+				AuditPolicyConfiguration: kubeadmapi.AuditPolicyConfiguration{
+					LogMaxAge: utilpointer.Int32Ptr(0),
+				},
 			},
 			expected: []string{
 				"kube-apiserver",
@@ -476,6 +485,9 @@ func TestGetAPIServerCommand(t *testing.T) {
 				"--advertise-address=2001:db8::1",
 				"--etcd-servers=http://127.0.0.1:2379",
 				fmt.Sprintf("--endpoint-reconciler-type=%s", reconcilers.LeaseEndpointReconcilerType),
+				"--audit-policy-file=/etc/kubernetes/audit/audit.yaml",
+				"--audit-log-path=/var/log/kubernetes/audit/audit.log",
+				"--audit-log-maxage=0",
 			},
 		},
 		{

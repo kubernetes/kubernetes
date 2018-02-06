@@ -61,6 +61,7 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//cmd/kubeadm/app/util/apiclient:all-srcs",
+        "//cmd/kubeadm/app/util/audit:all-srcs",
         "//cmd/kubeadm/app/util/config:all-srcs",
         "//cmd/kubeadm/app/util/dryrun:all-srcs",
         "//cmd/kubeadm/app/util/kubeconfig:all-srcs",
