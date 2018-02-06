@@ -101,7 +101,7 @@ pushd "${KUBE_ROOT}" 2>&1 > /dev/null
     ret=1
   fi
 
-  if ! _out="$(diff -Naupr -x "BUILD" -x "AUTHORS*" -x "CONTRIBUTORS*" vendor ${_kubetmp}/vendor)"; then
+  if ! _out="$(diff -Naupr -x "BUILD" -x "OWNERS" -x "AUTHORS*" -x "CONTRIBUTORS*" vendor ${_kubetmp}/vendor)"; then
     echo "Your vendored results are different:"
     echo "${_out}"
     echo "Godeps Verify failed."
