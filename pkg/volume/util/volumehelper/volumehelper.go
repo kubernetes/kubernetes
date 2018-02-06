@@ -23,6 +23,8 @@ import (
 	"strings"
 
 	"k8s.io/api/core/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util/types"
@@ -156,4 +158,19 @@ func GetPersistentVolumeClaimVolumeMode(claim *v1.PersistentVolumeClaim) (v1.Per
 		return *claim.Spec.VolumeMode, nil
 	}
 	return "", fmt.Errorf("cannot get volumeMode from pvc: %v", claim.Name)
+}
+
+// CheckVolumeModeFilesystem checks VolumeMode.
+// If the mode is Filesystem, return true otherwise return false.
+func CheckVolumeModeFilesystem(volumeSpec *volume.Spec) (bool, error) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) {
+		volumeMode, err := GetVolumeMode(volumeSpec)
+		if err != nil {
+			return true, err
+		}
+		if volumeMode == v1.PersistentVolumeBlock {
+			return false, nil
+		}
+	}
+	return true, nil
 }

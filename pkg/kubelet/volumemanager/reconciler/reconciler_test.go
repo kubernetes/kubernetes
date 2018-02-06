@@ -835,6 +835,8 @@ func Test_GenerateMapVolumeFunc_Plugin_Not_Found(t *testing.T) {
 		},
 	}
 
+	// Enable BlockVolume feature gate
+	utilfeature.DefaultFeatureGate.Set("BlockVolume=true")
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
 			volumePluginMgr := &volume.VolumePluginMgr{}
@@ -854,14 +856,20 @@ func Test_GenerateMapVolumeFunc_Plugin_Not_Found(t *testing.T) {
 				},
 				Spec: v1.PodSpec{},
 			}
-			volumeToMount := operationexecutor.VolumeToMount{Pod: pod, VolumeSpec: &volume.Spec{}}
-			err := oex.MapVolume(waitForAttachTimeout, volumeToMount, asw)
+			volumeMode := v1.PersistentVolumeBlock
+			tmpSpec := &volume.Spec{PersistentVolume: &v1.PersistentVolume{Spec: v1.PersistentVolumeSpec{VolumeMode: &volumeMode}}}
+			volumeToMount := operationexecutor.VolumeToMount{
+				Pod:        pod,
+				VolumeSpec: tmpSpec}
+			err := oex.MountVolume(waitForAttachTimeout, volumeToMount, asw, false)
 			// Assert
 			if assert.Error(t, err) {
 				assert.Contains(t, err.Error(), tc.expectedErrMsg)
 			}
 		})
 	}
+	// Rollback feature gate to false.
+	utilfeature.DefaultFeatureGate.Set("BlockVolume=false")
 }
 
 func Test_GenerateUnmapVolumeFunc_Plugin_Not_Found(t *testing.T) {
@@ -882,6 +890,8 @@ func Test_GenerateUnmapVolumeFunc_Plugin_Not_Found(t *testing.T) {
 		},
 	}
 
+	// Enable BlockVolume feature gate
+	utilfeature.DefaultFeatureGate.Set("BlockVolume=true")
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
 			volumePluginMgr := &volume.VolumePluginMgr{}
@@ -893,14 +903,20 @@ func Test_GenerateUnmapVolumeFunc_Plugin_Not_Found(t *testing.T) {
 				nil,   /* fakeRecorder */
 				false, /* checkNodeCapabilitiesBeforeMount */
 				nil))
-			volumeToUnmount := operationexecutor.MountedVolume{PluginName: "fake-file-plugin"}
-			err := oex.UnmapVolume(volumeToUnmount, asw)
+			volumeMode := v1.PersistentVolumeBlock
+			tmpSpec := &volume.Spec{PersistentVolume: &v1.PersistentVolume{Spec: v1.PersistentVolumeSpec{VolumeMode: &volumeMode}}}
+			volumeToUnmount := operationexecutor.MountedVolume{
+				PluginName: "fake-file-plugin",
+				VolumeSpec: tmpSpec}
+			err := oex.UnmountVolume(volumeToUnmount, asw)
 			// Assert
 			if assert.Error(t, err) {
 				assert.Contains(t, err.Error(), tc.expectedErrMsg)
 			}
 		})
 	}
+	// Rollback feature gate to false.
+	utilfeature.DefaultFeatureGate.Set("BlockVolume=false")
 }
 
 func Test_GenerateUnmapDeviceFunc_Plugin_Not_Found(t *testing.T) {
@@ -912,15 +928,17 @@ func Test_GenerateUnmapDeviceFunc_Plugin_Not_Found(t *testing.T) {
 		"volumePlugin is nil": {
 			volumePlugins:  []volume.VolumePlugin{},
 			expectErr:      true,
-			expectedErrMsg: "UnmapDevice.FindMapperPluginBySpec failed",
+			expectedErrMsg: "UnmapDevice.FindMapperPluginByName failed",
 		},
 		"blockVolumePlugin is nil": {
 			volumePlugins:  volumetesting.NewFakeFileVolumePlugin(),
 			expectErr:      true,
-			expectedErrMsg: "UnmapDevice.FindMapperPluginBySpec failed to find BlockVolumeMapper plugin. Volume plugin is nil.",
+			expectedErrMsg: "UnmapDevice.FindMapperPluginByName failed to find BlockVolumeMapper plugin. Volume plugin is nil.",
 		},
 	}
 
+	// Enable BlockVolume feature gate
+	utilfeature.DefaultFeatureGate.Set("BlockVolume=true")
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
 			volumePluginMgr := &volume.VolumePluginMgr{}
@@ -933,15 +951,18 @@ func Test_GenerateUnmapDeviceFunc_Plugin_Not_Found(t *testing.T) {
 				false, /* checkNodeCapabilitiesBeforeMount */
 				nil))
 			var mounter mount.Interface
-			plugins := volumetesting.NewFakeFileVolumePlugin()
-			deviceToDetach := operationexecutor.AttachedVolume{VolumeSpec: &volume.Spec{}, PluginName: plugins[0].GetPluginName()}
-			err := oex.UnmapDevice(deviceToDetach, asw, mounter)
+			volumeMode := v1.PersistentVolumeBlock
+			tmpSpec := &volume.Spec{PersistentVolume: &v1.PersistentVolume{Spec: v1.PersistentVolumeSpec{VolumeMode: &volumeMode}}}
+			deviceToDetach := operationexecutor.AttachedVolume{VolumeSpec: tmpSpec, PluginName: "fake-file-plugin"}
+			err := oex.UnmountDevice(deviceToDetach, asw, mounter)
 			// Assert
 			if assert.Error(t, err) {
 				assert.Contains(t, err.Error(), tc.expectedErrMsg)
 			}
 		})
 	}
+	// Rollback feature gate to false.
+	utilfeature.DefaultFeatureGate.Set("BlockVolume=false")
 }
 
 func waitForMount(

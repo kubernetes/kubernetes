@@ -166,12 +166,10 @@ func (rc *reconciler) reconcile() {
 	// Ensure volumes that should be unmounted are unmounted.
 	for _, mountedVolume := range rc.actualStateOfWorld.GetMountedVolumes() {
 		if !rc.desiredStateOfWorld.PodExistsInVolume(mountedVolume.PodName, mountedVolume.VolumeName) {
-			volumeHandler, err := operationexecutor.NewVolumeHandler(mountedVolume.VolumeSpec, rc.operationExecutor)
-			if err != nil {
-				glog.Errorf(mountedVolume.GenerateErrorDetailed(fmt.Sprintf("operationExecutor.NewVolumeHandler for UnmountVolume failed"), err).Error())
-				continue
-			}
-			err = volumeHandler.UnmountVolumeHandler(mountedVolume.MountedVolume, rc.actualStateOfWorld)
+			// Volume is mounted, unmount it
+			glog.V(12).Infof(mountedVolume.GenerateMsgDetailed("Starting operationExecutor.UnmountVolume", ""))
+			err := rc.operationExecutor.UnmountVolume(
+				mountedVolume.MountedVolume, rc.actualStateOfWorld)
 			if err != nil &&
 				!nestedpendingoperations.IsAlreadyExists(err) &&
 				!exponentialbackoff.IsExponentialBackoff(err) {
@@ -236,12 +234,12 @@ func (rc *reconciler) reconcile() {
 			if isRemount {
 				remountingLogStr = "Volume is already mounted to pod, but remount was requested."
 			}
-			volumeHandler, err := operationexecutor.NewVolumeHandler(volumeToMount.VolumeSpec, rc.operationExecutor)
-			if err != nil {
-				glog.Errorf(volumeToMount.GenerateErrorDetailed(fmt.Sprintf("operationExecutor.NewVolumeHandler for MountVolume failed"), err).Error())
-				continue
-			}
-			err = volumeHandler.MountVolumeHandler(rc.waitForAttachTimeout, volumeToMount.VolumeToMount, rc.actualStateOfWorld, isRemount, remountingLogStr)
+			glog.V(12).Infof(volumeToMount.GenerateMsgDetailed("Starting operationExecutor.MountVolume", remountingLogStr))
+			err := rc.operationExecutor.MountVolume(
+				rc.waitForAttachTimeout,
+				volumeToMount.VolumeToMount,
+				rc.actualStateOfWorld,
+				isRemount)
 			if err != nil &&
 				!nestedpendingoperations.IsAlreadyExists(err) &&
 				!exponentialbackoff.IsExponentialBackoff(err) {
@@ -265,12 +263,10 @@ func (rc *reconciler) reconcile() {
 		if !rc.desiredStateOfWorld.VolumeExists(attachedVolume.VolumeName) &&
 			!rc.operationExecutor.IsOperationPending(attachedVolume.VolumeName, nestedpendingoperations.EmptyUniquePodName) {
 			if attachedVolume.GloballyMounted {
-				volumeHandler, err := operationexecutor.NewVolumeHandler(attachedVolume.VolumeSpec, rc.operationExecutor)
-				if err != nil {
-					glog.Errorf(attachedVolume.GenerateErrorDetailed(fmt.Sprintf("operationExecutor.NewVolumeHandler for UnmountDevice failed"), err).Error())
-					continue
-				}
-				err = volumeHandler.UnmountDeviceHandler(attachedVolume.AttachedVolume, rc.actualStateOfWorld, rc.mounter)
+				// Volume is globally mounted to device, unmount it
+				glog.V(12).Infof(attachedVolume.GenerateMsgDetailed("Starting operationExecutor.UnmountDevice", ""))
+				err := rc.operationExecutor.UnmountDevice(
+					attachedVolume.AttachedVolume, rc.actualStateOfWorld, rc.mounter)
 				if err != nil &&
 					!nestedpendingoperations.IsAlreadyExists(err) &&
 					!exponentialbackoff.IsExponentialBackoff(err) {
@@ -403,14 +399,9 @@ func (rc *reconciler) cleanupMounts(volume podVolume) {
 		PluginName:          volume.pluginName,
 		PodUID:              types.UID(volume.podName),
 	}
-	volumeHandler, err := operationexecutor.NewVolumeHandlerWithMode(volume.volumeMode, rc.operationExecutor)
-	if err != nil {
-		glog.Errorf(mountedVolume.GenerateErrorDetailed(fmt.Sprintf("operationExecutor.NewVolumeHandler for UnmountVolume failed"), err).Error())
-		return
-	}
 	// TODO: Currently cleanupMounts only includes UnmountVolume operation. In the next PR, we will add
 	// to unmount both volume and device in the same routine.
-	err = volumeHandler.UnmountVolumeHandler(mountedVolume, rc.actualStateOfWorld)
+	err := rc.operationExecutor.UnmountVolume(mountedVolume, rc.actualStateOfWorld)
 	if err != nil {
 		glog.Errorf(mountedVolume.GenerateErrorDetailed(fmt.Sprintf("volumeHandler.UnmountVolumeHandler for UnmountVolume failed"), err).Error())
 		return
@@ -435,15 +426,12 @@ func (rc *reconciler) reconstructVolume(volume podVolume) (*reconstructedVolume,
 			UID: types.UID(volume.podName),
 		},
 	}
-	volumeHandler, err := operationexecutor.NewVolumeHandlerWithMode(volume.volumeMode, rc.operationExecutor)
-	if err != nil {
-		return nil, err
-	}
 	mapperPlugin, err := rc.volumePluginMgr.FindMapperPluginByName(volume.pluginName)
 	if err != nil {
 		return nil, err
 	}
-	volumeSpec, err := volumeHandler.ReconstructVolumeHandler(
+	volumeSpec, err := rc.operationExecutor.ReconstructVolumeOperation(
+		volume.volumeMode,
 		plugin,
 		mapperPlugin,
 		pod.UID,
@@ -466,7 +454,7 @@ func (rc *reconciler) reconstructVolume(volume podVolume) (*reconstructedVolume,
 		uniqueVolumeName = volumehelper.GetUniqueVolumeNameForNonAttachableVolume(volume.podName, plugin, volumeSpec)
 	}
 	// Check existence of mount point for filesystem volume or symbolic link for block volume
-	isExist, checkErr := volumeHandler.CheckVolumeExistence(volume.mountPath, volumeSpec.Name(), rc.mounter, uniqueVolumeName, volume.podName, pod.UID, attachablePlugin)
+	isExist, checkErr := rc.operationExecutor.CheckVolumeExistenceOperation(volumeSpec, volume.mountPath, volumeSpec.Name(), rc.mounter, uniqueVolumeName, volume.podName, pod.UID, attachablePlugin)
 	if checkErr != nil {
 		return nil, err
 	}
