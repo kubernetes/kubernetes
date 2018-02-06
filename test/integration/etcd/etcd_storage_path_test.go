@@ -437,11 +437,13 @@ var ephemeralWhiteList = createEphemeralWhiteList(
 	// --
 
 	// k8s.io/kubernetes/pkg/apis/authentication/v1beta1
-	gvr("authentication.k8s.io", "v1beta1", "tokenreviews"), // not stored in etcd
+	gvr("authentication.k8s.io", "v1beta1", "tokenreviews"),  // not stored in etcd
+	gvr("authentication.k8s.io", "v1beta1", "tokenrequests"), // not stored in etcd
 	// --
 
 	// k8s.io/kubernetes/pkg/apis/authentication/v1
-	gvr("authentication.k8s.io", "v1", "tokenreviews"), // not stored in etcd
+	gvr("authentication.k8s.io", "v1", "tokenreviews"),  // not stored in etcd
+	gvr("authentication.k8s.io", "v1", "tokenrequests"), // not stored in etcd
 	// --
 
 	// k8s.io/kubernetes/pkg/apis/authorization/v1beta1
