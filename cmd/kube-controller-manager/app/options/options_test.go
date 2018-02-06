@@ -110,8 +110,8 @@ func TestAddFlags(t *testing.T) {
 	// insertion order is random.
 	sort.Sort(sortedGCIgnoredResources(s.GCIgnoredResources))
 
-	expected := &CMServer{
-		ControllerManagerServer: cmoptions.ControllerManagerServer{
+	expected := &KubeControllerManagerOptions{
+		GenericControllerManagerOptions: cmoptions.GenericControllerManagerOptions{
 			KubeControllerManagerConfiguration: componentconfig.KubeControllerManagerConfiguration{
 				Port:                                            10000,
 				Address:                                         "192.168.4.10",

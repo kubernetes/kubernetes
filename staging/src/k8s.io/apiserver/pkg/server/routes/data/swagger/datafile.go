@@ -1596,7 +1596,7 @@ var _third_partySwaggerUiCssTypographyCss = []byte(`/* droid-sans-regular - lati
        url('../fonts/droid-sans-v6-latin-regular.woff2') format('woff2'), /* Super Modern Browsers */
        url('../fonts/droid-sans-v6-latin-regular.woff') format('woff'), /* Modern Browsers */
        url('../fonts/droid-sans-v6-latin-regular.ttf') format('truetype'), /* Safari, Android, iOS */
-       url('../fonts/droid-sans-v6-latin-regular.svg#DroidSans') format('svg'); /* Legacy iOS */
+       url('../fonts/droid-sans-v6-latin-regular.svg#DroidSans') format('svg'); /* ComponentConfig iOS */
 }
 /* droid-sans-700 - latin */
 @font-face {
@@ -1609,7 +1609,7 @@ var _third_partySwaggerUiCssTypographyCss = []byte(`/* droid-sans-regular - lati
        url('../fonts/droid-sans-v6-latin-700.woff2') format('woff2'), /* Super Modern Browsers */
        url('../fonts/droid-sans-v6-latin-700.woff') format('woff'), /* Modern Browsers */
        url('../fonts/droid-sans-v6-latin-700.ttf') format('truetype'), /* Safari, Android, iOS */
-       url('../fonts/droid-sans-v6-latin-700.svg#DroidSans') format('svg'); /* Legacy iOS */
+       url('../fonts/droid-sans-v6-latin-700.svg#DroidSans') format('svg'); /* ComponentConfig iOS */
 }
 `)
 

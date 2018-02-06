@@ -29,44 +29,43 @@ import (
 	_ "k8s.io/kubernetes/pkg/features"
 
 	"github.com/spf13/pflag"
-	kubecmoptions "k8s.io/kubernetes/cmd/controller-manager/app/options"
 )
 
-// CloudControllerManagerServer is the main context object for the controller manager.
-type CloudControllerManagerServer struct {
-	cmoptions.ControllerManagerServer
+// CloudControllerManagerOptions is the main context object for the controller manager.
+type CloudControllerManagerOptions struct {
+	Generic cmoptions.GenericControllerManagerOptions
 
 	// NodeStatusUpdateFrequency is the frequency at which the controller updates nodes' status
 	NodeStatusUpdateFrequency metav1.Duration
 }
 
-// NewCloudControllerManagerServer creates a new ExternalCMServer with a default config.
-func NewCloudControllerManagerServer() *CloudControllerManagerServer {
-	s := CloudControllerManagerServer{
+// NewCloudControllerManagerOptions creates a new ExternalCMServer with a default config.
+func NewCloudControllerManagerOptions() *CloudControllerManagerOptions {
+	componentConfig := cmoptions.NewDefaultControllerManagerComponentConfig(ports.CloudControllerManagerPort)
+
+	s := CloudControllerManagerOptions{
 		// The common/default are kept in 'cmd/kube-controller-manager/app/options/util.go'.
 		// Please make common changes there and put anything cloud specific here.
-		ControllerManagerServer: cmoptions.ControllerManagerServer{
-			ControllerManagerOptions: kubecmoptions.ControllerManagerOptions{
-				LegacyOptions: cmoptions.GetDefaultControllerOptions(ports.CloudControllerManagerPort),
-			},
-		},
+		Generic:                   cmoptions.NewGenericControllerManagerOptions(componentConfig),
 		NodeStatusUpdateFrequency: metav1.Duration{Duration: 5 * time.Minute},
 	}
-	s.LegacyOptions.LeaderElection.LeaderElect = true
+	s.Generic.ComponentConfig.LeaderElection.LeaderElect = true
+
 	return &s
 }
 
 // AddFlags adds flags for a specific ExternalCMServer to the specified FlagSet
-func (s *CloudControllerManagerServer) AddFlags(fs *pflag.FlagSet) {
-	cmoptions.AddDefaultControllerFlags(&s.ControllerManagerServer, fs)
-	fs.StringVar(&s.LegacyOptions.CloudProvider, "cloud-provider", s.LegacyOptions.CloudProvider, "The provider of cloud services. Cannot be empty.")
-	fs.DurationVar(&s.NodeStatusUpdateFrequency.Duration, "node-status-update-frequency", s.NodeStatusUpdateFrequency.Duration, "Specifies how often the controller updates nodes' status.")
-	// TODO: remove --service-account-private-key-file 6 months after 1.8 is released (~1.10)
-	fs.StringVar(&s.LegacyOptions.ServiceAccountKeyFile, "service-account-private-key-file", s.LegacyOptions.ServiceAccountKeyFile, "Filename containing a PEM-encoded private RSA or ECDSA key used to sign service account tokens.")
-	fs.MarkDeprecated("service-account-private-key-file", "This flag is currently no-op and will be deleted.")
-	fs.Int32Var(&s.LegacyOptions.ConcurrentServiceSyncs, "concurrent-service-syncs", s.LegacyOptions.ConcurrentServiceSyncs, "The number of services that are allowed to sync concurrently. Larger number = more responsive service management, but more CPU (and network) load")
+func (o *CloudControllerManagerOptions) AddFlags(fs *pflag.FlagSet) {
+	o.Generic.AddFlags(fs)
 
-	leaderelectionconfig.BindFlags(&s.LegacyOptions.LeaderElection, fs)
+	fs.StringVar(&o.Generic.ComponentConfig.CloudProvider, "cloud-provider", o.Generic.ComponentConfig.CloudProvider, "The provider of cloud services. Cannot be empty.")
+	fs.DurationVar(&o.NodeStatusUpdateFrequency.Duration, "node-status-update-frequency", o.NodeStatusUpdateFrequency.Duration, "Specifies how often the controller updates nodes' status.")
+	// TODO: remove --service-account-private-key-file 6 months after 1.8 is released (~1.10)
+	fs.StringVar(&o.Generic.ComponentConfig.ServiceAccountKeyFile, "service-account-private-key-file", o.Generic.ComponentConfig.ServiceAccountKeyFile, "Filename containing a PEM-encoded private RSA or ECDSA key used to sign service account tokens.")
+	fs.MarkDeprecated("service-account-private-key-file", "This flag is currently no-op and will be deleted.")
+	fs.Int32Var(&o.Generic.ComponentConfig.ConcurrentServiceSyncs, "concurrent-service-syncs", o.Generic.ComponentConfig.ConcurrentServiceSyncs, "The number of services that are allowed to sync concurrently. Larger number = more responsive service management, but more CPU (and network) load")
+
+	leaderelectionconfig.BindFlags(&o.Generic.ComponentConfig.LeaderElection, fs)
 
 	utilfeature.DefaultFeatureGate.AddFlag(fs)
 }
