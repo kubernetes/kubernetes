@@ -55,9 +55,9 @@ type APIInstaller struct {
 	enableAPIResponseCompression bool
 }
 
-// Struct capturing information about an action ("GET", "POST", "WATCH", "PROXY", etc).
+// Struct capturing information about an action ("GET", "POST", "WATCH", etc).
 type action struct {
-	Verb          string               // Verb identifying the action ("GET", "POST", "WATCH", "PROXY", etc).
+	Verb          string               // Verb identifying the action ("GET", "POST", "WATCH", etc).
 	Path          string               // The path of the action
 	Params        []*restful.Parameter // List of parameters associated with the action.
 	Namer         handlers.ScopeNamer
@@ -84,7 +84,6 @@ var toDiscoveryKubeVerb = map[string]string{
 	"LIST":             "list",
 	"PATCH":            "patch",
 	"POST":             "create",
-	"PROXY":            "proxy",
 	"PUT":              "update",
 	"WATCH":            "watch",
 	"WATCHLIST":        "watch",
@@ -240,7 +239,6 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	updater, isUpdater := storage.(rest.Updater)
 	patcher, isPatcher := storage.(rest.Patcher)
 	watcher, isWatcher := storage.(rest.Watcher)
-	_, isRedirector := storage.(rest.Redirector)
 	connecter, isConnecter := storage.(rest.Connecter)
 	storageMeta, isMetadata := storage.(rest.StorageMetadata)
 	if !isMetadata {
@@ -426,12 +424,6 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		actions = appendIf(actions, action{"PATCH", itemPath, nameParams, namer, false}, isPatcher)
 		actions = appendIf(actions, action{"DELETE", itemPath, nameParams, namer, false}, isDeleter)
 		actions = appendIf(actions, action{"WATCH", "watch/" + itemPath, nameParams, namer, false}, isWatcher)
-		// We add "proxy" subresource to remove the need for the generic top level prefix proxy.
-		// The generic top level prefix proxy is deprecated in v1.2, and will be removed in 1.3, or 1.4 at the latest.
-		// TODO: DEPRECATED in v1.2.
-		actions = appendIf(actions, action{"PROXY", "proxy/" + itemPath + "/{path:*}", proxyParams, namer, false}, isRedirector)
-		// TODO: DEPRECATED in v1.2.
-		actions = appendIf(actions, action{"PROXY", "proxy/" + itemPath, nameParams, namer, false}, isRedirector)
 		actions = appendIf(actions, action{"CONNECT", itemPath, nameParams, namer, false}, isConnecter)
 		actions = appendIf(actions, action{"CONNECT", itemPath + "/{path:*}", proxyParams, namer, false}, isConnecter && connectSubpath)
 		break
@@ -478,12 +470,6 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		actions = appendIf(actions, action{"PATCH", itemPath, nameParams, namer, false}, isPatcher)
 		actions = appendIf(actions, action{"DELETE", itemPath, nameParams, namer, false}, isDeleter)
 		actions = appendIf(actions, action{"WATCH", "watch/" + itemPath, nameParams, namer, false}, isWatcher)
-		// We add "proxy" subresource to remove the need for the generic top level prefix proxy.
-		// The generic top level prefix proxy is deprecated in v1.2, and will be removed in 1.3, or 1.4 at the latest.
-		// TODO: DEPRECATED in v1.2.
-		actions = appendIf(actions, action{"PROXY", "proxy/" + itemPath + "/{path:*}", proxyParams, namer, false}, isRedirector)
-		// TODO: DEPRECATED in v1.2.
-		actions = appendIf(actions, action{"PROXY", "proxy/" + itemPath, nameParams, namer, false}, isRedirector)
 		actions = appendIf(actions, action{"CONNECT", itemPath, nameParams, namer, false}, isConnecter)
 		actions = appendIf(actions, action{"CONNECT", itemPath + "/{path:*}", proxyParams, namer, false}, isConnecter && connectSubpath)
 
@@ -812,18 +798,6 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			}
 			addParams(route, action.Params)
 			routes = append(routes, route)
-		// We add "proxy" subresource to remove the need for the generic top level prefix proxy.
-		// The generic top level prefix proxy is deprecated in v1.2, and will be removed in 1.3, or 1.4 at the latest.
-		// TODO: DEPRECATED in v1.2.
-		case "PROXY": // Proxy requests to a resource.
-			// Accept all methods as per http://issue.k8s.io/3996
-			routes = append(routes, buildProxyRoute(ws, "GET", a.prefix, action.Path, kind, resource, subresource, namespaced, requestScope, hasSubresource, action.Params, proxyHandler, operationSuffix))
-			routes = append(routes, buildProxyRoute(ws, "PUT", a.prefix, action.Path, kind, resource, subresource, namespaced, requestScope, hasSubresource, action.Params, proxyHandler, operationSuffix))
-			routes = append(routes, buildProxyRoute(ws, "POST", a.prefix, action.Path, kind, resource, subresource, namespaced, requestScope, hasSubresource, action.Params, proxyHandler, operationSuffix))
-			routes = append(routes, buildProxyRoute(ws, "PATCH", a.prefix, action.Path, kind, resource, subresource, namespaced, requestScope, hasSubresource, action.Params, proxyHandler, operationSuffix))
-			routes = append(routes, buildProxyRoute(ws, "DELETE", a.prefix, action.Path, kind, resource, subresource, namespaced, requestScope, hasSubresource, action.Params, proxyHandler, operationSuffix))
-			routes = append(routes, buildProxyRoute(ws, "HEAD", a.prefix, action.Path, kind, resource, subresource, namespaced, requestScope, hasSubresource, action.Params, proxyHandler, operationSuffix))
-			routes = append(routes, buildProxyRoute(ws, "OPTIONS", a.prefix, action.Path, kind, resource, subresource, namespaced, requestScope, hasSubresource, action.Params, proxyHandler, operationSuffix))
 		case "CONNECT":
 			for _, method := range connecter.ConnectMethods() {
 				connectProducedObject := storageMeta.ProducesObject(method)
@@ -904,27 +878,6 @@ func routeFunction(handler http.Handler) restful.RouteFunction {
 	return func(restReq *restful.Request, restResp *restful.Response) {
 		handler.ServeHTTP(restResp.ResponseWriter, restReq.Request)
 	}
-}
-
-func buildProxyRoute(ws *restful.WebService,
-	method, prefix, path, kind, resource, subresource, namespaced, requestScope string,
-	hasSubresource bool,
-	params []*restful.Parameter,
-	proxyHandler http.Handler,
-	operationSuffix string) *restful.RouteBuilder {
-	doc := "proxy " + method + " requests to " + kind
-	if hasSubresource {
-		doc = "proxy " + method + " requests to " + subresource + " of " + kind
-	}
-	handler := metrics.InstrumentRouteFunc("PROXY", resource, subresource, requestScope, routeFunction(proxyHandler))
-	proxyRoute := ws.Method(method).Path(path).To(handler).
-		Doc(doc).
-		Operation("proxy" + strings.Title(method) + namespaced + kind + strings.Title(subresource) + operationSuffix).
-		Produces("*/*").
-		Consumes("*/*").
-		Writes("string")
-	addParams(proxyRoute, params)
-	return proxyRoute
 }
 
 func addParams(route *restful.RouteBuilder, params []*restful.Parameter) {
