@@ -104,8 +104,9 @@ func (ds *dockerService) updateCreateConfig(
 		rOpts := lc.GetResources()
 		if rOpts != nil {
 			createConfig.HostConfig.Resources = dockercontainer.Resources{
+				// Memory and MemorySwap are set to the same value, this prevents containers from using any swap.
 				Memory:     rOpts.MemoryLimitInBytes,
-				MemorySwap: DefaultMemorySwap(),
+				MemorySwap: rOpts.MemoryLimitInBytes,
 				CPUShares:  rOpts.CpuShares,
 				CPUQuota:   rOpts.CpuQuota,
 				CPUPeriod:  rOpts.CpuPeriod,
