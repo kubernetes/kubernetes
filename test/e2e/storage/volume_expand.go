@@ -60,6 +60,7 @@ var _ = utils.SIGDescribe("Volume expand [Feature:ExpandPersistentVolumes] [Slow
 		}
 		resizableSc, err = createResizableStorageClass(test, ns, "resizing", c)
 		Expect(err).NotTo(HaveOccurred(), "Error creating resizable storage class")
+		Expect(resizableSc.AllowVolumeExpansion).NotTo(BeNil())
 		Expect(*resizableSc.AllowVolumeExpansion).To(BeTrue())
 
 		pvc = newClaim(test, ns, "default")
@@ -108,8 +109,8 @@ var _ = utils.SIGDescribe("Volume expand [Feature:ExpandPersistentVolumes] [Slow
 		Expect(err).NotTo(HaveOccurred(), "While fetching pvc after controller resize")
 
 		inProgressConditions := pvc.Status.Conditions
-		Expect(len(inProgressConditions)).To(Equal(1), "pvc must have resize condition")
-		Expect(inProgressConditions[0].Type).To(Equal(v1.PersistentVolumeClaimResizing), "pvc must have resizing condition")
+		Expect(len(inProgressConditions)).To(Equal(1), "pvc must have file system resize pending condition")
+		Expect(inProgressConditions[0].Type).To(Equal(v1.PersistentVolumeClaimFileSystemResizePending), "pvc must have fs resizing condition")
 
 		By("Deleting the previously created pod")
 		err = framework.DeletePodWithWait(f, c, pod)
