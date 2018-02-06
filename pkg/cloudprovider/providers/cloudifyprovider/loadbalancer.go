@@ -26,7 +26,6 @@ import (
 // Balancer - struct with connection settings
 type Balancer struct {
 	deployment string
-	scaleGroup string
 	client     *cloudify.Client
 }
 
@@ -158,6 +157,25 @@ func (r *Balancer) EnsureLoadBalancerDeleted(clusterName string, service *api.Se
 	return nil
 }
 
+func (r *Balancer) getLoadbalancerScaleGroup() (string, error) {
+	var params = map[string]string{}
+	// Add filter by deployment
+	params["deployment_id"] = r.deployment
+	nodes, err := r.client.GetNodesFull(params)
+	if err != nil {
+		return "", err
+	}
+	for _, node := range nodes.Items {
+		if node.Type == "cloudify.nodes.ApplicationServer.kubernetes.LoadBalancer" {
+			if node.ScalingGroupName != "" {
+				return node.ScalingGroupName, nil
+			}
+		}
+	}
+
+	return "", fmt.Errorf("No groups for scale.")
+}
+
 func (r *Balancer) createOrGetLoadBalancer(clusterName string, service *api.Service) (*cloudify.NodeInstance, error) {
 	// already have some loadbalancer with same name
 	var nodeInstance *cloudify.NodeInstance
@@ -174,11 +192,16 @@ func (r *Balancer) createOrGetLoadBalancer(clusterName string, service *api.Serv
 	}
 	glog.Infof("No empty nodes for %s", service.Name)
 
+	loadScalingGroup, err := r.getLoadbalancerScaleGroup()
+	if err != nil {
+		return nil, err
+	}
+
 	var exec cloudify.ExecutionPost
 	exec.WorkflowID = "scale"
 	exec.DeploymentID = r.deployment
 	exec.Parameters = map[string]interface{}{}
-	exec.Parameters["scalable_entity_name"] = r.scaleGroup // Use scale group instead real node id
+	exec.Parameters["scalable_entity_name"] = loadScalingGroup
 	execution, err := r.client.RunExecution(exec, false)
 	if err != nil {
 		return nil, err
@@ -289,10 +312,9 @@ func (r *Balancer) EnsureLoadBalancer(clusterName string, service *api.Service, 
 }
 
 // NewBalancer - create instance with support kubernetes balancer interface.
-func NewBalancer(client *cloudify.Client, deployment, scaleGroup string) *Balancer {
+func NewBalancer(client *cloudify.Client, deployment string) *Balancer {
 	return &Balancer{
 		client:     client,
 		deployment: deployment,
-		scaleGroup: scaleGroup,
 	}
 }
