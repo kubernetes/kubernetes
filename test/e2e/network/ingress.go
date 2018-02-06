@@ -90,7 +90,8 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 				Client: jig.Client,
 				Cloud:  framework.TestContext.CloudConfig,
 			}
-			gceController.Init()
+			err := gceController.Init()
+			Expect(err).NotTo(HaveOccurred())
 		})
 
 		// Platform specific cleanup
@@ -106,7 +107,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			jig.TryDeleteIngress()
 
 			By("Cleaning up cloud resources")
-			framework.CleanupGCEIngressController(gceController)
+			Expect(gceController.CleanupGCEIngressController()).NotTo(HaveOccurred())
 		})
 
 		It("should conform to Ingress spec", func() {
@@ -356,7 +357,8 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			}, map[string]string{})
 
 			By("Test that ingress works with the pre-shared certificate")
-			jig.WaitForIngressWithCert(true, []string{testHostname}, cert)
+			err = jig.WaitForIngressWithCert(true, []string{testHostname}, cert)
+			Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Unexpected error while waiting for ingress: %v", err))
 		})
 
 		It("multicluster ingress should get instance group annotation", func() {
@@ -398,7 +400,8 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 				Client: jig.Client,
 				Cloud:  framework.TestContext.CloudConfig,
 			}
-			gceController.Init()
+			err := gceController.Init()
+			Expect(err).NotTo(HaveOccurred())
 		})
 
 		// Platform specific cleanup
@@ -414,7 +417,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			jig.TryDeleteIngress()
 
 			By("Cleaning up cloud resources")
-			framework.CleanupGCEIngressController(gceController)
+			Expect(gceController.CleanupGCEIngressController()).NotTo(HaveOccurred())
 		})
 
 		It("should conform to Ingress spec", func() {
