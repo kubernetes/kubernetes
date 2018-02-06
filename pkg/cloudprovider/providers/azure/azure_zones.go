@@ -40,11 +40,16 @@ type instanceInfo struct {
 
 // GetZone returns the Zone containing the current failure zone and locality region that the program is running in
 func (az *Cloud) GetZone() (cloudprovider.Zone, error) {
+	return az.getZoneFromURL(instanceInfoURL)
+}
+
+// This is injectable for testing.
+func (az *Cloud) getZoneFromURL(url string) (cloudprovider.Zone, error) {
 	faultMutex.Lock()
 	defer faultMutex.Unlock()
 	if faultDomain == nil {
 		var err error
-		faultDomain, err = fetchFaultDomain()
+		faultDomain, err = fetchFaultDomain(url)
 		if err != nil {
 			return cloudprovider.Zone{}, err
 		}
@@ -75,8 +80,8 @@ func (az *Cloud) GetZoneByNodeName(nodeName types.NodeName) (cloudprovider.Zone,
 	return az.vmSet.GetZoneByNodeName(string(nodeName))
 }
 
-func fetchFaultDomain() (*string, error) {
-	resp, err := http.Get(instanceInfoURL)
+func fetchFaultDomain(url string) (*string, error) {
+	resp, err := http.Get(url)
 	if err != nil {
 		return nil, err
 	}

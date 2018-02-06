@@ -68,6 +68,7 @@ go_test(
         "azure_cache_test.go",
         "azure_loadbalancer_test.go",
         "azure_metrics_test.go",
+        "azure_routes_test.go",
         "azure_standard_test.go",
         "azure_storage_test.go",
         "azure_storageaccount_test.go",
@@ -79,6 +80,7 @@ go_test(
     importpath = "k8s.io/kubernetes/pkg/cloudprovider/providers/azure",
     deps = [
         "//pkg/api/v1/service:go_default_library",
+        "//pkg/cloudprovider:go_default_library",
         "//pkg/cloudprovider/providers/azure/auth:go_default_library",
         "//pkg/kubelet/apis:go_default_library",
         "//vendor/github.com/Azure/azure-sdk-for-go/arm/compute:go_default_library",

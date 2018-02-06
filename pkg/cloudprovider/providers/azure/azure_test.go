@@ -19,6 +19,8 @@ package azure
 import (
 	"fmt"
 	"math"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
@@ -1560,10 +1562,48 @@ func validateEmptyConfig(t *testing.T, config string) {
 	if azureCloud.CloudProviderBackoff != false {
 		t.Errorf("got incorrect value for CloudProviderBackoff")
 	}
-
 	// rate limits should be disabled by default if not explicitly enabled in config
 	if azureCloud.CloudProviderRateLimit != false {
 		t.Errorf("got incorrect value for CloudProviderRateLimit")
+	}
+}
+func TestGetZone(t *testing.T) {
+	data := `{"ID":"_azdev","UD":"0","FD":"99"}`
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintln(w, data)
+	}))
+	defer ts.Close()
+
+	cloud := &Cloud{}
+	cloud.Location = "eastus"
+
+	zone, err := cloud.getZoneFromURL(ts.URL)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	if zone.FailureDomain != "99" {
+		t.Errorf("Unexpected value: %s, expected '99'", zone.FailureDomain)
+	}
+	if zone.Region != cloud.Location {
+		t.Errorf("Expected: %s, saw: %s", cloud.Location, zone.Region)
+	}
+}
+
+func TestFetchFaultDomain(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintln(w, `{"ID":"_azdev","UD":"0","FD":"99"}`)
+	}))
+	defer ts.Close()
+
+	faultDomain, err := fetchFaultDomain(ts.URL)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	if faultDomain == nil {
+		t.Errorf("Unexpected nil fault domain")
+	}
+	if *faultDomain != "99" {
+		t.Errorf("Expected '99', saw '%s'", *faultDomain)
 	}
 }
 
@@ -1572,7 +1612,7 @@ func TestDecodeInstanceInfo(t *testing.T) {
 
 	faultDomain, err := readFaultDomain(strings.NewReader(response))
 	if err != nil {
-		t.Error("Unexpected error in ReadFaultDomain")
+		t.Errorf("Unexpected error in ReadFaultDomain: %v", err)
 	}
 
 	if faultDomain == nil {
