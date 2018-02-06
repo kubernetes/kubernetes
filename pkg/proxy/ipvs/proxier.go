@@ -957,6 +957,9 @@ func (proxier *Proxier) OnEndpointsSynced() {
 	proxier.syncProxyRules()
 }
 
+// EntryInvalidErr indicates if an ipset entry is invalid or not
+const EntryInvalidErr = "error adding entry %s to ipset %s"
+
 // This is where all of the ipvs calls happen.
 // assumes proxier.mu is held
 func (proxier *Proxier) syncProxyRules() {
@@ -1111,6 +1114,10 @@ func (proxier *Proxier) syncProxyRules() {
 				IP2:      epIP,
 				SetType:  utilipset.HashIPPortIP,
 			}
+			if valid := proxier.loopbackSet.validateEntry(entry); !valid {
+				glog.Errorf("%s", fmt.Sprintf(EntryInvalidErr, entry, proxier.loopbackSet.Name))
+				continue
+			}
 			proxier.loopbackSet.activeEntries.Insert(entry.String())
 		}
 
@@ -1125,9 +1132,11 @@ func (proxier *Proxier) syncProxyRules() {
 		// add service Cluster IP:Port to kubeServiceAccess ip set for the purpose of solving hairpin.
 		// proxier.kubeServiceAccessSet.activeEntries.Insert(entry.String())
 		// Install masquerade rules if 'masqueradeAll' or 'clusterCIDR' is specified.
-		if proxier.masqueradeAll {
-			proxier.clusterIPSet.activeEntries.Insert(entry.String())
-		} else if len(proxier.clusterCIDR) > 0 {
+		if proxier.masqueradeAll || len(proxier.clusterCIDR) > 0 {
+			if valid := proxier.clusterIPSet.validateEntry(entry); !valid {
+				glog.Errorf("%s", fmt.Sprintf(EntryInvalidErr, entry, proxier.clusterIPSet.Name))
+				continue
+			}
 			proxier.clusterIPSet.activeEntries.Insert(entry.String())
 		}
 		// ipvs call
@@ -1195,6 +1204,10 @@ func (proxier *Proxier) syncProxyRules() {
 				SetType:  utilipset.HashIPPort,
 			}
 			// We have to SNAT packets to external IPs.
+			if valid := proxier.externalIPSet.validateEntry(entry); !valid {
+				glog.Errorf("%s", fmt.Sprintf(EntryInvalidErr, entry, proxier.externalIPSet.Name))
+				continue
+			}
 			proxier.externalIPSet.activeEntries.Insert(entry.String())
 
 			// ipvs call
@@ -1234,12 +1247,20 @@ func (proxier *Proxier) syncProxyRules() {
 				// If we are proxying globally, we need to masquerade in case we cross nodes.
 				// If we are proxying only locally, we can retain the source IP.
 				if !svcInfo.onlyNodeLocalEndpoints {
+					if valid := proxier.lbMasqSet.validateEntry(entry); !valid {
+						glog.Errorf("%s", fmt.Sprintf(EntryInvalidErr, entry, proxier.lbMasqSet.Name))
+						continue
+					}
 					proxier.lbMasqSet.activeEntries.Insert(entry.String())
 				}
 				if len(svcInfo.loadBalancerSourceRanges) != 0 {
 					// The service firewall rules are created based on ServiceSpec.loadBalancerSourceRanges field.
 					// This currently works for loadbalancers that preserves source ips.
 					// For loadbalancers which direct traffic to service NodePort, the firewall rules will not apply.
+					if valid := proxier.lbIngressSet.validateEntry(entry); !valid {
+						glog.Errorf("%s", fmt.Sprintf(EntryInvalidErr, entry, proxier.lbIngressSet.Name))
+						continue
+					}
 					proxier.lbIngressSet.activeEntries.Insert(entry.String())
 
 					allowFromNode := false
@@ -1253,6 +1274,10 @@ func (proxier *Proxier) syncProxyRules() {
 							SetType:  utilipset.HashIPPortNet,
 						}
 						// enumerate all white list source cidr
+						if valid := proxier.lbWhiteListCIDRSet.validateEntry(entry); !valid {
+							glog.Errorf("%s", fmt.Sprintf(EntryInvalidErr, entry, proxier.lbWhiteListCIDRSet.Name))
+							continue
+						}
 						proxier.lbWhiteListCIDRSet.activeEntries.Insert(entry.String())
 
 						// ignore error because it has been validated
@@ -1273,6 +1298,10 @@ func (proxier *Proxier) syncProxyRules() {
 							SetType:  utilipset.HashIPPortIP,
 						}
 						// enumerate all white list source ip
+						if valid := proxier.lbWhiteListIPSet.validateEntry(entry); !valid {
+							glog.Errorf("%s", fmt.Sprintf(EntryInvalidErr, entry, proxier.lbWhiteListIPSet.Name))
+							continue
+						}
 						proxier.lbWhiteListIPSet.activeEntries.Insert(entry.String())
 					}
 				}
@@ -1332,14 +1361,22 @@ func (proxier *Proxier) syncProxyRules() {
 					Protocol: protocol,
 					SetType:  utilipset.BitmapPort,
 				}
+				var nodePortSet *IPSet
 				switch protocol {
 				case "tcp":
-					proxier.nodePortSetTCP.activeEntries.Insert(entry.String())
+					nodePortSet = proxier.nodePortSetTCP
 				case "udp":
-					proxier.nodePortSetUDP.activeEntries.Insert(entry.String())
+					nodePortSet = proxier.nodePortSetUDP
 				default:
 					// It should never hit
 					glog.Errorf("Unsupported protocol type: %s", protocol)
+				}
+				if nodePortSet != nil {
+					if valid := nodePortSet.validateEntry(entry); !valid {
+						glog.Errorf("%s", fmt.Sprintf(EntryInvalidErr, entry, nodePortSet.Name))
+						continue
+					}
+					nodePortSet.activeEntries.Insert(entry.String())
 				}
 			}
 
