@@ -10,6 +10,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "jwt.go",
+        "legacy.go",
         "util.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/serviceaccount",

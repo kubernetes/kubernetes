@@ -38,15 +38,6 @@ import (
 	"gopkg.in/square/go-jose.v2/jwt"
 )
 
-const LegacyIssuer = "kubernetes/serviceaccount"
-
-type privateClaims struct {
-	ServiceAccountName string `json:"kubernetes.io/serviceaccount/service-account.name"`
-	ServiceAccountUID  string `json:"kubernetes.io/serviceaccount/service-account.uid"`
-	SecretName         string `json:"kubernetes.io/serviceaccount/secret.name"`
-	Namespace          string `json:"kubernetes.io/serviceaccount/namespace"`
-}
-
 // ServiceAccountTokenGetter defines functions to retrieve a named service account and secret
 type ServiceAccountTokenGetter interface {
 	GetServiceAccount(namespace, name string) (*v1.ServiceAccount, error)
@@ -54,9 +45,13 @@ type ServiceAccountTokenGetter interface {
 }
 
 type TokenGenerator interface {
-	// GenerateToken generates a token which will identify the given ServiceAccount.
-	// The returned token will be stored in the given (and yet-unpersisted) Secret.
-	GenerateToken(serviceAccount v1.ServiceAccount, secret v1.Secret) (string, error)
+	// GenerateToken generates a token which will identify the given
+	// ServiceAccount. privateClaims is an interface that will be
+	// serialized into the JWT payload JSON encoding at the root level of
+	// the payload object. Public claims take precedent over private
+	// claims i.e. if both claims and privateClaims have an "exp" field,
+	// the value in claims will be used.
+	GenerateToken(claims *jwt.Claims, privateClaims interface{}) (string, error)
 }
 
 // JWTTokenGenerator returns a TokenGenerator that generates signed JWT tokens, using the given privateKey.
@@ -74,7 +69,7 @@ type jwtTokenGenerator struct {
 	privateKey interface{}
 }
 
-func (j *jwtTokenGenerator) GenerateToken(serviceAccount v1.ServiceAccount, secret v1.Secret) (string, error) {
+func (j *jwtTokenGenerator) GenerateToken(claims *jwt.Claims, privateClaims interface{}) (string, error) {
 	var alg jose.SignatureAlgorithm
 	switch privateKey := j.privateKey.(type) {
 	case *rsa.PrivateKey:
@@ -105,17 +100,14 @@ func (j *jwtTokenGenerator) GenerateToken(serviceAccount v1.ServiceAccount, secr
 		return "", err
 	}
 
+	// claims are applied in reverse precedence
 	return jwt.Signed(signer).
+		Claims(privateClaims).
+		Claims(claims).
 		Claims(&jwt.Claims{
-			Issuer:  j.iss,
-			Subject: apiserverserviceaccount.MakeUsername(serviceAccount.Namespace, serviceAccount.Name),
+			Issuer: j.iss,
 		}).
-		Claims(&privateClaims{
-			Namespace:          serviceAccount.Namespace,
-			ServiceAccountName: serviceAccount.Name,
-			ServiceAccountUID:  string(serviceAccount.UID),
-			SecretName:         secret.Name,
-		}).CompactSerialize()
+		CompactSerialize()
 }
 
 // JWTTokenAuthenticator authenticates tokens as JWT tokens produced by JWTTokenGenerator
@@ -139,7 +131,7 @@ type jwtTokenAuthenticator struct {
 }
 
 type Validator interface {
-	Validate(tokenData string, public *jwt.Claims, private *privateClaims) error
+	Validate(tokenData string, public *jwt.Claims, private *legacyPrivateClaims) error
 }
 
 var errMismatchedSigningMethod = errors.New("invalid signing method")
@@ -155,7 +147,7 @@ func (j *jwtTokenAuthenticator) AuthenticateToken(tokenData string) (user.Info, 
 	}
 
 	public := &jwt.Claims{}
-	private := &privateClaims{}
+	private := &legacyPrivateClaims{}
 
 	var (
 		found   bool
@@ -218,7 +210,7 @@ type legacyValidator struct {
 	getter ServiceAccountTokenGetter
 }
 
-func (v *legacyValidator) Validate(tokenData string, public *jwt.Claims, private *privateClaims) error {
+func (v *legacyValidator) Validate(tokenData string, public *jwt.Claims, private *legacyPrivateClaims) error {
 
 	// Make sure the claims we need exist
 	if len(public.Subject) == 0 {
