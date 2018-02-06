@@ -12,6 +12,7 @@ go_library(
     importpath = "k8s.io/apiextensions-apiserver/pkg/apiserver/validation",
     deps = [
         "//vendor/github.com/go-openapi/spec:go_default_library",
+        "//vendor/github.com/go-openapi/strfmt:go_default_library",
         "//vendor/github.com/go-openapi/validate:go_default_library",
         "//vendor/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions:go_default_library",
     ],

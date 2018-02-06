@@ -20,14 +20,13 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/go-openapi/spec"
-
 	genericvalidation "k8s.io/apimachinery/pkg/api/validation"
 	validationutil "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
+	apiservervalidation "k8s.io/apiextensions-apiserver/pkg/apiserver/validation"
 	apiextensionsfeatures "k8s.io/apiextensions-apiserver/pkg/features"
 )
 
@@ -188,6 +187,12 @@ func ValidateCustomResourceDefinitionValidation(customResourceValidation *apiext
 		allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(customResourceValidation.OpenAPIV3Schema, fldPath.Child("openAPIV3Schema"), openAPIV3Schema)...)
 	}
 
+	// if validation passed otherwise, make sure we can actually construct a schema validator from this custom resource validation.
+	if len(allErrs) == 0 {
+		if _, err := apiservervalidation.NewSchemaValidator(customResourceValidation); err != nil {
+			allErrs = append(allErrs, field.Invalid(fldPath, "", fmt.Sprintf("error building validator: %v", err)))
+		}
+	}
 	return allErrs
 }
 
@@ -211,17 +216,6 @@ func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSch
 			allErrs = append(allErrs, field.Forbidden(fldPath.Child("additionalProperties"), "additionalProperties cannot be set to false"))
 		}
 		allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(schema.AdditionalProperties.Schema, fldPath.Child("additionalProperties"), ssv)...)
-	}
-
-	if schema.Ref != nil {
-		openapiRef, err := spec.NewRef(*schema.Ref)
-		if err != nil {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("ref"), *schema.Ref, err.Error()))
-		}
-
-		if !openapiRef.IsValidURI() {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("ref"), *schema.Ref, "ref does not point to a valid URI"))
-		}
 	}
 
 	if schema.AdditionalItems != nil {
@@ -316,6 +310,10 @@ func (v *specStandardValidatorV3) validate(schema *apiextensions.JSONSchemaProps
 
 	if schema.Dependencies != nil {
 		allErrs = append(allErrs, field.Forbidden(fldPath.Child("dependencies"), "dependencies is not supported"))
+	}
+
+	if schema.Ref != nil {
+		allErrs = append(allErrs, field.Forbidden(fldPath.Child("$ref"), "$ref is not supported"))
 	}
 
 	if schema.Type == "null" {
