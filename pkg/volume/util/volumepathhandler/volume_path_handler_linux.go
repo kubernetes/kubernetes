@@ -61,7 +61,7 @@ func (v VolumePathHandler) GetLoopDevice(path string) (string, error) {
 	cmd := exec.Command(losetupPath, args...)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		glog.V(2).Infof("Failed device discover command for path %s: %v", path, err)
+		glog.V(2).Infof("Failed device discover command for path %s: %v %s", path, err, out)
 		return "", err
 	}
 	return parseLosetupOutputForDevice(out)
@@ -72,7 +72,7 @@ func makeLoopDevice(path string) (string, error) {
 	cmd := exec.Command(losetupPath, args...)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		glog.V(2).Infof("Failed device create command for path %s: %v", path, err)
+		glog.V(2).Infof("Failed device create command for path: %s %v %s ", path, err, out)
 		return "", err
 	}
 	return parseLosetupOutputForDevice(out)
