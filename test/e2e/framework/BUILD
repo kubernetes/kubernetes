@@ -3,6 +3,7 @@ package(default_visibility = ["//visibility:public"])
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
+    "go_test",
 )
 
 go_library(
@@ -168,4 +169,11 @@ filegroup(
         "//test/e2e/framework/timer:all-srcs",
     ],
     tags = ["automanaged"],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = ["firewall_util_test.go"],
+    embed = [":go_default_library"],
+    importpath = "k8s.io/kubernetes/test/e2e/framework",
 )
