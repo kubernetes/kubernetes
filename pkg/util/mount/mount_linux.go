@@ -536,36 +536,57 @@ func (mounter *SafeFormatAndMount) formatAndMount(source string, target string, 
 	return mountErr
 }
 
-// GetDiskFormat uses 'lsblk' to see if the given disk is unformated
+// GetDiskFormat uses 'blkid' to see if the given disk is unformated
 func (mounter *SafeFormatAndMount) GetDiskFormat(disk string) (string, error) {
-	args := []string{"-n", "-o", "FSTYPE", disk}
-	glog.V(4).Infof("Attempting to determine if disk %q is formatted using lsblk with args: (%v)", disk, args)
-	dataOut, err := mounter.Exec.Run("lsblk", args...)
+	args := []string{"-p", "-s", "TYPE", "-s", "PTTYPE", "-o", "export", disk}
+	glog.V(4).Infof("Attempting to determine if disk %q is formatted using blkid with args: (%v)", disk, args)
+	dataOut, err := mounter.Exec.Run("blkid", args...)
 	output := string(dataOut)
-	glog.V(4).Infof("Output: %q", output)
+	glog.V(4).Infof("Output: %q, err: %v", output, err)
 
 	if err != nil {
+		if exit, ok := err.(utilexec.ExitError); ok {
+			if exit.ExitStatus() == 2 {
+				// Disk device is unformatted.
+				// For `blkid`, if the specified token (TYPE/PTTYPE, etc) was
+				// not found, or no (specified) devices could be identified, an
+				// exit code of 2 is returned.
+				return "", nil
+			}
+		}
 		glog.Errorf("Could not determine if disk %q is formatted (%v)", disk, err)
 		return "", err
 	}
 
-	// Split lsblk output into lines. Unformatted devices should contain only
-	// "\n". Beware of "\n\n", that's a device with one empty partition.
-	output = strings.TrimSuffix(output, "\n") // Avoid last empty line
+	var fstype, pttype string
+
 	lines := strings.Split(output, "\n")
-	if lines[0] != "" {
-		// The device is formatted
-		return lines[0], nil
+	for _, l := range lines {
+		if len(l) <= 0 {
+			// Ignore empty line.
+			continue
+		}
+		cs := strings.Split(l, "=")
+		if len(cs) != 2 {
+			return "", fmt.Errorf("blkid returns invalid output: %s", output)
+		}
+		// TYPE is filesystem type, and PTTYPE is partition table type, according
+		// to https://www.kernel.org/pub/linux/utils/util-linux/v2.21/libblkid-docs/.
+		if cs[0] == "TYPE" {
+			fstype = cs[1]
+		} else if cs[0] == "PTTYPE" {
+			pttype = cs[1]
+		}
 	}
 
-	if len(lines) == 1 {
-		// The device is unformatted and has no dependent devices
-		return "", nil
+	if len(pttype) > 0 {
+		glog.V(4).Infof("Disk %s detected partition table type: %s", pttype)
+		// Returns a special non-empty string as filesystem type, then kubelet
+		// will not format it.
+		return "unknown data, probably partitions", nil
 	}
 
-	// The device has dependent devices, most probably partitions (LVM, LUKS
-	// and MD RAID are reported as FSTYPE and caught above).
-	return "unknown data, probably partitions", nil
+	return fstype, nil
 }
 
 // isShared returns true, if given path is on a mount point that has shared
