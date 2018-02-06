@@ -210,7 +210,6 @@ func (c *completedConfig) startControllers(kubeconfig *restclient.Config, rootCl
 	client := func(serviceAccountName string) kubernetes.Interface {
 		return clientBuilder.ClientOrDie(serviceAccountName)
 	}
-
 	if cloud != nil {
 		// Initialize the cloud provider with a reference to the clientBuilder
 		cloud.Initialize(clientBuilder)

@@ -93,3 +93,16 @@ func (o *CloudControllerManagerOptions) Validate() error {
 
 	return utilerrors.NewAggregate(errors)
 }
+
+func (o CloudControllerManagerOptions) Config() (*cloudcontroller.Config, error) {
+	if err := o.Validate(); err != nil {
+		return nil, err
+	}
+
+	c := &cloudcontroller.Config{}
+	if err := o.ApplyTo(c); err != nil {
+		return nil, err
+	}
+
+	return c, nil
+}
