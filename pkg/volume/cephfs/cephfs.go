@@ -239,7 +239,7 @@ func (cephfsVolume *cephfsMounter) SetUpAt(dir string, fsGroup *int64) error {
 
 	// check whether it belongs to fuse, if not, default to use kernel mount.
 	if cephfsVolume.checkFuseMount() {
-		glog.V(4).Infof("CephFS fuse mount.")
+		glog.V(4).Info("CephFS fuse mount.")
 		err = cephfsVolume.execFuseMount(dir)
 		// cleanup no matter if fuse mount fail.
 		keyringPath := cephfsVolume.GetKeyringPath()
@@ -255,7 +255,7 @@ func (cephfsVolume *cephfsMounter) SetUpAt(dir string, fsGroup *int64) error {
 			glog.V(4).Infof("CephFS fuse mount failed: %v, fallback to kernel mount.", err)
 		}
 	}
-	glog.V(4).Infof("CephFS kernel mount.")
+	glog.V(4).Info("CephFS kernel mount.")
 
 	err = cephfsVolume.execMount(dir)
 	if err != nil {
@@ -336,7 +336,7 @@ func (cephfsMounter *cephfsMounter) checkFuseMount() bool {
 	switch runtime.GOOS {
 	case "linux":
 		if _, err := execute.Run("/usr/bin/test", "-x", "/sbin/mount.fuse.ceph"); err == nil {
-			glog.V(4).Infof("/sbin/mount.fuse.ceph exists, it should be fuse mount.")
+			glog.V(4).Info("/sbin/mount.fuse.ceph exists, it should be fuse mount.")
 			return true
 		}
 		return false
@@ -351,7 +351,7 @@ func (cephfsVolume *cephfs) execFuseMount(mountpoint string) error {
 	if cephfsVolume.secret != "" {
 		// TODO: cephfs fuse currently doesn't support secret option,
 		// remove keyring file create once secret option is supported.
-		glog.V(4).Infof("cephfs mount begin using fuse.")
+		glog.V(4).Info("cephfs mount begin using fuse.")
 
 		keyringPath := cephfsVolume.GetKeyringPath()
 		os.MkdirAll(keyringPath, 0750)
