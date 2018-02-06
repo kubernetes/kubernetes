@@ -926,7 +926,7 @@ func (vs *VSphere) DisksAreAttached(nodeVolumes map[k8stypes.NodeName][]string) 
 			return nodesToRetry, nil
 		}
 
-		glog.V(4).Info("Starting DisksAreAttached API for vSphere with nodeVolumes: %+v", nodeVolumes)
+		glog.V(4).Infof("Starting DisksAreAttached API for vSphere with nodeVolumes: %+v", nodeVolumes)
 		// Create context
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
