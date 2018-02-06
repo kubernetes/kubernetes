@@ -184,6 +184,10 @@ message GetOptions {
   // If true, partially initialized resources are included in the response.
   // +optional
   optional bool includeUninitialized = 2;
+
+  // Should this value be exported.  Export strips fields that a user can not specify.
+  // +optional
+  optional bool export = 3;
 }
 
 // GroupKind specifies a Group and a Kind, but does not force a version.  This is useful for identifying
@@ -377,6 +381,10 @@ message ListOptions {
   // Timeout for the list/watch call.
   // +optional
   optional int64 timeoutSeconds = 5;
+
+  // Should this value be exported.  Export strips fields that a user can not specify.
+  // +optional
+  optional bool export = 9;
 
   // limit is a maximum number of responses to return for a list call. If more items exist, the
   // server will set the `continue` field on the list metadata to a value that can be used with the

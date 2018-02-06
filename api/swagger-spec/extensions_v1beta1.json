@@ -75,6 +75,14 @@
         "allowMultiple": false
        },
        {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "export",
+        "description": "Should this value be exported.  Export strips fields that a user can not specify.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "integer",
         "paramType": "query",
         "name": "limit",
@@ -237,6 +245,14 @@
         "allowMultiple": false
        },
        {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "export",
+        "description": "Should this value be exported.  Export strips fields that a user can not specify.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "integer",
         "paramType": "query",
         "name": "limit",
@@ -342,6 +358,14 @@
         "paramType": "query",
         "name": "timeoutSeconds",
         "description": "Timeout for the list/watch call.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "export",
+        "description": "Should this value be exported.  Export strips fields that a user can not specify.",
         "required": false,
         "allowMultiple": false
        },
@@ -722,6 +746,14 @@
         "allowMultiple": false
        },
        {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "export",
+        "description": "Should this value be exported.  Export strips fields that a user can not specify.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "integer",
         "paramType": "query",
         "name": "limit",
@@ -841,6 +873,14 @@
         "allowMultiple": false
        },
        {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "export",
+        "description": "Should this value be exported.  Export strips fields that a user can not specify.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "integer",
         "paramType": "query",
         "name": "limit",
@@ -940,6 +980,14 @@
         "paramType": "query",
         "name": "timeoutSeconds",
         "description": "Timeout for the list/watch call.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "export",
+        "description": "Should this value be exported.  Export strips fields that a user can not specify.",
         "required": false,
         "allowMultiple": false
        },
@@ -1217,6 +1265,14 @@
         "allowMultiple": false
        },
        {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "export",
+        "description": "Should this value be exported.  Export strips fields that a user can not specify.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "integer",
         "paramType": "query",
         "name": "limit",
@@ -1379,6 +1435,14 @@
         "allowMultiple": false
        },
        {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "export",
+        "description": "Should this value be exported.  Export strips fields that a user can not specify.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "integer",
         "paramType": "query",
         "name": "limit",
@@ -1484,6 +1548,14 @@
         "paramType": "query",
         "name": "timeoutSeconds",
         "description": "Timeout for the list/watch call.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "export",
+        "description": "Should this value be exported.  Export strips fields that a user can not specify.",
         "required": false,
         "allowMultiple": false
        },
@@ -1864,6 +1936,14 @@
         "allowMultiple": false
        },
        {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "export",
+        "description": "Should this value be exported.  Export strips fields that a user can not specify.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "integer",
         "paramType": "query",
         "name": "limit",
@@ -1983,6 +2063,14 @@
         "allowMultiple": false
        },
        {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "export",
+        "description": "Should this value be exported.  Export strips fields that a user can not specify.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "integer",
         "paramType": "query",
         "name": "limit",
@@ -2082,6 +2170,14 @@
         "paramType": "query",
         "name": "timeoutSeconds",
         "description": "Timeout for the list/watch call.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "export",
+        "description": "Should this value be exported.  Export strips fields that a user can not specify.",
         "required": false,
         "allowMultiple": false
        },
@@ -2600,6 +2696,14 @@
         "allowMultiple": false
        },
        {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "export",
+        "description": "Should this value be exported.  Export strips fields that a user can not specify.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "integer",
         "paramType": "query",
         "name": "limit",
@@ -2762,6 +2866,14 @@
         "allowMultiple": false
        },
        {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "export",
+        "description": "Should this value be exported.  Export strips fields that a user can not specify.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "integer",
         "paramType": "query",
         "name": "limit",
@@ -2867,6 +2979,14 @@
         "paramType": "query",
         "name": "timeoutSeconds",
         "description": "Timeout for the list/watch call.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "export",
+        "description": "Should this value be exported.  Export strips fields that a user can not specify.",
         "required": false,
         "allowMultiple": false
        },
@@ -3247,6 +3367,14 @@
         "allowMultiple": false
        },
        {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "export",
+        "description": "Should this value be exported.  Export strips fields that a user can not specify.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "integer",
         "paramType": "query",
         "name": "limit",
@@ -3366,6 +3494,14 @@
         "allowMultiple": false
        },
        {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "export",
+        "description": "Should this value be exported.  Export strips fields that a user can not specify.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "integer",
         "paramType": "query",
         "name": "limit",
@@ -3465,6 +3601,14 @@
         "paramType": "query",
         "name": "timeoutSeconds",
         "description": "Timeout for the list/watch call.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "export",
+        "description": "Should this value be exported.  Export strips fields that a user can not specify.",
         "required": false,
         "allowMultiple": false
        },
@@ -3742,6 +3886,14 @@
         "allowMultiple": false
        },
        {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "export",
+        "description": "Should this value be exported.  Export strips fields that a user can not specify.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "integer",
         "paramType": "query",
         "name": "limit",
@@ -3904,6 +4056,14 @@
         "allowMultiple": false
        },
        {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "export",
+        "description": "Should this value be exported.  Export strips fields that a user can not specify.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "integer",
         "paramType": "query",
         "name": "limit",
@@ -4009,6 +4169,14 @@
         "paramType": "query",
         "name": "timeoutSeconds",
         "description": "Timeout for the list/watch call.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "export",
+        "description": "Should this value be exported.  Export strips fields that a user can not specify.",
         "required": false,
         "allowMultiple": false
        },
@@ -4389,6 +4557,14 @@
         "allowMultiple": false
        },
        {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "export",
+        "description": "Should this value be exported.  Export strips fields that a user can not specify.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "integer",
         "paramType": "query",
         "name": "limit",
@@ -4508,6 +4684,14 @@
         "allowMultiple": false
        },
        {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "export",
+        "description": "Should this value be exported.  Export strips fields that a user can not specify.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "integer",
         "paramType": "query",
         "name": "limit",
@@ -4611,6 +4795,14 @@
         "allowMultiple": false
        },
        {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "export",
+        "description": "Should this value be exported.  Export strips fields that a user can not specify.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "integer",
         "paramType": "query",
         "name": "limit",
@@ -4710,6 +4902,14 @@
         "paramType": "query",
         "name": "timeoutSeconds",
         "description": "Timeout for the list/watch call.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "export",
+        "description": "Should this value be exported.  Export strips fields that a user can not specify.",
         "required": false,
         "allowMultiple": false
        },
@@ -4860,6 +5060,14 @@
         "allowMultiple": false
        },
        {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "export",
+        "description": "Should this value be exported.  Export strips fields that a user can not specify.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "integer",
         "paramType": "query",
         "name": "limit",
@@ -4957,6 +5165,14 @@
         "paramType": "query",
         "name": "timeoutSeconds",
         "description": "Timeout for the list/watch call.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "export",
+        "description": "Should this value be exported.  Export strips fields that a user can not specify.",
         "required": false,
         "allowMultiple": false
        },
@@ -5297,6 +5513,14 @@
         "allowMultiple": false
        },
        {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "export",
+        "description": "Should this value be exported.  Export strips fields that a user can not specify.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "integer",
         "paramType": "query",
         "name": "limit",
@@ -5404,6 +5628,14 @@
         "paramType": "query",
         "name": "timeoutSeconds",
         "description": "Timeout for the list/watch call.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "export",
+        "description": "Should this value be exported.  Export strips fields that a user can not specify.",
         "required": false,
         "allowMultiple": false
        },
@@ -5570,6 +5802,14 @@
         "allowMultiple": false
        },
        {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "export",
+        "description": "Should this value be exported.  Export strips fields that a user can not specify.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "integer",
         "paramType": "query",
         "name": "limit",
@@ -5675,6 +5915,14 @@
         "paramType": "query",
         "name": "timeoutSeconds",
         "description": "Timeout for the list/watch call.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "export",
+        "description": "Should this value be exported.  Export strips fields that a user can not specify.",
         "required": false,
         "allowMultiple": false
        },
@@ -6055,6 +6303,14 @@
         "allowMultiple": false
        },
        {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "export",
+        "description": "Should this value be exported.  Export strips fields that a user can not specify.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "integer",
         "paramType": "query",
         "name": "limit",
@@ -6174,6 +6430,14 @@
         "allowMultiple": false
        },
        {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "export",
+        "description": "Should this value be exported.  Export strips fields that a user can not specify.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "integer",
         "paramType": "query",
         "name": "limit",
@@ -6273,6 +6537,14 @@
         "paramType": "query",
         "name": "timeoutSeconds",
         "description": "Timeout for the list/watch call.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "export",
+        "description": "Should this value be exported.  Export strips fields that a user can not specify.",
         "required": false,
         "allowMultiple": false
        },

@@ -344,6 +344,9 @@ type ListOptions struct {
 	// Timeout for the list/watch call.
 	// +optional
 	TimeoutSeconds *int64 `json:"timeoutSeconds,omitempty" protobuf:"varint,5,opt,name=timeoutSeconds"`
+	// Should this value be exported.  Export strips fields that a user can not specify.
+	// +optional
+	Export bool `json:"export,omitempty" protobuf:"varint,9,opt,name=export"`
 
 	// limit is a maximum number of responses to return for a list call. If more items exist, the
 	// server will set the `continue` field on the list metadata to a value that can be used with the
@@ -397,6 +400,9 @@ type GetOptions struct {
 	// If true, partially initialized resources are included in the response.
 	// +optional
 	IncludeUninitialized bool `json:"includeUninitialized,omitempty" protobuf:"varint,2,opt,name=includeUninitialized"`
+	// Should this value be exported.  Export strips fields that a user can not specify.
+	// +optional
+	Export bool `json:"export,omitempty" protobuf:"varint,3,opt,name=export"`
 }
 
 // DeletionPropagation decides if a deletion will propagate to the dependents of
