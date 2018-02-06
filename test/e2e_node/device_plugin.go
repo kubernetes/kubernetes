@@ -202,7 +202,7 @@ func parseLogFromNRuns(f *framework.Framework, podName string, contName string, 
 		return count >= restartCount
 	}, 5*time.Minute, framework.Poll).Should(BeTrue())
 
-	logs, err := framework.GetPodLogs(f.ClientSet, f.Namespace.Name, podName, contName)
+	logs, err := f.GetPodLogs(podName, contName)
 	if err != nil {
 		framework.Failf("GetPodLogs for pod %q failed: %v", podName, err)
 	}

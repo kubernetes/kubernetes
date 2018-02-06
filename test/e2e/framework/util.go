@@ -679,7 +679,7 @@ func kubectlLogPod(c clientset.Interface, pod v1.Pod, containerNameSubstr string
 	for _, container := range pod.Spec.Containers {
 		if strings.Contains(container.Name, containerNameSubstr) {
 			// Contains() matches all strings if substr is empty
-			logs, err := GetPodLogs(c, pod.Namespace, pod.Name, container.Name)
+			logs, err := getPodLogsInternal(c, pod.Namespace, pod.Name, container.Name, false)
 			if err != nil {
 				logs, err = getPreviousPodLogs(c, pod.Namespace, pod.Name, container.Name)
 				if err != nil {
@@ -2244,7 +2244,7 @@ func (f *Framework) MatchContainerOutput(
 	if podErr != nil {
 		// Pod failed. Dump all logs from all containers to see what's wrong
 		for _, container := range podStatus.Spec.Containers {
-			logs, err := GetPodLogs(f.ClientSet, ns, podStatus.Name, container.Name)
+			logs, err := f.GetPodLogs(podStatus.Name, container.Name)
 			if err != nil {
 				Logf("Failed to get logs from node %q pod %q container %q: %v",
 					podStatus.Spec.NodeName, podStatus.Name, container.Name, err)
@@ -2259,7 +2259,7 @@ func (f *Framework) MatchContainerOutput(
 		podStatus.Spec.NodeName, podStatus.Name, containerName, err)
 
 	// Sometimes the actual containers take a second to get started, try to get logs for 60s
-	logs, err := GetPodLogs(f.ClientSet, ns, podStatus.Name, containerName)
+	logs, err := f.GetPodLogs(podStatus.Name, containerName)
 	if err != nil {
 		Logf("Failed to get logs from node %q pod %q container %q. %v",
 			podStatus.Spec.NodeName, podStatus.Name, containerName, err)
@@ -4250,9 +4250,8 @@ func GetNodePortURL(client clientset.Interface, ns, name string, svcPort int) (s
 	return "", fmt.Errorf("Failed to find external address for service %v", name)
 }
 
-// TODO(random-liu): Change this to be a member function of the framework.
-func GetPodLogs(c clientset.Interface, namespace, podName, containerName string) (string, error) {
-	return getPodLogsInternal(c, namespace, podName, containerName, false)
+func (f *Framework) GetPodLogs(podName, containerName string) (string, error) {
+	return getPodLogsInternal(f.ClientSet, f.Namespace.Name, podName, containerName, false)
 }
 
 func getPreviousPodLogs(c clientset.Interface, namespace, podName, containerName string) (string, error) {
@@ -4517,7 +4516,7 @@ func CheckConnectivityToHost(f *Framework, nodeName, podName, host string, pingC
 	err = WaitForPodSuccessInNamespace(f.ClientSet, podName, f.Namespace.Name)
 
 	if err != nil {
-		logs, logErr := GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, contName)
+		logs, logErr := f.GetPodLogs(pod.Name, contName)
 		if logErr != nil {
 			Logf("Warning: Failed to get logs from pod %q: %v", pod.Name, logErr)
 		} else {

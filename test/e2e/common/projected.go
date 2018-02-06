@@ -362,17 +362,17 @@ var _ = Describe("[sig-storage] Projected", func() {
 		f.PodClient().CreateSync(pod)
 
 		pollCreateLogs := func() (string, error) {
-			return framework.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, createContainerName)
+			return f.GetPodLogs(pod.Name, createContainerName)
 		}
 		Eventually(pollCreateLogs, podLogTimeout, framework.Poll).Should(ContainSubstring("Error reading file /etc/projected-secret-volumes/create/data-1"))
 
 		pollUpdateLogs := func() (string, error) {
-			return framework.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, updateContainerName)
+			return f.GetPodLogs(pod.Name, updateContainerName)
 		}
 		Eventually(pollUpdateLogs, podLogTimeout, framework.Poll).Should(ContainSubstring("Error reading file /etc/projected-secret-volumes/update/data-3"))
 
 		pollDeleteLogs := func() (string, error) {
-			return framework.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, deleteContainerName)
+			return f.GetPodLogs(pod.Name, deleteContainerName)
 		}
 		Eventually(pollDeleteLogs, podLogTimeout, framework.Poll).Should(ContainSubstring("value-1"))
 
@@ -544,7 +544,7 @@ var _ = Describe("[sig-storage] Projected", func() {
 		f.PodClient().CreateSync(pod)
 
 		pollLogs := func() (string, error) {
-			return framework.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, containerName)
+			return f.GetPodLogs(pod.Name, containerName)
 		}
 
 		Eventually(pollLogs, podLogTimeout, framework.Poll).Should(ContainSubstring("value-1"))
@@ -724,17 +724,17 @@ var _ = Describe("[sig-storage] Projected", func() {
 		f.PodClient().CreateSync(pod)
 
 		pollCreateLogs := func() (string, error) {
-			return framework.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, createContainerName)
+			return f.GetPodLogs(pod.Name, createContainerName)
 		}
 		Eventually(pollCreateLogs, podLogTimeout, framework.Poll).Should(ContainSubstring("Error reading file /etc/projected-configmap-volumes/create/data-1"))
 
 		pollUpdateLogs := func() (string, error) {
-			return framework.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, updateContainerName)
+			return f.GetPodLogs(pod.Name, updateContainerName)
 		}
 		Eventually(pollUpdateLogs, podLogTimeout, framework.Poll).Should(ContainSubstring("Error reading file /etc/projected-configmap-volumes/update/data-3"))
 
 		pollDeleteLogs := func() (string, error) {
-			return framework.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, deleteContainerName)
+			return f.GetPodLogs(pod.Name, deleteContainerName)
 		}
 		Eventually(pollDeleteLogs, podLogTimeout, framework.Poll).Should(ContainSubstring("value-1"))
 
@@ -951,7 +951,7 @@ var _ = Describe("[sig-storage] Projected", func() {
 		podClient.CreateSync(pod)
 
 		Eventually(func() (string, error) {
-			return framework.GetPodLogs(f.ClientSet, f.Namespace.Name, podName, containerName)
+			return f.GetPodLogs(podName, containerName)
 		},
 			podLogTimeout, framework.Poll).Should(ContainSubstring("key1=\"value1\"\n"))
 
@@ -961,7 +961,7 @@ var _ = Describe("[sig-storage] Projected", func() {
 		})
 
 		Eventually(func() (string, error) {
-			return framework.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, containerName)
+			return f.GetPodLogs(pod.Name, containerName)
 		},
 			podLogTimeout, framework.Poll).Should(ContainSubstring("key3=\"value3\"\n"))
 	})
@@ -986,7 +986,7 @@ var _ = Describe("[sig-storage] Projected", func() {
 		Expect(err).NotTo(HaveOccurred(), "Failed to get pod %q", pod.Name)
 
 		Eventually(func() (string, error) {
-			return framework.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, containerName)
+			return f.GetPodLogs(pod.Name, containerName)
 		},
 			podLogTimeout, framework.Poll).Should(ContainSubstring("builder=\"bar\"\n"))
 
@@ -996,7 +996,7 @@ var _ = Describe("[sig-storage] Projected", func() {
 		})
 
 		Eventually(func() (string, error) {
-			return framework.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, containerName)
+			return f.GetPodLogs(pod.Name, containerName)
 		},
 			podLogTimeout, framework.Poll).Should(ContainSubstring("builder=\"foo\"\n"))
 	})

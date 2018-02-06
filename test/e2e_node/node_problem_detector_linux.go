@@ -352,7 +352,7 @@ var _ = framework.KubeDescribe("NodeProblemDetector", func() {
 		AfterEach(func() {
 			if CurrentGinkgoTestDescription().Failed && framework.TestContext.DumpLogsOnFailure {
 				By("Get node problem detector log")
-				log, err := framework.GetPodLogs(c, ns, name, name)
+				log, err := f.GetPodLogs(name, name)
 				Expect(err).ShouldNot(HaveOccurred())
 				framework.Logf("Node Problem Detector logs:\n %s", log)
 			}

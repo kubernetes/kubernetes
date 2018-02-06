@@ -129,7 +129,7 @@ var _ = Describe("[sig-storage] Downward API volume", func() {
 		podClient.CreateSync(pod)
 
 		Eventually(func() (string, error) {
-			return framework.GetPodLogs(f.ClientSet, f.Namespace.Name, podName, containerName)
+			return f.GetPodLogs(podName, containerName)
 		},
 			podLogTimeout, framework.Poll).Should(ContainSubstring("key1=\"value1\"\n"))
 
@@ -139,7 +139,7 @@ var _ = Describe("[sig-storage] Downward API volume", func() {
 		})
 
 		Eventually(func() (string, error) {
-			return framework.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, containerName)
+			return f.GetPodLogs(pod.Name, containerName)
 		},
 			podLogTimeout, framework.Poll).Should(ContainSubstring("key3=\"value3\"\n"))
 	})
@@ -163,7 +163,7 @@ var _ = Describe("[sig-storage] Downward API volume", func() {
 		Expect(err).NotTo(HaveOccurred(), "Failed to get pod %q", pod.Name)
 
 		Eventually(func() (string, error) {
-			return framework.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, containerName)
+			return f.GetPodLogs(pod.Name, containerName)
 		},
 			podLogTimeout, framework.Poll).Should(ContainSubstring("builder=\"bar\"\n"))
 
@@ -173,7 +173,7 @@ var _ = Describe("[sig-storage] Downward API volume", func() {
 		})
 
 		Eventually(func() (string, error) {
-			return framework.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, containerName)
+			return f.GetPodLogs(pod.Name, containerName)
 		},
 			podLogTimeout, framework.Poll).Should(ContainSubstring("builder=\"foo\"\n"))
 	})

@@ -246,7 +246,7 @@ func (c *PodClient) WaitForErrorEventOrSuccess(pod *v1.Pod) (*v1.Event, error) {
 // MatchContainerOutput gets output of a container and match expected regexp in the output.
 func (c *PodClient) MatchContainerOutput(name string, containerName string, expectedRegexp string) error {
 	f := c.f
-	output, err := GetPodLogs(f.ClientSet, f.Namespace.Name, name, containerName)
+	output, err := f.GetPodLogs(name, containerName)
 	if err != nil {
 		return fmt.Errorf("failed to get output for container %q of pod %q", containerName, name)
 	}

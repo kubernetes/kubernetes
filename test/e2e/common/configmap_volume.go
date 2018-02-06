@@ -169,7 +169,7 @@ var _ = Describe("[sig-storage] ConfigMap", func() {
 		f.PodClient().CreateSync(pod)
 
 		pollLogs := func() (string, error) {
-			return framework.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, containerName)
+			return f.GetPodLogs(pod.Name, containerName)
 		}
 
 		Eventually(pollLogs, podLogTimeout, framework.Poll).Should(ContainSubstring("value-1"))
@@ -263,10 +263,10 @@ var _ = Describe("[sig-storage] ConfigMap", func() {
 		f.PodClient().CreateSync(pod)
 
 		pollLogs1 := func() (string, error) {
-			return framework.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, containerName1)
+			return f.GetPodLogs(pod.Name, containerName1)
 		}
 		pollLogs2 := func() (string, error) {
-			return framework.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, containerName2)
+			return f.GetPodLogs(pod.Name, containerName2)
 		}
 
 		By("Waiting for pod with text data")
@@ -421,17 +421,17 @@ var _ = Describe("[sig-storage] ConfigMap", func() {
 		f.PodClient().CreateSync(pod)
 
 		pollCreateLogs := func() (string, error) {
-			return framework.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, createContainerName)
+			return f.GetPodLogs(pod.Name, createContainerName)
 		}
 		Eventually(pollCreateLogs, podLogTimeout, framework.Poll).Should(ContainSubstring("Error reading file /etc/configmap-volumes/create/data-1"))
 
 		pollUpdateLogs := func() (string, error) {
-			return framework.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, updateContainerName)
+			return f.GetPodLogs(pod.Name, updateContainerName)
 		}
 		Eventually(pollUpdateLogs, podLogTimeout, framework.Poll).Should(ContainSubstring("Error reading file /etc/configmap-volumes/update/data-3"))
 
 		pollDeleteLogs := func() (string, error) {
-			return framework.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, deleteContainerName)
+			return f.GetPodLogs(pod.Name, deleteContainerName)
 		}
 		Eventually(pollDeleteLogs, podLogTimeout, framework.Poll).Should(ContainSubstring("value-1"))
 

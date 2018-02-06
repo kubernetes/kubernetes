@@ -30,6 +30,7 @@ import (
 	"github.com/onsi/ginkgo/reporters"
 	"github.com/onsi/gomega"
 
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtimeutils "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/util/logs"
@@ -338,6 +339,12 @@ func RunE2ETests(t *testing.T) {
 func runKubernetesServiceTestContainer(c clientset.Interface, ns string) {
 	path := "test/images/clusterapi-tester/pod.yaml"
 	framework.Logf("Parsing pod from %v", path)
+	namespace := new(v1.Namespace)
+	namespace.Namespace = ns
+	f := &framework.Framework{
+		ClientSet: c,
+		Namespace: namespace,
+	}
 	p, err := manifest.PodFromManifest(path)
 	if err != nil {
 		framework.Logf("Failed to parse clusterapi-tester from manifest %v: %v", path, err)
@@ -358,7 +365,7 @@ func runKubernetesServiceTestContainer(c clientset.Interface, ns string) {
 		framework.Logf("Pod %v took longer than %v to enter running/ready: %v", p.Name, timeout, err)
 		return
 	}
-	logs, err := framework.GetPodLogs(c, ns, p.Name, p.Spec.Containers[0].Name)
+	logs, err := f.GetPodLogs(p.Name, p.Spec.Containers[0].Name)
 	if err != nil {
 		framework.Logf("Failed to retrieve logs from %v: %v", p.Name, err)
 	} else {
