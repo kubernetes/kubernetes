@@ -43,8 +43,6 @@ func addCadvisorFlags(fs *pflag.FlagSet) {
 	// These flags were also implicit from cadvisor, but are actually used by something in the core repo:
 	// TODO(mtaufen): This one is stil used by our salt, but for heaven's sake it's even deprecated in cadvisor
 	register(global, local, "docker_root")
-	// e2e node tests rely on this
-	register(global, local, "housekeeping_interval")
 
 	// These flags were implicit from cadvisor, and are mistakes that should be registered deprecated:
 	const deprecated = "This is a cadvisor flag that was mistakenly registered with the Kubelet. Due to legacy concerns, it will follow the standard CLI deprecation timeline before being removed."
@@ -64,6 +62,7 @@ func addCadvisorFlags(fs *pflag.FlagSet) {
 	registerDeprecated(global, local, "event_storage_age_limit", deprecated)
 	registerDeprecated(global, local, "event_storage_event_limit", deprecated)
 	registerDeprecated(global, local, "global_housekeeping_interval", deprecated)
+	registerDeprecated(global, local, "housekeeping_interval", deprecated)
 	registerDeprecated(global, local, "log_cadvisor_usage", deprecated)
 	registerDeprecated(global, local, "machine_id_file", deprecated)
 	registerDeprecated(global, local, "storage_driver_user", deprecated)
