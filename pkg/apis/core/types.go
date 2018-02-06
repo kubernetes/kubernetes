@@ -475,6 +475,7 @@ type PersistentVolumeReclaimPolicy string
 const (
 	// PersistentVolumeReclaimRecycle means the volume will be recycled back into the pool of unbound persistent volumes on release from its claim.
 	// The volume plugin must support Recycling.
+	// DEPRECATED: The PersistentVolumeReclaimRecycle called Recycle is being deprecated. See announcement here: https://groups.google.com/forum/#!topic/kubernetes-dev/uexugCza84I
 	PersistentVolumeReclaimRecycle PersistentVolumeReclaimPolicy = "Recycle"
 	// PersistentVolumeReclaimDelete means the volume will be deleted from Kubernetes on release from its claim.
 	// The volume plugin must support Deletion.
