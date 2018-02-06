@@ -31,7 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/mount"
 	kstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
-	"k8s.io/kubernetes/pkg/volume/util"
+	volutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
 // ProbeVolumePlugins is the primary endpoint for volume plugins
@@ -122,7 +122,7 @@ func (plugin *azureFilePlugin) newMounterInternal(spec *volume.Spec, pod *v1.Pod
 		secretName:      secretName,
 		shareName:       share,
 		readOnly:        readOnly,
-		mountOptions:    volume.MountOptionFromSpec(spec),
+		mountOptions:    volutil.MountOptionFromSpec(spec),
 	}, nil
 }
 
@@ -168,7 +168,7 @@ func (plugin *azureFilePlugin) ExpandVolumeDevice(
 		return oldSize, err
 	}
 
-	if err := azure.ResizeFileShare(accountName, accountKey, shareName, int(volume.RoundUpToGiB(newSize))); err != nil {
+	if err := azure.ResizeFileShare(accountName, accountKey, shareName, int(volutil.RoundUpToGiB(newSize))); err != nil {
 		return oldSize, err
 	}
 
@@ -262,7 +262,7 @@ func (b *azureFileMounter) SetUpAt(dir string, fsGroup *int64) error {
 		if b.readOnly {
 			options = append(options, "ro")
 		}
-		mountOptions = volume.JoinMountOptions(b.mountOptions, options)
+		mountOptions = volutil.JoinMountOptions(b.mountOptions, options)
 		mountOptions = appendDefaultMountOptions(mountOptions, fsGroup)
 	}
 
@@ -306,7 +306,7 @@ func (c *azureFileUnmounter) TearDown() error {
 }
 
 func (c *azureFileUnmounter) TearDownAt(dir string) error {
-	return util.UnmountPath(dir, c.mounter)
+	return volutil.UnmountPath(dir, c.mounter)
 }
 
 func getVolumeSource(spec *volume.Spec) (string, bool, error) {

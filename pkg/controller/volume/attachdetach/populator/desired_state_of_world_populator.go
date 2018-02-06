@@ -33,7 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/util"
 	"k8s.io/kubernetes/pkg/volume"
-	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
+	volutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
 // DesiredStateOfWorldPopulator periodically verifies that the pods in the
@@ -133,7 +133,7 @@ func (dswp *desiredStateOfWorldPopulator) findAndRemoveDeletedPods() {
 				true /* default volume action */)
 
 			if volumeActionFlag {
-				informerPodUID := volumehelper.GetUniquePodName(informerPod)
+				informerPodUID := volutil.GetUniquePodName(informerPod)
 				// Check whether the unique identifier of the pod from dsw matches the one retrieved from pod informer
 				if informerPodUID == dswPodUID {
 					glog.V(10).Infof("Verified pod %q (UID %q) from dsw exists in pod informer.", dswPodKey, dswPodUID)
@@ -158,7 +158,7 @@ func (dswp *desiredStateOfWorldPopulator) findAndAddActivePods() {
 	dswp.timeOfLastListPods = time.Now()
 
 	for _, pod := range pods {
-		if volumehelper.IsPodTerminated(pod, pod.Status) {
+		if volutil.IsPodTerminated(pod, pod.Status) {
 			// Do not add volumes for terminated pods
 			continue
 		}

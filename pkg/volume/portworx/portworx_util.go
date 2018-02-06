@@ -27,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/volume"
+	volutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
 const (
@@ -55,7 +56,7 @@ func (util *PortworxVolumeUtil) CreateVolume(p *portworxVolumeProvisioner) (stri
 
 	capacity := p.options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
 	// Portworx Volumes are specified in GB
-	requestGB := int(volume.RoundUpSize(capacity.Value(), 1024*1024*1024))
+	requestGB := int(volutil.RoundUpSize(capacity.Value(), 1024*1024*1024))
 
 	// Perform a best-effort parsing of parameters. Portworx 1.2.9 and later parses volume parameters from
 	// spec.VolumeLabels. So even if below SpecFromOpts() fails to parse certain parameters or

@@ -101,7 +101,7 @@ func (v VolumePathHandler) MapDevice(devicePath string, mapPath string, linkName
 	}
 	// Remove old symbolic link(or file) then create new one.
 	// This should be done because current symbolic link is
-	// stale accross node reboot.
+	// stale across node reboot.
 	linkPath := path.Join(mapPath, string(linkName))
 	if err = os.Remove(linkPath); err != nil && !os.IsNotExist(err) {
 		return err

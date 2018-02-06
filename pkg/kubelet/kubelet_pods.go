@@ -61,9 +61,8 @@ import (
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	utilfile "k8s.io/kubernetes/pkg/util/file"
-	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
-	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
+	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
 	volumevalidation "k8s.io/kubernetes/pkg/volume/validation"
 	"k8s.io/kubernetes/third_party/forked/golang/expansion"
 )
@@ -129,7 +128,7 @@ func makeAbsolutePath(goos, path string) string {
 
 // makeBlockVolumes maps the raw block devices specified in the path of the container
 // Experimental
-func (kl *Kubelet) makeBlockVolumes(pod *v1.Pod, container *v1.Container, podVolumes kubecontainer.VolumeMap, blkutil volumeutil.BlockVolumePathHandler) ([]kubecontainer.DeviceInfo, error) {
+func (kl *Kubelet) makeBlockVolumes(pod *v1.Pod, container *v1.Container, podVolumes kubecontainer.VolumeMap, blkutil volumepathhandler.BlockVolumePathHandler) ([]kubecontainer.DeviceInfo, error) {
 	var devices []kubecontainer.DeviceInfo
 	for _, device := range container.VolumeDevices {
 		// check path is absolute
@@ -188,7 +187,7 @@ func makeMounts(pod *v1.Pod, podDir string, container *v1.Container, hostName, h
 			vol.SELinuxLabeled = true
 			relabelVolume = true
 		}
-		hostPath, err := volume.GetPath(vol.Mounter)
+		hostPath, err := volumeutil.GetPath(vol.Mounter)
 		if err != nil {
 			return nil, err
 		}
@@ -451,7 +450,7 @@ func (kl *Kubelet) GenerateRunContainerOptions(pod *v1.Pod, container *v1.Contai
 		return nil, err
 	}
 	opts.Hostname = hostname
-	podName := volumehelper.GetUniquePodName(pod)
+	podName := volumeutil.GetUniquePodName(pod)
 	volumes := kl.volumeManager.GetMountedVolumesForPod(podName)
 
 	opts.PortMappings = kubecontainer.MakePortMappings(container)
@@ -464,7 +463,7 @@ func (kl *Kubelet) GenerateRunContainerOptions(pod *v1.Pod, container *v1.Contai
 
 	// TODO: remove feature gate check after no longer needed
 	if utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) {
-		blkutil := volumeutil.NewBlockVolumePathHandler()
+		blkutil := volumepathhandler.NewBlockVolumePathHandler()
 		blkVolumes, err := kl.makeBlockVolumes(pod, container, volumes, blkutil)
 		if err != nil {
 			return nil, err

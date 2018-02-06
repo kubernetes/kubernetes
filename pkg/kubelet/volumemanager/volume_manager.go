@@ -43,7 +43,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
 	"k8s.io/kubernetes/pkg/volume/util/types"
-	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
+	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
 )
 
 const (
@@ -169,7 +169,7 @@ func NewVolumeManager(
 			volumePluginMgr,
 			recorder,
 			checkNodeCapabilitiesBeforeMount,
-			util.NewBlockVolumePathHandler())),
+			volumepathhandler.NewBlockVolumePathHandler())),
 	}
 
 	vm.desiredStateOfWorldPopulator = populator.NewDesiredStateOfWorldPopulator(
@@ -264,7 +264,7 @@ func (vm *volumeManager) GetMountedVolumesForPod(podName types.UniquePodName) co
 }
 
 func (vm *volumeManager) GetExtraSupplementalGroupsForPod(pod *v1.Pod) []int64 {
-	podName := volumehelper.GetUniquePodName(pod)
+	podName := util.GetUniquePodName(pod)
 	supplementalGroups := sets.NewString()
 
 	for _, mountedVolume := range vm.actualStateOfWorld.GetMountedVolumesForPod(podName) {
@@ -340,7 +340,7 @@ func (vm *volumeManager) WaitForAttachAndMount(pod *v1.Pod) error {
 	}
 
 	glog.V(3).Infof("Waiting for volumes to attach and mount for pod %q", format.Pod(pod))
-	uniquePodName := volumehelper.GetUniquePodName(pod)
+	uniquePodName := util.GetUniquePodName(pod)
 
 	// Some pods expect to have Setup called over and over again to update.
 	// Remount plugins for which this is true. (Atomically updating volumes,

@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
+	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
 )
 
 type ioHandler interface {
@@ -354,14 +355,14 @@ func (util *FCUtil) DetachBlockFCDisk(c fcDiskUnmapper, mapPath, devicePath stri
 	// and remove loopback device then it will be remained on kubelet node. To avoid the problem,
 	// local attach plugins needs to remove loopback device during TearDownDevice().
 	var devices []string
-	blkUtil := volumeutil.NewBlockVolumePathHandler()
+	blkUtil := volumepathhandler.NewBlockVolumePathHandler()
 	dm := c.deviceUtil.FindMultipathDeviceForDevice(dstPath)
 	if len(dm) != 0 {
 		dstPath = dm
 	}
-	loop, err := volumeutil.BlockVolumePathHandler.GetLoopDevice(blkUtil, dstPath)
+	loop, err := volumepathhandler.BlockVolumePathHandler.GetLoopDevice(blkUtil, dstPath)
 	if err != nil {
-		if err.Error() != volumeutil.ErrDeviceNotFound {
+		if err.Error() != volumepathhandler.ErrDeviceNotFound {
 			return fmt.Errorf("fc: failed to get loopback for destination path: %v, err: %v", dstPath, err)
 		}
 		glog.Warning("fc: loopback for destination path: %s not found", dstPath)
@@ -389,7 +390,7 @@ func (util *FCUtil) DetachBlockFCDisk(c fcDiskUnmapper, mapPath, devicePath stri
 	}
 	if len(loop) != 0 {
 		// The volume was successfully detached from node. We can safely remove the loopback.
-		err = volumeutil.BlockVolumePathHandler.RemoveLoopDevice(blkUtil, loop)
+		err = volumepathhandler.BlockVolumePathHandler.RemoveLoopDevice(blkUtil, loop)
 		if err != nil {
 			return fmt.Errorf("fc: failed to remove loopback :%v, err: %v", loop, err)
 		}

@@ -35,7 +35,6 @@ import (
 	"k8s.io/kubernetes/pkg/util/metrics"
 	"k8s.io/kubernetes/pkg/util/slice"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
-	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
 )
 
 // Controller is controller that removes PVCProtectionFinalizer
@@ -214,7 +213,7 @@ func (c *Controller) isBeingUsed(pvc *v1.PersistentVolumeClaim) (bool, error) {
 			glog.V(4).Infof("Skipping unscheduled pod %s when checking PVC %s/%s", pod.Name, pvc.Namespace, pvc.Name)
 			continue
 		}
-		if volumehelper.IsPodTerminated(pod, pod.Status) {
+		if volumeutil.IsPodTerminated(pod, pod.Status) {
 			// This pod is being unmounted/detached or is already
 			// unmounted/detached. It does not block the PVC from deletion.
 			continue
@@ -270,7 +269,7 @@ func (c *Controller) podAddedDeletedUpdated(obj interface{}, deleted bool) {
 	}
 
 	// Filter out pods that can't help us to remove a finalizer on PVC
-	if !deleted && !volumehelper.IsPodTerminated(pod, pod.Status) && pod.Spec.NodeName != "" {
+	if !deleted && !volumeutil.IsPodTerminated(pod, pod.Status) && pod.Spec.NodeName != "" {
 		return
 	}
 
