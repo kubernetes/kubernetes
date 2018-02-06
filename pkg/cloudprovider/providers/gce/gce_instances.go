@@ -27,7 +27,6 @@ import (
 
 	"cloud.google.com/go/compute/metadata"
 	"github.com/golang/glog"
-	computealpha "google.golang.org/api/compute/v0.alpha"
 	computebeta "google.golang.org/api/compute/v0.beta"
 	compute "google.golang.org/api/compute/v1"
 
@@ -373,7 +372,7 @@ func (gce *GCECloud) AddAliasToInstance(nodeName types.NodeName, alias *net.IPNe
 	if err != nil {
 		return err
 	}
-	instance, err := gce.c.AlphaInstances().Get(context.Background(), meta.ZonalKey(v1instance.Name, lastComponent(v1instance.Zone)))
+	instance, err := gce.c.BetaInstances().Get(context.Background(), meta.ZonalKey(v1instance.Name, lastComponent(v1instance.Zone)))
 	if err != nil {
 		return err
 	}
@@ -388,13 +387,13 @@ func (gce *GCECloud) AddAliasToInstance(nodeName types.NodeName, alias *net.IPNe
 	}
 
 	iface := instance.NetworkInterfaces[0]
-	iface.AliasIpRanges = append(iface.AliasIpRanges, &computealpha.AliasIpRange{
+	iface.AliasIpRanges = append(iface.AliasIpRanges, &computebeta.AliasIpRange{
 		IpCidrRange:         alias.String(),
 		SubnetworkRangeName: gce.secondaryRangeName,
 	})
 
 	mc := newInstancesMetricContext("add_alias", v1instance.Zone)
-	err = gce.c.AlphaInstances().UpdateNetworkInterface(context.Background(), meta.ZonalKey(instance.Name, lastComponent(instance.Zone)), iface.Name, iface)
+	err = gce.c.BetaInstances().UpdateNetworkInterface(context.Background(), meta.ZonalKey(instance.Name, lastComponent(instance.Zone)), iface.Name, iface)
 	return mc.Observe(err)
 }
 
