@@ -386,7 +386,9 @@ func (gce *GCECloud) AddAliasToInstance(nodeName types.NodeName, alias *net.IPNe
 			nodeName, instance.NetworkInterfaces)
 	}
 
-	iface := instance.NetworkInterfaces[0]
+	iface := &computebeta.NetworkInterface{}
+	iface.Name = instance.NetworkInterfaces[0].Name
+	iface.Fingerprint = instance.NetworkInterfaces[0].Fingerprint
 	iface.AliasIpRanges = append(iface.AliasIpRanges, &computebeta.AliasIpRange{
 		IpCidrRange:         alias.String(),
 		SubnetworkRangeName: gce.secondaryRangeName,
