@@ -74,6 +74,7 @@ func New() *Generator {
 			`+k8s.io/apimachinery/pkg/runtime`,
 			`k8s.io/apimachinery/pkg/apis/meta/v1`,
 			`k8s.io/apimachinery/pkg/apis/meta/v1beta1`,
+			`k8s.io/apimachinery/pkg/apis/testapigroup/v1`,
 		}, ","),
 		Packages:           "",
 		DropEmbeddedFields: "k8s.io/apimachinery/pkg/apis/meta/v1.TypeMeta",
