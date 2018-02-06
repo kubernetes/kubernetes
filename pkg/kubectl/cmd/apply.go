@@ -678,13 +678,13 @@ func (p *patcher) patch(current runtime.Object, modified []byte, source, namespa
 		}
 		patchBytes, patchObject, err = p.patchSimple(current, modified, source, namespace, name, errOut)
 	}
-	if err != nil && p.force {
-		patchBytes, patchObject, err = p.deleteAndCreate(modified, namespace, name)
+	if err != nil && errors.IsConflict(err) && p.force {
+		patchBytes, patchObject, err = p.deleteAndCreate(current, modified, namespace, name)
 	}
 	return patchBytes, patchObject, err
 }
 
-func (p *patcher) deleteAndCreate(modified []byte, namespace, name string) ([]byte, runtime.Object, error) {
+func (p *patcher) deleteAndCreate(original runtime.Object, modified []byte, namespace, name string) ([]byte, runtime.Object, error) {
 	err := p.delete(namespace, name)
 	if err != nil {
 		return modified, nil, err
@@ -703,5 +703,15 @@ func (p *patcher) deleteAndCreate(modified []byte, namespace, name string) ([]by
 		return modified, nil, err
 	}
 	createdObject, err := p.helper.Create(namespace, true, versionedObject)
+	if err != nil {
+		// restore the original object if we fail to create the new one
+		// but still propagate and advertise error to user
+		recreated, recreateErr := p.helper.Create(namespace, true, original)
+		if recreateErr != nil {
+			err = fmt.Errorf("An error ocurred force-replacing the existing object with the newly provided one:\n\n%v.\n\nAdditionally, an error ocurred attempting to restore the original object:\n\n%v\n", err, recreateErr)
+		} else {
+			createdObject = recreated
+		}
+	}
 	return modified, createdObject, err
 }
