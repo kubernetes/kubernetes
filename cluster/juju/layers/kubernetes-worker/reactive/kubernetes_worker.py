@@ -451,8 +451,17 @@ def extra_args_changed():
 
 
 @when('config.changed.docker-logins')
+@when_not('docker.restart')
 def docker_logins_changed():
+    """Login to a docker registry with configured credentials."""
     config = hookenv.config()
+
+    if data_changed('docker-opts', config['docker-opts']):
+        hookenv.log('Skipping docker login until daemon is restarted.')
+        # State will be removed by layer-docker after restart
+        set_state('docker.restart')
+        return
+
     previous_logins = config.previous('docker-logins')
     logins = config['docker-logins']
     logins = json.loads(logins)
