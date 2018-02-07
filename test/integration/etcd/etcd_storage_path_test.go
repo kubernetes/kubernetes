@@ -943,7 +943,7 @@ func (c *allClient) verb(verb string, gvk schema.GroupVersionKind) (*restclient.
 	if err != nil {
 		return nil, err
 	}
-	return restclient.NewRequest(c.client, verb, baseURL, versionedAPIPath, contentConfig, *serializers, c.backoff, c.config.RateLimiter), nil
+	return restclient.NewRequest(c.client, verb, baseURL, versionedAPIPath, contentConfig, *serializers, c.backoff, c.config.RateLimiter, 0), nil
 }
 
 func (c *allClient) create(stub, ns string, mapping *meta.RESTMapping, all *[]cleanupData) error {
