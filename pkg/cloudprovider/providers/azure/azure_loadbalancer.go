@@ -819,7 +819,7 @@ func (az *Cloud) reconcileSecurityGroup(clusterName string, service *v1.Service,
 		ports = []v1.ServicePort{}
 	}
 
-	sg, err := az.SecurityGroupsClient.Get(az.ResourceGroup, az.SecurityGroupName, "")
+	sg, err := az.getSecurityGroup()
 	if err != nil {
 		return nil, err
 	}

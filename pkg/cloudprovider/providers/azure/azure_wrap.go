@@ -17,6 +17,7 @@ limitations under the License.
 package azure
 
 import (
+	"fmt"
 	"net/http"
 	"time"
 
@@ -29,8 +30,9 @@ import (
 )
 
 var (
-	vmCacheTTL = time.Minute
-	lbCacheTTL = 2 * time.Minute
+	vmCacheTTL  = time.Minute
+	lbCacheTTL  = 2 * time.Minute
+	nsgCacheTTL = 2 * time.Minute
 )
 
 // checkExistsFromError inspects an error and returns a true if err is nil,
@@ -152,6 +154,19 @@ func (az *Cloud) getAzureLoadBalancer(name string) (lb network.LoadBalancer, exi
 	return *(cachedLB.(*network.LoadBalancer)), true, nil
 }
 
+func (az *Cloud) getSecurityGroup() (nsg network.SecurityGroup, err error) {
+	securityGroup, err := az.nsgCache.Get(az.SecurityGroupName)
+	if err != nil {
+		return nsg, err
+	}
+
+	if securityGroup == nil {
+		return nsg, fmt.Errorf("nsg %q not found", az.SecurityGroupName)
+	}
+
+	return *(securityGroup.(*network.SecurityGroup)), nil
+}
+
 func (az *Cloud) newVMCache() (*timedCache, error) {
 	getter := func(key string) (interface{}, error) {
 		vm, err := az.VirtualMachinesClient.Get(az.ResourceGroup, key, compute.InstanceView)
@@ -186,4 +201,22 @@ func (az *Cloud) newLBCache() (*timedCache, error) {
 	}
 
 	return newTimedcache(lbCacheTTL, getter)
+}
+
+func (az *Cloud) newNSGCache() (*timedCache, error) {
+	getter := func(key string) (interface{}, error) {
+		nsg, err := az.SecurityGroupsClient.Get(az.ResourceGroup, key, "")
+		exists, realErr := checkResourceExistsFromError(err)
+		if realErr != nil {
+			return nil, realErr
+		}
+
+		if !exists {
+			return nil, nil
+		}
+
+		return &nsg, nil
+	}
+
+	return newTimedcache(nsgCacheTTL, getter)
 }

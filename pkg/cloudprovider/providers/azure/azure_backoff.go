@@ -131,7 +131,12 @@ func (az *Cloud) CreateOrUpdateSGWithRetry(sg network.SecurityGroup) error {
 		resp := <-respChan
 		err := <-errChan
 		glog.V(10).Infof("SecurityGroupsClient.CreateOrUpdate(%s): end", *sg.Name)
-		return processRetryResponse(resp.Response, err)
+		done, err := processRetryResponse(resp.Response, err)
+		if done && err == nil {
+			// Invalidate the cache right after updating
+			az.lbCache.Delete(*sg.Name)
+		}
+		return done, err
 	})
 }
 
