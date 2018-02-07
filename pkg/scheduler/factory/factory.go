@@ -19,7 +19,6 @@ limitations under the License.
 package factory
 
 import (
-	"encoding/json"
 	"fmt"
 	"reflect"
 	"time"
@@ -30,7 +29,6 @@ import (
 	"k8s.io/api/policy/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -1331,41 +1329,16 @@ func (p *podPreemptor) DeletePod(pod *v1.Pod) error {
 	return p.Client.CoreV1().Pods(pod.Namespace).Delete(pod.Name, &metav1.DeleteOptions{})
 }
 
-func (p *podPreemptor) UpdatePodAnnotations(pod *v1.Pod, annotations map[string]string) error {
+func (p *podPreemptor) SetNominatedNodeName(pod *v1.Pod, nominatedNodeName string) error {
 	podCopy := pod.DeepCopy()
-	if podCopy.Annotations == nil {
-		podCopy.Annotations = map[string]string{}
-	}
-	for k, v := range annotations {
-		podCopy.Annotations[k] = v
-	}
-	ret := &unstructured.Unstructured{}
-	ret.SetAnnotations(podCopy.Annotations)
-	patchData, err := json.Marshal(ret)
-	if err != nil {
-		return err
-	}
-	_, error := p.Client.CoreV1().Pods(podCopy.Namespace).Patch(podCopy.Name, types.MergePatchType, patchData, "status")
-	return error
+	podCopy.Status.NominatedNodeName = nominatedNodeName
+	_, err := p.Client.CoreV1().Pods(pod.Namespace).UpdateStatus(podCopy)
+	return err
 }
 
-func (p *podPreemptor) RemoveNominatedNodeAnnotation(pod *v1.Pod) error {
-	podCopy := pod.DeepCopy()
-	if podCopy.Annotations == nil {
+func (p *podPreemptor) RemoveNominatedNodeName(pod *v1.Pod) error {
+	if len(pod.Status.NominatedNodeName) == 0 {
 		return nil
 	}
-	if _, exists := podCopy.Annotations[core.NominatedNodeAnnotationKey]; !exists {
-		return nil
-	}
-	// Note: Deleting the entry from the annotations and passing it to Patch() will
-	// not remove the annotation. That's why we set it to empty string.
-	podCopy.Annotations[core.NominatedNodeAnnotationKey] = ""
-	ret := &unstructured.Unstructured{}
-	ret.SetAnnotations(podCopy.Annotations)
-	patchData, err := json.Marshal(ret)
-	if err != nil {
-		return err
-	}
-	_, error := p.Client.CoreV1().Pods(podCopy.Namespace).Patch(podCopy.Name, types.MergePatchType, patchData, "status")
-	return error
+	return p.SetNominatedNodeName(pod, "")
 }

@@ -39,7 +39,6 @@ go_test(
         "//pkg/scheduler/algorithm:go_default_library",
         "//pkg/scheduler/algorithmprovider:go_default_library",
         "//pkg/scheduler/api:go_default_library",
-        "//pkg/scheduler/core:go_default_library",
         "//pkg/scheduler/factory:go_default_library",
         "//pkg/scheduler/schedulercache:go_default_library",
         "//plugin/pkg/admission/podtolerationrestriction:go_default_library",

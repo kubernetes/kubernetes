@@ -41,11 +41,14 @@ var highPriorityPod, medPriorityPod, unschedulablePod = v1.Pod{
 			Name:      "mpp",
 			Namespace: "ns2",
 			Annotations: map[string]string{
-				NominatedNodeAnnotationKey: "node1", "annot2": "val2",
+				"annot2": "val2",
 			},
 		},
 		Spec: v1.PodSpec{
 			Priority: &mediumPriority,
+		},
+		Status: v1.PodStatus{
+			NominatedNodeName: "node1",
 		},
 	},
 	v1.Pod{
@@ -53,7 +56,7 @@ var highPriorityPod, medPriorityPod, unschedulablePod = v1.Pod{
 			Name:      "up",
 			Namespace: "ns1",
 			Annotations: map[string]string{
-				NominatedNodeAnnotationKey: "node1", "annot2": "val2",
+				"annot2": "val2",
 			},
 		},
 		Spec: v1.PodSpec{
@@ -67,6 +70,7 @@ var highPriorityPod, medPriorityPod, unschedulablePod = v1.Pod{
 					Reason: v1.PodReasonUnschedulable,
 				},
 			},
+			NominatedNodeName: "node1",
 		},
 	}
 
@@ -217,8 +221,11 @@ func TestUnschedulablePodsMap(t *testing.T) {
 				Name:      "p0",
 				Namespace: "ns1",
 				Annotations: map[string]string{
-					NominatedNodeAnnotationKey: "node1", "annot2": "val2",
+					"annot1": "val1",
 				},
+			},
+			Status: v1.PodStatus{
+				NominatedNodeName: "node1",
 			},
 		},
 		{
@@ -235,27 +242,30 @@ func TestUnschedulablePodsMap(t *testing.T) {
 				Name:      "p2",
 				Namespace: "ns2",
 				Annotations: map[string]string{
-					NominatedNodeAnnotationKey: "node3", "annot2": "val2", "annot3": "val3",
+					"annot2": "val2", "annot3": "val3",
 				},
+			},
+			Status: v1.PodStatus{
+				NominatedNodeName: "node3",
 			},
 		},
 		{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "p3",
 				Namespace: "ns4",
-				Annotations: map[string]string{
-					NominatedNodeAnnotationKey: "node1",
-				},
+			},
+			Status: v1.PodStatus{
+				NominatedNodeName: "node1",
 			},
 		},
 	}
 	var updatedPods = make([]*v1.Pod, len(pods))
 	updatedPods[0] = pods[0].DeepCopy()
-	updatedPods[0].Annotations[NominatedNodeAnnotationKey] = "node3"
+	updatedPods[0].Status.NominatedNodeName = "node3"
 	updatedPods[1] = pods[1].DeepCopy()
-	updatedPods[1].Annotations[NominatedNodeAnnotationKey] = "node3"
+	updatedPods[1].Status.NominatedNodeName = "node3"
 	updatedPods[3] = pods[3].DeepCopy()
-	delete(updatedPods[3].Annotations, NominatedNodeAnnotationKey)
+	updatedPods[3].Status.NominatedNodeName = ""
 
 	tests := []struct {
 		podsToAdd                    []*v1.Pod

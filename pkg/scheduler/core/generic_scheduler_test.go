@@ -1318,8 +1318,7 @@ func TestPreempt(t *testing.T) {
 			// Mark the victims for deletion and record the preemptor's nominated node name.
 			now := metav1.Now()
 			victim.DeletionTimestamp = &now
-			test.pod.Annotations = make(map[string]string)
-			test.pod.Annotations[NominatedNodeAnnotationKey] = node.Name
+			test.pod.Status.NominatedNodeName = node.Name
 		}
 		// Call preempt again and make sure it doesn't preempt any more pods.
 		node, victims, _, err = scheduler.Preempt(test.pod, schedulertesting.FakeNodeLister(makeNodeList(nodeNames)), error(&FitError{Pod: test.pod, FailedPredicates: failedPredMap}))

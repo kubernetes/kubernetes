@@ -397,10 +397,8 @@ func (p *PriorityQueue) WaitingPodsForNode(nodeName string) []*v1.Pod {
 	pods := p.unschedulableQ.GetPodsWaitingForNode(nodeName)
 	for _, obj := range p.activeQ.List() {
 		pod := obj.(*v1.Pod)
-		if pod.Annotations != nil {
-			if n, ok := pod.Annotations[NominatedNodeAnnotationKey]; ok && n == nodeName {
-				pods = append(pods, pod)
-			}
+		if pod.Status.NominatedNodeName == nodeName {
+			pods = append(pods, pod)
 		}
 	}
 	return pods
@@ -420,11 +418,7 @@ type UnschedulablePodsMap struct {
 var _ = UnschedulablePods(&UnschedulablePodsMap{})
 
 func NominatedNodeName(pod *v1.Pod) string {
-	nominatedNodeName, ok := pod.Annotations[NominatedNodeAnnotationKey]
-	if !ok {
-		return ""
-	}
-	return nominatedNodeName
+	return pod.Status.NominatedNodeName
 }
 
 // Add adds a pod to the unschedulable pods.
