@@ -41,6 +41,9 @@ func unsupported(path ...string) validationMatch {
 func immutable(path ...string) validationMatch {
 	return validationMatch{path: field.NewPath(path[0], path[1:]...), errorType: field.ErrorTypeInvalid}
 }
+func forbidden(path ...string) validationMatch {
+	return validationMatch{path: field.NewPath(path[0], path[1:]...), errorType: field.ErrorTypeForbidden}
+}
 
 func (v validationMatch) matches(err *field.Error) bool {
 	return err.Type == v.errorType && err.Field == v.path.String()
@@ -456,5 +459,114 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 				t.Errorf("%s: unexpected error: %v", tc.name, errs[i])
 			}
 		}
+	}
+}
+
+func TestValidateCustomResourceDefinitionOpenAPISchema(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name     string
+		resource *apiextensions.CustomResourceDefinition
+		errors   []validationMatch
+	}{
+		{
+			name: "valid 1",
+			resource: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "plural.group.com"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Group:   "group.com",
+					Version: "version",
+					Names: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "plural",
+						Singular: "singular",
+						Kind:     "kind",
+						ListKind: "listkind",
+					},
+					Scope: apiextensions.ClusterScoped,
+					Validation: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							AdditionalProperties: &apiextensions.JSONSchemaPropsOrBool{
+								Allows: true,
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "valid 2",
+			resource: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "plural.group.com"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Group:   "group.com",
+					Version: "version",
+					Names: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "plural",
+						Singular: "singular",
+						Kind:     "kind",
+						ListKind: "listkind",
+					},
+					Scope: apiextensions.ClusterScoped,
+					Validation: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							AdditionalProperties: &apiextensions.JSONSchemaPropsOrBool{
+								Schema: &apiextensions.JSONSchemaProps{},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "invalid 1",
+			resource: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "plural.group.com"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Group:   "group.com",
+					Version: "version",
+					Names: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "plural",
+						Singular: "singular",
+						Kind:     "kind",
+						ListKind: "listkind",
+					},
+					Scope: apiextensions.ClusterScoped,
+					Validation: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							AdditionalProperties: &apiextensions.JSONSchemaPropsOrBool{},
+						},
+					},
+				},
+			},
+			errors: []validationMatch{
+				forbidden("spec", "validation", "openAPIV3Schema", "additionalProperties"),
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			errs := ValidateCustomResourceDefinition(tc.resource)
+			seenErrs := make([]bool, len(errs))
+
+		nextError:
+			for _, expectedError := range tc.errors {
+				for i, err := range errs {
+					if expectedError.matches(err) && !seenErrs[i] {
+						seenErrs[i] = true
+						continue nextError
+					}
+				}
+				t.Errorf("expected %v at %v, got %v", expectedError.errorType, expectedError.path.String(), errs)
+			}
+
+			for i, seen := range seenErrs {
+				if !seen {
+					t.Errorf("unexpected error: %v", errs[i])
+				}
+			}
+		})
 	}
 }
