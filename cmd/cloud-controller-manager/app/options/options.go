@@ -23,7 +23,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	cloudcontroller "k8s.io/kubernetes/cmd/cloud-controller-manager/app/config"
+	cloudcontrollerconfig "k8s.io/kubernetes/cmd/cloud-controller-manager/app/config"
 	cmoptions "k8s.io/kubernetes/cmd/controller-manager/app/options"
 	"k8s.io/kubernetes/pkg/client/leaderelectionconfig"
 	"k8s.io/kubernetes/pkg/master/ports"
@@ -73,7 +73,7 @@ func (o *CloudControllerManagerOptions) AddFlags(fs *pflag.FlagSet) {
 	utilfeature.DefaultFeatureGate.AddFlag(fs)
 }
 
-func (o *CloudControllerManagerOptions) ApplyTo(c *cloudcontroller.Config) error {
+func (o *CloudControllerManagerOptions) ApplyTo(c *cloudcontrollerconfig.Config) error {
 	if err := o.Generic.ApplyTo(c.Generic); err != nil {
 		return err
 	}
@@ -94,12 +94,12 @@ func (o *CloudControllerManagerOptions) Validate() error {
 	return utilerrors.NewAggregate(errors)
 }
 
-func (o CloudControllerManagerOptions) Config() (*cloudcontroller.Config, error) {
+func (o CloudControllerManagerOptions) Config() (*cloudcontrollerconfig.Config, error) {
 	if err := o.Validate(); err != nil {
 		return nil, err
 	}
 
-	c := &cloudcontroller.Config{}
+	c := &cloudcontrollerconfig.Config{}
 	if err := o.ApplyTo(c); err != nil {
 		return nil, err
 	}
