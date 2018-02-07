@@ -321,6 +321,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	runtimeCgroups string,
 	hostnameOverride string,
 	nodeIP string,
+	validateNodeIP bool,
 	providerID string,
 	cloudProvider string,
 	certDirectory string,
@@ -522,6 +523,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		containerManager:     kubeDeps.ContainerManager,
 		containerRuntimeName: containerRuntime,
 		nodeIP:               parsedNodeIP,
+		validateNodeIP:       validateNodeIP,
 		clock:                clock.RealClock{},
 		enableControllerAttachDetach:            kubeCfg.EnableControllerAttachDetach,
 		iptClient:                               utilipt.New(utilexec.New(), utildbus.New(), utilipt.ProtocolIpv4),
@@ -1103,6 +1105,10 @@ type Kubelet struct {
 
 	// If non-nil, use this IP address for the node
 	nodeIP net.IP
+
+	// If false, do not run validation on nodeIP. May be desired when the ip the Kubelet has
+	// is not on the server, e.G. because its behind a NAT
+	validateNodeIP bool
 
 	// If non-nil, this is a unique identifier for the node in an external database, eg. cloudprovider
 	providerID string
