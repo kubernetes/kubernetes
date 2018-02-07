@@ -36,7 +36,6 @@ const (
 	testMountPath  = "pods/poduid/volumes/kubernetes.io~local-volume/pvA"
 	testGlobalPath = "plugins/kubernetes.io~local-volume/volumeDevices/pvA"
 	testPodPath    = "pods/poduid/volumeDevices/kubernetes.io~local-volume"
-	testDev        = "fakeDev"
 	testNodeName   = "fakeNodeName"
 )
 
@@ -64,25 +63,6 @@ func getBlockPlugin(t *testing.T) (string, volume.BlockVolumePlugin) {
 	tmpDir, err := utiltesting.MkTmpdir("localVolumeTest")
 	if err != nil {
 		t.Fatalf("can't make a temp dir: %v", err)
-	}
-	fakeDev := path.Join(tmpDir, testDev)
-	file, err := os.OpenFile(fakeDev, os.O_RDONLY|os.O_CREATE, 0666)
-	if err != nil {
-		t.Fatalf("Cannot create fakedev: %v", err)
-	}
-	err = file.Close()
-	if err != nil {
-		t.Fatalf("Cannot close fakedev: %v", err)
-	}
-	podPath := path.Join(tmpDir, testPodPath)
-	err = os.MkdirAll(path.Dir(podPath), 0766)
-	if err != nil {
-		t.Fatalf("Cannot create directories for %q: %v", path.Dir(podPath), err)
-	}
-
-	err = os.Symlink(fakeDev, podPath)
-	if err != nil {
-		t.Fatalf("Failed to create symlink for %q: %v", podPath, err)
 	}
 
 	plugMgr := volume.VolumePluginMgr{}
