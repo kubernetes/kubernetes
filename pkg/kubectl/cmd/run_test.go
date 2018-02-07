@@ -429,6 +429,26 @@ func TestRunValidations(t *testing.T) {
 			},
 			expectedErr: "stdin is required for containers with -t/--tty",
 		},
+		{
+			args: []string{"test"},
+			flags: map[string]string{
+				"image":       "busybox",
+				"show-labels": "true",
+				"dry-run":     "true",
+				"output":      "yaml",
+			},
+			expectedErr: "When --show-labels and --dry-run are set to true, --output must be wide or \"\" ",
+		},
+		{
+			args: []string{"test"},
+			flags: map[string]string{
+				"image":       "busybox",
+				"show-labels": "true",
+				"dry-run":     "false",
+				"output":      "",
+			},
+			expectedErr: "When --show-labels is set to true with default dry-run value (false), --output must be wide ",
+		},
 	}
 	for _, test := range tests {
 		f, tf, codec, ns := cmdtesting.NewTestFactory()
