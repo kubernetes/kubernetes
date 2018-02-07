@@ -104,7 +104,7 @@ func (rs *REST) Categories() []string {
 func (rs *REST) Create(ctx genericapirequest.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, includeUninitialized bool) (runtime.Object, error) {
 	service := obj.(*api.Service)
 
-	if err := rest.BeforeCreate(Strategy, ctx, obj); err != nil {
+	if err := rest.BeforeCreate(Strategy, ctx, obj, createValidation); err != nil {
 		return nil, err
 	}
 
@@ -294,7 +294,7 @@ func (rs *REST) healthCheckNodePortUpdate(oldService, service *api.Service, node
 	return true, nil
 }
 
-func (rs *REST) Update(ctx genericapirequest.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (runtime.Object, bool, error) {
+func (rs *REST) Update(ctx genericapirequest.Context, name string, objInfo rest.UpdatedObjectInfo) (runtime.Object, bool, error) {
 	oldService, err := rs.registry.GetService(ctx, name, &metav1.GetOptions{})
 	if err != nil {
 		return nil, false, err
@@ -368,7 +368,7 @@ func (rs *REST) Update(ctx genericapirequest.Context, name string, objInfo rest.
 		return nil, false, errors.NewInvalid(api.Kind("Service"), service.Name, errs)
 	}
 
-	out, err := rs.registry.UpdateService(ctx, service, createValidation, updateValidation)
+	out, err := rs.registry.UpdateService(ctx, service, objInfo.ValidateCreate, objInfo.ValidateUpdate)
 	if err == nil {
 		el := nodePortOp.Commit()
 		if el != nil {

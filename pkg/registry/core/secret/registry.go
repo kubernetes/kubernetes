@@ -72,7 +72,7 @@ func (s *storage) CreateSecret(ctx genericapirequest.Context, secret *api.Secret
 }
 
 func (s *storage) UpdateSecret(ctx genericapirequest.Context, secret *api.Secret, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (*api.Secret, error) {
-	obj, _, err := s.Update(ctx, secret.Name, rest.DefaultUpdatedObjectInfo(secret), createValidation, updateValidation)
+	obj, _, err := s.Update(ctx, secret.Name, rest.DefaultUpdatedObjectInfo(secret, createValidation, updateValidation))
 	return obj.(*api.Secret), err
 }
 

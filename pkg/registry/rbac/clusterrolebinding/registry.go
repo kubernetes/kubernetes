@@ -61,7 +61,7 @@ func (s *storage) CreateClusterRoleBinding(ctx genericapirequest.Context, cluste
 }
 
 func (s *storage) UpdateClusterRoleBinding(ctx genericapirequest.Context, clusterRoleBinding *rbac.ClusterRoleBinding, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) error {
-	_, _, err := s.Update(ctx, clusterRoleBinding.Name, rest.DefaultUpdatedObjectInfo(clusterRoleBinding), createValidation, updateValidation)
+	_, _, err := s.Update(ctx, clusterRoleBinding.Name, rest.DefaultUpdatedObjectInfo(clusterRoleBinding, createValidation, updateValidation))
 	return err
 }
 

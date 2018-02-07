@@ -72,7 +72,7 @@ func (s *storage) CreateServiceAccount(ctx genericapirequest.Context, serviceAcc
 }
 
 func (s *storage) UpdateServiceAccount(ctx genericapirequest.Context, serviceAccount *api.ServiceAccount, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) error {
-	_, _, err := s.Update(ctx, serviceAccount.Name, rest.DefaultUpdatedObjectInfo(serviceAccount), createValidation, updateValidation)
+	_, _, err := s.Update(ctx, serviceAccount.Name, rest.DefaultUpdatedObjectInfo(serviceAccount, createValidation, updateValidation))
 	return err
 }
 

@@ -377,7 +377,7 @@ func TestServiceRegistryUpdate(t *testing.T) {
 				TargetPort: intstr.FromInt(6502),
 			}},
 		},
-	}), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc)
+	}, rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc))
 	if err != nil {
 		t.Fatalf("Expected no error: %v", err)
 	}
@@ -439,7 +439,7 @@ func TestServiceStorageValidatesUpdate(t *testing.T) {
 		},
 	}
 	for _, failureCase := range failureCases {
-		c, created, err := storage.Update(ctx, failureCase.Name, rest.DefaultUpdatedObjectInfo(&failureCase), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc)
+		c, created, err := storage.Update(ctx, failureCase.Name, rest.DefaultUpdatedObjectInfo(&failureCase, rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc))
 		if c != nil || created {
 			t.Errorf("Expected nil object or created false")
 		}
@@ -560,7 +560,7 @@ func TestServiceRegistryUpdateExternalService(t *testing.T) {
 	// Modify load balancer to be external.
 	svc2 := svc1.DeepCopy()
 	svc2.Spec.Type = api.ServiceTypeLoadBalancer
-	if _, _, err := storage.Update(ctx, svc2.Name, rest.DefaultUpdatedObjectInfo(svc2), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc); err != nil {
+	if _, _, err := storage.Update(ctx, svc2.Name, rest.DefaultUpdatedObjectInfo(svc2, rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc)); err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 	defer releaseServiceNodePorts(t, ctx, svc2.Name, storage, registry)
@@ -568,7 +568,7 @@ func TestServiceRegistryUpdateExternalService(t *testing.T) {
 	// Change port.
 	svc3 := svc2.DeepCopy()
 	svc3.Spec.Ports[0].Port = 6504
-	if _, _, err := storage.Update(ctx, svc3.Name, rest.DefaultUpdatedObjectInfo(svc3), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc); err != nil {
+	if _, _, err := storage.Update(ctx, svc3.Name, rest.DefaultUpdatedObjectInfo(svc3, rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc)); err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 }
@@ -606,7 +606,7 @@ func TestServiceRegistryUpdateMultiPortExternalService(t *testing.T) {
 	// Modify ports
 	svc2 := svc1.DeepCopy()
 	svc2.Spec.Ports[1].Port = 8088
-	if _, _, err := storage.Update(ctx, svc2.Name, rest.DefaultUpdatedObjectInfo(svc2), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc); err != nil {
+	if _, _, err := storage.Update(ctx, svc2.Name, rest.DefaultUpdatedObjectInfo(svc2, rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc)); err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 }
@@ -1005,7 +1005,7 @@ func TestServiceRegistryIPUpdate(t *testing.T) {
 	update := created_service.DeepCopy()
 	update.Spec.Ports[0].Port = 6503
 
-	updated_svc, _, _ := storage.Update(ctx, update.Name, rest.DefaultUpdatedObjectInfo(update), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc)
+	updated_svc, _, _ := storage.Update(ctx, update.Name, rest.DefaultUpdatedObjectInfo(update, rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc))
 	updated_service := updated_svc.(*api.Service)
 	if updated_service.Spec.Ports[0].Port != 6503 {
 		t.Errorf("Expected port 6503, but got %v", updated_service.Spec.Ports[0].Port)
@@ -1024,7 +1024,7 @@ func TestServiceRegistryIPUpdate(t *testing.T) {
 	update.Spec.Ports[0].Port = 6503
 	update.Spec.ClusterIP = testIP // Error: Cluster IP is immutable
 
-	_, _, err := storage.Update(ctx, update.Name, rest.DefaultUpdatedObjectInfo(update), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc)
+	_, _, err := storage.Update(ctx, update.Name, rest.DefaultUpdatedObjectInfo(update, rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc))
 	if err == nil || !errors.IsInvalid(err) {
 		t.Errorf("Unexpected error type: %v", err)
 	}
@@ -1064,7 +1064,7 @@ func TestServiceRegistryIPLoadBalancer(t *testing.T) {
 
 	update := created_service.DeepCopy()
 
-	_, _, err = storage.Update(ctx, update.Name, rest.DefaultUpdatedObjectInfo(update), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc)
+	_, _, err = storage.Update(ctx, update.Name, rest.DefaultUpdatedObjectInfo(update, rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc))
 	if err != nil {
 		t.Errorf("Unexpected error %v", err)
 	}
@@ -1078,7 +1078,7 @@ func TestUpdateServiceWithConflictingNamespace(t *testing.T) {
 	}
 
 	ctx := genericapirequest.NewDefaultContext()
-	obj, created, err := storage.Update(ctx, service.Name, rest.DefaultUpdatedObjectInfo(service), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc)
+	obj, created, err := storage.Update(ctx, service.Name, rest.DefaultUpdatedObjectInfo(service, rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc))
 	if obj != nil || created {
 		t.Error("Expected a nil object, but we got a value or created was true")
 	}

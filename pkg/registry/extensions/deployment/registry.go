@@ -73,7 +73,7 @@ func (s *storage) CreateDeployment(ctx genericapirequest.Context, deployment *ex
 }
 
 func (s *storage) UpdateDeployment(ctx genericapirequest.Context, deployment *extensions.Deployment, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (*extensions.Deployment, error) {
-	obj, _, err := s.Update(ctx, deployment.Name, rest.DefaultUpdatedObjectInfo(deployment), createValidation, updateValidation)
+	obj, _, err := s.Update(ctx, deployment.Name, rest.DefaultUpdatedObjectInfo(deployment, createValidation, updateValidation))
 	if err != nil {
 		return nil, err
 	}

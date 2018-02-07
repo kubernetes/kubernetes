@@ -119,8 +119,8 @@ func (r *StatusREST) Get(ctx genericapirequest.Context, name string, options *me
 }
 
 // Update alters the status subset of an object.
-func (r *StatusREST) Update(ctx genericapirequest.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (runtime.Object, bool, error) {
-	return r.store.Update(ctx, name, objInfo, createValidation, updateValidation)
+func (r *StatusREST) Update(ctx genericapirequest.Context, name string, objInfo rest.UpdatedObjectInfo) (runtime.Object, bool, error) {
+	return r.store.Update(ctx, name, objInfo)
 }
 
 type ScaleREST struct {
@@ -153,7 +153,7 @@ func (r *ScaleREST) Get(ctx genericapirequest.Context, name string, options *met
 	return scaleFromRC(rc), nil
 }
 
-func (r *ScaleREST) Update(ctx genericapirequest.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (runtime.Object, bool, error) {
+func (r *ScaleREST) Update(ctx genericapirequest.Context, name string, objInfo rest.UpdatedObjectInfo) (runtime.Object, bool, error) {
 	rc, err := r.registry.GetController(ctx, name, &metav1.GetOptions{})
 	if err != nil {
 		return nil, false, errors.NewNotFound(autoscaling.Resource("replicationcontrollers/scale"), name)
@@ -180,7 +180,7 @@ func (r *ScaleREST) Update(ctx genericapirequest.Context, name string, objInfo r
 
 	rc.Spec.Replicas = scale.Spec.Replicas
 	rc.ResourceVersion = scale.ResourceVersion
-	rc, err = r.registry.UpdateController(ctx, rc, createValidation, updateValidation)
+	rc, err = r.registry.UpdateController(ctx, rc, objInfo.ValidateCreate, objInfo.ValidateUpdate)
 	if err != nil {
 		return nil, false, err
 	}

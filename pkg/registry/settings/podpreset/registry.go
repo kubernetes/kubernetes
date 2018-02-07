@@ -61,7 +61,7 @@ func (s *storage) CreatePodPreset(ctx genericapirequest.Context, pp *settings.Po
 }
 
 func (s *storage) UpdatePodPreset(ctx genericapirequest.Context, pp *settings.PodPreset, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) error {
-	_, _, err := s.Update(ctx, pp.Name, rest.DefaultUpdatedObjectInfo(pp), createValidation, updateValidation)
+	_, _, err := s.Update(ctx, pp.Name, rest.DefaultUpdatedObjectInfo(pp, createValidation, updateValidation))
 	return err
 }
 

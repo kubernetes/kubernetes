@@ -61,7 +61,7 @@ func (s *storage) CreateNetworkPolicy(ctx genericapirequest.Context, np *network
 }
 
 func (s *storage) UpdateNetworkPolicy(ctx genericapirequest.Context, np *networking.NetworkPolicy, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) error {
-	_, _, err := s.Update(ctx, np.Name, rest.DefaultUpdatedObjectInfo(np), createValidation, updateValidation)
+	_, _, err := s.Update(ctx, np.Name, rest.DefaultUpdatedObjectInfo(np, createValidation, updateValidation))
 	return err
 }
 

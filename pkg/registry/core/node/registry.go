@@ -61,7 +61,7 @@ func (s *storage) CreateNode(ctx genericapirequest.Context, node *api.Node, crea
 }
 
 func (s *storage) UpdateNode(ctx genericapirequest.Context, node *api.Node, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) error {
-	_, _, err := s.Update(ctx, node.Name, rest.DefaultUpdatedObjectInfo(node), createValidation, updateValidation)
+	_, _, err := s.Update(ctx, node.Name, rest.DefaultUpdatedObjectInfo(node, createValidation, updateValidation))
 	return err
 }
 

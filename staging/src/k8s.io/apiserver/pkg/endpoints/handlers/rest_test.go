@@ -171,7 +171,7 @@ func (p *testPatcher) New() runtime.Object {
 	return &example.Pod{}
 }
 
-func (p *testPatcher) Update(ctx request.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (runtime.Object, bool, error) {
+func (p *testPatcher) Update(ctx request.Context, name string, objInfo rest.UpdatedObjectInfo) (runtime.Object, bool, error) {
 	currentPod := p.startingPod
 	if p.numUpdates > 0 {
 		currentPod = p.updatePod

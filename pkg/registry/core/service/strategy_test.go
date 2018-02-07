@@ -201,7 +201,7 @@ func TestBeforeUpdate(t *testing.T) {
 		newSvc := makeValidService()
 		tc.tweakSvc(&oldSvc, &newSvc)
 		ctx := genericapirequest.NewDefaultContext()
-		err := rest.BeforeUpdate(Strategy, ctx, runtime.Object(&oldSvc), runtime.Object(&newSvc))
+		err := rest.BeforeUpdate(Strategy, ctx, runtime.Object(&oldSvc), runtime.Object(&newSvc), rest.ValidateAllObjectUpdateFunc)
 		if tc.expectErr && err == nil {
 			t.Errorf("unexpected non-error for %q", tc.name)
 		}

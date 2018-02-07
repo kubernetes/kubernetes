@@ -83,7 +83,7 @@ func validateCommonFields(obj, old runtime.Object, strategy RESTUpdateStrategy) 
 // BeforeUpdate ensures that common operations for all resources are performed on update. It only returns
 // errors that can be converted to api.Status. It will invoke update validation with the provided existing
 // and updated objects.
-func BeforeUpdate(strategy RESTUpdateStrategy, ctx genericapirequest.Context, obj, old runtime.Object) error {
+func BeforeUpdate(strategy RESTUpdateStrategy, ctx genericapirequest.Context, obj, old runtime.Object, updateValidation ValidateObjectUpdateFunc) error {
 	objectMeta, kind, kerr := objectMetaAndKind(strategy, obj)
 	if kerr != nil {
 		return kerr
@@ -126,6 +126,14 @@ func BeforeUpdate(strategy RESTUpdateStrategy, ctx genericapirequest.Context, ob
 
 	strategy.Canonicalize(obj)
 
+	// at this point we have a fully formed object.  It is time to call the validators that the apiserver
+	// handling chain wants to enforce.
+	if updateValidation != nil {
+		if err = updateValidation(obj.DeepCopyObject(), old.DeepCopyObject()); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -140,11 +148,14 @@ type defaultUpdatedObjectInfo struct {
 	// transformers is an optional list of transforming functions that modify or
 	// replace obj using information from the context, old object, or other sources.
 	transformers []TransformFunc
+
+	createValidation ValidateObjectFunc
+	updateValidation ValidateObjectUpdateFunc
 }
 
 // DefaultUpdatedObjectInfo returns an UpdatedObjectInfo impl based on the specified object.
-func DefaultUpdatedObjectInfo(obj runtime.Object, transformers ...TransformFunc) UpdatedObjectInfo {
-	return &defaultUpdatedObjectInfo{obj, transformers}
+func DefaultUpdatedObjectInfo(obj runtime.Object, createValidation ValidateObjectFunc, updateValidation ValidateObjectUpdateFunc, transformers ...TransformFunc) UpdatedObjectInfo {
+	return &defaultUpdatedObjectInfo{obj, transformers, createValidation, updateValidation}
 }
 
 // Preconditions satisfies the UpdatedObjectInfo interface.
@@ -190,6 +201,22 @@ func (i *defaultUpdatedObjectInfo) UpdatedObject(ctx genericapirequest.Context, 
 	return newObj, nil
 }
 
+// ValidateCreate applies validating admission to a newly created object.
+func (i *defaultUpdatedObjectInfo) ValidateCreate(obj runtime.Object) error {
+	if i.createValidation == nil {
+		return nil
+	}
+	return i.createValidation(obj)
+}
+
+// ValidateUpdate applies validating admission to an updated object.
+func (i *defaultUpdatedObjectInfo) ValidateUpdate(obj, old runtime.Object) error {
+	if i.updateValidation == nil {
+		return nil
+	}
+	return i.updateValidation(obj, old)
+}
+
 // wrappedUpdatedObjectInfo allows wrapping an existing objInfo and
 // chaining additional transformations/checks on the result of UpdatedObject()
 type wrappedUpdatedObjectInfo struct {
@@ -229,6 +256,16 @@ func (i *wrappedUpdatedObjectInfo) UpdatedObject(ctx genericapirequest.Context, 
 	}
 
 	return newObj, nil
+}
+
+// ValidateCreate applies validating admission to a newly created object.
+func (i *wrappedUpdatedObjectInfo) ValidateCreate(obj runtime.Object) error {
+	return i.objInfo.ValidateCreate(obj)
+}
+
+// ValidateUpdate applies validating admission to an updated object.
+func (i *wrappedUpdatedObjectInfo) ValidateUpdate(obj, old runtime.Object) error {
+	return i.objInfo.ValidateUpdate(obj, old)
 }
 
 // AdmissionToValidateObjectUpdateFunc converts validating admission to a rest validate object update func

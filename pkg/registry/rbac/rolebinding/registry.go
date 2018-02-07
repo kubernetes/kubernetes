@@ -62,7 +62,7 @@ func (s *storage) CreateRoleBinding(ctx genericapirequest.Context, roleBinding *
 }
 
 func (s *storage) UpdateRoleBinding(ctx genericapirequest.Context, roleBinding *rbac.RoleBinding, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) error {
-	_, _, err := s.Update(ctx, roleBinding.Name, rest.DefaultUpdatedObjectInfo(roleBinding), createValidation, updateValidation)
+	_, _, err := s.Update(ctx, roleBinding.Name, rest.DefaultUpdatedObjectInfo(roleBinding, createValidation, updateValidation))
 	return err
 }
 

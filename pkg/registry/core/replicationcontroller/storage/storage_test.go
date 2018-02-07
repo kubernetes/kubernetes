@@ -174,7 +174,7 @@ func TestGenerationNumber(t *testing.T) {
 
 	// Updates to spec should increment the generation number
 	controller.Spec.Replicas += 1
-	storage.Controller.Update(ctx, controller.Name, rest.DefaultUpdatedObjectInfo(controller), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc)
+	storage.Controller.Update(ctx, controller.Name, rest.DefaultUpdatedObjectInfo(controller, rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -189,7 +189,7 @@ func TestGenerationNumber(t *testing.T) {
 
 	// Updates to status should not increment either spec or status generation numbers
 	controller.Status.Replicas += 1
-	storage.Controller.Update(ctx, controller.Name, rest.DefaultUpdatedObjectInfo(controller), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc)
+	storage.Controller.Update(ctx, controller.Name, rest.DefaultUpdatedObjectInfo(controller, rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -309,7 +309,7 @@ func TestScaleUpdate(t *testing.T) {
 		},
 	}
 
-	if _, _, err := storage.Scale.Update(ctx, update.Name, rest.DefaultUpdatedObjectInfo(&update), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc); err != nil {
+	if _, _, err := storage.Scale.Update(ctx, update.Name, rest.DefaultUpdatedObjectInfo(&update, rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc)); err != nil {
 		t.Fatalf("error updating scale %v: %v", update, err)
 	}
 	obj, err := storage.Scale.Get(ctx, name, &metav1.GetOptions{})
@@ -324,7 +324,7 @@ func TestScaleUpdate(t *testing.T) {
 	update.ResourceVersion = rc.ResourceVersion
 	update.Spec.Replicas = 15
 
-	if _, _, err = storage.Scale.Update(ctx, update.Name, rest.DefaultUpdatedObjectInfo(&update), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc); err != nil && !errors.IsConflict(err) {
+	if _, _, err = storage.Scale.Update(ctx, update.Name, rest.DefaultUpdatedObjectInfo(&update, rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc)); err != nil && !errors.IsConflict(err) {
 		t.Fatalf("unexpected error, expecting an update conflict but got %v", err)
 	}
 }

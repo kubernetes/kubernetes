@@ -66,7 +66,7 @@ func (s *storage) GetEndpoints(ctx genericapirequest.Context, name string, optio
 }
 
 func (s *storage) UpdateEndpoints(ctx genericapirequest.Context, endpoints *api.Endpoints, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) error {
-	_, _, err := s.Update(ctx, endpoints.Name, rest.DefaultUpdatedObjectInfo(endpoints), createValidation, updateValidation)
+	_, _, err := s.Update(ctx, endpoints.Name, rest.DefaultUpdatedObjectInfo(endpoints, createValidation, updateValidation))
 	return err
 }
 

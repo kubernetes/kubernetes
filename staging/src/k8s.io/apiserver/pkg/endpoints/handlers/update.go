@@ -101,9 +101,7 @@ func UpdateResource(r rest.Updater, scope RequestScope, typer runtime.ObjectType
 			obj, created, err := r.Update(
 				ctx,
 				name,
-				rest.DefaultUpdatedObjectInfo(obj, transformers...),
-				rest.AdmissionToValidateObjectFunc(admit, staticAdmissionAttributes),
-				rest.AdmissionToValidateObjectUpdateFunc(admit, staticAdmissionAttributes),
+				rest.DefaultUpdatedObjectInfo(obj, rest.AdmissionToValidateObjectFunc(admit, staticAdmissionAttributes), rest.AdmissionToValidateObjectUpdateFunc(admit, staticAdmissionAttributes), transformers...),
 			)
 			wasCreated = created
 			return obj, err

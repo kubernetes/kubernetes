@@ -70,12 +70,12 @@ func (s *Storage) Create(ctx genericapirequest.Context, obj runtime.Object, crea
 	return s.StandardStorage.Create(ctx, obj, createValidation, includeUninitialized)
 }
 
-func (s *Storage) Update(ctx genericapirequest.Context, name string, obj rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (runtime.Object, bool, error) {
+func (s *Storage) Update(ctx genericapirequest.Context, name string, objInfo rest.UpdatedObjectInfo) (runtime.Object, bool, error) {
 	if rbacregistry.EscalationAllowed(ctx) {
-		return s.StandardStorage.Update(ctx, name, obj, createValidation, updateValidation)
+		return s.StandardStorage.Update(ctx, name, objInfo)
 	}
 
-	nonEscalatingInfo := rest.WrapUpdatedObjectInfo(obj, func(ctx genericapirequest.Context, obj runtime.Object, oldObj runtime.Object) (runtime.Object, error) {
+	nonEscalatingInfo := rest.WrapUpdatedObjectInfo(objInfo, func(ctx genericapirequest.Context, obj runtime.Object, oldObj runtime.Object) (runtime.Object, error) {
 		// Get the namespace from the context (populated from the URL).
 		// The namespace in the object can be empty until StandardStorage.Update()->BeforeUpdate() populates it from the context.
 		namespace, ok := genericapirequest.NamespaceFrom(ctx)
@@ -106,5 +106,5 @@ func (s *Storage) Update(ctx genericapirequest.Context, name string, obj rest.Up
 		return obj, nil
 	})
 
-	return s.StandardStorage.Update(ctx, name, nonEscalatingInfo, createValidation, updateValidation)
+	return s.StandardStorage.Update(ctx, name, nonEscalatingInfo)
 }

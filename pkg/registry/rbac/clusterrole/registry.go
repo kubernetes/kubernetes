@@ -61,7 +61,7 @@ func (s *storage) CreateClusterRole(ctx genericapirequest.Context, clusterRole *
 }
 
 func (s *storage) UpdateClusterRole(ctx genericapirequest.Context, clusterRole *rbac.ClusterRole, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) error {
-	_, _, err := s.Update(ctx, clusterRole.Name, rest.DefaultUpdatedObjectInfo(clusterRole), createValidation, updateValidation)
+	_, _, err := s.Update(ctx, clusterRole.Name, rest.DefaultUpdatedObjectInfo(clusterRole, createValidation, updateValidation))
 	return err
 }
 
