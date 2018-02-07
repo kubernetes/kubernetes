@@ -30,7 +30,7 @@ import (
 	"github.com/blang/semver"
 	dockertypes "github.com/docker/docker/api/types"
 	dockercontainer "github.com/docker/docker/api/types/container"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/runtime/v1alpha1"
 )
 
 func DefaultMemorySwap() int64 {

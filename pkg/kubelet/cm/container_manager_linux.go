@@ -42,7 +42,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
-	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
+	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/runtime"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/devicemanager"

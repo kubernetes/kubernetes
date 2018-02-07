@@ -22,7 +22,7 @@ import (
 	"fmt"
 
 	"golang.org/x/net/context"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/runtime/v1alpha1"
 )
 
 // ContainerStats returns stats for a container stats request based on container id.

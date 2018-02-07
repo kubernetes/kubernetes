@@ -32,8 +32,8 @@ import (
 	"github.com/golang/glog"
 
 	"k8s.io/api/core/v1"
-	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
+	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/runtime"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/runtime/v1alpha1"
 	"k8s.io/kubernetes/pkg/util/tail"
 )
 

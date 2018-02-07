@@ -22,8 +22,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
-	apitest "k8s.io/kubernetes/pkg/kubelet/apis/cri/testing"
+	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/runtime"
+	apitest "k8s.io/kubernetes/pkg/kubelet/apis/runtime/testing"
 	fakeremote "k8s.io/kubernetes/pkg/kubelet/remote/fake"
 )
 

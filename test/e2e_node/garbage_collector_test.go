@@ -23,8 +23,8 @@ import (
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
+	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/runtime"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/runtime/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/test/e2e/framework"
 

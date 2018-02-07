@@ -20,7 +20,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 
-	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
+	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/runtime"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"

@@ -84,7 +84,7 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/features:go_default_library",
-        "//pkg/kubelet/apis/cri:go_default_library",
+        "//pkg/kubelet/apis/runtime:go_default_library",
         "//pkg/kubelet/cm/cpumanager:go_default_library",
         "//pkg/kubelet/config:go_default_library",
         "//pkg/kubelet/container:go_default_library",
