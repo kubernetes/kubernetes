@@ -20,20 +20,15 @@ import (
 	"fmt"
 	"math/rand"
 	"net"
-	"net/http"
-	"net/http/pprof"
 	"os"
-	goruntime "runtime"
 	"strings"
 	"time"
 
 	"github.com/golang/glog"
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/spf13/cobra"
 
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
@@ -42,6 +37,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	cloudcontrollerconfig "k8s.io/kubernetes/cmd/cloud-controller-manager/app/config"
 	"k8s.io/kubernetes/cmd/cloud-controller-manager/app/options"
+	genericcontrollermanager "k8s.io/kubernetes/cmd/controller-manager/app"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller"
 	cloudcontrollers "k8s.io/kubernetes/pkg/controller/cloud"
@@ -120,12 +116,12 @@ func Run(c *cloudcontrollerconfig.CompletedConfig) error {
 	// Start the controller manager HTTP server
 	stopCh := make(chan struct{})
 	if c.Generic.SecureServingInfo != nil {
-		if err := serve(c, c.Generic.SecureServingInfo.Serve, stopCh); err != nil {
+		if err := genericcontrollermanager.Serve(&c.Generic, c.Generic.SecureServingInfo.Serve, stopCh); err != nil {
 			return err
 		}
 	}
 	if c.Generic.InsecureServingInfo != nil {
-		if err :=  serve(c, c.Generic.InsecureServingInfo.Serve, stopCh); err != nil {
+		if err := genericcontrollermanager.Serve(&c.Generic, c.Generic.InsecureServingInfo.Serve, stopCh); err != nil {
 			return err
 		}
 	}
@@ -276,24 +272,4 @@ func startControllers(c *cloudcontrollerconfig.CompletedConfig, kubeconfig *rest
 	sharedInformers.Start(stop)
 
 	select {}
-}
-
-type serveFunc func(handler http.Handler, shutdownTimeout time.Duration, stopCh <-chan struct{}) error
-
-func serve(c *cloudcontrollerconfig.CompletedConfig, serveFunc serveFunc, stopCh <-chan struct{}) error {
-	mux := http.NewServeMux()
-	healthz.InstallHandler(mux)
-	if c.Generic.ComponentConfig.EnableProfiling {
-		mux.HandleFunc("/debug/pprof/", pprof.Index)
-		mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
-		mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
-		mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
-		if c.Generic.ComponentConfig.EnableContentionProfiling {
-			goruntime.SetBlockProfileRate(1)
-		}
-	}
-	configz.InstallHandler(mux)
-	mux.Handle("/metrics", prometheus.Handler())
-
-	return serveFunc(mux, 0, stopCh)
 }

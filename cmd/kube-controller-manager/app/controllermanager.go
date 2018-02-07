@@ -25,22 +25,20 @@ import (
 	"io/ioutil"
 	"math/rand"
 	"net/http"
-	"net/http/pprof"
 	"os"
-	goruntime "runtime"
 	"time"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/informers"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/leaderelection"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	certutil "k8s.io/client-go/util/cert"
+	genericcontrollerconfig "k8s.io/kubernetes/cmd/controller-manager/app"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app/config"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app/options"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
@@ -52,7 +50,6 @@ import (
 	"k8s.io/kubernetes/pkg/version"
 
 	"github.com/golang/glog"
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/version/verflag"
@@ -127,12 +124,12 @@ func Run(c *config.CompletedConfig) error {
 	// Start the controller manager HTTP server
 	stopCh := make(chan struct{})
 	if c.Generic.SecureServingInfo != nil {
-		if err := serve(c, c.Generic.SecureServingInfo.Serve, stopCh); err != nil {
+		if err := genericcontrollerconfig.Serve(&c.Generic, c.Generic.SecureServingInfo.Serve, stopCh); err != nil {
 			return err
 		}
 	}
 	if c.Generic.InsecureServingInfo != nil {
-		if err := serve(c, c.Generic.InsecureServingInfo.Serve, stopCh); err != nil {
+		if err := genericcontrollerconfig.Serve(&c.Generic, c.Generic.InsecureServingInfo.Serve, stopCh); err != nil {
 			return err
 		}
 	}
@@ -210,26 +207,6 @@ func Run(c *config.CompletedConfig) error {
 		},
 	})
 	panic("unreachable")
-}
-
-type serveFunc func(handler http.Handler, shutdownTimeout time.Duration, stopCh <-chan struct{}) error
-
-func serve(c *config.CompletedConfig, serveFunc serveFunc, stopCh <-chan struct{}) error {
-	mux := http.NewServeMux()
-	healthz.InstallHandler(mux)
-	if c.Generic.ComponentConfig.EnableProfiling {
-		mux.HandleFunc("/debug/pprof/", pprof.Index)
-		mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
-		mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
-		mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
-		if c.Generic.ComponentConfig.EnableContentionProfiling {
-			goruntime.SetBlockProfileRate(1)
-		}
-	}
-	configz.InstallHandler(mux)
-	mux.Handle("/metrics", prometheus.Handler())
-
-	return serveFunc(mux, 0, stopCh)
 }
 
 type ControllerContext struct {
