@@ -19,6 +19,7 @@ package devicemanager
 import (
 	"path"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -109,6 +110,56 @@ func TestRun(t *testing.T) {
 		require.Equal(t, d.Health, dref.Health)
 	}
 
+}
+
+func TestAllocate(t *testing.T) {
+	socket := path.Join("/tmp", esocketName)
+	devs := []*pluginapi.Device{
+		{ID: "ADeviceId", Health: pluginapi.Healthy},
+	}
+	callbackCount := 0
+	callbackChan := make(chan int)
+	p, e := esetup(t, devs, socket, "mock", func(n string, a, u, r []pluginapi.Device) {
+		callbackCount++
+		callbackChan <- callbackCount
+	})
+	defer ecleanup(t, p, e)
+
+	resp := new(pluginapi.AllocateResponse)
+	resp.Devices = append(resp.Devices, &pluginapi.DeviceSpec{
+		ContainerPath: "/dev/aaa",
+		HostPath:      "/dev/aaa",
+		Permissions:   "mrw",
+	})
+
+	resp.Devices = append(resp.Devices, &pluginapi.DeviceSpec{
+		ContainerPath: "/dev/bbb",
+		HostPath:      "/dev/bbb",
+		Permissions:   "mrw",
+	})
+
+	resp.Mounts = append(resp.Mounts, &pluginapi.Mount{
+		ContainerPath: "/container_dir1/file1",
+		HostPath:      "host_dir1/file1",
+		ReadOnly:      true,
+	})
+
+	p.SetAllocFunc(func(r *pluginapi.AllocateRequest, devs map[string]pluginapi.Device) (*pluginapi.AllocateResponse, error) {
+		return resp, nil
+	})
+
+	go e.run()
+	// Wait for the callback to be issued.
+	select {
+	case <-callbackChan:
+		break
+	case <-time.After(time.Second):
+		t.FailNow()
+	}
+
+	respOut, err := e.allocate([]string{"ADeviceId"})
+	require.NoError(t, err)
+	require.Equal(t, resp, respOut)
 }
 
 func TestGetDevices(t *testing.T) {
