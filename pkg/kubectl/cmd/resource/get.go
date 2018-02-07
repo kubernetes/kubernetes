@@ -402,7 +402,7 @@ func (options *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []str
 		}
 		objToPrint := typedObj
 		if printer.IsGeneric() {
-			// use raw object as recieved from the builder when using generic
+			// use raw object as received from the builder when using generic
 			// printer instead of decodedObj
 			objToPrint = original
 		}
@@ -573,7 +573,6 @@ func (options *GetOptions) printGeneric(printer printers.ResourcePrinter, r *res
 
 	var obj runtime.Object
 	if !singleItemImplied || len(infos) > 1 {
-		// we have more than one item, so coerce all items into a list
 		// we have more than one item, so coerce all items into a list.
 		// we don't want an *unstructured.Unstructured list yet, as we
 		// may be dealing with non-unstructured objects. Compose all items
