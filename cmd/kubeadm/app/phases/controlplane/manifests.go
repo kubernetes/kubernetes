@@ -21,6 +21,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"k8s.io/api/core/v1"
@@ -223,6 +224,53 @@ func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration, k8sVersion *versio
 	return command
 }
 
+// calcNodeCidrSize determines the size of the subnets used on each node, based
+// on the pod subnet provided.  For IPv4, we assume that the pod subnet will
+// be /16 and use /24. If the pod subnet cannot be parsed, the IPv4 value will
+// be used (/24).
+//
+// For IPv6, the algorithm will do two three. First, the node CIDR will be set
+// to a multiple of 8, using the available bits for easier readability by user.
+// Second, the number of nodes will be 512 to 64K to attempt to maximize the
+// number of nodes (see NOTE below). Third, pod networks of /113 and larger will
+// be rejected, as the amount of bits available is too small.
+//
+// A special case is when the pod network size is /112, where /120 will be used,
+// only allowing 256 nodes and 256 pods.
+//
+// If the pod network size is /113 or larger, the node CIDR will be set to the same
+// size and this will be rejected later in validation.
+//
+// NOTE: Currently, the pod network must be /66 or larger. It is not reflected here,
+// but a smaller value will fail later validation.
+//
+// NOTE: Currently, the design allows a maximum of 64K nodes. This algorithm splits
+// the available bits to maximize the number used for nodes, but still have the node
+// CIDR be a multiple of eight.
+//
+func calcNodeCidrSize(podSubnet string) string {
+	maskSize := "24"
+	if ip, podCidr, err := net.ParseCIDR(podSubnet); err == nil {
+		if ip.To4() == nil {
+			var nodeCidrSize int
+			podNetSize, totalBits := podCidr.Mask.Size()
+			switch {
+			case podNetSize == 112:
+				// Special case, allows 256 nodes, 256 pods/node
+				nodeCidrSize = 120
+			case podNetSize < 112:
+				// Use multiple of 8 for node CIDR, with 512 to 64K nodes
+				nodeCidrSize = totalBits - ((totalBits-podNetSize-1)/8-1)*8
+			default:
+				// Not enough bits, will fail later, when validate
+				nodeCidrSize = podNetSize
+			}
+			maskSize = strconv.Itoa(nodeCidrSize)
+		}
+	}
+	return maskSize
+}
+
 // getControllerManagerCommand builds the right controller manager command from the given config object and version
 func getControllerManagerCommand(cfg *kubeadmapi.MasterConfiguration, k8sVersion *version.Version) []string {
 	defaultArguments := map[string]string{
@@ -259,12 +307,7 @@ func getControllerManagerCommand(cfg *kubeadmapi.MasterConfiguration, k8sVersion
 	// Let the controller-manager allocate Node CIDRs for the Pod network.
 	// Each node will get a subspace of the address CIDR provided with --pod-network-cidr.
 	if cfg.Networking.PodSubnet != "" {
-		maskSize := "24"
-		if ip, _, err := net.ParseCIDR(cfg.Networking.PodSubnet); err == nil {
-			if ip.To4() == nil {
-				maskSize = "64"
-			}
-		}
+		maskSize := calcNodeCidrSize(cfg.Networking.PodSubnet)
 		command = append(command, "--allocate-node-cidrs=true", "--cluster-cidr="+cfg.Networking.PodSubnet,
 			"--node-cidr-mask-size="+maskSize)
 	}
