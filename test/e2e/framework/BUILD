@@ -11,6 +11,7 @@ go_library(
     srcs = [
         "authorizer_util.go",
         "cleanup.go",
+        "crd_util.go",
         "deployment_util.go",
         "exec_util.go",
         "firewall_util.go",
@@ -111,6 +112,9 @@ go_library(
         "//vendor/k8s.io/api/extensions/v1beta1:go_default_library",
         "//vendor/k8s.io/api/policy/v1beta1:go_default_library",
         "//vendor/k8s.io/api/rbac/v1beta1:go_default_library",
+        "//vendor/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1:go_default_library",
+        "//vendor/k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset:go_default_library",
+        "//vendor/k8s.io/apiextensions-apiserver/test/integration/testserver:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/meta:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
