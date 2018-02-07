@@ -58,6 +58,7 @@ REQUIRED_BINS=(
   "github.com/onsi/ginkgo/ginkgo"
   "github.com/jteeuwen/go-bindata/go-bindata"
   "github.com/tools/godep"
+  "github.com/client9/misspell/cmd/misspell"
   "./..."
 )
 
