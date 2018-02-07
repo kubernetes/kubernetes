@@ -138,6 +138,7 @@ type Cloud struct {
 	vmCache  *timedCache
 	lbCache  *timedCache
 	nsgCache *timedCache
+	rtCache  *timedCache
 
 	*BlobDiskController
 	*ManagedDiskController
@@ -265,6 +266,12 @@ func NewCloud(configReader io.Reader) (cloudprovider.Interface, error) {
 		return nil, err
 	}
 	az.nsgCache = nsgCache
+
+	rtCache, err := az.newRouteTableCache()
+	if err != nil {
+		return nil, err
+	}
+	az.rtCache = rtCache
 
 	if err := initDiskControllers(&az); err != nil {
 		return nil, err

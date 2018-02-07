@@ -33,6 +33,7 @@ var (
 	vmCacheTTL  = time.Minute
 	lbCacheTTL  = 2 * time.Minute
 	nsgCacheTTL = 2 * time.Minute
+	rtCacheTTL  = 2 * time.Minute
 )
 
 // checkExistsFromError inspects an error and returns a true if err is nil,
@@ -83,19 +84,16 @@ func (az *Cloud) getVirtualMachine(nodeName types.NodeName) (vm compute.VirtualM
 }
 
 func (az *Cloud) getRouteTable() (routeTable network.RouteTable, exists bool, err error) {
-	var realErr error
-
-	routeTable, err = az.RouteTablesClient.Get(az.ResourceGroup, az.RouteTableName, "")
-	exists, realErr = checkResourceExistsFromError(err)
-	if realErr != nil {
-		return routeTable, false, realErr
+	cachedRt, err := az.rtCache.Get(az.RouteTableName)
+	if err != nil {
+		return routeTable, false, err
 	}
 
-	if !exists {
+	if cachedRt == nil {
 		return routeTable, false, nil
 	}
 
-	return routeTable, exists, err
+	return *(cachedRt.(*network.RouteTable)), true, nil
 }
 
 func (az *Cloud) getPublicIPAddress(pipResourceGroup string, pipName string) (pip network.PublicIPAddress, exists bool, err error) {
@@ -219,4 +217,22 @@ func (az *Cloud) newNSGCache() (*timedCache, error) {
 	}
 
 	return newTimedcache(nsgCacheTTL, getter)
+}
+
+func (az *Cloud) newRouteTableCache() (*timedCache, error) {
+	getter := func(key string) (interface{}, error) {
+		rt, err := az.RouteTablesClient.Get(az.ResourceGroup, key, "")
+		exists, realErr := checkResourceExistsFromError(err)
+		if realErr != nil {
+			return nil, realErr
+		}
+
+		if !exists {
+			return nil, nil
+		}
+
+		return &rt, nil
+	}
+
+	return newTimedcache(rtCacheTTL, getter)
 }
