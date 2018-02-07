@@ -7,7 +7,9 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/cloudprovider/providers/gce/cloud:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
+        "//pkg/cloudprovider/providers/gce/cloud/meta:go_default_library",
+        "//vendor/google.golang.org/api/compute/v1:go_default_library",
+        "//vendor/google.golang.org/api/googleapi:go_default_library",
     ],
 )
 

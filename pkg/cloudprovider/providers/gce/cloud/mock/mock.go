@@ -21,7 +21,6 @@ limitations under the License.
 //  // Example usage:
 // cloud := cloud.NewMockGCE()
 // cloud.MockTargetPools.AddInstanceHook = mock.AddInstanceHook
-
 package mock
 
 import (
@@ -35,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud/meta"
 )
 
+// AddInstanceHook mocks adding a Instance to MockTargetPools
 func AddInstanceHook(m *cloud.MockTargetPools, ctx context.Context, key *meta.Key, req *ga.TargetPoolsAddInstanceRequest) error {
 	pool, err := m.Get(ctx, key)
 	if err != nil {
@@ -51,6 +51,7 @@ func AddInstanceHook(m *cloud.MockTargetPools, ctx context.Context, key *meta.Ke
 	return nil
 }
 
+// AddInstanceHook mocks removing a Instance from MockTargetPools
 func RemoveInstanceHook(m *cloud.MockTargetPools, ctx context.Context, key *meta.Key, req *ga.TargetPoolsRemoveInstanceRequest) error {
 	pool, err := m.Get(ctx, key)
 	if err != nil {

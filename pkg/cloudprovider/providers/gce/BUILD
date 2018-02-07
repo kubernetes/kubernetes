@@ -107,6 +107,7 @@ go_test(
     deps = [
         "//pkg/cloudprovider:go_default_library",
         "//pkg/cloudprovider/providers/gce/cloud:go_default_library",
+        "//pkg/cloudprovider/providers/gce/cloud/mock:go_default_library",
         "//pkg/kubelet/apis:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
         "//vendor/github.com/stretchr/testify/require:go_default_library",
