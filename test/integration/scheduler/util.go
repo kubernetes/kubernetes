@@ -81,6 +81,7 @@ func initTest(t *testing.T, nsPrefix string) *TestContext {
 		context.informerFactory.Storage().V1().StorageClasses(),
 		v1.DefaultHardPodAffinitySymmetricWeight,
 		true,
+		16,
 	)
 	var err error
 	context.schedulerConfig, err = context.schedulerConfigFactory.Create()

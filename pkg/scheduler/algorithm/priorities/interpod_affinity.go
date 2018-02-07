@@ -34,10 +34,11 @@ import (
 
 // InterPodAffinity contains information to calculate inter pod affinity.
 type InterPodAffinity struct {
-	info                  predicates.NodeInfo
-	nodeLister            algorithm.NodeLister
-	podLister             algorithm.PodLister
-	hardPodAffinityWeight int32
+	info                      predicates.NodeInfo
+	nodeLister                algorithm.NodeLister
+	podLister                 algorithm.PodLister
+	hardPodAffinityWeight     int32
+	numberOfWorkQueueParallel int32
 }
 
 // NewInterPodAffinityPriority creates an InterPodAffinity.
@@ -45,12 +46,13 @@ func NewInterPodAffinityPriority(
 	info predicates.NodeInfo,
 	nodeLister algorithm.NodeLister,
 	podLister algorithm.PodLister,
-	hardPodAffinityWeight int32) algorithm.PriorityFunction {
+	hardPodAffinityWeight, numberOfWorkQueueParallel int32) algorithm.PriorityFunction {
 	interPodAffinity := &InterPodAffinity{
-		info:                  info,
-		nodeLister:            nodeLister,
-		podLister:             podLister,
-		hardPodAffinityWeight: hardPodAffinityWeight,
+		info:                      info,
+		nodeLister:                nodeLister,
+		podLister:                 podLister,
+		hardPodAffinityWeight:     hardPodAffinityWeight,
+		numberOfWorkQueueParallel: numberOfWorkQueueParallel,
 	}
 	return interPodAffinity.CalculateInterPodAffinityPriority
 }
@@ -210,7 +212,8 @@ func (ipa *InterPodAffinity) CalculateInterPodAffinityPriority(pod *v1.Pod, node
 			}
 		}
 	}
-	workqueue.Parallelize(16, len(allNodeNames), processNode)
+
+	workqueue.Parallelize(int(ipa.numberOfWorkQueueParallel), len(allNodeNames), processNode)
 	if pm.firstError != nil {
 		return nil, pm.firstError
 	}

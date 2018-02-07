@@ -90,20 +90,21 @@ func (f *FitError) Error() string {
 }
 
 type genericScheduler struct {
-	cache                    schedulercache.Cache
-	equivalenceCache         *EquivalenceCache
-	schedulingQueue          SchedulingQueue
-	predicates               map[string]algorithm.FitPredicate
-	priorityMetaProducer     algorithm.PriorityMetadataProducer
-	predicateMetaProducer    algorithm.PredicateMetadataProducer
-	prioritizers             []algorithm.PriorityConfig
-	extenders                []algorithm.SchedulerExtender
-	lastNodeIndexLock        sync.Mutex
-	lastNodeIndex            uint64
-	alwaysCheckAllPredicates bool
-	cachedNodeInfoMap        map[string]*schedulercache.NodeInfo
-	volumeBinder             *volumebinder.VolumeBinder
-	pvcLister                corelisters.PersistentVolumeClaimLister
+	cache                     schedulercache.Cache
+	equivalenceCache          *EquivalenceCache
+	schedulingQueue           SchedulingQueue
+	predicates                map[string]algorithm.FitPredicate
+	priorityMetaProducer      algorithm.PriorityMetadataProducer
+	predicateMetaProducer     algorithm.PredicateMetadataProducer
+	prioritizers              []algorithm.PriorityConfig
+	extenders                 []algorithm.SchedulerExtender
+	lastNodeIndexLock         sync.Mutex
+	lastNodeIndex             uint64
+	alwaysCheckAllPredicates  bool
+	numberOfWorkQueueParallel int
+	cachedNodeInfoMap         map[string]*schedulercache.NodeInfo
+	volumeBinder              *volumebinder.VolumeBinder
+	pvcLister                 corelisters.PersistentVolumeClaimLister
 }
 
 // Schedule tries to schedule the given pod to one of node in the node list.
@@ -112,7 +113,9 @@ type genericScheduler struct {
 func (g *genericScheduler) Schedule(pod *v1.Pod, nodeLister algorithm.NodeLister) (string, error) {
 	trace := utiltrace.New(fmt.Sprintf("Scheduling %s/%s", pod.Namespace, pod.Name))
 	defer trace.LogIfLong(100 * time.Millisecond)
-
+	if g.numberOfWorkQueueParallel <= 0 {
+		return "", fmt.Errorf("genericScheduler.numberOfWorkQueueParallel is %d ,less than 0", g.numberOfWorkQueueParallel)
+	}
 	if err := podPassesBasicChecks(pod, g.pvcLister); err != nil {
 		return "", err
 	}
@@ -133,7 +136,7 @@ func (g *genericScheduler) Schedule(pod *v1.Pod, nodeLister algorithm.NodeLister
 
 	trace.Step("Computing predicates")
 	startPredicateEvalTime := time.Now()
-	filteredNodes, failedPredicateMap, err := findNodesThatFit(pod, g.cachedNodeInfoMap, nodes, g.predicates, g.extenders, g.predicateMetaProducer, g.equivalenceCache, g.schedulingQueue, g.alwaysCheckAllPredicates)
+	filteredNodes, failedPredicateMap, err := findNodesThatFit(pod, g.cachedNodeInfoMap, nodes, g.predicates, g.extenders, g.predicateMetaProducer, g.equivalenceCache, g.schedulingQueue, g.alwaysCheckAllPredicates, g.numberOfWorkQueueParallel)
 	if err != nil {
 		return "", err
 	}
@@ -156,7 +159,7 @@ func (g *genericScheduler) Schedule(pod *v1.Pod, nodeLister algorithm.NodeLister
 	}
 
 	metaPrioritiesInterface := g.priorityMetaProducer(pod, g.cachedNodeInfoMap)
-	priorityList, err := PrioritizeNodes(pod, g.cachedNodeInfoMap, metaPrioritiesInterface, g.prioritizers, filteredNodes, g.extenders)
+	priorityList, err := PrioritizeNodes(pod, g.cachedNodeInfoMap, metaPrioritiesInterface, g.prioritizers, filteredNodes, g.extenders, g.numberOfWorkQueueParallel)
 	if err != nil {
 		return "", err
 	}
@@ -234,7 +237,7 @@ func (g *genericScheduler) Preempt(pod *v1.Pod, nodeLister algorithm.NodeLister,
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	nodeToVictims, err := selectNodesForPreemption(pod, g.cachedNodeInfoMap, potentialNodes, g.predicates, g.predicateMetaProducer, g.schedulingQueue, pdbs)
+	nodeToVictims, err := selectNodesForPreemption(pod, g.cachedNodeInfoMap, potentialNodes, g.predicates, g.predicateMetaProducer, g.schedulingQueue, pdbs, g.numberOfWorkQueueParallel)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -296,6 +299,7 @@ func findNodesThatFit(
 	ecache *EquivalenceCache,
 	schedulingQueue SchedulingQueue,
 	alwaysCheckAllPredicates bool,
+	numberOfWorkQueueParallel int,
 ) ([]*v1.Node, FailedPredicateMap, error) {
 	var filtered []*v1.Node
 	failedPredicateMap := FailedPredicateMap{}
@@ -345,7 +349,8 @@ func findNodesThatFit(
 				predicateResultLock.Unlock()
 			}
 		}
-		workqueue.Parallelize(16, len(nodes), checkNode)
+
+		workqueue.Parallelize(numberOfWorkQueueParallel, len(nodes), checkNode)
 		filtered = filtered[:filteredLen]
 		if len(errs) > 0 {
 			return []*v1.Node{}, FailedPredicateMap{}, errors.CreateAggregateFromMessageCountMap(errs)
@@ -531,6 +536,7 @@ func PrioritizeNodes(
 	priorityConfigs []algorithm.PriorityConfig,
 	nodes []*v1.Node,
 	extenders []algorithm.SchedulerExtender,
+	numberOfWorkQueueParallel int,
 ) (schedulerapi.HostPriorityList, error) {
 	// If no priority configs are provided, then the EqualPriority function is applied
 	// This is required to generate the priority list in the required format
@@ -589,7 +595,8 @@ func PrioritizeNodes(
 			}
 		}
 	}
-	workqueue.Parallelize(16, len(nodes), processNode)
+
+	workqueue.Parallelize(numberOfWorkQueueParallel, len(nodes), processNode)
 	for i, priorityConfig := range priorityConfigs {
 		if priorityConfig.Reduce == nil {
 			continue
@@ -782,6 +789,7 @@ func selectNodesForPreemption(pod *v1.Pod,
 	metadataProducer algorithm.PredicateMetadataProducer,
 	queue SchedulingQueue,
 	pdbs []*policy.PodDisruptionBudget,
+	numberOfWorkQueueParallel int,
 ) (map[*v1.Node]*Victims, error) {
 
 	nodeNameToVictims := map[*v1.Node]*Victims{}
@@ -806,7 +814,8 @@ func selectNodesForPreemption(pod *v1.Pod,
 			resultLock.Unlock()
 		}
 	}
-	workqueue.Parallelize(16, len(potentialNodes), checkNode)
+
+	workqueue.Parallelize(numberOfWorkQueueParallel, len(potentialNodes), checkNode)
 	return nodeNameToVictims, nil
 }
 
@@ -1067,19 +1076,21 @@ func NewGenericScheduler(
 	extenders []algorithm.SchedulerExtender,
 	volumeBinder *volumebinder.VolumeBinder,
 	pvcLister corelisters.PersistentVolumeClaimLister,
-	alwaysCheckAllPredicates bool) algorithm.ScheduleAlgorithm {
+	alwaysCheckAllPredicates bool,
+	numberOfWorkQueueParallel int32) algorithm.ScheduleAlgorithm {
 	return &genericScheduler{
-		cache:                    cache,
-		equivalenceCache:         eCache,
-		schedulingQueue:          podQueue,
-		predicates:               predicates,
-		predicateMetaProducer:    predicateMetaProducer,
-		prioritizers:             prioritizers,
-		priorityMetaProducer:     priorityMetaProducer,
-		extenders:                extenders,
-		cachedNodeInfoMap:        make(map[string]*schedulercache.NodeInfo),
-		volumeBinder:             volumeBinder,
-		pvcLister:                pvcLister,
-		alwaysCheckAllPredicates: alwaysCheckAllPredicates,
+		cache:                     cache,
+		equivalenceCache:          eCache,
+		schedulingQueue:           podQueue,
+		predicates:                predicates,
+		predicateMetaProducer:     predicateMetaProducer,
+		prioritizers:              prioritizers,
+		priorityMetaProducer:      priorityMetaProducer,
+		extenders:                 extenders,
+		cachedNodeInfoMap:         make(map[string]*schedulercache.NodeInfo),
+		volumeBinder:              volumeBinder,
+		pvcLister:                 pvcLister,
+		alwaysCheckAllPredicates:  alwaysCheckAllPredicates,
+		numberOfWorkQueueParallel: int(numberOfWorkQueueParallel),
 	}
 }

@@ -53,6 +53,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	componentconfigv1alpha1 "k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/client/leaderelectionconfig"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/features"
@@ -128,6 +129,8 @@ func (o *Options) AddFlags(fs *pflag.FlagSet) {
 	fs.Int32Var(&o.config.HardPodAffinitySymmetricWeight, "hard-pod-affinity-symmetric-weight", o.config.HardPodAffinitySymmetricWeight,
 		"RequiredDuringScheduling affinity is not symmetric, but there is an implicit PreferredDuringScheduling affinity rule corresponding "+
 			"to every RequiredDuringScheduling affinity rule. --hard-pod-affinity-symmetric-weight represents the weight of implicit PreferredDuringScheduling affinity rule.")
+	fs.Int32Var(&o.config.NumberOfWorkQueueParallel, "number-of-workqueue-parallel", o.config.NumberOfWorkQueueParallel,
+		"Number of workers running in parallel to find the nodes that fit the pods.")
 	fs.MarkDeprecated("hard-pod-affinity-symmetric-weight", "This option was moved to the policy configuration file")
 	fs.StringVar(&o.config.FailureDomains, "failure-domains", o.config.FailureDomains, "Indicate the \"all topologies\" set for an empty topologyKey when it's used for PreferredDuringScheduling pod anti-affinity.")
 	fs.MarkDeprecated("failure-domains", "Doesn't have any effect. Will be removed in future version.")
@@ -159,6 +162,7 @@ func (o *Options) Complete() error {
 		o.applyDeprecatedHealthzAddressToConfig()
 		o.applyDeprecatedHealthzPortToConfig()
 		o.applyDeprecatedAlgorithmSourceOptionsToConfig()
+		o.applyDeprecatedNumberOfWorkQueueParallelToConfig()
 	}
 
 	return nil
@@ -235,6 +239,20 @@ func (o *Options) applyDeprecatedAlgorithmSourceOptionsToConfig() {
 		o.config.AlgorithmSource = componentconfig.SchedulerAlgorithmSource{
 			Provider: &o.algorithmProvider,
 		}
+	}
+}
+
+// applyDeprecatedNumberOfWorkQueueParallelToConfig sets o.config.NumberOfWorkQueueParallel
+// from flags passed on the command line based on the following rules:
+//
+// 1. If NumberOfWorkQueueParallel is positive, leave the config as-is.
+// 2. Otherwise, If NumberOfWorkQueueParallel is not set or is set to a negative value then
+//    the default of 16.
+func (o *Options) applyDeprecatedNumberOfWorkQueueParallelToConfig() {
+	// Prepare the number of workqueu parallel, validate NumberOfWorkQueueParallel
+	// in configuration file, or use default number of parallelism(16).
+	if o.config.NumberOfWorkQueueParallel <= 0 {
+		o.config.NumberOfWorkQueueParallel = api.DefaultNumberOfWorkQueueParallel
 	}
 }
 
@@ -357,6 +375,7 @@ type SchedulerServer struct {
 	PodInformer                    coreinformers.PodInformer
 	AlgorithmSource                componentconfig.SchedulerAlgorithmSource
 	HardPodAffinitySymmetricWeight int32
+	NumberOfWorkQueueParallel      int32
 	EventClient                    v1core.EventsGetter
 	Recorder                       record.EventRecorder
 	Broadcaster                    record.EventBroadcaster
@@ -424,6 +443,7 @@ func NewSchedulerServer(config *componentconfig.KubeSchedulerConfiguration, mast
 		PodInformer:                    factory.NewPodInformer(client, 0, config.SchedulerName),
 		AlgorithmSource:                config.AlgorithmSource,
 		HardPodAffinitySymmetricWeight: config.HardPodAffinitySymmetricWeight,
+		NumberOfWorkQueueParallel:      config.NumberOfWorkQueueParallel,
 		EventClient:                    eventClient,
 		Recorder:                       recorder,
 		Broadcaster:                    eventBroadcaster,
@@ -650,6 +670,7 @@ func (s *SchedulerServer) SchedulerConfig() (*scheduler.Config, error) {
 		storageClassInformer,
 		s.HardPodAffinitySymmetricWeight,
 		utilfeature.DefaultFeatureGate.Enabled(features.EnableEquivalenceClassCache),
+		s.NumberOfWorkQueueParallel,
 	)
 
 	source := s.AlgorithmSource

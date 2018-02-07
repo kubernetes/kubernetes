@@ -89,6 +89,9 @@ type KubeSchedulerConfiguration struct {
 	// HardPodAffinitySymmetricWeight represents the weight of implicit PreferredDuringScheduling affinity rule, in the range 0-100.
 	HardPodAffinitySymmetricWeight int32
 
+	// Number of workers running in parallel to find the nodes that fit.
+	NumberOfWorkQueueParallel int32
+
 	// LeaderElection defines the configuration of leader election client.
 	LeaderElection KubeSchedulerLeaderElectionConfiguration
 
