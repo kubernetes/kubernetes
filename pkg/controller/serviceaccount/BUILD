@@ -58,6 +58,7 @@ go_test(
         "//pkg/controller:go_default_library",
         "//vendor/github.com/davecgh/go-spew/spew:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/gopkg.in/square/go-jose.v2/jwt:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
