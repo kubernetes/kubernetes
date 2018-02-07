@@ -453,6 +453,25 @@ func TestValidateRoleNonResourceURLNoVerbs(t *testing.T) {
 	}.test(t)
 }
 
+func TestValidateRoleNonResourceURLIllegalVerbs(t *testing.T) {
+	ValidateClusterRoleTest{
+		role: rbac.ClusterRole{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "default",
+			},
+			Rules: []rbac.PolicyRule{
+				{
+					Verbs:           []string{"illegalVerb"},
+					NonResourceURLs: []string{"/*"},
+				},
+			},
+		},
+		wantErr: true,
+		errType: field.ErrorTypeInvalid,
+		field:   "rules[0].verbs",
+	}.test(t)
+}
+
 func TestValidateRoleMixedNonResourceAndResource(t *testing.T) {
 	ValidateRoleTest{
 		role: rbac.Role{
