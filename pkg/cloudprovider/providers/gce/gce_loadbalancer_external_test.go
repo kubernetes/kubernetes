@@ -244,12 +244,14 @@ func TestDeleteAddressWithWrongTier(t *testing.T) {
 	}
 }
 
-const gceProjectId = "test-project"
-const gceRegion = "test-region"
-const zone = "zone1"
-const nodeName = "test-node-1"
-const clusterName = "Test Cluster Name"
-const clusterID = "test-cluster-id"
+const (
+	gceProjectId = "test-project"
+	gceRegion    = "test-region"
+	zoneName     = "zone1"
+	nodeName     = "test-node-1"
+	clusterName  = "Test Cluster Name"
+	clusterID    = "test-cluster-id"
+)
 
 var apiService = &v1.Service{
 	Spec: v1.ServiceSpec{
@@ -279,13 +281,13 @@ func fakeGCECloud() (*GCECloud, error) {
 
 	cloud := cloud.NewMockGCE()
 	cloud.MockTargetPools.AddInstanceHook = mock.AddInstanceHook
-	zonesWithNodes := createNodeZones([]string{zone})
+	zonesWithNodes := createNodeZones([]string{zoneName})
 
 	gce := GCECloud{
 		region:             gceRegion,
 		service:            service,
 		manager:            fakeManager,
-		managedZones:       []string{zone},
+		managedZones:       []string{zoneName},
 		projectID:          gceProjectId,
 		AlphaFeatureGate:   alphaFeatureGate,
 		nodeZones:          zonesWithNodes,
@@ -299,7 +301,7 @@ func fakeGCECloud() (*GCECloud, error) {
 func createExternalLoadBalancer(gce *GCECloud) (*v1.LoadBalancerStatus, error) {
 	err := gce.InsertInstance(
 		gceProjectId,
-		zone,
+		zoneName,
 		&compute.Instance{
 			Name: nodeName,
 			Tags: &compute.Tags{
@@ -379,12 +381,14 @@ func TestEnsureExternalLoadBalancer(t *testing.T) {
 func TestUpdateExternalLoadBalancer(t *testing.T) {
 	gce, err := fakeGCECloud()
 	require.NoError(t, err)
-	createExternalLoadBalancer(gce)
+
+	_, err = createExternalLoadBalancer(gce)
+	assert.NoError(t, err)
 
 	newNodeName := "test-node-2"
 	gce.InsertInstance(
 		gceProjectId,
-		zone,
+		zoneName,
 		&compute.Instance{
 			Name: newNodeName,
 			Tags: &compute.Tags{
@@ -434,8 +438,8 @@ func TestUpdateExternalLoadBalancer(t *testing.T) {
 	assert.Equal(
 		t,
 		[]string{
-			fmt.Sprintf("/zones/%s/instances/%s", zone, nodeName),
-			fmt.Sprintf("/zones/%s/instances/%s", zone, newNodeName),
+			fmt.Sprintf("/zones/%s/instances/%s", zoneName, nodeName),
+			fmt.Sprintf("/zones/%s/instances/%s", zoneName, newNodeName),
 		},
 		pool.Instances,
 	)
@@ -444,7 +448,9 @@ func TestUpdateExternalLoadBalancer(t *testing.T) {
 func TestEnsureExternalLoadBalancerDeleted(t *testing.T) {
 	gce, err := fakeGCECloud()
 	require.NoError(t, err)
-	createExternalLoadBalancer(gce)
+
+	_, err = createExternalLoadBalancer(gce)
+	assert.NoError(t, err)
 
 	err = gce.ensureExternalLoadBalancerDeleted(clusterName, clusterID, apiService)
 	assert.NoError(t, err)
