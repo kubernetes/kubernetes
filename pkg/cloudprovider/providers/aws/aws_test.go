@@ -966,7 +966,7 @@ func TestBuildListener(t *testing.T) {
 		{
 			"Port not in whitelist, passthrough",
 			443, "", 8009, "tcp", "cert", "1234,5678",
-			false, "tcp", "tcp", "",
+			false, "ssl", "tcp", "cert",
 		},
 		{
 			"Named port in whitelist",
