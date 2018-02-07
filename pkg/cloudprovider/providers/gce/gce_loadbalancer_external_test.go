@@ -283,6 +283,7 @@ func fakeGCECloud() (*GCECloud, error) {
 
 	cloud := cloud.NewMockGCE()
 	cloud.MockTargetPools.AddInstanceHook = mock.AddInstanceHook
+	cloud.MockTargetPools.RemoveInstanceHook = mock.RemoveInstanceHook
 
 	gce := GCECloud{
 		region:             gceRegion,
@@ -417,21 +418,43 @@ func TestUpdateExternalLoadBalancer(t *testing.T) {
 	newNodes, err := createAndInsertNodes(gce, []string{nodeName, newNodeName})
 	assert.NoError(t, err)
 
+	// Add the new node, then check that it is properly added to the TargetPool
 	err = gce.updateExternalLoadBalancer(clusterName, apiService, newNodes)
 	assert.NoError(t, err)
 
 	lbName := cloudprovider.GetLoadBalancerName(apiService)
 
-	// Check that TargetPool is updated with the new node
 	pool, err := gce.GetTargetPool(lbName, gceRegion)
+	require.NoError(t, err)
+
+	// TODO: when testify is updated to v1.2.0+, use ElementsMatch instead
+	assert.Contains(
+		t,
+		pool.Instances,
+		fmt.Sprintf("/zones/%s/instances/%s", zoneName, nodeName),
+	)
+
+	assert.Contains(
+		t,
+		pool.Instances,
+		fmt.Sprintf("/zones/%s/instances/%s", zoneName, newNodeName),
+	)
+
+	newNodes, err = createAndInsertNodes(gce, []string{nodeName})
+	assert.NoError(t, err)
+
+	// Remove the new node by calling updateExternalLoadBalancer with a list
+	// only containing the old node, and test that the TargetPool no longer
+	// contains the new node.
+	err = gce.updateExternalLoadBalancer(clusterName, apiService, newNodes)
+	assert.NoError(t, err)
+
+	pool, err = gce.GetTargetPool(lbName, gceRegion)
 	require.NoError(t, err)
 
 	assert.Equal(
 		t,
-		[]string{
-			fmt.Sprintf("/zones/%s/instances/%s", zoneName, nodeName),
-			fmt.Sprintf("/zones/%s/instances/%s", zoneName, newNodeName),
-		},
+		[]string{fmt.Sprintf("/zones/%s/instances/%s", zoneName, nodeName)},
 		pool.Instances,
 	)
 }

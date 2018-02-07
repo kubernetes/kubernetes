@@ -50,3 +50,26 @@ func AddInstanceHook(m *cloud.MockTargetPools, ctx context.Context, key *meta.Ke
 
 	return nil
 }
+
+func RemoveInstanceHook(m *cloud.MockTargetPools, ctx context.Context, key *meta.Key, req *ga.TargetPoolsRemoveInstanceRequest) error {
+	pool, err := m.Get(ctx, key)
+	if err != nil {
+		return &googleapi.Error{
+			Code:    http.StatusNotFound,
+			Message: fmt.Sprintf("Key: %s was not found in TargetPools", key.String()),
+		}
+	}
+
+	for _, instanceToRemove := range req.Instances {
+		for i, instance := range pool.Instances {
+			if instanceToRemove.Instance == instance {
+				// Delete instance from pool.Instances without preserving order
+				pool.Instances[i] = pool.Instances[len(pool.Instances)-1]
+				pool.Instances = pool.Instances[:len(pool.Instances)-1]
+				break
+			}
+		}
+	}
+
+	return nil
+}
