@@ -27,7 +27,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
+	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	clientv1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
@@ -35,6 +37,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
 	_ "k8s.io/kubernetes/pkg/scheduler/algorithmprovider"
 	"k8s.io/kubernetes/pkg/scheduler/factory"
@@ -54,6 +57,60 @@ type TestContext struct {
 	scheduler              *scheduler.Scheduler
 }
 
+// createConfigurator create a configurator for scheduler with given informer factory and default name.
+func CreateConfigurator(
+	clientSet clientset.Interface,
+	informerFactory informers.SharedInformerFactory,
+) scheduler.Configurator {
+	// Enable EnableEquivalenceClassCache for all integration tests.
+	utilfeature.DefaultFeatureGate.Set("EnableEquivalenceClassCache=true")
+
+	return factory.NewConfigFactory(
+		v1.DefaultSchedulerName,
+		clientSet,
+		informerFactory.Core().V1().Nodes(),
+		informerFactory.Core().V1().Pods(),
+		informerFactory.Core().V1().PersistentVolumes(),
+		informerFactory.Core().V1().PersistentVolumeClaims(),
+		informerFactory.Core().V1().ReplicationControllers(),
+		informerFactory.Extensions().V1beta1().ReplicaSets(),
+		informerFactory.Apps().V1beta1().StatefulSets(),
+		informerFactory.Core().V1().Services(),
+		informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
+		informerFactory.Storage().V1().StorageClasses(),
+		v1.DefaultHardPodAffinitySymmetricWeight,
+		utilfeature.DefaultFeatureGate.Enabled(features.EnableEquivalenceClassCache),
+	)
+}
+
+// CreateConfiguratorWithPodInformer create a configurator for scheduler with given informer factory, custom name and  pod informer.
+func CreateConfiguratorWithPodInformer(
+	schedulerName string,
+	clientSet clientset.Interface,
+	podInformer coreinformers.PodInformer,
+	informerFactory informers.SharedInformerFactory,
+) scheduler.Configurator {
+	// Enable EnableEquivalenceClassCache for all integration tests.
+	utilfeature.DefaultFeatureGate.Set("EnableEquivalenceClassCache=true")
+
+	return factory.NewConfigFactory(
+		schedulerName,
+		clientSet,
+		informerFactory.Core().V1().Nodes(),
+		podInformer,
+		informerFactory.Core().V1().PersistentVolumes(),
+		informerFactory.Core().V1().PersistentVolumeClaims(),
+		informerFactory.Core().V1().ReplicationControllers(),
+		informerFactory.Extensions().V1beta1().ReplicaSets(),
+		informerFactory.Apps().V1beta1().StatefulSets(),
+		informerFactory.Core().V1().Services(),
+		informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
+		informerFactory.Storage().V1().StorageClasses(),
+		v1.DefaultHardPodAffinitySymmetricWeight,
+		utilfeature.DefaultFeatureGate.Enabled(features.EnableEquivalenceClassCache),
+	)
+}
+
 // initTest initializes a test environment and creates a scheduler with default
 // configuration.
 func initTest(t *testing.T, nsPrefix string) *TestContext {
@@ -66,22 +123,7 @@ func initTest(t *testing.T, nsPrefix string) *TestContext {
 	context.clientSet = clientset.NewForConfigOrDie(&restclient.Config{Host: context.httpServer.URL})
 	context.informerFactory = informers.NewSharedInformerFactory(context.clientSet, 0)
 	podInformer := factory.NewPodInformer(context.clientSet, 12*time.Hour, v1.DefaultSchedulerName)
-	context.schedulerConfigFactory = factory.NewConfigFactory(
-		v1.DefaultSchedulerName,
-		context.clientSet,
-		context.informerFactory.Core().V1().Nodes(),
-		podInformer,
-		context.informerFactory.Core().V1().PersistentVolumes(),
-		context.informerFactory.Core().V1().PersistentVolumeClaims(),
-		context.informerFactory.Core().V1().ReplicationControllers(),
-		context.informerFactory.Extensions().V1beta1().ReplicaSets(),
-		context.informerFactory.Apps().V1beta1().StatefulSets(),
-		context.informerFactory.Core().V1().Services(),
-		context.informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
-		context.informerFactory.Storage().V1().StorageClasses(),
-		v1.DefaultHardPodAffinitySymmetricWeight,
-		true,
-	)
+	context.schedulerConfigFactory = CreateConfiguratorWithPodInformer(v1.DefaultSchedulerName, context.clientSet, podInformer, context.informerFactory)
 	var err error
 	context.schedulerConfig, err = context.schedulerConfigFactory.Create()
 	if err != nil {

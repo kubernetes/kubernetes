@@ -42,7 +42,6 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/pkg/scheduler/algorithmprovider"
-	"k8s.io/kubernetes/pkg/scheduler/factory"
 	"k8s.io/kubernetes/plugin/pkg/admission/podtolerationrestriction"
 	pluginapi "k8s.io/kubernetes/plugin/pkg/admission/podtolerationrestriction/apis/podtolerationrestriction"
 	"k8s.io/kubernetes/test/integration/framework"
@@ -113,22 +112,7 @@ func TestTaintNodeByCondition(t *testing.T) {
 	algorithmprovider.ApplyFeatureGates()
 
 	// Start scheduler
-	configurator := factory.NewConfigFactory(
-		v1.DefaultSchedulerName,
-		clientset,
-		informers.Core().V1().Nodes(),
-		informers.Core().V1().Pods(),
-		informers.Core().V1().PersistentVolumes(),
-		informers.Core().V1().PersistentVolumeClaims(),
-		informers.Core().V1().ReplicationControllers(),
-		informers.Extensions().V1beta1().ReplicaSets(),
-		informers.Apps().V1beta1().StatefulSets(),
-		informers.Core().V1().Services(),
-		informers.Policy().V1beta1().PodDisruptionBudgets(),
-		informers.Storage().V1().StorageClasses(),
-		v1.DefaultHardPodAffinitySymmetricWeight,
-		true, // Enable EqualCache by default.
-	)
+	configurator := CreateConfigurator(clientset, informers)
 
 	sched, err := scheduler.NewFromConfigurator(configurator, func(cfg *scheduler.Config) {
 		cfg.StopEverything = controllerCh
