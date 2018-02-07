@@ -147,6 +147,17 @@ func (o *GenericControllerManagerOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.Float32Var(&o.ComponentConfig.KubeAPIQPS, "kube-api-qps", o.ComponentConfig.KubeAPIQPS, "QPS to use while talking with kubernetes apiserver.")
 	fs.Int32Var(&o.ComponentConfig.KubeAPIBurst, "kube-api-burst", o.ComponentConfig.KubeAPIBurst, "Burst to use while talking with kubernetes apiserver.")
 	fs.DurationVar(&o.ComponentConfig.ControllerStartInterval.Duration, "controller-start-interval", o.ComponentConfig.ControllerStartInterval.Duration, "Interval between starting controller managers.")
+
+	fs.IPVar(&o.SecureServing.BindAddress, "insecure-bind-address", o.SecureServing.BindAddress, ""+
+		"The IP address on which to serve the --insecure-port (set to 0.0.0.0 for all interfaces).")
+	fs.MarkDeprecated("insecure-bind-address", "This flag will be removed in a future version.")
+
+	fs.IntVar(&o.SecureServing.BindPort, "insecure-port", o.SecureServing.BindPort, ""+
+		"The port on which to serve unsecured, unauthenticated access. It is assumed "+
+		"that firewall rules are set up such that this port is not reachable from outside of "+
+		"the cluster and that port 443 on the cluster's public address is proxied to this "+
+		"port. This is performed by nginx in the default setup. Set to zero to disable.")
+	fs.MarkDeprecated("insecure-port", "This flag will be removed in a future version.")
 }
 
 func (o *GenericControllerManagerOptions) ApplyTo(c *genericcontrollermanager.Config) error {
