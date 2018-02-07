@@ -17,6 +17,7 @@ limitations under the License.
 package azure_dd
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path"
@@ -64,7 +65,7 @@ func (a *azureDiskAttacher) Attach(spec *volume.Spec, nodeName types.NodeName) (
 		return "", err
 	}
 
-	instanceid, err := a.cloud.InstanceID(nodeName)
+	instanceid, err := a.cloud.InstanceID(context.TODO(), nodeName)
 	if err != nil {
 		glog.Warningf("failed to get azure instance id (%v)", err)
 		return "", fmt.Errorf("failed to get azure instance id for node %q (%v)", nodeName, err)
@@ -271,7 +272,7 @@ func (d *azureDiskDetacher) Detach(diskURI string, nodeName types.NodeName) erro
 		return fmt.Errorf("invalid disk to detach: %q", diskURI)
 	}
 
-	instanceid, err := d.cloud.InstanceID(nodeName)
+	instanceid, err := d.cloud.InstanceID(context.TODO(), nodeName)
 	if err != nil {
 		glog.Warningf("no instance id for node %q, skip detaching (%v)", nodeName, err)
 		return nil

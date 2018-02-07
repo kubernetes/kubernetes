@@ -17,6 +17,7 @@ limitations under the License.
 package node
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strings"
@@ -177,7 +178,7 @@ func ExistsInCloudProvider(cloud cloudprovider.Interface, nodeName types.NodeNam
 	if !ok {
 		return false, fmt.Errorf("%v", ErrCloudInstance)
 	}
-	if _, err := instances.ExternalID(nodeName); err != nil {
+	if _, err := instances.ExternalID(context.TODO(), nodeName); err != nil {
 		if err == cloudprovider.InstanceNotFound {
 			return false, nil
 		}

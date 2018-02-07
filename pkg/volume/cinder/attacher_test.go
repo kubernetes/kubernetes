@@ -17,6 +17,7 @@ limitations under the License.
 package cinder
 
 import (
+	"context"
 	"errors"
 	"reflect"
 	"testing"
@@ -703,31 +704,31 @@ type instances struct {
 	instanceID string
 }
 
-func (instances *instances) NodeAddresses(name types.NodeName) ([]v1.NodeAddress, error) {
+func (instances *instances) NodeAddresses(ctx context.Context, name types.NodeName) ([]v1.NodeAddress, error) {
 	return []v1.NodeAddress{}, errors.New("Not implemented")
 }
 
-func (instances *instances) NodeAddressesByProviderID(providerID string) ([]v1.NodeAddress, error) {
+func (instances *instances) NodeAddressesByProviderID(ctx context.Context, providerID string) ([]v1.NodeAddress, error) {
 	return []v1.NodeAddress{}, errors.New("Not implemented")
 }
 
-func (instances *instances) ExternalID(name types.NodeName) (string, error) {
+func (instances *instances) ExternalID(ctx context.Context, name types.NodeName) (string, error) {
 	return "", errors.New("Not implemented")
 }
 
-func (instances *instances) InstanceID(name types.NodeName) (string, error) {
+func (instances *instances) InstanceID(ctx context.Context, name types.NodeName) (string, error) {
 	return instances.instanceID, nil
 }
 
-func (instances *instances) InstanceType(name types.NodeName) (string, error) {
+func (instances *instances) InstanceType(ctx context.Context, name types.NodeName) (string, error) {
 	return "", errors.New("Not implemented")
 }
 
-func (instances *instances) InstanceTypeByProviderID(providerID string) (string, error) {
+func (instances *instances) InstanceTypeByProviderID(ctx context.Context, providerID string) (string, error) {
 	return "", errors.New("Not implemented")
 }
 
-func (instances *instances) InstanceExistsByProviderID(providerID string) (bool, error) {
+func (instances *instances) InstanceExistsByProviderID(ctx context.Context, providerID string) (bool, error) {
 	return false, errors.New("unimplemented")
 }
 
@@ -735,10 +736,10 @@ func (instances *instances) List(filter string) ([]types.NodeName, error) {
 	return []types.NodeName{}, errors.New("Not implemented")
 }
 
-func (instances *instances) AddSSHKeyToAllInstances(user string, keyData []byte) error {
+func (instances *instances) AddSSHKeyToAllInstances(ctx context.Context, user string, keyData []byte) error {
 	return errors.New("Not implemented")
 }
 
-func (instances *instances) CurrentNodeName(hostname string) (types.NodeName, error) {
+func (instances *instances) CurrentNodeName(ctx context.Context, hostname string) (types.NodeName, error) {
 	return "", errors.New("Not implemented")
 }
