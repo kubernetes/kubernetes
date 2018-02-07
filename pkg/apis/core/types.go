@@ -2577,9 +2577,10 @@ type PodSpec struct {
 	// file if specified. This is only valid for non-hostNetwork pods.
 	// +optional
 	HostAliases []HostAlias
-	// If specified, indicates the pod's priority. "SYSTEM" is a special keyword
-	// which indicates the highest priority. Any other name must be defined by
-	// creating a PriorityClass object with that name.
+	// If specified, indicates the pod's priority. "system-node-critical" and
+	// "system-cluster-critical" are two special keywords which indicate the
+	// highest priorities with the former being the highest priority. Any other
+	// name must be defined by creating a PriorityClass object with that name.
 	// If not specified, the pod priority will be default or zero if there is no
 	// default.
 	// +optional
