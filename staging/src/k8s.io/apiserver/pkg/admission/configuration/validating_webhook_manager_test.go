@@ -17,107 +17,49 @@ limitations under the License.
 package configuration
 
 import (
-	"fmt"
 	"reflect"
 	"testing"
-	"time"
 
 	"k8s.io/api/admissionregistration/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	admissionregistrationlisters "k8s.io/client-go/listers/admissionregistration/v1beta1"
-	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes/fake"
 )
 
-type fakeValidatingWebhookConfigSharedInformer struct {
-	informer *fakeValidatingWebhookConfigInformer
-	lister   *fakeValidatingWebhookConfigLister
-}
+func TestGetValidatingWebhookConfig(t *testing.T) {
+	// Build a test client that the admission plugin can use to look up the ValidatingWebhookConfiguration
+	client := fake.NewSimpleClientset()
+	informerFactory := informers.NewSharedInformerFactory(client, 0)
+	stop := make(chan struct{})
+	defer close(stop)
+	informerFactory.Start(stop)
+	informerFactory.WaitForCacheSync(stop)
 
-func (f *fakeValidatingWebhookConfigSharedInformer) Informer() cache.SharedIndexInformer {
-	return f.informer
-}
-func (f *fakeValidatingWebhookConfigSharedInformer) Lister() admissionregistrationlisters.ValidatingWebhookConfigurationLister {
-	return f.lister
-}
-
-type fakeValidatingWebhookConfigInformer struct {
-	eventHandler cache.ResourceEventHandler
-}
-
-func (f *fakeValidatingWebhookConfigInformer) AddEventHandler(handler cache.ResourceEventHandler) {
-	fmt.Println("added handler")
-	f.eventHandler = handler
-}
-func (f *fakeValidatingWebhookConfigInformer) AddEventHandlerWithResyncPeriod(handler cache.ResourceEventHandler, resyncPeriod time.Duration) {
-	panic("unsupported")
-}
-func (f *fakeValidatingWebhookConfigInformer) GetStore() cache.Store {
-	panic("unsupported")
-}
-func (f *fakeValidatingWebhookConfigInformer) GetController() cache.Controller {
-	panic("unsupported")
-}
-func (f *fakeValidatingWebhookConfigInformer) Run(stopCh <-chan struct{}) {
-	panic("unsupported")
-}
-func (f *fakeValidatingWebhookConfigInformer) HasSynced() bool {
-	panic("unsupported")
-}
-func (f *fakeValidatingWebhookConfigInformer) LastSyncResourceVersion() string {
-	panic("unsupported")
-}
-func (f *fakeValidatingWebhookConfigInformer) AddIndexers(indexers cache.Indexers) error {
-	panic("unsupported")
-}
-func (f *fakeValidatingWebhookConfigInformer) GetIndexer() cache.Indexer { panic("unsupported") }
-
-type fakeValidatingWebhookConfigLister struct {
-	list []*v1beta1.ValidatingWebhookConfiguration
-	err  error
-}
-
-func (f *fakeValidatingWebhookConfigLister) List(selector labels.Selector) (ret []*v1beta1.ValidatingWebhookConfiguration, err error) {
-	return f.list, f.err
-}
-
-func (f *fakeValidatingWebhookConfigLister) Get(name string) (*v1beta1.ValidatingWebhookConfiguration, error) {
-	panic("unsupported")
-}
-
-func TestGettValidatingWebhookConfig(t *testing.T) {
-	informer := &fakeValidatingWebhookConfigSharedInformer{
-		informer: &fakeValidatingWebhookConfigInformer{},
-		lister:   &fakeValidatingWebhookConfigLister{},
+	manager := NewValidatingWebhookConfigurationManager(informerFactory)
+	if validatingConfig, ok := manager.(*validatingWebhookConfigurationManager); ok {
+		validatingConfig.updateConfiguration()
 	}
-
 	// no configurations
-	informer.lister.list = nil
-	manager := NewValidatingWebhookConfigurationManager(informer)
-	if configurations := manager.Webhooks(); len(configurations.Webhooks) != 0 {
-		t.Errorf("expected empty webhooks, but got %v", configurations.Webhooks)
+	if configurations := manager.Webhooks(); len(configurations) != 0 {
+		t.Errorf("expected empty webhooks, but got %v", configurations)
 	}
 
-	// list error
 	webhookConfiguration := &v1beta1.ValidatingWebhookConfiguration{
 		ObjectMeta: metav1.ObjectMeta{Name: "webhook1"},
 		Webhooks:   []v1beta1.Webhook{{Name: "webhook1.1"}},
 	}
-	informer.lister.list = []*v1beta1.ValidatingWebhookConfiguration{webhookConfiguration.DeepCopy()}
-	informer.lister.err = fmt.Errorf("validating webhook configuration list error")
-	informer.informer.eventHandler.OnAdd(webhookConfiguration.DeepCopy())
-	if configurations := manager.Webhooks(); len(configurations.Webhooks) != 0 {
-		t.Errorf("expected empty webhooks, but got %v", configurations.Webhooks)
-	}
 
+	validatingInformer := informerFactory.Admissionregistration().V1beta1().ValidatingWebhookConfigurations()
+	validatingInformer.Informer().GetIndexer().Add(webhookConfiguration)
+	if validatingConfig, ok := manager.(*validatingWebhookConfigurationManager); ok {
+		validatingConfig.updateConfiguration()
+	}
 	// configuration populated
-	informer.lister.err = nil
-	informer.informer.eventHandler.OnAdd(webhookConfiguration.DeepCopy())
 	configurations := manager.Webhooks()
-	if len(configurations.Webhooks) == 0 {
+	if len(configurations) == 0 {
 		t.Errorf("expected non empty webhooks")
 	}
-	if !reflect.DeepEqual(configurations.Webhooks, webhookConfiguration.Webhooks) {
-		t.Errorf("Expected\n%#v\ngot\n%#v", webhookConfiguration.Webhooks, configurations.Webhooks)
+	if !reflect.DeepEqual(configurations, webhookConfiguration.Webhooks) {
+		t.Errorf("Expected\n%#v\ngot\n%#v", webhookConfiguration.Webhooks, configurations)
 	}
 }

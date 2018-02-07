@@ -21,10 +21,9 @@ package validating
 import (
 	"io"
 
+	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/configuration"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/generic"
-
-	"k8s.io/apiserver/pkg/admission"
 )
 
 const (

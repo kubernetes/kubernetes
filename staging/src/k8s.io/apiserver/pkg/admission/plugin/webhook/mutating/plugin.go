@@ -27,7 +27,6 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/configuration"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/generic"
-	"k8s.io/apiserver/pkg/admission/plugin/webhook/versioned"
 )
 
 const (
@@ -51,7 +50,6 @@ func Register(plugins *admission.Plugins) {
 type Plugin struct {
 	*generic.Webhook
 
-	convertor      versioned.Convertor
 	defaulter      runtime.ObjectDefaulter
 	jsonSerializer *json.Serializer
 }
@@ -75,7 +73,6 @@ func NewMutatingWebhook(configFile io.Reader) (*Plugin, error) {
 func (a *Plugin) SetScheme(scheme *runtime.Scheme) {
 	a.Webhook.SetScheme(scheme)
 	if scheme != nil {
-		a.convertor.Scheme = scheme
 		a.defaulter = scheme
 		a.jsonSerializer = json.NewSerializer(json.DefaultMetaFactory, scheme, scheme, false)
 	}
@@ -86,14 +83,11 @@ func (a *Plugin) ValidateInitialization() error {
 	if err := a.Webhook.ValidateInitialization(); err != nil {
 		return err
 	}
-	if err := a.convertor.Validate(); err != nil {
-		return fmt.Errorf("MutatingWebhook.convertor is not properly setup: %v", err)
-	}
 	if a.defaulter == nil {
-		return fmt.Errorf("MutatingWebhook.defaulter is not properly setup")
+		return fmt.Errorf("defaulter is not properly setup")
 	}
 	if a.jsonSerializer == nil {
-		return fmt.Errorf("MutatingWebhook admission plugin's JsonSerializer is not properly setup")
+		return fmt.Errorf("jsonSerializer is not properly setup")
 	}
 	return nil
 }

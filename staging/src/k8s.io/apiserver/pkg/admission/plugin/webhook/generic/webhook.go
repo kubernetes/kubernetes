@@ -40,12 +40,12 @@ import (
 type Webhook struct {
 	*admission.Handler
 
-	sourceFactory SourceFactory
+	sourceFactory sourceFactory
 
 	hookSource       Source
-	clientManager    config.ClientManager
-	convertor        versioned.Convertor
-	namespaceMatcher namespace.Matcher
+	clientManager    *config.ClientManager
+	convertor        *versioned.Convertor
+	namespaceMatcher *namespace.Matcher
 	dispatcher       Dispatcher
 }
 
@@ -54,11 +54,11 @@ var (
 	_ admission.Interface                             = &Webhook{}
 )
 
-type SourceFactory func(f informers.SharedInformerFactory) Source
-type DispatcherFactory func(cm *config.ClientManager) Dispatcher
+type sourceFactory func(f informers.SharedInformerFactory) Source
+type dispatcherFactory func(cm *config.ClientManager) Dispatcher
 
 // NewWebhook creates a new generic admission webhook.
-func NewWebhook(handler *admission.Handler, configFile io.Reader, sourceFactory SourceFactory, dispatcherFactory DispatcherFactory) (*Webhook, error) {
+func NewWebhook(handler *admission.Handler, configFile io.Reader, sourceFactory sourceFactory, dispatcherFactory dispatcherFactory) (*Webhook, error) {
 	kubeconfigFile, err := config.LoadConfig(configFile)
 	if err != nil {
 		return nil, err
@@ -77,13 +77,17 @@ func NewWebhook(handler *admission.Handler, configFile io.Reader, sourceFactory 
 	cm.SetServiceResolver(config.NewDefaultServiceResolver())
 
 	return &Webhook{
-		Handler:       handler,
-		sourceFactory: sourceFactory,
-		clientManager: cm,
-		dispatcher:    dispatcherFactory(&cm),
+		Handler:          handler,
+		sourceFactory:    sourceFactory,
+		clientManager:    &cm,
+		convertor:        &versioned.Convertor{},
+		namespaceMatcher: &namespace.Matcher{},
+		dispatcher:       dispatcherFactory(&cm),
 	}, nil
 }
 
+// SetAuthenticationInfoResolverWrapper sets the
+// AuthenticationInfoResolverWrapper.
 // TODO find a better way wire this, but keep this pull small for now.
 func (a *Webhook) SetAuthenticationInfoResolverWrapper(wrapper config.AuthenticationInfoResolverWrapper) {
 	a.clientManager.SetAuthenticationInfoResolverWrapper(wrapper)
@@ -124,16 +128,16 @@ func (a *Webhook) SetExternalKubeInformerFactory(f informers.SharedInformerFacto
 // ValidateInitialization implements the InitializationValidator interface.
 func (a *Webhook) ValidateInitialization() error {
 	if a.hookSource == nil {
-		return fmt.Errorf("MutatingWebhook admission plugin requires a Kubernetes client to be provided")
+		return fmt.Errorf("kubernetes client is not properly setup")
 	}
 	if err := a.namespaceMatcher.Validate(); err != nil {
-		return fmt.Errorf("MutatingWebhook.namespaceMatcher is not properly setup: %v", err)
+		return fmt.Errorf("namespaceMatcher is not properly setup: %v", err)
 	}
 	if err := a.clientManager.Validate(); err != nil {
-		return fmt.Errorf("MutatingWebhook.clientManager is not properly setup: %v", err)
+		return fmt.Errorf("clientManager is not properly setup: %v", err)
 	}
 	if err := a.convertor.Validate(); err != nil {
-		return fmt.Errorf("MutatingWebhook.convertor is not properly setup: %v", err)
+		return fmt.Errorf("convertor is not properly setup: %v", err)
 	}
 	return nil
 }

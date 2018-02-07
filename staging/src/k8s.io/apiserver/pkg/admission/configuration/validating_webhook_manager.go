@@ -65,8 +65,8 @@ func (v *validatingWebhookConfigurationManager) Webhooks() []v1beta1.Webhook {
 	return v.configuration.Load().(*v1beta1.ValidatingWebhookConfiguration).Webhooks
 }
 
-func (m *validatingWebhookConfigurationManager) HasSynched() bool {
-	return m.hasSynched()
+func (v *validatingWebhookConfigurationManager) HasSynched() bool {
+	return v.hasSynched()
 }
 
 func (v *validatingWebhookConfigurationManager) updateConfiguration() {

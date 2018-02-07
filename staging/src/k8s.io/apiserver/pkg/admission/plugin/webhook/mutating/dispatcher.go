@@ -24,7 +24,6 @@ import (
 
 	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/golang/glog"
-	"k8s.io/apiserver/pkg/admission/plugin/webhook/config"
 
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 	"k8s.io/api/admissionregistration/v1beta1"
@@ -32,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	admissionmetrics "k8s.io/apiserver/pkg/admission/metrics"
+	"k8s.io/apiserver/pkg/admission/plugin/webhook/config"
 	webhookerrors "k8s.io/apiserver/pkg/admission/plugin/webhook/errors"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/generic"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/request"
@@ -73,7 +73,7 @@ func (a *mutatingDispatcher) Dispatch(ctx context.Context, versionedAttr *versio
 	}
 
 	// convert attr.Object to the internal version
-	return a.plugin.convertor.Convert(versionedAttr.Object, versionedAttr.Attributes.GetObject())
+	return a.plugin.Convertor().Convert(versionedAttr.Object, versionedAttr.Attributes.GetObject())
 }
 
 // note that callAttrMutatingHook updates attr
