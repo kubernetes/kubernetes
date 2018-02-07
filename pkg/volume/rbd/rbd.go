@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	dstrings "strings"
 
 	"github.com/golang/glog"
@@ -585,6 +586,7 @@ func (r *rbdVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
 	secret := ""
 	secretName := ""
 	secretNamespace := ""
+	keyring := ""
 	imageFormat := rbdImageFormat2
 	fstype := ""
 
@@ -609,6 +611,8 @@ func (r *rbdVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
 			secretName = v
 		case "usersecretnamespace":
 			secretNamespace = v
+		case "keyring":
+			keyring = v
 		case "imageformat":
 			imageFormat = v
 		case "imagefeatures":
@@ -642,8 +646,8 @@ func (r *rbdVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
 	if len(r.Mon) < 1 {
 		return nil, fmt.Errorf("missing Ceph monitors")
 	}
-	if secretName == "" {
-		return nil, fmt.Errorf("missing user secret name")
+	if secretName == "" && keyring == "" {
+		return nil, fmt.Errorf("must specify either keyring or user secret name")
 	}
 	if r.adminId == "" {
 		r.adminId = rbdDefaultAdminId
@@ -666,9 +670,19 @@ func (r *rbdVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
 	glog.Infof("successfully created rbd image %q", image)
 	pv := new(v1.PersistentVolume)
 	metav1.SetMetaDataAnnotation(&pv.ObjectMeta, volumehelper.VolumeDynamicallyCreatedByKey, "rbd-dynamic-provisioner")
-	rbd.SecretRef = new(v1.SecretReference)
-	rbd.SecretRef.Name = secretName
-	rbd.SecretRef.Namespace = secretNamespace
+
+	if secretName != "" {
+		rbd.SecretRef = new(v1.SecretReference)
+		rbd.SecretRef.Name = secretName
+		rbd.SecretRef.Namespace = secretNamespace
+	} else {
+		var filePathRegex = regexp.MustCompile(`^(?:/[^/!;` + "`" + ` ]+)+$`)
+		if keyring != "" && !filePathRegex.MatchString(keyring) {
+			return nil, fmt.Errorf("keyring field must contain a path to a file")
+		}
+		rbd.Keyring = keyring
+	}
+
 	rbd.RadosUser = r.Id
 	rbd.FSType = fstype
 	pv.Spec.PersistentVolumeSource.RBD = rbd
