@@ -487,19 +487,22 @@ func TestGetHashEquivalencePod(t *testing.T) {
 	for _, test := range tests {
 		for i, podInfo := range test.podInfoList {
 			testPod := podInfo.pod
-			hash, isValid := ecache.getHashEquivalencePod(testPod)
-			if isValid != podInfo.hashIsValid {
+			eclassInfo := ecache.getEquivalenceClassInfo(testPod)
+			if eclassInfo == nil && podInfo.hashIsValid {
 				t.Errorf("Failed: pod %v is expected to have valid hash", testPod)
 			}
-			// NOTE(harry): the first element will be used as target so
-			// this logic can't verify more than two inequivalent pods
-			if i == 0 {
-				targetHash = hash
-				targetPodInfo = podInfo
-			} else {
-				if targetHash != hash {
-					if test.isEquivalent {
-						t.Errorf("Failed: pod: %v is expected to be equivalent to: %v", testPod, targetPodInfo.pod)
+
+			if eclassInfo != nil {
+				// NOTE(harry): the first element will be used as target so
+				// this logic can't verify more than two inequivalent pods
+				if i == 0 {
+					targetHash = eclassInfo.hash
+					targetPodInfo = podInfo
+				} else {
+					if targetHash != eclassInfo.hash {
+						if test.isEquivalent {
+							t.Errorf("Failed: pod: %v is expected to be equivalent to: %v", testPod, targetPodInfo.pod)
+						}
 					}
 				}
 			}

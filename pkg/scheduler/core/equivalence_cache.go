@@ -208,15 +208,22 @@ func (ec *EquivalenceCache) InvalidateCachedPredicateItemForPodAdd(pod *v1.Pod, 
 	ec.InvalidateCachedPredicateItem(nodeName, invalidPredicates)
 }
 
-// getHashEquivalencePod returns the hash of equivalence pod.
-// 1. equivalenceHash
-// 2. if equivalence hash is valid
-func (ec *EquivalenceCache) getHashEquivalencePod(pod *v1.Pod) (uint64, bool) {
+// equivalenceClassInfo holds equivalence hash which is used for checking equivalence cache.
+// We will pass this to podFitsOnNode to ensure equivalence hash is only calculated per schedule.
+type equivalenceClassInfo struct {
+	// Equivalence hash.
+	hash uint64
+}
+
+// getEquivalenceClassInfo returns the equivalence class of given pod.
+func (ec *EquivalenceCache) getEquivalenceClassInfo(pod *v1.Pod) *equivalenceClassInfo {
 	equivalencePod := ec.getEquivalencePod(pod)
 	if equivalencePod != nil {
 		hash := fnv.New32a()
 		hashutil.DeepHashObject(hash, equivalencePod)
-		return uint64(hash.Sum32()), true
+		return &equivalenceClassInfo{
+			hash: uint64(hash.Sum32()),
+		}
 	}
-	return 0, false
+	return nil
 }
