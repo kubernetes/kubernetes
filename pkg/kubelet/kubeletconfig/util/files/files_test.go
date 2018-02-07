@@ -51,7 +51,7 @@ func TestFileExists(t *testing.T) {
 			create:       true,
 			isFile:       false,
 			expectedBool: false,
-			expectedErr:  fmt.Errorf("expected regular file at %q, but mode is %q", prePath + "/ExistsAsDir", "drwxr-xr-x"), // should have error, but the error info can only be fulfilled after creating the dir
+			expectedErr:  fmt.Errorf("expected regular file at %q, but mode is %q", prePath+"/ExistsAsDir", "drwxr-xr-x"), // should have error, but the error info can only be fulfilled after creating the dir
 		},
 		"exists as file": {
 			path:         prePath + "/ExistsAsFile",
@@ -71,7 +71,7 @@ func TestFileExists(t *testing.T) {
 			}
 
 			result, err := FileExists(fs, testcase.path)
-			if !reflect.DeepEqual(testcase.expectedErr, err) {
+			if testcase.expectedErr.Error() != err.Error() {
 				t.Errorf("unexpected error in checking file exists, expected: %v, actual: %v", testcase.expectedErr, err)
 			}
 			if testcase.expectedBool != result {
@@ -202,7 +202,7 @@ func TestDirExists(t *testing.T) {
 			isFile:       true,
 			create:       true,
 			expectedBool: false,
-			expectedErr:  fmt.Errorf("expected dir at %q, but mode is %q", prePath + "/ExistsAsFile/file", "-rw-r--r--"), // should have error, but the error info can only be fulfilled after creating the file
+			expectedErr:  fmt.Errorf("expected dir at %q, but mode is %q", prePath+"/ExistsAsFile/file", "-rw-r--r--"), // should have error, but the error info can only be fulfilled after creating the file
 		},
 		"exists as dir": {
 			path:         prePath + "/ExistsAsDir",
@@ -251,7 +251,7 @@ func TestEnsureDir(t *testing.T) {
 			path:        prePath + "/ExistsAsFile",
 			isFile:      true,
 			create:      true,
-			expectedErr: fmt.Errorf("expected dir at %q, but mode is %q", prePath + "/ExistsAsFile", "-rw-r--r--"), // should have error, but the error info can only be fulfilled after creating the file
+			expectedErr: fmt.Errorf("expected dir at %q, but mode is %q", prePath+"/ExistsAsFile", "-rw-r--r--"), // should have error, but the error info can only be fulfilled after creating the file
 		},
 		"exists as dir": {
 			path:        prePath + "/NotExists",
@@ -298,9 +298,8 @@ func TestEnsureDir(t *testing.T) {
 func createFileOrDir(isFile bool, fs utilfs.Filesystem, path string) error {
 	if isFile {
 		return createFile(fs, path)
-	} else {
-		return createDir(fs, path)
 	}
+	return createDir(fs, path)
 }
 
 func getTempDir(t *testing.T, subPath string) string {
