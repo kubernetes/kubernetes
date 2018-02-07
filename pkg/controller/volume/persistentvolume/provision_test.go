@@ -416,7 +416,7 @@ func TestProvisionSync(t *testing.T) {
 			noerrors, wrapTestWithProvisionCalls([]provisionCall{}, testSyncClaim),
 		},
 	}
-	runSyncTests(t, tests, storageClasses)
+	runSyncTests(t, tests, storageClasses, []*v1.Pod{})
 }
 
 // Test multiple calls to syncClaim/syncVolume and periodic sync of all

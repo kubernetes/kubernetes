@@ -175,6 +175,7 @@ func startPersistentVolumeBinderController(ctx ControllerContext) (bool, error) 
 		VolumeInformer:            ctx.InformerFactory.Core().V1().PersistentVolumes(),
 		ClaimInformer:             ctx.InformerFactory.Core().V1().PersistentVolumeClaims(),
 		ClassInformer:             ctx.InformerFactory.Storage().V1().StorageClasses(),
+		PodInformer:               ctx.InformerFactory.Core().V1().Pods(),
 		EnableDynamicProvisioning: ctx.Options.VolumeConfiguration.EnableDynamicProvisioning,
 	}
 	volumeController, volumeControllerErr := persistentvolumecontroller.NewController(params)

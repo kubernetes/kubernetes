@@ -26,6 +26,8 @@ import (
 	storage "k8s.io/api/storage/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -43,6 +45,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/goroutinemap/exponentialbackoff"
 	vol "k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
+	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
 
 	"github.com/golang/glog"
 )
@@ -161,6 +164,8 @@ type PersistentVolumeController struct {
 	claimListerSynced  cache.InformerSynced
 	classLister        storagelisters.StorageClassLister
 	classListerSynced  cache.InformerSynced
+	podLister          corelisters.PodLister
+	podListerSynced    cache.InformerSynced
 
 	kubeClient                clientset.Interface
 	eventRecorder             record.EventRecorder
@@ -1065,6 +1070,17 @@ func (ctrl *PersistentVolumeController) recycleVolumeOperation(arg interface{}) 
 		glog.V(3).Infof("volume %q no longer needs recycling, skipping", volume.Name)
 		return
 	}
+	pods, used, err := ctrl.isVolumeUsed(newVolume)
+	if err != nil {
+		glog.V(3).Infof("can't recycle volume %q: %v", volume.Name, err)
+		return
+	}
+	if used {
+		msg := fmt.Sprintf("Volume is used by pods: %s", strings.Join(pods, ","))
+		glog.V(3).Infof("can't recycle volume %q: %s", volume.Name, msg)
+		ctrl.eventRecorder.Event(volume, v1.EventTypeNormal, events.VolumeFailedRecycle, msg)
+		return
+	}
 
 	// Use the newest volume copy, this will save us from version conflicts on
 	// saving.
@@ -1231,6 +1247,32 @@ func (ctrl *PersistentVolumeController) isVolumeReleased(volume *v1.PersistentVo
 
 	glog.V(2).Infof("isVolumeReleased[%s]: volume is released", volume.Name)
 	return true, nil
+}
+
+// isVolumeUsed returns list of pods that use given PV.
+func (ctrl *PersistentVolumeController) isVolumeUsed(pv *v1.PersistentVolume) ([]string, bool, error) {
+	if pv.Spec.ClaimRef == nil {
+		return nil, false, nil
+	}
+	claimName := pv.Spec.ClaimRef.Name
+
+	podNames := sets.NewString()
+	pods, err := ctrl.podLister.Pods(pv.Spec.ClaimRef.Namespace).List(labels.Everything())
+	if err != nil {
+		return nil, false, fmt.Errorf("error listing pods: %s", err)
+	}
+	for _, pod := range pods {
+		if volumehelper.IsPodTerminated(pod, pod.Status) {
+			continue
+		}
+		for i := range pod.Spec.Volumes {
+			usedPV := &pod.Spec.Volumes[i]
+			if usedPV.PersistentVolumeClaim != nil && usedPV.PersistentVolumeClaim.ClaimName == claimName {
+				podNames.Insert(pod.Namespace + "/" + pod.Name)
+			}
+		}
+	}
+	return podNames.List(), podNames.Len() != 0, nil
 }
 
 // doDeleteVolume finds appropriate delete plugin and deletes given volume. It
