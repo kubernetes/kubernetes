@@ -17,14 +17,20 @@ limitations under the License.
 package options
 
 import (
+	"net"
+	"strconv"
 	"time"
 
 	"github.com/cloudflare/cfssl/helpers"
 	"github.com/golang/glog"
 
+	"fmt"
+	"github.com/pborman/uuid"
 	"github.com/spf13/pflag"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilnet "k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/apiserver/pkg/server"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/client-go/kubernetes"
 	clientset "k8s.io/client-go/kubernetes"
@@ -36,6 +42,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	"k8s.io/kubernetes/pkg/client/leaderelectionconfig"
+	kubeserver "k8s.io/kubernetes/pkg/kubeapiserver/server"
 )
 
 // GenericControllerManagerOptions is the common structure for a controller manager. It works with NewGenericControllerManagerOptions
@@ -156,17 +163,6 @@ func (o *GenericControllerManagerOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.Float32Var(&o.ComponentConfig.KubeAPIQPS, "kube-api-qps", o.ComponentConfig.KubeAPIQPS, "QPS to use while talking with kubernetes apiserver.")
 	fs.Int32Var(&o.ComponentConfig.KubeAPIBurst, "kube-api-burst", o.ComponentConfig.KubeAPIBurst, "Burst to use while talking with kubernetes apiserver.")
 	fs.DurationVar(&o.ComponentConfig.ControllerStartInterval.Duration, "controller-start-interval", o.ComponentConfig.ControllerStartInterval.Duration, "Interval between starting controller managers.")
-
-	fs.IPVar(&o.SecureServing.BindAddress, "insecure-bind-address", o.SecureServing.BindAddress, ""+
-		"The IP address on which to serve the --insecure-port (set to 0.0.0.0 for all interfaces).")
-	fs.MarkDeprecated("insecure-bind-address", "This flag will be removed in a future version.")
-
-	fs.IntVar(&o.SecureServing.BindPort, "insecure-port", o.SecureServing.BindPort, ""+
-		"The port on which to serve unsecured, unauthenticated access. It is assumed "+
-		"that firewall rules are set up such that this port is not reachable from outside of "+
-		"the cluster and that port 443 on the cluster's public address is proxied to this "+
-		"port. This is performed by nginx in the default setup. Set to zero to disable.")
-	fs.MarkDeprecated("insecure-port", "This flag will be removed in a future version.")
 }
 
 func (o *GenericControllerManagerOptions) ApplyTo(c *genericcontrollermanager.Config, userAgent string) error {
@@ -211,4 +207,75 @@ func createRecorder(kubeClient *kubernetes.Clientset, userAgent string) record.E
 	eventBroadcaster.StartLogging(glog.Infof)
 	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(kubeClient.CoreV1().RESTClient()).Events("")})
 	return eventBroadcaster.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: userAgent})
+}
+
+// InsecureServingOptions are for creating an unauthenticated, unauthorized, insecure port.
+// No one should be using these anymore.
+type InsecureServingOptions struct {
+	BindAddress net.IP
+	BindPort    int
+}
+
+// NewInsecureServingOptions is for creating an unauthenticated, unauthorized, insecure port.
+// No one should be using these anymore.
+func NewInsecureServingOptions() *InsecureServingOptions {
+	return &InsecureServingOptions{
+		BindAddress: net.ParseIP("127.0.0.1"),
+		BindPort:    8080,
+	}
+}
+
+func (s InsecureServingOptions) Validate(portArg string) []error {
+	errors := []error{}
+
+	if s.BindPort < 0 || s.BindPort > 65535 {
+		errors = append(errors, fmt.Errorf("--insecure-port %v must be between 0 and 65535, inclusive. 0 for turning off insecure (HTTP) port", s.BindPort))
+	}
+
+	return errors
+}
+
+func (s *InsecureServingOptions) DefaultExternalAddress() (net.IP, error) {
+	return utilnet.ChooseBindAddress(s.BindAddress)
+}
+
+func (s *InsecureServingOptions) AddFlags(fs *pflag.FlagSet) {
+	fs.IPVar(&s.BindAddress, "insecure-bind-address", s.BindAddress, ""+
+		"The IP address on which to serve the --insecure-port (set to 0.0.0.0 for all interfaces).")
+	fs.MarkDeprecated("insecure-bind-address", "This flag will be removed in a future version.")
+
+	fs.IntVar(&s.BindPort, "insecure-port", s.BindPort, ""+
+		"The port on which to serve unsecured, unauthenticated access. It is assumed "+
+		"that firewall rules are set up such that this port is not reachable from outside of "+
+		"the cluster and that port 443 on the cluster's public address is proxied to this "+
+		"port. This is performed by nginx in the default setup. Set to zero to disable.")
+	fs.MarkDeprecated("insecure-port", "This flag will be removed in a future version.")
+}
+
+// TODO: remove it until kops stop using `--address`
+func (s *InsecureServingOptions) AddDeprecatedFlags(fs *pflag.FlagSet) {
+	fs.IPVar(&s.BindAddress, "address", s.BindAddress,
+		"DEPRECATED: see --insecure-bind-address instead.")
+	fs.MarkDeprecated("address", "see --insecure-bind-address instead.")
+
+	fs.IntVar(&s.BindPort, "port", s.BindPort, "DEPRECATED: see --insecure-port instead.")
+	fs.MarkDeprecated("port", "see --insecure-port instead.")
+}
+
+func (s *InsecureServingOptions) ApplyTo(c *server.Config) (*kubeserver.InsecureServingInfo, error) {
+	if s.BindPort <= 0 {
+		return nil, nil
+	}
+
+	ret := &kubeserver.InsecureServingInfo{
+		BindAddress: net.JoinHostPort(s.BindAddress.String(), strconv.Itoa(s.BindPort)),
+	}
+
+	var err error
+	privilegedLoopbackToken := uuid.NewRandom().String()
+	if c.LoopbackClientConfig, err = ret.NewLoopbackClientConfig(privilegedLoopbackToken); err != nil {
+		return nil, err
+	}
+
+	return ret, nil
 }
