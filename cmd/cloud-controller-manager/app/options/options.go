@@ -74,7 +74,7 @@ func (o *CloudControllerManagerOptions) AddFlags(fs *pflag.FlagSet) {
 }
 
 func (o *CloudControllerManagerOptions) ApplyTo(c *cloudcontrollerconfig.Config) error {
-	if err := o.Generic.ApplyTo(c.Generic); err != nil {
+	if err := o.Generic.ApplyTo(c.Generic, "cloud-controller-manager"); err != nil {
 		return err
 	}
 

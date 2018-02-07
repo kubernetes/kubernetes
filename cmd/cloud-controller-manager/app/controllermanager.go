@@ -31,23 +31,18 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/spf13/cobra"
 
-	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
-	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	restclient "k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/leaderelection"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	"k8s.io/client-go/tools/record"
 	cloudcontrollerconfig "k8s.io/kubernetes/cmd/cloud-controller-manager/app/config"
 	"k8s.io/kubernetes/cmd/cloud-controller-manager/app/options"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/cloudprovider"
-	cloudcontrollerconfig "k8s.io/kubernetes/cmd/cloud-controller-manager/app/config"
 	"k8s.io/kubernetes/pkg/controller"
 	cloudcontrollers "k8s.io/kubernetes/pkg/controller/cloud"
 	routecontroller "k8s.io/kubernetes/pkg/controller/route"
@@ -121,46 +116,28 @@ func Run(c *cloudcontrollerconfig.CompletedConfig) error {
 	} else {
 		glog.Errorf("unable to register configz: %c", err)
 	}
-	kubeconfig, err := clientcmd.BuildConfigFromFlags(c.Generic.Extra.Master, c.Generic.Extra.Kubeconfig)
-	if err != nil {
-		return err
-	}
 
-	// Set the ContentType of the requests from kube client
-	kubeconfig.ContentConfig.ContentType = c.Generic.ComponentConfig.ContentType
-	// Override kubeconfig qps/burst settings from flags
-	kubeconfig.QPS = c.Generic.ComponentConfig.KubeAPIQPS
-	kubeconfig.Burst = int(c.Generic.ComponentConfig.KubeAPIBurst)
-	kubeClient, err := kubernetes.NewForConfig(restclient.AddUserAgent(kubeconfig, "cloud-controller-manager"))
-	if err != nil {
-		glog.Fatalf("Invalid API configuration: %v", err)
-	}
-	leaderElectionClient := kubernetes.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "leader-election"))
-
-	// Start the external controller manager server
+	// Start the controller manager HTTP server
 	stopCh := make(chan struct{})
-
 	go serve(c, stopCh)
-
-	recorder := createRecorder(kubeClient)
 
 	run := func(stop <-chan struct{}) {
 		rootClientBuilder := controller.SimpleControllerClientBuilder{
-			ClientConfig: kubeconfig,
+			ClientConfig: c.Generic.Extra.Kubeconfig,
 		}
 		var clientBuilder controller.ControllerClientBuilder
 		if c.Generic.ComponentConfig.UseServiceAccountCredentials {
 			clientBuilder = controller.SAControllerClientBuilder{
-				ClientConfig:         restclient.AnonymousClientConfig(kubeconfig),
-				CoreClient:           kubeClient.CoreV1(),
-				AuthenticationClient: kubeClient.AuthenticationV1(),
+				ClientConfig:         restclient.AnonymousClientConfig(c.Generic.Extra.Kubeconfig),
+				CoreClient:           c.Generic.Extra.Client.CoreV1(),
+				AuthenticationClient: c.Generic.Extra.Client.AuthenticationV1(),
 				Namespace:            "kube-system",
 			}
 		} else {
 			clientBuilder = rootClientBuilder
 		}
 
-		if err := startControllers(c, kubeconfig, rootClientBuilder, clientBuilder, stop, recorder, cloud); err != nil {
+		if err := startControllers(c, c.Generic.Extra.Kubeconfig, rootClientBuilder, clientBuilder, stop, c.Generic.Extra.EventRecorder, cloud); err != nil {
 			glog.Fatalf("error running controllers: %v", err)
 		}
 	}
@@ -182,10 +159,10 @@ func Run(c *cloudcontrollerconfig.CompletedConfig) error {
 	rl, err := resourcelock.New(c.Generic.ComponentConfig.LeaderElection.ResourceLock,
 		"kube-system",
 		"cloud-controller-manager",
-		leaderElectionClient.CoreV1(),
+		c.Generic.Extra.LeaderElectionClient.CoreV1(),
 		resourcelock.ResourceLockConfig{
 			Identity:      id,
-			EventRecorder: recorder,
+			EventRecorder: c.Generic.Extra.EventRecorder,
 		})
 	if err != nil {
 		glog.Fatalf("error creating lock: %v", err)
@@ -307,11 +284,4 @@ func serve(c *cloudcontrollerconfig.CompletedConfig, stopCh <-chan struct{}) {
 	mux.Handle("/metrics", prometheus.Handler())
 
 	glog.Fatal(c.Generic.SecureServingInfo.Serve(mux, 0, stopCh))
-}
-
-func createRecorder(kubeClient *kubernetes.Clientset) record.EventRecorder {
-	eventBroadcaster := record.NewBroadcaster()
-	eventBroadcaster.StartLogging(glog.Infof)
-	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(kubeClient.CoreV1().RESTClient()).Events("")})
-	return eventBroadcaster.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: "cloud-controller-manager"})
 }

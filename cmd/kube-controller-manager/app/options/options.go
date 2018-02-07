@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cmoptions "k8s.io/kubernetes/cmd/controller-manager/app/options"
+	kubecontrollerconfig "k8s.io/kubernetes/cmd/kube-controller-manager/app/config"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	"k8s.io/kubernetes/pkg/client/leaderelectionconfig"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector"
@@ -42,8 +43,8 @@ type KubeControllerManagerOptions struct {
 	Generic cmoptions.GenericControllerManagerOptions
 }
 
-// NewCMServer creates a new KubeControllerManagerOptions with a default config.
-func NewCMServer() *KubeControllerManagerOptions {
+// NewKubeControllerManagerOptions creates a new KubeControllerManagerOptions with a default config.
+func NewKubeControllerManagerOptions() *KubeControllerManagerOptions {
 	componentConfig := cmoptions.NewDefaultControllerManagerComponentConfig(ports.ControllerManagerPort)
 	s := KubeControllerManagerOptions{
 		// The common/default are kept in 'cmd/kube-controller-manager/app/options/util.go'.
@@ -143,6 +144,14 @@ func (s *KubeControllerManagerOptions) AddFlags(fs *pflag.FlagSet, allController
 	utilfeature.DefaultFeatureGate.AddFlag(fs)
 }
 
+func (o *KubeControllerManagerOptions) ApplyTo(c *kubecontrollerconfig.Config) error {
+	if err := o.Generic.ApplyTo(c.Generic, "controller-manager"); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // Validate is used to validate the options and config before launching the controller manager
 func (s *KubeControllerManagerOptions) Validate(allControllers []string, disabledByDefaultControllers []string) error {
 	var errs []error
@@ -162,4 +171,17 @@ func (s *KubeControllerManagerOptions) Validate(allControllers []string, disable
 	}
 
 	return utilerrors.NewAggregate(errs)
+}
+
+func (o KubeControllerManagerOptions) Config(allControllers []string, disabledByDefaultControllers []string) (*kubecontrollerconfig.Config, error) {
+	if err := o.Validate(allControllers, disabledByDefaultControllers); err != nil {
+		return nil, err
+	}
+
+	c := &kubecontrollerconfig.Config{}
+	if err := o.ApplyTo(c); err != nil {
+		return nil, err
+	}
+
+	return c, nil
 }

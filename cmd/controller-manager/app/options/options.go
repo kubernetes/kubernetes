@@ -20,11 +20,20 @@ import (
 	"time"
 
 	"github.com/cloudflare/cfssl/helpers"
+	"github.com/golang/glog"
 
 	"github.com/spf13/pflag"
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
+	"k8s.io/client-go/kubernetes"
+	clientset "k8s.io/client-go/kubernetes"
+	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
+	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/tools/record"
 	genericcontrollermanager "k8s.io/kubernetes/cmd/controller-manager/app"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	"k8s.io/kubernetes/pkg/client/leaderelectionconfig"
 )
@@ -160,12 +169,30 @@ func (o *GenericControllerManagerOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.MarkDeprecated("insecure-port", "This flag will be removed in a future version.")
 }
 
-func (o *GenericControllerManagerOptions) ApplyTo(c *genericcontrollermanager.Config) error {
+func (o *GenericControllerManagerOptions) ApplyTo(c *genericcontrollermanager.Config, userAgent string) error {
 	c.ComponentConfig = o.ComponentConfig
 
 	if err := o.SecureServing.ApplyTo(&c.SecureServingInfo); err != nil {
 		return err
 	}
+
+	var err error
+	c.Extra.Kubeconfig, err = clientcmd.BuildConfigFromFlags(o.Master, o.Kubeconfig)
+	if err != nil {
+		return err
+	}
+	c.Extra.Kubeconfig.ContentConfig.ContentType = o.ComponentConfig.ContentType
+	c.Extra.Kubeconfig.QPS = o.ComponentConfig.KubeAPIQPS
+	c.Extra.Kubeconfig.Burst = int(o.ComponentConfig.KubeAPIBurst)
+
+	c.Extra.Client, err = clientset.NewForConfig(restclient.AddUserAgent(c.Extra.Kubeconfig, userAgent))
+	if err != nil {
+		return err
+	}
+
+	c.Extra.LeaderElectionClient = clientset.NewForConfigOrDie(restclient.AddUserAgent(c.Extra.Kubeconfig, "leader-election"))
+
+	c.Extra.EventRecorder = createRecorder(c.Extra.Client, userAgent)
 
 	return nil
 }
@@ -177,4 +204,11 @@ func (o *GenericControllerManagerOptions) Validate() []error {
 	// TODO: validate component config, master and kubeconfig
 
 	return errors
+}
+
+func createRecorder(kubeClient *kubernetes.Clientset, userAgent string) record.EventRecorder {
+	eventBroadcaster := record.NewBroadcaster()
+	eventBroadcaster.StartLogging(glog.Infof)
+	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(kubeClient.CoreV1().RESTClient()).Events("")})
+	return eventBroadcaster.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: userAgent})
 }

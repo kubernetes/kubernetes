@@ -14,43 +14,27 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package app
+package config
 
 import (
-	apiserver "k8s.io/apiserver/pkg/server"
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
-	clientset "k8s.io/client-go/kubernetes"
-	restclient "k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/record"
+	"time"
+
+	genericcontrollermanager "k8s.io/kubernetes/cmd/controller-manager/app"
 )
 
 type ExtraConfig struct {
-	Master     string
-
-	// the general kube client
-	Client *clientset.Clientset
-
-	// the client only used for leader election
-	LeaderElectionClient *clientset.Clientset
-
-	// the rest config for the master
-	Kubeconfig *restclient.Config
-
-	// the event sink
-	EventRecorder record.EventRecorder
+	NodeStatusUpdateFrequency time.Duration
 }
 
 // Config is the main context object for the controller manager.
 type Config struct {
-	ComponentConfig   componentconfig.KubeControllerManagerConfiguration
-	SecureServingInfo apiserver.SecureServingInfo
-	Extra             ExtraConfig
+	Generic *genericcontrollermanager.Config
+	Extra   ExtraConfig
 }
 
 type completedConfig struct {
-	ComponentConfig   componentconfig.KubeControllerManagerConfiguration
-	SecureServingInfo apiserver.SecureServingInfo
-	Extra             *ExtraConfig
+	Generic genericcontrollermanager.CompletedConfig
+	Extra   *ExtraConfig
 }
 
 type CompletedConfig struct {
@@ -59,12 +43,11 @@ type CompletedConfig struct {
 }
 
 // Complete fills in any fields not set that are required to have valid data. It's mutating the receiver.
-func (c *Config) Complete() CompletedConfig {
+func (c *Config) Complete() *CompletedConfig {
 	cc := completedConfig{
-		c.ComponentConfig,
-		c.SecureServingInfo,
+		c.Generic.Complete(),
 		&c.Extra,
 	}
 
-	return CompletedConfig{&cc}
+	return &CompletedConfig{&cc}
 }
