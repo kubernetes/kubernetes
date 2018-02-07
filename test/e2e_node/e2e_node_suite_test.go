@@ -36,7 +36,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
 	clientset "k8s.io/client-go/kubernetes"
-	nodeutil "k8s.io/kubernetes/pkg/api/v1/node"
+	utilnode "k8s.io/kubernetes/pkg/util/node"
 	commontest "k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e_node/services"
@@ -231,7 +231,7 @@ func waitForNodeReady() {
 		if err != nil {
 			return fmt.Errorf("failed to get node: %v", err)
 		}
-		if !nodeutil.IsNodeReady(node) {
+		if !utilnode.IsNodeReady(node) {
 			return fmt.Errorf("node is not ready: %+v", node)
 		}
 		return nil

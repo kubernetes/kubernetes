@@ -33,7 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	clientset "k8s.io/client-go/kubernetes"
 	coreclientset "k8s.io/client-go/kubernetes/typed/core/v1"
-	nodeutil "k8s.io/kubernetes/pkg/api/v1/node"
+	utilnode "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -442,7 +442,7 @@ func verifyNodeCondition(n coreclientset.NodeInterface, condition v1.NodeConditi
 	if err != nil {
 		return err
 	}
-	_, c := nodeutil.GetNodeCondition(&node.Status, condition)
+	_, c := utilnode.GetNodeCondition(&node.Status, condition)
 	if c == nil {
 		return fmt.Errorf("node condition %q not found", condition)
 	}
