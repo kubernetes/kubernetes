@@ -30,7 +30,7 @@ import (
 
 type ServiceCommonGeneratorV1 struct {
 	Name         string
-	TCP          []string
+	Ports        []string
 	Type         v1.ServiceType
 	ClusterIP    string
 	NodePort     int
@@ -57,21 +57,21 @@ type ServiceExternalNameGeneratorV1 struct {
 func (ServiceClusterIPGeneratorV1) ParamNames() []GeneratorParam {
 	return []GeneratorParam{
 		{"name", true},
-		{"tcp", true},
+		{"ports", true},
 		{"clusterip", false},
 	}
 }
 func (ServiceNodePortGeneratorV1) ParamNames() []GeneratorParam {
 	return []GeneratorParam{
 		{"name", true},
-		{"tcp", true},
+		{"ports", true},
 		{"nodeport", true},
 	}
 }
 func (ServiceLoadBalancerGeneratorV1) ParamNames() []GeneratorParam {
 	return []GeneratorParam{
 		{"name", true},
-		{"tcp", true},
+		{"ports", true},
 	}
 }
 
@@ -83,7 +83,9 @@ func (ServiceExternalNameGeneratorV1) ParamNames() []GeneratorParam {
 }
 
 func parsePorts(portString string) (int32, intstr.IntOrString, error) {
-	portStringSlice := strings.Split(portString, ":")
+
+	portPos := strings.Index(portString, ":") + 1
+	portStringSlice := strings.Split(portString[portPos:], ":")
 
 	port, err := strconv.Atoi(portStringSlice[0])
 	if err != nil {
@@ -118,9 +120,9 @@ func (s ServiceCommonGeneratorV1) GenerateCommon(params map[string]interface{}) 
 	if !isString {
 		return fmt.Errorf("expected string, saw %v for 'name'", name)
 	}
-	tcpStrings, isArray := params["tcp"].([]string)
+	portsStrings, isArray := params["ports"].([]string)
 	if !isArray {
-		return fmt.Errorf("expected []string, found :%v", tcpStrings)
+		return fmt.Errorf("expected []string, found :%v", portsStrings)
 	}
 	clusterip, isString := params["clusterip"].(string)
 	if !isString {
@@ -131,7 +133,7 @@ func (s ServiceCommonGeneratorV1) GenerateCommon(params map[string]interface{}) 
 		return fmt.Errorf("expected string, saw %v for 'externalname'", externalname)
 	}
 	s.Name = name
-	s.TCP = tcpStrings
+	s.Ports = portsStrings
 	s.ClusterIP = clusterip
 	s.ExternalName = externalname
 	return nil
@@ -201,8 +203,8 @@ func (s ServiceCommonGeneratorV1) validate() error {
 	if s.ClusterIP == v1.ClusterIPNone && s.Type != v1.ServiceTypeClusterIP {
 		return fmt.Errorf("ClusterIP=None can only be used with ClusterIP service type")
 	}
-	if s.ClusterIP != v1.ClusterIPNone && len(s.TCP) == 0 && s.Type != v1.ServiceTypeExternalName {
-		return fmt.Errorf("at least one tcp port specifier must be provided")
+	if s.ClusterIP != v1.ClusterIPNone && len(s.Ports) == 0 && s.Type != v1.ServiceTypeExternalName {
+		return fmt.Errorf("at least one port specifier must be provided")
 	}
 	if s.Type == v1.ServiceTypeExternalName {
 		if errs := validation.IsDNS1123Subdomain(s.ExternalName); len(errs) != 0 {
@@ -218,18 +220,20 @@ func (s ServiceCommonGeneratorV1) StructuredGenerate() (runtime.Object, error) {
 		return nil, err
 	}
 	ports := []v1.ServicePort{}
-	for _, tcpString := range s.TCP {
-		port, targetPort, err := parsePorts(tcpString)
+	for _, portsString := range s.Ports {
+		port, targetPort, err := parsePorts(portsString)
 		if err != nil {
 			return nil, err
 		}
 
-		portName := strings.Replace(tcpString, ":", "-", -1)
+		separatorPos := strings.Index(portsString, ":")
+		protocol := strings.ToUpper(portsString[0:separatorPos])
+		portName := strings.Replace(portsString[separatorPos+1:], ":", "-", -1)
 		ports = append(ports, v1.ServicePort{
 			Name:       portName,
 			Port:       port,
 			TargetPort: targetPort,
-			Protocol:   v1.Protocol("TCP"),
+			Protocol:   v1.Protocol(protocol),
 			NodePort:   int32(s.NodePort),
 		})
 	}
