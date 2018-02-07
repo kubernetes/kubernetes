@@ -35,7 +35,7 @@ go_library(
         "types_proto.go",
         "zz_generated.deepcopy.go",
     ],
-    importpath = "k8s.io/apimachinery/pkg/runtime",
+    importpath = "runtime",
     deps = [
         "//vendor/github.com/gogo/protobuf/proto:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",

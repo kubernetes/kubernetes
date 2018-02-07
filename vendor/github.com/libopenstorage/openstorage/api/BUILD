@@ -13,7 +13,7 @@ go_library(
         "api.pb.go",
         "status.go",
     ],
-    importpath = "github.com/libopenstorage/openstorage/api",
+    importpath = "api",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/golang/protobuf/proto:go_default_library",

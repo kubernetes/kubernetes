@@ -20,7 +20,7 @@ go_library(
         "group_version.go",
         "interfaces.go",
     ],
-    importpath = "k8s.io/apimachinery/pkg/runtime/schema",
+    importpath = "schema",
     deps = ["//vendor/github.com/gogo/protobuf/proto:go_default_library"],
 )
 
