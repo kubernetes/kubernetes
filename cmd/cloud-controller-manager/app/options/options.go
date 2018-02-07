@@ -44,7 +44,7 @@ type CloudControllerManagerOptions struct {
 
 // NewCloudControllerManagerOptions creates a new ExternalCMServer with a default config.
 func NewCloudControllerManagerOptions() *CloudControllerManagerOptions {
-	componentConfig := cmoptions.NewDefaultControllerManagerComponentConfig(ports.CloudControllerManagerPort)
+	componentConfig := cmoptions.NewDefaultControllerManagerComponentConfig(ports.InsecureCloudControllerManagerPort)
 
 	s := CloudControllerManagerOptions{
 		// The common/default are kept in 'cmd/kube-controller-manager/app/options/util.go'.
@@ -74,7 +74,7 @@ func (o *CloudControllerManagerOptions) AddFlags(fs *pflag.FlagSet) {
 }
 
 func (o *CloudControllerManagerOptions) ApplyTo(c *cloudcontrollerconfig.Config) error {
-	if err := o.Generic.ApplyTo(c.Generic, "cloud-controller-manager"); err != nil {
+	if err := o.Generic.ApplyTo(&c.Generic, "cloud-controller-manager"); err != nil {
 		return err
 	}
 

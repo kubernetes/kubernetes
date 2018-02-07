@@ -18,14 +18,14 @@ package app
 
 import (
 	apiserver "k8s.io/apiserver/pkg/server"
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/kubernetes/pkg/apis/componentconfig"
 )
 
 type ExtraConfig struct {
-	Master     string
+	Master string
 
 	// the general kube client
 	Client *clientset.Clientset
@@ -42,15 +42,17 @@ type ExtraConfig struct {
 
 // Config is the main context object for the controller manager.
 type Config struct {
-	ComponentConfig   componentconfig.KubeControllerManagerConfiguration
-	SecureServingInfo apiserver.SecureServingInfo
-	Extra             ExtraConfig
+	ComponentConfig     componentconfig.KubeControllerManagerConfiguration
+	SecureServingInfo   *apiserver.SecureServingInfo
+	InsecureServingInfo *InsecureServingInfo
+	Extra               ExtraConfig
 }
 
 type completedConfig struct {
-	ComponentConfig   componentconfig.KubeControllerManagerConfiguration
-	SecureServingInfo apiserver.SecureServingInfo
-	Extra             *ExtraConfig
+	ComponentConfig     componentconfig.KubeControllerManagerConfiguration
+	SecureServingInfo   *apiserver.SecureServingInfo
+	InsecureServingInfo *InsecureServingInfo
+	Extra               *ExtraConfig
 }
 
 type CompletedConfig struct {
@@ -63,6 +65,7 @@ func (c *Config) Complete() CompletedConfig {
 	cc := completedConfig{
 		c.ComponentConfig,
 		c.SecureServingInfo,
+		c.InsecureServingInfo,
 		&c.Extra,
 	}
 

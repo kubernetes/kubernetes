@@ -87,8 +87,7 @@ func (s *SecureServingInfo) Serve(handler http.Handler, shutdownTimeout time.Dur
 	}
 
 	glog.Infof("Serving securely on %s", secureServer.Addr)
-	err := RunServer(secureServer, s.Listener, shutdownTimeout, stopCh)
-	return err
+	return RunServer(secureServer, s.Listener, shutdownTimeout, stopCh)
 }
 
 // RunServer listens on the given port if listener is not given,

@@ -155,7 +155,7 @@ func (s *SecureServingOptions) AddFlags(fs *pflag.FlagSet) {
 }
 
 // ApplyTo fills up serving information in the server configuration.
-func (s *SecureServingOptions) ApplyTo(c *server.SecureServingInfo) error {
+func (s *SecureServingOptions) ApplyTo(config **server.SecureServingInfo) error {
 	if s == nil {
 		return nil
 	}
@@ -172,7 +172,10 @@ func (s *SecureServingOptions) ApplyTo(c *server.SecureServingInfo) error {
 		}
 	}
 
-	c.Listener = s.Listener
+	*config = &server.SecureServingInfo{
+		Listener: s.Listener,
+	}
+	c := *config
 
 	serverCertFile, serverKeyFile := s.ServerCert.CertKey.CertFile, s.ServerCert.CertKey.KeyFile
 	// load main cert

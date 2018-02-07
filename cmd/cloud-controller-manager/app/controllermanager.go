@@ -119,7 +119,16 @@ func Run(c *cloudcontrollerconfig.CompletedConfig) error {
 
 	// Start the controller manager HTTP server
 	stopCh := make(chan struct{})
-	go serve(c, stopCh)
+	if c.Generic.SecureServingInfo != nil {
+		if err := serve(c, c.Generic.SecureServingInfo.Serve, stopCh); err != nil {
+			return err
+		}
+	}
+	if c.Generic.InsecureServingInfo != nil {
+		if err :=  serve(c, c.Generic.InsecureServingInfo.Serve, stopCh); err != nil {
+			return err
+		}
+	}
 
 	run := func(stop <-chan struct{}) {
 		rootClientBuilder := controller.SimpleControllerClientBuilder{
@@ -195,6 +204,7 @@ func startControllers(c *cloudcontrollerconfig.CompletedConfig, kubeconfig *rest
 		cloud.Initialize(clientBuilder)
 	}
 
+	// TODO: move this setup into Config
 	versionedClient := rootClientBuilder.ClientOrDie("shared-informers")
 	sharedInformers := informers.NewSharedInformerFactory(versionedClient, resyncPeriod(c)())
 
@@ -268,7 +278,9 @@ func startControllers(c *cloudcontrollerconfig.CompletedConfig, kubeconfig *rest
 	select {}
 }
 
-func serve(c *cloudcontrollerconfig.CompletedConfig, stopCh <-chan struct{}) {
+type serveFunc func(handler http.Handler, shutdownTimeout time.Duration, stopCh <-chan struct{}) error
+
+func serve(c *cloudcontrollerconfig.CompletedConfig, serveFunc serveFunc, stopCh <-chan struct{}) error {
 	mux := http.NewServeMux()
 	healthz.InstallHandler(mux)
 	if c.Generic.ComponentConfig.EnableProfiling {
@@ -283,5 +295,5 @@ func serve(c *cloudcontrollerconfig.CompletedConfig, stopCh <-chan struct{}) {
 	configz.InstallHandler(mux)
 	mux.Handle("/metrics", prometheus.Handler())
 
-	glog.Fatal(c.Generic.SecureServingInfo.Serve(mux, 0, stopCh))
+	return serveFunc(mux, 0, stopCh)
 }

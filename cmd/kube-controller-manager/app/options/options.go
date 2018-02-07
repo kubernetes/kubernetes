@@ -45,7 +45,7 @@ type KubeControllerManagerOptions struct {
 
 // NewKubeControllerManagerOptions creates a new KubeControllerManagerOptions with a default config.
 func NewKubeControllerManagerOptions() *KubeControllerManagerOptions {
-	componentConfig := cmoptions.NewDefaultControllerManagerComponentConfig(ports.ControllerManagerPort)
+	componentConfig := cmoptions.NewDefaultControllerManagerComponentConfig(ports.InsecureKubeControllerManagerPort)
 	s := KubeControllerManagerOptions{
 		// The common/default are kept in 'cmd/kube-controller-manager/app/options/util.go'.
 		// Please make common changes there but put anything kube-controller specific here.
@@ -145,7 +145,7 @@ func (s *KubeControllerManagerOptions) AddFlags(fs *pflag.FlagSet, allController
 }
 
 func (o *KubeControllerManagerOptions) ApplyTo(c *kubecontrollerconfig.Config) error {
-	if err := o.Generic.ApplyTo(c.Generic, "controller-manager"); err != nil {
+	if err := o.Generic.ApplyTo(&c.Generic, "controller-manager"); err != nil {
 		return err
 	}
 

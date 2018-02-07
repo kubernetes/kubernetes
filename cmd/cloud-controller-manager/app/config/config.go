@@ -28,7 +28,7 @@ type ExtraConfig struct {
 
 // Config is the main context object for the controller manager.
 type Config struct {
-	Generic *genericcontrollermanager.Config
+	Generic genericcontrollermanager.Config
 	Extra   ExtraConfig
 }
 

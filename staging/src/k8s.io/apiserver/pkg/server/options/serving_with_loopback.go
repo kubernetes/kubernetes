@@ -40,9 +40,12 @@ func (s *SecureServingOptionsWithLoopback) ApplyTo(c *server.Config) error {
 		return nil
 	}
 
-	c.SecureServingInfo = &server.SecureServingInfo{}
-	if err := s.SecureServingOptions.ApplyTo(c.SecureServingInfo); err != nil {
+	if err := s.SecureServingOptions.ApplyTo(&c.SecureServingInfo); err != nil {
 		return err
+	}
+
+	if c.SecureServingInfo == nil {
+		return nil
 	}
 
 	c.ReadWritePort = s.BindPort
