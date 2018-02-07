@@ -1430,6 +1430,18 @@ run_kubectl_get_tests() {
   # Post-condition: Check if we get a limit and continue
   kube::test::if_has_string "${output_message}" "/clusterroles?limit=500 200 OK"
 
+  ### Test kubectl get chunk size does not result in a --watch error when resource list is served in multiple chunks
+  # Pre-condition: no ConfigMaps exist
+  kube::test::get_object_assert configmap "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Post-condition: Create three configmaps and ensure that we can --watch them with a --chunk-size of 1
+  kubectl create cm one "${kube_flags[@]}"
+  kubectl create cm two "${kube_flags[@]}"
+  kubectl create cm three "${kube_flags[@]}"
+  output_message=$(kubectl get configmap --chunk-size=1 --watch --request-timeout=1s 2>&1 "${kube_flags[@]}")
+  kube::test::if_has_not_string "${output_message}" "watch is only supported on individual resources"
+  output_message=$(kubectl get configmap --chunk-size=1 --watch-only --request-timeout=1s 2>&1 "${kube_flags[@]}")
+  kube::test::if_has_not_string "${output_message}" "watch is only supported on individual resources"
+
   ### Test --allow-missing-template-keys
   # Pre-condition: no POD exists
   create_and_use_new_namespace
