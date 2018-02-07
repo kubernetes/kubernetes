@@ -33,7 +33,6 @@ import (
 	tokencache "k8s.io/apiserver/pkg/authentication/token/cache"
 	"k8s.io/apiserver/pkg/authentication/token/tokenfile"
 	tokenunion "k8s.io/apiserver/pkg/authentication/token/union"
-	"k8s.io/apiserver/plugin/pkg/authenticator/password/keystone"
 	"k8s.io/apiserver/plugin/pkg/authenticator/password/passwordfile"
 	"k8s.io/apiserver/plugin/pkg/authenticator/request/basicauth"
 	"k8s.io/apiserver/plugin/pkg/authenticator/token/oidc"
@@ -61,8 +60,6 @@ type AuthenticatorConfig struct {
 	OIDCGroupsPrefix            string
 	ServiceAccountKeyFiles      []string
 	ServiceAccountLookup        bool
-	KeystoneURL                 string
-	KeystoneCAFile              string
 	WebhookTokenAuthnConfigFile string
 	WebhookTokenAuthnCacheTTL   time.Duration
 
@@ -106,14 +103,6 @@ func (config AuthenticatorConfig) New() (authenticator.Request, *spec.SecurityDe
 			return nil, nil, err
 		}
 		authenticators = append(authenticators, basicAuth)
-		hasBasicAuth = true
-	}
-	if len(config.KeystoneURL) > 0 {
-		keystoneAuth, err := newAuthenticatorFromKeystoneURL(config.KeystoneURL, config.KeystoneCAFile)
-		if err != nil {
-			return nil, nil, err
-		}
-		authenticators = append(authenticators, keystoneAuth)
 		hasBasicAuth = true
 	}
 
@@ -304,16 +293,6 @@ func newAuthenticatorFromClientCAFile(clientCAFile string) (authenticator.Reques
 	opts.Roots = roots
 
 	return x509.New(opts, x509.CommonNameUserConversion), nil
-}
-
-// newAuthenticatorFromKeystoneURL returns an authenticator.Request or an error
-func newAuthenticatorFromKeystoneURL(keystoneURL string, keystoneCAFile string) (authenticator.Request, error) {
-	keystoneAuthenticator, err := keystone.NewKeystoneAuthenticator(keystoneURL, keystoneCAFile)
-	if err != nil {
-		return nil, err
-	}
-
-	return basicauth.New(keystoneAuthenticator), nil
 }
 
 func newWebhookTokenAuthenticator(webhookConfigFile string, ttl time.Duration) (authenticator.Token, error) {

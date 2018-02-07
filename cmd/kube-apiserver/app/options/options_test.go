@@ -207,7 +207,6 @@ func TestAddFlags(t *testing.T) {
 				ConfigFile: "/token-webhook-config",
 			},
 			BootstrapToken: &kubeoptions.BootstrapTokenAuthenticationOptions{},
-			Keystone:       &kubeoptions.KeystoneAuthenticationOptions{},
 			OIDC: &kubeoptions.OIDCAuthenticationOptions{
 				UsernameClaim: "sub",
 			},
