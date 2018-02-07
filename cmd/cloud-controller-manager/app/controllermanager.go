@@ -43,6 +43,7 @@ import (
 	"k8s.io/client-go/tools/leaderelection"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	"k8s.io/client-go/tools/record"
+	cloudcontrollerconfig "k8s.io/kubernetes/cmd/cloud-controller-manager/app/config"
 	"k8s.io/kubernetes/cmd/cloud-controller-manager/app/options"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/cloudprovider"
@@ -75,7 +76,7 @@ the cloud specific control loops shipped with Kubernetes.`,
 				os.Exit(1)
 			}
 
-			if err := c.Complete().Run(); err != nil {
+			if err := Run(c.Complete()); err != nil {
 				fmt.Fprintf(os.Stderr, "%v\n", err)
 				os.Exit(1)
 			}
@@ -88,7 +89,7 @@ the cloud specific control loops shipped with Kubernetes.`,
 }
 
 // resyncPeriod computes the time interval a shared informer waits before resyncing with the api server
-func resyncPeriod(c *completedConfig) func() time.Duration {
+func resyncPeriod(c *cloudcontrollerconfig.CompletedConfig) func() time.Duration {
 	return func() time.Duration {
 		factor := rand.Float64() + 1
 		return time.Duration(float64(c.Generic.ComponentConfig.MinResyncPeriod.Nanoseconds()) * factor)
@@ -96,7 +97,7 @@ func resyncPeriod(c *completedConfig) func() time.Duration {
 }
 
 // Run runs the ExternalCMServer.  This should never exit.
-func (c *completedConfig) Run() error {
+func Run(c *cloudcontrollerconfig.CompletedConfig) error {
 	cloud, err := cloudprovider.InitCloudProvider(c.Generic.ComponentConfig.CloudProvider, c.Generic.ComponentConfig.CloudConfigFile)
 	if err != nil {
 		glog.Fatalf("Cloud provider could not be initialized: %v", err)
@@ -137,7 +138,8 @@ func (c *completedConfig) Run() error {
 
 	// Start the external controller manager server
 	stopCh := make(chan struct{})
-	go c.serve(stopCh)
+
+	go serve(c, stopCh)
 
 	recorder := createRecorder(kubeClient)
 
@@ -157,7 +159,7 @@ func (c *completedConfig) Run() error {
 			clientBuilder = rootClientBuilder
 		}
 
-		if err := c.startControllers(kubeconfig, rootClientBuilder, clientBuilder, stop, recorder, cloud); err != nil {
+		if err := startControllers(c, kubeconfig, rootClientBuilder, clientBuilder, stop, recorder, cloud); err != nil {
 			glog.Fatalf("error running controllers: %v", err)
 		}
 	}
@@ -205,7 +207,7 @@ func (c *completedConfig) Run() error {
 }
 
 // startControllers starts the cloud specific controller loops.
-func (c *completedConfig) startControllers(kubeconfig *restclient.Config, rootClientBuilder, clientBuilder controller.ControllerClientBuilder, stop <-chan struct{}, recorder record.EventRecorder, cloud cloudprovider.Interface) error {
+func startControllers(c *cloudcontrollerconfig.CompletedConfig, kubeconfig *restclient.Config, rootClientBuilder, clientBuilder controller.ControllerClientBuilder, stop <-chan struct{}, recorder record.EventRecorder, cloud cloudprovider.Interface) error {
 	// Function to build the kube client object
 	client := func(serviceAccountName string) kubernetes.Interface {
 		return clientBuilder.ClientOrDie(serviceAccountName)
@@ -288,7 +290,7 @@ func (c *completedConfig) startControllers(kubeconfig *restclient.Config, rootCl
 	select {}
 }
 
-func (c *completedConfig) serve(stopCh <-chan struct{}) {
+func serve(c *cloudcontrollerconfig.CompletedConfig, stopCh <-chan struct{}) {
 	mux := http.NewServeMux()
 	healthz.InstallHandler(mux)
 	if c.Generic.ComponentConfig.EnableProfiling {

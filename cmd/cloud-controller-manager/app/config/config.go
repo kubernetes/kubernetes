@@ -43,11 +43,11 @@ type CompletedConfig struct {
 }
 
 // Complete fills in any fields not set that are required to have valid data. It's mutating the receiver.
-func (c *Config) Complete() CompletedConfig {
+func (c *Config) Complete() *CompletedConfig {
 	cc := completedConfig{
 		c.Generic.Complete(),
 		&c.Extra,
 	}
 
-	return CompletedConfig{&cc}
+	return &CompletedConfig{&cc}
 }

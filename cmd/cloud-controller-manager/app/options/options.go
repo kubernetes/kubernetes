@@ -23,7 +23,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	cloudcontroller "k8s.io/kubernetes/cmd/cloud-controller-manager/app"
+	cloudcontroller "k8s.io/kubernetes/cmd/cloud-controller-manager/app/config"
 	cmoptions "k8s.io/kubernetes/cmd/controller-manager/app/options"
 	"k8s.io/kubernetes/pkg/client/leaderelectionconfig"
 	"k8s.io/kubernetes/pkg/master/ports"
@@ -88,7 +88,7 @@ func (o *CloudControllerManagerOptions) Validate() error {
 	errors = append(errors, o.Generic.Validate()...)
 
 	if len(o.Generic.ComponentConfig.CloudProvider) == 0 {
-		errors = append(errors, fmt.Errorf("--cloud-provider cannot be empty")
+		errors = append(errors, fmt.Errorf("--cloud-provider cannot be empty"))
 	}
 
 	return utilerrors.NewAggregate(errors)
