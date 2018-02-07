@@ -25,9 +25,9 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//pkg/kubelet/apis/cri:all-srcs",
         "//pkg/kubelet/apis/deviceplugin/v1alpha:all-srcs",
         "//pkg/kubelet/apis/kubeletconfig:all-srcs",
+        "//pkg/kubelet/apis/runtime:all-srcs",
         "//pkg/kubelet/apis/stats/v1alpha1:all-srcs",
     ],
     tags = ["automanaged"],
