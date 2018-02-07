@@ -105,13 +105,13 @@ type TokenRequest struct {
 
 // TokenRequestSpec contains client provided parameters of a token request.
 type TokenRequestSpec struct {
-	// Audiences are the intendend audiences of the token. A recipient of a
-	// token must identitfy themself with an identifier in the list of
-	// audiences of the token, and otherwise should reject the token. A
-	// token issued for multiple audiences may be used to authenticate
-	// against any of the audiences listed but implies a high degree of
-	// trust between the target audiences.
-	Audiences []string
+	// Audience is the intendend audience of the token. A recipient of a
+	// token must identitfy itself with an identifier that is a member of
+	// the audience of the token, and otherwise should reject the token. A
+	// token issued with multiple subjects in the audience may be used to
+	// authenticate against any of the audience members but implies a high
+	// degree of trust between the target audience members.
+	Audience []string
 
 	// ExpirationSeconds is the requested duration of validity of the request. The
 	// token issuer may return a token with a different validity duration so a
