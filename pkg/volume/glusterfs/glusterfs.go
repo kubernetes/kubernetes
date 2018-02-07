@@ -644,7 +644,7 @@ func (d *glusterfsVolumeDeleter) Delete() error {
 	}
 	err = cli.VolumeDelete(volumeID)
 	if err != nil {
-		glog.Errorf("error when deleting the volume(%s): %v", volumeName, err)
+		glog.Errorf("error when deleting the volume[%s]: %v", volumeName, err)
 		return err
 	}
 	glog.V(2).Infof("volume %s deleted successfully", volumeName)
@@ -1137,7 +1137,7 @@ func (plugin *glusterfsPlugin) ExpandVolumeDevice(spec *volume.Spec, newSize res
 	//Check the existing volume size
 	currentVolumeInfo, err := cli.VolumeInfo(volumeID)
 	if err != nil {
-		glog.Errorf("error when fetching details of volume(%s): %v", volumeName, err)
+		glog.Errorf("error when fetching details of volume[%s]: %v", volumeName, err)
 		return oldSize, err
 	}
 
@@ -1151,7 +1151,7 @@ func (plugin *glusterfsPlugin) ExpandVolumeDevice(spec *volume.Spec, newSize res
 	// Expand the volume
 	volumeInfoRes, err := cli.VolumeExpand(volumeID, volumeExpandReq)
 	if err != nil {
-		glog.Errorf("error when expanding the volume(%s): %v", volumeName, err)
+		glog.Errorf("error when expanding the volume[%s]: %v", volumeName, err)
 		return oldSize, err
 	}
 
