@@ -30,6 +30,7 @@ import (
 
 var (
 	vmCacheTTL = time.Minute
+	lbCacheTTL = 2 * time.Minute
 )
 
 // checkExistsFromError inspects an error and returns a true if err is nil,
@@ -139,19 +140,16 @@ func (az *Cloud) getSubnet(virtualNetworkName string, subnetName string) (subnet
 }
 
 func (az *Cloud) getAzureLoadBalancer(name string) (lb network.LoadBalancer, exists bool, err error) {
-	var realErr error
-
-	lb, err = az.LoadBalancerClient.Get(az.ResourceGroup, name, "")
-	exists, realErr = checkResourceExistsFromError(err)
-	if realErr != nil {
-		return lb, false, realErr
+	cachedLB, err := az.lbCache.Get(name)
+	if err != nil {
+		return lb, false, err
 	}
 
-	if !exists {
+	if cachedLB == nil {
 		return lb, false, nil
 	}
 
-	return lb, exists, err
+	return *(cachedLB.(*network.LoadBalancer)), true, nil
 }
 
 func (az *Cloud) newVMCache() (*timedCache, error) {
@@ -170,4 +168,22 @@ func (az *Cloud) newVMCache() (*timedCache, error) {
 	}
 
 	return newTimedcache(vmCacheTTL, getter)
+}
+
+func (az *Cloud) newLBCache() (*timedCache, error) {
+	getter := func(key string) (interface{}, error) {
+		lb, err := az.LoadBalancerClient.Get(az.ResourceGroup, key, "")
+		exists, realErr := checkResourceExistsFromError(err)
+		if realErr != nil {
+			return nil, realErr
+		}
+
+		if !exists {
+			return nil, nil
+		}
+
+		return &lb, nil
+	}
+
+	return newTimedcache(lbCacheTTL, getter)
 }
