@@ -37,9 +37,14 @@ const (
 
 type Policy struct {
 	metav1.TypeMeta
-	// Holds the information to configure the fit predicate functions
+	// Holds the information to configure the fit predicate functions.
+	// If unspecified, the default predicate functions will be applied.
+	// If empty list, all predicates (except the mandatory ones) will be
+	// bypassed.
 	Predicates []PredicatePolicy
-	// Holds the information to configure the priority functions
+	// Holds the information to configure the priority functions.
+	// If unspecified, the default priority functions will be applied.
+	// If empty list, all priority functions will be bypassed.
 	Priorities []PriorityPolicy
 	// Holds the information to communicate with the extender(s)
 	ExtenderConfigs []ExtenderConfig

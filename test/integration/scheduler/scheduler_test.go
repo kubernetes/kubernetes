@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
@@ -97,69 +98,128 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 	factory.RegisterPriorityFunction("PriorityOne", PriorityOne, 1)
 	factory.RegisterPriorityFunction("PriorityTwo", PriorityTwo, 1)
 
-	// Add a ConfigMap object.
-	configPolicyName := "scheduler-custom-policy-config"
-	policyConfigMap := v1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceSystem, Name: configPolicyName},
-		Data: map[string]string{
-			componentconfig.SchedulerPolicyConfigMapKey: `{
-			"kind" : "Policy",
-			"apiVersion" : "v1",
-			"predicates" : [
-				{"name" : "PredicateOne"},
-				{"name" : "PredicateTwo"}
-			],
-			"priorities" : [
-				{"name" : "PriorityOne", "weight" : 1},
-				{"name" : "PriorityTwo", "weight" : 5}
-			]
+	for i, test := range []struct {
+		policy               string
+		expectedPredicates   sets.String
+		expectedPrioritizers sets.String
+	}{
+		{
+			policy: `{
+				"kind" : "Policy",
+				"apiVersion" : "v1",
+				"predicates" : [
+					{"name" : "PredicateOne"},
+					{"name" : "PredicateTwo"}
+				],
+				"priorities" : [
+					{"name" : "PriorityOne", "weight" : 1},
+					{"name" : "PriorityTwo", "weight" : 5}
+				]
 			}`,
+			expectedPredicates: sets.NewString(
+				"CheckNodeCondition", // mandatory predicate
+				"PredicateOne",
+				"PredicateTwo",
+			),
+			expectedPrioritizers: sets.NewString(
+				"PriorityOne",
+				"PriorityTwo",
+			),
 		},
-	}
+		{
+			policy: `{
+				"kind" : "Policy",
+				"apiVersion" : "v1"
+			}`,
+			expectedPredicates: sets.NewString(
+				"CheckNodeCondition", // mandatory predicate
+				"CheckNodeDiskPressure",
+				"CheckNodeMemoryPressure",
+				"CheckVolumeBinding",
+				"GeneralPredicates",
+				"MatchInterPodAffinity",
+				"MaxAzureDiskVolumeCount",
+				"MaxEBSVolumeCount",
+				"MaxGCEPDVolumeCount",
+				"NoDiskConflict",
+				"NoVolumeZoneConflict",
+				"PodToleratesNodeTaints",
+			),
+			expectedPrioritizers: sets.NewString(
+				"BalancedResourceAllocation",
+				"InterPodAffinityPriority",
+				"LeastRequestedPriority",
+				"NodeAffinityPriority",
+				"NodePreferAvoidPodsPriority",
+				"SelectorSpreadPriority",
+				"TaintTolerationPriority",
+			),
+		},
+		{
+			policy: `{
+				"kind" : "Policy",
+				"apiVersion" : "v1",
+				"predicates" : [],
+				"priorities" : []
+			}`,
+			expectedPredicates: sets.NewString(
+				"CheckNodeCondition", // mandatory predicate
+			),
+			expectedPrioritizers: sets.NewString(),
+		},
+	} {
+		// Add a ConfigMap object.
+		configPolicyName := fmt.Sprintf("scheduler-custom-policy-config-%d", i)
+		policyConfigMap := v1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceSystem, Name: configPolicyName},
+			Data:       map[string]string{componentconfig.SchedulerPolicyConfigMapKey: test.policy},
+		}
 
-	policyConfigMap.APIVersion = testapi.Groups[v1.GroupName].GroupVersion().String()
-	clientSet.CoreV1().ConfigMaps(metav1.NamespaceSystem).Create(&policyConfigMap)
+		policyConfigMap.APIVersion = testapi.Groups[v1.GroupName].GroupVersion().String()
+		clientSet.CoreV1().ConfigMaps(metav1.NamespaceSystem).Create(&policyConfigMap)
 
-	eventBroadcaster := record.NewBroadcaster()
-	eventBroadcaster.StartRecordingToSink(&clientv1core.EventSinkImpl{Interface: clientv1core.New(clientSet.CoreV1().RESTClient()).Events("")})
+		eventBroadcaster := record.NewBroadcaster()
+		eventBroadcaster.StartRecordingToSink(&clientv1core.EventSinkImpl{Interface: clientv1core.New(clientSet.CoreV1().RESTClient()).Events("")})
 
-	ss := &schedulerapp.SchedulerServer{
-		SchedulerName: v1.DefaultSchedulerName,
-		AlgorithmSource: componentconfig.SchedulerAlgorithmSource{
-			Policy: &componentconfig.SchedulerPolicySource{
-				ConfigMap: &componentconfig.SchedulerPolicyConfigMapSource{
-					Namespace: policyConfigMap.Namespace,
-					Name:      policyConfigMap.Name,
+		ss := &schedulerapp.SchedulerServer{
+			SchedulerName: v1.DefaultSchedulerName,
+			AlgorithmSource: componentconfig.SchedulerAlgorithmSource{
+				Policy: &componentconfig.SchedulerPolicySource{
+					ConfigMap: &componentconfig.SchedulerPolicyConfigMapSource{
+						Namespace: policyConfigMap.Namespace,
+						Name:      policyConfigMap.Name,
+					},
 				},
 			},
-		},
-		HardPodAffinitySymmetricWeight: v1.DefaultHardPodAffinitySymmetricWeight,
-		Client:          clientSet,
-		InformerFactory: informerFactory,
-		PodInformer:     factory.NewPodInformer(clientSet, 0, v1.DefaultSchedulerName),
-		EventClient:     clientSet.CoreV1(),
-		Recorder:        eventBroadcaster.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: v1.DefaultSchedulerName}),
-		Broadcaster:     eventBroadcaster,
-	}
+			HardPodAffinitySymmetricWeight: v1.DefaultHardPodAffinitySymmetricWeight,
+			Client:          clientSet,
+			InformerFactory: informerFactory,
+			PodInformer:     factory.NewPodInformer(clientSet, 0, v1.DefaultSchedulerName),
+			EventClient:     clientSet.CoreV1(),
+			Recorder:        eventBroadcaster.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: v1.DefaultSchedulerName}),
+			Broadcaster:     eventBroadcaster,
+		}
 
-	config, err := ss.SchedulerConfig()
-	if err != nil {
-		t.Fatalf("couldn't make scheduler config: %v", err)
-	}
+		config, err := ss.SchedulerConfig()
+		if err != nil {
+			t.Fatalf("couldn't make scheduler config: %v", err)
+		}
 
-	// Verify that the config is applied correctly.
-	schedPredicates := config.Algorithm.Predicates()
-	schedPrioritizers := config.Algorithm.Prioritizers()
-	// Includes one mandatory predicates.
-	if len(schedPredicates) != 3 || len(schedPrioritizers) != 2 {
-		t.Errorf("Unexpected number of predicates or priority functions. Number of predicates: %v, number of prioritizers: %v", len(schedPredicates), len(schedPrioritizers))
-	}
-	// Check a predicate and a priority function.
-	if schedPredicates["PredicateTwo"] == nil {
-		t.Errorf("Expected to have a PodFitsHostPorts predicate.")
-	}
-	if schedPrioritizers[1].Function == nil || schedPrioritizers[1].Weight != 5 {
-		t.Errorf("Unexpected prioritizer: func: %v, weight: %v", schedPrioritizers[1].Function, schedPrioritizers[1].Weight)
+		// Verify that the config is applied correctly.
+		schedPredicates := sets.NewString()
+		for k := range config.Algorithm.Predicates() {
+			schedPredicates.Insert(k)
+		}
+		schedPrioritizers := sets.NewString()
+		for _, p := range config.Algorithm.Prioritizers() {
+			schedPrioritizers.Insert(p.Name)
+		}
+		if !schedPredicates.Equal(test.expectedPredicates) {
+			t.Errorf("Expected predicates %v, got %v", test.expectedPredicates, schedPredicates)
+		}
+		if !schedPrioritizers.Equal(test.expectedPrioritizers) {
+			t.Errorf("Expected priority functions %v, got %v", test.expectedPrioritizers, schedPrioritizers)
+		}
 	}
 }
 
