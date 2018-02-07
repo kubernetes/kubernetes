@@ -63,26 +63,26 @@ func TestCRIListPodStats(t *testing.T) {
 	)
 
 	var (
-		imageFsStorageUUID = "imagefs-storage-uuid"
-		unknownStorageUUID = "unknown-storage-uuid"
-		imageFsInfo        = getTestFsInfo(2000)
-		rootFsInfo         = getTestFsInfo(1000)
+		imageFsMountpoint = "/test/mount/point"
+		unknownMountpoint = "/unknown/mount/point"
+		imageFsInfo       = getTestFsInfo(2000)
+		rootFsInfo        = getTestFsInfo(1000)
 
 		sandbox0        = makeFakePodSandbox("sandbox0-name", "sandbox0-uid", "sandbox0-ns")
 		container0      = makeFakeContainer(sandbox0, cName0, 0, false)
-		containerStats0 = makeFakeContainerStats(container0, imageFsStorageUUID)
+		containerStats0 = makeFakeContainerStats(container0, imageFsMountpoint)
 		container1      = makeFakeContainer(sandbox0, cName1, 0, false)
-		containerStats1 = makeFakeContainerStats(container1, unknownStorageUUID)
+		containerStats1 = makeFakeContainerStats(container1, unknownMountpoint)
 
 		sandbox1        = makeFakePodSandbox("sandbox1-name", "sandbox1-uid", "sandbox1-ns")
 		container2      = makeFakeContainer(sandbox1, cName2, 0, false)
-		containerStats2 = makeFakeContainerStats(container2, imageFsStorageUUID)
+		containerStats2 = makeFakeContainerStats(container2, imageFsMountpoint)
 
 		sandbox2        = makeFakePodSandbox("sandbox2-name", "sandbox2-uid", "sandbox2-ns")
 		container3      = makeFakeContainer(sandbox2, cName3, 0, true)
-		containerStats3 = makeFakeContainerStats(container3, imageFsStorageUUID)
+		containerStats3 = makeFakeContainerStats(container3, imageFsMountpoint)
 		container4      = makeFakeContainer(sandbox2, cName3, 1, false)
-		containerStats4 = makeFakeContainerStats(container4, imageFsStorageUUID)
+		containerStats4 = makeFakeContainerStats(container4, imageFsMountpoint)
 	)
 
 	var (
@@ -116,8 +116,8 @@ func TestCRIListPodStats(t *testing.T) {
 	mockCadvisor.
 		On("ContainerInfoV2", "/", options).Return(infos, nil).
 		On("RootFsInfo").Return(rootFsInfo, nil).
-		On("GetFsInfoByFsUUID", imageFsStorageUUID).Return(imageFsInfo, nil).
-		On("GetFsInfoByFsUUID", unknownStorageUUID).Return(cadvisorapiv2.FsInfo{}, cadvisorfs.ErrNoSuchDevice)
+		On("GetDirFsInfo", imageFsMountpoint).Return(imageFsInfo, nil).
+		On("GetDirFsInfo", unknownMountpoint).Return(cadvisorapiv2.FsInfo{}, cadvisorfs.ErrNoSuchDevice)
 	fakeRuntimeService.SetFakeSandboxes([]*critest.FakePodSandbox{
 		sandbox0, sandbox1, sandbox2,
 	})
@@ -209,9 +209,9 @@ func TestCRIListPodStats(t *testing.T) {
 
 func TestCRIImagesFsStats(t *testing.T) {
 	var (
-		imageFsStorageUUID = "imagefs-storage-uuid"
-		imageFsInfo        = getTestFsInfo(2000)
-		imageFsUsage       = makeFakeImageFsUsage(imageFsStorageUUID)
+		imageFsMountpoint = "/test/mount/point"
+		imageFsInfo       = getTestFsInfo(2000)
+		imageFsUsage      = makeFakeImageFsUsage(imageFsMountpoint)
 	)
 	var (
 		mockCadvisor       = new(cadvisortest.Mock)
@@ -222,7 +222,7 @@ func TestCRIImagesFsStats(t *testing.T) {
 		fakeImageService   = critest.NewFakeImageService()
 	)
 
-	mockCadvisor.On("GetFsInfoByFsUUID", imageFsStorageUUID).Return(imageFsInfo, nil)
+	mockCadvisor.On("GetDirFsInfo", imageFsMountpoint).Return(imageFsInfo, nil)
 	fakeImageService.SetFakeFilesystemUsage([]*runtimeapi.FilesystemUsage{
 		imageFsUsage,
 	})
@@ -292,7 +292,7 @@ func makeFakeContainer(sandbox *critest.FakePodSandbox, name string, attempt uin
 	return c
 }
 
-func makeFakeContainerStats(container *critest.FakeContainer, imageFsUUID string) *runtimeapi.ContainerStats {
+func makeFakeContainerStats(container *critest.FakeContainer, imageFsMountpoint string) *runtimeapi.ContainerStats {
 	containerStats := &runtimeapi.ContainerStats{
 		Attributes: &runtimeapi.ContainerAttributes{
 			Id:       container.ContainerStatus.Id,
@@ -300,7 +300,7 @@ func makeFakeContainerStats(container *critest.FakeContainer, imageFsUUID string
 		},
 		WritableLayer: &runtimeapi.FilesystemUsage{
 			Timestamp:  time.Now().UnixNano(),
-			StorageId:  &runtimeapi.StorageIdentifier{Uuid: imageFsUUID},
+			FsId:       &runtimeapi.FilesystemIdentifier{Mountpoint: imageFsMountpoint},
 			UsedBytes:  &runtimeapi.UInt64Value{Value: rand.Uint64() / 100},
 			InodesUsed: &runtimeapi.UInt64Value{Value: rand.Uint64() / 100},
 		},
@@ -321,10 +321,10 @@ func makeFakeContainerStats(container *critest.FakeContainer, imageFsUUID string
 	return containerStats
 }
 
-func makeFakeImageFsUsage(fsUUID string) *runtimeapi.FilesystemUsage {
+func makeFakeImageFsUsage(fsMountpoint string) *runtimeapi.FilesystemUsage {
 	return &runtimeapi.FilesystemUsage{
 		Timestamp:  time.Now().UnixNano(),
-		StorageId:  &runtimeapi.StorageIdentifier{Uuid: fsUUID},
+		FsId:       &runtimeapi.FilesystemIdentifier{Mountpoint: fsMountpoint},
 		UsedBytes:  &runtimeapi.UInt64Value{Value: rand.Uint64()},
 		InodesUsed: &runtimeapi.UInt64Value{Value: rand.Uint64()},
 	}
