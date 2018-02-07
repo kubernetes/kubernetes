@@ -42,7 +42,7 @@ import (
 	// to "v1"?
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/runtime/v1alpha1"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/runtime/v1alpha2"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/server/portforward"

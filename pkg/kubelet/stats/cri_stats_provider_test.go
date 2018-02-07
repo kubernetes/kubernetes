@@ -26,7 +26,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	critest "k8s.io/kubernetes/pkg/kubelet/apis/runtime/testing"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/runtime/v1alpha1"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/runtime/v1alpha2"
 	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
 	kubecontainertest "k8s.io/kubernetes/pkg/kubelet/container/testing"

@@ -5,7 +5,7 @@ go_library(
     srcs = ["services.go"],
     importpath = "k8s.io/kubernetes/pkg/kubelet/apis/runtime",
     visibility = ["//visibility:public"],
-    deps = ["//pkg/kubelet/apis/runtime/v1alpha1:go_default_library"],
+    deps = ["//pkg/kubelet/apis/runtime/v1alpha2:go_default_library"],
 )
 
 filegroup(
@@ -20,7 +20,7 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//pkg/kubelet/apis/runtime/testing:all-srcs",
-        "//pkg/kubelet/apis/runtime/v1alpha1:all-srcs",
+        "//pkg/kubelet/apis/runtime/v1alpha2:all-srcs",
     ],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],

@@ -26,7 +26,7 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtimetesting "k8s.io/kubernetes/pkg/kubelet/apis/runtime/testing"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/runtime/v1alpha1"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/runtime/v1alpha2"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 

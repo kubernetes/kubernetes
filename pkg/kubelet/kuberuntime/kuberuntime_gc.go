@@ -27,7 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/runtime"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/runtime/v1alpha1"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/runtime/v1alpha2"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 

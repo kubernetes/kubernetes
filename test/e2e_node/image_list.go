@@ -26,7 +26,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/runtime"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/runtime/v1alpha1"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/runtime/v1alpha2"
 	commontest "k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"

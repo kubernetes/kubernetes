@@ -23,7 +23,7 @@ import (
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	apitest "k8s.io/kubernetes/pkg/kubelet/apis/runtime/testing"
-	kubeapi "k8s.io/kubernetes/pkg/kubelet/apis/runtime/v1alpha1"
+	kubeapi "k8s.io/kubernetes/pkg/kubelet/apis/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/kubelet/util"
 	utilexec "k8s.io/utils/exec"
 )

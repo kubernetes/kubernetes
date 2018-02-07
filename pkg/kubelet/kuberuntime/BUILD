@@ -31,7 +31,7 @@ go_library(
         "//pkg/credentialprovider/secrets:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/kubelet/apis/runtime:go_default_library",
-        "//pkg/kubelet/apis/runtime/v1alpha1:go_default_library",
+        "//pkg/kubelet/apis/runtime/v1alpha2:go_default_library",
         "//pkg/kubelet/cm:go_default_library",
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/events:go_default_library",
@@ -86,7 +86,7 @@ go_test(
     deps = [
         "//pkg/credentialprovider:go_default_library",
         "//pkg/kubelet/apis/runtime/testing:go_default_library",
-        "//pkg/kubelet/apis/runtime/v1alpha1:go_default_library",
+        "//pkg/kubelet/apis/runtime/v1alpha2:go_default_library",
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/container/testing:go_default_library",
         "//pkg/kubelet/lifecycle:go_default_library",

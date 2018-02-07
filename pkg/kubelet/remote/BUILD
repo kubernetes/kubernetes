@@ -17,7 +17,7 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/kubelet/remote",
     deps = [
         "//pkg/kubelet/apis/runtime:go_default_library",
-        "//pkg/kubelet/apis/runtime/v1alpha1:go_default_library",
+        "//pkg/kubelet/apis/runtime/v1alpha2:go_default_library",
         "//pkg/kubelet/util:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/golang.org/x/net/context:go_default_library",

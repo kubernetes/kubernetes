@@ -165,7 +165,7 @@ pkg/kubelet/apis/kubeletconfig
 pkg/kubelet/apis/kubeletconfig/v1alpha1
 pkg/kubelet/apis/runtime
 pkg/kubelet/apis/runtime/testing
-pkg/kubelet/apis/runtime/v1alpha1
+pkg/kubelet/apis/runtime/v1alpha2
 pkg/kubelet/cadvisor
 pkg/kubelet/cadvisor/testing
 pkg/kubelet/client

@@ -18,7 +18,7 @@ package fake
 
 import (
 	"golang.org/x/net/context"
-	kubeapi "k8s.io/kubernetes/pkg/kubelet/apis/runtime/v1alpha1"
+	kubeapi "k8s.io/kubernetes/pkg/kubelet/apis/runtime/v1alpha2"
 )
 
 // ListImages lists existing images.

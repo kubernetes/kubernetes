@@ -53,7 +53,7 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/kubelet/apis/runtime/testing:go_default_library",
-        "//pkg/kubelet/apis/runtime/v1alpha1:go_default_library",
+        "//pkg/kubelet/apis/runtime/v1alpha2:go_default_library",
         "//pkg/kubelet/util:go_default_library",
         "//vendor/golang.org/x/net/context:go_default_library",
         "//vendor/google.golang.org/grpc:go_default_library",
