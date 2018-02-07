@@ -23,6 +23,9 @@ const (
 	// that do not specify any priority class and there is no priority class
 	// marked as default.
 	DefaultPriorityWhenNoDefaultClassExists = 0
+	// SystemPriorityClassPrefix is the prefix reserved for system priority class names. Other priority
+	// classes are not allowed to start with this prefix.
+	SystemPriorityClassPrefix = "system-"
 )
 
 // +genclient

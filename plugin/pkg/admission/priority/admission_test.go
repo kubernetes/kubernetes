@@ -127,21 +127,6 @@ func TestPriorityClassAdmission(t *testing.T) {
 			systemClass,
 			true,
 		},
-		{
-			"forbidden system name prefix",
-			[]*scheduling.PriorityClass{},
-			&scheduling.PriorityClass{
-				TypeMeta: metav1.TypeMeta{
-					Kind: "PriorityClass",
-				},
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "system-something",
-				},
-				Value:       5,
-				Description: "Name with 'system-' prefix is reserved for system use",
-			},
-			true,
-		},
 	}
 
 	for _, test := range tests {

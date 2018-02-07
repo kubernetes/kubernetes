@@ -19,7 +19,6 @@ package admission
 import (
 	"fmt"
 	"io"
-	"strings"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
@@ -42,12 +41,11 @@ const (
 	HighestUserDefinablePriority = 1000000000
 	// SystemCriticalPriority is the beginning of the range of priority values for critical system components.
 	SystemCriticalPriority = 2 * HighestUserDefinablePriority
-	// SystemPriorityClassPrefix is the prefix reserved for system priority class names. Other priority
-	// classes are not allowed to start with this prefix.
-	SystemPriorityClassPrefix = "system-"
 )
 
 // SystemPriorityClasses defines special priority classes which are used by system critical pods that should not be preempted by workload pods.
+// NOTE: In order to avoid conflict of names with user-defined priority classes, all the names must
+// start with scheduling.SystemPriorityClassPrefix which is by default "system-".
 var SystemPriorityClasses = map[string]int32{
 	"system-cluster-critical": SystemCriticalPriority,
 	"system-node-critical":    SystemCriticalPriority + 1000,
@@ -206,9 +204,6 @@ func (p *PriorityPlugin) validatePriorityClass(a admission.Attributes) error {
 	}
 	if pc.Value > HighestUserDefinablePriority {
 		return admission.NewForbidden(a, fmt.Errorf("maximum allowed value of a user defined priority is %v", HighestUserDefinablePriority))
-	}
-	if strings.HasPrefix(pc.Name, SystemPriorityClassPrefix) {
-		return admission.NewForbidden(a, fmt.Errorf("priority class names with '%v' prefix are reserved for system use only: %v", SystemPriorityClassPrefix, pc.Name))
 	}
 	if _, ok := SystemPriorityClasses[pc.Name]; ok {
 		return admission.NewForbidden(a, fmt.Errorf("the name of the priority class is a reserved name for system use only: %v", pc.Name))
