@@ -246,8 +246,8 @@ func TestDeleteAddressWithWrongTier(t *testing.T) {
 
 const (
 	gceProjectId = "test-project"
-	gceRegion    = "test-region"
-	zoneName     = "zone1"
+	gceRegion    = "us-central1"
+	zoneName     = "us-central1-b"
 	nodeName     = "test-node-1"
 	clusterName  = "Test Cluster Name"
 	clusterID    = "test-cluster-id"
@@ -272,7 +272,9 @@ func fakeGCECloud() (*GCECloud, error) {
 		return nil, err
 	}
 
+	// Used in disk unit tests
 	fakeManager := newFakeManager(gceProjectId, gceRegion)
+	zonesWithNodes := createNodeZones([]string{zoneName})
 
 	alphaFeatureGate, err := NewAlphaFeatureGate([]string{})
 	if err != nil {
@@ -281,7 +283,6 @@ func fakeGCECloud() (*GCECloud, error) {
 
 	cloud := cloud.NewMockGCE()
 	cloud.MockTargetPools.AddInstanceHook = mock.AddInstanceHook
-	zonesWithNodes := createNodeZones([]string{zoneName})
 
 	gce := GCECloud{
 		region:             gceRegion,
@@ -298,36 +299,56 @@ func fakeGCECloud() (*GCECloud, error) {
 	return &gce, nil
 }
 
-func createExternalLoadBalancer(gce *GCECloud) (*v1.LoadBalancerStatus, error) {
-	err := gce.InsertInstance(
-		gceProjectId,
-		zoneName,
-		&compute.Instance{
-			Name: nodeName,
-			Tags: &compute.Tags{
-				Items: []string{nodeName},
+func createAndInsertNodes(gce *GCECloud, nodeNames []string) ([]*v1.Node, error) {
+	nodes := []*v1.Node{}
+
+	for _, name := range nodeNames {
+		// Inserting the same node name twice causes an error - here we call
+		// DeleteInstance to guarantee that nodes aren't inserted twice.
+		// See TestUpdateExternalLoadBalancer.
+		err := gce.DeleteInstance(gceProjectId, zoneName, name)
+
+		err = gce.InsertInstance(
+			gceProjectId,
+			zoneName,
+			&compute.Instance{
+				Name: name,
+				Tags: &compute.Tags{
+					Items: []string{name},
+				},
 			},
-		},
-	)
+		)
+
+		if err != nil {
+			return nodes, err
+		}
+
+		nodes = append(
+			nodes,
+			&v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: name,
+					Labels: map[string]string{
+						kubeletapis.LabelHostname: name,
+					},
+				},
+				Status: v1.NodeStatus{
+					NodeInfo: v1.NodeSystemInfo{
+						KubeProxyVersion: "v1.7.2",
+					},
+				},
+			},
+		)
+	}
+
+	return nodes, nil
+}
+
+func createExternalLoadBalancer(gce *GCECloud) (*v1.LoadBalancerStatus, error) {
+	nodes, err := createAndInsertNodes(gce, []string{nodeName})
 
 	if err != nil {
 		return nil, err
-	}
-
-	nodes := []*v1.Node{
-		{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: nodeName,
-				Labels: map[string]string{
-					kubeletapis.LabelHostname: nodeName,
-				},
-			},
-			Status: v1.NodeStatus{
-				NodeInfo: v1.NodeSystemInfo{
-					KubeProxyVersion: "v1.7.2",
-				},
-			},
-		},
 	}
 
 	status, err := gce.ensureExternalLoadBalancer(
@@ -386,45 +407,8 @@ func TestUpdateExternalLoadBalancer(t *testing.T) {
 	assert.NoError(t, err)
 
 	newNodeName := "test-node-2"
-	gce.InsertInstance(
-		gceProjectId,
-		zoneName,
-		&compute.Instance{
-			Name: newNodeName,
-			Tags: &compute.Tags{
-				Items: []string{newNodeName},
-			},
-		},
-	)
-
-	newNodes := []*v1.Node{
-		{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: nodeName,
-				Labels: map[string]string{
-					kubeletapis.LabelHostname: nodeName,
-				},
-			},
-			Status: v1.NodeStatus{
-				NodeInfo: v1.NodeSystemInfo{
-					KubeProxyVersion: "v1.7.2",
-				},
-			},
-		},
-		{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: newNodeName,
-				Labels: map[string]string{
-					kubeletapis.LabelHostname: newNodeName,
-				},
-			},
-			Status: v1.NodeStatus{
-				NodeInfo: v1.NodeSystemInfo{
-					KubeProxyVersion: "v1.7.2",
-				},
-			},
-		},
-	}
+	newNodes, err := createAndInsertNodes(gce, []string{nodeName, newNodeName})
+	assert.NoError(t, err)
 
 	err = gce.updateExternalLoadBalancer(clusterName, apiService, newNodes)
 	assert.NoError(t, err)
