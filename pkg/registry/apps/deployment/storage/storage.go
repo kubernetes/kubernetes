@@ -38,7 +38,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	extensionsv1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	extvalidation "k8s.io/kubernetes/pkg/apis/extensions/validation"
-	"k8s.io/kubernetes/pkg/registry/extensions/deployment"
+	"k8s.io/kubernetes/pkg/registry/apps/deployment"
 )
 
 // DeploymentStorage includes dummy storage for Deployments and for Scale subresource.

@@ -27,7 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/printers"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
-	"k8s.io/kubernetes/pkg/registry/extensions/daemonset"
+	"k8s.io/kubernetes/pkg/registry/apps/daemonset"
 )
 
 // rest implements a RESTStorage for DaemonSets
