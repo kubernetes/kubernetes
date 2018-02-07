@@ -117,7 +117,7 @@ func Convert_authentication_TokenRequest_To_v1_TokenRequest(in *authentication.T
 }
 
 func autoConvert_v1_TokenRequestSpec_To_authentication_TokenRequestSpec(in *v1.TokenRequestSpec, out *authentication.TokenRequestSpec, s conversion.Scope) error {
-	out.Audiences = *(*[]string)(unsafe.Pointer(&in.Audiences))
+	out.Audience = *(*[]string)(unsafe.Pointer(&in.Audience))
 	if err := meta_v1.Convert_Pointer_int64_To_int64(&in.ExpirationSeconds, &out.ExpirationSeconds, s); err != nil {
 		return err
 	}
@@ -131,7 +131,7 @@ func Convert_v1_TokenRequestSpec_To_authentication_TokenRequestSpec(in *v1.Token
 }
 
 func autoConvert_authentication_TokenRequestSpec_To_v1_TokenRequestSpec(in *authentication.TokenRequestSpec, out *v1.TokenRequestSpec, s conversion.Scope) error {
-	out.Audiences = *(*[]string)(unsafe.Pointer(&in.Audiences))
+	out.Audience = *(*[]string)(unsafe.Pointer(&in.Audience))
 	if err := meta_v1.Convert_int64_To_Pointer_int64(&in.ExpirationSeconds, &out.ExpirationSeconds, s); err != nil {
 		return err
 	}

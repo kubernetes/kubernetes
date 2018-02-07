@@ -49,7 +49,7 @@ func (TokenRequest) SwaggerDoc() map[string]string {
 
 var map_TokenRequestSpec = map[string]string{
 	"":                  "TokenRequestSpec contains client provided parameters of a token request.",
-	"audiences":         "Audiences are the intendend audiences of the token. A recipient of a token must identitfy themself with an identifier in the list of audiences of the token, and otherwise should reject the token. A token issued for multiple audiences may be used to authenticate against any of the audiences listed but implies a high degree of trust between the target audiences.",
+	"audience":          "Audience is the intendend audience of the token. A recipient of a token must identitfy itself with an identifier that is a member of the audience of the token, and otherwise should reject the token. A token issued with multiple subjects in the audience may be used to authenticate against any of the audience members but implies a high degree of trust between the target audience members.",
 	"expirationSeconds": "ExpirationSeconds is the requested duration of validity of the request. The token issuer may return a token with a different validity duration so a client needs to check the 'expiration' field in a response.",
 	"boundObjectRef":    "BoundObjectRef is a reference to an object that the token will be bound to. The token will only be valid for as long as the bound objet exists.",
 }
