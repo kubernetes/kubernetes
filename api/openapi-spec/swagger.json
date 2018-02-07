@@ -2,7 +2,7 @@
   "swagger": "2.0",
   "info": {
    "title": "Kubernetes",
-   "version": "v1.9.3"
+   "version": "v1.9.4"
   },
   "paths": {
    "/api/": {
