@@ -321,7 +321,6 @@ func createAndInsertNodes(gce *GCECloud, nodeNames []string) ([]*v1.Node, error)
 					},
 				},
 			)
-
 			if err != nil {
 				return nodes, err
 			}
@@ -351,20 +350,17 @@ func createAndInsertNodes(gce *GCECloud, nodeNames []string) ([]*v1.Node, error)
 
 func createExternalLoadBalancer(gce *GCECloud) (*v1.LoadBalancerStatus, error) {
 	nodes, err := createAndInsertNodes(gce, []string{nodeName})
-
 	if err != nil {
 		return nil, err
 	}
 
-	status, err := gce.ensureExternalLoadBalancer(
+	return gce.ensureExternalLoadBalancer(
 		clusterName,
 		clusterID,
 		apiService,
 		nil,
 		nodes,
 	)
-
-	return status, err
 }
 
 func TestEnsureExternalLoadBalancer(t *testing.T) {
