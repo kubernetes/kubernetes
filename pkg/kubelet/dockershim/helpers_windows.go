@@ -29,7 +29,7 @@ import (
 
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/features"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 )
 
 const (
@@ -79,7 +79,7 @@ func (ds *dockerService) updateCreateConfig(
 		createConfig.HostConfig.NetworkMode = dockercontainer.NetworkMode(networkMode)
 	} else if !shouldIsolatedByHyperV(sandboxConfig.Annotations) {
 		// Todo: Refactor this call in future for calling methods directly in security_context.go
-		modifyHostOptionsForContainer(false, podSandboxID, createConfig.HostConfig)
+		modifyHostOptionsForContainer(nil, podSandboxID, createConfig.HostConfig)
 	}
 
 	applyExperimentalCreateConfig(createConfig, sandboxConfig.Annotations)

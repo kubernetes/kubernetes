@@ -20,7 +20,7 @@ import (
 	"fmt"
 
 	"k8s.io/api/core/v1"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/security/apparmor"
 	"k8s.io/kubernetes/pkg/securitycontext"
 )
@@ -48,11 +48,7 @@ func (m *kubeGenericRuntimeManager) determineEffectiveSecurityContext(pod *v1.Po
 	}
 
 	// set namespace options and supplemental groups.
-	synthesized.NamespaceOptions = &runtimeapi.NamespaceOption{
-		HostNetwork: pod.Spec.HostNetwork,
-		HostIpc:     pod.Spec.HostIPC,
-		HostPid:     pod.Spec.HostPID,
-	}
+	synthesized.NamespaceOptions = namespacesForPod(pod)
 	podSc := pod.Spec.SecurityContext
 	if podSc != nil {
 		if podSc.FSGroup != nil {

@@ -1,7 +1,8 @@
 // To regenerate api.pb.go run hack/update-generated-runtime.sh
 syntax = 'proto3';
 
-package runtime;
+package runtime.v1alpha2;
+option go_package = "v1alpha2";
 
 import "github.com/gogo/protobuf/gogoproto/gogo.proto";
 
@@ -178,14 +179,39 @@ message Mount {
     MountPropagation propagation = 5;
 }
 
+// A NamespaceMode describes the intended namespace configuration for each
+// of the namespaces (Network, PID, IPC) in NamespaceOption. Runtimes should
+// map these modes as appropriate for the technology underlying the runtime.
+enum NamespaceMode {
+    // A POD namespace is common to all containers in a pod.
+    // For example, a container with a PID namespace of POD expects to view
+    // all of the processes in all of the containers in the pod.
+    POD       = 0;
+    // A CONTAINER namespace is restricted to a single container.
+    // For example, a container with a PID namespace of CONTAINER expects to
+    // view only the processes in that container.
+    CONTAINER = 1;
+    // A NODE namespace is the namespace of the Kubernetes node.
+    // For example, a container with a PID namespace of NODE expects to view
+    // all of the processes on the host running the kubelet.
+    NODE      = 2;
+}
+
 // NamespaceOption provides options for Linux namespaces.
 message NamespaceOption {
-    // If set, use the host's network namespace.
-    bool host_network = 1;
-    // If set, use the host's PID namespace.
-    bool host_pid = 2;
-    // If set, use the host's IPC namespace.
-    bool host_ipc = 3;
+    // Network namespace for this container/sandbox.
+    // Note: There is currently no way to set CONTAINER scoped network in the Kubernetes API.
+    // Namespaces currently set by the kubelet: POD, NODE
+    NamespaceMode network = 1;
+    // PID namespace for this container/sandbox.
+    // Note: The CRI default is POD, but the v1.PodSpec default is CONTAINER.
+    // The kubelet's runtime manager will set this to CONTAINER explicitly for v1 pods.
+    // Namespaces currently set by the kubelet: POD, CONTAINER, NODE
+    NamespaceMode pid = 2;
+    // IPC namespace for this container/sandbox.
+    // Note: There is currently no way to set CONTAINER scoped IPC in the Kubernetes API.
+    // Namespaces currently set by the kubelet: POD, NODE
+    NamespaceMode ipc = 3;
 }
 
 // Int64Value is the wrapper of int64.
