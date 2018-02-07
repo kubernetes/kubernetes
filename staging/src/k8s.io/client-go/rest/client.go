@@ -41,6 +41,8 @@ const (
 
 // Interface captures the set of operations for generically interacting with Kubernetes REST apis.
 type Interface interface {
+	RequestTimeoutQuery() time.Duration
+	WithRequestTimeoutQuery(time.Duration) Interface
 	GetRateLimiter() flowcontrol.RateLimiter
 	Verb(verb string) *Request
 	Post() *Request
@@ -78,6 +80,9 @@ type RESTClient struct {
 
 	// Set specific behavior of the client.  If not set http.DefaultClient will be used.
 	Client *http.Client
+
+	// requestTimeoutQuery is used to set the "timeout" query parameter for API requests.
+	requestTimeoutQuery time.Duration
 }
 
 type Serializers struct {
@@ -125,6 +130,19 @@ func NewRESTClient(baseURL *url.URL, versionedAPIPath string, config ContentConf
 		Throttle:         throttle,
 		Client:           client,
 	}, nil
+}
+
+// RequestTimeoutQuery returns the "timeout" duration sent as part of a request to the API server.
+// When RequestTimeoutQuery() value is <= 0 then it is omitted from API requests.
+func (c *RESTClient) RequestTimeoutQuery() time.Duration {
+	return c.requestTimeoutQuery
+}
+
+// WithRequestTimeoutQuery set the "timeout" duration sent as part of a request to the API server.
+// When WithRequestTimeoutQuery() value is <= 0 then it is omitted from API requests.
+func (c *RESTClient) WithRequestTimeoutQuery(duration time.Duration) Interface {
+	c.requestTimeoutQuery = duration
+	return c
 }
 
 // GetRateLimiter returns rate limier for a given client, or nil if it's called on a nil client
@@ -220,11 +238,16 @@ func createSerializers(config ContentConfig) (*Serializers, error) {
 //
 func (c *RESTClient) Verb(verb string) *Request {
 	backoff := c.createBackoffMgr()
-
+	var request *Request
 	if c.Client == nil {
-		return NewRequest(nil, verb, c.base, c.versionedAPIPath, c.contentConfig, c.serializers, backoff, c.Throttle)
+		request = NewRequest(nil, verb, c.base, c.versionedAPIPath, c.contentConfig, c.serializers, backoff, c.Throttle)
+	} else {
+		request = NewRequest(c.Client, verb, c.base, c.versionedAPIPath, c.contentConfig, c.serializers, backoff, c.Throttle)
 	}
-	return NewRequest(c.Client, verb, c.base, c.versionedAPIPath, c.contentConfig, c.serializers, backoff, c.Throttle)
+	if c.requestTimeoutQuery > 0 {
+		request.Timeout(c.requestTimeoutQuery)
+	}
+	return request
 }
 
 // Post begins a POST request. Short for c.Verb("POST").

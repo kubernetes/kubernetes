@@ -113,6 +113,9 @@ type Config struct {
 	// Version forces a specific version to be used (if registered)
 	// Do we need this?
 	// Version string
+
+	// The "timeout" query parameter to include in API server requests.
+	RequestTimeoutQuery time.Duration
 }
 
 // ImpersonationConfig has all the available impersonation options
@@ -210,7 +213,14 @@ func RESTClientFor(config *Config) (*RESTClient, error) {
 		}
 	}
 
-	return NewRESTClient(baseURL, versionedAPIPath, config.ContentConfig, qps, burst, config.RateLimiter, httpClient)
+	client, err := NewRESTClient(baseURL, versionedAPIPath, config.ContentConfig, qps, burst, config.RateLimiter, httpClient)
+	if err != nil {
+		return nil, err
+	}
+	if config.RequestTimeoutQuery > 0 {
+		client.WithRequestTimeoutQuery(config.RequestTimeoutQuery)
+	}
+	return client, nil
 }
 
 // UnversionedRESTClientFor is the same as RESTClientFor, except that it allows
@@ -405,14 +415,15 @@ func AnonymousClientConfig(config *Config) *Config {
 			CAFile:     config.TLSClientConfig.CAFile,
 			CAData:     config.TLSClientConfig.CAData,
 		},
-		RateLimiter:   config.RateLimiter,
-		UserAgent:     config.UserAgent,
-		Transport:     config.Transport,
-		WrapTransport: config.WrapTransport,
-		QPS:           config.QPS,
-		Burst:         config.Burst,
-		Timeout:       config.Timeout,
-		Dial:          config.Dial,
+		RateLimiter:         config.RateLimiter,
+		UserAgent:           config.UserAgent,
+		Transport:           config.Transport,
+		WrapTransport:       config.WrapTransport,
+		QPS:                 config.QPS,
+		Burst:               config.Burst,
+		Timeout:             config.Timeout,
+		Dial:                config.Dial,
+		RequestTimeoutQuery: config.RequestTimeoutQuery,
 	}
 }
 
@@ -442,13 +453,14 @@ func CopyConfig(config *Config) *Config {
 			KeyData:    config.TLSClientConfig.KeyData,
 			CAData:     config.TLSClientConfig.CAData,
 		},
-		UserAgent:     config.UserAgent,
-		Transport:     config.Transport,
-		WrapTransport: config.WrapTransport,
-		QPS:           config.QPS,
-		Burst:         config.Burst,
-		RateLimiter:   config.RateLimiter,
-		Timeout:       config.Timeout,
-		Dial:          config.Dial,
+		UserAgent:           config.UserAgent,
+		Transport:           config.Transport,
+		WrapTransport:       config.WrapTransport,
+		QPS:                 config.QPS,
+		Burst:               config.Burst,
+		RateLimiter:         config.RateLimiter,
+		Timeout:             config.Timeout,
+		Dial:                config.Dial,
+		RequestTimeoutQuery: config.RequestTimeoutQuery,
 	}
 }

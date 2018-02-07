@@ -317,6 +317,45 @@ func TestCreateBackoffManager(t *testing.T) {
 
 }
 
+func TestServerRequestTimeoutQuery(t *testing.T) {
+	testServer, _, _ := testServerEnv(t, 200)
+	defer testServer.Close()
+	c, _ := restClient(testServer)
+
+	if c.RequestTimeoutQuery() != 0 {
+		t.Errorf("RequestTimeoutQuery: Expected default is 0")
+	}
+
+	request := c.Verb("GET")
+	if request == nil {
+		t.Errorf("Get: Object returned should not be nil")
+	}
+
+	if request.timeout != 0 {
+		t.Errorf("Get: Request timeout should be 0")
+	}
+
+	oneMinute, _ := time.ParseDuration("1m")
+	cReturned := c.WithRequestTimeoutQuery(oneMinute)
+
+	if cReturned != c {
+		t.Errorf("WithRequestTimeoutQuery: Unexpected Interface returned")
+	}
+
+	if c.RequestTimeoutQuery() != oneMinute {
+		t.Errorf("GetRequestTimeoutQuery: Expected default is 1m")
+	}
+
+	request = c.Verb("GET")
+	if request == nil {
+		t.Errorf("Get: Object returned should not be nil")
+	}
+
+	if request.timeout != oneMinute {
+		t.Errorf("Get: Request timeout should be 1m")
+	}
+}
+
 func testServerEnv(t *testing.T, statusCode int) (*httptest.Server, *utiltesting.FakeHandler, *metav1.Status) {
 	status := &metav1.Status{TypeMeta: metav1.TypeMeta{APIVersion: "v1", Kind: "Status"}, Status: fmt.Sprintf("%s", metav1.StatusSuccess)}
 	expectedBody, _ := runtime.Encode(scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), status)
