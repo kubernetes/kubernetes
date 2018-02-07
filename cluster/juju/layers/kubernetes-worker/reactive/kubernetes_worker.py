@@ -453,7 +453,27 @@ def extra_args_changed():
 
 @when('config.changed.docker-logins')
 def docker_logins_changed():
+    """Set a flag to handle new docker login options.
+
+    If docker daemon options have also changed, set a flag to ensure the
+    daemon is restarted prior to running docker login.
+    """
     config = hookenv.config()
+
+    if data_changed('docker-opts', config['docker-opts']):
+        hookenv.log('Found new docker daemon options. Requesting a restart.')
+        # State will be removed by layer-docker after restart
+        set_state('docker.restart')
+
+    set_state('kubernetes-worker.docker-login')
+
+
+@when('kubernetes-worker.docker-login')
+@when_not('docker.restart')
+def run_docker_login():
+    """Login to a docker registry with configured credentials."""
+    config = hookenv.config()
+
     previous_logins = config.previous('docker-logins')
     logins = config['docker-logins']
     logins = json.loads(logins)
@@ -474,6 +494,7 @@ def docker_logins_changed():
         cmd = ['docker', 'login', server, '-u', username, '-p', password]
         subprocess.check_call(cmd)
 
+    remove_state('kubernetes-worker.docker-login')
     set_state('kubernetes-worker.restart-needed')
 
 
