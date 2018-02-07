@@ -1298,6 +1298,9 @@ function prepare-kube-proxy-manifest-variables {
   if [[ -n "${FEATURE_GATES:-}" ]]; then
     params+=" --feature-gates=${FEATURE_GATES}"
   fi
+  if [[ "${KUBE_PROXY_MODE:-}" == "ipvs" ]];then
+    params+=" --proxy-mode=ipvs --feature-gates=SupportIPVSProxyMode=true"
+  fi
   params+=" --iptables-sync-period=1m --iptables-min-sync-period=10s --ipvs-sync-period=1m --ipvs-min-sync-period=10s"
   if [[ -n "${KUBEPROXY_TEST_ARGS:-}" ]]; then
     params+=" ${KUBEPROXY_TEST_ARGS}"
