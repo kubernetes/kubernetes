@@ -2799,6 +2799,25 @@ run_deployment_tests() {
   # Clean up
   kubectl delete deployment test-nginx-apps "${kube_flags[@]}"
 
+  # Test kubectl create deployment using generator deployment/apps.v1
+  kubectl create deployment test-nginx-apps --image=gcr.io/google-containers/nginx:test-cmd --generator=deployment/apps.v1
+  # Post-Condition: Deployment "nginx" is created.
+  kube::test::get_object_assert 'deploy test-nginx-apps' "{{$container_name_field}}" 'nginx'
+  # and new generator was used, iow. new defaults are applied
+  output_message=$(kubectl get deployment/test-nginx-apps -o jsonpath='{.spec.revisionHistoryLimit}')
+  kube::test::if_has_string "${output_message}" '2'
+  # Ensure we can interact with deployments through extensions and apps endpoints
+  output_message=$(kubectl get deployment.extensions -o=jsonpath='{.items[0].apiVersion}' 2>&1 "${kube_flags[@]}")
+  kube::test::if_has_string "${output_message}" 'extensions/v1beta1'
+  output_message=$(kubectl get deployment.apps -o=jsonpath='{.items[0].apiVersion}' 2>&1 "${kube_flags[@]}")
+  kube::test::if_has_string "${output_message}" 'apps/v1'
+  # Describe command (resource only) should print detailed information
+  kube::test::describe_resource_assert rs "Name:" "Pod Template:" "Labels:" "Selector:" "Controlled By" "Replicas:" "Pods Status:" "Volumes:"
+  # Describe command (resource only) should print detailed information
+  kube::test::describe_resource_assert pods "Name:" "Image:" "Node:" "Labels:" "Status:" "Controlled By"
+  # Clean up
+  kubectl delete deployment test-nginx-apps "${kube_flags[@]}"
+
   ### Test kubectl create deployment should not fail validation
   # Pre-Condition: No deployment exists.
   kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" ''

@@ -36,6 +36,7 @@ func Test_generatorFromName(t *testing.T) {
 		nonsenseName   = "not-a-real-generator-name"
 		basicName      = cmdutil.DeploymentBasicV1Beta1GeneratorName
 		basicAppsName  = cmdutil.DeploymentBasicAppsV1Beta1GeneratorName
+		AppsV1Name     = cmdutil.DeploymentAppsV1GeneratorName
 		deploymentName = "deployment-name"
 	)
 	imageNames := []string{"image-1", "image-2"}
@@ -62,6 +63,19 @@ func Test_generatorFromName(t *testing.T) {
 
 	{
 		expectedGenerator := &kubectl.DeploymentBasicAppsGeneratorV1{
+			BaseDeploymentGenerator: kubectl.BaseDeploymentGenerator{
+				Name:   deploymentName,
+				Images: imageNames,
+			},
+		}
+		assert.Equal(t, expectedGenerator, generator)
+	}
+
+	generator, ok = generatorFromName(AppsV1Name, imageNames, deploymentName)
+	assert.True(t, ok)
+
+	{
+		expectedGenerator := &kubectl.DeploymentAppsGeneratorV1{
 			BaseDeploymentGenerator: kubectl.BaseDeploymentGenerator{
 				Name:   deploymentName,
 				Images: imageNames,

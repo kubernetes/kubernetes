@@ -20,8 +20,10 @@ import (
 	"reflect"
 	"testing"
 
+	appsv1 "k8s.io/api/apps/v1beta1"
 	"k8s.io/api/core/v1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -96,6 +98,82 @@ func TestDeploymentBasicGenerate(t *testing.T) {
 			continue
 		}
 		if !reflect.DeepEqual(obj.(*extensionsv1beta1.Deployment), test.expected) {
+			t.Errorf("test: %v\nexpected:\n%#v\nsaw:\n%#v", test.name, test.expected, obj.(*extensionsv1beta1.Deployment))
+		}
+	}
+}
+
+func TestDeploymentAppsGenerateV1(t *testing.T) {
+	one := int32(1)
+	tests := []struct {
+		name           string
+		deploymentName string
+		images         []string
+		expected       *appsv1.Deployment
+		expectErr      bool
+	}{
+		{
+			name:           "deployment name and images ok",
+			deploymentName: "images-name-ok",
+			images:         []string{"nn/image1", "registry/nn/image2", "nn/image3:tag", "nn/image4@digest"},
+			expected: &appsv1.Deployment{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "images-name-ok",
+					Labels: map[string]string{"app": "images-name-ok"},
+				},
+				Spec: appsv1.DeploymentSpec{
+					Replicas: &one,
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"app": "images-name-ok"},
+					},
+					Template: v1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: map[string]string{"app": "images-name-ok"},
+						},
+						Spec: v1.PodSpec{
+							Containers: []v1.Container{
+								{Name: "image1", Image: "nn/image1"},
+								{Name: "image2", Image: "registry/nn/image2"},
+								{Name: "image3", Image: "nn/image3:tag"},
+								{Name: "image4", Image: "nn/image4@digest"},
+							},
+						},
+					},
+				},
+			},
+			expectErr: false,
+		},
+		{
+			name:           "empty images",
+			deploymentName: "images-empty",
+			images:         []string{},
+			expectErr:      true,
+		},
+		{
+			name:           "no images",
+			deploymentName: "images-missing",
+			expectErr:      true,
+		},
+		{
+			name:      "no deployment name and images",
+			expectErr: true,
+		},
+	}
+	for _, test := range tests {
+		generator := &DeploymentAppsGeneratorV1{
+			BaseDeploymentGenerator{
+				Name:   test.deploymentName,
+				Images: test.images,
+			},
+		}
+		obj, err := generator.StructuredGenerate()
+		if !test.expectErr && err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		if test.expectErr && err != nil {
+			continue
+		}
+		if !reflect.DeepEqual(obj.(*appsv1.Deployment), test.expected) {
 			t.Errorf("test: %v\nexpected:\n%#v\nsaw:\n%#v", test.name, test.expected, obj.(*extensionsv1beta1.Deployment))
 		}
 	}

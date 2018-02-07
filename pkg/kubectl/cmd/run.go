@@ -23,9 +23,9 @@ import (
 	"github.com/docker/distribution/reference"
 	"github.com/spf13/cobra"
 
+	appsv1 "k8s.io/api/apps/v1beta1"
 	batchv1 "k8s.io/api/batch/v1"
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
-	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -232,14 +232,12 @@ func RunRun(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *c
 	if len(generatorName) == 0 {
 		switch restartPolicy {
 		case api.RestartPolicyAlways:
-			// TODO: we need to deprecate this along with extensions/v1beta1.Deployments
-			// in favor of the new generator for apps/v1beta1.Deployments
-			hasResource, err := cmdutil.HasResource(clientset.Discovery(), extensionsv1beta1.SchemeGroupVersion.WithResource("deployments"))
+			hasResource, err := cmdutil.HasResource(clientset.Discovery(), appsv1.SchemeGroupVersion.WithResource("deployments"))
 			if err != nil {
 				return err
 			}
 			if hasResource {
-				generatorName = cmdutil.DeploymentV1Beta1GeneratorName
+				generatorName = cmdutil.DeploymentAppsV1GeneratorName
 			} else {
 				generatorName = cmdutil.RunV1GeneratorName
 			}

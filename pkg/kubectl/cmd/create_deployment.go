@@ -69,7 +69,6 @@ func generatorFromName(
 	imageNames []string,
 	deploymentName string,
 ) (kubectl.StructuredGenerator, bool) {
-
 	switch generatorName {
 	case cmdutil.DeploymentBasicAppsV1Beta1GeneratorName:
 		generator := &kubectl.DeploymentBasicAppsGeneratorV1{
@@ -88,8 +87,16 @@ func generatorFromName(
 			},
 		}
 		return generator, true
-	}
 
+	case cmdutil.DeploymentAppsV1GeneratorName:
+		generator := &kubectl.DeploymentAppsGeneratorV1{
+			BaseDeploymentGenerator: kubectl.BaseDeploymentGenerator{
+				Name:   deploymentName,
+				Images: imageNames,
+			},
+		}
+		return generator, true
+	}
 	return nil, false
 }
 

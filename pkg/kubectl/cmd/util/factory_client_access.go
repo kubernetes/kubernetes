@@ -504,6 +504,7 @@ const (
 	DeploymentAppsV1Beta1GeneratorName      = "deployment/apps.v1beta1"
 	DeploymentBasicV1Beta1GeneratorName     = "deployment-basic/v1beta1"
 	DeploymentBasicAppsV1Beta1GeneratorName = "deployment-basic/apps.v1beta1"
+	DeploymentAppsV1GeneratorName           = "deployment/apps.v1"
 	JobV1GeneratorName                      = "job/v1"
 	CronJobV2Alpha1GeneratorName            = "cronjob/v2alpha1"
 	CronJobV1Beta1GeneratorName             = "cronjob/v1beta1"
@@ -555,6 +556,7 @@ func DefaultGenerators(cmdName string) map[string]kubectl.Generator {
 			RunPodV1GeneratorName:              kubectl.BasicPod{},
 			DeploymentV1Beta1GeneratorName:     kubectl.DeploymentV1Beta1{},
 			DeploymentAppsV1Beta1GeneratorName: kubectl.DeploymentAppsV1Beta1{},
+			DeploymentAppsV1GeneratorName:      kubectl.DeploymentAppsV1{},
 			JobV1GeneratorName:                 kubectl.JobV1{},
 			CronJobV2Alpha1GeneratorName:       kubectl.CronJobV2Alpha1{},
 			CronJobV1Beta1GeneratorName:        kubectl.CronJobV1Beta1{},
@@ -596,14 +598,14 @@ func FallbackGeneratorNameIfNecessary(
 	cmdErr io.Writer,
 ) (string, error) {
 	switch generatorName {
-	case DeploymentBasicAppsV1Beta1GeneratorName:
+	case DeploymentAppsV1GeneratorName:
 		hasResource, err := HasResource(discoveryClient, appsv1beta1.SchemeGroupVersion.WithResource("deployments"))
 		if err != nil {
 			return "", err
 		}
 		if !hasResource {
-			warning(cmdErr, DeploymentBasicAppsV1Beta1GeneratorName, DeploymentBasicV1Beta1GeneratorName)
-			return DeploymentBasicV1Beta1GeneratorName, nil
+			warning(cmdErr, DeploymentAppsV1GeneratorName, DeploymentBasicAppsV1Beta1GeneratorName)
+			return DeploymentBasicAppsV1Beta1GeneratorName, nil
 		}
 	case CronJobV2Alpha1GeneratorName:
 		hasResource, err := HasResource(discoveryClient, batchv2alpha1.SchemeGroupVersion.WithResource("cronjobs"))
