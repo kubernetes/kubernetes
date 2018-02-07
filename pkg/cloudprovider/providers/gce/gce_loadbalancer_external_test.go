@@ -304,24 +304,27 @@ func createAndInsertNodes(gce *GCECloud, nodeNames []string) ([]*v1.Node, error)
 	nodes := []*v1.Node{}
 
 	for _, name := range nodeNames {
-		// Inserting the same node name twice causes an error - here we call
-		// DeleteInstance to guarantee that nodes aren't inserted twice.
-		// See TestUpdateExternalLoadBalancer.
-		err := gce.DeleteInstance(gceProjectId, zoneName, name)
+		// Inserting the same node name twice causes an error - here we check if
+		// the instance exists already before insertion.
+		// TestUpdateExternalLoadBalancer inserts a new node, and relies on an older
+		// node to already have been inserted.
+		instance, _ := gce.getInstanceByName(name)
 
-		err = gce.InsertInstance(
-			gceProjectId,
-			zoneName,
-			&compute.Instance{
-				Name: name,
-				Tags: &compute.Tags{
-					Items: []string{name},
+		if instance == nil {
+			err := gce.InsertInstance(
+				gceProjectId,
+				zoneName,
+				&compute.Instance{
+					Name: name,
+					Tags: &compute.Tags{
+						Items: []string{name},
+					},
 				},
-			},
-		)
+			)
 
-		if err != nil {
-			return nodes, err
+			if err != nil {
+				return nodes, err
+			}
 		}
 
 		nodes = append(
@@ -340,6 +343,7 @@ func createAndInsertNodes(gce *GCECloud, nodeNames []string) ([]*v1.Node, error)
 				},
 			},
 		)
+
 	}
 
 	return nodes, nil
