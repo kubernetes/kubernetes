@@ -18,7 +18,6 @@ package cmd
 
 import (
 	"bytes"
-	"fmt"
 	"net/http"
 	"strings"
 	"testing"
@@ -237,8 +236,7 @@ func TestRunExposeService(t *testing.T) {
 					ClusterIP: "10.10.10.10",
 				},
 			},
-			expected: "service \"foo\" exposed",
-			status:   200,
+			status: 200,
 		},
 		{
 			name: "expose-headless-service",
@@ -269,8 +267,7 @@ func TestRunExposeService(t *testing.T) {
 					ClusterIP: api.ClusterIPNone,
 				},
 			},
-			expected: "service \"foo\" exposed",
-			status:   200,
+			status: 200,
 		},
 		{
 			name: "expose-headless-service-no-port",
@@ -295,8 +292,7 @@ func TestRunExposeService(t *testing.T) {
 					ClusterIP: api.ClusterIPNone,
 				},
 			},
-			expected: "service \"foo\" exposed",
-			status:   200,
+			status: 200,
 		},
 		{
 			name: "expose-from-file",
@@ -498,10 +494,8 @@ func TestRunExposeService(t *testing.T) {
 			buf.Reset()
 			if err := tf.Printer.PrintObj(test.output, buf); err != nil {
 				t.Errorf("%s: Unexpected error: %v", test.name, err)
-				continue
 			}
-
-			test.expected = fmt.Sprintf("service %q exposed (dry run)", test.flags["name"])
+			continue
 		}
 
 		if !strings.Contains(out, test.expected) {
