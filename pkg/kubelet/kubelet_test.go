@@ -731,7 +731,7 @@ func TestValidateContainerLogStatus(t *testing.T) {
 						Running: &v1.ContainerStateRunning{},
 					},
 					LastTerminationState: v1.ContainerState{
-						Terminated: &v1.ContainerStateTerminated{},
+						Terminated: &v1.ContainerStateTerminated{ContainerID: "docker://fakeid"},
 					},
 				},
 			},
@@ -759,8 +759,50 @@ func TestValidateContainerLogStatus(t *testing.T) {
 					},
 				},
 			},
+			success:  false,
+			pSuccess: false,
+		},
+		{
+			statuses: []v1.ContainerStatus{
+				{
+					Name: containerName,
+					State: v1.ContainerState{
+						Terminated: &v1.ContainerStateTerminated{ContainerID: "docker://fakeid"},
+					},
+				},
+			},
 			success:  true,
 			pSuccess: false,
+		},
+		{
+			statuses: []v1.ContainerStatus{
+				{
+					Name: containerName,
+					State: v1.ContainerState{
+						Terminated: &v1.ContainerStateTerminated{},
+					},
+					LastTerminationState: v1.ContainerState{
+						Terminated: &v1.ContainerStateTerminated{},
+					},
+				},
+			},
+			success:  false,
+			pSuccess: false,
+		},
+		{
+			statuses: []v1.ContainerStatus{
+				{
+					Name: containerName,
+					State: v1.ContainerState{
+						Terminated: &v1.ContainerStateTerminated{},
+					},
+					LastTerminationState: v1.ContainerState{
+						Terminated: &v1.ContainerStateTerminated{ContainerID: "docker://fakeid"},
+					},
+				},
+			},
+			success:  true,
+			pSuccess: true,
 		},
 		{
 			statuses: []v1.ContainerStatus{
