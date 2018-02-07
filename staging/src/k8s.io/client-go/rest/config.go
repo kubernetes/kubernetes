@@ -77,6 +77,9 @@ type Config struct {
 	// Callback to persist config for AuthProvider.
 	AuthConfigPersister AuthProviderConfigPersister
 
+	// Exec-based authentication provider.
+	ExecProvider *clientcmdapi.ExecConfig
+
 	// TLSClientConfig contains settings to enable transport layer security
 	TLSClientConfig
 
@@ -432,6 +435,7 @@ func CopyConfig(config *Config) *Config {
 		},
 		AuthProvider:        config.AuthProvider,
 		AuthConfigPersister: config.AuthConfigPersister,
+		ExecProvider:        config.ExecProvider,
 		TLSClientConfig: TLSClientConfig{
 			Insecure:   config.TLSClientConfig.Insecure,
 			ServerName: config.TLSClientConfig.ServerName,

@@ -241,6 +241,9 @@ func (config *DirectClientConfig) getUserIdentificationPartialConfig(configAuthI
 		mergedConfig.AuthProvider = configAuthInfo.AuthProvider
 		mergedConfig.AuthConfigPersister = persistAuthConfig
 	}
+	if configAuthInfo.Exec != nil {
+		mergedConfig.ExecProvider = configAuthInfo.Exec
+	}
 
 	// if there still isn't enough information to authenticate the user, try prompting
 	if !canIdentifyUser(*mergedConfig) && (fallbackReader != nil) {
@@ -291,7 +294,8 @@ func canIdentifyUser(config restclient.Config) bool {
 	return len(config.Username) > 0 ||
 		(len(config.CertFile) > 0 || len(config.CertData) > 0) ||
 		len(config.BearerToken) > 0 ||
-		config.AuthProvider != nil
+		config.AuthProvider != nil ||
+		config.ExecProvider != nil
 }
 
 // Namespace implements ClientConfig

@@ -206,6 +206,9 @@ func TestResolveRelativePaths(t *testing.T) {
 		AuthInfos: map[string]*clientcmdapi.AuthInfo{
 			"relative-user-1": {ClientCertificate: "relative/client/cert", ClientKey: "../relative/client/key"},
 			"absolute-user-1": {ClientCertificate: "/absolute/client/cert", ClientKey: "/absolute/client/key"},
+			"relative-cmd-1":  {Exec: &clientcmdapi.ExecConfig{Command: "../relative/client/cmd"}},
+			"absolute-cmd-1":  {Exec: &clientcmdapi.ExecConfig{Command: "/absolute/client/cmd"}},
+			"PATH-cmd-1":      {Exec: &clientcmdapi.ExecConfig{Command: "cmd"}},
 		},
 		Clusters: map[string]*clientcmdapi.Cluster{
 			"relative-server-1": {CertificateAuthority: "../relative/ca"},
@@ -291,9 +294,21 @@ func TestResolveRelativePaths(t *testing.T) {
 			matchStringArg(pathResolutionConfig2.AuthInfos["absolute-user-2"].ClientCertificate, authInfo.ClientCertificate, t)
 			matchStringArg(pathResolutionConfig2.AuthInfos["absolute-user-2"].ClientKey, authInfo.ClientKey, t)
 		}
+		if key == "relative-cmd-1" {
+			foundAuthInfoCount++
+			matchStringArg(path.Join(configDir1, pathResolutionConfig1.AuthInfos[key].Exec.Command), authInfo.Exec.Command, t)
+		}
+		if key == "absolute-cmd-1" {
+			foundAuthInfoCount++
+			matchStringArg(pathResolutionConfig1.AuthInfos[key].Exec.Command, authInfo.Exec.Command, t)
+		}
+		if key == "PATH-cmd-1" {
+			foundAuthInfoCount++
+			matchStringArg(pathResolutionConfig1.AuthInfos[key].Exec.Command, authInfo.Exec.Command, t)
+		}
 	}
-	if foundAuthInfoCount != 4 {
-		t.Errorf("Expected 4 users, found %v: %v", foundAuthInfoCount, mergedConfig.AuthInfos)
+	if foundAuthInfoCount != 7 {
+		t.Errorf("Expected 7 users, found %v: %v", foundAuthInfoCount, mergedConfig.AuthInfos)
 	}
 
 }
