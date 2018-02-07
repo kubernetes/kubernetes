@@ -443,7 +443,7 @@ func (o *EnvOptions) RunEnv(f cmdutil.Factory) error {
 			continue
 		}
 
-		f.PrintSuccess(o.Mapper, o.ShortOutput, o.Out, info.Mapping.Resource, info.Name, false, "env updated")
+		f.PrintSuccess(o.ShortOutput, o.Out, info.Mapping.Resource, info.Name, false, "env updated")
 	}
 	return utilerrors.NewAggregate(allErrs)
 }

@@ -70,7 +70,7 @@ type serviceAccountConfig struct {
 	local                  bool
 	PrintObject            func(cmd *cobra.Command, isLocal bool, mapper meta.RESTMapper, obj runtime.Object, out io.Writer) error
 	updatePodSpecForObject func(runtime.Object, func(*v1.PodSpec) error) (bool, error)
-	printSuccess           func(mapper meta.RESTMapper, shortOutput bool, out io.Writer, resource, name string, dryRun bool, operation string)
+	printSuccess           func(shortOutput bool, out io.Writer, resource, name string, dryRun bool, operation string)
 	infos                  []*resource.Info
 	serviceAccountName     string
 }
@@ -192,7 +192,7 @@ func (saConfig *serviceAccountConfig) Run() error {
 			}
 			continue
 		}
-		saConfig.printSuccess(saConfig.mapper, saConfig.shortOutput, saConfig.out, info.Mapping.Resource, info.Name, saConfig.dryRun, "serviceaccount updated")
+		saConfig.printSuccess(saConfig.shortOutput, saConfig.out, info.Mapping.Resource, info.Name, saConfig.dryRun, "serviceaccount updated")
 	}
 	return utilerrors.NewAggregate(patchErrs)
 }

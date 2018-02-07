@@ -6,9 +6,9 @@ args:
 - bars/test2
 namespace: default
 expectedStdout:
-- "service \"kubernetes\" edited"
-- "bar \"test\" edited"
-- "bar \"test2\" edited"
+- "services \"kubernetes\" edited"
+- "bars \"test\" edited"
+- "bars \"test2\" edited"
 expectedExitCode: 0
 steps:
 - type: request

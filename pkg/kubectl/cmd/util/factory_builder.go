@@ -82,8 +82,7 @@ func (f *ring2Factory) PrinterForMapping(options *printers.PrintOptions, mapping
 	return printer, nil
 }
 
-func (f *ring2Factory) PrintSuccess(mapper meta.RESTMapper, shortOutput bool, out io.Writer, resource, name string, dryRun bool, operation string) {
-	resource, _ = mapper.ResourceSingularizer(resource)
+func (f *ring2Factory) PrintSuccess(shortOutput bool, out io.Writer, resource, name string, dryRun bool, operation string) {
 	dryRunMsg := ""
 	if dryRun {
 		dryRunMsg = " (dry run)"

@@ -270,7 +270,7 @@ func (o AnnotateOptions) RunAnnotate(f cmdutil.Factory, cmd *cobra.Command) erro
 		if len(o.outputFormat) > 0 {
 			return f.PrintObject(cmd, o.local, mapper, outputObj, o.out)
 		}
-		f.PrintSuccess(mapper, false, o.out, info.Mapping.Resource, info.Name, o.dryrun, "annotated")
+		f.PrintSuccess(false, o.out, info.Mapping.Resource, info.Name, o.dryrun, "annotated")
 		return nil
 	})
 }

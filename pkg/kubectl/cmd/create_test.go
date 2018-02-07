@@ -69,7 +69,7 @@ func TestCreateObject(t *testing.T) {
 	cmd.Run(cmd, []string{})
 
 	// uses the name from the file, not the response
-	if buf.String() != "replicationcontroller/redis-master-controller\n" {
+	if buf.String() != "replicationcontrollers/redis-master-controller\n" {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
 }
@@ -106,7 +106,7 @@ func TestCreateMultipleObject(t *testing.T) {
 	cmd.Run(cmd, []string{})
 
 	// Names should come from the REST response, NOT the files
-	if buf.String() != "replicationcontroller/rc1\nservice/baz\n" {
+	if buf.String() != "replicationcontrollers/rc1\nservices/baz\n" {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
 }
@@ -140,7 +140,7 @@ func TestCreateDirectory(t *testing.T) {
 	cmd.Flags().Set("output", "name")
 	cmd.Run(cmd, []string{})
 
-	if buf.String() != "replicationcontroller/name\nreplicationcontroller/name\nreplicationcontroller/name\n" {
+	if buf.String() != "replicationcontrollers/name\nreplicationcontrollers/name\nreplicationcontrollers/name\n" {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
 }

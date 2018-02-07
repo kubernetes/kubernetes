@@ -60,7 +60,6 @@ type EditOptions struct {
 
 	cmdutil.ValidateOptions
 
-	Mapper         meta.RESTMapper
 	ResourceMapper *resource.Mapper
 	OriginalResult *resource.Result
 	Encoder        runtime.Encoder
@@ -107,7 +106,6 @@ func (o *EditOptions) Complete(f cmdutil.Factory, out, errOut io.Writer, args []
 	if err != nil {
 		return err
 	}
-	mapper, _ := f.Object()
 	b := f.NewBuilder().
 		Unstructured()
 	if o.EditMode == NormalEditMode || o.EditMode == ApplyEditMode {
@@ -138,7 +136,6 @@ func (o *EditOptions) Complete(f cmdutil.Factory, out, errOut io.Writer, args []
 			Do()
 	}
 
-	o.Mapper = mapper
 	o.CmdNamespace = cmdNamespace
 	o.Encoder = f.JSONEncoder()
 	o.f = f
@@ -408,14 +405,14 @@ func (o *EditOptions) visitToApplyEditPatch(originalInfos []*resource.Info, patc
 		}
 
 		if reflect.DeepEqual(originalJS, editedJS) {
-			o.f.PrintSuccess(o.Mapper, false, o.Out, info.Mapping.Resource, info.Name, false, "skipped")
+			o.f.PrintSuccess(false, o.Out, info.Mapping.Resource, info.Name, false, "skipped")
 			return nil
 		} else {
 			err := o.annotationPatch(info)
 			if err != nil {
 				return err
 			}
-			o.f.PrintSuccess(o.Mapper, false, o.Out, info.Mapping.Resource, info.Name, false, "edited")
+			o.f.PrintSuccess(false, o.Out, info.Mapping.Resource, info.Name, false, "edited")
 			return nil
 		}
 	})
@@ -534,7 +531,7 @@ func (o *EditOptions) visitToPatch(originalInfos []*resource.Info, patchVisitor 
 
 		if reflect.DeepEqual(originalJS, editedJS) {
 			// no edit, so just skip it.
-			o.f.PrintSuccess(o.Mapper, false, o.Out, info.Mapping.Resource, info.Name, false, "skipped")
+			o.f.PrintSuccess(false, o.Out, info.Mapping.Resource, info.Name, false, "skipped")
 			return nil
 		}
 
@@ -588,7 +585,7 @@ func (o *EditOptions) visitToPatch(originalInfos []*resource.Info, patchVisitor 
 			return nil
 		}
 		info.Refresh(patched, true)
-		o.f.PrintSuccess(o.Mapper, false, o.Out, info.Mapping.Resource, info.Name, false, "edited")
+		o.f.PrintSuccess(false, o.Out, info.Mapping.Resource, info.Name, false, "edited")
 		return nil
 	})
 	return err
@@ -599,7 +596,7 @@ func (o *EditOptions) visitToCreate(createVisitor resource.Visitor) error {
 		if err := resource.CreateAndRefresh(info); err != nil {
 			return err
 		}
-		o.f.PrintSuccess(o.Mapper, false, o.Out, info.Mapping.Resource, info.Name, false, "created")
+		o.f.PrintSuccess(false, o.Out, info.Mapping.Resource, info.Name, false, "created")
 		return nil
 	})
 	return err

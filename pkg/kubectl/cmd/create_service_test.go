@@ -51,7 +51,7 @@ func TestCreateService(t *testing.T) {
 	cmd.Flags().Set("output", "name")
 	cmd.Flags().Set("tcp", "8080:8000")
 	cmd.Run(cmd, []string{service.Name})
-	expectedOutput := "service/" + service.Name + "\n"
+	expectedOutput := "services/" + service.Name + "\n"
 	if buf.String() != expectedOutput {
 		t.Errorf("expected output: %s, but got: %s", expectedOutput, buf.String())
 	}
@@ -81,7 +81,7 @@ func TestCreateServiceNodePort(t *testing.T) {
 	cmd.Flags().Set("output", "name")
 	cmd.Flags().Set("tcp", "30000:8000")
 	cmd.Run(cmd, []string{service.Name})
-	expectedOutput := "service/" + service.Name + "\n"
+	expectedOutput := "services/" + service.Name + "\n"
 	if buf.String() != expectedOutput {
 		t.Errorf("expected output: %s, but got: %s", expectedOutput, buf.String())
 	}
@@ -111,7 +111,7 @@ func TestCreateServiceExternalName(t *testing.T) {
 	cmd.Flags().Set("output", "name")
 	cmd.Flags().Set("external-name", "name")
 	cmd.Run(cmd, []string{service.Name})
-	expectedOutput := "service/" + service.Name + "\n"
+	expectedOutput := "services/" + service.Name + "\n"
 	if buf.String() != expectedOutput {
 		t.Errorf("expected output: %s, but got: %s", expectedOutput, buf.String())
 	}

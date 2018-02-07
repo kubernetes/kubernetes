@@ -300,7 +300,7 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 			if len(output) > 0 && !shortOutput {
 				return f.PrintResourceInfoForCommand(cmd, info, out)
 			}
-			f.PrintSuccess(mapper, shortOutput, out, info.Mapping.Resource, info.Name, dryRun, "created")
+			f.PrintSuccess(shortOutput, out, info.Mapping.Resource, info.Name, dryRun, "created")
 			return nil
 		}
 
@@ -345,7 +345,7 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 
 			if string(patchBytes) == "{}" {
 				count++
-				f.PrintSuccess(mapper, shortOutput, out, info.Mapping.Resource, info.Name, false, "unchanged")
+				f.PrintSuccess(shortOutput, out, info.Mapping.Resource, info.Name, false, "unchanged")
 				return nil
 			}
 		}
@@ -353,7 +353,7 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 		if len(output) > 0 && !shortOutput {
 			return f.PrintResourceInfoForCommand(cmd, info, out)
 		}
-		f.PrintSuccess(mapper, shortOutput, out, info.Mapping.Resource, info.Name, dryRun, "configured")
+		f.PrintSuccess(shortOutput, out, info.Mapping.Resource, info.Name, dryRun, "configured")
 		return nil
 	})
 
@@ -520,7 +520,7 @@ func (p *pruner) prune(f cmdutil.Factory, namespace string, mapping *meta.RESTMa
 				return err
 			}
 		}
-		f.PrintSuccess(p.mapper, shortOutput, p.out, mapping.Resource, name, p.dryRun, "pruned")
+		f.PrintSuccess(shortOutput, p.out, mapping.Resource, name, p.dryRun, "pruned")
 	}
 	return nil
 }

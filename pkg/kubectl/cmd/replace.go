@@ -132,8 +132,6 @@ func RunReplace(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 		return err
 	}
 
-	mapper := r.Mapper().RESTMapper
-
 	return r.Visit(func(info *resource.Info, err error) error {
 		if err != nil {
 			return err
@@ -157,7 +155,7 @@ func RunReplace(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 
 		info.Refresh(obj, true)
 		f.PrintObjectSpecificMessage(obj, out)
-		f.PrintSuccess(mapper, shortOutput, out, info.Mapping.Resource, info.Name, false, "replaced")
+		f.PrintSuccess(shortOutput, out, info.Mapping.Resource, info.Name, false, "replaced")
 		return nil
 	})
 }
@@ -281,7 +279,7 @@ func forceReplace(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []s
 		count++
 		info.Refresh(obj, true)
 		f.PrintObjectSpecificMessage(obj, out)
-		f.PrintSuccess(mapper, shortOutput, out, info.Mapping.Resource, info.Name, false, "replaced")
+		f.PrintSuccess(shortOutput, out, info.Mapping.Resource, info.Name, false, "replaced")
 		return nil
 	})
 	if err != nil {

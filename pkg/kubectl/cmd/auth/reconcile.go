@@ -114,7 +114,6 @@ func (o *ReconcileOptions) Complete(cmd *cobra.Command, f cmdutil.Factory, args 
 	o.RBACClient = client.Rbac()
 	o.NamespaceClient = client.Core().Namespaces()
 
-	mapper, _ := f.Object()
 	dryRun := false
 	output := cmdutil.GetFlagString(cmd, "output")
 	shortOutput := output == "name"
@@ -122,7 +121,7 @@ func (o *ReconcileOptions) Complete(cmd *cobra.Command, f cmdutil.Factory, args 
 		if len(output) > 0 && !shortOutput {
 			return f.PrintResourceInfoForCommand(cmd, info, o.Out)
 		}
-		f.PrintSuccess(mapper, shortOutput, o.Out, info.Mapping.Resource, info.Name, dryRun, "reconciled")
+		f.PrintSuccess(shortOutput, o.Out, info.Mapping.Resource, info.Name, dryRun, "reconciled")
 		return nil
 	}
 

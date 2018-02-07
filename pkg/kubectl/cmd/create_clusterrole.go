@@ -173,7 +173,7 @@ func (c *CreateClusterRoleOptions) RunCreateRole() error {
 	}
 
 	if useShortOutput := c.OutputFormat == "name"; useShortOutput || len(c.OutputFormat) == 0 {
-		c.PrintSuccess(c.Mapper, useShortOutput, c.Out, "clusterroles", c.Name, c.DryRun, "created")
+		c.PrintSuccess(useShortOutput, c.Out, "clusterroles", c.Name, c.DryRun, "created")
 		return nil
 	}
 

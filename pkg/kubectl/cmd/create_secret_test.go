@@ -57,7 +57,7 @@ func TestCreateSecretGeneric(t *testing.T) {
 	cmd.Flags().Set("from-literal", "password=includes,comma")
 	cmd.Flags().Set("from-literal", "username=test_user")
 	cmd.Run(cmd, []string{secretObject.Name})
-	expectedOutput := "secret/" + secretObject.Name + "\n"
+	expectedOutput := "secrets/" + secretObject.Name + "\n"
 	if buf.String() != expectedOutput {
 		t.Errorf("expected output: %s, but got: %s", expectedOutput, buf.String())
 	}
@@ -89,7 +89,7 @@ func TestCreateSecretDockerRegistry(t *testing.T) {
 	cmd.Flags().Set("docker-email", "test-email")
 	cmd.Flags().Set("output", "name")
 	cmd.Run(cmd, []string{secretObject.Name})
-	expectedOutput := "secret/" + secretObject.Name + "\n"
+	expectedOutput := "secrets/" + secretObject.Name + "\n"
 	if buf.String() != expectedOutput {
 		t.Errorf("expected output: %s, but got: %s", buf.String(), expectedOutput)
 	}

@@ -112,7 +112,7 @@ type CreateRoleOptions struct {
 	Mapper       meta.RESTMapper
 	Out          io.Writer
 	PrintObject  func(obj runtime.Object) error
-	PrintSuccess func(mapper meta.RESTMapper, shortOutput bool, out io.Writer, resource, name string, dryRun bool, operation string)
+	PrintSuccess func(shortOutput bool, out io.Writer, resource, name string, dryRun bool, operation string)
 }
 
 // Role is a command to ease creating Roles.
@@ -295,7 +295,7 @@ func (c *CreateRoleOptions) RunCreateRole() error {
 	}
 
 	if useShortOutput := c.OutputFormat == "name"; useShortOutput || len(c.OutputFormat) == 0 {
-		c.PrintSuccess(c.Mapper, useShortOutput, c.Out, "roles", c.Name, c.DryRun, "created")
+		c.PrintSuccess(useShortOutput, c.Out, "roles", c.Name, c.DryRun, "created")
 		return nil
 	}
 

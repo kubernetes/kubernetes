@@ -50,7 +50,7 @@ func TestCreateConfigMap(t *testing.T) {
 	cmd := NewCmdCreateConfigMap(f, buf)
 	cmd.Flags().Set("output", "name")
 	cmd.Run(cmd, []string{configMap.Name})
-	expectedOutput := "configmap/" + configMap.Name + "\n"
+	expectedOutput := "configmaps/" + configMap.Name + "\n"
 	if buf.String() != expectedOutput {
 		t.Errorf("expected output: %s, but got: %s", expectedOutput, buf.String())
 	}
