@@ -452,8 +452,9 @@ func nodeAddresses(srv *servers.Server) ([]v1.NodeAddress, error) {
 	addrs := []v1.NodeAddress{}
 
 	type Address struct {
-		IPType string `mapstructure:"OS-EXT-IPS:type"`
-		Addr   string
+		IPType    string `mapstructure:"OS-EXT-IPS:type"`
+		Addr      string
+		IPVersion int `mapstructure:"version"`
 	}
 
 	var addresses map[string][]Address
@@ -465,7 +466,7 @@ func nodeAddresses(srv *servers.Server) ([]v1.NodeAddress, error) {
 	for network, addrList := range addresses {
 		for _, props := range addrList {
 			var addressType v1.NodeAddressType
-			if props.IPType == "floating" || network == "public" {
+			if props.IPType == "floating" || network == "public" || props.IPVersion == 6 {
 				addressType = v1.NodeExternalIP
 			} else {
 				addressType = v1.NodeInternalIP
