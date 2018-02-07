@@ -60,10 +60,16 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST) {
 }
 
 var _ rest.CategoriesProvider = &REST{}
+var _ rest.ShortNamesProvider = &REST{}
 
 // Categories implements the CategoriesProvider interface. Returns a list of categories a resource is part of.
 func (r *REST) Categories() []string {
 	return []string{"all"}
+}
+
+// ShortNames implements the ShortNamesProvider interface. Returns a list of short names for a resource.
+func (r *REST) ShortNames() []string {
+	return []string{"cj"}
 }
 
 // StatusREST implements the REST endpoint for changing the status of a resourcequota.
