@@ -358,7 +358,6 @@ func Convert_kubeadm_SelfHostedEtcd_To_v1alpha1_SelfHostedEtcd(in *kubeadm.SelfH
 func autoConvert_v1alpha1_TokenDiscovery_To_kubeadm_TokenDiscovery(in *TokenDiscovery, out *kubeadm.TokenDiscovery, s conversion.Scope) error {
 	out.ID = in.ID
 	out.Secret = in.Secret
-	out.Addresses = *(*[]string)(unsafe.Pointer(&in.Addresses))
 	return nil
 }
 
@@ -370,7 +369,6 @@ func Convert_v1alpha1_TokenDiscovery_To_kubeadm_TokenDiscovery(in *TokenDiscover
 func autoConvert_kubeadm_TokenDiscovery_To_v1alpha1_TokenDiscovery(in *kubeadm.TokenDiscovery, out *TokenDiscovery, s conversion.Scope) error {
 	out.ID = in.ID
 	out.Secret = in.Secret
-	out.Addresses = *(*[]string)(unsafe.Pointer(&in.Addresses))
 	return nil
 }
 

@@ -29,43 +29,75 @@ import (
 type MasterConfiguration struct {
 	metav1.TypeMeta `json:",inline"`
 
-	API                  API                  `json:"api"`
-	KubeProxy            KubeProxy            `json:"kubeProxy"`
-	Etcd                 Etcd                 `json:"etcd"`
+	// API holds configuration for the k8s apiserver.
+	API API `json:"api"`
+	// KubeProxy holds configuration for the k8s service proxy.
+	KubeProxy KubeProxy `json:"kubeProxy"`
+	// Etcd holds configuration for etcd.
+	Etcd Etcd `json:"etcd"`
+	// KubeletConfiguration holds configuration for the kubelet.
 	KubeletConfiguration KubeletConfiguration `json:"kubeletConfiguration"`
-	Networking           Networking           `json:"networking"`
-	KubernetesVersion    string               `json:"kubernetesVersion"`
-	CloudProvider        string               `json:"cloudProvider"`
-	NodeName             string               `json:"nodeName"`
-	AuthorizationModes   []string             `json:"authorizationModes,omitempty"`
+	// Networking holds configuration for the networking topology of the cluster.
+	Networking Networking `json:"networking"`
+	// KubernetesVersion is the target version of the control plane.
+	KubernetesVersion string `json:"kubernetesVersion"`
+	// CloudProvider is the name of the cloud provider.
+	CloudProvider string `json:"cloudProvider"`
+	// NodeName is the name of the node that will host the k8s control plane.
+	// Defaults to the hostname if not provided.
+	NodeName string `json:"nodeName"`
+	// AuthorizationModes is a set of authorization modes used inside the cluster.
+	// If not specified, defaults to Node and RBAC, meaning both the node
+	// authorizer and RBAC are enabled.
+	AuthorizationModes []string `json:"authorizationModes,omitempty"`
 
 	// Mark the controller and api server pods as privileged as some cloud
 	// controllers like openstack need escalated privileges under some conditions
 	// example - loading a config drive to fetch node information
 	PrivilegedPods bool `json:"privilegedPods"`
 
-	Token    string           `json:"token"`
+	// Token is used for establishing bidirectional trust between nodes and masters.
+	// Used for joining nodes in the cluster.
+	Token string `json:"token"`
+	// TokenTTL is a ttl for Token. Defaults to 24h.
 	TokenTTL *metav1.Duration `json:"tokenTTL,omitempty"`
 
-	APIServerExtraArgs         map[string]string `json:"apiServerExtraArgs,omitempty"`
+	// APIServerExtraArgs is a set of extra flags to pass to the API Server or override
+	// default ones in form of <flagname>=<value>.
+	// TODO: This is temporary and ideally we would like to switch all components to
+	// use ComponentConfig + ConfigMaps.
+	APIServerExtraArgs map[string]string `json:"apiServerExtraArgs,omitempty"`
+	// ControllerManagerExtraArgs is a set of extra flags to pass to the Controller Manager
+	// or override default ones in form of <flagname>=<value>
+	// TODO: This is temporary and ideally we would like to switch all components to
+	// use ComponentConfig + ConfigMaps.
 	ControllerManagerExtraArgs map[string]string `json:"controllerManagerExtraArgs,omitempty"`
-	SchedulerExtraArgs         map[string]string `json:"schedulerExtraArgs,omitempty"`
+	// SchedulerExtraArgs is a set of extra flags to pass to the Scheduler or override
+	// default ones in form of <flagname>=<value>
+	// TODO: This is temporary and ideally we would like to switch all components to
+	// use ComponentConfig + ConfigMaps.
+	SchedulerExtraArgs map[string]string `json:"schedulerExtraArgs,omitempty"`
 
-	APIServerExtraVolumes         []HostPathMount `json:"apiServerExtraVolumes,omitempty"`
+	// APIServerExtraVolumes is an extra set of host volumes mounted to the API server.
+	APIServerExtraVolumes []HostPathMount `json:"apiServerExtraVolumes,omitempty"`
+	// ControllerManagerExtraVolumes is an extra set of host volumes mounted to the
+	// Controller Manager.
 	ControllerManagerExtraVolumes []HostPathMount `json:"controllerManagerExtraVolumes,omitempty"`
-	SchedulerExtraVolumes         []HostPathMount `json:"schedulerExtraVolumes,omitempty"`
+	// SchedulerExtraVolumes is an extra set of host volumes mounted to the scheduler.
+	SchedulerExtraVolumes []HostPathMount `json:"schedulerExtraVolumes,omitempty"`
 
-	// APIServerCertSANs sets extra Subject Alternative Names for the API Server signing cert
+	// APIServerCertSANs sets extra Subject Alternative Names for the API Server signing cert.
 	APIServerCertSANs []string `json:"apiServerCertSANs,omitempty"`
-	// CertificatesDir specifies where to store or look for all required certificates
+	// CertificatesDir specifies where to store or look for all required certificates.
 	CertificatesDir string `json:"certificatesDir"`
 
 	// ImageRepository what container registry to pull control plane images from
 	ImageRepository string `json:"imageRepository"`
-	// UnifiedControlPlaneImage specifies if a specific container image should be used for all control plane components
+	// UnifiedControlPlaneImage specifies if a specific container image should
+	// be used for all control plane components.
 	UnifiedControlPlaneImage string `json:"unifiedControlPlaneImage"`
 
-	// FeatureGates enabled by the user
+	// FeatureGates enabled by the user.
 	FeatureGates map[string]bool `json:"featureGates,omitempty"`
 }
 
@@ -73,43 +105,64 @@ type MasterConfiguration struct {
 type API struct {
 	// AdvertiseAddress sets the address for the API server to advertise.
 	AdvertiseAddress string `json:"advertiseAddress"`
-	// BindPort sets the secure port for the API Server to bind to
+	// BindPort sets the secure port for the API Server to bind to.
+	// Defaults to 6443.
 	BindPort int32 `json:"bindPort"`
 }
 
-// TokenDiscovery contains elements needed for token discovery
+// TokenDiscovery contains elements needed for token discovery.
 type TokenDiscovery struct {
-	ID        string   `json:"id"`
-	Secret    string   `json:"secret"`
-	Addresses []string `json:"addresses"`
+	// ID is the first part of a bootstrap token. Considered public information.
+	// It is used when referring to a token without leaking the secret part.
+	ID string `json:"id"`
+	// Secret is the second part of a bootstrap token. Should only be shared
+	// with trusted parties.
+	Secret string `json:"secret"`
+	// TODO: Seems unused. Remove?
+	// Addresses []string `json:"addresses"`
 }
 
 // Networking contains elements describing cluster's networking configuration
 type Networking struct {
+	// ServiceSubnet is the subnet used by k8s services. Defaults to "10.96.0.0/12".
 	ServiceSubnet string `json:"serviceSubnet"`
-	PodSubnet     string `json:"podSubnet"`
-	DNSDomain     string `json:"dnsDomain"`
+	// PodSubnet is the subnet used by pods.
+	PodSubnet string `json:"podSubnet"`
+	// DNSDomain is the dns domain used by k8s services. Defaults to "cluster.local".
+	DNSDomain string `json:"dnsDomain"`
 }
 
-// Etcd contains elements describing Etcd configuration
+// Etcd contains elements describing Etcd configuration.
 type Etcd struct {
-	Endpoints []string          `json:"endpoints"`
-	CAFile    string            `json:"caFile"`
-	CertFile  string            `json:"certFile"`
-	KeyFile   string            `json:"keyFile"`
-	DataDir   string            `json:"dataDir"`
+	// Endpoints of etcd members. Useful for using external etcd.
+	// If not provided, kubeadm will run etcd in a static pod.
+	Endpoints []string `json:"endpoints"`
+	// CAFile is an SSL Certificate Authority file used to secure etcd communication.
+	CAFile string `json:"caFile"`
+	// CertFile is an SSL certification file used to secure etcd communication.
+	CertFile string `json:"certFile"`
+	// KeyFile is an SSL key file used to secure etcd communication.
+	KeyFile string `json:"keyFile"`
+	// DataDir is the directory etcd will place its data.
+	// Defaults to "/var/lib/etcd".
+	DataDir string `json:"dataDir"`
+	// ExtraArgs are extra arguments provided to the etcd binary
+	// when run inside a static pod.
 	ExtraArgs map[string]string `json:"extraArgs,omitempty"`
-	// Image specifies which container image to use for running etcd. If empty, automatically populated by kubeadm using the image repository and default etcd version
-	Image      string          `json:"image"`
+	// Image specifies which container image to use for running etcd.
+	// If empty, automatically populated by kubeadm using the image
+	// repository and default etcd version.
+	Image string `json:"image"`
+	// SelfHosted holds configuration for self-hosting etcd.
 	SelfHosted *SelfHostedEtcd `json:"selfHosted,omitempty"`
 }
 
-// SelfHostedEtcd describes options required to configure self-hosted etcd
+// SelfHostedEtcd describes options required to configure self-hosted etcd.
 type SelfHostedEtcd struct {
-	// CertificatesDir represents the directory where all etcd TLS assets are stored. By default this is
-	// a dir names "etcd" in the main CertificatesDir value.
+	// CertificatesDir represents the directory where all etcd TLS assets are stored.
+	// Defaults to "/etc/kubernetes/pki/etcd".
 	CertificatesDir string `json:"certificatesDir"`
-	// ClusterServiceName is the name of the service that load balances the etcd cluster
+	// ClusterServiceName is the name of the service that load balances the etcd cluster.
 	ClusterServiceName string `json:"clusterServiceName"`
 	// EtcdVersion is the version of etcd running in the cluster.
 	EtcdVersion string `json:"etcdVersion"`
@@ -119,17 +172,33 @@ type SelfHostedEtcd struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// NodeConfiguration contains elements describing a particular node
+// NodeConfiguration contains elements describing a particular node.
+// TODO: This struct should be replaced by dynamic kubelet configuration.
 type NodeConfiguration struct {
 	metav1.TypeMeta `json:",inline"`
 
-	CACertPath               string   `json:"caCertPath"`
-	DiscoveryFile            string   `json:"discoveryFile"`
-	DiscoveryToken           string   `json:"discoveryToken"`
+	// CACertPath is the path to the SSL certificate authority used to
+	// secure comunications between node and master.
+	// Defaults to "/etc/kubernetes/pki/ca.crt".
+	CACertPath string `json:"caCertPath"`
+	// DiscoveryFile is a file or url to a kubeconfig file from which to
+	// load cluster information.
+	DiscoveryFile string `json:"discoveryFile"`
+	// DiscoveryToken is a token used to validate cluster information
+	// fetched from the master.
+	DiscoveryToken string `json:"discoveryToken"`
+	// DiscoveryTokenAPIServers is a set of IPs to API servers from which info
+	// will be fetched. Currently we only pay attention to one API server but
+	// hope to support >1 in the future.
 	DiscoveryTokenAPIServers []string `json:"discoveryTokenAPIServers,omitempty"`
-	NodeName                 string   `json:"nodeName"`
-	TLSBootstrapToken        string   `json:"tlsBootstrapToken"`
-	Token                    string   `json:"token"`
+	// NodeName is the name of the node to join the cluster. Defaults
+	// to the name of the host.
+	NodeName string `json:"nodeName"`
+	// TLSBootstrapToken is a token used for TLS bootstrapping.
+	// Defaults to Token.
+	TLSBootstrapToken string `json:"tlsBootstrapToken"`
+	// Token is used for both discovery and TLS bootstrapping.
+	Token string `json:"token"`
 
 	// DiscoveryTokenCACertHashes specifies a set of public key pins to verify
 	// when token-based discovery is used. The root CA found during discovery
@@ -146,24 +215,28 @@ type NodeConfiguration struct {
 	// the security of kubeadm since other nodes can impersonate the master.
 	DiscoveryTokenUnsafeSkipCAVerification bool `json:"discoveryTokenUnsafeSkipCAVerification"`
 
-	// FeatureGates enabled by the user
+	// FeatureGates enabled by the user.
 	FeatureGates map[string]bool `json:"featureGates,omitempty"`
 }
 
-// KubeletConfiguration contains elements describing initial remote configuration of kubelet
+// KubeletConfiguration contains elements describing initial remote configuration of kubelet.
 type KubeletConfiguration struct {
 	BaseConfig *kubeletconfigv1alpha1.KubeletConfiguration `json:"baseConfig,omitempty"`
 }
 
 // HostPathMount contains elements describing volumes that are mounted from the
-// host
+// host.
 type HostPathMount struct {
-	Name      string `json:"name"`
-	HostPath  string `json:"hostPath"`
+	// Name of the volume inside the pod template.
+	Name string `json:"name"`
+	// HostPath is the path in the host that will be mounted inside
+	// the pod.
+	HostPath string `json:"hostPath"`
+	// MountPath is the path inside the pod where hostPath will be mounted.
 	MountPath string `json:"mountPath"`
 }
 
-// KubeProxy contains elements describing the proxy configuration
+// KubeProxy contains elements describing the proxy configuration.
 type KubeProxy struct {
 	Config *kubeproxyconfigv1alpha1.KubeProxyConfiguration `json:"config,omitempty"`
 }
