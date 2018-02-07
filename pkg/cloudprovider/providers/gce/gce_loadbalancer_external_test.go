@@ -371,12 +371,20 @@ func TestEnsureExternalLoadBalancer(t *testing.T) {
 	assert.NotEmpty(t, status.Ingress)
 
 	lbName := cloudprovider.GetLoadBalancerName(apiService)
+	hcName := MakeNodesHealthCheckName(clusterID)
 
-	// Check that Firewall is created
-	firewall, err := gce.GetFirewall(MakeFirewallName(lbName))
-	require.NoError(t, err)
-	assert.Equal(t, []string{nodeName}, firewall.TargetTags)
-	assert.Equal(t, []string{"0.0.0.0/0"}, firewall.SourceRanges)
+	// Check that Firewalls are created for the LoadBalancer and the HealthCheck
+	fwNames := []string{
+		MakeFirewallName(lbName),
+		MakeHealthCheckFirewallName(clusterID, hcName, true),
+	}
+
+	for _, fwName := range fwNames {
+		firewall, err := gce.GetFirewall(fwName)
+		require.NoError(t, err)
+		assert.Equal(t, []string{nodeName}, firewall.TargetTags)
+		assert.NotEmpty(t, firewall.SourceRanges)
+	}
 
 	// Check that TargetPool is Created
 	pool, err := gce.GetTargetPool(lbName, gceRegion)
@@ -386,7 +394,6 @@ func TestEnsureExternalLoadBalancer(t *testing.T) {
 	assert.Equal(t, 1, len(pool.Instances))
 
 	// Check that HealthCheck is created
-	hcName := MakeNodesHealthCheckName(clusterID)
 	healthcheck, err := gce.GetHttpHealthCheck(hcName)
 	require.NoError(t, err)
 	assert.Equal(t, hcName, healthcheck.Name)
@@ -440,11 +447,19 @@ func TestEnsureExternalLoadBalancerDeleted(t *testing.T) {
 	assert.NoError(t, err)
 
 	lbName := cloudprovider.GetLoadBalancerName(apiService)
+	hcName := MakeNodesHealthCheckName(clusterID)
 
-	// Check that Firewall is deleted
-	firewall, err := gce.GetFirewall(MakeFirewallName(lbName))
-	require.Error(t, err)
-	assert.Nil(t, firewall)
+	// Check that Firewalls are deleted for the LoadBalancer and the HealthCheck
+	fwNames := []string{
+		MakeFirewallName(lbName),
+		MakeHealthCheckFirewallName(clusterID, hcName, true),
+	}
+
+	for _, fwName := range fwNames {
+		firewall, err := gce.GetFirewall(fwName)
+		require.Error(t, err)
+		assert.Nil(t, firewall)
+	}
 
 	// Check that TargetPool is deleted
 	pool, err := gce.GetTargetPool(lbName, gceRegion)
@@ -452,7 +467,6 @@ func TestEnsureExternalLoadBalancerDeleted(t *testing.T) {
 	assert.Nil(t, pool)
 
 	// Check that HealthCheck is deleted
-	hcName := MakeNodesHealthCheckName(clusterID)
 	healthcheck, err := gce.GetHttpHealthCheck(hcName)
 	require.Error(t, err)
 	assert.Nil(t, healthcheck)
