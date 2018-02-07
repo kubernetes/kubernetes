@@ -36,6 +36,10 @@ import (
 
 // Utilities for dealing with Jobs and CronJobs and time.
 
+const (
+	jobLabelName = "cronjob.kubernetes.io/name"
+)
+
 func inActiveList(sj batchv1beta1.CronJob, uid types.UID) bool {
 	for _, j := range sj.Status.Active {
 		if j.UID == uid {
@@ -173,8 +177,8 @@ func getRecentUnmetScheduleTimes(sj batchv1beta1.CronJob, now time.Time) ([]time
 func getJobFromTemplate(sj *batchv1beta1.CronJob, scheduledTime time.Time) (*batchv1.Job, error) {
 	// TODO: consider adding the following labels:
 	// nominal-start-time=$RFC_3339_DATE_OF_INTENDED_START -- for user convenience
-	// scheduled-job-name=$SJ_NAME -- for user convenience
 	labels := copyLabels(&sj.Spec.JobTemplate)
+	labels[jobLabelName] = sj.ObjectMeta.Name
 	annotations := copyAnnotations(&sj.Spec.JobTemplate)
 	// We want job names for a given nominal start time to have a deterministic name to avoid the same job being created twice
 	name := fmt.Sprintf("%s-%d", sj.Name, getTimeHash(scheduledTime))

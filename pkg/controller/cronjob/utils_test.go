@@ -80,8 +80,11 @@ func TestGetJobFromTemplate(t *testing.T) {
 	if !strings.HasPrefix(job.ObjectMeta.Name, "mycronjob-") {
 		t.Errorf("Wrong Name")
 	}
-	if len(job.ObjectMeta.Labels) != 1 {
+	if len(job.ObjectMeta.Labels) != 2 {
 		t.Errorf("Wrong number of labels")
+	}
+	if job.ObjectMeta.Labels[jobLabelName] != "mycronjob" {
+		t.Errorf("Did not expect job label %s", job.ObjectMeta.Labels[jobLabelName])
 	}
 	if len(job.ObjectMeta.Annotations) != 1 {
 		t.Errorf("Wrong number of annotations")
