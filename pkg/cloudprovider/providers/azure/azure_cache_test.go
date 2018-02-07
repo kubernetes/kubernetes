@@ -17,80 +17,123 @@ limitations under the License.
 package azure
 
 import (
-	"sync/atomic"
+	"sync"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 )
 
-func TestCacheReturnsSameObject(t *testing.T) {
-	type cacheTestingStruct struct{}
-	c := newTimedcache(1 * time.Minute)
-	o1 := cacheTestingStruct{}
-	get1, _ := c.GetOrCreate("b1", func() interface{} {
-		return o1
-	})
-	o2 := cacheTestingStruct{}
-	get2, _ := c.GetOrCreate("b1", func() interface{} {
-		return o2
-	})
-	if get1 != get2 {
-		t.Error("Get not equal")
-	}
+var (
+	fakeCacheTTL = 2 * time.Second
+)
+
+type fakeDataObj struct{}
+
+type fakeDataSource struct {
+	data map[string]*fakeDataObj
+	lock sync.Mutex
 }
 
-func TestCacheCallsCreateFuncOnce(t *testing.T) {
-	var callsCount uint32
-	f1 := func() interface{} {
-		atomic.AddUint32(&callsCount, 1)
-		return 1
-	}
-	c := newTimedcache(500 * time.Millisecond)
-	for index := 0; index < 20; index++ {
-		_, _ = c.GetOrCreate("b1", f1)
+func (fake *fakeDataSource) get(key string) (interface{}, error) {
+	fake.lock.Lock()
+	defer fake.lock.Unlock()
+
+	if v, ok := fake.data[key]; ok {
+		return v, nil
 	}
 
-	if callsCount != 1 {
-		t.Error("Count not match")
-	}
-	time.Sleep(500 * time.Millisecond)
-	c.GetOrCreate("b1", f1)
-	if callsCount != 2 {
-		t.Error("Count not match")
-	}
+	return nil, nil
 }
 
-func TestCacheExpires(t *testing.T) {
-	f1 := func() interface{} {
-		return 1
+func (fake *fakeDataSource) set(data map[string]*fakeDataObj) {
+	fake.lock.Lock()
+	defer fake.lock.Unlock()
+
+	fake.data = data
+}
+
+func newFakeCache(t *testing.T) (*fakeDataSource, *timedCache) {
+	dataSource := &fakeDataSource{
+		data: make(map[string]*fakeDataObj),
 	}
-	c := newTimedcache(500 * time.Millisecond)
-	get1, _ := c.GetOrCreate("b1", f1)
-	if get1 != 1 {
-		t.Error("Value not equal")
+	getter := dataSource.get
+	cache, err := newTimedcache(fakeCacheTTL, getter)
+	assert.NoError(t, err)
+	return dataSource, cache
+}
+
+func TestCacheGet(t *testing.T) {
+	val := &fakeDataObj{}
+	cases := []struct {
+		name     string
+		data     map[string]*fakeDataObj
+		key      string
+		expected interface{}
+	}{
+		{
+			name:     "cache should return nil for empty data source",
+			key:      "key1",
+			expected: nil,
+		},
+		{
+			name:     "cache should return nil for non exist key",
+			data:     map[string]*fakeDataObj{"key2": val},
+			key:      "key1",
+			expected: nil,
+		},
+		{
+			name:     "cache should return data for existing key",
+			data:     map[string]*fakeDataObj{"key1": val},
+			key:      "key1",
+			expected: val,
+		},
 	}
-	time.Sleep(500 * time.Millisecond)
-	get1, _ = c.GetOrCreate("b1", nil)
-	if get1 != nil {
-		t.Error("value not expired")
+
+	for _, c := range cases {
+		dataSource, cache := newFakeCache(t)
+		dataSource.set(c.data)
+		val, err := cache.Get(c.key)
+		assert.NoError(t, err, c.name)
+		assert.Equal(t, c.expected, val, c.name)
 	}
 }
 
 func TestCacheDelete(t *testing.T) {
-	f1 := func() interface{} {
-		return 1
+	key := "key1"
+	val := &fakeDataObj{}
+	data := map[string]*fakeDataObj{
+		key: val,
 	}
-	c := newTimedcache(500 * time.Millisecond)
-	get1, _ := c.GetOrCreate("b1", f1)
-	if get1 != 1 {
-		t.Error("Value not equal")
+	dataSource, cache := newFakeCache(t)
+	dataSource.set(data)
+
+	v, err := cache.Get(key)
+	assert.NoError(t, err)
+	assert.Equal(t, val, v, "cache should get correct data")
+
+	dataSource.set(nil)
+	cache.Delete(key)
+	v, err = cache.Get(key)
+	assert.NoError(t, err)
+	assert.Equal(t, nil, v, "cache should get nil after data is removed")
+}
+
+func TestCacheExpired(t *testing.T) {
+	key := "key1"
+	val := &fakeDataObj{}
+	data := map[string]*fakeDataObj{
+		key: val,
 	}
-	get1, _ = c.GetOrCreate("b1", nil)
-	if get1 != 1 {
-		t.Error("Value not equal")
-	}
-	c.Delete("b1")
-	get1, _ = c.GetOrCreate("b1", nil)
-	if get1 != nil {
-		t.Error("value not deleted")
-	}
+	dataSource, cache := newFakeCache(t)
+	dataSource.set(data)
+
+	v, err := cache.Get(key)
+	assert.NoError(t, err)
+	assert.Equal(t, val, v, "cache should get correct data")
+
+	time.Sleep(fakeCacheTTL)
+	v, err = cache.Get(key)
+	assert.NoError(t, err)
+	assert.Equal(t, val, v, "cache should get correct data even after expired")
 }
