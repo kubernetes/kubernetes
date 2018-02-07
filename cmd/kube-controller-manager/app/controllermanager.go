@@ -30,7 +30,6 @@ import (
 	goruntime "runtime"
 	"time"
 
-	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -38,16 +37,12 @@ import (
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/informers"
-	clientset "k8s.io/client-go/kubernetes"
-	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/leaderelection"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
-	"k8s.io/client-go/tools/record"
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app/config"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app/options"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller"
@@ -183,8 +178,6 @@ func Run(c *config.CompletedConfig) error {
 		panic("unreachable")
 	}
 
-	recorder := createRecorder(c.Generic.Extra.Client)
-
 	id, err := os.Hostname()
 	if err != nil {
 		return err
@@ -198,7 +191,7 @@ func Run(c *config.CompletedConfig) error {
 		c.Generic.Extra.LeaderElectionClient.CoreV1(),
 		resourcelock.ResourceLockConfig{
 			Identity:      id,
-			EventRecorder: recorder,
+			EventRecorder: c.Generic.Extra.EventRecorder,
 		})
 	if err != nil {
 		glog.Fatalf("error creating lock: %v", err)
@@ -237,13 +230,6 @@ func serve(c *config.CompletedConfig, serveFunc serveFunc, stopCh <-chan struct{
 	mux.Handle("/metrics", prometheus.Handler())
 
 	return serveFunc(mux, 0, stopCh)
-}
-
-func createRecorder(kubeClient *clientset.Clientset) record.EventRecorder {
-	eventBroadcaster := record.NewBroadcaster()
-	eventBroadcaster.StartLogging(glog.Infof)
-	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(kubeClient.CoreV1().RESTClient()).Events("")})
-	return eventBroadcaster.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: "controller-manager"})
 }
 
 type ControllerContext struct {
