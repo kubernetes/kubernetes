@@ -544,7 +544,7 @@ else
 # We don't want to build any of the release artifacts when running tests.
 # Some things in vendor don't build due to empty target lists for cross-platform rules.
 bazel-test:
-	bazel test --build_tag_filters=-e2e,-integration --test_tag_filters=-e2e,-integration --flaky_test_attempts=3 -- \
+	bazel test --config=unit -- \
 	  //... \
 	  //hack:verify-all \
 	  -//build/... \
@@ -562,7 +562,8 @@ bazel-test-integration:
 	@echo "$$BAZEL_TEST_INTEGRATION_HELP_INFO"
 else
 bazel-test-integration:
-	bazel test //test/integration/...
+	bazel build --config integration //test/integration/...
+	bazel test --config integration //test/integration/...
 endif
 
 ifeq ($(PRINT_HELP),y)
