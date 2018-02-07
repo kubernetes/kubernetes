@@ -89,8 +89,8 @@ func (f *fakeVolumeHost) GetPluginDir(podUID string) string {
 	return path.Join(f.rootDir, "plugins", podUID)
 }
 
-func (f *fakeVolumeHost) GetVolumeDevicePluginDir(podUID string) string {
-	return path.Join(f.rootDir, "plugins", podUID)
+func (f *fakeVolumeHost) GetVolumeDevicePluginDir(pluginName string) string {
+	return path.Join(f.rootDir, "plugins", pluginName, "volumeDevices")
 }
 
 func (f *fakeVolumeHost) GetPodVolumeDir(podUID types.UID, pluginName, volumeName string) string {
