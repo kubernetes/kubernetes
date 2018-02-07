@@ -27,46 +27,99 @@ func TestCloneSelectorAndAddLabel(t *testing.T) {
 		"foo2": "bar2",
 		"foo3": "bar3",
 	}
-
-	cases := []struct {
-		labels     map[string]string
-		labelKey   string
-		labelValue string
-		want       map[string]string
-	}{
+	expressions := []LabelSelectorRequirement{
 		{
-			labels: labels,
-			want:   labels,
+			Key:      "key1",
+			Operator: LabelSelectorOperator("in"),
+			Values:   []string{"v1", "v2"},
 		},
 		{
-			labels:     labels,
-			labelKey:   "foo4",
-			labelValue: "89",
-			want: map[string]string{
-				"foo1": "bar1",
-				"foo2": "bar2",
-				"foo3": "bar3",
-				"foo4": "89",
+			Key:      "key2",
+			Operator: LabelSelectorOperator("in"),
+			Values:   []string{"v3", "v4"},
+		},
+	}
+
+	cases := []struct {
+		selector   LabelSelector
+		labelKey   string
+		labelValue string
+		want       LabelSelector
+	}{
+		{
+			selector: LabelSelector{
+				MatchLabels:      labels,
+				MatchExpressions: expressions,
+			},
+			want: LabelSelector{
+				MatchLabels:      labels,
+				MatchExpressions: expressions,
 			},
 		},
 		{
-			labels:     nil,
+			selector: LabelSelector{
+				MatchLabels:      labels,
+				MatchExpressions: expressions,
+			},
+			labelKey:   "foo4",
+			labelValue: "89",
+			want: LabelSelector{
+				MatchLabels: map[string]string{
+					"foo1": "bar1",
+					"foo2": "bar2",
+					"foo3": "bar3",
+					"foo4": "89",
+				},
+				MatchExpressions: expressions,
+			},
+		},
+		{
+			selector:   LabelSelector{},
 			labelKey:   "foo4",
 			labelValue: "12",
-			want: map[string]string{
-				"foo4": "12",
+			want: LabelSelector{
+				MatchLabels: map[string]string{
+					"foo4": "12",
+				},
 			},
 		},
 	}
 
 	for _, tc := range cases {
-		ls_in := LabelSelector{MatchLabels: tc.labels}
-		ls_out := LabelSelector{MatchLabels: tc.want}
-
-		got := CloneSelectorAndAddLabel(&ls_in, tc.labelKey, tc.labelValue)
-		if !reflect.DeepEqual(got, &ls_out) {
+		got := CloneSelectorAndAddLabel(&tc.selector, tc.labelKey, tc.labelValue)
+		if !reflect.DeepEqual(got, &tc.want) {
 			t.Errorf("got %v, want %v", got, tc.want)
 		}
+	}
+}
+
+// Test if the CloneSelectorAndAddLabel really has cloned the input selector.
+func TestIfCloneInCloneSelectorAndAddLabel(t *testing.T) {
+	selector := &LabelSelector{
+		MatchLabels: map[string]string{
+			"foo1": "bar1",
+			"foo2": "bar2",
+			"foo3": "bar3",
+		},
+		MatchExpressions: []LabelSelectorRequirement{
+			{
+				Key:      "key1",
+				Operator: LabelSelectorOperator("in"),
+				Values:   []string{"v1", "v2"},
+			},
+			{
+				Key:      "key2",
+				Operator: LabelSelectorOperator("in"),
+				Values:   []string{"v3", "v4"},
+			},
+		},
+	}
+
+	got := CloneSelectorAndAddLabel(selector, "new-key", "new-value")
+	selector.MatchLabels["foo2"] = "bar2-new"
+	selector.MatchExpressions[1].Values = []string{"v3-new", "v4-new"}
+	if reflect.DeepEqual(got, selector) {
+		t.Errorf("The CloneSelectorAndAddLabel don't clone selector, got %v", got)
 	}
 }
 
