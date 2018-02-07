@@ -17,9 +17,12 @@ limitations under the License.
 package kubelet
 
 import (
+	"bufio"
 	"fmt"
+	"io"
 	"math"
 	"net"
+	"os"
 	goruntime "runtime"
 	"sort"
 	"strings"
@@ -214,16 +217,61 @@ func (kl *Kubelet) reconcileCMADAnnotationWithExistingNode(node, existingNode *v
 	return true
 }
 
+type releaseInfo struct {
+	ID        string
+	VersionID string
+}
+
+func readOSRelease(rd io.Reader) *releaseInfo {
+	scanner := bufio.NewScanner(rd)
+	id := ""
+	versionID := ""
+	for scanner.Scan() {
+		line := scanner.Text()
+		if strings.HasPrefix(line, "ID=") {
+			id = strings.Replace(line[3:], "\"", "", -1)
+			id = strings.Replace(id, "'", "", -1)
+		}
+		if strings.HasPrefix(line, "VERSION_ID=") {
+			versionID = strings.Replace(line[11:], "\"", "", -1)
+			versionID = strings.Replace(versionID, "'", "", -1)
+		}
+		if id != "" && versionID != "" {
+			break
+		}
+	}
+	release := &releaseInfo{}
+	release.ID = id
+	release.VersionID = versionID
+	return release
+}
+
+// EnumerateDistribution resolves the underlying distribution
+func enumerateDistribution() (error, *releaseInfo) {
+	file, err := os.Open("/usr/lib/os-release")
+	if err != nil {
+		return err, &releaseInfo{}
+	}
+	defer file.Close()
+	return nil, readOSRelease(file)
+}
+
 // initialNode constructs the initial v1.Node for this Kubelet, incorporating node
 // labels, information from the cloud provider, and Kubelet configuration.
 func (kl *Kubelet) initialNode() (*v1.Node, error) {
+	err, releaseInfo := enumerateDistribution()
+	if err != nil {
+		glog.Warningf("Could not read OS release information", err)
+	}
 	node := &v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: string(kl.nodeName),
 			Labels: map[string]string{
-				kubeletapis.LabelHostname: kl.hostname,
-				kubeletapis.LabelOS:       goruntime.GOOS,
-				kubeletapis.LabelArch:     goruntime.GOARCH,
+				kubeletapis.LabelArch:      goruntime.GOARCH,
+				kubeletapis.LabelHostname:  kl.hostname,
+				kubeletapis.LabelID:        releaseInfo.ID,
+				kubeletapis.LabelOS:        goruntime.GOOS,
+				kubeletapis.LabelVersionID: releaseInfo.VersionID,
 			},
 		},
 		Spec: v1.NodeSpec{
