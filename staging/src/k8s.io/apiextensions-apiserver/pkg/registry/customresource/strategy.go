@@ -87,12 +87,14 @@ func (a customResourceDefinitionStorageStrategy) ValidateUpdate(ctx genericapire
 	return a.validator.ValidateUpdate(ctx, obj, old)
 }
 
-func (a customResourceDefinitionStorageStrategy) GetAttrs(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
+func (a customResourceDefinitionStorageStrategy) GetAttrs(obj runtime.Object) (storage.ObjectAttrs, error) {
+	result := storage.ObjectAttrs{}
 	accessor, err := meta.Accessor(obj)
 	if err != nil {
-		return nil, nil, false, err
+		return result, err
 	}
-	return labels.Set(accessor.GetLabels()), objectMetaFieldsSet(accessor, a.namespaceScoped), accessor.GetInitializers() != nil, nil
+	result.FieldSet = objectMetaFieldsSet(accessor, a.namespaceScoped)
+	return result, nil
 }
 
 // objectMetaFieldsSet returns a fields that represent the ObjectMeta.

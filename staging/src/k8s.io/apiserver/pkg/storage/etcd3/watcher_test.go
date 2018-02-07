@@ -72,9 +72,11 @@ func testWatch(t *testing.T, recursive bool) {
 		pred: storage.SelectionPredicate{
 			Label: labels.Everything(),
 			Field: fields.ParseSelectorOrDie("metadata.name=bar"),
-			GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
+			GetAttrs: func(obj runtime.Object) (storage.ObjectAttrs, error) {
 				pod := obj.(*example.Pod)
-				return nil, fields.Set{"metadata.name": pod.Name}, pod.Initializers != nil, nil
+				return storage.ObjectAttrs{
+					FieldSet: fields.Set{"metadata.name": pod.Name},
+				}, nil
 			},
 		},
 	}, { // update
@@ -87,9 +89,11 @@ func testWatch(t *testing.T, recursive bool) {
 		pred: storage.SelectionPredicate{
 			Label: labels.Everything(),
 			Field: fields.ParseSelectorOrDie("metadata.name!=bar"),
-			GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
+			GetAttrs: func(obj runtime.Object) (storage.ObjectAttrs, error) {
 				pod := obj.(*example.Pod)
-				return nil, fields.Set{"metadata.name": pod.Name}, pod.Initializers != nil, nil
+				return storage.ObjectAttrs{
+					FieldSet: fields.Set{"metadata.name": pod.Name},
+				}, nil
 			},
 		},
 	}}

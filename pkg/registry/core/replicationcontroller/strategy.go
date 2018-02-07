@@ -158,12 +158,14 @@ func ControllerToSelectableFields(controller *api.ReplicationController) fields.
 }
 
 // GetAttrs returns labels and fields of a given object for filtering purposes.
-func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
+func GetAttrs(obj runtime.Object) (apistorage.ObjectAttrs, error) {
+	result := apistorage.ObjectAttrs{}
 	rc, ok := obj.(*api.ReplicationController)
 	if !ok {
-		return nil, nil, false, fmt.Errorf("given object is not a replication controller.")
+		return result, fmt.Errorf("given object is not a replication controller.")
 	}
-	return labels.Set(rc.ObjectMeta.Labels), ControllerToSelectableFields(rc), rc.Initializers != nil, nil
+	result.FieldSet = ControllerToSelectableFields(rc)
+	return result, nil
 }
 
 // MatchController is the filter used by the generic etcd backend to route

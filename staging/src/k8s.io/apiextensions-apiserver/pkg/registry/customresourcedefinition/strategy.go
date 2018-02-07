@@ -143,12 +143,14 @@ func (statusStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old run
 	return validation.ValidateUpdateCustomResourceDefinitionStatus(obj.(*apiextensions.CustomResourceDefinition), old.(*apiextensions.CustomResourceDefinition))
 }
 
-func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
+func GetAttrs(obj runtime.Object) (storage.ObjectAttrs, error) {
+	result := storage.ObjectAttrs{}
 	apiserver, ok := obj.(*apiextensions.CustomResourceDefinition)
 	if !ok {
-		return nil, nil, false, fmt.Errorf("given object is not a CustomResourceDefinition.")
+		return result, fmt.Errorf("given object is not a CustomResourceDefinition.")
 	}
-	return labels.Set(apiserver.ObjectMeta.Labels), CustomResourceDefinitionToSelectableFields(apiserver), apiserver.Initializers != nil, nil
+	result.FieldSet = CustomResourceDefinitionToSelectableFields(apiserver)
+	return result, nil
 }
 
 // MatchCustomResourceDefinition is the filter used by the generic etcd backend to watch events

@@ -104,7 +104,7 @@ type watchCache struct {
 	keyFunc func(runtime.Object) (string, error)
 
 	// getAttrsFunc is used to get labels and fields of an object.
-	getAttrsFunc func(runtime.Object) (labels.Set, fields.Set, bool, error)
+	getAttrsFunc AttrFunc
 
 	// cache is used a cyclic buffer - its first element (with the smallest
 	// resourceVersion) is defined by startIndex, its last element is defined
@@ -138,7 +138,7 @@ type watchCache struct {
 func newWatchCache(
 	capacity int,
 	keyFunc func(runtime.Object) (string, error),
-	getAttrsFunc func(runtime.Object) (labels.Set, fields.Set, bool, error)) *watchCache {
+	getAttrsFunc AttrFunc) *watchCache {
 	wc := &watchCache{
 		capacity:        capacity,
 		keyFunc:         keyFunc,
@@ -231,34 +231,45 @@ func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64, upd
 	if err != nil {
 		return err
 	}
-	objLabels, objFields, objUninitialized, err := w.getAttrsFunc(event.Object)
+
+	metadata, err := meta.Accessor(event.Object)
 	if err != nil {
 		return err
 	}
-	var prevObject runtime.Object
-	var prevObjLabels labels.Set
-	var prevObjFields fields.Set
-	var prevObjUninitialized bool
+
+	objAttrs, err := w.getAttrsFunc(event.Object)
+	if err != nil {
+		return err
+	}
+
+	watchCacheEvent := &watchCacheEvent{
+		Type:             event.Type,
+		Object:           event.Object,
+		ObjLabels:        labels.Set(metadata.GetLabels()),
+		ObjFields:        objAttrs.FieldSet,
+		ObjUninitialized: metadata.GetInitializers() != nil,
+		Key:              key,
+		ResourceVersion:  resourceVersion,
+	}
+
 	if exists {
-		prevObject = previous.(*storeElement).Object
-		prevObjLabels, prevObjFields, prevObjUninitialized, err = w.getAttrsFunc(prevObject)
+		prevObject := previous.(*storeElement).Object
+		prevMetadata, err := meta.Accessor(prevObject)
 		if err != nil {
 			return err
 		}
+
+		prevObjAttrs, err := w.getAttrsFunc(prevObject)
+		if err != nil {
+			return err
+		}
+
+		watchCacheEvent.PrevObject = prevObject
+		watchCacheEvent.PrevObjLabels = labels.Set(prevMetadata.GetLabels())
+		watchCacheEvent.PrevObjFields = prevObjAttrs.FieldSet
+		watchCacheEvent.PrevObjUninitialized = prevMetadata.GetInitializers() != nil
 	}
-	watchCacheEvent := &watchCacheEvent{
-		Type:                 event.Type,
-		Object:               event.Object,
-		ObjLabels:            objLabels,
-		ObjFields:            objFields,
-		ObjUninitialized:     objUninitialized,
-		PrevObject:           prevObject,
-		PrevObjLabels:        prevObjLabels,
-		PrevObjFields:        prevObjFields,
-		PrevObjUninitialized: prevObjUninitialized,
-		Key:                  key,
-		ResourceVersion:      resourceVersion,
-	}
+
 	if w.onEvent != nil {
 		w.onEvent(watchCacheEvent)
 	}
@@ -432,16 +443,20 @@ func (w *watchCache) GetAllEventsSinceThreadUnsafe(resourceVersion uint64) ([]*w
 			if !ok {
 				return nil, fmt.Errorf("not a storeElement: %v", elem)
 			}
-			objLabels, objFields, objUninitialized, err := w.getAttrsFunc(elem.Object)
+			metadata, err := meta.Accessor(elem.Object)
+			if err != nil {
+				return nil, err
+			}
+			objAttrs, err := w.getAttrsFunc(elem.Object)
 			if err != nil {
 				return nil, err
 			}
 			result[i] = &watchCacheEvent{
 				Type:             watch.Added,
 				Object:           elem.Object,
-				ObjLabels:        objLabels,
-				ObjFields:        objFields,
-				ObjUninitialized: objUninitialized,
+				ObjLabels:        labels.Set(metadata.GetLabels()),
+				ObjFields:        objAttrs.FieldSet,
+				ObjUninitialized: metadata.GetInitializers() != nil,
 				Key:              elem.Key,
 				ResourceVersion:  w.resourceVersion,
 			}

@@ -205,13 +205,15 @@ func (podStatusStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old 
 	return validation.ValidatePodStatusUpdate(obj.(*api.Pod), old.(*api.Pod))
 }
 
-// GetAttrs returns labels and fields of a given object for filtering purposes.
-func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
+// GetAttrs returns fields of a given object for filtering purposes.
+func GetAttrs(obj runtime.Object) (storage.ObjectAttrs, error) {
+	result := storage.ObjectAttrs{}
 	pod, ok := obj.(*api.Pod)
 	if !ok {
-		return nil, nil, false, fmt.Errorf("not a pod")
+		return result, fmt.Errorf("not a pod")
 	}
-	return labels.Set(pod.ObjectMeta.Labels), PodToSelectableFields(pod), pod.Initializers != nil, nil
+	result.FieldSet = PodToSelectableFields(pod)
+	return result, nil
 }
 
 // MatchPod returns a generic matcher for a given label and field selector.

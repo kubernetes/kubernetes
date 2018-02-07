@@ -35,12 +35,14 @@ func NewStrategy(typer runtime.ObjectTyper) flunderStrategy {
 	return flunderStrategy{typer, names.SimpleNameGenerator}
 }
 
-func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
+func GetAttrs(obj runtime.Object) (storage.ObjectAttrs, error) {
+	result := storage.ObjectAttrs{}
 	apiserver, ok := obj.(*wardle.Flunder)
 	if !ok {
-		return nil, nil, false, fmt.Errorf("given object is not a Flunder.")
+		return result, fmt.Errorf("given object is not a Flunder.")
 	}
-	return labels.Set(apiserver.ObjectMeta.Labels), FlunderToSelectableFields(apiserver), apiserver.Initializers != nil, nil
+	result.FieldSet = FlunderToSelectableFields(apiserver)
+	return result, nil
 }
 
 // MatchFlunder is the filter used by the generic etcd backend to watch events

@@ -23,49 +23,58 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
-// AttrFunc returns label and field sets and the uninitialized flag for List or Watch to match.
+// AttrFunc returns field sets for List or Watch to match.
 // In any failure to parse given object, it returns error.
-type AttrFunc func(obj runtime.Object) (labels.Set, fields.Set, bool, error)
+type AttrFunc func(obj runtime.Object) (ObjectAttrs, error)
+
+// ObjectAttrs is a list of attributes parsed from a given object by AttrFunc.
+type ObjectAttrs struct {
+	FieldSet fields.Set
+}
 
 // FieldMutationFunc allows the mutation of the field selection fields.  It is mutating to
 // avoid the extra allocation on this common path
 type FieldMutationFunc func(obj runtime.Object, fieldSet fields.Set) error
 
-func DefaultClusterScopedAttr(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
+func DefaultClusterScopedAttr(obj runtime.Object) (ObjectAttrs, error) {
+	result := ObjectAttrs{}
 	metadata, err := meta.Accessor(obj)
 	if err != nil {
-		return nil, nil, false, err
+		return result, err
 	}
-	fieldSet := fields.Set{
+
+	result.FieldSet = fields.Set{
 		"metadata.name": metadata.GetName(),
 	}
 
-	return labels.Set(metadata.GetLabels()), fieldSet, metadata.GetInitializers() != nil, nil
+	return result, nil
 }
 
-func DefaultNamespaceScopedAttr(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
+func DefaultNamespaceScopedAttr(obj runtime.Object) (ObjectAttrs, error) {
+	result := ObjectAttrs{}
 	metadata, err := meta.Accessor(obj)
 	if err != nil {
-		return nil, nil, false, err
+		return result, err
 	}
-	fieldSet := fields.Set{
+
+	result.FieldSet = fields.Set{
 		"metadata.name":      metadata.GetName(),
 		"metadata.namespace": metadata.GetNamespace(),
 	}
 
-	return labels.Set(metadata.GetLabels()), fieldSet, metadata.GetInitializers() != nil, nil
+	return result, nil
 }
 
 func (f AttrFunc) WithFieldMutation(fieldMutator FieldMutationFunc) AttrFunc {
-	return func(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
-		labelSet, fieldSet, initialized, err := f(obj)
+	return func(obj runtime.Object) (ObjectAttrs, error) {
+		objAttrs, err := f(obj)
 		if err != nil {
-			return nil, nil, false, err
+			return objAttrs, err
 		}
-		if err := fieldMutator(obj, fieldSet); err != nil {
-			return nil, nil, false, err
+		if err := fieldMutator(obj, objAttrs.FieldSet); err != nil {
+			return objAttrs, err
 		}
-		return labelSet, fieldSet, initialized, nil
+		return objAttrs, nil
 	}
 }
 
@@ -87,18 +96,33 @@ func (s *SelectionPredicate) Matches(obj runtime.Object) (bool, error) {
 	if s.Empty() {
 		return true, nil
 	}
-	labels, fields, uninitialized, err := s.GetAttrs(obj)
+
+	metadata, err := meta.Accessor(obj)
 	if err != nil {
 		return false, err
 	}
+	labels := labels.Set(metadata.GetLabels())
+	uninitialized := metadata.GetInitializers() != nil
+
 	if !s.IncludeUninitialized && uninitialized {
 		return false, nil
 	}
-	matched := s.Label.Matches(labels)
-	if matched && s.Field != nil {
-		matched = matched && s.Field.Matches(fields)
+
+	if !s.Label.Matches(labels) {
+		return false, nil
 	}
-	return matched, nil
+
+	if s.Field != nil {
+		objAttrs, err := s.GetAttrs(obj)
+		if err != nil {
+			return false, err
+		}
+		if !s.Field.Matches(objAttrs.FieldSet) {
+			return false, nil
+		}
+	}
+
+	return true, nil
 }
 
 // MatchesObjectAttributes returns true if the given labels and fields

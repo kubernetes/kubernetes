@@ -56,9 +56,24 @@ func TestWatchInterpretations(t *testing.T) {
 	_, codecs := testScheme(t)
 	codec := apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)
 	// Declare some pods to make the test cases compact.
-	podFoo := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
-	podBar := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "bar"}}
-	podBaz := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "baz"}}
+	podFoo := &example.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   "foo",
+			Labels: map[string]string{"metadata.name": "foo"},
+		},
+	}
+	podBar := &example.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   "bar",
+			Labels: map[string]string{"metadata.name": "bar"},
+		},
+	}
+	podBaz := &example.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   "baz",
+			Labels: map[string]string{"metadata.name": "baz"},
+		},
+	}
 
 	// All of these test cases will be run with the firstLetterIsB SelectionPredicate.
 	table := map[string]struct {
@@ -141,9 +156,8 @@ func TestWatchInterpretations(t *testing.T) {
 		Label:                selector,
 		Field:                fields.Everything(),
 		IncludeUninitialized: true,
-		GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
-			pod := obj.(*example.Pod)
-			return labels.Set{"metadata.name": pod.Name}, nil, pod.Initializers != nil, nil
+		GetAttrs: func(obj runtime.Object) (storage.ObjectAttrs, error) {
+			return storage.ObjectAttrs{}, nil
 		},
 	}
 	for name, item := range table {
@@ -248,9 +262,11 @@ func TestSendResultDeleteEventHaveLatestIndex(t *testing.T) {
 		Label:                labels.Everything(),
 		Field:                selector,
 		IncludeUninitialized: true,
-		GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
+		GetAttrs: func(obj runtime.Object) (storage.ObjectAttrs, error) {
 			pod := obj.(*example.Pod)
-			return nil, fields.Set{"metadata.name": pod.Name}, pod.Initializers != nil, nil
+			return storage.ObjectAttrs{
+				FieldSet: fields.Set{"metadata.name": pod.Name},
+			}, nil
 		},
 	}
 	w := newEtcdWatcher(false, false, nil, pred, codec, versioner, nil, prefixTransformer{prefix: "test!"}, &fakeEtcdCache{})
@@ -260,8 +276,18 @@ func TestSendResultDeleteEventHaveLatestIndex(t *testing.T) {
 		eventChan <- e
 	}
 
-	fooPod := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
-	barPod := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "bar"}}
+	fooPod := &example.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   "foo",
+			Labels: map[string]string{"metadata.name": "foo"},
+		},
+	}
+	barPod := &example.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   "bar",
+			Labels: map[string]string{"metadata.name": "bar"},
+		},
+	}
 	fooBytes, err := runtime.Encode(codec, fooPod)
 	if err != nil {
 		t.Fatalf("Encode failed: %v", err)
