@@ -318,35 +318,40 @@ func (dc *DeploymentController) getNewReplicaSet(d *extensions.Deployment, rsLis
 	createdRS, err := dc.client.ExtensionsV1beta1().ReplicaSets(d.Namespace).Create(&newRS)
 	switch {
 	// We may end up hitting this due to a slow cache or a fast resync of the Deployment.
-	// Fetch a copy of the ReplicaSet. If its PodTemplateSpec is semantically deep equal
-	// with the PodTemplateSpec of the Deployment, then that is our new ReplicaSet. Otherwise,
-	// this is a hash collision and we need to increment the collisionCount field in the
-	// status of the Deployment and try the creation again.
 	case errors.IsAlreadyExists(err):
 		alreadyExists = true
+
+		// Fetch a copy of the ReplicaSet.
 		rs, rsErr := dc.rsLister.ReplicaSets(newRS.Namespace).Get(newRS.Name)
 		if rsErr != nil {
 			return nil, rsErr
 		}
+
+		// If the Deployment owns the ReplicaSet and the ReplicaSet's PodTemplateSpec is semantically
+		// deep equal to the PodTemplateSpec of the Deployment, it's the Deployment's new ReplicaSet.
+		// Otherwise, this is a hash collision and we need to increment the collisionCount field in
+		// the status of the Deployment and requeue to try the creation in the next sync.
+		controllerRef := metav1.GetControllerOf(rs)
+		if controllerRef != nil && controllerRef.UID == d.UID && deploymentutil.EqualIgnoreHash(&d.Spec.Template, &rs.Spec.Template) {
+			createdRS = rs
+			err = nil
+			break
+		}
+
 		// Matching ReplicaSet is not equal - increment the collisionCount in the DeploymentStatus
 		// and requeue the Deployment.
-		if !deploymentutil.EqualIgnoreHash(&d.Spec.Template, &rs.Spec.Template) {
-			if d.Status.CollisionCount == nil {
-				d.Status.CollisionCount = new(int32)
-			}
-			preCollisionCount := *d.Status.CollisionCount
-			*d.Status.CollisionCount++
-			// Update the collisionCount for the Deployment and let it requeue by returning the original
-			// error.
-			_, dErr := dc.client.ExtensionsV1beta1().Deployments(d.Namespace).UpdateStatus(d)
-			if dErr == nil {
-				glog.V(2).Infof("Found a hash collision for deployment %q - bumping collisionCount (%d->%d) to resolve it", d.Name, preCollisionCount, *d.Status.CollisionCount)
-			}
-			return nil, err
+		if d.Status.CollisionCount == nil {
+			d.Status.CollisionCount = new(int32)
 		}
-		// Pass through the matching ReplicaSet as the new ReplicaSet.
-		createdRS = rs
-		err = nil
+		preCollisionCount := *d.Status.CollisionCount
+		*d.Status.CollisionCount++
+		// Update the collisionCount for the Deployment and let it requeue by returning the original
+		// error.
+		_, dErr := dc.client.ExtensionsV1beta1().Deployments(d.Namespace).UpdateStatus(d)
+		if dErr == nil {
+			glog.V(2).Infof("Found a hash collision for deployment %q - bumping collisionCount (%d->%d) to resolve it", d.Name, preCollisionCount, *d.Status.CollisionCount)
+		}
+		return nil, err
 	case err != nil:
 		msg := fmt.Sprintf("Failed to create new replica set %q: %v", newRS.Name, err)
 		if d.Spec.ProgressDeadlineSeconds != nil {
