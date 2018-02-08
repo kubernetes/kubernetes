@@ -124,7 +124,7 @@ const MinCheckVersion = "1.4.11"
 const WaitMinVersion = "1.4.20"
 const WaitSecondsMinVersion = "1.4.22"
 const WaitString = "-w"
-const WaitSecondsString = "-w5"
+const WaitSecondsString = "-w 5"
 
 const LockfilePath16x = "/run/xtables.lock"
 
