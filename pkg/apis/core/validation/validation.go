@@ -1904,6 +1904,7 @@ func validateContainerPorts(ports []core.ContainerPort, fldPath *field.Path) fie
 func ValidateEnv(vars []core.EnvVar, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
+	allNames := sets.String{}
 	for i, ev := range vars {
 		idxPath := fldPath.Index(i)
 		if len(ev.Name) == 0 {
@@ -1911,6 +1912,11 @@ func ValidateEnv(vars []core.EnvVar, fldPath *field.Path) field.ErrorList {
 		} else {
 			for _, msg := range validation.IsEnvVarName(ev.Name) {
 				allErrs = append(allErrs, field.Invalid(idxPath.Child("name"), ev.Name, msg))
+			}
+			if allNames.Has(ev.Name) {
+				allErrs = append(allErrs, field.Duplicate(idxPath.Child("name"), ev.Name))
+			} else {
+				allNames.Insert(ev.Name)
 			}
 		}
 		allErrs = append(allErrs, validateEnvVarValueFrom(ev, idxPath.Child("valueFrom"))...)
