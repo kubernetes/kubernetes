@@ -1016,7 +1016,8 @@ def maybe_update_cloud_config():
 def get_node_name():
     node_name = db.get('node_name')
     if not node_name:
-        db.set('node_name', gethostname())
+        node_name = gethostname()
+        db.set('node_name', node_name)
 
     return node_name
 
