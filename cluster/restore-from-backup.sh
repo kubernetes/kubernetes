@@ -217,7 +217,7 @@ mkdir -p "${MNT_DISK}/var/etcd-corrupted"
 echo "Saving corrupted data to ${MNT_DISK}/var/etcd-corrupted"
 mv /var/etcd/data "${MNT_DISK}/var/etcd-corrupted"
 
-# Replace the corrupted data dir with the resotred data.
+# Replace the corrupted data dir with the restored data.
 echo "Copying restored data to /var/etcd/data"
 mv "${BACKUP_DIR}" /var/etcd/data
 
