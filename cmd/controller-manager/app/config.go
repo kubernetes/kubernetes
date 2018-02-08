@@ -24,6 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 )
 
+// ExtraConfig are part of Config, also can place you custom config here.
 type ExtraConfig struct {
 	Master string
 
@@ -55,6 +56,7 @@ type completedConfig struct {
 	Extra               *ExtraConfig
 }
 
+// CompletedConfig same as Config, just to swap private object.
 type CompletedConfig struct {
 	// Embed a private pointer that cannot be instantiated outside of this package.
 	*completedConfig

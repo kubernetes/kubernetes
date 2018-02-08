@@ -26,6 +26,7 @@ import (
 	"k8s.io/apiserver/pkg/server"
 )
 
+// InsecureServingInfo is the main context object for the insecure http server.
 type InsecureServingInfo struct {
 	// Listener is the secure server network listener.
 	Listener net.Listener

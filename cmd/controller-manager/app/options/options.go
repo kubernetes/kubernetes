@@ -77,6 +77,7 @@ func NewGenericControllerManagerOptions(componentConfig componentconfig.KubeCont
 	}
 }
 
+// NewDefaultControllerManagerComponentConfig returns default kube-controller manager configuration object.
 func NewDefaultControllerManagerComponentConfig(port int32) componentconfig.KubeControllerManagerConfiguration {
 	return componentconfig.KubeControllerManagerConfiguration{
 		Controllers:                                     []string{"*"},
@@ -169,6 +170,8 @@ func (o *GenericControllerManagerOptions) AddFlags(fs *pflag.FlagSet) {
 	o.InsecureServing.AddFlags(fs)
 	o.InsecureServing.AddDeprecatedFlags(fs)
 }
+
+// ApplyTo fills up controller manager config with options and userAgent
 func (o *GenericControllerManagerOptions) ApplyTo(c *genericcontrollermanager.Config, userAgent string) error {
 	c.ComponentConfig = o.ComponentConfig
 
@@ -200,6 +203,7 @@ func (o *GenericControllerManagerOptions) ApplyTo(c *genericcontrollermanager.Co
 	return nil
 }
 
+// Validate checks GenericControllerManagerOptions and return a slice of found errors.
 func (o *GenericControllerManagerOptions) Validate() []error {
 	errors := []error{}
 	errors = append(errors, o.SecureServing.Validate()...)

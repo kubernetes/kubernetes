@@ -41,6 +41,7 @@ type InsecureServingOptions struct {
 	Listener net.Listener
 }
 
+// Validate ensures that the insecure port values within the range of the port.
 func (s *InsecureServingOptions) Validate() []error {
 	errors := []error{}
 
@@ -55,12 +56,15 @@ func (s *InsecureServingOptions) Validate() []error {
 	return errors
 }
 
+// AddFlags adds flags related to insecure serving for controller manager to the specified FlagSet.
 func (s *InsecureServingOptions) AddFlags(fs *pflag.FlagSet) {
 	if s == nil {
 		return
 	}
 }
 
+// AddDeprecatedFlags adds deprecated flags related to insecure serving for controller manager to the specified FlagSet.
+// TODO: remove it until kops stop using `--address`
 func (s *InsecureServingOptions) AddDeprecatedFlags(fs *pflag.FlagSet) {
 	if s == nil {
 		return
@@ -74,6 +78,7 @@ func (s *InsecureServingOptions) AddDeprecatedFlags(fs *pflag.FlagSet) {
 	fs.MarkDeprecated("port", "see --secure-port instead.")
 }
 
+// ApplyTo adds InsecureServingOptions to the insecureserverinfo amd kube-controller manager configuration.
 func (s *InsecureServingOptions) ApplyTo(c **genericcontrollermanager.InsecureServingInfo, cfg *componentconfig.KubeControllerManagerConfiguration) error {
 	if s == nil {
 		return nil

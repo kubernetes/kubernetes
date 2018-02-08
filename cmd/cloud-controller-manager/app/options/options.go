@@ -73,6 +73,7 @@ func (o *CloudControllerManagerOptions) AddFlags(fs *pflag.FlagSet) {
 	utilfeature.DefaultFeatureGate.AddFlag(fs)
 }
 
+// ApplyTo fills up cloud controller manager config with options.
 func (o *CloudControllerManagerOptions) ApplyTo(c *cloudcontrollerconfig.Config) error {
 	if err := o.Generic.ApplyTo(&c.Generic, "cloud-controller-manager"); err != nil {
 		return err
@@ -83,6 +84,7 @@ func (o *CloudControllerManagerOptions) ApplyTo(c *cloudcontrollerconfig.Config)
 	return nil
 }
 
+// Validate is used to validate config before launching the cloud controller manager
 func (o *CloudControllerManagerOptions) Validate() error {
 	errors := []error{}
 	errors = append(errors, o.Generic.Validate()...)
@@ -94,6 +96,7 @@ func (o *CloudControllerManagerOptions) Validate() error {
 	return utilerrors.NewAggregate(errors)
 }
 
+// Config return a cloud controller manager config objective
 func (o CloudControllerManagerOptions) Config() (*cloudcontrollerconfig.Config, error) {
 	if err := o.Validate(); err != nil {
 		return nil, err

@@ -144,12 +144,11 @@ func (s *KubeControllerManagerOptions) AddFlags(fs *pflag.FlagSet, allController
 	utilfeature.DefaultFeatureGate.AddFlag(fs)
 }
 
-func (o *KubeControllerManagerOptions) ApplyTo(c *kubecontrollerconfig.Config) error {
-	if err := o.Generic.ApplyTo(&c.Generic, "controller-manager"); err != nil {
-		return err
-	}
+// ApplyTo fills up controller manager config with options.
+func (s *KubeControllerManagerOptions) ApplyTo(c *kubecontrollerconfig.Config) error {
+	err := s.Generic.ApplyTo(&c.Generic, "controller-manager")
 
-	return nil
+	return err
 }
 
 // Validate is used to validate the options and config before launching the controller manager
@@ -173,13 +172,14 @@ func (s *KubeControllerManagerOptions) Validate(allControllers []string, disable
 	return utilerrors.NewAggregate(errs)
 }
 
-func (o KubeControllerManagerOptions) Config(allControllers []string, disabledByDefaultControllers []string) (*kubecontrollerconfig.Config, error) {
-	if err := o.Validate(allControllers, disabledByDefaultControllers); err != nil {
+// Config return a controller manager config objective
+func (s KubeControllerManagerOptions) Config(allControllers []string, disabledByDefaultControllers []string) (*kubecontrollerconfig.Config, error) {
+	if err := s.Validate(allControllers, disabledByDefaultControllers); err != nil {
 		return nil, err
 	}
 
 	c := &kubecontrollerconfig.Config{}
-	if err := o.ApplyTo(c); err != nil {
+	if err := s.ApplyTo(c); err != nil {
 		return nil, err
 	}
 
