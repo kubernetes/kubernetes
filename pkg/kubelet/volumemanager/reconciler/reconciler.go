@@ -319,7 +319,7 @@ func (rc *reconciler) reconcile() {
 // sync process tries to observe the real world by scanning all pods' volume directories from the disk.
 // If the actual and desired state of worlds are not consistent with the observed world, it means that some
 // mounted volumes are left out probably during kubelet restart. This process will reconstruct
-// the volumes and udpate the actual and desired states. In the following reconciler loop, those volumes will
+// the volumes and update the actual and desired states. In the following reconciler loop, those volumes will
 // be cleaned up.
 func (rc *reconciler) sync() {
 	defer rc.updateLastSyncTime()
