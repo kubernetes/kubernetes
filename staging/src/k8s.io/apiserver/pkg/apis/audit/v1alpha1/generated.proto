@@ -97,6 +97,14 @@ message Event {
   // Time the request reached current audit stage.
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.MicroTime stageTimestamp = 16;
+
+  // Annotations is an unstructured key value map stored with an audit event that may be set by
+  // plugins invoked in the request serving chain, including authentication, authorization and
+  // admission plugins. Keys should uniquely identify the informing component to avoid name
+  // collisions (e.g. podsecuritypolicy.admission.k8s.io/policy). Values should be short. Annotations
+  // are included in the Metadata level.
+  // +optional
+  map<string, string> annotations = 17;
 }
 
 // EventList is a list of audit Events.
