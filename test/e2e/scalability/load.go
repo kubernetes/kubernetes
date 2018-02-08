@@ -104,6 +104,7 @@ var _ = SIGDescribe("Load capacity", func() {
 		// Stop apiserver CPU profile gatherer and gather memory allocations profile.
 		close(profileGathererStopCh)
 		wg := sync.WaitGroup{}
+		wg.Add(1)
 		framework.GatherApiserverMemoryProfile(&wg, "load")
 		wg.Wait()
 
