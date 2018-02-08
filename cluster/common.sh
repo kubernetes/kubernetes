@@ -611,6 +611,11 @@ EOF
 KUBELET_TEST_LOG_LEVEL: $(yaml-quote ${KUBELET_TEST_LOG_LEVEL})
 EOF
   fi
+  if [ -n "${KUBEPROXY_MODE:-}" ]; then
+      cat >>$file <<EOF
+KUBEPROXY_MODE: $(yaml-quote ${KUBEPROXY_MDOE})
+EOF
+  fi
   if [ -n "${DOCKER_TEST_LOG_LEVEL:-}" ]; then
       cat >>$file <<EOF
 DOCKER_TEST_LOG_LEVEL: $(yaml-quote ${DOCKER_TEST_LOG_LEVEL})
