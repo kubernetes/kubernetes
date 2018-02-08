@@ -53,6 +53,9 @@ type CustomResourceDefinitionNames struct {
 	Kind string `json:"kind" protobuf:"bytes,4,opt,name=kind"`
 	// ListKind is the serialized kind of the list for this resource.  Defaults to <kind>List.
 	ListKind string `json:"listKind,omitempty" protobuf:"bytes,5,opt,name=listKind"`
+	// Categories is a list of grouped resources custom resources belong to (e.g. 'all')
+	// +optional
+	Categories []string `json:"categories,omitempty" protobuf:"bytes,6,rep,name=categories"`
 }
 
 // ResourceScope is an enum defining the different scopes available to a custom resource

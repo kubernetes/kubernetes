@@ -18,6 +18,7 @@ package customresource_test
 
 import (
 	"io"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -82,7 +83,7 @@ func newStorage(t *testing.T) (customresource.CustomResourceStorage, *etcdtestin
 			status,
 			scale,
 		),
-		restOptions,
+		restOptions, []string{"all"},
 	)
 
 	return storage, server
@@ -151,6 +152,19 @@ func TestDelete(t *testing.T) {
 	defer storage.CustomResource.Store.DestroyFunc()
 	test := registrytest.New(t, storage.CustomResource.Store)
 	test.TestDelete(validNewCustomResource())
+}
+
+func TestCategories(t *testing.T) {
+	storage, server := newStorage(t)
+	defer server.Terminate(t)
+	defer storage.CustomResource.Store.DestroyFunc()
+
+	expected := []string{"all"}
+	actual := storage.CustomResource.Categories()
+	ok := reflect.DeepEqual(actual, expected)
+	if !ok {
+		t.Errorf("categories are not equal. expected = %v actual = %v", expected, actual)
+	}
 }
 
 func TestStatusUpdate(t *testing.T) {

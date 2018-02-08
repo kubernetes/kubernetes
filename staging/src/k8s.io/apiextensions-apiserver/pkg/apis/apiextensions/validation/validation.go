@@ -165,12 +165,17 @@ func ValidateCustomResourceDefinitionNames(names *apiextensions.CustomResourceDe
 		if errs := validationutil.IsDNS1035Label(shortName); len(errs) > 0 {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("shortNames").Index(i), shortName, strings.Join(errs, ",")))
 		}
-
 	}
 
 	// kind and listKind may not be the same or parsing become ambiguous
 	if len(names.Kind) > 0 && names.Kind == names.ListKind {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("listKind"), names.ListKind, "kind and listKind may not be the same"))
+	}
+
+	for i, category := range names.Categories {
+		if errs := validationutil.IsDNS1035Label(category); len(errs) > 0 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("categories").Index(i), category, strings.Join(errs, ",")))
+		}
 	}
 
 	return allErrs

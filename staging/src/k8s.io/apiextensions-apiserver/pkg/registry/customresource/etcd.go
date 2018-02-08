@@ -39,8 +39,8 @@ type CustomResourceStorage struct {
 	Scale          *ScaleREST
 }
 
-func NewStorage(resource schema.GroupResource, listKind schema.GroupVersionKind, strategy customResourceStrategy, optsGetter generic.RESTOptionsGetter) CustomResourceStorage {
-	customResourceREST, customResourceStatusREST := newREST(resource, listKind, strategy, optsGetter)
+func NewStorage(resource schema.GroupResource, listKind schema.GroupVersionKind, strategy customResourceStrategy, optsGetter generic.RESTOptionsGetter, categories []string) CustomResourceStorage {
+	customResourceREST, customResourceStatusREST := newREST(resource, listKind, strategy, optsGetter, categories)
 	customResourceRegistry := NewRegistry(customResourceREST)
 
 	s := CustomResourceStorage{
@@ -71,10 +71,11 @@ func NewStorage(resource schema.GroupResource, listKind schema.GroupVersionKind,
 // REST implements a RESTStorage for API services against etcd
 type REST struct {
 	*genericregistry.Store
+	categories []string
 }
 
 // newREST returns a RESTStorage object that will work against API services.
-func newREST(resource schema.GroupResource, listKind schema.GroupVersionKind, strategy customResourceStrategy, optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST) {
+func newREST(resource schema.GroupResource, listKind schema.GroupVersionKind, strategy customResourceStrategy, optsGetter generic.RESTOptionsGetter, categories []string) (*REST, *StatusREST) {
 	store := &genericregistry.Store{
 		NewFunc: func() runtime.Object { return &unstructured.Unstructured{} },
 		NewListFunc: func() runtime.Object {
@@ -97,7 +98,15 @@ func newREST(resource schema.GroupResource, listKind schema.GroupVersionKind, st
 
 	statusStore := *store
 	statusStore.UpdateStrategy = NewStatusStrategy(strategy)
-	return &REST{store}, &StatusREST{store: &statusStore}
+	return &REST{store, categories}, &StatusREST{store: &statusStore}
+}
+
+// Implement CategoriesProvider
+var _ rest.CategoriesProvider = &REST{}
+
+// Categories implements the CategoriesProvider interface. Returns a list of categories a resource is part of.
+func (r *REST) Categories() []string {
+	return r.categories
 }
 
 // StatusREST implements the REST endpoint for changing the status of a CustomResource

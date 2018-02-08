@@ -49,6 +49,9 @@ type CustomResourceDefinitionNames struct {
 	Kind string
 	// ListKind is the serialized kind of the list for this resource.  Defaults to <kind>List.
 	ListKind string
+	// Categories is a list of grouped resources custom resources belong to (e.g. 'all')
+	// +optional
+	Categories []string
 }
 
 // ResourceScope is an enum defining the different scopes available to a custom resource
