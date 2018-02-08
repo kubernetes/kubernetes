@@ -232,12 +232,15 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 	}
 
 	activePods := podFunc()
-	// make observations and get a function to derive pod usage stats relative to those observations.
-	observations, statsFunc, err := makeSignalObservations(m.summaryProvider, capacityProvider, activePods)
+	updateStats := true
+	summary, err := m.summaryProvider.Get(updateStats)
 	if err != nil {
-		glog.Errorf("eviction manager: unexpected err: %v", err)
+		glog.Errorf("eviction manager: failed to get get summary stats: %v", err)
 		return nil
 	}
+
+	// make observations and get a function to derive pod usage stats relative to those observations.
+	observations, statsFunc := makeSignalObservations(summary, capacityProvider, activePods)
 	debugLogObservations("observations", observations)
 
 	// attempt to create a threshold notifier to improve eviction response time
@@ -314,7 +317,7 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 	// evict pods if there is a resource usage violation from local volume temporary storage
 	// If eviction happens in localStorageEviction function, skip the rest of eviction action
 	if utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) {
-		if evictedPods := m.localStorageEviction(activePods); len(evictedPods) > 0 {
+		if evictedPods := m.localStorageEviction(summary, activePods); len(evictedPods) > 0 {
 			return evictedPods
 		}
 	}
@@ -454,15 +457,7 @@ func (m *managerImpl) reclaimNodeLevelResources(resourceToReclaim v1.ResourceNam
 
 // localStorageEviction checks the EmptyDir volume usage for each pod and determine whether it exceeds the specified limit and needs
 // to be evicted. It also checks every container in the pod, if the container overlay usage exceeds the limit, the pod will be evicted too.
-func (m *managerImpl) localStorageEviction(pods []*v1.Pod) []*v1.Pod {
-	// do not update node-level stats as local storage evictions do not utilize them.
-	forceStatsUpdate := false
-	summary, err := m.summaryProvider.Get(forceStatsUpdate)
-	if err != nil {
-		glog.Errorf("Could not get summary provider")
-		return nil
-	}
-
+func (m *managerImpl) localStorageEviction(summary *statsapi.Summary, pods []*v1.Pod) []*v1.Pod {
 	statsFunc := cachedStatsFunc(summary.Pods)
 	evicted := []*v1.Pod{}
 	for _, pod := range pods {
