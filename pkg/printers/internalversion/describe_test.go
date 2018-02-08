@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	versionedfake "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
+	"k8s.io/kubernetes/pkg/apis/batch"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/networking"
@@ -1547,7 +1548,6 @@ func TestDescribeHorizontalPodAutoscaler(t *testing.T) {
 }
 
 func TestDescribeEvents(t *testing.T) {
-
 	events := &api.EventList{
 		Items: []api.Event{
 			{
@@ -1594,9 +1594,38 @@ func TestDescribeEvents(t *testing.T) {
 				},
 			}, events),
 		},
-		// TODO(jchaloup): add tests for:
-		// - IngressDescriber
-		// - JobDescriber
+		"JobDescriber": &JobDescriber{
+			fake.NewSimpleClientset(&batch.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "bar",
+					Namespace: "foo",
+				},
+				Spec: batch.JobSpec{
+					Parallelism: utilpointer.Int32Ptr(1),
+				},
+			}, events),
+		},
+		"IngressDescriber": &IngressDescriber{
+			fake.NewSimpleClientset(
+				&extensions.Ingress{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "bar",
+						Namespace: "foo",
+					},
+				},
+				&api.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "default-http-backend",
+						Namespace: "kube-system",
+					},
+				},
+				&api.Endpoints{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "default-http-backend",
+						Namespace: "kube-system",
+					},
+				}, events),
+		},
 		"NodeDescriber": &NodeDescriber{
 			fake.NewSimpleClientset(&api.Node{
 				ObjectMeta: metav1.ObjectMeta{
@@ -2226,5 +2255,84 @@ func TestControllerRef(t *testing.T) {
 	}
 	if !strings.Contains(out, "1 Running") {
 		t.Errorf("unexpected out: %s", out)
+	}
+}
+
+func TestDescribeIngress(t *testing.T) {
+	fake := fake.NewSimpleClientset(
+		&extensions.Ingress{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "bar",
+				Namespace: "foo",
+			},
+		},
+		&api.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "default-http-backend",
+				Namespace: "kube-system",
+			},
+		},
+		&api.Endpoints{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "default-http-backend",
+				Namespace: "kube-system",
+			},
+		})
+
+	c := &describeClient{T: t, Namespace: "", Interface: fake}
+	d := IngressDescriber{c}
+	out, err := d.Describe("foo", "bar", printers.DescriberSettings{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	expected := `Name:             bar
+Namespace:        foo
+Address:          
+Default backend:  default-http-backend:80 (<none>)
+Rules:
+  Host  Path  Backends
+  ----  ----  --------
+  *     *     default-http-backend:80 (<none>)
+Annotations:` + "\n"
+	if out != expected {
+		t.Errorf("unexpected out:\n%v\nbut got:\n%s", expected, out)
+	}
+}
+
+func TestDescribeJob(t *testing.T) {
+	fake := fake.NewSimpleClientset(
+		&batch.Job{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "bar",
+				Namespace: "foo",
+				Labels:    map[string]string{"abc": "xyz"},
+			},
+			Spec: batch.JobSpec{
+				Parallelism: utilpointer.Int32Ptr(1),
+			},
+		})
+
+	c := &describeClient{T: t, Namespace: "", Interface: fake}
+	d := JobDescriber{c}
+	out, err := d.Describe("foo", "bar", printers.DescriberSettings{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	expected := `Name:           bar
+Namespace:      foo
+Selector:       
+Labels:         abc=xyz
+Annotations:    <none>
+Parallelism:    1
+Completions:    <unset>
+Pods Statuses:  0 Running / 0 Succeeded / 0 Failed
+Pod Template:
+  Labels:  <none>
+  Containers: <none>
+  Volumes:  <none>` + "\n"
+	if out != expected {
+		t.Errorf("expected out:\n%v\nbut got:\n%s", expected, out)
 	}
 }
