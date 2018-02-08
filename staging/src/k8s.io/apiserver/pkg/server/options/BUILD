@@ -15,6 +15,7 @@ go_library(
         "recommended.go",
         "server_run_options.go",
         "serving.go",
+        "serving_with_loopback.go",
     ],
     importpath = "k8s.io/apiserver/pkg/server/options",
     visibility = ["//visibility:public"],

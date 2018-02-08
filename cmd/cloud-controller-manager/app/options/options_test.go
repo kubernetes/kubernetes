@@ -31,7 +31,7 @@ import (
 
 func TestAddFlags(t *testing.T) {
 	f := pflag.NewFlagSet("addflagstest", pflag.ContinueOnError)
-	s := NewCloudControllerManagerServer()
+	s := NewCloudControllerManagerOptions()
 	s.AddFlags(f)
 
 	args := []string{
@@ -65,9 +65,9 @@ func TestAddFlags(t *testing.T) {
 	}
 	f.Parse(args)
 
-	expected := &CloudControllerManagerServer{
-		ControllerManagerServer: cmoptions.ControllerManagerServer{
-			KubeControllerManagerConfiguration: componentconfig.KubeControllerManagerConfiguration{
+	expected := &CloudControllerManagerOptions{
+		Generic: cmoptions.GenericControllerManagerOptions{
+			ComponentConfig: componentconfig.KubeControllerManagerConfiguration{
 				CloudProvider:                                   "gce",
 				CloudConfigFile:                                 "/cloud-config",
 				Port:                                            10000,
