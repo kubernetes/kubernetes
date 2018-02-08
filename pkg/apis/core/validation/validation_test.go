@@ -5964,38 +5964,6 @@ func TestValidatePodSpec(t *testing.T) {
 			DNSPolicy:         core.DNSClusterFirst,
 			PriorityClassName: "InvalidName",
 		},
-		"with privileged and allowPrivilegeEscalation false": {
-			Containers: []core.Container{
-				{
-					Name:            "ctr",
-					Image:           "image",
-					ImagePullPolicy: "IfNotPresent",
-					Ports: []core.ContainerPort{
-						{HostPort: 8080, ContainerPort: 2600, Protocol: "TCP"}},
-					SecurityContext: &core.SecurityContext{
-						Privileged:               boolPtr(true),
-						AllowPrivilegeEscalation: boolPtr(false),
-					},
-				},
-			},
-		},
-		"with CAP_SYS_ADMIN and allowPrivilegeEscalation false": {
-			Containers: []core.Container{
-				{
-					Name:            "ctr",
-					Image:           "image",
-					ImagePullPolicy: "IfNotPresent",
-					Ports: []core.ContainerPort{
-						{HostPort: 8080, ContainerPort: 2600, Protocol: "TCP"}},
-					SecurityContext: &core.SecurityContext{
-						Capabilities: &core.Capabilities{
-							Add: []core.Capability{"CAP_SYS_ADMIN"},
-						},
-						AllowPrivilegeEscalation: boolPtr(false),
-					},
-				},
-			},
-		},
 	}
 	for k, v := range failureCases {
 		if errs := ValidatePodSpec(&v, field.NewPath("field")); len(errs) == 0 {
@@ -11986,11 +11954,10 @@ func TestValidateTLSSecret(t *testing.T) {
 }
 
 func TestValidateSecurityContext(t *testing.T) {
-	priv := false
 	runAsUser := int64(1)
 	fullValidSC := func() *core.SecurityContext {
 		return &core.SecurityContext{
-			Privileged: &priv,
+			Privileged: boolPtr(false),
 			Capabilities: &core.Capabilities{
 				Add:  []core.Capability{"foo"},
 				Drop: []core.Capability{"bar"},
@@ -12035,17 +12002,25 @@ func TestValidateSecurityContext(t *testing.T) {
 	}
 
 	privRequestWithGlobalDeny := fullValidSC()
-	requestPrivileged := true
-	privRequestWithGlobalDeny.Privileged = &requestPrivileged
+	privRequestWithGlobalDeny.Privileged = boolPtr(true)
 
 	negativeRunAsUser := fullValidSC()
 	negativeUser := int64(-1)
 	negativeRunAsUser.RunAsUser = &negativeUser
 
+	privWithoutEscalation := fullValidSC()
+	privWithoutEscalation.Privileged = boolPtr(true)
+	privWithoutEscalation.AllowPrivilegeEscalation = boolPtr(false)
+
+	capSysAdminWithoutEscalation := fullValidSC()
+	capSysAdminWithoutEscalation.Capabilities.Add = []core.Capability{"CAP_SYS_ADMIN"}
+	capSysAdminWithoutEscalation.AllowPrivilegeEscalation = boolPtr(false)
+
 	errorCases := map[string]struct {
-		sc          *core.SecurityContext
-		errorType   field.ErrorType
-		errorDetail string
+		sc           *core.SecurityContext
+		errorType    field.ErrorType
+		errorDetail  string
+		capAllowPriv bool
 	}{
 		"request privileged when capabilities forbids": {
 			sc:          privRequestWithGlobalDeny,
@@ -12057,8 +12032,22 @@ func TestValidateSecurityContext(t *testing.T) {
 			errorType:   "FieldValueInvalid",
 			errorDetail: "must be between",
 		},
+		"with CAP_SYS_ADMIN and allowPrivilegeEscalation false": {
+			sc:          capSysAdminWithoutEscalation,
+			errorType:   "FieldValueInvalid",
+			errorDetail: "cannot set `allowPrivilegeEscalation` to false and `capabilities.Add` CAP_SYS_ADMIN",
+		},
+		"with privileged and allowPrivilegeEscalation false": {
+			sc:           privWithoutEscalation,
+			errorType:    "FieldValueInvalid",
+			errorDetail:  "cannot set `allowPrivilegeEscalation` to false and `privileged` to true",
+			capAllowPriv: true,
+		},
 	}
 	for k, v := range errorCases {
+		capabilities.SetForTests(capabilities.Capabilities{
+			AllowPrivileged: v.capAllowPriv,
+		})
 		if errs := ValidateSecurityContext(v.sc, field.NewPath("field")); len(errs) == 0 || errs[0].Type != v.errorType || !strings.Contains(errs[0].Detail, v.errorDetail) {
 			t.Errorf("[%s] Expected error type %q with detail %q, got %v", k, v.errorType, v.errorDetail, errs)
 		}
