@@ -131,6 +131,10 @@ func (s *DelegatingAuthenticationOptions) Validate() []error {
 }
 
 func (s *DelegatingAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
+	if s == nil {
+		return
+	}
+
 	fs.StringVar(&s.RemoteKubeConfigFile, "authentication-kubeconfig", s.RemoteKubeConfigFile, ""+
 		"kubeconfig file pointing at the 'core' kubernetes server with enough rights to create "+
 		"tokenaccessreviews.authentication.k8s.io.")

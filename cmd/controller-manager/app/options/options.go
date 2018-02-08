@@ -48,6 +48,8 @@ type GenericControllerManagerOptions struct {
 	SecureServing *apiserveroptions.SecureServingOptions
 	// TODO: remove insecure serving mode
 	InsecureServing *InsecureServingOptions
+	Authentication  *apiserveroptions.DelegatingAuthenticationOptions
+	Authorization   *apiserveroptions.DelegatingAuthorizationOptions
 
 	Master     string
 	Kubeconfig string
@@ -75,6 +77,8 @@ func NewGenericControllerManagerOptions(componentConfig componentconfig.KubeCont
 			BindPort:    int(componentConfig.Port),
 			BindNetwork: "tcp",
 		},
+		Authentication: nil, // TODO: enable with apiserveroptions.NewDelegatingAuthenticationOptions()
+		Authorization:  nil, // TODO: enable with apiserveroptions.NewDelegatingAuthorizationOptions()
 	}
 
 	// disable secure serving for now
@@ -175,6 +179,8 @@ func (o *GenericControllerManagerOptions) AddFlags(fs *pflag.FlagSet) {
 	o.SecureServing.AddFlags(fs)
 	o.InsecureServing.AddFlags(fs)
 	o.InsecureServing.AddDeprecatedFlags(fs)
+	o.Authentication.AddFlags(fs)
+	o.Authorization.AddFlags(fs)
 }
 
 // ApplyTo fills up controller manager config with options and userAgent
@@ -185,6 +191,12 @@ func (o *GenericControllerManagerOptions) ApplyTo(c *genericcontrollermanager.Co
 		return err
 	}
 	if err := o.InsecureServing.ApplyTo(&c.InsecureServing, &c.ComponentConfig); err != nil {
+		return err
+	}
+	if err := o.Authentication.ApplyTo(&c.Authentication, c.SecureServing, nil); err != nil {
+		return err
+	}
+	if err := o.Authorization.ApplyTo(&c.Authorization); err != nil {
 		return err
 	}
 
@@ -214,6 +226,8 @@ func (o *GenericControllerManagerOptions) Validate() []error {
 	errors := []error{}
 	errors = append(errors, o.SecureServing.Validate()...)
 	errors = append(errors, o.InsecureServing.Validate()...)
+	errors = append(errors, o.Authentication.Validate()...)
+	errors = append(errors, o.Authorization.Validate()...)
 
 	// TODO: validate component config, master and kubeconfig
 

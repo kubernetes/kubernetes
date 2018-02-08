@@ -32,6 +32,8 @@ type Config struct {
 	SecureServing *apiserver.SecureServingInfo
 	// TODO: remove deprecated insecure serving
 	InsecureServing *InsecureServingInfo
+	Authentication  apiserver.AuthenticationInfo
+	Authorization   apiserver.AuthorizationInfo
 
 	// the general kube client
 	Client *clientset.Clientset

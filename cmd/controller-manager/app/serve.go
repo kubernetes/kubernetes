@@ -24,7 +24,11 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
+	genericapifilters "k8s.io/apiserver/pkg/endpoints/filters"
+	apirequest "k8s.io/apiserver/pkg/endpoints/request"
+	genericfilters "k8s.io/apiserver/pkg/server/filters"
 	"k8s.io/apiserver/pkg/server/healthz"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/util/configz"
 )
 
@@ -47,5 +51,15 @@ func Serve(c *CompletedConfig, serveFunc serveFunc, stopCh <-chan struct{}) erro
 	configz.InstallHandler(mux)
 	mux.Handle("/metrics", prometheus.Handler())
 
-	return serveFunc(mux, 0, stopCh)
+	requestContextMapper := apirequest.NewRequestContextMapper()
+	requestInfoResolver := &apirequest.RequestInfoFactory{}
+	failedHandler := genericapifilters.Unauthorized(requestContextMapper, legacyscheme.Codecs, false)
+
+	handler := genericapifilters.WithAuthorization(mux, requestContextMapper, c.Authorization.Authorizer, legacyscheme.Codecs)
+	handler = genericapifilters.WithAuthentication(handler, requestContextMapper, c.Authentication.Authenticator, failedHandler)
+	handler = genericapifilters.WithRequestInfo(handler, requestInfoResolver, requestContextMapper)
+	handler = apirequest.WithRequestContext(handler, requestContextMapper)
+	handler = genericfilters.WithPanicRecovery(handler)
+
+	return serveFunc(handler, 0, stopCh)
 }
