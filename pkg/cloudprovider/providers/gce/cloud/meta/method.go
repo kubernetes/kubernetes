@@ -270,13 +270,14 @@ func (m *Method) MockHookName() string {
 // MockHook is the definition of the hook function.
 func (m *Method) MockHook() string {
 	args := m.args(m.argsSkip(), false, []string{
-		fmt.Sprintf("*%s", m.MockWrapType()),
 		"context.Context",
 		"*meta.Key",
 	})
 	if m.kind == MethodPaged {
 		args = append(args, "*filter.F")
 	}
+
+	args = append(args, fmt.Sprintf("*%s", m.MockWrapType()))
 
 	switch m.kind {
 	case MethodOperation:

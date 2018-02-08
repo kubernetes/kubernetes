@@ -352,27 +352,27 @@ type {{.MockWrapType}} struct {
 	// execution flow of the mock. Return (false, nil, nil) to continue with
 	// normal mock behavior/ after the hook function executes.
 	{{- if .GenerateGet}}
-	GetHook    func(m *{{.MockWrapType}}, ctx context.Context, key *meta.Key) (bool, *{{.FQObjectType}}, error)
+	GetHook    func(ctx context.Context, key *meta.Key, m *{{.MockWrapType}}) (bool, *{{.FQObjectType}}, error)
 	{{- end -}}
 	{{- if .GenerateList}}
 	{{- if .KeyIsGlobal}}
-	ListHook   func(m *{{.MockWrapType}}, ctx context.Context, fl *filter.F) (bool, []*{{.FQObjectType}}, error)
+	ListHook   func(ctx context.Context, fl *filter.F, m *{{.MockWrapType}}) (bool, []*{{.FQObjectType}}, error)
 	{{- end -}}
 	{{- if .KeyIsRegional}}
-	ListHook   func(m *{{.MockWrapType}}, ctx context.Context, region string, fl *filter.F) (bool, []*{{.FQObjectType}}, error)
+	ListHook   func(ctx context.Context, region string, fl *filter.F, m *{{.MockWrapType}}) (bool, []*{{.FQObjectType}}, error)
 	{{- end -}}
 	{{- if .KeyIsZonal}}
-	ListHook   func(m *{{.MockWrapType}}, ctx context.Context, zone string, fl *filter.F) (bool, []*{{.FQObjectType}}, error)
+	ListHook   func(ctx context.Context, zone string, fl *filter.F, m *{{.MockWrapType}}) (bool, []*{{.FQObjectType}}, error)
 	{{- end}}
 	{{- end -}}
 	{{- if .GenerateInsert}}
-	InsertHook func(m *{{.MockWrapType}}, ctx context.Context, key *meta.Key, obj *{{.FQObjectType}}) (bool, error)
+	InsertHook func(ctx context.Context, key *meta.Key, obj *{{.FQObjectType}}, m *{{.MockWrapType}}) (bool, error)
 	{{- end -}}
 	{{- if .GenerateDelete}}
-	DeleteHook func(m *{{.MockWrapType}}, ctx context.Context, key *meta.Key) (bool, error)
+	DeleteHook func(ctx context.Context, key *meta.Key, m *{{.MockWrapType}}) (bool, error)
 	{{- end -}}
 	{{- if .AggregatedList}}
-	AggregatedListHook func(m *{{.MockWrapType}}, ctx context.Context, fl *filter.F) (bool, map[string][]*{{.FQObjectType}}, error)
+	AggregatedListHook func(ctx context.Context, fl *filter.F, m *{{.MockWrapType}}) (bool, map[string][]*{{.FQObjectType}}, error)
 	{{- end}}
 
 {{- with .Methods -}}
@@ -390,7 +390,7 @@ type {{.MockWrapType}} struct {
 // Get returns the object from the mock.
 func (m *{{.MockWrapType}}) Get(ctx context.Context, key *meta.Key) (*{{.FQObjectType}}, error) {
 	if m.GetHook != nil {
-		if intercept, obj, err := m.GetHook(m, ctx, key);  intercept {
+		if intercept, obj, err := m.GetHook(ctx, key, m);  intercept {
 			glog.V(5).Infof("{{.MockWrapType}}.Get(%v, %s) = %+v, %v", ctx, key, obj ,err)
 			return obj, err
 		}
@@ -436,15 +436,15 @@ func (m *{{.MockWrapType}}) List(ctx context.Context, zone string, fl *filter.F)
 {{- end}}
 	if m.ListHook != nil {
 		{{if .KeyIsGlobal -}}
-		if intercept, objs, err := m.ListHook(m, ctx, fl);  intercept {
+		if intercept, objs, err := m.ListHook(ctx, fl, m);  intercept {
 			glog.V(5).Infof("{{.MockWrapType}}.List(%v, %v) = [%v items], %v", ctx, fl, len(objs), err)
 		{{- end -}}
 		{{- if .KeyIsRegional -}}
-		if intercept, objs, err := m.ListHook(m, ctx, region, fl);  intercept {
+		if intercept, objs, err := m.ListHook(ctx, region, fl, m);  intercept {
 			glog.V(5).Infof("{{.MockWrapType}}.List(%v, %q, %v) = [%v items], %v", ctx, region, fl, len(objs), err)
 		{{- end -}}
 		{{- if .KeyIsZonal -}}
-		if intercept, objs, err := m.ListHook(m, ctx, zone, fl);  intercept {
+		if intercept, objs, err := m.ListHook(ctx, zone, fl, m);  intercept {
 			glog.V(5).Infof("{{.MockWrapType}}.List(%v, %q, %v) = [%v items], %v", ctx, zone, fl, len(objs), err)
 		{{- end}}
 			return objs, err
@@ -508,7 +508,7 @@ func (m *{{.MockWrapType}}) List(ctx context.Context, zone string, fl *filter.F)
 // Insert is a mock for inserting/creating a new object.
 func (m *{{.MockWrapType}}) Insert(ctx context.Context, key *meta.Key, obj *{{.FQObjectType}}) error {
 	if m.InsertHook != nil {
-		if intercept, err := m.InsertHook(m, ctx, key, obj);  intercept {
+		if intercept, err := m.InsertHook(ctx, key, obj, m);  intercept {
 			glog.V(5).Infof("{{.MockWrapType}}.Insert(%v, %v, %+v) = %v", ctx, key, obj, err)
 			return err
 		}
@@ -548,7 +548,7 @@ func (m *{{.MockWrapType}}) Insert(ctx context.Context, key *meta.Key, obj *{{.F
 // Delete is a mock for deleting the object.
 func (m *{{.MockWrapType}}) Delete(ctx context.Context, key *meta.Key) error {
 	if m.DeleteHook != nil {
-		if intercept, err := m.DeleteHook(m, ctx, key);  intercept {
+		if intercept, err := m.DeleteHook(ctx, key, m);  intercept {
 			glog.V(5).Infof("{{.MockWrapType}}.Delete(%v, %v) = %v", ctx, key, err)
 			return err
 		}
@@ -583,7 +583,7 @@ func (m *{{.MockWrapType}}) Delete(ctx context.Context, key *meta.Key) error {
 // AggregatedList is a mock for AggregatedList.
 func (m *{{.MockWrapType}}) AggregatedList(ctx context.Context, fl *filter.F) (map[string][]*{{.FQObjectType}}, error) {
 	if m.AggregatedListHook != nil {
-		if intercept, objs, err := m.AggregatedListHook(m, ctx, fl); intercept {
+		if intercept, objs, err := m.AggregatedListHook(ctx, fl, m); intercept {
 			glog.V(5).Infof("{{.MockWrapType}}.AggregatedList(%v, %v) = [%v items], %v", ctx, fl, len(objs), err)
 			return objs, err
 		}
@@ -632,17 +632,17 @@ func (m *{{.MockWrapType}}) Obj(o *{{.FQObjectType}}) *Mock{{.Service}}Obj {
 func (m *{{.MockWrapType}}) {{.FcnArgs}} {
 {{- if .IsOperation }}
 	if m.{{.MockHookName}} != nil {
-		return m.{{.MockHookName}}(m, ctx, key {{.CallArgs}})
+		return m.{{.MockHookName}}(ctx, key {{.CallArgs}}, m)
 	}
 	return nil
 {{- else if .IsGet}}
 	if m.{{.MockHookName}} != nil {
-		return m.{{.MockHookName}}(m, ctx, key {{.CallArgs}})
+		return m.{{.MockHookName}}(ctx, key {{.CallArgs}}, m)
 	}
 	return nil, fmt.Errorf("{{.MockHookName}} must be set")
 {{- else if .IsPaged}}
 	if m.{{.MockHookName}} != nil {
-		return m.{{.MockHookName}}(m, ctx, key {{.CallArgs}}, fl)
+		return m.{{.MockHookName}}(ctx, key {{.CallArgs}}, fl, m)
 	}
 	return nil, nil
 {{- end}}
