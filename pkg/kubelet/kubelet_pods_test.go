@@ -1585,12 +1585,17 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 					"1234":  []byte("abc"),
 					"1z":    []byte("abc"),
 					"key.1": []byte("value"),
+					"key:2": []byte("value2"),
 				},
 			},
 			expectedEnvs: []kubecontainer.EnvVar{
 				{
 					Name:  "key.1",
 					Value: "value",
+				},
+				{
+					Name:  "key:2",
+					Value: "value2",
 				},
 			},
 			expectedEvent: "Warning InvalidEnvironmentVariableNames Keys [1234, 1z] from the EnvFrom secret test/test-secret were skipped since they are considered invalid environment variable names.",
@@ -1614,12 +1619,17 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 				},
 				Data: map[string][]byte{
 					"1234.name": []byte("abc"),
+					"5678:name": []byte("def"),
 				},
 			},
 			expectedEnvs: []kubecontainer.EnvVar{
 				{
 					Name:  "p_1234.name",
 					Value: "abc",
+				},
+				{
+					Name:  "p_5678:name",
+					Value: "def",
 				},
 			},
 		},
