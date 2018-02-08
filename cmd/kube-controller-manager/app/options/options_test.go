@@ -17,6 +17,7 @@ limitations under the License.
 package options
 
 import (
+	"net"
 	"reflect"
 	"sort"
 	"testing"
@@ -26,6 +27,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/diff"
+	apiserveroptions "k8s.io/apiserver/pkg/server/options"
 	cmoptions "k8s.io/kubernetes/cmd/controller-manager/app/options"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 )
@@ -36,7 +38,7 @@ func TestAddFlags(t *testing.T) {
 	s.AddFlags(f, []string{""}, []string{""})
 
 	args := []string{
-		"--address=192.168.4.10",
+		"--address=0.0.0.0",
 		"--allocate-node-cidrs=true",
 		"--attach-detach-reconcile-sync-period=30s",
 		"--cidr-allocator-type=CloudAllocator",
@@ -89,7 +91,7 @@ func TestAddFlags(t *testing.T) {
 		"--node-monitor-period=10s",
 		"--node-startup-grace-period=30s",
 		"--pod-eviction-timeout=2m",
-		"--port=10000",
+		"--port=10252",
 		"--profiling=false",
 		"--pv-recycler-increment-timeout-nfs=45",
 		"--pv-recycler-minimum-timeout-hostpath=45",
@@ -108,104 +110,112 @@ func TestAddFlags(t *testing.T) {
 	f.Parse(args)
 	// Sort GCIgnoredResources because it's built from a map, which means the
 	// insertion order is random.
-	sort.Sort(sortedGCIgnoredResources(s.GCIgnoredResources))
+	sort.Sort(sortedGCIgnoredResources(s.Generic.ComponentConfig.GCIgnoredResources))
 
-	expected := &KubeControllerManagerOptions{
-		GenericControllerManagerOptions: cmoptions.GenericControllerManagerOptions{
-			KubeControllerManagerConfiguration: componentconfig.KubeControllerManagerConfiguration{
-				Port:                                            10000,
-				Address:                                         "192.168.4.10",
-				AllocateNodeCIDRs:                               true,
-				CloudConfigFile:                                 "/cloud-config",
-				CloudProvider:                                   "gce",
-				ClusterCIDR:                                     "1.2.3.4/24",
-				ClusterName:                                     "k8s",
-				ConcurrentDeploymentSyncs:                       10,
-				ConcurrentEndpointSyncs:                         10,
-				ConcurrentGCSyncs:                               30,
-				ConcurrentNamespaceSyncs:                        20,
-				ConcurrentRSSyncs:                               10,
-				ConcurrentResourceQuotaSyncs:                    10,
-				ConcurrentServiceSyncs:                          2,
-				ConcurrentSATokenSyncs:                          10,
-				ConcurrentRCSyncs:                               10,
-				ConfigureCloudRoutes:                            false,
-				EnableContentionProfiling:                       true,
-				ControllerStartInterval:                         metav1.Duration{Duration: 2 * time.Minute},
-				ConcurrentDaemonSetSyncs:                        2,
-				ConcurrentJobSyncs:                              5,
-				DeletingPodsQps:                                 0.1,
-				EnableProfiling:                                 false,
-				CIDRAllocatorType:                               "CloudAllocator",
-				NodeCIDRMaskSize:                                48,
-				ServiceSyncPeriod:                               metav1.Duration{Duration: 2 * time.Minute},
-				ResourceQuotaSyncPeriod:                         metav1.Duration{Duration: 10 * time.Minute},
-				NamespaceSyncPeriod:                             metav1.Duration{Duration: 10 * time.Minute},
-				PVClaimBinderSyncPeriod:                         metav1.Duration{Duration: 30 * time.Second},
-				HorizontalPodAutoscalerSyncPeriod:               metav1.Duration{Duration: 45 * time.Second},
-				DeploymentControllerSyncPeriod:                  metav1.Duration{Duration: 45 * time.Second},
-				MinResyncPeriod:                                 metav1.Duration{Duration: 8 * time.Hour},
-				RegisterRetryCount:                              10,
-				RouteReconciliationPeriod:                       metav1.Duration{Duration: 30 * time.Second},
-				PodEvictionTimeout:                              metav1.Duration{Duration: 2 * time.Minute},
-				NodeMonitorGracePeriod:                          metav1.Duration{Duration: 30 * time.Second},
-				NodeStartupGracePeriod:                          metav1.Duration{Duration: 30 * time.Second},
-				NodeMonitorPeriod:                               metav1.Duration{Duration: 10 * time.Second},
-				HorizontalPodAutoscalerUpscaleForbiddenWindow:   metav1.Duration{Duration: 1 * time.Minute},
-				HorizontalPodAutoscalerDownscaleForbiddenWindow: metav1.Duration{Duration: 2 * time.Minute},
-				HorizontalPodAutoscalerTolerance:                0.1,
-				TerminatedPodGCThreshold:                        12000,
-				VolumeConfiguration: componentconfig.VolumeConfiguration{
-					EnableDynamicProvisioning:  false,
-					EnableHostPathProvisioning: true,
-					FlexVolumePluginDir:        "/flex-volume-plugin",
-					PersistentVolumeRecyclerConfiguration: componentconfig.PersistentVolumeRecyclerConfiguration{
-						MaximumRetry:             3,
-						MinimumTimeoutNFS:        200,
-						IncrementTimeoutNFS:      45,
-						MinimumTimeoutHostPath:   45,
-						IncrementTimeoutHostPath: 45,
-					},
-				},
-				ContentType:  "application/json",
-				KubeAPIQPS:   50.0,
-				KubeAPIBurst: 100,
-				LeaderElection: componentconfig.LeaderElectionConfiguration{
-					ResourceLock:  "configmap",
-					LeaderElect:   false,
-					LeaseDuration: metav1.Duration{Duration: 30 * time.Second},
-					RenewDeadline: metav1.Duration{Duration: 15 * time.Second},
-					RetryPeriod:   metav1.Duration{Duration: 5 * time.Second},
-				},
-				ClusterSigningCertFile: "/cluster-signing-cert",
-				ClusterSigningKeyFile:  "/cluster-signing-key",
-				ServiceAccountKeyFile:  "/service-account-private-key",
-				ClusterSigningDuration: metav1.Duration{Duration: 10 * time.Hour},
-				EnableGarbageCollector: false,
-				GCIgnoredResources: []componentconfig.GroupResource{
-					{Group: "extensions", Resource: "replicationcontrollers"},
-					{Group: "", Resource: "bindings"},
-					{Group: "", Resource: "componentstatuses"},
-					{Group: "", Resource: "events"},
-					{Group: "authentication.k8s.io", Resource: "tokenreviews"},
-					{Group: "authorization.k8s.io", Resource: "subjectaccessreviews"},
-					{Group: "authorization.k8s.io", Resource: "selfsubjectaccessreviews"},
-					{Group: "authorization.k8s.io", Resource: "localsubjectaccessreviews"},
-					{Group: "authorization.k8s.io", Resource: "selfsubjectrulesreviews"},
-					{Group: "apiregistration.k8s.io", Resource: "apiservices"},
-					{Group: "apiextensions.k8s.io", Resource: "customresourcedefinitions"},
-				},
-				NodeEvictionRate:                      0.2,
-				SecondaryNodeEvictionRate:             0.05,
-				LargeClusterSizeThreshold:             100,
-				UnhealthyZoneThreshold:                0.6,
-				DisableAttachDetachReconcilerSync:     true,
-				ReconcilerSyncLoopPeriod:              metav1.Duration{Duration: 30 * time.Second},
-				Controllers:                           []string{"foo", "bar"},
-				EnableTaintManager:                    false,
-				HorizontalPodAutoscalerUseRESTClients: true,
-				UseServiceAccountCredentials:          true,
+	componentConfig := componentconfig.KubeControllerManagerConfiguration{
+		Port:                                            10252,
+		Address:                                         "0.0.0.0",
+		AllocateNodeCIDRs:                               true,
+		CloudConfigFile:                                 "/cloud-config",
+		CloudProvider:                                   "gce",
+		ClusterCIDR:                                     "1.2.3.4/24",
+		ClusterName:                                     "k8s",
+		ConcurrentDeploymentSyncs:                       10,
+		ConcurrentEndpointSyncs:                         10,
+		ConcurrentGCSyncs:                               30,
+		ConcurrentNamespaceSyncs:                        20,
+		ConcurrentRSSyncs:                               10,
+		ConcurrentResourceQuotaSyncs:                    10,
+		ConcurrentServiceSyncs:                          2,
+		ConcurrentSATokenSyncs:                          10,
+		ConcurrentRCSyncs:                               10,
+		ConfigureCloudRoutes:                            false,
+		EnableContentionProfiling:                       true,
+		ControllerStartInterval:                         metav1.Duration{Duration: 2 * time.Minute},
+		ConcurrentDaemonSetSyncs:                        2,
+		ConcurrentJobSyncs:                              5,
+		DeletingPodsQps:                                 0.1,
+		EnableProfiling:                                 false,
+		CIDRAllocatorType:                               "CloudAllocator",
+		NodeCIDRMaskSize:                                48,
+		ServiceSyncPeriod:                               metav1.Duration{Duration: 2 * time.Minute},
+		ResourceQuotaSyncPeriod:                         metav1.Duration{Duration: 10 * time.Minute},
+		NamespaceSyncPeriod:                             metav1.Duration{Duration: 10 * time.Minute},
+		PVClaimBinderSyncPeriod:                         metav1.Duration{Duration: 30 * time.Second},
+		HorizontalPodAutoscalerSyncPeriod:               metav1.Duration{Duration: 45 * time.Second},
+		DeploymentControllerSyncPeriod:                  metav1.Duration{Duration: 45 * time.Second},
+		MinResyncPeriod:                                 metav1.Duration{Duration: 8 * time.Hour},
+		RegisterRetryCount:                              10,
+		RouteReconciliationPeriod:                       metav1.Duration{Duration: 30 * time.Second},
+		PodEvictionTimeout:                              metav1.Duration{Duration: 2 * time.Minute},
+		NodeMonitorGracePeriod:                          metav1.Duration{Duration: 30 * time.Second},
+		NodeStartupGracePeriod:                          metav1.Duration{Duration: 30 * time.Second},
+		NodeMonitorPeriod:                               metav1.Duration{Duration: 10 * time.Second},
+		HorizontalPodAutoscalerUpscaleForbiddenWindow:   metav1.Duration{Duration: 1 * time.Minute},
+		HorizontalPodAutoscalerDownscaleForbiddenWindow: metav1.Duration{Duration: 2 * time.Minute},
+		HorizontalPodAutoscalerTolerance:                0.1,
+		TerminatedPodGCThreshold:                        12000,
+		VolumeConfiguration: componentconfig.VolumeConfiguration{
+			EnableDynamicProvisioning:  false,
+			EnableHostPathProvisioning: true,
+			FlexVolumePluginDir:        "/flex-volume-plugin",
+			PersistentVolumeRecyclerConfiguration: componentconfig.PersistentVolumeRecyclerConfiguration{
+				MaximumRetry:             3,
+				MinimumTimeoutNFS:        200,
+				IncrementTimeoutNFS:      45,
+				MinimumTimeoutHostPath:   45,
+				IncrementTimeoutHostPath: 45,
 			},
+		},
+		ContentType:  "application/json",
+		KubeAPIQPS:   50.0,
+		KubeAPIBurst: 100,
+		LeaderElection: componentconfig.LeaderElectionConfiguration{
+			ResourceLock:  "configmap",
+			LeaderElect:   false,
+			LeaseDuration: metav1.Duration{Duration: 30 * time.Second},
+			RenewDeadline: metav1.Duration{Duration: 15 * time.Second},
+			RetryPeriod:   metav1.Duration{Duration: 5 * time.Second},
+		},
+		ClusterSigningCertFile: "/cluster-signing-cert",
+		ClusterSigningKeyFile:  "/cluster-signing-key",
+		ServiceAccountKeyFile:  "/service-account-private-key",
+		ClusterSigningDuration: metav1.Duration{Duration: 10 * time.Hour},
+		EnableGarbageCollector: false,
+		GCIgnoredResources: []componentconfig.GroupResource{
+			{Group: "extensions", Resource: "replicationcontrollers"},
+			{Group: "", Resource: "bindings"},
+			{Group: "", Resource: "componentstatuses"},
+			{Group: "", Resource: "events"},
+			{Group: "authentication.k8s.io", Resource: "tokenreviews"},
+			{Group: "authorization.k8s.io", Resource: "subjectaccessreviews"},
+			{Group: "authorization.k8s.io", Resource: "selfsubjectaccessreviews"},
+			{Group: "authorization.k8s.io", Resource: "localsubjectaccessreviews"},
+			{Group: "authorization.k8s.io", Resource: "selfsubjectrulesreviews"},
+			{Group: "apiregistration.k8s.io", Resource: "apiservices"},
+			{Group: "apiextensions.k8s.io", Resource: "customresourcedefinitions"},
+		},
+		NodeEvictionRate:                      0.2,
+		SecondaryNodeEvictionRate:             0.05,
+		LargeClusterSizeThreshold:             100,
+		UnhealthyZoneThreshold:                0.6,
+		DisableAttachDetachReconcilerSync:     true,
+		ReconcilerSyncLoopPeriod:              metav1.Duration{Duration: 30 * time.Second},
+		Controllers:                           []string{"foo", "bar"},
+		EnableTaintManager:                    false,
+		HorizontalPodAutoscalerUseRESTClients: true,
+		UseServiceAccountCredentials:          true,
+	}
+	expected := &KubeControllerManagerOptions{
+		Generic: cmoptions.GenericControllerManagerOptions{
+			ComponentConfig: componentConfig,
+			SecureServing:   &apiserveroptions.SecureServingOptions{},
+			InsecureServing: &cmoptions.InsecureServingOptions{
+				BindAddress: net.ParseIP(componentConfig.Address),
+				BindPort:    int(componentConfig.Port),
+				BindNetwork: "tcp",
+			},
+
 			Kubeconfig: "/kubeconfig",
 			Master:     "192.168.4.20",
 		},
@@ -213,7 +223,7 @@ func TestAddFlags(t *testing.T) {
 
 	// Sort GCIgnoredResources because it's built from a map, which means the
 	// insertion order is random.
-	sort.Sort(sortedGCIgnoredResources(expected.GCIgnoredResources))
+	sort.Sort(sortedGCIgnoredResources(expected.Generic.ComponentConfig.GCIgnoredResources))
 
 	if !reflect.DeepEqual(expected, s) {
 		t.Errorf("Got different run options than expected.\nDifference detected on:\n%s", diff.ObjectReflectDiff(expected, s))

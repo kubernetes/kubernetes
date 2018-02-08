@@ -66,8 +66,8 @@ func TestAddFlags(t *testing.T) {
 	f.Parse(args)
 
 	expected := &CloudControllerManagerOptions{
-		GenericControllerManagerOptions: cmoptions.GenericControllerManagerOptions{
-			KubeControllerManagerConfiguration: componentconfig.KubeControllerManagerConfiguration{
+		Generic: cmoptions.GenericControllerManagerOptions{
+			ComponentConfig: componentconfig.KubeControllerManagerConfiguration{
 				CloudProvider:                                   "gce",
 				CloudConfigFile:                                 "/cloud-config",
 				Port:                                            10000,
