@@ -49,7 +49,6 @@ func (pr PortRange) String() string {
 func (pr *PortRange) Set(value string) error {
 	value = strings.TrimSpace(value)
 
-	// TODO: Accept "80" syntax
 	// TODO: Accept "80+8" syntax
 
 	if value == "" {
@@ -60,7 +59,17 @@ func (pr *PortRange) Set(value string) error {
 
 	hyphenIndex := strings.Index(value, "-")
 	if hyphenIndex == -1 {
-		return fmt.Errorf("expected hyphen in port range")
+		singlePort, err := strconv.Atoi(value)
+		if err != nil {
+			return fmt.Errorf("unable to parse port range: %s: %v, expected hyphen in port range or a single port number", value, err)
+		}
+		if singlePort >= 0 && singlePort <= 65535 {
+			pr.Base = singlePort
+			pr.Size = 1
+		} else {
+			return fmt.Errorf("the port range should between 0 and 65535")
+		}
+		return nil
 	}
 
 	var err error
