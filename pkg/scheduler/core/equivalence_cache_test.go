@@ -90,6 +90,7 @@ func TestUpdateCachedPredicateItem(t *testing.T) {
 			test.fit,
 			test.reasons,
 			test.equivalenceHash,
+			true,
 		)
 
 		value, ok := ecache.algorithmCache[test.nodeName].predicatesCache.Get(test.predicateKey)
@@ -201,6 +202,7 @@ func TestPredicateWithECache(t *testing.T) {
 			test.cachedItem.fit,
 			test.cachedItem.reasons,
 			test.equivalenceHashForUpdatePredicate,
+			true,
 		)
 		// if we want to do invalid, invalid the cached item
 		if test.expectedInvalidPredicateKey {
@@ -213,6 +215,7 @@ func TestPredicateWithECache(t *testing.T) {
 			test.nodeName,
 			test.predicateKey,
 			test.equivalenceHashForCalPredicate,
+			true,
 		)
 		// returned invalid should match expectedInvalidPredicateKey or expectedInvalidEquivalenceHash
 		if test.equivalenceHashForUpdatePredicate != test.equivalenceHashForCalPredicate {
@@ -564,6 +567,7 @@ func TestInvalidateCachedPredicateItemOfAllNodes(t *testing.T) {
 			test.cachedItem.fit,
 			test.cachedItem.reasons,
 			test.equivalenceHashForUpdatePredicate,
+			true,
 		)
 	}
 
@@ -632,6 +636,7 @@ func TestInvalidateAllCachedPredicateItemOfNode(t *testing.T) {
 			test.cachedItem.fit,
 			test.cachedItem.reasons,
 			test.equivalenceHashForUpdatePredicate,
+			true,
 		)
 	}
 
