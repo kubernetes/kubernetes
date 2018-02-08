@@ -17,6 +17,6 @@ spec:
     spec:
       containers:
       - name: nginx
-        image: gcr.io/google-containers/nginx:test-cmd
+        image: k8s.gcr.io/nginx:test-cmd
         ports:
         - containerPort: 80

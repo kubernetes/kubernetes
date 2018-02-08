@@ -13,7 +13,7 @@ spec:
     spec:
       containers:
       - name: redis
-        image: gcr.io/google_containers/redis:v1
+        image: k8s.gcr.io/redis:v1
         ports:
         - containerPort: 6379
         resources:

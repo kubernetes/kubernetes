@@ -14,7 +14,7 @@
 
 .PHONY:	binary build push
 
-PREFIX = gcr.io/google-containers
+PREFIX = staging-k8s.gcr.io
 IMAGE = elasticsearch
 TAG = v5.6.4
 

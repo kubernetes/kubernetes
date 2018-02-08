@@ -686,10 +686,10 @@ def launch_default_ingress_controller():
        context['defaultbackend_image'] == "auto"):
         if context['arch'] == 's390x':
             context['defaultbackend_image'] = \
-                "gcr.io/google_containers/defaultbackend-s390x:1.4"
+                "k8s.gcr.io/defaultbackend-s390x:1.4"
         else:
             context['defaultbackend_image'] = \
-                "gcr.io/google_containers/defaultbackend:1.4"
+                "k8s.gcr.io/defaultbackend:1.4"
 
     # Render the default http backend (404) replicationcontroller manifest
     manifest = addon_path.format('default-http-backend.yaml')
@@ -712,7 +712,7 @@ def launch_default_ingress_controller():
                 "docker.io/cdkbot/nginx-ingress-controller-s390x:0.9.0-beta.13"
         else:
             context['ingress_image'] = \
-                "gcr.io/google_containers/nginx-ingress-controller:0.9.0-beta.15" # noqa
+                "k8s.gcr.io/nginx-ingress-controller:0.9.0-beta.15" # noqa
     context['juju_application'] = hookenv.service_name()
     manifest = addon_path.format('ingress-daemon-set.yaml')
     render('ingress-daemon-set.yaml', manifest, context)

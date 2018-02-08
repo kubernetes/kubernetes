@@ -15,18 +15,21 @@
 # build Kubemark image from currently built binaries containing both 'real' master and Hollow Node.
 # This makefile assumes that the kubemark binary is present in this directory.
 
-REGISTRY?=gcr.io
-PROJECT?=google_containers
+# Allow the caller to override this.  Beware make's precedence. This:
+#   REGISTRY=$VAR make
+# .. is not the same as:
+#   make REGISTRY=$VAR
+REGISTRY := $(if $(REGISTRY),$(REGISTRY),staging-k8s.gcr.io)
 
 all: gcloudpush
 
 build:
-	docker build --pull -t $(REGISTRY)/$(PROJECT)/kubemark .
+	docker build --pull -t $(REGISTRY)/kubemark .
 
 gcloudpush: build
-	gcloud docker -- push $(REGISTRY)/$(PROJECT)/kubemark
+	gcloud docker -- push $(REGISTRY)/kubemark
 
 push: build
-	docker -- push $(REGISTRY)/$(PROJECT)/kubemark
+	docker -- push $(REGISTRY)/kubemark
 
 .PHONY: all build gcloudpush push

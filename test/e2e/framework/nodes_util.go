@@ -83,7 +83,7 @@ func ingressUpgradeGCE(isUpgrade bool) error {
 		command = "sudo sed -i -re 's/(image:)(.*)/\\1 gcr.io\\/k8s-ingress-image-push\\/ingress-gce-e2e-glbc-amd64:latest/' /etc/kubernetes/manifests/glbc.manifest"
 	} else {
 		// Downgrade
-		command = "sudo sed -i -re 's/(image:)(.*)/\\1 gcr.io\\/google_containers\\/glbc:0.9.7/' /etc/kubernetes/manifests/glbc.manifest"
+		command = "sudo sed -i -re 's/(image:)(.*)/\\1 k8s.gcr.io\\/glbc:0.9.7/' /etc/kubernetes/manifests/glbc.manifest"
 	}
 	sshResult, err := NodeExec(GetMasterHost(), command)
 	LogSSHResult(sshResult)

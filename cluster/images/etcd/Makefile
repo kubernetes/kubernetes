@@ -15,7 +15,7 @@
 # Build the etcd image
 #
 # Usage:
-# 	[TAGS=2.2.1 2.3.7 3.0.17 3.1.11 3.2.14] [REGISTRY=gcr.io/google_containers] [ARCH=amd64] [BASEIMAGE=busybox] make (build|push)
+# 	[TAGS=2.2.1 2.3.7 3.0.17 3.1.11 3.2.14] [REGISTRY=k8s.gcr.io] [ARCH=amd64] [BASEIMAGE=busybox] make (build|push)
 
 # The image contains different etcd versions to simplify
 # upgrades. Thus be careful when removing any tag from here.
@@ -29,7 +29,7 @@
 TAGS?=2.2.1 2.3.7 3.0.17 3.1.11 3.2.14
 REGISTRY_TAG?=3.2.14
 ARCH?=amd64
-REGISTRY?=gcr.io/google_containers
+REGISTRY?=k8s.gcr.io
 # golang version should match the golang version from https://github.com/coreos/etcd/releases for REGISTRY_TAG version of etcd.
 GOLANG_VERSION?=1.8.5
 GOARM=7
