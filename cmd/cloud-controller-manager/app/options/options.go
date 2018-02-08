@@ -54,6 +54,9 @@ func NewCloudControllerManagerOptions() *CloudControllerManagerOptions {
 	}
 	s.Generic.ComponentConfig.LeaderElection.LeaderElect = true
 
+	s.Generic.SecureServing.ServerCert.CertDirectory = "/var/run/kubernetes"
+	s.Generic.SecureServing.ServerCert.PairName = "cloud-controller-manager"
+
 	return &s
 }
 

@@ -26,6 +26,7 @@ import (
 	"github.com/spf13/pflag"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apiserveroptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/client-go/kubernetes"
 	clientset "k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -44,9 +45,12 @@ type GenericControllerManagerOptions struct {
 	// TODO: turn ComponentConfig into modular option structs. This is not generic.
 	ComponentConfig componentconfig.KubeControllerManagerConfiguration
 
+	SecureServing *apiserveroptions.SecureServingOptions
+	// TODO: remove insecure serving mode
 	InsecureServing *InsecureServingOptions
-	Master          string
-	Kubeconfig      string
+
+	Master     string
+	Kubeconfig string
 }
 
 const (
@@ -65,12 +69,17 @@ const (
 func NewGenericControllerManagerOptions(componentConfig componentconfig.KubeControllerManagerConfiguration) GenericControllerManagerOptions {
 	o := GenericControllerManagerOptions{
 		ComponentConfig: componentConfig,
+		SecureServing:   apiserveroptions.NewSecureServingOptions(),
 		InsecureServing: &InsecureServingOptions{
 			BindAddress: net.ParseIP(componentConfig.Address),
 			BindPort:    int(componentConfig.Port),
 			BindNetwork: "tcp",
 		},
 	}
+
+	// disable secure serving for now
+	// TODO: enable HTTPS by default
+	o.SecureServing.BindPort = 0
 
 	return o
 }
@@ -163,6 +172,7 @@ func (o *GenericControllerManagerOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.Int32Var(&o.ComponentConfig.KubeAPIBurst, "kube-api-burst", o.ComponentConfig.KubeAPIBurst, "Burst to use while talking with kubernetes apiserver.")
 	fs.DurationVar(&o.ComponentConfig.ControllerStartInterval.Duration, "controller-start-interval", o.ComponentConfig.ControllerStartInterval.Duration, "Interval between starting controller managers.")
 
+	o.SecureServing.AddFlags(fs)
 	o.InsecureServing.AddFlags(fs)
 	o.InsecureServing.AddDeprecatedFlags(fs)
 }
@@ -171,6 +181,9 @@ func (o *GenericControllerManagerOptions) AddFlags(fs *pflag.FlagSet) {
 func (o *GenericControllerManagerOptions) ApplyTo(c *genericcontrollermanager.Config, userAgent string) error {
 	c.ComponentConfig = o.ComponentConfig
 
+	if err := o.SecureServing.ApplyTo(&c.SecureServing); err != nil {
+		return err
+	}
 	if err := o.InsecureServing.ApplyTo(&c.InsecureServing, &c.ComponentConfig); err != nil {
 		return err
 	}
@@ -199,6 +212,7 @@ func (o *GenericControllerManagerOptions) ApplyTo(c *genericcontrollermanager.Co
 // Validate checks GenericControllerManagerOptions and return a slice of found errors.
 func (o *GenericControllerManagerOptions) Validate() []error {
 	errors := []error{}
+	errors = append(errors, o.SecureServing.Validate()...)
 	errors = append(errors, o.InsecureServing.Validate()...)
 
 	// TODO: validate component config, master and kubeconfig

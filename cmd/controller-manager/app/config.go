@@ -17,6 +17,7 @@ limitations under the License.
 package app
 
 import (
+	apiserver "k8s.io/apiserver/pkg/server"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
@@ -28,6 +29,8 @@ type Config struct {
 	// TODO: split up the component config. This is not generic.
 	ComponentConfig componentconfig.KubeControllerManagerConfiguration
 
+	SecureServing *apiserver.SecureServingInfo
+	// TODO: remove deprecated insecure serving
 	InsecureServing *InsecureServingInfo
 
 	// the general kube client

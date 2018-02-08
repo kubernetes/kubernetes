@@ -28,7 +28,7 @@ const (
 	SchedulerPort = 10251
 	// InsecureKubeControllerManagerPort is the default port for the controller manager status server.
 	// May be overridden by a flag at startup.
-	InsecureControllerManagerPort = 10252
+	InsecureKubeControllerManagerPort = 10252
 	// InsecureCloudControllerManagerPort is the default port for the cloud controller manager server.
 	// This value may be overridden by a flag at startup.
 	InsecureCloudControllerManagerPort = 10253

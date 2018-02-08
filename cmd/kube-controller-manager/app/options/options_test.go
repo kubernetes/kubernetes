@@ -27,6 +27,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/diff"
+	apiserveroptions "k8s.io/apiserver/pkg/server/options"
 	cmoptions "k8s.io/kubernetes/cmd/controller-manager/app/options"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 )
@@ -104,6 +105,9 @@ func TestAddFlags(t *testing.T) {
 		"--terminated-pod-gc-threshold=12000",
 		"--unhealthy-zone-threshold=0.6",
 		"--use-service-account-credentials=true",
+		"--cert-dir=/a/b/c",
+		"--bind-address=192.168.4.21",
+		"--secure-port=10001",
 	}
 	f.Parse(args)
 	// Sort GCIgnoredResources because it's built from a map, which means the
@@ -204,6 +208,14 @@ func TestAddFlags(t *testing.T) {
 				EnableTaintManager:                    false,
 				HorizontalPodAutoscalerUseRESTClients: true,
 				UseServiceAccountCredentials:          true,
+			},
+			SecureServing: &apiserveroptions.SecureServingOptions{
+				BindPort:    10001,
+				BindAddress: net.ParseIP("192.168.4.21"),
+				ServerCert: apiserveroptions.GeneratableKeyCert{
+					CertDirectory: "/a/b/c",
+					PairName:      "kube-controller-manager",
+				},
 			},
 			InsecureServing: &cmoptions.InsecureServingOptions{
 				BindAddress: net.ParseIP("192.168.4.10"),

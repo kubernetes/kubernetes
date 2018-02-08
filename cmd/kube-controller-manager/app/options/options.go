@@ -52,6 +52,9 @@ func NewKubeControllerManagerOptions() *KubeControllerManagerOptions {
 		Generic: cmoptions.NewGenericControllerManagerOptions(componentConfig),
 	}
 
+	s.Generic.SecureServing.ServerCert.CertDirectory = "/var/run/kubernetes"
+	s.Generic.SecureServing.ServerCert.PairName = "kube-controller-manager"
+
 	gcIgnoredResources := make([]componentconfig.GroupResource, 0, len(garbagecollector.DefaultIgnoredResources()))
 	for r := range garbagecollector.DefaultIgnoredResources() {
 		gcIgnoredResources = append(gcIgnoredResources, componentconfig.GroupResource{Group: r.Group, Resource: r.Resource})
