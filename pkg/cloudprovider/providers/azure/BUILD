@@ -17,6 +17,7 @@ go_library(
         "azure_controllerCommon.go",
         "azure_fakes.go",
         "azure_file.go",
+        "azure_instance_metadata.go",
         "azure_instances.go",
         "azure_loadbalancer.go",
         "azure_managedDiskController.go",
