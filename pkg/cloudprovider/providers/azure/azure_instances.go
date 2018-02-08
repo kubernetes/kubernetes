@@ -112,10 +112,8 @@ func (az *Cloud) InstanceID(ctx context.Context, name types.NodeName) (string, e
 			return "", err
 		}
 		if isLocalInstance {
-			externalInstanceID, err := az.metadata.Text("instance/compute/vmId")
-			if err == nil {
-				return externalInstanceID, nil
-			}
+			nodeName := mapNodeNameToVMName(name)
+			return az.getMachineID(nodeName), nil
 		}
 	}
 
