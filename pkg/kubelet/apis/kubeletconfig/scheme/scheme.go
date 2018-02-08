@@ -25,7 +25,7 @@ import (
 
 // Utility functions for the Kubelet's kubeletconfig API group
 
-// NewSchemeAndCodecs is a utility funciton that returns a Scheme and CodecFactory
+// NewSchemeAndCodecs is a utility function that returns a Scheme and CodecFactory
 // that understand the types in the kubeletconfig API group.
 func NewSchemeAndCodecs() (*runtime.Scheme, *serializer.CodecFactory, error) {
 	scheme := runtime.NewScheme()

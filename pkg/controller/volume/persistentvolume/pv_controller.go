@@ -978,7 +978,7 @@ func (ctrl *PersistentVolumeController) bind(volume *v1.PersistentVolume, claim 
 func (ctrl *PersistentVolumeController) unbindVolume(volume *v1.PersistentVolume) error {
 	glog.V(4).Infof("updating PersistentVolume[%s]: rolling back binding from %q", volume.Name, claimrefToClaimKey(volume.Spec.ClaimRef))
 
-	// Save the PV only when any modification is neccessary.
+	// Save the PV only when any modification is necessary.
 	volumeClone := volume.DeepCopy()
 
 	if metav1.HasAnnotation(volume.ObjectMeta, annBoundByController) {
@@ -1058,7 +1058,7 @@ func (ctrl *PersistentVolumeController) recycleVolumeOperation(arg interface{}) 
 	// so read current volume state now.
 	newVolume, err := ctrl.kubeClient.CoreV1().PersistentVolumes().Get(volume.Name, metav1.GetOptions{})
 	if err != nil {
-		glog.V(3).Infof("error reading peristent volume %q: %v", volume.Name, err)
+		glog.V(3).Infof("error reading persistent volume %q: %v", volume.Name, err)
 		return
 	}
 	needsReclaim, err := ctrl.isVolumeReleased(newVolume)
@@ -1148,7 +1148,7 @@ func (ctrl *PersistentVolumeController) deleteVolumeOperation(arg interface{}) e
 	// read current volume state now.
 	newVolume, err := ctrl.kubeClient.CoreV1().PersistentVolumes().Get(volume.Name, metav1.GetOptions{})
 	if err != nil {
-		glog.V(3).Infof("error reading peristent volume %q: %v", volume.Name, err)
+		glog.V(3).Infof("error reading persistent volume %q: %v", volume.Name, err)
 		return nil
 	}
 	needsReclaim, err := ctrl.isVolumeReleased(newVolume)

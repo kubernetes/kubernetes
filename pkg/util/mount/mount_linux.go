@@ -69,7 +69,7 @@ func New(mounterPath string) Interface {
 }
 
 // Mount mounts source to target as fstype with given options. 'source' and 'fstype' must
-// be an emtpy string in case it's not required, e.g. for remount, or for auto filesystem
+// be an empty string in case it's not required, e.g. for remount, or for auto filesystem
 // type, where kernel handles fstype for you. The mount 'options' is a list of options,
 // currently come from mount(8), e.g. "ro", "remount", "bind", etc. If no more option is
 // required, call Mount with an empty string list or nil.
@@ -115,7 +115,7 @@ func (m *Mounter) doMount(mounterPath string, mountCmd string, source string, ta
 		//   argument (/bin/mount) there.
 		// * mount does its job, forks a fuse daemon if necessary and finishes.
 		//   (systemd-run --scope finishes at this point, returning mount's exit
-		//   code and stdout/stderr - thats one of --scope benefits).
+		//   code and stdout/stderr - that's one of --scope benefits).
 		// * systemd keeps the fuse daemon running in the scope (i.e. in its own
 		//   cgroup) until the fuse daemon dies (another --scope benefit).
 		//   Kubelet service can be restarted and the fuse daemon survives.

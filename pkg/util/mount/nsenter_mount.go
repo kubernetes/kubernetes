@@ -93,7 +93,7 @@ func (n *NsenterMounter) makeNsenterArgs(source, target, fstype string, options 
 		//   argument (/bin/mount) there.
 		// * mount does its job, forks a fuse daemon if necessary and finishes.
 		//   (systemd-run --scope finishes at this point, returning mount's exit
-		//   code and stdout/stderr - thats one of --scope benefits).
+		//   code and stdout/stderr - that's one of --scope benefits).
 		// * systemd keeps the fuse daemon running in the scope (i.e. in its own
 		//   cgroup) until the fuse daemon dies (another --scope benefit).
 		//   Kubelet container can be restarted and the fuse daemon survives.

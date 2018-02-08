@@ -109,7 +109,7 @@ var _ timer = realTimer{}
 // multiple runs are serialized. If the function needs to hold locks, it must
 // take them internally.
 //
-// Runs of the funtion will have at least minInterval between them (from
+// Runs of the function will have at least minInterval between them (from
 // completion to next start), except that up to bursts may be allowed.  Burst
 // runs are "accumulated" over time, one per minInterval up to burstRuns total.
 // This can be used, for example, to mitigate the impact of expensive operations
@@ -189,7 +189,7 @@ func (bfr *BoundedFrequencyRunner) Loop(stop <-chan struct{}) {
 // may be dropped - it is just guaranteed that we will try calling the
 // underlying function as soon as possible starting from now.
 func (bfr *BoundedFrequencyRunner) Run() {
-	// If it takes a lot of time to run the underlying function, noone is really
+	// If it takes a lot of time to run the underlying function, no one is really
 	// processing elements from <run> channel. So to avoid blocking here on the
 	// putting element to it, we simply skip it if there is already an element
 	// in it.

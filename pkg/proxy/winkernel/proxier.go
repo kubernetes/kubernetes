@@ -471,7 +471,7 @@ func NewProxier(
 	}
 	hnsNetwork, err := getHnsNetworkInfo(hnsNetworkName)
 	if err != nil {
-		glog.Fatalf("Unable to find Hns Network speficied by %s. Please check environment variable KUBE_NETWORK", hnsNetworkName)
+		glog.Fatalf("Unable to find Hns Network specified by %s. Please check environment variable KUBE_NETWORK", hnsNetworkName)
 		return nil, err
 	}
 

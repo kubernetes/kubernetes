@@ -322,7 +322,7 @@ func (util *ISCSIUtil) AttachDisk(b iscsiDiskMounter) (string, error) {
 	//Make sure we use a valid devicepath to find mpio device.
 	devicePath = devicePaths[0]
 	for _, path := range devicePaths {
-		// There shouldnt be any empty device paths. However adding this check
+		// There shouldn't be any empty device paths. However adding this check
 		// for safer side to avoid the possibility of an empty entry.
 		if path == "" {
 			continue
@@ -490,7 +490,7 @@ func (util *ISCSIUtil) DetachBlockISCSIDisk(c iscsiDiskUnmapper, mapPath string)
 		}
 		arr := strings.Split(device, "-lun-")
 		if len(arr) < 2 {
-			return fmt.Errorf("failed to retreive lun from mapPath: %v", mapPath)
+			return fmt.Errorf("failed to retrieve lun from mapPath: %v", mapPath)
 		}
 		lun = arr[1]
 		// Extract the iface from the mountPath and use it to log out. If the iface

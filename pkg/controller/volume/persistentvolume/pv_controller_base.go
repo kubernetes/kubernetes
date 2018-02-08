@@ -266,7 +266,7 @@ func (ctrl *PersistentVolumeController) Run(stopCh <-chan struct{}) {
 	defer ctrl.volumeQueue.ShutDown()
 
 	glog.Infof("Starting persistent volume controller")
-	defer glog.Infof("Shutting down peristent volume controller")
+	defer glog.Infof("Shutting down persistent volume controller")
 
 	if !controller.WaitForCacheSync("persistent volume", stopCh, ctrl.volumeListerSynced, ctrl.claimListerSynced, ctrl.classListerSynced, ctrl.podListerSynced) {
 		return

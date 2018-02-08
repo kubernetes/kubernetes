@@ -152,7 +152,7 @@ func (c *csiMountMgr) SetUpAt(dir string, fsGroup *int64) error {
 	}
 
 	// get volume attributes
-	// TODO: for alpha vol atttributes are passed via PV.Annotations
+	// TODO: for alpha vol attributes are passed via PV.Annotations
 	// Beta will fix that
 	attribs, err := getVolAttribsFromSpec(c.spec)
 	if err != nil {

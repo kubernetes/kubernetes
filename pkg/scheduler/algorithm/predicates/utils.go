@@ -40,7 +40,7 @@ func FindLabelsInSet(labelsToKeep []string, selector labels.Set) map[string]stri
 // AddUnsetLabelsToMap backfills missing values with values we find in a map.
 func AddUnsetLabelsToMap(aL map[string]string, labelsToAdd []string, labelSet labels.Set) {
 	for _, l := range labelsToAdd {
-		// if the label is already there, dont overwrite it.
+		// if the label is already there, don't overwrite it.
 		if _, exists := aL[l]; exists {
 			continue
 		}

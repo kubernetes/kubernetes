@@ -97,8 +97,8 @@ func (*FakeIPTables) AddReloadFunc(reloadFunc func()) {}
 
 func (*FakeIPTables) Destroy() {}
 
-func getToken(line, seperator string) string {
-	tokens := strings.Split(line, seperator)
+func getToken(line, separator string) string {
+	tokens := strings.Split(line, separator)
 	if len(tokens) == 2 {
 		return strings.Split(tokens[1], " ")[0]
 	}

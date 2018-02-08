@@ -86,8 +86,8 @@ func (attacher *photonPersistentDiskAttacher) Attach(spec *volume.Spec, nodeName
 		}
 	}
 
-	PdidWithNoHypens := strings.Replace(volumeSource.PdID, "-", "", -1)
-	return path.Join(diskByIDPath, diskPhotonPrefix+PdidWithNoHypens), nil
+	PdidWithNoHyphens := strings.Replace(volumeSource.PdID, "-", "", -1)
+	return path.Join(diskByIDPath, diskPhotonPrefix+PdidWithNoHyphens), nil
 }
 
 func (attacher *photonPersistentDiskAttacher) VolumesAreAttached(specs []*volume.Spec, nodeName types.NodeName) (map[*volume.Spec]bool, error) {
