@@ -99,7 +99,7 @@ func NewCmdCanI(f cmdutil.Factory, out, err io.Writer) *cobra.Command {
 
 			allowed, err := o.RunAccessCheck()
 			if err == nil {
-				if o.Quiet && !allowed {
+				if (o.Quiet || !o.Quiet) && !allowed {
 					os.Exit(1)
 				}
 			}
