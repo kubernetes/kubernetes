@@ -15,7 +15,7 @@ docker_push(
     registry = "$(REGISTRY)",
     repository = "kubemark",
     stamp = True,
-    tag = "latest",
+    tag = "$(IMAGE_TAG)",
     tags = ["manual"],
 )
 
