@@ -9,7 +9,7 @@ filegroup(
 go_library(
     name = "go_default_library",
     srcs = ["messages.pb.go"],
-    importpath = "google.golang.org/grpc/grpclb/grpc_lb_v1/messages",
+    importpath = "messages",
     visibility = ["//visibility:public"],
     deps = ["//vendor/github.com/golang/protobuf/proto:go_default_library"],
 )

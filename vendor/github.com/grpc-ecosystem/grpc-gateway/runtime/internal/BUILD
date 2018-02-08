@@ -9,7 +9,7 @@ filegroup(
 go_library(
     name = "go_default_library",
     srcs = ["stream_chunk.pb.go"],
-    importpath = "github.com/grpc-ecosystem/grpc-gateway/runtime/internal",
+    importpath = "internal",
     visibility = ["//visibility:public"],
     deps = ["//vendor/github.com/golang/protobuf/proto:go_default_library"],
 )

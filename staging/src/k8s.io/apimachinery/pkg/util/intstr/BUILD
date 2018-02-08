@@ -20,7 +20,7 @@ go_library(
         "generated.pb.go",
         "intstr.go",
     ],
-    importpath = "k8s.io/apimachinery/pkg/util/intstr",
+    importpath = "intstr",
     deps = [
         "//vendor/github.com/gogo/protobuf/proto:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
