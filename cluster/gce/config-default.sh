@@ -92,6 +92,9 @@ NODE_EXTRA_METADATA=${KUBE_NODE_EXTRA_METADATA:-${KUBE_EXTRA_METADATA:-}}
 # KUBELET_TEST_ARGS are extra arguments passed to kubelet.
 KUBELET_TEST_ARGS=${KUBE_KUBELET_EXTRA_ARGS:-}
 
+# KUBEPROXY_MODE is the proxy mode, ipvs/iptables/userspace
+KUBEPROXY_MODE=${KUBEPROXY_MODE:-iptables}
+
 NETWORK=${KUBE_GCE_NETWORK:-default}
 # Enable network deletion by default (for kube-down), unless we're using 'default' network.
 if [[ "${NETWORK}" == "default" ]]; then
