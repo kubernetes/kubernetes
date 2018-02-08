@@ -44,6 +44,9 @@ const (
 	RuntimeOperationsKey        = "runtime_operations"
 	RuntimeOperationsLatencyKey = "runtime_operations_latency_microseconds"
 	RuntimeOperationsErrorsKey  = "runtime_operations_errors"
+	// Metrics keys of device plugin operations
+	DevicePluginRegistrationCountKey = "device_plugin_registration_count"
+	DevicePluginAllocationLatencyKey = "device_plugin_alloc_latency_microseconds"
 )
 
 var (
@@ -179,6 +182,22 @@ var (
 		},
 		[]string{"namespace", "persistentvolumeclaim"},
 	)
+	DevicePluginRegistrationCount = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Subsystem: KubeletSubsystem,
+			Name:      DevicePluginRegistrationCountKey,
+			Help:      "Cumulative number of device plugin registrations. Broken down by resource name.",
+		},
+		[]string{"resource_name"},
+	)
+	DevicePluginAllocationLatency = prometheus.NewSummaryVec(
+		prometheus.SummaryOpts{
+			Subsystem: KubeletSubsystem,
+			Name:      DevicePluginAllocationLatencyKey,
+			Help:      "Latency in microseconds to serve a device plugin Allocation request. Broken down by resource name.",
+		},
+		[]string{"resource_name"},
+	)
 )
 
 var registerMetrics sync.Once
@@ -205,6 +224,8 @@ func Register(containerCache kubecontainer.RuntimeCache) {
 		prometheus.MustRegister(VolumeStatsInodes)
 		prometheus.MustRegister(VolumeStatsInodesFree)
 		prometheus.MustRegister(VolumeStatsInodesUsed)
+		prometheus.MustRegister(DevicePluginRegistrationCount)
+		prometheus.MustRegister(DevicePluginAllocationLatency)
 	})
 }
 

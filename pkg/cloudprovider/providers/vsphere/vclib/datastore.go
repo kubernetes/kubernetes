@@ -17,6 +17,7 @@ limitations under the License.
 package vclib
 
 import (
+	"fmt"
 	"github.com/golang/glog"
 	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/property"
@@ -30,6 +31,16 @@ import (
 type Datastore struct {
 	*object.Datastore
 	Datacenter *Datacenter
+}
+
+// DatastoreInfo is a structure to store the Datastore and it's Info.
+type DatastoreInfo struct {
+	*Datastore
+	Info *types.DatastoreInfo
+}
+
+func (di DatastoreInfo) String() string {
+	return fmt.Sprintf("Datastore: %+v, datastore URL: %s", di.Datastore, di.Info.Url)
 }
 
 // CreateDirectory creates the directory at location specified by directoryPath.

@@ -28,8 +28,8 @@ import (
 // Registry is an interface for things that know how to store CSRs.
 type Registry interface {
 	ListCSRs(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (*certificates.CertificateSigningRequestList, error)
-	CreateCSR(ctx genericapirequest.Context, csr *certificates.CertificateSigningRequest) error
-	UpdateCSR(ctx genericapirequest.Context, csr *certificates.CertificateSigningRequest) error
+	CreateCSR(ctx genericapirequest.Context, csr *certificates.CertificateSigningRequest, createValidation rest.ValidateObjectFunc) error
+	UpdateCSR(ctx genericapirequest.Context, csr *certificates.CertificateSigningRequest, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) error
 	GetCSR(ctx genericapirequest.Context, csrID string, options *metav1.GetOptions) (*certificates.CertificateSigningRequest, error)
 	DeleteCSR(ctx genericapirequest.Context, csrID string) error
 	WatchCSRs(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (watch.Interface, error)
@@ -55,13 +55,13 @@ func (s *storage) ListCSRs(ctx genericapirequest.Context, options *metainternalv
 	return obj.(*certificates.CertificateSigningRequestList), nil
 }
 
-func (s *storage) CreateCSR(ctx genericapirequest.Context, csr *certificates.CertificateSigningRequest) error {
-	_, err := s.Create(ctx, csr, false)
+func (s *storage) CreateCSR(ctx genericapirequest.Context, csr *certificates.CertificateSigningRequest, createValidation rest.ValidateObjectFunc) error {
+	_, err := s.Create(ctx, csr, createValidation, false)
 	return err
 }
 
-func (s *storage) UpdateCSR(ctx genericapirequest.Context, csr *certificates.CertificateSigningRequest) error {
-	_, _, err := s.Update(ctx, csr.Name, rest.DefaultUpdatedObjectInfo(csr))
+func (s *storage) UpdateCSR(ctx genericapirequest.Context, csr *certificates.CertificateSigningRequest, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) error {
+	_, _, err := s.Update(ctx, csr.Name, rest.DefaultUpdatedObjectInfo(csr), createValidation, updateValidation)
 	return err
 }
 

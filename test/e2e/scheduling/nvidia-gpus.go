@@ -17,6 +17,7 @@ limitations under the License.
 package scheduling
 
 import (
+	"os"
 	"strings"
 	"time"
 
@@ -24,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	extensionsinternal "k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -151,7 +153,8 @@ func getGPUsAvailable(f *framework.Framework) int64 {
 	return gpusAvailable
 }
 
-func testNvidiaGPUsOnCOS(f *framework.Framework) {
+func SetupNVIDIAGPUNode(f *framework.Framework, setupResourceGatherer bool) *framework.ContainerResourceGatherer {
+
 	// Skip the test if the base image is not COS.
 	// TODO: Add support for other base images.
 	// CUDA apps require host mounts which is not portable across base images (yet).
@@ -161,30 +164,58 @@ func testNvidiaGPUsOnCOS(f *framework.Framework) {
 	}
 	framework.Logf("Cluster is running on COS. Proceeding with test")
 
-	if f.BaseName == "device-plugin-gpus" {
-		dsYamlUrl = framework.GPUDevicePluginDSYAML
-		gpuResourceName = framework.NVIDIAGPUResourceName
-		podCreationFunc = makeCudaAdditionDevicePluginTestPod
-	} else {
+	if f.BaseName == "gpus" {
 		dsYamlUrl = "https://raw.githubusercontent.com/ContainerEngine/accelerators/master/cos-nvidia-gpu-installer/daemonset.yaml"
 		gpuResourceName = v1.ResourceNvidiaGPU
 		podCreationFunc = makeCudaAdditionTestPod
+	} else {
+		dsYamlUrlFromEnv := os.Getenv("NVIDIA_DRIVER_INSTALLER_DAEMONSET")
+		if dsYamlUrlFromEnv != "" {
+			dsYamlUrl = dsYamlUrlFromEnv
+		} else {
+			dsYamlUrl = "https://raw.githubusercontent.com/GoogleCloudPlatform/container-engine-accelerators/master/daemonset.yaml"
+		}
+		gpuResourceName = framework.NVIDIAGPUResourceName
+		podCreationFunc = makeCudaAdditionDevicePluginTestPod
 	}
 
-	// GPU drivers might have already been installed.
-	if !areGPUsAvailableOnAllSchedulableNodes(f) {
-		// Install Nvidia Drivers.
-		ds, err := framework.DsFromManifest(dsYamlUrl)
-		Expect(err).NotTo(HaveOccurred())
-		ds.Namespace = f.Namespace.Name
-		_, err = f.ClientSet.Extensions().DaemonSets(f.Namespace.Name).Create(ds)
-		framework.ExpectNoError(err, "failed to create daemonset")
-		framework.Logf("Successfully created daemonset to install Nvidia drivers. Waiting for drivers to be installed and GPUs to be available in Node Capacity...")
-		// Wait for Nvidia GPUs to be available on nodes
-		Eventually(func() bool {
-			return areGPUsAvailableOnAllSchedulableNodes(f)
-		}, driverInstallTimeout, time.Second).Should(BeTrue())
+	framework.Logf("Using %v", dsYamlUrl)
+	// Creates the DaemonSet that installs Nvidia Drivers.
+	ds, err := framework.DsFromManifest(dsYamlUrl)
+	Expect(err).NotTo(HaveOccurred())
+	ds.Namespace = f.Namespace.Name
+	_, err = f.ClientSet.ExtensionsV1beta1().DaemonSets(f.Namespace.Name).Create(ds)
+	framework.ExpectNoError(err, "failed to create nvidia-driver-installer daemonset")
+	framework.Logf("Successfully created daemonset to install Nvidia drivers.")
+
+	pods, err := framework.WaitForControlledPods(f.ClientSet, ds.Namespace, ds.Name, extensionsinternal.Kind("DaemonSet"))
+	framework.ExpectNoError(err, "failed to get pods controlled by the nvidia-driver-installer daemonset")
+
+	devicepluginPods, err := framework.WaitForControlledPods(f.ClientSet, "kube-system", "nvidia-gpu-device-plugin", extensionsinternal.Kind("DaemonSet"))
+	if err == nil {
+		framework.Logf("Adding deviceplugin addon pod.")
+		pods.Items = append(pods.Items, devicepluginPods.Items...)
 	}
+
+	var rsgather *framework.ContainerResourceGatherer
+	if setupResourceGatherer {
+		framework.Logf("Starting ResourceUsageGather for the created DaemonSet pods.")
+		rsgather, err = framework.NewResourceUsageGatherer(f.ClientSet, framework.ResourceGathererOptions{false, false, 2 * time.Second, 2 * time.Second, true}, pods)
+		framework.ExpectNoError(err, "creating ResourceUsageGather for the daemonset pods")
+		go rsgather.StartGatheringData()
+	}
+
+	// Wait for Nvidia GPUs to be available on nodes
+	framework.Logf("Waiting for drivers to be installed and GPUs to be available in Node Capacity...")
+	Eventually(func() bool {
+		return areGPUsAvailableOnAllSchedulableNodes(f)
+	}, driverInstallTimeout, time.Second).Should(BeTrue())
+
+	return rsgather
+}
+
+func testNvidiaGPUsOnCOS(f *framework.Framework) {
+	rsgather := SetupNVIDIAGPUNode(f, true)
 	framework.Logf("Creating as many pods as there are Nvidia GPUs and have the pods run a CUDA app")
 	podList := []*v1.Pod{}
 	for i := int64(0); i < getGPUsAvailable(f); i++ {
@@ -195,6 +226,13 @@ func testNvidiaGPUsOnCOS(f *framework.Framework) {
 	for _, po := range podList {
 		f.PodClient().WaitForSuccess(po.Name, 5*time.Minute)
 	}
+
+	framework.Logf("Stopping ResourceUsageGather")
+	constraints := make(map[string]framework.ResourceConstraint)
+	// For now, just gets summary. Can pass valid constraints in the future.
+	summary, err := rsgather.StopAndSummarize([]int{50, 90, 100}, constraints)
+	f.TestSummaries = append(f.TestSummaries, summary)
+	framework.ExpectNoError(err, "getting resource usage summary")
 }
 
 var _ = SIGDescribe("[Feature:GPU]", func() {

@@ -448,3 +448,23 @@ func (f *stubVolume) SetUp(fsGroup *int64) error {
 func (f *stubVolume) SetUpAt(dir string, fsGroup *int64) error {
 	return nil
 }
+
+type stubBlockVolume struct {
+	dirPath string
+	volName string
+}
+
+func (f *stubBlockVolume) GetGlobalMapPath(spec *volume.Spec) (string, error) {
+	return "", nil
+}
+
+func (f *stubBlockVolume) GetPodDeviceMapPath() (string, string) {
+	return f.dirPath, f.volName
+}
+
+func (f *stubBlockVolume) SetUpDevice() (string, error) {
+	return "", nil
+}
+func (f *stubBlockVolume) TearDownDevice(mapPath string, devicePath string) error {
+	return nil
+}

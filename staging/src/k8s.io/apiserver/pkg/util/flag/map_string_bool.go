@@ -23,12 +23,24 @@ import (
 	"strings"
 )
 
-type MapStringBool map[string]bool
+// MapStringBool can be set from the command line with the format `--flag "string=bool"`.
+// Multiple comma-separated key-value pairs in a single invocation are supported. For example: `--flag "a=true,b=false"`.
+// Multiple flag invocations are supported. For example: `--flag "a=true" --flag "b=false"`.
+type MapStringBool struct {
+	Map         *map[string]bool
+	initialized bool
+}
+
+// NewMapStringBool takes a pointer to a map[string]string and returns the
+// MapStringBool flag parsing shim for that map
+func NewMapStringBool(m *map[string]bool) *MapStringBool {
+	return &MapStringBool{Map: m}
+}
 
 // String implements github.com/spf13/pflag.Value
-func (m MapStringBool) String() string {
+func (m *MapStringBool) String() string {
 	pairs := []string{}
-	for k, v := range m {
+	for k, v := range *m.Map {
 		pairs = append(pairs, fmt.Sprintf("%s=%t", k, v))
 	}
 	sort.Strings(pairs)
@@ -36,7 +48,15 @@ func (m MapStringBool) String() string {
 }
 
 // Set implements github.com/spf13/pflag.Value
-func (m MapStringBool) Set(value string) error {
+func (m *MapStringBool) Set(value string) error {
+	if m.Map == nil {
+		return fmt.Errorf("no target (nil pointer to map[string]bool)")
+	}
+	if !m.initialized || *m.Map == nil {
+		// clear default values, or allocate if no existing map
+		*m.Map = make(map[string]bool)
+		m.initialized = true
+	}
 	for _, s := range strings.Split(value, ",") {
 		if len(s) == 0 {
 			continue
@@ -51,12 +71,17 @@ func (m MapStringBool) Set(value string) error {
 		if err != nil {
 			return fmt.Errorf("invalid value of %s: %s, err: %v", k, v, err)
 		}
-		m[k] = boolValue
+		(*m.Map)[k] = boolValue
 	}
 	return nil
 }
 
 // Type implements github.com/spf13/pflag.Value
-func (MapStringBool) Type() string {
+func (*MapStringBool) Type() string {
 	return "mapStringBool"
+}
+
+// Empty implements OmitEmpty
+func (m *MapStringBool) Empty() bool {
+	return len(*m.Map) == 0
 }

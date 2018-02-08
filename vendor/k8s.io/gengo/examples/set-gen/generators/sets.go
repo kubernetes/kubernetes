@@ -189,7 +189,7 @@ type Empty struct{}
 var setCode = `// sets.$.type|public$ is a set of $.type|raw$s, implemented via map[$.type|raw$]struct{} for minimal memory consumption.
 type $.type|public$ map[$.type|raw$]Empty
 
-// New creates a $.type|public$ from a list of values.
+// New$.type|public$ creates a $.type|public$ from a list of values.
 func New$.type|public$(items ...$.type|raw$) $.type|public$ {
 	ss := $.type|public${}
 	ss.Insert(items...)

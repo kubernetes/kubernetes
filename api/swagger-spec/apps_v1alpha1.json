@@ -1311,7 +1311,7 @@
      },
      "serviceAccountName": {
       "type": "string",
-      "description": "ServiceAccountName is the name of the ServiceAccount to use to run this pod. More info: http://releases.k8s.io/HEAD/docs/design/service_accounts.md"
+      "description": "ServiceAccountName is the name of the ServiceAccount to use to run this pod. More info: https://git.k8s.io/community/contributors/design-proposals/auth/service_accounts.md"
      },
      "serviceAccount": {
       "type": "string",

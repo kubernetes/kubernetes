@@ -28,8 +28,9 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/pkg/api"
+	scaleclient "k8s.io/client-go/scale"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	testutils "k8s.io/kubernetes/test/utils"
 )
@@ -84,9 +85,11 @@ func RcByNameContainer(name string, replicas int32, image string, labels map[str
 
 // ScaleRCByLabels scales an RC via ns/label lookup. If replicas == 0 it waits till
 // none are running, otherwise it does what a synchronous scale operation would do.
-func ScaleRCByLabels(clientset clientset.Interface, internalClientset internalclientset.Interface, ns string, l map[string]string, replicas uint) error {
+//TODO(p0lyn0mial): remove internalClientset.
+//TODO(p0lyn0mial): update the callers.
+func ScaleRCByLabels(clientset clientset.Interface, internalClientset internalclientset.Interface, scalesGetter scaleclient.ScalesGetter, ns string, l map[string]string, replicas uint) error {
 	listOpts := metav1.ListOptions{LabelSelector: labels.SelectorFromSet(labels.Set(l)).String()}
-	rcs, err := clientset.Core().ReplicationControllers(ns).List(listOpts)
+	rcs, err := clientset.CoreV1().ReplicationControllers(ns).List(listOpts)
 	if err != nil {
 		return err
 	}
@@ -96,10 +99,10 @@ func ScaleRCByLabels(clientset clientset.Interface, internalClientset internalcl
 	Logf("Scaling %v RCs with labels %v in ns %v to %v replicas.", len(rcs.Items), l, ns, replicas)
 	for _, labelRC := range rcs.Items {
 		name := labelRC.Name
-		if err := ScaleRC(clientset, internalClientset, ns, name, replicas, false); err != nil {
+		if err := ScaleRC(clientset, internalClientset, scalesGetter, ns, name, replicas, false); err != nil {
 			return err
 		}
-		rc, err := clientset.Core().ReplicationControllers(ns).Get(name, metav1.GetOptions{})
+		rc, err := clientset.CoreV1().ReplicationControllers(ns).Get(name, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
@@ -129,12 +132,12 @@ func UpdateReplicationControllerWithRetries(c clientset.Interface, namespace, na
 	var updateErr error
 	pollErr := wait.PollImmediate(10*time.Millisecond, 1*time.Minute, func() (bool, error) {
 		var err error
-		if rc, err = c.Core().ReplicationControllers(namespace).Get(name, metav1.GetOptions{}); err != nil {
+		if rc, err = c.CoreV1().ReplicationControllers(namespace).Get(name, metav1.GetOptions{}); err != nil {
 			return false, err
 		}
 		// Apply the update, then attempt to push it to the apiserver.
 		applyUpdate(rc)
-		if rc, err = c.Core().ReplicationControllers(namespace).Update(rc); err == nil {
+		if rc, err = c.CoreV1().ReplicationControllers(namespace).Update(rc); err == nil {
 			Logf("Updating replication controller %q", name)
 			return true, nil
 		}
@@ -156,8 +159,8 @@ func DeleteRCAndPods(clientset clientset.Interface, internalClientset internalcl
 	return DeleteResourceAndPods(clientset, internalClientset, api.Kind("ReplicationController"), ns, name)
 }
 
-func ScaleRC(clientset clientset.Interface, internalClientset internalclientset.Interface, ns, name string, size uint, wait bool) error {
-	return ScaleResource(clientset, internalClientset, ns, name, size, wait, api.Kind("ReplicationController"))
+func ScaleRC(clientset clientset.Interface, internalClientset internalclientset.Interface, scalesGetter scaleclient.ScalesGetter, ns, name string, size uint, wait bool) error {
+	return ScaleResource(clientset, internalClientset, scalesGetter, ns, name, size, wait, api.Kind("ReplicationController"), api.Resource("replicationcontrollers"))
 }
 
 func RunRC(config testutils.RCConfig) error {
@@ -180,7 +183,7 @@ func WaitForRCPodToDisappear(c clientset.Interface, ns, rcName, podName string) 
 // WaitForReplicationController waits until the RC appears (exist == true), or disappears (exist == false)
 func WaitForReplicationController(c clientset.Interface, namespace, name string, exist bool, interval, timeout time.Duration) error {
 	err := wait.PollImmediate(interval, timeout, func() (bool, error) {
-		_, err := c.Core().ReplicationControllers(namespace).Get(name, metav1.GetOptions{})
+		_, err := c.CoreV1().ReplicationControllers(namespace).Get(name, metav1.GetOptions{})
 		if err != nil {
 			Logf("Get ReplicationController %s in namespace %s failed (%v).", name, namespace, err)
 			return !exist, nil
@@ -200,7 +203,7 @@ func WaitForReplicationController(c clientset.Interface, namespace, name string,
 func WaitForReplicationControllerwithSelector(c clientset.Interface, namespace string, selector labels.Selector, exist bool, interval,
 	timeout time.Duration) error {
 	err := wait.PollImmediate(interval, timeout, func() (bool, error) {
-		rcs, err := c.Core().ReplicationControllers(namespace).List(metav1.ListOptions{LabelSelector: selector.String()})
+		rcs, err := c.CoreV1().ReplicationControllers(namespace).List(metav1.ListOptions{LabelSelector: selector.String()})
 		switch {
 		case len(rcs.Items) != 0:
 			Logf("ReplicationController with %s in namespace %s found.", selector.String(), namespace)

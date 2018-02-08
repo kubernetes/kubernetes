@@ -14,21 +14,12 @@ import (
 	"unsafe"
 )
 
-func Getpagesize() int { return 4096 }
-
-func TimespecToNsec(ts Timespec) int64 { return int64(ts.Sec)*1e9 + int64(ts.Nsec) }
-
-func NsecToTimespec(nsec int64) (ts Timespec) {
-	ts.Sec = int32(nsec / 1e9)
-	ts.Nsec = int32(nsec % 1e9)
-	return
+func setTimespec(sec, nsec int64) Timespec {
+	return Timespec{Sec: int32(sec), Nsec: int32(nsec)}
 }
 
-func NsecToTimeval(nsec int64) (tv Timeval) {
-	nsec += 999 // round up to microsecond
-	tv.Sec = int32(nsec / 1e9)
-	tv.Usec = int32(nsec % 1e9 / 1e3)
-	return
+func setTimeval(sec, usec int64) Timeval {
+	return Timeval{Sec: int32(sec), Usec: int32(usec)}
 }
 
 //sysnb	pipe(p *[2]_C_int) (err error)
@@ -185,9 +176,9 @@ func Seek(fd int, offset int64, whence int) (newoffset int64, err error) {
 
 // On x86 Linux, all the socket calls go through an extra indirection,
 // I think because the 5-register system call interface can't handle
-// the 6-argument calls like sendto and recvfrom.  Instead the
+// the 6-argument calls like sendto and recvfrom. Instead the
 // arguments to the underlying system call are the number below
-// and a pointer to an array of uintptr.  We hide the pointer in the
+// and a pointer to an array of uintptr. We hide the pointer in the
 // socketcall assembly to avoid allocation on every system call.
 
 const (

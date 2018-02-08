@@ -9,8 +9,8 @@ load(
 go_test(
     name = "go_default_test",
     srcs = ["ssh_test.go"],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/pkg/ssh",
-    library = ":go_default_library",
     deps = [
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/golang.org/x/crypto/ssh:go_default_library",

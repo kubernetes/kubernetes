@@ -146,7 +146,11 @@ func NewCurletInstance(namespace, name string) *unstructured.Unstructured {
 	}
 }
 
-func CreateNewCustomResourceDefinition(crd *apiextensionsv1beta1.CustomResourceDefinition, apiExtensionsClient clientset.Interface, clientPool dynamic.ClientPool) (dynamic.Interface, error) {
+// CreateNewCustomResourceDefinitionWatchUnsafe creates the CRD and makes sure
+// the apiextension apiserver has installed the CRD. But it's not safe to watch
+// the created CR. Please call CreateNewCustomResourceDefinition if you need to
+// watch the CR.
+func CreateNewCustomResourceDefinitionWatchUnsafe(crd *apiextensionsv1beta1.CustomResourceDefinition, apiExtensionsClient clientset.Interface, clientPool dynamic.ClientPool) (dynamic.Interface, error) {
 	_, err := apiExtensionsClient.Apiextensions().CustomResourceDefinitions().Create(crd)
 	if err != nil {
 		return nil, err
@@ -169,7 +173,11 @@ func CreateNewCustomResourceDefinition(crd *apiextensionsv1beta1.CustomResourceD
 		return nil, err
 	}
 
-	dynamicClient, err := clientPool.ClientForGroupVersionResource(schema.GroupVersionResource{Group: crd.Spec.Group, Version: crd.Spec.Version, Resource: crd.Spec.Names.Plural})
+	return clientPool.ClientForGroupVersionResource(schema.GroupVersionResource{Group: crd.Spec.Group, Version: crd.Spec.Version, Resource: crd.Spec.Names.Plural})
+}
+
+func CreateNewCustomResourceDefinition(crd *apiextensionsv1beta1.CustomResourceDefinition, apiExtensionsClient clientset.Interface, clientPool dynamic.ClientPool) (dynamic.Interface, error) {
+	dynamicClient, err := CreateNewCustomResourceDefinitionWatchUnsafe(crd, apiExtensionsClient, clientPool)
 	if err != nil {
 		return nil, err
 	}

@@ -25,7 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/authentication/user"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	eventratelimitapi "k8s.io/kubernetes/plugin/pkg/admission/eventratelimit/apis/eventratelimit"
 )
 
@@ -482,7 +482,7 @@ func TestEventRateLimiting(t *testing.T) {
 					clock.Step(rq.delay)
 				}
 				attributes := attributesForRequest(rq)
-				err = eventratelimit.Admit(attributes)
+				err = eventratelimit.Validate(attributes)
 				if rq.accepted != (err == nil) {
 					expectedAction := "admitted"
 					if !rq.accepted {

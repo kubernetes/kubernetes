@@ -488,7 +488,7 @@ func (asw *actualStateOfWorld) SetNodeStatusUpdateNeeded(nodeName types.NodeName
 	asw.Lock()
 	defer asw.Unlock()
 	if err := asw.updateNodeStatusUpdateNeeded(nodeName, true); err != nil {
-		glog.Errorf("Failed to update statusUpdateNeeded field in actual state of world: %v", err)
+		glog.Warningf("Failed to update statusUpdateNeeded field in actual state of world: %v", err)
 	}
 }
 

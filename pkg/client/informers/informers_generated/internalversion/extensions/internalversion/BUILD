@@ -14,7 +14,6 @@ go_library(
         "interface.go",
         "podsecuritypolicy.go",
         "replicaset.go",
-        "thirdpartyresource.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion/extensions/internalversion",
     deps = [

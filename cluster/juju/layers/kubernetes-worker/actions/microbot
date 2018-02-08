@@ -34,7 +34,7 @@ if not context['replicas']:
     context['replicas'] = 3
 
 # Declare a kubectl template when invoking kubectl
-kubectl = ['kubectl', '--kubeconfig=/root/cdk/kubeconfig']
+kubectl = ['kubectl', '--kubeconfig=/root/.kube/config']
 
 # Remove deployment if requested
 if context['delete']:

@@ -51,6 +51,9 @@ const googleApis = "type.googleapis.com/"
 // function. AnyMessageName is provided for less common use cases like filtering a
 // sequence of Any messages based on a set of allowed message type names.
 func AnyMessageName(any *any.Any) (string, error) {
+	if any == nil {
+		return "", fmt.Errorf("message is nil")
+	}
 	slash := strings.LastIndex(any.TypeUrl, "/")
 	if slash < 0 {
 		return "", fmt.Errorf("message type url %q is invalid", any.TypeUrl)

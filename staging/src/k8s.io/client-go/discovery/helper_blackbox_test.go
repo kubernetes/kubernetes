@@ -28,7 +28,6 @@ import (
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	uapi "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -87,7 +86,7 @@ func TestServerSupportsVersion(t *testing.T) {
 			NegotiatedSerializer: scheme.Codecs,
 			Resp: &http.Response{
 				StatusCode: test.statusCode,
-				Body:       objBody(&uapi.APIVersions{Versions: test.serverVersions}),
+				Body:       objBody(&metav1.APIVersions{Versions: test.serverVersions}),
 			},
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 				if test.sendErr != nil {
@@ -95,7 +94,7 @@ func TestServerSupportsVersion(t *testing.T) {
 				}
 				header := http.Header{}
 				header.Set("Content-Type", runtime.ContentTypeJSON)
-				return &http.Response{StatusCode: test.statusCode, Header: header, Body: objBody(&uapi.APIVersions{Versions: test.serverVersions})}, nil
+				return &http.Response{StatusCode: test.statusCode, Header: header, Body: objBody(&metav1.APIVersions{Versions: test.serverVersions})}, nil
 			}),
 		}
 		c := discovery.NewDiscoveryClientForConfigOrDie(&restclient.Config{})

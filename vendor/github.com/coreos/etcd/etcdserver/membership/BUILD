@@ -4,6 +4,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "cluster.go",
+        "doc.go",
         "errors.go",
         "member.go",
         "store.go",

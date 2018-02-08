@@ -50,10 +50,14 @@ var (
 	patch, _     = json.Marshal(jsonpatch.Patch{})
 )
 
-var _ = SIGDescribe("Advanced Audit [Feature:Audit]", func() {
+var _ = SIGDescribe("Advanced Audit", func() {
 	f := framework.NewDefaultFramework("audit")
+	BeforeEach(func() {
+		framework.SkipUnlessProviderIs("gce")
+	})
 
-	It("should audit API calls", func() {
+	// TODO: Get rid of [DisabledForLargeClusters] when feature request #53455 is ready.
+	It("should audit API calls [DisabledForLargeClusters]", func() {
 		namespace := f.Namespace.Name
 
 		config, err := framework.LoadConfig()
@@ -199,27 +203,27 @@ var _ = SIGDescribe("Advanced Audit [Feature:Audit]", func() {
 					podLabels := map[string]string{"name": "audit-deployment-pod"}
 					d := framework.NewDeployment("audit-deployment", int32(1), podLabels, "redis", imageutils.GetE2EImage(imageutils.Redis), extensions.RecreateDeploymentStrategyType)
 
-					_, err := f.ClientSet.Extensions().Deployments(namespace).Create(d)
+					_, err := f.ClientSet.ExtensionsV1beta1().Deployments(namespace).Create(d)
 					framework.ExpectNoError(err, "failed to create audit-deployment")
 
-					_, err = f.ClientSet.Extensions().Deployments(namespace).Get(d.Name, metav1.GetOptions{})
+					_, err = f.ClientSet.ExtensionsV1beta1().Deployments(namespace).Get(d.Name, metav1.GetOptions{})
 					framework.ExpectNoError(err, "failed to get audit-deployment")
 
-					deploymentChan, err := f.ClientSet.Extensions().Deployments(namespace).Watch(watchOptions)
+					deploymentChan, err := f.ClientSet.ExtensionsV1beta1().Deployments(namespace).Watch(watchOptions)
 					framework.ExpectNoError(err, "failed to create watch for deployments")
 					for range deploymentChan.ResultChan() {
 					}
 
-					_, err = f.ClientSet.Extensions().Deployments(namespace).Update(d)
+					_, err = f.ClientSet.ExtensionsV1beta1().Deployments(namespace).Update(d)
 					framework.ExpectNoError(err, "failed to update audit-deployment")
 
-					_, err = f.ClientSet.Extensions().Deployments(namespace).Patch(d.Name, types.JSONPatchType, patch)
+					_, err = f.ClientSet.ExtensionsV1beta1().Deployments(namespace).Patch(d.Name, types.JSONPatchType, patch)
 					framework.ExpectNoError(err, "failed to patch deployment")
 
-					_, err = f.ClientSet.Extensions().Deployments(namespace).List(metav1.ListOptions{})
+					_, err = f.ClientSet.ExtensionsV1beta1().Deployments(namespace).List(metav1.ListOptions{})
 					framework.ExpectNoError(err, "failed to create list deployments")
 
-					err = f.ClientSet.Extensions().Deployments(namespace).Delete("audit-deployment", &metav1.DeleteOptions{})
+					err = f.ClientSet.ExtensionsV1beta1().Deployments(namespace).Delete("audit-deployment", &metav1.DeleteOptions{})
 					framework.ExpectNoError(err, "failed to delete deployments")
 				},
 				[]auditEvent{
@@ -326,27 +330,27 @@ var _ = SIGDescribe("Advanced Audit [Feature:Audit]", func() {
 						},
 					}
 
-					_, err := f.ClientSet.Core().ConfigMaps(namespace).Create(configMap)
+					_, err := f.ClientSet.CoreV1().ConfigMaps(namespace).Create(configMap)
 					framework.ExpectNoError(err, "failed to create audit-configmap")
 
-					_, err = f.ClientSet.Core().ConfigMaps(namespace).Get(configMap.Name, metav1.GetOptions{})
+					_, err = f.ClientSet.CoreV1().ConfigMaps(namespace).Get(configMap.Name, metav1.GetOptions{})
 					framework.ExpectNoError(err, "failed to get audit-configmap")
 
-					configMapChan, err := f.ClientSet.Core().ConfigMaps(namespace).Watch(watchOptions)
+					configMapChan, err := f.ClientSet.CoreV1().ConfigMaps(namespace).Watch(watchOptions)
 					framework.ExpectNoError(err, "failed to create watch for config maps")
 					for range configMapChan.ResultChan() {
 					}
 
-					_, err = f.ClientSet.Core().ConfigMaps(namespace).Update(configMap)
+					_, err = f.ClientSet.CoreV1().ConfigMaps(namespace).Update(configMap)
 					framework.ExpectNoError(err, "failed to update audit-configmap")
 
-					_, err = f.ClientSet.Core().ConfigMaps(namespace).Patch(configMap.Name, types.JSONPatchType, patch)
+					_, err = f.ClientSet.CoreV1().ConfigMaps(namespace).Patch(configMap.Name, types.JSONPatchType, patch)
 					framework.ExpectNoError(err, "failed to patch configmap")
 
-					_, err = f.ClientSet.Core().ConfigMaps(namespace).List(metav1.ListOptions{})
+					_, err = f.ClientSet.CoreV1().ConfigMaps(namespace).List(metav1.ListOptions{})
 					framework.ExpectNoError(err, "failed to list config maps")
 
-					err = f.ClientSet.Core().ConfigMaps(namespace).Delete(configMap.Name, &metav1.DeleteOptions{})
+					err = f.ClientSet.CoreV1().ConfigMaps(namespace).Delete(configMap.Name, &metav1.DeleteOptions{})
 					framework.ExpectNoError(err, "failed to delete audit-configmap")
 				},
 				[]auditEvent{
@@ -452,27 +456,27 @@ var _ = SIGDescribe("Advanced Audit [Feature:Audit]", func() {
 							"top-secret": []byte("foo-bar"),
 						},
 					}
-					_, err := f.ClientSet.Core().Secrets(namespace).Create(secret)
+					_, err := f.ClientSet.CoreV1().Secrets(namespace).Create(secret)
 					framework.ExpectNoError(err, "failed to create audit-secret")
 
-					_, err = f.ClientSet.Core().Secrets(namespace).Get(secret.Name, metav1.GetOptions{})
+					_, err = f.ClientSet.CoreV1().Secrets(namespace).Get(secret.Name, metav1.GetOptions{})
 					framework.ExpectNoError(err, "failed to get audit-secret")
 
-					secretChan, err := f.ClientSet.Core().Secrets(namespace).Watch(watchOptions)
+					secretChan, err := f.ClientSet.CoreV1().Secrets(namespace).Watch(watchOptions)
 					framework.ExpectNoError(err, "failed to create watch for secrets")
 					for range secretChan.ResultChan() {
 					}
 
-					_, err = f.ClientSet.Core().Secrets(namespace).Update(secret)
+					_, err = f.ClientSet.CoreV1().Secrets(namespace).Update(secret)
 					framework.ExpectNoError(err, "failed to update audit-secret")
 
-					_, err = f.ClientSet.Core().Secrets(namespace).Patch(secret.Name, types.JSONPatchType, patch)
+					_, err = f.ClientSet.CoreV1().Secrets(namespace).Patch(secret.Name, types.JSONPatchType, patch)
 					framework.ExpectNoError(err, "failed to patch secret")
 
-					_, err = f.ClientSet.Core().Secrets(namespace).List(metav1.ListOptions{})
+					_, err = f.ClientSet.CoreV1().Secrets(namespace).List(metav1.ListOptions{})
 					framework.ExpectNoError(err, "failed to list secrets")
 
-					err = f.ClientSet.Core().Secrets(namespace).Delete(secret.Name, &metav1.DeleteOptions{})
+					err = f.ClientSet.CoreV1().Secrets(namespace).Delete(secret.Name, &metav1.DeleteOptions{})
 					framework.ExpectNoError(err, "failed to delete audit-secret")
 				},
 				[]auditEvent{
@@ -651,7 +655,7 @@ func expectAuditLines(f *framework.Framework, expected []auditEvent) {
 	}
 
 	// Fetch the log stream.
-	stream, err := f.ClientSet.Core().RESTClient().Get().AbsPath("/logs/kube-apiserver-audit.log").Stream()
+	stream, err := f.ClientSet.CoreV1().RESTClient().Get().AbsPath("/logs/kube-apiserver-audit.log").Stream()
 	framework.ExpectNoError(err, "could not read audit log")
 	defer stream.Close()
 

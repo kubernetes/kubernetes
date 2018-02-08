@@ -352,11 +352,12 @@ message RangeRequest {
   bytes key = 1;
   // range_end is the upper bound on the requested range [key, range_end).
   // If range_end is '\0', the range is all keys >= key.
-  // If the range_end is one bit larger than the given key,
-  // then the range requests get the all keys with the prefix (the given key).
-  // If both key and range_end are '\0', then range requests returns all keys.
+  // If range_end is key plus one (e.g., "aa"+1 == "ab", "a\xff"+1 == "b"),
+  // then the range request gets all keys prefixed with key.
+  // If both key and range_end are '\0', then the range request returns all keys.
   bytes range_end = 2;
-  // limit is a limit on the number of keys returned for the request.
+  // limit is a limit on the number of keys returned for the request. When limit is set to 0,
+  // it is treated as no limit.
   int64 limit = 3;
   // revision is the point-in-time of the key-value store to use for the range.
   // If revision is less or equal to zero, the range is over the newest key-value store.
@@ -423,6 +424,14 @@ message PutRequest {
   // If prev_kv is set, etcd gets the previous key-value pair before changing it.
   // The previous key-value pair will be returned in the put response.
   bool prev_kv = 4;
+
+  // If ignore_value is set, etcd updates the key using its current value.
+  // Returns an error if the key does not exist.
+  bool ignore_value = 5;
+
+  // If ignore_lease is set, etcd updates the key using its current lease.
+  // Returns an error if the key does not exist.
+  bool ignore_lease = 6;
 }
 
 message PutResponse {
@@ -436,13 +445,13 @@ message DeleteRangeRequest {
   bytes key = 1;
   // range_end is the key following the last key to delete for the range [key, range_end).
   // If range_end is not given, the range is defined to contain only the key argument.
-  // If range_end is one bit larger than the given key, then the range is all
-  // the all keys with the prefix (the given key).
+  // If range_end is one bit larger than the given key, then the range is all the keys
+  // with the prefix (the given key).
   // If range_end is '\0', the range is all keys greater than or equal to the key argument.
   bytes range_end = 2;
 
   // If prev_kv is set, etcd gets the previous key-value pairs before deleting it.
-  // The previous key-value pairs will be returned in the delte response.
+  // The previous key-value pairs will be returned in the delete response.
   bool prev_kv = 3;
 }
 
@@ -645,6 +654,9 @@ message WatchResponse {
   // watcher with the same start_revision again.
   int64 compact_revision  = 5;
 
+  // cancel_reason indicates the reason for canceling the watcher.
+  string cancel_reason = 6;
+
   repeated mvccpb.Event events = 11;
 }
 
@@ -725,6 +737,8 @@ message MemberAddResponse {
   ResponseHeader header = 1;
   // member is the member information for the added member.
   Member member = 2;
+  // members is a list of all members after adding the new member.
+  repeated Member members = 3;
 }
 
 message MemberRemoveRequest {
@@ -734,6 +748,8 @@ message MemberRemoveRequest {
 
 message MemberRemoveResponse {
   ResponseHeader header = 1;
+  // members is a list of all members after removing the member.
+  repeated Member members = 2;
 }
 
 message MemberUpdateRequest {
@@ -745,6 +761,8 @@ message MemberUpdateRequest {
 
 message MemberUpdateResponse{
   ResponseHeader header = 1;
+  // members is a list of all members after updating the member.
+  repeated Member members = 2;
 }
 
 message MemberListRequest {

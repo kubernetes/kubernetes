@@ -17,38 +17,29 @@ limitations under the License.
 package dns
 
 import (
+	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/pkg/util/version"
 )
 
 const (
-	kubeDNSv180AndAboveVersion = "1.14.5"
-	kubeDNSv190AndAboveVersion = "1.14.6"
-
-	kubeDNSProbeSRV = "SRV"
-	kubeDNSProbeA   = "A"
+	kubeDNSv190AndAboveVersion = "1.14.8"
+	coreDNSVersion             = "1.0.4"
 )
 
-// GetKubeDNSVersion returns the right kube-dns version for a specific k8s version
-func GetKubeDNSVersion(kubeVersion *version.Version) string {
-	// v1.8.0+ uses 1.14.5
-	// v1.9.0+ uses 1.14.6
-	// In the future when the kube-dns version is bumped at HEAD; add conditional logic to return the right versions
+// GetDNSVersion returns the right kube-dns version for a specific k8s version
+func GetDNSVersion(kubeVersion *version.Version, dns string) string {
+	// v1.9.0+ uses kube-dns 1.14.8
+	// v1.9.0+ uses CoreDNS  1.0.4 if feature gate "CoreDNS" is enabled.
+
+	// In the future when the version is bumped at HEAD; add conditional logic to return the right versions
 	// Also, the version might be bumped for different k8s releases on the same branch
-	if kubeVersion.Major() == 1 && kubeVersion.Minor() >= 9 {
+	switch dns {
+	case kubeadmconstants.CoreDNS:
+		// return the CoreDNS version
+		return coreDNSVersion
+	default:
 		return kubeDNSv190AndAboveVersion
 	}
-	return kubeDNSv180AndAboveVersion
-}
-
-// GetKubeDNSProbeType returns the right kube-dns probe for a specific k8s version
-func GetKubeDNSProbeType(kubeVersion *version.Version) string {
-	// v1.8.0+ uses type A, just return that here
-	// In the future when the kube-dns version is bumped at HEAD; add conditional logic to return the right versions
-	// Also, the version might be bumped for different k8s releases on the same branch
-	if kubeVersion.Major() == 1 && kubeVersion.Minor() >= 9 {
-		return kubeDNSProbeSRV
-	}
-	return kubeDNSProbeA
 }
 
 // GetKubeDNSManifest returns the right kube-dns YAML manifest for a specific k8s version
@@ -56,4 +47,11 @@ func GetKubeDNSManifest(kubeVersion *version.Version) string {
 	// v1.8.0+ has only one known YAML manifest spec, just return that here
 	// In the future when the kube-dns version is bumped at HEAD; add conditional logic to return the right manifest
 	return v180AndAboveKubeDNSDeployment
+}
+
+// GetCoreDNSManifest returns the right CoreDNS YAML manifest for a specific k8s version
+func GetCoreDNSManifest(kubeVersion *version.Version) string {
+	// v1.9.0+ has only one known YAML manifest spec, just return that here
+	// In the future when the CoreDNS version is bumped at HEAD; add conditional logic to return the right manifest
+	return CoreDNSDeployment
 }

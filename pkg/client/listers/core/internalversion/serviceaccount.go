@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2018 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,13 +22,13 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
-	api "k8s.io/kubernetes/pkg/api"
+	core "k8s.io/kubernetes/pkg/apis/core"
 )
 
 // ServiceAccountLister helps list ServiceAccounts.
 type ServiceAccountLister interface {
 	// List lists all ServiceAccounts in the indexer.
-	List(selector labels.Selector) (ret []*api.ServiceAccount, err error)
+	List(selector labels.Selector) (ret []*core.ServiceAccount, err error)
 	// ServiceAccounts returns an object that can list and get ServiceAccounts.
 	ServiceAccounts(namespace string) ServiceAccountNamespaceLister
 	ServiceAccountListerExpansion
@@ -45,9 +45,9 @@ func NewServiceAccountLister(indexer cache.Indexer) ServiceAccountLister {
 }
 
 // List lists all ServiceAccounts in the indexer.
-func (s *serviceAccountLister) List(selector labels.Selector) (ret []*api.ServiceAccount, err error) {
+func (s *serviceAccountLister) List(selector labels.Selector) (ret []*core.ServiceAccount, err error) {
 	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*api.ServiceAccount))
+		ret = append(ret, m.(*core.ServiceAccount))
 	})
 	return ret, err
 }
@@ -60,9 +60,9 @@ func (s *serviceAccountLister) ServiceAccounts(namespace string) ServiceAccountN
 // ServiceAccountNamespaceLister helps list and get ServiceAccounts.
 type ServiceAccountNamespaceLister interface {
 	// List lists all ServiceAccounts in the indexer for a given namespace.
-	List(selector labels.Selector) (ret []*api.ServiceAccount, err error)
+	List(selector labels.Selector) (ret []*core.ServiceAccount, err error)
 	// Get retrieves the ServiceAccount from the indexer for a given namespace and name.
-	Get(name string) (*api.ServiceAccount, error)
+	Get(name string) (*core.ServiceAccount, error)
 	ServiceAccountNamespaceListerExpansion
 }
 
@@ -74,21 +74,21 @@ type serviceAccountNamespaceLister struct {
 }
 
 // List lists all ServiceAccounts in the indexer for a given namespace.
-func (s serviceAccountNamespaceLister) List(selector labels.Selector) (ret []*api.ServiceAccount, err error) {
+func (s serviceAccountNamespaceLister) List(selector labels.Selector) (ret []*core.ServiceAccount, err error) {
 	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*api.ServiceAccount))
+		ret = append(ret, m.(*core.ServiceAccount))
 	})
 	return ret, err
 }
 
 // Get retrieves the ServiceAccount from the indexer for a given namespace and name.
-func (s serviceAccountNamespaceLister) Get(name string) (*api.ServiceAccount, error) {
+func (s serviceAccountNamespaceLister) Get(name string) (*core.ServiceAccount, error) {
 	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
 	if err != nil {
 		return nil, err
 	}
 	if !exists {
-		return nil, errors.NewNotFound(api.Resource("serviceaccount"), name)
+		return nil, errors.NewNotFound(core.Resource("serviceaccount"), name)
 	}
-	return obj.(*api.ServiceAccount), nil
+	return obj.(*core.ServiceAccount), nil
 }

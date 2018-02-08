@@ -14,6 +14,7 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/kubelet/gpu/nvidia",
     deps = [
+        "//pkg/kubelet/dockershim:go_default_library",
         "//pkg/kubelet/dockershim/libdocker:go_default_library",
         "//pkg/kubelet/gpu:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
@@ -39,9 +40,10 @@ filegroup(
 go_test(
     name = "go_default_test",
     srcs = ["nvidia_gpu_manager_test.go"],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/pkg/kubelet/gpu/nvidia",
-    library = ":go_default_library",
     deps = [
+        "//pkg/kubelet/dockershim:go_default_library",
         "//pkg/kubelet/dockershim/libdocker:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",

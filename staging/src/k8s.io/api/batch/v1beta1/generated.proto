@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2018 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -71,7 +71,10 @@ message CronJobSpec {
   optional int64 startingDeadlineSeconds = 2;
 
   // Specifies how to treat concurrent executions of a Job.
-  // Defaults to Allow.
+  // Valid values are:
+  // - "Allow" (default): allows CronJobs to run concurrently;
+  // - "Forbid": forbids concurrent runs, skipping next run if previous run hasn't finished yet;
+  // - "Replace": cancels currently running job and replaces it with a new one
   // +optional
   optional string concurrencyPolicy = 3;
 

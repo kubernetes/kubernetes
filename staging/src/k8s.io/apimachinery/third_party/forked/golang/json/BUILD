@@ -15,8 +15,8 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["fields_test.go"],
+    embed = [":go_default_library"],
     importpath = "k8s.io/apimachinery/third_party/forked/golang/json",
-    library = ":go_default_library",
 )
 
 filegroup(

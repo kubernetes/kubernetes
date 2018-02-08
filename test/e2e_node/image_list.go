@@ -17,7 +17,6 @@ limitations under the License.
 package e2e_node
 
 import (
-	"errors"
 	"fmt"
 	"os/exec"
 	"os/user"
@@ -27,8 +26,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
-	"k8s.io/kubernetes/pkg/kubelet/remote"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	commontest "k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -39,8 +37,6 @@ const (
 	maxImagePullRetries = 5
 	// Sleep duration between image pull retry attempts.
 	imagePullRetryDelay = time.Second
-	// connection timeout for gRPC image service connection
-	imageServiceConnectionTimeout = 15 * time.Minute
 )
 
 // NodeImageWhiteList is a list of images used in node e2e test. These images will be prepulled
@@ -55,7 +51,7 @@ var NodeImageWhiteList = sets.NewString(
 	imageutils.GetE2EImage(imageutils.ServeHostname),
 	imageutils.GetE2EImage(imageutils.Netexec),
 	imageutils.GetE2EImage(imageutils.Nonewprivs),
-	framework.GetPauseImageNameForHostArch(),
+	imageutils.GetPauseImageNameForHostArch(),
 	framework.GetGPUDevicePluginImage(),
 )
 
@@ -93,8 +89,11 @@ func (rp *remotePuller) Name() string {
 }
 
 func (rp *remotePuller) Pull(image string) ([]byte, error) {
-	// TODO(runcom): should we check if the image is already pulled with ImageStatus?
-	_, err := rp.imageService.PullImage(&runtimeapi.ImageSpec{Image: image}, nil)
+	imageStatus, err := rp.imageService.ImageStatus(&runtimeapi.ImageSpec{Image: image})
+	if err == nil && imageStatus != nil {
+		return nil, nil
+	}
+	_, err = rp.imageService.PullImage(&runtimeapi.ImageSpec{Image: image}, nil)
 	return nil, err
 }
 
@@ -104,17 +103,7 @@ func getPuller() (puller, error) {
 	case "docker":
 		return &dockerPuller{}, nil
 	case "remote":
-		endpoint := framework.TestContext.ContainerRuntimeEndpoint
-		if framework.TestContext.ImageServiceEndpoint != "" {
-			//ImageServiceEndpoint is the same as ContainerRuntimeEndpoint if not
-			//explicitly specified
-			//https://github.com/kubernetes/kubernetes/blob/master/pkg/kubelet/kubelet.go#L517
-			endpoint = framework.TestContext.ImageServiceEndpoint
-		}
-		if endpoint == "" {
-			return nil, errors.New("can't prepull images, no remote endpoint provided")
-		}
-		is, err := remote.NewRemoteImageService(endpoint, imageServiceConnectionTimeout)
+		_, is, err := getCRIClient()
 		if err != nil {
 			return nil, err
 		}

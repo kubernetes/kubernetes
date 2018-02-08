@@ -61,6 +61,7 @@ type fakeTimer struct {
 
 func newFakeTimer() *fakeTimer {
 	ft := &fakeTimer{
+		now:     time.Date(2000, 0, 0, 0, 0, 0, 0, time.UTC),
 		c:       make(chan time.Time),
 		updated: make(chan timerUpdate),
 	}

@@ -46,6 +46,8 @@ func ErrorToAPIStatus(err error) *metav1.Status {
 				status.Code = http.StatusInternalServerError
 			}
 		}
+		status.Kind = "Status"
+		status.APIVersion = "v1"
 		//TODO: check for invalid responses
 		return &status
 	default:
@@ -61,6 +63,10 @@ func ErrorToAPIStatus(err error) *metav1.Status {
 		// cases.
 		runtime.HandleError(fmt.Errorf("apiserver received an error that is not an metav1.Status: %v", err))
 		return &metav1.Status{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       "Status",
+				APIVersion: "v1",
+			},
 			Status:  metav1.StatusFailure,
 			Code:    int32(status),
 			Reason:  metav1.StatusReasonUnknown,

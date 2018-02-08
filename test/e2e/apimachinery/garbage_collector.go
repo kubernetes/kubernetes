@@ -35,7 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/storage/names"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/metrics"
 
@@ -43,6 +43,34 @@ import (
 	. "github.com/onsi/gomega"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
+
+// estimateMaximumPods estimates how many pods the cluster can handle
+// with some wiggle room, to prevent pods being unable to schedule due
+// to max pod constraints.
+func estimateMaximumPods(c clientset.Interface, min, max int32) int32 {
+	availablePods := int32(0)
+	for _, node := range framework.GetReadySchedulableNodesOrDie(c).Items {
+		if q, ok := node.Status.Allocatable["pods"]; ok {
+			if num, ok := q.AsInt64(); ok {
+				availablePods += int32(num)
+				continue
+			}
+		}
+		// best guess per node, since default maxPerCore is 10 and most nodes have at least
+		// one core.
+		availablePods += 10
+	}
+	//avoid creating exactly max pods
+	availablePods *= 8 / 10
+	// bound the top and bottom
+	if availablePods > max {
+		availablePods = max
+	}
+	if availablePods < min {
+		availablePods = min
+	}
+	return availablePods
+}
 
 func getForegroundOptions() *metav1.DeleteOptions {
 	policy := metav1.DeletePropagationForeground
@@ -138,7 +166,7 @@ func verifyRemainingDeploymentsReplicaSetsPods(
 	deploymentNum, rsNum, podNum int,
 ) (bool, error) {
 	var ret = true
-	rs, err := clientSet.Extensions().ReplicaSets(f.Namespace.Name).List(metav1.ListOptions{})
+	rs, err := clientSet.ExtensionsV1beta1().ReplicaSets(f.Namespace.Name).List(metav1.ListOptions{})
 	if err != nil {
 		return false, fmt.Errorf("Failed to list rs: %v", err)
 	}
@@ -146,7 +174,7 @@ func verifyRemainingDeploymentsReplicaSetsPods(
 		ret = false
 		By(fmt.Sprintf("expected %d rs, got %d rs", rsNum, len(rs.Items)))
 	}
-	deployments, err := clientSet.Extensions().Deployments(f.Namespace.Name).List(metav1.ListOptions{})
+	deployments, err := clientSet.ExtensionsV1beta1().Deployments(f.Namespace.Name).List(metav1.ListOptions{})
 	if err != nil {
 		return false, fmt.Errorf("Failed to list deployments: %v", err)
 	}
@@ -191,8 +219,8 @@ func newGCPod(name string) *v1.Pod {
 // controllers and pods are rcNum and podNum. It returns error if the
 // communication with the API server fails.
 func verifyRemainingReplicationControllersPods(f *framework.Framework, clientSet clientset.Interface, rcNum, podNum int) (bool, error) {
-	rcClient := clientSet.Core().ReplicationControllers(f.Namespace.Name)
-	pods, err := clientSet.Core().Pods(f.Namespace.Name).List(metav1.ListOptions{})
+	rcClient := clientSet.CoreV1().ReplicationControllers(f.Namespace.Name)
+	pods, err := clientSet.CoreV1().Pods(f.Namespace.Name).List(metav1.ListOptions{})
 	if err != nil {
 		return false, fmt.Errorf("Failed to list pods: %v", err)
 	}
@@ -227,7 +255,7 @@ func verifyRemainingCronJobsJobsPods(f *framework.Framework, clientSet clientset
 		By(fmt.Sprintf("expected %d cronjobs, got %d cronjobs", cjNum, len(cronJobs.Items)))
 	}
 
-	jobs, err := f.ClientSet.Batch().Jobs(f.Namespace.Name).List(metav1.ListOptions{})
+	jobs, err := f.ClientSet.BatchV1().Jobs(f.Namespace.Name).List(metav1.ListOptions{})
 	if err != nil {
 		return false, fmt.Errorf("Failed to list jobs: %v", err)
 	}
@@ -236,7 +264,7 @@ func verifyRemainingCronJobsJobsPods(f *framework.Framework, clientSet clientset
 		By(fmt.Sprintf("expected %d jobs, got %d jobs", jobNum, len(jobs.Items)))
 	}
 
-	pods, err := f.ClientSet.Core().Pods(f.Namespace.Name).List(metav1.ListOptions{})
+	pods, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).List(metav1.ListOptions{})
 	if err != nil {
 		return false, fmt.Errorf("Failed to list pods: %v", err)
 	}
@@ -304,8 +332,8 @@ var _ = SIGDescribe("Garbage collector", func() {
 	f := framework.NewDefaultFramework("gc")
 	It("should delete pods created by rc when not orphaning", func() {
 		clientSet := f.ClientSet
-		rcClient := clientSet.Core().ReplicationControllers(f.Namespace.Name)
-		podClient := clientSet.Core().Pods(f.Namespace.Name)
+		rcClient := clientSet.CoreV1().ReplicationControllers(f.Namespace.Name)
+		podClient := clientSet.CoreV1().Pods(f.Namespace.Name)
 		rcName := "simpletest.rc"
 		// TODO: find better way to keep this label unique in the test
 		uniqLabels := map[string]string{"gctest": "delete_pods"}
@@ -357,12 +385,12 @@ var _ = SIGDescribe("Garbage collector", func() {
 
 	It("should orphan pods created by rc if delete options say so", func() {
 		clientSet := f.ClientSet
-		rcClient := clientSet.Core().ReplicationControllers(f.Namespace.Name)
-		podClient := clientSet.Core().Pods(f.Namespace.Name)
+		rcClient := clientSet.CoreV1().ReplicationControllers(f.Namespace.Name)
+		podClient := clientSet.CoreV1().Pods(f.Namespace.Name)
 		rcName := "simpletest.rc"
 		// TODO: find better way to keep this label unique in the test
 		uniqLabels := map[string]string{"gctest": "orphan_pods"}
-		rc := newOwnerRC(f, rcName, 100, uniqLabels)
+		rc := newOwnerRC(f, rcName, estimateMaximumPods(clientSet, 10, 100), uniqLabels)
 		By("create the rc")
 		rc, err := rcClient.Create(rc)
 		if err != nil {
@@ -426,8 +454,8 @@ var _ = SIGDescribe("Garbage collector", func() {
 
 	It("should orphan pods created by rc if deleteOptions.OrphanDependents is nil", func() {
 		clientSet := f.ClientSet
-		rcClient := clientSet.Core().ReplicationControllers(f.Namespace.Name)
-		podClient := clientSet.Core().Pods(f.Namespace.Name)
+		rcClient := clientSet.CoreV1().ReplicationControllers(f.Namespace.Name)
+		podClient := clientSet.CoreV1().Pods(f.Namespace.Name)
 		rcName := "simpletest.rc"
 		// TODO: find better way to keep this label unique in the test
 		uniqLabels := map[string]string{"gctest": "orphan_pods_nil_option"}
@@ -475,8 +503,8 @@ var _ = SIGDescribe("Garbage collector", func() {
 
 	It("should delete RS created by deployment when not orphaning", func() {
 		clientSet := f.ClientSet
-		deployClient := clientSet.Extensions().Deployments(f.Namespace.Name)
-		rsClient := clientSet.Extensions().ReplicaSets(f.Namespace.Name)
+		deployClient := clientSet.ExtensionsV1beta1().Deployments(f.Namespace.Name)
+		rsClient := clientSet.ExtensionsV1beta1().ReplicaSets(f.Namespace.Name)
 		deploymentName := "simpletest.deployment"
 		// TODO: find better way to keep this label unique in the test
 		uniqLabels := map[string]string{"gctest": "delete_rs"}
@@ -526,8 +554,8 @@ var _ = SIGDescribe("Garbage collector", func() {
 
 	It("should orphan RS created by deployment when deleteOptions.OrphanDependents is true", func() {
 		clientSet := f.ClientSet
-		deployClient := clientSet.Extensions().Deployments(f.Namespace.Name)
-		rsClient := clientSet.Extensions().ReplicaSets(f.Namespace.Name)
+		deployClient := clientSet.ExtensionsV1beta1().Deployments(f.Namespace.Name)
+		rsClient := clientSet.ExtensionsV1beta1().ReplicaSets(f.Namespace.Name)
 		deploymentName := "simpletest.deployment"
 		// TODO: find better way to keep this label unique in the test
 		uniqLabels := map[string]string{"gctest": "orphan_rs"}
@@ -576,7 +604,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 				framework.Failf("remaining deployment's post mortem: %#v", remainingDSs)
 			}
 		}
-		rs, err := clientSet.Extensions().ReplicaSets(f.Namespace.Name).List(metav1.ListOptions{})
+		rs, err := clientSet.ExtensionsV1beta1().ReplicaSets(f.Namespace.Name).List(metav1.ListOptions{})
 		if err != nil {
 			framework.Failf("Failed to list ReplicaSet %v", err)
 		}
@@ -591,12 +619,12 @@ var _ = SIGDescribe("Garbage collector", func() {
 
 	It("should keep the rc around until all its pods are deleted if the deleteOptions says so", func() {
 		clientSet := f.ClientSet
-		rcClient := clientSet.Core().ReplicationControllers(f.Namespace.Name)
-		podClient := clientSet.Core().Pods(f.Namespace.Name)
+		rcClient := clientSet.CoreV1().ReplicationControllers(f.Namespace.Name)
+		podClient := clientSet.CoreV1().Pods(f.Namespace.Name)
 		rcName := "simpletest.rc"
 		// TODO: find better way to keep this label unique in the test
 		uniqLabels := map[string]string{"gctest": "delete_pods_foreground"}
-		rc := newOwnerRC(f, rcName, 100, uniqLabels)
+		rc := newOwnerRC(f, rcName, estimateMaximumPods(clientSet, 10, 100), uniqLabels)
 		By("create the rc")
 		rc, err := rcClient.Create(rc)
 		if err != nil {
@@ -675,10 +703,10 @@ var _ = SIGDescribe("Garbage collector", func() {
 	// TODO: this should be an integration test
 	It("should not delete dependents that have both valid owner and owner that's waiting for dependents to be deleted", func() {
 		clientSet := f.ClientSet
-		rcClient := clientSet.Core().ReplicationControllers(f.Namespace.Name)
-		podClient := clientSet.Core().Pods(f.Namespace.Name)
+		rcClient := clientSet.CoreV1().ReplicationControllers(f.Namespace.Name)
+		podClient := clientSet.CoreV1().Pods(f.Namespace.Name)
 		rc1Name := "simpletest-rc-to-be-deleted"
-		replicas := int32(100)
+		replicas := int32(estimateMaximumPods(clientSet, 10, 100))
 		halfReplicas := int(replicas / 2)
 		// TODO: find better way to keep this label unique in the test
 		uniqLabels := map[string]string{"gctest": "valid_and_pending_owners"}
@@ -786,7 +814,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 	// TODO: should be an integration test
 	It("should not be blocked by dependency circle", func() {
 		clientSet := f.ClientSet
-		podClient := clientSet.Core().Pods(f.Namespace.Name)
+		podClient := clientSet.CoreV1().Pods(f.Namespace.Name)
 		pod1 := newGCPod("pod1")
 		pod1, err := podClient.Create(pod1)
 		Expect(err).NotTo(HaveOccurred())
@@ -891,8 +919,8 @@ var _ = SIGDescribe("Garbage collector", func() {
 				"kind":       definition.Spec.Names.Kind,
 				"metadata": map[string]interface{}{
 					"name": dependentName,
-					"ownerReferences": []map[string]string{
-						{
+					"ownerReferences": []interface{}{
+						map[string]interface{}{
 							"uid":        string(persistedOwner.GetUID()),
 							"apiVersion": apiVersion,
 							"kind":       definition.Spec.Names.Kind,
@@ -946,7 +974,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 
 		By("Wait for the CronJob to create new Job")
 		err = wait.PollImmediate(500*time.Millisecond, 2*time.Minute, func() (bool, error) {
-			jobs, err := f.ClientSet.Batch().Jobs(f.Namespace.Name).List(metav1.ListOptions{})
+			jobs, err := f.ClientSet.BatchV1().Jobs(f.Namespace.Name).List(metav1.ListOptions{})
 			if err != nil {
 				return false, fmt.Errorf("Failed to list jobs: %v", err)
 			}

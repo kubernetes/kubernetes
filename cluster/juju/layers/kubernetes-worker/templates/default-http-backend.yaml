@@ -17,7 +17,7 @@ spec:
         # Any image is permissable as long as:
         # 1. It serves a 404 page at /
         # 2. It serves 200 on a /healthz endpoint
-        image: gcr.io/google_containers/defaultbackend:1.0
+        image: {{ defaultbackend_image }}
         livenessProbe:
           httpGet:
             path: /healthz
@@ -32,12 +32,13 @@ apiVersion: v1
 kind: Service
 metadata:
   name: default-http-backend
+#  namespace: kube-system
   labels:
-    app: default-http-backend
+    k8s-app: default-http-backend
 spec:
   ports:
-    - port: 80
-      protocol: TCP
-      targetPort: 80
+  - port: 80
+    protocol: TCP
+    targetPort: 80
   selector:
     app: default-http-backend

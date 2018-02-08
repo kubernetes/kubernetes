@@ -45,6 +45,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e_node/perftype"
 
+	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
 
@@ -84,16 +85,16 @@ func NewResourceCollector(interval time.Duration) *ResourceCollector {
 // Start starts resource collector and connects to the standalone Cadvisor pod
 // then repeatedly runs collectStats.
 func (r *ResourceCollector) Start() {
-	// Get the cgroup container names for kubelet and docker
+	// Get the cgroup container names for kubelet and runtime
 	kubeletContainer, err := getContainerNameForProcess(kubeletProcessName, "")
-	dockerContainer, err := getContainerNameForProcess(dockerProcessName, dockerPidFile)
+	runtimeContainer, err := getContainerNameForProcess(framework.TestContext.ContainerRuntimeProcessName, framework.TestContext.ContainerRuntimePidFile)
 	if err == nil {
 		systemContainers = map[string]string{
 			stats.SystemContainerKubelet: kubeletContainer,
-			stats.SystemContainerRuntime: dockerContainer,
+			stats.SystemContainerRuntime: runtimeContainer,
 		}
 	} else {
-		framework.Failf("Failed to get docker container name in test-e2e-node resource collector.")
+		framework.Failf("Failed to get runtime container name in test-e2e-node resource collector.")
 	}
 
 	wait.Poll(1*time.Second, 1*time.Minute, func() (bool, error) {
@@ -239,12 +240,11 @@ func (r *ResourceCollector) GetBasicCPUStats(containerName string) map[float64]f
 func formatResourceUsageStats(containerStats framework.ResourceUsagePerContainer) string {
 	// Example output:
 	//
-	// Resource usage for node "e2e-test-foo-node-abcde":
-	// container        cpu(cores)  memory(MB)
-	// "/"              0.363       2942.09
-	// "/docker-daemon" 0.088       521.80
-	// "/kubelet"       0.086       424.37
-	// "/system"        0.007       119.88
+	// Resource usage:
+	//container cpu(cores) memory_working_set(MB) memory_rss(MB)
+	//"kubelet" 0.068      27.92                  15.43
+	//"runtime" 0.664      89.88                  68.13
+
 	buf := &bytes.Buffer{}
 	w := tabwriter.NewWriter(buf, 1, 0, 1, ' ', 0)
 	fmt.Fprintf(w, "container\tcpu(cores)\tmemory_working_set(MB)\tmemory_rss(MB)\n")
@@ -257,7 +257,7 @@ func formatResourceUsageStats(containerStats framework.ResourceUsagePerContainer
 
 func formatCPUSummary(summary framework.ContainersCPUSummary) string {
 	// Example output for a node (the percentiles may differ):
-	// CPU usage of containers on node "e2e-test-foo-node-0vj7":
+	// CPU usage of containers:
 	// container        5th%  50th% 90th% 95th%
 	// "/"              0.051 0.159 0.387 0.455
 	// "/runtime        0.000 0.000 0.146 0.166
@@ -373,6 +373,7 @@ func deletePodsSync(f *framework.Framework, pods []*v1.Pod) {
 	for _, pod := range pods {
 		wg.Add(1)
 		go func(pod *v1.Pod) {
+			defer GinkgoRecover()
 			defer wg.Done()
 
 			err := f.PodClient().Delete(pod.ObjectMeta.Name, metav1.NewDeleteOptions(30))
@@ -459,15 +460,7 @@ func (r *ResourceCollector) GetResourceTimeSeries() map[string]*perftype.Resourc
 	return resourceSeries
 }
 
-// Code for getting container name of docker, copied from pkg/kubelet/cm/container_manager_linux.go
-// since they are not exposed
-const (
-	kubeletProcessName    = "kubelet"
-	dockerProcessName     = "docker"
-	dockerPidFile         = "/var/run/docker.pid"
-	containerdProcessName = "docker-containerd"
-	containerdPidFile     = "/run/docker/libcontainerd/docker-containerd.pid"
-)
+const kubeletProcessName = "kubelet"
 
 func getPidsForProcess(name, pidFile string) ([]int, error) {
 	if len(pidFile) > 0 {
@@ -534,7 +527,7 @@ func getContainer(pid int) (string, error) {
 		return "", cgroups.NewNotFoundError("memory")
 	}
 
-	// since we use this container for accounting, we need to ensure its a unified hierarchy.
+	// since we use this container for accounting, we need to ensure it is a unified hierarchy.
 	if cpu != memory {
 		return "", fmt.Errorf("cpu and memory cgroup hierarchy not unified.  cpu: %s, memory: %s", cpu, memory)
 	}

@@ -18,12 +18,11 @@ package kubectl
 
 import (
 	"fmt"
-	"os"
 
+	policy "k8s.io/api/policy/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/kubernetes/pkg/apis/policy"
 )
 
 // PodDisruptionBudgetV1Generator supports stable generation of a pod disruption budget.
@@ -39,7 +38,7 @@ var _ StructuredGenerator = &PodDisruptionBudgetV1Generator{}
 func (PodDisruptionBudgetV1Generator) ParamNames() []GeneratorParam {
 	return []GeneratorParam{
 		{"name", true},
-		{"min-available", true},
+		{"min-available", false},
 		{"selector", true},
 	}
 }
@@ -51,15 +50,15 @@ func (s PodDisruptionBudgetV1Generator) Generate(params map[string]interface{}) 
 	}
 	name, isString := params["name"].(string)
 	if !isString {
-		return nil, fmt.Errorf("expected string, saw %v for 'name'", name)
+		return nil, fmt.Errorf("expected string, found %T for 'name'", params["name"])
 	}
 	minAvailable, isString := params["min-available"].(string)
 	if !isString {
-		return nil, fmt.Errorf("expected string, found %v", minAvailable)
+		return nil, fmt.Errorf("expected string, found %T for 'min-available'", params["min-available"])
 	}
 	selector, isString := params["selector"].(string)
 	if !isString {
-		return nil, fmt.Errorf("expected string, found %v", selector)
+		return nil, fmt.Errorf("expected string, found %T for 'selector'", params["selector"])
 	}
 	delegate := &PodDisruptionBudgetV1Generator{Name: name, MinAvailable: minAvailable, Selector: selector}
 	return delegate.StructuredGenerate()
@@ -123,7 +122,7 @@ func (PodDisruptionBudgetV2Generator) ParamNames() []GeneratorParam {
 		{"name", true},
 		{"min-available", false},
 		{"max-unavailable", false},
-		{"selector", false},
+		{"selector", true},
 	}
 }
 
@@ -135,22 +134,22 @@ func (s PodDisruptionBudgetV2Generator) Generate(params map[string]interface{}) 
 
 	name, isString := params["name"].(string)
 	if !isString {
-		return nil, fmt.Errorf("expected string, saw %v for 'name'", name)
+		return nil, fmt.Errorf("expected string, found %T for 'name'", params["name"])
 	}
 
 	minAvailable, isString := params["min-available"].(string)
 	if !isString {
-		return nil, fmt.Errorf("expected string, found %v", minAvailable)
+		return nil, fmt.Errorf("expected string, found %T for 'min-available'", params["min-available"])
 	}
 
-	maxUnavailable, isString := params["max-available"].(string)
+	maxUnavailable, isString := params["max-unavailable"].(string)
 	if !isString {
-		return nil, fmt.Errorf("expected string, found %v", maxUnavailable)
+		return nil, fmt.Errorf("expected string, found %T for 'max-unavailable'", params["max-unavailable"])
 	}
 
 	selector, isString := params["selector"].(string)
 	if !isString {
-		return nil, fmt.Errorf("expected string, found %v", selector)
+		return nil, fmt.Errorf("expected string, found %T for 'selector'", params["selector"])
 	}
 	delegate := &PodDisruptionBudgetV2Generator{Name: name, MinAvailable: minAvailable, MaxUnavailable: maxUnavailable, Selector: selector}
 	return delegate.StructuredGenerate()
@@ -165,15 +164,6 @@ func (s *PodDisruptionBudgetV2Generator) StructuredGenerate() (runtime.Object, e
 	selector, err := metav1.ParseToLabelSelector(s.Selector)
 	if err != nil {
 		return nil, err
-	}
-
-	if len(s.MaxUnavailable) == 0 && len(s.MinAvailable) == 0 {
-		s.MinAvailable = "1"
-
-		// This behavior is intended for backward compatibility.
-		// TODO: remove in Kubernetes 1.8
-		fmt.Fprintln(os.Stderr, "Deprecated behavior in kubectl create pdb: Defaulting min-available to 1. "+
-			"Kubernetes 1.8 will remove this default, and one of min-available/max-available must be specified. ")
 	}
 
 	if len(s.MaxUnavailable) > 0 {
@@ -212,6 +202,9 @@ func (s *PodDisruptionBudgetV2Generator) validate() error {
 	}
 	if len(s.Selector) == 0 {
 		return fmt.Errorf("a selector must be specified")
+	}
+	if len(s.MaxUnavailable) == 0 && len(s.MinAvailable) == 0 {
+		return fmt.Errorf("one of min-available or max-unavailable must be specified")
 	}
 	if len(s.MaxUnavailable) > 0 && len(s.MinAvailable) > 0 {
 		return fmt.Errorf("min-available and max-unavailable cannot be both specified")

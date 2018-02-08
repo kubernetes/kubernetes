@@ -50,6 +50,7 @@ func TestTolerateBootstrapFailure(t *testing.T) {
 	go func() {
 		// The test might have false negative, but won't be flaky
 		timer := time.NewTimer(2 * time.Second)
+		defer timer.Stop()
 		<-timer.C
 		fakeGetSucceedLock.Lock()
 		defer fakeGetSucceedLock.Unlock()

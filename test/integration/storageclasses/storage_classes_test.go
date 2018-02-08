@@ -79,7 +79,7 @@ func DoTestStorageClasses(t *testing.T, client clientset.Interface, ns *v1.Names
 	}
 
 	pvc.ObjectMeta.Name = "uses-storageclass"
-	if _, err := client.Core().PersistentVolumeClaims(ns.Name).Create(pvc); err != nil {
+	if _, err := client.CoreV1().PersistentVolumeClaims(ns.Name).Create(pvc); err != nil {
 		t.Errorf("Failed to create pvc: %v", err)
 	}
 	defer deletePersistentVolumeClaimOrErrorf(t, client, ns.Name, pvc.Name)
@@ -92,7 +92,7 @@ func deleteStorageClassOrErrorf(t *testing.T, c clientset.Interface, ns, name st
 }
 
 func deletePersistentVolumeClaimOrErrorf(t *testing.T, c clientset.Interface, ns, name string) {
-	if err := c.Core().PersistentVolumeClaims(ns).Delete(name, nil); err != nil {
+	if err := c.CoreV1().PersistentVolumeClaims(ns).Delete(name, nil); err != nil {
 		t.Errorf("unable to delete persistent volume claim %v: %v", name, err)
 	}
 }

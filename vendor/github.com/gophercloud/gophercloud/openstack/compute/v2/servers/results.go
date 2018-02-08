@@ -211,6 +211,16 @@ type Server struct {
 	// SecurityGroups includes the security groups that this instance has applied
 	// to it.
 	SecurityGroups []map[string]interface{} `json:"security_groups"`
+
+	// Fault contains failure information about a server.
+	Fault Fault `json:"fault"`
+}
+
+type Fault struct {
+	Code    int       `json:"code"`
+	Created time.Time `json:"created"`
+	Details string    `json:"details"`
+	Message string    `json:"message"`
 }
 
 func (r *Server) UnmarshalJSON(b []byte) error {

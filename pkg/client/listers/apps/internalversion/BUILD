@@ -15,8 +15,8 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/client/listers/apps/internalversion",
     deps = [
-        "//pkg/api:go_default_library",
         "//pkg/apis/apps:go_default_library",
+        "//pkg/apis/core:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/labels:go_default_library",

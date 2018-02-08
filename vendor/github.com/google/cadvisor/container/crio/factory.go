@@ -154,7 +154,7 @@ func Register(factory info.MachineInfoFactory, fsInfo fs.FsInfo, ignoreMetrics c
 		return fmt.Errorf("failed to get cgroup subsystems: %v", err)
 	}
 
-	glog.Infof("Registering CRI-O factory")
+	glog.V(1).Infof("Registering CRI-O factory")
 	f := &crioFactory{
 		client:             client,
 		cgroupSubsystems:   cgroupSubsystems,

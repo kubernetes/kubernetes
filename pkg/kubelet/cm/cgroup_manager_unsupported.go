@@ -77,3 +77,11 @@ func ConvertCgroupFsNameToSystemd(cgroupfsName string) (string, error) {
 func ConvertCgroupNameToSystemd(cgroupName CgroupName, outputToCgroupFs bool) string {
 	return ""
 }
+
+func RevertFromSystemdToCgroupStyleName(name string) string {
+	return ""
+}
+
+func IsSystemdStyleName(name string) bool {
+	return false
+}

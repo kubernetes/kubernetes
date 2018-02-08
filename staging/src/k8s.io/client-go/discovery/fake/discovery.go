@@ -68,7 +68,44 @@ func (c *FakeDiscovery) ServerPreferredNamespacedResources() ([]*metav1.APIResou
 }
 
 func (c *FakeDiscovery) ServerGroups() (*metav1.APIGroupList, error) {
-	return nil, nil
+	action := testing.ActionImpl{
+		Verb:     "get",
+		Resource: schema.GroupVersionResource{Resource: "group"},
+	}
+	c.Invokes(action, nil)
+
+	groups := map[string]*metav1.APIGroup{}
+
+	for _, res := range c.Resources {
+		gv, err := schema.ParseGroupVersion(res.GroupVersion)
+		if err != nil {
+			return nil, err
+		}
+		group := groups[gv.Group]
+		if group == nil {
+			group = &metav1.APIGroup{
+				Name: gv.Group,
+				PreferredVersion: metav1.GroupVersionForDiscovery{
+					GroupVersion: res.GroupVersion,
+					Version:      gv.Version,
+				},
+			}
+			groups[gv.Group] = group
+		}
+
+		group.Versions = append(group.Versions, metav1.GroupVersionForDiscovery{
+			GroupVersion: res.GroupVersion,
+			Version:      gv.Version,
+		})
+	}
+
+	list := &metav1.APIGroupList{}
+	for _, apiGroup := range groups {
+		list.Groups = append(list.Groups, *apiGroup)
+	}
+
+	return list, nil
+
 }
 
 func (c *FakeDiscovery) ServerVersion() (*version.Info, error) {

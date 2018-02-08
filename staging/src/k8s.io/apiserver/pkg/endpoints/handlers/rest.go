@@ -28,7 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	metav1alpha1 "k8s.io/apimachinery/pkg/apis/meta/v1alpha1"
+	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -69,7 +69,7 @@ func (scope *RequestScope) err(err error, w http.ResponseWriter, req *http.Reque
 
 func (scope *RequestScope) AllowsConversion(gvk schema.GroupVersionKind) bool {
 	// TODO: this is temporary, replace with an abstraction calculated at endpoint installation time
-	if gvk.GroupVersion() == metav1alpha1.SchemeGroupVersion {
+	if gvk.GroupVersion() == metav1beta1.SchemeGroupVersion {
 		switch gvk.Kind {
 		case "Table":
 			return scope.TableConvertor != nil
@@ -110,18 +110,27 @@ func ConnectResource(connecter rest.Connecter, scope RequestScope, admit admissi
 			scope.err(err, w, req)
 			return
 		}
-		if admit.Handles(admission.Connect) {
+		if admit != nil && admit.Handles(admission.Connect) {
 			connectRequest := &rest.ConnectRequest{
 				Name:         name,
 				Options:      opts,
 				ResourcePath: restPath,
 			}
 			userInfo, _ := request.UserFrom(ctx)
-
-			err = admit.Admit(admission.NewAttributesRecord(connectRequest, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Connect, userInfo))
-			if err != nil {
-				scope.err(err, w, req)
-				return
+			// TODO: remove the mutating admission here as soon as we have ported all plugin that handle CONNECT
+			if mutatingAdmit, ok := admit.(admission.MutationInterface); ok {
+				err = mutatingAdmit.Admit(admission.NewAttributesRecord(connectRequest, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Connect, userInfo))
+				if err != nil {
+					scope.err(err, w, req)
+					return
+				}
+			}
+			if mutatingAdmit, ok := admit.(admission.ValidationInterface); ok {
+				err = mutatingAdmit.Validate(admission.NewAttributesRecord(connectRequest, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Connect, userInfo))
+				if err != nil {
+					scope.err(err, w, req)
+					return
+				}
 			}
 		}
 		requestInfo, _ := request.RequestInfoFrom(ctx)

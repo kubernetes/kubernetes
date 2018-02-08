@@ -42,9 +42,11 @@ type volumeStatCalculator struct {
 	latest        atomic.Value
 }
 
-// PodVolumeStats encapsulates all VolumeStats for a pod
+// PodVolumeStats encapsulates the VolumeStats for a pod.
+// It consists of two lists, for local ephemeral volumes, and for persistent volumes respectively.
 type PodVolumeStats struct {
-	Volumes []stats.VolumeStats
+	EphemeralVolumes  []stats.VolumeStats
+	PersistentVolumes []stats.VolumeStats
 }
 
 // newVolumeStatCalculator creates a new VolumeStatCalculator
@@ -101,7 +103,8 @@ func (s *volumeStatCalculator) calcAndStoreStats() {
 	}
 
 	// Call GetMetrics on each Volume and copy the result to a new VolumeStats.FsStats
-	fsStats := make([]stats.VolumeStats, 0, len(volumes))
+	ephemeralStats := []stats.VolumeStats{}
+	persistentStats := []stats.VolumeStats{}
 	for name, v := range volumes {
 		metric, err := v.GetMetrics()
 		if err != nil {
@@ -113,37 +116,52 @@ func (s *volumeStatCalculator) calcAndStoreStats() {
 		}
 		// Lookup the volume spec and add a 'PVCReference' for volumes that reference a PVC
 		volSpec := volumesSpec[name]
+		var pvcRef *stats.PVCReference
 		if pvcSource := volSpec.PersistentVolumeClaim; pvcSource != nil {
-			pvcRef := stats.PVCReference{
+			pvcRef = &stats.PVCReference{
 				Name:      pvcSource.ClaimName,
 				Namespace: s.pod.GetNamespace(),
 			}
-			fsStats = append(fsStats, s.parsePodVolumeStats(name, &pvcRef, metric))
 			// Set the PVC's prometheus metrics
-			s.setPVCMetrics(&pvcRef, metric)
-		} else {
-			fsStats = append(fsStats, s.parsePodVolumeStats(name, nil, metric))
+			s.setPVCMetrics(pvcRef, metric)
 		}
+		volumeStats := s.parsePodVolumeStats(name, pvcRef, metric, volSpec)
+		if isVolumeEphemeral(volSpec) {
+			ephemeralStats = append(ephemeralStats, volumeStats)
+		} else {
+			persistentStats = append(persistentStats, volumeStats)
+		}
+
 	}
 
 	// Store the new stats
-	s.latest.Store(PodVolumeStats{Volumes: fsStats})
+	s.latest.Store(PodVolumeStats{EphemeralVolumes: ephemeralStats,
+		PersistentVolumes: persistentStats})
 }
 
 // parsePodVolumeStats converts (internal) volume.Metrics to (external) stats.VolumeStats structures
-func (s *volumeStatCalculator) parsePodVolumeStats(podName string, pvcRef *stats.PVCReference, metric *volume.Metrics) stats.VolumeStats {
+func (s *volumeStatCalculator) parsePodVolumeStats(podName string, pvcRef *stats.PVCReference, metric *volume.Metrics, volSpec v1.Volume) stats.VolumeStats {
 	available := uint64(metric.Available.Value())
 	capacity := uint64(metric.Capacity.Value())
 	used := uint64(metric.Used.Value())
 	inodes := uint64(metric.Inodes.Value())
 	inodesFree := uint64(metric.InodesFree.Value())
 	inodesUsed := uint64(metric.InodesUsed.Value())
+
 	return stats.VolumeStats{
 		Name:   podName,
 		PVCRef: pvcRef,
 		FsStats: stats.FsStats{Time: metric.Time, AvailableBytes: &available, CapacityBytes: &capacity,
 			UsedBytes: &used, Inodes: &inodes, InodesFree: &inodesFree, InodesUsed: &inodesUsed},
 	}
+}
+
+func isVolumeEphemeral(volume v1.Volume) bool {
+	if (volume.EmptyDir != nil && volume.EmptyDir.Medium == v1.StorageMediumDefault) ||
+		volume.ConfigMap != nil || volume.GitRepo != nil {
+		return true
+	}
+	return false
 }
 
 // setPVCMetrics sets the given PVC's prometheus metrics to match the given volume.Metrics

@@ -208,6 +208,26 @@ type ExpandableVolumePlugin interface {
 	RequiresFSResize() bool
 }
 
+// BlockVolumePlugin is an extend interface of VolumePlugin and is used for block volumes support.
+type BlockVolumePlugin interface {
+	VolumePlugin
+	// NewBlockVolumeMapper creates a new volume.BlockVolumeMapper from an API specification.
+	// Ownership of the spec pointer in *not* transferred.
+	// - spec: The v1.Volume spec
+	// - pod: The enclosing pod
+	NewBlockVolumeMapper(spec *Spec, podRef *v1.Pod, opts VolumeOptions) (BlockVolumeMapper, error)
+	// NewBlockVolumeUnmapper creates a new volume.BlockVolumeUnmapper from recoverable state.
+	// - name: The volume name, as per the v1.Volume spec.
+	// - podUID: The UID of the enclosing pod
+	NewBlockVolumeUnmapper(name string, podUID types.UID) (BlockVolumeUnmapper, error)
+	// ConstructBlockVolumeSpec constructs a volume spec based on the given
+	// podUID, volume name and a pod device map path.
+	// The spec may have incomplete information due to limited information
+	// from input. This function is used by volume manager to reconstruct
+	// volume spec by reading the volume directories from disk.
+	ConstructBlockVolumeSpec(podUID types.UID, volumeName, mountPath string) (*Spec, error)
+}
+
 // VolumeHost is an interface that plugins can use to access the kubelet.
 type VolumeHost interface {
 	// GetPluginDir returns the absolute path to a directory under which
@@ -215,6 +235,11 @@ type VolumeHost interface {
 	// exist on disk yet.  For plugin data that is per-pod, see
 	// GetPodPluginDir().
 	GetPluginDir(pluginName string) string
+
+	// GetVolumeDevicePluginDir returns the absolute path to a directory
+	// under which a given plugin may store data.
+	// ex. plugins/kubernetes.io/{PluginName}/{DefaultKubeletVolumeDevicesDirName}/{volumePluginDependentPath}/
+	GetVolumeDevicePluginDir(pluginName string) string
 
 	// GetPodVolumeDir returns the absolute path a directory which
 	// represents the named volume under the named plugin for the given
@@ -227,6 +252,13 @@ type VolumeHost interface {
 	// does not exist, the result of this call might not exist.  This
 	// directory might not actually exist on disk yet.
 	GetPodPluginDir(podUID types.UID, pluginName string) string
+
+	// GetPodVolumeDeviceDir returns the absolute path a directory which
+	// represents the named plugin for the given pod.
+	// If the specified pod does not exist, the result of this call
+	// might not exist.
+	// ex. pods/{podUid}/{DefaultKubeletVolumeDevicesDirName}/{escapeQualifiedPluginName}/
+	GetPodVolumeDeviceDir(podUID types.UID, pluginName string) string
 
 	// GetKubeClient returns a client interface
 	GetKubeClient() clientset.Interface
@@ -271,6 +303,9 @@ type VolumeHost interface {
 
 	// Returns the labels on the node
 	GetNodeLabels() (map[string]string, error)
+
+	// Returns the name of the node
+	GetNodeName() types.NodeName
 }
 
 // VolumePluginMgr tracks registered plugins.
@@ -619,7 +654,7 @@ func (pm *VolumePluginMgr) FindCreatablePluginBySpec(spec *Spec) (ProvisionableV
 	return nil, fmt.Errorf("no creatable volume plugin matched")
 }
 
-// FindAttachablePluginBySpec fetches a persistent volume plugin by name.
+// FindAttachablePluginBySpec fetches a persistent volume plugin by spec.
 // Unlike the other "FindPlugin" methods, this does not return error if no
 // plugin is found.  All volumes require a mounter and unmounter, but not
 // every volume will have an attacher/detacher.
@@ -671,6 +706,32 @@ func (pm *VolumePluginMgr) FindExpandablePluginByName(name string) (ExpandableVo
 
 	if expandableVolumePlugin, ok := volumePlugin.(ExpandableVolumePlugin); ok {
 		return expandableVolumePlugin, nil
+	}
+	return nil, nil
+}
+
+// FindMapperPluginBySpec fetches a block volume plugin by spec.
+func (pm *VolumePluginMgr) FindMapperPluginBySpec(spec *Spec) (BlockVolumePlugin, error) {
+	volumePlugin, err := pm.FindPluginBySpec(spec)
+	if err != nil {
+		return nil, err
+	}
+
+	if blockVolumePlugin, ok := volumePlugin.(BlockVolumePlugin); ok {
+		return blockVolumePlugin, nil
+	}
+	return nil, nil
+}
+
+// FindMapperPluginByName fetches a block volume plugin by name.
+func (pm *VolumePluginMgr) FindMapperPluginByName(name string) (BlockVolumePlugin, error) {
+	volumePlugin, err := pm.FindPluginByName(name)
+	if err != nil {
+		return nil, err
+	}
+
+	if blockVolumePlugin, ok := volumePlugin.(BlockVolumePlugin); ok {
+		return blockVolumePlugin, nil
 	}
 	return nil, nil
 }

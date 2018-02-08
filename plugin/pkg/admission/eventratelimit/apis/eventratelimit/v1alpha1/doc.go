@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// +k8s:deepcopy-gen=package,register
+// +k8s:deepcopy-gen=package
 // +k8s:conversion-gen=k8s.io/kubernetes/plugin/pkg/admission/eventratelimit/apis/eventratelimit
 // +k8s:defaulter-gen=TypeMeta
 

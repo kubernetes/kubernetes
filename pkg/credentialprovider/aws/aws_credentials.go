@@ -30,7 +30,10 @@ import (
 	"k8s.io/kubernetes/pkg/credentialprovider"
 )
 
-const registryURLTemplate = "*.dkr.ecr.%s.amazonaws.com"
+const awsChinaRegionPrefix = "cn-"
+const awsStandardDNSSuffix = "amazonaws.com"
+const awsChinaDNSSuffix = "amazonaws.com.cn"
+const registryURLTemplate = "*.dkr.ecr.%s.%s"
 
 // awsHandlerLogger is a handler that logs all AWS SDK requests
 // Copied from pkg/cloudprovider/providers/aws/log_handler.go
@@ -80,6 +83,16 @@ type ecrProvider struct {
 
 var _ credentialprovider.DockerConfigProvider = &ecrProvider{}
 
+// registryURL has different suffix in AWS China region
+func registryURL(region string) string {
+	dnsSuffix := awsStandardDNSSuffix
+	// deal with aws none standard regions
+	if strings.HasPrefix(region, awsChinaRegionPrefix) {
+		dnsSuffix = awsChinaDNSSuffix
+	}
+	return fmt.Sprintf(registryURLTemplate, region, dnsSuffix)
+}
+
 // RegisterCredentialsProvider registers a credential provider for the specified region.
 // It creates a lazy provider for each AWS region, in order to support
 // cross-region ECR access. They have to be lazy because it's unlikely, but not
@@ -92,7 +105,7 @@ func RegisterCredentialsProvider(region string) {
 	credentialprovider.RegisterCredentialProvider("aws-ecr-"+region,
 		&lazyEcrProvider{
 			region:    region,
-			regionURL: fmt.Sprintf(registryURLTemplate, region),
+			regionURL: registryURL(region),
 		})
 }
 
@@ -136,7 +149,7 @@ func (p *lazyEcrProvider) Provide() credentialprovider.DockerConfig {
 func newEcrProvider(region string, getter tokenGetter) *ecrProvider {
 	return &ecrProvider{
 		region:    region,
-		regionURL: fmt.Sprintf(registryURLTemplate, region),
+		regionURL: registryURL(region),
 		getter:    getter,
 	}
 }

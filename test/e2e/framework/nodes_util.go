@@ -40,6 +40,15 @@ func EtcdUpgrade(target_storage, target_version string) error {
 	}
 }
 
+func IngressUpgrade(isUpgrade bool) error {
+	switch TestContext.Provider {
+	case "gce":
+		return ingressUpgradeGCE(isUpgrade)
+	default:
+		return fmt.Errorf("IngressUpgrade() is not implemented for provider %s", TestContext.Provider)
+	}
+}
+
 func MasterUpgrade(v string) error {
 	switch TestContext.Provider {
 	case "gce":
@@ -58,9 +67,26 @@ func etcdUpgradeGCE(target_storage, target_version string) error {
 		os.Environ(),
 		"TEST_ETCD_VERSION="+target_version,
 		"STORAGE_BACKEND="+target_storage,
-		"TEST_ETCD_IMAGE=3.1.10")
+		"TEST_ETCD_IMAGE=3.2.14")
 
 	_, _, err := RunCmdEnv(env, gceUpgradeScript(), "-l", "-M")
+	return err
+}
+
+func ingressUpgradeGCE(isUpgrade bool) error {
+	// Flip glbc image from latest release image to HEAD to simulate an upgrade.
+	// Flip from HEAD to latest release image to simulate a downgrade.
+	// Kubelet should restart glbc automatically.
+	var command string
+	if isUpgrade {
+		// Upgrade
+		command = "sudo sed -i -re 's/(image:)(.*)/\\1 gcr.io\\/k8s-ingress-image-push\\/ingress-gce-e2e-glbc-amd64:latest/' /etc/kubernetes/manifests/glbc.manifest"
+	} else {
+		// Downgrade
+		command = "sudo sed -i -re 's/(image:)(.*)/\\1 gcr.io\\/google_containers\\/glbc:0.9.7/' /etc/kubernetes/manifests/glbc.manifest"
+	}
+	sshResult, err := NodeExec(GetMasterHost(), command)
+	LogSSHResult(sshResult)
 	return err
 }
 
@@ -77,7 +103,11 @@ func masterUpgradeGCE(rawV string, enableKubeProxyDaemonSet bool) error {
 		env = append(env,
 			"TEST_ETCD_VERSION="+TestContext.EtcdUpgradeVersion,
 			"STORAGE_BACKEND="+TestContext.EtcdUpgradeStorage,
-			"TEST_ETCD_IMAGE=3.1.10")
+			"TEST_ETCD_IMAGE=3.2.14")
+	} else {
+		// In e2e tests, we skip the confirmation prompt about
+		// implicit etcd upgrades to simulate the user entering "y".
+		env = append(env, "TEST_ALLOW_IMPLICIT_ETCD_UPGRADE=true")
 	}
 
 	v := "v" + rawV
@@ -233,7 +263,7 @@ func CheckNodesReady(c clientset.Interface, nt time.Duration, expect int) ([]str
 		// A rolling-update (GCE/GKE implementation of restart) can complete before the apiserver
 		// knows about all of the nodes. Thus, we retry the list nodes call
 		// until we get the expected number of nodes.
-		nodeList, errLast = c.Core().Nodes().List(metav1.ListOptions{
+		nodeList, errLast = c.CoreV1().Nodes().List(metav1.ListOptions{
 			FieldSelector: fields.Set{"spec.unschedulable": "false"}.AsSelector().String()})
 		if errLast != nil {
 			return false, nil

@@ -19,10 +19,13 @@ package vclib
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/golang/glog"
+	"github.com/vmware/govmomi"
 	"github.com/vmware/govmomi/object"
+	"github.com/vmware/govmomi/property"
 	"github.com/vmware/govmomi/vim25/mo"
 	"github.com/vmware/govmomi/vim25/types"
 )
@@ -63,7 +66,7 @@ func (vm *VirtualMachine) AttachDisk(ctx context.Context, vmDiskPath string, vol
 		return "", fmt.Errorf("Not a valid SCSI Controller Type. Valid options are %q", SCSIControllerTypeValidOptions())
 	}
 	vmDiskPathCopy := vmDiskPath
-	vmDiskPath = RemoveClusterFromVDiskPath(vmDiskPath)
+	vmDiskPath = RemoveStorageClusterORFolderNameFromVDiskPath(vmDiskPath)
 	attached, err := vm.IsDiskAttached(ctx, vmDiskPath)
 	if err != nil {
 		glog.Errorf("Error occurred while checking if disk is attached on VM: %q. vmDiskPath: %q, err: %+v", vm.InventoryPath, vmDiskPath, err)
@@ -73,6 +76,20 @@ func (vm *VirtualMachine) AttachDisk(ctx context.Context, vmDiskPath string, vol
 	if attached {
 		diskUUID, _ := vm.Datacenter.GetVirtualDiskPage83Data(ctx, vmDiskPath)
 		return diskUUID, nil
+	}
+
+	if volumeOptions.StoragePolicyName != "" {
+		pbmClient, err := NewPbmClient(ctx, vm.Client())
+		if err != nil {
+			glog.Errorf("Error occurred while creating new pbmClient. err: %+v", err)
+			return "", err
+		}
+
+		volumeOptions.StoragePolicyID, err = pbmClient.ProfileIDByName(ctx, volumeOptions.StoragePolicyName)
+		if err != nil {
+			glog.Errorf("Failed to get Profile ID by name: %s. err: %+v", volumeOptions.StoragePolicyName, err)
+			return "", err
+		}
 	}
 
 	dsObj, err := vm.Datacenter.GetDatastoreByPath(ctx, vmDiskPathCopy)
@@ -139,7 +156,7 @@ func (vm *VirtualMachine) AttachDisk(ctx context.Context, vmDiskPath string, vol
 
 // DetachDisk detaches the disk specified by vmDiskPath
 func (vm *VirtualMachine) DetachDisk(ctx context.Context, vmDiskPath string) error {
-	vmDiskPath = RemoveClusterFromVDiskPath(vmDiskPath)
+	vmDiskPath = RemoveStorageClusterORFolderNameFromVDiskPath(vmDiskPath)
 	device, err := vm.getVirtualDeviceByPath(ctx, vmDiskPath)
 	if err != nil {
 		glog.Errorf("Disk ID not found for VM: %q with diskPath: %q", vm.InventoryPath, vmDiskPath)
@@ -186,7 +203,7 @@ func (vm *VirtualMachine) IsActive(ctx context.Context) (bool, error) {
 }
 
 // GetAllAccessibleDatastores gets the list of accessible Datastores for the given Virtual Machine
-func (vm *VirtualMachine) GetAllAccessibleDatastores(ctx context.Context) ([]*Datastore, error) {
+func (vm *VirtualMachine) GetAllAccessibleDatastores(ctx context.Context) ([]*DatastoreInfo, error) {
 	host, err := vm.HostSystem(ctx)
 	if err != nil {
 		glog.Errorf("Failed to get host system for VM: %q. err: %+v", vm.InventoryPath, err)
@@ -199,9 +216,28 @@ func (vm *VirtualMachine) GetAllAccessibleDatastores(ctx context.Context) ([]*Da
 		glog.Errorf("Failed to retrieve datastores for host: %+v. err: %+v", host, err)
 		return nil, err
 	}
-	var dsObjList []*Datastore
+	var dsRefList []types.ManagedObjectReference
 	for _, dsRef := range hostSystemMo.Datastore {
-		dsObjList = append(dsObjList, &Datastore{object.NewDatastore(vm.Client(), dsRef), vm.Datacenter})
+		dsRefList = append(dsRefList, dsRef)
+	}
+
+	var dsMoList []mo.Datastore
+	pc := property.DefaultCollector(vm.Client())
+	properties := []string{DatastoreInfoProperty}
+	err = pc.Retrieve(ctx, dsRefList, properties, &dsMoList)
+	if err != nil {
+		glog.Errorf("Failed to get Datastore managed objects from datastore objects."+
+			" dsObjList: %+v, properties: %+v, err: %v", dsRefList, properties, err)
+		return nil, err
+	}
+	glog.V(9).Infof("Result dsMoList: %+v", dsMoList)
+	var dsObjList []*DatastoreInfo
+	for _, dsMo := range dsMoList {
+		dsObjList = append(dsObjList,
+			&DatastoreInfo{
+				&Datastore{object.NewDatastore(vm.Client(), dsMo.Reference()),
+					vm.Datacenter},
+				dsMo.Info.GetDatastoreInfo()})
 	}
 	return dsObjList, nil
 }
@@ -328,18 +364,27 @@ func (vm *VirtualMachine) getVirtualDeviceByPath(ctx context.Context, diskPath s
 		glog.Errorf("Failed to get the devices for VM: %q. err: %+v", vm.InventoryPath, err)
 		return nil, err
 	}
+
 	// filter vm devices to retrieve device for the given vmdk file identified by disk path
 	for _, device := range vmDevices {
 		if vmDevices.TypeName(device) == "VirtualDisk" {
 			virtualDevice := device.GetVirtualDevice()
 			if backing, ok := virtualDevice.Backing.(*types.VirtualDiskFlatVer2BackingInfo); ok {
-				if backing.FileName == diskPath {
+				if matchVirtualDiskAndVolPath(backing.FileName, diskPath) {
+					glog.V(LogLevel).Infof("Found VirtualDisk backing with filename %q for diskPath %q", backing.FileName, diskPath)
 					return device, nil
 				}
 			}
 		}
 	}
 	return nil, nil
+}
+
+func matchVirtualDiskAndVolPath(diskPath, volPath string) bool {
+	fileExt := ".vmdk"
+	diskPath = strings.TrimSuffix(diskPath, fileExt)
+	volPath = strings.TrimSuffix(volPath, fileExt)
+	return diskPath == volPath
 }
 
 // deleteController removes latest added SCSI controller from VM.
@@ -355,4 +400,11 @@ func (vm *VirtualMachine) deleteController(ctx context.Context, controllerDevice
 		return err
 	}
 	return nil
+}
+
+// RenewVM renews this virtual machine with new client connection.
+func (vm *VirtualMachine) RenewVM(client *govmomi.Client) VirtualMachine {
+	dc := Datacenter{Datacenter: object.NewDatacenter(client.Client, vm.Datacenter.Reference())}
+	newVM := object.NewVirtualMachine(client.Client, vm.VirtualMachine.Reference())
+	return VirtualMachine{VirtualMachine: newVM, Datacenter: &dc}
 }

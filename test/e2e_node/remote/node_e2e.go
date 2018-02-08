@@ -30,8 +30,7 @@ import (
 )
 
 const (
-	localCOSMounterPath = "cluster/gce/gci/mounter/mounter"
-	systemSpecPath      = "test/e2e_node/system/specs"
+	systemSpecPath = "test/e2e_node/system/specs"
 )
 
 // NodeE2ERemote contains the specific functions in the node e2e test suite.
@@ -61,7 +60,7 @@ func (n *NodeE2ERemote) SetupTestPackage(tardir, systemSpecName string) error {
 	}
 
 	// Copy binaries
-	requiredBins := []string{"kubelet", "e2e_node.test", "ginkgo"}
+	requiredBins := []string{"kubelet", "e2e_node.test", "ginkgo", "mounter"}
 	for _, bin := range requiredBins {
 		source := filepath.Join(buildOutputDir, bin)
 		if _, err := os.Stat(source); err != nil {
@@ -85,11 +84,6 @@ func (n *NodeE2ERemote) SetupTestPackage(tardir, systemSpecName string) error {
 		}
 	}
 
-	// Include the GCI/COS mounter artifacts in the deployed tarball
-	err = tarAddCOSMounter(tardir)
-	if err != nil {
-		return err
-	}
 	return nil
 }
 
@@ -110,51 +104,11 @@ func tarAddFile(tar, source, dest string) error {
 	return nil
 }
 
-// Includes the GCI/COS mounter artifacts in the deployed tarball
-func tarAddCOSMounter(tar string) error {
-	k8sDir, err := builder.GetK8sRootDir()
-	if err != nil {
-		return fmt.Errorf("Could not find K8s root dir! Err: %v", err)
-	}
-
-	source := filepath.Join(k8sDir, localCOSMounterPath)
-
-	// Require the GCI/COS mounter script, we want to make sure the remote test runner stays up to date if the mounter file moves
-	if _, err := os.Stat(source); err != nil {
-		return fmt.Errorf("Could not find GCI/COS mounter script at %q! If this script has been (re)moved, please update the e2e node remote test runner accordingly! Err: %v", source, err)
-	}
-
-	tarAddFile(tar, source, localCOSMounterPath)
-	return nil
-}
-
 // prependCOSMounterFlag prepends the flag for setting the GCI mounter path to
 // args and returns the result.
 func prependCOSMounterFlag(args, host, workspace string) (string, error) {
-	// If we are testing on a GCI/COS node, we chmod 544 the mounter and specify a different mounter path in the test args.
-	// We do this here because the local var `workspace` tells us which /tmp/node-e2e-%d is relevant to the current test run.
-
-	// Determine if the GCI/COS mounter script exists locally.
-	k8sDir, err := builder.GetK8sRootDir()
-	if err != nil {
-		return args, fmt.Errorf("could not find K8s root dir! Err: %v", err)
-	}
-	source := filepath.Join(k8sDir, localCOSMounterPath)
-
-	// Require the GCI/COS mounter script, we want to make sure the remote test runner stays up to date if the mounter file moves
-	if _, err = os.Stat(source); err != nil {
-		return args, fmt.Errorf("could not find GCI/COS mounter script at %q! If this script has been (re)moved, please update the e2e node remote test runner accordingly! Err: %v", source, err)
-	}
-
 	glog.V(2).Infof("GCI/COS node and GCI/COS mounter both detected, modifying --experimental-mounter-path accordingly")
-	// Note this implicitly requires the script to be where we expect in the tarball, so if that location changes the error
-	// here will tell us to update the remote test runner.
-	mounterPath := filepath.Join(workspace, localCOSMounterPath)
-	output, err := SSH(host, "sh", "-c", fmt.Sprintf("'chmod 544 %s'", mounterPath))
-	if err != nil {
-		return args, fmt.Errorf("unabled to chmod 544 GCI/COS mounter script. Err: %v, Output:\n%s", err, output)
-	}
-	// Insert args at beginning of test args, so any values from command line take precedence
+	mounterPath := filepath.Join(workspace, "mounter")
 	args = fmt.Sprintf("--kubelet-flags=--experimental-mounter-path=%s ", mounterPath) + args
 	return args, nil
 }

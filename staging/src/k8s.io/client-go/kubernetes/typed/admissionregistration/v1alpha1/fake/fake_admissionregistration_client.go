@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2018 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -24,10 +24,6 @@ import (
 
 type FakeAdmissionregistrationV1alpha1 struct {
 	*testing.Fake
-}
-
-func (c *FakeAdmissionregistrationV1alpha1) ExternalAdmissionHookConfigurations() v1alpha1.ExternalAdmissionHookConfigurationInterface {
-	return &FakeExternalAdmissionHookConfigurations{c}
 }
 
 func (c *FakeAdmissionregistrationV1alpha1) InitializerConfigurations() v1alpha1.InitializerConfigurationInterface {

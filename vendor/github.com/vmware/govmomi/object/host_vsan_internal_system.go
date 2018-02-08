@@ -42,7 +42,7 @@ func (m HostVsanInternalSystem) QueryVsanObjectUuidsByFilter(ctx context.Context
 	req := types.QueryVsanObjectUuidsByFilter{
 		This:    m.Reference(),
 		Uuids:   uuids,
-		Limit:   limit,
+		Limit:   &limit,
 		Version: version,
 	}
 

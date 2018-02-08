@@ -16,7 +16,15 @@ package etcdserver
 
 import (
 	pb "github.com/coreos/etcd/etcdserver/etcdserverpb"
-	"github.com/coreos/etcd/mvcc/backend"
+)
+
+const (
+	// DefaultQuotaBytes is the number of bytes the backend Size may
+	// consume before exceeding the space quota.
+	DefaultQuotaBytes = int64(2 * 1024 * 1024 * 1024) // 2GB
+	// MaxQuotaBytes is the maximum number of bytes suggested for a backend
+	// quota. A larger quota may lead to degraded performance.
+	MaxQuotaBytes = int64(8 * 1024 * 1024 * 1024) // 8GB
 )
 
 // Quota represents an arbitrary quota against arbitrary requests. Each request
@@ -57,11 +65,10 @@ func NewBackendQuota(s *EtcdServer) Quota {
 	}
 	if s.Cfg.QuotaBackendBytes == 0 {
 		// use default size if no quota size given
-		return &backendQuota{s, backend.DefaultQuotaBytes}
+		return &backendQuota{s, DefaultQuotaBytes}
 	}
-	if s.Cfg.QuotaBackendBytes > backend.MaxQuotaBytes {
-		plog.Warningf("backend quota %v exceeds maximum quota %v; using maximum", s.Cfg.QuotaBackendBytes, backend.MaxQuotaBytes)
-		return &backendQuota{s, backend.MaxQuotaBytes}
+	if s.Cfg.QuotaBackendBytes > MaxQuotaBytes {
+		plog.Warningf("backend quota %v exceeds maximum recommended quota %v", s.Cfg.QuotaBackendBytes, MaxQuotaBytes)
 	}
 	return &backendQuota{s, s.Cfg.QuotaBackendBytes}
 }

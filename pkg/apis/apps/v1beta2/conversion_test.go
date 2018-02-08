@@ -22,9 +22,10 @@ import (
 	"k8s.io/api/apps/v1beta2"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/apps"
+	"k8s.io/kubernetes/pkg/apis/autoscaling"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -349,41 +350,41 @@ func TestV1beta2ScaleStatusConversion(t *testing.T) {
 	labelsSelector2, _ := metav1.LabelSelectorAsSelector(selector2)
 
 	testcases := map[string]struct {
-		scaleStatus1 *extensions.ScaleStatus
+		scaleStatus1 *autoscaling.ScaleStatus
 		scaleStatus2 *v1beta2.ScaleStatus
 	}{
 		"ScaleStatus Conversion 1": {
-			scaleStatus1: &extensions.ScaleStatus{Replicas: 2},
+			scaleStatus1: &autoscaling.ScaleStatus{Replicas: 2},
 			scaleStatus2: &v1beta2.ScaleStatus{Replicas: 2},
 		},
 		"ScaleStatus Conversion 2": {
-			scaleStatus1: &extensions.ScaleStatus{Replicas: 2, Selector: selector1},
+			scaleStatus1: &autoscaling.ScaleStatus{Replicas: 2, Selector: labelsSelector1.String()},
 			scaleStatus2: &v1beta2.ScaleStatus{Replicas: 2, Selector: matchLabels, TargetSelector: labelsSelector1.String()},
 		},
 		"ScaleStatus Conversion 3": {
-			scaleStatus1: &extensions.ScaleStatus{Replicas: 2, Selector: selector2},
+			scaleStatus1: &autoscaling.ScaleStatus{Replicas: 2, Selector: labelsSelector2.String()},
 			scaleStatus2: &v1beta2.ScaleStatus{Replicas: 2, Selector: map[string]string{}, TargetSelector: labelsSelector2.String()},
 		},
 	}
 
 	for k, tc := range testcases {
-		// extensions -> v1beta2
+		// autoscaling -> v1beta2
 		internal1 := &v1beta2.ScaleStatus{}
 		if err := legacyscheme.Scheme.Convert(tc.scaleStatus1, internal1, nil); err != nil {
-			t.Errorf("%q - %q: unexpected error: %v", k, "extensions -> v1beta2", err)
+			t.Errorf("%q - %q: unexpected error: %v", k, "autoscaling -> v1beta2", err)
 		}
 
 		if !apiequality.Semantic.DeepEqual(internal1, tc.scaleStatus2) {
-			t.Errorf("%q - %q: expected\n\t%#v, got \n\t%#v", k, "extensions -> v1beta2", tc.scaleStatus2, internal1)
+			t.Errorf("%q - %q: expected\n\t%#v, got \n\t%#v", k, "autoscaling -> v1beta2", tc.scaleStatus2, internal1)
 		}
 
-		// v1beta2 -> extensions
-		internal2 := &extensions.ScaleStatus{}
+		// v1beta2 -> autoscaling
+		internal2 := &autoscaling.ScaleStatus{}
 		if err := legacyscheme.Scheme.Convert(tc.scaleStatus2, internal2, nil); err != nil {
-			t.Errorf("%q - %q: unexpected error: %v", k, "v1beta2 -> extensions", err)
+			t.Errorf("%q - %q: unexpected error: %v", k, "v1beta2 -> autoscaling", err)
 		}
 		if !apiequality.Semantic.DeepEqual(internal2, tc.scaleStatus1) {
-			t.Errorf("%q - %q: expected\n\t%+v, got \n\t%+v", k, "v1beta2 -> extensions", tc.scaleStatus1, internal2)
+			t.Errorf("%q - %q: expected\n\t%+v, got \n\t%+v", k, "v1beta2 -> autoscaling", tc.scaleStatus1, internal2)
 		}
 	}
 }

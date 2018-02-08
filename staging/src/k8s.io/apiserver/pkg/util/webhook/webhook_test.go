@@ -114,15 +114,15 @@ func TestKubeConfigFile(t *testing.T) {
 			errRegex: errNoConfiguration,
 		},
 		{
-			test:           "missing context (specified context is missing)",
-			cluster:        &namedCluster,
-			currentContext: "missing-context",
-			errRegex:       errNoConfiguration,
+			test:     "missing context (specified context is missing)",
+			cluster:  &namedCluster,
+			errRegex: errNoConfiguration,
 		},
 		{
 			test: "context without cluster",
 			context: &v1.NamedContext{
 				Context: v1.Context{},
+				Name:    "testing-context",
 			},
 			currentContext: "testing-context",
 			errRegex:       errNoConfiguration,
@@ -134,6 +134,7 @@ func TestKubeConfigFile(t *testing.T) {
 				Context: v1.Context{
 					Cluster: namedCluster.Name,
 				},
+				Name: "testing-context",
 			},
 			currentContext: "testing-context",
 			errRegex:       "", // Not an error at parse time, only when using the webhook
@@ -145,6 +146,7 @@ func TestKubeConfigFile(t *testing.T) {
 				Context: v1.Context{
 					Cluster: "missing-cluster",
 				},
+				Name: "fake",
 			},
 			errRegex: errNoConfiguration,
 		},
@@ -156,6 +158,7 @@ func TestKubeConfigFile(t *testing.T) {
 					Cluster:  namedCluster.Name,
 					AuthInfo: "missing-user",
 				},
+				Name: "testing-context",
 			},
 			currentContext: "testing-context",
 			errRegex:       "", // Not an error at parse time, only when using the webhook
@@ -227,7 +230,7 @@ func TestKubeConfigFile(t *testing.T) {
 			errRegex: "tls: found a certificate rather than a key in the PEM for the private key",
 		},
 		{
-			test:     "valid configuration (certificate data embeded in config)",
+			test:     "valid configuration (certificate data embedded in config)",
 			cluster:  &defaultCluster,
 			user:     &defaultUser,
 			errRegex: "",
@@ -266,6 +269,8 @@ func TestKubeConfigFile(t *testing.T) {
 			if tt.user != nil {
 				kubeConfig.AuthInfos = []v1.NamedAuthInfo{*tt.user}
 			}
+
+			kubeConfig.CurrentContext = tt.currentContext
 
 			kubeConfigFile, err := newKubeConfigFile(kubeConfig)
 

@@ -65,7 +65,10 @@ func TestScaleDownOldReplicaSets(t *testing.T) {
 
 		kc := fake.NewSimpleClientset(expected...)
 		informers := informers.NewSharedInformerFactory(kc, controller.NoResyncPeriodFunc())
-		c := NewDeploymentController(informers.Extensions().V1beta1().Deployments(), informers.Extensions().V1beta1().ReplicaSets(), informers.Core().V1().Pods(), kc)
+		c, err := NewDeploymentController(informers.Extensions().V1beta1().Deployments(), informers.Extensions().V1beta1().ReplicaSets(), informers.Core().V1().Pods(), kc)
+		if err != nil {
+			t.Fatalf("error creating Deployment controller: %v", err)
+		}
 		c.eventRecorder = &record.FakeRecorder{}
 
 		c.scaleDownOldReplicaSetsForRecreate(oldRSs, test.d)
@@ -112,9 +115,11 @@ func TestOldPodsRunning(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		if expected, got := test.expected, oldPodsRunning(test.newRS, test.oldRSs, test.podMap); expected != got {
-			t.Errorf("%s: expected %t, got %t", test.name, expected, got)
-		}
+		t.Run(test.name, func(t *testing.T) {
+			if expected, got := test.expected, oldPodsRunning(test.newRS, test.oldRSs, test.podMap); expected != got {
+				t.Errorf("%s: expected %t, got %t", test.name, expected, got)
+			}
+		})
 	}
 }
 

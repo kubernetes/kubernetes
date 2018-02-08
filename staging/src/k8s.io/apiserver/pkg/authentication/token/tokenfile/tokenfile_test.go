@@ -125,6 +125,16 @@ func TestInsufficientColumnsTokenFile(t *testing.T) {
 	}
 }
 
+func TestEmptyTokenTokenFile(t *testing.T) {
+	auth, err := newWithContents(t, ",user5,uid5\n")
+	if err != nil {
+		t.Fatalf("unexpected error %v", err)
+	}
+	if len(auth.tokens) != 0 {
+		t.Fatalf("empty token should not be recorded")
+	}
+}
+
 func newWithContents(t *testing.T, contents string) (auth *TokenAuthenticator, err error) {
 	f, err := ioutil.TempFile("", "tokenfile_test")
 	if err != nil {

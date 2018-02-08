@@ -20,8 +20,8 @@ import (
 	"fmt"
 	"strings"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/pkg/api"
 )
 
 // ResourceQuotaGeneratorV1 supports stable generation of a resource quota
@@ -79,7 +79,7 @@ func (g *ResourceQuotaGeneratorV1) StructuredGenerate() (runtime.Object, error) 
 		return nil, err
 	}
 
-	resourceList, err := populateResourceList(g.Hard)
+	resourceList, err := populateResourceListV1(g.Hard)
 	if err != nil {
 		return nil, err
 	}
@@ -89,7 +89,7 @@ func (g *ResourceQuotaGeneratorV1) StructuredGenerate() (runtime.Object, error) 
 		return nil, err
 	}
 
-	resourceQuota := &api.ResourceQuota{}
+	resourceQuota := &v1.ResourceQuota{}
 	resourceQuota.Name = g.Name
 	resourceQuota.Spec.Hard = resourceList
 	resourceQuota.Spec.Scopes = scopes
@@ -104,14 +104,14 @@ func (r *ResourceQuotaGeneratorV1) validate() error {
 	return nil
 }
 
-func parseScopes(spec string) ([]api.ResourceQuotaScope, error) {
+func parseScopes(spec string) ([]v1.ResourceQuotaScope, error) {
 	// empty input gets a nil response to preserve generator test expected behaviors
 	if spec == "" {
 		return nil, nil
 	}
 
 	scopes := strings.Split(spec, ",")
-	result := make([]api.ResourceQuotaScope, 0, len(scopes))
+	result := make([]v1.ResourceQuotaScope, 0, len(scopes))
 	for _, scope := range scopes {
 		// intentionally do not verify the scope against the valid scope list. This is done by the apiserver anyway.
 
@@ -119,7 +119,7 @@ func parseScopes(spec string) ([]api.ResourceQuotaScope, error) {
 			return nil, fmt.Errorf("invalid resource quota scope \"\"")
 		}
 
-		result = append(result, api.ResourceQuotaScope(scope))
+		result = append(result, v1.ResourceQuotaScope(scope))
 	}
 	return result, nil
 }

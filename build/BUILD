@@ -38,7 +38,7 @@ DOCKERIZED_BINARIES = {
     },
     "kube-scheduler": {
         "base": "@official_busybox//image",
-        "target": "//plugin/cmd/kube-scheduler:kube-scheduler",
+        "target": "//cmd/kube-scheduler:kube-scheduler",
     },
     "kube-proxy": {
         "base": "@debian-iptables-amd64//image",
@@ -103,7 +103,6 @@ release_filegroup(
     name = "client-targets",
     srcs = [
         "//cmd/kubectl",
-        "//federation/cmd/kubefed",
     ],
 )
 
@@ -112,6 +111,7 @@ release_filegroup(
     name = "node-targets",
     srcs = [
         "//cmd/kube-proxy",
+        "//cmd/kubeadm",
         "//cmd/kubelet",
     ],
 )
@@ -122,12 +122,12 @@ release_filegroup(
 release_filegroup(
     name = "server-targets",
     srcs = [
+        "//cluster/gce/gci/mounter",
         "//cmd/cloud-controller-manager",
         "//cmd/hyperkube",
         "//cmd/kube-apiserver",
         "//cmd/kube-controller-manager",
-        "//cmd/kubeadm",
-        "//plugin/cmd/kube-scheduler",
+        "//cmd/kube-scheduler",
         "//vendor/k8s.io/kube-aggregator",
     ],
 )
@@ -143,7 +143,6 @@ filegroup(
         "//cmd/genyaml",
         "//cmd/kubemark",  # TODO: server platforms only
         "//cmd/linkcheck",
-        "//federation/cmd/genfeddocs",
         "//test/e2e:e2e.test",
         "//test/e2e_node:e2e_node.test",  # TODO: server platforms only
         "//vendor/github.com/onsi/ginkgo/ginkgo",
@@ -154,9 +153,7 @@ filegroup(
 filegroup(
     name = "test-portable-targets",
     srcs = [
-        "//federation/develop:all-srcs",
         "//hack:e2e.go",
-        "//hack:federated-ginkgo-e2e.sh",
         "//hack:get-build.sh",
         "//hack:ginkgo-e2e.sh",
         "//hack/e2e-internal:all-srcs",

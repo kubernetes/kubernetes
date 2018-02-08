@@ -34,7 +34,7 @@ go build -o "${CLIENTGEN}" ${CODEGEN_PKG}/cmd/client-gen
 
 PREFIX=k8s.io/metrics/pkg/apis
 INPUT_BASE="--input-base ${PREFIX}"
-CLIENTSET_PATH="--clientset-path k8s.io/metrics/pkg/client/clientset_generated"
+CLIENTSET_PATH="--output-package k8s.io/metrics/pkg/client/clientset_generated"
 
 ${CLIENTGEN} --clientset-name="clientset" ${INPUT_BASE} --input metrics/v1alpha1 --input metrics/v1beta1 ${CLIENTSET_PATH} --output-base ${SCRIPT_BASE}
 

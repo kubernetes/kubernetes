@@ -9,8 +9,8 @@ load(
 go_test(
     name = "go_default_test",
     srcs = ["codec_test.go"],
+    embed = [":go_default_library"],
     importpath = "k8s.io/apimachinery/pkg/runtime/serializer",
-    library = ":go_default_library",
     deps = [
         "//vendor/github.com/ghodss/yaml:go_default_library",
         "//vendor/github.com/google/gofuzz:go_default_library",

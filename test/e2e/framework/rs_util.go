@@ -38,7 +38,7 @@ func UpdateReplicaSetWithRetries(c clientset.Interface, namespace, name string, 
 
 // CheckNewRSAnnotations check if the new RS's annotation is as expected
 func CheckNewRSAnnotations(c clientset.Interface, ns, deploymentName string, expectedAnnotations map[string]string) error {
-	deployment, err := c.Extensions().Deployments(ns).Get(deploymentName, metav1.GetOptions{})
+	deployment, err := c.ExtensionsV1beta1().Deployments(ns).Get(deploymentName, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
@@ -58,7 +58,7 @@ func CheckNewRSAnnotations(c clientset.Interface, ns, deploymentName string, exp
 // WaitForReadyReplicaSet waits until the replicaset has all of its replicas ready.
 func WaitForReadyReplicaSet(c clientset.Interface, ns, name string) error {
 	err := wait.Poll(Poll, pollShortTimeout, func() (bool, error) {
-		rs, err := c.Extensions().ReplicaSets(ns).Get(name, metav1.GetOptions{})
+		rs, err := c.ExtensionsV1beta1().ReplicaSets(ns).Get(name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}

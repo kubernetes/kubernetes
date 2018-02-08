@@ -18,36 +18,8 @@ limitations under the License.
 
 package cm
 
-import (
-	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/types"
-)
-
 type unsupportedPodContainerManager struct {
+	podContainerManagerStub
 }
 
 var _ PodContainerManager = &unsupportedPodContainerManager{}
-
-func (m *unsupportedPodContainerManager) Exists(_ *v1.Pod) bool {
-	return true
-}
-
-func (m *unsupportedPodContainerManager) EnsureExists(_ *v1.Pod) error {
-	return nil
-}
-
-func (m *unsupportedPodContainerManager) GetPodContainerName(_ *v1.Pod) (CgroupName, string) {
-	return "", ""
-}
-
-func (m *unsupportedPodContainerManager) ReduceCPULimits(_ CgroupName) error {
-	return nil
-}
-
-func (m *unsupportedPodContainerManager) GetAllPodsFromCgroups() (map[types.UID]CgroupName, error) {
-	return nil, nil
-}
-
-func (m *unsupportedPodContainerManager) Destroy(name CgroupName) error {
-	return nil
-}

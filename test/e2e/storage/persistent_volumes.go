@@ -29,6 +29,7 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
 // Validate PV/PVC, create and verify writer pod, delete the PVC, and validate the PV's
@@ -85,7 +86,7 @@ func completeMultiTest(f *framework.Framework, c clientset.Interface, ns string,
 	return nil
 }
 
-var _ = SIGDescribe("PersistentVolumes", func() {
+var _ = utils.SIGDescribe("PersistentVolumes", func() {
 
 	// global vars for the Context()s and It()'s below
 	f := framework.NewDefaultFramework("pv")
@@ -204,9 +205,6 @@ var _ = SIGDescribe("PersistentVolumes", func() {
 		//   in different namespaces.
 		Context("with multiple PVs and PVCs all in same ns", func() {
 
-			// define the maximum number of PVs and PVCs supported by these tests
-			const maxNumPVs = 10
-			const maxNumPVCs = 10
 			// scope the pv and pvc maps to be available in the AfterEach
 			// note: these maps are created fresh in CreatePVsPVCs()
 			var pvols framework.PVMap
@@ -295,7 +293,7 @@ var _ = SIGDescribe("PersistentVolumes", func() {
 				// If a file is detected in /mnt, fail the pod and do not restart it.
 				By("Verifying the mount has been cleaned.")
 				mount := pod.Spec.Containers[0].VolumeMounts[0].MountPath
-				pod = framework.MakePod(ns, []*v1.PersistentVolumeClaim{pvc}, true, fmt.Sprintf("[ $(ls -A %s | wc -l) -eq 0 ] && exit 0 || exit 1", mount))
+				pod = framework.MakePod(ns, nil, []*v1.PersistentVolumeClaim{pvc}, true, fmt.Sprintf("[ $(ls -A %s | wc -l) -eq 0 ] && exit 0 || exit 1", mount))
 				pod, err = c.CoreV1().Pods(ns).Create(pod)
 				Expect(err).NotTo(HaveOccurred())
 				framework.ExpectNoError(framework.WaitForPodSuccessInNamespace(c, pod.Name, ns))

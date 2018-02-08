@@ -13,8 +13,10 @@ go_library(
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
         "//cmd/kubeadm/app/apis/kubeadm/v1alpha1:go_default_library",
+        "//cmd/kubeadm/app/apis/kubeadm/validation:go_default_library",
         "//cmd/kubeadm/app/cmd/util:go_default_library",
         "//cmd/kubeadm/app/constants:go_default_library",
+        "//cmd/kubeadm/app/features:go_default_library",
         "//cmd/kubeadm/app/phases/controlplane:go_default_library",
         "//cmd/kubeadm/app/phases/upgrade:go_default_library",
         "//cmd/kubeadm/app/preflight:go_default_library",
@@ -27,6 +29,7 @@ go_library(
         "//pkg/util/version:go_default_library",
         "//vendor/github.com/ghodss/yaml:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//vendor/k8s.io/client-go/discovery/fake:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes:go_default_library",
     ],
@@ -39,8 +42,8 @@ go_test(
         "common_test.go",
         "plan_test.go",
     ],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/cmd/kubeadm/app/cmd/upgrade",
-    library = ":go_default_library",
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm/v1alpha1:go_default_library",
         "//cmd/kubeadm/app/phases/upgrade:go_default_library",

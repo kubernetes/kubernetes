@@ -25,7 +25,7 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 	"k8s.io/api/core/v1"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 )
@@ -65,7 +65,6 @@ func TestSandboxGC(t *testing.T) {
 		description         string              // description of the test case
 		sandboxes           []sandboxTemplate   // templates of sandboxes
 		containers          []containerTemplate // templates of containers
-		minAge              time.Duration       // sandboxMinGCAge
 		remain              []int               // template indexes of remaining sandboxes
 		evictTerminatedPods bool
 	}{

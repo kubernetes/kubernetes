@@ -38,7 +38,7 @@ func NewDistributedVirtualPortgroup(c *vim25.Client, ref types.ManagedObjectRefe
 // EthernetCardBackingInfo returns the VirtualDeviceBackingInfo for this DistributedVirtualPortgroup
 func (p DistributedVirtualPortgroup) EthernetCardBackingInfo(ctx context.Context) (types.BaseVirtualDeviceBackingInfo, error) {
 	var dvp mo.DistributedVirtualPortgroup
-	var dvs mo.VmwareDistributedVirtualSwitch // TODO: should be mo.BaseDistributedVirtualSwitch
+	var dvs mo.DistributedVirtualSwitch
 
 	if err := p.Properties(ctx, p.Reference(), []string{"key", "config.distributedVirtualSwitch"}, &dvp); err != nil {
 		return nil, err

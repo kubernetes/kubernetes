@@ -25,6 +25,8 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	dto "github.com/prometheus/client_model/go"
 	"github.com/prometheus/common/expfmt"
 	"github.com/spf13/pflag"
 )
@@ -52,6 +54,11 @@ const (
 
 // Initialize prometheus metrics to be exported.
 var (
+	// Register all custom metrics with a dedicated registry to keep them separate.
+	customMetricRegistry = prometheus.NewRegistry()
+
+	// Custom etcd version metric since etcd 3.2- does not export one.
+	// This will be replaced by https://github.com/coreos/etcd/pull/8960 in etcd 3.3.
 	etcdVersion = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Namespace: namespace,
@@ -59,14 +66,121 @@ var (
 			Help:      "Etcd server's binary version",
 		},
 		[]string{"binary_version"})
-	etcdGRPCRequestsTotal = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Namespace: namespace,
-			Name:      "grpc_requests_total",
-			Help:      "Counter of received grpc requests, labeled by the grpc method and service names",
+
+	gatherer = &monitorGatherer{
+		// Rewrite rules for etcd metrics that are exported by default.
+		exported: map[string]*exportedMetric{
+			// etcd 3.0 metric format for total grpc requests with renamed method and service labels.
+			"etcd_grpc_requests_total": {
+				rewriters: []rewriteFunc{
+					func(mf *dto.MetricFamily) (*dto.MetricFamily, error) {
+						mf = deepCopyMetricFamily(mf)
+						renameLabels(mf, map[string]string{
+							"grpc_method":  "method",
+							"grpc_service": "service",
+						})
+						return mf, nil
+					},
+				},
+			},
+			// etcd 3.1+ metric format for total grpc requests.
+			"grpc_server_handled_total": {
+				rewriters: []rewriteFunc{
+					// Export the metric exactly as-is. For 3.1+ metrics, we will
+					// pass all metrics directly through.
+					identity,
+					// Write to the etcd 3.0 metric format for backward compatibility.
+					func(mf *dto.MetricFamily) (*dto.MetricFamily, error) {
+						mf = deepCopyMetricFamily(mf)
+						renameMetric(mf, "etcd_grpc_requests_total")
+						renameLabels(mf, map[string]string{
+							"grpc_method":  "method",
+							"grpc_service": "service",
+						})
+						return mf, nil
+					},
+				},
+			},
+
+			// etcd 3.0 metric format for grpc request latencies,
+			// rewritten to the etcd 3.1+ format.
+			"etcd_grpc_unary_requests_duration_seconds": {
+				rewriters: []rewriteFunc{
+					func(mf *dto.MetricFamily) (*dto.MetricFamily, error) {
+						mf = deepCopyMetricFamily(mf)
+						renameMetric(mf, "grpc_server_handling_seconds")
+						tpeName := "grpc_type"
+						tpeVal := "unary"
+						for _, m := range mf.Metric {
+							m.Label = append(m.Label, &dto.LabelPair{Name: &tpeName, Value: &tpeVal})
+						}
+						return mf, nil
+					},
+				},
+			},
+			// etcd 3.1+ metric format for total grpc requests.
+			"grpc_server_handling_seconds": {},
 		},
-		[]string{"method", "service"})
+	}
 )
+
+// monitorGatherer is a custom metric gatherer for prometheus that exports custom metrics
+// defined by this monitor as well as rewritten etcd metrics.
+type monitorGatherer struct {
+	exported map[string]*exportedMetric
+}
+
+// exportedMetric identifies a metric that is exported and defines how it is rewritten before
+// it is exported.
+type exportedMetric struct {
+	rewriters []rewriteFunc
+}
+
+// rewriteFunc rewrites metrics before they are exported.
+type rewriteFunc func(mf *dto.MetricFamily) (*dto.MetricFamily, error)
+
+func (m *monitorGatherer) Gather() ([]*dto.MetricFamily, error) {
+	etcdMetrics, err := scrapeMetrics()
+	if err != nil {
+		return nil, err
+	}
+	exported, err := m.rewriteExportedMetrics(etcdMetrics)
+	if err != nil {
+		return nil, err
+	}
+	custom, err := customMetricRegistry.Gather()
+	if err != nil {
+		return nil, err
+	}
+	result := make([]*dto.MetricFamily, 0, len(exported)+len(custom))
+	result = append(result, exported...)
+	result = append(result, custom...)
+	return result, nil
+}
+
+func (m *monitorGatherer) rewriteExportedMetrics(metrics map[string]*dto.MetricFamily) ([]*dto.MetricFamily, error) {
+	results := make([]*dto.MetricFamily, 0, len(metrics))
+	for n, mf := range metrics {
+		if e, ok := m.exported[n]; ok {
+			// Apply rewrite rules for metrics that have them.
+			if e.rewriters == nil {
+				results = append(results, mf)
+			} else {
+				for _, rewriter := range e.rewriters {
+					new, err := rewriter(mf)
+					if err != nil {
+						return nil, err
+					}
+					results = append(results, new)
+				}
+			}
+		} else {
+			// Proxy all metrics without any rewrite rules directly.
+			results = append(results, mf)
+		}
+	}
+	return results, nil
+}
 
 // Struct for unmarshalling the json response from etcd's /version endpoint.
 type EtcdVersion struct {
@@ -132,81 +246,76 @@ func getVersionPeriodically(stopCh <-chan struct{}) {
 	}
 }
 
-// Struct for storing labels for gRPC request types.
-type GRPCRequestLabels struct {
-	Method  string
-	Service string
-}
-
-// Function for fetching etcd grpc request counts and feeding it to the prometheus metric.
-func getGRPCRequestCount(lastRecordedCount *map[GRPCRequestLabels]float64) error {
-	// Create the get request for the etcd metrics endpoint.
+// scrapeMetrics scrapes the prometheus metrics from the etcd metrics URI.
+func scrapeMetrics() (map[string]*dto.MetricFamily, error) {
 	req, err := http.NewRequest("GET", etcdMetricsScrapeURI, nil)
 	if err != nil {
-		return fmt.Errorf("Failed to create GET request for etcd metrics: %v", err)
+		return nil, fmt.Errorf("Failed to create GET request for etcd metrics: %v", err)
 	}
 
 	// Send the get request and receive a response.
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		return fmt.Errorf("Failed to receive GET response for etcd metrics: %v", err)
+		return nil, fmt.Errorf("Failed to receive GET response for etcd metrics: %v", err)
 	}
 	defer resp.Body.Close()
 
 	// Parse the metrics in text format to a MetricFamily struct.
 	var textParser expfmt.TextParser
-	metricFamilies, err := textParser.TextToMetricFamilies(resp.Body)
-	if err != nil {
-		return fmt.Errorf("Failed to parse etcd metrics: %v", err)
-	}
-
-	// Look through the grpc requests metric family and update our promotheus metric.
-	for _, metric := range metricFamilies["etcd_grpc_requests_total"].GetMetric() {
-		var grpcRequestLabels GRPCRequestLabels
-		for _, label := range metric.GetLabel() {
-			if label.GetName() == "grpc_method" {
-				grpcRequestLabels.Method = label.GetValue()
-			}
-			if label.GetName() == "grpc_service" {
-				grpcRequestLabels.Service = label.GetValue()
-			}
-		}
-		if grpcRequestLabels.Method == "" || grpcRequestLabels.Service == "" {
-			return fmt.Errorf("Could not get value for grpc_method and/or grpc_service label")
-		}
-
-		// Get last recorded value and new value of the metric and update it suitably.
-		previousMetricValue := 0.0
-		if value, ok := (*lastRecordedCount)[grpcRequestLabels]; ok {
-			previousMetricValue = value
-		}
-		newMetricValue := metric.GetCounter().GetValue()
-		(*lastRecordedCount)[grpcRequestLabels] = newMetricValue
-		if newMetricValue >= previousMetricValue {
-			etcdGRPCRequestsTotal.With(prometheus.Labels{
-				"method":  grpcRequestLabels.Method,
-				"service": grpcRequestLabels.Service,
-			}).Add(newMetricValue - previousMetricValue)
-		}
-	}
-	return nil
+	return textParser.TextToMetricFamilies(resp.Body)
 }
 
-// Function for periodically fetching etcd GRPC request counts.
-func getGRPCRequestCountPeriodically(stopCh <-chan struct{}) {
-	// This map stores last recorded count for a given grpc request type.
-	lastRecordedCount := make(map[GRPCRequestLabels]float64)
-	for {
-		if err := getGRPCRequestCount(&lastRecordedCount); err != nil {
-			glog.Errorf("Failed to fetch etcd grpc request counts: %v", err)
-		}
-		select {
-		case <-stopCh:
-			break
-		case <-time.After(scrapeTimeout):
+func renameMetric(mf *dto.MetricFamily, name string) {
+	mf.Name = &name
+}
+
+func renameLabels(mf *dto.MetricFamily, nameMapping map[string]string) {
+	for _, m := range mf.Metric {
+		for _, lbl := range m.Label {
+			if alias, ok := nameMapping[*lbl.Name]; ok {
+				lbl.Name = &alias
+			}
 		}
 	}
+}
+
+func identity(mf *dto.MetricFamily) (*dto.MetricFamily, error) {
+	return mf, nil
+}
+
+func deepCopyMetricFamily(mf *dto.MetricFamily) *dto.MetricFamily {
+	r := &dto.MetricFamily{}
+	r.Name = mf.Name
+	r.Help = mf.Help
+	r.Type = mf.Type
+	r.Metric = make([]*dto.Metric, len(mf.Metric))
+	for i, m := range mf.Metric {
+		r.Metric[i] = deepCopyMetric(m)
+	}
+	return r
+}
+
+func deepCopyMetric(m *dto.Metric) *dto.Metric {
+	r := &dto.Metric{}
+	r.Label = make([]*dto.LabelPair, len(m.Label))
+	for i, lp := range m.Label {
+		r.Label[i] = deepCopyLabelPair(lp)
+	}
+	r.Gauge = m.Gauge
+	r.Counter = m.Counter
+	r.Summary = m.Summary
+	r.Untyped = m.Untyped
+	r.Histogram = m.Histogram
+	r.TimestampMs = m.TimestampMs
+	return r
+}
+
+func deepCopyLabelPair(lp *dto.LabelPair) *dto.LabelPair {
+	r := &dto.LabelPair{}
+	r.Name = lp.Name
+	r.Value = lp.Value
+	return r
 }
 
 func main() {
@@ -216,18 +325,16 @@ func main() {
 	pflag.Parse()
 
 	// Register the metrics we defined above with prometheus.
-	prometheus.MustRegister(etcdVersion)
-	prometheus.MustRegister(etcdGRPCRequestsTotal)
-	prometheus.Unregister(prometheus.NewGoCollector())
+	customMetricRegistry.MustRegister(etcdVersion)
+	customMetricRegistry.Unregister(prometheus.NewGoCollector())
 
 	// Spawn threads for periodically scraping etcd version metrics.
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 	go getVersionPeriodically(stopCh)
-	go getGRPCRequestCountPeriodically(stopCh)
 
 	// Serve our metrics on listenAddress/metricsPath.
 	glog.Infof("Listening on: %v", listenAddress)
-	http.Handle(metricsPath, prometheus.UninstrumentedHandler())
+	http.Handle(metricsPath, promhttp.HandlerFor(gatherer, promhttp.HandlerOpts{}))
 	glog.Errorf("Stopped listening/serving metrics: %v", http.ListenAndServe(listenAddress, nil))
 }

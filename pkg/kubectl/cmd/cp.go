@@ -64,7 +64,8 @@ var (
 // NewCmdCp creates a new Copy command.
 func NewCmdCp(f cmdutil.Factory, cmdOut, cmdErr io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "cp <file-spec-src> <file-spec-dest>",
+		Use: "cp <file-spec-src> <file-spec-dest>",
+		DisableFlagsInUseLine: true,
 		Short:   i18n.T("Copy files and directories to and from containers."),
 		Long:    "Copy files and directories to and from containers.",
 		Example: cpExample,
@@ -301,10 +302,12 @@ func recursiveTar(srcBase, srcFile, destBase, destFile string, tw *tar.Writer) e
 		if err != nil {
 			return err
 		}
-
 		defer f.Close()
-		_, err = io.Copy(tw, f)
-		return err
+
+		if _, err := io.Copy(tw, f); err != nil {
+			return err
+		}
+		return f.Close()
 	}
 	return nil
 }
@@ -330,7 +333,6 @@ func untarAll(reader io.Reader, destFile, prefix string) error {
 			return err
 		}
 		if header.FileInfo().IsDir() {
-
 			if err := os.MkdirAll(outFileName, 0755); err != nil {
 				return err
 			}
@@ -359,7 +361,12 @@ func untarAll(reader io.Reader, destFile, prefix string) error {
 				return err
 			}
 			defer outFile.Close()
-			io.Copy(outFile, tarReader)
+			if _, err := io.Copy(outFile, tarReader); err != nil {
+				return err
+			}
+			if err := outFile.Close(); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -372,11 +379,8 @@ func untarAll(reader io.Reader, destFile, prefix string) error {
 }
 
 func getPrefix(file string) string {
-	if file[0] == '/' {
-		// tar strips the leading '/' if it's there, so we will too
-		return file[1:]
-	}
-	return file
+	// tar strips the leading '/' if it's there, so we will too
+	return strings.TrimLeft(file, "/")
 }
 
 func execute(f cmdutil.Factory, cmd *cobra.Command, options *ExecOptions) error {

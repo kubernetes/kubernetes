@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2018 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	rest "k8s.io/client-go/rest"
-	api "k8s.io/kubernetes/pkg/api"
+	core "k8s.io/kubernetes/pkg/apis/core"
 	scheme "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/scheme"
 )
 
@@ -33,14 +33,14 @@ type LimitRangesGetter interface {
 
 // LimitRangeInterface has methods to work with LimitRange resources.
 type LimitRangeInterface interface {
-	Create(*api.LimitRange) (*api.LimitRange, error)
-	Update(*api.LimitRange) (*api.LimitRange, error)
+	Create(*core.LimitRange) (*core.LimitRange, error)
+	Update(*core.LimitRange) (*core.LimitRange, error)
 	Delete(name string, options *v1.DeleteOptions) error
 	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
-	Get(name string, options v1.GetOptions) (*api.LimitRange, error)
-	List(opts v1.ListOptions) (*api.LimitRangeList, error)
+	Get(name string, options v1.GetOptions) (*core.LimitRange, error)
+	List(opts v1.ListOptions) (*core.LimitRangeList, error)
 	Watch(opts v1.ListOptions) (watch.Interface, error)
-	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *api.LimitRange, err error)
+	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *core.LimitRange, err error)
 	LimitRangeExpansion
 }
 
@@ -59,8 +59,8 @@ func newLimitRanges(c *CoreClient, namespace string) *limitRanges {
 }
 
 // Get takes name of the limitRange, and returns the corresponding limitRange object, and an error if there is any.
-func (c *limitRanges) Get(name string, options v1.GetOptions) (result *api.LimitRange, err error) {
-	result = &api.LimitRange{}
+func (c *limitRanges) Get(name string, options v1.GetOptions) (result *core.LimitRange, err error) {
+	result = &core.LimitRange{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("limitranges").
@@ -72,8 +72,8 @@ func (c *limitRanges) Get(name string, options v1.GetOptions) (result *api.Limit
 }
 
 // List takes label and field selectors, and returns the list of LimitRanges that match those selectors.
-func (c *limitRanges) List(opts v1.ListOptions) (result *api.LimitRangeList, err error) {
-	result = &api.LimitRangeList{}
+func (c *limitRanges) List(opts v1.ListOptions) (result *core.LimitRangeList, err error) {
+	result = &core.LimitRangeList{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("limitranges").
@@ -94,8 +94,8 @@ func (c *limitRanges) Watch(opts v1.ListOptions) (watch.Interface, error) {
 }
 
 // Create takes the representation of a limitRange and creates it.  Returns the server's representation of the limitRange, and an error, if there is any.
-func (c *limitRanges) Create(limitRange *api.LimitRange) (result *api.LimitRange, err error) {
-	result = &api.LimitRange{}
+func (c *limitRanges) Create(limitRange *core.LimitRange) (result *core.LimitRange, err error) {
+	result = &core.LimitRange{}
 	err = c.client.Post().
 		Namespace(c.ns).
 		Resource("limitranges").
@@ -106,8 +106,8 @@ func (c *limitRanges) Create(limitRange *api.LimitRange) (result *api.LimitRange
 }
 
 // Update takes the representation of a limitRange and updates it. Returns the server's representation of the limitRange, and an error, if there is any.
-func (c *limitRanges) Update(limitRange *api.LimitRange) (result *api.LimitRange, err error) {
-	result = &api.LimitRange{}
+func (c *limitRanges) Update(limitRange *core.LimitRange) (result *core.LimitRange, err error) {
+	result = &core.LimitRange{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("limitranges").
@@ -141,8 +141,8 @@ func (c *limitRanges) DeleteCollection(options *v1.DeleteOptions, listOptions v1
 }
 
 // Patch applies the patch and returns the patched limitRange.
-func (c *limitRanges) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *api.LimitRange, err error) {
-	result = &api.LimitRange{}
+func (c *limitRanges) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *core.LimitRange, err error) {
+	result = &core.LimitRange{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
 		Resource("limitranges").

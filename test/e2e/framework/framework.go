@@ -28,14 +28,19 @@ import (
 
 	"k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/discovery"
+	cacheddiscovery "k8s.io/client-go/discovery/cached"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
+	scaleclient "k8s.io/client-go/scale"
 	"k8s.io/client-go/tools/clientcmd"
 	aggregatorclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -67,12 +72,15 @@ type Framework struct {
 	AggregatorClient  *aggregatorclient.Clientset
 	ClientPool        dynamic.ClientPool
 
+	ScalesGetter scaleclient.ScalesGetter
+
 	SkipNamespaceCreation    bool            // Whether to skip creating a namespace
 	Namespace                *v1.Namespace   // Every test has at least one namespace unless creation is skipped
 	namespacesToDelete       []*v1.Namespace // Some tests have more than one.
 	NamespaceDeletionTimeout time.Duration
+	SkipPrivilegedPSPBinding bool // Whether to skip creating a binding to the privileged PSP in the test namespace
 
-	gatherer *containerResourceGatherer
+	gatherer *ContainerResourceGatherer
 	// Constraints that passed to a check which is executed after data is gathered to
 	// see if 99% of results are within acceptable bounds. It has to be injected in the test,
 	// as expectations vary greatly. Constraints are grouped by the container names.
@@ -160,6 +168,25 @@ func (f *Framework) BeforeEach() {
 		f.AggregatorClient, err = aggregatorclient.NewForConfig(config)
 		Expect(err).NotTo(HaveOccurred())
 		f.ClientPool = dynamic.NewClientPool(config, legacyscheme.Registry.RESTMapper(), dynamic.LegacyAPIPathResolverFunc)
+
+		// create scales getter, set GroupVersion and NegotiatedSerializer to default values
+		// as they are required when creating a REST client.
+		if config.GroupVersion == nil {
+			config.GroupVersion = &schema.GroupVersion{}
+		}
+		if config.NegotiatedSerializer == nil {
+			config.NegotiatedSerializer = legacyscheme.Codecs
+		}
+		restClient, err := rest.RESTClientFor(config)
+		Expect(err).NotTo(HaveOccurred())
+		discoClient, err := discovery.NewDiscoveryClientForConfig(config)
+		Expect(err).NotTo(HaveOccurred())
+		cachedDiscoClient := cacheddiscovery.NewMemCacheClient(discoClient)
+		restMapper := discovery.NewDeferredDiscoveryRESTMapper(cachedDiscoClient, meta.InterfacesForUnstructured)
+		restMapper.Reset()
+		resolver := scaleclient.NewDiscoveryScaleKindResolver(cachedDiscoClient)
+		f.ScalesGetter = scaleclient.New(restClient, restMapper, dynamic.LegacyAPIPathResolverFunc, resolver)
+
 		if ProviderIs("kubemark") && TestContext.KubemarkExternalKubeConfig != "" && TestContext.CloudConfig.KubemarkController == nil {
 			externalConfig, err := clientcmd.BuildConfigFromFlags("", TestContext.KubemarkExternalKubeConfig)
 			externalConfig.QPS = f.Options.ClientQPS
@@ -202,13 +229,16 @@ func (f *Framework) BeforeEach() {
 	if TestContext.GatherKubeSystemResourceUsageData != "false" && TestContext.GatherKubeSystemResourceUsageData != "none" {
 		var err error
 		f.gatherer, err = NewResourceUsageGatherer(f.ClientSet, ResourceGathererOptions{
-			inKubemark: ProviderIs("kubemark"),
-			masterOnly: TestContext.GatherKubeSystemResourceUsageData == "master",
-		})
+			InKubemark:                  ProviderIs("kubemark"),
+			MasterOnly:                  TestContext.GatherKubeSystemResourceUsageData == "master",
+			ResourceDataGatheringPeriod: 60 * time.Second,
+			ProbeDuration:               15 * time.Second,
+			PrintVerboseLogs:            false,
+		}, nil)
 		if err != nil {
 			Logf("Error while creating NewResourceUsageGatherer: %v", err)
 		} else {
-			go f.gatherer.startGatheringData()
+			go f.gatherer.StartGatheringData()
 		}
 	}
 
@@ -318,7 +348,7 @@ func (f *Framework) AfterEach() {
 
 	if TestContext.GatherKubeSystemResourceUsageData != "false" && TestContext.GatherKubeSystemResourceUsageData != "none" && f.gatherer != nil {
 		By("Collecting resource usage data")
-		summary, resourceViolationError := f.gatherer.stopAndSummarize([]int{90, 99, 100}, f.AddonResourceConstraints)
+		summary, resourceViolationError := f.gatherer.StopAndSummarize([]int{90, 99, 100}, f.AddonResourceConstraints)
 		defer ExpectNoError(resourceViolationError)
 		f.TestSummaries = append(f.TestSummaries, summary)
 	}
@@ -373,6 +403,11 @@ func (f *Framework) CreateNamespace(baseName string, labels map[string]string) (
 	if ns != nil {
 		f.namespacesToDelete = append(f.namespacesToDelete, ns)
 	}
+
+	if err == nil && !f.SkipPrivilegedPSPBinding {
+		CreatePrivilegedPSPBinding(f, ns.Name)
+	}
+
 	return ns, err
 }
 
@@ -495,7 +530,7 @@ func (f *Framework) CreateServiceForSimpleApp(contPort, svcPort int, appName str
 		}
 	}
 	Logf("Creating a service-for-%v for selecting app=%v-pod", appName, appName)
-	service, err := f.ClientSet.Core().Services(f.Namespace.Name).Create(&v1.Service{
+	service, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(&v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "service-for-" + appName,
 			Labels: map[string]string{
@@ -521,7 +556,7 @@ func (f *Framework) CreatePodsPerNodeForSimpleApp(appName string, podSpec func(n
 		// one per node, but no more than maxCount.
 		if i <= maxCount {
 			Logf("%v/%v : Creating container with label app=%v-pod", i, maxCount, appName)
-			_, err := f.ClientSet.Core().Pods(f.Namespace.Name).Create(&v1.Pod{
+			_, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(&v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   fmt.Sprintf(appName+"-pod-%v", i),
 					Labels: labels,
@@ -634,6 +669,11 @@ func KubeDescribe(text string, body func()) bool {
 	return Describe("[k8s.io] "+text, body)
 }
 
+// Wrapper function for ginkgo It.  Adds "[Conformance]" tag and makes static analysis easier.
+func ConformanceIt(text string, body interface{}, timeout ...float64) bool {
+	return It(text+" [Conformance]", body, timeout...)
+}
+
 // PodStateVerification represents a verification of pod state.
 // Any time you have a set of pods that you want to operate against or query,
 // this struct can be used to declaratively identify those pods.
@@ -707,9 +747,9 @@ func filterLabels(selectors map[string]string, cli clientset.Interface, ns strin
 	if len(selectors) > 0 {
 		selector = labels.SelectorFromSet(labels.Set(selectors))
 		options := metav1.ListOptions{LabelSelector: selector.String()}
-		pl, err = cli.Core().Pods(ns).List(options)
+		pl, err = cli.CoreV1().Pods(ns).List(options)
 	} else {
-		pl, err = cli.Core().Pods(ns).List(metav1.ListOptions{})
+		pl, err = cli.CoreV1().Pods(ns).List(metav1.ListOptions{})
 	}
 	return pl, err
 }

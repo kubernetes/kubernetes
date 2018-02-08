@@ -18,7 +18,7 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/test/e2e/lifecycle",
     deps = [
-        "//pkg/api:go_default_library",
+        "//pkg/apis/core:go_default_library",
         "//pkg/kubelet/pod:go_default_library",
         "//pkg/util/version:go_default_library",
         "//test/e2e/chaosmonkey:go_default_library",

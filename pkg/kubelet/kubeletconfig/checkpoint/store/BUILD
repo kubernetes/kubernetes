@@ -12,8 +12,8 @@ go_test(
         "fsstore_test.go",
         "store_test.go",
     ],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/checkpoint/store",
-    library = ":go_default_library",
     deps = [
         "//pkg/kubelet/kubeletconfig/checkpoint:go_default_library",
         "//pkg/kubelet/kubeletconfig/util/files:go_default_library",

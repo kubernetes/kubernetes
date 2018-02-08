@@ -28,24 +28,32 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/discovery"
+	cacheddiscovery "k8s.io/client-go/discovery/cached"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
+	scaleclient "k8s.io/client-go/scale"
 	"k8s.io/client-go/transport"
 	"k8s.io/client-go/util/workqueue"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/batch"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/timer"
 	testutils "k8s.io/kubernetes/test/utils"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"k8s.io/client-go/dynamic"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 )
 
 const (
@@ -87,6 +95,7 @@ var _ = SIGDescribe("Load capacity", func() {
 	var configMapConfigs []*testutils.ConfigMapConfig
 
 	testCaseBaseName := "load"
+	var testPhaseDurations *timer.TestPhaseTimer
 
 	// Gathers metrics before teardown
 	// TODO add flag that allows to skip cleanup on failure
@@ -95,8 +104,9 @@ var _ = SIGDescribe("Load capacity", func() {
 		highLatencyRequests, metrics, err := framework.HighLatencyRequests(clientset, nodeCount)
 		framework.ExpectNoError(err)
 		if err == nil {
-			summaries := make([]framework.TestDataSummary, 0, 1)
+			summaries := make([]framework.TestDataSummary, 0, 2)
 			summaries = append(summaries, metrics)
+			summaries = append(summaries, testPhaseDurations)
 			framework.PrintSummaries(summaries, testCaseBaseName)
 			Expect(highLatencyRequests).NotTo(BeNumerically(">", 0), "There should be no high-latency requests")
 		}
@@ -122,6 +132,7 @@ var _ = SIGDescribe("Load capacity", func() {
 	f.NamespaceDeletionTimeout = time.Hour
 
 	BeforeEach(func() {
+		testPhaseDurations = timer.NewTestPhaseTimer()
 		clientset = f.ClientSet
 
 		ns = f.Namespace.Name
@@ -186,27 +197,31 @@ var _ = SIGDescribe("Load capacity", func() {
 		It(name, func() {
 			// Create a number of namespaces.
 			namespaceCount := (nodeCount + nodeCountPerNamespace - 1) / nodeCountPerNamespace
-			namespaces, err := CreateNamespaces(f, namespaceCount, fmt.Sprintf("load-%v-nodepods", itArg.podsPerNode))
+			namespaces, err := CreateNamespaces(f, namespaceCount, fmt.Sprintf("load-%v-nodepods", itArg.podsPerNode), testPhaseDurations.StartPhase(110, "namespace creation"))
 			framework.ExpectNoError(err)
 
 			totalPods := (itArg.podsPerNode - itArg.daemonsPerNode) * nodeCount
 			configs, secretConfigs, configMapConfigs = generateConfigs(totalPods, itArg.image, itArg.command, namespaces, itArg.kind, itArg.secretsPerPod, itArg.configMapsPerPod)
 
+			serviceCreationPhase := testPhaseDurations.StartPhase(120, "services creation")
+			defer serviceCreationPhase.End()
 			if itArg.services {
 				framework.Logf("Creating services")
 				services := generateServicesForConfigs(configs)
 				createService := func(i int) {
 					defer GinkgoRecover()
-					_, err := clientset.Core().Services(services[i].Namespace).Create(services[i])
+					_, err := clientset.CoreV1().Services(services[i].Namespace).Create(services[i])
 					framework.ExpectNoError(err)
 				}
 				workqueue.Parallelize(serviceOperationsParallelism, len(services), createService)
 				framework.Logf("%v Services created.", len(services))
 				defer func(services []*v1.Service) {
+					serviceCleanupPhase := testPhaseDurations.StartPhase(800, "services deletion")
+					defer serviceCleanupPhase.End()
 					framework.Logf("Starting to delete services...")
 					deleteService := func(i int) {
 						defer GinkgoRecover()
-						err := clientset.Core().Services(services[i].Namespace).Delete(services[i].Name, nil)
+						err := clientset.CoreV1().Services(services[i].Namespace).Delete(services[i].Name, nil)
 						framework.ExpectNoError(err)
 					}
 					workqueue.Parallelize(serviceOperationsParallelism, len(services), deleteService)
@@ -215,17 +230,26 @@ var _ = SIGDescribe("Load capacity", func() {
 			} else {
 				framework.Logf("Skipping service creation")
 			}
+			serviceCreationPhase.End()
 			// Create all secrets.
+			secretsCreationPhase := testPhaseDurations.StartPhase(130, "secrets creation")
+			defer secretsCreationPhase.End()
 			for i := range secretConfigs {
 				secretConfigs[i].Run()
 				defer secretConfigs[i].Stop()
 			}
+			secretsCreationPhase.End()
 			// Create all configmaps.
+			configMapsCreationPhase := testPhaseDurations.StartPhase(140, "configmaps creation")
+			defer configMapsCreationPhase.End()
 			for i := range configMapConfigs {
 				configMapConfigs[i].Run()
 				defer configMapConfigs[i].Stop()
 			}
-			// StartDeamon if needed
+			configMapsCreationPhase.End()
+			// StartDaemon if needed
+			daemonSetCreationPhase := testPhaseDurations.StartPhase(150, "daemonsets creation")
+			defer daemonSetCreationPhase.End()
 			for i := 0; i < itArg.daemonsPerNode; i++ {
 				daemonName := fmt.Sprintf("load-daemon-%v", i)
 				daemonConfig := &testutils.DaemonConfig{
@@ -245,6 +269,7 @@ var _ = SIGDescribe("Load capacity", func() {
 					))
 				}(daemonConfig)
 			}
+			daemonSetCreationPhase.End()
 
 			// Simulate lifetime of RC:
 			//  * create with initial size
@@ -261,9 +286,10 @@ var _ = SIGDescribe("Load capacity", func() {
 			// to make it possible to create/schedule them in the meantime.
 			// Currently we assume <throughput> pods/second average throughput.
 			// We may want to revisit it in the future.
-			framework.Logf("Starting to create ReplicationControllers...")
+			framework.Logf("Starting to create %v objects...", itArg.kind)
 			creatingTime := time.Duration(totalPods/throughput) * time.Second
-			createAllResources(configs, creatingTime)
+
+			createAllResources(configs, creatingTime, testPhaseDurations.StartPhase(200, "load pods creation"))
 			By("============================================================================")
 
 			// We would like to spread scaling replication controllers over time
@@ -271,27 +297,29 @@ var _ = SIGDescribe("Load capacity", func() {
 			// Currently we assume that <throughput> pods/second average throughput.
 			// The expected number of created/deleted pods is less than totalPods/3.
 			scalingTime := time.Duration(totalPods/(3*throughput)) * time.Second
-			framework.Logf("Starting to scale ReplicationControllers first time...")
-			scaleAllResources(configs, scalingTime)
+			framework.Logf("Starting to scale %v objects first time...", itArg.kind)
+			scaleAllResources(configs, scalingTime, testPhaseDurations.StartPhase(300, "scaling first time"))
 			By("============================================================================")
 
-			framework.Logf("Starting to scale ReplicationControllers second time...")
-			scaleAllResources(configs, scalingTime)
+			framework.Logf("Starting to scale %v objects second time...", itArg.kind)
+			scaleAllResources(configs, scalingTime, testPhaseDurations.StartPhase(400, "scaling second time"))
 			By("============================================================================")
 
 			// Cleanup all created replication controllers.
 			// Currently we assume <throughput> pods/second average deletion throughput.
 			// We may want to revisit it in the future.
 			deletingTime := time.Duration(totalPods/throughput) * time.Second
-			framework.Logf("Starting to delete ReplicationControllers...")
-			deleteAllResources(configs, deletingTime)
+			framework.Logf("Starting to delete %v objects...", itArg.kind)
+			deleteAllResources(configs, deletingTime, testPhaseDurations.StartPhase(500, "load pods deletion"))
 		})
 	}
 })
 
-func createClients(numberOfClients int) ([]clientset.Interface, []internalclientset.Interface, error) {
+func createClients(numberOfClients int) ([]clientset.Interface, []internalclientset.Interface, []scaleclient.ScalesGetter, error) {
 	clients := make([]clientset.Interface, numberOfClients)
 	internalClients := make([]internalclientset.Interface, numberOfClients)
+	scalesClients := make([]scaleclient.ScalesGetter, numberOfClients)
+
 	for i := 0; i < numberOfClients; i++ {
 		config, err := framework.LoadConfig()
 		Expect(err).NotTo(HaveOccurred())
@@ -307,11 +335,11 @@ func createClients(numberOfClients int) ([]clientset.Interface, []internalclient
 		// each client here.
 		transportConfig, err := config.TransportConfig()
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 		tlsConfig, err := transport.TLSConfigFor(transportConfig)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 		config.Transport = utilnet.SetTransportDefaults(&http.Transport{
 			Proxy:               http.ProxyFromEnvironment,
@@ -329,16 +357,38 @@ func createClients(numberOfClients int) ([]clientset.Interface, []internalclient
 
 		c, err := clientset.NewForConfig(config)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 		clients[i] = c
 		internalClient, err := internalclientset.NewForConfig(config)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 		internalClients[i] = internalClient
+
+		// create scale client, if GroupVersion or NegotiatedSerializer are not set
+		// assign default values - these fields are mandatory (required by RESTClientFor).
+		if config.GroupVersion == nil {
+			config.GroupVersion = &schema.GroupVersion{}
+		}
+		if config.NegotiatedSerializer == nil {
+			config.NegotiatedSerializer = legacyscheme.Codecs
+		}
+		restClient, err := restclient.RESTClientFor(config)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+		discoClient, err := discovery.NewDiscoveryClientForConfig(config)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+		cachedDiscoClient := cacheddiscovery.NewMemCacheClient(discoClient)
+		restMapper := discovery.NewDeferredDiscoveryRESTMapper(cachedDiscoClient, meta.InterfacesForUnstructured)
+		restMapper.Reset()
+		resolver := scaleclient.NewDiscoveryScaleKindResolver(cachedDiscoClient)
+		scalesClients[i] = scaleclient.New(restClient, restMapper, dynamic.LegacyAPIPathResolverFunc, resolver)
 	}
-	return clients, internalClients, nil
+	return clients, internalClients, scalesClients, nil
 }
 
 func computePodCounts(total int) (int, int, int) {
@@ -385,12 +435,13 @@ func generateConfigs(
 	// Create a number of clients to better simulate real usecase
 	// where not everyone is using exactly the same client.
 	rcsPerClient := 20
-	clients, internalClients, err := createClients((len(configs) + rcsPerClient - 1) / rcsPerClient)
+	clients, internalClients, scalesClients, err := createClients((len(configs) + rcsPerClient - 1) / rcsPerClient)
 	framework.ExpectNoError(err)
 
 	for i := 0; i < len(configs); i++ {
 		configs[i].SetClient(clients[i%len(clients)])
 		configs[i].SetInternalClient(internalClients[i%len(internalClients)])
+		configs[i].SetScalesClient(scalesClients[i%len(clients)])
 	}
 	for i := 0; i < len(secretConfigs); i++ {
 		secretConfigs[i].Client = clients[i%len(clients)]
@@ -523,7 +574,18 @@ func sleepUpTo(d time.Duration) {
 	}
 }
 
-func createAllResources(configs []testutils.RunObjectConfig, creatingTime time.Duration) {
+func retryWithExponentialBackOff(initialDuration time.Duration, fn wait.ConditionFunc) error {
+	backoff := wait.Backoff{
+		Duration: initialDuration,
+		Factor:   3,
+		Jitter:   0,
+		Steps:    6,
+	}
+	return wait.ExponentialBackoff(backoff, fn)
+}
+
+func createAllResources(configs []testutils.RunObjectConfig, creatingTime time.Duration, testPhase *timer.Phase) {
+	defer testPhase.End()
 	var wg sync.WaitGroup
 	wg.Add(len(configs))
 	for _, config := range configs {
@@ -540,7 +602,8 @@ func createResource(wg *sync.WaitGroup, config testutils.RunObjectConfig, creati
 	framework.ExpectNoError(config.Run(), fmt.Sprintf("creating %v %s", config.GetKind(), config.GetName()))
 }
 
-func scaleAllResources(configs []testutils.RunObjectConfig, scalingTime time.Duration) {
+func scaleAllResources(configs []testutils.RunObjectConfig, scalingTime time.Duration, testPhase *timer.Phase) {
+	defer testPhase.End()
 	var wg sync.WaitGroup
 	wg.Add(len(configs))
 	for _, config := range configs {
@@ -558,19 +621,40 @@ func scaleResource(wg *sync.WaitGroup, config testutils.RunObjectConfig, scaling
 	sleepUpTo(scalingTime)
 	newSize := uint(rand.Intn(config.GetReplicas()) + config.GetReplicas()/2)
 	framework.ExpectNoError(framework.ScaleResource(
-		config.GetClient(), config.GetInternalClient(), config.GetNamespace(), config.GetName(), newSize, true, config.GetKind()),
-		fmt.Sprintf("scaling rc %s for the first time", config.GetName()))
+		config.GetClient(),
+		config.GetInternalClient(),
+		config.GetScalesGetter(),
+		config.GetNamespace(),
+		config.GetName(),
+		newSize,
+		true,
+		config.GetKind(),
+		config.GetGroupResource(),
+	),
+		fmt.Sprintf("scaling %v %v", config.GetKind(), config.GetName()))
 
 	selector := labels.SelectorFromSet(labels.Set(map[string]string{"name": config.GetName()}))
 	options := metav1.ListOptions{
 		LabelSelector:   selector.String(),
 		ResourceVersion: "0",
 	}
-	_, err := config.GetClient().Core().Pods(config.GetNamespace()).List(options)
-	framework.ExpectNoError(err, fmt.Sprintf("listing pods from rc %v", config.GetName()))
+	listResourcePodsFunc := func() (bool, error) {
+		_, err := config.GetClient().CoreV1().Pods(config.GetNamespace()).List(options)
+		if err == nil {
+			return true, nil
+		}
+		framework.Logf("Failed to list pods from %v %v due to: %v", config.GetKind(), config.GetName(), err)
+		if framework.IsRetryableAPIError(err) {
+			return false, nil
+		}
+		return false, fmt.Errorf("Failed to list pods from %v %v with non-retriable error: %v", config.GetKind(), config.GetName(), err)
+	}
+	err := retryWithExponentialBackOff(100*time.Millisecond, listResourcePodsFunc)
+	framework.ExpectNoError(err)
 }
 
-func deleteAllResources(configs []testutils.RunObjectConfig, deletingTime time.Duration) {
+func deleteAllResources(configs []testutils.RunObjectConfig, deletingTime time.Duration, testPhase *timer.Phase) {
+	defer testPhase.End()
 	var wg sync.WaitGroup
 	wg.Add(len(configs))
 	for _, config := range configs {
@@ -595,7 +679,8 @@ func deleteResource(wg *sync.WaitGroup, config testutils.RunObjectConfig, deleti
 	}
 }
 
-func CreateNamespaces(f *framework.Framework, namespaceCount int, namePrefix string) ([]*v1.Namespace, error) {
+func CreateNamespaces(f *framework.Framework, namespaceCount int, namePrefix string, testPhase *timer.Phase) ([]*v1.Namespace, error) {
+	defer testPhase.End()
 	namespaces := []*v1.Namespace{}
 	for i := 1; i <= namespaceCount; i++ {
 		namespace, err := f.CreateNamespace(fmt.Sprintf("%v-%d", namePrefix, i), nil)

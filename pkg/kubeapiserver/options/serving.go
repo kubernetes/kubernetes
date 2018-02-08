@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package options contains flags and options for initializing an apiserver
+// Package options contains flags and options for initializing kube-apiserver
 package options
 
 import (
@@ -31,7 +31,7 @@ import (
 	kubeserver "k8s.io/kubernetes/pkg/kubeapiserver/server"
 )
 
-// NewSecureServingOptions gives default values for the kube-apiserver and federation-apiserver which are not the options wanted by
+// NewSecureServingOptions gives default values for the kube-apiserver which are not the options wanted by
 // "normal" API servers running on the platform
 func NewSecureServingOptions() *genericoptions.SecureServingOptions {
 	return &genericoptions.SecureServingOptions{
@@ -56,8 +56,8 @@ func DefaultAdvertiseAddress(s *genericoptions.ServerRunOptions, insecure *Insec
 	if s.AdvertiseAddress == nil || s.AdvertiseAddress.IsUnspecified() {
 		hostIP, err := insecure.DefaultExternalAddress()
 		if err != nil {
-			return fmt.Errorf("Unable to find suitable network address.error='%v'. "+
-				"Try to set the AdvertiseAddress directly or provide a valid BindAddress to fix this.", err)
+			return fmt.Errorf("unable to find suitable network address.error='%v'. "+
+				"Try to set the AdvertiseAddress directly or provide a valid BindAddress to fix this", err)
 		}
 		s.AdvertiseAddress = hostIP
 	}
@@ -85,7 +85,7 @@ func (s InsecureServingOptions) Validate(portArg string) []error {
 	errors := []error{}
 
 	if s.BindPort < 0 || s.BindPort > 65535 {
-		errors = append(errors, fmt.Errorf("--insecure-port %v must be between 0 and 65535, inclusive. 0 for turning off secure port.", s.BindPort))
+		errors = append(errors, fmt.Errorf("--insecure-port %v must be between 0 and 65535, inclusive. 0 for turning off insecure (HTTP) port", s.BindPort))
 	}
 
 	return errors
@@ -98,14 +98,17 @@ func (s *InsecureServingOptions) DefaultExternalAddress() (net.IP, error) {
 func (s *InsecureServingOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.IPVar(&s.BindAddress, "insecure-bind-address", s.BindAddress, ""+
 		"The IP address on which to serve the --insecure-port (set to 0.0.0.0 for all interfaces).")
+	fs.MarkDeprecated("insecure-bind-address", "This flag will be removed in a future version.")
 
 	fs.IntVar(&s.BindPort, "insecure-port", s.BindPort, ""+
 		"The port on which to serve unsecured, unauthenticated access. It is assumed "+
 		"that firewall rules are set up such that this port is not reachable from outside of "+
 		"the cluster and that port 443 on the cluster's public address is proxied to this "+
-		"port. This is performed by nginx in the default setup.")
+		"port. This is performed by nginx in the default setup. Set to zero to disable.")
+	fs.MarkDeprecated("insecure-port", "This flag will be removed in a future version.")
 }
 
+// TODO: remove it until kops stop using `--address`
 func (s *InsecureServingOptions) AddDeprecatedFlags(fs *pflag.FlagSet) {
 	fs.IPVar(&s.BindAddress, "address", s.BindAddress,
 		"DEPRECATED: see --insecure-bind-address instead.")

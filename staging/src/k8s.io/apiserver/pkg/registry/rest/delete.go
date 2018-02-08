@@ -48,7 +48,7 @@ const (
 // orphan dependents by default.
 type GarbageCollectionDeleteStrategy interface {
 	// DefaultGarbageCollectionPolicy returns the default garbage collection behavior.
-	DefaultGarbageCollectionPolicy() GarbageCollectionPolicy
+	DefaultGarbageCollectionPolicy(ctx genericapirequest.Context) GarbageCollectionPolicy
 }
 
 // RESTGracefulDeleteStrategy must be implemented by the registry that supports

@@ -32,7 +32,7 @@ func (s *SecureServingInfo) NewLoopbackClientConfig(token string, loopbackCert [
 		return nil, nil
 	}
 
-	host, port, err := LoopbackHostPort(s.BindAddress)
+	host, port, err := LoopbackHostPort(s.Listener.Addr().String())
 	if err != nil {
 		return nil, err
 	}
@@ -64,7 +64,7 @@ func LoopbackHostPort(bindAddress string) (string, string, error) {
 	}
 
 	// Value is expected to be an IP or DNS name, not "0.0.0.0".
-	if host == "0.0.0.0" {
+	if host == "0.0.0.0" || host == "::" {
 		host = "localhost"
 		// Get ip of local interface, but fall back to "localhost".
 		// Note that "localhost" is resolved with the external nameserver first with Go's stdlib.

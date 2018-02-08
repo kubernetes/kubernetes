@@ -22,12 +22,12 @@ import (
 	"strconv"
 
 	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
 // PodRequestsAndLimits returns a dictionary of all defined resources summed up for all
 // containers of the pod.
-func PodRequestsAndLimits(pod *api.Pod) (reqs map[api.ResourceName]resource.Quantity, limits map[api.ResourceName]resource.Quantity, err error) {
+func PodRequestsAndLimits(pod *api.Pod) (reqs map[api.ResourceName]resource.Quantity, limits map[api.ResourceName]resource.Quantity) {
 	reqs, limits = map[api.ResourceName]resource.Quantity{}, map[api.ResourceName]resource.Quantity{}
 	for _, container := range pod.Spec.Containers {
 		for name, quantity := range container.Resources.Requests {

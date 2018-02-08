@@ -13,8 +13,8 @@ go_test(
         "policy_comparator_test.go",
         "rule_test.go",
     ],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/pkg/registry/rbac/validation",
-    library = ":go_default_library",
     deps = [
         "//pkg/apis/rbac:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",

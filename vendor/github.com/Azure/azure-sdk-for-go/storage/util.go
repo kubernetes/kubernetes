@@ -1,5 +1,19 @@
 package storage
 
+// Copyright 2017 Microsoft Corporation
+//
+//  Licensed under the Apache License, Version 2.0 (the "License");
+//  you may not use this file except in compliance with the License.
+//  You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+//  Unless required by applicable law or agreed to in writing, software
+//  distributed under the License is distributed on an "AS IS" BASIS,
+//  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//  See the License for the specific language governing permissions and
+//  limitations under the License.
+
 import (
 	"bytes"
 	"crypto/hmac"
@@ -18,7 +32,29 @@ import (
 )
 
 var (
-	fixedTime = time.Date(2050, time.December, 20, 21, 55, 0, 0, time.FixedZone("GMT", -6))
+	fixedTime         = time.Date(2050, time.December, 20, 21, 55, 0, 0, time.FixedZone("GMT", -6))
+	accountSASOptions = AccountSASTokenOptions{
+		Services: Services{
+			Blob: true,
+		},
+		ResourceTypes: ResourceTypes{
+			Service:   true,
+			Container: true,
+			Object:    true,
+		},
+		Permissions: Permissions{
+			Read:    true,
+			Write:   true,
+			Delete:  true,
+			List:    true,
+			Add:     true,
+			Create:  true,
+			Update:  true,
+			Process: true,
+		},
+		Expiry:   fixedTime,
+		UseHTTPS: true,
+	}
 )
 
 func (c Client) computeHmac256(message string) string {
@@ -33,6 +69,10 @@ func currentTimeRfc1123Formatted() string {
 
 func timeRfc1123Formatted(t time.Time) string {
 	return t.Format(http.TimeFormat)
+}
+
+func timeRFC3339Formatted(t time.Time) string {
+	return t.Format("2006-01-02T15:04:05.0000000Z")
 }
 
 func mergeParams(v1, v2 url.Values) url.Values {
@@ -136,7 +176,7 @@ func addTimeout(params url.Values, timeout uint) url.Values {
 
 func addSnapshot(params url.Values, snapshot *time.Time) url.Values {
 	if snapshot != nil {
-		params.Add("snapshot", timeRfc1123Formatted(*snapshot))
+		params.Add("snapshot", timeRFC3339Formatted(*snapshot))
 	}
 	return params
 }

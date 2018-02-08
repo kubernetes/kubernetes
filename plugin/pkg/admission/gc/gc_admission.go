@@ -30,9 +30,12 @@ import (
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 )
 
+// PluginName indicates name of admission plugin.
+const PluginName = "OwnerReferencesPermissionEnforcement"
+
 // Register registers a plugin
 func Register(plugins *admission.Plugins) {
-	plugins.Register("OwnerReferencesPermissionEnforcement", func(config io.Reader) (admission.Interface, error) {
+	plugins.Register(PluginName, func(config io.Reader) (admission.Interface, error) {
 		// the pods/status endpoint is ignored by this plugin since old kubelets
 		// corrupt them.  the pod status strategy ensures status updates cannot mutate
 		// ownerRef.
@@ -63,6 +66,8 @@ type gcPermissionsEnforcement struct {
 	whiteList []whiteListItem
 }
 
+var _ admission.ValidationInterface = &gcPermissionsEnforcement{}
+
 // whiteListItem describes an entry in a whitelist ignored by gc permission enforcement.
 type whiteListItem struct {
 	groupResource schema.GroupResource
@@ -79,7 +84,7 @@ func (a *gcPermissionsEnforcement) isWhiteListed(groupResource schema.GroupResou
 	return false
 }
 
-func (a *gcPermissionsEnforcement) Admit(attributes admission.Attributes) (err error) {
+func (a *gcPermissionsEnforcement) Validate(attributes admission.Attributes) (err error) {
 	// // if the request is in the whitelist, we skip mutation checks for this resource.
 	if a.isWhiteListed(attributes.GetResource().GroupResource(), attributes.GetSubresource()) {
 		return nil
@@ -102,8 +107,8 @@ func (a *gcPermissionsEnforcement) Admit(attributes admission.Attributes) (err e
 		ResourceRequest: true,
 		Path:            "",
 	}
-	allowed, reason, err := a.authorizer.Authorize(deleteAttributes)
-	if !allowed {
+	decision, reason, err := a.authorizer.Authorize(deleteAttributes)
+	if decision != authorizer.DecisionAllow {
 		return admission.NewForbidden(attributes, fmt.Errorf("cannot set an ownerRef on a resource you can't delete: %v, %v", reason, err))
 	}
 
@@ -120,8 +125,8 @@ func (a *gcPermissionsEnforcement) Admit(attributes admission.Attributes) (err e
 		// resources. User needs to have delete permission on all the
 		// matched Resources.
 		for _, record := range records {
-			allowed, reason, err := a.authorizer.Authorize(record)
-			if !allowed {
+			decision, reason, err := a.authorizer.Authorize(record)
+			if decision != authorizer.DecisionAllow {
 				return admission.NewForbidden(attributes, fmt.Errorf("cannot set blockOwnerDeletion if an ownerReference refers to a resource you can't set finalizers on: %v, %v", reason, err))
 			}
 		}
@@ -260,7 +265,7 @@ func (a *gcPermissionsEnforcement) SetRESTMapper(restMapper meta.RESTMapper) {
 	a.restMapper = restMapper
 }
 
-func (a *gcPermissionsEnforcement) Validate() error {
+func (a *gcPermissionsEnforcement) ValidateInitialization() error {
 	if a.authorizer == nil {
 		return fmt.Errorf("missing authorizer")
 	}

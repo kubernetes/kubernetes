@@ -29,9 +29,10 @@ kube::golang::server_targets() {
     cmd/kubelet
     cmd/kubeadm
     cmd/hyperkube
+    cmd/kube-scheduler
     vendor/k8s.io/kube-aggregator
     vendor/k8s.io/apiextensions-apiserver
-    plugin/cmd/kube-scheduler
+    cluster/gce/gci/mounter
   )
   echo "${targets[@]}"
 }
@@ -44,6 +45,7 @@ readonly KUBE_SERVER_BINARIES=("${KUBE_SERVER_TARGETS[@]##*/}")
 kube::golang::node_targets() {
   local targets=(
     cmd/kube-proxy
+    cmd/kubeadm
     cmd/kubelet
   )
   echo "${targets[@]}"
@@ -125,7 +127,6 @@ fi
 # If you update this list, please also update build/BUILD.
 readonly KUBE_CLIENT_TARGETS=(
   cmd/kubectl
-  federation/cmd/kubefed
 )
 readonly KUBE_CLIENT_BINARIES=("${KUBE_CLIENT_TARGETS[@]##*/}")
 readonly KUBE_CLIENT_BINARIES_WIN=("${KUBE_CLIENT_BINARIES[@]/%/.exe}")
@@ -140,7 +141,6 @@ kube::golang::test_targets() {
     cmd/genyaml
     cmd/genswaggertypedocs
     cmd/linkcheck
-    federation/cmd/genfeddocs
     vendor/github.com/onsi/ginkgo/ginkgo
     test/e2e/e2e.test
   )
@@ -153,12 +153,10 @@ readonly KUBE_TEST_BINARIES_WIN=("${KUBE_TEST_BINARIES[@]/%/.exe}")
 readonly KUBE_TEST_PORTABLE=(
   test/e2e/testing-manifests
   test/kubemark
-  federation/develop
   hack/e2e.go
   hack/e2e-internal
   hack/get-build.sh
   hack/ginkgo-e2e.sh
-  hack/federated-ginkgo-e2e.sh
   hack/lib
 )
 
@@ -183,10 +181,10 @@ readonly KUBE_TEST_SERVER_TARGETS=($(kube::golang::server_test_targets))
 readonly KUBE_TEST_SERVER_BINARIES=("${KUBE_TEST_SERVER_TARGETS[@]##*/}")
 readonly KUBE_TEST_SERVER_PLATFORMS=("${KUBE_SERVER_PLATFORMS[@]}")
 
-# Gigabytes desired for parallel platform builds. 11 is fairly
-# arbitrary, but is a reasonable splitting point for 2015
-# laptops-versus-not.
-readonly KUBE_PARALLEL_BUILD_MEMORY=11
+# Gigabytes necessary for parallel platform builds.
+# As of January 2018, RAM usage is exceeding 30G
+# Setting to 40 to provide some headroom
+readonly KUBE_PARALLEL_BUILD_MEMORY=40
 
 # TODO(pipejakob) gke-certificates-controller is included here to exercise its
 # compilation, but it doesn't need to be distributed in any of our tars. Its
@@ -324,8 +322,8 @@ EOF
   local go_version
   go_version=($(go version))
   local minimum_go_version
-  minimum_go_version=go1.8.3
-  if [[ "${go_version[2]}" < "${minimum_go_version}" && "${go_version[2]}" != "devel" ]]; then
+  minimum_go_version=go1.9.1
+  if [[ "${minimum_go_version}" != $(echo -e "${minimum_go_version}\n${go_version[2]}" | sort -s -t. -k 1,1 -k 2,2n -k 3,3n | head -n1) && "${go_version[2]}" != "devel" ]]; then
     kube::log::usage_from_stdin <<EOF
 Detected go version: ${go_version[*]}.
 Kubernetes requires ${minimum_go_version} or greater.

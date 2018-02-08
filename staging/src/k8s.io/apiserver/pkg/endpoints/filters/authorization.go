@@ -47,7 +47,8 @@ func WithAuthorization(handler http.Handler, requestContextMapper request.Reques
 			return
 		}
 		authorized, reason, err := a.Authorize(attributes)
-		if authorized {
+		// an authorizer like RBAC could encounter evaluation errors and still allow the request, so authorizer decision is checked before error here.
+		if authorized == authorizer.DecisionAllow {
 			handler.ServeHTTP(w, req)
 			return
 		}

@@ -37,9 +37,9 @@ else
   readonly use_custom_instance_list=
 fi
 
-readonly master_ssh_supported_providers="gce aws"
-readonly node_ssh_supported_providers="gce gke aws"
-readonly gcloud_supported_providers="gce gke"
+readonly master_ssh_supported_providers="gce aws kubernetes-anywhere"
+readonly node_ssh_supported_providers="gce gke aws kubernetes-anywhere"
+readonly gcloud_supported_providers="gce gke kubernetes-anywhere"
 
 readonly master_logfiles="kube-apiserver kube-apiserver-audit kube-scheduler rescheduler kube-controller-manager etcd etcd-events glbc cluster-autoscaler kube-addon-manager fluentd"
 readonly node_logfiles="kube-proxy fluentd node-problem-detector"
@@ -50,7 +50,7 @@ readonly gce_logfiles="startupscript"
 readonly kern_logfile="kern"
 readonly initd_logfiles="docker"
 readonly supervisord_logfiles="kubelet supervisor/supervisord supervisor/kubelet-stdout supervisor/kubelet-stderr supervisor/docker-stdout supervisor/docker-stderr"
-readonly systemd_services="kubelet docker"
+readonly systemd_services="kubelet ${LOG_DUMP_SYSTEMD_SERVICES:-docker}"
 
 # Limit the number of concurrent node connections so that we don't run out of
 # file descriptors for large clusters.
@@ -141,7 +141,7 @@ function save-logs() {
       fi
     else
       case "${KUBERNETES_PROVIDER}" in
-        gce|gke)
+        gce|gke|kubernetes-anywhere)
           files="${files} ${gce_logfiles}"
           ;;
         aws)
@@ -219,7 +219,7 @@ function dump_masters() {
 }
 
 function dump_nodes() {
-  local node_names
+  local node_names=()
   if [[ -n "${1:-}" ]]; then
     echo "Dumping logs for nodes provided as args to dump_nodes() function"
     node_names=( "$@" )
@@ -232,7 +232,9 @@ function dump_nodes() {
   else
     echo "Detecting nodes in the cluster"
     detect-node-names &> /dev/null
-    node_names=( "${NODE_NAMES[@]}" )
+    if [[ -n "${NODE_NAMES:-}" ]]; then
+      node_names=( "${NODE_NAMES[@]}" )
+    fi
   fi
 
   if [[ "${#node_names[@]}" == 0 ]]; then
@@ -283,7 +285,7 @@ function dump_nodes_with_logexporter() {
   echo "Detecting nodes in the cluster"
   detect-node-names &> /dev/null
 
-  if [[ "${#NODE_NAMES[@]}" == 0 ]]; then
+  if [[ -z "${NODE_NAMES:-}" ]]; then
     echo "No nodes found!"
     return
   fi

@@ -28,7 +28,7 @@ import (
 
 	. "github.com/onsi/gomega"
 
-	apps "k8s.io/api/apps/v1beta1"
+	apps "k8s.io/api/apps/v1"
 	appsV1beta2 "k8s.io/api/apps/v1beta2"
 	"k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
@@ -83,7 +83,7 @@ func NewStatefulSetTester(c clientset.Interface) *StatefulSetTester {
 
 // GetStatefulSet gets the StatefulSet named name in namespace.
 func (s *StatefulSetTester) GetStatefulSet(namespace, name string) *apps.StatefulSet {
-	ss, err := s.c.AppsV1beta1().StatefulSets(namespace).Get(name, metav1.GetOptions{})
+	ss, err := s.c.AppsV1().StatefulSets(namespace).Get(name, metav1.GetOptions{})
 	if err != nil {
 		Failf("Failed to get StatefulSet %s/%s: %v", namespace, name, err)
 	}
@@ -108,7 +108,7 @@ func (s *StatefulSetTester) CreateStatefulSet(manifestPath, ns string) *apps.Sta
 	Expect(err).NotTo(HaveOccurred())
 
 	Logf(fmt.Sprintf("creating statefulset %v/%v with %d replicas and selector %+v", ss.Namespace, ss.Name, *(ss.Spec.Replicas), ss.Spec.Selector))
-	_, err = s.c.AppsV1beta1().StatefulSets(ns).Create(ss)
+	_, err = s.c.AppsV1().StatefulSets(ns).Create(ss)
 	Expect(err).NotTo(HaveOccurred())
 	s.WaitForRunningAndReady(*ss.Spec.Replicas, ss)
 	return ss
@@ -175,7 +175,7 @@ func (s *StatefulSetTester) Saturate(ss *apps.StatefulSet) {
 func (s *StatefulSetTester) DeleteStatefulPodAtIndex(index int, ss *apps.StatefulSet) {
 	name := getStatefulSetPodNameAtIndex(index, ss)
 	noGrace := int64(0)
-	if err := s.c.Core().Pods(ss.Namespace).Delete(name, &metav1.DeleteOptions{GracePeriodSeconds: &noGrace}); err != nil {
+	if err := s.c.CoreV1().Pods(ss.Namespace).Delete(name, &metav1.DeleteOptions{GracePeriodSeconds: &noGrace}); err != nil {
 		Failf("Failed to delete stateful pod %v for StatefulSet %v/%v: %v", name, ss.Namespace, ss.Name, err)
 	}
 }
@@ -186,7 +186,7 @@ type VerifyStatefulPodFunc func(*v1.Pod)
 // VerifyPodAtIndex applies a visitor patter to the Pod at index in ss. verify is is applied to the Pod to "visit" it.
 func (s *StatefulSetTester) VerifyPodAtIndex(index int, ss *apps.StatefulSet, verify VerifyStatefulPodFunc) {
 	name := getStatefulSetPodNameAtIndex(index, ss)
-	pod, err := s.c.Core().Pods(ss.Namespace).Get(name, metav1.GetOptions{})
+	pod, err := s.c.CoreV1().Pods(ss.Namespace).Get(name, metav1.GetOptions{})
 	Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Failed to get stateful pod %s for StatefulSet %s/%s", name, ss.Namespace, ss.Name))
 	verify(pod)
 }
@@ -245,12 +245,12 @@ func (s *StatefulSetTester) Restart(ss *apps.StatefulSet) {
 
 func (s *StatefulSetTester) update(ns, name string, update func(ss *apps.StatefulSet)) *apps.StatefulSet {
 	for i := 0; i < 3; i++ {
-		ss, err := s.c.AppsV1beta1().StatefulSets(ns).Get(name, metav1.GetOptions{})
+		ss, err := s.c.AppsV1().StatefulSets(ns).Get(name, metav1.GetOptions{})
 		if err != nil {
 			Failf("failed to get statefulset %q: %v", name, err)
 		}
 		update(ss)
-		ss, err = s.c.AppsV1beta1().StatefulSets(ns).Update(ss)
+		ss, err = s.c.AppsV1().StatefulSets(ns).Update(ss)
 		if err == nil {
 			return ss
 		}
@@ -266,7 +266,7 @@ func (s *StatefulSetTester) update(ns, name string, update func(ss *apps.Statefu
 func (s *StatefulSetTester) GetPodList(ss *apps.StatefulSet) *v1.PodList {
 	selector, err := metav1.LabelSelectorAsSelector(ss.Spec.Selector)
 	ExpectNoError(err)
-	podList, err := s.c.Core().Pods(ss.Namespace).List(metav1.ListOptions{LabelSelector: selector.String()})
+	podList, err := s.c.CoreV1().Pods(ss.Namespace).List(metav1.ListOptions{LabelSelector: selector.String()})
 	ExpectNoError(err)
 	return podList
 }
@@ -328,7 +328,7 @@ func (s *StatefulSetTester) WaitForRunning(numPodsRunning, numPodsReady int32, s
 func (s *StatefulSetTester) WaitForState(ss *apps.StatefulSet, until func(*apps.StatefulSet, *v1.PodList) (bool, error)) {
 	pollErr := wait.PollImmediate(StatefulSetPoll, StatefulSetTimeout,
 		func() (bool, error) {
-			ssGet, err := s.c.AppsV1beta1().StatefulSets(ss.Namespace).Get(ss.Name, metav1.GetOptions{})
+			ssGet, err := s.c.AppsV1().StatefulSets(ss.Namespace).Get(ss.Name, metav1.GetOptions{})
 			if err != nil {
 				return false, err
 			}
@@ -344,7 +344,7 @@ func (s *StatefulSetTester) WaitForState(ss *apps.StatefulSet, until func(*apps.
 // The returned StatefulSet contains such a StatefulSetStatus
 func (s *StatefulSetTester) WaitForStatus(set *apps.StatefulSet) *apps.StatefulSet {
 	s.WaitForState(set, func(set2 *apps.StatefulSet, pods *v1.PodList) (bool, error) {
-		if set2.Status.ObservedGeneration != nil && *set2.Status.ObservedGeneration >= set.Generation {
+		if set2.Status.ObservedGeneration >= set.Generation {
 			set = set2
 			return true, nil
 		}
@@ -613,11 +613,11 @@ func (s *StatefulSetTester) WaitForStatusReadyReplicas(ss *apps.StatefulSet, exp
 	ns, name := ss.Namespace, ss.Name
 	pollErr := wait.PollImmediate(StatefulSetPoll, StatefulSetTimeout,
 		func() (bool, error) {
-			ssGet, err := s.c.AppsV1beta1().StatefulSets(ns).Get(name, metav1.GetOptions{})
+			ssGet, err := s.c.AppsV1().StatefulSets(ns).Get(name, metav1.GetOptions{})
 			if err != nil {
 				return false, err
 			}
-			if *ssGet.Status.ObservedGeneration < ss.Generation {
+			if ssGet.Status.ObservedGeneration < ss.Generation {
 				return false, nil
 			}
 			if ssGet.Status.ReadyReplicas != expectedReplicas {
@@ -638,11 +638,11 @@ func (s *StatefulSetTester) WaitForStatusReplicas(ss *apps.StatefulSet, expected
 	ns, name := ss.Namespace, ss.Name
 	pollErr := wait.PollImmediate(StatefulSetPoll, StatefulSetTimeout,
 		func() (bool, error) {
-			ssGet, err := s.c.AppsV1beta1().StatefulSets(ns).Get(name, metav1.GetOptions{})
+			ssGet, err := s.c.AppsV1().StatefulSets(ns).Get(name, metav1.GetOptions{})
 			if err != nil {
 				return false, err
 			}
-			if *ssGet.Status.ObservedGeneration < ss.Generation {
+			if ssGet.Status.ObservedGeneration < ss.Generation {
 				return false, nil
 			}
 			if ssGet.Status.Replicas != expectedReplicas {
@@ -676,7 +676,7 @@ func (s *StatefulSetTester) SortStatefulPods(pods *v1.PodList) {
 // DeleteAllStatefulSets deletes all StatefulSet API Objects in Namespace ns.
 func DeleteAllStatefulSets(c clientset.Interface, ns string) {
 	sst := &StatefulSetTester{c: c}
-	ssList, err := c.AppsV1beta1().StatefulSets(ns).List(metav1.ListOptions{LabelSelector: labels.Everything().String()})
+	ssList, err := c.AppsV1().StatefulSets(ns).List(metav1.ListOptions{LabelSelector: labels.Everything().String()})
 	ExpectNoError(err)
 
 	// Scale down each statefulset, then delete it completely.
@@ -692,7 +692,7 @@ func DeleteAllStatefulSets(c clientset.Interface, ns string) {
 		Logf("Deleting statefulset %v", ss.Name)
 		// Use OrphanDependents=false so it's deleted synchronously.
 		// We already made sure the Pods are gone inside Scale().
-		if err := c.AppsV1beta1().StatefulSets(ss.Namespace).Delete(ss.Name, &metav1.DeleteOptions{OrphanDependents: new(bool)}); err != nil {
+		if err := c.AppsV1().StatefulSets(ss.Namespace).Delete(ss.Name, &metav1.DeleteOptions{OrphanDependents: new(bool)}); err != nil {
 			errList = append(errList, fmt.Sprintf("%v", err))
 		}
 	}
@@ -701,7 +701,7 @@ func DeleteAllStatefulSets(c clientset.Interface, ns string) {
 	pvNames := sets.NewString()
 	// TODO: Don't assume all pvcs in the ns belong to a statefulset
 	pvcPollErr := wait.PollImmediate(StatefulSetPoll, StatefulSetTimeout, func() (bool, error) {
-		pvcList, err := c.Core().PersistentVolumeClaims(ns).List(metav1.ListOptions{LabelSelector: labels.Everything().String()})
+		pvcList, err := c.CoreV1().PersistentVolumeClaims(ns).List(metav1.ListOptions{LabelSelector: labels.Everything().String()})
 		if err != nil {
 			Logf("WARNING: Failed to list pvcs, retrying %v", err)
 			return false, nil
@@ -710,7 +710,7 @@ func DeleteAllStatefulSets(c clientset.Interface, ns string) {
 			pvNames.Insert(pvc.Spec.VolumeName)
 			// TODO: Double check that there are no pods referencing the pvc
 			Logf("Deleting pvc: %v with volume %v", pvc.Name, pvc.Spec.VolumeName)
-			if err := c.Core().PersistentVolumeClaims(ns).Delete(pvc.Name, nil); err != nil {
+			if err := c.CoreV1().PersistentVolumeClaims(ns).Delete(pvc.Name, nil); err != nil {
 				return false, nil
 			}
 		}
@@ -721,7 +721,7 @@ func DeleteAllStatefulSets(c clientset.Interface, ns string) {
 	}
 
 	pollErr := wait.PollImmediate(StatefulSetPoll, StatefulSetTimeout, func() (bool, error) {
-		pvList, err := c.Core().PersistentVolumes().List(metav1.ListOptions{LabelSelector: labels.Everything().String()})
+		pvList, err := c.CoreV1().PersistentVolumes().List(metav1.ListOptions{LabelSelector: labels.Everything().String()})
 		if err != nil {
 			Logf("WARNING: Failed to list pvs, retrying %v", err)
 			return false, nil
@@ -790,7 +790,7 @@ func NewStatefulSet(name, ns, governingSvcName string, replicas int32, statefulP
 	return &apps.StatefulSet{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "StatefulSet",
-			APIVersion: "apps/v1beta1",
+			APIVersion: "apps/v1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
@@ -872,7 +872,7 @@ func (sp statefulPodsByOrdinal) Less(i, j int) bool {
 type updateStatefulSetFunc func(*apps.StatefulSet)
 
 func UpdateStatefulSetWithRetries(c clientset.Interface, namespace, name string, applyUpdate updateStatefulSetFunc) (statefulSet *apps.StatefulSet, err error) {
-	statefulSets := c.AppsV1beta1().StatefulSets(namespace)
+	statefulSets := c.AppsV1().StatefulSets(namespace)
 	var updateErr error
 	pollErr := wait.Poll(10*time.Millisecond, 1*time.Minute, func() (bool, error) {
 		if statefulSet, err = statefulSets.Get(name, metav1.GetOptions{}); err != nil {

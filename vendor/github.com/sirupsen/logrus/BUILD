@@ -15,11 +15,23 @@ go_library(
         "text_formatter.go",
         "writer.go",
     ] + select({
-        "@io_bazel_rules_go//go/platform:darwin_amd64": [
+        "@io_bazel_rules_go//go/platform:darwin": [
             "terminal_bsd.go",
         ],
-        "@io_bazel_rules_go//go/platform:linux_amd64": [
+        "@io_bazel_rules_go//go/platform:dragonfly": [
+            "terminal_bsd.go",
+        ],
+        "@io_bazel_rules_go//go/platform:freebsd": [
+            "terminal_bsd.go",
+        ],
+        "@io_bazel_rules_go//go/platform:linux": [
             "terminal_linux.go",
+        ],
+        "@io_bazel_rules_go//go/platform:netbsd": [
+            "terminal_bsd.go",
+        ],
+        "@io_bazel_rules_go//go/platform:openbsd": [
+            "terminal_bsd.go",
         ],
         "//conditions:default": [],
     }),
@@ -28,10 +40,22 @@ go_library(
     deps = [
         "//vendor/golang.org/x/crypto/ssh/terminal:go_default_library",
     ] + select({
-        "@io_bazel_rules_go//go/platform:darwin_amd64": [
+        "@io_bazel_rules_go//go/platform:darwin": [
             "//vendor/golang.org/x/sys/unix:go_default_library",
         ],
-        "@io_bazel_rules_go//go/platform:linux_amd64": [
+        "@io_bazel_rules_go//go/platform:dragonfly": [
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:freebsd": [
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:linux": [
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:netbsd": [
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:openbsd": [
             "//vendor/golang.org/x/sys/unix:go_default_library",
         ],
         "//conditions:default": [],

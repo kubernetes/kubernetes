@@ -47,6 +47,7 @@ import (
 	utilflag "k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/client-go/discovery"
 	restclient "k8s.io/client-go/rest"
+	"strconv"
 )
 
 func setUp(t *testing.T) Config {
@@ -481,6 +482,15 @@ NextTest:
 				},
 				SNICertKeys: namedCertKeys,
 			}
+			// use a random free port
+			ln, err := net.Listen("tcp", "127.0.0.1:0")
+			if err != nil {
+				t.Errorf("failed to listen on 127.0.0.1:0")
+			}
+
+			secureOptions.Listener = ln
+			// get port
+			secureOptions.BindPort = ln.Addr().(*net.TCPAddr).Port
 			config.LoopbackClientConfig = &restclient.Config{}
 			if err := secureOptions.ApplyTo(&config); err != nil {
 				t.Errorf("%q - failed applying the SecureServingOptions: %v", title, err)
@@ -492,9 +502,6 @@ NextTest:
 				t.Errorf("%q - failed creating the server: %v", title, err)
 				return
 			}
-
-			// patch in a 0-port to enable auto port allocation
-			s.SecureServingInfo.BindAddress = "127.0.0.1:0"
 
 			// add poststart hook to know when the server is up.
 			startedCh := make(chan struct{})
@@ -517,9 +524,8 @@ NextTest:
 
 			<-startedCh
 
-			effectiveSecurePort := fmt.Sprintf("%d", preparedServer.EffectiveSecurePort())
 			// try to dial
-			addr := fmt.Sprintf("localhost:%s", effectiveSecurePort)
+			addr := fmt.Sprintf("localhost:%d", secureOptions.BindPort)
 			t.Logf("Dialing %s as %q", addr, test.ServerName)
 			conn, err := tls.Dial("tcp", addr, &tls.Config{
 				RootCAs:    roots,
@@ -547,7 +553,7 @@ NextTest:
 			if len(test.LoopbackClientBindAddressOverride) != 0 {
 				host = test.LoopbackClientBindAddressOverride
 			}
-			s.LoopbackClientConfig.Host = net.JoinHostPort(host, effectiveSecurePort)
+			s.LoopbackClientConfig.Host = net.JoinHostPort(host, strconv.Itoa(secureOptions.BindPort))
 			if test.ExpectLoopbackClientError {
 				if err == nil {
 					t.Errorf("%q - expected error creating loopback client config", title)

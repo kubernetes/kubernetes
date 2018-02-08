@@ -33,12 +33,12 @@ import (
 const resizeNodeReadyTimeout = 2 * time.Minute
 
 func resizeRC(c clientset.Interface, ns, name string, replicas int32) error {
-	rc, err := c.Core().ReplicationControllers(ns).Get(name, metav1.GetOptions{})
+	rc, err := c.CoreV1().ReplicationControllers(ns).Get(name, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
 	*(rc.Spec.Replicas) = replicas
-	_, err = c.Core().ReplicationControllers(rc.Namespace).Update(rc)
+	_, err = c.CoreV1().ReplicationControllers(rc.Namespace).Update(rc)
 	return err
 }
 

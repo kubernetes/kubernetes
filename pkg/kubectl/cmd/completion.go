@@ -46,7 +46,7 @@ const defaultBoilerPlate = `
 var (
 	completion_long = templates.LongDesc(i18n.T(`
 		Output shell completion code for the specified shell (bash or zsh).
-		The shell code must be evalutated to provide interactive
+		The shell code must be evaluated to provide interactive
 		completion of kubectl commands.  This can be done by sourcing it from
 		the .bash_profile.
 
@@ -97,7 +97,8 @@ func NewCmdCompletion(out io.Writer, boilerPlate string) *cobra.Command {
 	}
 
 	cmd := &cobra.Command{
-		Use:     "completion SHELL",
+		Use: "completion SHELL",
+		DisableFlagsInUseLine: true,
 		Short:   i18n.T("Output shell completion code for the specified shell (bash or zsh)"),
 		Long:    completion_long,
 		Example: completion_example,

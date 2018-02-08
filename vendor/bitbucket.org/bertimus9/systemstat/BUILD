@@ -4,9 +4,40 @@ go_library(
     name = "go_default_library",
     srcs = [
         "systemstat.go",
+        "utils.go",
     ] + select({
-        "@io_bazel_rules_go//go/platform:linux_amd64": [
+        "@io_bazel_rules_go//go/platform:android": [
+            "systemstat_ex.go",
+        ],
+        "@io_bazel_rules_go//go/platform:darwin": [
+            "systemstat_ex.go",
+        ],
+        "@io_bazel_rules_go//go/platform:dragonfly": [
+            "systemstat_ex.go",
+        ],
+        "@io_bazel_rules_go//go/platform:freebsd": [
+            "systemstat_ex.go",
+        ],
+        "@io_bazel_rules_go//go/platform:linux": [
             "systemstat_linux.go",
+        ],
+        "@io_bazel_rules_go//go/platform:nacl": [
+            "systemstat_ex.go",
+        ],
+        "@io_bazel_rules_go//go/platform:netbsd": [
+            "systemstat_ex.go",
+        ],
+        "@io_bazel_rules_go//go/platform:openbsd": [
+            "systemstat_ex.go",
+        ],
+        "@io_bazel_rules_go//go/platform:plan9": [
+            "systemstat_ex.go",
+        ],
+        "@io_bazel_rules_go//go/platform:solaris": [
+            "systemstat_ex.go",
+        ],
+        "@io_bazel_rules_go//go/platform:windows": [
+            "systemstat_ex.go",
         ],
         "//conditions:default": [],
     }),

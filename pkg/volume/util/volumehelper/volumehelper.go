@@ -136,3 +136,24 @@ func NewSafeFormatAndMountFromHost(pluginName string, host volume.VolumeHost) *m
 	exec := host.GetExec(pluginName)
 	return &mount.SafeFormatAndMount{Interface: mounter, Exec: exec}
 }
+
+// GetVolumeMode retrieves VolumeMode from pv.
+// If the volume doesn't have PersistentVolume, it's an inline volume,
+// should return volumeMode as filesystem to keep existing behavior.
+func GetVolumeMode(volumeSpec *volume.Spec) (v1.PersistentVolumeMode, error) {
+	if volumeSpec == nil || volumeSpec.PersistentVolume == nil {
+		return v1.PersistentVolumeFilesystem, nil
+	}
+	if volumeSpec.PersistentVolume.Spec.VolumeMode != nil {
+		return *volumeSpec.PersistentVolume.Spec.VolumeMode, nil
+	}
+	return "", fmt.Errorf("cannot get volumeMode for volume: %v", volumeSpec.Name())
+}
+
+// GetPersistentVolumeClaimVolumeMode retrieves VolumeMode from pvc.
+func GetPersistentVolumeClaimVolumeMode(claim *v1.PersistentVolumeClaim) (v1.PersistentVolumeMode, error) {
+	if claim.Spec.VolumeMode != nil {
+		return *claim.Spec.VolumeMode, nil
+	}
+	return "", fmt.Errorf("cannot get volumeMode from pvc: %v", claim.Name)
+}

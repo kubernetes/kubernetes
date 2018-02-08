@@ -1,15 +1,18 @@
 approvers:
+- andyzhangx
 - brendandburns
+- feiskyer
+- karataliu
+- khenidak
 - rootfs
 reviewers:
-- justinsb
-- rootfs
+- andyzhangx
 - brendandburns
-- thockin
-- smarterclayton
-- derekwaynecarr
-- pmorie
-- saad-ali
-- jsafrane
+- feiskyer
 - jingxu97
+- jsafrane
 - msau42
+- karataliu
+- khenidak
+- rootfs
+- saad-ali

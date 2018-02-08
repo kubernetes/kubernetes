@@ -239,7 +239,7 @@ func attachDetachRecoveryTestCase(t *testing.T, extraPods1 []*v1.Pod, extraPods2
 
 	for _, newPod := range extraPods1 {
 		// Add a new pod between ASW and DSW ppoulators
-		_, err = adc.kubeClient.Core().Pods(newPod.ObjectMeta.Namespace).Create(newPod)
+		_, err = adc.kubeClient.CoreV1().Pods(newPod.ObjectMeta.Namespace).Create(newPod)
 		if err != nil {
 			t.Fatalf("Run failed with error. Failed to create a new pod: <%v>", err)
 		}
@@ -256,7 +256,7 @@ func attachDetachRecoveryTestCase(t *testing.T, extraPods1 []*v1.Pod, extraPods2
 
 	for _, newPod := range extraPods2 {
 		// Add a new pod between DSW ppoulator and reconciler run
-		_, err = adc.kubeClient.Core().Pods(newPod.ObjectMeta.Namespace).Create(newPod)
+		_, err = adc.kubeClient.CoreV1().Pods(newPod.ObjectMeta.Namespace).Create(newPod)
 		if err != nil {
 			t.Fatalf("Run failed with error. Failed to create a new pod: <%v>", err)
 		}

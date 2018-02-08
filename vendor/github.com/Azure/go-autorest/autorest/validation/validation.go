@@ -3,6 +3,20 @@ Package validation provides methods for validating parameter value using reflect
 */
 package validation
 
+// Copyright 2017 Microsoft Corporation
+//
+//  Licensed under the Apache License, Version 2.0 (the "License");
+//  you may not use this file except in compliance with the License.
+//  You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+//  Unless required by applicable law or agreed to in writing, software
+//  distributed under the License is distributed on an "AS IS" BASIS,
+//  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//  See the License for the specific language governing permissions and
+//  limitations under the License.
+
 import (
 	"fmt"
 	"reflect"
@@ -91,15 +105,12 @@ func validateStruct(x reflect.Value, v Constraint, name ...string) error {
 		return createError(x, v, fmt.Sprintf("field %q doesn't exist", v.Target))
 	}
 
-	if err := Validate([]Validation{
+	return Validate([]Validation{
 		{
 			TargetValue: getInterfaceValue(f),
 			Constraints: []Constraint{v},
 		},
-	}); err != nil {
-		return err
-	}
-	return nil
+	})
 }
 
 func validatePtr(x reflect.Value, v Constraint) error {
@@ -205,14 +216,14 @@ func validateString(x reflect.Value, v Constraint) error {
 			return createError(x, v, fmt.Sprintf("rule must be integer value for %v constraint; got: %v", v.Name, v.Rule))
 		}
 		if len(s) > v.Rule.(int) {
-			return createError(x, v, fmt.Sprintf("value length must be less than %v", v.Rule))
+			return createError(x, v, fmt.Sprintf("value length must be less than or equal to %v", v.Rule))
 		}
 	case MinLength:
 		if _, ok := v.Rule.(int); !ok {
 			return createError(x, v, fmt.Sprintf("rule must be integer value for %v constraint; got: %v", v.Name, v.Rule))
 		}
 		if len(s) < v.Rule.(int) {
-			return createError(x, v, fmt.Sprintf("value length must be greater than %v", v.Rule))
+			return createError(x, v, fmt.Sprintf("value length must be greater than or equal to %v", v.Rule))
 		}
 	case ReadOnly:
 		if len(s) > 0 {
@@ -272,6 +283,17 @@ func validateArrayMap(x reflect.Value, v Constraint) error {
 	case ReadOnly:
 		if x.Len() != 0 {
 			return createError(x, v, "readonly parameter; must send as nil or empty in request")
+		}
+	case Pattern:
+		reg, err := regexp.Compile(v.Rule.(string))
+		if err != nil {
+			return createError(x, v, err.Error())
+		}
+		keys := x.MapKeys()
+		for _, k := range keys {
+			if !reg.MatchString(k.String()) {
+				return createError(k, v, fmt.Sprintf("map key doesn't match pattern %v", v.Rule))
+			}
 		}
 	default:
 		return createError(x, v, fmt.Sprintf("constraint %v is not applicable to array, slice and map type", v.Name))

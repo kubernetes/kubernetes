@@ -33,8 +33,6 @@ go_library(
         "//pkg/kubectl/util/i18n:go_default_library",
         "//pkg/printers:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/api/meta:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/errors:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/util/flag:go_default_library",
@@ -63,8 +61,8 @@ go_test(
         "use_context_test.go",
         "view_test.go",
     ],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/pkg/kubectl/cmd/config",
-    library = ":go_default_library",
     deps = [
         "//pkg/kubectl/cmd/util:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/equality:go_default_library",

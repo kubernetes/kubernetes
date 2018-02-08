@@ -21,7 +21,7 @@ import (
 	"strings"
 
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 )
 
@@ -67,6 +67,7 @@ func GetAllFSTypesAsSet() sets.String {
 		string(extensions.Projected),
 		string(extensions.PortworxVolume),
 		string(extensions.ScaleIO),
+		string(extensions.CSI),
 	)
 	return fstypes
 }
@@ -220,4 +221,18 @@ func hasPathPrefix(s, pathPrefix string) bool {
 	}
 
 	return false
+}
+
+// EqualStringSlices compares string slices for equality. Slices are equal when
+// their sizes and elements on similar positions are equal.
+func EqualStringSlices(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := 0; i < len(a); i++ {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }

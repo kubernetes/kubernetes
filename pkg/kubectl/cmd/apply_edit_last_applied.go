@@ -26,7 +26,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/editor"
-	"k8s.io/kubernetes/pkg/printers"
 )
 
 var (
@@ -63,20 +62,11 @@ func NewCmdApplyEditLastApplied(f cmdutil.Factory, out, errOut io.Writer) *cobra
 	options := &editor.EditOptions{
 		EditMode: editor.ApplyEditMode,
 	}
-
-	// retrieve a list of handled resources from printer as valid args
-	validArgs, argAliases := []string{}, []string{}
-	p, err := f.Printer(nil, printers.PrintOptions{
-		ColumnLabels: []string{},
-	})
-	cmdutil.CheckErr(err)
-	if p != nil {
-		validArgs = p.HandledResources()
-		argAliases = kubectl.ResourceAliases(validArgs)
-	}
+	validArgs := cmdutil.ValidArgList(f)
 
 	cmd := &cobra.Command{
-		Use:     "edit-last-applied (RESOURCE/NAME | -f FILENAME)",
+		Use: "edit-last-applied (RESOURCE/NAME | -f FILENAME)",
+		DisableFlagsInUseLine: true,
 		Short:   "Edit latest last-applied-configuration annotations of a resource/object",
 		Long:    applyEditLastAppliedLong,
 		Example: applyEditLastAppliedExample,
@@ -90,7 +80,7 @@ func NewCmdApplyEditLastApplied(f cmdutil.Factory, out, errOut io.Writer) *cobra
 			}
 		},
 		ValidArgs:  validArgs,
-		ArgAliases: argAliases,
+		ArgAliases: kubectl.ResourceAliases(validArgs),
 	}
 
 	usage := "to use to edit the resource"

@@ -35,7 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
@@ -405,8 +405,7 @@ func (m *kubeGenericRuntimeManager) podSandboxChanged(pod *v1.Pod, podStatus *ku
 	}
 
 	// Needs to create a new sandbox when network namespace changed.
-	if sandboxStatus.Linux != nil && sandboxStatus.Linux.Namespaces != nil && sandboxStatus.Linux.Namespaces.Options != nil &&
-		sandboxStatus.Linux.Namespaces.Options.HostNetwork != kubecontainer.IsHostNetworkPod(pod) {
+	if sandboxStatus.GetLinux().GetNamespaces().GetOptions().GetNetwork() != networkNamespaceForPod(pod) {
 		glog.V(2).Infof("Sandbox for pod %q has changed. Need to start a new one", format.Pod(pod))
 		return true, sandboxStatus.Metadata.Attempt + 1, ""
 	}
@@ -645,20 +644,20 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, _ v1.PodStatus, podStat
 		if err != nil {
 			createSandboxResult.Fail(kubecontainer.ErrCreatePodSandbox, msg)
 			glog.Errorf("createPodSandbox for pod %q failed: %v", format.Pod(pod), err)
-			ref, err := ref.GetReference(legacyscheme.Scheme, pod)
-			if err != nil {
-				glog.Errorf("Couldn't make a ref to pod %q: '%v'", format.Pod(pod), err)
+			ref, referr := ref.GetReference(legacyscheme.Scheme, pod)
+			if referr != nil {
+				glog.Errorf("Couldn't make a ref to pod %q: '%v'", format.Pod(pod), referr)
 			}
-			m.recorder.Eventf(ref, v1.EventTypeWarning, events.FailedCreatePodSandBox, "Failed create pod sandbox.")
+			m.recorder.Eventf(ref, v1.EventTypeWarning, events.FailedCreatePodSandBox, "Failed create pod sandbox: %v", err)
 			return
 		}
 		glog.V(4).Infof("Created PodSandbox %q for pod %q", podSandboxID, format.Pod(pod))
 
 		podSandboxStatus, err := m.runtimeService.PodSandboxStatus(podSandboxID)
 		if err != nil {
-			ref, err := ref.GetReference(legacyscheme.Scheme, pod)
-			if err != nil {
-				glog.Errorf("Couldn't make a ref to pod %q: '%v'", format.Pod(pod), err)
+			ref, referr := ref.GetReference(legacyscheme.Scheme, pod)
+			if referr != nil {
+				glog.Errorf("Couldn't make a ref to pod %q: '%v'", format.Pod(pod), referr)
 			}
 			m.recorder.Eventf(ref, v1.EventTypeWarning, events.FailedStatusPodSandBox, "Unable to get pod sandbox status: %v", err)
 			glog.Errorf("Failed to get pod sandbox status: %v; Skipping pod %q", err, format.Pod(pod))
@@ -699,7 +698,7 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, _ v1.PodStatus, podStat
 		}
 
 		glog.V(4).Infof("Creating init container %+v in pod %v", container, format.Pod(pod))
-		if msg, err := m.startContainer(podSandboxID, podSandboxConfig, container, pod, podStatus, pullSecrets, podIP); err != nil {
+		if msg, err := m.startContainer(podSandboxID, podSandboxConfig, container, pod, podStatus, pullSecrets, podIP, kubecontainer.ContainerTypeInit); err != nil {
 			startContainerResult.Fail(err, msg)
 			utilruntime.HandleError(fmt.Errorf("init container start failed: %v: %s", err, msg))
 			return
@@ -723,7 +722,7 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, _ v1.PodStatus, podStat
 		}
 
 		glog.V(4).Infof("Creating container %+v in pod %v", container, format.Pod(pod))
-		if msg, err := m.startContainer(podSandboxID, podSandboxConfig, container, pod, podStatus, pullSecrets, podIP); err != nil {
+		if msg, err := m.startContainer(podSandboxID, podSandboxConfig, container, pod, podStatus, pullSecrets, podIP, kubecontainer.ContainerTypeRegular); err != nil {
 			startContainerResult.Fail(err, msg)
 			// known errors that are logged in other places are logged at higher levels here to avoid
 			// repetitive log spam
@@ -815,8 +814,8 @@ func (m *kubeGenericRuntimeManager) isHostNetwork(podSandBoxID string, pod *v1.P
 		return false, err
 	}
 
-	if nsOpts := podStatus.GetLinux().GetNamespaces().GetOptions(); nsOpts != nil {
-		return nsOpts.HostNetwork, nil
+	if podStatus.GetLinux().GetNamespaces().GetOptions().GetNetwork() == runtimeapi.NamespaceMode_NODE {
+		return true, nil
 	}
 
 	return false, nil

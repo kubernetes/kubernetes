@@ -30,8 +30,7 @@ import (
 //       see https://github.com/kubernetes/kubernetes/issues/21479
 type updatePodFunc func(pod *v1.Pod) error
 
-// UpdatePodWithRetries updates a pod with given applyUpdate function. Note that pod not found error is ignored.
-// The returned bool value can be used to tell if the pod is actually updated.
+// UpdatePodWithRetries updates a pod with given applyUpdate function.
 func UpdatePodWithRetries(podClient v1core.PodInterface, podLister corelisters.PodLister, namespace, name string, applyUpdate updatePodFunc) (*v1.Pod, error) {
 	var pod *v1.Pod
 

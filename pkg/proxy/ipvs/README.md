@@ -2,54 +2,55 @@
 
 This document shows how to use kube-proxy ipvs mode.
 
-### What is IPVS
+## What is IPVS
 
 **IPVS (IP Virtual Server)** implements transport-layer load balancing, usually called Layer 4 LAN switching, as part of
 Linux kernel.
 
 IPVS runs on a host and acts as a load balancer in front of a cluster of real servers. IPVS can direct requests for TCP
-and UDP-based services to the real servers, and make services of real servers appear as irtual services on a single IP address.
+and UDP-based services to the real servers, and make services of real servers appear as virtual services on a single IP address.
 
-### How to use
+## Run kube-proxy in ipvs mode
 
-##### Load IPVS kernel modules
+Currently, local-up scripts and kubeadm support switching IPVS proxy mode via exporting environment variables or specifying flags.
 
-Currently the IPVS kernel module can't be loaded automatically, so first we should use the following command to load IPVS kernel
-modules manually.
+### Local UP Cluster
 
-```shell
-modprobe ip_vs
-modprobe ip_vs_rr
-modprobe ip_vs_wrr
-modprobe ip_vs_sh
-modprobe nf_conntrack_ipv4
+Kube-proxy will run in iptables mode by default in a [local-up cluster](https://github.com/kubernetes/community/blob/master/contributors/devel/running-locally.md). 
+
+Users should export the env `KUBEPROXY_MODE=ipvs` to specify the ipvs mode before deploying the cluster if want to run kube-proxy in ipvs mode.
+
+### Cluster Created by Kubeadm
+
+Kube-proxy will run in iptables mode by default in a cluster deployed by [kubeadm](https://kubernetes.io/docs/setup/independent/create-cluster-kubeadm/). 
+
+Since IPVS mode is still feature-gated, users should add the flag `--feature-gates=SupportIPVSProxyMode=true` in `kubeadm init` command
+
+```
+kubeadm init --feature-gates=SupportIPVSProxyMode=true
 ```
 
-After that, use `lsmod | grep ip_vs` to make sure kernel modules are loaded.
+to specify the ipvs mode before deploying the cluster if want to run kube-proxy in ipvs mode.
 
-##### Run kube-proxy in ipvs mode
+If you are using kubeadm with a configuration file, you can specify the ipvs mode adding `SupportIPVSProxyMode: true` below the `featureGates` field.
+Then the configuration file is similar to:
 
-First, [run cluster locally](https://github.com/kubernetes/community/blob/master/contributors/devel/running-locally.md). 
-
-By default kube-proxy will run in iptables mode, with configuration file `/tmp/kube-proxy.yaml`. so we need to change the
-configuration file and restart it. Here is a yaml file for reference.
-
-```yaml
-apiVersion: componentconfig/v1alpha1
-kind: KubeProxyConfiguration
-clientConnection:
-  kubeconfig: /var/run/kubernetes/kube-proxy.kubeconfig
-hostnameOverride: 127.0.0.1
-mode: ipvs
-featureGates: AllAlpha=true
-ipvs:
-  minSyncPeriod: 10s
-  syncPeriod: 60s
+```json
+kind: MasterConfiguration
+apiVersion: kubeadm.k8s.io/v1alpha1
+...
+kubeProxy:
+  config:
+    featureGates: SupportIPVSProxyMode=true
+    mode: ipvs
+...
 ```
 
-##### Test
+## Debug
 
-Use `ipvsadm` tool to test whether the kube-proxy start succeed. By default we may get result like:
+### Check IPVS proxy rules
+
+People can use `ipvsadm` tool to check whether kube-proxy are maintaining IPVS rules correctly. For example, we may get IPVS proxy rules like:
 
 ```shell
 # ipvsadm -ln
@@ -62,3 +63,28 @@ TCP  10.0.0.10:53 rr
 UDP  10.0.0.10:53 rr
 ```
 
+### Why kube-proxy can't start IPVS mode
+
+People can do the following check list step by step:
+
+**1. Enable IPVS feature gateway**
+
+Currently IPVS-based kube-proxy is still in alpha phase, people need to enable `--feature-gates=SupportIPVSProxyMode=true` explicitly.
+
+**2. Specify proxy-mode=ipvs**
+
+Tell kube-proxy that proxy-mode=ipvs, please.
+
+**3. Load ipvs required kernel modules**
+
+The following kernel modules are required by IPVS-based kube-proxy:
+
+```shell
+ip_vs
+ip_vs_rr
+ip_vs_wrr
+ip_vs_sh
+nf_conntrack_ipv4
+```
+
+IPVS-based kube-proxy will load them automatically. If it fails to load them, please check whether they are compiled into your kernel.

@@ -84,12 +84,13 @@ type StatsProvider struct {
 type containerStatsProvider interface {
 	ListPodStats() ([]statsapi.PodStats, error)
 	ImageFsStats() (*statsapi.FsStats, error)
+	ImageFsDevice() (string, error)
 }
 
 // GetCgroupStats returns the stats of the cgroup with the cgroupName. Note that
 // this function doesn't generate filesystem stats.
-func (p *StatsProvider) GetCgroupStats(cgroupName string) (*statsapi.ContainerStats, *statsapi.NetworkStats, error) {
-	info, err := getCgroupInfo(p.cadvisor, cgroupName)
+func (p *StatsProvider) GetCgroupStats(cgroupName string, updateStats bool) (*statsapi.ContainerStats, *statsapi.NetworkStats, error) {
+	info, err := getCgroupInfo(p.cadvisor, cgroupName, updateStats)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get cgroup stats for %q: %v", cgroupName, err)
 	}
@@ -113,8 +114,8 @@ func (p *StatsProvider) RootFsStats() (*statsapi.FsStats, error) {
 	}
 
 	// Get the root container stats's timestamp, which will be used as the
-	// imageFs stats timestamp.
-	rootStats, err := getCgroupStats(p.cadvisor, "/")
+	// imageFs stats timestamp.  Dont force a stats update, as we only want the timestamp.
+	rootStats, err := getCgroupStats(p.cadvisor, "/", false)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get root container stats: %v", err)
 	}
@@ -166,4 +167,17 @@ func (p *StatsProvider) GetRawContainerInfo(containerName string, req *cadvisora
 	return map[string]*cadvisorapiv1.ContainerInfo{
 		containerInfo.Name: containerInfo,
 	}, nil
+}
+
+// HasDedicatedImageFs returns true if a dedicated image filesystem exists for storing images.
+func (p *StatsProvider) HasDedicatedImageFs() (bool, error) {
+	device, err := p.containerStatsProvider.ImageFsDevice()
+	if err != nil {
+		return false, err
+	}
+	rootFsInfo, err := p.cadvisor.RootFsInfo()
+	if err != nil {
+		return false, err
+	}
+	return device != rootFsInfo.Device, nil
 }

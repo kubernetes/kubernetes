@@ -11,11 +11,13 @@ type commonResult struct {
 
 // Extract is a function that accepts a result and extracts a port resource.
 func (r commonResult) Extract() (*Port, error) {
-	var s struct {
-		Port *Port `json:"port"`
-	}
+	var s Port
 	err := r.ExtractInto(&s)
-	return s.Port, err
+	return &s, err
+}
+
+func (r commonResult) ExtractInto(v interface{}) error {
+	return r.Result.ExtractIntoStructPtr(v, "port")
 }
 
 // CreateResult represents the result of a create operation. Call its Extract
@@ -128,9 +130,11 @@ func (r PortPage) IsEmpty() (bool, error) {
 // and extracts the elements into a slice of Port structs. In other words,
 // a generic collection is mapped into a relevant slice.
 func ExtractPorts(r pagination.Page) ([]Port, error) {
-	var s struct {
-		Ports []Port `json:"ports"`
-	}
-	err := (r.(PortPage)).ExtractInto(&s)
-	return s.Ports, err
+	var s []Port
+	err := ExtractPortsInto(r, &s)
+	return s, err
+}
+
+func ExtractPortsInto(r pagination.Page, v interface{}) error {
+	return r.(PortPage).Result.ExtractIntoSlicePtr(v, "ports")
 }

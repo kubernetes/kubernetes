@@ -42,7 +42,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd/api/v1"
 )
 
-// newWebhookHandler returns a handler which recieves webhook events and decodes the
+// newWebhookHandler returns a handler which receives webhook events and decodes the
 // request body. The caller passes a callback which is called on each webhook POST.
 // The object passed to cb is of the same type as list.
 func newWebhookHandler(t *testing.T, list runtime.Object, cb func(events runtime.Object)) http.Handler {
@@ -116,7 +116,7 @@ func newWebhook(t *testing.T, endpoint string, mode string, groupVersion schema.
 	// NOTE(ericchiang): Do we need to use a proper serializer?
 	require.NoError(t, stdjson.NewEncoder(f).Encode(config), "writing kubeconfig")
 
-	backend, err := NewBackend(f.Name(), mode, groupVersion)
+	backend, err := NewBackend(f.Name(), mode, groupVersion, NewDefaultBatchBackendConfig())
 	require.NoError(t, err, "initializing backend")
 
 	return backend

@@ -23,7 +23,6 @@ import (
 
 	autoscalingapi "k8s.io/api/autoscaling/v2beta1"
 	"k8s.io/api/core/v1"
-	kv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -186,7 +185,7 @@ func (tc *restClientTestCase) runTest(t *testing.T) {
 	metricsClient := NewRESTMetricsClient(testMetricsClient.MetricsV1beta1(), testCMClient)
 	isResource := len(tc.resourceName) > 0
 	if isResource {
-		info, timestamp, err := metricsClient.GetResourceMetric(kv1.ResourceName(tc.resourceName), tc.namespace, tc.selector)
+		info, timestamp, err := metricsClient.GetResourceMetric(v1.ResourceName(tc.resourceName), tc.namespace, tc.selector)
 		tc.verifyResults(t, info, timestamp, err)
 	} else if tc.singleObject == nil {
 		info, timestamp, err := metricsClient.GetRawMetric(tc.metricName, tc.namespace, tc.selector)
@@ -249,10 +248,20 @@ func TestRESTClientQpsSumEqualZero(t *testing.T) {
 	tc.runTest(t)
 }
 
+func TestRESTClientQpsEmptyMetrics(t *testing.T) {
+	tc := restClientTestCase{
+		metricName:           "qps",
+		desiredError:         fmt.Errorf("no metrics returned from custom metrics API"),
+		reportedMetricPoints: []metricPoint{},
+	}
+
+	tc.runTest(t)
+}
+
 func TestRESTClientCPUEmptyMetrics(t *testing.T) {
 	tc := restClientTestCase{
 		resourceName:         v1.ResourceCPU,
-		desiredError:         fmt.Errorf("no metrics returned from heapster"),
+		desiredError:         fmt.Errorf("no metrics returned from resource metrics API"),
 		reportedMetricPoints: []metricPoint{},
 		reportedPodMetrics:   [][]int64{},
 	}

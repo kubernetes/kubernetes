@@ -17,10 +17,9 @@ limitations under the License.
 package selinux
 
 import (
-	"testing"
-
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	"testing"
 )
 
 func TestRunAsAnyOptions(t *testing.T) {

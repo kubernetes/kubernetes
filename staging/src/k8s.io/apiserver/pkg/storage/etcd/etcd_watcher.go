@@ -76,9 +76,9 @@ type etcdWatcher struct {
 	valueTransformer ValueTransformer
 
 	list    bool // If we're doing a recursive watch, should be true.
-	quorum  bool // If we enable quorum, shoule be true
+	quorum  bool // If we enable quorum, should be true
 	include includeFunc
-	filter  storage.FilterFunc
+	pred    storage.SelectionPredicate
 
 	etcdIncoming  chan *etcd.Response
 	etcdError     chan error
@@ -105,11 +105,9 @@ const watchWaitDuration = 100 * time.Millisecond
 
 // newEtcdWatcher returns a new etcdWatcher; if list is true, watch sub-nodes.
 // The versioner must be able to handle the objects that transform creates.
-func newEtcdWatcher(
-	list bool, quorum bool, include includeFunc, filter storage.FilterFunc,
+func newEtcdWatcher(list bool, quorum bool, include includeFunc, pred storage.SelectionPredicate,
 	encoding runtime.Codec, versioner storage.Versioner, transform TransformFunc,
-	valueTransformer ValueTransformer,
-	cache etcdCache) *etcdWatcher {
+	valueTransformer ValueTransformer, cache etcdCache) *etcdWatcher {
 	w := &etcdWatcher{
 		encoding:         encoding,
 		versioner:        versioner,
@@ -119,7 +117,7 @@ func newEtcdWatcher(
 		list:    list,
 		quorum:  quorum,
 		include: include,
-		filter:  filter,
+		pred:    pred,
 		// Buffer this channel, so that the etcd client is not forced
 		// to context switch with every object it gets, and so that a
 		// long time spent decoding an object won't block the *next*
@@ -315,7 +313,7 @@ func (w *etcdWatcher) translate() {
 
 // decodeObject extracts an object from the provided etcd node or returns an error.
 func (w *etcdWatcher) decodeObject(node *etcd.Node) (runtime.Object, error) {
-	if obj, found := w.cache.getFromCache(node.ModifiedIndex, storage.SimpleFilter(storage.Everything)); found {
+	if obj, found := w.cache.getFromCache(node.ModifiedIndex, storage.Everything); found {
 		return obj, nil
 	}
 
@@ -365,7 +363,7 @@ func (w *etcdWatcher) sendAdd(res *etcd.Response) {
 		// the resourceVersion to resume will never be able to get past a bad value.
 		return
 	}
-	if !w.filter(obj) {
+	if matched, err := w.pred.Matches(obj); err != nil || !matched {
 		return
 	}
 	action := watch.Added
@@ -391,7 +389,10 @@ func (w *etcdWatcher) sendModify(res *etcd.Response) {
 		// the resourceVersion to resume will never be able to get past a bad value.
 		return
 	}
-	curObjPasses := w.filter(curObj)
+	curObjPasses := false
+	if matched, err := w.pred.Matches(curObj); err == nil && matched {
+		curObjPasses = true
+	}
 	oldObjPasses := false
 	var oldObj runtime.Object
 	if res.PrevNode != nil && res.PrevNode.Value != "" {
@@ -400,10 +401,12 @@ func (w *etcdWatcher) sendModify(res *etcd.Response) {
 			if err := w.versioner.UpdateObject(oldObj, res.Node.ModifiedIndex); err != nil {
 				utilruntime.HandleError(fmt.Errorf("failure to version api object (%d) %#v: %v", res.Node.ModifiedIndex, oldObj, err))
 			}
-			oldObjPasses = w.filter(oldObj)
+			if matched, err := w.pred.Matches(oldObj); err == nil && matched {
+				oldObjPasses = true
+			}
 		}
 	}
-	// Some changes to an object may cause it to start or stop matching a filter.
+	// Some changes to an object may cause it to start or stop matching a pred.
 	// We need to report those as adds/deletes. So we have to check both the previous
 	// and current value of the object.
 	switch {
@@ -423,7 +426,7 @@ func (w *etcdWatcher) sendModify(res *etcd.Response) {
 			Object: oldObj,
 		})
 	}
-	// Do nothing if neither new nor old object passed the filter.
+	// Do nothing if neither new nor old object passed the pred.
 }
 
 func (w *etcdWatcher) sendDelete(res *etcd.Response) {
@@ -449,7 +452,7 @@ func (w *etcdWatcher) sendDelete(res *etcd.Response) {
 		// the resourceVersion to resume will never be able to get past a bad value.
 		return
 	}
-	if !w.filter(obj) {
+	if matched, err := w.pred.Matches(obj); err != nil || !matched {
 		return
 	}
 	w.emit(watch.Event{

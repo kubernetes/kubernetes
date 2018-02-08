@@ -22,6 +22,8 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"syscall"
@@ -139,6 +141,41 @@ func (m *Mounter) doMount(mounterPath string, mountCmd string, source string, ta
 			err, mountCmd, args, string(output))
 	}
 	return err
+}
+
+// GetMountRefs finds all other references to the device referenced
+// by mountPath; returns a list of paths.
+func GetMountRefs(mounter Interface, mountPath string) ([]string, error) {
+	mps, err := mounter.List()
+	if err != nil {
+		return nil, err
+	}
+	// Find the device name.
+	deviceName := ""
+	// If mountPath is symlink, need get its target path.
+	slTarget, err := filepath.EvalSymlinks(mountPath)
+	if err != nil {
+		slTarget = mountPath
+	}
+	for i := range mps {
+		if mps[i].Path == slTarget {
+			deviceName = mps[i].Device
+			break
+		}
+	}
+
+	// Find all references to the device.
+	var refs []string
+	if deviceName == "" {
+		glog.Warningf("could not determine device for path: %q", mountPath)
+	} else {
+		for i := range mps {
+			if mps[i].Device == deviceName && mps[i].Path != slTarget {
+				refs = append(refs, mps[i].Path)
+			}
+		}
+	}
+	return refs, nil
 }
 
 // detectSystemd returns true if OS runs with systemd as init. When not sure
@@ -299,6 +336,34 @@ func (mounter *Mounter) GetDeviceNameFromMount(mountPath, pluginDir string) (str
 	return getDeviceNameFromMount(mounter, mountPath, pluginDir)
 }
 
+// getDeviceNameFromMount find the device name from /proc/mounts in which
+// the mount path reference should match the given plugin directory. In case no mount path reference
+// matches, returns the volume name taken from its given mountPath
+func getDeviceNameFromMount(mounter Interface, mountPath, pluginDir string) (string, error) {
+	refs, err := GetMountRefs(mounter, mountPath)
+	if err != nil {
+		glog.V(4).Infof("GetMountRefs failed for mount path %q: %v", mountPath, err)
+		return "", err
+	}
+	if len(refs) == 0 {
+		glog.V(4).Infof("Directory %s is not mounted", mountPath)
+		return "", fmt.Errorf("directory %s is not mounted", mountPath)
+	}
+	basemountPath := path.Join(pluginDir, MountsInGlobalPDPath)
+	for _, ref := range refs {
+		if strings.HasPrefix(ref, basemountPath) {
+			volumeID, err := filepath.Rel(basemountPath, ref)
+			if err != nil {
+				glog.Errorf("Failed to get volume id from mount %s - %v", mountPath, err)
+				return "", err
+			}
+			return volumeID, nil
+		}
+	}
+
+	return path.Base(mountPath), nil
+}
+
 func listProcMounts(mountFilePath string) ([]MountPoint, error) {
 	content, err := utilio.ConsistentRead(mountFilePath, maxListTries)
 	if err != nil {
@@ -433,7 +498,7 @@ func (mounter *SafeFormatAndMount) formatAndMount(source string, target string, 
 	if mountErr != nil {
 		// Mount failed. This indicates either that the disk is unformatted or
 		// it contains an unexpected filesystem.
-		existingFormat, err := mounter.getDiskFormat(source)
+		existingFormat, err := mounter.GetDiskFormat(source)
 		if err != nil {
 			return err
 		}
@@ -471,36 +536,57 @@ func (mounter *SafeFormatAndMount) formatAndMount(source string, target string, 
 	return mountErr
 }
 
-// getDiskFormat uses 'lsblk' to see if the given disk is unformated
-func (mounter *SafeFormatAndMount) getDiskFormat(disk string) (string, error) {
-	args := []string{"-n", "-o", "FSTYPE", disk}
-	glog.V(4).Infof("Attempting to determine if disk %q is formatted using lsblk with args: (%v)", disk, args)
-	dataOut, err := mounter.Exec.Run("lsblk", args...)
+// GetDiskFormat uses 'blkid' to see if the given disk is unformated
+func (mounter *SafeFormatAndMount) GetDiskFormat(disk string) (string, error) {
+	args := []string{"-p", "-s", "TYPE", "-s", "PTTYPE", "-o", "export", disk}
+	glog.V(4).Infof("Attempting to determine if disk %q is formatted using blkid with args: (%v)", disk, args)
+	dataOut, err := mounter.Exec.Run("blkid", args...)
 	output := string(dataOut)
-	glog.V(4).Infof("Output: %q", output)
+	glog.V(4).Infof("Output: %q, err: %v", output, err)
 
 	if err != nil {
+		if exit, ok := err.(utilexec.ExitError); ok {
+			if exit.ExitStatus() == 2 {
+				// Disk device is unformatted.
+				// For `blkid`, if the specified token (TYPE/PTTYPE, etc) was
+				// not found, or no (specified) devices could be identified, an
+				// exit code of 2 is returned.
+				return "", nil
+			}
+		}
 		glog.Errorf("Could not determine if disk %q is formatted (%v)", disk, err)
 		return "", err
 	}
 
-	// Split lsblk output into lines. Unformatted devices should contain only
-	// "\n". Beware of "\n\n", that's a device with one empty partition.
-	output = strings.TrimSuffix(output, "\n") // Avoid last empty line
+	var fstype, pttype string
+
 	lines := strings.Split(output, "\n")
-	if lines[0] != "" {
-		// The device is formatted
-		return lines[0], nil
+	for _, l := range lines {
+		if len(l) <= 0 {
+			// Ignore empty line.
+			continue
+		}
+		cs := strings.Split(l, "=")
+		if len(cs) != 2 {
+			return "", fmt.Errorf("blkid returns invalid output: %s", output)
+		}
+		// TYPE is filesystem type, and PTTYPE is partition table type, according
+		// to https://www.kernel.org/pub/linux/utils/util-linux/v2.21/libblkid-docs/.
+		if cs[0] == "TYPE" {
+			fstype = cs[1]
+		} else if cs[0] == "PTTYPE" {
+			pttype = cs[1]
+		}
 	}
 
-	if len(lines) == 1 {
-		// The device is unformatted and has no dependent devices
-		return "", nil
+	if len(pttype) > 0 {
+		glog.V(4).Infof("Disk %s detected partition table type: %s", pttype)
+		// Returns a special non-empty string as filesystem type, then kubelet
+		// will not format it.
+		return "unknown data, probably partitions", nil
 	}
 
-	// The device has dependent devices, most probably partitions (LVM, LUKS
-	// and MD RAID are reported as FSTYPE and caught above).
-	return "unknown data, probably partitions", nil
+	return fstype, nil
 }
 
 // isShared returns true, if given path is on a mount point that has shared

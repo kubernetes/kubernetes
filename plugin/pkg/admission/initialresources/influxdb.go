@@ -22,7 +22,7 @@ import (
 	"time"
 
 	influxdb "github.com/influxdata/influxdb/client"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
 const (

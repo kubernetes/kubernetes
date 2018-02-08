@@ -13,8 +13,8 @@ go_test(
         "config_test.go",
         "genericapiserver_test.go",
     ],
+    embed = [":go_default_library"],
     importpath = "k8s.io/apiserver/pkg/server",
-    library = ":go_default_library",
     deps = [
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/meta:go_default_library",
@@ -30,14 +30,14 @@ go_test(
         "//vendor/k8s.io/apiserver/pkg/authentication/user:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/authorization/authorizer:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/endpoints/discovery:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/endpoints/filters:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/endpoints/request:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/registry/rest:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/server/filters:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/server/healthz:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/storage/etcd/testing:go_default_library",
         "//vendor/k8s.io/client-go/informers:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes/fake:go_default_library",
         "//vendor/k8s.io/client-go/rest:go_default_library",
-        "//vendor/k8s.io/kube-openapi/pkg/common:go_default_library",
     ],
 )
 
@@ -54,9 +54,38 @@ go_library(
         "plugins.go",
         "serve.go",
         "signal.go",
-        "signal_posix.go",
     ] + select({
-        "@io_bazel_rules_go//go/platform:windows_amd64": [
+        "@io_bazel_rules_go//go/platform:android": [
+            "signal_posix.go",
+        ],
+        "@io_bazel_rules_go//go/platform:darwin": [
+            "signal_posix.go",
+        ],
+        "@io_bazel_rules_go//go/platform:dragonfly": [
+            "signal_posix.go",
+        ],
+        "@io_bazel_rules_go//go/platform:freebsd": [
+            "signal_posix.go",
+        ],
+        "@io_bazel_rules_go//go/platform:linux": [
+            "signal_posix.go",
+        ],
+        "@io_bazel_rules_go//go/platform:nacl": [
+            "signal_posix.go",
+        ],
+        "@io_bazel_rules_go//go/platform:netbsd": [
+            "signal_posix.go",
+        ],
+        "@io_bazel_rules_go//go/platform:openbsd": [
+            "signal_posix.go",
+        ],
+        "@io_bazel_rules_go//go/platform:plan9": [
+            "signal_posix.go",
+        ],
+        "@io_bazel_rules_go//go/platform:solaris": [
+            "signal_posix.go",
+        ],
+        "@io_bazel_rules_go//go/platform:windows": [
             "signal_windows.go",
         ],
         "//conditions:default": [],
@@ -69,7 +98,6 @@ go_library(
         "//vendor/github.com/go-openapi/spec:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/pborman/uuid:go_default_library",
-        "//vendor/github.com/pkg/errors:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apimachinery:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apimachinery/registered:go_default_library",
@@ -81,10 +109,13 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/validation:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/waitgroup:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/version:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/admission:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/admission/plugin/initialization:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/admission/plugin/namespace/lifecycle:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/admission/plugin/webhook/mutating:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/admission/plugin/webhook/validating:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/apis/apiserver/install:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/audit:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/audit/policy:go_default_library",
@@ -108,6 +139,7 @@ go_library(
         "//vendor/k8s.io/apiserver/pkg/server/healthz:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/server/mux:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/server/routes:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/server/storage:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//vendor/k8s.io/client-go/informers:go_default_library",
         "//vendor/k8s.io/client-go/rest:go_default_library",
@@ -132,6 +164,7 @@ filegroup(
         "//staging/src/k8s.io/apiserver/pkg/server/httplog:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/server/mux:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/server/options:all-srcs",
+        "//staging/src/k8s.io/apiserver/pkg/server/resourceconfig:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/server/routes:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/server/storage:all-srcs",
     ],

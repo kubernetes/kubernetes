@@ -31,7 +31,7 @@ import (
 
 // EnableTracing controls whether to trace RPCs using the golang.org/x/net/trace package.
 // This should only be set before any RPCs are sent or received by this program.
-var EnableTracing = true
+var EnableTracing bool
 
 // methodFamily returns the trace family for the given method.
 // It turns "/pkg.Service/GetFoo" into "pkg.Service".
@@ -76,6 +76,15 @@ func (f *firstLine) String() string {
 	return line.String()
 }
 
+const truncateSize = 100
+
+func truncate(x string, l int) string {
+	if l > len(x) {
+		return x
+	}
+	return x[:l]
+}
+
 // payload represents an RPC request or response payload.
 type payload struct {
 	sent bool        // whether this is an outgoing payload
@@ -85,9 +94,9 @@ type payload struct {
 
 func (p payload) String() string {
 	if p.sent {
-		return fmt.Sprintf("sent: %v", p.msg)
+		return truncate(fmt.Sprintf("sent: %v", p.msg), truncateSize)
 	}
-	return fmt.Sprintf("recv: %v", p.msg)
+	return truncate(fmt.Sprintf("recv: %v", p.msg), truncateSize)
 }
 
 type fmtStringer struct {

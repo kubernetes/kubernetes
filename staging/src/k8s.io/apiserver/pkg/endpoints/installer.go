@@ -144,8 +144,9 @@ func (a *APIInstaller) newWebService() *restful.WebService {
 // object. If the storage object is a subresource and has an override supplied for it, it returns
 // the group version kind supplied in the override.
 func (a *APIInstaller) getResourceKind(path string, storage rest.Storage) (schema.GroupVersionKind, error) {
-	if fqKindToRegister, ok := a.group.SubresourceGroupVersionKind[path]; ok {
-		return fqKindToRegister, nil
+	// Let the storage tell us exactly what GVK it has
+	if gvkProvider, ok := storage.(rest.GroupVersionKindProvider); ok {
+		return gvkProvider.GroupVersionKind(a.group.GroupVersion), nil
 	}
 
 	object := storage.New()
@@ -161,12 +162,6 @@ func (a *APIInstaller) getResourceKind(path string, storage rest.Storage) (schem
 		if fqKind.Group == a.group.GroupVersion.Group {
 			fqKindToRegister = a.group.GroupVersion.WithKind(fqKind.Kind)
 			break
-		}
-
-		// TODO: keep rid of extensions api group dependency here
-		// This keeps it doing what it was doing before, but it doesn't feel right.
-		if fqKind.Group == "extensions" && fqKind.Kind == "ThirdPartyResourceData" {
-			fqKindToRegister = a.group.GroupVersion.WithKind(fqKind.Kind)
 		}
 	}
 	if fqKindToRegister.Empty() {
@@ -695,7 +690,12 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			if hasSubresource {
 				doc = "partially update " + subresource + " of the specified " + kind
 			}
-			handler := metrics.InstrumentRouteFunc(action.Verb, resource, subresource, requestScope, restfulPatchResource(patcher, reqScope, admit, mapping.ObjectConvertor))
+			supportedTypes := []string{
+				string(types.JSONPatchType),
+				string(types.MergePatchType),
+				string(types.StrategicMergePatchType),
+			}
+			handler := metrics.InstrumentRouteFunc(action.Verb, resource, subresource, requestScope, restfulPatchResource(patcher, reqScope, admit, mapping.ObjectConvertor, supportedTypes))
 			route := ws.PATCH(action.Path).To(handler).
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
@@ -878,7 +878,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		apiResource.Categories = categoriesProvider.Categories()
 	}
 	if gvkProvider, ok := storage.(rest.GroupVersionKindProvider); ok {
-		gvk := gvkProvider.GroupVersionKind()
+		gvk := gvkProvider.GroupVersionKind(a.group.GroupVersion)
 		apiResource.Group = gvk.Group
 		apiResource.Version = gvk.Version
 		apiResource.Kind = gvk.Kind
@@ -1104,9 +1104,9 @@ func restfulUpdateResource(r rest.Updater, scope handlers.RequestScope, typer ru
 	}
 }
 
-func restfulPatchResource(r rest.Patcher, scope handlers.RequestScope, admit admission.Interface, converter runtime.ObjectConvertor) restful.RouteFunction {
+func restfulPatchResource(r rest.Patcher, scope handlers.RequestScope, admit admission.Interface, converter runtime.ObjectConvertor, supportedTypes []string) restful.RouteFunction {
 	return func(req *restful.Request, res *restful.Response) {
-		handlers.PatchResource(r, scope, admit, converter)(res.ResponseWriter, req.Request)
+		handlers.PatchResource(r, scope, admit, converter, supportedTypes)(res.ResponseWriter, req.Request)
 	}
 }
 

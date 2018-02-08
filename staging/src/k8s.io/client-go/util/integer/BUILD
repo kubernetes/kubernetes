@@ -9,8 +9,8 @@ load(
 go_test(
     name = "go_default_test",
     srcs = ["integer_test.go"],
+    embed = [":go_default_library"],
     importpath = "k8s.io/client-go/util/integer",
-    library = ":go_default_library",
 )
 
 go_library(

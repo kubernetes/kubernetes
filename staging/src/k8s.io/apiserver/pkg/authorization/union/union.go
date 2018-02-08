@@ -14,6 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// Package union implements an authorizer that combines multiple subauthorizer.
+// The union authorizer iterates over each subauthorizer and returns the first
+// decision that is either an Allow decision or a Deny decision. If a
+// subauthorizer returns a NoOpinion, then the union authorizer moves onto the
+// next authorizer or, if the subauthorizer was the last authorizer, returns
+// NoOpinion as the aggregate decision. I.e. union authorizer creates an
+// aggregate decision and supports short-circut allows and denies from
+// subauthorizers.
 package union
 
 import (
@@ -33,14 +41,14 @@ func New(authorizationHandlers ...authorizer.Authorizer) authorizer.Authorizer {
 }
 
 // Authorizes against a chain of authorizer.Authorizer objects and returns nil if successful and returns error if unsuccessful
-func (authzHandler unionAuthzHandler) Authorize(a authorizer.Attributes) (bool, string, error) {
+func (authzHandler unionAuthzHandler) Authorize(a authorizer.Attributes) (authorizer.Decision, string, error) {
 	var (
 		errlist    []error
 		reasonlist []string
 	)
 
 	for _, currAuthzHandler := range authzHandler {
-		authorized, reason, err := currAuthzHandler.Authorize(a)
+		decision, reason, err := currAuthzHandler.Authorize(a)
 
 		if err != nil {
 			errlist = append(errlist, err)
@@ -48,13 +56,15 @@ func (authzHandler unionAuthzHandler) Authorize(a authorizer.Attributes) (bool, 
 		if len(reason) != 0 {
 			reasonlist = append(reasonlist, reason)
 		}
-		if !authorized {
-			continue
+		switch decision {
+		case authorizer.DecisionAllow, authorizer.DecisionDeny:
+			return decision, reason, err
+		case authorizer.DecisionNoOpinion:
+			// continue to the next authorizer
 		}
-		return true, reason, nil
 	}
 
-	return false, strings.Join(reasonlist, "\n"), utilerrors.NewAggregate(errlist)
+	return authorizer.DecisionNoOpinion, strings.Join(reasonlist, "\n"), utilerrors.NewAggregate(errlist)
 }
 
 // unionAuthzRulesHandler authorizer against a chain of authorizer.RuleResolver

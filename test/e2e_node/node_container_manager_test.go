@@ -25,6 +25,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -34,19 +35,20 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 )
 
 func setDesiredConfiguration(initialConfig *kubeletconfig.KubeletConfiguration) {
 	initialConfig.EnforceNodeAllocatable = []string{"pods", "kube-reserved", "system-reserved"}
-	initialConfig.SystemReserved = kubeletconfig.ConfigurationMap{
+	initialConfig.SystemReserved = map[string]string{
 		string(v1.ResourceCPU):    "100m",
 		string(v1.ResourceMemory): "100Mi",
 	}
-	initialConfig.KubeReserved = kubeletconfig.ConfigurationMap{
+	initialConfig.KubeReserved = map[string]string{
 		string(v1.ResourceCPU):    "100m",
 		string(v1.ResourceMemory): "100Mi",
 	}
-	initialConfig.EvictionHard = "memory.available<100Mi"
+	initialConfig.EvictionHard = map[string]string{"memory.available": "100Mi"}
 	// Necessary for allocatable cgroup creation.
 	initialConfig.CgroupsPerQOS = true
 	initialConfig.KubeReservedCgroup = kubeReservedCgroup
@@ -176,41 +178,45 @@ func runTest(f *framework.Framework) error {
 		return fmt.Errorf("Expected Node Allocatable Cgroup Does not exist")
 	}
 	// TODO: Update cgroupManager to expose a Status interface to get current Cgroup Settings.
-	nodeList, err := f.ClientSet.Core().Nodes().List(metav1.ListOptions{})
-	if err != nil {
-		return err
-	}
-	if len(nodeList.Items) != 1 {
-		return fmt.Errorf("Unexpected number of node objects for node e2e. Expects only one node: %+v", nodeList)
-	}
-	node := nodeList.Items[0]
-	capacity := node.Status.Capacity
-	allocatableCPU, allocatableMemory := getAllocatableLimits("200m", "200Mi", capacity)
-	// Total Memory reservation is 200Mi excluding eviction thresholds.
-	// Expect CPU shares on node allocatable cgroup to equal allocatable.
-	if err := expectFileValToEqual(filepath.Join(subsystems.MountPoints["cpu"], "kubepods", "cpu.shares"), int64(cm.MilliCPUToShares(allocatableCPU.MilliValue())), 10); err != nil {
-		return err
-	}
-	// Expect Memory limit on node allocatable cgroup to equal allocatable.
-	if err := expectFileValToEqual(filepath.Join(subsystems.MountPoints["memory"], "kubepods", "memory.limit_in_bytes"), allocatableMemory.Value(), 0); err != nil {
-		return err
-	}
+	// The node may not have updated capacity and allocatable yet, so check that it happens eventually.
+	Eventually(func() error {
+		nodeList, err := f.ClientSet.CoreV1().Nodes().List(metav1.ListOptions{})
+		if err != nil {
+			return err
+		}
+		if len(nodeList.Items) != 1 {
+			return fmt.Errorf("Unexpected number of node objects for node e2e. Expects only one node: %+v", nodeList)
+		}
+		node := nodeList.Items[0]
+		capacity := node.Status.Capacity
+		allocatableCPU, allocatableMemory := getAllocatableLimits("200m", "200Mi", capacity)
+		// Total Memory reservation is 200Mi excluding eviction thresholds.
+		// Expect CPU shares on node allocatable cgroup to equal allocatable.
+		if err := expectFileValToEqual(filepath.Join(subsystems.MountPoints["cpu"], "kubepods", "cpu.shares"), int64(cm.MilliCPUToShares(allocatableCPU.MilliValue())), 10); err != nil {
+			return err
+		}
+		// Expect Memory limit on node allocatable cgroup to equal allocatable.
+		if err := expectFileValToEqual(filepath.Join(subsystems.MountPoints["memory"], "kubepods", "memory.limit_in_bytes"), allocatableMemory.Value(), 0); err != nil {
+			return err
+		}
 
-	// Check that Allocatable reported to scheduler includes eviction thresholds.
-	schedulerAllocatable := node.Status.Allocatable
-	// Memory allocatable should take into account eviction thresholds.
-	allocatableCPU, allocatableMemory = getAllocatableLimits("200m", "300Mi", capacity)
-	// Expect allocatable to include all resources in capacity.
-	if len(schedulerAllocatable) != len(capacity) {
-		return fmt.Errorf("Expected all resources in capacity to be found in allocatable")
-	}
-	// CPU based evictions are not supported.
-	if allocatableCPU.Cmp(schedulerAllocatable[v1.ResourceCPU]) != 0 {
-		return fmt.Errorf("Unexpected cpu allocatable value exposed by the node. Expected: %v, got: %v, capacity: %v", allocatableCPU, schedulerAllocatable[v1.ResourceCPU], capacity[v1.ResourceCPU])
-	}
-	if allocatableMemory.Cmp(schedulerAllocatable[v1.ResourceMemory]) != 0 {
-		return fmt.Errorf("Unexpected cpu allocatable value exposed by the node. Expected: %v, got: %v, capacity: %v", allocatableCPU, schedulerAllocatable[v1.ResourceCPU], capacity[v1.ResourceMemory])
-	}
+		// Check that Allocatable reported to scheduler includes eviction thresholds.
+		schedulerAllocatable := node.Status.Allocatable
+		// Memory allocatable should take into account eviction thresholds.
+		allocatableCPU, allocatableMemory = getAllocatableLimits("200m", "300Mi", capacity)
+		// Expect allocatable to include all resources in capacity.
+		if len(schedulerAllocatable) != len(capacity) {
+			return fmt.Errorf("Expected all resources in capacity to be found in allocatable")
+		}
+		// CPU based evictions are not supported.
+		if allocatableCPU.Cmp(schedulerAllocatable[v1.ResourceCPU]) != 0 {
+			return fmt.Errorf("Unexpected cpu allocatable value exposed by the node. Expected: %v, got: %v, capacity: %v", allocatableCPU, schedulerAllocatable[v1.ResourceCPU], capacity[v1.ResourceCPU])
+		}
+		if allocatableMemory.Cmp(schedulerAllocatable[v1.ResourceMemory]) != 0 {
+			return fmt.Errorf("Unexpected memory allocatable value exposed by the node. Expected: %v, got: %v, capacity: %v", allocatableMemory, schedulerAllocatable[v1.ResourceMemory], capacity[v1.ResourceMemory])
+		}
+		return nil
+	}, time.Minute, 5*time.Second).Should(BeNil())
 
 	if !cgroupManager.Exists(cm.CgroupName(kubeReservedCgroup)) {
 		return fmt.Errorf("Expected kube reserved cgroup Does not exist")

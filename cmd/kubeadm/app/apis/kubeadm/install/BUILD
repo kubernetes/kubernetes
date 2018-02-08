@@ -39,8 +39,8 @@ filegroup(
 go_test(
     name = "go_default_test",
     srcs = ["install_test.go"],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/install",
-    library = ":go_default_library",
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm/fuzzer:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/testing/roundtrip:go_default_library",

@@ -21,7 +21,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	appsv1beta2 "k8s.io/api/apps/v1beta2"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -32,7 +32,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	typedcorev1 "k8s.io/client-go/kubernetes/typed/core/v1"
-	appslisters "k8s.io/client-go/listers/apps/v1beta2"
+	appslisters "k8s.io/client-go/listers/apps/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
@@ -93,7 +93,7 @@ func NewController(
 
 	// obtain references to shared index informers for the Deployment and Foo
 	// types.
-	deploymentInformer := kubeInformerFactory.Apps().V1beta2().Deployments()
+	deploymentInformer := kubeInformerFactory.Apps().V1().Deployments()
 	fooInformer := sampleInformerFactory.Samplecontroller().V1alpha1().Foos()
 
 	// Create event broadcaster
@@ -134,8 +134,8 @@ func NewController(
 	deploymentInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: controller.handleObject,
 		UpdateFunc: func(old, new interface{}) {
-			newDepl := new.(*appsv1beta2.Deployment)
-			oldDepl := old.(*appsv1beta2.Deployment)
+			newDepl := new.(*appsv1.Deployment)
+			oldDepl := old.(*appsv1.Deployment)
 			if newDepl.ResourceVersion == oldDepl.ResourceVersion {
 				// Periodic resync will send update events for all known Deployments.
 				// Two different versions of the same Deployment will always have different RVs.
@@ -277,7 +277,7 @@ func (c *Controller) syncHandler(key string) error {
 	deployment, err := c.deploymentsLister.Deployments(foo.Namespace).Get(deploymentName)
 	// If the resource doesn't exist, we'll create it
 	if errors.IsNotFound(err) {
-		deployment, err = c.kubeclientset.AppsV1beta2().Deployments(foo.Namespace).Create(newDeployment(foo))
+		deployment, err = c.kubeclientset.AppsV1().Deployments(foo.Namespace).Create(newDeployment(foo))
 	}
 
 	// If an error occurs during Get/Create, we'll requeue the item so we can
@@ -299,8 +299,8 @@ func (c *Controller) syncHandler(key string) error {
 	// number does not equal the current desired replicas on the Deployment, we
 	// should update the Deployment resource.
 	if foo.Spec.Replicas != nil && *foo.Spec.Replicas != *deployment.Spec.Replicas {
-		glog.V(4).Infof("Foor: %d, deplR: %d", *foo.Spec.Replicas, *deployment.Spec.Replicas)
-		deployment, err = c.kubeclientset.AppsV1beta2().Deployments(foo.Namespace).Update(newDeployment(foo))
+		glog.V(4).Infof("Foo %s replicas: %d, deployment replicas: %d", name, *foo.Spec.Replicas, *deployment.Spec.Replicas)
+		deployment, err = c.kubeclientset.AppsV1().Deployments(foo.Namespace).Update(newDeployment(foo))
 	}
 
 	// If an error occurs during Update, we'll requeue the item so we can
@@ -321,7 +321,7 @@ func (c *Controller) syncHandler(key string) error {
 	return nil
 }
 
-func (c *Controller) updateFooStatus(foo *samplev1alpha1.Foo, deployment *appsv1beta2.Deployment) error {
+func (c *Controller) updateFooStatus(foo *samplev1alpha1.Foo, deployment *appsv1.Deployment) error {
 	// NEVER modify objects from the store. It's a read-only, local cache.
 	// You can use DeepCopy() to make a deep copy of original object and modify this copy
 	// Or create a copy manually for better performance
@@ -391,12 +391,12 @@ func (c *Controller) handleObject(obj interface{}) {
 // newDeployment creates a new Deployment for a Foo resource. It also sets
 // the appropriate OwnerReferences on the resource so handleObject can discover
 // the Foo resource that 'owns' it.
-func newDeployment(foo *samplev1alpha1.Foo) *appsv1beta2.Deployment {
+func newDeployment(foo *samplev1alpha1.Foo) *appsv1.Deployment {
 	labels := map[string]string{
 		"app":        "nginx",
 		"controller": foo.Name,
 	}
-	return &appsv1beta2.Deployment{
+	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      foo.Spec.DeploymentName,
 			Namespace: foo.Namespace,
@@ -408,7 +408,7 @@ func newDeployment(foo *samplev1alpha1.Foo) *appsv1beta2.Deployment {
 				}),
 			},
 		},
-		Spec: appsv1beta2.DeploymentSpec{
+		Spec: appsv1.DeploymentSpec{
 			Replicas: foo.Spec.Replicas,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: labels,

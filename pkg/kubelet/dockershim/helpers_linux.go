@@ -30,7 +30,7 @@ import (
 	"github.com/blang/semver"
 	dockertypes "github.com/docker/docker/api/types"
 	dockercontainer "github.com/docker/docker/api/types/container"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 )
 
 func DefaultMemorySwap() int64 {
@@ -62,7 +62,11 @@ func getSeccompDockerOpts(seccompProfile string) ([]dockerOpt, error) {
 		return nil, fmt.Errorf("unknown seccomp profile option: %s", seccompProfile)
 	}
 
-	fname := strings.TrimPrefix(seccompProfile, "localhost/") // by pod annotation validation, name is a valid subpath
+	// get the full path of seccomp profile when prefixed with 'localhost/'.
+	fname := strings.TrimPrefix(seccompProfile, "localhost/")
+	if !filepath.IsAbs(fname) {
+		return nil, fmt.Errorf("seccomp profile path must be absolute, but got relative path %q", fname)
+	}
 	file, err := ioutil.ReadFile(filepath.FromSlash(fname))
 	if err != nil {
 		return nil, fmt.Errorf("cannot load seccomp profile %q: %v", fname, err)
@@ -132,4 +136,16 @@ func (ds *dockerService) updateCreateConfig(
 
 func (ds *dockerService) determinePodIPBySandboxID(uid string) string {
 	return ""
+}
+
+func getNetworkNamespace(c *dockertypes.ContainerJSON) (string, error) {
+	if c.State.Pid == 0 {
+		// Docker reports pid 0 for an exited container.
+		return "", fmt.Errorf("cannot find network namespace for the terminated container %q", c.ID)
+	}
+	return fmt.Sprintf(dockerNetNSFmt, c.State.Pid), nil
+}
+
+// applyExperimentalCreateConfig applys experimental configures from sandbox annotations.
+func applyExperimentalCreateConfig(createConfig *dockertypes.ContainerCreateConfig, annotations map[string]string) {
 }

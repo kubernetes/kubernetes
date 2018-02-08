@@ -47,12 +47,12 @@ func newSharedNodeInformer(client clientset.Interface, nodeName string,
 
 	lw := &cache.ListWatch{
 		ListFunc: func(options metav1.ListOptions) (kuberuntime.Object, error) {
-			return client.Core().Nodes().List(metav1.ListOptions{
+			return client.CoreV1().Nodes().List(metav1.ListOptions{
 				FieldSelector: fieldselector.String(),
 			})
 		},
 		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-			return client.Core().Nodes().Watch(metav1.ListOptions{
+			return client.CoreV1().Nodes().Watch(metav1.ListOptions{
 				FieldSelector:   fieldselector.String(),
 				ResourceVersion: options.ResourceVersion,
 			})

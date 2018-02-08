@@ -17,9 +17,10 @@ limitations under the License.
 package stats
 
 import (
-	"github.com/stretchr/testify/assert"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 
 	k8sv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -84,14 +85,14 @@ func TestPVCRef(t *testing.T) {
 	statsCalculator.calcAndStoreStats()
 	vs, _ := statsCalculator.GetLatest()
 
-	assert.Len(t, vs.Volumes, 2)
+	assert.Len(t, append(vs.EphemeralVolumes, vs.PersistentVolumes...), 2)
 	// Verify 'vol0' doesn't have a PVC reference
-	assert.Contains(t, vs.Volumes, kubestats.VolumeStats{
+	assert.Contains(t, append(vs.EphemeralVolumes, vs.PersistentVolumes...), kubestats.VolumeStats{
 		Name:    vol0,
 		FsStats: expectedFSStats(),
 	})
 	// Verify 'vol1' has a PVC reference
-	assert.Contains(t, vs.Volumes, kubestats.VolumeStats{
+	assert.Contains(t, append(vs.EphemeralVolumes, vs.PersistentVolumes...), kubestats.VolumeStats{
 		Name: vol1,
 		PVCRef: &kubestats.PVCReference{
 			Name:      pvcClaimName,

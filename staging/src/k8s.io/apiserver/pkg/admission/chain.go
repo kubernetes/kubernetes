@@ -16,11 +16,12 @@ limitations under the License.
 
 package admission
 
-// chainAdmissionHandler is an instance of admission.Interface that performs admission control using a chain of admission handlers
+// chainAdmissionHandler is an instance of admission.NamedHandler that performs admission control using
+// a chain of admission handlers
 type chainAdmissionHandler []Interface
 
 // NewChainHandler creates a new chain handler from an array of handlers. Used for testing.
-func NewChainHandler(handlers ...Interface) Interface {
+func NewChainHandler(handlers ...Interface) chainAdmissionHandler {
 	return chainAdmissionHandler(handlers)
 }
 
@@ -30,9 +31,27 @@ func (admissionHandler chainAdmissionHandler) Admit(a Attributes) error {
 		if !handler.Handles(a.GetOperation()) {
 			continue
 		}
-		err := handler.Admit(a)
-		if err != nil {
-			return err
+		if mutator, ok := handler.(MutationInterface); ok {
+			err := mutator.Admit(a)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// Validate performs an admission control check using a chain of handlers, and returns immediately on first error
+func (admissionHandler chainAdmissionHandler) Validate(a Attributes) error {
+	for _, handler := range admissionHandler {
+		if !handler.Handles(a.GetOperation()) {
+			continue
+		}
+		if validator, ok := handler.(ValidationInterface); ok {
+			err := validator.Validate(a)
+			if err != nil {
+				return err
+			}
 		}
 	}
 	return nil

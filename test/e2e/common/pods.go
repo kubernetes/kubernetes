@@ -133,7 +133,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 		    Description: Make sure when a pod is created that it is assigned a host IP
 			Address.
 	*/
-	It("should get a host IP [Conformance]", func() {
+	framework.ConformanceIt("should get a host IP ", func() {
 		name := "pod-hostip-" + string(uuid.NewUUID())
 		testHostIP(podClient, &v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
@@ -155,7 +155,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 		    Description: Makes sure a pod is created, a watch can be setup for the pod,
 			pod creation was observed, pod is deleted, and pod deletion is observed.
 	*/
-	It("should be submitted and removed [Conformance]", func() {
+	framework.ConformanceIt("should be submitted and removed ", func() {
 		By("creating the pod")
 		name := "pod-submit-remove-" + string(uuid.NewUUID())
 		value := strconv.Itoa(time.Now().Nanosecond())
@@ -280,7 +280,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 	   Testname: pods-updated-successfully
 	   Description: Make sure it is possible to successfully update a pod's labels.
 	*/
-	It("should be updated [Conformance]", func() {
+	framework.ConformanceIt("should be updated ", func() {
 		By("creating the pod")
 		name := "pod-update-" + string(uuid.NewUUID())
 		value := strconv.Itoa(time.Now().Nanosecond())
@@ -335,7 +335,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 			activeDeadlineSecondsValue, and then waits for the deadline to pass
 			and verifies the pod is terminated.
 	*/
-	It("should allow activeDeadlineSeconds to be updated [Conformance]", func() {
+	framework.ConformanceIt("should allow activeDeadlineSeconds to be updated ", func() {
 		By("creating the pod")
 		name := "pod-update-activedeadlineseconds-" + string(uuid.NewUUID())
 		value := strconv.Itoa(time.Now().Nanosecond())
@@ -381,7 +381,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 		    Description: Make sure that when a pod is created it contains environment
 			variables for each active service.
 	*/
-	It("should contain environment variables for services [Conformance]", func() {
+	framework.ConformanceIt("should contain environment variables for services ", func() {
 		// Make a pod that will be a service.
 		// This pod serves its hostname via HTTP.
 		serverName := "server-envvars-" + string(uuid.NewUUID())
@@ -427,7 +427,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 				},
 			},
 		}
-		_, err := f.ClientSet.Core().Services(f.Namespace.Name).Create(svc)
+		_, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(svc)
 		Expect(err).NotTo(HaveOccurred(), "failed to create service")
 
 		// Make a client pod that verifies that it has the service environment variables.
@@ -491,7 +491,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 		By("submitting the pod to kubernetes")
 		pod = podClient.CreateSync(pod)
 
-		req := f.ClientSet.Core().RESTClient().Get().
+		req := f.ClientSet.CoreV1().RESTClient().Get().
 			Namespace(f.Namespace.Name).
 			Resource("pods").
 			Name(pod.Name).
@@ -561,7 +561,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 		By("submitting the pod to kubernetes")
 		podClient.CreateSync(pod)
 
-		req := f.ClientSet.Core().RESTClient().Get().
+		req := f.ClientSet.CoreV1().RESTClient().Get().
 			Namespace(f.Namespace.Name).
 			Resource("pods").
 			Name(pod.Name).

@@ -12,8 +12,8 @@ go_test(
         "event_test.go",
         "events_cache_test.go",
     ],
+    embed = [":go_default_library"],
     importpath = "k8s.io/client-go/tools/record",
-    library = ":go_default_library",
     deps = [
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",

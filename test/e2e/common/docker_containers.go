@@ -22,20 +22,30 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
-
-	. "github.com/onsi/ginkgo"
 )
 
 var _ = framework.KubeDescribe("Docker Containers", func() {
 	f := framework.NewDefaultFramework("containers")
 
-	It("should use the image defaults if command and args are blank [Conformance]", func() {
+	/*
+		    Testname: container-without-command-args
+		    Description: When a Pod is created neither 'command' nor 'args' are
+			provided for a Container, ensure that the docker image's default
+			command and args are used.
+	*/
+	framework.ConformanceIt("should use the image defaults if command and args are blank ", func() {
 		f.TestContainerOutput("use defaults", entrypointTestPod(), 0, []string{
 			"[/ep default arguments]",
 		})
 	})
 
-	It("should be able to override the image's default arguments (docker cmd) [Conformance]", func() {
+	/*
+		    Testname: container-with-args
+		    Description: When a Pod is created and 'args' are provided for a
+			Container, ensure that they take precedent to the docker image's
+			default arguments, but that the default command is used.
+	*/
+	framework.ConformanceIt("should be able to override the image's default arguments (docker cmd) ", func() {
 		pod := entrypointTestPod()
 		pod.Spec.Containers[0].Args = []string{"override", "arguments"}
 
@@ -46,7 +56,13 @@ var _ = framework.KubeDescribe("Docker Containers", func() {
 
 	// Note: when you override the entrypoint, the image's arguments (docker cmd)
 	// are ignored.
-	It("should be able to override the image's default commmand (docker entrypoint) [Conformance]", func() {
+	/*
+		    Testname: container-with-command
+		    Description: When a Pod is created and 'command' is provided for a
+			Container, ensure that it takes precedent to the docker image's default
+			command.
+	*/
+	framework.ConformanceIt("should be able to override the image's default commmand (docker entrypoint) ", func() {
 		pod := entrypointTestPod()
 		pod.Spec.Containers[0].Command = []string{"/ep-2"}
 
@@ -55,7 +71,13 @@ var _ = framework.KubeDescribe("Docker Containers", func() {
 		})
 	})
 
-	It("should be able to override the image's default command and arguments [Conformance]", func() {
+	/*
+		    Testname: container-with-command-args
+		    Description: When a Pod is created and 'command' and 'args' are
+			provided for a Container, ensure that they take precedent to the docker
+			image's default command and arguments.
+	*/
+	framework.ConformanceIt("should be able to override the image's default command and arguments ", func() {
 		pod := entrypointTestPod()
 		pod.Spec.Containers[0].Command = []string{"/ep-2"}
 		pod.Spec.Containers[0].Args = []string{"override", "arguments"}

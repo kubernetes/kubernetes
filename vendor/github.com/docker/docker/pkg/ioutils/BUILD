@@ -7,11 +7,40 @@ go_library(
         "bytespipe.go",
         "fswriters.go",
         "readers.go",
-        "temp_unix.go",
         "writeflusher.go",
         "writers.go",
     ] + select({
-        "@io_bazel_rules_go//go/platform:windows_amd64": [
+        "@io_bazel_rules_go//go/platform:android": [
+            "temp_unix.go",
+        ],
+        "@io_bazel_rules_go//go/platform:darwin": [
+            "temp_unix.go",
+        ],
+        "@io_bazel_rules_go//go/platform:dragonfly": [
+            "temp_unix.go",
+        ],
+        "@io_bazel_rules_go//go/platform:freebsd": [
+            "temp_unix.go",
+        ],
+        "@io_bazel_rules_go//go/platform:linux": [
+            "temp_unix.go",
+        ],
+        "@io_bazel_rules_go//go/platform:nacl": [
+            "temp_unix.go",
+        ],
+        "@io_bazel_rules_go//go/platform:netbsd": [
+            "temp_unix.go",
+        ],
+        "@io_bazel_rules_go//go/platform:openbsd": [
+            "temp_unix.go",
+        ],
+        "@io_bazel_rules_go//go/platform:plan9": [
+            "temp_unix.go",
+        ],
+        "@io_bazel_rules_go//go/platform:solaris": [
+            "temp_unix.go",
+        ],
+        "@io_bazel_rules_go//go/platform:windows": [
             "temp_windows.go",
         ],
         "//conditions:default": [],
@@ -21,7 +50,7 @@ go_library(
     deps = [
         "//vendor/golang.org/x/net/context:go_default_library",
     ] + select({
-        "@io_bazel_rules_go//go/platform:windows_amd64": [
+        "@io_bazel_rules_go//go/platform:windows": [
             "//vendor/github.com/docker/docker/pkg/longpath:go_default_library",
         ],
         "//conditions:default": [],

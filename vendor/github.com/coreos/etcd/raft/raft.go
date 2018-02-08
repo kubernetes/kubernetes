@@ -1159,6 +1159,10 @@ func (r *raft) addNode(id uint64) {
 	}
 
 	r.setProgress(id, 0, r.raftLog.lastIndex()+1)
+	// When a node is first added, we should mark it as recently active.
+	// Otherwise, CheckQuorum may cause us to step down if it is invoked
+	// before the added node has a chance to communicate with us.
+	r.prs[id].RecentActive = true
 }
 
 func (r *raft) removeNode(id uint64) {

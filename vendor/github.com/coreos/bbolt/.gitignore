@@ -1,0 +1,5 @@
+*.prof
+*.test
+*.swp
+/bin/
+cmd/bolt/bolt

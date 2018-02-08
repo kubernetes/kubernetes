@@ -234,13 +234,13 @@ func TestPriorityRESTMapperRESTMapping(t *testing.T) {
 			name:   "empty",
 			mapper: PriorityRESTMapper{Delegate: MultiRESTMapper{}},
 			input:  schema.GroupKind{Kind: "Foo"},
-			err:    &NoKindMatchError{PartialKind: schema.GroupVersionKind{Kind: "Foo"}},
+			err:    &NoKindMatchError{GroupKind: schema.GroupKind{Kind: "Foo"}},
 		},
 		{
 			name:   "ignore not found",
-			mapper: PriorityRESTMapper{Delegate: MultiRESTMapper{fixedRESTMapper{err: &NoKindMatchError{PartialKind: schema.GroupVersionKind{Kind: "IGNORE_THIS"}}}}},
+			mapper: PriorityRESTMapper{Delegate: MultiRESTMapper{fixedRESTMapper{err: &NoKindMatchError{GroupKind: schema.GroupKind{Kind: "IGNORE_THIS"}}}}},
 			input:  schema.GroupKind{Kind: "Foo"},
-			err:    &NoKindMatchError{PartialKind: schema.GroupVersionKind{Kind: "Foo"}},
+			err:    &NoKindMatchError{GroupKind: schema.GroupKind{Kind: "Foo"}},
 		},
 		{
 			name:   "accept first failure",

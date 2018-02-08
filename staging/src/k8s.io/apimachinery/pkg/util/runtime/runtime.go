@@ -128,7 +128,9 @@ func (r *rudimentaryErrorBackoff) OnError(error) {
 	r.lastErrorTimeLock.Lock()
 	defer r.lastErrorTimeLock.Unlock()
 	d := time.Since(r.lastErrorTime)
-	if d < r.minPeriod {
+	if d < r.minPeriod && d >= 0 {
+		// If the time moves backwards for any reason, do nothing
+		// TODO: remove check "d >= 0" after go 1.8 is no longer supported
 		time.Sleep(r.minPeriod - d)
 	}
 	r.lastErrorTime = time.Now()

@@ -52,6 +52,10 @@ const (
 	vsphereVolumePluginName = "kubernetes.io/vsphere-volume"
 )
 
+func getPath(uid types.UID, volName string, host volume.VolumeHost) string {
+	return host.GetPodVolumeDir(uid, utilstrings.EscapeQualifiedNameForDisk(vsphereVolumePluginName), volName)
+}
+
 // vSphere Volume Plugin
 func (plugin *vsphereVolumePlugin) Init(host volume.VolumeHost) error {
 	plugin.host = host
@@ -107,12 +111,13 @@ func (plugin *vsphereVolumePlugin) newMounterInternal(spec *volume.Spec, podUID 
 
 	return &vsphereVolumeMounter{
 		vsphereVolume: &vsphereVolume{
-			podUID:  podUID,
-			volName: spec.Name(),
-			volPath: volPath,
-			manager: manager,
-			mounter: mounter,
-			plugin:  plugin,
+			podUID:          podUID,
+			volName:         spec.Name(),
+			volPath:         volPath,
+			manager:         manager,
+			mounter:         mounter,
+			plugin:          plugin,
+			MetricsProvider: volume.NewMetricsStatFS(getPath(podUID, spec.Name(), plugin.host)),
 		},
 		fsType:      fsType,
 		diskMounter: volumehelper.NewSafeFormatAndMountFromHost(plugin.GetPluginName(), plugin.host)}, nil
@@ -121,11 +126,12 @@ func (plugin *vsphereVolumePlugin) newMounterInternal(spec *volume.Spec, podUID 
 func (plugin *vsphereVolumePlugin) newUnmounterInternal(volName string, podUID types.UID, manager vdManager, mounter mount.Interface) (volume.Unmounter, error) {
 	return &vsphereVolumeUnmounter{
 		&vsphereVolume{
-			podUID:  podUID,
-			volName: volName,
-			manager: manager,
-			mounter: mounter,
-			plugin:  plugin,
+			podUID:          podUID,
+			volName:         volName,
+			manager:         manager,
+			mounter:         mounter,
+			plugin:          plugin,
+			MetricsProvider: volume.NewMetricsStatFS(getPath(podUID, volName, plugin.host)),
 		}}, nil
 }
 
@@ -174,7 +180,7 @@ type vsphereVolume struct {
 	// diskMounter provides the interface that is used to mount the actual block device.
 	diskMounter mount.Interface
 	plugin      *vsphereVolumePlugin
-	volume.MetricsNil
+	volume.MetricsProvider
 }
 
 var _ volume.Mounter = &vsphereVolumeMounter{}

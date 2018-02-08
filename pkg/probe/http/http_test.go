@@ -52,6 +52,16 @@ func TestHTTPProbeChecker(t *testing.T) {
 		w.Write([]byte(output))
 	}
 
+	redirectHandler := func(s int, bad bool) func(w http.ResponseWriter, r *http.Request) {
+		return func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Path == "/" {
+				http.Redirect(w, r, "/new", s)
+			} else if bad && r.URL.Path == "/new" {
+				w.WriteHeader(http.StatusInternalServerError)
+			}
+		}
+	}
+
 	prober := New()
 	testCases := []struct {
 		handler    func(w http.ResponseWriter, r *http.Request)
@@ -121,6 +131,38 @@ func TestHTTPProbeChecker(t *testing.T) {
 				time.Sleep(3 * time.Second)
 			},
 			health: probe.Failure,
+		},
+		{
+			handler: redirectHandler(http.StatusMovedPermanently, false), // 301
+			health:  probe.Success,
+		},
+		{
+			handler: redirectHandler(http.StatusMovedPermanently, true), // 301
+			health:  probe.Failure,
+		},
+		{
+			handler: redirectHandler(http.StatusFound, false), // 302
+			health:  probe.Success,
+		},
+		{
+			handler: redirectHandler(http.StatusFound, true), // 302
+			health:  probe.Failure,
+		},
+		{
+			handler: redirectHandler(http.StatusTemporaryRedirect, false), // 307
+			health:  probe.Success,
+		},
+		{
+			handler: redirectHandler(http.StatusTemporaryRedirect, true), // 307
+			health:  probe.Failure,
+		},
+		{
+			handler: redirectHandler(http.StatusPermanentRedirect, false), // 308
+			health:  probe.Success,
+		},
+		{
+			handler: redirectHandler(http.StatusPermanentRedirect, true), // 308
+			health:  probe.Failure,
 		},
 	}
 	for i, test := range testCases {

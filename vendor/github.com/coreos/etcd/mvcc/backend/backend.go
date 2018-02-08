@@ -25,7 +25,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/boltdb/bolt"
+	bolt "github.com/coreos/bbolt"
 	"github.com/coreos/pkg/capnslog"
 )
 
@@ -35,25 +35,21 @@ var (
 
 	defragLimit = 10000
 
-	// InitialMmapSize is the initial size of the mmapped region. Setting this larger than
+	// initialMmapSize is the initial size of the mmapped region. Setting this larger than
 	// the potential max db size can prevent writer from blocking reader.
 	// This only works for linux.
-	InitialMmapSize = int64(10 * 1024 * 1024 * 1024)
+	initialMmapSize = uint64(10 * 1024 * 1024 * 1024)
 
 	plog = capnslog.NewPackageLogger("github.com/coreos/etcd", "mvcc/backend")
-)
 
-const (
-	// DefaultQuotaBytes is the number of bytes the backend Size may
-	// consume before exceeding the space quota.
-	DefaultQuotaBytes = int64(2 * 1024 * 1024 * 1024) // 2GB
-	// MaxQuotaBytes is the maximum number of bytes suggested for a backend
-	// quota. A larger quota may lead to degraded performance.
-	MaxQuotaBytes = int64(8 * 1024 * 1024 * 1024) // 8GB
+	// minSnapshotWarningTimeout is the minimum threshold to trigger a long running snapshot warning.
+	minSnapshotWarningTimeout = time.Duration(30 * time.Second)
 )
 
 type Backend interface {
+	ReadTx() ReadTx
 	BatchTx() BatchTx
+
 	Snapshot() Snapshot
 	Hash(ignores map[IgnoreKey]struct{}) (uint32, error)
 	// Size returns the current size of the backend.
@@ -86,36 +82,71 @@ type backend struct {
 
 	batchInterval time.Duration
 	batchLimit    int
-	batchTx       *batchTx
+	batchTx       *batchTxBuffered
+
+	readTx *readTx
 
 	stopc chan struct{}
 	donec chan struct{}
 }
 
-func New(path string, d time.Duration, limit int) Backend {
-	return newBackend(path, d, limit)
+type BackendConfig struct {
+	// Path is the file path to the backend file.
+	Path string
+	// BatchInterval is the maximum time before flushing the BatchTx.
+	BatchInterval time.Duration
+	// BatchLimit is the maximum puts before flushing the BatchTx.
+	BatchLimit int
+	// MmapSize is the number of bytes to mmap for the backend.
+	MmapSize uint64
+}
+
+func DefaultBackendConfig() BackendConfig {
+	return BackendConfig{
+		BatchInterval: defaultBatchInterval,
+		BatchLimit:    defaultBatchLimit,
+		MmapSize:      initialMmapSize,
+	}
+}
+
+func New(bcfg BackendConfig) Backend {
+	return newBackend(bcfg)
 }
 
 func NewDefaultBackend(path string) Backend {
-	return newBackend(path, defaultBatchInterval, defaultBatchLimit)
+	bcfg := DefaultBackendConfig()
+	bcfg.Path = path
+	return newBackend(bcfg)
 }
 
-func newBackend(path string, d time.Duration, limit int) *backend {
-	db, err := bolt.Open(path, 0600, boltOpenOptions)
+func newBackend(bcfg BackendConfig) *backend {
+	bopts := &bolt.Options{}
+	if boltOpenOptions != nil {
+		*bopts = *boltOpenOptions
+	}
+	bopts.InitialMmapSize = bcfg.mmapSize()
+
+	db, err := bolt.Open(bcfg.Path, 0600, bopts)
 	if err != nil {
-		plog.Panicf("cannot open database at %s (%v)", path, err)
+		plog.Panicf("cannot open database at %s (%v)", bcfg.Path, err)
 	}
 
+	// In future, may want to make buffering optional for low-concurrency systems
+	// or dynamically swap between buffered/non-buffered depending on workload.
 	b := &backend{
 		db: db,
 
-		batchInterval: d,
-		batchLimit:    limit,
+		batchInterval: bcfg.BatchInterval,
+		batchLimit:    bcfg.BatchLimit,
+
+		readTx: &readTx{buf: txReadBuffer{
+			txBuffer: txBuffer{make(map[string]*bucketBuffer)}},
+		},
 
 		stopc: make(chan struct{}),
 		donec: make(chan struct{}),
 	}
-	b.batchTx = newBatchTx(b)
+	b.batchTx = newBatchTxBuffered(b)
 	go b.run()
 	return b
 }
@@ -126,6 +157,8 @@ func newBackend(path string, d time.Duration, limit int) *backend {
 func (b *backend) BatchTx() BatchTx {
 	return b.batchTx
 }
+
+func (b *backend) ReadTx() ReadTx { return b.readTx }
 
 // ForceCommit forces the current batching tx to commit.
 func (b *backend) ForceCommit() {
@@ -141,7 +174,33 @@ func (b *backend) Snapshot() Snapshot {
 	if err != nil {
 		plog.Fatalf("cannot begin tx (%s)", err)
 	}
-	return &snapshot{tx}
+
+	stopc, donec := make(chan struct{}), make(chan struct{})
+	dbBytes := tx.Size()
+	go func() {
+		defer close(donec)
+		// sendRateBytes is based on transferring snapshot data over a 1 gigabit/s connection
+		// assuming a min tcp throughput of 100MB/s.
+		var sendRateBytes int64 = 100 * 1024 * 1014
+		warningTimeout := time.Duration(int64((float64(dbBytes) / float64(sendRateBytes)) * float64(time.Second)))
+		if warningTimeout < minSnapshotWarningTimeout {
+			warningTimeout = minSnapshotWarningTimeout
+		}
+		start := time.Now()
+		ticker := time.NewTicker(warningTimeout)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				plog.Warningf("snapshotting is taking more than %v seconds to finish transferring %v MB [started at %v]", time.Since(start).Seconds(), float64(dbBytes)/float64(1024*1014), start)
+			case <-stopc:
+				snapshotDurations.Observe(time.Since(start).Seconds())
+				return
+			}
+		}
+	}()
+
+	return &snapshot{tx, stopc, donec}
 }
 
 type IgnoreKey struct {
@@ -235,7 +294,11 @@ func (b *backend) defrag() error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
-	b.batchTx.commit(true)
+	// block concurrent read requests while resetting tx
+	b.readTx.mu.Lock()
+	defer b.readTx.mu.Unlock()
+
+	b.batchTx.unsafeCommit(true)
 	b.batchTx.tx = nil
 
 	tmpdb, err := bolt.Open(b.db.Path()+".tmp", 0600, boltOpenOptions)
@@ -275,6 +338,10 @@ func (b *backend) defrag() error {
 	if err != nil {
 		plog.Fatalf("cannot begin tx (%s)", err)
 	}
+
+	b.readTx.buf.reset()
+	b.readTx.tx = b.unsafeBegin(false)
+	atomic.StoreInt64(&b.size, b.readTx.tx.Size())
 
 	return nil
 }
@@ -331,6 +398,22 @@ func defragdb(odb, tmpdb *bolt.DB, limit int) error {
 	return tmptx.Commit()
 }
 
+func (b *backend) begin(write bool) *bolt.Tx {
+	b.mu.RLock()
+	tx := b.unsafeBegin(write)
+	b.mu.RUnlock()
+	atomic.StoreInt64(&b.size, tx.Size())
+	return tx
+}
+
+func (b *backend) unsafeBegin(write bool) *bolt.Tx {
+	tx, err := b.db.Begin(write)
+	if err != nil {
+		plog.Fatalf("cannot begin tx (%s)", err)
+	}
+	return tx
+}
+
 // NewTmpBackend creates a backend implementation for testing.
 func NewTmpBackend(batchInterval time.Duration, batchLimit int) (*backend, string) {
 	dir, err := ioutil.TempDir(os.TempDir(), "etcd_backend_test")
@@ -338,7 +421,9 @@ func NewTmpBackend(batchInterval time.Duration, batchLimit int) (*backend, strin
 		plog.Fatal(err)
 	}
 	tmpPath := filepath.Join(dir, "database")
-	return newBackend(tmpPath, batchInterval, batchLimit), tmpPath
+	bcfg := DefaultBackendConfig()
+	bcfg.Path, bcfg.BatchInterval, bcfg.BatchLimit = tmpPath, batchInterval, batchLimit
+	return newBackend(bcfg), tmpPath
 }
 
 func NewDefaultTmpBackend() (*backend, string) {
@@ -347,6 +432,12 @@ func NewDefaultTmpBackend() (*backend, string) {
 
 type snapshot struct {
 	*bolt.Tx
+	stopc chan struct{}
+	donec chan struct{}
 }
 
-func (s *snapshot) Close() error { return s.Tx.Rollback() }
+func (s *snapshot) Close() error {
+	close(s.stopc)
+	<-s.donec
+	return s.Tx.Rollback()
+}

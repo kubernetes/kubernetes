@@ -31,7 +31,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	conditions "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/kubectl"
@@ -96,7 +96,8 @@ type RunObject struct {
 
 func NewCmdRun(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "run NAME --image=image [--env=\"key=value\"] [--port=port] [--replicas=replicas] [--dry-run=bool] [--overrides=inline-json] [--command] -- [COMMAND] [args...]",
+		Use: "run NAME --image=image [--env=\"key=value\"] [--port=port] [--replicas=replicas] [--dry-run=bool] [--overrides=inline-json] [--command] -- [COMMAND] [args...]",
+		DisableFlagsInUseLine: true,
 		Short:   i18n.T("Run a particular image on the cluster"),
 		Long:    runLong,
 		Example: runExample,
@@ -354,6 +355,7 @@ func RunRun(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *c
 					return err
 				}
 				r := f.NewBuilder().
+					Internal().
 					ContinueOnError().
 					NamespaceParam(namespace).DefaultNamespace().
 					ResourceNames(obj.Mapping.Resource, name).
@@ -404,7 +406,7 @@ func RunRun(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *c
 	if outputFormat != "" || cmdutil.GetDryRunFlag(cmd) {
 		return f.PrintObject(cmd, false, runObject.Mapper, runObject.Object, cmdOut)
 	}
-	cmdutil.PrintSuccess(runObject.Mapper, false, cmdOut, runObject.Mapping.Resource, args[0], cmdutil.GetDryRunFlag(cmd), "created")
+	f.PrintSuccess(false, cmdOut, runObject.Mapping.Resource, args[0], cmdutil.GetDryRunFlag(cmd), "created")
 	return nil
 }
 
@@ -500,7 +502,7 @@ func getRestartPolicy(cmd *cobra.Command, interactive bool) (api.RestartPolicy, 
 	case api.RestartPolicyNever:
 		return api.RestartPolicyNever, nil
 	}
-	return "", cmdutil.UsageErrorf(cmd, "invalid restart policy: %s")
+	return "", cmdutil.UsageErrorf(cmd, "invalid restart policy: %s", restart)
 }
 
 func verifyImagePullPolicy(cmd *cobra.Command) error {
@@ -559,7 +561,7 @@ func generateService(f cmdutil.Factory, cmd *cobra.Command, args []string, servi
 		}
 		return runObject, nil
 	}
-	cmdutil.PrintSuccess(runObject.Mapper, false, out, runObject.Mapping.Resource, args[0], cmdutil.GetDryRunFlag(cmd), "created")
+	f.PrintSuccess(false, out, runObject.Mapping.Resource, args[0], cmdutil.GetDryRunFlag(cmd), "created")
 
 	return runObject, nil
 }

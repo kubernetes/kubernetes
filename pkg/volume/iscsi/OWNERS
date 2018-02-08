@@ -3,13 +3,7 @@ approvers:
 - saad-ali
 - rootfs
 reviewers:
-- thockin
-- smarterclayton
-- brendandburns
-- derekwaynecarr
-- pmorie
 - saad-ali
-- justinsb
 - jsafrane
 - rootfs
 - humblec

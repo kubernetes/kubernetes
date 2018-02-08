@@ -243,7 +243,6 @@ func Getfsstat(buf []Statfs_t, flags int) (n int, err error) {
 // nfssvc
 // nnpfspioctl
 // openat
-// poll
 // preadv
 // profil
 // pwritev

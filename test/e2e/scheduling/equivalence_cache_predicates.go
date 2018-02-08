@@ -25,7 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/test/e2e/framework"
 	testutils "k8s.io/kubernetes/test/utils"
 
@@ -155,7 +155,7 @@ var _ = framework.KubeDescribe("EquivalenceCache [Serial]", func() {
 		By("Trying to schedule another equivalent Pod should fail due to node label has been removed.")
 		// use scale to create another equivalent pod and wait for failure event
 		WaitForSchedulerAfterAction(f, func() error {
-			err := framework.ScaleRC(f.ClientSet, f.InternalClientset, ns, affinityRCName, uint(replica+1), false)
+			err := framework.ScaleRC(f.ClientSet, f.InternalClientset, f.ScalesGetter, ns, affinityRCName, uint(replica+1), false)
 			return err
 		}, affinityRCName, false)
 		// and this new pod should be rejected since node label has been updated

@@ -2,13 +2,7 @@ approvers:
 - rootfs
 - saad-ali
 reviewers:
-- justinsb
 - rootfs
-- brendandburns
-- thockin
-- smarterclayton
-- derekwaynecarr
-- pmorie
 - saad-ali
 - jsafrane
 - jingxu97

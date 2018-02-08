@@ -145,6 +145,17 @@ var _ = Describe("When KindVisitor accepts a GroupKind", func() {
 		}))
 	})
 
+	It("should Visit CronJob iff the Kind is a CronJob", func() {
+		kind := apps.GroupKindElement{
+			Kind:  "CronJob",
+			Group: "batch",
+		}
+		Expect(kind.Accept(visitor)).ShouldNot(HaveOccurred())
+		Expect(visitor.visits).To(Equal(map[string]int{
+			"CronJob": 1,
+		}))
+	})
+
 	It("should give an error if the Kind is unknown", func() {
 		kind := apps.GroupKindElement{
 			Kind:  "Unknown",
@@ -171,3 +182,4 @@ func (t *TestKindVisitor) VisitPod(kind apps.GroupKindElement)                  
 func (t *TestKindVisitor) VisitReplicaSet(kind apps.GroupKindElement)            { t.Visit(kind) }
 func (t *TestKindVisitor) VisitReplicationController(kind apps.GroupKindElement) { t.Visit(kind) }
 func (t *TestKindVisitor) VisitStatefulSet(kind apps.GroupKindElement)           { t.Visit(kind) }
+func (t *TestKindVisitor) VisitCronJob(kind apps.GroupKindElement)               { t.Visit(kind) }

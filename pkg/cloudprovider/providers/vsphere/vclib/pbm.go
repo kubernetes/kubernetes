@@ -85,7 +85,7 @@ func (pbmClient *PbmClient) IsDatastoreCompatible(ctx context.Context, storagePo
 
 // GetCompatibleDatastores filters and returns compatible list of datastores for given storage policy id
 // For Non Compatible Datastores, fault message with the Datastore Name is also returned
-func (pbmClient *PbmClient) GetCompatibleDatastores(ctx context.Context, storagePolicyID string, datastores []*Datastore) ([]*Datastore, string, error) {
+func (pbmClient *PbmClient) GetCompatibleDatastores(ctx context.Context, dc *Datacenter, storagePolicyID string, datastores []*DatastoreInfo) ([]*DatastoreInfo, string, error) {
 	var (
 		dsMorNameMap                                = getDsMorNameMap(ctx, datastores)
 		localizedMessagesForNotCompatibleDatastores = ""
@@ -96,7 +96,7 @@ func (pbmClient *PbmClient) GetCompatibleDatastores(ctx context.Context, storage
 		return nil, "", err
 	}
 	compatibleHubs := compatibilityResult.CompatibleDatastores()
-	var compatibleDatastoreList []*Datastore
+	var compatibleDatastoreList []*DatastoreInfo
 	for _, hub := range compatibleHubs {
 		compatibleDatastoreList = append(compatibleDatastoreList, getDatastoreFromPlacementHub(datastores, hub))
 	}
@@ -121,7 +121,7 @@ func (pbmClient *PbmClient) GetCompatibleDatastores(ctx context.Context, storage
 }
 
 // GetPlacementCompatibilityResult gets placement compatibility result based on storage policy requirements.
-func (pbmClient *PbmClient) GetPlacementCompatibilityResult(ctx context.Context, storagePolicyID string, datastore []*Datastore) (pbm.PlacementCompatibilityResult, error) {
+func (pbmClient *PbmClient) GetPlacementCompatibilityResult(ctx context.Context, storagePolicyID string, datastore []*DatastoreInfo) (pbm.PlacementCompatibilityResult, error) {
 	var hubs []pbmtypes.PbmPlacementHub
 	for _, ds := range datastore {
 		hubs = append(hubs, pbmtypes.PbmPlacementHub{
@@ -145,7 +145,7 @@ func (pbmClient *PbmClient) GetPlacementCompatibilityResult(ctx context.Context,
 }
 
 // getDataStoreForPlacementHub returns matching datastore associated with given pbmPlacementHub
-func getDatastoreFromPlacementHub(datastore []*Datastore, pbmPlacementHub pbmtypes.PbmPlacementHub) *Datastore {
+func getDatastoreFromPlacementHub(datastore []*DatastoreInfo, pbmPlacementHub pbmtypes.PbmPlacementHub) *DatastoreInfo {
 	for _, ds := range datastore {
 		if ds.Reference().Type == pbmPlacementHub.HubType && ds.Reference().Value == pbmPlacementHub.HubId {
 			return ds
@@ -155,7 +155,7 @@ func getDatastoreFromPlacementHub(datastore []*Datastore, pbmPlacementHub pbmtyp
 }
 
 // getDsMorNameMap returns map of ds Mor and Datastore Object Name
-func getDsMorNameMap(ctx context.Context, datastores []*Datastore) map[string]string {
+func getDsMorNameMap(ctx context.Context, datastores []*DatastoreInfo) map[string]string {
 	dsMorNameMap := make(map[string]string)
 	for _, ds := range datastores {
 		dsObjectName, err := ds.ObjectName(ctx)

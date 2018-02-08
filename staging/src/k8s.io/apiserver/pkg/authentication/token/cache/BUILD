@@ -12,8 +12,8 @@ go_test(
         "cache_test.go",
         "cached_token_authenticator_test.go",
     ],
+    embed = [":go_default_library"],
     importpath = "k8s.io/apiserver/pkg/authentication/token/cache",
-    library = ":go_default_library",
     deps = [
         "//vendor/github.com/pborman/uuid:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/clock:go_default_library",

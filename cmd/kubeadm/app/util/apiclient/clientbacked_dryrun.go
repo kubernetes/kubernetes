@@ -23,7 +23,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	kuberuntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	clientsetscheme "k8s.io/client-go/kubernetes/scheme"
@@ -75,6 +74,9 @@ func (clg *ClientBackedDryRunGetter) HandleGetAction(action core.GetAction) (boo
 	}
 
 	unversionedObj, err := rc.Get(action.GetName(), metav1.GetOptions{})
+	if err != nil {
+		return true, nil, err
+	}
 	// If the unversioned object does not have .apiVersion; the inner object is probably nil
 	if len(unversionedObj.GetAPIVersion()) == 0 {
 		return true, nil, apierrors.NewNotFound(action.GetResource().GroupResource(), action.GetName())
@@ -100,6 +102,9 @@ func (clg *ClientBackedDryRunGetter) HandleListAction(action core.ListAction) (b
 	}
 
 	unversionedList, err := rc.List(listOpts)
+	if err != nil {
+		return true, nil, err
+	}
 	// If the runtime.Object here is nil, we should return successfully with no result
 	if unversionedList == nil {
 		return true, unversionedList, nil
@@ -142,7 +147,7 @@ func decodeUnversionedIntoAPIObject(action core.Action, unversionedObj runtime.O
 	if err != nil {
 		return nil, err
 	}
-	newObj, err := kuberuntime.Decode(clientsetscheme.Codecs.UniversalDecoder(action.GetResource().GroupVersion()), objBytes)
+	newObj, err := runtime.Decode(clientsetscheme.Codecs.UniversalDecoder(action.GetResource().GroupVersion()), objBytes)
 	if err != nil {
 		return nil, err
 	}

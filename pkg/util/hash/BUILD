@@ -16,8 +16,8 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["hash_test.go"],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/pkg/util/hash",
-    library = ":go_default_library",
     deps = ["//vendor/github.com/davecgh/go-spew/spew:go_default_library"],
 )
 

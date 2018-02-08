@@ -190,9 +190,8 @@ func checkIPExists(ipToCheck string, args []string, runner *runner) (bool, error
 	glog.V(3).Infof("Searching for IP: %v in IP dump: %v", ipToCheck, ipAddressString)
 	showAddressArray := strings.Split(ipAddressString, "\n")
 	for _, showAddress := range showAddressArray {
-		if strings.Contains(showAddress, "IP Address:") {
-			ipFromNetsh := strings.TrimLeft(showAddress, "IP Address:")
-			ipFromNetsh = strings.TrimSpace(ipFromNetsh)
+		if strings.Contains(showAddress, "IP") {
+			ipFromNetsh := getIP(showAddress)
 			if ipFromNetsh == ipToCheck {
 				return true, nil
 			}
@@ -200,4 +199,13 @@ func checkIPExists(ipToCheck string, args []string, runner *runner) (bool, error
 	}
 
 	return false, nil
+}
+
+// getIP gets ip from showAddress (e.g. "IP Address: 10.96.0.4").
+func getIP(showAddress string) string {
+	list := strings.SplitN(showAddress, ":", 2)
+	if len(list) != 2 {
+		return ""
+	}
+	return strings.TrimSpace(list[1])
 }

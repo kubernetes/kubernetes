@@ -20,14 +20,7 @@ set -o pipefail
 export KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
-if LANG=C sed --help 2>&1 | grep -q GNU; then
-  SED="sed"
-elif which gsed &>/dev/null; then
-  SED="gsed"
-else
-  echo "Failed to find GNU sed as sed or gsed. If you are on Mac: brew install gnu-sed." >&2
-  exit 1
-fi
+kube::util::ensure-gnu-sed
 
 # Remove generated files prior to running kazel.
 # TODO(spxtr): Remove this line once Bazel is the only way to build.
@@ -36,10 +29,10 @@ rm -f "${KUBE_ROOT}/pkg/generated/openapi/zz_generated.openapi.go"
 # The git commit sha1s here should match the values in $KUBE_ROOT/WORKSPACE.
 kube::util::go_install_from_commit \
     github.com/kubernetes/repo-infra/kazel \
-    e26fc85d14a1d3dc25569831acc06919673c545a
+    ae4e9a3906ace4ba657b7a09242610c6266e832c
 kube::util::go_install_from_commit \
-    github.com/bazelbuild/rules_go/go/tools/gazelle/gazelle \
-    c72631a220406c4fae276861ee286aaec82c5af2
+    github.com/bazelbuild/bazel-gazelle/cmd/gazelle \
+    31ce76e3acc34a22434d1a783bb9b3cae790d108  # 0.8.0
 
 touch "${KUBE_ROOT}/vendor/BUILD"
 

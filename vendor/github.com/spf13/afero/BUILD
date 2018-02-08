@@ -6,7 +6,6 @@ go_library(
         "afero.go",
         "basepath.go",
         "cacheOnReadFs.go",
-        "const_win_unix.go",
         "copyOnWriteFs.go",
         "httpFs.go",
         "ioutil.go",
@@ -20,8 +19,38 @@ go_library(
         "unionFile.go",
         "util.go",
     ] + select({
-        "@io_bazel_rules_go//go/platform:darwin_amd64": [
+        "@io_bazel_rules_go//go/platform:android": [
+            "const_win_unix.go",
+        ],
+        "@io_bazel_rules_go//go/platform:darwin": [
             "const_bsds.go",
+        ],
+        "@io_bazel_rules_go//go/platform:dragonfly": [
+            "const_bsds.go",
+        ],
+        "@io_bazel_rules_go//go/platform:freebsd": [
+            "const_bsds.go",
+        ],
+        "@io_bazel_rules_go//go/platform:linux": [
+            "const_win_unix.go",
+        ],
+        "@io_bazel_rules_go//go/platform:nacl": [
+            "const_win_unix.go",
+        ],
+        "@io_bazel_rules_go//go/platform:netbsd": [
+            "const_bsds.go",
+        ],
+        "@io_bazel_rules_go//go/platform:openbsd": [
+            "const_bsds.go",
+        ],
+        "@io_bazel_rules_go//go/platform:plan9": [
+            "const_win_unix.go",
+        ],
+        "@io_bazel_rules_go//go/platform:solaris": [
+            "const_win_unix.go",
+        ],
+        "@io_bazel_rules_go//go/platform:windows": [
+            "const_win_unix.go",
         ],
         "//conditions:default": [],
     }),

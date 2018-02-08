@@ -206,6 +206,19 @@ func (StatefulSet) SwaggerDoc() map[string]string {
 	return map_StatefulSet
 }
 
+var map_StatefulSetCondition = map[string]string{
+	"":                   "StatefulSetCondition describes the state of a statefulset at a certain point.",
+	"type":               "Type of statefulset condition.",
+	"status":             "Status of the condition, one of True, False, Unknown.",
+	"lastTransitionTime": "Last time the condition transitioned from one status to another.",
+	"reason":             "The reason for the condition's last transition.",
+	"message":            "A human readable message indicating details about the transition.",
+}
+
+func (StatefulSetCondition) SwaggerDoc() map[string]string {
+	return map_StatefulSetCondition
+}
+
 var map_StatefulSetList = map[string]string{
 	"": "StatefulSetList is a collection of StatefulSets.",
 }
@@ -240,6 +253,7 @@ var map_StatefulSetStatus = map[string]string{
 	"currentRevision":    "currentRevision, if not empty, indicates the version of the StatefulSet used to generate Pods in the sequence [0,currentReplicas).",
 	"updateRevision":     "updateRevision, if not empty, indicates the version of the StatefulSet used to generate Pods in the sequence [replicas-updatedReplicas,replicas)",
 	"collisionCount":     "collisionCount is the count of hash collisions for the StatefulSet. The StatefulSet controller uses this field as a collision avoidance mechanism when it needs to create the name for the newest ControllerRevision.",
+	"conditions":         "Represents the latest available observations of a statefulset's current state.",
 }
 
 func (StatefulSetStatus) SwaggerDoc() map[string]string {

@@ -21,14 +21,14 @@ import (
 	"net/http"
 	"testing"
 
+	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/rest/fake"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 )
 
 func TestCreateSecretGeneric(t *testing.T) {
-	secretObject := &api.Secret{
+	secretObject := &v1.Secret{
 		Data: map[string][]byte{
 			"password": []byte("includes,comma"),
 			"username": []byte("test_user"),
@@ -38,7 +38,7 @@ func TestCreateSecretGeneric(t *testing.T) {
 	f, tf, codec, ns := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
-		APIRegistry:          legacyscheme.Registry,
+		GroupVersion:         schema.GroupVersion{Version: "v1"},
 		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
@@ -57,19 +57,19 @@ func TestCreateSecretGeneric(t *testing.T) {
 	cmd.Flags().Set("from-literal", "password=includes,comma")
 	cmd.Flags().Set("from-literal", "username=test_user")
 	cmd.Run(cmd, []string{secretObject.Name})
-	expectedOutput := "secret/" + secretObject.Name + "\n"
+	expectedOutput := "secrets/" + secretObject.Name + "\n"
 	if buf.String() != expectedOutput {
 		t.Errorf("expected output: %s, but got: %s", expectedOutput, buf.String())
 	}
 }
 
 func TestCreateSecretDockerRegistry(t *testing.T) {
-	secretObject := &api.Secret{}
+	secretObject := &v1.Secret{}
 	secretObject.Name = "my-secret"
 	f, tf, codec, ns := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
-		APIRegistry:          legacyscheme.Registry,
+		GroupVersion:         schema.GroupVersion{Version: "v1"},
 		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
@@ -89,7 +89,7 @@ func TestCreateSecretDockerRegistry(t *testing.T) {
 	cmd.Flags().Set("docker-email", "test-email")
 	cmd.Flags().Set("output", "name")
 	cmd.Run(cmd, []string{secretObject.Name})
-	expectedOutput := "secret/" + secretObject.Name + "\n"
+	expectedOutput := "secrets/" + secretObject.Name + "\n"
 	if buf.String() != expectedOutput {
 		t.Errorf("expected output: %s, but got: %s", buf.String(), expectedOutput)
 	}

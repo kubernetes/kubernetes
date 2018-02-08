@@ -39,7 +39,7 @@ func configFromEnv() (cfg VSphereConfig, ok bool) {
 	cfg.Global.Password = os.Getenv("VSPHERE_PASSWORD")
 	cfg.Global.Datacenter = os.Getenv("VSPHERE_DATACENTER")
 	cfg.Network.PublicNetwork = os.Getenv("VSPHERE_PUBLIC_NETWORK")
-	cfg.Global.Datastore = os.Getenv("VSPHERE_DATASTORE")
+	cfg.Global.DefaultDatastore = os.Getenv("VSPHERE_DATASTORE")
 	cfg.Disk.SCSIControllerType = os.Getenv("VSPHERE_SCSICONTROLLER_TYPE")
 	cfg.Global.WorkingDir = os.Getenv("VSPHERE_WORKING_DIR")
 	cfg.Global.VMName = os.Getenv("VSPHERE_VM_NAME")
@@ -103,7 +103,7 @@ func TestNewVSphere(t *testing.T) {
 		t.Skipf("No config found in environment")
 	}
 
-	_, err := newVSphere(cfg)
+	_, err := newControllerNode(cfg)
 	if err != nil {
 		t.Fatalf("Failed to construct/authenticate vSphere: %s", err)
 	}
@@ -116,7 +116,7 @@ func TestVSphereLogin(t *testing.T) {
 	}
 
 	// Create vSphere configuration object
-	vs, err := newVSphere(cfg)
+	vs, err := newControllerNode(cfg)
 	if err != nil {
 		t.Fatalf("Failed to construct/authenticate vSphere: %s", err)
 	}
@@ -126,11 +126,16 @@ func TestVSphereLogin(t *testing.T) {
 	defer cancel()
 
 	// Create vSphere client
-	err = vs.conn.Connect(ctx)
+	var vcInstance *VSphereInstance
+	if vcInstance, ok = vs.vsphereInstanceMap[cfg.Global.VCenterIP]; !ok {
+		t.Fatalf("Couldn't get vSphere instance: %s", cfg.Global.VCenterIP)
+	}
+
+	err = vcInstance.conn.Connect(ctx)
 	if err != nil {
 		t.Errorf("Failed to connect to vSphere: %s", err)
 	}
-	defer vs.conn.GoVmomiClient.Logout(ctx)
+	defer vcInstance.conn.GoVmomiClient.Logout(ctx)
 }
 
 func TestZones(t *testing.T) {
@@ -154,7 +159,7 @@ func TestInstances(t *testing.T) {
 		t.Skipf("No config found in environment")
 	}
 
-	vs, err := newVSphere(cfg)
+	vs, err := newControllerNode(cfg)
 	if err != nil {
 		t.Fatalf("Failed to construct/authenticate vSphere: %s", err)
 	}
@@ -164,19 +169,19 @@ func TestInstances(t *testing.T) {
 		t.Fatalf("Instances() returned false")
 	}
 
-	nodeName, err := vs.CurrentNodeName("")
+	nodeName, err := vs.CurrentNodeName(context.TODO(), "")
 	if err != nil {
 		t.Fatalf("CurrentNodeName() failed: %s", err)
 	}
 
-	externalID, err := i.ExternalID(nodeName)
+	externalID, err := i.ExternalID(context.TODO(), nodeName)
 	if err != nil {
 		t.Fatalf("Instances.ExternalID(%s) failed: %s", nodeName, err)
 	}
 	t.Logf("Found ExternalID(%s) = %s\n", nodeName, externalID)
 
 	nonExistingVM := types.NodeName(rand.String(15))
-	externalID, err = i.ExternalID(nonExistingVM)
+	externalID, err = i.ExternalID(context.TODO(), nonExistingVM)
 	if err == cloudprovider.InstanceNotFound {
 		t.Logf("VM %s was not found as expected\n", nonExistingVM)
 	} else if err == nil {
@@ -185,13 +190,13 @@ func TestInstances(t *testing.T) {
 		t.Fatalf("Instances.ExternalID did not fail as expected, err: %v", err)
 	}
 
-	instanceID, err := i.InstanceID(nodeName)
+	instanceID, err := i.InstanceID(context.TODO(), nodeName)
 	if err != nil {
 		t.Fatalf("Instances.InstanceID(%s) failed: %s", nodeName, err)
 	}
 	t.Logf("Found InstanceID(%s) = %s\n", nodeName, instanceID)
 
-	instanceID, err = i.InstanceID(nonExistingVM)
+	instanceID, err = i.InstanceID(context.TODO(), nonExistingVM)
 	if err == cloudprovider.InstanceNotFound {
 		t.Logf("VM %s was not found as expected\n", nonExistingVM)
 	} else if err == nil {
@@ -200,7 +205,7 @@ func TestInstances(t *testing.T) {
 		t.Fatalf("Instances.InstanceID did not fail as expected, err: %v", err)
 	}
 
-	addrs, err := i.NodeAddresses(nodeName)
+	addrs, err := i.NodeAddresses(context.TODO(), nodeName)
 	if err != nil {
 		t.Fatalf("Instances.NodeAddresses(%s) failed: %s", nodeName, err)
 	}
@@ -213,12 +218,12 @@ func TestVolumes(t *testing.T) {
 		t.Skipf("No config found in environment")
 	}
 
-	vs, err := newVSphere(cfg)
+	vs, err := newControllerNode(cfg)
 	if err != nil {
 		t.Fatalf("Failed to construct/authenticate vSphere: %s", err)
 	}
 
-	nodeName, err := vs.CurrentNodeName("")
+	nodeName, err := vs.CurrentNodeName(context.TODO(), "")
 	if err != nil {
 		t.Fatalf("CurrentNodeName() failed: %s", err)
 	}

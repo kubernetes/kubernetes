@@ -18,7 +18,7 @@ package property
 
 import (
 	"fmt"
-	"path/filepath"
+	"path"
 	"reflect"
 	"strconv"
 	"strings"
@@ -103,7 +103,11 @@ func (f Filter) MatchProperty(prop types.DynamicProperty) bool {
 
 	switch pval := prop.Val.(type) {
 	case string:
-		m, _ := filepath.Match(match.(string), pval)
+		s := match.(string)
+		if s == "*" {
+			return true // TODO: path.Match fails if s contains a '/'
+		}
+		m, _ := path.Match(s, pval)
 		return m
 	default:
 		return reflect.DeepEqual(match, pval)

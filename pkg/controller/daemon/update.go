@@ -228,7 +228,7 @@ func (dsc *DaemonSetsController) dedupCurHistories(ds *extensions.DaemonSet, cur
 					toUpdate.Labels = make(map[string]string)
 				}
 				toUpdate.Labels[extensions.DefaultDaemonSetUniqueLabelKey] = keepCur.Labels[extensions.DefaultDaemonSetUniqueLabelKey]
-				_, err = dsc.kubeClient.Core().Pods(ds.Namespace).Update(toUpdate)
+				_, err = dsc.kubeClient.CoreV1().Pods(ds.Namespace).Update(toUpdate)
 				if err != nil {
 					return nil, err
 				}

@@ -35,6 +35,7 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//staging/src/k8s.io/kube-aggregator/pkg/registry/apiservice/etcd:all-srcs",
+        "//staging/src/k8s.io/kube-aggregator/pkg/registry/apiservice/rest:all-srcs",
     ],
     tags = ["automanaged"],
 )

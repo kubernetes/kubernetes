@@ -25,7 +25,8 @@ function get-node-instance-metadata {
   metadata+="cluster-name=${KUBE_TEMP}/cluster-name.txt,"
   metadata+="gci-update-strategy=${KUBE_TEMP}/gci-update.txt,"
   metadata+="gci-ensure-gke-docker=${KUBE_TEMP}/gci-ensure-gke-docker.txt,"
-  metadata+="gci-docker-version=${KUBE_TEMP}/gci-docker-version.txt"
+  metadata+="gci-docker-version=${KUBE_TEMP}/gci-docker-version.txt,"
+  metadata+="${NODE_EXTRA_METADATA}"
   echo "${metadata}"
 }
 

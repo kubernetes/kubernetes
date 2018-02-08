@@ -75,3 +75,12 @@ func checkErr(prefix string, err error, handleErr func(string, int)) {
 		handleErr(err.Error(), DefaultErrorExitCode)
 	}
 }
+
+// FormatErrMsg returns a human-readable string describing the slice of errors passed to the function
+func FormatErrMsg(errs []error) string {
+	var errMsg string
+	for _, err := range errs {
+		errMsg = fmt.Sprintf("%s\t- %s\n", errMsg, err.Error())
+	}
+	return errMsg
+}

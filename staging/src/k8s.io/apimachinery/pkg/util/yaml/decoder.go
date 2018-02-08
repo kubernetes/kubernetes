@@ -122,12 +122,12 @@ func (d *YAMLDecoder) Read(data []byte) (n int, err error) {
 	if left <= len(data) {
 		copy(data, d.remaining)
 		d.remaining = nil
-		return len(d.remaining), nil
+		return left, nil
 	}
 
 	// caller will need to reread
-	copy(data, d.remaining[:left])
-	d.remaining = d.remaining[left:]
+	copy(data, d.remaining[:len(data)])
+	d.remaining = d.remaining[len(data):]
 	return len(data), io.ErrShortBuffer
 }
 

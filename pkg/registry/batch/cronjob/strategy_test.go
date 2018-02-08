@@ -22,15 +22,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/batch"
+	api "k8s.io/kubernetes/pkg/apis/core"
 )
-
-func newBool(a bool) *bool {
-	r := new(bool)
-	*r = a
-	return r
-}
 
 func TestCronJobStrategy(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
@@ -96,7 +90,7 @@ func TestCronJobStrategy(t *testing.T) {
 	// Make sure we correctly implement the interface.
 	// Otherwise a typo could silently change the default.
 	var gcds rest.GarbageCollectionDeleteStrategy = Strategy
-	if got, want := gcds.DefaultGarbageCollectionPolicy(), rest.OrphanDependents; got != want {
+	if got, want := gcds.DefaultGarbageCollectionPolicy(genericapirequest.NewContext()), rest.OrphanDependents; got != want {
 		t.Errorf("DefaultGarbageCollectionPolicy() = %#v, want %#v", got, want)
 	}
 }

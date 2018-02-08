@@ -20,12 +20,12 @@ import (
 	"testing"
 
 	"k8s.io/apiserver/pkg/admission"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
 func TestAdmissionNonNilAttribute(t *testing.T) {
 	handler := NewAlwaysAdmit()
-	err := handler.Admit(admission.NewAttributesRecord(nil, nil, api.Kind("kind").WithVersion("version"), "namespace", "name", api.Resource("resource").WithVersion("version"), "subresource", admission.Create, nil))
+	err := handler.(*alwaysAdmit).Admit(admission.NewAttributesRecord(nil, nil, api.Kind("kind").WithVersion("version"), "namespace", "name", api.Resource("resource").WithVersion("version"), "subresource", admission.Create, nil))
 	if err != nil {
 		t.Errorf("Unexpected error returned from admission handler")
 	}
@@ -33,7 +33,7 @@ func TestAdmissionNonNilAttribute(t *testing.T) {
 
 func TestAdmissionNilAttribute(t *testing.T) {
 	handler := NewAlwaysAdmit()
-	err := handler.Admit(nil)
+	err := handler.(*alwaysAdmit).Admit(nil)
 	if err != nil {
 		t.Errorf("Unexpected error returned from admission handler")
 	}

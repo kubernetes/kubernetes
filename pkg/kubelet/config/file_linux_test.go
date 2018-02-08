@@ -36,17 +36,17 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utiltesting "k8s.io/client-go/util/testing"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	k8s_api_v1 "k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/api/validation"
+	api "k8s.io/kubernetes/pkg/apis/core"
+	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
+	"k8s.io/kubernetes/pkg/apis/core/validation"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/securitycontext"
 )
 
 func TestExtractFromNonExistentFile(t *testing.T) {
 	ch := make(chan interface{}, 1)
-	c := new("/some/fake/file", "localhost", time.Millisecond, ch)
+	c := newSourceFile("/some/fake/file", "localhost", ch)
 	err := c.watch()
 	if err == nil {
 		t.Errorf("Expected error")
@@ -90,7 +90,7 @@ func TestReadPodsFromFileExistAlready(t *testing.T) {
 				for _, pod := range update.Pods {
 					// TODO: remove the conversion when validation is performed on versioned objects.
 					internalPod := &api.Pod{}
-					if err := k8s_api_v1.Convert_v1_Pod_To_api_Pod(pod, internalPod, nil); err != nil {
+					if err := k8s_api_v1.Convert_v1_Pod_To_core_Pod(pod, internalPod, nil); err != nil {
 						t.Fatalf("%s: Cannot convert pod %#v, %#v", testCase.desc, pod, err)
 					}
 					if errs := validation.ValidatePod(internalPod); len(errs) > 0 {
@@ -137,7 +137,7 @@ func TestExtractFromBadDataFile(t *testing.T) {
 	}
 
 	ch := make(chan interface{}, 1)
-	c := new(fileName, "localhost", time.Millisecond, ch)
+	c := newSourceFile(fileName, "localhost", ch)
 	err = c.resetStoreFromPath()
 	if err == nil {
 		t.Fatalf("expected error, got nil")
@@ -153,7 +153,7 @@ func TestExtractFromEmptyDir(t *testing.T) {
 	defer os.RemoveAll(dirName)
 
 	ch := make(chan interface{}, 1)
-	c := new(dirName, "localhost", time.Millisecond, ch)
+	c := newSourceFile(dirName, "localhost", ch)
 	err = c.resetStoreFromPath()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -373,7 +373,7 @@ func expectUpdate(t *testing.T, ch chan interface{}, testCase *testCase) {
 			for _, pod := range update.Pods {
 				// TODO: remove the conversion when validation is performed on versioned objects.
 				internalPod := &api.Pod{}
-				if err := k8s_api_v1.Convert_v1_Pod_To_api_Pod(pod, internalPod, nil); err != nil {
+				if err := k8s_api_v1.Convert_v1_Pod_To_core_Pod(pod, internalPod, nil); err != nil {
 					t.Fatalf("%s: Cannot convert pod %#v, %#v", testCase.desc, pod, err)
 				}
 				if errs := validation.ValidatePod(internalPod); len(errs) > 0 {

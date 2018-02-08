@@ -31,7 +31,8 @@ var helpLong = templates.LongDesc(i18n.T(`
 
 func NewCmdHelp() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "help [command] | STRING_TO_SEARCH",
+		Use: "help [command] | STRING_TO_SEARCH",
+		DisableFlagsInUseLine: true,
 		Short: i18n.T("Help about any command"),
 		Long:  helpLong,
 

@@ -20,6 +20,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net"
 	"os"
@@ -59,11 +60,27 @@ func lookup(svcName string) (sets.String, error) {
 
 func shellOut(sendStdin, script string) {
 	log.Printf("execing: %v with stdin: %v", script, sendStdin)
-	// TODO: Switch to sending stdin from go
-	out, err := exec.Command("bash", "-c", fmt.Sprintf("echo -e '%v' | %v", sendStdin, script)).CombinedOutput()
+
+	cmd := exec.Command(script)
+	stdin, err := cmd.StdinPipe()
+	if err != nil {
+		log.Fatalf("Failed to get stdin pipe: %v", err)
+	}
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		log.Fatalf("Failed to get stdout pipe: %v", err)
+	}
+
+	cmd.Start()
+
+	stdin.Write([]byte(sendStdin))
+	stdin.Close()
+
+	out, err := ioutil.ReadAll(stdout)
 	if err != nil {
 		log.Fatalf("Failed to execute %v: %v, err: %v", script, string(out), err)
 	}
+
 	log.Print(string(out))
 }
 

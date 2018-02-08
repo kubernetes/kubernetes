@@ -48,16 +48,16 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/integer"
 	"k8s.io/client-go/util/workqueue"
-	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/daemon/util"
 	"k8s.io/kubernetes/pkg/features"
 	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
+	"k8s.io/kubernetes/pkg/scheduler/algorithm"
+	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
+	"k8s.io/kubernetes/pkg/scheduler/schedulercache"
 	"k8s.io/kubernetes/pkg/util/metrics"
-	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
-	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
-	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 
 	"github.com/golang/glog"
 )
@@ -130,14 +130,16 @@ type DaemonSetsController struct {
 	suspendedDaemonPods      map[string]sets.String
 }
 
-func NewDaemonSetsController(daemonSetInformer extensionsinformers.DaemonSetInformer, historyInformer appsinformers.ControllerRevisionInformer, podInformer coreinformers.PodInformer, nodeInformer coreinformers.NodeInformer, kubeClient clientset.Interface) *DaemonSetsController {
+func NewDaemonSetsController(daemonSetInformer extensionsinformers.DaemonSetInformer, historyInformer appsinformers.ControllerRevisionInformer, podInformer coreinformers.PodInformer, nodeInformer coreinformers.NodeInformer, kubeClient clientset.Interface) (*DaemonSetsController, error) {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
 	// TODO: remove the wrapper when every clients have moved to use the clientset.
-	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(kubeClient.Core().RESTClient()).Events("")})
+	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(kubeClient.CoreV1().RESTClient()).Events("")})
 
-	if kubeClient != nil && kubeClient.Core().RESTClient().GetRateLimiter() != nil {
-		metrics.RegisterMetricAndTrackRateLimiterUsage("daemon_controller", kubeClient.Core().RESTClient().GetRateLimiter())
+	if kubeClient != nil && kubeClient.CoreV1().RESTClient().GetRateLimiter() != nil {
+		if err := metrics.RegisterMetricAndTrackRateLimiterUsage("daemon_controller", kubeClient.CoreV1().RESTClient().GetRateLimiter()); err != nil {
+			return nil, err
+		}
 	}
 	dsc := &DaemonSetsController{
 		kubeClient:    kubeClient,
@@ -201,7 +203,7 @@ func NewDaemonSetsController(daemonSetInformer extensionsinformers.DaemonSetInfo
 	dsc.syncHandler = dsc.syncDaemonSet
 	dsc.enqueueDaemonSet = dsc.enqueue
 	dsc.enqueueDaemonSetRateLimited = dsc.enqueueRateLimited
-	return dsc
+	return dsc, nil
 }
 
 func (dsc *DaemonSetsController) deleteDaemonset(obj interface{}) {
@@ -298,8 +300,8 @@ func (dsc *DaemonSetsController) enqueueDaemonSetAfter(obj interface{}, after ti
 	dsc.queue.AddAfter(key, after)
 }
 
-// getPodDaemonSets returns a list of DaemonSets that potentially match the pod.
-func (dsc *DaemonSetsController) getPodDaemonSets(pod *v1.Pod) []*extensions.DaemonSet {
+// getDaemonSetsForPod returns a list of DaemonSets that potentially match the pod.
+func (dsc *DaemonSetsController) getDaemonSetsForPod(pod *v1.Pod) []*extensions.DaemonSet {
 	sets, err := dsc.dsLister.GetPodDaemonSets(pod)
 	if err != nil {
 		return nil
@@ -362,8 +364,8 @@ func (dsc *DaemonSetsController) addHistory(obj interface{}) {
 }
 
 // updateHistory figures out what DaemonSet(s) manage a ControllerRevision when the ControllerRevision
-// is updated and wake them up. If the anything of the ControllerRevision have changed, we need to
-// awaken both the old and new DaemonSets.
+// is updated and wake them up. If anything of the ControllerRevision has changed, we need to  awaken
+// both the old and new DaemonSets.
 func (dsc *DaemonSetsController) updateHistory(old, cur interface{}) {
 	curHistory := cur.(*apps.ControllerRevision)
 	oldHistory := old.(*apps.ControllerRevision)
@@ -474,7 +476,7 @@ func (dsc *DaemonSetsController) addPod(obj interface{}) {
 	// them to see if anyone wants to adopt it.
 	// DO NOT observe creation because no controller should be waiting for an
 	// orphan.
-	dss := dsc.getPodDaemonSets(pod)
+	dss := dsc.getDaemonSetsForPod(pod)
 	if len(dss) == 0 {
 		return
 	}
@@ -495,8 +497,6 @@ func (dsc *DaemonSetsController) updatePod(old, cur interface{}) {
 		// Two different versions of the same pod will always have different RVs.
 		return
 	}
-	changedToReady := !podutil.IsPodReady(oldPod) && podutil.IsPodReady(curPod)
-	labelChanged := !reflect.DeepEqual(curPod.Labels, oldPod.Labels)
 
 	curControllerRef := metav1.GetControllerOf(curPod)
 	oldControllerRef := metav1.GetControllerOf(oldPod)
@@ -516,6 +516,7 @@ func (dsc *DaemonSetsController) updatePod(old, cur interface{}) {
 		}
 		glog.V(4).Infof("Pod %s updated.", curPod.Name)
 		dsc.enqueueDaemonSet(ds)
+		changedToReady := !podutil.IsPodReady(oldPod) && podutil.IsPodReady(curPod)
 		// See https://github.com/kubernetes/kubernetes/pull/38076 for more details
 		if changedToReady && ds.Spec.MinReadySeconds > 0 {
 			// Add a second to avoid milliseconds skew in AddAfter.
@@ -527,11 +528,12 @@ func (dsc *DaemonSetsController) updatePod(old, cur interface{}) {
 
 	// Otherwise, it's an orphan. If anything changed, sync matching controllers
 	// to see if anyone wants to adopt it now.
-	dss := dsc.getPodDaemonSets(curPod)
+	dss := dsc.getDaemonSetsForPod(curPod)
 	if len(dss) == 0 {
 		return
 	}
 	glog.V(4).Infof("Orphan Pod %s updated.", curPod.Name)
+	labelChanged := !reflect.DeepEqual(curPod.Labels, oldPod.Labels)
 	if labelChanged || controllerRefChanged {
 		for _, ds := range dss {
 			dsc.enqueueDaemonSet(ds)
@@ -707,7 +709,7 @@ func (dsc *DaemonSetsController) updateNode(old, cur interface{}) {
 
 	dsList, err := dsc.dsLister.List(labels.Everything())
 	if err != nil {
-		glog.V(4).Infof("Error enqueueing daemon sets: %v", err)
+		glog.V(4).Infof("Error listing daemon sets: %v", err)
 		return
 	}
 	// TODO: it'd be nice to pass a hint with these enqueues, so that each ds would only examine the added node (unless it has other work to do, too).
@@ -799,6 +801,10 @@ func (dsc *DaemonSetsController) resolveControllerRef(namespace string, controll
 	return ds
 }
 
+// manage manages the scheduling and running of Pods of ds on nodes.
+// After figuring out which nodes should run a Pod of ds but not yet running one and
+// which nodes should not run a Pod of ds but currently running one, it calls function
+// syncNodes with a list of pods to remove and a list of nodes to run a Pod of ds.
 func (dsc *DaemonSetsController) manage(ds *extensions.DaemonSet, hash string) error {
 	// Find out which nodes are running the daemon pods controlled by ds.
 	nodeToDaemonPods, err := dsc.getNodesToDaemonPods(ds)
@@ -1065,7 +1071,7 @@ func (dsc *DaemonSetsController) updateDaemonSetStatus(ds *extensions.DaemonSet,
 	}
 	numberUnavailable := desiredNumberScheduled - numberAvailable
 
-	err = storeDaemonSetStatus(dsc.kubeClient.Extensions().DaemonSets(ds.Namespace), ds, desiredNumberScheduled, currentNumberScheduled, numberMisscheduled, numberReady, updatedNumberScheduled, numberAvailable, numberUnavailable)
+	err = storeDaemonSetStatus(dsc.kubeClient.ExtensionsV1beta1().DaemonSets(ds.Namespace), ds, desiredNumberScheduled, currentNumberScheduled, numberMisscheduled, numberReady, updatedNumberScheduled, numberAvailable, numberUnavailable)
 	if err != nil {
 		return fmt.Errorf("error storing status for daemon set %#v: %v", ds, err)
 	}

@@ -5,19 +5,43 @@ go_library(
     srcs = [
         "hsalsa20.go",
         "salsa208.go",
-        "salsa20_ref.go",
     ] + select({
-        "@io_bazel_rules_go//go/platform:darwin_amd64": [
+        "@io_bazel_rules_go//go/platform:386": [
+            "salsa20_ref.go",
+        ],
+        "@io_bazel_rules_go//go/platform:amd64": [
             "salsa2020_amd64.s",
             "salsa20_amd64.go",
         ],
-        "@io_bazel_rules_go//go/platform:linux_amd64": [
-            "salsa2020_amd64.s",
-            "salsa20_amd64.go",
+        "@io_bazel_rules_go//go/platform:amd64p32": [
+            "salsa20_ref.go",
         ],
-        "@io_bazel_rules_go//go/platform:windows_amd64": [
-            "salsa2020_amd64.s",
-            "salsa20_amd64.go",
+        "@io_bazel_rules_go//go/platform:arm": [
+            "salsa20_ref.go",
+        ],
+        "@io_bazel_rules_go//go/platform:arm64": [
+            "salsa20_ref.go",
+        ],
+        "@io_bazel_rules_go//go/platform:mips": [
+            "salsa20_ref.go",
+        ],
+        "@io_bazel_rules_go//go/platform:mips64": [
+            "salsa20_ref.go",
+        ],
+        "@io_bazel_rules_go//go/platform:mips64le": [
+            "salsa20_ref.go",
+        ],
+        "@io_bazel_rules_go//go/platform:mipsle": [
+            "salsa20_ref.go",
+        ],
+        "@io_bazel_rules_go//go/platform:ppc64": [
+            "salsa20_ref.go",
+        ],
+        "@io_bazel_rules_go//go/platform:ppc64le": [
+            "salsa20_ref.go",
+        ],
+        "@io_bazel_rules_go//go/platform:s390x": [
+            "salsa20_ref.go",
         ],
         "//conditions:default": [],
     }),

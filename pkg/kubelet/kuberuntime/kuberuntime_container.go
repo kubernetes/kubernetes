@@ -39,7 +39,7 @@ import (
 	kubetypes "k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
@@ -85,7 +85,7 @@ func (m *kubeGenericRuntimeManager) recordContainerEvent(pod *v1.Pod, container 
 // * create the container
 // * start the container
 // * run the post start lifecycle hooks (if applicable)
-func (m *kubeGenericRuntimeManager) startContainer(podSandboxID string, podSandboxConfig *runtimeapi.PodSandboxConfig, container *v1.Container, pod *v1.Pod, podStatus *kubecontainer.PodStatus, pullSecrets []v1.Secret, podIP string) (string, error) {
+func (m *kubeGenericRuntimeManager) startContainer(podSandboxID string, podSandboxConfig *runtimeapi.PodSandboxConfig, container *v1.Container, pod *v1.Pod, podStatus *kubecontainer.PodStatus, pullSecrets []v1.Secret, podIP string, containerType kubecontainer.ContainerType) (string, error) {
 	// Step 1: pull the image.
 	imageRef, msg, err := m.imagePuller.EnsureImageExists(pod, container, pullSecrets)
 	if err != nil {
@@ -107,7 +107,7 @@ func (m *kubeGenericRuntimeManager) startContainer(podSandboxID string, podSandb
 		restartCount = containerStatus.RestartCount + 1
 	}
 
-	containerConfig, err := m.generateContainerConfig(container, pod, restartCount, podIP, imageRef)
+	containerConfig, err := m.generateContainerConfig(container, pod, restartCount, podIP, imageRef, containerType)
 	if err != nil {
 		m.recordContainerEvent(pod, container, "", v1.EventTypeWarning, events.FailedToCreateContainer, "Error: %v", grpc.ErrorDesc(err))
 		return grpc.ErrorDesc(err), ErrCreateContainerConfig
@@ -173,8 +173,8 @@ func (m *kubeGenericRuntimeManager) startContainer(podSandboxID string, podSandb
 }
 
 // generateContainerConfig generates container config for kubelet runtime v1.
-func (m *kubeGenericRuntimeManager) generateContainerConfig(container *v1.Container, pod *v1.Pod, restartCount int, podIP, imageRef string) (*runtimeapi.ContainerConfig, error) {
-	opts, _, err := m.runtimeHelper.GenerateRunContainerOptions(pod, container, podIP)
+func (m *kubeGenericRuntimeManager) generateContainerConfig(container *v1.Container, pod *v1.Pod, restartCount int, podIP, imageRef string, containerType kubecontainer.ContainerType) (*runtimeapi.ContainerConfig, error) {
+	opts, err := m.runtimeHelper.GenerateRunContainerOptions(pod, container, podIP)
 	if err != nil {
 		return nil, err
 	}
@@ -183,13 +183,10 @@ func (m *kubeGenericRuntimeManager) generateContainerConfig(container *v1.Contai
 	if err != nil {
 		return nil, err
 	}
-	if uid != nil {
-		// Verify RunAsNonRoot. Non-root verification only supports numeric user.
-		if err := verifyRunAsNonRoot(pod, container, *uid); err != nil {
-			return nil, err
-		}
-	} else if username != "" {
-		glog.Warningf("Non-root verification doesn't support non-numeric user (%s)", username)
+
+	// Verify RunAsNonRoot. Non-root verification only supports numeric user.
+	if err := verifyRunAsNonRoot(pod, container, uid, username); err != nil {
+		return nil, err
 	}
 
 	command, args := kubecontainer.ExpandContainerCommandAndArgs(container, opts.Envs)
@@ -204,8 +201,8 @@ func (m *kubeGenericRuntimeManager) generateContainerConfig(container *v1.Contai
 		Command:     command,
 		Args:        args,
 		WorkingDir:  container.WorkingDir,
-		Labels:      newContainerLabels(container, pod),
-		Annotations: newContainerAnnotations(container, pod, restartCount),
+		Labels:      newContainerLabels(container, pod, containerType),
+		Annotations: newContainerAnnotations(container, pod, restartCount, opts),
 		Devices:     makeDevices(opts),
 		Mounts:      m.makeMounts(opts, container),
 		LogPath:     containerLogsPath,
@@ -761,7 +758,8 @@ func findNextInitContainerToRun(pod *v1.Pod, podStatus *kubecontainer.PodStatus)
 func (m *kubeGenericRuntimeManager) GetContainerLogs(pod *v1.Pod, containerID kubecontainer.ContainerID, logOptions *v1.PodLogOptions, stdout, stderr io.Writer) (err error) {
 	status, err := m.runtimeService.ContainerStatus(containerID.ID)
 	if err != nil {
-		return fmt.Errorf("failed to get container status %q: %v", containerID, err)
+		glog.V(4).Infof("failed to get container status for %v: %v", containerID.String(), err)
+		return fmt.Errorf("Unable to retrieve container logs for %v", containerID.String())
 	}
 	labeledInfo := getContainerInfoFromLabels(status.Labels)
 	annotatedInfo := getContainerInfoFromAnnotations(status.Annotations)

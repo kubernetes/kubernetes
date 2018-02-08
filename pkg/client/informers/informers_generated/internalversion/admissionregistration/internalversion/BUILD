@@ -8,9 +8,10 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
-        "externaladmissionhookconfiguration.go",
         "initializerconfiguration.go",
         "interface.go",
+        "mutatingwebhookconfiguration.go",
+        "validatingwebhookconfiguration.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion/admissionregistration/internalversion",
     deps = [

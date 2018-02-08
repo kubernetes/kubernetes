@@ -79,12 +79,12 @@ func BindingAuthorized(ctx genericapirequest.Context, roleRef rbac.RoleRef, bind
 		return false
 	}
 
-	ok, _, err := a.Authorize(attrs)
+	decision, _, err := a.Authorize(attrs)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf(
 			"error authorizing user %#v to bind %#v in namespace %s: %v",
 			user, roleRef, bindingNamespace, err,
 		))
 	}
-	return ok
+	return decision == authorizer.DecisionAllow
 }

@@ -17,6 +17,7 @@ limitations under the License.
 package app
 
 import (
+	"fmt"
 	"math/rand"
 	"net"
 	"net/http"
@@ -27,13 +28,16 @@ import (
 	"strings"
 	"time"
 
+	"github.com/golang/glog"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/spf13/cobra"
+
 	"k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
-	clientset "k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -48,11 +52,7 @@ import (
 	routecontroller "k8s.io/kubernetes/pkg/controller/route"
 	servicecontroller "k8s.io/kubernetes/pkg/controller/service"
 	"k8s.io/kubernetes/pkg/util/configz"
-
-	"github.com/golang/glog"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
+	"k8s.io/kubernetes/pkg/version/verflag"
 )
 
 const (
@@ -63,14 +63,21 @@ const (
 // NewCloudControllerManagerCommand creates a *cobra.Command object with default parameters
 func NewCloudControllerManagerCommand() *cobra.Command {
 	s := options.NewCloudControllerManagerServer()
-	s.AddFlags(pflag.CommandLine)
 	cmd := &cobra.Command{
 		Use: "cloud-controller-manager",
 		Long: `The Cloud controller manager is a daemon that embeds
 the cloud specific control loops shipped with Kubernetes.`,
 		Run: func(cmd *cobra.Command, args []string) {
+			verflag.PrintAndExitIfRequested()
+
+			if err := Run(s); err != nil {
+				fmt.Fprintf(os.Stderr, "%v\n", err)
+				os.Exit(1)
+			}
+
 		},
 	}
+	s.AddFlags(cmd.Flags())
 
 	return cmd
 }
@@ -84,7 +91,28 @@ func resyncPeriod(s *options.CloudControllerManagerServer) func() time.Duration 
 }
 
 // Run runs the ExternalCMServer.  This should never exit.
-func Run(s *options.CloudControllerManagerServer, cloud cloudprovider.Interface) error {
+func Run(s *options.CloudControllerManagerServer) error {
+	if s.CloudProvider == "" {
+		glog.Fatalf("--cloud-provider cannot be empty")
+	}
+
+	cloud, err := cloudprovider.InitCloudProvider(s.CloudProvider, s.CloudConfigFile)
+	if err != nil {
+		glog.Fatalf("Cloud provider could not be initialized: %v", err)
+	}
+
+	if cloud == nil {
+		glog.Fatalf("cloud provider is nil")
+	}
+
+	if cloud.HasClusterID() == false {
+		if s.AllowUntaggedCloud == true {
+			glog.Warning("detected a cluster without a ClusterID.  A ClusterID will be required in the future.  Please tag your cluster to avoid any future issues")
+		} else {
+			glog.Fatalf("no ClusterID found.  A ClusterID is required for the cloud provider to function properly.  This check can be bypassed by setting the allow-untagged-cloud option")
+		}
+	}
+
 	if c, err := configz.New("componentconfig"); err == nil {
 		c.Set(s.KubeControllerManagerConfiguration)
 	} else {
@@ -100,7 +128,7 @@ func Run(s *options.CloudControllerManagerServer, cloud cloudprovider.Interface)
 	// Override kubeconfig qps/burst settings from flags
 	kubeconfig.QPS = s.KubeAPIQPS
 	kubeconfig.Burst = int(s.KubeAPIBurst)
-	kubeClient, err := clientset.NewForConfig(restclient.AddUserAgent(kubeconfig, "cloud-controller-manager"))
+	kubeClient, err := kubernetes.NewForConfig(restclient.AddUserAgent(kubeconfig, "cloud-controller-manager"))
 	if err != nil {
 		glog.Fatalf("Invalid API configuration: %v", err)
 	}
@@ -120,16 +148,16 @@ func Run(s *options.CloudControllerManagerServer, cloud cloudprovider.Interface)
 			clientBuilder = controller.SAControllerClientBuilder{
 				ClientConfig:         restclient.AnonymousClientConfig(kubeconfig),
 				CoreClient:           kubeClient.CoreV1(),
-				AuthenticationClient: kubeClient.Authentication(),
+				AuthenticationClient: kubeClient.AuthenticationV1(),
 				Namespace:            "kube-system",
 			}
 		} else {
 			clientBuilder = rootClientBuilder
 		}
 
-		err := StartControllers(s, kubeconfig, clientBuilder, stop, recorder, cloud)
-		glog.Fatalf("error running controllers: %v", err)
-		panic("unreachable")
+		if err := StartControllers(s, kubeconfig, rootClientBuilder, clientBuilder, stop, recorder, cloud); err != nil {
+			glog.Fatalf("error running controllers: %v", err)
+		}
 	}
 
 	if !s.LeaderElection.LeaderElect {
@@ -142,23 +170,25 @@ func Run(s *options.CloudControllerManagerServer, cloud cloudprovider.Interface)
 	if err != nil {
 		return err
 	}
+	// add a uniquifier so that two processes on the same host don't accidentally both become active
+	id = id + "_" + string(uuid.NewUUID())
 
 	// Lock required for leader election
-	rl := resourcelock.EndpointsLock{
-		EndpointsMeta: metav1.ObjectMeta{
-			Namespace: "kube-system",
-			Name:      "cloud-controller-manager",
-		},
-		Client: leaderElectionClient.CoreV1(),
-		LockConfig: resourcelock.ResourceLockConfig{
-			Identity:      id + "-external-cloud-controller",
+	rl, err := resourcelock.New(s.LeaderElection.ResourceLock,
+		"kube-system",
+		"cloud-controller-manager",
+		leaderElectionClient.CoreV1(),
+		resourcelock.ResourceLockConfig{
+			Identity:      id,
 			EventRecorder: recorder,
-		},
+		})
+	if err != nil {
+		glog.Fatalf("error creating lock: %v", err)
 	}
 
 	// Try and become the leader and start cloud controller manager loops
 	leaderelection.RunOrDie(leaderelection.LeaderElectionConfig{
-		Lock:          &rl,
+		Lock:          rl,
 		LeaseDuration: s.LeaderElection.LeaseDuration.Duration,
 		RenewDeadline: s.LeaderElection.RenewDeadline.Duration,
 		RetryPeriod:   s.LeaderElection.RetryPeriod.Duration,
@@ -173,9 +203,9 @@ func Run(s *options.CloudControllerManagerServer, cloud cloudprovider.Interface)
 }
 
 // StartControllers starts the cloud specific controller loops.
-func StartControllers(s *options.CloudControllerManagerServer, kubeconfig *restclient.Config, clientBuilder controller.ControllerClientBuilder, stop <-chan struct{}, recorder record.EventRecorder, cloud cloudprovider.Interface) error {
+func StartControllers(s *options.CloudControllerManagerServer, kubeconfig *restclient.Config, rootClientBuilder, clientBuilder controller.ControllerClientBuilder, stop <-chan struct{}, recorder record.EventRecorder, cloud cloudprovider.Interface) error {
 	// Function to build the kube client object
-	client := func(serviceAccountName string) clientset.Interface {
+	client := func(serviceAccountName string) kubernetes.Interface {
 		return clientBuilder.ClientOrDie(serviceAccountName)
 	}
 
@@ -184,7 +214,7 @@ func StartControllers(s *options.CloudControllerManagerServer, kubeconfig *restc
 		cloud.Initialize(clientBuilder)
 	}
 
-	versionedClient := client("shared-informers")
+	versionedClient := rootClientBuilder.ClientOrDie("shared-informers")
 	sharedInformers := informers.NewSharedInformerFactory(versionedClient, resyncPeriod(s)())
 
 	// Start the CloudNodeController
@@ -279,7 +309,7 @@ func startHTTP(s *options.CloudControllerManagerServer) {
 	glog.Fatal(server.ListenAndServe())
 }
 
-func createRecorder(kubeClient *clientset.Clientset) record.EventRecorder {
+func createRecorder(kubeClient *kubernetes.Clientset) record.EventRecorder {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
 	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(kubeClient.CoreV1().RESTClient()).Events("")})

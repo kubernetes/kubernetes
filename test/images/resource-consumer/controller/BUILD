@@ -8,8 +8,8 @@ load(
 
 go_binary(
     name = "controller",
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/test/images/resource-consumer/controller",
-    library = ":go_default_library",
 )
 
 go_library(

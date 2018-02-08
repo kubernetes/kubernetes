@@ -18,21 +18,23 @@ package azure
 
 import (
 	"io"
+	"io/ioutil"
 	"os"
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/arm/containerregistry"
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/adal"
-	azureapi "github.com/Azure/go-autorest/autorest/azure"
+	"github.com/Azure/go-autorest/autorest/azure"
+	"github.com/ghodss/yaml"
 	"github.com/golang/glog"
 	"github.com/spf13/pflag"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/azure"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/azure/auth"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 )
 
 var flagConfigFile = pflag.String("azure-container-registry-config", "",
-	"Path to the file container Azure container registry configuration information.")
+	"Path to the file containing Azure container registry configuration information.")
 
 const dummyRegistryEmail = "name@contoso.com"
 
@@ -60,18 +62,44 @@ func NewACRProvider(configFile *string) credentialprovider.DockerConfigProvider 
 
 type acrProvider struct {
 	file                  *string
-	config                *azure.Config
-	environment           *azureapi.Environment
+	config                *auth.AzureAuthConfig
+	environment           *azure.Environment
 	registryClient        RegistriesClient
 	servicePrincipalToken *adal.ServicePrincipalToken
 }
 
+// ParseConfig returns a parsed configuration for an Azure cloudprovider config file
+func parseConfig(configReader io.Reader) (*auth.AzureAuthConfig, error) {
+	var config auth.AzureAuthConfig
+
+	if configReader == nil {
+		return &config, nil
+	}
+
+	configContents, err := ioutil.ReadAll(configReader)
+	if err != nil {
+		return nil, err
+	}
+	err = yaml.Unmarshal(configContents, &config)
+	if err != nil {
+		return nil, err
+	}
+
+	return &config, nil
+}
+
 func (a *acrProvider) loadConfig(rdr io.Reader) error {
 	var err error
-	a.config, a.environment, err = azure.ParseConfig(rdr)
+	a.config, err = parseConfig(rdr)
 	if err != nil {
 		glog.Errorf("Failed to load azure credential file: %v", err)
 	}
+
+	a.environment, err = auth.ParseAzureEnvironment(a.config.Cloud)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -94,7 +122,7 @@ func (a *acrProvider) Enabled() bool {
 		return false
 	}
 
-	a.servicePrincipalToken, err = azure.GetServicePrincipalToken(a.config, a.environment)
+	a.servicePrincipalToken, err = auth.GetServicePrincipalToken(a.config, a.environment)
 	if err != nil {
 		glog.Errorf("Failed to create service principal token: %v", err)
 		return false

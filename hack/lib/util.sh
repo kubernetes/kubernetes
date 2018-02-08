@@ -148,10 +148,11 @@ kube::util::find-binary-for-platform() {
     "${KUBE_ROOT}/platforms/${platform}/${lookfor}"
   )
   # Also search for binary in bazel build tree.
-  # In some cases we have to name the binary $BINARY_bin, since there was a
-  # directory named $BINARY next to it.
+  # The bazel go rules place binaries in subtrees like
+  # "bazel-bin/source/path/linux_amd64_pure_stripped/binaryname", so make sure
+  # the platform name is matched in the path.
   locations+=($(find "${KUBE_ROOT}/bazel-bin/" -type f -executable \
-    \( -name "${lookfor}" -o -name "${lookfor}_bin" \) 2>/dev/null || true) )
+    -path "*/${platform/\//_}*/${lookfor}" 2>/dev/null || true) )
 
   # List most recently-updated location.
   local -r bin=$( (ls -t "${locations[@]}" 2>/dev/null || true) | head -1 )
@@ -183,13 +184,7 @@ kube::util::gen-docs() {
   "${genkubedocs}" "${dest}/docs/admin/" "kube-proxy"
   "${genkubedocs}" "${dest}/docs/admin/" "kube-scheduler"
   "${genkubedocs}" "${dest}/docs/admin/" "kubelet"
-
-  # We don't really need federation-apiserver and federation-controller-manager
-  # binaries to generate the docs. We just pass their names to decide which docs
-  # to generate. The actual binary for running federation is hyperkube.
-  "${genfeddocs}" "${dest}/docs/admin/" "federation-apiserver"
-  "${genfeddocs}" "${dest}/docs/admin/" "federation-controller-manager"
-  "${genfeddocs}" "${dest}/docs/admin/" "kubefed"
+  "${genkubedocs}" "${dest}/docs/admin/" "kubeadm"
 
   mkdir -p "${dest}/docs/man/man1/"
   "${genman}" "${dest}/docs/man/man1/" "kube-apiserver"
@@ -199,6 +194,7 @@ kube::util::gen-docs() {
   "${genman}" "${dest}/docs/man/man1/" "kube-scheduler"
   "${genman}" "${dest}/docs/man/man1/" "kubelet"
   "${genman}" "${dest}/docs/man/man1/" "kubectl"
+  "${genman}" "${dest}/docs/man/man1/" "kubeadm"
 
   mkdir -p "${dest}/docs/yaml/kubectl/"
   "${genyaml}" "${dest}/docs/yaml/kubectl/"
@@ -273,10 +269,7 @@ kube::util::group-version-to-pkg-path() {
   case "${group_version}" in
     # both group and version are "", this occurs when we generate deep copies for internal objects of the legacy v1 API.
     __internal)
-      echo "pkg/api"
-      ;;
-    federation/v1beta1)
-      echo "federation/apis/federation/v1beta1"
+      echo "pkg/apis/core"
       ;;
     meta/v1)
       echo "vendor/k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -284,11 +277,11 @@ kube::util::group-version-to-pkg-path() {
     meta/v1)
       echo "../vendor/k8s.io/apimachinery/pkg/apis/meta/v1"
       ;;
-    meta/v1alpha1)
-      echo "vendor/k8s.io/apimachinery/pkg/apis/meta/v1alpha1"
+    meta/v1beta1)
+      echo "vendor/k8s.io/apimachinery/pkg/apis/meta/v1beta1"
       ;;
-    meta/v1alpha1)
-      echo "../vendor/k8s.io/apimachinery/pkg/apis/meta/v1alpha1"
+    meta/v1beta1)
+      echo "../vendor/k8s.io/apimachinery/pkg/apis/meta/v1beta1"
       ;;
     unversioned)
       echo "pkg/api/unversioned"
@@ -453,6 +446,9 @@ kube::util::ensure_godep_version() {
 
   kube::log::status "Installing godep version ${GODEP_VERSION}"
   go install ./vendor/github.com/tools/godep/
+  GP="$(echo $GOPATH | cut -f1 -d:)"
+  hash -r # force bash to clear PATH cache
+  PATH="${GP}/bin:${PATH}"
 
   if [[ "$(godep version 2>/dev/null)" != *"godep ${GODEP_VERSION}"* ]]; then
     kube::log::error "Expected godep ${GODEP_VERSION}, got $(godep version)"
@@ -745,12 +741,12 @@ function kube::util::ensure-cfssl {
     kernel=$(uname -s)
     case "${kernel}" in
       Linux)
-        curl -s -L -o cfssl https://pkg.cfssl.org/R1.2/cfssl_linux-amd64
-        curl -s -L -o cfssljson https://pkg.cfssl.org/R1.2/cfssljson_linux-amd64
+        curl --retry 10 -L -o cfssl https://pkg.cfssl.org/R1.2/cfssl_linux-amd64
+        curl --retry 10 -L -o cfssljson https://pkg.cfssl.org/R1.2/cfssljson_linux-amd64
         ;;
       Darwin)
-        curl -s -L -o cfssl https://pkg.cfssl.org/R1.2/cfssl_darwin-amd64
-        curl -s -L -o cfssljson https://pkg.cfssl.org/R1.2/cfssljson_darwin-amd64
+        curl --retry 10 -L -o cfssl https://pkg.cfssl.org/R1.2/cfssl_darwin-amd64
+        curl --retry 10 -L -o cfssljson https://pkg.cfssl.org/R1.2/cfssljson_darwin-amd64
         ;;
       *)
         echo "Unknown, unsupported platform: ${kernel}." >&2
@@ -780,6 +776,23 @@ function kube::util::ensure_dockerized {
   else
     echo "ERROR: This script is designed to be run inside a kube-build container"
     exit 1
+  fi
+}
+
+# kube::util::ensure-gnu-sed
+# Determines which sed binary is gnu-sed on linux/darwin
+#
+# Sets:
+#  SED: The name of the gnu-sed binary
+#
+function kube::util::ensure-gnu-sed {
+  if LANG=C sed --help 2>&1 | grep -q GNU; then
+    SED="sed"
+  elif which gsed &>/dev/null; then
+    SED="gsed"
+  else
+    kube::log::error "Failed to find GNU sed as sed or gsed. If you are on Mac: brew install gnu-sed." >&2
+    return 1
   fi
 }
 

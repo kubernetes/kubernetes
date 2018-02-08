@@ -24,7 +24,6 @@ import (
 
 	// s390/s390x changes
 	"runtime"
-	"syscall"
 
 	info "github.com/google/cadvisor/info/v1"
 	"github.com/google/cadvisor/utils"
@@ -32,6 +31,8 @@ import (
 	"github.com/google/cadvisor/utils/sysinfo"
 
 	"github.com/golang/glog"
+
+	"golang.org/x/sys/unix"
 )
 
 var (
@@ -265,18 +266,13 @@ func addNode(nodes *[]info.Node, id int) (int, error) {
 
 // s390/s390x changes
 func getMachineArch() (string, error) {
-	uname := syscall.Utsname{}
-	err := syscall.Uname(&uname)
+	uname := unix.Utsname{}
+	err := unix.Uname(&uname)
 	if err != nil {
 		return "", err
 	}
 
-	var arch string
-	for _, val := range uname.Machine {
-		arch += string(int(val))
-	}
-
-	return arch, nil
+	return string(uname.Machine[:]), nil
 }
 
 // arm32 chanes

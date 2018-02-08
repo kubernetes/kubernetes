@@ -255,7 +255,7 @@ func Getgroups() (gids []int, err error) {
 		return nil, nil
 	}
 
-	// Sanity check group count.  Max is 1<<16 on Linux.
+	// Sanity check group count. Max is 1<<16 on Linux.
 	if n < 0 || n > 1<<20 {
 		return nil, EINVAL
 	}
@@ -290,8 +290,8 @@ type WaitStatus uint32
 // 0x7F (stopped), or a signal number that caused an exit.
 // The 0x80 bit is whether there was a core dump.
 // An extra number (exit code, signal causing a stop)
-// is in the high bits.  At least that's the idea.
-// There are various irregularities.  For example, the
+// is in the high bits. At least that's the idea.
+// There are various irregularities. For example, the
 // "continued" status is 0xFFFF, distinguishing itself
 // from stopped via the core dump bit.
 
@@ -926,7 +926,7 @@ func Recvmsg(fd int, p, oob []byte, flags int) (n, oobn int, recvflags int, from
 	msg.Namelen = uint32(SizeofSockaddrAny)
 	var iov Iovec
 	if len(p) > 0 {
-		iov.Base = (*byte)(unsafe.Pointer(&p[0]))
+		iov.Base = &p[0]
 		iov.SetLen(len(p))
 	}
 	var dummy byte
@@ -941,7 +941,7 @@ func Recvmsg(fd int, p, oob []byte, flags int) (n, oobn int, recvflags int, from
 			iov.Base = &dummy
 			iov.SetLen(1)
 		}
-		msg.Control = (*byte)(unsafe.Pointer(&oob[0]))
+		msg.Control = &oob[0]
 		msg.SetControllen(len(oob))
 	}
 	msg.Iov = &iov
@@ -974,11 +974,11 @@ func SendmsgN(fd int, p, oob []byte, to Sockaddr, flags int) (n int, err error) 
 		}
 	}
 	var msg Msghdr
-	msg.Name = (*byte)(unsafe.Pointer(ptr))
+	msg.Name = (*byte)(ptr)
 	msg.Namelen = uint32(salen)
 	var iov Iovec
 	if len(p) > 0 {
-		iov.Base = (*byte)(unsafe.Pointer(&p[0]))
+		iov.Base = &p[0]
 		iov.SetLen(len(p))
 	}
 	var dummy byte
@@ -993,7 +993,7 @@ func SendmsgN(fd int, p, oob []byte, to Sockaddr, flags int) (n int, err error) 
 			iov.Base = &dummy
 			iov.SetLen(1)
 		}
-		msg.Control = (*byte)(unsafe.Pointer(&oob[0]))
+		msg.Control = &oob[0]
 		msg.SetControllen(len(oob))
 	}
 	msg.Iov = &iov
@@ -1023,7 +1023,7 @@ func ptracePeek(req int, pid int, addr uintptr, out []byte) (count int, err erro
 
 	var buf [sizeofPtr]byte
 
-	// Leading edge.  PEEKTEXT/PEEKDATA don't require aligned
+	// Leading edge. PEEKTEXT/PEEKDATA don't require aligned
 	// access (PEEKUSER warns that it might), but if we don't
 	// align our reads, we might straddle an unmapped page
 	// boundary and not get the bytes leading up to the page
@@ -1262,6 +1262,7 @@ func Getpgrp() (pid int) {
 //sys	PivotRoot(newroot string, putold string) (err error) = SYS_PIVOT_ROOT
 //sysnb prlimit(pid int, resource int, newlimit *Rlimit, old *Rlimit) (err error) = SYS_PRLIMIT64
 //sys   Prctl(option int, arg2 uintptr, arg3 uintptr, arg4 uintptr, arg5 uintptr) (err error)
+//sys	Pselect(nfd int, r *FdSet, w *FdSet, e *FdSet, timeout *Timespec, sigmask *Sigset_t) (n int, err error) = SYS_PSELECT6
 //sys	read(fd int, p []byte) (n int, err error)
 //sys	Removexattr(path string, attr string) (err error)
 //sys	Renameat(olddirfd int, oldpath string, newdirfd int, newpath string) (err error)

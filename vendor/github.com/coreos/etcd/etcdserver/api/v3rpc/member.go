@@ -48,21 +48,24 @@ func (cs *ClusterServer) MemberAdd(ctx context.Context, r *pb.MemberAddRequest) 
 
 	now := time.Now()
 	m := membership.NewMember("", urls, "", &now)
-	if err = cs.server.AddMember(ctx, *m); err != nil {
-		return nil, togRPCError(err)
+	membs, merr := cs.server.AddMember(ctx, *m)
+	if merr != nil {
+		return nil, togRPCError(merr)
 	}
 
 	return &pb.MemberAddResponse{
-		Header: cs.header(),
-		Member: &pb.Member{ID: uint64(m.ID), PeerURLs: m.PeerURLs},
+		Header:  cs.header(),
+		Member:  &pb.Member{ID: uint64(m.ID), PeerURLs: m.PeerURLs},
+		Members: membersToProtoMembers(membs),
 	}, nil
 }
 
 func (cs *ClusterServer) MemberRemove(ctx context.Context, r *pb.MemberRemoveRequest) (*pb.MemberRemoveResponse, error) {
-	if err := cs.server.RemoveMember(ctx, r.ID); err != nil {
+	membs, err := cs.server.RemoveMember(ctx, r.ID)
+	if err != nil {
 		return nil, togRPCError(err)
 	}
-	return &pb.MemberRemoveResponse{Header: cs.header()}, nil
+	return &pb.MemberRemoveResponse{Header: cs.header(), Members: membersToProtoMembers(membs)}, nil
 }
 
 func (cs *ClusterServer) MemberUpdate(ctx context.Context, r *pb.MemberUpdateRequest) (*pb.MemberUpdateResponse, error) {
@@ -70,15 +73,23 @@ func (cs *ClusterServer) MemberUpdate(ctx context.Context, r *pb.MemberUpdateReq
 		ID:             types.ID(r.ID),
 		RaftAttributes: membership.RaftAttributes{PeerURLs: r.PeerURLs},
 	}
-	if err := cs.server.UpdateMember(ctx, m); err != nil {
+	membs, err := cs.server.UpdateMember(ctx, m)
+	if err != nil {
 		return nil, togRPCError(err)
 	}
-	return &pb.MemberUpdateResponse{Header: cs.header()}, nil
+	return &pb.MemberUpdateResponse{Header: cs.header(), Members: membersToProtoMembers(membs)}, nil
 }
 
 func (cs *ClusterServer) MemberList(ctx context.Context, r *pb.MemberListRequest) (*pb.MemberListResponse, error) {
-	membs := cs.cluster.Members()
+	membs := membersToProtoMembers(cs.cluster.Members())
+	return &pb.MemberListResponse{Header: cs.header(), Members: membs}, nil
+}
 
+func (cs *ClusterServer) header() *pb.ResponseHeader {
+	return &pb.ResponseHeader{ClusterId: uint64(cs.cluster.ID()), MemberId: uint64(cs.server.ID()), RaftTerm: cs.raftTimer.Term()}
+}
+
+func membersToProtoMembers(membs []*membership.Member) []*pb.Member {
 	protoMembs := make([]*pb.Member, len(membs))
 	for i := range membs {
 		protoMembs[i] = &pb.Member{
@@ -88,10 +99,5 @@ func (cs *ClusterServer) MemberList(ctx context.Context, r *pb.MemberListRequest
 			ClientURLs: membs[i].ClientURLs,
 		}
 	}
-
-	return &pb.MemberListResponse{Header: cs.header(), Members: protoMembs}, nil
-}
-
-func (cs *ClusterServer) header() *pb.ResponseHeader {
-	return &pb.ResponseHeader{ClusterId: uint64(cs.cluster.ID()), MemberId: uint64(cs.server.ID()), RaftTerm: cs.raftTimer.Term()}
+	return protoMembs
 }

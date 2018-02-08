@@ -21,38 +21,39 @@ limitations under the License.
 package main
 
 import (
-	"fmt"
+	goflag "flag"
+	"math/rand"
 	"os"
+	"time"
 
-	"k8s.io/apiserver/pkg/server/healthz"
-	"k8s.io/apiserver/pkg/util/flag"
+	"github.com/spf13/pflag"
+
+	"fmt"
+
+	utilflag "k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/apiserver/pkg/util/logs"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app"
-	"k8s.io/kubernetes/cmd/kube-controller-manager/app/options"
 	_ "k8s.io/kubernetes/pkg/client/metrics/prometheus" // for client metric registration
 	_ "k8s.io/kubernetes/pkg/util/reflector/prometheus" // for reflector metric registration
 	_ "k8s.io/kubernetes/pkg/util/workqueue/prometheus" // for workqueue metric registration
 	_ "k8s.io/kubernetes/pkg/version/prometheus"        // for version metric registration
-	"k8s.io/kubernetes/pkg/version/verflag"
-
-	"github.com/spf13/pflag"
 )
 
-func init() {
-	healthz.DefaultHealthz()
-}
-
 func main() {
-	s := options.NewCMServer()
-	s.AddFlags(pflag.CommandLine, app.KnownControllers(), app.ControllersDisabledByDefault.List())
+	rand.Seed(time.Now().UTC().UnixNano())
 
-	flag.InitFlags()
+	command := app.NewControllerManagerCommand()
+
+	// TODO: once we switch everything over to Cobra commands, we can go back to calling
+	// utilflag.InitFlags() (by removing its pflag.Parse() call). For now, we have to set the
+	// normalize func and add the go flag set by hand.
+	pflag.CommandLine.SetNormalizeFunc(utilflag.WordSepNormalizeFunc)
+	pflag.CommandLine.AddGoFlagSet(goflag.CommandLine)
+	// utilflag.InitFlags()
 	logs.InitLogs()
 	defer logs.FlushLogs()
 
-	verflag.PrintAndExitIfRequested()
-
-	if err := app.Run(s); err != nil {
+	if err := command.Execute(); err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
 		os.Exit(1)
 	}

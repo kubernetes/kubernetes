@@ -21,6 +21,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/request"
 	"github.com/golang/glog"
@@ -53,7 +54,15 @@ func (c *CrossRequestRetryDelay) BeforeSign(r *request.Request) {
 	if delay > 0 {
 		glog.Warningf("Inserting delay before AWS request (%s) to avoid RequestLimitExceeded: %s",
 			describeRequest(r), delay.String())
-		r.Config.SleepDelay(delay)
+
+		if sleepFn := r.Config.SleepDelay; sleepFn != nil {
+			// Support SleepDelay for backwards compatibility
+			sleepFn(delay)
+		} else if err := aws.SleepWithContext(r.Context(), delay); err != nil {
+			r.Error = awserr.New(request.CanceledErrorCode, "request context canceled", err)
+			r.Retryable = aws.Bool(false)
+			return
+		}
 
 		// Avoid clock skew problems
 		r.Time = now

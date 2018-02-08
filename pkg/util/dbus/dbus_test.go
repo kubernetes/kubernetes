@@ -25,21 +25,16 @@ import (
 )
 
 const (
-	DBusNameFlagAllowReplacement uint32 = 1 << (iota + 1)
-	DBusNameFlagReplaceExisting
-	DBusNameFlagDoNotQueue
+	DBusNameFlagDoNotQueue uint32 = 1 << (iota + 1)
 )
 
 const (
 	DBusRequestNameReplyPrimaryOwner uint32 = iota + 1
-	DBusRequestNameReplyInQueue
-	DBusRequestNameReplyExists
 	DBusRequestNameReplyAlreadyOwner
 )
 
 const (
 	DBusReleaseNameReplyReleased uint32 = iota + 1
-	DBusReleaseNameReplyNonExistent
 	DBusReleaseNameReplyNotOwner
 )
 

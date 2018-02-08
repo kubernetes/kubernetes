@@ -23,6 +23,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/autoscaling"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/elb"
+	"github.com/aws/aws-sdk-go/service/elbv2"
 	"github.com/aws/aws-sdk-go/service/kms"
 
 	"github.com/golang/glog"
@@ -38,6 +39,7 @@ type FakeAWSServices struct {
 
 	ec2      FakeEC2
 	elb      ELB
+	elbv2    ELBV2
 	asg      *FakeASG
 	metadata *FakeMetadata
 	kms      *FakeKMS
@@ -48,6 +50,7 @@ func NewFakeAWSServices(clusterId string) *FakeAWSServices {
 	s.region = "us-east-1"
 	s.ec2 = &FakeEC2Impl{aws: s}
 	s.elb = &FakeELB{aws: s}
+	s.elbv2 = &FakeELBV2{aws: s}
 	s.asg = &FakeASG{aws: s}
 	s.metadata = &FakeMetadata{aws: s}
 	s.kms = &FakeKMS{aws: s}
@@ -88,6 +91,10 @@ func (s *FakeAWSServices) Compute(region string) (EC2, error) {
 
 func (s *FakeAWSServices) LoadBalancing(region string) (ELB, error) {
 	return s.elb, nil
+}
+
+func (s *FakeAWSServices) LoadBalancingV2(region string) (ELBV2, error) {
+	return s.elbv2, nil
 }
 
 func (s *FakeAWSServices) Autoscaling(region string) (ASG, error) {
@@ -196,6 +203,14 @@ func (ec2i *FakeEC2Impl) RevokeSecurityGroupIngress(*ec2.RevokeSecurityGroupIngr
 	panic("Not implemented")
 }
 
+func (ec2i *FakeEC2Impl) DescribeVolumeModifications(*ec2.DescribeVolumesModificationsInput) ([]*ec2.VolumeModification, error) {
+	panic("Not implemented")
+}
+
+func (ec2i *FakeEC2Impl) ModifyVolume(*ec2.ModifyVolumeInput) (*ec2.ModifyVolumeOutput, error) {
+	panic("Not implemented")
+}
+
 func (ec2i *FakeEC2Impl) CreateSubnet(request *ec2.Subnet) (*ec2.CreateSubnetOutput, error) {
 	ec2i.Subnets = append(ec2i.Subnets, request)
 	response := &ec2.CreateSubnetOutput{
@@ -244,6 +259,10 @@ func (ec2i *FakeEC2Impl) DeleteRoute(request *ec2.DeleteRouteInput) (*ec2.Delete
 
 func (ec2i *FakeEC2Impl) ModifyInstanceAttribute(request *ec2.ModifyInstanceAttributeInput) (*ec2.ModifyInstanceAttributeOutput, error) {
 	panic("Not implemented")
+}
+
+func (ec2i *FakeEC2Impl) DescribeVpcs(request *ec2.DescribeVpcsInput) (*ec2.DescribeVpcsOutput, error) {
+	return &ec2.DescribeVpcsOutput{Vpcs: []*ec2.Vpc{{CidrBlock: aws.String("172.20.0.0/16")}}}, nil
 }
 
 type FakeMetadata struct {
@@ -312,6 +331,10 @@ func (elb *FakeELB) DescribeLoadBalancers(input *elb.DescribeLoadBalancersInput)
 	panic("Not implemented")
 }
 
+func (elb *FakeELB) AddTags(input *elb.AddTagsInput) (*elb.AddTagsOutput, error) {
+	panic("Not implemented")
+}
+
 func (elb *FakeELB) RegisterInstancesWithLoadBalancer(*elb.RegisterInstancesWithLoadBalancerInput) (*elb.RegisterInstancesWithLoadBalancerOutput, error) {
 	panic("Not implemented")
 }
@@ -352,6 +375,14 @@ func (elb *FakeELB) SetLoadBalancerPoliciesForBackendServer(*elb.SetLoadBalancer
 	panic("Not implemented")
 }
 
+func (elb *FakeELB) SetLoadBalancerPoliciesOfListener(input *elb.SetLoadBalancerPoliciesOfListenerInput) (*elb.SetLoadBalancerPoliciesOfListenerOutput, error) {
+	panic("Not implemented")
+}
+
+func (elb *FakeELB) DescribeLoadBalancerPolicies(input *elb.DescribeLoadBalancerPoliciesInput) (*elb.DescribeLoadBalancerPoliciesOutput, error) {
+	panic("Not implemented")
+}
+
 func (elb *FakeELB) DescribeLoadBalancerAttributes(*elb.DescribeLoadBalancerAttributesInput) (*elb.DescribeLoadBalancerAttributesOutput, error) {
 	panic("Not implemented")
 }
@@ -361,6 +392,79 @@ func (elb *FakeELB) ModifyLoadBalancerAttributes(*elb.ModifyLoadBalancerAttribut
 }
 
 func (self *FakeELB) expectDescribeLoadBalancers(loadBalancerName string) {
+	panic("Not implemented")
+}
+
+type FakeELBV2 struct {
+	aws *FakeAWSServices
+}
+
+func (self *FakeELBV2) AddTags(input *elbv2.AddTagsInput) (*elbv2.AddTagsOutput, error) {
+	panic("Not implemented")
+}
+
+func (self *FakeELBV2) CreateLoadBalancer(*elbv2.CreateLoadBalancerInput) (*elbv2.CreateLoadBalancerOutput, error) {
+	panic("Not implemented")
+}
+func (self *FakeELBV2) DescribeLoadBalancers(*elbv2.DescribeLoadBalancersInput) (*elbv2.DescribeLoadBalancersOutput, error) {
+	panic("Not implemented")
+}
+func (self *FakeELBV2) DeleteLoadBalancer(*elbv2.DeleteLoadBalancerInput) (*elbv2.DeleteLoadBalancerOutput, error) {
+	panic("Not implemented")
+}
+
+func (self *FakeELBV2) ModifyLoadBalancerAttributes(*elbv2.ModifyLoadBalancerAttributesInput) (*elbv2.ModifyLoadBalancerAttributesOutput, error) {
+	panic("Not implemented")
+}
+func (self *FakeELBV2) DescribeLoadBalancerAttributes(*elbv2.DescribeLoadBalancerAttributesInput) (*elbv2.DescribeLoadBalancerAttributesOutput, error) {
+	panic("Not implemented")
+}
+
+func (self *FakeELBV2) CreateTargetGroup(*elbv2.CreateTargetGroupInput) (*elbv2.CreateTargetGroupOutput, error) {
+	panic("Not implemented")
+}
+func (self *FakeELBV2) DescribeTargetGroups(*elbv2.DescribeTargetGroupsInput) (*elbv2.DescribeTargetGroupsOutput, error) {
+	panic("Not implemented")
+}
+func (self *FakeELBV2) ModifyTargetGroup(*elbv2.ModifyTargetGroupInput) (*elbv2.ModifyTargetGroupOutput, error) {
+	panic("Not implemented")
+}
+func (self *FakeELBV2) DeleteTargetGroup(*elbv2.DeleteTargetGroupInput) (*elbv2.DeleteTargetGroupOutput, error) {
+	panic("Not implemented")
+}
+
+func (self *FakeELBV2) DescribeTargetHealth(input *elbv2.DescribeTargetHealthInput) (*elbv2.DescribeTargetHealthOutput, error) {
+	panic("Not implemented")
+}
+
+func (self *FakeELBV2) DescribeTargetGroupAttributes(*elbv2.DescribeTargetGroupAttributesInput) (*elbv2.DescribeTargetGroupAttributesOutput, error) {
+	panic("Not implemented")
+}
+func (self *FakeELBV2) ModifyTargetGroupAttributes(*elbv2.ModifyTargetGroupAttributesInput) (*elbv2.ModifyTargetGroupAttributesOutput, error) {
+	panic("Not implemented")
+}
+
+func (self *FakeELBV2) RegisterTargets(*elbv2.RegisterTargetsInput) (*elbv2.RegisterTargetsOutput, error) {
+	panic("Not implemented")
+}
+func (self *FakeELBV2) DeregisterTargets(*elbv2.DeregisterTargetsInput) (*elbv2.DeregisterTargetsOutput, error) {
+	panic("Not implemented")
+}
+
+func (self *FakeELBV2) CreateListener(*elbv2.CreateListenerInput) (*elbv2.CreateListenerOutput, error) {
+	panic("Not implemented")
+}
+func (self *FakeELBV2) DescribeListeners(*elbv2.DescribeListenersInput) (*elbv2.DescribeListenersOutput, error) {
+	panic("Not implemented")
+}
+func (self *FakeELBV2) DeleteListener(*elbv2.DeleteListenerInput) (*elbv2.DeleteListenerOutput, error) {
+	panic("Not implemented")
+}
+func (self *FakeELBV2) ModifyListener(*elbv2.ModifyListenerInput) (*elbv2.ModifyListenerOutput, error) {
+	panic("Not implemented")
+}
+
+func (self *FakeELBV2) WaitUntilLoadBalancersDeleted(*elbv2.DescribeLoadBalancersInput) error {
 	panic("Not implemented")
 }
 

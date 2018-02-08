@@ -35,12 +35,10 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/helper"
 	apiservice "k8s.io/kubernetes/pkg/api/service"
-	"k8s.io/kubernetes/pkg/features"
+	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/apis/core/helper"
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	"k8s.io/kubernetes/pkg/util/async"
@@ -93,7 +91,7 @@ type serviceInfo struct {
 	targetPort               int
 	loadBalancerStatus       api.LoadBalancerStatus
 	sessionAffinityType      api.ServiceAffinity
-	stickyMaxAgeMinutes      int
+	stickyMaxAgeSeconds      int
 	externalIPs              []*externalIPInfo
 	loadBalancerIngressIPs   []*loadBalancerIngressInfo
 	loadBalancerSourceRanges []string
@@ -160,11 +158,16 @@ func (ep *endpointsInfo) Cleanup() {
 // returns a new serviceInfo struct
 func newServiceInfo(svcPortName proxy.ServicePortName, port *api.ServicePort, service *api.Service) *serviceInfo {
 	onlyNodeLocalEndpoints := false
-	if utilfeature.DefaultFeatureGate.Enabled(features.ExternalTrafficLocalOnly) &&
-		apiservice.RequestsOnlyLocalTraffic(service) {
+	if apiservice.RequestsOnlyLocalTraffic(service) {
 		onlyNodeLocalEndpoints = true
 	}
 
+	// set default session sticky max age 180min=10800s
+	stickyMaxAgeSeconds := 10800
+	if service.Spec.SessionAffinity == api.ServiceAffinityClientIP {
+		// Kube-apiserver side guarantees SessionAffinityConfig won't be nil when session affinity type is ClientIP
+		stickyMaxAgeSeconds = int(*service.Spec.SessionAffinityConfig.ClientIP.TimeoutSeconds)
+	}
 	info := &serviceInfo{
 		clusterIP:  net.ParseIP(service.Spec.ClusterIP),
 		port:       int(port.Port),
@@ -174,7 +177,7 @@ func newServiceInfo(svcPortName proxy.ServicePortName, port *api.ServicePort, se
 		// Deep-copy in case the service instance changes
 		loadBalancerStatus:       *helper.LoadBalancerStatusDeepCopy(&service.Status.LoadBalancer),
 		sessionAffinityType:      service.Spec.SessionAffinity,
-		stickyMaxAgeMinutes:      180, // TODO: paramaterize this in the API.
+		stickyMaxAgeSeconds:      stickyMaxAgeSeconds,
 		loadBalancerSourceRanges: make([]string, len(service.Spec.LoadBalancerSourceRanges)),
 		onlyNodeLocalEndpoints:   onlyNodeLocalEndpoints,
 	}
@@ -447,15 +450,6 @@ func NewProxier(
 	recorder record.EventRecorder,
 	healthzServer healthcheck.HealthzUpdater,
 ) (*Proxier, error) {
-	// check valid user input
-	if minSyncPeriod > syncPeriod {
-		return nil, fmt.Errorf("min-sync (%v) must be < sync(%v)", minSyncPeriod, syncPeriod)
-	}
-
-	// Generate the masquerade mark to use for SNAT rules.
-	if masqueradeBit < 0 || masqueradeBit > 31 {
-		return nil, fmt.Errorf("invalid iptables-masquerade-bit %v not in [0, 31]", masqueradeBit)
-	}
 	masqueradeValue := 1 << uint(masqueradeBit)
 	masqueradeMark := fmt.Sprintf("%#08x/%#08x", masqueradeValue, masqueradeValue)
 
@@ -828,10 +822,6 @@ func (proxier *Proxier) updateEndpointsMap() (result updateEndpointMapResult) {
 		changes.items = make(map[types.NamespacedName]*endpointsChange)
 	}()
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.ExternalTrafficLocalOnly) {
-		return
-	}
-
 	// TODO: If this will appear to be computationally expensive, consider
 	// computing this incrementally similarly to endpointsMap.
 	result.hcEndpoints = make(map[types.NamespacedName]int)
@@ -1037,8 +1027,8 @@ func (proxier *Proxier) syncProxyRules() {
 			false,
 			svcInfo.clusterIP.String(),
 			Enum(svcInfo.protocol),
-			uint16(svcInfo.port),
 			uint16(svcInfo.targetPort),
+			uint16(svcInfo.port),
 		)
 		if err != nil {
 			glog.Errorf("Policy creation failed: %v", err)
@@ -1075,8 +1065,8 @@ func (proxier *Proxier) syncProxyRules() {
 				false,
 				externalIp.ip,
 				Enum(svcInfo.protocol),
-				uint16(svcInfo.port),
 				uint16(svcInfo.targetPort),
+				uint16(svcInfo.port),
 			)
 			if err != nil {
 				glog.Errorf("Policy creation failed: %v", err)
@@ -1093,8 +1083,8 @@ func (proxier *Proxier) syncProxyRules() {
 				false,
 				lbIngressIp.ip,
 				Enum(svcInfo.protocol),
-				uint16(svcInfo.port),
 				uint16(svcInfo.targetPort),
+				uint16(svcInfo.port),
 			)
 			if err != nil {
 				glog.Errorf("Policy creation failed: %v", err)
@@ -1124,7 +1114,7 @@ func (proxier *Proxier) syncProxyRules() {
 
 	// Finish housekeeping.
 	// TODO: these could be made more consistent.
-	for _, svcIP := range staleServices.List() {
+	for _, svcIP := range staleServices.UnsortedList() {
 		// TODO : Check if this is required to cleanup stale services here
 		glog.V(5).Infof("Pending delete stale service IP %s connections", svcIP)
 	}

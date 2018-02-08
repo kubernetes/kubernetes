@@ -22,7 +22,7 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
-	containermanager "k8s.io/kubernetes/pkg/kubelet/cm"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
 // ValidateKubeletConfiguration validates `kc` and returns an error if it is invalid
@@ -91,14 +91,22 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration) error 
 	}
 	for _, val := range kc.EnforceNodeAllocatable {
 		switch val {
-		case containermanager.NodeAllocatableEnforcementKey:
-		case containermanager.SystemReservedEnforcementKey:
-		case containermanager.KubeReservedEnforcementKey:
+		case kubetypes.NodeAllocatableEnforcementKey:
+		case kubetypes.SystemReservedEnforcementKey:
+		case kubetypes.KubeReservedEnforcementKey:
 			continue
 		default:
 			allErrors = append(allErrors, fmt.Errorf("Invalid option %q specified for EnforceNodeAllocatable (--enforce-node-allocatable) setting. Valid options are %q, %q or %q",
-				val, containermanager.NodeAllocatableEnforcementKey, containermanager.SystemReservedEnforcementKey, containermanager.KubeReservedEnforcementKey))
+				val, kubetypes.NodeAllocatableEnforcementKey, kubetypes.SystemReservedEnforcementKey, kubetypes.KubeReservedEnforcementKey))
 		}
+	}
+	switch kc.HairpinMode {
+	case kubeletconfig.HairpinNone:
+	case kubeletconfig.HairpinVeth:
+	case kubeletconfig.PromiscuousBridge:
+	default:
+		allErrors = append(allErrors, fmt.Errorf("Invalid option %q specified for HairpinMode (--hairpin-mode) setting. Valid options are %q, %q or %q",
+			kc.HairpinMode, kubeletconfig.HairpinNone, kubeletconfig.HairpinVeth, kubeletconfig.PromiscuousBridge))
 	}
 	return utilerrors.NewAggregate(allErrors)
 }

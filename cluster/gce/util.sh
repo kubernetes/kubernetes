@@ -18,23 +18,30 @@
 
 # Use the config file specified in $KUBE_CONFIG_FILE, or default to
 # config-default.sh.
+readonly GCE_MAX_LOCAL_SSD=8
+
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 source "${KUBE_ROOT}/cluster/gce/${KUBE_CONFIG_FILE-"config-default.sh"}"
 source "${KUBE_ROOT}/cluster/common.sh"
 source "${KUBE_ROOT}/hack/lib/util.sh"
 
-if [[ "${NODE_OS_DISTRIBUTION}" == "debian" || "${NODE_OS_DISTRIBUTION}" == "container-linux" || "${NODE_OS_DISTRIBUTION}" == "trusty" || "${NODE_OS_DISTRIBUTION}" == "gci" || "${NODE_OS_DISTRIBUTION}" == "ubuntu" ]]; then
+if [[ "${NODE_OS_DISTRIBUTION}" == "gci" || "${NODE_OS_DISTRIBUTION}" == "ubuntu" ]]; then
   source "${KUBE_ROOT}/cluster/gce/${NODE_OS_DISTRIBUTION}/node-helper.sh"
 else
   echo "Cannot operate on cluster using node os distro: ${NODE_OS_DISTRIBUTION}" >&2
   exit 1
 fi
 
-if [[ "${MASTER_OS_DISTRIBUTION}" == "container-linux" || "${MASTER_OS_DISTRIBUTION}" == "trusty" || "${MASTER_OS_DISTRIBUTION}" == "gci" || "${MASTER_OS_DISTRIBUTION}" == "ubuntu" ]]; then
+if [[ "${MASTER_OS_DISTRIBUTION}" == "trusty" || "${MASTER_OS_DISTRIBUTION}" == "gci" || "${MASTER_OS_DISTRIBUTION}" == "ubuntu" ]]; then
   source "${KUBE_ROOT}/cluster/gce/${MASTER_OS_DISTRIBUTION}/master-helper.sh"
 else
   echo "Cannot operate on cluster using master os distro: ${MASTER_OS_DISTRIBUTION}" >&2
   exit 1
+fi
+
+if [[ ${NODE_LOCAL_SSDS:-} -ge 1 ]] && [[ ! -z ${NODE_LOCAL_SSDS_EXT:-} ]] ; then
+  echo -e "${color_red}Local SSD: Only one of NODE_LOCAL_SSDS and NODE_LOCAL_SSDS_EXT can be specified at once${color_norm}" >&2
+  exit 2
 fi
 
 if [[ "${MASTER_OS_DISTRIBUTION}" == "gci" ]]; then
@@ -46,9 +53,6 @@ if [[ "${MASTER_OS_DISTRIBUTION}" == "gci" ]]; then
     # If the master image is not set, we use the latest GCI image.
     # Otherwise, we respect whatever is set by the user.
     MASTER_IMAGE=${KUBE_GCE_MASTER_IMAGE:-${GCI_VERSION}}
-elif [[ "${MASTER_OS_DISTRIBUTION}" == "debian" ]]; then
-    MASTER_IMAGE=${KUBE_GCE_MASTER_IMAGE:-${CVM_VERSION}}
-    MASTER_IMAGE_PROJECT=${KUBE_GCE_MASTER_PROJECT:-google-containers}
 fi
 
 # Sets node image based on the specified os distro. Currently this function only
@@ -64,9 +68,6 @@ function set-node-image() {
         # Otherwise, we respect whatever is set by the user.
         NODE_IMAGE=${KUBE_GCE_NODE_IMAGE:-${GCI_VERSION}}
         NODE_IMAGE_PROJECT=${KUBE_GCE_NODE_PROJECT:-${DEFAULT_GCI_PROJECT}}
-    elif [[ "${NODE_OS_DISTRIBUTION}" == "debian" ]]; then
-        NODE_IMAGE=${KUBE_GCE_NODE_IMAGE:-${CVM_VERSION}}
-        NODE_IMAGE_PROJECT=${KUBE_GCE_NODE_PROJECT:-google-containers}
     fi
 }
 
@@ -84,7 +85,8 @@ if [[ "${ENABLE_CLUSTER_AUTOSCALER}" == "true" ]]; then
   fi
 fi
 
-NODE_INSTANCE_PREFIX="${INSTANCE_PREFIX}-minion"
+NODE_INSTANCE_PREFIX=${NODE_INSTANCE_PREFIX:-"${INSTANCE_PREFIX}-minion"}
+
 NODE_TAGS="${NODE_TAG}"
 
 ALLOCATE_NODE_CIDRS=true
@@ -235,11 +237,11 @@ function set-preferred-region() {
   else
     KUBE_ADDON_REGISTRY="gcr.io/google_containers"
   fi
-
-  if [[ "${ENABLE_DOCKER_REGISTRY_CACHE:-}" == "true" ]]; then
-    DOCKER_REGISTRY_MIRROR_URL="https://${preferred}-mirror.gcr.io"
-  fi
 }
+
+if [[ "${ENABLE_DOCKER_REGISTRY_CACHE:-}" == "true" ]]; then
+  DOCKER_REGISTRY_MIRROR_URL="https://mirror.gcr.io"
+fi
 
 # Take the local tar files and upload them to Google Storage.  They will then be
 # downloaded by the master as part of the start up script for the master.
@@ -247,21 +249,16 @@ function set-preferred-region() {
 # Assumed vars:
 #   PROJECT
 #   SERVER_BINARY_TAR
-#   SALT_TAR
 #   KUBE_MANIFESTS_TAR
 #   ZONE
 # Vars set:
 #   SERVER_BINARY_TAR_URL
 #   SERVER_BINARY_TAR_HASH
-#   SALT_TAR_URL
-#   SALT_TAR_HASH
 #   KUBE_MANIFESTS_TAR_URL
 #   KUBE_MANIFESTS_TAR_HASH
 function upload-server-tars() {
   SERVER_BINARY_TAR_URL=
   SERVER_BINARY_TAR_HASH=
-  SALT_TAR_URL=
-  SALT_TAR_HASH=
   KUBE_MANIFESTS_TAR_URL=
   KUBE_MANIFESTS_TAR_HASH=
 
@@ -279,13 +276,11 @@ function upload-server-tars() {
   set-preferred-region
 
   SERVER_BINARY_TAR_HASH=$(sha1sum-file "${SERVER_BINARY_TAR}")
-  SALT_TAR_HASH=$(sha1sum-file "${SALT_TAR}")
   if [[ -n "${KUBE_MANIFESTS_TAR:-}" ]]; then
     KUBE_MANIFESTS_TAR_HASH=$(sha1sum-file "${KUBE_MANIFESTS_TAR}")
   fi
 
   local server_binary_tar_urls=()
-  local salt_tar_urls=()
   local kube_manifest_tar_urls=()
 
   for region in "${PREFERRED_REGION[@]}"; do
@@ -305,13 +300,10 @@ function upload-server-tars() {
 
     echo "+++ Staging server tars to Google Storage: ${staging_path}"
     local server_binary_gs_url="${staging_path}/${SERVER_BINARY_TAR##*/}"
-    local salt_gs_url="${staging_path}/${SALT_TAR##*/}"
     copy-to-staging "${staging_path}" "${server_binary_gs_url}" "${SERVER_BINARY_TAR}" "${SERVER_BINARY_TAR_HASH}"
-    copy-to-staging "${staging_path}" "${salt_gs_url}" "${SALT_TAR}" "${SALT_TAR_HASH}"
 
     # Convert from gs:// URL to an https:// URL
     server_binary_tar_urls+=("${server_binary_gs_url/gs:\/\//https://storage.googleapis.com/}")
-    salt_tar_urls+=("${salt_gs_url/gs:\/\//https://storage.googleapis.com/}")
     if [[ -n "${KUBE_MANIFESTS_TAR:-}" ]]; then
       local kube_manifests_gs_url="${staging_path}/${KUBE_MANIFESTS_TAR##*/}"
       copy-to-staging "${staging_path}" "${kube_manifests_gs_url}" "${KUBE_MANIFESTS_TAR}" "${KUBE_MANIFESTS_TAR_HASH}"
@@ -321,7 +313,6 @@ function upload-server-tars() {
   done
 
   SERVER_BINARY_TAR_URL=$(join_csv "${server_binary_tar_urls[@]}")
-  SALT_TAR_URL=$(join_csv "${salt_tar_urls[@]}")
   if [[ -n "${KUBE_MANIFESTS_TAR:-}" ]]; then
     KUBE_MANIFESTS_TAR_URL=$(join_csv "${kube_manifests_tar_urls[@]}")
   fi
@@ -401,12 +392,12 @@ function detect-master() {
   if [[ -z "${KUBE_MASTER_IP-}" ]]; then
     local master_address_name="${MASTER_NAME}-ip"
     echo "Looking for address '${master_address_name}'" >&2
-    KUBE_MASTER_IP=$(gcloud compute addresses describe "${master_address_name}" \
-      --project "${PROJECT}" --region "${REGION}" -q --format='value(address)')
-  fi
-  if [[ -z "${KUBE_MASTER_IP-}" ]]; then
-    echo "Could not detect Kubernetes master node.  Make sure you've launched a cluster with 'kube-up.sh'" >&2
-    exit 1
+    if ! KUBE_MASTER_IP=$(gcloud compute addresses describe "${master_address_name}" \
+      --project "${PROJECT}" --region "${REGION}" -q --format='value(address)') || \
+      [[ -z "${KUBE_MASTER_IP-}" ]]; then
+      echo "Could not detect Kubernetes master node.  Make sure you've launched a cluster with 'kube-up.sh'" >&2
+      exit 1
+    fi
   fi
   echo "Using master: $KUBE_MASTER (external IP: $KUBE_MASTER_IP)" >&2
 }
@@ -545,6 +536,29 @@ function get-template-name-from-version() {
   echo "${NODE_INSTANCE_PREFIX}-template-${1}" | cut -c 1-63 | sed 's/[\.\+]/-/g;s/-*$//g'
 }
 
+# validates the NODE_LOCAL_SSDS_EXT variable 
+function validate-node-local-ssds-ext(){
+  ssdopts="${1}"
+
+  if [[ -z "${ssdopts[0]}" || -z "${ssdopts[1]}" || -z "${ssdopts[2]}" ]]; then
+	  echo -e "${color_red}Local SSD: NODE_LOCAL_SSDS_EXT is malformed, found ${ssdopts[0]-_},${ssdopts[1]-_},${ssdopts[2]-_} ${color_norm}" >&2
+    exit 2
+  fi
+  if [[ "${ssdopts[1]}" != "scsi" && "${ssdopts[1]}" != "nvme" ]]; then
+    echo -e "${color_red}Local SSD: Interface must be scsi or nvme, found: ${ssdopts[1]} ${color_norm}" >&2
+    exit 2
+  fi
+  if [[ "${ssdopts[2]}" != "fs" && "${ssdopts[2]}" != "block" ]]; then
+    echo -e "${color_red}Local SSD: Filesystem type must be fs or block, found: ${ssdopts[2]} ${color_norm}"  >&2
+    exit 2
+  fi
+  local_ssd_ext_count=$((local_ssd_ext_count+ssdopts[0]))
+  if [[ "${local_ssd_ext_count}" -gt "${GCE_MAX_LOCAL_SSD}" || "${local_ssd_ext_count}" -lt 1 ]]; then
+    echo -e "${color_red}Local SSD: Total number of local ssds must range from 1 to 8, found: ${local_ssd_ext_count} ${color_norm}" >&2
+    exit 2
+  fi
+}
+
 # Robustly try to create an instance template.
 # $1: The name of the instance template.
 # $2: The scopes flag.
@@ -586,6 +600,19 @@ function create-node-template() {
   fi
 
   local local_ssds=""
+  local_ssd_ext_count=0
+  if [[ ! -z ${NODE_LOCAL_SSDS_EXT:-} ]]; then
+    IFS=";" read -r -a ssdgroups <<< "${NODE_LOCAL_SSDS_EXT:-}"
+    for ssdgroup in "${ssdgroups[@]}"
+    do
+      IFS="," read -r -a ssdopts <<< "${ssdgroup}"
+      validate-node-local-ssds-ext "${ssdopts}"
+      for i in $(seq ${ssdopts[0]}); do
+        local_ssds="$local_ssds--local-ssd=interface=${ssdopts[1]} "
+      done
+    done
+  fi
+  
   if [[ ! -z ${NODE_LOCAL_SSDS+x} ]]; then
     # The NODE_LOCAL_SSDS check below fixes issue #49171
     # Some versions of seq will count down from 1 if "seq 0" is specified
@@ -595,6 +622,7 @@ function create-node-template() {
       done
     fi
   fi
+  
 
   local network=$(make-gcloud-network-argument \
     "${NETWORK_PROJECT}" \
@@ -616,6 +644,7 @@ function create-node-template() {
       --boot-disk-size "${NODE_DISK_SIZE}" \
       --image-project="${NODE_IMAGE_PROJECT}" \
       --image "${NODE_IMAGE}" \
+      --service-account "${NODE_SERVICE_ACCOUNT}" \
       --tags "${NODE_TAG}" \
       ${accelerator_args} \
       ${local_ssds} \
@@ -636,61 +665,6 @@ function create-node-template() {
         # Backend Error and left the entry laying around, delete it
         # before we try again.
         gcloud compute instance-templates delete "$template_name" --project "${PROJECT}" &>/dev/null || true
-    else
-        break
-    fi
-  done
-}
-
-# Robustly try to add metadata on an instance.
-# $1: The name of the instance.
-# $2...$n: The metadata key=value pairs to add.
-function add-instance-metadata() {
-  local -r instance=$1
-  shift 1
-  local -r kvs=( "$@" )
-  detect-project
-  local attempt=0
-  while true; do
-    if ! gcloud compute instances add-metadata "${instance}" \
-      --project "${PROJECT}" \
-      --zone "${ZONE}" \
-      --metadata "${kvs[@]}"; then
-        if (( attempt > 5 )); then
-          echo -e "${color_red}Failed to add instance metadata in ${instance} ${color_norm}" >&2
-          exit 2
-        fi
-        echo -e "${color_yellow}Attempt $(($attempt+1)) failed to add metadata in ${instance}. Retrying.${color_norm}" >&2
-        attempt=$(($attempt+1))
-        sleep $((5 * $attempt))
-    else
-        break
-    fi
-  done
-}
-
-# Robustly try to add metadata on an instance, from a file.
-# $1: The name of the instance.
-# $2...$n: The metadata key=file pairs to add.
-function add-instance-metadata-from-file() {
-  local -r instance=$1
-  shift 1
-  local -r kvs=( "$@" )
-  detect-project
-  local attempt=0
-  while true; do
-    echo "${kvs[@]}"
-    if ! gcloud compute instances add-metadata "${instance}" \
-      --project "${PROJECT}" \
-      --zone "${ZONE}" \
-      --metadata-from-file "$(join_csv ${kvs[@]})"; then
-        if (( attempt > 5 )); then
-          echo -e "${color_red}Failed to add instance metadata in ${instance} ${color_norm}" >&2
-          exit 2
-        fi
-        echo -e "${color_yellow}Attempt $(($attempt+1)) failed to add metadata in ${instance}. Retrying.${color_norm}" >&2
-        attempt=$(($attempt+1))
-        sleep $(($attempt * 5))
     else
         break
     fi
@@ -723,8 +697,8 @@ function kube-up() {
     detect-subnetworks
     create-nodes
   elif [[ ${KUBE_REPLICATE_EXISTING_MASTER:-} == "true" ]]; then
-    if  [[ "${MASTER_OS_DISTRIBUTION}" != "gci" && "${MASTER_OS_DISTRIBUTION}" != "debian" && "${MASTER_OS_DISTRIBUTION}" != "ubuntu" ]]; then
-      echo "Master replication supported only for gci, debian, and ubuntu"
+    if  [[ "${MASTER_OS_DISTRIBUTION}" != "gci" && "${MASTER_OS_DISTRIBUTION}" != "ubuntu" ]]; then
+      echo "Master replication supported only for gci and ubuntu"
       return 1
     fi
     create-loadbalancer
@@ -1040,15 +1014,6 @@ function create-master() {
     --type "${MASTER_DISK_TYPE}" \
     --size "${MASTER_DISK_SIZE}"
 
-  # Create disk for cluster registry if enabled
-  if [[ "${ENABLE_CLUSTER_REGISTRY}" == true && -n "${CLUSTER_REGISTRY_DISK}" ]]; then
-    gcloud compute disks create "${CLUSTER_REGISTRY_DISK}" \
-      --project "${PROJECT}" \
-      --zone "${ZONE}" \
-      --type "${CLUSTER_REGISTRY_DISK_TYPE_GCE}" \
-      --size "${CLUSTER_REGISTRY_DISK_SIZE}" &
-  fi
-
   # Create rule for accessing and securing etcd servers.
   if ! gcloud compute firewall-rules --project "${NETWORK_PROJECT}" describe "${MASTER_NAME}-etcd" &>/dev/null; then
     gcloud compute firewall-rules create "${MASTER_NAME}-etcd" \
@@ -1063,7 +1028,6 @@ function create-master() {
   # from the other cluster variables so that the client (this
   # computer) can forget it later. This should disappear with
   # http://issue.k8s.io/3168
-  KUBELET_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
   KUBE_PROXY_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
   if [[ "${ENABLE_NODE_PROBLEM_DETECTOR:-}" == "standalone" ]]; then
     NODE_PROBLEM_DETECTOR_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
@@ -1355,6 +1319,7 @@ function create-nodes() {
 # - NODE_DISK_SIZE
 # - NODE_IMAGE_PROJECT
 # - NODE_IMAGE
+# - NODE_SERVICE_ACCOUNT
 # - NODE_TAG
 # - NETWORK
 # - ENABLE_IP_ALIASES
@@ -1385,6 +1350,7 @@ function create-heapster-node() {
       --boot-disk-size "${NODE_DISK_SIZE}" \
       --image-project="${NODE_IMAGE_PROJECT}" \
       --image "${NODE_IMAGE}" \
+      --service-account "${NODE_SERVICE_ACCOUNT}" \
       --tags "${NODE_TAG}" \
       ${network} \
       $(get-scope-flags) \
@@ -1478,14 +1444,20 @@ function check-cluster() {
   fi
 
   local start_time=$(date +%s)
+  local curl_out=$(mktemp)
+  kube::util::trap_add "rm -f ${curl_out}" EXIT
   until curl --cacert "${CERT_DIR}/pki/ca.crt" \
           -H "Authorization: Bearer ${KUBE_BEARER_TOKEN}" \
           ${secure} \
-          --max-time 5 --fail --output /dev/null --silent \
-          "https://${KUBE_MASTER_IP}/api/v1/pods"; do
+          --max-time 5 --fail \
+          "https://${KUBE_MASTER_IP}/api/v1/pods?limit=100" > "${curl_out}" 2>&1; do
       local elapsed=$(($(date +%s) - ${start_time}))
       if [[ ${elapsed} -gt ${KUBE_CLUSTER_INITIALIZATION_TIMEOUT} ]]; then
           echo -e "${color_red}Cluster failed to initialize within ${KUBE_CLUSTER_INITIALIZATION_TIMEOUT} seconds.${color_norm}" >&2
+          echo "Last output from querying API server follows:" >&2
+          echo "-----------------------------------------------------" >&2
+          cat "${curl_out}" >&2
+          echo "-----------------------------------------------------" >&2
           exit 2
       fi
       printf "."
@@ -1503,8 +1475,6 @@ function check-cluster() {
 
    # Update the user's kubeconfig to include credentials for this apiserver.
    create-kubeconfig
-
-   create-kubeconfig-for-federation
   )
 
   # ensures KUBECONFIG is set
@@ -1640,17 +1610,6 @@ function kube-down() {
       --quiet \
       --zone "${ZONE}" \
       "${replica_pd}"
-  fi
-
-  # Delete disk for cluster registry if enabled
-  if [[ "${ENABLE_CLUSTER_REGISTRY}" == true && -n "${CLUSTER_REGISTRY_DISK}" ]]; then
-    if gcloud compute disks describe "${CLUSTER_REGISTRY_DISK}" --zone "${ZONE}" --project "${PROJECT}" &>/dev/null; then
-      gcloud compute disks delete \
-        --project "${PROJECT}" \
-        --quiet \
-        --zone "${ZONE}" \
-        "${CLUSTER_REGISTRY_DISK}"
-    fi
   fi
 
   # Check if this are any remaining master replicas.
@@ -1827,7 +1786,7 @@ function get-master-replicas-count() {
 # Prints regexp for full master machine name. In a cluster with replicated master,
 # VM names may either be MASTER_NAME or MASTER_NAME with a suffix for a replica.
 function get-replica-name-regexp() {
-  echo "${MASTER_NAME}(-...)?"
+  echo "^${MASTER_NAME}(-...)?"
 }
 
 # Sets REPLICA_NAME to a unique name for a master replica that will match
@@ -1898,11 +1857,6 @@ function check-resources() {
 
   if gcloud compute disks describe --project "${PROJECT}" "${MASTER_NAME}"-pd --zone "${ZONE}" &>/dev/null; then
     KUBE_RESOURCE_FOUND="Persistent disk ${MASTER_NAME}-pd"
-    return 1
-  fi
-
-  if gcloud compute disks describe --project "${PROJECT}" "${CLUSTER_REGISTRY_DISK}" --zone "${ZONE}" &>/dev/null; then
-    KUBE_RESOURCE_FOUND="Persistent disk ${CLUSTER_REGISTRY_DISK}"
     return 1
   fi
 
@@ -2013,66 +1967,6 @@ function prepare-push() {
   fi
 }
 
-# Push binaries to kubernetes master
-function push-master() {
-  echo "Updating master metadata ..."
-  write-master-env
-  prepare-startup-script
-  add-instance-metadata-from-file "${KUBE_MASTER}" "kube-env=${KUBE_TEMP}/master-kube-env.yaml" "startup-script=${KUBE_TEMP}/configure-vm.sh"
-
-  echo "Pushing to master (log at ${OUTPUT}/push-${KUBE_MASTER}.log) ..."
-  cat ${KUBE_TEMP}/configure-vm.sh | gcloud compute ssh --ssh-flag="-o LogLevel=quiet" --project "${PROJECT}" --zone "${ZONE}" "${KUBE_MASTER}" --command "sudo bash -s -- --push" &> ${OUTPUT}/push-"${KUBE_MASTER}".log
-}
-
-# Push binaries to kubernetes node
-function push-node() {
-  node=${1}
-
-  echo "Updating node ${node} metadata... "
-  prepare-startup-script
-  add-instance-metadata-from-file "${node}" "kube-env=${KUBE_TEMP}/node-kube-env.yaml" "startup-script=${KUBE_TEMP}/configure-vm.sh"
-
-  echo "Start upgrading node ${node} (log at ${OUTPUT}/push-${node}.log) ..."
-  cat ${KUBE_TEMP}/configure-vm.sh | gcloud compute ssh --ssh-flag="-o LogLevel=quiet" --project "${PROJECT}" --zone "${ZONE}" "${node}" --command "sudo bash -s -- --push" &> ${OUTPUT}/push-"${node}".log
-}
-
-# Push binaries to kubernetes cluster
-function kube-push() {
-  # Disable this until it's fixed.
-  # See https://github.com/kubernetes/kubernetes/issues/17397
-  echo "./cluster/kube-push.sh is currently not supported in GCE."
-  echo "Please use ./cluster/gce/upgrade.sh."
-  exit 1
-
-  prepare-push true
-
-  push-master
-
-  for (( i=0; i<${#NODE_NAMES[@]}; i++)); do
-    push-node "${NODE_NAMES[$i]}" &
-  done
-
-  kube::util::wait-for-jobs || {
-    echo -e "${color_red}Some commands failed.${color_norm}" >&2
-  }
-
-  # TODO(zmerlynn): Re-create instance-template with the new
-  # node-kube-env. This isn't important until the node-ip-range issue
-  # is solved (because that's blocking automatic dynamic nodes from
-  # working). The node-kube-env has to be composed with the KUBELET_TOKEN
-  # and KUBE_PROXY_TOKEN.  Ideally we would have
-  # http://issue.k8s.io/3168
-  # implemented before then, though, so avoiding this mess until then.
-
-  echo
-  echo "Kubernetes cluster is running.  The master is running at:"
-  echo
-  echo "  https://${KUBE_MASTER_IP}"
-  echo
-  echo "The user name and password to use is located in ~/.kube/config"
-  echo
-}
-
 # -----------------------------------------------------------------------------
 # Cluster specific test helpers used from hack/e2e.go
 
@@ -2180,20 +2074,4 @@ function ssh-to-node() {
 # Perform preparations required to run e2e tests
 function prepare-e2e() {
   detect-project
-}
-
-# Writes configure-vm.sh to a temporary location with comments stripped. GCE
-# limits the size of metadata fields to 32K, and stripping comments is the
-# easiest way to buy us a little more room.
-function prepare-startup-script() {
-  # Find a standard sed instance (and ensure that the command works as expected on a Mac).
-  SED=sed
-  if which gsed &>/dev/null; then
-    SED=gsed
-  fi
-  if ! ($SED --version 2>&1 | grep -q GNU); then
-    echo "!!! GNU sed is required.  If on OS X, use 'brew install gnu-sed'."
-    exit 1
-  fi
-  $SED '/^\s*#\([^!].*\)*$/ d' ${KUBE_ROOT}/cluster/gce/configure-vm.sh > ${KUBE_TEMP}/configure-vm.sh
 }

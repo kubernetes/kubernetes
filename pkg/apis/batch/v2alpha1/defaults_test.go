@@ -23,10 +23,10 @@ import (
 	batchv2alpha1 "k8s.io/api/batch/v2alpha1"
 
 	"k8s.io/apimachinery/pkg/runtime"
-	_ "k8s.io/kubernetes/pkg/api/install"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	_ "k8s.io/kubernetes/pkg/apis/batch/install"
 	. "k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
+	_ "k8s.io/kubernetes/pkg/apis/core/install"
 )
 
 func TestSetDefaultCronJob(t *testing.T) {

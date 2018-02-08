@@ -39,8 +39,8 @@ go_test(
         "flocker_util_test.go",
         "flocker_volume_test.go",
     ],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/pkg/volume/flocker",
-    library = ":go_default_library",
     deps = [
         "//pkg/util/mount:go_default_library",
         "//pkg/volume:go_default_library",

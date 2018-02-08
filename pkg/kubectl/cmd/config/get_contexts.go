@@ -19,6 +19,7 @@ package config
 import (
 	"fmt"
 	"io"
+	"sort"
 	"strings"
 	"text/tabwriter"
 
@@ -60,7 +61,8 @@ func NewCmdConfigGetContexts(out io.Writer, configAccess clientcmd.ConfigAccess)
 	options := &GetContextsOptions{configAccess: configAccess}
 
 	cmd := &cobra.Command{
-		Use:     "get-contexts [(-o|--output=)name)]",
+		Use: "get-contexts [(-o|--output=)name)]",
+		DisableFlagsInUseLine: true,
 		Short:   i18n.T("Describe one or many contexts"),
 		Long:    getContextsLong,
 		Example: getContextsExample,
@@ -138,6 +140,7 @@ func (o GetContextsOptions) RunGetContexts() error {
 		}
 	}
 
+	sort.Strings(toPrint)
 	for _, name := range toPrint {
 		err = printContext(name, config.Contexts[name], out, o.nameOnly, config.CurrentContext == name)
 		if err != nil {

@@ -494,7 +494,7 @@ func TestPersistentVolumeMultiPVs(t *testing.T) {
 	pvs := make([]*v1.PersistentVolume, maxPVs)
 	for i := 0; i < maxPVs; i++ {
 		// This PV will be claimed, released, and deleted
-		pvs[i] = createPV("pv-"+strconv.Itoa(i), "/tmp/foo"+strconv.Itoa(i), strconv.Itoa(i)+"G",
+		pvs[i] = createPV("pv-"+strconv.Itoa(i), "/tmp/foo"+strconv.Itoa(i), strconv.Itoa(i+1)+"G",
 			[]v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}, v1.PersistentVolumeReclaimRetain)
 	}
 
@@ -1135,6 +1135,7 @@ func createClients(ns *v1.Namespace, t *testing.T, s *httptest.Server, syncPerio
 			VolumeInformer:            informers.Core().V1().PersistentVolumes(),
 			ClaimInformer:             informers.Core().V1().PersistentVolumeClaims(),
 			ClassInformer:             informers.Storage().V1().StorageClasses(),
+			PodInformer:               informers.Core().V1().Pods(),
 			EnableDynamicProvisioning: true,
 		})
 	if err != nil {

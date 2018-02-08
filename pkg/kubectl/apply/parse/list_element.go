@@ -45,7 +45,7 @@ func (v ElementBuildingVisitor) mergeListElement(meta apply.FieldMetaImpl, item 
 func (v ElementBuildingVisitor) doPrimitiveList(meta apply.FieldMetaImpl, item *listItem) (*apply.ListElement, error) {
 	result := &apply.ListElement{
 		FieldMetaImpl: apply.FieldMetaImpl{
-			MergeType: "merge",
+			MergeType: apply.MergeStrategy,
 			Name:      item.Name,
 		},
 		ListElementData: item.ListElementData,
@@ -101,7 +101,7 @@ func (v ElementBuildingVisitor) doMapList(meta apply.FieldMetaImpl, item *listIt
 	key := meta.GetFieldMergeKeys()
 	result := &apply.ListElement{
 		FieldMetaImpl: apply.FieldMetaImpl{
-			MergeType: "merge",
+			MergeType: apply.MergeStrategy,
 			MergeKeys: key,
 			Name:      item.Name,
 		},
@@ -154,7 +154,11 @@ func (v ElementBuildingVisitor) doMapList(meta apply.FieldMetaImpl, item *listIt
 // Uses the "replace" strategy and identify "same" elements across lists by their index
 func (v ElementBuildingVisitor) replaceListElement(meta apply.FieldMetaImpl, item *listItem) (*apply.ListElement, error) {
 	meta.Name = item.Name
-	result := &apply.ListElement{meta, item.ListElementData, []apply.Element{}}
+	result := &apply.ListElement{
+		FieldMetaImpl:   meta,
+		ListElementData: item.ListElementData,
+		Values:          []apply.Element{},
+	}
 
 	// Use the max length to iterate over the slices
 	for i := 0; i < max(len(item.GetRecordedList()), len(item.GetLocalList()), len(item.GetRemoteList())); i++ {

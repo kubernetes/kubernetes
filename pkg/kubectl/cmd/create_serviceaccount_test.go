@@ -21,19 +21,19 @@ import (
 	"net/http"
 	"testing"
 
+	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/rest/fake"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 )
 
 func TestCreateServiceAccount(t *testing.T) {
-	serviceAccountObject := &api.ServiceAccount{}
+	serviceAccountObject := &v1.ServiceAccount{}
 	serviceAccountObject.Name = "my-service-account"
 	f, tf, codec, ns := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
-		APIRegistry:          legacyscheme.Registry,
+		GroupVersion:         schema.GroupVersion{Version: "v1"},
 		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
@@ -50,7 +50,7 @@ func TestCreateServiceAccount(t *testing.T) {
 	cmd := NewCmdCreateServiceAccount(f, buf)
 	cmd.Flags().Set("output", "name")
 	cmd.Run(cmd, []string{serviceAccountObject.Name})
-	expectedOutput := "serviceaccount/" + serviceAccountObject.Name + "\n"
+	expectedOutput := "serviceaccounts/" + serviceAccountObject.Name + "\n"
 	if buf.String() != expectedOutput {
 		t.Errorf("expected output: %s, but got: %s", expectedOutput, buf.String())
 	}

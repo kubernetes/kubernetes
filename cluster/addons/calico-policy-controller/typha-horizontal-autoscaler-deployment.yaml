@@ -31,3 +31,4 @@ spec:
               cpu: 10m
             limits:
               cpu: 10m
+      serviceAccountName: typha-cpha

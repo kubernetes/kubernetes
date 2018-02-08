@@ -33,7 +33,7 @@ func TestEncodeTokenSecretData(t *testing.T) {
 		{token: &kubeadmapi.TokenDiscovery{ID: "foo", Secret: "bar"}, t: time.Second}, // should use default
 	}
 	for _, rt := range tests {
-		actual := encodeTokenSecretData(rt.token.ID, rt.token.Secret, rt.t, []string{}, []string{}, "")
+		actual, _ := encodeTokenSecretData(rt.token.ID, rt.token.Secret, rt.t, []string{}, []string{}, "")
 		if !bytes.Equal(actual["token-id"], []byte(rt.token.ID)) {
 			t.Errorf(
 				"failed EncodeTokenSecretData:\n\texpected: %s\n\t  actual: %s",

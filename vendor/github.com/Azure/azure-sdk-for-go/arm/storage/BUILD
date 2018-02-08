@@ -6,6 +6,8 @@ go_library(
         "accounts.go",
         "client.go",
         "models.go",
+        "operations.go",
+        "skus.go",
         "usage.go",
         "version.go",
     ],

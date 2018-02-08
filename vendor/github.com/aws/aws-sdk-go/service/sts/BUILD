@@ -5,6 +5,8 @@ go_library(
     srcs = [
         "api.go",
         "customizations.go",
+        "doc.go",
+        "errors.go",
         "service.go",
     ],
     importpath = "github.com/aws/aws-sdk-go/service/sts",

@@ -17,6 +17,7 @@ limitations under the License.
 package gce
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"net/http"
@@ -26,7 +27,6 @@ import (
 
 	"cloud.google.com/go/compute/metadata"
 	"github.com/golang/glog"
-	computealpha "google.golang.org/api/compute/v0.alpha"
 	computebeta "google.golang.org/api/compute/v0.beta"
 	compute "google.golang.org/api/compute/v1"
 
@@ -35,6 +35,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/cloudprovider"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud/filter"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud/meta"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 )
 
@@ -65,6 +67,11 @@ func getZone(n *v1.Node) string {
 	return zone
 }
 
+func makeHostURL(projectsApiEndpoint, projectID, zone, host string) string {
+	host = canonicalizeInstanceName(host)
+	return projectsApiEndpoint + strings.Join([]string{projectID, "zones", zone, "instances", host}, "/")
+}
+
 // ToInstanceReferences returns instance references by links
 func (gce *GCECloud) ToInstanceReferences(zone string, instanceNames []string) (refs []*compute.InstanceReference) {
 	for _, ins := range instanceNames {
@@ -75,7 +82,7 @@ func (gce *GCECloud) ToInstanceReferences(zone string, instanceNames []string) (
 }
 
 // NodeAddresses is an implementation of Instances.NodeAddresses.
-func (gce *GCECloud) NodeAddresses(_ types.NodeName) ([]v1.NodeAddress, error) {
+func (gce *GCECloud) NodeAddresses(_ context.Context, _ types.NodeName) ([]v1.NodeAddress, error) {
 	internalIP, err := metadata.Get("instance/network-interfaces/0/ip")
 	if err != nil {
 		return nil, fmt.Errorf("couldn't get internal IP: %v", err)
@@ -90,15 +97,15 @@ func (gce *GCECloud) NodeAddresses(_ types.NodeName) ([]v1.NodeAddress, error) {
 	}, nil
 }
 
-// This method will not be called from the node that is requesting this ID.
+// NodeAddressesByProviderID will not be called from the node that is requesting this ID.
 // i.e. metadata service and other local methods cannot be used here
-func (gce *GCECloud) NodeAddressesByProviderID(providerID string) ([]v1.NodeAddress, error) {
-	project, zone, name, err := splitProviderID(providerID)
+func (gce *GCECloud) NodeAddressesByProviderID(ctx context.Context, providerID string) ([]v1.NodeAddress, error) {
+	_, zone, name, err := splitProviderID(providerID)
 	if err != nil {
 		return []v1.NodeAddress{}, err
 	}
 
-	instance, err := gce.service.Instances.Get(project, zone, canonicalizeInstanceName(name)).Do()
+	instance, err := gce.c.Instances().Get(context.Background(), meta.ZonalKey(canonicalizeInstanceName(name), zone))
 	if err != nil {
 		return []v1.NodeAddress{}, fmt.Errorf("error while querying for providerID %q: %v", providerID, err)
 	}
@@ -116,24 +123,40 @@ func (gce *GCECloud) NodeAddressesByProviderID(providerID string) ([]v1.NodeAddr
 	return nodeAddresses, nil
 }
 
+// instanceByProviderID returns the cloudprovider instance of the node
+// with the specified unique providerID
+func (gce *GCECloud) instanceByProviderID(providerID string) (*gceInstance, error) {
+	project, zone, name, err := splitProviderID(providerID)
+	if err != nil {
+		return nil, err
+	}
+
+	instance, err := gce.getInstanceFromProjectInZoneByName(project, zone, name)
+	if err != nil {
+		if isHTTPErrorCode(err, http.StatusNotFound) {
+			return nil, cloudprovider.InstanceNotFound
+		}
+		return nil, err
+	}
+
+	return instance, nil
+}
+
 // InstanceTypeByProviderID returns the cloudprovider instance type of the node
 // with the specified unique providerID This method will not be called from the
 // node that is requesting this ID. i.e. metadata service and other local
 // methods cannot be used here
-func (gce *GCECloud) InstanceTypeByProviderID(providerID string) (string, error) {
-	project, zone, name, err := splitProviderID(providerID)
+func (gce *GCECloud) InstanceTypeByProviderID(ctx context.Context, providerID string) (string, error) {
+	instance, err := gce.instanceByProviderID(providerID)
 	if err != nil {
 		return "", err
 	}
-	instance, err := gce.getInstanceFromProjectInZoneByName(project, zone, name)
-	if err != nil {
-		return "", err
-	}
+
 	return instance.Type, nil
 }
 
 // ExternalID returns the cloud provider ID of the node with the specified NodeName (deprecated).
-func (gce *GCECloud) ExternalID(nodeName types.NodeName) (string, error) {
+func (gce *GCECloud) ExternalID(ctx context.Context, nodeName types.NodeName) (string, error) {
 	instanceName := mapNodeNameToInstanceName(nodeName)
 	if gce.useMetadataServer {
 		// Use metadata, if possible, to fetch ID. See issue #12000
@@ -155,12 +178,20 @@ func (gce *GCECloud) ExternalID(nodeName types.NodeName) (string, error) {
 
 // InstanceExistsByProviderID returns true if the instance with the given provider id still exists and is running.
 // If false is returned with no error, the instance will be immediately deleted by the cloud controller manager.
-func (gce *GCECloud) InstanceExistsByProviderID(providerID string) (bool, error) {
-	return false, cloudprovider.NotImplemented
+func (gce *GCECloud) InstanceExistsByProviderID(ctx context.Context, providerID string) (bool, error) {
+	_, err := gce.instanceByProviderID(providerID)
+	if err != nil {
+		if err == cloudprovider.InstanceNotFound {
+			return false, nil
+		}
+		return false, err
+	}
+
+	return true, nil
 }
 
 // InstanceID returns the cloud provider ID of the node with the specified NodeName.
-func (gce *GCECloud) InstanceID(nodeName types.NodeName) (string, error) {
+func (gce *GCECloud) InstanceID(ctx context.Context, nodeName types.NodeName) (string, error) {
 	instanceName := mapNodeNameToInstanceName(nodeName)
 	if gce.useMetadataServer {
 		// Use metadata, if possible, to fetch ID. See issue #12000
@@ -179,7 +210,7 @@ func (gce *GCECloud) InstanceID(nodeName types.NodeName) (string, error) {
 }
 
 // InstanceType returns the type of the specified node with the specified NodeName.
-func (gce *GCECloud) InstanceType(nodeName types.NodeName) (string, error) {
+func (gce *GCECloud) InstanceType(ctx context.Context, nodeName types.NodeName) (string, error) {
 	instanceName := mapNodeNameToInstanceName(nodeName)
 	if gce.useMetadataServer {
 		// Use metadata, if possible, to fetch ID. See issue #12000
@@ -197,9 +228,9 @@ func (gce *GCECloud) InstanceType(nodeName types.NodeName) (string, error) {
 	return instance.Type, nil
 }
 
-func (gce *GCECloud) AddSSHKeyToAllInstances(user string, keyData []byte) error {
+func (gce *GCECloud) AddSSHKeyToAllInstances(ctx context.Context, user string, keyData []byte) error {
 	return wait.Poll(2*time.Second, 30*time.Second, func() (bool, error) {
-		project, err := gce.service.Projects.Get(gce.projectID).Do()
+		project, err := gce.c.Projects().Get(context.Background(), gce.projectID)
 		if err != nil {
 			glog.Errorf("Could not get project: %v", err)
 			return false, nil
@@ -230,89 +261,87 @@ func (gce *GCECloud) AddSSHKeyToAllInstances(user string, keyData []byte) error 
 		}
 
 		mc := newInstancesMetricContext("add_ssh_key", "")
-		op, err := gce.service.Projects.SetCommonInstanceMetadata(
-			gce.projectID, project.CommonInstanceMetadata).Do()
+		err = gce.c.Projects().SetCommonInstanceMetadata(context.Background(), gce.projectID, project.CommonInstanceMetadata)
+		mc.Observe(err)
 
 		if err != nil {
 			glog.Errorf("Could not Set Metadata: %v", err)
-			mc.Observe(err)
 			return false, nil
 		}
-
-		if err := gce.waitForGlobalOp(op, mc); err != nil {
-			glog.Errorf("Could not Set Metadata: %v", err)
-			return false, nil
-		}
-
 		glog.Infof("Successfully added sshKey to project metadata")
 		return true, nil
 	})
 }
 
-// GetAllZones returns all the zones in which nodes are running
-func (gce *GCECloud) GetAllZones() (sets.String, error) {
-	// Fast-path for non-multizone
-	if len(gce.managedZones) == 1 {
-		return sets.NewString(gce.managedZones...), nil
+// GetAllCurrentZones returns all the zones in which k8s nodes are currently running
+func (gce *GCECloud) GetAllCurrentZones() (sets.String, error) {
+	if gce.nodeInformerSynced == nil {
+		glog.Warningf("GCECloud object does not have informers set, should only happen in E2E binary.")
+		return gce.GetAllZonesFromCloudProvider()
 	}
-
-	// TODO: Caching, but this is currently only called when we are creating a volume,
-	// which is a relatively infrequent operation, and this is only # zones API calls
+	gce.nodeZonesLock.Lock()
+	defer gce.nodeZonesLock.Unlock()
+	if !gce.nodeInformerSynced() {
+		return nil, fmt.Errorf("node informer is not synced when trying to GetAllCurrentZones")
+	}
 	zones := sets.NewString()
-
-	// TODO: Parallelize, although O(zones) so not too bad (N <= 3 typically)
-	for _, zone := range gce.managedZones {
-		mc := newInstancesMetricContext("list", zone)
-		// We only retrieve one page in each zone - we only care about existence
-		listCall := gce.service.Instances.List(gce.projectID, zone)
-
-		// No filter: We assume that a zone is either used or unused
-		// We could only consider running nodes (like we do in List above),
-		// but probably if instances are starting we still want to consider them.
-		// I think we should wait until we have a reason to make the
-		// call one way or the other; we generally can't guarantee correct
-		// volume spreading if the set of zones is changing
-		// (and volume spreading is currently only a heuristic).
-		// Long term we want to replace GetAllZones (which primarily supports volume
-		// spreading) with a scheduler policy that is able to see the global state of
-		// volumes and the health of zones.
-
-		// Just a minimal set of fields - we only care about existence
-		listCall = listCall.Fields("items(name)")
-		res, err := listCall.Do()
-		if err != nil {
-			return nil, mc.Observe(err)
-		}
-		mc.Observe(nil)
-
-		if len(res.Items) != 0 {
+	for zone, nodes := range gce.nodeZones {
+		if len(nodes) > 0 {
 			zones.Insert(zone)
 		}
 	}
-
 	return zones, nil
 }
 
-// ListInstanceNames returns a string of instance names seperated by spaces.
+// GetAllZonesFromCloudProvider returns all the zones in which nodes are running
+// Only use this in E2E tests to get zones, on real clusters this will
+// get all zones with compute instances in them even if not k8s instances!!!
+// ex. I have k8s nodes in us-central1-c and us-central1-b. I also have
+// a non-k8s compute in us-central1-a. This func will return a,b, and c.
+//
+// TODO: this should be removed from the cloud provider.
+func (gce *GCECloud) GetAllZonesFromCloudProvider() (sets.String, error) {
+	zones := sets.NewString()
+	for _, zone := range gce.managedZones {
+		instances, err := gce.c.Instances().List(context.Background(), zone, filter.None)
+		if err != nil {
+			return sets.NewString(), err
+		}
+		if len(instances) > 0 {
+			zones.Insert(zone)
+		}
+	}
+	return zones, nil
+}
+
+// InsertInstance creates a new instance on GCP
+func (gce *GCECloud) InsertInstance(project string, zone string, i *compute.Instance) error {
+	mc := newInstancesMetricContext("create", zone)
+	return mc.Observe(gce.c.Instances().Insert(context.Background(), meta.ZonalKey(i.Name, zone), i))
+}
+
+// ListInstanceNames returns a string of instance names separated by spaces.
+// This method should only be used for e2e testing.
+// TODO: remove this method.
 func (gce *GCECloud) ListInstanceNames(project, zone string) (string, error) {
-	res, err := gce.service.Instances.List(project, zone).Fields("items(name)").Do()
+	l, err := gce.c.Instances().List(context.Background(), zone, filter.None)
 	if err != nil {
 		return "", err
 	}
-	var output string
-	for _, item := range res.Items {
-		output += item.Name + " "
+	var names []string
+	for _, i := range l {
+		names = append(names, i.Name)
 	}
-	return output, nil
+	return strings.Join(names, " "), nil
 }
 
 // DeleteInstance deletes an instance specified by project, zone, and name
-func (gce *GCECloud) DeleteInstance(project, zone, name string) (*compute.Operation, error) {
-	return gce.service.Instances.Delete(project, zone, name).Do()
+func (gce *GCECloud) DeleteInstance(project, zone, name string) error {
+	return gce.c.Instances().Delete(context.Background(), meta.ZonalKey(name, zone))
 }
 
 // Implementation of Instances.CurrentNodeName
-func (gce *GCECloud) CurrentNodeName(hostname string) (types.NodeName, error) {
+func (gce *GCECloud) CurrentNodeName(ctx context.Context, hostname string) (types.NodeName, error) {
 	return types.NodeName(hostname), nil
 }
 
@@ -327,15 +356,14 @@ func (gce *GCECloud) AliasRanges(nodeName types.NodeName) (cidrs []string, err e
 	}
 
 	var res *computebeta.Instance
-	res, err = gce.serviceBeta.Instances.Get(
-		gce.projectID, instance.Zone, instance.Name).Do()
+	res, err = gce.c.BetaInstances().Get(context.Background(), meta.ZonalKey(instance.Name, lastComponent(instance.Zone)))
 	if err != nil {
 		return
 	}
 
 	for _, networkInterface := range res.NetworkInterfaces {
-		for _, aliasIpRange := range networkInterface.AliasIpRanges {
-			cidrs = append(cidrs, aliasIpRange.IpCidrRange)
+		for _, r := range networkInterface.AliasIpRanges {
+			cidrs = append(cidrs, r.IpCidrRange)
 		}
 	}
 	return
@@ -349,110 +377,96 @@ func (gce *GCECloud) AddAliasToInstance(nodeName types.NodeName, alias *net.IPNe
 	if err != nil {
 		return err
 	}
-	instance, err := gce.serviceAlpha.Instances.Get(gce.projectID, v1instance.Zone, v1instance.Name).Do()
+	instance, err := gce.c.BetaInstances().Get(context.Background(), meta.ZonalKey(v1instance.Name, lastComponent(v1instance.Zone)))
 	if err != nil {
 		return err
 	}
 
 	switch len(instance.NetworkInterfaces) {
 	case 0:
-		return fmt.Errorf("Instance %q has no network interfaces", nodeName)
+		return fmt.Errorf("instance %q has no network interfaces", nodeName)
 	case 1:
 	default:
 		glog.Warningf("Instance %q has more than one network interface, using only the first (%v)",
 			nodeName, instance.NetworkInterfaces)
 	}
 
-	iface := instance.NetworkInterfaces[0]
-	iface.AliasIpRanges = append(iface.AliasIpRanges, &computealpha.AliasIpRange{
+	iface := &computebeta.NetworkInterface{}
+	iface.Name = instance.NetworkInterfaces[0].Name
+	iface.Fingerprint = instance.NetworkInterfaces[0].Fingerprint
+	iface.AliasIpRanges = append(iface.AliasIpRanges, &computebeta.AliasIpRange{
 		IpCidrRange:         alias.String(),
 		SubnetworkRangeName: gce.secondaryRangeName,
 	})
 
-	mc := newInstancesMetricContext("addalias", v1instance.Zone)
-	op, err := gce.serviceAlpha.Instances.UpdateNetworkInterface(
-		gce.projectID, lastComponent(instance.Zone), instance.Name, iface.Name, iface).Do()
-	if err != nil {
-		return mc.Observe(err)
-	}
-	return gce.waitForZoneOp(op, v1instance.Zone, mc)
+	mc := newInstancesMetricContext("add_alias", v1instance.Zone)
+	err = gce.c.BetaInstances().UpdateNetworkInterface(context.Background(), meta.ZonalKey(instance.Name, lastComponent(instance.Zone)), iface.Name, iface)
+	return mc.Observe(err)
 }
 
-// Gets the named instances, returning cloudprovider.InstanceNotFound if any instance is not found
+// Gets the named instances, returning cloudprovider.InstanceNotFound if any
+// instance is not found
 func (gce *GCECloud) getInstancesByNames(names []string) ([]*gceInstance, error) {
-	instances := make(map[string]*gceInstance)
+	found := map[string]*gceInstance{}
 	remaining := len(names)
 
 	nodeInstancePrefix := gce.nodeInstancePrefix
 	for _, name := range names {
 		name = canonicalizeInstanceName(name)
 		if !strings.HasPrefix(name, gce.nodeInstancePrefix) {
-			glog.Warningf("instance '%s' does not conform to prefix '%s', removing filter", name, gce.nodeInstancePrefix)
+			glog.Warningf("Instance %q does not conform to prefix %q, removing filter", name, gce.nodeInstancePrefix)
 			nodeInstancePrefix = ""
 		}
-		instances[name] = nil
+		found[name] = nil
 	}
 
 	for _, zone := range gce.managedZones {
 		if remaining == 0 {
 			break
 		}
-
-		pageToken := ""
-		page := 0
-		for ; page == 0 || (pageToken != "" && page < maxPages); page++ {
-			listCall := gce.service.Instances.List(gce.projectID, zone)
-
-			if nodeInstancePrefix != "" {
-				// Add the filter for hosts
-				listCall = listCall.Filter("name eq " + nodeInstancePrefix + ".*")
-			}
-
-			// TODO(zmerlynn): Internal bug 29524655
-			// listCall = listCall.Fields("items(name,id,disks,machineType)")
-			if pageToken != "" {
-				listCall.PageToken(pageToken)
-			}
-
-			res, err := listCall.Do()
-			if err != nil {
-				return nil, err
-			}
-			pageToken = res.NextPageToken
-			for _, i := range res.Items {
-				name := i.Name
-				if _, ok := instances[name]; !ok {
-					continue
-				}
-
-				instance := &gceInstance{
-					Zone:  zone,
-					Name:  name,
-					ID:    i.Id,
-					Disks: i.Disks,
-					Type:  lastComponent(i.MachineType),
-				}
-				instances[name] = instance
-				remaining--
-			}
+		instances, err := gce.c.Instances().List(context.Background(), zone, filter.Regexp("name", nodeInstancePrefix+".*"))
+		if err != nil {
+			return nil, err
 		}
-		if page >= maxPages {
-			glog.Errorf("getInstancesByNames exceeded maxPages=%d for Instances.List: truncating.", maxPages)
+		for _, inst := range instances {
+			if remaining == 0 {
+				break
+			}
+			if _, ok := found[inst.Name]; !ok {
+				continue
+			}
+			if found[inst.Name] != nil {
+				glog.Errorf("Instance name %q was duplicated (in zone %q and %q)", inst.Name, zone, found[inst.Name].Zone)
+				continue
+			}
+			found[inst.Name] = &gceInstance{
+				Zone:  zone,
+				Name:  inst.Name,
+				ID:    inst.Id,
+				Disks: inst.Disks,
+				Type:  lastComponent(inst.MachineType),
+			}
+			remaining--
 		}
 	}
 
-	instanceArray := make([]*gceInstance, len(names))
-	for i, name := range names {
-		name = canonicalizeInstanceName(name)
-		instance := instances[name]
-		if instance == nil {
-			glog.Errorf("Failed to retrieve instance: %q", name)
-			return nil, cloudprovider.InstanceNotFound
+	if remaining > 0 {
+		var failed []string
+		for k := range found {
+			if found[k] == nil {
+				failed = append(failed, k)
+			}
 		}
-		instanceArray[i] = instances[name]
+		glog.Errorf("Failed to retrieve instances: %v", failed)
+		return nil, cloudprovider.InstanceNotFound
 	}
 
-	return instanceArray, nil
+	var ret []*gceInstance
+	for _, instance := range found {
+		ret = append(ret, instance)
+	}
+
+	return ret, nil
 }
 
 // Gets the named instance, returning cloudprovider.InstanceNotFound if the instance is not found
@@ -464,6 +478,7 @@ func (gce *GCECloud) getInstanceByName(name string) (*gceInstance, error) {
 			if isHTTPErrorCode(err, http.StatusNotFound) {
 				continue
 			}
+			glog.Errorf("getInstanceByName: failed to get instance %s in zone %s; err: %v", name, zone, err)
 			return nil, err
 		}
 		return instance, nil
@@ -475,13 +490,11 @@ func (gce *GCECloud) getInstanceByName(name string) (*gceInstance, error) {
 func (gce *GCECloud) getInstanceFromProjectInZoneByName(project, zone, name string) (*gceInstance, error) {
 	name = canonicalizeInstanceName(name)
 	mc := newInstancesMetricContext("get", zone)
-	res, err := gce.service.Instances.Get(project, zone, name).Do()
+	res, err := gce.c.Instances().Get(context.Background(), meta.ZonalKey(name, zone))
 	mc.Observe(err)
 	if err != nil {
-		glog.Errorf("getInstanceFromProjectInZoneByName: failed to get instance %s; err: %v", name, err)
 		return nil, err
 	}
-
 	return &gceInstance{
 		Zone:  lastComponent(res.Zone),
 		Name:  res.Name,
@@ -540,16 +553,16 @@ func (gce *GCECloud) isCurrentInstance(instanceID string) bool {
 // ComputeHostTags grabs all tags from all instances being added to the pool.
 // * The longest tag that is a prefix of the instance name is used
 // * If any instance has no matching prefix tag, return error
-// Invoking this method to get host tags is risky since it depends on the format
-// of the host names in the cluster. Only use it as a fallback if gce.nodeTags
-// is unspecified
+// Invoking this method to get host tags is risky since it depends on the
+// format of the host names in the cluster. Only use it as a fallback if
+// gce.nodeTags is unspecified
 func (gce *GCECloud) computeHostTags(hosts []*gceInstance) ([]string, error) {
 	// TODO: We could store the tags in gceInstance, so we could have already fetched it
 	hostNamesByZone := make(map[string]map[string]bool) // map of zones -> map of names -> bool (for easy lookup)
 	nodeInstancePrefix := gce.nodeInstancePrefix
 	for _, host := range hosts {
 		if !strings.HasPrefix(host.Name, gce.nodeInstancePrefix) {
-			glog.Warningf("instance '%s' does not conform to prefix '%s', ignoring filter", host, gce.nodeInstancePrefix)
+			glog.Warningf("instance %v does not conform to prefix '%s', ignoring filter", host, gce.nodeInstancePrefix)
 			nodeInstancePrefix = ""
 		}
 
@@ -563,54 +576,34 @@ func (gce *GCECloud) computeHostTags(hosts []*gceInstance) ([]string, error) {
 
 	tags := sets.NewString()
 
+	filt := filter.None
+	if nodeInstancePrefix != "" {
+		filt = filter.Regexp("name", nodeInstancePrefix+".*")
+	}
 	for zone, hostNames := range hostNamesByZone {
-		pageToken := ""
-		page := 0
-		for ; page == 0 || (pageToken != "" && page < maxPages); page++ {
-			listCall := gce.service.Instances.List(gce.projectID, zone)
-
-			if nodeInstancePrefix != "" {
-				// Add the filter for hosts
-				listCall = listCall.Filter("name eq " + nodeInstancePrefix + ".*")
-			}
-
-			// Add the fields we want
-			// TODO(zmerlynn): Internal bug 29524655
-			// listCall = listCall.Fields("items(name,tags)")
-
-			if pageToken != "" {
-				listCall = listCall.PageToken(pageToken)
-			}
-
-			res, err := listCall.Do()
-			if err != nil {
-				return nil, err
-			}
-			pageToken = res.NextPageToken
-			for _, instance := range res.Items {
-				if !hostNames[instance.Name] {
-					continue
-				}
-
-				longest_tag := ""
-				for _, tag := range instance.Tags.Items {
-					if strings.HasPrefix(instance.Name, tag) && len(tag) > len(longest_tag) {
-						longest_tag = tag
-					}
-				}
-				if len(longest_tag) > 0 {
-					tags.Insert(longest_tag)
-				} else {
-					return nil, fmt.Errorf("Could not find any tag that is a prefix of instance name for instance %s", instance.Name)
-				}
-			}
+		instances, err := gce.c.Instances().List(context.Background(), zone, filt)
+		if err != nil {
+			return nil, err
 		}
-		if page >= maxPages {
-			glog.Errorf("computeHostTags exceeded maxPages=%d for Instances.List: truncating.", maxPages)
+		for _, instance := range instances {
+			if !hostNames[instance.Name] {
+				continue
+			}
+			longest_tag := ""
+			for _, tag := range instance.Tags.Items {
+				if strings.HasPrefix(instance.Name, tag) && len(tag) > len(longest_tag) {
+					longest_tag = tag
+				}
+			}
+			if len(longest_tag) > 0 {
+				tags.Insert(longest_tag)
+			} else {
+				return nil, fmt.Errorf("could not find any tag that is a prefix of instance name for instance %s", instance.Name)
+			}
 		}
 	}
 	if len(tags) == 0 {
-		return nil, fmt.Errorf("No instances found")
+		return nil, fmt.Errorf("no instances found")
 	}
 	return tags.List(), nil
 }

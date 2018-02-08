@@ -163,7 +163,7 @@ func restartNodes(f *framework.Framework, nodeNames []string) error {
 	// List old boot IDs.
 	oldBootIDs := make(map[string]string)
 	for _, name := range nodeNames {
-		node, err := f.ClientSet.Core().Nodes().Get(name, metav1.GetOptions{})
+		node, err := f.ClientSet.CoreV1().Nodes().Get(name, metav1.GetOptions{})
 		if err != nil {
 			return fmt.Errorf("error getting node info before reboot: %s", err)
 		}
@@ -185,7 +185,7 @@ func restartNodes(f *framework.Framework, nodeNames []string) error {
 	// Wait for their boot IDs to change.
 	for _, name := range nodeNames {
 		if err := wait.Poll(30*time.Second, 5*time.Minute, func() (bool, error) {
-			node, err := f.ClientSet.Core().Nodes().Get(name, metav1.GetOptions{})
+			node, err := f.ClientSet.CoreV1().Nodes().Get(name, metav1.GetOptions{})
 			if err != nil {
 				return false, fmt.Errorf("error getting node info after reboot: %s", err)
 			}

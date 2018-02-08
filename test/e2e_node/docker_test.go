@@ -24,6 +24,7 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -100,7 +101,7 @@ var _ = framework.KubeDescribe("Docker features [Feature:Docker]", func() {
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{{
 						Name:  containerName,
-						Image: "gcr.io/google_containers/nginx-slim:0.7",
+						Image: imageutils.GetE2EImage(imageutils.NginxSlim),
 					}},
 				},
 			})

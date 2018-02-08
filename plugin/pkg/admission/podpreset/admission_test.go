@@ -20,12 +20,11 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	kadmission "k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/authentication/user"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/settings"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
@@ -393,7 +392,7 @@ func TestMergeVolumes(t *testing.T) {
 
 // NewTestAdmission provides an admission plugin with test implementations of internal structs.  It uses
 // an authorizer that always returns true.
-func NewTestAdmission(lister settingslisters.PodPresetLister, objects ...runtime.Object) kadmission.Interface {
+func NewTestAdmission(lister settingslisters.PodPresetLister, objects ...runtime.Object) kadmission.MutationInterface {
 	// Build a test client that the admission plugin can use to look up the service account missing from its cache
 	client := fake.NewSimpleClientset(objects...)
 
@@ -426,16 +425,16 @@ func TestAdmitConflictWithDifferentNamespaceShouldDoNothing(t *testing.T) {
 	}
 
 	pip := &settings.PodPreset{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "hello",
 			Namespace: "othernamespace",
 		},
 		Spec: settings.PodPresetSpec{
-			Selector: v1.LabelSelector{
-				MatchExpressions: []v1.LabelSelectorRequirement{
+			Selector: metav1.LabelSelector{
+				MatchExpressions: []metav1.LabelSelectorRequirement{
 					{
 						Key:      "security",
-						Operator: v1.LabelSelectorOpIn,
+						Operator: metav1.LabelSelectorOpIn,
 						Values:   []string{"S2"},
 					},
 				},
@@ -472,16 +471,16 @@ func TestAdmitConflictWithNonMatchingLabelsShouldNotError(t *testing.T) {
 	}
 
 	pip := &settings.PodPreset{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "hello",
 			Namespace: "namespace",
 		},
 		Spec: settings.PodPresetSpec{
-			Selector: v1.LabelSelector{
-				MatchExpressions: []v1.LabelSelectorRequirement{
+			Selector: metav1.LabelSelector{
+				MatchExpressions: []metav1.LabelSelectorRequirement{
 					{
 						Key:      "security",
-						Operator: v1.LabelSelectorOpIn,
+						Operator: metav1.LabelSelectorOpIn,
 						Values:   []string{"S3"},
 					},
 				},
@@ -519,16 +518,16 @@ func TestAdmitConflictShouldNotModifyPod(t *testing.T) {
 	origPod := *pod
 
 	pip := &settings.PodPreset{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "hello",
 			Namespace: "namespace",
 		},
 		Spec: settings.PodPresetSpec{
-			Selector: v1.LabelSelector{
-				MatchExpressions: []v1.LabelSelectorRequirement{
+			Selector: metav1.LabelSelector{
+				MatchExpressions: []metav1.LabelSelectorRequirement{
 					{
 						Key:      "security",
-						Operator: v1.LabelSelectorOpIn,
+						Operator: metav1.LabelSelectorOpIn,
 						Values:   []string{"S2"},
 					},
 				},
@@ -568,16 +567,16 @@ func TestAdmit(t *testing.T) {
 	}
 
 	pip := &settings.PodPreset{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "hello",
 			Namespace: "namespace",
 		},
 		Spec: settings.PodPresetSpec{
-			Selector: v1.LabelSelector{
-				MatchExpressions: []v1.LabelSelectorRequirement{
+			Selector: metav1.LabelSelector{
+				MatchExpressions: []metav1.LabelSelectorRequirement{
 					{
 						Key:      "security",
-						Operator: v1.LabelSelectorOpIn,
+						Operator: metav1.LabelSelectorOpIn,
 						Values:   []string{"S2"},
 					},
 				},
@@ -628,16 +627,16 @@ func TestAdmitMirrorPod(t *testing.T) {
 	}
 
 	pip := &settings.PodPreset{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "hello",
 			Namespace: "namespace",
 		},
 		Spec: settings.PodPresetSpec{
-			Selector: v1.LabelSelector{
-				MatchExpressions: []v1.LabelSelectorRequirement{
+			Selector: metav1.LabelSelector{
+				MatchExpressions: []metav1.LabelSelectorRequirement{
 					{
 						Key:      "security",
-						Operator: v1.LabelSelectorOpIn,
+						Operator: metav1.LabelSelectorOpIn,
 						Values:   []string{"S2"},
 					},
 				},
@@ -698,16 +697,16 @@ func TestExclusionNoAdmit(t *testing.T) {
 	}
 
 	pip := &settings.PodPreset{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "hello",
 			Namespace: "namespace",
 		},
 		Spec: settings.PodPresetSpec{
-			Selector: v1.LabelSelector{
-				MatchExpressions: []v1.LabelSelectorRequirement{
+			Selector: metav1.LabelSelector{
+				MatchExpressions: []metav1.LabelSelectorRequirement{
 					{
 						Key:      "security",
-						Operator: v1.LabelSelectorOpIn,
+						Operator: metav1.LabelSelectorOpIn,
 						Values:   []string{"S2"},
 					},
 				},
@@ -762,16 +761,16 @@ func TestAdmitEmptyPodNamespace(t *testing.T) {
 	}
 
 	pip := &settings.PodPreset{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "hello",
 			Namespace: "different", // (pod will be submitted to namespace 'namespace')
 		},
 		Spec: settings.PodPresetSpec{
-			Selector: v1.LabelSelector{
-				MatchExpressions: []v1.LabelSelectorRequirement{
+			Selector: metav1.LabelSelector{
+				MatchExpressions: []metav1.LabelSelectorRequirement{
 					{
 						Key:      "security",
-						Operator: v1.LabelSelectorOpIn,
+						Operator: metav1.LabelSelectorOpIn,
 						Values:   []string{"S2"},
 					},
 				},

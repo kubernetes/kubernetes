@@ -23,7 +23,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"k8s.io/kubernetes/pkg/apis/rbac"
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
@@ -66,7 +66,8 @@ func NewCmdCreateClusterRole(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command
 		},
 	}
 	cmd := &cobra.Command{
-		Use:     "clusterrole NAME --verb=verb --resource=resource.group [--resource-name=resourcename] [--dry-run]",
+		Use: "clusterrole NAME --verb=verb --resource=resource.group [--resource-name=resourcename] [--dry-run]",
+		DisableFlagsInUseLine: true,
 		Short:   clusterRoleLong,
 		Long:    clusterRoleLong,
 		Example: clusterRoleExample,
@@ -155,7 +156,7 @@ func (c *CreateClusterRoleOptions) Validate() error {
 }
 
 func (c *CreateClusterRoleOptions) RunCreateRole() error {
-	clusterRole := &rbac.ClusterRole{}
+	clusterRole := &rbacv1.ClusterRole{}
 	clusterRole.Name = c.Name
 	rules, err := generateResourcePolicyRules(c.Mapper, c.Verbs, c.Resources, c.ResourceNames, c.NonResourceURLs)
 	if err != nil {
@@ -172,7 +173,7 @@ func (c *CreateClusterRoleOptions) RunCreateRole() error {
 	}
 
 	if useShortOutput := c.OutputFormat == "name"; useShortOutput || len(c.OutputFormat) == 0 {
-		cmdutil.PrintSuccess(c.Mapper, useShortOutput, c.Out, "clusterroles", c.Name, c.DryRun, "created")
+		c.PrintSuccess(useShortOutput, c.Out, "clusterroles", c.Name, c.DryRun, "created")
 		return nil
 	}
 

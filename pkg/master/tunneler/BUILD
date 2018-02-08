@@ -9,8 +9,8 @@ load(
 go_test(
     name = "go_default_test",
     srcs = ["ssh_test.go"],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/pkg/master/tunneler",
-    library = ":go_default_library",
     deps = [
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/clock:go_default_library",

@@ -56,9 +56,11 @@ func NewOpenAPIData(doc *openapi_v2.Document) (Resources, error) {
 		if model == nil {
 			panic("ListModels returns a model that can't be looked-up.")
 		}
-		gvk := parseGroupVersionKind(model)
-		if len(gvk.Kind) > 0 {
-			resources[gvk] = modelName
+		gvkList := parseGroupVersionKind(model)
+		for _, gvk := range gvkList {
+			if len(gvk.Kind) > 0 {
+				resources[gvk] = modelName
+			}
 		}
 	}
 
@@ -77,48 +79,49 @@ func (d *document) LookupResource(gvk schema.GroupVersionKind) proto.Schema {
 }
 
 // Get and parse GroupVersionKind from the extension. Returns empty if it doesn't have one.
-func parseGroupVersionKind(s proto.Schema) schema.GroupVersionKind {
+func parseGroupVersionKind(s proto.Schema) []schema.GroupVersionKind {
 	extensions := s.GetExtensions()
+
+	gvkListResult := []schema.GroupVersionKind{}
 
 	// Get the extensions
 	gvkExtension, ok := extensions[groupVersionKindExtensionKey]
 	if !ok {
-		return schema.GroupVersionKind{}
+		return []schema.GroupVersionKind{}
 	}
 
-	// gvk extension must be a list of 1 element.
+	// gvk extension must be a list of at least 1 element.
 	gvkList, ok := gvkExtension.([]interface{})
 	if !ok {
-		return schema.GroupVersionKind{}
-	}
-	if len(gvkList) != 1 {
-		return schema.GroupVersionKind{}
-
-	}
-	gvk := gvkList[0]
-
-	// gvk extension list must be a map with group, version, and
-	// kind fields
-	gvkMap, ok := gvk.(map[interface{}]interface{})
-	if !ok {
-		return schema.GroupVersionKind{}
-	}
-	group, ok := gvkMap["group"].(string)
-	if !ok {
-		return schema.GroupVersionKind{}
-	}
-	version, ok := gvkMap["version"].(string)
-	if !ok {
-		return schema.GroupVersionKind{}
-	}
-	kind, ok := gvkMap["kind"].(string)
-	if !ok {
-		return schema.GroupVersionKind{}
+		return []schema.GroupVersionKind{}
 	}
 
-	return schema.GroupVersionKind{
-		Group:   group,
-		Version: version,
-		Kind:    kind,
+	for _, gvk := range gvkList {
+		// gvk extension list must be a map with group, version, and
+		// kind fields
+		gvkMap, ok := gvk.(map[interface{}]interface{})
+		if !ok {
+			continue
+		}
+		group, ok := gvkMap["group"].(string)
+		if !ok {
+			continue
+		}
+		version, ok := gvkMap["version"].(string)
+		if !ok {
+			continue
+		}
+		kind, ok := gvkMap["kind"].(string)
+		if !ok {
+			continue
+		}
+
+		gvkListResult = append(gvkListResult, schema.GroupVersionKind{
+			Group:   group,
+			Version: version,
+			Kind:    kind,
+		})
 	}
+
+	return gvkListResult
 }

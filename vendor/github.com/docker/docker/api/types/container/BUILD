@@ -10,10 +10,39 @@ go_library(
         "container_update.go",
         "container_wait.go",
         "host_config.go",
-        "hostconfig_unix.go",
         "waitcondition.go",
     ] + select({
-        "@io_bazel_rules_go//go/platform:windows_amd64": [
+        "@io_bazel_rules_go//go/platform:android": [
+            "hostconfig_unix.go",
+        ],
+        "@io_bazel_rules_go//go/platform:darwin": [
+            "hostconfig_unix.go",
+        ],
+        "@io_bazel_rules_go//go/platform:dragonfly": [
+            "hostconfig_unix.go",
+        ],
+        "@io_bazel_rules_go//go/platform:freebsd": [
+            "hostconfig_unix.go",
+        ],
+        "@io_bazel_rules_go//go/platform:linux": [
+            "hostconfig_unix.go",
+        ],
+        "@io_bazel_rules_go//go/platform:nacl": [
+            "hostconfig_unix.go",
+        ],
+        "@io_bazel_rules_go//go/platform:netbsd": [
+            "hostconfig_unix.go",
+        ],
+        "@io_bazel_rules_go//go/platform:openbsd": [
+            "hostconfig_unix.go",
+        ],
+        "@io_bazel_rules_go//go/platform:plan9": [
+            "hostconfig_unix.go",
+        ],
+        "@io_bazel_rules_go//go/platform:solaris": [
+            "hostconfig_unix.go",
+        ],
+        "@io_bazel_rules_go//go/platform:windows": [
             "hostconfig_windows.go",
         ],
         "//conditions:default": [],

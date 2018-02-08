@@ -4,6 +4,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "header_rules.go",
+        "options.go",
         "uri_path.go",
         "v4.go",
     ],

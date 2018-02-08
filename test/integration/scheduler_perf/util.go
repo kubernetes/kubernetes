@@ -29,9 +29,9 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/plugin/pkg/scheduler"
-	_ "k8s.io/kubernetes/plugin/pkg/scheduler/algorithmprovider"
-	"k8s.io/kubernetes/plugin/pkg/scheduler/factory"
+	"k8s.io/kubernetes/pkg/scheduler"
+	_ "k8s.io/kubernetes/pkg/scheduler/algorithmprovider"
+	"k8s.io/kubernetes/pkg/scheduler/factory"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
@@ -74,6 +74,8 @@ func mustSetupScheduler() (schedulerConfigurator scheduler.Configurator, destroy
 		informerFactory.Extensions().V1beta1().ReplicaSets(),
 		informerFactory.Apps().V1beta1().StatefulSets(),
 		informerFactory.Core().V1().Services(),
+		informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
+		informerFactory.Storage().V1().StorageClasses(),
 		v1.DefaultHardPodAffinitySymmetricWeight,
 		enableEquivalenceCache,
 	)

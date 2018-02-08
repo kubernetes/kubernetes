@@ -31,8 +31,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	"k8s.io/kubernetes/pkg/proxy"
+	proxyconfigapi "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig"
 	proxyconfig "k8s.io/kubernetes/pkg/proxy/config"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	"k8s.io/kubernetes/pkg/proxy/winkernel"
@@ -46,12 +46,16 @@ import (
 )
 
 // NewProxyServer returns a new ProxyServer.
-func NewProxyServer(config *componentconfig.KubeProxyConfiguration, cleanupAndExit bool, scheme *runtime.Scheme, master string) (*ProxyServer, error) {
+func NewProxyServer(o *Options) (*ProxyServer, error) {
+	return newProxyServer(o.config, o.CleanupAndExit, o.scheme, o.master)
+}
+
+func newProxyServer(config *proxyconfigapi.KubeProxyConfiguration, cleanupAndExit bool, scheme *runtime.Scheme, master string) (*ProxyServer, error) {
 	if config == nil {
 		return nil, errors.New("config is required")
 	}
 
-	if c, err := configz.New("componentconfig"); err == nil {
+	if c, err := configz.New(proxyconfigapi.GroupName); err == nil {
 		c.Set(config)
 	} else {
 		return nil, fmt.Errorf("unable to register configz: %s", err)

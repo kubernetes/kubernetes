@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package install installs the certificates API group, making it available as
+// Package install installs the example API group, making it available as
 // an option to all of the API encoding/decoding machinery.
 package install
 

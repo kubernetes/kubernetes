@@ -19,10 +19,12 @@ limitations under the License.
 package dockershim
 
 import (
+	"fmt"
+
 	"github.com/blang/semver"
 	dockertypes "github.com/docker/docker/api/types"
 	"github.com/golang/glog"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 )
 
 func DefaultMemorySwap() int64 {
@@ -46,4 +48,12 @@ func (ds *dockerService) updateCreateConfig(
 func (ds *dockerService) determinePodIPBySandboxID(uid string) string {
 	glog.Warningf("determinePodIPBySandboxID is unsupported in this build")
 	return ""
+}
+
+func getNetworkNamespace(c *dockertypes.ContainerJSON) (string, error) {
+	return "", fmt.Errorf("unsupported platform")
+}
+
+// applyExperimentalCreateConfig applys experimental configures from sandbox annotations.
+func applyExperimentalCreateConfig(createConfig *dockertypes.ContainerCreateConfig, annotations map[string]string) {
 }

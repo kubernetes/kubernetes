@@ -123,7 +123,7 @@ verify:
 	@echo "$$VERIFY_HELP_INFO"
 else
 verify: verify_generated_files
-	KUBE_VERIFY_GIT_BRANCH=$(BRANCH) hack/make-rules/verify.sh -v
+	KUBE_VERIFY_GIT_BRANCH=$(BRANCH) hack/make-rules/verify.sh
 endif
 
 define QUICK_VERIFY_HELP_INFO
@@ -138,7 +138,7 @@ quick-verify:
 	@echo "$$QUICK_VERIFY_HELP_INFO"
 else
 quick-verify: verify_generated_files
-	hack/make-rules/verify.sh -v -Q
+	QUICK=true SILENT=false hack/make-rules/verify.sh
 endif
 
 define UPDATE_HELP_INFO
@@ -149,11 +149,11 @@ define UPDATE_HELP_INFO
 endef
 .PHONY: update
 ifeq ($(PRINT_HELP),y)
-update:
+update: generated_files
 	@echo "$$UPDATE_HELP_INFO"
 else
 update:
-	hack/update-all.sh
+	CALLED_FROM_MAIN_MAKEFILE=1 hack/make-rules/update.sh
 endif
 
 define CHECK_TEST_HELP_INFO
@@ -291,7 +291,6 @@ else
 test-cmd: generated_files
 	hack/make-rules/test-kubeadm-cmd.sh
 	hack/make-rules/test-cmd.sh
-	hack/make-rules/test-federation-cmd.sh
 endif
 
 define CLEAN_HELP_INFO
@@ -390,7 +389,7 @@ define RELEASE_SKIP_TESTS_HELP_INFO
 #
 # Args:
 #   KUBE_RELEASE_RUN_TESTS: Whether to run tests. Set to 'y' to run tests anyways.
-#   KUBE_FASTBUILD: Whether to cross-compile for other architectures. Set to 'true' to do so.
+#   KUBE_FASTBUILD: Whether to cross-compile for other architectures. Set to 'false' to do so.
 #
 # Example:
 #   make release-skip-tests
@@ -465,36 +464,6 @@ $(filter-out %$(EXCLUDE_TARGET),$(notdir $(abspath $(wildcard cmd/*/)))):
 else
 $(filter-out %$(EXCLUDE_TARGET),$(notdir $(abspath $(wildcard cmd/*/)))): generated_files
 	hack/make-rules/build.sh cmd/$@
-endif
-
-define PLUGIN_CMD_HELP_INFO
-# Add rules for all directories in plugin/cmd/
-#
-# Example:
-#   make kube-scheduler
-endef
-.PHONY: $(notdir $(abspath $(wildcard plugin/cmd/*/)))
-ifeq ($(PRINT_HELP),y)
-$(notdir $(abspath $(wildcard plugin/cmd/*/))):
-	@echo "$$PLUGIN_CMD_HELP_INFO"
-else
-$(notdir $(abspath $(wildcard plugin/cmd/*/))): generated_files
-	hack/make-rules/build.sh plugin/cmd/$@
-endif
-
-define FED_CMD_HELP_INFO
-# Add rules for all directories in federation/cmd/
-#
-# Example:
-#   make federation-apiserver federation-controller-manager
-endef
-.PHONY: $(notdir $(abspath $(wildcard federation/cmd/*/)))
-ifeq ($(PRINT_HELP),y)
-$(notdir $(abspath $(wildcard federation/cmd/*/))):
-	@echo "$$FED_CMD_HELP_INFO"
-else
-$(notdir $(abspath $(wildcard federation/cmd/*/))): generated_files
-	hack/make-rules/build.sh federation/cmd/$@
 endif
 
 define GENERATED_FILES_HELP_INFO
@@ -575,7 +544,7 @@ else
 # We don't want to build any of the release artifacts when running tests.
 # Some things in vendor don't build due to empty target lists for cross-platform rules.
 bazel-test:
-	bazel test --build_tag_filters=-e2e,-integration --test_tag_filters=-e2e,-integration --flaky_test_attempts=3 -- \
+	bazel test --config=unit -- \
 	  //... \
 	  //hack:verify-all \
 	  -//build/... \
@@ -593,7 +562,8 @@ bazel-test-integration:
 	@echo "$$BAZEL_TEST_INTEGRATION_HELP_INFO"
 else
 bazel-test-integration:
-	bazel test //test/integration/...
+	bazel build --config integration //test/integration/...
+	bazel test --config integration //test/integration/...
 endif
 
 ifeq ($(PRINT_HELP),y)

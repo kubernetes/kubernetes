@@ -23,9 +23,12 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
-	"k8s.io/kubernetes/pkg/api"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	rbacapi "k8s.io/kubernetes/pkg/apis/rbac"
+	storageapi "k8s.io/kubernetes/pkg/apis/storage"
 	"k8s.io/kubernetes/pkg/auth/nodeidentifier"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac"
 	"k8s.io/kubernetes/third_party/forked/gonum/graph"
 	"k8s.io/kubernetes/third_party/forked/gonum/graph/traverse"
@@ -46,6 +49,9 @@ type NodeAuthorizer struct {
 	graph      *Graph
 	identifier nodeidentifier.NodeIdentifier
 	nodeRules  []rbacapi.PolicyRule
+
+	// allows overriding for testing
+	features utilfeature.FeatureGate
 }
 
 // NewAuthorizer returns a new node authorizer
@@ -54,6 +60,7 @@ func NewAuthorizer(graph *Graph, identifier nodeidentifier.NodeIdentifier, rules
 		graph:      graph,
 		identifier: identifier,
 		nodeRules:  rules,
+		features:   utilfeature.DefaultFeatureGate,
 	}
 }
 
@@ -62,18 +69,19 @@ var (
 	secretResource    = api.Resource("secrets")
 	pvcResource       = api.Resource("persistentvolumeclaims")
 	pvResource        = api.Resource("persistentvolumes")
+	vaResource        = storageapi.Resource("volumeattachments")
 )
 
-func (r *NodeAuthorizer) Authorize(attrs authorizer.Attributes) (bool, string, error) {
+func (r *NodeAuthorizer) Authorize(attrs authorizer.Attributes) (authorizer.Decision, string, error) {
 	nodeName, isNode := r.identifier.NodeIdentity(attrs.GetUser())
 	if !isNode {
 		// reject requests from non-nodes
-		return false, "", nil
+		return authorizer.DecisionNoOpinion, "", nil
 	}
 	if len(nodeName) == 0 {
 		// reject requests from unidentifiable nodes
 		glog.V(2).Infof("NODE DENY: unknown node for user %q", attrs.GetUser().GetName())
-		return false, fmt.Sprintf("unknown node for user %q", attrs.GetUser().GetName()), nil
+		return authorizer.DecisionNoOpinion, fmt.Sprintf("unknown node for user %q", attrs.GetUser().GetName()), nil
 	}
 
 	// subdivide access to specific resources
@@ -85,38 +93,76 @@ func (r *NodeAuthorizer) Authorize(attrs authorizer.Attributes) (bool, string, e
 		case configMapResource:
 			return r.authorizeGet(nodeName, configMapVertexType, attrs)
 		case pvcResource:
+			if r.features.Enabled(features.ExpandPersistentVolumes) {
+				if attrs.GetSubresource() == "status" {
+					return r.authorizeStatusUpdate(nodeName, pvcVertexType, attrs)
+				}
+			}
 			return r.authorizeGet(nodeName, pvcVertexType, attrs)
 		case pvResource:
 			return r.authorizeGet(nodeName, pvVertexType, attrs)
+		case vaResource:
+			if r.features.Enabled(features.CSIPersistentVolume) {
+				return r.authorizeGet(nodeName, vaVertexType, attrs)
+			}
+			return authorizer.DecisionNoOpinion, fmt.Sprintf("disabled by feature gate %s", features.CSIPersistentVolume), nil
 		}
 	}
 
 	// Access to other resources is not subdivided, so just evaluate against the statically defined node rules
-	return rbac.RulesAllow(attrs, r.nodeRules...), "", nil
+	if rbac.RulesAllow(attrs, r.nodeRules...) {
+		return authorizer.DecisionAllow, "", nil
+	}
+	return authorizer.DecisionNoOpinion, "", nil
+}
+
+// authorizeStatusUpdate authorizes get/update/patch requests to status subresources of the specified type if they are related to the specified node
+func (r *NodeAuthorizer) authorizeStatusUpdate(nodeName string, startingType vertexType, attrs authorizer.Attributes) (authorizer.Decision, string, error) {
+	switch attrs.GetVerb() {
+	case "update", "patch":
+		// ok
+	default:
+		glog.V(2).Infof("NODE DENY: %s %#v", nodeName, attrs)
+		return authorizer.DecisionNoOpinion, "can only get/update/patch this type", nil
+	}
+
+	if attrs.GetSubresource() != "status" {
+		glog.V(2).Infof("NODE DENY: %s %#v", nodeName, attrs)
+		return authorizer.DecisionNoOpinion, "can only update status subresource", nil
+	}
+
+	return r.authorize(nodeName, startingType, attrs)
 }
 
 // authorizeGet authorizes "get" requests to objects of the specified type if they are related to the specified node
-func (r *NodeAuthorizer) authorizeGet(nodeName string, startingType vertexType, attrs authorizer.Attributes) (bool, string, error) {
-	if attrs.GetVerb() != "get" || len(attrs.GetName()) == 0 {
+func (r *NodeAuthorizer) authorizeGet(nodeName string, startingType vertexType, attrs authorizer.Attributes) (authorizer.Decision, string, error) {
+	if attrs.GetVerb() != "get" {
 		glog.V(2).Infof("NODE DENY: %s %#v", nodeName, attrs)
-		return false, "can only get individual resources of this type", nil
+		return authorizer.DecisionNoOpinion, "can only get individual resources of this type", nil
 	}
-
 	if len(attrs.GetSubresource()) > 0 {
 		glog.V(2).Infof("NODE DENY: %s %#v", nodeName, attrs)
-		return false, "cannot get subresource", nil
+		return authorizer.DecisionNoOpinion, "cannot get subresource", nil
+	}
+	return r.authorize(nodeName, startingType, attrs)
+}
+
+func (r *NodeAuthorizer) authorize(nodeName string, startingType vertexType, attrs authorizer.Attributes) (authorizer.Decision, string, error) {
+	if len(attrs.GetName()) == 0 {
+		glog.V(2).Infof("NODE DENY: %s %#v", nodeName, attrs)
+		return authorizer.DecisionNoOpinion, "No Object name found", nil
 	}
 
 	ok, err := r.hasPathFrom(nodeName, startingType, attrs.GetNamespace(), attrs.GetName())
 	if err != nil {
 		glog.V(2).Infof("NODE DENY: %v", err)
-		return false, "no path found to object", nil
+		return authorizer.DecisionNoOpinion, "no path found to object", nil
 	}
 	if !ok {
 		glog.V(2).Infof("NODE DENY: %q %#v", nodeName, attrs)
-		return false, "no path found to object", nil
+		return authorizer.DecisionNoOpinion, "no path found to object", nil
 	}
-	return ok, "", nil
+	return authorizer.DecisionAllow, "", nil
 }
 
 // hasPathFrom returns true if there is a directed path from the specified type/namespace/name to the specified Node

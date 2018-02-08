@@ -8,8 +8,8 @@ load(
 
 go_binary(
     name = "n-way-http",
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/test/images/n-way-http",
-    library = ":go_default_library",
 )
 
 go_library(

@@ -23,6 +23,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
 	testutils "k8s.io/kubernetes/test/utils"
@@ -36,6 +37,7 @@ var _ = SIGDescribe("Kubernetes Dashboard", func() {
 		uiServiceName = "kubernetes-dashboard"
 		uiAppName     = uiServiceName
 		uiNamespace   = metav1.NamespaceSystem
+		uiRedirect    = "/ui"
 
 		serverStartTimeout = 1 * time.Minute
 	)
@@ -55,7 +57,7 @@ var _ = SIGDescribe("Kubernetes Dashboard", func() {
 		By("Checking to make sure we get a response from the kubernetes-dashboard.")
 		err = wait.Poll(framework.Poll, serverStartTimeout, func() (bool, error) {
 			var status int
-			proxyRequest, errProxy := framework.GetServicesProxyRequest(f.ClientSet, f.ClientSet.Core().RESTClient().Get())
+			proxyRequest, errProxy := framework.GetServicesProxyRequest(f.ClientSet, f.ClientSet.CoreV1().RESTClient().Get())
 			if errProxy != nil {
 				framework.Logf("Get services proxy request failed: %v", errProxy)
 			}
@@ -63,20 +65,20 @@ var _ = SIGDescribe("Kubernetes Dashboard", func() {
 			ctx, cancel := context.WithTimeout(context.Background(), framework.SingleCallTimeout)
 			defer cancel()
 
-			// Query against the proxy URL for the kube-ui service.
+			// Query against the proxy URL for the kubernetes-dashboard service.
 			err := proxyRequest.Namespace(uiNamespace).
 				Context(ctx).
-				Name(uiServiceName).
+				Name(utilnet.JoinSchemeNamePort("https", uiServiceName, "")).
 				Timeout(framework.SingleCallTimeout).
 				Do().
 				StatusCode(&status).
 				Error()
 			if err != nil {
 				if ctx.Err() != nil {
-					framework.Failf("Request to kube-ui failed: %v", err)
+					framework.Failf("Request to kubernetes-dashboard failed: %v", err)
 					return true, err
 				}
-				framework.Logf("Request to kube-ui failed: %v", err)
+				framework.Logf("Request to kubernetes-dashboard failed: %v", err)
 			} else if status != http.StatusOK {
 				framework.Logf("Unexpected status from kubernetes-dashboard: %v", status)
 			}
@@ -87,8 +89,8 @@ var _ = SIGDescribe("Kubernetes Dashboard", func() {
 
 		By("Checking that the ApiServer /ui endpoint redirects to a valid server.")
 		var status int
-		err = f.ClientSet.Core().RESTClient().Get().
-			AbsPath("/ui").
+		err = f.ClientSet.CoreV1().RESTClient().Get().
+			AbsPath(uiRedirect).
 			Timeout(framework.SingleCallTimeout).
 			Do().
 			StatusCode(&status).

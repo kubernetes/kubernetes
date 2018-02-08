@@ -18,8 +18,10 @@ package validation
 
 import (
 	"k8s.io/apimachinery/pkg/api/validation/path"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	unversionedvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/kubernetes/pkg/api/validation"
+	"k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 )
 
@@ -61,6 +63,22 @@ func ValidateClusterRole(role *rbac.ClusterRole) field.ErrorList {
 			allErrs = append(allErrs, err...)
 		}
 	}
+
+	if role.AggregationRule != nil {
+		if len(role.AggregationRule.ClusterRoleSelectors) == 0 {
+			allErrs = append(allErrs, field.Required(field.NewPath("aggregationRule", "clusterRoleSelectors"), "at least one clusterRoleSelector required if aggregationRule is non-nil"))
+		}
+		for i, selector := range role.AggregationRule.ClusterRoleSelectors {
+			fieldPath := field.NewPath("aggregationRule", "clusterRoleSelectors").Index(i)
+			allErrs = append(allErrs, unversionedvalidation.ValidateLabelSelector(&selector, fieldPath)...)
+
+			selector, err := metav1.LabelSelectorAsSelector(&selector)
+			if err != nil {
+				allErrs = append(allErrs, field.Invalid(fieldPath, selector, "invalid label selector."))
+			}
+		}
+	}
+
 	if len(allErrs) != 0 {
 		return allErrs
 	}

@@ -104,6 +104,12 @@ func SerializeObject(mediaType string, encoder runtime.Encoder, w http.ResponseW
 func WriteObjectNegotiated(ctx request.Context, s runtime.NegotiatedSerializer, gv schema.GroupVersion, w http.ResponseWriter, req *http.Request, statusCode int, object runtime.Object) {
 	serializer, err := negotiation.NegotiateOutputSerializer(req, s)
 	if err != nil {
+		// if original statusCode was not successful we need to return the original error
+		// we cannot hide it behind negotiation problems
+		if statusCode < http.StatusOK || statusCode >= http.StatusBadRequest {
+			WriteRawJSON(int(statusCode), object, w)
+			return
+		}
 		status := ErrorToAPIStatus(err)
 		WriteRawJSON(int(status.Code), status, w)
 		return

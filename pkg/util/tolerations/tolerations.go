@@ -17,7 +17,7 @@ limitations under the License.
 package tolerations
 
 import (
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
 type key struct {

@@ -18,6 +18,7 @@ go_library(
         "//pkg/util/mount:go_default_library",
         "//pkg/util/strings:go_default_library",
         "//pkg/volume:go_default_library",
+        "//pkg/volume/util:go_default_library",
         "//pkg/volume/util/volumehelper:go_default_library",
         "//vendor/github.com/stretchr/testify/mock:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",

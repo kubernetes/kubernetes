@@ -410,7 +410,7 @@ func (f *FakeDockerClient) ListContainers(options dockertypes.ContainerListOptio
 		var filtered []dockertypes.Container
 		for _, container := range containerList {
 			for _, statusFilter := range statusFilters {
-				if container.Status == statusFilter {
+				if toDockerContainerStatus(container.Status) == statusFilter {
 					filtered = append(filtered, container)
 					break
 				}
@@ -441,6 +441,19 @@ func (f *FakeDockerClient) ListContainers(options dockertypes.ContainerListOptio
 		containerList = filtered
 	}
 	return containerList, err
+}
+
+func toDockerContainerStatus(state string) string {
+	switch {
+	case strings.HasPrefix(state, StatusCreatedPrefix):
+		return "created"
+	case strings.HasPrefix(state, StatusRunningPrefix):
+		return "running"
+	case strings.HasPrefix(state, StatusExitedPrefix):
+		return "exited"
+	default:
+		return "unknown"
+	}
 }
 
 // InspectContainer is a test-spy implementation of Interface.InspectContainer.
@@ -565,6 +578,18 @@ func (f *FakeDockerClient) StartContainer(id string) error {
 	}
 	f.appendContainerTrace("Started", id)
 	container, ok := f.ContainerMap[id]
+	if container.HostConfig.NetworkMode.IsContainer() {
+		hostContainerID := container.HostConfig.NetworkMode.ConnectedContainer()
+		found := false
+		for _, container := range f.RunningContainerList {
+			if container.ID == hostContainerID {
+				found = true
+			}
+		}
+		if !found {
+			return fmt.Errorf("failed to start container \"%s\": Error response from daemon: cannot join network of a non running container: %s", id, hostContainerID)
+		}
+	}
 	timestamp := f.Clock.Now()
 	if !ok {
 		container = convertFakeContainer(&FakeContainer{ID: id, Name: id, CreatedAt: timestamp})
@@ -635,6 +660,15 @@ func (f *FakeDockerClient) RemoveContainer(id string, opts dockertypes.Container
 			return nil
 		}
 
+	}
+	for i := range f.RunningContainerList {
+		// allow removal of running containers which are not running
+		if f.RunningContainerList[i].ID == id && !f.ContainerMap[id].State.Running {
+			delete(f.ContainerMap, id)
+			f.RunningContainerList = append(f.RunningContainerList[:i], f.RunningContainerList[i+1:]...)
+			f.appendContainerTrace("Removed", id)
+			return nil
+		}
 	}
 	// To be a good fake, report error if container is not stopped.
 	return fmt.Errorf("container not stopped")

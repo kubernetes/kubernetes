@@ -18,6 +18,10 @@ package options
 
 import (
 	"fmt"
+
+	apiextensionsapiserver "k8s.io/apiextensions-apiserver/pkg/apiserver"
+	aggregatorscheme "k8s.io/kube-aggregator/pkg/apiserver/scheme"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 )
 
 // TODO: Longer term we should read this from some config store, rather than a flag.
@@ -66,11 +70,18 @@ func (options *ServerRunOptions) Validate() []error {
 	if errs := options.Audit.Validate(); len(errs) > 0 {
 		errors = append(errors, errs...)
 	}
+	if errs := options.Admission.Validate(); len(errs) > 0 {
+		errors = append(errors, errs...)
+	}
 	if errs := options.InsecureServing.Validate("insecure-port"); len(errs) > 0 {
 		errors = append(errors, errs...)
 	}
 	if options.MasterCount <= 0 {
 		errors = append(errors, fmt.Errorf("--apiserver-count should be a positive number, but value '%d' provided", options.MasterCount))
 	}
+	if errs := options.APIEnablement.Validate(legacyscheme.Registry, apiextensionsapiserver.Registry, aggregatorscheme.Registry); len(errs) > 0 {
+		errors = append(errors, errs...)
+	}
+
 	return errors
 }

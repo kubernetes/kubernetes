@@ -10,6 +10,7 @@ go_library(
         "blobserviceclient.go",
         "blockblob.go",
         "client.go",
+        "commonsasuri.go",
         "container.go",
         "copyblob.go",
         "directory.go",
@@ -21,6 +22,7 @@ go_library(
         "odata.go",
         "pageblob.go",
         "queue.go",
+        "queuesasuri.go",
         "queueserviceclient.go",
         "share.go",
         "storagepolicy.go",
@@ -36,7 +38,7 @@ go_library(
     deps = [
         "//vendor/github.com/Azure/go-autorest/autorest:go_default_library",
         "//vendor/github.com/Azure/go-autorest/autorest/azure:go_default_library",
-        "//vendor/github.com/satori/uuid:go_default_library",
+        "//vendor/github.com/satori/go.uuid:go_default_library",
     ],
 )
 

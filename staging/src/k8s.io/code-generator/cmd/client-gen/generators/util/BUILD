@@ -9,8 +9,8 @@ load(
 go_test(
     name = "go_default_test",
     srcs = ["tags_test.go"],
+    embed = [":go_default_library"],
     importpath = "k8s.io/code-generator/cmd/client-gen/generators/util",
-    library = ":go_default_library",
 )
 
 go_library(

@@ -63,7 +63,6 @@ filegroup(
         "//cmd:all-srcs",
         "//docs:all-srcs",
         "//examples:all-srcs",
-        "//federation:all-srcs",
         "//hack:all-srcs",
         "//pkg:all-srcs",
         "//plugin:all-srcs",

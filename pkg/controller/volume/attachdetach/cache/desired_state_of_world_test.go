@@ -1032,3 +1032,49 @@ func verifyVolumeToAttach(
 
 	t.Fatalf("volumesToAttach (%v) should contain %q/%q. It does not.", volumesToAttach, expectedVolumeName, expectedNodeName)
 }
+
+func Test_GetPodsOnNodes(t *testing.T) {
+	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
+	dsw := NewDesiredStateOfWorld(volumePluginMgr)
+
+	// 2 nodes, each with one pod with a different volume
+	node1Name := k8stypes.NodeName("node1-name")
+	pod1Name := "pod1-uid"
+	volume1Name := v1.UniqueVolumeName("volume1-name")
+	volume1Spec := controllervolumetesting.GetTestVolumeSpec(string(volume1Name), volume1Name)
+	dsw.AddNode(node1Name, false /*keepTerminatedPodVolumes*/)
+	generatedVolume1Name, podAddErr := dsw.AddPod(types.UniquePodName(pod1Name), controllervolumetesting.NewPod(pod1Name, pod1Name), volume1Spec, node1Name)
+	if podAddErr != nil {
+		t.Fatalf(
+			"AddPod failed for pod %q. Expected: <no error> Actual: <%v>",
+			pod1Name,
+			podAddErr)
+	}
+	node2Name := k8stypes.NodeName("node2-name")
+	pod2Name := "pod2-uid"
+	volume2Name := v1.UniqueVolumeName("volume2-name")
+	volume2Spec := controllervolumetesting.GetTestVolumeSpec(string(volume2Name), volume2Name)
+	dsw.AddNode(node2Name, false /*keepTerminatedPodVolumes*/)
+	_, podAddErr = dsw.AddPod(types.UniquePodName(pod2Name), controllervolumetesting.NewPod(pod2Name, pod2Name), volume2Spec, node2Name)
+	if podAddErr != nil {
+		t.Fatalf(
+			"AddPod failed for pod %q. Expected: <no error> Actual: <%v>",
+			pod2Name,
+			podAddErr)
+	}
+
+	// Third node without any pod
+	node3Name := k8stypes.NodeName("node3-name")
+	dsw.AddNode(node3Name, false /*keepTerminatedPodVolumes*/)
+
+	// Act
+	pods := dsw.GetVolumePodsOnNodes([]k8stypes.NodeName{node1Name, node2Name, node3Name, "non-existing-node"}, generatedVolume1Name)
+
+	// Assert
+	if len(pods) != 1 {
+		t.Fatalf("Expected 1 pod, got %d", len(pods))
+	}
+	if pods[0].Name != pod1Name {
+		t.Errorf("Expected pod %s/%s, got %s", pod1Name, pod1Name, pods[0].Name)
+	}
+}

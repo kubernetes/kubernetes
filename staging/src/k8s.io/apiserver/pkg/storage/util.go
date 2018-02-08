@@ -18,16 +18,12 @@ package storage
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 	"sync/atomic"
-
-	"github.com/golang/glog"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/validation/path"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
 type SimpleUpdateFunc func(runtime.Object) (runtime.Object, error)
@@ -37,19 +33,6 @@ func SimpleUpdate(fn SimpleUpdateFunc) UpdateFunc {
 	return func(input runtime.Object, _ ResponseMeta) (runtime.Object, *uint64, error) {
 		out, err := fn(input)
 		return out, nil, err
-	}
-}
-
-// SimpleFilter converts a selection predicate into a FilterFunc.
-// It ignores any error from Matches().
-func SimpleFilter(p SelectionPredicate) FilterFunc {
-	return func(obj runtime.Object) bool {
-		matches, err := p.Matches(obj)
-		if err != nil {
-			glog.Errorf("invalid object for matching. Obj: %v. Err: %v", obj, err)
-			return false
-		}
-		return matches
 	}
 }
 
@@ -63,35 +46,6 @@ func NoTriggerFunc() []MatchValue {
 
 func NoTriggerPublisher(runtime.Object) []MatchValue {
 	return nil
-}
-
-// ParseWatchResourceVersion takes a resource version argument and converts it to
-// the etcd version we should pass to helper.Watch(). Because resourceVersion is
-// an opaque value, the default watch behavior for non-zero watch is to watch
-// the next value (if you pass "1", you will see updates from "2" onwards).
-func ParseWatchResourceVersion(resourceVersion string) (uint64, error) {
-	if resourceVersion == "" || resourceVersion == "0" {
-		return 0, nil
-	}
-	version, err := strconv.ParseUint(resourceVersion, 10, 64)
-	if err != nil {
-		return 0, NewInvalidError(field.ErrorList{
-			// Validation errors are supposed to return version-specific field
-			// paths, but this is probably close enough.
-			field.Invalid(field.NewPath("resourceVersion"), resourceVersion, err.Error()),
-		})
-	}
-	return version, nil
-}
-
-// ParseListResourceVersion takes a resource version argument and converts it to
-// the etcd version.
-func ParseListResourceVersion(resourceVersion string) (uint64, error) {
-	if resourceVersion == "" {
-		return 0, nil
-	}
-	version, err := strconv.ParseUint(resourceVersion, 10, 64)
-	return version, err
 }
 
 func NamespaceKeyFunc(prefix string, obj runtime.Object) (string, error) {

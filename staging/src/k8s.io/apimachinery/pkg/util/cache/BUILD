@@ -12,8 +12,8 @@ go_test(
         "cache_test.go",
         "lruexpirecache_test.go",
     ],
+    embed = [":go_default_library"],
     importpath = "k8s.io/apimachinery/pkg/util/cache",
-    library = ":go_default_library",
     deps = [
         "//vendor/github.com/golang/groupcache/lru:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/clock:go_default_library",

@@ -28,7 +28,7 @@ func NewCmdPhase(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "phase",
 		Short: "Invoke subsets of kubeadm functions separately for a manual install.",
-		RunE:  cmdutil.SubCmdRunE("phase"),
+		Long:  cmdutil.MacroCommandLongDescription,
 	}
 
 	cmd.AddCommand(NewCmdAddon())

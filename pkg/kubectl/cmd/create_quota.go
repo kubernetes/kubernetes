@@ -42,11 +42,12 @@ var (
 // NewCmdCreateQuota is a macro command to create a new quota
 func NewCmdCreateQuota(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "quota NAME [--hard=key1=value1,key2=value2] [--scopes=Scope1,Scope2] [--dry-run=bool]",
-		Aliases: []string{"resourcequota"},
-		Short:   i18n.T("Create a quota with the specified name."),
-		Long:    quotaLong,
-		Example: quotaExample,
+		Use: "quota NAME [--hard=key1=value1,key2=value2] [--scopes=Scope1,Scope2] [--dry-run=bool]",
+		DisableFlagsInUseLine: true,
+		Aliases:               []string{"resourcequota"},
+		Short:                 i18n.T("Create a quota with the specified name."),
+		Long:                  quotaLong,
+		Example:               quotaExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			err := CreateQuota(f, cmdOut, cmd, args)
 			cmdutil.CheckErr(err)
@@ -82,7 +83,7 @@ func CreateQuota(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Command, args [
 	return RunCreateSubcommand(f, cmd, cmdOut, &CreateSubcommandOptions{
 		Name:                name,
 		StructuredGenerator: generator,
-		DryRun:              cmdutil.GetFlagBool(cmd, "dry-run"),
+		DryRun:              cmdutil.GetDryRunFlag(cmd),
 		OutputFormat:        cmdutil.GetFlagString(cmd, "output"),
 	})
 }

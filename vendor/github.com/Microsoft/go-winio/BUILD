@@ -7,7 +7,7 @@ go_library(
         "reparse.go",
         "syscall.go",
     ] + select({
-        "@io_bazel_rules_go//go/platform:windows_amd64": [
+        "@io_bazel_rules_go//go/platform:windows": [
             "backup.go",
             "file.go",
             "fileinfo.go",
@@ -21,7 +21,7 @@ go_library(
     importpath = "github.com/Microsoft/go-winio",
     visibility = ["//visibility:public"],
     deps = select({
-        "@io_bazel_rules_go//go/platform:windows_amd64": [
+        "@io_bazel_rules_go//go/platform:windows": [
             "//vendor/golang.org/x/sys/windows:go_default_library",
         ],
         "//conditions:default": [],

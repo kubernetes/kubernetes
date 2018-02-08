@@ -18,9 +18,7 @@ package options
 
 import (
 	"crypto/tls"
-	"encoding/pem"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"path"
 	"strconv"
@@ -38,11 +36,25 @@ import (
 type SecureServingOptions struct {
 	BindAddress net.IP
 	BindPort    int
+	// BindNetwork is the type of network to bind to - defaults to "tcp", accepts "tcp",
+	// "tcp4", and "tcp6".
+	BindNetwork string
+
+	// Listener is the secure server network listener.
+	// either Listener or BindAddress/BindPort/BindNetwork is set,
+	// if Listener is set, use it and omit BindAddress/BindPort/BindNetwork.
+	Listener net.Listener
 
 	// ServerCert is the TLS cert info for serving secure traffic
 	ServerCert GeneratableKeyCert
 	// SNICertKeys are named CertKeys for serving secure traffic with SNI support.
 	SNICertKeys []utilflag.NamedCertKey
+	// CipherSuites is the list of allowed cipher suites for the server.
+	// Values are from tls package constants (https://golang.org/pkg/crypto/tls/#pkg-constants).
+	CipherSuites []string
+	// MinTLSVersion is the minimum TLS version supported.
+	// Values are from tls package constants (https://golang.org/pkg/crypto/tls/#pkg-constants).
+	MinTLSVersion string
 }
 
 type CertKey struct {
@@ -55,8 +67,6 @@ type CertKey struct {
 type GeneratableKeyCert struct {
 	CertKey CertKey
 
-	// CACertFile is an optional file containing the certificate chain for CertKey.CertFile
-	CACertFile string
 	// CertDirectory is a directory that will contain the certificates.  If the cert and key aren't specifically set
 	// this will be used to derive a match with the "pair-name"
 	CertDirectory string
@@ -88,7 +98,7 @@ func (s *SecureServingOptions) Validate() []error {
 	errors := []error{}
 
 	if s.BindPort < 0 || s.BindPort > 65535 {
-		errors = append(errors, fmt.Errorf("--secure-port %v must be between 0 and 65535, inclusive. 0 for turning off secure port.", s.BindPort))
+		errors = append(errors, fmt.Errorf("--secure-port %v must be between 0 and 65535, inclusive. 0 for turning off secure port", s.BindPort))
 	}
 
 	return errors
@@ -121,10 +131,14 @@ func (s *SecureServingOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.ServerCert.CertKey.KeyFile, "tls-private-key-file", s.ServerCert.CertKey.KeyFile,
 		"File containing the default x509 private key matching --tls-cert-file.")
 
-	fs.StringVar(&s.ServerCert.CACertFile, "tls-ca-file", s.ServerCert.CACertFile, "If set, this "+
-		"certificate authority will used for secure access from Admission "+
-		"Controllers. This must be a valid PEM-encoded CA bundle. Altneratively, the certificate authority "+
-		"can be appended to the certificate provided by --tls-cert-file.")
+	fs.StringSliceVar(&s.CipherSuites, "tls-cipher-suites", s.CipherSuites,
+		"Comma-separated list of cipher suites for the server. "+
+			"Values are from tls package constants (https://golang.org/pkg/crypto/tls/#pkg-constants). "+
+			"If omitted, the default Go cipher suites will be used")
+
+	fs.StringVar(&s.MinTLSVersion, "tls-min-version", s.MinTLSVersion,
+		"Minimum TLS version supported. "+
+			"Value must match version names from https://golang.org/pkg/crypto/tls/#pkg-constants.")
 
 	fs.Var(utilflag.NewNamedCertKeyArray(&s.SNICertKeys), "tls-sni-cert-key", ""+
 		"A pair of x509 certificate and private key file paths, optionally suffixed with a list of "+
@@ -134,12 +148,11 @@ func (s *SecureServingOptions) AddFlags(fs *pflag.FlagSet) {
 		"trump over extracted names. For multiple key/certificate pairs, use the "+
 		"--tls-sni-cert-key multiple times. "+
 		"Examples: \"example.crt,example.key\" or \"foo.crt,foo.key:*.foo.com,foo.com\".")
-}
 
-func (s *SecureServingOptions) AddDeprecatedFlags(fs *pflag.FlagSet) {
-	fs.IPVar(&s.BindAddress, "public-address-override", s.BindAddress,
-		"DEPRECATED: see --bind-address instead.")
-	fs.MarkDeprecated("public-address-override", "see --bind-address instead.")
+	// TODO remove this flag in 1.11.  The flag had no effect before this will prevent scripts from immediately failing on upgrade.
+	fs.String("tls-ca-file", "", "This flag has no effect.")
+	fs.MarkDeprecated("tls-ca-file", "This flag has no effect.")
+
 }
 
 // ApplyTo fills up serving information in the server configuration.
@@ -147,13 +160,24 @@ func (s *SecureServingOptions) ApplyTo(c *server.Config) error {
 	if s == nil {
 		return nil
 	}
-
 	if s.BindPort <= 0 {
 		return nil
 	}
+
+	if s.Listener == nil {
+		var err error
+		addr := net.JoinHostPort(s.BindAddress.String(), strconv.Itoa(s.BindPort))
+		s.Listener, s.BindPort, err = CreateListener(s.BindNetwork, addr)
+		if err != nil {
+			return fmt.Errorf("failed to create listener: %v", err)
+		}
+	}
+
 	if err := s.applyServingInfoTo(c); err != nil {
 		return err
 	}
+
+	c.SecureServingInfo.Listener = s.Listener
 
 	// create self-signed cert+key with the fake server.LoopbackClientServerNameOverride and
 	// let the server return it when the loopback client connects.
@@ -184,16 +208,9 @@ func (s *SecureServingOptions) ApplyTo(c *server.Config) error {
 }
 
 func (s *SecureServingOptions) applyServingInfoTo(c *server.Config) error {
-	if s.BindPort <= 0 {
-		return nil
-	}
-
-	secureServingInfo := &server.SecureServingInfo{
-		BindAddress: net.JoinHostPort(s.BindAddress.String(), strconv.Itoa(s.BindPort)),
-	}
+	secureServingInfo := &server.SecureServingInfo{}
 
 	serverCertFile, serverKeyFile := s.ServerCert.CertKey.CertFile, s.ServerCert.CertKey.KeyFile
-
 	// load main cert
 	if len(serverCertFile) != 0 || len(serverKeyFile) != 0 {
 		tlsCert, err := tls.LoadX509KeyPair(serverCertFile, serverKeyFile)
@@ -203,22 +220,18 @@ func (s *SecureServingOptions) applyServingInfoTo(c *server.Config) error {
 		secureServingInfo.Cert = &tlsCert
 	}
 
-	// optionally load CA cert
-	if len(s.ServerCert.CACertFile) != 0 {
-		pemData, err := ioutil.ReadFile(s.ServerCert.CACertFile)
+	if len(s.CipherSuites) != 0 {
+		cipherSuites, err := utilflag.TLSCipherSuites(s.CipherSuites)
 		if err != nil {
-			return fmt.Errorf("failed to read certificate authority from %q: %v", s.ServerCert.CACertFile, err)
+			return err
 		}
-		block, pemData := pem.Decode(pemData)
-		if block == nil {
-			return fmt.Errorf("no certificate found in certificate authority file %q", s.ServerCert.CACertFile)
-		}
-		if block.Type != "CERTIFICATE" {
-			return fmt.Errorf("expected CERTIFICATE block in certiticate authority file %q, found: %s", s.ServerCert.CACertFile, block.Type)
-		}
-		secureServingInfo.CACert = &tls.Certificate{
-			Certificate: [][]byte{block.Bytes},
-		}
+		secureServingInfo.CipherSuites = cipherSuites
+	}
+
+	var err error
+	secureServingInfo.MinTLSVersion, err = utilflag.TLSVersion(s.MinTLSVersion)
+	if err != nil {
+		return err
 	}
 
 	// load SNI certs
@@ -233,7 +246,6 @@ func (s *SecureServingOptions) applyServingInfoTo(c *server.Config) error {
 			return fmt.Errorf("failed to load SNI cert and key: %v", err)
 		}
 	}
-	var err error
 	secureServingInfo.SNICerts, err = server.GetNamedCertificateMap(namedTLSCerts)
 	if err != nil {
 		return err
@@ -250,7 +262,7 @@ func (s *SecureServingOptions) MaybeDefaultWithSelfSignedCerts(publicAddress str
 		return nil
 	}
 	keyCert := &s.ServerCert.CertKey
-	if s.BindPort == 0 || len(keyCert.CertFile) != 0 || len(keyCert.KeyFile) != 0 {
+	if len(keyCert.CertFile) != 0 || len(keyCert.KeyFile) != 0 {
 		return nil
 	}
 
@@ -285,4 +297,23 @@ func (s *SecureServingOptions) MaybeDefaultWithSelfSignedCerts(publicAddress str
 	}
 
 	return nil
+}
+
+func CreateListener(network, addr string) (net.Listener, int, error) {
+	if len(network) == 0 {
+		network = "tcp"
+	}
+	ln, err := net.Listen(network, addr)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to listen on %v: %v", addr, err)
+	}
+
+	// get port
+	tcpAddr, ok := ln.Addr().(*net.TCPAddr)
+	if !ok {
+		ln.Close()
+		return nil, 0, fmt.Errorf("invalid listen address: %q", ln.Addr().String())
+	}
+
+	return ln, tcpAddr.Port, nil
 }

@@ -30,8 +30,10 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//vendor/github.com/gophercloud/gophercloud/openstack/blockstorage/extensions/volumeactions:all-srcs",
         "//vendor/github.com/gophercloud/gophercloud/openstack/blockstorage/v1/volumes:all-srcs",
         "//vendor/github.com/gophercloud/gophercloud/openstack/blockstorage/v2/volumes:all-srcs",
+        "//vendor/github.com/gophercloud/gophercloud/openstack/blockstorage/v3/volumes:all-srcs",
         "//vendor/github.com/gophercloud/gophercloud/openstack/common/extensions:all-srcs",
         "//vendor/github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/attachinterfaces:all-srcs",
         "//vendor/github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/volumeattach:all-srcs",
@@ -43,6 +45,7 @@ filegroup(
         "//vendor/github.com/gophercloud/gophercloud/openstack/identity/v3/extensions/trusts:all-srcs",
         "//vendor/github.com/gophercloud/gophercloud/openstack/identity/v3/tokens:all-srcs",
         "//vendor/github.com/gophercloud/gophercloud/openstack/networking/v2/extensions:all-srcs",
+        "//vendor/github.com/gophercloud/gophercloud/openstack/networking/v2/networks:all-srcs",
         "//vendor/github.com/gophercloud/gophercloud/openstack/networking/v2/ports:all-srcs",
         "//vendor/github.com/gophercloud/gophercloud/openstack/utils:all-srcs",
     ],

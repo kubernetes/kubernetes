@@ -34,7 +34,7 @@ import (
 )
 
 // phaseTestK8sVersion is a fake kubernetes version to use when testing
-const phaseTestK8sVersion = "v1.8.0"
+const phaseTestK8sVersion = "v1.9.0"
 
 func TestCertsSubCommandsHasFlags(t *testing.T) {
 

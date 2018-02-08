@@ -41,11 +41,12 @@ var (
 // Note that this command overlaps significantly with the `kubectl run` command.
 func NewCmdCreateDeployment(f cmdutil.Factory, cmdOut, cmdErr io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "deployment NAME --image=image [--dry-run]",
-		Aliases: []string{"deploy"},
-		Short:   i18n.T("Create a deployment with the specified name."),
-		Long:    deploymentLong,
-		Example: deploymentExample,
+		Use: "deployment NAME --image=image [--dry-run]",
+		DisableFlagsInUseLine: true,
+		Aliases:               []string{"deploy"},
+		Short:                 i18n.T("Create a deployment with the specified name."),
+		Long:                  deploymentLong,
+		Example:               deploymentExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			err := createDeployment(f, cmdOut, cmdErr, cmd, args)
 			cmdutil.CheckErr(err)

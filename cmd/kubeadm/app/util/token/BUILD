@@ -9,8 +9,8 @@ load(
 go_test(
     name = "go_default_test",
     srcs = ["tokens_test.go"],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/cmd/kubeadm/app/util/token",
-    library = ":go_default_library",
     deps = ["//cmd/kubeadm/app/apis/kubeadm:go_default_library"],
 )
 

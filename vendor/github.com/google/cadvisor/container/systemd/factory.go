@@ -51,7 +51,7 @@ func (f *systemdFactory) DebugInfo() map[string][]string {
 
 // Register registers the systemd container factory.
 func Register(machineInfoFactory info.MachineInfoFactory, fsInfo fs.FsInfo, ignoreMetrics container.MetricSet) error {
-	glog.Infof("Registering systemd factory")
+	glog.V(1).Infof("Registering systemd factory")
 	factory := &systemdFactory{}
 	container.RegisterContainerHandlerFactory(factory, []watcher.ContainerWatchSource{watcher.Raw})
 	return nil

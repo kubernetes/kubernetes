@@ -20,10 +20,10 @@ import (
 	"bytes"
 	"fmt"
 	"net/http"
+	"strings"
 	"testing"
 
 	"k8s.io/client-go/rest/fake"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 )
 
@@ -33,7 +33,6 @@ func TestDescribeUnknownSchemaObject(t *testing.T) {
 	f, tf, codec, _ := cmdtesting.NewTestFactory()
 	tf.Describer = d
 	tf.UnstructuredClient = &fake.RESTClient{
-		APIRegistry:          legacyscheme.Registry,
 		NegotiatedSerializer: unstructuredSerializer,
 		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, cmdtesting.NewInternalType("", "", "foo"))},
 	}
@@ -58,7 +57,6 @@ func TestDescribeUnknownNamespacedSchemaObject(t *testing.T) {
 	f, tf, codec, _ := cmdtesting.NewTestFactory()
 	tf.Describer = d
 	tf.UnstructuredClient = &fake.RESTClient{
-		APIRegistry:          legacyscheme.Registry,
 		NegotiatedSerializer: unstructuredSerializer,
 		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, cmdtesting.NewInternalNamespacedType("", "", "foo", "non-default"))},
 	}
@@ -83,7 +81,6 @@ func TestDescribeObject(t *testing.T) {
 	d := &testDescriber{Output: "test output"}
 	tf.Describer = d
 	tf.UnstructuredClient = &fake.RESTClient{
-		APIRegistry:          legacyscheme.Registry,
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
@@ -117,7 +114,6 @@ func TestDescribeListObjects(t *testing.T) {
 	d := &testDescriber{Output: "test output"}
 	tf.Describer = d
 	tf.UnstructuredClient = &fake.RESTClient{
-		APIRegistry:          legacyscheme.Registry,
 		NegotiatedSerializer: unstructuredSerializer,
 		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, pods)},
 	}
@@ -138,7 +134,6 @@ func TestDescribeObjectShowEvents(t *testing.T) {
 	d := &testDescriber{Output: "test output"}
 	tf.Describer = d
 	tf.UnstructuredClient = &fake.RESTClient{
-		APIRegistry:          legacyscheme.Registry,
 		NegotiatedSerializer: unstructuredSerializer,
 		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, pods)},
 	}
@@ -160,7 +155,6 @@ func TestDescribeObjectSkipEvents(t *testing.T) {
 	d := &testDescriber{Output: "test output"}
 	tf.Describer = d
 	tf.UnstructuredClient = &fake.RESTClient{
-		APIRegistry:          legacyscheme.Registry,
 		NegotiatedSerializer: unstructuredSerializer,
 		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, pods)},
 	}
@@ -173,5 +167,32 @@ func TestDescribeObjectSkipEvents(t *testing.T) {
 	cmd.Run(cmd, []string{"pods"})
 	if d.Settings.ShowEvents != false {
 		t.Errorf("ShowEvents = false expected, got ShowEvents = %v", d.Settings.ShowEvents)
+	}
+}
+
+func TestDescribeHelpMessage(t *testing.T) {
+	f, _, _, _ := cmdtesting.NewAPIFactory()
+
+	buf := bytes.NewBuffer([]byte{})
+	buferr := bytes.NewBuffer([]byte{})
+	cmd := NewCmdDescribe(f, buf, buferr)
+	cmd.SetArgs([]string{"-h"})
+	cmd.SetOutput(buf)
+	_, err := cmd.ExecuteC()
+
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	got := buf.String()
+
+	expected := `describe (-f FILENAME | TYPE [NAME_PREFIX | -l label] | TYPE/NAME)`
+	if !strings.Contains(got, expected) {
+		t.Errorf("Expected to contain: \n %v\nGot:\n %v\n", expected, got)
+	}
+
+	unexpected := `describe (-f FILENAME | TYPE [NAME_PREFIX | -l label] | TYPE/NAME) [flags]`
+	if strings.Contains(got, unexpected) {
+		t.Errorf("Expected not to contain: \n %v\nGot:\n %v\n", unexpected, got)
 	}
 }

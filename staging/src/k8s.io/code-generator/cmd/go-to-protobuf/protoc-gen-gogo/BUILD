@@ -8,8 +8,8 @@ load(
 
 go_binary(
     name = "protoc-gen-gogo",
+    embed = [":go_default_library"],
     importpath = "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo",
-    library = ":go_default_library",
 )
 
 go_library(

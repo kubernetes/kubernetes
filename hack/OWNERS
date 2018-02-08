@@ -9,11 +9,11 @@ reviewers:
   - zmerlynn
   - sttts
   - gmarek
+  - vishh
 approvers:
   - cblecker
   - deads2k
   - eparis
-  - fabianofranz
   - fejta
   - ixdy
   - jbeda
@@ -25,3 +25,5 @@ approvers:
   - zmerlynn
   - sttts
   - gmarek
+  - vishh
+  - liggitt

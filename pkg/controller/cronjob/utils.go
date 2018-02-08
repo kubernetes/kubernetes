@@ -176,11 +176,6 @@ func getJobFromTemplate(sj *batchv1beta1.CronJob, scheduledTime time.Time) (*bat
 	// scheduled-job-name=$SJ_NAME -- for user convenience
 	labels := copyLabels(&sj.Spec.JobTemplate)
 	annotations := copyAnnotations(&sj.Spec.JobTemplate)
-	createdByRefJson, err := makeCreatedByRefJson(sj)
-	if err != nil {
-		return nil, err
-	}
-	annotations[v1.CreatedByAnnotation] = string(createdByRefJson)
 	// We want job names for a given nominal start time to have a deterministic name to avoid the same job being created twice
 	name := fmt.Sprintf("%s-%d", sj.Name, getTimeHash(scheduledTime))
 

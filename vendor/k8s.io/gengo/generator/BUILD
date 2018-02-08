@@ -16,6 +16,7 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/golang.org/x/tools/imports:go_default_library",
         "//vendor/k8s.io/gengo/namer:go_default_library",
         "//vendor/k8s.io/gengo/parser:go_default_library",
         "//vendor/k8s.io/gengo/types:go_default_library",

@@ -21,22 +21,22 @@ import (
 	"reflect"
 	"testing"
 
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/api"
 )
 
 func TestSecretGenerate(t *testing.T) {
 	tests := []struct {
 		setup     func(t *testing.T, params map[string]interface{}) func()
 		params    map[string]interface{}
-		expected  *api.Secret
+		expected  *v1.Secret
 		expectErr bool
 	}{
 		{
 			params: map[string]interface{}{
 				"name": "foo",
 			},
-			expected: &api.Secret{
+			expected: &v1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
@@ -49,7 +49,7 @@ func TestSecretGenerate(t *testing.T) {
 				"name":        "foo",
 				"append-hash": true,
 			},
-			expected: &api.Secret{
+			expected: &v1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo-949tdgdkgg",
 				},
@@ -62,7 +62,7 @@ func TestSecretGenerate(t *testing.T) {
 				"name": "foo",
 				"type": "my-type",
 			},
-			expected: &api.Secret{
+			expected: &v1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
@@ -77,7 +77,7 @@ func TestSecretGenerate(t *testing.T) {
 				"type":        "my-type",
 				"append-hash": true,
 			},
-			expected: &api.Secret{
+			expected: &v1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo-dg474f9t76",
 				},
@@ -91,7 +91,7 @@ func TestSecretGenerate(t *testing.T) {
 				"name":         "foo",
 				"from-literal": []string{"key1=value1", "key2=value2"},
 			},
-			expected: &api.Secret{
+			expected: &v1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
@@ -108,7 +108,7 @@ func TestSecretGenerate(t *testing.T) {
 				"from-literal": []string{"key1=value1", "key2=value2"},
 				"append-hash":  true,
 			},
-			expected: &api.Secret{
+			expected: &v1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo-tf72c228m4",
 				},
@@ -145,7 +145,7 @@ func TestSecretGenerate(t *testing.T) {
 				"name":         "foo",
 				"from-literal": []string{"key1==value1"},
 			},
-			expected: &api.Secret{
+			expected: &v1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
@@ -161,7 +161,7 @@ func TestSecretGenerate(t *testing.T) {
 				"from-literal": []string{"key1==value1"},
 				"append-hash":  true,
 			},
-			expected: &api.Secret{
+			expected: &v1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo-fdcc8tkhh5",
 				},
@@ -177,7 +177,7 @@ func TestSecretGenerate(t *testing.T) {
 				"name":          "valid_env",
 				"from-env-file": "file.env",
 			},
-			expected: &api.Secret{
+			expected: &v1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "valid_env",
 				},
@@ -195,7 +195,7 @@ func TestSecretGenerate(t *testing.T) {
 				"from-env-file": "file.env",
 				"append-hash":   true,
 			},
-			expected: &api.Secret{
+			expected: &v1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "valid_env-bkb2m2965h",
 				},
@@ -216,7 +216,7 @@ func TestSecretGenerate(t *testing.T) {
 				"name":          "getenv",
 				"from-env-file": "file.env",
 			},
-			expected: &api.Secret{
+			expected: &v1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "getenv",
 				},
@@ -238,7 +238,7 @@ func TestSecretGenerate(t *testing.T) {
 				"from-env-file": "file.env",
 				"append-hash":   true,
 			},
-			expected: &api.Secret{
+			expected: &v1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "getenv-m7kg2khdb4",
 				},
@@ -271,7 +271,7 @@ func TestSecretGenerate(t *testing.T) {
 				"name":          "with_spaces",
 				"from-env-file": "file.env",
 			},
-			expected: &api.Secret{
+			expected: &v1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "with_spaces",
 				},
@@ -288,7 +288,7 @@ func TestSecretGenerate(t *testing.T) {
 				"from-env-file": "file.env",
 				"append-hash":   true,
 			},
-			expected: &api.Secret{
+			expected: &v1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "with_spaces-4488d5b57d",
 				},
@@ -314,8 +314,8 @@ func TestSecretGenerate(t *testing.T) {
 		if test.expectErr && err != nil {
 			continue
 		}
-		if !reflect.DeepEqual(obj.(*api.Secret), test.expected) {
-			t.Errorf("\ncase %d, expected:\n%#v\nsaw:\n%#v", i, test.expected, obj.(*api.Secret))
+		if !reflect.DeepEqual(obj.(*v1.Secret), test.expected) {
+			t.Errorf("\ncase %d, expected:\n%#v\nsaw:\n%#v", i, test.expected, obj.(*v1.Secret))
 		}
 	}
 }

@@ -15,13 +15,13 @@ limitations under the License.
 */
 
 // +k8s:conversion-gen=k8s.io/kubernetes/pkg/apis/admissionregistration
-// +k8s:conversion-gen-external-types=../../../../vendor/k8s.io/api/admissionregistration/v1alpha1
+// +k8s:conversion-gen-external-types=k8s.io/api/admissionregistration/v1alpha1
 // +k8s:defaulter-gen=TypeMeta
 // +k8s:defaulter-gen-input=../../../../vendor/k8s.io/api/admissionregistration/v1alpha1
 
 // Package v1alpha1 is the v1alpha1 version of the API.
 // AdmissionConfiguration and AdmissionPluginConfiguration are legacy static admission plugin configuration
-// admissionregistrationv1alpha1.InitializerConfiguration and admissionregistrationv1alpha1.ExternalAdmissionHookConfiguration is for the
+// InitializerConfiguration, ValidatingWebhookConfiguration, and MutatingWebhookConfiguration are for the
 // new dynamic admission controller configuration.
 // +groupName=admissionregistration.k8s.io
 package v1alpha1 // import "k8s.io/kubernetes/pkg/apis/admissionregistration/v1alpha1"

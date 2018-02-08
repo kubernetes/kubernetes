@@ -14,7 +14,7 @@
 //
 // Example of using the environment variable credentials.
 //
-//     creds := NewEnvCredentials()
+//     creds := credentials.NewEnvCredentials()
 //
 //     // Retrieve the credentials value
 //     credValue, err := creds.Get()
@@ -26,7 +26,7 @@
 // This may be helpful to proactively expire credentials and refresh them sooner
 // than they would naturally expire on their own.
 //
-//     creds := NewCredentials(&EC2RoleProvider{})
+//     creds := credentials.NewCredentials(&ec2rolecreds.EC2RoleProvider{})
 //     creds.Expire()
 //     credsValue, err := creds.Get()
 //     // New credentials will be retrieved instead of from cache.
@@ -43,7 +43,7 @@
 //     func (m *MyProvider) Retrieve() (Value, error) {...}
 //     func (m *MyProvider) IsExpired() bool {...}
 //
-//     creds := NewCredentials(&MyProvider{})
+//     creds := credentials.NewCredentials(&MyProvider{})
 //     credValue, err := creds.Get()
 //
 package credentials
@@ -60,7 +60,9 @@ import (
 // when making service API calls. For example, when accessing public
 // s3 buckets.
 //
-//     svc := s3.New(&aws.Config{Credentials: AnonymousCredentials})
+//     svc := s3.New(session.Must(session.NewSession(&aws.Config{
+//       Credentials: credentials.AnonymousCredentials,
+//     })))
 //     // Access public S3 buckets.
 //
 // @readonly
@@ -88,13 +90,34 @@ type Value struct {
 // The Provider should not need to implement its own mutexes, because
 // that will be managed by Credentials.
 type Provider interface {
-	// Refresh returns nil if it successfully retrieved the value.
+	// Retrieve returns nil if it successfully retrieved the value.
 	// Error is returned if the value were not obtainable, or empty.
 	Retrieve() (Value, error)
 
 	// IsExpired returns if the credentials are no longer valid, and need
 	// to be retrieved.
 	IsExpired() bool
+}
+
+// An ErrorProvider is a stub credentials provider that always returns an error
+// this is used by the SDK when construction a known provider is not possible
+// due to an error.
+type ErrorProvider struct {
+	// The error to be returned from Retrieve
+	Err error
+
+	// The provider name to set on the Retrieved returned Value
+	ProviderName string
+}
+
+// Retrieve will always return the error that the ErrorProvider was created with.
+func (p ErrorProvider) Retrieve() (Value, error) {
+	return Value{ProviderName: p.ProviderName}, p.Err
+}
+
+// IsExpired will always return not expired.
+func (p ErrorProvider) IsExpired() bool {
+	return false
 }
 
 // A Expiry provides shared expiration logic to be used by credentials

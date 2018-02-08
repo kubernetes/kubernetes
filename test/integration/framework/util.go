@@ -19,16 +19,20 @@ limitations under the License.
 package framework
 
 import (
+	"net/http/httptest"
 	"strings"
+	"testing"
 
+	"k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 )
 
 const (
-	// When these values are updated, also update cmd/kubelet/app/options/options.go
-	// A copy of these values exist in e2e/framework/util.go.
+	// When these values are updated, also update cmd/kubelet/app/options/container_runtime.go
+	// A copy of these values exist in test/utils/image/manifest.go
 	currentPodInfraContainerImageName    = "gcr.io/google_containers/pause"
-	currentPodInfraContainerImageVersion = "3.0"
+	currentPodInfraContainerImageVersion = "3.1"
 )
 
 // GetServerArchitecture fetches the architecture of the cluster's apiserver.
@@ -50,4 +54,20 @@ func GetServerArchitecture(c clientset.Interface) string {
 // GetPauseImageName fetches the pause image name for the same architecture as the apiserver.
 func GetPauseImageName(c clientset.Interface) string {
 	return currentPodInfraContainerImageName + "-" + GetServerArchitecture(c) + ":" + currentPodInfraContainerImageVersion
+}
+
+func CreateTestingNamespace(baseName string, apiserver *httptest.Server, t *testing.T) *v1.Namespace {
+	// TODO: Create a namespace with a given basename.
+	// Currently we neither create the namespace nor delete all of its contents at the end.
+	// But as long as tests are not using the same namespaces, this should work fine.
+	return &v1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			// TODO: Once we start creating namespaces, switch to GenerateName.
+			Name: baseName,
+		},
+	}
+}
+
+func DeleteTestingNamespace(ns *v1.Namespace, apiserver *httptest.Server, t *testing.T) {
+	// TODO: Remove all resources from a given namespace once we implement CreateTestingNamespace.
 }

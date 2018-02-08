@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2018 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,23 +22,31 @@ import (
 	rest "k8s.io/client-go/rest"
 	flowcontrol "k8s.io/client-go/util/flowcontrol"
 	exampleinternalversion "k8s.io/code-generator/_examples/apiserver/clientset/internalversion/typed/example/internalversion"
+	secondexampleinternalversion "k8s.io/code-generator/_examples/apiserver/clientset/internalversion/typed/example2/internalversion"
 )
 
 type Interface interface {
 	Discovery() discovery.DiscoveryInterface
 	Example() exampleinternalversion.ExampleInterface
+	SecondExample() secondexampleinternalversion.SecondExampleInterface
 }
 
 // Clientset contains the clients for groups. Each group has exactly one
 // version included in a Clientset.
 type Clientset struct {
 	*discovery.DiscoveryClient
-	example *exampleinternalversion.ExampleClient
+	example       *exampleinternalversion.ExampleClient
+	secondExample *secondexampleinternalversion.SecondExampleClient
 }
 
 // Example retrieves the ExampleClient
 func (c *Clientset) Example() exampleinternalversion.ExampleInterface {
 	return c.example
+}
+
+// SecondExample retrieves the SecondExampleClient
+func (c *Clientset) SecondExample() secondexampleinternalversion.SecondExampleInterface {
+	return c.secondExample
 }
 
 // Discovery retrieves the DiscoveryClient
@@ -61,6 +69,10 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 	if err != nil {
 		return nil, err
 	}
+	cs.secondExample, err = secondexampleinternalversion.NewForConfig(&configShallowCopy)
+	if err != nil {
+		return nil, err
+	}
 
 	cs.DiscoveryClient, err = discovery.NewDiscoveryClientForConfig(&configShallowCopy)
 	if err != nil {
@@ -75,6 +87,7 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 func NewForConfigOrDie(c *rest.Config) *Clientset {
 	var cs Clientset
 	cs.example = exampleinternalversion.NewForConfigOrDie(c)
+	cs.secondExample = secondexampleinternalversion.NewForConfigOrDie(c)
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClientForConfigOrDie(c)
 	return &cs
@@ -84,6 +97,7 @@ func NewForConfigOrDie(c *rest.Config) *Clientset {
 func New(c rest.Interface) *Clientset {
 	var cs Clientset
 	cs.example = exampleinternalversion.New(c)
+	cs.secondExample = secondexampleinternalversion.New(c)
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClient(c)
 	return &cs

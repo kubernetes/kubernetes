@@ -161,7 +161,7 @@ func TestPlugin(t *testing.T) {
 	if _, err := os.Stat(path); err == nil {
 		t.Errorf("TearDown() failed, volume path still exists: %s", path)
 	} else if !os.IsNotExist(err) {
-		t.Errorf("SetUp() failed: %v", err)
+		t.Errorf("TearDown() failed: %v", err)
 	}
 
 	// Test Provisioner
@@ -183,7 +183,7 @@ func TestPlugin(t *testing.T) {
 	}
 	cap := persistentSpec.Spec.Capacity[v1.ResourceStorage]
 	size := cap.Value()
-	if size != 100*1024*1024*1024 {
+	if size != 100*volume.GB {
 		t.Errorf("Provision() returned unexpected volume size: %v", size)
 	}
 

@@ -143,7 +143,7 @@ func (glogAdapter) Infof(format string, args ...interface{}) {
 	glog.V(4).Infof(format, args)
 }
 func (glogAdapter) Warningf(format string, args ...interface{}) {
-	glog.Infof(format, args)
+	glog.V(2).Infof(format, args)
 }
 func (glogAdapter) Errorf(format string, args ...interface{}) {
 	glog.Warningf(format, args)

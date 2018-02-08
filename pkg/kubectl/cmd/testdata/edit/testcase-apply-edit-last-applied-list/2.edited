@@ -16,6 +16,7 @@ items:
     name: cm1
     namespace: myproject
 - kind: Service
+  apiVersion: v1
   metadata:
     annotations: {}
     labels:

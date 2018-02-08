@@ -188,6 +188,8 @@ func getPidForContainer(id string) (int, error) {
 		filepath.Join(cgroupRoot, "system.slice", "docker-"+id+".scope", "tasks"),
 		// Even more recent docker versions under cgroup/systemd/docker/<id>/
 		filepath.Join(cgroupRoot, "..", "systemd", "docker", id, "tasks"),
+		// Kubernetes with docker and CNI is even more different
+		filepath.Join(cgroupRoot, "..", "systemd", "kubepods", "*", "pod*", id, "tasks"),
 	}
 
 	var filename string

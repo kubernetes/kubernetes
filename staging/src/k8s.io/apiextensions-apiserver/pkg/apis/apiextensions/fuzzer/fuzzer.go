@@ -58,7 +58,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 					case reflect.Interface, reflect.Map, reflect.Slice, reflect.Ptr:
 						isValue = false
 					}
-					if isValue || c.Intn(5) == 0 {
+					if isValue || c.Intn(10) == 0 {
 						c.Fuzz(vobj.Field(i).Addr().Interface())
 					}
 				}

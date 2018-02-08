@@ -27,7 +27,7 @@ import (
 	"google.golang.org/grpc"
 
 	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/kubelet/util"
 	utilexec "k8s.io/utils/exec"
 )
@@ -475,4 +475,16 @@ func (r *RemoteRuntimeService) ListContainerStats(filter *runtimeapi.ContainerSt
 	}
 
 	return resp.GetStats(), nil
+}
+
+func (r *RemoteRuntimeService) ReopenContainerLog(containerID string) error {
+	ctx, cancel := getContextWithTimeout(r.timeout)
+	defer cancel()
+
+	_, err := r.runtimeClient.ReopenContainerLog(ctx, &runtimeapi.ReopenContainerLogRequest{ContainerId: containerID})
+	if err != nil {
+		glog.Errorf("ReopenContainerLog %q from runtime service failed: %v", containerID, err)
+		return err
+	}
+	return nil
 }

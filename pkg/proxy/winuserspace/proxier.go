@@ -19,6 +19,7 @@ package winuserspace
 import (
 	"fmt"
 	"net"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -29,8 +30,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/helper"
+	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/apis/core/helper"
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/util/netsh"
 )
@@ -103,7 +104,7 @@ type portMapKey struct {
 }
 
 func (k *portMapKey) String() string {
-	return fmt.Sprintf("%s:%d/%s", k.ip, k.port, k.protocol)
+	return fmt.Sprintf("%s/%s", net.JoinHostPort(k.ip, strconv.Itoa(k.port)), k.protocol)
 }
 
 // A value for the portMap
@@ -233,7 +234,7 @@ func (proxier *Proxier) addServicePortPortal(servicePortPortalName ServicePortPo
 		if existed, err := proxier.netsh.EnsureIPAddress(args, serviceIP); err != nil {
 			return nil, err
 		} else if !existed {
-			glog.V(3).Infof("Added ip address to fowarder interface for service %q at %s:%d/%s", servicePortPortalName, listenIP, port, protocol)
+			glog.V(3).Infof("Added ip address to fowarder interface for service %q at %s/%s", servicePortPortalName, net.JoinHostPort(listenIP, strconv.Itoa(port)), protocol)
 		}
 	}
 
@@ -258,7 +259,7 @@ func (proxier *Proxier) addServicePortPortal(servicePortPortalName ServicePortPo
 	}
 	proxier.setServiceInfo(servicePortPortalName, si)
 
-	glog.V(2).Infof("Proxying for service %q at %s:%d/%s", servicePortPortalName, listenIP, port, protocol)
+	glog.V(2).Infof("Proxying for service %q at %s/%s", servicePortPortalName, net.JoinHostPort(listenIP, strconv.Itoa(port)), protocol)
 	go func(service ServicePortPortalName, proxier *Proxier) {
 		defer runtime.HandleCrash()
 		atomic.AddInt32(&proxier.numProxyLoops, 1)
@@ -341,7 +342,7 @@ func (proxier *Proxier) mergeService(service *api.Service) map[ServicePortPortal
 					glog.Errorf("Failed to close service port portal %q: %v", servicePortPortalName, err)
 				}
 			}
-			glog.V(1).Infof("Adding new service %q at %s:%d/%s", servicePortPortalName, listenIP, listenPort, protocol)
+			glog.V(1).Infof("Adding new service %q at %s/%s", servicePortPortalName, net.JoinHostPort(listenIP, strconv.Itoa(listenPort)), protocol)
 			info, err := proxier.addServicePortPortal(servicePortPortalName, protocol, listenIP, listenPort, proxier.udpIdleTimeout)
 			if err != nil {
 				glog.Errorf("Failed to start proxy for %q: %v", servicePortPortalName, err)

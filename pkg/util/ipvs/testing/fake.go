@@ -18,6 +18,8 @@ package testing
 
 import (
 	"fmt"
+	"net"
+	"strconv"
 
 	utilipvs "k8s.io/kubernetes/pkg/util/ipvs"
 )
@@ -39,6 +41,15 @@ func (s *serviceKey) String() string {
 	return fmt.Sprintf("%s:%d/%s", s.IP, s.Port, s.Protocol)
 }
 
+type realServerKey struct {
+	Address net.IP
+	Port    uint16
+}
+
+func (r *realServerKey) String() string {
+	return net.JoinHostPort(r.Address.String(), strconv.Itoa(int(r.Port)))
+}
+
 //NewFake creates a fake ipvs implementation - a cache store.
 func NewFake() *FakeIPVS {
 	return &FakeIPVS{
@@ -52,6 +63,13 @@ func toServiceKey(serv *utilipvs.VirtualServer) serviceKey {
 		IP:       serv.Address.String(),
 		Port:     serv.Port,
 		Protocol: serv.Protocol,
+	}
+}
+
+func toRealServerKey(rs *utilipvs.RealServer) *realServerKey {
+	return &realServerKey{
+		Address: rs.Address,
+		Port:    rs.Port,
 	}
 }
 
@@ -159,18 +177,19 @@ func (f *FakeIPVS) DeleteRealServer(serv *utilipvs.VirtualServer, dest *utilipvs
 		return fmt.Errorf("Failed to delete destination for service %v, service not found", key.String())
 	}
 	dests := f.Destinations[key]
-	var i int
-	for i = range dests {
-		if dests[i].Equal(dest) {
+	exist := false
+	for i := range dests {
+		if toRealServerKey(dests[i]).String() == toRealServerKey(dest).String() {
+			// Delete one element
+			f.Destinations[key] = append(f.Destinations[key][:i], f.Destinations[key][i+1:]...)
+			exist = true
 			break
 		}
 	}
 	// Not Found
-	if i >= len(f.Destinations[key]) {
+	if !exist {
 		return fmt.Errorf("Failed to delete real server for service %v, real server not found", key.String())
 	}
-	// Delete one element
-	f.Destinations[key] = append(f.Destinations[key][:i], f.Destinations[key][i+1:]...)
 	return nil
 }
 

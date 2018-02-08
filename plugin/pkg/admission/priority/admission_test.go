@@ -25,14 +25,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/admission"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/features"
 )
 
-func addPriorityClasses(ctrl *priorityPlugin, priorityClasses []*scheduling.PriorityClass) {
+func addPriorityClasses(ctrl *PriorityPlugin, priorityClasses []*scheduling.PriorityClass) {
 	informerFactory := informers.NewSharedInformerFactory(nil, controller.NoResyncPeriodFunc())
 	ctrl.SetInternalKubeInformerFactory(informerFactory)
 	// First add the existing classes to the cache.
@@ -132,22 +132,22 @@ func TestPriorityClassAdmission(t *testing.T) {
 	for _, test := range tests {
 		glog.V(4).Infof("starting test %q", test.name)
 
-		ctrl := NewPlugin().(*priorityPlugin)
+		ctrl := NewPlugin()
 		// Add existing priority classes.
 		addPriorityClasses(ctrl, test.existingClasses)
 		// Now add the new class.
 		attrs := admission.NewAttributesRecord(
 			test.newClass,
 			nil,
-			api.Kind("PriorityClass").WithVersion("version"),
+			scheduling.Kind("PriorityClass").WithVersion("version"),
 			"",
 			"",
-			api.Resource("priorityclasses").WithVersion("version"),
+			scheduling.Resource("priorityclasses").WithVersion("version"),
 			"",
 			admission.Create,
 			nil,
 		)
-		err := ctrl.Admit(attrs)
+		err := ctrl.Validate(attrs)
 		glog.Infof("Got %v", err)
 		if err != nil && !test.expectError {
 			t.Errorf("Test %q: unexpected error received: %v", test.name, err)
@@ -160,8 +160,8 @@ func TestPriorityClassAdmission(t *testing.T) {
 
 // TestDefaultPriority tests that default priority is resolved correctly.
 func TestDefaultPriority(t *testing.T) {
-	pcResource := api.Resource("priorityclasses").WithVersion("version")
-	pcKind := api.Kind("PriorityClass").WithVersion("version")
+	pcResource := scheduling.Resource("priorityclasses").WithVersion("version")
+	pcKind := scheduling.Kind("PriorityClass").WithVersion("version")
 	updatedDefaultClass1 := *defaultClass1
 	updatedDefaultClass1.GlobalDefault = false
 
@@ -209,7 +209,7 @@ func TestDefaultPriority(t *testing.T) {
 
 	for _, test := range tests {
 		glog.V(4).Infof("starting test %q", test.name)
-		ctrl := NewPlugin().(*priorityPlugin)
+		ctrl := NewPlugin()
 		addPriorityClasses(ctrl, test.classesBefore)
 		defaultPriority, err := ctrl.getDefaultPriority()
 		if err != nil {
@@ -219,7 +219,7 @@ func TestDefaultPriority(t *testing.T) {
 			t.Errorf("Test %q: expected default priority %d, but got %d", test.name, test.expectedDefaultBefore, defaultPriority)
 		}
 		if test.attributes != nil {
-			err := ctrl.Admit(test.attributes)
+			err := ctrl.Validate(test.attributes)
 			if err != nil {
 				t.Errorf("Test %q: unexpected error received: %v", test.name, err)
 			}
@@ -316,6 +316,39 @@ func TestPodAdmission(t *testing.T) {
 				PriorityClassName: "system-cluster-critical",
 			},
 		},
+		// pod[5]: mirror Pod with a system priority class name
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:        "mirror-pod-w-system-priority",
+				Namespace:   "namespace",
+				Annotations: map[string]string{api.MirrorPodAnnotationKey: ""},
+			},
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name: containerName,
+					},
+				},
+				PriorityClassName: "system-cluster-critical",
+			},
+		},
+		// pod[6]: mirror Pod with integer value of priority
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:        "mirror-pod-w-integer-priority",
+				Namespace:   "namespace",
+				Annotations: map[string]string{api.MirrorPodAnnotationKey: ""},
+			},
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name: containerName,
+					},
+				},
+				PriorityClassName: "default1",
+				Priority:          &intPriority,
+			},
+		},
 	}
 	// Enable PodPriority feature gate.
 	utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%s=true", features.PodPriority))
@@ -378,12 +411,26 @@ func TestPodAdmission(t *testing.T) {
 			0,
 			true,
 		},
+		{
+			"mirror pod with system priority class",
+			[]*scheduling.PriorityClass{},
+			*pods[5],
+			SystemCriticalPriority,
+			false,
+		},
+		{
+			"mirror pod with integer priority",
+			[]*scheduling.PriorityClass{},
+			*pods[6],
+			0,
+			true,
+		},
 	}
 
 	for _, test := range tests {
 		glog.V(4).Infof("starting test %q", test.name)
 
-		ctrl := NewPlugin().(*priorityPlugin)
+		ctrl := NewPlugin()
 		// Add existing priority classes.
 		addPriorityClasses(ctrl, test.existingClasses)
 

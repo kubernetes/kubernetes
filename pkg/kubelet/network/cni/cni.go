@@ -153,37 +153,12 @@ func vendorCNIDir(prefix, pluginType string) string {
 	return fmt.Sprintf(VendorCNIDirTemplate, prefix, pluginType)
 }
 
-func getLoNetwork(binDir, vendorDirPrefix string) *cniNetwork {
-	loConfig, err := libcni.ConfListFromBytes([]byte(`{
-  "cniVersion": "0.2.0",
-  "name": "cni-loopback",
-  "plugins":[{
-    "type": "loopback"
-  }]
-}`))
-	if err != nil {
-		// The hardcoded config above should always be valid and unit tests will
-		// catch this
-		panic(err)
-	}
-	cninet := &libcni.CNIConfig{
-		Path: []string{vendorCNIDir(vendorDirPrefix, "loopback"), binDir},
-	}
-	loNetwork := &cniNetwork{
-		name:          "lo",
-		NetworkConfig: loConfig,
-		CNIConfig:     cninet,
-	}
-
-	return loNetwork
-}
-
 func (plugin *cniNetworkPlugin) Init(host network.Host, hairpinMode kubeletconfig.HairpinMode, nonMasqueradeCIDR string, mtu int) error {
-	var err error
-	plugin.nsenterPath, err = plugin.execer.LookPath("nsenter")
+	err := plugin.platformInit()
 	if err != nil {
 		return err
 	}
+
 	plugin.host = host
 
 	plugin.syncNetworkConfig()
@@ -239,10 +214,12 @@ func (plugin *cniNetworkPlugin) SetUpPod(namespace string, name string, id kubec
 		return fmt.Errorf("CNI failed to retrieve network namespace path: %v", err)
 	}
 
-	_, err = plugin.addToNetwork(plugin.loNetwork, name, namespace, id, netnsPath)
-	if err != nil {
-		glog.Errorf("Error while adding to cni lo network: %s", err)
-		return err
+	// Windows doesn't have loNetwork. It comes only with Linux
+	if plugin.loNetwork != nil {
+		if _, err = plugin.addToNetwork(plugin.loNetwork, name, namespace, id, netnsPath); err != nil {
+			glog.Errorf("Error while adding to cni lo network: %s", err)
+			return err
+		}
 	}
 
 	_, err = plugin.addToNetwork(plugin.getDefaultNetwork(), name, namespace, id, netnsPath)
@@ -266,25 +243,6 @@ func (plugin *cniNetworkPlugin) TearDownPod(namespace string, name string, id ku
 	}
 
 	return plugin.deleteFromNetwork(plugin.getDefaultNetwork(), name, namespace, id, netnsPath)
-}
-
-// TODO: Use the addToNetwork function to obtain the IP of the Pod. That will assume idempotent ADD call to the plugin.
-// Also fix the runtime's call to Status function to be done only in the case that the IP is lost, no need to do periodic calls
-func (plugin *cniNetworkPlugin) GetPodNetworkStatus(namespace string, name string, id kubecontainer.ContainerID) (*network.PodNetworkStatus, error) {
-	netnsPath, err := plugin.host.GetNetNS(id.ID)
-	if err != nil {
-		return nil, fmt.Errorf("CNI failed to retrieve network namespace path: %v", err)
-	}
-	if netnsPath == "" {
-		return nil, fmt.Errorf("Cannot find the network namespace, skipping pod network status for container %q", id)
-	}
-
-	ip, err := network.GetPodIP(plugin.execer, plugin.nsenterPath, netnsPath, network.DefaultInterfaceName)
-	if err != nil {
-		return nil, err
-	}
-
-	return &network.PodNetworkStatus{IP: ip}, nil
 }
 
 func (plugin *cniNetworkPlugin) addToNetwork(network *cniNetwork, podName string, podNamespace string, podSandboxID kubecontainer.ContainerID, podNetnsPath string) (cnitypes.Result, error) {
@@ -315,7 +273,9 @@ func (plugin *cniNetworkPlugin) deleteFromNetwork(network *cniNetwork, podName s
 	netConf, cniNet := network.NetworkConfig, network.CNIConfig
 	glog.V(4).Infof("About to del CNI network %v (type=%v)", netConf.Name, netConf.Plugins[0].Network.Type)
 	err = cniNet.DelNetworkList(netConf, rt)
-	if err != nil {
+	// The pod may not get deleted successfully at the first time.
+	// Ignore "no such file or directory" error in case the network has already been deleted in previous attempts.
+	if err != nil && !strings.Contains(err.Error(), "no such file or directory") {
 		glog.Errorf("Error deleting network: %v", err)
 		return err
 	}
@@ -324,7 +284,7 @@ func (plugin *cniNetworkPlugin) deleteFromNetwork(network *cniNetwork, podName s
 
 func (plugin *cniNetworkPlugin) buildCNIRuntimeConf(podName string, podNs string, podSandboxID kubecontainer.ContainerID, podNetnsPath string) (*libcni.RuntimeConf, error) {
 	glog.V(4).Infof("Got netns path %v", podNetnsPath)
-	glog.V(4).Infof("Using netns path %v", podNs)
+	glog.V(4).Infof("Using podns path %v", podNs)
 
 	rt := &libcni.RuntimeConf{
 		ContainerID: podSandboxID.ID,

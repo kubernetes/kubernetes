@@ -157,7 +157,7 @@ func (vmdisk vmDiskManager) Create(ctx context.Context, datastore *vclib.Datasto
 	return vmdisk.diskPath, nil
 }
 
-func (vmdisk vmDiskManager) Delete(ctx context.Context, datastore *vclib.Datastore) error {
+func (vmdisk vmDiskManager) Delete(ctx context.Context, datacenter *vclib.Datacenter) error {
 	return fmt.Errorf("vmDiskManager.Delete is not supported")
 }
 

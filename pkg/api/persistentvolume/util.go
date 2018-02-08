@@ -17,7 +17,9 @@ limitations under the License.
 package persistentvolume
 
 import (
-	"k8s.io/kubernetes/pkg/api"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 func getClaimRefNamespace(pv *api.PersistentVolume) string {
@@ -60,20 +62,50 @@ func VisitPVSecretNames(pv *api.PersistentVolume, visitor Visitor) bool {
 			}
 		}
 	case source.FlexVolume != nil:
-		if source.FlexVolume.SecretRef != nil && !visitor(getClaimRefNamespace(pv), source.FlexVolume.SecretRef.Name) {
-			return false
+		if source.FlexVolume.SecretRef != nil {
+			// previously persisted PV objects use claimRef namespace
+			ns := getClaimRefNamespace(pv)
+			if len(source.FlexVolume.SecretRef.Namespace) > 0 {
+				// use the secret namespace if namespace is set
+				ns = source.FlexVolume.SecretRef.Namespace
+			}
+			if !visitor(ns, source.FlexVolume.SecretRef.Name) {
+				return false
+			}
 		}
 	case source.RBD != nil:
-		if source.RBD.SecretRef != nil && !visitor(getClaimRefNamespace(pv), source.RBD.SecretRef.Name) {
-			return false
+		if source.RBD.SecretRef != nil {
+			// previously persisted PV objects use claimRef namespace
+			ns := getClaimRefNamespace(pv)
+			if len(source.RBD.SecretRef.Namespace) > 0 {
+				// use the secret namespace if namespace is set
+				ns = source.RBD.SecretRef.Namespace
+			}
+			if !visitor(ns, source.RBD.SecretRef.Name) {
+				return false
+			}
 		}
 	case source.ScaleIO != nil:
-		if source.ScaleIO.SecretRef != nil && !visitor(getClaimRefNamespace(pv), source.ScaleIO.SecretRef.Name) {
-			return false
+		if source.ScaleIO.SecretRef != nil {
+			ns := getClaimRefNamespace(pv)
+			if source.ScaleIO.SecretRef != nil && len(source.ScaleIO.SecretRef.Namespace) > 0 {
+				ns = source.ScaleIO.SecretRef.Namespace
+			}
+			if !visitor(ns, source.ScaleIO.SecretRef.Name) {
+				return false
+			}
 		}
 	case source.ISCSI != nil:
-		if source.ISCSI.SecretRef != nil && !visitor(getClaimRefNamespace(pv), source.ISCSI.SecretRef.Name) {
-			return false
+		if source.ISCSI.SecretRef != nil {
+			// previously persisted PV objects use claimRef namespace
+			ns := getClaimRefNamespace(pv)
+			if len(source.ISCSI.SecretRef.Namespace) > 0 {
+				// use the secret namespace if namespace is set
+				ns = source.ISCSI.SecretRef.Namespace
+			}
+			if !visitor(ns, source.ISCSI.SecretRef.Name) {
+				return false
+			}
 		}
 	case source.StorageOS != nil:
 		if source.StorageOS.SecretRef != nil && !visitor(source.StorageOS.SecretRef.Namespace, source.StorageOS.SecretRef.Name) {
@@ -81,4 +113,12 @@ func VisitPVSecretNames(pv *api.PersistentVolume, visitor Visitor) bool {
 		}
 	}
 	return true
+}
+
+// DropDisabledAlphaFields removes disabled fields from the pv spec.
+// This should be called from PrepareForCreate/PrepareForUpdate for all resources containing a pv spec.
+func DropDisabledAlphaFields(pvSpec *api.PersistentVolumeSpec) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) {
+		pvSpec.VolumeMode = nil
+	}
 }

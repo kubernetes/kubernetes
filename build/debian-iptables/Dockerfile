@@ -19,7 +19,8 @@ FROM BASEIMAGE
 CROSS_BUILD_COPY qemu-ARCH-static /usr/bin/
 
 RUN clean-install \
-    iptables \
-    ebtables \
     conntrack \
-    module-init-tools
+    ebtables \
+    ipset \
+    iptables \
+    kmod

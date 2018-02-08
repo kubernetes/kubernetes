@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// Package remote contains implementations of the TestSuite interface, which specify
+// how to run various node test suites remotely.
 package remote
 
 import (

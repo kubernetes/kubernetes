@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 // schedulingTimeout is longer specifically because sometimes we need to wait
@@ -64,7 +65,7 @@ var _ = SIGDescribe("DisruptionController", func() {
 		// Since disruptionAllowed starts out 0, if we see it ever become positive,
 		// that means the controller is working.
 		err := wait.PollImmediate(framework.Poll, timeout, func() (bool, error) {
-			pdb, err := cs.Policy().PodDisruptionBudgets(ns).Get("foo", metav1.GetOptions{})
+			pdb, err := cs.PolicyV1beta1().PodDisruptionBudgets(ns).Get("foo", metav1.GetOptions{})
 			if err != nil {
 				return false, err
 			}
@@ -226,7 +227,7 @@ func createPDBMinAvailableOrDie(cs kubernetes.Interface, ns string, minAvailable
 			MinAvailable: &minAvailable,
 		},
 	}
-	_, err := cs.Policy().PodDisruptionBudgets(ns).Create(&pdb)
+	_, err := cs.PolicyV1beta1().PodDisruptionBudgets(ns).Create(&pdb)
 	Expect(err).NotTo(HaveOccurred())
 }
 
@@ -241,7 +242,7 @@ func createPDBMaxUnavailableOrDie(cs kubernetes.Interface, ns string, maxUnavail
 			MaxUnavailable: &maxUnavailable,
 		},
 	}
-	_, err := cs.Policy().PodDisruptionBudgets(ns).Create(&pdb)
+	_, err := cs.PolicyV1beta1().PodDisruptionBudgets(ns).Create(&pdb)
 	Expect(err).NotTo(HaveOccurred())
 }
 
@@ -257,7 +258,7 @@ func createPodsOrDie(cs kubernetes.Interface, ns string, n int) {
 				Containers: []v1.Container{
 					{
 						Name:  "busybox",
-						Image: "gcr.io/google_containers/echoserver:1.6",
+						Image: imageutils.GetE2EImage(imageutils.EchoServer),
 					},
 				},
 				RestartPolicy: v1.RestartPolicyAlways,
@@ -301,7 +302,7 @@ func waitForPodsOrDie(cs kubernetes.Interface, ns string, n int) {
 func createReplicaSetOrDie(cs kubernetes.Interface, ns string, size int32, exclusive bool) {
 	container := v1.Container{
 		Name:  "busybox",
-		Image: "gcr.io/google_containers/echoserver:1.6",
+		Image: imageutils.GetE2EImage(imageutils.EchoServer),
 	}
 	if exclusive {
 		container.Ports = []v1.ContainerPort{
@@ -330,6 +331,6 @@ func createReplicaSetOrDie(cs kubernetes.Interface, ns string, size int32, exclu
 		},
 	}
 
-	_, err := cs.Extensions().ReplicaSets(ns).Create(rs)
+	_, err := cs.ExtensionsV1beta1().ReplicaSets(ns).Create(rs)
 	framework.ExpectNoError(err, "Creating replica set %q in namespace %q", rs.Name, ns)
 }

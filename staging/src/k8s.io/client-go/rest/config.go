@@ -54,9 +54,6 @@ type Config struct {
 	Host string
 	// APIPath is a sub-path that points to an API root.
 	APIPath string
-	// Prefix is the sub path of the server. If not specified, the client will set
-	// a default value.  Use "/" to indicate the server root should be used
-	Prefix string
 
 	// ContentConfig contains settings that affect how objects are transformed when
 	// sent to the server.
@@ -70,10 +67,6 @@ type Config struct {
 	// refresh tokens for an OAuth2 flow.
 	// TODO: demonstrate an OAuth2 compatible client.
 	BearerToken string
-
-	// CacheDir is the directory where we'll store HTTP cached responses.
-	// If set to empty string, no caching mechanism will be used.
-	CacheDir string
 
 	// Impersonate is the configuration that RESTClient will use for impersonation.
 	Impersonate ImpersonationConfig
@@ -405,7 +398,6 @@ func AnonymousClientConfig(config *Config) *Config {
 	return &Config{
 		Host:          config.Host,
 		APIPath:       config.APIPath,
-		Prefix:        config.Prefix,
 		ContentConfig: config.ContentConfig,
 		TLSClientConfig: TLSClientConfig{
 			Insecure:   config.Insecure,
@@ -429,12 +421,10 @@ func CopyConfig(config *Config) *Config {
 	return &Config{
 		Host:          config.Host,
 		APIPath:       config.APIPath,
-		Prefix:        config.Prefix,
 		ContentConfig: config.ContentConfig,
 		Username:      config.Username,
 		Password:      config.Password,
 		BearerToken:   config.BearerToken,
-		CacheDir:      config.CacheDir,
 		Impersonate: ImpersonationConfig{
 			Groups:   config.Impersonate.Groups,
 			Extra:    config.Impersonate.Extra,

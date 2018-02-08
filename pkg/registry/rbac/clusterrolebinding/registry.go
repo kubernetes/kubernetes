@@ -28,8 +28,8 @@ import (
 // Registry is an interface for things that know how to store ClusterRoleBindings.
 type Registry interface {
 	ListClusterRoleBindings(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (*rbac.ClusterRoleBindingList, error)
-	CreateClusterRoleBinding(ctx genericapirequest.Context, clusterRoleBinding *rbac.ClusterRoleBinding) error
-	UpdateClusterRoleBinding(ctx genericapirequest.Context, clusterRoleBinding *rbac.ClusterRoleBinding) error
+	CreateClusterRoleBinding(ctx genericapirequest.Context, clusterRoleBinding *rbac.ClusterRoleBinding, createValidation rest.ValidateObjectFunc) error
+	UpdateClusterRoleBinding(ctx genericapirequest.Context, clusterRoleBinding *rbac.ClusterRoleBinding, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) error
 	GetClusterRoleBinding(ctx genericapirequest.Context, name string, options *metav1.GetOptions) (*rbac.ClusterRoleBinding, error)
 	DeleteClusterRoleBinding(ctx genericapirequest.Context, name string) error
 	WatchClusterRoleBindings(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (watch.Interface, error)
@@ -55,13 +55,13 @@ func (s *storage) ListClusterRoleBindings(ctx genericapirequest.Context, options
 	return obj.(*rbac.ClusterRoleBindingList), nil
 }
 
-func (s *storage) CreateClusterRoleBinding(ctx genericapirequest.Context, clusterRoleBinding *rbac.ClusterRoleBinding) error {
-	_, err := s.Create(ctx, clusterRoleBinding, false)
+func (s *storage) CreateClusterRoleBinding(ctx genericapirequest.Context, clusterRoleBinding *rbac.ClusterRoleBinding, createValidation rest.ValidateObjectFunc) error {
+	_, err := s.Create(ctx, clusterRoleBinding, createValidation, false)
 	return err
 }
 
-func (s *storage) UpdateClusterRoleBinding(ctx genericapirequest.Context, clusterRoleBinding *rbac.ClusterRoleBinding) error {
-	_, _, err := s.Update(ctx, clusterRoleBinding.Name, rest.DefaultUpdatedObjectInfo(clusterRoleBinding))
+func (s *storage) UpdateClusterRoleBinding(ctx genericapirequest.Context, clusterRoleBinding *rbac.ClusterRoleBinding, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) error {
+	_, _, err := s.Update(ctx, clusterRoleBinding.Name, rest.DefaultUpdatedObjectInfo(clusterRoleBinding), createValidation, updateValidation)
 	return err
 }
 

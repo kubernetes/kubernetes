@@ -27,9 +27,9 @@ import (
 	"path/filepath"
 	"sync"
 
-	"k8s.io/kubernetes/pkg/util/env"
-
 	"github.com/golang/glog"
+
+	"k8s.io/kubernetes/pkg/util/env"
 )
 
 var (

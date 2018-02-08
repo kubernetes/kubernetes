@@ -16,36 +16,35 @@ package clientv3
 
 import (
 	"io/ioutil"
-	"log"
 	"sync"
 
 	"google.golang.org/grpc/grpclog"
 )
 
 // Logger is the logger used by client library.
-// It implements grpclog.Logger interface.
-type Logger grpclog.Logger
+// It implements grpclog.LoggerV2 interface.
+type Logger grpclog.LoggerV2
 
 var (
 	logger settableLogger
 )
 
 type settableLogger struct {
-	l  grpclog.Logger
+	l  grpclog.LoggerV2
 	mu sync.RWMutex
 }
 
 func init() {
 	// disable client side logs by default
 	logger.mu.Lock()
-	logger.l = log.New(ioutil.Discard, "", 0)
+	logger.l = grpclog.NewLoggerV2(ioutil.Discard, ioutil.Discard, ioutil.Discard)
 
 	// logger has to override the grpclog at initialization so that
 	// any changes to the grpclog go through logger with locking
 	// instead of through SetLogger
 	//
 	// now updates only happen through settableLogger.set
-	grpclog.SetLogger(&logger)
+	grpclog.SetLoggerV2(&logger)
 	logger.mu.Unlock()
 }
 
@@ -62,6 +61,7 @@ func GetLogger() Logger {
 func (s *settableLogger) set(l Logger) {
 	s.mu.Lock()
 	logger.l = l
+	grpclog.SetLoggerV2(&logger)
 	s.mu.Unlock()
 }
 
@@ -72,11 +72,25 @@ func (s *settableLogger) get() Logger {
 	return l
 }
 
-// implement the grpclog.Logger interface
+// implement the grpclog.LoggerV2 interface
 
+func (s *settableLogger) Info(args ...interface{})                 { s.get().Info(args...) }
+func (s *settableLogger) Infof(format string, args ...interface{}) { s.get().Infof(format, args...) }
+func (s *settableLogger) Infoln(args ...interface{})               { s.get().Infoln(args...) }
+func (s *settableLogger) Warning(args ...interface{})              { s.get().Warning(args...) }
+func (s *settableLogger) Warningf(format string, args ...interface{}) {
+	s.get().Warningf(format, args...)
+}
+func (s *settableLogger) Warningln(args ...interface{}) { s.get().Warningln(args...) }
+func (s *settableLogger) Error(args ...interface{})     { s.get().Error(args...) }
+func (s *settableLogger) Errorf(format string, args ...interface{}) {
+	s.get().Errorf(format, args...)
+}
+func (s *settableLogger) Errorln(args ...interface{})               { s.get().Errorln(args...) }
 func (s *settableLogger) Fatal(args ...interface{})                 { s.get().Fatal(args...) }
 func (s *settableLogger) Fatalf(format string, args ...interface{}) { s.get().Fatalf(format, args...) }
 func (s *settableLogger) Fatalln(args ...interface{})               { s.get().Fatalln(args...) }
-func (s *settableLogger) Print(args ...interface{})                 { s.get().Print(args...) }
-func (s *settableLogger) Printf(format string, args ...interface{}) { s.get().Printf(format, args...) }
-func (s *settableLogger) Println(args ...interface{})               { s.get().Println(args...) }
+func (s *settableLogger) Print(args ...interface{})                 { s.get().Info(args...) }
+func (s *settableLogger) Printf(format string, args ...interface{}) { s.get().Infof(format, args...) }
+func (s *settableLogger) Println(args ...interface{})               { s.get().Infoln(args...) }
+func (s *settableLogger) V(l int) bool                              { return s.get().V(l) }

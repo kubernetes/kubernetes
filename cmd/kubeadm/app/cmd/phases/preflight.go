@@ -19,9 +19,33 @@ package phases
 import (
 	"github.com/spf13/cobra"
 
+	"k8s.io/apimachinery/pkg/util/sets"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
+	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
+	"k8s.io/kubernetes/pkg/util/normalizer"
+	utilsexec "k8s.io/utils/exec"
+)
+
+var (
+	masterPreflightLongDesc = normalizer.LongDesc(`
+		Run master pre-flight checks, functionally equivalent to what implemented by kubeadm init.
+		` + cmdutil.AlphaDisclaimer)
+
+	masterPreflightExample = normalizer.Examples(`
+		# Run master pre-flight checks.
+		kubeadm alpha phase preflight master
+		`)
+
+	nodePreflightLongDesc = normalizer.LongDesc(`
+		Run node pre-flight checks, functionally equivalent to what implemented by kubeadm join.
+		` + cmdutil.AlphaDisclaimer)
+
+	nodePreflightExample = normalizer.Examples(`
+		# Run node pre-flight checks.
+		kubeadm alpha phase preflight node
+	`)
 )
 
 // NewCmdPreFlight calls cobra.Command for preflight checks
@@ -29,7 +53,7 @@ func NewCmdPreFlight() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "preflight",
 		Short: "Run pre-flight checks",
-		RunE:  cmdutil.SubCmdRunE("preflight"),
+		Long:  cmdutil.MacroCommandLongDescription,
 	}
 
 	cmd.AddCommand(NewCmdPreFlightMaster())
@@ -40,11 +64,15 @@ func NewCmdPreFlight() *cobra.Command {
 // NewCmdPreFlightMaster calls cobra.Command for master preflight checks
 func NewCmdPreFlightMaster() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "master",
-		Short: "Run master pre-flight checks",
-		RunE: func(cmd *cobra.Command, args []string) error {
+		Use:     "master",
+		Short:   "Run master pre-flight checks",
+		Long:    masterPreflightLongDesc,
+		Example: masterPreflightExample,
+		Run: func(cmd *cobra.Command, args []string) {
 			cfg := &kubeadmapi.MasterConfiguration{}
-			return preflight.RunInitMasterChecks(cfg)
+			criSocket := ""
+			err := preflight.RunInitMasterChecks(utilsexec.New(), cfg, criSocket, sets.NewString())
+			kubeadmutil.CheckErr(err)
 		},
 	}
 
@@ -54,11 +82,15 @@ func NewCmdPreFlightMaster() *cobra.Command {
 // NewCmdPreFlightNode calls cobra.Command for node preflight checks
 func NewCmdPreFlightNode() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "node",
-		Short: "Run node pre-flight checks",
-		RunE: func(cmd *cobra.Command, args []string) error {
+		Use:     "node",
+		Short:   "Run node pre-flight checks",
+		Long:    nodePreflightLongDesc,
+		Example: nodePreflightExample,
+		Run: func(cmd *cobra.Command, args []string) {
 			cfg := &kubeadmapi.NodeConfiguration{}
-			return preflight.RunJoinNodeChecks(cfg)
+			criSocket := ""
+			err := preflight.RunJoinNodeChecks(utilsexec.New(), cfg, criSocket, sets.NewString())
+			kubeadmutil.CheckErr(err)
 		},
 	}
 

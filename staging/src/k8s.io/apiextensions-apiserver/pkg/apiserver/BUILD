@@ -16,9 +16,6 @@ go_library(
     ],
     importpath = "k8s.io/apiextensions-apiserver/pkg/apiserver",
     deps = [
-        "//vendor/github.com/go-openapi/spec:go_default_library",
-        "//vendor/github.com/go-openapi/strfmt:go_default_library",
-        "//vendor/github.com/go-openapi/validate:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions:go_default_library",
         "//vendor/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/install:go_default_library",
@@ -54,11 +51,13 @@ go_library(
         "//vendor/k8s.io/apiserver/pkg/admission:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/endpoints/discovery:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/endpoints/handlers:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/endpoints/handlers/responsewriters:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/endpoints/request:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/registry/generic:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/registry/generic/registry:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/registry/rest:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/server:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/server/storage:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/storage/storagebackend:go_default_library",
         "//vendor/k8s.io/client-go/discovery:go_default_library",
         "//vendor/k8s.io/client-go/tools/cache:go_default_library",
@@ -85,7 +84,7 @@ filegroup(
 go_test(
     name = "go_default_test",
     srcs = ["customresource_handler_test.go"],
+    embed = [":go_default_library"],
     importpath = "k8s.io/apiextensions-apiserver/pkg/apiserver",
-    library = ":go_default_library",
     deps = ["//vendor/k8s.io/apimachinery/pkg/apis/meta/v1/unstructured:go_default_library"],
 )

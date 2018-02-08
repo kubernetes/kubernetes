@@ -277,12 +277,6 @@ func roundTrip(t *testing.T, scheme *runtime.Scheme, codec runtime.Codec, object
 		return
 	}
 
-	// catch deepcopy errors early
-	if !apiequality.Semantic.DeepEqual(original, object) {
-		t.Errorf("%v: DeepCopy did not lead to equal object, diff: %v", name, diff.ObjectReflectDiff(original, object))
-		return
-	}
-
 	// encode (serialize) the deep copy using the provided codec
 	data, err := runtime.Encode(codec, object)
 	if err != nil {

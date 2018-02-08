@@ -13,8 +13,8 @@ go_test(
         "etcd_helper_test.go",
         "etcd_watcher_test.go",
     ],
+    embed = [":go_default_library"],
     importpath = "k8s.io/apiserver/pkg/storage/etcd",
-    library = ":go_default_library",
     deps = [
         "//vendor/github.com/coreos/etcd/client:go_default_library",
         "//vendor/golang.org/x/net/context:go_default_library",
@@ -58,6 +58,7 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/cache:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/validation/field:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/watch:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/storage:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/storage/etcd/metrics:go_default_library",

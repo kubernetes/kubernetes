@@ -58,14 +58,31 @@ func buildControllerRoles() ([]rbac.ClusterRole, []rbac.ClusterRoleBinding) {
 	// controllerRoleBindings is a slice of roles used for controllers
 	controllerRoleBindings := []rbac.ClusterRoleBinding{}
 
+	addControllerRole(&controllerRoles, &controllerRoleBindings, func() rbac.ClusterRole {
+		role := rbac.ClusterRole{
+			ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "attachdetach-controller"},
+			Rules: []rbac.PolicyRule{
+				rbac.NewRule("list", "watch").Groups(legacyGroup).Resources("persistentvolumes", "persistentvolumeclaims").RuleOrDie(),
+				rbac.NewRule("get", "list", "watch").Groups(legacyGroup).Resources("nodes").RuleOrDie(),
+				rbac.NewRule("patch", "update").Groups(legacyGroup).Resources("nodes/status").RuleOrDie(),
+				rbac.NewRule("list", "watch").Groups(legacyGroup).Resources("pods").RuleOrDie(),
+				eventsRule(),
+			},
+		}
+
+		if utilfeature.DefaultFeatureGate.Enabled(features.CSIPersistentVolume) {
+			role.Rules = append(role.Rules, rbac.NewRule("get", "create", "delete", "list", "watch").Groups(storageGroup).Resources("volumeattachments").RuleOrDie())
+		}
+
+		return role
+	}())
+
 	addControllerRole(&controllerRoles, &controllerRoleBindings, rbac.ClusterRole{
-		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "attachdetach-controller"},
+		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "clusterrole-aggregation-controller"},
 		Rules: []rbac.PolicyRule{
-			rbac.NewRule("list", "watch").Groups(legacyGroup).Resources("persistentvolumes", "persistentvolumeclaims").RuleOrDie(),
-			rbac.NewRule("get", "list", "watch").Groups(legacyGroup).Resources("nodes").RuleOrDie(),
-			rbac.NewRule("patch", "update").Groups(legacyGroup).Resources("nodes/status").RuleOrDie(),
-			rbac.NewRule("list", "watch").Groups(legacyGroup).Resources("pods").RuleOrDie(),
-			eventsRule(),
+			// this controller must have full permissions to allow it to mutate any role in any way
+			rbac.NewRule("*").Groups("*").Resources("*").RuleOrDie(),
+			rbac.NewRule("*").URLs("*").RuleOrDie(),
 		},
 	})
 	addControllerRole(&controllerRoles, &controllerRoleBindings, rbac.ClusterRole{
@@ -162,7 +179,7 @@ func buildControllerRoles() ([]rbac.ClusterRole, []rbac.ClusterRoleBinding) {
 			rbac.NewRule("get").Groups(legacyGroup).Resources("services/proxy").Names("https:heapster:", "http:heapster:").RuleOrDie(),
 			// allow listing resource metrics and custom metrics
 			rbac.NewRule("list").Groups(resMetricsGroup).Resources("pods").RuleOrDie(),
-			rbac.NewRule("list").Groups(customMetricsGroup).Resources("*").RuleOrDie(),
+			rbac.NewRule("get", "list").Groups(customMetricsGroup).Resources("*").RuleOrDie(),
 			eventsRule(),
 		},
 	})
@@ -301,12 +318,31 @@ func buildControllerRoles() ([]rbac.ClusterRole, []rbac.ClusterRoleBinding) {
 	addControllerRole(&controllerRoles, &controllerRoleBindings, rbac.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "certificate-controller"},
 		Rules: []rbac.PolicyRule{
-			rbac.NewRule("get", "list", "watch").Groups(certificatesGroup).Resources("certificatesigningrequests").RuleOrDie(),
+			rbac.NewRule("get", "list", "watch", "delete").Groups(certificatesGroup).Resources("certificatesigningrequests").RuleOrDie(),
 			rbac.NewRule("update").Groups(certificatesGroup).Resources("certificatesigningrequests/status", "certificatesigningrequests/approval").RuleOrDie(),
 			rbac.NewRule("create").Groups(authorizationGroup).Resources("subjectaccessreviews").RuleOrDie(),
 			eventsRule(),
 		},
 	})
+	if utilfeature.DefaultFeatureGate.Enabled(features.StorageProtection) {
+		addControllerRole(&controllerRoles, &controllerRoleBindings, rbac.ClusterRole{
+			ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "pvc-protection-controller"},
+			Rules: []rbac.PolicyRule{
+				rbac.NewRule("get", "list", "watch", "update").Groups(legacyGroup).Resources("persistentvolumeclaims").RuleOrDie(),
+				rbac.NewRule("list", "watch", "get").Groups(legacyGroup).Resources("pods").RuleOrDie(),
+				eventsRule(),
+			},
+		})
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.StorageProtection) {
+		addControllerRole(&controllerRoles, &controllerRoleBindings, rbac.ClusterRole{
+			ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "pv-protection-controller"},
+			Rules: []rbac.PolicyRule{
+				rbac.NewRule("get", "list", "watch", "update").Groups(legacyGroup).Resources("persistentvolumes").RuleOrDie(),
+				eventsRule(),
+			},
+		})
+	}
 
 	return controllerRoles, controllerRoleBindings
 }

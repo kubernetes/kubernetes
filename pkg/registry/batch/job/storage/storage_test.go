@@ -24,9 +24,10 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/registry/generic"
+	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
 	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/batch"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 )
 
@@ -82,7 +83,7 @@ func TestCreate(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Job.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Job.Store)
+	test := genericregistrytest.New(t, storage.Job.Store)
 	validJob := validNewJob()
 	validJob.ObjectMeta = metav1.ObjectMeta{}
 	test.TestCreate(
@@ -103,7 +104,7 @@ func TestUpdate(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Job.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Job.Store)
+	test := genericregistrytest.New(t, storage.Job.Store)
 	two := int32(2)
 	test.TestUpdate(
 		// valid
@@ -132,7 +133,7 @@ func TestDelete(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Job.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Job.Store)
+	test := genericregistrytest.New(t, storage.Job.Store)
 	test.TestDelete(validNewJob())
 }
 
@@ -140,7 +141,7 @@ func TestGet(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Job.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Job.Store)
+	test := genericregistrytest.New(t, storage.Job.Store)
 	test.TestGet(validNewJob())
 }
 
@@ -148,7 +149,7 @@ func TestList(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Job.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Job.Store)
+	test := genericregistrytest.New(t, storage.Job.Store)
 	test.TestList(validNewJob())
 }
 
@@ -156,7 +157,7 @@ func TestWatch(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Job.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Job.Store)
+	test := genericregistrytest.New(t, storage.Job.Store)
 	test.TestWatch(
 		validNewJob(),
 		// matching labels

@@ -21,19 +21,19 @@ import (
 	"net/http"
 	"testing"
 
+	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/rest/fake"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 )
 
 func TestCreateQuota(t *testing.T) {
-	resourceQuotaObject := &api.ResourceQuota{}
+	resourceQuotaObject := &v1.ResourceQuota{}
 	resourceQuotaObject.Name = "my-quota"
 	f, tf, codec, ns := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
-		APIRegistry:          legacyscheme.Registry,
+		GroupVersion:         schema.GroupVersion{Version: "v1"},
 		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
@@ -53,19 +53,19 @@ func TestCreateQuota(t *testing.T) {
 	}{
 		"single resource": {
 			flags:          []string{"--hard=cpu=1"},
-			expectedOutput: "resourcequota/" + resourceQuotaObject.Name + "\n",
+			expectedOutput: "resourcequotas/" + resourceQuotaObject.Name + "\n",
 		},
 		"single resource with a scope": {
 			flags:          []string{"--hard=cpu=1", "--scopes=BestEffort"},
-			expectedOutput: "resourcequota/" + resourceQuotaObject.Name + "\n",
+			expectedOutput: "resourcequotas/" + resourceQuotaObject.Name + "\n",
 		},
 		"multiple resources": {
 			flags:          []string{"--hard=cpu=1,pods=42", "--scopes=BestEffort"},
-			expectedOutput: "resourcequota/" + resourceQuotaObject.Name + "\n",
+			expectedOutput: "resourcequotas/" + resourceQuotaObject.Name + "\n",
 		},
 		"single resource with multiple scopes": {
 			flags:          []string{"--hard=cpu=1", "--scopes=BestEffort,NotTerminating"},
-			expectedOutput: "resourcequota/" + resourceQuotaObject.Name + "\n",
+			expectedOutput: "resourcequotas/" + resourceQuotaObject.Name + "\n",
 		},
 	}
 	for name, test := range tests {

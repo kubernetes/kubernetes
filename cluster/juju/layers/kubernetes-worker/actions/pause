@@ -21,8 +21,8 @@ fi
 
 
 # Cordon and drain the unit
-kubectl --kubeconfig=/root/cdk/kubeconfig cordon $(hostname)
-kubectl --kubeconfig=/root/cdk/kubeconfig drain $(hostname) ${EXTRA_FLAGS}
+kubectl --kubeconfig=/root/.kube/config cordon $(hostname)
+kubectl --kubeconfig=/root/.kube/config drain $(hostname) ${EXTRA_FLAGS}
 
 # Set status to indicate the unit is paused and under maintenance.
 status-set 'waiting' 'Kubernetes unit paused'

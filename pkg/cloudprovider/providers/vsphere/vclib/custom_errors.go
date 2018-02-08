@@ -25,6 +25,7 @@ const (
 	NoDevicesFoundErrMsg       = "No devices found"
 	DiskNotFoundErrMsg         = "No vSphere disk ID found"
 	InvalidVolumeOptionsErrMsg = "VolumeOptions verification failed"
+	NoVMFoundErrMsg            = "No VM found"
 )
 
 // Error constants
@@ -34,4 +35,5 @@ var (
 	ErrNoDevicesFound       = errors.New(NoDevicesFoundErrMsg)
 	ErrNoDiskIDFound        = errors.New(DiskNotFoundErrMsg)
 	ErrInvalidVolumeOptions = errors.New(InvalidVolumeOptionsErrMsg)
+	ErrNoVMFound            = errors.New(NoVMFoundErrMsg)
 )

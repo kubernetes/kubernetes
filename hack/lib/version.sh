@@ -22,6 +22,7 @@
 #          source code.
 #    KUBE_GIT_TREE_STATE - "clean" indicates no changes since the git commit id
 #        "dirty" indicates source code changes after the git commit id
+#        "archive" indicates the tree was produced by 'git archive'
 #    KUBE_GIT_VERSION - "vX.Y" used to indicate the last release version.
 #    KUBE_GIT_MAJOR - The major part of the version
 #    KUBE_GIT_MINOR - The minor component of the version
@@ -36,6 +37,19 @@ kube::version::get_version_vars() {
     return
   fi
 
+  # If the kubernetes source was exported through git archive, then
+  # we likely don't have a git tree, but these magic values may be filled in.
+  if [[ '$Format:%%$' == "%" ]]; then
+    KUBE_GIT_COMMIT='$Format:%H$'
+    KUBE_GIT_TREE_STATE="archive"
+    # When a 'git archive' is exported, the '$Format:%D$' below will look
+    # something like 'HEAD -> release-1.8, tag: v1.8.3' where then 'tag: '
+    # can be extracted from it.
+    if [[ '$Format:%D$' =~ tag:\ (v[^ ]+) ]]; then
+     KUBE_GIT_VERSION="${BASH_REMATCH[1]}"
+    fi
+  fi
+
   local git=(git --work-tree "${KUBE_ROOT}")
 
   if [[ -n ${KUBE_GIT_COMMIT-} ]] || KUBE_GIT_COMMIT=$("${git[@]}" rev-parse "HEAD^{commit}" 2>/dev/null); then
@@ -48,7 +62,7 @@ kube::version::get_version_vars() {
       fi
     fi
 
-    # Use git describe to find the version based on annotated tags.
+    # Use git describe to find the version based on tags.
     if [[ -n ${KUBE_GIT_VERSION-} ]] || KUBE_GIT_VERSION=$("${git[@]}" describe --tags --abbrev=14 "${KUBE_GIT_COMMIT}^{commit}" 2>/dev/null); then
       # This translates the "git describe" to an actual semver.org
       # compatible semantic version that looks something like this:
@@ -75,7 +89,7 @@ kube::version::get_version_vars() {
       # Try to match the "git describe" output to a regex to try to extract
       # the "major" and "minor" versions and whether this is the exact tagged
       # version or whether the tree is between two tagged versions.
-      if [[ "${KUBE_GIT_VERSION}" =~ ^v([0-9]+)\.([0-9]+)(\.[0-9]+)?([-].*)?$ ]]; then
+      if [[ "${KUBE_GIT_VERSION}" =~ ^v([0-9]+)\.([0-9]+)(\.[0-9]+)?([-].*)?([+].*)?$ ]]; then
         KUBE_GIT_MAJOR=${BASH_REMATCH[1]}
         KUBE_GIT_MINOR=${BASH_REMATCH[2]}
         if [[ -n "${BASH_REMATCH[4]}" ]]; then
@@ -119,8 +133,8 @@ kube::version::ldflag() {
   local val=${2}
 
   # If you update these, also update the list pkg/version/def.bzl.
-  echo "-X ${KUBE_GO_PACKAGE}/pkg/version.${key}=${val}"
-  echo "-X ${KUBE_GO_PACKAGE}/vendor/k8s.io/client-go/pkg/version.${key}=${val}"
+  echo "-X '${KUBE_GO_PACKAGE}/pkg/version.${key}=${val}'"
+  echo "-X '${KUBE_GO_PACKAGE}/vendor/k8s.io/client-go/pkg/version.${key}=${val}'"
 }
 
 # Prints the value that needs to be passed to the -ldflags parameter of go build

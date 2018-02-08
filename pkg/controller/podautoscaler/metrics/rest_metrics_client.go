@@ -58,11 +58,11 @@ type resourceMetricsClient struct {
 func (c *resourceMetricsClient) GetResourceMetric(resource v1.ResourceName, namespace string, selector labels.Selector) (PodMetricsInfo, time.Time, error) {
 	metrics, err := c.client.PodMetricses(namespace).List(metav1.ListOptions{LabelSelector: selector.String()})
 	if err != nil {
-		return nil, time.Time{}, fmt.Errorf("unable to fetch metrics from API: %v", err)
+		return nil, time.Time{}, fmt.Errorf("unable to fetch metrics from resource metrics API: %v", err)
 	}
 
 	if len(metrics.Items) == 0 {
-		return nil, time.Time{}, fmt.Errorf("no metrics returned from heapster")
+		return nil, time.Time{}, fmt.Errorf("no metrics returned from resource metrics API")
 	}
 
 	res := make(PodMetricsInfo, len(metrics.Items))
@@ -101,7 +101,7 @@ type customMetricsClient struct {
 func (c *customMetricsClient) GetRawMetric(metricName string, namespace string, selector labels.Selector) (PodMetricsInfo, time.Time, error) {
 	metrics, err := c.client.NamespacedMetrics(namespace).GetForObjects(schema.GroupKind{Kind: "Pod"}, selector, metricName)
 	if err != nil {
-		return nil, time.Time{}, fmt.Errorf("unable to fetch metrics from API: %v", err)
+		return nil, time.Time{}, fmt.Errorf("unable to fetch metrics from custom metrics API: %v", err)
 	}
 
 	if len(metrics.Items) == 0 {
@@ -134,7 +134,7 @@ func (c *customMetricsClient) GetObjectMetric(metricName string, namespace strin
 	}
 
 	if err != nil {
-		return 0, time.Time{}, fmt.Errorf("unable to fetch metrics from API: %v", err)
+		return 0, time.Time{}, fmt.Errorf("unable to fetch metrics from custom metrics API: %v", err)
 	}
 
 	return metricValue.Value.MilliValue(), metricValue.Timestamp.Time, nil

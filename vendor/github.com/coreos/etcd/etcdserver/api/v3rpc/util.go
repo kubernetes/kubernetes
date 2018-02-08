@@ -42,8 +42,6 @@ func togRPCError(err error) error {
 		return rpctypes.ErrGRPCCompacted
 	case mvcc.ErrFutureRev:
 		return rpctypes.ErrGRPCFutureRev
-	case lease.ErrLeaseNotFound:
-		return rpctypes.ErrGRPCLeaseNotFound
 	case etcdserver.ErrRequestTooLarge:
 		return rpctypes.ErrGRPCRequestTooLarge
 	case etcdserver.ErrNoSpace:
@@ -63,6 +61,8 @@ func togRPCError(err error) error {
 		return rpctypes.ErrGRPCTimeoutDueToConnectionLost
 	case etcdserver.ErrUnhealthy:
 		return rpctypes.ErrGRPCUnhealthy
+	case etcdserver.ErrKeyNotFound:
+		return rpctypes.ErrGRPCKeyNotFound
 
 	case lease.ErrLeaseNotFound:
 		return rpctypes.ErrGRPCLeaseNotFound
@@ -95,6 +95,8 @@ func togRPCError(err error) error {
 		return rpctypes.ErrGRPCAuthNotEnabled
 	case auth.ErrInvalidAuthToken:
 		return rpctypes.ErrGRPCInvalidAuthToken
+	case auth.ErrInvalidAuthMgmt:
+		return rpctypes.ErrGRPCInvalidAuthMgmt
 	default:
 		return grpc.Errorf(codes.Unknown, err.Error())
 	}

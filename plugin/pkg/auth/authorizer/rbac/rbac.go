@@ -43,7 +43,7 @@ type RequestToRuleMapper interface {
 	// VisitRulesFor invokes visitor() with each rule that applies to a given user in a given namespace,
 	// and each error encountered resolving those rules. Rule may be nil if err is non-nil.
 	// If visitor() returns false, visiting is short-circuited.
-	VisitRulesFor(user user.Info, namespace string, visitor func(rule *rbac.PolicyRule, err error) bool)
+	VisitRulesFor(user user.Info, namespace string, visitor func(source fmt.Stringer, rule *rbac.PolicyRule, err error) bool)
 }
 
 type RBACAuthorizer struct {
@@ -55,12 +55,14 @@ type authorizingVisitor struct {
 	requestAttributes authorizer.Attributes
 
 	allowed bool
+	reason  string
 	errors  []error
 }
 
-func (v *authorizingVisitor) visit(rule *rbac.PolicyRule, err error) bool {
+func (v *authorizingVisitor) visit(source fmt.Stringer, rule *rbac.PolicyRule, err error) bool {
 	if rule != nil && RuleAllows(v.requestAttributes, rule) {
 		v.allowed = true
+		v.reason = fmt.Sprintf("allowed by %s", source.String())
 		return false
 	}
 	if err != nil {
@@ -69,17 +71,17 @@ func (v *authorizingVisitor) visit(rule *rbac.PolicyRule, err error) bool {
 	return true
 }
 
-func (r *RBACAuthorizer) Authorize(requestAttributes authorizer.Attributes) (bool, string, error) {
+func (r *RBACAuthorizer) Authorize(requestAttributes authorizer.Attributes) (authorizer.Decision, string, error) {
 	ruleCheckingVisitor := &authorizingVisitor{requestAttributes: requestAttributes}
 
 	r.authorizationRuleResolver.VisitRulesFor(requestAttributes.GetUser(), requestAttributes.GetNamespace(), ruleCheckingVisitor.visit)
 	if ruleCheckingVisitor.allowed {
-		return true, "", nil
+		return authorizer.DecisionAllow, ruleCheckingVisitor.reason, nil
 	}
 
 	// Build a detailed log of the denial.
 	// Make the whole block conditional so we don't do a lot of string-building we won't use.
-	if glog.V(2) {
+	if glog.V(5) {
 		var operation string
 		if requestAttributes.IsResourceRequest() {
 			b := &bytes.Buffer{}
@@ -120,7 +122,7 @@ func (r *RBACAuthorizer) Authorize(requestAttributes authorizer.Attributes) (boo
 	if len(ruleCheckingVisitor.errors) > 0 {
 		reason = fmt.Sprintf("%v", utilerrors.NewAggregate(ruleCheckingVisitor.errors))
 	}
-	return false, reason, nil
+	return authorizer.DecisionNoOpinion, reason, nil
 }
 
 func (r *RBACAuthorizer) RulesFor(user user.Info, namespace string) ([]authorizer.ResourceRuleInfo, []authorizer.NonResourceRuleInfo, bool, error) {

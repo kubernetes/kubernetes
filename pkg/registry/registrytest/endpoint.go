@@ -25,7 +25,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/watch"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/apiserver/pkg/registry/rest"
+	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
 // Registry is an interface for things that know how to store endpoints.
@@ -66,7 +67,7 @@ func (e *EndpointRegistry) WatchEndpoints(ctx genericapirequest.Context, options
 	return nil, fmt.Errorf("unimplemented!")
 }
 
-func (e *EndpointRegistry) UpdateEndpoints(ctx genericapirequest.Context, endpoints *api.Endpoints) error {
+func (e *EndpointRegistry) UpdateEndpoints(ctx genericapirequest.Context, endpoints *api.Endpoints, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) error {
 	// TODO: support namespaces in this mock
 	e.lock.Lock()
 	defer e.lock.Unlock()

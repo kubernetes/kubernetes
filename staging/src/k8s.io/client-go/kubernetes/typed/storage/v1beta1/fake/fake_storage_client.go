@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2018 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -28,6 +28,10 @@ type FakeStorageV1beta1 struct {
 
 func (c *FakeStorageV1beta1) StorageClasses() v1beta1.StorageClassInterface {
 	return &FakeStorageClasses{c}
+}
+
+func (c *FakeStorageV1beta1) VolumeAttachments() v1beta1.VolumeAttachmentInterface {
+	return &FakeVolumeAttachments{c}
 }
 
 // RESTClient returns a RESTClient that is used to communicate

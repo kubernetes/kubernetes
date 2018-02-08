@@ -13,8 +13,8 @@ go_test(
         "round_trippers_test.go",
         "transport_test.go",
     ],
+    embed = [":go_default_library"],
     importpath = "k8s.io/client-go/transport",
-    library = ":go_default_library",
 )
 
 go_library(
@@ -28,9 +28,6 @@ go_library(
     importpath = "k8s.io/client-go/transport",
     deps = [
         "//vendor/github.com/golang/glog:go_default_library",
-        "//vendor/github.com/gregjones/httpcache:go_default_library",
-        "//vendor/github.com/gregjones/httpcache/diskcache:go_default_library",
-        "//vendor/github.com/peterbourgon/diskv:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/net:go_default_library",
     ],
 )

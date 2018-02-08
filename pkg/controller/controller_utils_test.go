@@ -41,9 +41,9 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	utiltesting "k8s.io/client-go/util/testing"
-	_ "k8s.io/kubernetes/pkg/api/install"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	"k8s.io/kubernetes/pkg/controller/testutil"
 	"k8s.io/kubernetes/pkg/securitycontext"
 
@@ -437,10 +437,6 @@ func TestActiveReplicaSetsFiltering(t *testing.T) {
 		"expected %v, got %v", expectedNames.List(), gotNames.List())
 	assert.Equal(t, 0, gotNames.Difference(expectedNames).Len(),
 		"expected %v, got %v", expectedNames.List(), gotNames.List())
-}
-
-func int64P(num int64) *int64 {
-	return &num
 }
 
 func TestComputeHash(t *testing.T) {

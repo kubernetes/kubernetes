@@ -50,7 +50,7 @@ type StatsProvider interface {
 	//
 	// GetCgroupStats returns the stats and the networking usage of the cgroup
 	// with the specified cgroupName.
-	GetCgroupStats(cgroupName string) (*statsapi.ContainerStats, *statsapi.NetworkStats, error)
+	GetCgroupStats(cgroupName string, updateStats bool) (*statsapi.ContainerStats, *statsapi.NetworkStats, error)
 	// RootFsStats returns the stats of the node root filesystem.
 	RootFsStats() (*statsapi.FsStats, error)
 
@@ -183,7 +183,9 @@ func (h *handler) handleStats(request *restful.Request, response *restful.Respon
 
 // Handles stats summary requests to /stats/summary
 func (h *handler) handleSummary(request *restful.Request, response *restful.Response) {
-	summary, err := h.summaryProvider.Get()
+	// external calls to the summary API use cached stats
+	forceStatsUpdate := false
+	summary, err := h.summaryProvider.Get(forceStatsUpdate)
 	if err != nil {
 		handleError(response, "/stats/summary", err)
 	} else {

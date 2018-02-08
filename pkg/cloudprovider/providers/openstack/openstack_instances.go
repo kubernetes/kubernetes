@@ -17,6 +17,7 @@ limitations under the License.
 package openstack
 
 import (
+	"context"
 	"fmt"
 	"regexp"
 
@@ -29,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider"
 )
 
+// Instances encapsulates an implementation of Instances for OpenStack.
 type Instances struct {
 	compute *gophercloud.ServiceClient
 	opts    MetadataOpts
@@ -43,7 +45,7 @@ func (os *OpenStack) Instances() (cloudprovider.Instances, bool) {
 		return nil, false
 	}
 
-	glog.V(1).Info("Claiming to support Instances")
+	glog.V(4).Info("Claiming to support Instances")
 
 	return &Instances{
 		compute: compute,
@@ -51,21 +53,23 @@ func (os *OpenStack) Instances() (cloudprovider.Instances, bool) {
 	}, true
 }
 
-// Implementation of Instances.CurrentNodeName
+// CurrentNodeName implements Instances.CurrentNodeName
 // Note this is *not* necessarily the same as hostname.
-func (i *Instances) CurrentNodeName(hostname string) (types.NodeName, error) {
+func (i *Instances) CurrentNodeName(ctx context.Context, hostname string) (types.NodeName, error) {
 	md, err := getMetadata(i.opts.SearchOrder)
 	if err != nil {
 		return "", err
 	}
-	return types.NodeName(md.Name), nil
+	return types.NodeName(md.Hostname), nil
 }
 
-func (i *Instances) AddSSHKeyToAllInstances(user string, keyData []byte) error {
+// AddSSHKeyToAllInstances is not implemented for OpenStack
+func (i *Instances) AddSSHKeyToAllInstances(ctx context.Context, user string, keyData []byte) error {
 	return cloudprovider.NotImplemented
 }
 
-func (i *Instances) NodeAddresses(name types.NodeName) ([]v1.NodeAddress, error) {
+// NodeAddresses implements Instances.NodeAddresses
+func (i *Instances) NodeAddresses(ctx context.Context, name types.NodeName) ([]v1.NodeAddress, error) {
 	glog.V(4).Infof("NodeAddresses(%v) called", name)
 
 	addrs, err := getAddressesByName(i.compute, name)
@@ -80,7 +84,7 @@ func (i *Instances) NodeAddresses(name types.NodeName) ([]v1.NodeAddress, error)
 // NodeAddressesByProviderID returns the node addresses of an instances with the specified unique providerID
 // This method will not be called from the node that is requesting this ID. i.e. metadata service
 // and other local methods cannot be used here
-func (i *Instances) NodeAddressesByProviderID(providerID string) ([]v1.NodeAddress, error) {
+func (i *Instances) NodeAddressesByProviderID(ctx context.Context, providerID string) ([]v1.NodeAddress, error) {
 	instanceID, err := instanceIDFromProviderID(providerID)
 
 	if err != nil {
@@ -102,8 +106,8 @@ func (i *Instances) NodeAddressesByProviderID(providerID string) ([]v1.NodeAddre
 }
 
 // ExternalID returns the cloud provider ID of the specified instance (deprecated).
-func (i *Instances) ExternalID(name types.NodeName) (string, error) {
-	srv, err := getServerByName(i.compute, name)
+func (i *Instances) ExternalID(ctx context.Context, name types.NodeName) (string, error) {
+	srv, err := getServerByName(i.compute, name, true)
 	if err != nil {
 		if err == ErrNotFound {
 			return "", cloudprovider.InstanceNotFound
@@ -115,8 +119,26 @@ func (i *Instances) ExternalID(name types.NodeName) (string, error) {
 
 // InstanceExistsByProviderID returns true if the instance with the given provider id still exists and is running.
 // If false is returned with no error, the instance will be immediately deleted by the cloud controller manager.
-func (i *Instances) InstanceExistsByProviderID(providerID string) (bool, error) {
-	return false, cloudprovider.NotImplemented
+func (i *Instances) InstanceExistsByProviderID(ctx context.Context, providerID string) (bool, error) {
+	instanceID, err := instanceIDFromProviderID(providerID)
+	if err != nil {
+		return false, err
+	}
+
+	server, err := servers.Get(i.compute, instanceID).Extract()
+	if err != nil {
+		if isNotFound(err) {
+			return false, nil
+		}
+		return false, err
+	}
+
+	if server.Status != "ACTIVE" {
+		glog.Warningf("the instance %s is not active", instanceID)
+		return false, nil
+	}
+
+	return true, nil
 }
 
 // InstanceID returns the kubelet's cloud provider ID.
@@ -132,8 +154,8 @@ func (os *OpenStack) InstanceID() (string, error) {
 }
 
 // InstanceID returns the cloud provider ID of the specified instance.
-func (i *Instances) InstanceID(name types.NodeName) (string, error) {
-	srv, err := getServerByName(i.compute, name)
+func (i *Instances) InstanceID(ctx context.Context, name types.NodeName) (string, error) {
+	srv, err := getServerByName(i.compute, name, true)
 	if err != nil {
 		if err == ErrNotFound {
 			return "", cloudprovider.InstanceNotFound
@@ -148,7 +170,7 @@ func (i *Instances) InstanceID(name types.NodeName) (string, error) {
 // InstanceTypeByProviderID returns the cloudprovider instance type of the node with the specified unique providerID
 // This method will not be called from the node that is requesting this ID. i.e. metadata service
 // and other local methods cannot be used here
-func (i *Instances) InstanceTypeByProviderID(providerID string) (string, error) {
+func (i *Instances) InstanceTypeByProviderID(ctx context.Context, providerID string) (string, error) {
 	instanceID, err := instanceIDFromProviderID(providerID)
 
 	if err != nil {
@@ -165,8 +187,8 @@ func (i *Instances) InstanceTypeByProviderID(providerID string) (string, error) 
 }
 
 // InstanceType returns the type of the specified instance.
-func (i *Instances) InstanceType(name types.NodeName) (string, error) {
-	srv, err := getServerByName(i.compute, name)
+func (i *Instances) InstanceType(ctx context.Context, name types.NodeName) (string, error) {
+	srv, err := getServerByName(i.compute, name, true)
 
 	if err != nil {
 		return "", err
@@ -194,9 +216,9 @@ func srvInstanceType(srv *servers.Server) (string, error) {
 // See cloudprovider.GetInstanceProviderID and Instances.InstanceID.
 func instanceIDFromProviderID(providerID string) (instanceID string, err error) {
 	// If Instances.InstanceID or cloudprovider.GetInstanceProviderID is changed, the regexp should be changed too.
-	var providerIdRegexp = regexp.MustCompile(`^` + ProviderName + `:///([^/]+)$`)
+	var providerIDRegexp = regexp.MustCompile(`^` + ProviderName + `:///([^/]+)$`)
 
-	matches := providerIdRegexp.FindStringSubmatch(providerID)
+	matches := providerIDRegexp.FindStringSubmatch(providerID)
 	if len(matches) != 2 {
 		return "", fmt.Errorf("ProviderID \"%s\" didn't match expected format \"openstack:///InstanceID\"", providerID)
 	}

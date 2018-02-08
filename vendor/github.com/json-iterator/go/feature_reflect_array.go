@@ -21,7 +21,7 @@ func encoderOfArray(cfg *frozenConfig, typ reflect.Type) (ValEncoder, error) {
 		return nil, err
 	}
 	if typ.Elem().Kind() == reflect.Map {
-		encoder = &optionalEncoder{encoder}
+		encoder = &OptionalEncoder{encoder}
 	}
 	return &arrayEncoder{typ, typ.Elem(), encoder}, nil
 }

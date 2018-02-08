@@ -54,6 +54,10 @@ func TestFindField(t *testing.T) {
 			path: []string{"field1", "what?"},
 			err:  `field "what?" does not exist`,
 		},
+		{
+			path: []string{"field1", ""},
+			err:  `field "" does not exist`,
+		},
 	}
 
 	for _, test := range tests {
@@ -69,9 +73,9 @@ func TestFindField(t *testing.T) {
 			gotPath = path.GetPath().String()
 		}
 
-		if gotErr != test.err && gotPath != test.expectedPath {
-			t.Errorf("LookupSchemaForField(schema, %v) = (%v, %v), expected (%s, %v)",
-				test.path, gotErr, gotPath, test.expectedPath, test.err)
+		if gotErr != test.err || gotPath != test.expectedPath {
+			t.Errorf("LookupSchemaForField(schema, %v) = (path: %q, err: %q), expected (path: %q, err: %q)",
+				test.path, gotPath, gotErr, test.expectedPath, test.err)
 		}
 	}
 }

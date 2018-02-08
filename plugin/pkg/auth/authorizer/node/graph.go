@@ -19,9 +19,9 @@ package node
 import (
 	"sync"
 
-	"k8s.io/kubernetes/pkg/api"
 	pvutil "k8s.io/kubernetes/pkg/api/persistentvolume"
 	podutil "k8s.io/kubernetes/pkg/api/pod"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/third_party/forked/gonum/graph"
 	"k8s.io/kubernetes/third_party/forked/gonum/graph/simple"
 )
@@ -106,6 +106,7 @@ const (
 	pvcVertexType
 	pvVertexType
 	secretVertexType
+	vaVertexType
 )
 
 var vertexTypes = map[vertexType]string{
@@ -115,6 +116,7 @@ var vertexTypes = map[vertexType]string{
 	pvcVertexType:       "pvc",
 	pvVertexType:        "pv",
 	secretVertexType:    "secret",
+	vaVertexType:        "volumeattachment",
 }
 
 // must be called under a write lock
@@ -262,4 +264,27 @@ func (g *Graph) DeletePV(name string) {
 	g.lock.Lock()
 	defer g.lock.Unlock()
 	g.deleteVertex_locked(pvVertexType, "", name)
+}
+
+// AddVolumeAttachment sets up edges for the following relationships:
+//
+//   volume attachment -> node
+func (g *Graph) AddVolumeAttachment(attachmentName, nodeName string) {
+	g.lock.Lock()
+	defer g.lock.Unlock()
+
+	// clear existing edges
+	g.deleteVertex_locked(vaVertexType, "", attachmentName)
+
+	// if we have a node, establish new edges
+	if len(nodeName) > 0 {
+		vaVertex := g.getOrCreateVertex_locked(vaVertexType, "", attachmentName)
+		nodeVertex := g.getOrCreateVertex_locked(nodeVertexType, "", nodeName)
+		g.graph.SetEdge(newDestinationEdge(vaVertex, nodeVertex, nodeVertex))
+	}
+}
+func (g *Graph) DeleteVolumeAttachment(name string) {
+	g.lock.Lock()
+	defer g.lock.Unlock()
+	g.deleteVertex_locked(vaVertexType, "", name)
 }

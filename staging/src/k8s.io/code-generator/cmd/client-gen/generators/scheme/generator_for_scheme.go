@@ -35,6 +35,7 @@ type GenScheme struct {
 	generator.DefaultGen
 	OutputPackage   string
 	Groups          []clientgentypes.GroupVersions
+	GroupGoNames    map[clientgentypes.GroupVersion]string
 	InputPackages   map[clientgentypes.GroupVersion]string
 	OutputPath      string
 	ImportTracker   namer.ImportTracker
@@ -60,17 +61,18 @@ func (g *GenScheme) Imports(c *generator.Context) (imports []string) {
 	imports = append(imports, g.ImportTracker.ImportLines()...)
 	for _, group := range g.Groups {
 		for _, version := range group.Versions {
-			packagePath := g.InputPackages[clientgentypes.GroupVersion{Group: group.Group, Version: version}]
+			packagePath := g.InputPackages[clientgentypes.GroupVersion{Group: group.Group, Version: version.Version}]
+			groupAlias := strings.ToLower(g.GroupGoNames[clientgentypes.GroupVersion{group.Group, version.Version}])
 			if g.CreateRegistry {
 				// import the install package for internal clientsets instead of the type package with register.go
-				if version != "" {
+				if version.Version != "" {
 					packagePath = filepath.Dir(packagePath)
 				}
 				packagePath = filepath.Join(packagePath, "install")
-				imports = append(imports, strings.ToLower(fmt.Sprintf("%s \"%s\"", group.Group.NonEmpty(), path.Vendorless(packagePath))))
+				imports = append(imports, strings.ToLower(fmt.Sprintf("%s \"%s\"", groupAlias, path.Vendorless(packagePath))))
 				break
 			} else {
-				imports = append(imports, strings.ToLower(fmt.Sprintf("%s%s \"%s\"", group.Group.NonEmpty(), version.NonEmpty(), path.Vendorless(packagePath))))
+				imports = append(imports, strings.ToLower(fmt.Sprintf("%s%s \"%s\"", groupAlias, version.Version.NonEmpty(), path.Vendorless(packagePath))))
 			}
 		}
 	}
@@ -80,8 +82,8 @@ func (g *GenScheme) Imports(c *generator.Context) (imports []string) {
 func (g *GenScheme) GenerateType(c *generator.Context, t *types.Type, w io.Writer) error {
 	sw := generator.NewSnippetWriter(w, c, "$", "$")
 
-	allGroupVersions := clientgentypes.ToGroupVersionPackages(g.Groups)
-	allInstallGroups := clientgentypes.ToGroupInstallPackages(g.Groups)
+	allGroupVersions := clientgentypes.ToGroupVersionInfo(g.Groups, g.GroupGoNames)
+	allInstallGroups := clientgentypes.ToGroupInstallPackages(g.Groups, g.GroupGoNames)
 
 	m := map[string]interface{}{
 		"allGroupVersions":                 allGroupVersions,
@@ -147,9 +149,12 @@ func init() {
 
 // Install registers the API group and adds types to a scheme
 func Install(groupFactoryRegistry $.announcedAPIGroupFactoryRegistry|raw$, registry *$.registeredAPIRegistrationManager|raw$, scheme *$.runtimeScheme|raw$) {
-	$range .allInstallGroups$ $.InstallPackageName$.Install(groupFactoryRegistry, registry, scheme)
-	$end$
-	$if .customRegister$ExtraInstall(groupFactoryRegistry, registry, scheme)$end$
+	$- range .allInstallGroups$
+	$.InstallPackageAlias$.Install(groupFactoryRegistry, registry, scheme)
+	$- end$
+	$if .customRegister$
+	ExtraInstall(groupFactoryRegistry, registry, scheme)
+	$end -$
 }
 `
 
@@ -166,7 +171,7 @@ func init() {
 //
 //   import (
 //     "k8s.io/client-go/kubernetes"
-//     clientsetscheme "k8s.io/client-go/kuberentes/scheme"
+//     clientsetscheme "k8s.io/client-go/kubernetes/scheme"
 //     aggregatorclientsetscheme "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/scheme"
 //   )
 //
@@ -176,8 +181,11 @@ func init() {
 // After this, RawExtensions in Kubernetes types will serialize kube-aggregator types
 // correctly.
 func AddToScheme(scheme *$.runtimeScheme|raw$) {
-	$range .allGroupVersions$ $.PackageName$.AddToScheme(scheme)
-	$end$
-	$if .customRegister$ExtraAddToScheme(scheme)$end$
+	$- range .allGroupVersions$
+	$.PackageAlias$.AddToScheme(scheme)
+	$- end$
+	$if .customRegister$
+	ExtraAddToScheme(scheme)
+	$end -$
 }
 `

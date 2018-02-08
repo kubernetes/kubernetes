@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2018 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,6 +19,8 @@ limitations under the License.
 package v1alpha1
 
 import (
+	time "time"
+
 	scheduling_v1alpha1 "k8s.io/api/scheduling/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
@@ -27,7 +29,6 @@ import (
 	kubernetes "k8s.io/client-go/kubernetes"
 	v1alpha1 "k8s.io/client-go/listers/scheduling/v1alpha1"
 	cache "k8s.io/client-go/tools/cache"
-	time "time"
 )
 
 // PriorityClassInformer provides access to a shared informer and lister for
@@ -38,19 +39,33 @@ type PriorityClassInformer interface {
 }
 
 type priorityClassInformer struct {
-	factory internalinterfaces.SharedInformerFactory
+	factory          internalinterfaces.SharedInformerFactory
+	tweakListOptions internalinterfaces.TweakListOptionsFunc
 }
 
 // NewPriorityClassInformer constructs a new informer for PriorityClass type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
 func NewPriorityClassInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return NewFilteredPriorityClassInformer(client, resyncPeriod, indexers, nil)
+}
+
+// NewFilteredPriorityClassInformer constructs a new informer for PriorityClass type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewFilteredPriorityClassInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
+				if tweakListOptions != nil {
+					tweakListOptions(&options)
+				}
 				return client.SchedulingV1alpha1().PriorityClasses().List(options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
+				if tweakListOptions != nil {
+					tweakListOptions(&options)
+				}
 				return client.SchedulingV1alpha1().PriorityClasses().Watch(options)
 			},
 		},
@@ -60,12 +75,12 @@ func NewPriorityClassInformer(client kubernetes.Interface, resyncPeriod time.Dur
 	)
 }
 
-func defaultPriorityClassInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewPriorityClassInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+func (f *priorityClassInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewFilteredPriorityClassInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
 func (f *priorityClassInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&scheduling_v1alpha1.PriorityClass{}, defaultPriorityClassInformer)
+	return f.factory.InformerFor(&scheduling_v1alpha1.PriorityClass{}, f.defaultInformer)
 }
 
 func (f *priorityClassInformer) Lister() v1alpha1.PriorityClassLister {

@@ -76,7 +76,7 @@ func (attacher *vsphereVMDKAttacher) Attach(spec *volume.Spec, nodeName types.No
 
 	// vsphereCloud.AttachDisk checks if disk is already attached to host and
 	// succeeds in that case, so no need to do that separately.
-	diskUUID, err := attacher.vsphereVolumes.AttachDisk(volumeSource.VolumePath, volumeSource.StoragePolicyID, nodeName)
+	diskUUID, err := attacher.vsphereVolumes.AttachDisk(volumeSource.VolumePath, volumeSource.StoragePolicyName, nodeName)
 	if err != nil {
 		glog.Errorf("Error attaching volume %q to node %q: %+v", volumeSource.VolumePath, nodeName, err)
 		return "", err
@@ -251,9 +251,9 @@ func (plugin *vsphereVolumePlugin) NewDetacher() (volume.Detacher, error) {
 }
 
 // Detach the given device from the given node.
-func (detacher *vsphereVMDKDetacher) Detach(deviceMountPath string, nodeName types.NodeName) error {
+func (detacher *vsphereVMDKDetacher) Detach(volumeName string, nodeName types.NodeName) error {
 
-	volPath := getVolPathfromDeviceMountPath(deviceMountPath)
+	volPath := getVolPathfromVolumeName(volumeName)
 	attached, err := detacher.vsphereVolumes.DiskIsAttached(volPath, nodeName)
 	if err != nil {
 		// Log error and continue with detach

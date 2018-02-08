@@ -17,6 +17,7 @@ limitations under the License.
 package gce
 
 import (
+	"context"
 	"encoding/json"
 	"reflect"
 	"strings"
@@ -100,7 +101,7 @@ func TestGetRegion(t *testing.T) {
 	if !ok {
 		t.Fatalf("Unexpected missing zones impl")
 	}
-	zone, err := zones.GetZone()
+	zone, err := zones.GetZone(context.TODO())
 	if err != nil {
 		t.Fatalf("unexpected error %v", err)
 	}
@@ -171,42 +172,6 @@ func TestComparingHostURLs(t *testing.T) {
 			t.Errorf("expected link1 and link2 to be equal, got %s and %s", link1, link2)
 		} else if !test.expectEqual && link1 == link2 {
 			t.Errorf("expected link1 and link2 not to be equal, got %s and %s", link1, link2)
-		}
-	}
-}
-
-func TestScrubDNS(t *testing.T) {
-	tcs := []struct {
-		nameserversIn  []string
-		searchesIn     []string
-		nameserversOut []string
-		searchesOut    []string
-	}{
-		{
-			nameserversIn:  []string{"1.2.3.4", "5.6.7.8"},
-			nameserversOut: []string{"1.2.3.4", "5.6.7.8"},
-		},
-		{
-			searchesIn:  []string{"c.prj.internal.", "12345678910.google.internal.", "google.internal."},
-			searchesOut: []string{"c.prj.internal.", "google.internal."},
-		},
-		{
-			searchesIn:  []string{"c.prj.internal.", "12345678910.google.internal.", "zone.c.prj.internal.", "google.internal."},
-			searchesOut: []string{"c.prj.internal.", "zone.c.prj.internal.", "google.internal."},
-		},
-		{
-			searchesIn:  []string{"c.prj.internal.", "12345678910.google.internal.", "zone.c.prj.internal.", "google.internal.", "unexpected"},
-			searchesOut: []string{"c.prj.internal.", "zone.c.prj.internal.", "google.internal.", "unexpected"},
-		},
-	}
-	gce := &GCECloud{}
-	for i := range tcs {
-		n, s := gce.ScrubDNS(tcs[i].nameserversIn, tcs[i].searchesIn)
-		if !reflect.DeepEqual(n, tcs[i].nameserversOut) {
-			t.Errorf("Expected %v, got %v", tcs[i].nameserversOut, n)
-		}
-		if !reflect.DeepEqual(s, tcs[i].searchesOut) {
-			t.Errorf("Expected %v, got %v", tcs[i].searchesOut, s)
 		}
 	}
 }
@@ -341,7 +306,7 @@ func TestGetZoneByProviderID(t *testing.T) {
 		region:    "us-central1",
 	}
 	for _, test := range tests {
-		zone, err := gce.GetZoneByProviderID(test.providerID)
+		zone, err := gce.GetZoneByProviderID(context.TODO(), test.providerID)
 		if (err != nil) != test.fail {
 			t.Errorf("Expected to fail=%t, provider ID %v, tests %s", test.fail, test, test.description)
 		}

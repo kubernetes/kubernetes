@@ -1,6 +1,6 @@
 # etcd/clientv3
 
-[![Godoc](http://img.shields.io/badge/go-documentation-blue.svg?style=flat-square)](https://godoc.org/github.com/coreos/etcd/clientv3)
+[![Godoc](https://img.shields.io/badge/go-documentation-blue.svg?style=flat-square)](https://godoc.org/github.com/coreos/etcd/clientv3)
 
 `etcd/clientv3` is the official Go etcd client for v3.
 
@@ -32,7 +32,7 @@ pass `context.WithTimeout` to APIs:
 
 ```go
 ctx, cancel := context.WithTimeout(context.Background(), timeout)
-resp, err := kvc.Put(ctx, "sample_key", "sample_value")
+resp, err := cli.Put(ctx, "sample_key", "sample_value")
 cancel()
 if err != nil {
     // handle error!
@@ -57,7 +57,7 @@ etcd client returns 2 types of errors:
 Here is the example code to handle client errors:
 
 ```go
-resp, err := kvc.Put(ctx, "", "")
+resp, err := cli.Put(ctx, "", "")
 if err != nil {
 	switch err {
 	case context.Canceled:
@@ -75,6 +75,10 @@ if err != nil {
 ## Metrics
 
 The etcd client optionally exposes RPC metrics through [go-grpc-prometheus](https://github.com/grpc-ecosystem/go-grpc-prometheus). See the [examples](https://github.com/coreos/etcd/blob/master/clientv3/example_metrics_test.go).
+
+## Namespacing
+
+The [namespace](https://godoc.org/github.com/coreos/etcd/clientv3/namespace) package provides `clientv3` interface wrappers to transparently isolate client requests to a user-defined prefix.
 
 ## Examples
 

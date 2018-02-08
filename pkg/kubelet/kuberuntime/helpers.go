@@ -25,8 +25,8 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
+	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
@@ -39,11 +39,6 @@ const (
 	// 100000 is equivalent to 100ms
 	quotaPeriod    = 100 * minQuotaPeriod
 	minQuotaPeriod = 1000
-)
-
-var (
-	// The default dns opt strings
-	defaultDNSOptions = []string{"ndots:5"}
 )
 
 type podsByID []*kubecontainer.Pod
@@ -278,8 +273,40 @@ func (m *kubeGenericRuntimeManager) getSeccompProfileFromAnnotations(annotations
 	if strings.HasPrefix(profile, "localhost/") {
 		name := strings.TrimPrefix(profile, "localhost/")
 		fname := filepath.Join(m.seccompProfileRoot, filepath.FromSlash(name))
-		return fname
+		return "localhost/" + fname
 	}
 
 	return profile
+}
+
+func ipcNamespaceForPod(pod *v1.Pod) runtimeapi.NamespaceMode {
+	if pod != nil && pod.Spec.HostIPC {
+		return runtimeapi.NamespaceMode_NODE
+	}
+	return runtimeapi.NamespaceMode_POD
+}
+
+func networkNamespaceForPod(pod *v1.Pod) runtimeapi.NamespaceMode {
+	if pod != nil && pod.Spec.HostNetwork {
+		return runtimeapi.NamespaceMode_NODE
+	}
+	return runtimeapi.NamespaceMode_POD
+}
+
+func pidNamespaceForPod(pod *v1.Pod) runtimeapi.NamespaceMode {
+	if pod != nil && pod.Spec.HostPID {
+		return runtimeapi.NamespaceMode_NODE
+	}
+	// Note that PID does not default to the zero value
+	return runtimeapi.NamespaceMode_CONTAINER
+}
+
+// namespacesForPod returns the runtimeapi.NamespaceOption for a given pod.
+// An empty or nil pod can be used to get the namespace defaults for v1.Pod.
+func namespacesForPod(pod *v1.Pod) *runtimeapi.NamespaceOption {
+	return &runtimeapi.NamespaceOption{
+		Ipc:     ipcNamespaceForPod(pod),
+		Network: networkNamespaceForPod(pod),
+		Pid:     pidNamespaceForPod(pod),
+	}
 }

@@ -17,11 +17,10 @@ limitations under the License.
 package initialresources
 
 import (
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"math"
 	"sort"
 	"time"
-
-	"k8s.io/kubernetes/pkg/api"
 
 	gce "cloud.google.com/go/compute/metadata"
 	"golang.org/x/oauth2"

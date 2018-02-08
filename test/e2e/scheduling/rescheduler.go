@@ -42,7 +42,7 @@ var _ = SIGDescribe("Rescheduler [Serial]", func() {
 	var totalMillicores int
 
 	BeforeEach(func() {
-		framework.SkipUnlessProviderIs("gce", "gke")
+		framework.Skipf("Rescheduler is being deprecated soon in Kubernetes 1.10")
 		ns = f.Namespace.Name
 		nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
 		nodeCount := len(nodes.Items)
@@ -61,15 +61,15 @@ var _ = SIGDescribe("Rescheduler [Serial]", func() {
 		By("creating a new instance of Dashboard and waiting for Dashboard to be scheduled")
 		label := labels.SelectorFromSet(labels.Set(map[string]string{"k8s-app": "kubernetes-dashboard"}))
 		listOpts := metav1.ListOptions{LabelSelector: label.String()}
-		deployments, err := f.ClientSet.Extensions().Deployments(metav1.NamespaceSystem).List(listOpts)
+		deployments, err := f.ClientSet.ExtensionsV1beta1().Deployments(metav1.NamespaceSystem).List(listOpts)
 		framework.ExpectNoError(err)
 		Expect(len(deployments.Items)).Should(Equal(1))
 
 		deployment := deployments.Items[0]
 		replicas := uint(*(deployment.Spec.Replicas))
 
-		err = framework.ScaleDeployment(f.ClientSet, f.InternalClientset, metav1.NamespaceSystem, deployment.Name, replicas+1, true)
-		defer framework.ExpectNoError(framework.ScaleDeployment(f.ClientSet, f.InternalClientset, metav1.NamespaceSystem, deployment.Name, replicas, true))
+		err = framework.ScaleDeployment(f.ClientSet, f.InternalClientset, f.ScalesGetter, metav1.NamespaceSystem, deployment.Name, replicas+1, true)
+		defer framework.ExpectNoError(framework.ScaleDeployment(f.ClientSet, f.InternalClientset, f.ScalesGetter, metav1.NamespaceSystem, deployment.Name, replicas, true))
 		framework.ExpectNoError(err)
 
 	})
@@ -80,7 +80,7 @@ func reserveAllCpu(f *framework.Framework, id string, millicores int) error {
 	replicas := millicores / 100
 
 	reserveCpu(f, id, 1, 100)
-	framework.ExpectNoError(framework.ScaleRC(f.ClientSet, f.InternalClientset, f.Namespace.Name, id, uint(replicas), false))
+	framework.ExpectNoError(framework.ScaleRC(f.ClientSet, f.InternalClientset, f.ScalesGetter, f.Namespace.Name, id, uint(replicas), false))
 
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(10 * time.Second) {
 		pods, err := framework.GetPodsInNamespace(f.ClientSet, f.Namespace.Name, framework.ImagePullerLabels)

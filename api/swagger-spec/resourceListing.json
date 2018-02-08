@@ -146,6 +146,10 @@
     "description": "API at /apis/storage.k8s.io/v1beta1"
    },
    {
+    "path": "/apis/storage.k8s.io/v1alpha1",
+    "description": "API at /apis/storage.k8s.io/v1alpha1"
+   },
+   {
     "path": "/apis/storage.k8s.io",
     "description": "get information of a group"
    },
@@ -166,11 +170,23 @@
     "description": "get information of a group"
    },
    {
+    "path": "/apis/admissionregistration.k8s.io/v1beta1",
+    "description": "API at /apis/admissionregistration.k8s.io/v1beta1"
+   },
+   {
     "path": "/apis/admissionregistration.k8s.io/v1alpha1",
     "description": "API at /apis/admissionregistration.k8s.io/v1alpha1"
    },
    {
     "path": "/apis/admissionregistration.k8s.io",
+    "description": "get information of a group"
+   },
+   {
+    "path": "/apis/events.k8s.io/v1beta1",
+    "description": "API at /apis/events.k8s.io/v1beta1"
+   },
+   {
+    "path": "/apis/events.k8s.io",
     "description": "get information of a group"
    }
   ],

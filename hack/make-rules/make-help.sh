@@ -24,11 +24,8 @@ readonly reset=$(tput sgr0)
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 ALL_TARGETS=$(make -C "${KUBE_ROOT}" PRINT_HELP=y -rpn | sed -n -e '/^$/ { n ; /^[^ .#][^ ]*:/ { s/:.*$// ; p ; } ; }' | sort)
 CMD_TARGETS=$(ls -l "${KUBE_ROOT}/cmd" |awk '/^d/ {print $NF}')
-PLUGIN_CMD_TARGETS=$(ls -l "${KUBE_ROOT}/plugin/cmd" |awk '/^d/ {print $NF}')
-FED_CMD_TARGETS=$(ls -l "${KUBE_ROOT}/federation/cmd" |awk '/^d/ {print $NF}')
 CMD_FLAG=false
 PLUGIN_CMD_FLAG=false
-FED_CMD_FLAG=false
 
 echo "--------------------------------------------------------------------------------"
 for tar in $ALL_TARGETS; do
@@ -43,36 +40,6 @@ for tar in $ALL_TARGETS; do
 			echo "---------------------------------------------------------------------------------"
 
 			CMD_FLAG=true
-			continue 2
-		fi
-	done
-
-	for plugincmdtar in $PLUGIN_CMD_TARGETS; do
-		if [ $tar = $plugincmdtar ]; then
-			if [ $PLUGIN_CMD_FLAG = true ]; then
-				continue 2;
-			fi
-
-			echo -e "${red}${PLUGIN_CMD_TARGETS}${reset}"
-			make -C "${KUBE_ROOT}" $tar PRINT_HELP=y
-			echo "---------------------------------------------------------------------------------"
-
-			PLUGIN_CMD_FLAG=true
-			continue 2
-		fi
-	done
-
-	for fedcmdtar in $FED_CMD_TARGETS; do
-		if [ $tar = $fedcmdtar ]; then
-			if [ $FED_CMD_FLAG = true ]; then
-				continue 2;
-			fi
-
-			echo -e "${red}${FED_CMD_TARGETS}${reset}"
-			make -C "${KUBE_ROOT}" $tar PRINT_HELP=y
-			echo "---------------------------------------------------------------------------------"
-
-			FED_CMD_FLAG=true
 			continue 2
 		fi
 	done

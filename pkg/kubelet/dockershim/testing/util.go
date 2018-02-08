@@ -17,9 +17,8 @@ limitations under the License.
 package testing
 
 import (
+	"fmt"
 	"sync"
-
-	"k8s.io/kubernetes/pkg/kubelet/dockershim/errors"
 )
 
 // MemStore is an implementation of CheckpointStore interface which stores checkpoint in memory.
@@ -44,7 +43,7 @@ func (mstore *MemStore) Read(key string) ([]byte, error) {
 	defer mstore.Unlock()
 	data, ok := mstore.mem[key]
 	if !ok {
-		return nil, errors.CheckpointNotFoundError
+		return nil, fmt.Errorf("checkpoint is not found")
 	}
 	return data, nil
 }

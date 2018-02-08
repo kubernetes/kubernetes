@@ -33,7 +33,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/configmap"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
-	"k8s.io/kubernetes/pkg/kubelet/pod"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	podtest "k8s.io/kubernetes/pkg/kubelet/pod/testing"
 	"k8s.io/kubernetes/pkg/kubelet/secret"
@@ -213,7 +212,7 @@ func TestGetExtraSupplementalGroupsForPod(t *testing.T) {
 	}
 }
 
-func newTestVolumeManager(tmpDir string, podManager pod.Manager, kubeClient clientset.Interface) VolumeManager {
+func newTestVolumeManager(tmpDir string, podManager kubepod.Manager, kubeClient clientset.Interface) VolumeManager {
 	plug := &volumetest.FakeVolumePlugin{PluginName: "fake", Host: nil}
 	fakeRecorder := &record.FakeRecorder{}
 	plugMgr := &volume.VolumePluginMgr{}
@@ -324,11 +323,11 @@ func delayClaimBecomesBound(
 ) {
 	time.Sleep(500 * time.Millisecond)
 	volumeClaim, _ :=
-		kubeClient.Core().PersistentVolumeClaims(namespace).Get(claimName, metav1.GetOptions{})
+		kubeClient.CoreV1().PersistentVolumeClaims(namespace).Get(claimName, metav1.GetOptions{})
 	volumeClaim.Status = v1.PersistentVolumeClaimStatus{
 		Phase: v1.ClaimBound,
 	}
-	kubeClient.Core().PersistentVolumeClaims(namespace).Update(volumeClaim)
+	kubeClient.CoreV1().PersistentVolumeClaims(namespace).Update(volumeClaim)
 	return
 }
 

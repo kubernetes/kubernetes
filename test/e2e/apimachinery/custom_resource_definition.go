@@ -33,7 +33,12 @@ var _ = SIGDescribe("CustomResourceDefinition resources", func() {
 	f := framework.NewDefaultFramework("custom-resource-definition")
 
 	Context("Simple CustomResourceDefinition", func() {
-		It("creating/deleting custom resource definition objects works [Conformance]", func() {
+		/*
+			   	   Testname: crd-creation-test
+			   	   Description: Create a random Custom Resource Definition and make sure
+				   the API returns success.
+		*/
+		framework.ConformanceIt("creating/deleting custom resource definition objects works ", func() {
 
 			framework.SkipUnlessServerVersionGTE(crdVersion, f.ClientSet.Discovery())
 

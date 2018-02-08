@@ -28,12 +28,12 @@ import (
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 )
 
-func TestChecker(t *testing.T) {
-	tim := &user.DefaultInfo{
+var (
+	tim = &user.DefaultInfo{
 		Name:   "tim@k8s.io",
 		Groups: []string{"humans", "developers"},
 	}
-	attrs := map[string]authorizer.Attributes{
+	attrs = map[string]authorizer.Attributes{
 		"namespaced": &authorizer.AttributesRecord{
 			User:            tim,
 			Verb:            "get",
@@ -75,7 +75,7 @@ func TestChecker(t *testing.T) {
 		},
 	}
 
-	rules := map[string]audit.PolicyRule{
+	rules = map[string]audit.PolicyRule{
 		"default": {
 			Level: audit.LevelMetadata,
 		},
@@ -151,65 +151,165 @@ func TestChecker(t *testing.T) {
 			},
 		},
 	}
+)
 
-	test := func(req string, expLevel audit.Level, expOmitStages []audit.Stage, ruleNames ...string) {
-		policy := audit.Policy{}
-		for _, rule := range ruleNames {
-			require.Contains(t, rules, rule)
-			policy.Rules = append(policy.Rules, rules[rule])
+func test(t *testing.T, req string, expLevel audit.Level, policyStages, expOmitStages []audit.Stage, ruleNames ...string) {
+	policy := audit.Policy{OmitStages: policyStages}
+	for _, rule := range ruleNames {
+		require.Contains(t, rules, rule)
+		policy.Rules = append(policy.Rules, rules[rule])
+	}
+	require.Contains(t, attrs, req)
+	actualLevel, actualOmitStages := NewChecker(&policy).LevelAndStages(attrs[req])
+	assert.Equal(t, expLevel, actualLevel, "request:%s rules:%s", req, strings.Join(ruleNames, ","))
+	assert.True(t, stageEqual(expOmitStages, actualOmitStages), "request:%s rules:%s, expected stages: %v, actual stages: %v",
+		req, strings.Join(ruleNames, ","), expOmitStages, actualOmitStages)
+}
+
+func testAuditLevel(t *testing.T, stages []audit.Stage) {
+	test(t, "namespaced", audit.LevelMetadata, stages, stages, "default")
+	test(t, "namespaced", audit.LevelNone, stages, stages, "create")
+	test(t, "namespaced", audit.LevelMetadata, stages, stages, "tims")
+	test(t, "namespaced", audit.LevelMetadata, stages, stages, "humans")
+	test(t, "namespaced", audit.LevelNone, stages, stages, "serviceAccounts")
+	test(t, "namespaced", audit.LevelRequestResponse, stages, stages, "getPods")
+	test(t, "namespaced", audit.LevelNone, stages, stages, "getClusterRoles")
+	test(t, "namespaced", audit.LevelNone, stages, stages, "getLogs")
+	test(t, "namespaced", audit.LevelNone, stages, stages, "getMetrics")
+	test(t, "namespaced", audit.LevelMetadata, stages, stages, "getMetrics", "serviceAccounts", "default")
+	test(t, "namespaced", audit.LevelRequestResponse, stages, stages, "getMetrics", "getPods", "default")
+	test(t, "namespaced", audit.LevelRequestResponse, stages, stages, "getPodLogs", "getPods")
+
+	test(t, "cluster", audit.LevelMetadata, stages, stages, "default")
+	test(t, "cluster", audit.LevelNone, stages, stages, "create")
+	test(t, "cluster", audit.LevelMetadata, stages, stages, "tims")
+	test(t, "cluster", audit.LevelMetadata, stages, stages, "humans")
+	test(t, "cluster", audit.LevelNone, stages, stages, "serviceAccounts")
+	test(t, "cluster", audit.LevelNone, stages, stages, "getPods")
+	test(t, "cluster", audit.LevelRequestResponse, stages, stages, "getClusterRoles")
+	test(t, "cluster", audit.LevelRequest, stages, stages, "clusterRoleEdit", "getClusterRoles")
+	test(t, "cluster", audit.LevelNone, stages, stages, "getLogs")
+	test(t, "cluster", audit.LevelNone, stages, stages, "getMetrics")
+	test(t, "cluster", audit.LevelMetadata, stages, stages, "getMetrics", "serviceAccounts", "default")
+	test(t, "cluster", audit.LevelRequestResponse, stages, stages, "getMetrics", "getClusterRoles", "default")
+	test(t, "cluster", audit.LevelNone, stages, stages, "getPodLogs", "getPods")
+
+	test(t, "nonResource", audit.LevelMetadata, stages, stages, "default")
+	test(t, "nonResource", audit.LevelNone, stages, stages, "create")
+	test(t, "nonResource", audit.LevelMetadata, stages, stages, "tims")
+	test(t, "nonResource", audit.LevelMetadata, stages, stages, "humans")
+	test(t, "nonResource", audit.LevelNone, stages, stages, "serviceAccounts")
+	test(t, "nonResource", audit.LevelNone, stages, stages, "getPods")
+	test(t, "nonResource", audit.LevelNone, stages, stages, "getClusterRoles")
+	test(t, "nonResource", audit.LevelRequestResponse, stages, stages, "getLogs")
+	test(t, "nonResource", audit.LevelNone, stages, stages, "getMetrics")
+	test(t, "nonResource", audit.LevelMetadata, stages, stages, "getMetrics", "serviceAccounts", "default")
+	test(t, "nonResource", audit.LevelRequestResponse, stages, stages, "getLogs", "getClusterRoles", "default")
+	test(t, "nonResource", audit.LevelNone, stages, stages, "getPodLogs", "getPods")
+
+	test(t, "subresource", audit.LevelRequest, stages, stages, "getPodLogs", "getPods")
+
+}
+
+func TestChecker(t *testing.T) {
+	testAuditLevel(t, nil)
+
+	// test omitStages pre rule
+	test(t, "namespaced", audit.LevelRequest, nil, []audit.Stage{audit.StageRequestReceived}, "omit RequestReceived", "getPods", "default")
+	test(t, "namespaced", audit.LevelRequest, nil, []audit.Stage{audit.StageRequestReceived, audit.StageResponseStarted, audit.StageResponseComplete}, "only audit panic", "getPods", "default")
+	test(t, "cluster", audit.LevelRequest, nil, []audit.Stage{audit.StageRequestReceived}, "omit RequestReceived", "getPods", "default")
+	test(t, "cluster", audit.LevelRequest, nil, []audit.Stage{audit.StageRequestReceived, audit.StageResponseStarted, audit.StageResponseComplete}, "only audit panic", "getPods", "default")
+	test(t, "nonResource", audit.LevelRequest, nil, []audit.Stage{audit.StageRequestReceived}, "omit RequestReceived", "getPods", "default")
+	test(t, "nonResource", audit.LevelRequest, nil, []audit.Stage{audit.StageRequestReceived, audit.StageResponseStarted, audit.StageResponseComplete}, "only audit panic", "getPods", "default")
+}
+
+func TestCheckerPolicyOmitStages(t *testing.T) {
+	policyStages := []audit.Stage{audit.StageRequestReceived, audit.StageResponseStarted}
+	testAuditLevel(t, policyStages)
+
+	// test omitStages policy wide
+	test(t, "namespaced", audit.LevelRequest, policyStages, []audit.Stage{audit.StageRequestReceived, audit.StageResponseStarted}, "omit RequestReceived", "getPods", "default")
+	test(t, "namespaced", audit.LevelRequest, policyStages, []audit.Stage{audit.StageRequestReceived, audit.StageResponseStarted, audit.StageResponseComplete}, "only audit panic", "getPods", "default")
+	test(t, "cluster", audit.LevelRequest, policyStages, []audit.Stage{audit.StageRequestReceived, audit.StageResponseStarted}, "omit RequestReceived", "getPods", "default")
+	test(t, "cluster", audit.LevelRequest, policyStages, []audit.Stage{audit.StageRequestReceived, audit.StageResponseStarted, audit.StageResponseComplete}, "only audit panic", "getPods", "default")
+	test(t, "nonResource", audit.LevelMetadata, policyStages, []audit.Stage{audit.StageRequestReceived, audit.StageResponseStarted}, "default", "omit RequestReceived", "getPods")
+	test(t, "nonResource", audit.LevelRequest, policyStages, []audit.Stage{audit.StageRequestReceived, audit.StageResponseStarted, audit.StageResponseComplete}, "only audit panic", "getPods", "default")
+}
+
+// stageEqual returns true if s1 and s2 are super set of each other
+func stageEqual(s1, s2 []audit.Stage) bool {
+	m1 := make(map[audit.Stage]bool)
+	m2 := make(map[audit.Stage]bool)
+	for _, s := range s1 {
+		m1[s] = true
+	}
+	for _, s := range s2 {
+		m2[s] = true
+	}
+	if len(m1) != len(m2) {
+		return false
+	}
+	for key, value := range m1 {
+		if m2[key] != value {
+			return false
 		}
-		require.Contains(t, attrs, req)
-		actualLevel, actualOmitStages := NewChecker(&policy).LevelAndStages(attrs[req])
-		assert.Equal(t, expLevel, actualLevel, "request:%s rules:%s", req, strings.Join(ruleNames, ","))
-		assert.Equal(t, expOmitStages, actualOmitStages, "request:%s rules:%s", req, strings.Join(ruleNames, ","))
+	}
+	return true
+}
+
+func TestUnionStages(t *testing.T) {
+	var testCases = []struct {
+		s1, s2, exp []audit.Stage
+	}{
+		{
+			[]audit.Stage{},
+			[]audit.Stage{},
+			[]audit.Stage{},
+		},
+		{
+			[]audit.Stage{audit.StageRequestReceived},
+			[]audit.Stage{},
+			[]audit.Stage{audit.StageRequestReceived},
+		},
+		{
+			[]audit.Stage{audit.StageRequestReceived},
+			[]audit.Stage{audit.StageRequestReceived},
+			[]audit.Stage{audit.StageRequestReceived},
+		},
+		{
+			[]audit.Stage{audit.StageRequestReceived},
+			[]audit.Stage{audit.StageResponseStarted},
+			[]audit.Stage{audit.StageRequestReceived, audit.StageResponseStarted},
+		},
+		{
+			[]audit.Stage{audit.StageRequestReceived, audit.StageRequestReceived},
+			[]audit.Stage{audit.StageRequestReceived, audit.StageRequestReceived},
+			[]audit.Stage{audit.StageRequestReceived},
+		},
+		{
+			[]audit.Stage{audit.StageRequestReceived, audit.StageResponseStarted},
+			[]audit.Stage{audit.StagePanic, audit.StageRequestReceived},
+			[]audit.Stage{audit.StageRequestReceived, audit.StageResponseStarted, audit.StagePanic},
+		},
+		{
+			nil,
+			[]audit.Stage{audit.StageRequestReceived},
+			[]audit.Stage{audit.StageRequestReceived},
+		},
 	}
 
-	test("namespaced", audit.LevelMetadata, nil, "default")
-	test("namespaced", audit.LevelNone, nil, "create")
-	test("namespaced", audit.LevelMetadata, nil, "tims")
-	test("namespaced", audit.LevelMetadata, nil, "humans")
-	test("namespaced", audit.LevelNone, nil, "serviceAccounts")
-	test("namespaced", audit.LevelRequestResponse, nil, "getPods")
-	test("namespaced", audit.LevelNone, nil, "getClusterRoles")
-	test("namespaced", audit.LevelNone, nil, "getLogs")
-	test("namespaced", audit.LevelNone, nil, "getMetrics")
-	test("namespaced", audit.LevelMetadata, nil, "getMetrics", "serviceAccounts", "default")
-	test("namespaced", audit.LevelRequestResponse, nil, "getMetrics", "getPods", "default")
-	test("namespaced", audit.LevelRequestResponse, nil, "getPodLogs", "getPods")
-	test("namespaced", audit.LevelRequest, []audit.Stage{audit.StageRequestReceived}, "omit RequestReceived", "getPods", "default")
-	test("namespaced", audit.LevelRequest, []audit.Stage{audit.StageRequestReceived, audit.StageResponseStarted, audit.StageResponseComplete}, "only audit panic", "getPods", "default")
-
-	test("cluster", audit.LevelMetadata, nil, "default")
-	test("cluster", audit.LevelNone, nil, "create")
-	test("cluster", audit.LevelMetadata, nil, "tims")
-	test("cluster", audit.LevelMetadata, nil, "humans")
-	test("cluster", audit.LevelNone, nil, "serviceAccounts")
-	test("cluster", audit.LevelNone, nil, "getPods")
-	test("cluster", audit.LevelRequestResponse, nil, "getClusterRoles")
-	test("cluster", audit.LevelRequest, nil, "clusterRoleEdit", "getClusterRoles")
-	test("cluster", audit.LevelNone, nil, "getLogs")
-	test("cluster", audit.LevelNone, nil, "getMetrics")
-	test("cluster", audit.LevelMetadata, nil, "getMetrics", "serviceAccounts", "default")
-	test("cluster", audit.LevelRequestResponse, nil, "getMetrics", "getClusterRoles", "default")
-	test("cluster", audit.LevelNone, nil, "getPodLogs", "getPods")
-	test("cluster", audit.LevelRequest, []audit.Stage{audit.StageRequestReceived}, "omit RequestReceived", "getPods", "default")
-	test("cluster", audit.LevelRequest, []audit.Stage{audit.StageRequestReceived, audit.StageResponseStarted, audit.StageResponseComplete}, "only audit panic", "getPods", "default")
-
-	test("nonResource", audit.LevelMetadata, nil, "default")
-	test("nonResource", audit.LevelNone, nil, "create")
-	test("nonResource", audit.LevelMetadata, nil, "tims")
-	test("nonResource", audit.LevelMetadata, nil, "humans")
-	test("nonResource", audit.LevelNone, nil, "serviceAccounts")
-	test("nonResource", audit.LevelNone, nil, "getPods")
-	test("nonResource", audit.LevelNone, nil, "getClusterRoles")
-	test("nonResource", audit.LevelRequestResponse, nil, "getLogs")
-	test("nonResource", audit.LevelNone, nil, "getMetrics")
-	test("nonResource", audit.LevelMetadata, nil, "getMetrics", "serviceAccounts", "default")
-	test("nonResource", audit.LevelRequestResponse, nil, "getLogs", "getClusterRoles", "default")
-	test("nonResource", audit.LevelNone, nil, "getPodLogs", "getPods")
-	test("nonResource", audit.LevelRequest, []audit.Stage{audit.StageRequestReceived}, "omit RequestReceived", "getPods", "default")
-	test("nonResource", audit.LevelRequest, []audit.Stage{audit.StageRequestReceived, audit.StageResponseStarted, audit.StageResponseComplete}, "only audit panic", "getPods", "default")
-
-	test("subresource", audit.LevelRequest, nil, "getPodLogs", "getPods")
-	test("subresource", audit.LevelRequest, nil, "getPods", "getPodLogs")
+	for _, tc := range testCases {
+		result := unionStages(tc.s1, tc.s2)
+		assert.Len(t, result, len(tc.exp))
+		for _, expStage := range tc.exp {
+			ok := false
+			for _, resultStage := range result {
+				if resultStage == expStage {
+					ok = true
+					break
+				}
+			}
+			assert.True(t, ok)
+		}
+	}
 }

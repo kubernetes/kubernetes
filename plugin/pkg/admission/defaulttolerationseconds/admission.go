@@ -23,10 +23,13 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apiserver/pkg/admission"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/helper"
-	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
+	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/apis/core/helper"
+	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 )
+
+// PluginName indicates name of admission plugin.
+const PluginName = "DefaultTolerationSeconds"
 
 var (
 	defaultNotReadyTolerationSeconds = flag.Int64("default-not-ready-toleration-seconds", 300,
@@ -40,29 +43,32 @@ var (
 
 // Register registers a plugin
 func Register(plugins *admission.Plugins) {
-	plugins.Register("DefaultTolerationSeconds", func(config io.Reader) (admission.Interface, error) {
+	plugins.Register(PluginName, func(config io.Reader) (admission.Interface, error) {
 		return NewDefaultTolerationSeconds(), nil
 	})
 }
 
-// plugin contains the client used by the admission controller
+// Plugin contains the client used by the admission controller
 // It will add default tolerations for every pod
 // that tolerate taints `notReady:NoExecute` and `unreachable:NoExecute`,
 // with tolerationSeconds of 300s.
 // If the pod already specifies a toleration for taint `notReady:NoExecute`
 // or `unreachable:NoExecute`, the plugin won't touch it.
-type plugin struct {
+type Plugin struct {
 	*admission.Handler
 }
 
+var _ admission.MutationInterface = &Plugin{}
+
 // NewDefaultTolerationSeconds creates a new instance of the DefaultTolerationSeconds admission controller
-func NewDefaultTolerationSeconds() admission.Interface {
-	return &plugin{
+func NewDefaultTolerationSeconds() *Plugin {
+	return &Plugin{
 		Handler: admission.NewHandler(admission.Create, admission.Update),
 	}
 }
 
-func (p *plugin) Admit(attributes admission.Attributes) (err error) {
+// Admit makes an admission decision based on the request attributes
+func (p *Plugin) Admit(attributes admission.Attributes) (err error) {
 	if attributes.GetResource().GroupResource() != api.Resource("pods") {
 		return nil
 	}

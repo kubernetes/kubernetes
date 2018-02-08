@@ -5,7 +5,7 @@ go_library(
     srcs = ["docker.go"],
     importpath = "github.com/google/cadvisor/utils/docker",
     visibility = ["//visibility:public"],
-    deps = ["//vendor/github.com/docker/engine-api/types:go_default_library"],
+    deps = ["//vendor/github.com/docker/docker/api/types:go_default_library"],
 )
 
 filegroup(

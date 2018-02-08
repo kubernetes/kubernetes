@@ -52,6 +52,23 @@ func FetchConfiguration(client clientset.Interface, w io.Writer, cfgPath string)
 	return versionedcfg, nil
 }
 
+// FetchConfigurationFromFile fetch configuration from a file
+func FetchConfigurationFromFile(cfgPath string) (*kubeadmapiext.MasterConfiguration, error) {
+	// Load the configuration from a file or the cluster
+	configBytes, err := ioutil.ReadFile(cfgPath)
+	if err != nil {
+		return nil, err
+	}
+
+	// Take the versioned configuration populated from the configmap, default it and validate
+	// Return the internal version of the API object
+	versionedcfg, err := bytesToValidatedMasterConfig(configBytes)
+	if err != nil {
+		return nil, fmt.Errorf("could not decode configuration: %v", err)
+	}
+	return versionedcfg, nil
+}
+
 // loadConfigurationBytes loads the configuration byte slice from either a file or the cluster ConfigMap
 func loadConfigurationBytes(client clientset.Interface, w io.Writer, cfgPath string) ([]byte, error) {
 	if cfgPath != "" {
@@ -64,7 +81,7 @@ func loadConfigurationBytes(client clientset.Interface, w io.Writer, cfgPath str
 	configMap, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(constants.MasterConfigurationConfigMap, metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {
 		fmt.Printf("[upgrade/config] In order to upgrade, a ConfigMap called %q in the %s namespace must exist.\n", constants.MasterConfigurationConfigMap, metav1.NamespaceSystem)
-		fmt.Println("[upgrade/config] Without this information, 'kubeadm upgrade' don't how to configure your upgraded cluster.")
+		fmt.Println("[upgrade/config] Without this information, 'kubeadm upgrade' won't know how to configure your upgraded cluster.")
 		fmt.Println("")
 		fmt.Println("[upgrade/config] Next steps:")
 		fmt.Printf("\t- OPTION 1: Run 'kubeadm config upload from-flags' and specify the same CLI arguments you passed to 'kubeadm init' when you created your master.\n")

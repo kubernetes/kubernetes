@@ -16,7 +16,9 @@ limitations under the License.
 
 package util
 
-import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
 
 // IsDefaultStorageClassAnnotation represents a StorageClass annotation that
 // marks a class as the default StorageClass

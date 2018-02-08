@@ -177,15 +177,16 @@ type ObjectMeta struct {
 	// DeletionTimestamp is RFC 3339 date and time at which this resource will be deleted. This
 	// field is set by the server when a graceful deletion is requested by the user, and is not
 	// directly settable by a client. The resource is expected to be deleted (no longer visible
-	// from resource lists, and not reachable by name) after the time in this field. Once set,
-	// this value may not be unset or be set further into the future, although it may be shortened
-	// or the resource may be deleted prior to this time. For example, a user may request that
-	// a pod is deleted in 30 seconds. The Kubelet will react by sending a graceful termination
-	// signal to the containers in the pod. After that 30 seconds, the Kubelet will send a hard
-	// termination signal (SIGKILL) to the container and after cleanup, remove the pod from the
-	// API. In the presence of network partitions, this object may still exist after this
-	// timestamp, until an administrator or automated process can determine the resource is
-	// fully terminated.
+	// from resource lists, and not reachable by name) after the time in this field, once the
+	// finalizers list is empty. As long as the finalizers list contains items, deletion is blocked.
+	// Once the deletionTimestamp is set, this value may not be unset or be set further into the
+	// future, although it may be shortened or the resource may be deleted prior to this time.
+	// For example, a user may request that a pod is deleted in 30 seconds. The Kubelet will react
+	// by sending a graceful termination signal to the containers in the pod. After that 30 seconds,
+	// the Kubelet will send a hard termination signal (SIGKILL) to the container and after cleanup,
+	// remove the pod from the API. In the presence of network partitions, this object may still
+	// exist after this timestamp, until an administrator or automated process can determine the
+	// resource is fully terminated.
 	// If not set, graceful deletion of the object has not been requested.
 	//
 	// Populated by the system when a graceful deletion is requested.
@@ -341,6 +342,7 @@ type ListOptions struct {
 	// +optional
 	ResourceVersion string `json:"resourceVersion,omitempty" protobuf:"bytes,4,opt,name=resourceVersion"`
 	// Timeout for the list/watch call.
+	// This limits the duration of the call, regardless of any activity or inactivity.
 	// +optional
 	TimeoutSeconds *int64 `json:"timeoutSeconds,omitempty" protobuf:"varint,5,opt,name=timeoutSeconds"`
 
@@ -445,6 +447,10 @@ type DeleteOptions struct {
 	// Either this field or OrphanDependents may be set, but not both.
 	// The default policy is decided by the existing finalizer set in the
 	// metadata.finalizers and the resource-specific default policy.
+	// Acceptable values are: 'Orphan' - orphan the dependents; 'Background' -
+	// allow the garbage collector to delete the dependents in the background;
+	// 'Foreground' - a cascading policy that deletes all dependents in the
+	// foreground.
 	// +optional
 	PropagationPolicy *DeletionPropagation `json:"propagationPolicy,omitempty" protobuf:"varint,4,opt,name=propagationPolicy"`
 }
@@ -645,6 +651,18 @@ const (
 	// resource was not supported by the code - for instance, attempting to delete a resource that
 	// can only be created. API calls that return MethodNotAllowed can never succeed.
 	StatusReasonMethodNotAllowed StatusReason = "MethodNotAllowed"
+
+	// StatusReasonNotAcceptable means that the accept types indicated by the client were not acceptable
+	// to the server - for instance, attempting to receive protobuf for a resource that supports only json and yaml.
+	// API calls that return NotAcceptable can never succeed.
+	// Status code 406
+	StatusReasonNotAcceptable StatusReason = "NotAcceptable"
+
+	// StatusReasonUnsupportedMediaType means that the content type sent by the client is not acceptable
+	// to the server - for instance, attempting to send protobuf for a resource that supports only json and yaml.
+	// API calls that return UnsupportedMediaType can never succeed.
+	// Status code 415
+	StatusReasonUnsupportedMediaType StatusReason = "UnsupportedMediaType"
 
 	// StatusReasonInternalError indicates that an internal error occurred, it is unexpected
 	// and the outcome of the call is unknown.

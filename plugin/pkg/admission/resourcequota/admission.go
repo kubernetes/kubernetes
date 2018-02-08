@@ -22,18 +22,21 @@ import (
 	"time"
 
 	"k8s.io/apiserver/pkg/admission"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 	"k8s.io/kubernetes/pkg/quota"
+	"k8s.io/kubernetes/pkg/quota/generic"
 	resourcequotaapi "k8s.io/kubernetes/plugin/pkg/admission/resourcequota/apis/resourcequota"
 	"k8s.io/kubernetes/plugin/pkg/admission/resourcequota/apis/resourcequota/validation"
 )
 
+const PluginName = "ResourceQuota"
+
 // Register registers a plugin
 func Register(plugins *admission.Plugins) {
-	plugins.Register("ResourceQuota",
+	plugins.Register(PluginName,
 		func(config io.Reader) (admission.Interface, error) {
 			// load the configuration provided (if any)
 			configuration, err := LoadConfiguration(config)
@@ -50,19 +53,20 @@ func Register(plugins *admission.Plugins) {
 		})
 }
 
-// quotaAdmission implements an admission controller that can enforce quota constraints
-type quotaAdmission struct {
+// QuotaAdmission implements an admission controller that can enforce quota constraints
+type QuotaAdmission struct {
 	*admission.Handler
-	config        *resourcequotaapi.Configuration
-	stopCh        <-chan struct{}
-	registry      quota.Registry
-	numEvaluators int
-	quotaAccessor *quotaAccessor
-	evaluator     Evaluator
+	config             *resourcequotaapi.Configuration
+	stopCh             <-chan struct{}
+	quotaConfiguration quota.Configuration
+	numEvaluators      int
+	quotaAccessor      *quotaAccessor
+	evaluator          Evaluator
 }
 
-var _ = kubeapiserveradmission.WantsInternalKubeClientSet(&quotaAdmission{})
-var _ = kubeapiserveradmission.WantsQuotaRegistry(&quotaAdmission{})
+var _ admission.ValidationInterface = &QuotaAdmission{}
+var _ = kubeapiserveradmission.WantsInternalKubeClientSet(&QuotaAdmission{})
+var _ = kubeapiserveradmission.WantsQuotaConfiguration(&QuotaAdmission{})
 
 type liveLookupEntry struct {
 	expiry time.Time
@@ -72,13 +76,13 @@ type liveLookupEntry struct {
 // NewResourceQuota configures an admission controller that can enforce quota constraints
 // using the provided registry.  The registry must have the capability to handle group/kinds that
 // are persisted by the server this admission controller is intercepting
-func NewResourceQuota(config *resourcequotaapi.Configuration, numEvaluators int, stopCh <-chan struct{}) (admission.Interface, error) {
+func NewResourceQuota(config *resourcequotaapi.Configuration, numEvaluators int, stopCh <-chan struct{}) (*QuotaAdmission, error) {
 	quotaAccessor, err := newQuotaAccessor()
 	if err != nil {
 		return nil, err
 	}
 
-	return &quotaAdmission{
+	return &QuotaAdmission{
 		Handler:       admission.NewHandler(admission.Create, admission.Update),
 		stopCh:        stopCh,
 		numEvaluators: numEvaluators,
@@ -87,21 +91,21 @@ func NewResourceQuota(config *resourcequotaapi.Configuration, numEvaluators int,
 	}, nil
 }
 
-func (a *quotaAdmission) SetInternalKubeClientSet(client internalclientset.Interface) {
+func (a *QuotaAdmission) SetInternalKubeClientSet(client internalclientset.Interface) {
 	a.quotaAccessor.client = client
 }
 
-func (a *quotaAdmission) SetInternalKubeInformerFactory(f informers.SharedInformerFactory) {
+func (a *QuotaAdmission) SetInternalKubeInformerFactory(f informers.SharedInformerFactory) {
 	a.quotaAccessor.lister = f.Core().InternalVersion().ResourceQuotas().Lister()
 }
 
-func (a *quotaAdmission) SetQuotaRegistry(r quota.Registry) {
-	a.registry = r
-	a.evaluator = NewQuotaEvaluator(a.quotaAccessor, a.registry, nil, a.config, a.numEvaluators, a.stopCh)
+func (a *QuotaAdmission) SetQuotaConfiguration(c quota.Configuration) {
+	a.quotaConfiguration = c
+	a.evaluator = NewQuotaEvaluator(a.quotaAccessor, a.quotaConfiguration.IgnoredResources(), generic.NewRegistry(a.quotaConfiguration.Evaluators()), nil, a.config, a.numEvaluators, a.stopCh)
 }
 
-// Validate ensures an authorizer is set.
-func (a *quotaAdmission) Validate() error {
+// ValidateInitialization ensures an authorizer is set.
+func (a *QuotaAdmission) ValidateInitialization() error {
 	if a.quotaAccessor == nil {
 		return fmt.Errorf("missing quotaAccessor")
 	}
@@ -111,8 +115,8 @@ func (a *quotaAdmission) Validate() error {
 	if a.quotaAccessor.lister == nil {
 		return fmt.Errorf("missing quotaAccessor.lister")
 	}
-	if a.registry == nil {
-		return fmt.Errorf("missing registry")
+	if a.quotaConfiguration == nil {
+		return fmt.Errorf("missing quotaConfiguration")
 	}
 	if a.evaluator == nil {
 		return fmt.Errorf("missing evaluator")
@@ -120,10 +124,14 @@ func (a *quotaAdmission) Validate() error {
 	return nil
 }
 
-// Admit makes admission decisions while enforcing quota
-func (a *quotaAdmission) Admit(attr admission.Attributes) (err error) {
+// Validate makes admission decisions while enforcing quota
+func (a *QuotaAdmission) Validate(attr admission.Attributes) (err error) {
 	// ignore all operations that correspond to sub-resource actions
 	if attr.GetSubresource() != "" {
+		return nil
+	}
+	// ignore all operations that are not namespaced
+	if attr.GetNamespace() == "" {
 		return nil
 	}
 	return a.evaluator.Evaluate(attr)

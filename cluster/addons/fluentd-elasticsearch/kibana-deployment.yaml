@@ -1,4 +1,4 @@
-apiVersion: apps/v1beta2
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: kibana-logging
@@ -19,7 +19,7 @@ spec:
     spec:
       containers:
       - name: kibana-logging
-        image: docker.elastic.co/kibana/kibana:5.6.2
+        image: docker.elastic.co/kibana/kibana:5.6.4
         resources:
           # need more cpu upon initialization, therefore burstable class
           limits:

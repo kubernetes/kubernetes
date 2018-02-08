@@ -42,22 +42,22 @@ type testEnvelopeService struct {
 	keyVersion string
 }
 
-func (t *testEnvelopeService) Decrypt(data string) ([]byte, error) {
+func (t *testEnvelopeService) Decrypt(data []byte) ([]byte, error) {
 	if t.disabled {
 		return nil, fmt.Errorf("Envelope service was disabled")
 	}
-	dataChunks := strings.SplitN(data, ":", 2)
+	dataChunks := strings.SplitN(string(data), ":", 2)
 	if len(dataChunks) != 2 {
 		return nil, fmt.Errorf("invalid data encountered for decryption: %s. Missing key version", data)
 	}
 	return base64.StdEncoding.DecodeString(dataChunks[1])
 }
 
-func (t *testEnvelopeService) Encrypt(data []byte) (string, error) {
+func (t *testEnvelopeService) Encrypt(data []byte) ([]byte, error) {
 	if t.disabled {
-		return "", fmt.Errorf("Envelope service was disabled")
+		return nil, fmt.Errorf("Envelope service was disabled")
 	}
-	return t.keyVersion + ":" + base64.StdEncoding.EncodeToString(data), nil
+	return []byte(t.keyVersion + ":" + base64.StdEncoding.EncodeToString(data)), nil
 }
 
 func (t *testEnvelopeService) SetDisabledStatus(status bool) {

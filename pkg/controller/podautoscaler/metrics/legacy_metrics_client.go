@@ -28,7 +28,6 @@ import (
 
 	autoscaling "k8s.io/api/autoscaling/v2beta1"
 	"k8s.io/api/core/v1"
-	clientgov1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	clientset "k8s.io/client-go/kubernetes"
@@ -54,8 +53,8 @@ type HeapsterMetricsClient struct {
 
 func NewHeapsterMetricsClient(client clientset.Interface, namespace, scheme, service, port string) MetricsClient {
 	return &HeapsterMetricsClient{
-		services:        client.Core().Services(namespace),
-		podsGetter:      client.Core(),
+		services:        client.CoreV1().Services(namespace),
+		podsGetter:      client.CoreV1(),
 		heapsterScheme:  scheme,
 		heapsterService: service,
 		heapsterPort:    port,
@@ -91,7 +90,7 @@ func (h *HeapsterMetricsClient) GetResourceMetric(resource v1.ResourceName, name
 		podSum := int64(0)
 		missing := len(m.Containers) == 0
 		for _, c := range m.Containers {
-			resValue, found := c.Usage[clientgov1.ResourceName(resource)]
+			resValue, found := c.Usage[v1.ResourceName(resource)]
 			if !found {
 				missing = true
 				glog.V(2).Infof("missing resource metric %v for container %s in pod %s/%s", resource, c.Name, namespace, m.Name)

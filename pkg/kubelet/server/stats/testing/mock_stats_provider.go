@@ -33,13 +33,13 @@ type StatsProvider struct {
 	mock.Mock
 }
 
-// GetCgroupStats provides a mock function with given fields: cgroupName
-func (_m *StatsProvider) GetCgroupStats(cgroupName string) (*v1alpha1.ContainerStats, *v1alpha1.NetworkStats, error) {
-	ret := _m.Called(cgroupName)
+// GetCgroupStats provides a mock function with given fields: cgroupName, updateStats
+func (_m *StatsProvider) GetCgroupStats(cgroupName string, updateStats bool) (*v1alpha1.ContainerStats, *v1alpha1.NetworkStats, error) {
+	ret := _m.Called(cgroupName, updateStats)
 
 	var r0 *v1alpha1.ContainerStats
-	if rf, ok := ret.Get(0).(func(string) *v1alpha1.ContainerStats); ok {
-		r0 = rf(cgroupName)
+	if rf, ok := ret.Get(0).(func(string, bool) *v1alpha1.ContainerStats); ok {
+		r0 = rf(cgroupName, updateStats)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*v1alpha1.ContainerStats)
@@ -47,8 +47,8 @@ func (_m *StatsProvider) GetCgroupStats(cgroupName string) (*v1alpha1.ContainerS
 	}
 
 	var r1 *v1alpha1.NetworkStats
-	if rf, ok := ret.Get(1).(func(string) *v1alpha1.NetworkStats); ok {
-		r1 = rf(cgroupName)
+	if rf, ok := ret.Get(1).(func(string, bool) *v1alpha1.NetworkStats); ok {
+		r1 = rf(cgroupName, updateStats)
 	} else {
 		if ret.Get(1) != nil {
 			r1 = ret.Get(1).(*v1alpha1.NetworkStats)
@@ -56,8 +56,8 @@ func (_m *StatsProvider) GetCgroupStats(cgroupName string) (*v1alpha1.ContainerS
 	}
 
 	var r2 error
-	if rf, ok := ret.Get(2).(func(string) error); ok {
-		r2 = rf(cgroupName)
+	if rf, ok := ret.Get(2).(func(string, bool) error); ok {
+		r2 = rf(cgroupName, updateStats)
 	} else {
 		r2 = ret.Error(2)
 	}

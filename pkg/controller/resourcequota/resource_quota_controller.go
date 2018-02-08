@@ -18,6 +18,8 @@ package resourcequota
 
 import (
 	"fmt"
+	"reflect"
+	"sync"
 	"time"
 
 	"github.com/golang/glog"
@@ -27,20 +29,34 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/informers"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
-	"k8s.io/kubernetes/pkg/api"
-	k8s_api_v1 "k8s.io/kubernetes/pkg/api/v1"
+	api "k8s.io/kubernetes/pkg/apis/core"
+	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/quota"
 )
+
+// NamespacedResourcesFunc knows how to discover namespaced resources.
+type NamespacedResourcesFunc func() ([]*metav1.APIResourceList, error)
+
+// ReplenishmentFunc is a signal that a resource changed in specified namespace
+// that may require quota to be recalculated.
+type ReplenishmentFunc func(groupResource schema.GroupResource, namespace string)
+
+// InformerFactory is all the quota system needs to interface with informers.
+type InformerFactory interface {
+	ForResource(resource schema.GroupVersionResource) (informers.GenericInformer, error)
+	Start(stopCh <-chan struct{})
+}
 
 // ResourceQuotaControllerOptions holds options for creating a quota controller
 type ResourceQuotaControllerOptions struct {
@@ -50,15 +66,18 @@ type ResourceQuotaControllerOptions struct {
 	ResourceQuotaInformer coreinformers.ResourceQuotaInformer
 	// Controls full recalculation of quota usage
 	ResyncPeriod controller.ResyncPeriodFunc
-	// Knows how to calculate usage
+	// Maintains evaluators that know how to calculate usage for group resource
 	Registry quota.Registry
-	// Knows how to build controllers that notify replenishment events
-	ControllerFactory ReplenishmentControllerFactory
+	// Discover list of supported resources on the server.
+	DiscoveryFunc NamespacedResourcesFunc
+	// A function that returns the list of resources to ignore
+	IgnoredResourcesFunc func() map[schema.GroupResource]struct{}
+	// InformersStarted knows if informers were started.
+	InformersStarted <-chan struct{}
+	// InformerFactory interfaces with informers.
+	InformerFactory InformerFactory
 	// Controls full resync of objects monitored for replenishment.
 	ReplenishmentResyncPeriod controller.ResyncPeriodFunc
-	// List of GroupKind objects that should be monitored for replenishment at
-	// a faster frequency than the quota controller recalculation interval
-	GroupKindsToReplenish []schema.GroupKind
 }
 
 // ResourceQuotaController is responsible for tracking quota usage status in the system
@@ -79,9 +98,16 @@ type ResourceQuotaController struct {
 	resyncPeriod controller.ResyncPeriodFunc
 	// knows how to calculate usage
 	registry quota.Registry
+	// knows how to monitor all the resources tracked by quota and trigger replenishment
+	quotaMonitor *QuotaMonitor
+	// controls the workers that process quotas
+	// this lock is acquired to control write access to the monitors and ensures that all
+	// monitors are synced before the controller can process quotas.
+	workerLock sync.RWMutex
 }
 
-func NewResourceQuotaController(options *ResourceQuotaControllerOptions) *ResourceQuotaController {
+// NewResourceQuotaController creates a quota controller with specified options
+func NewResourceQuotaController(options *ResourceQuotaControllerOptions) (*ResourceQuotaController, error) {
 	// build the resource quota controller
 	rq := &ResourceQuotaController{
 		rqClient:            options.QuotaClient,
@@ -122,21 +148,33 @@ func NewResourceQuotaController(options *ResourceQuotaControllerOptions) *Resour
 		rq.resyncPeriod(),
 	)
 
-	for _, groupKindToReplenish := range options.GroupKindsToReplenish {
-		controllerOptions := &ReplenishmentControllerOptions{
-			GroupKind:         groupKindToReplenish,
-			ResyncPeriod:      options.ReplenishmentResyncPeriod,
-			ReplenishmentFunc: rq.replenishQuota,
+	if options.DiscoveryFunc != nil {
+		qm := &QuotaMonitor{
+			informersStarted:  options.InformersStarted,
+			informerFactory:   options.InformerFactory,
+			ignoredResources:  options.IgnoredResourcesFunc(),
+			resourceChanges:   workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "resource_quota_controller_resource_changes"),
+			resyncPeriod:      options.ReplenishmentResyncPeriod,
+			replenishmentFunc: rq.replenishQuota,
+			registry:          rq.registry,
 		}
-		replenishmentController, err := options.ControllerFactory.NewController(controllerOptions)
+
+		rq.quotaMonitor = qm
+
+		// do initial quota monitor setup
+		resources, err := GetQuotableResources(options.DiscoveryFunc)
 		if err != nil {
-			glog.Warningf("quota controller unable to replenish %s due to %v, changes only accounted during full resync", groupKindToReplenish, err)
-		} else {
-			// make sure we wait for each shared informer's cache to sync
-			rq.informerSyncedFuncs = append(rq.informerSyncedFuncs, replenishmentController.HasSynced)
+			return nil, err
 		}
+		if err = qm.SyncMonitors(resources); err != nil {
+			utilruntime.HandleError(fmt.Errorf("initial monitor sync has error: %v", err))
+		}
+
+		// only start quota once all informers synced
+		rq.informerSyncedFuncs = append(rq.informerSyncedFuncs, qm.IsSynced)
 	}
-	return rq
+
+	return rq, nil
 }
 
 // enqueueAll is called at the fullResyncPeriod interval to force a full recalculation of quota usage statistics
@@ -186,7 +224,7 @@ func (rq *ResourceQuotaController) addQuota(obj interface{}) {
 	for constraint := range resourceQuota.Status.Hard {
 		if _, usageFound := resourceQuota.Status.Used[constraint]; !usageFound {
 			matchedResources := []api.ResourceName{api.ResourceName(constraint)}
-			for _, evaluator := range rq.registry.Evaluators() {
+			for _, evaluator := range rq.registry.List() {
 				if intersection := evaluator.MatchingResources(matchedResources); len(intersection) > 0 {
 					rq.missingUsageQueue.Add(key)
 					return
@@ -207,6 +245,8 @@ func (rq *ResourceQuotaController) worker(queue workqueue.RateLimitingInterface)
 			return true
 		}
 		defer queue.Done(key)
+		rq.workerLock.RLock()
+		defer rq.workerLock.RUnlock()
 		err := rq.syncHandler(key.(string))
 		if err == nil {
 			queue.Forget(key)
@@ -234,6 +274,10 @@ func (rq *ResourceQuotaController) Run(workers int, stopCh <-chan struct{}) {
 
 	glog.Infof("Starting resource quota controller")
 	defer glog.Infof("Shutting down resource quota controller")
+
+	if rq.quotaMonitor != nil {
+		go rq.quotaMonitor.Run(stopCh)
+	}
 
 	if !controller.WaitForCacheSync("resource quota", stopCh, rq.informerSyncedFuncs...) {
 		return
@@ -267,7 +311,6 @@ func (rq *ResourceQuotaController) syncResourceQuotaFromKey(key string) (err err
 	}
 	if err != nil {
 		glog.Infof("Unable to retrieve resource quota %v from store: %v", key, err)
-		rq.queue.Add(key)
 		return err
 	}
 	return rq.syncResourceQuota(quota)
@@ -279,7 +322,7 @@ func (rq *ResourceQuotaController) syncResourceQuota(v1ResourceQuota *v1.Resourc
 	dirty := !apiequality.Semantic.DeepEqual(v1ResourceQuota.Spec.Hard, v1ResourceQuota.Status.Hard)
 
 	resourceQuota := api.ResourceQuota{}
-	if err := k8s_api_v1.Convert_v1_ResourceQuota_To_api_ResourceQuota(v1ResourceQuota, &resourceQuota, nil); err != nil {
+	if err := k8s_api_v1.Convert_v1_ResourceQuota_To_core_ResourceQuota(v1ResourceQuota, &resourceQuota, nil); err != nil {
 		return err
 	}
 
@@ -326,7 +369,7 @@ func (rq *ResourceQuotaController) syncResourceQuota(v1ResourceQuota *v1.Resourc
 	// there was a change observed by this controller that requires we update quota
 	if dirty {
 		v1Usage := &v1.ResourceQuota{}
-		if err := k8s_api_v1.Convert_api_ResourceQuota_To_v1_ResourceQuota(&usage, v1Usage, nil); err != nil {
+		if err := k8s_api_v1.Convert_core_ResourceQuota_To_v1_ResourceQuota(&usage, v1Usage, nil); err != nil {
 			return err
 		}
 		_, err = rq.rqClient.ResourceQuotas(usage.Namespace).UpdateStatus(v1Usage)
@@ -336,11 +379,10 @@ func (rq *ResourceQuotaController) syncResourceQuota(v1ResourceQuota *v1.Resourc
 }
 
 // replenishQuota is a replenishment function invoked by a controller to notify that a quota should be recalculated
-func (rq *ResourceQuotaController) replenishQuota(groupKind schema.GroupKind, namespace string, object runtime.Object) {
-	// check if the quota controller can evaluate this kind, if not, ignore it altogether...
-	evaluators := rq.registry.Evaluators()
-	evaluator, found := evaluators[groupKind]
-	if !found {
+func (rq *ResourceQuotaController) replenishQuota(groupResource schema.GroupResource, namespace string) {
+	// check if the quota controller can evaluate this groupResource, if not, ignore it altogether...
+	evaluator := rq.registry.Get(groupResource)
+	if evaluator == nil {
 		return
 	}
 
@@ -362,7 +404,7 @@ func (rq *ResourceQuotaController) replenishQuota(groupKind schema.GroupKind, na
 	for i := range resourceQuotas {
 		resourceQuota := resourceQuotas[i]
 		internalResourceQuota := &api.ResourceQuota{}
-		if err := k8s_api_v1.Convert_v1_ResourceQuota_To_api_ResourceQuota(resourceQuota, internalResourceQuota, nil); err != nil {
+		if err := k8s_api_v1.Convert_v1_ResourceQuota_To_core_ResourceQuota(resourceQuota, internalResourceQuota, nil); err != nil {
 			glog.Error(err)
 			continue
 		}
@@ -372,4 +414,71 @@ func (rq *ResourceQuotaController) replenishQuota(groupKind schema.GroupKind, na
 			rq.enqueueResourceQuota(resourceQuota)
 		}
 	}
+}
+
+// Sync periodically resyncs the controller when new resources are observed from discovery.
+func (rq *ResourceQuotaController) Sync(discoveryFunc NamespacedResourcesFunc, period time.Duration, stopCh <-chan struct{}) {
+	// Something has changed, so track the new state and perform a sync.
+	oldResources := make(map[schema.GroupVersionResource]struct{})
+	wait.Until(func() {
+		// Get the current resource list from discovery.
+		newResources, err := GetQuotableResources(discoveryFunc)
+		if err != nil {
+			utilruntime.HandleError(err)
+			return
+		}
+
+		// Decide whether discovery has reported a change.
+		if reflect.DeepEqual(oldResources, newResources) {
+			glog.V(4).Infof("no resource updates from discovery, skipping resource quota sync")
+			return
+		}
+
+		// Something has changed, so track the new state and perform a sync.
+		glog.V(2).Infof("syncing resource quota controller with updated resources from discovery: %v", newResources)
+		oldResources = newResources
+
+		// Ensure workers are paused to avoid processing events before informers
+		// have resynced.
+		rq.workerLock.Lock()
+		defer rq.workerLock.Unlock()
+
+		// Perform the monitor resync and wait for controllers to report cache sync.
+		if err := rq.resyncMonitors(newResources); err != nil {
+			utilruntime.HandleError(fmt.Errorf("failed to sync resource monitors: %v", err))
+			return
+		}
+		if rq.quotaMonitor != nil && !controller.WaitForCacheSync("resource quota", stopCh, rq.quotaMonitor.IsSynced) {
+			utilruntime.HandleError(fmt.Errorf("timed out waiting for quota monitor sync"))
+		}
+	}, period, stopCh)
+}
+
+// resyncMonitors starts or stops quota monitors as needed to ensure that all
+// (and only) those resources present in the map are monitored.
+func (rq *ResourceQuotaController) resyncMonitors(resources map[schema.GroupVersionResource]struct{}) error {
+	if rq.quotaMonitor == nil {
+		return nil
+	}
+
+	if err := rq.quotaMonitor.SyncMonitors(resources); err != nil {
+		return err
+	}
+	rq.quotaMonitor.StartMonitors()
+	return nil
+}
+
+// GetQuotableResources returns all resources that the quota system should recognize.
+// It requires a resource supports the following verbs: 'create','list','delete'
+func GetQuotableResources(discoveryFunc NamespacedResourcesFunc) (map[schema.GroupVersionResource]struct{}, error) {
+	possibleResources, err := discoveryFunc()
+	if err != nil {
+		return nil, fmt.Errorf("failed to discover resources: %v", err)
+	}
+	quotableResources := discovery.FilteredBy(discovery.SupportsAllVerbs{Verbs: []string{"create", "list", "watch", "delete"}}, possibleResources)
+	quotableGroupVersionResources, err := discovery.GroupVersionResources(quotableResources)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to parse resources: %v", err)
+	}
+	return quotableGroupVersionResources, nil
 }

@@ -17,10 +17,8 @@ limitations under the License.
 package group
 
 import (
-	"testing"
-
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	"testing"
 )
 
 func TestMustRunAsOptions(t *testing.T) {
@@ -111,7 +109,6 @@ func TestGenerate(t *testing.T) {
 func TestValidate(t *testing.T) {
 	tests := map[string]struct {
 		ranges []extensions.GroupIDRange
-		pod    *api.Pod
 		groups []int64
 		pass   bool
 	}{

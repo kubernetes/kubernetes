@@ -32,7 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
@@ -48,12 +48,12 @@ func NewSourceFile(path string, nodeName types.NodeName, period time.Duration, u
 	// "golang.org/x/exp/inotify" requires a path without trailing "/"
 	path = strings.TrimRight(path, string(os.PathSeparator))
 
-	config := new(path, nodeName, period, updates)
+	config := newSourceFile(path, nodeName, updates)
 	glog.V(1).Infof("Watching path %q", path)
 	go wait.Forever(config.run, period)
 }
 
-func new(path string, nodeName types.NodeName, period time.Duration, updates chan<- interface{}) *sourceFile {
+func newSourceFile(path string, nodeName types.NodeName, updates chan<- interface{}) *sourceFile {
 	send := func(objs []interface{}) {
 		var pods []*v1.Pod
 		for _, o := range objs {

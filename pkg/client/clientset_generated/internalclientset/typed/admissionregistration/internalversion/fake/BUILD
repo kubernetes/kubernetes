@@ -10,8 +10,9 @@ go_library(
     srcs = [
         "doc.go",
         "fake_admissionregistration_client.go",
-        "fake_externaladmissionhookconfiguration.go",
         "fake_initializerconfiguration.go",
+        "fake_mutatingwebhookconfiguration.go",
+        "fake_validatingwebhookconfiguration.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/admissionregistration/internalversion/fake",
     deps = [

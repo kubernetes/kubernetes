@@ -21,7 +21,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -64,7 +64,8 @@ func addPortFlags(cmd *cobra.Command) {
 // NewCmdCreateServiceClusterIP is a command to create a ClusterIP service
 func NewCmdCreateServiceClusterIP(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "clusterip NAME [--tcp=<port>:<targetPort>] [--dry-run]",
+		Use: "clusterip NAME [--tcp=<port>:<targetPort>] [--dry-run]",
+		DisableFlagsInUseLine: true,
 		Short:   i18n.T("Create a ClusterIP service."),
 		Long:    serviceClusterIPLong,
 		Example: serviceClusterIPExample,
@@ -98,7 +99,7 @@ func CreateServiceClusterIP(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Comm
 		generator = &kubectl.ServiceCommonGeneratorV1{
 			Name:      name,
 			TCP:       cmdutil.GetFlagStringSlice(cmd, "tcp"),
-			Type:      api.ServiceTypeClusterIP,
+			Type:      v1.ServiceTypeClusterIP,
 			ClusterIP: cmdutil.GetFlagString(cmd, "clusterip"),
 		}
 	default:
@@ -124,7 +125,8 @@ var (
 // NewCmdCreateServiceNodePort is a macro command for creating a NodePort service
 func NewCmdCreateServiceNodePort(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "nodeport NAME [--tcp=port:targetPort] [--dry-run]",
+		Use: "nodeport NAME [--tcp=port:targetPort] [--dry-run]",
+		DisableFlagsInUseLine: true,
 		Short:   i18n.T("Create a NodePort service."),
 		Long:    serviceNodePortLong,
 		Example: serviceNodePortExample,
@@ -154,7 +156,7 @@ func CreateServiceNodePort(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Comma
 		generator = &kubectl.ServiceCommonGeneratorV1{
 			Name:      name,
 			TCP:       cmdutil.GetFlagStringSlice(cmd, "tcp"),
-			Type:      api.ServiceTypeNodePort,
+			Type:      v1.ServiceTypeNodePort,
 			ClusterIP: "",
 			NodePort:  cmdutil.GetFlagInt(cmd, "node-port"),
 		}
@@ -181,7 +183,8 @@ var (
 // NewCmdCreateServiceLoadBalancer is a macro command for creating a LoadBalancer service
 func NewCmdCreateServiceLoadBalancer(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "loadbalancer NAME [--tcp=port:targetPort] [--dry-run]",
+		Use: "loadbalancer NAME [--tcp=port:targetPort] [--dry-run]",
+		DisableFlagsInUseLine: true,
 		Short:   i18n.T("Create a LoadBalancer service."),
 		Long:    serviceLoadBalancerLong,
 		Example: serviceLoadBalancerExample,
@@ -210,7 +213,7 @@ func CreateServiceLoadBalancer(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.C
 		generator = &kubectl.ServiceCommonGeneratorV1{
 			Name:      name,
 			TCP:       cmdutil.GetFlagStringSlice(cmd, "tcp"),
-			Type:      api.ServiceTypeLoadBalancer,
+			Type:      v1.ServiceTypeLoadBalancer,
 			ClusterIP: "",
 		}
 	default:
@@ -219,7 +222,7 @@ func CreateServiceLoadBalancer(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.C
 	return RunCreateSubcommand(f, cmd, cmdOut, &CreateSubcommandOptions{
 		Name:                name,
 		StructuredGenerator: generator,
-		DryRun:              cmdutil.GetFlagBool(cmd, "dry-run"),
+		DryRun:              cmdutil.GetDryRunFlag(cmd),
 		OutputFormat:        cmdutil.GetFlagString(cmd, "output"),
 	})
 }
@@ -240,7 +243,8 @@ var (
 // NewCmdCreateServiceExternalName is a macro command for creating an ExternalName service
 func NewCmdCreateServiceExternalName(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "externalname NAME --external-name external.name [--dry-run]",
+		Use: "externalname NAME --external-name external.name [--dry-run]",
+		DisableFlagsInUseLine: true,
 		Short:   i18n.T("Create an ExternalName service."),
 		Long:    serviceExternalNameLong,
 		Example: serviceExternalNameExample,
@@ -270,7 +274,7 @@ func CreateExternalNameService(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.C
 	case cmdutil.ServiceExternalNameGeneratorV1Name:
 		generator = &kubectl.ServiceCommonGeneratorV1{
 			Name:         name,
-			Type:         api.ServiceTypeExternalName,
+			Type:         v1.ServiceTypeExternalName,
 			ExternalName: cmdutil.GetFlagString(cmd, "external-name"),
 			ClusterIP:    "",
 		}

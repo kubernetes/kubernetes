@@ -362,7 +362,7 @@ func (w *watchCache) GetByKey(key string) (interface{}, bool, error) {
 	return w.store.GetByKey(key)
 }
 
-// Replace takes slice of runtime.Object as a paramater.
+// Replace takes slice of runtime.Object as a parameter.
 func (w *watchCache) Replace(objs []interface{}, resourceVersion string) error {
 	version, err := parseResourceVersion(resourceVersion)
 	if err != nil {

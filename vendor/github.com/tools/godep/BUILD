@@ -36,8 +36,8 @@ go_library(
 
 go_binary(
     name = "godep",
+    embed = [":go_default_library"],
     importpath = "github.com/tools/godep",
-    library = ":go_default_library",
     visibility = ["//visibility:public"],
 )
 

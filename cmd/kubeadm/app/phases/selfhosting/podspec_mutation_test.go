@@ -33,8 +33,36 @@ func TestMutatePodSpec(t *testing.T) {
 	}{
 		{
 			component: kubeadmconstants.KubeAPIServer,
-			podSpec:   &v1.PodSpec{},
+			podSpec: &v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Name: "kube-apiserver",
+						Command: []string{
+							"--advertise-address=10.0.0.1",
+						},
+					},
+				},
+			},
 			expected: v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Name: "kube-apiserver",
+						Command: []string{
+							"--advertise-address=$(HOST_IP)",
+						},
+						Env: []v1.EnvVar{
+							{
+								Name: "HOST_IP",
+								ValueFrom: &v1.EnvVarSource{
+									FieldRef: &v1.ObjectFieldSelector{
+										FieldPath: "status.hostIP",
+									},
+								},
+							},
+						},
+					},
+				},
+
 				NodeSelector: map[string]string{
 					kubeadmconstants.LabelNodeRoleMaster: "",
 				},
@@ -181,6 +209,55 @@ func TestSetRightDNSPolicyOnPodSpec(t *testing.T) {
 
 		if !reflect.DeepEqual(*rt.podSpec, rt.expected) {
 			t.Errorf("failed setRightDNSPolicyOnPodSpec:\nexpected:\n%v\nsaw:\n%v", rt.expected, *rt.podSpec)
+		}
+	}
+}
+
+func TestSetHostIPOnPodSpec(t *testing.T) {
+	var tests = []struct {
+		podSpec  *v1.PodSpec
+		expected v1.PodSpec
+	}{
+		{
+			podSpec: &v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Name: "kube-apiserver",
+						Command: []string{
+							"--advertise-address=10.0.0.1",
+						},
+						Env: []v1.EnvVar{},
+					},
+				},
+			},
+			expected: v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Name: "kube-apiserver",
+						Command: []string{
+							"--advertise-address=$(HOST_IP)",
+						},
+						Env: []v1.EnvVar{
+							{
+								Name: "HOST_IP",
+								ValueFrom: &v1.EnvVarSource{
+									FieldRef: &v1.ObjectFieldSelector{
+										FieldPath: "status.hostIP",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for _, rt := range tests {
+		setHostIPOnPodSpec(rt.podSpec)
+
+		if !reflect.DeepEqual(*rt.podSpec, rt.expected) {
+			t.Errorf("failed setHostIPOnPodSpec:\nexpected:\n%v\nsaw:\n%v", rt.expected, *rt.podSpec)
 		}
 	}
 }

@@ -9,8 +9,8 @@ load(
 go_test(
     name = "go_default_test",
     srcs = ["deep_equal_test.go"],
+    embed = [":go_default_library"],
     importpath = "k8s.io/apimachinery/third_party/forked/golang/reflect",
-    library = ":go_default_library",
 )
 
 go_library(

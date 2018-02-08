@@ -15,10 +15,10 @@
 package rafthttp
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"io/ioutil"
-	"net"
 	"net/http"
 	"path"
 	"strings"
@@ -27,6 +27,7 @@ import (
 
 	"github.com/coreos/etcd/etcdserver/stats"
 	"github.com/coreos/etcd/pkg/httputil"
+	"github.com/coreos/etcd/pkg/transport"
 	"github.com/coreos/etcd/pkg/types"
 	"github.com/coreos/etcd/raft/raftpb"
 	"github.com/coreos/etcd/version"
@@ -51,6 +52,7 @@ var (
 		"2.3.0": {streamTypeMsgAppV2, streamTypeMessage},
 		"3.0.0": {streamTypeMsgAppV2, streamTypeMessage},
 		"3.1.0": {streamTypeMsgAppV2, streamTypeMessage},
+		"3.2.0": {streamTypeMsgAppV2, streamTypeMessage},
 	}
 )
 
@@ -140,7 +142,8 @@ func (cw *streamWriter) run() {
 		flusher    http.Flusher
 		batched    int
 	)
-	tickc := time.Tick(ConnReadTimeout / 3)
+	tickc := time.NewTicker(ConnReadTimeout / 3)
+	defer tickc.Stop()
 	unflushed := 0
 
 	plog.Infof("started streaming with peer %s (writer)", cw.peerID)
@@ -212,7 +215,7 @@ func (cw *streamWriter) run() {
 				plog.Warningf("closed an existing TCP streaming connection with peer %s (%s writer)", cw.peerID, t)
 			}
 			plog.Infof("established a TCP streaming connection with peer %s (%s writer)", cw.peerID, t)
-			heartbeatc, msgc = tickc, cw.msgc
+			heartbeatc, msgc = tickc.C, cw.msgc
 		case <-cw.stopc:
 			if cw.close() {
 				plog.Infof("closed the TCP streaming connection with peer %s (%s writer)", cw.peerID, t)
@@ -314,7 +317,7 @@ func (cr *streamReader) run() {
 			// all data is read out
 			case err == io.EOF:
 			// connection is closed by the remote
-			case isClosedConnectionError(err):
+			case transport.IsClosedConnError(err):
 			default:
 				cr.status.deactivate(failureType{source: t.String(), action: "read"}, err.Error())
 			}
@@ -426,14 +429,17 @@ func (cr *streamReader) dial(t streamType) (io.ReadCloser, error) {
 
 	setPeerURLsHeader(req, cr.tr.URLs)
 
+	ctx, cancel := context.WithCancel(context.Background())
+	req = req.WithContext(ctx)
+
 	cr.mu.Lock()
+	cr.cancel = cancel
 	select {
 	case <-cr.stopc:
 		cr.mu.Unlock()
 		return nil, fmt.Errorf("stream reader is stopped")
 	default:
 	}
-	cr.cancel = httputil.RequestCanceler(req)
 	cr.mu.Unlock()
 
 	resp, err := cr.tr.streamRt.RoundTrip(req)
@@ -506,11 +512,6 @@ func (cr *streamReader) resume() {
 	cr.mu.Lock()
 	defer cr.mu.Unlock()
 	cr.paused = false
-}
-
-func isClosedConnectionError(err error) bool {
-	operr, ok := err.(*net.OpError)
-	return ok && operr.Err.Error() == "use of closed network connection"
 }
 
 // checkStreamSupport checks whether the stream type is supported in the

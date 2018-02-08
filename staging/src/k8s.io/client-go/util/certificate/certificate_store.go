@@ -266,6 +266,13 @@ func (s *fileStore) updateSymlink(filename string) error {
 		return fmt.Errorf("file %q does not exist so it can not be used as the currently selected cert/key", filename)
 	}
 
+	// Ensure the source path is absolute to ensure the symlink target is
+	// correct when certDirectory is a relative path.
+	filename, err := filepath.Abs(filename)
+	if err != nil {
+		return err
+	}
+
 	// Create the 'updated' symlink pointing to the requested file name.
 	if err := os.Symlink(filename, updatedPath); err != nil {
 		return fmt.Errorf("unable to create a symlink from %q to %q: %v", updatedPath, filename, err)

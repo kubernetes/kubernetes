@@ -19,15 +19,17 @@ package iscsi
 import (
 	"fmt"
 	"os"
-	"strconv"
 	"time"
 
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
+	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
 )
 
 type iscsiAttacher struct {
@@ -65,7 +67,7 @@ func (attacher *iscsiAttacher) VolumesAreAttached(specs []*volume.Spec, nodeName
 }
 
 func (attacher *iscsiAttacher) WaitForAttach(spec *volume.Spec, devicePath string, pod *v1.Pod, timeout time.Duration) (string, error) {
-	mounter, err := attacher.volumeSpecToMounter(spec, attacher.host, pod)
+	mounter, err := volumeSpecToMounter(spec, attacher.host, pod)
 	if err != nil {
 		glog.Warningf("failed to get iscsi mounter: %v", err)
 		return "", err
@@ -75,7 +77,7 @@ func (attacher *iscsiAttacher) WaitForAttach(spec *volume.Spec, devicePath strin
 
 func (attacher *iscsiAttacher) GetDeviceMountPath(
 	spec *volume.Spec) (string, error) {
-	mounter, err := attacher.volumeSpecToMounter(spec, attacher.host, nil)
+	mounter, err := volumeSpecToMounter(spec, attacher.host, nil)
 	if err != nil {
 		glog.Warningf("failed to get iscsi mounter: %v", err)
 		return "", err
@@ -100,7 +102,7 @@ func (attacher *iscsiAttacher) MountDevice(spec *volume.Spec, devicePath string,
 			return err
 		}
 	}
-	volumeSource, readOnly, err := getVolumeSource(spec)
+	readOnly, fsType, err := getISCSIVolumeInfo(spec)
 	if err != nil {
 		return err
 	}
@@ -112,7 +114,7 @@ func (attacher *iscsiAttacher) MountDevice(spec *volume.Spec, devicePath string,
 	if notMnt {
 		diskMounter := &mount.SafeFormatAndMount{Interface: mounter, Exec: attacher.host.GetExec(iscsiPluginName)}
 		mountOptions := volume.MountOptionFromSpec(spec, options...)
-		err = diskMounter.FormatAndMount(devicePath, deviceMountPath, volumeSource.FSType, mountOptions)
+		err = diskMounter.FormatAndMount(devicePath, deviceMountPath, fsType, mountOptions)
 		if err != nil {
 			os.Remove(deviceMountPath)
 			return err
@@ -137,12 +139,12 @@ func (plugin *iscsiPlugin) NewDetacher() (volume.Detacher, error) {
 	}, nil
 }
 
-func (detacher *iscsiDetacher) Detach(deviceMountPath string, nodeName types.NodeName) error {
+func (detacher *iscsiDetacher) Detach(volumeName string, nodeName types.NodeName) error {
 	return nil
 }
 
 func (detacher *iscsiDetacher) UnmountDevice(deviceMountPath string) error {
-	unMounter := detacher.volumeSpecToUnmounter(detacher.mounter)
+	unMounter := volumeSpecToUnmounter(detacher.mounter, detacher.host)
 	err := detacher.manager.DetachDisk(*unMounter, deviceMountPath)
 	if err != nil {
 		return fmt.Errorf("iscsi: failed to detach disk: %s\nError: %v", deviceMountPath, err)
@@ -156,49 +158,50 @@ func (detacher *iscsiDetacher) UnmountDevice(deviceMountPath string) error {
 	return nil
 }
 
-func (attacher *iscsiAttacher) volumeSpecToMounter(spec *volume.Spec, host volume.VolumeHost, pod *v1.Pod) (*iscsiDiskMounter, error) {
+func volumeSpecToMounter(spec *volume.Spec, host volume.VolumeHost, pod *v1.Pod) (*iscsiDiskMounter, error) {
 	var secret map[string]string
-	var bkportal []string
-	iscsi, readOnly, err := getVolumeSource(spec)
+	readOnly, fsType, err := getISCSIVolumeInfo(spec)
 	if err != nil {
 		return nil, err
 	}
-	// Obtain secret for AttachDisk
-	if iscsi.SecretRef != nil && pod != nil {
-		if secret, err = volumeutil.GetSecretForPod(pod, iscsi.SecretRef.Name, host.GetKubeClient()); err != nil {
-			glog.Errorf("Couldn't get secret from %v/%v", pod.Namespace, iscsi.SecretRef)
+	var podUID types.UID
+	if pod != nil {
+		secret, err = createSecretMap(spec, &iscsiPlugin{host: host}, pod.Namespace)
+		if err != nil {
 			return nil, err
 		}
+		podUID = pod.UID
 	}
-	lun := strconv.Itoa(int(iscsi.Lun))
-	portal := portalMounter(iscsi.TargetPortal)
-	bkportal = append(bkportal, portal)
-	for _, tp := range iscsi.Portals {
-		bkportal = append(bkportal, portalMounter(string(tp)))
+	iscsiDisk, err := createISCSIDisk(spec,
+		podUID,
+		&iscsiPlugin{host: host},
+		&ISCSIUtil{},
+		secret,
+	)
+	if err != nil {
+		return nil, err
 	}
-	iface := iscsi.ISCSIInterface
-	exec := attacher.host.GetExec(iscsiPluginName)
-	var initiatorName string
-	if iscsi.InitiatorName != nil {
-		initiatorName = *iscsi.InitiatorName
+	exec := host.GetExec(iscsiPluginName)
+	// TODO: remove feature gate check after no longer needed
+	if utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) {
+		volumeMode, err := volumehelper.GetVolumeMode(spec)
+		if err != nil {
+			return nil, err
+		}
+		glog.V(5).Infof("iscsi: VolumeSpecToMounter volumeMode %s", volumeMode)
+		return &iscsiDiskMounter{
+			iscsiDisk:  iscsiDisk,
+			fsType:     fsType,
+			volumeMode: volumeMode,
+			readOnly:   readOnly,
+			mounter:    &mount.SafeFormatAndMount{Interface: host.GetMounter(iscsiPluginName), Exec: exec},
+			exec:       exec,
+			deviceUtil: volumeutil.NewDeviceHandler(volumeutil.NewIOHandler()),
+		}, nil
 	}
-
 	return &iscsiDiskMounter{
-		iscsiDisk: &iscsiDisk{
-			plugin: &iscsiPlugin{
-				host: host,
-			},
-			VolName:        spec.Name(),
-			Portals:        bkportal,
-			Iqn:            iscsi.IQN,
-			lun:            lun,
-			Iface:          iface,
-			chap_discovery: iscsi.DiscoveryCHAPAuth,
-			chap_session:   iscsi.SessionCHAPAuth,
-			secret:         secret,
-			InitiatorName:  initiatorName,
-			manager:        &ISCSIUtil{}},
-		fsType:     iscsi.FSType,
+		iscsiDisk:  iscsiDisk,
+		fsType:     fsType,
 		readOnly:   readOnly,
 		mounter:    &mount.SafeFormatAndMount{Interface: host.GetMounter(iscsiPluginName), Exec: exec},
 		exec:       exec,
@@ -206,8 +209,8 @@ func (attacher *iscsiAttacher) volumeSpecToMounter(spec *volume.Spec, host volum
 	}, nil
 }
 
-func (detacher *iscsiDetacher) volumeSpecToUnmounter(mounter mount.Interface) *iscsiDiskUnmounter {
-	exec := detacher.host.GetExec(iscsiPluginName)
+func volumeSpecToUnmounter(mounter mount.Interface, host volume.VolumeHost) *iscsiDiskUnmounter {
+	exec := host.GetExec(iscsiPluginName)
 	return &iscsiDiskUnmounter{
 		iscsiDisk: &iscsiDisk{
 			plugin: &iscsiPlugin{},

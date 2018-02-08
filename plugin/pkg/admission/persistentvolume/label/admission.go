@@ -24,7 +24,7 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/apiserver/pkg/admission"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
@@ -33,9 +33,11 @@ import (
 	vol "k8s.io/kubernetes/pkg/volume"
 )
 
+const PluginName = "PersistentVolumeLabel"
+
 // Register registers a plugin
 func Register(plugins *admission.Plugins) {
-	plugins.Register("PersistentVolumeLabel", func(config io.Reader) (admission.Interface, error) {
+	plugins.Register(PluginName, func(config io.Reader) (admission.Interface, error) {
 		persistentVolumeLabelAdmission := NewPersistentVolumeLabel()
 		return persistentVolumeLabelAdmission, nil
 	})
@@ -52,6 +54,7 @@ type persistentVolumeLabel struct {
 	gceCloudProvider *gce.GCECloud
 }
 
+var _ admission.MutationInterface = &persistentVolumeLabel{}
 var _ kubeapiserveradmission.WantsCloudConfig = &persistentVolumeLabel{}
 
 // NewPersistentVolumeLabel returns an admission.Interface implementation which adds labels to PersistentVolume CREATE requests,

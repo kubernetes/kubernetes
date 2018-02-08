@@ -34,47 +34,58 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	metav1alpha1 "k8s.io/apimachinery/pkg/apis/meta/v1alpha1"
+	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	yamlserializer "k8s.io/apimachinery/pkg/runtime/serializer/yaml"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/kubernetes/federation/apis/federation"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/batch"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/apis/storage"
-	kubectltesting "k8s.io/kubernetes/pkg/kubectl/testing"
 	"k8s.io/kubernetes/pkg/printers"
 )
 
 func init() {
-	legacyscheme.Scheme.AddKnownTypes(testapi.Default.InternalGroupVersion(), &kubectltesting.TestStruct{})
-	legacyscheme.Scheme.AddKnownTypes(legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion, &kubectltesting.TestStruct{})
+	legacyscheme.Scheme.AddKnownTypes(testapi.Default.InternalGroupVersion(), &TestPrintType{})
+	legacyscheme.Scheme.AddKnownTypes(legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion, &TestPrintType{})
 }
 
-var testData = kubectltesting.TestStruct{
+var testData = TestStruct{
 	Key:        "testValue",
 	Map:        map[string]int{"TestSubkey": 1},
 	StringList: []string{"a", "b", "c"},
 	IntList:    []int{1, 2, 3},
 }
 
+type TestStruct struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+	Key               string         `json:"Key"`
+	Map               map[string]int `json:"Map"`
+	StringList        []string       `json:"StringList"`
+	IntList           []int          `json:"IntList"`
+}
+
+func (in *TestStruct) DeepCopyObject() runtime.Object {
+	panic("never called")
+}
+
 func TestVersionedPrinter(t *testing.T) {
-	original := &kubectltesting.TestStruct{Key: "value"}
+	original := &TestPrintType{Data: "value"}
 	p := printers.NewVersionedPrinter(
 		printers.ResourcePrinterFunc(func(obj runtime.Object, w io.Writer) error {
 			if obj == original {
 				t.Fatalf("object should not be identical: %#v", obj)
 			}
-			if obj.(*kubectltesting.TestStruct).Key != "value" {
+			if obj.(*TestPrintType).Data != "value" {
 				t.Fatalf("object was not converted: %#v", obj)
 			}
 			return nil
@@ -97,7 +108,7 @@ func TestPrintDefault(t *testing.T) {
 	}
 
 	for _, test := range printerTests {
-		printer, err := printers.GetStandardPrinter(&printers.OutputOptions{AllowMissingKeys: false}, false, nil, nil, legacyscheme.Codecs.LegacyCodec(legacyscheme.Registry.EnabledVersions()...), []runtime.Decoder{legacyscheme.Codecs.UniversalDecoder(), unstructured.UnstructuredJSONScheme}, printers.PrintOptions{})
+		printer, err := printers.GetStandardPrinter(nil, nil, legacyscheme.Codecs.LegacyCodec(legacyscheme.Registry.EnabledVersions()...), []runtime.Decoder{legacyscheme.Codecs.UniversalDecoder(), unstructured.UnstructuredJSONScheme}, printers.PrintOptions{AllowMissingKeys: false})
 		if err != nil {
 			t.Errorf("in %s, unexpected error: %#v", test.Name, err)
 		}
@@ -255,24 +266,24 @@ func TestPrinter(t *testing.T) {
 
 	printerTests := []struct {
 		Name           string
-		OutputOpts     *printers.OutputOptions
+		PrintOpts      *printers.PrintOptions
 		Input          runtime.Object
 		OutputVersions []schema.GroupVersion
 		Expect         string
 	}{
-		{"test json", &printers.OutputOptions{FmtType: "json", AllowMissingKeys: true}, simpleTest, nil, "{\n    \"Data\": \"foo\"\n}\n"},
-		{"test yaml", &printers.OutputOptions{FmtType: "yaml", AllowMissingKeys: true}, simpleTest, nil, "Data: foo\n"},
-		{"test template", &printers.OutputOptions{FmtType: "template", FmtArg: "{{if .id}}{{.id}}{{end}}{{if .metadata.name}}{{.metadata.name}}{{end}}", AllowMissingKeys: true},
+		{"test json", &printers.PrintOptions{OutputFormatType: "json", AllowMissingKeys: true}, simpleTest, nil, "{\n    \"Data\": \"foo\"\n}\n"},
+		{"test yaml", &printers.PrintOptions{OutputFormatType: "yaml", AllowMissingKeys: true}, simpleTest, nil, "Data: foo\n"},
+		{"test template", &printers.PrintOptions{OutputFormatType: "template", OutputFormatArgument: "{{if .id}}{{.id}}{{end}}{{if .metadata.name}}{{.metadata.name}}{{end}}", AllowMissingKeys: true},
 			podTest, []schema.GroupVersion{v1.SchemeGroupVersion}, "foo"},
-		{"test jsonpath", &printers.OutputOptions{FmtType: "jsonpath", FmtArg: "{.metadata.name}", AllowMissingKeys: true}, podTest, []schema.GroupVersion{v1.SchemeGroupVersion}, "foo"},
-		{"test jsonpath list", &printers.OutputOptions{FmtType: "jsonpath", FmtArg: "{.items[*].metadata.name}", AllowMissingKeys: true}, podListTest, []schema.GroupVersion{v1.SchemeGroupVersion}, "foo bar"},
-		{"test jsonpath empty list", &printers.OutputOptions{FmtType: "jsonpath", FmtArg: "{.items[*].metadata.name}", AllowMissingKeys: true}, emptyListTest, []schema.GroupVersion{v1.SchemeGroupVersion}, ""},
-		{"test name", &printers.OutputOptions{FmtType: "name", AllowMissingKeys: true}, podTest, []schema.GroupVersion{v1.SchemeGroupVersion}, "pods/foo\n"},
-		{"emits versioned objects", &printers.OutputOptions{FmtType: "template", FmtArg: "{{.kind}}", AllowMissingKeys: true}, testapi, []schema.GroupVersion{v1.SchemeGroupVersion}, "Pod"},
+		{"test jsonpath", &printers.PrintOptions{OutputFormatType: "jsonpath", OutputFormatArgument: "{.metadata.name}", AllowMissingKeys: true}, podTest, []schema.GroupVersion{v1.SchemeGroupVersion}, "foo"},
+		{"test jsonpath list", &printers.PrintOptions{OutputFormatType: "jsonpath", OutputFormatArgument: "{.items[*].metadata.name}", AllowMissingKeys: true}, podListTest, []schema.GroupVersion{v1.SchemeGroupVersion}, "foo bar"},
+		{"test jsonpath empty list", &printers.PrintOptions{OutputFormatType: "jsonpath", OutputFormatArgument: "{.items[*].metadata.name}", AllowMissingKeys: true}, emptyListTest, []schema.GroupVersion{v1.SchemeGroupVersion}, ""},
+		{"test name", &printers.PrintOptions{OutputFormatType: "name", AllowMissingKeys: true}, podTest, []schema.GroupVersion{v1.SchemeGroupVersion}, "pods/foo\n"},
+		{"emits versioned objects", &printers.PrintOptions{OutputFormatType: "template", OutputFormatArgument: "{{.kind}}", AllowMissingKeys: true}, testapi, []schema.GroupVersion{v1.SchemeGroupVersion}, "Pod"},
 	}
 	for _, test := range printerTests {
 		buf := bytes.NewBuffer([]byte{})
-		printer, err := printers.GetStandardPrinter(test.OutputOpts, false, legacyscheme.Registry.RESTMapper(legacyscheme.Registry.EnabledVersions()...), legacyscheme.Scheme, legacyscheme.Codecs.LegacyCodec(legacyscheme.Registry.EnabledVersions()...), []runtime.Decoder{legacyscheme.Codecs.UniversalDecoder(), unstructured.UnstructuredJSONScheme}, printers.PrintOptions{})
+		printer, err := printers.GetStandardPrinter(legacyscheme.Registry.RESTMapper(legacyscheme.Registry.EnabledVersions()...), legacyscheme.Scheme, legacyscheme.Codecs.LegacyCodec(legacyscheme.Registry.EnabledVersions()...), []runtime.Decoder{legacyscheme.Codecs.UniversalDecoder(), unstructured.UnstructuredJSONScheme}, *test.PrintOpts)
 		if err != nil {
 			t.Errorf("in %s, unexpected error: %#v", test.Name, err)
 		}
@@ -291,18 +302,18 @@ func TestPrinter(t *testing.T) {
 
 func TestBadPrinter(t *testing.T) {
 	badPrinterTests := []struct {
-		Name       string
-		OutputOpts *printers.OutputOptions
-		Error      error
+		Name      string
+		PrintOpts *printers.PrintOptions
+		Error     error
 	}{
-		{"empty template", &printers.OutputOptions{FmtType: "template", AllowMissingKeys: false}, fmt.Errorf("template format specified but no template given")},
-		{"bad template", &printers.OutputOptions{FmtType: "template", FmtArg: "{{ .Name", AllowMissingKeys: false}, fmt.Errorf("error parsing template {{ .Name, template: output:1: unclosed action\n")},
-		{"bad templatefile", &printers.OutputOptions{FmtType: "templatefile", AllowMissingKeys: false}, fmt.Errorf("templatefile format specified but no template file given")},
-		{"bad jsonpath", &printers.OutputOptions{FmtType: "jsonpath", FmtArg: "{.Name", AllowMissingKeys: false}, fmt.Errorf("error parsing jsonpath {.Name, unclosed action\n")},
-		{"unknown format", &printers.OutputOptions{FmtType: "anUnknownFormat", FmtArg: "", AllowMissingKeys: false}, fmt.Errorf("output format \"anUnknownFormat\" not recognized")},
+		{"empty template", &printers.PrintOptions{OutputFormatType: "template", AllowMissingKeys: false}, fmt.Errorf("template format specified but no template given")},
+		{"bad template", &printers.PrintOptions{OutputFormatType: "template", OutputFormatArgument: "{{ .Name", AllowMissingKeys: false}, fmt.Errorf("error parsing template {{ .Name, template: output:1: unclosed action\n")},
+		{"bad templatefile", &printers.PrintOptions{OutputFormatType: "templatefile", AllowMissingKeys: false}, fmt.Errorf("templatefile format specified but no template file given")},
+		{"bad jsonpath", &printers.PrintOptions{OutputFormatType: "jsonpath", OutputFormatArgument: "{.Name", AllowMissingKeys: false}, fmt.Errorf("error parsing jsonpath {.Name, unclosed action\n")},
+		{"unknown format", &printers.PrintOptions{OutputFormatType: "anUnknownFormat", OutputFormatArgument: "", AllowMissingKeys: false}, fmt.Errorf("output format \"anUnknownFormat\" not recognized")},
 	}
 	for _, test := range badPrinterTests {
-		_, err := printers.GetStandardPrinter(test.OutputOpts, false, legacyscheme.Registry.RESTMapper(legacyscheme.Registry.EnabledVersions()...), legacyscheme.Scheme, legacyscheme.Codecs.LegacyCodec(legacyscheme.Registry.EnabledVersions()...), []runtime.Decoder{legacyscheme.Codecs.UniversalDecoder(), unstructured.UnstructuredJSONScheme}, printers.PrintOptions{})
+		_, err := printers.GetStandardPrinter(legacyscheme.Registry.RESTMapper(legacyscheme.Registry.EnabledVersions()...), legacyscheme.Scheme, legacyscheme.Codecs.LegacyCodec(legacyscheme.Registry.EnabledVersions()...), []runtime.Decoder{legacyscheme.Codecs.UniversalDecoder(), unstructured.UnstructuredJSONScheme}, *test.PrintOpts)
 		if err == nil || err.Error() != test.Error.Error() {
 			t.Errorf("in %s, expect %s, got %s", test.Name, test.Error, err)
 		}
@@ -316,14 +327,14 @@ func testPrinter(t *testing.T, printer printers.ResourcePrinter, unmarshalFunc f
 	if err != nil {
 		t.Fatal(err)
 	}
-	var poutput kubectltesting.TestStruct
+	var poutput TestStruct
 	// Verify that given function runs without error.
 	err = unmarshalFunc(buf.Bytes(), &poutput)
 	if err != nil {
 		t.Fatal(err)
 	}
 	// Use real decode function to undo the versioning process.
-	poutput = kubectltesting.TestStruct{}
+	poutput = TestStruct{}
 	s := yamlserializer.NewDecodingSerializer(testapi.Default.Codec())
 	if err := runtime.DecodeInto(s, buf.Bytes(), &poutput); err != nil {
 		t.Fatal(err)
@@ -495,8 +506,8 @@ func TestNamePrinter(t *testing.T) {
 			},
 			"pods/foo\npods/bar\n"},
 	}
-	outputOpts := &printers.OutputOptions{FmtType: "name", AllowMissingKeys: false}
-	printer, _ := printers.GetStandardPrinter(outputOpts, false, legacyscheme.Registry.RESTMapper(legacyscheme.Registry.EnabledVersions()...), legacyscheme.Scheme, legacyscheme.Codecs.LegacyCodec(legacyscheme.Registry.EnabledVersions()...), []runtime.Decoder{legacyscheme.Codecs.UniversalDecoder(), unstructured.UnstructuredJSONScheme}, printers.PrintOptions{})
+	printOpts := &printers.PrintOptions{OutputFormatType: "name", AllowMissingKeys: false}
+	printer, _ := printers.GetStandardPrinter(legacyscheme.Registry.RESTMapper(legacyscheme.Registry.EnabledVersions()...), legacyscheme.Scheme, legacyscheme.Codecs.LegacyCodec(legacyscheme.Registry.EnabledVersions()...), []runtime.Decoder{legacyscheme.Codecs.UniversalDecoder(), unstructured.UnstructuredJSONScheme}, *printOpts)
 	for name, item := range tests {
 		buff := &bytes.Buffer{}
 		err := printer.PrintObj(item.obj, buff)
@@ -1579,7 +1590,7 @@ func TestPrintPodTable(t *testing.T) {
 func TestPrintPod(t *testing.T) {
 	tests := []struct {
 		pod    api.Pod
-		expect []metav1alpha1.TableRow
+		expect []metav1beta1.TableRow
 	}{
 		{
 			// Test name, num of containers, restarts, container ready status
@@ -1594,7 +1605,7 @@ func TestPrintPod(t *testing.T) {
 					},
 				},
 			},
-			[]metav1alpha1.TableRow{{Cells: []interface{}{"test1", "1/2", "podPhase", 6, "<unknown>"}}},
+			[]metav1beta1.TableRow{{Cells: []interface{}{"test1", "1/2", "podPhase", 6, "<unknown>"}}},
 		},
 		{
 			// Test container error overwrites pod phase
@@ -1609,7 +1620,7 @@ func TestPrintPod(t *testing.T) {
 					},
 				},
 			},
-			[]metav1alpha1.TableRow{{Cells: []interface{}{"test2", "1/2", "ContainerWaitingReason", 6, "<unknown>"}}},
+			[]metav1beta1.TableRow{{Cells: []interface{}{"test2", "1/2", "ContainerWaitingReason", 6, "<unknown>"}}},
 		},
 		{
 			// Test the same as the above but with Terminated state and the first container overwrites the rest
@@ -1624,7 +1635,7 @@ func TestPrintPod(t *testing.T) {
 					},
 				},
 			},
-			[]metav1alpha1.TableRow{{Cells: []interface{}{"test3", "0/2", "ContainerWaitingReason", 6, "<unknown>"}}},
+			[]metav1beta1.TableRow{{Cells: []interface{}{"test3", "0/2", "ContainerWaitingReason", 6, "<unknown>"}}},
 		},
 		{
 			// Test ready is not enough for reporting running
@@ -1639,7 +1650,7 @@ func TestPrintPod(t *testing.T) {
 					},
 				},
 			},
-			[]metav1alpha1.TableRow{{Cells: []interface{}{"test4", "1/2", "podPhase", 6, "<unknown>"}}},
+			[]metav1beta1.TableRow{{Cells: []interface{}{"test4", "1/2", "podPhase", 6, "<unknown>"}}},
 		},
 		{
 			// Test ready is not enough for reporting running
@@ -1655,7 +1666,7 @@ func TestPrintPod(t *testing.T) {
 					},
 				},
 			},
-			[]metav1alpha1.TableRow{{Cells: []interface{}{"test5", "1/2", "podReason", 6, "<unknown>"}}},
+			[]metav1beta1.TableRow{{Cells: []interface{}{"test5", "1/2", "podReason", 6, "<unknown>"}}},
 		},
 	}
 
@@ -1673,10 +1684,70 @@ func TestPrintPod(t *testing.T) {
 	}
 }
 
+func TestPrintPodwide(t *testing.T) {
+	tests := []struct {
+		pod    api.Pod
+		expect []metav1beta1.TableRow
+	}{
+		{
+			// Test when the NodeName and PodIP are not none
+			api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "test1"},
+				Spec: api.PodSpec{
+					Containers: make([]api.Container, 2),
+					NodeName:   "test1",
+				},
+				Status: api.PodStatus{
+					Phase: "podPhase",
+					PodIP: "1.1.1.1",
+					ContainerStatuses: []api.ContainerStatus{
+						{Ready: true, RestartCount: 3, State: api.ContainerState{Running: &api.ContainerStateRunning{}}},
+						{RestartCount: 3},
+					},
+					NominatedNodeName: "node1",
+				},
+			},
+			[]metav1beta1.TableRow{{Cells: []interface{}{"test1", "1/2", "podPhase", 6, "<unknown>", "1.1.1.1", "test1", "node1"}}},
+		},
+		{
+			// Test when the NodeName and PodIP are none
+			api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "test2"},
+				Spec: api.PodSpec{
+					Containers: make([]api.Container, 2),
+					NodeName:   "",
+				},
+				Status: api.PodStatus{
+					Phase: "podPhase",
+					PodIP: "",
+					ContainerStatuses: []api.ContainerStatus{
+						{Ready: true, RestartCount: 3, State: api.ContainerState{Running: &api.ContainerStateRunning{}}},
+						{State: api.ContainerState{Waiting: &api.ContainerStateWaiting{Reason: "ContainerWaitingReason"}}, RestartCount: 3},
+					},
+				},
+			},
+			[]metav1beta1.TableRow{{Cells: []interface{}{"test2", "1/2", "ContainerWaitingReason", 6, "<unknown>", "<none>", "<none>"}}},
+		},
+	}
+
+	for i, test := range tests {
+		rows, err := printPod(&test.pod, printers.PrintOptions{Wide: true})
+		if err != nil {
+			t.Fatal(err)
+		}
+		for i := range rows {
+			rows[i].Object.Object = nil
+		}
+		if !reflect.DeepEqual(test.expect, rows) {
+			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expect, rows))
+		}
+	}
+}
+
 func TestPrintPodList(t *testing.T) {
 	tests := []struct {
 		pods   api.PodList
-		expect []metav1alpha1.TableRow
+		expect []metav1beta1.TableRow
 	}{
 		// Test podList's pod: name, num of containers, restarts, container ready status
 		{
@@ -1705,7 +1776,7 @@ func TestPrintPodList(t *testing.T) {
 					},
 				},
 			},
-			[]metav1alpha1.TableRow{{Cells: []interface{}{"test1", "2/2", "podPhase", 6, "<unknown>"}}, {Cells: []interface{}{"test2", "1/1", "podPhase", 1, "<unknown>"}}},
+			[]metav1beta1.TableRow{{Cells: []interface{}{"test1", "2/2", "podPhase", 6, "<unknown>"}}, {Cells: []interface{}{"test2", "1/1", "podPhase", 1, "<unknown>"}}},
 		},
 	}
 
@@ -1727,7 +1798,7 @@ func TestPrintPodList(t *testing.T) {
 func TestPrintNonTerminatedPod(t *testing.T) {
 	tests := []struct {
 		pod    api.Pod
-		expect []metav1alpha1.TableRow
+		expect []metav1beta1.TableRow
 	}{
 		{
 			// Test pod phase Running should be printed
@@ -1742,7 +1813,7 @@ func TestPrintNonTerminatedPod(t *testing.T) {
 					},
 				},
 			},
-			[]metav1alpha1.TableRow{{Cells: []interface{}{"test1", "1/2", "Running", 6, "<unknown>"}}},
+			[]metav1beta1.TableRow{{Cells: []interface{}{"test1", "1/2", "Running", 6, "<unknown>"}}},
 		},
 		{
 			// Test pod phase Pending should be printed
@@ -1757,7 +1828,7 @@ func TestPrintNonTerminatedPod(t *testing.T) {
 					},
 				},
 			},
-			[]metav1alpha1.TableRow{{Cells: []interface{}{"test2", "1/2", "Pending", 6, "<unknown>"}}},
+			[]metav1beta1.TableRow{{Cells: []interface{}{"test2", "1/2", "Pending", 6, "<unknown>"}}},
 		},
 		{
 			// Test pod phase Unknown should be printed
@@ -1772,7 +1843,7 @@ func TestPrintNonTerminatedPod(t *testing.T) {
 					},
 				},
 			},
-			[]metav1alpha1.TableRow{{Cells: []interface{}{"test3", "1/2", "Unknown", 6, "<unknown>"}}},
+			[]metav1beta1.TableRow{{Cells: []interface{}{"test3", "1/2", "Unknown", 6, "<unknown>"}}},
 		},
 		{
 			// Test pod phase Succeeded shouldn't be printed
@@ -1787,7 +1858,7 @@ func TestPrintNonTerminatedPod(t *testing.T) {
 					},
 				},
 			},
-			[]metav1alpha1.TableRow{{Cells: []interface{}{"test4", "1/2", "Succeeded", 6, "<unknown>"}, Conditions: podSuccessConditions}},
+			[]metav1beta1.TableRow{{Cells: []interface{}{"test4", "1/2", "Succeeded", 6, "<unknown>"}, Conditions: podSuccessConditions}},
 		},
 		{
 			// Test pod phase Failed shouldn't be printed
@@ -1802,7 +1873,7 @@ func TestPrintNonTerminatedPod(t *testing.T) {
 					},
 				},
 			},
-			[]metav1alpha1.TableRow{{Cells: []interface{}{"test5", "1/2", "Failed", 6, "<unknown>"}, Conditions: podFailedConditions}},
+			[]metav1beta1.TableRow{{Cells: []interface{}{"test5", "1/2", "Failed", 6, "<unknown>"}, Conditions: podFailedConditions}},
 		},
 	}
 
@@ -1825,7 +1896,7 @@ func TestPrintPodWithLabels(t *testing.T) {
 	tests := []struct {
 		pod          api.Pod
 		labelColumns []string
-		expect       []metav1alpha1.TableRow
+		expect       []metav1beta1.TableRow
 	}{
 		{
 			// Test name, num of containers, restarts, container ready status
@@ -1844,7 +1915,7 @@ func TestPrintPodWithLabels(t *testing.T) {
 				},
 			},
 			[]string{"col1", "COL2"},
-			[]metav1alpha1.TableRow{{Cells: []interface{}{"test1", "1/2", "podPhase", 6, "<unknown>", "asd", "zxc"}}},
+			[]metav1beta1.TableRow{{Cells: []interface{}{"test1", "1/2", "podPhase", 6, "<unknown>", "asd", "zxc"}}},
 		},
 		{
 			// Test name, num of containers, restarts, container ready status
@@ -1863,7 +1934,7 @@ func TestPrintPodWithLabels(t *testing.T) {
 				},
 			},
 			[]string{},
-			[]metav1alpha1.TableRow{{Cells: []interface{}{"test1", "1/2", "podPhase", 6, "<unknown>"}}},
+			[]metav1beta1.TableRow{{Cells: []interface{}{"test1", "1/2", "podPhase", 6, "<unknown>"}}},
 		},
 	}
 
@@ -2124,7 +2195,7 @@ func TestPrintHPA(t *testing.T) {
 					DesiredReplicas: 5,
 				},
 			},
-			"some-hpa\tReplicationController/some-rc\t<unknown> / 100m\t2\t10\t4\t<unknown>\n",
+			"some-hpa\tReplicationController/some-rc\t<unknown>/100m\t2\t10\t4\t<unknown>\n",
 		},
 		// pods source type
 		{
@@ -2161,7 +2232,7 @@ func TestPrintHPA(t *testing.T) {
 					},
 				},
 			},
-			"some-hpa\tReplicationController/some-rc\t50m / 100m\t2\t10\t4\t<unknown>\n",
+			"some-hpa\tReplicationController/some-rc\t50m/100m\t2\t10\t4\t<unknown>\n",
 		},
 		// object source type (no current)
 		{
@@ -2193,7 +2264,7 @@ func TestPrintHPA(t *testing.T) {
 					DesiredReplicas: 5,
 				},
 			},
-			"some-hpa\tReplicationController/some-rc\t<unknown> / 100m\t2\t10\t4\t<unknown>\n",
+			"some-hpa\tReplicationController/some-rc\t<unknown>/100m\t2\t10\t4\t<unknown>\n",
 		},
 		// object source type
 		{
@@ -2238,7 +2309,7 @@ func TestPrintHPA(t *testing.T) {
 					},
 				},
 			},
-			"some-hpa\tReplicationController/some-rc\t50m / 100m\t2\t10\t4\t<unknown>\n",
+			"some-hpa\tReplicationController/some-rc\t50m/100m\t2\t10\t4\t<unknown>\n",
 		},
 		// resource source type, targetVal (no current)
 		{
@@ -2266,7 +2337,7 @@ func TestPrintHPA(t *testing.T) {
 					DesiredReplicas: 5,
 				},
 			},
-			"some-hpa\tReplicationController/some-rc\t<unknown> / 100m\t2\t10\t4\t<unknown>\n",
+			"some-hpa\tReplicationController/some-rc\t<unknown>/100m\t2\t10\t4\t<unknown>\n",
 		},
 		// resource source type, targetVal
 		{
@@ -2303,7 +2374,7 @@ func TestPrintHPA(t *testing.T) {
 					},
 				},
 			},
-			"some-hpa\tReplicationController/some-rc\t50m / 100m\t2\t10\t4\t<unknown>\n",
+			"some-hpa\tReplicationController/some-rc\t50m/100m\t2\t10\t4\t<unknown>\n",
 		},
 		// resource source type, targetUtil (no current)
 		{
@@ -2331,7 +2402,7 @@ func TestPrintHPA(t *testing.T) {
 					DesiredReplicas: 5,
 				},
 			},
-			"some-hpa\tReplicationController/some-rc\t<unknown> / 80%\t2\t10\t4\t<unknown>\n",
+			"some-hpa\tReplicationController/some-rc\t<unknown>/80%\t2\t10\t4\t<unknown>\n",
 		},
 		// resource source type, targetUtil
 		{
@@ -2369,7 +2440,7 @@ func TestPrintHPA(t *testing.T) {
 					},
 				},
 			},
-			"some-hpa\tReplicationController/some-rc\t50% / 80%\t2\t10\t4\t<unknown>\n",
+			"some-hpa\tReplicationController/some-rc\t50%/80%\t2\t10\t4\t<unknown>\n",
 		},
 		// multiple specs
 		{
@@ -2428,7 +2499,7 @@ func TestPrintHPA(t *testing.T) {
 					},
 				},
 			},
-			"some-hpa\tReplicationController/some-rc\t50m / 100m, 50% / 80% + 1 more...\t2\t10\t4\t<unknown>\n",
+			"some-hpa\tReplicationController/some-rc\t50m/100m, 50%/80% + 1 more...\t2\t10\t4\t<unknown>\n",
 		},
 	}
 
@@ -2453,7 +2524,7 @@ func TestPrintPodShowLabels(t *testing.T) {
 	tests := []struct {
 		pod        api.Pod
 		showLabels bool
-		expect     []metav1alpha1.TableRow
+		expect     []metav1beta1.TableRow
 	}{
 		{
 			// Test name, num of containers, restarts, container ready status
@@ -2472,7 +2543,7 @@ func TestPrintPodShowLabels(t *testing.T) {
 				},
 			},
 			true,
-			[]metav1alpha1.TableRow{{Cells: []interface{}{"test1", "1/2", "podPhase", 6, "<unknown>", "COL2=zxc,col1=asd"}}},
+			[]metav1beta1.TableRow{{Cells: []interface{}{"test1", "1/2", "podPhase", 6, "<unknown>", "COL2=zxc,col1=asd"}}},
 		},
 		{
 			// Test name, num of containers, restarts, container ready status
@@ -2491,7 +2562,7 @@ func TestPrintPodShowLabels(t *testing.T) {
 				},
 			},
 			false,
-			[]metav1alpha1.TableRow{{Cells: []interface{}{"test1", "1/2", "podPhase", 6, "<unknown>"}}},
+			[]metav1beta1.TableRow{{Cells: []interface{}{"test1", "1/2", "podPhase", 6, "<unknown>"}}},
 		},
 	}
 
@@ -2735,20 +2806,20 @@ func TestPrintPodDisruptionBudget(t *testing.T) {
 
 func TestAllowMissingKeys(t *testing.T) {
 	tests := []struct {
-		Name       string
-		OutputOpts *printers.OutputOptions
-		Input      runtime.Object
-		Expect     string
-		Error      string
+		Name      string
+		PrintOpts *printers.PrintOptions
+		Input     runtime.Object
+		Expect    string
+		Error     string
 	}{
-		{"test template, allow missing keys", &printers.OutputOptions{FmtType: "template", FmtArg: "{{.blarg}}", AllowMissingKeys: true}, &api.Pod{}, "<no value>", ""},
-		{"test template, strict", &printers.OutputOptions{FmtType: "template", FmtArg: "{{.blarg}}", AllowMissingKeys: false}, &api.Pod{}, "", `error executing template "{{.blarg}}": template: output:1:2: executing "output" at <.blarg>: map has no entry for key "blarg"`},
-		{"test jsonpath, allow missing keys", &printers.OutputOptions{FmtType: "jsonpath", FmtArg: "{.blarg}", AllowMissingKeys: true}, &api.Pod{}, "", ""},
-		{"test jsonpath, strict", &printers.OutputOptions{FmtType: "jsonpath", FmtArg: "{.blarg}", AllowMissingKeys: false}, &api.Pod{}, "", "error executing jsonpath \"{.blarg}\": blarg is not found\n"},
+		{"test template, allow missing keys", &printers.PrintOptions{OutputFormatType: "template", OutputFormatArgument: "{{.blarg}}", AllowMissingKeys: true}, &api.Pod{}, "<no value>", ""},
+		{"test template, strict", &printers.PrintOptions{OutputFormatType: "template", OutputFormatArgument: "{{.blarg}}", AllowMissingKeys: false}, &api.Pod{}, "", `error executing template "{{.blarg}}": template: output:1:2: executing "output" at <.blarg>: map has no entry for key "blarg"`},
+		{"test jsonpath, allow missing keys", &printers.PrintOptions{OutputFormatType: "jsonpath", OutputFormatArgument: "{.blarg}", AllowMissingKeys: true}, &api.Pod{}, "", ""},
+		{"test jsonpath, strict", &printers.PrintOptions{OutputFormatType: "jsonpath", OutputFormatArgument: "{.blarg}", AllowMissingKeys: false}, &api.Pod{}, "", "error executing jsonpath \"{.blarg}\": blarg is not found\n"},
 	}
 	for _, test := range tests {
 		buf := bytes.NewBuffer([]byte{})
-		printer, err := printers.GetStandardPrinter(test.OutputOpts, false, legacyscheme.Registry.RESTMapper(legacyscheme.Registry.EnabledVersions()...), legacyscheme.Scheme, legacyscheme.Codecs.LegacyCodec(legacyscheme.Registry.EnabledVersions()...), []runtime.Decoder{legacyscheme.Codecs.UniversalDecoder(), unstructured.UnstructuredJSONScheme}, printers.PrintOptions{})
+		printer, err := printers.GetStandardPrinter(legacyscheme.Registry.RESTMapper(legacyscheme.Registry.EnabledVersions()...), legacyscheme.Scheme, legacyscheme.Codecs.LegacyCodec(legacyscheme.Registry.EnabledVersions()...), []runtime.Decoder{legacyscheme.Codecs.UniversalDecoder(), unstructured.UnstructuredJSONScheme}, *test.PrintOpts)
 		if err != nil {
 			t.Errorf("in %s, unexpected error: %#v", test.Name, err)
 		}
@@ -3132,126 +3203,5 @@ func TestPrintStorageClass(t *testing.T) {
 			t.Fatalf("Expected: %s, got: %s", test.expect, buf.String())
 		}
 		buf.Reset()
-	}
-}
-
-func TestPrintCluster(t *testing.T) {
-	tests := []struct {
-		cluster    federation.Cluster
-		expect     []metav1alpha1.TableRow
-		showLabels bool
-	}{
-		{
-			federation.Cluster{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:              "cluster1",
-					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
-				},
-			},
-			[]metav1alpha1.TableRow{{Cells: []interface{}{"cluster1", "Unknown", "0s"}}},
-			false,
-		},
-		{
-			federation.Cluster{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:              "cluster2",
-					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
-					Labels:            map[string]string{"label1": "", "label2": "cluster"},
-				},
-				Status: federation.ClusterStatus{
-					Conditions: []federation.ClusterCondition{
-						{
-							Status: api.ConditionTrue,
-							Type:   federation.ClusterReady,
-						},
-						{
-							Status: api.ConditionFalse,
-							Type:   federation.ClusterOffline,
-						},
-					},
-				},
-			},
-			[]metav1alpha1.TableRow{{Cells: []interface{}{"cluster2", "Ready,NotOffline", "0s", "label1=,label2=cluster"}}},
-			true,
-		},
-	}
-
-	for i, test := range tests {
-		rows, err := printCluster(&test.cluster, printers.PrintOptions{ShowLabels: test.showLabels})
-		if err != nil {
-			t.Fatal(err)
-		}
-		for i := range rows {
-			rows[i].Object.Object = nil
-		}
-		if !reflect.DeepEqual(test.expect, rows) {
-			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expect, rows))
-		}
-	}
-}
-
-func TestPrintClusterList(t *testing.T) {
-	tests := []struct {
-		clusters   federation.ClusterList
-		expect     []metav1alpha1.TableRow
-		showLabels bool
-	}{
-		// Test podList's pod: name, num of containers, restarts, container ready status
-		{
-			federation.ClusterList{
-				Items: []federation.Cluster{
-					{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:              "cluster1",
-							CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
-						},
-						Status: federation.ClusterStatus{
-							Conditions: []federation.ClusterCondition{
-								{
-									Status: api.ConditionTrue,
-									Type:   federation.ClusterReady,
-								},
-							},
-						},
-					},
-					{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:              "cluster2",
-							CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
-							Labels:            map[string]string{"label1": "", "label2": "cluster2"},
-						},
-						Status: federation.ClusterStatus{
-							Conditions: []federation.ClusterCondition{
-								{
-									Status: api.ConditionTrue,
-									Type:   federation.ClusterReady,
-								},
-								{
-									Status: api.ConditionFalse,
-									Type:   federation.ClusterOffline,
-								},
-							},
-						},
-					},
-				},
-			},
-			[]metav1alpha1.TableRow{{Cells: []interface{}{"cluster1", "Ready", "0s", "<none>"}},
-				{Cells: []interface{}{"cluster2", "Ready,NotOffline", "0s", "label1=,label2=cluster2"}}},
-			true,
-		},
-	}
-
-	for _, test := range tests {
-		rows, err := printClusterList(&test.clusters, printers.PrintOptions{ShowLabels: test.showLabels})
-
-		if err != nil {
-			t.Fatal(err)
-		}
-		for i := range rows {
-			rows[i].Object.Object = nil
-		}
-		if !reflect.DeepEqual(test.expect, rows) {
-			t.Errorf("mismatch: %s", diff.ObjectReflectDiff(test.expect, rows))
-		}
 	}
 }

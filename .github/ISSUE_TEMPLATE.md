@@ -22,7 +22,7 @@ If you're looking for help check [Stack Overflow](https://stackoverflow.com/ques
 
 **Environment**:
 - Kubernetes version (use `kubectl version`):
-- Cloud provider or hardware configuration**:
+- Cloud provider or hardware configuration:
 - OS (e.g. from /etc/os-release):
 - Kernel (e.g. `uname -a`):
 - Install tools:

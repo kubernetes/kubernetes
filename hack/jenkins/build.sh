@@ -35,8 +35,6 @@ export PATH=$PATH:/usr/local/go/bin
 # Skip gcloud update checking
 export CLOUDSDK_COMPONENT_MANAGER_DISABLE_UPDATE_CHECK=true
 
-# FEDERATION?
-: ${FEDERATION:="false"}
 : ${KUBE_RELEASE_RUN_TESTS:="n"}
 export KUBE_RELEASE_RUN_TESTS
 
@@ -67,10 +65,9 @@ else
 
   [[ -n "${KUBE_GCS_RELEASE_BUCKET-}" ]] \
     && bucket_flag="--bucket=${KUBE_GCS_RELEASE_BUCKET-}"
-  ${FEDERATION} && federation_flag="--federation"
   [[ -n "${KUBE_GCS_RELEASE_SUFFIX-}" ]] \
     && gcs_suffix_flag="--gcs-suffix=${KUBE_GCS_RELEASE_SUFFIX-}"
-  ${push_build} ${bucket_flag-} ${federation_flag-} ${gcs_suffix_flag-} \
+  ${push_build} ${bucket_flag-} ${gcs_suffix_flag-} \
     --nomock --verbose --ci
 fi
 

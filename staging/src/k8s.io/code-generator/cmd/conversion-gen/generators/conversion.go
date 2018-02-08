@@ -30,17 +30,9 @@ import (
 	"k8s.io/gengo/types"
 
 	"github.com/golang/glog"
-)
 
-// CustomArgs is used by the gengo framework to pass args specific to this generator.
-type CustomArgs struct {
-	ExtraPeerDirs []string // Always consider these as last-ditch possibilities for conversions.
-	// Skipunsafe indicates whether to generate unsafe conversions to improve the efficiency
-	// of these operations. The unsafe operation is a direct pointer assignment via unsafe
-	// (within the allowed uses of unsafe) and is equivalent to a proposed Golang change to
-	// allow structs that are identical to be assigned to each other.
-	SkipUnsafe bool
-}
+	conversionargs "k8s.io/code-generator/cmd/conversion-gen/args"
+)
 
 // These are the comment tags that carry parameters for conversion generation.
 const (
@@ -131,6 +123,10 @@ type conversionFuncMap map[conversionPair]*types.Type
 
 // Returns all manually-defined conversion functions in the package.
 func getManualConversionFunctions(context *generator.Context, pkg *types.Package, manualMap conversionFuncMap) {
+	if pkg == nil {
+		glog.Warningf("Skipping nil package passed to getManualConversionFunctions")
+		return
+	}
 	glog.V(5).Infof("Scanning for conversion functions in %v", pkg.Name)
 
 	scopeName := types.Ref(conversionPackagePath, "Scope").Name
@@ -246,10 +242,9 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 			continue
 		}
 		skipUnsafe := false
-		if customArgs, ok := arguments.CustomArgs.(*CustomArgs); ok {
-			if len(customArgs.ExtraPeerDirs) > 0 {
-				peerPkgs = append(peerPkgs, customArgs.ExtraPeerDirs...)
-			}
+		if customArgs, ok := arguments.CustomArgs.(*conversionargs.CustomArgs); ok {
+			peerPkgs = append(peerPkgs, customArgs.BasePeerDirs...)
+			peerPkgs = append(peerPkgs, customArgs.ExtraPeerDirs...)
 			skipUnsafe = customArgs.SkipUnsafe
 		}
 
@@ -262,7 +257,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 			externalTypes := externalTypesValues[0]
 			glog.V(5).Infof("  external types tags: %q", externalTypes)
 			var err error
-			typesPkg, err = context.AddDirectory(filepath.Join(pkg.Path, externalTypes))
+			typesPkg, err = context.AddDirectory(externalTypes)
 			if err != nil {
 				glog.Fatalf("cannot import package %s", externalTypes)
 			}
@@ -573,12 +568,6 @@ func argsFromType(inType, outType *types.Type) generator.Args {
 	return generator.Args{
 		"inType":  inType,
 		"outType": outType,
-	}
-}
-
-func defaultingArgsFromType(inType *types.Type) generator.Args {
-	return generator.Args{
-		"inType": inType,
 	}
 }
 

@@ -28,8 +28,8 @@ import (
 // Registry is an interface for things that know how to store NetworkPolicies.
 type Registry interface {
 	ListNetworkPolicies(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (*networking.NetworkPolicyList, error)
-	CreateNetworkPolicy(ctx genericapirequest.Context, np *networking.NetworkPolicy) error
-	UpdateNetworkPolicy(ctx genericapirequest.Context, np *networking.NetworkPolicy) error
+	CreateNetworkPolicy(ctx genericapirequest.Context, np *networking.NetworkPolicy, createValidation rest.ValidateObjectFunc) error
+	UpdateNetworkPolicy(ctx genericapirequest.Context, np *networking.NetworkPolicy, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) error
 	GetNetworkPolicy(ctx genericapirequest.Context, name string, options *metav1.GetOptions) (*networking.NetworkPolicy, error)
 	DeleteNetworkPolicy(ctx genericapirequest.Context, name string) error
 	WatchNetworkPolicies(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (watch.Interface, error)
@@ -55,13 +55,13 @@ func (s *storage) ListNetworkPolicies(ctx genericapirequest.Context, options *me
 	return obj.(*networking.NetworkPolicyList), nil
 }
 
-func (s *storage) CreateNetworkPolicy(ctx genericapirequest.Context, np *networking.NetworkPolicy) error {
-	_, err := s.Create(ctx, np, false)
+func (s *storage) CreateNetworkPolicy(ctx genericapirequest.Context, np *networking.NetworkPolicy, createValidation rest.ValidateObjectFunc) error {
+	_, err := s.Create(ctx, np, createValidation, false)
 	return err
 }
 
-func (s *storage) UpdateNetworkPolicy(ctx genericapirequest.Context, np *networking.NetworkPolicy) error {
-	_, _, err := s.Update(ctx, np.Name, rest.DefaultUpdatedObjectInfo(np))
+func (s *storage) UpdateNetworkPolicy(ctx genericapirequest.Context, np *networking.NetworkPolicy, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) error {
+	_, _, err := s.Update(ctx, np.Name, rest.DefaultUpdatedObjectInfo(np), createValidation, updateValidation)
 	return err
 }
 

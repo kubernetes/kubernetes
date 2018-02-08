@@ -23,7 +23,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
@@ -73,11 +73,12 @@ func RunClusterInfo(f cmdutil.Factory, out io.Writer, cmd *cobra.Command) error 
 
 	// TODO use generalized labels once they are implemented (#341)
 	b := f.NewBuilder().
+		Internal().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
-		SelectorParam("kubernetes.io/cluster-service=true").
+		LabelSelectorParam("kubernetes.io/cluster-service=true").
 		ResourceTypeOrNameArgs(false, []string{"services"}...).
 		Latest()
-	b.Do().Visit(func(r *resource.Info, err error) error {
+	err = b.Do().Visit(func(r *resource.Info, err error) error {
 		if err != nil {
 			return err
 		}
@@ -125,7 +126,7 @@ func RunClusterInfo(f cmdutil.Factory, out io.Writer, cmd *cobra.Command) error 
 		return nil
 	})
 	out.Write([]byte("\nTo further debug and diagnose cluster problems, use 'kubectl cluster-info dump'.\n"))
-	return nil
+	return err
 
 	// TODO consider printing more information about cluster
 }
@@ -134,7 +135,7 @@ func printService(out io.Writer, name, link string) {
 	ct.ChangeColor(ct.Green, false, ct.None, false)
 	fmt.Fprint(out, name)
 	ct.ResetColor()
-	fmt.Fprintf(out, " is running at ")
+	fmt.Fprint(out, " is running at ")
 	ct.ChangeColor(ct.Yellow, false, ct.None, false)
 	fmt.Fprint(out, link)
 	ct.ResetColor()

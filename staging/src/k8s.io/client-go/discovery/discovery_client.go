@@ -145,9 +145,9 @@ func (d *DiscoveryClient) ServerGroups() (apiGroupList *metav1.APIGroupList, err
 		apiGroupList = &metav1.APIGroupList{}
 	}
 
-	// append the group retrieved from /api to the list if not empty
+	// prepend the group retrieved from /api to the list if not empty
 	if len(v.Versions) != 0 {
-		apiGroupList.Groups = append(apiGroupList.Groups, apiGroup)
+		apiGroupList.Groups = append([]metav1.APIGroup{apiGroup}, apiGroupList.Groups...)
 	}
 	return apiGroupList, nil
 }
@@ -393,15 +393,6 @@ func NewDiscoveryClientForConfigOrDie(c *restclient.Config) *DiscoveryClient {
 // NewDiscoveryClient returns  a new DiscoveryClient for the given RESTClient.
 func NewDiscoveryClient(c restclient.Interface) *DiscoveryClient {
 	return &DiscoveryClient{restClient: c, LegacyPrefix: "/api"}
-}
-
-func stringDoesntExistIn(str string, slice []string) bool {
-	for _, s := range slice {
-		if s == str {
-			return false
-		}
-	}
-	return true
 }
 
 // RESTClient returns a RESTClient that is used to communicate

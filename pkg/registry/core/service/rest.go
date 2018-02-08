@@ -36,12 +36,13 @@ import (
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/helper"
 	apiservice "k8s.io/kubernetes/pkg/api/service"
-	"k8s.io/kubernetes/pkg/api/validation"
+	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/apis/core/helper"
+	"k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/registry/core/endpoint"
+	podstore "k8s.io/kubernetes/pkg/registry/core/pod/storage"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	"k8s.io/kubernetes/pkg/registry/core/service/portallocator"
 )
@@ -59,10 +60,21 @@ type REST struct {
 	serviceIPs       ipallocator.Interface
 	serviceNodePorts portallocator.Interface
 	proxyTransport   http.RoundTripper
+	pods             *podstore.REST
+}
+
+// ServiceNodePort includes protocol and port number of a service NodePort.
+type ServiceNodePort struct {
+	// The IP protocol for this port. Supports "TCP" and "UDP".
+	Protocol api.Protocol
+
+	// The port on each node on which this service is exposed.
+	// Default is to auto-allocate a port if the ServiceType of this Service requires one.
+	NodePort int32
 }
 
 // NewStorage returns a new REST.
-func NewStorage(registry Registry, endpoints endpoint.Registry, serviceIPs ipallocator.Interface,
+func NewStorage(registry Registry, endpoints endpoint.Registry, pods *podstore.REST, serviceIPs ipallocator.Interface,
 	serviceNodePorts portallocator.Interface, proxyTransport http.RoundTripper) *ServiceRest {
 	rest := &REST{
 		registry:         registry,
@@ -70,6 +82,7 @@ func NewStorage(registry Registry, endpoints endpoint.Registry, serviceIPs ipall
 		serviceIPs:       serviceIPs,
 		serviceNodePorts: serviceNodePorts,
 		proxyTransport:   proxyTransport,
+		pods:             pods,
 	}
 	return &ServiceRest{
 		Service: rest,
@@ -88,7 +101,7 @@ func (rs *REST) Categories() []string {
 }
 
 // TODO: implement includeUninitialized by refactoring this to move to store
-func (rs *REST) Create(ctx genericapirequest.Context, obj runtime.Object, includeUninitialized bool) (runtime.Object, error) {
+func (rs *REST) Create(ctx genericapirequest.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, includeUninitialized bool) (runtime.Object, error) {
 	service := obj.(*api.Service)
 
 	if err := rest.BeforeCreate(Strategy, ctx, obj); err != nil {
@@ -121,19 +134,17 @@ func (rs *REST) Create(ctx genericapirequest.Context, obj runtime.Object, includ
 		}
 	}
 
-	// Handle ExternalTraiffc related fields during service creation.
-	if utilfeature.DefaultFeatureGate.Enabled(features.ExternalTrafficLocalOnly) {
-		if apiservice.NeedsHealthCheck(service) {
-			if err := rs.allocateHealthCheckNodePort(service, nodePortOp); err != nil {
-				return nil, errors.NewInternalError(err)
-			}
-		}
-		if errs := validation.ValidateServiceExternalTrafficFieldsCombination(service); len(errs) > 0 {
-			return nil, errors.NewInvalid(api.Kind("Service"), service.Name, errs)
+	// Handle ExternalTraffic related fields during service creation.
+	if apiservice.NeedsHealthCheck(service) {
+		if err := rs.allocateHealthCheckNodePort(service, nodePortOp); err != nil {
+			return nil, errors.NewInternalError(err)
 		}
 	}
+	if errs := validation.ValidateServiceExternalTrafficFieldsCombination(service); len(errs) > 0 {
+		return nil, errors.NewInvalid(api.Kind("Service"), service.Name, errs)
+	}
 
-	out, err := rs.registry.CreateService(ctx, service)
+	out, err := rs.registry.CreateService(ctx, service, createValidation)
 	if err != nil {
 		err = rest.CheckGeneratedNameError(Strategy, err, service)
 	}
@@ -181,8 +192,7 @@ func (rs *REST) Delete(ctx genericapirequest.Context, id string) (runtime.Object
 		}
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.ExternalTrafficLocalOnly) &&
-		apiservice.NeedsHealthCheck(service) {
+	if apiservice.NeedsHealthCheck(service) {
 		nodePort := service.Spec.HealthCheckNodePort
 		if nodePort > 0 {
 			err := rs.serviceNodePorts.Release(int(nodePort))
@@ -284,7 +294,7 @@ func (rs *REST) healthCheckNodePortUpdate(oldService, service *api.Service, node
 	return true, nil
 }
 
-func (rs *REST) Update(ctx genericapirequest.Context, name string, objInfo rest.UpdatedObjectInfo) (runtime.Object, bool, error) {
+func (rs *REST) Update(ctx genericapirequest.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (runtime.Object, bool, error) {
 	oldService, err := rs.registry.GetService(ctx, name, &metav1.GetOptions{})
 	if err != nil {
 		return nil, false, err
@@ -348,19 +358,17 @@ func (rs *REST) Update(ctx genericapirequest.Context, name string, objInfo rest.
 		service.Status.LoadBalancer = api.LoadBalancerStatus{}
 	}
 
-	// Handle ExternalTraiffc related updates.
-	if utilfeature.DefaultFeatureGate.Enabled(features.ExternalTrafficLocalOnly) {
-		success, err := rs.healthCheckNodePortUpdate(oldService, service, nodePortOp)
-		if !success || err != nil {
-			return nil, false, err
-		}
-		externalTrafficPolicyUpdate(oldService, service)
-		if errs := validation.ValidateServiceExternalTrafficFieldsCombination(service); len(errs) > 0 {
-			return nil, false, errors.NewInvalid(api.Kind("Service"), service.Name, errs)
-		}
+	// Handle ExternalTraffic related updates.
+	success, err := rs.healthCheckNodePortUpdate(oldService, service, nodePortOp)
+	if !success || err != nil {
+		return nil, false, err
+	}
+	externalTrafficPolicyUpdate(oldService, service)
+	if errs := validation.ValidateServiceExternalTrafficFieldsCombination(service); len(errs) > 0 {
+		return nil, false, errors.NewInvalid(api.Kind("Service"), service.Name, errs)
 	}
 
-	out, err := rs.registry.UpdateService(ctx, service)
+	out, err := rs.registry.UpdateService(ctx, service, createValidation, updateValidation)
 	if err == nil {
 		el := nodePortOp.Commit()
 		if el != nil {
@@ -422,24 +430,73 @@ func (rs *REST) ResourceLocation(ctx genericapirequest.Context, id string) (*url
 		}
 		for i := range ss.Ports {
 			if ss.Ports[i].Name == portStr {
-				// Pick a random address.
-				ip := ss.Addresses[rand.Intn(len(ss.Addresses))].IP
-				port := int(ss.Ports[i].Port)
-				return &url.URL{
-					Scheme: svcScheme,
-					Host:   net.JoinHostPort(ip, strconv.Itoa(port)),
-				}, rs.proxyTransport, nil
+				addrSeed := rand.Intn(len(ss.Addresses))
+				// This is a little wonky, but it's expensive to test for the presence of a Pod
+				// So we repeatedly try at random and validate it, this means that for an invalid
+				// service with a lot of endpoints we're going to potentially make a lot of calls,
+				// but in the expected case we'll only make one.
+				for try := 0; try < len(ss.Addresses); try++ {
+					addr := ss.Addresses[(addrSeed+try)%len(ss.Addresses)]
+					if !utilfeature.DefaultFeatureGate.Enabled(features.ServiceProxyAllowExternalIPs) {
+						if err := isValidAddress(ctx, &addr, rs.pods); err != nil {
+							glog.Errorf("Address %v isn't valid (%v)", addr, err)
+							continue
+						}
+					}
+					ip := addr.IP
+					port := int(ss.Ports[i].Port)
+					return &url.URL{
+						Scheme: svcScheme,
+						Host:   net.JoinHostPort(ip, strconv.Itoa(port)),
+					}, rs.proxyTransport, nil
+				}
+				glog.Errorf("Failed to find a valid address, skipping subset: %v", ss)
 			}
 		}
 	}
 	return nil, nil, errors.NewServiceUnavailable(fmt.Sprintf("no endpoints available for service %q", id))
 }
 
+func isValidAddress(ctx genericapirequest.Context, addr *api.EndpointAddress, pods *podstore.REST) error {
+	if addr.TargetRef == nil {
+		return fmt.Errorf("Address has no target ref, skipping: %v", addr)
+	}
+	if genericapirequest.NamespaceValue(ctx) != addr.TargetRef.Namespace {
+		return fmt.Errorf("Address namespace doesn't match context namespace")
+	}
+	obj, err := pods.Get(ctx, addr.TargetRef.Name, &metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+	pod, ok := obj.(*api.Pod)
+	if !ok {
+		return fmt.Errorf("failed to cast to pod: %v", obj)
+	}
+	if pod == nil {
+		return fmt.Errorf("pod is missing, skipping (%s/%s)", addr.TargetRef.Namespace, addr.TargetRef.Name)
+	}
+	if pod.Status.PodIP != addr.IP {
+		return fmt.Errorf("pod ip doesn't match endpoint ip, skipping: %s vs %s (%s/%s)", pod.Status.PodIP, addr.IP, addr.TargetRef.Namespace, addr.TargetRef.Name)
+	}
+	return nil
+}
+
 // This is O(N), but we expect haystack to be small;
 // so small that we expect a linear search to be faster
-func contains(haystack []int, needle int) bool {
+func containsNumber(haystack []int, needle int) bool {
 	for _, v := range haystack {
 		if v == needle {
+			return true
+		}
+	}
+	return false
+}
+
+// This is O(N), but we expect serviceNodePorts to be small;
+// so small that we expect a linear search to be faster
+func containsNodePort(serviceNodePorts []ServiceNodePort, serviceNodePort ServiceNodePort) bool {
+	for _, snp := range serviceNodePorts {
+		if snp == serviceNodePort {
 			return true
 		}
 	}
@@ -569,44 +626,48 @@ func (rs *REST) initNodePorts(service *api.Service, nodePortOp *portallocator.Po
 }
 
 func (rs *REST) updateNodePorts(oldService, newService *api.Service, nodePortOp *portallocator.PortAllocationOperation) error {
-	oldNodePorts := CollectServiceNodePorts(oldService)
+	oldNodePortsNumbers := CollectServiceNodePorts(oldService)
+	newNodePorts := []ServiceNodePort{}
+	portAllocated := map[int]bool{}
 
-	newNodePorts := []int{}
 	for i := range newService.Spec.Ports {
 		servicePort := &newService.Spec.Ports[i]
-		nodePort := int(servicePort.NodePort)
-		if nodePort != 0 {
-			if !contains(oldNodePorts, nodePort) {
-				err := nodePortOp.Allocate(nodePort)
+		nodePort := ServiceNodePort{Protocol: servicePort.Protocol, NodePort: servicePort.NodePort}
+		if nodePort.NodePort != 0 {
+			if !containsNumber(oldNodePortsNumbers, int(nodePort.NodePort)) && !portAllocated[int(nodePort.NodePort)] {
+				err := nodePortOp.Allocate(int(nodePort.NodePort))
 				if err != nil {
-					el := field.ErrorList{field.Invalid(field.NewPath("spec", "ports").Index(i).Child("nodePort"), nodePort, err.Error())}
+					el := field.ErrorList{field.Invalid(field.NewPath("spec", "ports").Index(i).Child("nodePort"), nodePort.NodePort, err.Error())}
 					return errors.NewInvalid(api.Kind("Service"), newService.Name, el)
 				}
+				portAllocated[int(nodePort.NodePort)] = true
 			}
 		} else {
-			nodePort, err := nodePortOp.AllocateNext()
+			nodePortNumber, err := nodePortOp.AllocateNext()
 			if err != nil {
 				// TODO: what error should be returned here?  It's not a
 				// field-level validation failure (the field is valid), and it's
 				// not really an internal error.
 				return errors.NewInternalError(fmt.Errorf("failed to allocate a nodePort: %v", err))
 			}
-			servicePort.NodePort = int32(nodePort)
+			servicePort.NodePort = int32(nodePortNumber)
+			nodePort.NodePort = servicePort.NodePort
 		}
-		// Detect duplicate node ports; this should have been caught by validation, so we panic
-		if contains(newNodePorts, nodePort) {
-			panic("duplicate node port")
+		if containsNodePort(newNodePorts, nodePort) {
+			return fmt.Errorf("duplicate nodePort: %v", nodePort)
 		}
 		newNodePorts = append(newNodePorts, nodePort)
 	}
 
+	newNodePortsNumbers := CollectServiceNodePorts(newService)
+
 	// The comparison loops are O(N^2), but we don't expect N to be huge
 	// (there's a hard-limit at 2^16, because they're ports; and even 4 ports would be a lot)
-	for _, oldNodePort := range oldNodePorts {
-		if contains(newNodePorts, oldNodePort) {
+	for _, oldNodePortNumber := range oldNodePortsNumbers {
+		if containsNumber(newNodePortsNumbers, oldNodePortNumber) {
 			continue
 		}
-		nodePortOp.ReleaseDeferred(oldNodePort)
+		nodePortOp.ReleaseDeferred(int(oldNodePortNumber))
 	}
 
 	return nil

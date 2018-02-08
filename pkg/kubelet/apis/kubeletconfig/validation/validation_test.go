@@ -26,7 +26,7 @@ import (
 func TestValidateKubeletConfiguration(t *testing.T) {
 	successCase := &kubeletconfig.KubeletConfiguration{
 		CgroupsPerQOS:               true,
-		EnforceNodeAllocatable:      []string{"pods"},
+		EnforceNodeAllocatable:      []string{"pods", "system-reserved", "kube-reserved"},
 		SystemCgroups:               "",
 		CgroupRoot:                  "",
 		CAdvisorPort:                0,
@@ -47,6 +47,7 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 		ReadOnlyPort:                0,
 		RegistryBurst:               10,
 		RegistryPullQPS:             5,
+		HairpinMode:                 kubeletconfig.PromiscuousBridge,
 	}
 	if allErrors := ValidateKubeletConfiguration(successCase); allErrors != nil {
 		t.Errorf("expect no errors got %v", allErrors)
@@ -54,7 +55,7 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 
 	errorCase := &kubeletconfig.KubeletConfiguration{
 		CgroupsPerQOS:               false,
-		EnforceNodeAllocatable:      []string{"pods"},
+		EnforceNodeAllocatable:      []string{"pods", "system-reserved", "kube-reserved", "illegal-key"},
 		SystemCgroups:               "/",
 		CgroupRoot:                  "",
 		CAdvisorPort:                -10,
@@ -75,8 +76,9 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 		ReadOnlyPort:                -10,
 		RegistryBurst:               -10,
 		RegistryPullQPS:             -10,
+		HairpinMode:                 "foo",
 	}
-	if allErrors := ValidateKubeletConfiguration(errorCase); len(allErrors.(utilerrors.Aggregate).Errors()) != 20 {
-		t.Errorf("expect 20 errors got %v", len(allErrors.(utilerrors.Aggregate).Errors()))
+	if allErrors := ValidateKubeletConfiguration(errorCase); len(allErrors.(utilerrors.Aggregate).Errors()) != 22 {
+		t.Errorf("expect 22 errors got %v", len(allErrors.(utilerrors.Aggregate).Errors()))
 	}
 }

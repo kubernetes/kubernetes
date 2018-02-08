@@ -24,9 +24,9 @@ set -o pipefail
 #   instead of the $GOPATH directly. For normal projects this can be dropped.
 $(dirname ${BASH_SOURCE})/../generate-internal-groups.sh all \
   k8s.io/code-generator/_examples/apiserver k8s.io/code-generator/_examples/apiserver/apis k8s.io/code-generator/_examples/apiserver/apis \
-  example:v1 \
+  "example:v1 example2:v1" \
   --output-base "$(dirname ${BASH_SOURCE})/../../.."
 $(dirname ${BASH_SOURCE})/../generate-groups.sh all \
   k8s.io/code-generator/_examples/crd k8s.io/code-generator/_examples/crd/apis \
-  example:v1 \
+  "example:v1 example2:v1" \
   --output-base "$(dirname ${BASH_SOURCE})/../../.."

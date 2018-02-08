@@ -15,7 +15,10 @@ import (
 // needs to match the shape of the XML expected to be decoded.
 // If the shape doesn't match unmarshaling will fail.
 func UnmarshalXML(v interface{}, d *xml.Decoder, wrapper string) error {
-	n, _ := XMLToStruct(d, nil)
+	n, err := XMLToStruct(d, nil)
+	if err != nil {
+		return err
+	}
 	if n.Children != nil {
 		for _, root := range n.Children {
 			for _, c := range root {
@@ -23,7 +26,7 @@ func UnmarshalXML(v interface{}, d *xml.Decoder, wrapper string) error {
 					c = wrappedChild[0] // pull out wrapped element
 				}
 
-				err := parse(reflect.ValueOf(v), c, "")
+				err = parse(reflect.ValueOf(v), c, "")
 				if err != nil {
 					if err == io.EOF {
 						return nil

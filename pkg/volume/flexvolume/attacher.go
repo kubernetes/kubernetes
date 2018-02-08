@@ -113,6 +113,8 @@ func (a *flexVolumeAttacher) VolumesAreAttached(specs []*volume.Spec, nodeName t
 				volumesAttachedCheck[spec] = false
 				glog.V(2).Infof("VolumesAreAttached: check volume (%q) is no longer attached", spec.Name())
 			}
+		} else {
+			return nil, err
 		}
 	}
 	return volumesAttachedCheck, nil

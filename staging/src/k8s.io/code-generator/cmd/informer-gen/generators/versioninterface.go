@@ -22,6 +22,8 @@ import (
 	"k8s.io/gengo/generator"
 	"k8s.io/gengo/namer"
 	"k8s.io/gengo/types"
+
+	"k8s.io/code-generator/cmd/client-gen/generators/util"
 )
 
 // versionInterfaceGenerator generates the per-version interface file.
@@ -59,11 +61,21 @@ func (g *versionInterfaceGenerator) GenerateType(c *generator.Context, t *types.
 	sw := generator.NewSnippetWriter(w, c, "$", "$")
 
 	m := map[string]interface{}{
+		"interfacesTweakListOptionsFunc":  c.Universe.Type(types.Name{Package: g.internalInterfacesPackage, Name: "TweakListOptionsFunc"}),
 		"interfacesSharedInformerFactory": c.Universe.Type(types.Name{Package: g.internalInterfacesPackage, Name: "SharedInformerFactory"}),
 		"types": g.types,
 	}
 
 	sw.Do(versionTemplate, m)
+	for _, typeDef := range g.types {
+		tags, err := util.ParseClientGenTags(typeDef.SecondClosestCommentLines)
+		if err != nil {
+			return err
+		}
+		m["namespaced"] = !tags.NonNamespaced
+		m["type"] = typeDef
+		sw.Do(versionFuncTemplate, m)
+	}
 
 	return sw.Error()
 }
@@ -78,18 +90,20 @@ type Interface interface {
 }
 
 type version struct {
-	$.interfacesSharedInformerFactory|raw$
+	factory $.interfacesSharedInformerFactory|raw$
+	namespace string
+	tweakListOptions $.interfacesTweakListOptionsFunc|raw$
 }
 
 // New returns a new Interface.
-func New(f $.interfacesSharedInformerFactory|raw$) Interface {
-	return &version{f}
+func New(f $.interfacesSharedInformerFactory|raw$, namespace string, tweakListOptions $.interfacesTweakListOptionsFunc|raw$) Interface {
+	return &version{factory: f, namespace: namespace, tweakListOptions: tweakListOptions}
 }
+`
 
-$range .types$
-// $.|publicPlural$ returns a $.|public$Informer.
-func (v *version) $.|publicPlural$() $.|public$Informer {
-	return &$.|private$Informer{factory: v.SharedInformerFactory}
+var versionFuncTemplate = `
+// $.type|publicPlural$ returns a $.type|public$Informer.
+func (v *version) $.type|publicPlural$() $.type|public$Informer {
+	return &$.type|private$Informer{factory: v.factory$if .namespaced$, namespace: v.namespace$end$, tweakListOptions: v.tweakListOptions}
 }
-$end$
 `

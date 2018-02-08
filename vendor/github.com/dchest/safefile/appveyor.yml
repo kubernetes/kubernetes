@@ -1,0 +1,24 @@
+version: "{build}"
+
+os: Windows Server 2012 R2
+
+clone_folder: c:\projects\src\github.com\dchest\safefile
+
+environment:
+ PATH: c:\projects\bin;%PATH%
+ GOPATH: c:\projects
+ NOTIFY_TIMEOUT: 5s
+
+install:
+ - go version
+ - go get golang.org/x/tools/cmd/vet
+ - go get -v -t ./...
+
+build_script:
+ - go tool vet -all .
+ - go build ./...
+ - go test -v -race ./...
+
+test: off
+
+deploy: off

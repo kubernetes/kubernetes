@@ -16,8 +16,8 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/client/listers/batch/internalversion",
     deps = [
-        "//pkg/api:go_default_library",
         "//pkg/apis/batch:go_default_library",
+        "//pkg/apis/core:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/labels:go_default_library",
@@ -28,11 +28,11 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["job_test.go"],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/pkg/client/listers/batch/internalversion",
-    library = ":go_default_library",
     deps = [
-        "//pkg/api:go_default_library",
         "//pkg/apis/batch:go_default_library",
+        "//pkg/apis/core:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/labels:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",

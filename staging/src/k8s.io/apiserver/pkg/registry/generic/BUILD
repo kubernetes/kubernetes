@@ -39,6 +39,7 @@ filegroup(
         ":package-srcs",
         "//staging/src/k8s.io/apiserver/pkg/registry/generic/registry:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/registry/generic/rest:all-srcs",
+        "//staging/src/k8s.io/apiserver/pkg/registry/generic/testing:all-srcs",
     ],
     tags = ["automanaged"],
 )

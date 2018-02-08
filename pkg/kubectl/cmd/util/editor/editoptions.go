@@ -41,11 +41,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apimachinery/pkg/util/yaml"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/crlf"
 	"k8s.io/kubernetes/pkg/printers"
 )
@@ -60,7 +60,6 @@ type EditOptions struct {
 
 	cmdutil.ValidateOptions
 
-	Mapper         meta.RESTMapper
 	ResourceMapper *resource.Mapper
 	OriginalResult *resource.Result
 	Encoder        runtime.Encoder
@@ -107,12 +106,8 @@ func (o *EditOptions) Complete(f cmdutil.Factory, out, errOut io.Writer, args []
 	if err != nil {
 		return err
 	}
-	mapper, typer, err := f.UnstructuredObject()
-	if err != nil {
-		return err
-	}
-
-	b := f.NewBuilder().Unstructured(f.UnstructuredClientForMapping, mapper, typer)
+	b := f.NewBuilder().
+		Unstructured()
 	if o.EditMode == NormalEditMode || o.EditMode == ApplyEditMode {
 		// when do normal edit or apply edit we need to always retrieve the latest resource from server
 		b = b.ResourceTypeOrNameArgs(true, args...).Latest()
@@ -132,7 +127,8 @@ func (o *EditOptions) Complete(f cmdutil.Factory, out, errOut io.Writer, args []
 
 	o.updatedResultGetter = func(data []byte) *resource.Result {
 		// resource builder to read objects from edited data
-		return resource.NewBuilder(mapper, f.CategoryExpander(), typer, resource.ClientMapperFunc(f.UnstructuredClientForMapping), unstructured.UnstructuredJSONScheme).
+		return f.NewBuilder().
+			Unstructured().
 			Stream(bytes.NewReader(data), "edited-file").
 			IncludeUninitialized(includeUninitialized).
 			ContinueOnError().
@@ -140,7 +136,6 @@ func (o *EditOptions) Complete(f cmdutil.Factory, out, errOut io.Writer, args []
 			Do()
 	}
 
-	o.Mapper = mapper
 	o.CmdNamespace = cmdNamespace
 	o.Encoder = f.JSONEncoder()
 	o.f = f
@@ -410,14 +405,14 @@ func (o *EditOptions) visitToApplyEditPatch(originalInfos []*resource.Info, patc
 		}
 
 		if reflect.DeepEqual(originalJS, editedJS) {
-			cmdutil.PrintSuccess(o.Mapper, false, o.Out, info.Mapping.Resource, info.Name, false, "skipped")
+			o.f.PrintSuccess(false, o.Out, info.Mapping.Resource, info.Name, false, "skipped")
 			return nil
 		} else {
 			err := o.annotationPatch(info)
 			if err != nil {
 				return err
 			}
-			cmdutil.PrintSuccess(o.Mapper, false, o.Out, info.Mapping.Resource, info.Name, false, "edited")
+			o.f.PrintSuccess(false, o.Out, info.Mapping.Resource, info.Name, false, "edited")
 			return nil
 		}
 	})
@@ -536,7 +531,7 @@ func (o *EditOptions) visitToPatch(originalInfos []*resource.Info, patchVisitor 
 
 		if reflect.DeepEqual(originalJS, editedJS) {
 			// no edit, so just skip it.
-			cmdutil.PrintSuccess(o.Mapper, false, o.Out, info.Mapping.Resource, info.Name, false, "skipped")
+			o.f.PrintSuccess(false, o.Out, info.Mapping.Resource, info.Name, false, "skipped")
 			return nil
 		}
 
@@ -548,7 +543,7 @@ func (o *EditOptions) visitToPatch(originalInfos []*resource.Info, patchVisitor 
 
 		// Create the versioned struct from the type defined in the mapping
 		// (which is the API version we'll be submitting the patch to)
-		versionedObject, err := legacyscheme.Scheme.New(info.Mapping.GroupVersionKind)
+		versionedObject, err := scheme.Scheme.New(info.Mapping.GroupVersionKind)
 		var patchType types.PatchType
 		var patch []byte
 		switch {
@@ -590,7 +585,7 @@ func (o *EditOptions) visitToPatch(originalInfos []*resource.Info, patchVisitor 
 			return nil
 		}
 		info.Refresh(patched, true)
-		cmdutil.PrintSuccess(o.Mapper, false, o.Out, info.Mapping.Resource, info.Name, false, "edited")
+		o.f.PrintSuccess(false, o.Out, info.Mapping.Resource, info.Name, false, "edited")
 		return nil
 	})
 	return err
@@ -601,7 +596,7 @@ func (o *EditOptions) visitToCreate(createVisitor resource.Visitor) error {
 		if err := resource.CreateAndRefresh(info); err != nil {
 			return err
 		}
-		cmdutil.PrintSuccess(o.Mapper, false, o.Out, info.Mapping.Resource, info.Name, false, "created")
+		o.f.PrintSuccess(false, o.Out, info.Mapping.Resource, info.Name, false, "created")
 		return nil
 	})
 	return err

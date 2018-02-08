@@ -34,6 +34,8 @@ import (
 type RemoteConfigSource interface {
 	// UID returns the UID of the remote config source object
 	UID() string
+	// APIPath returns the API path to the remote resource, e.g. its SelfLink
+	APIPath() string
 	// Download downloads the remote config source object returns a Checkpoint backed by the object,
 	// or a sanitized failure reason and error if the download fails
 	Download(client clientset.Interface) (Checkpoint, string, error)
@@ -110,6 +112,13 @@ func (r *remoteConfigMap) UID() string {
 	return string(r.source.ConfigMapRef.UID)
 }
 
+const configMapAPIPathFmt = "/api/v1/namespaces/%s/configmaps/%s"
+
+func (r *remoteConfigMap) APIPath() string {
+	ref := r.source.ConfigMapRef
+	return fmt.Sprintf(configMapAPIPathFmt, ref.Namespace, ref.Name)
+}
+
 func (r *remoteConfigMap) Download(client clientset.Interface) (Checkpoint, string, error) {
 	var reason string
 	uid := string(r.source.ConfigMapRef.UID)
@@ -119,13 +128,13 @@ func (r *remoteConfigMap) Download(client clientset.Interface) (Checkpoint, stri
 	// get the ConfigMap via namespace/name, there doesn't seem to be a way to get it by UID
 	cm, err := client.CoreV1().ConfigMaps(r.source.ConfigMapRef.Namespace).Get(r.source.ConfigMapRef.Name, metav1.GetOptions{})
 	if err != nil {
-		reason = fmt.Sprintf(status.FailSyncReasonDownloadFmt, r.source.ConfigMapRef.Name, r.source.ConfigMapRef.Namespace)
+		reason = fmt.Sprintf(status.FailSyncReasonDownloadFmt, r.APIPath())
 		return nil, reason, fmt.Errorf("%s, error: %v", reason, err)
 	}
 
 	// ensure that UID matches the UID on the reference, the ObjectReference must be unambiguous
 	if r.source.ConfigMapRef.UID != cm.UID {
-		reason = fmt.Sprintf(status.FailSyncReasonUIDMismatchFmt, r.source.ConfigMapRef.UID, cm.UID)
+		reason = fmt.Sprintf(status.FailSyncReasonUIDMismatchFmt, r.source.ConfigMapRef.UID, r.APIPath(), cm.UID)
 		return nil, reason, fmt.Errorf(reason)
 	}
 

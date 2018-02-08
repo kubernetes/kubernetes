@@ -21,6 +21,7 @@ import (
 	"github.com/opencontainers/runc/libcontainer/cgroups"
 	"github.com/opencontainers/runc/libcontainer/configs"
 	"github.com/opencontainers/runc/libcontainer/criurpc"
+	"github.com/opencontainers/runc/libcontainer/intelrdt"
 	"github.com/opencontainers/runc/libcontainer/system"
 	"github.com/opencontainers/runc/libcontainer/utils"
 
@@ -38,10 +39,14 @@ type linuxContainer struct {
 	root                 string
 	config               *configs.Config
 	cgroupManager        cgroups.Manager
+	intelRdtManager      intelrdt.Manager
+	initPath             string
 	initArgs             []string
 	initProcess          parentProcess
 	initProcessStartTime uint64
 	criuPath             string
+	newuidmapPath        string
+	newgidmapPath        string
 	m                    sync.Mutex
 	criuVersion          int
 	state                containerState
@@ -67,6 +72,9 @@ type State struct {
 
 	// Container's standard descriptors (std{in,out,err}), needed for checkpoint and restore
 	ExternalDescriptors []string `json:"external_descriptors,omitempty"`
+
+	// Intel RDT "resource control" filesystem path
+	IntelRdtPath string `json:"intel_rdt_path"`
 }
 
 // Container is a libcontainer container object.
@@ -163,6 +171,11 @@ func (c *linuxContainer) Stats() (*Stats, error) {
 	if stats.CgroupStats, err = c.cgroupManager.GetStats(); err != nil {
 		return stats, newSystemErrorWithCause(err, "getting container stats from cgroups")
 	}
+	if c.intelRdtManager != nil {
+		if stats.IntelRdtStats, err = c.intelRdtManager.GetStats(); err != nil {
+			return stats, newSystemErrorWithCause(err, "getting container's Intel RDT stats")
+		}
+	}
 	for _, iface := range c.config.Networks {
 		switch iface.Type {
 		case "veth":
@@ -192,6 +205,15 @@ func (c *linuxContainer) Set(config configs.Config) error {
 			logrus.Warnf("Setting back cgroup configs failed due to error: %v, your state.json and actual configs might be inconsistent.", err2)
 		}
 		return err
+	}
+	if c.intelRdtManager != nil {
+		if err := c.intelRdtManager.Set(&config); err != nil {
+			// Set configs back
+			if err2 := c.intelRdtManager.Set(c.config); err2 != nil {
+				logrus.Warnf("Setting back intelrdt configs failed due to error: %v, your state.json and actual configs might be inconsistent.", err2)
+			}
+			return err
+		}
 	}
 	// After config setting succeed, update config and states
 	c.config = &config
@@ -268,7 +290,7 @@ func (c *linuxContainer) start(process *Process, isInit bool) error {
 	}
 	if err := parent.start(); err != nil {
 		// terminate the process to ensure that it properly is reaped.
-		if err := parent.terminate(); err != nil {
+		if err := ignoreTerminateErrors(parent.terminate()); err != nil {
 			logrus.Warn(err)
 		}
 		return newSystemErrorWithCause(err, "starting container process")
@@ -294,7 +316,7 @@ func (c *linuxContainer) start(process *Process, isInit bool) error {
 			}
 			for i, hook := range c.config.Hooks.Poststart {
 				if err := hook.Run(s); err != nil {
-					if err := parent.terminate(); err != nil {
+					if err := ignoreTerminateErrors(parent.terminate()); err != nil {
 						logrus.Warn(err)
 					}
 					return newSystemErrorWithCausef(err, "running poststart hook %d", i)
@@ -392,7 +414,8 @@ func (c *linuxContainer) newParentProcess(p *Process, doInit bool) (parentProces
 }
 
 func (c *linuxContainer) commandTemplate(p *Process, childPipe *os.File) (*exec.Cmd, error) {
-	cmd := exec.Command(c.initArgs[0], c.initArgs[1:]...)
+	cmd := exec.Command(c.initPath, c.initArgs[1:]...)
+	cmd.Args[0] = c.initArgs[0]
 	cmd.Stdin = p.Stdin
 	cmd.Stdout = p.Stdout
 	cmd.Stderr = p.Stderr
@@ -434,15 +457,16 @@ func (c *linuxContainer) newInitProcess(p *Process, cmd *exec.Cmd, parentPipe, c
 		return nil, err
 	}
 	return &initProcess{
-		cmd:           cmd,
-		childPipe:     childPipe,
-		parentPipe:    parentPipe,
-		manager:       c.cgroupManager,
-		config:        c.newInitConfig(p),
-		container:     c,
-		process:       p,
-		bootstrapData: data,
-		sharePidns:    sharePidns,
+		cmd:             cmd,
+		childPipe:       childPipe,
+		parentPipe:      parentPipe,
+		manager:         c.cgroupManager,
+		intelRdtManager: c.intelRdtManager,
+		config:          c.newInitConfig(p),
+		container:       c,
+		process:         p,
+		bootstrapData:   data,
+		sharePidns:      sharePidns,
 	}, nil
 }
 
@@ -461,6 +485,7 @@ func (c *linuxContainer) newSetnsProcess(p *Process, cmd *exec.Cmd, parentPipe, 
 	return &setnsProcess{
 		cmd:           cmd,
 		cgroupPaths:   c.cgroupManager.GetPaths(),
+		intelRdtPath:  state.IntelRdtPath,
 		childPipe:     childPipe,
 		parentPipe:    parentPipe,
 		config:        c.newInitConfig(p),
@@ -499,6 +524,8 @@ func (c *linuxContainer) newInitConfig(process *Process) *initConfig {
 		cfg.Rlimits = process.Rlimits
 	}
 	cfg.CreateConsole = process.ConsoleSocket != nil
+	cfg.ConsoleWidth = process.ConsoleWidth
+	cfg.ConsoleHeight = process.ConsoleHeight
 	return cfg
 }
 
@@ -600,9 +627,24 @@ func (c *linuxContainer) checkCriuFeatures(criuOpts *CriuOpts, rpcOpts *criurpc.
 	logrus.Debugf("Feature check says: %s", criuFeatures)
 	missingFeatures := false
 
-	if *criuFeat.MemTrack && !*criuFeatures.MemTrack {
-		missingFeatures = true
-		logrus.Debugf("CRIU does not support MemTrack")
+	// The outer if checks if the fields actually exist
+	if (criuFeat.MemTrack != nil) &&
+		(criuFeatures.MemTrack != nil) {
+		// The inner if checks if they are set to true
+		if *criuFeat.MemTrack && !*criuFeatures.MemTrack {
+			missingFeatures = true
+			logrus.Debugf("CRIU does not support MemTrack")
+		}
+	}
+
+	// This needs to be repeated for every new feature check.
+	// Is there a way to put this in a function. Reflection?
+	if (criuFeat.LazyPages != nil) &&
+		(criuFeatures.LazyPages != nil) {
+		if *criuFeat.LazyPages && !*criuFeatures.LazyPages {
+			missingFeatures = true
+			logrus.Debugf("CRIU does not support LazyPages")
+		}
 	}
 
 	if missingFeatures {
@@ -632,9 +674,9 @@ func parseCriuVersion(path string) (int, error) {
 			return 0, fmt.Errorf("Unable to parse the CRIU version: %s", path)
 		}
 
-		n, err := fmt.Sscanf(string(version), "GitID: v%d.%d.%d", &x, &y, &z) // 1.5.2
+		n, err := fmt.Sscanf(version, "GitID: v%d.%d.%d", &x, &y, &z) // 1.5.2
 		if err != nil {
-			n, err = fmt.Sscanf(string(version), "GitID: v%d.%d", &x, &y) // 1.6
+			n, err = fmt.Sscanf(version, "GitID: v%d.%d", &x, &y) // 1.6
 			y++
 		} else {
 			z++
@@ -758,6 +800,25 @@ func (c *linuxContainer) addMaskPaths(req *criurpc.CriuReq) error {
 		}
 		req.Opts.ExtMnt = append(req.Opts.ExtMnt, extMnt)
 	}
+	return nil
+}
+
+func waitForCriuLazyServer(r *os.File, status string) error {
+
+	data := make([]byte, 1)
+	_, err := r.Read(data)
+	if err != nil {
+		return err
+	}
+	fd, err := os.OpenFile(status, os.O_TRUNC|os.O_WRONLY, os.ModeAppend)
+	if err != nil {
+		return err
+	}
+	_, err = fd.Write(data)
+	if err != nil {
+		return err
+	}
+	fd.Close()
 
 	return nil
 }
@@ -825,6 +886,7 @@ func (c *linuxContainer) Checkpoint(criuOpts *CriuOpts) error {
 		EmptyNs:         proto.Uint32(criuOpts.EmptyNs),
 		OrphanPtsMaster: proto.Bool(true),
 		AutoDedup:       proto.Bool(criuOpts.AutoDedup),
+		LazyPages:       proto.Bool(criuOpts.LazyPages),
 	}
 
 	fcg := c.cgroupManager.GetPaths()["freezer"]
@@ -873,6 +935,24 @@ func (c *linuxContainer) Checkpoint(criuOpts *CriuOpts) error {
 	req := &criurpc.CriuReq{
 		Type: &t,
 		Opts: &rpcOpts,
+	}
+
+	if criuOpts.LazyPages {
+		// lazy migration requested; check if criu supports it
+		feat := criurpc.CriuFeatures{
+			LazyPages: proto.Bool(true),
+		}
+
+		if err := c.checkCriuFeatures(criuOpts, &rpcOpts, &feat); err != nil {
+			return err
+		}
+
+		statusRead, statusWrite, err := os.Pipe()
+		if err != nil {
+			return err
+		}
+		rpcOpts.StatusFd = proto.Int32(int32(statusWrite.Fd()))
+		go waitForCriuLazyServer(statusRead, criuOpts.StatusFd)
 	}
 
 	//no need to dump these information in pre-dump
@@ -1027,6 +1107,7 @@ func (c *linuxContainer) Restore(process *Process, criuOpts *CriuOpts) error {
 			EmptyNs:         proto.Uint32(criuOpts.EmptyNs),
 			OrphanPtsMaster: proto.Bool(true),
 			AutoDedup:       proto.Bool(criuOpts.AutoDedup),
+			LazyPages:       proto.Bool(criuOpts.LazyPages),
 		},
 	}
 
@@ -1404,7 +1485,7 @@ func (c *linuxContainer) criuNotifications(resp *criurpc.CriuResp, process *Proc
 		defer master.Close()
 
 		// While we can access console.master, using the API is a good idea.
-		if err := utils.SendFd(process.ConsoleSocket, master); err != nil {
+		if err := utils.SendFd(process.ConsoleSocket, master.Name(), master.Fd()); err != nil {
 			return err
 		}
 	}
@@ -1519,6 +1600,10 @@ func (c *linuxContainer) currentState() (*State, error) {
 		startTime, _ = c.initProcess.startTime()
 		externalDescriptors = c.initProcess.externalDescriptors()
 	}
+	intelRdtPath, err := intelrdt.GetIntelRdtPath(c.ID())
+	if err != nil {
+		intelRdtPath = ""
+	}
 	state := &State{
 		BaseState: BaseState{
 			ID:                   c.ID(),
@@ -1529,6 +1614,7 @@ func (c *linuxContainer) currentState() (*State, error) {
 		},
 		Rootless:            c.config.Rootless,
 		CgroupPaths:         c.cgroupManager.GetPaths(),
+		IntelRdtPath:        intelRdtPath,
 		NamespacePaths:      make(map[configs.NamespaceType]string),
 		ExternalDescriptors: externalDescriptors,
 	}
@@ -1627,6 +1713,12 @@ func (c *linuxContainer) bootstrapData(cloneFlags uintptr, nsMaps map[configs.Na
 	if !joinExistingUser {
 		// write uid mappings
 		if len(c.config.UidMappings) > 0 {
+			if c.config.Rootless && c.newuidmapPath != "" {
+				r.AddData(&Bytemsg{
+					Type:  UidmapPathAttr,
+					Value: []byte(c.newuidmapPath),
+				})
+			}
 			b, err := encodeIDMapping(c.config.UidMappings)
 			if err != nil {
 				return nil, err
@@ -1647,6 +1739,12 @@ func (c *linuxContainer) bootstrapData(cloneFlags uintptr, nsMaps map[configs.Na
 				Type:  GidmapAttr,
 				Value: b,
 			})
+			if c.config.Rootless && c.newgidmapPath != "" {
+				r.AddData(&Bytemsg{
+					Type:  GidmapPathAttr,
+					Value: []byte(c.newgidmapPath),
+				})
+			}
 			// The following only applies if we are root.
 			if !c.config.Rootless {
 				// check if we have CAP_SETGID to setgroup properly
@@ -1677,4 +1775,19 @@ func (c *linuxContainer) bootstrapData(cloneFlags uintptr, nsMaps map[configs.Na
 	})
 
 	return bytes.NewReader(r.Serialize()), nil
+}
+
+// ignoreTerminateErrors returns nil if the given err matches an error known
+// to indicate that the terminate occurred successfully or err was nil, otherwise
+// err is returned unaltered.
+func ignoreTerminateErrors(err error) error {
+	if err == nil {
+		return nil
+	}
+	s := err.Error()
+	switch {
+	case strings.Contains(s, "process already finished"), strings.Contains(s, "Wait was already called"):
+		return nil
+	}
+	return err
 }

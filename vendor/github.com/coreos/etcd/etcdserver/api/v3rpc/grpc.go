@@ -16,6 +16,10 @@ package v3rpc
 
 import (
 	"crypto/tls"
+	"io/ioutil"
+	"math"
+	"os"
+	"sync"
 
 	"github.com/coreos/etcd/etcdserver"
 	pb "github.com/coreos/etcd/etcdserver/etcdserverpb"
@@ -24,11 +28,16 @@ import (
 	"google.golang.org/grpc/grpclog"
 )
 
-func init() {
-	grpclog.SetLogger(plog)
-}
+const (
+	grpcOverheadBytes = 512 * 1024
+	maxStreams        = math.MaxUint32
+	maxSendBytes      = math.MaxInt32
+)
 
-func Server(s *etcdserver.EtcdServer, tls *tls.Config) *grpc.Server {
+// integration tests call this multiple times, which is racey in gRPC side
+var grpclogOnce sync.Once
+
+func Server(s *etcdserver.EtcdServer, tls *tls.Config, gopts ...grpc.ServerOption) *grpc.Server {
 	var opts []grpc.ServerOption
 	opts = append(opts, grpc.CustomCodec(&codec{}))
 	if tls != nil {
@@ -36,8 +45,11 @@ func Server(s *etcdserver.EtcdServer, tls *tls.Config) *grpc.Server {
 	}
 	opts = append(opts, grpc.UnaryInterceptor(newUnaryInterceptor(s)))
 	opts = append(opts, grpc.StreamInterceptor(newStreamInterceptor(s)))
+	opts = append(opts, grpc.MaxRecvMsgSize(int(s.Cfg.MaxRequestBytes+grpcOverheadBytes)))
+	opts = append(opts, grpc.MaxSendMsgSize(maxSendBytes))
+	opts = append(opts, grpc.MaxConcurrentStreams(maxStreams))
+	grpcServer := grpc.NewServer(append(opts, gopts...)...)
 
-	grpcServer := grpc.NewServer(opts...)
 	pb.RegisterKVServer(grpcServer, NewQuotaKVServer(s))
 	pb.RegisterWatchServer(grpcServer, NewWatchServer(s))
 	pb.RegisterLeaseServer(grpcServer, NewQuotaLeaseServer(s))
@@ -45,5 +57,15 @@ func Server(s *etcdserver.EtcdServer, tls *tls.Config) *grpc.Server {
 	pb.RegisterAuthServer(grpcServer, NewAuthServer(s))
 	pb.RegisterMaintenanceServer(grpcServer, NewMaintenanceServer(s))
 
+	grpclogOnce.Do(func() {
+		if s.Cfg.Debug {
+			grpc.EnableTracing = true
+			// enable info, warning, error
+			grpclog.SetLoggerV2(grpclog.NewLoggerV2(os.Stderr, os.Stderr, os.Stderr))
+		} else {
+			// only discard info
+			grpclog.SetLoggerV2(grpclog.NewLoggerV2(ioutil.Discard, os.Stderr, os.Stderr))
+		}
+	})
 	return grpcServer
 }

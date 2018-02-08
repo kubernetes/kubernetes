@@ -23,8 +23,8 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["discovery_test.go"],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/cmd/kubeadm/app/discovery",
-    library = ":go_default_library",
     deps = ["//cmd/kubeadm/app/apis/kubeadm:go_default_library"],
 )
 

@@ -27,13 +27,8 @@ import (
 	"strings"
 	"testing"
 
-	appsapiv1beta1 "k8s.io/api/apps/v1beta1"
-	autoscalingapiv1 "k8s.io/api/autoscaling/v1"
-	batchapiv1 "k8s.io/api/batch/v1"
-	batchapiv1beta1 "k8s.io/api/batch/v1beta1"
 	certificatesapiv1beta1 "k8s.io/api/certificates/v1beta1"
 	apiv1 "k8s.io/api/core/v1"
-	extensionsapiv1beta1 "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -49,15 +44,16 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	restclient "k8s.io/client-go/rest"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/certificates"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/rbac"
+	"k8s.io/kubernetes/pkg/apis/storage"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master/reconcilers"
 	certificatesrest "k8s.io/kubernetes/pkg/registry/certificates/rest"
@@ -70,7 +66,7 @@ import (
 
 // setUp is a convience function for setting up for (most) tests.
 func setUp(t *testing.T) (*etcdtesting.EtcdTestServer, Config, informers.SharedInformerFactory, *assert.Assertions) {
-	server, storageConfig := etcdtesting.NewUnsecuredEtcd3TestClientServer(t, legacyscheme.Scheme)
+	server, storageConfig := etcdtesting.NewUnsecuredEtcd3TestClientServer(t)
 
 	config := &Config{
 		GenericConfig: genericapiserver.NewConfig(legacyscheme.Codecs),
@@ -88,6 +84,8 @@ func setUp(t *testing.T) (*etcdtesting.EtcdTestServer, Config, informers.SharedI
 	resourceEncoding.SetVersionEncoding(batch.GroupName, *testapi.Batch.GroupVersion(), schema.GroupVersion{Group: batch.GroupName, Version: runtime.APIVersionInternal})
 	// FIXME (soltysh): this GroupVersionResource override should be configurable
 	resourceEncoding.SetResourceEncoding(schema.GroupResource{Group: "batch", Resource: "cronjobs"}, schema.GroupVersion{Group: batch.GroupName, Version: "v1beta1"}, schema.GroupVersion{Group: batch.GroupName, Version: runtime.APIVersionInternal})
+	resourceEncoding.SetResourceEncoding(schema.GroupResource{Group: "storage.k8s.io", Resource: "volumeattachments"}, schema.GroupVersion{Group: storage.GroupName, Version: "v1beta1"}, schema.GroupVersion{Group: storage.GroupName, Version: runtime.APIVersionInternal})
+
 	resourceEncoding.SetVersionEncoding(apps.GroupName, *testapi.Apps.GroupVersion(), schema.GroupVersion{Group: apps.GroupName, Version: runtime.APIVersionInternal})
 	resourceEncoding.SetVersionEncoding(extensions.GroupName, *testapi.Extensions.GroupVersion(), schema.GroupVersion{Group: extensions.GroupName, Version: runtime.APIVersionInternal})
 	resourceEncoding.SetVersionEncoding(rbac.GroupName, *testapi.Rbac.GroupVersion(), schema.GroupVersion{Group: rbac.GroupName, Version: runtime.APIVersionInternal})
@@ -186,32 +184,6 @@ func TestCertificatesRestStorageStrategies(t *testing.T) {
 func newMaster(t *testing.T) (*Master, *etcdtesting.EtcdTestServer, Config, *assert.Assertions) {
 	etcdserver, config, sharedInformers, assert := setUp(t)
 
-	master, err := config.Complete(sharedInformers).New(genericapiserver.EmptyDelegate)
-	if err != nil {
-		t.Fatalf("Error in bringing up the master: %v", err)
-	}
-
-	return master, etcdserver, config, assert
-}
-
-// limitedAPIResourceConfigSource only enables the core group, the extensions group, the batch group, and the autoscaling group.
-func limitedAPIResourceConfigSource() *serverstorage.ResourceConfig {
-	ret := serverstorage.NewResourceConfig()
-	ret.EnableVersions(
-		apiv1.SchemeGroupVersion,
-		extensionsapiv1beta1.SchemeGroupVersion,
-		batchapiv1.SchemeGroupVersion,
-		batchapiv1beta1.SchemeGroupVersion,
-		appsapiv1beta1.SchemeGroupVersion,
-		autoscalingapiv1.SchemeGroupVersion,
-	)
-	return ret
-}
-
-// newLimitedMaster only enables the core group, the extensions group, the batch group, and the autoscaling group.
-func newLimitedMaster(t *testing.T) (*Master, *etcdtesting.EtcdTestServer, Config, *assert.Assertions) {
-	etcdserver, config, sharedInformers, assert := setUp(t)
-	config.ExtraConfig.APIResourceConfigSource = limitedAPIResourceConfigSource()
 	master, err := config.Complete(sharedInformers).New(genericapiserver.EmptyDelegate)
 	if err != nil {
 		t.Fatalf("Error in bringing up the master: %v", err)
@@ -377,8 +349,8 @@ func TestAPIVersionOfDiscoveryEndpoints(t *testing.T) {
 
 func TestNoAlphaVersionsEnabledByDefault(t *testing.T) {
 	config := DefaultAPIResourceConfigSource()
-	for gv, gvConfig := range config.GroupVersionResourceConfigs {
-		if gvConfig.Enable && strings.Contains(gv.Version, "alpha") {
+	for gv, enable := range config.GroupVersionConfigs {
+		if enable && strings.Contains(gv.Version, "alpha") {
 			t.Errorf("Alpha API version %s enabled by default", gv.String())
 		}
 	}

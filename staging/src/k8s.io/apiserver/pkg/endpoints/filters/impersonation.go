@@ -110,8 +110,8 @@ func WithImpersonation(handler http.Handler, requestContextMapper request.Reques
 				return
 			}
 
-			allowed, reason, err := a.Authorize(actingAsAttributes)
-			if err != nil || !allowed {
+			decision, reason, err := a.Authorize(actingAsAttributes)
+			if err != nil || decision != authorizer.DecisionAllow {
 				glog.V(4).Infof("Forbidden: %#v, Reason: %s, Error: %v", req.RequestURI, reason, err)
 				responsewriters.Forbidden(ctx, actingAsAttributes, w, req, reason, s)
 				return

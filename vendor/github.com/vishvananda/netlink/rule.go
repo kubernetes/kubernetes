@@ -8,6 +8,7 @@ import (
 // Rule represents a netlink rule.
 type Rule struct {
 	Priority          int
+	Family            int
 	Table             int
 	Mark              int
 	Mask              int
@@ -20,6 +21,7 @@ type Rule struct {
 	OifName           string
 	SuppressIfgroup   int
 	SuppressPrefixlen int
+	Invert            bool
 }
 
 func (r Rule) String() string {

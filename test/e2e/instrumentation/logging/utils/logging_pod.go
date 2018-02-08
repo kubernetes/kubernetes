@@ -21,10 +21,12 @@ import (
 	"time"
 
 	"fmt"
+
 	api_v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 const (
@@ -101,7 +103,7 @@ func (p *loadLoggingPod) Start(f *framework.Framework) error {
 			Containers: []api_v1.Container{
 				{
 					Name:  loggingContainerName,
-					Image: "gcr.io/google_containers/logs-generator:v0.1.0",
+					Image: imageutils.GetE2EImage(imageutils.LogsGenerator),
 					Env: []api_v1.EnvVar{
 						{
 							Name:  "LOGS_GENERATOR_LINES_TOTAL",

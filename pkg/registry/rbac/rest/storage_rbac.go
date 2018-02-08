@@ -18,7 +18,6 @@ package rest
 
 import (
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/golang/glog"
@@ -26,6 +25,7 @@ import (
 	rbacapiv1 "k8s.io/api/rbac/v1"
 	rbacapiv1alpha1 "k8s.io/api/rbac/v1alpha1"
 	rbacapiv1beta1 "k8s.io/api/rbac/v1beta1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -70,15 +70,15 @@ func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorag
 	// If you add a version here, be sure to add an entry in `k8s.io/kubernetes/cmd/kube-apiserver/app/aggregator.go with specific priorities.
 	// TODO refactor the plumbing to provide the information in the APIGroupInfo
 
-	if apiResourceConfigSource.AnyResourcesForVersionEnabled(rbacapiv1alpha1.SchemeGroupVersion) {
+	if apiResourceConfigSource.VersionEnabled(rbacapiv1alpha1.SchemeGroupVersion) {
 		apiGroupInfo.VersionedResourcesStorageMap[rbacapiv1alpha1.SchemeGroupVersion.Version] = p.storage(rbacapiv1alpha1.SchemeGroupVersion, apiResourceConfigSource, restOptionsGetter)
 		apiGroupInfo.GroupMeta.GroupVersion = rbacapiv1alpha1.SchemeGroupVersion
 	}
-	if apiResourceConfigSource.AnyResourcesForVersionEnabled(rbacapiv1beta1.SchemeGroupVersion) {
+	if apiResourceConfigSource.VersionEnabled(rbacapiv1beta1.SchemeGroupVersion) {
 		apiGroupInfo.VersionedResourcesStorageMap[rbacapiv1beta1.SchemeGroupVersion.Version] = p.storage(rbacapiv1beta1.SchemeGroupVersion, apiResourceConfigSource, restOptionsGetter)
 		apiGroupInfo.GroupMeta.GroupVersion = rbacapiv1beta1.SchemeGroupVersion
 	}
-	if apiResourceConfigSource.AnyResourcesForVersionEnabled(rbacapiv1.SchemeGroupVersion) {
+	if apiResourceConfigSource.VersionEnabled(rbacapiv1.SchemeGroupVersion) {
 		apiGroupInfo.VersionedResourcesStorageMap[rbacapiv1.SchemeGroupVersion.Version] = p.storage(rbacapiv1.SchemeGroupVersion, apiResourceConfigSource, restOptionsGetter)
 		apiGroupInfo.GroupMeta.GroupVersion = rbacapiv1.SchemeGroupVersion
 	}
@@ -87,57 +87,41 @@ func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorag
 }
 
 func (p RESTStorageProvider) storage(version schema.GroupVersion, apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) map[string]rest.Storage {
-	once := new(sync.Once)
-	var (
-		authorizationRuleResolver  rbacregistryvalidation.AuthorizationRuleResolver
-		rolesStorage               rest.StandardStorage
-		roleBindingsStorage        rest.StandardStorage
-		clusterRolesStorage        rest.StandardStorage
-		clusterRoleBindingsStorage rest.StandardStorage
+	storage := map[string]rest.Storage{}
+	rolesStorage := rolestore.NewREST(restOptionsGetter)
+	roleBindingsStorage := rolebindingstore.NewREST(restOptionsGetter)
+	clusterRolesStorage := clusterrolestore.NewREST(restOptionsGetter)
+	clusterRoleBindingsStorage := clusterrolebindingstore.NewREST(restOptionsGetter)
+
+	authorizationRuleResolver := rbacregistryvalidation.NewDefaultRuleResolver(
+		role.AuthorizerAdapter{Registry: role.NewRegistry(rolesStorage)},
+		rolebinding.AuthorizerAdapter{Registry: rolebinding.NewRegistry(roleBindingsStorage)},
+		clusterrole.AuthorizerAdapter{Registry: clusterrole.NewRegistry(clusterRolesStorage)},
+		clusterrolebinding.AuthorizerAdapter{Registry: clusterrolebinding.NewRegistry(clusterRoleBindingsStorage)},
 	)
 
-	initializeStorage := func() {
-		once.Do(func() {
-			rolesStorage = rolestore.NewREST(restOptionsGetter)
-			roleBindingsStorage = rolebindingstore.NewREST(restOptionsGetter)
-			clusterRolesStorage = clusterrolestore.NewREST(restOptionsGetter)
-			clusterRoleBindingsStorage = clusterrolebindingstore.NewREST(restOptionsGetter)
+	// roles
+	storage["roles"] = rolepolicybased.NewStorage(rolesStorage, authorizationRuleResolver)
 
-			authorizationRuleResolver = rbacregistryvalidation.NewDefaultRuleResolver(
-				role.AuthorizerAdapter{Registry: role.NewRegistry(rolesStorage)},
-				rolebinding.AuthorizerAdapter{Registry: rolebinding.NewRegistry(roleBindingsStorage)},
-				clusterrole.AuthorizerAdapter{Registry: clusterrole.NewRegistry(clusterRolesStorage)},
-				clusterrolebinding.AuthorizerAdapter{Registry: clusterrolebinding.NewRegistry(clusterRoleBindingsStorage)},
-			)
-		})
-	}
+	// rolebindings
+	storage["rolebindings"] = rolebindingpolicybased.NewStorage(roleBindingsStorage, p.Authorizer, authorizationRuleResolver)
 
-	storage := map[string]rest.Storage{}
-	if apiResourceConfigSource.ResourceEnabled(version.WithResource("roles")) {
-		initializeStorage()
-		storage["roles"] = rolepolicybased.NewStorage(rolesStorage, authorizationRuleResolver)
-	}
-	if apiResourceConfigSource.ResourceEnabled(version.WithResource("rolebindings")) {
-		initializeStorage()
-		storage["rolebindings"] = rolebindingpolicybased.NewStorage(roleBindingsStorage, p.Authorizer, authorizationRuleResolver)
-	}
-	if apiResourceConfigSource.ResourceEnabled(version.WithResource("clusterroles")) {
-		initializeStorage()
-		storage["clusterroles"] = clusterrolepolicybased.NewStorage(clusterRolesStorage, authorizationRuleResolver)
-	}
-	if apiResourceConfigSource.ResourceEnabled(version.WithResource("clusterrolebindings")) {
-		initializeStorage()
-		storage["clusterrolebindings"] = clusterrolebindingpolicybased.NewStorage(clusterRoleBindingsStorage, p.Authorizer, authorizationRuleResolver)
-	}
+	// clusterroles
+	storage["clusterroles"] = clusterrolepolicybased.NewStorage(clusterRolesStorage, authorizationRuleResolver)
+
+	// clusterrolebindings
+	storage["clusterrolebindings"] = clusterrolebindingpolicybased.NewStorage(clusterRoleBindingsStorage, p.Authorizer, authorizationRuleResolver)
+
 	return storage
 }
 
 func (p RESTStorageProvider) PostStartHook() (string, genericapiserver.PostStartHookFunc, error) {
 	policy := &PolicyData{
-		ClusterRoles:        append(bootstrappolicy.ClusterRoles(), bootstrappolicy.ControllerRoles()...),
-		ClusterRoleBindings: append(bootstrappolicy.ClusterRoleBindings(), bootstrappolicy.ControllerRoleBindings()...),
-		Roles:               bootstrappolicy.NamespaceRoles(),
-		RoleBindings:        bootstrappolicy.NamespaceRoleBindings(),
+		ClusterRoles:            append(bootstrappolicy.ClusterRoles(), bootstrappolicy.ControllerRoles()...),
+		ClusterRoleBindings:     append(bootstrappolicy.ClusterRoleBindings(), bootstrappolicy.ControllerRoleBindings()...),
+		Roles:                   bootstrappolicy.NamespaceRoles(),
+		RoleBindings:            bootstrappolicy.NamespaceRoleBindings(),
+		ClusterRolesToAggregate: bootstrappolicy.ClusterRolesToAggregate(),
 	}
 	return PostStartHookName, policy.EnsureRBACPolicy(), nil
 }
@@ -147,6 +131,8 @@ type PolicyData struct {
 	ClusterRoleBindings []rbac.ClusterRoleBinding
 	Roles               map[string][]rbac.Role
 	RoleBindings        map[string][]rbac.RoleBinding
+	// ClusterRolesToAggregate maps from previous clusterrole name to the new clusterrole name
+	ClusterRolesToAggregate map[string]string
 }
 
 func (p *PolicyData) EnsureRBACPolicy() genericapiserver.PostStartHookFunc {
@@ -173,6 +159,13 @@ func (p *PolicyData) EnsureRBACPolicy() genericapiserver.PostStartHookFunc {
 			}
 			if _, err := clientset.ClusterRoleBindings().List(metav1.ListOptions{}); err != nil {
 				utilruntime.HandleError(fmt.Errorf("unable to initialize clusterrolebindings: %v", err))
+				return false, nil
+			}
+
+			// if the new cluster roles to aggregate do not yet exist, then we need to copy the old roles if they don't exist
+			// in new locations
+			if err := primeAggregatedClusterRoles(p.ClusterRolesToAggregate, clientset); err != nil {
+				utilruntime.HandleError(fmt.Errorf("unable to prime aggregated clusterroles: %v", err))
 				return false, nil
 			}
 
@@ -253,7 +246,7 @@ func (p *PolicyData) EnsureRBACPolicy() genericapiserver.PostStartHookFunc {
 						case result.Operation == reconciliation.ReconcileUpdate:
 							glog.Infof("updated role.%s/%s in %v with additional permissions: %v", rbac.GroupName, role.Name, namespace, result.MissingRules)
 						case result.Operation == reconciliation.ReconcileCreate:
-							glog.Infof("created role.%s/%s in %v ", rbac.GroupName, role.Name, namespace)
+							glog.Infof("created role.%s/%s in %v", rbac.GroupName, role.Name, namespace)
 						}
 						return nil
 					})
@@ -309,4 +302,34 @@ func (p *PolicyData) EnsureRBACPolicy() genericapiserver.PostStartHookFunc {
 
 func (p RESTStorageProvider) GroupName() string {
 	return rbac.GroupName
+}
+
+// primeAggregatedClusterRoles copies roles that have transitioned to aggregated roles and may need to pick up changes
+// that were done to the legacy roles.
+func primeAggregatedClusterRoles(clusterRolesToAggregate map[string]string, clusterRoleClient rbacclient.ClusterRolesGetter) error {
+	for oldName, newName := range clusterRolesToAggregate {
+		_, err := clusterRoleClient.ClusterRoles().Get(newName, metav1.GetOptions{})
+		if err == nil {
+			continue
+		}
+		if !apierrors.IsNotFound(err) {
+			return err
+		}
+
+		existingRole, err := clusterRoleClient.ClusterRoles().Get(oldName, metav1.GetOptions{})
+		if apierrors.IsNotFound(err) {
+			continue
+		}
+		if err != nil {
+			return err
+		}
+		glog.V(1).Infof("migrating %v to %v", existingRole.Name, newName)
+		existingRole.Name = newName
+		existingRole.ResourceVersion = "" // clear this so the object can be created.
+		if _, err := clusterRoleClient.ClusterRoles().Create(existingRole); err != nil && !apierrors.IsAlreadyExists(err) {
+			return err
+		}
+	}
+
+	return nil
 }

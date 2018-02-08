@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2018 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,15 +22,15 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
-	api "k8s.io/kubernetes/pkg/api"
+	core "k8s.io/kubernetes/pkg/apis/core"
 )
 
 // NodeLister helps list Nodes.
 type NodeLister interface {
 	// List lists all Nodes in the indexer.
-	List(selector labels.Selector) (ret []*api.Node, err error)
+	List(selector labels.Selector) (ret []*core.Node, err error)
 	// Get retrieves the Node from the index for a given name.
-	Get(name string) (*api.Node, error)
+	Get(name string) (*core.Node, error)
 	NodeListerExpansion
 }
 
@@ -45,21 +45,21 @@ func NewNodeLister(indexer cache.Indexer) NodeLister {
 }
 
 // List lists all Nodes in the indexer.
-func (s *nodeLister) List(selector labels.Selector) (ret []*api.Node, err error) {
+func (s *nodeLister) List(selector labels.Selector) (ret []*core.Node, err error) {
 	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*api.Node))
+		ret = append(ret, m.(*core.Node))
 	})
 	return ret, err
 }
 
 // Get retrieves the Node from the index for a given name.
-func (s *nodeLister) Get(name string) (*api.Node, error) {
+func (s *nodeLister) Get(name string) (*core.Node, error) {
 	obj, exists, err := s.indexer.GetByKey(name)
 	if err != nil {
 		return nil, err
 	}
 	if !exists {
-		return nil, errors.NewNotFound(api.Resource("node"), name)
+		return nil, errors.NewNotFound(core.Resource("node"), name)
 	}
-	return obj.(*api.Node), nil
+	return obj.(*core.Node), nil
 }

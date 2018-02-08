@@ -40,7 +40,7 @@ const (
 // VirtualDiskProvider defines interfaces for creating disk
 type VirtualDiskProvider interface {
 	Create(ctx context.Context, datastore *vclib.Datastore) (string, error)
-	Delete(ctx context.Context, datastore *vclib.Datastore) error
+	Delete(ctx context.Context, datacenter *vclib.Datacenter) error
 }
 
 // getDiskManager returns vmDiskManager or vdmDiskManager based on given volumeoptions
@@ -75,6 +75,6 @@ func (virtualDisk *VirtualDisk) Create(ctx context.Context, datastore *vclib.Dat
 }
 
 // Delete gets appropriate disk manager and calls respective delete method
-func (virtualDisk *VirtualDisk) Delete(ctx context.Context, datastore *vclib.Datastore) error {
-	return getDiskManager(virtualDisk, VirtualDiskDeleteOperation).Delete(ctx, datastore)
+func (virtualDisk *VirtualDisk) Delete(ctx context.Context, datacenter *vclib.Datacenter) error {
+	return getDiskManager(virtualDisk, VirtualDiskDeleteOperation).Delete(ctx, datacenter)
 }

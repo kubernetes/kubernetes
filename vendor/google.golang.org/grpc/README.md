@@ -10,13 +10,13 @@ Installation
 To install this package, you need to install Go and setup your Go workspace on your computer. The simplest way to install the library is to run:
 
 ```
-$ go get google.golang.org/grpc
+$ go get -u google.golang.org/grpc
 ```
 
 Prerequisites
 -------------
 
-This requires Go 1.6 or later.
+This requires Go 1.7 or later.
 
 Constraints
 -----------

@@ -15,8 +15,8 @@ go_test(
         "testdata/intermediate.pem",
         "testdata/root.pem",
     ],
+    embed = [":go_default_library"],
     importpath = "k8s.io/apiserver/pkg/authentication/request/x509",
-    library = ":go_default_library",
     deps = [
         "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/authentication/authenticator:go_default_library",

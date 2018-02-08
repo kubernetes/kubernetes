@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"golang.org/x/net/context"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/apis/audit"
 	"k8s.io/apiserver/pkg/authentication/user"
@@ -66,8 +67,6 @@ const (
 
 	// auditKey is the context key for the audit event.
 	auditKey
-
-	namespaceDefault = "default" // TODO(sttts): solve import cycle when using metav1.NamespaceDefault
 )
 
 // NewContext instantiates a base context object for request flows.
@@ -77,7 +76,7 @@ func NewContext() Context {
 
 // NewDefaultContext instantiates a base context object for request flows in the default namespace
 func NewDefaultContext() Context {
-	return WithNamespace(NewContext(), namespaceDefault)
+	return WithNamespace(NewContext(), metav1.NamespaceDefault)
 }
 
 // WithValue returns a copy of parent in which the value associated with key is val.
@@ -110,7 +109,7 @@ func NamespaceValue(ctx Context) string {
 func WithNamespaceDefaultIfNone(parent Context) Context {
 	namespace, ok := NamespaceFrom(parent)
 	if !ok || len(namespace) == 0 {
-		return WithNamespace(parent, namespaceDefault)
+		return WithNamespace(parent, metav1.NamespaceDefault)
 	}
 	return parent
 }

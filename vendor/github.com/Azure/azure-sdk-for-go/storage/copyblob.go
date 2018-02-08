@@ -1,5 +1,19 @@
 package storage
 
+// Copyright 2017 Microsoft Corporation
+//
+//  Licensed under the Apache License, Version 2.0 (the "License");
+//  you may not use this file except in compliance with the License.
+//  You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+//  Unless required by applicable law or agreed to in writing, software
+//  distributed under the License is distributed on an "AS IS" BASIS,
+//  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//  See the License for the specific language governing permissions and
+//  limitations under the License.
+
 import (
 	"errors"
 	"fmt"
@@ -50,7 +64,7 @@ type IncrementalCopyOptionsConditions struct {
 
 // Copy starts a blob copy operation and waits for the operation to
 // complete. sourceBlob parameter must be a canonical URL to the blob (can be
-// obtained using GetBlobURL method.) There is no SLA on blob copy and therefore
+// obtained using the GetURL method.) There is no SLA on blob copy and therefore
 // this helper method works faster on smaller files.
 //
 // See https://docs.microsoft.com/en-us/rest/api/storageservices/fileservices/Copy-Blob
@@ -65,7 +79,7 @@ func (b *Blob) Copy(sourceBlob string, options *CopyOptions) error {
 
 // StartCopy starts a blob copy operation.
 // sourceBlob parameter must be a canonical URL to the blob (can be
-// obtained using GetBlobURL method.)
+// obtained using the GetURL method.)
 //
 // See https://docs.microsoft.com/en-us/rest/api/storageservices/fileservices/Copy-Blob
 func (b *Blob) StartCopy(sourceBlob string, options *CopyOptions) (string, error) {

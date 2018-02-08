@@ -10,6 +10,7 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/opencontainers/runc/libcontainer/configs:go_default_library",
+        "//vendor/github.com/opencontainers/runc/libcontainer/intelrdt:go_default_library",
         "//vendor/github.com/opencontainers/selinux/go-selinux:go_default_library",
     ],
 )

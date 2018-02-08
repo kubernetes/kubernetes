@@ -42,8 +42,12 @@ const (
 	testCheckpointContent = `{"version":"v1","name":"fluentd-gcp-v2.0-vmnqx","namespace":"kube-system","data":{},"checksum":1799154314}`
 )
 
-var _ = framework.KubeDescribe("Dockershim [Serial] [Disruptive] [Feature:Docker]", func() {
+var _ = SIGDescribe("Dockershim [Serial] [Disruptive] [Feature:Docker]", func() {
 	f := framework.NewDefaultFramework("dockerhism-checkpoint-test")
+
+	BeforeEach(func() {
+		framework.RunIfContainerRuntimeIs("docker")
+	})
 
 	It("should clean up pod sandbox checkpoint after pod deletion", func() {
 		podName := "pod-checkpoint-no-disrupt"

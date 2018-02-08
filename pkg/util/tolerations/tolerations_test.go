@@ -17,9 +17,8 @@ limitations under the License.
 package tolerations
 
 import (
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"testing"
-
-	"k8s.io/kubernetes/pkg/api"
 )
 
 func TestVerifyAgainstWhitelist(t *testing.T) {

@@ -22,15 +22,18 @@ import (
 	"os"
 
 	"github.com/golang/glog"
-	api "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 )
 
 func addSecretsToOptions(options map[string]string, spec *volume.Spec, namespace string, driverName string, host volume.VolumeHost) error {
-	fv, _ := getVolumeSource(spec)
-	if fv.SecretRef == nil {
+	secretName, secretNamespace, err := getSecretNameAndNamespace(spec, namespace)
+	if err != nil {
+		return err
+	}
+
+	if len(secretName) == 0 || len(secretNamespace) == 0 {
 		return nil
 	}
 
@@ -39,9 +42,9 @@ func addSecretsToOptions(options map[string]string, spec *volume.Spec, namespace
 		return fmt.Errorf("Cannot get kube client")
 	}
 
-	secrets, err := util.GetSecretForPV(namespace, fv.SecretRef.Name, driverName, host.GetKubeClient())
+	secrets, err := util.GetSecretForPV(secretNamespace, secretName, driverName, host.GetKubeClient())
 	if err != nil {
-		err = fmt.Errorf("Couldn't get secret %v/%v err: %v", namespace, fv.SecretRef.Name, err)
+		err = fmt.Errorf("Couldn't get secret %v/%v err: %v", secretNamespace, secretName, err)
 		return err
 	}
 	for name, data := range secrets {
@@ -52,15 +55,68 @@ func addSecretsToOptions(options map[string]string, spec *volume.Spec, namespace
 	return nil
 }
 
-func getVolumeSource(spec *volume.Spec) (volumeSource *api.FlexVolumeSource, readOnly bool) {
+var notFlexVolume = fmt.Errorf("not a flex volume")
+
+func getDriver(spec *volume.Spec) (string, error) {
 	if spec.Volume != nil && spec.Volume.FlexVolume != nil {
-		volumeSource = spec.Volume.FlexVolume
-		readOnly = volumeSource.ReadOnly
-	} else if spec.PersistentVolume != nil {
-		volumeSource = spec.PersistentVolume.Spec.FlexVolume
-		readOnly = spec.ReadOnly
+		return spec.Volume.FlexVolume.Driver, nil
 	}
-	return
+	if spec.PersistentVolume != nil && spec.PersistentVolume.Spec.FlexVolume != nil {
+		return spec.PersistentVolume.Spec.FlexVolume.Driver, nil
+	}
+	return "", notFlexVolume
+}
+
+func getFSType(spec *volume.Spec) (string, error) {
+	if spec.Volume != nil && spec.Volume.FlexVolume != nil {
+		return spec.Volume.FlexVolume.FSType, nil
+	}
+	if spec.PersistentVolume != nil && spec.PersistentVolume.Spec.FlexVolume != nil {
+		return spec.PersistentVolume.Spec.FlexVolume.FSType, nil
+	}
+	return "", notFlexVolume
+}
+
+func getSecretNameAndNamespace(spec *volume.Spec, podNamespace string) (string, string, error) {
+	if spec.Volume != nil && spec.Volume.FlexVolume != nil {
+		if spec.Volume.FlexVolume.SecretRef == nil {
+			return "", "", nil
+		}
+		return spec.Volume.FlexVolume.SecretRef.Name, podNamespace, nil
+	}
+	if spec.PersistentVolume != nil && spec.PersistentVolume.Spec.FlexVolume != nil {
+		if spec.PersistentVolume.Spec.FlexVolume.SecretRef == nil {
+			return "", "", nil
+		}
+		secretName := spec.PersistentVolume.Spec.FlexVolume.SecretRef.Name
+		secretNamespace := spec.PersistentVolume.Spec.FlexVolume.SecretRef.Namespace
+		if len(secretNamespace) == 0 {
+			secretNamespace = podNamespace
+		}
+		return secretName, secretNamespace, nil
+	}
+	return "", "", notFlexVolume
+}
+
+func getReadOnly(spec *volume.Spec) (bool, error) {
+	if spec.Volume != nil && spec.Volume.FlexVolume != nil {
+		return spec.Volume.FlexVolume.ReadOnly, nil
+	}
+	if spec.PersistentVolume != nil && spec.PersistentVolume.Spec.FlexVolume != nil {
+		// ReadOnly is specified at the PV level
+		return spec.ReadOnly, nil
+	}
+	return false, notFlexVolume
+}
+
+func getOptions(spec *volume.Spec) (map[string]string, error) {
+	if spec.Volume != nil && spec.Volume.FlexVolume != nil {
+		return spec.Volume.FlexVolume.Options, nil
+	}
+	if spec.PersistentVolume != nil && spec.PersistentVolume.Spec.FlexVolume != nil {
+		return spec.PersistentVolume.Spec.FlexVolume.Options, nil
+	}
+	return nil, notFlexVolume
 }
 
 func prepareForMount(mounter mount.Interface, deviceMountPath string) (bool, error) {

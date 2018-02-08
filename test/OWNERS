@@ -4,7 +4,6 @@ reviewers:
   - enisoc
   - enj # for test/integration/etcd/etcd_storage_path_test.go
   - erictune
-  - fabianofranz # for test/e2e/kubectl.go
   - foxish # for test/e2e/network-partition.go
   - gmarek
   - janetkuo
@@ -17,6 +16,7 @@ reviewers:
   - ncdc
   - pwittrock # for test/e2e/kubectl.go
   - saad-ali
+  - shyamjvs
   - smarterclayton
   - soltysh
   - sig-testing-reviewers
@@ -31,7 +31,6 @@ approvers:
   - enj # for test/integration/etcd/etcd_storage_path_test.go
   - eparis
   - erictune
-  - fabianofranz # for test/e2e/kubectl.go
   - foxish # for test/e2e/network-partition.go
   - gmarek
   - janetkuo
@@ -44,6 +43,7 @@ approvers:
   - ncdc
   - pwittrock # for test/e2e/kubectl.go
   - saad-ali
+  - shyamjvs
   - sig-testing-approvers
   - smarterclayton
   - soltysh

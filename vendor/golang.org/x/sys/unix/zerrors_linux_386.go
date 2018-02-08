@@ -36,7 +36,7 @@ const (
 	AF_KEY                               = 0xf
 	AF_LLC                               = 0x1a
 	AF_LOCAL                             = 0x1
-	AF_MAX                               = 0x2b
+	AF_MAX                               = 0x2c
 	AF_MPLS                              = 0x1c
 	AF_NETBEUI                           = 0xd
 	AF_NETLINK                           = 0x10
@@ -51,6 +51,7 @@ const (
 	AF_ROUTE                             = 0x10
 	AF_RXRPC                             = 0x21
 	AF_SECURITY                          = 0xe
+	AF_SMC                               = 0x2b
 	AF_SNA                               = 0x16
 	AF_TIPC                              = 0x1e
 	AF_UNIX                              = 0x1
@@ -129,6 +130,7 @@ const (
 	ARPHRD_TUNNEL                        = 0x300
 	ARPHRD_TUNNEL6                       = 0x301
 	ARPHRD_VOID                          = 0xffff
+	ARPHRD_VSOCKMON                      = 0x33a
 	ARPHRD_X25                           = 0x10f
 	B0                                   = 0x0
 	B1000000                             = 0x1008
@@ -392,6 +394,7 @@ const (
 	ETH_P_FIP                            = 0x8914
 	ETH_P_HDLC                           = 0x19
 	ETH_P_HSR                            = 0x892f
+	ETH_P_IBOE                           = 0x8915
 	ETH_P_IEEE802154                     = 0xf6
 	ETH_P_IEEEPUP                        = 0xa00
 	ETH_P_IEEEPUPAT                      = 0xa01
@@ -453,6 +456,8 @@ const (
 	FF1                                  = 0x8000
 	FFDLY                                = 0x8000
 	FLUSHO                               = 0x1000
+	FS_ENCRYPTION_MODE_AES_128_CBC       = 0x5
+	FS_ENCRYPTION_MODE_AES_128_CTS       = 0x6
 	FS_ENCRYPTION_MODE_AES_256_CBC       = 0x3
 	FS_ENCRYPTION_MODE_AES_256_CTS       = 0x4
 	FS_ENCRYPTION_MODE_AES_256_GCM       = 0x2
@@ -657,8 +662,10 @@ const (
 	IPV6_2292PKTOPTIONS                  = 0x6
 	IPV6_2292RTHDR                       = 0x5
 	IPV6_ADDRFORM                        = 0x1
+	IPV6_ADDR_PREFERENCES                = 0x48
 	IPV6_ADD_MEMBERSHIP                  = 0x14
 	IPV6_AUTHHDR                         = 0xa
+	IPV6_AUTOFLOWLABEL                   = 0x46
 	IPV6_CHECKSUM                        = 0x7
 	IPV6_DONTFRAG                        = 0x3e
 	IPV6_DROP_MEMBERSHIP                 = 0x15
@@ -671,12 +678,14 @@ const (
 	IPV6_JOIN_GROUP                      = 0x14
 	IPV6_LEAVE_ANYCAST                   = 0x1c
 	IPV6_LEAVE_GROUP                     = 0x15
+	IPV6_MINHOPCOUNT                     = 0x49
 	IPV6_MTU                             = 0x18
 	IPV6_MTU_DISCOVER                    = 0x17
 	IPV6_MULTICAST_HOPS                  = 0x12
 	IPV6_MULTICAST_IF                    = 0x11
 	IPV6_MULTICAST_LOOP                  = 0x13
 	IPV6_NEXTHOP                         = 0x9
+	IPV6_ORIGDSTADDR                     = 0x4a
 	IPV6_PATHMTU                         = 0x3d
 	IPV6_PKTINFO                         = 0x32
 	IPV6_PMTUDISC_DO                     = 0x2
@@ -687,8 +696,10 @@ const (
 	IPV6_PMTUDISC_WANT                   = 0x1
 	IPV6_RECVDSTOPTS                     = 0x3a
 	IPV6_RECVERR                         = 0x19
+	IPV6_RECVFRAGSIZE                    = 0x4d
 	IPV6_RECVHOPLIMIT                    = 0x33
 	IPV6_RECVHOPOPTS                     = 0x35
+	IPV6_RECVORIGDSTADDR                 = 0x4a
 	IPV6_RECVPATHMTU                     = 0x3c
 	IPV6_RECVPKTINFO                     = 0x31
 	IPV6_RECVRTHDR                       = 0x38
@@ -702,7 +713,9 @@ const (
 	IPV6_RXDSTOPTS                       = 0x3b
 	IPV6_RXHOPOPTS                       = 0x36
 	IPV6_TCLASS                          = 0x43
+	IPV6_TRANSPARENT                     = 0x4b
 	IPV6_UNICAST_HOPS                    = 0x10
+	IPV6_UNICAST_IF                      = 0x4c
 	IPV6_V6ONLY                          = 0x1a
 	IPV6_XFRM_POLICY                     = 0x23
 	IP_ADD_MEMBERSHIP                    = 0x23
@@ -745,6 +758,7 @@ const (
 	IP_PMTUDISC_PROBE                    = 0x3
 	IP_PMTUDISC_WANT                     = 0x1
 	IP_RECVERR                           = 0xb
+	IP_RECVFRAGSIZE                      = 0x19
 	IP_RECVOPTS                          = 0x6
 	IP_RECVORIGDSTADDR                   = 0x14
 	IP_RECVRETOPTS                       = 0x7
@@ -782,6 +796,7 @@ const (
 	KEYCTL_NEGATE                        = 0xd
 	KEYCTL_READ                          = 0xb
 	KEYCTL_REJECT                        = 0x13
+	KEYCTL_RESTRICT_KEYRING              = 0x1d
 	KEYCTL_REVOKE                        = 0x3
 	KEYCTL_SEARCH                        = 0xa
 	KEYCTL_SESSION_TO_PARENT             = 0x12
@@ -915,6 +930,7 @@ const (
 	MS_SILENT                            = 0x8000
 	MS_SLAVE                             = 0x80000
 	MS_STRICTATIME                       = 0x1000000
+	MS_SUBMOUNT                          = 0x4000000
 	MS_SYNC                              = 0x4
 	MS_SYNCHRONOUS                       = 0x10
 	MS_UNBINDABLE                        = 0x20000
@@ -929,6 +945,7 @@ const (
 	NETLINK_DNRTMSG                      = 0xe
 	NETLINK_DROP_MEMBERSHIP              = 0x2
 	NETLINK_ECRYPTFS                     = 0x13
+	NETLINK_EXT_ACK                      = 0xb
 	NETLINK_FIB_LOOKUP                   = 0xa
 	NETLINK_FIREWALL                     = 0x3
 	NETLINK_GENERIC                      = 0x10
@@ -947,6 +964,7 @@ const (
 	NETLINK_RX_RING                      = 0x6
 	NETLINK_SCSITRANSPORT                = 0x12
 	NETLINK_SELINUX                      = 0x7
+	NETLINK_SMC                          = 0x16
 	NETLINK_SOCK_DIAG                    = 0x4
 	NETLINK_TX_RING                      = 0x7
 	NETLINK_UNUSED                       = 0x1
@@ -967,8 +985,10 @@ const (
 	NLMSG_NOOP                           = 0x1
 	NLMSG_OVERRUN                        = 0x4
 	NLM_F_ACK                            = 0x4
+	NLM_F_ACK_TLVS                       = 0x200
 	NLM_F_APPEND                         = 0x800
 	NLM_F_ATOMIC                         = 0x400
+	NLM_F_CAPPED                         = 0x100
 	NLM_F_CREATE                         = 0x400
 	NLM_F_DUMP                           = 0x300
 	NLM_F_DUMP_FILTERED                  = 0x20
@@ -1025,6 +1045,7 @@ const (
 	PACKET_FANOUT_EBPF                   = 0x7
 	PACKET_FANOUT_FLAG_DEFRAG            = 0x8000
 	PACKET_FANOUT_FLAG_ROLLOVER          = 0x1000
+	PACKET_FANOUT_FLAG_UNIQUEID          = 0x2000
 	PACKET_FANOUT_HASH                   = 0x0
 	PACKET_FANOUT_LB                     = 0x1
 	PACKET_FANOUT_QM                     = 0x5
@@ -1256,7 +1277,7 @@ const (
 	RLIMIT_RTTIME                        = 0xf
 	RLIMIT_SIGPENDING                    = 0xb
 	RLIMIT_STACK                         = 0x3
-	RLIM_INFINITY                        = -0x1
+	RLIM_INFINITY                        = 0xffffffffffffffff
 	RTAX_ADVMSS                          = 0x8
 	RTAX_CC_ALGO                         = 0x10
 	RTAX_CWND                            = 0x7
@@ -1281,7 +1302,7 @@ const (
 	RTAX_UNSPEC                          = 0x0
 	RTAX_WINDOW                          = 0x3
 	RTA_ALIGNTO                          = 0x4
-	RTA_MAX                              = 0x19
+	RTA_MAX                              = 0x1a
 	RTCF_DIRECTSRC                       = 0x4000000
 	RTCF_DOREDIRECT                      = 0x1000000
 	RTCF_LOG                             = 0x2000000
@@ -1325,6 +1346,7 @@ const (
 	RTM_DELLINK                          = 0x11
 	RTM_DELMDB                           = 0x55
 	RTM_DELNEIGH                         = 0x1d
+	RTM_DELNETCONF                       = 0x51
 	RTM_DELNSID                          = 0x59
 	RTM_DELQDISC                         = 0x25
 	RTM_DELROUTE                         = 0x19
@@ -1333,6 +1355,7 @@ const (
 	RTM_DELTFILTER                       = 0x2d
 	RTM_F_CLONED                         = 0x200
 	RTM_F_EQUALIZE                       = 0x400
+	RTM_F_FIB_MATCH                      = 0x2000
 	RTM_F_LOOKUP_TABLE                   = 0x1000
 	RTM_F_NOTIFY                         = 0x100
 	RTM_F_PREFIX                         = 0x800
@@ -1354,10 +1377,11 @@ const (
 	RTM_GETSTATS                         = 0x5e
 	RTM_GETTCLASS                        = 0x2a
 	RTM_GETTFILTER                       = 0x2e
-	RTM_MAX                              = 0x5f
+	RTM_MAX                              = 0x63
 	RTM_NEWACTION                        = 0x30
 	RTM_NEWADDR                          = 0x14
 	RTM_NEWADDRLABEL                     = 0x48
+	RTM_NEWCACHEREPORT                   = 0x60
 	RTM_NEWLINK                          = 0x10
 	RTM_NEWMDB                           = 0x54
 	RTM_NEWNDUSEROPT                     = 0x44
@@ -1372,8 +1396,8 @@ const (
 	RTM_NEWSTATS                         = 0x5c
 	RTM_NEWTCLASS                        = 0x28
 	RTM_NEWTFILTER                       = 0x2c
-	RTM_NR_FAMILIES                      = 0x14
-	RTM_NR_MSGTYPES                      = 0x50
+	RTM_NR_FAMILIES                      = 0x15
+	RTM_NR_MSGTYPES                      = 0x54
 	RTM_SETDCB                           = 0x4f
 	RTM_SETLINK                          = 0x13
 	RTM_SETNEIGHTBL                      = 0x43
@@ -1384,6 +1408,7 @@ const (
 	RTNH_F_OFFLOAD                       = 0x8
 	RTNH_F_ONLINK                        = 0x4
 	RTNH_F_PERVASIVE                     = 0x2
+	RTNH_F_UNRESOLVED                    = 0x20
 	RTN_MAX                              = 0xb
 	RTPROT_BABEL                         = 0x2a
 	RTPROT_BIRD                          = 0xc
@@ -1414,6 +1439,7 @@ const (
 	SCM_TIMESTAMP                        = 0x1d
 	SCM_TIMESTAMPING                     = 0x25
 	SCM_TIMESTAMPING_OPT_STATS           = 0x36
+	SCM_TIMESTAMPING_PKTINFO             = 0x3a
 	SCM_TIMESTAMPNS                      = 0x23
 	SCM_WIFI_STATUS                      = 0x29
 	SECCOMP_MODE_DISABLED                = 0x0
@@ -1552,6 +1578,7 @@ const (
 	SO_BSDCOMPAT                         = 0xe
 	SO_BUSY_POLL                         = 0x2e
 	SO_CNX_ADVICE                        = 0x35
+	SO_COOKIE                            = 0x39
 	SO_DEBUG                             = 0x1
 	SO_DETACH_BPF                        = 0x1b
 	SO_DETACH_FILTER                     = 0x1b
@@ -1560,11 +1587,13 @@ const (
 	SO_ERROR                             = 0x4
 	SO_GET_FILTER                        = 0x1a
 	SO_INCOMING_CPU                      = 0x31
+	SO_INCOMING_NAPI_ID                  = 0x38
 	SO_KEEPALIVE                         = 0x9
 	SO_LINGER                            = 0xd
 	SO_LOCK_FILTER                       = 0x2c
 	SO_MARK                              = 0x24
 	SO_MAX_PACING_RATE                   = 0x2f
+	SO_MEMINFO                           = 0x37
 	SO_NOFCS                             = 0x2b
 	SO_NO_CHECK                          = 0xb
 	SO_OOBINLINE                         = 0xa
@@ -1572,6 +1601,7 @@ const (
 	SO_PASSSEC                           = 0x22
 	SO_PEEK_OFF                          = 0x2a
 	SO_PEERCRED                          = 0x11
+	SO_PEERGROUPS                        = 0x3b
 	SO_PEERNAME                          = 0x1c
 	SO_PEERSEC                           = 0x1f
 	SO_PRIORITY                          = 0xc
@@ -1668,6 +1698,7 @@ const (
 	TCP_CORK                             = 0x3
 	TCP_DEFER_ACCEPT                     = 0x9
 	TCP_FASTOPEN                         = 0x17
+	TCP_FASTOPEN_CONNECT                 = 0x1e
 	TCP_INFO                             = 0xb
 	TCP_KEEPCNT                          = 0x6
 	TCP_KEEPIDLE                         = 0x4
@@ -1727,6 +1758,7 @@ const (
 	TIOCGPKT                             = 0x80045438
 	TIOCGPTLCK                           = 0x80045439
 	TIOCGPTN                             = 0x80045430
+	TIOCGPTPEER                          = 0x5441
 	TIOCGRS485                           = 0x542e
 	TIOCGSERIAL                          = 0x541e
 	TIOCGSID                             = 0x5429
@@ -1810,6 +1842,8 @@ const (
 	TUNSETVNETHDRSZ                      = 0x400454d8
 	TUNSETVNETLE                         = 0x400454dc
 	UMOUNT_NOFOLLOW                      = 0x8
+	UTIME_NOW                            = 0x3fffffff
+	UTIME_OMIT                           = 0x3ffffffe
 	VDISCARD                             = 0xd
 	VEOF                                 = 0x4
 	VEOL                                 = 0xb
@@ -1839,6 +1873,17 @@ const (
 	WALL                                 = 0x40000000
 	WCLONE                               = 0x80000000
 	WCONTINUED                           = 0x8
+	WDIOC_GETBOOTSTATUS                  = 0x80045702
+	WDIOC_GETPRETIMEOUT                  = 0x80045709
+	WDIOC_GETSTATUS                      = 0x80045701
+	WDIOC_GETSUPPORT                     = 0x80285700
+	WDIOC_GETTEMP                        = 0x80045703
+	WDIOC_GETTIMELEFT                    = 0x8004570a
+	WDIOC_GETTIMEOUT                     = 0x80045707
+	WDIOC_KEEPALIVE                      = 0x80045705
+	WDIOC_SETOPTIONS                     = 0x80045704
+	WDIOC_SETPRETIMEOUT                  = 0xc0045708
+	WDIOC_SETTIMEOUT                     = 0xc0045706
 	WEXITED                              = 0x4
 	WNOHANG                              = 0x1
 	WNOTHREAD                            = 0x20000000
@@ -2019,7 +2064,6 @@ const (
 	SIGTSTP   = syscall.Signal(0x14)
 	SIGTTIN   = syscall.Signal(0x15)
 	SIGTTOU   = syscall.Signal(0x16)
-	SIGUNUSED = syscall.Signal(0x1f)
 	SIGURG    = syscall.Signal(0x17)
 	SIGUSR1   = syscall.Signal(0xa)
 	SIGUSR2   = syscall.Signal(0xc)

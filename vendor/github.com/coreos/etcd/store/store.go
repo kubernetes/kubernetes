@@ -682,6 +682,9 @@ func (s *store) DeleteExpiredKeys(cutoff time.Time) {
 		e := newEvent(Expire, node.Path, s.CurrentIndex, node.CreatedIndex)
 		e.EtcdIndex = s.CurrentIndex
 		e.PrevNode = node.Repr(false, false, s.clock)
+		if node.IsDir() {
+			e.Node.Dir = true
+		}
 
 		callback := func(path string) { // notify function
 			// notify the watchers with deleted set true

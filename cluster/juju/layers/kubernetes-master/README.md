@@ -54,6 +54,10 @@ The domain name to use for the Kubernetes cluster for DNS.
 Enables the installation of Kubernetes dashboard, Heapster, Grafana, and
 InfluxDB.
 
+#### enable-rbac
+
+Enable RBAC and Node authorisation.
+
 # DNS for the cluster
 
 The DNS add-on allows the pods to have a DNS names in addition to IP addresses.

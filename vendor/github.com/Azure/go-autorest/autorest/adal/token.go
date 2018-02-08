@@ -1,5 +1,19 @@
 package adal
 
+// Copyright 2017 Microsoft Corporation
+//
+//  Licensed under the Apache License, Version 2.0 (the "License");
+//  you may not use this file except in compliance with the License.
+//  You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+//  Unless required by applicable law or agreed to in writing, software
+//  distributed under the License is distributed on an "AS IS" BASIS,
+//  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//  See the License for the specific language governing permissions and
+//  limitations under the License.
+
 import (
 	"crypto/rand"
 	"crypto/rsa"
@@ -15,12 +29,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Azure/go-autorest/autorest/date"
 	"github.com/dgrijalva/jwt-go"
 )
 
 const (
 	defaultRefresh = 5 * time.Minute
-	tokenBaseDate  = "1970-01-01T00:00:00Z"
 
 	// OAuthGrantTypeDeviceCode is the "grant_type" identifier used in device flow
 	OAuthGrantTypeDeviceCode = "device_code"
@@ -31,15 +45,9 @@ const (
 	// OAuthGrantTypeRefreshToken is the "grant_type" identifier used in refresh token flows
 	OAuthGrantTypeRefreshToken = "refresh_token"
 
-	// managedIdentitySettingsPath is the path to the MSI Extension settings file (to discover the endpoint)
-	managedIdentitySettingsPath = "/var/lib/waagent/ManagedIdentity-Settings"
+	// metadataHeader is the header required by MSI extension
+	metadataHeader = "Metadata"
 )
-
-var expirationBase time.Time
-
-func init() {
-	expirationBase, _ = time.Parse(time.RFC3339, tokenBaseDate)
-}
 
 // OAuthTokenProvider is an interface which should be implemented by an access token retriever
 type OAuthTokenProvider interface {
@@ -76,7 +84,10 @@ func (t Token) Expires() time.Time {
 	if err != nil {
 		s = -3600
 	}
-	return expirationBase.Add(time.Duration(s) * time.Second).UTC()
+
+	expiration := date.NewUnixTimeFromSeconds(float64(s))
+
+	return time.Time(expiration).UTC()
 }
 
 // IsExpired returns true if the Token is expired, false otherwise.
@@ -135,9 +146,7 @@ type ServicePrincipalMSISecret struct {
 }
 
 // SetAuthenticationValues is a method of the interface ServicePrincipalSecret.
-// MSI extension requires the authority field to be set to the real tenant authority endpoint
 func (msiSecret *ServicePrincipalMSISecret) SetAuthenticationValues(spt *ServicePrincipalToken, v *url.Values) error {
-	v.Set("authority", spt.oauthConfig.AuthorityEndpoint.String())
 	return nil
 }
 
@@ -261,41 +270,43 @@ func NewServicePrincipalTokenFromCertificate(oauthConfig OAuthConfig, clientID s
 	)
 }
 
-// NewServicePrincipalTokenFromMSI creates a ServicePrincipalToken via the MSI VM Extension.
-func NewServicePrincipalTokenFromMSI(oauthConfig OAuthConfig, resource string, callbacks ...TokenRefreshCallback) (*ServicePrincipalToken, error) {
-	return newServicePrincipalTokenFromMSI(oauthConfig, resource, managedIdentitySettingsPath, callbacks...)
+// GetMSIVMEndpoint gets the MSI endpoint on Virtual Machines.
+func GetMSIVMEndpoint() (string, error) {
+	return getMSIVMEndpoint(msiPath)
 }
 
-func newServicePrincipalTokenFromMSI(oauthConfig OAuthConfig, resource, settingsPath string, callbacks ...TokenRefreshCallback) (*ServicePrincipalToken, error) {
+func getMSIVMEndpoint(path string) (string, error) {
 	// Read MSI settings
-	bytes, err := ioutil.ReadFile(settingsPath)
+	bytes, err := ioutil.ReadFile(path)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 	msiSettings := struct {
 		URL string `json:"url"`
 	}{}
 	err = json.Unmarshal(bytes, &msiSettings)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
+	return msiSettings.URL, nil
+}
+
+// NewServicePrincipalTokenFromMSI creates a ServicePrincipalToken via the MSI VM Extension.
+func NewServicePrincipalTokenFromMSI(msiEndpoint, resource string, callbacks ...TokenRefreshCallback) (*ServicePrincipalToken, error) {
 	// We set the oauth config token endpoint to be MSI's endpoint
-	// We leave the authority as-is so MSI can POST it with the token request
-	msiEndpointURL, err := url.Parse(msiSettings.URL)
+	msiEndpointURL, err := url.Parse(msiEndpoint)
 	if err != nil {
 		return nil, err
 	}
 
-	msiTokenEndpointURL, err := msiEndpointURL.Parse("/oauth2/token")
+	oauthConfig, err := NewOAuthConfig(msiEndpointURL.String(), "")
 	if err != nil {
 		return nil, err
 	}
-
-	oauthConfig.TokenEndpoint = *msiTokenEndpointURL
 
 	spt := &ServicePrincipalToken{
-		oauthConfig:      oauthConfig,
+		oauthConfig:      *oauthConfig,
 		secret:           &ServicePrincipalMSISecret{},
 		resource:         resource,
 		autoRefresh:      true,
@@ -364,16 +375,24 @@ func (spt *ServicePrincipalToken) refreshInternal(resource string) error {
 
 	req.ContentLength = int64(len(s))
 	req.Header.Set(contentType, mimeTypeFormPost)
+	if _, ok := spt.secret.(*ServicePrincipalMSISecret); ok {
+		req.Header.Set(metadataHeader, "true")
+	}
 	resp, err := spt.sender.Do(req)
 	if err != nil {
 		return fmt.Errorf("adal: Failed to execute the refresh request. Error = '%v'", err)
 	}
+
 	defer resp.Body.Close()
+	rb, err := ioutil.ReadAll(resp.Body)
+
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("adal: Refresh request failed. Status Code = '%d'", resp.StatusCode)
+		if err != nil {
+			return fmt.Errorf("adal: Refresh request failed. Status Code = '%d'. Failed reading response body", resp.StatusCode)
+		}
+		return fmt.Errorf("adal: Refresh request failed. Status Code = '%d'. Response body: %s", resp.StatusCode, string(rb))
 	}
 
-	rb, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return fmt.Errorf("adal: Failed to read a new service principal token during refresh. Error = '%v'", err)
 	}

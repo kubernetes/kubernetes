@@ -154,6 +154,7 @@ type ExtensionDesc struct {
 	Field         int32       // field number
 	Name          string      // fully-qualified name of extension, for text formatting
 	Tag           string      // protobuf tag style
+	Filename      string      // name of the file in which the extension is defined
 }
 
 func (ed *ExtensionDesc) repeated() bool {

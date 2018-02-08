@@ -16,6 +16,8 @@
  *
  */
 
+//go:generate protoc --go_out=plugins=grpc:. grpc_testing/test.proto
+
 // Package stats is for collecting and reporting various network and RPC stats.
 // This package is for monitoring purpose only. All fields are read-only.
 // All APIs are experimental.
@@ -24,6 +26,8 @@ package stats
 import (
 	"net"
 	"time"
+
+	"golang.org/x/net/context"
 )
 
 // RPCStats contains stats information about RPCs.
@@ -131,8 +135,6 @@ func (s *OutPayload) isRPCStats() {}
 type OutHeader struct {
 	// Client is true if this OutHeader is from client side.
 	Client bool
-	// WireLength is the wire length of header.
-	WireLength int
 
 	// The following fields are valid only if Client is true.
 	// FullMethod is the full RPC method string, i.e., /package.service/method.
@@ -169,7 +171,9 @@ type End struct {
 	Client bool
 	// EndTime is the time when the RPC ends.
 	EndTime time.Time
-	// Error is the error just happened.  It implements status.Status if non-nil.
+	// Error is the error the RPC ended with. It is an error generated from
+	// status.Status and can be converted back to status.Status using
+	// status.FromError if non-nil.
 	Error error
 }
 
@@ -206,3 +210,85 @@ type ConnEnd struct {
 func (s *ConnEnd) IsClient() bool { return s.Client }
 
 func (s *ConnEnd) isConnStats() {}
+
+type incomingTagsKey struct{}
+type outgoingTagsKey struct{}
+
+// SetTags attaches stats tagging data to the context, which will be sent in
+// the outgoing RPC with the header grpc-tags-bin.  Subsequent calls to
+// SetTags will overwrite the values from earlier calls.
+//
+// NOTE: this is provided only for backward compatibility with existing clients
+// and will likely be removed in an upcoming release.  New uses should transmit
+// this type of data using metadata with a different, non-reserved (i.e. does
+// not begin with "grpc-") header name.
+func SetTags(ctx context.Context, b []byte) context.Context {
+	return context.WithValue(ctx, outgoingTagsKey{}, b)
+}
+
+// Tags returns the tags from the context for the inbound RPC.
+//
+// NOTE: this is provided only for backward compatibility with existing clients
+// and will likely be removed in an upcoming release.  New uses should transmit
+// this type of data using metadata with a different, non-reserved (i.e. does
+// not begin with "grpc-") header name.
+func Tags(ctx context.Context) []byte {
+	b, _ := ctx.Value(incomingTagsKey{}).([]byte)
+	return b
+}
+
+// SetIncomingTags attaches stats tagging data to the context, to be read by
+// the application (not sent in outgoing RPCs).
+//
+// This is intended for gRPC-internal use ONLY.
+func SetIncomingTags(ctx context.Context, b []byte) context.Context {
+	return context.WithValue(ctx, incomingTagsKey{}, b)
+}
+
+// OutgoingTags returns the tags from the context for the outbound RPC.
+//
+// This is intended for gRPC-internal use ONLY.
+func OutgoingTags(ctx context.Context) []byte {
+	b, _ := ctx.Value(outgoingTagsKey{}).([]byte)
+	return b
+}
+
+type incomingTraceKey struct{}
+type outgoingTraceKey struct{}
+
+// SetTrace attaches stats tagging data to the context, which will be sent in
+// the outgoing RPC with the header grpc-trace-bin.  Subsequent calls to
+// SetTrace will overwrite the values from earlier calls.
+//
+// NOTE: this is provided only for backward compatibility with existing clients
+// and will likely be removed in an upcoming release.  New uses should transmit
+// this type of data using metadata with a different, non-reserved (i.e. does
+// not begin with "grpc-") header name.
+func SetTrace(ctx context.Context, b []byte) context.Context {
+	return context.WithValue(ctx, outgoingTraceKey{}, b)
+}
+
+// Trace returns the trace from the context for the inbound RPC.
+//
+// NOTE: this is provided only for backward compatibility with existing clients
+// and will likely be removed in an upcoming release.  New uses should transmit
+// this type of data using metadata with a different, non-reserved (i.e. does
+// not begin with "grpc-") header name.
+func Trace(ctx context.Context) []byte {
+	b, _ := ctx.Value(incomingTraceKey{}).([]byte)
+	return b
+}
+
+// SetIncomingTrace attaches stats tagging data to the context, to be read by
+// the application (not sent in outgoing RPCs).  It is intended for
+// gRPC-internal use.
+func SetIncomingTrace(ctx context.Context, b []byte) context.Context {
+	return context.WithValue(ctx, incomingTraceKey{}, b)
+}
+
+// OutgoingTrace returns the trace from the context for the outbound RPC.  It is
+// intended for gRPC-internal use.
+func OutgoingTrace(ctx context.Context) []byte {
+	b, _ := ctx.Value(outgoingTraceKey{}).([]byte)
+	return b
+}

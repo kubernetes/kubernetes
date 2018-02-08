@@ -23,16 +23,11 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/watch"
-	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 )
 
 // ErrPodCompleted is returned by PodRunning or PodContainerRunning to indicate that
 // the pod has already reached completed state.
 var ErrPodCompleted = fmt.Errorf("pod ran to completion")
-
-// ErrContainerTerminated is returned by PodContainerRunning in the intermediate
-// state where the pod indicates it's still running, but its container is already terminated
-var ErrContainerTerminated = fmt.Errorf("container terminated")
 
 // PodRunning returns true if the pod is running, false if the pod has not yet reached running state,
 // returns ErrPodCompleted if the pod has run to completion, or an error in any other case.
@@ -68,86 +63,6 @@ func PodCompleted(event watch.Event) (bool, error) {
 		}
 	}
 	return false, nil
-}
-
-// PodRunningAndReady returns true if the pod is running and ready, false if the pod has not
-// yet reached those states, returns ErrPodCompleted if the pod has run to completion, or
-// an error in any other case.
-func PodRunningAndReady(event watch.Event) (bool, error) {
-	switch event.Type {
-	case watch.Deleted:
-		return false, errors.NewNotFound(schema.GroupResource{Resource: "pods"}, "")
-	}
-	switch t := event.Object.(type) {
-	case *v1.Pod:
-		switch t.Status.Phase {
-		case v1.PodFailed, v1.PodSucceeded:
-			return false, ErrPodCompleted
-		case v1.PodRunning:
-			return podutil.IsPodReady(t), nil
-		}
-	}
-	return false, nil
-}
-
-// PodNotPending returns true if the pod has left the pending state, false if it has not,
-// or an error in any other case (such as if the pod was deleted).
-func PodNotPending(event watch.Event) (bool, error) {
-	switch event.Type {
-	case watch.Deleted:
-		return false, errors.NewNotFound(schema.GroupResource{Resource: "pods"}, "")
-	}
-	switch t := event.Object.(type) {
-	case *v1.Pod:
-		switch t.Status.Phase {
-		case v1.PodPending:
-			return false, nil
-		default:
-			return true, nil
-		}
-	}
-	return false, nil
-}
-
-// PodContainerRunning returns false until the named container has ContainerStatus running (at least once),
-// and will return an error if the pod is deleted, runs to completion, or the container pod is not available.
-func PodContainerRunning(containerName string) watch.ConditionFunc {
-	return func(event watch.Event) (bool, error) {
-		switch event.Type {
-		case watch.Deleted:
-			return false, errors.NewNotFound(schema.GroupResource{Resource: "pods"}, "")
-		}
-		switch t := event.Object.(type) {
-		case *v1.Pod:
-			switch t.Status.Phase {
-			case v1.PodRunning, v1.PodPending:
-			case v1.PodFailed, v1.PodSucceeded:
-				return false, ErrPodCompleted
-			default:
-				return false, nil
-			}
-			for _, s := range t.Status.ContainerStatuses {
-				if s.Name != containerName {
-					continue
-				}
-				if s.State.Terminated != nil {
-					return false, ErrContainerTerminated
-				}
-				return s.State.Running != nil, nil
-			}
-			for _, s := range t.Status.InitContainerStatuses {
-				if s.Name != containerName {
-					continue
-				}
-				if s.State.Terminated != nil {
-					return false, ErrContainerTerminated
-				}
-				return s.State.Running != nil, nil
-			}
-			return false, nil
-		}
-		return false, nil
-	}
 }
 
 // ServiceAccountHasSecrets returns true if the service account has at least one secret,

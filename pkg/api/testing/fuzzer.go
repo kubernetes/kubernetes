@@ -27,14 +27,13 @@ import (
 	genericfuzzer "k8s.io/apimachinery/pkg/apis/meta/fuzzer"
 	"k8s.io/apimachinery/pkg/runtime"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
-	kubeadmfuzzer "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/fuzzer"
-	"k8s.io/kubernetes/pkg/api"
-	corefuzzer "k8s.io/kubernetes/pkg/api/fuzzer"
 	admissionregistrationfuzzer "k8s.io/kubernetes/pkg/apis/admissionregistration/fuzzer"
 	appsfuzzer "k8s.io/kubernetes/pkg/apis/apps/fuzzer"
 	autoscalingfuzzer "k8s.io/kubernetes/pkg/apis/autoscaling/fuzzer"
 	batchfuzzer "k8s.io/kubernetes/pkg/apis/batch/fuzzer"
 	certificatesfuzzer "k8s.io/kubernetes/pkg/apis/certificates/fuzzer"
+	api "k8s.io/kubernetes/pkg/apis/core"
+	corefuzzer "k8s.io/kubernetes/pkg/apis/core/fuzzer"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	extensionsfuzzer "k8s.io/kubernetes/pkg/apis/extensions/fuzzer"
 	extensionsv1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
@@ -98,7 +97,6 @@ var FuzzerFuncs = fuzzer.MergeFuzzerFuncs(
 	batchfuzzer.Funcs,
 	autoscalingfuzzer.Funcs,
 	rbacfuzzer.Funcs,
-	kubeadmfuzzer.Funcs,
 	policyfuzzer.Funcs,
 	certificatesfuzzer.Funcs,
 	admissionregistrationfuzzer.Funcs,

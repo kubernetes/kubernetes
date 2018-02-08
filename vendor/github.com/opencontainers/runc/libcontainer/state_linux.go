@@ -45,6 +45,11 @@ func destroy(c *linuxContainer) error {
 		}
 	}
 	err := c.cgroupManager.Destroy()
+	if c.intelRdtManager != nil {
+		if ierr := c.intelRdtManager.Destroy(); err == nil {
+			err = ierr
+		}
+	}
 	if rerr := os.RemoveAll(c.root); err == nil {
 		err = rerr
 	}

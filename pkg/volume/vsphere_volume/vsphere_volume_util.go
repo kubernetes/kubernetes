@@ -170,7 +170,7 @@ func (util *VsphereDiskUtil) DeleteVolume(vd *vsphereVolumeDeleter) error {
 	return nil
 }
 
-func getVolPathfromDeviceMountPath(deviceMountPath string) string {
+func getVolPathfromVolumeName(deviceMountPath string) string {
 	// Assumption: No file or folder is named starting with '[' in datastore
 	volPath := deviceMountPath[strings.LastIndex(deviceMountPath, "["):]
 	// space between datastore and vmdk name in volumePath is encoded as '\040' when returned by GetMountRefs().

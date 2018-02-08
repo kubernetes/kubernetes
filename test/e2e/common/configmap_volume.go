@@ -32,11 +32,21 @@ import (
 var _ = Describe("[sig-storage] ConfigMap", func() {
 	f := framework.NewDefaultFramework("configmap")
 
-	It("should be consumable from pods in volume [Conformance]", func() {
+	/*
+		    Testname: configmap-nomap-simple
+		    Description: Make sure config map without mappings works by mounting it
+			to a volume with a custom path (mapping) on the pod with no other settings.
+	*/
+	framework.ConformanceIt("should be consumable from pods in volume ", func() {
 		doConfigMapE2EWithoutMappings(f, 0, 0, nil)
 	})
 
-	It("should be consumable from pods in volume with defaultMode set [Conformance]", func() {
+	/*
+		    Testname: configmap-nomap-default-mode
+		    Description: Make sure config map without mappings works by mounting it
+			to a volume with a custom path (mapping) on the pod with defaultMode set
+	*/
+	framework.ConformanceIt("should be consumable from pods in volume with defaultMode set ", func() {
 		defaultMode := int32(0400)
 		doConfigMapE2EWithoutMappings(f, 0, 0, &defaultMode)
 	})
@@ -46,7 +56,12 @@ var _ = Describe("[sig-storage] ConfigMap", func() {
 		doConfigMapE2EWithoutMappings(f, 1000, 1001, &defaultMode)
 	})
 
-	It("should be consumable from pods in volume as non-root [Conformance]", func() {
+	/*
+		    Testname: configmap-nomap-user
+		    Description: Make sure config map without mappings works by mounting it
+			to a volume with a custom path (mapping) on the pod as non-root.
+	*/
+	framework.ConformanceIt("should be consumable from pods in volume as non-root ", func() {
 		doConfigMapE2EWithoutMappings(f, 1000, 0, nil)
 	})
 
@@ -54,16 +69,31 @@ var _ = Describe("[sig-storage] ConfigMap", func() {
 		doConfigMapE2EWithoutMappings(f, 1000, 1001, nil)
 	})
 
-	It("should be consumable from pods in volume with mappings [Conformance]", func() {
+	/*
+		    Testname: configmap-simple-mapped
+		    Description: Make sure config map works by mounting it to a volume with
+			a custom path (mapping) on the pod with no other settings and make sure
+			the pod actually consumes it.
+	*/
+	framework.ConformanceIt("should be consumable from pods in volume with mappings ", func() {
 		doConfigMapE2EWithMappings(f, 0, 0, nil)
 	})
 
-	It("should be consumable from pods in volume with mappings and Item mode set[Conformance]", func() {
+	/*
+		    Testname: configmap-with-item-mode-mapped
+		    Description: Make sure config map works with an item mode (e.g. 0400)
+			for the config map item.
+	*/
+	framework.ConformanceIt("should be consumable from pods in volume with mappings and Item mode set", func() {
 		mode := int32(0400)
 		doConfigMapE2EWithMappings(f, 0, 0, &mode)
 	})
 
-	It("should be consumable from pods in volume with mappings as non-root [Conformance]", func() {
+	/*
+	   Testname: configmap-simple-user-mapped
+	   Description: Make sure config map works when it is mounted as non-root.
+	*/
+	framework.ConformanceIt("should be consumable from pods in volume with mappings as non-root ", func() {
 		doConfigMapE2EWithMappings(f, 1000, 0, nil)
 	})
 
@@ -71,7 +101,12 @@ var _ = Describe("[sig-storage] ConfigMap", func() {
 		doConfigMapE2EWithMappings(f, 1000, 1001, nil)
 	})
 
-	It("updates should be reflected in volume [Conformance]", func() {
+	/*
+		    Testname: configmap-update-test
+		    Description: Make sure update operation is working on config map and
+			the result is observed on volumes mounted in containers.
+	*/
+	framework.ConformanceIt("updates should be reflected in volume ", func() {
 		podLogTimeout := framework.GetPodSecretUpdateTimeout(f.ClientSet)
 		containerTimeoutArg := fmt.Sprintf("--retry_time=%v", int(podLogTimeout.Seconds()))
 
@@ -92,7 +127,7 @@ var _ = Describe("[sig-storage] ConfigMap", func() {
 
 		By(fmt.Sprintf("Creating configMap with name %s", configMap.Name))
 		var err error
-		if configMap, err = f.ClientSet.Core().ConfigMaps(f.Namespace.Name).Create(configMap); err != nil {
+		if configMap, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(configMap); err != nil {
 			framework.Failf("unable to create test configMap %s: %v", configMap.Name, err)
 		}
 
@@ -142,14 +177,110 @@ var _ = Describe("[sig-storage] ConfigMap", func() {
 		By(fmt.Sprintf("Updating configmap %v", configMap.Name))
 		configMap.ResourceVersion = "" // to force update
 		configMap.Data["data-1"] = "value-2"
-		_, err = f.ClientSet.Core().ConfigMaps(f.Namespace.Name).Update(configMap)
+		_, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Update(configMap)
 		Expect(err).NotTo(HaveOccurred(), "Failed to update configmap %q in namespace %q", configMap.Name, f.Namespace.Name)
 
 		By("waiting to observe update in volume")
 		Eventually(pollLogs, podLogTimeout, framework.Poll).Should(ContainSubstring("value-2"))
 	})
 
-	It("optional updates should be reflected in volume [Conformance]", func() {
+	It("binary data should be reflected in volume ", func() {
+		podLogTimeout := framework.GetPodSecretUpdateTimeout(f.ClientSet)
+		containerTimeoutArg := fmt.Sprintf("--retry_time=%v", int(podLogTimeout.Seconds()))
+
+		name := "configmap-test-upd-" + string(uuid.NewUUID())
+		volumeName := "configmap-volume"
+		volumeMountPath := "/etc/configmap-volume"
+		containerName1 := "configmap-volume-data-test"
+		containerName2 := "configmap-volume-binary-test"
+
+		configMap := &v1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: f.Namespace.Name,
+				Name:      name,
+			},
+			Data: map[string]string{
+				"data-1": "value-1",
+			},
+			BinaryData: map[string][]byte{
+				"dump.bin": {0xde, 0xca, 0xfe, 0xba, 0xd0, 0xfe, 0xff},
+			},
+		}
+
+		By(fmt.Sprintf("Creating configMap with name %s", configMap.Name))
+		var err error
+		if configMap, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(configMap); err != nil {
+			framework.Failf("unable to create test configMap %s: %v", configMap.Name, err)
+		}
+
+		pod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "pod-configmaps-" + string(uuid.NewUUID()),
+			},
+			Spec: v1.PodSpec{
+				Volumes: []v1.Volume{
+					{
+						Name: volumeName,
+						VolumeSource: v1.VolumeSource{
+							ConfigMap: &v1.ConfigMapVolumeSource{
+								LocalObjectReference: v1.LocalObjectReference{
+									Name: name,
+								},
+							},
+						},
+					},
+				},
+				Containers: []v1.Container{
+					{
+						Name:    containerName1,
+						Image:   mountImage,
+						Command: []string{"/mounttest", "--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/configmap-volume/data-1"},
+						VolumeMounts: []v1.VolumeMount{
+							{
+								Name:      volumeName,
+								MountPath: volumeMountPath,
+								ReadOnly:  true,
+							},
+						},
+					},
+					{
+						Name:    containerName2,
+						Image:   "busybox",
+						Command: []string{"hexdump", "-C", "/etc/configmap-volume/dump.bin"},
+						VolumeMounts: []v1.VolumeMount{
+							{
+								Name:      volumeName,
+								MountPath: volumeMountPath,
+								ReadOnly:  true,
+							},
+						},
+					},
+				},
+				RestartPolicy: v1.RestartPolicyNever,
+			},
+		}
+		By("Creating the pod")
+		f.PodClient().CreateSync(pod)
+
+		pollLogs1 := func() (string, error) {
+			return framework.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, containerName1)
+		}
+		pollLogs2 := func() (string, error) {
+			return framework.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, containerName2)
+		}
+
+		By("Waiting for pod with text data")
+		Eventually(pollLogs1, podLogTimeout, framework.Poll).Should(ContainSubstring("value-1"))
+		By("Waiting for pod with binary data")
+		Eventually(pollLogs2, podLogTimeout, framework.Poll).Should(ContainSubstring("de ca fe ba d0 fe ff"))
+	})
+
+	/*
+		    Testname: configmap-CUD-test
+		    Description: Make sure Create, Update, Delete operations are all working
+			on config map and the result is observed on volumes mounted in containers.
+	*/
+	framework.ConformanceIt("optional updates should be reflected in volume ", func() {
 		podLogTimeout := framework.GetPodSecretUpdateTimeout(f.ClientSet)
 		containerTimeoutArg := fmt.Sprintf("--retry_time=%v", int(podLogTimeout.Seconds()))
 		trueVal := true
@@ -196,12 +327,12 @@ var _ = Describe("[sig-storage] ConfigMap", func() {
 
 		By(fmt.Sprintf("Creating configMap with name %s", deleteConfigMap.Name))
 		var err error
-		if deleteConfigMap, err = f.ClientSet.Core().ConfigMaps(f.Namespace.Name).Create(deleteConfigMap); err != nil {
+		if deleteConfigMap, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(deleteConfigMap); err != nil {
 			framework.Failf("unable to create test configMap %s: %v", deleteConfigMap.Name, err)
 		}
 
 		By(fmt.Sprintf("Creating configMap with name %s", updateConfigMap.Name))
-		if updateConfigMap, err = f.ClientSet.Core().ConfigMaps(f.Namespace.Name).Create(updateConfigMap); err != nil {
+		if updateConfigMap, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(updateConfigMap); err != nil {
 			framework.Failf("unable to create test configMap %s: %v", updateConfigMap.Name, err)
 		}
 
@@ -305,18 +436,18 @@ var _ = Describe("[sig-storage] ConfigMap", func() {
 		Eventually(pollDeleteLogs, podLogTimeout, framework.Poll).Should(ContainSubstring("value-1"))
 
 		By(fmt.Sprintf("Deleting configmap %v", deleteConfigMap.Name))
-		err = f.ClientSet.Core().ConfigMaps(f.Namespace.Name).Delete(deleteConfigMap.Name, &metav1.DeleteOptions{})
+		err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Delete(deleteConfigMap.Name, &metav1.DeleteOptions{})
 		Expect(err).NotTo(HaveOccurred(), "Failed to delete configmap %q in namespace %q", deleteConfigMap.Name, f.Namespace.Name)
 
 		By(fmt.Sprintf("Updating configmap %v", updateConfigMap.Name))
 		updateConfigMap.ResourceVersion = "" // to force update
 		delete(updateConfigMap.Data, "data-1")
 		updateConfigMap.Data["data-3"] = "value-3"
-		_, err = f.ClientSet.Core().ConfigMaps(f.Namespace.Name).Update(updateConfigMap)
+		_, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Update(updateConfigMap)
 		Expect(err).NotTo(HaveOccurred(), "Failed to update configmap %q in namespace %q", updateConfigMap.Name, f.Namespace.Name)
 
 		By(fmt.Sprintf("Creating configMap with name %s", createConfigMap.Name))
-		if createConfigMap, err = f.ClientSet.Core().ConfigMaps(f.Namespace.Name).Create(createConfigMap); err != nil {
+		if createConfigMap, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(createConfigMap); err != nil {
 			framework.Failf("unable to create test configMap %s: %v", createConfigMap.Name, err)
 		}
 
@@ -327,7 +458,12 @@ var _ = Describe("[sig-storage] ConfigMap", func() {
 		Eventually(pollDeleteLogs, podLogTimeout, framework.Poll).Should(ContainSubstring("Error reading file /etc/configmap-volumes/delete/data-1"))
 	})
 
-	It("should be consumable in multiple volumes in the same pod [Conformance]", func() {
+	/*
+		    Testname: configmap-multiple-volumes
+		    Description: Make sure config map works when it mounted as two different
+			volumes on the same node.
+	*/
+	framework.ConformanceIt("should be consumable in multiple volumes in the same pod ", func() {
 		var (
 			name             = "configmap-test-volume-" + string(uuid.NewUUID())
 			volumeName       = "configmap-volume"
@@ -339,7 +475,7 @@ var _ = Describe("[sig-storage] ConfigMap", func() {
 
 		By(fmt.Sprintf("Creating configMap with name %s", configMap.Name))
 		var err error
-		if configMap, err = f.ClientSet.Core().ConfigMaps(f.Namespace.Name).Create(configMap); err != nil {
+		if configMap, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(configMap); err != nil {
 			framework.Failf("unable to create test configMap %s: %v", configMap.Name, err)
 		}
 
@@ -427,7 +563,7 @@ func doConfigMapE2EWithoutMappings(f *framework.Framework, uid, fsGroup int64, d
 
 	By(fmt.Sprintf("Creating configMap with name %s", configMap.Name))
 	var err error
-	if configMap, err = f.ClientSet.Core().ConfigMaps(f.Namespace.Name).Create(configMap); err != nil {
+	if configMap, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(configMap); err != nil {
 		framework.Failf("unable to create test configMap %s: %v", configMap.Name, err)
 	}
 
@@ -507,7 +643,7 @@ func doConfigMapE2EWithMappings(f *framework.Framework, uid, fsGroup int64, item
 	By(fmt.Sprintf("Creating configMap with name %s", configMap.Name))
 
 	var err error
-	if configMap, err = f.ClientSet.Core().ConfigMaps(f.Namespace.Name).Create(configMap); err != nil {
+	if configMap, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(configMap); err != nil {
 		framework.Failf("unable to create test configMap %s: %v", configMap.Name, err)
 	}
 

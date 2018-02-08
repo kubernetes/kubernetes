@@ -30,6 +30,7 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/kubelet/dockershim"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 	"k8s.io/kubernetes/pkg/kubelet/gpu"
 )
@@ -43,8 +44,11 @@ const (
 	// Optional device.
 	nvidiaUVMToolsDevice string = "/dev/nvidia-uvm-tools"
 	devDirectory                = "/dev"
-	nvidiaDeviceRE              = `^nvidia[0-9]*$`
-	nvidiaFullpathRE            = `^/dev/nvidia[0-9]*$`
+)
+
+var (
+	nvidiaDeviceRE   = regexp.MustCompile(`^nvidia[0-9]*$`)
+	nvidiaFullpathRE = regexp.MustCompile(`^/dev/nvidia[0-9]*$`)
 )
 
 type activePodsLister interface {
@@ -67,10 +71,12 @@ type nvidiaGPUManager struct {
 
 // NewNvidiaGPUManager returns a GPUManager that manages local Nvidia GPUs.
 // TODO: Migrate to use pod level cgroups and make it generic to all runtimes.
-func NewNvidiaGPUManager(activePodsLister activePodsLister, dockerClient libdocker.Interface) (gpu.GPUManager, error) {
+func NewNvidiaGPUManager(activePodsLister activePodsLister, config *dockershim.ClientConfig) (gpu.GPUManager, error) {
+	dockerClient := dockershim.NewDockerClientFromConfig(config)
 	if dockerClient == nil {
-		return nil, fmt.Errorf("invalid docker client specified")
+		return nil, fmt.Errorf("invalid docker client configure specified")
 	}
+
 	return &nvidiaGPUManager{
 		allGPUs:          sets.NewString(),
 		dockerClient:     dockerClient,
@@ -191,7 +197,6 @@ func (ngm *nvidiaGPUManager) updateAllocatedGPUs() {
 // we want more features, features like schedule containers according to GPU family
 // name.
 func (ngm *nvidiaGPUManager) discoverGPUs() error {
-	reg := regexp.MustCompile(nvidiaDeviceRE)
 	files, err := ioutil.ReadDir(devDirectory)
 	if err != nil {
 		return err
@@ -200,7 +205,7 @@ func (ngm *nvidiaGPUManager) discoverGPUs() error {
 		if f.IsDir() {
 			continue
 		}
-		if reg.MatchString(f.Name()) {
+		if nvidiaDeviceRE.MatchString(f.Name()) {
 			glog.V(2).Infof("Found Nvidia GPU %q", f.Name())
 			ngm.allGPUs.Insert(path.Join(devDirectory, f.Name()))
 		}
@@ -271,5 +276,5 @@ func (ngm *nvidiaGPUManager) gpusInUse() *podGPUs {
 }
 
 func isValidPath(path string) bool {
-	return regexp.MustCompile(nvidiaFullpathRE).MatchString(path)
+	return nvidiaFullpathRE.MatchString(path)
 }

@@ -9,8 +9,8 @@ load(
 go_test(
     name = "go_default_test",
     srcs = ["framer_test.go"],
+    embed = [":go_default_library"],
     importpath = "k8s.io/apimachinery/pkg/util/framer",
-    library = ":go_default_library",
 )
 
 go_library(

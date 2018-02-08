@@ -41,11 +41,11 @@ import (
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/helper/qos"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	podutil "k8s.io/kubernetes/pkg/api/pod"
-	"k8s.io/kubernetes/pkg/api/validation"
+	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/apis/core/helper/qos"
+	"k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/kubelet/client"
 )
 
@@ -243,6 +243,7 @@ func PodToSelectableFields(pod *api.Pod) fields.Set {
 	podSpecificFieldsSet["spec.schedulerName"] = string(pod.Spec.SchedulerName)
 	podSpecificFieldsSet["status.phase"] = string(pod.Status.Phase)
 	podSpecificFieldsSet["status.podIP"] = string(pod.Status.PodIP)
+	podSpecificFieldsSet["status.nominatedNodeName"] = string(pod.Status.NominatedNodeName)
 	return generic.AddObjectMetaFieldsSet(podSpecificFieldsSet, &pod.ObjectMeta, true)
 }
 

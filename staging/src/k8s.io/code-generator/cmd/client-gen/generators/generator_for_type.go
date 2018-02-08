@@ -35,6 +35,7 @@ type genClientForType struct {
 	clientsetPackage string
 	group            string
 	version          string
+	groupGoName      string
 	typeToMatch      *types.Type
 	imports          namer.ImportTracker
 }
@@ -66,14 +67,14 @@ func genStatus(t *types.Type) bool {
 			break
 		}
 	}
-	return hasStatus && !util.MustParseClientGenTags(t.SecondClosestCommentLines).NoStatus
+	return hasStatus && !util.MustParseClientGenTags(append(t.SecondClosestCommentLines, t.CommentLines...)).NoStatus
 }
 
 // GenerateType makes the body of a file implementing the individual typed client for type t.
 func (g *genClientForType) GenerateType(c *generator.Context, t *types.Type, w io.Writer) error {
 	sw := generator.NewSnippetWriter(w, c, "$", "$")
 	pkg := filepath.Base(t.Name.Package)
-	tags, err := util.ParseClientGenTags(t.SecondClosestCommentLines)
+	tags, err := util.ParseClientGenTags(append(t.SecondClosestCommentLines, t.CommentLines...))
 	if err != nil {
 		return err
 	}
@@ -132,7 +133,8 @@ func (g *genClientForType) GenerateType(c *generator.Context, t *types.Type, w i
 		"Group":                namer.IC(g.group),
 		"subresource":          false,
 		"subresourcePath":      "",
-		"GroupVersion":         namer.IC(g.group) + namer.IC(g.version),
+		"GroupGoName":          g.groupGoName,
+		"Version":              namer.IC(g.version),
 		"DeleteOptions":        c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "DeleteOptions"}),
 		"ListOptions":          c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "ListOptions"}),
 		"GetOptions":           c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "GetOptions"}),
@@ -366,7 +368,7 @@ type $.type|privatePlural$ struct {
 
 var newStructNamespaced = `
 // new$.type|publicPlural$ returns a $.type|publicPlural$
-func new$.type|publicPlural$(c *$.GroupVersion$Client, namespace string) *$.type|privatePlural$ {
+func new$.type|publicPlural$(c *$.GroupGoName$$.Version$Client, namespace string) *$.type|privatePlural$ {
 	return &$.type|privatePlural${
 		client: c.RESTClient(),
 		ns:     namespace,
@@ -376,7 +378,7 @@ func new$.type|publicPlural$(c *$.GroupVersion$Client, namespace string) *$.type
 
 var newStructNonNamespaced = `
 // new$.type|publicPlural$ returns a $.type|publicPlural$
-func new$.type|publicPlural$(c *$.GroupVersion$Client) *$.type|privatePlural$ {
+func new$.type|publicPlural$(c *$.GroupGoName$$.Version$Client) *$.type|privatePlural$ {
 	return &$.type|privatePlural${
 		client: c.RESTClient(),
 	}

@@ -136,6 +136,7 @@ func (c *compressionResponseWriter) Write(p []byte) (int, error) {
 		return -1, errors.New("compressing error: tried to write data using closed compressor")
 	}
 	c.Header().Set(headerContentEncoding, c.encoding)
+	defer c.compressor.Flush()
 	return c.compressor.Write(p)
 }
 

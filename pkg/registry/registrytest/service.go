@@ -23,7 +23,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/watch"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/apiserver/pkg/registry/rest"
+	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
 func NewServiceRegistry() *ServiceRegistry {
@@ -72,7 +73,7 @@ func (r *ServiceRegistry) ListServices(ctx genericapirequest.Context, options *m
 	return res, r.Err
 }
 
-func (r *ServiceRegistry) CreateService(ctx genericapirequest.Context, svc *api.Service) (*api.Service, error) {
+func (r *ServiceRegistry) CreateService(ctx genericapirequest.Context, svc *api.Service, createValidation rest.ValidateObjectFunc) (*api.Service, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -99,7 +100,7 @@ func (r *ServiceRegistry) DeleteService(ctx genericapirequest.Context, id string
 	return r.Err
 }
 
-func (r *ServiceRegistry) UpdateService(ctx genericapirequest.Context, svc *api.Service) (*api.Service, error) {
+func (r *ServiceRegistry) UpdateService(ctx genericapirequest.Context, svc *api.Service, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (*api.Service, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 

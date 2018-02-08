@@ -17,6 +17,7 @@ limitations under the License.
 package cloud
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"time"
@@ -182,10 +183,10 @@ func (pvlc *PersistentVolumeLabelController) addLabels(key string) error {
 
 func (pvlc *PersistentVolumeLabelController) addLabelsToVolume(vol *v1.PersistentVolume) error {
 	var volumeLabels map[string]string
-	// Only add labels if in the list of initializers
+	// Only add labels if the next pending initializer.
 	if needsInitialization(vol.Initializers, initializerName) {
 		if labeler, ok := (pvlc.cloud).(cloudprovider.PVLabeler); ok {
-			labels, err := labeler.GetLabelsForVolume(vol)
+			labels, err := labeler.GetLabelsForVolume(context.TODO(), vol)
 			if err != nil {
 				return fmt.Errorf("error querying volume %v: %v", vol.Spec, err)
 			}
@@ -235,7 +236,7 @@ func (pvlc *PersistentVolumeLabelController) updateVolume(vol *v1.PersistentVolu
 		return err
 	}
 
-	_, err = pvlc.kubeClient.Core().PersistentVolumes().Patch(string(volName), types.StrategicMergePatchType, patchBytes)
+	_, err = pvlc.kubeClient.CoreV1().PersistentVolumes().Patch(string(volName), types.StrategicMergePatchType, patchBytes)
 	if err != nil {
 		return fmt.Errorf("failed to update PersistentVolume %s: %v", volName, err)
 	}
@@ -265,16 +266,17 @@ func removeInitializer(initializers *metav1.Initializers, name string) *metav1.I
 	return &metav1.Initializers{Pending: updated}
 }
 
+// needsInitialization checks whether or not the PVL is the next pending initializer.
 func needsInitialization(initializers *metav1.Initializers, name string) bool {
-	hasInitializer := false
-
-	if initializers != nil {
-		for _, pending := range initializers.Pending {
-			if pending.Name == name {
-				hasInitializer = true
-				break
-			}
-		}
+	if initializers == nil {
+		return false
 	}
-	return hasInitializer
+
+	if len(initializers.Pending) == 0 {
+		return false
+	}
+
+	// There is at least one initializer still pending so check to
+	// see if the PVL is the next in line.
+	return initializers.Pending[0].Name == name
 }

@@ -425,7 +425,7 @@ const (
 	IFLA_LINKINFO       = 0x12
 	IFLA_NET_NS_PID     = 0x13
 	IFLA_IFALIAS        = 0x14
-	IFLA_MAX            = 0x2b
+	IFLA_MAX            = 0x2c
 	RT_SCOPE_UNIVERSE   = 0x0
 	RT_SCOPE_SITE       = 0xc8
 	RT_SCOPE_LINK       = 0xfd
@@ -621,12 +621,12 @@ type Sysinfo_t struct {
 }
 
 type Utsname struct {
-	Sysname    [65]int8
-	Nodename   [65]int8
-	Release    [65]int8
-	Version    [65]int8
-	Machine    [65]int8
-	Domainname [65]int8
+	Sysname    [65]byte
+	Nodename   [65]byte
+	Release    [65]byte
+	Version    [65]byte
+	Machine    [65]byte
+	Domainname [65]byte
 }
 
 type Ustat_t struct {
@@ -672,8 +672,6 @@ type Sigset_t struct {
 const RNDGETENTCNT = 0x80045200
 
 const PERF_IOC_FLAG_GROUP = 0x1
-
-const _SC_PAGESIZE = 0x1e
 
 type Termios struct {
 	Iflag  uint32

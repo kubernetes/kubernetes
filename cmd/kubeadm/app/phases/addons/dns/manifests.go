@@ -19,7 +19,7 @@ package dns
 const (
 	// v180AndAboveKubeDNSDeployment is the kube-dns Deployment manifest for the kube-dns manifest for v1.7+
 	v180AndAboveKubeDNSDeployment = `
-apiVersion: apps/v1beta2
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: kube-dns
@@ -123,9 +123,9 @@ spec:
         - --cache-size=1000
         - --no-negcache
         - --log-facility=-
-        - --server=/{{ .DNSDomain }}/127.0.0.1#10053
-        - --server=/in-addr.arpa/127.0.0.1#10053
-        - --server=/ip6.arpa/127.0.0.1#10053
+        - --server=/{{ .DNSDomain }}/{{ .DNSBindAddr }}#10053
+        - --server=/in-addr.arpa/{{ .DNSBindAddr }}#10053
+        - --server=/ip6.arpa/{{ .DNSBindAddr }}#10053
         ports:
         - containerPort: 53
           name: dns
@@ -156,8 +156,8 @@ spec:
         args:
         - --v=2
         - --logtostderr
-        - --probe=kubedns,127.0.0.1:10053,kubernetes.default.svc.{{ .DNSDomain }},5,{{ .DNSProbeType }}
-        - --probe=dnsmasq,127.0.0.1:53,kubernetes.default.svc.{{ .DNSDomain }},5,{{ .DNSProbeType }}
+        - --probe=kubedns,{{ .DNSProbeAddr }}:10053,kubernetes.default.svc.{{ .DNSDomain }},5,SRV
+        - --probe=dnsmasq,{{ .DNSProbeAddr }}:53,kubernetes.default.svc.{{ .DNSDomain }},5,SRV
         ports:
         - containerPort: 10054
           name: metrics
@@ -212,5 +212,150 @@ spec:
     targetPort: 53
   selector:
     k8s-app: kube-dns
+`
+
+	// CoreDNSDeployment is the CoreDNS Deployment manifest
+	CoreDNSDeployment = `
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: coredns
+  namespace: kube-system
+  labels:
+    k8s-app: kube-dns
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+  selector:
+    matchLabels:
+      k8s-app: kube-dns
+  template:
+    metadata:
+      labels:
+        k8s-app: kube-dns
+    spec:
+      serviceAccountName: coredns
+      tolerations:
+      - key: CriticalAddonsOnly
+        operator: Exists
+      - key: {{ .MasterTaintKey }}
+        effect: NoSchedule
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: k8s-app
+                  operator: In
+                  values:
+                  - coredns
+              topologyKey: kubernetes.io/hostname
+      containers:
+      - name: coredns
+        image: coredns/coredns:{{ .Version }}
+        imagePullPolicy: IfNotPresent
+        resources:
+          limits:
+            memory: 170Mi
+          requests:
+            cpu: 100m
+            memory: 70Mi
+        args: [ "-conf", "/etc/coredns/Corefile" ]
+        volumeMounts:
+        - name: config-volume
+          mountPath: /etc/coredns
+        ports:
+        - containerPort: 53
+          name: dns
+          protocol: UDP
+        - containerPort: 53
+          name: dns-tcp
+          protocol: TCP
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 60
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 5
+      dnsPolicy: Default
+      volumes:
+        - name: config-volume
+          configMap:
+            name: coredns
+            items:
+            - key: Corefile
+              path: Corefile
+`
+
+	// CoreDNSConfigMap is the CoreDNS ConfigMap manifest
+	CoreDNSConfigMap = `
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: coredns
+  namespace: kube-system
+data:
+  Corefile: |
+    .:53 {
+        errors
+        health
+        kubernetes {{ .DNSDomain }} {{ .ServiceCIDR }} {
+           pods insecure
+           upstream /etc/resolv.conf
+           fallthrough in-addr.arpa ip6.arpa
+        }
+        prometheus :9153
+        proxy . /etc/resolv.conf
+        cache 30
+    }
+`
+	// CoreDNSClusterRole is the CoreDNS ClusterRole manifest
+	CoreDNSClusterRole = `
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: system:coredns
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - endpoints
+  - services
+  - pods
+  - namespaces
+  verbs:
+  - list
+  - watch
+`
+	// CoreDNSClusterRoleBinding is the CoreDNS Clusterrolebinding manifest
+	CoreDNSClusterRoleBinding = `
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: system:coredns
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:coredns
+subjects:
+- kind: ServiceAccount
+  name: coredns
+  namespace: kube-system
+`
+	// CoreDNSServiceAccount is the CoreDNS ServiceAccount manifest
+	CoreDNSServiceAccount = `
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: coredns
+  namespace: kube-system
 `
 )

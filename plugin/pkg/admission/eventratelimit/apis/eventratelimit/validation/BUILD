@@ -32,7 +32,7 @@ filegroup(
 go_test(
     name = "go_default_test",
     srcs = ["validation_test.go"],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/plugin/pkg/admission/eventratelimit/apis/eventratelimit/validation",
-    library = ":go_default_library",
     deps = ["//plugin/pkg/admission/eventratelimit/apis/eventratelimit:go_default_library"],
 )

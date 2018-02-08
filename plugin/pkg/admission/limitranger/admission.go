@@ -32,7 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apiserver/pkg/admission"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 	corelisters "k8s.io/kubernetes/pkg/client/listers/core/internalversion"
@@ -41,17 +41,19 @@ import (
 
 const (
 	limitRangerAnnotation = "kubernetes.io/limit-ranger"
+	// PluginName indicates name of admission plugin.
+	PluginName = "LimitRanger"
 )
 
 // Register registers a plugin
 func Register(plugins *admission.Plugins) {
-	plugins.Register("LimitRanger", func(config io.Reader) (admission.Interface, error) {
+	plugins.Register(PluginName, func(config io.Reader) (admission.Interface, error) {
 		return NewLimitRanger(&DefaultLimitRangerActions{})
 	})
 }
 
-// limitRanger enforces usage limits on a per resource basis in the namespace
-type limitRanger struct {
+// LimitRanger enforces usage limits on a per resource basis in the namespace
+type LimitRanger struct {
 	*admission.Handler
 	client  internalclientset.Interface
 	actions LimitRangerActions
@@ -64,18 +66,22 @@ type limitRanger struct {
 	liveTTL         time.Duration
 }
 
+var _ admission.MutationInterface = &LimitRanger{}
+var _ admission.ValidationInterface = &LimitRanger{}
+var _ kubeapiserveradmission.WantsInternalKubeInformerFactory = &LimitRanger{}
+
 type liveLookupEntry struct {
 	expiry time.Time
 	items  []*api.LimitRange
 }
 
-func (l *limitRanger) SetInternalKubeInformerFactory(f informers.SharedInformerFactory) {
+func (l *LimitRanger) SetInternalKubeInformerFactory(f informers.SharedInformerFactory) {
 	limitRangeInformer := f.Core().InternalVersion().LimitRanges()
 	l.SetReadyFunc(limitRangeInformer.Informer().HasSynced)
 	l.lister = limitRangeInformer.Lister()
 }
 
-func (l *limitRanger) Validate() error {
+func (l *LimitRanger) ValidateInitialization() error {
 	if l.lister == nil {
 		return fmt.Errorf("missing limitRange lister")
 	}
@@ -86,7 +92,16 @@ func (l *limitRanger) Validate() error {
 }
 
 // Admit admits resources into cluster that do not violate any defined LimitRange in the namespace
-func (l *limitRanger) Admit(a admission.Attributes) (err error) {
+func (l *LimitRanger) Admit(a admission.Attributes) (err error) {
+	return l.runLimitFunc(a, l.actions.MutateLimit)
+}
+
+// Validate admits resources into cluster that do not violate any defined LimitRange in the namespace
+func (l *LimitRanger) Validate(a admission.Attributes) (err error) {
+	return l.runLimitFunc(a, l.actions.ValidateLimit)
+}
+
+func (l *LimitRanger) runLimitFunc(a admission.Attributes, limitFn func(limitRange *api.LimitRange, kind string, obj runtime.Object) error) (err error) {
 	if !l.actions.SupportsAttributes(a) {
 		return nil
 	}
@@ -100,9 +115,43 @@ func (l *limitRanger) Admit(a admission.Attributes) (err error) {
 		}
 	}
 
+	// ignore all objects marked for deletion
+	oldObj := a.GetOldObject()
+	if oldObj != nil {
+		oldAccessor, err := meta.Accessor(oldObj)
+		if err != nil {
+			return admission.NewForbidden(a, err)
+		}
+		if oldAccessor.GetDeletionTimestamp() != nil {
+			return nil
+		}
+	}
+
+	items, err := l.GetLimitRanges(a)
+	if err != nil {
+		return err
+	}
+
+	// ensure it meets each prescribed min/max
+	for i := range items {
+		limitRange := items[i]
+
+		if !l.actions.SupportsLimit(limitRange) {
+			continue
+		}
+
+		err = limitFn(limitRange, a.GetResource().Resource, a.GetObject())
+		if err != nil {
+			return admission.NewForbidden(a, err)
+		}
+	}
+	return nil
+}
+
+func (l *LimitRanger) GetLimitRanges(a admission.Attributes) ([]*api.LimitRange, error) {
 	items, err := l.lister.LimitRanges(a.GetNamespace()).List(labels.Everything())
 	if err != nil {
-		return admission.NewForbidden(a, fmt.Errorf("unable to %s %v at this time because there was an error enforcing limit ranges", a.GetOperation(), a.GetResource()))
+		return nil, admission.NewForbidden(a, fmt.Errorf("unable to %s %v at this time because there was an error enforcing limit ranges", a.GetOperation(), a.GetResource()))
 	}
 
 	// if there are no items held in our indexer, check our live-lookup LRU, if that misses, do the live lookup to prime it.
@@ -116,7 +165,7 @@ func (l *limitRanger) Admit(a admission.Attributes) (err error) {
 			// throttling - see #22422 for details.
 			liveList, err := l.client.Core().LimitRanges(a.GetNamespace()).List(metav1.ListOptions{})
 			if err != nil {
-				return admission.NewForbidden(a, err)
+				return nil, admission.NewForbidden(a, err)
 			}
 			newEntry := liveLookupEntry{expiry: time.Now().Add(l.liveTTL)}
 			for i := range liveList.Items {
@@ -133,24 +182,11 @@ func (l *limitRanger) Admit(a admission.Attributes) (err error) {
 
 	}
 
-	// ensure it meets each prescribed min/max
-	for i := range items {
-		limitRange := items[i]
-
-		if !l.actions.SupportsLimit(limitRange) {
-			continue
-		}
-
-		err = l.actions.Limit(limitRange, a.GetResource().Resource, a.GetObject())
-		if err != nil {
-			return admission.NewForbidden(a, err)
-		}
-	}
-	return nil
+	return items, nil
 }
 
 // NewLimitRanger returns an object that enforces limits based on the supplied limit function
-func NewLimitRanger(actions LimitRangerActions) (admission.Interface, error) {
+func NewLimitRanger(actions LimitRangerActions) (*LimitRanger, error) {
 	liveLookupCache, err := lru.New(10000)
 	if err != nil {
 		return nil, err
@@ -160,7 +196,7 @@ func NewLimitRanger(actions LimitRangerActions) (admission.Interface, error) {
 		actions = &DefaultLimitRangerActions{}
 	}
 
-	return &limitRanger{
+	return &LimitRanger{
 		Handler:         admission.NewHandler(admission.Create, admission.Update),
 		actions:         actions,
 		liveLookupCache: liveLookupCache,
@@ -168,10 +204,10 @@ func NewLimitRanger(actions LimitRangerActions) (admission.Interface, error) {
 	}, nil
 }
 
-var _ = kubeapiserveradmission.WantsInternalKubeInformerFactory(&limitRanger{})
-var _ = kubeapiserveradmission.WantsInternalKubeClientSet(&limitRanger{})
+var _ = kubeapiserveradmission.WantsInternalKubeInformerFactory(&LimitRanger{})
+var _ = kubeapiserveradmission.WantsInternalKubeClientSet(&LimitRanger{})
 
-func (a *limitRanger) SetInternalKubeClientSet(client internalclientset.Interface) {
+func (a *LimitRanger) SetInternalKubeClientSet(client internalclientset.Interface) {
 	a.client = client
 }
 
@@ -399,12 +435,23 @@ var _ LimitRangerActions = &DefaultLimitRangerActions{}
 // Limit enforces resource requirements of incoming resources against enumerated constraints
 // on the LimitRange.  It may modify the incoming object to apply default resource requirements
 // if not specified, and enumerated on the LimitRange
-func (d *DefaultLimitRangerActions) Limit(limitRange *api.LimitRange, resourceName string, obj runtime.Object) error {
+func (d *DefaultLimitRangerActions) MutateLimit(limitRange *api.LimitRange, resourceName string, obj runtime.Object) error {
 	switch resourceName {
 	case "pods":
-		return PodLimitFunc(limitRange, obj.(*api.Pod))
+		return PodMutateLimitFunc(limitRange, obj.(*api.Pod))
+	}
+	return nil
+}
+
+// Limit enforces resource requirements of incoming resources against enumerated constraints
+// on the LimitRange.  It may modify the incoming object to apply default resource requirements
+// if not specified, and enumerated on the LimitRange
+func (d *DefaultLimitRangerActions) ValidateLimit(limitRange *api.LimitRange, resourceName string, obj runtime.Object) error {
+	switch resourceName {
+	case "pods":
+		return PodValidateLimitFunc(limitRange, obj.(*api.Pod))
 	case "persistentvolumeclaims":
-		return PersistentVolumeClaimLimitFunc(limitRange, obj.(*api.PersistentVolumeClaim))
+		return PersistentVolumeClaimValidateLimitFunc(limitRange, obj.(*api.PersistentVolumeClaim))
 	}
 	return nil
 }
@@ -424,11 +471,11 @@ func (d *DefaultLimitRangerActions) SupportsLimit(limitRange *api.LimitRange) bo
 	return true
 }
 
-// PersistentVolumeClaimLimitFunc enforces storage limits for PVCs.
+// PersistentVolumeClaimValidateLimitFunc enforces storage limits for PVCs.
 // Users request storage via pvc.Spec.Resources.Requests.  Min/Max is enforced by an admin with LimitRange.
 // Claims will not be modified with default values because storage is a required part of pvc.Spec.
 // All storage enforced values *only* apply to pvc.Spec.Resources.Requests.
-func PersistentVolumeClaimLimitFunc(limitRange *api.LimitRange, pvc *api.PersistentVolumeClaim) error {
+func PersistentVolumeClaimValidateLimitFunc(limitRange *api.LimitRange, pvc *api.PersistentVolumeClaim) error {
 	var errs []error
 	for i := range limitRange.Spec.Limits {
 		limit := limitRange.Spec.Limits[i]
@@ -452,14 +499,19 @@ func PersistentVolumeClaimLimitFunc(limitRange *api.LimitRange, pvc *api.Persist
 	return utilerrors.NewAggregate(errs)
 }
 
-// PodLimitFunc enforces resource requirements enumerated by the pod against
+// PodMutateLimitFunc sets resource requirements enumerated by the pod against
 // the specified LimitRange.  The pod may be modified to apply default resource
 // requirements if not specified, and enumerated on the LimitRange
-func PodLimitFunc(limitRange *api.LimitRange, pod *api.Pod) error {
-	var errs []error
-
+func PodMutateLimitFunc(limitRange *api.LimitRange, pod *api.Pod) error {
 	defaultResources := defaultContainerResourceRequirements(limitRange)
 	mergePodResourceRequirements(pod, &defaultResources)
+	return nil
+}
+
+// PodValidateLimitFunc enforces resource requirements enumerated by the pod against
+// the specified LimitRange.
+func PodValidateLimitFunc(limitRange *api.LimitRange, pod *api.Pod) error {
+	var errs []error
 
 	for i := range limitRange.Spec.Limits {
 		limit := limitRange.Spec.Limits[i]

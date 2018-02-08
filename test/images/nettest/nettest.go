@@ -36,6 +36,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -278,7 +279,8 @@ func getWebserverEndpoints(client clientset.Interface) sets.String {
 	for _, ss := range endpoints.Subsets {
 		for _, a := range ss.Addresses {
 			for _, p := range ss.Ports {
-				eps.Insert(fmt.Sprintf("http://%s:%d", a.IP, p.Port))
+				ipPort := net.JoinHostPort(a.IP, fmt.Sprint(p.Port))
+				eps.Insert(fmt.Sprintf("http://%s", ipPort))
 			}
 		}
 	}

@@ -146,9 +146,14 @@ func TestAddLabelsToVolume(t *testing.T) {
 			initializers: &metav1.Initializers{Pending: []metav1.Initializer{{Name: initializerName}}},
 			shouldLabel:  true,
 		},
-		"PV with other initializers": {
+		"PV with other initializers only": {
 			vol:          pv,
 			initializers: &metav1.Initializers{Pending: []metav1.Initializer{{Name: "OtherInit"}}},
+			shouldLabel:  false,
+		},
+		"PV with other initializers first": {
+			vol:          pv,
+			initializers: &metav1.Initializers{Pending: []metav1.Initializer{{Name: "OtherInit"}, {Name: initializerName}}},
 			shouldLabel:  false,
 		},
 	}

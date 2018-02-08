@@ -101,7 +101,7 @@ func (gce *GCECloud) watchClusterID() {
 		},
 	}
 
-	listerWatcher := cache.NewListWatchFromClient(gce.ClusterID.client.Core().RESTClient(), "configmaps", UIDNamespace, fields.Everything())
+	listerWatcher := cache.NewListWatchFromClient(gce.ClusterID.client.CoreV1().RESTClient(), "configmaps", UIDNamespace, fields.Everything())
 	var controller cache.Controller
 	gce.ClusterID.store, controller = cache.NewInformer(newSingleObjectListerWatcher(listerWatcher, UIDConfigMapName), &v1.ConfigMap{}, updateFuncFrequency, mapEventHandler)
 
@@ -189,7 +189,7 @@ func (ci *ClusterID) getOrInitialize() error {
 		UIDProvider: newId,
 	}
 
-	if _, err := ci.client.Core().ConfigMaps(UIDNamespace).Create(cfg); err != nil {
+	if _, err := ci.client.CoreV1().ConfigMaps(UIDNamespace).Create(cfg); err != nil {
 		glog.Errorf("GCE cloud provider failed to create %v config map to store cluster id: %v", ci.cfgMapKey, err)
 		return err
 	}

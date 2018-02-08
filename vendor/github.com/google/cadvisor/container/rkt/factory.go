@@ -86,7 +86,7 @@ func Register(machineInfoFactory info.MachineInfoFactory, fsInfo fs.FsInfo, igno
 		return fmt.Errorf("failed to find supported cgroup mounts for the raw factory")
 	}
 
-	glog.Infof("Registering Rkt factory")
+	glog.V(1).Infof("Registering Rkt factory")
 	factory := &rktFactory{
 		machineInfoFactory: machineInfoFactory,
 		fsInfo:             fsInfo,

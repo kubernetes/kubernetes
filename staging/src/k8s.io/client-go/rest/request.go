@@ -112,7 +112,7 @@ type Request struct {
 }
 
 // NewRequest creates a new request helper object for accessing runtime.Objects on a server.
-func NewRequest(client HTTPClient, verb string, baseURL *url.URL, versionedAPIPath string, content ContentConfig, serializers Serializers, backoff BackoffManager, throttle flowcontrol.RateLimiter) *Request {
+func NewRequest(client HTTPClient, verb string, baseURL *url.URL, versionedAPIPath string, content ContentConfig, serializers Serializers, backoff BackoffManager, throttle flowcontrol.RateLimiter, timeout time.Duration) *Request {
 	if backoff == nil {
 		glog.V(2).Infof("Not implementing request backoff strategy.")
 		backoff = &NoBackoff{}
@@ -131,6 +131,7 @@ func NewRequest(client HTTPClient, verb string, baseURL *url.URL, versionedAPIPa
 		serializers: serializers,
 		backoffMgr:  backoff,
 		throttle:    throttle,
+		timeout:     timeout,
 	}
 	switch {
 	case len(content.AcceptContentTypes) > 0:
@@ -176,6 +177,24 @@ func (r *Request) Resource(resource string) *Request {
 		return r
 	}
 	r.resource = resource
+	return r
+}
+
+// BackOff sets the request's backoff manager to the one specified,
+// or defaults to the stub implementation if nil is provided
+func (r *Request) BackOff(manager BackoffManager) *Request {
+	if manager == nil {
+		r.backoffMgr = &NoBackoff{}
+		return r
+	}
+
+	r.backoffMgr = manager
+	return r
+}
+
+// Throttle receives a rate-limiter and sets or replaces an existing request limiter
+func (r *Request) Throttle(limiter flowcontrol.RateLimiter) *Request {
+	r.throttle = limiter
 	return r
 }
 
@@ -827,6 +846,8 @@ func (r *Request) transformResponse(resp *http.Response, req *http.Request) Resu
 func truncateBody(body string) string {
 	max := 0
 	switch {
+	case bool(glog.V(10)):
+		return body
 	case bool(glog.V(9)):
 		max = 10240
 	case bool(glog.V(8)):

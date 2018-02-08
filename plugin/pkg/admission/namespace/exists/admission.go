@@ -23,33 +23,38 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/admission"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 	corelisters "k8s.io/kubernetes/pkg/client/listers/core/internalversion"
 	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 )
 
+// PluginName indicates name of admission plugin.
+const PluginName = "NamespaceExists"
+
 // Register registers a plugin
 func Register(plugins *admission.Plugins) {
-	plugins.Register("NamespaceExists", func(config io.Reader) (admission.Interface, error) {
+	plugins.Register(PluginName, func(config io.Reader) (admission.Interface, error) {
 		return NewExists(), nil
 	})
 }
 
-// exists is an implementation of admission.Interface.
+// Exists is an implementation of admission.Interface.
 // It rejects all incoming requests in a namespace context if the namespace does not exist.
 // It is useful in deployments that want to enforce pre-declaration of a Namespace resource.
-type exists struct {
+type Exists struct {
 	*admission.Handler
 	client          internalclientset.Interface
 	namespaceLister corelisters.NamespaceLister
 }
 
-var _ = kubeapiserveradmission.WantsInternalKubeInformerFactory(&exists{})
-var _ = kubeapiserveradmission.WantsInternalKubeClientSet(&exists{})
+var _ admission.ValidationInterface = &Exists{}
+var _ = kubeapiserveradmission.WantsInternalKubeInformerFactory(&Exists{})
+var _ = kubeapiserveradmission.WantsInternalKubeClientSet(&Exists{})
 
-func (e *exists) Admit(a admission.Attributes) error {
+// Validate makes an admission decision based on the request attributes
+func (e *Exists) Validate(a admission.Attributes) error {
 	// if we're here, then we've already passed authentication, so we're allowed to do what we're trying to do
 	// if we're here, then the API server has found a route, which means that if we have a non-empty namespace
 	// its a namespaced resource.
@@ -82,23 +87,26 @@ func (e *exists) Admit(a admission.Attributes) error {
 }
 
 // NewExists creates a new namespace exists admission control handler
-func NewExists() admission.Interface {
-	return &exists{
+func NewExists() *Exists {
+	return &Exists{
 		Handler: admission.NewHandler(admission.Create, admission.Update, admission.Delete),
 	}
 }
 
-func (e *exists) SetInternalKubeClientSet(client internalclientset.Interface) {
+// SetInternalKubeClientSet implements the WantsInternalKubeClientSet interface.
+func (e *Exists) SetInternalKubeClientSet(client internalclientset.Interface) {
 	e.client = client
 }
 
-func (e *exists) SetInternalKubeInformerFactory(f informers.SharedInformerFactory) {
+// SetInternalKubeInformerFactory implements the WantsInternalKubeInformerFactory interface.
+func (e *Exists) SetInternalKubeInformerFactory(f informers.SharedInformerFactory) {
 	namespaceInformer := f.Core().InternalVersion().Namespaces()
 	e.namespaceLister = namespaceInformer.Lister()
 	e.SetReadyFunc(namespaceInformer.Informer().HasSynced)
 }
 
-func (e *exists) Validate() error {
+// ValidateInitialization implements the InitializationValidator interface.
+func (e *Exists) ValidateInitialization() error {
 	if e.namespaceLister == nil {
 		return fmt.Errorf("missing namespaceLister")
 	}

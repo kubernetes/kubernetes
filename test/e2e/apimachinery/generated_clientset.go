@@ -151,7 +151,7 @@ func observerUpdate(w watch.Interface, expectedUpdate func(runtime.Object) bool)
 var _ = SIGDescribe("Generated clientset", func() {
 	f := framework.NewDefaultFramework("clientset")
 	It("should create pods, set the deletionTimestamp and deletionGracePeriodSeconds of the pod", func() {
-		podClient := f.ClientSet.Core().Pods(f.Namespace.Name)
+		podClient := f.ClientSet.CoreV1().Pods(f.Namespace.Name)
 		By("constructing the pod")
 		name := "pod" + string(uuid.NewUUID())
 		value := strconv.Itoa(time.Now().Nanosecond())

@@ -62,6 +62,20 @@ func TestTLSConfigKey(t *testing.T) {
 				KeyData:  []byte{1},
 			},
 		},
+		"cert 1, key 1, servername 1": {
+			TLS: TLSConfig{
+				CertData:   []byte{1},
+				KeyData:    []byte{1},
+				ServerName: "1",
+			},
+		},
+		"cert 1, key 1, servername 2": {
+			TLS: TLSConfig{
+				CertData:   []byte{1},
+				KeyData:    []byte{1},
+				ServerName: "2",
+			},
+		},
 		"cert 1, key 2": {
 			TLS: TLSConfig{
 				CertData: []byte{1},

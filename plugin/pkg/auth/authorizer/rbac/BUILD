@@ -31,8 +31,8 @@ go_test(
         "rbac_test.go",
         "subject_locator_test.go",
     ],
+    embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac",
-    library = ":go_default_library",
     deps = [
         "//pkg/apis/rbac:go_default_library",
         "//pkg/registry/rbac/validation:go_default_library",

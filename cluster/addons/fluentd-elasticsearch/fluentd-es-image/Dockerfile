@@ -21,6 +21,8 @@
 
 FROM debian:stretch-slim
 
+ARG DEBIAN_FRONTEND=noninteractive
+
 COPY clean-apt /usr/bin
 COPY clean-install /usr/bin
 COPY Gemfile /Gemfile

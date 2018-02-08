@@ -37,12 +37,18 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
 )
 
-// This is the primary entrypoint for volume plugins.
+const (
+	// DefaultCloudConfigPath is the default path for cloud configuration
+	DefaultCloudConfigPath = "/etc/kubernetes/cloud-config"
+)
+
+// ProbeVolumePlugins is the primary entrypoint for volume plugins.
 func ProbeVolumePlugins() []volume.VolumePlugin {
 	return []volume.VolumePlugin{&cinderPlugin{}}
 }
 
-type CinderProvider interface {
+// BlockStorageProvider is the interface for accessing cinder functionality.
+type BlockStorageProvider interface {
 	AttachDisk(instanceID, volumeID string) (string, error)
 	DetachDisk(instanceID, volumeID string) error
 	DeleteVolume(volumeID string) error
@@ -52,9 +58,11 @@ type CinderProvider interface {
 	GetAttachmentDiskPath(instanceID, volumeID string) (string, error)
 	OperationPending(diskName string) (bool, string, error)
 	DiskIsAttached(instanceID, volumeID string) (bool, error)
-	DisksAreAttached(instanceID string, volumeIDs []string) (map[string]bool, error)
+	DiskIsAttachedByName(nodeName types.NodeName, volumeID string) (bool, string, error)
+	DisksAreAttachedByName(nodeName types.NodeName, volumeIDs []string) (map[string]bool, error)
 	ShouldTrustDevicePath() bool
 	Instances() (cloudprovider.Instances, bool)
+	ExpandVolume(volumeID string, oldSize resource.Quantity, newSize resource.Quantity) (resource.Quantity, error)
 }
 
 type cinderPlugin struct {
@@ -114,7 +122,7 @@ func (plugin *cinderPlugin) GetAccessModes() []v1.PersistentVolumeAccessMode {
 }
 
 func (plugin *cinderPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ volume.VolumeOptions) (volume.Mounter, error) {
-	return plugin.newMounterInternal(spec, pod.UID, &CinderDiskUtil{}, plugin.host.GetMounter(plugin.GetPluginName()))
+	return plugin.newMounterInternal(spec, pod.UID, &DiskUtil{}, plugin.host.GetMounter(plugin.GetPluginName()))
 }
 
 func (plugin *cinderPlugin) newMounterInternal(spec *volume.Spec, podUID types.UID, manager cdManager, mounter mount.Interface) (volume.Mounter, error) {
@@ -141,7 +149,7 @@ func (plugin *cinderPlugin) newMounterInternal(spec *volume.Spec, podUID types.U
 }
 
 func (plugin *cinderPlugin) NewUnmounter(volName string, podUID types.UID) (volume.Unmounter, error) {
-	return plugin.newUnmounterInternal(volName, podUID, &CinderDiskUtil{}, plugin.host.GetMounter(plugin.GetPluginName()))
+	return plugin.newUnmounterInternal(volName, podUID, &DiskUtil{}, plugin.host.GetMounter(plugin.GetPluginName()))
 }
 
 func (plugin *cinderPlugin) newUnmounterInternal(volName string, podUID types.UID, manager cdManager, mounter mount.Interface) (volume.Unmounter, error) {
@@ -156,7 +164,7 @@ func (plugin *cinderPlugin) newUnmounterInternal(volName string, podUID types.UI
 }
 
 func (plugin *cinderPlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, error) {
-	return plugin.newDeleterInternal(spec, &CinderDiskUtil{})
+	return plugin.newDeleterInternal(spec, &DiskUtil{})
 }
 
 func (plugin *cinderPlugin) newDeleterInternal(spec *volume.Spec, manager cdManager) (volume.Deleter, error) {
@@ -173,7 +181,7 @@ func (plugin *cinderPlugin) newDeleterInternal(spec *volume.Spec, manager cdMana
 }
 
 func (plugin *cinderPlugin) NewProvisioner(options volume.VolumeOptions) (volume.Provisioner, error) {
-	return plugin.newProvisionerInternal(options, &CinderDiskUtil{})
+	return plugin.newProvisionerInternal(options, &DiskUtil{})
 }
 
 func (plugin *cinderPlugin) newProvisionerInternal(options volume.VolumeOptions, manager cdManager) (volume.Provisioner, error) {
@@ -186,25 +194,30 @@ func (plugin *cinderPlugin) newProvisionerInternal(options volume.VolumeOptions,
 	}, nil
 }
 
-func getCloudProvider(cloudProvider cloudprovider.Interface) (CinderProvider, error) {
-	if cloud, ok := cloudProvider.(*openstack.OpenStack); ok && cloud != nil {
-		return cloud, nil
-	}
-	return nil, fmt.Errorf("wrong cloud type")
-}
-
-func (plugin *cinderPlugin) getCloudProvider() (CinderProvider, error) {
+func (plugin *cinderPlugin) getCloudProvider() (BlockStorageProvider, error) {
 	cloud := plugin.host.GetCloudProvider()
 	if cloud == nil {
-		glog.Errorf("Cloud provider not initialized properly")
-		return nil, errors.New("Cloud provider not initialized properly")
+		if _, err := os.Stat(DefaultCloudConfigPath); err == nil {
+			var config *os.File
+			config, err = os.Open(DefaultCloudConfigPath)
+			if err != nil {
+				return nil, fmt.Errorf("unable to load OpenStack configuration from default path : %v", err)
+			}
+			defer config.Close()
+			cloud, err = cloudprovider.GetCloudProvider(openstack.ProviderName, config)
+			if err != nil {
+				return nil, fmt.Errorf("unable to create OpenStack cloud provider from default path : %v", err)
+			}
+		} else {
+			return nil, fmt.Errorf("OpenStack cloud provider was not initialized properly : %v", err)
+		}
 	}
 
 	switch cloud := cloud.(type) {
 	case *openstack.OpenStack:
 		return cloud, nil
 	default:
-		return nil, errors.New("Invalid cloud provider: expected OpenStack.")
+		return nil, errors.New("invalid cloud provider: expected OpenStack")
 	}
 }
 
@@ -225,6 +238,31 @@ func (plugin *cinderPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*
 		},
 	}
 	return volume.NewSpecFromVolume(cinderVolume), nil
+}
+
+var _ volume.ExpandableVolumePlugin = &cinderPlugin{}
+
+func (plugin *cinderPlugin) ExpandVolumeDevice(spec *volume.Spec, newSize resource.Quantity, oldSize resource.Quantity) (resource.Quantity, error) {
+	cinder, _, err := getVolumeSource(spec)
+	if err != nil {
+		return oldSize, err
+	}
+	cloud, err := plugin.getCloudProvider()
+	if err != nil {
+		return oldSize, err
+	}
+
+	expandedSize, err := cloud.ExpandVolume(cinder.VolumeID, oldSize, newSize)
+	if err != nil {
+		return oldSize, err
+	}
+
+	glog.V(2).Infof("volume %s expanded to new size %d successfully", cinder.VolumeID, int(newSize.Value()))
+	return expandedSize, nil
+}
+
+func (plugin *cinderPlugin) RequiresFSResize() bool {
+	return true
 }
 
 // Abstract interface to PD operations.

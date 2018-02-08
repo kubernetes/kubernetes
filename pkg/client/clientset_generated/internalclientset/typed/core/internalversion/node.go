@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2018 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	rest "k8s.io/client-go/rest"
-	api "k8s.io/kubernetes/pkg/api"
+	core "k8s.io/kubernetes/pkg/apis/core"
 	scheme "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/scheme"
 )
 
@@ -33,15 +33,15 @@ type NodesGetter interface {
 
 // NodeInterface has methods to work with Node resources.
 type NodeInterface interface {
-	Create(*api.Node) (*api.Node, error)
-	Update(*api.Node) (*api.Node, error)
-	UpdateStatus(*api.Node) (*api.Node, error)
+	Create(*core.Node) (*core.Node, error)
+	Update(*core.Node) (*core.Node, error)
+	UpdateStatus(*core.Node) (*core.Node, error)
 	Delete(name string, options *v1.DeleteOptions) error
 	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
-	Get(name string, options v1.GetOptions) (*api.Node, error)
-	List(opts v1.ListOptions) (*api.NodeList, error)
+	Get(name string, options v1.GetOptions) (*core.Node, error)
+	List(opts v1.ListOptions) (*core.NodeList, error)
 	Watch(opts v1.ListOptions) (watch.Interface, error)
-	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *api.Node, err error)
+	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *core.Node, err error)
 	NodeExpansion
 }
 
@@ -58,8 +58,8 @@ func newNodes(c *CoreClient) *nodes {
 }
 
 // Get takes name of the node, and returns the corresponding node object, and an error if there is any.
-func (c *nodes) Get(name string, options v1.GetOptions) (result *api.Node, err error) {
-	result = &api.Node{}
+func (c *nodes) Get(name string, options v1.GetOptions) (result *core.Node, err error) {
+	result = &core.Node{}
 	err = c.client.Get().
 		Resource("nodes").
 		Name(name).
@@ -70,8 +70,8 @@ func (c *nodes) Get(name string, options v1.GetOptions) (result *api.Node, err e
 }
 
 // List takes label and field selectors, and returns the list of Nodes that match those selectors.
-func (c *nodes) List(opts v1.ListOptions) (result *api.NodeList, err error) {
-	result = &api.NodeList{}
+func (c *nodes) List(opts v1.ListOptions) (result *core.NodeList, err error) {
+	result = &core.NodeList{}
 	err = c.client.Get().
 		Resource("nodes").
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -90,8 +90,8 @@ func (c *nodes) Watch(opts v1.ListOptions) (watch.Interface, error) {
 }
 
 // Create takes the representation of a node and creates it.  Returns the server's representation of the node, and an error, if there is any.
-func (c *nodes) Create(node *api.Node) (result *api.Node, err error) {
-	result = &api.Node{}
+func (c *nodes) Create(node *core.Node) (result *core.Node, err error) {
+	result = &core.Node{}
 	err = c.client.Post().
 		Resource("nodes").
 		Body(node).
@@ -101,8 +101,8 @@ func (c *nodes) Create(node *api.Node) (result *api.Node, err error) {
 }
 
 // Update takes the representation of a node and updates it. Returns the server's representation of the node, and an error, if there is any.
-func (c *nodes) Update(node *api.Node) (result *api.Node, err error) {
-	result = &api.Node{}
+func (c *nodes) Update(node *core.Node) (result *core.Node, err error) {
+	result = &core.Node{}
 	err = c.client.Put().
 		Resource("nodes").
 		Name(node.Name).
@@ -115,8 +115,8 @@ func (c *nodes) Update(node *api.Node) (result *api.Node, err error) {
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
 
-func (c *nodes) UpdateStatus(node *api.Node) (result *api.Node, err error) {
-	result = &api.Node{}
+func (c *nodes) UpdateStatus(node *core.Node) (result *core.Node, err error) {
+	result = &core.Node{}
 	err = c.client.Put().
 		Resource("nodes").
 		Name(node.Name).
@@ -148,8 +148,8 @@ func (c *nodes) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListO
 }
 
 // Patch applies the patch and returns the patched node.
-func (c *nodes) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *api.Node, err error) {
-	result = &api.Node{}
+func (c *nodes) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *core.Node, err error) {
+	result = &core.Node{}
 	err = c.client.Patch(pt).
 		Resource("nodes").
 		SubResource(subresources...).

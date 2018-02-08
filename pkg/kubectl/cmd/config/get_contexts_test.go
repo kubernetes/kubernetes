@@ -66,6 +66,27 @@ func TestGetContextsAllNoHeader(t *testing.T) {
 	test.run(t)
 }
 
+func TestGetContextsAllSorted(t *testing.T) {
+	tconf := clientcmdapi.Config{
+		CurrentContext: "shaker-context",
+		Contexts: map[string]*clientcmdapi.Context{
+			"shaker-context": {AuthInfo: "blue-user", Cluster: "big-cluster", Namespace: "saw-ns"},
+			"abc":            {AuthInfo: "blue-user", Cluster: "abc-cluster", Namespace: "kube-system"},
+			"xyz":            {AuthInfo: "blue-user", Cluster: "xyz-cluster", Namespace: "default"}}}
+	test := getContextsTest{
+		startingConfig: tconf,
+		names:          []string{},
+		noHeader:       false,
+		nameOnly:       false,
+		expectedOut: `CURRENT   NAME             CLUSTER       AUTHINFO    NAMESPACE
+          abc              abc-cluster   blue-user   kube-system
+*         shaker-context   big-cluster   blue-user   saw-ns
+          xyz              xyz-cluster   blue-user   default
+`,
+	}
+	test.run(t)
+}
+
 func TestGetContextsAllName(t *testing.T) {
 	tconf := clientcmdapi.Config{
 		Contexts: map[string]*clientcmdapi.Context{

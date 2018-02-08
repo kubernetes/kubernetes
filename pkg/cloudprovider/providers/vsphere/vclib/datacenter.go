@@ -49,6 +49,22 @@ func GetDatacenter(ctx context.Context, connection *VSphereConnection, datacente
 	return &dc, nil
 }
 
+// GetAllDatacenter returns all the DataCenter Objects
+func GetAllDatacenter(ctx context.Context, connection *VSphereConnection) ([]*Datacenter, error) {
+	var dc []*Datacenter
+	finder := find.NewFinder(connection.GoVmomiClient.Client, true)
+	datacenters, err := finder.DatacenterList(ctx, "*")
+	if err != nil {
+		glog.Errorf("Failed to find the datacenter. err: %+v", err)
+		return nil, err
+	}
+	for _, datacenter := range datacenters {
+		dc = append(dc, &(Datacenter{datacenter}))
+	}
+
+	return dc, nil
+}
+
 // GetVMByUUID gets the VM object from the given vmUUID
 func (dc *Datacenter) GetVMByUUID(ctx context.Context, vmUUID string) (*VirtualMachine, error) {
 	s := object.NewSearchIndex(dc.Client())
@@ -60,7 +76,7 @@ func (dc *Datacenter) GetVMByUUID(ctx context.Context, vmUUID string) (*VirtualM
 	}
 	if svm == nil {
 		glog.Errorf("Unable to find VM by UUID. VM UUID: %s", vmUUID)
-		return nil, fmt.Errorf("Failed to find VM by UUID: %s", vmUUID)
+		return nil, ErrNoVMFound
 	}
 	virtualMachine := VirtualMachine{object.NewVirtualMachine(dc.Client(), svm.Reference()), dc}
 	return &virtualMachine, nil
@@ -79,6 +95,41 @@ func (dc *Datacenter) GetVMByPath(ctx context.Context, vmPath string) (*VirtualM
 	return &virtualMachine, nil
 }
 
+// GetAllDatastores gets the datastore URL to DatastoreInfo map for all the datastores in
+// the datacenter.
+func (dc *Datacenter) GetAllDatastores(ctx context.Context) (map[string]*DatastoreInfo, error) {
+	finder := getFinder(dc)
+	datastores, err := finder.DatastoreList(ctx, "*")
+	if err != nil {
+		glog.Errorf("Failed to get all the datastores. err: %+v", err)
+		return nil, err
+	}
+	var dsList []types.ManagedObjectReference
+	for _, ds := range datastores {
+		dsList = append(dsList, ds.Reference())
+	}
+
+	var dsMoList []mo.Datastore
+	pc := property.DefaultCollector(dc.Client())
+	properties := []string{DatastoreInfoProperty}
+	err = pc.Retrieve(ctx, dsList, properties, &dsMoList)
+	if err != nil {
+		glog.Errorf("Failed to get Datastore managed objects from datastore objects."+
+			" dsObjList: %+v, properties: %+v, err: %v", dsList, properties, err)
+		return nil, err
+	}
+
+	dsURLInfoMap := make(map[string]*DatastoreInfo)
+	for _, dsMo := range dsMoList {
+		dsURLInfoMap[dsMo.Info.GetDatastoreInfo().Url] = &DatastoreInfo{
+			&Datastore{object.NewDatastore(dc.Client(), dsMo.Reference()),
+				dc},
+			dsMo.Info.GetDatastoreInfo()}
+	}
+	glog.V(9).Infof("dsURLInfoMap : %+v", dsURLInfoMap)
+	return dsURLInfoMap, nil
+}
+
 // GetDatastoreByPath gets the Datastore object from the given vmDiskPath
 func (dc *Datacenter) GetDatastoreByPath(ctx context.Context, vmDiskPath string) (*Datastore, error) {
 	datastorePathObj := new(object.DatastorePath)
@@ -87,14 +138,8 @@ func (dc *Datacenter) GetDatastoreByPath(ctx context.Context, vmDiskPath string)
 		glog.Errorf("Failed to parse vmDiskPath: %s", vmDiskPath)
 		return nil, errors.New("Failed to parse vmDiskPath")
 	}
-	finder := getFinder(dc)
-	ds, err := finder.Datastore(ctx, datastorePathObj.Datastore)
-	if err != nil {
-		glog.Errorf("Failed while searching for datastore: %s. err: %+v", datastorePathObj.Datastore, err)
-		return nil, err
-	}
-	datastore := Datastore{ds, dc}
-	return &datastore, nil
+
+	return dc.GetDatastoreByName(ctx, datastorePathObj.Datastore)
 }
 
 // GetDatastoreByName gets the Datastore object for the given datastore name
@@ -107,6 +152,23 @@ func (dc *Datacenter) GetDatastoreByName(ctx context.Context, name string) (*Dat
 	}
 	datastore := Datastore{ds, dc}
 	return &datastore, nil
+}
+
+// GetResourcePool gets the resource pool for the given path
+func (dc *Datacenter) GetResourcePool(ctx context.Context, computePath string) (*object.ResourcePool, error) {
+	finder := getFinder(dc)
+	var computeResource *object.ComputeResource
+	var err error
+	if computePath == "" {
+		computeResource, err = finder.DefaultComputeResource(ctx)
+	} else {
+		computeResource, err = finder.ComputeResource(ctx, computePath)
+	}
+	if err != nil {
+		glog.Errorf("Failed to get the ResourcePool for computePath '%s'. err: %+v", computePath, err)
+		return nil, err
+	}
+	return computeResource.ResourcePool(ctx)
 }
 
 // GetFolderByPath gets the Folder Object from the given folder path

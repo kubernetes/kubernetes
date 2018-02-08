@@ -21,6 +21,9 @@ set -o pipefail
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 source "${KUBE_ROOT}/hack/lib/util.sh"
 
+# include shell2junit library
+source "${KUBE_ROOT}/third_party/forked/shell2junit/sh2ju.sh"
+
 # Excluded check patterns are always skipped.
 EXCLUDED_PATTERNS=(
   "verify-all.sh"                # this script calls the make rule and would cause a loop
@@ -39,10 +42,10 @@ QUICK_PATTERNS+=(
   "verify-generated-files-remake"
   "verify-godep-licenses.sh"
   "verify-gofmt.sh"
+  "verify-imports.sh"
   "verify-pkg-names.sh"
   "verify-readonly-packages.sh"
   "verify-staging-client-go.sh"
-  "verify-staging-imports.sh"
   "verify-test-images.sh"
   "verify-test-owners.sh"
 )
@@ -69,11 +72,19 @@ function is-quick {
 }
 
 function run-cmd {
+  local filename="${2##*/verify-}"
+  local testname="${filename%%.*}"
+  local output="${KUBE_JUNIT_REPORT_DIR:-/tmp/junit-results}"
+  local tr
+
   if ${SILENT}; then
-    "$@" &> /dev/null
+    juLog -output="${output}" -class="verify" -name="${testname}" "$@" &> /dev/null
+    tr=$?
   else
-    "$@"
+    juLog -output="${output}" -class="verify" -name="${testname}" "$@"
+    tr=$?
   fi
+  return ${tr}
 }
 
 # Collect Failed tests in this Array , initalize it to nil
@@ -92,54 +103,41 @@ function run-checks {
   local -r pattern=$1
   local -r runner=$2
 
+  local t
   for t in $(ls ${pattern})
   do
+    local check_name="$(basename "${t}")"
     if is-excluded "${t}" ; then
-      echo "Skipping ${t}"
+      echo "Skipping ${check_name}"
       continue
     fi
     if ${QUICK} && ! is-quick "${t}" ; then
-      echo "Skipping ${t} in quick mode"
+      echo "Skipping ${check_name} in quick mode"
       continue
     fi
-    echo -e "Verifying ${t}"
+    echo -e "Verifying ${check_name}"
     local start=$(date +%s)
     run-cmd "${runner}" "${t}" && tr=$? || tr=$?
     local elapsed=$(($(date +%s) - ${start}))
     if [[ ${tr} -eq 0 ]]; then
-      echo -e "${color_green}SUCCESS${color_norm}  ${t}\t${elapsed}s"
+      echo -e "${color_green}SUCCESS${color_norm}  ${check_name}\t${elapsed}s"
     else
-      echo -e "${color_red}FAILED${color_norm}   ${t}\t${elapsed}s"
+      echo -e "${color_red}FAILED${color_norm}   ${check_name}\t${elapsed}s"
       ret=1
       FAILED_TESTS+=(${t})
     fi
   done
 }
 
-SILENT=true
-QUICK=false
-
-while getopts ":vQ" opt; do
-  case ${opt} in
-    v)
-      SILENT=false
-      ;;
-    Q)
-      QUICK=true
-      ;;
-    \?)
-      echo "Invalid flag: -${OPTARG}" >&2
-      exit 1
-      ;;
-  esac
-done
+SILENT=${SILENT:-false}
+QUICK=${QUICK:-false}
 
 if ${SILENT} ; then
-  echo "Running in silent mode, run with -v if you want to see script logs."
+  echo "Running in silent mode, run with SILENT=false if you want to see script logs."
 fi
 
 if ${QUICK} ; then
-  echo "Running in quick mode (-Q flag). Only fast checks will run."
+  echo "Running in quick mode (QUICK=true). Only fast checks will run."
 fi
 
 ret=0
@@ -147,7 +145,7 @@ run-checks "${KUBE_ROOT}/hack/verify-*.sh" bash
 run-checks "${KUBE_ROOT}/hack/verify-*.py" python
 
 if [[ ${ret} -eq 1 ]]; then
-    print-failed-tests 
+    print-failed-tests
 fi
 exit ${ret}
 

@@ -52,15 +52,15 @@ type PodGCController struct {
 }
 
 func NewPodGC(kubeClient clientset.Interface, podInformer coreinformers.PodInformer, terminatedPodThreshold int) *PodGCController {
-	if kubeClient != nil && kubeClient.Core().RESTClient().GetRateLimiter() != nil {
-		metrics.RegisterMetricAndTrackRateLimiterUsage("gc_controller", kubeClient.Core().RESTClient().GetRateLimiter())
+	if kubeClient != nil && kubeClient.CoreV1().RESTClient().GetRateLimiter() != nil {
+		metrics.RegisterMetricAndTrackRateLimiterUsage("gc_controller", kubeClient.CoreV1().RESTClient().GetRateLimiter())
 	}
 	gcc := &PodGCController{
 		kubeClient:             kubeClient,
 		terminatedPodThreshold: terminatedPodThreshold,
 		deletePod: func(namespace, name string) error {
 			glog.Infof("PodGC is force deleting Pod: %v:%v", namespace, name)
-			return kubeClient.Core().Pods(namespace).Delete(name, metav1.NewDeleteOptions(0))
+			return kubeClient.CoreV1().Pods(namespace).Delete(name, metav1.NewDeleteOptions(0))
 		},
 	}
 
@@ -143,7 +143,7 @@ func (gcc *PodGCController) gcTerminated(pods []*v1.Pod) {
 func (gcc *PodGCController) gcOrphaned(pods []*v1.Pod) {
 	glog.V(4).Infof("GC'ing orphaned")
 	// We want to get list of Nodes from the etcd, to make sure that it's as fresh as possible.
-	nodes, err := gcc.kubeClient.Core().Nodes().List(metav1.ListOptions{})
+	nodes, err := gcc.kubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
 	if err != nil {
 		return
 	}

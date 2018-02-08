@@ -1,6 +1,16 @@
 kind: ConfigMap
 apiVersion: v1
+metadata:
+  name: fluentd-es-config-v0.1.3
+  namespace: kube-system
+  labels:
+    addonmanager.kubernetes.io/mode: Reconcile
 data:
+  system.conf: |-
+    <system>
+      root_dir /tmp/fluentd-buffers/
+    </system>
+
   containers.input.conf: |-
     # This configuration file for Fluentd / td-agent is used
     # to watch changes to Docker log files. The kubelet creates symlinks that
@@ -96,33 +106,51 @@ data:
     # the name of the Kubernetes container regardless of how many times the
     # Kubernetes pod has been restarted (resulting in a several Docker container IDs).
 
-    # Example:
+    # Json Log Example:
     # {"log":"[info:2016-02-16T16:04:05.930-08:00] Some log text here\n","stream":"stdout","time":"2016-02-17T00:04:05.931087621Z"}
+    # CRI Log Example:
+    # 2016-02-17T00:04:05.931087621Z stdout F [info:2016-02-16T16:04:05.930-08:00] Some log text here
     <source>
-      type tail
+      @id fluentd-containers.log
+      @type tail
       path /var/log/containers/*.log
       pos_file /var/log/es-containers.log.pos
       time_format %Y-%m-%dT%H:%M:%S.%NZ
-      tag kubernetes.*
+      tag raw.kubernetes.*
       format json
       read_from_head true
     </source>
+
+    # Detect exceptions in the log output and forward them as one log entry.
+    <match raw.kubernetes.**>
+      @id raw.kubernetes
+      @type detect_exceptions
+      remove_tag_prefix raw
+      message log
+      stream stream
+      multiline_flush_interval 5
+      max_bytes 500000
+      max_lines 1000
+    </match>
+
   system.input.conf: |-
     # Example:
     # 2015-12-21 23:17:22,066 [salt.state       ][INFO    ] Completed state [net.ipv4.ip_forward] at time 23:17:22.066081
     <source>
-      type tail
+      @id minion
+      @type tail
       format /^(?<time>[^ ]* [^ ,]*)[^\[]*\[[^\]]*\]\[(?<severity>[^ \]]*) *\] (?<message>.*)$/
       time_format %Y-%m-%d %H:%M:%S
       path /var/log/salt/minion
-      pos_file /var/log/es-salt.pos
+      pos_file /var/log/salt.pos
       tag salt
     </source>
 
     # Example:
     # Dec 21 23:17:22 gke-foo-1-1-4b5cbd14-node-4eoj startupscript: Finished running startup script /var/run/google.startup.script
     <source>
-      type tail
+      @id startupscript.log
+      @type tail
       format syslog
       path /var/log/startupscript.log
       pos_file /var/log/es-startupscript.log.pos
@@ -133,7 +161,8 @@ data:
     # time="2016-02-04T06:51:03.053580605Z" level=info msg="GET /containers/json"
     # time="2016-02-04T07:53:57.505612354Z" level=error msg="HTTP Error" err="No such image: -f" statusCode=404
     <source>
-      type tail
+      @id docker.log
+      @type tail
       format /^time="(?<time>[^)]*)" level=(?<severity>[^ ]*) msg="(?<message>[^"]*)"( err="(?<error>[^"]*)")?( statusCode=($<status_code>\d+))?/
       path /var/log/docker.log
       pos_file /var/log/es-docker.log.pos
@@ -143,7 +172,8 @@ data:
     # Example:
     # 2016/02/04 06:52:38 filePurge: successfully removed file /var/etcd/data/member/wal/00000000000006d0-00000000010a23d1.wal
     <source>
-      type tail
+      @id etcd.log
+      @type tail
       # Not parsing this, because it doesn't have anything particularly useful to
       # parse out of it (like severities).
       format none
@@ -159,7 +189,8 @@ data:
     # Example:
     # I0204 07:32:30.020537    3368 server.go:1048] POST /stats/container/: (13.972191ms) 200 [[Go-http-client/1.1] 10.244.1.3:40537]
     <source>
-      type tail
+      @id kubelet.log
+      @type tail
       format multiline
       multiline_flush_interval 5s
       format_firstline /^\w\d{4}/
@@ -173,7 +204,8 @@ data:
     # Example:
     # I1118 21:26:53.975789       6 proxier.go:1096] Port "nodePort for kube-system/default-http-backend:http" (:31429/tcp) was open before and is still needed
     <source>
-      type tail
+      @id kube-proxy.log
+      @type tail
       format multiline
       multiline_flush_interval 5s
       format_firstline /^\w\d{4}/
@@ -187,7 +219,8 @@ data:
     # Example:
     # I0204 07:00:19.604280       5 handlers.go:131] GET /api/v1/nodes: (1.624207ms) 200 [[kube-controller-manager/v1.1.3 (linux/amd64) kubernetes/6a81b50] 127.0.0.1:38266]
     <source>
-      type tail
+      @id kube-apiserver.log
+      @type tail
       format multiline
       multiline_flush_interval 5s
       format_firstline /^\w\d{4}/
@@ -201,7 +234,8 @@ data:
     # Example:
     # I0204 06:55:31.872680       5 servicecontroller.go:277] LB already exists and doesn't need update for service kube-system/kube-ui
     <source>
-      type tail
+      @id kube-controller-manager.log
+      @type tail
       format multiline
       multiline_flush_interval 5s
       format_firstline /^\w\d{4}/
@@ -215,7 +249,8 @@ data:
     # Example:
     # W0204 06:49:18.239674       7 reflector.go:245] pkg/scheduler/factory/factory.go:193: watch of *api.Service ended with: 401: The event in requested index is outdated and cleared (the requested history has been cleared [2578313/2577886]) [2579312]
     <source>
-      type tail
+      @id kube-scheduler.log
+      @type tail
       format multiline
       multiline_flush_interval 5s
       format_firstline /^\w\d{4}/
@@ -229,7 +264,8 @@ data:
     # Example:
     # I1104 10:36:20.242766       5 rescheduler.go:73] Running Rescheduler
     <source>
-      type tail
+      @id rescheduler.log
+      @type tail
       format multiline
       multiline_flush_interval 5s
       format_firstline /^\w\d{4}/
@@ -243,7 +279,8 @@ data:
     # Example:
     # I0603 15:31:05.793605       6 cluster_manager.go:230] Reading config from path /etc/gce.conf
     <source>
-      type tail
+      @id glbc.log
+      @type tail
       format multiline
       multiline_flush_interval 5s
       format_firstline /^\w\d{4}/
@@ -257,7 +294,8 @@ data:
     # Example:
     # I0603 15:31:05.793605       6 cluster_manager.go:230] Reading config from path /etc/gce.conf
     <source>
-      type tail
+      @id cluster-autoscaler.log
+      @type tail
       format multiline
       multiline_flush_interval 5s
       format_firstline /^\w\d{4}/
@@ -270,33 +308,47 @@ data:
 
     # Logs from systemd-journal for interesting services.
     <source>
-      type systemd
+      @id journald-docker
+      @type systemd
       filters [{ "_SYSTEMD_UNIT": "docker.service" }]
-      pos_file /var/log/gcp-journald-docker.pos
+      <storage>
+        @type local
+        persistent true
+      </storage>
       read_from_head true
       tag docker
     </source>
 
     <source>
-      type systemd
+      @id journald-kubelet
+      @type systemd
       filters [{ "_SYSTEMD_UNIT": "kubelet.service" }]
-      pos_file /var/log/gcp-journald-kubelet.pos
+      <storage>
+        @type local
+        persistent true
+      </storage>
       read_from_head true
       tag kubelet
     </source>
 
     <source>
-      type systemd
+      @id journald-node-problem-detector
+      @type systemd
       filters [{ "_SYSTEMD_UNIT": "node-problem-detector.service" }]
-      pos_file /var/log/gcp-journald-node-problem-detector.pos
+      <storage>
+        @type local
+        persistent true
+      </storage>
       read_from_head true
       tag node-problem-detector
     </source>
+
   forward.input.conf: |-
     # Takes the messages sent over TCP
     <source>
-      type forward
+      @type forward
     </source>
+
   monitoring.conf: |-
     # Prometheus Exporter Plugin
     # input plugin that exports metrics
@@ -331,32 +383,32 @@ data:
         host ${hostname}
       </labels>
     </source>
+
   output.conf: |-
     # Enriches records with Kubernetes metadata
     <filter kubernetes.**>
-      type kubernetes_metadata
+      @type kubernetes_metadata
     </filter>
 
     <match **>
-       type elasticsearch
-       log_level info
-       include_tag_key true
-       host elasticsearch-logging
-       port 9200
-       logstash_format true
-       # Set the chunk limits.
-       buffer_chunk_limit 2M
-       buffer_queue_limit 8
-       flush_interval 5s
-       # Never wait longer than 5 minutes between retries.
-       max_retry_wait 30
-       # Disable the limit on the number of retries (retry forever).
-       disable_retry_limit
-       # Use multiple threads for processing.
-       num_threads 2
+      @id elasticsearch
+      @type elasticsearch
+      @log_level info
+      include_tag_key true
+      host elasticsearch-logging
+      port 9200
+      logstash_format true
+      <buffer>
+        @type file
+        path /var/log/fluentd-buffers/kubernetes.system.buffer
+        flush_mode interval
+        retry_type exponential_backoff
+        flush_thread_count 2
+        flush_interval 5s
+        retry_forever
+        retry_max_interval 30
+        chunk_limit_size 2M
+        queue_limit_length 8
+        overflow_action block
+      </buffer>
     </match>
-metadata:
-  name: fluentd-es-config-v0.1.0
-  namespace: kube-system
-  labels:
-    addonmanager.kubernetes.io/mode: Reconcile

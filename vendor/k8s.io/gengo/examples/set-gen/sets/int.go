@@ -26,7 +26,7 @@ import (
 // sets.Int is a set of ints, implemented via map[int]struct{} for minimal memory consumption.
 type Int map[int]Empty
 
-// New creates a Int from a list of values.
+// NewInt creates a Int from a list of values.
 func NewInt(items ...int) Int {
 	ss := Int{}
 	ss.Insert(items...)

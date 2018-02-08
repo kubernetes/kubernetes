@@ -3,7 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = select({
-        "@io_bazel_rules_go//go/platform:linux_amd64": [
+        "@io_bazel_rules_go//go/platform:linux": [
             "constants.go",
             "ipvs.go",
             "netlink.go",
@@ -13,7 +13,7 @@ go_library(
     importpath = "github.com/docker/libnetwork/ipvs",
     visibility = ["//visibility:public"],
     deps = select({
-        "@io_bazel_rules_go//go/platform:linux_amd64": [
+        "@io_bazel_rules_go//go/platform:linux": [
             "//vendor/github.com/sirupsen/logrus:go_default_library",
             "//vendor/github.com/vishvananda/netlink/nl:go_default_library",
             "//vendor/github.com/vishvananda/netns:go_default_library",

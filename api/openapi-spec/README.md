@@ -4,7 +4,7 @@ This folder contains an [OpenAPI specification][openapi] for Kubernetes API.
 
 ## Vendor Extensions
 
-Kuberntes extends OpenAPI using these extensions. Note the version that
+Kubernetes extends OpenAPI using these extensions. Note the version that
 extensions has been added.
 
 ### `x-kubernetes-group-version-kind`

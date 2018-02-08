@@ -22,11 +22,11 @@ import (
 	"sync"
 	"time"
 
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 )
 
 var (
-	version = "0.1.0"
+	FakeVersion = "0.1.0"
 
 	FakeRuntimeName  = "fakeRuntime"
 	FakePodSandboxIP = "192.168.192.168"
@@ -117,10 +117,10 @@ func (r *FakeRuntimeService) Version(apiVersion string) (*runtimeapi.VersionResp
 	r.Called = append(r.Called, "Version")
 
 	return &runtimeapi.VersionResponse{
-		Version:           version,
+		Version:           FakeVersion,
 		RuntimeName:       FakeRuntimeName,
-		RuntimeVersion:    version,
-		RuntimeApiVersion: version,
+		RuntimeVersion:    FakeVersion,
+		RuntimeApiVersion: FakeVersion,
 	}, nil
 }
 
@@ -458,4 +458,12 @@ func (r *FakeRuntimeService) ListContainerStats(filter *runtimeapi.ContainerStat
 	}
 
 	return result, nil
+}
+
+func (r *FakeRuntimeService) ReopenContainerLog(containerID string) error {
+	r.Lock()
+	defer r.Unlock()
+
+	r.Called = append(r.Called, "ReopenContainerLog")
+	return nil
 }

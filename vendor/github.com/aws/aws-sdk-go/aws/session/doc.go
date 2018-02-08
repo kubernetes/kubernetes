@@ -23,7 +23,7 @@ additional config if the AWS_SDK_LOAD_CONFIG environment variable is set.
 Alternatively you can explicitly create a Session with shared config enabled.
 To do this you can use NewSessionWithOptions to configure how the Session will
 be created. Using the NewSessionWithOptions with SharedConfigState set to
-SharedConfigEnabled will create the session as if the AWS_SDK_LOAD_CONFIG
+SharedConfigEnable will create the session as if the AWS_SDK_LOAD_CONFIG
 environment variable was set.
 
 Creating Sessions
@@ -45,16 +45,16 @@ region, and profile loaded from the environment and shared config automatically.
 Requires the AWS_PROFILE to be set, or "default" is used.
 
 	// Create Session
-	sess, err := session.NewSession()
+	sess := session.Must(session.NewSession())
 
 	// Create a Session with a custom region
-	sess, err := session.NewSession(&aws.Config{Region: aws.String("us-east-1")})
+	sess := session.Must(session.NewSession(&aws.Config{
+		Region: aws.String("us-east-1"),
+	}))
 
 	// Create a S3 client instance from a session
-	sess, err := session.NewSession()
-	if err != nil {
-		// Handle Session creation error
-	}
+	sess := session.Must(session.NewSession())
+
 	svc := s3.New(sess)
 
 Create Session With Option Overrides
@@ -67,23 +67,25 @@ Use NewSessionWithOptions when you want to provide the config profile, or
 override the shared config state (AWS_SDK_LOAD_CONFIG).
 
 	// Equivalent to session.NewSession()
-	sess, err := session.NewSessionWithOptions(session.Options{})
+	sess := session.Must(session.NewSessionWithOptions(session.Options{
+		// Options
+	}))
 
 	// Specify profile to load for the session's config
-	sess, err := session.NewSessionWithOptions(session.Options{
+	sess := session.Must(session.NewSessionWithOptions(session.Options{
 		 Profile: "profile_name",
-	})
+	}))
 
 	// Specify profile for config and region for requests
-	sess, err := session.NewSessionWithOptions(session.Options{
+	sess := session.Must(session.NewSessionWithOptions(session.Options{
 		 Config: aws.Config{Region: aws.String("us-east-1")},
 		 Profile: "profile_name",
-	})
+	}))
 
 	// Force enable Shared Config support
-	sess, err := session.NewSessionWithOptions(session.Options{
-		SharedConfigState: SharedConfigEnable,
-	})
+	sess := session.Must(session.NewSessionWithOptions(session.Options{
+		SharedConfigState: session.SharedConfigEnable,
+	}))
 
 Adding Handlers
 
@@ -93,7 +95,8 @@ handler logs every request and its payload made by a service client:
 
 	// Create a session, and add additional handlers for all service
 	// clients created with the Session to inherit. Adds logging handler.
-	sess, err := session.NewSession()
+	sess := session.Must(session.NewSession())
+
 	sess.Handlers.Send.PushFront(func(r *request.Request) {
 		// Log every request made and its payload
 		logger.Println("Request: %s/%s, Payload: %s",
@@ -121,9 +124,8 @@ file (~/.aws/config) and shared credentials file (~/.aws/credentials). Both
 files have the same format.
 
 If both config files are present the configuration from both files will be
-read. The Session will be created from  configuration values from the shared
-credentials file (~/.aws/credentials) over those in the shared credentials
-file (~/.aws/config).
+read. The Session will be created from configuration values from the shared
+credentials file (~/.aws/credentials) over those in the shared config file (~/.aws/config).
 
 Credentials are the values the SDK should use for authenticating requests with
 AWS Services. They arfrom a configuration file will need to include both
@@ -138,21 +140,51 @@ the other two fields are also provided.
 
 Assume Role values allow you to configure the SDK to assume an IAM role using
 a set of credentials provided in a config file via the source_profile field.
-Both "role_arn" and "source_profile" are required. The SDK does not support
-assuming a role with MFA token Via the Session's constructor. You can use the
-stscreds.AssumeRoleProvider credentials provider to specify custom
-configuration and support for MFA.
+Both "role_arn" and "source_profile" are required. The SDK supports assuming
+a role with MFA token if the session option AssumeRoleTokenProvider
+is set.
 
 	role_arn = arn:aws:iam::<account_number>:role/<role_name>
 	source_profile = profile_with_creds
 	external_id = 1234
-	mfa_serial = not supported!
+	mfa_serial = <serial or mfa arn>
 	role_session_name = session_name
 
 Region is the region the SDK should use for looking up AWS service endpoints
 and signing requests.
 
 	region = us-east-1
+
+Assume Role with MFA token
+
+To create a session with support for assuming an IAM role with MFA set the
+session option AssumeRoleTokenProvider to a function that will prompt for the
+MFA token code when the SDK assumes the role and refreshes the role's credentials.
+This allows you to configure the SDK via the shared config to assumea role
+with MFA tokens.
+
+In order for the SDK to assume a role with MFA the SharedConfigState
+session option must be set to SharedConfigEnable, or AWS_SDK_LOAD_CONFIG
+environment variable set.
+
+The shared configuration instructs the SDK to assume an IAM role with MFA
+when the mfa_serial configuration field is set in the shared config
+(~/.aws/config) or shared credentials (~/.aws/credentials) file.
+
+If mfa_serial is set in the configuration, the SDK will assume the role, and
+the AssumeRoleTokenProvider session option is not set an an error will
+be returned when creating the session.
+
+    sess := session.Must(session.NewSessionWithOptions(session.Options{
+        AssumeRoleTokenProvider: stscreds.StdinTokenProvider,
+    }))
+
+    // Create service client value configured for credentials
+    // from assumed role.
+    svc := s3.New(sess)
+
+To setup assume role outside of a session see the stscrds.AssumeRoleProvider
+documentation.
 
 Environment Variables
 
@@ -218,6 +250,24 @@ $HOME/.aws/config on Linux/Unix based systems, and
 
 	AWS_CONFIG_FILE=$HOME/my_shared_config
 
+Path to a custom Credentials Authority (CA) bundle PEM file that the SDK
+will use instead of the default system's root CA bundle. Use this only
+if you want to replace the CA bundle the SDK uses for TLS requests.
 
+	AWS_CA_BUNDLE=$HOME/my_custom_ca_bundle
+
+Enabling this option will attempt to merge the Transport into the SDK's HTTP
+client. If the client's Transport is not a http.Transport an error will be
+returned. If the Transport's TLS config is set this option will cause the SDK
+to overwrite the Transport's TLS config's  RootCAs value. If the CA bundle file
+contains multiple certificates all of them will be loaded.
+
+The Session option CustomCABundle is also available when creating sessions
+to also enable this feature. CustomCABundle session option field has priority
+over the AWS_CA_BUNDLE environment variable, and will be used if both are set.
+
+Setting a custom HTTPClient in the aws.Config options will override this setting.
+To use this option and custom HTTP client, the HTTP client needs to be provided
+when creating the session. Not the service client.
 */
 package session

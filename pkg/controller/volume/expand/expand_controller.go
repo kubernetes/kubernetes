@@ -42,12 +42,13 @@ import (
 	"k8s.io/kubernetes/pkg/util/io"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
 )
 
 const (
 	// How often resizing loop runs
-	syncLoopPeriod time.Duration = 30 * time.Second
+	syncLoopPeriod time.Duration = 400 * time.Millisecond
 	// How often pvc populator runs
 	populatorLoopPeriod time.Duration = 2 * time.Minute
 )
@@ -117,12 +118,14 @@ func NewExpandController(
 	eventBroadcaster.StartLogging(glog.Infof)
 	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(kubeClient.CoreV1().RESTClient()).Events("")})
 	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "volume_expand"})
+	blkutil := util.NewBlockVolumePathHandler()
 
 	expc.opExecutor = operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
 		kubeClient,
 		&expc.volumePluginMgr,
 		recorder,
-		false))
+		false,
+		blkutil))
 
 	expc.resizeMap = cache.NewVolumeResizeMap(expc.kubeClient)
 
@@ -159,9 +162,17 @@ func (expc *expandController) Run(stopCh <-chan struct{}) {
 
 func (expc *expandController) deletePVC(obj interface{}) {
 	pvc, ok := obj.(*v1.PersistentVolumeClaim)
-
-	if pvc == nil || !ok {
-		return
+	if !ok {
+		tombstone, ok := obj.(kcache.DeletedFinalStateUnknown)
+		if !ok {
+			runtime.HandleError(fmt.Errorf("couldn't get object from tombstone %+v", obj))
+			return
+		}
+		pvc, ok = tombstone.Obj.(*v1.PersistentVolumeClaim)
+		if !ok {
+			runtime.HandleError(fmt.Errorf("tombstone contained object that is not a pvc %#v", obj))
+			return
+		}
 	}
 
 	expc.resizeMap.DeletePVC(pvc)
@@ -179,12 +190,21 @@ func (expc *expandController) pvcUpdate(oldObj, newObj interface{}) {
 	if newPVC == nil || !ok {
 		return
 	}
-	pv, err := getPersistentVolume(newPVC, expc.pvLister)
-	if err != nil {
-		glog.V(5).Infof("Error getting Persistent Volume for pvc %q : %v", newPVC.UID, err)
-		return
+
+	newSize := newPVC.Spec.Resources.Requests[v1.ResourceStorage]
+	oldSize := oldPvc.Spec.Resources.Requests[v1.ResourceStorage]
+
+	// We perform additional checks inside resizeMap.AddPVCUpdate function
+	// this check here exists to ensure - we do not consider every
+	// PVC update event for resizing, just those where the PVC size changes
+	if newSize.Cmp(oldSize) > 0 {
+		pv, err := getPersistentVolume(newPVC, expc.pvLister)
+		if err != nil {
+			glog.V(5).Infof("Error getting Persistent Volume for pvc %q : %v", newPVC.UID, err)
+			return
+		}
+		expc.resizeMap.AddPVCUpdate(newPVC, pv)
 	}
-	expc.resizeMap.AddPVCUpdate(newPVC, pv)
 }
 
 func getPersistentVolume(pvc *v1.PersistentVolumeClaim, pvLister corelisters.PersistentVolumeLister) (*v1.PersistentVolume, error) {
@@ -203,7 +223,15 @@ func (expc *expandController) GetPluginDir(pluginName string) string {
 	return ""
 }
 
+func (expc *expandController) GetVolumeDevicePluginDir(pluginName string) string {
+	return ""
+}
+
 func (expc *expandController) GetPodVolumeDir(podUID types.UID, pluginName string, volumeName string) string {
+	return ""
+}
+
+func (expc *expandController) GetPodVolumeDeviceDir(podUID types.UID, pluginName string) string {
 	return ""
 }
 
@@ -265,4 +293,8 @@ func (expc *expandController) GetConfigMapFunc() func(namespace, name string) (*
 
 func (expc *expandController) GetNodeLabels() (map[string]string, error) {
 	return nil, fmt.Errorf("GetNodeLabels unsupported in expandController")
+}
+
+func (expc *expandController) GetNodeName() types.NodeName {
+	return ""
 }

@@ -25,9 +25,13 @@ import (
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
+	"regexp"
 	"sync"
 	"time"
 )
+
+// awsInstanceRegMatch represents Regex Match for AWS instance.
+var awsInstanceRegMatch = regexp.MustCompile("^i-[^/]*$")
 
 // awsInstanceID represents the ID of the instance in the AWS API, e.g. i-12345678
 // The "traditional" format is "i-12345678"
@@ -76,8 +80,7 @@ func (name kubernetesInstanceID) mapToAWSInstanceID() (awsInstanceID, error) {
 
 	// We sanity check the resulting volume; the two known formats are
 	// i-12345678 and i-12345678abcdef01
-	// TODO: Regex match?
-	if awsID == "" || strings.Contains(awsID, "/") || !strings.HasPrefix(awsID, "i-") {
+	if awsID == "" || !awsInstanceRegMatch.MatchString(awsID) {
 		return "", fmt.Errorf("Invalid format for AWS instance (%s)", name)
 	}
 

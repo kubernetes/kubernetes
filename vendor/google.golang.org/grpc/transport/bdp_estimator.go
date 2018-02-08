@@ -1,3 +1,21 @@
+/*
+ *
+ * Copyright 2017 gRPC authors.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ */
+
 package transport
 
 import (
@@ -41,7 +59,7 @@ type bdpEstimator struct {
 	sample uint32
 	// bwMax is the maximum bandwidth noted so far (bytes/sec).
 	bwMax float64
-	// bool to keep track of the begining of a new measurement cycle.
+	// bool to keep track of the beginning of a new measurement cycle.
 	isSent bool
 	// Callback to update the window sizes.
 	updateFlowControl func(n uint32)
@@ -52,7 +70,7 @@ type bdpEstimator struct {
 }
 
 // timesnap registers the time bdp ping was sent out so that
-// network rtt can be calculated when its ack is recieved.
+// network rtt can be calculated when its ack is received.
 // It is called (by controller) when the bdpPing is
 // being written on the wire.
 func (b *bdpEstimator) timesnap(d [8]byte) {
@@ -101,7 +119,7 @@ func (b *bdpEstimator) calculate(d [8]byte) {
 		b.rtt += (rttSample - b.rtt) * float64(alpha)
 	}
 	b.isSent = false
-	// The number of bytes accumalated so far in the sample is smaller
+	// The number of bytes accumulated so far in the sample is smaller
 	// than or equal to 1.5 times the real BDP on a saturated connection.
 	bwCurrent := float64(b.sample) / (b.rtt * float64(1.5))
 	if bwCurrent > b.bwMax {

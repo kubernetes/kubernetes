@@ -28,19 +28,20 @@ import (
 	"testing"
 	"time"
 
-	apps "k8s.io/api/apps/v1beta1"
+	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/informers"
-	appsinformers "k8s.io/client-go/informers/apps/v1beta1"
+	appsinformers "k8s.io/client-go/informers/apps/v1"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
-	appslisters "k8s.io/client-go/listers/apps/v1beta1"
+	appslisters "k8s.io/client-go/listers/apps/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/tools/record"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/history"
@@ -50,17 +51,18 @@ type invariantFunc func(set *apps.StatefulSet, spc *fakeStatefulPodControl) erro
 
 func setupController(client clientset.Interface) (*fakeStatefulPodControl, *fakeStatefulSetStatusUpdater, StatefulSetControlInterface, chan struct{}) {
 	informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
-	spc := newFakeStatefulPodControl(informerFactory.Core().V1().Pods(), informerFactory.Apps().V1beta1().StatefulSets())
-	ssu := newFakeStatefulSetStatusUpdater(informerFactory.Apps().V1beta1().StatefulSets())
-	ssc := NewDefaultStatefulSetControl(spc, ssu, history.NewFakeHistory(informerFactory.Apps().V1beta1().ControllerRevisions()))
+	spc := newFakeStatefulPodControl(informerFactory.Core().V1().Pods(), informerFactory.Apps().V1().StatefulSets())
+	ssu := newFakeStatefulSetStatusUpdater(informerFactory.Apps().V1().StatefulSets())
+	recorder := record.NewFakeRecorder(10)
+	ssc := NewDefaultStatefulSetControl(spc, ssu, history.NewFakeHistory(informerFactory.Apps().V1().ControllerRevisions()), recorder)
 
 	stop := make(chan struct{})
 	informerFactory.Start(stop)
 	cache.WaitForCacheSync(
 		stop,
-		informerFactory.Apps().V1beta1().StatefulSets().Informer().HasSynced,
+		informerFactory.Apps().V1().StatefulSets().Informer().HasSynced,
 		informerFactory.Core().V1().Pods().Informer().HasSynced,
-		informerFactory.Apps().V1beta1().ControllerRevisions().Informer().HasSynced,
+		informerFactory.Apps().V1().ControllerRevisions().Informer().HasSynced,
 	)
 	return spc, ssu, ssc, stop
 }
@@ -450,18 +452,19 @@ func TestStatefulSetControl_getSetRevisions(t *testing.T) {
 	testFn := func(test *testcase, t *testing.T) {
 		client := fake.NewSimpleClientset()
 		informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
-		spc := newFakeStatefulPodControl(informerFactory.Core().V1().Pods(), informerFactory.Apps().V1beta1().StatefulSets())
-		ssu := newFakeStatefulSetStatusUpdater(informerFactory.Apps().V1beta1().StatefulSets())
-		ssc := defaultStatefulSetControl{spc, ssu, history.NewFakeHistory(informerFactory.Apps().V1beta1().ControllerRevisions())}
+		spc := newFakeStatefulPodControl(informerFactory.Core().V1().Pods(), informerFactory.Apps().V1().StatefulSets())
+		ssu := newFakeStatefulSetStatusUpdater(informerFactory.Apps().V1().StatefulSets())
+		recorder := record.NewFakeRecorder(10)
+		ssc := defaultStatefulSetControl{spc, ssu, history.NewFakeHistory(informerFactory.Apps().V1().ControllerRevisions()), recorder}
 
 		stop := make(chan struct{})
 		defer close(stop)
 		informerFactory.Start(stop)
 		cache.WaitForCacheSync(
 			stop,
-			informerFactory.Apps().V1beta1().StatefulSets().Informer().HasSynced,
+			informerFactory.Apps().V1().StatefulSets().Informer().HasSynced,
 			informerFactory.Core().V1().Pods().Informer().HasSynced,
-			informerFactory.Apps().V1beta1().ControllerRevisions().Informer().HasSynced,
+			informerFactory.Apps().V1().ControllerRevisions().Informer().HasSynced,
 		)
 		test.set.Status.CollisionCount = new(int32)
 		for i := range test.existing {

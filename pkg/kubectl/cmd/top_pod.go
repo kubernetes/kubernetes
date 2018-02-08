@@ -22,14 +22,18 @@ import (
 	"io"
 	"time"
 
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/kubernetes/pkg/api"
-	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
+	"k8s.io/client-go/discovery"
+	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/metricsutil"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
+	metricsapi "k8s.io/metrics/pkg/apis/metrics"
+	metricsv1beta1api "k8s.io/metrics/pkg/apis/metrics/v1beta1"
+	metricsclientset "k8s.io/metrics/pkg/client/clientset_generated/clientset"
 
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
@@ -41,10 +45,12 @@ type TopPodOptions struct {
 	Selector        string
 	AllNamespaces   bool
 	PrintContainers bool
-	PodClient       coreclient.PodsGetter
+	PodClient       corev1.PodsGetter
 	HeapsterOptions HeapsterTopOptions
 	Client          *metricsutil.HeapsterMetricsClient
 	Printer         *metricsutil.TopCmdPrinter
+	DiscoveryClient discovery.DiscoveryInterface
+	MetricsClient   metricsclientset.Interface
 }
 
 const metricsCreationDelay = 2 * time.Minute
@@ -78,7 +84,8 @@ func NewCmdTopPod(f cmdutil.Factory, options *TopPodOptions, out io.Writer) *cob
 	}
 
 	cmd := &cobra.Command{
-		Use:     "pod [NAME | -l label]",
+		Use: "pod [NAME | -l label]",
+		DisableFlagsInUseLine: true,
 		Short:   i18n.T("Display Resource (CPU/Memory/Storage) usage of pods"),
 		Long:    topPodLong,
 		Example: topPodExample,
@@ -114,12 +121,20 @@ func (o *TopPodOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []s
 	if err != nil {
 		return err
 	}
-	clientset, err := f.ClientSet()
+	clientset, err := f.KubernetesClientSet()
 	if err != nil {
 		return err
 	}
-	o.PodClient = clientset.Core()
-	o.Client = metricsutil.NewHeapsterMetricsClient(clientset.Core(), o.HeapsterOptions.Namespace, o.HeapsterOptions.Scheme, o.HeapsterOptions.Service, o.HeapsterOptions.Port)
+
+	o.DiscoveryClient = clientset.DiscoveryClient
+	o.MetricsClient, err = f.MetricsClientSet()
+	if err != nil {
+		return err
+	}
+
+	o.PodClient = clientset.CoreV1()
+	o.Client = metricsutil.NewHeapsterMetricsClient(clientset.CoreV1(), o.HeapsterOptions.Namespace, o.HeapsterOptions.Scheme, o.HeapsterOptions.Service, o.HeapsterOptions.Port)
+
 	o.Printer = metricsutil.NewTopCmdPrinter(out)
 	return nil
 }
@@ -140,10 +155,30 @@ func (o TopPodOptions) RunTopPod() error {
 			return err
 		}
 	}
-	metrics, err := o.Client.GetPodMetrics(o.Namespace, o.ResourceName, o.AllNamespaces, selector)
+
+	apiGroups, err := o.DiscoveryClient.ServerGroups()
+	if err != nil {
+		return err
+	}
+
+	metricsAPIAvailable := SupportedMetricsAPIVersionAvailable(apiGroups)
+
+	metrics := &metricsapi.PodMetricsList{}
+	if metricsAPIAvailable {
+		metrics, err = getMetricsFromMetricsAPI(o.MetricsClient, o.Namespace, o.ResourceName, o.AllNamespaces, selector)
+		if err != nil {
+			return err
+		}
+	} else {
+		metrics, err = o.Client.GetPodMetrics(o.Namespace, o.ResourceName, o.AllNamespaces, selector)
+		if err != nil {
+			return err
+		}
+	}
+
 	// TODO: Refactor this once Heapster becomes the API server.
 	// First we check why no metrics have been received.
-	if len(metrics) == 0 {
+	if len(metrics.Items) == 0 {
 		// If the API server query is successful but all the pods are newly created,
 		// the metrics are probably not ready yet, so we return the error here in the first place.
 		e := verifyEmptyMetrics(o, selector)
@@ -154,7 +189,35 @@ func (o TopPodOptions) RunTopPod() error {
 	if err != nil {
 		return err
 	}
-	return o.Printer.PrintPodMetrics(metrics, o.PrintContainers, o.AllNamespaces)
+
+	return o.Printer.PrintPodMetrics(metrics.Items, o.PrintContainers, o.AllNamespaces)
+}
+
+func getMetricsFromMetricsAPI(metricsClient metricsclientset.Interface, namespace, resourceName string, allNamespaces bool, selector labels.Selector) (*metricsapi.PodMetricsList, error) {
+	var err error
+	ns := metav1.NamespaceAll
+	if !allNamespaces {
+		ns = namespace
+	}
+	versionedMetrics := &metricsv1beta1api.PodMetricsList{}
+	if resourceName != "" {
+		m, err := metricsClient.Metrics().PodMetricses(ns).Get(resourceName, metav1.GetOptions{})
+		if err != nil {
+			return nil, err
+		}
+		versionedMetrics.Items = []metricsv1beta1api.PodMetrics{*m}
+	} else {
+		versionedMetrics, err = metricsClient.Metrics().PodMetricses(ns).List(metav1.ListOptions{LabelSelector: selector.String()})
+		if err != nil {
+			return nil, err
+		}
+	}
+	metrics := &metricsapi.PodMetricsList{}
+	err = metricsv1beta1api.Convert_v1beta1_PodMetricsList_To_metrics_PodMetricsList(versionedMetrics, metrics, nil)
+	if err != nil {
+		return nil, err
+	}
+	return metrics, nil
 }
 
 func verifyEmptyMetrics(o TopPodOptions, selector labels.Selector) error {
@@ -185,7 +248,7 @@ func verifyEmptyMetrics(o TopPodOptions, selector labels.Selector) error {
 	return errors.New("metrics not available yet")
 }
 
-func checkPodAge(pod *api.Pod) error {
+func checkPodAge(pod *v1.Pod) error {
 	age := time.Since(pod.CreationTimestamp.Time)
 	if age > metricsCreationDelay {
 		message := fmt.Sprintf("Metrics not available for pod %s/%s, age: %s", pod.Namespace, pod.Name, age.String())

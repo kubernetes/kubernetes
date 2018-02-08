@@ -88,6 +88,15 @@ func (s HostStorageSystem) RescanAllHba(ctx context.Context) error {
 	return err
 }
 
+func (s HostStorageSystem) Refresh(ctx context.Context) error {
+	req := types.RefreshStorageSystem{
+		This: s.Reference(),
+	}
+
+	_, err := methods.RefreshStorageSystem(ctx, s.c, &req)
+	return err
+}
+
 func (s HostStorageSystem) MarkAsSsd(ctx context.Context, uuid string) (*Task, error) {
 	req := types.MarkAsSsd_Task{
 		This:         s.Reference(),

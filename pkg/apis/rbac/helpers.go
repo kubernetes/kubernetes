@@ -147,6 +147,10 @@ func (r PolicyRule) String() string {
 func (r PolicyRule) CompactString() string {
 	formatStringParts := []string{}
 	formatArgs := []interface{}{}
+	if len(r.APIGroups) > 0 {
+		formatStringParts = append(formatStringParts, "APIGroups:%q")
+		formatArgs = append(formatArgs, r.APIGroups)
+	}
 	if len(r.Resources) > 0 {
 		formatStringParts = append(formatStringParts, "Resources:%q")
 		formatArgs = append(formatArgs, r.Resources)
@@ -158,10 +162,6 @@ func (r PolicyRule) CompactString() string {
 	if len(r.ResourceNames) > 0 {
 		formatStringParts = append(formatStringParts, "ResourceNames:%q")
 		formatArgs = append(formatArgs, r.ResourceNames)
-	}
-	if len(r.APIGroups) > 0 {
-		formatStringParts = append(formatStringParts, "APIGroups:%q")
-		formatArgs = append(formatArgs, r.APIGroups)
 	}
 	if len(r.Verbs) > 0 {
 		formatStringParts = append(formatStringParts, "Verbs:%q")

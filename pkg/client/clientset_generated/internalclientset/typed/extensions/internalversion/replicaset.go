@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2018 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,6 +21,7 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	rest "k8s.io/client-go/rest"
+	autoscaling "k8s.io/kubernetes/pkg/apis/autoscaling"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions"
 	scheme "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/scheme"
 )
@@ -42,8 +43,8 @@ type ReplicaSetInterface interface {
 	List(opts v1.ListOptions) (*extensions.ReplicaSetList, error)
 	Watch(opts v1.ListOptions) (watch.Interface, error)
 	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *extensions.ReplicaSet, err error)
-	GetScale(replicaSetName string, options v1.GetOptions) (*extensions.Scale, error)
-	UpdateScale(replicaSetName string, scale *extensions.Scale) (*extensions.Scale, error)
+	GetScale(replicaSetName string, options v1.GetOptions) (*autoscaling.Scale, error)
+	UpdateScale(replicaSetName string, scale *autoscaling.Scale) (*autoscaling.Scale, error)
 
 	ReplicaSetExpansion
 }
@@ -174,9 +175,9 @@ func (c *replicaSets) Patch(name string, pt types.PatchType, data []byte, subres
 	return
 }
 
-// GetScale takes name of the replicaSet, and returns the corresponding extensions.Scale object, and an error if there is any.
-func (c *replicaSets) GetScale(replicaSetName string, options v1.GetOptions) (result *extensions.Scale, err error) {
-	result = &extensions.Scale{}
+// GetScale takes name of the replicaSet, and returns the corresponding autoscaling.Scale object, and an error if there is any.
+func (c *replicaSets) GetScale(replicaSetName string, options v1.GetOptions) (result *autoscaling.Scale, err error) {
+	result = &autoscaling.Scale{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("replicasets").
@@ -189,8 +190,8 @@ func (c *replicaSets) GetScale(replicaSetName string, options v1.GetOptions) (re
 }
 
 // UpdateScale takes the top resource name and the representation of a scale and updates it. Returns the server's representation of the scale, and an error, if there is any.
-func (c *replicaSets) UpdateScale(replicaSetName string, scale *extensions.Scale) (result *extensions.Scale, err error) {
-	result = &extensions.Scale{}
+func (c *replicaSets) UpdateScale(replicaSetName string, scale *autoscaling.Scale) (result *autoscaling.Scale, err error) {
+	result = &autoscaling.Scale{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("replicasets").

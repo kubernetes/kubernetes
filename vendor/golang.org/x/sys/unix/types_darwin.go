@@ -19,6 +19,7 @@ package unix
 #define _DARWIN_USE_64_BIT_INODE
 #include <dirent.h>
 #include <fcntl.h>
+#include <poll.h>
 #include <signal.h>
 #include <termios.h>
 #include <unistd.h>
@@ -251,4 +252,21 @@ const (
 	AT_REMOVEDIR        = C.AT_REMOVEDIR
 	AT_SYMLINK_FOLLOW   = C.AT_SYMLINK_FOLLOW
 	AT_SYMLINK_NOFOLLOW = C.AT_SYMLINK_NOFOLLOW
+)
+
+// poll
+
+type PollFd C.struct_pollfd
+
+const (
+	POLLERR    = C.POLLERR
+	POLLHUP    = C.POLLHUP
+	POLLIN     = C.POLLIN
+	POLLNVAL   = C.POLLNVAL
+	POLLOUT    = C.POLLOUT
+	POLLPRI    = C.POLLPRI
+	POLLRDBAND = C.POLLRDBAND
+	POLLRDNORM = C.POLLRDNORM
+	POLLWRBAND = C.POLLWRBAND
+	POLLWRNORM = C.POLLWRNORM
 )

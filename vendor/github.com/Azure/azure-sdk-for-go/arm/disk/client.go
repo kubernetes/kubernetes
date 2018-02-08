@@ -2,6 +2,8 @@
 // 2016-04-30-preview.
 //
 // The Disk Resource Provider Client.
+//
+// Deprecated: Please instead use github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2016-04-30-preview/compute
 package disk
 
 // Copyright (c) Microsoft and contributors.  All rights reserved.

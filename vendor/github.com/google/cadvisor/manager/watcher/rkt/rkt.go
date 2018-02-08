@@ -53,7 +53,7 @@ func (self *rktContainerWatcher) Stop() error {
 }
 
 func (self *rktContainerWatcher) detectRktContainers(events chan watcher.ContainerEvent) {
-	glog.Infof("starting detectRktContainers thread")
+	glog.V(1).Infof("Starting detectRktContainers thread")
 	ticker := time.Tick(10 * time.Second)
 	curpods := make(map[string]*rktapi.Pod)
 
@@ -92,7 +92,7 @@ func (self *rktContainerWatcher) syncRunningPods(pods []*rktapi.Pod, events chan
 	for id, pod := range curpods {
 		if _, ok := newpods[id]; !ok {
 			for _, cgroup := range podToCgroup(pod) {
-				glog.Infof("cgroup to delete = %v", cgroup)
+				glog.V(2).Infof("cgroup to delete = %v", cgroup)
 				self.sendDestroyEvent(cgroup, events)
 			}
 		}

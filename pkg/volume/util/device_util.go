@@ -19,6 +19,7 @@ package util
 //DeviceUtil is a util for common device methods
 type DeviceUtil interface {
 	FindMultipathDeviceForDevice(disk string) string
+	FindSlaveDevicesOnMultipath(disk string) []string
 }
 
 type deviceHandler struct {

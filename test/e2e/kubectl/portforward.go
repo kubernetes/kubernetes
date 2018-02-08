@@ -22,7 +22,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"net"
 	"os/exec"
@@ -36,7 +35,6 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilversion "k8s.io/kubernetes/pkg/util/version"
 	"k8s.io/kubernetes/test/e2e/framework"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -51,8 +49,7 @@ const (
 
 // TODO support other ports besides 80
 var (
-	portForwardRegexp        = regexp.MustCompile("Forwarding from 127.0.0.1:([0-9]+) -> 80")
-	portForwardPortToStdOutV = utilversion.MustParseSemantic("v1.3.0-alpha.4")
+	portForwardRegexp = regexp.MustCompile("Forwarding from 127.0.0.1:([0-9]+) -> 80")
 )
 
 func pfPod(expectedClientData, chunks, chunkSize, chunkIntervalMillis string, bindAddress string) *v1.Pod {
@@ -167,24 +164,12 @@ func runPortForward(ns, podName string, port int) *portForwardCommand {
 	// by the port-forward command. We don't want to hard code the port as we have no
 	// way of guaranteeing we can pick one that isn't in use, particularly on Jenkins.
 	framework.Logf("starting port-forward command and streaming output")
-	stdout, stderr, err := framework.StartCmdAndStreamOutput(cmd)
+	portOutput, _, err := framework.StartCmdAndStreamOutput(cmd)
 	if err != nil {
 		framework.Failf("Failed to start port-forward command: %v", err)
 	}
 
 	buf := make([]byte, 128)
-
-	// After v1.3.0-alpha.4 (#17030), kubectl port-forward outputs port
-	// info to stdout, not stderr, so for version-skewed tests, look there
-	// instead.
-	var portOutput io.ReadCloser
-	if useStdOut, err := framework.KubectlVersionGTE(portForwardPortToStdOutV); err != nil {
-		framework.Failf("Failed to get kubectl version: %v", err)
-	} else if useStdOut {
-		portOutput = stdout
-	} else {
-		portOutput = stderr
-	}
 
 	var n int
 	framework.Logf("reading from `kubectl port-forward` command's stdout")
@@ -211,7 +196,7 @@ func runPortForward(ns, podName string, port int) *portForwardCommand {
 func doTestConnectSendDisconnect(bindAddress string, f *framework.Framework) {
 	By("Creating the target pod")
 	pod := pfPod("", "10", "10", "100", fmt.Sprintf("%s", bindAddress))
-	if _, err := f.ClientSet.Core().Pods(f.Namespace.Name).Create(pod); err != nil {
+	if _, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod); err != nil {
 		framework.Failf("Couldn't create pod: %v", err)
 	}
 	if err := f.WaitForPodReady(pod.Name); err != nil {
@@ -267,7 +252,7 @@ func doTestConnectSendDisconnect(bindAddress string, f *framework.Framework) {
 func doTestMustConnectSendNothing(bindAddress string, f *framework.Framework) {
 	By("Creating the target pod")
 	pod := pfPod("abc", "1", "1", "1", fmt.Sprintf("%s", bindAddress))
-	if _, err := f.ClientSet.Core().Pods(f.Namespace.Name).Create(pod); err != nil {
+	if _, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod); err != nil {
 		framework.Failf("Couldn't create pod: %v", err)
 	}
 	if err := f.WaitForPodReady(pod.Name); err != nil {
@@ -312,7 +297,7 @@ func doTestMustConnectSendNothing(bindAddress string, f *framework.Framework) {
 func doTestMustConnectSendDisconnect(bindAddress string, f *framework.Framework) {
 	By("Creating the target pod")
 	pod := pfPod("abc", "10", "10", "100", fmt.Sprintf("%s", bindAddress))
-	if _, err := f.ClientSet.Core().Pods(f.Namespace.Name).Create(pod); err != nil {
+	if _, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod); err != nil {
 		framework.Failf("Couldn't create pod: %v", err)
 	}
 	if err := f.WaitForPodReady(pod.Name); err != nil {
@@ -382,7 +367,7 @@ func doTestOverWebSockets(bindAddress string, f *framework.Framework) {
 
 	By("Creating the pod")
 	pod := pfPod("def", "10", "10", "100", fmt.Sprintf("%s", bindAddress))
-	if _, err := f.ClientSet.Core().Pods(f.Namespace.Name).Create(pod); err != nil {
+	if _, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod); err != nil {
 		framework.Failf("Couldn't create pod: %v", err)
 	}
 	if err := f.WaitForPodReady(pod.Name); err != nil {
@@ -397,7 +382,7 @@ func doTestOverWebSockets(bindAddress string, f *framework.Framework) {
 		}
 	}()
 
-	req := f.ClientSet.Core().RESTClient().Get().
+	req := f.ClientSet.CoreV1().RESTClient().Get().
 		Namespace(f.Namespace.Name).
 		Resource("pods").
 		Name(pod.Name).

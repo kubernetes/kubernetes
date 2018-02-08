@@ -24,7 +24,7 @@ import (
 	"github.com/blang/semver"
 	dockercontainer "github.com/docker/docker/api/types/container"
 
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	knetwork "k8s.io/kubernetes/pkg/kubelet/network"
 )
 
@@ -122,40 +122,30 @@ func modifyHostConfig(sc *runtimeapi.LinuxContainerSecurityContext, hostConfig *
 
 // modifySandboxNamespaceOptions apply namespace options for sandbox
 func modifySandboxNamespaceOptions(nsOpts *runtimeapi.NamespaceOption, hostConfig *dockercontainer.HostConfig, network *knetwork.PluginManager) {
-	hostNetwork := false
-	if nsOpts != nil {
-		hostNetwork = nsOpts.HostNetwork
-	}
 	modifyCommonNamespaceOptions(nsOpts, hostConfig)
-	modifyHostNetworkOptionForSandbox(hostNetwork, network, hostConfig)
+	modifyHostOptionsForSandbox(nsOpts, network, hostConfig)
 }
 
 // modifyContainerNamespaceOptions apply namespace options for container
 func modifyContainerNamespaceOptions(nsOpts *runtimeapi.NamespaceOption, podSandboxID string, hostConfig *dockercontainer.HostConfig) {
-	hostNetwork := false
-	if nsOpts != nil {
-		hostNetwork = nsOpts.HostNetwork
-	}
 	hostConfig.PidMode = dockercontainer.PidMode(fmt.Sprintf("container:%v", podSandboxID))
 	modifyCommonNamespaceOptions(nsOpts, hostConfig)
-	modifyHostNetworkOptionForContainer(hostNetwork, podSandboxID, hostConfig)
+	modifyHostOptionsForContainer(nsOpts, podSandboxID, hostConfig)
 }
 
 // modifyCommonNamespaceOptions apply common namespace options for sandbox and container
 func modifyCommonNamespaceOptions(nsOpts *runtimeapi.NamespaceOption, hostConfig *dockercontainer.HostConfig) {
-	if nsOpts != nil {
-		if nsOpts.HostPid {
-			hostConfig.PidMode = namespaceModeHost
-		}
-		if nsOpts.HostIpc {
-			hostConfig.IpcMode = namespaceModeHost
-		}
+	if nsOpts.GetPid() == runtimeapi.NamespaceMode_NODE {
+		hostConfig.PidMode = namespaceModeHost
 	}
 }
 
-// modifyHostNetworkOptionForSandbox applies NetworkMode/UTSMode to sandbox's dockercontainer.HostConfig.
-func modifyHostNetworkOptionForSandbox(hostNetwork bool, network *knetwork.PluginManager, hc *dockercontainer.HostConfig) {
-	if hostNetwork {
+// modifyHostOptionsForSandbox applies NetworkMode/UTSMode to sandbox's dockercontainer.HostConfig.
+func modifyHostOptionsForSandbox(nsOpts *runtimeapi.NamespaceOption, network *knetwork.PluginManager, hc *dockercontainer.HostConfig) {
+	if nsOpts.GetIpc() == runtimeapi.NamespaceMode_NODE {
+		hc.IpcMode = namespaceModeHost
+	}
+	if nsOpts.GetNetwork() == runtimeapi.NamespaceMode_NODE {
 		hc.NetworkMode = namespaceModeHost
 		return
 	}
@@ -175,14 +165,14 @@ func modifyHostNetworkOptionForSandbox(hostNetwork bool, network *knetwork.Plugi
 	}
 }
 
-// modifyHostNetworkOptionForContainer applies NetworkMode/UTSMode to container's dockercontainer.HostConfig.
-func modifyHostNetworkOptionForContainer(hostNetwork bool, podSandboxID string, hc *dockercontainer.HostConfig) {
+// modifyHostOptionsForContainer applies NetworkMode/UTSMode to container's dockercontainer.HostConfig.
+func modifyHostOptionsForContainer(nsOpts *runtimeapi.NamespaceOption, podSandboxID string, hc *dockercontainer.HostConfig) {
 	sandboxNSMode := fmt.Sprintf("container:%v", podSandboxID)
 	hc.NetworkMode = dockercontainer.NetworkMode(sandboxNSMode)
 	hc.IpcMode = dockercontainer.IpcMode(sandboxNSMode)
 	hc.UTSMode = ""
 
-	if hostNetwork {
+	if nsOpts.GetNetwork() == runtimeapi.NamespaceMode_NODE {
 		hc.UTSMode = namespaceModeHost
 	}
 }

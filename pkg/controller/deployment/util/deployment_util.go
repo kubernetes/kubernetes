@@ -124,18 +124,6 @@ func GetDeploymentCondition(status extensions.DeploymentStatus, condType extensi
 	return nil
 }
 
-// TODO: remove the duplicate
-// GetDeploymentConditionInternal returns the condition with the provided type.
-func GetDeploymentConditionInternal(status internalextensions.DeploymentStatus, condType internalextensions.DeploymentConditionType) *internalextensions.DeploymentCondition {
-	for i := range status.Conditions {
-		c := status.Conditions[i]
-		if c.Type == condType {
-			return &c
-		}
-	}
-	return nil
-}
-
 // SetDeploymentCondition updates the deployment to include the provided condition. If the condition that
 // we are about to add already exists and has the same status and reason then we are not going to update.
 func SetDeploymentCondition(status *extensions.DeploymentStatus, condition extensions.DeploymentCondition) {
@@ -721,7 +709,7 @@ func LabelPodsWithHash(podList *v1.PodList, c clientset.Interface, podLister cor
 		}
 		// Only label the pod that doesn't already have the new hash
 		if pod.Labels[extensions.DefaultDeploymentUniqueLabelKey] != hash {
-			_, err := UpdatePodWithRetries(c.Core().Pods(namespace), podLister, pod.Namespace, pod.Name,
+			_, err := UpdatePodWithRetries(c.CoreV1().Pods(namespace), podLister, pod.Namespace, pod.Name,
 				func(podToUpdate *v1.Pod) error {
 					// Precondition: the pod doesn't contain the new hash in its label.
 					if podToUpdate.Labels[extensions.DefaultDeploymentUniqueLabelKey] == hash {

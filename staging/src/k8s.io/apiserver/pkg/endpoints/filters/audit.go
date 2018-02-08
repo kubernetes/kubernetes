@@ -239,7 +239,7 @@ func (f *fancyResponseWriterDelegator) Hijack() (net.Conn, *bufio.ReadWriter, er
 	// fake a response status before protocol switch happens
 	f.processCode(http.StatusSwitchingProtocols)
 
-	// This will be ignored if WriteHeader() function has aready been called.
+	// This will be ignored if WriteHeader() function has already been called.
 	// It's not guaranteed Audit-ID http header is sent for all requests.
 	// For example, when user run "kubectl exec", apiserver uses a proxy handler
 	// to deal with the request, users can only get http headers returned by kubelet node.

@@ -22,23 +22,28 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
 	apiv1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/util/homedir"
+	"k8s.io/client-go/util/retry"
 	// Uncomment the following line to load the gcp plugin (only required to authenticate against GKE clusters).
 	// _ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 )
 
 func main() {
-	kubeconfig := flag.String("kubeconfig", "", "absolute path to the kubeconfig file")
-	flag.Parse()
-	if *kubeconfig == "" {
-		panic("-kubeconfig not specified")
+	var kubeconfig *string
+	if home := homedir.HomeDir(); home != "" {
+		kubeconfig = flag.String("kubeconfig", filepath.Join(home, ".kube", "config"), "(optional) absolute path to the kubeconfig file")
+	} else {
+		kubeconfig = flag.String("kubeconfig", "", "absolute path to the kubeconfig file")
 	}
+	flag.Parse()
+
 	config, err := clientcmd.BuildConfigFromFlags("", *kubeconfig)
 	if err != nil {
 		panic(err)
@@ -66,7 +71,7 @@ func main() {
 					Containers: []apiv1.Container{
 						{
 							Name:  "web",
-							Image: "nginx:1.13",
+							Image: "nginx:1.12",
 							Ports: []apiv1.ContainerPort{
 								{
 									Name:          "http",
@@ -97,35 +102,52 @@ func main() {
 	//    1. Modify the "deployment" variable and call: Update(deployment).
 	//       This works like the "kubectl replace" command and it overwrites/loses changes
 	//       made by other clients between you Create() and Update() the object.
-	//    2. Modify the "result" returned by Create()/Get() and retry Update(result) until
+	//    2. Modify the "result" returned by Get() and retry Update(result) until
 	//       you no longer get a conflict error. This way, you can preserve changes made
-	//       by other clients between Create() and Update(). This is implemented below:
+	//       by other clients between Create() and Update(). This is implemented below
+	//			 using the retry utility package included with client-go. (RECOMMENDED)
+	//
+	// More Info:
+	// https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#concurrency-control-and-consistency
 
-	for {
-		result.Spec.Replicas = int32Ptr(1)                    // reduce replica count
-		result.Spec.Template.Annotations = map[string]string{ // add annotations
-			"foo": "bar",
+	retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		// Retrieve the latest version of Deployment before attempting update
+		// RetryOnConflict uses exponential backoff to avoid exhausting the apiserver
+		result, getErr := deploymentsClient.Get("demo-deployment", metav1.GetOptions{})
+		if getErr != nil {
+			panic(fmt.Errorf("Failed to get latest version of Deployment: %v", getErr))
 		}
 
-		if _, err := deploymentsClient.Update(result); errors.IsConflict(err) {
-			// Deployment is modified in the meanwhile, query the latest version
-			// and modify the retrieved object.
-			fmt.Println("encountered conflict, retrying")
-			result, err = deploymentsClient.Get("demo-deployment", metav1.GetOptions{})
-			if err != nil {
-				panic(fmt.Errorf("Get failed: %+v", err))
-			}
-		} else if err != nil {
-			panic(err)
-		} else {
-			break
-		}
-
-		// TODO: You should sleep here with an exponential backoff to avoid
-		// exhausting the apiserver, and add a limit/timeout on the retries to
-		// avoid getting stuck in this loop indefintiely.
+		result.Spec.Replicas = int32Ptr(1)                           // reduce replica count
+		result.Spec.Template.Spec.Containers[0].Image = "nginx:1.13" // change nginx version
+		_, updateErr := deploymentsClient.Update(result)
+		return updateErr
+	})
+	if retryErr != nil {
+		panic(fmt.Errorf("Update failed: %v", retryErr))
 	}
 	fmt.Println("Updated deployment...")
+
+	// Rollback Deployment
+	prompt()
+	fmt.Println("Rolling back deployment...")
+	// Once again use RetryOnConflict to avoid update conflicts
+	retryErr = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		result, getErr := deploymentsClient.Get("demo-deployment", metav1.GetOptions{})
+		if getErr != nil {
+			panic(fmt.Errorf("Failed to get latest version of Deployment: %v", getErr))
+		}
+
+		result.Spec.RollbackTo = &appsv1beta1.RollbackConfig{
+			Revision: 0, // can be specific revision number, or 0 for last revision
+		}
+		_, updateErr := deploymentsClient.Update(result)
+		return updateErr
+	})
+	if retryErr != nil {
+		panic(fmt.Errorf("Rollback failed: %v", retryErr))
+	}
+	fmt.Println("Rolled back deployment...")
 
 	// List Deployments
 	prompt()

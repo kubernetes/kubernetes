@@ -129,7 +129,7 @@ type baseTimeoutWriter struct {
 	w http.ResponseWriter
 
 	mu sync.Mutex
-	// if the timeout handler has timedout
+	// if the timeout handler has timeout
 	timedOut bool
 	// if this timeout writer has wrote header
 	wroteHeader bool

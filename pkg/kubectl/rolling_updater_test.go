@@ -36,10 +36,10 @@ import (
 	restclient "k8s.io/client-go/rest"
 	manualfake "k8s.io/client-go/rest/fake"
 	testcore "k8s.io/client-go/testing"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	"k8s.io/kubernetes/pkg/kubectl/util"
@@ -1260,7 +1260,6 @@ func TestFindSourceController(t *testing.T) {
 	tests := []struct {
 		list               *api.ReplicationControllerList
 		expectedController *api.ReplicationController
-		err                error
 		name               string
 		expectError        bool
 	}{
@@ -1469,7 +1468,7 @@ func TestUpdateRcWithRetries(t *testing.T) {
 		{StatusCode: 200, Header: header, Body: objBody(codec, rc)},
 	}
 	fakeClient := &manualfake.RESTClient{
-		APIRegistry:          legacyscheme.Registry,
+		GroupVersion:         legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion,
 		NegotiatedSerializer: testapi.Default.NegotiatedSerializer(),
 		Client: manualfake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
@@ -1562,7 +1561,7 @@ func TestAddDeploymentHash(t *testing.T) {
 	seen := sets.String{}
 	updatedRc := false
 	fakeClient := &manualfake.RESTClient{
-		APIRegistry:          legacyscheme.Registry,
+		GroupVersion:         legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion,
 		NegotiatedSerializer: testapi.Default.NegotiatedSerializer(),
 		Client: manualfake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			header := http.Header{}

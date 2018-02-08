@@ -18,10 +18,23 @@ package validation
 
 import (
 	"github.com/go-openapi/spec"
+	"github.com/go-openapi/strfmt"
 	"github.com/go-openapi/validate"
 
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 )
+
+// NewSchemaValidator creates an openapi schema validator for the given CRD validation.
+func NewSchemaValidator(customResourceValidation *apiextensions.CustomResourceValidation) (*validate.SchemaValidator, error) {
+	// Convert CRD schema to openapi schema
+	openapiSchema := &spec.Schema{}
+	if customResourceValidation != nil {
+		if err := convertJSONSchemaProps(customResourceValidation.OpenAPIV3Schema, openapiSchema); err != nil {
+			return nil, err
+		}
+	}
+	return validate.NewSchemaValidator(openapiSchema, nil, "", strfmt.Default), nil
+}
 
 // ValidateCustomResource validates the Custom Resource against the schema in the CustomResourceDefinition.
 // CustomResource is a JSON data structure.
@@ -29,16 +42,6 @@ func ValidateCustomResource(customResource interface{}, validator *validate.Sche
 	result := validator.Validate(customResource)
 	if result.AsError() != nil {
 		return result.AsError()
-	}
-	return nil
-}
-
-// ConvertToOpenAPITypes is used to convert internal types to go-openapi types.
-func ConvertToOpenAPITypes(in *apiextensions.CustomResourceDefinition, out *spec.Schema) error {
-	if in.Spec.Validation != nil {
-		if err := convertJSONSchemaProps(in.Spec.Validation.OpenAPIV3Schema, out); err != nil {
-			return err
-		}
 	}
 	return nil
 }

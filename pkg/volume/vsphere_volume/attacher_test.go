@@ -21,13 +21,12 @@ import (
 	"testing"
 
 	"k8s.io/api/core/v1"
-	k8stypes "k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere/vclib"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 
 	"github.com/golang/glog"
-	"k8s.io/apimachinery/pkg/types"
 )
 
 func TestGetDeviceName_Volume(t *testing.T) {
@@ -309,7 +308,7 @@ func (testcase *testcase) DiskIsAttached(diskName string, nodeName types.NodeNam
 	return expected.isAttached, expected.ret
 }
 
-func (testcase *testcase) DisksAreAttached(nodeVolumes map[k8stypes.NodeName][]string) (map[k8stypes.NodeName]map[string]bool, error) {
+func (testcase *testcase) DisksAreAttached(nodeVolumes map[types.NodeName][]string) (map[types.NodeName]map[string]bool, error) {
 	return nil, errors.New("Not implemented")
 }
 

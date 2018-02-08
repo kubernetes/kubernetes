@@ -6498,7 +6498,7 @@ function marked(src, opt, callback) {
   } catch (e) {
     e.message += '\nPlease report this to https://github.com/chjj/marked.';
     if ((opt || marked.defaults).silent) {
-      return '<p>An error occured:</p><pre>'
+      return '<p>An error occurred:</p><pre>'
         + escape(e.message + '', true)
         + '</pre>';
     }
@@ -7152,7 +7152,7 @@ var Shred = function(options) {
   this.logCurl = options.logCurl || false;
 };
 
-// Most of the real work is done in the request and reponse classes.
+// Most of the real work is done in the request and response classes.
  
 Shred.Request = require("./shred/request");
 Shred.Response = require("./shred/response");
@@ -8351,7 +8351,7 @@ Changelog:
  a regress. I appologize for that.
 
 2010.05.09 - 0.5:
- - bug fix: 0 is now preceeded with a + sign
+ - bug fix: 0 is now preceded with a + sign
  - bug fix: the sign was not at the right position on padded results (Kamal Abdali)
  - switched from GPL to BSD license
 

@@ -21,19 +21,19 @@ import (
 	"reflect"
 	"time"
 
-	apps "k8s.io/api/apps/v1beta1"
+	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
-	appsinformers "k8s.io/client-go/informers/apps/v1beta1"
+	appsinformers "k8s.io/client-go/informers/apps/v1"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
-	appslisters "k8s.io/client-go/listers/apps/v1beta1"
+	appslisters "k8s.io/client-go/listers/apps/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
@@ -71,6 +71,8 @@ type StatefulSetController struct {
 	setListerSynced cache.InformerSynced
 	// pvcListerSynced returns true if the pvc shared informer has synced at least once
 	pvcListerSynced cache.InformerSynced
+	// revListerSynced returns true if the rev shared informer has synced at least once
+	revListerSynced cache.InformerSynced
 	// StatefulSets that need to be synced.
 	queue workqueue.RateLimitingInterface
 }
@@ -85,7 +87,7 @@ func NewStatefulSetController(
 ) *StatefulSetController {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
-	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(kubeClient.Core().RESTClient()).Events("")})
+	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(kubeClient.CoreV1().RESTClient()).Events("")})
 	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "statefulset-controller"})
 
 	ssc := &StatefulSetController{
@@ -99,10 +101,13 @@ func NewStatefulSetController(
 				recorder),
 			NewRealStatefulSetStatusUpdater(kubeClient, setInformer.Lister()),
 			history.NewHistory(kubeClient, revInformer.Lister()),
+			recorder,
 		),
 		pvcListerSynced: pvcInformer.Informer().HasSynced,
 		queue:           workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "statefulset"),
 		podControl:      controller.RealPodControl{KubeClient: kubeClient, Recorder: recorder},
+
+		revListerSynced: revInformer.Informer().HasSynced,
 	}
 
 	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -146,7 +151,7 @@ func (ssc *StatefulSetController) Run(workers int, stopCh <-chan struct{}) {
 	glog.Infof("Starting stateful set controller")
 	defer glog.Infof("Shutting down statefulset controller")
 
-	if !controller.WaitForCacheSync("stateful set", stopCh, ssc.podListerSynced, ssc.setListerSynced, ssc.pvcListerSynced) {
+	if !controller.WaitForCacheSync("stateful set", stopCh, ssc.podListerSynced, ssc.setListerSynced, ssc.pvcListerSynced, ssc.revListerSynced) {
 		return
 	}
 
@@ -293,7 +298,7 @@ func (ssc *StatefulSetController) getPodsForStatefulSet(set *apps.StatefulSet, s
 	// If any adoptions are attempted, we should first recheck for deletion with
 	// an uncached quorum read sometime after listing Pods (see #42639).
 	canAdoptFunc := controller.RecheckDeletionTimestamp(func() (metav1.Object, error) {
-		fresh, err := ssc.kubeClient.AppsV1beta1().StatefulSets(set.Namespace).Get(set.Name, metav1.GetOptions{})
+		fresh, err := ssc.kubeClient.AppsV1().StatefulSets(set.Namespace).Get(set.Name, metav1.GetOptions{})
 		if err != nil {
 			return nil, err
 		}
@@ -321,7 +326,7 @@ func (ssc *StatefulSetController) adoptOrphanRevisions(set *apps.StatefulSet) er
 		}
 	}
 	if hasOrphans {
-		fresh, err := ssc.kubeClient.AppsV1beta1().StatefulSets(set.Namespace).Get(set.Name, metav1.GetOptions{})
+		fresh, err := ssc.kubeClient.AppsV1().StatefulSets(set.Namespace).Get(set.Name, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}

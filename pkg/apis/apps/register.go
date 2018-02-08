@@ -19,6 +19,7 @@ package apps
 import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 )
 
@@ -43,7 +44,7 @@ func Resource(resource string) schema.GroupResource {
 	return SchemeGroupVersion.WithResource(resource).GroupResource()
 }
 
-// Adds the list of known types to api.Scheme.
+// Adds the list of known types to the given scheme.
 func addKnownTypes(scheme *runtime.Scheme) error {
 	// TODO this will get cleaned up with the scheme types are fixed
 	scheme.AddKnownTypes(SchemeGroupVersion,
@@ -52,7 +53,7 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&extensions.Deployment{},
 		&extensions.DeploymentList{},
 		&extensions.DeploymentRollback{},
-		&extensions.Scale{},
+		&autoscaling.Scale{},
 		&StatefulSet{},
 		&StatefulSetList{},
 		&ControllerRevision{},

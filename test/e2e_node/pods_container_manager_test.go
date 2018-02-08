@@ -57,8 +57,8 @@ const (
 	defaultNodeAllocatableCgroup = "kubepods"
 	// Kubelet internal cgroup name for burstable tier
 	burstableCgroup = "burstable"
-	// Kubelet internal cgroup name for burstable tier
-	bestEffortCgroup = "burstable"
+	// Kubelet internal cgroup name for besteffort tier
+	bestEffortCgroup = "besteffort"
 )
 
 // makePodToVerifyCgroups returns a pod that verifies the existence of the specified cgroups.

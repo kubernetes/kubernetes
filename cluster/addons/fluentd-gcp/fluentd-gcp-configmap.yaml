@@ -41,17 +41,26 @@ data:
     # Tag is then parsed by google_cloud plugin and translated to the metadata,
     # visible in the log viewer
 
-    # Example:
+    # Json Log Example:
     # {"log":"[info:2016-02-16T16:04:05.930-08:00] Some log text here\n","stream":"stdout","time":"2016-02-17T00:04:05.931087621Z"}
+    # CRI Log Example:
+    # 2016-02-17T00:04:05.931087621Z stdout F [info:2016-02-16T16:04:05.930-08:00] Some log text here
     <source>
       type tail
-      format json
-      time_key time
       path /var/log/containers/*.log
       pos_file /var/log/gcp-containers.log.pos
-      time_format %Y-%m-%dT%H:%M:%S.%N%Z
       tag reform.*
       read_from_head true
+      format multi_format
+      <pattern>
+        format json
+        time_key time
+        time_format %Y-%m-%dT%H:%M:%S.%NZ
+      </pattern>
+      <pattern>
+        format /^(?<time>.+) (?<stream>stdout|stderr) [^ ]* (?<log>.*)$/
+        time_format %Y-%m-%dT%H:%M:%S.%N%:z
+      </pattern>
     </source>
 
     <filter reform.**>
@@ -80,17 +89,6 @@ data:
       max_lines 1000
     </match>
   system.input.conf: |-
-    # Example:
-    # 2015-12-21 23:17:22,066 [salt.state       ][INFO    ] Completed state [net.ipv4.ip_forward] at time 23:17:22.066081
-    <source>
-      type tail
-      format /^(?<time>[^ ]* [^ ,]*)[^\[]*\[[^\]]*\]\[(?<severity>[^ \]]*) *\] (?<message>.*)$/
-      time_format %Y-%m-%d %H:%M:%S
-      path /var/log/salt/minion
-      pos_file /var/log/gcp-salt.pos
-      tag salt
-    </source>
-
     # Example:
     # Dec 21 23:17:22 gke-foo-1-1-4b5cbd14-node-4eoj startupscript: Finished running startup script /var/run/google.startup.script
     <source>
@@ -389,7 +387,7 @@ data:
       num_threads 2
     </match>
 metadata:
-  name: fluentd-gcp-config-v1.2.2
+  name: fluentd-gcp-config-v1.2.3
   namespace: kube-system
   labels:
     addonmanager.kubernetes.io/mode: Reconcile

@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2018 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,6 +19,8 @@ limitations under the License.
 package v1
 
 import (
+	time "time"
+
 	core_v1 "k8s.io/api/core/v1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
@@ -27,7 +29,6 @@ import (
 	kubernetes "k8s.io/client-go/kubernetes"
 	v1 "k8s.io/client-go/listers/core/v1"
 	cache "k8s.io/client-go/tools/cache"
-	time "time"
 )
 
 // LimitRangeInformer provides access to a shared informer and lister for
@@ -38,19 +39,34 @@ type LimitRangeInformer interface {
 }
 
 type limitRangeInformer struct {
-	factory internalinterfaces.SharedInformerFactory
+	factory          internalinterfaces.SharedInformerFactory
+	tweakListOptions internalinterfaces.TweakListOptionsFunc
+	namespace        string
 }
 
 // NewLimitRangeInformer constructs a new informer for LimitRange type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
 func NewLimitRangeInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return NewFilteredLimitRangeInformer(client, namespace, resyncPeriod, indexers, nil)
+}
+
+// NewFilteredLimitRangeInformer constructs a new informer for LimitRange type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewFilteredLimitRangeInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options meta_v1.ListOptions) (runtime.Object, error) {
+				if tweakListOptions != nil {
+					tweakListOptions(&options)
+				}
 				return client.CoreV1().LimitRanges(namespace).List(options)
 			},
 			WatchFunc: func(options meta_v1.ListOptions) (watch.Interface, error) {
+				if tweakListOptions != nil {
+					tweakListOptions(&options)
+				}
 				return client.CoreV1().LimitRanges(namespace).Watch(options)
 			},
 		},
@@ -60,12 +76,12 @@ func NewLimitRangeInformer(client kubernetes.Interface, namespace string, resync
 	)
 }
 
-func defaultLimitRangeInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewLimitRangeInformer(client, meta_v1.NamespaceAll, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+func (f *limitRangeInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewFilteredLimitRangeInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
 func (f *limitRangeInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&core_v1.LimitRange{}, defaultLimitRangeInformer)
+	return f.factory.InformerFor(&core_v1.LimitRange{}, f.defaultInformer)
 }
 
 func (f *limitRangeInformer) Lister() v1.LimitRangeLister {

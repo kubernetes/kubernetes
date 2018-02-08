@@ -58,14 +58,14 @@ func (hr *HandlerRunner) Run(containerID kubecontainer.ContainerID, pod *v1.Pod,
 		// TODO(tallclair): Pass a proper timeout value.
 		output, err := hr.commandRunner.RunInContainer(containerID, handler.Exec.Command, 0)
 		if err != nil {
-			msg := fmt.Sprintf("Exec lifecycle hook (%v) for Container %q in Pod %q failed - error: %v, message: %q", handler.Exec.Command, container.Name, format.Pod(pod), err, string(output))
+			msg = fmt.Sprintf("Exec lifecycle hook (%v) for Container %q in Pod %q failed - error: %v, message: %q", handler.Exec.Command, container.Name, format.Pod(pod), err, string(output))
 			glog.V(1).Infof(msg)
 		}
 		return msg, err
 	case handler.HTTPGet != nil:
 		msg, err := hr.runHTTPHandler(pod, container, handler)
 		if err != nil {
-			msg := fmt.Sprintf("Http lifecycle hook (%s) for Container %q in Pod %q failed - error: %v, message: %q", handler.HTTPGet.Path, container.Name, format.Pod(pod), err, msg)
+			msg = fmt.Sprintf("Http lifecycle hook (%s) for Container %q in Pod %q failed - error: %v, message: %q", handler.HTTPGet.Path, container.Name, format.Pod(pod), err, msg)
 			glog.V(1).Infof(msg)
 		}
 		return msg, err
