@@ -35,7 +35,7 @@ import (
 )
 
 // AddInstanceHook mocks adding a Instance to MockTargetPools
-func AddInstanceHook(m *cloud.MockTargetPools, ctx context.Context, key *meta.Key, req *ga.TargetPoolsAddInstanceRequest) error {
+func AddInstanceHook(ctx context.Context, key *meta.Key, req *ga.TargetPoolsAddInstanceRequest, m *cloud.MockTargetPools) error {
 	pool, err := m.Get(ctx, key)
 	if err != nil {
 		return &googleapi.Error{
@@ -51,8 +51,8 @@ func AddInstanceHook(m *cloud.MockTargetPools, ctx context.Context, key *meta.Ke
 	return nil
 }
 
-// AddInstanceHook mocks removing a Instance from MockTargetPools
-func RemoveInstanceHook(m *cloud.MockTargetPools, ctx context.Context, key *meta.Key, req *ga.TargetPoolsRemoveInstanceRequest) error {
+// RemoveInstanceHook mocks removing a Instance from MockTargetPools
+func RemoveInstanceHook(ctx context.Context, key *meta.Key, req *ga.TargetPoolsRemoveInstanceRequest, m *cloud.MockTargetPools) error {
 	pool, err := m.Get(ctx, key)
 	if err != nil {
 		return &googleapi.Error{
