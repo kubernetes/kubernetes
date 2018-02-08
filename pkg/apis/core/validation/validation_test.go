@@ -3988,15 +3988,20 @@ func TestLocalStorageEnvWithFeatureGate(t *testing.T) {
 }
 
 func TestValidateEnv(t *testing.T) {
+	counter := 0
+	makeName := func(prefix string) string {
+		counter = counter + 1
+		return fmt.Sprintf("%s%v", prefix, counter)
+	}
 	successCase := []core.EnvVar{
-		{Name: "abc", Value: "value"},
+		{Name: makeName("abc"), Value: "value"},
 		{Name: "ABC", Value: "value"},
 		{Name: "AbC_123", Value: "value"},
-		{Name: "abc", Value: ""},
+		{Name: makeName("abc"), Value: ""},
 		{Name: "a.b.c", Value: "value"},
 		{Name: "a-b-c", Value: "value"},
 		{
-			Name: "abc",
+			Name: makeName("abc"),
 			ValueFrom: &core.EnvVarSource{
 				FieldRef: &core.ObjectFieldSelector{
 					APIVersion: legacyscheme.Registry.GroupOrDie(core.GroupName).GroupVersion.String(),
@@ -4005,7 +4010,7 @@ func TestValidateEnv(t *testing.T) {
 			},
 		},
 		{
-			Name: "abc",
+			Name: makeName("abc"),
 			ValueFrom: &core.EnvVarSource{
 				FieldRef: &core.ObjectFieldSelector{
 					APIVersion: legacyscheme.Registry.GroupOrDie(core.GroupName).GroupVersion.String(),
@@ -4014,7 +4019,7 @@ func TestValidateEnv(t *testing.T) {
 			},
 		},
 		{
-			Name: "abc",
+			Name: makeName("abc"),
 			ValueFrom: &core.EnvVarSource{
 				FieldRef: &core.ObjectFieldSelector{
 					APIVersion: legacyscheme.Registry.GroupOrDie(core.GroupName).GroupVersion.String(),
@@ -4023,7 +4028,7 @@ func TestValidateEnv(t *testing.T) {
 			},
 		},
 		{
-			Name: "abc",
+			Name: makeName("abc"),
 			ValueFrom: &core.EnvVarSource{
 				FieldRef: &core.ObjectFieldSelector{
 					APIVersion: legacyscheme.Registry.GroupOrDie(core.GroupName).GroupVersion.String(),
@@ -4032,7 +4037,7 @@ func TestValidateEnv(t *testing.T) {
 			},
 		},
 		{
-			Name: "abc",
+			Name: makeName("abc"),
 			ValueFrom: &core.EnvVarSource{
 				FieldRef: &core.ObjectFieldSelector{
 					APIVersion: legacyscheme.Registry.GroupOrDie(core.GroupName).GroupVersion.String(),
@@ -4041,7 +4046,7 @@ func TestValidateEnv(t *testing.T) {
 			},
 		},
 		{
-			Name: "abc",
+			Name: makeName("abc"),
 			ValueFrom: &core.EnvVarSource{
 				FieldRef: &core.ObjectFieldSelector{
 					APIVersion: legacyscheme.Registry.GroupOrDie(core.GroupName).GroupVersion.String(),
@@ -4050,7 +4055,7 @@ func TestValidateEnv(t *testing.T) {
 			},
 		},
 		{
-			Name: "abc",
+			Name: makeName("abc"),
 			ValueFrom: &core.EnvVarSource{
 				FieldRef: &core.ObjectFieldSelector{
 					APIVersion: legacyscheme.Registry.GroupOrDie(core.GroupName).GroupVersion.String(),
@@ -4059,7 +4064,7 @@ func TestValidateEnv(t *testing.T) {
 			},
 		},
 		{
-			Name: "abc",
+			Name: makeName("abc"),
 			ValueFrom: &core.EnvVarSource{
 				FieldRef: &core.ObjectFieldSelector{
 					APIVersion: legacyscheme.Registry.GroupOrDie(core.GroupName).GroupVersion.String(),
@@ -4068,7 +4073,7 @@ func TestValidateEnv(t *testing.T) {
 			},
 		},
 		{
-			Name: "abc",
+			Name: makeName("abc"),
 			ValueFrom: &core.EnvVarSource{
 				FieldRef: &core.ObjectFieldSelector{
 					APIVersion: legacyscheme.Registry.GroupOrDie(core.GroupName).GroupVersion.String(),
