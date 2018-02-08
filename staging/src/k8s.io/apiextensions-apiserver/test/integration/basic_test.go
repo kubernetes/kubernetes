@@ -578,6 +578,17 @@ func TestPatch(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
+	// this call waits for the resourceVersion to be reached in the cache before returning.
+	// We need to do this because the patch gets its initial object from the storage, and the cache serves that.
+	// If it is out of date, then our initial patch is applied to an old resource version, which conflicts
+	// and then the updated object shows a conflicting diff, which permanently fails the patch.
+	// This gives expected stability in the patch without retrying on an known number of conflicts below in the test.
+	// See https://issue.k8s.io/42644
+	_, err = noxuNamespacedResourceClient.Get("foo", metav1.GetOptions{ResourceVersion: createdNoxuInstance.GetResourceVersion()})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
 	// a patch with no change
 	createdNoxuInstance, err = noxuNamespacedResourceClient.Patch("foo", types.MergePatchType, patch)
 	if err != nil {
