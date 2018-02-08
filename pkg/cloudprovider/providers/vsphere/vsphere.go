@@ -54,8 +54,6 @@ const (
 	MacOuiVC                      = "00:50:56"
 	MacOuiEsx                     = "00:0c:29"
 	CleanUpDummyVMRoutineInterval = 5
-	UUIDPath                      = "/sys/class/dmi/id/product_serial"
-	UUIDPrefix                    = "VMware-"
 )
 
 var cleanUpRoutineInitialized = false
@@ -72,6 +70,7 @@ type VSphere struct {
 	vsphereInstanceMap map[string]*VSphereInstance
 	// Responsible for managing discovery of k8s node, their location etc.
 	nodeManager *NodeManager
+	vmUUID      string
 }
 
 // Represents a vSphere instance where one or more kubernetes nodes are running.
@@ -237,7 +236,11 @@ func newWorkerNode() (*VSphere, error) {
 		glog.Errorf("Failed to get hostname. err: %+v", err)
 		return nil, err
 	}
-
+	vs.vmUUID, err = GetVMUUID()
+	if err != nil {
+		glog.Errorf("Failed to get uuid. err: %+v", err)
+		return nil, err
+	}
 	return &vs, nil
 }
 
@@ -393,6 +396,11 @@ func newControllerNode(cfg VSphereConfig) (*VSphere, error) {
 	vs.hostName, err = os.Hostname()
 	if err != nil {
 		glog.Errorf("Failed to get hostname. err: %+v", err)
+		return nil, err
+	}
+	vs.vmUUID, err = GetVMUUID()
+	if err != nil {
+		glog.Errorf("Failed to get uuid. err: %+v", err)
 		return nil, err
 	}
 	runtime.SetFinalizer(&vs, logout)
@@ -576,7 +584,23 @@ func (vs *VSphere) ExternalID(ctx context.Context, nodeName k8stypes.NodeName) (
 // InstanceExistsByProviderID returns true if the instance with the given provider id still exists and is running.
 // If false is returned with no error, the instance will be immediately deleted by the cloud controller manager.
 func (vs *VSphere) InstanceExistsByProviderID(ctx context.Context, providerID string) (bool, error) {
-	_, err := vs.InstanceID(ctx, convertToK8sType(providerID))
+	var nodeName string
+	nodes, err := vs.nodeManager.GetNodeDetails()
+	if err != nil {
+		glog.Errorf("Error while obtaining Kubernetes node nodeVmDetail details. error : %+v", err)
+		return false, err
+	}
+	for _, node := range nodes {
+		if node.VMUUID == GetUUIDFromProviderID(providerID) {
+			nodeName = node.NodeName
+			break
+		}
+	}
+	if nodeName == "" {
+		msg := fmt.Sprintf("Error while obtaining Kubernetes nodename for providerID %s.", providerID)
+		return false, errors.New(msg)
+	}
+	_, err = vs.InstanceID(ctx, convertToK8sType(nodeName))
 	if err == nil {
 		return true, nil
 	}
@@ -589,7 +613,7 @@ func (vs *VSphere) InstanceID(ctx context.Context, nodeName k8stypes.NodeName) (
 
 	instanceIDInternal := func() (string, error) {
 		if vs.hostName == convertToString(nodeName) {
-			return vs.hostName, nil
+			return vs.vmUUID, nil
 		}
 
 		// Below logic can be performed only on master node where VC details are preset.
@@ -623,7 +647,7 @@ func (vs *VSphere) InstanceID(ctx context.Context, nodeName k8stypes.NodeName) (
 			return "", err
 		}
 		if isActive {
-			return convertToString(nodeName), nil
+			return vs.vmUUID, nil
 		}
 		glog.Warningf("The VM: %s is not in %s state", convertToString(nodeName), vclib.ActivePowerState)
 		return "", cloudprovider.InstanceNotFound
