@@ -75,7 +75,7 @@ type Resource struct {
 	ScalarResources map[v1.ResourceName]int64
 }
 
-// New creates a Resource from ResourceList
+// NewResource creates a Resource from ResourceList
 func NewResource(rl v1.ResourceList) *Resource {
 	r := &Resource{}
 	r.Add(rl)
@@ -108,6 +108,7 @@ func (r *Resource) Add(rl v1.ResourceList) {
 	}
 }
 
+// ResourceList returns a resource list of this resource.
 func (r *Resource) ResourceList() v1.ResourceList {
 	result := v1.ResourceList{
 		v1.ResourceCPU:              *resource.NewMilliQuantity(r.MilliCPU, resource.DecimalSI),
@@ -126,6 +127,7 @@ func (r *Resource) ResourceList() v1.ResourceList {
 	return result
 }
 
+// Clone returns a copy of this resource.
 func (r *Resource) Clone() *Resource {
 	res := &Resource{
 		MilliCPU:         r.MilliCPU,
@@ -143,10 +145,12 @@ func (r *Resource) Clone() *Resource {
 	return res
 }
 
+// AddScalar adds a resource by a scalar value of this resource.
 func (r *Resource) AddScalar(name v1.ResourceName, quantity int64) {
 	r.SetScalar(name, r.ScalarResources[name]+quantity)
 }
 
+// SetScalar sets a resource by a scalar value of this resource.
 func (r *Resource) SetScalar(name v1.ResourceName, quantity int64) {
 	// Lazily allocate scalar resource map.
 	if r.ScalarResources == nil {
@@ -172,7 +176,7 @@ func NewNodeInfo(pods ...*v1.Pod) *NodeInfo {
 	return ni
 }
 
-// Returns overall information about this node.
+// Node returns overall information about this node.
 func (n *NodeInfo) Node() *v1.Node {
 	if n == nil {
 		return nil
@@ -188,6 +192,7 @@ func (n *NodeInfo) Pods() []*v1.Pod {
 	return n.pods
 }
 
+// UsedPorts returns used ports on this node.
 func (n *NodeInfo) UsedPorts() util.HostPortInfo {
 	if n == nil {
 		return nil
@@ -203,6 +208,7 @@ func (n *NodeInfo) PodsWithAffinity() []*v1.Pod {
 	return n.podsWithAffinity
 }
 
+// AllowedPodNumber returns the number of the allowed pods on this node.
 func (n *NodeInfo) AllowedPodNumber() int {
 	if n == nil || n.allocatableResource == nil {
 		return 0
@@ -210,6 +216,7 @@ func (n *NodeInfo) AllowedPodNumber() int {
 	return n.allocatableResource.AllowedPodNumber
 }
 
+// Taints returns the taints list on this node.
 func (n *NodeInfo) Taints() ([]v1.Taint, error) {
 	if n == nil {
 		return nil, nil
@@ -217,6 +224,7 @@ func (n *NodeInfo) Taints() ([]v1.Taint, error) {
 	return n.taints, n.taintsErr
 }
 
+// MemoryPressureCondition returns the memory pressure condition status on this node.
 func (n *NodeInfo) MemoryPressureCondition() v1.ConditionStatus {
 	if n == nil {
 		return v1.ConditionUnknown
@@ -224,6 +232,7 @@ func (n *NodeInfo) MemoryPressureCondition() v1.ConditionStatus {
 	return n.memoryPressureCondition
 }
 
+// DiskPressureCondition returns the disk pressure condition status on this node.
 func (n *NodeInfo) DiskPressureCondition() v1.ConditionStatus {
 	if n == nil {
 		return v1.ConditionUnknown
@@ -260,6 +269,7 @@ func (n *NodeInfo) SetAllocatableResource(allocatableResource *Resource) {
 	n.allocatableResource = allocatableResource
 }
 
+// Clone returns a copy of this node.
 func (n *NodeInfo) Clone() *NodeInfo {
 	clone := &NodeInfo{
 		node:                    n.node,
@@ -306,7 +316,7 @@ func hasPodAffinityConstraints(pod *v1.Pod) bool {
 
 // AddPod adds pod information to this NodeInfo.
 func (n *NodeInfo) AddPod(pod *v1.Pod) {
-	res, non0_cpu, non0_mem := calculateResource(pod)
+	res, non0CPU, non0Mem := calculateResource(pod)
 	n.requestedResource.MilliCPU += res.MilliCPU
 	n.requestedResource.Memory += res.Memory
 	n.requestedResource.NvidiaGPU += res.NvidiaGPU
@@ -317,8 +327,8 @@ func (n *NodeInfo) AddPod(pod *v1.Pod) {
 	for rName, rQuant := range res.ScalarResources {
 		n.requestedResource.ScalarResources[rName] += rQuant
 	}
-	n.nonzeroRequest.MilliCPU += non0_cpu
-	n.nonzeroRequest.Memory += non0_mem
+	n.nonzeroRequest.MilliCPU += non0CPU
+	n.nonzeroRequest.Memory += non0Mem
 	n.pods = append(n.pods, pod)
 	if hasPodAffinityConstraints(pod) {
 		n.podsWithAffinity = append(n.podsWithAffinity, pod)
@@ -361,7 +371,7 @@ func (n *NodeInfo) RemovePod(pod *v1.Pod) error {
 			n.pods[i] = n.pods[len(n.pods)-1]
 			n.pods = n.pods[:len(n.pods)-1]
 			// reduce the resource data
-			res, non0_cpu, non0_mem := calculateResource(pod)
+			res, non0CPU, non0Mem := calculateResource(pod)
 
 			n.requestedResource.MilliCPU -= res.MilliCPU
 			n.requestedResource.Memory -= res.Memory
@@ -372,8 +382,8 @@ func (n *NodeInfo) RemovePod(pod *v1.Pod) error {
 			for rName, rQuant := range res.ScalarResources {
 				n.requestedResource.ScalarResources[rName] -= rQuant
 			}
-			n.nonzeroRequest.MilliCPU -= non0_cpu
-			n.nonzeroRequest.Memory -= non0_mem
+			n.nonzeroRequest.MilliCPU -= non0CPU
+			n.nonzeroRequest.Memory -= non0Mem
 
 			// Release ports when remove Pods.
 			n.updateUsedPorts(pod, false)
@@ -386,14 +396,14 @@ func (n *NodeInfo) RemovePod(pod *v1.Pod) error {
 	return fmt.Errorf("no corresponding pod %s in pods of node %s", pod.Name, n.node.Name)
 }
 
-func calculateResource(pod *v1.Pod) (res Resource, non0_cpu int64, non0_mem int64) {
+func calculateResource(pod *v1.Pod) (res Resource, non0CPU int64, non0Mem int64) {
 	resPtr := &res
 	for _, c := range pod.Spec.Containers {
 		resPtr.Add(c.Resources.Requests)
 
-		non0_cpu_req, non0_mem_req := priorityutil.GetNonzeroRequests(&c.Resources.Requests)
-		non0_cpu += non0_cpu_req
-		non0_mem += non0_mem_req
+		non0CPUReq, non0MemReq := priorityutil.GetNonzeroRequests(&c.Resources.Requests)
+		non0CPU += non0CPUReq
+		non0Mem += non0MemReq
 		// No non-zero resources for GPUs or opaque resources.
 	}
 
@@ -414,7 +424,7 @@ func (n *NodeInfo) updateUsedPorts(pod *v1.Pod, add bool) {
 	}
 }
 
-// Sets the overall node information.
+// SetNode sets the overall node information.
 func (n *NodeInfo) SetNode(node *v1.Node) error {
 	n.node = node
 
@@ -436,7 +446,7 @@ func (n *NodeInfo) SetNode(node *v1.Node) error {
 	return nil
 }
 
-// Removes the overall information about the node.
+// RemoveNode removes the overall information about the node.
 func (n *NodeInfo) RemoveNode(node *v1.Node) error {
 	// We don't remove NodeInfo for because there can still be some pods on this node -
 	// this is because notifications about pods are delivered in a different watch,

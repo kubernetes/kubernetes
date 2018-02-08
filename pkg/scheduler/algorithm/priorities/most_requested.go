@@ -24,7 +24,7 @@ import (
 var (
 	mostResourcePriority = &ResourceAllocationPriority{"MostResourceAllocation", mostResourceScorer}
 
-	// MostRequestedPriority is a priority function that favors nodes with most requested resources.
+	// MostRequestedPriorityMap is a priority function that favors nodes with most requested resources.
 	// It calculates the percentage of memory and CPU requested by pods scheduled on the node, and prioritizes
 	// based on the maximum of the average of the fraction of requested to capacity.
 	// Details: (cpu(10 * sum(requested) / capacity) + memory(10 * sum(requested) / capacity)) / 2

@@ -27,6 +27,7 @@ import (
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// Policy describes a struct for a policy resource used in api.
 type Policy struct {
 	metav1.TypeMeta `json:",inline"`
 	// Holds the information to configure the fit predicate functions
@@ -47,6 +48,7 @@ type Policy struct {
 	AlwaysCheckAllPredicates bool `json:"alwaysCheckAllPredicates"`
 }
 
+// PredicatePolicy describes a struct of a predicate policy.
 type PredicatePolicy struct {
 	// Identifier of the predicate policy
 	// For a custom predicate, the name can be user-defined
@@ -56,6 +58,7 @@ type PredicatePolicy struct {
 	Argument *PredicateArgument `json:"argument"`
 }
 
+// PriorityPolicy describes a struct of a priority policy.
 type PriorityPolicy struct {
 	// Identifier of the priority policy
 	// For a custom priority, the name can be user-defined
@@ -138,8 +141,8 @@ type ExtenderConfig struct {
 	// If this method is implemented by the extender, it is the extender's responsibility to bind the pod to apiserver. Only one extender
 	// can implement this function.
 	BindVerb string
-	// EnableHttps specifies whether https should be used to communicate with the extender
-	EnableHttps bool `json:"enableHttps,omitempty"`
+	// EnableHTTPS specifies whether https should be used to communicate with the extender
+	EnableHTTPS bool `json:"enableHttps,omitempty"`
 	// TLSConfig specifies the transport layer security config
 	TLSConfig *restclient.TLSClientConfig `json:"tlsConfig,omitempty"`
 	// HTTPTimeout specifies the timeout duration for a call to the extender. Filter timeout fails the scheduling of the pod. Prioritize
@@ -207,6 +210,7 @@ type HostPriority struct {
 	Score int `json:"score"`
 }
 
+// HostPriorityList declares a []HostPriority type.
 type HostPriorityList []HostPriority
 
 func (h HostPriorityList) Len() int {

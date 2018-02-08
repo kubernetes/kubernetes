@@ -92,17 +92,18 @@ func (e *EquivalencePodGenerator) getEquivalencePod(pod *v1.Pod) interface{} {
 	// to be equivalent
 	for _, ref := range pod.OwnerReferences {
 		if ref.Controller != nil && *ref.Controller {
-			if pvcSet, err := e.getPVCSet(pod); err == nil {
+			pvcSet, err := e.getPVCSet(pod)
+			if err == nil {
 				// A pod can only belongs to one controller, so let's return.
 				return &EquivalencePod{
 					ControllerRef: ref,
 					PVCSet:        pvcSet,
 				}
-			} else {
-				// If error encountered, log warning and return nil (i.e. no equivalent pod found)
-				glog.Warningf("[EquivalencePodGenerator] for pod: %v failed due to: %v", pod.GetName(), err)
-				return nil
 			}
+
+			// If error encountered, log warning and return nil (i.e. no equivalent pod found)
+			glog.Warningf("[EquivalencePodGenerator] for pod: %v failed due to: %v", pod.GetName(), err)
+			return nil
 		}
 	}
 	return nil

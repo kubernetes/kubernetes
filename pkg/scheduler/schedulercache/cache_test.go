@@ -125,7 +125,7 @@ func TestAssumePodScheduled(t *testing.T) {
 				Memory:   0,
 			},
 			nonzeroRequest: &Resource{
-				MilliCPU: priorityutil.DefaultMilliCpuRequest,
+				MilliCPU: priorityutil.DefaultMilliCPURequest,
 				Memory:   priorityutil.DefaultMemoryRequest,
 			},
 			allocatableResource: &Resource{},
@@ -710,10 +710,10 @@ func buildNodeInfo(node *v1.Node, pods []*v1.Pod) *NodeInfo {
 func TestNodeOperators(t *testing.T) {
 	// Test datas
 	nodeName := "test-node"
-	cpu_1 := resource.MustParse("1000m")
-	mem_100m := resource.MustParse("100m")
-	cpu_half := resource.MustParse("500m")
-	mem_50m := resource.MustParse("50m")
+	cpu1 := resource.MustParse("1000m")
+	mem100m := resource.MustParse("100m")
+	cpuHalf := resource.MustParse("500m")
+	mem50m := resource.MustParse("50m")
 	resourceFooName := "example.com/foo"
 	resourceFoo := resource.MustParse("1")
 
@@ -728,8 +728,8 @@ func TestNodeOperators(t *testing.T) {
 				},
 				Status: v1.NodeStatus{
 					Allocatable: v1.ResourceList{
-						v1.ResourceCPU:                   cpu_1,
-						v1.ResourceMemory:                mem_100m,
+						v1.ResourceCPU:                   cpu1,
+						v1.ResourceMemory:                mem100m,
 						v1.ResourceName(resourceFooName): resourceFoo,
 					},
 				},
@@ -754,8 +754,8 @@ func TestNodeOperators(t *testing.T) {
 							{
 								Resources: v1.ResourceRequirements{
 									Requests: v1.ResourceList{
-										v1.ResourceCPU:    cpu_half,
-										v1.ResourceMemory: mem_50m,
+										v1.ResourceCPU:    cpuHalf,
+										v1.ResourceMemory: mem50m,
 									},
 								},
 								Ports: []v1.ContainerPort{
@@ -778,8 +778,8 @@ func TestNodeOperators(t *testing.T) {
 				},
 				Status: v1.NodeStatus{
 					Allocatable: v1.ResourceList{
-						v1.ResourceCPU:                   cpu_1,
-						v1.ResourceMemory:                mem_100m,
+						v1.ResourceCPU:                   cpu1,
+						v1.ResourceMemory:                mem100m,
 						v1.ResourceName(resourceFooName): resourceFoo,
 					},
 				},
@@ -804,8 +804,8 @@ func TestNodeOperators(t *testing.T) {
 							{
 								Resources: v1.ResourceRequirements{
 									Requests: v1.ResourceList{
-										v1.ResourceCPU:    cpu_half,
-										v1.ResourceMemory: mem_50m,
+										v1.ResourceCPU:    cpuHalf,
+										v1.ResourceMemory: mem50m,
 									},
 								},
 							},
@@ -822,8 +822,8 @@ func TestNodeOperators(t *testing.T) {
 							{
 								Resources: v1.ResourceRequirements{
 									Requests: v1.ResourceList{
-										v1.ResourceCPU:    cpu_half,
-										v1.ResourceMemory: mem_50m,
+										v1.ResourceCPU:    cpuHalf,
+										v1.ResourceMemory: mem50m,
 									},
 								},
 							},
@@ -866,8 +866,8 @@ func TestNodeOperators(t *testing.T) {
 		}
 
 		// Case 3: update node attribute successfully.
-		node.Status.Allocatable[v1.ResourceMemory] = mem_50m
-		expected.allocatableResource.Memory = mem_50m.Value()
+		node.Status.Allocatable[v1.ResourceMemory] = mem50m
+		expected.allocatableResource.Memory = mem50m.Value()
 		expected.generation++
 		cache.UpdateNode(nil, node)
 		got, found = cache.nodes[node.Name]

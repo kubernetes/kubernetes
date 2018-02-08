@@ -44,22 +44,27 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/volumebinder"
 )
 
+// FailedPredicateMap declares a map[string][]algorithm.PredicateFailureReason type.
 type FailedPredicateMap map[string][]algorithm.PredicateFailureReason
 
+// FitError describes a fit error of a pod.
 type FitError struct {
 	Pod              *v1.Pod
 	NumAllNodes      int
 	FailedPredicates FailedPredicateMap
 }
 
+// Victims describes pod victims.
 type Victims struct {
 	pods             []*v1.Pod
 	numPDBViolations int
 }
 
+// ErrNoNodesAvailable defines an error of no nodes available.
 var ErrNoNodesAvailable = fmt.Errorf("no nodes available to schedule pods")
 
 const (
+	// NoNodeAvailableMsg is used to format message when no nodes available.
 	NoNodeAvailableMsg = "0/%v nodes are available"
 )
 
@@ -68,7 +73,7 @@ func (f *FitError) Error() string {
 	reasons := make(map[string]int)
 	for _, predicates := range f.FailedPredicates {
 		for _, pred := range predicates {
-			reasons[pred.GetReason()] += 1
+			reasons[pred.GetReason()]++
 		}
 	}
 
@@ -383,7 +388,7 @@ func addNominatedPods(podPriority int32, meta algorithm.PredicateMetadata,
 	if nominatedPods == nil || len(nominatedPods) == 0 {
 		return false, meta, nodeInfo
 	}
-	var metaOut algorithm.PredicateMetadata = nil
+	var metaOut algorithm.PredicateMetadata
 	if meta != nil {
 		metaOut = meta.ShallowCopy()
 	}
@@ -460,7 +465,7 @@ func podFitsOnNode(
 		// TODO(bsalamat): consider using eCache and adding proper eCache invalidations
 		// when pods are nominated or their nominations change.
 		eCacheAvailable = equivCacheInfo != nil && !podsAdded
-		for _, predicateKey := range predicates.PredicatesOrdering() {
+		for _, predicateKey := range predicates.Ordering() {
 			//TODO (yastij) : compute average predicate restrictiveness to export it as Prometheus metric
 			if predicate, exist := predicateFuncs[predicateKey]; exist {
 				if eCacheAvailable {
@@ -513,7 +518,7 @@ func podFitsOnNode(
 	return len(failedPredicates) == 0, failedPredicates, nil
 }
 
-// Prioritizes the nodes by running the individual priority functions in parallel.
+// PrioritizeNodes prioritizes the nodes by running the individual priority functions in parallel.
 // Each priority function is expected to set a score of 0-10
 // 0 is the lowest priority score (least preferred node) and 10 is the highest
 // Each priority function can also have its own weight
@@ -652,7 +657,7 @@ func PrioritizeNodes(
 	return result, nil
 }
 
-// EqualPriority is a prioritizer function that gives an equal weight of one to all nodes
+// EqualPriorityMap is a prioritizer function that gives an equal weight of one to all nodes
 func EqualPriorityMap(_ *v1.Pod, _ interface{}, nodeInfo *schedulercache.NodeInfo) (schedulerapi.HostPriority, error) {
 	node := nodeInfo.Node()
 	if node == nil {
@@ -1050,6 +1055,7 @@ func podPassesBasicChecks(pod *v1.Pod, pvcLister corelisters.PersistentVolumeCla
 	return nil
 }
 
+// NewGenericScheduler creates a genericScheduler object.
 func NewGenericScheduler(
 	cache schedulercache.Cache,
 	eCache *EquivalenceCache,
