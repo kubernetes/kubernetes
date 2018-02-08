@@ -354,6 +354,9 @@ func findNodesThatFit(
 
 	if len(filtered) > 0 && len(extenders) != 0 {
 		for _, extender := range extenders {
+			if !extender.IsInterested(pod) {
+				continue
+			}
 			filteredList, failedMap, err := extender.Filter(pod, filtered, nodeNameToInfo)
 			if err != nil {
 				return []*v1.Node{}, FailedPredicateMap{}, err
@@ -624,6 +627,9 @@ func PrioritizeNodes(
 	if len(extenders) != 0 && nodes != nil {
 		combinedScores := make(map[string]int, len(nodeNameToInfo))
 		for _, extender := range extenders {
+			if !extender.IsInterested(pod) {
+				continue
+			}
 			wg.Add(1)
 			go func(ext algorithm.SchedulerExtender) {
 				defer wg.Done()

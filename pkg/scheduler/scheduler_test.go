@@ -195,10 +195,12 @@ func TestScheduler(t *testing.T) {
 					[]*v1.Node{&testNode},
 				),
 				Algorithm: item.algo,
-				Binder: fakeBinder{func(b *v1.Binding) error {
-					gotBinding = b
-					return item.injectBindError
-				}},
+				GetBinder: func(pod *v1.Pod) Binder {
+					return fakeBinder{func(b *v1.Binding) error {
+						gotBinding = b
+						return item.injectBindError
+					}}
+				},
 				PodConditionUpdater: fakePodConditionUpdater{},
 				Error: func(p *v1.Pod, err error) {
 					gotPod = p
@@ -543,10 +545,12 @@ func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache schedulercache.
 			SchedulerCache: scache,
 			NodeLister:     nodeLister,
 			Algorithm:      algo,
-			Binder: fakeBinder{func(b *v1.Binding) error {
-				bindingChan <- b
-				return nil
-			}},
+			GetBinder: func(pod *v1.Pod) Binder {
+				return fakeBinder{func(b *v1.Binding) error {
+					bindingChan <- b
+					return nil
+				}}
+			},
 			NextPod: func() *v1.Pod {
 				return clientcache.Pop(queuedPodStore).(*v1.Pod)
 			},
@@ -588,11 +592,13 @@ func setupTestSchedulerLongBindingWithRetry(queuedPodStore *clientcache.FIFO, sc
 			SchedulerCache: scache,
 			NodeLister:     nodeLister,
 			Algorithm:      algo,
-			Binder: fakeBinder{func(b *v1.Binding) error {
-				time.Sleep(bindingTime)
-				bindingChan <- b
-				return nil
-			}},
+			GetBinder: func(pod *v1.Pod) Binder {
+				return fakeBinder{func(b *v1.Binding) error {
+					time.Sleep(bindingTime)
+					bindingChan <- b
+					return nil
+				}}
+			},
 			WaitForCacheSync: func() bool {
 				return true
 			},

@@ -47,9 +47,10 @@ import (
 )
 
 const (
-	filter     = "filter"
-	prioritize = "prioritize"
-	bind       = "bind"
+	filter               = "filter"
+	prioritize           = "prioritize"
+	bind                 = "bind"
+	extendedResourceName = "foo.com/bar"
 )
 
 type fitPredicate func(pod *v1.Pod, node *v1.Node) (bool, error)
@@ -343,6 +344,12 @@ func TestSchedulerExtender(t *testing.T) {
 				BindVerb:       bind,
 				Weight:         4,
 				EnableHTTPS:    false,
+				ManagedResources: []schedulerapi.ExtenderManagedResource{
+					{
+						Name:               extendedResourceName,
+						IgnoredByScheduler: true,
+					},
+				},
 			},
 			{
 				URLPrefix:        es3.URL,
@@ -420,7 +427,17 @@ func DoTestPodScheduling(ns *v1.Namespace, t *testing.T, cs clientset.Interface)
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: "extender-test-pod"},
 		Spec: v1.PodSpec{
-			Containers: []v1.Container{{Name: "container", Image: e2e.GetPauseImageName(cs)}},
+			Containers: []v1.Container{
+				{
+					Name:  "container",
+					Image: e2e.GetPauseImageName(cs),
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							extendedResourceName: *resource.NewQuantity(1, resource.DecimalSI),
+						},
+					},
+				},
+			},
 		},
 	}
 
