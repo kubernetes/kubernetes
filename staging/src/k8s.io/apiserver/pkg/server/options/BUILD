@@ -65,6 +65,7 @@ go_library(
         "//vendor/k8s.io/client-go/rest:go_default_library",
         "//vendor/k8s.io/client-go/tools/clientcmd:go_default_library",
         "//vendor/k8s.io/client-go/util/cert:go_default_library",
+        "//vendor/k8s.io/kube-openapi/pkg/common:go_default_library",
     ],
 )
 
