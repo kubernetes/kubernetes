@@ -4967,6 +4967,7 @@ func ValidateCIDR(cidr string) (*net.IPNet, error) {
 	return net, nil
 }
 
+// IsDecremented returns true if the update is decremented.
 func IsDecremented(update, old *int32) bool {
 	if update == nil && old != nil {
 		return true
