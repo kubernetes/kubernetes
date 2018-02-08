@@ -166,15 +166,6 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 			**out = **in
 		}
 	}
-	if in.CAdvisorPort != nil {
-		in, out := &in.CAdvisorPort, &out.CAdvisorPort
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(int32)
-			**out = **in
-		}
-	}
 	if in.HealthzPort != nil {
 		in, out := &in.HealthzPort, &out.HealthzPort
 		if *in == nil {

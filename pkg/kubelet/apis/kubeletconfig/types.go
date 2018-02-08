@@ -114,8 +114,6 @@ type KubeletConfiguration struct {
 	EnableDebuggingHandlers bool
 	// enableContentionProfiling enables lock contention profiling, if enableDebuggingHandlers is true.
 	EnableContentionProfiling bool
-	// cAdvisorPort is the port of the localhost cAdvisor endpoint (set to 0 to disable)
-	CAdvisorPort int32
 	// healthzPort is the port of the localhost healthz endpoint (set to 0 to disable)
 	HealthzPort int32
 	// healthzBindAddress is the IP address for the healthz server to serve
