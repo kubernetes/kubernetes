@@ -173,7 +173,7 @@ func (r *Balancer) getLoadbalancerScaleGroup() (string, error) {
 		}
 	}
 
-	return "", fmt.Errorf("No groups for scale.")
+	return "", fmt.Errorf("no groups for scale")
 }
 
 func (r *Balancer) createOrGetLoadBalancer(clusterName string, service *api.Service) (*cloudify.NodeInstance, error) {
