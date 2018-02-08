@@ -18,21 +18,22 @@ package state
 
 import (
 	"fmt"
-	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
-	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager/errors"
-	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 	"path"
 	"sync"
+
+	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
+	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
+	utilstore "k8s.io/kubernetes/pkg/kubelet/util/store"
 )
 
-// cpuManagerCheckpointName is the name of checkpoint file
-const cpuManagerCheckpointName = "cpu_manager_state"
+// CPUManagerCheckpointName is the name of checkpoint file
+const CPUManagerCheckpointName = "cpu_manager_state"
 
 var _ State = &stateCheckpoint{}
 
 type stateCheckpoint struct {
-	mux sync.RWMutex
+	mux               sync.RWMutex
 	policyName        string
 	cache             State
 	checkpointManager checkpointmanager.CheckpointManager
@@ -50,17 +51,17 @@ func NewCheckpointState(stateDir string, policyName string) (State, error) {
 		checkpointManager: checkpointManager,
 	}
 
-	if err := stateCheckpoint.tryRestoreState(); err != nil {
-		return nil, fmt.Errorf("unable to restore state from checkpoint: %v\n"+
+	if err := stateCheckpoint.restoreState(); err != nil {
+		return nil, fmt.Errorf("could not restore state from checkpoint: %v\n"+
 			"Please drain this node and delete the CPU manager checkpoint file %q before restarting Kubelet.",
-			err, path.Join(stateDir, cpuManagerCheckpointName))
+			err, path.Join(stateDir, CPUManagerCheckpointName))
 	}
 
 	return stateCheckpoint, nil
 }
 
-// tryRestoreState tries to read checkpoint and creates it if it doesn't exist
-func (sc *stateCheckpoint) tryRestoreState() error {
+// restores state from a checkpoint and creates it if it doesn't exist
+func (sc *stateCheckpoint) restoreState() error {
 	sc.mux.Lock()
 	defer sc.mux.Unlock()
 	var err error
@@ -71,8 +72,9 @@ func (sc *stateCheckpoint) tryRestoreState() error {
 	tmpContainerCPUSet := cpuset.NewCPUSet()
 
 	checkpoint := NewCPUManagerCheckpoint()
-	if err = sc.checkpointManager.GetCheckpoint(cpuManagerCheckpointName, checkpoint); err != nil {
-		if err == errors.ErrCheckpointNotFound {
+	if err = sc.checkpointManager.GetCheckpoint(CPUManagerCheckpointName, checkpoint); err != nil {
+		// TODO: change to errors.ErrCheckpointNotFound may be required after issue in checkpointing PR is resolved
+		if err == utilstore.ErrKeyNotFound {
 			sc.storeState()
 			return nil
 		}
@@ -80,16 +82,16 @@ func (sc *stateCheckpoint) tryRestoreState() error {
 	}
 
 	if sc.policyName != checkpoint.PolicyName {
-		return fmt.Errorf("policy configured %q != policy from state checkpoint %q", sc.policyName, checkpoint.PolicyName)
+		return fmt.Errorf("configured policy %q differs from state checkpoint policy %q", sc.policyName, checkpoint.PolicyName)
 	}
 
 	if tmpDefaultCPUSet, err = cpuset.Parse(checkpoint.DefaultCPUSet); err != nil {
-		return fmt.Errorf("could not parse state checkpoint - [defaultCpuSet: %q]", checkpoint.DefaultCPUSet)
+		return fmt.Errorf("could not parse default cpu set %q: %v", checkpoint.DefaultCPUSet, err)
 	}
 
 	for containerID, cpuString := range checkpoint.Entries {
 		if tmpContainerCPUSet, err = cpuset.Parse(cpuString); err != nil {
-			return fmt.Errorf("could not parse state checkpoint - container id: %q, cpuset: %q", containerID, cpuString)
+			return fmt.Errorf("could not parse cpuset %q for container id %q: %v", cpuString, containerID, err)
 		}
 		tmpAssignments[containerID] = tmpContainerCPUSet
 	}
@@ -113,7 +115,7 @@ func (sc *stateCheckpoint) storeState() {
 		checkpoint.Entries[containerID] = cset.String()
 	}
 
-	err := sc.checkpointManager.CreateCheckpoint(cpuManagerCheckpointName, checkpoint)
+	err := sc.checkpointManager.CreateCheckpoint(CPUManagerCheckpointName, checkpoint)
 
 	if err != nil {
 		panic("[cpumanager] could not save checkpoint: " + err.Error())

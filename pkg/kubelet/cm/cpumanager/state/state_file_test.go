@@ -34,7 +34,8 @@ func writeToStateFile(statefile string, content string) {
 	ioutil.WriteFile(statefile, []byte(content), 0644)
 }
 
-func stateEqual(t *testing.T, sf State, sm State) {
+// AssertStateEqual marks provided test as failed if provided states differ
+func AssertStateEqual(t *testing.T, sf State, sm State) {
 	cpusetSf := sf.GetDefaultCPUSet()
 	cpusetSm := sm.GetDefaultCPUSet()
 	if !cpusetSf.Equals(cpusetSm) {
@@ -253,7 +254,7 @@ func TestFileStateTryRestore(t *testing.T) {
 				}
 			}
 
-			stateEqual(t, fileState, tc.expectedState)
+			AssertStateEqual(t, fileState, tc.expectedState)
 		})
 	}
 }
@@ -363,7 +364,7 @@ func TestUpdateStateFile(t *testing.T) {
 				}
 			}
 			newFileState := NewFileState(sfilePath.Name(), "static")
-			stateEqual(t, newFileState, tc.expectedState)
+			AssertStateEqual(t, newFileState, tc.expectedState)
 		})
 	}
 }
@@ -471,7 +472,6 @@ func TestClearStateStateFile(t *testing.T) {
 					t.Error("cleared state shoudn't has got information about containers")
 				}
 			}
-
 		})
 	}
 }
