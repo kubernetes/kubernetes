@@ -72,6 +72,7 @@ filegroup(
         "//pkg/registry/extensions/ingress:all-srcs",
         "//pkg/registry/extensions/podsecuritypolicy:all-srcs",
         "//pkg/registry/extensions/rest:all-srcs",
+        "//pkg/registry/networking/ingress:all-srcs",
         "//pkg/registry/networking/networkpolicy:all-srcs",
         "//pkg/registry/networking/rest:all-srcs",
         "//pkg/registry/policy/poddisruptionbudget:all-srcs",

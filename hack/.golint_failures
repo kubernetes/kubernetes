@@ -303,6 +303,8 @@ pkg/registry/extensions/controller/storage
 pkg/registry/extensions/ingress
 pkg/registry/extensions/ingress/storage
 pkg/registry/extensions/rest
+pkg/registry/networking/ingress
+pkg/registry/networking/ingress/storage
 pkg/registry/networking/networkpolicy/storage
 pkg/registry/networking/rest
 pkg/registry/policy/poddisruptionbudget

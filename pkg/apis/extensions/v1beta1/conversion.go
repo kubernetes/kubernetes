@@ -66,6 +66,27 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 		Convert_networking_IPBlock_To_v1beta1_IPBlock,
 		Convert_networking_NetworkPolicyEgressRule_To_v1beta1_NetworkPolicyEgressRule,
 		Convert_v1beta1_NetworkPolicyEgressRule_To_networking_NetworkPolicyEgressRule,
+
+		Convert_v1beta1_HTTPIngressPath_To_networking_HTTPIngressPath,
+		Convert_networking_HTTPIngressPath_To_v1beta1_HTTPIngressPath,
+		Convert_v1beta1_HTTPIngressRuleValue_To_networking_HTTPIngressRuleValue,
+		Convert_networking_HTTPIngressRuleValue_To_v1beta1_HTTPIngressRuleValue,
+		Convert_v1beta1_Ingress_To_networking_Ingress,
+		Convert_networking_Ingress_To_v1beta1_Ingress,
+		Convert_v1beta1_IngressBackend_To_networking_IngressBackend,
+		Convert_networking_IngressBackend_To_v1beta1_IngressBackend,
+		Convert_v1beta1_IngressList_To_networking_IngressList,
+		Convert_networking_IngressList_To_v1beta1_IngressList,
+		Convert_v1beta1_IngressRule_To_networking_IngressRule,
+		Convert_networking_IngressRule_To_v1beta1_IngressRule,
+		Convert_v1beta1_IngressRuleValue_To_networking_IngressRuleValue,
+		Convert_networking_IngressRuleValue_To_v1beta1_IngressRuleValue,
+		Convert_v1beta1_IngressSpec_To_networking_IngressSpec,
+		Convert_networking_IngressSpec_To_v1beta1_IngressSpec,
+		Convert_v1beta1_IngressStatus_To_networking_IngressStatus,
+		Convert_networking_IngressStatus_To_v1beta1_IngressStatus,
+		Convert_v1beta1_IngressTLS_To_networking_IngressTLS,
+		Convert_networking_IngressTLS_To_v1beta1_IngressTLS,
 	)
 	if err != nil {
 		return err
@@ -506,4 +527,186 @@ func Convert_networking_NetworkPolicyList_To_v1beta1_NetworkPolicyList(in *netwo
 
 func Convert_extensions_PodSecurityPolicySpec_To_v1beta1_PodSecurityPolicySpec(in *extensions.PodSecurityPolicySpec, out *extensionsv1beta1.PodSecurityPolicySpec, s conversion.Scope) error {
 	return autoConvert_extensions_PodSecurityPolicySpec_To_v1beta1_PodSecurityPolicySpec(in, out, s)
+}
+
+func Convert_v1beta1_Ingress_To_networking_Ingress(in *extensionsv1beta1.Ingress, out *networking.Ingress, s conversion.Scope) error {
+	out.ObjectMeta = in.ObjectMeta
+	if err := Convert_v1beta1_IngressSpec_To_networking_IngressSpec(&in.Spec, &out.Spec, s); err != nil {
+		return err
+	}
+	if err := Convert_v1beta1_IngressStatus_To_networking_IngressStatus(&in.Status, &out.Status, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func Convert_networking_Ingress_To_v1beta1_Ingress(in *networking.Ingress, out *extensionsv1beta1.Ingress, s conversion.Scope) error {
+	out.ObjectMeta = in.ObjectMeta
+	if err := Convert_networking_IngressSpec_To_v1beta1_IngressSpec(&in.Spec, &out.Spec, s); err != nil {
+		return err
+	}
+	if err := Convert_networking_IngressStatus_To_v1beta1_IngressStatus(&in.Status, &out.Status, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func Convert_v1beta1_IngressSpec_To_networking_IngressSpec(in *extensionsv1beta1.IngressSpec, out *networking.IngressSpec, s conversion.Scope) error {
+	Convert_v1beta1_IngressBackend_To_networking_IngressBackend(in.Backend, out.Backend, s)
+	out.TLS = make([]networking.IngressTLS, len(in.TLS))
+	for i := range in.TLS {
+		if err := Convert_v1beta1_IngressTLS_To_networking_IngressTLS(&in.TLS[i], &out.TLS[i], s); err != nil {
+			return err
+		}
+	}
+	out.Rules = make([]networking.IngressRule, len(in.Rules))
+	for i := range in.Rules {
+		if err := Convert_v1beta1_IngressRule_To_networking_IngressRule(&in.Rules[i], &out.Rules[i], s); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func Convert_networking_IngressSpec_To_v1beta1_IngressSpec(in *networking.IngressSpec, out *extensionsv1beta1.IngressSpec, s conversion.Scope) error {
+	Convert_networking_IngressBackend_To_v1beta1_IngressBackend(in.Backend, out.Backend, s)
+	out.TLS = make([]extensionsv1beta1.IngressTLS, len(in.TLS))
+	for i := range in.TLS {
+		if err := Convert_networking_IngressTLS_To_v1beta1_IngressTLS(&in.TLS[i], &out.TLS[i], s); err != nil {
+			return err
+		}
+	}
+	out.Rules = make([]extensionsv1beta1.IngressRule, len(in.Rules))
+	for i := range in.Rules {
+		if err := Convert_networking_IngressRule_To_v1beta1_IngressRule(&in.Rules[i], &out.Rules[i], s); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func Convert_v1beta1_HTTPIngressPath_To_networking_HTTPIngressPath(in *extensionsv1beta1.HTTPIngressPath, out *networking.HTTPIngressPath, s conversion.Scope) error {
+	out.Path = in.Path
+	return Convert_v1beta1_IngressBackend_To_networking_IngressBackend(&in.Backend, &out.Backend, s)
+}
+
+func Convert_networking_HTTPIngressPath_To_v1beta1_HTTPIngressPath(in *networking.HTTPIngressPath, out *extensionsv1beta1.HTTPIngressPath, s conversion.Scope) error {
+	out.Path = in.Path
+	return Convert_networking_IngressBackend_To_v1beta1_IngressBackend(&in.Backend, &out.Backend, s)
+}
+
+func Convert_v1beta1_HTTPIngressRuleValue_To_networking_HTTPIngressRuleValue(in *extensionsv1beta1.HTTPIngressRuleValue, out *networking.HTTPIngressRuleValue, s conversion.Scope) error {
+	out.Paths = make([]networking.HTTPIngressPath, len(in.Paths))
+	for i := range in.Paths {
+		if err := Convert_v1beta1_HTTPIngressPath_To_networking_HTTPIngressPath(&in.Paths[i], &out.Paths[i], s); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func Convert_networking_HTTPIngressRuleValue_To_v1beta1_HTTPIngressRuleValue(in *networking.HTTPIngressRuleValue, out *extensionsv1beta1.HTTPIngressRuleValue, s conversion.Scope) error {
+	out.Paths = make([]extensionsv1beta1.HTTPIngressPath, len(in.Paths))
+	for i := range in.Paths {
+		if err := Convert_networking_HTTPIngressPath_To_v1beta1_HTTPIngressPath(&in.Paths[i], &out.Paths[i], s); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func Convert_v1beta1_IngressBackend_To_networking_IngressBackend(in *extensionsv1beta1.IngressBackend, out *networking.IngressBackend, s conversion.Scope) error {
+	if in != nil {
+		out = new(networking.IngressBackend)
+		out.ServiceName = in.ServiceName
+		out.ServicePort = in.ServicePort
+	} else {
+		out = nil
+	}
+	return nil
+}
+
+func Convert_networking_IngressBackend_To_v1beta1_IngressBackend(in *networking.IngressBackend, out *extensionsv1beta1.IngressBackend, s conversion.Scope) error {
+	if in != nil {
+		out = new(extensionsv1beta1.IngressBackend)
+		out.ServiceName = in.ServiceName
+		out.ServicePort = in.ServicePort
+	} else {
+		out = nil
+	}
+	return nil
+}
+
+func Convert_v1beta1_IngressList_To_networking_IngressList(in *extensionsv1beta1.IngressList, out *networking.IngressList, s conversion.Scope) error {
+	out.ListMeta = in.ListMeta
+	out.Items = make([]networking.Ingress, len(in.Items))
+	for i := range in.Items {
+		if err := Convert_v1beta1_Ingress_To_networking_Ingress(&in.Items[i], &out.Items[i], s); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+func Convert_networking_IngressList_To_v1beta1_IngressList(in *networking.IngressList, out *extensionsv1beta1.IngressList, s conversion.Scope) error {
+	out.ListMeta = in.ListMeta
+	out.Items = make([]extensionsv1beta1.Ingress, len(in.Items))
+	for i := range in.Items {
+		if err := Convert_networking_Ingress_To_v1beta1_Ingress(&in.Items[i], &out.Items[i], s); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+func Convert_v1beta1_IngressRuleValue_To_networking_IngressRuleValue(in *extensionsv1beta1.IngressRuleValue, out *networking.IngressRuleValue, s conversion.Scope) error {
+	if in.HTTP != nil {
+		if err := Convert_v1beta1_HTTPIngressRuleValue_To_networking_HTTPIngressRuleValue(in.HTTP, out.HTTP, s); err != nil {
+			return nil
+		}
+	} else {
+		out.HTTP = nil
+	}
+	return nil
+}
+
+func Convert_networking_IngressRuleValue_To_v1beta1_IngressRuleValue(in *networking.IngressRuleValue, out *extensionsv1beta1.IngressRuleValue, s conversion.Scope) error {
+	if in.HTTP != nil {
+		if err := Convert_networking_HTTPIngressRuleValue_To_v1beta1_HTTPIngressRuleValue(in.HTTP, out.HTTP, s); err != nil {
+			return nil
+		}
+	} else {
+		out.HTTP = nil
+	}
+	return nil
+}
+
+func Convert_v1beta1_IngressStatus_To_networking_IngressStatus(in *extensionsv1beta1.IngressStatus, out *networking.IngressStatus, s conversion.Scope) error {
+	return k8s_api_v1.Convert_v1_LoadBalancerStatus_To_core_LoadBalancerStatus(&in.LoadBalancer, &out.LoadBalancer, s)
+}
+
+func Convert_networking_IngressStatus_To_v1beta1_IngressStatus(in *networking.IngressStatus, out *extensionsv1beta1.IngressStatus, s conversion.Scope) error {
+	return k8s_api_v1.Convert_core_LoadBalancerStatus_To_v1_LoadBalancerStatus(&in.LoadBalancer, &out.LoadBalancer, s)
+}
+
+func Convert_v1beta1_IngressTLS_To_networking_IngressTLS(in *extensionsv1beta1.IngressTLS, out *networking.IngressTLS, s conversion.Scope) error {
+	out.Hosts = make([]string, len(in.Hosts))
+	copy(out.Hosts, in.Hosts)
+	out.SecretName = in.SecretName
+	return nil
+}
+
+func Convert_networking_IngressTLS_To_v1beta1_IngressTLS(in *networking.IngressTLS, out *extensionsv1beta1.IngressTLS, s conversion.Scope) error {
+	out.Hosts = make([]string, len(in.Hosts))
+	copy(out.Hosts, in.Hosts)
+	out.SecretName = in.SecretName
+	return nil
+}
+
+func Convert_v1beta1_IngressRule_To_networking_IngressRule(in *extensionsv1beta1.IngressRule, out *networking.IngressRule, s conversion.Scope) error {
+	out.Host = in.Host
+	return Convert_v1beta1_IngressRuleValue_To_networking_IngressRuleValue(&in.IngressRuleValue, &out.IngressRuleValue, s)
+}
+
+func Convert_networking_IngressRule_To_v1beta1_IngressRule(in *networking.IngressRule, out *extensionsv1beta1.IngressRule, s conversion.Scope) error {
+	out.Host = in.Host
+	return Convert_networking_IngressRuleValue_To_v1beta1_IngressRuleValue(&in.IngressRuleValue, &out.IngressRuleValue, s)
 }

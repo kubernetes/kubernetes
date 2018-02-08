@@ -24,6 +24,7 @@ import (
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/networking"
+	ingressstore "k8s.io/kubernetes/pkg/registry/networking/ingress/storage"
 	networkpolicystore "k8s.io/kubernetes/pkg/registry/networking/networkpolicy/storage"
 )
 
@@ -47,6 +48,11 @@ func (p RESTStorageProvider) v1alpha1Storage(apiResourceConfigSource serverstora
 	// networkpolicies
 	networkPolicyStorage := networkpolicystore.NewREST(restOptionsGetter)
 	storage["networkpolicies"] = networkPolicyStorage
+
+	// ingresses
+	ingressStorage, ingressStatusStorage := ingressstore.NewREST(restOptionsGetter)
+	storage["ingresses"] = ingressStorage
+	storage["ingresses/status"] = ingressStatusStorage
 
 	return storage
 }

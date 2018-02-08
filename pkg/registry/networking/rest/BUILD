@@ -12,6 +12,7 @@ go_library(
     deps = [
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/networking:go_default_library",
+        "//pkg/registry/networking/ingress/storage:go_default_library",
         "//pkg/registry/networking/networkpolicy/storage:go_default_library",
         "//vendor/k8s.io/api/networking/v1:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/registry/generic:go_default_library",
