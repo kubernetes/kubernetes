@@ -20,16 +20,17 @@
 # .. is not the same as:
 #   make REGISTRY=$VAR
 REGISTRY := $(if $(REGISTRY),$(REGISTRY),staging-k8s.gcr.io)
+IMAGE_TAG := $(if $(IMAGE_TAG),$(IMAGE_TAG),latest)
 
 all: gcloudpush
 
 build:
-	docker build --pull -t $(REGISTRY)/kubemark .
+	docker build --pull -t $(REGISTRY)/kubemark:$(IMAGE_TAG) .
 
 gcloudpush: build
-	gcloud docker -- push $(REGISTRY)/kubemark
+	gcloud docker -- push $(REGISTRY)/kubemark:$(IMAGE_TAG)
 
 push: build
-	docker -- push $(REGISTRY)/kubemark
+	docker -- push $(REGISTRY)/kubemark:$(IMAGE_TAG)
 
 .PHONY: all build gcloudpush push
