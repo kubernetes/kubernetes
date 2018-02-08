@@ -646,6 +646,7 @@ func (kubever KubernetesVersionCheck) Check() (warnings, errors []error) {
 // KubeletVersionCheck validates installed kubelet version
 type KubeletVersionCheck struct {
 	KubernetesVersion string
+	exec              utilsexec.Interface
 }
 
 // Name will return KubeletVersion as name for KubeletVersionCheck
@@ -655,7 +656,7 @@ func (KubeletVersionCheck) Name() string {
 
 // Check validates kubelet version. It should be not less than minimal supported version
 func (kubever KubeletVersionCheck) Check() (warnings, errors []error) {
-	kubeletVersion, err := GetKubeletVersion()
+	kubeletVersion, err := GetKubeletVersion(kubever.exec)
 	if err != nil {
 		return nil, []error{fmt.Errorf("couldn't get kubelet version: %v", err)}
 	}
@@ -871,7 +872,7 @@ func RunInitMasterChecks(execer utilsexec.Interface, cfg *kubeadmapi.MasterConfi
 		SystemVerificationCheck{CRISocket: criSocket},
 		IsPrivilegedUserCheck{},
 		HostnameCheck{nodeName: cfg.NodeName},
-		KubeletVersionCheck{KubernetesVersion: cfg.KubernetesVersion},
+		KubeletVersionCheck{KubernetesVersion: cfg.KubernetesVersion, exec: execer},
 		ServiceCheck{Service: "kubelet", CheckIfActive: false},
 		ServiceCheck{Service: "docker", CheckIfActive: true}, // assume docker
 		FirewalldCheck{ports: []int{int(cfg.API.BindPort), 10250}},
@@ -968,7 +969,7 @@ func RunJoinNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.NodeConfigura
 		SystemVerificationCheck{CRISocket: criSocket},
 		IsPrivilegedUserCheck{},
 		HostnameCheck{cfg.NodeName},
-		KubeletVersionCheck{},
+		KubeletVersionCheck{exec: execer},
 		ServiceCheck{Service: "kubelet", CheckIfActive: false},
 		PortOpenCheck{port: 10250},
 		DirAvailableCheck{Path: filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.ManifestsSubDirName)},
