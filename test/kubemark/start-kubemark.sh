@@ -395,8 +395,7 @@ current-context: kubemark-context")
   proxy_mem=$((100 * 1024 + ${proxy_mem_per_node}*${NUM_NODES}))
   sed -i'' -e "s/{{HOLLOW_PROXY_CPU}}/${proxy_cpu}/g" "${RESOURCE_DIRECTORY}/hollow-node.yaml"
   sed -i'' -e "s/{{HOLLOW_PROXY_MEM}}/${proxy_mem}/g" "${RESOURCE_DIRECTORY}/hollow-node.yaml"
-  sed -i'' -e "s/{{registry}}/${CONTAINER_REGISTRY}/g" "${RESOURCE_DIRECTORY}/hollow-node.yaml"
-  sed -i'' -e "s/{{project}}/${PROJECT}/g" "${RESOURCE_DIRECTORY}/hollow-node.yaml"
+  sed -i'' -e "s'{{full_registry}}'${FULL_REGISTRY}'g" "${RESOURCE_DIRECTORY}/hollow-node.yaml"
   sed -i'' -e "s/{{master_ip}}/${MASTER_IP}/g" "${RESOURCE_DIRECTORY}/hollow-node.yaml"
   sed -i'' -e "s/{{kubelet_verbosity_level}}/${KUBELET_TEST_LOG_LEVEL}/g" "${RESOURCE_DIRECTORY}/hollow-node.yaml"
   sed -i'' -e "s/{{kubeproxy_verbosity_level}}/${KUBEPROXY_TEST_LOG_LEVEL}/g" "${RESOURCE_DIRECTORY}/hollow-node.yaml"
@@ -456,15 +455,6 @@ write-pki-config-to-master
 write-local-kubeconfig
 copy-resource-files-to-master
 start-master-components
-
-# TODO: Simplify. The caller should have to pass a full registry or nothing.
-if [[ -n "${CONTAINER_REGISTRY}" && -n "${PROJECT}" ]]; then
-  FULL_REGISTRY="${CONTAINER_REGISTRY}/${PROJECT}"
-elif [[ -n "${CONTAINER_REGISTRY}" ]]; then
-  FULL_REGISTRY="${CONTAINER_REGISTRY}"
-else
-  FULL_REGISTRY=staging-k8s.gcr.io
-fi
 
 # Setup for hollow-nodes.
 echo ""
