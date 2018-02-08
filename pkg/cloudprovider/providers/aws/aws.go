@@ -33,6 +33,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/credentials/ec2rolecreds"
+	"github.com/aws/aws-sdk-go/aws/credentials/stscreds"
 	"github.com/aws/aws-sdk-go/aws/ec2metadata"
 	"github.com/aws/aws-sdk-go/aws/request"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -41,6 +42,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/elb"
 	"github.com/aws/aws-sdk-go/service/elbv2"
 	"github.com/aws/aws-sdk-go/service/kms"
+	"github.com/aws/aws-sdk-go/service/sts"
 	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
 	clientset "k8s.io/client-go/kubernetes"
@@ -526,6 +528,9 @@ type CloudConfig struct {
 		// RouteTableID enables using a specific RouteTable
 		RouteTableID string
 
+		// RoleARN is the IAM role to assume when interaction with AWS APIs.
+		RoleARN string
+
 		// KubernetesClusterTag is the legacy cluster id we'll use to identify our cluster resources
 		KubernetesClusterTag string
 		// KubernetesClusterID is the cluster id we'll use to identify our cluster resources
@@ -927,22 +932,43 @@ func (s *awsSdkEC2) DescribeVpcs(request *ec2.DescribeVpcsInput) (*ec2.DescribeV
 func init() {
 	registerMetrics()
 	cloudprovider.RegisterCloudProvider(ProviderName, func(config io.Reader) (cloudprovider.Interface, error) {
+		cfg, err := readAWSCloudConfig(config)
+		if err != nil {
+			return nil, fmt.Errorf("unable to read AWS cloud provider config file: %v", err)
+		}
+
+		sess, err := session.NewSession(&aws.Config{})
+		if err != nil {
+			return nil, fmt.Errorf("unable to initialize AWS session: %v", err)
+		}
+
+		var provider credentials.Provider
+		if cfg.Global.RoleARN == "" {
+			provider = &ec2rolecreds.EC2RoleProvider{
+				Client: ec2metadata.New(sess),
+			}
+		} else {
+			glog.Infof("Using AWS assumed role %v", cfg.Global.RoleARN)
+			provider = &stscreds.AssumeRoleProvider{
+				Client:  sts.New(sess),
+				RoleARN: cfg.Global.RoleARN,
+			}
+		}
+
 		creds := credentials.NewChainCredentials(
 			[]credentials.Provider{
 				&credentials.EnvProvider{},
-				&ec2rolecreds.EC2RoleProvider{
-					Client: ec2metadata.New(session.New(&aws.Config{})),
-				},
+				provider,
 				&credentials.SharedCredentialsProvider{},
 			})
 
 		aws := newAWSSDKProvider(creds)
-		return newAWSCloud(config, aws)
+		return newAWSCloud(*cfg, aws)
 	})
 }
 
 // readAWSCloudConfig reads an instance of AWSCloudConfig from config reader.
-func readAWSCloudConfig(config io.Reader, metadata EC2Metadata) (*CloudConfig, error) {
+func readAWSCloudConfig(config io.Reader) (*CloudConfig, error) {
 	var cfg CloudConfig
 	var err error
 
@@ -953,20 +979,25 @@ func readAWSCloudConfig(config io.Reader, metadata EC2Metadata) (*CloudConfig, e
 		}
 	}
 
+	return &cfg, nil
+}
+
+func updateConfigZone(cfg *CloudConfig, metadata EC2Metadata) error {
 	if cfg.Global.Zone == "" {
 		if metadata != nil {
 			glog.Info("Zone not specified in configuration file; querying AWS metadata service")
+			var err error
 			cfg.Global.Zone, err = getAvailabilityZone(metadata)
 			if err != nil {
-				return nil, err
+				return err
 			}
 		}
 		if cfg.Global.Zone == "" {
-			return nil, fmt.Errorf("no zone specified in configuration file")
+			return fmt.Errorf("no zone specified in configuration file")
 		}
 	}
 
-	return &cfg, nil
+	return nil
 }
 
 func getInstanceType(metadata EC2Metadata) (string, error) {
@@ -989,7 +1020,7 @@ func azToRegion(az string) (string, error) {
 
 // newAWSCloud creates a new instance of AWSCloud.
 // AWSProvider and instanceId are primarily for tests
-func newAWSCloud(config io.Reader, awsServices Services) (*Cloud, error) {
+func newAWSCloud(cfg CloudConfig, awsServices Services) (*Cloud, error) {
 	// We have some state in the Cloud object - in particular the attaching map
 	// Log so that if we are building multiple Cloud objects, it is obvious!
 	glog.Infof("Building AWS cloudprovider")
@@ -999,9 +1030,9 @@ func newAWSCloud(config io.Reader, awsServices Services) (*Cloud, error) {
 		return nil, fmt.Errorf("error creating AWS metadata client: %q", err)
 	}
 
-	cfg, err := readAWSCloudConfig(config, metadata)
+	err = updateConfigZone(&cfg, metadata)
 	if err != nil {
-		return nil, fmt.Errorf("unable to read AWS cloud provider config file: %v", err)
+		return nil, fmt.Errorf("unable to determine AWS zone from cloud provider config or EC2 instance metadata: %v", err)
 	}
 
 	zone := cfg.Global.Zone
@@ -1059,7 +1090,7 @@ func newAWSCloud(config io.Reader, awsServices Services) (*Cloud, error) {
 		asg:      asg,
 		metadata: metadata,
 		kms:      kms,
-		cfg:      cfg,
+		cfg:      &cfg,
 		region:   regionName,
 
 		attaching:        make(map[types.NodeName]map[mountDevice]awsVolumeID),
@@ -1067,8 +1098,9 @@ func newAWSCloud(config io.Reader, awsServices Services) (*Cloud, error) {
 	}
 	awsCloud.instanceCache.cloud = awsCloud
 
-	if cfg.Global.VPC != "" && cfg.Global.SubnetID != "" && (cfg.Global.KubernetesClusterTag != "" || cfg.Global.KubernetesClusterID != "") {
-		// When the master is running on a different AWS account, cloud provider or on-premises
+	tagged := cfg.Global.KubernetesClusterTag != "" || cfg.Global.KubernetesClusterID != ""
+	if cfg.Global.VPC != "" && (cfg.Global.SubnetID != "" || cfg.Global.RoleARN != "") && tagged {
+		// When the master is running on a different AWS account, cloud provider or on-premise
 		// build up a dummy instance and use the VPC from the nodes account
 		glog.Info("Master is configured to run on a different AWS account, different cloud provider or on-premises")
 		awsCloud.selfAWSInstance = &awsInstance{
@@ -1084,7 +1116,6 @@ func newAWSCloud(config io.Reader, awsServices Services) (*Cloud, error) {
 		}
 		awsCloud.selfAWSInstance = selfAWSInstance
 		awsCloud.vpcID = selfAWSInstance.vpcID
-
 	}
 
 	if cfg.Global.KubernetesClusterTag != "" || cfg.Global.KubernetesClusterID != "" {
