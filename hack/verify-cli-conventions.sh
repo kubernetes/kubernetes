@@ -30,7 +30,7 @@ make -C "${KUBE_ROOT}" WHAT="${BINS[*]}"
 
 clicheck=$(kube::util::find-binary "clicheck")
 
-if ! output=`$clicheck 2>&1`
+if ! output=$($clicheck 2>&1)
 then
 	echo "$output"
 	echo
