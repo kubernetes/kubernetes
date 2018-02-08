@@ -21,9 +21,9 @@ export KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
 if [[ ! -f "${KUBE_ROOT}/vendor/BUILD" ]]; then
-  echo "${KUBE_ROOT}/vendor/BUILD does not exist."
-  echo
-  echo "Run ./hack/update-bazel.sh"
+  echo "${KUBE_ROOT}/vendor/BUILD does not exist." >&2
+  echo >&2
+  echo "Run ./hack/update-bazel.sh" >&2
   exit 1
 fi
 
@@ -45,8 +45,8 @@ GOPATH="${_tmp_gopath}" ./hack/update-bazel.sh
 diff=$(diff -Naupr "${KUBE_ROOT}" "${_tmp_kuberoot}" || true)
 
 if [[ -n "${diff}" ]]; then
-  echo "${diff}"
-  echo
-  echo "Run ./hack/update-bazel.sh"
+  echo "${diff}" >&2
+  echo >&2
+  echo "Run ./hack/update-bazel.sh" >&2
   exit 1
 fi
