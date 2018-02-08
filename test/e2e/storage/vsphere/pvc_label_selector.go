@@ -56,11 +56,18 @@ var _ = utils.SIGDescribe("PersistentVolumes [Feature:LabelSelector]", func() {
 		ssdlabels  map[string]string
 		vvollabels map[string]string
 		err        error
+		nodeInfo   *NodeInfo
 	)
 	BeforeEach(func() {
 		framework.SkipUnlessProviderIs("vsphere")
 		c = f.ClientSet
 		ns = f.Namespace.Name
+		Bootstrap(f)
+		nodes := framework.GetReadySchedulableNodesOrDie(c)
+		if len(nodes.Items) < 1 {
+			framework.Skipf("Requires at least %d node", 1)
+		}
+		nodeInfo = TestContext.NodeMapper.GetNodeInfo(nodes.Items[0].Name)
 		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(c, framework.TestContext.NodeSchedulableTimeout))
 		ssdlabels = make(map[string]string)
 		ssdlabels["volume-type"] = "ssd"
@@ -73,11 +80,11 @@ var _ = utils.SIGDescribe("PersistentVolumes [Feature:LabelSelector]", func() {
 		AfterEach(func() {
 			By("Running clean up actions")
 			if framework.ProviderIs("vsphere") {
-				testCleanupVSpherePVClabelselector(c, ns, volumePath, pv_ssd, pvc_ssd, pvc_vvol)
+				testCleanupVSpherePVClabelselector(c, ns, nodeInfo, volumePath, pv_ssd, pvc_ssd, pvc_vvol)
 			}
 		})
 		It("should bind volume with claim for given label", func() {
-			volumePath, pv_ssd, pvc_ssd, pvc_vvol, err = testSetupVSpherePVClabelselector(c, ns, ssdlabels, vvollabels)
+			volumePath, pv_ssd, pvc_ssd, pvc_vvol, err = testSetupVSpherePVClabelselector(c, nodeInfo, ns, ssdlabels, vvollabels)
 			Expect(err).NotTo(HaveOccurred())
 
 			By("wait for the pvc_ssd to bind with pv_ssd")
@@ -101,12 +108,11 @@ var _ = utils.SIGDescribe("PersistentVolumes [Feature:LabelSelector]", func() {
 	})
 })
 
-func testSetupVSpherePVClabelselector(c clientset.Interface, ns string, ssdlabels map[string]string, vvollabels map[string]string) (volumePath string, pv_ssd *v1.PersistentVolume, pvc_ssd *v1.PersistentVolumeClaim, pvc_vvol *v1.PersistentVolumeClaim, err error) {
+func testSetupVSpherePVClabelselector(c clientset.Interface, nodeInfo *NodeInfo, ns string, ssdlabels map[string]string, vvollabels map[string]string) (volumePath string, pv_ssd *v1.PersistentVolume, pvc_ssd *v1.PersistentVolumeClaim, pvc_vvol *v1.PersistentVolumeClaim, err error) {
 	volumePath = ""
 	By("creating vmdk")
-	vsp, err := getVSphere(c)
 	Expect(err).NotTo(HaveOccurred())
-	volumePath, err = createVSphereVolume(vsp, nil)
+	volumePath, err = nodeInfo.VSphere.CreateVolume(&VolumeOptions{}, nodeInfo.DataCenterRef)
 	if err != nil {
 		return
 	}
@@ -131,12 +137,10 @@ func testSetupVSpherePVClabelselector(c clientset.Interface, ns string, ssdlabel
 	return
 }
 
-func testCleanupVSpherePVClabelselector(c clientset.Interface, ns string, volumePath string, pv_ssd *v1.PersistentVolume, pvc_ssd *v1.PersistentVolumeClaim, pvc_vvol *v1.PersistentVolumeClaim) {
+func testCleanupVSpherePVClabelselector(c clientset.Interface, ns string, nodeInfo *NodeInfo, volumePath string, pv_ssd *v1.PersistentVolume, pvc_ssd *v1.PersistentVolumeClaim, pvc_vvol *v1.PersistentVolumeClaim) {
 	By("running testCleanupVSpherePVClabelselector")
 	if len(volumePath) > 0 {
-		vsp, err := getVSphere(c)
-		Expect(err).NotTo(HaveOccurred())
-		vsp.DeleteVolume(volumePath)
+		nodeInfo.VSphere.DeleteVolume(volumePath, nodeInfo.DataCenterRef)
 	}
 	if pvc_ssd != nil {
 		framework.ExpectNoError(framework.DeletePersistentVolumeClaim(c, pvc_ssd.Name, ns), "Failed to delete PVC ", pvc_ssd.Name)

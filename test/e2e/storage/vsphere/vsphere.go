@@ -17,17 +17,41 @@ limitations under the License.
 package vsphere
 
 import (
+	"fmt"
 	"github.com/vmware/govmomi"
 	"github.com/vmware/govmomi/find"
 	"github.com/vmware/govmomi/object"
+	"github.com/vmware/govmomi/vim25/soap"
+	"github.com/vmware/govmomi/vim25/types"
 	"golang.org/x/net/context"
+	"k8s.io/kubernetes/test/e2e/framework"
+	"path/filepath"
+	"strconv"
 	"strings"
+	"time"
+)
+
+const (
+	VolDir                    = "kubevols"
+	DefaultDiskCapacityKB     = 2097152
+	DefaultDiskFormat         = "thin"
+	DefaultSCSIControllerType = "lsiLogic"
+	VirtualMachineType        = "VirtualMachine"
 )
 
 // Represents a vSphere instance where one or more kubernetes nodes are running.
 type VSphere struct {
 	Config *Config
 	Client *govmomi.Client
+}
+
+// VolumeOptions specifies various options for a volume.
+type VolumeOptions struct {
+	Name               string
+	CapacityKB         int
+	DiskFormat         string
+	SCSIControllerType string
+	Datastore          string
 }
 
 // GetDatacenter returns the DataCenter Object for the given datacenterPath
@@ -37,6 +61,12 @@ func (vs *VSphere) GetDatacenter(ctx context.Context, datacenterPath string) (*o
 	return finder.Datacenter(ctx, datacenterPath)
 }
 
+// GetDatacenter returns the DataCenter Object for the given datacenterPath
+func (vs *VSphere) GetDatacenterFromObjectReference(ctx context.Context, dc object.Reference) *object.Datacenter {
+	Connect(ctx, vs)
+	return object.NewDatacenter(vs.Client.Client, dc.Reference())
+}
+
 // GetAllDatacenter returns all the DataCenter Objects
 func (vs *VSphere) GetAllDatacenter(ctx context.Context) ([]*object.Datacenter, error) {
 	Connect(ctx, vs)
@@ -44,11 +74,159 @@ func (vs *VSphere) GetAllDatacenter(ctx context.Context) ([]*object.Datacenter, 
 	return finder.DatacenterList(ctx, "*")
 }
 
-// GetVMByUUID gets the VM object from the given vmUUID
+// GetVMByUUID gets the VM object Reference from the given vmUUID
 func (vs *VSphere) GetVMByUUID(ctx context.Context, vmUUID string, dc object.Reference) (object.Reference, error) {
 	Connect(ctx, vs)
-	datacenter := object.NewDatacenter(vs.Client.Client, dc.Reference())
+	datacenter := vs.GetDatacenterFromObjectReference(ctx, dc)
 	s := object.NewSearchIndex(vs.Client.Client)
 	vmUUID = strings.ToLower(strings.TrimSpace(vmUUID))
 	return s.FindByUuid(ctx, datacenter, vmUUID, true, nil)
+}
+
+// GetFolderByPath gets the Folder Object Reference from the given folder path
+// folderPath should be the full path to folder
+func (vs *VSphere) GetFolderByPath(ctx context.Context, dc object.Reference, folderPath string) (vmFolderMor types.ManagedObjectReference, err error) {
+	Connect(ctx, vs)
+	datacenter := object.NewDatacenter(vs.Client.Client, dc.Reference())
+	finder := find.NewFinder(datacenter.Client(), true)
+	finder.SetDatacenter(datacenter)
+	vmFolder, err := finder.Folder(ctx, folderPath)
+	if err != nil {
+		framework.Logf("Failed to get the folder reference for %s. err: %+v", folderPath, err)
+		return vmFolderMor, err
+	}
+	return vmFolder.Reference(), nil
+}
+
+func (vs *VSphere) CreateVolume(volumeOptions *VolumeOptions, dataCenterRef types.ManagedObjectReference) (string, error) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	Connect(ctx, vs)
+	datacenter := object.NewDatacenter(vs.Client.Client, dataCenterRef)
+	var (
+		err                     error
+		directoryAlreadyPresent = false
+	)
+	if datacenter == nil {
+		err = fmt.Errorf("datacenter is nil")
+		return "", err
+	}
+	if volumeOptions == nil {
+		volumeOptions = &VolumeOptions{}
+	}
+	if volumeOptions.Datastore == "" {
+		volumeOptions.Datastore = vs.Config.DefaultDatastore
+	}
+	if volumeOptions.CapacityKB == 0 {
+		volumeOptions.CapacityKB = DefaultDiskCapacityKB
+	}
+	if volumeOptions.Name == "" {
+		volumeOptions.Name = "e2e-vmdk-" + strconv.FormatInt(time.Now().UnixNano(), 10)
+	}
+	if volumeOptions.DiskFormat == "" {
+		volumeOptions.DiskFormat = DefaultDiskFormat
+	}
+	if volumeOptions.SCSIControllerType == "" {
+		volumeOptions.SCSIControllerType = DefaultSCSIControllerType
+	}
+
+	finder := find.NewFinder(datacenter.Client(), true)
+	finder.SetDatacenter(datacenter)
+	ds, err := finder.Datastore(ctx, volumeOptions.Datastore)
+	if err != nil {
+		err = fmt.Errorf("Failed while searching for datastore: %s. err: %+v", volumeOptions.Datastore, err)
+		return "", err
+	}
+	directoryPath := filepath.Clean(ds.Path(VolDir)) + "/"
+	fileManager := object.NewFileManager(ds.Client())
+	err = fileManager.MakeDirectory(ctx, directoryPath, datacenter, false)
+	if err != nil {
+		if soap.IsSoapFault(err) {
+			soapFault := soap.ToSoapFault(err)
+			if _, ok := soapFault.VimFault().(types.FileAlreadyExists); ok {
+				directoryAlreadyPresent = true
+				framework.Logf("Directory with the path %+q is already present", directoryPath)
+			}
+		}
+		if !directoryAlreadyPresent {
+			framework.Logf("Cannot create dir %#v. err %s", directoryPath, err)
+			return "", err
+		}
+	}
+	framework.Logf("Created dir with path as %+q", directoryPath)
+	vmdkPath := directoryPath + volumeOptions.Name + ".vmdk"
+
+	// Create a virtual disk manager
+	vdm := object.NewVirtualDiskManager(ds.Client())
+	// Create specification for new virtual disk
+	vmDiskSpec := &types.FileBackedVirtualDiskSpec{
+		VirtualDiskSpec: types.VirtualDiskSpec{
+			AdapterType: volumeOptions.SCSIControllerType,
+			DiskType:    volumeOptions.DiskFormat,
+		},
+		CapacityKb: int64(volumeOptions.CapacityKB),
+	}
+	// Create virtual disk
+	task, err := vdm.CreateVirtualDisk(ctx, vmdkPath, datacenter, vmDiskSpec)
+	if err != nil {
+		framework.Logf("Failed to create virtual disk: %s. err: %+v", vmdkPath, err)
+		return "", err
+	}
+	taskInfo, err := task.WaitForResult(ctx, nil)
+	if err != nil {
+		framework.Logf("Failed to complete virtual disk creation: %s. err: %+v", vmdkPath, err)
+		return "", err
+	}
+	volumePath := taskInfo.Result.(string)
+	canonicalDiskPath, err := getCanonicalVolumePath(ctx, datacenter, volumePath)
+	if err != nil {
+		return "", err
+	}
+	return canonicalDiskPath, nil
+}
+
+func (vs *VSphere) DeleteVolume(volumePath string, dataCenterRef types.ManagedObjectReference) error {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	Connect(ctx, vs)
+
+	datacenter := object.NewDatacenter(vs.Client.Client, dataCenterRef)
+	virtualDiskManager := object.NewVirtualDiskManager(datacenter.Client())
+	diskPath := removeStorageClusterORFolderNameFromVDiskPath(volumePath)
+	// Delete virtual disk
+	task, err := virtualDiskManager.DeleteVirtualDisk(ctx, diskPath, datacenter)
+	if err != nil {
+		framework.Logf("Failed to delete virtual disk. err: %v", err)
+		return err
+	}
+	err = task.Wait(ctx)
+	if err != nil {
+		framework.Logf("Failed to delete virtual disk. err: %v", err)
+		return err
+	}
+	return nil
+}
+
+func (vs *VSphere) IsVMPresent(vmName string, dataCenterRef types.ManagedObjectReference) (isVMPresent bool, err error) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	Connect(ctx, vs)
+	folderMor, err := vs.GetFolderByPath(ctx, dataCenterRef, vs.Config.Folder)
+	if err != nil {
+		return
+	}
+	vmFolder := object.NewFolder(vs.Client.Client, folderMor)
+	vmFoldersChildren, err := vmFolder.Children(ctx)
+	if err != nil {
+		framework.Logf("Failed to get children from Folder: %s. err: %+v", vmFolder.InventoryPath, err)
+		return
+	}
+	for _, vmFoldersChild := range vmFoldersChildren {
+		if vmFoldersChild.Reference().Type == VirtualMachineType {
+			if object.NewVirtualMachine(vs.Client.Client, vmFoldersChild.Reference()).Name() == vmName {
+				return true, nil
+			}
+		}
+	}
+	return
 }
