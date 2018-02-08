@@ -26,6 +26,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/apimachinery/pkg/util/sets"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
@@ -39,13 +40,14 @@ const (
 
 // HTTPExtender implements the algorithm.SchedulerExtender interface.
 type HTTPExtender struct {
-	extenderURL      string
-	filterVerb       string
-	prioritizeVerb   string
-	bindVerb         string
-	weight           int
-	client           *http.Client
-	nodeCacheCapable bool
+	extenderURL         string
+	filterVerb          string
+	prioritizeVerb      string
+	bindVerb            string
+	weight              int
+	client              *http.Client
+	nodeCacheCapable    bool
+	interestedResources sets.String
 }
 
 func makeTransport(config *schedulerapi.ExtenderConfig) (http.RoundTripper, error) {
@@ -86,13 +88,14 @@ func NewHTTPExtender(config *schedulerapi.ExtenderConfig) (algorithm.SchedulerEx
 		Timeout:   config.HTTPTimeout,
 	}
 	return &HTTPExtender{
-		extenderURL:      config.URLPrefix,
-		filterVerb:       config.FilterVerb,
-		prioritizeVerb:   config.PrioritizeVerb,
-		bindVerb:         config.BindVerb,
-		weight:           config.Weight,
-		client:           client,
-		nodeCacheCapable: config.NodeCacheCapable,
+		extenderURL:         config.URLPrefix,
+		filterVerb:          config.FilterVerb,
+		prioritizeVerb:      config.PrioritizeVerb,
+		bindVerb:            config.BindVerb,
+		weight:              config.Weight,
+		client:              client,
+		nodeCacheCapable:    config.NodeCacheCapable,
+		interestedResources: sets.NewString(config.InterestedResources...),
 	}, nil
 }
 
@@ -251,4 +254,19 @@ func (h *HTTPExtender) send(action string, args interface{}, result interface{})
 	}
 
 	return json.NewDecoder(resp.Body).Decode(result)
+}
+
+// IsInterested returns whether this extender is interested in this pod.
+func (h *HTTPExtender) IsInterested(pod *v1.Pod) bool {
+	if h.interestedResources.Len() == 0 {
+		return true
+	}
+	for _, container := range pod.Spec.Containers {
+		for resourceName := range container.Resources.Requests {
+			if h.interestedResources.Has(string(resourceName)) {
+				return true
+			}
+		}
+	}
+	return false
 }

@@ -110,6 +110,7 @@ type FakeExtender struct {
 	weight           int
 	nodeCacheCapable bool
 	filteredNodes    []*v1.Node
+	unInterested     bool
 }
 
 func (f *FakeExtender) Filter(pod *v1.Pod, nodes []*v1.Node, nodeNameToInfo map[string]*schedulercache.NodeInfo) ([]*v1.Node, schedulerapi.FailedNodesMap, error) {
@@ -181,6 +182,10 @@ func (f *FakeExtender) Bind(binding *v1.Binding) error {
 
 func (f *FakeExtender) IsBinder() bool {
 	return true
+}
+
+func (f *FakeExtender) IsInterested(pod *v1.Pod) bool {
+	return !f.unInterested
 }
 
 var _ algorithm.SchedulerExtender = &FakeExtender{}
@@ -303,6 +308,22 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 			nodes:        []string{"machine1", "machine2"},
 			expectedHost: "machine2", // machine2 has higher score
 			name:         "test 7",
+		},
+		{
+			// Scheduler is expected to not send filter requests to extender if it's not interested.
+			// If it does, the errorPredicateExtender will return an error, since expectsErr is false, the test will fail
+			predicates:   map[string]algorithm.FitPredicate{"true": truePredicate},
+			prioritizers: []algorithm.PriorityConfig{{Map: EqualPriorityMap, Weight: 1}},
+			extenders: []FakeExtender{
+				{
+					predicates:   []fitPredicate{errorPredicateExtender},
+					unInterested: true,
+				},
+			},
+			nodes:        []string{"machine1", "machine2"},
+			expectsErr:   false,
+			expectedHost: "machine2", // machine2 has higher score
+			name:         "test 8",
 		},
 	}
 

@@ -135,6 +135,8 @@ func TestScheduler(t *testing.T) {
 	errB := errors.New("binder")
 	testNode := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "machine1"}}
 
+	testBindingPodName := "testBinding"
+	testBinding := &v1.Binding{ObjectMeta: metav1.ObjectMeta{Name: "anotherPod"}, Target: v1.ObjectReference{Kind: "Node", Name: testNode.Name}}
 	table := []struct {
 		injectBindError  error
 		sendPod          *v1.Pod
@@ -172,6 +174,12 @@ func TestScheduler(t *testing.T) {
 			sendPod:     deletingPod("foo"),
 			algo:        mockScheduler{"", nil},
 			eventReason: "FailedScheduling",
+		}, {
+			sendPod:          podWithID(testBindingPodName, ""),
+			algo:             mockScheduler{testNode.Name, nil},
+			expectBind:       testBinding, // testBinding has a name different than testBindingPodName
+			expectAssumedPod: podWithID(testBindingPodName, testNode.Name),
+			eventReason:      "Scheduled",
 		},
 	}
 
@@ -195,10 +203,18 @@ func TestScheduler(t *testing.T) {
 					[]*v1.Node{&testNode},
 				),
 				Algorithm: item.algo,
-				Binder: fakeBinder{func(b *v1.Binding) error {
-					gotBinding = b
-					return item.injectBindError
-				}},
+				GetBinder: func(pod *v1.Pod) Binder {
+					if pod.Name != testBindingPodName {
+						return fakeBinder{func(b *v1.Binding) error {
+							gotBinding = b
+							return item.injectBindError
+						}}
+					}
+					return fakeBinder{func(b *v1.Binding) error {
+						gotBinding = testBinding
+						return nil
+					}}
+				},
 				PodConditionUpdater: fakePodConditionUpdater{},
 				Error: func(p *v1.Pod, err error) {
 					gotPod = p
@@ -542,10 +558,12 @@ func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache schedulercache.
 			SchedulerCache: scache,
 			NodeLister:     nodeLister,
 			Algorithm:      algo,
-			Binder: fakeBinder{func(b *v1.Binding) error {
-				bindingChan <- b
-				return nil
-			}},
+			GetBinder: func(pod *v1.Pod) Binder {
+				return fakeBinder{func(b *v1.Binding) error {
+					bindingChan <- b
+					return nil
+				}}
+			},
 			NextPod: func() *v1.Pod {
 				return clientcache.Pop(queuedPodStore).(*v1.Pod)
 			},
@@ -586,11 +604,13 @@ func setupTestSchedulerLongBindingWithRetry(queuedPodStore *clientcache.FIFO, sc
 			SchedulerCache: scache,
 			NodeLister:     nodeLister,
 			Algorithm:      algo,
-			Binder: fakeBinder{func(b *v1.Binding) error {
-				time.Sleep(bindingTime)
-				bindingChan <- b
-				return nil
-			}},
+			GetBinder: func(pod *v1.Pod) Binder {
+				return fakeBinder{func(b *v1.Binding) error {
+					time.Sleep(bindingTime)
+					bindingChan <- b
+					return nil
+				}}
+			},
 			WaitForCacheSync: func() bool {
 				return true
 			},

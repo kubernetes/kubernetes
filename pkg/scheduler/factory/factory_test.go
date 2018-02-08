@@ -17,6 +17,7 @@ limitations under the License.
 package factory
 
 import (
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -532,4 +533,50 @@ func newConfigFactory(client *clientset.Clientset, hardPodAffinitySymmetricWeigh
 		hardPodAffinitySymmetricWeight,
 		enableEquivalenceCache,
 	)
+}
+
+type fakeExtender struct {
+	isBinder          bool
+	interestedPodName string
+}
+
+func (f *fakeExtender) Filter(pod *v1.Pod, nodes []*v1.Node, nodeNameToInfo map[string]*schedulercache.NodeInfo) (filteredNodes []*v1.Node, failedNodesMap schedulerapi.FailedNodesMap, err error) {
+	return nil, nil, nil
+}
+
+func (f *fakeExtender) Prioritize(pod *v1.Pod, nodes []*v1.Node) (hostPriorities *schedulerapi.HostPriorityList, weight int, err error) {
+	return nil, 0, nil
+}
+
+func (f *fakeExtender) Bind(binding *v1.Binding) error {
+	if f.isBinder {
+		return nil
+	}
+	return errors.New("not a binder")
+}
+
+func (f *fakeExtender) IsBinder() bool {
+	return f.isBinder
+}
+
+func (f *fakeExtender) IsInterested(pod *v1.Pod) bool {
+	return pod != nil && pod.Name == f.interestedPodName
+}
+
+func TestGetBinderFunc(t *testing.T) {
+	notBinder, isBinder := &fakeExtender{isBinder: false, interestedPodName: "pod0"}, &fakeExtender{isBinder: true, interestedPodName: "pod0"}
+	f := &configFactory{}
+	// all input extenders are not binder, return binder of BinderFunc should be the default one
+	b := f.getBinderFunc([]algorithm.SchedulerExtender{notBinder})(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod0"}})
+	if _, ok := b.(*binder); !ok {
+		t.Error()
+	}
+	// one of input extenders is a binder, return binder of BinderFunc should be it
+	b = f.getBinderFunc([]algorithm.SchedulerExtender{notBinder, isBinder})(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod0"}})
+	if _, ok := b.(*binder); ok {
+		t.Error()
+	}
+	if err := b.Bind(&v1.Binding{ObjectMeta: metav1.ObjectMeta{Name: "pod0"}}); err != nil {
+		t.Error()
+	}
 }
