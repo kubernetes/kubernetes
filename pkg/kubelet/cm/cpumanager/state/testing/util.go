@@ -30,12 +30,15 @@ func (mc *MockCheckpoint) MarshalCheckpoint() ([]byte, error) {
 	return []byte(mc.Content), nil
 }
 
+// UnmarshalCheckpoint fakes unmarshaling
 func (mc *MockCheckpoint) UnmarshalCheckpoint(blob []byte) error {
 	return nil
 }
 
+// GetChecksum fakes getting checksum
 func (mc *MockCheckpoint) GetChecksum() uint64 {
 	return 0
 }
 
+// UpdateChecksum fakes updating cheksum
 func (mc *MockCheckpoint) UpdateChecksum() {}

@@ -25,14 +25,14 @@ import (
 	hashutil "k8s.io/kubernetes/pkg/util/hash"
 )
 
-var _ checkpointmanager.Checkpoint = &cpuManagerCheckpoint {}
+var _ checkpointmanager.Checkpoint = &cpuManagerCheckpoint{}
 
 // cpuManagerCheckpoint struct is used to store cpu/pod assignments in a checkpoint
 type cpuManagerCheckpoint struct {
-	PolicyName string
+	PolicyName    string
 	DefaultCPUSet string
-	Entries map[string]string
-	Checksum uint64
+	Entries       map[string]string
+	Checksum      uint64
 }
 
 // NewCPUManagerCheckpoint returns an instance of Checkpoint
