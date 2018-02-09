@@ -240,18 +240,18 @@ if [[ -z "${requested_profiles}" ]]; then
   exit 1
 fi
 
-gcloud compute ssh "${server_addr}" --ssh-flag=-nN --ssh-flag=-L${tunnel_port}:localhost:8080 &
+gcloud compute ssh "${server_addr}" --ssh-flag=-nN --ssh-flag=-L"${tunnel_port}":localhost:8080 &
 
 echo "Waiting for tunnel to be created..."
-kube::util::wait_for_url http://localhost:${tunnel_port}/healthz
+kube::util::wait_for_url http://localhost:"${tunnel_port}"/healthz
 
 SSH_PID=$(pgrep -f "/usr/bin/ssh.*${tunnel_port}:localhost:8080")
 kube::util::trap_add "kill $SSH_PID" EXIT
 kube::util::trap_add "kill $SSH_PID" SIGTERM
 
-requested_profiles=$(echo ${requested_profiles} | xargs -n1 | LC_ALL=C sort -u | xargs)
-profile_components=$(echo ${profile_components} | xargs -n1 | LC_ALL=C sort -u | xargs)
-kubelet_addreses=$(echo ${kubelet_addreses} | xargs -n1 | LC_ALL=C sort -u | xargs)
+requested_profiles=$(echo "${requested_profiles}" | xargs -n1 | LC_ALL=C sort -u | xargs)
+profile_components=$(echo "${profile_components}" | xargs -n1 | LC_ALL=C sort -u | xargs)
+kubelet_addreses=$(echo "${kubelet_addreses}" | xargs -n1 | LC_ALL=C sort -u | xargs)
 echo "requested profiles: ${requested_profiles}"
 echo "flags for heap profile: ${mem_pprof_flags}"
 
@@ -291,7 +291,7 @@ for component in ${profile_components}; do
   esac
 
   if [[ "${component}" == "kubelet" ]]; then
-    for node in $(echo ${kubelet_addreses} | sed 's/[,;]/\n/g'); do
+    for node in ${kubelet_addreses//[,;]/' '}; do
       grab_profiles_from_component "${requested_profiles}" "${mem_pprof_flags}" "${binary}" "${tunnel_port}" "${path}/${node}" "${output_dir}/${component}" "${timestamp}"
     done    
   else 
