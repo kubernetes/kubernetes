@@ -49,14 +49,14 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 	defer GinkgoRecover()
 	var (
 		ns               string
-		jig              *framework.IngressTestJig
-		conformanceTests []framework.IngressConformanceTests
+		jig              *IngressTestJig
+		conformanceTests []IngressConformanceTests
 		cloudConfig      framework.CloudConfig
 	)
 	f := framework.NewDefaultFramework("ingress")
 
 	BeforeEach(func() {
-		jig = framework.NewIngressTestJig(f.ClientSet)
+		jig = NewIngressTestJig(f.ClientSet)
 		ns = f.Namespace.Name
 		cloudConfig = framework.TestContext.CloudConfig
 
@@ -79,13 +79,13 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 	// Slow by design ~10m for each "It" block dominated by loadbalancer setup time
 	// TODO: write similar tests for nginx, haproxy and AWS Ingress.
 	Describe("GCE [Slow] [Feature:Ingress]", func() {
-		var gceController *framework.GCEIngressController
+		var gceController *GCEIngressController
 
 		// Platform specific setup
 		BeforeEach(func() {
 			framework.SkipUnlessProviderIs("gce", "gke")
 			By("Initializing gce controller")
-			gceController = &framework.GCEIngressController{
+			gceController = &GCEIngressController{
 				Ns:     ns,
 				Client: jig.Client,
 				Cloud:  framework.TestContext.CloudConfig,
@@ -96,7 +96,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 		// Platform specific cleanup
 		AfterEach(func() {
 			if CurrentGinkgoTestDescription().Failed {
-				framework.DescribeIng(ns)
+				DescribeIng(ns)
 			}
 			if jig.Ingress == nil {
 				By("No ingress created, no cleanup necessary")
@@ -106,11 +106,11 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			jig.TryDeleteIngress()
 
 			By("Cleaning up cloud resources")
-			framework.CleanupGCEIngressController(gceController)
+			CleanupGCEIngressController(gceController)
 		})
 
 		It("should conform to Ingress spec", func() {
-			conformanceTests = framework.CreateIngressComformanceTests(jig, ns, map[string]string{})
+			conformanceTests = CreateIngressComformanceTests(jig, ns, map[string]string{})
 			for _, t := range conformanceTests {
 				By(t.EntryLog)
 				t.Execute()
@@ -124,13 +124,13 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			ip := gceController.CreateStaticIP(ns)
 			By(fmt.Sprintf("allocated static ip %v: %v through the GCE cloud provider", ns, ip))
 
-			jig.CreateIngress(filepath.Join(framework.IngressManifestPath, "static-ip"), ns, map[string]string{
-				framework.IngressStaticIPKey:  ns,
-				framework.IngressAllowHTTPKey: "false",
+			jig.CreateIngress(filepath.Join(IngressManifestPath, "static-ip"), ns, map[string]string{
+				IngressStaticIPKey:  ns,
+				IngressAllowHTTPKey: "false",
 			}, map[string]string{})
 
 			By("waiting for Ingress to come up with ip: " + ip)
-			httpClient := framework.BuildInsecureClient(framework.IngressReqTimeout)
+			httpClient := BuildInsecureClient(IngressReqTimeout)
 			framework.ExpectNoError(framework.PollURL(fmt.Sprintf("https://%v/", ip), "", framework.LoadBalancerPollTimeout, jig.PollInterval, httpClient, false))
 
 			By("should reject HTTP traffic")
@@ -224,7 +224,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			By("Creating a basic HTTP ingress and wait for it to come up")
-			jig.CreateIngress(filepath.Join(framework.IngressManifestPath, "http"), ns, nil, nil)
+			jig.CreateIngress(filepath.Join(IngressManifestPath, "http"), ns, nil, nil)
 			jig.WaitForIngress(true)
 
 			By("Updating the path on ingress and wait for it to take effect")
@@ -252,7 +252,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 
 		It("should not reconcile manually modified health check for ingress", func() {
 			By("Creating a basic HTTP ingress and wait for it to come up.")
-			jig.CreateIngress(filepath.Join(framework.IngressManifestPath, "http"), ns, nil, nil)
+			jig.CreateIngress(filepath.Join(IngressManifestPath, "http"), ns, nil, nil)
 			jig.WaitForIngress(true)
 
 			// Get cluster UID.
@@ -321,7 +321,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			preSharedCertName := "test-pre-shared-cert"
 			By(fmt.Sprintf("Creating ssl certificate %q on GCE", preSharedCertName))
 			testHostname := "test.ingress.com"
-			cert, key, err := framework.GenerateRSACerts(testHostname, true)
+			cert, key, err := GenerateRSACerts(testHostname, true)
 			Expect(err).NotTo(HaveOccurred())
 			gceCloud, err := framework.GetGCECloud()
 			Expect(err).NotTo(HaveOccurred())
@@ -350,9 +350,9 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 
 			By("Creating an ingress referencing the pre-shared certificate")
 			// Create an ingress referencing this cert using pre-shared-cert annotation.
-			jig.CreateIngress(filepath.Join(framework.IngressManifestPath, "pre-shared-cert"), ns, map[string]string{
-				framework.IngressPreSharedCertKey: preSharedCertName,
-				framework.IngressAllowHTTPKey:     "false",
+			jig.CreateIngress(filepath.Join(IngressManifestPath, "pre-shared-cert"), ns, map[string]string{
+				IngressPreSharedCertKey: preSharedCertName,
+				IngressAllowHTTPKey:     "false",
 			}, map[string]string{})
 
 			By("Test that ingress works with the pre-shared certificate")
@@ -361,8 +361,8 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 
 		It("multicluster ingress should get instance group annotation", func() {
 			name := "echomap"
-			jig.CreateIngress(filepath.Join(framework.IngressManifestPath, "http"), ns, map[string]string{
-				framework.IngressClassKey: framework.MulticlusterIngressClassValue,
+			jig.CreateIngress(filepath.Join(IngressManifestPath, "http"), ns, map[string]string{
+				IngressClassKey: MulticlusterIngressClassValue,
 			}, map[string]string{})
 
 			By(fmt.Sprintf("waiting for Ingress %s to come up", name))
@@ -387,13 +387,13 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 	})
 
 	Describe("GCE [Slow] [Feature:NEG]", func() {
-		var gceController *framework.GCEIngressController
+		var gceController *GCEIngressController
 
 		// Platform specific setup
 		BeforeEach(func() {
 			framework.SkipUnlessProviderIs("gce", "gke")
 			By("Initializing gce controller")
-			gceController = &framework.GCEIngressController{
+			gceController = &GCEIngressController{
 				Ns:     ns,
 				Client: jig.Client,
 				Cloud:  framework.TestContext.CloudConfig,
@@ -404,7 +404,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 		// Platform specific cleanup
 		AfterEach(func() {
 			if CurrentGinkgoTestDescription().Failed {
-				framework.DescribeIng(ns)
+				DescribeIng(ns)
 			}
 			if jig.Ingress == nil {
 				By("No ingress created, no cleanup necessary")
@@ -414,12 +414,12 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			jig.TryDeleteIngress()
 
 			By("Cleaning up cloud resources")
-			framework.CleanupGCEIngressController(gceController)
+			CleanupGCEIngressController(gceController)
 		})
 
 		It("should conform to Ingress spec", func() {
 			jig.PollInterval = 5 * time.Second
-			conformanceTests = framework.CreateIngressComformanceTests(jig, ns, map[string]string{
+			conformanceTests = CreateIngressComformanceTests(jig, ns, map[string]string{
 				NEGAnnotation: "true",
 			})
 			for _, t := range conformanceTests {
@@ -436,7 +436,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 		It("should be able to switch between IG and NEG modes", func() {
 			var err error
 			By("Create a basic HTTP ingress using NEG")
-			jig.CreateIngress(filepath.Join(framework.IngressManifestPath, "neg"), ns, map[string]string{}, map[string]string{})
+			jig.CreateIngress(filepath.Join(IngressManifestPath, "neg"), ns, map[string]string{}, map[string]string{})
 			jig.WaitForIngress(true)
 			usingNEG, err := gceController.BackendServiceUsingNEG(jig.GetIngressNodePorts(false))
 			Expect(err).NotTo(HaveOccurred())
@@ -489,7 +489,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			}
 
 			By("Create a basic HTTP ingress using NEG")
-			jig.CreateIngress(filepath.Join(framework.IngressManifestPath, "neg"), ns, map[string]string{}, map[string]string{})
+			jig.CreateIngress(filepath.Join(IngressManifestPath, "neg"), ns, map[string]string{}, map[string]string{})
 			jig.WaitForIngress(true)
 			usingNEG, err := gceController.BackendServiceUsingNEG(jig.GetIngressNodePorts(false))
 			Expect(err).NotTo(HaveOccurred())
@@ -514,7 +514,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			name := "hostname"
 			replicas := 8
 			By("Create a basic HTTP ingress using NEG")
-			jig.CreateIngress(filepath.Join(framework.IngressManifestPath, "neg"), ns, map[string]string{}, map[string]string{})
+			jig.CreateIngress(filepath.Join(IngressManifestPath, "neg"), ns, map[string]string{}, map[string]string{})
 			jig.WaitForIngress(true)
 			usingNEG, err := gceController.BackendServiceUsingNEG(jig.GetIngressNodePorts(false))
 			Expect(err).NotTo(HaveOccurred())
@@ -565,19 +565,19 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 
 	// Time: borderline 5m, slow by design
 	Describe("[Slow] Nginx", func() {
-		var nginxController *framework.NginxIngressController
+		var nginxController *NginxIngressController
 
 		BeforeEach(func() {
 			framework.SkipUnlessProviderIs("gce", "gke")
 			By("Initializing nginx controller")
 			jig.Class = "nginx"
-			nginxController = &framework.NginxIngressController{Ns: ns, Client: jig.Client}
+			nginxController = &NginxIngressController{Ns: ns, Client: jig.Client}
 
 			// TODO: This test may fail on other platforms. We can simply skip it
 			// but we want to allow easy testing where a user might've hand
 			// configured firewalls.
 			if framework.ProviderIs("gce", "gke") {
-				framework.ExpectNoError(framework.GcloudComputeResourceCreate("firewall-rules", fmt.Sprintf("ingress-80-443-%v", ns), framework.TestContext.CloudConfig.ProjectID, "--allow", "tcp:80,tcp:443", "--network", framework.TestContext.CloudConfig.Network))
+				framework.ExpectNoError(GcloudComputeResourceCreate("firewall-rules", fmt.Sprintf("ingress-80-443-%v", ns), framework.TestContext.CloudConfig.ProjectID, "--allow", "tcp:80,tcp:443", "--network", framework.TestContext.CloudConfig.Network))
 			} else {
 				framework.Logf("WARNING: Not running on GCE/GKE, cannot create firewall rules for :80, :443. Assuming traffic can reach the external ips of all nodes in cluster on those ports.")
 			}
@@ -587,10 +587,10 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 
 		AfterEach(func() {
 			if framework.ProviderIs("gce", "gke") {
-				framework.ExpectNoError(framework.GcloudComputeResourceDelete("firewall-rules", fmt.Sprintf("ingress-80-443-%v", ns), framework.TestContext.CloudConfig.ProjectID))
+				framework.ExpectNoError(GcloudComputeResourceDelete("firewall-rules", fmt.Sprintf("ingress-80-443-%v", ns), framework.TestContext.CloudConfig.ProjectID))
 			}
 			if CurrentGinkgoTestDescription().Failed {
-				framework.DescribeIng(ns)
+				DescribeIng(ns)
 			}
 			if jig.Ingress == nil {
 				By("No ingress created, no cleanup necessary")
@@ -604,7 +604,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			// Poll more frequently to reduce e2e completion time.
 			// This test runs in presubmit.
 			jig.PollInterval = 5 * time.Second
-			conformanceTests = framework.CreateIngressComformanceTests(jig, ns, map[string]string{})
+			conformanceTests = CreateIngressComformanceTests(jig, ns, map[string]string{})
 			for _, t := range conformanceTests {
 				By(t.EntryLog)
 				t.Execute()

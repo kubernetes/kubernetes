@@ -16,6 +16,7 @@ go_library(
         "firewall.go",
         "framework.go",
         "ingress.go",
+        "ingress_utils.go",
         "kube_proxy.go",
         "network_policy.go",
         "network_tiers.go",
@@ -38,6 +39,7 @@ go_library(
         "//pkg/controller/endpoint:go_default_library",
         "//pkg/kubelet/apis:go_default_library",
         "//pkg/master/ports:go_default_library",
+        "//pkg/util/file:go_default_library",
         "//test/e2e/framework:go_default_library",
         "//test/e2e/manifest:go_default_library",
         "//test/images/net/nat:go_default_library",
@@ -47,6 +49,7 @@ go_library(
         "//vendor/github.com/onsi/gomega:go_default_library",
         "//vendor/google.golang.org/api/compute/v0.alpha:go_default_library",
         "//vendor/google.golang.org/api/compute/v1:go_default_library",
+        "//vendor/google.golang.org/api/googleapi:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/api/extensions/v1beta1:go_default_library",
         "//vendor/k8s.io/api/networking/v1:go_default_library",
@@ -68,6 +71,7 @@ go_library(
         "//vendor/k8s.io/client-go/rest:go_default_library",
         "//vendor/k8s.io/client-go/tools/cache:go_default_library",
         "//vendor/k8s.io/client-go/util/flowcontrol:go_default_library",
+        "//vendor/k8s.io/utils/exec:go_default_library",
     ],
 )
 
