@@ -49,7 +49,7 @@ resources:
           secret: dGhpcyBpcyBwYXNzd29yZA==
     - kms:
         name: testprovider
-        endpoint: /tmp/testprovider.sock
+        endpoint: unix:///tmp/testprovider.sock
         cachesize: 10
     - aescbc:
         keys:
@@ -82,7 +82,7 @@ resources:
           secret: YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXoxMjM0NTY=
     - kms:
         name: testprovider
-        endpoint: /tmp/testprovider.sock
+        endpoint: unix:///tmp/testprovider.sock
         cachesize: 10
     - aescbc:
         keys:
@@ -108,7 +108,7 @@ resources:
           secret: dGhpcyBpcyBwYXNzd29yZA==
     - kms:
         name: testprovider
-        endpoint: /tmp/testprovider.sock
+        endpoint: unix:///tmp/testprovider.sock
         cachesize: 10
     - identity: {}
     - secretbox:
@@ -142,7 +142,7 @@ resources:
           secret: dGhpcyBpcyBwYXNzd29yZA==
     - kms:
         name: testprovider
-        endpoint: /tmp/testprovider.sock
+        endpoint: unix:///tmp/testprovider.sock
         cachesize: 10
     - identity: {}
     - aesgcm:
@@ -162,7 +162,7 @@ resources:
     providers:
     - kms:
         name: testprovider
-        endpoint: /tmp/testprovider.sock
+        endpoint: unix:///tmp/testprovider.sock
         cachesize: 10
     - secretbox:
         keys:
