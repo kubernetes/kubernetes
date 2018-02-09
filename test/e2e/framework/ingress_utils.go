@@ -35,6 +35,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/golang/glog"
+
 	compute "google.golang.org/api/compute/v1"
 	"google.golang.org/api/googleapi"
 	"k8s.io/api/core/v1"
@@ -114,19 +116,29 @@ const (
 	nameLenLimit = 62
 )
 
-// IngressTestJig holds the relevant state and parameters of the ingress test.
-type IngressTestJig struct {
-	Client  clientset.Interface
-	RootCAs map[string][]byte
-	Address string
-	Ingress *extensions.Ingress
-	// class is the value of the annotation keyed under
-	// `kubernetes.io/ingress.class`. It's added to all ingresses created by
-	// this jig.
-	Class string
+type TestLogger interface {
+	Infof(format string, args ...interface{})
+	Errorf(format string, args ...interface{})
+}
 
-	// The interval used to poll urls
-	PollInterval time.Duration
+type GLogger struct{}
+
+func (l *GLogger) Infof(format string, args ...interface{}) {
+	glog.Infof(format, args...)
+}
+
+func (l *GLogger) Errorf(format string, args ...interface{}) {
+	glog.Errorf(format, args...)
+}
+
+type E2ELogger struct{}
+
+func (l *E2ELogger) Infof(format string, args ...interface{}) {
+	Logf(format, args...)
+}
+
+func (l *E2ELogger) Errorf(format string, args ...interface{}) {
+	Logf(format, args...)
 }
 
 // IngressConformanceTests contains a closure with an entry and exit log line.
@@ -302,12 +314,11 @@ func BuildInsecureClient(timeout time.Duration) *http.Client {
 	return &http.Client{Timeout: timeout, Transport: utilnet.SetTransportDefaults(t)}
 }
 
-// createIngressTLSSecret creates a secret containing TLS certificates for the given Ingress.
+// createTLSSecret creates a secret containing TLS certificates.
 // If a secret with the same name already pathExists in the namespace of the
 // Ingress, it's updated.
-func createIngressTLSSecret(kubeClient clientset.Interface, ing *extensions.Ingress) (host string, rootCA, privKey []byte, err error) {
-	tls := ing.Spec.TLS[0]
-	host = strings.Join(tls.Hosts, ",")
+func createTLSSecret(kubeClient clientset.Interface, namespace, secretName string, hosts ...string) (host string, rootCA, privKey []byte, err error) {
+	host = strings.Join(hosts, ",")
 	Logf("Generating RSA cert for host %v", host)
 	cert, key, err := GenerateRSACerts(host, true)
 	if err != nil {
@@ -315,7 +326,7 @@ func createIngressTLSSecret(kubeClient clientset.Interface, ing *extensions.Ingr
 	}
 	secret := &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: tls.SecretName,
+			Name: secretName,
 		},
 		Data: map[string][]byte{
 			v1.TLSCertKey:       cert,
@@ -323,23 +334,39 @@ func createIngressTLSSecret(kubeClient clientset.Interface, ing *extensions.Ingr
 		},
 	}
 	var s *v1.Secret
-	if s, err = kubeClient.CoreV1().Secrets(ing.Namespace).Get(tls.SecretName, metav1.GetOptions{}); err == nil {
+	if s, err = kubeClient.CoreV1().Secrets(namespace).Get(secretName, metav1.GetOptions{}); err == nil {
 		// TODO: Retry the update. We don't really expect anything to conflict though.
-		Logf("Updating secret %v in ns %v with hosts %v for ingress %v", secret.Name, secret.Namespace, host, ing.Name)
+		Logf("Updating secret %v in ns %v with hosts %v", secret.Name, namespace, host)
 		s.Data = secret.Data
-		_, err = kubeClient.CoreV1().Secrets(ing.Namespace).Update(s)
+		_, err = kubeClient.CoreV1().Secrets(namespace).Update(s)
 	} else {
-		Logf("Creating secret %v in ns %v with hosts %v for ingress %v", secret.Name, secret.Namespace, host, ing.Name)
-		_, err = kubeClient.CoreV1().Secrets(ing.Namespace).Create(secret)
+		Logf("Creating secret %v in ns %v with hosts %v", secret.Name, namespace, host)
+		_, err = kubeClient.CoreV1().Secrets(namespace).Create(secret)
 	}
 	return host, cert, key, err
 }
 
-// CleanupGCEIngressController calls the GCEIngressController.Cleanup(false)
+// GCEIngressController manages implementation details of Ingress on GCE/GKE.
+type GCEIngressController struct {
+	Ns           string
+	rcPath       string
+	UID          string
+	staticIPName string
+	rc           *v1.ReplicationController
+	svc          *v1.Service
+	Client       clientset.Interface
+	Cloud        CloudConfig
+}
+
+func (cont *GCEIngressController) CleanupGCEIngressController() error {
+	return cont.CleanupGCEIngressControllerWithTimeout(LoadBalancerCleanupTimeout)
+}
+
+// CleanupGCEIngressControllerWithTimeout calls the GCEIngressController.Cleanup(false)
 // followed with deleting the static ip, and then a final GCEIngressController.Cleanup(true)
-func CleanupGCEIngressController(gceController *GCEIngressController) {
-	pollErr := wait.Poll(5*time.Second, LoadBalancerCleanupTimeout, func() (bool, error) {
-		if err := gceController.Cleanup(false); err != nil {
+func (cont *GCEIngressController) CleanupGCEIngressControllerWithTimeout(timeout time.Duration) error {
+	pollErr := wait.Poll(5*time.Second, timeout, func() (bool, error) {
+		if err := cont.Cleanup(false); err != nil {
 			Logf("Monitoring glbc's cleanup of gce resources:\n%v", err)
 			return false, nil
 		}
@@ -349,7 +376,7 @@ func CleanupGCEIngressController(gceController *GCEIngressController) {
 	// Always try to cleanup even if pollErr == nil, because the cleanup
 	// routine also purges old leaked resources based on creation timestamp.
 	By("Performing final delete of any remaining resources")
-	if cleanupErr := gceController.Cleanup(true); cleanupErr != nil {
+	if cleanupErr := cont.Cleanup(true); cleanupErr != nil {
 		By(fmt.Sprintf("WARNING: possibly leaked resources: %v\n", cleanupErr))
 	} else {
 		By("No resources leaked.")
@@ -360,7 +387,7 @@ func CleanupGCEIngressController(gceController *GCEIngressController) {
 	// to cleanup or it might interfere with the controller, causing it to
 	// throw out confusing events.
 	if ipErr := wait.Poll(5*time.Second, 1*time.Minute, func() (bool, error) {
-		if err := gceController.deleteStaticIPs(); err != nil {
+		if err := cont.deleteStaticIPs(); err != nil {
 			Logf("Failed to delete static-ip: %v\n", err)
 			return false, nil
 		}
@@ -374,8 +401,21 @@ func CleanupGCEIngressController(gceController *GCEIngressController) {
 	// Logging that the GLBC failed to cleanup GCE resources on ingress deletion
 	// See kubernetes/ingress#431
 	if pollErr != nil {
-		Logf("error: L7 controller failed to delete all cloud resources on time. %v", pollErr)
+		return fmt.Errorf("error: L7 controller failed to delete all cloud resources on time. %v", pollErr)
 	}
+	return nil
+}
+
+func (cont *GCEIngressController) getL7AddonUID() (string, error) {
+	Logf("Retrieving UID from config map: %v/%v", metav1.NamespaceSystem, uidConfigMap)
+	cm, err := cont.Client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(uidConfigMap, metav1.GetOptions{})
+	if err != nil {
+		return "", err
+	}
+	if uid, ok := cm.Data[uidKey]; ok {
+		return uid, nil
+	}
+	return "", fmt.Errorf("Could not find cluster UID for L7 addon pod")
 }
 
 func (cont *GCEIngressController) ListGlobalForwardingRules() []*compute.ForwardingRule {
@@ -905,9 +945,11 @@ func (cont *GCEIngressController) Cleanup(del bool) error {
 }
 
 // Init initializes the GCEIngressController with an UID
-func (cont *GCEIngressController) Init() {
+func (cont *GCEIngressController) Init() error {
 	uid, err := cont.getL7AddonUID()
-	Expect(err).NotTo(HaveOccurred())
+	if err != nil {
+		return err
+	}
 	cont.UID = uid
 	// There's a name limit imposed by GCE. The controller will truncate.
 	testName := fmt.Sprintf("k8s-fw-foo-app-X-%v--%v", cont.Ns, cont.UID)
@@ -916,6 +958,7 @@ func (cont *GCEIngressController) Init() {
 	} else {
 		Logf("Detected cluster UID %v", cont.UID)
 	}
+	return nil
 }
 
 // CreateStaticIP allocates a random static ip with the given name. Returns a string
@@ -1017,6 +1060,33 @@ func GcloudComputeResourceCreate(resource, name, project string, args ...string)
 	return err
 }
 
+// IngressTestJig holds the relevant state and parameters of the ingress test.
+type IngressTestJig struct {
+	Client clientset.Interface
+	Logger TestLogger
+
+	RootCAs map[string][]byte
+	Address string
+	Ingress *extensions.Ingress
+	// class is the value of the annotation keyed under
+	// `kubernetes.io/ingress.class`. It's added to all ingresses created by
+	// this jig.
+	Class string
+
+	// The interval used to poll urls
+	PollInterval time.Duration
+}
+
+// NewIngressTestJig instantiates struct with client
+func NewIngressTestJig(c clientset.Interface) *IngressTestJig {
+	return &IngressTestJig{
+		Client:       c,
+		RootCAs:      map[string][]byte{},
+		PollInterval: LoadBalancerPollInterval,
+		Logger:       &E2ELogger{},
+	}
+}
+
 // CreateIngress creates the Ingress and associated service/rc.
 // Required: ing.yaml, rc.yaml, svc.yaml must exist in manifestPath
 // Optional: secret.yaml, ingAnnotations
@@ -1028,10 +1098,10 @@ func (j *IngressTestJig) CreateIngress(manifestPath, ns string, ingAnnotations m
 		return filepath.Join(TestContext.RepoRoot, manifestPath, file)
 	}
 
-	Logf("creating replication controller")
+	j.Logger.Infof("creating replication controller")
 	RunKubectlOrDie("create", "-f", mkpath("rc.yaml"), fmt.Sprintf("--namespace=%v", ns))
 
-	Logf("creating service")
+	j.Logger.Infof("creating service")
 	RunKubectlOrDie("create", "-f", mkpath("svc.yaml"), fmt.Sprintf("--namespace=%v", ns))
 	if len(svcAnnotations) > 0 {
 		svcList, err := j.Client.CoreV1().Services(ns).List(metav1.ListOptions{})
@@ -1044,10 +1114,10 @@ func (j *IngressTestJig) CreateIngress(manifestPath, ns string, ingAnnotations m
 	}
 
 	if exists, _ := utilfile.FileExists(mkpath("secret.yaml")); exists {
-		Logf("creating secret")
+		j.Logger.Infof("creating secret")
 		RunKubectlOrDie("create", "-f", mkpath("secret.yaml"), fmt.Sprintf("--namespace=%v", ns))
 	}
-	Logf("Parsing ingress from %v", filepath.Join(manifestPath, "ing.yaml"))
+	j.Logger.Infof("Parsing ingress from %v", filepath.Join(manifestPath, "ing.yaml"))
 
 	j.Ingress, err = manifest.IngressFromManifest(filepath.Join(manifestPath, "ing.yaml"))
 	ExpectNoError(err)
@@ -1056,7 +1126,7 @@ func (j *IngressTestJig) CreateIngress(manifestPath, ns string, ingAnnotations m
 	for k, v := range ingAnnotations {
 		j.Ingress.Annotations[k] = v
 	}
-	Logf(fmt.Sprintf("creating" + j.Ingress.Name + " ingress"))
+	j.Logger.Infof(fmt.Sprintf("creating" + j.Ingress.Name + " ingress"))
 	j.Ingress, err = j.Client.ExtensionsV1beta1().Ingresses(ns).Create(j.Ingress)
 	ExpectNoError(err)
 }
@@ -1088,13 +1158,23 @@ func (j *IngressTestJig) AddHTTPS(secretName string, hosts ...string) {
 	j.Ingress.Spec.TLS = []extensions.IngressTLS{{Hosts: hosts, SecretName: secretName}}
 	// TODO: Just create the secret in GetRootCAs once we're watching secrets in
 	// the ingress controller.
-	_, cert, _, err := createIngressTLSSecret(j.Client, j.Ingress)
+	_, cert, _, err := createTLSSecret(j.Client, j.Ingress.Namespace, secretName, hosts...)
 	ExpectNoError(err)
-	Logf("Updating ingress %v to use secret %v for TLS termination", j.Ingress.Name, secretName)
+	j.Logger.Infof("Updating ingress %v to use secret %v for TLS termination", j.Ingress.Name, secretName)
 	j.Update(func(ing *extensions.Ingress) {
 		ing.Spec.TLS = []extensions.IngressTLS{{Hosts: hosts, SecretName: secretName}}
 	})
 	j.RootCAs[secretName] = cert
+}
+
+// PrepareTLSSecret creates a TLS secret and caches the cert.
+func (j *IngressTestJig) PrepareTLSSecret(namespace, secretName string, hosts ...string) error {
+	_, cert, _, err := createTLSSecret(j.Client, namespace, secretName, hosts...)
+	if err != nil {
+		return err
+	}
+	j.RootCAs[secretName] = cert
+	return nil
 }
 
 // GetRootCA returns a rootCA from the ingress test jig.
@@ -1109,9 +1189,20 @@ func (j *IngressTestJig) GetRootCA(secretName string) (rootCA []byte) {
 
 // TryDeleteIngress attempts to delete the ingress resource and logs errors if they occur.
 func (j *IngressTestJig) TryDeleteIngress() {
-	err := j.Client.ExtensionsV1beta1().Ingresses(j.Ingress.Namespace).Delete(j.Ingress.Name, nil)
+	j.TryDeleteGivenIngress(j.Ingress)
+}
+
+func (j *IngressTestJig) TryDeleteGivenIngress(ing *extensions.Ingress) {
+	err := j.Client.ExtensionsV1beta1().Ingresses(ing.Namespace).Delete(ing.Name, nil)
 	if err != nil {
-		Logf("Error while deleting the ingress %v/%v: %v", j.Ingress.Namespace, j.Ingress.Name, err)
+		j.Logger.Infof("Error while deleting the ingress %v/%v: %v", ing.Namespace, ing.Name, err)
+	}
+}
+
+func (j *IngressTestJig) TryDeleteGivenService(svc *v1.Service) {
+	err := j.Client.CoreV1().Services(svc.Namespace).Delete(svc.Name, nil)
+	if err != nil {
+		j.Logger.Infof("Error while deleting the service %v/%v: %v", svc.Namespace, svc.Name, err)
 	}
 }
 
@@ -1134,12 +1225,12 @@ func getIngressAddress(client clientset.Interface, ns, name string) ([]string, e
 }
 
 // WaitForIngressAddress waits for the Ingress to acquire an address.
-func WaitForIngressAddress(c clientset.Interface, ns, ingName string, timeout time.Duration) (string, error) {
+func (j *IngressTestJig) WaitForIngressAddress(c clientset.Interface, ns, ingName string, timeout time.Duration) (string, error) {
 	var address string
 	err := wait.PollImmediate(10*time.Second, timeout, func() (bool, error) {
 		ipOrNameList, err := getIngressAddress(c, ns, ingName)
 		if err != nil || len(ipOrNameList) == 0 {
-			Logf("Waiting for Ingress %v to acquire IP, error %v", ingName, err)
+			j.Logger.Errorf("Waiting for Ingress %v to acquire IP, error %v", ingName, err)
 			if IsRetryableAPIError(err) {
 				return false, nil
 			}
@@ -1151,52 +1242,62 @@ func WaitForIngressAddress(c clientset.Interface, ns, ingName string, timeout ti
 	return address, err
 }
 
-func (j *IngressTestJig) PollIngressWithCert(waitForNodePort bool, knownHosts []string, cert []byte) {
+func (j *IngressTestJig) pollIngressWithCert(ing *extensions.Ingress, address string, knownHosts []string, cert []byte, waitForNodePort bool, timeout time.Duration) error {
 	// Check that all rules respond to a simple GET.
 	knownHostsSet := sets.NewString(knownHosts...)
-	for _, rules := range j.Ingress.Spec.Rules {
+	for _, rules := range ing.Spec.Rules {
 		timeoutClient := &http.Client{Timeout: IngressReqTimeout}
 		proto := "http"
 		if knownHostsSet.Has(rules.Host) {
 			var err error
 			// Create transport with cert to verify if the server uses the correct one.
 			timeoutClient.Transport, err = buildTransportWithCA(rules.Host, cert)
-			ExpectNoError(err)
+			if err != nil {
+				return err
+			}
 			proto = "https"
 		}
 		for _, p := range rules.IngressRuleValue.HTTP.Paths {
 			if waitForNodePort {
-				j.pollServiceNodePort(j.Ingress.Namespace, p.Backend.ServiceName, int(p.Backend.ServicePort.IntVal))
+				if err := j.pollServiceNodePort(ing.Namespace, p.Backend.ServiceName, int(p.Backend.ServicePort.IntVal)); err != nil {
+					return err
+				}
 			}
-			route := fmt.Sprintf("%v://%v%v", proto, j.Address, p.Path)
-			Logf("Testing route %v host %v with simple GET", route, rules.Host)
-			ExpectNoError(PollURL(route, rules.Host, LoadBalancerPollTimeout, j.PollInterval, timeoutClient, false))
+			route := fmt.Sprintf("%v://%v%v", proto, address, p.Path)
+			j.Logger.Infof("Testing route %v host %v with simple GET", route, rules.Host)
+			if err := PollURL(route, rules.Host, timeout, j.PollInterval, timeoutClient, false); err != nil {
+				return err
+			}
 		}
 	}
-	Logf("Finished polling on all rules on ingress %q", j.Ingress.Name)
+	j.Logger.Infof("Finished polling on all rules on ingress %q", ing.Name)
+	return nil
 }
 
-// WaitForIngress waits till the ingress acquires an IP, then waits for its
-// hosts/urls to respond to a protocol check (either http or https). If
-// waitForNodePort is true, the NodePort of the Service is verified before
-// verifying the Ingress. NodePort is currently a requirement for cloudprovider
-// Ingress.
 func (j *IngressTestJig) WaitForIngress(waitForNodePort bool) {
+	j.WaitForGivenIngressWithTimeout(j.Ingress, waitForNodePort, LoadBalancerPollTimeout)
+}
+
+// WaitForGivenIngressWithTimeout waits till the ingress acquires an IP,
+// then waits for its hosts/urls to respond to a protocol check (either
+// http or https). If waitForNodePort is true, the NodePort of the Service
+// is verified before verifying the Ingress. NodePort is currently a
+// requirement for cloudprovider Ingress.
+func (j *IngressTestJig) WaitForGivenIngressWithTimeout(ing *extensions.Ingress, waitForNodePort bool, timeout time.Duration) error {
 	// Wait for the loadbalancer IP.
-	address, err := WaitForIngressAddress(j.Client, j.Ingress.Namespace, j.Ingress.Name, LoadBalancerPollTimeout)
+	address, err := j.WaitForIngressAddress(j.Client, ing.Namespace, ing.Name, timeout)
 	if err != nil {
-		Failf("Ingress failed to acquire an IP address within %v", LoadBalancerPollTimeout)
+		return fmt.Errorf("Ingress failed to acquire an IP address within %v", timeout)
 	}
-	j.Address = address
-	Logf("Found address %v for ingress %v", j.Address, j.Ingress.Name)
+	j.Logger.Infof("Found address %v for ingress %v", address, ing.Name)
 
 	var knownHosts []string
 	var cert []byte
-	if len(j.Ingress.Spec.TLS) > 0 {
-		knownHosts = j.Ingress.Spec.TLS[0].Hosts
-		cert = j.GetRootCA(j.Ingress.Spec.TLS[0].SecretName)
+	if len(ing.Spec.TLS) > 0 {
+		knownHosts = ing.Spec.TLS[0].Hosts
+		cert = j.GetRootCA(ing.Spec.TLS[0].SecretName)
 	}
-	j.PollIngressWithCert(waitForNodePort, knownHosts, cert)
+	return j.pollIngressWithCert(ing, address, knownHosts, cert, waitForNodePort, timeout)
 }
 
 // WaitForIngress waits till the ingress acquires an IP, then waits for its
@@ -1204,16 +1305,15 @@ func (j *IngressTestJig) WaitForIngress(waitForNodePort bool) {
 // waitForNodePort is true, the NodePort of the Service is verified before
 // verifying the Ingress. NodePort is currently a requirement for cloudprovider
 // Ingress. Hostnames and certificate need to be explicitly passed in.
-func (j *IngressTestJig) WaitForIngressWithCert(waitForNodePort bool, knownHosts []string, cert []byte) {
+func (j *IngressTestJig) WaitForIngressWithCert(waitForNodePort bool, knownHosts []string, cert []byte) error {
 	// Wait for the loadbalancer IP.
-	address, err := WaitForIngressAddress(j.Client, j.Ingress.Namespace, j.Ingress.Name, LoadBalancerPollTimeout)
+	address, err := j.WaitForIngressAddress(j.Client, j.Ingress.Namespace, j.Ingress.Name, LoadBalancerPollTimeout)
 	if err != nil {
-		Failf("Ingress failed to acquire an IP address within %v", LoadBalancerPollTimeout)
+		return fmt.Errorf("Ingress failed to acquire an IP address within %v", LoadBalancerPollTimeout)
 	}
-	j.Address = address
-	Logf("Found address %v for ingress %v", j.Address, j.Ingress.Name)
+	j.Logger.Infof("Found address %v for ingress %v", address, j.Ingress.Name)
 
-	j.PollIngressWithCert(waitForNodePort, knownHosts, cert)
+	return j.pollIngressWithCert(j.Ingress, address, knownHosts, cert, waitForNodePort, LoadBalancerPollTimeout)
 }
 
 // VerifyURL polls for the given iterations, in intervals, and fails if the
@@ -1225,17 +1325,19 @@ func (j *IngressTestJig) VerifyURL(route, host string, iterations int, interval 
 			Logf(b)
 			return err
 		}
-		Logf("Verfied %v with host %v %d times, sleeping for %v", route, host, i, interval)
+		j.Logger.Infof("Verfied %v with host %v %d times, sleeping for %v", route, host, i, interval)
 		time.Sleep(interval)
 	}
 	return nil
 }
 
-func (j *IngressTestJig) pollServiceNodePort(ns, name string, port int) {
+func (j *IngressTestJig) pollServiceNodePort(ns, name string, port int) error {
 	// TODO: Curl all nodes?
 	u, err := GetNodePortURL(j.Client, ns, name, port)
-	ExpectNoError(err)
-	ExpectNoError(PollURL(u, "", 30*time.Second, j.PollInterval, &http.Client{Timeout: IngressReqTimeout}, false))
+	if err != nil {
+		return err
+	}
+	return PollURL(u, "", 30*time.Second, j.PollInterval, &http.Client{Timeout: IngressReqTimeout}, false)
 }
 
 func (j *IngressTestJig) GetDefaultBackendNodePort() (int32, error) {
@@ -1294,7 +1396,7 @@ func (j *IngressTestJig) ConstructFirewallForIngress(gceController *GCEIngressCo
 // GetDistinctResponseFromIngress tries GET call to the ingress VIP and return all distinct responses.
 func (j *IngressTestJig) GetDistinctResponseFromIngress() (sets.String, error) {
 	// Wait for the loadbalancer IP.
-	address, err := WaitForIngressAddress(j.Client, j.Ingress.Namespace, j.Ingress.Name, LoadBalancerPollTimeout)
+	address, err := j.WaitForIngressAddress(j.Client, j.Ingress.Namespace, j.Ingress.Name, LoadBalancerPollTimeout)
 	if err != nil {
 		Failf("Ingress failed to acquire an IP address within %v", LoadBalancerPollTimeout)
 	}
@@ -1305,41 +1407,12 @@ func (j *IngressTestJig) GetDistinctResponseFromIngress() (sets.String, error) {
 		url := fmt.Sprintf("http://%v", address)
 		res, err := SimpleGET(timeoutClient, url, "")
 		if err != nil {
-			Logf("Failed to GET %q. Got responses: %q: %v", url, res, err)
+			j.Logger.Errorf("Failed to GET %q. Got responses: %q: %v", url, res, err)
 			return responses, err
 		}
 		responses.Insert(res)
 	}
 	return responses, nil
-}
-
-func (cont *GCEIngressController) getL7AddonUID() (string, error) {
-	Logf("Retrieving UID from config map: %v/%v", metav1.NamespaceSystem, uidConfigMap)
-	cm, err := cont.Client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(uidConfigMap, metav1.GetOptions{})
-	if err != nil {
-		return "", err
-	}
-	if uid, ok := cm.Data[uidKey]; ok {
-		return uid, nil
-	}
-	return "", fmt.Errorf("Could not find cluster UID for L7 addon pod")
-}
-
-// GCEIngressController manages implementation details of Ingress on GCE/GKE.
-type GCEIngressController struct {
-	Ns           string
-	rcPath       string
-	UID          string
-	staticIPName string
-	rc           *v1.ReplicationController
-	svc          *v1.Service
-	Client       clientset.Interface
-	Cloud        CloudConfig
-}
-
-// NewIngressTestJig instantiates struct with client
-func NewIngressTestJig(c clientset.Interface) *IngressTestJig {
-	return &IngressTestJig{Client: c, RootCAs: map[string][]byte{}, PollInterval: LoadBalancerPollInterval}
 }
 
 // NginxIngressController manages implementation details of Ingress on Nginx.

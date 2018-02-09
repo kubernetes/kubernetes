@@ -81,7 +81,7 @@ func (t *IngressUpgradeTest) Setup(f *framework.Framework) {
 		Client: jig.Client,
 		Cloud:  framework.TestContext.CloudConfig,
 	}
-	gceController.Init()
+	framework.ExpectNoError(gceController.Init())
 
 	t.gceController = gceController
 	t.jig = jig
@@ -142,7 +142,7 @@ func (t *IngressUpgradeTest) Teardown(f *framework.Framework) {
 	}
 
 	By("Cleaning up cloud resources")
-	framework.CleanupGCEIngressController(t.gceController)
+	framework.ExpectNoError(t.gceController.CleanupGCEIngressController())
 }
 
 func (t *IngressUpgradeTest) verify(f *framework.Framework, done <-chan struct{}, testDuringDisruption bool) {
