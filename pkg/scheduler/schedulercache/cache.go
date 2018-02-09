@@ -257,7 +257,7 @@ func (cache *schedulerCache) AddPod(pod *v1.Pod) error {
 		}
 		cache.podStates[key] = ps
 	default:
-		return fmt.Errorf("pod %v was already in added state.", key)
+		return fmt.Errorf("pod %v was already in added state", key)
 	}
 	return nil
 }

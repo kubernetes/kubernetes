@@ -48,25 +48,44 @@ import (
 )
 
 const (
-	MatchInterPodAffinityPred           = "MatchInterPodAffinity"
-	CheckVolumeBindingPred              = "CheckVolumeBinding"
-	CheckNodeConditionPred              = "CheckNodeCondition"
-	GeneralPred                         = "GeneralPredicates"
-	HostNamePred                        = "HostName"
-	PodFitsHostPortsPred                = "PodFitsHostPorts"
-	MatchNodeSelectorPred               = "MatchNodeSelector"
-	PodFitsResourcesPred                = "PodFitsResources"
-	NoDiskConflictPred                  = "NoDiskConflict"
-	PodToleratesNodeTaintsPred          = "PodToleratesNodeTaints"
+	// MatchInterPodAffinityPred defines the name of predicate MatchInterPodAffinity.
+	MatchInterPodAffinityPred = "MatchInterPodAffinity"
+	// CheckVolumeBindingPred defines the name of predicate CheckVolumeBinding.
+	CheckVolumeBindingPred = "CheckVolumeBinding"
+	// CheckNodeConditionPred defines the name of predicate CheckNodeCondition.
+	CheckNodeConditionPred = "CheckNodeCondition"
+	// GeneralPred defines the name of predicate GeneralPredicates.
+	GeneralPred = "GeneralPredicates"
+	// HostNamePred defines the name of predicate HostName.
+	HostNamePred = "HostName"
+	// PodFitsHostPortsPred defines the name of predicate PodFitsHostPorts.
+	PodFitsHostPortsPred = "PodFitsHostPorts"
+	// MatchNodeSelectorPred defines the name of predicate MatchNodeSelector.
+	MatchNodeSelectorPred = "MatchNodeSelector"
+	// PodFitsResourcesPred defines the name of predicate PodFitsResources.
+	PodFitsResourcesPred = "PodFitsResources"
+	// NoDiskConflictPred defines the name of predicate NoDiskConflict.
+	NoDiskConflictPred = "NoDiskConflict"
+	// PodToleratesNodeTaintsPred defines the name of predicate PodToleratesNodeTaints.
+	PodToleratesNodeTaintsPred = "PodToleratesNodeTaints"
+	// PodToleratesNodeNoExecuteTaintsPred defines the name of predicate PodToleratesNodeNoExecuteTaints.
 	PodToleratesNodeNoExecuteTaintsPred = "PodToleratesNodeNoExecuteTaints"
-	CheckNodeLabelPresencePred          = "CheckNodeLabelPresence"
-	checkServiceAffinityPred            = "checkServiceAffinity"
-	MaxEBSVolumeCountPred               = "MaxEBSVolumeCount"
-	MaxGCEPDVolumeCountPred             = "MaxGCEPDVolumeCount"
-	MaxAzureDiskVolumeCountPred         = "MaxAzureDiskVolumeCount"
-	NoVolumeZoneConflictPred            = "NoVolumeZoneConflict"
-	CheckNodeMemoryPressurePred         = "CheckNodeMemoryPressure"
-	CheckNodeDiskPressurePred           = "CheckNodeDiskPressure"
+	// CheckNodeLabelPresencePred defines the name of predicate CheckNodeLabelPresence.
+	CheckNodeLabelPresencePred = "CheckNodeLabelPresence"
+	// checkServiceAffinityPred defines the name of predicate checkServiceAffinity.
+	checkServiceAffinityPred = "checkServiceAffinity"
+	// MaxEBSVolumeCountPred defines the name of predicate MaxEBSVolumeCount.
+	MaxEBSVolumeCountPred = "MaxEBSVolumeCount"
+	// MaxGCEPDVolumeCountPred defines the name of predicate MaxGCEPDVolumeCount.
+	MaxGCEPDVolumeCountPred = "MaxGCEPDVolumeCount"
+	// MaxAzureDiskVolumeCountPred defines the name of predicate MaxAzureDiskVolumeCount.
+	MaxAzureDiskVolumeCountPred = "MaxAzureDiskVolumeCount"
+	// NoVolumeZoneConflictPred defines the name of predicate NoVolumeZoneConflict.
+	NoVolumeZoneConflictPred = "NoVolumeZoneConflict"
+	// CheckNodeMemoryPressurePred defines the name of predicate CheckNodeMemoryPressure.
+	CheckNodeMemoryPressurePred = "CheckNodeMemoryPressure"
+	// CheckNodeDiskPressurePred defines the name of predicate CheckNodeDiskPressure.
+	CheckNodeDiskPressurePred = "CheckNodeDiskPressure"
 
 	// DefaultMaxEBSVolumes is the limit for volumes attached to an instance.
 	// Amazon recommends no more than 40; the system root volume uses at least one.
@@ -83,11 +102,11 @@ const (
 	// KubeMaxPDVols defines the maximum number of PD Volumes per kubelet
 	KubeMaxPDVols = "KUBE_MAX_PD_VOLS"
 
-	// for EBSVolumeFilter
+	// EBSVolumeFilterType defines the filter name for EBSVolumeFilter.
 	EBSVolumeFilterType = "EBS"
-	// for GCEPDVolumeFilter
+	// GCEPDVolumeFilterType defines the filter name for GCEPDVolumeFilter.
 	GCEPDVolumeFilterType = "GCE"
-	// for AzureDiskVolumeFilter
+	// AzureDiskVolumeFilterType defines the filter name for AzureDiskVolumeFilter.
 	AzureDiskVolumeFilterType = "AzureDisk"
 )
 
@@ -114,11 +133,12 @@ var (
 		CheckNodeMemoryPressurePred, CheckNodeDiskPressurePred, MatchInterPodAffinityPred}
 )
 
-// NodeInfo: Other types for predicate functions...
+// NodeInfo interface represents anything that can get node object from node ID.
 type NodeInfo interface {
 	GetNodeInfo(nodeID string) (*v1.Node, error)
 }
 
+// PersistentVolumeInfo interface represents anything that can get persistent volume object by PV ID.
 type PersistentVolumeInfo interface {
 	GetPersistentVolumeInfo(pvID string) (*v1.PersistentVolume, error)
 }
@@ -128,18 +148,23 @@ type CachedPersistentVolumeInfo struct {
 	corelisters.PersistentVolumeLister
 }
 
-func PredicatesOrdering() []string {
+// Ordering returns the ordering of predicates.
+func Ordering() []string {
 	return predicatesOrdering
 }
 
+// SetPredicatesOrdering sets the ordering of predicates.
 func SetPredicatesOrdering(names []string) {
 	predicatesOrdering = names
 }
 
+// GetPersistentVolumeInfo returns a persistent volume object by PV ID.
 func (c *CachedPersistentVolumeInfo) GetPersistentVolumeInfo(pvID string) (*v1.PersistentVolume, error) {
 	return c.Get(pvID)
 }
 
+// PersistentVolumeClaimInfo interface represents anything that can get a PVC object in
+// specified namespace with specified name.
 type PersistentVolumeClaimInfo interface {
 	GetPersistentVolumeClaimInfo(namespace string, name string) (*v1.PersistentVolumeClaim, error)
 }
@@ -154,6 +179,7 @@ func (c *CachedPersistentVolumeClaimInfo) GetPersistentVolumeClaimInfo(namespace
 	return c.PersistentVolumeClaims(namespace).Get(name)
 }
 
+// CachedNodeInfo implements NodeInfo
 type CachedNodeInfo struct {
 	corelisters.NodeLister
 }
@@ -173,6 +199,7 @@ func (c *CachedNodeInfo) GetNodeInfo(id string) (*v1.Node, error) {
 	return node, nil
 }
 
+// StorageClassInfo interface represents anything that can get a storage class object by class name.
 type StorageClassInfo interface {
 	GetStorageClassInfo(className string) (*storagev1.StorageClass, error)
 }
@@ -182,6 +209,7 @@ type CachedStorageClassInfo struct {
 	storagelisters.StorageClassLister
 }
 
+// GetStorageClassInfo get StorageClass by class name.
 func (c *CachedStorageClassInfo) GetStorageClassInfo(className string) (*storagev1.StorageClass, error) {
 	return c.Get(className)
 }
@@ -253,6 +281,7 @@ func NoDiskConflict(pod *v1.Pod, meta algorithm.PredicateMetadata, nodeInfo *sch
 	return true, nil, nil
 }
 
+// MaxPDVolumeCountChecker contains information to check the max number of volumes for a predicate.
 type MaxPDVolumeCountChecker struct {
 	filter     VolumeFilter
 	maxVolumes int
@@ -341,13 +370,13 @@ func (c *MaxPDVolumeCountChecker) filterVolumes(volumes []v1.Volume, namespace s
 			// Until we know real ID of the volume use namespace/pvcName as substitute
 			// with a random prefix (calculated and stored inside 'c' during initialization)
 			// to avoid conflicts with existing volume IDs.
-			pvId := fmt.Sprintf("%s-%s/%s", c.randomVolumeIDPrefix, namespace, pvcName)
+			pvID := fmt.Sprintf("%s-%s/%s", c.randomVolumeIDPrefix, namespace, pvcName)
 
 			pvc, err := c.pvcInfo.GetPersistentVolumeClaimInfo(namespace, pvcName)
 			if err != nil || pvc == nil {
 				// if the PVC is not found, log the error and count the PV towards the PV limit
 				glog.V(4).Infof("Unable to look up PVC info for %s/%s, assuming PVC matches predicate when counting limits: %v", namespace, pvcName, err)
-				filteredVolumes[pvId] = true
+				filteredVolumes[pvID] = true
 				continue
 			}
 
@@ -358,7 +387,7 @@ func (c *MaxPDVolumeCountChecker) filterVolumes(volumes []v1.Volume, namespace s
 				// original PV where it was bound to -> log the error and count
 				// the PV towards the PV limit
 				glog.V(4).Infof("PVC %s/%s is not bound, assuming PVC matches predicate when counting limits", namespace, pvcName)
-				filteredVolumes[pvId] = true
+				filteredVolumes[pvID] = true
 				continue
 			}
 
@@ -367,7 +396,7 @@ func (c *MaxPDVolumeCountChecker) filterVolumes(volumes []v1.Volume, namespace s
 				// if the PV is not found, log the error
 				// and count the PV towards the PV limit
 				glog.V(4).Infof("Unable to look up PV info for %s/%s/%s, assuming PV matches predicate when counting limits: %v", namespace, pvcName, pvName, err)
-				filteredVolumes[pvId] = true
+				filteredVolumes[pvID] = true
 				continue
 			}
 
@@ -424,7 +453,7 @@ func (c *MaxPDVolumeCountChecker) predicate(pod *v1.Pod, meta algorithm.Predicat
 }
 
 // EBSVolumeFilter is a VolumeFilter for filtering AWS ElasticBlockStore Volumes
-var EBSVolumeFilter VolumeFilter = VolumeFilter{
+var EBSVolumeFilter = VolumeFilter{
 	FilterVolume: func(vol *v1.Volume) (string, bool) {
 		if vol.AWSElasticBlockStore != nil {
 			return vol.AWSElasticBlockStore.VolumeID, true
@@ -441,7 +470,7 @@ var EBSVolumeFilter VolumeFilter = VolumeFilter{
 }
 
 // GCEPDVolumeFilter is a VolumeFilter for filtering GCE PersistentDisk Volumes
-var GCEPDVolumeFilter VolumeFilter = VolumeFilter{
+var GCEPDVolumeFilter = VolumeFilter{
 	FilterVolume: func(vol *v1.Volume) (string, bool) {
 		if vol.GCEPersistentDisk != nil {
 			return vol.GCEPersistentDisk.PDName, true
@@ -458,7 +487,7 @@ var GCEPDVolumeFilter VolumeFilter = VolumeFilter{
 }
 
 // AzureDiskVolumeFilter is a VolumeFilter for filtering Azure Disk Volumes
-var AzureDiskVolumeFilter VolumeFilter = VolumeFilter{
+var AzureDiskVolumeFilter = VolumeFilter{
 	FilterVolume: func(vol *v1.Volume) (string, bool) {
 		if vol.AzureDisk != nil {
 			return vol.AzureDisk.DiskName, true
@@ -474,6 +503,7 @@ var AzureDiskVolumeFilter VolumeFilter = VolumeFilter{
 	},
 }
 
+// VolumeZoneChecker contains information to check the volume zone for a predicate.
 type VolumeZoneChecker struct {
 	pvInfo    PersistentVolumeInfo
 	pvcInfo   PersistentVolumeClaimInfo
@@ -818,11 +848,14 @@ func PodFitsHost(pod *v1.Pod, meta algorithm.PredicateMetadata, nodeInfo *schedu
 	return false, []algorithm.PredicateFailureReason{ErrPodNotMatchHostName}, nil
 }
 
+// NodeLabelChecker contains information to check node labels for a predicate.
 type NodeLabelChecker struct {
 	labels   []string
 	presence bool
 }
 
+// NewNodeLabelPredicate creates a predicate which evaluates whether a pod can fit based on the
+// node labels which match a filter that it requests.
 func NewNodeLabelPredicate(labels []string, presence bool) algorithm.FitPredicate {
 	labelChecker := &NodeLabelChecker{
 		labels:   labels,
@@ -860,6 +893,7 @@ func (n *NodeLabelChecker) CheckNodeLabelPresence(pod *v1.Pod, meta algorithm.Pr
 	return true, nil, nil
 }
 
+// ServiceAffinity defines a struct used for create service affinity predicates.
 type ServiceAffinity struct {
 	podLister     algorithm.PodLister
 	serviceLister algorithm.ServiceLister
@@ -889,6 +923,7 @@ func (s *ServiceAffinity) serviceAffinityMetadataProducer(pm *predicateMetadata)
 	pm.serviceAffinityMatchingPodList = FilterPodsByNamespace(allMatches, pm.pod.Namespace)
 }
 
+// NewServiceAffinityPredicate creates a ServiceAffinity.
 func NewServiceAffinityPredicate(podLister algorithm.PodLister, serviceLister algorithm.ServiceLister, nodeInfo NodeInfo, labels []string) (algorithm.FitPredicate, PredicateMetadataProducer) {
 	affinity := &ServiceAffinity{
 		podLister:     podLister,
@@ -1071,11 +1106,13 @@ func EssentialPredicates(pod *v1.Pod, meta algorithm.PredicateMetadata, nodeInfo
 	return len(predicateFails) == 0, predicateFails, nil
 }
 
+// PodAffinityChecker contains information to check pod affinity.
 type PodAffinityChecker struct {
 	info      NodeInfo
 	podLister algorithm.PodLister
 }
 
+// NewPodAffinityPredicate creates a PodAffinityChecker.
 func NewPodAffinityPredicate(info NodeInfo, podLister algorithm.PodLister) algorithm.FitPredicate {
 	checker := &PodAffinityChecker{
 		info:      info,
@@ -1151,6 +1188,7 @@ func (c *PodAffinityChecker) anyPodMatchesPodAffinityTerm(pod *v1.Pod, pods []*v
 	return false, matchingPodExists, nil
 }
 
+// GetPodAffinityTerms gets pod affinity terms by a pod affinity object.
 func GetPodAffinityTerms(podAffinity *v1.PodAffinity) (terms []v1.PodAffinityTerm) {
 	if podAffinity != nil {
 		if len(podAffinity.RequiredDuringSchedulingIgnoredDuringExecution) != 0 {
@@ -1164,6 +1202,7 @@ func GetPodAffinityTerms(podAffinity *v1.PodAffinity) (terms []v1.PodAffinityTer
 	return terms
 }
 
+// GetPodAntiAffinityTerms gets pod affinity terms by a pod anti-affinity.
 func GetPodAntiAffinityTerms(podAntiAffinity *v1.PodAntiAffinity) (terms []v1.PodAffinityTerm) {
 	if podAntiAffinity != nil {
 		if len(podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution) != 0 {
@@ -1496,6 +1535,7 @@ func CheckNodeConditionPredicate(pod *v1.Pod, meta algorithm.PredicateMetadata, 
 	return len(reasons) == 0, reasons, nil
 }
 
+// VolumeBindingChecker contains information to check a volume binding.
 type VolumeBindingChecker struct {
 	binder *volumebinder.VolumeBinder
 }

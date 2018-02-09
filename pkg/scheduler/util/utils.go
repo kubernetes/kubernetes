@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 )
 
+// DefaultBindAllHostIP defines the default ip address used to bind to all host.
 const DefaultBindAllHostIP = "0.0.0.0"
 
 // ProtocolPort represents a protocol port pair, e.g. tcp:80.

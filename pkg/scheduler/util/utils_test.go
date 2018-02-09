@@ -68,7 +68,7 @@ func TestSortableList(t *testing.T) {
 	podList := SortableList{CompFunc: higherPriority}
 	// Add a few Pods with different priorities from lowest to highest priority.
 	for i := 0; i < 10; i++ {
-		var p int32 = int32(i)
+		var p = int32(i)
 		pod := &v1.Pod{
 			Spec: v1.PodSpec{
 				Containers: []v1.Container{

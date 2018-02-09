@@ -26,11 +26,14 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/schedulercache"
 )
 
+// ResourceAllocationPriority contains information to calculate resource allocation priority.
 type ResourceAllocationPriority struct {
 	Name   string
 	scorer func(requested, allocable *schedulercache.Resource) int64
 }
 
+// PriorityMap priorities nodes according to the resource allocations on the node.
+// It will use `scorer` function to calculate the score.
 func (r *ResourceAllocationPriority) PriorityMap(
 	pod *v1.Pod,
 	meta interface{},

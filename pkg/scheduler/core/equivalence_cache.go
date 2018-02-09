@@ -62,6 +62,7 @@ func newAlgorithmCache() AlgorithmCache {
 	}
 }
 
+// NewEquivalenceCache creates a EquivalenceCache object.
 func NewEquivalenceCache(getEquivalencePodFunc algorithm.GetEquivalencePodFunc) *EquivalenceCache {
 	return &EquivalenceCache{
 		getEquivalencePod: getEquivalencePodFunc,
@@ -119,13 +120,11 @@ func (ec *EquivalenceCache) PredicateWithECache(
 			if hostPredicate, ok := predicateMap[equivalenceHash]; ok {
 				if hostPredicate.Fit {
 					return true, []algorithm.PredicateFailureReason{}, false
-				} else {
-					return false, hostPredicate.FailReasons, false
 				}
-			} else {
-				// is invalid
-				return false, []algorithm.PredicateFailureReason{}, true
+				return false, hostPredicate.FailReasons, false
 			}
+			// is invalid
+			return false, []algorithm.PredicateFailureReason{}, true
 		}
 	}
 	return false, []algorithm.PredicateFailureReason{}, true

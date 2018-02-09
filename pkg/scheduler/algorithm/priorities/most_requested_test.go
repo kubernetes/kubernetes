@@ -83,7 +83,7 @@ func TestMostRequested(t *testing.T) {
 			},
 		},
 	}
-	bigCpuAndMemory := v1.PodSpec{
+	bigCPUAndMemory := v1.PodSpec{
 		NodeName: "machine1",
 		Containers: []v1.Container{
 			{
@@ -201,7 +201,7 @@ func TestMostRequested(t *testing.T) {
 				Memory Score: 9000 > 8000 return 0
 				Node2 Score: (5 + 0) / 2 = 2
 			*/
-			pod:          &v1.Pod{Spec: bigCpuAndMemory},
+			pod:          &v1.Pod{Spec: bigCPUAndMemory},
 			nodes:        []*v1.Node{makeNode("machine1", 4000, 10000), makeNode("machine2", 10000, 8000)},
 			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 4}, {Host: "machine2", Score: 2}},
 			test:         "resources requested with more than the node, pods scheduled with resources",

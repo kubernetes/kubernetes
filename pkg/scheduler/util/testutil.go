@@ -28,9 +28,11 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 
+	// Init the core api installation
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 )
 
+// TestGroup defines a api group for testing.
 type TestGroup struct {
 	externalGroupVersion schema.GroupVersion
 	internalGroupVersion schema.GroupVersion
@@ -39,8 +41,10 @@ type TestGroup struct {
 }
 
 var (
+	// Groups defines a TestGroup map.
 	Groups = make(map[string]TestGroup)
-	Test   TestGroup
+	// Test defines a TestGroup object.
+	Test TestGroup
 
 	serializer runtime.SerializerInfo
 )

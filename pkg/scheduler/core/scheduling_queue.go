@@ -76,10 +76,12 @@ type FIFO struct {
 
 var _ = SchedulingQueue(&FIFO{}) // Making sure that FIFO implements SchedulingQueue.
 
+// Add adds a pod to the FIFO.
 func (f *FIFO) Add(pod *v1.Pod) error {
 	return f.FIFO.Add(pod)
 }
 
+// AddIfNotPresent adds a pod to the FIFO if it is absent in the FIFO.
 func (f *FIFO) AddIfNotPresent(pod *v1.Pod) error {
 	return f.FIFO.AddIfNotPresent(pod)
 }
@@ -90,10 +92,12 @@ func (f *FIFO) AddUnschedulableIfNotPresent(pod *v1.Pod) error {
 	return f.FIFO.AddIfNotPresent(pod)
 }
 
+// Update updates a pod in the FIFO.
 func (f *FIFO) Update(pod *v1.Pod) error {
 	return f.FIFO.Update(pod)
 }
 
+// Delete deletes a pod in the FIFO.
 func (f *FIFO) Delete(pod *v1.Pod) error {
 	return f.FIFO.Delete(pod)
 }
@@ -114,7 +118,11 @@ func (f *FIFO) Pop() (*v1.Pod, error) {
 
 // FIFO does not need to react to events, as all pods are always in the active
 // scheduling queue anyway.
-func (f *FIFO) AssignedPodAdded(pod *v1.Pod)   {}
+
+// AssignedPodAdded does nothing here.
+func (f *FIFO) AssignedPodAdded(pod *v1.Pod) {}
+
+// AssignedPodUpdated does nothing here.
 func (f *FIFO) AssignedPodUpdated(pod *v1.Pod) {}
 
 // MoveAllToActiveQueue does nothing in FIFO as all pods are always in the active queue.
@@ -126,6 +134,7 @@ func (f *FIFO) WaitingPodsForNode(nodeName string) []*v1.Pod {
 	return nil
 }
 
+// NewFIFO creates a FIFO object.
 func NewFIFO() *FIFO {
 	return &FIFO{FIFO: cache.NewFIFO(cache.MetaNamespaceKeyFunc)}
 }
@@ -169,6 +178,7 @@ type PriorityQueue struct {
 // Making sure that PriorityQueue implements SchedulingQueue.
 var _ = SchedulingQueue(&PriorityQueue{})
 
+// NewPriorityQueue creates a PriorityQueue object.
 func NewPriorityQueue() *PriorityQueue {
 	pq := &PriorityQueue{
 		activeQ:        newHeap(cache.MetaNamespaceKeyFunc, util.HigherPriorityPod),
@@ -294,10 +304,9 @@ func (p *PriorityQueue) Update(pod *v1.Pod) error {
 				p.cond.Broadcast()
 			}
 			return err
-		} else {
-			p.unschedulableQ.Update(pod)
-			return nil
 		}
+		p.unschedulableQ.Update(pod)
+		return nil
 	}
 	// If pod is not in any of the two queue, we put it in the active queue.
 	err := p.activeQ.Add(pod)
@@ -417,6 +426,7 @@ type UnschedulablePodsMap struct {
 
 var _ = UnschedulablePods(&UnschedulablePodsMap{})
 
+// NominatedNodeName returns the nominated node name of a pod.
 func NominatedNodeName(pod *v1.Pod) string {
 	return pod.Status.NominatedNodeName
 }
@@ -517,7 +527,10 @@ func newUnschedulablePodsMap() *UnschedulablePodsMap {
 // as cache.heap, however, this heap does not perform synchronization. It leaves
 // synchronization to the SchedulingQueue.
 
+// LessFunc is a function type to compare two objects.
 type LessFunc func(interface{}, interface{}) bool
+
+// KeyFunc is a function type to get the key from an object.
 type KeyFunc func(obj interface{}) (string, error)
 
 type heapItem struct {
@@ -681,9 +694,8 @@ func (h *Heap) Pop() (interface{}, error) {
 	obj := heap.Pop(h.data)
 	if obj != nil {
 		return obj, nil
-	} else {
-		return nil, fmt.Errorf("object was removed from heap data")
 	}
+	return nil, fmt.Errorf("object was removed from heap data")
 }
 
 // Get returns the requested item, or sets exists=false.

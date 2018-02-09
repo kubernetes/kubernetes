@@ -22,6 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 )
 
+// PodFilter is a function to filter a pod. If pod passed return true else return false.
 type PodFilter func(*v1.Pod) bool
 
 // Cache collects pods' information and provides node-level aggregated information.
