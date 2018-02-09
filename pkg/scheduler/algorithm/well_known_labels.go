@@ -62,8 +62,6 @@ const (
 	// the taint
 	TaintExternalCloudProvider = "node.cloudprovider.kubernetes.io/uninitialized"
 
-	// When node is shutdown in external cloud provider
-	// shutdown flag is needed for immediately volume detach
-	// after node comes back, the taint is removed
+	// TaintNodeShutdown when node is shutdown in external cloud provider
 	TaintNodeShutdown = "node.cloudprovider.kubernetes.io/shutdown"
 )
