@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"net/http"
 	"path"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -41,6 +42,7 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/endpoints/handlers"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
+	"k8s.io/apiserver/pkg/endpoints/metrics"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
@@ -187,37 +189,34 @@ func (r *crdHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	requestScope := crdInfo.requestScope
 	minRequestTimeout := 1 * time.Minute
 
+	verb := strings.ToUpper(requestInfo.Verb)
+	resource := requestInfo.Resource
+	subresource := requestInfo.Subresource
+	scope := metrics.CleanScope(requestInfo)
+
+	var handler http.HandlerFunc
+
 	switch requestInfo.Verb {
 	case "get":
-		handler := handlers.GetResource(storage, storage, requestScope)
-		handler(w, req)
-		return
+		handler = handlers.GetResource(storage, storage, requestScope)
 	case "list":
 		forceWatch := false
-		handler := handlers.ListResource(storage, storage, requestScope, forceWatch, minRequestTimeout)
-		handler(w, req)
-		return
+		handler = handlers.ListResource(storage, storage, requestScope, forceWatch, minRequestTimeout)
 	case "watch":
 		forceWatch := true
-		handler := handlers.ListResource(storage, storage, requestScope, forceWatch, minRequestTimeout)
-		handler(w, req)
-		return
+		handler = handlers.ListResource(storage, storage, requestScope, forceWatch, minRequestTimeout)
 	case "create":
 		if terminating {
 			http.Error(w, fmt.Sprintf("%v not allowed while CustomResourceDefinition is terminating", requestInfo.Verb), http.StatusMethodNotAllowed)
 			return
 		}
-		handler := handlers.CreateResource(storage, requestScope, discovery.NewUnstructuredObjectTyper(nil), r.admission)
-		handler(w, req)
-		return
+		handler = handlers.CreateResource(storage, requestScope, discovery.NewUnstructuredObjectTyper(nil), r.admission)
 	case "update":
 		if terminating {
 			http.Error(w, fmt.Sprintf("%v not allowed while CustomResourceDefinition is terminating", requestInfo.Verb), http.StatusMethodNotAllowed)
 			return
 		}
-		handler := handlers.UpdateResource(storage, requestScope, discovery.NewUnstructuredObjectTyper(nil), r.admission)
-		handler(w, req)
-		return
+		handler = handlers.UpdateResource(storage, requestScope, discovery.NewUnstructuredObjectTyper(nil), r.admission)
 	case "patch":
 		if terminating {
 			http.Error(w, fmt.Sprintf("%v not allowed while CustomResourceDefinition is terminating", requestInfo.Verb), http.StatusMethodNotAllowed)
@@ -227,24 +226,20 @@ func (r *crdHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			string(types.JSONPatchType),
 			string(types.MergePatchType),
 		}
-		handler := handlers.PatchResource(storage, requestScope, r.admission, unstructured.UnstructuredObjectConverter{}, supportedTypes)
-		handler(w, req)
-		return
+		handler = handlers.PatchResource(storage, requestScope, r.admission, unstructured.UnstructuredObjectConverter{}, supportedTypes)
 	case "delete":
 		allowsOptions := true
-		handler := handlers.DeleteResource(storage, allowsOptions, requestScope, r.admission)
-		handler(w, req)
-		return
+		handler = handlers.DeleteResource(storage, allowsOptions, requestScope, r.admission)
 	case "deletecollection":
 		checkBody := true
-		handler := handlers.DeleteCollection(storage, checkBody, requestScope, r.admission)
-		handler(w, req)
-		return
-
+		handler = handlers.DeleteCollection(storage, checkBody, requestScope, r.admission)
 	default:
 		http.Error(w, fmt.Sprintf("unhandled verb %q", requestInfo.Verb), http.StatusMethodNotAllowed)
 		return
 	}
+	handler = metrics.InstrumentHandlerFunc(verb, resource, subresource, scope, handler)
+	handler(w, req)
+	return
 }
 
 func (r *crdHandler) updateCustomResourceDefinition(oldObj, newObj interface{}) {
