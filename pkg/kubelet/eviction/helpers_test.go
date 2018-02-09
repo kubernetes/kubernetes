@@ -288,6 +288,20 @@ func TestParseThresholdConfig(t *testing.T) {
 				},
 			},
 		},
+		"disable via 0%": {
+			allocatableConfig: []string{},
+			evictionHard:      map[string]string{"memory.available": "0%"},
+			evictionSoft:      map[string]string{"memory.available": "0%"},
+			expectErr:         false,
+			expectThresholds:  []evictionapi.Threshold{},
+		},
+		"disable via 100%": {
+			allocatableConfig: []string{},
+			evictionHard:      map[string]string{"memory.available": "100%"},
+			evictionSoft:      map[string]string{"memory.available": "100%"},
+			expectErr:         false,
+			expectThresholds:  []evictionapi.Threshold{},
+		},
 		"invalid-signal": {
 			allocatableConfig:       []string{},
 			evictionHard:            map[string]string{"mem.available": "150Mi"},
