@@ -1,3 +1,5 @@
+// +build !windows
+
 /*
 Copyright 2017 The Kubernetes Authors.
 
@@ -15,9 +17,6 @@ limitations under the License.
 */
 
 // Package envelope transforms values for storage at rest using a Envelope provider
-
-// +build !windows
-
 package envelope
 
 import (
