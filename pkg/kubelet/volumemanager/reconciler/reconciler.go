@@ -639,7 +639,7 @@ func getVolumesFromPodDir(podDir string) ([]podVolume, error) {
 		for volumeMode, volumesDir := range volumesDirs {
 			var volumesDirInfo []os.FileInfo
 			if volumesDirInfo, err = ioutil.ReadDir(volumesDir); err != nil {
-				// Just skip the loop becuase given volumesDir doesn't exist depending on volumeMode
+				// Just skip the loop because given volumesDir doesn't exist depending on volumeMode
 				continue
 			}
 			for _, volumeDir := range volumesDirInfo {

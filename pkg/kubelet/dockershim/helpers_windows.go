@@ -114,7 +114,7 @@ func (ds *dockerService) determinePodIPBySandboxID(sandboxID string) string {
 		// Windows version < Windows Server 2016 is Not Supported
 
 		// Sandbox support in Windows mandates CNI Plugin.
-		// Presense of CONTAINER_NETWORK flag is considered as non-Sandbox cases here
+		// Presence of CONTAINER_NETWORK flag is considered as non-Sandbox cases here
 
 		// Todo: Add a kernel version check for more validation
 
