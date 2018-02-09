@@ -237,20 +237,19 @@ func (ds *dockerService) removeContainerLogSymlink(containerID string) error {
 
 // StartContainer starts the container.
 func (ds *dockerService) StartContainer(_ context.Context, r *runtimeapi.StartContainerRequest) (*runtimeapi.StartContainerResponse, error) {
-	err := ds.client.StartContainer(r.ContainerId)
+	//report start container failed event when return error.
+	if err := ds.client.StartContainer(r.ContainerId); err != nil {
+		err = transformStartContainerError(err)
+		return nil, fmt.Errorf("failed to start container %q: %v", r.ContainerId, err)
+	}
 
-	// Create container log symlink for all containers (including failed ones).
 	if linkError := ds.createContainerLogSymlink(r.ContainerId); linkError != nil {
 		// Do not stop the container if we failed to create symlink because:
 		//   1. This is not a critical failure.
 		//   2. We don't have enough information to properly stop container here.
-		// Kubelet will surface this error to user via an event.
-		return nil, linkError
-	}
-
-	if err != nil {
-		err = transformStartContainerError(err)
-		return nil, fmt.Errorf("failed to start container %q: %v", r.ContainerId, err)
+		// Do not report start container failed here because the container start successed
+		// and we don't stop container here, the container status will keep running.
+		glog.Errorf("failed to create log symlink for container %q: %v", r.ContainerId, linkError)
 	}
 
 	return &runtimeapi.StartContainerResponse{}, nil
