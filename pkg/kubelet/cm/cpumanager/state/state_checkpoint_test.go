@@ -146,15 +146,12 @@ func TestCheckpointStateRestore(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
 			// ensure there is no previous checkpoint
-			cpm.RemoveCheckpoint(CPUManagerCheckpointName)
+			cpm.RemoveCheckpoint(cpuManagerCheckpointName)
 
 			// prepare checkpoint for testing
-			var checkpoint *testutil.MockCheckpoint = nil
 			if strings.TrimSpace(tc.checkpointContent) != "" {
-				checkpoint = &testutil.MockCheckpoint{Content: tc.checkpointContent}
-			}
-			if checkpoint != nil {
-				if err := cpm.CreateCheckpoint(CPUManagerCheckpointName, checkpoint); err != nil {
+				checkpoint := &testutil.MockCheckpoint{Content: tc.checkpointContent}
+				if err := cpm.CreateCheckpoint(cpuManagerCheckpointName, checkpoint); err != nil {
 					t.Fatalf("could not create testing checkpoint: %v", err)
 				}
 			}
@@ -204,16 +201,18 @@ func TestCheckpointStateStore(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
 			// ensure there is no previous checkpoint
-			cpm.RemoveCheckpoint(CPUManagerCheckpointName)
+			cpm.RemoveCheckpoint(cpuManagerCheckpointName)
 
 			cs1, err := NewCheckpointState(testingDir, "none")
 			if err != nil {
 				t.Fatalf("could not create testing checkpointState instance: %v", err)
 			}
 
+			// set values of cs1 instance so they are stored in checkpoint and can be read by cs2
 			cs1.SetDefaultCPUSet(tc.expectedState.defaultCPUSet)
 			cs1.SetCPUAssignments(tc.expectedState.assignments)
 
+			// restore checkpoint with previously stored values
 			cs2, err := NewCheckpointState(testingDir, "none")
 			if err != nil {
 				t.Fatalf("could not create testing checkpointState instance: %v", err)
@@ -262,7 +261,7 @@ func TestCheckpointStateHelpers(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
 			// ensure there is no previous checkpoint
-			cpm.RemoveCheckpoint(CPUManagerCheckpointName)
+			cpm.RemoveCheckpoint(cpuManagerCheckpointName)
 
 			state, err := NewCheckpointState(testingDir, "none")
 			if err != nil {
@@ -277,11 +276,10 @@ func TestCheckpointStateHelpers(t *testing.T) {
 				}
 
 				state.Delete(container)
-				if cpus := state.GetCPUSetOrDefault(container); !cpus.Equals(tc.defaultCPUset) {
+				if _, ok := state.GetCPUSet(container); ok {
 					t.Fatal("deleted container still existing in state")
 				}
 			}
-
 		})
 	}
 }
@@ -316,7 +314,7 @@ func TestCheckpointStateClear(t *testing.T) {
 				t.Fatal("cleared state with non-empty default cpu set")
 			}
 			for container := range tc.containers {
-				if !cpuset.NewCPUSet().Equals(state.GetCPUSetOrDefault(container)) {
+				if _, ok := state.GetCPUSet(container); ok {
 					t.Fatalf("container %q with non-default cpu set in cleared state", container)
 				}
 			}

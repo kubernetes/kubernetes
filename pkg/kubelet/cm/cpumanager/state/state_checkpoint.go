@@ -27,8 +27,8 @@ import (
 	utilstore "k8s.io/kubernetes/pkg/kubelet/util/store"
 )
 
-// CPUManagerCheckpointName is the name of checkpoint file
-const CPUManagerCheckpointName = "cpu_manager_state"
+// cpuManagerCheckpointName is the name of checkpoint file
+const cpuManagerCheckpointName = "cpu_manager_state"
 
 var _ State = &stateCheckpoint{}
 
@@ -54,7 +54,7 @@ func NewCheckpointState(stateDir string, policyName string) (State, error) {
 	if err := stateCheckpoint.restoreState(); err != nil {
 		return nil, fmt.Errorf("could not restore state from checkpoint: %v\n"+
 			"Please drain this node and delete the CPU manager checkpoint file %q before restarting Kubelet.",
-			err, path.Join(stateDir, CPUManagerCheckpointName))
+			err, path.Join(stateDir, cpuManagerCheckpointName))
 	}
 
 	return stateCheckpoint, nil
@@ -72,7 +72,7 @@ func (sc *stateCheckpoint) restoreState() error {
 	tmpContainerCPUSet := cpuset.NewCPUSet()
 
 	checkpoint := NewCPUManagerCheckpoint()
-	if err = sc.checkpointManager.GetCheckpoint(CPUManagerCheckpointName, checkpoint); err != nil {
+	if err = sc.checkpointManager.GetCheckpoint(cpuManagerCheckpointName, checkpoint); err != nil {
 		// TODO: change to errors.ErrCheckpointNotFound may be required after issue in checkpointing PR is resolved
 		if err == utilstore.ErrKeyNotFound {
 			sc.storeState()
@@ -115,7 +115,7 @@ func (sc *stateCheckpoint) storeState() {
 		checkpoint.Entries[containerID] = cset.String()
 	}
 
-	err := sc.checkpointManager.CreateCheckpoint(CPUManagerCheckpointName, checkpoint)
+	err := sc.checkpointManager.CreateCheckpoint(cpuManagerCheckpointName, checkpoint)
 
 	if err != nil {
 		panic("[cpumanager] could not save checkpoint: " + err.Error())

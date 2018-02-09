@@ -33,7 +33,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/status"
-	"path"
 )
 
 // ActivePodsFunc is a function that returns a list of pods to reconcile.
