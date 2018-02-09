@@ -171,6 +171,29 @@ shift $((OPTIND - 1))
 eval "goflags=(${GOFLAGS:-})"
 eval "testargs=(${KUBE_TEST_ARGS:-})"
 
+# We use -trace below ourselves to inject "env HOME=...".
+# Therefore we have to find and merge that command with
+# whatever -trace command might have been specified in GOFLAGS.
+i=0
+goflagsExec=
+while [ $i -lt ${#goflags[*]} ]; do
+  if [ "${goflags[$i]}" = "-exec" ]; then
+    # Remove the -exec parameter. Beware that
+    # 'unset' leads to a gap, i.e. indices are no
+    # longer a continuous sequence of integers
+    # although the array size is reduced by one.
+    unset goflags[$i]
+    # Store and remove the -exec value.
+    i=$(($i + 1))
+    if [ $i -le ${#goflags[*]} ]; then
+      goflagsExec="${goflags[$i]}"
+      unset goflags[$i]
+    fi
+    break
+  fi
+  i=$(($i + 1))
+done
+
 # Used to filter verbose test output.
 go_test_grep_pattern=".*"
 
@@ -285,6 +308,7 @@ runTests() {
       ${KUBE_RACE} ${KUBE_TIMEOUT} "${@}" \
      "${testargs[@]:+${testargs[@]}}"
     go test "${goflags[@]:+${goflags[@]}}" \
+      -exec "env -u KUBECONFIG HOME=$tmpHome${goflagsExec:+ ${goflagsExec}}" \
       ${KUBE_RACE} ${KUBE_TIMEOUT} "${@}" \
      "${testargs[@]:+${testargs[@]}}" \
      | tee ${junit_filename_prefix:+"${junit_filename_prefix}.stdout"} \
@@ -391,6 +415,10 @@ checkFDs() {
 
 checkFDs
 
+# Run all tests in a clean environment to avoid side effects (like
+# influencing the tests with what is in $HOME/.kube/config).
+tmpHome=$(mktemp -d)
+trap 'rm -rf "$tmpHome"' EXIT
 
 # Convert the CSVs to arrays.
 IFS=';' read -a apiVersions <<< "${KUBE_TEST_API_VERSIONS}"

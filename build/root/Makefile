@@ -172,6 +172,7 @@ define CHECK_TEST_HELP_INFO
 #   make check
 #   make test
 #   make check WHAT=./pkg/kubelet GOFLAGS=-v
+#   make check GOFLAGS='-v -exec "strace -f -e trace=file"'
 endef
 .PHONY: check test
 ifeq ($(PRINT_HELP),y)
