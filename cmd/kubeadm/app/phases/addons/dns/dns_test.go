@@ -184,7 +184,8 @@ func TestGetDNSIP(t *testing.T) {
 func TestTranslateStubDomainKubeDNSToCoreDNS(t *testing.T) {
 	testCases := []struct {
 		configMap *v1.ConfigMap
-		expect    string
+		expectOne string
+		expectTwo string
 	}{
 		{
 			configMap: &v1.ConfigMap{
@@ -198,7 +199,7 @@ func TestTranslateStubDomainKubeDNSToCoreDNS(t *testing.T) {
 				},
 			},
 
-			expect: `
+			expectOne: `
     foo.com:53 {
         errors
         cache 30
@@ -210,6 +211,18 @@ func TestTranslateStubDomainKubeDNSToCoreDNS(t *testing.T) {
         proxy . 2.3.4.5
     }
     `,
+			expectTwo: `
+    my.cluster.local:53 {
+        errors
+        cache 30
+        proxy . 2.3.4.5
+    }
+    foo.com:53 {
+        errors
+        cache 30
+        proxy . 1.2.3.4:5300 3.3.3.3
+    }
+    `,
 		},
 		{
 			configMap: &v1.ConfigMap{
@@ -219,7 +232,7 @@ func TestTranslateStubDomainKubeDNSToCoreDNS(t *testing.T) {
 				},
 			},
 
-			expect: "",
+			expectOne: "",
 		},
 		{
 			configMap: &v1.ConfigMap{
@@ -233,7 +246,7 @@ func TestTranslateStubDomainKubeDNSToCoreDNS(t *testing.T) {
 				},
 			},
 
-			expect: `
+			expectOne: `
     foo.com:53 {
         errors
         cache 30
@@ -245,6 +258,31 @@ func TestTranslateStubDomainKubeDNSToCoreDNS(t *testing.T) {
         proxy . 2.3.4.5
     }
     `,
+			expectTwo: `
+    my.cluster.local:53 {
+        errors
+        cache 30
+        proxy . 2.3.4.5
+    }
+    foo.com:53 {
+        errors
+        cache 30
+        proxy . 1.2.3.4:5300
+    }
+    `,
+		},
+		{
+			configMap: &v1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "kube-dns",
+					Namespace: "kube-system",
+				},
+				Data: map[string]string{
+					"upstreamNameservers": `["8.8.8.8", "8.8.4.4"]`,
+				},
+			},
+
+			expectOne: "",
 		},
 	}
 	for _, testCase := range testCases {
@@ -252,8 +290,8 @@ func TestTranslateStubDomainKubeDNSToCoreDNS(t *testing.T) {
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
-		if !strings.Contains(out, testCase.expect) {
-			t.Errorf("expected to find %q in output: %q", testCase.expect, out)
+		if !strings.Contains(out, testCase.expectOne) && !strings.Contains(out, testCase.expectTwo) {
+			t.Errorf("expected to find %q or %q in output: %q", testCase.expectOne, testCase.expectTwo, out)
 		}
 	}
 }
@@ -315,7 +353,8 @@ func TestTranslateUpstreamKubeDNSToCoreDNS(t *testing.T) {
 func TestTranslateFederationKubeDNSToCoreDNS(t *testing.T) {
 	testCases := []struct {
 		configMap *v1.ConfigMap
-		expect    string
+		expectOne string
+		expectTwo string
 	}{
 		{
 			configMap: &v1.ConfigMap{
@@ -330,10 +369,15 @@ func TestTranslateFederationKubeDNSToCoreDNS(t *testing.T) {
 				},
 			},
 
-			expect: `
+			expectOne: `
     federation cluster.local {
        foo foo.feddomain.com
        bar bar.feddomain.com
+    }`,
+			expectTwo: `
+    federation cluster.local {
+       bar bar.feddomain.com
+       foo foo.feddomain.com
     }`,
 		},
 		{
@@ -344,7 +388,7 @@ func TestTranslateFederationKubeDNSToCoreDNS(t *testing.T) {
 				},
 			},
 
-			expect: "",
+			expectOne: "",
 		},
 		{
 			configMap: &v1.ConfigMap{
@@ -358,7 +402,7 @@ func TestTranslateFederationKubeDNSToCoreDNS(t *testing.T) {
 				},
 			},
 
-			expect: "",
+			expectOne: "",
 		},
 	}
 	for _, testCase := range testCases {
@@ -366,8 +410,8 @@ func TestTranslateFederationKubeDNSToCoreDNS(t *testing.T) {
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
-		if !strings.Contains(out, testCase.expect) {
-			t.Errorf("expected to find %q in output: %q", testCase.expect, out)
+		if !strings.Contains(out, testCase.expectOne) && !strings.Contains(out, testCase.expectTwo) {
+			t.Errorf("expected to find %q or %q in output: %q", testCase.expectOne, testCase.expectTwo, out)
 		}
 	}
 }
