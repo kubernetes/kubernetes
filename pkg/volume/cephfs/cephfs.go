@@ -173,7 +173,7 @@ func (plugin *cephfsPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*
 		VolumeSource: v1.VolumeSource{
 			CephFS: &v1.CephFSVolumeSource{
 				Monitors: []string{},
-				Path:     volumeName,
+				Path:     mountPath,
 			},
 		},
 	}
