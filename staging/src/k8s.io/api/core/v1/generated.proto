@@ -992,7 +992,7 @@ message EndpointsList {
 
 // EnvFromSource represents the source of a set of ConfigMaps
 message EnvFromSource {
-  // An optional identifer to prepend to each key in the ConfigMap. Must be a C_IDENTIFIER.
+  // An optional identifier to prepend to each key in the ConfigMap. Must be a C_IDENTIFIER.
   // +optional
   optional string prefix = 1;
 

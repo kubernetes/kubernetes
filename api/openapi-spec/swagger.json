@@ -76937,7 +76937,7 @@
       "$ref": "#/definitions/io.k8s.api.core.v1.ConfigMapEnvSource"
      },
      "prefix": {
-      "description": "An optional identifer to prepend to each key in the ConfigMap. Must be a C_IDENTIFIER.",
+      "description": "An optional identifier to prepend to each key in the ConfigMap. Must be a C_IDENTIFIER.",
       "type": "string"
      },
      "secretRef": {
@@ -77107,7 +77107,7 @@
     ]
    },
    "io.k8s.api.core.v1.EventSeries": {
-    "description": "EventSeries contain information on series of events, i.e. thing that was/is happening continously for some time.",
+    "description": "EventSeries contain information on series of events, i.e. thing that was/is happening continuously for some time.",
     "properties": {
      "count": {
       "description": "Number of occurrences in this series up to the last heartbeat time",
@@ -77115,7 +77115,7 @@
       "format": "int32"
      },
      "lastObservedTime": {
-      "description": "Time of the last occurence observed",
+      "description": "Time of the last occurrence observed",
       "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.MicroTime"
      },
      "state": {
@@ -80757,7 +80757,7 @@
     ]
    },
    "io.k8s.api.events.v1beta1.EventSeries": {
-    "description": "EventSeries contain information on series of events, i.e. thing that was/is happening continously for some time.",
+    "description": "EventSeries contain information on series of events, i.e. thing that was/is happening continuously for some time.",
     "required": [
      "count",
      "lastObservedTime",
