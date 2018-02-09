@@ -17,6 +17,7 @@ limitations under the License.
 package azure
 
 import (
+	"context"
 	"fmt"
 	"math/rand"
 	"net/http"
@@ -28,6 +29,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/arm/disk"
 	"github.com/Azure/azure-sdk-for-go/arm/network"
 	"github.com/Azure/azure-sdk-for-go/arm/storage"
+	computepreview "github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2017-12-01/compute"
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/to"
 )
@@ -629,48 +631,39 @@ func getRandomIPPtr() *string {
 
 type fakeVirtualMachineScaleSetVMsClient struct {
 	mutex     *sync.Mutex
-	FakeStore map[string]map[string]compute.VirtualMachineScaleSetVM
+	FakeStore map[string]map[string]computepreview.VirtualMachineScaleSetVM
 }
 
 func newFakeVirtualMachineScaleSetVMsClient() *fakeVirtualMachineScaleSetVMsClient {
 	fVMC := &fakeVirtualMachineScaleSetVMsClient{}
-	fVMC.FakeStore = make(map[string]map[string]compute.VirtualMachineScaleSetVM)
+	fVMC.FakeStore = make(map[string]map[string]computepreview.VirtualMachineScaleSetVM)
 	fVMC.mutex = &sync.Mutex{}
 
 	return fVMC
 }
 
-func (fVMC *fakeVirtualMachineScaleSetVMsClient) setFakeStore(store map[string]map[string]compute.VirtualMachineScaleSetVM) {
+func (fVMC *fakeVirtualMachineScaleSetVMsClient) setFakeStore(store map[string]map[string]computepreview.VirtualMachineScaleSetVM) {
 	fVMC.mutex.Lock()
 	defer fVMC.mutex.Unlock()
 
 	fVMC.FakeStore = store
 }
 
-func (fVMC *fakeVirtualMachineScaleSetVMsClient) List(resourceGroupName string, virtualMachineScaleSetName string, filter string, selectParameter string, expand string) (result compute.VirtualMachineScaleSetVMListResult, err error) {
+func (fVMC *fakeVirtualMachineScaleSetVMsClient) List(ctx context.Context, resourceGroupName string, virtualMachineScaleSetName string, filter string, selectParameter string, expand string) (result []computepreview.VirtualMachineScaleSetVM, err error) {
 	fVMC.mutex.Lock()
 	defer fVMC.mutex.Unlock()
 
-	value := []compute.VirtualMachineScaleSetVM{}
+	result = []computepreview.VirtualMachineScaleSetVM{}
 	if _, ok := fVMC.FakeStore[resourceGroupName]; ok {
 		for _, v := range fVMC.FakeStore[resourceGroupName] {
-			value = append(value, v)
+			result = append(result, v)
 		}
 	}
 
-	result.Response.Response = &http.Response{
-		StatusCode: http.StatusOK,
-	}
-	result.NextLink = nil
-	result.Value = &value
 	return result, nil
 }
 
-func (fVMC *fakeVirtualMachineScaleSetVMsClient) ListNextResults(resourceGroupName string, lastResults compute.VirtualMachineScaleSetVMListResult) (result compute.VirtualMachineScaleSetVMListResult, err error) {
-	return result, nil
-}
-
-func (fVMC *fakeVirtualMachineScaleSetVMsClient) Get(resourceGroupName string, VMScaleSetName string, instanceID string) (result compute.VirtualMachineScaleSetVM, err error) {
+func (fVMC *fakeVirtualMachineScaleSetVMsClient) Get(ctx context.Context, resourceGroupName string, VMScaleSetName string, instanceID string) (result computepreview.VirtualMachineScaleSetVM, err error) {
 	fVMC.mutex.Lock()
 	defer fVMC.mutex.Unlock()
 
@@ -687,8 +680,8 @@ func (fVMC *fakeVirtualMachineScaleSetVMsClient) Get(resourceGroupName string, V
 	}
 }
 
-func (fVMC *fakeVirtualMachineScaleSetVMsClient) GetInstanceView(resourceGroupName string, VMScaleSetName string, instanceID string) (result compute.VirtualMachineScaleSetVMInstanceView, err error) {
-	_, err = fVMC.Get(resourceGroupName, VMScaleSetName, instanceID)
+func (fVMC *fakeVirtualMachineScaleSetVMsClient) GetInstanceView(ctx context.Context, resourceGroupName string, VMScaleSetName string, instanceID string) (result computepreview.VirtualMachineScaleSetVMInstanceView, err error) {
+	_, err = fVMC.Get(ctx, resourceGroupName, VMScaleSetName, instanceID)
 	if err != nil {
 		return result, err
 	}
@@ -696,54 +689,53 @@ func (fVMC *fakeVirtualMachineScaleSetVMsClient) GetInstanceView(resourceGroupNa
 	return result, nil
 }
 
+func (fVMC *fakeVirtualMachineScaleSetVMsClient) Update(ctx context.Context, resourceGroupName string, VMScaleSetName string, instanceID string, parameters computepreview.VirtualMachineScaleSetVM) (resp *http.Response, err error) {
+	fVMC.mutex.Lock()
+	defer fVMC.mutex.Unlock()
+
+	vmKey := fmt.Sprintf("%s_%s", VMScaleSetName, instanceID)
+	if scaleSetMap, ok := fVMC.FakeStore[resourceGroupName]; ok {
+		if _, ok := scaleSetMap[vmKey]; ok {
+			scaleSetMap[vmKey] = parameters
+		}
+	}
+
+	return nil, nil
+}
+
 type fakeVirtualMachineScaleSetsClient struct {
 	mutex     *sync.Mutex
-	FakeStore map[string]map[string]compute.VirtualMachineScaleSet
+	FakeStore map[string]map[string]computepreview.VirtualMachineScaleSet
 }
 
 func newFakeVirtualMachineScaleSetsClient() *fakeVirtualMachineScaleSetsClient {
 	fVMSSC := &fakeVirtualMachineScaleSetsClient{}
-	fVMSSC.FakeStore = make(map[string]map[string]compute.VirtualMachineScaleSet)
+	fVMSSC.FakeStore = make(map[string]map[string]computepreview.VirtualMachineScaleSet)
 	fVMSSC.mutex = &sync.Mutex{}
 
 	return fVMSSC
 }
 
-func (fVMSSC *fakeVirtualMachineScaleSetsClient) setFakeStore(store map[string]map[string]compute.VirtualMachineScaleSet) {
+func (fVMSSC *fakeVirtualMachineScaleSetsClient) setFakeStore(store map[string]map[string]computepreview.VirtualMachineScaleSet) {
 	fVMSSC.mutex.Lock()
 	defer fVMSSC.mutex.Unlock()
 
 	fVMSSC.FakeStore = store
 }
 
-func (fVMSSC *fakeVirtualMachineScaleSetsClient) CreateOrUpdate(resourceGroupName string, VMScaleSetName string, parameters compute.VirtualMachineScaleSet, cancel <-chan struct{}) (<-chan compute.VirtualMachineScaleSet, <-chan error) {
+func (fVMSSC *fakeVirtualMachineScaleSetsClient) CreateOrUpdate(ctx context.Context, resourceGroupName string, VMScaleSetName string, parameters computepreview.VirtualMachineScaleSet) (resp *http.Response, err error) {
 	fVMSSC.mutex.Lock()
 	defer fVMSSC.mutex.Unlock()
 
-	resultChan := make(chan compute.VirtualMachineScaleSet, 1)
-	errChan := make(chan error, 1)
-	var result compute.VirtualMachineScaleSet
-	var err error
-	defer func() {
-		resultChan <- result
-		errChan <- err
-		close(resultChan)
-		close(errChan)
-	}()
-
 	if _, ok := fVMSSC.FakeStore[resourceGroupName]; !ok {
-		fVMSSC.FakeStore[resourceGroupName] = make(map[string]compute.VirtualMachineScaleSet)
+		fVMSSC.FakeStore[resourceGroupName] = make(map[string]computepreview.VirtualMachineScaleSet)
 	}
 	fVMSSC.FakeStore[resourceGroupName][VMScaleSetName] = parameters
-	result = fVMSSC.FakeStore[resourceGroupName][VMScaleSetName]
-	result.Response.Response = &http.Response{
-		StatusCode: http.StatusOK,
-	}
-	err = nil
-	return resultChan, errChan
+
+	return nil, nil
 }
 
-func (fVMSSC *fakeVirtualMachineScaleSetsClient) Get(resourceGroupName string, VMScaleSetName string) (result compute.VirtualMachineScaleSet, err error) {
+func (fVMSSC *fakeVirtualMachineScaleSetsClient) Get(ctx context.Context, resourceGroupName string, VMScaleSetName string) (result computepreview.VirtualMachineScaleSet, err error) {
 	fVMSSC.mutex.Lock()
 	defer fVMSSC.mutex.Unlock()
 
@@ -759,45 +751,22 @@ func (fVMSSC *fakeVirtualMachineScaleSetsClient) Get(resourceGroupName string, V
 	}
 }
 
-func (fVMSSC *fakeVirtualMachineScaleSetsClient) List(resourceGroupName string) (result compute.VirtualMachineScaleSetListResult, err error) {
+func (fVMSSC *fakeVirtualMachineScaleSetsClient) List(ctx context.Context, resourceGroupName string) (result []computepreview.VirtualMachineScaleSet, err error) {
 	fVMSSC.mutex.Lock()
 	defer fVMSSC.mutex.Unlock()
 
-	value := []compute.VirtualMachineScaleSet{}
+	result = []computepreview.VirtualMachineScaleSet{}
 	if _, ok := fVMSSC.FakeStore[resourceGroupName]; ok {
 		for _, v := range fVMSSC.FakeStore[resourceGroupName] {
-			value = append(value, v)
+			result = append(result, v)
 		}
 	}
-	result.Response.Response = &http.Response{
-		StatusCode: http.StatusOK,
-	}
-	result.NextLink = nil
-	result.Value = &value
+
 	return result, nil
 }
 
-func (fVMSSC *fakeVirtualMachineScaleSetsClient) ListNextResults(resourceGroupName string, lastResults compute.VirtualMachineScaleSetListResult) (result compute.VirtualMachineScaleSetListResult, err error) {
-	return result, nil
-}
-
-func (fVMSSC *fakeVirtualMachineScaleSetsClient) UpdateInstances(resourceGroupName string, VMScaleSetName string, VMInstanceIDs compute.VirtualMachineScaleSetVMInstanceRequiredIDs, cancel <-chan struct{}) (<-chan compute.OperationStatusResponse, <-chan error) {
-	resultChan := make(chan compute.OperationStatusResponse, 1)
-	errChan := make(chan error, 1)
-	var result compute.OperationStatusResponse
-	var err error
-	defer func() {
-		resultChan <- result
-		errChan <- err
-		close(resultChan)
-		close(errChan)
-	}()
-
-	result.Response.Response = &http.Response{
-		StatusCode: http.StatusOK,
-	}
-	err = nil
-	return resultChan, errChan
+func (fVMSSC *fakeVirtualMachineScaleSetsClient) UpdateInstances(ctx context.Context, resourceGroupName string, VMScaleSetName string, VMInstanceIDs computepreview.VirtualMachineScaleSetVMInstanceRequiredIDs) (resp *http.Response, err error) {
+	return nil, nil
 }
 
 type fakeRoutesClient struct {
