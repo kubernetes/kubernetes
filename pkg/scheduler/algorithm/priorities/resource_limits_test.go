@@ -108,31 +108,31 @@ func TestResourceLimistPriority(t *testing.T) {
 		{
 			pod:          &v1.Pod{Spec: noResources},
 			nodes:        []*v1.Node{makeNode("machine1", 4000, 10000), makeNode("machine2", 4000, 0), makeNode("machine3", 0, 10000), makeNode("machine4", 0, 0)},
-			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 0}, {Host: "machine2", Score: 0}, {Host: "machine3", Score: 0}, {Host: "machine4", Score: 0}},
+			expectedList: []*schedulerapi.HostPriority{{Host: "machine1", Score: 0}, {Host: "machine2", Score: 0}, {Host: "machine3", Score: 0}, {Host: "machine4", Score: 0}},
 			test:         "pod does not specify its resource limits",
 		},
 		{
 			pod:          &v1.Pod{Spec: cpuOnly},
 			nodes:        []*v1.Node{makeNode("machine1", 3000, 10000), makeNode("machine2", 2000, 10000)},
-			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 1}, {Host: "machine2", Score: 0}},
+			expectedList: []*schedulerapi.HostPriority{{Host: "machine1", Score: 1}, {Host: "machine2", Score: 0}},
 			test:         "pod only specifies  cpu limits",
 		},
 		{
 			pod:          &v1.Pod{Spec: memOnly},
 			nodes:        []*v1.Node{makeNode("machine1", 4000, 4000), makeNode("machine2", 5000, 10000)},
-			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 0}, {Host: "machine2", Score: 1}},
+			expectedList: []*schedulerapi.HostPriority{{Host: "machine1", Score: 0}, {Host: "machine2", Score: 1}},
 			test:         "pod only specifies  mem limits",
 		},
 		{
 			pod:          &v1.Pod{Spec: cpuAndMemory},
 			nodes:        []*v1.Node{makeNode("machine1", 4000, 4000), makeNode("machine2", 5000, 10000)},
-			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 1}, {Host: "machine2", Score: 1}},
+			expectedList: []*schedulerapi.HostPriority{{Host: "machine1", Score: 1}, {Host: "machine2", Score: 1}},
 			test:         "pod specifies both cpu and  mem limits",
 		},
 		{
 			pod:          &v1.Pod{Spec: cpuAndMemory},
 			nodes:        []*v1.Node{makeNode("machine1", 0, 0)},
-			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 0}},
+			expectedList: []*schedulerapi.HostPriority{{Host: "machine1", Score: 0}},
 			test:         "node does not advertise its allocatables",
 		},
 	}
@@ -144,7 +144,11 @@ func TestResourceLimistPriority(t *testing.T) {
 			t.Errorf("unexpected error: %v", err)
 		}
 		if !reflect.DeepEqual(test.expectedList, list) {
-			t.Errorf("%s: expected %#v, got %#v", test.test, test.expectedList, list)
+			expectedString, gotString, err := marshalComparingTestResults(test.expectedList, list)
+			if err != nil {
+				t.Error(err)
+			}
+			t.Errorf("%s: \nexpected %s, \ngot %s", test.test, expectedString, gotString)
 		}
 	}
 

@@ -50,10 +50,11 @@ type priorityMetadata struct {
 	podSelectors            []labels.Selector
 	controllerRef           *metav1.OwnerReference
 	podFirstServiceSelector labels.Selector
+	nodes                   []*v1.Node
 }
 
 // PriorityMetadata is a PriorityMetadataProducer.  Node info can be nil.
-func (pmf *PriorityMetadataFactory) PriorityMetadata(pod *v1.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo) interface{} {
+func (pmf *PriorityMetadataFactory) PriorityMetadata(pod *v1.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo, filteredNodes []*v1.Node) interface{} {
 	// If we cannot compute metadata, just return nil
 	if pod == nil {
 		return nil
@@ -65,6 +66,7 @@ func (pmf *PriorityMetadataFactory) PriorityMetadata(pod *v1.Pod, nodeNameToInfo
 		podSelectors:            getSelectors(pod, pmf.serviceLister, pmf.controllerLister, pmf.replicaSetLister, pmf.statefulSetLister),
 		controllerRef:           priorityutil.GetControllerRef(pod),
 		podFirstServiceSelector: getFirstServiceSelector(pod, pmf.serviceLister),
+		nodes: filteredNodes,
 	}
 }
 

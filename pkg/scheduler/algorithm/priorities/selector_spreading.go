@@ -61,11 +61,11 @@ func NewSelectorSpreadPriority(
 // It favors nodes that have fewer existing matching pods.
 // i.e. it pushes the scheduler towards a node where there's the smallest number of
 // pods which match the same service, RC,RSs or StatefulSets selectors as the pod being scheduled.
-func (s *SelectorSpread) CalculateSpreadPriorityMap(pod *v1.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (schedulerapi.HostPriority, error) {
+func (s *SelectorSpread) CalculateSpreadPriorityMap(pod *v1.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (*schedulerapi.HostPriority, error) {
 	var selectors []labels.Selector
 	node := nodeInfo.Node()
 	if node == nil {
-		return schedulerapi.HostPriority{}, fmt.Errorf("node not found")
+		return &schedulerapi.HostPriority{}, fmt.Errorf("node not found")
 	}
 
 	priorityMeta, ok := meta.(*priorityMetadata)
@@ -76,7 +76,7 @@ func (s *SelectorSpread) CalculateSpreadPriorityMap(pod *v1.Pod, meta interface{
 	}
 
 	if len(selectors) == 0 {
-		return schedulerapi.HostPriority{
+		return &schedulerapi.HostPriority{
 			Host:  node.Name,
 			Score: int(0),
 		}, nil
@@ -106,7 +106,7 @@ func (s *SelectorSpread) CalculateSpreadPriorityMap(pod *v1.Pod, meta interface{
 			count++
 		}
 	}
-	return schedulerapi.HostPriority{
+	return &schedulerapi.HostPriority{
 		Host:  node.Name,
 		Score: int(count),
 	}, nil
@@ -216,12 +216,12 @@ func filteredPod(namespace string, selector labels.Selector, nodeInfo *scheduler
 
 // CalculateAntiAffinityPriorityMap spreads pods by minimizing the number of pods belonging to the same service
 // on given machine
-func (s *ServiceAntiAffinity) CalculateAntiAffinityPriorityMap(pod *v1.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (schedulerapi.HostPriority, error) {
+func (s *ServiceAntiAffinity) CalculateAntiAffinityPriorityMap(pod *v1.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (*schedulerapi.HostPriority, error) {
 	var firstServiceSelector labels.Selector
 
 	node := nodeInfo.Node()
 	if node == nil {
-		return schedulerapi.HostPriority{}, fmt.Errorf("node not found")
+		return &schedulerapi.HostPriority{}, fmt.Errorf("node not found")
 	}
 	priorityMeta, ok := meta.(*priorityMetadata)
 	if ok {
@@ -232,7 +232,7 @@ func (s *ServiceAntiAffinity) CalculateAntiAffinityPriorityMap(pod *v1.Pod, meta
 	//pods matched namespace,selector on current node
 	matchedPodsOfNode := filteredPod(pod.Namespace, firstServiceSelector, nodeInfo)
 
-	return schedulerapi.HostPriority{
+	return &schedulerapi.HostPriority{
 		Host:  node.Name,
 		Score: int(len(matchedPodsOfNode)),
 	}, nil

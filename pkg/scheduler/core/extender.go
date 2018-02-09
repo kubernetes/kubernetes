@@ -165,7 +165,7 @@ func (h *HTTPExtender) Prioritize(pod *v1.Pod, nodes []*v1.Node) (*schedulerapi.
 	if h.prioritizeVerb == "" {
 		result := schedulerapi.HostPriorityList{}
 		for _, node := range nodes {
-			result = append(result, schedulerapi.HostPriority{Host: node.Name, Score: 0})
+			result = append(result, &schedulerapi.HostPriority{Host: node.Name, Score: 0})
 		}
 		return &result, 0, nil
 	}
