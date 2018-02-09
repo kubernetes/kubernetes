@@ -74,7 +74,7 @@ func TestGetStaticPodSpecs(t *testing.T) {
 
 			// Assert each specs refers to the right pod
 			if spec.Spec.Containers[0].Name != assertion.staticPodName {
-				t.Errorf("getKubeConfigSpecs spec for %s contains pod %s, expectes %s", assertion.staticPodName, spec.Spec.Containers[0].Name, assertion.staticPodName)
+				t.Errorf("getKubeConfigSpecs spec for %s contains pod %s, expects %s", assertion.staticPodName, spec.Spec.Containers[0].Name, assertion.staticPodName)
 			}
 
 		} else {

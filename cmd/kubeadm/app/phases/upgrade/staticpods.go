@@ -219,7 +219,7 @@ func performEtcdStaticPodUpgrade(waiter apiclient.Waiter, pathMgr StaticPodPathM
 	}
 
 	// Write the updated etcd static Pod manifest into the temporary directory, at this point no etcd change
-	// has occured in any aspects.
+	// has occurred in any aspects.
 	if err := etcdphase.CreateLocalEtcdStaticPodManifestFile(pathMgr.TempManifestDir(), cfg); err != nil {
 		return true, fmt.Errorf("error creating local etcd static pod manifest file: %v", err)
 	}
@@ -253,7 +253,7 @@ func performEtcdStaticPodUpgrade(waiter apiclient.Waiter, pathMgr StaticPodPathM
 
 	// Checking health state of etcd after the upgrade
 	if _, err = etcdCluster.GetEtcdClusterStatus(); err != nil {
-		// Despite the fact that upgradeComponent was sucessfull, there is something wrong with etcd cluster
+		// Despite the fact that upgradeComponent was successful, there is something wrong with etcd cluster
 		// First step is to restore back up of datastore
 		if err := rollbackEtcdData(cfg, fmt.Errorf("etcd cluster is not healthy after upgrade: %v rolling back", err), pathMgr); err != nil {
 			// Even copying back datastore failed, no options for recovery left, bailing out
@@ -324,7 +324,7 @@ func StaticPodControlPlane(waiter apiclient.Waiter, pathMgr StaticPodPathManager
 func rollbackOldManifests(oldManifests map[string]string, origErr error, pathMgr StaticPodPathManager, restoreEtcd bool) error {
 	errs := []error{origErr}
 	for component, backupPath := range oldManifests {
-		// Will restore etcd manifest only if it was explicitely requested by setting restoreEtcd to True
+		// Will restore etcd manifest only if it was explicitly requested by setting restoreEtcd to True
 		if component == constants.Etcd && !restoreEtcd {
 			continue
 		}
