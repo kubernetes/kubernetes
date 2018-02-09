@@ -268,7 +268,7 @@ type signingCtx struct {
 // "X-Amz-Content-Sha256" header with a precomputed value. The signer will
 // only compute the hash if the request header value is empty.
 func (v4 Signer) Sign(r *http.Request, body io.ReadSeeker, service, region string, signTime time.Time) (http.Header, error) {
-	return v4.signWithBody(r, body, service, region, 0, signTime)
+	return v4.signWithBody(r, body, service, region, 0, false, signTime)
 }
 
 // Presign signs AWS v4 requests with the provided body, service name, region
@@ -302,10 +302,10 @@ func (v4 Signer) Sign(r *http.Request, body io.ReadSeeker, service, region strin
 // presigned request's signature you can set the "X-Amz-Content-Sha256"
 // HTTP header and that will be included in the request's signature.
 func (v4 Signer) Presign(r *http.Request, body io.ReadSeeker, service, region string, exp time.Duration, signTime time.Time) (http.Header, error) {
-	return v4.signWithBody(r, body, service, region, exp, signTime)
+	return v4.signWithBody(r, body, service, region, exp, true, signTime)
 }
 
-func (v4 Signer) signWithBody(r *http.Request, body io.ReadSeeker, service, region string, exp time.Duration, signTime time.Time) (http.Header, error) {
+func (v4 Signer) signWithBody(r *http.Request, body io.ReadSeeker, service, region string, exp time.Duration, isPresign bool, signTime time.Time) (http.Header, error) {
 	currentTimeFn := v4.currentTimeFn
 	if currentTimeFn == nil {
 		currentTimeFn = time.Now
@@ -317,7 +317,7 @@ func (v4 Signer) signWithBody(r *http.Request, body io.ReadSeeker, service, regi
 		Query:                  r.URL.Query(),
 		Time:                   signTime,
 		ExpireTime:             exp,
-		isPresign:              exp != 0,
+		isPresign:              isPresign,
 		ServiceName:            service,
 		Region:                 region,
 		DisableURIPathEscaping: v4.DisableURIPathEscaping,
@@ -339,6 +339,7 @@ func (v4 Signer) signWithBody(r *http.Request, body io.ReadSeeker, service, regi
 		return http.Header{}, err
 	}
 
+	ctx.sanitizeHostForHeader()
 	ctx.assignAmzQueryValues()
 	ctx.build(v4.DisableHeaderHoisting)
 
@@ -361,6 +362,10 @@ func (v4 Signer) signWithBody(r *http.Request, body io.ReadSeeker, service, regi
 	}
 
 	return ctx.SignedHeaderVals, nil
+}
+
+func (ctx *signingCtx) sanitizeHostForHeader() {
+	request.SanitizeHostForHeader(ctx.Request)
 }
 
 func (ctx *signingCtx) handlePresignRemoval() {
@@ -467,7 +472,7 @@ func signSDKRequestWithCurrTime(req *request.Request, curTimeFn func() time.Time
 	}
 
 	signedHeaders, err := v4.signWithBody(req.HTTPRequest, req.GetBody(),
-		name, region, req.ExpireTime, signingTime,
+		name, region, req.ExpireTime, req.ExpireTime > 0, signingTime,
 	)
 	if err != nil {
 		req.Error = err
