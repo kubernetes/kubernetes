@@ -102,6 +102,9 @@ func ParseEncryptionConfiguration(f io.Reader) (map[schema.GroupResource]value.T
 	return result, nil
 }
 
+// The factory to create kms service. This is to make writing test easier.
+var envelopeServiceFactory = envelope.NewGRPCService
+
 // GetPrefixTransformers constructs and returns the appropriate prefix transformers for the passed resource using its configuration
 func GetPrefixTransformers(config *ResourceConfig) ([]value.PrefixTransformer, error) {
 	var result []value.PrefixTransformer
@@ -150,18 +153,18 @@ func GetPrefixTransformers(config *ResourceConfig) ([]value.PrefixTransformer, e
 			if found == true {
 				return nil, fmt.Errorf("more than one provider specified in a single element, should split into different list elements")
 			}
-			f, err := os.Open(provider.KMS.ConfigFile)
+
+			// Ensure the endpoint is provided.
+			if len(provider.KMS.Endpoint) == 0 {
+				return nil, fmt.Errorf("remote KMS provider can't use empty string as endpoint")
+			}
+
+			// Get gRPC client service with endpoint.
+			envelopeService, err := envelopeServiceFactory(provider.KMS.Endpoint)
 			if err != nil {
-				return nil, fmt.Errorf("error opening KMS provider configuration file %q: %v", provider.KMS.ConfigFile, err)
+				return nil, fmt.Errorf("could not configure KMS plugin %q, error: %v", provider.KMS.Name, err)
 			}
-			defer f.Close()
-			envelopeService, pluginFound, err := KMSPluginRegistry.getPlugin(provider.KMS.Name, f)
-			if err != nil {
-				return nil, fmt.Errorf("could not configure KMS plugin %q, %v", provider.KMS.Name, err)
-			}
-			if pluginFound == false {
-				return nil, fmt.Errorf("KMS plugin %q not found", provider.KMS.Name)
-			}
+
 			transformer, err = getEnvelopePrefixTransformer(provider.KMS, envelopeService, kmsTransformerPrefixV1)
 			found = true
 		}
