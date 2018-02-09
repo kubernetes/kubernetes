@@ -1103,18 +1103,18 @@ message UInt64Value {
     uint64 value = 1;
 }
 
-// StorageIdentifier uniquely identify the storage..
-message StorageIdentifier{
-    // UUID of the device.
-    string uuid = 1;
+// FilesystemIdentifier uniquely identify the filesystem.
+message FilesystemIdentifier{
+    // Mountpoint of a filesystem.
+    string mountpoint = 1;
 }
 
 // FilesystemUsage provides the filesystem usage information.
 message FilesystemUsage {
     // Timestamp in nanoseconds at which the information were collected. Must be > 0.
     int64 timestamp = 1;
-    // The underlying storage of the filesystem.
-    StorageIdentifier storage_id = 2;
+    // The unique identifier of the filesystem.
+    FilesystemIdentifier fs_id = 2;
     // UsedBytes represents the bytes used for images on the filesystem.
     // This may differ from the total bytes used on the filesystem and may not
     // equal CapacityBytes - AvailableBytes.
