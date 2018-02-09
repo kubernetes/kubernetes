@@ -340,8 +340,8 @@ func (util *ISCSIUtil) AttachDisk(b iscsiDiskMounter) (string, error) {
 
 // globalPDPathOperation returns global mount path related operations based on volumeMode.
 // If the volumeMode is 'Filesystem' or not defined, plugin needs to create a dir, persist
-// iscsi configrations, and then format/mount the volume.
-// If the volumeMode is 'Block', plugin creates a dir and persists iscsi configrations.
+// iscsi configurations, and then format/mount the volume.
+// If the volumeMode is 'Block', plugin creates a dir and persists iscsi configurations.
 // Since volume type is block, plugin doesn't need to format/mount the volume.
 func globalPDPathOperation(b iscsiDiskMounter) func(iscsiDiskMounter, string, *ISCSIUtil) (string, error) {
 	// TODO: remove feature gate check after no longer needed
