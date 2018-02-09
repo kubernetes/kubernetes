@@ -25,10 +25,10 @@ import (
 	hashutil "k8s.io/kubernetes/pkg/util/hash"
 )
 
-var _ checkpointmanager.Checkpoint = &cpuManagerCheckpoint{}
+var _ checkpointmanager.Checkpoint = &CPUManagerCheckpoint{}
 
-// cpuManagerCheckpoint struct is used to store cpu/pod assignments in a checkpoint
-type cpuManagerCheckpoint struct {
+// CPUManagerCheckpoint struct is used to store cpu/pod assignments in a checkpoint
+type CPUManagerCheckpoint struct {
 	PolicyName    string
 	DefaultCPUSet string
 	Entries       map[string]string
@@ -36,17 +36,17 @@ type cpuManagerCheckpoint struct {
 }
 
 // NewCPUManagerCheckpoint returns an instance of Checkpoint
-func NewCPUManagerCheckpoint() *cpuManagerCheckpoint {
-	return &cpuManagerCheckpoint{Entries: make(map[string]string)}
+func NewCPUManagerCheckpoint() *CPUManagerCheckpoint {
+	return &CPUManagerCheckpoint{Entries: make(map[string]string)}
 }
 
 // MarshalCheckpoint returns marshalled checkpoint
-func (cp *cpuManagerCheckpoint) MarshalCheckpoint() ([]byte, error) {
+func (cp *CPUManagerCheckpoint) MarshalCheckpoint() ([]byte, error) {
 	return json.Marshal(*cp)
 }
 
 // UnmarshalCheckpoint tries to unmarshal passed bytes to checkpoint
-func (cp *cpuManagerCheckpoint) UnmarshalCheckpoint(blob []byte) error {
+func (cp *CPUManagerCheckpoint) UnmarshalCheckpoint(blob []byte) error {
 	if err := json.Unmarshal(blob, cp); err != nil {
 		return err
 	}
@@ -57,7 +57,7 @@ func (cp *cpuManagerCheckpoint) UnmarshalCheckpoint(blob []byte) error {
 }
 
 // GetChecksum returns calculated checksum of checkpoint
-func (cp *cpuManagerCheckpoint) GetChecksum() uint64 {
+func (cp *CPUManagerCheckpoint) GetChecksum() uint64 {
 	orig := cp.Checksum
 	cp.Checksum = 0
 	hash := fnv.New32a()
@@ -67,6 +67,6 @@ func (cp *cpuManagerCheckpoint) GetChecksum() uint64 {
 }
 
 // UpdateChecksum calculates and updates checksum of the checkpoint
-func (cp *cpuManagerCheckpoint) UpdateChecksum() {
+func (cp *CPUManagerCheckpoint) UpdateChecksum() {
 	cp.Checksum = cp.GetChecksum()
 }
