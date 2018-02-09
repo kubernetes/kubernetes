@@ -19,10 +19,10 @@ package disk
 
 // UserAgent returns the UserAgent string to use when sending http.Requests.
 func UserAgent() string {
-	return "Azure-SDK-For-Go/v12.1.0-beta arm-disk/2016-04-30-preview"
+	return "Azure-SDK-For-Go/v12.4.0-beta arm-disk/2016-04-30-preview"
 }
 
 // Version returns the semantic version (see http://semver.org) of the client.
 func Version() string {
-	return "v12.1.0-beta"
+	return "v12.4.0-beta"
 }
