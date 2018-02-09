@@ -19,6 +19,7 @@ limitations under the License.
 package mount
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -472,23 +473,33 @@ func (mounter *Mounter) ExistsPath(pathname string) bool {
 
 // formatAndMount uses unix utils to format and mount the given disk
 func (mounter *SafeFormatAndMount) formatAndMount(source string, target string, fstype string, options []string) error {
+	readOnly := false
+	for _, option := range options {
+		if option == "ro" {
+			readOnly = true
+			break
+		}
+	}
+
 	options = append(options, "defaults")
 
-	// Run fsck on the disk to fix repairable issues
-	glog.V(4).Infof("Checking for issues with fsck on disk: %s", source)
-	args := []string{"-a", source}
-	out, err := mounter.Exec.Run("fsck", args...)
-	if err != nil {
-		ee, isExitError := err.(utilexec.ExitError)
-		switch {
-		case err == utilexec.ErrExecutableNotFound:
-			glog.Warningf("'fsck' not found on system; continuing mount without running 'fsck'.")
-		case isExitError && ee.ExitStatus() == fsckErrorsCorrected:
-			glog.Infof("Device %s has errors which were corrected by fsck.", source)
-		case isExitError && ee.ExitStatus() == fsckErrorsUncorrected:
-			return fmt.Errorf("'fsck' found errors on device %s but could not correct them: %s.", source, string(out))
-		case isExitError && ee.ExitStatus() > fsckErrorsUncorrected:
-			glog.Infof("`fsck` error %s", string(out))
+	if !readOnly {
+		// Run fsck on the disk to fix repairable issues, only do this for volumes requested as rw.
+		glog.V(4).Infof("Checking for issues with fsck on disk: %s", source)
+		args := []string{"-a", source}
+		out, err := mounter.Exec.Run("fsck", args...)
+		if err != nil {
+			ee, isExitError := err.(utilexec.ExitError)
+			switch {
+			case err == utilexec.ErrExecutableNotFound:
+				glog.Warningf("'fsck' not found on system; continuing mount without running 'fsck'.")
+			case isExitError && ee.ExitStatus() == fsckErrorsCorrected:
+				glog.Infof("Device %s has errors which were corrected by fsck.", source)
+			case isExitError && ee.ExitStatus() == fsckErrorsUncorrected:
+				return fmt.Errorf("'fsck' found errors on device %s but could not correct them: %s.", source, string(out))
+			case isExitError && ee.ExitStatus() > fsckErrorsUncorrected:
+				glog.Infof("`fsck` error %s", string(out))
+			}
 		}
 	}
 
@@ -503,8 +514,13 @@ func (mounter *SafeFormatAndMount) formatAndMount(source string, target string, 
 			return err
 		}
 		if existingFormat == "" {
+			if readOnly {
+				// Don't attempt to format if mounting as readonly, return an error to reflect this.
+				return errors.New("failed to mount unformatted volume as read only")
+			}
+
 			// Disk is unformatted so format it.
-			args = []string{source}
+			args := []string{source}
 			// Use 'ext4' as the default
 			if len(fstype) == 0 {
 				fstype = "ext4"
