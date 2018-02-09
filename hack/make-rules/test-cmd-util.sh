@@ -77,6 +77,7 @@ selfsubjectaccessreviews="selfsubjectaccessreviews"
 customresourcedefinitions="customresourcedefinitions"
 daemonsets="daemonsets"
 controllerrevisions="controllerrevisions"
+podsecuritypolicies="podsecuritypolicies"
 
 
 # include shell2junit library
@@ -3823,6 +3824,35 @@ run_service_accounts_tests() {
   set +o errexit
 }
 
+run_pod_security_policy_tests() {
+  set -o nounset
+  set -o errexit
+
+  create_and_use_new_namespace
+  kube::log::status "Testing pod security policy"
+
+  ### Create a new namespace
+  # Pre-condition: the test-service-accounts namespace does not exist
+  kube::test::get_object_assert 'namespaces' '{{range.items}}{{ if eq $id_field \"test-pod-security-policies\" }}found{{end}}{{end}}:' ':'
+  # Command
+  kubectl create namespace test-pod-security-policies
+  # Post-condition: namespace 'test-service-accounts' is created.
+  kube::test::get_object_assert 'namespaces/test-pod-security-policies' "{{$id_field}}" 'test-pod-security-policies'
+
+  ### Create a service account in a specific namespace
+  # Command
+  kubectl create podsecuritypolicy test-pod-security-policy --namespace=test-pod-security-policies --privileged=false --selinux=RunAsAny --supplemental-groups=RunAsAny --run-as-user=RunAsAny --fs-group=RunAsAny
+  # Post-condition: secret exists and has expected values
+  kube::test::get_object_assert 'podsecuritypolicy/test-pod-security-policy --namespace=test-pod-security-policies' "{{$id_field}}" 'test-pod-security-policy'
+  # Clean-up
+  kubectl delete podsecuritypolicy test-pod-security-policy --namespace=test-pod-security-policies
+  # Clean up
+  kubectl delete namespace test-pod-security-policies
+
+  set +o nounset
+  set +o errexit
+}
+
 run_pod_templates_tests() {
   set -o nounset
   set -o errexit
@@ -4793,6 +4823,14 @@ runTests() {
 
   if kube::test::if_supports_resource "${namespaces}" && kube::test::if_supports_resource "${serviceaccounts}" ; then
     record_command run_service_accounts_tests
+  fi
+
+  ####################
+  # PodSecurityPolicy#
+  ####################
+
+  if kube::test::if_supports_resource "${namespaces}" && kube::test::if_supports_resource "${podsecuritypolicies}" ; then
+    record_command run_pod_security_policy_tests
   fi
 
   #################
