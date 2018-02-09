@@ -214,7 +214,7 @@ func (scaler *ReplicationControllerScaler) Scale(namespace, name string, newSize
 			return rc.Status.ObservedGeneration >= rc.Generation && rc.Status.Replicas == rc.Spec.Replicas
 		}
 		// If number of replicas doesn't change, then the update may not event
-		// be sent to underlying databse (we don't send no-op changes).
+		// be sent to underlying database (we don't send no-op changes).
 		// In such case, <updatedResourceVersion> will have value of the most
 		// recent update (which may be far in the past) so we may get "too old
 		// RV" error from watch or potentially no ReplicationController events

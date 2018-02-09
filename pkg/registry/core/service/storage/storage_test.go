@@ -162,7 +162,7 @@ func TestWatch(t *testing.T) {
 		[]fields.Set{
 			{"metadata.name": "foo"},
 		},
-		// not matchin fields
+		// not matching fields
 		[]fields.Set{
 			{"metadata.name": "bar"},
 		},

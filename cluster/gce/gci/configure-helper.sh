@@ -1934,7 +1934,7 @@ function start-cluster-autoscaler {
 #
 # $1: addon category under /etc/kubernetes
 # $2: manifest source dir
-# $3: (optional) auxilary manifest source dir
+# $3: (optional) auxiliary manifest source dir
 function setup-addon-manifests {
   local -r src_dir="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty"
   local -r dst_dir="/etc/kubernetes/$1/$2"

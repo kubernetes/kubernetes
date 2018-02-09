@@ -33,10 +33,10 @@ import (
 )
 
 const (
-	// Now only supportied unix domain socket.
+	// Now only supported unix domain socket.
 	unixProtocol = "unix"
 
-	// Current version for the protocal interface definition.
+	// Current version for the protocol interface definition.
 	kmsapiVersion = "v1beta1"
 
 	// The timeout that communicate with KMS server.

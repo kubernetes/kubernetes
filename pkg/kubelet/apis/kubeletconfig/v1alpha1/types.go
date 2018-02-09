@@ -82,7 +82,7 @@ type KubeletConfiguration struct {
 	// and key are generated for the public address and saved to the directory
 	// passed to certDir.
 	TLSCertFile string `json:"tlsCertFile"`
-	// tlsPrivateKeyFile is the ile containing x509 private key matching
+	// tlsPrivateKeyFile is the file containing x509 private key matching
 	// tlsCertFile.
 	TLSPrivateKeyFile string `json:"tlsPrivateKeyFile"`
 	// TLSCipherSuites is the list of allowed cipher suites for the server.
@@ -181,7 +181,7 @@ type KubeletConfiguration struct {
 	//   "hairpin-veth":       set the hairpin flag on container veth interfaces.
 	//   "none":               do nothing.
 	// Generally, one must set --hairpin-mode=hairpin-veth to achieve hairpin NAT,
-	// because promiscous-bridge assumes the existence of a container bridge named cbr0.
+	// because promiscuous-bridge assumes the existence of a container bridge named cbr0.
 	HairpinMode string `json:"hairpinMode"`
 	// maxPods is the number of pods that can run on this Kubelet.
 	MaxPods int32 `json:"maxPods"`

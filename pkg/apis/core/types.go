@@ -4065,7 +4065,7 @@ type Event struct {
 type EventSeries struct {
 	// Number of occurrences in this series up to the last heartbeat time
 	Count int32
-	// Time of the last occurence observed
+	// Time of the last occurrence observed
 	LastObservedTime metav1.MicroTime
 	// State of this Series: Ongoing or Finished
 	State EventSeriesState

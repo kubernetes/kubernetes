@@ -12,7 +12,7 @@
 
 ## Custom Metrics API
 
-***NB: None of the below implemenations are officially part of Kubernetes.
+***NB: None of the below implementations are officially part of Kubernetes.
 They are listed here for convenience.***
 
 - [Prometheus

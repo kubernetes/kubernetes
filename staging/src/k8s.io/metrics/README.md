@@ -15,7 +15,7 @@ library when implementing their API servers.
 ## APIs
 
 This repository contains types and clients for several APIs.  For more
-details on implemenations of these apis, see
+details on implementations of these apis, see
 [IMPLEMENTATIONS.md](IMPLEMENTATIONS.md).
 
 ### Custom Metrics API

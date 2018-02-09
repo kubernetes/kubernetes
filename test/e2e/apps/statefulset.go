@@ -324,7 +324,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			ss = sst.WaitForStatus(ss)
 			currentRevision, updateRevision = ss.Status.CurrentRevision, ss.Status.UpdateRevision
 			Expect(currentRevision).NotTo(Equal(updateRevision),
-				"Current revision should not equal update revision during roll bakc")
+				"Current revision should not equal update revision during roll back")
 			Expect(priorRevision).To(Equal(updateRevision),
 				"Prior revision should equal update revision during roll back")
 

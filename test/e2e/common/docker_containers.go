@@ -62,7 +62,7 @@ var _ = framework.KubeDescribe("Docker Containers", func() {
 			Container, ensure that it takes precedent to the docker image's default
 			command.
 	*/
-	framework.ConformanceIt("should be able to override the image's default commmand (docker entrypoint) ", func() {
+	framework.ConformanceIt("should be able to override the image's default command (docker entrypoint) ", func() {
 		pod := entrypointTestPod()
 		pod.Spec.Containers[0].Command = []string{"/ep-2"}
 

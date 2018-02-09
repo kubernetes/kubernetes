@@ -137,7 +137,7 @@ var _ = framework.KubeDescribe("GarbageCollect [Serial]", func() {
 
 // Tests the following:
 // 	pods are created, and all containers restart the specified number of times
-// 	while contianers are running, the number of copies of a single container does not exceed maxPerPodContainer
+// 	while containers are running, the number of copies of a single container does not exceed maxPerPodContainer
 // 	while containers are running, the total number of containers does not exceed maxTotalContainers
 // 	while containers are running, if not constrained by maxPerPodContainer or maxTotalContainers, keep an extra copy of each container
 // 	once pods are killed, all containers are eventually cleaned up

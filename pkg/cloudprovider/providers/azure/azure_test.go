@@ -1243,7 +1243,7 @@ func validatePublicIP(t *testing.T, publicIP *network.PublicIPAddress, service *
 	}
 	// We cannot use service.Spec.LoadBalancerIP to compare with
 	// Public IP's IPAddress
-	// Becuase service properties are updated outside of cloudprovider code
+	// Because service properties are updated outside of cloudprovider code
 }
 
 func contains(ruleValues []string, targetValue string) bool {

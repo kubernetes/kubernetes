@@ -1665,7 +1665,7 @@ func WaitForEndpoint(c clientset.Interface, ns, name string) error {
 }
 
 // Context for checking pods responses by issuing GETs to them (via the API
-// proxy) and verifying that they answer with ther own pod name.
+// proxy) and verifying that they answer with there own pod name.
 type podProxyResponseChecker struct {
 	c              clientset.Interface
 	ns             string

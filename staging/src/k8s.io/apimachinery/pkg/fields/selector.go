@@ -396,7 +396,7 @@ const (
 var termOperators = []string{notEqualOperator, doubleEqualOperator, equalOperator}
 
 // splitTerm returns the lhs, operator, and rhs parsed from the given term, along with an indicator of whether the parse was successful.
-// no escaping of special characters is supported in the lhs value, so the first occurance of a recognized operator is used as the split point.
+// no escaping of special characters is supported in the lhs value, so the first occurrence of a recognized operator is used as the split point.
 // the literal rhs is returned, and the caller is responsible for applying any desired unescaping.
 func splitTerm(term string) (lhs, op, rhs string, ok bool) {
 	for i := range term {

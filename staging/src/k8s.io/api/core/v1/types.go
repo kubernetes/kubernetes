@@ -1901,7 +1901,7 @@ type SecretKeySelector struct {
 
 // EnvFromSource represents the source of a set of ConfigMaps
 type EnvFromSource struct {
-	// An optional identifer to prepend to each key in the ConfigMap. Must be a C_IDENTIFIER.
+	// An optional identifier to prepend to each key in the ConfigMap. Must be a C_IDENTIFIER.
 	// +optional
 	Prefix string `json:"prefix,omitempty" protobuf:"bytes,1,opt,name=prefix"`
 	// The ConfigMap to select from
@@ -4583,11 +4583,11 @@ type Event struct {
 }
 
 // EventSeries contain information on series of events, i.e. thing that was/is happening
-// continously for some time.
+// continuously for some time.
 type EventSeries struct {
 	// Number of occurrences in this series up to the last heartbeat time
 	Count int32 `json:"count,omitempty" protobuf:"varint,1,name=count"`
-	// Time of the last occurence observed
+	// Time of the last occurrence observed
 	LastObservedTime metav1.MicroTime `json:"lastObservedTime,omitempty" protobuf:"bytes,2,name=lastObservedTime"`
 	// State of this Series: Ongoing or Finished
 	State EventSeriesState `json:"state,omitempty" protobuf:"bytes,3,name=state"`

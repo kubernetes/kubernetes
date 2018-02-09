@@ -25,7 +25,7 @@ import (
 	"golang.org/x/sys/windows"
 )
 
-// getCurrentVersionVal gets value of speficied key from registry.
+// getCurrentVersionVal gets value of specified key from registry.
 func getCurrentVersionVal(key string) (string, error) {
 	var h windows.Handle
 	if err := windows.RegOpenKeyEx(windows.HKEY_LOCAL_MACHINE,

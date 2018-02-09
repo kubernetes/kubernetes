@@ -658,7 +658,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 		time.Sleep(2 * kubelet.MaxContainerBackOff) // it takes slightly more than 2*x to get to a back-off of x
 
 		// wait for a delay == capped delay of MaxContainerBackOff
-		By("geting restart delay when capped")
+		By("getting restart delay when capped")
 		var (
 			delay1 time.Duration
 			err    error

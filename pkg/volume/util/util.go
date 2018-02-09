@@ -321,7 +321,7 @@ type BlockVolumePathHandler interface {
 	UnmapDevice(mapPath string, linkName string) error
 	// RemovePath removes a file or directory on specified map path
 	RemoveMapPath(mapPath string) error
-	// IsSymlinkExist retruns true if specified symbolic link exists
+	// IsSymlinkExist returns true if specified symbolic link exists
 	IsSymlinkExist(mapPath string) (bool, error)
 	// GetDeviceSymlinkRefs searches symbolic links under global map path
 	GetDeviceSymlinkRefs(devPath string, mapPath string) ([]string, error)
@@ -380,7 +380,7 @@ func (v VolumePathHandler) MapDevice(devicePath string, mapPath string, linkName
 	}
 	// Remove old symbolic link(or file) then create new one.
 	// This should be done because current symbolic link is
-	// stale accross node reboot.
+	// stale across node reboot.
 	linkPath := path.Join(mapPath, string(linkName))
 	if err = os.Remove(linkPath); err != nil && !os.IsNotExist(err) {
 		return err

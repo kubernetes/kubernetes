@@ -197,7 +197,7 @@ func (gc *GarbageCollector) Sync(discoveryClient discovery.DiscoveryInterface, p
 		// discovered by restMapper during the call to Reset, since they are
 		// distinct discovery clients invalidated at different times. For example,
 		// newResources may contain resources not returned in the restMapper's
-		// discovery call if the resources appeared inbetween the calls. In that
+		// discovery call if the resources appeared in-between the calls. In that
 		// case, the restMapper will fail to map some of newResources until the next
 		// sync period.
 		if err := gc.resyncMonitors(newResources); err != nil {
@@ -214,7 +214,7 @@ func (gc *GarbageCollector) Sync(discoveryClient discovery.DiscoveryInterface, p
 
 		// Finally, keep track of our new state. Do this after all preceding steps
 		// have succeeded to ensure we'll retry on subsequent syncs if an error
-		// occured.
+		// occurred.
 		oldResources = newResources
 		glog.V(2).Infof("synced garbage collector")
 	}, period, stopCh)

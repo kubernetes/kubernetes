@@ -403,7 +403,7 @@ func allowFlexVolumesPSP(allowAllFlexVolumes, allowAllVolumes bool) *extensions.
 }
 
 func TestValidateContainerSecurityContextFailures(t *testing.T) {
-	// fail user strat
+	// fail user strategy
 	failUserPSP := defaultPSP()
 	uid := int64(999)
 	badUID := int64(1)
@@ -414,7 +414,7 @@ func TestValidateContainerSecurityContextFailures(t *testing.T) {
 	failUserPod := defaultPod()
 	failUserPod.Spec.Containers[0].SecurityContext.RunAsUser = &badUID
 
-	// fail selinux strat
+	// fail selinux strategy
 	failSELinuxPSP := defaultPSP()
 	failSELinuxPSP.Spec.SELinux = extensions.SELinuxStrategyOptions{
 		Rule: extensions.SELinuxStrategyMustRunAs,
@@ -741,7 +741,7 @@ func TestValidatePodSecurityContextSuccess(t *testing.T) {
 }
 
 func TestValidateContainerSecurityContextSuccess(t *testing.T) {
-	// success user strat
+	// success user strategy
 	userPSP := defaultPSP()
 	uid := int64(999)
 	userPSP.Spec.RunAsUser = extensions.RunAsUserStrategyOptions{
@@ -751,7 +751,7 @@ func TestValidateContainerSecurityContextSuccess(t *testing.T) {
 	userPod := defaultPod()
 	userPod.Spec.Containers[0].SecurityContext.RunAsUser = &uid
 
-	// success selinux strat
+	// success selinux strategy
 	seLinuxPSP := defaultPSP()
 	seLinuxPSP.Spec.SELinux = extensions.SELinuxStrategyOptions{
 		Rule: extensions.SELinuxStrategyMustRunAs,

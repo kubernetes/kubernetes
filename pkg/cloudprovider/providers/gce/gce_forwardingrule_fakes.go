@@ -41,7 +41,7 @@ func NewFakeCloudForwardingRuleService() *FakeCloudForwardingRuleService {
 	}
 }
 
-// SetRegionalForwardingRulees sets the fwdRuleesses of ther region. This is used for
+// SetRegionalForwardingRulees sets the fwdRuleesses of there region. This is used for
 // setting the test environment.
 func (f *FakeCloudForwardingRuleService) SetRegionalForwardingRulees(region string, fwdRules []*computealpha.ForwardingRule) {
 	// Reset fwdRuleesses in the region.

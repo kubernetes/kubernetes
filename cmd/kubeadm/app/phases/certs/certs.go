@@ -140,7 +140,7 @@ func CreateServiceAccountKeyAndPublicKeyFiles(cfg *kubeadmapi.MasterConfiguratio
 
 // CreateFrontProxyCACertAndKeyFiles create a self signed front proxy CA certificate and key files.
 // Front proxy CA and client certs are used to secure a front proxy authenticator which is used to assert identity
-// without the client cert; This is a separte CA, so that front proxy identities cannot hit the API and normal client certs cannot be used
+// without the client cert; This is a separate CA, so that front proxy identities cannot hit the API and normal client certs cannot be used
 // as front proxies.
 // If the front proxy CA certificate and key files already exists in the target folder, they are used only if evaluated equals; otherwise an error is returned.
 func CreateFrontProxyCACertAndKeyFiles(cfg *kubeadmapi.MasterConfiguration) error {

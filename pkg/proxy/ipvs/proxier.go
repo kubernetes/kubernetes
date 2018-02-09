@@ -1641,7 +1641,7 @@ func (proxier *Proxier) syncEndpoint(svcPortName proxy.ServicePortName, onlyNode
 		return err
 	}
 
-	// curEndpoints represents IPVS destiantions listed from current system.
+	// curEndpoints represents IPVS destinations listed from current system.
 	curEndpoints := sets.NewString()
 	// newEndpoints represents Endpoints watched from API Server.
 	newEndpoints := sets.NewString()

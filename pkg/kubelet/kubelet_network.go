@@ -282,7 +282,7 @@ func getIPTablesMark(bit int) string {
 	return fmt.Sprintf("%#08x/%#08x", value, value)
 }
 
-// GetPodDNS returns DNS setttings for the pod.
+// GetPodDNS returns DNS settings for the pod.
 // This function is defined in kubecontainer.RuntimeHelper interface so we
 // have to implement it.
 func (kl *Kubelet) GetPodDNS(pod *v1.Pod) (*runtimeapi.DNSConfig, error) {

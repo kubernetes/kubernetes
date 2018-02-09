@@ -3473,13 +3473,13 @@ run_kubectl_config_set_tests() {
   cert_data=$(echo "#Comment" && cat "${TMPDIR:-/tmp}/apiserver.crt")
 
   kubectl config set clusters.test-cluster.certificate-authority-data "$cert_data" --set-raw-bytes
-  r_writen=$(kubectl config view --raw -o jsonpath='{.clusters[?(@.name == "test-cluster")].cluster.certificate-authority-data}')
+  r_written=$(kubectl config view --raw -o jsonpath='{.clusters[?(@.name == "test-cluster")].cluster.certificate-authority-data}')
 
   encoded=$(echo -n "$cert_data" | base64)
   kubectl config set clusters.test-cluster.certificate-authority-data "$encoded"
-  e_writen=$(kubectl config view --raw -o jsonpath='{.clusters[?(@.name == "test-cluster")].cluster.certificate-authority-data}')
+  e_written=$(kubectl config view --raw -o jsonpath='{.clusters[?(@.name == "test-cluster")].cluster.certificate-authority-data}')
 
-  test "$e_writen" == "$r_writen"
+  test "$e_written" == "$r_written"
 
   set +o nounset
   set +o errexit
