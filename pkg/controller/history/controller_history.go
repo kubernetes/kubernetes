@@ -18,7 +18,6 @@ package history
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"hash/fnv"
 	"sort"
@@ -63,11 +62,12 @@ func ControllerRevisionName(prefix string, hash uint32) string {
 // returned error is not nil, the returned ControllerRevision is invalid for use.
 func NewControllerRevision(parent metav1.Object,
 	parentKind schema.GroupVersionKind,
+	podLabels map[string]string,
 	selector labels.Selector,
 	data runtime.RawExtension,
 	revision int64,
 	collisionCount *int32) (*apps.ControllerRevision, error) {
-	labelMap := getPodLabelsFromData(data)
+	labelMap := podLabels
 	blockOwnerDeletion := true
 	isController := true
 	cr := &apps.ControllerRevision{
@@ -451,32 +451,4 @@ func (fh *fakeHistory) ReleaseControllerRevision(parent metav1.Object, revision 
 		}
 	}
 	return clone, fh.indexer.Update(clone)
-}
-
-func getPodLabelsFromData(data runtime.RawExtension) map[string]string {
-	var dat map[string]interface{}
-	labelMap := make(map[string]string)
-	if err := json.Unmarshal(data.Raw, &dat); err != nil {
-		return labelMap
-	}
-	spec, ok := dat["spec"].(map[string]interface{})
-	if !ok {
-		return labelMap
-	}
-	template, ok := spec["template"].(map[string]interface{})
-	if !ok {
-		return labelMap
-	}
-	metadata, ok := template["metadata"].(map[string]interface{})
-	if !ok {
-		return labelMap
-	}
-	labels, ok := metadata["labels"].(map[string]interface{})
-	if !ok {
-		return labelMap
-	}
-	for key, value := range labels {
-		labelMap[key] = value.(string)
-	}
-	return labelMap
 }
