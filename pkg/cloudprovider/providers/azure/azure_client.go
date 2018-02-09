@@ -140,6 +140,10 @@ type azVirtualMachinesClient struct {
 	rateLimiter flowcontrol.RateLimiter
 }
 
+func getContextWithCancel() (context.Context, context.CancelFunc) {
+	return context.WithCancel(context.Background())
+}
+
 func newAzVirtualMachinesClient(config *azClientConfig) *azVirtualMachinesClient {
 	virtualMachinesClient := compute.NewVirtualMachinesClient(config.subscriptionID)
 	virtualMachinesClient.BaseURI = config.resourceManagerEndpoint

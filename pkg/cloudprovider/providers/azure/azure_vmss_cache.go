@@ -58,7 +58,9 @@ func (ss *scaleSet) extractVmssVMName(name string) (string, string, error) {
 
 func (ss *scaleSet) newVmssCache() (*timedCache, error) {
 	getter := func(key string) (interface{}, error) {
-		result, err := ss.VirtualMachineScaleSetsClient.Get(ss.ResourceGroup, key)
+		ctx, cancel := getContextWithCancel()
+		defer cancel()
+		result, err := ss.VirtualMachineScaleSetsClient.Get(ctx, ss.ResourceGroup, key)
 		exists, realErr := checkResourceExistsFromError(err)
 		if realErr != nil {
 			return nil, realErr
@@ -76,14 +78,14 @@ func (ss *scaleSet) newVmssCache() (*timedCache, error) {
 
 func (ss *scaleSet) newNodeNameToScaleSetMappingCache() (*timedCache, error) {
 	getter := func(key string) (interface{}, error) {
-		scaleSetNames, err := ss.listScaleSetsWithRetry()
+		scaleSetNames, err := ss.listScaleSets()
 		if err != nil {
 			return nil, err
 		}
 
 		localCache := make(nodeNameToScaleSetMapping)
 		for _, ssName := range scaleSetNames {
-			vms, err := ss.listScaleSetVMsWithRetry(ssName)
+			vms, err := ss.listScaleSetVMs(ssName)
 			if err != nil {
 				return nil, err
 			}
@@ -136,7 +138,9 @@ func (ss *scaleSet) newVmssVMCache() (*timedCache, error) {
 			return nil, nil
 		}
 
-		result, err := ss.VirtualMachineScaleSetVMsClient.Get(ss.ResourceGroup, ssName, instanceID)
+		ctx, cancel := getContextWithCancel()
+		defer cancel()
+		result, err := ss.VirtualMachineScaleSetVMsClient.Get(ctx, ss.ResourceGroup, ssName, instanceID)
 		exists, realErr := checkResourceExistsFromError(err)
 		if realErr != nil {
 			return nil, realErr
