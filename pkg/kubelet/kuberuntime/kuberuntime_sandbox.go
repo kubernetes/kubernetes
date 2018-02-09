@@ -44,7 +44,7 @@ func (m *kubeGenericRuntimeManager) createPodSandbox(pod *v1.Pod, attempt uint32
 	err = m.osInterface.MkdirAll(podSandboxConfig.LogDirectory, 0755)
 	if err != nil {
 		message := fmt.Sprintf("Create pod log directory for pod %q failed: %v", format.Pod(pod), err)
-		glog.Errorf(message)
+		glog.Error(message)
 		return "", message, err
 	}
 
@@ -195,7 +195,7 @@ func (m *kubeGenericRuntimeManager) getKubeletSandboxes(all bool) ([]*runtimeapi
 // determinePodSandboxIP determines the IP address of the given pod sandbox.
 func (m *kubeGenericRuntimeManager) determinePodSandboxIP(podNamespace, podName string, podSandbox *runtimeapi.PodSandboxStatus) string {
 	if podSandbox.Network == nil {
-		glog.Warningf("Pod Sandbox status doesn't have network information, cannot report IP")
+		glog.Warning("Pod Sandbox status doesn't have network information, cannot report IP")
 		return ""
 	}
 	ip := podSandbox.Network.Ip
