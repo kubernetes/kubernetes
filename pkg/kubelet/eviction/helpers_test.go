@@ -993,9 +993,6 @@ func TestMakeSignalObservations(t *testing.T) {
 		},
 		Pods: []statsapi.PodStats{},
 	}
-	provider := &fakeSummaryProvider{
-		result: fakeStats,
-	}
 	pods := []*v1.Pod{
 		podMaker("pod1", "ns1", "uuid1", 1),
 		podMaker("pod1", "ns2", "uuid2", 1),
@@ -1011,10 +1008,7 @@ func TestMakeSignalObservations(t *testing.T) {
 	if res.CmpInt64(int64(allocatableMemoryCapacity)) != 0 {
 		t.Errorf("Expected Threshold %v to be equal to value %v", res.Value(), allocatableMemoryCapacity)
 	}
-	actualObservations, statsFunc, err := makeSignalObservations(provider, capacityProvider, pods)
-	if err != nil {
-		t.Errorf("Unexpected err: %v", err)
-	}
+	actualObservations, statsFunc := makeSignalObservations(fakeStats, capacityProvider, pods)
 	allocatableMemQuantity, found := actualObservations[evictionapi.SignalAllocatableMemoryAvailable]
 	if !found {
 		t.Errorf("Expected allocatable memory observation, but didnt find one")
@@ -1027,7 +1021,7 @@ func TestMakeSignalObservations(t *testing.T) {
 	}
 	memQuantity, found := actualObservations[evictionapi.SignalMemoryAvailable]
 	if !found {
-		t.Errorf("Expected available memory observation: %v", err)
+		t.Error("Expected available memory observation")
 	}
 	if expectedBytes := int64(nodeAvailableBytes); memQuantity.available.Value() != expectedBytes {
 		t.Errorf("Expected %v, actual: %v", expectedBytes, memQuantity.available.Value())
@@ -1037,7 +1031,7 @@ func TestMakeSignalObservations(t *testing.T) {
 	}
 	nodeFsQuantity, found := actualObservations[evictionapi.SignalNodeFsAvailable]
 	if !found {
-		t.Errorf("Expected available nodefs observation: %v", err)
+		t.Error("Expected available nodefs observation")
 	}
 	if expectedBytes := int64(nodeFsAvailableBytes); nodeFsQuantity.available.Value() != expectedBytes {
 		t.Errorf("Expected %v, actual: %v", expectedBytes, nodeFsQuantity.available.Value())
@@ -1047,7 +1041,7 @@ func TestMakeSignalObservations(t *testing.T) {
 	}
 	nodeFsInodesQuantity, found := actualObservations[evictionapi.SignalNodeFsInodesFree]
 	if !found {
-		t.Errorf("Expected inodes free nodefs observation: %v", err)
+		t.Error("Expected inodes free nodefs observation")
 	}
 	if expected := int64(nodeFsInodesFree); nodeFsInodesQuantity.available.Value() != expected {
 		t.Errorf("Expected %v, actual: %v", expected, nodeFsInodesQuantity.available.Value())
@@ -1057,7 +1051,7 @@ func TestMakeSignalObservations(t *testing.T) {
 	}
 	imageFsQuantity, found := actualObservations[evictionapi.SignalImageFsAvailable]
 	if !found {
-		t.Errorf("Expected available imagefs observation: %v", err)
+		t.Error("Expected available imagefs observation")
 	}
 	if expectedBytes := int64(imageFsAvailableBytes); imageFsQuantity.available.Value() != expectedBytes {
 		t.Errorf("Expected %v, actual: %v", expectedBytes, imageFsQuantity.available.Value())
@@ -1067,7 +1061,7 @@ func TestMakeSignalObservations(t *testing.T) {
 	}
 	imageFsInodesQuantity, found := actualObservations[evictionapi.SignalImageFsInodesFree]
 	if !found {
-		t.Errorf("Expected inodes free imagefs observation: %v", err)
+		t.Error("Expected inodes free imagefs observation")
 	}
 	if expected := int64(imageFsInodesFree); imageFsInodesQuantity.available.Value() != expected {
 		t.Errorf("Expected %v, actual: %v", expected, imageFsInodesQuantity.available.Value())

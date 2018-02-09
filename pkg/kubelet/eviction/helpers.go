@@ -30,7 +30,6 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
-	"k8s.io/kubernetes/pkg/kubelet/server/stats"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	schedulerutils "k8s.io/kubernetes/pkg/scheduler/util"
 )
@@ -715,12 +714,7 @@ func (a byEvictionPriority) Less(i, j int) bool {
 }
 
 // makeSignalObservations derives observations using the specified summary provider.
-func makeSignalObservations(summaryProvider stats.SummaryProvider, capacityProvider CapacityProvider, pods []*v1.Pod) (signalObservations, statsFunc, error) {
-	updateStats := true
-	summary, err := summaryProvider.Get(updateStats)
-	if err != nil {
-		return nil, nil, err
-	}
+func makeSignalObservations(summary *statsapi.Summary, capacityProvider CapacityProvider, pods []*v1.Pod) (signalObservations, statsFunc) {
 	// build the function to work against for pod stats
 	statsFunc := cachedStatsFunc(summary.Pods)
 	// build an evaluation context for current eviction signals
@@ -787,7 +781,7 @@ func makeSignalObservations(summaryProvider stats.SummaryProvider, capacityProvi
 		glog.Errorf("Could not find capacity information for resource %v", v1.ResourceMemory)
 	}
 
-	return result, statsFunc, nil
+	return result, statsFunc
 }
 
 // thresholdsMet returns the set of thresholds that were met independent of grace period
