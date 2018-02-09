@@ -198,6 +198,7 @@ func ValidResourceTypeList(f ClientAccessFactory) string {
 			* events (aka 'ev')
 			* horizontalpodautoscalers (aka 'hpa')
 			* ingresses (aka 'ing')
+			* initializerConfiguration
 			* jobs
 			* limitranges (aka 'limits')
 			* namespaces (aka 'ns')
