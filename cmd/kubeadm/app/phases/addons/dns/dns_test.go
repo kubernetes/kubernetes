@@ -130,9 +130,9 @@ func TestCompileManifests(t *testing.T) {
 		},
 		{
 			manifest: CoreDNSConfigMap,
-			data: struct{ DNSDomain, ServiceCIDR, UpstreamNameserver, StubDomain string }{
+			data: struct{ DNSDomain, Federation, UpstreamNameserver, StubDomain string }{
 				DNSDomain:          "foo",
-				ServiceCIDR:        "foo",
+				Federation:         "foo",
 				UpstreamNameserver: "foo",
 				StubDomain:         "foo",
 			},
@@ -303,6 +303,66 @@ func TestTranslateUpstreamKubeDNSToCoreDNS(t *testing.T) {
 	}
 	for _, testCase := range testCases {
 		out, err := translateUpstreamNameServerOfKubeDNSToUpstreamProxyCoreDNS(kubeDNSUpstreamNameservers, testCase.configMap)
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		if !strings.Contains(out, testCase.expect) {
+			t.Errorf("expected to find %q in output: %q", testCase.expect, out)
+		}
+	}
+}
+
+func TestTranslateFederationKubeDNSToCoreDNS(t *testing.T) {
+	testCases := []struct {
+		configMap *v1.ConfigMap
+		expect    string
+	}{
+		{
+			configMap: &v1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "kube-dns",
+					Namespace: "kube-system",
+				},
+				Data: map[string]string{
+					"federations":         `{"foo" : "foo.feddomain.com", "bar" : "bar.feddomain.com"}`,
+					"stubDomains":         `{"foo.com" : ["1.2.3.4:5300","3.3.3.3"], "my.cluster.local" : ["2.3.4.5"]}`,
+					"upstreamNameservers": `["8.8.8.8", "8.8.4.4"]`,
+				},
+			},
+
+			expect: `
+    federation cluster.local {
+       foo foo.feddomain.com
+       bar bar.feddomain.com
+    }`,
+		},
+		{
+			configMap: &v1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "kubedns",
+					Namespace: "kube-system",
+				},
+			},
+
+			expect: "",
+		},
+		{
+			configMap: &v1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "kube-dns",
+					Namespace: "kube-system",
+				},
+				Data: map[string]string{
+					"stubDomains":         `{"foo.com" : ["1.2.3.4:5300"], "my.cluster.local" : ["2.3.4.5"]}`,
+					"upstreamNameservers": `["8.8.8.8", "8.8.4.4"]`,
+				},
+			},
+
+			expect: "",
+		},
+	}
+	for _, testCase := range testCases {
+		out, err := translateFederationsofKubeDNSToCoreDNS(kubeDNSFederation, "cluster.local", testCase.configMap)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}

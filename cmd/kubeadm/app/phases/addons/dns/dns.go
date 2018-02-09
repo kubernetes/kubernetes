@@ -46,6 +46,7 @@ const (
 	KubeDNSServiceAccountName  = "kube-dns"
 	kubeDNSStubDomain          = "stubDomains"
 	kubeDNSUpstreamNameservers = "upstreamNameservers"
+	kubeDNSFederation          = "federations"
 )
 
 // EnsureDNSAddon creates the kube-dns or CoreDNS addon
@@ -160,12 +161,17 @@ func coreDNSAddon(cfg *kubeadmapi.MasterConfiguration, client clientset.Interfac
 	if err != nil {
 		return err
 	}
+	coreDNSDomain := cfg.Networking.DNSDomain
+	federations, err := translateFederationsofKubeDNSToCoreDNS(kubeDNSFederation, coreDNSDomain, kubeDNSConfigMap)
+	if err != nil {
+		return err
+	}
 
 	// Get the config file for CoreDNS
-	coreDNSConfigMapBytes, err := kubeadmutil.ParseTemplate(CoreDNSConfigMap, struct{ DNSDomain, ServiceCIDR, UpstreamNameserver, StubDomain string }{
-		ServiceCIDR:        cfg.Networking.ServiceSubnet,
-		DNSDomain:          cfg.Networking.DNSDomain,
+	coreDNSConfigMapBytes, err := kubeadmutil.ParseTemplate(CoreDNSConfigMap, struct{ DNSDomain, UpstreamNameserver, Federation, StubDomain string }{
+		DNSDomain:          coreDNSDomain,
 		UpstreamNameserver: upstreamNameserver,
+		Federation:         federations,
 		StubDomain:         stubDomain,
 	})
 	if err != nil {
@@ -273,7 +279,7 @@ func createDNSService(dnsService *v1.Service, serviceBytes []byte, client client
 func translateStubDomainOfKubeDNSToProxyCoreDNS(dataField string, kubeDNSConfigMap *v1.ConfigMap) (string, error) {
 	if proxy, ok := kubeDNSConfigMap.Data[dataField]; ok {
 		stubDomainData := make(map[string][]string)
-		proxyStanzaList := coreDNSProxyStanzaPrefix
+		proxyStanzaList := coreDNSStanzaPrefix
 
 		err := json.Unmarshal([]byte(proxy), &stubDomainData)
 		if err != nil {
@@ -303,4 +309,25 @@ func translateUpstreamNameServerOfKubeDNSToUpstreamProxyCoreDNS(dataField string
 		return coreDNSProxyStanzaList, nil
 	}
 	return kubetypes.ResolvConfDefault, nil
+}
+
+// translateFederationofKubeDNSToCoreDNS translates Federations Data in kube-dns ConfigMap
+// to Federation for CoreDNS Corefile.
+func translateFederationsofKubeDNSToCoreDNS(dataField, coreDNSDomain string, kubeDNSConfigMap *v1.ConfigMap) (string, error) {
+	if federation, ok := kubeDNSConfigMap.Data[dataField]; ok {
+		federationData := make(map[string]string)
+
+		err := json.Unmarshal([]byte(federation), &federationData)
+		if err != nil {
+			return "", fmt.Errorf("failed to parse JSON from kube-dns ConfigMap: %v", err)
+		}
+		federationStanzaList := coreDNSStanzaPrefix + coreDNSFederation + coreDNSDomain + coreDNSFederationStanzaPrefix
+		var federationStanzaContents string
+		for name, domain := range federationData {
+			federationStanzaContents = federationStanzaContents + coreDNSFederationStanzaMid + name + " " + domain
+		}
+		federationStanzaList = federationStanzaList + federationStanzaContents + coreDNSFederationStanzaSuffix
+		return federationStanzaList, nil
+	}
+	return "", nil
 }

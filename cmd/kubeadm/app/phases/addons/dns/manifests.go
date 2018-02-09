@@ -307,11 +307,11 @@ data:
     .:53 {
         errors
         health
-        kubernetes {{ .DNSDomain }} {{ .ServiceCIDR }} {
+        kubernetes {{ .DNSDomain }} in-addr.arpa ip6.arpa {
            pods insecure
            upstream {{ .UpstreamNameserver }}
            fallthrough in-addr.arpa ip6.arpa
-        }
+        }{{ .Federation }}
         prometheus :9153
         proxy . {{ .UpstreamNameserver }}
         cache 30
@@ -359,14 +359,15 @@ metadata:
   namespace: kube-system
 `
 	// coreDNSProxyDefaultPort, coreDNSCorefileDefaultData, coreDNSProxyStanzaSuffix is used in the translation of configMap of kube-dns to CoreDNS.
-	coreDNSProxyStanzaPrefix = `
-    `
+	coreDNSStanzaPrefix        = "\n    "
 	coreDNSProxyDefaultPort    = `:53`
 	coreDNSCorefileDefaultData = ` {
         errors
         cache 30
         proxy . `
-	coreDNSProxyStanzaSuffix = `
-    }
-    `
+	coreDNSProxyStanzaSuffix      = "\n    }\n    "
+	coreDNSFederation             = "federation "
+	coreDNSFederationStanzaPrefix = " {"
+	coreDNSFederationStanzaMid    = "\n       "
+	coreDNSFederationStanzaSuffix = "\n    }"
 )
