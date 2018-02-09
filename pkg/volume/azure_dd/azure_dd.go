@@ -26,7 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 )
 
-// interface exposed by the cloud provider implementing Disk functionlity
+// interface exposed by the cloud provider implementing Disk functionality
 type DiskController interface {
 	CreateBlobDisk(dataDiskName string, storageAccountType storage.SkuName, sizeGB int) (string, error)
 	DeleteBlobDisk(diskUri string) error

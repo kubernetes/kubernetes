@@ -181,7 +181,7 @@ func (a *azureDiskAttacher) WaitForAttach(spec *volume.Spec, devicePath string, 
 
 		// did we find it?
 		if newDevicePath != "" {
-			// the curent sequence k8s uses for unformated disk (check-disk, mount, fail, mkfs.extX) hangs on
+			// the current sequence k8s uses for unformated disk (check-disk, mount, fail, mkfs.extX) hangs on
 			// Azure Managed disk scsi interface. this is a hack and will be replaced once we identify and solve
 			// the root case on Azure.
 			formatIfNotFormatted(newDevicePath, *volumeSource.FSType, exec)
