@@ -31,7 +31,6 @@ import (
 )
 
 type csiClient interface {
-	AssertSupportedVersion(ctx grpctx.Context, ver *csipb.Version) error
 	NodeProbe(ctx grpctx.Context, ver *csipb.Version) error
 	NodePublishVolume(
 		ctx grpctx.Context,
@@ -89,12 +88,12 @@ func (c *csiDriverClient) assertConnection() error {
 	return nil
 }
 
-// AssertSupportedVersion ensures driver supports specified spec version.
+// assertSupportedVersion ensures driver supports specified spec version.
 // If version is not supported, the assertion fails with an error.
 // This test should be done early during the storage operation flow to avoid
 // unnecessary calls later.
 // `ver` argument holds the expected supported version.
-func (c *csiDriverClient) AssertSupportedVersion(ctx grpctx.Context, ver *csipb.Version) error {
+func (c *csiDriverClient) assertSupportedVersion(ctx grpctx.Context, ver *csipb.Version) error {
 	if c.versionAsserted {
 		if !c.versionSupported {
 			return fmt.Errorf("version %s not supported", verToStr(ver))
@@ -147,6 +146,12 @@ func (c *csiDriverClient) AssertSupportedVersion(ctx grpctx.Context, ver *csipb.
 }
 
 func (c *csiDriverClient) NodeProbe(ctx grpctx.Context, ver *csipb.Version) error {
+	// ensure version is supported
+	if err := c.assertSupportedVersion(ctx, csiVersion); err != nil {
+		glog.Error(log("failed to assert version: %v", err))
+		return err
+	}
+
 	glog.V(4).Info(log("sending NodeProbe rpc call to csi driver: [version %v]", ver))
 	req := &csipb.NodeProbeRequest{Version: ver}
 	_, err := c.nodeClient.NodeProbe(ctx, req)
@@ -163,6 +168,12 @@ func (c *csiDriverClient) NodePublishVolume(
 	volumeAttribs map[string]string,
 	fsType string,
 ) error {
+	// ensure version is supported
+	if err := c.assertSupportedVersion(ctx, csiVersion); err != nil {
+		glog.Error(log("failed to assert version: %v", err))
+		return err
+	}
+
 	glog.V(4).Info(log("calling NodePublishVolume rpc [volid=%s,target_path=%s]", volID, targetPath))
 	if volID == "" {
 		return errors.New("missing volume id")
@@ -200,6 +211,12 @@ func (c *csiDriverClient) NodePublishVolume(
 }
 
 func (c *csiDriverClient) NodeUnpublishVolume(ctx grpctx.Context, volID string, targetPath string) error {
+	// ensure version is supported
+	if err := c.assertSupportedVersion(ctx, csiVersion); err != nil {
+		glog.Error(log("failed to assert version: %v", err))
+		return err
+	}
+
 	glog.V(4).Info(log("calling NodeUnpublishVolume rpc: [volid=%s, target_path=%s", volID, targetPath))
 	if volID == "" {
 		return errors.New("missing volume id")
