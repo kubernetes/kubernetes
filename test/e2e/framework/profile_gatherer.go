@@ -17,6 +17,7 @@ limitations under the License.
 package framework
 
 import (
+	"bytes"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -107,8 +108,10 @@ func gatherProfileOfKind(profileBaseName, kind string) error {
 	}
 	defer outfile.Close()
 	cmd.Stdout = outfile
+	stderr := bytes.NewBuffer(nil)
+	cmd.Stderr = stderr
 	if err := cmd.Run(); nil != err {
-		return fmt.Errorf("Failed to run 'go tool pprof': %v", err)
+		return fmt.Errorf("Failed to run 'go tool pprof': %v, stderr: %#v", err, stderr.String())
 	}
 	return nil
 }
