@@ -202,14 +202,13 @@ const nodeWithImpairedVolumes = "NodeWithImpairedVolumes"
 const (
 	// volumeAttachmentConsecutiveErrorLimit is the number of consecutive errors we will ignore when waiting for a volume to attach/detach
 	volumeAttachmentStatusConsecutiveErrorLimit = 10
-	// volumeAttachmentStatus* is configuration of exponential backoff for
-	// waiting for attach/detach operation to complete. Starting with 10
-	// seconds, multiplying by 1.2 with each step and taking 21 steps at maximum
-	// it will time out after 31.11 minutes, which roughly corresponds to GCE
-	// timeout (30 minutes).
-	volumeAttachmentStatusInitialDelay = 10 * time.Second
-	volumeAttachmentStatusFactor       = 1.2
-	volumeAttachmentStatusSteps        = 21
+	// most attach/detach operations on AWS finish within 1-4 seconds
+	// By using 1 second starting interval with a backoff of 1.8
+	// we get -  [1, 1.8, 3.24, 5.832000000000001, 10.4976]
+	// in total we wait for 2601 seconds
+	volumeAttachmentStatusInitialDelay = 1 * time.Second
+	volumeAttachmentStatusFactor       = 1.8
+	volumeAttachmentStatusSteps        = 13
 
 	// createTag* is configuration of exponential backoff for CreateTag call. We
 	// retry mainly because if we create an object, we cannot tag it until it is
