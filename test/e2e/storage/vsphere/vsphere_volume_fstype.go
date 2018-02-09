@@ -72,6 +72,7 @@ var _ = utils.SIGDescribe("Volume FStype [Feature:vsphere]", func() {
 	)
 	BeforeEach(func() {
 		framework.SkipUnlessProviderIs("vsphere")
+		Bootstrap(f)
 		client = f.ClientSet
 		namespace = f.Namespace.Name
 		nodeList := framework.GetReadySchedulableNodesOrDie(f.ClientSet)

@@ -14,12 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package bootstrap
+package vsphere
 
 // Context holds common information for vSphere tests
-type Context struct {
-	// NodeMapper and other instances, common to vSphere tests
+type VSphereContext struct {
+	NodeMapper       *NodeMapper
+	VSphereInstances map[string]*VSphere
 }
 
 // TestContext should be used by all tests to access common context data. It should be initialized only once, during bootstrapping the tests.
-var TestContext Context
+var TestContext VSphereContext
