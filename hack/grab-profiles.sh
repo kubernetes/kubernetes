@@ -167,7 +167,7 @@ while true; do
         >&2 echo "empty argumet to --controller-manager-port flag"
         exit 1
       fi
-      controller-managerr_port=$1
+      controller_manager_port=$1
       shift
       ;;
     -o|--output)
