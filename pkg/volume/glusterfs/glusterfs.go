@@ -614,7 +614,7 @@ func (d *glusterfsVolumeDeleter) Delete() error {
 	}
 	d.provisionerConfig = *cfg
 
-	glog.V(4).Infof("deleting volume %q with configuration %+v", volumeID, d.provisionerConfig)
+	glog.V(4).Infof("deleting volume %q", volumeID)
 
 	gid, exists, err := d.getGid()
 	if err != nil {
@@ -743,7 +743,7 @@ func (p *glusterfsVolumeProvisioner) CreateVolume(gid int) (r *v1.GlusterfsVolum
 	capacity := p.options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
 	// Glusterfs creates volumes in units of GiB, but heketi documentation incorrectly reports GBs
 	sz := int(volume.RoundUpToGiB(capacity))
-	glog.V(2).Infof("create volume of size: %d GiB and configuration %+v", sz, p.provisionerConfig)
+	glog.V(2).Infof("create volume of size: %d GiB", sz)
 	if p.url == "" {
 		glog.Errorf("REST server endpoint is empty")
 		return nil, 0, "", fmt.Errorf("failed to create glusterfs REST client, REST URL is empty")
