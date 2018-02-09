@@ -167,6 +167,12 @@ func (az *Cloud) getSecurityGroup() (nsg network.SecurityGroup, err error) {
 
 func (az *Cloud) newVMCache() (*timedCache, error) {
 	getter := func(key string) (interface{}, error) {
+		// Currently InstanceView request are used by azure_zones, while the calls come after non-InstanceView
+		// request. If we first send an InstanceView request and then a non InstanceView request, the second
+		// request will still hit throttling. This is what happens now for cloud controller manager: In this
+		// case we do get instance view every time to fulfill the azure_zones requirement without hitting
+		// throttling.
+		// Consider adding separate parameter for controlling 'InstanceView' once node update issue #56276 is fixed
 		vm, err := az.VirtualMachinesClient.Get(az.ResourceGroup, key, compute.InstanceView)
 		exists, realErr := checkResourceExistsFromError(err)
 		if realErr != nil {

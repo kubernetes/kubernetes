@@ -134,7 +134,7 @@ func (az *Cloud) CreateOrUpdateSGWithRetry(sg network.SecurityGroup) error {
 		done, err := processRetryResponse(resp.Response, err)
 		if done && err == nil {
 			// Invalidate the cache right after updating
-			az.lbCache.Delete(*sg.Name)
+			az.nsgCache.Delete(*sg.Name)
 		}
 		return done, err
 	})

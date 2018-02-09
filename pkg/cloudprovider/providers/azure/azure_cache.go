@@ -38,11 +38,7 @@ type cacheEntry struct {
 
 // cacheKeyFunc defines the key function required in TTLStore.
 func cacheKeyFunc(obj interface{}) (string, error) {
-	if entry, ok := obj.(*cacheEntry); ok {
-		return entry.key, nil
-	}
-
-	return "", fmt.Errorf("obj %q is not an object of cacheEntry", obj)
+	return obj.(*cacheEntry).key, nil
 }
 
 // timedCache is a cache with TTL.
@@ -107,23 +103,17 @@ func (t *timedCache) Get(key string) (interface{}, error) {
 		entry.lock.Lock()
 		defer entry.lock.Unlock()
 
-		data, err := t.getter(key)
-		if err != nil {
-			return nil, err
-		}
+		if entry.data == nil {
+			data, err := t.getter(key)
+			if err != nil {
+				return nil, err
+			}
 
-		entry.data = data
+			entry.data = data
+		}
 	}
 
 	return entry.data, nil
-}
-
-// Update sets an item in the cache to its updated state.
-func (t *timedCache) Update(key string, data interface{}) error {
-	return t.store.Update(&cacheEntry{
-		key:  key,
-		data: data,
-	})
 }
 
 // Delete removes an item from the cache.

@@ -249,29 +249,25 @@ func NewCloud(configReader io.Reader) (cloudprovider.Interface, error) {
 		az.vmSet = newAvailabilitySet(&az)
 	}
 
-	vmCache, err := az.newVMCache()
+	az.vmCache, err = az.newVMCache()
 	if err != nil {
 		return nil, err
 	}
-	az.vmCache = vmCache
 
-	lbCache, err := az.newLBCache()
+	az.lbCache, err = az.newLBCache()
 	if err != nil {
 		return nil, err
 	}
-	az.lbCache = lbCache
 
-	nsgCache, err := az.newNSGCache()
+	az.nsgCache, err = az.newNSGCache()
 	if err != nil {
 		return nil, err
 	}
-	az.nsgCache = nsgCache
 
-	rtCache, err := az.newRouteTableCache()
+	az.rtCache, err = az.newRouteTableCache()
 	if err != nil {
 		return nil, err
 	}
-	az.rtCache = rtCache
 
 	if err := initDiskControllers(&az); err != nil {
 		return nil, err

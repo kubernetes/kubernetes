@@ -17,6 +17,7 @@ limitations under the License.
 package azure
 
 import (
+	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -31,14 +32,16 @@ var (
 type fakeDataObj struct{}
 
 type fakeDataSource struct {
-	data map[string]*fakeDataObj
-	lock sync.Mutex
+	called int
+	data   map[string]*fakeDataObj
+	lock   sync.Mutex
 }
 
 func (fake *fakeDataSource) get(key string) (interface{}, error) {
 	fake.lock.Lock()
 	defer fake.lock.Unlock()
 
+	fake.called = fake.called + 1
 	if v, ok := fake.data[key]; ok {
 		return v, nil
 	}
@@ -51,6 +54,7 @@ func (fake *fakeDataSource) set(data map[string]*fakeDataObj) {
 	defer fake.lock.Unlock()
 
 	fake.data = data
+	fake.called = 0
 }
 
 func newFakeCache(t *testing.T) (*fakeDataSource, *timedCache) {
@@ -99,6 +103,20 @@ func TestCacheGet(t *testing.T) {
 	}
 }
 
+func TestCacheGetError(t *testing.T) {
+	getError := fmt.Errorf("getError")
+	getter := func(key string) (interface{}, error) {
+		return nil, getError
+	}
+	cache, err := newTimedcache(fakeCacheTTL, getter)
+	assert.NoError(t, err)
+
+	val, err := cache.Get("key")
+	assert.Error(t, err)
+	assert.Equal(t, getError, err)
+	assert.Nil(t, val)
+}
+
 func TestCacheDelete(t *testing.T) {
 	key := "key1"
 	val := &fakeDataObj{}
@@ -116,6 +134,7 @@ func TestCacheDelete(t *testing.T) {
 	cache.Delete(key)
 	v, err = cache.Get(key)
 	assert.NoError(t, err)
+	assert.Equal(t, 1, dataSource.called)
 	assert.Equal(t, nil, v, "cache should get nil after data is removed")
 }
 
@@ -130,10 +149,12 @@ func TestCacheExpired(t *testing.T) {
 
 	v, err := cache.Get(key)
 	assert.NoError(t, err)
+	assert.Equal(t, 1, dataSource.called)
 	assert.Equal(t, val, v, "cache should get correct data")
 
 	time.Sleep(fakeCacheTTL)
 	v, err = cache.Get(key)
 	assert.NoError(t, err)
+	assert.Equal(t, 2, dataSource.called)
 	assert.Equal(t, val, v, "cache should get correct data even after expired")
 }
