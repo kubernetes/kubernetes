@@ -62,10 +62,6 @@ func checkProfileGatheringPrerequisites() error {
 }
 
 func gatherProfileOfKind(profileBaseName, kind string) error {
-	// Check some prerequisites before gathering the profile.
-	if err := checkProfileGatheringPrerequisites(); err != nil {
-		return err
-	}
 	// Get the profile data over SSH.
 	getCommand := fmt.Sprintf("curl -s localhost:8080/debug/pprof/%s", kind)
 	sshResult, err := SSH(getCommand, GetMasterHost()+":22", TestContext.Provider)
@@ -91,10 +87,10 @@ func gatherProfileOfKind(profileBaseName, kind string) error {
 	switch {
 	// TODO: Support other profile kinds if needed (e.g inuse_space, alloc_objects, mutex, etc)
 	case kind == "heap":
-		cmd = exec.Command("go", "tool", "pprof", "-pdf", "--alloc_space", tmpfile.Name())
+		cmd = exec.Command("go", "tool", "pprof", "-pdf", "-symbolize=none", "--alloc_space", tmpfile.Name())
 		profilePrefix = "ApiserverMemoryProfile_"
 	case strings.HasPrefix(kind, "profile"):
-		cmd = exec.Command("go", "tool", "pprof", "-pdf", tmpfile.Name())
+		cmd = exec.Command("go", "tool", "pprof", "-pdf", "-symbolize=none", tmpfile.Name())
 		profilePrefix = "ApiserverCPUProfile_"
 	default:
 		return fmt.Errorf("Unknown profile kind provided: %s", kind)
@@ -141,6 +137,10 @@ func GatherApiserverCPUProfileForNSeconds(wg *sync.WaitGroup, profileBaseName st
 	if wg != nil {
 		defer wg.Done()
 	}
+	if err := checkProfileGatheringPrerequisites(); err != nil {
+		Logf("Profile gathering pre-requisite failed: %v", err)
+		return
+	}
 	if profileBaseName == "" {
 		profileBaseName = time.Now().Format(time.RFC3339)
 	}
@@ -152,6 +152,10 @@ func GatherApiserverCPUProfileForNSeconds(wg *sync.WaitGroup, profileBaseName st
 func GatherApiserverMemoryProfile(wg *sync.WaitGroup, profileBaseName string) {
 	if wg != nil {
 		defer wg.Done()
+	}
+	if err := checkProfileGatheringPrerequisites(); err != nil {
+		Logf("Profile gathering pre-requisite failed: %v", err)
+		return
 	}
 	if profileBaseName == "" {
 		profileBaseName = time.Now().Format(time.RFC3339)
