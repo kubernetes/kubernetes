@@ -24,7 +24,7 @@ import time
 from shlex import split
 from subprocess import check_call, check_output
 from subprocess import CalledProcessError
-from socket import gethostname
+from socket import gethostname, getfqdn
 
 from charms import layer
 from charms.layer import snap
@@ -614,6 +614,7 @@ def configure_kube_proxy(api_servers, cluster_cidr):
     kube_proxy_opts['logtostderr'] = 'true'
     kube_proxy_opts['v'] = '0'
     kube_proxy_opts['master'] = random.choice(api_servers)
+    kube_proxy_opts['hostname-override'] = get_node_name()
 
     if b'lxc' in check_output('virt-what', shell=True):
         kube_proxy_opts['conntrack-max-per-core'] = '0'
@@ -989,44 +990,13 @@ def _systemctl_is_active(application):
         return False
 
 
-class GetNodeNameFailed(Exception):
-    pass
-
-
 def get_node_name():
-    # Get all the nodes in the cluster
-    cmd = 'kubectl --kubeconfig={} get no -o=json'.format(kubeconfig_path)
-    cmd = cmd.split()
-    deadline = time.time() + 180
-    while time.time() < deadline:
-        try:
-            raw = check_output(cmd)
-        except CalledProcessError:
-            hookenv.log('Failed to get node name for node %s.'
-                        ' Will retry.' % (gethostname()))
-            time.sleep(1)
-            continue
-
-        result = json.loads(raw.decode('utf-8'))
-        if 'items' in result:
-            for node in result['items']:
-                if 'status' not in node:
-                    continue
-                if 'addresses' not in node['status']:
-                    continue
-
-                # find the hostname
-                for address in node['status']['addresses']:
-                    if address['type'] == 'Hostname':
-                        if address['address'] == gethostname():
-                            return node['metadata']['name']
-
-                        # if we didn't match, just bail to the next node
-                        break
-        time.sleep(1)
-
-    msg = 'Failed to get node name for node %s' % gethostname()
-    raise GetNodeNameFailed(msg)
+    kubelet_extra_args = parse_extra_args('kubelet-extra-args')
+    cloud_provider = kubelet_extra_args.get('cloud-provider', '')
+    if cloud_provider == 'aws':
+        return getfqdn()
+    else:
+        return gethostname()
 
 
 class ApplyNodeLabelFailed(Exception):
