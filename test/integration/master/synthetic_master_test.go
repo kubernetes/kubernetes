@@ -748,7 +748,7 @@ func TestUpdateNodeObjects(t *testing.T) {
 							Reason: "bar",
 						},
 					}
-				case i%4 == 1:
+				case i%4 == 2:
 					lastCount = 0
 					n.Status.Conditions = nil
 				}
