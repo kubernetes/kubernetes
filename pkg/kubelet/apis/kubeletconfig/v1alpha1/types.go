@@ -47,9 +47,6 @@ const (
 type KubeletConfiguration struct {
 	metav1.TypeMeta `json:",inline"`
 
-	// Only used for dynamic configuration.
-	// The length of the trial period for this configuration. This configuration will become the last-known-good after this duration.
-	ConfigTrialDuration *metav1.Duration `json:"configTrialDuration"`
 	// podManifestPath is the path to the directory containing pod manifests to
 	// run, or the path to a single manifest file
 	PodManifestPath string `json:"podManifestPath"`

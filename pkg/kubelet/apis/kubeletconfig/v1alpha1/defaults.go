@@ -45,10 +45,6 @@ func addDefaultingFuncs(scheme *kruntime.Scheme) error {
 }
 
 func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
-	// pointer because the zeroDuration is valid - if you want to skip the trial period
-	if obj.ConfigTrialDuration == nil {
-		obj.ConfigTrialDuration = &metav1.Duration{Duration: 10 * time.Minute}
-	}
 	if obj.Authentication.Anonymous.Enabled == nil {
 		obj.Authentication.Anonymous.Enabled = boolVar(true)
 	}
