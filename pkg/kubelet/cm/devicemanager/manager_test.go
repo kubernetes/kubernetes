@@ -24,6 +24,7 @@ import (
 	"reflect"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -99,7 +100,12 @@ func TestDevicePluginReRegistration(t *testing.T) {
 	p1.Register(socketName, testResourceName)
 	// Wait for the first callback to be issued.
 
-	<-callbackChan
+	select {
+	case <-callbackChan:
+		break
+	case <-time.After(time.Second):
+		t.FailNow()
+	}
 	devices := m.Devices()
 	require.Equal(t, 2, len(devices[testResourceName]), "Devices are not updated.")
 
@@ -109,7 +115,12 @@ func TestDevicePluginReRegistration(t *testing.T) {
 	atomic.StoreInt32(&expCallbackCount, 2)
 	p2.Register(socketName, testResourceName)
 	// Wait for the second callback to be issued.
-	<-callbackChan
+	select {
+	case <-callbackChan:
+		break
+	case <-time.After(time.Second):
+		t.FailNow()
+	}
 
 	devices2 := m.Devices()
 	require.Equal(t, 2, len(devices2[testResourceName]), "Devices shouldn't change.")
@@ -121,7 +132,12 @@ func TestDevicePluginReRegistration(t *testing.T) {
 	atomic.StoreInt32(&expCallbackCount, 3)
 	p3.Register(socketName, testResourceName)
 	// Wait for the second callback to be issued.
-	<-callbackChan
+	select {
+	case <-callbackChan:
+		break
+	case <-time.After(time.Second):
+		t.FailNow()
+	}
 
 	devices3 := m.Devices()
 	require.Equal(t, 1, len(devices3[testResourceName]), "Devices of plugin previously registered should be removed.")
