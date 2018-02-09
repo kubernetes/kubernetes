@@ -53,6 +53,10 @@ func TestValidatePriorityClass(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{Name: "tier&1", Namespace: ""},
 			Value:      100,
 		},
+		"invalid system name": {
+			ObjectMeta: metav1.ObjectMeta{Name: scheduling.SystemPriorityClassPrefix + "test"},
+			Value:      100,
+		},
 	}
 
 	for k, v := range errorCases {

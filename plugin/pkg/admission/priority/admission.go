@@ -44,6 +44,8 @@ const (
 )
 
 // SystemPriorityClasses defines special priority classes which are used by system critical pods that should not be preempted by workload pods.
+// NOTE: In order to avoid conflict of names with user-defined priority classes, all the names must
+// start with scheduling.SystemPriorityClassPrefix which is by default "system-".
 var SystemPriorityClasses = map[string]int32{
 	"system-cluster-critical": SystemCriticalPriority,
 	"system-node-critical":    SystemCriticalPriority + 1000,
