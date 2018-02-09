@@ -35,9 +35,6 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration) error 
 	if kc.SystemCgroups != "" && kc.CgroupRoot == "" {
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: SystemCgroups (--system-cgroups) was specified and CgroupRoot (--cgroup-root) was not specified"))
 	}
-	if kc.CAdvisorPort != 0 && utilvalidation.IsValidPortNum(int(kc.CAdvisorPort)) != nil {
-		allErrors = append(allErrors, fmt.Errorf("invalid configuration: CAdvisorPort (--cadvisor-port) %v must be between 0 and 65535, inclusive", kc.CAdvisorPort))
-	}
 	if kc.EventBurst < 0 {
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: EventBurst (--event-burst) %v must not be a negative number", kc.EventBurst))
 	}

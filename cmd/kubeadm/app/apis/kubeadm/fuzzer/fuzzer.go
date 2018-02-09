@@ -72,7 +72,6 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 					Authentication: kubeletconfigv1alpha1.KubeletAuthentication{
 						X509: kubeletconfigv1alpha1.KubeletX509Authentication{ClientCAFile: "foo"},
 					},
-					CAdvisorPort: utilpointer.Int32Ptr(0),
 				},
 			}
 			kubeletconfigv1alpha1.SetDefaults_KubeletConfiguration(obj.KubeletConfiguration.BaseConfig)
