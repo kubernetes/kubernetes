@@ -77,7 +77,7 @@ func EnsureProxyAddon(cfg *kubeadmapi.MasterConfiguration, client clientset.Inte
 	if err != nil {
 		return fmt.Errorf("error when parsing kube-proxy configmap template: %v", err)
 	}
-	proxyDaemonSetBytes, err = kubeadmutil.ParseTemplate(KubeProxyDaemonSet19, struct{ ImageRepository, Arch, Version, ImageOverride, ClusterCIDR, MasterTaintKey, CloudTaintKey string }{
+	proxyDaemonSetBytes, err = kubeadmutil.ParseTemplate(KubeProxyDaemonSet19, struct{ ImageRepository, Arch, Version, ImageOverride, MasterTaintKey, CloudTaintKey string }{
 		ImageRepository: cfg.GetControlPlaneImageRepository(),
 		Arch:            runtime.GOARCH,
 		Version:         kubeadmutil.KubernetesVersionToImageTag(cfg.KubernetesVersion),
@@ -153,11 +153,4 @@ func createClusterRoleBindings(client clientset.Interface) error {
 			},
 		},
 	})
-}
-
-func getClusterCIDR(podsubnet string) string {
-	if len(podsubnet) == 0 {
-		return ""
-	}
-	return "- --cluster-cidr=" + podsubnet
 }
