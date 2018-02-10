@@ -314,7 +314,7 @@ func exclusiveOpenFailsOnDevice(pathname string) (bool, error) {
 	}
 
 	if !isDevice {
-		glog.Errorf("Path %q is not refering to a device.", pathname)
+		glog.Errorf("Path %q is not referring to a device.", pathname)
 		return false, nil
 	}
 	fd, errno := unix.Open(pathname, unix.O_RDONLY|unix.O_EXCL, 0)

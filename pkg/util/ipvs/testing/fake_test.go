@@ -35,7 +35,7 @@ func TestVirtualServer(t *testing.T) {
 	}
 	err := fake.AddVirtualServer(vs1)
 	if err != nil {
-		t.Errorf("Fail to add virutal server, error: %v", err)
+		t.Errorf("Fail to add virtual server, error: %v", err)
 	}
 	// Get a specific virtual server
 	got1, err := fake.GetVirtualServer(vs1)
