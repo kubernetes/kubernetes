@@ -3674,6 +3674,14 @@ run_kubectl_config_set_tests() {
 
   test "$e_written" == "$r_written"
 
+  kubectl config set-cluster foobar-name --certificate-authority <(echo foobar) --embed-certs
+  a_writen=$(kubectl config view --raw -o jsonpath='{.clusters[?(@.name == "foobar-name")].cluster.certificate-authority-data}')
+
+  kubectl config set clusters.test-cluster.certificate-authority-data $(echo foobar) --set-raw-bytes
+  b_writen=$(kubectl config view --raw -o jsonpath='{.clusters[?(@.name == "test-cluster")].cluster.certificate-authority-data}')
+
+  test "$a_writen" == "$b_writen"
+
   set +o nounset
   set +o errexit
 }
