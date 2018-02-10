@@ -2450,6 +2450,10 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 	nonEmptyFlexVolumes := validPSP()
 	nonEmptyFlexVolumes.Spec.AllowedFlexVolumes = []extensions.AllowedFlexVolume{{Driver: "example/driver"}}
 
+	negativePriority := validPSP()
+	var priority int32 = -1
+	negativePriority.Spec.MaxPriorityClassValue = &priority
+
 	type testCase struct {
 		psp         *extensions.PodSecurityPolicy
 		errorType   field.ErrorType
@@ -2585,6 +2589,11 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 			psp:         emptyFlexDriver,
 			errorType:   field.ErrorTypeRequired,
 			errorDetail: "must specify a driver",
+		},
+		"negative MaxPriorityClassValue": {
+			psp:         negativePriority,
+			errorType:   field.ErrorTypeInvalid,
+			errorDetail: "MaxPriorityClassValue should not be a negative value",
 		},
 	}
 

@@ -645,6 +645,7 @@ func ValidatePodSecurityPolicySpec(spec *extensions.PodSecurityPolicySpec, fldPa
 	allErrs = append(allErrs, validatePSPDefaultAllowPrivilegeEscalation(fldPath.Child("defaultAllowPrivilegeEscalation"), spec.DefaultAllowPrivilegeEscalation, spec.AllowPrivilegeEscalation)...)
 	allErrs = append(allErrs, validatePSPAllowedHostPaths(fldPath.Child("allowedHostPaths"), spec.AllowedHostPaths)...)
 	allErrs = append(allErrs, validatePSPAllowedFlexVolumes(fldPath.Child("allowedFlexVolumes"), spec.AllowedFlexVolumes)...)
+	allErrs = append(allErrs, validatePSPMaxPriorityClassValue(fldPath.Child("maxPriorityClassValue"), spec.MaxPriorityClassValue)...)
 
 	return allErrs
 }
@@ -708,6 +709,15 @@ func validatePSPAllowedHostPaths(fldPath *field.Path, allowedHostPaths []extensi
 		}
 	}
 
+	return allErrs
+}
+
+// validatePSPMaxPriorityClassValue validates the MaxPriorityClassValue of PodSecurityPolicy.
+func validatePSPMaxPriorityClassValue(fldPath *field.Path, priority *int32) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if priority != nil && *priority < 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath, priority, "MaxPriorityClassValue should not be a negative value"))
+	}
 	return allErrs
 }
 

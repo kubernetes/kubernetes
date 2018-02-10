@@ -268,6 +268,13 @@ func TestValidatePodSecurityContextFailures(t *testing.T) {
 		},
 	}
 
+	failPriorityPSP := defaultPSP()
+	var maxPriority int32 = 99
+	failPriorityPSP.Spec.MaxPriorityClassValue = &maxPriority
+	failPriorityPod := defaultPod()
+	var podPriority int32 = 100
+	failPriorityPod.Spec.Priority = &podPriority
+
 	errorCases := map[string]struct {
 		pod           *api.Pod
 		psp           *extensions.PodSecurityPolicy
@@ -362,6 +369,11 @@ func TestValidatePodSecurityContextFailures(t *testing.T) {
 			pod:           podWithInvalidFlexVolumeDriver,
 			psp:           allowFlexVolumesPSP(false, true),
 			expectedError: "Flexvolume driver is not allowed to be used",
+		},
+		"fail pod with priority larger than the MaxPriorityClassValue": {
+			pod:           failPriorityPod,
+			psp:           failPriorityPSP,
+			expectedError: "is larger than the max allowed value",
 		},
 	}
 	for k, v := range errorCases {
