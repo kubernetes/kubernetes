@@ -20,6 +20,7 @@ import random
 import shutil
 import subprocess
 import time
+import re
 
 from shlex import split
 from subprocess import check_call, check_output
@@ -30,6 +31,7 @@ from charms import layer
 from charms.layer import snap
 from charms.reactive import hook
 from charms.reactive import set_state, remove_state, is_state
+from charms.reactive import set_flag, clear_flag
 from charms.reactive import when, when_any, when_not
 
 from charms.kubernetes.common import get_version
@@ -151,6 +153,7 @@ def install_snaps():
     snap.install('kube-proxy', channel=channel, classic=True)
     set_state('kubernetes-worker.snaps.installed')
     set_state('kubernetes-worker.restart-needed')
+    set_flag('kubernetes-worker.node-name-changed')
     remove_state('kubernetes-worker.snaps.upgrade-needed')
     remove_state('kubernetes-worker.snaps.upgrade-specified')
 
@@ -163,7 +166,7 @@ def shutdown():
     '''
     try:
         if os.path.isfile(kubeconfig_path):
-            kubectl('delete', 'node', gethostname().lower())
+            kubectl('delete', 'node', get_node_name().lower())
     except CalledProcessError:
         hookenv.log('Failed to unregister node.')
     service_stop('snap.kubelet.daemon')
@@ -927,6 +930,7 @@ def notify_master_gpu_not_enabled(kube_control):
 
 
 @when('kube-control.connected')
+@when('kubernetes-worker.node-name-changed')
 def request_kubelet_and_proxy_credentials(kube_control):
     """ Request kubelet node authorization with a well formed kubelet user.
     This also implies that we are requesting kube-proxy auth. """
@@ -934,14 +938,15 @@ def request_kubelet_and_proxy_credentials(kube_control):
     # The kube-cotrol interface is created to support RBAC.
     # At this point we might as well do the right thing and return the hostname
     # even if it will only be used when we enable RBAC
-    nodeuser = 'system:node:{}'.format(gethostname().lower())
+    nodeuser = 'system:node:{}'.format(get_node_name().lower())
     kube_control.set_auth_request(nodeuser)
+    clear_flag('kubernetes-worker.node-name-changed')
 
 
 @when('kube-control.connected')
 def catch_change_in_creds(kube_control):
     """Request a service restart in case credential updates were detected."""
-    nodeuser = 'system:node:{}'.format(gethostname().lower())
+    nodeuser = 'system:node:{}'.format(get_node_name().lower())
     creds = kube_control.get_auth_credentials(nodeuser)
     if creds \
             and data_changed('kube-control.creds', creds) \
@@ -989,44 +994,53 @@ def _systemctl_is_active(application):
         return False
 
 
-class GetNodeNameFailed(Exception):
+class NodeNameFailed(Exception):
     pass
 
 
-def get_node_name():
-    # Get all the nodes in the cluster
-    cmd = 'kubectl --kubeconfig={} get no -o=json'.format(kubeconfig_path)
-    cmd = cmd.split()
-    deadline = time.time() + 180
-    while time.time() < deadline:
+@when('config.changed.kubelet-extra-args')
+def maybe_update_cloud_config():
+    # if we changed the extra args, we might have added a cloud
+    # config. If we did it might impact the node name of this
+    # node(aws).
+    config = hookenv.config()
+    extra_args = config.get('kubelet-extra-args')
+    previous_extra_args = config.previous('kubelet-extra-args')
+
+    # aws-specific logic
+    aws_in_arg_re = 'cloud-provider\s*=\s*aws'
+    aws_in_extra_args = True if extra_args and re.match(
+        aws_in_arg_re, extra_args.lower()) else False
+    aws_in_previous_extra_args = True if previous_extra_args and re.match(
+        aws_in_arg_re, previous_extra_args.lower()) else False
+    if aws_in_extra_args and not aws_in_previous_extra_args:
+        # newly added aws cloud provider. Do all the things that this means
+        cmd = 'host {}'.format(gethostname())
+        cmd = cmd.split()
         try:
-            raw = check_output(cmd)
+            raw = check_output(cmd).decode('utf-8')
+            fqdn = raw.split()[0]
         except CalledProcessError:
-            hookenv.log('Failed to get node name for node %s.'
-                        ' Will retry.' % (gethostname()))
-            time.sleep(1)
-            continue
+            hookenv.log('Failed to get FQDN for node with hostname {}'
+                        .format(gethostname()))
+            # now what?
+            raise NodeNameFailed('Unable to get FQDN for node with hostname {}'
+                                 .format(gethostname()))
+        db.set('node_name', fqdn)
+        set_flag('kubernetes-worker.node-name-changed')
+    elif aws_in_previous_extra_args and not aws_in_extra_args:
+        # removing aws cloud provider, poke the node name back
+        db.set('node_name', gethostname())
+        set_flag('kubernetes-worker.node-name-changed')
 
-        result = json.loads(raw.decode('utf-8'))
-        if 'items' in result:
-            for node in result['items']:
-                if 'status' not in node:
-                    continue
-                if 'addresses' not in node['status']:
-                    continue
 
-                # find the hostname
-                for address in node['status']['addresses']:
-                    if address['type'] == 'Hostname':
-                        if address['address'] == gethostname():
-                            return node['metadata']['name']
+def get_node_name():
+    node_name = db.get('node_name')
+    if not node_name:
+        node_name = gethostname()
+        db.set('node_name', node_name)
 
-                        # if we didn't match, just bail to the next node
-                        break
-        time.sleep(1)
-
-    msg = 'Failed to get node name for node %s' % gethostname()
-    raise GetNodeNameFailed(msg)
+    return node_name
 
 
 class ApplyNodeLabelFailed(Exception):
