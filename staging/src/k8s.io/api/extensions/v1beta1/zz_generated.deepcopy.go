@@ -1215,6 +1215,15 @@ func (in *PodSecurityPolicySpec) DeepCopyInto(out *PodSecurityPolicySpec) {
 		*out = make([]AllowedFlexVolume, len(*in))
 		copy(*out, *in)
 	}
+	if in.MaxPriorityClassValue != nil {
+		in, out := &in.MaxPriorityClassValue, &out.MaxPriorityClassValue
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(int32)
+			**out = **in
+		}
+	}
 	return
 }
 
