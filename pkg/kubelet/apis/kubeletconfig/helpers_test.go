@@ -152,7 +152,6 @@ var (
 		"CgroupsPerQOS",
 		"ClusterDNS[*]",
 		"ClusterDomain",
-		"ConfigTrialDuration.Duration",
 		"ContentType",
 		"EnableContentionProfiling",
 		"EnableControllerAttachDetach",

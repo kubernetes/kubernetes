@@ -95,10 +95,8 @@ var _ = framework.KubeDescribe("DynamicKubeletConfiguration [Feature:DynamicKube
 		Context("When setting new NodeConfigSources that cause transitions between ConfigOK conditions", func() {
 			It("the Kubelet should report the appropriate status and configz", func() {
 				var err error
-				// we base the "correct" configmap off of the current configuration,
-				// but we also set the trial duration very high to prevent changing the last-known-good
+				// we base the "correct" configmap off of the current configuration
 				correctKC := originalKC.DeepCopy()
-				correctKC.ConfigTrialDuration = metav1.Duration{Duration: time.Hour}
 				correctConfigMap := newKubeletConfigMap("dynamic-kubelet-config-test-correct", correctKC)
 				correctConfigMap, err = f.ClientSet.CoreV1().ConfigMaps("kube-system").Create(correctConfigMap)
 				framework.ExpectNoError(err)
@@ -209,7 +207,7 @@ var _ = framework.KubeDescribe("DynamicKubeletConfiguration [Feature:DynamicKube
 
 				L := len(states)
 				for i := 1; i <= L; i++ { // need one less iteration than the number of states
-					testBothDirections(f, &states[i-1 : i][0], states[i:L])
+					testBothDirections(f, &states[i-1 : i][0], states[i:L], 0)
 				}
 
 			})
@@ -218,10 +216,8 @@ var _ = framework.KubeDescribe("DynamicKubeletConfiguration [Feature:DynamicKube
 		Context("When a remote config becomes the new last-known-good, and then the Kubelet is updated to use a new, bad config", func() {
 			It("the Kubelet should report a status and configz indicating that it rolled back to the new last-known-good", func() {
 				var err error
-				// we base the "lkg" configmap off of the current configuration, but set the trial
-				// duration very low so that it quickly becomes the last-known-good
+				// we base the "lkg" configmap off of the current configuration
 				lkgKC := originalKC.DeepCopy()
-				lkgKC.ConfigTrialDuration = metav1.Duration{Duration: time.Nanosecond}
 				lkgConfigMap := newKubeletConfigMap("dynamic-kubelet-config-test-intended-lkg", lkgKC)
 				lkgConfigMap, err = f.ClientSet.CoreV1().ConfigMaps("kube-system").Create(lkgConfigMap)
 				framework.ExpectNoError(err)
@@ -264,7 +260,8 @@ var _ = framework.KubeDescribe("DynamicKubeletConfiguration [Feature:DynamicKube
 					},
 				}
 
-				testBothDirections(f, &states[0], states[1:])
+				// wait 12 minutes after setting the first config to ensure it has time to pass the trial duration
+				testBothDirections(f, &states[0], states[1:], 12*time.Minute)
 			})
 		})
 
@@ -314,7 +311,7 @@ var _ = framework.KubeDescribe("DynamicKubeletConfiguration [Feature:DynamicKube
 				}
 
 				for i := 0; i < 50; i++ { // change the config 101 times (changes 3 times in the first iteration, 2 times in each subsequent iteration)
-					testBothDirections(f, &states[0], states[1:])
+					testBothDirections(f, &states[0], states[1:], 0)
 				}
 			})
 		})
@@ -323,12 +320,14 @@ var _ = framework.KubeDescribe("DynamicKubeletConfiguration [Feature:DynamicKube
 
 // testBothDirections tests the state change represented by each edge, where each state is a vertex,
 // and there are edges in each direction between first and each of the states.
-func testBothDirections(f *framework.Framework, first *configState, states []configState) {
+func testBothDirections(f *framework.Framework, first *configState, states []configState, waitAfterFirst time.Duration) {
 	// set to first and check that everything got set up properly
 	By(fmt.Sprintf("setting configSource to state %q", first.desc))
 	// we don't always expect an event here, because setting "first" might not represent
 	// a change from the current configuration
 	setAndTestKubeletConfigState(f, first, false)
+
+	time.Sleep(waitAfterFirst)
 
 	// for each state, set to that state, check condition and configz, then reset to first and check again
 	for i := range states {
