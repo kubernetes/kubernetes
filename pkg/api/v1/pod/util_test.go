@@ -434,7 +434,7 @@ func TestGetContainerStatus(t *testing.T) {
 			status:   []v1.ContainerStatus{{Name: "test3", Ready: false, Image: "image3"}},
 			name:     "",
 			expected: ExpectedStruct{status: v1.ContainerStatus{}, exists: false},
-			desc:     "retrieve an empty ContainerStatus with contianer name empty",
+			desc:     "retrieve an empty ContainerStatus with container name empty",
 		},
 		{
 			status:   nil,
