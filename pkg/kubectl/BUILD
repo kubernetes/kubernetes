@@ -110,6 +110,7 @@ go_library(
         "kubectl.go",
         "namespace.go",
         "pdb.go",
+        "pod_spec_visitor.go",
         "priorityclass.go",
         "quota.go",
         "resource_filter.go",
