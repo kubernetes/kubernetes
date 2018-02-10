@@ -504,13 +504,106 @@ func TestHTTPProxyCIDRCheck(t *testing.T) {
 	}
 
 	// Save current content of *_proxy and *_PROXY variables.
-	savedEnv := resetProxyEnv()
+	savedEnv := resetProxyEnv(t)
 	defer restoreEnv(savedEnv)
+
+	for _, rt := range tests {
+		warning, _ := rt.check.Check()
+		if (warning != nil) != rt.expectWarnings {
+			t.Errorf(
+				"failed HTTPProxyCIDRCheck:\n\texpected: %t\n\t  actual: %t (CIDR:%s). Warnings: %v",
+				rt.expectWarnings,
+				(warning != nil),
+				rt.check.CIDR,
+				warning,
+			)
+		}
+	}
+}
+
+func TestHTTPProxyCheck(t *testing.T) {
+	var tests = []struct {
+		name           string
+		check          HTTPProxyCheck
+		expectWarnings bool
+	}{
+		{
+			name: "Loopback address",
+			check: HTTPProxyCheck{
+				Proto: "https",
+				Host:  "127.0.0.1",
+			}, // Loopback addresses never should produce proxy warnings
+			expectWarnings: false,
+		},
+		{
+			name: "IPv4 direct access",
+			check: HTTPProxyCheck{
+				Proto: "https",
+				Host:  "10.96.0.1",
+			}, // Expected to be accessed directly, we set NO_PROXY to 10.0.0.0/8
+			expectWarnings: false,
+		},
+		{
+			name: "IPv4 via proxy",
+			check: HTTPProxyCheck{
+				Proto: "https",
+				Host:  "192.168.0.1",
+			}, // Expected to go via proxy as this range is not listed in NO_PROXY
+			expectWarnings: true,
+		},
+		{
+			name: "IPv6 direct access",
+			check: HTTPProxyCheck{
+				Proto: "https",
+				Host:  "[2001:db8::1:15]",
+			}, // Expected to be accessed directly, part of 2001:db8::/48 in NO_PROXY
+			expectWarnings: false,
+		},
+		{
+			name: "IPv6 via proxy",
+			check: HTTPProxyCheck{
+				Proto: "https",
+				Host:  "[2001:db8:1::1:15]",
+			}, // Expected to go via proxy, range is not in 2001:db8::/48
+			expectWarnings: true,
+		},
+	}
+
+	// Save current content of *_proxy and *_PROXY variables.
+	savedEnv := resetProxyEnv(t)
+	defer restoreEnv(savedEnv)
+
+	for _, rt := range tests {
+		warning, _ := rt.check.Check()
+		if (warning != nil) != rt.expectWarnings {
+			t.Errorf(
+				"%s failed HTTPProxyCheck:\n\texpected: %t\n\t  actual: %t (Host:%s). Warnings: %v",
+				rt.name,
+				rt.expectWarnings,
+				(warning != nil),
+				rt.check.Host,
+				warning,
+			)
+		}
+	}
+}
+
+// resetProxyEnv is helper function that unsets all *_proxy variables
+// and return previously set values as map. This can be used to restore
+// original state of the environment.
+func resetProxyEnv(t *testing.T) map[string]string {
+	savedEnv := make(map[string]string)
+	for _, e := range os.Environ() {
+		pair := strings.Split(e, "=")
+		if strings.HasSuffix(strings.ToLower(pair[0]), "_proxy") {
+			savedEnv[pair[0]] = pair[1]
+			os.Unsetenv(pair[0])
+		}
+	}
 	t.Log("Saved environment: ", savedEnv)
 
 	os.Setenv("HTTP_PROXY", "http://proxy.example.com:3128")
 	os.Setenv("NO_PROXY", "example.com,10.0.0.0/8,2001:db8::/48")
-
 	// Check if we can reliably execute tests:
 	// ProxyFromEnvironment caches the *_proxy environment variables and
 	// if ProxyFromEnvironment already executed before our test with empty
@@ -527,33 +620,6 @@ func TestHTTPProxyCIDRCheck(t *testing.T) {
 		t.Skip("test skipped as ProxyFromEnvironment already initialized in environment without defined HTTP proxy")
 	}
 	t.Log("http.ProxyFromEnvironment is usable, continue executing test")
-
-	for _, rt := range tests {
-		warning, _ := rt.check.Check()
-		if (warning != nil) != rt.expectWarnings {
-			t.Errorf(
-				"failed HTTPProxyCIDRCheck:\n\texpected: %t\n\t  actual: %t (CIDR:%s). Warnings: %v",
-				rt.expectWarnings,
-				(warning != nil),
-				rt.check.CIDR,
-				warning,
-			)
-		}
-	}
-}
-
-// resetProxyEnv is helper function that unsets all *_proxy variables
-// and return previously set values as map. This can be used to restore
-// original state of the environment.
-func resetProxyEnv() map[string]string {
-	savedEnv := make(map[string]string)
-	for _, e := range os.Environ() {
-		pair := strings.Split(e, "=")
-		if strings.HasSuffix(strings.ToLower(pair[0]), "_proxy") {
-			savedEnv[pair[0]] = pair[1]
-			os.Unsetenv(pair[0])
-		}
-	}
 	return savedEnv
 }
 

@@ -425,9 +425,9 @@ func (hst HTTPProxyCheck) Name() string {
 // Check validates http connectivity type, direct or via proxy.
 func (hst HTTPProxyCheck) Check() (warnings, errors []error) {
 
-	url := fmt.Sprintf("%s://%s", hst.Proto, hst.Host)
+	u := (&url.URL{Scheme: hst.Proto, Host: hst.Host}).String()
 
-	req, err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequest("GET", u, nil)
 	if err != nil {
 		return nil, []error{err}
 	}
@@ -437,7 +437,7 @@ func (hst HTTPProxyCheck) Check() (warnings, errors []error) {
 		return nil, []error{err}
 	}
 	if proxy != nil {
-		return []error{fmt.Errorf("Connection to %q uses proxy %q. If that is not intended, adjust your proxy settings", url, proxy)}, nil
+		return []error{fmt.Errorf("Connection to %q uses proxy %q. If that is not intended, adjust your proxy settings", u, proxy)}, nil
 	}
 	return nil, nil
 }
