@@ -383,7 +383,7 @@ func (c *MaxPDVolumeCountChecker) filterVolumes(volumes []v1.Volume, namespace s
 			pvName := pvc.Spec.VolumeName
 			if pvName == "" {
 				// PVC is not bound. It was either deleted and created again or
-				// it was forcefuly unbound by admin. The pod can still use the
+				// it was forcefully unbound by admin. The pod can still use the
 				// original PV where it was bound to -> log the error and count
 				// the PV towards the PV limit
 				glog.V(4).Infof("PVC %s/%s is not bound, assuming PVC matches predicate when counting limits", namespace, pvcName)

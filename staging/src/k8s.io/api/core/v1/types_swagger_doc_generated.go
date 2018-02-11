@@ -510,7 +510,7 @@ func (EndpointsList) SwaggerDoc() map[string]string {
 
 var map_EnvFromSource = map[string]string{
 	"":             "EnvFromSource represents the source of a set of ConfigMaps",
-	"prefix":       "An optional identifer to prepend to each key in the ConfigMap. Must be a C_IDENTIFIER.",
+	"prefix":       "An optional identifier to prepend to each key in the ConfigMap. Must be a C_IDENTIFIER.",
 	"configMapRef": "The ConfigMap to select from",
 	"secretRef":    "The Secret to select from",
 }
@@ -576,9 +576,9 @@ func (EventList) SwaggerDoc() map[string]string {
 }
 
 var map_EventSeries = map[string]string{
-	"":                 "EventSeries contain information on series of events, i.e. thing that was/is happening continously for some time.",
+	"":                 "EventSeries contain information on series of events, i.e. thing that was/is happening continuously for some time.",
 	"count":            "Number of occurrences in this series up to the last heartbeat time",
-	"lastObservedTime": "Time of the last occurence observed",
+	"lastObservedTime": "Time of the last occurrence observed",
 	"state":            "State of this Series: Ongoing or Finished",
 }
 

@@ -301,9 +301,9 @@ func (util *FCUtil) DetachBlockFCDisk(c fcDiskUnmapper, mapPath, devicePath stri
 			return pathErr
 		}
 	} else {
-		// TODO: FC plugin can't obtain the devicePath from kubelet becuase devicePath
+		// TODO: FC plugin can't obtain the devicePath from kubelet because devicePath
 		// in volume object isn't updated when volume is attached to kubelet node.
-		glog.Infof("fc: devicePath is empty. Try to retreive FC configuration from global map path: %v", mapPath)
+		glog.Infof("fc: devicePath is empty. Try to retrieve FC configuration from global map path: %v", mapPath)
 	}
 
 	// Check if global map path is valid
@@ -314,10 +314,10 @@ func (util *FCUtil) DetachBlockFCDisk(c fcDiskUnmapper, mapPath, devicePath stri
 		return pathErr
 	}
 
-	// Retreive volume plugin dependent path like '50060e801049cfd1-lun-0' from global map path
+	// Retrieve volume plugin dependent path like '50060e801049cfd1-lun-0' from global map path
 	arr := strings.Split(mapPath, "/")
 	if len(arr) < 1 {
-		return fmt.Errorf("Fail to retreive volume plugin information from global map path: %v", mapPath)
+		return fmt.Errorf("Fail to retrieve volume plugin information from global map path: %v", mapPath)
 	}
 	volumeInfo := arr[len(arr)-1]
 

@@ -946,7 +946,7 @@ func (gce *GCECloud) GetDiskByNameUnknownZone(diskName string) (*GCEDisk, error)
 	// Note: this is the gotcha right now with GCE PD support:
 	// disk names are not unique per-region.
 	// (I can create two volumes with name "myvol" in e.g. us-central1-b & us-central1-f)
-	// For now, this is simply undefined behvaiour.
+	// For now, this is simply undefined behaviour.
 	//
 	// In future, we will have to require users to qualify their disk
 	// "us-central1-a/mydisk".  We could do this for them as part of

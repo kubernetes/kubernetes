@@ -704,7 +704,7 @@ func (os *OpenStack) GetLabelsForVolume(ctx context.Context, pv *v1.PersistentVo
 		return nil, err
 	}
 
-	// Contruct Volume Labels
+	// Construct Volume Labels
 	labels := make(map[string]string)
 	labels[kubeletapis.LabelZoneFailureDomain] = volume.AvailabilityZone
 	labels[kubeletapis.LabelZoneRegion] = os.region

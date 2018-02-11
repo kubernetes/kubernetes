@@ -1614,7 +1614,7 @@ filename | sha256 hash
 * fix a bug where disk pressure could trigger prematurely when using overlay2 ([#53684](https://github.com/kubernetes/kubernetes/pull/53684), [@dashpole](https://github.com/dashpole))
 * "kubectl cp" updated to honor destination names  ([#51215](https://github.com/kubernetes/kubernetes/pull/51215), [@juanvallejo](https://github.com/juanvallejo))
 * kubeadm: Strip bootstrap tokens from the `kubeadm-config` ConfigMap ([#53559](https://github.com/kubernetes/kubernetes/pull/53559), [@fabriziopandini](https://github.com/fabriziopandini))
-* Skip podpreset test if the alpha feature setttings/v1alpha1 is disabled ([#53080](https://github.com/kubernetes/kubernetes/pull/53080), [@jennybuckley](https://github.com/jennybuckley))
+* Skip podpreset test if the alpha feature settings/v1alpha1 is disabled ([#53080](https://github.com/kubernetes/kubernetes/pull/53080), [@jennybuckley](https://github.com/jennybuckley))
 * Log when node is successfully initialized by Cloud Controller Manager ([#53517](https://github.com/kubernetes/kubernetes/pull/53517), [@andrewsykim](https://github.com/andrewsykim))
 * apiserver: --etcd-quorum-read now defaults to true, to ensure correct operation with HA etcd clusters ([#53717](https://github.com/kubernetes/kubernetes/pull/53717), [@liggitt](https://github.com/liggitt))
 * The Kubelet's feature gates are now specified as a map when provided via a JSON or YAML KubeletConfiguration, rather than as a string of key-value pairs. ([#53025](https://github.com/kubernetes/kubernetes/pull/53025), [@mtaufen](https://github.com/mtaufen))

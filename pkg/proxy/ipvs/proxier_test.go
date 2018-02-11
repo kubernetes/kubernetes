@@ -2500,7 +2500,7 @@ func Test_syncService(t *testing.T) {
 			}
 		}
 		if err := proxier.syncService(testCases[i].svcName, testCases[i].newVirtualServer, testCases[i].bindAddr); err != nil {
-			t.Errorf("Case [%d], unexpected sync IPVS virutal server error: %v", i, err)
+			t.Errorf("Case [%d], unexpected sync IPVS virtual server error: %v", i, err)
 		}
 		// check
 		list, err := proxier.ipvs.GetVirtualServers()

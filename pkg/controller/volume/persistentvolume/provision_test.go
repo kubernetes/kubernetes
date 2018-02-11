@@ -172,7 +172,7 @@ func TestProvisionSync(t *testing.T) {
 			newClaimArray("claim11-6", "uid11-6", "1Gi", "volume11-6", v1.ClaimBound, &classGold, annBoundByController, annBindCompleted),
 			noevents, noerrors,
 			// No provisioning plugin confingure - makes the test fail when
-			// the controller errorneously tries to provision something
+			// the controller erroneously tries to provision something
 			wrapTestWithProvisionCalls([]provisionCall{provision1Success}, testSyncClaim),
 		},
 		{

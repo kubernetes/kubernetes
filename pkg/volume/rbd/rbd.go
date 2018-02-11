@@ -398,13 +398,13 @@ func (plugin *rbdPlugin) ConstructBlockVolumeSpec(podUID types.UID, volumeName, 
 	glog.V(5).Infof("globalMapPathUUID: %v, err: %v", globalMapPathUUID, err)
 	globalMapPath := filepath.Dir(globalMapPathUUID)
 	if len(globalMapPath) == 1 {
-		return nil, fmt.Errorf("failed to retreive volume plugin information from globalMapPathUUID: %v", globalMapPathUUID)
+		return nil, fmt.Errorf("failed to retrieve volume plugin information from globalMapPathUUID: %v", globalMapPathUUID)
 	}
 	return getVolumeSpecFromGlobalMapPath(globalMapPath)
 }
 
 func getVolumeSpecFromGlobalMapPath(globalMapPath string) (*volume.Spec, error) {
-	// Retreive volume spec information from globalMapPath
+	// Retrieve volume spec information from globalMapPath
 	// globalMapPath example:
 	//   plugins/kubernetes.io/{PluginName}/{DefaultKubeletVolumeDevicesDirName}/{volumePluginDependentPath}
 	pool, image, err := getPoolAndImageFromMapPath(globalMapPath)

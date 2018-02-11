@@ -554,7 +554,7 @@ func TestGetVolumeSpec_no_lun(t *testing.T) {
 func TestGetVolumeSpec_no_iface(t *testing.T) {
 	path := "plugins/kubernetes.io/iscsi/volumeDevices/default/127.0.0.1:3260-iqn.2014-12.server:storage.target01-lun-0"
 	_, err := getVolumeSpecFromGlobalMapPath("test", path)
-	if !strings.Contains(err.Error(), "failed to retreive iface") {
-		t.Errorf("should get error: failed to retreive iface")
+	if !strings.Contains(err.Error(), "failed to retrieve iface") {
+		t.Errorf("should get error: failed to retrieve iface")
 	}
 }

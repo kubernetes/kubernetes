@@ -2252,7 +2252,7 @@ func TestPreferValidatedPSP(t *testing.T) {
 			validatedPSPHint:     "",
 			expectedPSP:          "001permissive",
 		},
-		"policy saved in annotations is prefered": {
+		"policy saved in annotations is preferred": {
 			inPolicies: []*extensions.PodSecurityPolicy{
 				restrictivePSPWithName("001restrictive"),
 				restrictivePSPWithName("002restrictive"),

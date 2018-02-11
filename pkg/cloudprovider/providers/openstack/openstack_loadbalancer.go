@@ -1057,7 +1057,7 @@ func (lbaas *LbaasV2) ensureSecurityGroup(clusterName string, apiService *v1.Ser
 				_, err = rules.Create(lbaas.network, lbSecGroupRuleCreateOpts).Extract()
 
 				if err != nil {
-					return fmt.Errorf("error occured creating rule for SecGroup %s: %v", lbSecGroup.ID, err)
+					return fmt.Errorf("error occurred creating rule for SecGroup %s: %v", lbSecGroup.ID, err)
 				}
 			}
 		}
@@ -1075,7 +1075,7 @@ func (lbaas *LbaasV2) ensureSecurityGroup(clusterName string, apiService *v1.Ser
 		_, err = rules.Create(lbaas.network, lbSecGroupRuleCreateOpts).Extract()
 
 		if err != nil {
-			return fmt.Errorf("error occured creating rule for SecGroup %s: %v", lbSecGroup.ID, err)
+			return fmt.Errorf("error occurred creating rule for SecGroup %s: %v", lbSecGroup.ID, err)
 		}
 
 		lbSecGroupRuleCreateOpts = rules.CreateOpts{
@@ -1090,7 +1090,7 @@ func (lbaas *LbaasV2) ensureSecurityGroup(clusterName string, apiService *v1.Ser
 
 		_, err = rules.Create(lbaas.network, lbSecGroupRuleCreateOpts).Extract()
 		if err != nil {
-			return fmt.Errorf("error occured creating rule for SecGroup %s: %v", lbSecGroup.ID, err)
+			return fmt.Errorf("error occurred creating rule for SecGroup %s: %v", lbSecGroup.ID, err)
 		}
 
 		// get security groups of port
@@ -1115,7 +1115,7 @@ func (lbaas *LbaasV2) ensureSecurityGroup(clusterName string, apiService *v1.Ser
 			updateOpts := neutronports.UpdateOpts{SecurityGroups: &port.SecurityGroups}
 			res := neutronports.Update(lbaas.network, portID, updateOpts)
 			if res.Err != nil {
-				msg := fmt.Sprintf("Error occured updating port %s for loadbalancer service %s/%s: %v", portID, apiService.Namespace, apiService.Name, res.Err)
+				msg := fmt.Sprintf("Error occurred updating port %s for loadbalancer service %s/%s: %v", portID, apiService.Namespace, apiService.Name, res.Err)
 				return fmt.Errorf(msg)
 			}
 		}
@@ -1145,7 +1145,7 @@ func (lbaas *LbaasV2) ensureSecurityGroup(clusterName string, apiService *v1.Ser
 			// Add the rules in the Node Security Group
 			err = createNodeSecurityGroup(lbaas.network, nodeSecurityGroupID, int(port.NodePort), port.Protocol, lbSecGroupID)
 			if err != nil {
-				return fmt.Errorf("error occured creating security group for loadbalancer service %s/%s: %v", apiService.Namespace, apiService.Name, err)
+				return fmt.Errorf("error occurred creating security group for loadbalancer service %s/%s: %v", apiService.Namespace, apiService.Name, err)
 			}
 		}
 	}
@@ -1366,7 +1366,7 @@ func (lbaas *LbaasV2) updateSecurityGroup(clusterName string, apiService *v1.Ser
 			// Add the rules in the Node Security Group
 			err = createNodeSecurityGroup(lbaas.network, nodeSecurityGroupID, int(port.NodePort), port.Protocol, lbSecGroupID)
 			if err != nil {
-				return fmt.Errorf("error occured creating security group for loadbalancer service %s/%s: %v", apiService.Namespace, apiService.Name, err)
+				return fmt.Errorf("error occurred creating security group for loadbalancer service %s/%s: %v", apiService.Namespace, apiService.Name, err)
 			}
 		}
 	}

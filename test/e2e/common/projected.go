@@ -471,7 +471,7 @@ var _ = Describe("[sig-storage] Projected", func() {
 	})
 
 	/*
-		    Testname: projected-volume-configMaps-updated-succesfully
+		    Testname: projected-volume-configMaps-updated-successfully
 		    Description: Make sure that if a projected volume has configMaps,
 			that the values in these configMaps can be updated, deleted,
 			and created.
@@ -560,7 +560,7 @@ var _ = Describe("[sig-storage] Projected", func() {
 	})
 
 	/*
-		    Testname: projected-volume-optional-configMaps-updated-succesfully
+		    Testname: projected-volume-optional-configMaps-updated-successfully
 		    Description: Make sure that if a projected volume has optional
 			configMaps, that the values in these configMaps can be updated,
 			deleted, and created.
@@ -875,7 +875,7 @@ var _ = Describe("[sig-storage] Projected", func() {
 
 	/*
 		    Testname: projected-downwardapi-volume-set-default-mode
-		    Description: Ensure that downward API can set default file premission
+		    Description: Ensure that downward API can set default file permission
 			mode for DownwardAPIVolumeFiles if no mode is specified in a projected
 			volume.
 	*/
@@ -891,7 +891,7 @@ var _ = Describe("[sig-storage] Projected", func() {
 
 	/*
 		    Testname: projected-downwardapi-volume-set-mode
-		    Description: Ensure that downward API can set file premission mode for
+		    Description: Ensure that downward API can set file permission mode for
 			DownwardAPIVolumeFiles in a projected volume.
 	*/
 	framework.ConformanceIt("should set mode on item file", func() {

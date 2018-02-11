@@ -28,7 +28,7 @@ translates to
 NRIA_LOG_FILE=/var/log/nr-infra.log
 ```
 
-Edit examples/newrelic-infrastructure/nrconfig.env and configure relevant environment variables for your NewRelic Infrastructure agent.  There are a few defauts defined, but the only required variable is the New Relic license key.
+Edit examples/newrelic-infrastructure/nrconfig.env and configure relevant environment variables for your NewRelic Infrastructure agent.  There are a few defaults defined, but the only required variable is the New Relic license key.
 
 Now, let's vendor the config into a secret.
 

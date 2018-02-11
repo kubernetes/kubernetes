@@ -86,7 +86,7 @@ var (
 		},
 		[]string{"requestKind"},
 	)
-	// Becasue of volatality of the base metric this is pre-aggregated one. Instead of reporing current usage all the time
+	// Because of volatality of the base metric this is pre-aggregated one. Instead of reporing current usage all the time
 	// it reports maximal usage during the last second.
 	currentInflightRequests = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{

@@ -80,7 +80,7 @@ var _ = utils.SIGDescribe("PVC Protection [Feature:StorageProtection]", func() {
 		pvcCreatedAndNotDeleted = false
 	})
 
-	It("Verify that PVC in active use by a pod is not removed immediatelly", func() {
+	It("Verify that PVC in active use by a pod is not removed immediately", func() {
 		By("Creating a Pod that becomes Running and therefore is actively using the PVC")
 		pvcClaims := []*v1.PersistentVolumeClaim{pvc}
 		pod, err := framework.CreatePod(client, nameSpace, nil, pvcClaims, false, "")

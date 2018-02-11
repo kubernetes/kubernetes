@@ -250,7 +250,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local [Feature:LocalPersistentVolum
 		// TODO:
 		// - make the pod create timeout shorter
 		// - check for these errors in unit tests intead
-		It("should fail due to non-existant path", func() {
+		It("should fail due to non-existent path", func() {
 			ep := &eventPatterns{
 				reason:  "FailedMount",
 				pattern: make([]string, 2)}

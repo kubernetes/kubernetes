@@ -55,7 +55,7 @@ var _ = Describe("[sig-storage] Downward API volume", func() {
 
 	/*
 		    Testname: downwardapi-volume-set-default-mode
-		    Description: Ensure that downward API can set default file premission
+		    Description: Ensure that downward API can set default file permission
 			mode for DownwardAPIVolumeFiles if no mode is specified.
 	*/
 	framework.ConformanceIt("should set DefaultMode on files ", func() {
@@ -70,7 +70,7 @@ var _ = Describe("[sig-storage] Downward API volume", func() {
 
 	/*
 		    Testname: downwardapi-volume-set-mode
-		    Description: Ensure that downward API can set file premission mode for
+		    Description: Ensure that downward API can set file permission mode for
 			DownwardAPIVolumeFiles.
 	*/
 	framework.ConformanceIt("should set mode on item file ", func() {

@@ -122,7 +122,7 @@ var _ = SIGDescribe("Load capacity", func() {
 
 	// We assume a default throughput of 10 pods/second throughput.
 	// We may want to revisit it in the future.
-	// However, this can be overriden by LOAD_TEST_THROUGHPUT env var.
+	// However, this can be overridden by LOAD_TEST_THROUGHPUT env var.
 	throughput := 10
 	if throughputEnv := os.Getenv("LOAD_TEST_THROUGHPUT"); throughputEnv != "" {
 		if newThroughput, err := strconv.Atoi(throughputEnv); err == nil {

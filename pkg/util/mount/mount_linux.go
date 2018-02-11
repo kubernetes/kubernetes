@@ -70,7 +70,7 @@ func New(mounterPath string) Interface {
 }
 
 // Mount mounts source to target as fstype with given options. 'source' and 'fstype' must
-// be an emtpy string in case it's not required, e.g. for remount, or for auto filesystem
+// be an empty string in case it's not required, e.g. for remount, or for auto filesystem
 // type, where kernel handles fstype for you. The mount 'options' is a list of options,
 // currently come from mount(8), e.g. "ro", "remount", "bind", etc. If no more option is
 // required, call Mount with an empty string list or nil.
@@ -314,7 +314,7 @@ func exclusiveOpenFailsOnDevice(pathname string) (bool, error) {
 	}
 
 	if !isDevice {
-		glog.Errorf("Path %q is not refering to a device.", pathname)
+		glog.Errorf("Path %q is not referring to a device.", pathname)
 		return false, nil
 	}
 	fd, errno := unix.Open(pathname, unix.O_RDONLY|unix.O_EXCL, 0)

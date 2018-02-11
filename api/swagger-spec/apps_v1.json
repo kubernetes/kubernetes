@@ -7915,7 +7915,7 @@
     "properties": {
      "prefix": {
       "type": "string",
-      "description": "An optional identifer to prepend to each key in the ConfigMap. Must be a C_IDENTIFIER."
+      "description": "An optional identifier to prepend to each key in the ConfigMap. Must be a C_IDENTIFIER."
      },
      "configMapRef": {
       "$ref": "v1.ConfigMapEnvSource",

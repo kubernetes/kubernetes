@@ -28,7 +28,7 @@ func ReadOrDie(filePath string) []byte {
 
 	fileBytes, err := Asset(filePath)
 	if err != nil {
-		gobindataMsg := "An error occured, possibly gobindata doesn't know about the file you're opening. For questions on maintaining gobindata, contact the sig-testing group."
+		gobindataMsg := "An error occurred, possibly gobindata doesn't know about the file you're opening. For questions on maintaining gobindata, contact the sig-testing group."
 		glog.Infof("Available gobindata files: %v ", AssetNames())
 		glog.Fatalf("Failed opening %v , with error %v.  %v.", filePath, err, gobindataMsg)
 	}

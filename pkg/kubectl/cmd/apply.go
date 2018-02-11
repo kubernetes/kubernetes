@@ -708,7 +708,7 @@ func (p *patcher) deleteAndCreate(original runtime.Object, modified []byte, name
 		// but still propagate and advertise error to user
 		recreated, recreateErr := p.helper.Create(namespace, true, original)
 		if recreateErr != nil {
-			err = fmt.Errorf("An error ocurred force-replacing the existing object with the newly provided one:\n\n%v.\n\nAdditionally, an error ocurred attempting to restore the original object:\n\n%v\n", err, recreateErr)
+			err = fmt.Errorf("An error occurred force-replacing the existing object with the newly provided one:\n\n%v.\n\nAdditionally, an error occurred attempting to restore the original object:\n\n%v\n", err, recreateErr)
 		} else {
 			createdObject = recreated
 		}

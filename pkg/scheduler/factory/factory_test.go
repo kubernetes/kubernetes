@@ -284,7 +284,7 @@ func TestDefaultErrorFunc(t *testing.T) {
 	}
 	mux := http.NewServeMux()
 
-	// FakeHandler musn't be sent requests other than the one you want to test.
+	// FakeHandler mustn't be sent requests other than the one you want to test.
 	mux.Handle(util.Test.ResourcePath(string(v1.ResourcePods), "bar", "foo"), &handler)
 	server := httptest.NewServer(mux)
 	defer server.Close()

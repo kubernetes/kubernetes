@@ -122,7 +122,7 @@ func TestSetImageValidation(t *testing.T) {
 			expectErr: "all containers are already specified by *, but saw more than one container_name=container_image pairs",
 		},
 		{
-			name: "sucess case",
+			name: "success case",
 			imageOptions: &ImageOptions{
 				Resources: []string{"a", "b", "c"},
 				FilenameOptions: resource.FilenameOptions{

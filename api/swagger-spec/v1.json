@@ -19730,7 +19730,7 @@
    },
    "v1.EventSeries": {
     "id": "v1.EventSeries",
-    "description": "EventSeries contain information on series of events, i.e. thing that was/is happening continously for some time.",
+    "description": "EventSeries contain information on series of events, i.e. thing that was/is happening continuously for some time.",
     "properties": {
      "count": {
       "type": "integer",
@@ -19739,7 +19739,7 @@
      },
      "lastObservedTime": {
       "type": "string",
-      "description": "Time of the last occurence observed"
+      "description": "Time of the last occurrence observed"
      },
      "state": {
       "type": "string",
@@ -22390,7 +22390,7 @@
     "properties": {
      "prefix": {
       "type": "string",
-      "description": "An optional identifer to prepend to each key in the ConfigMap. Must be a C_IDENTIFIER."
+      "description": "An optional identifier to prepend to each key in the ConfigMap. Must be a C_IDENTIFIER."
      },
      "configMapRef": {
       "$ref": "v1.ConfigMapEnvSource",

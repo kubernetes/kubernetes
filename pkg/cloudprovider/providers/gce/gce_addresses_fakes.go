@@ -49,7 +49,7 @@ func NewFakeCloudAddressService() *FakeCloudAddressService {
 	}
 }
 
-// SetRegionalAddresses sets the addresses of ther region. This is used for
+// SetRegionalAddresses sets the addresses of there region. This is used for
 // setting the test environment.
 func (cas *FakeCloudAddressService) SetRegionalAddresses(region string, addrs []*computealpha.Address) {
 	// Reset addresses in the region.

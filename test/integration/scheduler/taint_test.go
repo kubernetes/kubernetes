@@ -51,7 +51,7 @@ import (
 // TestTaintNodeByCondition verifies:
 //   1. MemoryPressure Toleration is added to non-BestEffort Pod by PodTolerationRestriction
 //   2. NodeController taints nodes by node condition
-//   3. Scheduler allows pod to tolerate node condition taints, e.g. network unavailabe
+//   3. Scheduler allows pod to tolerate node condition taints, e.g. network unavailable
 func TestTaintNodeByCondition(t *testing.T) {
 	h := &framework.MasterHolder{Initialized: make(chan struct{})}
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
