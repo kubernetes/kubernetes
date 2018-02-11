@@ -147,6 +147,13 @@ func TestDevicePluginReRegistration(t *testing.T) {
 	close(callbackChan)
 }
 
+func TestCheckpointFile(t *testing.T) {
+	m, err := NewManagerImpl(socketName, func(n string, a, u, r []*pluginapi.Device) {})
+	require.NoError(t, err)
+	result := m.CheckpointFile()
+	require.Equal(t, "/tmp/device_plugin/kubelet_internal_checkpoint", result)
+}
+
 func setup(t *testing.T, devs []*pluginapi.Device, callback monitorCallback, socketName string, pluginSocketName string) (Manager, *Stub) {
 	m, err := newManagerImpl(socketName)
 	require.NoError(t, err)
