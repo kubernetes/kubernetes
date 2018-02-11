@@ -53,7 +53,7 @@ func ReadAtMost(path string, max int64) ([]byte, bool, error) {
 	if size < max {
 		max = size
 	}
-	offset, err := f.Seek(-max, os.SEEK_END)
+	offset, err := f.Seek(-max, io.SeekEnd)
 	if err != nil {
 		return nil, false, err
 	}
@@ -70,7 +70,7 @@ func FindTailLineStartIndex(f io.ReadSeeker, n int64) (int64, error) {
 	if n < 0 {
 		return 0, nil
 	}
-	size, err := f.Seek(0, os.SEEK_END)
+	size, err := f.Seek(0, io.SeekEnd)
 	if err != nil {
 		return 0, err
 	}
@@ -82,7 +82,7 @@ func FindTailLineStartIndex(f io.ReadSeeker, n int64) (int64, error) {
 			left = 0
 			buf = make([]byte, right)
 		}
-		if _, err := f.Seek(left, os.SEEK_SET); err != nil {
+		if _, err := f.Seek(left, io.SeekStart); err != nil {
 			return 0, err
 		}
 		if _, err := f.Read(buf); err != nil {
