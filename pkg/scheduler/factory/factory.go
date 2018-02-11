@@ -919,6 +919,7 @@ func (c *configFactory) CreateFromConfig(policy schedulerapi.Policy) (*scheduler
 
 	extenders := make([]algorithm.SchedulerExtender, 0)
 	if len(policy.ExtenderConfigs) != 0 {
+		interestedResources := sets.NewString()
 		for ii := range policy.ExtenderConfigs {
 			glog.V(2).Infof("Creating extender with config %+v", policy.ExtenderConfigs[ii])
 			extender, err := core.NewHTTPExtender(&policy.ExtenderConfigs[ii])
@@ -926,7 +927,9 @@ func (c *configFactory) CreateFromConfig(policy schedulerapi.Policy) (*scheduler
 				return nil, err
 			}
 			extenders = append(extenders, extender)
+			interestedResources.Insert(policy.ExtenderConfigs[ii].InterestedResources...)
 		}
+		predicates.RegisterPodFitsResourcesPredicateMetadataProducer(interestedResources)
 	}
 	// Providing HardPodAffinitySymmetricWeight in the policy config is the new and preferred way of providing the value.
 	// Give it higher precedence than scheduler CLI configuration when it is provided.
