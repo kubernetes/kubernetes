@@ -294,7 +294,7 @@ func Test_AddPodToVolume_Positive_ExistingVolumeExistingNode(t *testing.T) {
 	verifyPodExistsInVolumeAsw(t, podName, generatedVolumeName, "fake/device/path" /* expectedDevicePath */, asw)
 }
 
-// Calls AddPodToVolume() to add pod to empty data stuct
+// Calls AddPodToVolume() to add pod to empty data struct
 // Verifies call fails with "volume does not exist" error.
 func Test_AddPodToVolume_Negative_VolumeDoesntExist(t *testing.T) {
 	// Arrange
