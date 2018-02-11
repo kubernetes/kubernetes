@@ -123,7 +123,7 @@ func (c *Controller) processPV(pvName string) error {
 	glog.V(4).Infof("Processing PV %s", pvName)
 	startTime := time.Now()
 	defer func() {
-		glog.V(4).Infof("Finished processing PV %s (%v)", pvName, time.Now().Sub(startTime))
+		glog.V(4).Infof("Finished processing PV %s (%v)", pvName, time.Since(startTime))
 	}()
 
 	pv, err := c.pvLister.Get(pvName)
