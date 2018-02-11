@@ -131,7 +131,12 @@ func (az *Cloud) CreateOrUpdateSGWithRetry(sg network.SecurityGroup) error {
 		resp := <-respChan
 		err := <-errChan
 		glog.V(10).Infof("SecurityGroupsClient.CreateOrUpdate(%s): end", *sg.Name)
-		return processRetryResponse(resp.Response, err)
+		done, err := processRetryResponse(resp.Response, err)
+		if done && err == nil {
+			// Invalidate the cache right after updating
+			az.nsgCache.Delete(*sg.Name)
+		}
+		return done, err
 	})
 }
 
@@ -142,7 +147,12 @@ func (az *Cloud) CreateOrUpdateLBWithRetry(lb network.LoadBalancer) error {
 		resp := <-respChan
 		err := <-errChan
 		glog.V(10).Infof("LoadBalancerClient.CreateOrUpdate(%s): end", *lb.Name)
-		return processRetryResponse(resp.Response, err)
+		done, err := processRetryResponse(resp.Response, err)
+		if done && err == nil {
+			// Invalidate the cache right after updating
+			az.lbCache.Delete(*lb.Name)
+		}
+		return done, err
 	})
 }
 
@@ -283,7 +293,12 @@ func (az *Cloud) DeleteLBWithRetry(lbName string) error {
 		respChan, errChan := az.LoadBalancerClient.Delete(az.ResourceGroup, lbName, nil)
 		resp := <-respChan
 		err := <-errChan
-		return processRetryResponse(resp, err)
+		done, err := processRetryResponse(resp, err)
+		if done && err == nil {
+			// Invalidate the cache right after deleting
+			az.lbCache.Delete(lbName)
+		}
+		return done, err
 	})
 }
 

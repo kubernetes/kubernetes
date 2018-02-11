@@ -37,6 +37,7 @@ func TestCreateRoute(t *testing.T) {
 			Location:       "location",
 		},
 	}
+	cloud.rtCache, _ = cloud.newRouteTableCache()
 	expectedTable := network.RouteTable{
 		Name:     &cloud.RouteTableName,
 		Location: &cloud.Location,

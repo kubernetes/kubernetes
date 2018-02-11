@@ -878,6 +878,10 @@ func getTestCloud() (az *Cloud) {
 	az.VirtualMachineScaleSetVMsClient = newFakeVirtualMachineScaleSetVMsClient()
 	az.VirtualMachinesClient = newFakeAzureVirtualMachinesClient()
 	az.vmSet = newAvailabilitySet(az)
+	az.vmCache, _ = az.newVMCache()
+	az.lbCache, _ = az.newLBCache()
+	az.nsgCache, _ = az.newNSGCache()
+	az.rtCache, _ = az.newRouteTableCache()
 
 	return az
 }

@@ -98,10 +98,9 @@ func (az *Cloud) createRouteTable() error {
 		return err
 	}
 
-	glog.V(10).Infof("RouteTablesClient.Get(%q): start", az.RouteTableName)
-	_, err = az.RouteTablesClient.Get(az.ResourceGroup, az.RouteTableName, "")
-	glog.V(10).Infof("RouteTablesClient.Get(%q): end", az.RouteTableName)
-	return err
+	// Invalidate the cache right after updating
+	az.rtCache.Delete(az.RouteTableName)
+	return nil
 }
 
 // CreateRoute creates the described managed route
