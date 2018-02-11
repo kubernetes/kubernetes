@@ -521,6 +521,9 @@ func (m *ManagerImpl) updateAllocatedDevices(activePods []*v1.Pod) {
 func (m *ManagerImpl) devicesToAllocate(podUID, contName, resource string, required int, reusableDevices sets.String) (sets.String, error) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
+	if required <= 0 {
+		return sets.NewString(), nil
+	}
 	needed := required
 	// Gets list of devices that have already been allocated.
 	// This can happen if a container restarts for example.
@@ -532,11 +535,10 @@ func (m *ManagerImpl) devicesToAllocate(podUID, contName, resource string, requi
 		// so just fail loudly here. We can revisit this part if this no longer holds.
 		if needed != 0 {
 			return nil, fmt.Errorf("pod %v container %v changed request for resource %v from %v to %v", podUID, contName, resource, devices.Len(), required)
+		} else {
+			// No change, no work.
+			return nil, nil
 		}
-	}
-	if needed == 0 {
-		// No change, no work.
-		return nil, nil
 	}
 	glog.V(3).Infof("Needs to allocate %v %v for pod %q container %q", needed, resource, podUID, contName)
 	// Needs to allocate additional devices.
@@ -607,7 +609,7 @@ func (m *ManagerImpl) allocateContainerResources(pod *v1.Pod, container *v1.Cont
 		if err != nil {
 			return err
 		}
-		if allocDevices == nil || len(allocDevices) <= 0 {
+		if allocDevices == nil {
 			continue
 		}
 		startRPCTime := time.Now()
