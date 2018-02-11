@@ -18,7 +18,6 @@ package app
 
 import (
 	"net/http"
-	"net/http/pprof"
 	goruntime "runtime"
 	"time"
 
@@ -28,6 +27,8 @@ import (
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	genericfilters "k8s.io/apiserver/pkg/server/filters"
 	"k8s.io/apiserver/pkg/server/healthz"
+	"k8s.io/apiserver/pkg/server/mux"
+	"k8s.io/apiserver/pkg/server/routes"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/util/configz"
 )
@@ -37,13 +38,10 @@ type serveFunc func(handler http.Handler, shutdownTimeout time.Duration, stopCh 
 // Serve creates a base handler chain for a controller manager. It runs the
 // the chain with the given serveFunc.
 func Serve(c *CompletedConfig, serveFunc serveFunc, stopCh <-chan struct{}) error {
-	mux := http.NewServeMux()
+	mux := mux.NewPathRecorderMux("controller-manager")
 	healthz.InstallHandler(mux)
 	if c.ComponentConfig.EnableProfiling {
-		mux.HandleFunc("/debug/pprof/", pprof.Index)
-		mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
-		mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
-		mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
+		routes.Profiling{}.Install(mux)
 		if c.ComponentConfig.EnableContentionProfiling {
 			goruntime.SetBlockProfileRate(1)
 		}
