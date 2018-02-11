@@ -534,7 +534,7 @@ func TestPodContainerDeviceAllocation(t *testing.T) {
 		expErr                    error
 	}{
 		{
-			description:               "Successfull allocation of two Res1 resources and one Res2 resource",
+			description:               "Successful allocation of two Res1 resources and one Res2 resource",
 			testPod:                   testPods[0],
 			expectedContainerOptsLen:  []int{3, 2, 2},
 			expectedAllocatedResName1: 2,
@@ -550,7 +550,7 @@ func TestPodContainerDeviceAllocation(t *testing.T) {
 			expErr: fmt.Errorf("requested number of devices unavailable for domain1.com/resource1. Requested: 1, Available: 0"),
 		},
 		{
-			description:               "Successfull allocation of all available Res1 resources and Res2 resources",
+			description:               "Successful allocation of all available Res1 resources and Res2 resources",
 			testPod:                   testPods[2],
 			expectedContainerOptsLen:  []int{0, 0, 1},
 			expectedAllocatedResName1: 2,

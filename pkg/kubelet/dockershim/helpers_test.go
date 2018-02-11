@@ -243,7 +243,7 @@ func TestMakePortsAndBindings(t *testing.T) {
 				},
 			},
 		},
-		"multipe port mappings": {
+		"multiple port mappings": {
 			pm: []*runtimeapi.PortMapping{
 				{
 					Protocol:      runtimeapi.Protocol_TCP,

@@ -348,7 +348,7 @@ func TestResultRunOnLivenessCheckFailure(t *testing.T) {
 	m.statusManager.SetPodStatus(w.pod, getTestRunningStatus())
 
 	m.prober.exec = fakeExecProber{probe.Success, nil}
-	msg := "inital probe success"
+	msg := "initial probe success"
 	expectContinue(t, w, w.doProbe(), msg)
 	expectResult(t, w, results.Success, msg)
 	if w.resultRun != 1 {
