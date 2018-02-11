@@ -14,9 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// Package envelope transforms values for storage at rest using a Envelope provider
+
 // +build !windows
 
-// Package envelope transforms values for storage at rest using a Envelope provider
 package envelope
 
 import (

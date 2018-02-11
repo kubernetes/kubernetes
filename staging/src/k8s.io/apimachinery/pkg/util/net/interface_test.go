@@ -623,7 +623,7 @@ func TestFailGettingIPv4Routes(t *testing.T) {
 	errStrFrag := "no such file"
 	_, err := v4File.extract()
 	if err == nil {
-		fmt.Errorf("Expected error trying to read non-existent v4 route file")
+		t.Errorf("Expected error trying to read non-existent v4 route file")
 	}
 	if !strings.Contains(err.Error(), errStrFrag) {
 		t.Errorf("Unable to find %q in error string %q", errStrFrag, err.Error())
@@ -638,7 +638,7 @@ func TestFailGettingIPv6Routes(t *testing.T) {
 	errStrFrag := "no such file"
 	_, err := v6File.extract()
 	if err == nil {
-		fmt.Errorf("Expected error trying to read non-existent v6 route file")
+		t.Errorf("Expected error trying to read non-existent v6 route file")
 	}
 	if !strings.Contains(err.Error(), errStrFrag) {
 		t.Errorf("Unable to find %q in error string %q", errStrFrag, err.Error())
@@ -653,7 +653,7 @@ func TestGetAllDefaultRoutesFailNoV4RouteFile(t *testing.T) {
 	errStrFrag := "no such file"
 	_, err := getAllDefaultRoutes()
 	if err == nil {
-		fmt.Errorf("Expected error trying to read non-existent v4 route file")
+		t.Errorf("Expected error trying to read non-existent v4 route file")
 	}
 	if !strings.Contains(err.Error(), errStrFrag) {
 		t.Errorf("Unable to find %q in error string %q", errStrFrag, err.Error())

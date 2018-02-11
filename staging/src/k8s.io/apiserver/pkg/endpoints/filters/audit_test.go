@@ -848,7 +848,7 @@ func TestAuditIDHttpHeader(t *testing.T) {
 			}
 		} else {
 			if resp.Header.Get("Audit-ID") != "" {
-				t.Errorf("[%s] expected no Audit-ID http header returned, but got %p", test.desc, resp.Header.Get("Audit-ID"))
+				t.Errorf("[%s] expected no Audit-ID http header returned, but got %s", test.desc, resp.Header.Get("Audit-ID"))
 			}
 		}
 	}
