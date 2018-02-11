@@ -85,7 +85,7 @@ func (c *cachedGetter) Token() (string, error) {
 
 	var err error
 	// no token or exceeds the TTL
-	if c.token == "" || time.Now().Sub(c.born) > c.ttl {
+	if c.token == "" || time.Since(c.born) > c.ttl {
 		c.token, err = c.tokenGetter.Token()
 		if err != nil {
 			return "", fmt.Errorf("failed to get token: %s", err)

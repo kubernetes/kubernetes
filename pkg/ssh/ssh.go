@@ -399,7 +399,7 @@ func (l *SSHTunnelList) Dial(net, addr string) (net.Conn, error) {
 	id := mathrand.Int63() // So you can match begins/ends in the log.
 	glog.Infof("[%x: %v] Dialing...", id, addr)
 	defer func() {
-		glog.Infof("[%x: %v] Dialed in %v.", id, addr, time.Now().Sub(start))
+		glog.Infof("[%x: %v] Dialed in %v.", id, addr, time.Since(start))
 	}()
 	tunnel, err := l.pickTunnel(strings.Split(addr, ":")[0])
 	if err != nil {
