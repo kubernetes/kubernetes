@@ -477,7 +477,7 @@ function start_apiserver {
         if [[ -n "${RUNTIME_CONFIG}" ]]; then
           RUNTIME_CONFIG+=","
         fi
-        RUNTIME_CONFIG+="admissionregistration.k8s.io/v1alpha1"
+        RUNTIME_CONFIG+="admissionregistration.k8s.io/v1beta1"
     fi
 
     if [[ ${ENABLE_ADMISSION_PLUGINS} == *"PodPreset"* ]]; then
