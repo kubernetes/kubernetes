@@ -202,7 +202,7 @@ type StatefulSetStatus struct {
 
 type StatefulSetConditionType string
 
-// TODO: Add valid condition types for Statefulsets.
+// TODO: Add valid condition types for StatefulSets.
 
 // StatefulSetCondition describes the state of a statefulset at a certain point.
 type StatefulSetCondition struct {
