@@ -575,6 +575,68 @@ func TestExpireAddUpdatePod(t *testing.T) {
 	}
 }
 
+func makePodWithEphemeralStorage(nodeName, ephemeralStorage string) *v1.Pod {
+	req := v1.ResourceList{
+		v1.ResourceEphemeralStorage: resource.MustParse(ephemeralStorage),
+	}
+	return &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "default-namespace",
+			Name:      "pod-with-ephemeral-storage",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{{
+				Resources: v1.ResourceRequirements{
+					Requests: req,
+				},
+			}},
+			NodeName: nodeName,
+		},
+	}
+}
+
+func TestEphemeralStorageResource(t *testing.T) {
+	nodeName := "node"
+	podE := makePodWithEphemeralStorage(nodeName, "500")
+	tests := []struct {
+		pod       *v1.Pod
+		wNodeInfo *NodeInfo
+	}{
+		{
+			pod: podE,
+			wNodeInfo: &NodeInfo{
+				requestedResource: &Resource{
+					EphemeralStorage: 500,
+				},
+				nonzeroRequest: &Resource{
+					MilliCPU: priorityutil.DefaultMilliCPURequest,
+					Memory:   priorityutil.DefaultMemoryRequest,
+				},
+				allocatableResource: &Resource{},
+				pods:                []*v1.Pod{podE},
+				usedPorts:           schedutil.HostPortInfo{},
+			},
+		},
+	}
+	for i, tt := range tests {
+		cache := newSchedulerCache(time.Second, time.Second, nil)
+		if err := cache.AddPod(tt.pod); err != nil {
+			t.Fatalf("AddPod failed: %v", err)
+		}
+		n := cache.nodes[nodeName]
+		deepEqualWithoutGeneration(t, i, n, tt.wNodeInfo)
+
+		if err := cache.RemovePod(tt.pod); err != nil {
+			t.Fatalf("RemovePod failed: %v", err)
+		}
+
+		n = cache.nodes[nodeName]
+		if n != nil {
+			t.Errorf("#%d: expecting pod deleted and nil node info, get=%s", i, n)
+		}
+	}
+}
+
 // TestRemovePod tests after added pod is removed, its information should also be subtracted.
 func TestRemovePod(t *testing.T) {
 	nodeName := "node"
