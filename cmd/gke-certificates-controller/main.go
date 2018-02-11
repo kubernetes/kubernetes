@@ -20,30 +20,36 @@ limitations under the License.
 package main
 
 import (
+	goflag "flag"
 	"fmt"
+	"math/rand"
 	"os"
-
-	"k8s.io/apiserver/pkg/util/flag"
-	"k8s.io/kubernetes/cmd/gke-certificates-controller/app"
-	"k8s.io/kubernetes/pkg/kubectl/util/logs"
-	"k8s.io/kubernetes/pkg/version/verflag"
+	"time"
 
 	"github.com/spf13/pflag"
+
+	utilflag "k8s.io/apiserver/pkg/util/flag"
+	"k8s.io/kubernetes/cmd/gke-certificates-controller/app"
+	"k8s.io/kubernetes/pkg/kubectl/util/logs"
 )
 
 // TODO(pipejakob): Move this entire cmd directory into its own repo
 func main() {
-	s := app.NewGKECertificatesController()
-	s.AddFlags(pflag.CommandLine)
+	rand.Seed(time.Now().UTC().UnixNano())
 
-	flag.InitFlags()
+	command := app.NewGKECertificatesControllerCommand()
+
+	// TODO: once we switch everything over to Cobra commands, we can go back to calling
+	// utilflag.InitFlags() (by removing its pflag.Parse() call). For now, we have to set the
+	// normalize func and add the go flag set by hand.
+	pflag.CommandLine.SetNormalizeFunc(utilflag.WordSepNormalizeFunc)
+	pflag.CommandLine.AddGoFlagSet(goflag.CommandLine)
+	// utilflag.InitFlags()
 	logs.InitLogs()
 	defer logs.FlushLogs()
 
-	verflag.PrintAndExitIfRequested()
-
-	if err := app.Run(s); err != nil {
-		fmt.Fprintf(os.Stderr, "%v\n", err)
+	if err := command.Execute(); err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		os.Exit(1)
 	}
 }
