@@ -30,6 +30,7 @@ import (
 	"github.com/spf13/cobra"
 	flag "github.com/spf13/pflag"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilflag "k8s.io/apiserver/pkg/util/flag"
@@ -92,10 +93,12 @@ var (
 		This error is likely caused by:
 			- The kubelet is not running
 			- The kubelet is unhealthy due to a misconfiguration of the node in some way (required cgroups disabled)
-			- There is no internet connection, so the kubelet cannot pull the following control plane images:
+			- Either there is no internet connection, or imagePullPolicy is set to "Never",
+			  so the kubelet cannot pull or find the following control plane images:
 				- {{ .APIServerImage }}
 				- {{ .ControllerManagerImage }}
 				- {{ .SchedulerImage }}
+				- {{ .EtcdImage }} (only if no external etcd endpoints are configured)
 
 		If you are on a systemd-powered system, you can try to troubleshoot the error with the following commands:
 			- 'systemctl status kubelet'
@@ -357,7 +360,7 @@ func (i *Init) Run(out io.Writer) error {
 	}
 
 	// waiter holds the apiclient.Waiter implementation of choice, responsible for querying the API server in various ways and waiting for conditions to be fulfilled
-	waiter := getWaiter(i.dryRun, client)
+	waiter := getWaiter(i, client)
 
 	if err := waitForAPIAndKubelet(waiter); err != nil {
 		ctx := map[string]string{
@@ -365,6 +368,7 @@ func (i *Init) Run(out io.Writer) error {
 			"APIServerImage":         images.GetCoreImage(kubeadmconstants.KubeAPIServer, i.cfg.GetControlPlaneImageRepository(), i.cfg.KubernetesVersion, i.cfg.UnifiedControlPlaneImage),
 			"ControllerManagerImage": images.GetCoreImage(kubeadmconstants.KubeControllerManager, i.cfg.GetControlPlaneImageRepository(), i.cfg.KubernetesVersion, i.cfg.UnifiedControlPlaneImage),
 			"SchedulerImage":         images.GetCoreImage(kubeadmconstants.KubeScheduler, i.cfg.GetControlPlaneImageRepository(), i.cfg.KubernetesVersion, i.cfg.UnifiedControlPlaneImage),
+			"EtcdImage":              images.GetCoreImage(kubeadmconstants.Etcd, i.cfg.ImageRepository, i.cfg.KubernetesVersion, i.cfg.Etcd.Image),
 		}
 
 		kubeletFailTempl.Execute(out, ctx)
@@ -522,11 +526,18 @@ func printFilesIfDryRunning(dryRun bool, manifestDir string) error {
 }
 
 // getWaiter gets the right waiter implementation for the right occasion
-func getWaiter(dryRun bool, client clientset.Interface) apiclient.Waiter {
-	if dryRun {
+func getWaiter(i *Init, client clientset.Interface) apiclient.Waiter {
+	if i.dryRun {
 		return dryrunutil.NewWaiter()
 	}
-	return apiclient.NewKubeWaiter(client, 30*time.Minute, os.Stdout)
+
+	timeout := 30 * time.Minute
+
+	// No need for a large timeout if we don't expect downloads
+	if i.cfg.ImagePullPolicy == v1.PullNever {
+		timeout = 60 * time.Second
+	}
+	return apiclient.NewKubeWaiter(client, timeout, os.Stdout)
 }
 
 // waitForAPIAndKubelet waits primarily for the API server to come up. If that takes a long time, and the kubelet

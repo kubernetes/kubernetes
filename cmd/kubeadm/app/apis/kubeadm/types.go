@@ -17,6 +17,7 @@ limitations under the License.
 package kubeadm
 
 import (
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeletconfigv1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1alpha1"
 	kubeproxyconfigv1alpha1 "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/v1alpha1"
@@ -91,6 +92,9 @@ type MasterConfiguration struct {
 	APIServerCertSANs []string
 	// CertificatesDir specifies where to store or look for all required certificates.
 	CertificatesDir string
+
+	// ImagePullPolicy for control plane images. Can be Always, IfNotPresent or Never.
+	ImagePullPolicy v1.PullPolicy
 
 	// ImageRepository is the container registry to pull control plane images from.
 	ImageRepository string
