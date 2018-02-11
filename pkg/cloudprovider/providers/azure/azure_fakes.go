@@ -674,7 +674,7 @@ func (fVMC *fakeVirtualMachineScaleSetVMsClient) Get(resourceGroupName string, V
 	fVMC.mutex.Lock()
 	defer fVMC.mutex.Unlock()
 
-	vmKey := fmt.Sprintf("%s-%s", VMScaleSetName, instanceID)
+	vmKey := fmt.Sprintf("%s_%s", VMScaleSetName, instanceID)
 	if scaleSetMap, ok := fVMC.FakeStore[resourceGroupName]; ok {
 		if entity, ok := scaleSetMap[vmKey]; ok {
 			return entity, nil
