@@ -169,6 +169,20 @@ func (s *Serializer) Decode(originalData []byte, gvk *schema.GroupVersionKind, i
 
 // Encode serializes the provided object to the given writer.
 func (s *Serializer) Encode(obj runtime.Object, w io.Writer) error {
+	if sso, ok := obj.(*runtime.SmartlySerializedObject); ok {
+		for _, serialized := range sso.Serialized {
+			if serialized.Scheme.MediaType == s.contentType {
+				serialized.Serialize(s, sso.Object)
+				if serialized.Err != nil {
+					return serialized.Err
+				}
+				_, err := w.Write(serialized.Raw)
+				return err
+			}
+		}
+		return s.Encode(sso.Object.DeepCopyObject(), w)
+	}
+
 	prefixSize := uint64(len(s.prefix))
 
 	var unk runtime.Unknown
@@ -405,6 +419,11 @@ func unmarshalToObject(typer runtime.ObjectTyper, creater runtime.ObjectCreater,
 
 // Encode serializes the provided object to the given writer. Overrides is ignored.
 func (s *RawSerializer) Encode(obj runtime.Object, w io.Writer) error {
+	if sso, ok := obj.(*runtime.SmartlySerializedObject); ok {
+		// FIXME: This should never happen.
+		obj = sso.Object.DeepCopyObject()
+	}
+
 	switch t := obj.(type) {
 	case bufferedMarshaller:
 		// this path performs a single allocation during write but requires the caller to implement

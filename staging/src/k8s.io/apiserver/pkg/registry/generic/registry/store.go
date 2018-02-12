@@ -173,6 +173,10 @@ type Store struct {
 	Storage storage.Interface
 	// Called to cleanup clients used by the underlying Storage; optional.
 	DestroyFunc func()
+
+	// FIXME: Comment.
+	// TODO: Better name.
+	OnceSerializationSchemes []*runtime.SerializationScheme
 }
 
 // Note: the rest.StandardStorage interface aggregates the common REST verbs
@@ -1362,6 +1366,7 @@ func (e *Store) CompleteWithOptions(options *generic.StoreOptions) error {
 			e.NewListFunc,
 			attrFunc,
 			triggerFunc,
+			e.OnceSerializationSchemes,
 		)
 	}
 

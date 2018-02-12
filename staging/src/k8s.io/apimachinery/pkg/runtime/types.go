@@ -16,6 +16,13 @@ limitations under the License.
 
 package runtime
 
+import (
+	"bytes"
+	"sync"
+
+	"k8s.io/apimachinery/pkg/runtime/schema"
+)
+
 // Note that the types provided in this file are not versioned and are intended to be
 // safe to use from within all versions of every API object.
 
@@ -134,4 +141,51 @@ type VersionedObjects struct {
 	// other objects may be present. The right most object is the same as would be returned
 	// by a normal Decode call.
 	Objects []Object
+}
+
+
+// FIXME: This isn't really first-class citized. Consider putting it somewhere else.
+// FIXME: Comment.
+// +k8s:deepcopy-gen=true
+type SerializedObject struct {
+	Scheme *SerializationScheme
+	Once   sync.Once
+	Raw    []byte
+	Err    error
+}
+
+// FIXME: Comment.
+func (s *SerializedObject) Serialize(serializer Serializer, object Object) {
+	s.Once.Do(func() {
+		buffer := bytes.NewBuffer(nil)
+		// We need to do deep-copy here.
+		s.Err = serializer.Encode(object.DeepCopyObject(), buffer)
+		s.Raw = buffer.Bytes()
+	})
+}
+
+// FIXME: Comment.
+func NewSerializedObject(scheme *SerializationScheme) *SerializedObject {
+	return &SerializedObject{
+		Once:   sync.Once{},
+		Scheme: scheme,
+	}
+}
+
+// FIXME: Comment.
+//
+// FIXME: This object shouldn't support DeepCopy.
+// We should never DeepCopy it !
+// +k8s:deepcopy-gen=true
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+type SmartlySerializedObject struct {
+	// TODO: Comment.
+	Object Object
+	// TODO: Comment
+	Serialized []*SerializedObject
+}
+
+// FIXME: Move somewhere else.
+func (s *SmartlySerializedObject) GetObjectKind() schema.ObjectKind {
+	return s.Object.GetObjectKind()
 }

@@ -65,8 +65,16 @@ type watchCacheEvent struct {
 // (to serve the event in different List/Watch requests), in the
 // underlying store we are keeping pair (key, object).
 type storeElement struct {
-	Key    string
-	Object runtime.Object
+	Key     string
+	Object  runtime.Object
+	Wrapped runtime.Object
+}
+
+func (s *storeElement) WrappedObject() runtime.Object {
+	if s.Wrapped != nil {
+		return s.Wrapped
+	}
+	return s.Object
 }
 
 func storeElementKey(obj interface{}) (string, error) {
@@ -133,22 +141,28 @@ type watchCache struct {
 
 	// for testing timeouts.
 	clock clock.Clock
+
+
+	// FIXME:
+	onceSerializationSchemes []*runtime.SerializationScheme
 }
 
 func newWatchCache(
 	capacity int,
 	keyFunc func(runtime.Object) (string, error),
-	getAttrsFunc func(runtime.Object) (labels.Set, fields.Set, bool, error)) *watchCache {
+	getAttrsFunc func(runtime.Object) (labels.Set, fields.Set, bool, error),
+	onceSerializationSchemes []*runtime.SerializationScheme) *watchCache {
 	wc := &watchCache{
-		capacity:        capacity,
-		keyFunc:         keyFunc,
-		getAttrsFunc:    getAttrsFunc,
-		cache:           make([]watchCacheElement, capacity),
-		startIndex:      0,
-		endIndex:        0,
-		store:           cache.NewStore(storeElementKey),
-		resourceVersion: 0,
-		clock:           clock.RealClock{},
+		capacity:                 capacity,
+		keyFunc:                  keyFunc,
+		getAttrsFunc:             getAttrsFunc,
+		cache:                    make([]watchCacheElement, capacity),
+		startIndex:               0,
+		endIndex:                 0,
+		store:                    cache.NewStore(storeElementKey),
+		resourceVersion:          0,
+		clock:                    clock.RealClock{},
+		onceSerializationSchemes: onceSerializationSchemes,
 	}
 	wc.cond = sync.NewCond(wc.RLocker())
 	return wc
@@ -220,6 +234,17 @@ func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64, upd
 		return fmt.Errorf("couldn't compute key: %v", err)
 	}
 	elem := &storeElement{Key: key, Object: event.Object}
+	if len(w.onceSerializationSchemes) > 0 {
+		// TODO: Make it look better.
+		serialized := make([]*runtime.SerializedObject, 0, len(w.onceSerializationSchemes))
+		for _, ss := range w.onceSerializationSchemes {
+			serialized = append(serialized, runtime.NewSerializedObject(ss))
+		}
+		elem.WrappedObject = runtime.SmartlySerializedObject{
+			Object:     event.Object,
+			Serialized: serialized,
+		}
+	}
 
 	// TODO: We should consider moving this lock below after the watchCacheEvent
 	// is created. In such situation, the only problematic scenario is Replace(
@@ -248,7 +273,7 @@ func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64, upd
 	}
 	watchCacheEvent := &watchCacheEvent{
 		Type:                 event.Type,
-		Object:               event.Object,
+		Object:               elem.WrappedObject(),
 		ObjLabels:            objLabels,
 		ObjFields:            objFields,
 		ObjUninitialized:     objUninitialized,

@@ -169,6 +169,22 @@ func (c *codec) Encode(obj runtime.Object, w io.Writer) error {
 	switch obj.(type) {
 	case *runtime.Unknown, runtime.Unstructured:
 		return c.encoder.Encode(obj, w)
+	case *runtime.SmartlySerializedObject:
+		// FIXME: Add comment why this is safe.
+		sso := obj.(*runtime.SmartlySerializedObject)
+		// If there are multiple GVs, we support it well.
+		// FIXME: We may consider assuming single GV.
+		found := true
+		for _, serialized := range sso.Serialized {
+			if serialized.Scheme.GV != c.encodeVersion {
+				found = false
+			}
+		}
+		if found {
+			return c.encoder.Encode(sso, w)
+		}
+		// FIXME: Add comment why do we need that.
+		obj = sso.Object.DeepCopyObject()
 	}
 
 	gvks, isUnversioned, err := c.typer.ObjectKinds(obj)

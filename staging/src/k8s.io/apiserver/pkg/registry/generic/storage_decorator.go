@@ -33,18 +33,20 @@ type StorageDecorator func(
 	keyFunc func(obj runtime.Object) (string, error),
 	newListFunc func() runtime.Object,
 	getAttrsFunc storage.AttrFunc,
-	trigger storage.TriggerPublisherFunc) (storage.Interface, factory.DestroyFunc)
+	trigger storage.TriggerPublisherFunc,
+	serializatioNSchemes []*runtime.SerializationScheme) (storage.Interface, factory.DestroyFunc)
 
 // UndecoratedStorage returns the given a new storage from the given config
 // without any decoration.
 func UndecoratedStorage(
 	config *storagebackend.Config,
-	objectType runtime.Object,
-	resourcePrefix string,
-	keyFunc func(obj runtime.Object) (string, error),
-	newListFunc func() runtime.Object,
-	getAttrsFunc storage.AttrFunc,
-	trigger storage.TriggerPublisherFunc) (storage.Interface, factory.DestroyFunc) {
+	_ runtime.Object,
+	_ string,
+	_ func(obj runtime.Object) (string, error),
+	_ func() runtime.Object,
+	_ storage.AttrFunc,
+	_ storage.TriggerPublisherFunc,
+	_ []*runtime.SerializationScheme) (storage.Interface, factory.DestroyFunc) {
 	return NewRawStorage(config)
 }
 
