@@ -179,6 +179,7 @@ func autoConvert_v1beta1_CustomResourceDefinitionNames_To_apiextensions_CustomRe
 	out.ShortNames = *(*[]string)(unsafe.Pointer(&in.ShortNames))
 	out.Kind = in.Kind
 	out.ListKind = in.ListKind
+	out.Categories = *(*[]string)(unsafe.Pointer(&in.Categories))
 	return nil
 }
 
@@ -193,6 +194,7 @@ func autoConvert_apiextensions_CustomResourceDefinitionNames_To_v1beta1_CustomRe
 	out.ShortNames = *(*[]string)(unsafe.Pointer(&in.ShortNames))
 	out.Kind = in.Kind
 	out.ListKind = in.ListKind
+	out.Categories = *(*[]string)(unsafe.Pointer(&in.Categories))
 	return nil
 }
 
