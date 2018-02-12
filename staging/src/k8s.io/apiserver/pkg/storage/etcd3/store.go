@@ -412,6 +412,15 @@ func (s *store) GetToList(ctx context.Context, key string, resourceVersion strin
 	return s.versioner.UpdateList(listObj, uint64(getResp.Header.Revision), "")
 }
 
+func (s *store) Count(key string) (int64, error) {
+	key = path.Join(s.pathPrefix, key)
+	getResp, err := s.client.KV.Get(context.Background(), key, clientv3.WithRange(clientv3.GetPrefixRangeEnd(key)), clientv3.WithCountOnly())
+	if err != nil {
+		return 0, err
+	}
+	return getResp.Count, nil
+}
+
 // continueToken is a simple structured object for encoding the state of a continue token.
 // TODO: if we change the version of the encoded from, we can't start encoding the new version
 // until all other servers are upgraded (i.e. we need to support rolling schema)
