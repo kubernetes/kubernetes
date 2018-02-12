@@ -201,6 +201,10 @@ func (s *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			}
 
 			obj := event.Object
+			// FIXME: There is a potential race here. We do DeepCopy on this object for
+			// serialization.
+			// FIXME: Also, if there are different self-links, single serialization doesn't help
+			// and simply won't work. We need to figure it out.
 			s.Fixup(obj)
 			if err := s.EmbeddedEncoder.Encode(obj, buf); err != nil {
 				// unexpected error
