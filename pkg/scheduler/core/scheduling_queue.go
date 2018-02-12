@@ -202,8 +202,8 @@ func NewPriorityQueue() *PriorityQueue {
 func (p *PriorityQueue) addNominatedPodIfNeeded(pod *v1.Pod) {
 	nnn := NominatedNodeName(pod)
 	if len(nnn) > 0 {
-		for _, p := range p.nominatedPods[nnn] {
-			if p.Name == pod.Name && p.Namespace == pod.Namespace {
+		for _, np := range p.nominatedPods[nnn] {
+			if np.UID == pod.UID {
 				glog.Errorf("Pod %v/%v already exists in the nominated map!", pod.Namespace, pod.Name)
 				return
 			}
@@ -217,7 +217,7 @@ func (p *PriorityQueue) deleteNominatedPodIfExists(pod *v1.Pod) {
 	nnn := NominatedNodeName(pod)
 	if len(nnn) > 0 {
 		for i, np := range p.nominatedPods[nnn] {
-			if np.Name == pod.Name && np.Namespace == pod.Namespace {
+			if np.UID == pod.UID {
 				p.nominatedPods[nnn] = append(p.nominatedPods[nnn][:i], p.nominatedPods[nnn][i+1:]...)
 				if len(p.nominatedPods[nnn]) == 0 {
 					delete(p.nominatedPods, nnn)

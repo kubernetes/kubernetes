@@ -31,6 +31,7 @@ var highPriorityPod, highPriNominatedPod, medPriorityPod, unschedulablePod = v1.
 	ObjectMeta: metav1.ObjectMeta{
 		Name:      "hpp",
 		Namespace: "ns1",
+		UID:       "hppns1",
 	},
 	Spec: v1.PodSpec{
 		Priority: &highPriority,
@@ -40,6 +41,7 @@ var highPriorityPod, highPriNominatedPod, medPriorityPod, unschedulablePod = v1.
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "hpp",
 			Namespace: "ns1",
+			UID:       "hppns1",
 		},
 		Spec: v1.PodSpec{
 			Priority: &highPriority,
@@ -52,6 +54,7 @@ var highPriorityPod, highPriNominatedPod, medPriorityPod, unschedulablePod = v1.
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "mpp",
 			Namespace: "ns2",
+			UID:       "mppns2",
 			Annotations: map[string]string{
 				"annot2": "val2",
 			},
@@ -67,6 +70,7 @@ var highPriorityPod, highPriNominatedPod, medPriorityPod, unschedulablePod = v1.
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "up",
 			Namespace: "ns1",
+			UID:       "upns1",
 			Annotations: map[string]string{
 				"annot2": "val2",
 			},
