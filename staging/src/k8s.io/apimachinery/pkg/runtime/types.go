@@ -158,11 +158,11 @@ type SerializedObject struct {
 // FIXME: Comment.
 func (s *SerializedObject) Serialize(serializer Serializer, object Object) {
 	s.Once.Do(func() {
-		glog.Errorf("BBB: smart serialization")
 		buffer := bytes.NewBuffer(nil)
 		// We need to do deep-copy here.
 		s.Err = serializer.Encode(object.DeepCopyObject(), buffer)
 		s.Raw = buffer.Bytes()
+		glog.Errorf("BBB: smart serialization: %v", s.Err)
 	})
 }
 

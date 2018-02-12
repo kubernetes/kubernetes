@@ -176,6 +176,7 @@ func (s *Serializer) Encode(obj runtime.Object, w io.Writer) error {
 			if serialized.Scheme.MediaType == s.contentType {
 				serialized.Serialize(s, sso.Object)
 				if serialized.Err != nil {
+					glog.Errorf("XXX: Bad serialization: %v", serialized.Err)
 					return serialized.Err
 				}
 				glog.Errorf("AAA: using smartly serialized")
@@ -424,6 +425,7 @@ func unmarshalToObject(typer runtime.ObjectTyper, creater runtime.ObjectCreater,
 func (s *RawSerializer) Encode(obj runtime.Object, w io.Writer) error {
 	if sso, ok := obj.(*runtime.SmartlySerializedObject); ok {
 		// FIXME: This should never happen.
+		glog.Errorf("CCC: PANIC")
 		obj = sso.Object.DeepCopyObject()
 	}
 
