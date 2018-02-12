@@ -43,31 +43,50 @@ func TestMarkMaster(t *testing.T) {
 		name          string
 		existingLabel string
 		existingTaint *v1.Taint
+		wantTaint     bool
 		expectedPatch string
 	}{
 		{
 			"master label and taint missing",
 			"",
 			nil,
+			true,
 			"{\"metadata\":{\"labels\":{\"node-role.kubernetes.io/master\":\"\"}},\"spec\":{\"taints\":[{\"effect\":\"NoSchedule\",\"key\":\"node-role.kubernetes.io/master\"}]}}",
+		},
+		{
+			"master label and taint missing but taint not wanted",
+			"",
+			nil,
+			false,
+			"{\"metadata\":{\"labels\":{\"node-role.kubernetes.io/master\":\"\"}}}",
 		},
 		{
 			"master label missing",
 			"",
 			&kubeadmconstants.MasterTaint,
+			true,
 			"{\"metadata\":{\"labels\":{\"node-role.kubernetes.io/master\":\"\"}}}",
 		},
 		{
 			"master taint missing",
 			kubeadmconstants.LabelNodeRoleMaster,
 			nil,
+			true,
 			"{\"spec\":{\"taints\":[{\"effect\":\"NoSchedule\",\"key\":\"node-role.kubernetes.io/master\"}]}}",
 		},
 		{
 			"nothing missing",
 			kubeadmconstants.LabelNodeRoleMaster,
 			&kubeadmconstants.MasterTaint,
+			true,
 			"{}",
+		},
+		{
+			"nothing missing but taint unwanted",
+			kubeadmconstants.LabelNodeRoleMaster,
+			&kubeadmconstants.MasterTaint,
+			false,
+			"{\"spec\":{\"taints\":null}}",
 		},
 	}
 
@@ -125,7 +144,7 @@ func TestMarkMaster(t *testing.T) {
 			t.Fatalf("MarkMaster(%s): unexpected error building clientset: %v", tc.name, err)
 		}
 
-		err = MarkMaster(cs, hostname)
+		err = MarkMaster(cs, hostname, tc.wantTaint)
 		if err != nil {
 			t.Errorf("MarkMaster(%s) returned unexpected error: %v", tc.name, err)
 		}
