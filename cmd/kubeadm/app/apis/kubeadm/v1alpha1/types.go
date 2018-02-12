@@ -86,7 +86,8 @@ type Etcd struct {
 	KeyFile   string            `json:"keyFile"`
 	DataDir   string            `json:"dataDir"`
 	ExtraArgs map[string]string `json:"extraArgs,omitempty"`
-	// Image specifies which container image to use for running etcd. If empty, automatically populated by kubeadm using the image repository and default etcd version
+	// Image specifies which container image to be used for running etcd.
+	// If empty, automatically populated by kubeadm using the image repository and default etcd version
 	Image string `json:"image"`
 }
 
