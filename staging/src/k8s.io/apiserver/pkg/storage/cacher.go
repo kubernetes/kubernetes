@@ -904,7 +904,6 @@ func (c *cacheWatcher) sendWatchCacheEvent(event *watchCacheEvent) {
 		} else {
 			watchEvent.Object = event.Object.DeepCopyObject()
 		}
-		watchEvent = watch.Event{Type: watch.Modified, Object: event.Object.DeepCopyObject()}
 	case !curObjPasses && oldObjPasses:
 		watchEvent.Type = watch.Deleted
 		// return a delete event with the previous object content, but with the event's resource version
