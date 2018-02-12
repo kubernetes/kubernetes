@@ -30,6 +30,7 @@ import (
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/features"
+	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 )
 
 func addPriorityClasses(ctrl *PriorityPlugin, priorityClasses []*scheduling.PriorityClass) {
@@ -82,7 +83,7 @@ func TestPriorityClassAdmission(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "toohighclass",
 		},
-		Value:       HighestUserDefinablePriority + 1,
+		Value:       schedulerapi.HighestUserDefinablePriority + 1,
 		Description: "Just a test priority class",
 	}
 
@@ -91,9 +92,9 @@ func TestPriorityClassAdmission(t *testing.T) {
 			Kind: "PriorityClass",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "system-cluster-critical",
+			Name: schedulerapi.SystemClusterCritical,
 		},
-		Value:       HighestUserDefinablePriority + 1,
+		Value:       schedulerapi.HighestUserDefinablePriority + 1,
 		Description: "Name conflicts with system priority class names",
 	}
 
@@ -313,7 +314,7 @@ func TestPodAdmission(t *testing.T) {
 						Name: containerName,
 					},
 				},
-				PriorityClassName: "system-cluster-critical",
+				PriorityClassName: schedulerapi.SystemClusterCritical,
 			},
 		},
 		// pod[5]: mirror Pod with a system priority class name
@@ -349,9 +350,27 @@ func TestPodAdmission(t *testing.T) {
 				Priority:          &intPriority,
 			},
 		},
+		// pod[7]: Pod with a critical priority annotation. This needs to be automatically assigned
+		// system-cluster-critical
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:        "pod-w-system-priority",
+				Namespace:   "kube-system",
+				Annotations: map[string]string{"scheduler.alpha.kubernetes.io/critical-pod": ""},
+			},
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name: containerName,
+					},
+				},
+			},
+		},
 	}
 	// Enable PodPriority feature gate.
 	utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%s=true", features.PodPriority))
+	// Enable ExperimentalCriticalPodAnnotation feature gate.
+	utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%s=true", features.ExperimentalCriticalPodAnnotation))
 	tests := []struct {
 		name            string
 		existingClasses []*scheduling.PriorityClass
@@ -394,7 +413,7 @@ func TestPodAdmission(t *testing.T) {
 			"pod with a system priority class",
 			[]*scheduling.PriorityClass{},
 			*pods[4],
-			SystemCriticalPriority,
+			schedulerapi.SystemCriticalPriority,
 			false,
 		},
 		{
@@ -415,7 +434,7 @@ func TestPodAdmission(t *testing.T) {
 			"mirror pod with system priority class",
 			[]*scheduling.PriorityClass{},
 			*pods[5],
-			SystemCriticalPriority,
+			schedulerapi.SystemCriticalPriority,
 			false,
 		},
 		{
@@ -424,6 +443,13 @@ func TestPodAdmission(t *testing.T) {
 			*pods[6],
 			0,
 			true,
+		},
+		{
+			"pod with critical pod annotation",
+			[]*scheduling.PriorityClass{},
+			*pods[7],
+			schedulerapi.SystemCriticalPriority,
+			false,
 		},
 	}
 
