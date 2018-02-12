@@ -1,19 +1,19 @@
 apiVersion: v1
 kind: Pod
 metadata:
-  name: l7-lb-controller-v0.9.8-alpha.1
+  name: l7-lb-controller-v0.9.8-alpha.2
   namespace: kube-system
   annotations:
     scheduler.alpha.kubernetes.io/critical-pod: ''
   labels:
     k8s-app: gcp-lb-controller
-    version: v0.9.8-alpha.1
+    version: v0.9.8-alpha.2
     kubernetes.io/name: "GLBC"
 spec:
   terminationGracePeriodSeconds: 600
   hostNetwork: true
   containers:
-  - image: k8s.gcr.io/ingress-gce-glbc-amd64:0.9.8-alpha.1
+  - image: k8s.gcr.io/ingress-gce-glbc-amd64:0.9.8-alpha.2
     livenessProbe:
       httpGet:
         path: /healthz
@@ -44,7 +44,7 @@ spec:
     # TODO: split this out into args when we no longer need to pipe stdout to a file #6428
     - sh
     - -c
-    - 'exec /glbc -v=3 --apiserver-host=http://localhost:8080 --default-backend-service=kube-system/default-http-backend --sync-period=600s --running-in-cluster=false --use-real-cloud=true --config-file-path=/etc/gce.conf --healthz-port=8086 1>>/var/log/glbc.log 2>&1'
+    - 'exec /glbc --verbose --apiserver-host=http://localhost:8080 --default-backend-service=kube-system/default-http-backend --sync-period=600s --running-in-cluster=false --use-real-cloud=true --config-file-path=/etc/gce.conf --healthz-port=8086 1>>/var/log/glbc.log 2>&1'
   volumes:
   - hostPath:
       path: /etc/gce.conf
