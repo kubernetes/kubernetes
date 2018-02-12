@@ -115,9 +115,10 @@ func TestCompileManifests(t *testing.T) {
 		},
 		{
 			manifest: CoreDNSDeployment,
-			data: struct{ MasterTaintKey, Version string }{
-				MasterTaintKey: "foo",
-				Version:        "foo",
+			data: struct{ ImageRepository, MasterTaintKey, Version string }{
+				ImageRepository: "foo",
+				MasterTaintKey:  "foo",
+				Version:         "foo",
 			},
 			expected: true,
 		},
