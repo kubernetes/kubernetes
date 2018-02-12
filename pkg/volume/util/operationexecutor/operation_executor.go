@@ -714,12 +714,6 @@ func (oe *operationExecutor) MountVolume(
 	}
 
 	podName := nestedpendingoperations.EmptyUniquePodName
-	// TODO: remove this -- not necessary
-	if !volumeToMount.PluginIsAttachable {
-		// Non-attachable volume plugins can execute mount for multiple pods
-		// referencing the same volume in parallel
-		podName = volumehelper.GetUniquePodName(volumeToMount.Pod)
-	}
 
 	// TODO mount_device
 	return oe.pendingOperations.Run(
