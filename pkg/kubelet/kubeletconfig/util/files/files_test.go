@@ -71,7 +71,7 @@ func TestFileExists(t *testing.T) {
 			}
 
 			result, err := FileExists(fs, testcase.path)
-			if testcase.expectedErr.Error() != err.Error() {
+			if !reflect.DeepEqual(testcase.expectedErr, err) {
 				t.Errorf("unexpected error in checking file exists, expected: %v, actual: %v", testcase.expectedErr, err)
 			}
 			if testcase.expectedBool != result {
