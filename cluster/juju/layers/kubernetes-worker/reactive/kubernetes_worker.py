@@ -928,6 +928,15 @@ def notify_master_gpu_not_enabled(kube_control):
 
 
 @when('kube-control.connected')
+@when('config.changed.kubelet-extra-args')
+def maybe_request_new_credentials(kube_control):
+    kubelet_extra_args = parse_extra_args('kubelet-extra-args')
+    cloud_provider = kubelet_extra_args.get('cloud-provider', '')
+    if data_changed('cloud_provider', cloud_provider):
+        request_kubelet_and_proxy_credentials(kube_control)
+
+
+@when('kube-control.connected')
 def request_kubelet_and_proxy_credentials(kube_control):
     """ Request kubelet node authorization with a well formed kubelet user.
     This also implies that we are requesting kube-proxy auth. """
@@ -935,14 +944,14 @@ def request_kubelet_and_proxy_credentials(kube_control):
     # The kube-cotrol interface is created to support RBAC.
     # At this point we might as well do the right thing and return the hostname
     # even if it will only be used when we enable RBAC
-    nodeuser = 'system:node:{}'.format(gethostname().lower())
+    nodeuser = 'system:node:{}'.format(get_node_name().lower())
     kube_control.set_auth_request(nodeuser)
 
 
 @when('kube-control.connected')
 def catch_change_in_creds(kube_control):
     """Request a service restart in case credential updates were detected."""
-    nodeuser = 'system:node:{}'.format(gethostname().lower())
+    nodeuser = 'system:node:{}'.format(get_node_name().lower())
     creds = kube_control.get_auth_credentials(nodeuser)
     if creds \
             and data_changed('kube-control.creds', creds) \
