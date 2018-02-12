@@ -463,8 +463,25 @@ func (options *GetOptions) watch(f cmdutil.Factory, cmd *cobra.Command, args []s
 	if err != nil {
 		return err
 	}
-	if len(infos) != 1 {
-		return i18n.Errorf("watch is only supported on individual resources and resource collections - %d resources were found", len(infos))
+	if len(infos) > 1 {
+		gvk := infos[0].Mapping.GroupVersionKind
+		uniqueGVKs := 1
+
+		// If requesting a resource count greater than a request's --chunk-size,
+		// we will end up making multiple requests to the server, with each
+		// request producing its own "Info" object. Although overall we are
+		// dealing with a single resource type, we will end up with multiple
+		// infos returned by the builder. To handle this case, only fail if we
+		// have at least one info with a different GVK than the others.
+		for _, info := range infos {
+			if info.Mapping.GroupVersionKind != gvk {
+				uniqueGVKs++
+			}
+		}
+
+		if uniqueGVKs > 1 {
+			return i18n.Errorf("watch is only supported on individual resources and resource collections - %d resources were found", uniqueGVKs)
+		}
 	}
 
 	filterOpts := cmdutil.ExtractCmdPrintOptions(cmd, options.AllNamespaces)
