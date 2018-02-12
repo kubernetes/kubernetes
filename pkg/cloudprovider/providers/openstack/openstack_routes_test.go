@@ -40,9 +40,17 @@ func TestRoutes(t *testing.T) {
 		t.Fatalf("Failed to construct/authenticate OpenStack: %s", err)
 	}
 
+	vms := getServers(os)
+	_, err = os.InstanceID()
+	if err != nil || len(vms) == 0 {
+		t.Skipf("Please run this test in an OpenStack vm or create at least one VM in OpenStack before you run this test.")
+	}
+
+	// We know we have at least one vm.
+	servername := vms[0].Name
+
 	// Pick the first router and server to try a test with
 	os.routeOpts.RouterID = getRouters(os)[0].ID
-	servername := getServers(os)[0].Name
 
 	r, ok := os.Routes()
 	if !ok {
