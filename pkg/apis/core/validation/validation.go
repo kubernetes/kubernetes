@@ -2917,17 +2917,11 @@ func ValidatePodSpec(spec *core.PodSpec, fldPath *field.Path) field.ErrorList {
 	}
 
 	if len(spec.PriorityClassName) > 0 {
-		if !utilfeature.DefaultFeatureGate.Enabled(features.PodPriority) {
-			allErrs = append(allErrs, field.Forbidden(fldPath.Child("priorityClassName"), "Pod priority is disabled by feature-gate"))
-		} else {
+		if utilfeature.DefaultFeatureGate.Enabled(features.PodPriority) {
 			for _, msg := range ValidatePriorityClassName(spec.PriorityClassName, false) {
 				allErrs = append(allErrs, field.Invalid(fldPath.Child("priorityClassName"), spec.PriorityClassName, msg))
 			}
 		}
-	}
-
-	if spec.Priority != nil && !utilfeature.DefaultFeatureGate.Enabled(features.PodPriority) {
-		allErrs = append(allErrs, field.Forbidden(fldPath.Child("priority"), "Pod priority is disabled by feature-gate"))
 	}
 
 	return allErrs

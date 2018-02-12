@@ -5970,34 +5970,6 @@ func TestValidatePodSpec(t *testing.T) {
 			t.Errorf("expected failure for %q", k)
 		}
 	}
-
-	err = utilfeature.DefaultFeatureGate.Set("PodPriority=false")
-	if err != nil {
-		t.Errorf("Failed to disable feature gate for PodPriority: %v", err)
-		return
-	}
-	priority := int32(100)
-	featuregatedCases := map[string]core.PodSpec{
-		"set PriorityClassName": {
-			Volumes:           []core.Volume{{Name: "vol", VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}}}},
-			Containers:        []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-			RestartPolicy:     core.RestartPolicyAlways,
-			DNSPolicy:         core.DNSClusterFirst,
-			PriorityClassName: "valid-name",
-		},
-		"set Priority": {
-			Volumes:       []core.Volume{{Name: "vol", VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}}}},
-			Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-			RestartPolicy: core.RestartPolicyAlways,
-			DNSPolicy:     core.DNSClusterFirst,
-			Priority:      &priority,
-		},
-	}
-	for k, v := range featuregatedCases {
-		if errs := ValidatePodSpec(&v, field.NewPath("field")); len(errs) == 0 {
-			t.Errorf("expected failure due to gated feature: %q", k)
-		}
-	}
 }
 
 func extendPodSpecwithTolerations(in core.PodSpec, tolerations []core.Toleration) core.PodSpec {
