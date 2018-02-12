@@ -104,12 +104,13 @@ var (
 			- 'systemctl status kubelet'
 			- 'journalctl -xeu kubelet'
 		
-		Additionally a service may not have come up in docker. If that's the case, you can enumerate all docker
-		containers that have been started (including ones that have crashed and exited) by running the following commands:
+		Additionally a control plane component may not have come up in docker. If that's the case, you can enumerate 
+		all docker containers that have been started (including ones that have crashed and exited) by running the
+		following commands:
 			- 'docker ps -a'
 		
-		Once you have that list, you can inspect the logs for any job with:
-			- 'docker logs $INSTANCEID'
+		Once you have that list, you can inspect the logs for any pod with:
+			- 'docker logs $CONTAINERID'
 		`)))
 )
 
