@@ -61,7 +61,7 @@ func StorageWithCacher(capacity int) generic.StorageDecorator {
 			GetAttrsFunc:         getAttrsFunc,
 			TriggerPublisherFunc: triggerFunc,
 			Codec:                storageConfig.Codec,
-			SerializationSchemes: serializationSchemes,
+			OnceSerializationSchemes: serializationSchemes,
 		}
 		cacher := storage.NewCacherFromConfig(cacherConfig)
 		destroyFunc := func() {

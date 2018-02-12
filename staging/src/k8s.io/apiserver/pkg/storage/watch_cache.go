@@ -240,7 +240,7 @@ func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64, upd
 		for _, ss := range w.onceSerializationSchemes {
 			serialized = append(serialized, runtime.NewSerializedObject(ss))
 		}
-		elem.WrappedObject = runtime.SmartlySerializedObject{
+		elem.Wrapped = &runtime.SmartlySerializedObject{
 			Object:     event.Object,
 			Serialized: serialized,
 		}
