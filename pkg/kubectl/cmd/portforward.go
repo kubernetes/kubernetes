@@ -23,11 +23,13 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
+	"time"
 
 	"github.com/spf13/cobra"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/portforward"
 	"k8s.io/client-go/transport/spdy"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -46,8 +48,11 @@ type PortForwardOptions struct {
 	PodClient     coreclient.PodsGetter
 	Ports         []string
 	PortForwarder portForwarder
+	Timeout       time.Duration
 	StopChannel   chan struct{}
 	ReadyChannel  chan struct{}
+
+	errOut io.Writer
 }
 
 var (
@@ -68,6 +73,8 @@ func NewCmdPortForward(f cmdutil.Factory, cmdOut, cmdErr io.Writer) *cobra.Comma
 			cmdOut: cmdOut,
 			cmdErr: cmdErr,
 		},
+
+		errOut: cmdErr,
 	}
 	cmd := &cobra.Command{
 		Use: "port-forward POD [LOCAL_PORT:]REMOTE_PORT [...[LOCAL_PORT_N:]REMOTE_PORT_N]",
@@ -149,6 +156,13 @@ func (o *PortForwardOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, arg
 		return err
 	}
 
+	unparsedTimeout := cmdutil.GetFlagString(cmd, "request-timeout")
+	timeout, err := clientcmd.ParseTimeout(unparsedTimeout)
+	if err != nil {
+		return err
+	}
+	o.Timeout = timeout
+
 	o.StopChannel = make(chan struct{}, 1)
 	o.ReadyChannel = make(chan struct{})
 	return nil
@@ -191,6 +205,16 @@ func (o PortForwardOptions) RunPortForward() error {
 			close(o.StopChannel)
 		}
 	}()
+
+	if o.Timeout > 0 {
+		go func() {
+			select {
+			case <-time.After(o.Timeout):
+				fmt.Fprintf(o.errOut, "info: timed out request after %v\n", o.Timeout)
+				o.StopChannel <- struct{}{}
+			}
+		}()
+	}
 
 	req := o.RESTClient.Post().
 		Resource("pods").
