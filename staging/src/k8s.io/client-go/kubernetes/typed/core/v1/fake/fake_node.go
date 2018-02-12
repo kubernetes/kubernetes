@@ -127,3 +127,13 @@ func (c *FakeNodes) Patch(name string, pt types.PatchType, data []byte, subresou
 	}
 	return obj.(*core_v1.Node), err
 }
+
+// UpdateConfigSource takes the representation of a node and updates it. Returns the server's representation of the node, and an error, if there is any.
+func (c *FakeNodes) UpdateConfigSource(nodeName string, node *core_v1.Node) (result *core_v1.Node, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewRootUpdateAction(nodesResource, node), &core_v1.Node{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*core_v1.Node), err
+}

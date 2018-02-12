@@ -77,6 +77,7 @@ func (nodeStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old run
 	newNode := obj.(*api.Node)
 	oldNode := old.(*api.Node)
 	newNode.Status = oldNode.Status
+	newNode.Spec.ConfigSource = oldNode.Spec.ConfigSource
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.DynamicKubeletConfig) {
 		newNode.Spec.ConfigSource = nil
@@ -143,6 +144,32 @@ func (nodeStatusStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old
 
 // Canonicalize normalizes the object after validation.
 func (nodeStatusStrategy) Canonicalize(obj runtime.Object) {
+}
+
+type nodeConfigSourceStrategy struct {
+	nodeStrategy
+}
+
+var ConfigSourceStrategy = nodeConfigSourceStrategy{Strategy}
+
+func (nodeConfigSourceStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runtime.Object) {
+	newNode := obj.(*api.Node)
+	oldNode := old.(*api.Node)
+
+	// only Node.Spec.ConfigSource is allowed to change
+	// block updates to Spec, except for Spec.ConfigSource
+	newSource := newNode.Spec.ConfigSource
+	newNode.Spec = oldNode.Spec
+	newNode.Spec.ConfigSource = newSource
+	// block updates to Status
+	newNode.Status = oldNode.Status
+}
+
+func (nodeConfigSourceStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
+	return validation.ValidateNodeUpdate(obj.(*api.Node), old.(*api.Node))
+}
+
+func (nodeConfigSourceStrategy) Canonicalize(obj runtime.Object) {
 }
 
 // ResourceGetter is an interface for retrieving resources by ResourceLocation.

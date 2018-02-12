@@ -42,6 +42,8 @@ type NodeInterface interface {
 	List(opts meta_v1.ListOptions) (*v1.NodeList, error)
 	Watch(opts meta_v1.ListOptions) (watch.Interface, error)
 	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.Node, err error)
+	UpdateConfigSource(nodeName string, node *v1.Node) (*v1.Node, error)
+
 	NodeExpansion
 }
 
@@ -155,6 +157,19 @@ func (c *nodes) Patch(name string, pt types.PatchType, data []byte, subresources
 		SubResource(subresources...).
 		Name(name).
 		Body(data).
+		Do().
+		Into(result)
+	return
+}
+
+// UpdateConfigSource takes the top resource name and the representation of a node and updates it. Returns the server's representation of the node, and an error, if there is any.
+func (c *nodes) UpdateConfigSource(nodeName string, node *v1.Node) (result *v1.Node, err error) {
+	result = &v1.Node{}
+	err = c.client.Put().
+		Resource("nodes").
+		Name(nodeName).
+		SubResource("configsource").
+		Body(node).
 		Do().
 		Into(result)
 	return

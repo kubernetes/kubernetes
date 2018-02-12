@@ -4062,6 +4062,7 @@ type ResourceList map[ResourceName]resource.Quantity
 
 // +genclient
 // +genclient:nonNamespaced
+// +genclient:method=UpdateConfigSource,verb=update,subresource=configsource
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // Node is a worker node in Kubernetes.

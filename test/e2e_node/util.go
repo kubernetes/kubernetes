@@ -197,12 +197,10 @@ func setKubeletConfiguration(f *framework.Framework, kubeCfg *kubeletconfig.Kube
 
 // sets the current node's configSource, this should only be called from Serial tests
 func setNodeConfigSource(f *framework.Framework, source *apiv1.NodeConfigSource) error {
-	// since this is a serial test, we just get the node, change the source, and then update it
-	// this prevents any issues with the patch API from affecting the test results
-	nodeclient := f.ClientSet.CoreV1().Nodes()
+	c := f.ClientSet.CoreV1().Nodes()
 
 	// get the node
-	node, err := nodeclient.Get(framework.TestContext.NodeName, metav1.GetOptions{})
+	node, err := c.Get(framework.TestContext.NodeName, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
@@ -211,7 +209,7 @@ func setNodeConfigSource(f *framework.Framework, source *apiv1.NodeConfigSource)
 	node.Spec.ConfigSource = source
 
 	// update to the new source
-	_, err = nodeclient.Update(node)
+	_, err = c.UpdateConfigSource(node.Name, node)
 	if err != nil {
 		return err
 	}
