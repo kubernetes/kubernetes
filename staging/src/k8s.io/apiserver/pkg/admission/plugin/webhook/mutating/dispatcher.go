@@ -20,6 +20,7 @@ package mutating
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	jsonpatch "github.com/evanphx/json-patch"
@@ -86,6 +87,10 @@ func (a *mutatingDispatcher) callAttrMutatingHook(ctx context.Context, h *v1beta
 	response := &admissionv1beta1.AdmissionReview{}
 	if err := client.Post().Context(ctx).Body(&request).Do().Into(response); err != nil {
 		return &webhookerrors.ErrCallingWebhook{WebhookName: h.Name, Reason: err}
+	}
+
+	if response.Response == nil {
+		return &webhookerrors.ErrCallingWebhook{WebhookName: h.Name, Reason: fmt.Errorf("Webhook response was absent")}
 	}
 
 	if !response.Response.Allowed {
