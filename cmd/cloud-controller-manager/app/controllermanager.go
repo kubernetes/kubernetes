@@ -157,7 +157,7 @@ func Run(c *cloudcontrollerconfig.CompletedConfig) error {
 	}
 
 	if !c.ComponentConfig.GenericComponent.LeaderElection.LeaderElect {
-		run(nil)
+		run(wait.NeverStop)
 		panic("unreachable")
 	}
 
@@ -183,7 +183,7 @@ func Run(c *cloudcontrollerconfig.CompletedConfig) error {
 	}
 
 	// Try and become the leader and start cloud controller manager loops
-	leaderelection.RunOrDie(leaderelection.LeaderElectionConfig{
+	leaderelection.RunOrDie(wait.NeverStop, leaderelection.LeaderElectionConfig{
 		Lock:          rl,
 		LeaseDuration: c.ComponentConfig.GenericComponent.LeaderElection.LeaseDuration.Duration,
 		RenewDeadline: c.ComponentConfig.GenericComponent.LeaderElection.RenewDeadline.Duration,

@@ -199,7 +199,7 @@ func Run(c schedulerserverconfig.CompletedConfig, stopCh <-chan struct{}) error 
 			return fmt.Errorf("couldn't create leader elector: %v", err)
 		}
 
-		leaderElector.Run()
+		leaderElector.Run(stopCh)
 
 		return fmt.Errorf("lost lease")
 	}
