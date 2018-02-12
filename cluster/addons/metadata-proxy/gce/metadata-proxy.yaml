@@ -33,6 +33,7 @@ spec:
       annotations:
         scheduler.alpha.kubernetes.io/critical-pod: ''
     spec:
+      priorityClassName: system-node-critical
       serviceAccountName: metadata-proxy
       hostNetwork: true
       dnsPolicy: Default

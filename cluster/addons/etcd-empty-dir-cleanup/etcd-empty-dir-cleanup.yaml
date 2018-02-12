@@ -18,6 +18,7 @@ metadata:
   labels:
     k8s-app: etcd-empty-dir-cleanup
 spec:
+  priorityClassName: system-node-critical
   serviceAccountName: etcd-empty-dir-cleanup
   hostNetwork: true
   dnsPolicy: Default

@@ -20,6 +20,7 @@ spec:
       annotations:
         scheduler.alpha.kubernetes.io/critical-pod: ''
     spec:
+      priorityClassName: system-node-critical
       nodeSelector:
         projectcalico.org/ds-ready: "true"
       hostNetwork: true
