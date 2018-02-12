@@ -1443,6 +1443,7 @@ func podWithUIDNameNs(uid types.UID, name, namespace string) *v1.Pod {
 func podWithUIDNameNsSpec(uid types.UID, name, namespace string, spec v1.PodSpec) *v1.Pod {
 	pod := podWithUIDNameNs(uid, name, namespace)
 	pod.Spec = spec
+	pod.Status = v1.PodStatus{Phase: v1.PodPending}
 	return pod
 }
 
@@ -1995,6 +1996,7 @@ func TestHandlePodAdditionsInvokesPodAdmitHandlers(t *testing.T) {
 				Name:      "podA",
 				Namespace: "foo",
 			},
+			Status: v1.PodStatus{Phase: v1.PodPending},
 		},
 		{
 			ObjectMeta: metav1.ObjectMeta{
@@ -2002,6 +2004,7 @@ func TestHandlePodAdditionsInvokesPodAdmitHandlers(t *testing.T) {
 				Name:      "podB",
 				Namespace: "foo",
 			},
+			Status: v1.PodStatus{Phase: v1.PodPending},
 		},
 	}
 	podToReject := pods[0]
