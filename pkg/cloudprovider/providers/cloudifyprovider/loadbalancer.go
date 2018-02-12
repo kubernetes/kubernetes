@@ -72,23 +72,15 @@ func (r *Balancer) nodeToState(nodeInstance *cloudify.NodeInstance) (status *api
 		ingressNode := api.LoadBalancerIngress{}
 
 		// hostname
-		if v, ok := nodeInstance.RuntimeProperties["hostname"]; ok == true {
-			switch v.(type) {
-			case string:
-				{
-					ingressNode.Hostname = v.(string)
-				}
-			}
+		hostName := nodeInstance.GetStringProperty("hostname")
+		if hostName != "" {
+			ingressNode.Hostname = hostName
 		}
 
 		// ip
-		if v, ok := nodeInstance.RuntimeProperties["public_ip"]; ok == true {
-			switch v.(type) {
-			case string:
-				{
-					ingressNode.IP = v.(string)
-				}
-			}
+		hostPublicIp := nodeInstance.GetStringProperty("public_ip")
+		if hostPublicIp != "" {
+			ingressNode.IP = hostPublicIp
 		}
 
 		ingress = append(ingress, ingressNode)

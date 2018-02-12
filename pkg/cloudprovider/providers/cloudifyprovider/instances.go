@@ -54,51 +54,34 @@ func (r *Instances) NodeAddresses(nodeName types.NodeName) ([]api.NodeAddress, e
 	addresses := []api.NodeAddress{}
 
 	for _, nodeInstance := range nodeInstances.Items {
-		// check runtime properties
-		if nodeInstance.RuntimeProperties != nil {
-			if v, ok := nodeInstance.RuntimeProperties["hostname"]; ok == true {
-				switch v.(type) {
-				case string:
-					{
-						if v.(string) != name {
-							// node with different name
-							continue
-						} else {
-							addresses = append(addresses, api.NodeAddress{
-								Type:    api.NodeHostName,
-								Address: v.(string),
-							})
-						}
-					}
-				}
-			} else {
-				// node without name
-				continue
-			}
 
-			if v, ok := nodeInstance.RuntimeProperties["ip"]; ok == true {
-				switch v.(type) {
-				case string:
-					{
-						addresses = append(addresses, api.NodeAddress{
-							Type:    api.NodeInternalIP,
-							Address: v.(string),
-						})
-					}
-				}
-			}
+		hostName := nodeInstance.GetStringProperty("hostname")
+		if hostName != name {
+			// node with different name
+			continue
+		}
 
-			if v, ok := nodeInstance.RuntimeProperties["public_ip"]; ok == true {
-				switch v.(type) {
-				case string:
-					{
-						addresses = append(addresses, api.NodeAddress{
-							Type:    api.NodeExternalIP,
-							Address: v.(string),
-						})
-					}
-				}
-			}
+		if hostName != "" {
+			addresses = append(addresses, api.NodeAddress{
+				Type:    api.NodeHostName,
+				Address: hostName,
+			})
+		}
+
+		hostPrivateIp := nodeInstance.GetStringProperty("ip")
+		if hostPrivateIp != "" {
+			addresses = append(addresses, api.NodeAddress{
+				Type:    api.NodeInternalIP,
+				Address: hostPrivateIp,
+			})
+		}
+
+		hostPublicIp := nodeInstance.GetStringProperty("public_ip")
+		if hostPublicIp != "" {
+			addresses = append(addresses, api.NodeAddress{
+				Type:    api.NodeExternalIP,
+				Address: hostPublicIp,
+			})
 		}
 	}
 
@@ -166,25 +149,13 @@ func (r *Instances) InstanceID(nodeName types.NodeName) (string, error) {
 
 	for _, nodeInstance := range nodeInstances.Items {
 		// check runtime properties
-		if nodeInstance.RuntimeProperties != nil {
-			if v, ok := nodeInstance.RuntimeProperties["hostname"]; ok == true {
-				switch v.(type) {
-				case string:
-					{
-						if v.(string) != name {
-							// node with different name
-							continue
-						}
-					}
-				}
-			} else {
-				// node without name
-				continue
-			}
-
-			glog.Infof("Node is alive: %+v", name)
-			return name, nil
+		if nodeInstance.GetStringProperty("hostname") != name {
+			// node with different name
+			continue
 		}
+
+		glog.Infof("Node is alive: %+v", name)
+		return name, nil
 	}
 
 	glog.Infof("Node died: %+v", name)
