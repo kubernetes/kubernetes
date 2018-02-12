@@ -23,8 +23,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"sync"
-	"time"
 
 	"github.com/Azure/azure-sdk-for-go/arm/compute"
 	"github.com/Azure/azure-sdk-for-go/arm/network"
@@ -33,7 +31,6 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 )
@@ -45,26 +42,6 @@ var (
 	scaleSetNameRE = regexp.MustCompile(`.*/subscriptions/(?:.*)/Microsoft.Compute/virtualMachineScaleSets/(.+)/virtualMachines(?:.*)`)
 )
 
-// scaleSetVMInfo includes basic information of a virtual machine.
-type scaleSetVMInfo struct {
-	// The ID of the machine.
-	ID string
-	// Instance ID of the machine (only for scale sets vm).
-	InstanceID string
-	// Node name of the machine.
-	NodeName string
-	// Set name of the machine.
-	ScaleSetName string
-	// The type of the machine.
-	Type string
-	// The region of the machine.
-	Region string
-	// Primary interface ID of the machine.
-	PrimaryInterfaceID string
-	// Fault domain of the machine.
-	FaultDomain string
-}
-
 // scaleSet implements VMSet interface for Azure scale set.
 type scaleSet struct {
 	*Cloud
@@ -73,207 +50,123 @@ type scaleSet struct {
 	// (e.g. master nodes) may not belong to any scale sets.
 	availabilitySet VMSet
 
-	cacheMutex sync.Mutex
-	// A local cache of scale sets. The key is scale set name and the value is a
-	// list of virtual machines belonging to the scale set.
-	cache                     map[string][]scaleSetVMInfo
-	availabilitySetNodesCache sets.String
+	vmssCache                      *timedCache
+	vmssVMCache                    *timedCache
+	nodeNameToScaleSetMappingCache *timedCache
+	availabilitySetNodesCache      *timedCache
 }
 
 // newScaleSet creates a new scaleSet.
-func newScaleSet(az *Cloud) VMSet {
+func newScaleSet(az *Cloud) (VMSet, error) {
+	var err error
 	ss := &scaleSet{
-		Cloud:                     az,
-		availabilitySet:           newAvailabilitySet(az),
-		availabilitySetNodesCache: sets.NewString(),
-		cache: make(map[string][]scaleSetVMInfo),
+		Cloud:           az,
+		availabilitySet: newAvailabilitySet(az),
 	}
 
-	go wait.Until(func() {
-		ss.cacheMutex.Lock()
-		defer ss.cacheMutex.Unlock()
-
-		if err := ss.updateCache(); err != nil {
-			glog.Errorf("updateCache failed: %v", err)
-		}
-	}, 5*time.Minute, wait.NeverStop)
-
-	return ss
-}
-
-// updateCache updates scale sets cache. It should be called within a lock.
-func (ss *scaleSet) updateCache() error {
-	scaleSetNames, err := ss.listScaleSetsWithRetry()
+	ss.nodeNameToScaleSetMappingCache, err = ss.newNodeNameToScaleSetMappingCache()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	localCache := make(map[string][]scaleSetVMInfo)
-	for _, scaleSetName := range scaleSetNames {
-		if _, ok := localCache[scaleSetName]; !ok {
-			localCache[scaleSetName] = make([]scaleSetVMInfo, 0)
-		}
-		vms, err := ss.listScaleSetVMsWithRetry(scaleSetName)
-		if err != nil {
-			return err
-		}
-
-		for _, vm := range vms {
-			nodeName := ""
-			if vm.OsProfile != nil && vm.OsProfile.ComputerName != nil {
-				nodeName = strings.ToLower(*vm.OsProfile.ComputerName)
-			}
-
-			vmSize := ""
-			if vm.Sku != nil && vm.Sku.Name != nil {
-				vmSize = *vm.Sku.Name
-			}
-
-			primaryInterfaceID, err := ss.getPrimaryInterfaceID(vm)
-			if err != nil {
-				glog.Errorf("getPrimaryInterfaceID for %s failed: %v", nodeName, err)
-				return err
-			}
-
-			faultDomain := ""
-			if vm.InstanceView != nil && vm.InstanceView.PlatformFaultDomain != nil {
-				faultDomain = strconv.Itoa(int(*vm.InstanceView.PlatformFaultDomain))
-			}
-
-			localCache[scaleSetName] = append(localCache[scaleSetName], scaleSetVMInfo{
-				ID:                 *vm.ID,
-				Type:               vmSize,
-				NodeName:           nodeName,
-				FaultDomain:        faultDomain,
-				ScaleSetName:       scaleSetName,
-				Region:             *vm.Location,
-				InstanceID:         *vm.InstanceID,
-				PrimaryInterfaceID: primaryInterfaceID,
-			})
-		}
+	ss.availabilitySetNodesCache, err = ss.newAvailabilitySetNodesCache()
+	if err != nil {
+		return nil, err
 	}
 
-	// Only update cache after all steps are success.
-	ss.cache = localCache
+	ss.vmssCache, err = ss.newVmssCache()
+	if err != nil {
+		return nil, err
+	}
 
-	return nil
+	ss.vmssVMCache, err = ss.newVmssVMCache()
+	if err != nil {
+		return nil, err
+	}
+
+	return ss, nil
 }
 
-// getCachedVirtualMachine gets virtualMachine by nodeName from cache.
+// getVmssVM gets virtualMachineScaleSetVM by nodeName from cache.
 // It returns cloudprovider.InstanceNotFound if node does not belong to any scale sets.
-func (ss *scaleSet) getCachedVirtualMachine(nodeName string) (scaleSetVMInfo, error) {
-	ss.cacheMutex.Lock()
-	defer ss.cacheMutex.Unlock()
-
-	getVMFromCache := func(nodeName string) (scaleSetVMInfo, bool) {
-		glog.V(8).Infof("Getting scaleSetVMInfo for %q from cache %v", nodeName, ss.cache)
-		for scaleSetName := range ss.cache {
-			for _, vm := range ss.cache[scaleSetName] {
-				if vm.NodeName == nodeName {
-					return vm, true
-				}
-			}
-		}
-
-		return scaleSetVMInfo{}, false
-	}
-
-	vm, found := getVMFromCache(nodeName)
-	if found {
-		return vm, nil
-	}
-
+func (ss *scaleSet) getVmssVM(nodeName string) (ssName, instanceID string, vm compute.VirtualMachineScaleSetVM, err error) {
 	// Known node not managed by scale sets.
-	if ss.availabilitySetNodesCache.Has(nodeName) {
-		glog.V(10).Infof("Found node %q in availabilitySetNodesCache", nodeName)
-		return scaleSetVMInfo{}, cloudprovider.InstanceNotFound
+	managedByAS, err := ss.isNodeManagedByAvailabilitySet(nodeName)
+	if err != nil {
+		return "", "", vm, err
+	}
+	if managedByAS {
+		glog.V(8).Infof("Found node %q in availabilitySetNodesCache", nodeName)
+		return "", "", vm, ErrorNotVmssInstance
 	}
 
-	// Update cache and try again.
-	glog.V(10).Infof("vmss cache before updateCache: %v", ss.cache)
-	if err := ss.updateCache(); err != nil {
-		glog.Errorf("updateCache failed with error: %v", err)
-		return scaleSetVMInfo{}, err
-	}
-	glog.V(10).Infof("vmss cache after updateCache: %v", ss.cache)
-	vm, found = getVMFromCache(nodeName)
-	if found {
-		return vm, nil
+	instanceID, err = getScaleSetVMInstanceID(nodeName)
+	if err != nil {
+		return ssName, instanceID, vm, err
 	}
 
-	// Node still not found, assuming it is not managed by scale sets.
-	glog.V(8).Infof("Node %q doesn't belong to any scale sets, adding it to availabilitySetNodesCache", nodeName)
-	ss.availabilitySetNodesCache.Insert(nodeName)
-	return scaleSetVMInfo{}, cloudprovider.InstanceNotFound
+	ssName, err = ss.getScaleSetNameByNodeName(nodeName)
+	if err != nil {
+		return ssName, instanceID, vm, err
+	}
+
+	if ssName == "" {
+		return "", "", vm, cloudprovider.InstanceNotFound
+	}
+
+	glog.V(4).Infof("getVmssVM gets scaleSetName (%q) and instanceID (%q) for node %q", ssName, instanceID, nodeName)
+	cachedVM, err := ss.vmssVMCache.Get(ss.makeVmssVMName(ssName, instanceID))
+	if err != nil {
+		return ssName, instanceID, vm, err
+	}
+
+	if cachedVM == nil {
+		glog.Errorf("Can't find node (%q) in any scale sets", nodeName)
+		return ssName, instanceID, vm, cloudprovider.InstanceNotFound
+	}
+
+	return ssName, instanceID, *(cachedVM.(*compute.VirtualMachineScaleSetVM)), nil
 }
 
 // getCachedVirtualMachineByInstanceID gets scaleSetVMInfo from cache.
 // The node must belong to one of scale sets.
-func (ss *scaleSet) getCachedVirtualMachineByInstanceID(scaleSetName, instanceID string) (scaleSetVMInfo, error) {
-	ss.cacheMutex.Lock()
-	defer ss.cacheMutex.Unlock()
-
-	getVMByID := func(scaleSetName, instanceID string) (scaleSetVMInfo, bool) {
-		glog.V(8).Infof("Getting scaleSetVMInfo with scaleSetName: %q and instanceID %q from cache %v", scaleSetName, instanceID, ss.cache)
-		vms, ok := ss.cache[scaleSetName]
-		if !ok {
-			glog.V(4).Infof("scale set (%s) not found", scaleSetName)
-			return scaleSetVMInfo{}, false
-		}
-
-		for _, vm := range vms {
-			if vm.InstanceID == instanceID {
-				glog.V(4).Infof("getCachedVirtualMachineByInstanceID gets vm (%s) by instanceID (%s) within scale set (%s)", vm.NodeName, instanceID, scaleSetName)
-				return vm, true
-			}
-		}
-
-		glog.V(4).Infof("instanceID (%s) not found in scale set (%s)", instanceID, scaleSetName)
-		return scaleSetVMInfo{}, false
+func (ss *scaleSet) getVmssVMByInstanceID(scaleSetName, instanceID string) (vm compute.VirtualMachineScaleSetVM, err error) {
+	vmName := ss.makeVmssVMName(scaleSetName, instanceID)
+	cachedVM, err := ss.vmssVMCache.Get(vmName)
+	if err != nil {
+		return vm, err
 	}
 
-	vm, found := getVMByID(scaleSetName, instanceID)
-	if found {
-		return vm, nil
+	if cachedVM == nil {
+		glog.Errorf("cound't find vmss virtual machine by scaleSetName (%q) and instanceID (%q)", scaleSetName, instanceID)
+		return vm, cloudprovider.InstanceNotFound
 	}
 
-	// Update cache and try again.
-	if err := ss.updateCache(); err != nil {
-		glog.Errorf("updateCache failed with error: %v", err)
-		return scaleSetVMInfo{}, err
-	}
-	vm, found = getVMByID(scaleSetName, instanceID)
-	if found {
-		return vm, nil
-	}
-
-	return scaleSetVMInfo{}, cloudprovider.InstanceNotFound
+	return *(cachedVM.(*compute.VirtualMachineScaleSetVM)), nil
 }
 
 // GetInstanceIDByNodeName gets the cloud provider ID by node name.
 // It must return ("", cloudprovider.InstanceNotFound) if the instance does
 // not exist or is no longer running.
 func (ss *scaleSet) GetInstanceIDByNodeName(name string) (string, error) {
-	vm, err := ss.getCachedVirtualMachine(name)
+	_, _, vm, err := ss.getVmssVM(name)
 	if err != nil {
-		if err == cloudprovider.InstanceNotFound {
-			glog.V(4).Infof("GetInstanceIDByNodeName: node %q is not found in scale sets, assuming it is managed by availability set", name)
-
-			// Retry with standard type because master nodes may not belong to any vmss.
-			// TODO: find a better way to identify the type of VM.
+		if err == ErrorNotVmssInstance {
+			glog.V(4).Infof("GetInstanceIDByNodeName: node %q is managed by availability set", name)
+			// Retry with standard type because nodes are not managed by vmss.
 			return ss.availabilitySet.GetInstanceIDByNodeName(name)
 		}
 
 		return "", err
 	}
 
-	return vm.ID, nil
+	return *vm.ID, nil
 }
 
 // GetNodeNameByProviderID gets the node name by provider ID.
 func (ss *scaleSet) GetNodeNameByProviderID(providerID string) (types.NodeName, error) {
 	// NodeName is not part of providerID for vmss instances.
-	scaleSetName, err := extractScaleSetNameByVMID(providerID)
+	scaleSetName, err := extractScaleSetNameByExternalID(providerID)
 	if err != nil {
 		glog.V(4).Infof("Can not extract scale set name from providerID (%s), assuming it is mananaged by availability set: %v", providerID, err)
 		return ss.availabilitySet.GetNodeNameByProviderID(providerID)
@@ -285,49 +178,60 @@ func (ss *scaleSet) GetNodeNameByProviderID(providerID string) (types.NodeName, 
 		return ss.availabilitySet.GetNodeNameByProviderID(providerID)
 	}
 
-	vm, err := ss.getCachedVirtualMachineByInstanceID(scaleSetName, instanceID)
+	vm, err := ss.getVmssVMByInstanceID(scaleSetName, instanceID)
 	if err != nil {
 		return "", err
 	}
 
-	return types.NodeName(vm.NodeName), nil
+	if vm.OsProfile != nil && vm.OsProfile.ComputerName != nil {
+		nodeName := strings.ToLower(*vm.OsProfile.ComputerName)
+		return types.NodeName(nodeName), nil
+	}
+
+	return "", nil
 }
 
 // GetInstanceTypeByNodeName gets the instance type by node name.
 func (ss *scaleSet) GetInstanceTypeByNodeName(name string) (string, error) {
-	vm, err := ss.getCachedVirtualMachine(name)
+	_, _, vm, err := ss.getVmssVM(name)
 	if err != nil {
-		if err == cloudprovider.InstanceNotFound {
-			glog.V(4).Infof("GetInstanceTypeByNodeName: node %q is not found in scale sets, assuming it is managed by availability set", name)
-
-			// Retry with standard type because master nodes may not belong to any vmss.
-			// TODO: find a better way to identify the type of VM.
+		if err == ErrorNotVmssInstance {
+			glog.V(4).Infof("GetInstanceTypeByNodeName: node %q is managed by availability set", name)
+			// Retry with standard type because nodes are not managed by vmss.
 			return ss.availabilitySet.GetInstanceTypeByNodeName(name)
 		}
 
 		return "", err
 	}
 
-	return vm.Type, nil
+	if vm.Sku != nil && vm.Sku.Name != nil {
+		return *vm.Sku.Name, nil
+	}
+
+	return "", nil
 }
 
 // GetZoneByNodeName gets cloudprovider.Zone by node name.
 func (ss *scaleSet) GetZoneByNodeName(name string) (cloudprovider.Zone, error) {
-	vm, err := ss.getCachedVirtualMachine(name)
+	_, _, vm, err := ss.getVmssVM(name)
 	if err != nil {
-		if err == cloudprovider.InstanceNotFound {
-			glog.V(4).Infof("GetZoneByNodeName: node %q is not found in scale sets, assuming it is managed by availability set", name)
-			// Retry with standard type because master nodes may not belong to any vmss.
-			// TODO: find a better way to identify the type of VM.
+		if err == ErrorNotVmssInstance {
+			glog.V(4).Infof("GetZoneByNodeName: node %q is managed by availability set", name)
+			// Retry with standard type because nodes are not managed by vmss.
 			return ss.availabilitySet.GetZoneByNodeName(name)
 		}
+
 		return cloudprovider.Zone{}, err
 	}
 
-	return cloudprovider.Zone{
-		FailureDomain: vm.FaultDomain,
-		Region:        vm.Region,
-	}, nil
+	if vm.InstanceView != nil && vm.InstanceView.PlatformFaultDomain != nil {
+		return cloudprovider.Zone{
+			FailureDomain: strconv.Itoa(int(*vm.InstanceView.PlatformFaultDomain)),
+			Region:        *vm.Location,
+		}, nil
+	}
+
+	return cloudprovider.Zone{}, nil
 }
 
 // GetPrimaryVMSetName returns the VM set name depending on the configured vmType.
@@ -386,9 +290,9 @@ func getScaleSetVMInstanceID(machineName string) (string, error) {
 	return fmt.Sprintf("%d", instanceID), nil
 }
 
-// extractScaleSetNameByVMID extracts the scaleset name by scaleSetVirtualMachine's ID.
-func extractScaleSetNameByVMID(vmID string) (string, error) {
-	matches := scaleSetNameRE.FindStringSubmatch(vmID)
+// extractScaleSetNameByExternalID extracts the scaleset name by node's externalID.
+func extractScaleSetNameByExternalID(externalID string) (string, error) {
+	matches := scaleSetNameRE.FindStringSubmatch(externalID)
 	if len(matches) != 2 {
 		return "", ErrorNotVmssInstance
 	}
@@ -493,41 +397,20 @@ func (ss *scaleSet) listScaleSetVMsWithRetry(scaleSetName string) ([]compute.Vir
 // getAgentPoolScaleSets lists the virtual machines for for the resource group and then builds
 // a list of scale sets that match the nodes available to k8s.
 func (ss *scaleSet) getAgentPoolScaleSets(nodes []*v1.Node) (*[]string, error) {
-	ss.cacheMutex.Lock()
-	defer ss.cacheMutex.Unlock()
-
-	// Always update cache to get latest lists of scale sets and virtual machines.
-	if err := ss.updateCache(); err != nil {
-		return nil, err
-	}
-
-	vmNameToScaleSetName := make(map[string]string)
-	for scaleSetName := range ss.cache {
-		vms := ss.cache[scaleSetName]
-		for idx := range vms {
-			vm := vms[idx]
-			if vm.NodeName != "" {
-				vmNameToScaleSetName[vm.NodeName] = scaleSetName
-			}
-		}
-	}
-
 	agentPoolScaleSets := &[]string{}
-	availableScaleSetNames := sets.NewString()
 	for nx := range nodes {
 		if isMasterNode(nodes[nx]) {
 			continue
 		}
 
 		nodeName := nodes[nx].Name
-		ssName, ok := vmNameToScaleSetName[nodeName]
-		if !ok {
-			// TODO: support master nodes not managed by VMSS.
-			glog.Errorf("Node %q is not belonging to any known scale sets", nodeName)
-			return nil, fmt.Errorf("node %q is not belonging to any known scale sets", nodeName)
+		ssName, err := ss.getScaleSetNameByNodeName(nodeName)
+		if err != nil {
+			return nil, err
 		}
 
-		if availableScaleSetNames.Has(ssName) {
+		if ssName == "" {
+			glog.V(3).Infof("Node %q is not belonging to any known scale sets", nodeName)
 			continue
 		}
 
@@ -589,11 +472,11 @@ func (ss *scaleSet) GetVMSetNames(service *v1.Service, nodes []*v1.Node) (vmSetN
 
 // GetPrimaryInterface gets machine primary network interface by node name and vmSet.
 func (ss *scaleSet) GetPrimaryInterface(nodeName, vmSetName string) (network.Interface, error) {
-	vm, err := ss.getCachedVirtualMachine(nodeName)
+	ssName, instanceID, vm, err := ss.getVmssVM(nodeName)
 	if err != nil {
-		if err == cloudprovider.InstanceNotFound {
-			// Retry with standard type because master nodes may not belong to any vmss.
-			// TODO: find a better way to identify the type of VM.
+		if err == ErrorNotVmssInstance {
+			glog.V(4).Infof("GetPrimaryInterface: node %q is managed by availability set", nodeName)
+			// Retry with standard type because nodes are not managed by vmss.
 			return ss.availabilitySet.GetPrimaryInterface(nodeName, "")
 		}
 
@@ -602,44 +485,35 @@ func (ss *scaleSet) GetPrimaryInterface(nodeName, vmSetName string) (network.Int
 	}
 
 	// Check scale set name.
-	if vmSetName != "" && !strings.EqualFold(vm.ScaleSetName, vmSetName) {
+	if vmSetName != "" && !strings.EqualFold(ssName, vmSetName) {
 		return network.Interface{}, errNotInVMSet
 	}
 
-	nicName, err := getLastSegment(vm.PrimaryInterfaceID)
+	primaryInterfaceID, err := ss.getPrimaryInterfaceID(vm)
 	if err != nil {
-		glog.Errorf("error: ss.GetPrimaryInterface(%s), getLastSegment(%s), err=%v", nodeName, vm.PrimaryInterfaceID, err)
+		glog.Errorf("error: ss.GetPrimaryInterface(%s), ss.getPrimaryInterfaceID(), err=%v", nodeName, err)
 		return network.Interface{}, err
 	}
 
-	nic, err := ss.InterfacesClient.GetVirtualMachineScaleSetNetworkInterface(ss.ResourceGroup, vm.ScaleSetName, vm.InstanceID, nicName, "")
+	nicName, err := getLastSegment(primaryInterfaceID)
 	if err != nil {
-		glog.Errorf("error: ss.GetPrimaryInterface(%s), ss.GetVirtualMachineScaleSetNetworkInterface.Get(%s, %s, %s), err=%v", nodeName, ss.ResourceGroup, vm.ScaleSetName, nicName, err)
+		glog.Errorf("error: ss.GetPrimaryInterface(%s), getLastSegment(%s), err=%v", nodeName, primaryInterfaceID, err)
+		return network.Interface{}, err
+	}
+
+	nic, err := ss.InterfacesClient.GetVirtualMachineScaleSetNetworkInterface(ss.ResourceGroup, ssName, instanceID, nicName, "")
+	if err != nil {
+		glog.Errorf("error: ss.GetPrimaryInterface(%s), ss.GetVirtualMachineScaleSetNetworkInterface.Get(%s, %s, %s), err=%v", nodeName, ss.ResourceGroup, ssName, nicName, err)
 		return network.Interface{}, err
 	}
 
 	// Fix interface's location, which is required when updating the interface.
 	// TODO: is this a bug of azure SDK?
 	if nic.Location == nil || *nic.Location == "" {
-		nic.Location = &vm.Region
+		nic.Location = vm.Location
 	}
 
 	return nic, nil
-}
-
-// getScaleSet gets a scale set by name.
-func (ss *scaleSet) getScaleSet(name string) (compute.VirtualMachineScaleSet, bool, error) {
-	result, err := ss.VirtualMachineScaleSetsClient.Get(ss.ResourceGroup, name)
-	exists, realErr := checkResourceExistsFromError(err)
-	if realErr != nil {
-		return result, false, realErr
-	}
-
-	if !exists {
-		return result, false, nil
-	}
-
-	return result, exists, err
 }
 
 // getScaleSetWithRetry gets scale set with exponential backoff retry
@@ -648,13 +522,18 @@ func (ss *scaleSet) getScaleSetWithRetry(name string) (compute.VirtualMachineSca
 	var exists bool
 
 	err := wait.ExponentialBackoff(ss.requestBackoff(), func() (bool, error) {
-		var retryErr error
-		result, exists, retryErr = ss.getScaleSet(name)
+		cached, retryErr := ss.vmssCache.Get(name)
 		if retryErr != nil {
-			glog.Errorf("backoff: failure, will retry,err=%v", retryErr)
+			glog.Errorf("backoff: failure for scale set %q, will retry,err=%v", name, retryErr)
 			return false, nil
 		}
-		glog.V(2).Info("backoff: success")
+		glog.V(4).Info("backoff: success for scale set %q", name)
+
+		if cached != nil {
+			exists = true
+			result = *(cached.(*compute.VirtualMachineScaleSet))
+		}
+
 		return true, nil
 	})
 
@@ -783,7 +662,7 @@ func (ss *scaleSet) EnsureHostsInPool(serviceName string, nodes []*v1.Node, back
 	// Construct instanceIDs from nodes.
 	instanceIDs := []string{}
 	for _, curNode := range nodes {
-		curScaleSetName, err := extractScaleSetNameByVMID(curNode.Spec.ExternalID)
+		curScaleSetName, err := extractScaleSetNameByExternalID(curNode.Spec.ExternalID)
 		if err != nil {
 			glog.V(4).Infof("Node %q is not belonging to any scale sets, omitting it", curNode.Name)
 			continue

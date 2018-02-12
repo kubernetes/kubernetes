@@ -244,7 +244,10 @@ func NewCloud(configReader io.Reader) (cloudprovider.Interface, error) {
 	}
 
 	if strings.EqualFold(vmTypeVMSS, az.Config.VMType) {
-		az.vmSet = newScaleSet(&az)
+		az.vmSet, err = newScaleSet(&az)
+		if err != nil {
+			return nil, err
+		}
 	} else {
 		az.vmSet = newAvailabilitySet(&az)
 	}
