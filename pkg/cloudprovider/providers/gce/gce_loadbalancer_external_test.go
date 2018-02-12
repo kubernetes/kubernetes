@@ -27,6 +27,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud/mock"
@@ -296,6 +297,7 @@ func fakeGCECloud() (*GCECloud, error) {
 	cloud := cloud.NewMockGCE(&gceProjectRouter{gce})
 	cloud.MockTargetPools.AddInstanceHook = mock.AddInstanceHook
 	cloud.MockTargetPools.RemoveInstanceHook = mock.RemoveInstanceHook
+	cloud.MockAlphaForwardingRules.GetHook = mock.GetAlphaFwdRuleHook
 
 	gce.c = cloud
 
@@ -500,4 +502,55 @@ func TestEnsureExternalLoadBalancerDeleted(t *testing.T) {
 	fwdRule, err := gce.GetRegionForwardingRule(lbName, gceRegion)
 	require.Error(t, err)
 	assert.Nil(t, fwdRule)
+}
+
+func TestLoadBalancerWrongTierResourceDeletion(t *testing.T) {
+	gce, err := fakeGCECloud()
+	require.NoError(t, err)
+
+	// Enable the NetworkTiers feature
+	gce.AlphaFeatureGate.features[AlphaFeatureNetworkTiers] = true
+	apiService.Annotations = map[string]string{NetworkTierAnnotationKey: "Premium"}
+
+	// NetworkTier defaults to Premium
+	desiredTier, err := gce.getServiceNetworkTier(apiService)
+	require.NoError(t, err)
+	assert.Equal(t, NetworkTierPremium, desiredTier)
+
+	lbName := cloudprovider.GetLoadBalancerName(apiService)
+	serviceName := types.NamespacedName{Namespace: apiService.Namespace, Name: apiService.Name}
+
+	// create ForwardingRule and Address with the wrong tier
+	err = createForwardingRule(
+		gce,
+		lbName,
+		serviceName.String(),
+		gceRegion,
+		"",
+		gce.targetPoolURL(lbName),
+		apiService.Spec.Ports,
+		NetworkTierStandard,
+	)
+	require.NoError(t, err)
+
+	addressObj := &computealpha.Address{
+		Name:        lbName,
+		Description: serviceName.String(),
+		NetworkTier: NetworkTierStandard.ToGCEValue(),
+	}
+
+	err = gce.ReserveAlphaRegionAddress(addressObj, gceRegion)
+	require.NoError(t, err)
+
+	_, err = createExternalLoadBalancer(gce)
+	require.NoError(t, err)
+
+	// Expect forwarding rule tier to not be Standard
+	tier, err := gce.getNetworkTierFromForwardingRule(lbName, gceRegion)
+	assert.NoError(t, err)
+	assert.Equal(t, NetworkTierDefault.ToGCEValue(), tier)
+
+	// Expect address to be deleted
+	_, err = gce.GetRegionAddress(lbName, gceRegion)
+	assert.True(t, isNotFound(err))
 }

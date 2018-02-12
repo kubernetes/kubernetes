@@ -28,6 +28,7 @@ import (
 	"fmt"
 	"net/http"
 
+	alpha "google.golang.org/api/compute/v0.alpha"
 	ga "google.golang.org/api/compute/v1"
 	"google.golang.org/api/googleapi"
 	cloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud"
@@ -73,4 +74,22 @@ func RemoveInstanceHook(ctx context.Context, key *meta.Key, req *ga.TargetPoolsR
 	}
 
 	return nil
+}
+
+// GetAlphaFwdRuleHook mocks getting an AlphaForwardingRule. ForwardingRules
+// are expected to default to Premium tier if no NetworkTier is specified.
+func GetAlphaFwdRuleHook(ctx context.Context, key *meta.Key, m *cloud.MockAlphaForwardingRules) (bool, *alpha.ForwardingRule, error) {
+	if obj, ok := m.Objects[*key]; ok {
+		typedObj := obj.ToAlpha()
+		if typedObj.NetworkTier == "" {
+			typedObj.NetworkTier = "PREMIUM"
+		}
+		return true, typedObj, nil
+	}
+
+	err := &googleapi.Error{
+		Code: http.StatusNotFound,
+	}
+
+	return false, nil, err
 }
