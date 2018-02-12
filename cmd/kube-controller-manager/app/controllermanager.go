@@ -21,6 +21,7 @@ limitations under the License.
 package app
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"math/rand"
@@ -144,7 +145,7 @@ func Run(c *config.CompletedConfig) error {
 		}
 	}
 
-	run := func(stop <-chan struct{}) {
+	run := func(runCtx context.Context) {
 		rootClientBuilder := controller.SimpleControllerClientBuilder{
 			ClientConfig: c.Kubeconfig,
 		}
@@ -164,7 +165,7 @@ func Run(c *config.CompletedConfig) error {
 		} else {
 			clientBuilder = rootClientBuilder
 		}
-		ctx, err := CreateControllerContext(c, rootClientBuilder, clientBuilder, stop)
+		ctx, err := CreateControllerContext(c, rootClientBuilder, clientBuilder, runCtx.Done())
 		if err != nil {
 			glog.Fatalf("error building controller context: %v", err)
 		}
@@ -180,8 +181,11 @@ func Run(c *config.CompletedConfig) error {
 		select {}
 	}
 
+	runCtx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	if !c.ComponentConfig.GenericComponent.LeaderElection.LeaderElect {
-		run(wait.NeverStop)
+		run(runCtx)
 		panic("unreachable")
 	}
 
@@ -204,7 +208,7 @@ func Run(c *config.CompletedConfig) error {
 		glog.Fatalf("error creating lock: %v", err)
 	}
 
-	leaderelection.RunOrDie(wait.NeverStop, leaderelection.LeaderElectionConfig{
+	leaderelection.RunOrDie(runCtx, leaderelection.LeaderElectionConfig{
 		Lock:          rl,
 		LeaseDuration: c.ComponentConfig.GenericComponent.LeaderElection.LeaseDuration.Duration,
 		RenewDeadline: c.ComponentConfig.GenericComponent.LeaderElection.RenewDeadline.Duration,

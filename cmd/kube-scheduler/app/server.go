@@ -18,6 +18,7 @@ limitations under the License.
 package app
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -189,7 +190,9 @@ func Run(c schedulerserverconfig.CompletedConfig, stopCh <-chan struct{}) error 
 	// If leader election is enabled, run via LeaderElector until done and exit.
 	if c.LeaderElection != nil {
 		c.LeaderElection.Callbacks = leaderelection.LeaderCallbacks{
-			OnStartedLeading: run,
+			OnStartedLeading: func(ctx context.Context) {
+				run(ctx.Done())
+			},
 			OnStoppedLeading: func() {
 				utilruntime.HandleError(fmt.Errorf("lost master"))
 			},
@@ -199,7 +202,7 @@ func Run(c schedulerserverconfig.CompletedConfig, stopCh <-chan struct{}) error 
 			return fmt.Errorf("couldn't create leader elector: %v", err)
 		}
 
-		leaderElector.Run(stopCh)
+		leaderElector.Run(context.TODO())
 
 		return fmt.Errorf("lost lease")
 	}

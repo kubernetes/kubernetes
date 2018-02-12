@@ -17,6 +17,7 @@ limitations under the License.
 package app
 
 import (
+	"context"
 	"fmt"
 	"math/rand"
 	"net"
@@ -135,7 +136,7 @@ func Run(c *cloudcontrollerconfig.CompletedConfig) error {
 		}
 	}
 
-	run := func(stop <-chan struct{}) {
+	run := func(ctx context.Context) {
 		rootClientBuilder := controller.SimpleControllerClientBuilder{
 			ClientConfig: c.Kubeconfig,
 		}
@@ -151,13 +152,16 @@ func Run(c *cloudcontrollerconfig.CompletedConfig) error {
 			clientBuilder = rootClientBuilder
 		}
 
-		if err := startControllers(c, rootClientBuilder, clientBuilder, stop, cloud); err != nil {
+		if err := startControllers(c, rootClientBuilder, clientBuilder, ctx.Done(), cloud); err != nil {
 			glog.Fatalf("error running controllers: %v", err)
 		}
 	}
 
+	runCtx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	if !c.ComponentConfig.GenericComponent.LeaderElection.LeaderElect {
-		run(wait.NeverStop)
+		run(runCtx)
 		panic("unreachable")
 	}
 
@@ -183,7 +187,7 @@ func Run(c *cloudcontrollerconfig.CompletedConfig) error {
 	}
 
 	// Try and become the leader and start cloud controller manager loops
-	leaderelection.RunOrDie(wait.NeverStop, leaderelection.LeaderElectionConfig{
+	leaderelection.RunOrDie(runCtx, leaderelection.LeaderElectionConfig{
 		Lock:          rl,
 		LeaseDuration: c.ComponentConfig.GenericComponent.LeaderElection.LeaseDuration.Duration,
 		RenewDeadline: c.ComponentConfig.GenericComponent.LeaderElection.RenewDeadline.Duration,
