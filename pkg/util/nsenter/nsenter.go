@@ -119,6 +119,6 @@ func (ne *Nsenter) AbsHostPath(command string) string {
 
 // SupportsSystemd checks whether command systemd-run exists
 func (ne *Nsenter) SupportsSystemd() (string, bool) {
-	systemdRunPath, hasSystemd := ne.paths["systemd-run"]
-	return systemdRunPath, hasSystemd
+	systemdRunPath := ne.paths["systemd-run"]
+	return systemdRunPath, systemdRunPath != ""
 }
