@@ -203,6 +203,19 @@ const (
 
 	// CRICtlPackage defines the go package that installs crictl
 	CRICtlPackage = "github.com/kubernetes-incubator/cri-tools/cmd/crictl"
+
+	// KubeAuditPolicyVolumeName is the name of the volume that will contain the audit policy
+	KubeAuditPolicyVolumeName = "audit"
+	// AuditPolicyDir is the directory that will contain the audit policy
+	AuditPolicyDir = "audit"
+	// AuditPolicyFile is the name of the audit policy file itself
+	AuditPolicyFile = "audit.yaml"
+	// AuditPolicyLogFile is the name of the file audit logs get written to
+	AuditPolicyLogFile = "audit.log"
+	// KubeAuditPolicyLogVolumeName is the name of the volume that will contain the audit logs
+	KubeAuditPolicyLogVolumeName = "audit-log"
+	// StaticPodAuditPolicyLogDir is the name of the directory in the static pod that will have the audit logs
+	StaticPodAuditPolicyLogDir = "/var/log/kubernetes/audit"
 )
 
 var (
@@ -310,4 +323,9 @@ func GetDNSIP(svcSubnet string) (net.IP, error) {
 	}
 
 	return dnsIP, nil
+}
+
+// GetStaticPodAuditPolicyFile returns the path to the audit policy file within a static pod
+func GetStaticPodAuditPolicyFile() string {
+	return filepath.Join(KubernetesDir, AuditPolicyDir, AuditPolicyFile)
 }

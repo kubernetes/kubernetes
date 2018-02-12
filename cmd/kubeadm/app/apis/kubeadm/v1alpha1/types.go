@@ -100,6 +100,9 @@ type MasterConfiguration struct {
 	// be used for all control plane components.
 	UnifiedControlPlaneImage string `json:"unifiedControlPlaneImage"`
 
+	// AuditPolicyConfiguration defines the options for the api server audit system
+	AuditPolicyConfiguration AuditPolicyConfiguration `json:"auditPolicy"`
+
 	// FeatureGates enabled by the user.
 	FeatureGates map[string]bool `json:"featureGates,omitempty"`
 }
@@ -242,4 +245,15 @@ type HostPathMount struct {
 // KubeProxy contains elements describing the proxy configuration.
 type KubeProxy struct {
 	Config *kubeproxyconfigv1alpha1.KubeProxyConfiguration `json:"config,omitempty"`
+}
+
+// AuditPolicyConfiguration holds the options for configuring the api server audit policy.
+type AuditPolicyConfiguration struct {
+	// Path is the local path to an audit policy.
+	Path string `json:"path"`
+	// LogDir is the local path to the directory where logs should be stored.
+	LogDir string `json:"logDir"`
+	// LogMaxAge is the number of days logs will be stored for. 0 indicates forever.
+	LogMaxAge *int32 `json:"logMaxAge,omitempty"`
+	//TODO(chuckha) add other options for audit policy.
 }

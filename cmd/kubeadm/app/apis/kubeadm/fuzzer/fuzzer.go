@@ -110,6 +110,11 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 					ConfigSyncPeriod: metav1.Duration{Duration: 1},
 				},
 			}
+			obj.AuditPolicyConfiguration = kubeadm.AuditPolicyConfiguration{
+				Path:      "foo",
+				LogDir:    "/foo",
+				LogMaxAge: utilpointer.Int32Ptr(0),
+			}
 		},
 		func(obj *kubeadm.NodeConfiguration, c fuzz.Continue) {
 			c.FuzzNoCustom(obj)

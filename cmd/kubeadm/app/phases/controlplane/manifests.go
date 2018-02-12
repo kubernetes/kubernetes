@@ -224,6 +224,16 @@ func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration, k8sVersion *versio
 		command = append(command, "--feature-gates=DynamicKubeletConfig=true")
 	}
 
+	if features.Enabled(cfg.FeatureGates, features.Auditing) {
+		command = append(command, "--audit-policy-file="+kubeadmconstants.GetStaticPodAuditPolicyFile())
+		command = append(command, "--audit-log-path="+filepath.Join(kubeadmconstants.StaticPodAuditPolicyLogDir, kubeadmconstants.AuditPolicyLogFile))
+		if cfg.AuditPolicyConfiguration.LogMaxAge == nil {
+			command = append(command, fmt.Sprintf("--audit-log-maxage=%d", kubeadmapiext.DefaultAuditPolicyLogMaxAge))
+		} else {
+			command = append(command, fmt.Sprintf("--audit-log-maxage=%d", *cfg.AuditPolicyConfiguration.LogMaxAge))
+		}
+	}
+
 	return command
 }
 
