@@ -59,7 +59,7 @@ http_file(
 
 docker_pull(
     name = "debian-iptables-amd64",
-    digest = "sha256:a3b936c0fb98a934eecd2cfb91f73658d402b29116084e778ce9ddb68e55383e",
+    digest = "sha256:fb18678f8203ca1bd2fad2671e3ebd80cb408a1baae423d4ad39c05f4caac4e1",
     registry = "k8s.gcr.io",
     repository = "debian-iptables-amd64",
     tag = "v10",  # ignored, but kept here for documentation
