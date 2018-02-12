@@ -27,6 +27,8 @@ import (
 )
 
 var (
+	vmssNameSeparator = "_"
+
 	nodeNameToScaleSetMappingKey = "k8sNodeNameToScaleSetMappingKey"
 	availabilitySetNodesKey      = "k8sAvailabilitySetNodesKey"
 
@@ -41,11 +43,11 @@ var (
 type nodeNameToScaleSetMapping map[string]string
 
 func (ss *scaleSet) makeVmssVMName(scaleSetName, instanceID string) string {
-	return fmt.Sprintf("%s_%s", scaleSetName, instanceID)
+	return fmt.Sprintf("%s%s%s", scaleSetName, vmssNameSeparator, instanceID)
 }
 
 func (ss *scaleSet) extractVmssVMName(name string) (string, string, error) {
-	ret := strings.Split(name, "_")
+	ret := strings.Split(name, vmssNameSeparator)
 	if len(ret) != 2 {
 		glog.Errorf("Failed to extract vmssVMName %q", name)
 		return "", "", ErrorNotVmssInstance
@@ -88,7 +90,7 @@ func (ss *scaleSet) newNodeNameToScaleSetMappingCache() (*timedCache, error) {
 
 			for _, vm := range vms {
 				if vm.OsProfile == nil || vm.OsProfile.ComputerName == nil {
-					glog.Warningf("failed to get computerName for vmssVM (%q)", *vm.Name)
+					glog.Warningf("failed to get computerName for vmssVM (%q)", vm.Name)
 					continue
 				}
 
