@@ -221,7 +221,7 @@ func (s *ServerRunOptions) AddFlags(fs *pflag.FlagSet) {
 		"api-server and calling out to webhook admission plugins. It is expected that this "+
 		"cert includes a signature from the CA in the --requestheader-client-ca-file flag. "+
 		"That CA is published in the 'extension-apiserver-authentication' configmap in "+
-		"the kube-system namespace. Components recieving calls from kube-aggregator should "+
+		"the kube-system namespace. Components receiving calls from kube-aggregator should "+
 		"use that CA to perform their half of the mutual TLS verification.")
 	fs.StringVar(&s.ProxyClientKeyFile, "proxy-client-key-file", s.ProxyClientKeyFile, ""+
 		"Private key for the client certificate used to prove the identity of the aggregator or kube-apiserver "+

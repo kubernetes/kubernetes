@@ -24,12 +24,15 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func newTestScaleSet(scaleSetName string, vmList []string) *scaleSet {
+func newTestScaleSet(scaleSetName string, vmList []string) (*scaleSet, error) {
 	cloud := getTestCloud()
 	setTestVirtualMachineCloud(cloud, scaleSetName, vmList)
-	ss := newScaleSet(cloud)
+	ss, err := newScaleSet(cloud)
+	if err != nil {
+		return nil, err
+	}
 
-	return ss.(*scaleSet)
+	return ss.(*scaleSet), nil
 }
 
 func setTestVirtualMachineCloud(ss *Cloud, scaleSetName string, vmList []string) {
@@ -46,16 +49,16 @@ func setTestVirtualMachineCloud(ss *Cloud, scaleSetName string, vmList []string)
 	ssVMs := make(map[string]map[string]compute.VirtualMachineScaleSetVM)
 	ssVMs["rg"] = make(map[string]compute.VirtualMachineScaleSetVM)
 	for i := range vmList {
-		ID := fmt.Sprintf("azure:///subscriptions/script/resourceGroups/rg/providers/Microsoft.Compute/virtualMachineScaleSets/%s/virtualMachines/%d", scaleSetName, i)
+		ID := fmt.Sprintf("/subscriptions/script/resourceGroups/rg/providers/Microsoft.Compute/virtualMachineScaleSets/%s/virtualMachines/%d", scaleSetName, i)
 		nodeName := vmList[i]
 		instanceID := fmt.Sprintf("%d", i)
-		vmKey := fmt.Sprintf("%s-%s", scaleSetName, nodeName)
+		vmName := fmt.Sprintf("%s_%s", scaleSetName, instanceID)
 		networkInterfaces := []compute.NetworkInterfaceReference{
 			{
 				ID: &nodeName,
 			},
 		}
-		ssVMs["rg"][vmKey] = compute.VirtualMachineScaleSetVM{
+		ssVMs["rg"][vmName] = compute.VirtualMachineScaleSetVM{
 			VirtualMachineScaleSetVMProperties: &compute.VirtualMachineScaleSetVMProperties{
 				OsProfile: &compute.OSProfile{
 					ComputerName: &nodeName,
@@ -66,6 +69,7 @@ func setTestVirtualMachineCloud(ss *Cloud, scaleSetName string, vmList []string)
 			},
 			ID:         &ID,
 			InstanceID: &instanceID,
+			Name:       &vmName,
 			Location:   &ss.Location,
 		}
 	}
@@ -116,28 +120,29 @@ func TestGetInstanceIDByNodeName(t *testing.T) {
 		{
 			description: "scaleSet should get instance by node name",
 			scaleSet:    "ss",
-			vmList:      []string{"vm1", "vm2"},
-			nodeName:    "vm1",
-			expected:    "azure:///subscriptions/script/resourceGroups/rg/providers/Microsoft.Compute/virtualMachineScaleSets/ss/virtualMachines/0",
+			vmList:      []string{"vmssee6c2000000", "vmssee6c2000001"},
+			nodeName:    "vmssee6c2000001",
+			expected:    "/subscriptions/script/resourceGroups/rg/providers/Microsoft.Compute/virtualMachineScaleSets/ss/virtualMachines/1",
 		},
 		{
 			description: "scaleSet should get instance by node name with upper cases hostname",
 			scaleSet:    "ss",
-			vmList:      []string{"VM1", "vm2"},
-			nodeName:    "vm1",
-			expected:    "azure:///subscriptions/script/resourceGroups/rg/providers/Microsoft.Compute/virtualMachineScaleSets/ss/virtualMachines/0",
+			vmList:      []string{"VMSSEE6C2000000", "VMSSEE6C2000001"},
+			nodeName:    "vmssee6c2000000",
+			expected:    "/subscriptions/script/resourceGroups/rg/providers/Microsoft.Compute/virtualMachineScaleSets/ss/virtualMachines/0",
 		},
 		{
 			description: "scaleSet should not get instance for non-exist nodes",
 			scaleSet:    "ss",
-			vmList:      []string{"VM1", "vm2"},
-			nodeName:    "vm3",
+			vmList:      []string{"vmssee6c2000000", "vmssee6c2000001"},
+			nodeName:    "agente6c2000005",
 			expectError: true,
 		},
 	}
 
 	for _, test := range testCases {
-		ss := newTestScaleSet(test.scaleSet, test.vmList)
+		ss, err := newTestScaleSet(test.scaleSet, test.vmList)
+		assert.NoError(t, err, test.description)
 
 		real, err := ss.GetInstanceIDByNodeName(test.nodeName)
 		if test.expectError {

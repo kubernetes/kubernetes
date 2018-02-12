@@ -637,7 +637,7 @@ message Container {
 // Describe a container image
 message ContainerImage {
   // Names by which this image is known.
-  // e.g. ["gcr.io/google_containers/hyperkube:v1.0.7", "dockerhub.io/google_containers/hyperkube:v1.0.7"]
+  // e.g. ["k8s.gcr.io/hyperkube:v1.0.7", "dockerhub.io/google_containers/hyperkube:v1.0.7"]
   repeated string names = 1;
 
   // The size of the image in bytes.
@@ -992,7 +992,7 @@ message EndpointsList {
 
 // EnvFromSource represents the source of a set of ConfigMaps
 message EnvFromSource {
-  // An optional identifer to prepend to each key in the ConfigMap. Must be a C_IDENTIFIER.
+  // An optional identifier to prepend to each key in the ConfigMap. Must be a C_IDENTIFIER.
   // +optional
   optional string prefix = 1;
 
@@ -1124,12 +1124,12 @@ message EventList {
 }
 
 // EventSeries contain information on series of events, i.e. thing that was/is happening
-// continously for some time.
+// continuously for some time.
 message EventSeries {
   // Number of occurrences in this series up to the last heartbeat time
   optional int32 count = 1;
 
-  // Time of the last occurence observed
+  // Time of the last occurrence observed
   optional k8s.io.apimachinery.pkg.apis.meta.v1.MicroTime lastObservedTime = 2;
 
   // State of this Series: Ongoing or Finished
@@ -3122,9 +3122,10 @@ message PodSpec {
   // +patchStrategy=merge
   repeated HostAlias hostAliases = 23;
 
-  // If specified, indicates the pod's priority. "SYSTEM" is a special keyword
-  // which indicates the highest priority. Any other name must be defined by
-  // creating a PriorityClass object with that name.
+  // If specified, indicates the pod's priority. "system-node-critical" and
+  // "system-cluster-critical" are two special keywords which indicate the
+  // highest priorities with the former being the highest priority. Any other
+  // name must be defined by creating a PriorityClass object with that name.
   // If not specified, the pod priority will be default or zero if there is no
   // default.
   // +optional

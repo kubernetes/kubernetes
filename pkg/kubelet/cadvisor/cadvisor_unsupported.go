@@ -77,6 +77,6 @@ func (cu *cadvisorUnsupported) WatchEvents(request *events.Request) (*events.Eve
 	return nil, unsupportedErr
 }
 
-func (c *cadvisorUnsupported) GetFsInfoByFsUUID(uuid string) (cadvisorapiv2.FsInfo, error) {
+func (cu *cadvisorUnsupported) GetDirFsInfo(path string) (cadvisorapiv2.FsInfo, error) {
 	return cadvisorapiv2.FsInfo{}, nil
 }

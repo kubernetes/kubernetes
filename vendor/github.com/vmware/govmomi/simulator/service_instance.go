@@ -62,6 +62,7 @@ func NewServiceInstance(content types.ServiceContent, folder mo.Folder) *Service
 		NewLicenseManager(*s.Content.LicenseManager),
 		NewSearchIndex(*s.Content.SearchIndex),
 		NewViewManager(*s.Content.ViewManager),
+		NewEventManager(*s.Content.EventManager),
 		NewTaskManager(*s.Content.TaskManager),
 		NewUserDirectory(*s.Content.UserDirectory),
 		NewOptionManager(s.Content.Setting, setting),
@@ -73,6 +74,10 @@ func NewServiceInstance(content types.ServiceContent, folder mo.Folder) *Service
 
 	if s.Content.IpPoolManager != nil {
 		objects = append(objects, NewIpPoolManager(*s.Content.IpPoolManager))
+	}
+
+	if s.Content.AccountManager != nil {
+		objects = append(objects, NewHostLocalAccountManager(*s.Content.AccountManager))
 	}
 
 	for _, o := range objects {

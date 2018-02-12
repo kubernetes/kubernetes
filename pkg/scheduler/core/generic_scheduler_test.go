@@ -546,7 +546,7 @@ func TestZeroRequest(t *testing.T) {
 				Resources: v1.ResourceRequirements{
 					Requests: v1.ResourceList{
 						v1.ResourceCPU: resource.MustParse(
-							strconv.FormatInt(priorityutil.DefaultMilliCpuRequest, 10) + "m"),
+							strconv.FormatInt(priorityutil.DefaultMilliCPURequest, 10) + "m"),
 						v1.ResourceMemory: resource.MustParse(
 							strconv.FormatInt(priorityutil.DefaultMemoryRequest, 10)),
 					},
@@ -563,7 +563,7 @@ func TestZeroRequest(t *testing.T) {
 				Resources: v1.ResourceRequirements{
 					Requests: v1.ResourceList{
 						v1.ResourceCPU: resource.MustParse(
-							strconv.FormatInt(priorityutil.DefaultMilliCpuRequest*3, 10) + "m"),
+							strconv.FormatInt(priorityutil.DefaultMilliCPURequest*3, 10) + "m"),
 						v1.ResourceMemory: resource.MustParse(
 							strconv.FormatInt(priorityutil.DefaultMemoryRequest*3, 10)),
 					},
@@ -716,7 +716,7 @@ var smallContainers = []v1.Container{
 		Resources: v1.ResourceRequirements{
 			Requests: v1.ResourceList{
 				"cpu": resource.MustParse(
-					strconv.FormatInt(priorityutil.DefaultMilliCpuRequest, 10) + "m"),
+					strconv.FormatInt(priorityutil.DefaultMilliCPURequest, 10) + "m"),
 				"memory": resource.MustParse(
 					strconv.FormatInt(priorityutil.DefaultMemoryRequest, 10)),
 			},
@@ -728,7 +728,7 @@ var mediumContainers = []v1.Container{
 		Resources: v1.ResourceRequirements{
 			Requests: v1.ResourceList{
 				"cpu": resource.MustParse(
-					strconv.FormatInt(priorityutil.DefaultMilliCpuRequest*2, 10) + "m"),
+					strconv.FormatInt(priorityutil.DefaultMilliCPURequest*2, 10) + "m"),
 				"memory": resource.MustParse(
 					strconv.FormatInt(priorityutil.DefaultMemoryRequest*2, 10)),
 			},
@@ -740,7 +740,7 @@ var largeContainers = []v1.Container{
 		Resources: v1.ResourceRequirements{
 			Requests: v1.ResourceList{
 				"cpu": resource.MustParse(
-					strconv.FormatInt(priorityutil.DefaultMilliCpuRequest*3, 10) + "m"),
+					strconv.FormatInt(priorityutil.DefaultMilliCPURequest*3, 10) + "m"),
 				"memory": resource.MustParse(
 					strconv.FormatInt(priorityutil.DefaultMemoryRequest*3, 10)),
 			},
@@ -752,7 +752,7 @@ var veryLargeContainers = []v1.Container{
 		Resources: v1.ResourceRequirements{
 			Requests: v1.ResourceList{
 				"cpu": resource.MustParse(
-					strconv.FormatInt(priorityutil.DefaultMilliCpuRequest*5, 10) + "m"),
+					strconv.FormatInt(priorityutil.DefaultMilliCPURequest*5, 10) + "m"),
 				"memory": resource.MustParse(
 					strconv.FormatInt(priorityutil.DefaultMemoryRequest*5, 10)),
 			},
@@ -883,7 +883,7 @@ func TestSelectNodesForPreemption(t *testing.T) {
 	for _, test := range tests {
 		nodes := []*v1.Node{}
 		for _, n := range test.nodes {
-			node := makeNode(n, priorityutil.DefaultMilliCpuRequest*5, priorityutil.DefaultMemoryRequest*5)
+			node := makeNode(n, priorityutil.DefaultMilliCPURequest*5, priorityutil.DefaultMemoryRequest*5)
 			node.ObjectMeta.Labels = map[string]string{"hostname": node.Name}
 			nodes = append(nodes, node)
 		}
@@ -1046,7 +1046,7 @@ func TestPickOneNodeForPreemption(t *testing.T) {
 	for _, test := range tests {
 		nodes := []*v1.Node{}
 		for _, n := range test.nodes {
-			nodes = append(nodes, makeNode(n, priorityutil.DefaultMilliCpuRequest*5, priorityutil.DefaultMemoryRequest*5))
+			nodes = append(nodes, makeNode(n, priorityutil.DefaultMilliCPURequest*5, priorityutil.DefaultMemoryRequest*5))
 		}
 		nodeNameToInfo := schedulercache.CreateNodeNameToInfoMap(test.pods, nodes)
 		candidateNodes, _ := selectNodesForPreemption(test.pod, nodeNameToInfo, nodes, test.predicates, PredicateMetadata, nil, nil)
@@ -1285,7 +1285,7 @@ func TestPreempt(t *testing.T) {
 			cache.AddPod(pod)
 		}
 		for _, name := range nodeNames {
-			cache.AddNode(makeNode(name, priorityutil.DefaultMilliCpuRequest*5, priorityutil.DefaultMemoryRequest*5))
+			cache.AddNode(makeNode(name, priorityutil.DefaultMilliCPURequest*5, priorityutil.DefaultMemoryRequest*5))
 		}
 		extenders := []algorithm.SchedulerExtender{}
 		for _, extender := range test.extenders {
@@ -1318,8 +1318,7 @@ func TestPreempt(t *testing.T) {
 			// Mark the victims for deletion and record the preemptor's nominated node name.
 			now := metav1.Now()
 			victim.DeletionTimestamp = &now
-			test.pod.Annotations = make(map[string]string)
-			test.pod.Annotations[NominatedNodeAnnotationKey] = node.Name
+			test.pod.Status.NominatedNodeName = node.Name
 		}
 		// Call preempt again and make sure it doesn't preempt any more pods.
 		node, victims, _, err = scheduler.Preempt(test.pod, schedulertesting.FakeNodeLister(makeNodeList(nodeNames)), error(&FitError{Pod: test.pod, FailedPredicates: failedPredMap}))

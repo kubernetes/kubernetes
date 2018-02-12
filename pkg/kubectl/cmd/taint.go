@@ -280,7 +280,7 @@ func (o TaintOptions) RunTaint() error {
 			return o.f.PrintObject(o.cmd, false, mapper, outputObj, o.out)
 		}
 
-		o.f.PrintSuccess(mapper, false, o.out, info.Mapping.Resource, info.Name, false, operation)
+		o.f.PrintSuccess(false, o.out, info.Mapping.Resource, info.Name, false, operation)
 		return nil
 	})
 }

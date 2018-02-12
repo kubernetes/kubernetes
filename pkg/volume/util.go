@@ -91,7 +91,7 @@ func internalRecycleVolumeByWatchingPodUntilCompletion(pvName string, pod *v1.Po
 			if deleteErr != nil {
 				return fmt.Errorf("failed to delete old recycler pod %s/%s: %s", pod.Namespace, pod.Name, deleteErr)
 			}
-			// Recycler will try again and the old pod will be hopefuly deleted
+			// Recycler will try again and the old pod will be hopefully deleted
 			// at that time.
 			return fmt.Errorf("old recycler pod found, will retry later")
 		}

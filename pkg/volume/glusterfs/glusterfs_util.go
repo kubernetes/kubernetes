@@ -27,7 +27,7 @@ import (
 // readGlusterLog will take the last 2 lines of the log file
 // on failure of gluster SetUp and return those so kubelet can
 // properly expose them
-// return nil on any failure
+// return error on any failure
 func readGlusterLog(path string, podName string) error {
 
 	var line1 string

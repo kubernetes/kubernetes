@@ -32,7 +32,7 @@ import (
 
 func TestPriorityMetadata(t *testing.T) {
 	nonZeroReqs := &schedulercache.Resource{}
-	nonZeroReqs.MilliCPU = priorityutil.DefaultMilliCpuRequest
+	nonZeroReqs.MilliCPU = priorityutil.DefaultMilliCPURequest
 	nonZeroReqs.Memory = priorityutil.DefaultMemoryRequest
 
 	specifiedReqs := &schedulercache.Resource{}

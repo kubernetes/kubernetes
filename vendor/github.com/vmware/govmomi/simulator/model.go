@@ -34,13 +34,13 @@ import (
 // This is a simple helper for tests running against a simulator, to populate an inventory
 // with commonly used models.
 type Model struct {
-	Service *Service
+	Service *Service `json:"-"`
 
-	ServiceContent types.ServiceContent
-	RootFolder     mo.Folder
+	ServiceContent types.ServiceContent `json:"-"`
+	RootFolder     mo.Folder            `json:"-"`
 
 	// Autostart will power on Model created VMs when true
-	Autostart bool
+	Autostart bool `json:"-"`
 
 	// Datacenter specifies the number of Datacenter entities to create
 	Datacenter int
@@ -49,13 +49,13 @@ type Model struct {
 	Portgroup int
 
 	// Host specifies the number of standalone HostSystems entities to create per Datacenter
-	Host int
+	Host int `json:",omitempty"`
 
 	// Cluster specifies the number of ClusterComputeResource entities to create per Datacenter
 	Cluster int
 
 	// ClusterHost specifies the number of HostSystems entities to create within a Cluster
-	ClusterHost int
+	ClusterHost int `json:",omitempty"`
 
 	// Pool specifies the number of ResourcePool entities to create per Cluster
 	Pool int
@@ -233,6 +233,7 @@ func (m *Model) Create() error {
 				cdrom, _ := devices.CreateCdrom(ide.(*types.VirtualIDEController))
 				disk := devices.CreateDisk(scsi.(types.BaseVirtualController), ds,
 					config.Files.VmPathName+" "+path.Join(name, "disk1.vmdk"))
+				disk.CapacityInKB = 1024
 
 				devices = append(devices, scsi, cdrom, disk, &nic)
 

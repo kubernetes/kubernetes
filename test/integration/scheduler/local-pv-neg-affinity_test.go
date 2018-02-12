@@ -82,7 +82,7 @@ func TestLocalPVNegativeAffinity(t *testing.T) {
 		}
 		// Give time to shceduler to attempt to schedule pod
 		if err := waitForPodToSchedule(config.client, pod); err == nil {
-			t.Errorf("Failed as Pod %s was scheduled sucessfully but expected to fail", pod.Name)
+			t.Errorf("Failed as Pod %s was scheduled successfully but expected to fail", pod.Name)
 		}
 		// Deleting test pod
 		p, err := config.client.CoreV1().Pods(config.ns).Get(podName, metav1.GetOptions{})
@@ -136,6 +136,7 @@ func setupNodes(t *testing.T, nsName string, numberOfNodes int) *testConfig {
 		VolumeInformer:            informers.Core().V1().PersistentVolumes(),
 		ClaimInformer:             informers.Core().V1().PersistentVolumeClaims(),
 		ClassInformer:             informers.Storage().V1().StorageClasses(),
+		PodInformer:               informers.Core().V1().Pods(),
 		EventRecorder:             nil, // TODO: add one so we can test PV events
 		EnableDynamicProvisioning: true,
 	}

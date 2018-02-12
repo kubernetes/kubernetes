@@ -29,7 +29,7 @@ import (
 	"golang.org/x/net/context"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
@@ -37,7 +37,7 @@ import (
 )
 
 const (
-	defaultSandboxImage = "gcr.io/google_containers/pause-amd64:3.1"
+	defaultSandboxImage = "k8s.gcr.io/pause-amd64:3.1"
 
 	// Various default sandbox resources requests/limits.
 	defaultSandboxCPUshares int64 = 2
@@ -148,7 +148,7 @@ func (ds *dockerService) RunPodSandbox(ctx context.Context, r *runtimeapi.RunPod
 	}
 
 	// Do not invoke network plugins if in hostNetwork mode.
-	if nsOptions := config.GetLinux().GetSecurityContext().GetNamespaceOptions(); nsOptions != nil && nsOptions.HostNetwork {
+	if config.GetLinux().GetSecurityContext().GetNamespaceOptions().GetNetwork() == runtimeapi.NamespaceMode_NODE {
 		return resp, nil
 	}
 
@@ -187,8 +187,7 @@ func (ds *dockerService) StopPodSandbox(ctx context.Context, r *runtimeapi.StopP
 	statusResp, statusErr := ds.PodSandboxStatus(ctx, &runtimeapi.PodSandboxStatusRequest{PodSandboxId: podSandboxID})
 	status := statusResp.GetStatus()
 	if statusErr == nil {
-		nsOpts := status.GetLinux().GetNamespaces().GetOptions()
-		hostNetwork = nsOpts != nil && nsOpts.HostNetwork
+		hostNetwork = status.GetLinux().GetNamespaces().GetOptions().GetNetwork() == runtimeapi.NamespaceMode_NODE
 		m := status.GetMetadata()
 		namespace = m.Namespace
 		name = m.Name
@@ -323,7 +322,7 @@ func (ds *dockerService) getIP(podSandboxID string, sandbox *dockertypes.Contain
 	if sandbox.NetworkSettings == nil {
 		return ""
 	}
-	if sharesHostNetwork(sandbox) {
+	if networkNamespaceMode(sandbox) == runtimeapi.NamespaceMode_NODE {
 		// For sandboxes using host network, the shim is not responsible for
 		// reporting the IP.
 		return ""
@@ -388,7 +387,6 @@ func (ds *dockerService) PodSandboxStatus(ctx context.Context, req *runtimeapi.P
 	if IP = ds.determinePodIPBySandboxID(podSandboxID); IP == "" {
 		IP = ds.getIP(podSandboxID, r)
 	}
-	hostNetwork := sharesHostNetwork(r)
 
 	metadata, err := parseSandboxName(r.Name)
 	if err != nil {
@@ -408,9 +406,9 @@ func (ds *dockerService) PodSandboxStatus(ctx context.Context, req *runtimeapi.P
 		Linux: &runtimeapi.LinuxPodSandboxStatus{
 			Namespaces: &runtimeapi.Namespace{
 				Options: &runtimeapi.NamespaceOption{
-					HostNetwork: hostNetwork,
-					HostPid:     sharesHostPid(r),
-					HostIpc:     sharesHostIpc(r),
+					Network: networkNamespaceMode(r),
+					Pid:     pidNamespaceMode(r),
+					Ipc:     ipcNamespaceMode(r),
 				},
 			},
 		},
@@ -592,31 +590,32 @@ func (ds *dockerService) makeSandboxDockerConfig(c *runtimeapi.PodSandboxConfig,
 	return createConfig, nil
 }
 
-// sharesHostNetwork returns true if the given container is sharing the host's
-// network namespace.
-func sharesHostNetwork(container *dockertypes.ContainerJSON) bool {
-	if container != nil && container.HostConfig != nil {
-		return string(container.HostConfig.NetworkMode) == namespaceModeHost
+// networkNamespaceMode returns the network runtimeapi.NamespaceMode for this container.
+// Supports: POD, NODE
+func networkNamespaceMode(container *dockertypes.ContainerJSON) runtimeapi.NamespaceMode {
+	if container != nil && container.HostConfig != nil && string(container.HostConfig.NetworkMode) == namespaceModeHost {
+		return runtimeapi.NamespaceMode_NODE
 	}
-	return false
+	return runtimeapi.NamespaceMode_POD
 }
 
-// sharesHostPid returns true if the given container is sharing the host's pid
-// namespace.
-func sharesHostPid(container *dockertypes.ContainerJSON) bool {
-	if container != nil && container.HostConfig != nil {
-		return string(container.HostConfig.PidMode) == namespaceModeHost
+// pidNamespaceMode returns the PID runtimeapi.NamespaceMode for this container.
+// Supports: CONTAINER, NODE
+// TODO(verb): add support for POD PID namespace sharing
+func pidNamespaceMode(container *dockertypes.ContainerJSON) runtimeapi.NamespaceMode {
+	if container != nil && container.HostConfig != nil && string(container.HostConfig.PidMode) == namespaceModeHost {
+		return runtimeapi.NamespaceMode_NODE
 	}
-	return false
+	return runtimeapi.NamespaceMode_CONTAINER
 }
 
-// sharesHostIpc returns true if the given container is sharing the host's ipc
-// namespace.
-func sharesHostIpc(container *dockertypes.ContainerJSON) bool {
-	if container != nil && container.HostConfig != nil {
-		return string(container.HostConfig.IpcMode) == namespaceModeHost
+// ipcNamespaceMode returns the IPC runtimeapi.NamespaceMode for this container.
+// Supports: POD, NODE
+func ipcNamespaceMode(container *dockertypes.ContainerJSON) runtimeapi.NamespaceMode {
+	if container != nil && container.HostConfig != nil && string(container.HostConfig.IpcMode) == namespaceModeHost {
+		return runtimeapi.NamespaceMode_NODE
 	}
-	return false
+	return runtimeapi.NamespaceMode_POD
 }
 
 func constructPodSandboxCheckpoint(config *runtimeapi.PodSandboxConfig) *PodSandboxCheckpoint {
@@ -629,8 +628,8 @@ func constructPodSandboxCheckpoint(config *runtimeapi.PodSandboxConfig) *PodSand
 			Protocol:      &proto,
 		})
 	}
-	if nsOptions := config.GetLinux().GetSecurityContext().GetNamespaceOptions(); nsOptions != nil {
-		checkpoint.Data.HostNetwork = nsOptions.HostNetwork
+	if config.GetLinux().GetSecurityContext().GetNamespaceOptions().GetNetwork() == runtimeapi.NamespaceMode_NODE {
+		checkpoint.Data.HostNetwork = true
 	}
 	return checkpoint
 }

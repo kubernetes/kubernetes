@@ -104,7 +104,6 @@ func RunScale(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []strin
 	selector := cmdutil.GetFlagString(cmd, "selector")
 	all := cmdutil.GetFlagBool(cmd, "all")
 
-	mapper, _ := f.Object()
 	r := f.NewBuilder().
 		Internal().
 		ContinueOnError().
@@ -181,7 +180,7 @@ func RunScale(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []strin
 			}
 		}
 		counter++
-		f.PrintSuccess(mapper, shortOutput, out, info.Mapping.Resource, info.Name, false, "scaled")
+		f.PrintSuccess(shortOutput, out, info.Mapping.Resource, info.Name, false, "scaled")
 		return nil
 	})
 	if err != nil {

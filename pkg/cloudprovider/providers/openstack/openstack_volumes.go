@@ -17,6 +17,7 @@ limitations under the License.
 package openstack
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -691,7 +692,7 @@ func (os *OpenStack) ShouldTrustDevicePath() bool {
 }
 
 // GetLabelsForVolume implements PVLabeler.GetLabelsForVolume
-func (os *OpenStack) GetLabelsForVolume(pv *v1.PersistentVolume) (map[string]string, error) {
+func (os *OpenStack) GetLabelsForVolume(ctx context.Context, pv *v1.PersistentVolume) (map[string]string, error) {
 	// Ignore any volumes that are being provisioned
 	if pv.Spec.Cinder.VolumeID == k8s_volume.ProvisionedVolumeName {
 		return nil, nil
@@ -703,7 +704,7 @@ func (os *OpenStack) GetLabelsForVolume(pv *v1.PersistentVolume) (map[string]str
 		return nil, err
 	}
 
-	// Contruct Volume Labels
+	// Construct Volume Labels
 	labels := make(map[string]string)
 	labels[kubeletapis.LabelZoneFailureDomain] = volume.AvailabilityZone
 	labels[kubeletapis.LabelZoneRegion] = os.region

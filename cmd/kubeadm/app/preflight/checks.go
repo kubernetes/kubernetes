@@ -415,7 +415,6 @@ func (hc HostnameCheck) Check() (warnings, errors []error) {
 type HTTPProxyCheck struct {
 	Proto string
 	Host  string
-	Port  int
 }
 
 // Name returns HTTPProxy as name for HTTPProxyCheck
@@ -426,9 +425,9 @@ func (hst HTTPProxyCheck) Name() string {
 // Check validates http connectivity type, direct or via proxy.
 func (hst HTTPProxyCheck) Check() (warnings, errors []error) {
 
-	url := fmt.Sprintf("%s://%s:%d", hst.Proto, hst.Host, hst.Port)
+	u := (&url.URL{Scheme: hst.Proto, Host: hst.Host}).String()
 
-	req, err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequest("GET", u, nil)
 	if err != nil {
 		return nil, []error{err}
 	}
@@ -438,7 +437,7 @@ func (hst HTTPProxyCheck) Check() (warnings, errors []error) {
 		return nil, []error{err}
 	}
 	if proxy != nil {
-		return []error{fmt.Errorf("Connection to %q uses proxy %q. If that is not intended, adjust your proxy settings", url, proxy)}, nil
+		return []error{fmt.Errorf("Connection to %q uses proxy %q. If that is not intended, adjust your proxy settings", u, proxy)}, nil
 	}
 	return nil, nil
 }
@@ -647,6 +646,7 @@ func (kubever KubernetesVersionCheck) Check() (warnings, errors []error) {
 // KubeletVersionCheck validates installed kubelet version
 type KubeletVersionCheck struct {
 	KubernetesVersion string
+	exec              utilsexec.Interface
 }
 
 // Name will return KubeletVersion as name for KubeletVersionCheck
@@ -656,7 +656,7 @@ func (KubeletVersionCheck) Name() string {
 
 // Check validates kubelet version. It should be not less than minimal supported version
 func (kubever KubeletVersionCheck) Check() (warnings, errors []error) {
-	kubeletVersion, err := GetKubeletVersion()
+	kubeletVersion, err := GetKubeletVersion(kubever.exec)
 	if err != nil {
 		return nil, []error{fmt.Errorf("couldn't get kubelet version: %v", err)}
 	}
@@ -872,7 +872,7 @@ func RunInitMasterChecks(execer utilsexec.Interface, cfg *kubeadmapi.MasterConfi
 		SystemVerificationCheck{CRISocket: criSocket},
 		IsPrivilegedUserCheck{},
 		HostnameCheck{nodeName: cfg.NodeName},
-		KubeletVersionCheck{KubernetesVersion: cfg.KubernetesVersion},
+		KubeletVersionCheck{KubernetesVersion: cfg.KubernetesVersion, exec: execer},
 		ServiceCheck{Service: "kubelet", CheckIfActive: false},
 		ServiceCheck{Service: "docker", CheckIfActive: true}, // assume docker
 		FirewalldCheck{ports: []int{int(cfg.API.BindPort), 10250}},
@@ -901,7 +901,7 @@ func RunInitMasterChecks(execer utilsexec.Interface, cfg *kubeadmapi.MasterConfi
 			ControllerManagerExtraArgs: cfg.ControllerManagerExtraArgs,
 			SchedulerExtraArgs:         cfg.SchedulerExtraArgs,
 		},
-		HTTPProxyCheck{Proto: "https", Host: cfg.API.AdvertiseAddress, Port: int(cfg.API.BindPort)},
+		HTTPProxyCheck{Proto: "https", Host: cfg.API.AdvertiseAddress},
 		HTTPProxyCIDRCheck{Proto: "https", CIDR: cfg.Networking.ServiceSubnet},
 		HTTPProxyCIDRCheck{Proto: "https", CIDR: cfg.Networking.PodSubnet},
 	}
@@ -969,7 +969,7 @@ func RunJoinNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.NodeConfigura
 		SystemVerificationCheck{CRISocket: criSocket},
 		IsPrivilegedUserCheck{},
 		HostnameCheck{cfg.NodeName},
-		KubeletVersionCheck{},
+		KubeletVersionCheck{exec: execer},
 		ServiceCheck{Service: "kubelet", CheckIfActive: false},
 		PortOpenCheck{port: 10250},
 		DirAvailableCheck{Path: filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.ManifestsSubDirName)},

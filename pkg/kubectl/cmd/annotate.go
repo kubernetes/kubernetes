@@ -121,11 +121,11 @@ func NewCmdAnnotate(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	}
 	cmdutil.AddPrinterFlags(cmd)
 	cmdutil.AddIncludeUninitializedFlag(cmd)
-	cmd.Flags().Bool("overwrite", false, "If true, allow annotations to be overwritten, otherwise reject annotation updates that overwrite existing annotations.")
-	cmd.Flags().Bool("local", false, "If true, annotation will NOT contact api-server but run locally.")
-	cmd.Flags().StringP("selector", "l", "", "Selector (label query) to filter on, not including uninitialized ones, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2).")
-	cmd.Flags().Bool("all", false, "Select all resources, including uninitialized ones, in the namespace of the specified resource types.")
-	cmd.Flags().String("resource-version", "", i18n.T("If non-empty, the annotation update will only succeed if this is the current resource-version for the object. Only valid when specifying a single resource."))
+	cmd.Flags().BoolVar(&options.overwrite, "overwrite", options.overwrite, "If true, allow annotations to be overwritten, otherwise reject annotation updates that overwrite existing annotations.")
+	cmd.Flags().BoolVar(&options.local, "local", options.local, "If true, annotation will NOT contact api-server but run locally.")
+	cmd.Flags().StringVarP(&options.selector, "selector", "l", options.selector, "Selector (label query) to filter on, not including uninitialized ones, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2).")
+	cmd.Flags().BoolVar(&options.all, "all", options.all, "Select all resources, including uninitialized ones, in the namespace of the specified resource types.")
+	cmd.Flags().StringVar(&options.resourceVersion, "resource-version", options.resourceVersion, i18n.T("If non-empty, the annotation update will only succeed if this is the current resource-version for the object. Only valid when specifying a single resource."))
 	usage := "identifying the resource to update the annotation"
 	cmdutil.AddFilenameOptionFlags(cmd, &options.FilenameOptions, usage)
 	cmdutil.AddDryRunFlag(cmd)
@@ -138,11 +138,6 @@ func NewCmdAnnotate(f cmdutil.Factory, out io.Writer) *cobra.Command {
 // Complete adapts from the command line args and factory to the data required.
 func (o *AnnotateOptions) Complete(out io.Writer, cmd *cobra.Command, args []string) (err error) {
 	o.out = out
-	o.local = cmdutil.GetFlagBool(cmd, "local")
-	o.overwrite = cmdutil.GetFlagBool(cmd, "overwrite")
-	o.all = cmdutil.GetFlagBool(cmd, "all")
-	o.resourceVersion = cmdutil.GetFlagString(cmd, "resource-version")
-	o.selector = cmdutil.GetFlagString(cmd, "selector")
 	o.outputFormat = cmdutil.GetFlagString(cmd, "output")
 	o.dryrun = cmdutil.GetDryRunFlag(cmd)
 	o.recordChangeCause = cmdutil.GetRecordFlag(cmd)
@@ -160,6 +155,9 @@ func (o *AnnotateOptions) Complete(out io.Writer, cmd *cobra.Command, args []str
 
 // Validate checks to the AnnotateOptions to see if there is sufficient information run the command.
 func (o AnnotateOptions) Validate() error {
+	if o.all && len(o.selector) > 0 {
+		return fmt.Errorf("cannot set --all and --selector at the same time")
+	}
 	if len(o.resources) < 1 && cmdutil.IsFilenameSliceEmpty(o.Filenames) {
 		return fmt.Errorf("one or more resources must be specified as <resource> <name> or <resource>/<name>")
 	}
@@ -272,7 +270,7 @@ func (o AnnotateOptions) RunAnnotate(f cmdutil.Factory, cmd *cobra.Command) erro
 		if len(o.outputFormat) > 0 {
 			return f.PrintObject(cmd, o.local, mapper, outputObj, o.out)
 		}
-		f.PrintSuccess(mapper, false, o.out, info.Mapping.Resource, info.Name, o.dryrun, "annotated")
+		f.PrintSuccess(false, o.out, info.Mapping.Resource, info.Name, o.dryrun, "annotated")
 		return nil
 	})
 }

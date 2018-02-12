@@ -21,7 +21,6 @@ limitations under the License.
 package v1alpha1
 
 import (
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -90,15 +89,6 @@ func (in *KubeletAuthorization) DeepCopy() *KubeletAuthorization {
 func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	if in.ConfigTrialDuration != nil {
-		in, out := &in.ConfigTrialDuration, &out.ConfigTrialDuration
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(v1.Duration)
-			**out = **in
-		}
-	}
 	out.SyncFrequency = in.SyncFrequency
 	out.FileCheckFrequency = in.FileCheckFrequency
 	out.HTTPCheckFrequency = in.HTTPCheckFrequency
@@ -163,15 +153,6 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 			*out = nil
 		} else {
 			*out = new(bool)
-			**out = **in
-		}
-	}
-	if in.CAdvisorPort != nil {
-		in, out := &in.CAdvisorPort, &out.CAdvisorPort
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(int32)
 			**out = **in
 		}
 	}

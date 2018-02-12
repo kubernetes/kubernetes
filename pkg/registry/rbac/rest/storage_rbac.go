@@ -291,7 +291,7 @@ func (p *PolicyData) EnsureRBACPolicy() genericapiserver.PostStartHookFunc {
 
 			return true, nil
 		})
-		// if we're never able to make it through intialization, kill the API server
+		// if we're never able to make it through initialization, kill the API server
 		if err != nil {
 			return fmt.Errorf("unable to initialize roles: %v", err)
 		}

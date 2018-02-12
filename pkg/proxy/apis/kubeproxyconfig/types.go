@@ -26,7 +26,7 @@ import (
 
 // ClientConnectionConfiguration contains details for constructing a client.
 type ClientConnectionConfiguration struct {
-	// kubeConfigFile is the path to a kubeconfig file.
+	// kubeconfig is the path to a kubeconfig file.
 	KubeConfigFile string
 	// acceptContentTypes defines the Accept header sent by clients when connecting to a server, overriding the
 	// default value of 'application/json'. This field will control all connections to the server used by a particular
@@ -97,13 +97,13 @@ type KubeProxyConntrackConfiguration struct {
 type KubeProxyConfiguration struct {
 	metav1.TypeMeta
 
-	// featureGates is a comma-separated list of key=value pairs that control
-	// which alpha/beta features are enabled.
-	//
-	// TODO this really should be a map but that requires refactoring all
+	// TODO FeatureGates really should be a map but that requires refactoring all
 	// components to use config files because local-up-cluster.sh only supports
 	// the --feature-gates flag right now, which is comma-separated key=value
 	// pairs.
+	//
+	// featureGates is a comma-separated list of key=value pairs that control
+	// which alpha/beta features are enabled.
 	FeatureGates string
 
 	// bindAddress is the IP address for the proxy server to serve on (set to 0.0.0.0

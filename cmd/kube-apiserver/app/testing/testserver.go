@@ -21,7 +21,6 @@ import (
 	"io/ioutil"
 	"net"
 	"os"
-	"testing"
 	"time"
 
 	pflag "github.com/spf13/pflag"
@@ -46,13 +45,20 @@ type TestServer struct {
 	TmpDir       string                    // Temp Dir used, by the apiserver
 }
 
+// Logger allows t.Testing and b.Testing to be passed to StartTestServer and StartTestServerOrDie
+type Logger interface {
+	Errorf(format string, args ...interface{})
+	Fatalf(format string, args ...interface{})
+	Logf(format string, args ...interface{})
+}
+
 // StartTestServer starts a etcd server and kube-apiserver. A rest client config and a tear-down func,
 // and location of the tmpdir are returned.
 //
-// Note: we return a tear-down func instead of a stop channel because the later will leak temporariy
-// 		 files that becaues Golang testing's call to os.Exit will not give a stop channel go routine
-// 		 enough time to remove temporariy files.
-func StartTestServer(t *testing.T, customFlags []string, storageConfig *storagebackend.Config) (result TestServer, err error) {
+// Note: we return a tear-down func instead of a stop channel because the later will leak temporary
+// 		 files that because Golang testing's call to os.Exit will not give a stop channel go routine
+// 		 enough time to remove temporary files.
+func StartTestServer(t Logger, customFlags []string, storageConfig *storagebackend.Config) (result TestServer, err error) {
 
 	// TODO : Remove TrackStorageCleanup below when PR
 	// https://github.com/kubernetes/kubernetes/pull/50690
@@ -137,7 +143,7 @@ func StartTestServer(t *testing.T, customFlags []string, storageConfig *storageb
 }
 
 // StartTestServerOrDie calls StartTestServer t.Fatal if it does not succeed.
-func StartTestServerOrDie(t *testing.T, flags []string, storageConfig *storagebackend.Config) *TestServer {
+func StartTestServerOrDie(t Logger, flags []string, storageConfig *storagebackend.Config) *TestServer {
 
 	result, err := StartTestServer(t, flags, storageConfig)
 	if err == nil {

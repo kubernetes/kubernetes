@@ -45,7 +45,7 @@ spec:
         scheduler.alpha.kubernetes.io/critical-pod: ''
     spec:
       containers:
-        - image: gcr.io/google_containers/heapster-amd64:v1.5.0
+        - image: k8s.gcr.io/heapster-amd64:v1.5.0
           name: heapster
           livenessProbe:
             httpGet:
@@ -57,7 +57,7 @@ spec:
           command:
             - /heapster
             - --source=kubernetes.summary_api:''
-        - image: gcr.io/google_containers/addon-resizer:1.8.1
+        - image: k8s.gcr.io/addon-resizer:1.8.1
           name: heapster-nanny
           resources:
             limits:

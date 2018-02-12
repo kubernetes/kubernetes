@@ -29,6 +29,7 @@ import (
 	"github.com/golang/glog"
 )
 
+// PredicateMetadataFactory defines a factory of predicate metadata.
 type PredicateMetadataFactory struct {
 	podLister algorithm.PodLister
 }
@@ -57,18 +58,20 @@ type predicateMetadata struct {
 // Ensure that predicateMetadata implements algorithm.PredicateMetadata.
 var _ algorithm.PredicateMetadata = &predicateMetadata{}
 
-// PredicateMetadataProducer: Helper types/variables...
+// PredicateMetadataProducer function produces predicate metadata.
 type PredicateMetadataProducer func(pm *predicateMetadata)
 
 var predicateMetaProducerRegisterLock sync.Mutex
-var predicateMetadataProducers map[string]PredicateMetadataProducer = make(map[string]PredicateMetadataProducer)
+var predicateMetadataProducers = make(map[string]PredicateMetadataProducer)
 
+// RegisterPredicateMetadataProducer registers a PredicateMetadataProducer.
 func RegisterPredicateMetadataProducer(predicateName string, precomp PredicateMetadataProducer) {
 	predicateMetaProducerRegisterLock.Lock()
 	defer predicateMetaProducerRegisterLock.Unlock()
 	predicateMetadataProducers[predicateName] = precomp
 }
 
+// NewPredicateMetadataFactory creates a PredicateMetadataFactory.
 func NewPredicateMetadataFactory(podLister algorithm.PodLister) algorithm.PredicateMetadataProducer {
 	factory := &PredicateMetadataFactory{
 		podLister,
@@ -105,7 +108,7 @@ func (pfactory *PredicateMetadataFactory) GetMetadata(pod *v1.Pod, nodeNameToInf
 func (meta *predicateMetadata) RemovePod(deletedPod *v1.Pod) error {
 	deletedPodFullName := schedutil.GetPodFullName(deletedPod)
 	if deletedPodFullName == schedutil.GetPodFullName(meta.pod) {
-		return fmt.Errorf("deletedPod and meta.pod must not be the same.")
+		return fmt.Errorf("deletedPod and meta.pod must not be the same")
 	}
 	// Delete any anti-affinity rule from the deletedPod.
 	delete(meta.matchingAntiAffinityTerms, deletedPodFullName)
@@ -132,10 +135,10 @@ func (meta *predicateMetadata) RemovePod(deletedPod *v1.Pod) error {
 func (meta *predicateMetadata) AddPod(addedPod *v1.Pod, nodeInfo *schedulercache.NodeInfo) error {
 	addedPodFullName := schedutil.GetPodFullName(addedPod)
 	if addedPodFullName == schedutil.GetPodFullName(meta.pod) {
-		return fmt.Errorf("addedPod and meta.pod must not be the same.")
+		return fmt.Errorf("addedPod and meta.pod must not be the same")
 	}
 	if nodeInfo.Node() == nil {
-		return fmt.Errorf("Invalid node in nodeInfo.")
+		return fmt.Errorf("invalid node in nodeInfo")
 	}
 	// Add matching anti-affinity terms of the addedPod to the map.
 	podMatchingTerms, err := getMatchingAntiAffinityTermsOfExistingPod(meta.pod, addedPod, nodeInfo.Node())

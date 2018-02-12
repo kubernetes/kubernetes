@@ -111,8 +111,14 @@ func newContainerLabels(container *v1.Container, pod *v1.Pod, containerType kube
 }
 
 // newContainerAnnotations creates container annotations from v1.Container and v1.Pod.
-func newContainerAnnotations(container *v1.Container, pod *v1.Pod, restartCount int) map[string]string {
+func newContainerAnnotations(container *v1.Container, pod *v1.Pod, restartCount int, opts *kubecontainer.RunContainerOptions) map[string]string {
 	annotations := map[string]string{}
+
+	// Kubelet always overrides device plugin annotations if they are conflicting
+	for _, a := range opts.Annotations {
+		annotations[a.Name] = a.Value
+	}
+
 	annotations[containerHashLabel] = strconv.FormatUint(kubecontainer.HashContainer(container), 16)
 	annotations[containerRestartCountLabel] = strconv.Itoa(restartCount)
 	annotations[containerTerminationMessagePathLabel] = container.TerminationMessagePath
@@ -126,7 +132,7 @@ func newContainerAnnotations(container *v1.Container, pod *v1.Pod, restartCount 
 	}
 
 	if container.Lifecycle != nil && container.Lifecycle.PreStop != nil {
-		// Using json enconding so that the PreStop handler object is readable after writing as a label
+		// Using json encoding so that the PreStop handler object is readable after writing as a label
 		rawPreStop, err := json.Marshal(container.Lifecycle.PreStop)
 		if err != nil {
 			glog.Errorf("Unable to marshal lifecycle PreStop handler for container %q of pod %q: %v", container.Name, format.Pod(pod), err)

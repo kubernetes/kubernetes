@@ -23,6 +23,8 @@ import (
 	"time"
 
 	. "github.com/onsi/gomega"
+	"github.com/vmware/govmomi/object"
+	"github.com/vmware/govmomi/vim25/mo"
 	"k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -36,6 +38,11 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
+
+	"context"
+
+	"github.com/vmware/govmomi/find"
+	vimtypes "github.com/vmware/govmomi/vim25/types"
 )
 
 const (
@@ -466,4 +473,97 @@ func getVSphere(c clientset.Interface) (*vsphere.VSphere, error) {
 // GetVSphere returns vsphere cloud provider
 func GetVSphere(c clientset.Interface) (*vsphere.VSphere, error) {
 	return getVSphere(c)
+}
+
+// get .vmx file path for a virtual machine
+func getVMXFilePath(vmObject *object.VirtualMachine) (vmxPath string) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	var nodeVM mo.VirtualMachine
+	err := vmObject.Properties(ctx, vmObject.Reference(), []string{"config.files"}, &nodeVM)
+	Expect(err).NotTo(HaveOccurred())
+	Expect(nodeVM.Config).NotTo(BeNil())
+
+	vmxPath = nodeVM.Config.Files.VmPathName
+	framework.Logf("vmx file path is %s", vmxPath)
+	return vmxPath
+}
+
+// verify ready node count. Try upto 3 minutes. Return true if count is expected count
+func verifyReadyNodeCount(client clientset.Interface, expectedNodes int) bool {
+	numNodes := 0
+	for i := 0; i < 36; i++ {
+		nodeList := framework.GetReadySchedulableNodesOrDie(client)
+		Expect(nodeList.Items).NotTo(BeEmpty(), "Unable to find ready and schedulable Node")
+
+		numNodes = len(nodeList.Items)
+		if numNodes == expectedNodes {
+			break
+		}
+		time.Sleep(5 * time.Second)
+	}
+	return (numNodes == expectedNodes)
+}
+
+// poweroff nodeVM and confirm the poweroff state
+func poweroffNodeVM(nodeName string, vm *object.VirtualMachine) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	framework.Logf("Powering off node VM %s", nodeName)
+
+	_, err := vm.PowerOff(ctx)
+	Expect(err).NotTo(HaveOccurred())
+	err = vm.WaitForPowerState(ctx, vimtypes.VirtualMachinePowerStatePoweredOff)
+	Expect(err).NotTo(HaveOccurred(), "Unable to power off the node")
+}
+
+// poweron nodeVM and confirm the poweron state
+func poweronNodeVM(nodeName string, vm *object.VirtualMachine) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	framework.Logf("Powering on node VM %s", nodeName)
+
+	vm.PowerOn(ctx)
+	err := vm.WaitForPowerState(ctx, vimtypes.VirtualMachinePowerStatePoweredOn)
+	Expect(err).NotTo(HaveOccurred(), "Unable to power on the node")
+}
+
+// unregister a nodeVM from VC
+func unregisterNodeVM(nodeName string, vm *object.VirtualMachine) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	poweroffNodeVM(nodeName, vm)
+
+	framework.Logf("Unregistering node VM %s", nodeName)
+	err := vm.Unregister(ctx)
+	Expect(err).NotTo(HaveOccurred(), "Unable to unregister the node")
+}
+
+// register a nodeVM into a VC
+func registerNodeVM(nodeName, workingDir, vmxFilePath string, rpool *object.ResourcePool, host *object.HostSystem) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	framework.Logf("Registering node VM %s with vmx file path %s", nodeName, vmxFilePath)
+
+	nodeInfo := TestContext.NodeMapper.GetNodeInfo(nodeName)
+	finder := find.NewFinder(nodeInfo.VSphere.Client.Client, true)
+
+	vmFolder, err := finder.FolderOrDefault(ctx, workingDir)
+	Expect(err).NotTo(HaveOccurred())
+
+	registerTask, err := vmFolder.RegisterVM(ctx, vmxFilePath, nodeName, false, rpool, host)
+	Expect(err).NotTo(HaveOccurred())
+	err = registerTask.Wait(ctx)
+	Expect(err).NotTo(HaveOccurred())
+
+	vmPath := filepath.Join(workingDir, nodeName)
+	vm, err := finder.VirtualMachine(ctx, vmPath)
+	Expect(err).NotTo(HaveOccurred())
+
+	poweronNodeVM(nodeName, vm)
 }

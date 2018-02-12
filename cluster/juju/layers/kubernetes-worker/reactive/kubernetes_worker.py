@@ -24,7 +24,7 @@ import time
 from shlex import split
 from subprocess import check_call, check_output
 from subprocess import CalledProcessError
-from socket import gethostname
+from socket import gethostname, getfqdn
 
 from charms import layer
 from charms.layer import snap
@@ -453,7 +453,27 @@ def extra_args_changed():
 
 @when('config.changed.docker-logins')
 def docker_logins_changed():
+    """Set a flag to handle new docker login options.
+
+    If docker daemon options have also changed, set a flag to ensure the
+    daemon is restarted prior to running docker login.
+    """
     config = hookenv.config()
+
+    if data_changed('docker-opts', config['docker-opts']):
+        hookenv.log('Found new docker daemon options. Requesting a restart.')
+        # State will be removed by layer-docker after restart
+        set_state('docker.restart')
+
+    set_state('kubernetes-worker.docker-login')
+
+
+@when('kubernetes-worker.docker-login')
+@when_not('docker.restart')
+def run_docker_login():
+    """Login to a docker registry with configured credentials."""
+    config = hookenv.config()
+
     previous_logins = config.previous('docker-logins')
     logins = config['docker-logins']
     logins = json.loads(logins)
@@ -474,6 +494,7 @@ def docker_logins_changed():
         cmd = ['docker', 'login', server, '-u', username, '-p', password]
         subprocess.check_call(cmd)
 
+    remove_state('kubernetes-worker.docker-login')
     set_state('kubernetes-worker.restart-needed')
 
 
@@ -593,6 +614,7 @@ def configure_kube_proxy(api_servers, cluster_cidr):
     kube_proxy_opts['logtostderr'] = 'true'
     kube_proxy_opts['v'] = '0'
     kube_proxy_opts['master'] = random.choice(api_servers)
+    kube_proxy_opts['hostname-override'] = get_node_name()
 
     if b'lxc' in check_output('virt-what', shell=True):
         kube_proxy_opts['conntrack-max-per-core'] = '0'
@@ -665,10 +687,10 @@ def launch_default_ingress_controller():
        context['defaultbackend_image'] == "auto"):
         if context['arch'] == 's390x':
             context['defaultbackend_image'] = \
-                "gcr.io/google_containers/defaultbackend-s390x:1.4"
+                "k8s.gcr.io/defaultbackend-s390x:1.4"
         else:
             context['defaultbackend_image'] = \
-                "gcr.io/google_containers/defaultbackend:1.4"
+                "k8s.gcr.io/defaultbackend:1.4"
 
     # Render the default http backend (404) replicationcontroller manifest
     manifest = addon_path.format('default-http-backend.yaml')
@@ -691,7 +713,7 @@ def launch_default_ingress_controller():
                 "docker.io/cdkbot/nginx-ingress-controller-s390x:0.9.0-beta.13"
         else:
             context['ingress_image'] = \
-                "gcr.io/google_containers/nginx-ingress-controller:0.9.0-beta.15" # noqa
+                "k8s.gcr.io/nginx-ingress-controller:0.9.0-beta.15" # noqa
     context['juju_application'] = hookenv.service_name()
     manifest = addon_path.format('ingress-daemon-set.yaml')
     render('ingress-daemon-set.yaml', manifest, context)
@@ -739,7 +761,7 @@ def kubectl(*args):
 
 
 def kubectl_success(*args):
-    ''' Runs kubectl with the given args. Returns True if succesful, False if
+    ''' Runs kubectl with the given args. Returns True if successful, False if
     not. '''
     try:
         kubectl(*args)
@@ -968,44 +990,13 @@ def _systemctl_is_active(application):
         return False
 
 
-class GetNodeNameFailed(Exception):
-    pass
-
-
 def get_node_name():
-    # Get all the nodes in the cluster
-    cmd = 'kubectl --kubeconfig={} get no -o=json'.format(kubeconfig_path)
-    cmd = cmd.split()
-    deadline = time.time() + 180
-    while time.time() < deadline:
-        try:
-            raw = check_output(cmd)
-        except CalledProcessError:
-            hookenv.log('Failed to get node name for node %s.'
-                        ' Will retry.' % (gethostname()))
-            time.sleep(1)
-            continue
-
-        result = json.loads(raw.decode('utf-8'))
-        if 'items' in result:
-            for node in result['items']:
-                if 'status' not in node:
-                    continue
-                if 'addresses' not in node['status']:
-                    continue
-
-                # find the hostname
-                for address in node['status']['addresses']:
-                    if address['type'] == 'Hostname':
-                        if address['address'] == gethostname():
-                            return node['metadata']['name']
-
-                        # if we didn't match, just bail to the next node
-                        break
-        time.sleep(1)
-
-    msg = 'Failed to get node name for node %s' % gethostname()
-    raise GetNodeNameFailed(msg)
+    kubelet_extra_args = parse_extra_args('kubelet-extra-args')
+    cloud_provider = kubelet_extra_args.get('cloud-provider', '')
+    if cloud_provider == 'aws':
+        return getfqdn()
+    else:
+        return gethostname()
 
 
 class ApplyNodeLabelFailed(Exception):

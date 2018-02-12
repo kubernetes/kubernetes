@@ -24,6 +24,7 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/golang/glog"
+	"gopkg.in/square/go-jose.v2/jwt"
 
 	"k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -39,15 +40,11 @@ import (
 )
 
 type testGenerator struct {
-	GeneratedServiceAccounts []v1.ServiceAccount
-	GeneratedSecrets         []v1.Secret
-	Token                    string
-	Err                      error
+	Token string
+	Err   error
 }
 
-func (t *testGenerator) GenerateToken(serviceAccount v1.ServiceAccount, secret v1.Secret) (string, error) {
-	t.GeneratedSecrets = append(t.GeneratedSecrets, secret)
-	t.GeneratedServiceAccounts = append(t.GeneratedServiceAccounts, serviceAccount)
+func (t *testGenerator) GenerateToken(sc *jwt.Claims, pc interface{}) (string, error) {
 	return t.Token, t.Err
 }
 

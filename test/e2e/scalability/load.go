@@ -96,10 +96,18 @@ var _ = SIGDescribe("Load capacity", func() {
 
 	testCaseBaseName := "load"
 	var testPhaseDurations *timer.TestPhaseTimer
+	var profileGathererStopCh chan struct{}
 
 	// Gathers metrics before teardown
 	// TODO add flag that allows to skip cleanup on failure
 	AfterEach(func() {
+		// Stop apiserver CPU profile gatherer and gather memory allocations profile.
+		close(profileGathererStopCh)
+		wg := sync.WaitGroup{}
+		wg.Add(1)
+		framework.GatherApiserverMemoryProfile(&wg, "load")
+		wg.Wait()
+
 		// Verify latency metrics
 		highLatencyRequests, metrics, err := framework.HighLatencyRequests(clientset, nodeCount)
 		framework.ExpectNoError(err)
@@ -114,7 +122,7 @@ var _ = SIGDescribe("Load capacity", func() {
 
 	// We assume a default throughput of 10 pods/second throughput.
 	// We may want to revisit it in the future.
-	// However, this can be overriden by LOAD_TEST_THROUGHPUT env var.
+	// However, this can be overridden by LOAD_TEST_THROUGHPUT env var.
 	throughput := 10
 	if throughputEnv := os.Getenv("LOAD_TEST_THROUGHPUT"); throughputEnv != "" {
 		if newThroughput, err := strconv.Atoi(throughputEnv); err == nil {
@@ -147,6 +155,10 @@ var _ = SIGDescribe("Load capacity", func() {
 		framework.ExpectNoError(err)
 
 		framework.ExpectNoError(framework.ResetMetrics(clientset))
+
+		// Start apiserver CPU profile gatherer with frequency based on cluster size.
+		profileGatheringDelay := time.Duration(5+nodeCount/100) * time.Minute
+		profileGathererStopCh = framework.StartApiserverCPUProfileGatherer(profileGatheringDelay)
 	})
 
 	type Load struct {

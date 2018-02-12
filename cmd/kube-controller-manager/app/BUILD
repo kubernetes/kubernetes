@@ -14,6 +14,7 @@ go_library(
         "batch.go",
         "bootstrap.go",
         "certificates.go",
+        "cloudproviders.go",
         "controllermanager.go",
         "core.go",
         "extensions.go",

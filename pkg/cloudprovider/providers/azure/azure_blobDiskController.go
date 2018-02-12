@@ -91,7 +91,7 @@ func (c *BlobDiskController) CreateVolume(name, storageAccount, storageAccountTy
 		accounts = append(accounts, accountWithLocation{Name: storageAccount})
 	} else {
 		// find a storage account
-		accounts, err = c.common.cloud.getStorageAccounts()
+		accounts, err = c.common.cloud.getStorageAccounts(storageAccountType, location)
 		if err != nil {
 			// TODO: create a storage account and container
 			return "", "", 0, err
@@ -383,7 +383,7 @@ func (c *BlobDiskController) ensureDefaultContainer(storageAccountName string) e
 			counter = counter + 1
 			// check if we passed the max sleep
 			if counter >= 20 {
-				return fmt.Errorf("azureDisk - timeout waiting to aquire lock to validate account:%s readiness", storageAccountName)
+				return fmt.Errorf("azureDisk - timeout waiting to acquire lock to validate account:%s readiness", storageAccountName)
 			}
 		}
 

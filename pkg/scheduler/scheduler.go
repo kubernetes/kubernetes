@@ -57,8 +57,8 @@ type PodConditionUpdater interface {
 type PodPreemptor interface {
 	GetUpdatedPod(pod *v1.Pod) (*v1.Pod, error)
 	DeletePod(pod *v1.Pod) error
-	UpdatePodAnnotations(pod *v1.Pod, annots map[string]string) error
-	RemoveNominatedNodeAnnotation(pod *v1.Pod) error
+	SetNominatedNodeName(pod *v1.Pod, nominatedNode string) error
+	RemoveNominatedNodeName(pod *v1.Pod) error
 }
 
 // Scheduler watches for new unscheduled pods. It attempts to find
@@ -226,8 +226,7 @@ func (sched *Scheduler) preempt(preemptor *v1.Pod, scheduleErr error) (string, e
 	var nodeName = ""
 	if node != nil {
 		nodeName = node.Name
-		annotations := map[string]string{core.NominatedNodeAnnotationKey: nodeName}
-		err = sched.config.PodPreemptor.UpdatePodAnnotations(preemptor, annotations)
+		err = sched.config.PodPreemptor.SetNominatedNodeName(preemptor, nodeName)
 		if err != nil {
 			glog.Errorf("Error in preemption process. Cannot update pod %v annotations: %v", preemptor.Name, err)
 			return "", err
@@ -245,7 +244,7 @@ func (sched *Scheduler) preempt(preemptor *v1.Pod, scheduleErr error) (string, e
 	// but preemption logic does not find any node for it. In that case Preempt()
 	// function of generic_scheduler.go returns the pod itself for removal of the annotation.
 	for _, p := range nominatedPodsToClear {
-		rErr := sched.config.PodPreemptor.RemoveNominatedNodeAnnotation(p)
+		rErr := sched.config.PodPreemptor.RemoveNominatedNodeName(p)
 		if rErr != nil {
 			glog.Errorf("Cannot remove nominated node annotation of pod: %v", rErr)
 			// We do not return as this error is not critical.

@@ -60,7 +60,7 @@ const (
 
 /*
    Test to verify the storage policy based management for dynamic volume provisioning inside kubernetes.
-   There are 2 ways to achive it:
+   There are 2 ways to achieve it:
    1. Specify VSAN storage capabilities in the storage-class.
    2. Use existing vCenter SPBM storage policies.
 
@@ -98,6 +98,7 @@ var _ = utils.SIGDescribe("Storage Policy Based Volume Provisioning [Feature:vsp
 	)
 	BeforeEach(func() {
 		framework.SkipUnlessProviderIs("vsphere")
+		Bootstrap(f)
 		client = f.ClientSet
 		namespace = f.Namespace.Name
 		policyName = GetAndExpectStringEnvVar(SPBMPolicyName)

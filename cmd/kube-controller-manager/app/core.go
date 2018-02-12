@@ -175,6 +175,7 @@ func startPersistentVolumeBinderController(ctx ControllerContext) (bool, error) 
 		VolumeInformer:            ctx.InformerFactory.Core().V1().PersistentVolumes(),
 		ClaimInformer:             ctx.InformerFactory.Core().V1().PersistentVolumeClaims(),
 		ClassInformer:             ctx.InformerFactory.Storage().V1().StorageClasses(),
+		PodInformer:               ctx.InformerFactory.Core().V1().Pods(),
 		EnableDynamicProvisioning: ctx.Options.VolumeConfiguration.EnableDynamicProvisioning,
 	}
 	volumeController, volumeControllerErr := persistentvolumecontroller.NewController(params)
@@ -359,7 +360,7 @@ func startGarbageCollectorController(ctx ControllerContext) (bool, error) {
 	// TODO: Make NewMetadataCodecFactory support arbitrary (non-compiled)
 	// resource types. Otherwise we'll be storing full Unstructured data in our
 	// caches for custom resources. Consider porting it to work with
-	// metav1alpha1.PartialObjectMetadata.
+	// metav1beta1.PartialObjectMetadata.
 	metaOnlyClientPool := dynamic.NewClientPool(config, restMapper, dynamic.LegacyAPIPathResolverFunc)
 	clientPool := dynamic.NewClientPool(config, restMapper, dynamic.LegacyAPIPathResolverFunc)
 

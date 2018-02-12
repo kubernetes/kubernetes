@@ -33,6 +33,7 @@ import (
 // TODO: Any way to justify this weighting?
 const zoneWeighting float64 = 2.0 / 3.0
 
+// SelectorSpread contains information to calculate selector spread priority.
 type SelectorSpread struct {
 	serviceLister     algorithm.ServiceLister
 	controllerLister  algorithm.ControllerLister
@@ -40,6 +41,7 @@ type SelectorSpread struct {
 	statefulSetLister algorithm.StatefulSetLister
 }
 
+// NewSelectorSpreadPriority creates a SelectorSpread.
 func NewSelectorSpreadPriority(
 	serviceLister algorithm.ServiceLister,
 	controllerLister algorithm.ControllerLister,
@@ -125,16 +127,16 @@ func (s *SelectorSpread) CalculateSpreadPriorityReduce(pod *v1.Pod, meta interfa
 		if result[i].Score > maxCountByNodeName {
 			maxCountByNodeName = result[i].Score
 		}
-		zoneId := utilnode.GetZoneKey(nodeNameToInfo[result[i].Host].Node())
-		if zoneId == "" {
+		zoneID := utilnode.GetZoneKey(nodeNameToInfo[result[i].Host].Node())
+		if zoneID == "" {
 			continue
 		}
-		countsByZone[zoneId] += result[i].Score
+		countsByZone[zoneID] += result[i].Score
 	}
 
-	for zoneId := range countsByZone {
-		if countsByZone[zoneId] > maxCountByZone {
-			maxCountByZone = countsByZone[zoneId]
+	for zoneID := range countsByZone {
+		if countsByZone[zoneID] > maxCountByZone {
+			maxCountByZone = countsByZone[zoneID]
 		}
 	}
 
@@ -152,11 +154,11 @@ func (s *SelectorSpread) CalculateSpreadPriorityReduce(pod *v1.Pod, meta interfa
 		}
 		// If there is zone information present, incorporate it
 		if haveZones {
-			zoneId := utilnode.GetZoneKey(nodeNameToInfo[result[i].Host].Node())
-			if zoneId != "" {
+			zoneID := utilnode.GetZoneKey(nodeNameToInfo[result[i].Host].Node())
+			if zoneID != "" {
 				zoneScore := MaxPriorityFloat64
 				if maxCountByZone > 0 {
-					zoneScore = MaxPriorityFloat64 * (float64(maxCountByZone-countsByZone[zoneId]) / maxCountByZoneFloat64)
+					zoneScore = MaxPriorityFloat64 * (float64(maxCountByZone-countsByZone[zoneID]) / maxCountByZoneFloat64)
 				}
 				fScore = (fScore * (1.0 - zoneWeighting)) + (zoneWeighting * zoneScore)
 			}
@@ -171,12 +173,14 @@ func (s *SelectorSpread) CalculateSpreadPriorityReduce(pod *v1.Pod, meta interfa
 	return nil
 }
 
+// ServiceAntiAffinity contains information to calculate service anti-affinity priority.
 type ServiceAntiAffinity struct {
 	podLister     algorithm.PodLister
 	serviceLister algorithm.ServiceLister
 	label         string
 }
 
+// NewServiceAntiAffinityPriority creates a ServiceAntiAffinity.
 func NewServiceAntiAffinityPriority(podLister algorithm.PodLister, serviceLister algorithm.ServiceLister, label string) (algorithm.PriorityMapFunction, algorithm.PriorityReduceFunction) {
 	antiAffinity := &ServiceAntiAffinity{
 		podLister:     podLister,

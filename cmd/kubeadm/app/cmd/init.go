@@ -30,6 +30,7 @@ import (
 	"github.com/spf13/cobra"
 	flag "github.com/spf13/pflag"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilflag "k8s.io/apiserver/pkg/util/flag"
@@ -56,6 +57,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
+	auditutil "k8s.io/kubernetes/cmd/kubeadm/app/util/audit"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	dryrunutil "k8s.io/kubernetes/cmd/kubeadm/app/util/dryrun"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
@@ -92,10 +94,12 @@ var (
 		This error is likely caused by:
 			- The kubelet is not running
 			- The kubelet is unhealthy due to a misconfiguration of the node in some way (required cgroups disabled)
-			- There is no internet connection, so the kubelet cannot pull the following control plane images:
+			- Either there is no internet connection, or imagePullPolicy is set to "Never",
+			  so the kubelet cannot pull or find the following control plane images:
 				- {{ .APIServerImage }}
 				- {{ .ControllerManagerImage }}
 				- {{ .SchedulerImage }}
+				- {{ .EtcdImage }} (only if no external etcd endpoints are configured)
 
 		If you are on a systemd-powered system, you can try to troubleshoot the error with the following commands:
 			- 'systemctl status kubelet'
@@ -319,6 +323,21 @@ func (i *Init) Run(out io.Writer) error {
 		fmt.Println("[externalca] The file 'ca.key' was not found, yet all other certificates are present. Using external CA mode - certificates or kubeconfig will not be generated.")
 	}
 
+	if features.Enabled(i.cfg.FeatureGates, features.Auditing) {
+		// Setup the AuditPolicy (either it was passed in and exists or it wasn't passed in and generate a default policy)
+		if i.cfg.AuditPolicyConfiguration.Path != "" {
+			// TODO(chuckha) ensure passed in audit policy is valid so users don't have to find the error in the api server log.
+			if _, err := os.Stat(i.cfg.AuditPolicyConfiguration.Path); err != nil {
+				return fmt.Errorf("error getting file info for audit policy file %q [%v]", i.cfg.AuditPolicyConfiguration.Path, err)
+			}
+		} else {
+			i.cfg.AuditPolicyConfiguration.Path = filepath.Join(kubeConfigDir, kubeadmconstants.AuditPolicyDir, kubeadmconstants.AuditPolicyFile)
+			if err := auditutil.CreateDefaultAuditLogPolicy(i.cfg.AuditPolicyConfiguration.Path); err != nil {
+				return fmt.Errorf("error creating default audit policy %q [%v]", i.cfg.AuditPolicyConfiguration.Path, err)
+			}
+		}
+	}
+
 	// Temporarily set cfg.CertificatesDir to the "real value" when writing controlplane manifests
 	// This is needed for writing the right kind of manifests
 	i.cfg.CertificatesDir = realCertsDir
@@ -357,7 +376,7 @@ func (i *Init) Run(out io.Writer) error {
 	}
 
 	// waiter holds the apiclient.Waiter implementation of choice, responsible for querying the API server in various ways and waiting for conditions to be fulfilled
-	waiter := getWaiter(i.dryRun, client)
+	waiter := getWaiter(i, client)
 
 	if err := waitForAPIAndKubelet(waiter); err != nil {
 		ctx := map[string]string{
@@ -365,6 +384,7 @@ func (i *Init) Run(out io.Writer) error {
 			"APIServerImage":         images.GetCoreImage(kubeadmconstants.KubeAPIServer, i.cfg.GetControlPlaneImageRepository(), i.cfg.KubernetesVersion, i.cfg.UnifiedControlPlaneImage),
 			"ControllerManagerImage": images.GetCoreImage(kubeadmconstants.KubeControllerManager, i.cfg.GetControlPlaneImageRepository(), i.cfg.KubernetesVersion, i.cfg.UnifiedControlPlaneImage),
 			"SchedulerImage":         images.GetCoreImage(kubeadmconstants.KubeScheduler, i.cfg.GetControlPlaneImageRepository(), i.cfg.KubernetesVersion, i.cfg.UnifiedControlPlaneImage),
+			"EtcdImage":              images.GetCoreImage(kubeadmconstants.Etcd, i.cfg.ImageRepository, i.cfg.KubernetesVersion, i.cfg.Etcd.Image),
 		}
 
 		kubeletFailTempl.Execute(out, ctx)
@@ -522,11 +542,18 @@ func printFilesIfDryRunning(dryRun bool, manifestDir string) error {
 }
 
 // getWaiter gets the right waiter implementation for the right occasion
-func getWaiter(dryRun bool, client clientset.Interface) apiclient.Waiter {
-	if dryRun {
+func getWaiter(i *Init, client clientset.Interface) apiclient.Waiter {
+	if i.dryRun {
 		return dryrunutil.NewWaiter()
 	}
-	return apiclient.NewKubeWaiter(client, 30*time.Minute, os.Stdout)
+
+	timeout := 30 * time.Minute
+
+	// No need for a large timeout if we don't expect downloads
+	if i.cfg.ImagePullPolicy == v1.PullNever {
+		timeout = 60 * time.Second
+	}
+	return apiclient.NewKubeWaiter(client, timeout, os.Stdout)
 }
 
 // waitForAPIAndKubelet waits primarily for the API server to come up. If that takes a long time, and the kubelet

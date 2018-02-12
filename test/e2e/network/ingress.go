@@ -90,7 +90,8 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 				Client: jig.Client,
 				Cloud:  framework.TestContext.CloudConfig,
 			}
-			gceController.Init()
+			err := gceController.Init()
+			Expect(err).NotTo(HaveOccurred())
 		})
 
 		// Platform specific cleanup
@@ -106,7 +107,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			jig.TryDeleteIngress()
 
 			By("Cleaning up cloud resources")
-			framework.CleanupGCEIngressController(gceController)
+			Expect(gceController.CleanupGCEIngressController()).NotTo(HaveOccurred())
 		})
 
 		It("should conform to Ingress spec", func() {
@@ -356,7 +357,8 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			}, map[string]string{})
 
 			By("Test that ingress works with the pre-shared certificate")
-			jig.WaitForIngressWithCert(true, []string{testHostname}, cert)
+			err = jig.WaitForIngressWithCert(true, []string{testHostname}, cert)
+			Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Unexpected error while waiting for ingress: %v", err))
 		})
 
 		It("multicluster ingress should get instance group annotation", func() {
@@ -398,7 +400,8 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 				Client: jig.Client,
 				Cloud:  framework.TestContext.CloudConfig,
 			}
-			gceController.Init()
+			err := gceController.Init()
+			Expect(err).NotTo(HaveOccurred())
 		})
 
 		// Platform specific cleanup
@@ -414,7 +417,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			jig.TryDeleteIngress()
 
 			By("Cleaning up cloud resources")
-			framework.CleanupGCEIngressController(gceController)
+			Expect(gceController.CleanupGCEIngressController()).NotTo(HaveOccurred())
 		})
 
 		It("should conform to Ingress spec", func() {
@@ -560,6 +563,38 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 					return false, nil
 				}
 			})
+		})
+	})
+
+	Describe("GCE [Slow] [Feature:kubemci]", func() {
+		// Platform specific setup
+		BeforeEach(func() {
+			framework.SkipUnlessProviderIs("gce", "gke")
+			jig.Class = framework.MulticlusterIngressClassValue
+		})
+
+		// Platform specific cleanup
+		AfterEach(func() {
+			if CurrentGinkgoTestDescription().Failed {
+				framework.DescribeIng(ns)
+			}
+			if jig.Ingress == nil {
+				By("No ingress created, no cleanup necessary")
+				return
+			}
+			By("Deleting ingress")
+			jig.TryDeleteIngress()
+		})
+
+		It("should conform to Ingress spec", func() {
+			jig.PollInterval = 5 * time.Second
+			conformanceTests = framework.CreateIngressComformanceTests(jig, ns, map[string]string{})
+			for _, t := range conformanceTests {
+				By(t.EntryLog)
+				t.Execute()
+				By(t.ExitLog)
+				jig.WaitForIngress(true /*waitForNodePort*/)
+			}
 		})
 	})
 

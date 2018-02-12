@@ -79,7 +79,7 @@ func TestRunExposeService(t *testing.T) {
 					Selector: map[string]string{"app": "go"},
 				},
 			},
-			expected: "service \"foo\" exposed",
+			expected: "services \"foo\" exposed",
 			status:   200,
 		},
 		{
@@ -110,7 +110,7 @@ func TestRunExposeService(t *testing.T) {
 					Selector: map[string]string{"func": "stream"},
 				},
 			},
-			expected: "service \"foo\" exposed",
+			expected: "services \"foo\" exposed",
 			status:   200,
 		},
 		{
@@ -142,7 +142,7 @@ func TestRunExposeService(t *testing.T) {
 					Selector: map[string]string{"run": "this"},
 				},
 			},
-			expected: "service \"mayor\" exposed",
+			expected: "services \"mayor\" exposed",
 			status:   200,
 		},
 		{
@@ -237,7 +237,7 @@ func TestRunExposeService(t *testing.T) {
 					ClusterIP: "10.10.10.10",
 				},
 			},
-			expected: "service \"foo\" exposed",
+			expected: "services \"foo\" exposed",
 			status:   200,
 		},
 		{
@@ -269,7 +269,7 @@ func TestRunExposeService(t *testing.T) {
 					ClusterIP: api.ClusterIPNone,
 				},
 			},
-			expected: "service \"foo\" exposed",
+			expected: "services \"foo\" exposed",
 			status:   200,
 		},
 		{
@@ -295,7 +295,7 @@ func TestRunExposeService(t *testing.T) {
 					ClusterIP: api.ClusterIPNone,
 				},
 			},
-			expected: "service \"foo\" exposed",
+			expected: "services \"foo\" exposed",
 			status:   200,
 		},
 		{
@@ -353,7 +353,7 @@ func TestRunExposeService(t *testing.T) {
 					Selector: map[string]string{"svc": "frompod"},
 				},
 			},
-			expected: "service \"a-name-that-is-toooo-big-for-a-service-because-it-can-only-hand\" exposed",
+			expected: "services \"a-name-that-is-toooo-big-for-a-service-because-it-can-only-hand\" exposed",
 			status:   200,
 		},
 		{
@@ -501,7 +501,7 @@ func TestRunExposeService(t *testing.T) {
 				continue
 			}
 
-			test.expected = fmt.Sprintf("service %q exposed (dry run)", test.flags["name"])
+			test.expected = fmt.Sprintf("services %q exposed (dry run)", test.flags["name"])
 		}
 
 		if !strings.Contains(out, test.expected) {

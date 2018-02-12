@@ -52,9 +52,10 @@ import (
 	utilversion "k8s.io/kubernetes/pkg/util/version"
 
 	"fmt"
-	"github.com/golang/glog"
 	"sync"
 	"time"
+
+	"github.com/golang/glog"
 )
 
 func init() {
@@ -813,6 +814,7 @@ func (nc *Controller) tryUpdateNodeStatus(node *v1.Node) (time.Duration, v1.Node
 
 		// remaining node conditions should also be set to Unknown
 		remainingNodeConditionTypes := []v1.NodeConditionType{
+			v1.NodeOutOfDisk,
 			v1.NodeMemoryPressure,
 			v1.NodeDiskPressure,
 			// We don't change 'NodeNetworkUnavailable' condition, as it's managed on a control plane level.

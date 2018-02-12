@@ -103,7 +103,7 @@ func (f *NodeClient) NodePublishVolume(ctx grpctx.Context, req *csipb.NodePublis
 	fsTypes := "ext4|xfs|zfs"
 	fsType := req.GetVolumeCapability().GetMount().GetFsType()
 	if !strings.Contains(fsTypes, fsType) {
-		return nil, errors.New("invlid fstype")
+		return nil, errors.New("invalid fstype")
 	}
 	f.nodePublishedVolumes[req.GetVolumeId()] = req.GetTargetPath()
 	return &csipb.NodePublishVolumeResponse{}, nil

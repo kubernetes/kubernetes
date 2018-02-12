@@ -343,7 +343,7 @@ func TestConverter_GeneratedConversionOverriden(t *testing.T) {
 		t.Fatalf("unexpected error %v", err)
 	}
 	if err := c.RegisterGeneratedConversionFunc(func(in *A, out *B, s Scope) error {
-		return fmt.Errorf("generated function should be overriden")
+		return fmt.Errorf("generated function should be overridden")
 	}); err != nil {
 		t.Fatalf("unexpected error %v", err)
 	}
@@ -360,12 +360,12 @@ func TestConverter_WithConversionOverriden(t *testing.T) {
 	type B struct{}
 	c := NewConverter(DefaultNameFunc)
 	if err := c.RegisterConversionFunc(func(in *A, out *B, s Scope) error {
-		return fmt.Errorf("conversion function should be overriden")
+		return fmt.Errorf("conversion function should be overridden")
 	}); err != nil {
 		t.Fatalf("unexpected error %v", err)
 	}
 	if err := c.RegisterGeneratedConversionFunc(func(in *A, out *B, s Scope) error {
-		return fmt.Errorf("generated function should be overriden")
+		return fmt.Errorf("generated function should be overridden")
 	}); err != nil {
 		t.Fatalf("unexpected error %v", err)
 	}
@@ -378,7 +378,7 @@ func TestConverter_WithConversionOverriden(t *testing.T) {
 
 	a := A{}
 	b := B{}
-	if err := c.Convert(&a, &b, 0, nil); err == nil || err.Error() != "conversion function should be overriden" {
+	if err := c.Convert(&a, &b, 0, nil); err == nil || err.Error() != "conversion function should be overridden" {
 		t.Errorf("unexpected error: %v", err)
 	}
 	if err := newc.Convert(&a, &b, 0, nil); err != nil {

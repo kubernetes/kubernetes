@@ -1430,7 +1430,7 @@ func TestGenericScaleSimple(t *testing.T) {
 			resVersion, err := target.ScaleSimple("default", scenario.resName, &scenario.precondition, uint(scenario.newSize))
 
 			if scenario.expectError && err == nil {
-				t.Fatal("expeced an error but was not returned")
+				t.Fatal("expected an error but was not returned")
 			}
 			if !scenario.expectError && err != nil {
 				t.Fatalf("unexpected error: %v", err)
@@ -1527,7 +1527,7 @@ func TestGenericScale(t *testing.T) {
 			err := target.Scale("default", scenario.resName, uint(scenario.newSize), &scenario.precondition, nil, scenario.waitForReplicas)
 
 			if scenario.expectError && err == nil {
-				t.Fatal("expeced an error but was not returned")
+				t.Fatal("expected an error but was not returned")
 			}
 			if !scenario.expectError && err != nil {
 				t.Fatalf("unexpected error: %v", err)

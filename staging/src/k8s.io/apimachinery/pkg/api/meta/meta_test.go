@@ -22,7 +22,7 @@ import (
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	metav1alpha1 "k8s.io/apimachinery/pkg/apis/meta/v1alpha1"
+	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/util/diff"
 
 	fuzz "github.com/google/gofuzz"
@@ -41,7 +41,7 @@ func TestAsPartialObjectMetadata(t *testing.T) {
 	}
 
 	for i := 0; i < 100; i++ {
-		m := &metav1alpha1.PartialObjectMetadata{}
+		m := &metav1beta1.PartialObjectMetadata{}
 		f.Fuzz(&m.ObjectMeta)
 		partial := AsPartialObjectMetadata(m)
 		if !reflect.DeepEqual(&partial.ObjectMeta, &m.ObjectMeta) {

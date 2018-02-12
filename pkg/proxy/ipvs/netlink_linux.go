@@ -92,7 +92,11 @@ func (h *netlinkHandle) EnsureDummyDevice(devName string) (bool, error) {
 func (h *netlinkHandle) DeleteDummyDevice(devName string) error {
 	link, err := h.LinkByName(devName)
 	if err != nil {
-		return fmt.Errorf("error deleting a non-exist dummy device: %s", devName)
+		_, ok := err.(netlink.LinkNotFoundError)
+		if ok {
+			return nil
+		}
+		return fmt.Errorf("error deleting a non-exist dummy device: %s, %v", devName, err)
 	}
 	dummy, ok := link.(*netlink.Dummy)
 	if !ok {

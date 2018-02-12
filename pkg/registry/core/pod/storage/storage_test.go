@@ -26,7 +26,7 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	metav1alpha1 "k8s.io/apimachinery/pkg/apis/meta/v1alpha1"
+	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -396,7 +396,7 @@ func TestWatch(t *testing.T) {
 		[]fields.Set{
 			{"metadata.name": "foo"},
 		},
-		// not matchin fields
+		// not matching fields
 		[]fields.Set{
 			{"metadata.name": "bar"},
 		},
@@ -409,7 +409,7 @@ func TestConvertToTableList(t *testing.T) {
 	defer storage.Store.DestroyFunc()
 	ctx := genericapirequest.NewDefaultContext()
 
-	columns := []metav1alpha1.TableColumnDefinition{
+	columns := []metav1beta1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
 		{Name: "Ready", Type: "string", Description: "The aggregate readiness state of this pod for accepting traffic."},
 		{Name: "Status", Type: "string", Description: "The aggregate status of the containers in this pod."},
@@ -440,7 +440,7 @@ func TestConvertToTableList(t *testing.T) {
 
 	testCases := []struct {
 		in  runtime.Object
-		out *metav1alpha1.Table
+		out *metav1beta1.Table
 		err bool
 	}{
 		{
@@ -449,25 +449,25 @@ func TestConvertToTableList(t *testing.T) {
 		},
 		{
 			in: &api.Pod{},
-			out: &metav1alpha1.Table{
+			out: &metav1beta1.Table{
 				ColumnDefinitions: columns,
-				Rows: []metav1alpha1.TableRow{
+				Rows: []metav1beta1.TableRow{
 					{Cells: []interface{}{"", "0/0", "", 0, "<unknown>", "<none>", "<none>"}, Object: runtime.RawExtension{Object: &api.Pod{}}},
 				},
 			},
 		},
 		{
 			in: pod1,
-			out: &metav1alpha1.Table{
+			out: &metav1beta1.Table{
 				ColumnDefinitions: columns,
-				Rows: []metav1alpha1.TableRow{
+				Rows: []metav1beta1.TableRow{
 					{Cells: []interface{}{"foo", "1/2", "Pending", 10, "1y", "10.1.2.3", "test-node"}, Object: runtime.RawExtension{Object: pod1}},
 				},
 			},
 		},
 		{
 			in:  &api.PodList{},
-			out: &metav1alpha1.Table{ColumnDefinitions: columns},
+			out: &metav1beta1.Table{ColumnDefinitions: columns},
 		},
 	}
 	for i, test := range testCases {

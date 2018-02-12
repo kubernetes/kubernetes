@@ -38,7 +38,7 @@ http_archive(
 
 load("@bazel_skylib//:lib.bzl", "versions")
 
-versions.check(minimum_bazel_version = "0.8.0")
+versions.check(minimum_bazel_version = "0.10.0")
 
 load("@io_bazel_rules_go//go:def.bzl", "go_rules_dependencies", "go_register_toolchains", "go_download_sdk")
 load("@io_bazel_rules_docker//docker:docker.bzl", "docker_repositories", "docker_pull")
@@ -60,16 +60,16 @@ http_file(
 docker_pull(
     name = "debian-iptables-amd64",
     digest = "sha256:a3b936c0fb98a934eecd2cfb91f73658d402b29116084e778ce9ddb68e55383e",
-    registry = "gcr.io",
-    repository = "google-containers/debian-iptables-amd64",
+    registry = "k8s.gcr.io",
+    repository = "debian-iptables-amd64",
     tag = "v10",  # ignored, but kept here for documentation
 )
 
 docker_pull(
     name = "debian-hyperkube-base-amd64",
     digest = "sha256:fc1b461367730660ac5a40c1eb2d1b23221829acf8a892981c12361383b3742b",
-    registry = "gcr.io",
-    repository = "google-containers/debian-hyperkube-base-amd64",
+    registry = "k8s.gcr.io",
+    repository = "debian-hyperkube-base-amd64",
     tag = "0.8",  # ignored, but kept here for documentation
 )
 

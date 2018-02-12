@@ -48188,7 +48188,7 @@ func init() {
 type VirtualMachineAffinityInfo struct {
 	DynamicData
 
-	AffinitySet []int32 `xml:"affinitySet,omitempty"`
+	AffinitySet []int32 `xml:"affinitySet"`
 }
 
 func init() {

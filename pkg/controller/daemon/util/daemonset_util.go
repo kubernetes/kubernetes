@@ -102,7 +102,7 @@ func IsPodUpdated(dsTemplateGeneration int64, pod *v1.Pod, hash string) bool {
 	return hashMatches || templateMatches
 }
 
-// SplitByAvailablePods splits provided daemon set pods by availabilty
+// SplitByAvailablePods splits provided daemon set pods by availability
 func SplitByAvailablePods(minReadySeconds int32, pods []*v1.Pod) ([]*v1.Pod, []*v1.Pod) {
 	unavailablePods := []*v1.Pod{}
 	availablePods := []*v1.Pod{}

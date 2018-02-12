@@ -19,7 +19,6 @@ limitations under the License.
 package factory
 
 import (
-	"encoding/json"
 	"fmt"
 	"reflect"
 	"time"
@@ -30,7 +29,6 @@ import (
 	"k8s.io/api/policy/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -192,10 +190,9 @@ func NewConfigFactory(
 				case cache.DeletedFinalStateUnknown:
 					if pod, ok := t.Obj.(*v1.Pod); ok {
 						return assignedNonTerminatedPod(pod)
-					} else {
-						runtime.HandleError(fmt.Errorf("unable to convert object %T to *v1.Pod in %T", obj, c))
-						return false
 					}
+					runtime.HandleError(fmt.Errorf("unable to convert object %T to *v1.Pod in %T", obj, c))
+					return false
 				default:
 					runtime.HandleError(fmt.Errorf("unable to handle object in %T: %T", c, obj))
 					return false
@@ -218,10 +215,9 @@ func NewConfigFactory(
 				case cache.DeletedFinalStateUnknown:
 					if pod, ok := t.Obj.(*v1.Pod); ok {
 						return unassignedNonTerminatedPod(pod)
-					} else {
-						runtime.HandleError(fmt.Errorf("unable to convert object %T to *v1.Pod in %T", obj, c))
-						return false
 					}
+					runtime.HandleError(fmt.Errorf("unable to convert object %T to *v1.Pod in %T", obj, c))
+					return false
 				default:
 					runtime.HandleError(fmt.Errorf("unable to handle object in %T: %T", c, obj))
 					return false
@@ -533,13 +529,13 @@ func (c *configFactory) GetHardPodAffinitySymmetricWeight() int32 {
 	return c.hardPodAffinitySymmetricWeight
 }
 
-func (f *configFactory) GetSchedulerName() string {
-	return f.schedulerName
+func (c *configFactory) GetSchedulerName() string {
+	return c.schedulerName
 }
 
 // GetClient provides a kubernetes client, mostly internal use, but may also be called by mock-tests.
-func (f *configFactory) GetClient() clientset.Interface {
-	return f.client
+func (c *configFactory) GetClient() clientset.Interface {
+	return c.client
 }
 
 // GetScheduledPodListerIndexer provides a pod lister, mostly internal use, but may also be called by mock-tests.
@@ -867,23 +863,23 @@ func (c *configFactory) deletePDBFromCache(obj interface{}) {
 }
 
 // Create creates a scheduler with the default algorithm provider.
-func (f *configFactory) Create() (*scheduler.Config, error) {
-	return f.CreateFromProvider(DefaultProvider)
+func (c *configFactory) Create() (*scheduler.Config, error) {
+	return c.CreateFromProvider(DefaultProvider)
 }
 
 // Creates a scheduler from the name of a registered algorithm provider.
-func (f *configFactory) CreateFromProvider(providerName string) (*scheduler.Config, error) {
+func (c *configFactory) CreateFromProvider(providerName string) (*scheduler.Config, error) {
 	glog.V(2).Infof("Creating scheduler from algorithm provider '%v'", providerName)
 	provider, err := GetAlgorithmProvider(providerName)
 	if err != nil {
 		return nil, err
 	}
 
-	return f.CreateFromKeys(provider.FitPredicateKeys, provider.PriorityFunctionKeys, []algorithm.SchedulerExtender{})
+	return c.CreateFromKeys(provider.FitPredicateKeys, provider.PriorityFunctionKeys, []algorithm.SchedulerExtender{})
 }
 
 // Creates a scheduler from the configuration file
-func (f *configFactory) CreateFromConfig(policy schedulerapi.Policy) (*scheduler.Config, error) {
+func (c *configFactory) CreateFromConfig(policy schedulerapi.Policy) (*scheduler.Config, error) {
 	glog.V(2).Infof("Creating scheduler from configuration: %v", policy)
 
 	// validate the policy configuration
@@ -892,113 +888,131 @@ func (f *configFactory) CreateFromConfig(policy schedulerapi.Policy) (*scheduler
 	}
 
 	predicateKeys := sets.NewString()
-	for _, predicate := range policy.Predicates {
-		glog.V(2).Infof("Registering predicate: %s", predicate.Name)
-		predicateKeys.Insert(RegisterCustomFitPredicate(predicate))
+	if policy.Predicates == nil {
+		glog.V(2).Infof("Using predicates from algorithm provider '%v'", DefaultProvider)
+		provider, err := GetAlgorithmProvider(DefaultProvider)
+		if err != nil {
+			return nil, err
+		}
+		predicateKeys = provider.FitPredicateKeys
+	} else {
+		for _, predicate := range policy.Predicates {
+			glog.V(2).Infof("Registering predicate: %s", predicate.Name)
+			predicateKeys.Insert(RegisterCustomFitPredicate(predicate))
+		}
 	}
 
 	priorityKeys := sets.NewString()
-	for _, priority := range policy.Priorities {
-		glog.V(2).Infof("Registering priority: %s", priority.Name)
-		priorityKeys.Insert(RegisterCustomPriorityFunction(priority))
+	if policy.Priorities == nil {
+		glog.V(2).Infof("Using priorities from algorithm provider '%v'", DefaultProvider)
+		provider, err := GetAlgorithmProvider(DefaultProvider)
+		if err != nil {
+			return nil, err
+		}
+		priorityKeys = provider.PriorityFunctionKeys
+	} else {
+		for _, priority := range policy.Priorities {
+			glog.V(2).Infof("Registering priority: %s", priority.Name)
+			priorityKeys.Insert(RegisterCustomPriorityFunction(priority))
+		}
 	}
 
 	extenders := make([]algorithm.SchedulerExtender, 0)
 	if len(policy.ExtenderConfigs) != 0 {
 		for ii := range policy.ExtenderConfigs {
 			glog.V(2).Infof("Creating extender with config %+v", policy.ExtenderConfigs[ii])
-			if extender, err := core.NewHTTPExtender(&policy.ExtenderConfigs[ii]); err != nil {
+			extender, err := core.NewHTTPExtender(&policy.ExtenderConfigs[ii])
+			if err != nil {
 				return nil, err
-			} else {
-				extenders = append(extenders, extender)
 			}
+			extenders = append(extenders, extender)
 		}
 	}
 	// Providing HardPodAffinitySymmetricWeight in the policy config is the new and preferred way of providing the value.
 	// Give it higher precedence than scheduler CLI configuration when it is provided.
 	if policy.HardPodAffinitySymmetricWeight != 0 {
-		f.hardPodAffinitySymmetricWeight = policy.HardPodAffinitySymmetricWeight
+		c.hardPodAffinitySymmetricWeight = policy.HardPodAffinitySymmetricWeight
 	}
 	// When AlwaysCheckAllPredicates is set to true, scheduler checks all the configured
 	// predicates even after one or more of them fails.
 	if policy.AlwaysCheckAllPredicates {
-		f.alwaysCheckAllPredicates = policy.AlwaysCheckAllPredicates
+		c.alwaysCheckAllPredicates = policy.AlwaysCheckAllPredicates
 	}
 
-	return f.CreateFromKeys(predicateKeys, priorityKeys, extenders)
+	return c.CreateFromKeys(predicateKeys, priorityKeys, extenders)
 }
 
 // getBinder returns an extender that supports bind or a default binder.
-func (f *configFactory) getBinder(extenders []algorithm.SchedulerExtender) scheduler.Binder {
+func (c *configFactory) getBinder(extenders []algorithm.SchedulerExtender) scheduler.Binder {
 	for i := range extenders {
 		if extenders[i].IsBinder() {
 			return extenders[i]
 		}
 	}
-	return &binder{f.client}
+	return &binder{c.client}
 }
 
 // Creates a scheduler from a set of registered fit predicate keys and priority keys.
-func (f *configFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, extenders []algorithm.SchedulerExtender) (*scheduler.Config, error) {
+func (c *configFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, extenders []algorithm.SchedulerExtender) (*scheduler.Config, error) {
 	glog.V(2).Infof("Creating scheduler with fit predicates '%v' and priority functions '%v'", predicateKeys, priorityKeys)
 
-	if f.GetHardPodAffinitySymmetricWeight() < 1 || f.GetHardPodAffinitySymmetricWeight() > 100 {
-		return nil, fmt.Errorf("invalid hardPodAffinitySymmetricWeight: %d, must be in the range 1-100", f.GetHardPodAffinitySymmetricWeight())
+	if c.GetHardPodAffinitySymmetricWeight() < 1 || c.GetHardPodAffinitySymmetricWeight() > 100 {
+		return nil, fmt.Errorf("invalid hardPodAffinitySymmetricWeight: %d, must be in the range 1-100", c.GetHardPodAffinitySymmetricWeight())
 	}
 
-	predicateFuncs, err := f.GetPredicates(predicateKeys)
+	predicateFuncs, err := c.GetPredicates(predicateKeys)
 	if err != nil {
 		return nil, err
 	}
 
-	priorityConfigs, err := f.GetPriorityFunctionConfigs(priorityKeys)
+	priorityConfigs, err := c.GetPriorityFunctionConfigs(priorityKeys)
 	if err != nil {
 		return nil, err
 	}
 
-	priorityMetaProducer, err := f.GetPriorityMetadataProducer()
+	priorityMetaProducer, err := c.GetPriorityMetadataProducer()
 	if err != nil {
 		return nil, err
 	}
 
-	predicateMetaProducer, err := f.GetPredicateMetadataProducer()
+	predicateMetaProducer, err := c.GetPredicateMetadataProducer()
 	if err != nil {
 		return nil, err
 	}
 
 	// Init equivalence class cache
-	if f.enableEquivalenceClassCache && getEquivalencePodFuncFactory != nil {
-		pluginArgs, err := f.getPluginArgs()
+	if c.enableEquivalenceClassCache && getEquivalencePodFuncFactory != nil {
+		pluginArgs, err := c.getPluginArgs()
 		if err != nil {
 			return nil, err
 		}
-		f.equivalencePodCache = core.NewEquivalenceCache(
+		c.equivalencePodCache = core.NewEquivalenceCache(
 			getEquivalencePodFuncFactory(*pluginArgs),
 		)
 		glog.Info("Created equivalence class cache")
 	}
 
-	algo := core.NewGenericScheduler(f.schedulerCache, f.equivalencePodCache, f.podQueue, predicateFuncs, predicateMetaProducer, priorityConfigs, priorityMetaProducer, extenders, f.volumeBinder, f.pVCLister, f.alwaysCheckAllPredicates)
+	algo := core.NewGenericScheduler(c.schedulerCache, c.equivalencePodCache, c.podQueue, predicateFuncs, predicateMetaProducer, priorityConfigs, priorityMetaProducer, extenders, c.volumeBinder, c.pVCLister, c.alwaysCheckAllPredicates)
 
 	podBackoff := util.CreateDefaultPodBackoff()
 	return &scheduler.Config{
-		SchedulerCache: f.schedulerCache,
-		Ecache:         f.equivalencePodCache,
+		SchedulerCache: c.schedulerCache,
+		Ecache:         c.equivalencePodCache,
 		// The scheduler only needs to consider schedulable nodes.
-		NodeLister:          &nodeLister{f.nodeLister},
+		NodeLister:          &nodeLister{c.nodeLister},
 		Algorithm:           algo,
-		Binder:              f.getBinder(extenders),
-		PodConditionUpdater: &podConditionUpdater{f.client},
-		PodPreemptor:        &podPreemptor{f.client},
+		Binder:              c.getBinder(extenders),
+		PodConditionUpdater: &podConditionUpdater{c.client},
+		PodPreemptor:        &podPreemptor{c.client},
 		WaitForCacheSync: func() bool {
-			return cache.WaitForCacheSync(f.StopEverything, f.scheduledPodsHasSynced)
+			return cache.WaitForCacheSync(c.StopEverything, c.scheduledPodsHasSynced)
 		},
 		NextPod: func() *v1.Pod {
-			return f.getNextPod()
+			return c.getNextPod()
 		},
-		Error:          f.MakeDefaultErrorFunc(podBackoff, f.podQueue),
-		StopEverything: f.StopEverything,
-		VolumeBinder:   f.volumeBinder,
+		Error:          c.MakeDefaultErrorFunc(podBackoff, c.podQueue),
+		StopEverything: c.StopEverything,
+		VolumeBinder:   c.volumeBinder,
 	}, nil
 }
 
@@ -1010,8 +1024,8 @@ func (n *nodeLister) List() ([]*v1.Node, error) {
 	return n.NodeLister.List(labels.Everything())
 }
 
-func (f *configFactory) GetPriorityFunctionConfigs(priorityKeys sets.String) ([]algorithm.PriorityConfig, error) {
-	pluginArgs, err := f.getPluginArgs()
+func (c *configFactory) GetPriorityFunctionConfigs(priorityKeys sets.String) ([]algorithm.PriorityConfig, error) {
+	pluginArgs, err := c.getPluginArgs()
 	if err != nil {
 		return nil, err
 	}
@@ -1019,8 +1033,8 @@ func (f *configFactory) GetPriorityFunctionConfigs(priorityKeys sets.String) ([]
 	return getPriorityFunctionConfigs(priorityKeys, *pluginArgs)
 }
 
-func (f *configFactory) GetPriorityMetadataProducer() (algorithm.PriorityMetadataProducer, error) {
-	pluginArgs, err := f.getPluginArgs()
+func (c *configFactory) GetPriorityMetadataProducer() (algorithm.PriorityMetadataProducer, error) {
+	pluginArgs, err := c.getPluginArgs()
 	if err != nil {
 		return nil, err
 	}
@@ -1028,16 +1042,16 @@ func (f *configFactory) GetPriorityMetadataProducer() (algorithm.PriorityMetadat
 	return getPriorityMetadataProducer(*pluginArgs)
 }
 
-func (f *configFactory) GetPredicateMetadataProducer() (algorithm.PredicateMetadataProducer, error) {
-	pluginArgs, err := f.getPluginArgs()
+func (c *configFactory) GetPredicateMetadataProducer() (algorithm.PredicateMetadataProducer, error) {
+	pluginArgs, err := c.getPluginArgs()
 	if err != nil {
 		return nil, err
 	}
 	return getPredicateMetadataProducer(*pluginArgs)
 }
 
-func (f *configFactory) GetPredicates(predicateKeys sets.String) (map[string]algorithm.FitPredicate, error) {
-	pluginArgs, err := f.getPluginArgs()
+func (c *configFactory) GetPredicates(predicateKeys sets.String) (map[string]algorithm.FitPredicate, error) {
+	pluginArgs, err := c.getPluginArgs()
 	if err != nil {
 		return nil, err
 	}
@@ -1045,31 +1059,31 @@ func (f *configFactory) GetPredicates(predicateKeys sets.String) (map[string]alg
 	return getFitPredicateFunctions(predicateKeys, *pluginArgs)
 }
 
-func (f *configFactory) getPluginArgs() (*PluginFactoryArgs, error) {
+func (c *configFactory) getPluginArgs() (*PluginFactoryArgs, error) {
 	return &PluginFactoryArgs{
-		PodLister:                      f.podLister,
-		ServiceLister:                  f.serviceLister,
-		ControllerLister:               f.controllerLister,
-		ReplicaSetLister:               f.replicaSetLister,
-		StatefulSetLister:              f.statefulSetLister,
-		NodeLister:                     &nodeLister{f.nodeLister},
-		NodeInfo:                       &predicates.CachedNodeInfo{NodeLister: f.nodeLister},
-		PVInfo:                         &predicates.CachedPersistentVolumeInfo{PersistentVolumeLister: f.pVLister},
-		PVCInfo:                        &predicates.CachedPersistentVolumeClaimInfo{PersistentVolumeClaimLister: f.pVCLister},
-		StorageClassInfo:               &predicates.CachedStorageClassInfo{StorageClassLister: f.storageClassLister},
-		VolumeBinder:                   f.volumeBinder,
-		HardPodAffinitySymmetricWeight: f.hardPodAffinitySymmetricWeight,
+		PodLister:                      c.podLister,
+		ServiceLister:                  c.serviceLister,
+		ControllerLister:               c.controllerLister,
+		ReplicaSetLister:               c.replicaSetLister,
+		StatefulSetLister:              c.statefulSetLister,
+		NodeLister:                     &nodeLister{c.nodeLister},
+		NodeInfo:                       &predicates.CachedNodeInfo{NodeLister: c.nodeLister},
+		PVInfo:                         &predicates.CachedPersistentVolumeInfo{PersistentVolumeLister: c.pVLister},
+		PVCInfo:                        &predicates.CachedPersistentVolumeClaimInfo{PersistentVolumeClaimLister: c.pVCLister},
+		StorageClassInfo:               &predicates.CachedStorageClassInfo{StorageClassLister: c.storageClassLister},
+		VolumeBinder:                   c.volumeBinder,
+		HardPodAffinitySymmetricWeight: c.hardPodAffinitySymmetricWeight,
 	}, nil
 }
 
-func (f *configFactory) getNextPod() *v1.Pod {
-	if pod, err := f.podQueue.Pop(); err == nil {
+func (c *configFactory) getNextPod() *v1.Pod {
+	pod, err := c.podQueue.Pop()
+	if err == nil {
 		glog.V(4).Infof("About to try and schedule pod %v", pod.Name)
 		return pod
-	} else {
-		glog.Errorf("Error while retrieving next pod from scheduling queue: %v", err)
-		return nil
 	}
+	glog.Errorf("Error while retrieving next pod from scheduling queue: %v", err)
+	return nil
 }
 
 // unassignedNonTerminatedPod selects pods that are unassigned and non-terminal.
@@ -1177,7 +1191,7 @@ func NewPodInformer(client clientset.Interface, resyncPeriod time.Duration, sche
 	}
 }
 
-func (factory *configFactory) MakeDefaultErrorFunc(backoff *util.PodBackoff, podQueue core.SchedulingQueue) func(pod *v1.Pod, err error) {
+func (c *configFactory) MakeDefaultErrorFunc(backoff *util.PodBackoff, podQueue core.SchedulingQueue) func(pod *v1.Pod, err error) {
 	return func(pod *v1.Pod, err error) {
 		if err == core.ErrNoNodesAvailable {
 			glog.V(4).Infof("Unable to schedule %v %v: no nodes are registered to the cluster; waiting", pod.Namespace, pod.Name)
@@ -1189,13 +1203,13 @@ func (factory *configFactory) MakeDefaultErrorFunc(backoff *util.PodBackoff, pod
 					nodeName := errStatus.Status().Details.Name
 					// when node is not found, We do not remove the node right away. Trying again to get
 					// the node and if the node is still not found, then remove it from the scheduler cache.
-					_, err := factory.client.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
+					_, err := c.client.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
 					if err != nil && errors.IsNotFound(err) {
 						node := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: nodeName}}
-						factory.schedulerCache.RemoveNode(&node)
+						c.schedulerCache.RemoveNode(&node)
 						// invalidate cached predicate for the node
-						if factory.enableEquivalenceClassCache {
-							factory.equivalencePodCache.InvalidateAllCachedPredicateItemOfNode(nodeName)
+						if c.enableEquivalenceClassCache {
+							c.equivalencePodCache.InvalidateAllCachedPredicateItemOfNode(nodeName)
 						}
 					}
 				}
@@ -1229,14 +1243,14 @@ func (factory *configFactory) MakeDefaultErrorFunc(backoff *util.PodBackoff, pod
 			// Get the pod again; it may have changed/been scheduled already.
 			getBackoff := initialGetBackoff
 			for {
-				pod, err := factory.client.CoreV1().Pods(podID.Namespace).Get(podID.Name, metav1.GetOptions{})
+				pod, err := c.client.CoreV1().Pods(podID.Namespace).Get(podID.Name, metav1.GetOptions{})
 				if err == nil {
 					if len(pod.Spec.NodeName) == 0 {
 						podQueue.AddUnschedulableIfNotPresent(pod)
 					} else {
-						if factory.volumeBinder != nil {
+						if c.volumeBinder != nil {
 							// Volume binder only wants to keep unassigned pods
-							factory.volumeBinder.DeletePodBindings(pod)
+							c.volumeBinder.DeletePodBindings(pod)
 						}
 					}
 					break
@@ -1244,9 +1258,9 @@ func (factory *configFactory) MakeDefaultErrorFunc(backoff *util.PodBackoff, pod
 				if errors.IsNotFound(err) {
 					glog.Warningf("A pod %v no longer exists", podID)
 
-					if factory.volumeBinder != nil {
+					if c.volumeBinder != nil {
 						// Volume binder only wants to keep unassigned pods
-						factory.volumeBinder.DeletePodBindings(origPod)
+						c.volumeBinder.DeletePodBindings(origPod)
 					}
 					return
 				}
@@ -1313,41 +1327,16 @@ func (p *podPreemptor) DeletePod(pod *v1.Pod) error {
 	return p.Client.CoreV1().Pods(pod.Namespace).Delete(pod.Name, &metav1.DeleteOptions{})
 }
 
-func (p *podPreemptor) UpdatePodAnnotations(pod *v1.Pod, annotations map[string]string) error {
+func (p *podPreemptor) SetNominatedNodeName(pod *v1.Pod, nominatedNodeName string) error {
 	podCopy := pod.DeepCopy()
-	if podCopy.Annotations == nil {
-		podCopy.Annotations = map[string]string{}
-	}
-	for k, v := range annotations {
-		podCopy.Annotations[k] = v
-	}
-	ret := &unstructured.Unstructured{}
-	ret.SetAnnotations(podCopy.Annotations)
-	patchData, err := json.Marshal(ret)
-	if err != nil {
-		return err
-	}
-	_, error := p.Client.CoreV1().Pods(podCopy.Namespace).Patch(podCopy.Name, types.MergePatchType, patchData, "status")
-	return error
+	podCopy.Status.NominatedNodeName = nominatedNodeName
+	_, err := p.Client.CoreV1().Pods(pod.Namespace).UpdateStatus(podCopy)
+	return err
 }
 
-func (p *podPreemptor) RemoveNominatedNodeAnnotation(pod *v1.Pod) error {
-	podCopy := pod.DeepCopy()
-	if podCopy.Annotations == nil {
+func (p *podPreemptor) RemoveNominatedNodeName(pod *v1.Pod) error {
+	if len(pod.Status.NominatedNodeName) == 0 {
 		return nil
 	}
-	if _, exists := podCopy.Annotations[core.NominatedNodeAnnotationKey]; !exists {
-		return nil
-	}
-	// Note: Deleting the entry from the annotations and passing it to Patch() will
-	// not remove the annotation. That's why we set it to empty string.
-	podCopy.Annotations[core.NominatedNodeAnnotationKey] = ""
-	ret := &unstructured.Unstructured{}
-	ret.SetAnnotations(podCopy.Annotations)
-	patchData, err := json.Marshal(ret)
-	if err != nil {
-		return err
-	}
-	_, error := p.Client.CoreV1().Pods(podCopy.Namespace).Patch(podCopy.Name, types.MergePatchType, patchData, "status")
-	return error
+	return p.SetNominatedNodeName(pod, "")
 }

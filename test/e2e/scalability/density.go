@@ -356,9 +356,17 @@ var _ = SIGDescribe("Density", func() {
 	testCaseBaseName := "density"
 	missingMeasurements := 0
 	var testPhaseDurations *timer.TestPhaseTimer
+	var profileGathererStopCh chan struct{}
 
 	// Gathers data prior to framework namespace teardown
 	AfterEach(func() {
+		// Stop apiserver CPU profile gatherer and gather memory allocations profile.
+		close(profileGathererStopCh)
+		wg := sync.WaitGroup{}
+		wg.Add(1)
+		framework.GatherApiserverMemoryProfile(&wg, "density")
+		wg.Wait()
+
 		saturationThreshold := time.Duration((totalPods / MinPodsPerSecondThroughput)) * time.Second
 		if saturationThreshold < MinSaturationThreshold {
 			saturationThreshold = MinSaturationThreshold
@@ -442,6 +450,10 @@ var _ = SIGDescribe("Density", func() {
 			}
 			framework.Logf("Name: %v, clusterIP: %v, externalIP: %v", node.ObjectMeta.Name, internalIP, externalIP)
 		}
+
+		// Start apiserver CPU profile gatherer with frequency based on cluster size.
+		profileGatheringDelay := time.Duration(5+nodeCount/100) * time.Minute
+		profileGathererStopCh = framework.StartApiserverCPUProfileGatherer(profileGatheringDelay)
 	})
 
 	type Density struct {

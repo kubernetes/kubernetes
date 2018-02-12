@@ -45,6 +45,10 @@ KUBECTL="${KUBE_ROOT}/cluster/kubectl.sh"
 KUBEMARK_DIRECTORY="${KUBE_ROOT}/test/kubemark"
 RESOURCE_DIRECTORY="${KUBEMARK_DIRECTORY}/resources"
 
+# Generate a random 6-digit alphanumeric tag for the kubemark image.
+# Used to uniquify image builds across different invocations of this script.
+KUBEMARK_IMAGE_TAG=$(head /dev/urandom | tr -dc 'a-z0-9' | fold -w 6 | head -n 1)
+
 # Write all environment variables that we need to pass to the kubemark master,
 # locally to the file ${RESOURCE_DIRECTORY}/kubemark-master-env.sh.
 function create-master-environment-file {
@@ -193,14 +197,14 @@ function create-and-upload-hollow-node-image {
     echo 'Cannot find cmd/kubemark binary'
     exit 1
   fi
-  
+
   echo "Copying kubemark binary to ${MAKE_DIR}"
   cp "${KUBEMARK_BIN}" "${MAKE_DIR}"
   CURR_DIR=`pwd`
   cd "${MAKE_DIR}"
   RETRIES=3
   for attempt in $(seq 1 ${RETRIES}); do
-    if ! REGISTRY="${CONTAINER_REGISTRY}" PROJECT="${PROJECT}" make "${KUBEMARK_IMAGE_MAKE_TARGET}"; then
+    if ! REGISTRY="${FULL_REGISTRY}" IMAGE_TAG="${KUBEMARK_IMAGE_TAG}" make "${KUBEMARK_IMAGE_MAKE_TARGET}"; then
       if [[ $((attempt)) -eq "${RETRIES}" ]]; then
         echo "${color_red}Make failed. Exiting.${color_norm}"
         exit 1
@@ -221,7 +225,7 @@ function create-and-upload-hollow-node-image {
 function create-and-upload-hollow-node-image-bazel {
   RETRIES=3
   for attempt in $(seq 1 ${RETRIES}); do
-    if ! bazel run //cluster/images/kubemark:push --define PROJECT="${PROJECT}"; then
+    if ! bazel run //cluster/images/kubemark:push --define REGISTRY="${FULL_REGISTRY}" --define IMAGE_TAG="${KUBEMARK_IMAGE_TAG}"; then
       if [[ $((attempt)) -eq "${RETRIES}" ]]; then
         echo "${color_red}Image push failed. Exiting.${color_norm}"
         exit 1
@@ -395,8 +399,8 @@ current-context: kubemark-context")
   proxy_mem=$((100 * 1024 + ${proxy_mem_per_node}*${NUM_NODES}))
   sed -i'' -e "s/{{HOLLOW_PROXY_CPU}}/${proxy_cpu}/g" "${RESOURCE_DIRECTORY}/hollow-node.yaml"
   sed -i'' -e "s/{{HOLLOW_PROXY_MEM}}/${proxy_mem}/g" "${RESOURCE_DIRECTORY}/hollow-node.yaml"
-  sed -i'' -e "s/{{registry}}/${CONTAINER_REGISTRY}/g" "${RESOURCE_DIRECTORY}/hollow-node.yaml"
-  sed -i'' -e "s/{{project}}/${PROJECT}/g" "${RESOURCE_DIRECTORY}/hollow-node.yaml"
+  sed -i'' -e "s'{{full_registry}}'${FULL_REGISTRY}'g" "${RESOURCE_DIRECTORY}/hollow-node.yaml"
+  sed -i'' -e "s/{{kubemark_image_tag}}/${KUBEMARK_IMAGE_TAG}/g" "${RESOURCE_DIRECTORY}/hollow-node.yaml"
   sed -i'' -e "s/{{master_ip}}/${MASTER_IP}/g" "${RESOURCE_DIRECTORY}/hollow-node.yaml"
   sed -i'' -e "s/{{kubelet_verbosity_level}}/${KUBELET_TEST_LOG_LEVEL}/g" "${RESOURCE_DIRECTORY}/hollow-node.yaml"
   sed -i'' -e "s/{{kubeproxy_verbosity_level}}/${KUBEPROXY_TEST_LOG_LEVEL}/g" "${RESOURCE_DIRECTORY}/hollow-node.yaml"

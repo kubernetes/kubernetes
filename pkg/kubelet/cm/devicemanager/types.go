@@ -66,6 +66,8 @@ type DeviceRunContainerOptions struct {
 	Mounts []kubecontainer.Mount
 	// The host devices mapped into the container.
 	Devices []kubecontainer.DeviceInfo
+	// The Annotations for the container
+	Annotations []kubecontainer.Annotation
 }
 
 // TODO: evaluate whether we need these error definitions.

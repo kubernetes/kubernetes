@@ -22,7 +22,7 @@ import (
 
 // ClientConnectionConfiguration contains details for constructing a client.
 type ClientConnectionConfiguration struct {
-	// kubeConfigFile is the path to a kubeconfig file.
+	// kubeconfig is the path to a kubeconfig file.
 	KubeConfigFile string `json:"kubeconfig"`
 	// acceptContentTypes defines the Accept header sent by clients when connecting to a server, overriding the
 	// default value of 'application/json'. This field will control all connections to the server used by a particular
@@ -30,7 +30,7 @@ type ClientConnectionConfiguration struct {
 	AcceptContentTypes string `json:"acceptContentTypes"`
 	// contentType is the content type used when sending data to the server from this client.
 	ContentType string `json:"contentType"`
-	// cps controls the number of queries per second allowed for this connection.
+	// qps controls the number of queries per second allowed for this connection.
 	QPS float32 `json:"qps"`
 	// burst allows extra queries to accumulate when a client is exceeding its rate.
 	Burst int `json:"burst"`
@@ -93,13 +93,13 @@ type KubeProxyConntrackConfiguration struct {
 type KubeProxyConfiguration struct {
 	metav1.TypeMeta `json:",inline"`
 
-	// featureGates is a comma-separated list of key=value pairs that control
-	// which alpha/beta features are enabled.
-	//
-	// TODO this really should be a map but that requires refactoring all
+	// TODO FeatureGates really should be a map but that requires refactoring all
 	// components to use config files because local-up-cluster.sh only supports
 	// the --feature-gates flag right now, which is comma-separated key=value
 	// pairs.
+	//
+	// featureGates is a comma-separated list of key=value pairs that control
+	// which alpha/beta features are enabled.
 	FeatureGates string `json:"featureGates"`
 
 	// bindAddress is the IP address for the proxy server to serve on (set to 0.0.0.0
@@ -140,7 +140,7 @@ type KubeProxyConfiguration struct {
 	ResourceContainer string `json:"resourceContainer"`
 	// udpIdleTimeout is how long an idle UDP connection will be kept open (e.g. '250ms', '2s').
 	// Must be greater than 0. Only applicable for proxyMode=userspace.
-	UDPIdleTimeout metav1.Duration `json:"udpTimeoutMilliseconds"`
+	UDPIdleTimeout metav1.Duration `json:"udpIdleTimeout"`
 	// conntrack contains conntrack-related configuration options.
 	Conntrack KubeProxyConntrackConfiguration `json:"conntrack"`
 	// configSyncPeriod is how often configuration from the apiserver is refreshed. Must be greater

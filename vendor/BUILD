@@ -273,7 +273,6 @@ filegroup(
         "//vendor/github.com/jonboulle/clockwork:all-srcs",
         "//vendor/github.com/json-iterator/go:all-srcs",
         "//vendor/github.com/jteeuwen/go-bindata:all-srcs",
-        "//vendor/github.com/juju/ratelimit:all-srcs",
         "//vendor/github.com/kardianos/osext:all-srcs",
         "//vendor/github.com/kr/fs:all-srcs",
         "//vendor/github.com/kr/pretty:all-srcs",

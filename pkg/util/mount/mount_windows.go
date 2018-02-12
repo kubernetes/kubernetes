@@ -89,10 +89,7 @@ func (mounter *Mounter) Mount(source string, target string, fstype string, optio
 		cmdLine += fmt.Sprintf(";New-SmbGlobalMapping -RemotePath %s -Credential $Credential", source)
 
 		if output, err := exec.Command("powershell", "/c", cmdLine).CombinedOutput(); err != nil {
-			// we don't return error here, even though New-SmbGlobalMapping failed, we still make it successful,
-			// will return error when Windows 2016 RS3 is ready on azure
-			glog.Errorf("azureMount: SmbGlobalMapping failed: %v, only SMB mount is supported now, output: %q", err, string(output))
-			return os.MkdirAll(target, 0755)
+			return fmt.Errorf("azureMount: SmbGlobalMapping failed: %v, only SMB mount is supported now, output: %q", err, string(output))
 		}
 	}
 

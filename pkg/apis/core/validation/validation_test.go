@@ -737,6 +737,29 @@ func testVolumeClaimAnnotation(name string, namespace string, ann string, annval
 	}
 }
 
+func testVolumeClaimStorageClassInSpec(name, namespace, scName string, spec core.PersistentVolumeClaimSpec) *core.PersistentVolumeClaim {
+	spec.StorageClassName = &scName
+	return &core.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+		Spec: spec,
+	}
+}
+
+func testVolumeClaimStorageClassInAnnotationAndSpec(name, namespace, scNameInAnn, scName string, spec core.PersistentVolumeClaimSpec) *core.PersistentVolumeClaim {
+	spec.StorageClassName = &scName
+	return &core.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        name,
+			Namespace:   namespace,
+			Annotations: map[string]string{v1.BetaStorageClassAnnotation: scNameInAnn},
+		},
+		Spec: spec,
+	}
+}
+
 func TestValidatePersistentVolumeClaim(t *testing.T) {
 	invalidClassName := "-invalid-"
 	validClassName := "valid"
@@ -1252,6 +1275,52 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 		Phase: core.ClaimPending,
 	})
 
+	validClaimStorageClassInSpec := testVolumeClaimStorageClassInSpec("foo", "ns", "fast", core.PersistentVolumeClaimSpec{
+		AccessModes: []core.PersistentVolumeAccessMode{
+			core.ReadOnlyMany,
+		},
+		Resources: core.ResourceRequirements{
+			Requests: core.ResourceList{
+				core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+			},
+		},
+	})
+
+	invalidClaimStorageClassInSpec := testVolumeClaimStorageClassInSpec("foo", "ns", "fast2", core.PersistentVolumeClaimSpec{
+		AccessModes: []core.PersistentVolumeAccessMode{
+			core.ReadOnlyMany,
+		},
+		Resources: core.ResourceRequirements{
+			Requests: core.ResourceList{
+				core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+			},
+		},
+	})
+
+	validClaimStorageClassInAnnotationAndSpec := testVolumeClaimStorageClassInAnnotationAndSpec(
+		"foo", "ns", "fast", "fast", core.PersistentVolumeClaimSpec{
+			AccessModes: []core.PersistentVolumeAccessMode{
+				core.ReadOnlyMany,
+			},
+			Resources: core.ResourceRequirements{
+				Requests: core.ResourceList{
+					core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+				},
+			},
+		})
+
+	invalidClaimStorageClassInAnnotationAndSpec := testVolumeClaimStorageClassInAnnotationAndSpec(
+		"foo", "ns", "fast2", "fast", core.PersistentVolumeClaimSpec{
+			AccessModes: []core.PersistentVolumeAccessMode{
+				core.ReadOnlyMany,
+			},
+			Resources: core.ResourceRequirements{
+				Requests: core.ResourceList{
+					core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+				},
+			},
+		})
+
 	scenarios := map[string]struct {
 		isExpectedFailure bool
 		oldClaim          *core.PersistentVolumeClaim
@@ -1411,6 +1480,48 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 			oldClaim:          validClaim,
 			newClaim:          unboundSizeUpdate,
 			enableResize:      true,
+			enableBlock:       false,
+		},
+		"valid-upgrade-storage-class-annotation-to-spec": {
+			isExpectedFailure: false,
+			oldClaim:          validClaimStorageClass,
+			newClaim:          validClaimStorageClassInSpec,
+			enableResize:      false,
+			enableBlock:       false,
+		},
+		"invalid-upgrade-storage-class-annotation-to-spec": {
+			isExpectedFailure: true,
+			oldClaim:          validClaimStorageClass,
+			newClaim:          invalidClaimStorageClassInSpec,
+			enableResize:      false,
+			enableBlock:       false,
+		},
+		"valid-upgrade-storage-class-annotation-to-annotation-and-spec": {
+			isExpectedFailure: false,
+			oldClaim:          validClaimStorageClass,
+			newClaim:          validClaimStorageClassInAnnotationAndSpec,
+			enableResize:      false,
+			enableBlock:       false,
+		},
+		"invalid-upgrade-storage-class-annotation-to-annotation-and-spec": {
+			isExpectedFailure: true,
+			oldClaim:          validClaimStorageClass,
+			newClaim:          invalidClaimStorageClassInAnnotationAndSpec,
+			enableResize:      false,
+			enableBlock:       false,
+		},
+		"invalid-upgrade-storage-class-in-spec": {
+			isExpectedFailure: true,
+			oldClaim:          validClaimStorageClassInSpec,
+			newClaim:          invalidClaimStorageClassInSpec,
+			enableResize:      false,
+			enableBlock:       false,
+		},
+		"invalid-downgrade-storage-class-spec-to-annotation": {
+			isExpectedFailure: true,
+			oldClaim:          validClaimStorageClassInSpec,
+			newClaim:          validClaimStorageClass,
+			enableResize:      false,
 			enableBlock:       false,
 		},
 	}
@@ -1663,6 +1774,74 @@ func TestValidateCSIVolumeSource(t *testing.T) {
 			csi:      &core.CSIPersistentVolumeSource{Driver: "my-driver"},
 			errtype:  field.ErrorTypeRequired,
 			errfield: "volumeHandle",
+		},
+		{
+			name: "driver name: ok no punctuations",
+			csi:  &core.CSIPersistentVolumeSource{Driver: "comgooglestoragecsigcepd", VolumeHandle: "test-123"},
+		},
+		{
+			name: "driver name: ok dot only",
+			csi:  &core.CSIPersistentVolumeSource{Driver: "io.kubernetes.storage.csi.flex", VolumeHandle: "test-123"},
+		},
+		{
+			name: "driver name: ok dash only",
+			csi:  &core.CSIPersistentVolumeSource{Driver: "io-kubernetes-storage-csi-flex", VolumeHandle: "test-123"},
+		},
+		{
+			name: "driver name: ok underscore only",
+			csi:  &core.CSIPersistentVolumeSource{Driver: "io_kubernetes_storage_csi_flex", VolumeHandle: "test-123"},
+		},
+		{
+			name: "driver name: ok dot underscores",
+			csi:  &core.CSIPersistentVolumeSource{Driver: "io.kubernetes.storage_csi.flex", VolumeHandle: "test-123"},
+		},
+		{
+			name: "driver name: ok beginnin with number",
+			csi:  &core.CSIPersistentVolumeSource{Driver: "2io.kubernetes.storage_csi.flex", VolumeHandle: "test-123"},
+		},
+		{
+			name: "driver name: ok ending with number",
+			csi:  &core.CSIPersistentVolumeSource{Driver: "io.kubernetes.storage_csi.flex2", VolumeHandle: "test-123"},
+		},
+		{
+			name: "driver name: ok dot dash underscores",
+			csi:  &core.CSIPersistentVolumeSource{Driver: "io.kubernetes-storage.csi_flex", VolumeHandle: "test-123"},
+		},
+		{
+			name:     "driver name: invalid length 0",
+			csi:      &core.CSIPersistentVolumeSource{Driver: "", VolumeHandle: "test-123"},
+			errtype:  field.ErrorTypeRequired,
+			errfield: "driver",
+		},
+		{
+			name:     "driver name: invalid length 1",
+			csi:      &core.CSIPersistentVolumeSource{Driver: "a", VolumeHandle: "test-123"},
+			errtype:  field.ErrorTypeInvalid,
+			errfield: "driver",
+		},
+		{
+			name:     "driver name: invalid length > 63",
+			csi:      &core.CSIPersistentVolumeSource{Driver: "comgooglestoragecsigcepdcomgooglestoragecsigcepdcomgooglestoragecsigcepdcomgooglestoragecsigcepd", VolumeHandle: "test-123"},
+			errtype:  field.ErrorTypeTooLong,
+			errfield: "driver",
+		},
+		{
+			name:     "driver name: invalid start char",
+			csi:      &core.CSIPersistentVolumeSource{Driver: "_comgooglestoragecsigcepd", VolumeHandle: "test-123"},
+			errtype:  field.ErrorTypeInvalid,
+			errfield: "driver",
+		},
+		{
+			name:     "driver name: invalid end char",
+			csi:      &core.CSIPersistentVolumeSource{Driver: "comgooglestoragecsigcepd/", VolumeHandle: "test-123"},
+			errtype:  field.ErrorTypeInvalid,
+			errfield: "driver",
+		},
+		{
+			name:     "driver name: invalid separators",
+			csi:      &core.CSIPersistentVolumeSource{Driver: "com/google/storage/csi~gcepd", VolumeHandle: "test-123"},
+			errtype:  field.ErrorTypeInvalid,
+			errfield: "driver",
 		},
 	}
 
@@ -5785,70 +5964,10 @@ func TestValidatePodSpec(t *testing.T) {
 			DNSPolicy:         core.DNSClusterFirst,
 			PriorityClassName: "InvalidName",
 		},
-		"with privileged and allowPrivilegeEscalation false": {
-			Containers: []core.Container{
-				{
-					Name:            "ctr",
-					Image:           "image",
-					ImagePullPolicy: "IfNotPresent",
-					Ports: []core.ContainerPort{
-						{HostPort: 8080, ContainerPort: 2600, Protocol: "TCP"}},
-					SecurityContext: &core.SecurityContext{
-						Privileged:               boolPtr(true),
-						AllowPrivilegeEscalation: boolPtr(false),
-					},
-				},
-			},
-		},
-		"with CAP_SYS_ADMIN and allowPrivilegeEscalation false": {
-			Containers: []core.Container{
-				{
-					Name:            "ctr",
-					Image:           "image",
-					ImagePullPolicy: "IfNotPresent",
-					Ports: []core.ContainerPort{
-						{HostPort: 8080, ContainerPort: 2600, Protocol: "TCP"}},
-					SecurityContext: &core.SecurityContext{
-						Capabilities: &core.Capabilities{
-							Add: []core.Capability{"CAP_SYS_ADMIN"},
-						},
-						AllowPrivilegeEscalation: boolPtr(false),
-					},
-				},
-			},
-		},
 	}
 	for k, v := range failureCases {
 		if errs := ValidatePodSpec(&v, field.NewPath("field")); len(errs) == 0 {
 			t.Errorf("expected failure for %q", k)
-		}
-	}
-
-	err = utilfeature.DefaultFeatureGate.Set("PodPriority=false")
-	if err != nil {
-		t.Errorf("Failed to disable feature gate for PodPriority: %v", err)
-		return
-	}
-	priority := int32(100)
-	featuregatedCases := map[string]core.PodSpec{
-		"set PriorityClassName": {
-			Volumes:           []core.Volume{{Name: "vol", VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}}}},
-			Containers:        []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-			RestartPolicy:     core.RestartPolicyAlways,
-			DNSPolicy:         core.DNSClusterFirst,
-			PriorityClassName: "valid-name",
-		},
-		"set Priority": {
-			Volumes:       []core.Volume{{Name: "vol", VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}}}},
-			Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-			RestartPolicy: core.RestartPolicyAlways,
-			DNSPolicy:     core.DNSClusterFirst,
-			Priority:      &priority,
-		},
-	}
-	for k, v := range featuregatedCases {
-		if errs := ValidatePodSpec(&v, field.NewPath("field")); len(errs) == 0 {
-			t.Errorf("expected failure due to gated feature: %q", k)
 		}
 	}
 }
@@ -11807,11 +11926,10 @@ func TestValidateTLSSecret(t *testing.T) {
 }
 
 func TestValidateSecurityContext(t *testing.T) {
-	priv := false
 	runAsUser := int64(1)
 	fullValidSC := func() *core.SecurityContext {
 		return &core.SecurityContext{
-			Privileged: &priv,
+			Privileged: boolPtr(false),
 			Capabilities: &core.Capabilities{
 				Add:  []core.Capability{"foo"},
 				Drop: []core.Capability{"bar"},
@@ -11856,17 +11974,25 @@ func TestValidateSecurityContext(t *testing.T) {
 	}
 
 	privRequestWithGlobalDeny := fullValidSC()
-	requestPrivileged := true
-	privRequestWithGlobalDeny.Privileged = &requestPrivileged
+	privRequestWithGlobalDeny.Privileged = boolPtr(true)
 
 	negativeRunAsUser := fullValidSC()
 	negativeUser := int64(-1)
 	negativeRunAsUser.RunAsUser = &negativeUser
 
+	privWithoutEscalation := fullValidSC()
+	privWithoutEscalation.Privileged = boolPtr(true)
+	privWithoutEscalation.AllowPrivilegeEscalation = boolPtr(false)
+
+	capSysAdminWithoutEscalation := fullValidSC()
+	capSysAdminWithoutEscalation.Capabilities.Add = []core.Capability{"CAP_SYS_ADMIN"}
+	capSysAdminWithoutEscalation.AllowPrivilegeEscalation = boolPtr(false)
+
 	errorCases := map[string]struct {
-		sc          *core.SecurityContext
-		errorType   field.ErrorType
-		errorDetail string
+		sc           *core.SecurityContext
+		errorType    field.ErrorType
+		errorDetail  string
+		capAllowPriv bool
 	}{
 		"request privileged when capabilities forbids": {
 			sc:          privRequestWithGlobalDeny,
@@ -11878,8 +12004,22 @@ func TestValidateSecurityContext(t *testing.T) {
 			errorType:   "FieldValueInvalid",
 			errorDetail: "must be between",
 		},
+		"with CAP_SYS_ADMIN and allowPrivilegeEscalation false": {
+			sc:          capSysAdminWithoutEscalation,
+			errorType:   "FieldValueInvalid",
+			errorDetail: "cannot set `allowPrivilegeEscalation` to false and `capabilities.Add` CAP_SYS_ADMIN",
+		},
+		"with privileged and allowPrivilegeEscalation false": {
+			sc:           privWithoutEscalation,
+			errorType:    "FieldValueInvalid",
+			errorDetail:  "cannot set `allowPrivilegeEscalation` to false and `privileged` to true",
+			capAllowPriv: true,
+		},
 	}
 	for k, v := range errorCases {
+		capabilities.SetForTests(capabilities.Capabilities{
+			AllowPrivileged: v.capAllowPriv,
+		})
 		if errs := ValidateSecurityContext(v.sc, field.NewPath("field")); len(errs) == 0 || errs[0].Type != v.errorType || !strings.Contains(errs[0].Detail, v.errorDetail) {
 			t.Errorf("[%s] Expected error type %q with detail %q, got %v", k, v.errorType, v.errorDetail, errs)
 		}

@@ -415,7 +415,7 @@ func TestApplyObjectWithoutAnnotation(t *testing.T) {
 	cmd.Run(cmd, []string{})
 
 	// uses the name from the file, not the response
-	expectRC := "replicationcontroller/" + nameRC + "\n"
+	expectRC := "replicationcontrollers/" + nameRC + "\n"
 	expectWarning := fmt.Sprintf(warningNoLastAppliedConfigAnnotation, "kubectl")
 	if errBuf.String() != expectWarning {
 		t.Fatalf("unexpected non-warning: %s\nexpected: %s", errBuf.String(), expectWarning)
@@ -461,7 +461,7 @@ func TestApplyObject(t *testing.T) {
 		cmd.Run(cmd, []string{})
 
 		// uses the name from the file, not the response
-		expectRC := "replicationcontroller/" + nameRC + "\n"
+		expectRC := "replicationcontrollers/" + nameRC + "\n"
 		if buf.String() != expectRC {
 			t.Fatalf("unexpected output: %s\nexpected: %s", buf.String(), expectRC)
 		}
@@ -586,7 +586,7 @@ func TestApplyRetry(t *testing.T) {
 		}
 
 		// uses the name from the file, not the response
-		expectRC := "replicationcontroller/" + nameRC + "\n"
+		expectRC := "replicationcontrollers/" + nameRC + "\n"
 		if buf.String() != expectRC {
 			t.Fatalf("unexpected output: %s\nexpected: %s", buf.String(), expectRC)
 		}
@@ -630,7 +630,7 @@ func TestApplyNonExistObject(t *testing.T) {
 	cmd.Run(cmd, []string{})
 
 	// uses the name from the file, not the response
-	expectRC := "replicationcontroller/" + nameRC + "\n"
+	expectRC := "replicationcontrollers/" + nameRC + "\n"
 	if buf.String() != expectRC {
 		t.Errorf("unexpected output: %s\nexpected: %s", buf.String(), expectRC)
 	}
@@ -683,7 +683,7 @@ func TestApplyEmptyPatch(t *testing.T) {
 	cmd.Flags().Set("output", "name")
 	cmd.Run(cmd, []string{})
 
-	expectRC := "replicationcontroller/" + nameRC + "\n"
+	expectRC := "replicationcontrollers/" + nameRC + "\n"
 	if buf.String() != expectRC {
 		t.Fatalf("unexpected output: %s\nexpected: %s", buf.String(), expectRC)
 	}
@@ -764,8 +764,8 @@ func testApplyMultipleObjects(t *testing.T, asList bool) {
 		cmd.Run(cmd, []string{})
 
 		// Names should come from the REST response, NOT the files
-		expectRC := "replicationcontroller/" + nameRC + "\n"
-		expectSVC := "service/" + nameSVC + "\n"
+		expectRC := "replicationcontrollers/" + nameRC + "\n"
+		expectSVC := "services/" + nameSVC + "\n"
 		// Test both possible orders since output is non-deterministic.
 		expectOne := expectRC + expectSVC
 		expectTwo := expectSVC + expectRC
@@ -855,7 +855,7 @@ func TestApplyNULLPreservation(t *testing.T) {
 
 		cmd.Run(cmd, []string{})
 
-		expected := "deployment/" + deploymentName + "\n"
+		expected := "deployments/" + deploymentName + "\n"
 		if buf.String() != expected {
 			t.Fatalf("unexpected output: %s\nexpected: %s", buf.String(), expected)
 		}
@@ -918,7 +918,7 @@ func TestUnstructuredApply(t *testing.T) {
 		cmd.Flags().Set("output", "name")
 		cmd.Run(cmd, []string{})
 
-		expected := "widget/" + name + "\n"
+		expected := "widgets/" + name + "\n"
 		if buf.String() != expected {
 			t.Fatalf("unexpected output: %s\nexpected: %s", buf.String(), expected)
 		}
@@ -1009,7 +1009,7 @@ func TestUnstructuredIdempotentApply(t *testing.T) {
 		cmd.Flags().Set("output", "name")
 		cmd.Run(cmd, []string{})
 
-		expected := "widget/widget\n"
+		expected := "widgets/widget\n"
 		if buf.String() != expected {
 			t.Fatalf("unexpected output: %s\nexpected: %s", buf.String(), expected)
 		}
@@ -1040,7 +1040,7 @@ func TestRunApplySetLastApplied(t *testing.T) {
 			name:        "set with exist object",
 			filePath:    filenameRC,
 			expectedErr: "",
-			expectedOut: "replicationcontroller/test-rc\n",
+			expectedOut: "replicationcontrollers/test-rc\n",
 			output:      "name",
 		},
 		{
@@ -1061,14 +1061,14 @@ func TestRunApplySetLastApplied(t *testing.T) {
 			name:        "set with exist object output json",
 			filePath:    filenameRCJSON,
 			expectedErr: "",
-			expectedOut: "replicationcontroller/test-rc\n",
+			expectedOut: "replicationcontrollers/test-rc\n",
 			output:      "name",
 		},
 		{
 			name:        "set test for a directory of files",
 			filePath:    dirName,
 			expectedErr: "",
-			expectedOut: "replicationcontroller/test-rc\nreplicationcontroller/test-rc\n",
+			expectedOut: "replicationcontrollers/test-rc\nreplicationcontrollers/test-rc\n",
 			output:      "name",
 		},
 	}
@@ -1243,7 +1243,7 @@ func TestForceApply(t *testing.T) {
 			}
 		}
 
-		if expected := "replicationcontroller/" + nameRC + "\n"; buf.String() != expected {
+		if expected := "replicationcontrollers/" + nameRC + "\n"; buf.String() != expected {
 			t.Fatalf("unexpected output: %s\nexpected: %s", buf.String(), expected)
 		}
 		if errBuf.String() != "" {

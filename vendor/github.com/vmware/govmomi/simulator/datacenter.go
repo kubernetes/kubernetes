@@ -74,3 +74,14 @@ func createDatacenterFolders(dc *mo.Datacenter, isVC bool) {
 		net.putChild(network)
 	}
 }
+
+func datacenterEventArgument(obj mo.Entity) *types.DatacenterEventArgument {
+	dc, ok := obj.(*mo.Datacenter)
+	if !ok {
+		dc = Map.getEntityDatacenter(obj)
+	}
+	return &types.DatacenterEventArgument{
+		Datacenter:          dc.Self,
+		EntityEventArgument: types.EntityEventArgument{Name: dc.Name},
+	}
+}

@@ -13,7 +13,7 @@
 # limitations under the License.
 
 TAG = 0.4
-PREFIX = gcr.io/google_containers
+PREFIX = staging-k8s.gcr.io
 
 all: push
 

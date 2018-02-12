@@ -35,12 +35,12 @@ func TestVirtualServer(t *testing.T) {
 	}
 	err := fake.AddVirtualServer(vs1)
 	if err != nil {
-		t.Errorf("Fail to add virutal server, error: %v", err)
+		t.Errorf("Fail to add virtual server, error: %v", err)
 	}
 	// Get a specific virtual server
 	got1, err := fake.GetVirtualServer(vs1)
 	if err != nil {
-		t.Errorf("Fail to get virutal server, error: %v", err)
+		t.Errorf("Fail to get virtual server, error: %v", err)
 	}
 	if !vs1.Equal(got1) {
 		t.Errorf("Expect virtual server: %v, got: %v", vs1, got1)
@@ -54,12 +54,12 @@ func TestVirtualServer(t *testing.T) {
 	}
 	err = fake.UpdateVirtualServer(vs12)
 	if err != nil {
-		t.Errorf("Fail to update virutal server, error: %v", err)
+		t.Errorf("Fail to update virtual server, error: %v", err)
 	}
 	// Check the updated virtual server
 	got12, err := fake.GetVirtualServer(vs1)
 	if !got12.Equal(vs12) {
-		t.Errorf("Expect virutal server: %v, got: %v", vs12, got12)
+		t.Errorf("Expect virtual server: %v, got: %v", vs12, got12)
 	}
 	// Add another virtual server
 	vs2 := &utilipvs.VirtualServer{
@@ -69,20 +69,20 @@ func TestVirtualServer(t *testing.T) {
 	}
 	err = fake.AddVirtualServer(vs2)
 	if err != nil {
-		t.Errorf("Unexpected error when add virutal server, error: %v", err)
+		t.Errorf("Unexpected error when add virtual server, error: %v", err)
 	}
 	// List all virtual servers
 	list, err := fake.GetVirtualServers()
 	if err != nil {
-		t.Errorf("Fail to list virutal servers, error: %v", err)
+		t.Errorf("Fail to list virtual servers, error: %v", err)
 	}
 	if len(list) != 2 {
-		t.Errorf("Expect 2 virutal servers, got: %d", len(list))
+		t.Errorf("Expect 2 virtual servers, got: %d", len(list))
 	}
 	// Delete a virtual server
 	err = fake.DeleteVirtualServer(vs1)
 	if err != nil {
-		t.Errorf("Fail to delete virutal server: %v, error: %v", vs1, err)
+		t.Errorf("Fail to delete virtual server: %v, error: %v", vs1, err)
 	}
 	// Check the deleted virtual server no longer exists
 	got, _ := fake.GetVirtualServer(vs1)
@@ -92,15 +92,15 @@ func TestVirtualServer(t *testing.T) {
 	// Flush all virtual servers
 	err = fake.Flush()
 	if err != nil {
-		t.Errorf("Fail to flush virutal servers, error: %v", err)
+		t.Errorf("Fail to flush virtual servers, error: %v", err)
 	}
 	// List all virtual servers
 	list, err = fake.GetVirtualServers()
 	if err != nil {
-		t.Errorf("Fail to list virutal servers, error: %v", err)
+		t.Errorf("Fail to list virtual servers, error: %v", err)
 	}
 	if len(list) != 0 {
-		t.Errorf("Expect 0 virutal servers, got: %d", len(list))
+		t.Errorf("Expect 0 virtual servers, got: %d", len(list))
 	}
 }
 
@@ -120,7 +120,7 @@ func TestRealServer(t *testing.T) {
 	}
 	err := fake.AddVirtualServer(vs)
 	if err != nil {
-		t.Errorf("Fail to add virutal server, error: %v", err)
+		t.Errorf("Fail to add virtual server, error: %v", err)
 	}
 	// Add real server to the virtual server
 	for i := range rss {
@@ -138,7 +138,7 @@ func TestRealServer(t *testing.T) {
 			t.Errorf("Fail to get real servers of the virtual server, error: %v", err)
 		}
 		if len(list) != rssLen {
-			t.Errorf("Expect %d virutal servers, got: %d", len(rss), len(list))
+			t.Errorf("Expect %d virtual servers, got: %d", len(rss), len(list))
 		}
 		rsToDel := list[i]
 		if err = fake.DeleteRealServer(vs, rsToDel); err != nil {

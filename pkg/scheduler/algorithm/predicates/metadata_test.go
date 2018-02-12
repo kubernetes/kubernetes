@@ -92,24 +92,24 @@ var _ = sort.Interface(&sortableServices{})
 // Note: this function does not compare podRequest.
 func predicateMetadataEquivalent(meta1, meta2 *predicateMetadata) error {
 	if !reflect.DeepEqual(meta1.pod, meta2.pod) {
-		return fmt.Errorf("pods are not the same.")
+		return fmt.Errorf("pods are not the same")
 	}
 	if meta1.podBestEffort != meta2.podBestEffort {
-		return fmt.Errorf("podBestEfforts are not equal.")
+		return fmt.Errorf("podBestEfforts are not equal")
 	}
 	if meta1.serviceAffinityInUse != meta1.serviceAffinityInUse {
-		return fmt.Errorf("serviceAffinityInUses are not equal.")
+		return fmt.Errorf("serviceAffinityInUses are not equal")
 	}
 	if len(meta1.podPorts) != len(meta2.podPorts) {
-		return fmt.Errorf("podPorts are not equal.")
+		return fmt.Errorf("podPorts are not equal")
 	}
 	for !reflect.DeepEqual(meta1.podPorts, meta2.podPorts) {
-		return fmt.Errorf("podPorts are not equal.")
+		return fmt.Errorf("podPorts are not equal")
 	}
 	sortAntiAffinityTerms(meta1.matchingAntiAffinityTerms)
 	sortAntiAffinityTerms(meta2.matchingAntiAffinityTerms)
 	if !reflect.DeepEqual(meta1.matchingAntiAffinityTerms, meta2.matchingAntiAffinityTerms) {
-		return fmt.Errorf("matchingAntiAffinityTerms are not euqal.")
+		return fmt.Errorf("matchingAntiAffinityTerms are not euqal")
 	}
 	if meta1.serviceAffinityInUse {
 		sortablePods1 := sortablePods(meta1.serviceAffinityMatchingPodList)
@@ -117,7 +117,7 @@ func predicateMetadataEquivalent(meta1, meta2 *predicateMetadata) error {
 		sortablePods2 := sortablePods(meta2.serviceAffinityMatchingPodList)
 		sort.Sort(sortablePods2)
 		if !reflect.DeepEqual(sortablePods1, sortablePods2) {
-			return fmt.Errorf("serviceAffinityMatchingPodLists are not euqal.")
+			return fmt.Errorf("serviceAffinityMatchingPodLists are not euqal")
 		}
 
 		sortableServices1 := sortableServices(meta1.serviceAffinityMatchingPodServices)
@@ -125,7 +125,7 @@ func predicateMetadataEquivalent(meta1, meta2 *predicateMetadata) error {
 		sortableServices2 := sortableServices(meta2.serviceAffinityMatchingPodServices)
 		sort.Sort(sortableServices2)
 		if !reflect.DeepEqual(sortableServices1, sortableServices2) {
-			return fmt.Errorf("serviceAffinityMatchingPodServices are not euqal.")
+			return fmt.Errorf("serviceAffinityMatchingPodServices are not euqal")
 		}
 	}
 	return nil

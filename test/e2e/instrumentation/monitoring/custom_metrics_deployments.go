@@ -127,7 +127,7 @@ func StackdriverExporterPod(podName, namespace, podLabel, metricName string, met
 func stackdriverExporterContainerSpec(name string, metricName string, metricValue int64) corev1.Container {
 	return corev1.Container{
 		Name:            name,
-		Image:           "gcr.io/google-containers/sd-dummy-exporter:v0.1.0",
+		Image:           "k8s.gcr.io/sd-dummy-exporter:v0.1.0",
 		ImagePullPolicy: corev1.PullPolicy("Always"),
 		Command:         []string{"/sd_dummy_exporter", "--pod-id=$(POD_ID)", "--metric-name=" + metricName, fmt.Sprintf("--metric-value=%v", metricValue)},
 		Env: []corev1.EnvVar{
@@ -175,7 +175,7 @@ func prometheusExporterPodSpec(metricName string, metricValue int64, port int32)
 		Containers: []corev1.Container{
 			{
 				Name:            "prometheus-exporter",
-				Image:           "gcr.io/google-containers/prometheus-dummy-exporter:v0.1.0",
+				Image:           "k8s.gcr.io/prometheus-dummy-exporter:v0.1.0",
 				ImagePullPolicy: corev1.PullPolicy("Always"),
 				Command: []string{"/prometheus_dummy_exporter", "--metric-name=" + metricName,
 					fmt.Sprintf("--metric-value=%v", metricValue), fmt.Sprintf("=--port=%d", port)},
@@ -183,7 +183,7 @@ func prometheusExporterPodSpec(metricName string, metricValue int64, port int32)
 			},
 			{
 				Name:            "prometheus-to-sd",
-				Image:           "gcr.io/google-containers/prometheus-to-sd:v0.2.3",
+				Image:           "k8s.gcr.io/prometheus-to-sd:v0.2.3",
 				ImagePullPolicy: corev1.PullPolicy("Always"),
 				Command: []string{"/monitor", fmt.Sprintf("--source=:http://localhost:%d", port),
 					"--stackdriver-prefix=custom.googleapis.com", "--pod-id=$(POD_ID)", "--namespace-id=$(POD_NAMESPACE)"},

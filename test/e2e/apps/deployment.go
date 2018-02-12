@@ -760,11 +760,18 @@ func testDeploymentsControllerRef(f *framework.Framework) {
 	err = framework.WaitForDeploymentComplete(c, deploy)
 	Expect(err).NotTo(HaveOccurred())
 
-	framework.Logf("Checking its ReplicaSet has the right controllerRef")
+	framework.Logf("Verifying Deployment %q has only one ReplicaSet", deploymentName)
+	rsList := listDeploymentReplicaSets(c, ns, podLabels)
+	Expect(len(rsList.Items)).Should(Equal(1))
+
+	framework.Logf("Obtaining the ReplicaSet's UID")
+	orphanedRSUID := rsList.Items[0].UID
+
+	framework.Logf("Checking the ReplicaSet has the right controllerRef")
 	err = checkDeploymentReplicaSetsControllerRef(c, ns, deploy.UID, podLabels)
 	Expect(err).NotTo(HaveOccurred())
 
-	framework.Logf("Deleting Deployment %q and orphaning its ReplicaSets", deploymentName)
+	framework.Logf("Deleting Deployment %q and orphaning its ReplicaSet", deploymentName)
 	err = orphanDeploymentReplicaSets(c, deploy)
 	Expect(err).NotTo(HaveOccurred())
 
@@ -783,6 +790,13 @@ func testDeploymentsControllerRef(f *framework.Framework) {
 	framework.Logf("Waiting for the ReplicaSet to have the right controllerRef")
 	err = checkDeploymentReplicaSetsControllerRef(c, ns, deploy.UID, podLabels)
 	Expect(err).NotTo(HaveOccurred())
+
+	framework.Logf("Verifying no extra ReplicaSet is created (Deployment %q still has only one ReplicaSet after adoption)", deploymentName)
+	rsList = listDeploymentReplicaSets(c, ns, podLabels)
+	Expect(len(rsList.Items)).Should(Equal(1))
+
+	framework.Logf("Verifying the ReplicaSet has the same UID as the orphaned ReplicaSet")
+	Expect(rsList.Items[0].UID).Should(Equal(orphanedRSUID))
 }
 
 func checkDeploymentReplicaSetsControllerRef(c clientset.Interface, ns string, uid types.UID, label map[string]string) error {

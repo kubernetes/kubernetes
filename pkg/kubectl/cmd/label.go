@@ -118,12 +118,12 @@ func NewCmdLabel(f cmdutil.Factory, out io.Writer) *cobra.Command {
 		ArgAliases: kubectl.ResourceAliases(validArgs),
 	}
 	cmdutil.AddPrinterFlags(cmd)
-	cmd.Flags().Bool("overwrite", false, "If true, allow labels to be overwritten, otherwise reject label updates that overwrite existing labels.")
+	cmd.Flags().BoolVar(&options.overwrite, "overwrite", false, "If true, allow labels to be overwritten, otherwise reject label updates that overwrite existing labels.")
 	cmd.Flags().BoolVar(&options.list, "list", options.list, "If true, display the labels for a given resource.")
-	cmd.Flags().Bool("local", false, "If true, label will NOT contact api-server but run locally.")
-	cmd.Flags().StringP("selector", "l", "", "Selector (label query) to filter on, not including uninitialized ones, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2).")
-	cmd.Flags().Bool("all", false, "Select all resources, including uninitialized ones, in the namespace of the specified resource types")
-	cmd.Flags().String("resource-version", "", i18n.T("If non-empty, the labels update will only succeed if this is the current resource-version for the object. Only valid when specifying a single resource."))
+	cmd.Flags().BoolVar(&options.local, "local", options.local, "If true, label will NOT contact api-server but run locally.")
+	cmd.Flags().StringVarP(&options.selector, "selector", "l", options.selector, "Selector (label query) to filter on, not including uninitialized ones, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2).")
+	cmd.Flags().BoolVar(&options.all, "all", options.all, "Select all resources, including uninitialized ones, in the namespace of the specified resource types")
+	cmd.Flags().StringVar(&options.resourceVersion, "resource-version", options.resourceVersion, i18n.T("If non-empty, the labels update will only succeed if this is the current resource-version for the object. Only valid when specifying a single resource."))
 	usage := "identifying the resource to update the labels"
 	cmdutil.AddFilenameOptionFlags(cmd, &options.FilenameOptions, usage)
 	cmdutil.AddDryRunFlag(cmd)
@@ -137,12 +137,6 @@ func NewCmdLabel(f cmdutil.Factory, out io.Writer) *cobra.Command {
 // Complete adapts from the command line args and factory to the data required.
 func (o *LabelOptions) Complete(out io.Writer, cmd *cobra.Command, args []string) (err error) {
 	o.out = out
-	o.list = cmdutil.GetFlagBool(cmd, "list")
-	o.local = cmdutil.GetFlagBool(cmd, "local")
-	o.overwrite = cmdutil.GetFlagBool(cmd, "overwrite")
-	o.all = cmdutil.GetFlagBool(cmd, "all")
-	o.resourceVersion = cmdutil.GetFlagString(cmd, "resource-version")
-	o.selector = cmdutil.GetFlagString(cmd, "selector")
 	o.outputFormat = cmdutil.GetFlagString(cmd, "output")
 	o.dryrun = cmdutil.GetDryRunFlag(cmd)
 
@@ -162,6 +156,9 @@ func (o *LabelOptions) Complete(out io.Writer, cmd *cobra.Command, args []string
 
 // Validate checks to the LabelOptions to see if there is sufficient information run the command.
 func (o *LabelOptions) Validate() error {
+	if o.all && len(o.selector) > 0 {
+		return fmt.Errorf("cannot set --all and --selector at the same time")
+	}
 	if len(o.resources) < 1 && cmdutil.IsFilenameSliceEmpty(o.FilenameOptions.Filenames) {
 		return fmt.Errorf("one or more resources must be specified as <resource> <name> or <resource>/<name>")
 	}
@@ -293,7 +290,7 @@ func (o *LabelOptions) RunLabel(f cmdutil.Factory, cmd *cobra.Command) error {
 		if o.outputFormat != "" {
 			return f.PrintObject(cmd, o.local, r.Mapper().RESTMapper, outputObj, o.out)
 		}
-		f.PrintSuccess(r.Mapper().RESTMapper, false, o.out, info.Mapping.Resource, info.Name, o.dryrun, dataChangeMsg)
+		f.PrintSuccess(false, o.out, info.Mapping.Resource, info.Name, o.dryrun, dataChangeMsg)
 		return nil
 	})
 }

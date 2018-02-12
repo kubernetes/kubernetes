@@ -298,7 +298,7 @@ func ViperizeFlags() {
 	viper.AddConfigPath(".")
 	viper.ReadInConfig()
 
-	// TODO Consider wether or not we want to use overwriteFlagsWithViperConfig().
+	// TODO Consider whether or not we want to use overwriteFlagsWithViperConfig().
 	viper.Unmarshal(&TestContext)
 
 	AfterReadingAllFlags(&TestContext)

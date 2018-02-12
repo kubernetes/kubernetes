@@ -21,10 +21,10 @@ explorer: explorer.go
 	CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags '-w' ./explorer.go
 
 container: explorer
-	docker build --pull -t gcr.io/google_containers/explorer:$(TAG) .
+	docker build --pull -t staging-k8s.gcr.io/explorer:$(TAG) .
 
 push: container
-	gcloud docker -- push gcr.io/google_containers/explorer:$(TAG)
+	gcloud docker -- push staging-k8s.gcr.io/explorer:$(TAG)
 
 clean:
 	rm -f explorer

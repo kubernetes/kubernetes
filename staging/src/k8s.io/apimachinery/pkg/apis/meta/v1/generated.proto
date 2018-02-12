@@ -375,6 +375,7 @@ message ListOptions {
   optional string resourceVersion = 4;
 
   // Timeout for the list/watch call.
+  // This limits the duration of the call, regardless of any activity or inactivity.
   // +optional
   optional int64 timeoutSeconds = 5;
 

@@ -154,7 +154,7 @@ func NewCmdEnv(f cmdutil.Factory, in io.Reader, out, errout io.Writer) *cobra.Co
 	cmd.Flags().BoolVar(&options.List, "list", options.List, "If true, display the environment and any changes in the standard format. this flag will removed when we have kubectl view env.")
 	cmd.Flags().BoolVar(&options.Resolve, "resolve", options.Resolve, "If true, show secret or configmap references when listing variables")
 	cmd.Flags().StringVarP(&options.Selector, "selector", "l", options.Selector, "Selector (label query) to filter on")
-	cmd.Flags().BoolVar(&options.Local, "local", false, "If true, set env will NOT contact api-server but run locally.")
+	cmd.Flags().BoolVar(&options.Local, "local", options.Local, "If true, set env will NOT contact api-server but run locally.")
 	cmd.Flags().BoolVar(&options.All, "all", options.All, "If true, select all resources in the namespace of the specified resource types")
 	cmd.Flags().BoolVar(&options.Overwrite, "overwrite", true, "If true, allow environment to be overwritten, otherwise reject updates that overwrite existing environment.")
 
@@ -178,6 +178,9 @@ func keyToEnvName(key string) string {
 }
 
 func (o *EnvOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
+	if o.All && len(o.Selector) > 0 {
+		return fmt.Errorf("cannot set --all and --selector at the same time")
+	}
 	resources, envArgs, ok := envutil.SplitEnvironmentFromResources(args)
 	if !ok {
 		return cmdutil.UsageErrorf(o.Cmd, "all resources must be specified before environment changes: %s", strings.Join(args, " "))
@@ -440,7 +443,7 @@ func (o *EnvOptions) RunEnv(f cmdutil.Factory) error {
 			continue
 		}
 
-		f.PrintSuccess(o.Mapper, o.ShortOutput, o.Out, info.Mapping.Resource, info.Name, false, "env updated")
+		f.PrintSuccess(o.ShortOutput, o.Out, info.Mapping.Resource, info.Name, false, "env updated")
 	}
 	return utilerrors.NewAggregate(allErrs)
 }

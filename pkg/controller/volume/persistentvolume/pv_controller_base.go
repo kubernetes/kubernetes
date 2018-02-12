@@ -40,6 +40,7 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/controller/volume/persistentvolume/metrics"
 	"k8s.io/kubernetes/pkg/util/goroutinemap"
 	vol "k8s.io/kubernetes/pkg/volume"
 
@@ -61,6 +62,7 @@ type ControllerParameters struct {
 	VolumeInformer            coreinformers.PersistentVolumeInformer
 	ClaimInformer             coreinformers.PersistentVolumeClaimInformer
 	ClassInformer             storageinformers.StorageClassInformer
+	PodInformer               coreinformers.PodInformer
 	EventRecorder             record.EventRecorder
 	EnableDynamicProvisioning bool
 }
@@ -118,6 +120,8 @@ func NewController(p ControllerParameters) (*PersistentVolumeController, error) 
 
 	controller.classLister = p.ClassInformer.Lister()
 	controller.classListerSynced = p.ClassInformer.Informer().HasSynced
+	controller.podLister = p.PodInformer.Lister()
+	controller.podListerSynced = p.PodInformer.Informer().HasSynced
 	return controller, nil
 }
 
@@ -262,9 +266,9 @@ func (ctrl *PersistentVolumeController) Run(stopCh <-chan struct{}) {
 	defer ctrl.volumeQueue.ShutDown()
 
 	glog.Infof("Starting persistent volume controller")
-	defer glog.Infof("Shutting down peristent volume controller")
+	defer glog.Infof("Shutting down persistent volume controller")
 
-	if !controller.WaitForCacheSync("persistent volume", stopCh, ctrl.volumeListerSynced, ctrl.claimListerSynced, ctrl.classListerSynced) {
+	if !controller.WaitForCacheSync("persistent volume", stopCh, ctrl.volumeListerSynced, ctrl.claimListerSynced, ctrl.classListerSynced, ctrl.podListerSynced) {
 		return
 	}
 
@@ -273,6 +277,8 @@ func (ctrl *PersistentVolumeController) Run(stopCh <-chan struct{}) {
 	go wait.Until(ctrl.resync, ctrl.resyncPeriod, stopCh)
 	go wait.Until(ctrl.volumeWorker, time.Second, stopCh)
 	go wait.Until(ctrl.claimWorker, time.Second, stopCh)
+
+	metrics.Register(ctrl.volumes.store, ctrl.claims)
 
 	<-stopCh
 }

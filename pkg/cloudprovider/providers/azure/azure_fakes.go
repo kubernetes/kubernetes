@@ -674,7 +674,7 @@ func (fVMC *fakeVirtualMachineScaleSetVMsClient) Get(resourceGroupName string, V
 	fVMC.mutex.Lock()
 	defer fVMC.mutex.Unlock()
 
-	vmKey := fmt.Sprintf("%s-%s", VMScaleSetName, instanceID)
+	vmKey := fmt.Sprintf("%s_%s", VMScaleSetName, instanceID)
 	if scaleSetMap, ok := fVMC.FakeStore[resourceGroupName]; ok {
 		if entity, ok := scaleSetMap[vmKey]; ok {
 			return entity, nil
@@ -930,11 +930,15 @@ func (fRTC *fakeRouteTablesClient) Get(resourceGroupName string, routeTableName 
 type fakeFileClient struct {
 }
 
-func (fFC *fakeFileClient) createFileShare(accountName, accountKey, name string, sizeGB int) error {
+func (fFC *fakeFileClient) createFileShare(accountName, accountKey, name string, sizeGiB int) error {
 	return nil
 }
 
 func (fFC *fakeFileClient) deleteFileShare(accountName, accountKey, name string) error {
+	return nil
+}
+
+func (fFC *fakeFileClient) resizeFileShare(accountName, accountKey, name string, sizeGiB int) error {
 	return nil
 }
 

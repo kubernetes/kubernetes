@@ -17,6 +17,7 @@ limitations under the License.
 package cloudprovider
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strings"
@@ -56,9 +57,9 @@ type InformerUser interface {
 // Clusters is an abstract, pluggable interface for clusters of containers.
 type Clusters interface {
 	// ListClusters lists the names of the available clusters.
-	ListClusters() ([]string, error)
+	ListClusters(ctx context.Context) ([]string, error)
 	// Master gets back the address (either DNS name or IP address) of the master node for the cluster.
-	Master(clusterName string) (string, error)
+	Master(ctx context.Context, clusterName string) (string, error)
 }
 
 // TODO(#6812): Use a shorter name that's less likely to be longer than cloud
@@ -75,12 +76,12 @@ func GetLoadBalancerName(service *v1.Service) string {
 }
 
 // GetInstanceProviderID builds a ProviderID for a node in a cloud.
-func GetInstanceProviderID(cloud Interface, nodeName types.NodeName) (string, error) {
+func GetInstanceProviderID(ctx context.Context, cloud Interface, nodeName types.NodeName) (string, error) {
 	instances, ok := cloud.Instances()
 	if !ok {
 		return "", fmt.Errorf("failed to get instances from cloud provider")
 	}
-	instanceID, err := instances.InstanceID(nodeName)
+	instanceID, err := instances.InstanceID(ctx, nodeName)
 	if err != nil {
 		return "", fmt.Errorf("failed to get instance ID from cloud provider: %v", err)
 	}
@@ -94,17 +95,17 @@ type LoadBalancer interface {
 	// if so, what its status is.
 	// Implementations must treat the *v1.Service parameter as read-only and not modify it.
 	// Parameter 'clusterName' is the name of the cluster as presented to kube-controller-manager
-	GetLoadBalancer(clusterName string, service *v1.Service) (status *v1.LoadBalancerStatus, exists bool, err error)
+	GetLoadBalancer(ctx context.Context, clusterName string, service *v1.Service) (status *v1.LoadBalancerStatus, exists bool, err error)
 	// EnsureLoadBalancer creates a new load balancer 'name', or updates the existing one. Returns the status of the balancer
 	// Implementations must treat the *v1.Service and *v1.Node
 	// parameters as read-only and not modify them.
 	// Parameter 'clusterName' is the name of the cluster as presented to kube-controller-manager
-	EnsureLoadBalancer(clusterName string, service *v1.Service, nodes []*v1.Node) (*v1.LoadBalancerStatus, error)
+	EnsureLoadBalancer(ctx context.Context, clusterName string, service *v1.Service, nodes []*v1.Node) (*v1.LoadBalancerStatus, error)
 	// UpdateLoadBalancer updates hosts under the specified load balancer.
 	// Implementations must treat the *v1.Service and *v1.Node
 	// parameters as read-only and not modify them.
 	// Parameter 'clusterName' is the name of the cluster as presented to kube-controller-manager
-	UpdateLoadBalancer(clusterName string, service *v1.Service, nodes []*v1.Node) error
+	UpdateLoadBalancer(ctx context.Context, clusterName string, service *v1.Service, nodes []*v1.Node) error
 	// EnsureLoadBalancerDeleted deletes the specified load balancer if it
 	// exists, returning nil if the load balancer specified either didn't exist or
 	// was successfully deleted.
@@ -113,7 +114,7 @@ type LoadBalancer interface {
 	// doesn't exist even if some part of it is still laying around.
 	// Implementations must treat the *v1.Service parameter as read-only and not modify it.
 	// Parameter 'clusterName' is the name of the cluster as presented to kube-controller-manager
-	EnsureLoadBalancerDeleted(clusterName string, service *v1.Service) error
+	EnsureLoadBalancerDeleted(ctx context.Context, clusterName string, service *v1.Service) error
 }
 
 // Instances is an abstract, pluggable interface for sets of instances.
@@ -122,31 +123,31 @@ type Instances interface {
 	// TODO(roberthbailey): This currently is only used in such a way that it
 	// returns the address of the calling instance. We should do a rename to
 	// make this clearer.
-	NodeAddresses(name types.NodeName) ([]v1.NodeAddress, error)
+	NodeAddresses(ctx context.Context, name types.NodeName) ([]v1.NodeAddress, error)
 	// NodeAddressesByProviderID returns the addresses of the specified instance.
 	// The instance is specified using the providerID of the node. The
 	// ProviderID is a unique identifier of the node. This will not be called
 	// from the node whose nodeaddresses are being queried. i.e. local metadata
 	// services cannot be used in this method to obtain nodeaddresses
-	NodeAddressesByProviderID(providerID string) ([]v1.NodeAddress, error)
+	NodeAddressesByProviderID(ctx context.Context, providerID string) ([]v1.NodeAddress, error)
 	// ExternalID returns the cloud provider ID of the node with the specified NodeName.
 	// Note that if the instance does not exist or is no longer running, we must return ("", cloudprovider.InstanceNotFound)
-	ExternalID(nodeName types.NodeName) (string, error)
+	ExternalID(ctx context.Context, nodeName types.NodeName) (string, error)
 	// InstanceID returns the cloud provider ID of the node with the specified NodeName.
-	InstanceID(nodeName types.NodeName) (string, error)
+	InstanceID(ctx context.Context, nodeName types.NodeName) (string, error)
 	// InstanceType returns the type of the specified instance.
-	InstanceType(name types.NodeName) (string, error)
+	InstanceType(ctx context.Context, name types.NodeName) (string, error)
 	// InstanceTypeByProviderID returns the type of the specified instance.
-	InstanceTypeByProviderID(providerID string) (string, error)
+	InstanceTypeByProviderID(ctx context.Context, providerID string) (string, error)
 	// AddSSHKeyToAllInstances adds an SSH public key as a legal identity for all instances
 	// expected format for the key is standard ssh-keygen format: <protocol> <blob>
-	AddSSHKeyToAllInstances(user string, keyData []byte) error
+	AddSSHKeyToAllInstances(ctx context.Context, user string, keyData []byte) error
 	// CurrentNodeName returns the name of the node we are currently running on
 	// On most clouds (e.g. GCE) this is the hostname, so we provide the hostname
-	CurrentNodeName(hostname string) (types.NodeName, error)
+	CurrentNodeName(ctx context.Context, hostname string) (types.NodeName, error)
 	// InstanceExistsByProviderID returns true if the instance for the given provider id still is running.
 	// If false is returned with no error, the instance will be immediately deleted by the cloud controller manager.
-	InstanceExistsByProviderID(providerID string) (bool, error)
+	InstanceExistsByProviderID(ctx context.Context, providerID string) (bool, error)
 }
 
 // Route is a representation of an advanced routing rule.
@@ -167,14 +168,14 @@ type Route struct {
 // Routes is an abstract, pluggable interface for advanced routing rules.
 type Routes interface {
 	// ListRoutes lists all managed routes that belong to the specified clusterName
-	ListRoutes(clusterName string) ([]*Route, error)
+	ListRoutes(ctx context.Context, clusterName string) ([]*Route, error)
 	// CreateRoute creates the described managed route
 	// route.Name will be ignored, although the cloud-provider may use nameHint
 	// to create a more user-meaningful name.
-	CreateRoute(clusterName string, nameHint string, route *Route) error
+	CreateRoute(ctx context.Context, clusterName string, nameHint string, route *Route) error
 	// DeleteRoute deletes the specified managed route
 	// Route should be as returned by ListRoutes
-	DeleteRoute(clusterName string, route *Route) error
+	DeleteRoute(ctx context.Context, clusterName string, route *Route) error
 }
 
 var (
@@ -192,23 +193,23 @@ type Zone struct {
 // Zones is an abstract, pluggable interface for zone enumeration.
 type Zones interface {
 	// GetZone returns the Zone containing the current failure zone and locality region that the program is running in
-	// In most cases, this method is called from the kubelet querying a local metadata service to aquire its zone.
+	// In most cases, this method is called from the kubelet querying a local metadata service to acquire its zone.
 	// For the case of external cloud providers, use GetZoneByProviderID or GetZoneByNodeName since GetZone
 	// can no longer be called from the kubelets.
-	GetZone() (Zone, error)
+	GetZone(ctx context.Context) (Zone, error)
 
 	// GetZoneByProviderID returns the Zone containing the current zone and locality region of the node specified by providerId
 	// This method is particularly used in the context of external cloud providers where node initialization must be down
 	// outside the kubelets.
-	GetZoneByProviderID(providerID string) (Zone, error)
+	GetZoneByProviderID(ctx context.Context, providerID string) (Zone, error)
 
 	// GetZoneByNodeName returns the Zone containing the current zone and locality region of the node specified by node name
 	// This method is particularly used in the context of external cloud providers where node initialization must be down
 	// outside the kubelets.
-	GetZoneByNodeName(nodeName types.NodeName) (Zone, error)
+	GetZoneByNodeName(ctx context.Context, nodeName types.NodeName) (Zone, error)
 }
 
 // PVLabeler is an abstract, pluggable interface for fetching labels for volumes
 type PVLabeler interface {
-	GetLabelsForVolume(pv *v1.PersistentVolume) (map[string]string, error)
+	GetLabelsForVolume(ctx context.Context, pv *v1.PersistentVolume) (map[string]string, error)
 }

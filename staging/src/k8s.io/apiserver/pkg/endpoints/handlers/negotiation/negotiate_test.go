@@ -184,7 +184,7 @@ func TestNegotiate(t *testing.T) {
 		{
 			req: &http.Request{
 				Header: http.Header{
-					"Accept": []string{"application/json;as=BOGUS;v=v1alpha1;g=meta.k8s.io, application/json"},
+					"Accept": []string{"application/json;as=BOGUS;v=v1beta1;g=meta.k8s.io, application/json"},
 				},
 			},
 			contentType: "application/json",

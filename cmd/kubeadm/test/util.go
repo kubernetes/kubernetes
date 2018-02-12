@@ -44,7 +44,7 @@ func SetupTempDir(t *testing.T) string {
 
 // SetupMasterConfigurationFile is a utility function for kubeadm testing that writes a master configuration file
 // into /config subfolder of a given temporary directory.
-// The funtion returns the path of the created master configuration file.
+// The function returns the path of the created master configuration file.
 func SetupMasterConfigurationFile(t *testing.T, tmpdir string, cfg *kubeadmapi.MasterConfiguration) string {
 
 	cfgPath := filepath.Join(tmpdir, "config/masterconfig.yaml")
@@ -89,7 +89,7 @@ func SetupEmptyFiles(t *testing.T, tmpdir string, fileNames ...string) {
 
 // SetupPkiDirWithCertificateAuthorithy is a utility function for kubeadm testing that creates a
 // CertificateAuthorithy cert/key pair into /pki subfolder of a given temporary directory.
-// The funtion returns the path of the created pki.
+// The function returns the path of the created pki.
 func SetupPkiDirWithCertificateAuthorithy(t *testing.T, tmpdir string) string {
 	caCert, caKey := certtestutil.SetupCertificateAuthorithy(t)
 

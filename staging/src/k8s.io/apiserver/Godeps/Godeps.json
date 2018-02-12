@@ -559,10 +559,6 @@
 			"Rev": "13f86432b882000a51c6e610c620974462691a97"
 		},
 		{
-			"ImportPath": "github.com/juju/ratelimit",
-			"Rev": "5b9ff866471762aa2ab2dced63c9fb6f53921342"
-		},
-		{
 			"ImportPath": "github.com/mailru/easyjson/buffer",
 			"Rev": "2f5df55504ebc322e4d52d34df6a1f5b503bf26d"
 		},
@@ -848,7 +844,7 @@
 		},
 		{
 			"ImportPath": "gopkg.in/yaml.v2",
-			"Rev": "53feefa2559fb8dfa8d81baad31be332c97d6c77"
+			"Rev": "670d4cfef0544295bc27a114dbac37980d83185a"
 		},
 		{
 			"ImportPath": "k8s.io/api/admission/v1beta1",
@@ -1035,7 +1031,7 @@
 			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 		},
 		{
-			"ImportPath": "k8s.io/apimachinery/pkg/apis/meta/v1alpha1",
+			"ImportPath": "k8s.io/apimachinery/pkg/apis/meta/v1beta1",
 			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 		},
 		{

@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: dns-backend
-          image: gcr.io/google_containers/example-dns-backend:v1
+          image: k8s.gcr.io/example-dns-backend:v1
           ports:
             - name: backend-port
               containerPort: 8000

@@ -53,19 +53,19 @@ func TestCreateQuota(t *testing.T) {
 	}{
 		"single resource": {
 			flags:          []string{"--hard=cpu=1"},
-			expectedOutput: "resourcequota/" + resourceQuotaObject.Name + "\n",
+			expectedOutput: "resourcequotas/" + resourceQuotaObject.Name + "\n",
 		},
 		"single resource with a scope": {
 			flags:          []string{"--hard=cpu=1", "--scopes=BestEffort"},
-			expectedOutput: "resourcequota/" + resourceQuotaObject.Name + "\n",
+			expectedOutput: "resourcequotas/" + resourceQuotaObject.Name + "\n",
 		},
 		"multiple resources": {
 			flags:          []string{"--hard=cpu=1,pods=42", "--scopes=BestEffort"},
-			expectedOutput: "resourcequota/" + resourceQuotaObject.Name + "\n",
+			expectedOutput: "resourcequotas/" + resourceQuotaObject.Name + "\n",
 		},
 		"single resource with multiple scopes": {
 			flags:          []string{"--hard=cpu=1", "--scopes=BestEffort,NotTerminating"},
-			expectedOutput: "resourcequota/" + resourceQuotaObject.Name + "\n",
+			expectedOutput: "resourcequotas/" + resourceQuotaObject.Name + "\n",
 		},
 	}
 	for name, test := range tests {

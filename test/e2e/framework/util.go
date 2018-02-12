@@ -1665,7 +1665,7 @@ func WaitForEndpoint(c clientset.Interface, ns, name string) error {
 }
 
 // Context for checking pods responses by issuing GETs to them (via the API
-// proxy) and verifying that they answer with ther own pod name.
+// proxy) and verifying that they answer with there own pod name.
 type podProxyResponseChecker struct {
 	c              clientset.Interface
 	ns             string
@@ -2175,6 +2175,21 @@ func RunKubectl(args ...string) (string, error) {
 // RunKubectlOrDieInput is a convenience wrapper over kubectlBuilder that takes input to stdin
 func RunKubectlOrDieInput(data string, args ...string) string {
 	return NewKubectlCommand(args...).WithStdinData(data).ExecOrDie()
+}
+
+// RunKubemciCmd is a convenience wrapper over kubectlBuilder to run kubemci.
+// It assumes that kubemci exists in PATH.
+func RunKubemciCmd(args ...string) (string, error) {
+	// kubemci is assumed to be in PATH.
+	kubemci := "kubemci"
+	b := new(kubectlBuilder)
+	if TestContext.KubeConfig != "" {
+		args = append(args, "--"+clientcmd.RecommendedConfigPathFlag+"="+TestContext.KubeConfig)
+	}
+	args = append(args, "--gcp-project="+TestContext.CloudConfig.ProjectID)
+
+	b.cmd = exec.Command(kubemci, args...)
+	return b.Exec()
 }
 
 func StartCmdAndStreamOutput(cmd *exec.Cmd) (stdout, stderr io.ReadCloser, err error) {

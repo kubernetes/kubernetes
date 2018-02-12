@@ -17,6 +17,7 @@ limitations under the License.
 package azure
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"strconv"
@@ -73,7 +74,7 @@ const ServiceAnnotationLoadBalancerResourceGroup = "service.beta.kubernetes.io/a
 
 // GetLoadBalancer returns whether the specified load balancer exists, and
 // if so, what its status is.
-func (az *Cloud) GetLoadBalancer(clusterName string, service *v1.Service) (status *v1.LoadBalancerStatus, exists bool, err error) {
+func (az *Cloud) GetLoadBalancer(ctx context.Context, clusterName string, service *v1.Service) (status *v1.LoadBalancerStatus, exists bool, err error) {
 	_, status, exists, err = az.getServiceLoadBalancer(service, clusterName, nil, false)
 	if err != nil {
 		return nil, false, err
@@ -94,7 +95,7 @@ func getPublicIPDomainNameLabel(service *v1.Service) string {
 }
 
 // EnsureLoadBalancer creates a new load balancer 'name', or updates the existing one. Returns the status of the balancer
-func (az *Cloud) EnsureLoadBalancer(clusterName string, service *v1.Service, nodes []*v1.Node) (*v1.LoadBalancerStatus, error) {
+func (az *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, service *v1.Service, nodes []*v1.Node) (*v1.LoadBalancerStatus, error) {
 	// When a client updates the internal load balancer annotation,
 	// the service may be switched from an internal LB to a public one, or vise versa.
 	// Here we'll firstly ensure service do not lie in the opposite LB.
@@ -132,8 +133,8 @@ func (az *Cloud) EnsureLoadBalancer(clusterName string, service *v1.Service, nod
 }
 
 // UpdateLoadBalancer updates hosts under the specified load balancer.
-func (az *Cloud) UpdateLoadBalancer(clusterName string, service *v1.Service, nodes []*v1.Node) error {
-	_, err := az.EnsureLoadBalancer(clusterName, service, nodes)
+func (az *Cloud) UpdateLoadBalancer(ctx context.Context, clusterName string, service *v1.Service, nodes []*v1.Node) error {
+	_, err := az.EnsureLoadBalancer(ctx, clusterName, service, nodes)
 	return err
 }
 
@@ -143,12 +144,12 @@ func (az *Cloud) UpdateLoadBalancer(clusterName string, service *v1.Service, nod
 // This construction is useful because many cloud providers' load balancers
 // have multiple underlying components, meaning a Get could say that the LB
 // doesn't exist even if some part of it is still laying around.
-func (az *Cloud) EnsureLoadBalancerDeleted(clusterName string, service *v1.Service) error {
+func (az *Cloud) EnsureLoadBalancerDeleted(ctx context.Context, clusterName string, service *v1.Service) error {
 	isInternal := requiresInternalLoadBalancer(service)
 	serviceName := getServiceName(service)
 	glog.V(5).Infof("delete(%s): START clusterName=%q", serviceName, clusterName)
 
-	serviceIPToCleanup, err := az.findServiceIPAddress(clusterName, service, isInternal)
+	serviceIPToCleanup, err := az.findServiceIPAddress(ctx, clusterName, service, isInternal)
 	if err != nil {
 		return err
 	}
@@ -373,20 +374,22 @@ func flipServiceInternalAnnotation(service *v1.Service) *v1.Service {
 	return copyService
 }
 
-func (az *Cloud) findServiceIPAddress(clusterName string, service *v1.Service, isInternalLb bool) (string, error) {
+func (az *Cloud) findServiceIPAddress(ctx context.Context, clusterName string, service *v1.Service, isInternalLb bool) (string, error) {
 	if len(service.Spec.LoadBalancerIP) > 0 {
 		return service.Spec.LoadBalancerIP, nil
 	}
 
-	lbStatus, existsLb, err := az.GetLoadBalancer(clusterName, service)
+	lbStatus, existsLb, err := az.GetLoadBalancer(ctx, clusterName, service)
 	if err != nil {
 		return "", err
 	}
 	if !existsLb {
-		return "", fmt.Errorf("Expected to find an IP address for service %s but did not", service.Name)
+		glog.V(2).Infof("Expected to find an IP address for service %s but did not. Assuming it has been removed", service.Name)
+		return "", nil
 	}
 	if len(lbStatus.Ingress) < 1 {
-		return "", fmt.Errorf("Expected to find an IP address for service %s but it had no ingresses", service.Name)
+		glog.V(2).Infof("Expected to find an IP address for service %s but it had no ingresses. Assuming it has been removed", service.Name)
+		return "", nil
 	}
 
 	return lbStatus.Ingress[0].IP, nil
@@ -816,7 +819,7 @@ func (az *Cloud) reconcileSecurityGroup(clusterName string, service *v1.Service,
 		ports = []v1.ServicePort{}
 	}
 
-	sg, err := az.SecurityGroupsClient.Get(az.ResourceGroup, az.SecurityGroupName, "")
+	sg, err := az.getSecurityGroup()
 	if err != nil {
 		return nil, err
 	}

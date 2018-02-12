@@ -26,7 +26,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 	"k8s.io/kubernetes/pkg/kubelet/network"
@@ -103,13 +103,18 @@ func TestSandboxStatus(t *testing.T) {
 
 	state := runtimeapi.PodSandboxState_SANDBOX_READY
 	ct := int64(0)
-	hostNetwork := false
 	expected := &runtimeapi.PodSandboxStatus{
-		State:       state,
-		CreatedAt:   ct,
-		Metadata:    config.Metadata,
-		Network:     &runtimeapi.PodSandboxNetworkStatus{Ip: fakeIP},
-		Linux:       &runtimeapi.LinuxPodSandboxStatus{Namespaces: &runtimeapi.Namespace{Options: &runtimeapi.NamespaceOption{HostNetwork: hostNetwork}}},
+		State:     state,
+		CreatedAt: ct,
+		Metadata:  config.Metadata,
+		Network:   &runtimeapi.PodSandboxNetworkStatus{Ip: fakeIP},
+		Linux: &runtimeapi.LinuxPodSandboxStatus{
+			Namespaces: &runtimeapi.Namespace{
+				Options: &runtimeapi.NamespaceOption{
+					Pid: runtimeapi.NamespaceMode_CONTAINER,
+				},
+			},
+		},
 		Labels:      labels,
 		Annotations: annotations,
 	}
@@ -162,13 +167,18 @@ func TestSandboxStatusAfterRestart(t *testing.T) {
 
 	state := runtimeapi.PodSandboxState_SANDBOX_READY
 	ct := int64(0)
-	hostNetwork := false
 	expected := &runtimeapi.PodSandboxStatus{
-		State:       state,
-		CreatedAt:   ct,
-		Metadata:    config.Metadata,
-		Network:     &runtimeapi.PodSandboxNetworkStatus{Ip: fakeIP},
-		Linux:       &runtimeapi.LinuxPodSandboxStatus{Namespaces: &runtimeapi.Namespace{Options: &runtimeapi.NamespaceOption{HostNetwork: hostNetwork}}},
+		State:     state,
+		CreatedAt: ct,
+		Metadata:  config.Metadata,
+		Network:   &runtimeapi.PodSandboxNetworkStatus{Ip: fakeIP},
+		Linux: &runtimeapi.LinuxPodSandboxStatus{
+			Namespaces: &runtimeapi.Namespace{
+				Options: &runtimeapi.NamespaceOption{
+					Pid: runtimeapi.NamespaceMode_CONTAINER,
+				},
+			},
+		},
 		Labels:      map[string]string{},
 		Annotations: map[string]string{},
 	}
@@ -238,11 +248,10 @@ func TestHostNetworkPluginInvocation(t *testing.T) {
 		map[string]string{"label": name},
 		map[string]string{"annotation": ns},
 	)
-	hostNetwork := true
 	c.Linux = &runtimeapi.LinuxPodSandboxConfig{
 		SecurityContext: &runtimeapi.LinuxSandboxSecurityContext{
 			NamespaceOptions: &runtimeapi.NamespaceOption{
-				HostNetwork: hostNetwork,
+				Network: runtimeapi.NamespaceMode_NODE,
 			},
 		},
 	}
