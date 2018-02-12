@@ -110,7 +110,7 @@ func (az *Cloud) getLoadBalancerProbeID(lbName, lbRuleName string) string {
 
 func (az *Cloud) mapLoadBalancerNameToVMSet(lbName string, clusterName string) (vmSetName string) {
 	vmSetName = strings.TrimSuffix(lbName, InternalLoadBalancerNameSuffix)
-	if strings.EqualFold(clusterName, lbName) {
+	if strings.EqualFold(clusterName, vmSetName) {
 		vmSetName = az.vmSet.GetPrimaryVMSetName()
 	}
 
