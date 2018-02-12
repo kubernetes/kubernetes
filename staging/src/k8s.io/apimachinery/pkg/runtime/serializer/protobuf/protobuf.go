@@ -28,6 +28,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer/recognizer"
 	"k8s.io/apimachinery/pkg/util/framer"
+
+	"github.com/golang/glog"
 )
 
 var (
@@ -176,6 +178,7 @@ func (s *Serializer) Encode(obj runtime.Object, w io.Writer) error {
 				if serialized.Err != nil {
 					return serialized.Err
 				}
+				glog.Errorf("AAA: using smartly serialized")
 				_, err := w.Write(serialized.Raw)
 				return err
 			}

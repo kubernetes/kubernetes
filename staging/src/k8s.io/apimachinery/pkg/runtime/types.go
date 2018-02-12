@@ -21,6 +21,8 @@ import (
 	"sync"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
+
+	"github.com/golang/glog"
 )
 
 // Note that the types provided in this file are not versioned and are intended to be
@@ -157,6 +159,7 @@ type SerializedObject struct {
 // FIXME: Comment.
 func (s *SerializedObject) Serialize(serializer Serializer, object Object) {
 	s.Once.Do(func() {
+		glog.Errorf("BBB: smart serialization")
 		buffer := bytes.NewBuffer(nil)
 		// We need to do deep-copy here.
 		s.Err = serializer.Encode(object.DeepCopyObject(), buffer)
