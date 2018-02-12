@@ -19,6 +19,8 @@ package azure
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -118,5 +120,47 @@ func TestGenerateStorageAccountName(t *testing.T) {
 				break
 			}
 		}
+	}
+}
+
+func TestMapLoadBalancerNameToVMSet(t *testing.T) {
+	az := getTestCloud()
+	az.PrimaryAvailabilitySetName = "primary"
+
+	cases := []struct {
+		description   string
+		lbName        string
+		clusterName   string
+		expectedVMSet string
+	}{
+		{
+			description:   "default external LB should map to primary vmset",
+			lbName:        "azure",
+			clusterName:   "azure",
+			expectedVMSet: "primary",
+		},
+		{
+			description:   "default internal LB should map to primary vmset",
+			lbName:        "azure-internal",
+			clusterName:   "azure",
+			expectedVMSet: "primary",
+		},
+		{
+			description:   "non-default external LB should map to its own vmset",
+			lbName:        "azuretest-internal",
+			clusterName:   "azure",
+			expectedVMSet: "azuretest",
+		},
+		{
+			description:   "non-default internal LB should map to its own vmset",
+			lbName:        "azuretest-internal",
+			clusterName:   "azure",
+			expectedVMSet: "azuretest",
+		},
+	}
+
+	for _, c := range cases {
+		vmset := az.mapLoadBalancerNameToVMSet(c.lbName, c.clusterName)
+		assert.Equal(t, c.expectedVMSet, vmset, c.description)
 	}
 }
