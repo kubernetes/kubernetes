@@ -1578,46 +1578,52 @@ func TestServiceAffinity(t *testing.T) {
 	}
 }
 
-func TestEBSVolumeCountConflicts(t *testing.T) {
+func onePVCPod(filterName string) *v1.Pod {
+	return &v1.Pod{
+		Spec: v1.PodSpec{
+			Volumes: []v1.Volume{
+				{
+					VolumeSource: v1.VolumeSource{
+						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+							ClaimName: "some" + filterName + "Vol",
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func splitPVCPod(filterName string) *v1.Pod {
+	return &v1.Pod{
+		Spec: v1.PodSpec{
+			Volumes: []v1.Volume{
+				{
+					VolumeSource: v1.VolumeSource{
+						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+							ClaimName: "someNon" + filterName + "Vol",
+						},
+					},
+				},
+				{
+					VolumeSource: v1.VolumeSource{
+						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+							ClaimName: "some" + filterName + "Vol",
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func TestVolumeCountConflicts(t *testing.T) {
 	oneVolPod := &v1.Pod{
 		Spec: v1.PodSpec{
 			Volumes: []v1.Volume{
 				{
 					VolumeSource: v1.VolumeSource{
 						AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{VolumeID: "ovp"},
-					},
-				},
-			},
-		},
-	}
-	ebsPVCPod := &v1.Pod{
-		Spec: v1.PodSpec{
-			Volumes: []v1.Volume{
-				{
-					VolumeSource: v1.VolumeSource{
-						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
-							ClaimName: "someEBSVol",
-						},
-					},
-				},
-			},
-		},
-	}
-	splitPVCPod := &v1.Pod{
-		Spec: v1.PodSpec{
-			Volumes: []v1.Volume{
-				{
-					VolumeSource: v1.VolumeSource{
-						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
-							ClaimName: "someNonEBSVol",
-						},
-					},
-				},
-				{
-					VolumeSource: v1.VolumeSource{
-						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
-							ClaimName: "someEBSVol",
-						},
 					},
 				},
 			},
@@ -1789,13 +1795,16 @@ func TestEBSVolumeCountConflicts(t *testing.T) {
 	tests := []struct {
 		newPod       *v1.Pod
 		existingPods []*v1.Pod
+		filterName   string
 		maxVols      int
 		fits         bool
 		test         string
 	}{
+		// filterName:EBSVolumeFilterType
 		{
 			newPod:       oneVolPod,
 			existingPods: []*v1.Pod{twoVolPod, oneVolPod},
+			filterName:   EBSVolumeFilterType,
 			maxVols:      4,
 			fits:         true,
 			test:         "fits when node capacity >= new pod's EBS volumes",
@@ -1803,6 +1812,7 @@ func TestEBSVolumeCountConflicts(t *testing.T) {
 		{
 			newPod:       twoVolPod,
 			existingPods: []*v1.Pod{oneVolPod},
+			filterName:   EBSVolumeFilterType,
 			maxVols:      2,
 			fits:         false,
 			test:         "doesn't fit when node capacity < new pod's EBS volumes",
@@ -1810,6 +1820,7 @@ func TestEBSVolumeCountConflicts(t *testing.T) {
 		{
 			newPod:       splitVolsPod,
 			existingPods: []*v1.Pod{twoVolPod},
+			filterName:   EBSVolumeFilterType,
 			maxVols:      3,
 			fits:         true,
 			test:         "new pod's count ignores non-EBS volumes",
@@ -1817,76 +1828,87 @@ func TestEBSVolumeCountConflicts(t *testing.T) {
 		{
 			newPod:       twoVolPod,
 			existingPods: []*v1.Pod{splitVolsPod, nonApplicablePod, emptyPod},
+			filterName:   EBSVolumeFilterType,
 			maxVols:      3,
 			fits:         true,
 			test:         "existing pods' counts ignore non-EBS volumes",
 		},
 		{
-			newPod:       ebsPVCPod,
+			newPod:       onePVCPod(EBSVolumeFilterType),
 			existingPods: []*v1.Pod{splitVolsPod, nonApplicablePod, emptyPod},
+			filterName:   EBSVolumeFilterType,
 			maxVols:      3,
 			fits:         true,
 			test:         "new pod's count considers PVCs backed by EBS volumes",
 		},
 		{
-			newPod:       splitPVCPod,
+			newPod:       splitPVCPod(EBSVolumeFilterType),
 			existingPods: []*v1.Pod{splitVolsPod, oneVolPod},
+			filterName:   EBSVolumeFilterType,
 			maxVols:      3,
 			fits:         true,
 			test:         "new pod's count ignores PVCs not backed by EBS volumes",
 		},
 		{
 			newPod:       twoVolPod,
-			existingPods: []*v1.Pod{oneVolPod, ebsPVCPod},
+			existingPods: []*v1.Pod{oneVolPod, onePVCPod(EBSVolumeFilterType)},
+			filterName:   EBSVolumeFilterType,
 			maxVols:      3,
 			fits:         false,
 			test:         "existing pods' counts considers PVCs backed by EBS volumes",
 		},
 		{
 			newPod:       twoVolPod,
-			existingPods: []*v1.Pod{oneVolPod, twoVolPod, ebsPVCPod},
+			existingPods: []*v1.Pod{oneVolPod, twoVolPod, onePVCPod(EBSVolumeFilterType)},
+			filterName:   EBSVolumeFilterType,
 			maxVols:      4,
 			fits:         true,
 			test:         "already-mounted EBS volumes are always ok to allow",
 		},
 		{
 			newPod:       splitVolsPod,
-			existingPods: []*v1.Pod{oneVolPod, oneVolPod, ebsPVCPod},
+			existingPods: []*v1.Pod{oneVolPod, oneVolPod, onePVCPod(EBSVolumeFilterType)},
+			filterName:   EBSVolumeFilterType,
 			maxVols:      3,
 			fits:         true,
 			test:         "the same EBS volumes are not counted multiple times",
 		},
 		{
-			newPod:       ebsPVCPod,
+			newPod:       onePVCPod(EBSVolumeFilterType),
 			existingPods: []*v1.Pod{oneVolPod, deletedPVCPod},
+			filterName:   EBSVolumeFilterType,
 			maxVols:      2,
 			fits:         false,
 			test:         "pod with missing PVC is counted towards the PV limit",
 		},
 		{
-			newPod:       ebsPVCPod,
+			newPod:       onePVCPod(EBSVolumeFilterType),
 			existingPods: []*v1.Pod{oneVolPod, deletedPVCPod},
+			filterName:   EBSVolumeFilterType,
 			maxVols:      3,
 			fits:         true,
 			test:         "pod with missing PVC is counted towards the PV limit",
 		},
 		{
-			newPod:       ebsPVCPod,
+			newPod:       onePVCPod(EBSVolumeFilterType),
 			existingPods: []*v1.Pod{oneVolPod, twoDeletedPVCPod},
+			filterName:   EBSVolumeFilterType,
 			maxVols:      3,
 			fits:         false,
 			test:         "pod with missing two PVCs is counted towards the PV limit twice",
 		},
 		{
-			newPod:       ebsPVCPod,
+			newPod:       onePVCPod(EBSVolumeFilterType),
 			existingPods: []*v1.Pod{oneVolPod, deletedPVPod},
+			filterName:   EBSVolumeFilterType,
 			maxVols:      2,
 			fits:         false,
 			test:         "pod with missing PV is counted towards the PV limit",
 		},
 		{
-			newPod:       ebsPVCPod,
+			newPod:       onePVCPod(EBSVolumeFilterType),
 			existingPods: []*v1.Pod{oneVolPod, deletedPVPod},
+			filterName:   EBSVolumeFilterType,
 			maxVols:      3,
 			fits:         true,
 			test:         "pod with missing PV is counted towards the PV limit",
@@ -1894,6 +1916,7 @@ func TestEBSVolumeCountConflicts(t *testing.T) {
 		{
 			newPod:       deletedPVPod2,
 			existingPods: []*v1.Pod{oneVolPod, deletedPVPod},
+			filterName:   EBSVolumeFilterType,
 			maxVols:      2,
 			fits:         true,
 			test:         "two pods missing the same PV are counted towards the PV limit only once",
@@ -1901,20 +1924,23 @@ func TestEBSVolumeCountConflicts(t *testing.T) {
 		{
 			newPod:       anotherDeletedPVPod,
 			existingPods: []*v1.Pod{oneVolPod, deletedPVPod},
+			filterName:   EBSVolumeFilterType,
 			maxVols:      2,
 			fits:         false,
 			test:         "two pods missing different PVs are counted towards the PV limit twice",
 		},
 		{
-			newPod:       ebsPVCPod,
+			newPod:       onePVCPod(EBSVolumeFilterType),
 			existingPods: []*v1.Pod{oneVolPod, unboundPVCPod},
+			filterName:   EBSVolumeFilterType,
 			maxVols:      2,
 			fits:         false,
 			test:         "pod with unbound PVC is counted towards the PV limit",
 		},
 		{
-			newPod:       ebsPVCPod,
+			newPod:       onePVCPod(EBSVolumeFilterType),
 			existingPods: []*v1.Pod{oneVolPod, unboundPVCPod},
+			filterName:   EBSVolumeFilterType,
 			maxVols:      3,
 			fits:         true,
 			test:         "pod with unbound PVC is counted towards the PV limit",
@@ -1922,6 +1948,7 @@ func TestEBSVolumeCountConflicts(t *testing.T) {
 		{
 			newPod:       unboundPVCPod2,
 			existingPods: []*v1.Pod{oneVolPod, unboundPVCPod},
+			filterName:   EBSVolumeFilterType,
 			maxVols:      2,
 			fits:         true,
 			test:         "the same unbound PVC in multiple pods is counted towards the PV limit only once",
@@ -1929,70 +1956,397 @@ func TestEBSVolumeCountConflicts(t *testing.T) {
 		{
 			newPod:       anotherUnboundPVCPod,
 			existingPods: []*v1.Pod{oneVolPod, unboundPVCPod},
+			filterName:   EBSVolumeFilterType,
 			maxVols:      2,
 			fits:         false,
 			test:         "two different unbound PVCs are counted towards the PV limit as two volumes",
 		},
+		// filterName:GCEPDVolumeFilterType
+		{
+			newPod:       oneVolPod,
+			existingPods: []*v1.Pod{twoVolPod, oneVolPod},
+			filterName:   GCEPDVolumeFilterType,
+			maxVols:      4,
+			fits:         true,
+			test:         "fits when node capacity >= new pod's GCE volumes",
+		},
+		{
+			newPod:       twoVolPod,
+			existingPods: []*v1.Pod{oneVolPod},
+			filterName:   GCEPDVolumeFilterType,
+			maxVols:      2,
+			fits:         true,
+			test:         "fit when node capacity < new pod's GCE volumes",
+		},
+		{
+			newPod:       splitVolsPod,
+			existingPods: []*v1.Pod{twoVolPod},
+			filterName:   GCEPDVolumeFilterType,
+			maxVols:      3,
+			fits:         true,
+			test:         "new pod's count ignores non-GCE volumes",
+		},
+		{
+			newPod:       twoVolPod,
+			existingPods: []*v1.Pod{splitVolsPod, nonApplicablePod, emptyPod},
+			filterName:   GCEPDVolumeFilterType,
+			maxVols:      3,
+			fits:         true,
+			test:         "existing pods' counts ignore non-GCE volumes",
+		},
+		{
+			newPod:       onePVCPod(GCEPDVolumeFilterType),
+			existingPods: []*v1.Pod{splitVolsPod, nonApplicablePod, emptyPod},
+			filterName:   GCEPDVolumeFilterType,
+			maxVols:      3,
+			fits:         true,
+			test:         "new pod's count considers PVCs backed by GCE volumes",
+		},
+		{
+			newPod:       splitPVCPod(GCEPDVolumeFilterType),
+			existingPods: []*v1.Pod{splitVolsPod, oneVolPod},
+			filterName:   GCEPDVolumeFilterType,
+			maxVols:      3,
+			fits:         true,
+			test:         "new pod's count ignores PVCs not backed by GCE volumes",
+		},
+		{
+			newPod:       twoVolPod,
+			existingPods: []*v1.Pod{oneVolPod, onePVCPod(GCEPDVolumeFilterType)},
+			filterName:   GCEPDVolumeFilterType,
+			maxVols:      3,
+			fits:         true,
+			test:         "existing pods' counts considers PVCs backed by GCE volumes",
+		},
+		{
+			newPod:       twoVolPod,
+			existingPods: []*v1.Pod{oneVolPod, twoVolPod, onePVCPod(GCEPDVolumeFilterType)},
+			filterName:   GCEPDVolumeFilterType,
+			maxVols:      4,
+			fits:         true,
+			test:         "already-mounted EBS volumes are always ok to allow",
+		},
+		{
+			newPod:       splitVolsPod,
+			existingPods: []*v1.Pod{oneVolPod, oneVolPod, onePVCPod(GCEPDVolumeFilterType)},
+			filterName:   GCEPDVolumeFilterType,
+			maxVols:      3,
+			fits:         true,
+			test:         "the same GCE volumes are not counted multiple times",
+		},
+		{
+			newPod:       onePVCPod(GCEPDVolumeFilterType),
+			existingPods: []*v1.Pod{oneVolPod, deletedPVCPod},
+			filterName:   GCEPDVolumeFilterType,
+			maxVols:      2,
+			fits:         true,
+			test:         "pod with missing PVC is counted towards the PV limit",
+		},
+		{
+			newPod:       onePVCPod(GCEPDVolumeFilterType),
+			existingPods: []*v1.Pod{oneVolPod, deletedPVCPod},
+			filterName:   GCEPDVolumeFilterType,
+			maxVols:      3,
+			fits:         true,
+			test:         "pod with missing PVC is counted towards the PV limit",
+		},
+		{
+			newPod:       onePVCPod(GCEPDVolumeFilterType),
+			existingPods: []*v1.Pod{oneVolPod, twoDeletedPVCPod},
+			filterName:   GCEPDVolumeFilterType,
+			maxVols:      3,
+			fits:         true,
+			test:         "pod with missing two PVCs is counted towards the PV limit twice",
+		},
+		{
+			newPod:       onePVCPod(GCEPDVolumeFilterType),
+			existingPods: []*v1.Pod{oneVolPod, deletedPVPod},
+			filterName:   GCEPDVolumeFilterType,
+			maxVols:      2,
+			fits:         true,
+			test:         "pod with missing PV is counted towards the PV limit",
+		},
+		{
+			newPod:       onePVCPod(GCEPDVolumeFilterType),
+			existingPods: []*v1.Pod{oneVolPod, deletedPVPod},
+			filterName:   GCEPDVolumeFilterType,
+			maxVols:      3,
+			fits:         true,
+			test:         "pod with missing PV is counted towards the PV limit",
+		},
+		{
+			newPod:       deletedPVPod2,
+			existingPods: []*v1.Pod{oneVolPod, deletedPVPod},
+			filterName:   GCEPDVolumeFilterType,
+			maxVols:      2,
+			fits:         true,
+			test:         "two pods missing the same PV are counted towards the PV limit only once",
+		},
+		{
+			newPod:       anotherDeletedPVPod,
+			existingPods: []*v1.Pod{oneVolPod, deletedPVPod},
+			filterName:   GCEPDVolumeFilterType,
+			maxVols:      2,
+			fits:         true,
+			test:         "two pods missing different PVs are counted towards the PV limit twice",
+		},
+		{
+			newPod:       onePVCPod(GCEPDVolumeFilterType),
+			existingPods: []*v1.Pod{oneVolPod, unboundPVCPod},
+			filterName:   GCEPDVolumeFilterType,
+			maxVols:      2,
+			fits:         true,
+			test:         "pod with unbound PVC is counted towards the PV limit",
+		},
+		{
+			newPod:       onePVCPod(GCEPDVolumeFilterType),
+			existingPods: []*v1.Pod{oneVolPod, unboundPVCPod},
+			filterName:   GCEPDVolumeFilterType,
+			maxVols:      3,
+			fits:         true,
+			test:         "pod with unbound PVC is counted towards the PV limit",
+		},
+		{
+			newPod:       unboundPVCPod2,
+			existingPods: []*v1.Pod{oneVolPod, unboundPVCPod},
+			filterName:   GCEPDVolumeFilterType,
+			maxVols:      2,
+			fits:         true,
+			test:         "the same unbound PVC in multiple pods is counted towards the PV limit only once",
+		},
+		{
+			newPod:       anotherUnboundPVCPod,
+			existingPods: []*v1.Pod{oneVolPod, unboundPVCPod},
+			filterName:   GCEPDVolumeFilterType,
+			maxVols:      2,
+			fits:         true,
+			test:         "two different unbound PVCs are counted towards the PV limit as two volumes",
+		},
+		// filterName:AzureDiskVolumeFilterType
+		{
+			newPod:       oneVolPod,
+			existingPods: []*v1.Pod{twoVolPod, oneVolPod},
+			filterName:   AzureDiskVolumeFilterType,
+			maxVols:      4,
+			fits:         true,
+			test:         "fits when node capacity >= new pod's AzureDisk volumes",
+		},
+		{
+			newPod:       twoVolPod,
+			existingPods: []*v1.Pod{oneVolPod},
+			filterName:   AzureDiskVolumeFilterType,
+			maxVols:      2,
+			fits:         true,
+			test:         "fit when node capacity < new pod's AzureDisk volumes",
+		},
+		{
+			newPod:       splitVolsPod,
+			existingPods: []*v1.Pod{twoVolPod},
+			filterName:   AzureDiskVolumeFilterType,
+			maxVols:      3,
+			fits:         true,
+			test:         "new pod's count ignores non-AzureDisk volumes",
+		},
+		{
+			newPod:       twoVolPod,
+			existingPods: []*v1.Pod{splitVolsPod, nonApplicablePod, emptyPod},
+			filterName:   AzureDiskVolumeFilterType,
+			maxVols:      3,
+			fits:         true,
+			test:         "existing pods' counts ignore non-AzureDisk volumes",
+		},
+		{
+			newPod:       onePVCPod(AzureDiskVolumeFilterType),
+			existingPods: []*v1.Pod{splitVolsPod, nonApplicablePod, emptyPod},
+			filterName:   AzureDiskVolumeFilterType,
+			maxVols:      3,
+			fits:         true,
+			test:         "new pod's count considers PVCs backed by AzureDisk volumes",
+		},
+		{
+			newPod:       splitPVCPod(AzureDiskVolumeFilterType),
+			existingPods: []*v1.Pod{splitVolsPod, oneVolPod},
+			filterName:   AzureDiskVolumeFilterType,
+			maxVols:      3,
+			fits:         true,
+			test:         "new pod's count ignores PVCs not backed by AzureDisk volumes",
+		},
+		{
+			newPod:       twoVolPod,
+			existingPods: []*v1.Pod{oneVolPod, onePVCPod(AzureDiskVolumeFilterType)},
+			filterName:   AzureDiskVolumeFilterType,
+			maxVols:      3,
+			fits:         true,
+			test:         "existing pods' counts considers PVCs backed by AzureDisk volumes",
+		},
+		{
+			newPod:       twoVolPod,
+			existingPods: []*v1.Pod{oneVolPod, twoVolPod, onePVCPod(AzureDiskVolumeFilterType)},
+			filterName:   AzureDiskVolumeFilterType,
+			maxVols:      4,
+			fits:         true,
+			test:         "already-mounted AzureDisk volumes are always ok to allow",
+		},
+		{
+			newPod:       splitVolsPod,
+			existingPods: []*v1.Pod{oneVolPod, oneVolPod, onePVCPod(AzureDiskVolumeFilterType)},
+			filterName:   AzureDiskVolumeFilterType,
+			maxVols:      3,
+			fits:         true,
+			test:         "the same AzureDisk volumes are not counted multiple times",
+		},
+		{
+			newPod:       onePVCPod(AzureDiskVolumeFilterType),
+			existingPods: []*v1.Pod{oneVolPod, deletedPVCPod},
+			filterName:   AzureDiskVolumeFilterType,
+			maxVols:      2,
+			fits:         true,
+			test:         "pod with missing PVC is counted towards the PV limit",
+		},
+		{
+			newPod:       onePVCPod(AzureDiskVolumeFilterType),
+			existingPods: []*v1.Pod{oneVolPod, deletedPVCPod},
+			filterName:   AzureDiskVolumeFilterType,
+			maxVols:      3,
+			fits:         true,
+			test:         "pod with missing PVC is counted towards the PV limit",
+		},
+		{
+			newPod:       onePVCPod(AzureDiskVolumeFilterType),
+			existingPods: []*v1.Pod{oneVolPod, twoDeletedPVCPod},
+			filterName:   AzureDiskVolumeFilterType,
+			maxVols:      3,
+			fits:         true,
+			test:         "pod with missing two PVCs is counted towards the PV limit twice",
+		},
+		{
+			newPod:       onePVCPod(AzureDiskVolumeFilterType),
+			existingPods: []*v1.Pod{oneVolPod, deletedPVPod},
+			filterName:   AzureDiskVolumeFilterType,
+			maxVols:      2,
+			fits:         true,
+			test:         "pod with missing PV is counted towards the PV limit",
+		},
+		{
+			newPod:       onePVCPod(AzureDiskVolumeFilterType),
+			existingPods: []*v1.Pod{oneVolPod, deletedPVPod},
+			filterName:   AzureDiskVolumeFilterType,
+			maxVols:      3,
+			fits:         true,
+			test:         "pod with missing PV is counted towards the PV limit",
+		},
+		{
+			newPod:       deletedPVPod2,
+			existingPods: []*v1.Pod{oneVolPod, deletedPVPod},
+			filterName:   AzureDiskVolumeFilterType,
+			maxVols:      2,
+			fits:         true,
+			test:         "two pods missing the same PV are counted towards the PV limit only once",
+		},
+		{
+			newPod:       anotherDeletedPVPod,
+			existingPods: []*v1.Pod{oneVolPod, deletedPVPod},
+			filterName:   AzureDiskVolumeFilterType,
+			maxVols:      2,
+			fits:         true,
+			test:         "two pods missing different PVs are counted towards the PV limit twice",
+		},
+		{
+			newPod:       onePVCPod(AzureDiskVolumeFilterType),
+			existingPods: []*v1.Pod{oneVolPod, unboundPVCPod},
+			filterName:   AzureDiskVolumeFilterType,
+			maxVols:      2,
+			fits:         true,
+			test:         "pod with unbound PVC is counted towards the PV limit",
+		},
+		{
+			newPod:       onePVCPod(AzureDiskVolumeFilterType),
+			existingPods: []*v1.Pod{oneVolPod, unboundPVCPod},
+			filterName:   AzureDiskVolumeFilterType,
+			maxVols:      3,
+			fits:         true,
+			test:         "pod with unbound PVC is counted towards the PV limit",
+		},
+		{
+			newPod:       unboundPVCPod2,
+			existingPods: []*v1.Pod{oneVolPod, unboundPVCPod},
+			filterName:   AzureDiskVolumeFilterType,
+			maxVols:      2,
+			fits:         true,
+			test:         "the same unbound PVC in multiple pods is counted towards the PV limit only once",
+		},
+		{
+			newPod:       anotherUnboundPVCPod,
+			existingPods: []*v1.Pod{oneVolPod, unboundPVCPod},
+			filterName:   AzureDiskVolumeFilterType,
+			maxVols:      2,
+			fits:         true,
+			test:         "two different unbound PVCs are counted towards the PV limit as two volumes",
+		},
 	}
 
-	pvInfo := FakePersistentVolumeInfo{
-		{
-			ObjectMeta: metav1.ObjectMeta{Name: "someEBSVol"},
-			Spec: v1.PersistentVolumeSpec{
-				PersistentVolumeSource: v1.PersistentVolumeSource{
-					AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{VolumeID: "ebsVol"},
+	pvInfo := func(filterName string) FakePersistentVolumeInfo {
+		return FakePersistentVolumeInfo{
+			{
+				ObjectMeta: metav1.ObjectMeta{Name: "some" + filterName + "Vol"},
+				Spec: v1.PersistentVolumeSpec{
+					PersistentVolumeSource: v1.PersistentVolumeSource{
+						AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{VolumeID: strings.ToLower(filterName) + "Vol"},
+					},
 				},
 			},
-		},
-		{
-			ObjectMeta: metav1.ObjectMeta{Name: "someNonEBSVol"},
-			Spec: v1.PersistentVolumeSpec{
-				PersistentVolumeSource: v1.PersistentVolumeSource{},
+			{
+				ObjectMeta: metav1.ObjectMeta{Name: "someNon" + filterName + "Vol"},
+				Spec: v1.PersistentVolumeSpec{
+					PersistentVolumeSource: v1.PersistentVolumeSource{},
+				},
 			},
-		},
+		}
 	}
 
-	pvcInfo := FakePersistentVolumeClaimInfo{
-		{
-			ObjectMeta: metav1.ObjectMeta{Name: "someEBSVol"},
-			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "someEBSVol"},
-		},
-		{
-			ObjectMeta: metav1.ObjectMeta{Name: "someNonEBSVol"},
-			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "someNonEBSVol"},
-		},
-		{
-			ObjectMeta: metav1.ObjectMeta{Name: "pvcWithDeletedPV"},
-			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "pvcWithDeletedPV"},
-		},
-		{
-			ObjectMeta: metav1.ObjectMeta{Name: "anotherPVCWithDeletedPV"},
-			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "anotherPVCWithDeletedPV"},
-		},
-		{
-			ObjectMeta: metav1.ObjectMeta{Name: "unboundPVC"},
-			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: ""},
-		},
-		{
-			ObjectMeta: metav1.ObjectMeta{Name: "anotherUnboundPVC"},
-			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: ""},
-		},
+	pvcInfo := func(filterName string) FakePersistentVolumeClaimInfo {
+		return FakePersistentVolumeClaimInfo{
+			{
+				ObjectMeta: metav1.ObjectMeta{Name: "some" + filterName + "Vol"},
+				Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "some" + filterName + "Vol"},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{Name: "someNon" + filterName + "Vol"},
+				Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "someNon" + filterName + "Vol"},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{Name: "pvcWithDeletedPV"},
+				Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "pvcWithDeletedPV"},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{Name: "anotherPVCWithDeletedPV"},
+				Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "anotherPVCWithDeletedPV"},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{Name: "unboundPVC"},
+				Spec:       v1.PersistentVolumeClaimSpec{VolumeName: ""},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{Name: "anotherUnboundPVC"},
+				Spec:       v1.PersistentVolumeClaimSpec{VolumeName: ""},
+			},
+		}
 	}
 
 	expectedFailureReasons := []algorithm.PredicateFailureReason{ErrMaxVolumeCountExceeded}
 
 	for _, test := range tests {
 		os.Setenv(KubeMaxPDVols, strconv.Itoa(test.maxVols))
-		pred := NewMaxPDVolumeCountPredicate(EBSVolumeFilterType, pvInfo, pvcInfo)
+		pred := NewMaxPDVolumeCountPredicate(test.filterName, pvInfo(test.filterName), pvcInfo(test.filterName))
 		fits, reasons, err := pred(test.newPod, PredicateMetadata(test.newPod, nil), schedulercache.NewNodeInfo(test.existingPods...))
 		if err != nil {
-			t.Errorf("%s: unexpected error: %v", test.test, err)
+			t.Errorf("[%s]%s: unexpected error: %v", test.filterName, test.test, err)
 		}
 		if !fits && !reflect.DeepEqual(reasons, expectedFailureReasons) {
-			t.Errorf("%s: unexpected failure reasons: %v, want: %v", test.test, reasons, expectedFailureReasons)
+			t.Errorf("[%s]%s: unexpected failure reasons: %v, want: %v", test.filterName, test.test, reasons, expectedFailureReasons)
 		}
 		if fits != test.fits {
-			t.Errorf("%s: expected %v, got %v", test.test, test.fits, fits)
+			t.Errorf("[%s]%s: expected %v, got %v", test.filterName, test.test, test.fits, fits)
 		}
 	}
 }
