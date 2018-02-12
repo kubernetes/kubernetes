@@ -30,61 +30,6 @@ import (
 	"k8s.io/apiextensions-apiserver/test/integration/testserver"
 )
 
-func TestForProperValidationErrors(t *testing.T) {
-	stopCh, apiExtensionClient, clientPool, err := testserver.StartDefaultServerWithClients()
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer close(stopCh)
-
-	noxuDefinition := testserver.NewNoxuCustomResourceDefinition(apiextensionsv1beta1.NamespaceScoped)
-	noxuVersionClient, err := testserver.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, clientPool)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	ns := "not-the-default"
-	noxuResourceClient := NewNamespacedCustomResourceClient(ns, noxuVersionClient, noxuDefinition)
-
-	tests := []struct {
-		name          string
-		instanceFn    func() *unstructured.Unstructured
-		expectedError string
-	}{
-		{
-			name: "bad version",
-			instanceFn: func() *unstructured.Unstructured {
-				instance := testserver.NewNoxuInstance(ns, "foo")
-				instance.Object["apiVersion"] = "mygroup.example.com/v2"
-				return instance
-			},
-			expectedError: "the API version in the data (mygroup.example.com/v2) does not match the expected API version (mygroup.example.com/v1beta1)",
-		},
-		{
-			name: "bad kind",
-			instanceFn: func() *unstructured.Unstructured {
-				instance := testserver.NewNoxuInstance(ns, "foo")
-				instance.Object["kind"] = "SomethingElse"
-				return instance
-			},
-			expectedError: `SomethingElse.mygroup.example.com "foo" is invalid: kind: Invalid value: "SomethingElse": must be WishIHadChosenNoxu`,
-		},
-	}
-
-	for _, tc := range tests {
-		_, err := noxuResourceClient.Create(tc.instanceFn())
-		if err == nil {
-			t.Errorf("%v: expected %v", tc.name, tc.expectedError)
-			continue
-		}
-		// this only works when status errors contain the expect kind and version, so this effectively tests serializations too
-		if !strings.Contains(err.Error(), tc.expectedError) {
-			t.Errorf("%v: expected %v, got %v", tc.name, tc.expectedError, err)
-			continue
-		}
-	}
-}
-
 func newNoxuValidationCRD(scope apiextensionsv1beta1.ResourceScope) *apiextensionsv1beta1.CustomResourceDefinition {
 	return &apiextensionsv1beta1.CustomResourceDefinition{
 		ObjectMeta: metav1.ObjectMeta{Name: "noxus.mygroup.example.com"},
@@ -165,6 +110,136 @@ func newNoxuValidationInstance(namespace, name string) *unstructured.Unstructure
 			"gamma": "bar",
 			"delta": "hello",
 		},
+	}
+}
+
+func TestForProperValidationErrors(t *testing.T) {
+	stopCh, apiExtensionClient, clientPool, err := testserver.StartDefaultServerWithClients()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer close(stopCh)
+
+	noxuDefinition := testserver.NewNoxuCustomResourceDefinition(apiextensionsv1beta1.NamespaceScoped)
+	noxuVersionClient, err := testserver.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, clientPool)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ns := "not-the-default"
+	noxuResourceClient := NewNamespacedCustomResourceClient(ns, noxuVersionClient, noxuDefinition)
+
+	tests := []struct {
+		name          string
+		instanceFn    func() *unstructured.Unstructured
+		expectedError string
+	}{
+		{
+			name: "bad version",
+			instanceFn: func() *unstructured.Unstructured {
+				instance := testserver.NewNoxuInstance(ns, "foo")
+				instance.Object["apiVersion"] = "mygroup.example.com/v2"
+				return instance
+			},
+			expectedError: "the API version in the data (mygroup.example.com/v2) does not match the expected API version (mygroup.example.com/v1beta1)",
+		},
+		{
+			name: "bad kind",
+			instanceFn: func() *unstructured.Unstructured {
+				instance := testserver.NewNoxuInstance(ns, "foo")
+				instance.Object["kind"] = "SomethingElse"
+				return instance
+			},
+			expectedError: `SomethingElse.mygroup.example.com "foo" is invalid: kind: Invalid value: "SomethingElse": must be WishIHadChosenNoxu`,
+		},
+	}
+
+	for _, tc := range tests {
+		_, err := noxuResourceClient.Create(tc.instanceFn())
+		if err == nil {
+			t.Errorf("%v: expected %v", tc.name, tc.expectedError)
+			continue
+		}
+		// this only works when status errors contain the expect kind and version, so this effectively tests serializations too
+		if !strings.Contains(err.Error(), tc.expectedError) {
+			t.Errorf("%v: expected %v, got %v", tc.name, tc.expectedError, err)
+			continue
+		}
+	}
+}
+
+func TestValidateMetadata(t *testing.T) {
+	stopCh, apiExtensionClient, clientPool, err := testserver.StartDefaultServerWithClients()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer close(stopCh)
+
+	noxuDefinition := testserver.NewNoxuCustomResourceDefinition(apiextensionsv1beta1.NamespaceScoped)
+	noxuVersionClient, err := testserver.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, clientPool)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ns := "not-the-default"
+	noxuResourceClient := NewNamespacedCustomResourceClient(ns, noxuVersionClient, noxuDefinition)
+
+	// set unknown field in metadata
+	noxuInstance := testserver.NewNoxuInstance(ns, "foo")
+	err = unstructured.SetNestedField(noxuInstance.Object, "bar", "metadata", "foo")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	createdNoxuInstance, err := instantiateCustomResource(t, noxuInstance, noxuResourceClient, noxuDefinition)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// unknown fields should be dropped
+	foo, found, err := unstructured.NestedString(createdNoxuInstance.Object, "metadata", "foo")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if found {
+		t.Fatalf(".metadata should not contain unknown fields. Found foo:%v", foo)
+	}
+
+	// set invalid label value
+	noxuInstance = testserver.NewNoxuInstance(ns, "foo")
+	err = unstructured.SetNestedField(noxuInstance.Object, int64(1), "metadata", "labels", "qux")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	_, err = instantiateCustomResource(t, noxuInstance, noxuResourceClient, noxuDefinition)
+	if err == nil {
+		t.Fatalf("unexpected non-error: .metadata.labels contains a non-string value")
+	}
+
+	// set invalid annotations value
+	noxuInstance = testserver.NewNoxuInstance(ns, "foo")
+	err = unstructured.SetNestedField(noxuInstance.Object, int64(1), "metadata", "annotations", "qux")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	_, err = instantiateCustomResource(t, noxuInstance, noxuResourceClient, noxuDefinition)
+	if err == nil {
+		t.Fatalf("unexpected non-error: .metadata.annotations contains a non-string value")
+	}
+
+	// nil/null value should be persisted as ""
+	gottenNoxuInstance, err := noxuResourceClient.Get("foo", metav1.GetOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = unstructured.SetNestedField(gottenNoxuInstance.Object, nil, "metadata", "labels", "qux")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	updatedNoxuInstance, err := noxuResourceClient.Update(gottenNoxuInstance)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updatedNoxuInstance.GetLabels()["qux"] != "" {
+		t.Fatalf(".metadata.labels.qux: expected \"\", got %v", createdNoxuInstance.GetLabels()["qux"])
 	}
 }
 
