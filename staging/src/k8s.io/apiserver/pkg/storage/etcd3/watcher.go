@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/storage"
+	"k8s.io/apiserver/pkg/storage/etcd"
 	"k8s.io/apiserver/pkg/storage/value"
 
 	"github.com/coreos/etcd/clientv3"
@@ -62,7 +63,7 @@ func init() {
 type watcher struct {
 	client      *clientv3.Client
 	codec       runtime.Codec
-	versioner   storage.Versioner
+	versioner   etcd.APIObjectVersioner
 	transformer value.Transformer
 }
 
@@ -80,7 +81,7 @@ type watchChan struct {
 	errChan           chan error
 }
 
-func newWatcher(client *clientv3.Client, codec runtime.Codec, versioner storage.Versioner, transformer value.Transformer) *watcher {
+func newWatcher(client *clientv3.Client, codec runtime.Codec, versioner etcd.APIObjectVersioner, transformer value.Transformer) *watcher {
 	return &watcher{
 		client:      client,
 		codec:       codec,
@@ -380,7 +381,7 @@ func (wc *watchChan) prepareObjs(e *event) (curObj runtime.Object, oldObj runtim
 	return curObj, oldObj, nil
 }
 
-func decodeObj(codec runtime.Codec, versioner storage.Versioner, data []byte, rev int64) (_ runtime.Object, err error) {
+func decodeObj(codec runtime.Codec, versioner etcd.APIObjectVersioner, data []byte, rev int64) (_ runtime.Object, err error) {
 	obj, err := runtime.Decode(codec, []byte(data))
 	if err != nil {
 		if fatalOnDecodeError {
@@ -395,7 +396,7 @@ func decodeObj(codec runtime.Codec, versioner storage.Versioner, data []byte, re
 		return nil, err
 	}
 	// ensure resource version is set on the object we load from etcd
-	if err := versioner.UpdateObject(obj, uint64(rev)); err != nil {
+	if err := versioner.UpdateObjectEtcdVersion(obj, uint64(rev)); err != nil {
 		return nil, fmt.Errorf("failure to version api object (%d) %#v: %v", rev, obj, err)
 	}
 	return obj, nil

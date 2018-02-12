@@ -97,7 +97,7 @@ func newEtcdTestStorage(t *testing.T, prefix string) (*etcdtesting.EtcdTestServe
 	return server, storage
 }
 
-func newTestCacher(s storage.Interface, cap int) (*storage.Cacher, storage.Versioner) {
+func newTestCacher(s storage.Interface, cap int) (*storage.Cacher, etcdstorage.APIObjectVersioner) {
 	prefix := "pods"
 	v := etcdstorage.APIObjectVersioner{}
 	config := storage.CacherConfig{
@@ -323,13 +323,9 @@ func TestWatch(t *testing.T) {
 	podFooNS2 := makeTestPod("foo")
 	podFooNS2.Namespace += "2"
 
-	// initialVersion is used to initate the watcher at the beginning of the world,
+	// startVersion is used to initate the watcher at the beginning of the world,
 	// which is not defined precisely in etcd.
-	initialVersion, err := cacher.LastSyncResourceVersion()
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-	startVersion := strconv.Itoa(int(initialVersion))
+	startVersion := cacher.LastSyncResourceVersion()
 
 	// Set up Watch for object "podFoo".
 	watcher, err := cacher.Watch(context.TODO(), "pods/ns/foo", startVersion, storage.Everything)
@@ -386,13 +382,9 @@ func TestWatcherTimeout(t *testing.T) {
 	cacher, _ := newTestCacher(etcdStorage, 10)
 	defer cacher.Stop()
 
-	// initialVersion is used to initate the watcher at the beginning of the world,
+	// startVersion is used to initate the watcher at the beginning of the world,
 	// which is not defined precisely in etcd.
-	initialVersion, err := cacher.LastSyncResourceVersion()
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-	startVersion := strconv.Itoa(int(initialVersion))
+	startVersion := cacher.LastSyncResourceVersion()
 
 	// Create a number of watchers that will not be reading any result.
 	nonReadingWatchers := 50

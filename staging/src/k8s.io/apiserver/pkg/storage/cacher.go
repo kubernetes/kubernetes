@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"net/http"
 	"reflect"
+	"strconv"
 	"sync"
 	"time"
 
@@ -191,7 +192,7 @@ type Cacher struct {
 // its internal cache and updating its cache in the background based on the
 // given configuration.
 func NewCacherFromConfig(config CacherConfig) *Cacher {
-	watchCache := newWatchCache(config.CacheCapacity, config.KeyFunc, config.GetAttrsFunc)
+	watchCache := newWatchCache(config.CacheCapacity, config.KeyFunc, config.GetAttrsFunc, config.Versioner)
 	listerWatcher := newCacherListerWatcher(config.Storage, config.ResourcePrefix, config.NewListFunc)
 	reflectorName := "storage/cacher.go:" + config.ResourcePrefix
 
@@ -289,11 +290,6 @@ func (c *Cacher) Delete(ctx context.Context, key string, out runtime.Object, pre
 
 // Implements storage.Interface.
 func (c *Cacher) Watch(ctx context.Context, key string, resourceVersion string, pred SelectionPredicate) (watch.Interface, error) {
-	watchRV, err := c.versioner.ParseWatchResourceVersion(resourceVersion)
-	if err != nil {
-		return nil, err
-	}
-
 	c.ready.wait()
 
 	// We explicitly use thread unsafe version and do locking ourself to ensure that
@@ -303,7 +299,7 @@ func (c *Cacher) Watch(ctx context.Context, key string, resourceVersion string, 
 	// underlying watchCache is calling processEvent under its lock.
 	c.watchCache.RLock()
 	defer c.watchCache.RUnlock()
-	initEvents, err := c.watchCache.GetAllEventsSinceThreadUnsafe(watchRV)
+	initEvents, err := c.watchCache.GetAllEventsSinceThreadUnsafe(resourceVersion)
 	if err != nil {
 		// To match the uncached watch implementation, once we have passed authn/authz/admission,
 		// and successfully parsed a resource version, other errors must fail with a watch event of type ERROR,
@@ -337,7 +333,7 @@ func (c *Cacher) Watch(ctx context.Context, key string, resourceVersion string, 
 	c.Lock()
 	defer c.Unlock()
 	forget := forgetWatcher(c, c.watcherIdx, triggerValue, triggerSupported)
-	watcher := newCacheWatcher(watchRV, chanSize, initEvents, watchFilterFunction(key, pred), forget, c.versioner)
+	watcher := newCacheWatcher(resourceVersion, chanSize, initEvents, watchFilterFunction(key, pred), forget, c.versioner)
 
 	c.watchers.addWatcher(watcher, c.watcherIdx, triggerValue, triggerSupported)
 	c.watcherIdx++
@@ -357,15 +353,7 @@ func (c *Cacher) Get(ctx context.Context, key string, resourceVersion string, ob
 		return c.storage.Get(ctx, key, resourceVersion, objPtr, ignoreNotFound)
 	}
 
-	// If resourceVersion is specified, serve it from cache.
-	// It's guaranteed that the returned value is at least that
-	// fresh as the given resourceVersion.
-	getRV, err := c.versioner.ParseListResourceVersion(resourceVersion)
-	if err != nil {
-		return err
-	}
-
-	if getRV == 0 && !c.ready.check() {
+	if resourceVersion == "" && !c.ready.check() {
 		// If Cacher is not yet initialized and we don't require any specific
 		// minimal resource version, simply forward the request to storage.
 		return c.storage.Get(ctx, key, resourceVersion, objPtr, ignoreNotFound)
@@ -380,7 +368,7 @@ func (c *Cacher) Get(ctx context.Context, key string, resourceVersion string, ob
 		return err
 	}
 
-	obj, exists, readResourceVersion, err := c.watchCache.WaitUntilFreshAndGet(getRV, key, nil)
+	obj, exists, readResourceVersion, err := c.watchCache.WaitUntilFreshAndGet(resourceVersion, key, nil)
 	if err != nil {
 		return err
 	}
@@ -394,7 +382,9 @@ func (c *Cacher) Get(ctx context.Context, key string, resourceVersion string, ob
 	} else {
 		objVal.Set(reflect.Zero(objVal.Type()))
 		if !ignoreNotFound {
-			return NewKeyNotFoundError(key, int64(readResourceVersion))
+			// TODO: Make error messages that use string resource versions so this parsing isn't necessary
+			storageBackendResourceVersion, _ := strconv.ParseUint(readResourceVersion, 10, 64)
+			return NewKeyNotFoundError(key, int64(storageBackendResourceVersion))
 		}
 	}
 	return nil
@@ -413,12 +403,7 @@ func (c *Cacher) GetToList(ctx context.Context, key string, resourceVersion stri
 	// If resourceVersion is specified, serve it from cache.
 	// It's guaranteed that the returned value is at least that
 	// fresh as the given resourceVersion.
-	listRV, err := c.versioner.ParseListResourceVersion(resourceVersion)
-	if err != nil {
-		return err
-	}
-
-	if listRV == 0 && !c.ready.check() {
+	if resourceVersion == "" && !c.ready.check() {
 		// If Cacher is not yet initialized and we don't require any specific
 		// minimal resource version, simply forward the request to storage.
 		return c.storage.GetToList(ctx, key, resourceVersion, pred, listObj)
@@ -430,7 +415,7 @@ func (c *Cacher) GetToList(ctx context.Context, key string, resourceVersion stri
 	c.ready.wait()
 	trace.Step("Ready")
 
-	// List elements with at least 'listRV' from cache.
+	// List elements with at least 'resourceVersion' from cache.
 	listPtr, err := meta.GetItemsPtr(listObj)
 	if err != nil {
 		return err
@@ -441,7 +426,7 @@ func (c *Cacher) GetToList(ctx context.Context, key string, resourceVersion stri
 	}
 	filter := filterFunction(key, pred)
 
-	obj, exists, readResourceVersion, err := c.watchCache.WaitUntilFreshAndGet(listRV, key, trace)
+	obj, exists, readResourceVersion, err := c.watchCache.WaitUntilFreshAndGet(resourceVersion, key, trace)
 	if err != nil {
 		return err
 	}
@@ -482,12 +467,7 @@ func (c *Cacher) List(ctx context.Context, key string, resourceVersion string, p
 	// If resourceVersion is specified, serve it from cache.
 	// It's guaranteed that the returned value is at least that
 	// fresh as the given resourceVersion.
-	listRV, err := c.versioner.ParseListResourceVersion(resourceVersion)
-	if err != nil {
-		return err
-	}
-
-	if listRV == 0 && !c.ready.check() {
+	if resourceVersion == "" && !c.ready.check() {
 		// If Cacher is not yet initialized and we don't require any specific
 		// minimal resource version, simply forward the request to storage.
 		return c.storage.List(ctx, key, resourceVersion, pred, listObj)
@@ -499,7 +479,7 @@ func (c *Cacher) List(ctx context.Context, key string, resourceVersion string, p
 	c.ready.wait()
 	trace.Step("Ready")
 
-	// List elements with at least 'listRV' from cache.
+	// List elements with at least 'resourceVersion' from cache.
 	listPtr, err := meta.GetItemsPtr(listObj)
 	if err != nil {
 		return err
@@ -510,7 +490,7 @@ func (c *Cacher) List(ctx context.Context, key string, resourceVersion string, p
 	}
 	filter := filterFunction(key, pred)
 
-	objs, readResourceVersion, err := c.watchCache.WaitUntilFreshAndList(listRV, trace)
+	objs, readResourceVersion, err := c.watchCache.WaitUntilFreshAndList(resourceVersion, trace)
 	if err != nil {
 		return err
 	}
@@ -706,11 +686,11 @@ func watchFilterFunction(key string, p SelectionPredicate) watchFilterFunc {
 }
 
 // Returns resource version to which the underlying cache is synced.
-func (c *Cacher) LastSyncResourceVersion() (uint64, error) {
+func (c *Cacher) LastSyncResourceVersion() string {
 	c.ready.wait()
 
 	resourceVersion := c.reflector.LastSyncResourceVersion()
-	return c.versioner.ParseListResourceVersion(resourceVersion)
+	return resourceVersion
 }
 
 // cacherListerWatcher opaques storage.Interface to expose cache.ListerWatcher.
@@ -794,7 +774,7 @@ type cacheWatcher struct {
 	versioner Versioner
 }
 
-func newCacheWatcher(resourceVersion uint64, chanSize int, initEvents []*watchCacheEvent, filter watchFilterFunc, forget func(bool), versioner Versioner) *cacheWatcher {
+func newCacheWatcher(resourceVersion string, chanSize int, initEvents []*watchCacheEvent, filter watchFilterFunc, forget func(bool), versioner Versioner) *cacheWatcher {
 	watcher := &cacheWatcher{
 		input:     make(chan *watchCacheEvent, chanSize),
 		result:    make(chan watch.Event, chanSize),
@@ -923,7 +903,7 @@ func (c *cacheWatcher) sendWatchCacheEvent(event *watchCacheEvent) {
 	}
 }
 
-func (c *cacheWatcher) process(initEvents []*watchCacheEvent, resourceVersion uint64) {
+func (c *cacheWatcher) process(initEvents []*watchCacheEvent, resourceVersion string) {
 	defer utilruntime.HandleCrash()
 
 	// Check how long we are processing initEvents.
@@ -961,7 +941,7 @@ func (c *cacheWatcher) process(initEvents []*watchCacheEvent, resourceVersion ui
 			return
 		}
 		// only send events newer than resourceVersion
-		if event.ResourceVersion > resourceVersion {
+		if c.versioner.CompareResourceVersion(event.ResourceVersion, resourceVersion) == 1 {
 			c.sendWatchCacheEvent(event)
 		}
 	}

@@ -53,7 +53,7 @@ func newTestWatchCache(capacity int) *watchCache {
 	getAttrsFunc := func(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
 		return nil, nil, false, nil
 	}
-	wc := newWatchCache(capacity, keyFunc, getAttrsFunc)
+	wc := newWatchCache(capacity, keyFunc, getAttrsFunc, testVersioner{})
 	wc.clock = clock.NewFakeClock(time.Now())
 	return wc
 }
@@ -135,7 +135,7 @@ func TestEvents(t *testing.T) {
 
 	// Test for Added event.
 	{
-		_, err := store.GetAllEventsSince(1)
+		_, err := store.GetAllEventsSince("1")
 		if err == nil {
 			t.Errorf("expected error too old")
 		}
@@ -144,7 +144,7 @@ func TestEvents(t *testing.T) {
 		}
 	}
 	{
-		result, err := store.GetAllEventsSince(2)
+		result, err := store.GetAllEventsSince("2")
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -168,13 +168,13 @@ func TestEvents(t *testing.T) {
 
 	// Test with not full cache.
 	{
-		_, err := store.GetAllEventsSince(1)
+		_, err := store.GetAllEventsSince("1")
 		if err == nil {
 			t.Errorf("expected error too old")
 		}
 	}
 	{
-		result, err := store.GetAllEventsSince(3)
+		result, err := store.GetAllEventsSince("3")
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -202,13 +202,13 @@ func TestEvents(t *testing.T) {
 
 	// Test with full cache - there should be elements from 5 to 9.
 	{
-		_, err := store.GetAllEventsSince(3)
+		_, err := store.GetAllEventsSince("3")
 		if err == nil {
 			t.Errorf("expected error too old")
 		}
 	}
 	{
-		result, err := store.GetAllEventsSince(4)
+		result, err := store.GetAllEventsSince("4")
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -227,7 +227,7 @@ func TestEvents(t *testing.T) {
 	store.Delete(makeTestPod("pod", uint64(10)))
 
 	{
-		result, err := store.GetAllEventsSince(9)
+		result, err := store.GetAllEventsSince("9")
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -257,11 +257,11 @@ func TestWaitUntilFreshAndList(t *testing.T) {
 		store.Add(makeTestPod("bar", 5))
 	}()
 
-	list, resourceVersion, err := store.WaitUntilFreshAndList(5, nil)
+	list, resourceVersion, err := store.WaitUntilFreshAndList("5", nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if resourceVersion != 5 {
+	if resourceVersion != "5" {
 		t.Errorf("unexpected resourceVersion: %v, expected: 5", resourceVersion)
 	}
 	if len(list) != 2 {
@@ -278,11 +278,11 @@ func TestWaitUntilFreshAndGet(t *testing.T) {
 		store.Add(makeTestPod("bar", 5))
 	}()
 
-	obj, exists, resourceVersion, err := store.WaitUntilFreshAndGet(5, "prefix/ns/bar", nil)
+	obj, exists, resourceVersion, err := store.WaitUntilFreshAndGet("5", "prefix/ns/bar", nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if resourceVersion != 5 {
+	if resourceVersion != "5" {
 		t.Errorf("unexpected resourceVersion: %v, expected: 5", resourceVersion)
 	}
 	if !exists {
@@ -311,7 +311,7 @@ func TestWaitUntilFreshAndListTimeout(t *testing.T) {
 		store.Add(makeTestPod("bar", 5))
 	}()
 
-	_, _, err := store.WaitUntilFreshAndList(5, nil)
+	_, _, err := store.WaitUntilFreshAndList("5", nil)
 	if err == nil {
 		t.Fatalf("unexpected lack of timeout error")
 	}
@@ -333,11 +333,11 @@ func TestReflectorForWatchCache(t *testing.T) {
 	store := newTestWatchCache(5)
 
 	{
-		_, version, err := store.WaitUntilFreshAndList(0, nil)
+		_, version, err := store.WaitUntilFreshAndList("", nil)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		if version != 0 {
+		if version != "" {
 			t.Errorf("unexpected resource version: %d", version)
 		}
 	}
@@ -356,11 +356,11 @@ func TestReflectorForWatchCache(t *testing.T) {
 	r.ListAndWatch(wait.NeverStop)
 
 	{
-		_, version, err := store.WaitUntilFreshAndList(10, nil)
+		_, version, err := store.WaitUntilFreshAndList("10", nil)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		if version != 10 {
+		if version != "10" {
 			t.Errorf("unexpected resource version: %d", version)
 		}
 	}

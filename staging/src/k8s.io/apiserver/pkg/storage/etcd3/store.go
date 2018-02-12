@@ -65,7 +65,7 @@ type store struct {
 	// to all Get() calls.
 	getOps        []clientv3.OpOption
 	codec         runtime.Codec
-	versioner     storage.Versioner
+	versioner     etcd.APIObjectVersioner
 	transformer   value.Transformer
 	pathPrefix    string
 	watcher       *watcher
@@ -409,7 +409,7 @@ func (s *store) GetToList(ctx context.Context, key string, resourceVersion strin
 		return err
 	}
 	// update version with cluster level revision
-	return s.versioner.UpdateList(listObj, uint64(getResp.Header.Revision), "")
+	return s.versioner.UpdateListEtcdVersion(listObj, uint64(getResp.Header.Revision), "")
 }
 
 // continueToken is a simple structured object for encoding the state of a continue token.
@@ -616,11 +616,11 @@ func (s *store) List(ctx context.Context, key, resourceVersion string, pred stor
 		if err != nil {
 			return err
 		}
-		return s.versioner.UpdateList(listObj, uint64(returnedRV), next)
+		return s.versioner.UpdateListEtcdVersion(listObj, uint64(returnedRV), next)
 	}
 
 	// no continuation
-	return s.versioner.UpdateList(listObj, uint64(returnedRV), "")
+	return s.versioner.UpdateListEtcdVersion(listObj, uint64(returnedRV), "")
 }
 
 // growSlice takes a slice value and grows its capacity up
@@ -691,7 +691,7 @@ func (s *store) getState(getResp *clientv3.GetResponse, key string, v reflect.Va
 			return nil, storage.NewInternalError(err.Error())
 		}
 		state.rev = getResp.Kvs[0].ModRevision
-		state.meta.ResourceVersion = uint64(state.rev)
+		state.meta.ResourceVersion = s.versioner.EtcdRVToDisplayRV(uint64(state.rev))
 		state.data = data
 		state.stale = stale
 		if err := decode(s.codec, s.versioner, state.data, state.obj, state.rev); err != nil {
@@ -712,7 +712,7 @@ func (s *store) getStateFromObject(obj runtime.Object) (*objState, error) {
 		return nil, fmt.Errorf("couldn't get resource version: %v", err)
 	}
 	state.rev = int64(rv)
-	state.meta.ResourceVersion = uint64(state.rev)
+	state.meta.ResourceVersion = s.versioner.EtcdRVToDisplayRV(uint64(state.rev))
 
 	// Compute the serialized form - for that we need to temporarily clean
 	// its resource version field (those are not stored in etcd).
@@ -723,7 +723,7 @@ func (s *store) getStateFromObject(obj runtime.Object) (*objState, error) {
 	if err != nil {
 		return nil, err
 	}
-	s.versioner.UpdateObject(state.obj, uint64(rv))
+	s.versioner.UpdateObjectEtcdVersion(state.obj, uint64(rv))
 	return state, nil
 }
 
@@ -760,7 +760,7 @@ func (s *store) ttlOpts(ctx context.Context, ttl int64) ([]clientv3.OpOption, er
 
 // decode decodes value of bytes into object. It will also set the object resource version to rev.
 // On success, objPtr would be set to the object.
-func decode(codec runtime.Codec, versioner storage.Versioner, value []byte, objPtr runtime.Object, rev int64) error {
+func decode(codec runtime.Codec, versioner etcd.APIObjectVersioner, value []byte, objPtr runtime.Object, rev int64) error {
 	if _, err := conversion.EnforcePtr(objPtr); err != nil {
 		panic("unable to convert output object to pointer")
 	}
@@ -769,18 +769,18 @@ func decode(codec runtime.Codec, versioner storage.Versioner, value []byte, objP
 		return err
 	}
 	// being unable to set the version does not prevent the object from being extracted
-	versioner.UpdateObject(objPtr, uint64(rev))
+	versioner.UpdateObjectEtcdVersion(objPtr, uint64(rev))
 	return nil
 }
 
 // appendListItem decodes and appends the object (if it passes filter) to v, which must be a slice.
-func appendListItem(v reflect.Value, data []byte, rev uint64, pred storage.SelectionPredicate, codec runtime.Codec, versioner storage.Versioner) error {
+func appendListItem(v reflect.Value, data []byte, rev uint64, pred storage.SelectionPredicate, codec runtime.Codec, versioner etcd.APIObjectVersioner) error {
 	obj, _, err := codec.Decode(data, nil, reflect.New(v.Type().Elem()).Interface().(runtime.Object))
 	if err != nil {
 		return err
 	}
 	// being unable to set the version does not prevent the object from being extracted
-	versioner.UpdateObject(obj, rev)
+	versioner.UpdateObjectEtcdVersion(obj, rev)
 	if matched, err := pred.Matches(obj); err == nil && matched {
 		v.Set(reflect.Append(v, reflect.ValueOf(obj).Elem()))
 	}

@@ -19,7 +19,6 @@ package storage
 import (
 	"fmt"
 	"sort"
-	"strconv"
 	"sync"
 	"time"
 
@@ -57,7 +56,7 @@ type watchCacheEvent struct {
 	PrevObjFields        fields.Set
 	PrevObjUninitialized bool
 	Key                  string
-	ResourceVersion      uint64
+	ResourceVersion      string
 }
 
 // Computing a key of an object is generally non-trivial (it performs
@@ -81,7 +80,7 @@ func storeElementKey(obj interface{}) (string, error) {
 // It contains the resource version of the object and the object
 // itself.
 type watchCacheElement struct {
-	resourceVersion uint64
+	resourceVersion string
 	watchCacheEvent *watchCacheEvent
 }
 
@@ -122,7 +121,7 @@ type watchCache struct {
 	store cache.Store
 
 	// ResourceVersion up to which the watchCache is propagated.
-	resourceVersion uint64
+	resourceVersion string
 
 	// This handler is run at the end of every successful Replace() method.
 	onReplace func()
@@ -133,12 +132,16 @@ type watchCache struct {
 
 	// for testing timeouts.
 	clock clock.Clock
+
+	// An underlying storage.Versioner.
+	versioner Versioner
 }
 
 func newWatchCache(
 	capacity int,
 	keyFunc func(runtime.Object) (string, error),
-	getAttrsFunc func(runtime.Object) (labels.Set, fields.Set, bool, error)) *watchCache {
+	getAttrsFunc func(runtime.Object) (labels.Set, fields.Set, bool, error),
+	versioner Versioner) *watchCache {
 	wc := &watchCache{
 		capacity:        capacity,
 		keyFunc:         keyFunc,
@@ -147,8 +150,9 @@ func newWatchCache(
 		startIndex:      0,
 		endIndex:        0,
 		store:           cache.NewStore(storeElementKey),
-		resourceVersion: 0,
+		resourceVersion: "",
 		clock:           clock.RealClock{},
+		versioner:       versioner,
 	}
 	wc.cond = sync.NewCond(wc.RLocker())
 	return wc
@@ -156,7 +160,7 @@ func newWatchCache(
 
 // Add takes runtime.Object as an argument.
 func (w *watchCache) Add(obj interface{}) error {
-	object, resourceVersion, err := objectToVersionedRuntimeObject(obj)
+	object, resourceVersion, err := w.objectToVersionedRuntimeObject(obj)
 	if err != nil {
 		return err
 	}
@@ -168,7 +172,7 @@ func (w *watchCache) Add(obj interface{}) error {
 
 // Update takes runtime.Object as an argument.
 func (w *watchCache) Update(obj interface{}) error {
-	object, resourceVersion, err := objectToVersionedRuntimeObject(obj)
+	object, resourceVersion, err := w.objectToVersionedRuntimeObject(obj)
 	if err != nil {
 		return err
 	}
@@ -180,7 +184,7 @@ func (w *watchCache) Update(obj interface{}) error {
 
 // Delete takes runtime.Object as an argument.
 func (w *watchCache) Delete(obj interface{}) error {
-	object, resourceVersion, err := objectToVersionedRuntimeObject(obj)
+	object, resourceVersion, err := w.objectToVersionedRuntimeObject(obj)
 	if err != nil {
 		return err
 	}
@@ -190,31 +194,20 @@ func (w *watchCache) Delete(obj interface{}) error {
 	return w.processEvent(event, resourceVersion, f)
 }
 
-func objectToVersionedRuntimeObject(obj interface{}) (runtime.Object, uint64, error) {
+func (w *watchCache) objectToVersionedRuntimeObject(obj interface{}) (runtime.Object, string, error) {
 	object, ok := obj.(runtime.Object)
 	if !ok {
-		return nil, 0, fmt.Errorf("obj does not implement runtime.Object interface: %v", obj)
+		return nil, "", fmt.Errorf("obj does not implement runtime.Object interface: %v", obj)
 	}
 	meta, err := meta.Accessor(object)
 	if err != nil {
-		return nil, 0, err
+		return nil, "", err
 	}
-	resourceVersion, err := parseResourceVersion(meta.GetResourceVersion())
-	if err != nil {
-		return nil, 0, err
-	}
+	resourceVersion := meta.GetResourceVersion()
 	return object, resourceVersion, nil
 }
 
-func parseResourceVersion(resourceVersion string) (uint64, error) {
-	if resourceVersion == "" {
-		return 0, nil
-	}
-	// Use bitsize being the size of int on the machine.
-	return strconv.ParseUint(resourceVersion, 10, 0)
-}
-
-func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64, updateFunc func(*storeElement) error) error {
+func (w *watchCache) processEvent(event watch.Event, resourceVersion string, updateFunc func(*storeElement) error) error {
 	key, err := w.keyFunc(event.Object)
 	if err != nil {
 		return fmt.Errorf("couldn't compute key: %v", err)
@@ -269,7 +262,7 @@ func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64, upd
 }
 
 // Assumes that lock is already held for write.
-func (w *watchCache) updateCache(resourceVersion uint64, event *watchCacheEvent) {
+func (w *watchCache) updateCache(resourceVersion string, event *watchCacheEvent) {
 	if w.endIndex == w.startIndex+w.capacity {
 		// Cache is full - remove the oldest element.
 		w.startIndex++
@@ -286,7 +279,7 @@ func (w *watchCache) List() []interface{} {
 // waitUntilFreshAndBlock waits until cache is at least as fresh as given <resourceVersion>.
 // NOTE: This function acquired lock and doesn't release it.
 // You HAVE TO explicitly call w.RUnlock() after this function.
-func (w *watchCache) waitUntilFreshAndBlock(resourceVersion uint64, trace *utiltrace.Trace) error {
+func (w *watchCache) waitUntilFreshAndBlock(resourceVersion string, trace *utiltrace.Trace) error {
 	startTime := w.clock.Now()
 	go func() {
 		// Wake us up when the time limit has expired.  The docs
@@ -304,7 +297,7 @@ func (w *watchCache) waitUntilFreshAndBlock(resourceVersion uint64, trace *utilt
 	if trace != nil {
 		trace.Step("watchCache locked acquired")
 	}
-	for w.resourceVersion < resourceVersion {
+	for w.versioner.CompareResourceVersion(w.resourceVersion, resourceVersion) == -1 {
 		if w.clock.Since(startTime) >= blockTimeout {
 			// Timeout with retry after 1 second.
 			return errors.NewTimeoutError(fmt.Sprintf("Too large resource version: %v, current: %v", resourceVersion, w.resourceVersion), 1)
@@ -318,21 +311,21 @@ func (w *watchCache) waitUntilFreshAndBlock(resourceVersion uint64, trace *utilt
 }
 
 // WaitUntilFreshAndList returns list of pointers to <storeElement> objects.
-func (w *watchCache) WaitUntilFreshAndList(resourceVersion uint64, trace *utiltrace.Trace) ([]interface{}, uint64, error) {
+func (w *watchCache) WaitUntilFreshAndList(resourceVersion string, trace *utiltrace.Trace) ([]interface{}, string, error) {
 	err := w.waitUntilFreshAndBlock(resourceVersion, trace)
 	defer w.RUnlock()
 	if err != nil {
-		return nil, 0, err
+		return nil, "", err
 	}
 	return w.store.List(), w.resourceVersion, nil
 }
 
 // WaitUntilFreshAndGet returns a pointers to <storeElement> object.
-func (w *watchCache) WaitUntilFreshAndGet(resourceVersion uint64, key string, trace *utiltrace.Trace) (interface{}, bool, uint64, error) {
+func (w *watchCache) WaitUntilFreshAndGet(resourceVersion string, key string, trace *utiltrace.Trace) (interface{}, bool, string, error) {
 	err := w.waitUntilFreshAndBlock(resourceVersion, trace)
 	defer w.RUnlock()
 	if err != nil {
-		return nil, false, 0, err
+		return nil, false, "", err
 	}
 	value, exists, err := w.store.GetByKey(key)
 	return value, exists, w.resourceVersion, err
@@ -364,11 +357,6 @@ func (w *watchCache) GetByKey(key string) (interface{}, bool, error) {
 
 // Replace takes slice of runtime.Object as a paramater.
 func (w *watchCache) Replace(objs []interface{}, resourceVersion string) error {
-	version, err := parseResourceVersion(resourceVersion)
-	if err != nil {
-		return err
-	}
-
 	toReplace := make([]interface{}, 0, len(objs))
 	for _, obj := range objs {
 		object, ok := obj.(runtime.Object)
@@ -390,7 +378,7 @@ func (w *watchCache) Replace(objs []interface{}, resourceVersion string) error {
 	if err := w.store.Replace(toReplace, resourceVersion); err != nil {
 		return err
 	}
-	w.resourceVersion = version
+	w.resourceVersion = resourceVersion
 	if w.onReplace != nil {
 		w.onReplace()
 	}
@@ -410,15 +398,18 @@ func (w *watchCache) SetOnEvent(onEvent func(*watchCacheEvent)) {
 	w.onEvent = onEvent
 }
 
-func (w *watchCache) GetAllEventsSinceThreadUnsafe(resourceVersion uint64) ([]*watchCacheEvent, error) {
+func (w *watchCache) GetAllEventsSinceThreadUnsafe(resourceVersion string) ([]*watchCacheEvent, error) {
 	size := w.endIndex - w.startIndex
 	// if we have no watch events in our cache, the oldest one we can successfully deliver to a watcher
 	// is the *next* event we'll receive, which will be at least one greater than our current resourceVersion
-	oldest := w.resourceVersion + 1
+	oldest, err := w.versioner.NextResourceVersion(w.resourceVersion)
+	if err != nil {
+		return nil, err
+	}
 	if size > 0 {
 		oldest = w.cache[w.startIndex%w.capacity].resourceVersion
 	}
-	if resourceVersion == 0 {
+	if resourceVersion == "" || resourceVersion == "0" {
 		// resourceVersion = 0 means that we don't require any specific starting point
 		// and we would like to start watching from ~now.
 		// However, to keep backward compatibility, we additionally need to return the
@@ -448,13 +439,17 @@ func (w *watchCache) GetAllEventsSinceThreadUnsafe(resourceVersion uint64) ([]*w
 		}
 		return result, nil
 	}
-	if resourceVersion < oldest-1 {
-		return nil, errors.NewGone(fmt.Sprintf("too old resource version: %d (%d)", resourceVersion, oldest-1))
+	beforeOldest, err := w.versioner.LastResourceVersion(oldest)
+	if err != nil {
+		return nil, err
+	}
+	if w.versioner.CompareResourceVersion(resourceVersion, beforeOldest) == -1 {
+		return nil, errors.NewGone(fmt.Sprintf("too old resource version: %q (%q)", resourceVersion, beforeOldest))
 	}
 
 	// Binary search the smallest index at which resourceVersion is greater than the given one.
 	f := func(i int) bool {
-		return w.cache[(w.startIndex+i)%w.capacity].resourceVersion > resourceVersion
+		return w.versioner.CompareResourceVersion(w.cache[(w.startIndex+i)%w.capacity].resourceVersion, resourceVersion) == 1
 	}
 	first := sort.Search(size, f)
 	result := make([]*watchCacheEvent, size-first)
@@ -464,7 +459,7 @@ func (w *watchCache) GetAllEventsSinceThreadUnsafe(resourceVersion uint64) ([]*w
 	return result, nil
 }
 
-func (w *watchCache) GetAllEventsSince(resourceVersion uint64) ([]*watchCacheEvent, error) {
+func (w *watchCache) GetAllEventsSince(resourceVersion string) ([]*watchCacheEvent, error) {
 	w.RLock()
 	defer w.RUnlock()
 	return w.GetAllEventsSinceThreadUnsafe(resourceVersion)

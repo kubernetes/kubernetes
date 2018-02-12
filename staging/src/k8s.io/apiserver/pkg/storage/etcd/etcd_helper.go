@@ -85,7 +85,7 @@ type etcdHelper struct {
 	// The public constructors (NewStorage & NewEtcdStorage) are setting it
 	// correctly, so be careful when manipulating with it manually.
 	// optional, has to be set to perform any atomic operations
-	versioner storage.Versioner
+	versioner APIObjectVersioner
 	// prefix for all etcd keys
 	pathPrefix string
 	// if true,  perform quorum read
@@ -325,7 +325,7 @@ func (h *etcdHelper) extractObj(response *etcd.Response, inErr error, objPtr run
 		return body, nil, stale, fmt.Errorf("unable to decode object %s into %v", gvk.String(), reflect.TypeOf(objPtr))
 	}
 	// being unable to set the version does not prevent the object from being extracted
-	_ = h.versioner.UpdateObject(objPtr, node.ModifiedIndex)
+	_ = h.versioner.UpdateObjectEtcdVersion(objPtr, node.ModifiedIndex)
 	return body, node, stale, err
 }
 
@@ -363,7 +363,7 @@ func (h *etcdHelper) GetToList(ctx context.Context, key string, resourceVersion 
 		return err
 	}
 	trace.Step("Object decoded")
-	if err := h.versioner.UpdateList(listObj, response.Index, ""); err != nil {
+	if err := h.versioner.UpdateListEtcdVersion(listObj, response.Index, ""); err != nil {
 		return err
 	}
 	return nil
@@ -406,7 +406,7 @@ func (h *etcdHelper) decodeNodeList(nodes []*etcd.Node, pred storage.SelectionPr
 				return err
 			}
 			// being unable to set the version does not prevent the object from being extracted
-			_ = h.versioner.UpdateObject(obj, node.ModifiedIndex)
+			_ = h.versioner.UpdateObjectEtcdVersion(obj, node.ModifiedIndex)
 			if matched, err := pred.Matches(obj); err == nil && matched {
 				v.Set(reflect.Append(v, reflect.ValueOf(obj).Elem()))
 			}
@@ -443,7 +443,7 @@ func (h *etcdHelper) List(ctx context.Context, key string, resourceVersion strin
 		return err
 	}
 	trace.Step("Node list decoded")
-	if err := h.versioner.UpdateList(listObj, index, ""); err != nil {
+	if err := h.versioner.UpdateListEtcdVersion(listObj, index, ""); err != nil {
 		return err
 	}
 	return nil
@@ -500,7 +500,7 @@ func (h *etcdHelper) GuaranteedUpdate(
 		meta := storage.ResponseMeta{}
 		if node != nil {
 			meta.TTL = node.TTL
-			meta.ResourceVersion = node.ModifiedIndex
+			meta.ResourceVersion = h.versioner.EtcdRVToDisplayRV(node.ModifiedIndex)
 		}
 		// Get the object to be written by calling tryUpdate.
 		ret, newTTL, err := tryUpdate(obj, meta)

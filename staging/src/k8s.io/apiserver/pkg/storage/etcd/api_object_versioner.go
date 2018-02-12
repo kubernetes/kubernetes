@@ -30,32 +30,36 @@ import (
 type APIObjectVersioner struct{}
 
 // UpdateObject implements Versioner
-func (a APIObjectVersioner) UpdateObject(obj runtime.Object, resourceVersion uint64) error {
+func (a APIObjectVersioner) UpdateObject(obj runtime.Object, resourceVersion string) error {
 	accessor, err := meta.Accessor(obj)
 	if err != nil {
 		return err
 	}
-	versionString := ""
-	if resourceVersion != 0 {
-		versionString = strconv.FormatUint(resourceVersion, 10)
-	}
-	accessor.SetResourceVersion(versionString)
+	accessor.SetResourceVersion(resourceVersion)
 	return nil
 }
 
 // UpdateList implements Versioner
-func (a APIObjectVersioner) UpdateList(obj runtime.Object, resourceVersion uint64, nextKey string) error {
+func (a APIObjectVersioner) UpdateList(obj runtime.Object, resourceVersion string, nextKey string) error {
 	listAccessor, err := meta.ListAccessor(obj)
 	if err != nil || listAccessor == nil {
 		return err
 	}
-	versionString := ""
-	if resourceVersion != 0 {
-		versionString = strconv.FormatUint(resourceVersion, 10)
-	}
-	listAccessor.SetResourceVersion(versionString)
+	listAccessor.SetResourceVersion(resourceVersion)
 	listAccessor.SetContinue(nextKey)
 	return nil
+}
+
+// UpdateObjectEtcdVersion calls first converts etcdResourceVersion to a string then calls UpdateObject
+func (a APIObjectVersioner) UpdateObjectEtcdVersion(obj runtime.Object, etcdResourceVersion uint64) error {
+	resourceVersion := a.EtcdRVToDisplayRV(etcdResourceVersion)
+	return a.UpdateObject(obj, resourceVersion)
+}
+
+// UpdateListEtcdVersion calls first converts etcdResourceVersion to a string then calls UpdateList
+func (a APIObjectVersioner) UpdateListEtcdVersion(obj runtime.Object, etcdResourceVersion uint64, nextKey string) error {
+	resourceVersion := a.EtcdRVToDisplayRV(etcdResourceVersion)
+	return a.UpdateList(obj, resourceVersion, nextKey)
 }
 
 // PrepareObjectForStorage clears resource version and self link prior to writing to etcd.
@@ -75,11 +79,9 @@ func (a APIObjectVersioner) ObjectResourceVersion(obj runtime.Object) (uint64, e
 	if err != nil {
 		return 0, err
 	}
-	version := accessor.GetResourceVersion()
-	if len(version) == 0 {
-		return 0, nil
-	}
-	return strconv.ParseUint(version, 10, 64)
+	resourceVersion := accessor.GetResourceVersion()
+	etcdResourceVersion, err := a.DisplayRVToEtcdRV(resourceVersion)
+	return etcdResourceVersion, err
 }
 
 // ParseWatchResourceVersion takes a resource version argument and converts it to
@@ -87,10 +89,7 @@ func (a APIObjectVersioner) ObjectResourceVersion(obj runtime.Object) (uint64, e
 // an opaque value, the default watch behavior for non-zero watch is to watch
 // the next value (if you pass "1", you will see updates from "2" onwards).
 func (a APIObjectVersioner) ParseWatchResourceVersion(resourceVersion string) (uint64, error) {
-	if resourceVersion == "" || resourceVersion == "0" {
-		return 0, nil
-	}
-	version, err := strconv.ParseUint(resourceVersion, 10, 64)
+	etcdResourceVersion, err := a.DisplayRVToEtcdRV(resourceVersion)
 	if err != nil {
 		return 0, storage.NewInvalidError(field.ErrorList{
 			// Validation errors are supposed to return version-specific field
@@ -98,7 +97,7 @@ func (a APIObjectVersioner) ParseWatchResourceVersion(resourceVersion string) (u
 			field.Invalid(field.NewPath("resourceVersion"), resourceVersion, err.Error()),
 		})
 	}
-	return version, nil
+	return etcdResourceVersion, nil
 }
 
 // ParseListResourceVersion takes a resource version argument and converts it to
@@ -106,10 +105,7 @@ func (a APIObjectVersioner) ParseWatchResourceVersion(resourceVersion string) (u
 // TODO: reevaluate whether it is really clearer to have both this and the
 // Watch version of this function, since they perform the same logic.
 func (a APIObjectVersioner) ParseListResourceVersion(resourceVersion string) (uint64, error) {
-	if resourceVersion == "" {
-		return 0, nil
-	}
-	version, err := strconv.ParseUint(resourceVersion, 10, 64)
+	etcdResourceVersion, err := a.DisplayRVToEtcdRV(resourceVersion)
 	if err != nil {
 		return 0, storage.NewInvalidError(field.ErrorList{
 			// Validation errors are supposed to return version-specific field
@@ -117,21 +113,20 @@ func (a APIObjectVersioner) ParseListResourceVersion(resourceVersion string) (ui
 			field.Invalid(field.NewPath("resourceVersion"), resourceVersion, err.Error()),
 		})
 	}
-	return version, nil
+	return etcdResourceVersion, nil
 }
 
 // APIObjectVersioner implements Versioner
 var Versioner storage.Versioner = APIObjectVersioner{}
 
-// CompareResourceVersion compares etcd resource versions.  Outside this API they are all strings,
-// but etcd resource versions are special, they're actually ints, so we can easily compare them.
-func (a APIObjectVersioner) CompareResourceVersion(lhs, rhs runtime.Object) int {
-	lhsVersion, err := Versioner.ObjectResourceVersion(lhs)
+// CompareObjectResourceVersion compares etcd resource versions of two objects.
+func (a APIObjectVersioner) CompareObjectResourceVersion(lhs, rhs runtime.Object) int {
+	lhsVersion, err := a.ObjectResourceVersion(lhs)
 	if err != nil {
 		// coder error
 		panic(err)
 	}
-	rhsVersion, err := Versioner.ObjectResourceVersion(rhs)
+	rhsVersion, err := a.ObjectResourceVersion(rhs)
 	if err != nil {
 		// coder error
 		panic(err)
@@ -145,4 +140,62 @@ func (a APIObjectVersioner) CompareResourceVersion(lhs, rhs runtime.Object) int 
 	}
 
 	return 1
+}
+
+// CompareResourceVersion compares etcd resource versions.  Outside this API they are all strings,
+// but etcd resource versions are special, they're actually ints, so we can easily compare them.
+func (a APIObjectVersioner) CompareResourceVersion(lhs, rhs string) int {
+	lhsVersion, err := a.DisplayRVToEtcdRV(lhs)
+	if err != nil {
+		// coder error
+		panic(err)
+	}
+	rhsVersion, err := a.DisplayRVToEtcdRV(rhs)
+	if err != nil {
+		// coder error
+		panic(err)
+	}
+
+	if lhsVersion == rhsVersion {
+		return 0
+	}
+	if lhsVersion < rhsVersion {
+		return -1
+	}
+
+	return 1
+}
+
+// NextResourceVersion implements Versioner.
+func (a APIObjectVersioner) NextResourceVersion(resourceVersion string) (string, error) {
+	etcdResourceVersion, err := a.DisplayRVToEtcdRV(resourceVersion)
+	if err != nil {
+		return "", err
+	}
+	return a.EtcdRVToDisplayRV(etcdResourceVersion + 1), nil
+}
+
+// LastResourceVersion implements Versioner.
+func (a APIObjectVersioner) LastResourceVersion(resourceVersion string) (string, error) {
+	etcdResourceVersion, err := a.DisplayRVToEtcdRV(resourceVersion)
+	if err != nil {
+		return "", err
+	}
+	return a.EtcdRVToDisplayRV(etcdResourceVersion - 1), nil
+}
+
+// EtcdRVToDisplayRV takes a uint64 and formats it to a string, or returns "" if the value is 0
+func (a APIObjectVersioner) EtcdRVToDisplayRV(versionUint uint64) string {
+	if versionUint == 0 {
+		return ""
+	}
+	return strconv.FormatUint(versionUint, 10)
+}
+
+// DisplayRVToEtcdRV takes a string and parses it's value as a uint64, or returns 0 if the string is ""
+func (a APIObjectVersioner) DisplayRVToEtcdRV(versionString string) (uint64, error) {
+	if versionString == "" {
+		return 0, nil
+	}
+	return strconv.ParseUint(versionString, 10, 64)
 }

@@ -71,7 +71,7 @@ type etcdWatcher struct {
 	// Note that versioner is required for etcdWatcher to work correctly.
 	// There is no public constructor of it, so be careful when manipulating
 	// with it manually.
-	versioner        storage.Versioner
+	versioner        APIObjectVersioner
 	transform        TransformFunc
 	valueTransformer ValueTransformer
 
@@ -106,7 +106,7 @@ const watchWaitDuration = 100 * time.Millisecond
 // newEtcdWatcher returns a new etcdWatcher; if list is true, watch sub-nodes.
 // The versioner must be able to handle the objects that transform creates.
 func newEtcdWatcher(list bool, quorum bool, include includeFunc, pred storage.SelectionPredicate,
-	encoding runtime.Codec, versioner storage.Versioner, transform TransformFunc,
+	encoding runtime.Codec, versioner APIObjectVersioner, transform TransformFunc,
 	valueTransformer ValueTransformer, cache etcdCache) *etcdWatcher {
 	w := &etcdWatcher{
 		encoding:         encoding,
@@ -328,7 +328,7 @@ func (w *etcdWatcher) decodeObject(node *etcd.Node) (runtime.Object, error) {
 	}
 
 	// ensure resource version is set on the object we load from etcd
-	if err := w.versioner.UpdateObject(obj, node.ModifiedIndex); err != nil {
+	if err := w.versioner.UpdateObjectEtcdVersion(obj, node.ModifiedIndex); err != nil {
 		utilruntime.HandleError(fmt.Errorf("failure to version api object (%d) %#v: %v", node.ModifiedIndex, obj, err))
 	}
 
@@ -398,7 +398,7 @@ func (w *etcdWatcher) sendModify(res *etcd.Response) {
 	if res.PrevNode != nil && res.PrevNode.Value != "" {
 		// Ignore problems reading the old object.
 		if oldObj, err = w.decodeObject(res.PrevNode); err == nil {
-			if err := w.versioner.UpdateObject(oldObj, res.Node.ModifiedIndex); err != nil {
+			if err := w.versioner.UpdateObjectEtcdVersion(oldObj, res.Node.ModifiedIndex); err != nil {
 				utilruntime.HandleError(fmt.Errorf("failure to version api object (%d) %#v: %v", res.Node.ModifiedIndex, oldObj, err))
 			}
 			if matched, err := w.pred.Matches(oldObj); err == nil && matched {

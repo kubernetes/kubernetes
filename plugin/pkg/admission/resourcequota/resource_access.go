@@ -101,7 +101,7 @@ func (e *quotaAccessor) checkCache(quota *api.ResourceQuota) *api.ResourceQuota 
 	}
 	cachedQuota := uncastCachedQuota.(*api.ResourceQuota)
 
-	if etcdVersioner.CompareResourceVersion(quota, cachedQuota) >= 0 {
+	if etcdVersioner.CompareObjectResourceVersion(quota, cachedQuota) >= 0 {
 		e.updatedQuotas.Remove(key)
 		return quota
 	}

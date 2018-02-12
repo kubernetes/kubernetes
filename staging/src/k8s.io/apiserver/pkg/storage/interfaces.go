@@ -35,12 +35,12 @@ type Versioner interface {
 	// UpdateObject sets storage metadata into an API object. Returns an error if the object
 	// cannot be updated correctly. May return nil if the requested object does not need metadata
 	// from database.
-	UpdateObject(obj runtime.Object, resourceVersion uint64) error
+	UpdateObject(obj runtime.Object, resourceVersion string) error
 	// UpdateList sets the resource version into an API list object. Returns an error if the object
 	// cannot be updated correctly. May return nil if the requested object does not need metadata
 	// from database. continueValue is optional and indicates that more results are available if
 	// the client passes that value to the server in a subsequent call.
-	UpdateList(obj runtime.Object, resourceVersion uint64, continueValue string) error
+	UpdateList(obj runtime.Object, resourceVersion string, continueValue string) error
 	// PrepareObjectForStorage should set SelfLink and ResourceVersion to the empty value. Should
 	// return an error if the specified object cannot be updated.
 	PrepareObjectForStorage(obj runtime.Object) error
@@ -48,16 +48,15 @@ type Versioner interface {
 	// Should return an error if the specified object does not have a persistable version.
 	ObjectResourceVersion(obj runtime.Object) (uint64, error)
 
-	// ParseWatchResourceVersion takes a resource version argument and
-	// converts it to the storage backend we should pass to helper.Watch().
-	// Because resourceVersion is an opaque value, the default watch
-	// behavior for non-zero watch is to watch the next value (if you pass
-	// "1", you will see updates from "2" onwards).
-	ParseWatchResourceVersion(resourceVersion string) (uint64, error)
-	// ParseListResourceVersion takes a resource version argument and
-	// converts it to the storage backend version. Appropriate for
-	// everything that's not intended as an argument for watch.
-	ParseListResourceVersion(resourceVersion string) (uint64, error)
+	// CompareResourceVersion compares two resource versions and returns 1 if lhs is newer than rhs,
+	// -1 if lhs is older than rhs, and 0 if lhs == rhs.
+	CompareResourceVersion(lhs, rhs string) int
+	// NextResourceVersion takes a resource version argument and returns the resource version which
+	// will occur one revision later.
+	NextResourceVersion(resourceVersion string) (string, error)
+	// LastResourceVersion takes a resource version argument and returns the resource version which
+	// occurred one revision earlier.
+	LastResourceVersion(resourceVersion string) (string, error)
 }
 
 // ResponseMeta contains information about the database metadata that is associated with
@@ -69,7 +68,7 @@ type ResponseMeta struct {
 	// expiration time due to server lag).
 	TTL int64
 	// The resource version of the node that contained the returned object.
-	ResourceVersion uint64
+	ResourceVersion string
 }
 
 // MatchValue defines a pair (<index name>, <value for that index>).

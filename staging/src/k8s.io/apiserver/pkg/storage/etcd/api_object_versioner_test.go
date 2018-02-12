@@ -33,7 +33,7 @@ func TestObjectVersioner(t *testing.T) {
 		t.Errorf("unexpected version: %d %v", ver, err)
 	}
 	obj := &storagetesting.TestResource{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "a"}}
-	if err := v.UpdateObject(obj, 5); err != nil {
+	if err := v.UpdateObject(obj, "5"); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if obj.ResourceVersion != "5" || obj.DeletionTimestamp != nil {
@@ -79,8 +79,8 @@ func TestEtcdParseResourceVersion(t *testing.T) {
 }
 
 func TestCompareResourceVersion(t *testing.T) {
-	five := &storagetesting.TestResource{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "5"}}
-	six := &storagetesting.TestResource{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "6"}}
+	five := "5"
+	six := "6"
 
 	versioner := APIObjectVersioner{}
 
